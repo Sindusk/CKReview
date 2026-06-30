@@ -1,0 +1,14 @@
+[
+  {
+    "id": "tank",
+    "name": "Tank"
+  },
+  {
+    "id": "healer",
+    "name": "Healer"
+  },
+  {
+    "id": "dps",
+    "name": "DPS"
+  }
+]

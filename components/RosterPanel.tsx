@@ -319,7 +319,7 @@ export default function RosterPanel({ players }: RosterPanelProps) {
           overflowY: "hidden",
           display: "flex",
           gap: "8px",
-          padding: "8px 8px 20px",
+          padding: "8px 8px 28px",
           boxSizing: "border-box",
         }}
       >

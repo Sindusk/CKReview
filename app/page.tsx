@@ -94,6 +94,13 @@ export default function Home() {
     );
   }
 
+  function handleResetImportState() {
+    setImportError(null);
+    setImportProgress(0);
+    setImportStatus(null);
+    setLoadedReportCode(null);
+  }
+
   async function handleImportReport(reportCode: string) {
     setImporting(true);
     setImportError(null);
@@ -183,6 +190,7 @@ export default function Home() {
           loadedReportCode={loadedReportCode}
           error={importError}
           onImport={handleImportReport}
+          onReset={handleResetImportState}
         />
       </div>
 
@@ -345,6 +353,7 @@ function WCLImportBar({
   loadedReportCode,
   error,
   onImport,
+  onReset,
 }: {
   importing: boolean;
   importProgress: number;
@@ -352,6 +361,7 @@ function WCLImportBar({
   loadedReportCode: string | null;
   error: string | null;
   onImport: (code: string) => void;
+  onReset: () => void;
 }) {
   const [code, setCode] = useState("");
 
@@ -364,19 +374,37 @@ function WCLImportBar({
 
   if (loadedReportCode && !importing) {
     return (
-      <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: 1 }}>
-        <span
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", flex: 1 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <span
+            style={{
+              padding: "6px 12px",
+              borderRadius: "999px",
+              backgroundColor: "#1e293b",
+              color: "#93c5fd",
+              fontSize: "12px",
+              fontWeight: 600,
+            }}
+          >
+            Log Loaded: {loadedReportCode}
+          </span>
+          <span style={{ fontSize: "11px", color: "#94a3b8" }}>Ready for review</span>
+        </div>
+        <button
+          onClick={onReset}
           style={{
-            padding: "6px 12px",
-            borderRadius: "999px",
-            backgroundColor: "#1e293b",
-            color: "#93c5fd",
+            backgroundColor: "#111827",
+            color: "#e2e8f0",
+            border: "1px solid #334155",
+            borderRadius: "6px",
+            padding: "6px 10px",
             fontSize: "12px",
             fontWeight: 600,
+            cursor: "pointer",
           }}
         >
-          Log Loaded: {loadedReportCode}
-        </span>
+          Import Another
+        </button>
       </div>
     );
   }
@@ -384,7 +412,12 @@ function WCLImportBar({
   if (importing) {
     return (
       <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1 }}>
+        <div style={{ width: "10px", height: "10px", borderRadius: "999px", backgroundColor: "#38bdf8", boxShadow: "0 0 0 4px rgba(56, 189, 248, 0.2)" }} />
         <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
+            <span style={{ fontSize: "11px", fontWeight: 600, color: "#e2e8f0" }}>Importing report</span>
+            <span style={{ fontSize: "11px", color: "#94a3b8" }}>{Math.max(4, importProgress)}%</span>
+          </div>
           <div style={{ height: "8px", borderRadius: "999px", backgroundColor: "#1f2937", overflow: "hidden" }}>
             <div
               style={{
@@ -397,7 +430,7 @@ function WCLImportBar({
             />
           </div>
           <div style={{ marginTop: "4px", fontSize: "11px", color: "#94a3b8" }}>
-            {importStatus ?? "Importing log..."}
+            {importStatus ?? "Preparing import..."}
           </div>
         </div>
       </div>

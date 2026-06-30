@@ -15,16 +15,35 @@ export default function Header({ onAddVod, onConnectWCL }: HeaderProps) {
         height: "80px",
         padding: "0 20px",
         borderBottom: "1px solid #444",
-        backgroundColor: "#1a1a1a",
+        background: "#06070a",
+        overflow: "hidden",
       }}
     >
       <BurgerMenu onConnectWCL={onConnectWCL} />
 
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", flex: 1 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flex: 1,
+          height: "100%",
+          minWidth: 0,
+          padding: "0 8px",
+        }}
+      >
         <img
           src="/ckreviewv3.jpg"
           alt="Consistency Kings Raid Review"
-          style={{ height: "44px", width: "auto", objectFit: "contain" }}
+          style={{
+            display: "block",
+            width: "100%",
+            maxWidth: "1536px",
+            height: "auto",
+            objectFit: "fill",
+            objectPosition: "center",
+            background: "transparent",
+          }}
         />
       </div>
 
