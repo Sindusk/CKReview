@@ -50,17 +50,22 @@ export type WCLActor = {
   id:      number;
   name:    string;
   type:    string;    // WoW class name, e.g. "Warrior", "Priest"
-  subType: string;   // spec name, e.g. "Arms", "Holy"
+  subType: string;    // spec name, e.g. "Arms", "Holy"
 };
 
 export type WCLDeathEvent = {
-  timestamp: number;   // ms from report start (NOT fight start)
-  type:      "death";
+  timestamp:            number;   // ms from report start (NOT fight start)
+  type:                 "death";
+  sourceID:             number;
+  targetID:             number;
+  killingAbilityGameID: number;   // raw ability ID; 0 if unknown
+};
+
+export type WCLCombatantInfoEvent = {
+  timestamp: number;
+  type:      "combatantinfo";
   sourceID:  number;
-  targetID:  number;
-  killingBlow?: {
-    name: string;
-  };
+  specID:    number;
 };
 
 export type WCLCastEvent = {
@@ -68,12 +73,55 @@ export type WCLCastEvent = {
   type:          "cast";
   sourceID:      number;
   abilityGameID: number;
-  ability: {
+  ability?: {
     name: string;
   };
 };
 
-export type WCLEvent = WCLDeathEvent | WCLCastEvent;
+export type WCLDamageEvent = {
+  timestamp:     number;
+  type:          "damage";
+  sourceID:      number;
+  targetID:      number;
+  abilityGameID: number;
+  ability?: {
+    name: string;
+  };
+  amount:        number;
+  overkill?:     number;
+};
+
+export type WCLHealEvent = {
+  timestamp:     number;
+  type:          "heal";
+  sourceID:      number;
+  targetID:      number;
+  abilityGameID: number;
+  ability?: {
+    name: string;
+  };
+  amount:        number;
+  overheal?:     number;
+};
+
+export type WCLDebuffEvent = {
+  timestamp:     number;
+  type:          "applydebuff" | "removedebuff" | "applydebuffstack";
+  sourceID:      number;
+  targetID:      number;
+  abilityGameID: number;
+  ability?: {
+    name: string;
+  };
+};
+
+export type WCLEvent =
+  | WCLDeathEvent
+  | WCLCombatantInfoEvent
+  | WCLCastEvent
+  | WCLDamageEvent
+  | WCLHealEvent
+  | WCLDebuffEvent;
 
 export type WCLReport = {
   title:      string;
@@ -170,12 +218,11 @@ async function fetchAllEvents(
   fightId:    number,
   startTime:  number,
   endTime:    number,
-  type:       "Deaths" | "Casts"
+  type:       "Deaths" | "Casts" | "CombatantInfo" | "DamageDone" | "DamageTaken" | "Healing" | "Debuffs"
 ): Promise<WCLEvent[]> {
   const allEvents: WCLEvent[] = [];
   let pageStart = startTime;
 
-  // Paginate: advance startTime to nextPageTimestamp each page until exhausted.
   while (true) {
     const data = await gql<EventsQueryResult>(EVENTS_QUERY, {
       code:      reportCode,
@@ -195,33 +242,57 @@ async function fetchAllEvents(
   return allEvents;
 }
 
-// ─── Public: fetch everything for a fight ─────────────────────────────────────
+// ─── Public: fetch everything for a fight ────────────────────────────────────
 
 export type WCLFightData = {
-  fight:       WCLFight;
-  actors:      WCLActor[];
-  deathEvents: WCLDeathEvent[];
-  castEvents:  WCLCastEvent[];
+  fight:             WCLFight;
+  actors:            WCLActor[];
+  deathEvents:       WCLDeathEvent[];
+  combatantInfos:    WCLCombatantInfoEvent[];
+  castEvents:        WCLCastEvent[];
+  damageDoneEvents:  WCLDamageEvent[];
+  damageTakenEvents: WCLDamageEvent[];
+  healingEvents:     WCLHealEvent[];
+  debuffEvents:      WCLDebuffEvent[];
 };
 
 /**
- * Fetches deaths and casts for a single fight in parallel.
+ * Fetches all event types for a single fight in parallel.
  * Actors are passed in from report-level masterData to avoid re-fetching.
+ * All data is fetched eagerly so downstream components read from memory only.
  */
 export async function fetchFightData(
   reportCode: string,
   fight:      WCLFight,
   actors:     WCLActor[]
 ): Promise<WCLFightData> {
-  const [rawDeaths, rawCasts] = await Promise.all([
+  const [
+    rawDeaths,
+    rawCombatantInfos,
+    rawCasts,
+    rawDamageDone,
+    rawDamageTaken,
+    rawHealing,
+    rawDebuffs,
+  ] = await Promise.all([
     fetchAllEvents(reportCode, fight.id, fight.startTime, fight.endTime, "Deaths"),
+    fetchAllEvents(reportCode, fight.id, fight.startTime, fight.endTime, "CombatantInfo"),
     fetchAllEvents(reportCode, fight.id, fight.startTime, fight.endTime, "Casts"),
+    fetchAllEvents(reportCode, fight.id, fight.startTime, fight.endTime, "DamageDone"),
+    fetchAllEvents(reportCode, fight.id, fight.startTime, fight.endTime, "DamageTaken"),
+    fetchAllEvents(reportCode, fight.id, fight.startTime, fight.endTime, "Healing"),
+    fetchAllEvents(reportCode, fight.id, fight.startTime, fight.endTime, "Debuffs"),
   ]);
 
   return {
     fight,
     actors,
-    deathEvents: rawDeaths as WCLDeathEvent[],
-    castEvents:  rawCasts  as WCLCastEvent[],
+    deathEvents:       rawDeaths       as WCLDeathEvent[],
+    combatantInfos:    rawCombatantInfos as WCLCombatantInfoEvent[],
+    castEvents:        rawCasts         as WCLCastEvent[],
+    damageDoneEvents:  rawDamageDone    as WCLDamageEvent[],
+    damageTakenEvents: rawDamageTaken   as WCLDamageEvent[],
+    healingEvents:     rawHealing       as WCLHealEvent[],
+    debuffEvents:      rawDebuffs       as WCLDebuffEvent[],
   };
 }

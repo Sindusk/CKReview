@@ -6,8 +6,9 @@ import type { CastEvent } from "@/lib/wcl-transforms";
 type RichPull = Pull & { castEvents?: CastEvent[] };
 
 type AnalysisPanelProps = {
-  pull:           RichPull | null;
-  playbackTimeMs: number;   // ms into the current pull — drives live highlighting
+  pull:              RichPull | null;
+  playbackTimeMs:    number;
+  onSeekToTime?:     (ms: number) => void;  // seeks video to ms-into-pull
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -82,29 +83,42 @@ function DeathRow({
   event,
   fightDuration,
   playbackTimeMs,
+  onSeek,
 }: {
   event:          RichPull["deathEvents"][number];
   fightDuration:  number;
   playbackTimeMs: number;
+  onSeek?:        (ms: number) => void;
 }) {
-  const hasPassed = playbackTimeMs >= event.timestamp;
-  const pct       = fightDuration > 0 ? Math.round((event.timestamp / fightDuration) * 100) : 0;
-  const roleColor = ROLE_COLOR[event.role] ?? "#aaa";
-  const cls       = classColor(event.class);
+  const [hovered, setHovered] = useState(false);
+  const hasPassed  = playbackTimeMs >= event.timestamp;
+  const pct        = fightDuration > 0 ? Math.round((event.timestamp / fightDuration) * 100) : 0;
+  const roleColor  = ROLE_COLOR[event.role] ?? "#aaa";
+  const cls        = classColor(event.class);
+
+  // Seek 3 s before the death (clamped to 0)
+  const seekTarget = Math.max(0, event.timestamp - 3000);
 
   return (
     <div
+      onClick={() => onSeek?.(seekTarget)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       style={{
         display:         "flex",
         alignItems:      "center",
         gap:             "8px",
         padding:         "6px 10px",
         borderRadius:    "5px",
-        // Start black, light up red once the playhead passes this death
-        backgroundColor: hasPassed ? "rgba(248,113,113,0.10)" : "transparent",
+        backgroundColor: hovered
+          ? "rgba(248,113,113,0.07)"
+          : hasPassed
+          ? "rgba(248,113,113,0.10)"
+          : "transparent",
         borderLeft:      `2px solid ${hasPassed ? roleColor : "#2a2a2a"}`,
         marginBottom:    "4px",
-        transition:      "background-color 0.3s, border-color 0.3s",
+        cursor:          onSeek ? "pointer" : "default",
+        transition:      "background-color 0.2s, border-color 0.3s",
       }}
     >
       {/* Timestamp */}
@@ -125,9 +139,9 @@ function DeathRow({
         💀
       </span>
 
-      {/* Player + role */}
+      {/* Player + role + class + killing blow */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "5px", flexWrap: "wrap" }}>
           <span
             style={{
               color:      hasPassed ? cls : "#555",
@@ -156,11 +170,10 @@ function DeathRow({
             {event.class}
           </span>
         </div>
-        {event.cause && (
-          <div style={{ fontSize: "11px", color: hasPassed ? "#666" : "#333", marginTop: "2px", transition: "color 0.3s" }}>
-            {event.cause}
-          </div>
-        )}
+        {/* Killing blow */}
+        <div style={{ fontSize: "11px", color: hasPassed ? "#f87171" : "#3a2020", marginTop: "2px", transition: "color 0.3s" }}>
+          ⚔ {event.cause}
+        </div>
       </div>
 
       {/* % into pull */}
@@ -210,9 +223,12 @@ function StatPill({ label, value, color = "#ccc" }: { label: string; value: stri
   );
 }
 
+// ─── useState import (needed for DeathRow hover) ──────────────────────────────
+import { useState } from "react";
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-export default function AnalysisPanel({ pull, playbackTimeMs }: AnalysisPanelProps) {
+export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime }: AnalysisPanelProps) {
   if (!pull) {
     return (
       <div
@@ -236,6 +252,11 @@ export default function AnalysisPanel({ pull, playbackTimeMs }: AnalysisPanelPro
   const tankDeaths    = deaths.filter(d => d.role === "Tank").length;
   const healerDeaths  = deaths.filter(d => d.role === "Healer").length;
   const dpsDeaths     = deaths.filter(d => d.role === "DPS").length;
+
+  // Convert ms-into-pull seek to absolute video seek via useTimelineController
+  function handleDeathSeek(ms: number) {
+    onSeekToTime?.(ms);
+  }
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -280,7 +301,13 @@ export default function AnalysisPanel({ pull, playbackTimeMs }: AnalysisPanelPro
           <>
             <SectionLabel label="Deaths" count={deaths.length} />
             {deaths.map((d, i) => (
-              <DeathRow key={i} event={d} fightDuration={pull.fightDuration} playbackTimeMs={playbackTimeMs} />
+              <DeathRow
+                key={i}
+                event={d}
+                fightDuration={pull.fightDuration}
+                playbackTimeMs={playbackTimeMs}
+                onSeek={onSeekToTime ? handleDeathSeek : undefined}
+              />
             ))}
           </>
         ) : (

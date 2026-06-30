@@ -9,6 +9,7 @@ import VideoPanel from "../components/VideoPanel";
 import VODSidebar from "../components/VODSidebar";
 import PerspectiveTabs from "../components/PerspectiveTabs";
 import AnalysisPanel from "../components/AnalysisPanel";
+import RosterPanel from "../components/RosterPanel";
 import TimelinePanel from "@/components/TimelinePanel";
 import type { Pull } from "../types/Pull";
 import useTimelineController from "@/hooks/useTimelineController";
@@ -19,14 +20,14 @@ import { transformReportToPulls } from "@/lib/wcl-transforms";
 export default function Home() {
   // ─── VOD state ───────────────────────────────────────────────────────────────
 
-  const [vods, setVods]               = useState<Vod[]>([]);
+  const [vods, setVods]                   = useState<Vod[]>([]);
   const [selectedVodId, setSelectedVodId] = useState<number | null>(null);
-  const [showDialog, setShowDialog]   = useState(false);
-  const [perspective, setPerspective] = useState<"Tank" | "Healer" | "DPS">("DPS");
+  const [showDialog, setShowDialog]       = useState(false);
+  const [perspective, setPerspective]     = useState<"Tank" | "Healer" | "DPS">("DPS");
 
   // ─── Pull state ──────────────────────────────────────────────────────────────
 
-  const [pulls, setPulls]               = useState<Pull[]>([]);
+  const [pulls, setPulls]                   = useState<Pull[]>([]);
   const [selectedPullId, setSelectedPullId] = useState<number | null>(null);
 
   // ─── WCL import state ────────────────────────────────────────────────────────
@@ -55,12 +56,20 @@ export default function Home() {
   });
 
   // ─── VideoPanel needs ONE combined time-update callback ──────────────────────
-  // VideoPanel calls this every ~200ms; we fan it out to both controller functions.
 
   const handleVideoTimeUpdate = useCallback((rawTime: number) => {
     timeline.updateFromVideo(rawTime);
     timeline.updateRawVideoTime(rawTime);
   }, [timeline.updateFromVideo, timeline.updateRawVideoTime]);
+
+  // ─── Seek to ms-into-pull (used by AnalysisPanel death click) ────────────────
+  // Death timestamps are ms into the pull.
+  // seekToPullStart(offsetOverride) adds offsetOverride seconds to pull start.
+
+  const handleSeekToMs = useCallback((ms: number) => {
+    if (!activePull || !selectedVod) return;
+    timeline.seekToPullStart(ms / 1000);
+  }, [activePull, selectedVod, timeline]);
 
   // ─── VOD handlers ────────────────────────────────────────────────────────────
 
@@ -193,12 +202,40 @@ export default function Home() {
           overflow:            "hidden",
         }}
       >
-        {/* LEFT: ANALYSIS */}
-        <div style={{ border: "1px solid #333", overflow: "hidden", display: "flex", flexDirection: "column" }}>
-          <AnalysisPanel
-            pull={activePull}
-            playbackTimeMs={timeline.playbackTimeMs}
-          />
+        {/* LEFT: ROSTER (33%) + ANALYSIS (67%) */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "10px", overflow: "hidden", minHeight: 0 }}>
+
+          {/* Roster panel — 33% of left column height */}
+          <div
+            style={{
+              flex:       "0 0 33%",
+              border:     "1px solid #333",
+              overflow:   "hidden",
+              display:    "flex",
+              flexDirection: "column",
+              minHeight:  0,
+            }}
+          >
+            <RosterPanel players={activePull?.players ?? []} />
+          </div>
+
+          {/* Analysis panel — remaining 67% */}
+          <div
+            style={{
+              flex:      "1 1 0",
+              border:    "1px solid #333",
+              overflow:  "hidden",
+              display:   "flex",
+              flexDirection: "column",
+              minHeight: 0,
+            }}
+          >
+            <AnalysisPanel
+              pull={activePull}
+              playbackTimeMs={timeline.playbackTimeMs}
+              onSeekToTime={isCalibrated ? handleSeekToMs : undefined}
+            />
+          </div>
         </div>
 
         {/* MIDDLE: VIDEO */}

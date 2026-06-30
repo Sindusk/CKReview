@@ -1,22 +1,15 @@
-import type { DeathEvent } from "@/types/DeathEvent";
+// types/Pull.ts
 
-export type PullCastEvent = {
-  timestamp: number;
-  sourceId: number;
-  sourceName: string;
-  sourceClass: string;
-  role: "Tank" | "Healer" | "DPS";
-  abilityId: number;
-  abilityName: string;
-};
+import type { DeathEvent } from "./DeathEvent";
+import type { PlayerInfo } from "./PlayerInfo";
 
 export type Pull = {
-  id: number;
-  name: string;
-  startTime: number;    // seconds from VOD start
-  endTime: number;      // so you know pull duration
-  result: "Wipe" | "Kill";
-  fightDuration: number; // actual fight length in ms (from logs)
-  deathEvents: DeathEvent[];
-  castEvents?: PullCastEvent[];
+  id:            number;
+  name:          string;
+  startTime:     number;    // seconds from report start
+  endTime:       number;    // seconds from report start
+  result:        "Wipe" | "Kill";
+  fightDuration: number;    // actual fight length in ms (from logs)
+  deathEvents:   DeathEvent[];
+  players:       PlayerInfo[];  // roster for this pull, from CombatantInfo
 };
