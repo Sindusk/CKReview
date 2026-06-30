@@ -1,0 +1,201 @@
+"use client";
+
+import { useEffect, useRef } from "react";
+import type { Vod } from "@/types/Vod";
+
+declare global {
+  interface Window {
+    onYouTubeIframeAPIReady: () => void;
+    YT: any;
+  }
+}
+
+type VideoPanelProps = {
+  vod: Vod | null;
+
+  // ONE-TIME SEEK COMMAND ONLY
+  seekRequest: number | null;
+
+  // continuous playback reporting
+  onCurrentTimeChange?: (time: number) => void;
+};
+
+function loadYouTubeAPI(): Promise<void> {
+  return new Promise((resolve) => {
+    if (window.YT?.Player) {
+      resolve();
+      return;
+    }
+
+    const existing = document.querySelector(
+      'script[src="https://www.youtube.com/iframe_api"]'
+    );
+
+    if (!existing) {
+      const tag = document.createElement("script");
+      tag.src = "https://www.youtube.com/iframe_api";
+      document.body.appendChild(tag);
+    }
+
+    window.onYouTubeIframeAPIReady = () => resolve();
+  });
+}
+
+export default function VideoPanel({
+  vod,
+  seekRequest,
+  onCurrentTimeChange,
+}: VideoPanelProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const playerRef = useRef<YT.Player | null>(null);
+  const playerReadyRef = useRef(false);
+  const pendingSeekRef = useRef<number | null>(null);
+
+  /**
+   * =========================
+   * CREATE / DESTROY PLAYER
+   * =========================
+   */
+  useEffect(() => {
+    if (!vod || !containerRef.current) return;
+
+    playerReadyRef.current = false;
+    pendingSeekRef.current = null;
+
+    if (playerRef.current) {
+      playerRef.current.destroy();
+      playerRef.current = null;
+    }
+
+    const div = document.createElement("div");
+    containerRef.current.innerHTML = "";
+    containerRef.current.appendChild(div);
+
+    loadYouTubeAPI().then(() => {
+      if (!containerRef.current) return;
+
+      playerRef.current = new window.YT.Player(div, {
+        videoId: vod.videoId,
+        width: "100%",
+        height: "100%",
+        playerVars: {
+          autoplay: 1,
+          mute: 1,
+          enablejsapi: 1,
+        },
+        events: {
+          onReady: (event: YT.PlayerEvent) => {
+            playerReadyRef.current = true;
+
+            if (pendingSeekRef.current !== null) {
+              const time = pendingSeekRef.current;
+
+              event.target.seekTo(time, true);
+              event.target.playVideo();
+            }
+          },
+
+          onStateChange: (event: YT.OnStateChangeEvent) => {
+            // 1 = playing
+            if (event.data === 1 && pendingSeekRef.current !== null) {
+              const time = pendingSeekRef.current;
+
+              event.target.seekTo(time, true);
+              pendingSeekRef.current = null;
+
+              // ensure playback continues after late seek
+              event.target.playVideo();
+            }
+          },
+        }
+      });
+    });
+
+    return () => {
+      playerReadyRef.current = false;
+
+      if (playerRef.current) {
+        playerRef.current.destroy();
+        playerRef.current = null;
+      }
+    };
+  }, [vod?.id]);
+
+  /**
+   * =========================
+   * SEEK HANDLER (ONE-SHOT ONLY)
+   * =========================
+   */
+  useEffect(() => {
+    if (seekRequest === null) return;
+
+    // Always store latest seek
+    pendingSeekRef.current = seekRequest;
+
+    if (!playerRef.current || !playerReadyRef.current) return;
+
+    playerRef.current.seekTo(seekRequest, true);
+    playerRef.current.playVideo();
+  }, [seekRequest]);
+
+  /**
+   * =========================
+   * PLAYBACK SYNC LOOP
+   * =========================
+   * SINGLE SOURCE OF TRUTH
+   */
+  useEffect(() => {
+    if (!onCurrentTimeChange) return;
+    if (!playerRef.current) return;
+
+    const interval = setInterval(() => {
+      const time = playerRef.current?.getCurrentTime();
+
+      if (typeof time === "number") {
+        onCurrentTimeChange(time);
+      }
+    }, 200);
+
+    return () => clearInterval(interval);
+  }, [onCurrentTimeChange]);
+
+  /**
+   * Fix for seeking not occurring when swapping VOD's.
+   */
+  useEffect(() => {
+    if (!vod || seekRequest === null) return;
+
+    // When VOD changes, ALWAYS re-arm seek
+    pendingSeekRef.current = seekRequest;
+
+    if (playerRef.current && playerReadyRef.current) {
+      playerRef.current.seekTo(seekRequest, true);
+      playerRef.current.playVideo();
+    }
+  }, [vod?.id]);
+
+  return (
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <div style={{ padding: "8px", background: "#1a1a1a" }}>
+        {vod ? vod.player : "No VOD Selected"}
+      </div>
+
+      <div
+        ref={containerRef}
+        style={{
+          flex: 1,
+          position: "relative",
+          width: "100%",
+          height: "100%",
+        }}
+      />
+    </div>
+  );
+}
