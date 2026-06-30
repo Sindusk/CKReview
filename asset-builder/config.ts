@@ -1,9 +1,7 @@
 import path from "path";
 
-export const OUTPUT = path.resolve(
-    "../public/wow/icons"
-);
+const rootDir = path.resolve(__dirname, "..");
 
-export const CACHE = path.resolve(
-    "../asset-builder/cache"
-);
+export const OUTPUT = path.join(rootDir, "public", "wow", "icons");
+
+export const CACHE = path.join(rootDir, "asset-builder", "cache");

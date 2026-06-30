@@ -5,10 +5,26 @@ import type { Vod } from "@/types/Vod";
 
 declare global {
   interface Window {
-    onYouTubeIframeAPIReady: () => void;
+    onYouTubeIframeAPIReady?: () => void;
     YT: any;
   }
 }
+
+type YTPlayer = {
+  destroy(): void;
+  seekTo(seconds: number, allowSeekAhead: boolean): void;
+  playVideo(): void;
+  getCurrentTime(): number;
+};
+
+type YTPlayerEvent = {
+  target: YTPlayer;
+};
+
+type YTOnStateChangeEvent = {
+  data: number;
+  target: YTPlayer;
+};
 
 type VideoPanelProps = {
   vod: Vod | null;
@@ -47,7 +63,7 @@ export default function VideoPanel({
   onCurrentTimeChange,
 }: VideoPanelProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const playerRef = useRef<YT.Player | null>(null);
+  const playerRef = useRef<YTPlayer | null>(null);
   const playerReadyRef = useRef(false);
   const pendingSeekRef = useRef<number | null>(null);
 
@@ -84,7 +100,7 @@ export default function VideoPanel({
           enablejsapi: 1,
         },
         events: {
-          onReady: (event: YT.PlayerEvent) => {
+          onReady: (event: YTPlayerEvent) => {
             playerReadyRef.current = true;
 
             if (pendingSeekRef.current !== null) {
@@ -95,7 +111,7 @@ export default function VideoPanel({
             }
           },
 
-          onStateChange: (event: YT.OnStateChangeEvent) => {
+          onStateChange: (event: YTOnStateChangeEvent) => {
             // 1 = playing
             if (event.data === 1 && pendingSeekRef.current !== null) {
               const time = pendingSeekRef.current;
@@ -183,7 +199,18 @@ export default function VideoPanel({
         flexDirection: "column",
       }}
     >
-      <div style={{ padding: "8px", background: "#1a1a1a" }}>
+      <div
+        style={{
+          padding: "8px 10px",
+          background: "#1a1a1a",
+          borderBottom: "1px solid #2a2a2a",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          fontWeight: 700,
+          color: "#f8fafc",
+        }}
+      >
         {vod ? vod.player : "No VOD Selected"}
       </div>
 

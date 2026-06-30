@@ -34,7 +34,6 @@ export default function VODSidebar({
         overflow: "hidden",
       }}
     >
-      {/* HEADER */}
       <div
         style={{
           padding: "10px",
@@ -47,24 +46,26 @@ export default function VODSidebar({
         VODs
       </div>
 
-      {/* LIST */}
       <div
         style={{
-          flex: 1,
+          flex: "0 0 28%",
+          minHeight: 0,
           overflowY: "auto",
           padding: "8px",
-          display: "flex",
-          flexDirection: "column",
+          display: "grid",
+          gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
           gap: "8px",
+          alignContent: "start",
+          borderBottom: "1px solid #333",
         }}
       >
         {vods.length === 0 && (
-          <div style={{ color: "#777", fontSize: "14px" }}>
+          <div style={{ color: "#777", fontSize: "14px", gridColumn: "1 / -1" }}>
             No VODs added yet
           </div>
         )}
 
-        {vods.map((vod) => {
+        {vods.map(vod => {
           const isSelected = vod.id === selectedVodId;
 
           return (
@@ -73,26 +74,30 @@ export default function VODSidebar({
               onClick={() => onSelectVod(vod.id)}
               style={{
                 textAlign: "left",
-                padding: "10px",
+                padding: "8px 6px",
                 borderRadius: "6px",
-                border: isSelected
-                  ? "1px solid #3b82f6"
-                  : "1px solid #333",
+                border: isSelected ? "1px solid #3b82f6" : "1px solid #333",
                 backgroundColor: isSelected ? "#1e293b" : "#111",
                 color: "white",
                 cursor: "pointer",
+                minHeight: "70px",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+                overflow: "hidden",
               }}
             >
-              <div style={{ fontWeight: "bold" }}>{vod.player}</div>
-              <div style={{ fontSize: "12px", color: "#aaa" }}>
-                {vod.url.length > 30
-                  ? vod.url.slice(0, 30) + "..."
-                  : vod.url}
+              <div style={{ fontWeight: "bold", fontSize: "12px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {vod.player}
+              </div>
+              <div style={{ fontSize: "10px", color: "#aaa", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {vod.url.length > 18 ? vod.url.slice(0, 18) + "..." : vod.url}
               </div>
             </button>
           );
         })}
       </div>
+
       <PullList
         pulls={pulls}
         selectedPullId={selectedPullId}

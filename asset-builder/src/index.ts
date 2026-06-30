@@ -1,6 +1,6 @@
 import fs from "fs-extra";
 
-import { OUTPUT } from "./config";
+import { OUTPUT } from "../config";
 
 async function main() {
 

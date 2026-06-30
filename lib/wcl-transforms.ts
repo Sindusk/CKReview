@@ -22,13 +22,33 @@ import { getSpecInfo, getRosterSortOrder } from "./spec-data";
 // ─── CastEvent (app-internal, used by AnalysisPanel) ─────────────────────────
 
 export type CastEvent = {
-  timestamp:   number;
-  sourceId:    number;
-  sourceName:  string;
-  sourceClass: string;
-  role:        "Tank" | "Healer" | "DPS";
-  abilityId:   number;
-  abilityName: string;
+  timestamp:     number;
+  sourceId:      number;
+  sourceName:    string;
+  sourceClass:   string;
+  role:          "Tank" | "Healer" | "DPS";
+  abilityId:     number;
+  abilityName:   string;
+  resourceActor?: number;
+  classResources?: Array<{
+    amount: number;
+    max: number;
+    type: number;
+    cost?: number;
+  }>;
+  hitPoints?: number;
+  maxHitPoints?: number;
+  attackPower?: number;
+  spellPower?: number;
+  armor?: number;
+  absorb?: number;
+  x?: number;
+  y?: number;
+  facing?: number;
+  mapID?: number;
+  versatility?: number;
+  avoidance?: number;
+  itemLevel?: number;
 };
 
 // ─── Actor lookup ─────────────────────────────────────────────────────────────
@@ -85,13 +105,28 @@ function transformCast(
   const spec   = getSpecInfo(specId);
 
   return {
-    timestamp:   event.timestamp - fightStart,
-    sourceId:    event.sourceID,
-    sourceName:  actor?.name ?? `Unknown (${event.sourceID})`,
-    sourceClass: actor?.type ?? spec.className,
-    role:        specId ? spec.role : "DPS",
-    abilityId:   event.abilityGameID,
-    abilityName: abilityName(event),
+    timestamp:      event.timestamp - fightStart,
+    sourceId:       event.sourceID,
+    sourceName:     actor?.name ?? `Unknown (${event.sourceID})`,
+    sourceClass:    actor?.type ?? spec.className,
+    role:           specId ? spec.role : "DPS",
+    abilityId:      event.abilityGameID,
+    abilityName:    abilityName(event),
+    resourceActor:  event.resourceActor,
+    classResources: event.classResources,
+    hitPoints:      event.hitPoints,
+    maxHitPoints:   event.maxHitPoints,
+    attackPower:    event.attackPower,
+    spellPower:     event.spellPower,
+    armor:          event.armor,
+    absorb:         event.absorb,
+    x:              event.x,
+    y:              event.y,
+    facing:         event.facing,
+    mapID:          event.mapID,
+    versatility:    event.versatility,
+    avoidance:      event.avoidance,
+    itemLevel:      event.itemLevel,
   };
 }
 

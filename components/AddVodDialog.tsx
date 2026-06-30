@@ -5,28 +5,23 @@ import { useState } from "react";
 type AddVodDialogProps = {
   open: boolean;
   onCancel: () => void;
-  onAdd: (player: string, url: string, reportCode?: string) => void;
+  onAdd: (player: string, url: string) => void;
 };
 
-export default function AddVodDialog({
-  open,
-  onCancel,
-  onAdd,
-}: AddVodDialogProps) {
+export default function AddVodDialog({ open, onCancel, onAdd }: AddVodDialogProps) {
   const [player, setPlayer] = useState("");
   const [url, setUrl] = useState("");
-  const [reportCode, setReportCode] = useState("");
 
   if (!open) {
     return null;
   }
 
   function handleAdd() {
-    onAdd(player.trim(), url.trim(), reportCode.trim());
+    if (!player.trim() || !url.trim()) return;
 
+    onAdd(player.trim(), url.trim());
     setPlayer("");
     setUrl("");
-    setReportCode("");
   }
 
   return (
@@ -38,79 +33,89 @@ export default function AddVodDialog({
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
+        zIndex: 1000,
       }}
     >
       <div
         style={{
-          backgroundColor: "#2a2a2a",
+          backgroundColor: "#222",
           padding: "24px",
-          borderRadius: "8px",
+          borderRadius: "10px",
           width: "500px",
           color: "white",
-          border: "1px solid #555",
+          border: "1px solid #444",
+          boxShadow: "0 12px 32px rgba(0,0,0,0.35)",
         }}
       >
-        <h2>Add VOD</h2>
+        <h2 style={{ marginTop: 0, marginBottom: "16px", fontSize: "20px" }}>Add VOD</h2>
 
-        <div style={{ marginBottom: "16px" }}>
-          <label>Player / Perspective</label>
-
+        <div style={{ marginBottom: "14px" }}>
+          <label style={{ display: "block", marginBottom: "4px", fontSize: "13px", color: "#ddd" }}>
+            Player / Perspective
+          </label>
           <input
             style={{
               width: "100%",
-              padding: "8px",
-              marginTop: "4px",
-              color: "black",
-              backgroundColor: "white",
+              padding: "8px 10px",
+              color: "#111",
+              backgroundColor: "#fff",
+              border: "1px solid #666",
+              borderRadius: "6px",
             }}
             value={player}
-            onChange={(e) => setPlayer(e.target.value)}
+            onChange={e => setPlayer(e.target.value)}
+            placeholder="e.g. Koro"
           />
         </div>
 
-        <div style={{ marginBottom: "16px" }}>
-          <label>Warcraft Logs report code or URL</label>
-
+        <div style={{ marginBottom: "20px" }}>
+          <label style={{ display: "block", marginBottom: "4px", fontSize: "13px", color: "#ddd" }}>
+            YouTube URL
+          </label>
           <input
             style={{
               width: "100%",
-              padding: "8px",
-              marginTop: "4px",
-              color: "black",
-              backgroundColor: "white",
-            }}
-            value={reportCode}
-            onChange={(e) => setReportCode(e.target.value)}
-            placeholder="Optional. Example: abc123def456"
-          />
-        </div>
-
-        <div style={{ marginBottom: "24px" }}>
-          <label>YouTube URL</label>
-
-          <input
-            style={{
-              width: "100%",
-              padding: "8px",
-              marginTop: "4px",
-              color: "black",
-              backgroundColor: "white",
+              padding: "8px 10px",
+              color: "#111",
+              backgroundColor: "#fff",
+              border: "1px solid #666",
+              borderRadius: "6px",
             }}
             value={url}
-            onChange={(e) => setUrl(e.target.value)}
+            onChange={e => setUrl(e.target.value)}
+            placeholder="https://www.youtube.com/watch?v=..."
           />
         </div>
 
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "flex-end",
-            gap: "10px",
-          }}
-        >
-          <button onClick={onCancel}>Cancel</button>
-
-          <button onClick={handleAdd}>Add</button>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+          <button
+            onClick={onCancel}
+            style={{
+              backgroundColor: "#2f2f2f",
+              color: "#f3f4f6",
+              border: "1px solid #555",
+              borderRadius: "6px",
+              padding: "8px 14px",
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleAdd}
+            style={{
+              backgroundColor: "#2563eb",
+              color: "white",
+              border: "none",
+              borderRadius: "6px",
+              padding: "8px 14px",
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            Add
+          </button>
         </div>
       </div>
     </div>

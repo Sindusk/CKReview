@@ -76,6 +76,26 @@ export type WCLCastEvent = {
   ability?: {
     name: string;
   };
+  resourceActor?: number;
+  classResources?: Array<{
+    amount: number;
+    max: number;
+    type: number;
+    cost?: number;
+  }>;
+  hitPoints?: number;
+  maxHitPoints?: number;
+  attackPower?: number;
+  spellPower?: number;
+  armor?: number;
+  absorb?: number;
+  x?: number;
+  y?: number;
+  facing?: number;
+  mapID?: number;
+  versatility?: number;
+  avoidance?: number;
+  itemLevel?: number;
 };
 
 export type WCLDamageEvent = {
@@ -189,10 +209,11 @@ const EVENTS_QUERY = /* graphql */`
     reportData {
       report(code: $code) {
         events(
-          fightIDs:  $fightIDs
-          startTime: $startTime
-          endTime:   $endTime
-          dataType:  $type
+          fightIDs:        $fightIDs
+          startTime:       $startTime
+          endTime:         $endTime
+          dataType:        $type
+          includeResources: true
         ) {
           data
           nextPageTimestamp
