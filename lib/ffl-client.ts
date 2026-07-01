@@ -35,7 +35,6 @@ async function gql<T>(query: string, variables?: Record<string, unknown>): Promi
     throw new Error(`FFLogs GraphQL error: ${json.errors[0].message}`);
   }
 
-  console.log("[FFL RAW]", JSON.stringify(json.data, null, 2));
   return json.data as T;
 }
 
@@ -56,6 +55,21 @@ export type FFLActor = {
   type:    string;    // e.g. "Player", "NPC", "Boss"
   subType: string;    // FFXIV job name in PascalCase, e.g. "WhiteMage", "DarkKnight"
                       // May be "Unknown" for NPC actors
+};
+
+// A single ability/action used anywhere in the report. Fetched once per
+// report via masterData and used to resolve abilityGameID on any event that
+// doesn't already carry an embedded ability.name — replacing the previous
+// "Ability {id}" fallback with a real name in the vast majority of cases.
+//
+// NOTE: field names are a best guess, mirrored from the WCL schema (FFLogs
+// and WarcraftLogs share the same GraphQL platform/schema conventions). If
+// the live schema differs, GraphQL will surface a "Cannot query field"
+// error — verify via the API explorer at https://www.fflogs.com/api/v2/client.
+export type FFLGameAbility = {
+  gameID: number;
+  name:   string;
+  icon?:  string;
 };
 
 // FFLogs death events — the killing ability is carried on the event itself.
@@ -171,7 +185,8 @@ export type FFLReport = {
   code:       string;
   fights:     FFLFight[];
   masterData: {
-    actors: FFLActor[];
+    actors:    FFLActor[];
+    abilities: FFLGameAbility[];
   };
 };
 
@@ -197,6 +212,11 @@ const REPORT_QUERY = /* graphql */`
             name
             type
             subType
+          }
+          abilities {
+            gameID
+            name
+            icon
           }
         }
       }

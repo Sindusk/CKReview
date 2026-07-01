@@ -12,6 +12,7 @@ import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import type {
   FFLFightData,
   FFLActor,
+  FFLGameAbility,
   FFLDeathEvent,
   FFLCastEvent,
   FFLDamageEvent,
@@ -19,6 +20,19 @@ import type {
   FFLDebuffEvent,
 } from "./ffl-client";
 import { getFFJobByName, getFFRosterSortOrder } from "./ffl-job-data";
+
+// ─── Ability name resolution ───────────────────────────────────────────────────
+//
+// Resolution order for any ability ID:
+//   1. Name embedded directly on the event itself (event.ability.name).
+//   2. The report's own masterData.abilities list — covers every ability
+//      actually used in this report, including ones whose events don't
+//      carry an embedded name.
+//   3. "Ability {id}" (previous behavior) as the final fallback.
+
+export function buildAbilityMap(abilities: FFLGameAbility[]): Map<number, string> {
+  return new Map(abilities.map((a) => [a.gameID, a.name]));
+}
 
 // ─── CastEvent (app-internal, used by AnalysisPanel) ─────────────────────────
 // Re-exported so AnalysisPanel / page.tsx can type against it without caring
@@ -61,12 +75,17 @@ function buildActorMap(actors: FFLActor[]): Map<number, FFLActor> {
 // FFLogs embeds the ability name directly on the event's `ability` object.
 // Fall back gracefully when it is absent (environmental / unknown source).
 
-function abilityName(event: {
-  abilityGameID?: number;
-  ability?: { name?: string } | null;
-}): string {
+function abilityName(
+  event: {
+    abilityGameID?: number;
+    ability?: { name?: string } | null;
+  },
+  abilityMap: Map<number, string>
+): string {
   if (event.ability?.name) return event.ability.name;
-  if (event.abilityGameID) return `Ability ${event.abilityGameID}`;
+  if (event.abilityGameID) {
+    return abilityMap.get(event.abilityGameID) ?? `Ability ${event.abilityGameID}`;
+  }
   return "Unknown";
 }
 
@@ -78,17 +97,21 @@ function abilityName(event: {
 function transformDeath(
   event:      FFLDeathEvent,
   actorMap:   Map<number, FFLActor>,
+  abilityMap: Map<number, string>,
   fightStart: number
 ): DeathEvent {
   const actor = actorMap.get(event.targetID);
   const subType = actor?.subType ?? "";
   const job = getFFJobByName(subType);
 
-  // Killing ability name — may be absent for environmental deaths
+  // Killing ability name — may be absent for environmental deaths.
+  // Resolution order: embedded name → masterData.abilities → "Environmental" → "Unknown".
   let cause = "Unknown";
   try {
     if (event.ability?.name) {
       cause = event.ability.name;
+    } else if (event.ability?.gameID && abilityMap.has(event.ability.gameID)) {
+      cause = abilityMap.get(event.ability.gameID)!;
     } else if (event.ability === null || event.ability === undefined) {
       cause = "Environmental";
     }
@@ -112,6 +135,7 @@ function transformDeath(
 function transformCast(
   event:      FFLCastEvent,
   actorMap:   Map<number, FFLActor>,
+  abilityMap: Map<number, string>,
   fightStart: number
 ): CastEvent {
   const actor  = actorMap.get(event.sourceID);
@@ -125,7 +149,7 @@ function transformCast(
     sourceClass:    job.name,
     role:           job.role,
     abilityId:      event.abilityGameID ?? 0,
-    abilityName:    abilityName(event),
+    abilityName:    abilityName(event, abilityMap),
     resourceActor:  event.resourceActor,
     classResources: event.classResources,
     hitPoints:      event.hitPoints,
@@ -145,50 +169,54 @@ function transformCast(
 
 function damageToPlayerEvent(
   event:      FFLDamageEvent,
+  abilityMap: Map<number, string>,
   fightStart: number
 ): PlayerEvent {
   return {
     timestamp:   Math.max(0, event.timestamp - fightStart),
     abilityId:   event.abilityGameID ?? 0,
-    abilityName: abilityName(event),
+    abilityName: abilityName(event, abilityMap),
     amount:      event.amount ?? 0,
   };
 }
 
 function healToPlayerEvent(
   event:      FFLHealEvent,
+  abilityMap: Map<number, string>,
   fightStart: number
 ): PlayerEvent {
   return {
     timestamp:   Math.max(0, event.timestamp - fightStart),
     abilityId:   event.abilityGameID ?? 0,
-    abilityName: abilityName(event),
+    abilityName: abilityName(event, abilityMap),
     amount:      event.amount ?? 0,
   };
 }
 
 function debuffToPlayerEvent(
-  event:    FFLDebuffEvent,
-  actorMap: Map<number, FFLActor>,
+  event:      FFLDebuffEvent,
+  actorMap:   Map<number, FFLActor>,
+  abilityMap: Map<number, string>,
   fightStart: number
 ): PlayerEvent {
   const target = actorMap.get(event.targetID);
   return {
     timestamp:   Math.max(0, event.timestamp - fightStart),
     abilityId:   event.abilityGameID ?? 0,
-    abilityName: abilityName(event),
+    abilityName: abilityName(event, abilityMap),
     extra:       target?.name,
   };
 }
 
 function castToPlayerEvent(
   event:      FFLCastEvent,
+  abilityMap: Map<number, string>,
   fightStart: number
 ): PlayerEvent {
   return {
     timestamp:   Math.max(0, event.timestamp - fightStart),
     abilityId:   event.abilityGameID ?? 0,
-    abilityName: abilityName(event),
+    abilityName: abilityName(event, abilityMap),
   };
 }
 
@@ -200,6 +228,7 @@ function castToPlayerEvent(
 function buildFFPlayers(
   friendlyPlayerIds: number[],
   actorMap:          Map<number, FFLActor>,
+  abilityMap:        Map<number, string>,
   castEvents:        FFLCastEvent[],
   damageDoneEvents:  FFLDamageEvent[],
   damageTakenEvents: FFLDamageEvent[],
@@ -229,23 +258,23 @@ function buildFFPlayers(
 
         damageDone: damageDoneEvents
           .filter((e) => e.sourceID === actorId)
-          .map((e) => damageToPlayerEvent(e, fightStart)),
+          .map((e) => damageToPlayerEvent(e, abilityMap, fightStart)),
 
         damageTaken: damageTakenEvents
           .filter((e) => e.targetID === actorId)
-          .map((e) => damageToPlayerEvent(e, fightStart)),
+          .map((e) => damageToPlayerEvent(e, abilityMap, fightStart)),
 
         healing: healingEvents
           .filter((e) => e.sourceID === actorId)
-          .map((e) => healToPlayerEvent(e, fightStart)),
+          .map((e) => healToPlayerEvent(e, abilityMap, fightStart)),
 
         debuffs: debuffEvents
           .filter((e) => e.sourceID === actorId)
-          .map((e) => debuffToPlayerEvent(e, actorMap, fightStart)),
+          .map((e) => debuffToPlayerEvent(e, actorMap, abilityMap, fightStart)),
 
         casts: castEvents
           .filter((e) => e.sourceID === actorId)
-          .map((e) => castToPlayerEvent(e, fightStart)),
+          .map((e) => castToPlayerEvent(e, abilityMap, fightStart)),
       };
     })
     .filter((p): p is PlayerInfo => p !== null)
@@ -264,22 +293,24 @@ function buildFFPlayers(
 
 export function transformFFightToPull(
   data:        FFLFightData,
+  abilityMap:  Map<number, string>,
   idOverride?: number
 ): Pull & { castEvents: CastEvent[] } {
   const actorMap   = buildActorMap(data.actors);
   const fightStart = data.fight.startTime;
 
   const deathEvents: DeathEvent[] = data.deathEvents.map((e) =>
-    transformDeath(e, actorMap, fightStart)
+    transformDeath(e, actorMap, abilityMap, fightStart)
   );
 
   const castEvents: CastEvent[] = data.castEvents.map((e) =>
-    transformCast(e, actorMap, fightStart)
+    transformCast(e, actorMap, abilityMap, fightStart)
   );
 
   const players: PlayerInfo[] = buildFFPlayers(
     data.fight.friendlyPlayers ?? [],
     actorMap,
+    abilityMap,
     data.castEvents,
     data.damageDoneEvents,
     data.damageTakenEvents,
@@ -306,9 +337,10 @@ export function transformFFightToPull(
 }
 
 export function transformFFReportToPulls(
-  fightDataList: FFLFightData[]
+  fightDataList: FFLFightData[],
+  abilityMap:    Map<number, string>
 ): Array<Pull & { castEvents: CastEvent[] }> {
   return fightDataList
     .sort((a, b) => a.fight.startTime - b.fight.startTime)
-    .map((data, i) => transformFFightToPull(data, i + 1));
+    .map((data, i) => transformFFightToPull(data, abilityMap, i + 1));
 }

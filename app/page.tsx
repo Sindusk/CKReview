@@ -15,9 +15,9 @@ import useTimelineController from "@/hooks/useTimelineController";
 import { loginWithWarcraftLogs } from "@/lib/wcl-auth";
 import { loginWithFFLogs } from "@/lib/ffl-auth";
 import { fetchReport, fetchFightData } from "@/lib/wcl-client";
-import { transformReportToPulls } from "@/lib/wcl-transforms";
+import { transformReportToPulls, buildAbilityMap as buildWCLAbilityMap } from "@/lib/wcl-transforms";
 import { fetchFFReport, fetchFFightData } from "@/lib/ffl-client";
-import { transformFFReportToPulls } from "@/lib/ffl-transforms";
+import { transformFFReportToPulls, buildAbilityMap as buildFFLAbilityMap } from "@/lib/ffl-transforms";
 
 // ─── Log source detection ─────────────────────────────────────────────────────
 
@@ -157,6 +157,10 @@ export default function Home() {
     setImportProgress(10);
     setImportStatus(`Loading ${report.fights.length} fight${report.fights.length === 1 ? "" : "s"}…`);
 
+    // Every ability used anywhere in the report, keyed by gameID — resolves
+    // ability names (including death causes) without a hand-maintained table.
+    const abilityMap = buildWCLAbilityMap(report.masterData.abilities);
+
     const fightDataList = [] as Awaited<ReturnType<typeof fetchFightData>>[];
     const totalFights   = Math.max(report.fights.length, 1);
 
@@ -170,7 +174,7 @@ export default function Home() {
       setImportStatus(`Loaded fight ${index + 1}/${report.fights.length}`);
     }
 
-    const newPulls = transformReportToPulls(fightDataList);
+    const newPulls = transformReportToPulls(fightDataList, abilityMap);
     setPulls(newPulls);
     setSelectedPullId(null);
     setLoadedReportCode(report.code);
@@ -185,6 +189,10 @@ export default function Home() {
     setImportProgress(10);
     setImportStatus(`Loading ${report.fights.length} fight${report.fights.length === 1 ? "" : "s"}…`);
 
+    // Every ability used anywhere in the report, keyed by gameID — resolves
+    // ability names (including death causes) without falling back to "Ability {id}".
+    const abilityMap = buildFFLAbilityMap(report.masterData.abilities);
+
     const fightDataList = [] as Awaited<ReturnType<typeof fetchFFightData>>[];
     const totalFights   = Math.max(report.fights.length, 1);
 
@@ -198,7 +206,7 @@ export default function Home() {
       setImportStatus(`Loaded fight ${index + 1}/${report.fights.length}`);
     }
 
-    const newPulls = transformFFReportToPulls(fightDataList);
+    const newPulls = transformFFReportToPulls(fightDataList, abilityMap);
     setPulls(newPulls);
     setSelectedPullId(null);
     setLoadedReportCode(report.code);

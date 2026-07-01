@@ -53,6 +53,22 @@ export type WCLActor = {
   subType: string;    // spec name, e.g. "Arms", "Holy"
 };
 
+// A single ability/spell used anywhere in the report (players, NPCs, bosses —
+// everything). Fetched once per report via masterData and used to resolve
+// every abilityGameID / killingAbilityGameID we see in events, so we no
+// longer depend on a hand-maintained spell-name table.
+//
+// NOTE: field names (gameID/name/icon) are our best guess based on the WCL
+// schema's consistent naming (abilityGameID on events, id/name/type/subType
+// on actors). If the live schema uses different field names, GraphQL will
+// return a clear "Cannot query field" error — check the API explorer at
+// https://www.warcraftlogs.com/api/v2/client if that happens.
+export type WCLGameAbility = {
+  gameID: number;
+  name:   string;
+  icon?:  string;
+};
+
 export type WCLDeathEvent = {
   timestamp:            number;   // ms from report start (NOT fight start)
   type:                 "death";
@@ -148,7 +164,8 @@ export type WCLReport = {
   code:       string;
   fights:     WCLFight[];
   masterData: {
-    actors: WCLActor[];
+    actors:    WCLActor[];
+    abilities: WCLGameAbility[];
   };
 };
 
@@ -174,6 +191,11 @@ const REPORT_QUERY = /* graphql */`
             name
             type
             subType
+          }
+          abilities {
+            gameID
+            name
+            icon
           }
         }
       }

@@ -9,6 +9,7 @@ import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import type {
   WCLFightData,
   WCLActor,
+  WCLGameAbility,
   WCLDeathEvent,
   WCLCombatantInfoEvent,
   WCLCastEvent,
@@ -18,6 +19,22 @@ import type {
 } from "./wcl-client";
 import { getSpellName }                from "./spell-data";
 import { getSpecInfo, getRosterSortOrder } from "./spec-data";
+
+// ─── Ability name resolution ───────────────────────────────────────────────────
+//
+// Resolution order for any ability ID:
+//   1. Name embedded directly on the event itself (event.ability.name) — WCL
+//      already includes this on most event types.
+//   2. The report's own masterData.abilities list — covers every ability
+//      actually used in this report, including ones that never carry an
+//      embedded name (e.g. killingAbilityGameID on death events).
+//   3. The hand-maintained spell-data.ts table — last-resort fallback for
+//      the rare ID that's missing from both of the above.
+//   4. "Unknown (ID: X)".
+
+export function buildAbilityMap(abilities: WCLGameAbility[]): Map<number, string> {
+  return new Map(abilities.map((a) => [a.gameID, a.name]));
+}
 
 // ─── CastEvent (app-internal, used by AnalysisPanel) ─────────────────────────
 
@@ -65,11 +82,17 @@ function transformDeath(
   event:       WCLDeathEvent,
   actorMap:    Map<number, WCLActor>,
   specIdMap:   Map<number, number>,   // actorId → specId
+  abilityMap:  Map<number, string>,   // gameID → name, from masterData.abilities
   fightStart:  number
 ): DeathEvent {
   const actor  = actorMap.get(event.targetID);
   const specId = specIdMap.get(event.targetID) ?? 0;
   const spec   = getSpecInfo(specId);
+
+  const killingId = event.killingAbilityGameID ?? 0;
+  const cause = killingId
+    ? abilityMap.get(killingId) ?? getSpellName(killingId)
+    : "Unknown";
 
   return {
     timestamp:            event.timestamp - fightStart,
@@ -77,18 +100,25 @@ function transformDeath(
     class:                actor?.type ?? spec.className,
     specId,
     role:                 specId ? spec.role : "DPS",
-    killingAbilityGameId: event.killingAbilityGameID ?? 0,
-    cause:                getSpellName(event.killingAbilityGameID ?? 0),
+    killingAbilityGameId: killingId,
+    cause,
   };
 }
 
 // ─── Safe ability name accessor ───────────────────────────────────────────────
 // WCL does not guarantee `ability` is present on every event (environmental
 // damage, some proc events, and mixed-stream events may omit it entirely).
+// Resolution order: embedded name → report's masterData.abilities → the
+// hand-maintained spell-data.ts table → "Unknown".
 
-function abilityName(event: { abilityGameID?: number; ability?: { name?: string } }): string {
+function abilityName(
+  event:      { abilityGameID?: number; ability?: { name?: string } },
+  abilityMap: Map<number, string>
+): string {
   if (event.ability?.name) return event.ability.name;
-  if (event.abilityGameID) return getSpellName(event.abilityGameID);
+  if (event.abilityGameID) {
+    return abilityMap.get(event.abilityGameID) ?? getSpellName(event.abilityGameID);
+  }
   return "Unknown";
 }
 
@@ -98,6 +128,7 @@ function transformCast(
   event:      WCLCastEvent,
   actorMap:   Map<number, WCLActor>,
   specIdMap:  Map<number, number>,
+  abilityMap: Map<number, string>,
   fightStart: number
 ): CastEvent {
   const actor  = actorMap.get(event.sourceID);
@@ -111,7 +142,7 @@ function transformCast(
     sourceClass:    actor?.type ?? spec.className,
     role:           specId ? spec.role : "DPS",
     abilityId:      event.abilityGameID,
-    abilityName:    abilityName(event),
+    abilityName:    abilityName(event, abilityMap),
     resourceActor:  event.resourceActor,
     classResources: event.classResources,
     hitPoints:      event.hitPoints,
@@ -134,24 +165,26 @@ function transformCast(
 
 function damageToPlayerEvent(
   event:      WCLDamageEvent,
+  abilityMap: Map<number, string>,
   fightStart: number
 ): PlayerEvent {
   return {
     timestamp:   event.timestamp - fightStart,
     abilityId:   event.abilityGameID ?? 0,
-    abilityName: abilityName(event),
+    abilityName: abilityName(event, abilityMap),
     amount:      event.amount,
   };
 }
 
 function healToPlayerEvent(
   event:      WCLHealEvent,
+  abilityMap: Map<number, string>,
   fightStart: number
 ): PlayerEvent {
   return {
     timestamp:   event.timestamp - fightStart,
     abilityId:   event.abilityGameID ?? 0,
-    abilityName: abilityName(event),
+    abilityName: abilityName(event, abilityMap),
     amount:      event.amount,
   };
 }
@@ -159,25 +192,27 @@ function healToPlayerEvent(
 function debuffToPlayerEvent(
   event:      WCLDebuffEvent,
   actorMap:   Map<number, WCLActor>,
+  abilityMap: Map<number, string>,
   fightStart: number
 ): PlayerEvent {
   const target = actorMap.get(event.targetID);
   return {
     timestamp:   event.timestamp - fightStart,
     abilityId:   event.abilityGameID ?? 0,
-    abilityName: abilityName(event),
+    abilityName: abilityName(event, abilityMap),
     extra:       target?.name,
   };
 }
 
 function castToPlayerEvent(
   event:      WCLCastEvent,
+  abilityMap: Map<number, string>,
   fightStart: number
 ): PlayerEvent {
   return {
     timestamp:   event.timestamp - fightStart,
     abilityId:   event.abilityGameID ?? 0,
-    abilityName: abilityName(event),
+    abilityName: abilityName(event, abilityMap),
   };
 }
 
@@ -187,6 +222,7 @@ function buildPlayers(
   combatantInfos:    WCLCombatantInfoEvent[],
   actorMap:          Map<number, WCLActor>,
   specIdMap:         Map<number, number>,
+  abilityMap:        Map<number, string>,
   castEvents:        WCLCastEvent[],
   damageDoneEvents:  WCLDamageEvent[],
   damageTakenEvents: WCLDamageEvent[],
@@ -213,23 +249,23 @@ function buildPlayers(
 
         damageDone: damageDoneEvents
           .filter(e => e.sourceID === actorId)
-          .map(e => damageToPlayerEvent(e, fightStart)),
+          .map(e => damageToPlayerEvent(e, abilityMap, fightStart)),
 
         damageTaken: damageTakenEvents
           .filter(e => e.targetID === actorId)
-          .map(e => damageToPlayerEvent(e, fightStart)),
+          .map(e => damageToPlayerEvent(e, abilityMap, fightStart)),
 
         healing: healingEvents
           .filter(e => e.sourceID === actorId)
-          .map(e => healToPlayerEvent(e, fightStart)),
+          .map(e => healToPlayerEvent(e, abilityMap, fightStart)),
 
         debuffs: debuffEvents
           .filter(e => e.sourceID === actorId)
-          .map(e => debuffToPlayerEvent(e, actorMap, fightStart)),
+          .map(e => debuffToPlayerEvent(e, actorMap, abilityMap, fightStart)),
 
         casts: castEvents
           .filter(e => e.sourceID === actorId)
-          .map(e => castToPlayerEvent(e, fightStart)),
+          .map(e => castToPlayerEvent(e, abilityMap, fightStart)),
       };
     })
     .sort((a, b) => getRosterSortOrder(a.specId) - getRosterSortOrder(b.specId));
@@ -239,6 +275,7 @@ function buildPlayers(
 
 export function transformFightToPull(
   data:        WCLFightData,
+  abilityMap:  Map<number, string>,
   idOverride?: number
 ): Pull & { castEvents: CastEvent[] } {
   const actorMap  = buildActorMap(data.actors);
@@ -251,17 +288,18 @@ export function transformFightToPull(
   }
 
   const deathEvents: DeathEvent[] = data.deathEvents.map((e) =>
-    transformDeath(e, actorMap, specIdMap, fightStart)
+    transformDeath(e, actorMap, specIdMap, abilityMap, fightStart)
   );
 
   const castEvents: CastEvent[] = data.castEvents.map((e) =>
-    transformCast(e, actorMap, specIdMap, fightStart)
+    transformCast(e, actorMap, specIdMap, abilityMap, fightStart)
   );
 
   const players: PlayerInfo[] = buildPlayers(
     data.combatantInfos,
     actorMap,
     specIdMap,
+    abilityMap,
     data.castEvents,
     data.damageDoneEvents,
     data.damageTakenEvents,
@@ -288,9 +326,10 @@ export function transformFightToPull(
 }
 
 export function transformReportToPulls(
-  fightDataList: WCLFightData[]
+  fightDataList: WCLFightData[],
+  abilityMap:    Map<number, string>
 ): Array<Pull & { castEvents: CastEvent[] }> {
   return fightDataList
     .sort((a, b) => a.fight.startTime - b.fight.startTime)
-    .map((data, i) => transformFightToPull(data, i + 1));
+    .map((data, i) => transformFightToPull(data, abilityMap, i + 1));
 }
