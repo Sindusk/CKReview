@@ -1,0 +1,148 @@
+          {
+            "timestamp": 10712733,
+            "type": "cast",
+            "sourceID": 18,
+            "targetID": 23,
+            "abilityGameID": 1242174,
+            "fight": 43,
+            "resourceActor": 1,
+            "classResources": [
+              {
+                "amount": 760,
+                "max": 1000,
+                "type": 6,
+                "cost": 300
+              }
+            ],
+            "hitPoints": 346789,
+            "maxHitPoints": 536960,
+            "attackPower": 3437,
+            "spellPower": 345,
+            "armor": 1985,
+            "absorb": 2375,
+            "x": 460922,
+            "y": 1071876,
+            "facing": -614,
+            "mapID": 2533,
+            "versatility": 798,
+            "avoidance": 249,
+            "itemLevel": 291
+          },
+          {
+            "timestamp": 10712834,
+            "type": "cast",
+            "sourceID": 4,
+            "targetID": -1,
+            "abilityGameID": 456366,
+            "fight": 43,
+            "resourceActor": 1,
+            "classResources": [
+              {
+                "amount": 71510,
+                "max": 275730,
+                "type": 0
+              }
+            ],
+            "hitPoints": 479599,
+            "maxHitPoints": 544540,
+            "attackPower": 922,
+            "spellPower": 2689,
+            "armor": 2268,
+            "absorb": 60760,
+            "x": 460909,
+            "y": 1071472,
+            "facing": -702,
+            "mapID": 2533,
+            "versatility": 1911,
+            "avoidance": 0,
+            "itemLevel": 291
+          },
+          {
+            "timestamp": 10712834,
+            "type": "cast",
+            "sourceID": 4,
+            "targetID": -1,
+            "abilityGameID": 444995,
+            "fight": 43,
+            "resourceActor": 1,
+            "classResources": [
+              {
+                "amount": 71512,
+                "max": 275730,
+                "type": 0,
+                "cost": 16250
+              }
+            ],
+            "hitPoints": 493598,
+            "maxHitPoints": 544540,
+            "attackPower": 922,
+            "spellPower": 2689,
+            "armor": 2268,
+            "absorb": 60760,
+            "x": 460909,
+            "y": 1071472,
+            "facing": -702,
+            "mapID": 2533,
+            "versatility": 1911,
+            "avoidance": 0,
+            "itemLevel": 291
+          },
+          {
+            "timestamp": 10713686,
+            "type": "cast",
+            "sourceID": 28,
+            "targetID": -1,
+            "abilityGameID": 6343,
+            "fight": 43,
+            "resourceActor": 1,
+            "classResources": [
+              {
+                "amount": 377,
+                "max": 1300,
+                "type": 1
+              }
+            ],
+            "hitPoints": 85196,
+            "maxHitPoints": 601620,
+            "attackPower": 3513,
+            "spellPower": 433,
+            "armor": 2070,
+            "absorb": 0,
+            "x": 461142,
+            "y": 1071809,
+            "facing": -597,
+            "mapID": 2533,
+            "versatility": 1048,
+            "avoidance": 0,
+            "itemLevel": 291
+          },
+          {
+            "timestamp": 10714014,
+            "type": "cast",
+            "sourceID": 18,
+            "targetID": 23,
+            "abilityGameID": 1242174,
+            "fight": 43,
+            "resourceActor": 1,
+            "classResources": [
+              {
+                "amount": 460,
+                "max": 1000,
+                "type": 6,
+                "cost": 300
+              }
+            ],
+            "hitPoints": 59529,
+            "maxHitPoints": 536960,
+            "attackPower": 3437,
+            "spellPower": 345,
+            "armor": 1985,
+            "absorb": 2306,
+            "x": 460922,
+            "y": 1071876,
+            "facing": -614,
+            "mapID": 2533,
+            "versatility": 798,
+            "avoidance": 249,
+            "itemLevel": 291
+          }

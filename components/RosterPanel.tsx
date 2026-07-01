@@ -243,11 +243,21 @@ type RosterPanelProps = {
 export default function RosterPanel({ players }: RosterPanelProps) {
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerInfo | null>(null);
 
+  // FFLogs includes a synthetic "Multiple Players / LimitBreak" actor that
+  // represents the party Limit Break ability. Filter it out — it is not a
+  // real player and should never appear in the roster.
+  const filteredPlayers = players.filter(
+    p =>
+      p.name !== "Multiple Players" &&
+      p.specName !== "LimitBreak" &&
+      p.specName !== "Limit Break"
+  );
+
   if (selectedPlayer) {
     return <PlayerDetail player={selectedPlayer} onBack={() => setSelectedPlayer(null)} />;
   }
 
-  if (players.length === 0) {
+  if (filteredPlayers.length === 0) {
     return (
       <div
         style={{
@@ -270,23 +280,23 @@ export default function RosterPanel({ players }: RosterPanelProps) {
     );
   }
 
-  const tankCount = players.filter(player => player.role === "Tank").length;
-  const healerCount = players.filter(player => player.role === "Healer").length;
-  const dpsCount = players.filter(player => player.role === "DPS").length;
+  const tankCount = filteredPlayers.filter(player => player.role === "Tank").length;
+  const healerCount = filteredPlayers.filter(player => player.role === "Healer").length;
+  const dpsCount = filteredPlayers.filter(player => player.role === "DPS").length;
 
   const COLS = 4;
   const ROWS = 5;
   const GROUP_SIZE = COLS * ROWS;
 
   const groups: PlayerInfo[][] = [];
-  for (let i = 0; i < players.length; i += GROUP_SIZE) {
-    groups.push(players.slice(i, i + GROUP_SIZE));
+  for (let i = 0; i < filteredPlayers.length; i += GROUP_SIZE) {
+    groups.push(filteredPlayers.slice(i, i + GROUP_SIZE));
   }
 
-  const needsScroll = players.length > GROUP_SIZE;
+  const needsScroll = filteredPlayers.length > GROUP_SIZE;
 
   return (
-    <div style={{ height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+    <div style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div
         style={{
           padding: "6px 10px",
@@ -305,7 +315,7 @@ export default function RosterPanel({ players }: RosterPanelProps) {
       >
         <span>Roster</span>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#777", flexWrap: "wrap", justifyContent: "flex-end" }}>
-          <span>{players.length} players</span>
+          <span>{filteredPlayers.length} players</span>
           {tankCount > 0 && <span style={{ color: ROLE_COLOR.Tank }}>Tanks {tankCount}</span>}
           {healerCount > 0 && <span style={{ color: ROLE_COLOR.Healer }}>Healers {healerCount}</span>}
           {dpsCount > 0 && <span style={{ color: ROLE_COLOR.DPS }}>DPS {dpsCount}</span>}
@@ -314,12 +324,11 @@ export default function RosterPanel({ players }: RosterPanelProps) {
 
       <div
         style={{
-          flex: 1,
           overflowX: needsScroll ? "auto" : "hidden",
           overflowY: "hidden",
           display: "flex",
           gap: "8px",
-          padding: "8px 8px 28px",
+          padding: "8px",
           boxSizing: "border-box",
         }}
       >
@@ -329,7 +338,7 @@ export default function RosterPanel({ players }: RosterPanelProps) {
             style={{
               display: "grid",
               gridTemplateColumns: `repeat(${COLS}, minmax(0, 1fr))`,
-              gridTemplateRows: `repeat(${ROWS}, 1fr)`,
+              gridTemplateRows: `repeat(${ROWS}, auto)`,
               gridAutoFlow: "column",
               gap: "4px",
               flexShrink: 0,

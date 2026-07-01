@@ -1,48 +1,52 @@
 import BurgerMenu from "./BurgerMenu";
 
 type HeaderProps = {
-  onAddVod: () => void;
+  onAddVod:     () => void;
   onConnectWCL: () => void;
+  onConnectFFL: () => void;
 };
 
-export default function Header({ onAddVod, onConnectWCL }: HeaderProps) {
+export default function Header({ onAddVod, onConnectWCL, onConnectFFL }: HeaderProps) {
   return (
     <header
       style={{
-        display: "flex",
-        alignItems: "center",
+        display:        "flex",
+        alignItems:     "center",
         justifyContent: "space-between",
-        height: "80px",
-        padding: "0 20px",
-        borderBottom: "1px solid #444",
-        background: "#06070a",
-        overflow: "hidden",
+        height:         "80px",
+        padding:        "0 20px",
+        borderBottom:   "1px solid #444",
+        background:     "#06070a",
+        overflow:       "visible",   // was "hidden" — must be visible so the burger dropdown can escape
+        position:       "relative",  // establishes stacking context above the grid below
+        zIndex:         100,
       }}
     >
-      <BurgerMenu onConnectWCL={onConnectWCL} />
+      <BurgerMenu onConnectWCL={onConnectWCL} onConnectFFL={onConnectFFL} />
 
       <div
         style={{
-          display: "flex",
-          alignItems: "center",
+          display:        "flex",
+          alignItems:     "center",
           justifyContent: "center",
-          flex: 1,
-          height: "100%",
-          minWidth: 0,
-          padding: "0 8px",
+          flex:           1,
+          height:         "100%",
+          minWidth:       0,
+          padding:        "0 8px",
         }}
       >
         <img
-          src="/ckreviewv3.jpg"
+          src="/ckreviewv9.png"
           alt="Consistency Kings Raid Review"
           style={{
-            display: "block",
-            width: "100%",
-            maxWidth: "1536px",
-            height: "auto",
-            objectFit: "fill",
+            display:        "block",
+            width:          "100%",
+            maxWidth:       "1536px",
+            height:         "auto",
+            maxHeight:      "100%",
+            objectFit:      "scale-down",
             objectPosition: "center",
-            background: "transparent",
+            background:     "transparent",
           }}
         />
       </div>
@@ -52,12 +56,12 @@ export default function Header({ onAddVod, onConnectWCL }: HeaderProps) {
           onClick={onAddVod}
           style={{
             backgroundColor: "#2563eb",
-            color: "white",
-            border: "none",
-            borderRadius: "6px",
-            padding: "10px 18px",
-            fontWeight: "bold",
-            cursor: "pointer",
+            color:           "white",
+            border:          "none",
+            borderRadius:    "6px",
+            padding:         "10px 18px",
+            fontWeight:      "bold",
+            cursor:          "pointer",
           }}
         >
           Add VOD

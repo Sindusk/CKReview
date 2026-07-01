@@ -2,12 +2,32 @@
 
 import { useState, useEffect, useRef } from "react";
 import { isAuthenticated } from "@/lib/wcl-auth";
+import { isFFAuthenticated } from "@/lib/ffl-auth";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type BurgerMenuProps = {
   onConnectWCL: () => void;
+  onConnectFFL: () => void;
 };
+
+// ─── Section Divider ──────────────────────────────────────────────────────────
+
+function SectionLabel({ label }: { label: string }) {
+  return (
+    <div
+      style={{
+        fontSize:      "10px",
+        color:         "#555",
+        textTransform: "uppercase",
+        letterSpacing: "0.08em",
+        padding:       "4px 14px 6px",
+      }}
+    >
+      {label}
+    </div>
+  );
+}
 
 // ─── Menu Item ────────────────────────────────────────────────────────────────
 
@@ -33,19 +53,19 @@ function MenuItem({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        display:         "flex",
-        alignItems:      "center",
-        gap:             "10px",
-        width:           "100%",
-        padding:         "9px 14px",
-        background:      !disabled && hovered ? "#2a2a2a" : "transparent",
-        border:          "none",
-        borderRadius:    "5px",
-        color:           disabled ? "#555" : hovered ? "#fff" : "#ccc",
-        fontSize:        "13px",
-        cursor:          disabled ? "default" : "pointer",
-        textAlign:       "left",
-        transition:      "background 0.1s, color 0.1s",
+        display:      "flex",
+        alignItems:   "center",
+        gap:          "10px",
+        width:        "100%",
+        padding:      "9px 14px",
+        background:   !disabled && hovered ? "#2a2a2a" : "transparent",
+        border:       "none",
+        borderRadius: "5px",
+        color:        disabled ? "#555" : hovered ? "#fff" : "#ccc",
+        fontSize:     "13px",
+        cursor:       disabled ? "default" : "pointer",
+        textAlign:    "left",
+        transition:   "background 0.1s, color 0.1s",
       }}
     >
       <span style={{ fontSize: "15px", width: "18px", textAlign: "center", flexShrink: 0 }}>
@@ -65,15 +85,18 @@ function MenuItem({
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function BurgerMenu({ onConnectWCL }: BurgerMenuProps) {
-  const [open, setOpen]           = useState(false);
-  const [wclReady, setWclReady]   = useState(false);
-  const containerRef              = useRef<HTMLDivElement>(null);
+export default function BurgerMenu({ onConnectWCL, onConnectFFL }: BurgerMenuProps) {
+  const [open, setOpen]         = useState(false);
+  const [wclReady, setWclReady] = useState(false);
+  const [fflReady, setFflReady] = useState(false);
+  const containerRef            = useRef<HTMLDivElement>(null);
 
-  // Read localStorage only on the client to avoid SSR mismatch
+  // Read localStorage only on the client to avoid SSR mismatch.
+  // Re-check every time the menu opens so state reflects any mid-session changes.
   useEffect(() => {
     setWclReady(isAuthenticated());
-  }, [open]); // re-check every time the menu opens
+    setFflReady(isFFAuthenticated());
+  }, [open]);
 
   // Close on click outside
   useEffect(() => {
@@ -102,8 +125,16 @@ export default function BurgerMenu({ onConnectWCL }: BurgerMenuProps) {
     onConnectWCL();
   }
 
+  function handleConnectFFL() {
+    setOpen(false);
+    onConnectFFL();
+  }
+
   return (
-    <div ref={containerRef} style={{ position: "relative", width: "120px" }}>
+    // position: relative here so the dropdown can use position: absolute
+    // without being clipped by parent overflow. The zIndex on the dropdown
+    // itself must exceed anything in the layout below the header.
+    <div ref={containerRef} style={{ position: "relative", width: "120px", zIndex: 200 }}>
       {/* Burger button */}
       <button
         onClick={() => setOpen((v) => !v)}
@@ -145,54 +176,67 @@ export default function BurgerMenu({ onConnectWCL }: BurgerMenuProps) {
         ))}
       </button>
 
-      {/* Dropdown */}
+      {/* Dropdown
+          zIndex: 300 ensures it renders above the grid panels (border/background
+          elements) that sit below the header in the page layout. */}
       {open && (
         <div
           style={{
             position:        "absolute",
             top:             "calc(100% + 8px)",
             left:            0,
-            minWidth:        "240px",
+            minWidth:        "260px",
             backgroundColor: "#1a1a1a",
             border:          "1px solid #333",
             borderRadius:    "8px",
             padding:         "6px",
-            boxShadow:       "0 8px 24px rgba(0,0,0,0.5)",
-            zIndex:          100,
+            boxShadow:       "0 8px 24px rgba(0,0,0,0.6)",
+            zIndex:          300,
           }}
         >
-          {/* Section: Integrations */}
-          <div
-            style={{
-              fontSize:      "10px",
-              color:         "#555",
-              textTransform: "uppercase",
-              letterSpacing: "0.08em",
-              padding:       "4px 14px 6px",
-            }}
-          >
-            Integrations
-          </div>
+          {/* ── WarcraftLogs ── */}
+          <SectionLabel label="WarcraftLogs" />
 
           {wclReady ? (
             <MenuItem
               icon="✅"
               label="WarcraftLogs Connected"
-              sublabel="Ready to receive reports"
+              sublabel="Ready to import WoW reports"
               disabled
             />
           ) : (
             <MenuItem
               icon="📊"
               label="Connect WarcraftLogs"
-              sublabel="Authorize to import reports"
+              sublabel="Authorize to import WoW reports"
               onClick={handleConnectWCL}
+            />
+          )}
+
+          {/* Thin rule between sections */}
+          <div style={{ height: "1px", backgroundColor: "#2a2a2a", margin: "6px 8px" }} />
+
+          {/* ── FFLogs ── */}
+          <SectionLabel label="FFLogs" />
+
+          {fflReady ? (
+            <MenuItem
+              icon="✅"
+              label="FFLogs Connected"
+              sublabel="Ready to import FFXIV reports"
+              disabled
+            />
+          ) : (
+            <MenuItem
+              icon="🎮"
+              label="Connect FFLogs"
+              sublabel="Authorize to import FFXIV reports"
+              onClick={handleConnectFFL}
             />
           )}
 
           {/*
             ── Add future menu items below ──
-            <MenuItem icon="📁" label="Connect FFLogs" onClick={handleFFLogs} />
           */}
         </div>
       )}
