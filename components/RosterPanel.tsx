@@ -296,7 +296,7 @@ export default function RosterPanel({ players }: RosterPanelProps) {
   const needsScroll = filteredPlayers.length > GROUP_SIZE;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", overflow: "hidden" }}>
+    <div style={{ height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div
         style={{
           padding: "6px 10px",

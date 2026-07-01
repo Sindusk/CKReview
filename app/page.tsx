@@ -315,7 +315,11 @@ export default function Home() {
         <div style={{ display: "flex", flexDirection: "column", gap: "10px", overflow: "hidden", minHeight: 0 }}>
           <div
             style={{
+              // Fixed to fit exactly one column of 5 players (header + 5 rows).
+              // Drilling into a player's detail tabs scrolls WITHIN this
+              // height instead of expanding the panel.
               flex:          "0 0 auto",
+              height:        "300px",
               border:        "1px solid #333",
               overflow:      "hidden",
               display:       "flex",

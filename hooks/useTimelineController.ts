@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Pull } from "@/types/Pull";
 import type { Vod } from "@/types/Vod";
 
@@ -7,6 +7,15 @@ type TimelineControllerProps = {
   pull:            Pull | null;
   pulls:           Pull[];                        // full list for auto-detection
   onPullDetected:  (pullId: number) => void;      // called when video crosses into a different pull
+};
+
+// One-shot seek command. `token` is bumped on every request so that
+// clicking the same target twice in a row still produces a NEW object
+// reference — otherwise React bails out of the effect in VideoPanel
+// because the seekRequest value "hasn't changed".
+export type SeekRequest = {
+  time:  number;
+  token: number;
 };
 
 export default function useTimelineController({
@@ -22,7 +31,15 @@ export default function useTimelineController({
   const [playbackTime, setPlaybackTime] = useState(0);
 
   // One-shot seek command sent down to VideoPanel
-  const [seekRequest, setSeekRequest] = useState<number | null>(null);
+  const [seekRequest, setSeekRequest] = useState<SeekRequest | null>(null);
+  const seekTokenRef = useRef(0);
+
+  // Always emits a brand-new object so repeated seeks to the same time
+  // still trigger VideoPanel's effect.
+  const emitSeek = useCallback((time: number) => {
+    seekTokenRef.current += 1;
+    setSeekRequest({ time, token: seekTokenRef.current });
+  }, []);
 
   // ─── Derived ─────────────────────────────────────────────────────────────────
 
@@ -55,7 +72,7 @@ export default function useTimelineController({
 
     const base = (vod.offset ?? 0) + pull.startTime;
     setPlaybackTime(0);
-    setSeekRequest(base);
+    emitSeek(base);
   }, [vod?.id, pull?.id]);
 
   // Reset playback when pull is cleared
@@ -119,14 +136,14 @@ export default function useTimelineController({
     const newPlayback = clamped * pullDuration;
 
     setPlaybackTime(newPlayback);
-    setSeekRequest((vod.offset ?? 0) + pull.startTime + newPlayback);
+    emitSeek((vod.offset ?? 0) + pull.startTime + newPlayback);
   }
 
   // ─── Jump to pull start ───────────────────────────────────────────────────────
 
   function seekToPullStart(offsetOverride = 0) {
     if (!pull || !vod) return;
-    setSeekRequest((vod.offset ?? 0) + pull.startTime + offsetOverride);
+    emitSeek((vod.offset ?? 0) + pull.startTime + offsetOverride);
   }
 
   // ─── Raw video time (for the Sync button label) ───────────────────────────────
@@ -157,7 +174,7 @@ export default function useTimelineController({
     updateFromVideo,
     updateRawVideoTime,
 
-    // Seek command for VideoPanel
+    // Seek command for VideoPanel — { time, token } | null
     seekRequest,
   };
 }

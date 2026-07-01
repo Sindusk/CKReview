@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import type { Vod } from "@/types/Vod";
+import type { SeekRequest } from "@/hooks/useTimelineController";
 
 declare global {
   interface Window {
@@ -29,8 +30,9 @@ type YTOnStateChangeEvent = {
 type VideoPanelProps = {
   vod: Vod | null;
 
-  // ONE-TIME SEEK COMMAND ONLY
-  seekRequest: number | null;
+  // ONE-TIME SEEK COMMAND ONLY. `token` is bumped on every request so that
+  // seeking to the same time twice in a row still re-fires the effect below.
+  seekRequest: SeekRequest | null;
 
   // continuous playback reporting
   onCurrentTimeChange?: (time: number) => void;
@@ -141,16 +143,21 @@ export default function VideoPanel({
    * =========================
    * SEEK HANDLER (ONE-SHOT ONLY)
    * =========================
+   * Depends on the whole `seekRequest` object (not just its time), so a
+   * repeat click on the same timestamp — which bumps `token` and creates a
+   * new object — still re-triggers this effect and re-seeks the player.
    */
   useEffect(() => {
     if (seekRequest === null) return;
 
+    const { time } = seekRequest;
+
     // Always store latest seek
-    pendingSeekRef.current = seekRequest;
+    pendingSeekRef.current = time;
 
     if (!playerRef.current || !playerReadyRef.current) return;
 
-    playerRef.current.seekTo(seekRequest, true);
+    playerRef.current.seekTo(time, true);
     playerRef.current.playVideo();
   }, [seekRequest]);
 
@@ -182,10 +189,10 @@ export default function VideoPanel({
     if (!vod || seekRequest === null) return;
 
     // When VOD changes, ALWAYS re-arm seek
-    pendingSeekRef.current = seekRequest;
+    pendingSeekRef.current = seekRequest.time;
 
     if (playerRef.current && playerReadyRef.current) {
-      playerRef.current.seekTo(seekRequest, true);
+      playerRef.current.seekTo(seekRequest.time, true);
       playerRef.current.playVideo();
     }
   }, [vod?.id]);

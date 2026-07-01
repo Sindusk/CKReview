@@ -46,21 +46,27 @@ export default function VODSidebar({
         VODs
       </div>
 
+      {/*
+        Fixed to the height of a single row of VOD cards. With ~3 VODs this
+        never needs to scroll; a 4th+ VOD just scrolls horizontally instead
+        of eating vertical space that PullList needs below.
+      */}
       <div
         style={{
-          flex: "0 0 28%",
-          minHeight: 0,
-          overflowY: "auto",
-          padding: "8px",
-          display: "grid",
-          gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-          gap: "8px",
-          alignContent: "start",
+          flex:       "0 0 auto",
+          height:     "86px",
+          minHeight:  0,
+          overflowX:  "auto",
+          overflowY:  "hidden",
+          padding:    "8px",
+          display:    "flex",
+          flexWrap:   "nowrap",
+          gap:        "8px",
           borderBottom: "1px solid #333",
         }}
       >
         {vods.length === 0 && (
-          <div style={{ color: "#777", fontSize: "14px", gridColumn: "1 / -1" }}>
+          <div style={{ color: "#777", fontSize: "14px", alignSelf: "center" }}>
             No VODs added yet
           </div>
         )}
@@ -80,7 +86,8 @@ export default function VODSidebar({
                 backgroundColor: isSelected ? "#1e293b" : "#111",
                 color: "white",
                 cursor: "pointer",
-                minHeight: "70px",
+                width: "130px",
+                flexShrink: 0,
                 display: "flex",
                 flexDirection: "column",
                 justifyContent: "space-between",
