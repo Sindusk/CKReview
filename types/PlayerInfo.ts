@@ -13,7 +13,7 @@ export type PlayerEvent = {
   abilityId:   number;
   abilityName: string;
   amount?:     number;  // damage / healing value when relevant
-  extra?:      string;  // e.g. debuff target name — intentionally not rendered in the UI
+  extra?:      string;  // e.g. debuff source (caster) name — intentionally not rendered in the UI
 
   // Target/source labeling — populated depending on tab, see usage below.
   target?:       string;  // target actor name — Damage Done, Healing, Casts (blank = no target)
@@ -27,6 +27,11 @@ export type PlayerEvent = {
   healthAfter?:  number;  // target's health immediately after this hit
   maxHealth?:    number;  // for context/formatting
   overkill?:     number;  // set only on fatal hits
+
+  // Debuffs — carries which side of the on/off transition this event
+  // represents, so error-detection.ts can reconstruct uptime windows
+  // ("was this debuff active on the player at time T?").
+  debuffStatus?: "applied" | "removed" | "stack";
 };
 
 export type PlayerInfo = {

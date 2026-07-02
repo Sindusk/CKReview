@@ -19,6 +19,7 @@ import type {
 } from "./wcl-client";
 import { getSpellName }                from "./spell-data";
 import { getSpecInfo, getRosterSortOrder } from "./spec-data";
+import { detectPullErrors }            from "./error-detection";
 
 // ─── Ability name resolution ───────────────────────────────────────────────────
 //
@@ -223,18 +224,29 @@ function healToPlayerEvent(
   };
 }
 
+// NOTE: this is keyed by the debuff's TARGET (the player carrying it), not
+// its source — buildPlayers() below filters debuffEvents by targetID, since
+// what we care about is "which debuffs does this player currently have",
+// not "which debuffs did this player apply to something else". `extra`
+// therefore reports the source/caster name for context instead.
 function debuffToPlayerEvent(
   event:      WCLDebuffEvent,
   actorMap:   Map<number, WCLActor>,
   abilityMap: Map<number, string>,
   fightStart: number
 ): PlayerEvent {
-  const target = actorMap.get(event.targetID);
+  const source = actorMap.get(event.sourceID);
+  const debuffStatus =
+    event.type === "removedebuff"      ? "removed" :
+    event.type === "applydebuffstack"  ? "stack"   :
+    "applied";
+
   return {
     timestamp:   event.timestamp - fightStart,
     abilityId:   event.abilityGameID ?? 0,
     abilityName: abilityName(event, abilityMap),
-    extra:       target?.name,
+    extra:       source?.name,
+    debuffStatus,
   };
 }
 
@@ -302,7 +314,7 @@ function buildPlayers(
           .map(e => healToPlayerEvent(e, actorMap, abilityMap, fightStart)),
 
         debuffs: debuffEvents
-          .filter(e => e.sourceID === actorId)
+          .filter(e => e.targetID === actorId)
           .map(e => debuffToPlayerEvent(e, actorMap, abilityMap, fightStart)),
 
         casts: castEvents
@@ -350,6 +362,8 @@ export function transformFightToPull(
     fightStart
   );
 
+  const errors = detectPullErrors(players);
+
   const fightDurationMs = data.fight.endTime - data.fight.startTime;
   const startTimeSec    = Math.round(data.fight.startTime / 1000);
   const endTimeSec      = Math.round(data.fight.endTime   / 1000);
@@ -363,6 +377,7 @@ export function transformFightToPull(
     fightDuration: fightDurationMs,
     deathEvents,
     players,
+    errors,
     castEvents,
   };
 }

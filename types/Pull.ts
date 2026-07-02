@@ -2,6 +2,7 @@
 
 import type { DeathEvent } from "./DeathEvent";
 import type { PlayerInfo } from "./PlayerInfo";
+import type { PullError }  from "./PullError";
 
 export type Pull = {
   id:            number;
@@ -12,4 +13,5 @@ export type Pull = {
   fightDuration: number;    // actual fight length in ms (from logs)
   deathEvents:   DeathEvent[];
   players:       PlayerInfo[];  // roster for this pull, from CombatantInfo
+  errors:        PullError[];   // detected mistakes (Major + Minor) — see lib/error-rules.ts
 };

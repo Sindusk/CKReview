@@ -2,11 +2,59 @@
 
 import { useState } from "react";
 import type { Pull } from "@/types/Pull";
+import type { DeathEvent } from "@/types/DeathEvent";
+import type { PullError } from "@/types/PullError";
 
 type AnalysisPanelProps = {
   pull: Pull | null;
   playbackTimeMs: number;
   onSeekToTime?: (ms: number) => void;
+};
+
+type Tab = "Overall" | "Deaths" | "Major" | "Minor";
+const TABS: Tab[] = ["Overall", "Deaths", "Major", "Minor"];
+
+// Unified shape for anything that can appear in the timeline feed —
+// a death, a Major error, or a Minor error.
+type FeedKind = "Death" | "Major" | "Minor";
+
+type FeedEntry = {
+  kind:      FeedKind;
+  timestamp: number;
+  player:    string;
+  class:     string;
+  role:      "Tank" | "Healer" | "DPS";
+  title:     string;    // death cause / error name
+  subtitle?: string;    // error description (deaths have none)
+};
+
+function deathToFeedEntry(d: DeathEvent): FeedEntry {
+  return {
+    kind:      "Death",
+    timestamp: d.timestamp,
+    player:    d.player,
+    class:     d.class,
+    role:      d.role,
+    title:     d.cause,
+  };
+}
+
+function errorToFeedEntry(e: PullError): FeedEntry {
+  return {
+    kind:      e.severity,
+    timestamp: e.timestamp,
+    player:    e.player,
+    class:     e.class,
+    role:      e.role,
+    title:     e.name,
+    subtitle:  e.description,
+  };
+}
+
+const FEED_KIND_STYLE: Record<FeedKind, { icon: string; color: string; label: string }> = {
+  Death: { icon: "💀", color: "#f87171", label: "Death" },
+  Major: { icon: "⛔", color: "#fb923c", label: "Major" },
+  Minor: { icon: "⚠️", color: "#fbbf24", label: "Minor" },
 };
 
 function formatMs(ms: number): string {
@@ -74,23 +122,26 @@ function SectionLabel({ label, count }: { label: string; count?: number }) {
   );
 }
 
-function DeathRow({
-  event,
+function FeedRow({
+  entry,
   fightDuration,
   playbackTimeMs,
   onSeek,
+  showKindBadge,
 }: {
-  event: Pull["deathEvents"][number];
+  entry: FeedEntry;
   fightDuration: number;
   playbackTimeMs: number;
   onSeek?: (ms: number) => void;
+  showKindBadge?: boolean;   // show a Death/Major/Minor tag — used on the Overall tab
 }) {
   const [hovered, setHovered] = useState(false);
-  const hasPassed = playbackTimeMs >= event.timestamp;
-  const pct = fightDuration > 0 ? Math.round((event.timestamp / fightDuration) * 100) : 0;
-  const roleColor = ROLE_COLOR[event.role] ?? "#aaa";
-  const cls = classColor(event.class);
-  const seekTarget = Math.max(0, event.timestamp - 3000);
+  const hasPassed = playbackTimeMs >= entry.timestamp;
+  const pct = fightDuration > 0 ? Math.round((entry.timestamp / fightDuration) * 100) : 0;
+  const roleColor = ROLE_COLOR[entry.role] ?? "#aaa";
+  const cls = classColor(entry.class);
+  const style = FEED_KIND_STYLE[entry.kind];
+  const seekTarget = Math.max(0, entry.timestamp - 3000);
 
   return (
     <div
@@ -103,7 +154,7 @@ function DeathRow({
         gap: "8px",
         padding: "6px 10px",
         borderRadius: "5px",
-        backgroundColor: hovered ? "rgba(248,113,113,0.07)" : hasPassed ? "rgba(248,113,113,0.10)" : "transparent",
+        backgroundColor: hovered ? style.color + "12" : hasPassed ? style.color + "18" : "transparent",
         borderLeft: `2px solid ${hasPassed ? roleColor : "#2a2a2a"}`,
         marginBottom: "4px",
         cursor: onSeek ? "pointer" : "default",
@@ -120,11 +171,11 @@ function DeathRow({
           transition: "color 0.3s",
         }}
       >
-        {formatMs(event.timestamp)}
+        {formatMs(entry.timestamp)}
       </span>
 
       <span style={{ fontSize: "13px", flexShrink: 0, opacity: hasPassed ? 1 : 0.3, transition: "opacity 0.3s" }}>
-        💀
+        {style.icon}
       </span>
 
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -137,7 +188,7 @@ function DeathRow({
               transition: "color 0.3s",
             }}
           >
-            {event.player}
+            {entry.player}
           </span>
           <span
             style={{
@@ -151,15 +202,37 @@ function DeathRow({
               transition: "all 0.3s",
             }}
           >
-            {event.role}
+            {entry.role}
           </span>
           <span style={{ fontSize: "10px", color: hasPassed ? "#555" : "#333", flexShrink: 0, transition: "color 0.3s" }}>
-            {event.class}
+            {entry.class}
           </span>
+          {showKindBadge && (
+            <span
+              style={{
+                fontSize: "9px",
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: "0.04em",
+                color: hasPassed ? style.color : "#444",
+                border: `1px solid ${hasPassed ? style.color + "44" : "#2a2a2a"}`,
+                borderRadius: "3px",
+                padding: "1px 5px",
+                flexShrink: 0,
+              }}
+            >
+              {style.label}
+            </span>
+          )}
         </div>
-        <div style={{ fontSize: "11px", color: hasPassed ? "#f87171" : "#3a2020", marginTop: "2px", transition: "color 0.3s" }}>
-          ⚔ {event.cause}
+        <div style={{ fontSize: "11px", color: hasPassed ? style.color : "#3a3a20", marginTop: "2px", transition: "color 0.3s" }}>
+          {entry.kind === "Death" ? "⚔ " : ""}{entry.title}
         </div>
+        {entry.subtitle && (
+          <div style={{ fontSize: "10px", color: hasPassed ? "#666" : "#333", marginTop: "1px", transition: "color 0.3s" }}>
+            {entry.subtitle}
+          </div>
+        )}
       </div>
 
       <span style={{ fontSize: "10px", color: hasPassed ? "#555" : "#333", flexShrink: 0, transition: "color 0.3s" }}>
@@ -180,7 +253,74 @@ function StatPill({ label, value, color = "#ccc" }: { label: string; value: stri
   );
 }
 
+function TabBar({ value, onChange, counts }: { value: Tab; onChange: (t: Tab) => void; counts: Record<Tab, number> }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        gap: "2px",
+        padding: "4px 6px",
+        backgroundColor: "#0d0d0d",
+        borderBottom: "1px solid #1e1e1e",
+        flexShrink: 0,
+        flexWrap: "wrap",
+      }}
+    >
+      {TABS.map((tab) => {
+        const active = tab === value;
+        const count = counts[tab];
+        const badgeColor =
+          tab === "Major" ? "#fb923c" :
+          tab === "Minor" ? "#fbbf24" :
+          tab === "Deaths" ? "#f87171" :
+          "#94a3b8";
+
+        return (
+          <button
+            key={tab}
+            onClick={() => onChange(tab)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "5px",
+              padding: "3px 8px",
+              fontSize: "11px",
+              borderRadius: "3px",
+              border: active ? `1px solid ${badgeColor}44` : "1px solid #222",
+              backgroundColor: active ? badgeColor + "18" : "transparent",
+              color: active ? badgeColor : "#555",
+              cursor: "pointer",
+              fontWeight: active ? 600 : 400,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {tab}
+            {count > 0 && (
+              <span
+                style={{
+                  fontSize: "9px",
+                  color: active ? badgeColor : "#555",
+                  backgroundColor: "#1a1a1a",
+                  border: "1px solid #2a2a2a",
+                  borderRadius: "10px",
+                  padding: "0 5px",
+                }}
+              >
+                {count}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime }: AnalysisPanelProps) {
+  // Hooks must run unconditionally on every render — declared before the
+  // early "no pull selected" return below.
+  const [activeTab, setActiveTab] = useState<Tab>("Overall");
+
   if (!pull) {
     return (
       <div
@@ -204,12 +344,46 @@ export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime }: An
     );
   }
 
-  const deaths = [...pull.deathEvents].sort((a, b) => a.timestamp - b.timestamp);
   const isKill = pull.result === "Kill";
 
-  function handleDeathSeek(ms: number) {
+  const deaths = [...pull.deathEvents].sort((a, b) => a.timestamp - b.timestamp);
+  const majors = pull.errors.filter((e) => e.severity === "Major").sort((a, b) => a.timestamp - b.timestamp);
+  const minors = pull.errors.filter((e) => e.severity === "Minor").sort((a, b) => a.timestamp - b.timestamp);
+
+  const counts: Record<Tab, number> = {
+    Overall: deaths.length + majors.length + minors.length,
+    Deaths:  deaths.length,
+    Major:   majors.length,
+    Minor:   minors.length,
+  };
+
+  function handleSeek(ms: number) {
     onSeekToTime?.(ms);
   }
+
+  const feed: FeedEntry[] = (() => {
+    switch (activeTab) {
+      case "Overall":
+        return [
+          ...deaths.map(deathToFeedEntry),
+          ...majors.map(errorToFeedEntry),
+          ...minors.map(errorToFeedEntry),
+        ].sort((a, b) => a.timestamp - b.timestamp);
+      case "Deaths":
+        return deaths.map(deathToFeedEntry);
+      case "Major":
+        return majors.map(errorToFeedEntry);
+      case "Minor":
+        return minors.map(errorToFeedEntry);
+    }
+  })();
+
+  const emptyState: Record<Tab, { icon: string; text: string; color: string }> = {
+    Overall: { icon: "✨", text: "No deaths or errors this pull", color: "#4ade80" },
+    Deaths:  { icon: "✨", text: "No deaths this pull", color: "#4ade80" },
+    Major:   { icon: "✨", text: "No major errors this pull", color: "#4ade80" },
+    Minor:   { icon: "✨", text: "No minor errors this pull", color: "#4ade80" },
+  };
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -245,26 +419,41 @@ export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime }: An
       >
         <StatPill label="Duration" value={formatDuration(pull.fightDuration)} />
         <StatPill label="Deaths" value={String(deaths.length)} color={deaths.length > 0 ? "#f87171" : "#4ade80"} />
+        <StatPill label="Major" value={String(majors.length)} color={majors.length > 0 ? "#fb923c" : "#4ade80"} />
+        <StatPill label="Minor" value={String(minors.length)} color={minors.length > 0 ? "#fbbf24" : "#4ade80"} />
       </div>
 
+      <TabBar value={activeTab} onChange={setActiveTab} counts={counts} />
+
       <div style={{ flex: 1, overflowY: "auto", padding: "4px 10px 12px" }}>
-        {deaths.length > 0 ? (
+        {feed.length > 0 ? (
           <>
-            <SectionLabel label="Deaths" count={deaths.length} />
-            {deaths.map((d, i) => (
-              <DeathRow
+            <SectionLabel label={activeTab} count={feed.length} />
+            {feed.map((entry, i) => (
+              <FeedRow
                 key={i}
-                event={d}
+                entry={entry}
                 fightDuration={pull.fightDuration}
                 playbackTimeMs={playbackTimeMs}
-                onSeek={onSeekToTime ? handleDeathSeek : undefined}
+                onSeek={onSeekToTime ? handleSeek : undefined}
+                showKindBadge={activeTab === "Overall"}
               />
             ))}
           </>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", padding: "16px 0 8px", color: "#4ade80", fontSize: "12px" }}>
-            <span style={{ fontSize: "20px" }}>✨</span>
-            No deaths this pull
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "4px",
+              padding: "16px 0 8px",
+              color: emptyState[activeTab].color,
+              fontSize: "12px",
+            }}
+          >
+            <span style={{ fontSize: "20px" }}>{emptyState[activeTab].icon}</span>
+            {emptyState[activeTab].text}
           </div>
         )}
       </div>
