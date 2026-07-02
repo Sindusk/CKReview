@@ -1,10 +1,6 @@
 // lib/ffl-transforms.ts
 //
 // Converts raw FFLogs API shapes into the app's shared internal types.
-// The output types (Pull, DeathEvent, PlayerInfo) are IDENTICAL to those
-// produced by wcl-transforms.ts — the rest of the app is log-source agnostic.
-//
-// Nothing in here touches the network — it's pure data mapping.
 
 import type { Pull }                    from "@/types/Pull";
 import type { DeathEvent }              from "@/types/DeathEvent";
@@ -22,22 +18,9 @@ import type {
 import { getFFJobByName, getFFRosterSortOrder } from "./ffl-job-data";
 import { detectPullErrors }                     from "./error-detection";
 
-// ─── Ability name resolution ───────────────────────────────────────────────────
-//
-// Resolution order for any ability ID:
-//   1. Name embedded directly on the event itself (event.ability.name).
-//   2. The report's own masterData.abilities list — covers every ability
-//      actually used in this report, including ones whose events don't
-//      carry an embedded name.
-//   3. "Ability {id}" (previous behavior) as the final fallback.
-
 export function buildAbilityMap(abilities: FFLGameAbility[]): Map<number, string> {
   return new Map(abilities.map((a) => [a.gameID, a.name]));
 }
-
-// ─── CastEvent (app-internal, used by AnalysisPanel) ─────────────────────────
-// Re-exported so AnalysisPanel / page.tsx can type against it without caring
-// which log source produced it.
 
 export type CastEvent = {
   timestamp:      number;
@@ -66,15 +49,9 @@ export type CastEvent = {
   mapID?:        number;
 };
 
-// ─── Actor lookup ─────────────────────────────────────────────────────────────
-
 function buildActorMap(actors: FFLActor[]): Map<number, FFLActor> {
   return new Map(actors.map((a) => [a.id, a]));
 }
-
-// ─── Safe ability name accessor ───────────────────────────────────────────────
-// FFLogs embeds the ability name directly on the event's `ability` object.
-// Fall back gracefully when it is absent (environmental / unknown source).
 
 function abilityName(
   event: {
@@ -91,9 +68,14 @@ function abilityName(
 }
 
 // ─── Death transformer ────────────────────────────────────────────────────────
-// FFLogs carries the killing ability name directly on the death event's
-// `ability` field, so no separate spell-data lookup table is needed.
-// All accesses are guarded against null/undefined defensively.
+//
+// BUGFIX: FFLogs puts the killing blow's ability on `killingAbilityGameID`
+// at the top level of the death event (see getFFDeaths-Sample.json) — it
+// does NOT embed an `ability` object the way this code previously assumed.
+// Because `event.ability` was always undefined, every death fell through to
+// the "Environmental" fallback. We now resolve killingAbilityGameID against
+// the report's ability map, same as WCL, and only call it "Environmental"
+// when there truly is no killer (sourceID === -1, e.g. falls/fire).
 
 function transformDeath(
   event:      FFLDeathEvent,
@@ -105,18 +87,14 @@ function transformDeath(
   const subType = actor?.subType ?? "";
   const job = getFFJobByName(subType);
 
-  // Killing ability name — may be absent for environmental deaths.
-  // Resolution order: embedded name → masterData.abilities → "Environmental" → "Unknown".
-  let cause = "Unknown";
-  try {
-    if (event.ability?.name) {
-      cause = event.ability.name;
-    } else if (event.ability?.gameID && abilityMap.has(event.ability.gameID)) {
-      cause = abilityMap.get(event.ability.gameID)!;
-    } else if (event.ability === null || event.ability === undefined) {
-      cause = "Environmental";
-    }
-  } catch {
+  const killingId = event.killingAbilityGameID ?? event.ability?.gameID ?? 0;
+
+  let cause: string;
+  if (killingId) {
+    cause = event.ability?.name ?? abilityMap.get(killingId) ?? `Ability ${killingId}`;
+  } else if (event.sourceID === -1) {
+    cause = "Environmental";
+  } else {
     cause = "Unknown";
   }
 
@@ -124,14 +102,12 @@ function transformDeath(
     timestamp:            Math.max(0, event.timestamp - fightStart),
     player:               actor?.name ?? `Unknown (${event.targetID})`,
     class:                job.name,
-    specId:               0,        // FFXIV has no numeric specId in the WoW sense
+    specId:               0,
     role:                 job.role,
-    killingAbilityGameId: event.ability?.gameID ?? 0,
+    killingAbilityGameId: killingId,
     cause,
   };
 }
-
-// ─── CastEvent transformer ────────────────────────────────────────────────────
 
 function transformCast(
   event:      FFLCastEvent,
@@ -166,8 +142,6 @@ function transformCast(
   };
 }
 
-// ─── PlayerEvent helpers ──────────────────────────────────────────────────────
-
 function damageDoneToPlayerEvent(
   event:      FFLDamageEvent,
   actorMap:   Map<number, FFLActor>,
@@ -181,16 +155,15 @@ function damageDoneToPlayerEvent(
     abilityName: abilityName(event, abilityMap),
     amount:      event.amount ?? 0,
     target:      target?.name,
-    // NOTE: DoT/tick detection for FFLogs isn't implemented yet — hitType/
-    // directHit in the sample data look like promising signals but need
-    // more verification before being mapped to isDoT.
   };
 }
 
-// hitPoints on an FFLogs damage event reflects the target's health AFTER the
-// hit landed (confirmed against sample data), so "before" is reconstructed
-// as after + amount. If the hit was fatal, `amount` is the effective
-// (capped) damage and `overkill` is the portion beyond remaining health.
+// BUGFIX: FFLogs nests the post-hit health snapshot under
+// `targetResources.hitPoints` / `targetResources.maxHitPoints`, not flat
+// `hitPoints`/`maxHitPoints` on the event the way WCL does (see
+// getFFDamageTaken-Sample.json). The flat fields are essentially never
+// present on FFLogs "damage" events, so healthBefore/healthAfter always
+// came out undefined.
 function damageTakenToPlayerEvent(
   event:      FFLDamageEvent,
   actorMap:   Map<number, FFLActor>,
@@ -199,7 +172,7 @@ function damageTakenToPlayerEvent(
 ): PlayerEvent {
   const source = actorMap.get(event.sourceID);
   const dealt  = event.amount ?? 0;
-  const after  = event.hitPoints;
+  const after  = event.targetResources?.hitPoints ?? event.hitPoints;
   const before = after !== undefined ? after + dealt : undefined;
 
   return {
@@ -210,7 +183,7 @@ function damageTakenToPlayerEvent(
     source:       source?.name,
     healthBefore: before,
     healthAfter:  after,
-    maxHealth:    event.maxHitPoints,
+    maxHealth:    event.targetResources?.maxHitPoints ?? event.maxHitPoints,
     overkill:     event.overkill,
   };
 }
@@ -231,11 +204,6 @@ function healToPlayerEvent(
   };
 }
 
-// NOTE: this is keyed by the debuff's TARGET (the player carrying it), not
-// its source — buildFFPlayers() below filters debuffEvents by targetID,
-// since what we care about is "which debuffs does this player currently
-// have", not "which debuffs did this player apply to something else".
-// `extra` therefore reports the source/caster name for context instead.
 function debuffToPlayerEvent(
   event:      FFLDebuffEvent,
   actorMap:   Map<number, FFLActor>,
@@ -274,11 +242,6 @@ function castToPlayerEvent(
   };
 }
 
-// ─── Build PlayerInfo array ───────────────────────────────────────────────────
-// FFLogs does not have a CombatantInfo event that mirrors WCL's — instead,
-// we build the roster directly from the actors list filtered to friendlyPlayers.
-// The subType on each actor carries the job name.
-
 function buildFFPlayers(
   friendlyPlayerIds: number[],
   actorMap:          Map<number, FFLActor>,
@@ -290,7 +253,6 @@ function buildFFPlayers(
   debuffEvents:      FFLDebuffEvent[],
   fightStart:        number
 ): PlayerInfo[] {
-  // Deduplicate player IDs (friendlyPlayers can contain duplicates in some FF logs)
   const uniqueIds = [...new Set(friendlyPlayerIds)];
 
   return uniqueIds
@@ -305,10 +267,11 @@ function buildFFPlayers(
         actorId,
         name:      actor.name,
         className: job.name,
-        specId:    0,           // No numeric spec in FFXIV
-        specName:  job.name,    // Job name doubles as spec name
+        specId:    0,
+        specName:  job.name,   // FFXIV has no separate spec; UI dedupes via formatSpecClass()
         role:      job.role,
         rangeType: job.rangeType,
+        game:      "ffxiv",
 
         damageDone: damageDoneEvents
           .filter((e) => e.sourceID === actorId)
@@ -320,8 +283,6 @@ function buildFFPlayers(
 
         healing: healingEvents
           .filter((e) => e.sourceID === actorId)
-          // Drop pure-overheal (or entirely blank-amount) instances — they
-          // had zero effective healing impact on the target.
           .filter((e) => (e.amount ?? 0) > 0)
           .map((e) => healToPlayerEvent(e, actorMap, abilityMap, fightStart)),
 
@@ -336,21 +297,15 @@ function buildFFPlayers(
     })
     .filter((p): p is PlayerInfo => p !== null)
     .sort((a, b) =>
-      getFFRosterSortOrder(
-        // Look up the original subType for sort ordering
-        actorMap.get(a.actorId)?.subType ?? ""
-      ) -
-      getFFRosterSortOrder(
-        actorMap.get(b.actorId)?.subType ?? ""
-      )
+      getFFRosterSortOrder(actorMap.get(a.actorId)?.subType ?? "") -
+      getFFRosterSortOrder(actorMap.get(b.actorId)?.subType ?? "")
     );
 }
-
-// ─── Fight → Pull ─────────────────────────────────────────────────────────────
 
 export function transformFFightToPull(
   data:        FFLFightData,
   abilityMap:  Map<number, string>,
+  reportCode:  string,
   idOverride?: number
 ): Pull & { castEvents: CastEvent[] } {
   const actorMap   = buildActorMap(data.actors);
@@ -384,6 +339,7 @@ export function transformFFightToPull(
 
   return {
     id:            idOverride ?? data.fight.id,
+    pullNumber:    0, // filled in by transformFFReportToPulls (per-boss numbering)
     name:          data.fight.name ?? "Unknown Fight",
     startTime:     startTimeSec,
     endTime:       endTimeSec,
@@ -392,15 +348,29 @@ export function transformFFightToPull(
     deathEvents,
     players,
     errors,
+    game:          "ffxiv",
+    reportCode,
+    logSource:     "ffl",
+    fightId:       data.fight.id,
     castEvents,
   };
 }
 
 export function transformFFReportToPulls(
   fightDataList: FFLFightData[],
-  abilityMap:    Map<number, string>
+  abilityMap:    Map<number, string>,
+  reportCode:    string
 ): Array<Pull & { castEvents: CastEvent[] }> {
-  return fightDataList
+  const pulls = [...fightDataList]
     .sort((a, b) => a.fight.startTime - b.fight.startTime)
-    .map((data, i) => transformFFightToPull(data, abilityMap, i + 1));
+    .map((data, i) => transformFFightToPull(data, abilityMap, reportCode, i + 1));
+
+  const nameCounters = new Map<string, number>();
+  for (const pull of pulls) {
+    const next = (nameCounters.get(pull.name) ?? 0) + 1;
+    nameCounters.set(pull.name, next);
+    pull.pullNumber = next;
+  }
+
+  return pulls;
 }

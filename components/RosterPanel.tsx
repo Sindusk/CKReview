@@ -3,26 +3,8 @@
 import { useState } from "react";
 import type { CSSProperties } from "react";
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
-
-const CLASS_COLOR: Record<string, string> = {
-  "Death Knight": "#C41E3A",
-  "Demon Hunter": "#A330C9",
-  Druid: "#FF7C0A",
-  Evoker: "#33937F",
-  Hunter: "#AAD372",
-  Mage: "#3FC7EB",
-  Monk: "#00FF98",
-  Paladin: "#F48CBA",
-  Priest: "#FFFFFF",
-  Rogue: "#FFF468",
-  Shaman: "#0070DD",
-  Warlock: "#8788EE",
-  Warrior: "#C69B3A",
-};
-
-function classColor(cls: string): string {
-  return CLASS_COLOR[cls] ?? "#aaa";
-}
+import { getClassColor } from "@/lib/class-colors";
+import { formatSpecClass } from "@/lib/player-display";
 
 const ROLE_COLOR: Record<string, string> = {
   Tank: "#60a5fa",
@@ -56,15 +38,16 @@ function formatAmount(n: number): string {
 
 function PlayerButton({ player, onClick }: { player: PlayerInfo; onClick: () => void }) {
   const [hovered, setHovered] = useState(false);
-  const color = classColor(player.className);
+  const color = getClassColor(player.game, player.className);
   const roleColor = ROLE_COLOR[player.role] ?? "#aaa";
+  const specLabel = player.specName && player.specName !== player.className ? player.specName : null;
 
   return (
     <button
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      title={`${player.name} — ${player.specName} ${player.className}`}
+      title={`${player.name} — ${formatSpecClass(player.specName, player.className)}`}
       style={{
         display: "flex",
         flexDirection: "column",
@@ -95,15 +78,13 @@ function PlayerButton({ player, onClick }: { player: PlayerInfo; onClick: () => 
       </span>
       <span style={{ fontSize: "10px", color: "#555", whiteSpace: "nowrap" }}>
         <span style={{ color: roleColor }}>{player.role}</span>
-        {" · "}
-        {player.specName}
+        {specLabel && <>{" · "}{specLabel}</>}
       </span>
     </button>
   );
 }
 
 function rowBackground(hasPassed: boolean): string {
-  // Very light tint once playback has moved past this event's timestamp.
   return hasPassed ? "rgba(255,255,255,0.035)" : "transparent";
 }
 
@@ -154,17 +135,7 @@ function DamageDoneRow({ event, playbackTimeMs }: { event: PlayerEvent; playback
         <span style={timeStyle}>{formatMs(event.timestamp)}</span>
         <span style={abilityStyle}>{event.abilityName}</span>
         {event.isDoT && (
-          <span
-            style={{
-              fontSize: "9px",
-              fontWeight: 700,
-              color: "#a78bfa",
-              border: "1px solid #a78bfa44",
-              borderRadius: "3px",
-              padding: "0 4px",
-              flexShrink: 0,
-            }}
-          >
+          <span style={{ fontSize: "9px", fontWeight: 700, color: "#a78bfa", border: "1px solid #a78bfa44", borderRadius: "3px", padding: "0 4px", flexShrink: 0 }}>
             DoT
           </span>
         )}
@@ -243,14 +214,38 @@ function CastRow({ event, playbackTimeMs }: { event: PlayerEvent; playbackTimeMs
   );
 }
 
+// #9 — show whether the debuff was applied, refreshed, or removed instead
+// of just listing every raw application/removal with no context.
+const DEBUFF_STATUS_STYLE: Record<string, { label: string; color: string }> = {
+  applied: { label: "Applied", color: "#4ade80" },
+  stack:   { label: "Stack",   color: "#fbbf24" },
+  removed: { label: "Removed", color: "#f87171" },
+};
+
 function DebuffRow({ event, playbackTimeMs }: { event: PlayerEvent; playbackTimeMs: number }) {
   const hasPassed = playbackTimeMs >= event.timestamp;
+  const status = DEBUFF_STATUS_STYLE[event.debuffStatus ?? "applied"];
+
   return (
     <div style={{ ...rowShellStyle, backgroundColor: rowBackground(hasPassed) }}>
       <div style={line1Style}>
         <span style={timeStyle}>{formatMs(event.timestamp)}</span>
         <span style={abilityStyle}>{event.abilityName}</span>
+        <span
+          style={{
+            fontSize: "9px",
+            fontWeight: 700,
+            color: status.color,
+            border: `1px solid ${status.color}44`,
+            borderRadius: "3px",
+            padding: "0 4px",
+            flexShrink: 0,
+          }}
+        >
+          {status.label}
+        </span>
       </div>
+      {event.extra && <div style={line2Style}>from {event.extra}</div>}
     </div>
   );
 }
@@ -265,35 +260,32 @@ function PlayerDetail({
   playbackTimeMs: number;
 }) {
   const [activeTab, setActiveTab] = useState<Tab>("DamageDone");
-  const color = classColor(player.className);
+  const [search, setSearch] = useState("");
+  const color = getClassColor(player.game, player.className);
 
   const events: PlayerEvent[] = (() => {
     switch (activeTab) {
-      case "DamageDone":
-        return player.damageDone;
-      case "DamageTaken":
-        return player.damageTaken;
-      case "Healing":
-        return player.healing;
-      case "Debuffs":
-        return player.debuffs;
-      case "Casts":
-        return player.casts;
+      case "DamageDone":  return player.damageDone;
+      case "DamageTaken": return player.damageTaken;
+      case "Healing":     return player.healing;
+      case "Debuffs":     return player.debuffs;
+      case "Casts":       return player.casts;
     }
   })();
 
+  // #4 — filter by ability/debuff name
+  const query = search.trim().toLowerCase();
+  const filteredEvents = query
+    ? events.filter((e) => e.abilityName.toLowerCase().includes(query))
+    : events;
+
   function renderRow(event: PlayerEvent, i: number) {
     switch (activeTab) {
-      case "DamageDone":
-        return <DamageDoneRow key={i} event={event} playbackTimeMs={playbackTimeMs} />;
-      case "DamageTaken":
-        return <DamageTakenRow key={i} event={event} playbackTimeMs={playbackTimeMs} />;
-      case "Healing":
-        return <HealingRow key={i} event={event} playbackTimeMs={playbackTimeMs} />;
-      case "Debuffs":
-        return <DebuffRow key={i} event={event} playbackTimeMs={playbackTimeMs} />;
-      case "Casts":
-        return <CastRow key={i} event={event} playbackTimeMs={playbackTimeMs} />;
+      case "DamageDone":  return <DamageDoneRow key={i} event={event} playbackTimeMs={playbackTimeMs} />;
+      case "DamageTaken": return <DamageTakenRow key={i} event={event} playbackTimeMs={playbackTimeMs} />;
+      case "Healing":     return <HealingRow key={i} event={event} playbackTimeMs={playbackTimeMs} />;
+      case "Debuffs":     return <DebuffRow key={i} event={event} playbackTimeMs={playbackTimeMs} />;
+      case "Casts":       return <CastRow key={i} event={event} playbackTimeMs={playbackTimeMs} />;
     }
   }
 
@@ -328,7 +320,7 @@ function PlayerDetail({
         <div style={{ minWidth: 0 }}>
           <span style={{ color, fontWeight: 700, fontSize: "13px" }}>{player.name}</span>
           <span style={{ color: "#555", fontSize: "11px", marginLeft: "6px" }}>
-            {player.specName} {player.className}
+            {formatSpecClass(player.specName, player.className)}
           </span>
         </div>
       </div>
@@ -336,7 +328,9 @@ function PlayerDetail({
       <div
         style={{
           display: "flex",
-          gap: "2px",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "8px",
           padding: "4px 6px",
           backgroundColor: "#0d0d0d",
           borderBottom: "1px solid #1e1e1e",
@@ -344,37 +338,58 @@ function PlayerDetail({
           flexWrap: "wrap",
         }}
       >
-        {TABS.map(tab => {
-          const active = tab === activeTab;
-          return (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              style={{
-                padding: "3px 8px",
-                fontSize: "11px",
-                borderRadius: "3px",
-                border: active ? `1px solid ${color}44` : "1px solid #222",
-                backgroundColor: active ? color + "18" : "transparent",
-                color: active ? color : "#555",
-                cursor: "pointer",
-                fontWeight: active ? 600 : 400,
-                whiteSpace: "nowrap",
-              }}
-            >
-              {TAB_LABELS[tab]}
-            </button>
-          );
-        })}
+        <div style={{ display: "flex", gap: "2px", flexWrap: "wrap" }}>
+          {TABS.map(tab => {
+            const active = tab === activeTab;
+            return (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                style={{
+                  padding: "3px 8px",
+                  fontSize: "11px",
+                  borderRadius: "3px",
+                  border: active ? `1px solid ${color}44` : "1px solid #222",
+                  backgroundColor: active ? color + "18" : "transparent",
+                  color: active ? color : "#555",
+                  cursor: "pointer",
+                  fontWeight: active ? 600 : 400,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {TAB_LABELS[tab]}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* #4 — search/filter by ability name */}
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Filter by ability…"
+          style={{
+            padding: "3px 8px",
+            fontSize: "11px",
+            backgroundColor: "#111",
+            border: "1px solid #333",
+            borderRadius: "4px",
+            color: "#ccc",
+            outline: "none",
+            minWidth: "140px",
+          }}
+        />
       </div>
 
       <div style={{ flex: 1, overflowY: "auto" }}>
-        {events.length === 0 ? (
+        {filteredEvents.length === 0 ? (
           <div style={{ padding: "16px", textAlign: "center", color: "#333", fontSize: "12px" }}>
-            No {TAB_LABELS[activeTab].toLowerCase()} events for this pull
+            {events.length === 0
+              ? `No ${TAB_LABELS[activeTab].toLowerCase()} events for this pull`
+              : `No results matching "${search}"`}
           </div>
         ) : (
-          events.map((e, i) => renderRow(e, i))
+          filteredEvents.map((e, i) => renderRow(e, i))
         )}
       </div>
     </div>
@@ -389,9 +404,6 @@ type RosterPanelProps = {
 export default function RosterPanel({ players, playbackTimeMs }: RosterPanelProps) {
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerInfo | null>(null);
 
-  // FFLogs includes a synthetic "Multiple Players / LimitBreak" actor that
-  // represents the party Limit Break ability. Filter it out — it is not a
-  // real player and should never appear in the roster.
   const filteredPlayers = players.filter(
     p =>
       p.name !== "Multiple Players" &&
@@ -411,19 +423,7 @@ export default function RosterPanel({ players, playbackTimeMs }: RosterPanelProp
 
   if (filteredPlayers.length === 0) {
     return (
-      <div
-        style={{
-          height: "100%",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: "6px",
-          color: "#333",
-          padding: "12px",
-          textAlign: "center",
-        }}
-      >
+      <div style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "6px", color: "#333", padding: "12px", textAlign: "center" }}>
         <span style={{ fontSize: "22px" }}>👥</span>
         <span style={{ fontSize: "12px", color: "#444", lineHeight: "1.5" }}>
           Select a pull to see the roster
@@ -449,22 +449,7 @@ export default function RosterPanel({ players, playbackTimeMs }: RosterPanelProp
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-      <div
-        style={{
-          padding: "6px 10px",
-          fontSize: "10px",
-          color: "#555",
-          textTransform: "uppercase",
-          letterSpacing: "0.08em",
-          borderBottom: "1px solid #1a1a1a",
-          backgroundColor: "#0d0d0d",
-          flexShrink: 0,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "8px",
-        }}
-      >
+      <div style={{ padding: "6px 10px", fontSize: "10px", color: "#555", textTransform: "uppercase", letterSpacing: "0.08em", borderBottom: "1px solid #1a1a1a", backgroundColor: "#0d0d0d", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
         <span>Roster</span>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#777", flexWrap: "wrap", justifyContent: "flex-end" }}>
           <span>{filteredPlayers.length} players</span>
@@ -474,16 +459,7 @@ export default function RosterPanel({ players, playbackTimeMs }: RosterPanelProp
         </div>
       </div>
 
-      <div
-        style={{
-          overflowX: needsScroll ? "auto" : "hidden",
-          overflowY: "hidden",
-          display: "flex",
-          gap: "8px",
-          padding: "8px",
-          boxSizing: "border-box",
-        }}
-      >
+      <div style={{ overflowX: needsScroll ? "auto" : "hidden", overflowY: "hidden", display: "flex", gap: "8px", padding: "8px", boxSizing: "border-box" }}>
         {groups.map((group, gi) => (
           <div
             key={gi}

@@ -45,6 +45,7 @@ export type PlayerInfo = {
   // Role derived from specId (via spec-data.ts)
   role:       "Tank" | "Healer" | "DPS";
   rangeType:  "Melee" | "Ranged";
+  game:       "wow" | "ffxiv";   // NEW — used to pick the right color table
 
   // Pre-fetched event tabs (populated at import, read from memory thereafter)
   damageDone:   PlayerEvent[];

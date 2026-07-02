@@ -5,13 +5,19 @@ import type { PlayerInfo } from "./PlayerInfo";
 import type { PullError }  from "./PullError";
 
 export type Pull = {
-  id:            number;
+  id:            number;    // globally unique, used for selection/keys
+  pullNumber:    number;    // sequential per boss name — what the UI displays as "#N"
   name:          string;
-  startTime:     number;    // seconds from report start
-  endTime:       number;    // seconds from report start
+  startTime:     number;
+  endTime:       number;
   result:        "Wipe" | "Kill";
-  fightDuration: number;    // actual fight length in ms (from logs)
+  fightDuration: number;
   deathEvents:   DeathEvent[];
-  players:       PlayerInfo[];  // roster for this pull, from CombatantInfo
-  errors:        PullError[];   // detected mistakes (Major + Minor) — see lib/error-rules.ts
+  players:       PlayerInfo[];
+  errors:        PullError[];
+
+  game:          "wow" | "ffxiv";
+  reportCode:    string;
+  logSource:     "wcl" | "ffl";
+  fightId:       number;    // raw fight ID from the log source, for report URLs (?fight=N)
 };

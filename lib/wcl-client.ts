@@ -193,7 +193,7 @@ const REPORT_QUERY = /* graphql */`
       report(code: $code) {
         title
         code
-        fights(killType: All) {
+        fights(killType: Encounters) {
           id
           name
           startTime

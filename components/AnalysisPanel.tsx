@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { Pull } from "@/types/Pull";
 import type { DeathEvent } from "@/types/DeathEvent";
 import type { PullError } from "@/types/PullError";
+import { getClassColor } from "@/lib/class-colors";
 
 type AnalysisPanelProps = {
   pull: Pull | null;
@@ -18,37 +19,24 @@ const TABS: Tab[] = ["Overall", "Deaths", "Major", "Minor"];
 // a death, a Major error, or a Minor error.
 type FeedKind = "Death" | "Major" | "Minor";
 
+// FeedEntry needs the game so FeedRow can pick the right color table:
 type FeedEntry = {
   kind:      FeedKind;
   timestamp: number;
   player:    string;
   class:     string;
   role:      "Tank" | "Healer" | "DPS";
-  title:     string;    // death cause / error name
-  subtitle?: string;    // error description (deaths have none)
+  title:     string;
+  subtitle?: string;
+  game:      "wow" | "ffxiv";   // NEW
 };
 
-function deathToFeedEntry(d: DeathEvent): FeedEntry {
-  return {
-    kind:      "Death",
-    timestamp: d.timestamp,
-    player:    d.player,
-    class:     d.class,
-    role:      d.role,
-    title:     d.cause,
-  };
+function deathToFeedEntry(d: DeathEvent, game: "wow" | "ffxiv"): FeedEntry {
+  return { kind: "Death", timestamp: d.timestamp, player: d.player, class: d.class, role: d.role, title: d.cause, game };
 }
 
-function errorToFeedEntry(e: PullError): FeedEntry {
-  return {
-    kind:      e.severity,
-    timestamp: e.timestamp,
-    player:    e.player,
-    class:     e.class,
-    role:      e.role,
-    title:     e.name,
-    subtitle:  e.description,
-  };
+function errorToFeedEntry(e: PullError, game: "wow" | "ffxiv"): FeedEntry {
+  return { kind: e.severity, timestamp: e.timestamp, player: e.player, class: e.class, role: e.role, title: e.name, subtitle: e.description, game };
 }
 
 const FEED_KIND_STYLE: Record<FeedKind, { icon: string; color: string; label: string }> = {
@@ -76,26 +64,6 @@ const ROLE_COLOR: Record<string, string> = {
   Healer: "#4ade80",
   DPS: "#f87171",
 };
-
-const CLASS_COLOR: Record<string, string> = {
-  "Death Knight": "#C41E3A",
-  "Demon Hunter": "#A330C9",
-  Druid: "#FF7C0A",
-  Evoker: "#33937F",
-  Hunter: "#AAD372",
-  Mage: "#3FC7EB",
-  Monk: "#00FF98",
-  Paladin: "#F48CBA",
-  Priest: "#FFFFFF",
-  Rogue: "#FFF468",
-  Shaman: "#0070DD",
-  Warlock: "#8788EE",
-  Warrior: "#C69B3A",
-};
-
-function classColor(cls: string): string {
-  return CLASS_COLOR[cls] ?? "#aaa";
-}
 
 function SectionLabel({ label, count }: { label: string; count?: number }) {
   return (
@@ -139,7 +107,7 @@ function FeedRow({
   const hasPassed = playbackTimeMs >= entry.timestamp;
   const pct = fightDuration > 0 ? Math.round((entry.timestamp / fightDuration) * 100) : 0;
   const roleColor = ROLE_COLOR[entry.role] ?? "#aaa";
-  const cls = classColor(entry.class);
+  const cls = getClassColor(entry.game, entry.class);
   const style = FEED_KIND_STYLE[entry.kind];
   const seekTarget = Math.max(0, entry.timestamp - 3000);
 
@@ -365,16 +333,16 @@ export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime }: An
     switch (activeTab) {
       case "Overall":
         return [
-          ...deaths.map(deathToFeedEntry),
-          ...majors.map(errorToFeedEntry),
-          ...minors.map(errorToFeedEntry),
+          ...deaths.map((d) => deathToFeedEntry(d, pull.game)),
+          ...majors.map((e) => errorToFeedEntry(e, pull.game)),
+          ...minors.map((e) => errorToFeedEntry(e, pull.game)),
         ].sort((a, b) => a.timestamp - b.timestamp);
       case "Deaths":
-        return deaths.map(deathToFeedEntry);
+        return deaths.map((d) => deathToFeedEntry(d, pull.game));
       case "Major":
-        return majors.map(errorToFeedEntry);
+        return majors.map((e) => errorToFeedEntry(e, pull.game));
       case "Minor":
-        return minors.map(errorToFeedEntry);
+        return minors.map((e) => errorToFeedEntry(e, pull.game));
     }
   })();
 

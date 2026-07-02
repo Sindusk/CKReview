@@ -15,29 +15,17 @@ function formatDuration(ms: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+function buildLogUrl(pull: Pull): string {
+  const base = pull.logSource === "ffl"
+    ? "https://www.fflogs.com/reports"
+    : "https://www.warcraftlogs.com/reports";
+  return `${base}/${pull.reportCode}?fight=${pull.fightId}`;
+}
+
 export default function PullList({ pulls, selectedPullId, onSelectPull }: PullListProps) {
   return (
-    <div
-      style={{
-        borderTop: "1px solid #333",
-        paddingTop: "10px",
-        display: "flex",
-        flexDirection: "column",
-        minHeight: 0,
-        flex: 1,
-        overflow: "hidden",
-      }}
-    >
-      <div
-        style={{
-          fontWeight: "bold",
-          marginBottom: "8px",
-          fontSize: "13px",
-          color: "#ccc",
-          paddingLeft: "2px",
-          flexShrink: 0,
-        }}
-      >
+    <div style={{ borderTop: "1px solid #333", paddingTop: "10px", display: "flex", flexDirection: "column", minHeight: 0, flex: 1, overflow: "hidden" }}>
+      <div style={{ fontWeight: "bold", marginBottom: "8px", fontSize: "13px", color: "#ccc", paddingLeft: "2px", flexShrink: 0 }}>
         Pulls
         {pulls.length > 0 && (
           <span style={{ color: "#555", fontWeight: "normal", marginLeft: "6px" }}>
@@ -57,11 +45,23 @@ export default function PullList({ pulls, selectedPullId, onSelectPull }: PullLi
           const active = pull.id === selectedPullId;
           const isKill = pull.result === "Kill";
           const deaths = pull.deathEvents.length;
+          const majors = pull.errors.filter(e => e.severity === "Major");
+          const minors = pull.errors.filter(e => e.severity === "Minor");
+
+          // #6 — earliest Major error or death, ignoring Minor errors
+          const issueTimestamps = [
+            ...majors.map(e => e.timestamp),
+            ...pull.deathEvents.map(d => d.timestamp),
+          ];
+          const firstIssueTime = issueTimestamps.length > 0 ? Math.min(...issueTimestamps) : null;
 
           return (
-            <button
+            <div
               key={pull.id}
+              role="button"
+              tabIndex={0}
               onClick={() => onSelectPull(pull.id)}
+              onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onSelectPull(pull.id)}
               style={{
                 textAlign: "left",
                 padding: "8px 10px",
@@ -73,35 +73,71 @@ export default function PullList({ pulls, selectedPullId, onSelectPull }: PullLi
                 flexShrink: 0,
               }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-                <span style={{ fontWeight: 600, fontSize: "13px" }}>
-                  #{pull.id} {pull.name}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px", gap: "8px" }}>
+                <span style={{ fontWeight: 600, fontSize: "13px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  #{pull.pullNumber} {pull.name}
                 </span>
-                <span
-                  style={{
-                    fontSize: "10px",
-                    fontWeight: 700,
-                    padding: "2px 6px",
-                    borderRadius: "4px",
-                    backgroundColor: isKill ? "rgba(74,222,128,0.15)" : "rgba(248,113,113,0.12)",
-                    color: isKill ? "#4ade80" : "#f87171",
-                    border: `1px solid ${isKill ? "#166534" : "#7f1d1d"}`,
-                    letterSpacing: "0.04em",
-                  }}
-                >
-                  {isKill ? "KILL" : "WIPE"}
-                </span>
+
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
+                  <span
+                    style={{
+                      fontSize: "10px",
+                      fontWeight: 700,
+                      padding: "2px 6px",
+                      borderRadius: "4px",
+                      backgroundColor: isKill ? "rgba(74,222,128,0.15)" : "rgba(248,113,113,0.12)",
+                      color: isKill ? "#4ade80" : "#f87171",
+                      border: `1px solid ${isKill ? "#166534" : "#7f1d1d"}`,
+                      letterSpacing: "0.04em",
+                    }}
+                  >
+                    {isKill ? "KILL" : "WIPE"}
+                  </span>
+
+                  {/* #3 — link to the source report, scoped to this fight */}
+                  <a
+                    href={buildLogUrl(pull)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    title={`Open in ${pull.logSource === "ffl" ? "FFLogs" : "WarcraftLogs"}`}
+                    style={{
+                      fontSize: "10px",
+                      color: "#60a5fa",
+                      textDecoration: "none",
+                      border: "1px solid #1e3a5f",
+                      borderRadius: "4px",
+                      padding: "2px 5px",
+                      lineHeight: 1,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    Log ↗
+                  </a>
+                </div>
               </div>
 
-              <div style={{ display: "flex", gap: "10px", fontSize: "11px", color: "#666" }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", fontSize: "11px", color: "#666" }}>
                 <span>⏱ {formatDuration(pull.fightDuration)}</span>
                 {deaths > 0 ? (
                   <span style={{ color: "#ef4444" }}>💀 {deaths} death{deaths !== 1 ? "s" : ""}</span>
                 ) : (
                   <span style={{ color: "#22c55e" }}>✓ No deaths</span>
                 )}
+                {majors.length > 0 && (
+                  <span style={{ color: "#fb923c" }}>⛔ {majors.length} major</span>
+                )}
+                {minors.length > 0 && (
+                  <span style={{ color: "#fbbf24" }}>⚠️ {minors.length} minor</span>
+                )}
               </div>
-            </button>
+
+              {firstIssueTime !== null && (
+                <div style={{ fontSize: "10px", color: "#7a7a7a", marginTop: "3px" }}>
+                  First issue at {formatDuration(firstIssueTime)}
+                </div>
+              )}
+            </div>
           );
         })}
       </div>

@@ -189,32 +189,35 @@ export default function Home() {
 
   async function handleImportWCL(reportCode: string) {
     const report = await fetchReport(reportCode);
+
+    // Extra safety net beyond killType: Encounters — drop any fight with a
+    // degenerate/zero duration rather than showing it as a pull (#7).
+    const validFights = report.fights.filter(f => f.endTime > f.startTime);
+
     setImportProgress(10);
-    setImportStatus(`Loading ${report.fights.length} fight${report.fights.length === 1 ? "" : "s"}…`);
+    setImportStatus(`Loading ${validFights.length} fight${validFights.length === 1 ? "" : "s"}…`);
 
     // Every ability used anywhere in the report, keyed by gameID — resolves
     // ability names (including death causes) without a hand-maintained table.
     const abilityMap = buildWCLAbilityMap(report.masterData.abilities);
 
-    const totalFights = Math.max(report.fights.length, 1);
+    const totalFights = Math.max(validFights.length, 1);
     let completedFights = 0;
 
     const fightDataList = await mapWithConcurrency(
-      report.fights,
+      validFights,
       FIGHT_FETCH_CONCURRENCY,
       async (fight) => {
         const fightData = await fetchFightData(reportCode, fight, report.masterData.actors);
-
         completedFights += 1;
         const progress = Math.round(10 + (completedFights / totalFights) * 85);
         setImportProgress(progress);
-        setImportStatus(`Loaded ${completedFights}/${report.fights.length} fights…`);
-
+        setImportStatus(`Loaded ${completedFights}/${validFights.length} fights…`);
         return fightData;
       }
     );
 
-    const newPulls = transformReportToPulls(fightDataList, abilityMap);
+    const newPulls = transformReportToPulls(fightDataList, abilityMap, report.code);
     setPulls(newPulls);
     setSelectedPullId(null);
     setLoadedReportCode(report.code);
@@ -226,32 +229,33 @@ export default function Home() {
 
   async function handleImportFFL(reportCode: string) {
     const report = await fetchFFReport(reportCode);
+
+    const validFights = report.fights.filter(f => f.endTime > f.startTime);
+
     setImportProgress(10);
-    setImportStatus(`Loading ${report.fights.length} fight${report.fights.length === 1 ? "" : "s"}…`);
+    setImportStatus(`Loading ${validFights.length} fight${validFights.length === 1 ? "" : "s"}…`);
 
     // Every ability used anywhere in the report, keyed by gameID — resolves
     // ability names (including death causes) without falling back to "Ability {id}".
     const abilityMap = buildFFLAbilityMap(report.masterData.abilities);
 
-    const totalFights = Math.max(report.fights.length, 1);
+    const totalFights = Math.max(validFights.length, 1);
     let completedFights = 0;
 
     const fightDataList = await mapWithConcurrency(
-      report.fights,
+      validFights,
       FIGHT_FETCH_CONCURRENCY,
       async (fight) => {
         const fightData = await fetchFFightData(reportCode, fight, report.masterData.actors);
-
         completedFights += 1;
         const progress = Math.round(10 + (completedFights / totalFights) * 85);
         setImportProgress(progress);
-        setImportStatus(`Loaded ${completedFights}/${report.fights.length} fights…`);
-
+        setImportStatus(`Loaded ${completedFights}/${validFights.length} fights…`);
         return fightData;
       }
     );
 
-    const newPulls = transformFFReportToPulls(fightDataList, abilityMap);
+    const newPulls = transformFFReportToPulls(fightDataList, abilityMap, report.code);
     setPulls(newPulls);
     setSelectedPullId(null);
     setLoadedReportCode(report.code);

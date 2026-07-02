@@ -21,23 +21,9 @@ import { getSpellName }                from "./spell-data";
 import { getSpecInfo, getRosterSortOrder } from "./spec-data";
 import { detectPullErrors }            from "./error-detection";
 
-// ─── Ability name resolution ───────────────────────────────────────────────────
-//
-// Resolution order for any ability ID:
-//   1. Name embedded directly on the event itself (event.ability.name) — WCL
-//      already includes this on most event types.
-//   2. The report's own masterData.abilities list — covers every ability
-//      actually used in this report, including ones that never carry an
-//      embedded name (e.g. killingAbilityGameID on death events).
-//   3. The hand-maintained spell-data.ts table — last-resort fallback for
-//      the rare ID that's missing from both of the above.
-//   4. "Unknown (ID: X)".
-
 export function buildAbilityMap(abilities: WCLGameAbility[]): Map<number, string> {
   return new Map(abilities.map((a) => [a.gameID, a.name]));
 }
-
-// ─── CastEvent (app-internal, used by AnalysisPanel) ─────────────────────────
 
 export type CastEvent = {
   timestamp:     number;
@@ -69,21 +55,22 @@ export type CastEvent = {
   itemLevel?: number;
 };
 
-// ─── Actor lookup ─────────────────────────────────────────────────────────────
-
 function buildActorMap(actors: WCLActor[]): Map<number, WCLActor> {
   return new Map(actors.map((a) => [a.id, a]));
 }
 
 // ─── Death transformer ────────────────────────────────────────────────────────
-// Uses killingAbilityGameID (the real field from the API) + spell-data lookup.
-// Uses specId from CombatantInfo for accurate role, falling back to class heuristic.
+//
+// BUGFIX: WCLActor.type is "Player"/"NPC"/"Pet" — the actual WoW class name
+// lives on WCLActor.subType (e.g. "DeathKnight"). Reading `actor?.type` here
+// produced classes like "Player" (hence deaths/casts showing as
+// "Unholy Player" instead of "Unholy Death Knight").
 
 function transformDeath(
   event:       WCLDeathEvent,
   actorMap:    Map<number, WCLActor>,
-  specIdMap:   Map<number, number>,   // actorId → specId
-  abilityMap:  Map<number, string>,   // gameID → name, from masterData.abilities
+  specIdMap:   Map<number, number>,
+  abilityMap:  Map<number, string>,
   fightStart:  number
 ): DeathEvent {
   const actor  = actorMap.get(event.targetID);
@@ -98,19 +85,13 @@ function transformDeath(
   return {
     timestamp:            event.timestamp - fightStart,
     player:               actor?.name ?? `Unknown (${event.targetID})`,
-    class:                actor?.type ?? spec.className,
+    class:                actor?.subType ?? spec.className,   // was actor?.type
     specId,
     role:                 specId ? spec.role : "DPS",
     killingAbilityGameId: killingId,
     cause,
   };
 }
-
-// ─── Safe ability name accessor ───────────────────────────────────────────────
-// WCL does not guarantee `ability` is present on every event (environmental
-// damage, some proc events, and mixed-stream events may omit it entirely).
-// Resolution order: embedded name → report's masterData.abilities → the
-// hand-maintained spell-data.ts table → "Unknown".
 
 function abilityName(
   event:      { abilityGameID?: number; ability?: { name?: string } },
@@ -122,8 +103,6 @@ function abilityName(
   }
   return "Unknown";
 }
-
-// ─── CastEvent transformer (for AnalysisPanel cast timeline) ─────────────────
 
 function transformCast(
   event:      WCLCastEvent,
@@ -140,7 +119,7 @@ function transformCast(
     timestamp:      event.timestamp - fightStart,
     sourceId:       event.sourceID,
     sourceName:     actor?.name ?? `Unknown (${event.sourceID})`,
-    sourceClass:    actor?.type ?? spec.className,
+    sourceClass:    actor?.subType ?? spec.className,   // was actor?.type
     role:           specId ? spec.role : "DPS",
     abilityId:      event.abilityGameID,
     abilityName:    abilityName(event, abilityMap),
@@ -162,8 +141,6 @@ function transformCast(
   };
 }
 
-// ─── PlayerEvent helpers ──────────────────────────────────────────────────────
-
 function damageDoneToPlayerEvent(
   event:      WCLDamageEvent,
   actorMap:   Map<number, WCLActor>,
@@ -181,10 +158,6 @@ function damageDoneToPlayerEvent(
   };
 }
 
-// hitPoints on a WCL damage event reflects the target's health AFTER the hit
-// landed, so "before" is reconstructed as after + amount. If the hit was
-// fatal, `amount` is the effective (capped) damage and `overkill` is the
-// portion beyond the target's remaining health.
 function damageTakenToPlayerEvent(
   event:      WCLDamageEvent,
   actorMap:   Map<number, WCLActor>,
@@ -224,11 +197,6 @@ function healToPlayerEvent(
   };
 }
 
-// NOTE: this is keyed by the debuff's TARGET (the player carrying it), not
-// its source — buildPlayers() below filters debuffEvents by targetID, since
-// what we care about is "which debuffs does this player currently have",
-// not "which debuffs did this player apply to something else". `extra`
-// therefore reports the source/caster name for context instead.
 function debuffToPlayerEvent(
   event:      WCLDebuffEvent,
   actorMap:   Map<number, WCLActor>,
@@ -267,8 +235,6 @@ function castToPlayerEvent(
   };
 }
 
-// ─── Build PlayerInfo array from CombatantInfo events ────────────────────────
-
 function buildPlayers(
   combatantInfos:    WCLCombatantInfoEvent[],
   actorMap:          Map<number, WCLActor>,
@@ -292,11 +258,12 @@ function buildPlayers(
       return {
         actorId,
         name:       actor?.name      ?? `Unknown (${actorId})`,
-        className:  actor?.type      ?? spec.className,
+        className:  actor?.subType   ?? spec.className,   // was actor?.type
         specId,
         specName:   spec.name,
         role:       spec.role,
         rangeType:  spec.rangeType,
+        game:       "wow",
 
         damageDone: damageDoneEvents
           .filter(e => e.sourceID === actorId)
@@ -308,8 +275,6 @@ function buildPlayers(
 
         healing: healingEvents
           .filter(e => e.sourceID === actorId)
-          // Drop pure-overheal (or entirely blank-amount) instances — they
-          // had zero effective healing impact on the target.
           .filter(e => (e.amount ?? 0) > 0)
           .map(e => healToPlayerEvent(e, actorMap, abilityMap, fightStart)),
 
@@ -325,17 +290,15 @@ function buildPlayers(
     .sort((a, b) => getRosterSortOrder(a.specId) - getRosterSortOrder(b.specId));
 }
 
-// ─── Fight → Pull ─────────────────────────────────────────────────────────────
-
 export function transformFightToPull(
   data:        WCLFightData,
   abilityMap:  Map<number, string>,
+  reportCode:  string,
   idOverride?: number
 ): Pull & { castEvents: CastEvent[] } {
   const actorMap  = buildActorMap(data.actors);
   const fightStart = data.fight.startTime;
 
-  // Build specId lookup from CombatantInfo events: actorId → specId
   const specIdMap = new Map<number, number>();
   for (const ci of data.combatantInfos) {
     if (ci.specID) specIdMap.set(ci.sourceID, ci.specID);
@@ -370,6 +333,7 @@ export function transformFightToPull(
 
   return {
     id:            idOverride ?? data.fight.id,
+    pullNumber:    0, // filled in by transformReportToPulls (per-boss numbering)
     name:          data.fight.name,
     startTime:     startTimeSec,
     endTime:       endTimeSec,
@@ -378,15 +342,31 @@ export function transformFightToPull(
     deathEvents,
     players,
     errors,
+    game:          "wow",
+    reportCode,
+    logSource:     "wcl",
+    fightId:       data.fight.id,
     castEvents,
   };
 }
 
 export function transformReportToPulls(
   fightDataList: WCLFightData[],
-  abilityMap:    Map<number, string>
+  abilityMap:    Map<number, string>,
+  reportCode:    string
 ): Array<Pull & { castEvents: CastEvent[] }> {
-  return fightDataList
+  const pulls = [...fightDataList]
     .sort((a, b) => a.fight.startTime - b.fight.startTime)
-    .map((data, i) => transformFightToPull(data, abilityMap, i + 1));
+    .map((data, i) => transformFightToPull(data, abilityMap, reportCode, i + 1));
+
+  // Number pulls sequentially per boss name, not globally, so e.g. Rotmire
+  // pulls read #1–#5 and the next boss's pulls restart at #1.
+  const nameCounters = new Map<string, number>();
+  for (const pull of pulls) {
+    const next = (nameCounters.get(pull.name) ?? 0) + 1;
+    nameCounters.set(pull.name, next);
+    pull.pullNumber = next;
+  }
+
+  return pulls;
 }

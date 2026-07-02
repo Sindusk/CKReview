@@ -81,11 +81,18 @@ export type FFLGameAbility = {
 
 // FFLogs death events — the killing ability is carried on the event itself.
 // `ability` may be absent for environmental/fall deaths; handle defensively.
+// 2) Death event shape (#10)
 export type FFLDeathEvent = {
-  timestamp:  number;   // ms from report start (NOT fight start)
+  timestamp:  number;
   type:       "death";
   sourceID:   number;
   targetID:   number;
+  abilityGameID?: number;
+  // FFLogs' actual killing-blow field — mirrors WCL's killingAbilityGameID.
+  // Absent for environmental deaths (sourceID === -1).
+  killingAbilityGameID?: number;
+  killerID?:       number;
+  killerInstance?: number;
   ability?:   {
     name:     string;
     abilityIcon?: string;
@@ -133,6 +140,7 @@ export type FFLCastEvent = {
   mapID?:        number;
 };
 
+// 3) Damage event shape (#8) — nested resources, not flat
 export type FFLDamageEvent = {
   timestamp:     number;
   type:          "damage";
@@ -146,7 +154,10 @@ export type FFLDamageEvent = {
   } | null;
   amount:        number;
   overkill?:     number;
-  // Resource fields
+  // FFLogs nests the post-hit health snapshot here, not as flat fields.
+  targetResources?: { hitPoints?: number; maxHitPoints?: number };
+  sourceResources?: { hitPoints?: number; maxHitPoints?: number };
+  // Kept as a fallback only — rarely populated on FFLogs "damage" events.
   hitPoints?:    number;
   maxHitPoints?: number;
 };
@@ -205,7 +216,7 @@ const REPORT_QUERY = /* graphql */`
       report(code: $code) {
         title
         code
-        fights(killType: All) {
+        fights(killType: Encounters) {
           id
           name
           startTime
@@ -333,19 +344,17 @@ export type FFLFightData = {
  * Actors are passed in from report-level masterData to avoid re-fetching.
  * All data is fetched eagerly so downstream components read from memory only.
  */
+// 4) fetchFFightData — drop the duplicate "calculateddamage" preview
+//    entries FFLogs streams alongside the real "damage" event (#8, and
+//    fixes doubled damage-done/taken totals as a side effect):
 export async function fetchFFightData(
   reportCode: string,
   fight:      FFLFight,
   actors:     FFLActor[]
 ): Promise<FFLFightData> {
   const [
-    rawDeaths,
-    rawCombatantInfos,
-    rawCasts,
-    rawDamageDone,
-    rawDamageTaken,
-    rawHealing,
-    rawDebuffs,
+    rawDeaths, rawCombatantInfos, rawCasts,
+    rawDamageDone, rawDamageTaken, rawHealing, rawDebuffs,
   ] = await Promise.all([
     fetchAllFFEvents(reportCode, fight.id, fight.startTime, fight.endTime, "Deaths"),
     fetchAllFFEvents(reportCode, fight.id, fight.startTime, fight.endTime, "CombatantInfo"),
@@ -356,15 +365,21 @@ export async function fetchFFightData(
     fetchAllFFEvents(reportCode, fight.id, fight.startTime, fight.endTime, "Debuffs"),
   ]);
 
+  // See getFFDamageDone-Sample.json / getFFDamageTaken-Sample.json — FFLogs
+  // emits a "calculateddamage" preview alongside the "damage" event that
+  // actually lands. Only the latter carries the post-hit targetResources
+  // snapshot; keeping both double-counts every hit.
+  const onlyLanded = (events: any[]) => events.filter((e) => e.type === "damage");
+
   return {
     fight,
     actors,
-    deathEvents:       rawDeaths          as FFLDeathEvent[],
-    combatantInfos:    rawCombatantInfos  as FFLCombatantInfoEvent[],
-    castEvents:        rawCasts           as FFLCastEvent[],
-    damageDoneEvents:  rawDamageDone      as FFLDamageEvent[],
-    damageTakenEvents: rawDamageTaken     as FFLDamageEvent[],
-    healingEvents:     rawHealing         as FFLHealEvent[],
-    debuffEvents:      rawDebuffs         as FFLDebuffEvent[],
+    deathEvents:       rawDeaths                as FFLDeathEvent[],
+    combatantInfos:    rawCombatantInfos         as FFLCombatantInfoEvent[],
+    castEvents:        rawCasts                  as FFLCastEvent[],
+    damageDoneEvents:  onlyLanded(rawDamageDone)  as FFLDamageEvent[],
+    damageTakenEvents: onlyLanded(rawDamageTaken) as FFLDamageEvent[],
+    healingEvents:     rawHealing                as FFLHealEvent[],
+    debuffEvents:      rawDebuffs                as FFLDebuffEvent[],
   };
 }
