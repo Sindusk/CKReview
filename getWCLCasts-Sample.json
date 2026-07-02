@@ -1,0 +1,83 @@
+{
+    "query": "\n  query GetEvents(\n    $code:      String!\n    $fightIDs:  [Int]!\n    $startTime: Float!\n    $endTime:   Float!\n    $type:      EventDataType!\n  ) {\n    reportData {\n      report(code: $code) {\n        events(\n          fightIDs:        $fightIDs\n          startTime:       $startTime\n          endTime:         $endTime\n          dataType:        $type\n          includeResources: true\n        ) {\n          data\n          nextPageTimestamp\n        }\n      }\n    }\n  }\n",
+    "variables": {
+        "code": "WNMkah9DQwP64AF2",
+        "fightIDs": [
+            3
+        ],
+        "startTime": 1731278,
+        "endTime": 1731343,
+        "type": "Casts"
+    },
+    "json": {
+        "data": {
+            "reportData": {
+                "report": {
+                    "events": {
+                        "data": [
+                            {
+                                "timestamp": 1731279,
+                                "type": "cast",
+                                "sourceID": 11,
+                                "targetID": -1,
+                                "abilityGameID": 187827,
+                                "fight": 3,
+                                "resourceActor": 1,
+                                "classResources": [
+                                    {
+                                        "amount": 93,
+                                        "max": 120,
+                                        "type": 17
+                                    }
+                                ],
+                                "hitPoints": 1144563,
+                                "maxHitPoints": 820482,
+                                "attackPower": 3390,
+                                "spellPower": 640,
+                                "armor": 13637,
+                                "absorb": 0,
+                                "x": 868215,
+                                "y": 392002,
+                                "facing": -201,
+                                "mapID": 2427,
+                                "versatility": 1529,
+                                "avoidance": 717,
+                                "itemLevel": 291
+                            },
+                            {
+                                "timestamp": 1731339,
+                                "type": "cast",
+                                "sourceID": 15,
+                                "targetID": -1,
+                                "abilityGameID": 190411,
+                                "fight": 3,
+                                "resourceActor": 1,
+                                "classResources": [
+                                    {
+                                        "amount": 518,
+                                        "max": 1300,
+                                        "type": 1
+                                    }
+                                ],
+                                "hitPoints": 401458,
+                                "maxHitPoints": 568760,
+                                "attackPower": 3640,
+                                "spellPower": 433,
+                                "armor": 2102,
+                                "absorb": 0,
+                                "x": 868206,
+                                "y": 392011,
+                                "facing": -266,
+                                "mapID": 2427,
+                                "versatility": 459,
+                                "avoidance": 353,
+                                "itemLevel": 291
+                            }
+                        ],
+                        "nextPageTimestamp": null
+                    }
+                }
+            }
+        }
+    }
+}

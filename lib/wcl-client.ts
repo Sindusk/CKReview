@@ -28,6 +28,14 @@ async function gql<T>(query: string, variables?: Record<string, unknown>): Promi
 
   const json = await res.json();
 
+  // Raw response dump — this is the single choke point every WCL query
+  // (report + all 7 event types) passes through, so logging here captures
+  // everything. Useful for confirming field names/shapes (e.g. does a damage
+  // event actually carry `tick` or `hitPoints`?) directly from a live report
+  // instead of guessing from schema docs. Safe to comment out once you're
+  // done collecting sample data — it is verbose on large reports.
+  console.log("[WCL raw response]", { query, variables, json });
+
   if (json.errors?.length) {
     throw new Error(`WCL GraphQL error: ${json.errors[0].message}`);
   }
@@ -49,8 +57,11 @@ export type WCLFight = {
 export type WCLActor = {
   id:      number;
   name:    string;
-  type:    string;    // WoW class name, e.g. "Warrior", "Priest"
-  subType: string;    // spec name, e.g. "Arms", "Holy"
+  type:    string;    // WoW class name for players (e.g. "Warrior"); "NPC" or
+                      // similar for enemies now that masterData.actors is
+                      // unfiltered — only ever meaningful as a class label
+                      // when looked up for a player actor.
+  subType: string;    // spec name, e.g. "Arms", "Holy" — empty/irrelevant for NPCs
 };
 
 // A single ability/spell used anywhere in the report (players, NPCs, bosses —
@@ -88,6 +99,7 @@ export type WCLCastEvent = {
   timestamp:     number;
   type:          "cast";
   sourceID:      number;
+  targetID?:     number;  // -1 or absent = no meaningful target (self-cast/ground-targeted/etc.)
   abilityGameID: number;
   ability?: {
     name: string;
@@ -125,6 +137,10 @@ export type WCLDamageEvent = {
   };
   amount:        number;
   overkill?:     number;
+  tick?:         boolean;  // true = periodic/DoT damage instance
+  // Resource snapshot — reflects the target's health AFTER this hit landed.
+  hitPoints?:    number;
+  maxHitPoints?: number;
 };
 
 export type WCLHealEvent = {
@@ -186,7 +202,7 @@ const REPORT_QUERY = /* graphql */`
           friendlyPlayers
         }
         masterData(translate: true) {
-          actors(type: "Player") {
+          actors {
             id
             name
             type

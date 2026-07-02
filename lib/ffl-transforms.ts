@@ -167,29 +167,66 @@ function transformCast(
 
 // ─── PlayerEvent helpers ──────────────────────────────────────────────────────
 
-function damageToPlayerEvent(
+function damageDoneToPlayerEvent(
   event:      FFLDamageEvent,
+  actorMap:   Map<number, FFLActor>,
   abilityMap: Map<number, string>,
   fightStart: number
 ): PlayerEvent {
+  const target = actorMap.get(event.targetID);
   return {
     timestamp:   Math.max(0, event.timestamp - fightStart),
     abilityId:   event.abilityGameID ?? 0,
     abilityName: abilityName(event, abilityMap),
     amount:      event.amount ?? 0,
+    target:      target?.name,
+    // NOTE: DoT/tick detection for FFLogs isn't implemented yet — hitType/
+    // directHit in the sample data look like promising signals but need
+    // more verification before being mapped to isDoT.
+  };
+}
+
+// hitPoints on an FFLogs damage event reflects the target's health AFTER the
+// hit landed (confirmed against sample data), so "before" is reconstructed
+// as after + amount. If the hit was fatal, `amount` is the effective
+// (capped) damage and `overkill` is the portion beyond remaining health.
+function damageTakenToPlayerEvent(
+  event:      FFLDamageEvent,
+  actorMap:   Map<number, FFLActor>,
+  abilityMap: Map<number, string>,
+  fightStart: number
+): PlayerEvent {
+  const source = actorMap.get(event.sourceID);
+  const dealt  = event.amount ?? 0;
+  const after  = event.hitPoints;
+  const before = after !== undefined ? after + dealt : undefined;
+
+  return {
+    timestamp:    Math.max(0, event.timestamp - fightStart),
+    abilityId:    event.abilityGameID ?? 0,
+    abilityName:  abilityName(event, abilityMap),
+    amount:       dealt,
+    source:       source?.name,
+    healthBefore: before,
+    healthAfter:  after,
+    maxHealth:    event.maxHitPoints,
+    overkill:     event.overkill,
   };
 }
 
 function healToPlayerEvent(
   event:      FFLHealEvent,
+  actorMap:   Map<number, FFLActor>,
   abilityMap: Map<number, string>,
   fightStart: number
 ): PlayerEvent {
+  const target = actorMap.get(event.targetID);
   return {
     timestamp:   Math.max(0, event.timestamp - fightStart),
     abilityId:   event.abilityGameID ?? 0,
     abilityName: abilityName(event, abilityMap),
-    amount:      event.amount ?? 0,
+    amount:      event.amount,
+    target:      target?.name,
   };
 }
 
@@ -210,13 +247,18 @@ function debuffToPlayerEvent(
 
 function castToPlayerEvent(
   event:      FFLCastEvent,
+  actorMap:   Map<number, FFLActor>,
   abilityMap: Map<number, string>,
   fightStart: number
 ): PlayerEvent {
+  const hasTarget = event.targetID !== undefined && event.targetID !== -1;
+  const target = hasTarget ? actorMap.get(event.targetID as number)?.name : undefined;
+
   return {
     timestamp:   Math.max(0, event.timestamp - fightStart),
     abilityId:   event.abilityGameID ?? 0,
     abilityName: abilityName(event, abilityMap),
+    target,
   };
 }
 
@@ -258,15 +300,18 @@ function buildFFPlayers(
 
         damageDone: damageDoneEvents
           .filter((e) => e.sourceID === actorId)
-          .map((e) => damageToPlayerEvent(e, abilityMap, fightStart)),
+          .map((e) => damageDoneToPlayerEvent(e, actorMap, abilityMap, fightStart)),
 
         damageTaken: damageTakenEvents
           .filter((e) => e.targetID === actorId)
-          .map((e) => damageToPlayerEvent(e, abilityMap, fightStart)),
+          .map((e) => damageTakenToPlayerEvent(e, actorMap, abilityMap, fightStart)),
 
         healing: healingEvents
           .filter((e) => e.sourceID === actorId)
-          .map((e) => healToPlayerEvent(e, abilityMap, fightStart)),
+          // Drop pure-overheal (or entirely blank-amount) instances — they
+          // had zero effective healing impact on the target.
+          .filter((e) => (e.amount ?? 0) > 0)
+          .map((e) => healToPlayerEvent(e, actorMap, abilityMap, fightStart)),
 
         debuffs: debuffEvents
           .filter((e) => e.sourceID === actorId)
@@ -274,7 +319,7 @@ function buildFFPlayers(
 
         casts: castEvents
           .filter((e) => e.sourceID === actorId)
-          .map((e) => castToPlayerEvent(e, abilityMap, fightStart)),
+          .map((e) => castToPlayerEvent(e, actorMap, abilityMap, fightStart)),
       };
     })
     .filter((p): p is PlayerInfo => p !== null)

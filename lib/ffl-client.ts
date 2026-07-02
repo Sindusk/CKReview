@@ -31,6 +31,13 @@ async function gql<T>(query: string, variables?: Record<string, unknown>): Promi
 
   const json = await res.json();
 
+  // Raw response dump — this is the single choke point every FFLogs query
+  // (report + all 7 event types) passes through, so logging here captures
+  // everything. Useful for confirming field names/shapes directly from a
+  // live report instead of guessing from schema docs. Safe to comment out
+  // once you're done collecting sample data — it is verbose on large reports.
+  console.log("[FFL raw response]", { query, variables, json });
+
   if (json.errors?.length) {
     throw new Error(`FFLogs GraphQL error: ${json.errors[0].message}`);
   }
@@ -207,7 +214,7 @@ const REPORT_QUERY = /* graphql */`
           friendlyPlayers
         }
         masterData(translate: true) {
-          actors(type: "Player") {
+          actors {
             id
             name
             type

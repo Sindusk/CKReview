@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { CSSProperties } from "react";
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 
 const CLASS_COLOR: Record<string, string> = {
@@ -101,39 +102,168 @@ function PlayerButton({ player, onClick }: { player: PlayerInfo; onClick: () => 
   );
 }
 
-function EventRow({ event }: { event: PlayerEvent }) {
+function rowBackground(hasPassed: boolean): string {
+  // Very light tint once playback has moved past this event's timestamp.
+  return hasPassed ? "rgba(255,255,255,0.035)" : "transparent";
+}
+
+const rowShellStyle: CSSProperties = {
+  padding: "5px 10px",
+  borderBottom: "1px solid #111",
+  transition: "background-color 0.3s",
+};
+
+const line1Style: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "8px",
+  fontSize: "12px",
+};
+
+const timeStyle: CSSProperties = {
+  fontFamily: "monospace",
+  color: "#555",
+  minWidth: "34px",
+  flexShrink: 0,
+};
+
+const abilityStyle: CSSProperties = {
+  color: "#94a3b8",
+  flex: 1,
+  minWidth: 0,
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+};
+
+const line2Style: CSSProperties = {
+  fontSize: "11px",
+  color: "#555",
+  paddingLeft: "42px",
+  marginTop: "1px",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+};
+
+function DamageDoneRow({ event, playbackTimeMs }: { event: PlayerEvent; playbackTimeMs: number }) {
+  const hasPassed = playbackTimeMs >= event.timestamp;
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "8px",
-        padding: "4px 10px",
-        borderBottom: "1px solid #111",
-        fontSize: "12px",
-      }}
-    >
-      <span style={{ fontFamily: "monospace", color: "#555", minWidth: "34px", flexShrink: 0 }}>
-        {formatMs(event.timestamp)}
-      </span>
-      <span style={{ color: "#94a3b8", flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-        {event.abilityName}
-      </span>
-      {event.amount !== undefined && (
-        <span style={{ color: "#ccc", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>
-          {formatAmount(event.amount)}
+    <div style={{ ...rowShellStyle, backgroundColor: rowBackground(hasPassed) }}>
+      <div style={line1Style}>
+        <span style={timeStyle}>{formatMs(event.timestamp)}</span>
+        <span style={abilityStyle}>{event.abilityName}</span>
+        {event.isDoT && (
+          <span
+            style={{
+              fontSize: "9px",
+              fontWeight: 700,
+              color: "#a78bfa",
+              border: "1px solid #a78bfa44",
+              borderRadius: "3px",
+              padding: "0 4px",
+              flexShrink: 0,
+            }}
+          >
+            DoT
+          </span>
+        )}
+        {event.amount !== undefined && (
+          <span style={{ color: "#ccc", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>
+            {formatAmount(event.amount)}
+          </span>
+        )}
+      </div>
+      {event.target && <div style={line2Style}>→ {event.target}</div>}
+    </div>
+  );
+}
+
+function DamageTakenRow({ event, playbackTimeMs }: { event: PlayerEvent; playbackTimeMs: number }) {
+  const hasPassed = playbackTimeMs >= event.timestamp;
+  const isFatal = (event.overkill ?? 0) > 0;
+  const hasHealth = event.healthBefore !== undefined || event.healthAfter !== undefined;
+
+  return (
+    <div style={{ ...rowShellStyle, backgroundColor: rowBackground(hasPassed) }}>
+      <div style={line1Style}>
+        <span style={timeStyle}>{formatMs(event.timestamp)}</span>
+        <span style={abilityStyle}>
+          {event.abilityName}
+          {event.source && <span style={{ color: "#555" }}> ({event.source})</span>}
         </span>
-      )}
-      {event.extra && (
-        <span style={{ color: "#555", flexShrink: 0, fontSize: "11px" }}>
-          → {event.extra}
-        </span>
+        {event.amount !== undefined && (
+          <span style={{ color: "#ccc", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>
+            {formatAmount(event.amount)}
+          </span>
+        )}
+      </div>
+      {hasHealth && (
+        <div style={line2Style}>
+          {formatAmount(event.healthBefore ?? 0)} → {formatAmount(event.healthAfter ?? 0)}
+          {isFatal && (
+            <span style={{ color: "#f87171", marginLeft: "6px" }}>
+              +{formatAmount(event.overkill!)} overkill
+            </span>
+          )}
+        </div>
       )}
     </div>
   );
 }
 
-function PlayerDetail({ player, onBack }: { player: PlayerInfo; onBack: () => void }) {
+function HealingRow({ event, playbackTimeMs }: { event: PlayerEvent; playbackTimeMs: number }) {
+  const hasPassed = playbackTimeMs >= event.timestamp;
+  return (
+    <div style={{ ...rowShellStyle, backgroundColor: rowBackground(hasPassed) }}>
+      <div style={line1Style}>
+        <span style={timeStyle}>{formatMs(event.timestamp)}</span>
+        <span style={abilityStyle}>{event.abilityName}</span>
+        {event.amount !== undefined && (
+          <span style={{ color: "#ccc", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>
+            {formatAmount(event.amount)}
+          </span>
+        )}
+      </div>
+      {event.target && <div style={line2Style}>→ {event.target}</div>}
+    </div>
+  );
+}
+
+function CastRow({ event, playbackTimeMs }: { event: PlayerEvent; playbackTimeMs: number }) {
+  const hasPassed = playbackTimeMs >= event.timestamp;
+  return (
+    <div style={{ ...rowShellStyle, backgroundColor: rowBackground(hasPassed) }}>
+      <div style={line1Style}>
+        <span style={timeStyle}>{formatMs(event.timestamp)}</span>
+        <span style={abilityStyle}>{event.abilityName}</span>
+      </div>
+      {event.target && <div style={line2Style}>→ {event.target}</div>}
+    </div>
+  );
+}
+
+function DebuffRow({ event, playbackTimeMs }: { event: PlayerEvent; playbackTimeMs: number }) {
+  const hasPassed = playbackTimeMs >= event.timestamp;
+  return (
+    <div style={{ ...rowShellStyle, backgroundColor: rowBackground(hasPassed) }}>
+      <div style={line1Style}>
+        <span style={timeStyle}>{formatMs(event.timestamp)}</span>
+        <span style={abilityStyle}>{event.abilityName}</span>
+      </div>
+    </div>
+  );
+}
+
+function PlayerDetail({
+  player,
+  onBack,
+  playbackTimeMs,
+}: {
+  player: PlayerInfo;
+  onBack: () => void;
+  playbackTimeMs: number;
+}) {
   const [activeTab, setActiveTab] = useState<Tab>("DamageDone");
   const color = classColor(player.className);
 
@@ -151,6 +281,21 @@ function PlayerDetail({ player, onBack }: { player: PlayerInfo; onBack: () => vo
         return player.casts;
     }
   })();
+
+  function renderRow(event: PlayerEvent, i: number) {
+    switch (activeTab) {
+      case "DamageDone":
+        return <DamageDoneRow key={i} event={event} playbackTimeMs={playbackTimeMs} />;
+      case "DamageTaken":
+        return <DamageTakenRow key={i} event={event} playbackTimeMs={playbackTimeMs} />;
+      case "Healing":
+        return <HealingRow key={i} event={event} playbackTimeMs={playbackTimeMs} />;
+      case "Debuffs":
+        return <DebuffRow key={i} event={event} playbackTimeMs={playbackTimeMs} />;
+      case "Casts":
+        return <CastRow key={i} event={event} playbackTimeMs={playbackTimeMs} />;
+    }
+  }
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -229,7 +374,7 @@ function PlayerDetail({ player, onBack }: { player: PlayerInfo; onBack: () => vo
             No {TAB_LABELS[activeTab].toLowerCase()} events for this pull
           </div>
         ) : (
-          events.map((e, i) => <EventRow key={i} event={e} />)
+          events.map((e, i) => renderRow(e, i))
         )}
       </div>
     </div>
@@ -238,9 +383,10 @@ function PlayerDetail({ player, onBack }: { player: PlayerInfo; onBack: () => vo
 
 type RosterPanelProps = {
   players: PlayerInfo[];
+  playbackTimeMs: number;
 };
 
-export default function RosterPanel({ players }: RosterPanelProps) {
+export default function RosterPanel({ players, playbackTimeMs }: RosterPanelProps) {
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerInfo | null>(null);
 
   // FFLogs includes a synthetic "Multiple Players / LimitBreak" actor that
@@ -254,7 +400,13 @@ export default function RosterPanel({ players }: RosterPanelProps) {
   );
 
   if (selectedPlayer) {
-    return <PlayerDetail player={selectedPlayer} onBack={() => setSelectedPlayer(null)} />;
+    return (
+      <PlayerDetail
+        player={selectedPlayer}
+        onBack={() => setSelectedPlayer(null)}
+        playbackTimeMs={playbackTimeMs}
+      />
+    );
   }
 
   if (filteredPlayers.length === 0) {

@@ -13,7 +13,20 @@ export type PlayerEvent = {
   abilityId:   number;
   abilityName: string;
   amount?:     number;  // damage / healing value when relevant
-  extra?:      string;  // e.g. debuff target name, interrupt target
+  extra?:      string;  // e.g. debuff target name — intentionally not rendered in the UI
+
+  // Target/source labeling — populated depending on tab, see usage below.
+  target?:       string;  // target actor name — Damage Done, Healing, Casts (blank = no target)
+  source?:       string;  // damage source actor name — Damage Taken only
+
+  // Damage Done
+  isDoT?:        boolean; // marks a periodic/tick damage instance (WCL only for now)
+
+  // Damage Taken
+  healthBefore?: number;  // target's health immediately before this hit
+  healthAfter?:  number;  // target's health immediately after this hit
+  maxHealth?:    number;  // for context/formatting
+  overkill?:     number;  // set only on fatal hits
 };
 
 export type PlayerInfo = {

@@ -19,6 +19,41 @@ import { transformReportToPulls, buildAbilityMap as buildWCLAbilityMap } from "@
 import { fetchFFReport, fetchFFightData } from "@/lib/ffl-client";
 import { transformFFReportToPulls, buildAbilityMap as buildFFLAbilityMap } from "@/lib/ffl-transforms";
 
+// ─── Concurrency-limited fetch helper ─────────────────────────────────────────
+//
+// Fights used to be fetched one at a time in a sequential for-loop, which is
+// the main reason large reports felt slow to import — each fight's ~7 event
+// queries (with their own pagination) had to fully finish before the next
+// fight's queries even started. Fetching multiple fights at once fixes that,
+// but WCL/FFLogs both enforce an hourly API "points" budget on their GraphQL
+// APIs, so firing off every fight at once risks 429s on big reports. This caps
+// how many fights are in flight at a time as a middle ground — raise/lower
+// FIGHT_FETCH_CONCURRENCY if you find it's still slow or start hitting rate
+// limit errors.
+
+const FIGHT_FETCH_CONCURRENCY = 3;
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T, index: number) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const current = nextIndex++;
+      results[current] = await fn(items[current], current);
+    }
+  }
+
+  const workerCount = Math.max(1, Math.min(limit, items.length));
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+
+  return results;
+}
+
 // ─── Log source detection ─────────────────────────────────────────────────────
 
 type LogSource = "wcl" | "ffl";
@@ -161,18 +196,23 @@ export default function Home() {
     // ability names (including death causes) without a hand-maintained table.
     const abilityMap = buildWCLAbilityMap(report.masterData.abilities);
 
-    const fightDataList = [] as Awaited<ReturnType<typeof fetchFightData>>[];
-    const totalFights   = Math.max(report.fights.length, 1);
+    const totalFights = Math.max(report.fights.length, 1);
+    let completedFights = 0;
 
-    for (let index = 0; index < report.fights.length; index += 1) {
-      const fight    = report.fights[index];
-      const fightData = await fetchFightData(reportCode, fight, report.masterData.actors);
-      fightDataList.push(fightData);
+    const fightDataList = await mapWithConcurrency(
+      report.fights,
+      FIGHT_FETCH_CONCURRENCY,
+      async (fight) => {
+        const fightData = await fetchFightData(reportCode, fight, report.masterData.actors);
 
-      const progress = Math.round(10 + ((index + 1) / totalFights) * 85);
-      setImportProgress(progress);
-      setImportStatus(`Loaded fight ${index + 1}/${report.fights.length}`);
-    }
+        completedFights += 1;
+        const progress = Math.round(10 + (completedFights / totalFights) * 85);
+        setImportProgress(progress);
+        setImportStatus(`Loaded ${completedFights}/${report.fights.length} fights…`);
+
+        return fightData;
+      }
+    );
 
     const newPulls = transformReportToPulls(fightDataList, abilityMap);
     setPulls(newPulls);
@@ -193,18 +233,23 @@ export default function Home() {
     // ability names (including death causes) without falling back to "Ability {id}".
     const abilityMap = buildFFLAbilityMap(report.masterData.abilities);
 
-    const fightDataList = [] as Awaited<ReturnType<typeof fetchFFightData>>[];
-    const totalFights   = Math.max(report.fights.length, 1);
+    const totalFights = Math.max(report.fights.length, 1);
+    let completedFights = 0;
 
-    for (let index = 0; index < report.fights.length; index += 1) {
-      const fight     = report.fights[index];
-      const fightData = await fetchFFightData(reportCode, fight, report.masterData.actors);
-      fightDataList.push(fightData);
+    const fightDataList = await mapWithConcurrency(
+      report.fights,
+      FIGHT_FETCH_CONCURRENCY,
+      async (fight) => {
+        const fightData = await fetchFFightData(reportCode, fight, report.masterData.actors);
 
-      const progress = Math.round(10 + ((index + 1) / totalFights) * 85);
-      setImportProgress(progress);
-      setImportStatus(`Loaded fight ${index + 1}/${report.fights.length}`);
-    }
+        completedFights += 1;
+        const progress = Math.round(10 + (completedFights / totalFights) * 85);
+        setImportProgress(progress);
+        setImportStatus(`Loaded ${completedFights}/${report.fights.length} fights…`);
+
+        return fightData;
+      }
+    );
 
     const newPulls = transformFFReportToPulls(fightDataList, abilityMap);
     setPulls(newPulls);
@@ -327,7 +372,7 @@ export default function Home() {
               minHeight:     0,
             }}
           >
-            <RosterPanel players={activePull?.players ?? []} />
+            <RosterPanel players={activePull?.players ?? []} playbackTimeMs={timeline.playbackTimeMs} />
           </div>
 
           <div
