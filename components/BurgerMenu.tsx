@@ -200,30 +200,21 @@ export default function BurgerMenu({ onConnectWCL, onConnectFFL, onOpenReport }:
             zIndex:          300,
           }}
         >
-          {/* ── WarcraftLogs ── */}
-          <SectionLabel label="WarcraftLogs" />
+          {/* ── Review ── */}
+          <SectionLabel label="Review" />
 
-          {wclReady ? (
-            <MenuItem
-              icon="✅"
-              label="WarcraftLogs Connected"
-              sublabel="Ready to import WoW reports"
-              disabled
-            />
-          ) : (
-            <MenuItem
-              icon="📊"
-              label="Connect WarcraftLogs"
-              sublabel="Authorize to import WoW reports"
-              onClick={handleConnectWCL}
-            />
-          )}
+          <MenuItem
+            icon="📋"
+            label="View Report"
+            sublabel="First errors, MVPs, and raid uptime"
+            onClick={handleOpenReport}
+          />
 
           {/* Thin rule between sections */}
           <div style={{ height: "1px", backgroundColor: "#2a2a2a", margin: "6px 8px" }} />
 
-          {/* ── FFLogs ── */}
-          <SectionLabel label="FFLogs" />
+          {/* ── Integrations ── */}
+          <SectionLabel label="Integrations" />
 
           {fflReady ? (
             <MenuItem
@@ -241,18 +232,21 @@ export default function BurgerMenu({ onConnectWCL, onConnectFFL, onOpenReport }:
             />
           )}
 
-          {/* Thin rule between sections */}
-          <div style={{ height: "1px", backgroundColor: "#2a2a2a", margin: "6px 8px" }} />
-
-          {/* ── Report ── */}
-          <SectionLabel label="Raid Review" />
-
-          <MenuItem
-            icon="📋"
-            label="View Report"
-            sublabel="First errors, MVPs, and raid uptime"
-            onClick={handleOpenReport}
-          />
+          {wclReady ? (
+            <MenuItem
+              icon="✅"
+              label="WarcraftLogs Connected"
+              sublabel="Ready to import WoW reports"
+              disabled
+            />
+          ) : (
+            <MenuItem
+              icon="📊"
+              label="Connect WarcraftLogs"
+              sublabel="Authorize to import WoW reports"
+              onClick={handleConnectWCL}
+            />
+          )}
 
           {/*
             ── Add future menu items below ──

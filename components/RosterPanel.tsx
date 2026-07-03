@@ -40,7 +40,16 @@ function PlayerButton({ player, onClick }: { player: PlayerInfo; onClick: () => 
   const [hovered, setHovered] = useState(false);
   const color = getClassColor(player.game, player.className);
   const roleColor = ROLE_COLOR[player.role] ?? "#aaa";
-  const specLabel = player.specName && player.specName !== player.className ? player.specName : null;
+
+  // FFXIV has no separate spec from job — specName === className there, so
+  // the "different from class" check below always hid it. Show the job
+  // itself in that case; WoW keeps its existing spec-vs-class behavior.
+  const specLabel =
+    player.game === "ffxiv"
+      ? player.className
+      : player.specName && player.specName !== player.className
+      ? player.specName
+      : null;
 
   return (
     <button

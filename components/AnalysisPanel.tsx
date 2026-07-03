@@ -45,11 +45,13 @@ const FEED_KIND_STYLE: Record<FeedKind, { icon: string; color: string; label: st
   Minor: { icon: "⚠️", color: "#fbbf24", label: "Minor" },
 };
 
+// #10 — show hundredths of a second (M:SS.ss) so events that land within
+// the same second can still be told apart.
 function formatMs(ms: number): string {
-  const totalSec = Math.floor(ms / 1000);
+  const totalSec = Math.max(0, ms) / 1000;
   const m = Math.floor(totalSec / 60);
-  const s = totalSec % 60;
-  return `${m}:${s.toString().padStart(2, "0")}`;
+  const s = totalSec - m * 60;
+  return `${m}:${s.toFixed(2).padStart(5, "0")}`;
 }
 
 function formatDuration(ms: number): string {
@@ -134,7 +136,7 @@ function FeedRow({
           fontFamily: "monospace",
           fontSize: "11px",
           color: hasPassed ? "#888" : "#444",
-          minWidth: "32px",
+          minWidth: "50px",
           flexShrink: 0,
           transition: "color 0.3s",
         }}
@@ -146,35 +148,36 @@ function FeedRow({
         {style.icon}
       </span>
 
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "5px", flexWrap: "wrap" }}>
-          <span
-            style={{
-              color: hasPassed ? cls : "#555",
-              fontWeight: 600,
-              fontSize: "13px",
-              transition: "color 0.3s",
-            }}
-          >
-            {entry.player}
-          </span>
-          <span
-            style={{
-              fontSize: "10px",
-              color: hasPassed ? roleColor : "#444",
-              border: `1px solid ${hasPassed ? roleColor + "33" : "#2a2a2a"}`,
-              borderRadius: "3px",
-              padding: "1px 5px",
-              backgroundColor: hasPassed ? roleColor + "10" : "transparent",
-              flexShrink: 0,
-              transition: "all 0.3s",
-            }}
-          >
-            {entry.role}
-          </span>
-          <span style={{ fontSize: "10px", color: hasPassed ? "#555" : "#333", flexShrink: 0, transition: "color 0.3s" }}>
-            {entry.class}
-          </span>
+      {/* Main content (left) + kind/role column (right) */}
+      <div style={{ flex: 1, minWidth: 0, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px" }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "5px", flexWrap: "wrap" }}>
+            <span
+              style={{
+                color: hasPassed ? cls : "#555",
+                fontWeight: 600,
+                fontSize: "13px",
+                transition: "color 0.3s",
+              }}
+            >
+              {entry.player}
+            </span>
+            <span style={{ fontSize: "10px", color: hasPassed ? "#555" : "#333", flexShrink: 0, transition: "color 0.3s" }}>
+              {entry.class}
+            </span>
+          </div>
+          <div style={{ fontSize: "11px", color: hasPassed ? style.color : "#3a3a20", marginTop: "2px", transition: "color 0.3s" }}>
+            {entry.kind === "Death" ? "⚔ " : ""}{entry.title}
+          </div>
+          {entry.subtitle && (
+            <div style={{ fontSize: "10px", color: hasPassed ? "#666" : "#333", marginTop: "1px", transition: "color 0.3s" }}>
+              {entry.subtitle}
+            </div>
+          )}
+        </div>
+
+        {/* Kind badge (top) + role (below), right-aligned */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "3px", flexShrink: 0 }}>
           {showKindBadge && (
             <span
               style={{
@@ -186,21 +189,27 @@ function FeedRow({
                 border: `1px solid ${hasPassed ? style.color + "44" : "#2a2a2a"}`,
                 borderRadius: "3px",
                 padding: "1px 5px",
-                flexShrink: 0,
+                whiteSpace: "nowrap",
               }}
             >
               {style.label}
             </span>
           )}
+          <span
+            style={{
+              fontSize: "10px",
+              color: hasPassed ? roleColor : "#444",
+              border: `1px solid ${hasPassed ? roleColor + "33" : "#2a2a2a"}`,
+              borderRadius: "3px",
+              padding: "1px 5px",
+              backgroundColor: hasPassed ? roleColor + "10" : "transparent",
+              whiteSpace: "nowrap",
+              transition: "all 0.3s",
+            }}
+          >
+            {entry.role}
+          </span>
         </div>
-        <div style={{ fontSize: "11px", color: hasPassed ? style.color : "#3a3a20", marginTop: "2px", transition: "color 0.3s" }}>
-          {entry.kind === "Death" ? "⚔ " : ""}{entry.title}
-        </div>
-        {entry.subtitle && (
-          <div style={{ fontSize: "10px", color: hasPassed ? "#666" : "#333", marginTop: "1px", transition: "color 0.3s" }}>
-            {entry.subtitle}
-          </div>
-        )}
       </div>
 
       <span style={{ fontSize: "10px", color: hasPassed ? "#555" : "#333", flexShrink: 0, transition: "color 0.3s" }}>

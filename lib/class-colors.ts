@@ -54,7 +54,26 @@ export const FF_JOB_COLORS: Record<string, string> = {
   "Blue Mage": "#2A9DC7",
 };
 
+// Strips whitespace and lowercases — lets us match names regardless of
+// spacing/casing differences between data sources (e.g. WCL's actor.subType
+// sometimes comes through as "DeathKnight"/"DemonHunter" with no space,
+// while our lookup tables above use the display form "Death Knight").
+function normalizeKey(s: string): string {
+  return s.replace(/\s+/g, "").toLowerCase();
+}
+
+function buildNormalizedTable(table: Record<string, string>): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const [key, color] of Object.entries(table)) {
+    map.set(normalizeKey(key), color);
+  }
+  return map;
+}
+
+const WOW_CLASS_COLORS_NORMALIZED = buildNormalizedTable(WOW_CLASS_COLORS);
+const FF_JOB_COLORS_NORMALIZED = buildNormalizedTable(FF_JOB_COLORS);
+
 export function getClassColor(game: GameId | undefined, name: string): string {
-  if (game === "ffxiv") return FF_JOB_COLORS[name] ?? "#aaa";
-  return WOW_CLASS_COLORS[name] ?? "#aaa";
+  const table = game === "ffxiv" ? FF_JOB_COLORS_NORMALIZED : WOW_CLASS_COLORS_NORMALIZED;
+  return table.get(normalizeKey(name)) ?? "#aaa";
 }

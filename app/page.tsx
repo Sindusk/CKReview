@@ -180,13 +180,6 @@ export default function Home() {
     );
   }
 
-  function handleResetImportState() {
-    setImportError(null);
-    setImportProgress(0);
-    setImportStatus(null);
-    setLoadedReportCode(null);
-  }
-
   // ── WarcraftLogs import ────────────────────────────────────────────────────
 
   async function handleImportWCL(reportCode: string) {
@@ -350,7 +343,6 @@ export default function Home() {
           loadedReportCode={loadedReportCode}
           error={importError}
           onImport={handleImportReport}
-          onReset={handleResetImportState}
         />
       </div>
 
@@ -379,7 +371,18 @@ export default function Home() {
               minHeight:     0,
             }}
           >
-            <RosterPanel players={activePull?.players ?? []} playbackTimeMs={timeline.playbackTimeMs} />
+            {/*
+              #8 — keying on selectedPullId forces RosterPanel to remount
+              (and therefore reset its internal "selected player" state)
+              any time the user picks a different pull. Without this, the
+              player-detail view stayed open across pull changes showing
+              stale event data from the previous pull's timeline.
+            */}
+            <RosterPanel
+              key={selectedPullId ?? "none"}
+              players={activePull?.players ?? []}
+              playbackTimeMs={timeline.playbackTimeMs}
+            />
           </div>
 
           <div
@@ -527,7 +530,6 @@ function WCLImportBar({
   loadedReportCode,
   error,
   onImport,
-  onReset,
 }: {
   importing:        boolean;
   importProgress:   number;
@@ -535,7 +537,6 @@ function WCLImportBar({
   loadedReportCode: string | null;
   error:            string | null;
   onImport:         (url: string) => void;
-  onReset:          () => void;
 }) {
   const [input, setInput] = useState("");
 
@@ -545,39 +546,25 @@ function WCLImportBar({
     onImport(trimmed);
   }
 
+  // #7 — "Import Another" was removed. Once a report is loaded, this bar
+  // just shows the loaded-state badge; there's no in-place reset flow to
+  // maintain/support.
   if (loadedReportCode && !importing) {
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", flex: 1 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <span
-            style={{
-              padding:         "6px 12px",
-              borderRadius:    "999px",
-              backgroundColor: "#1e293b",
-              color:           "#93c5fd",
-              fontSize:        "12px",
-              fontWeight:      600,
-            }}
-          >
-            Log Loaded: {loadedReportCode}
-          </span>
-          <span style={{ fontSize: "11px", color: "#94a3b8" }}>Ready for review</span>
-        </div>
-        <button
-          onClick={onReset}
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: 1 }}>
+        <span
           style={{
-            backgroundColor: "#111827",
-            color:           "#e2e8f0",
-            border:          "1px solid #334155",
-            borderRadius:    "6px",
-            padding:         "6px 10px",
+            padding:         "6px 12px",
+            borderRadius:    "999px",
+            backgroundColor: "#1e293b",
+            color:           "#93c5fd",
             fontSize:        "12px",
             fontWeight:      600,
-            cursor:          "pointer",
           }}
         >
-          Import Another
-        </button>
+          Log Loaded: {loadedReportCode}
+        </span>
+        <span style={{ fontSize: "11px", color: "#94a3b8" }}>Ready for review</span>
       </div>
     );
   }

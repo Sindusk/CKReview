@@ -73,6 +73,7 @@ export default function PullList({ pulls, selectedPullId, onSelectPull }: PullLi
                 flexShrink: 0,
               }}
             >
+              {/* Line 1 — name/kill badge/log link */}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px", gap: "8px" }}>
                 <span style={{ fontWeight: 600, fontSize: "13px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   #{pull.pullNumber} {pull.name}
@@ -117,26 +118,29 @@ export default function PullList({ pulls, selectedPullId, onSelectPull }: PullLi
                 </div>
               </div>
 
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", fontSize: "11px", color: "#666" }}>
-                <span>⏱ {formatDuration(pull.fightDuration)}</span>
-                {deaths > 0 ? (
-                  <span style={{ color: "#ef4444" }}>💀 {deaths} death{deaths !== 1 ? "s" : ""}</span>
-                ) : (
-                  <span style={{ color: "#22c55e" }}>✓ No deaths</span>
-                )}
-                {majors.length > 0 && (
-                  <span style={{ color: "#fb923c" }}>⛔ {majors.length} major</span>
-                )}
-                {minors.length > 0 && (
-                  <span style={{ color: "#fbbf24" }}>⚠️ {minors.length} minor</span>
+              {/* Line 2 — stats on the left, first issue time on the right */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", fontSize: "11px", color: "#666", minWidth: 0 }}>
+                  <span>⏱ {formatDuration(pull.fightDuration)}</span>
+                  {deaths > 0 ? (
+                    <span style={{ color: "#ef4444" }}>💀 {deaths} death{deaths !== 1 ? "s" : ""}</span>
+                  ) : (
+                    <span style={{ color: "#22c55e" }}>✓ No deaths</span>
+                  )}
+                  {majors.length > 0 && (
+                    <span style={{ color: "#fb923c" }}>⛔ {majors.length} major</span>
+                  )}
+                  {minors.length > 0 && (
+                    <span style={{ color: "#fbbf24" }}>⚠️ {minors.length} minor</span>
+                  )}
+                </div>
+
+                {firstIssueTime !== null && (
+                  <span style={{ fontSize: "10px", color: "#7a7a7a", flexShrink: 0, whiteSpace: "nowrap" }}>
+                    First issue at {formatDuration(firstIssueTime)}
+                  </span>
                 )}
               </div>
-
-              {firstIssueTime !== null && (
-                <div style={{ fontSize: "10px", color: "#7a7a7a", marginTop: "3px" }}>
-                  First issue at {formatDuration(firstIssueTime)}
-                </div>
-              )}
             </div>
           );
         })}

@@ -18,13 +18,13 @@ export type PlayerReportStats = {
   game:            ReportGame;
 
   // Column 2 — how many pulls this player caused the very first
-  // Major error or death.
+  // Major error.
   firstErrorCount: number;
   // Column 3 — firstErrorCount / total pulls, as a 0–100 percentage.
   firstErrorPct:   number;
 
-  // Column 4 — how many times this player's error/death was among the
-  // first 3 Major errors/deaths of a pull (a player can be credited twice
+  // Column 4 — how many times this player's error was among the
+  // first 3 Major errors of a pull (a player can be credited twice
   // in the same pull if they account for 2 of the first 3 events).
   top3Count:       number;
   // Column 5 — top3Count / total pulls, as a 0–100 percentage.
@@ -42,17 +42,10 @@ type CriticalEvent = {
   role:      ReportRole;
 };
 
-// A pull's ordered stream of "critical" events — every death plus every
-// Major (not Minor) error, sorted chronologically. This is the shared
-// source for both the first-error and top-3 metrics.
+// A pull's ordered stream of "critical" events. Deaths are intentionally
+// excluded here — a death isn't inherently the fault of the player who
+// died, so the report only counts Major errors as mistakes.
 function getPullCriticalEvents(pull: Pull): CriticalEvent[] {
-  const deaths: CriticalEvent[] = pull.deathEvents.map((d) => ({
-    timestamp: d.timestamp,
-    player:    d.player,
-    class:     d.class,
-    role:      d.role,
-  }));
-
   const majors: CriticalEvent[] = pull.errors
     .filter((e) => e.severity === "Major")
     .map((e) => ({
@@ -62,7 +55,7 @@ function getPullCriticalEvents(pull: Pull): CriticalEvent[] {
       role:      e.role,
     }));
 
-  return [...deaths, ...majors].sort((a, b) => a.timestamp - b.timestamp);
+  return majors.sort((a, b) => a.timestamp - b.timestamp);
 }
 
 // Roster info keyed by player name. Names are used as the join key across
@@ -173,10 +166,12 @@ export type RaidTimeline = {
 };
 
 /**
- * Builds a gapless timeline from t=0 (start of the log) through the end of
- * the final pull. Pull start/end times are already report-relative seconds
- * (see Pull.startTime/endTime). Green = a pull was engaged, gray = downtime
- * between/before pulls.
+ * Builds a timeline spanning from the start of the FIRST pull through the
+ * end of the LAST pull. Pull start/end times are already report-relative
+ * seconds (see Pull.startTime/endTime), but the timeline itself is
+ * re-based so t=0 is the first pull's start — this guarantees the timeline
+ * always begins with a green (combat) segment instead of leading downtime
+ * from the start of the log/report.
  */
 export function computeRaidTimeline(pulls: Pull[]): RaidTimeline {
   if (pulls.length === 0) {
@@ -184,15 +179,21 @@ export function computeRaidTimeline(pulls: Pull[]): RaidTimeline {
   }
 
   const sorted = [...pulls].sort((a, b) => a.startTime - b.startTime);
-  const totalDurationSec = sorted[sorted.length - 1].endTime;
+  const rangeStart = sorted[0].startTime;
+  const rangeEnd = sorted[sorted.length - 1].endTime;
+  const totalDurationSec = Math.max(0, rangeEnd - rangeStart);
 
   const segments: TimelineSegment[] = [];
-  let cursor = 0;
+  let cursor = rangeStart;
   let combatSeconds = 0;
 
   for (const pull of sorted) {
     if (pull.startTime > cursor) {
-      segments.push({ type: "downtime", startSec: cursor, endSec: pull.startTime });
+      segments.push({
+        type:     "downtime",
+        startSec: cursor - rangeStart,
+        endSec:   pull.startTime - rangeStart,
+      });
       cursor = pull.startTime;
     }
 
@@ -200,7 +201,12 @@ export function computeRaidTimeline(pulls: Pull[]): RaidTimeline {
     const segEnd   = Math.max(segStart, pull.endTime);
 
     if (segEnd > segStart) {
-      segments.push({ type: "combat", startSec: segStart, endSec: segEnd, pull });
+      segments.push({
+        type:     "combat",
+        startSec: segStart - rangeStart,
+        endSec:   segEnd - rangeStart,
+        pull,
+      });
       combatSeconds += segEnd - segStart;
     }
 
