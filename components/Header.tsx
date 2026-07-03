@@ -4,9 +4,10 @@ type HeaderProps = {
   onAddVod:     () => void;
   onConnectWCL: () => void;
   onConnectFFL: () => void;
+  onOpenReport: () => void;
 };
 
-export default function Header({ onAddVod, onConnectWCL, onConnectFFL }: HeaderProps) {
+export default function Header({ onAddVod, onConnectWCL, onConnectFFL, onOpenReport }: HeaderProps) {
   return (
     <header
       style={{
@@ -22,7 +23,7 @@ export default function Header({ onAddVod, onConnectWCL, onConnectFFL }: HeaderP
         zIndex:         100,
       }}
     >
-      <BurgerMenu onConnectWCL={onConnectWCL} onConnectFFL={onConnectFFL} />
+      <BurgerMenu onConnectWCL={onConnectWCL} onConnectFFL={onConnectFFL} onOpenReport={onOpenReport} />
 
       <div
         style={{

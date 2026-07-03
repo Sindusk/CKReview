@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import Header from "../components/Header";
 import AddVodDialog from "../components/AddVodDialog";
+import ReportDialog from "../components/ReportDialog";
 import { parseYouTubeUrl } from "../lib/youtube";
 import type { Vod } from "../types/Vod";
 import VideoPanel from "../components/VideoPanel";
@@ -106,6 +107,7 @@ export default function Home() {
   const [vods, setVods] = useState<Vod[]>([]);
   const [selectedVodId, setSelectedVodId] = useState<number | null>(null);
   const [showDialog, setShowDialog] = useState(false);
+  const [showReport, setShowReport] = useState(false);
 
   const [pulls, setPulls] = useState<Pull[]>([]);
   const [selectedPullId, setSelectedPullId] = useState<number | null>(null);
@@ -327,6 +329,7 @@ export default function Home() {
         onAddVod={() => setShowDialog(true)}
         onConnectWCL={loginWithWarcraftLogs}
         onConnectFFL={loginWithFFLogs}
+        onOpenReport={() => setShowReport(true)}
       />
 
       <div
@@ -435,6 +438,12 @@ export default function Home() {
         open={showDialog}
         onCancel={() => setShowDialog(false)}
         onAdd={handleAddVod}
+      />
+
+      <ReportDialog
+        open={showReport}
+        onClose={() => setShowReport(false)}
+        pulls={pulls}
       />
     </div>
   );

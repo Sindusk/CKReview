@@ -9,6 +9,7 @@ import { isFFAuthenticated } from "@/lib/ffl-auth";
 export type BurgerMenuProps = {
   onConnectWCL: () => void;
   onConnectFFL: () => void;
+  onOpenReport: () => void;
 };
 
 // ─── Section Divider ──────────────────────────────────────────────────────────
@@ -85,7 +86,7 @@ function MenuItem({
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function BurgerMenu({ onConnectWCL, onConnectFFL }: BurgerMenuProps) {
+export default function BurgerMenu({ onConnectWCL, onConnectFFL, onOpenReport }: BurgerMenuProps) {
   const [open, setOpen]         = useState(false);
   const [wclReady, setWclReady] = useState(false);
   const [fflReady, setFflReady] = useState(false);
@@ -128,6 +129,11 @@ export default function BurgerMenu({ onConnectWCL, onConnectFFL }: BurgerMenuPro
   function handleConnectFFL() {
     setOpen(false);
     onConnectFFL();
+  }
+
+  function handleOpenReport() {
+    setOpen(false);
+    onOpenReport();
   }
 
   return (
@@ -234,6 +240,19 @@ export default function BurgerMenu({ onConnectWCL, onConnectFFL }: BurgerMenuPro
               onClick={handleConnectFFL}
             />
           )}
+
+          {/* Thin rule between sections */}
+          <div style={{ height: "1px", backgroundColor: "#2a2a2a", margin: "6px 8px" }} />
+
+          {/* ── Report ── */}
+          <SectionLabel label="Raid Review" />
+
+          <MenuItem
+            icon="📋"
+            label="View Report"
+            sublabel="First errors, MVPs, and raid uptime"
+            onClick={handleOpenReport}
+          />
 
           {/*
             ── Add future menu items below ──
