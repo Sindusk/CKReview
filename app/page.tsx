@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import Header from "../components/Header";
 import AddVodDialog from "../components/AddVodDialog";
 import ReportDialog from "../components/ReportDialog";
+import SessionFoundDialog from "@/components/SessionFoundDialog";
 import { parseYouTubeUrl } from "../lib/youtube";
 import type { Vod } from "../types/Vod";
 import VideoPanel from "../components/VideoPanel";
@@ -13,6 +14,7 @@ import RosterPanel from "../components/RosterPanel";
 import TimelinePanel from "@/components/TimelinePanel";
 import type { Pull } from "../types/Pull";
 import { createCallWipeError, CALL_WIPE_RULE_ID } from "@/types/PullError";
+import type { SavedSession } from "@/types/Session";
 import useTimelineController from "@/hooks/useTimelineController";
 import { loginWithWarcraftLogs } from "@/lib/wcl-auth";
 import { loginWithFFLogs } from "@/lib/ffl-auth";
@@ -20,6 +22,15 @@ import { fetchReport, fetchFightData } from "@/lib/wcl-client";
 import { transformReportToPulls, buildAbilityMap as buildWCLAbilityMap } from "@/lib/wcl-transforms";
 import { fetchFFReport, fetchFFightData } from "@/lib/ffl-client";
 import { transformFFReportToPulls, buildAbilityMap as buildFFLAbilityMap } from "@/lib/ffl-transforms";
+import { parseLogUrl } from "@/lib/log-url";
+import {
+  lookupSessionForLog,
+  fetchSession,
+  createSession,
+  updateSession,
+  type SessionLookupMatch,
+} from "@/lib/session-client";
+import { buildWipeCallsMap, applyPendingWipeCalls } from "@/lib/session-helpers";
 
 // ─── Concurrency-limited fetch helper ─────────────────────────────────────────
 //
@@ -56,52 +67,6 @@ async function mapWithConcurrency<T, R>(
   return results;
 }
 
-// ─── Log source detection ─────────────────────────────────────────────────────
-
-type LogSource = "wcl" | "ffl";
-
-/**
- * Determines whether a user-supplied string is a valid full WCL or FFLogs URL
- * and extracts the report code from it.
- *
- * Valid examples:
- *   https://www.warcraftlogs.com/reports/mhLjAT4vDyJgZcBk?fight=14  → { source: "wcl", code: "mhLjAT4vDyJgZcBk" }
- *   https://www.fflogs.com/reports/mArWGh8nkBawQ7g1                 → { source: "ffl", code: "mArWGh8nkBawQ7g1" }
- *
- * Bare codes (e.g. "mhLjAT4vDyJgZcBk") are explicitly rejected — users must
- * paste the full URL.
- *
- * Returns null if the input is not a recognised full log URL.
- */
-function parseLogUrl(input: string): { source: LogSource; code: string } | null {
-  const trimmed = input.trim();
-
-  let parsed: URL;
-  try {
-    parsed = new URL(trimmed);
-  } catch {
-    // Not a valid URL at all
-    return null;
-  }
-
-  const hostname = parsed.hostname.toLowerCase();
-  // Extract the report code from the path: /reports/<CODE>
-  const pathMatch = parsed.pathname.match(/^\/reports\/([a-zA-Z0-9]+)/);
-  if (!pathMatch) return null;
-
-  const code = pathMatch[1];
-
-  if (hostname === "www.warcraftlogs.com" || hostname === "warcraftlogs.com") {
-    return { source: "wcl", code };
-  }
-
-  if (hostname === "www.fflogs.com" || hostname === "fflogs.com") {
-    return { source: "ffl", code };
-  }
-
-  return null;
-}
-
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function Home() {
@@ -118,6 +83,34 @@ export default function Home() {
   const [importProgress, setImportProgress] = useState(0);
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const [loadedReportCode, setLoadedReportCode] = useState<string | null>(null);
+
+  // ── Session save/load ──────────────────────────────────────────────────────
+  //
+  // A "session" is just the log URL + VODs (with calibration offsets) +
+  // any manually-called wipes, saved server-side under a short id that
+  // gets stamped onto the URL as ?session=<id> the first time anything
+  // savable happens. Loading that URL later re-populates all three
+  // without auto-importing the log — the user still has to hit Import.
+
+  const [importInput, setImportInput] = useState("");
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionReportUrl, setSessionReportUrl] = useState("");
+  const [duplicateMatch, setDuplicateMatch] = useState<SessionLookupMatch | null>(null);
+  const [pendingRawInput, setPendingRawInput] = useState<string | null>(null);
+
+  // Refs mirror the state above so the debounced persistSession() call
+  // below always reads current values, even when called synchronously
+  // right after a setState (before the closure over state would update).
+  const sessionIdRef = useRef<string | null>(null);
+  const vodsRef = useRef<Vod[]>(vods);
+  const pullsRef = useRef<Pull[]>(pulls);
+  const sessionReportUrlRef = useRef(sessionReportUrl);
+  const pendingWipeCallsRef = useRef<Record<number, number>>({});
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => { vodsRef.current = vods; }, [vods]);
+  useEffect(() => { pullsRef.current = pulls; }, [pulls]);
+  useEffect(() => { sessionReportUrlRef.current = sessionReportUrl; }, [sessionReportUrl]);
 
   const selectedVod = vods.find(v => v.id === selectedVodId) ?? null;
   const activePull  = pulls.find(p => p.id === selectedPullId) ?? null;
@@ -143,6 +136,93 @@ export default function Home() {
     timeline.seekToPullStart(ms / 1000);
   }, [activePull, selectedVod, timeline]);
 
+  // Debounced session save. Lazily creates a session (and stamps
+  // ?session=<id> onto the URL) the first time anything savable exists;
+  // every subsequent call overwrites that same session. Safe to call
+  // right after any setVods/setPulls/setSessionReportUrl — it reads from
+  // refs, not from state closed over at render time.
+  const persistSession = useCallback(() => {
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+
+    saveTimeoutRef.current = setTimeout(async () => {
+      const payload: Omit<SavedSession, "createdAt"> = {
+        reportUrl: sessionReportUrlRef.current ?? "",
+        vods: vodsRef.current.map(v => ({
+          player: v.player,
+          url:    v.url,
+          offset: v.isCalibrated ? v.offset : undefined,
+        })),
+        wipeCalls: buildWipeCallsMap(pullsRef.current),
+      };
+
+      // Nothing worth saving yet — don't create an empty session.
+      if (!payload.reportUrl && payload.vods.length === 0) return;
+
+      try {
+        if (sessionIdRef.current) {
+          await updateSession(sessionIdRef.current, payload);
+        } else {
+          const id = await createSession(payload);
+          sessionIdRef.current = id;
+          setSessionId(id);
+
+          const url = new URL(window.location.href);
+          url.searchParams.set("session", id);
+          window.history.replaceState({}, "", url.toString());
+        }
+      } catch (err) {
+        console.error("Failed to save session:", err);
+      }
+    }, 400);
+  }, []);
+
+  // Restore a saved session from ?session=<id> on first load. Pre-fills
+  // the import box (does NOT auto-import) and restores VODs with their
+  // calibration already applied. Wipe calls are stashed in a ref and
+  // reattached once the log is actually imported and pulls exist.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get("session");
+    if (!id) return;
+
+    (async () => {
+      const session = await fetchSession(id);
+      if (!session) return;
+
+      sessionIdRef.current = id;
+      setSessionId(id);
+      setSessionReportUrl(session.reportUrl);
+      setImportInput(session.reportUrl);
+      pendingWipeCallsRef.current = session.wipeCalls ?? {};
+
+      const restoredVods: Vod[] = session.vods.map((v, i) => {
+        const parsedYt = parseYouTubeUrl(v.url);
+        return {
+          id:           Date.now() + i,
+          player:       v.player,
+          url:          v.url,
+          videoId:      parsedYt?.videoId ?? "",
+          embedUrl:     parsedYt?.embedUrl ?? "",
+          class:        "Unknown",
+          role:         "DPS",
+          raid:         "Unknown Raid",
+          boss:         "Unknown Boss",
+          difficulty:   "Unknown",
+          uploadedBy:   "local-user",
+          offset:       v.offset,
+          isCalibrated: v.offset !== undefined,
+        };
+      });
+
+      if (restoredVods.length > 0) {
+        setVods(restoredVods);
+        setSelectedVodId(restoredVods[0].id);
+      }
+    })();
+    // Runs once on mount only — intentionally omits deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // "Call Wipe" — appends a manually-created Raid error (see
   // types/PullError.ts createCallWipeError) to the given pull at the given
   // timestamp (the current playback time, passed up from AnalysisPanel).
@@ -161,7 +241,8 @@ export default function Home() {
         return { ...p, errors: updatedErrors };
       })
     );
-  }, []);
+    persistSession();
+  }, [persistSession]);
 
   function handleAddVod(player: string, url: string) {
     const parsed = parseYouTubeUrl(url);
@@ -187,6 +268,7 @@ export default function Home() {
     setVods(prev => [...prev, newVod]);
     setSelectedVodId(newVod.id);
     setShowDialog(false);
+    persistSession();
   }
 
   function syncToPull() {
@@ -199,6 +281,7 @@ export default function Home() {
           : v
       )
     );
+    persistSession();
   }
 
   // ── WarcraftLogs import ────────────────────────────────────────────────────
@@ -233,12 +316,19 @@ export default function Home() {
       }
     );
 
-    const newPulls = transformReportToPulls(fightDataList, abilityMap, report.code);
+    let newPulls = transformReportToPulls(fightDataList, abilityMap, report.code);
+
+    // Reattach any wipe calls carried over from a loaded/matched session —
+    // pulls are always rebuilt fresh here, so this has to happen post-hoc.
+    newPulls = applyPendingWipeCalls(newPulls, pendingWipeCallsRef.current);
+    pendingWipeCallsRef.current = {};
+
     setPulls(newPulls);
     setSelectedPullId(null);
     setLoadedReportCode(report.code);
     setImportStatus(`Log Loaded: ${report.code}`);
     setImportProgress(100);
+    persistSession();
   }
 
   // ── FFLogs import ──────────────────────────────────────────────────────────
@@ -271,17 +361,22 @@ export default function Home() {
       }
     );
 
-    const newPulls = transformFFReportToPulls(fightDataList, abilityMap, report.code);
+    let newPulls = transformFFReportToPulls(fightDataList, abilityMap, report.code);
+
+    newPulls = applyPendingWipeCalls(newPulls, pendingWipeCallsRef.current);
+    pendingWipeCallsRef.current = {};
+
     setPulls(newPulls);
     setSelectedPullId(null);
     setLoadedReportCode(report.code);
     setImportStatus(`Log Loaded: ${report.code}`);
     setImportProgress(100);
+    persistSession();
   }
 
   // ── Unified import dispatcher ──────────────────────────────────────────────
 
-  async function handleImportReport(rawInput: string) {
+  async function handleImportReport(rawInput: string, options?: { skipDuplicateCheck?: boolean }) {
     const parsed = parseLogUrl(rawInput);
 
     if (!parsed) {
@@ -292,10 +387,23 @@ export default function Home() {
       return;
     }
 
+    // If a saved session already exists for this exact log — and it isn't
+    // the one we're already working from — offer to load it instead of
+    // silently spinning up a second session for the same report.
+    if (!options?.skipDuplicateCheck) {
+      const match = await lookupSessionForLog(parsed.source, parsed.code);
+      if (match && match.id !== sessionIdRef.current) {
+        setDuplicateMatch(match);
+        setPendingRawInput(rawInput);
+        return;
+      }
+    }
+
     setImporting(true);
     setImportError(null);
     setImportProgress(0);
     setImportStatus("Fetching report information…");
+    setSessionReportUrl(rawInput);
 
     try {
       if (parsed.source === "wcl") {
@@ -310,6 +418,66 @@ export default function Home() {
     } finally {
       setImporting(false);
     }
+  }
+
+  // ── "A session was found for this log" dialog ───────────────────────────────
+
+  async function handleLoadFoundSession() {
+    const match = duplicateMatch;
+    const rawInput = pendingRawInput;
+    setDuplicateMatch(null);
+    setPendingRawInput(null);
+
+    if (!match || !rawInput) return;
+
+    const session = await fetchSession(match.id);
+    if (!session) {
+      // Fetch failed for some reason — don't block the user, just import fresh.
+      handleImportReport(rawInput, { skipDuplicateCheck: true });
+      return;
+    }
+
+    sessionIdRef.current = match.id;
+    setSessionId(match.id);
+    setSessionReportUrl(session.reportUrl);
+    pendingWipeCallsRef.current = session.wipeCalls ?? {};
+
+    const restoredVods: Vod[] = session.vods.map((v, i) => {
+      const parsedYt = parseYouTubeUrl(v.url);
+      return {
+        id:           Date.now() + i,
+        player:       v.player,
+        url:          v.url,
+        videoId:      parsedYt?.videoId ?? "",
+        embedUrl:     parsedYt?.embedUrl ?? "",
+        class:        "Unknown",
+        role:         "DPS",
+        raid:         "Unknown Raid",
+        boss:         "Unknown Boss",
+        difficulty:   "Unknown",
+        uploadedBy:   "local-user",
+        offset:       v.offset,
+        isCalibrated: v.offset !== undefined,
+      };
+    });
+
+    if (restoredVods.length > 0) {
+      setVods(restoredVods);
+      setSelectedVodId(restoredVods[0].id);
+    }
+
+    const url = new URL(window.location.href);
+    url.searchParams.set("session", match.id);
+    window.history.replaceState({}, "", url.toString());
+
+    handleImportReport(rawInput, { skipDuplicateCheck: true });
+  }
+
+  function handleImportFreshInstead() {
+    const rawInput = pendingRawInput;
+    setDuplicateMatch(null);
+    setPendingRawInput(null);
+    if (rawInput) handleImportReport(rawInput, { skipDuplicateCheck: true });
   }
 
   const isCalibrated = selectedVod?.isCalibrated ?? false;
@@ -358,6 +526,8 @@ export default function Home() {
         }}
       >
         <WCLImportBar
+          value={importInput}
+          onChange={setImportInput}
           importing={importing}
           importProgress={importProgress}
           importStatus={importStatus}
@@ -470,6 +640,14 @@ export default function Home() {
         onClose={() => setShowReport(false)}
         pulls={pulls}
       />
+
+      <SessionFoundDialog
+        open={duplicateMatch !== null}
+        vodCount={duplicateMatch?.vodCount ?? 0}
+        wipeCount={duplicateMatch?.wipeCount ?? 0}
+        onLoad={handleLoadFoundSession}
+        onImportFresh={handleImportFreshInstead}
+      />
     </div>
   );
 }
@@ -544,8 +722,14 @@ function SyncToPullButton({
 }
 
 // ─── WCLImportBar (now handles both WCL and FFLogs) ───────────────────────────
+//
+// Now a controlled component — `value`/`onChange` are lifted to page.tsx so
+// a restored session (?session=<id>) can pre-fill the text box without
+// auto-submitting it.
 
 function WCLImportBar({
+  value,
+  onChange,
   importing,
   importProgress,
   importStatus,
@@ -553,6 +737,8 @@ function WCLImportBar({
   error,
   onImport,
 }: {
+  value:            string;
+  onChange:         (v: string) => void;
   importing:        boolean;
   importProgress:   number;
   importStatus:     string | null;
@@ -560,10 +746,8 @@ function WCLImportBar({
   error:            string | null;
   onImport:         (url: string) => void;
 }) {
-  const [input, setInput] = useState("");
-
   function handleSubmit() {
-    const trimmed = input.trim();
+    const trimmed = value.trim();
     if (!trimmed) return;
     onImport(trimmed);
   }
@@ -622,8 +806,8 @@ function WCLImportBar({
   return (
     <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: 1 }}>
       <input
-        value={input}
-        onChange={e => setInput(e.target.value)}
+        value={value}
+        onChange={e => onChange(e.target.value)}
         onKeyDown={e => e.key === "Enter" && handleSubmit()}
         placeholder="Paste a WarcraftLogs or FFLogs report URL…"
         style={{
@@ -640,7 +824,7 @@ function WCLImportBar({
       />
       <button
         onClick={handleSubmit}
-        disabled={!input.trim()}
+        disabled={!value.trim()}
         style={{
           backgroundColor: "#2563eb",
           color:           "white",
@@ -649,8 +833,8 @@ function WCLImportBar({
           padding:         "6px 14px",
           fontSize:        "12px",
           fontWeight:      600,
-          cursor:          input.trim() ? "pointer" : "default",
-          opacity:         input.trim() ? 1 : 0.7,
+          cursor:          value.trim() ? "pointer" : "default",
+          opacity:         value.trim() ? 1 : 0.7,
         }}
       >
         Import
