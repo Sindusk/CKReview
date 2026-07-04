@@ -45,8 +45,13 @@ export default function PullList({ pulls, selectedPullId, onSelectPull }: PullLi
           const active = pull.id === selectedPullId;
           const isKill = pull.result === "Kill";
           const deaths = pull.deathEvents.length;
+          const raids = pull.errors.filter(e => e.severity === "Raid");
           const majors = pull.errors.filter(e => e.severity === "Major");
           const minors = pull.errors.filter(e => e.severity === "Minor");
+
+          // Earliest raid-wide error (auto-detected or manually "Call
+          // Wipe"d) — shown as a badge next to KILL/WIPE, with its time.
+          const firstRaidTime = raids.length > 0 ? Math.min(...raids.map(e => e.timestamp)) : null;
 
           // #6 — earliest Major error or death, ignoring Minor errors
           const issueTimestamps = [
@@ -73,7 +78,7 @@ export default function PullList({ pulls, selectedPullId, onSelectPull }: PullLi
                 flexShrink: 0,
               }}
             >
-              {/* Line 1 — name/kill badge/log link */}
+              {/* Line 1 — name/kill badge/raid badge/log link */}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px", gap: "8px" }}>
                 <span style={{ fontWeight: 600, fontSize: "13px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   #{pull.pullNumber} {pull.name}
@@ -94,6 +99,24 @@ export default function PullList({ pulls, selectedPullId, onSelectPull }: PullLi
                   >
                     {isKill ? "KILL" : "WIPE"}
                   </span>
+
+                  {firstRaidTime !== null && (
+                    <span
+                      style={{
+                        fontSize: "10px",
+                        fontWeight: 700,
+                        padding: "2px 6px",
+                        borderRadius: "4px",
+                        backgroundColor: "rgba(192,132,252,0.15)",
+                        color: "#c084fc",
+                        border: "1px solid #6b21a8",
+                        letterSpacing: "0.04em",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      RAID {formatDuration(firstRaidTime)}
+                    </span>
+                  )}
 
                   {/* #3 — link to the source report, scoped to this fight */}
                   <a

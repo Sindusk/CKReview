@@ -6,6 +6,7 @@
 import type { Pull }       from "@/types/Pull";
 import type { DeathEvent } from "@/types/DeathEvent";
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
+import type { EnemyEvent } from "@/types/PullError";
 import type {
   WCLFightData,
   WCLActor,
@@ -16,6 +17,7 @@ import type {
   WCLDamageEvent,
   WCLHealEvent,
   WCLDebuffEvent,
+  WCLBuffEvent,
 } from "./wcl-client";
 import { getSpellName }                from "./spell-data";
 import { getSpecInfo, getRosterSortOrder } from "./spec-data";
@@ -235,6 +237,59 @@ function castToPlayerEvent(
   };
 }
 
+// ─── Enemy (raid-wide) event builders ──────────────────────────────────────
+//
+// Feeds the "enemyCast" / "enemyBuffApplied" raid-error rules. These MUST
+// read from data.enemyCastEvents / data.enemyBuffEvents — the ones fetched
+// with hostilityType: "Enemies" in wcl-client.ts — NOT from the friendly
+// castEvents/debuffEvents streams above, which are scoped to players only
+// and will never contain a boss's own casts or buffs no matter how they're
+// filtered afterwards.
+//
+// The actor.type === "NPC" filter here is a defensive extra layer (in case
+// the API ever returns something unexpected on the Enemies side, e.g. a
+// hostile pet); the real filtering already happened server-side via
+// hostilityType.
+
+function buildEnemyCastEvents(
+  enemyCastEvents: WCLCastEvent[],
+  actorMap:        Map<number, WCLActor>,
+  abilityMap:      Map<number, string>,
+  fightStart:      number
+): EnemyEvent[] {
+  return enemyCastEvents
+    // Only actually-completed casts count — an interrupted cast never
+    // reaches "cast" (per clarification: "begincast" starts it, "cast"
+    // is the signal it went off).
+    .filter((e) => e.type === "cast")
+    .filter((e) => actorMap.get(e.sourceID)?.type === "NPC")
+    .map((e) => ({
+      timestamp:   e.timestamp - fightStart,
+      actorId:     e.sourceID,
+      actorName:   actorMap.get(e.sourceID)?.name ?? `Unknown (${e.sourceID})`,
+      abilityId:   e.abilityGameID ?? 0,
+      abilityName: abilityName(e, abilityMap),
+    }));
+}
+
+function buildEnemyBuffEvents(
+  enemyBuffEvents: WCLBuffEvent[],
+  actorMap:        Map<number, WCLActor>,
+  abilityMap:      Map<number, string>,
+  fightStart:      number
+): EnemyEvent[] {
+  return enemyBuffEvents
+    .filter((e) => e.type === "applybuff")
+    .filter((e) => actorMap.get(e.targetID)?.type === "NPC")
+    .map((e) => ({
+      timestamp:   e.timestamp - fightStart,
+      actorId:     e.targetID,
+      actorName:   actorMap.get(e.targetID)?.name ?? `Unknown (${e.targetID})`,
+      abilityId:   e.abilityGameID ?? 0,
+      abilityName: abilityName(e, abilityMap),
+    }));
+}
+
 function buildPlayers(
   combatantInfos:    WCLCombatantInfoEvent[],
   actorMap:          Map<number, WCLActor>,
@@ -308,7 +363,12 @@ export function transformFightToPull(
     transformDeath(e, actorMap, specIdMap, abilityMap, fightStart)
   );
 
-  const castEvents: CastEvent[] = data.castEvents.map((e) =>
+  // Friendly-player-facing cast list only ever showed completed casts
+  // historically — keep that behavior unchanged now that "begincast"
+  // events may also come back from the same query.
+  const completedCasts = data.castEvents.filter((e) => e.type === "cast");
+
+  const castEvents: CastEvent[] = completedCasts.map((e) =>
     transformCast(e, actorMap, specIdMap, abilityMap, fightStart)
   );
 
@@ -317,7 +377,7 @@ export function transformFightToPull(
     actorMap,
     specIdMap,
     abilityMap,
-    data.castEvents,
+    completedCasts,
     data.damageDoneEvents,
     data.damageTakenEvents,
     data.healingEvents,
@@ -325,7 +385,12 @@ export function transformFightToPull(
     fightStart
   );
 
-  const errors = detectPullErrors(players);
+  // NOTE: sourced from data.enemyCastEvents / data.enemyBuffEvents — the
+  // hostilityType: "Enemies" fetches — NOT data.castEvents/debuffEvents.
+  const enemyCastEvents = buildEnemyCastEvents(data.enemyCastEvents ?? [], actorMap, abilityMap, fightStart);
+  const enemyBuffEvents = buildEnemyBuffEvents(data.enemyBuffEvents ?? [], actorMap, abilityMap, fightStart);
+
+  const errors = detectPullErrors(players, enemyCastEvents, enemyBuffEvents);
 
   const fightDurationMs = data.fight.endTime - data.fight.startTime;
   const startTimeSec    = Math.round(data.fight.startTime / 1000);

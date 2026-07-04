@@ -5,7 +5,7 @@
 // ffl-transforms.ts converts them into app-internal Pull / DeathEvent types.
 //
 // FFLogs GraphQL API mirrors WarcraftLogs API structure closely — the same
-// pagination pattern (nextPageTimestamp) applies.
+// pagination pattern (nextPageTimestamp) and hostilityType argument apply.
 
 import { getFFAccessToken } from "./ffl-auth";
 
@@ -32,7 +32,7 @@ async function gql<T>(query: string, variables?: Record<string, unknown>): Promi
   const json = await res.json();
 
   // Raw response dump — this is the single choke point every FFLogs query
-  // (report + all 7 event types) passes through, so logging here captures
+  // (report + all 9 event fetches) passes through, so logging here captures
   // everything. Useful for confirming field names/shapes directly from a
   // live report instead of guessing from schema docs. Safe to comment out
   // once you're done collecting sample data — it is verbose on large reports.
@@ -62,6 +62,11 @@ export type FFLActor = {
   type:    string;    // e.g. "Player", "NPC", "Boss"
   subType: string;    // FFXIV job name in PascalCase, e.g. "WhiteMage", "DarkKnight"
                       // May be "Unknown" for NPC actors
+                      //
+                      // Raid-error enemy detection (error-detection.ts
+                      // "enemyCast" trigger) relies on `type === "NPC"` to
+                      // separate boss/add actors from players and pets — see
+                      // ffl-transforms.ts buildEnemyCastEvents/buildEnemyBuffEvents.
 };
 
 // A single ability/action used anywhere in the report. Fetched once per
@@ -111,7 +116,11 @@ export type FFLCombatantInfoEvent = {
 
 export type FFLCastEvent = {
   timestamp:     number;
-  type:          "cast";
+  // "begincast" is the start of a cast-time action; "cast" is the signal
+  // that it actually went off. The events query can surface both — an
+  // "enemyCast" raid-error rule only counts "cast" (see ffl-transforms.ts
+  // buildEnemyCastEvents), since an interrupted cast never reaches "cast".
+  type:          "cast" | "begincast";
   sourceID:      number;
   targetID?:     number;
   abilityGameID: number;
@@ -190,13 +199,31 @@ export type FFLDebuffEvent = {
   } | null;
 };
 
+// Mirrors FFLDebuffEvent, but for buffs. Needed for the "enemyBuffApplied"
+// raid-error trigger. Only ever fetched with hostilityType: "Enemies" — see
+// fetchFFightData below — because that's the whole point (a boss gaining a
+// buff, not a player).
+export type FFLBuffEvent = {
+  timestamp:     number;
+  type:          "applybuff" | "removebuff" | "applybuffstack";
+  sourceID:      number;
+  targetID:      number;
+  abilityGameID: number;
+  ability?: {
+    name:        string;
+    abilityIcon?: string;
+    gameID?:     number;
+  } | null;
+};
+
 export type FFLEvent =
   | FFLDeathEvent
   | FFLCombatantInfoEvent
   | FFLCastEvent
   | FFLDamageEvent
   | FFLHealEvent
-  | FFLDebuffEvent;
+  | FFLDebuffEvent
+  | FFLBuffEvent;
 
 export type FFLReport = {
   title:      string;
@@ -259,14 +286,20 @@ export async function fetchFFReport(reportCode: string): Promise<FFLReport> {
 // pass nextPageTimestamp back as the next startTime — there is no `after` arg.
 //
 // includeResources: true is set on all queries to maximise data richness.
-
+//
+// $hostilityType selects Friendlies vs Enemies. It's nullable/optional —
+// when the caller doesn't pass one, fetchAllFFEvents below simply omits the
+// variable from the request body, so the server falls back to its default
+// (Friendlies), matching every existing call's prior behavior. Only the new
+// enemy-side cast/buff fetches in fetchFFightData pass "Enemies" explicitly.
 const EVENTS_QUERY = /* graphql */`
   query GetFFEvents(
-    $code:      String!
-    $fightIDs:  [Int]!
-    $startTime: Float!
-    $endTime:   Float!
-    $type:      EventDataType!
+    $code:          String!
+    $fightIDs:      [Int]!
+    $startTime:     Float!
+    $endTime:       Float!
+    $type:          EventDataType!
+    $hostilityType: HostilityType
   ) {
     reportData {
       report(code: $code) {
@@ -275,6 +308,7 @@ const EVENTS_QUERY = /* graphql */`
           startTime:        $startTime
           endTime:          $endTime
           dataType:         $type
+          hostilityType:    $hostilityType
           includeResources: true
         ) {
           data
@@ -296,12 +330,17 @@ type EventsQueryResult = {
   };
 };
 
+type HostilityType = "Friendlies" | "Enemies";
+
 async function fetchAllFFEvents(
   reportCode: string,
   fightId:    number,
   startTime:  number,
   endTime:    number,
-  type:       "Deaths" | "Casts" | "CombatantInfo" | "DamageDone" | "DamageTaken" | "Healing" | "Debuffs"
+  type:       "Deaths" | "Casts" | "CombatantInfo" | "DamageDone" | "DamageTaken" | "Healing" | "Debuffs" | "Buffs",
+  // Omitted entirely (not even sent as null) when not passed — see the
+  // comment on EVENTS_QUERY above for why that matters.
+  hostilityType?: HostilityType
 ): Promise<FFLEvent[]> {
   const allEvents: FFLEvent[] = [];
   let pageStart = startTime;
@@ -313,6 +352,7 @@ async function fetchAllFFEvents(
       startTime: pageStart,
       endTime,
       type,
+      hostilityType,
     });
 
     const page = data.reportData.report.events;
@@ -332,11 +372,13 @@ export type FFLFightData = {
   actors:            FFLActor[];
   deathEvents:       FFLDeathEvent[];
   combatantInfos:    FFLCombatantInfoEvent[];
-  castEvents:        FFLCastEvent[];
+  castEvents:        FFLCastEvent[];       // friendly-hostility casts (players) — unchanged behavior
   damageDoneEvents:  FFLDamageEvent[];
   damageTakenEvents: FFLDamageEvent[];
   healingEvents:     FFLHealEvent[];
-  debuffEvents:      FFLDebuffEvent[];
+  debuffEvents:      FFLDebuffEvent[];     // friendly-hostility debuffs (players) — unchanged behavior
+  enemyCastEvents:   FFLCastEvent[];       // NEW — hostilityType: Enemies, feeds "enemyCast" rules
+  enemyBuffEvents:   FFLBuffEvent[];       // NEW — hostilityType: Enemies, feeds "enemyBuffApplied" rules
 };
 
 /**
@@ -355,6 +397,7 @@ export async function fetchFFightData(
   const [
     rawDeaths, rawCombatantInfos, rawCasts,
     rawDamageDone, rawDamageTaken, rawHealing, rawDebuffs,
+    rawEnemyCasts, rawEnemyBuffs,
   ] = await Promise.all([
     fetchAllFFEvents(reportCode, fight.id, fight.startTime, fight.endTime, "Deaths"),
     fetchAllFFEvents(reportCode, fight.id, fight.startTime, fight.endTime, "CombatantInfo"),
@@ -363,6 +406,9 @@ export async function fetchFFightData(
     fetchAllFFEvents(reportCode, fight.id, fight.startTime, fight.endTime, "DamageTaken"),
     fetchAllFFEvents(reportCode, fight.id, fight.startTime, fight.endTime, "Healing"),
     fetchAllFFEvents(reportCode, fight.id, fight.startTime, fight.endTime, "Debuffs"),
+    // NEW — enemy-hostility fetches for raid-wide error detection.
+    fetchAllFFEvents(reportCode, fight.id, fight.startTime, fight.endTime, "Casts", "Enemies"),
+    fetchAllFFEvents(reportCode, fight.id, fight.startTime, fight.endTime, "Buffs", "Enemies"),
   ]);
 
   // See getFFDamageDone-Sample.json / getFFDamageTaken-Sample.json — FFLogs
@@ -381,5 +427,7 @@ export async function fetchFFightData(
     damageTakenEvents: onlyLanded(rawDamageTaken) as FFLDamageEvent[],
     healingEvents:     rawHealing                as FFLHealEvent[],
     debuffEvents:      rawDebuffs                as FFLDebuffEvent[],
+    enemyCastEvents:   rawEnemyCasts             as FFLCastEvent[],
+    enemyBuffEvents:   rawEnemyBuffs             as FFLBuffEvent[],
   };
 }

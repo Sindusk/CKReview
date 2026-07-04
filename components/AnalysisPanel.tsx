@@ -4,31 +4,37 @@ import { useState } from "react";
 import type { Pull } from "@/types/Pull";
 import type { DeathEvent } from "@/types/DeathEvent";
 import type { PullError } from "@/types/PullError";
+import { CALL_WIPE_RULE_ID } from "@/types/PullError";
 import { getClassColor } from "@/lib/class-colors";
 
 type AnalysisPanelProps = {
   pull: Pull | null;
   playbackTimeMs: number;
   onSeekToTime?: (ms: number) => void;
+  // Fires when the user clicks "Call Wipe" — page.tsx appends a manual
+  // Raid error (createCallWipeError) to this pull at the given timestamp.
+  onCallWipe?: (pullId: number, timestampMs: number) => void;
 };
 
-type Tab = "Overall" | "Deaths" | "Major" | "Minor";
-const TABS: Tab[] = ["Overall", "Deaths", "Major", "Minor"];
+type Tab = "Overall" | "Deaths" | "Raid" | "Major" | "Minor";
+const TABS: Tab[] = ["Overall", "Deaths", "Raid", "Major", "Minor"];
 
 // Unified shape for anything that can appear in the timeline feed —
-// a death, a Major error, or a Minor error.
-type FeedKind = "Death" | "Major" | "Minor";
+// a death, or a Raid/Major/Minor error.
+type FeedKind = "Death" | "Raid" | "Major" | "Minor";
 
-// FeedEntry needs the game so FeedRow can pick the right color table:
+// FeedEntry needs the game so FeedRow can pick the right color table.
+// player/class/role are optional — Raid errors are raid-wide mistakes not
+// attributable to any one person (see types/PullError.ts).
 type FeedEntry = {
   kind:      FeedKind;
   timestamp: number;
-  player:    string;
-  class:     string;
-  role:      "Tank" | "Healer" | "DPS";
+  player?:   string;
+  class?:    string;
+  role?:     "Tank" | "Healer" | "DPS";
   title:     string;
   subtitle?: string;
-  game:      "wow" | "ffxiv";   // NEW
+  game:      "wow" | "ffxiv";
 };
 
 function deathToFeedEntry(d: DeathEvent, game: "wow" | "ffxiv"): FeedEntry {
@@ -41,6 +47,7 @@ function errorToFeedEntry(e: PullError, game: "wow" | "ffxiv"): FeedEntry {
 
 const FEED_KIND_STYLE: Record<FeedKind, { icon: string; color: string; label: string }> = {
   Death: { icon: "💀", color: "#f87171", label: "Death" },
+  Raid:  { icon: "🚨", color: "#c084fc", label: "Raid" },
   Major: { icon: "⛔", color: "#fb923c", label: "Major" },
   Minor: { icon: "⚠️", color: "#fbbf24", label: "Minor" },
 };
@@ -59,6 +66,14 @@ function formatDuration(ms: number): string {
   const m = Math.floor(totalSec / 60);
   const s = totalSec % 60;
   return `${m}m ${s}s`;
+}
+
+// Short M:SS form used for the "Call Wipe" / "Wipe called at" header label.
+function formatCallTime(ms: number): string {
+  const totalSec = Math.max(0, Math.floor(ms / 1000));
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
 const ROLE_COLOR: Record<string, string> = {
@@ -103,14 +118,16 @@ function FeedRow({
   fightDuration: number;
   playbackTimeMs: number;
   onSeek?: (ms: number) => void;
-  showKindBadge?: boolean;   // show a Death/Major/Minor tag — used on the Overall tab
+  showKindBadge?: boolean;   // show a Death/Raid/Major/Minor tag — used on the Overall tab
 }) {
   const [hovered, setHovered] = useState(false);
   const hasPassed = playbackTimeMs >= entry.timestamp;
   const pct = fightDuration > 0 ? Math.round((entry.timestamp / fightDuration) * 100) : 0;
-  const roleColor = ROLE_COLOR[entry.role] ?? "#aaa";
-  const cls = getClassColor(entry.game, entry.class);
   const style = FEED_KIND_STYLE[entry.kind];
+  // Raid errors have no player/class/role — fall back to the kind's own
+  // color instead of looking up a class or role color that doesn't exist.
+  const roleColor = entry.role ? ROLE_COLOR[entry.role] ?? "#aaa" : style.color;
+  const cls = entry.class ? getClassColor(entry.game, entry.class) : style.color;
   const seekTarget = Math.max(0, entry.timestamp - 3000);
 
   return (
@@ -160,11 +177,13 @@ function FeedRow({
                 transition: "color 0.3s",
               }}
             >
-              {entry.player}
+              {entry.player ?? "Raid-Wide"}
             </span>
-            <span style={{ fontSize: "10px", color: hasPassed ? "#555" : "#333", flexShrink: 0, transition: "color 0.3s" }}>
-              {entry.class}
-            </span>
+            {entry.class && (
+              <span style={{ fontSize: "10px", color: hasPassed ? "#555" : "#333", flexShrink: 0, transition: "color 0.3s" }}>
+                {entry.class}
+              </span>
+            )}
           </div>
           <div style={{ fontSize: "11px", color: hasPassed ? style.color : "#3a3a20", marginTop: "2px", transition: "color 0.3s" }}>
             {entry.kind === "Death" ? "⚔ " : ""}{entry.title}
@@ -195,20 +214,22 @@ function FeedRow({
               {style.label}
             </span>
           )}
-          <span
-            style={{
-              fontSize: "10px",
-              color: hasPassed ? roleColor : "#444",
-              border: `1px solid ${hasPassed ? roleColor + "33" : "#2a2a2a"}`,
-              borderRadius: "3px",
-              padding: "1px 5px",
-              backgroundColor: hasPassed ? roleColor + "10" : "transparent",
-              whiteSpace: "nowrap",
-              transition: "all 0.3s",
-            }}
-          >
-            {entry.role}
-          </span>
+          {entry.role && (
+            <span
+              style={{
+                fontSize: "10px",
+                color: hasPassed ? roleColor : "#444",
+                border: `1px solid ${hasPassed ? roleColor + "33" : "#2a2a2a"}`,
+                borderRadius: "3px",
+                padding: "1px 5px",
+                backgroundColor: hasPassed ? roleColor + "10" : "transparent",
+                whiteSpace: "nowrap",
+                transition: "all 0.3s",
+              }}
+            >
+              {entry.role}
+            </span>
+          )}
         </div>
       </div>
 
@@ -247,6 +268,7 @@ function TabBar({ value, onChange, counts }: { value: Tab; onChange: (t: Tab) =>
         const active = tab === value;
         const count = counts[tab];
         const badgeColor =
+          tab === "Raid" ? "#c084fc" :
           tab === "Major" ? "#fb923c" :
           tab === "Minor" ? "#fbbf24" :
           tab === "Deaths" ? "#f87171" :
@@ -293,7 +315,7 @@ function TabBar({ value, onChange, counts }: { value: Tab; onChange: (t: Tab) =>
   );
 }
 
-export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime }: AnalysisPanelProps) {
+export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime, onCallWipe }: AnalysisPanelProps) {
   // Hooks must run unconditionally on every render — declared before the
   // early "no pull selected" return below.
   const [activeTab, setActiveTab] = useState<Tab>("Overall");
@@ -324,12 +346,16 @@ export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime }: An
   const isKill = pull.result === "Kill";
 
   const deaths = [...pull.deathEvents].sort((a, b) => a.timestamp - b.timestamp);
+  const raids  = pull.errors.filter((e) => e.severity === "Raid").sort((a, b) => a.timestamp - b.timestamp);
   const majors = pull.errors.filter((e) => e.severity === "Major").sort((a, b) => a.timestamp - b.timestamp);
   const minors = pull.errors.filter((e) => e.severity === "Minor").sort((a, b) => a.timestamp - b.timestamp);
 
+  const callWipeError = pull.errors.find((e) => e.ruleId === CALL_WIPE_RULE_ID);
+
   const counts: Record<Tab, number> = {
-    Overall: deaths.length + majors.length + minors.length,
+    Overall: deaths.length + raids.length + majors.length + minors.length,
     Deaths:  deaths.length,
+    Raid:    raids.length,
     Major:   majors.length,
     Minor:   minors.length,
   };
@@ -343,11 +369,14 @@ export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime }: An
       case "Overall":
         return [
           ...deaths.map((d) => deathToFeedEntry(d, pull.game)),
+          ...raids.map((e) => errorToFeedEntry(e, pull.game)),
           ...majors.map((e) => errorToFeedEntry(e, pull.game)),
           ...minors.map((e) => errorToFeedEntry(e, pull.game)),
         ].sort((a, b) => a.timestamp - b.timestamp);
       case "Deaths":
         return deaths.map((d) => deathToFeedEntry(d, pull.game));
+      case "Raid":
+        return raids.map((e) => errorToFeedEntry(e, pull.game));
       case "Major":
         return majors.map((e) => errorToFeedEntry(e, pull.game));
       case "Minor":
@@ -358,6 +387,7 @@ export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime }: An
   const emptyState: Record<Tab, { icon: string; text: string; color: string }> = {
     Overall: { icon: "✨", text: "No deaths or errors this pull", color: "#4ade80" },
     Deaths:  { icon: "✨", text: "No deaths this pull", color: "#4ade80" },
+    Raid:    { icon: "✨", text: "No raid-wide errors this pull", color: "#4ade80" },
     Major:   { icon: "✨", text: "No major errors this pull", color: "#4ade80" },
     Minor:   { icon: "✨", text: "No minor errors this pull", color: "#4ade80" },
   };
@@ -365,21 +395,65 @@ export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime }: An
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div style={{ padding: "10px 12px", borderBottom: "1px solid #1e1e1e", backgroundColor: "#111", flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
           <span style={{ fontWeight: 700, fontSize: "14px", color: "#e2e8f0" }}>{pull.name}</span>
-          <span
-            style={{
-              fontSize: "11px",
-              fontWeight: 700,
-              padding: "2px 8px",
-              borderRadius: "4px",
-              backgroundColor: isKill ? "rgba(74,222,128,0.12)" : "rgba(248,113,113,0.1)",
-              color: isKill ? "#4ade80" : "#f87171",
-              border: `1px solid ${isKill ? "#166534" : "#7f1d1d"}`,
-            }}
-          >
-            {isKill ? "KILL" : "WIPE"}
-          </span>
+
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+            <span
+              style={{
+                fontSize: "11px",
+                fontWeight: 700,
+                padding: "2px 8px",
+                borderRadius: "4px",
+                backgroundColor: isKill ? "rgba(74,222,128,0.12)" : "rgba(248,113,113,0.1)",
+                color: isKill ? "#4ade80" : "#f87171",
+                border: `1px solid ${isKill ? "#166534" : "#7f1d1d"}`,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {isKill ? "KILL" : "WIPE"}
+            </span>
+
+            {/* "Call Wipe" — creates a manual Raid error at the current
+                playback time. Once one exists on this pull, it's replaced
+                by the time it was called, per product decision this is
+                independent of any auto-detected Raid errors. */}
+            {callWipeError ? (
+              <span
+                style={{
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  color: "#c084fc",
+                  border: "1px solid #6b21a8",
+                  borderRadius: "4px",
+                  padding: "3px 8px",
+                  backgroundColor: "rgba(192,132,252,0.1)",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Wipe called {formatCallTime(callWipeError.timestamp)}
+              </span>
+            ) : (
+              onCallWipe && (
+                <button
+                  onClick={() => onCallWipe(pull.id, playbackTimeMs)}
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: 600,
+                    color: "#c084fc",
+                    border: "1px solid #6b21a8",
+                    borderRadius: "4px",
+                    padding: "3px 8px",
+                    backgroundColor: "transparent",
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  Call Wipe
+                </button>
+              )
+            )}
+          </div>
         </div>
       </div>
 
@@ -396,6 +470,7 @@ export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime }: An
       >
         <StatPill label="Duration" value={formatDuration(pull.fightDuration)} />
         <StatPill label="Deaths" value={String(deaths.length)} color={deaths.length > 0 ? "#f87171" : "#4ade80"} />
+        <StatPill label="Raid" value={String(raids.length)} color={raids.length > 0 ? "#c084fc" : "#4ade80"} />
         <StatPill label="Major" value={String(majors.length)} color={majors.length > 0 ? "#fb923c" : "#4ade80"} />
         <StatPill label="Minor" value={String(minors.length)} color={minors.length > 0 ? "#fbbf24" : "#4ade80"} />
       </div>

@@ -29,7 +29,7 @@ async function gql<T>(query: string, variables?: Record<string, unknown>): Promi
   const json = await res.json();
 
   // Raw response dump — this is the single choke point every WCL query
-  // (report + all 7 event types) passes through, so logging here captures
+  // (report + all 9 event fetches) passes through, so logging here captures
   // everything. Useful for confirming field names/shapes (e.g. does a damage
   // event actually carry `tick` or `hitPoints`?) directly from a live report
   // instead of guessing from schema docs. Safe to comment out once you're
@@ -60,7 +60,10 @@ export type WCLActor = {
   type:    string;    // WoW class name for players (e.g. "Warrior"); "NPC" or
                       // similar for enemies now that masterData.actors is
                       // unfiltered — only ever meaningful as a class label
-                      // when looked up for a player actor.
+                      // when looked up for a player actor. Raid-error enemy
+                      // detection (error-detection.ts "enemyCast"/
+                      // "enemyBuffApplied" rules) relies on this being
+                      // exactly "NPC" for bosses/adds — see wcl-transforms.ts.
   subType: string;    // spec name, e.g. "Arms", "Holy" — empty/irrelevant for NPCs
 };
 
@@ -97,7 +100,12 @@ export type WCLCombatantInfoEvent = {
 
 export type WCLCastEvent = {
   timestamp:     number;
-  type:          "cast";
+  // "begincast" is the start of a channeled/cast-time spell; "cast" is the
+  // signal that it actually went off. The EventDataType: Casts query can
+  // surface both — enemyCast raid-error rules only count "cast" (see
+  // wcl-transforms.ts buildEnemyCastEvents), matching how a real interrupt
+  // would prevent "cast" from ever firing.
+  type:          "cast" | "begincast";
   sourceID:      number;
   targetID?:     number;  // -1 or absent = no meaningful target (self-cast/ground-targeted/etc.)
   abilityGameID: number;
@@ -167,13 +175,29 @@ export type WCLDebuffEvent = {
   };
 };
 
+// Mirrors WCLDebuffEvent, but for buffs. Needed for the "enemyBuffApplied"
+// raid-error trigger (e.g. the boss gaining Guardian Edict). Only ever
+// fetched with hostilityType: "Enemies" — see fetchFightData below —
+// because that's the whole point (a boss gaining a buff, not a player).
+export type WCLBuffEvent = {
+  timestamp:     number;
+  type:          "applybuff" | "removebuff" | "applybuffstack";
+  sourceID:      number;
+  targetID:      number;
+  abilityGameID: number;
+  ability?: {
+    name: string;
+  };
+};
+
 export type WCLEvent =
   | WCLDeathEvent
   | WCLCombatantInfoEvent
   | WCLCastEvent
   | WCLDamageEvent
   | WCLHealEvent
-  | WCLDebuffEvent;
+  | WCLDebuffEvent
+  | WCLBuffEvent;
 
 export type WCLReport = {
   title:      string;
@@ -235,14 +259,22 @@ export async function fetchReport(reportCode: string): Promise<WCLReport> {
 // WCL paginates events by returning a `nextPageTimestamp`.
 // The correct pagination pattern is to pass that value back as the next
 // `startTime` — there is NO `after` argument on the events field.
-
+//
+// $hostilityType selects Friendlies vs Enemies (mirrors the "hostility=1"
+// query param on the WCL website itself). It's nullable/optional — when the
+// caller doesn't pass one, fetchAllEvents below simply omits the variable
+// from the request body, so the server falls back to its own default
+// (Friendlies), which is exactly the behavior every existing call already
+// relied on before this field was added. Only the new enemy-side cast/buff
+// fetches in fetchFightData pass "Enemies" explicitly.
 const EVENTS_QUERY = /* graphql */`
   query GetEvents(
-    $code:      String!
-    $fightIDs:  [Int]!
-    $startTime: Float!
-    $endTime:   Float!
-    $type:      EventDataType!
+    $code:          String!
+    $fightIDs:      [Int]!
+    $startTime:     Float!
+    $endTime:       Float!
+    $type:          EventDataType!
+    $hostilityType: HostilityType
   ) {
     reportData {
       report(code: $code) {
@@ -251,6 +283,7 @@ const EVENTS_QUERY = /* graphql */`
           startTime:       $startTime
           endTime:         $endTime
           dataType:        $type
+          hostilityType:   $hostilityType
           includeResources: true
         ) {
           data
@@ -272,12 +305,17 @@ type EventsQueryResult = {
   };
 };
 
+type HostilityType = "Friendlies" | "Enemies";
+
 async function fetchAllEvents(
   reportCode: string,
   fightId:    number,
   startTime:  number,
   endTime:    number,
-  type:       "Deaths" | "Casts" | "CombatantInfo" | "DamageDone" | "DamageTaken" | "Healing" | "Debuffs"
+  type:       "Deaths" | "Casts" | "CombatantInfo" | "DamageDone" | "DamageTaken" | "Healing" | "Debuffs" | "Buffs",
+  // Omitted entirely (not even sent as null) when not passed — see the
+  // comment on EVENTS_QUERY above for why that matters.
+  hostilityType?: HostilityType
 ): Promise<WCLEvent[]> {
   const allEvents: WCLEvent[] = [];
   let pageStart = startTime;
@@ -289,6 +327,7 @@ async function fetchAllEvents(
       startTime: pageStart,
       endTime,
       type,
+      hostilityType,
     });
 
     const page = data.reportData.report.events;
@@ -308,11 +347,13 @@ export type WCLFightData = {
   actors:            WCLActor[];
   deathEvents:       WCLDeathEvent[];
   combatantInfos:    WCLCombatantInfoEvent[];
-  castEvents:        WCLCastEvent[];
+  castEvents:        WCLCastEvent[];       // friendly-hostility casts (players) — unchanged behavior
   damageDoneEvents:  WCLDamageEvent[];
   damageTakenEvents: WCLDamageEvent[];
   healingEvents:     WCLHealEvent[];
-  debuffEvents:      WCLDebuffEvent[];
+  debuffEvents:      WCLDebuffEvent[];     // friendly-hostility debuffs (players) — unchanged behavior
+  enemyCastEvents:   WCLCastEvent[];       // NEW — hostilityType: Enemies, feeds "enemyCast" rules
+  enemyBuffEvents:   WCLBuffEvent[];       // NEW — hostilityType: Enemies, feeds "enemyBuffApplied" rules
 };
 
 /**
@@ -333,6 +374,8 @@ export async function fetchFightData(
     rawDamageTaken,
     rawHealing,
     rawDebuffs,
+    rawEnemyCasts,
+    rawEnemyBuffs,
   ] = await Promise.all([
     fetchAllEvents(reportCode, fight.id, fight.startTime, fight.endTime, "Deaths"),
     fetchAllEvents(reportCode, fight.id, fight.startTime, fight.endTime, "CombatantInfo"),
@@ -341,17 +384,24 @@ export async function fetchFightData(
     fetchAllEvents(reportCode, fight.id, fight.startTime, fight.endTime, "DamageTaken"),
     fetchAllEvents(reportCode, fight.id, fight.startTime, fight.endTime, "Healing"),
     fetchAllEvents(reportCode, fight.id, fight.startTime, fight.endTime, "Debuffs"),
+    // NEW — enemy-hostility fetches for raid-wide error detection. Same
+    // dataType as above, but hostilityType: "Enemies" so bosses/adds show
+    // up instead of being filtered out by the server's default.
+    fetchAllEvents(reportCode, fight.id, fight.startTime, fight.endTime, "Casts", "Enemies"),
+    fetchAllEvents(reportCode, fight.id, fight.startTime, fight.endTime, "Buffs", "Enemies"),
   ]);
 
   return {
     fight,
     actors,
-    deathEvents:       rawDeaths       as WCLDeathEvent[],
+    deathEvents:       rawDeaths         as WCLDeathEvent[],
     combatantInfos:    rawCombatantInfos as WCLCombatantInfoEvent[],
-    castEvents:        rawCasts         as WCLCastEvent[],
-    damageDoneEvents:  rawDamageDone    as WCLDamageEvent[],
-    damageTakenEvents: rawDamageTaken   as WCLDamageEvent[],
-    healingEvents:     rawHealing       as WCLHealEvent[],
-    debuffEvents:      rawDebuffs       as WCLDebuffEvent[],
+    castEvents:        rawCasts          as WCLCastEvent[],
+    damageDoneEvents:  rawDamageDone     as WCLDamageEvent[],
+    damageTakenEvents: rawDamageTaken    as WCLDamageEvent[],
+    healingEvents:     rawHealing        as WCLHealEvent[],
+    debuffEvents:      rawDebuffs        as WCLDebuffEvent[],
+    enemyCastEvents:   rawEnemyCasts     as WCLCastEvent[],
+    enemyBuffEvents:   rawEnemyBuffs     as WCLBuffEvent[],
   };
 }

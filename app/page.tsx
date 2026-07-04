@@ -12,6 +12,7 @@ import AnalysisPanel from "../components/AnalysisPanel";
 import RosterPanel from "../components/RosterPanel";
 import TimelinePanel from "@/components/TimelinePanel";
 import type { Pull } from "../types/Pull";
+import { createCallWipeError, CALL_WIPE_RULE_ID } from "@/types/PullError";
 import useTimelineController from "@/hooks/useTimelineController";
 import { loginWithWarcraftLogs } from "@/lib/wcl-auth";
 import { loginWithFFLogs } from "@/lib/ffl-auth";
@@ -141,6 +142,26 @@ export default function Home() {
     if (!activePull || !selectedVod) return;
     timeline.seekToPullStart(ms / 1000);
   }, [activePull, selectedVod, timeline]);
+
+  // "Call Wipe" — appends a manually-created Raid error (see
+  // types/PullError.ts createCallWipeError) to the given pull at the given
+  // timestamp (the current playback time, passed up from AnalysisPanel).
+  // Per product decision this is independent of any auto-detected Raid
+  // errors already on the pull — it only no-ops if a Call Wipe error has
+  // already been added once.
+  const handleCallWipe = useCallback((pullId: number, timestampMs: number) => {
+    setPulls(prev =>
+      prev.map(p => {
+        if (p.id !== pullId) return p;
+        if (p.errors.some(e => e.ruleId === CALL_WIPE_RULE_ID)) return p;
+
+        const updatedErrors = [...p.errors, createCallWipeError(timestampMs)]
+          .sort((a, b) => a.timestamp - b.timestamp);
+
+        return { ...p, errors: updatedErrors };
+      })
+    );
+  }, []);
 
   function handleAddVod(player: string, url: string) {
     const parsed = parseYouTubeUrl(url);
@@ -399,6 +420,7 @@ export default function Home() {
               pull={activePull}
               playbackTimeMs={timeline.playbackTimeMs}
               onSeekToTime={isCalibrated ? handleSeekToMs : undefined}
+              onCallWipe={handleCallWipe}
             />
           </div>
         </div>

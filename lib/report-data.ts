@@ -42,17 +42,38 @@ type CriticalEvent = {
   role:      ReportRole;
 };
 
-// A pull's ordered stream of "critical" events. Deaths are intentionally
-// excluded here — a death isn't inherently the fault of the player who
-// died, so the report only counts Major errors as mistakes.
+// A pull's ordered stream of "critical" events, for the purposes of the
+// Report's per-player attribution.
+//
+// Deaths are intentionally excluded — a death isn't inherently the fault of
+// the player who died, so the report only counts Major errors as mistakes.
+//
+// Raid errors are also excluded from per-player attribution (they aren't
+// any one player's fault to begin with — see types/PullError.ts), but the
+// EARLIEST Raid error in the pull (whether auto-detected, e.g. River of
+// Light, or manually marked via "Call Wipe") is used as a cutoff: once a
+// raid-wide mistake has happened, the raid is assumed to be wiping, and any
+// Major errors after that point are dropped from the report. Otherwise
+// players scrambling/jumping into fire to end the pull faster would get
+// unfairly dinged for "mistakes" that only happened because the pull was
+// already over.
 function getPullCriticalEvents(pull: Pull): CriticalEvent[] {
+  const raidTimestamps = pull.errors
+    .filter((e) => e.severity === "Raid")
+    .map((e) => e.timestamp);
+
+  const cutoff = raidTimestamps.length > 0 ? Math.min(...raidTimestamps) : null;
+
   const majors: CriticalEvent[] = pull.errors
     .filter((e) => e.severity === "Major")
+    .filter((e) => cutoff === null || e.timestamp <= cutoff)
+    // Major errors always carry player/class/role (only Raid errors can
+    // omit them) so these are safe to assert.
     .map((e) => ({
       timestamp: e.timestamp,
-      player:    e.player,
-      class:     e.class,
-      role:      e.role,
+      player:    e.player!,
+      class:     e.class!,
+      role:      e.role!,
     }));
 
   return majors.sort((a, b) => a.timestamp - b.timestamp);

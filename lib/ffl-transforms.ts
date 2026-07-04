@@ -5,6 +5,7 @@
 import type { Pull }                    from "@/types/Pull";
 import type { DeathEvent }              from "@/types/DeathEvent";
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
+import type { EnemyEvent }              from "@/types/PullError";
 import type {
   FFLFightData,
   FFLActor,
@@ -14,6 +15,7 @@ import type {
   FFLDamageEvent,
   FFLHealEvent,
   FFLDebuffEvent,
+  FFLBuffEvent,
 } from "./ffl-client";
 import { getFFJobByName, getFFRosterSortOrder } from "./ffl-job-data";
 import { detectPullErrors }                     from "./error-detection";
@@ -242,6 +244,57 @@ function castToPlayerEvent(
   };
 }
 
+// ─── Enemy (raid-wide) event builders ──────────────────────────────────────
+//
+// Feeds the "enemyCast" / "enemyBuffApplied" raid-error rules. These MUST
+// read from data.enemyCastEvents / data.enemyBuffEvents — the ones fetched
+// with hostilityType: "Enemies" in ffl-client.ts — NOT from the friendly
+// castEvents/debuffEvents streams above, which are scoped to players only
+// and will never contain a boss's own casts or buffs no matter how they're
+// filtered afterwards.
+//
+// The actor.type === "NPC" filter here is a defensive extra layer (in case
+// the API ever returns something unexpected on the Enemies side); the real
+// filtering already happened server-side via hostilityType.
+
+function buildEnemyCastEvents(
+  enemyCastEvents: FFLCastEvent[],
+  actorMap:        Map<number, FFLActor>,
+  abilityMap:      Map<number, string>,
+  fightStart:      number
+): EnemyEvent[] {
+  return enemyCastEvents
+    // Only actually-completed casts count — "begincast" is just the start
+    // of the wind-up; an interrupted cast never reaches "cast".
+    .filter((e) => e.type === "cast")
+    .filter((e) => actorMap.get(e.sourceID)?.type === "NPC")
+    .map((e) => ({
+      timestamp:   Math.max(0, e.timestamp - fightStart),
+      actorId:     e.sourceID,
+      actorName:   actorMap.get(e.sourceID)?.name ?? `Unknown (${e.sourceID})`,
+      abilityId:   e.abilityGameID ?? 0,
+      abilityName: abilityName(e, abilityMap),
+    }));
+}
+
+function buildEnemyBuffEvents(
+  enemyBuffEvents: FFLBuffEvent[],
+  actorMap:        Map<number, FFLActor>,
+  abilityMap:      Map<number, string>,
+  fightStart:      number
+): EnemyEvent[] {
+  return enemyBuffEvents
+    .filter((e) => e.type === "applybuff")
+    .filter((e) => actorMap.get(e.targetID)?.type === "NPC")
+    .map((e) => ({
+      timestamp:   Math.max(0, e.timestamp - fightStart),
+      actorId:     e.targetID,
+      actorName:   actorMap.get(e.targetID)?.name ?? `Unknown (${e.targetID})`,
+      abilityId:   e.abilityGameID ?? 0,
+      abilityName: abilityName(e, abilityMap),
+    }));
+}
+
 function buildFFPlayers(
   friendlyPlayerIds: number[],
   actorMap:          Map<number, FFLActor>,
@@ -268,7 +321,7 @@ function buildFFPlayers(
         name:      actor.name,
         className: job.name,
         specId:    0,
-        specName:  job.name,   // FFXIV has no separate spec; UI dedupes via formatSpecClass()
+        specName:  job.name,   // FFXIV has no separate spec from job; UI dedupes via formatSpecClass()
         role:      job.role,
         rangeType: job.rangeType,
         game:      "ffxiv",
@@ -315,7 +368,12 @@ export function transformFFightToPull(
     transformDeath(e, actorMap, abilityMap, fightStart)
   );
 
-  const castEvents: CastEvent[] = data.castEvents.map((e) =>
+  // Friendly-player-facing cast list only ever showed completed casts
+  // historically — keep that behavior unchanged now that "begincast"
+  // events may also come back from the same query.
+  const completedCasts = data.castEvents.filter((e) => e.type === "cast");
+
+  const castEvents: CastEvent[] = completedCasts.map((e) =>
     transformCast(e, actorMap, abilityMap, fightStart)
   );
 
@@ -323,7 +381,7 @@ export function transformFFightToPull(
     data.fight.friendlyPlayers ?? [],
     actorMap,
     abilityMap,
-    data.castEvents,
+    completedCasts,
     data.damageDoneEvents,
     data.damageTakenEvents,
     data.healingEvents,
@@ -331,7 +389,12 @@ export function transformFFightToPull(
     fightStart
   );
 
-  const errors = detectPullErrors(players);
+  // NOTE: sourced from data.enemyCastEvents / data.enemyBuffEvents — the
+  // hostilityType: "Enemies" fetches — NOT data.castEvents/debuffEvents.
+  const enemyCastEvents = buildEnemyCastEvents(data.enemyCastEvents ?? [], actorMap, abilityMap, fightStart);
+  const enemyBuffEvents = buildEnemyBuffEvents(data.enemyBuffEvents ?? [], actorMap, abilityMap, fightStart);
+
+  const errors = detectPullErrors(players, enemyCastEvents, enemyBuffEvents);
 
   const fightDurationMs = data.fight.endTime - data.fight.startTime;
   const startTimeSec    = Math.round(data.fight.startTime / 1000);
