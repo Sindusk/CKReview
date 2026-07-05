@@ -2,12 +2,12 @@
 //
 // Thin GraphQL client for the FFLogs v2 API.
 // All queries are typed end-to-end; raw FFLogs shapes live here and
-// ffl-transforms.ts converts them into app-internal Pull / DeathEvent types.
+// log-transforms.ts converts them into app-internal Pull / DeathEvent types.
 //
 // FFLogs GraphQL API mirrors WarcraftLogs API structure closely — the same
 // pagination pattern (nextPageTimestamp) and hostilityType argument apply.
 
-import { getFFAccessToken } from "./ffl-auth";
+import { getFFAccessToken } from "./log-auth";
 
 const GQL_ENDPOINT = "https://www.fflogs.com/api/v2/user";
 
@@ -66,7 +66,7 @@ export type FFLActor = {
                       // Raid-error enemy detection (error-detection.ts
                       // "enemyCast" trigger) relies on `type === "NPC"` to
                       // separate boss/add actors from players and pets — see
-                      // ffl-transforms.ts buildEnemyCastEvents/buildEnemyBuffEvents.
+                      // log-transforms.ts fflBuildEnemyCastEvents/fflBuildEnemyBuffEvents.
 };
 
 // A single ability/action used anywhere in the report. Fetched once per
@@ -118,8 +118,8 @@ export type FFLCastEvent = {
   timestamp:     number;
   // "begincast" is the start of a cast-time action; "cast" is the signal
   // that it actually went off. The events query can surface both — an
-  // "enemyCast" raid-error rule only counts "cast" (see ffl-transforms.ts
-  // buildEnemyCastEvents), since an interrupted cast never reaches "cast".
+  // "enemyCast" raid-error rule only counts "cast" (see log-transforms.ts
+  // fflBuildEnemyCastEvents), since an interrupted cast never reaches "cast".
   type:          "cast" | "begincast";
   sourceID:      number;
   targetID?:     number;
@@ -283,7 +283,8 @@ export async function fetchFFReport(reportCode: string): Promise<FFLReport> {
 // ─── Query: Events for a single fight ────────────────────────────────────────
 //
 // FFLogs uses the same pagination approach as WarcraftLogs:
-// pass nextPageTimestamp back as the next startTime — there is no `after` arg.
+// pass nextPageTimestamp back as the next startTime — there is no `after`
+// arg.
 //
 // includeResources: true is set on all queries to maximise data richness.
 //

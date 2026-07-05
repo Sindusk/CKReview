@@ -107,9 +107,10 @@ function evaluateDebuffAppliedRule(rule: PullErrorRule, player: PlayerInfo): Pul
 //
 // Shared by both "enemyCast" and "enemyBuffApplied" — the input EnemyEvent[]
 // is already pre-filtered to the right kind of event by the caller
-// (buildEnemyCastEvents / buildEnemyBuffEvents in wcl-transforms.ts and
-// ffl-transforms.ts). No player/class/role is set on the resulting
-// PullError — see the type comment on PullError for why.
+// (wclBuildEnemyCastEvents/wclBuildEnemyBuffEvents and
+// fflBuildEnemyCastEvents/fflBuildEnemyBuffEvents in lib/log-transforms.ts).
+// No player/class/role is set on the resulting PullError — see the type
+// comment on PullError for why.
 
 function evaluateEnemyEventRule(rule: PullErrorRule, events: EnemyEvent[]): PullError[] {
   return events

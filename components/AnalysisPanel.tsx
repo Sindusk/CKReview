@@ -5,9 +5,8 @@ import type { Pull } from "@/types/Pull";
 import type { DeathEvent } from "@/types/DeathEvent";
 import type { PullError } from "@/types/PullError";
 import { CALL_WIPE_RULE_ID } from "@/types/PullError";
-import { getClassColor } from "@/lib/class-colors";
-import { formatClassName } from "@/lib/player-display";
-import { getPlayerSpecIcon } from "@/lib/player-icons";
+import { getClassColor, getRoleColor, formatClassName, getPlayerSpecIcon } from "@/lib/player-display";
+import { getSpecInfo } from "@/lib/spec-data";
 
 type AnalysisPanelProps = {
   pull: Pull | null;
@@ -79,11 +78,13 @@ function formatCallTime(ms: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-const ROLE_COLOR: Record<string, string> = {
-  Tank: "#60a5fa",
-  Healer: "#4ade80",
-  DPS: "#f87171",
-};
+// Resolves the specialization label shown under a player's name in the
+// feed. WoW carries a real specId (e.g. "Unholy"); FFXIV has no separate
+// spec from job, so `class` already holds the display-ready job name.
+function getSpecLabel(game: "wow" | "ffxiv", specId: number | undefined, className: string): string {
+  if (game === "wow") return getSpecInfo(specId ?? 0).name;
+  return formatClassName(className);
+}
 
 function SectionLabel({ label, count }: { label: string; count?: number }) {
   return (
@@ -125,14 +126,15 @@ function FeedRow({
   const hasPassed = playbackTimeMs >= entry.timestamp;
   const style = FEED_KIND_STYLE[entry.kind];
   // Raid errors have no player/class/role — fall back to the kind's own
-  // color instead of looking up a class or role color that doesn't exist.
-  const roleColor = entry.role ? ROLE_COLOR[entry.role] ?? "#aaa" : style.color;
+  // color instead of looking up a role color that doesn't exist.
+  const roleColor = entry.role ? getRoleColor(entry.role) : style.color;
   const cls = entry.class ? getClassColor(entry.game, entry.class) : style.color;
   // entry.specId defaults to 0 when absent (raid-wide entries) — harmless,
-  // since the icon is only rendered when entry.class is also present below,
-  // and a real specId always accompanies a real class on player-attributable
-  // entries (see error-detection.ts / wcl-transforms.ts / ffl-transforms.ts).
+  // since the icon/label are only rendered when entry.class is also
+  // present below, and a real specId always accompanies a real class on
+  // player-attributable entries (see error-detection.ts / log-transforms.ts).
   const specIcon = entry.class ? getPlayerSpecIcon(entry.game, entry.specId ?? 0, entry.class) : null;
+  const specLabel = entry.class ? getSpecLabel(entry.game, entry.specId, entry.class) : null;
   const seekTarget = Math.max(0, entry.timestamp - 3000);
 
   return (
@@ -195,9 +197,9 @@ function FeedRow({
             >
               {entry.player ?? "Raid-Wide"}
             </span>
-            {entry.class && (
+            {specLabel && (
               <span style={{ fontSize: "10px", color: hasPassed ? "#555" : "#333", flexShrink: 0, transition: "color 0.3s" }}>
-                {formatClassName(entry.class)}
+                {specLabel}
               </span>
             )}
           </div>

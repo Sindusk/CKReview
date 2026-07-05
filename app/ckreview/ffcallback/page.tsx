@@ -13,7 +13,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter }           from "next/navigation";
-import { exchangeFFCodeForTokens } from "@/lib/ffl-auth";
+import { exchangeFFCodeForTokens } from "@/lib/log-auth";
 
 type Status = "exchanging" | "success" | "error";
 

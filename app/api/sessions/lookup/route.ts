@@ -8,7 +8,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { listSessions } from "@/lib/session-store";
-import { parseLogUrl } from "@/lib/log-url";
+import { parseLogUrl } from "@/lib/url-parsers";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);

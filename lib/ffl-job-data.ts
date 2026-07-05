@@ -2,7 +2,9 @@
 //
 // Maps every FFXIV job ID (as used by FFLogs) to its display name, role,
 // and whether it is melee or ranged. Used by the RosterPanel to sort players
-// into the correct column (Tank → Healer → Melee DPS → Ranged DPS).
+// into the correct column (Tank → Healer → Melee DPS → Ranged DPS), and
+// (via the icon helper at the bottom, formerly ffl-job-icons.ts) to resolve
+// the local icon path for a job.
 //
 // HOW TO EDIT:
 //   - Each entry is a plain object — just change the values inline.
@@ -15,7 +17,8 @@
 //
 // NOTE: FFLogs reports the job on actor objects as a `subType` string (e.g. "WhiteMage")
 // and as a numeric `gameID` in some contexts. The string-keyed lookup (FF_JOB_BY_NAME)
-// is the primary path since FFLogs GraphQL returns subType as a PascalCase job name.
+// is the primary path since FFLogs GraphQL returns subType as a PascalCase job name —
+// this is the primary lookup used in lib/log-transforms.ts.
 
 export type FFJobInfo = {
   name:      string;   // Display name, e.g. "White Mage"
@@ -26,7 +29,7 @@ export type FFJobInfo = {
 // ─── Lookup by FFLogs subType string (PascalCase) ────────────────────────────
 //
 // FFLogs actor.subType is a PascalCase job name string, e.g. "WhiteMage", "DarkKnight".
-// This is the primary lookup used in ffl-transforms.ts.
+// This is the primary lookup used in log-transforms.ts.
 
 export const FF_JOB_BY_NAME: Record<string, FFJobInfo> = {
 
@@ -195,4 +198,30 @@ export function getFFRosterSortOrder(subType: string): number {
   if (info.role === "Tank")   return 0 * 100 + priorityIndex(FF_TANK_PRIORITY, subType);
   if (info.role === "Healer") return 1 * 100 + priorityIndex(FF_HEALER_PRIORITY, subType);
   return 2 * 100 + (FF_DPS_CATEGORY[subType] ?? 3);
+}
+
+// ─── Icons (formerly lib/ffl-job-icons.ts) ──────────────────────────────────
+//
+// Local path lookups for FFXIV job icons downloaded by
+// scripts/download-class-spec-icons.mjs into public/icons/ffxiv/jobs/.
+//
+// Run the downloader first:
+//   node scripts/download-class-spec-icons.mjs
+//
+// FFXIV has no separate "class" icon from "job" the way WoW does — see the
+// comment in lib/player-display.ts — so this is the only icon lookup needed
+// on the FFXIV side.
+
+/**
+ * Returns the local icon path for an FFXIV job. Downloaded filenames are
+ * keyed by the raw PascalCase job name from FF_JOB_BY_NAME ("DarkKnight",
+ * "WhiteMage" — see above), but PlayerInfo.className stores the spaced
+ * display name instead ("Dark Knight", "White Mage" — see this file's
+ * `name` field). Stripping whitespace reconstructs the exact PascalCase key
+ * since removing the single space in a two-word job name is the only
+ * difference between the two forms.
+ */
+export function getFFJobIcon(jobName: string): string {
+  const key = jobName.replace(/\s+/g, "");
+  return `/icons/ffxiv/jobs/${key}.png`;
 }

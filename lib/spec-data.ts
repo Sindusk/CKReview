@@ -2,7 +2,9 @@
 //
 // Maps every WoW retail specialization ID to its display name, class, role,
 // and whether it's melee or ranged. Used by the RosterPanel to sort players
-// into the correct column (Tank → Healer → Melee DPS → Ranged DPS).
+// into the correct column (Tank → Healer → Melee DPS → Ranged DPS), and
+// (via the icon helpers at the bottom, formerly spec-icons.ts) to resolve
+// the local icon path for a class or spec.
 //
 // HOW TO EDIT:
 //   - Each entry is a plain object — just change the values inline.
@@ -117,6 +119,9 @@ const WOW_CLASS_SORT_PRIORITY = [
   "Priest", "Mage", "Warlock",
 ];
 
+// Strips whitespace and lowercases — shared by the sort-priority lookup
+// above and the icon-file lookup below, since both need to match a class
+// name regardless of spacing ("Death Knight" vs "DeathKnight").
 function normalizeClassKey(name: string): string {
   return name.replace(/\s+/g, "").toLowerCase();
 }
@@ -146,4 +151,47 @@ export function getRosterSortOrder(specId: number): number {
     info.role === "DPS" && info.rangeType === "Melee"     ? 2 :
                                                              3;
   return roleOrder * 100 + getWowClassPriority(info.className);
+}
+
+// ─── Icons (formerly lib/spec-icons.ts) ─────────────────────────────────────
+//
+// Local path lookups for WoW class + spec icons downloaded by
+// scripts/download-class-spec-icons.mjs into public/icons/wow/.
+//
+// Run the downloader first:
+//   node scripts/download-class-spec-icons.mjs
+//
+// These are plain public/ paths (not imports), so they work directly in
+// <img src={...}> the same way /ckreviewv9.png is used in Header.tsx.
+
+// Downloaded filenames (see scripts/icon-sources.mjs WOW_CLASS_ICON_SLUGS)
+// use the properly-spaced display name, e.g. "Death Knight.jpg". Callers may
+// pass either that form OR the raw unspaced WCL form ("DeathKnight" — see
+// the comment on formatClassName in lib/player-display.ts for why that
+// exists), so this normalizes before matching against the known canonical
+// filenames — same pattern as lib/player-display.ts's getClassColor.
+const WOW_CLASS_ICON_FILES = [
+  "Death Knight", "Demon Hunter", "Druid", "Evoker", "Hunter", "Mage",
+  "Monk", "Paladin", "Priest", "Rogue", "Shaman", "Warlock", "Warrior",
+];
+
+const WOW_CLASS_ICON_MAP = new Map(
+  WOW_CLASS_ICON_FILES.map((name) => [normalizeClassKey(name), name])
+);
+
+/**
+ * Returns the local icon path for a WoW class. Accepts either the spaced
+ * display name ("Death Knight") or the raw unspaced form ("DeathKnight").
+ */
+export function getWowClassIcon(className: string): string {
+  const canonical = WOW_CLASS_ICON_MAP.get(normalizeClassKey(className)) ?? className;
+  return `/icons/wow/classes/${canonical}.jpg`;
+}
+
+/**
+ * Returns the local icon path for a WoW spec, keyed by Blizzard spec ID —
+ * matches SPEC_DATA keys exactly.
+ */
+export function getWowSpecIcon(specId: number): string {
+  return `/icons/wow/specs/${specId}.jpg`;
 }

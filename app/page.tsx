@@ -5,7 +5,7 @@ import Header from "../components/Header";
 import AddVodDialog from "../components/AddVodDialog";
 import ReportDialog from "../components/ReportDialog";
 import SessionFoundDialog from "@/components/SessionFoundDialog";
-import { parseYouTubeUrl } from "../lib/youtube";
+import { parseYouTubeUrl, parseLogUrl } from "@/lib/url-parsers";
 import type { Vod } from "../types/Vod";
 import VideoPanel from "../components/VideoPanel";
 import VODSidebar from "../components/VODSidebar";
@@ -16,21 +16,19 @@ import type { Pull } from "../types/Pull";
 import { createCallWipeError, CALL_WIPE_RULE_ID } from "@/types/PullError";
 import type { SavedSession } from "@/types/Session";
 import useTimelineController from "@/hooks/useTimelineController";
-import { loginWithWarcraftLogs } from "@/lib/wcl-auth";
-import { loginWithFFLogs } from "@/lib/ffl-auth";
+import { loginWithWarcraftLogs, loginWithFFLogs } from "@/lib/log-auth";
 import { fetchReport, fetchFightData } from "@/lib/wcl-client";
-import { transformReportToPulls, buildAbilityMap as buildWCLAbilityMap } from "@/lib/wcl-transforms";
+import { transformReportToPulls, transformFFReportToPulls, buildWCLAbilityMap, buildFFLAbilityMap } from "@/lib/log-transforms";
 import { fetchFFReport, fetchFFightData } from "@/lib/ffl-client";
-import { transformFFReportToPulls, buildAbilityMap as buildFFLAbilityMap } from "@/lib/ffl-transforms";
-import { parseLogUrl } from "@/lib/log-url";
 import {
   lookupSessionForLog,
   fetchSession,
   createSession,
   updateSession,
+  buildWipeCallsMap,
+  applyPendingWipeCalls,
   type SessionLookupMatch,
-} from "@/lib/session-client";
-import { buildWipeCallsMap, applyPendingWipeCalls } from "@/lib/session-helpers";
+} from "../lib/session";
 
 // ─── Concurrency-limited fetch helper ─────────────────────────────────────────
 //
@@ -278,6 +276,20 @@ export default function Home() {
       prev.map(v =>
         v.id === selectedVod.id
           ? { ...v, offset, isCalibrated: true }
+          : v
+      )
+    );
+    persistSession();
+  }
+
+  // Clears a VOD's calibration so it can be re-synced from scratch — the
+  // counterpart to syncToPull() above. Triggered from the "Unsync" button
+  // in VideoPanel's title bar (only shown while the VOD is calibrated).
+  function handleUnsyncVod(vodId: number) {
+    setVods(prev =>
+      prev.map(v =>
+        v.id === vodId
+          ? { ...v, isCalibrated: false, offset: undefined }
           : v
       )
     );
@@ -611,6 +623,7 @@ export default function Home() {
                 vod={selectedVod}
                 seekRequest={timeline.seekRequest}
                 onCurrentTimeChange={handleVideoTimeUpdate}
+                onUnsync={handleUnsyncVod}
               />
             </div>
             <div style={{ flexShrink: 0 }}>

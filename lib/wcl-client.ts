@@ -2,9 +2,9 @@
 //
 // Thin GraphQL client for the WarcraftLogs v2 API.
 // All queries are typed end-to-end; raw WCL shapes live here and
-// wcl-transforms.ts converts them into app-internal Pull / DeathEvent types.
+// log-transforms.ts converts them into app-internal Pull / DeathEvent types.
 
-import { getAccessToken } from "./wcl-auth";
+import { getAccessToken } from "./log-auth";
 
 const GQL_ENDPOINT = "https://www.warcraftlogs.com/api/v2/user";
 
@@ -63,7 +63,7 @@ export type WCLActor = {
                       // when looked up for a player actor. Raid-error enemy
                       // detection (error-detection.ts "enemyCast"/
                       // "enemyBuffApplied" rules) relies on this being
-                      // exactly "NPC" for bosses/adds — see wcl-transforms.ts.
+                      // exactly "NPC" for bosses/adds — see log-transforms.ts.
   subType: string;    // spec name, e.g. "Arms", "Holy" — empty/irrelevant for NPCs
 };
 
@@ -103,7 +103,7 @@ export type WCLCastEvent = {
   // "begincast" is the start of a channeled/cast-time spell; "cast" is the
   // signal that it actually went off. The EventDataType: Casts query can
   // surface both — enemyCast raid-error rules only count "cast" (see
-  // wcl-transforms.ts buildEnemyCastEvents), matching how a real interrupt
+  // log-transforms.ts wclBuildEnemyCastEvents), matching how a real interrupt
   // would prevent "cast" from ever firing.
   type:          "cast" | "begincast";
   sourceID:      number;

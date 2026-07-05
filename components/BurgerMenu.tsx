@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { isAuthenticated } from "@/lib/wcl-auth";
-import { isFFAuthenticated } from "@/lib/ffl-auth";
+import { isAuthenticated, isFFAuthenticated } from "@/lib/log-auth";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -86,28 +85,32 @@ function MenuItem({
 
 // ─── Menu Link Item ───────────────────────────────────────────────────────────
 //
-// Same visual treatment as MenuItem, but for external links (an <a>, not a
+// Same visual treatment as MenuItem, but for links (an <a>, not a
 // <button> — MenuItem's onClick is for in-app actions, this is for
-// navigating away).
+// navigating away). `newTab` defaults to true (external references like the
+// GitHub link); pass `newTab={false}` for actions that should replace the
+// current tab, like "New Session".
 
 function MenuLinkItem({
   icon,
   label,
   href,
   onNavigate,
+  newTab = true,
 }: {
   icon:       string;
   label:      string;
   href:       string;
   onNavigate?: () => void;
+  newTab?:    boolean;
 }) {
   const [hovered, setHovered] = useState(false);
 
   return (
     <a
       href={href}
-      target="_blank"
-      rel="noopener noreferrer"
+      target={newTab ? "_blank" : undefined}
+      rel={newTab ? "noopener noreferrer" : undefined}
       onClick={onNavigate}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -252,6 +255,14 @@ export default function BurgerMenu({ onConnectWCL, onConnectFFL, onOpenReport }:
         >
           {/* ── Review ── */}
           <SectionLabel label="Review" />
+
+          <MenuLinkItem
+            icon="🆕"
+            label="New Session"
+            href="https://consistencykings.com/"
+            newTab={false}
+            onNavigate={() => setOpen(false)}
+          />
 
           <MenuItem
             icon="📋"

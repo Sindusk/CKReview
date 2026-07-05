@@ -3,15 +3,7 @@
 import { useState } from "react";
 import type { CSSProperties } from "react";
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
-import { getClassColor } from "@/lib/class-colors";
-import { formatSpecClass, formatClassName } from "@/lib/player-display";
-import { getPlayerSpecIcon } from "@/lib/player-icons";
-
-const ROLE_COLOR: Record<string, string> = {
-  Tank: "#60a5fa",
-  Healer: "#4ade80",
-  DPS: "#f87171",
-};
+import { getClassColor, getRoleColor, formatSpecClass, getPlayerSpecIcon } from "@/lib/player-display";
 
 type Tab = "DamageDone" | "DamageTaken" | "Healing" | "Debuffs" | "Casts";
 const TABS: Tab[] = ["DamageDone", "DamageTaken", "Healing", "Debuffs", "Casts"];
@@ -37,21 +29,15 @@ function formatAmount(n: number): string {
   return String(n);
 }
 
+// Overview grid tile — name + role only. Specialization/job is no longer
+// spelled out here; the spec/job icon already carries that information,
+// and the full spec name still shows in the player detail header once
+// clicked (see PlayerDetail below).
 function PlayerButton({ player, onClick }: { player: PlayerInfo; onClick: () => void }) {
   const [hovered, setHovered] = useState(false);
   const color = getClassColor(player.game, player.className);
-  const roleColor = ROLE_COLOR[player.role] ?? "#aaa";
+  const roleColor = getRoleColor(player.role);
   const iconSrc = getPlayerSpecIcon(player.game, player.specId, player.className);
-
-  // FFXIV has no separate spec from job — specName === className there, so
-  // the "different from class" check below always hid it. Show the job
-  // itself in that case; WoW keeps its existing spec-vs-class behavior.
-  const specLabel =
-    player.game === "ffxiv"
-      ? formatClassName(player.className)
-      : player.specName && player.specName !== player.className
-      ? player.specName
-      : null;
 
   return (
     <button
@@ -99,7 +85,6 @@ function PlayerButton({ player, onClick }: { player: PlayerInfo; onClick: () => 
         </span>
         <span style={{ fontSize: "10px", color: "#555", whiteSpace: "nowrap" }}>
           <span style={{ color: roleColor }}>{player.role}</span>
-          {specLabel && <>{" · "}{specLabel}</>}
         </span>
       </div>
     </button>
@@ -340,6 +325,8 @@ function PlayerDetail({
           ← Back
         </button>
         <div style={{ minWidth: 0 }}>
+          {/* Full spec + class name still lives here — this is the one
+              place specialization text remains, per product decision. */}
           <span style={{ color, fontWeight: 700, fontSize: "13px" }}>{player.name}</span>
           <span style={{ color: "#555", fontSize: "11px", marginLeft: "6px" }}>
             {formatSpecClass(player.specName, player.className)}
@@ -475,9 +462,9 @@ export default function RosterPanel({ players, playbackTimeMs }: RosterPanelProp
         <span>Roster</span>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#777", flexWrap: "wrap", justifyContent: "flex-end" }}>
           <span>{filteredPlayers.length} players</span>
-          {tankCount > 0 && <span style={{ color: ROLE_COLOR.Tank }}>Tanks {tankCount}</span>}
-          {healerCount > 0 && <span style={{ color: ROLE_COLOR.Healer }}>Healers {healerCount}</span>}
-          {dpsCount > 0 && <span style={{ color: ROLE_COLOR.DPS }}>DPS {dpsCount}</span>}
+          {tankCount > 0 && <span style={{ color: getRoleColor("Tank") }}>Tanks {tankCount}</span>}
+          {healerCount > 0 && <span style={{ color: getRoleColor("Healer") }}>Healers {healerCount}</span>}
+          {dpsCount > 0 && <span style={{ color: getRoleColor("DPS") }}>DPS {dpsCount}</span>}
         </div>
       </div>
 

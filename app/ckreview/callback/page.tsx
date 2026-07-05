@@ -13,7 +13,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter }           from "next/navigation";
-import { exchangeCodeForTokens } from "@/lib/wcl-auth";
+import { exchangeCodeForTokens } from "@/lib/log-auth";
 
 type Status = "exchanging" | "success" | "error";
 

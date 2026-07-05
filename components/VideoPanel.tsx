@@ -36,6 +36,11 @@ type VideoPanelProps = {
 
   // continuous playback reporting
   onCurrentTimeChange?: (time: number) => void;
+
+  // Clears this VOD's calibration (isCalibrated/offset) so it can be
+  // re-synced. Only rendered in the title bar when the VOD is currently
+  // calibrated — nothing to unsync otherwise.
+  onUnsync?: (vodId: number) => void;
 };
 
 function loadYouTubeAPI(): Promise<void> {
@@ -63,6 +68,7 @@ export default function VideoPanel({
   vod,
   seekRequest,
   onCurrentTimeChange,
+  onUnsync,
 }: VideoPanelProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const playerRef = useRef<YTPlayer | null>(null);
@@ -212,13 +218,35 @@ export default function VideoPanel({
           background: "#1a1a1a",
           borderBottom: "1px solid #2a2a2a",
           display: "flex",
-          justifyContent: "center",
+          justifyContent: "space-between",
           alignItems: "center",
-          fontWeight: 700,
-          color: "#f8fafc",
+          gap: "10px",
         }}
       >
-        {vod ? vod.player : "No VOD Selected"}
+        <span style={{ fontWeight: 700, color: "#f8fafc", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {vod ? vod.player : "No VOD Selected"}
+        </span>
+
+        {vod?.isCalibrated && onUnsync && (
+          <button
+            onClick={() => onUnsync(vod.id)}
+            title="Clear this VOD's sync so it can be re-aligned"
+            style={{
+              backgroundColor: "transparent",
+              color: "#60a5fa",
+              border: "1px solid #2563eb",
+              borderRadius: "6px",
+              padding: "4px 10px",
+              fontSize: "11px",
+              fontWeight: 600,
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+              flexShrink: 0,
+            }}
+          >
+            Unsync
+          </button>
+        )}
       </div>
 
       <div
