@@ -14,6 +14,7 @@ export type ReportGame = "wow" | "ffxiv";
 export type PlayerReportStats = {
   name:            string;
   className:       string;
+  specId:          number;   // Blizzard spec ID (WoW) — 0/meaningless for FFXIV
   role:            ReportRole;
   game:            ReportGame;
 
@@ -81,7 +82,7 @@ function getPullCriticalEvents(pull: Pull): CriticalEvent[] {
 
 // Roster info keyed by player name. Names are used as the join key across
 // pulls since actorId is only stable within a single pull/report.
-type RosterEntry = { className: string; role: ReportRole; game: ReportGame };
+type RosterEntry = { className: string; specId: number; role: ReportRole; game: ReportGame };
 
 function buildRoster(pulls: Pull[]): Map<string, RosterEntry> {
   const roster = new Map<string, RosterEntry>();
@@ -94,7 +95,7 @@ function buildRoster(pulls: Pull[]): Map<string, RosterEntry> {
       if (p.specName === "LimitBreak" || p.specName === "Limit Break") continue;
 
       if (!roster.has(p.name)) {
-        roster.set(p.name, { className: p.className, role: p.role, game: pull.game });
+        roster.set(p.name, { className: p.className, specId: p.specId, role: p.role, game: pull.game });
       }
     }
   }
@@ -136,6 +137,7 @@ export function computePlayerReportStats(pulls: Pull[]): PlayerReportStats[] {
     stats.push({
       name,
       className:       info.className,
+      specId:          info.specId,
       role:            info.role,
       game:            info.game,
       firstErrorCount,

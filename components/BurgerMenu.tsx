@@ -84,6 +84,56 @@ function MenuItem({
   );
 }
 
+// ─── Menu Link Item ───────────────────────────────────────────────────────────
+//
+// Same visual treatment as MenuItem, but for external links (an <a>, not a
+// <button> — MenuItem's onClick is for in-app actions, this is for
+// navigating away).
+
+function MenuLinkItem({
+  icon,
+  label,
+  href,
+  onNavigate,
+}: {
+  icon:       string;
+  label:      string;
+  href:       string;
+  onNavigate?: () => void;
+}) {
+  const [hovered, setHovered] = useState(false);
+
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={onNavigate}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display:        "flex",
+        alignItems:     "center",
+        gap:            "10px",
+        width:          "100%",
+        padding:        "9px 14px",
+        background:     hovered ? "#2a2a2a" : "transparent",
+        borderRadius:   "5px",
+        color:          hovered ? "#fff" : "#ccc",
+        fontSize:       "13px",
+        textDecoration: "none",
+        boxSizing:      "border-box",
+        transition:     "background 0.1s, color 0.1s",
+      }}
+    >
+      <span style={{ fontSize: "15px", width: "18px", textAlign: "center", flexShrink: 0 }}>
+        {icon}
+      </span>
+      <span>{label}</span>
+    </a>
+  );
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function BurgerMenu({ onConnectWCL, onConnectFFL, onOpenReport }: BurgerMenuProps) {
@@ -247,6 +297,19 @@ export default function BurgerMenu({ onConnectWCL, onConnectFFL, onOpenReport }:
               onClick={handleConnectWCL}
             />
           )}
+
+          {/* Thin rule between sections */}
+          <div style={{ height: "1px", backgroundColor: "#2a2a2a", margin: "6px 8px" }} />
+
+          {/* ── About ── */}
+          <SectionLabel label="About" />
+
+          <MenuLinkItem
+            icon="🐙"
+            label="View on GitHub"
+            href="https://github.com/Sindusk/CKReview"
+            onNavigate={() => setOpen(false)}
+          />
 
           {/*
             ── Add future menu items below ──

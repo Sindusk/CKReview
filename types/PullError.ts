@@ -62,6 +62,12 @@ export type PullError = {
   timestamp:   number;   // ms into the pull — same convention as DeathEvent
   player?:     string;
   class?:      string;
+  // Blizzard spec ID (WoW only) — lets the UI show a spec-specific icon
+  // instead of just a class-level one. Always 0 for FFXIV (job doubles as
+  // spec there, so it's meaningless — icon lookup ignores it and uses
+  // `class` directly for FFXIV). Optional/absent for the same reason
+  // `class`/`role` are: raid-wide errors aren't attributable to a player.
+  specId?:     number;
   role?:       "Tank" | "Healer" | "DPS";
 
   abilityId:   number;

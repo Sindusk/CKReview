@@ -29,6 +29,12 @@ export const SPEC_DATA: Record<number, SpecInfo> = {
   // ── Demon Hunter ─────────────────────────────────────────────────────────
   577: { name: "Havoc",        className: "Demon Hunter", role: "DPS",    rangeType: "Melee"  },
   581: { name: "Vengeance",    className: "Demon Hunter", role: "Tank",   rangeType: "Melee"  },
+  // Devourer — 3rd DH spec, added in the Midnight expansion. Spec ID
+  // confirmed via a real WCL CombatantInfo log (the only specID present
+  // that didn't match an existing entry here, on a glaive-wielding,
+  // Intellect-dominant-stat combatant — matching every published
+  // description of Devourer as the Int-caster DH spec).
+  1480: { name: "Devourer",   className: "Demon Hunter", role: "DPS",    rangeType: "Ranged" },
 
   // ── Druid ─────────────────────────────────────────────────────────────────
   102: { name: "Balance",      className: "Druid",        role: "DPS",    rangeType: "Ranged" },
@@ -99,14 +105,45 @@ export function getSpecInfo(specId: number): SpecInfo {
   };
 }
 
+// ── Class-grouping priority (secondary sort) ────────────────────────────────
+//
+// Applied AFTER the Tank → Healer → Melee DPS → Ranged DPS grouping below —
+// within each of those groups, players are further grouped by class in this
+// order. Classes not listed (shouldn't happen — this covers all 13) fall
+// back to the end.
+const WOW_CLASS_SORT_PRIORITY = [
+  "Death Knight", "Monk", "Paladin", "Warrior", "Rogue",
+  "Demon Hunter", "Druid", "Evoker", "Hunter", "Shaman",
+  "Priest", "Mage", "Warlock",
+];
+
+function normalizeClassKey(name: string): string {
+  return name.replace(/\s+/g, "").toLowerCase();
+}
+
+const WOW_CLASS_PRIORITY_MAP = new Map(
+  WOW_CLASS_SORT_PRIORITY.map((name, index) => [normalizeClassKey(name), index])
+);
+
+function getWowClassPriority(className: string): number {
+  return WOW_CLASS_PRIORITY_MAP.get(normalizeClassKey(className)) ?? WOW_CLASS_SORT_PRIORITY.length;
+}
+
 /**
- * Returns the sort priority for the roster grid.
- * Tank (0) → Healer (1) → Melee DPS (2) → Ranged DPS (3)
+ * Returns the sort priority for the roster grid:
+ *   Tank (0) → Healer (1) → Melee DPS (2) → Ranged DPS (3) as the primary
+ *   grouping, then WOW_CLASS_SORT_PRIORITY as a secondary tiebreaker within
+ *   each group. Encoded as roleOrder * 100 + classPriority so the existing
+ *   `.sort((a, b) => getRosterSortOrder(a) - getRosterSortOrder(b))` call
+ *   sites need no changes — classPriority (0–13) always fits well within one
+ *   "roleOrder" bucket's span of 100.
  */
 export function getRosterSortOrder(specId: number): number {
   const info = getSpecInfo(specId);
-  if (info.role === "Tank")                                  return 0;
-  if (info.role === "Healer")                                return 1;
-  if (info.role === "DPS" && info.rangeType === "Melee")     return 2;
-  return 3;
+  const roleOrder =
+    info.role === "Tank"                                  ? 0 :
+    info.role === "Healer"                                ? 1 :
+    info.role === "DPS" && info.rangeType === "Melee"     ? 2 :
+                                                             3;
+  return roleOrder * 100 + getWowClassPriority(info.className);
 }

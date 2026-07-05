@@ -8,6 +8,8 @@ import {
   computeRaidTimeline,
 } from "@/lib/report-data";
 import { getClassColor } from "@/lib/class-colors";
+import { formatClassName } from "@/lib/player-display";
+import { getPlayerSpecIcon } from "@/lib/player-icons";
 import ReportPedestal from "./report/ReportPedestal";
 import ReportTimeline from "./report/ReportTimeline";
 
@@ -143,13 +145,25 @@ export default function ReportDialog({ open, onClose, pulls }: ReportDialogProps
                             }}
                           >
                             <td style={tdStyle}>
-                              <span style={{ color, fontWeight: 600 }}>{p.name}</span>
-                              <span style={{ color: roleColor, fontSize: "11px", marginLeft: "8px" }}>
-                                {p.role}
-                              </span>
-                              <span style={{ color: "#555", fontSize: "11px", marginLeft: "6px" }}>
-                                {p.className}
-                              </span>
+                              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                <img
+                                  src={getPlayerSpecIcon(p.game, p.specId, p.className)}
+                                  alt=""
+                                  width={20}
+                                  height={20}
+                                  style={{ borderRadius: "4px", flexShrink: 0 }}
+                                  onError={(e) => { e.currentTarget.style.display = "none"; }}
+                                />
+                                <span>
+                                  <span style={{ color, fontWeight: 600 }}>{p.name}</span>
+                                  <span style={{ color: roleColor, fontSize: "11px", marginLeft: "8px" }}>
+                                    {p.role}
+                                  </span>
+                                  <span style={{ color: "#555", fontSize: "11px", marginLeft: "6px" }}>
+                                    {formatClassName(p.className)}
+                                  </span>
+                                </span>
+                              </div>
                             </td>
                             <td style={{ ...tdStyle, textAlign: "right" }}>{p.firstErrorCount}</td>
                             <td style={{ ...tdStyle, textAlign: "right", color: "#f87171", fontWeight: 600 }}>

@@ -4,7 +4,8 @@ import { useState } from "react";
 import type { CSSProperties } from "react";
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import { getClassColor } from "@/lib/class-colors";
-import { formatSpecClass } from "@/lib/player-display";
+import { formatSpecClass, formatClassName } from "@/lib/player-display";
+import { getPlayerSpecIcon } from "@/lib/player-icons";
 
 const ROLE_COLOR: Record<string, string> = {
   Tank: "#60a5fa",
@@ -40,13 +41,14 @@ function PlayerButton({ player, onClick }: { player: PlayerInfo; onClick: () => 
   const [hovered, setHovered] = useState(false);
   const color = getClassColor(player.game, player.className);
   const roleColor = ROLE_COLOR[player.role] ?? "#aaa";
+  const iconSrc = getPlayerSpecIcon(player.game, player.specId, player.className);
 
   // FFXIV has no separate spec from job — specName === className there, so
   // the "different from class" check below always hid it. Show the job
   // itself in that case; WoW keeps its existing spec-vs-class behavior.
   const specLabel =
     player.game === "ffxiv"
-      ? player.className
+      ? formatClassName(player.className)
       : player.specName && player.specName !== player.className
       ? player.specName
       : null;
@@ -59,8 +61,9 @@ function PlayerButton({ player, onClick }: { player: PlayerInfo; onClick: () => 
       title={`${player.name} — ${formatSpecClass(player.specName, player.className)}`}
       style={{
         display: "flex",
-        flexDirection: "column",
-        alignItems: "flex-start",
+        flexDirection: "row",
+        alignItems: "center",
+        gap: "6px",
         padding: "5px 7px",
         borderRadius: "4px",
         border: `1px solid ${hovered ? color + "66" : "#2a2a2a"}`,
@@ -71,24 +74,34 @@ function PlayerButton({ player, onClick }: { player: PlayerInfo; onClick: () => 
         width: "100%",
       }}
     >
-      <span
-        style={{
-          color,
-          fontWeight: 600,
-          fontSize: "12px",
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          width: "100%",
-          textAlign: "left",
-        }}
-      >
-        {player.name}
-      </span>
-      <span style={{ fontSize: "10px", color: "#555", whiteSpace: "nowrap" }}>
-        <span style={{ color: roleColor }}>{player.role}</span>
-        {specLabel && <>{" · "}{specLabel}</>}
-      </span>
+      <img
+        src={iconSrc}
+        alt=""
+        width={22}
+        height={22}
+        style={{ borderRadius: "4px", flexShrink: 0, border: `1px solid ${color}44` }}
+        onError={(e) => { e.currentTarget.style.visibility = "hidden"; }}
+      />
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", minWidth: 0, flex: 1 }}>
+        <span
+          style={{
+            color,
+            fontWeight: 600,
+            fontSize: "12px",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            width: "100%",
+            textAlign: "left",
+          }}
+        >
+          {player.name}
+        </span>
+        <span style={{ fontSize: "10px", color: "#555", whiteSpace: "nowrap" }}>
+          <span style={{ color: roleColor }}>{player.role}</span>
+          {specLabel && <>{" · "}{specLabel}</>}
+        </span>
+      </div>
     </button>
   );
 }

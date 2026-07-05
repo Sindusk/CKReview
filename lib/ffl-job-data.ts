@@ -151,14 +151,48 @@ export function getFFJobById(gameId: number): FFJobInfo {
   };
 }
 
+// ── Roster sort priorities ──────────────────────────────────────────────────
+//
+// Within each role group, players are further ordered by this priority.
+// Tanks/healers use an explicit per-job order; DPS uses a 3-way category
+// (Melee → Physical Ranged → Caster) rather than per-job ordering, since no
+// specific job order was requested within a DPS category — jobs within the
+// same category simply keep their relative (stable-sort) order.
+//
+// Jobs not listed in a role's priority array (shouldn't happen for current
+// content, but covers legacy/base classes like Gladiator/Conjurer) fall back
+// to the end of that array.
+const FF_TANK_PRIORITY = ["Paladin", "Warrior", "Gunbreaker", "DarkKnight"];
+const FF_HEALER_PRIORITY = ["WhiteMage", "Astrologian", "Sage", "Scholar"];
+
+const FF_DPS_CATEGORY: Record<string, number> = {
+  // Melee (0)
+  Monk: 0, Dragoon: 0, Ninja: 0, Samurai: 0, Reaper: 0, Viper: 0,
+  Pugilist: 0, Lancer: 0, Rogue: 0,
+  // Physical Ranged (1)
+  Bard: 1, Machinist: 1, Dancer: 1, Archer: 1,
+  // Caster / Magical Ranged (2)
+  BlackMage: 2, Summoner: 2, RedMage: 2, Pictomancer: 2, BlueMage: 2,
+  Arcanist: 2, Thaumaturge: 2,
+};
+
+function priorityIndex(list: string[], subType: string): number {
+  const idx = list.indexOf(subType);
+  return idx === -1 ? list.length : idx;
+}
+
 /**
- * Returns the roster sort priority for a given FFLogs subType string.
- * Tank (0) → Healer (1) → Melee DPS (2) → Ranged DPS (3)
+ * Returns the roster sort priority for a given FFLogs subType string:
+ *   Tank (0) → Healer (1) → DPS (2) as the primary grouping, then
+ *   FF_TANK_PRIORITY / FF_HEALER_PRIORITY / FF_DPS_CATEGORY as a secondary
+ *   tiebreaker within each group. Encoded as roleOrder * 100 + priority so
+ *   existing `.sort((a, b) => getFFRosterSortOrder(a) - getFFRosterSortOrder(b))`
+ *   call sites need no changes.
  */
 export function getFFRosterSortOrder(subType: string): number {
   const info = getFFJobByName(subType);
-  if (info.role === "Tank")                                return 0;
-  if (info.role === "Healer")                              return 1;
-  if (info.role === "DPS" && info.rangeType === "Melee")   return 2;
-  return 3;
+
+  if (info.role === "Tank")   return 0 * 100 + priorityIndex(FF_TANK_PRIORITY, subType);
+  if (info.role === "Healer") return 1 * 100 + priorityIndex(FF_HEALER_PRIORITY, subType);
+  return 2 * 100 + (FF_DPS_CATEGORY[subType] ?? 3);
 }

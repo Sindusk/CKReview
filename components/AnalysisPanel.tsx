@@ -6,6 +6,8 @@ import type { DeathEvent } from "@/types/DeathEvent";
 import type { PullError } from "@/types/PullError";
 import { CALL_WIPE_RULE_ID } from "@/types/PullError";
 import { getClassColor } from "@/lib/class-colors";
+import { formatClassName } from "@/lib/player-display";
+import { getPlayerSpecIcon } from "@/lib/player-icons";
 
 type AnalysisPanelProps = {
   pull: Pull | null;
@@ -31,6 +33,7 @@ type FeedEntry = {
   timestamp: number;
   player?:   string;
   class?:    string;
+  specId?:   number;
   role?:     "Tank" | "Healer" | "DPS";
   title:     string;
   subtitle?: string;
@@ -38,11 +41,11 @@ type FeedEntry = {
 };
 
 function deathToFeedEntry(d: DeathEvent, game: "wow" | "ffxiv"): FeedEntry {
-  return { kind: "Death", timestamp: d.timestamp, player: d.player, class: d.class, role: d.role, title: d.cause, game };
+  return { kind: "Death", timestamp: d.timestamp, player: d.player, class: d.class, specId: d.specId, role: d.role, title: d.cause, game };
 }
 
 function errorToFeedEntry(e: PullError, game: "wow" | "ffxiv"): FeedEntry {
-  return { kind: e.severity, timestamp: e.timestamp, player: e.player, class: e.class, role: e.role, title: e.name, subtitle: e.description, game };
+  return { kind: e.severity, timestamp: e.timestamp, player: e.player, class: e.class, specId: e.specId, role: e.role, title: e.name, subtitle: e.description, game };
 }
 
 const FEED_KIND_STYLE: Record<FeedKind, { icon: string; color: string; label: string }> = {
@@ -109,25 +112,27 @@ function SectionLabel({ label, count }: { label: string; count?: number }) {
 
 function FeedRow({
   entry,
-  fightDuration,
   playbackTimeMs,
   onSeek,
   showKindBadge,
 }: {
   entry: FeedEntry;
-  fightDuration: number;
   playbackTimeMs: number;
   onSeek?: (ms: number) => void;
   showKindBadge?: boolean;   // show a Death/Raid/Major/Minor tag — used on the Overall tab
 }) {
   const [hovered, setHovered] = useState(false);
   const hasPassed = playbackTimeMs >= entry.timestamp;
-  const pct = fightDuration > 0 ? Math.round((entry.timestamp / fightDuration) * 100) : 0;
   const style = FEED_KIND_STYLE[entry.kind];
   // Raid errors have no player/class/role — fall back to the kind's own
   // color instead of looking up a class or role color that doesn't exist.
   const roleColor = entry.role ? ROLE_COLOR[entry.role] ?? "#aaa" : style.color;
   const cls = entry.class ? getClassColor(entry.game, entry.class) : style.color;
+  // entry.specId defaults to 0 when absent (raid-wide entries) — harmless,
+  // since the icon is only rendered when entry.class is also present below,
+  // and a real specId always accompanies a real class on player-attributable
+  // entries (see error-detection.ts / wcl-transforms.ts / ffl-transforms.ts).
+  const specIcon = entry.class ? getPlayerSpecIcon(entry.game, entry.specId ?? 0, entry.class) : null;
   const seekTarget = Math.max(0, entry.timestamp - 3000);
 
   return (
@@ -165,6 +170,17 @@ function FeedRow({
         {style.icon}
       </span>
 
+      {specIcon && (
+        <img
+          src={specIcon}
+          alt=""
+          width={18}
+          height={18}
+          style={{ borderRadius: "3px", flexShrink: 0, opacity: hasPassed ? 1 : 0.4, transition: "opacity 0.3s" }}
+          onError={(e) => { e.currentTarget.style.display = "none"; }}
+        />
+      )}
+
       {/* Main content (left) + kind/role column (right) */}
       <div style={{ flex: 1, minWidth: 0, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px" }}>
         <div style={{ minWidth: 0, flex: 1 }}>
@@ -181,7 +197,7 @@ function FeedRow({
             </span>
             {entry.class && (
               <span style={{ fontSize: "10px", color: hasPassed ? "#555" : "#333", flexShrink: 0, transition: "color 0.3s" }}>
-                {entry.class}
+                {formatClassName(entry.class)}
               </span>
             )}
           </div>
@@ -232,10 +248,6 @@ function FeedRow({
           )}
         </div>
       </div>
-
-      <span style={{ fontSize: "10px", color: hasPassed ? "#555" : "#333", flexShrink: 0, transition: "color 0.3s" }}>
-        {pct}%
-      </span>
     </div>
   );
 }
@@ -485,7 +497,6 @@ export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime, onCa
               <FeedRow
                 key={i}
                 entry={entry}
-                fightDuration={pull.fightDuration}
                 playbackTimeMs={playbackTimeMs}
                 onSeek={onSeekToTime ? handleSeek : undefined}
                 showKindBadge={activeTab === "Overall"}

@@ -2,6 +2,8 @@
 
 import type { PlayerReportStats } from "@/lib/report-data";
 import { getClassColor } from "@/lib/class-colors";
+import { formatClassName } from "@/lib/player-display";
+import { getPlayerSpecIcon } from "@/lib/player-icons";
 
 const ROLE_COLOR: Record<string, string> = {
   Tank: "#60a5fa",
@@ -50,23 +52,40 @@ function PedestalCard({
 
       <div
         style={{
-          fontWeight:   700,
-          fontSize:     slot.place === 1 ? "14px" : "13px",
-          color:        player ? color : "#444",
-          textAlign:    "center",
-          whiteSpace:   "nowrap",
-          overflow:     "hidden",
-          textOverflow: "ellipsis",
+          display:      "flex",
+          alignItems:   "center",
+          gap:          "5px",
           maxWidth:     "130px",
           marginBottom: "2px",
         }}
       >
-        {player?.name ?? "—"}
+        {player && (
+          <img
+            src={getPlayerSpecIcon(player.game, player.specId, player.className)}
+            alt=""
+            width={16}
+            height={16}
+            style={{ borderRadius: "3px", flexShrink: 0 }}
+            onError={(e) => { e.currentTarget.style.display = "none"; }}
+          />
+        )}
+        <span
+          style={{
+            fontWeight:   700,
+            fontSize:     slot.place === 1 ? "14px" : "13px",
+            color:        player ? color : "#444",
+            whiteSpace:   "nowrap",
+            overflow:     "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
+          {player?.name ?? "—"}
+        </span>
       </div>
 
       {player && (
         <div style={{ fontSize: "10px", color: roleColor, marginBottom: "6px" }}>
-          {player.role} · {player.className}
+          {player.role} · {formatClassName(player.className)}
         </div>
       )}
 
