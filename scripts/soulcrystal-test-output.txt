@@ -1,0 +1,99 @@
+﻿ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+Querying ClassJob.ItemSoulCrystal.Icon for test jobs
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+[Paladin / id 19]
+  ClassJob.Name: paladin
+  Abbreviation:  PLD
+  SoulCrystal.Name: Soul of the Paladin
+  SoulCrystal.Icon: {"id":26003,"path":"ui/icon/026000/026003.tex","path_hr1":"ui/icon/026000/026003_hr1.tex"}
+
+[Monk / id 20]
+  ClassJob.Name: monk
+  Abbreviation:  MNK
+  SoulCrystal.Name: Soul of the Monk
+  SoulCrystal.Icon: {"id":26004,"path":"ui/icon/026000/026004.tex","path_hr1":"ui/icon/026000/026004_hr1.tex"}
+
+[Warrior / id 21]
+  ClassJob.Name: warrior
+  Abbreviation:  WAR
+  SoulCrystal.Name: Soul of the Warrior
+  SoulCrystal.Icon: {"id":26005,"path":"ui/icon/026000/026005.tex","path_hr1":"ui/icon/026000/026005_hr1.tex"}
+
+[White Mage / id 24]
+  ClassJob.Name: white mage
+  Abbreviation:  WHM
+  SoulCrystal.Name: Soul of the White Mage
+  SoulCrystal.Icon: {"id":26008,"path":"ui/icon/026000/026008.tex","path_hr1":"ui/icon/026000/026008_hr1.tex"}
+
+[Scholar / id 28]
+  ClassJob.Name: scholar
+  Abbreviation:  SCH
+  SoulCrystal.Name: Soul of the Scholar
+  SoulCrystal.Icon: {"id":26011,"path":"ui/icon/026000/026011.tex","path_hr1":"ui/icon/026000/026011_hr1.tex"}
+
+[Dark Knight / id 32]
+  ClassJob.Name: dark knight
+  Abbreviation:  DRK
+  SoulCrystal.Name: Soul of the Dark Knight
+  SoulCrystal.Icon: {"id":26040,"path":"ui/icon/026000/026040.tex","path_hr1":"ui/icon/026000/026040_hr1.tex"}
+
+[Astrologian / id 33]
+  ClassJob.Name: astrologian
+  Abbreviation:  AST
+  SoulCrystal.Name: Soul of the Astrologian
+  SoulCrystal.Icon: {"id":26041,"path":"ui/icon/026000/026041.tex","path_hr1":"ui/icon/026000/026041_hr1.tex"}
+
+[Gunbreaker / id 37]
+  ClassJob.Name: gunbreaker
+  Abbreviation:  GNB
+  SoulCrystal.Name: Soul of the Gunbreaker
+  SoulCrystal.Icon: {"id":26061,"path":"ui/icon/026000/026061.tex","path_hr1":"ui/icon/026000/026061_hr1.tex"}
+
+[Reaper / id 39]
+  ClassJob.Name: reaper
+  Abbreviation:  RPR
+  SoulCrystal.Name: Soul of the Reaper
+  SoulCrystal.Icon: {"id":26063,"path":"ui/icon/026000/026063.tex","path_hr1":"ui/icon/026000/026063_hr1.tex"}
+
+[Sage / id 40]
+  ClassJob.Name: sage
+  Abbreviation:  SGE
+  SoulCrystal.Name: Soul of the Sage
+  SoulCrystal.Icon: {"id":26064,"path":"ui/icon/026000/026064.tex","path_hr1":"ui/icon/026000/026064_hr1.tex"}
+
+[Viper / id 41]
+  ClassJob.Name: viper
+  Abbreviation:  VPR
+  SoulCrystal.Name: Soul of the Viper
+  SoulCrystal.Icon: {"id":26068,"path":"ui/icon/026000/026068.tex","path_hr1":"ui/icon/026000/026068_hr1.tex"}
+
+[Pictomancer / id 42]
+  ClassJob.Name: pictomancer
+  Abbreviation:  PCT
+  SoulCrystal.Name: Soul of the Pictomancer
+  SoulCrystal.Icon: {"id":26069,"path":"ui/icon/026000/026069.tex","path_hr1":"ui/icon/026000/026069_hr1.tex"}
+
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+Rendering Paladin's soul crystal icon to PNG for visual check
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+GET https://v2.xivapi.com/api/asset?path=ui%2Ficon%2F026000%2F026003.tex&format=png
+Status: 200 OK
+=> Saved 3130 bytes to C:\Users\sinis\Documents\WoW\VoD Coding\scripts\xivapi-test-output\paladin-soulcrystal.png
+   Open it: does it look like a filled, colored icon
+   (any color is fine at this stage ΓÇö we're checking it's
+   filled art, not a plain outline) associated with Paladin?
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+SUMMARY (job -> icon path found):
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+Paladin        ui/icon/026000/026003.tex
+Monk           ui/icon/026000/026004.tex
+Warrior        ui/icon/026000/026005.tex
+White Mage     ui/icon/026000/026008.tex
+Scholar        ui/icon/026000/026011.tex
+Dark Knight    ui/icon/026000/026040.tex
+Astrologian    ui/icon/026000/026041.tex
+Gunbreaker     ui/icon/026000/026061.tex
+Reaper         ui/icon/026000/026063.tex
+Sage           ui/icon/026000/026064.tex
+Viper          ui/icon/026000/026068.tex
+Pictomancer    ui/icon/026000/026069.tex

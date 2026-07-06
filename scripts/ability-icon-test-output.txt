@@ -1,0 +1,80 @@
+﻿ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+Testing WarcraftLogs ability icon bases
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+
+Base: https://assets.rpglogs.com/img/warcraft/abilities/
+  Γ£à [0] Unknown Ability      -> https://assets.rpglogs.com/img/warcraft/abilities/inv_axe_02.jpg
+      status=200 content-type=image/jpeg
+  Γ£à [1302] Regeneration         -> https://assets.rpglogs.com/img/warcraft/abilities/spell_nature_regeneration_02.jpg
+      status=200 content-type=image/jpeg
+  Γ£à [1285644] Hearty Well Fed      -> https://assets.rpglogs.com/img/warcraft/abilities/spell_misc_food.jpg
+      status=200 content-type=image/jpeg
+  Γ£à [358733] Glide                -> https://assets.rpglogs.com/img/warcraft/abilities/ability_racial_glide.jpg
+      status=200 content-type=image/jpeg
+
+Base: https://www.warcraftlogs.com/img/warcraft/abilities/
+  Γ¥î [0] Unknown Ability      -> https://www.warcraftlogs.com/img/warcraft/abilities/inv_axe_02.jpg
+      status=404 content-type=text/html; charset=utf-8
+  Γ¥î [1302] Regeneration         -> https://www.warcraftlogs.com/img/warcraft/abilities/spell_nature_regeneration_02.jpg
+      status=404 content-type=text/html; charset=utf-8
+  Γ¥î [1285644] Hearty Well Fed      -> https://www.warcraftlogs.com/img/warcraft/abilities/spell_misc_food.jpg
+      status=404 content-type=text/html; charset=utf-8
+  Γ¥î [358733] Glide                -> https://www.warcraftlogs.com/img/warcraft/abilities/ability_racial_glide.jpg
+      status=404 content-type=text/html; charset=utf-8
+
+Base: https://cdn.warcraftlogs.com/img/warcraft/abilities/
+  Γ¥î [0] Unknown Ability      -> https://cdn.warcraftlogs.com/img/warcraft/abilities/inv_axe_02.jpg
+      status=null content-type=fetch failed
+  Γ¥î [1302] Regeneration         -> https://cdn.warcraftlogs.com/img/warcraft/abilities/spell_nature_regeneration_02.jpg
+      status=null content-type=fetch failed
+  Γ¥î [1285644] Hearty Well Fed      -> https://cdn.warcraftlogs.com/img/warcraft/abilities/spell_misc_food.jpg
+      status=null content-type=fetch failed
+  Γ¥î [358733] Glide                -> https://cdn.warcraftlogs.com/img/warcraft/abilities/ability_racial_glide.jpg
+      status=null content-type=fetch failed
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+=> WarcraftLogs: base(s) that returned real images:
+   https://assets.rpglogs.com/img/warcraft/abilities/
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+Testing FFLogs ability icon bases
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+
+Base: https://assets.rpglogs.com/img/ff/abilities/
+  Γ£à [0] Unknown Ability      -> https://assets.rpglogs.com/img/ff/abilities/000000-000405.png
+      status=200 content-type=image/png
+  Γ£à [1000048] Well Fed             -> https://assets.rpglogs.com/img/ff/abilities/216000-216202.png
+      status=200 content-type=image/png
+  Γ£à [16006] Closed Position      -> https://assets.rpglogs.com/img/ff/abilities/003000-003470.png
+      status=200 content-type=image/png
+  Γ£à [1001199] Peloton              -> https://assets.rpglogs.com/img/ff/abilities/213000-213908.png
+      status=200 content-type=image/png
+
+Base: https://www.fflogs.com/img/ff/abilities/
+  Γ¥î [0] Unknown Ability      -> https://www.fflogs.com/img/ff/abilities/000000-000405.png
+      status=404 content-type=text/html; charset=utf-8
+  Γ¥î [1000048] Well Fed             -> https://www.fflogs.com/img/ff/abilities/216000-216202.png
+      status=404 content-type=text/html; charset=utf-8
+  Γ¥î [16006] Closed Position      -> https://www.fflogs.com/img/ff/abilities/003000-003470.png
+      status=404 content-type=text/html; charset=utf-8
+  Γ¥î [1001199] Peloton              -> https://www.fflogs.com/img/ff/abilities/213000-213908.png
+      status=404 content-type=text/html; charset=utf-8
+
+Base: https://assets.rpglogs.com/img/ffxiv/abilities/
+  Γ¥î [0] Unknown Ability      -> https://assets.rpglogs.com/img/ffxiv/abilities/000000-000405.png
+      status=403 content-type=application/xml
+  Γ¥î [1000048] Well Fed             -> https://assets.rpglogs.com/img/ffxiv/abilities/216000-216202.png
+      status=403 content-type=application/xml
+  Γ¥î [16006] Closed Position      -> https://assets.rpglogs.com/img/ffxiv/abilities/003000-003470.png
+      status=403 content-type=application/xml
+  Γ¥î [1001199] Peloton              -> https://assets.rpglogs.com/img/ffxiv/abilities/213000-213908.png
+      status=403 content-type=application/xml
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+=> FFLogs: base(s) that returned real images:
+   https://assets.rpglogs.com/img/ff/abilities/
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+OVERALL SUMMARY
+ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+WarcraftLogs working base(s): https://assets.rpglogs.com/img/warcraft/abilities/
+FFLogs working base(s):       https://assets.rpglogs.com/img/ff/abilities/
+
+Paste this full output back so we can lock in the confirmed
+base URL(s) before wiring icons through the app.

@@ -16,6 +16,14 @@
 //
 // Re-run any time — existing files are skipped unless --force is passed,
 // so this is safe to run again after fixing a bad slug in icon-sources.mjs.
+//
+// FFXIV REWRITE (see icon-sources.mjs for the full story): the old source
+// was raw.githubusercontent.com/xivapi/classjob-icons — flat/outline fan
+// art, missing Viper/Pictomancer entirely. This now queries XIVAPI v2 live
+// per job (ClassJob.ItemSoulCrystal.Icon) and renders the real in-game
+// filled job-crystal icon via XIVAPI's asset endpoint. Confirmed working
+// end-to-end, including both previously-missing Dawntrail jobs, via
+// scripts/test-xivapi-soulcrystal.mjs before this rewrite.
 
 import { mkdir, writeFile, access } from "node:fs/promises";
 import path from "node:path";
@@ -23,16 +31,17 @@ import {
   WOW_CLASS_ICON_SLUGS,
   WOW_SPEC_ICON_SLUGS,
   WOW_PENDING_SPEC_ICON_SLUGS,
-  FFXIV_ICON_BASE,
-  FF_JOB_KEYS,
+  FF_JOB_CLASSJOB_IDS,
 } from "./icon-sources.mjs";
 
 const OUT_ROOT = path.join(process.cwd(), "public", "icons");
 const WOW_ZAMIMG_BASE = "https://wow.zamimg.com/images/wow/icons/large";
+const XIVAPI_BASE = "https://v2.xivapi.com/api";
 const FORCE = process.argv.includes("--force");
 
 // Zamimg has occasionally blocked requests with no User-Agent. GitHub raw
-// doesn't care, but sending one is harmless.
+// doesn't care, but sending one is harmless. XIVAPI doesn't require one
+// either, but it's kept for consistency across all three fetch sites.
 const HEADERS = {
   "User-Agent": "Mozilla/5.0 (compatible; ck-raid-review-icon-fetcher/1.0)",
 };
@@ -108,15 +117,73 @@ async function downloadWowIcons() {
   }
 }
 
+// ─── FFXIV ──────────────────────────────────────────────────────────────────
+//
+// Two live calls per job:
+//   1. GET /sheet/ClassJob/{id}?fields=Abbreviation,ItemSoulCrystal.Icon
+//      -> resolves the job's soul crystal texture path (e.g.
+//         "ui/icon/026000/026003.tex" for Paladin). Base classes (no
+//         soul crystal) come back with ItemSoulCrystal.value === 0 and
+//         are skipped, not failed — see icon-sources.mjs for why that's
+//         expected rather than an error.
+//   2. GET /asset?path={texPath}&format=png
+//      -> the actual renderable PNG for that texture.
+//
+// A failure at either step is recorded as a normal failure so it shows up
+// in the summary the same way a WoW 404 would.
+
+async function fetchSoulCrystalIconPath(classJobId) {
+  const url = `${XIVAPI_BASE}/sheet/ClassJob/${classJobId}?fields=Abbreviation,ItemSoulCrystal.Icon`;
+  const res = await fetch(url, { headers: HEADERS });
+  if (!res.ok) {
+    throw new Error(`ClassJob lookup failed (${res.status})`);
+  }
+
+  const json = await res.json();
+  const crystal = json.fields?.ItemSoulCrystal;
+
+  // Base classes (Gladiator, Conjurer, etc.) have no soul crystal — XIVAPI
+  // represents that "empty relation" as value: 0 with no nested `fields`.
+  if (!crystal?.fields?.Icon?.path) {
+    return null;
+  }
+
+  return crystal.fields.Icon.path;
+}
+
 async function downloadFFXIVIcons() {
   const jobDir = path.join(OUT_ROOT, "ffxiv", "jobs");
   await mkdir(jobDir, { recursive: true });
 
-  for (const jobKey of FF_JOB_KEYS) {
-    const filename = jobKey.toLowerCase();
-    const url = `${FFXIV_ICON_BASE}/${filename}.png`;
+  for (const [jobKey, classJobId] of Object.entries(FF_JOB_CLASSJOB_IDS)) {
     const dest = path.join(jobDir, `${jobKey}.png`);
-    await downloadOne(url, dest, `ffxiv/job/${jobKey}`);
+    const label = `ffxiv/job/${jobKey} (ClassJob ${classJobId})`;
+
+    if (!FORCE && (await fileExists(dest))) {
+      results.skipped.push(label);
+      await sleep(75);
+      continue;
+    }
+
+    try {
+      const texPath = await fetchSoulCrystalIconPath(classJobId);
+
+      if (!texPath) {
+        results.failed.push({
+          label,
+          url: `${XIVAPI_BASE}/sheet/ClassJob/${classJobId}`,
+          status: "No ItemSoulCrystal on this ClassJob (base class?)",
+        });
+        await sleep(75);
+        continue;
+      }
+
+      const assetUrl = `${XIVAPI_BASE}/asset?path=${encodeURIComponent(texPath)}&format=png`;
+      await downloadOne(assetUrl, dest, label);
+    } catch (err) {
+      results.failed.push({ label, url: `ClassJob ${classJobId}`, status: err?.message ?? String(err) });
+    }
+
     await sleep(75);
   }
 }
@@ -125,7 +192,7 @@ async function main() {
   console.log("Downloading WoW class + spec icons…");
   await downloadWowIcons();
 
-  console.log("Downloading FFXIV job icons…");
+  console.log("Downloading FFXIV job icons (XIVAPI v2, soul crystal icons)…");
   await downloadFFXIVIcons();
 
   console.log("\n─── Summary ───────────────────────────────");
