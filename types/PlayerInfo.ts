@@ -12,6 +12,11 @@ export type PlayerEvent = {
   timestamp:   number;  // ms into the pull
   abilityId:   number;
   abilityName: string;
+  // Fully-resolved icon URL (via lib/ability-icons.ts), or undefined if the
+  // report's masterData didn't carry an icon for this ability. UI code
+  // should render this optimistically and hide on load failure, same
+  // pattern already used for spec/class icons.
+  abilityIcon?: string;
   amount?:     number;  // damage / healing value when relevant
   extra?:      string;  // e.g. debuff source (caster) name — intentionally not rendered in the UI
 

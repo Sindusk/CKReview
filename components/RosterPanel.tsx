@@ -29,6 +29,54 @@ function formatAmount(n: number): string {
   return String(n);
 }
 
+// Small ability icon shown inline with the ability name in each event row.
+// Renders nothing if the icon is missing/unresolved, and hides itself on
+// load failure — same graceful-degradation pattern as the spec/class icons
+// elsewhere in the app (see PlayerButton below, or AnalysisPanel's FeedRow).
+//
+// For WoW only, wraps the icon in a Wowhead tooltip link — WCL's abilityId
+// IS the real WoW spell ID, so `wowhead.com/spell={id}` plus the power.js
+// widget (loaded in app/layout.tsx) gives a full hover tooltip for free,
+// no extra data/lookup needed. FFXIV has no equivalent widget yet, so its
+// icons stay plain.
+function AbilityIcon({
+  src,
+  abilityId,
+  game,
+}: {
+  src?: string;
+  abilityId: number;
+  game: "wow" | "ffxiv";
+}) {
+  if (!src) return null;
+
+  const img = (
+    <img
+      src={src}
+      alt=""
+      width={16}
+      height={16}
+      style={{ borderRadius: "3px", flexShrink: 0 }}
+      onError={(e) => { e.currentTarget.style.display = "none"; }}
+    />
+  );
+
+  if (game === "wow" && abilityId > 0) {
+    return (
+      <a
+        href={`https://www.wowhead.com/spell=${abilityId}`}
+        className="wowhead"
+        onClick={(e) => e.preventDefault()}
+        style={{ display: "inline-flex", flexShrink: 0 }}
+      >
+        {img}
+      </a>
+    );
+  }
+
+  return img;
+}
+
 // Overview grid tile — name + role only. Specialization/job is no longer
 // spelled out here; the spec/job icon already carries that information,
 // and the full spec name still shows in the player detail header once
@@ -134,12 +182,15 @@ const line2Style: CSSProperties = {
   whiteSpace: "nowrap",
 };
 
-function DamageDoneRow({ event, playbackTimeMs }: { event: PlayerEvent; playbackTimeMs: number }) {
+type RowProps = { event: PlayerEvent; playbackTimeMs: number; game: "wow" | "ffxiv" };
+
+function DamageDoneRow({ event, playbackTimeMs, game }: RowProps) {
   const hasPassed = playbackTimeMs >= event.timestamp;
   return (
     <div style={{ ...rowShellStyle, backgroundColor: rowBackground(hasPassed) }}>
       <div style={line1Style}>
         <span style={timeStyle}>{formatMs(event.timestamp)}</span>
+        <AbilityIcon src={event.abilityIcon} abilityId={event.abilityId} game={game} />
         <span style={abilityStyle}>{event.abilityName}</span>
         {event.isDoT && (
           <span style={{ fontSize: "9px", fontWeight: 700, color: "#a78bfa", border: "1px solid #a78bfa44", borderRadius: "3px", padding: "0 4px", flexShrink: 0 }}>
@@ -157,7 +208,7 @@ function DamageDoneRow({ event, playbackTimeMs }: { event: PlayerEvent; playback
   );
 }
 
-function DamageTakenRow({ event, playbackTimeMs }: { event: PlayerEvent; playbackTimeMs: number }) {
+function DamageTakenRow({ event, playbackTimeMs, game }: RowProps) {
   const hasPassed = playbackTimeMs >= event.timestamp;
   const isFatal = (event.overkill ?? 0) > 0;
   const hasHealth = event.healthBefore !== undefined || event.healthAfter !== undefined;
@@ -166,6 +217,7 @@ function DamageTakenRow({ event, playbackTimeMs }: { event: PlayerEvent; playbac
     <div style={{ ...rowShellStyle, backgroundColor: rowBackground(hasPassed) }}>
       <div style={line1Style}>
         <span style={timeStyle}>{formatMs(event.timestamp)}</span>
+        <AbilityIcon src={event.abilityIcon} abilityId={event.abilityId} game={game} />
         <span style={abilityStyle}>
           {event.abilityName}
           {event.source && <span style={{ color: "#555" }}> ({event.source})</span>}
@@ -190,12 +242,13 @@ function DamageTakenRow({ event, playbackTimeMs }: { event: PlayerEvent; playbac
   );
 }
 
-function HealingRow({ event, playbackTimeMs }: { event: PlayerEvent; playbackTimeMs: number }) {
+function HealingRow({ event, playbackTimeMs, game }: RowProps) {
   const hasPassed = playbackTimeMs >= event.timestamp;
   return (
     <div style={{ ...rowShellStyle, backgroundColor: rowBackground(hasPassed) }}>
       <div style={line1Style}>
         <span style={timeStyle}>{formatMs(event.timestamp)}</span>
+        <AbilityIcon src={event.abilityIcon} abilityId={event.abilityId} game={game} />
         <span style={abilityStyle}>{event.abilityName}</span>
         {event.amount !== undefined && (
           <span style={{ color: "#ccc", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>
@@ -208,12 +261,13 @@ function HealingRow({ event, playbackTimeMs }: { event: PlayerEvent; playbackTim
   );
 }
 
-function CastRow({ event, playbackTimeMs }: { event: PlayerEvent; playbackTimeMs: number }) {
+function CastRow({ event, playbackTimeMs, game }: RowProps) {
   const hasPassed = playbackTimeMs >= event.timestamp;
   return (
     <div style={{ ...rowShellStyle, backgroundColor: rowBackground(hasPassed) }}>
       <div style={line1Style}>
         <span style={timeStyle}>{formatMs(event.timestamp)}</span>
+        <AbilityIcon src={event.abilityIcon} abilityId={event.abilityId} game={game} />
         <span style={abilityStyle}>{event.abilityName}</span>
       </div>
       {event.target && <div style={line2Style}>→ {event.target}</div>}
@@ -229,7 +283,7 @@ const DEBUFF_STATUS_STYLE: Record<string, { label: string; color: string }> = {
   removed: { label: "Removed", color: "#f87171" },
 };
 
-function DebuffRow({ event, playbackTimeMs }: { event: PlayerEvent; playbackTimeMs: number }) {
+function DebuffRow({ event, playbackTimeMs, game }: RowProps) {
   const hasPassed = playbackTimeMs >= event.timestamp;
   const status = DEBUFF_STATUS_STYLE[event.debuffStatus ?? "applied"];
 
@@ -237,6 +291,7 @@ function DebuffRow({ event, playbackTimeMs }: { event: PlayerEvent; playbackTime
     <div style={{ ...rowShellStyle, backgroundColor: rowBackground(hasPassed) }}>
       <div style={line1Style}>
         <span style={timeStyle}>{formatMs(event.timestamp)}</span>
+        <AbilityIcon src={event.abilityIcon} abilityId={event.abilityId} game={game} />
         <span style={abilityStyle}>{event.abilityName}</span>
         <span
           style={{
@@ -288,11 +343,11 @@ function PlayerDetail({
 
   function renderRow(event: PlayerEvent, i: number) {
     switch (activeTab) {
-      case "DamageDone":  return <DamageDoneRow key={i} event={event} playbackTimeMs={playbackTimeMs} />;
-      case "DamageTaken": return <DamageTakenRow key={i} event={event} playbackTimeMs={playbackTimeMs} />;
-      case "Healing":     return <HealingRow key={i} event={event} playbackTimeMs={playbackTimeMs} />;
-      case "Debuffs":     return <DebuffRow key={i} event={event} playbackTimeMs={playbackTimeMs} />;
-      case "Casts":       return <CastRow key={i} event={event} playbackTimeMs={playbackTimeMs} />;
+      case "DamageDone":  return <DamageDoneRow key={i} event={event} playbackTimeMs={playbackTimeMs} game={player.game} />;
+      case "DamageTaken": return <DamageTakenRow key={i} event={event} playbackTimeMs={playbackTimeMs} game={player.game} />;
+      case "Healing":     return <HealingRow key={i} event={event} playbackTimeMs={playbackTimeMs} game={player.game} />;
+      case "Debuffs":     return <DebuffRow key={i} event={event} playbackTimeMs={playbackTimeMs} game={player.game} />;
+      case "Casts":       return <CastRow key={i} event={event} playbackTimeMs={playbackTimeMs} game={player.game} />;
     }
   }
 

@@ -72,7 +72,11 @@ export type PullError = {
 
   abilityId:   number;
   abilityName: string;
-  amount?:     number;   // effective damage that triggered it, when applicable
+  // Fully-resolved icon URL for this ability (via lib/ability-icons.ts),
+  // or undefined if the report's masterData didn't carry one — e.g. the
+  // manually-created "Call Wipe" marker (abilityId 0) never has one.
+  abilityIcon?: string;
+  amount?:      number;   // effective damage that triggered it, when applicable
 };
 
 // Stable ruleId for the manually-created "Call Wipe" Raid error, so the UI
@@ -107,4 +111,7 @@ export type EnemyEvent = {
   actorName:   string;
   abilityId:   number;
   abilityName: string;
+  // Fully-resolved icon URL for this ability (via lib/ability-icons.ts),
+  // or undefined if unavailable.
+  abilityIcon?: string;
 };

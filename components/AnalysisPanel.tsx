@@ -35,16 +35,26 @@ type FeedEntry = {
   specId?:   number;
   role?:     "Tank" | "Healer" | "DPS";
   title:     string;
+  // Resolved ability icon for the death's killing blow / error's ability
+  // (via lib/ability-icons.ts, threaded through log-transforms.ts) —
+  // undefined for the manual "Call Wipe" marker or anything else with no
+  // real ability behind it.
+  titleIcon?: string;
+  // The underlying ability/spell ID behind `title` (killingAbilityGameId
+  // for deaths, abilityId for errors) — needed to link WoW icons to a
+  // Wowhead tooltip, since that ID IS the real WoW spell ID. 0/absent for
+  // the manual "Call Wipe" marker.
+  abilityId?: number;
   subtitle?: string;
   game:      "wow" | "ffxiv";
 };
 
 function deathToFeedEntry(d: DeathEvent, game: "wow" | "ffxiv"): FeedEntry {
-  return { kind: "Death", timestamp: d.timestamp, player: d.player, class: d.class, specId: d.specId, role: d.role, title: d.cause, game };
+  return { kind: "Death", timestamp: d.timestamp, player: d.player, class: d.class, specId: d.specId, role: d.role, title: d.cause, titleIcon: d.causeIcon, abilityId: d.killingAbilityGameId, game };
 }
 
 function errorToFeedEntry(e: PullError, game: "wow" | "ffxiv"): FeedEntry {
-  return { kind: e.severity, timestamp: e.timestamp, player: e.player, class: e.class, specId: e.specId, role: e.role, title: e.name, subtitle: e.description, game };
+  return { kind: e.severity, timestamp: e.timestamp, player: e.player, class: e.class, specId: e.specId, role: e.role, title: e.name, titleIcon: e.abilityIcon, abilityId: e.abilityId, subtitle: e.description, game };
 }
 
 const FEED_KIND_STYLE: Record<FeedKind, { icon: string; color: string; label: string }> = {
@@ -84,6 +94,41 @@ function formatCallTime(ms: number): string {
 function getSpecLabel(game: "wow" | "ffxiv", specId: number | undefined, className: string): string {
   if (game === "wow") return getSpecInfo(specId ?? 0).name;
   return formatClassName(className);
+}
+
+// Small ability icon shown next to the death cause / error name. For WoW
+// only, wraps in a Wowhead tooltip link — see the identical helper +
+// comment in RosterPanel.tsx (the ID IS the real WoW spell ID, so this
+// needs no extra lookup, and the power.js widget is already loaded once in
+// app/layout.tsx for the whole app). FFXIV has no equivalent widget yet.
+function TitleIcon({ src, abilityId, game }: { src?: string; abilityId?: number; game: "wow" | "ffxiv" }) {
+  if (!src) return null;
+
+  const img = (
+    <img
+      src={src}
+      alt=""
+      width={14}
+      height={14}
+      style={{ borderRadius: "2px", flexShrink: 0 }}
+      onError={(e) => { e.currentTarget.style.display = "none"; }}
+    />
+  );
+
+  if (game === "wow" && abilityId) {
+    return (
+      <a
+        href={`https://www.wowhead.com/spell=${abilityId}`}
+        className="wowhead"
+        onClick={(e) => e.preventDefault()}
+        style={{ display: "inline-flex", flexShrink: 0 }}
+      >
+        {img}
+      </a>
+    );
+  }
+
+  return img;
 }
 
 function SectionLabel({ label, count }: { label: string; count?: number }) {
@@ -203,8 +248,11 @@ function FeedRow({
               </span>
             )}
           </div>
-          <div style={{ fontSize: "11px", color: hasPassed ? style.color : "#3a3a20", marginTop: "2px", transition: "color 0.3s" }}>
-            {entry.kind === "Death" ? "⚔ " : ""}{entry.title}
+          <div style={{ display: "flex", alignItems: "center", gap: "4px", marginTop: "2px" }}>
+            <TitleIcon src={entry.titleIcon} abilityId={entry.abilityId} game={entry.game} />
+            <div style={{ fontSize: "11px", color: hasPassed ? style.color : "#3a3a20", transition: "color 0.3s" }}>
+              {entry.kind === "Death" ? "⚔ " : ""}{entry.title}
+            </div>
           </div>
           {entry.subtitle && (
             <div style={{ fontSize: "10px", color: hasPassed ? "#666" : "#333", marginTop: "1px", transition: "color 0.3s" }}>

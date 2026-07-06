@@ -76,6 +76,7 @@ function evaluateDamageRule(rule: PullErrorRule, player: PlayerInfo): PullError[
       role:        player.role,
       abilityId:   hit.abilityId,
       abilityName: hit.abilityName,
+      abilityIcon: hit.abilityIcon,
       amount:      hit.amount,
     });
   }
@@ -100,6 +101,7 @@ function evaluateDebuffAppliedRule(rule: PullErrorRule, player: PlayerInfo): Pul
     role:        player.role,
     abilityId:   e.abilityId,
     abilityName: e.abilityName,
+    abilityIcon: e.abilityIcon,
   }));
 }
 
@@ -123,6 +125,7 @@ function evaluateEnemyEventRule(rule: PullErrorRule, events: EnemyEvent[]): Pull
       timestamp:   e.timestamp,
       abilityId:   e.abilityId,
       abilityName: e.abilityName,
+      abilityIcon: e.abilityIcon,
     }));
 }
 

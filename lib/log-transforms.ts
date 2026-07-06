@@ -10,6 +10,17 @@
 // transformFFightToPull/transformFFReportToPulls for FFXIV, and
 // buildWCLAbilityMap/buildFFLAbilityMap) are exported. Nothing in here
 // touches the network.
+//
+// ABILITY ICONS: masterData.abilities already carries a raw `icon` filename
+// per ability (both games) — previously fetched and silently discarded.
+// buildWCLAbilityMap/buildFFLAbilityMap now keep it alongside the name, and
+// every function that resolves an ability name also resolves its icon (via
+// lib/ability-icons.ts, which knows the confirmed per-game CDN base — see
+// scripts/test-ability-icon-urls.mjs) onto the same display types that
+// already carry abilityName/abilityId. FFLogs additionally sometimes
+// carries an icon inline per-event (`ability.abilityIcon`), which is
+// preferred over the masterData lookup when present — mirrors how
+// fflAbilityName already prefers `ability.name` over the masterData lookup.
 
 import type { Pull }       from "@/types/Pull";
 import type { DeathEvent } from "@/types/DeathEvent";
@@ -42,13 +53,21 @@ import { getSpellName }                          from "./spell-data";
 import { getSpecInfo, getRosterSortOrder }        from "./spec-data";
 import { getFFJobByName, getFFRosterSortOrder }   from "./ffl-job-data";
 import { detectPullErrors }                       from "./error-detection";
+import { getWCLAbilityIconUrl, getFFAbilityIconUrl } from "./ability-icons";
+
+// Shared shape for both games' ability maps: gameID -> name + raw icon
+// filename (not yet resolved to a URL — that happens per-game via
+// getWCLAbilityIconUrl/getFFAbilityIconUrl at the point of use, since the
+// same raw filename format could theoretically differ in meaning between
+// the two APIs).
+type AbilityInfo = { name: string; icon?: string };
 
 // ─────────────────────────────────────────────────────────────────────────
 // ═══ WarcraftLogs (WoW) ═════════════════════════════════════════════════
 // ─────────────────────────────────────────────────────────────────────────
 
-export function buildWCLAbilityMap(abilities: WCLGameAbility[]): Map<number, string> {
-  return new Map(abilities.map((a) => [a.gameID, a.name]));
+export function buildWCLAbilityMap(abilities: WCLGameAbility[]): Map<number, AbilityInfo> {
+  return new Map(abilities.map((a) => [a.gameID, { name: a.name, icon: a.icon }]));
 }
 
 export type WCLDisplayCastEvent = {
@@ -59,6 +78,7 @@ export type WCLDisplayCastEvent = {
   role:          "Tank" | "Healer" | "DPS";
   abilityId:     number;
   abilityName:   string;
+  abilityIcon?:  string;
   resourceActor?: number;
   classResources?: Array<{
     amount: number;
@@ -96,17 +116,19 @@ function wclTransformDeath(
   event:       WCLDeathEvent,
   actorMap:    Map<number, WCLActor>,
   specIdMap:   Map<number, number>,
-  abilityMap:  Map<number, string>,
+  abilityMap:  Map<number, AbilityInfo>,
   fightStart:  number
 ): DeathEvent {
   const actor  = actorMap.get(event.targetID);
   const specId = specIdMap.get(event.targetID) ?? 0;
   const spec   = getSpecInfo(specId);
 
-  const killingId = event.killingAbilityGameID ?? 0;
+  const killingId      = event.killingAbilityGameID ?? 0;
+  const killingAbility  = killingId ? abilityMap.get(killingId) : undefined;
   const cause = killingId
-    ? abilityMap.get(killingId) ?? getSpellName(killingId)
+    ? killingAbility?.name ?? getSpellName(killingId)
     : "Unknown";
+  const causeIcon = getWCLAbilityIconUrl(killingAbility?.icon);
 
   return {
     timestamp:            event.timestamp - fightStart,
@@ -116,25 +138,38 @@ function wclTransformDeath(
     role:                 specId ? spec.role : "DPS",
     killingAbilityGameId: killingId,
     cause,
+    causeIcon,
   };
 }
 
 function wclAbilityName(
   event:      { abilityGameID?: number; ability?: { name?: string } },
-  abilityMap: Map<number, string>
+  abilityMap: Map<number, AbilityInfo>
 ): string {
   if (event.ability?.name) return event.ability.name;
   if (event.abilityGameID) {
-    return abilityMap.get(event.abilityGameID) ?? getSpellName(event.abilityGameID);
+    return abilityMap.get(event.abilityGameID)?.name ?? getSpellName(event.abilityGameID);
   }
   return "Unknown";
+}
+
+// WCL's inline `ability` object (on cast/damage/heal/debuff events) never
+// carries an icon — only `name` — unlike FFLogs' (see fflAbilityIcon below).
+// So this always resolves via the report-level ability map, keyed by
+// abilityGameID.
+function wclAbilityIcon(
+  event:      { abilityGameID?: number },
+  abilityMap: Map<number, AbilityInfo>
+): string | undefined {
+  if (!event.abilityGameID) return undefined;
+  return getWCLAbilityIconUrl(abilityMap.get(event.abilityGameID)?.icon);
 }
 
 function wclTransformCast(
   event:      WCLCastEvent,
   actorMap:   Map<number, WCLActor>,
   specIdMap:  Map<number, number>,
-  abilityMap: Map<number, string>,
+  abilityMap: Map<number, AbilityInfo>,
   fightStart: number
 ): WCLDisplayCastEvent {
   const actor  = actorMap.get(event.sourceID);
@@ -149,6 +184,7 @@ function wclTransformCast(
     role:           specId ? spec.role : "DPS",
     abilityId:      event.abilityGameID,
     abilityName:    wclAbilityName(event, abilityMap),
+    abilityIcon:    wclAbilityIcon(event, abilityMap),
     resourceActor:  event.resourceActor,
     classResources: event.classResources,
     hitPoints:      event.hitPoints,
@@ -170,7 +206,7 @@ function wclTransformCast(
 function wclDamageDoneToPlayerEvent(
   event:      WCLDamageEvent,
   actorMap:   Map<number, WCLActor>,
-  abilityMap: Map<number, string>,
+  abilityMap: Map<number, AbilityInfo>,
   fightStart: number
 ): PlayerEvent {
   const target = actorMap.get(event.targetID);
@@ -178,6 +214,7 @@ function wclDamageDoneToPlayerEvent(
     timestamp:   event.timestamp - fightStart,
     abilityId:   event.abilityGameID ?? 0,
     abilityName: wclAbilityName(event, abilityMap),
+    abilityIcon: wclAbilityIcon(event, abilityMap),
     amount:      event.amount,
     target:      target?.name,
     isDoT:       event.tick === true,
@@ -187,7 +224,7 @@ function wclDamageDoneToPlayerEvent(
 function wclDamageTakenToPlayerEvent(
   event:      WCLDamageEvent,
   actorMap:   Map<number, WCLActor>,
-  abilityMap: Map<number, string>,
+  abilityMap: Map<number, AbilityInfo>,
   fightStart: number
 ): PlayerEvent {
   const source = actorMap.get(event.sourceID);
@@ -198,6 +235,7 @@ function wclDamageTakenToPlayerEvent(
     timestamp:    event.timestamp - fightStart,
     abilityId:    event.abilityGameID ?? 0,
     abilityName:  wclAbilityName(event, abilityMap),
+    abilityIcon:  wclAbilityIcon(event, abilityMap),
     amount:       event.amount,
     source:       source?.name,
     healthBefore: before,
@@ -210,7 +248,7 @@ function wclDamageTakenToPlayerEvent(
 function wclHealToPlayerEvent(
   event:      WCLHealEvent,
   actorMap:   Map<number, WCLActor>,
-  abilityMap: Map<number, string>,
+  abilityMap: Map<number, AbilityInfo>,
   fightStart: number
 ): PlayerEvent {
   const target = actorMap.get(event.targetID);
@@ -218,6 +256,7 @@ function wclHealToPlayerEvent(
     timestamp:   event.timestamp - fightStart,
     abilityId:   event.abilityGameID ?? 0,
     abilityName: wclAbilityName(event, abilityMap),
+    abilityIcon: wclAbilityIcon(event, abilityMap),
     amount:      event.amount,
     target:      target?.name,
   };
@@ -226,7 +265,7 @@ function wclHealToPlayerEvent(
 function wclDebuffToPlayerEvent(
   event:      WCLDebuffEvent,
   actorMap:   Map<number, WCLActor>,
-  abilityMap: Map<number, string>,
+  abilityMap: Map<number, AbilityInfo>,
   fightStart: number
 ): PlayerEvent {
   const source = actorMap.get(event.sourceID);
@@ -239,6 +278,7 @@ function wclDebuffToPlayerEvent(
     timestamp:   event.timestamp - fightStart,
     abilityId:   event.abilityGameID ?? 0,
     abilityName: wclAbilityName(event, abilityMap),
+    abilityIcon: wclAbilityIcon(event, abilityMap),
     extra:       source?.name,
     debuffStatus,
   };
@@ -247,7 +287,7 @@ function wclDebuffToPlayerEvent(
 function wclCastToPlayerEvent(
   event:      WCLCastEvent,
   actorMap:   Map<number, WCLActor>,
-  abilityMap: Map<number, string>,
+  abilityMap: Map<number, AbilityInfo>,
   fightStart: number
 ): PlayerEvent {
   const hasTarget = event.targetID !== undefined && event.targetID !== -1;
@@ -257,6 +297,7 @@ function wclCastToPlayerEvent(
     timestamp:   event.timestamp - fightStart,
     abilityId:   event.abilityGameID ?? 0,
     abilityName: wclAbilityName(event, abilityMap),
+    abilityIcon: wclAbilityIcon(event, abilityMap),
     target,
   };
 }
@@ -278,7 +319,7 @@ function wclCastToPlayerEvent(
 function wclBuildEnemyCastEvents(
   enemyCastEvents: WCLCastEvent[],
   actorMap:        Map<number, WCLActor>,
-  abilityMap:      Map<number, string>,
+  abilityMap:      Map<number, AbilityInfo>,
   fightStart:      number
 ): EnemyEvent[] {
   return enemyCastEvents
@@ -293,13 +334,14 @@ function wclBuildEnemyCastEvents(
       actorName:   actorMap.get(e.sourceID)?.name ?? `Unknown (${e.sourceID})`,
       abilityId:   e.abilityGameID ?? 0,
       abilityName: wclAbilityName(e, abilityMap),
+      abilityIcon: wclAbilityIcon(e, abilityMap),
     }));
 }
 
 function wclBuildEnemyBuffEvents(
   enemyBuffEvents: WCLBuffEvent[],
   actorMap:        Map<number, WCLActor>,
-  abilityMap:      Map<number, string>,
+  abilityMap:      Map<number, AbilityInfo>,
   fightStart:      number
 ): EnemyEvent[] {
   return enemyBuffEvents
@@ -311,6 +353,7 @@ function wclBuildEnemyBuffEvents(
       actorName:   actorMap.get(e.targetID)?.name ?? `Unknown (${e.targetID})`,
       abilityId:   e.abilityGameID ?? 0,
       abilityName: wclAbilityName(e, abilityMap),
+      abilityIcon: wclAbilityIcon(e, abilityMap),
     }));
 }
 
@@ -318,7 +361,7 @@ function wclBuildPlayers(
   combatantInfos:    WCLCombatantInfoEvent[],
   actorMap:          Map<number, WCLActor>,
   specIdMap:         Map<number, number>,
-  abilityMap:        Map<number, string>,
+  abilityMap:        Map<number, AbilityInfo>,
   castEvents:        WCLCastEvent[],
   damageDoneEvents:  WCLDamageEvent[],
   damageTakenEvents: WCLDamageEvent[],
@@ -371,7 +414,7 @@ function wclBuildPlayers(
 
 export function transformFightToPull(
   data:        WCLFightData,
-  abilityMap:  Map<number, string>,
+  abilityMap:  Map<number, AbilityInfo>,
   reportCode:  string,
   idOverride?: number
 ): Pull & { castEvents: WCLDisplayCastEvent[] } {
@@ -441,7 +484,7 @@ export function transformFightToPull(
 
 export function transformReportToPulls(
   fightDataList: WCLFightData[],
-  abilityMap:    Map<number, string>,
+  abilityMap:    Map<number, AbilityInfo>,
   reportCode:    string
 ): Array<Pull & { castEvents: WCLDisplayCastEvent[] }> {
   const pulls = [...fightDataList]
@@ -464,8 +507,8 @@ export function transformReportToPulls(
 // ═══ FFLogs (FFXIV) ═════════════════════════════════════════════════════
 // ─────────────────────────────────────────────────────────────────────────
 
-export function buildFFLAbilityMap(abilities: FFLGameAbility[]): Map<number, string> {
-  return new Map(abilities.map((a) => [a.gameID, a.name]));
+export function buildFFLAbilityMap(abilities: FFLGameAbility[]): Map<number, AbilityInfo> {
+  return new Map(abilities.map((a) => [a.gameID, { name: a.name, icon: a.icon }]));
 }
 
 export type FFLDisplayCastEvent = {
@@ -476,6 +519,7 @@ export type FFLDisplayCastEvent = {
   role:           "Tank" | "Healer" | "DPS";
   abilityId:      number;
   abilityName:    string;
+  abilityIcon?:   string;
   resourceActor?: number;
   classResources?: Array<{
     amount: number;
@@ -504,13 +548,32 @@ function fflAbilityName(
     abilityGameID?: number;
     ability?: { name?: string } | null;
   },
-  abilityMap: Map<number, string>
+  abilityMap: Map<number, AbilityInfo>
 ): string {
   if (event.ability?.name) return event.ability.name;
   if (event.abilityGameID) {
-    return abilityMap.get(event.abilityGameID) ?? `Ability ${event.abilityGameID}`;
+    return abilityMap.get(event.abilityGameID)?.name ?? `Ability ${event.abilityGameID}`;
   }
   return "Unknown";
+}
+
+// FFLogs' inline `ability` object CAN carry its own icon (`abilityIcon`),
+// unlike WCL's — preferred when present, same precedence as fflAbilityName
+// preferring `ability.name`. Falls back to the report-level ability map.
+function fflAbilityIcon(
+  event: {
+    abilityGameID?: number;
+    ability?: { abilityIcon?: string } | null;
+  },
+  abilityMap: Map<number, AbilityInfo>
+): string | undefined {
+  if (event.ability?.abilityIcon) {
+    return getFFAbilityIconUrl(event.ability.abilityIcon);
+  }
+  if (event.abilityGameID) {
+    return getFFAbilityIconUrl(abilityMap.get(event.abilityGameID)?.icon);
+  }
+  return undefined;
 }
 
 // ─── Death transformer ────────────────────────────────────────────────────────
@@ -526,7 +589,7 @@ function fflAbilityName(
 function fflTransformDeath(
   event:      FFLDeathEvent,
   actorMap:   Map<number, FFLActor>,
-  abilityMap: Map<number, string>,
+  abilityMap: Map<number, AbilityInfo>,
   fightStart: number
 ): DeathEvent {
   const actor = actorMap.get(event.targetID);
@@ -537,12 +600,16 @@ function fflTransformDeath(
 
   let cause: string;
   if (killingId) {
-    cause = event.ability?.name ?? abilityMap.get(killingId) ?? `Ability ${killingId}`;
+    cause = event.ability?.name ?? abilityMap.get(killingId)?.name ?? `Ability ${killingId}`;
   } else if (event.sourceID === -1) {
     cause = "Environmental";
   } else {
     cause = "Unknown";
   }
+
+  const causeIcon = killingId
+    ? getFFAbilityIconUrl(event.ability?.abilityIcon ?? abilityMap.get(killingId)?.icon)
+    : undefined;
 
   return {
     timestamp:            Math.max(0, event.timestamp - fightStart),
@@ -552,13 +619,14 @@ function fflTransformDeath(
     role:                 job.role,
     killingAbilityGameId: killingId,
     cause,
+    causeIcon,
   };
 }
 
 function fflTransformCast(
   event:      FFLCastEvent,
   actorMap:   Map<number, FFLActor>,
-  abilityMap: Map<number, string>,
+  abilityMap: Map<number, AbilityInfo>,
   fightStart: number
 ): FFLDisplayCastEvent {
   const actor  = actorMap.get(event.sourceID);
@@ -573,6 +641,7 @@ function fflTransformCast(
     role:           job.role,
     abilityId:      event.abilityGameID ?? 0,
     abilityName:    fflAbilityName(event, abilityMap),
+    abilityIcon:    fflAbilityIcon(event, abilityMap),
     resourceActor:  event.resourceActor,
     classResources: event.classResources,
     hitPoints:      event.hitPoints,
@@ -591,7 +660,7 @@ function fflTransformCast(
 function fflDamageDoneToPlayerEvent(
   event:      FFLDamageEvent,
   actorMap:   Map<number, FFLActor>,
-  abilityMap: Map<number, string>,
+  abilityMap: Map<number, AbilityInfo>,
   fightStart: number
 ): PlayerEvent {
   const target = actorMap.get(event.targetID);
@@ -599,6 +668,7 @@ function fflDamageDoneToPlayerEvent(
     timestamp:   Math.max(0, event.timestamp - fightStart),
     abilityId:   event.abilityGameID ?? 0,
     abilityName: fflAbilityName(event, abilityMap),
+    abilityIcon: fflAbilityIcon(event, abilityMap),
     amount:      event.amount ?? 0,
     target:      target?.name,
   };
@@ -613,7 +683,7 @@ function fflDamageDoneToPlayerEvent(
 function fflDamageTakenToPlayerEvent(
   event:      FFLDamageEvent,
   actorMap:   Map<number, FFLActor>,
-  abilityMap: Map<number, string>,
+  abilityMap: Map<number, AbilityInfo>,
   fightStart: number
 ): PlayerEvent {
   const source = actorMap.get(event.sourceID);
@@ -625,6 +695,7 @@ function fflDamageTakenToPlayerEvent(
     timestamp:    Math.max(0, event.timestamp - fightStart),
     abilityId:    event.abilityGameID ?? 0,
     abilityName:  fflAbilityName(event, abilityMap),
+    abilityIcon:  fflAbilityIcon(event, abilityMap),
     amount:       dealt,
     source:       source?.name,
     healthBefore: before,
@@ -637,7 +708,7 @@ function fflDamageTakenToPlayerEvent(
 function fflHealToPlayerEvent(
   event:      FFLHealEvent,
   actorMap:   Map<number, FFLActor>,
-  abilityMap: Map<number, string>,
+  abilityMap: Map<number, AbilityInfo>,
   fightStart: number
 ): PlayerEvent {
   const target = actorMap.get(event.targetID);
@@ -645,6 +716,7 @@ function fflHealToPlayerEvent(
     timestamp:   Math.max(0, event.timestamp - fightStart),
     abilityId:   event.abilityGameID ?? 0,
     abilityName: fflAbilityName(event, abilityMap),
+    abilityIcon: fflAbilityIcon(event, abilityMap),
     amount:      event.amount,
     target:      target?.name,
   };
@@ -653,7 +725,7 @@ function fflHealToPlayerEvent(
 function fflDebuffToPlayerEvent(
   event:      FFLDebuffEvent,
   actorMap:   Map<number, FFLActor>,
-  abilityMap: Map<number, string>,
+  abilityMap: Map<number, AbilityInfo>,
   fightStart: number
 ): PlayerEvent {
   const source = actorMap.get(event.sourceID);
@@ -666,6 +738,7 @@ function fflDebuffToPlayerEvent(
     timestamp:   Math.max(0, event.timestamp - fightStart),
     abilityId:   event.abilityGameID ?? 0,
     abilityName: fflAbilityName(event, abilityMap),
+    abilityIcon: fflAbilityIcon(event, abilityMap),
     extra:       source?.name,
     debuffStatus,
   };
@@ -674,7 +747,7 @@ function fflDebuffToPlayerEvent(
 function fflCastToPlayerEvent(
   event:      FFLCastEvent,
   actorMap:   Map<number, FFLActor>,
-  abilityMap: Map<number, string>,
+  abilityMap: Map<number, AbilityInfo>,
   fightStart: number
 ): PlayerEvent {
   const hasTarget = event.targetID !== undefined && event.targetID !== -1;
@@ -684,6 +757,7 @@ function fflCastToPlayerEvent(
     timestamp:   Math.max(0, event.timestamp - fightStart),
     abilityId:   event.abilityGameID ?? 0,
     abilityName: fflAbilityName(event, abilityMap),
+    abilityIcon: fflAbilityIcon(event, abilityMap),
     target,
   };
 }
@@ -704,7 +778,7 @@ function fflCastToPlayerEvent(
 function fflBuildEnemyCastEvents(
   enemyCastEvents: FFLCastEvent[],
   actorMap:        Map<number, FFLActor>,
-  abilityMap:      Map<number, string>,
+  abilityMap:      Map<number, AbilityInfo>,
   fightStart:      number
 ): EnemyEvent[] {
   return enemyCastEvents
@@ -718,13 +792,14 @@ function fflBuildEnemyCastEvents(
       actorName:   actorMap.get(e.sourceID)?.name ?? `Unknown (${e.sourceID})`,
       abilityId:   e.abilityGameID ?? 0,
       abilityName: fflAbilityName(e, abilityMap),
+      abilityIcon: fflAbilityIcon(e, abilityMap),
     }));
 }
 
 function fflBuildEnemyBuffEvents(
   enemyBuffEvents: FFLBuffEvent[],
   actorMap:        Map<number, FFLActor>,
-  abilityMap:      Map<number, string>,
+  abilityMap:      Map<number, AbilityInfo>,
   fightStart:      number
 ): EnemyEvent[] {
   return enemyBuffEvents
@@ -736,13 +811,14 @@ function fflBuildEnemyBuffEvents(
       actorName:   actorMap.get(e.targetID)?.name ?? `Unknown (${e.targetID})`,
       abilityId:   e.abilityGameID ?? 0,
       abilityName: fflAbilityName(e, abilityMap),
+      abilityIcon: fflAbilityIcon(e, abilityMap),
     }));
 }
 
 function buildFFPlayers(
   friendlyPlayerIds: number[],
   actorMap:          Map<number, FFLActor>,
-  abilityMap:        Map<number, string>,
+  abilityMap:        Map<number, AbilityInfo>,
   castEvents:        FFLCastEvent[],
   damageDoneEvents:  FFLDamageEvent[],
   damageTakenEvents: FFLDamageEvent[],
@@ -801,7 +877,7 @@ function buildFFPlayers(
 
 export function transformFFightToPull(
   data:        FFLFightData,
-  abilityMap:  Map<number, string>,
+  abilityMap:  Map<number, AbilityInfo>,
   reportCode:  string,
   idOverride?: number
 ): Pull & { castEvents: FFLDisplayCastEvent[] } {
@@ -865,7 +941,7 @@ export function transformFFightToPull(
 
 export function transformFFReportToPulls(
   fightDataList: FFLFightData[],
-  abilityMap:    Map<number, string>,
+  abilityMap:    Map<number, AbilityInfo>,
   reportCode:    string
 ): Array<Pull & { castEvents: FFLDisplayCastEvent[] }> {
   const pulls = [...fightDataList]
