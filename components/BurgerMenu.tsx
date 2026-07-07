@@ -259,7 +259,7 @@ export default function BurgerMenu({ onConnectWCL, onConnectFFL, onOpenReport }:
           <MenuLinkItem
             icon="🆕"
             label="New Session"
-            href="https://consistencykings.com/"
+            href="https://review.consistencykings.com/"
             newTab={false}
             onNavigate={() => setOpen(false)}
           />
