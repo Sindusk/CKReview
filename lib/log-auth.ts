@@ -234,7 +234,7 @@ export const logout                = wclAuth.logout;
 
 // ─── FFLogs instance ────────────────────────────────────────────────────────
 
-const FFL_REDIRECT_URI = "http://consistencykings.com/ckreview/ffcallback";
+const FFL_REDIRECT_URI = "https://review.consistencykings.com/ckreview/ffcallback";
 
 const fflAuth = createLogAuth({
   providerLabel:  "FFLogs",
