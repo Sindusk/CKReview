@@ -3,10 +3,12 @@
 import { useState } from "react";
 import type { Pull } from "@/types/Pull";
 import type { DeathEvent } from "@/types/DeathEvent";
-import type { PullError } from "@/types/PullError";
-import { CALL_WIPE_RULE_ID } from "@/types/PullError";
+import type { PullError, ManualErrorInput } from "@/types/PullError";
+import { CALL_WIPE_RULE_ID, MANUAL_ERROR_RULE_ID } from "@/types/PullError";
 import { getClassColor, getRoleColor, formatClassName, getPlayerSpecIcon } from "@/lib/player-display";
 import { getSpecInfo } from "@/lib/spec-data";
+import ConfirmDialog from "./ConfirmDialog";
+import AddErrorDialog from "./AddErrorDialog";
 
 type AnalysisPanelProps = {
   pull: Pull | null;
@@ -15,6 +17,15 @@ type AnalysisPanelProps = {
   // Fires when the user clicks "Call Wipe" — page.tsx appends a manual
   // Raid error (createCallWipeError) to this pull at the given timestamp.
   onCallWipe?: (pullId: number, timestampMs: number) => void;
+  // Fires when the user submits the "Add Error" dialog — page.tsx appends
+  // a manual error (createManualError) to this pull.
+  onAddError?: (pullId: number, input: ManualErrorInput) => void;
+  // Fires when the user confirms removal of a Call Wipe marker OR a
+  // manually-added error, identified by PullError.id.
+  onRemoveError?: (pullId: number, errorId: string) => void;
+  // Whether playbackTimeMs actually reflects a calibrated VOD right now —
+  // used to decide whether to prefill the Add Error dialog's timestamp.
+  vodTimeAvailable?: boolean;
 };
 
 type Tab = "Overall" | "Deaths" | "Raid" | "Major" | "Minor";
@@ -35,18 +46,15 @@ type FeedEntry = {
   specId?:   number;
   role?:     "Tank" | "Healer" | "DPS";
   title:     string;
-  // Resolved ability icon for the death's killing blow / error's ability
-  // (via lib/ability-icons.ts, threaded through log-transforms.ts) —
-  // undefined for the manual "Call Wipe" marker or anything else with no
-  // real ability behind it.
   titleIcon?: string;
-  // The underlying ability/spell ID behind `title` (killingAbilityGameId
-  // for deaths, abilityId for errors) — needed to link WoW icons to a
-  // Wowhead tooltip, since that ID IS the real WoW spell ID. 0/absent for
-  // the manual "Call Wipe" marker.
   abilityId?: number;
   subtitle?: string;
   game:      "wow" | "ffxiv";
+  // Only present on PullError-derived entries (not deaths) — lets FeedRow
+  // decide whether this specific entry can be deleted (manually-added
+  // errors only; auto-detected rule errors have no `id`).
+  id?:       string;
+  ruleId?:   string;
 };
 
 function deathToFeedEntry(d: DeathEvent, game: "wow" | "ffxiv"): FeedEntry {
@@ -54,7 +62,7 @@ function deathToFeedEntry(d: DeathEvent, game: "wow" | "ffxiv"): FeedEntry {
 }
 
 function errorToFeedEntry(e: PullError, game: "wow" | "ffxiv"): FeedEntry {
-  return { kind: e.severity, timestamp: e.timestamp, player: e.player, class: e.class, specId: e.specId, role: e.role, title: e.name, titleIcon: e.abilityIcon, abilityId: e.abilityId, subtitle: e.description, game };
+  return { kind: e.severity, timestamp: e.timestamp, player: e.player, class: e.class, specId: e.specId, role: e.role, title: e.name, titleIcon: e.abilityIcon, abilityId: e.abilityId, subtitle: e.description, game, id: e.id, ruleId: e.ruleId };
 }
 
 const FEED_KIND_STYLE: Record<FeedKind, { icon: string; color: string; label: string }> = {
@@ -64,8 +72,6 @@ const FEED_KIND_STYLE: Record<FeedKind, { icon: string; color: string; label: st
   Minor: { icon: "⚠️", color: "#fbbf24", label: "Minor" },
 };
 
-// #10 — show hundredths of a second (M:SS.ss) so events that land within
-// the same second can still be told apart.
 function formatMs(ms: number): string {
   const totalSec = Math.max(0, ms) / 1000;
   const m = Math.floor(totalSec / 60);
@@ -80,7 +86,6 @@ function formatDuration(ms: number): string {
   return `${m}m ${s}s`;
 }
 
-// Short M:SS form used for the "Call Wipe" / "Wipe called at" header label.
 function formatCallTime(ms: number): string {
   const totalSec = Math.max(0, Math.floor(ms / 1000));
   const m = Math.floor(totalSec / 60);
@@ -88,19 +93,11 @@ function formatCallTime(ms: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-// Resolves the specialization label shown under a player's name in the
-// feed. WoW carries a real specId (e.g. "Unholy"); FFXIV has no separate
-// spec from job, so `class` already holds the display-ready job name.
 function getSpecLabel(game: "wow" | "ffxiv", specId: number | undefined, className: string): string {
   if (game === "wow") return getSpecInfo(specId ?? 0).name;
   return formatClassName(className);
 }
 
-// Small ability icon shown next to the death cause / error name. For WoW
-// only, wraps in a Wowhead tooltip link — see the identical helper +
-// comment in RosterPanel.tsx (the ID IS the real WoW spell ID, so this
-// needs no extra lookup, and the power.js widget is already loaded once in
-// app/layout.tsx for the whole app). FFXIV has no equivalent widget yet.
 function TitleIcon({ src, abilityId, game }: { src?: string; abilityId?: number; game: "wow" | "ffxiv" }) {
   if (!src) return null;
 
@@ -161,26 +158,25 @@ function FeedRow({
   playbackTimeMs,
   onSeek,
   showKindBadge,
+  onRequestRemove,
 }: {
   entry: FeedEntry;
   playbackTimeMs: number;
   onSeek?: (ms: number) => void;
-  showKindBadge?: boolean;   // show a Death/Raid/Major/Minor tag — used on the Overall tab
+  showKindBadge?: boolean;
+  // Only wired up for manually-added errors (entry.ruleId === MANUAL_ERROR_RULE_ID)
+  onRequestRemove?: (entry: FeedEntry) => void;
 }) {
   const [hovered, setHovered] = useState(false);
   const hasPassed = playbackTimeMs >= entry.timestamp;
   const style = FEED_KIND_STYLE[entry.kind];
-  // Raid errors have no player/class/role — fall back to the kind's own
-  // color instead of looking up a role color that doesn't exist.
   const roleColor = entry.role ? getRoleColor(entry.role) : style.color;
   const cls = entry.class ? getClassColor(entry.game, entry.class) : style.color;
-  // entry.specId defaults to 0 when absent (raid-wide entries) — harmless,
-  // since the icon/label are only rendered when entry.class is also
-  // present below, and a real specId always accompanies a real class on
-  // player-attributable entries (see error-detection.ts / log-transforms.ts).
   const specIcon = entry.class ? getPlayerSpecIcon(entry.game, entry.specId ?? 0, entry.class) : null;
   const specLabel = entry.class ? getSpecLabel(entry.game, entry.specId, entry.class) : null;
   const seekTarget = Math.max(0, entry.timestamp - 3000);
+
+  const isDeletableManualError = entry.ruleId === MANUAL_ERROR_RULE_ID && !!entry.id && !!onRequestRemove;
 
   return (
     <div
@@ -228,7 +224,6 @@ function FeedRow({
         />
       )}
 
-      {/* Main content (left) + kind/role column (right) */}
       <div style={{ flex: 1, minWidth: 0, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px" }}>
         <div style={{ minWidth: 0, flex: 1 }}>
           <div style={{ display: "flex", alignItems: "center", gap: "5px", flexWrap: "wrap" }}>
@@ -261,40 +256,61 @@ function FeedRow({
           )}
         </div>
 
-        {/* Kind badge (top) + role (below), right-aligned */}
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "3px", flexShrink: 0 }}>
-          {showKindBadge && (
-            <span
+        <div style={{ display: "flex", alignItems: "flex-start", gap: "6px", flexShrink: 0 }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "3px" }}>
+            {showKindBadge && (
+              <span
+                style={{
+                  fontSize: "9px",
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.04em",
+                  color: hasPassed ? style.color : "#444",
+                  border: `1px solid ${hasPassed ? style.color + "44" : "#2a2a2a"}`,
+                  borderRadius: "3px",
+                  padding: "1px 5px",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {style.label}
+              </span>
+            )}
+            {entry.role && (
+              <span
+                style={{
+                  fontSize: "10px",
+                  color: hasPassed ? roleColor : "#444",
+                  border: `1px solid ${hasPassed ? roleColor + "33" : "#2a2a2a"}`,
+                  borderRadius: "3px",
+                  padding: "1px 5px",
+                  backgroundColor: hasPassed ? roleColor + "10" : "transparent",
+                  whiteSpace: "nowrap",
+                  transition: "all 0.3s",
+                }}
+              >
+                {entry.role}
+              </span>
+            )}
+          </div>
+
+          {isDeletableManualError && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onRequestRemove?.(entry); }}
+              title="Remove this error"
               style={{
-                fontSize: "9px",
-                fontWeight: 700,
-                textTransform: "uppercase",
-                letterSpacing: "0.04em",
-                color: hasPassed ? style.color : "#444",
-                border: `1px solid ${hasPassed ? style.color + "44" : "#2a2a2a"}`,
-                borderRadius: "3px",
-                padding: "1px 5px",
-                whiteSpace: "nowrap",
+                background: "transparent",
+                border: "1px solid #333",
+                borderRadius: "4px",
+                color: hovered ? "#f87171" : "#555",
+                fontSize: "11px",
+                lineHeight: 1,
+                padding: "3px 6px",
+                cursor: "pointer",
+                flexShrink: 0,
               }}
             >
-              {style.label}
-            </span>
-          )}
-          {entry.role && (
-            <span
-              style={{
-                fontSize: "10px",
-                color: hasPassed ? roleColor : "#444",
-                border: `1px solid ${hasPassed ? roleColor + "33" : "#2a2a2a"}`,
-                borderRadius: "3px",
-                padding: "1px 5px",
-                backgroundColor: hasPassed ? roleColor + "10" : "transparent",
-                whiteSpace: "nowrap",
-                transition: "all 0.3s",
-              }}
-            >
-              {entry.role}
-            </span>
+              ✕
+            </button>
           )}
         </div>
       </div>
@@ -377,10 +393,23 @@ function TabBar({ value, onChange, counts }: { value: Tab; onChange: (t: Tab) =>
   );
 }
 
-export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime, onCallWipe }: AnalysisPanelProps) {
-  // Hooks must run unconditionally on every render — declared before the
-  // early "no pull selected" return below.
+// Roster filter shared with RosterPanel.tsx — excludes the synthetic
+// "Multiple Players" (Limit Break) actor and pets, so the Add Error
+// dropdown only ever offers real players.
+function filterRealPlayers(players: Pull["players"]) {
+  return players.filter(
+    (p) =>
+      p.name !== "Multiple Players" &&
+      p.specName !== "LimitBreak" &&
+      p.specName !== "Limit Break"
+  );
+}
+
+export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime, onCallWipe, onAddError, onRemoveError, vodTimeAvailable }: AnalysisPanelProps) {
   const [activeTab, setActiveTab] = useState<Tab>("Overall");
+  const [showAddErrorDialog, setShowAddErrorDialog] = useState(false);
+  const [confirmRemoveWipe, setConfirmRemoveWipe] = useState(false);
+  const [pendingRemoveEntry, setPendingRemoveEntry] = useState<FeedEntry | null>(null);
 
   if (!pull) {
     return (
@@ -413,6 +442,7 @@ export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime, onCa
   const minors = pull.errors.filter((e) => e.severity === "Minor").sort((a, b) => a.timestamp - b.timestamp);
 
   const callWipeError = pull.errors.find((e) => e.ruleId === CALL_WIPE_RULE_ID);
+  const rosterPlayers = filterRealPlayers(pull.players);
 
   const counts: Record<Tab, number> = {
     Overall: deaths.length + raids.length + majors.length + minors.length,
@@ -476,12 +506,32 @@ export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime, onCa
               {isKill ? "KILL" : "WIPE"}
             </span>
 
-            {/* "Call Wipe" — creates a manual Raid error at the current
-                playback time. Once one exists on this pull, it's replaced
-                by the time it was called, per product decision this is
-                independent of any auto-detected Raid errors. */}
+            {/* "Add Error" — sits to the left of Call Wipe */}
+            {onAddError && (
+              <button
+                onClick={() => setShowAddErrorDialog(true)}
+                style={{
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  color: "#60a5fa",
+                  border: "1px solid #1e3a8a",
+                  borderRadius: "4px",
+                  padding: "3px 8px",
+                  backgroundColor: "transparent",
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Add Error
+              </button>
+            )}
+
+            {/* "Call Wipe" — now a button when it exists, opening a confirm
+                dialog to remove it, instead of a static badge. */}
             {callWipeError ? (
-              <span
+              <button
+                onClick={() => setConfirmRemoveWipe(true)}
+                title="Click to remove this wipe call"
                 style={{
                   fontSize: "11px",
                   fontWeight: 600,
@@ -491,10 +541,11 @@ export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime, onCa
                   padding: "3px 8px",
                   backgroundColor: "rgba(192,132,252,0.1)",
                   whiteSpace: "nowrap",
+                  cursor: "pointer",
                 }}
               >
                 Wipe called {formatCallTime(callWipeError.timestamp)}
-              </span>
+              </button>
             ) : (
               onCallWipe && (
                 <button
@@ -545,11 +596,12 @@ export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime, onCa
             <SectionLabel label={activeTab} count={feed.length} />
             {feed.map((entry, i) => (
               <FeedRow
-                key={i}
+                key={entry.id ?? i}
                 entry={entry}
                 playbackTimeMs={playbackTimeMs}
                 onSeek={onSeekToTime ? handleSeek : undefined}
                 showKindBadge={activeTab === "Overall"}
+                onRequestRemove={onRemoveError ? (e) => setPendingRemoveEntry(e) : undefined}
               />
             ))}
           </>
@@ -570,6 +622,43 @@ export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime, onCa
           </div>
         )}
       </div>
+
+      <AddErrorDialog
+        open={showAddErrorDialog}
+        players={rosterPlayers}
+        defaultTimestampMs={vodTimeAvailable ? playbackTimeMs : null}
+        onCancel={() => setShowAddErrorDialog(false)}
+        onAdd={(input) => {
+          onAddError?.(pull.id, input);
+          setShowAddErrorDialog(false);
+        }}
+      />
+
+      <ConfirmDialog
+        open={confirmRemoveWipe}
+        title="Remove Wipe Call?"
+        message="This will remove the manually-called wipe marker from this pull."
+        confirmLabel="Remove"
+        cancelLabel="Cancel"
+        onConfirm={() => {
+          if (callWipeError?.id) onRemoveError?.(pull.id, callWipeError.id);
+          setConfirmRemoveWipe(false);
+        }}
+        onCancel={() => setConfirmRemoveWipe(false)}
+      />
+
+      <ConfirmDialog
+        open={pendingRemoveEntry !== null}
+        title="Remove this error?"
+        message={pendingRemoveEntry ? `"${pendingRemoveEntry.title}" for ${pendingRemoveEntry.player ?? "Raid-Wide"} will be permanently removed.` : undefined}
+        confirmLabel="Remove"
+        cancelLabel="Cancel"
+        onConfirm={() => {
+          if (pendingRemoveEntry?.id) onRemoveError?.(pull.id, pendingRemoveEntry.id);
+          setPendingRemoveEntry(null);
+        }}
+        onCancel={() => setPendingRemoveEntry(null)}
+      />
     </div>
   );
 }

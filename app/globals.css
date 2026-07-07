@@ -32,3 +32,58 @@ body {
   width: 100% !important;
   height: 100% !important;
 }
+
+/* ─── Dark form fields ────────────────────────────────────────────────────
+   Shared by dialogs (AddVodDialog, AddErrorDialog, etc.) instead of the
+   browser default white input/select/textarea background, which is
+   jarringly bright against the rest of the app's dark UI.
+
+   .ck-input and .ck-select share an explicit height so a text input and a
+   <select> sitting side-by-side in a form row always line up exactly —
+   native selects otherwise render very slightly taller than text inputs
+   in most browsers even with identical padding.
+*/
+.ck-input,
+.ck-select,
+.ck-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  line-height: 20px;
+  color: #e5e7eb;
+  background-color: #1a1a1a;
+  border: 1px solid #444;
+  border-radius: 6px;
+  outline: none;
+}
+
+.ck-input,
+.ck-select {
+  height: 38px;
+}
+
+.ck-input::placeholder,
+.ck-textarea::placeholder {
+  color: #666;
+}
+
+.ck-input:focus,
+.ck-select:focus,
+.ck-textarea:focus {
+  border-color: #2563eb;
+}
+
+.ck-select {
+  cursor: pointer;
+}
+
+.ck-select option {
+  background-color: #1a1a1a;
+  color: #e5e7eb;
+}
+
+.ck-textarea {
+  resize: vertical;
+}

@@ -8,9 +8,14 @@
 // belong together. lib/session-store.ts stays separate — it's server-only
 // (uses `fs`) and must never be imported from a "use client" file.
 
-import type { SavedSession } from "@/types/Session";
+import type { SavedSession, SavedManualError } from "@/types/Session";
 import type { Pull } from "@/types/Pull";
-import { createCallWipeError, CALL_WIPE_RULE_ID } from "@/types/PullError";
+import {
+  createCallWipeError,
+  CALL_WIPE_RULE_ID,
+  MANUAL_ERROR_RULE_ID,
+  type PullError,
+} from "@/types/PullError";
 
 // ─── Fetch wrappers around /api/sessions ────────────────────────────────────
 
@@ -71,14 +76,12 @@ export async function updateSession(id: string, session: Omit<SavedSession, "cre
 
 export function buildWipeCallsMap(pulls: Pull[]): Record<number, number> {
   const map: Record<number, number> = {};
-
   for (const pull of pulls) {
     const wipeError = pull.errors.find((e) => e.ruleId === CALL_WIPE_RULE_ID);
     if (wipeError) {
       map[pull.fightId] = wipeError.timestamp;
     }
   }
-
   return map;
 }
 
@@ -105,6 +108,79 @@ export function applyPendingWipeCalls<T extends Pull>(
     const updatedErrors = [...pull.errors, createCallWipeError(timestamp)]
       .sort((a, b) => a.timestamp - b.timestamp);
 
+    return { ...pull, errors: updatedErrors };
+  });
+}
+
+// ─── Manual-error map helpers ────────────────────────────────────────────────
+//
+// Same shape of problem as wipeCalls above — pulls are always rebuilt from
+// scratch on import, so manually-added errors need to be extracted before a
+// re-import and reattached after, keyed by fightId (stable across
+// re-imports) rather than Pull.id (just an incrementing index).
+
+export function buildManualErrorsMap(pulls: Pull[]): Record<number, SavedManualError[]> {
+  const map: Record<number, SavedManualError[]> = {};
+
+  for (const pull of pulls) {
+    const manual = pull.errors.filter((e) => e.ruleId === MANUAL_ERROR_RULE_ID);
+    if (manual.length === 0) continue;
+
+    map[pull.fightId] = manual.map((e) => ({
+      id:          e.id!,
+      severity:    e.severity,
+      name:        e.name,
+      description: e.description,
+      timestamp:   e.timestamp,
+      player:      e.player,
+    }));
+  }
+
+  return map;
+}
+
+/**
+ * Re-applies previously-saved manual errors onto a freshly-transformed
+ * Pull[], matching on fightId. Player class/specId/role are re-resolved
+ * against the newly-imported roster by name — if the player no longer
+ * appears in the roster (renamed, log re-imported differently), the error
+ * still applies but without those fields.
+ */
+export function applyPendingManualErrors<T extends Pull>(
+  pulls:        T[],
+  manualErrors: Record<number, SavedManualError[]> | undefined
+): T[] {
+  if (!manualErrors || Object.keys(manualErrors).length === 0) return pulls;
+
+  return pulls.map((pull) => {
+    const saved = manualErrors[pull.fightId];
+    if (!saved || saved.length === 0) return pull;
+
+    const existingIds = new Set(
+      pull.errors.filter((e) => e.ruleId === MANUAL_ERROR_RULE_ID).map((e) => e.id)
+    );
+    const toAdd = saved.filter((s) => !existingIds.has(s.id));
+    if (toAdd.length === 0) return pull;
+
+    const newErrors: PullError[] = toAdd.map((s) => {
+      const playerInfo = s.player ? pull.players.find((p) => p.name === s.player) : undefined;
+      return {
+        id:          s.id,
+        ruleId:      MANUAL_ERROR_RULE_ID,
+        severity:    s.severity,
+        name:        s.name,
+        description: s.description,
+        timestamp:   s.timestamp,
+        player:      s.player,
+        class:       playerInfo?.className,
+        specId:      playerInfo?.specId,
+        role:        playerInfo?.role,
+        abilityId:   0,
+        abilityName: s.name,
+      };
+    });
+
+    const updatedErrors = [...pull.errors, ...newErrors].sort((a, b) => a.timestamp - b.timestamp);
     return { ...pull, errors: updatedErrors };
   });
 }

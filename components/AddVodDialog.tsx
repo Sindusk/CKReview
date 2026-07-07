@@ -54,14 +54,7 @@ export default function AddVodDialog({ open, onCancel, onAdd }: AddVodDialogProp
             Player / Perspective
           </label>
           <input
-            style={{
-              width: "100%",
-              padding: "8px 10px",
-              color: "#111",
-              backgroundColor: "#fff",
-              border: "1px solid #666",
-              borderRadius: "6px",
-            }}
+            className="ck-input"
             value={player}
             onChange={e => setPlayer(e.target.value)}
             placeholder="e.g. Koro"
@@ -73,14 +66,7 @@ export default function AddVodDialog({ open, onCancel, onAdd }: AddVodDialogProp
             YouTube URL
           </label>
           <input
-            style={{
-              width: "100%",
-              padding: "8px 10px",
-              color: "#111",
-              backgroundColor: "#fff",
-              border: "1px solid #666",
-              borderRadius: "6px",
-            }}
+            className="ck-input"
             value={url}
             onChange={e => setUrl(e.target.value)}
             placeholder="https://www.youtube.com/watch?v=..."

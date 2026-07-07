@@ -13,7 +13,7 @@ import AnalysisPanel from "../components/AnalysisPanel";
 import RosterPanel from "../components/RosterPanel";
 import TimelinePanel from "@/components/TimelinePanel";
 import type { Pull } from "../types/Pull";
-import { createCallWipeError, CALL_WIPE_RULE_ID } from "@/types/PullError";
+import { createCallWipeError, CALL_WIPE_RULE_ID, createManualError, type ManualErrorInput } from "@/types/PullError";
 import type { SavedSession } from "@/types/Session";
 import useTimelineController from "@/hooks/useTimelineController";
 import { loginWithWarcraftLogs, loginWithFFLogs } from "@/lib/log-auth";
@@ -27,8 +27,11 @@ import {
   updateSession,
   buildWipeCallsMap,
   applyPendingWipeCalls,
+  buildManualErrorsMap,
+  applyPendingManualErrors,
   type SessionLookupMatch,
 } from "../lib/session";
+import type { SavedManualError } from "@/types/Session";
 
 // ─── Concurrency-limited fetch helper ─────────────────────────────────────────
 //
@@ -104,6 +107,7 @@ export default function Home() {
   const pullsRef = useRef<Pull[]>(pulls);
   const sessionReportUrlRef = useRef(sessionReportUrl);
   const pendingWipeCallsRef = useRef<Record<number, number>>({});
+  const pendingManualErrorsRef = useRef<Record<number, SavedManualError[]>>({});
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => { vodsRef.current = vods; }, [vods]);
@@ -150,7 +154,8 @@ export default function Home() {
           url:    v.url,
           offset: v.isCalibrated ? v.offset : undefined,
         })),
-        wipeCalls: buildWipeCallsMap(pullsRef.current),
+        wipeCalls:    buildWipeCallsMap(pullsRef.current),
+        manualErrors: buildManualErrorsMap(pullsRef.current),
       };
 
       // Nothing worth saving yet — don't create an empty session.
@@ -192,6 +197,7 @@ export default function Home() {
       setSessionReportUrl(session.reportUrl);
       setImportInput(session.reportUrl);
       pendingWipeCallsRef.current = session.wipeCalls ?? {};
+      pendingManualErrorsRef.current = session.manualErrors ?? {};
 
       const restoredVods: Vod[] = session.vods.map((v, i) => {
         const parsedYt = parseYouTubeUrl(v.url);
@@ -237,6 +243,28 @@ export default function Home() {
           .sort((a, b) => a.timestamp - b.timestamp);
 
         return { ...p, errors: updatedErrors };
+      })
+    );
+    persistSession();
+  }, [persistSession]);
+
+  const handleAddError = useCallback((pullId: number, input: ManualErrorInput) => {
+    setPulls(prev =>
+      prev.map(p => {
+        if (p.id !== pullId) return p;
+        const newError = createManualError(input);
+        const updatedErrors = [...p.errors, newError].sort((a, b) => a.timestamp - b.timestamp);
+        return { ...p, errors: updatedErrors };
+      })
+    );
+    persistSession();
+  }, [persistSession]);
+
+  const handleRemoveError = useCallback((pullId: number, errorId: string) => {
+    setPulls(prev =>
+      prev.map(p => {
+        if (p.id !== pullId) return p;
+        return { ...p, errors: p.errors.filter(e => e.id !== errorId) };
       })
     );
     persistSession();
@@ -334,6 +362,9 @@ export default function Home() {
     // pulls are always rebuilt fresh here, so this has to happen post-hoc.
     newPulls = applyPendingWipeCalls(newPulls, pendingWipeCallsRef.current);
     pendingWipeCallsRef.current = {};
+    
+    newPulls = applyPendingManualErrors(newPulls, pendingManualErrorsRef.current);
+    pendingManualErrorsRef.current = {};
 
     setPulls(newPulls);
     setSelectedPullId(null);
@@ -377,6 +408,9 @@ export default function Home() {
 
     newPulls = applyPendingWipeCalls(newPulls, pendingWipeCallsRef.current);
     pendingWipeCallsRef.current = {};
+    
+    newPulls = applyPendingManualErrors(newPulls, pendingManualErrorsRef.current);
+    pendingManualErrorsRef.current = {};
 
     setPulls(newPulls);
     setSelectedPullId(null);
@@ -453,6 +487,7 @@ export default function Home() {
     setSessionId(match.id);
     setSessionReportUrl(session.reportUrl);
     pendingWipeCallsRef.current = session.wipeCalls ?? {};
+    pendingManualErrorsRef.current = session.manualErrors ?? {};
 
     const restoredVods: Vod[] = session.vods.map((v, i) => {
       const parsedYt = parseYouTubeUrl(v.url);
@@ -603,6 +638,9 @@ export default function Home() {
               playbackTimeMs={timeline.playbackTimeMs}
               onSeekToTime={isCalibrated ? handleSeekToMs : undefined}
               onCallWipe={handleCallWipe}
+              onAddError={handleAddError}
+              onRemoveError={handleRemoveError}
+              vodTimeAvailable={isCalibrated}
             />
           </div>
         </div>

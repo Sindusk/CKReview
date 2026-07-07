@@ -28,15 +28,14 @@ export async function PUT(
   const { id } = await params;
   const body = await req.json();
 
-  // Preserve the original createdAt so "earliest session wins" stays
-  // correct across edits — only set on first write.
   const existing = await readSession(id).catch(() => null);
 
   const session: SavedSession = {
-    createdAt: existing?.createdAt ?? Date.now(),
-    reportUrl: typeof body.reportUrl === "string" ? body.reportUrl : "",
-    vods:      Array.isArray(body.vods) ? body.vods : [],
-    wipeCalls: body.wipeCalls && typeof body.wipeCalls === "object" ? body.wipeCalls : {},
+    createdAt:    existing?.createdAt ?? Date.now(),
+    reportUrl:    typeof body.reportUrl === "string" ? body.reportUrl : "",
+    vods:         Array.isArray(body.vods) ? body.vods : [],
+    wipeCalls:    body.wipeCalls && typeof body.wipeCalls === "object" ? body.wipeCalls : {},
+    manualErrors: body.manualErrors && typeof body.manualErrors === "object" ? body.manualErrors : {},
   };
 
   await writeSession(id, session);

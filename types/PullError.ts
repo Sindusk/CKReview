@@ -54,29 +54,23 @@ export type PullErrorRule = {
 // one person's fault — enemy casts, enemy buffs, and the manual "Call Wipe"
 // marker. UI code must treat these as optional.
 export type PullError = {
+  id?:         string;   // unique per-instance id — only set on manually-created
+                          // errors (Call Wipe, Add Error), used to remove a
+                          // specific instance later. Auto-detected rule errors
+                          // don't need one (there's nothing to delete individually).
   ruleId:      string;
   severity:    ErrorSeverity;
   name:        string;
   description: string;
-
-  timestamp:   number;   // ms into the pull — same convention as DeathEvent
+  timestamp:   number;
   player?:     string;
   class?:      string;
-  // Blizzard spec ID (WoW only) — lets the UI show a spec-specific icon
-  // instead of just a class-level one. Always 0 for FFXIV (job doubles as
-  // spec there, so it's meaningless — icon lookup ignores it and uses
-  // `class` directly for FFXIV). Optional/absent for the same reason
-  // `class`/`role` are: raid-wide errors aren't attributable to a player.
   specId?:     number;
   role?:       "Tank" | "Healer" | "DPS";
-
   abilityId:   number;
   abilityName: string;
-  // Fully-resolved icon URL for this ability (via lib/ability-icons.ts),
-  // or undefined if the report's masterData didn't carry one — e.g. the
-  // manually-created "Call Wipe" marker (abilityId 0) never has one.
   abilityIcon?: string;
-  amount?:      number;   // effective damage that triggered it, when applicable
+  amount?:      number;
 };
 
 // Stable ruleId for the manually-created "Call Wipe" Raid error, so the UI
@@ -92,6 +86,7 @@ export const CALL_WIPE_RULE_ID = "manual-call-wipe";
  */
 export function createCallWipeError(timestampMs: number): PullError {
   return {
+    id:          CALL_WIPE_RULE_ID,   // only one per pull, so the ruleId doubles as its id
     ruleId:      CALL_WIPE_RULE_ID,
     severity:    "Raid",
     name:        "Wipe Called",
@@ -99,6 +94,58 @@ export function createCallWipeError(timestampMs: number): PullError {
     timestamp:   timestampMs,
     abilityId:   0,
     abilityName: "Call Wipe",
+  };
+}
+
+// ─── Manually-added errors ("Add Error" in AnalysisPanel) ──────────────────
+//
+// Unlike Call Wipe (one per pull, fixed ruleId), many of these can exist on
+// the same pull — each gets its own unique `id` so a specific one can be
+// removed later without disturbing the others.
+
+export const MANUAL_ERROR_RULE_ID = "manual-added-error";
+
+function generateManualErrorId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `manual-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+export type ManualErrorInput = {
+  severity:    ErrorSeverity;
+  name:        string;
+  description: string;
+  timestamp:   number;
+  // Player is optional here at the type level because Raid-severity manual
+  // errors intentionally omit it (see AddErrorDialog) — Major/Minor should
+  // always populate it in practice, since report-data.ts's per-player
+  // attribution assumes Major errors carry a player.
+  player?:     string;
+  class?:      string;
+  specId?:     number;
+  role?:       "Tank" | "Healer" | "DPS";
+};
+
+/**
+ * Builds a manually-added error (via AnalysisPanel's "Add Error" dialog).
+ * Appended directly to a pull's `errors` array by page.tsx's onAddError
+ * handler — NOT produced by detectPullErrors/ERROR_RULES like the others.
+ */
+export function createManualError(input: ManualErrorInput): PullError {
+  return {
+    id:          generateManualErrorId(),
+    ruleId:      MANUAL_ERROR_RULE_ID,
+    severity:    input.severity,
+    name:        input.name,
+    description: input.description,
+    timestamp:   input.timestamp,
+    player:      input.player,
+    class:       input.class,
+    specId:      input.specId,
+    role:        input.role,
+    abilityId:   0,
+    abilityName: input.name,
   };
 }
 
