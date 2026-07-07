@@ -49,9 +49,27 @@ export default function PullList({ pulls, selectedPullId, onSelectPull }: PullLi
           const majors = pull.errors.filter(e => e.severity === "Major");
           const minors = pull.errors.filter(e => e.severity === "Minor");
 
-          // Earliest raid-wide error (auto-detected or manually "Call
-          // Wipe"d) — shown as a badge next to KILL/WIPE, with its time.
           const firstRaidTime = raids.length > 0 ? Math.min(...raids.map(e => e.timestamp)) : null;
+          const resultBadgeText = isKill
+            ? "KILL"
+            : `WIPE${firstRaidTime !== null ? ` (${formatDuration(firstRaidTime)})` : ""}`;
+          const resultBadgeStyle = isKill
+            ? {
+                backgroundColor: "rgba(74,222,128,0.15)",
+                color: "#4ade80",
+                border: "1px solid #166534",
+              }
+            : firstRaidTime !== null
+              ? {
+                  backgroundColor: "rgba(192,132,252,0.15)",
+                  color: "#c084fc",
+                  border: "1px solid #6b21a8",
+                }
+              : {
+                  backgroundColor: "rgba(248,113,113,0.12)",
+                  color: "#f87171",
+                  border: "1px solid #7f1d1d",
+                };
 
           // #6 — earliest Major error or death, ignoring Minor errors
           const issueTimestamps = [
@@ -91,32 +109,13 @@ export default function PullList({ pulls, selectedPullId, onSelectPull }: PullLi
                       fontWeight: 700,
                       padding: "2px 6px",
                       borderRadius: "4px",
-                      backgroundColor: isKill ? "rgba(74,222,128,0.15)" : "rgba(248,113,113,0.12)",
-                      color: isKill ? "#4ade80" : "#f87171",
-                      border: `1px solid ${isKill ? "#166534" : "#7f1d1d"}`,
                       letterSpacing: "0.04em",
+                      whiteSpace: "nowrap",
+                      ...resultBadgeStyle,
                     }}
                   >
-                    {isKill ? "KILL" : "WIPE"}
+                    {resultBadgeText}
                   </span>
-
-                  {firstRaidTime !== null && (
-                    <span
-                      style={{
-                        fontSize: "10px",
-                        fontWeight: 700,
-                        padding: "2px 6px",
-                        borderRadius: "4px",
-                        backgroundColor: "rgba(192,132,252,0.15)",
-                        color: "#c084fc",
-                        border: "1px solid #6b21a8",
-                        letterSpacing: "0.04em",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      RAID {formatDuration(firstRaidTime)}
-                    </span>
-                  )}
 
                   {/* #3 — link to the source report, scoped to this fight */}
                   <a

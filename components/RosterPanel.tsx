@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import { getClassColor, getRoleColor, formatSpecClass, getPlayerSpecIcon } from "@/lib/player-display";
@@ -98,7 +98,7 @@ function PlayerButton({ player, onClick }: { player: PlayerInfo; onClick: () => 
         flexDirection: "row",
         alignItems: "center",
         gap: "6px",
-        padding: "5px 7px",
+        padding: "3px 5px",
         borderRadius: "4px",
         border: `1px solid ${hovered ? color + "66" : "#2a2a2a"}`,
         backgroundColor: hovered ? "#1a1a1a" : "#0d0d0d",
@@ -111,8 +111,8 @@ function PlayerButton({ player, onClick }: { player: PlayerInfo; onClick: () => 
       <img
         src={iconSrc}
         alt=""
-        width={22}
-        height={22}
+        width={26}
+        height={26}
         style={{ borderRadius: "4px", flexShrink: 0, border: `1px solid ${color}44` }}
         onError={(e) => { e.currentTarget.style.visibility = "hidden"; }}
       />
@@ -323,6 +323,7 @@ function PlayerDetail({
 }) {
   const [activeTab, setActiveTab] = useState<Tab>("DamageDone");
   const [search, setSearch] = useState("");
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const color = getClassColor(player.game, player.className);
 
   const events: PlayerEvent[] = (() => {
@@ -341,13 +342,30 @@ function PlayerDetail({
     ? events.filter((e) => e.abilityName.toLowerCase().includes(query))
     : events;
 
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const targetIndex = filteredEvents.findIndex((event) => event.timestamp >= playbackTimeMs);
+    const index = targetIndex >= 0 ? targetIndex : filteredEvents.length - 1;
+
+    if (index < 0) return;
+
+    const target = container.querySelector<HTMLElement>(`[data-event-index="${index}"]`);
+    if (!target) return;
+
+    requestAnimationFrame(() => {
+      target.scrollIntoView({ block: "center", behavior: "smooth" });
+    });
+  }, [activeTab, player.actorId]);
+
   function renderRow(event: PlayerEvent, i: number) {
     switch (activeTab) {
-      case "DamageDone":  return <DamageDoneRow key={i} event={event} playbackTimeMs={playbackTimeMs} game={player.game} />;
-      case "DamageTaken": return <DamageTakenRow key={i} event={event} playbackTimeMs={playbackTimeMs} game={player.game} />;
-      case "Healing":     return <HealingRow key={i} event={event} playbackTimeMs={playbackTimeMs} game={player.game} />;
-      case "Debuffs":     return <DebuffRow key={i} event={event} playbackTimeMs={playbackTimeMs} game={player.game} />;
-      case "Casts":       return <CastRow key={i} event={event} playbackTimeMs={playbackTimeMs} game={player.game} />;
+      case "DamageDone":  return <div key={i} data-event-index={i}><DamageDoneRow event={event} playbackTimeMs={playbackTimeMs} game={player.game} /></div>;
+      case "DamageTaken": return <div key={i} data-event-index={i}><DamageTakenRow event={event} playbackTimeMs={playbackTimeMs} game={player.game} /></div>;
+      case "Healing":     return <div key={i} data-event-index={i}><HealingRow event={event} playbackTimeMs={playbackTimeMs} game={player.game} /></div>;
+      case "Debuffs":     return <div key={i} data-event-index={i}><DebuffRow event={event} playbackTimeMs={playbackTimeMs} game={player.game} /></div>;
+      case "Casts":       return <div key={i} data-event-index={i}><CastRow event={event} playbackTimeMs={playbackTimeMs} game={player.game} /></div>;
     }
   }
 
@@ -445,7 +463,7 @@ function PlayerDetail({
         />
       </div>
 
-      <div style={{ flex: 1, overflowY: "auto" }}>
+      <div ref={scrollContainerRef} style={{ flex: 1, overflowY: "auto" }}>
         {filteredEvents.length === 0 ? (
           <div style={{ padding: "16px", textAlign: "center", color: "#333", fontSize: "12px" }}>
             {events.length === 0

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Vod } from "@/types/Vod";
 import type { SeekRequest } from "@/hooks/useTimelineController";
 
@@ -74,6 +74,7 @@ export default function VideoPanel({
   const playerRef = useRef<YTPlayer | null>(null);
   const playerReadyRef = useRef(false);
   const pendingSeekRef = useRef<number | null>(null);
+  const [playerReady, setPlayerReady] = useState(false);
 
   /**
    * =========================
@@ -85,6 +86,7 @@ export default function VideoPanel({
 
     playerReadyRef.current = false;
     pendingSeekRef.current = null;
+    setPlayerReady(false);
 
     if (playerRef.current) {
       playerRef.current.destroy();
@@ -110,6 +112,7 @@ export default function VideoPanel({
         events: {
           onReady: (event: YTPlayerEvent) => {
             playerReadyRef.current = true;
+            setPlayerReady(true);
 
             if (pendingSeekRef.current !== null) {
               const time = pendingSeekRef.current;
@@ -137,6 +140,7 @@ export default function VideoPanel({
 
     return () => {
       playerReadyRef.current = false;
+      setPlayerReady(false);
 
       if (playerRef.current) {
         playerRef.current.destroy();
@@ -175,7 +179,7 @@ export default function VideoPanel({
    */
   useEffect(() => {
     if (!onCurrentTimeChange) return;
-    if (!playerRef.current) return;
+    if (!playerReady || !playerRef.current) return;
 
     const interval = setInterval(() => {
       const time = playerRef.current?.getCurrentTime();
@@ -186,7 +190,7 @@ export default function VideoPanel({
     }, 200);
 
     return () => clearInterval(interval);
-  }, [onCurrentTimeChange]);
+  }, [onCurrentTimeChange, playerReady, vod?.id]);
 
   /**
    * Fix for seeking not occurring when swapping VOD's.
