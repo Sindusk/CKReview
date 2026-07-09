@@ -17,9 +17,10 @@ import { createCallWipeError, CALL_WIPE_RULE_ID, createManualError, type ManualE
 import type { SavedSession } from "@/types/Session";
 import useTimelineController from "@/hooks/useTimelineController";
 import { loginWithWarcraftLogs, loginWithFFLogs } from "@/lib/log-auth";
-import { fetchReport, fetchFightData } from "@/lib/wcl-client";
+import { fetchReport, fetchFightData, getWCLRateLimitStatus } from "@/lib/wcl-client";
 import { transformReportToPulls, transformFFReportToPulls, buildWCLAbilityMap, buildFFLAbilityMap } from "@/lib/log-transforms";
-import { fetchFFReport, fetchFFightData } from "@/lib/ffl-client";
+import { fetchFFReport, fetchFFightData, getFFLRateLimitStatus } from "@/lib/ffl-client";
+import { formatWaitTime, type RateLimitStatus } from "@/lib/rate-limit";
 import {
   lookupSessionForLog,
   fetchSession,
@@ -84,6 +85,34 @@ export default function Home() {
   const [importProgress, setImportProgress] = useState(0);
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const [loadedReportCode, setLoadedReportCode] = useState<string | null>(null);
+
+  // ── Rate limit display ─────────────────────────────────────────────────────
+  //
+  // "Points" spent by the most recently completed import specifically
+  // (end-of-import snapshot minus the snapshot taken right before that
+  // import started), and which provider's tracker to keep polling for the
+  // live "resets in" countdown shown next to "Ready for review".
+  const [importPointsUsed, setImportPointsUsed] = useState<number | null>(null);
+  const [loadedSource, setLoadedSource] = useState<"wcl" | "ffl" | null>(null);
+  const [liveRateLimit, setLiveRateLimit] = useState<RateLimitStatus | null>(null);
+
+  // Poll the relevant provider's tracker once a report is loaded so the
+  // "resets in Xm Ys" readout counts down in real time rather than freezing
+  // at whatever it read the moment the import finished. This is a local
+  // recomputation against the last-seen snapshot (see lib/rate-limit.ts) —
+  // it does NOT make a network request every second.
+  useEffect(() => {
+    if (!loadedSource) return;
+
+    const getStatus = loadedSource === "wcl" ? getWCLRateLimitStatus : getFFLRateLimitStatus;
+    const initial = getStatus();
+    // TEMP DIAGNOSTIC — remove once the missing-display issue is confirmed fixed.
+    console.log("[rate-limit debug] polling effect (re)started for", loadedSource, "initial status:", initial);
+    setLiveRateLimit(initial);
+
+    const interval = setInterval(() => setLiveRateLimit(getStatus()), 1000);
+    return () => clearInterval(interval);
+  }, [loadedSource]);
 
   // ── Session save/load ──────────────────────────────────────────────────────
   //
@@ -327,6 +356,13 @@ export default function Home() {
   // ── WarcraftLogs import ────────────────────────────────────────────────────
 
   async function handleImportWCL(reportCode: string) {
+    // Baseline "points spent this hour" BEFORE this import does anything —
+    // used to compute how many points THIS import specifically cost (see
+    // the diff against endStatus below). Read before fetchReport so a
+    // fresh session (never seen a response yet) baselines at 0 rather than
+    // missing data entirely.
+    const startStatus = getWCLRateLimitStatus();
+
     const report = await fetchReport(reportCode);
 
     // Extra safety net beyond killType: Encounters — drop any fight with a
@@ -369,14 +405,31 @@ export default function Home() {
     setPulls(newPulls);
     setSelectedPullId(null);
     setLoadedReportCode(report.code);
+    setLoadedSource("wcl");
     setImportStatus(`Log Loaded: ${report.code}`);
     setImportProgress(100);
+
+    const endStatus = getWCLRateLimitStatus();
+    // TEMP DIAGNOSTIC — remove once the missing-display issue is confirmed fixed.
+    console.log("[rate-limit debug] WCL import finished — startStatus:", startStatus, "endStatus:", endStatus);
+    if (endStatus) {
+      const spent = startStatus
+        ? Math.max(0, endStatus.pointsSpentThisHour - startStatus.pointsSpentThisHour)
+        : endStatus.pointsSpentThisHour;
+      setImportPointsUsed(spent);
+    }
+
     persistSession();
   }
 
   // ── FFLogs import ──────────────────────────────────────────────────────────
 
   async function handleImportFFL(reportCode: string) {
+    // Baseline "points spent this hour" BEFORE this import does anything —
+    // used to compute how many points THIS import specifically cost (see
+    // the diff against endStatus below).
+    const startStatus = getFFLRateLimitStatus();
+
     const report = await fetchFFReport(reportCode);
 
     const validFights = report.fights.filter(f => f.endTime > f.startTime);
@@ -415,8 +468,20 @@ export default function Home() {
     setPulls(newPulls);
     setSelectedPullId(null);
     setLoadedReportCode(report.code);
+    setLoadedSource("ffl");
     setImportStatus(`Log Loaded: ${report.code}`);
     setImportProgress(100);
+
+    const endStatus = getFFLRateLimitStatus();
+    // TEMP DIAGNOSTIC — remove once the missing-display issue is confirmed fixed.
+    console.log("[rate-limit debug] FFL import finished — startStatus:", startStatus, "endStatus:", endStatus);
+    if (endStatus) {
+      const spent = startStatus
+        ? Math.max(0, endStatus.pointsSpentThisHour - startStatus.pointsSpentThisHour)
+        : endStatus.pointsSpentThisHour;
+      setImportPointsUsed(spent);
+    }
+
     persistSession();
   }
 
@@ -450,6 +515,10 @@ export default function Home() {
     setImportProgress(0);
     setImportStatus("Fetching report information…");
     setSessionReportUrl(rawInput);
+    // Clear the previous import's rate-limit readout so stale numbers can't
+    // briefly show once this new import finishes and loadedReportCode is
+    // still momentarily set from the last one.
+    setImportPointsUsed(null);
 
     try {
       if (parsed.source === "wcl") {
@@ -581,6 +650,8 @@ export default function Home() {
           loadedReportCode={loadedReportCode}
           error={importError}
           onImport={handleImportReport}
+          importPointsUsed={importPointsUsed}
+          rateLimit={liveRateLimit}
         />
       </div>
 
@@ -787,6 +858,8 @@ function WCLImportBar({
   loadedReportCode,
   error,
   onImport,
+  importPointsUsed,
+  rateLimit,
 }: {
   value:            string;
   onChange:         (v: string) => void;
@@ -796,6 +869,12 @@ function WCLImportBar({
   loadedReportCode: string | null;
   error:            string | null;
   onImport:         (url: string) => void;
+  // Points spent specifically by the import that just completed, or null
+  // if unavailable (e.g. the provider never returned rateLimitData).
+  importPointsUsed?: number | null;
+  // Live-ticking snapshot of the provider's hourly points quota — see
+  // page.tsx's polling useEffect keyed on loadedSource.
+  rateLimit?:        RateLimitStatus | null;
 }) {
   function handleSubmit() {
     const trimmed = value.trim();
@@ -808,7 +887,7 @@ function WCLImportBar({
   // maintain/support.
   if (loadedReportCode && !importing) {
     return (
-      <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: 1 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: 1, flexWrap: "wrap", rowGap: "4px" }}>
         <span
           style={{
             padding:         "6px 12px",
@@ -822,6 +901,19 @@ function WCLImportBar({
           Log Loaded: {loadedReportCode}
         </span>
         <span style={{ fontSize: "11px", color: "#94a3b8" }}>Ready for review</span>
+
+        {rateLimit && (
+          <span
+            title="API points used to import this log, total points used this hour, and when the hourly quota resets"
+            style={{ fontSize: "11px", color: "#666", whiteSpace: "nowrap" }}
+          >
+            · {importPointsUsed !== null && importPointsUsed !== undefined && (
+              <>{importPointsUsed.toLocaleString()} pts this import · </>
+            )}
+            {rateLimit.pointsSpentThisHour.toLocaleString()}/{rateLimit.limitPerHour.toLocaleString()} this hour
+            · resets in {formatWaitTime(rateLimit.secondsUntilReset)}
+          </span>
+        )}
       </div>
     );
   }

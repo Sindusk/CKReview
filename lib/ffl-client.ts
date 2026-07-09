@@ -8,41 +8,104 @@
 // pagination pattern (nextPageTimestamp) and hostilityType argument apply.
 
 import { getFFAccessToken } from "./log-auth";
+import {
+  RateLimitTracker,
+  buildRateLimitErrorMessage,
+  backoffDelayMs,
+  sleep,
+  SHORT_RETRY_CEILING_SECONDS,
+  type RateLimitStatus,
+} from "./rate-limit";
 
 const GQL_ENDPOINT = "https://www.fflogs.com/api/v2/user";
 
+// ─── Rate limit tracking ────────────────────────────────────────────────────
+//
+// See lib/rate-limit.ts for the full explanation of why there are two
+// different kinds of 429 here (Cloudflare request-rate limiting vs the
+// GraphQL API's own hourly points quota) and why they need different
+// handling. This tracker remembers the most recent successful response's
+// rateLimitData so a persisted 429 can report an accurate reset estimate
+// instead of just "try again later".
+
+const rateLimitTracker = new RateLimitTracker();
+
+/** Best-known current FFLogs rate-limit status, or null if never observed. */
+export function getFFLRateLimitStatus(): RateLimitStatus | null {
+  return rateLimitTracker.status();
+}
+
 // ─── Generic GraphQL runner ───────────────────────────────────────────────────
+
+const MAX_RETRIES = 5;
 
 async function gql<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
   const token = await getFFAccessToken();
 
-  const res = await fetch(GQL_ENDPOINT, {
-    method:  "POST",
-    headers: {
-      "Content-Type":  "application/json",
-      "Authorization": `Bearer ${token}`,
-    },
-    body: JSON.stringify({ query, variables }),
-  });
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const res = await fetch(GQL_ENDPOINT, {
+      method:  "POST",
+      headers: {
+        "Content-Type":  "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+      body: JSON.stringify({ query, variables }),
+    });
 
-  if (!res.ok) {
-    throw new Error(`FFLogs request failed (${res.status}): ${await res.text()}`);
+    if (res.status === 429) {
+      // If a recent successful response already told us the hourly quota
+      // is exhausted and the reset is more than a minute out, this 429
+      // isn't a short burst — retrying for ~30s cannot fix it. Fail fast
+      // with an accurate estimate instead of wasting the retry budget.
+      const status = rateLimitTracker.status();
+      if (rateLimitTracker.isQuotaExhausted() && status && status.secondsUntilReset > SHORT_RETRY_CEILING_SECONDS) {
+        throw new Error(buildRateLimitErrorMessage("FFLogs", status));
+      }
+
+      if (attempt === MAX_RETRIES) {
+        throw new Error(buildRateLimitErrorMessage("FFLogs", rateLimitTracker.status()));
+      }
+
+      // Cloudflare's 429 challenge page doesn't reliably send a
+      // Retry-After header, so fall back to exponential backoff + jitter
+      // when it's absent.
+      const retryAfterHeader = res.headers.get("retry-after");
+      const waitMs = retryAfterHeader ? Number(retryAfterHeader) * 1000 : backoffDelayMs(attempt);
+
+      console.warn(
+        `[FFL] 429 rate limited — retrying in ${Math.round(waitMs)}ms ` +
+        `(attempt ${attempt + 1}/${MAX_RETRIES})`
+      );
+
+      await sleep(waitMs);
+      continue;
+    }
+
+    if (!res.ok) {
+      throw new Error(`FFLogs request failed (${res.status}): ${await res.text()}`);
+    }
+
+    const json = await res.json();
+    rateLimitTracker.capture(json.data);
+
+    // Raw response dump — this is the single choke point every FFLogs query
+    // (report + all per-fight event fetches) passes through, so logging here
+    // captures everything. Useful for confirming field names/shapes directly
+    // from a live report instead of guessing from schema docs. Safe to
+    // comment out once you're done collecting sample data — it is verbose
+    // on large reports.
+    console.log("[FFL raw response]", { query, variables, json });
+
+    if (json.errors?.length) {
+      throw new Error(`FFLogs GraphQL error: ${json.errors[0].message}`);
+    }
+
+    return json.data as T;
   }
 
-  const json = await res.json();
-
-  // Raw response dump — this is the single choke point every FFLogs query
-  // (report + all 9 event fetches) passes through, so logging here captures
-  // everything. Useful for confirming field names/shapes directly from a
-  // live report instead of guessing from schema docs. Safe to comment out
-  // once you're done collecting sample data — it is verbose on large reports.
-  console.log("[FFL raw response]", { query, variables, json });
-
-  if (json.errors?.length) {
-    throw new Error(`FFLogs GraphQL error: ${json.errors[0].message}`);
-  }
-
-  return json.data as T;
+  // Unreachable — the loop above always returns or throws — but keeps
+  // TypeScript happy about a guaranteed return type.
+  throw new Error("FFLogs request failed: exhausted retry loop unexpectedly.");
 }
 
 // ─── Raw FFLogs types ─────────────────────────────────────────────────────────
@@ -239,6 +302,11 @@ export type FFLReport = {
 
 const REPORT_QUERY = /* graphql */`
   query GetFFReport($code: String!) {
+    rateLimitData {
+      limitPerHour
+      pointsSpentThisHour
+      pointsResetIn
+    }
     reportData {
       report(code: $code) {
         title
@@ -280,91 +348,129 @@ export async function fetchFFReport(reportCode: string): Promise<FFLReport> {
   return data.reportData.report;
 }
 
-// ─── Query: Events for a single fight ────────────────────────────────────────
+// ─── Query: ALL event types for a single fight, merged into one request ─────
 //
-// FFLogs uses the same pagination approach as WarcraftLogs:
-// pass nextPageTimestamp back as the next startTime — there is no `after`
-// arg.
+// Previously this was 9 separate HTTP requests per fight (Deaths,
+// CombatantInfo, Casts, DamageDone, DamageTaken, Healing, Debuffs, enemy
+// Casts, enemy Buffs), fired via Promise.all in fetchFFightData. On a large
+// report (many fights × up to 3 fights fetched concurrently, see
+// FIGHT_FETCH_CONCURRENCY in app/page.tsx) that's a big burst of HTTP
+// requests, which is what actually trips FFLogs' Cloudflare-level 429 —
+// that's a request-RATE limit, distinct from the GraphQL API's own hourly
+// points quota (see lib/rate-limit.ts).
 //
-// includeResources: true is set on all queries to maximise data richness.
+// GraphQL aliases let us ask for the same `events` field 9 times with
+// different arguments in a SINGLE request instead — each event type gets
+// its own alias and its own `$xStart` pagination cursor variable (since
+// different event types can have entirely different amounts of data and
+// therefore need to paginate independently, even though they share the
+// same $code/$fightIDs/$endTime).
 //
-// $hostilityType selects Friendlies vs Enemies. It's nullable/optional —
-// when the caller doesn't pass one, fetchAllFFEvents below simply omits the
-// variable from the request body, so the server falls back to its default
-// (Friendlies), matching every existing call's prior behavior. Only the new
-// enemy-side cast/buff fetches in fetchFFightData pass "Enemies" explicitly.
-const EVENTS_QUERY = /* graphql */`
-  query GetFFEvents(
-    $code:          String!
-    $fightIDs:      [Int]!
-    $startTime:     Float!
-    $endTime:       Float!
-    $type:          EventDataType!
-    $hostilityType: HostilityType
+// This also satisfies the "request only the specific fields you need"
+// guidance — every one of these 9 fields is actually consumed by
+// log-transforms.ts, so nothing extraneous is being pulled in per fight.
+const FIGHT_EVENTS_QUERY = /* graphql */`
+  query GetFFightEvents(
+    $code:               String!
+    $fightIDs:            [Int]!
+    $endTime:             Float!
+    $deathsStart:         Float!
+    $combatantInfoStart:  Float!
+    $castsStart:          Float!
+    $damageDoneStart:     Float!
+    $damageTakenStart:    Float!
+    $healingStart:        Float!
+    $debuffsStart:        Float!
+    $enemyCastsStart:     Float!
+    $enemyBuffsStart:     Float!
   ) {
+    rateLimitData {
+      limitPerHour
+      pointsSpentThisHour
+      pointsResetIn
+    }
     reportData {
       report(code: $code) {
-        events(
-          fightIDs:         $fightIDs
-          startTime:        $startTime
-          endTime:          $endTime
-          dataType:         $type
-          hostilityType:    $hostilityType
-          includeResources: true
-        ) {
-          data
-          nextPageTimestamp
-        }
+        deaths: events(
+          fightIDs: $fightIDs, startTime: $deathsStart, endTime: $endTime,
+          dataType: Deaths, includeResources: true
+        ) { data nextPageTimestamp }
+
+        combatantInfo: events(
+          fightIDs: $fightIDs, startTime: $combatantInfoStart, endTime: $endTime,
+          dataType: CombatantInfo, includeResources: true
+        ) { data nextPageTimestamp }
+
+        casts: events(
+          fightIDs: $fightIDs, startTime: $castsStart, endTime: $endTime,
+          dataType: Casts, includeResources: true
+        ) { data nextPageTimestamp }
+
+        damageDone: events(
+          fightIDs: $fightIDs, startTime: $damageDoneStart, endTime: $endTime,
+          dataType: DamageDone, includeResources: true
+        ) { data nextPageTimestamp }
+
+        damageTaken: events(
+          fightIDs: $fightIDs, startTime: $damageTakenStart, endTime: $endTime,
+          dataType: DamageTaken, includeResources: true
+        ) { data nextPageTimestamp }
+
+        healing: events(
+          fightIDs: $fightIDs, startTime: $healingStart, endTime: $endTime,
+          dataType: Healing, includeResources: true
+        ) { data nextPageTimestamp }
+
+        debuffs: events(
+          fightIDs: $fightIDs, startTime: $debuffsStart, endTime: $endTime,
+          dataType: Debuffs, includeResources: true
+        ) { data nextPageTimestamp }
+
+        enemyCasts: events(
+          fightIDs: $fightIDs, startTime: $enemyCastsStart, endTime: $endTime,
+          dataType: Casts, hostilityType: Enemies, includeResources: true
+        ) { data nextPageTimestamp }
+
+        enemyBuffs: events(
+          fightIDs: $fightIDs, startTime: $enemyBuffsStart, endTime: $endTime,
+          dataType: Buffs, hostilityType: Enemies, includeResources: true
+        ) { data nextPageTimestamp }
       }
     }
   }
 `;
 
-type EventsQueryResult = {
+type EventStream<T> = { data: T[]; nextPageTimestamp: number | null };
+
+type FightEventsQueryResult = {
   reportData: {
     report: {
-      events: {
-        data:              FFLEvent[];
-        nextPageTimestamp: number | null;
-      };
+      deaths:         EventStream<FFLDeathEvent>;
+      combatantInfo:  EventStream<FFLCombatantInfoEvent>;
+      casts:          EventStream<FFLCastEvent>;
+      damageDone:     EventStream<FFLDamageEvent>;
+      damageTaken:    EventStream<FFLDamageEvent>;
+      healing:        EventStream<FFLHealEvent>;
+      debuffs:        EventStream<FFLDebuffEvent>;
+      enemyCasts:     EventStream<FFLCastEvent>;
+      enemyBuffs:     EventStream<FFLBuffEvent>;
     };
   };
 };
 
-type HostilityType = "Friendlies" | "Enemies";
+// One entry per alias in FIGHT_EVENTS_QUERY above. Order doesn't matter,
+// it's just used to loop generically over every stream when paginating.
+const STREAM_KEYS = [
+  "deaths", "combatantInfo", "casts", "damageDone",
+  "damageTaken", "healing", "debuffs", "enemyCasts", "enemyBuffs",
+] as const;
 
-async function fetchAllFFEvents(
-  reportCode: string,
-  fightId:    number,
-  startTime:  number,
-  endTime:    number,
-  type:       "Deaths" | "Casts" | "CombatantInfo" | "DamageDone" | "DamageTaken" | "Healing" | "Debuffs" | "Buffs",
-  // Omitted entirely (not even sent as null) when not passed — see the
-  // comment on EVENTS_QUERY above for why that matters.
-  hostilityType?: HostilityType
-): Promise<FFLEvent[]> {
-  const allEvents: FFLEvent[] = [];
-  let pageStart = startTime;
+type StreamKey = typeof STREAM_KEYS[number];
 
-  while (true) {
-    const data = await gql<EventsQueryResult>(EVENTS_QUERY, {
-      code:      reportCode,
-      fightIDs:  [fightId],
-      startTime: pageStart,
-      endTime,
-      type,
-      hostilityType,
-    });
-
-    const page = data.reportData.report.events;
-    allEvents.push(...page.data);
-
-    if (!page.nextPageTimestamp || page.nextPageTimestamp >= endTime) break;
-    pageStart = page.nextPageTimestamp;
-  }
-
-  return allEvents;
-}
+// Safety valve — an unexpected/never-terminating pagination loop shouldn't
+// be able to hang an import forever. 200 pages per fight is already far
+// beyond anything a real fight should ever need.
+const MAX_PAGES_PER_FIGHT = 200;
 
 // ─── Public: fetch everything for a fight ────────────────────────────────────
 
@@ -378,57 +484,97 @@ export type FFLFightData = {
   damageTakenEvents: FFLDamageEvent[];
   healingEvents:     FFLHealEvent[];
   debuffEvents:      FFLDebuffEvent[];     // friendly-hostility debuffs (players) — unchanged behavior
-  enemyCastEvents:   FFLCastEvent[];       // NEW — hostilityType: Enemies, feeds "enemyCast" rules
-  enemyBuffEvents:   FFLBuffEvent[];       // NEW — hostilityType: Enemies, feeds "enemyBuffApplied" rules
+  enemyCastEvents:   FFLCastEvent[];       // hostilityType: Enemies, feeds "enemyCast" rules
+  enemyBuffEvents:   FFLBuffEvent[];       // hostilityType: Enemies, feeds "enemyBuffApplied" rules
 };
 
 /**
- * Fetches all event types for a single FF fight in parallel.
+ * Fetches all event types for a single FF fight — as ONE merged GraphQL
+ * request per page (see FIGHT_EVENTS_QUERY above), instead of the previous
+ * 9 parallel requests. Each of the 9 event streams paginates independently
+ * via its own cursor: once a stream's nextPageTimestamp comes back null (or
+ * >= the fight's endTime) it's "done" and its cursor is pinned to endTime,
+ * so subsequent merged requests cost it a cheap empty page instead of a
+ * whole separate HTTP round-trip. In the common case (no single event type
+ * needs more than one page) this whole function costs exactly ONE request.
+ *
  * Actors are passed in from report-level masterData to avoid re-fetching.
  * All data is fetched eagerly so downstream components read from memory only.
  */
-// 4) fetchFFightData — drop the duplicate "calculateddamage" preview
-//    entries FFLogs streams alongside the real "damage" event (#8, and
-//    fixes doubled damage-done/taken totals as a side effect):
 export async function fetchFFightData(
   reportCode: string,
   fight:      FFLFight,
   actors:     FFLActor[]
 ): Promise<FFLFightData> {
-  const [
-    rawDeaths, rawCombatantInfos, rawCasts,
-    rawDamageDone, rawDamageTaken, rawHealing, rawDebuffs,
-    rawEnemyCasts, rawEnemyBuffs,
-  ] = await Promise.all([
-    fetchAllFFEvents(reportCode, fight.id, fight.startTime, fight.endTime, "Deaths"),
-    fetchAllFFEvents(reportCode, fight.id, fight.startTime, fight.endTime, "CombatantInfo"),
-    fetchAllFFEvents(reportCode, fight.id, fight.startTime, fight.endTime, "Casts"),
-    fetchAllFFEvents(reportCode, fight.id, fight.startTime, fight.endTime, "DamageDone"),
-    fetchAllFFEvents(reportCode, fight.id, fight.startTime, fight.endTime, "DamageTaken"),
-    fetchAllFFEvents(reportCode, fight.id, fight.startTime, fight.endTime, "Healing"),
-    fetchAllFFEvents(reportCode, fight.id, fight.startTime, fight.endTime, "Debuffs"),
-    // NEW — enemy-hostility fetches for raid-wide error detection.
-    fetchAllFFEvents(reportCode, fight.id, fight.startTime, fight.endTime, "Casts", "Enemies"),
-    fetchAllFFEvents(reportCode, fight.id, fight.startTime, fight.endTime, "Buffs", "Enemies"),
-  ]);
+  const endTime = fight.endTime;
+
+  const cursors: Record<StreamKey, number> = {
+    deaths: fight.startTime, combatantInfo: fight.startTime, casts: fight.startTime,
+    damageDone: fight.startTime, damageTaken: fight.startTime, healing: fight.startTime,
+    debuffs: fight.startTime, enemyCasts: fight.startTime, enemyBuffs: fight.startTime,
+  };
+  const done: Record<StreamKey, boolean> = {
+    deaths: false, combatantInfo: false, casts: false, damageDone: false,
+    damageTaken: false, healing: false, debuffs: false, enemyCasts: false, enemyBuffs: false,
+  };
+  const collected: { [K in StreamKey]: FightEventsQueryResult["reportData"]["report"][K]["data"] } = {
+    deaths: [], combatantInfo: [], casts: [], damageDone: [],
+    damageTaken: [], healing: [], debuffs: [], enemyCasts: [], enemyBuffs: [],
+  };
+
+  let page = 0;
+  while (STREAM_KEYS.some((k) => !done[k]) && page < MAX_PAGES_PER_FIGHT) {
+    page += 1;
+
+    const data = await gql<FightEventsQueryResult>(FIGHT_EVENTS_QUERY, {
+      code:                reportCode,
+      fightIDs:            [fight.id],
+      endTime,
+      deathsStart:         cursors.deaths,
+      combatantInfoStart:  cursors.combatantInfo,
+      castsStart:          cursors.casts,
+      damageDoneStart:     cursors.damageDone,
+      damageTakenStart:    cursors.damageTaken,
+      healingStart:        cursors.healing,
+      debuffsStart:        cursors.debuffs,
+      enemyCastsStart:     cursors.enemyCasts,
+      enemyBuffsStart:     cursors.enemyBuffs,
+    });
+
+    const report = data.reportData.report;
+
+    for (const key of STREAM_KEYS) {
+      if (done[key]) continue; // already finished — ignore the (cheap, empty) page we still requested for it
+
+      const stream = report[key];
+      (collected[key] as unknown[]).push(...stream.data);
+
+      if (!stream.nextPageTimestamp || stream.nextPageTimestamp >= endTime) {
+        done[key] = true;
+        cursors[key] = endTime;
+      } else {
+        cursors[key] = stream.nextPageTimestamp;
+      }
+    }
+  }
 
   // See getFFDamageDone-Sample.json / getFFDamageTaken-Sample.json — FFLogs
   // emits a "calculateddamage" preview alongside the "damage" event that
   // actually lands. Only the latter carries the post-hit targetResources
   // snapshot; keeping both double-counts every hit.
-  const onlyLanded = (events: any[]) => events.filter((e) => e.type === "damage");
+  const onlyLanded = <T extends { type?: string }>(events: T[]) => events.filter((e) => e.type === "damage");
 
   return {
     fight,
     actors,
-    deathEvents:       rawDeaths                as FFLDeathEvent[],
-    combatantInfos:    rawCombatantInfos         as FFLCombatantInfoEvent[],
-    castEvents:        rawCasts                  as FFLCastEvent[],
-    damageDoneEvents:  onlyLanded(rawDamageDone)  as FFLDamageEvent[],
-    damageTakenEvents: onlyLanded(rawDamageTaken) as FFLDamageEvent[],
-    healingEvents:     rawHealing                as FFLHealEvent[],
-    debuffEvents:      rawDebuffs                as FFLDebuffEvent[],
-    enemyCastEvents:   rawEnemyCasts             as FFLCastEvent[],
-    enemyBuffEvents:   rawEnemyBuffs             as FFLBuffEvent[],
+    deathEvents:       collected.deaths,
+    combatantInfos:    collected.combatantInfo,
+    castEvents:        collected.casts,
+    damageDoneEvents:  onlyLanded(collected.damageDone),
+    damageTakenEvents: onlyLanded(collected.damageTaken),
+    healingEvents:     collected.healing,
+    debuffEvents:      collected.debuffs,
+    enemyCastEvents:   collected.enemyCasts,
+    enemyBuffEvents:   collected.enemyBuffs,
   };
 }
