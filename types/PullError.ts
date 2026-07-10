@@ -37,13 +37,21 @@ export type PullErrorRule = {
   name:        string;             // short display name
   description: string;             // explanation shown in the UI
 
-  trigger:     "damage" | "debuffApplied" | "enemyCast" | "enemyBuffApplied";
+  // "killingBlow" — fires when a player's death is credited to `abilityId`
+  // (DeathEvent.killingAbilityGameId). Unlike "damage", this isn't gated by
+  // whether the hit was survivable — it only matters if it was the actual
+  // killing blow.
+  trigger:     "damage" | "debuffApplied" | "enemyCast" | "enemyBuffApplied" | "killingBlow";
   abilityId:   number;             // ability id relevant to the trigger
 
   // ── "damage" trigger only ────────────────────────────────────────────────
   minEffectiveDamage?: number;     // event.amount must be STRICTLY greater than this
   requiredDebuffId?:   number;     // player must currently be carrying this debuff
   forbiddenDebuffId?:  number;     // player must NOT currently be carrying this debuff
+  // If true, periodic/DoT tick instances of this ability don't count toward
+  // the rule — only the initial (non-tick) hit does. Needed for abilities
+  // like Void Flames/Light Flames that hit once on impact and then tick.
+  excludeTicks?:       boolean;
 };
 
 // A concrete occurrence of a rule firing during a specific pull.

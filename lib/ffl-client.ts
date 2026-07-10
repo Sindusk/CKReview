@@ -226,6 +226,7 @@ export type FFLDamageEvent = {
   } | null;
   amount:        number;
   overkill?:     number;
+  tick?:         boolean;   // ← added — mirrors WCLDamageEvent.tick
   // FFLogs nests the post-hit health snapshot here, not as flat fields.
   targetResources?: { hitPoints?: number; maxHitPoints?: number };
   sourceResources?: { hitPoints?: number; maxHitPoints?: number };

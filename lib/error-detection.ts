@@ -9,6 +9,7 @@
 // friendly player. Nothing in here touches the network.
 
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
+import type { DeathEvent } from "@/types/DeathEvent";
 import type { PullError, PullErrorRule, EnemyEvent } from "@/types/PullError";
 import { ERROR_RULES } from "./error-rules";
 
@@ -39,7 +40,9 @@ function isDebuffActiveAt(
 // ─── Rule evaluation — player-attributable ─────────────────────────────────
 
 function evaluateDamageRule(rule: PullErrorRule, player: PlayerInfo): PullError[] {
-  const hits = player.damageTaken.filter((e) => e.abilityId === rule.abilityId);
+  const hits = player.damageTaken
+    .filter((e) => e.abilityId === rule.abilityId)
+    .filter((e) => !rule.excludeTicks || !e.isDoT);
   const results: PullError[] = [];
 
   for (const hit of hits) {
@@ -105,6 +108,27 @@ function evaluateDebuffAppliedRule(rule: PullErrorRule, player: PlayerInfo): Pul
   }));
 }
 
+// ─── Rule evaluation — killing blow (attributed to the player who died) ───
+
+function evaluateKillingBlowRule(rule: PullErrorRule, deathEvents: DeathEvent[]): PullError[] {
+  return deathEvents
+    .filter((d) => d.killingAbilityGameId === rule.abilityId)
+    .map((d) => ({
+      ruleId:      rule.id,
+      severity:    rule.severity,
+      name:        rule.name,
+      description: rule.description,
+      timestamp:   d.timestamp,
+      player:      d.player,
+      class:       d.class,
+      specId:      d.specId,
+      role:        d.role,
+      abilityId:   d.killingAbilityGameId,
+      abilityName: d.cause,
+      abilityIcon: d.causeIcon,
+    }));
+}
+
 // ─── Rule evaluation — raid-wide (NOT attributable to a single player) ─────
 //
 // Shared by both "enemyCast" and "enemyBuffApplied" — the input EnemyEvent[]
@@ -132,9 +156,10 @@ function evaluateEnemyEventRule(rule: PullErrorRule, events: EnemyEvent[]): Pull
 // ─── Public entry point ─────────────────────────────────────────────────────
 
 export function detectPullErrors(
-  players:    PlayerInfo[],
-  enemyCasts: EnemyEvent[] = [],
-  enemyBuffs: EnemyEvent[] = []
+  players:     PlayerInfo[],
+  deathEvents: DeathEvent[] = [],
+  enemyCasts:  EnemyEvent[] = [],
+  enemyBuffs:  EnemyEvent[] = []
 ): PullError[] {
   const errors: PullError[] = [];
 
@@ -153,6 +178,8 @@ export function detectPullErrors(
       errors.push(...evaluateEnemyEventRule(rule, enemyCasts));
     } else if (rule.trigger === "enemyBuffApplied") {
       errors.push(...evaluateEnemyEventRule(rule, enemyBuffs));
+    } else if (rule.trigger === "killingBlow") {
+      errors.push(...evaluateKillingBlowRule(rule, deathEvents));
     }
   }
 

@@ -242,6 +242,7 @@ function wclDamageTakenToPlayerEvent(
     healthAfter:  after,
     maxHealth:    event.maxHitPoints,
     overkill:     event.overkill,
+    isDoT:        event.tick === true,   // ← added
   };
 }
 
@@ -457,7 +458,7 @@ export function transformFightToPull(
   const enemyCastEvents = wclBuildEnemyCastEvents(data.enemyCastEvents ?? [], actorMap, abilityMap, fightStart);
   const enemyBuffEvents = wclBuildEnemyBuffEvents(data.enemyBuffEvents ?? [], actorMap, abilityMap, fightStart);
 
-  const errors = detectPullErrors(players, enemyCastEvents, enemyBuffEvents);
+  const errors = detectPullErrors(players, deathEvents, enemyCastEvents, enemyBuffEvents);
 
   const fightDurationMs = data.fight.endTime - data.fight.startTime;
   const startTimeSec    = Math.round(data.fight.startTime / 1000);
@@ -702,6 +703,7 @@ function fflDamageTakenToPlayerEvent(
     healthAfter:  after,
     maxHealth:    event.targetResources?.maxHitPoints ?? event.maxHitPoints,
     overkill:     event.overkill,
+    isDoT:        event.tick === true,   // ← added
   };
 }
 
@@ -914,7 +916,7 @@ export function transformFFightToPull(
   const enemyCastEvents = fflBuildEnemyCastEvents(data.enemyCastEvents ?? [], actorMap, abilityMap, fightStart);
   const enemyBuffEvents = fflBuildEnemyBuffEvents(data.enemyBuffEvents ?? [], actorMap, abilityMap, fightStart);
 
-  const errors = detectPullErrors(players, enemyCastEvents, enemyBuffEvents);
+  const errors = detectPullErrors(players, deathEvents, enemyCastEvents, enemyBuffEvents);
 
   const fightDurationMs = data.fight.endTime - data.fight.startTime;
   const startTimeSec    = Math.round(data.fight.startTime / 1000);

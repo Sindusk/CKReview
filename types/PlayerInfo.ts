@@ -24,7 +24,7 @@ export type PlayerEvent = {
   target?:       string;  // target actor name — Damage Done, Healing, Casts (blank = no target)
   source?:       string;  // damage source actor name — Damage Taken only
 
-  // Damage Done
+  // Damage Done / Damage Taken
   isDoT?:        boolean; // marks a periodic/tick damage instance (WCL only for now)
 
   // Damage Taken
