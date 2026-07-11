@@ -48,24 +48,28 @@
 // negative or positive, only get the display number wrong if it's ever
 // wrong at all.
 //
-// ── PHASE 2: WRONG-TOWER-POSITION DETECTION (see bottom of file) ────────────
+// ── PHASE 2: POSITIONING DETECTION (see bottom of file) ─────────────────────
 //
-// Beyond "did you soak at all", each tower's two soakers must hold two
-// DIFFERENT assignment debuffs (1005084/1005085/1005086 — the rotating
-// per-player mechanic assignments). Confirmed across all 64 clean tower
-// soaks in four real logs: every clean tower pairs two different debuffs,
-// and the one observed positioning wipe (two players swapping towers) shows
-// up as one tower with two 1005086 holders and the other with two 1005085
-// holders. Which of the two same-debuff holders is the one actually out of
-// position is attributed geometrically — see the Phase-2 section below.
+// Beyond "did you soak at all", two positioning rules are enforced,
+// confirmed across every clean tower soak in five real logs (80 of them):
+// (1) each tower's two soakers must hold two DIFFERENT assignment debuffs
+// (1005084/1005085/1005086 — the rotating per-player mechanic
+// assignments), and (2) each soaker must stand at the specific SPOT their
+// debuff owns at that tower, because their follow-up aoe is planted at
+// their exact soak position. Both observed failing for real exactly once:
+// a two-player tower swap (same-debuff pairs on both towers), and a
+// 1005086 holder soaking too far in so their proximity cone latched onto
+// the wrong bait and cleaved half the raid. See the Phase-2 section below
+// for the full geometry model and attribution rules.
 //
 // ── WHAT THIS DOES NOT DO YET ───────────────────────────────────────────────
 //
-// It does not verify the follow-up bait placements (47808/47809/47810 —
-// the stack/single aoes planted at each soaker's position and detonated at
-// the next resolution), or whether those aoes hit the wrong number of
-// people. Those are downstream consequences of the tower errors already
-// detected here, so modeling them would mostly re-flag the same mistakes.
+// It does not directly verify where the follow-up aoes (47808/47809/47810
+// — the stack/single aoes planted at each soaker's position) actually
+// land, or whether they hit the wrong number of people. Those are
+// downstream consequences of the tower errors already detected here at
+// their root cause, so modeling them would mostly re-flag the same
+// mistakes.
 
 import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { PullError } from "@/types/PullError";
@@ -464,70 +468,181 @@ function detectOvercrowdedTowerErrors(
 }
 
 export const FORSAKEN_WRONG_POSITION_RULE_ID = "ffxiv-forsaken-wrong-tower-position";
+export const FORSAKEN_WRONG_SPOT_RULE_ID     = "ffxiv-forsaken-wrong-spot-in-tower";
 
-// ── Phase 2: wrong-tower-position detection ─────────────────────────────────
+// ── Phase 2: positioning detection (wrong tower / wrong spot in tower) ──────
 //
 // Every Forsaken resolution spawns TWO simultaneous towers (two separate
 // instances of the same NPC actor — telling them apart is exactly what the
 // sourceInstance field on Path of Light hits exists for), and each is
-// soaked by 2 of the resolving team's 4 players. The pairing rule,
-// confirmed against all 64 clean tower soaks across four real logs: the
-// two soakers of one tower must hold two DIFFERENT assignment debuffs
-// (1005084 / 1005085 / 1005086 — the rotating per-player mechanic
-// assignments; each soaker plants a follow-up aoe of their debuff's type
-// at their soak spot, and a tower resolved by a same-debuff pair plants
-// two copies of one aoe where the raid plan expects one of each — the
-// observed result being a raid wipe within seconds).
+// soaked by 2 of the resolving team's 4 players. Two rules, both confirmed
+// against every clean tower soak across five real logs (80 of them):
 //
-// A same-debuff pair means two players from opposite towers swapped — but
-// only ONE member of each broken tower is actually out of position (the
-// other is standing exactly where their own assignment belongs). Blaming
-// both would flag two innocent players, so attribution falls to geometry:
-// each debuff owns a fixed SPOT TYPE at its tower, measurable purely as
-// the soaker's distance from the arena center (10000,10000 in FFLogs'
-// centi-yalm units; all 8 tower spawn points sit on the r=800 ring):
+// (1) WRONG TOWER: the two soakers of one tower must hold two DIFFERENT
+//     assignment debuffs (1005084 / 1005085 / 1005086 — the rotating
+//     per-player mechanic assignments). A same-debuff pair means two
+//     players from opposite towers swapped — observed once for real, and
+//     the raid wiped within seconds.
 //
-//     debuff    paired with     spot                observed radius
-//     1005084   1005085         inner  (~r 485-530)
-//     1005084   1005086         on-tower (~r 620-740)
-//     1005085   anything        outer  (~r 1010-1150)   ← always outer
-//     1005086   1005085         inner  (~r 485-560)
-//     1005086   1005084         outer  (~r 1030-1090)
+// (2) WRONG SPOT: each soaker plants a follow-up aoe of their debuff's
+//     type at their exact soak position (fires ~0.6s later — e.g. 47810,
+//     the proximity-baited cone, comes from the 1005086 holder's spot), so
+//     even in a correctly-paired tower each debuff owns a fixed SPOT at
+//     that tower. Standing at the wrong spot misplaces the planted aoe:
+//     observed once for real — a 1005086 holder soaked ~150 units from the
+//     tower instead of ~250 beyond it, their proximity cone latched onto
+//     the on-tower partner instead of the designated far bait, cleaved
+//     five players and wiped the raid.
 //
-// The radius bands below split those clusters at their widest gaps. In a
-// same-debuff tower, the soaker standing at their debuff's own spot type
-// is innocent; the other one went to the wrong tower and gets the error.
-// (Validated: the known positioning wipe resolves to exactly the two
-// players confirmed to have swapped, and no clean log produces any flag.)
-// If the geometry is too ambiguous to single one out — both or neither at
-// the expected spot, or the intended partner debuff unknowable — every
-// member of the same-debuff pair is flagged rather than guessing.
+// The spot geometry (FFLogs centi-yalm units; arena center 10000,10000;
+// all 8 tower spawn points sit on the r=800 ring at 45° spacing and are
+// identical across every log seen):
+//
+//     debuff    paired with   spot       dist to tower   dist to center
+//     1005084   1005085       inner      ~280-359        ~449-586
+//     1005084   1005086       on-tower   ~90-201         ~603-740
+//     1005085   anything      outer      ~264-369        ~1002-1150
+//     1005086   1005085       inner      ~339-386        ~485-560
+//     1005086   1005084       flare      ~204-298        ~1002-1120
+//
+// "inner" vs "outer" is which side of the r=800 tower ring the soaker
+// stands on. The "flare" spot (the 1005086 proximity-cone plant beyond an
+// on-tower anchor) needs a finer test than outer's side-of-ring: the
+// observed wrong-spot failure stood at r 944 from center — beyond the
+// ring, but not far enough for the cone to reach its designated far bait —
+// while legitimate flares run r 1002+ and, critically, always stand
+// FARTHER from the tower than their on-tower anchor partner (the failure
+// stood 147 to the anchor's 172; the tightest clean flare stood 204 to its
+// anchor's 197). The tower's own position is recovered by snapping the
+// soakers' centroid to the nearest spawn point — clean pairs snap within
+// ~110 units while neighboring spawn points are 612+ apart, so the snap
+// cannot realistically pick the wrong tower.
+//
+// Attribution for rule (1): only ONE member of each broken tower actually
+// swapped (the other stands exactly where their own assignment belongs),
+// so the soaker found at their debuff's own spot type is innocent and the
+// other gets the error. If the geometry is too ambiguous to single one
+// out — both or neither at the expected spot, the intended partner debuff
+// unknowable, or no usable tower snap — every member of the same-debuff
+// pair is flagged rather than guessing.
 
 const ASSIGNMENT_DEBUFF_IDS = new Set([1005084, 1005085, 1005086]);
 
 const ARENA_CENTER = 10000;
 
-type SpotType = "inner" | "on-tower" | "outer";
+// The 8 fixed tower spawn points: 4 diagonal + 4 cardinal, all on the
+// r=800 ring around arena center. Identical across every log observed.
+const TOWER_SPAWN_POINTS: ReadonlyArray<readonly [number, number]> = [
+  [9434, 9434], [10566, 9434], [9434, 10566], [10566, 10566],
+  [10000, 9200], [9200, 10000], [10800, 10000], [10000, 10800],
+];
 
-// Observed radii: inner tops out ~560, on-tower spans ~620-740, outer
-// starts ~1010 — the cutoffs sit in the middle of each gap.
-const INNER_MAX_RADIUS    = 590;
-const ON_TOWER_MAX_RADIUS = 900;
+// A clean pair's centroid lands within ~110 units of its spawn point (a
+// degraded 2-of-4 resolution was observed at 230); anything further means
+// the geometry is unusable, not that a 612+-distant neighbor was meant.
+const TOWER_SNAP_MAX_DIST = 400;
 
-function classifySpot(x: number, y: number): SpotType {
-  const radius = Math.hypot(x - ARENA_CENTER, y - ARENA_CENTER);
-  if (radius <= INNER_MAX_RADIUS)    return "inner";
-  if (radius <= ON_TOWER_MAX_RADIUS) return "on-tower";
-  return "outer";
+/** Recovers the tower's position from its two soakers' centroid, or undefined if nothing snaps. */
+function snapToTowerSpawn(soaks: TowerSoak[]): readonly [number, number] | undefined {
+  const cx = soaks.reduce((sum, s) => sum + s.x, 0) / soaks.length;
+  const cy = soaks.reduce((sum, s) => sum + s.y, 0) / soaks.length;
+
+  let best: readonly [number, number] | undefined;
+  let bestDist = Infinity;
+  for (const spawn of TOWER_SPAWN_POINTS) {
+    const dist = Math.hypot(cx - spawn[0], cy - spawn[1]);
+    if (dist < bestDist) {
+      bestDist = dist;
+      best = spawn;
+    }
+  }
+  return bestDist <= TOWER_SNAP_MAX_DIST ? best : undefined;
 }
+
+type SpotType = "inner" | "on-tower" | "outer" | "flare";
+
+// On-tower anchors stand within ~201 of the tower; every legitimate
+// standing-off spot begins at 204.
+const ON_TOWER_MAX_DIST = 210;
+
+// A flare (1005086 cone plant beyond an on-tower anchor) is legitimate at
+// r 1002+ from center; the observed too-shallow failure sat at 944.
+const FLARE_MIN_CENTER_DIST = 975;
 
 /** The spot type a debuff's holder should occupy, given their partner's debuff (see table above). */
 function expectedSpotFor(debuffId: number, partnerDebuffId: number | undefined): SpotType | undefined {
   if (debuffId === 1005085) return "outer";   // outer regardless of partner
   if (partnerDebuffId === undefined) return undefined;
   if (debuffId === 1005084) return partnerDebuffId === 1005085 ? "inner" : "on-tower";
-  if (debuffId === 1005086) return partnerDebuffId === 1005085 ? "inner" : "outer";
+  if (debuffId === 1005086) return partnerDebuffId === 1005085 ? "inner" : "flare";
   return undefined;
+}
+
+/**
+ * Whether a soaker is standing at the given spot type. The flare test is
+ * the only one that needs the partner: a flare that hugs the r=975 line is
+ * still fine as long as it sits beyond its on-tower anchor (see the
+ * geometry comment above), so it fails only when BOTH signals say "too far
+ * in" — shallower than every clean flare AND closer to the tower than the
+ * anchor.
+ */
+function isAtSpot(
+  soak:    TowerSoak,
+  spot:    SpotType,
+  tower:   readonly [number, number],
+  partner: TowerSoak | undefined
+): boolean {
+  const distToTower  = Math.hypot(soak.x - tower[0], soak.y - tower[1]);
+  const distToCenter = Math.hypot(soak.x - ARENA_CENTER, soak.y - ARENA_CENTER);
+
+  switch (spot) {
+    case "on-tower": return distToTower <= ON_TOWER_MAX_DIST;
+    case "inner":    return distToCenter < 800;
+    case "outer":    return distToCenter >= 800;
+    case "flare": {
+      if (distToCenter < 800) return false;
+      if (distToCenter >= FLARE_MIN_CENTER_DIST) return true;
+      const partnerDistToTower =
+        partner !== undefined ? Math.hypot(partner.x - tower[0], partner.y - tower[1]) : undefined;
+      return partnerDistToTower !== undefined && distToTower >= partnerDistToTower;
+    }
+  }
+}
+
+/** Human phrasing of where a soaker actually stood, for error descriptions. */
+function describeStanding(soak: TowerSoak, tower: readonly [number, number]): string {
+  if (Math.hypot(soak.x - tower[0], soak.y - tower[1]) <= ON_TOWER_MAX_DIST) return "directly on the tower";
+  return Math.hypot(soak.x - ARENA_CENTER, soak.y - ARENA_CENTER) < 800
+    ? "off the tower toward the arena center"
+    : "off the tower away from the arena center";
+}
+
+const SPOT_PHRASES: Record<SpotType, string> = {
+  "on-tower": "directly on the tower",
+  "inner":    "off the tower toward the arena center",
+  "outer":    "off the tower away from the arena center",
+  "flare":    "well beyond the tower away from the arena center",
+};
+
+// Ideal standing point per spot type, expressed as an offset along the
+// tower's outward ray (negative = toward arena center), taken from the
+// middle of each observed clean band. Only used for ATTRIBUTION — deciding
+// which of several structurally-interchangeable players is the one out of
+// position — never for flagging directly, so its precision is uncritical.
+const SPOT_IDEAL_OFFSET: Record<SpotType, number> = {
+  "on-tower": -150,
+  "inner":    -350,
+  "outer":    +320,
+  "flare":    +260,
+};
+
+/** Distance from a soaker to the ideal point of a spot type at the given tower. */
+function distToIdealSpot(soak: TowerSoak, spot: SpotType, tower: readonly [number, number]): number {
+  const ringDist = Math.hypot(tower[0] - ARENA_CENTER, tower[1] - ARENA_CENTER);
+  const outX = (tower[0] - ARENA_CENTER) / ringDist;
+  const outY = (tower[1] - ARENA_CENTER) / ringDist;
+  const offset = SPOT_IDEAL_OFFSET[spot];
+  return Math.hypot(soak.x - (tower[0] + outX * offset), soak.y - (tower[1] + outY * offset));
 }
 
 type AssignmentInterval = { abilityId: number; abilityName: string; start: number; end: number };
@@ -653,64 +768,208 @@ function detectWrongTowerPositionErrors(
       towers.set(soak.towerInstance, group);
     }
 
-    // Resolve each 2-person tower to its pair of held assignment debuffs.
-    // Other group sizes are missed-soak / overcrowding territory — already
-    // covered by the Phase-1 rules above, so they're skipped here.
-    type TowerPair = { soaks: TowerSoak[]; assignments: AssignmentInterval[] };
-    const pairs: TowerPair[] = [];
-    for (const group of towers.values()) {
-      if (group.length !== 2) continue;
+    // Resolve each tower group to its soakers' held assignment debuffs and
+    // its snapped tower position. 2-person groups are the normal case;
+    // the 3+1 split (one player joined the wrong tower, leaving their
+    // partner to soak alone) is untangled below; anything else is
+    // missed-soak / overcrowding territory — already covered by the
+    // Phase-1 rules above.
+    type TowerGroup = {
+      soaks:       TowerSoak[];
+      assignments: AssignmentInterval[];
+      tower:       readonly [number, number] | undefined;
+    };
+    const buildGroup = (group: TowerSoak[]): TowerGroup | undefined => {
       const assignments = group.map((s) =>
         assignmentAt(intervalsByPlayer.get(s.player.actorId) ?? [], assignmentQueryTime)
       );
-      if (assignments[0] === undefined || assignments[1] === undefined) continue;
-      pairs.push({ soaks: group, assignments: assignments as AssignmentInterval[] });
+      if (assignments.some((a) => a === undefined)) return undefined;
+      return {
+        soaks:       group,
+        assignments: assignments as AssignmentInterval[],
+        tower:       snapToTowerSpawn(group),
+      };
+    };
+
+    const pairs: TowerGroup[] = [];
+    for (const group of towers.values()) {
+      if (group.length !== 2) continue;
+      const built = buildGroup(group);
+      if (built) pairs.push(built);
+    }
+
+    const reportTimestamp = consensusTimestamp ?? clusterTime;
+    const towerLabel = towerNumber !== undefined ? ` (tower #${towerNumber})` : "";
+
+    // ── The 3+1 split: one soaker joined the wrong tower ──────────────────
+    //
+    // Observed for real: three players stacked into one tower while the
+    // fourth soaked the other alone (standing, tellingly, at the spot the
+    // missing partner's debuff owns). The intruder is identified in two
+    // steps: structurally, moving them to the lone tower must leave BOTH
+    // towers as valid different-debuff pairs; among structural candidates,
+    // geometry decides — the candidate standing farthest from their own
+    // debuff's ideal point at the crowded tower is the one who doesn't
+    // belong there (in the real case the two candidates measured 420 vs
+    // 209, with the legitimate one sitting square in the clean band).
+    const groupList = [...towers.values()];
+    if (groupList.length === 2 && groupList.some((g) => g.length === 3) && groupList.some((g) => g.length === 1)) {
+      const trio = buildGroup(groupList.find((g) => g.length === 3)!);
+      const lone = buildGroup(groupList.find((g) => g.length === 1)!);
+
+      if (trio && lone && trio.tower) {
+        const loneDebuff = lone.assignments[0];
+
+        // Structural candidates: removing them leaves the trio a valid
+        // pair, and they pair validly with the lone soaker.
+        const candidates = trio.soaks
+          .map((_, i) => i)
+          .filter((i) => {
+            const moved = trio.assignments[i];
+            if (moved.abilityId === loneDebuff.abilityId) return false;
+            const remaining = trio.assignments.filter((_, j) => j !== i);
+            return remaining[0].abilityId !== remaining[1].abilityId;
+          });
+
+        if (candidates.length > 0) {
+          // Geometric attribution: the candidate farthest from their own
+          // spot's ideal point is the intruder. If the runner-up is within
+          // 100 units of the same distance, the call is too close — flag
+          // every candidate rather than guess.
+          const distances = candidates.map((i) => {
+            const partnerDebuffId = trio.assignments.find((a, j) => j !== i && a.abilityId !== trio.assignments[i].abilityId)?.abilityId;
+            const spot = expectedSpotFor(trio.assignments[i].abilityId, partnerDebuffId);
+            return spot !== undefined ? distToIdealSpot(trio.soaks[i], spot, trio.tower!) : 0;
+          });
+          const maxDist = Math.max(...distances);
+          const intruders = candidates.filter(
+            (_, k) => distances[k] > maxDist - 100
+          );
+
+          for (const i of intruders) {
+            errors.push({
+              ruleId:      FORSAKEN_WRONG_POSITION_RULE_ID,
+              severity:    "Major",
+              name:        "Wrong Tower Position",
+              description: `Went to the wrong Forsaken tower${towerLabel}: joined a tower that already had its two soakers, leaving their intended partner to take a tower alone.`,
+              timestamp:   reportTimestamp,
+              player:      trio.soaks[i].player.name,
+              class:       trio.soaks[i].player.className,
+              specId:      trio.soaks[i].player.specId,
+              role:        trio.soaks[i].player.role,
+              abilityId:   trio.assignments[i].abilityId,
+              abilityName: trio.assignments[i].abilityName,
+            });
+          }
+
+          // With the intruder(s) known, the rest of the resolution can be
+          // spot-checked as if the towers had been paired properly: the
+          // trio minus a single unambiguous intruder is a normal pair, and
+          // the lone soaker's intended partner debuff is the intruder's.
+          if (intruders.length === 1) {
+            const remaining = trio.soaks.filter((_, j) => j !== intruders[0]);
+            const remainingBuilt = buildGroup(remaining);
+            if (remainingBuilt) pairs.push(remainingBuilt);
+
+            const intruderDebuffId = trio.assignments[intruders[0]].abilityId;
+            const expected = expectedSpotFor(loneDebuff.abilityId, intruderDebuffId);
+            if (expected !== undefined && lone.tower !== undefined &&
+                !isAtSpot(lone.soaks[0], expected, lone.tower, undefined)) {
+              errors.push({
+                ruleId:      FORSAKEN_WRONG_SPOT_RULE_ID,
+                severity:    "Major",
+                name:        "Wrong Spot In Tower",
+                description: `Soaked the right Forsaken tower${towerLabel} but stood at the wrong spot for their debuff — ${describeStanding(lone.soaks[0], lone.tower)} instead of ${SPOT_PHRASES[expected]} — misplacing the follow-up aoe planted at their position.`,
+                timestamp:   reportTimestamp,
+                player:      lone.soaks[0].player.name,
+                class:       lone.soaks[0].player.className,
+                specId:      lone.soaks[0].player.specId,
+                role:        lone.soaks[0].player.role,
+                abilityId:   loneDebuff.abilityId,
+                abilityName: loneDebuff.abilityName,
+              });
+            }
+          }
+        }
+      }
     }
 
     for (const pair of pairs) {
       const [a, b] = pair.assignments;
-      if (a.abilityId !== b.abilityId) continue;   // clean tower — two different debuffs
 
-      // Same-debuff pair: someone here swapped with the other tower. The
-      // intended partner debuff is only knowable when the resolution's
-      // other tower is ALSO a same-debuff pair (a straight two-player swap
-      // breaks both towers symmetrically — the observed real-log case).
-      const other = pairs.find((p) => p !== pair);
-      const otherIsSamePair =
-        other !== undefined && other.assignments[0].abilityId === other.assignments[1].abilityId;
-      const partnerDebuffId = otherIsSamePair ? other!.assignments[0].abilityId : undefined;
+      if (a.abilityId === b.abilityId) {
+        // Rule (1) — same-debuff pair: someone here swapped with the other
+        // tower. The intended partner debuff is only knowable when the
+        // resolution's other tower is ALSO a same-debuff pair (a straight
+        // two-player swap breaks both towers symmetrically — the observed
+        // real-log case).
+        const other = pairs.find((p) => p !== pair);
+        const otherIsSamePair =
+          other !== undefined && other.assignments[0].abilityId === other.assignments[1].abilityId;
+        const partnerDebuffId = otherIsSamePair ? other!.assignments[0].abilityId : undefined;
 
-      const expectedSpot = expectedSpotFor(a.abilityId, partnerDebuffId);
-      const atOwnSpot = pair.soaks.map(
-        (s) => expectedSpot !== undefined && classifySpot(s.x, s.y) === expectedSpot
-      );
+        const expectedSpot = expectedSpotFor(a.abilityId, partnerDebuffId);
+        const atOwnSpot = pair.soaks.map(
+          (s, i) =>
+            expectedSpot !== undefined &&
+            pair.tower !== undefined &&
+            isAtSpot(s, expectedSpot, pair.tower, pair.soaks[1 - i])
+        );
 
-      // Exactly one soaker standing at their own debuff's spot → the other
-      // one is the player who went to the wrong tower. Anything murkier →
-      // flag both rather than guess.
-      const culprits =
-        atOwnSpot[0] !== atOwnSpot[1]
-          ? [pair.soaks[atOwnSpot[0] ? 1 : 0]]
-          : pair.soaks;
+        // Exactly one soaker standing at their own debuff's spot → the
+        // other one is the player who went to the wrong tower. Anything
+        // murkier → flag both rather than guess.
+        const culprits =
+          atOwnSpot[0] !== atOwnSpot[1]
+            ? [pair.soaks[atOwnSpot[0] ? 1 : 0]]
+            : pair.soaks;
 
-      const reportTimestamp = consensusTimestamp ?? clusterTime;
-      const towerLabel = towerNumber !== undefined ? ` (tower #${towerNumber})` : "";
+        for (const soak of culprits) {
+          errors.push({
+            ruleId:      FORSAKEN_WRONG_POSITION_RULE_ID,
+            severity:    "Major",
+            name:        "Wrong Tower Position",
+            description: `Went to the wrong Forsaken tower${towerLabel}: both of its soakers held the same debuff, and this player was standing at the spot their swapped partner's debuff owns.`,
+            timestamp:   reportTimestamp,
+            player:      soak.player.name,
+            class:       soak.player.className,
+            specId:      soak.player.specId,
+            role:        soak.player.role,
+            abilityId:   a.abilityId,
+            abilityName: a.abilityName,
+          });
+        }
+        continue;
+      }
 
-      for (const soak of culprits) {
+      // Rule (2) — correctly-paired tower: verify each soaker stands at
+      // their own debuff's spot, since their follow-up aoe is planted at
+      // their exact soak position (a misplaced plant re-aims the aoe at
+      // the wrong bait — the observed case cleaved five players).
+      if (pair.tower === undefined) continue;
+
+      pair.soaks.forEach((soak, i) => {
+        const debuff   = pair.assignments[i];
+        const partner  = pair.assignments[1 - i];
+        const expected = expectedSpotFor(debuff.abilityId, partner.abilityId);
+        if (expected === undefined) return;
+
+        if (isAtSpot(soak, expected, pair.tower!, pair.soaks[1 - i])) return;
+
         errors.push({
-          ruleId:      FORSAKEN_WRONG_POSITION_RULE_ID,
+          ruleId:      FORSAKEN_WRONG_SPOT_RULE_ID,
           severity:    "Major",
-          name:        "Wrong Tower Position",
-          description: `Went to the wrong Forsaken tower${towerLabel}: both of its soakers held the same debuff, and this player was standing at the spot their swapped partner's debuff owns.`,
+          name:        "Wrong Spot In Tower",
+          description: `Soaked the right Forsaken tower${towerLabel} but stood at the wrong spot for their debuff — ${describeStanding(soak, pair.tower!)} instead of ${SPOT_PHRASES[expected]} — misplacing the follow-up aoe planted at their position.`,
           timestamp:   reportTimestamp,
           player:      soak.player.name,
           class:       soak.player.className,
           specId:      soak.player.specId,
           role:        soak.player.role,
-          abilityId:   a.abilityId,
-          abilityName: a.abilityName,
+          abilityId:   debuff.abilityId,
+          abilityName: debuff.abilityName,
         });
-      }
+      });
     }
   }
 
