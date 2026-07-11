@@ -108,6 +108,39 @@ function hasPathOfLightNear(player: PlayerInfo, lossTimestamp: number): boolean 
   );
 }
 
+// ── Wipe-cleanup removals must not count as resolutions ────────────────────
+//
+// When a pull wipes mid-Forsaken, the encounter strips Spell's Trouble from
+// every player SIMULTANEOUSLY — both teams at once, including players whose
+// remaining towers never even spawned (observed on a real wipe: all 8
+// players' removals on the same millisecond, seconds after the last tower).
+//
+// This CANNOT be handled by discarding individual loss events that sit far
+// from any tower, because a genuine miss produces exactly such an event:
+// the player who skips their tower keeps their stack until that same
+// cleanup instant (observed on a real log — all three legitimate missed-
+// tower losses WERE the cleanup removals). What tells the two situations
+// apart is the team's CONSENSUS slot, not the individual loss:
+//
+//   • A consensus timestamp with Path of Light landing on somebody near it
+//     is a tower that really resolved — teammates' losses anchor it, and a
+//     player carried to cleanup against that slot genuinely missed.
+//   • A consensus timestamp with no Path of Light anywhere near it is a
+//     phantom slot made entirely of cleanup removals (the tower never
+//     spawned) — nobody can miss a tower that never existed.
+//
+// So phantom slots are dropped wholesale after consensus-building, and the
+// per-player check below additionally accepts a Path of Light hit at the
+// team's consensus moment: a player whose own stack decrement was delayed —
+// or outright swallowed by an intruding extra player at an overcrowded
+// tower (observed: the game decremented the intruder instead) — still
+// demonstrably stood in the tower when it resolved.
+function isNearAnyPathOfLight(allPathOfLightTimestamps: number[], timestamp: number): boolean {
+  return allPathOfLightTimestamps.some(
+    (t) => Math.abs(t - timestamp) <= PATH_OF_LIGHT_WINDOW_MS
+  );
+}
+
 // ── Expected resolution timestamp (for accurate error timing) ──────────────
 //
 // A player who misses a tower doesn't necessarily get their own 1005083
@@ -250,6 +283,15 @@ function buildTowerLabelsByPlayer(
  * encounter-name check, so it's safe to always call regardless of fight.
  */
 export function detectForsakenTowerErrors(players: PlayerInfo[]): PullError[] {
+  // Every Path of Light hit on ANYONE — the reference for which stack-loss
+  // instants correspond to a tower that actually resolved (see the
+  // wipe-cleanup comment above isNearAnyPathOfLight).
+  const allPathOfLightTimestamps = players.flatMap((p) =>
+    p.damageTaken
+      .filter((e) => e.abilityId === PATH_OF_LIGHT_ABILITY_ID)
+      .map((e) => e.timestamp)
+  );
+
   const lossesByPlayer = new Map<number, number[]>();
 
   for (const player of players) {
@@ -265,6 +307,16 @@ export function detectForsakenTowerErrors(players: PlayerInfo[]): PullError[] {
   const labelsByPlayer = buildTowerLabelsByPlayer(lossesByPlayer, teamByPlayer);
   const expectedTimestamps = buildExpectedTimestamps(lossesByPlayer, teamByPlayer);
 
+  // Drop phantom slots — consensus instants where no tower actually fired
+  // (see the wipe-cleanup comment above isNearAnyPathOfLight). Downstream
+  // consumers (missed-tower, extra-player, wrong-position) all anchor on
+  // this map, so pruning here keeps every rule blind to cleanup artifacts.
+  for (const [key, consensus] of expectedTimestamps) {
+    if (!isNearAnyPathOfLight(allPathOfLightTimestamps, consensus)) {
+      expectedTimestamps.delete(key);
+    }
+  }
+
   const errors: PullError[] = [];
 
   for (const player of players) {
@@ -275,21 +327,39 @@ export function detectForsakenTowerErrors(players: PlayerInfo[]): PullError[] {
     const labels = labelsByPlayer.get(player.actorId) ?? [];
 
     losses.forEach((lossTimestamp, i) => {
-      // Pass/fail is always checked against the player's OWN timestamp —
+      // Pass/fail is first checked against the player's OWN timestamp —
       // that's what tells "resolved late but for real" apart from "never
       // resolved at all" (see module comment above).
       if (hasPathOfLightNear(player, lossTimestamp)) return;
 
-      // But the REPORTED time is the consensus moment the tower actually
+      const consensusTimestamp = team ? expectedTimestamps.get(`${team}-${i}`) : undefined;
+
+      // No surviving consensus for this slot, and the player's own loss
+      // sits nowhere near any tower either → this "loss" is a wipe-cleanup
+      // removal for a tower that never spawned (the slot was pruned as a
+      // phantom above). Not a miss — the pull just ended first.
+      if (
+        consensusTimestamp === undefined &&
+        !isNearAnyPathOfLight(allPathOfLightTimestamps, lossTimestamp)
+      ) {
+        return;
+      }
+
+      // A Path of Light hit at the TEAM's consensus moment also counts as
+      // having soaked: a player's own decrement can be delayed — or, at an
+      // overcrowded tower, swallowed entirely by the intruding extra
+      // player (the game hands them the decrement) — while the hit itself
+      // proves the player stood in the tower when it resolved.
+      if (consensusTimestamp !== undefined && hasPathOfLightNear(player, consensusTimestamp)) return;
+
+      // The REPORTED time is the consensus moment the tower actually
       // resolved for the team, not whenever this player's own debuff
       // eventually caught up — a real miss should show up when it
       // happened, not whenever it was cleaned up after the fact. Falls
       // back to the player's own timestamp only if no teammate data
       // exists for this slot at all (e.g. every single player on the team
       // missed the same tower — no "on time" instant to anchor to).
-      const expectedTimestamp = team
-        ? expectedTimestamps.get(`${team}-${i}`) ?? lossTimestamp
-        : lossTimestamp;
+      const expectedTimestamp = consensusTimestamp ?? lossTimestamp;
 
       const towerNumber = labels[i];
       const towerLabel = towerNumber !== undefined ? ` (tower #${towerNumber})` : "";
