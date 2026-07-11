@@ -48,14 +48,24 @@
 // negative or positive, only get the display number wrong if it's ever
 // wrong at all.
 //
+// ── PHASE 2: WRONG-TOWER-POSITION DETECTION (see bottom of file) ────────────
+//
+// Beyond "did you soak at all", each tower's two soakers must hold two
+// DIFFERENT assignment debuffs (1005084/1005085/1005086 — the rotating
+// per-player mechanic assignments). Confirmed across all 64 clean tower
+// soaks in four real logs: every clean tower pairs two different debuffs,
+// and the one observed positioning wipe (two players swapping towers) shows
+// up as one tower with two 1005086 holders and the other with two 1005085
+// holders. Which of the two same-debuff holders is the one actually out of
+// position is attributed geometrically — see the Phase-2 section below.
+//
 // ── WHAT THIS DOES NOT DO YET ───────────────────────────────────────────────
 //
-// This is Phase 1: pass/fail detection only ("did you soak your tower at
-// all"). It does not check WHERE within the tower a player stood, which
-// specific debuff type (stack/cone/circle) they were assigned, or whether
-// a cone/circle mechanic hit the wrong number of people. That requires the
-// tower's real x/y, per-player positions, and the geometry model from the
-// raid-plan cheatsheet — a separate, later effort.
+// It does not verify the follow-up bait placements (47808/47809/47810 —
+// the stack/single aoes planted at each soaker's position and detonated at
+// the next resolution), or whether those aoes hit the wrong number of
+// people. Those are downstream consequences of the tower errors already
+// detected here, so modeling them would mostly re-flag the same mistakes.
 
 import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { PullError } from "@/types/PullError";
@@ -301,6 +311,7 @@ export function detectForsakenTowerErrors(players: PlayerInfo[]): PullError[] {
   }
 
   errors.push(...detectOvercrowdedTowerErrors(players, teamByPlayer, labelsByPlayer, expectedTimestamps));
+  errors.push(...detectWrongTowerPositionErrors(players, expectedTimestamps));
 
   return errors.sort((a, b) => a.timestamp - b.timestamp);
 }
@@ -376,6 +387,260 @@ function detectOvercrowdedTowerErrors(
         abilityId:   PATH_OF_LIGHT_ABILITY_ID,
         abilityName: "Path of Light",
       });
+    }
+  }
+
+  return errors;
+}
+
+export const FORSAKEN_WRONG_POSITION_RULE_ID = "ffxiv-forsaken-wrong-tower-position";
+
+// ── Phase 2: wrong-tower-position detection ─────────────────────────────────
+//
+// Every Forsaken resolution spawns TWO simultaneous towers (two separate
+// instances of the same NPC actor — telling them apart is exactly what the
+// sourceInstance field on Path of Light hits exists for), and each is
+// soaked by 2 of the resolving team's 4 players. The pairing rule,
+// confirmed against all 64 clean tower soaks across four real logs: the
+// two soakers of one tower must hold two DIFFERENT assignment debuffs
+// (1005084 / 1005085 / 1005086 — the rotating per-player mechanic
+// assignments; each soaker plants a follow-up aoe of their debuff's type
+// at their soak spot, and a tower resolved by a same-debuff pair plants
+// two copies of one aoe where the raid plan expects one of each — the
+// observed result being a raid wipe within seconds).
+//
+// A same-debuff pair means two players from opposite towers swapped — but
+// only ONE member of each broken tower is actually out of position (the
+// other is standing exactly where their own assignment belongs). Blaming
+// both would flag two innocent players, so attribution falls to geometry:
+// each debuff owns a fixed SPOT TYPE at its tower, measurable purely as
+// the soaker's distance from the arena center (10000,10000 in FFLogs'
+// centi-yalm units; all 8 tower spawn points sit on the r=800 ring):
+//
+//     debuff    paired with     spot                observed radius
+//     1005084   1005085         inner  (~r 485-530)
+//     1005084   1005086         on-tower (~r 620-740)
+//     1005085   anything        outer  (~r 1010-1150)   ← always outer
+//     1005086   1005085         inner  (~r 485-560)
+//     1005086   1005084         outer  (~r 1030-1090)
+//
+// The radius bands below split those clusters at their widest gaps. In a
+// same-debuff tower, the soaker standing at their debuff's own spot type
+// is innocent; the other one went to the wrong tower and gets the error.
+// (Validated: the known positioning wipe resolves to exactly the two
+// players confirmed to have swapped, and no clean log produces any flag.)
+// If the geometry is too ambiguous to single one out — both or neither at
+// the expected spot, or the intended partner debuff unknowable — every
+// member of the same-debuff pair is flagged rather than guessing.
+
+const ASSIGNMENT_DEBUFF_IDS = new Set([1005084, 1005085, 1005086]);
+
+const ARENA_CENTER = 10000;
+
+type SpotType = "inner" | "on-tower" | "outer";
+
+// Observed radii: inner tops out ~560, on-tower spans ~620-740, outer
+// starts ~1010 — the cutoffs sit in the middle of each gap.
+const INNER_MAX_RADIUS    = 590;
+const ON_TOWER_MAX_RADIUS = 900;
+
+function classifySpot(x: number, y: number): SpotType {
+  const radius = Math.hypot(x - ARENA_CENTER, y - ARENA_CENTER);
+  if (radius <= INNER_MAX_RADIUS)    return "inner";
+  if (radius <= ON_TOWER_MAX_RADIUS) return "on-tower";
+  return "outer";
+}
+
+/** The spot type a debuff's holder should occupy, given their partner's debuff (see table above). */
+function expectedSpotFor(debuffId: number, partnerDebuffId: number | undefined): SpotType | undefined {
+  if (debuffId === 1005085) return "outer";   // outer regardless of partner
+  if (partnerDebuffId === undefined) return undefined;
+  if (debuffId === 1005084) return partnerDebuffId === 1005085 ? "inner" : "on-tower";
+  if (debuffId === 1005086) return partnerDebuffId === 1005085 ? "inner" : "outer";
+  return undefined;
+}
+
+type AssignmentInterval = { abilityId: number; abilityName: string; start: number; end: number };
+
+/** Reconstructs which assignment debuff (1005084/85/86) a player held over time from their apply/remove events. */
+function collectAssignmentIntervals(player: PlayerInfo): AssignmentInterval[] {
+  const intervals: AssignmentInterval[] = [];
+  const openSince = new Map<number, { start: number; abilityName: string }>();
+
+  const events = [...player.debuffs]
+    .filter((d) => ASSIGNMENT_DEBUFF_IDS.has(d.abilityId))
+    .sort((a, b) => a.timestamp - b.timestamp);
+
+  for (const e of events) {
+    if (e.debuffStatus === "applied") {
+      openSince.set(e.abilityId, { start: e.timestamp, abilityName: e.abilityName });
+    } else if (e.debuffStatus === "removed") {
+      const open = openSince.get(e.abilityId);
+      intervals.push({
+        abilityId:   e.abilityId,
+        abilityName: open?.abilityName ?? e.abilityName,
+        start:       open?.start ?? 0,
+        end:         e.timestamp,
+      });
+      openSince.delete(e.abilityId);
+    }
+  }
+  for (const [abilityId, open] of openSince) {
+    intervals.push({ abilityId, abilityName: open.abilityName, start: open.start, end: Infinity });
+  }
+
+  return intervals;
+}
+
+function assignmentAt(intervals: AssignmentInterval[], timestamp: number): AssignmentInterval | undefined {
+  return intervals.find((iv) => iv.start <= timestamp && timestamp < iv.end);
+}
+
+type TowerSoak = {
+  player:        PlayerInfo;
+  timestamp:     number;
+  towerInstance: number;
+  x:             number;
+  y:             number;
+};
+
+// Path of Light hits within one resolution land within ~700ms of each other
+// (the "calculateddamage"/"damage" split); the same player's next
+// resolution is 10+ seconds away. Anything inside this gap is one
+// resolution moment.
+const RESOLUTION_CLUSTER_GAP_MS = 3000;
+
+function detectWrongTowerPositionErrors(
+  players:            PlayerInfo[],
+  expectedTimestamps: Map<string, number>
+): PullError[] {
+  // Every PoL hit that carries the tower instance and a position snapshot.
+  const soaks: TowerSoak[] = [];
+  for (const player of players) {
+    for (const e of player.damageTaken) {
+      if (e.abilityId !== PATH_OF_LIGHT_ABILITY_ID) continue;
+      if (e.sourceInstance === undefined || e.x === undefined || e.y === undefined) continue;
+      soaks.push({ player, timestamp: e.timestamp, towerInstance: e.sourceInstance, x: e.x, y: e.y });
+    }
+  }
+  if (soaks.length === 0) return [];
+
+  // Group into resolution moments, keeping only each player's FIRST hit per
+  // moment (the earliest event is the closest snapshot to the actual soak —
+  // a "damage" record landing ~700ms later may already show them moving away).
+  soaks.sort((a, b) => a.timestamp - b.timestamp);
+  const clusters: TowerSoak[][] = [];
+  for (const soak of soaks) {
+    const current = clusters[clusters.length - 1];
+    if (current && soak.timestamp - current[current.length - 1].timestamp <= RESOLUTION_CLUSTER_GAP_MS) {
+      current.push(soak);
+    } else {
+      clusters.push([soak]);
+    }
+  }
+
+  const intervalsByPlayer = new Map<number, AssignmentInterval[]>();
+  for (const player of players) {
+    intervalsByPlayer.set(player.actorId, collectAssignmentIntervals(player));
+  }
+
+  const errors: PullError[] = [];
+
+  for (const cluster of clusters) {
+    const clusterTime = cluster[0].timestamp;
+
+    // Match this resolution to its consensus (team, slot) stack-loss
+    // timestamp up front — it anchors BOTH the display label and, more
+    // importantly, the assignment-debuff lookup below.
+    let towerNumber: number | undefined;
+    let consensusTimestamp: number | undefined;
+    for (const [key, consensus] of expectedTimestamps) {
+      if (Math.abs(consensus - clusterTime) > PATH_OF_LIGHT_WINDOW_MS) continue;
+      const [team, slotIndexStr] = key.split("-") as ["first" | "second", string];
+      towerNumber = (team === "first" ? TOWER_ORDER_FIRST_TEAM : TOWER_ORDER_SECOND_TEAM)[Number(slotIndexStr)];
+      consensusTimestamp = consensus;
+      break;
+    }
+
+    // The assignment debuffs ROTATE at the stack-loss instant, ~580ms after
+    // the soak itself — and when a player's only surviving Path of Light
+    // record is the late-arriving "landed" tick (~670ms after the soak),
+    // its timestamp already sits PAST that rotation. Querying there returns
+    // the player's NEXT assignment and mislabels a clean tower as a
+    // same-debuff pair. So the lookup is pinned to just before the
+    // resolution's consensus stack-loss — the last instant the soak-time
+    // assignments were still in effect.
+    const assignmentQueryTime =
+      consensusTimestamp !== undefined ? Math.min(clusterTime, consensusTimestamp - 1) : clusterTime;
+
+    const towers = new Map<number, TowerSoak[]>();
+    const seenPlayers = new Set<number>();
+    for (const soak of cluster) {
+      if (seenPlayers.has(soak.player.actorId)) continue;
+      seenPlayers.add(soak.player.actorId);
+      const group = towers.get(soak.towerInstance) ?? [];
+      group.push(soak);
+      towers.set(soak.towerInstance, group);
+    }
+
+    // Resolve each 2-person tower to its pair of held assignment debuffs.
+    // Other group sizes are missed-soak / overcrowding territory — already
+    // covered by the Phase-1 rules above, so they're skipped here.
+    type TowerPair = { soaks: TowerSoak[]; assignments: AssignmentInterval[] };
+    const pairs: TowerPair[] = [];
+    for (const group of towers.values()) {
+      if (group.length !== 2) continue;
+      const assignments = group.map((s) =>
+        assignmentAt(intervalsByPlayer.get(s.player.actorId) ?? [], assignmentQueryTime)
+      );
+      if (assignments[0] === undefined || assignments[1] === undefined) continue;
+      pairs.push({ soaks: group, assignments: assignments as AssignmentInterval[] });
+    }
+
+    for (const pair of pairs) {
+      const [a, b] = pair.assignments;
+      if (a.abilityId !== b.abilityId) continue;   // clean tower — two different debuffs
+
+      // Same-debuff pair: someone here swapped with the other tower. The
+      // intended partner debuff is only knowable when the resolution's
+      // other tower is ALSO a same-debuff pair (a straight two-player swap
+      // breaks both towers symmetrically — the observed real-log case).
+      const other = pairs.find((p) => p !== pair);
+      const otherIsSamePair =
+        other !== undefined && other.assignments[0].abilityId === other.assignments[1].abilityId;
+      const partnerDebuffId = otherIsSamePair ? other!.assignments[0].abilityId : undefined;
+
+      const expectedSpot = expectedSpotFor(a.abilityId, partnerDebuffId);
+      const atOwnSpot = pair.soaks.map(
+        (s) => expectedSpot !== undefined && classifySpot(s.x, s.y) === expectedSpot
+      );
+
+      // Exactly one soaker standing at their own debuff's spot → the other
+      // one is the player who went to the wrong tower. Anything murkier →
+      // flag both rather than guess.
+      const culprits =
+        atOwnSpot[0] !== atOwnSpot[1]
+          ? [pair.soaks[atOwnSpot[0] ? 1 : 0]]
+          : pair.soaks;
+
+      const reportTimestamp = consensusTimestamp ?? clusterTime;
+      const towerLabel = towerNumber !== undefined ? ` (tower #${towerNumber})` : "";
+
+      for (const soak of culprits) {
+        errors.push({
+          ruleId:      FORSAKEN_WRONG_POSITION_RULE_ID,
+          severity:    "Major",
+          name:        "Wrong Tower Position",
+          description: `Went to the wrong Forsaken tower${towerLabel}: both of its soakers held the same debuff, and this player was standing at the spot their swapped partner's debuff owns.`,
+          timestamp:   reportTimestamp,
+          player:      soak.player.name,
+          class:       soak.player.className,
+          specId:      soak.player.specId,
+          role:        soak.player.role,
+          abilityId:   a.abilityId,
+          abilityName: a.abilityName,
+        });
+      }
     }
   }
 

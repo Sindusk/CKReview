@@ -223,6 +223,10 @@ export type FFLDamageEvent = {
   // filter in fetchFFightData below, which relies on both of these fields.
   type:          "damage" | "calculateddamage";
   sourceID:      number;
+  // Distinguishes multiple simultaneous copies of the same NPC actor —
+  // e.g. each Forsaken tower is a separate instance of one actor, and this
+  // is the only field that says WHICH tower dealt a given soak hit.
+  sourceInstance?: number;
   targetID:      number;
   abilityGameID: number;
   ability?: {
@@ -237,8 +241,10 @@ export type FFLDamageEvent = {
   unpaired?:     boolean;
   tick?:         boolean;   // ← added — mirrors WCLDamageEvent.tick
   // FFLogs nests the post-hit health snapshot here, not as flat fields.
-  targetResources?: { hitPoints?: number; maxHitPoints?: number };
-  sourceResources?: { hitPoints?: number; maxHitPoints?: number };
+  // x/y are the actor's position at the moment of the hit, in FFLogs'
+  // centi-yalm map units (arena center of the Forsaken room = 10000,10000).
+  targetResources?: { hitPoints?: number; maxHitPoints?: number; x?: number; y?: number };
+  sourceResources?: { hitPoints?: number; maxHitPoints?: number; x?: number; y?: number };
   // Kept as a fallback only — rarely populated on FFLogs "damage" events.
   hitPoints?:    number;
   maxHitPoints?: number;

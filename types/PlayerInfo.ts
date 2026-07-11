@@ -28,6 +28,13 @@ export type PlayerEvent = {
   isDoT?:        boolean; // marks a periodic/tick damage instance (WCL only for now)
 
   // Damage Taken
+  // FFXIV only — which instance of the source NPC dealt the hit (e.g. which
+  // of several simultaneous Forsaken towers), plus the victim's own x/y
+  // position snapshot at the moment of the hit (FFLogs centi-yalm units).
+  // Consumed by mechanics/forsaken.ts; not rendered in the UI.
+  sourceInstance?: number;
+  x?:            number;
+  y?:            number;
   healthBefore?: number;  // target's health immediately before this hit
   healthAfter?:  number;  // target's health immediately after this hit
   maxHealth?:    number;  // for context/formatting
