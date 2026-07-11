@@ -278,9 +278,10 @@ function CastRow({ event, playbackTimeMs, game }: RowProps) {
 // #9 — show whether the debuff was applied, refreshed, or removed instead
 // of just listing every raw application/removal with no context.
 const DEBUFF_STATUS_STYLE: Record<string, { label: string; color: string }> = {
-  applied: { label: "Applied", color: "#4ade80" },
-  stack:   { label: "Stack",   color: "#fbbf24" },
-  removed: { label: "Removed", color: "#f87171" },
+  applied:      { label: "Applied",     color: "#4ade80" },
+  stack:        { label: "Stack",       color: "#fbbf24" },
+  stackRemoved: { label: "Stack Lost",  color: "#fb923c" },
+  removed:      { label: "Removed",     color: "#f87171" },
 };
 
 function DebuffRow({ event, playbackTimeMs, game }: RowProps) {

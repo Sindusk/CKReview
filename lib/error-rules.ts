@@ -161,16 +161,6 @@ export const ERROR_RULES: PullErrorRule[] = [
   // These aren't any one player's fault, they represent the raid as a whole
   // failing a mechanic, and are severe enough to almost always cause a wipe.
 
-  {
-    id:          "ffxiv-raid-river-of-light",
-    game:        "ffxiv",
-    severity:    "Raid",
-    name:        "River of Light",
-    description: "A player took damage from River of Light — a Forsaken Tower was missed.",
-    trigger:     "damage",
-    abilityId:    47807,           // River of Light
-  },
-
   // -- Beloren --
 
   {

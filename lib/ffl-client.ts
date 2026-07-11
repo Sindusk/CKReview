@@ -215,7 +215,13 @@ export type FFLCastEvent = {
 // 3) Damage event shape (#8) — nested resources, not flat
 export type FFLDamageEvent = {
   timestamp:     number;
-  type:          "damage";
+  // "calculateddamage" is FFLogs' preview/prediction record for a hit,
+  // normally followed by a "damage" event once it actually lands — except
+  // when the hit is fully absorbed to 0 net damage, in which case NO
+  // "damage" follow-up ever arrives and the "calculateddamage" record
+  // (tagged `unpaired: true`) is the only trace of it. See the onlyLanded
+  // filter in fetchFFightData below, which relies on both of these fields.
+  type:          "damage" | "calculateddamage";
   sourceID:      number;
   targetID:      number;
   abilityGameID: number;
@@ -226,6 +232,9 @@ export type FFLDamageEvent = {
   } | null;
   amount:        number;
   overkill?:     number;
+  // Set on a "calculateddamage" event that never receives a matching
+  // "damage" event — see the `type` comment above.
+  unpaired?:     boolean;
   tick?:         boolean;   // ← added — mirrors WCLDamageEvent.tick
   // FFLogs nests the post-hit health snapshot here, not as flat fields.
   targetResources?: { hitPoints?: number; maxHitPoints?: number };
@@ -252,7 +261,7 @@ export type FFLHealEvent = {
 
 export type FFLDebuffEvent = {
   timestamp:     number;
-  type:          "applydebuff" | "removedebuff" | "applydebuffstack";
+  type:          "applydebuff" | "removedebuff" | "applydebuffstack" | "removedebuffstack";
   sourceID:      number;
   targetID:      number;
   abilityGameID: number;
@@ -563,7 +572,8 @@ export async function fetchFFightData(
   // emits a "calculateddamage" preview alongside the "damage" event that
   // actually lands. Only the latter carries the post-hit targetResources
   // snapshot; keeping both double-counts every hit.
-  const onlyLanded = <T extends { type?: string }>(events: T[]) => events.filter((e) => e.type === "damage");
+  const onlyLanded = <T extends { type?: string; unpaired?: boolean }>(events: T[]) =>
+    events.filter((e) => e.type === "damage" || (e.type === "calculateddamage" && e.unpaired === true));
 
   return {
     fight,

@@ -227,7 +227,10 @@ export type WCLHealEvent = {
 
 export type WCLDebuffEvent = {
   timestamp:     number;
-  type:          "applydebuff" | "removedebuff" | "applydebuffstack";
+  // "removedebuffstack" — a stack decrement that leaves the debuff still
+  // active with stacks remaining, distinct from "removedebuff" (full
+  // removal). See types/PlayerInfo.ts's "stackRemoved" status.
+  type:          "applydebuff" | "removedebuff" | "applydebuffstack" | "removedebuffstack";
   sourceID:      number;
   targetID:      number;
   abilityGameID: number;

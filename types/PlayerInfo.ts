@@ -36,7 +36,7 @@ export type PlayerEvent = {
   // Debuffs — carries which side of the on/off transition this event
   // represents, so error-detection.ts can reconstruct uptime windows
   // ("was this debuff active on the player at time T?").
-  debuffStatus?: "applied" | "removed" | "stack";
+  debuffStatus?: "applied" | "removed" | "stack" | "stackRemoved";
 };
 
 export type PlayerInfo = {

@@ -54,6 +54,7 @@ import { getSpecInfo, getRosterSortOrder }        from "./spec-data";
 import { getFFJobByName, getFFRosterSortOrder }   from "./ffl-job-data";
 import { detectPullErrors }                       from "./error-detection";
 import { getWCLAbilityIconUrl, getFFAbilityIconUrl } from "./ability-icons";
+import { detectForsakenTowerErrors } from "./mechanics/forsaken";
 
 // Shared shape for both games' ability maps: gameID -> name + raw icon
 // filename (not yet resolved to a URL — that happens per-game via
@@ -271,8 +272,9 @@ function wclDebuffToPlayerEvent(
 ): PlayerEvent {
   const source = actorMap.get(event.sourceID);
   const debuffStatus =
-    event.type === "removedebuff"      ? "removed" :
-    event.type === "applydebuffstack"  ? "stack"   :
+    event.type === "removedebuff"       ? "removed"      :
+    event.type === "applydebuffstack"   ? "stack"        :
+    event.type === "removedebuffstack"  ? "stackRemoved" :
     "applied";
 
   return {
@@ -732,8 +734,9 @@ function fflDebuffToPlayerEvent(
 ): PlayerEvent {
   const source = actorMap.get(event.sourceID);
   const debuffStatus =
-    event.type === "removedebuff"      ? "removed" :
-    event.type === "applydebuffstack"  ? "stack"   :
+    event.type === "removedebuff"       ? "removed"      :
+    event.type === "applydebuffstack"   ? "stack"        :
+    event.type === "removedebuffstack"  ? "stackRemoved" :
     "applied";
 
   return {
@@ -916,7 +919,10 @@ export function transformFFightToPull(
   const enemyCastEvents = fflBuildEnemyCastEvents(data.enemyCastEvents ?? [], actorMap, abilityMap, fightStart);
   const enemyBuffEvents = fflBuildEnemyBuffEvents(data.enemyBuffEvents ?? [], actorMap, abilityMap, fightStart);
 
-  const errors = detectPullErrors(players, deathEvents, enemyCastEvents, enemyBuffEvents);
+  const errors = [
+    ...detectPullErrors(players, deathEvents, enemyCastEvents, enemyBuffEvents),
+    ...detectForsakenTowerErrors(players),
+  ].sort((a, b) => a.timestamp - b.timestamp);
 
   const fightDurationMs = data.fight.endTime - data.fight.startTime;
   const startTimeSec    = Math.round(data.fight.startTime / 1000);
