@@ -478,32 +478,39 @@ export const FORSAKEN_WRONG_SPOT_RULE_ID     = "ffxiv-forsaken-wrong-spot-in-tow
 // soaked by 2 of the resolving team's 4 players. Two rules, both confirmed
 // against every clean tower soak across five real logs (80 of them):
 //
-// (1) WRONG TOWER: the two soakers of one tower must hold two DIFFERENT
-//     assignment debuffs (1005084 / 1005085 / 1005086 — the rotating
-//     per-player mechanic assignments). A same-debuff pair means two
-//     players from opposite towers swapped — observed once for real, and
-//     the raid wiped within seconds.
+// The three rotating assignment debuffs and what they mean (semantics
+// confirmed for 85/86; 84 inferred from its follow-up hitting 3 players):
 //
-// (2) WRONG SPOT: each soaker plants a follow-up aoe of their debuff's
-//     type at their exact soak position (fires ~0.6s later — e.g. 47810,
-//     the proximity-baited cone, comes from the 1005086 holder's spot), so
-//     even in a correctly-paired tower each debuff owns a fixed SPOT at
-//     that tower. Standing at the wrong spot misplaces the planted aoe:
-//     observed once for real — a 1005086 holder soaked ~150 units from the
-//     tower instead of ~250 beyond it, their proximity cone latched onto
-//     the on-tower partner instead of the designated far bait, cleaved
-//     five players and wiped the raid.
+//     1005084  "Stack"  — plants 47808, the 3-player stack aoe
+//     1005085  "Spread" — plants 47809; nobody may be near them when it
+//                         resolves (hits exactly 1 player when clean)
+//     1005086  "Cone"   — plants 47810, a conal aoe fired at the closest
+//                         player in proximity when it resolves
+//
+// (1) WRONG TOWER: the two soakers of one tower must hold two DIFFERENT
+//     assignment debuffs. A same-debuff pair means two players from
+//     opposite towers swapped — observed once for real, and the raid
+//     wiped within seconds.
+//
+// (2) WRONG SPOT: each soaker plants their debuff's follow-up aoe at
+//     their exact soak position (fires ~0.6s later), so even in a
+//     correctly-paired tower each debuff owns a fixed SPOT at that tower.
+//     Standing at the wrong spot misplaces the planted aoe: observed once
+//     for real — a Cone (1005086) holder soaked ~150 units from the tower
+//     instead of ~250 beyond it, their proximity cone latched onto the
+//     on-tower partner instead of the designated far bait, cleaved five
+//     players and wiped the raid.
 //
 // The spot geometry (FFLogs centi-yalm units; arena center 10000,10000;
 // all 8 tower spawn points sit on the r=800 ring at 45° spacing and are
 // identical across every log seen):
 //
-//     debuff    paired with   spot       dist to tower   dist to center
-//     1005084   1005085       inner      ~280-359        ~449-586
-//     1005084   1005086       on-tower   ~90-201         ~603-740
-//     1005085   anything      outer      ~264-369        ~1002-1150
-//     1005086   1005085       inner      ~339-386        ~485-560
-//     1005086   1005084       flare      ~204-298        ~1002-1120
+//     debuff           paired with      spot       dist to tower   dist to center
+//     1005084 Stack    1005085 Spread   inner      ~280-359        ~449-586
+//     1005084 Stack    1005086 Cone     on-tower   ~90-201         ~603-740
+//     1005085 Spread   anything         outer      ~264-369        ~1002-1150
+//     1005086 Cone     1005085 Spread   inner      ~339-386        ~485-560
+//     1005086 Cone     1005084 Stack    flare      ~204-298        ~1002-1120
 //
 // "inner" vs "outer" is which side of the r=800 tower ring the soaker
 // stands on. The "flare" spot (the 1005086 proximity-cone plant beyond an
