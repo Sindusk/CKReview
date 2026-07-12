@@ -30,6 +30,7 @@ const JOBS = {
   'ForsakenPull2Fail.json':  { 11:'DNC', 12:'DRK', 13:'PLD', 14:'AST', 15:'VPR', 16:'PCT', 17:'RPR', 18:'SGE' },
   'ForsakenPull10Fail.json': { 11:'DNC', 12:'DRK', 13:'PLD', 14:'AST', 15:'VPR', 16:'PCT', 17:'RPR', 18:'SGE' },
   'ForsakenSuccessPull1.json':    { 177:'AST', 178:'DRK', 179:'PLD', 180:'BLM', 181:'SAM', 182:'BRD', 183:'SGE', 184:'DRG' },
+  'ForsakenSuccessPull7.json':    { 177:'AST', 178:'DRK', 179:'PLD', 180:'BLM', 181:'SAM', 182:'BRD', 183:'SGE', 184:'DRG' },
   'BlackHoleFailPull5.json':      { 177:'AST', 178:'DRK', 179:'PLD', 180:'BLM', 181:'SAM', 182:'BRD', 183:'SGE', 184:'DRG' },
   'BlackHoleSuccessPull14.json':  { 177:'AST', 178:'DRK', 179:'PLD', 180:'BLM', 181:'SAM', 182:'BRD', 183:'SGE', 184:'DRG' },
 };
@@ -78,7 +79,7 @@ function buildDeaths(rep) {
 
 const FILES = [
   'BlackHoleFailPull5.json', 'BlackHoleSuccessPull14.json',
-  'ForsakenSuccess.json', 'ForsakenSuccessPull1.json', 'ForsakenPull1Fail.json',
+  'ForsakenSuccess.json', 'ForsakenSuccessPull1.json', 'ForsakenSuccessPull7.json', 'ForsakenPull1Fail.json',
   'ForsakenPull8Fail.json', 'Forsaken3Playertower.json', 'ForsakenPull2Fail.json', 'ForsakenPull10Fail.json',
 ];
 for (const f of FILES) {

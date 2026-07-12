@@ -14,6 +14,7 @@
 //   ForsakenPull2Fail      -> DRK wrong-spot (#5)
 //   ForsakenPull10Fail     -> DRK wrong-tower (#8); PCT wrong-spot (#8)
 //   ForsakenSuccessPull1   -> 0 errors (deep-but-clean Stack anchor at #7)
+//   ForsakenSuccessPull7   -> 0 errors (shallow-but-clean Cone flare at #5)
 const fs = require('fs');
 const path = require('path');
 const ROOT = path.join(__dirname, '..');
@@ -30,6 +31,7 @@ const JOBS = {
   'ForsakenPull2Fail.json':  { 11:'DNC', 12:'DRK', 13:'PLD', 14:'AST', 15:'VPR', 16:'PCT', 17:'RPR', 18:'SGE' },
   'ForsakenPull10Fail.json': { 11:'DNC', 12:'DRK', 13:'PLD', 14:'AST', 15:'VPR', 16:'PCT', 17:'RPR', 18:'SGE' },
   'ForsakenSuccessPull1.json': { 177:'AST', 178:'DRK', 179:'PLD', 180:'BLM', 181:'SAM', 182:'BRD', 183:'SGE', 184:'DRG' },
+  'ForsakenSuccessPull7.json': { 177:'AST', 178:'DRK', 179:'PLD', 180:'BLM', 181:'SAM', 182:'BRD', 183:'SGE', 184:'DRG' },
 };
 let JOB = JOBS.default;
 const DATA_DIR = path.join(ROOT, 'sampledata');
@@ -63,7 +65,7 @@ function buildPlayers(rep) {
   }));
 }
 
-for (const f of ['ForsakenPull1Fail.json', 'ForsakenSuccess.json', 'ForsakenPull8Fail.json', 'Forsaken3Playertower.json', 'ForsakenPull2Fail.json', 'ForsakenPull10Fail.json', 'ForsakenSuccessPull1.json']) {
+for (const f of ['ForsakenPull1Fail.json', 'ForsakenSuccess.json', 'ForsakenPull8Fail.json', 'Forsaken3Playertower.json', 'ForsakenPull2Fail.json', 'ForsakenPull10Fail.json', 'ForsakenSuccessPull1.json', 'ForsakenSuccessPull7.json']) {
   JOB = JOBS[f] ?? JOBS.default;
   const rep = JSON.parse(fs.readFileSync(path.join(DATA_DIR, f), 'utf8')).json.data.reportData.report;
   const errors = detectForsakenTowerErrors(buildPlayers(rep));

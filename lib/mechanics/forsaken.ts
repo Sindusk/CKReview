@@ -514,16 +514,21 @@ export const FORSAKEN_WRONG_SPOT_RULE_ID     = "ffxiv-forsaken-wrong-spot-in-tow
 //
 // "inner" vs "outer" is which side of the r=800 tower ring the soaker
 // stands on. The "flare" spot (the 1005086 proximity-cone plant beyond an
-// on-tower anchor) needs a finer test than outer's side-of-ring: the
-// observed wrong-spot failure stood at r 944 from center — beyond the
-// ring, but not far enough for the cone to reach its designated far bait —
-// while legitimate flares run r 1002+ and, critically, always stand
-// FARTHER from the tower than their on-tower anchor partner (the failure
-// stood 147 to the anchor's 172; the tightest clean flare stood 204 to its
-// anchor's 197). The tower's own position is recovered by snapping the
-// soakers' centroid to the nearest spawn point — clean pairs snap within
-// ~110 units while neighboring spawn points are 612+ apart, so the snap
-// cannot realistically pick the wrong tower.
+// on-tower anchor) is special: plant GEOMETRY alone cannot tell a failure
+// from a success. The observed wrong-spot failure stood at r 944, 147 from
+// the tower — but a fully clean pull later showed a flare at r 894, only
+// 96 from the tower, with the cone resolving perfectly (ForsakenSuccessPull7
+// tower #5). What actually decides the outcome is who the planted cone
+// latches when it fires ~0.5-1.6s after the resolution: every clean cone
+// hit EXACTLY ONE victim standing at r 1012+ (the designated far bait),
+// while the failure's cones cleaved five players at r 356-640. So a
+// shallow-looking flare (inside r 975 and not beyond its anchor) is only
+// FLAGGED when the resolution's cone outcome actually went bad — a 47810
+// victim inside the r=800 ring, or more victims than there were cone
+// plants. The tower's own position is recovered by snapping the soakers'
+// centroid to the nearest spawn point — clean pairs snap within ~110 units
+// while neighboring spawn points are 612+ apart, so the snap cannot
+// realistically pick the wrong tower.
 //
 // Attribution for rule (1): only ONE member of each broken tower actually
 // swapped (the other stands exactly where their own assignment belongs),
@@ -534,6 +539,13 @@ export const FORSAKEN_WRONG_SPOT_RULE_ID     = "ffxiv-forsaken-wrong-spot-in-tow
 // pair is flagged rather than guessing.
 
 const ASSIGNMENT_DEBUFF_IDS = new Set([1005084, 1005085, 1005086]);
+
+// The proximity cone planted by a 1005086 holder (see the flare-outcome
+// comment above). Fires at its closest player ~0.5-1.6s after the cone
+// holder's own resolution — the window below covers every observed fire
+// while ending far before the next resolution 10s later.
+const CONE_FOLLOWUP_ABILITY_ID = 47810;
+const CONE_FIRE_WINDOW_MS      = 3000;
 
 const ARENA_CENTER = 10000;
 
@@ -724,6 +736,21 @@ function detectWrongTowerPositionErrors(
   }
   if (soaks.length === 0) return [];
 
+  // Every planted-cone (47810) hit on a player, with the victim's distance
+  // from arena center — the outcome evidence for the flare check (see the
+  // flare-outcome comment above the spot table).
+  const coneHits: Array<{ timestamp: number; victimCenterDist: number }> = [];
+  for (const player of players) {
+    for (const e of player.damageTaken) {
+      if (e.abilityId !== CONE_FOLLOWUP_ABILITY_ID) continue;
+      if (e.x === undefined || e.y === undefined) continue;
+      coneHits.push({
+        timestamp:        e.timestamp,
+        victimCenterDist: Math.hypot(e.x - ARENA_CENTER, e.y - ARENA_CENTER),
+      });
+    }
+  }
+
   // Group into resolution moments, keeping only each player's FIRST hit per
   // moment (the earliest event is the closest snapshot to the actual soak —
   // a "damage" record landing ~700ms later may already show them moving away).
@@ -781,6 +808,22 @@ function detectWrongTowerPositionErrors(
       group.push(soak);
       towers.set(soak.towerInstance, group);
     }
+
+    // Cone-outcome evidence for this resolution: each Cone (1005086) soaker
+    // plants one cone, and every clean cone hits exactly one victim at the
+    // far bait spot (r 1012+ observed). More victims than plants, or any
+    // victim inside the r=800 ring, means a cone latched the wrong player —
+    // the confirmation required before flagging a shallow flare plant.
+    const conePlantCount = [...seenPlayers].filter(
+      (actorId) => assignmentAt(intervalsByPlayer.get(actorId) ?? [], assignmentQueryTime)?.abilityId === 1005086
+    ).length;
+    const windowConeHits = coneHits.filter(
+      (h) => h.timestamp >= clusterTime && h.timestamp <= clusterTime + CONE_FIRE_WINDOW_MS
+    );
+    const coneOutcomeBad =
+      conePlantCount > 0 &&
+      (windowConeHits.length > conePlantCount ||
+        windowConeHits.some((h) => h.victimCenterDist < 800));
 
     // Resolve each tower group to its soakers' held assignment debuffs and
     // its snapped tower position. 2-person groups are the normal case;
@@ -969,6 +1012,12 @@ function detectWrongTowerPositionErrors(
         if (expected === undefined) return;
 
         if (isAtSpot(soak, expected, pair.tower!, pair.soaks[1 - i])) return;
+
+        // A shallow flare plant is only an error when the cone actually
+        // misbehaved — a clean pull planted one at just 96 from the tower
+        // (r 894) and the cone still hit only its far bait (see the
+        // flare-outcome comment above the spot table).
+        if (expected === "flare" && !coneOutcomeBad) return;
 
         errors.push({
           ruleId:      FORSAKEN_WRONG_SPOT_RULE_ID,
