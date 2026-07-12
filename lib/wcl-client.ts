@@ -118,13 +118,13 @@ export type WCLFight = {
 export type WCLActor = {
   id:      number;
   name:    string;
-  type:    string;    // WoW class name for players (e.g. "Warrior"); "NPC" or
-                      // similar for enemies now that masterData.actors is
-                      // unfiltered — only ever meaningful as a class label
-                      // when looked up for a player actor. Raid-error enemy
-                      // detection (error-detection.ts "enemyCast"/
-                      // "enemyBuffApplied" rules) relies on this being
-                      // exactly "NPC" for bosses/adds — see log-transforms.ts.
+  type:    string;    // "Player" for players; "NPC" or "Pet" for enemies (some
+                      // boss-summoned adds come back typed "Pet") — only ever
+                      // meaningful as a class label when looked up for a
+                      // player actor. Raid-error enemy detection
+                      // (error-detection.ts "enemyCast"/"enemyBuffApplied"
+                      // rules) treats anything NOT "Player" as a valid enemy
+                      // source — see log-transforms.ts.
   subType: string;    // spec name, e.g. "Arms", "Holy" — empty/irrelevant for NPCs
 };
 

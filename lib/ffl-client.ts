@@ -127,9 +127,10 @@ export type FFLActor = {
                       // May be "Unknown" for NPC actors
                       //
                       // Raid-error enemy detection (error-detection.ts
-                      // "enemyCast" trigger) relies on `type === "NPC"` to
-                      // separate boss/add actors from players and pets — see
-                      // log-transforms.ts fflBuildEnemyCastEvents/fflBuildEnemyBuffEvents.
+                      // "enemyCast" trigger) treats anything NOT `type ===
+                      // "Player"` as a valid enemy source (bosses can come
+                      // back typed "NPC" or "Boss" depending on the fight) —
+                      // see log-transforms.ts fflBuildEnemyCastEvents/fflBuildEnemyBuffEvents.
 };
 
 // A single ability/action used anywhere in the report. Fetched once per

@@ -315,10 +315,13 @@ function wclCastToPlayerEvent(
 // and will never contain a boss's own casts or buffs no matter how they're
 // filtered afterwards.
 //
-// The actor.type === "NPC" filter here is a defensive extra layer (in case
-// the API ever returns something unexpected on the Enemies side, e.g. a
-// hostile pet); the real filtering already happened server-side via
-// hostilityType.
+// The actor-type filter here is a defensive extra layer (in case the API
+// ever returns something unexpected on the Enemies side) — the real
+// filtering already happened server-side via hostilityType. It excludes
+// "Player" specifically rather than requiring exactly "NPC": some
+// boss-summoned adds (e.g. Midnight Falls' termination matrices) come back
+// from masterData typed "Pet" rather than "NPC" despite being hostile
+// enemies, and requiring "NPC" exactly silently dropped their casts.
 
 function wclBuildEnemyCastEvents(
   enemyCastEvents: WCLCastEvent[],
@@ -331,7 +334,7 @@ function wclBuildEnemyCastEvents(
     // reaches "cast" (per clarification: "begincast" starts it, "cast"
     // is the signal it went off).
     .filter((e) => e.type === "cast")
-    .filter((e) => actorMap.get(e.sourceID)?.type === "NPC")
+    .filter((e) => actorMap.get(e.sourceID)?.type !== "Player")
     .map((e) => ({
       timestamp:   e.timestamp - fightStart,
       actorId:     e.sourceID,
@@ -350,7 +353,7 @@ function wclBuildEnemyBuffEvents(
 ): EnemyEvent[] {
   return enemyBuffEvents
     .filter((e) => e.type === "applybuff")
-    .filter((e) => actorMap.get(e.targetID)?.type === "NPC")
+    .filter((e) => actorMap.get(e.targetID)?.type !== "Player")
     .map((e) => ({
       timestamp:   e.timestamp - fightStart,
       actorId:     e.targetID,
@@ -794,7 +797,7 @@ function fflBuildEnemyCastEvents(
     // Only actually-completed casts count — "begincast" is just the start
     // of the wind-up; an interrupted cast never reaches "cast".
     .filter((e) => e.type === "cast")
-    .filter((e) => actorMap.get(e.sourceID)?.type === "NPC")
+    .filter((e) => actorMap.get(e.sourceID)?.type !== "Player")
     .map((e) => ({
       timestamp:   Math.max(0, e.timestamp - fightStart),
       actorId:     e.sourceID,
@@ -813,7 +816,7 @@ function fflBuildEnemyBuffEvents(
 ): EnemyEvent[] {
   return enemyBuffEvents
     .filter((e) => e.type === "applybuff")
-    .filter((e) => actorMap.get(e.targetID)?.type === "NPC")
+    .filter((e) => actorMap.get(e.targetID)?.type !== "Player")
     .map((e) => ({
       timestamp:   Math.max(0, e.timestamp - fightStart),
       actorId:     e.targetID,
