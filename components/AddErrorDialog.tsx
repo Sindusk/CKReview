@@ -172,15 +172,23 @@ export default function AddErrorDialog({
   const [description, setDescription] = useState("");
   const [timeInput, setTimeInput]   = useState("");
 
-  // Reset the form fresh every time the dialog opens.
+  // Reset the form fresh whenever the dialog transitions from closed to
+  // open — NOT on every re-render while it stays open. defaultTimestampMs
+  // (live VOD playback time) and players (a freshly-filtered array each
+  // render) both change continuously while playback runs, so including them
+  // in the dependency array would re-run this effect every tick and wipe
+  // out in-progress edits.
+  const wasOpenRef = useRef(false);
   useEffect(() => {
-    if (!open) return;
-    setPlayerName(players[0]?.name ?? "");
-    setSeverity("Major");
-    setName("");
-    setDescription("");
-    setTimeInput(defaultTimestampMs !== null ? formatTimeInput(defaultTimestampMs) : "");
-  }, [open, defaultTimestampMs, players]);
+    if (open && !wasOpenRef.current) {
+      setPlayerName(players[0]?.name ?? "");
+      setSeverity("Major");
+      setName("");
+      setDescription("");
+      setTimeInput(defaultTimestampMs !== null ? formatTimeInput(defaultTimestampMs) : "");
+    }
+    wasOpenRef.current = open;
+  });
 
   if (!open) return null;
 
