@@ -55,6 +55,7 @@ import { getFFJobByName, getFFRosterSortOrder }   from "./ffl-job-data";
 import { detectPullErrors }                       from "./error-detection";
 import { getWCLAbilityIconUrl, getFFAbilityIconUrl } from "./ability-icons";
 import { detectForsakenTowerErrors } from "./mechanics/forsaken";
+import { detectBlackHoleErrors } from "./mechanics/blackhole";
 
 // Shared shape for both games' ability maps: gameID -> name + raw icon
 // filename (not yet resolved to a URL — that happens per-game via
@@ -925,6 +926,7 @@ export function transformFFightToPull(
   const errors = [
     ...detectPullErrors(players, deathEvents, enemyCastEvents, enemyBuffEvents),
     ...detectForsakenTowerErrors(players),
+    ...detectBlackHoleErrors(players, deathEvents),
   ].sort((a, b) => a.timestamp - b.timestamp);
 
   const fightDurationMs = data.fight.endTime - data.fight.startTime;

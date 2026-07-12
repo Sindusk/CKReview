@@ -507,7 +507,7 @@ export const FORSAKEN_WRONG_SPOT_RULE_ID     = "ffxiv-forsaken-wrong-spot-in-tow
 //
 //     debuff           paired with      spot       dist to tower   dist to center
 //     1005084 Stack    1005085 Spread   inner      ~280-359        ~449-586
-//     1005084 Stack    1005086 Cone     on-tower   ~90-201         ~603-740
+//     1005084 Stack    1005086 Cone     on-tower   ~90-311         ~576-740
 //     1005085 Spread   anything         outer      ~264-369        ~1002-1150
 //     1005086 Cone     1005085 Spread   inner      ~339-386        ~485-560
 //     1005086 Cone     1005084 Stack    flare      ~204-298        ~1002-1120
@@ -603,7 +603,14 @@ function isAtSpot(
   const distToCenter = Math.hypot(soak.x - ARENA_CENTER, soak.y - ARENA_CENTER);
 
   switch (spot) {
-    case "on-tower": return distToTower <= ON_TOWER_MAX_DIST;
+    // The Stack-with-Cone anchor isn't required to hug the tower: a clean
+    // log (ForsakenSuccessPull1, tower #7) showed the anchor standing 311
+    // from the tower on the inner side (r=576 from center) with the whole
+    // resolution — including both follow-up aoes — executing perfectly.
+    // What the pair actually needs is the Cone planted beyond the ring, so
+    // the anchor is fine anywhere inward of it: on the tower itself
+    // (observed r up to 740 from center) or deeper toward the middle.
+    case "on-tower": return distToTower <= ON_TOWER_MAX_DIST || distToCenter < 800;
     case "inner":    return distToCenter < 800;
     case "outer":    return distToCenter >= 800;
     case "flare": {
