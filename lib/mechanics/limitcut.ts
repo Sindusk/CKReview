@@ -59,12 +59,20 @@
 // The dash itself is a straight chord across the arena: the clones sit ON
 // the rim (r=2000, at the k*45° angles between bait slots — both facts
 // captured directly in stray sourceResources/position records), and the
-// chord runs from the clone's spawn to its numbered player. A player can
-// therefore be clipped ANYWHERE along that chord — the confirmed real
-// case was a player idling near the far END of a dash lane (next to the
-// clone's own spawn, ~3500 units from the dash's actual target) and being
-// struck at the chord's origin. Everyone stays safe purely by standing on
-// their OWN slot. The earlier pulses from the same clones (47843) and the
+// chord runs from the clone's spawn to its numbered player — WHEREVER
+// that player actually stands. A confirmed two-player position swap
+// (#6 and #7 standing on each other's slots) had dash 6 and dash 7 land
+// squarely on the swapped spots, so the dash follows its player, not the
+// slot — which makes instance→victim the assignment itself, and a
+// single-victim dash landing away from its fitted slot direct evidence
+// that the victim stood at the wrong spot. It's also lethal: the
+// mispositioned dash hit for ~5x the normal unmitigated damage (649k vs
+// the usual 113-140k) and killed its target, while the other swapped
+// player's dash happened to hit normally. A player can also be clipped
+// ANYWHERE along a dash chord — one confirmed case idled near the far END
+// of a dash lane (next to the clone's own spawn, ~3500 units from the
+// dash's actual target) and was struck at the chord's origin. Everyone
+// stays safe purely by standing on their OWN slot. The earlier pulses from the same clones (47843) and the
 // 47864 burst at ~+519 hit the whole raid for incidental damage and are
 // NOT part of the check.
 //
@@ -100,8 +108,9 @@ const GAZE_DEBUFF_IDS = [1001602, 1001603] as const;
 // is comfortably wide without being able to reach anything unrelated.
 const FALL_GRACE_WINDOW_MS = 10000;
 
-export const LIMITCUT_PUSHED_OFF_RULE_ID = "ffxiv-limitcut-pushed-off-arena";
-export const LIMITCUT_DASH_CLIP_RULE_ID  = "ffxiv-limitcut-dash-clipped-other-player";
+export const LIMITCUT_PUSHED_OFF_RULE_ID   = "ffxiv-limitcut-pushed-off-arena";
+export const LIMITCUT_DASH_CLIP_RULE_ID    = "ffxiv-limitcut-dash-clipped-other-player";
+export const LIMITCUT_WRONG_POSITION_RULE_ID = "ffxiv-limitcut-wrong-dash-position";
 
 const DASH_ABILITY_ID = 47844;
 
@@ -383,6 +392,44 @@ function detectDashErrors(
     }
     return best;
   };
+
+  // ── Wrong bait spot: a dash landing away from its fitted slot ───────────
+  //
+  // The dash follows its numbered player (see module comment), so a
+  // single-victim dash landing far off the slot the progression assigns to
+  // that instance means the victim stood at the wrong spot — the confirmed
+  // case was a #6/#7 swap, both dashes landing 45° away on each other's
+  // slots, one victim dying to the ~5x-amplified mispositioned hit. Clean
+  // baits sit within ~8° of their slot; a swap is 45° minimum, so the
+  // half-slot tolerance splits them with room on both sides. Dead-player
+  // re-fires (which also land off-slot, on blameless players) never reach
+  // here — the deadDashMissed gate above returns first.
+  if (slotIndexFor !== undefined) {
+    for (const [instance, group] of victimsByInstance) {
+      if (group.length !== 1) continue;
+      const h = group[0];
+      if (h.x === undefined || h.y === undefined) continue;
+
+      const expectedSlot = slotIndexFor(instance);
+      if (angularDist(angleOf(h.x, h.y), slotAngle(expectedSlot)) <= SLOT_SNAP_TOLERANCE_DEG) continue;
+
+      const [ix, iy] = slotPoint(expectedSlot);
+      const yalms = (Math.hypot(h.x - ix, h.y - iy) / 100).toFixed(1);
+      errors.push({
+        ruleId:      LIMITCUT_WRONG_POSITION_RULE_ID,
+        severity:    "Major",
+        name:        "Wrong Dash Position",
+        description: `Took their Limit Cut dash while standing at another number's bait spot (~${yalms} yalms from their assigned position) — a mispositioned dash hits several times harder and drags its path across the arena.`,
+        timestamp:   h.timestamp,
+        player:      h.player.name,
+        class:       h.player.className,
+        specId:      h.player.specId,
+        role:        h.player.role,
+        abilityId:   DASH_ABILITY_ID,
+        abilityName: "Limit Cut Dash",
+      });
+    }
+  }
 
   // ── Clipped dashes: one clone striking 2+ living players ────────────────
   for (const group of victimsByInstance.values()) {
