@@ -40,38 +40,54 @@
 //                                                 clean — every log wiped)
 //
 // Each player must be hit by Nothingness exactly 3 times, at consecutive
-// moments, forming a conga line: one new player takes over a tether each
-// moment as the previous holder finishes their 3rd hit (the 3rd hit does
-// ~10-20x the damage of the first two). The entry order is fully
-// determined by the debuffs:
+// moments, forming a conga line. Raids run (at least) three documented
+// strategies for who holds which tether when (see the BlackHoleDoubleTether
+// / BlackHoleDSA / BlackHoleSDA cheatsheets in sampledata/ff), and crews
+// also re-shuffle within a strategy on the fly to salvage a bad start —
+// observed for real: a first tether that clipped BOTH First-in-Line
+// players, after which the two simply ran parallel lanes (each hit at
+// moments 1,2,3) and the mechanic stayed on schedule.
 //
-//   entrant  role                          hit at moments
-//   p1       First in Line, no Accretion   1, 3, 4     (skips m2)
-//   p2       First in Line, no Accretion   2, 2, 3     (BOTH m2 tethers)
-//   p3       First in Line + Accretion     3, 4, 5
-//   p4       Second in Line, no Accretion  4, 5, 6
-//   p5       Second in Line, no Accretion  5, 6, 7
-//   p6       Second in Line + Accretion    6, 7, 8
-//   p7       Third in Line                 7, 8, 9
-//   p8       Third in Line                 8, 9, 10
+//   DoubleTether: p1 F 1,3,4 (skips m2) · p2 F 2,2 (BOTH m2 tethers),3 ·
+//                 F+Acc 3,4,5 · p4 S 4,5,6 · p5 S 5,6,7 · S+Acc 6,7,8 ·
+//                 p7 T 7,8,9 · p8 T 8,9,10
+//   DSA / SDA:    three fixed lanes (DPS/Support/Accretion columns in
+//                 either order). Lane A: F 1,2,3 · S 4,5,6 · T 7,8,9.
+//                 Lane B: F 2,3,4 · S 5,6,7 · T 8,9,10. Accretion lane:
+//                 F+Acc 3,4,5 · S+Acc 6,7,8.
 //
-// Which of the two same-role players is p1 vs p2 (likewise p4/p5, p7/p8)
-// is positional strategy (clockwise from the boss), not knowable from
-// debuffs — so each player is checked against the UNION of their role
-// pair's moments. That union is exactly what both sample logs validate:
-// e.g. the confirmed failure was a First-in-Line + Accretion player
+// Every strategy (and the observed on-the-fly reshuffle) lands inside the
+// same per-debuff-role UNION of moments — which is the whole check, making
+// it strategy-agnostic by construction:
+//
+//   First in Line, no Accretion   {1,2,3,4}
+//   First in Line + Accretion     {3,4,5}
+//   Second in Line, no Accretion  {4,5,6,7}
+//   Second in Line + Accretion    {6,7,8}
+//   Third in Line                 {7,8,9,10}
+//
+// The confirmed individual failure was a First-in-Line + Accretion player
 // (assigned moments 3-5) taking a Nothingness hit at moment 1. An extra
 // hit still gets game credit — 1005452 ("soaked once") / 1005453 ("soaked
 // twice") was applied to the erroneous soaker just like a legitimate one —
 // and the un-soaked hit resurfaces later as a doubled earthquake that
 // wipes the raid. Flagging the out-of-schedule hit reports the root cause.
 //
+// Separately from WHO got hit, ONE tether hitting SEVERAL players at the
+// same moment (players standing too close together when it fires) is
+// raised as a raid-severity error: the extra hits skip ahead in everyone's
+// 3-hit budget, which makes the remaining schedule borderline unresolvable
+// — both observed cases doubled the follow-up earthquake and wiped the
+// raid within seconds. (The DoubleTether strategy's m2 is the opposite
+// shape — TWO tethers hitting ONE player — and never triggers this.)
+//
 // ── WHAT THIS DOES NOT DO YET ───────────────────────────────────────────
 //
-// It doesn't flag MISSED tether hits (fewer than 3), nor verify the p1/p2
-// ordering within a role pair, nor check the earthquake/Accretion soak
-// positioning that follows — every failure observed so far roots in an
-// out-of-schedule hit, which is what's detected here.
+// It doesn't flag MISSED tether hits (fewer than 3), nor verify the exact
+// per-strategy lane ordering, nor check the earthquake/Accretion soak
+// positioning that follows — every failure observed so far surfaces as an
+// out-of-schedule hit or a multi-player tether hit, which are what's
+// detected here.
 
 import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { PullError } from "@/types/PullError";
@@ -84,6 +100,7 @@ const ACCRETION_ID      = 1001604;
 const NOTHINGNESS_ABILITY_ID = 47868; // the tether hit
 
 export const BLACKHOLE_INCORRECT_TETHER_RULE_ID = "ffxiv-blackhole-soaked-incorrect-tether";
+export const BLACKHOLE_MULTI_HIT_TETHER_RULE_ID = "ffxiv-blackhole-tether-hit-multiple-players";
 
 // The 10 tether moments, as offsets from the debuff burst (see the
 // timetable above). Matched across two independent logs to within 100ms.
@@ -230,8 +247,10 @@ export function detectBlackHoleErrors(
   const burstTimestamp = findBurstTimestamp(players);
   if (burstTimestamp === undefined) return [];
 
+  // May be undefined for an unrecognized composition — that only disables
+  // the schedule check, not the multi-hit check below (a tether cleaving
+  // several players is wrong under every conceivable assignment order).
   const assignments = buildAssignments(players, burstTimestamp);
-  if (assignments === undefined) return [];
 
   const deathTimestamps = deathEvents.map((d) => d.timestamp);
   const isCompromisedMoment = (momentTimestamp: number) =>
@@ -241,8 +260,53 @@ export function detectBlackHoleErrors(
 
   const errors: PullError[] = [];
 
+  // ── Raid check: one tether hitting several players ──────────────────────
+  //
+  // Group every Nothingness hit by (moment, tether instance) and count the
+  // DISTINCT players each tether struck. Two-plus means players overlapped
+  // when it fired (see the module comment) — reported once per tether as a
+  // raid-severity error naming everyone hit, on top of any individual
+  // out-of-schedule errors the same firing produces below.
+  type TetherGroup = { firstHit: number; victims: Map<number, string> };
+  const tetherGroups = new Map<string, TetherGroup>();
+
   for (const player of players) {
-    const assignment = assignments.get(player.actorId);
+    for (const e of player.damageTaken) {
+      if (e.abilityId !== NOTHINGNESS_ABILITY_ID) continue;
+      if (e.sourceInstance === undefined) continue; // can't tell tethers apart without it
+
+      const moment = momentIndexFor(e.timestamp, burstTimestamp);
+      if (moment === undefined) continue;
+
+      const key = `${moment}:${e.sourceInstance}`;
+      const group = tetherGroups.get(key) ?? { firstHit: e.timestamp, victims: new Map() };
+      group.firstHit = Math.min(group.firstHit, e.timestamp);
+      group.victims.set(player.actorId, player.name);
+      tetherGroups.set(key, group);
+    }
+  }
+
+  for (const [key, group] of tetherGroups) {
+    if (group.victims.size < 2) continue;
+    if (isCompromisedMoment(group.firstHit)) continue;
+
+    const moment = Number(key.split(":")[0]);
+    const names = [...group.victims.values()].join(", ");
+
+    errors.push({
+      ruleId:      BLACKHOLE_MULTI_HIT_TETHER_RULE_ID,
+      severity:    "Raid",
+      name:        "Tether Hit Multiple Players",
+      description: `Black Hole tether #${moment} hit ${group.victims.size} players at once (${names}) — the extra hits burn through the raid's soak budget, leaving the mechanic borderline unresolvable.`,
+      timestamp:   group.firstHit,
+      abilityId:   NOTHINGNESS_ABILITY_ID,
+      abilityName: "Nothingness",
+    });
+  }
+
+  // ── Individual check: hit at a moment outside the player's schedule ─────
+  for (const player of players) {
+    const assignment = assignments?.get(player.actorId);
     if (!assignment) continue;
 
     // One error per (player, moment) — a single tether firing can surface
