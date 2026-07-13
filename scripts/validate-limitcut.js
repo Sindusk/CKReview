@@ -16,10 +16,13 @@
 //                             clones re-fired at SGE/PLD — same
 //                             exclusion). Wipe-cascade fall deaths at
 //                             +540/+557 must NOT flag.
+//   ff/LimitCutFailPull1   -> SMN out of position for the dashes (~5.6
+//                             yalms off slot 67.5°, clipped by clone 4's
+//                             chord near its spawn) — and ONLY SMN: dash
+//                             8's re-fire into VPR+PLD (no victim near
+//                             its slot) is fallout and must not flag VPR.
 //   everything else        -> 0 errors (Limit Cut passed cleanly, or the
-//                             pull wiped before it). The dash clip /
-//                             missed-own-dash rules have no positive
-//                             sample yet — they exist for future logs.
+//                             pull wiped before it).
 const fs = require('fs');
 const path = require('path');
 const ROOT = path.join(__dirname, '..');
@@ -41,6 +44,7 @@ const JOBS = {
   'BlackHoleSuccessPull14.json':  { 177:'AST', 178:'DRK', 179:'PLD', 180:'BLM', 181:'SAM', 182:'BRD', 183:'SGE', 184:'DRG' },
   'ff/BlackHoleFailPull13.json':  { 3:'DNC', 8:'DRK', 10:'PLD', 11:'WHM', 12:'RPR', 13:'SGE', 14:'VPR', 39:'PCT' },
   'ff/BlackHoleFailPull21.json':  { 3:'DNC', 8:'DRK', 10:'PLD', 11:'WHM', 12:'RPR', 13:'SGE', 14:'VPR', 39:'PCT' },
+  'ff/LimitCutFailPull1.json':    { 3:'DNC', 8:'DRK', 9:'SMN', 10:'PLD', 11:'WHM', 12:'RPR', 13:'SGE', 14:'VPR' },
 };
 let JOB = JOBS.default;
 const DATA_DIR = path.join(ROOT, 'sampledata');
@@ -86,6 +90,7 @@ function buildDeaths(rep) {
 }
 
 const FILES = [
+  'ff/LimitCutFailPull1.json',
   'ff/BlackHoleFailPull13.json', 'BlackHoleFailPull5.json', 'BlackHoleSuccessPull14.json',
   'ff/BlackHoleFailPull21.json', 'ForsakenSuccess.json', 'ForsakenSuccessPull1.json',
   'ForsakenSuccessPull7.json', 'ForsakenPull1Fail.json', 'ForsakenPull8Fail.json',

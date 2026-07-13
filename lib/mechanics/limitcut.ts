@@ -50,32 +50,38 @@
 // the 8 victims stand at the 8 slot angles 22.5° + k*45° around center,
 // and INSTANCE ORDER WALKS CONSECUTIVE SLOTS — clone N+1's target always
 // sits 45° from clone N's, with the starting slot and rotation direction
-// varying per pull. Clean baits deviate ≤ ~13° from their slot. The one
-// dash record that captured the clone's own position put it ON the rim
-// (r=2000), its dash a straight chord across the arena that passed within
-// ~66 units of the player it clipped — so a dash is a line attack whose
-// lane is owned by its target's slot, and everyone else stays safe purely
-// by standing on their OWN slot. The earlier pulses from the same clones
-// (47843) and the 47864 burst at ~+519 hit the whole raid for incidental
-// damage and are NOT part of the check.
+// varying per pull. The instance IS the player's strategy number
+// (confirmed: a pull's #1/#7/#8 assignments matched instances 1/7/8).
+// Clean baits deviate ≤ ~13° from their slot. EVERY living player gets
+// hit — a full shield absorb still logs a 0-damage hit — so "nobody was
+// hit by dash N" is never a thing to detect on a player.
+//
+// The dash itself is a straight chord across the arena: the clones sit ON
+// the rim (r=2000, at the k*45° angles between bait slots — both facts
+// captured directly in stray sourceResources/position records), and the
+// chord runs from the clone's spawn to its numbered player. A player can
+// therefore be clipped ANYWHERE along that chord — the confirmed real
+// case was a player idling near the far END of a dash lane (next to the
+// clone's own spawn, ~3500 units from the dash's actual target) and being
+// struck at the chord's origin. Everyone stays safe purely by standing on
+// their OWN slot. The earlier pulses from the same clones (47843) and the
+// 47864 burst at ~+519 hit the whole raid for incidental damage and are
+// NOT part of the check.
 //
 // What counts as a player error (per the raid's own standard): being out
-// of position. When one dash strikes TWO living players, either its
-// intended target dragged the dash lane across a neighbor by standing off
-// their slot, or the clipped player wandered into a lane that wasn't
-// theirs — so the blame goes to whichever victim is FARTHER from their
-// own fitted slot position, not automatically to whoever took the second
-// hit. A living player untouched by all 8 dashes is likewise flagged
-// (their dash went somewhere else — necessarily at somebody).
-//
-// When a player DIES between the gaze check and the dashes, their clone
-// re-fires at a living player instead — observed three times, always
-// lethal (the victim's own-dash vulnerability amplifies the hit; one
-// landed for 2.67 MILLION). That fallout is deliberately NOT flagged:
-// being dead may not be the dead player's fault (and when it is, the
-// death already carries its own error at the root cause), and the
-// re-target victim had no say at all. Dash analysis simply switches off
-// for the set when an unsoaked-because-dead dash exists.
+// of position. When one dash strikes TWO living players and some victim
+// is clearly outside the clean bait band, the blame goes to whichever
+// victim is FARTHEST from their own slot — never automatically to whoever
+// took the second hit. When every victim of a multi-hit dash stands at a
+// proper bait spot, the dash came to THEM: it re-fired because its
+// assigned player was missing (dead, or already killed by their own
+// positioning error) — pure fallout, deliberately unflagged: the root
+// cause either carries its own death-related error or was already flagged
+// on the mispositioned player, and the re-target victims had no say at
+// all. The same reasoning skips the whole set when a player died between
+// the gaze check and the dashes without ever being dash-hit (their
+// clone's re-fire scrambles the set; observed lethal at up to 2.67
+// MILLION via the own-dash vulnerability).
 //
 // Pulls that wipe before Limit Cut never see 1001602/1001603, so the
 // module self-gates on the debuffs' presence rather than any
@@ -94,9 +100,8 @@ const GAZE_DEBUFF_IDS = [1001602, 1001603] as const;
 // is comfortably wide without being able to reach anything unrelated.
 const FALL_GRACE_WINDOW_MS = 10000;
 
-export const LIMITCUT_PUSHED_OFF_RULE_ID  = "ffxiv-limitcut-pushed-off-arena";
-export const LIMITCUT_DASH_CLIP_RULE_ID   = "ffxiv-limitcut-dash-clipped-other-player";
-export const LIMITCUT_MISSED_DASH_RULE_ID = "ffxiv-limitcut-missed-own-dash";
+export const LIMITCUT_PUSHED_OFF_RULE_ID = "ffxiv-limitcut-pushed-off-arena";
+export const LIMITCUT_DASH_CLIP_RULE_ID  = "ffxiv-limitcut-dash-clipped-other-player";
 
 const DASH_ABILITY_ID = 47844;
 
@@ -121,6 +126,14 @@ const SLOT_SNAP_TOLERANCE_DEG = 22.5;
 // to their own ideal slot point; calls closer than this margin are too
 // ambiguous to single one player out, so both get flagged.
 const CLIP_ATTRIBUTION_MARGIN = 150;
+
+// A multi-hit dash is only attributed when some victim is CLEARLY out of
+// position; when every victim is inside the clean bait band, the dash
+// came to them (a re-target of a missing player), not the other way
+// around. The band is tight on both sides: the sloppiest clean bait ever
+// observed sat 469 from its ideal slot point, while the one confirmed
+// real culprit measured 561 — revisit here first if a new log misjudges.
+const CLIP_MIN_CULPRIT_DEV = 500;
 
 type GazeWindow = {
   abilityId:   number;
@@ -289,7 +302,6 @@ function detectDashErrors(
   if (hits.length === 0) return [];
 
   const firstDashTime = Math.min(...hits.map((h) => h.timestamp));
-  const lastDashTime  = Math.max(...hits.map((h) => h.timestamp));
 
   // A player who died between the gaze going out and the dash set AND was
   // never hit by a dash left their clone with no target — it re-fires at a
@@ -346,79 +358,73 @@ function detectDashErrors(
     }
   }
 
+  // Slots claimed by clean single-victim baits — anything left unclaimed
+  // is where a mispositioned player SHOULD have been standing, which is
+  // how a player who never soaked their own dash (they were clipped and
+  // killed elsewhere first) still gets measured against a meaningful spot.
+  const claimedSlots = new Set(
+    [...ownSlotByActor.values()].map((s) => ((s % 8) + 8) % 8)
+  );
+  const distToOwnIdeal = (hit: DashHit): number | undefined => {
+    if (hit.x === undefined || hit.y === undefined) return undefined;
+    const ownSlot = ownSlotByActor.get(hit.player.actorId);
+    if (ownSlot !== undefined) {
+      const [ix, iy] = slotPoint(ownSlot);
+      return Math.hypot(hit.x - ix, hit.y - iy);
+    }
+    // No slot of their own — measure against the nearest UNCLAIMED slot
+    // (the most charitable reading of where they were supposed to be).
+    let best: number | undefined;
+    for (let s = 0; s < 8; s++) {
+      if (claimedSlots.has(s)) continue;
+      const [ix, iy] = slotPoint(s);
+      const d = Math.hypot(hit.x - ix, hit.y - iy);
+      if (best === undefined || d < best) best = d;
+    }
+    return best;
+  };
+
   // ── Clipped dashes: one clone striking 2+ living players ────────────────
-  for (const [instance, group] of victimsByInstance) {
+  for (const group of victimsByInstance.values()) {
     if (group.length < 2) continue;
 
-    // Blame whoever strayed farthest from their own slot. Every victim's
-    // deviation is measured against the slot THEY own — the dash's
-    // intended target against this instance's fitted slot, everyone else
-    // against the slot of the dash that hit only them. Without a usable
-    // fit (or positions), attribution is impossible — flag every victim
-    // rather than guess silently.
+    // Without a slot fit or positions there is no way to tell a genuine
+    // clip from re-target fallout, and the one thing this rule must never
+    // do is blame a fallout victim — so unmeasurable groups are skipped.
+    if (slotIndexFor === undefined) continue;
     type Scored = { hit: DashHit; deviation: number | undefined };
-    const scored: Scored[] = group.map((hit) => {
-      const ownSlot =
-        ownSlotByActor.get(hit.player.actorId) ??
-        (slotIndexFor ? slotIndexFor(instance) : undefined);
-      if (ownSlot === undefined || hit.x === undefined || hit.y === undefined) {
-        return { hit, deviation: undefined };
-      }
-      const [ix, iy] = slotPoint(ownSlot);
-      return { hit, deviation: Math.hypot(hit.x - ix, hit.y - iy) };
-    });
+    const scored: Scored[] = group.map((hit) => ({ hit, deviation: distToOwnIdeal(hit) }));
+    if (scored.some((s) => s.deviation === undefined)) continue;
 
-    let culprits: Scored[];
-    if (scored.some((s) => s.deviation === undefined)) {
-      culprits = scored;
-    } else {
-      const maxDev = Math.max(...scored.map((s) => s.deviation!));
-      culprits = scored.filter((s) => s.deviation! > maxDev - CLIP_ATTRIBUTION_MARGIN);
-    }
+    // Attribute only when some victim is CLEARLY out of position. When
+    // every victim stands inside the clean bait band, the dash came to
+    // them — the re-fire of a clone whose assigned player was missing
+    // (dead, or already killed by their own positioning error) — which is
+    // fallout, not a new mistake (see module comment). Otherwise blame
+    // whoever strayed farthest from their own slot: the intended target
+    // dragging the lane and a wanderer walking into it look the same from
+    // the victim list, and this is what tells them apart.
+    const maxDev = Math.max(...scored.map((s) => s.deviation!));
+    if (maxDev < CLIP_MIN_CULPRIT_DEV) continue;
+    const culprits = scored.filter((s) => s.deviation! > maxDev - CLIP_ATTRIBUTION_MARGIN);
 
     for (const culprit of culprits) {
       const others = group
         .filter((g) => g.player.actorId !== culprit.hit.player.actorId)
         .map((g) => g.player.name)
         .join(", ");
+      const yalms =
+        culprit.deviation !== undefined ? ` (~${(culprit.deviation / 100).toFixed(1)} yalms off their spot)` : "";
       errors.push({
         ruleId:      LIMITCUT_DASH_CLIP_RULE_ID,
         severity:    "Major",
         name:        "Out Of Position For Dash",
-        description: `Was out of position when a Limit Cut dash fired, putting two players in one dash's path (also hit: ${others}) — the doubled, vulnerability-amplified hit is usually lethal.`,
+        description: `Was out of position during the Limit Cut dashes${yalms}, putting multiple players in one dash's path (also hit: ${others}) — the extra, vulnerability-amplified hit is usually lethal.`,
         timestamp:   culprit.hit.timestamp,
         player:      culprit.hit.player.name,
         class:       culprit.hit.player.className,
         specId:      culprit.hit.player.specId,
         role:        culprit.hit.player.role,
-        abilityId:   DASH_ABILITY_ID,
-        abilityName: "Limit Cut Dash",
-      });
-    }
-  }
-
-  // ── A living player untouched by a full 8-clone dash set ────────────────
-  // Their dash necessarily went at somebody else. Gated on all 8 clones
-  // actually firing so a wipe that truncates the set doesn't smear the
-  // survivors.
-  if (victimsByInstance.size >= 8) {
-    for (const player of players) {
-      if (hitsByActor.has(player.actorId)) continue;
-      const diedBeforeSetEnded = deathEvents.some(
-        (d) => d.player === player.name && d.timestamp <= lastDashTime
-      );
-      if (diedBeforeSetEnded) continue;
-
-      errors.push({
-        ruleId:      LIMITCUT_MISSED_DASH_RULE_ID,
-        severity:    "Major",
-        name:        "Missed Own Dash",
-        description: "Was never hit by a Limit Cut dash despite all eight firing — their dash hit another player instead.",
-        timestamp:   lastDashTime,
-        player:      player.name,
-        class:       player.className,
-        specId:      player.specId,
-        role:        player.role,
         abilityId:   DASH_ABILITY_ID,
         abilityName: "Limit Cut Dash",
       });
