@@ -73,6 +73,7 @@
 
 import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { PullError } from "@/types/PullError";
+import type { DeathEvent } from "@/types/DeathEvent";
 
 const SPELLS_TROUBLE_ABILITY_ID = 1005083; // "Spell's Trouble" stack counter
 const PATH_OF_LIGHT_ABILITY_ID  = 47806;   // "Path of Light" — the tower-soak damage tick
@@ -286,7 +287,10 @@ function buildTowerLabelsByPlayer(
  * Forsaken at all — self-gating on the presence of 1005083 rather than an
  * encounter-name check, so it's safe to always call regardless of fight.
  */
-export function detectForsakenTowerErrors(players: PlayerInfo[]): PullError[] {
+export function detectForsakenTowerErrors(
+  players:     PlayerInfo[],
+  deathEvents: DeathEvent[] = []
+): PullError[] {
   // Every Path of Light hit on ANYONE — the reference for which stack-loss
   // instants correspond to a tower that actually resolved (see the
   // wipe-cleanup comment above isNearAnyPathOfLight).
@@ -386,6 +390,7 @@ export function detectForsakenTowerErrors(players: PlayerInfo[]): PullError[] {
 
   errors.push(...detectOvercrowdedTowerErrors(players, teamByPlayer, labelsByPlayer, expectedTimestamps));
   errors.push(...detectWrongTowerPositionErrors(players, expectedTimestamps));
+  errors.push(...detectLethalConeBaitErrors(players, deathEvents, expectedTimestamps));
 
   return errors.sort((a, b) => a.timestamp - b.timestamp);
 }
@@ -1037,4 +1042,107 @@ function detectWrongTowerPositionErrors(
   }
 
   return errors;
+}
+
+export const FORSAKEN_LETHAL_CONE_BAIT_RULE_ID = "ffxiv-forsaken-baited-cone-too-close";
+
+// ── Lethal cone bait: standing too close to a planted cone ──────────────────
+//
+// The 47810 proximity cone fires from its plant at the closest player, and
+// its damage scales with how close that player is. A designated bait at
+// proper range takes a survivable hit (every clean bait across six logs
+// survived, at plant distances anywhere from 175 to 660 — the geometry
+// bands of good and bad baits fully overlap, so position alone CANNOT
+// flag this). Standing right up against the plant is what kills: the one
+// confirmed case took a hit equal to their entire max HP and died two
+// seconds later, credited to 47810.
+//
+// So the rule is outcome-based: a death credited to 47810 where the
+// killing cone struck EXACTLY ONE player. The single-victim requirement
+// is what separates "bait stood too close" (the victim's own positioning
+// error) from a cone that CLEAVED several players — that's the planter's
+// misplant (already flagged by the wrong-spot rule) or mid-wipe chaos,
+// and its victims are not to blame (observed: a wipe-collapse cone that
+// swept four players, killing two — correctly skipped here).
+const CONE_FOLLOWUP_VOLLEY_GAP_MS = 1500; // hits of one firing land ~130ms apart; volleys are 10s apart
+const CONE_DEATH_WINDOW_MS        = 3000; // fatal hit → death event lag (observed ~2s)
+
+function detectLethalConeBaitErrors(
+  players:            PlayerInfo[],
+  deathEvents:        DeathEvent[],
+  expectedTimestamps: Map<string, number>
+): PullError[] {
+  type ConeHit = { player: PlayerInfo; timestamp: number; instance?: number };
+  const coneHits: ConeHit[] = [];
+  for (const player of players) {
+    for (const e of player.damageTaken) {
+      if (e.abilityId !== CONE_FOLLOWUP_ABILITY_ID) continue;
+      coneHits.push({ player, timestamp: e.timestamp, instance: e.sourceInstance });
+    }
+  }
+  if (coneHits.length === 0) return [];
+
+  // Group hits into per-cone firings: same source instance, close in time
+  // (instances are reused across resolutions, so time matters too).
+  coneHits.sort((a, b) => a.timestamp - b.timestamp);
+  const volleys: ConeHit[][] = [];
+  for (const hit of coneHits) {
+    const current = volleys.find(
+      (v) =>
+        v[0].instance === hit.instance &&
+        hit.timestamp - v[v.length - 1].timestamp <= CONE_FOLLOWUP_VOLLEY_GAP_MS
+    );
+    if (current) current.push(hit);
+    else volleys.push([hit]);
+  }
+
+  const errors: PullError[] = [];
+
+  for (const death of deathEvents) {
+    if (death.killingAbilityGameId !== CONE_FOLLOWUP_ABILITY_ID) continue;
+
+    // The volley containing the fatal hit on this player.
+    const volley = volleys.find((v) =>
+      v.some(
+        (h) =>
+          h.player.name === death.player &&
+          death.timestamp - h.timestamp >= 0 &&
+          death.timestamp - h.timestamp <= CONE_DEATH_WINDOW_MS
+      )
+    );
+    if (!volley) continue;
+
+    const distinctVictims = new Set(volley.map((h) => h.player.actorId));
+    if (distinctVictims.size !== 1) continue; // a cleave — the planter's error, not the bait's
+
+    const victimHit = volley.find((h) => h.player.name === death.player)!;
+
+    // Tower label: the resolution whose consensus stack-loss immediately
+    // precedes this volley (cones fire ~1.2s after their own resolution).
+    let towerLabel = "";
+    for (const [key, consensus] of expectedTimestamps) {
+      const delta = victimHit.timestamp - consensus;
+      if (delta < 0 || delta > PATH_OF_LIGHT_WINDOW_MS + 1500) continue;
+      const [team, slotIndexStr] = key.split("-") as ["first" | "second", string];
+      const towerNumber = (team === "first" ? TOWER_ORDER_FIRST_TEAM : TOWER_ORDER_SECOND_TEAM)[Number(slotIndexStr)];
+      if (towerNumber !== undefined) towerLabel = ` (tower #${towerNumber})`;
+      break;
+    }
+
+    errors.push({
+      ruleId:      FORSAKEN_LETHAL_CONE_BAIT_RULE_ID,
+      severity:    "Major",
+      name:        "Baited Cone Too Close",
+      description: `Stood too close to a planted Forsaken cone${towerLabel} — the proximity aoe latched onto them at point-blank range, and its distance-scaled damage killed them outright.`,
+      timestamp:   victimHit.timestamp,
+      player:      victimHit.player.name,
+      class:       victimHit.player.className,
+      specId:      victimHit.player.specId,
+      role:        victimHit.player.role,
+      abilityId:   CONE_FOLLOWUP_ABILITY_ID,
+      abilityName: "Forsaken Cone",
+    });
+  }
+
+  return errors.sort((a, b) => a.timestamp - b.timestamp);
 }

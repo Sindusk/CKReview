@@ -936,7 +936,7 @@ export function transformFFightToPull(
 
   const errors = [
     ...detectPullErrors(players, deathEvents, enemyCastEvents, enemyBuffEvents),
-    ...detectForsakenTowerErrors(players),
+    ...detectForsakenTowerErrors(players, deathEvents),
     ...detectBlackHoleErrors(players, deathEvents),
     ...detectLimitCutErrors(players, deathEvents),
   ].sort((a, b) => a.timestamp - b.timestamp);

@@ -32,6 +32,7 @@ const JOBS = {
   'ForsakenPull10Fail.json': { 11:'DNC', 12:'DRK', 13:'PLD', 14:'AST', 15:'VPR', 16:'PCT', 17:'RPR', 18:'SGE' },
   'ForsakenSuccessPull1.json': { 177:'AST', 178:'DRK', 179:'PLD', 180:'BLM', 181:'SAM', 182:'BRD', 183:'SGE', 184:'DRG' },
   'ForsakenSuccessPull7.json': { 177:'AST', 178:'DRK', 179:'PLD', 180:'BLM', 181:'SAM', 182:'BRD', 183:'SGE', 184:'DRG' },
+  'ff/ForsakenFail17-4.json':  { 148:'AST', 149:'DRG', 150:'SAM', 151:'SGE', 152:'DRK', 153:'BLM', 154:'PLD', 155:'BRD' },
 };
 let JOB = JOBS.default;
 const DATA_DIR = path.join(ROOT, 'sampledata');
@@ -65,10 +66,21 @@ function buildPlayers(rep) {
   }));
 }
 
-for (const f of ['ForsakenPull1Fail.json', 'ForsakenSuccess.json', 'ForsakenPull8Fail.json', 'Forsaken3Playertower.json', 'ForsakenPull2Fail.json', 'ForsakenPull10Fail.json', 'ForsakenSuccessPull1.json', 'ForsakenSuccessPull7.json']) {
+function buildDeaths(rep) {
+  return rep.deaths.data.map(e => ({
+    timestamp: e.timestamp,
+    player: JOB[e.targetID] ?? `P${e.targetID}`,
+    class: JOB[e.targetID] ?? '?',
+    specId: 0, role: 'DPS',
+    killingAbilityGameId: e.killingAbilityGameID ?? 0,
+    cause: '',
+  }));
+}
+
+for (const f of ['ForsakenPull1Fail.json', 'ForsakenSuccess.json', 'ForsakenPull8Fail.json', 'Forsaken3Playertower.json', 'ForsakenPull2Fail.json', 'ForsakenPull10Fail.json', 'ForsakenSuccessPull1.json', 'ForsakenSuccessPull7.json', 'ff/ForsakenFail17-4.json']) {
   JOB = JOBS[f] ?? JOBS.default;
   const rep = JSON.parse(fs.readFileSync(path.join(DATA_DIR, f), 'utf8')).json.data.reportData.report;
-  const errors = detectForsakenTowerErrors(buildPlayers(rep));
+  const errors = detectForsakenTowerErrors(buildPlayers(rep), buildDeaths(rep));
   console.log('='.repeat(70));
   console.log(f, '->', errors.length, 'errors');
   for (const e of errors) {
