@@ -35,6 +35,11 @@ export function getFFLRateLimitStatus(): RateLimitStatus | null {
   return rateLimitTracker.status();
 }
 
+/** True if the last-observed hourly points quota is exhausted. */
+export function isFFLQuotaExhausted(): boolean {
+  return rateLimitTracker.isQuotaExhausted();
+}
+
 // ─── Generic GraphQL runner ───────────────────────────────────────────────────
 
 const MAX_RETRIES = 5;

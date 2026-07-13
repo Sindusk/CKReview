@@ -17,9 +17,17 @@ import { createCallWipeError, CALL_WIPE_RULE_ID, createManualError, type ManualE
 import type { SavedSession } from "@/types/Session";
 import useTimelineController from "@/hooks/useTimelineController";
 import { loginWithWarcraftLogs, loginWithFFLogs } from "@/lib/log-auth";
-import { fetchReport, fetchFightData, getWCLRateLimitStatus } from "@/lib/wcl-client";
-import { transformReportToPulls, transformFFReportToPulls, buildWCLAbilityMap, buildFFLAbilityMap } from "@/lib/log-transforms";
-import { fetchFFReport, fetchFFightData, getFFLRateLimitStatus } from "@/lib/ffl-client";
+import { fetchReport, fetchFightData, getWCLRateLimitStatus, isWCLQuotaExhausted, type WCLReport } from "@/lib/wcl-client";
+import {
+  transformReportToPulls,
+  transformFFReportToPulls,
+  transformFightToPull,
+  transformFFightToPull,
+  buildWCLAbilityMap,
+  buildFFLAbilityMap,
+  renumberPullsByBoss,
+} from "@/lib/log-transforms";
+import { fetchFFReport, fetchFFightData, getFFLRateLimitStatus, isFFLQuotaExhausted, type FFLReport } from "@/lib/ffl-client";
 import { formatWaitTime, type RateLimitStatus } from "@/lib/rate-limit";
 import {
   lookupSessionForLog,
@@ -47,6 +55,13 @@ import type { SavedManualError } from "@/types/Session";
 // limit errors.
 
 const FIGHT_FETCH_CONCURRENCY = 3;
+
+// How often to re-check a "live" report for newly-appeared fights while
+// live log mode is on. Each check costs one report/fights query plus, only
+// when new fights actually exist, one fetchFightData per new fight — modest
+// against the hourly points quota, and isWCLQuotaExhausted()/
+// isFFLQuotaExhausted() skip the cycle entirely if the quota is already spent.
+const LIVE_POLL_INTERVAL_MS = 30_000;
 
 async function mapWithConcurrency<T, R>(
   items: T[],
@@ -85,6 +100,11 @@ export default function Home() {
   const [importProgress, setImportProgress] = useState(0);
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const [loadedReportCode, setLoadedReportCode] = useState<string | null>(null);
+
+  // "Live log" — opt-in, off by default. When on, keeps polling the loaded
+  // report for newly-appeared fights (see the polling useEffect below) and
+  // appends them as new pulls instead of requiring a manual re-import.
+  const [liveLogEnabled, setLiveLogEnabled] = useState(false);
 
   // ── Rate limit display ─────────────────────────────────────────────────────
   //
@@ -485,6 +505,106 @@ export default function Home() {
     persistSession();
   }
 
+  // ── Live log polling ────────────────────────────────────────────────────────
+  //
+  // Re-fetches the report and diffs its fight list against the currently
+  // loaded pulls (by fightId — the stable identifier; Pull.id is just a
+  // startTime-sorted position, see below) to find fights that appeared
+  // since the last check. New fights are transformed and appended without
+  // disturbing existing pulls' errors/VOD sync. Mirrors handleImportWCL's
+  // fetch → transform → reattach-pending-state shape, just scoped to only
+  // the new fights instead of the whole report.
+
+  async function pollWCLForNewFights(reportCode: string) {
+    if (isWCLQuotaExhausted()) return;
+
+    let report: WCLReport;
+    try {
+      report = await fetchReport(reportCode);
+    } catch (err) {
+      console.error("Live log poll failed:", err);
+      return;
+    }
+
+    const knownFightIds = new Set(pullsRef.current.map(p => p.fightId));
+    const newFights = report.fights.filter(f => f.endTime > f.startTime && !knownFightIds.has(f.id));
+    if (newFights.length === 0) return;
+
+    const abilityMap = buildWCLAbilityMap(report.masterData.abilities);
+    const newFightData = await mapWithConcurrency(
+      newFights,
+      FIGHT_FETCH_CONCURRENCY,
+      (fight) => fetchFightData(reportCode, fight, report.masterData.actors)
+    );
+
+    let appended = newFightData.map(data => transformFightToPull(data, abilityMap, report.code));
+    appended = applyPendingWipeCalls(appended, pendingWipeCallsRef.current);
+    appended = applyPendingManualErrors(appended, pendingManualErrorsRef.current);
+
+    appendLivePulls(appended);
+  }
+
+  async function pollFFLForNewFights(reportCode: string) {
+    if (isFFLQuotaExhausted()) return;
+
+    let report: FFLReport;
+    try {
+      report = await fetchFFReport(reportCode);
+    } catch (err) {
+      console.error("Live log poll failed:", err);
+      return;
+    }
+
+    const knownFightIds = new Set(pullsRef.current.map(p => p.fightId));
+    const newFights = report.fights.filter(f => f.endTime > f.startTime && !knownFightIds.has(f.id));
+    if (newFights.length === 0) return;
+
+    const abilityMap = buildFFLAbilityMap(report.masterData.abilities);
+    const newFightData = await mapWithConcurrency(
+      newFights,
+      FIGHT_FETCH_CONCURRENCY,
+      (fight) => fetchFFightData(reportCode, fight, report.masterData.actors)
+    );
+
+    let appended = newFightData.map(data => transformFFightToPull(data, abilityMap, report.code));
+    appended = applyPendingWipeCalls(appended, pendingWipeCallsRef.current);
+    appended = applyPendingManualErrors(appended, pendingManualErrorsRef.current);
+
+    appendLivePulls(appended);
+  }
+
+  // Shared by both poll functions — merges newly-appeared pulls into the
+  // existing set, then renumbers ids (Pull.id is just a startTime-sorted
+  // position, not stable across imports) and per-boss pull numbers across
+  // the COMBINED set so e.g. a 4th Rotmire pull appearing live reads #4,
+  // not a fresh #1.
+  function appendLivePulls(newPulls: Pull[]) {
+    setPulls(prev => {
+      const combined = [...prev, ...newPulls].sort((a, b) => a.startTime - b.startTime);
+      combined.forEach((p, i) => { p.id = i + 1; });
+      renumberPullsByBoss(combined);
+      return combined;
+    });
+    persistSession();
+  }
+
+  // Polls the loaded report for new fights while live log mode is on.
+  // Deliberately does not fire an immediate poll on mount/enable — the
+  // report was just fully fetched by the initial import, so the first
+  // live check happens after one full interval.
+  useEffect(() => {
+    if (!liveLogEnabled || !loadedReportCode || importing) return;
+
+    const poll =
+      loadedSource === "wcl" ? () => pollWCLForNewFights(loadedReportCode) :
+      loadedSource === "ffl" ? () => pollFFLForNewFights(loadedReportCode) :
+      null;
+    if (!poll) return;
+
+    const interval = setInterval(poll, LIVE_POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [liveLogEnabled, loadedReportCode, loadedSource, importing]);
+
   // ── Unified import dispatcher ──────────────────────────────────────────────
 
   async function handleImportReport(rawInput: string, options?: { skipDuplicateCheck?: boolean }) {
@@ -652,6 +772,8 @@ export default function Home() {
           onImport={handleImportReport}
           importPointsUsed={importPointsUsed}
           rateLimit={liveRateLimit}
+          liveLogEnabled={liveLogEnabled}
+          onLiveLogEnabledChange={setLiveLogEnabled}
         />
       </div>
 
@@ -860,6 +982,8 @@ function WCLImportBar({
   onImport,
   importPointsUsed,
   rateLimit,
+  liveLogEnabled,
+  onLiveLogEnabledChange,
 }: {
   value:            string;
   onChange:         (v: string) => void;
@@ -875,6 +999,11 @@ function WCLImportBar({
   // Live-ticking snapshot of the provider's hourly points quota — see
   // page.tsx's polling useEffect keyed on loadedSource.
   rateLimit?:        RateLimitStatus | null;
+  // Opt-in "keep polling this report for new fights" toggle — off by
+  // default, set before Import is clicked, drives page.tsx's live-poll
+  // useEffect once a report is loaded.
+  liveLogEnabled:         boolean;
+  onLiveLogEnabledChange: (v: boolean) => void;
 }) {
   function handleSubmit() {
     const trimmed = value.trim();
@@ -901,6 +1030,13 @@ function WCLImportBar({
           Log Loaded: {loadedReportCode}
         </span>
         <span style={{ fontSize: "11px", color: "#94a3b8" }}>Ready for review</span>
+
+        {liveLogEnabled && (
+          <span style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "11px", color: "#4ade80" }}>
+            <span style={{ width: "6px", height: "6px", borderRadius: "999px", backgroundColor: "#4ade80" }} />
+            Live — checking for new pulls
+          </span>
+        )}
 
         {rateLimit && (
           <span
@@ -965,6 +1101,17 @@ function WCLImportBar({
           outline:         "none",
         }}
       />
+      <label
+        title="Keep checking this report for new fights and import them automatically as they occur"
+        style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "11px", color: "#94a3b8", whiteSpace: "nowrap", cursor: "pointer" }}
+      >
+        <input
+          type="checkbox"
+          checked={liveLogEnabled}
+          onChange={e => onLiveLogEnabledChange(e.target.checked)}
+        />
+        Live log
+      </label>
       <button
         onClick={handleSubmit}
         disabled={!value.trim()}

@@ -32,6 +32,11 @@ export function getWCLRateLimitStatus(): RateLimitStatus | null {
   return rateLimitTracker.status();
 }
 
+/** True if the last-observed hourly points quota is exhausted. */
+export function isWCLQuotaExhausted(): boolean {
+  return rateLimitTracker.isQuotaExhausted();
+}
+
 // ─── Generic GraphQL runner ───────────────────────────────────────────────────
 
 const MAX_RETRIES = 5;

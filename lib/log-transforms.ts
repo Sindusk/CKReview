@@ -489,6 +489,20 @@ export function transformFightToPull(
   };
 }
 
+// Numbers pulls sequentially per boss name, not globally, so e.g. Rotmire
+// pulls read #1–#5 and the next boss's pulls restart at #1. Mutates in
+// array order — callers must sort by startTime first. Shared by the bulk
+// transforms below and by live-log polling, which recomputes numbering
+// across the combined existing+newly-appended pull set.
+export function renumberPullsByBoss(pulls: Pull[]): void {
+  const nameCounters = new Map<string, number>();
+  for (const pull of pulls) {
+    const next = (nameCounters.get(pull.name) ?? 0) + 1;
+    nameCounters.set(pull.name, next);
+    pull.pullNumber = next;
+  }
+}
+
 export function transformReportToPulls(
   fightDataList: WCLFightData[],
   abilityMap:    Map<number, AbilityInfo>,
@@ -498,14 +512,7 @@ export function transformReportToPulls(
     .sort((a, b) => a.fight.startTime - b.fight.startTime)
     .map((data, i) => transformFightToPull(data, abilityMap, reportCode, i + 1));
 
-  // Number pulls sequentially per boss name, not globally, so e.g. Rotmire
-  // pulls read #1–#5 and the next boss's pulls restart at #1.
-  const nameCounters = new Map<string, number>();
-  for (const pull of pulls) {
-    const next = (nameCounters.get(pull.name) ?? 0) + 1;
-    nameCounters.set(pull.name, next);
-    pull.pullNumber = next;
-  }
+  renumberPullsByBoss(pulls);
 
   return pulls;
 }
@@ -964,12 +971,7 @@ export function transformFFReportToPulls(
     .sort((a, b) => a.fight.startTime - b.fight.startTime)
     .map((data, i) => transformFFightToPull(data, abilityMap, reportCode, i + 1));
 
-  const nameCounters = new Map<string, number>();
-  for (const pull of pulls) {
-    const next = (nameCounters.get(pull.name) ?? 0) + 1;
-    nameCounters.set(pull.name, next);
-    pull.pullNumber = next;
-  }
+  renumberPullsByBoss(pulls);
 
   return pulls;
 }
