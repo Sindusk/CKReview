@@ -5,17 +5,21 @@
 // Run from the repo root:  node scripts/validate-limitcut.js
 //
 // Expected results (any deviation is a regression):
-//   ff/BlackHoleFailPull13 -> WHM pushed off (~+518.7s, fall death 2.5s
-//                             after the gaze resolution)
-//   BlackHoleFailPull5     -> BRD pushed off (~+520.4s). The same log's
+//   ff/BlackHoleFailPull13 -> WHM pushed off (~+518.7s) ONLY. WHM's clone
+//                             re-fired into VPR+PCT, but dead-forced
+//                             re-targets are deliberately unflagged and
+//                             disable the whole dash analysis for the set.
+//   BlackHoleFailPull5     -> BRD pushed off (~+520.4s) ONLY (BRD's clone
+//                             re-fired at DRG — same exclusion). The
 //                             unrelated fall death at +56s must NOT flag.
-//   ForsakenSuccess        -> RPR + PCT pushed off (~+519.3s) — that pull
-//                             cleared Forsaken but failed Limit Cut; its
-//                             later wipe-cascade fall deaths at +540/+557
-//                             are outside the grace window and must NOT
-//                             flag.
-//   everything else        -> 0 errors (Limit Cut passed, or the pull
-//                             wiped before it)
+//   ForsakenSuccess        -> RPR + PCT pushed off (~+519.3s) ONLY (their
+//                             clones re-fired at SGE/PLD — same
+//                             exclusion). Wipe-cascade fall deaths at
+//                             +540/+557 must NOT flag.
+//   everything else        -> 0 errors (Limit Cut passed cleanly, or the
+//                             pull wiped before it). The dash clip /
+//                             missed-own-dash rules have no positive
+//                             sample yet — they exist for future logs.
 const fs = require('fs');
 const path = require('path');
 const ROOT = path.join(__dirname, '..');
@@ -43,13 +47,24 @@ const DATA_DIR = path.join(ROOT, 'sampledata');
 
 function buildPlayers(rep) {
   const playerIds = [...new Set(rep.combatantInfo.data.map(e => e.sourceID))];
+  const onlyLanded = evs => evs.filter(e => e.type === 'damage' || (e.type === 'calculateddamage' && e.unpaired === true));
+  const dt = onlyLanded(rep.damageTaken.data);
   const statusMap = { removedebuff: 'removed', applydebuffstack: 'stack', removedebuffstack: 'stackRemoved' };
   return playerIds.map(id => ({
     actorId: id,
     name: JOB[id] ?? `P${id}`,
     className: JOB[id] ?? '?',
     specId: 0, specName: '', role: 'DPS', rangeType: 'Melee', game: 'ffxiv',
-    damageDone: [], healing: [], casts: [], damageTaken: [],
+    damageDone: [], healing: [], casts: [],
+    damageTaken: dt.filter(e => e.targetID === id).map(e => ({
+      timestamp: e.timestamp,
+      abilityId: e.abilityGameID ?? 0,
+      abilityName: '',
+      amount: e.amount ?? 0,
+      sourceInstance: e.sourceInstance,
+      x: e.targetResources?.x,
+      y: e.targetResources?.y,
+    })),
     debuffs: rep.debuffs.data.filter(e => e.targetID === id).map(e => ({
       timestamp: e.timestamp,
       abilityId: e.abilityGameID ?? 0,
