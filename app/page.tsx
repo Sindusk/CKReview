@@ -9,6 +9,7 @@ import { parseYouTubeUrl, parseLogUrl } from "@/lib/url-parsers";
 import type { Vod } from "../types/Vod";
 import VideoPanel from "../components/VideoPanel";
 import VODSidebar from "../components/VODSidebar";
+import TranscriptDialog from "../components/TranscriptDialog";
 import AnalysisPanel from "../components/AnalysisPanel";
 import RosterPanel from "../components/RosterPanel";
 import TimelinePanel from "@/components/TimelinePanel";
@@ -91,6 +92,7 @@ export default function Home() {
   const [selectedVodId, setSelectedVodId] = useState<number | null>(null);
   const [showDialog, setShowDialog] = useState(false);
   const [showReport, setShowReport] = useState(false);
+  const [transcriptVodId, setTranscriptVodId] = useState<number | null>(null);
 
   const [pulls, setPulls] = useState<Pull[]>([]);
   const [selectedPullId, setSelectedPullId] = useState<number | null>(null);
@@ -870,6 +872,7 @@ export default function Home() {
           vods={vods}
           selectedVodId={selectedVodId}
           onSelectVod={setSelectedVodId}
+          onOpenTranscript={setTranscriptVodId}
         />
       </div>
 
@@ -883,6 +886,11 @@ export default function Home() {
         open={showReport}
         onClose={() => setShowReport(false)}
         pulls={pulls}
+      />
+
+      <TranscriptDialog
+        vod={vods.find(v => v.id === transcriptVodId) ?? null}
+        onClose={() => setTranscriptVodId(null)}
       />
 
       <SessionFoundDialog

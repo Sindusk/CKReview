@@ -8,6 +8,7 @@ type VODSidebarProps = {
   vods: Vod[];
   selectedVodId: number | null;
   onSelectVod: (id: number) => void;
+  onOpenTranscript: (id: number) => void;
 
   pulls: Pull[];
   selectedPullId: number | null;
@@ -18,6 +19,7 @@ export default function VODSidebar({
   vods,
   selectedVodId,
   onSelectVod,
+  onOpenTranscript,
   pulls,
   selectedPullId,
   onSelectPull,
@@ -75,9 +77,17 @@ export default function VODSidebar({
           const isSelected = vod.id === selectedVodId;
 
           return (
-            <button
+            <div
               key={vod.id}
+              role="button"
+              tabIndex={0}
               onClick={() => onSelectVod(vod.id)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onSelectVod(vod.id);
+                }
+              }}
               style={{
                 textAlign: "left",
                 padding: "8px 6px",
@@ -94,13 +104,34 @@ export default function VODSidebar({
                 overflow: "hidden",
               }}
             >
-              <div style={{ fontWeight: "bold", fontSize: "12px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {vod.player}
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "4px" }}>
+                <div style={{ fontWeight: "bold", fontSize: "12px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {vod.player}
+                </div>
+                <button
+                  title="View transcript"
+                  onClick={(e) => { e.stopPropagation(); onOpenTranscript(vod.id); }}
+                  style={{
+                    flexShrink: 0,
+                    width: "16px",
+                    height: "16px",
+                    lineHeight: "16px",
+                    padding: 0,
+                    fontSize: "10px",
+                    color: "#94a3b8",
+                    backgroundColor: "#1f1f1f",
+                    border: "1px solid #333",
+                    borderRadius: "4px",
+                    cursor: "pointer",
+                  }}
+                >
+                  T
+                </button>
               </div>
               <div style={{ fontSize: "10px", color: "#aaa", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {vod.url.length > 18 ? vod.url.slice(0, 18) + "..." : vod.url}
               </div>
-            </button>
+            </div>
           );
         })}
       </div>
