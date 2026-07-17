@@ -28,8 +28,11 @@ type AnalysisPanelProps = {
   vodTimeAvailable?: boolean;
 };
 
-type Tab = "Overall" | "Deaths" | "Raid" | "Major" | "Minor";
-const TABS: Tab[] = ["Overall", "Deaths", "Raid", "Major", "Minor"];
+// "Review" is the default tab — the curated raid-review feed showing only
+// what's worth talking through after a pull: Raid + Major errors, no
+// deaths (mostly consequences) and no Minor noise.
+type Tab = "Overall" | "Deaths" | "Review" | "Raid" | "Major" | "Minor";
+const TABS: Tab[] = ["Overall", "Deaths", "Review", "Raid", "Major", "Minor"];
 
 // Unified shape for anything that can appear in the timeline feed —
 // a death, or a Raid/Major/Minor error.
@@ -350,6 +353,7 @@ function TabBar({ value, onChange, counts }: { value: Tab; onChange: (t: Tab) =>
           tab === "Major" ? "#fb923c" :
           tab === "Minor" ? "#fbbf24" :
           tab === "Deaths" ? "#f87171" :
+          tab === "Review" ? "#60a5fa" :
           "#94a3b8";
 
         return (
@@ -406,7 +410,7 @@ function filterRealPlayers(players: Pull["players"]) {
 }
 
 export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime, onCallWipe, onAddError, onRemoveError, vodTimeAvailable }: AnalysisPanelProps) {
-  const [activeTab, setActiveTab] = useState<Tab>("Overall");
+  const [activeTab, setActiveTab] = useState<Tab>("Review");
   const [showAddErrorDialog, setShowAddErrorDialog] = useState(false);
   const [confirmRemoveWipe, setConfirmRemoveWipe] = useState(false);
   const [pendingRemoveEntry, setPendingRemoveEntry] = useState<FeedEntry | null>(null);
@@ -447,6 +451,7 @@ export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime, onCa
   const counts: Record<Tab, number> = {
     Overall: deaths.length + raids.length + majors.length + minors.length,
     Deaths:  deaths.length,
+    Review:  raids.length + majors.length,
     Raid:    raids.length,
     Major:   majors.length,
     Minor:   minors.length,
@@ -467,6 +472,11 @@ export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime, onCa
         ].sort((a, b) => a.timestamp - b.timestamp);
       case "Deaths":
         return deaths.map((d) => deathToFeedEntry(d, pull.game));
+      case "Review":
+        return [
+          ...raids.map((e) => errorToFeedEntry(e, pull.game)),
+          ...majors.map((e) => errorToFeedEntry(e, pull.game)),
+        ].sort((a, b) => a.timestamp - b.timestamp);
       case "Raid":
         return raids.map((e) => errorToFeedEntry(e, pull.game));
       case "Major":
@@ -479,6 +489,7 @@ export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime, onCa
   const emptyState: Record<Tab, { icon: string; text: string; color: string }> = {
     Overall: { icon: "✨", text: "No deaths or errors this pull", color: "#4ade80" },
     Deaths:  { icon: "✨", text: "No deaths this pull", color: "#4ade80" },
+    Review:  { icon: "✨", text: "No raid or major errors this pull", color: "#4ade80" },
     Raid:    { icon: "✨", text: "No raid-wide errors this pull", color: "#4ade80" },
     Major:   { icon: "✨", text: "No major errors this pull", color: "#4ade80" },
     Minor:   { icon: "✨", text: "No minor errors this pull", color: "#4ade80" },
@@ -600,7 +611,7 @@ export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime, onCa
                 entry={entry}
                 playbackTimeMs={playbackTimeMs}
                 onSeek={onSeekToTime ? handleSeek : undefined}
-                showKindBadge={activeTab === "Overall"}
+                showKindBadge={activeTab === "Overall" || activeTab === "Review"}
                 onRequestRemove={onRemoveError ? (e) => setPendingRemoveEntry(e) : undefined}
               />
             ))}

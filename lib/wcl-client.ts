@@ -41,7 +41,10 @@ export function isWCLQuotaExhausted(): boolean {
 
 const MAX_RETRIES = 5;
 
-async function gql<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
+// `logLabel` tags the raw-response console dump below so individual
+// requests are identifiable when scraping sample data from the console —
+// e.g. "Midnight Falls Pull 4 (page 1)" instead of an anonymous dump.
+async function gql<T>(query: string, variables?: Record<string, unknown>, logLabel?: string): Promise<T> {
   const token = await getAccessToken();
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -95,7 +98,7 @@ async function gql<T>(query: string, variables?: Record<string, unknown>): Promi
     // a damage event actually carry `tick` or `hitPoints`?) directly from a
     // live report instead of guessing from schema docs. Safe to comment out
     // once you're done collecting sample data — it is verbose on large reports.
-    console.log("[WCL raw response]", { query, variables, json });
+    console.log(`[WCL raw response]${logLabel ? ` — ${logLabel}` : ""}`, { query, variables, json });
 
     if (json.errors?.length) {
       throw new Error(`WCL GraphQL error: ${json.errors[0].message}`);
@@ -324,8 +327,28 @@ type ReportQueryResult = {
 };
 
 export async function fetchReport(reportCode: string): Promise<WCLReport> {
-  const data = await gql<ReportQueryResult>(REPORT_QUERY, { code: reportCode });
+  const data = await gql<ReportQueryResult>(REPORT_QUERY, { code: reportCode }, `report ${reportCode}`);
   return data.reportData.report;
+}
+
+/**
+ * Per-boss "Pull N" console labels for every fight in a report, keyed by
+ * fight id — the same per-boss-name numbering the UI uses (see
+ * renumberPullsByBoss in log-transforms.ts), computed up front so
+ * fetchFightData can tag its raw-response console dumps before the Pull
+ * objects exist. Callers should pass the same full fight list every time
+ * (not a filtered subset) so numbering stays stable across live-poll
+ * refetches.
+ */
+export function buildFightLogLabels(fights: WCLFight[]): Map<number, string> {
+  const labels = new Map<number, string>();
+  const nameCounters = new Map<string, number>();
+  for (const fight of [...fights].sort((a, b) => a.startTime - b.startTime)) {
+    const next = (nameCounters.get(fight.name) ?? 0) + 1;
+    nameCounters.set(fight.name, next);
+    labels.set(fight.id, `${fight.name} Pull ${next}`);
+  }
+  return labels;
 }
 
 // ─── Query: ALL event types for a single fight, merged into one request ─────
@@ -484,9 +507,11 @@ export type WCLFightData = {
 export async function fetchFightData(
   reportCode: string,
   fight:      WCLFight,
-  actors:     WCLActor[]
+  actors:     WCLActor[],
+  logLabel?:  string      // e.g. from buildFightLogLabels — tags console dumps
 ): Promise<WCLFightData> {
   const endTime = fight.endTime;
+  const label   = logLabel ?? `${fight.name} (fight ${fight.id})`;
 
   const cursors: Record<StreamKey, number> = {
     deaths: fight.startTime, combatantInfo: fight.startTime, casts: fight.startTime,
@@ -519,7 +544,7 @@ export async function fetchFightData(
       debuffsStart:        cursors.debuffs,
       enemyCastsStart:     cursors.enemyCasts,
       enemyBuffsStart:     cursors.enemyBuffs,
-    });
+    }, `${label} (page ${page})`);
 
     const report = data.reportData.report;
 

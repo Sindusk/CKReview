@@ -18,7 +18,7 @@ import { createCallWipeError, CALL_WIPE_RULE_ID, createManualError, type ManualE
 import type { SavedSession } from "@/types/Session";
 import useTimelineController from "@/hooks/useTimelineController";
 import { loginWithWarcraftLogs, loginWithFFLogs } from "@/lib/log-auth";
-import { fetchReport, fetchFightData, getWCLRateLimitStatus, isWCLQuotaExhausted, type WCLReport } from "@/lib/wcl-client";
+import { fetchReport, fetchFightData, buildFightLogLabels, getWCLRateLimitStatus, isWCLQuotaExhausted, type WCLReport } from "@/lib/wcl-client";
 import {
   transformReportToPulls,
   transformFFReportToPulls,
@@ -28,7 +28,7 @@ import {
   buildFFLAbilityMap,
   renumberPullsByBoss,
 } from "@/lib/log-transforms";
-import { fetchFFReport, fetchFFightData, getFFLRateLimitStatus, isFFLQuotaExhausted, type FFLReport } from "@/lib/ffl-client";
+import { fetchFFReport, fetchFFightData, buildFFFightLogLabels, getFFLRateLimitStatus, isFFLQuotaExhausted, type FFLReport } from "@/lib/ffl-client";
 import { formatWaitTime, type RateLimitStatus } from "@/lib/rate-limit";
 import {
   lookupSessionForLog,
@@ -401,11 +401,15 @@ export default function Home() {
     const totalFights = Math.max(validFights.length, 1);
     let completedFights = 0;
 
+    // "Boss Pull N" labels for the raw-response console dumps, so sample
+    // data grabbed from the console is identifiable per pull.
+    const fightLogLabels = buildFightLogLabels(report.fights);
+
     const fightDataList = await mapWithConcurrency(
       validFights,
       FIGHT_FETCH_CONCURRENCY,
       async (fight) => {
-        const fightData = await fetchFightData(reportCode, fight, report.masterData.actors);
+        const fightData = await fetchFightData(reportCode, fight, report.masterData.actors, fightLogLabels.get(fight.id));
         completedFights += 1;
         const progress = Math.round(10 + (completedFights / totalFights) * 85);
         setImportProgress(progress);
@@ -466,11 +470,13 @@ export default function Home() {
     const totalFights = Math.max(validFights.length, 1);
     let completedFights = 0;
 
+    const fightLogLabels = buildFFFightLogLabels(report.fights);
+
     const fightDataList = await mapWithConcurrency(
       validFights,
       FIGHT_FETCH_CONCURRENCY,
       async (fight) => {
-        const fightData = await fetchFFightData(reportCode, fight, report.masterData.actors);
+        const fightData = await fetchFFightData(reportCode, fight, report.masterData.actors, fightLogLabels.get(fight.id));
         completedFights += 1;
         const progress = Math.round(10 + (completedFights / totalFights) * 85);
         setImportProgress(progress);
@@ -533,10 +539,11 @@ export default function Home() {
     if (newFights.length === 0) return;
 
     const abilityMap = buildWCLAbilityMap(report.masterData.abilities);
+    const fightLogLabels = buildFightLogLabels(report.fights);
     const newFightData = await mapWithConcurrency(
       newFights,
       FIGHT_FETCH_CONCURRENCY,
-      (fight) => fetchFightData(reportCode, fight, report.masterData.actors)
+      (fight) => fetchFightData(reportCode, fight, report.masterData.actors, fightLogLabels.get(fight.id))
     );
 
     let appended = newFightData.map(data => transformFightToPull(data, abilityMap, report.code));
@@ -562,10 +569,11 @@ export default function Home() {
     if (newFights.length === 0) return;
 
     const abilityMap = buildFFLAbilityMap(report.masterData.abilities);
+    const fightLogLabels = buildFFFightLogLabels(report.fights);
     const newFightData = await mapWithConcurrency(
       newFights,
       FIGHT_FETCH_CONCURRENCY,
-      (fight) => fetchFFightData(reportCode, fight, report.masterData.actors)
+      (fight) => fetchFFightData(reportCode, fight, report.masterData.actors, fightLogLabels.get(fight.id))
     );
 
     let appended = newFightData.map(data => transformFFightToPull(data, abilityMap, report.code));

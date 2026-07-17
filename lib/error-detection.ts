@@ -153,9 +153,49 @@ function evaluateEnemyEventRule(rule: PullErrorRule, events: EnemyEvent[]): Pull
     }));
 }
 
-// ─── Public entry point ─────────────────────────────────────────────────────
+// ─── Raid-error burst suppression ───────────────────────────────────────────
+//
+// A single raid-wide event often surfaces as MANY near-simultaneous rule
+// firings — e.g. Light's End is one crystal detonation but lands as ~18
+// per-player damage events within 300ms, producing 18 identical Raid
+// errors. One detonation is one mistake, so after keeping a Raid error,
+// further Raid errors with the same ruleId inside the window are dropped.
+// Genuinely separate occurrences stay separate: the closest real repeat
+// seen (two Light's End crystals in MFPull21) was ~5.5s apart, well
+// outside the 2s window. Only Raid severity is collapsed — Major/Minor
+// errors are per-player by design, and the FIRST firing is the one kept
+// (for player-triggered Raid errors like Dissonance, the first recipient
+// is the likeliest root cause; the rest are usually chain fallout).
 
-export function detectPullErrors(
+const RAID_ERROR_SUPPRESS_WINDOW_MS = 2000;
+
+export function suppressDuplicateRaidErrors(errors: PullError[]): PullError[] {
+  const lastKeptByRule = new Map<string, number>();
+  const result: PullError[] = [];
+
+  for (const e of [...errors].sort((a, b) => a.timestamp - b.timestamp)) {
+    if (e.severity === "Raid") {
+      const lastKept = lastKeptByRule.get(e.ruleId);
+      if (lastKept !== undefined && e.timestamp - lastKept <= RAID_ERROR_SUPPRESS_WINDOW_MS) {
+        continue;
+      }
+      lastKeptByRule.set(e.ruleId, e.timestamp);
+    }
+    result.push(e);
+  }
+
+  return result;
+}
+
+// ─── Generic rule-set evaluation ────────────────────────────────────────────
+//
+// Runs an arbitrary rule table — used both for the global ERROR_RULES and
+// for encounter-specific tables kept inside lib/mechanics/ modules (e.g.
+// mechanics/wow/vs-dr-mqd/midnightfalls.ts), so declarative single-ability
+// rules never need to be reimplemented per encounter.
+
+export function evaluateRuleSet(
+  rules:       readonly PullErrorRule[],
   players:     PlayerInfo[],
   deathEvents: DeathEvent[] = [],
   enemyCasts:  EnemyEvent[] = [],
@@ -164,7 +204,7 @@ export function detectPullErrors(
   const errors: PullError[] = [];
 
   for (const player of players) {
-    for (const rule of ERROR_RULES) {
+    for (const rule of rules) {
       if (rule.trigger === "damage") {
         errors.push(...evaluateDamageRule(rule, player));
       } else if (rule.trigger === "debuffApplied") {
@@ -173,7 +213,7 @@ export function detectPullErrors(
     }
   }
 
-  for (const rule of ERROR_RULES) {
+  for (const rule of rules) {
     if (rule.trigger === "enemyCast") {
       errors.push(...evaluateEnemyEventRule(rule, enemyCasts));
     } else if (rule.trigger === "enemyBuffApplied") {
@@ -184,4 +224,17 @@ export function detectPullErrors(
   }
 
   return errors.sort((a, b) => a.timestamp - b.timestamp);
+}
+
+// ─── Public entry point ─────────────────────────────────────────────────────
+
+export function detectPullErrors(
+  players:     PlayerInfo[],
+  deathEvents: DeathEvent[] = [],
+  enemyCasts:  EnemyEvent[] = [],
+  enemyBuffs:  EnemyEvent[] = []
+): PullError[] {
+  return suppressDuplicateRaidErrors(
+    evaluateRuleSet(ERROR_RULES, players, deathEvents, enemyCasts, enemyBuffs)
+  );
 }

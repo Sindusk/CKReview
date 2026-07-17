@@ -1,4 +1,4 @@
-// Regression harness for lib/mechanics/forsaken.ts against the raw FFLogs
+// Regression harness for lib/mechanics/ffxiv/dancingmad/forsaken.ts against the raw FFLogs
 // dumps in sampledata/ (gitignored). Builds PlayerInfo[] the same way the
 // real pipeline does (onlyLanded filter, debuffStatus mapping,
 // sourceInstance/x/y plumbing), runs detectForsakenTowerErrors, and prints
@@ -20,7 +20,7 @@ const path = require('path');
 const ROOT = path.join(__dirname, '..');
 const ts = require(path.join(ROOT, 'node_modules', 'typescript'));
 
-const SRC = fs.readFileSync(path.join(ROOT, 'lib', 'mechanics', 'forsaken.ts'), 'utf8');
+const SRC = fs.readFileSync(path.join(ROOT, 'lib', 'mechanics', 'ffxiv', 'dancingmad', 'forsaken.ts'), 'utf8');
 const out = ts.transpileModule(SRC, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } });
 const mod = { exports: {} };
 new Function('exports', 'require', 'module', out.outputText)(mod.exports, require, mod);

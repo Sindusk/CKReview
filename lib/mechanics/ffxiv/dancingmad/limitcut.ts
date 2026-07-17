@@ -1,4 +1,4 @@
-// lib/mechanics/limitcut.ts
+// lib/mechanics/ffxiv/dancingmad/limitcut.ts
 //
 // Encounter-specific error detection for Limit Cut, the facing-check
 // mechanic in FFXIV's Dancing Mad (Kefka's Return) ultimate that runs

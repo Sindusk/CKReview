@@ -123,26 +123,11 @@ export const ERROR_RULES: PullErrorRule[] = [
   },
 
   // -- Midnight Falls --
-
-  {
-    id:          "wow-heavens-glaives",
-    game:        "wow",
-    severity:    "Major",
-    name:        "Hit By Heaven's Glaives",
-    description: "Took damage from Heaven's Glaives.",
-    trigger:     "killingBlow",
-    abilityId:   1254076,          // Heaven's Glaives
-  },
-
-  {
-    id:          "wow-death-dark-quasar",
-    game:        "wow",
-    severity:    "Major",
-    name:        "Death to Dark Quasar",
-    description: "Died to the Dark Quasar beam's killing blow.",
-    trigger:     "killingBlow",
-    abilityId:    1282469,         // Dark Quasar beam
-  },
+  //
+  // Midnight Falls detection lives in lib/mechanics/wow/vs-dr-mqd/
+  // midnightfalls.ts — the encounter grew past what single-ability rules
+  // can express, so its declarative rules AND its correlation logic are
+  // kept together in that module.
 
   // ── FFXIV ────────────────────────────────────────────────────────────────
 
@@ -219,91 +204,6 @@ export const ERROR_RULES: PullErrorRule[] = [
     description: "A frontal was executed incorrectly, enraging the boss.",
     trigger:     "enemyBuffApplied",
     abilityId:    1260826,         // Guardian Edict
-  },
-  
-  // -- Midnight Falls --
-
-  // Verified against MFTerminateFailPull2.json (fight 2, actor 55
-  // "Termination Matrix"): 1284934 is the "Terminate" CAST spell — the ID
-  // that shows up as a "cast"-type completion in the enemyCasts stream,
-  // which is what the "enemyCast" trigger reads. 1286276 is a distinct
-  // "Terminate"-named ability WCL uses for the killing blow/damage effect
-  // and never appears in enemyCasts — using it here (as the previous
-  // version of this rule did) meant the trigger could never match.
-  {
-    id:          "wow-raid-terminate-cast",
-    game:        "wow",
-    severity:    "Raid",
-    name:        "Terminate Cast",
-    description: "The interrupt on the termination matrix's Terminate cast was missed.",
-    trigger:     "enemyCast",
-    abilityId:    1284934,         // Terminate (cast)
-  },
-
-  // Verified against MFDissonanceFailPull1.json vs MFDissonanceSuccessPull55.json:
-  // 1249584 is the "Dissonance" DEBUFF applied to the player who used their
-  // Dark Rune out of order (5 applications in the fail pull, 0 in the clean
-  // one). The follow-up AoE that actually wipes the raid is logged under a
-  // separate "Dissonance"-named ability (1249585, the killingAbilityGameID
-  // on the resulting deaths) that never appears in any fetched stream —
-  // same cast-ID-vs-damage-ID split seen on Terminate above — so the debuff
-  // application itself (1249584) is what the rule keys on. Raid-severity
-  // per product decision even though it's player-attributable, same as
-  // other debuffApplied-triggered Raid errors.
-  {
-    id:          "wow-raid-dissonance",
-    game:        "wow",
-    severity:    "Raid",
-    name:        "Dissonance",
-    description: "A Dark Rune was activated out of order, triggering Dissonance.",
-    trigger:     "debuffApplied",
-    abilityId:    1249584,         // Dissonance (debuff)
-  },
-
-  // Verified against MFLightsEndPull31.json: 1284699 "Light's End" hits
-  // only the 1-2 players caught by it (raid-target-marked) for ~150k-260k
-  // each — it's the damage from an improperly-destroyed Dawn Crystal, not
-  // the wipe's actual killing blow. Most deaths in that pull are credited
-  // to 1254256 "Naaru's Lament" instead (see wow-raid-naaru-lament below —
-  // the boss's missed-soak punishment), which finishes off whoever Light's
-  // End left low. minEffectiveDamage filters out the fully-absorbed
-  // 0-amount duplicate entries WCL logs alongside each real hit.
-  {
-    id:          "wow-raid-lights-end",
-    game:        "wow",
-    severity:    "Raid",
-    name:        "Light's End",
-    description: "A Dawn Crystal was destroyed, unleashing Light's End.",
-    trigger:            "damage",
-    abilityId:           1284699,   // Light's End
-    minEffectiveDamage:  100000,
-  },
-
-  // MFNaaruLamentPull36.json (the log meant to verify this) turned out to
-  // have empty deaths/casts/debuffs/enemyCasts/enemyBuffs streams — its
-  // cursors were already exhausted from an earlier session, so it only
-  // captured a stale empty tail page. Used MFLightsEndPull31.json instead,
-  // which already had full data and happens to also feature this ability:
-  // 1254256 "Naaru's Lament" lands as a pure environmental damageTaken hit
-  // (sourceID -1 — not a real NPC actor), simultaneously on ~20 players in
-  // a ~250ms window, 9 of them fatally. Since there's no actual NPC
-  // "casting" it, it never appears in enemyCasts/enemyBuffs/debuffs — only
-  // "damage" can see it. minEffectiveDamage filters the two 0-amount
-  // fully-absorbed duplicate entries seen alongside the real (19k-482k)
-  // hits. UNVERIFIED against a dedicated Naaru's Lament pull — re-check
-  // once MFNaaruLamentPull36.json (or a fresh capture) has real data, in
-  // particular whether the soak-miss itself is separately detectable
-  // (a debuff/marker on the missed soak spot) rather than only the
-  // resulting damage.
-  {
-    id:          "wow-raid-naaru-lament",
-    game:        "wow",
-    severity:    "Raid",
-    name:        "Naaru's Lament",
-    description: "A ground soak was missed, triggering Naaru's Lament.",
-    trigger:            "damage",
-    abilityId:           1254256,   // Naaru's Lament
-    minEffectiveDamage:  10000,
   },
 
 ];

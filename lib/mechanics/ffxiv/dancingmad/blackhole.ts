@@ -1,4 +1,4 @@
-// lib/mechanics/blackhole.ts
+// lib/mechanics/ffxiv/dancingmad/blackhole.ts
 //
 // Encounter-specific error detection for Black Hole ("Earthquake"), the
 // tether conga-line mechanic in FFXIV's Dancing Mad (Kefka's Return)

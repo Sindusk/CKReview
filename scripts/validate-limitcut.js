@@ -1,4 +1,4 @@
-// Regression harness for lib/mechanics/limitcut.ts against the raw FFLogs
+// Regression harness for lib/mechanics/ffxiv/dancingmad/limitcut.ts against the raw FFLogs
 // dumps in sampledata/ (gitignored). Builds PlayerInfo[] + DeathEvent[] the
 // same way the real pipeline does and prints every error per log.
 //
@@ -32,7 +32,7 @@ const path = require('path');
 const ROOT = path.join(__dirname, '..');
 const ts = require(path.join(ROOT, 'node_modules', 'typescript'));
 
-const SRC = fs.readFileSync(path.join(ROOT, 'lib', 'mechanics', 'limitcut.ts'), 'utf8');
+const SRC = fs.readFileSync(path.join(ROOT, 'lib', 'mechanics', 'ffxiv', 'dancingmad', 'limitcut.ts'), 'utf8');
 const out = ts.transpileModule(SRC, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } });
 const mod = { exports: {} };
 new Function('exports', 'require', 'module', out.outputText)(mod.exports, require, mod);

@@ -1,4 +1,4 @@
-// lib/mechanics/forsaken.ts
+// lib/mechanics/ffxiv/dancingmad/forsaken.ts
 //
 // Encounter-specific error detection for Forsaken, the tower-soak mechanic
 // in FFXIV's Dancing Mad (Kefka's Return) ultimate. Unlike the declarative

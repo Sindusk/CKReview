@@ -54,9 +54,10 @@ import { getSpecInfo, getRosterSortOrder }        from "./spec-data";
 import { getFFJobByName, getFFRosterSortOrder }   from "./ffl-job-data";
 import { detectPullErrors }                       from "./error-detection";
 import { getWCLAbilityIconUrl, getFFAbilityIconUrl } from "./ability-icons";
-import { detectForsakenTowerErrors } from "./mechanics/forsaken";
-import { detectBlackHoleErrors } from "./mechanics/blackhole";
-import { detectLimitCutErrors } from "./mechanics/limitcut";
+import { detectForsakenTowerErrors } from "./mechanics/ffxiv/dancingmad/forsaken";
+import { detectBlackHoleErrors } from "./mechanics/ffxiv/dancingmad/blackhole";
+import { detectLimitCutErrors } from "./mechanics/ffxiv/dancingmad/limitcut";
+import { detectMidnightFallsErrors } from "./mechanics/wow/vs-dr-mqd/midnightfalls";
 
 // Shared shape for both games' ability maps: gameID -> name + raw icon
 // filename (not yet resolved to a URL — that happens per-game via
@@ -465,7 +466,10 @@ export function transformFightToPull(
   const enemyCastEvents = wclBuildEnemyCastEvents(data.enemyCastEvents ?? [], actorMap, abilityMap, fightStart);
   const enemyBuffEvents = wclBuildEnemyBuffEvents(data.enemyBuffEvents ?? [], actorMap, abilityMap, fightStart);
 
-  const errors = detectPullErrors(players, deathEvents, enemyCastEvents, enemyBuffEvents);
+  const errors = [
+    ...detectPullErrors(players, deathEvents, enemyCastEvents, enemyBuffEvents),
+    ...detectMidnightFallsErrors(players, deathEvents, enemyCastEvents, enemyBuffEvents),
+  ].sort((a, b) => a.timestamp - b.timestamp);
 
   const fightDurationMs = data.fight.endTime - data.fight.startTime;
   const startTimeSec    = Math.round(data.fight.startTime / 1000);

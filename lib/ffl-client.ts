@@ -44,7 +44,10 @@ export function isFFLQuotaExhausted(): boolean {
 
 const MAX_RETRIES = 5;
 
-async function gql<T>(query: string, variables?: Record<string, unknown>): Promise<T> {
+// `logLabel` tags the raw-response console dump below so individual
+// requests are identifiable when scraping sample data from the console —
+// e.g. "Kefka's Return Pull 4 (page 1)" instead of an anonymous dump.
+async function gql<T>(query: string, variables?: Record<string, unknown>, logLabel?: string): Promise<T> {
   const token = await getFFAccessToken();
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -99,7 +102,7 @@ async function gql<T>(query: string, variables?: Record<string, unknown>): Promi
     // from a live report instead of guessing from schema docs. Safe to
     // comment out once you're done collecting sample data — it is verbose
     // on large reports.
-    console.log("[FFL raw response]", { query, variables, json });
+    console.log(`[FFL raw response]${logLabel ? ` — ${logLabel}` : ""}`, { query, variables, json });
 
     if (json.errors?.length) {
       throw new Error(`FFLogs GraphQL error: ${json.errors[0].message}`);
@@ -366,8 +369,25 @@ type ReportQueryResult = {
 };
 
 export async function fetchFFReport(reportCode: string): Promise<FFLReport> {
-  const data = await gql<ReportQueryResult>(REPORT_QUERY, { code: reportCode });
+  const data = await gql<ReportQueryResult>(REPORT_QUERY, { code: reportCode }, `report ${reportCode}`);
   return data.reportData.report;
+}
+
+/**
+ * Per-boss "Pull N" console labels for every fight in a report, keyed by
+ * fight id — mirrors buildFightLogLabels in wcl-client.ts (see that
+ * comment for usage rules).
+ */
+export function buildFFFightLogLabels(fights: FFLFight[]): Map<number, string> {
+  const labels = new Map<number, string>();
+  const nameCounters = new Map<string, number>();
+  for (const fight of [...fights].sort((a, b) => a.startTime - b.startTime)) {
+    const name = fight.name ?? "Unknown Fight";
+    const next = (nameCounters.get(name) ?? 0) + 1;
+    nameCounters.set(name, next);
+    labels.set(fight.id, `${name} Pull ${next}`);
+  }
+  return labels;
 }
 
 // ─── Query: ALL event types for a single fight, merged into one request ─────
@@ -526,9 +546,11 @@ export type FFLFightData = {
 export async function fetchFFightData(
   reportCode: string,
   fight:      FFLFight,
-  actors:     FFLActor[]
+  actors:     FFLActor[],
+  logLabel?:  string      // e.g. from buildFFFightLogLabels — tags console dumps
 ): Promise<FFLFightData> {
   const endTime = fight.endTime;
+  const label   = logLabel ?? `${fight.name ?? "Unknown Fight"} (fight ${fight.id})`;
 
   const cursors: Record<StreamKey, number> = {
     deaths: fight.startTime, combatantInfo: fight.startTime, casts: fight.startTime,
@@ -561,7 +583,7 @@ export async function fetchFFightData(
       debuffsStart:        cursors.debuffs,
       enemyCastsStart:     cursors.enemyCasts,
       enemyBuffsStart:     cursors.enemyBuffs,
-    });
+    }, `${label} (page ${page})`);
 
     const report = data.reportData.report;
 
