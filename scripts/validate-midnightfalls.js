@@ -14,36 +14,63 @@
 //
 // Players are labeled P<actorId> — these dumps carry no roster names.
 //
-// Expected results (any deviation is a regression):
-//   7-16/MFPull4   -> P9 Heaven's Glaives death (+91s); P2 Death to Dark
-//                     Quasar (+199.5s); ONE Light's End raid error
-//                     (+201.9s — 18 near-simultaneous hits deduped),
-//                     description names P14's Starsplinter detonation
-//                     0.28s earlier as the breaker
-//   7-16/MFPull11  -> P15 Death to Dark Quasar (+125.2s); ONE Dissonance
-//                     raid error attributed to P14 (+174.5s — first of 4
-//                     recipients within 0.5s, rest suppressed as chain
-//                     fallout); ONE Light's End raid error (+183.7s),
-//                     description notes carrier P6 dying with the crystal
-//   7-16/MFPull13  -> P10/P28/P6 Heaven's Glaives deaths (+94-95s); ONE
-//                     Light's End raid error (+95.3s; the second
-//                     detonation at +99.1s only landed 0/81k hits on the
-//                     already-dead raid, filtered by minEffectiveDamage),
-//                     description notes carriers P10 and P6 dying with
-//                     crystals in hand (their Glaives deaths stripped
-//                     Glimmering 0.96s/0.12s before the LE); ONE Naaru's
-//                     Lament raid error (+97.8s — 13 hits deduped)
-//   7-16/MFPull21  -> P17 Caught in Starsplinter (+195.0s, ~487k splash
-//                     attributed to P22's detonation 0.28s earlier); TWO
-//                     Light's End raid errors (+215.0s and +220.7s — two
-//                     separate crystals 5.7s apart, correctly NOT
-//                     deduped): #1 names P2's detonation 0.11s earlier
-//                     (P2 had dropped their own crystal at their feet
-//                     1.2s before), #2 names P12's detonation (the other
-//                     two simultaneous marker removals were death-strips
-//                     of already-dead owners and must NOT be named)
-//   7-16/MFPull22, MFPull33 -> 0 errors (stale-cursor captures, event
-//                     streams empty)
+// ── sampledata/wow/7-16/ naming ─────────────────────────────────────────
+// Files there follow "MFPull<AppPullNumber>P<PageNumber>.json" — the pull
+// number matches the app's own per-boss "Pull N" numbering (see
+// buildFightLogLabels in lib/wcl-client.ts), NOT the raw WCL fight.id the
+// files used before 2026-07-17 (fight.id is a global index across every
+// encounter in the whole report, which drifts from the app's per-boss
+// count whenever other bosses were attempted in between — e.g. old
+// "MFPull13.json"/fight-id-13 is actually app Pull 12; old
+// "MFPull21.json"/fight-id-21 is actually app Pull 19). A page-less name
+// (no "P<n>" suffix) is an older single-page-only capture predating the
+// merged-dump console logging change; the harness treats it as page 1 of
+// a 1-page group. Every stream's .data arrays are concatenated across a
+// pull's pages before building players/deaths/events — see mergeReport().
+//
+// Expected results (any deviation is a regression) — ONLY for pulls that
+// have actually been analyzed; others intentionally omitted pending
+// review, not because they're assumed to produce 0 errors:
+//   7-16 Pull 4   -> P9 Heaven's Glaives death (+91s); P2 Death to Dark
+//                    Quasar (+199.5s); ONE Light's End raid error
+//                    (+201.9s — 18 near-simultaneous hits deduped),
+//                    description names P14's Starsplinter detonation
+//                    0.28s earlier as the breaker
+//   7-16 Pull 11  -> P15 Death to Dark Quasar (+125.2s); ONE Dissonance
+//                    raid error attributed to P14 (+174.5s — first of 4
+//                    recipients within 0.5s, rest suppressed as chain
+//                    fallout); ONE Light's End raid error (+183.7s),
+//                    description notes carrier P6 dying with the crystal
+//   7-16 Pull 12  -> (formerly captured as fight-id 13/"MFPull13.json";
+//                    now correctly named MFPull12P1.json — same data)
+//                    P10/P28/P6 Heaven's Glaives deaths (+94-95s); ONE
+//                    Light's End raid error (+95.3s; the second
+//                    detonation at +99.1s only landed 0/81k hits on the
+//                    already-dead raid, filtered by minEffectiveDamage),
+//                    description notes carriers P10 and P6 dying with
+//                    crystals in hand (their Glaives deaths stripped
+//                    Glimmering 0.96s/0.12s before the LE); ONE Naaru's
+//                    Lament raid error (+97.8s — 13 hits deduped)
+//   7-16 Pull 19  -> (page 1 formerly captured as fight-id 21/
+//                    "MFPull21.json"; page 2 is a NEW addition not
+//                    previously analyzed — re-verify this pull's full
+//                    output before trusting it) previously observed on
+//                    page 1 alone: P17 Caught in Starsplinter (+195.0s,
+//                    ~487k splash attributed to P22's detonation 0.28s
+//                    earlier); TWO Light's End raid errors (+215.0s and
+//                    +220.7s — two separate crystals 5.7s apart,
+//                    correctly NOT deduped): #1 names P2's detonation
+//                    0.11s earlier (P2 had dropped their own crystal at
+//                    their feet 1.2s before), #2 names P12's detonation
+//                    (the other two simultaneous marker removals were
+//                    death-strips of already-dead owners and must NOT be
+//                    named)
+//   7-16 Pull 13, Pull 21, Pull 22, Pull 33 -> NOT YET ANALYZED. Pulls 13
+//                    and 21 are brand-new multi-page captures; 22 and 33
+//                    replace earlier single-page captures whose event
+//                    streams were empty (stale pagination cursors) with
+//                    real paginated data, so their previous "0 errors"
+//                    result no longer applies and must not be assumed.
 //   MFDissonanceFailPull1    -> ONE Dissonance raid error (was 5 before
 //                               dedup) + any Light's End/Naaru's fallout
 //                               errors present in that log
@@ -82,6 +109,50 @@ const midnightfalls  = loadModule('lib/mechanics/wow/vs-dr-mqd/midnightfalls.ts'
 const { detectMidnightFallsErrors } = midnightfalls;
 
 const DATA_DIR = path.join(ROOT, 'sampledata', 'wow');
+const STREAM_KEYS = ['deaths', 'combatantInfo', 'casts', 'damageDone', 'damageTaken', 'healing', 'debuffs', 'enemyCasts', 'enemyBuffs'];
+
+/** Reads one raw dump file (the {query, variables, json} console-log shape) down to its report object. */
+function readReport(filePath) {
+  return JSON.parse(fs.readFileSync(filePath, 'utf8')).json.data.reportData.report;
+}
+
+/** Concatenates every stream's .data array across an ordered list of page reports into one merged report. */
+function mergeReports(reports) {
+  const merged = {};
+  for (const key of STREAM_KEYS) {
+    merged[key] = { data: reports.flatMap((r) => r[key]?.data ?? []) };
+  }
+  return merged;
+}
+
+/**
+ * Discovers every "MFPull<N>P<M>.json" (or page-less "MFPull<N>.json")
+ * file in sampledata/wow/7-16/, groups by pull number N, sorts each
+ * group's pages, and returns [{ label, rep }] with pages pre-merged.
+ */
+function discover7_16Pulls() {
+  const dir = path.join(DATA_DIR, '7-16');
+  if (!fs.existsSync(dir)) return [];
+
+  const groups = new Map(); // pullNumber -> [{page, filePath}]
+  for (const name of fs.readdirSync(dir)) {
+    const m = name.match(/^MFPull(\d+)(?:P(\d+))?\.json$/);
+    if (!m) continue;
+    const pullNumber = Number(m[1]);
+    const page = m[2] ? Number(m[2]) : 1;
+    const list = groups.get(pullNumber) ?? [];
+    list.push({ page, filePath: path.join(dir, name) });
+    groups.set(pullNumber, list);
+  }
+
+  return [...groups.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([pullNumber, pages]) => {
+      pages.sort((a, b) => a.page - b.page);
+      const rep = mergeReports(pages.map((p) => readReport(p.filePath)));
+      return { label: `7-16 Pull ${pullNumber} (${pages.length} page${pages.length === 1 ? '' : 's'})`, rep };
+    });
+}
 
 function fightStartOf(rep) {
   let t0 = Infinity;
@@ -147,21 +218,26 @@ function buildAll(rep) {
   return { players, deaths, enemyCasts, enemyBuffs };
 }
 
-const FILES = [
-  '7-16/MFPull4.json', '7-16/MFPull11.json', '7-16/MFPull13.json',
-  '7-16/MFPull21.json', '7-16/MFPull22.json', '7-16/MFPull33.json',
+const FLAT_FILES = [
   'MFDissonanceFailPull1.json', 'MFDissonanceSuccessPull55.json',
   'MFTerminateFailPull2.json', 'MFLightsEndPull31.json',
 ];
 
-for (const f of FILES) {
-  const filePath = path.join(DATA_DIR, ...f.split('/'));
-  if (!fs.existsSync(filePath)) { console.log(f, '-> MISSING'); continue; }
-  const rep = JSON.parse(fs.readFileSync(filePath, 'utf8')).json.data.reportData.report;
+const cases = [
+  ...discover7_16Pulls(),
+  ...FLAT_FILES.map((f) => ({ label: f, filePath: path.join(DATA_DIR, f) })),
+];
+
+for (const c of cases) {
+  let rep = c.rep;
+  if (!rep) {
+    if (!fs.existsSync(c.filePath)) { console.log(c.label, '-> MISSING'); continue; }
+    rep = readReport(c.filePath);
+  }
   const { players, deaths, enemyCasts, enemyBuffs } = buildAll(rep);
   const errors = detectMidnightFallsErrors(players, deaths, enemyCasts, enemyBuffs);
   console.log('='.repeat(70));
-  console.log(f, '->', errors.length, 'errors');
+  console.log(c.label, '->', errors.length, 'errors');
   for (const e of errors) {
     console.log(`  [${e.severity}] [${e.ruleId}] t=+${(e.timestamp / 1000).toFixed(1)}s ${e.player ?? '(raid)'}: ${e.name}`);
     // Light's End descriptions carry the detonation-source attribution —

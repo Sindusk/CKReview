@@ -43,8 +43,10 @@ const MAX_RETRIES = 5;
 
 // `logLabel` tags the raw-response console dump below so individual
 // requests are identifiable when scraping sample data from the console —
-// e.g. "Midnight Falls Pull 4 (page 1)" instead of an anonymous dump.
-async function gql<T>(query: string, variables?: Record<string, unknown>, logLabel?: string): Promise<T> {
+// e.g. "Midnight Falls Pull 4". Pass `false` to suppress the dump entirely
+// (used for fetchFightData's per-page requests, which get ONE merged dump
+// at the end instead — see fetchFightData).
+async function gql<T>(query: string, variables?: Record<string, unknown>, logLabel?: string | false): Promise<T> {
   const token = await getAccessToken();
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -98,7 +100,9 @@ async function gql<T>(query: string, variables?: Record<string, unknown>, logLab
     // a damage event actually carry `tick` or `hitPoints`?) directly from a
     // live report instead of guessing from schema docs. Safe to comment out
     // once you're done collecting sample data — it is verbose on large reports.
-    console.log(`[WCL raw response]${logLabel ? ` — ${logLabel}` : ""}`, { query, variables, json });
+    if (logLabel !== false) {
+      console.log(`[WCL raw response]${logLabel ? ` — ${logLabel}` : ""}`, { query, variables, json });
+    }
 
     if (json.errors?.length) {
       throw new Error(`WCL GraphQL error: ${json.errors[0].message}`);
@@ -544,7 +548,7 @@ export async function fetchFightData(
       debuffsStart:        cursors.debuffs,
       enemyCastsStart:     cursors.enemyCasts,
       enemyBuffsStart:     cursors.enemyBuffs,
-    }, `${label} (page ${page})`);
+    }, false); // per-page dump suppressed — see the single merged dump below
 
     const report = data.reportData.report;
 
@@ -562,6 +566,29 @@ export async function fetchFightData(
       }
     }
   }
+
+  // ONE console dump per fight with every stream fully merged across all
+  // pages it took — previously each page dumped separately, which for a
+  // busy fight (Midnight Falls' damageDone/healing streams commonly need
+  // 3-4 pages) meant copying several separate console entries by hand to
+  // capture one pull. This single object is in the exact same
+  // {query, variables, json} shape a per-page dump used, and json.data.
+  // reportData.report.<stream>.data is the FULL merged array — so a file
+  // saved from this one log entry is a drop-in replacement for what used
+  // to require pasting multiple page files together.
+  console.log(`[WCL raw response] — ${label} (${page} page${page === 1 ? "" : "s"} merged)`, {
+    query:     FIGHT_EVENTS_QUERY,
+    variables: { code: reportCode, fightIDs: [fight.id], endTime },
+    json: {
+      data: {
+        reportData: {
+          report: Object.fromEntries(
+            STREAM_KEYS.map((key) => [key, { data: collected[key], nextPageTimestamp: null }])
+          ),
+        },
+      },
+    },
+  });
 
   return {
     fight,

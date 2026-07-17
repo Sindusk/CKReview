@@ -46,8 +46,10 @@ const MAX_RETRIES = 5;
 
 // `logLabel` tags the raw-response console dump below so individual
 // requests are identifiable when scraping sample data from the console —
-// e.g. "Kefka's Return Pull 4 (page 1)" instead of an anonymous dump.
-async function gql<T>(query: string, variables?: Record<string, unknown>, logLabel?: string): Promise<T> {
+// e.g. "Kefka's Return Pull 4". Pass `false` to suppress the dump entirely
+// (used for fetchFFightData's per-page requests, which get ONE merged
+// dump at the end instead — see fetchFFightData).
+async function gql<T>(query: string, variables?: Record<string, unknown>, logLabel?: string | false): Promise<T> {
   const token = await getFFAccessToken();
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
@@ -102,7 +104,9 @@ async function gql<T>(query: string, variables?: Record<string, unknown>, logLab
     // from a live report instead of guessing from schema docs. Safe to
     // comment out once you're done collecting sample data — it is verbose
     // on large reports.
-    console.log(`[FFL raw response]${logLabel ? ` — ${logLabel}` : ""}`, { query, variables, json });
+    if (logLabel !== false) {
+      console.log(`[FFL raw response]${logLabel ? ` — ${logLabel}` : ""}`, { query, variables, json });
+    }
 
     if (json.errors?.length) {
       throw new Error(`FFLogs GraphQL error: ${json.errors[0].message}`);
@@ -583,7 +587,7 @@ export async function fetchFFightData(
       debuffsStart:        cursors.debuffs,
       enemyCastsStart:     cursors.enemyCasts,
       enemyBuffsStart:     cursors.enemyBuffs,
-    }, `${label} (page ${page})`);
+    }, false); // per-page dump suppressed — see the single merged dump below
 
     const report = data.reportData.report;
 
@@ -608,6 +612,23 @@ export async function fetchFFightData(
   // snapshot; keeping both double-counts every hit.
   const onlyLanded = <T extends { type?: string; unpaired?: boolean }>(events: T[]) =>
     events.filter((e) => e.type === "damage" || (e.type === "calculateddamage" && e.unpaired === true));
+
+  // ONE console dump per fight, all pages merged — see the WCL client's
+  // fetchFightData for the full rationale. Same {query, variables, json}
+  // shape a per-page dump used, so a saved file is a drop-in replacement.
+  console.log(`[FFL raw response] — ${label} (${page} page${page === 1 ? "" : "s"} merged)`, {
+    query:     FIGHT_EVENTS_QUERY,
+    variables: { code: reportCode, fightIDs: [fight.id], endTime },
+    json: {
+      data: {
+        reportData: {
+          report: Object.fromEntries(
+            STREAM_KEYS.map((key) => [key, { data: collected[key], nextPageTimestamp: null }])
+          ),
+        },
+      },
+    },
+  });
 
   return {
     fight,
