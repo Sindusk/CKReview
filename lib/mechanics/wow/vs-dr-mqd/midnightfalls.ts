@@ -281,10 +281,12 @@ function detectTerminateCasts(players: PlayerInfo[], enemyCasts: EnemyEvent[]): 
     .sort((a, b) => a.timestamp - b.timestamp);
   if (casts.length === 0) return [];
 
-  const hitTimes: number[] = [];
+  const hits: Array<{ timestamp: number; playerName: string }> = [];
   for (const p of players) {
     for (const h of p.damageTaken) {
-      if (h.abilityId === TERMINATE_DAMAGE_ID && (h.amount ?? 0) > 0) hitTimes.push(h.timestamp);
+      if (h.abilityId === TERMINATE_DAMAGE_ID && (h.amount ?? 0) > 0) {
+        hits.push({ timestamp: h.timestamp, playerName: p.name });
+      }
     }
   }
 
@@ -292,15 +294,21 @@ function detectTerminateCasts(players: PlayerInfo[], enemyCasts: EnemyEvent[]): 
   let group: EnemyEvent[] = [];
   const flush = () => {
     if (group.length === 0) return;
-    const anyHit = group.some((c) =>
-      hitTimes.some((t) => t >= c.timestamp - 100 && t <= c.timestamp + TERMINATE_HIT_WINDOW_MS)
-    );
+    const inWindow = (t: number) =>
+      group.some((c) => t >= c.timestamp - 100 && t <= c.timestamp + TERMINATE_HIT_WINDOW_MS);
+    // Everyone hit by this volley, in hit order (ground truth request,
+    // Pull 6: the Raid error should name all the victims).
+    const victims = [...new Set(
+      hits.filter((h) => inWindow(h.timestamp))
+        .sort((a, b) => a.timestamp - b.timestamp)
+        .map((h) => h.playerName)
+    )];
     errors.push({
       ruleId:      MIDNIGHTFALLS_TERMINATE_RULE_ID,
-      severity:    anyHit ? "Raid" : "Minor",
+      severity:    victims.length > 0 ? "Raid" : "Minor",
       name:        "Terminate Cast",
-      description: anyHit
-        ? "The interrupt on the termination matrix's Terminate cast was missed."
+      description: victims.length > 0
+        ? `The interrupt on the termination matrix's Terminate cast was missed. Hit: ${victims.join(", ")}.`
         : "The interrupt on the termination matrix's Terminate cast was missed, but nobody was hit.",
       timestamp:   group[0].timestamp,
       abilityId:   TERMINATE_CAST_ID,

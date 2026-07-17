@@ -56,7 +56,7 @@ function project(streams, projectors) {
 const WCL_PROJECTORS = {
   deaths:        (e) => omit(e, ['fight']),
   combatantInfo: (e) => pick(e, ['timestamp', 'type', 'sourceID', 'specID']),
-  casts:         (e) => pick(e, ['timestamp', 'type', 'sourceID', 'targetID', 'abilityGameID', 'x', 'y']),
+  casts:         (e) => pick(e, ['timestamp', 'type', 'sourceID', 'targetID', 'targetInstance', 'sourceInstance', 'abilityGameID', 'x', 'y']),
   damageDone:    (e) => pick(e, ['timestamp', 'type', 'sourceID', 'targetID', 'abilityGameID', 'amount', 'overkill', 'tick', 'x', 'y', 'sourceInstance']),
   damageTaken:   (e) => pick(e, ['timestamp', 'type', 'sourceID', 'targetID', 'abilityGameID', 'amount', 'overkill', 'tick', 'hitPoints', 'maxHitPoints', 'x', 'y', 'sourceInstance']),
   healing:       (e) => pick(e, ['timestamp', 'type', 'sourceID', 'targetID', 'targetInstance', 'abilityGameID', 'amount', 'overheal', 'hitPoints', 'maxHitPoints']),

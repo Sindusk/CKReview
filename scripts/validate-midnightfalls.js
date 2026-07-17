@@ -58,6 +58,7 @@ const midnightfalls  = loadModule('lib/mechanics/wow/vs-dr-mqd/midnightfalls.ts'
   '../../../error-detection': errorDetection,
 });
 const { detectMidnightFallsErrors } = midnightfalls;
+const { detectTerminateKickOrder } = loadModule('lib/mechanics/wow/vs-dr-mqd/terminate-kicks.ts', {});
 const { getSpecInfo } = loadModule('lib/spec-data.ts', {});
 
 const WOW_DATA_DIR = path.join(ROOT, 'sampledata', 'wow');
@@ -88,7 +89,16 @@ function buildAll(rep, actorMap, abilityMap) {
       role: spec.role,
       rangeType: spec.rangeType,
       game: 'wow',
-      damageDone: [], casts: [],
+      damageDone: [],
+      // Completed casts with target names — the Terminate kick-order
+      // detection filters on target === "Termination Matrix", same as the
+      // live wclCastToPlayerEvent.
+      casts: (rep.casts?.data ?? []).filter((e) => e.sourceID === id && e.type === 'cast').map((e) => ({
+        timestamp: e.timestamp - t0,
+        abilityId: e.abilityGameID ?? 0,
+        abilityName: abilityName(e.abilityGameID ?? 0),
+        target: actorMap.get(e.targetID)?.name,
+      })),
       // target name matters here — the Dusk Crystal rule filters heals by
       // target === "Dusk Crystal", same as the live wclHealToPlayerEvent.
       healing: (rep.healing?.data ?? []).filter((e) => e.sourceID === id && (e.amount ?? 0) > 0).map((e) => ({
@@ -180,8 +190,10 @@ for (const dir of reportDirs) {
   console.log(`${meta.title ?? meta.code} (${dir})`);
   console.log(`  ${pulls.length} pull(s)`);
 
+  const builtPulls = [];
   for (const { bossName, pullNumber, rep } of pulls) {
     const { players, deaths, enemyCasts, enemyBuffs, friendlyNpcDamage } = buildAll(rep, actorMap, abilityMap);
+    builtPulls.push({ players });
     const errors = detectMidnightFallsErrors(players, deaths, enemyCasts, enemyBuffs, friendlyNpcDamage);
     console.log('='.repeat(70));
     console.log(`${bossName} Pull ${pullNumber} ->`, errors.length, 'errors');
@@ -193,6 +205,21 @@ for (const dir of reportDirs) {
       if (['wow-raid-lights-end', 'wow-raid-dusk-crystal-unhealed', 'wow-raid-terminate-cast'].includes(e.ruleId)) {
         console.log(`      ${e.description}`);
       }
+    }
+  }
+
+  // Report-level Terminate kick-order detection (feeds the Strategy dialog).
+  const strategy = detectTerminateKickOrder(builtPulls);
+  console.log('='.repeat(70));
+  if (!strategy) {
+    console.log('Terminate kick order: no interrupt data detected');
+  } else {
+    console.log(`Terminate kick order (${strategy.pullsAnalyzed} pulls, ${strategy.wavesAnalyzed} waves):`);
+    strategy.rounds.forEach((round, i) => {
+      console.log(`  Round ${i + 1}: ${round.map((s) => `${s.player} (${s.ability})`).join(' / ')}`);
+    });
+    if (strategy.fillIns.length) {
+      console.log(`  Fill-ins: ${strategy.fillIns.map((s) => `${s.player} (${s.ability}, ${s.wavesSeen}/${strategy.wavesAnalyzed} waves)`).join(', ')}`);
     }
   }
 }

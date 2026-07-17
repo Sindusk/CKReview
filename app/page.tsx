@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import Header from "../components/Header";
 import AddVodDialog from "../components/AddVodDialog";
 import ReportDialog from "../components/ReportDialog";
@@ -13,6 +13,8 @@ import TranscriptDialog from "../components/TranscriptDialog";
 import AnalysisPanel from "../components/AnalysisPanel";
 import RosterPanel from "../components/RosterPanel";
 import TimelinePanel from "@/components/TimelinePanel";
+import StrategyDialog from "@/components/StrategyDialog";
+import { detectTerminateKickOrder } from "@/lib/mechanics/wow/vs-dr-mqd/terminate-kicks";
 import type { Pull } from "../types/Pull";
 import { createCallWipeError, CALL_WIPE_RULE_ID, createManualError, type ManualErrorInput } from "@/types/PullError";
 import type { SavedSession } from "@/types/Session";
@@ -95,6 +97,11 @@ export default function Home() {
   const [transcriptVodId, setTranscriptVodId] = useState<number | null>(null);
 
   const [pulls, setPulls] = useState<Pull[]>([]);
+  const [showStrategy, setShowStrategy] = useState(false);
+  // Report-level strategy detection (currently the Midnight Falls
+  // Terminate kick rotation) — recomputed whenever the pull set changes,
+  // e.g. live-log polling appending new fights.
+  const kickStrategy = useMemo(() => detectTerminateKickOrder(pulls), [pulls]);
   const [selectedPullId, setSelectedPullId] = useState<number | null>(null);
 
   const [importError, setImportError] = useState<string | null>(null);
@@ -785,7 +792,31 @@ export default function Home() {
           liveLogEnabled={liveLogEnabled}
           onLiveLogEnabledChange={setLiveLogEnabled}
         />
+        <button
+          onClick={() => setShowStrategy(true)}
+          title="Raid strategy detected automatically from this report's pulls"
+          style={{
+            backgroundColor: "#1f2937",
+            color:           "#93c5fd",
+            border:          "1px solid #374151",
+            borderRadius:    "6px",
+            padding:         "6px 14px",
+            fontSize:        "12px",
+            fontWeight:      600,
+            cursor:          "pointer",
+            whiteSpace:      "nowrap",
+            flexShrink:      0,
+          }}
+        >
+          Strategy
+        </button>
       </div>
+
+      <StrategyDialog
+        open={showStrategy}
+        onClose={() => setShowStrategy(false)}
+        strategy={kickStrategy}
+      />
 
       <div
         style={{
