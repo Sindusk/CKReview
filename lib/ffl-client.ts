@@ -7,7 +7,7 @@
 // FFLogs GraphQL API mirrors WarcraftLogs API structure closely — the same
 // pagination pattern (nextPageTimestamp) and hostilityType argument apply.
 
-import { getFFAccessToken } from "./log-auth";
+import { getFFAccessToken, refreshFFAccessToken, ffLogout } from "./log-auth";
 import {
   RateLimitTracker,
   buildRateLimitErrorMessage,
@@ -50,7 +50,8 @@ const MAX_RETRIES = 5;
 // (used for fetchFFightData's per-page requests, which get ONE merged
 // dump at the end instead — see fetchFFightData).
 async function gql<T>(query: string, variables?: Record<string, unknown>, logLabel?: string | false): Promise<T> {
-  const token = await getFFAccessToken();
+  let token = await getFFAccessToken();
+  let authRetried = false;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     const res = await fetch(GQL_ENDPOINT, {
@@ -61,6 +62,23 @@ async function gql<T>(query: string, variables?: Record<string, unknown>, logLab
       },
       body: JSON.stringify({ query, variables }),
     });
+
+    if (res.status === 401) {
+      // Same revoked-token recovery as lib/wcl-client.ts's gql — refresh
+      // once and retry; a failed refresh (or a second 401) clears the
+      // stored session so the menu shows "Connect FFLogs" again, and
+      // throws a login-shaped error instead of a raw HTTP failure.
+      if (!authRetried) {
+        authRetried = true;
+        token = await refreshFFAccessToken();
+        attempt--; // don't spend the 429 retry budget on the auth retry
+        continue;
+      }
+      ffLogout();
+      throw new Error(
+        'FFLogs session expired — open the menu and use "Connect FFLogs" to log in again.'
+      );
+    }
 
     if (res.status === 429) {
       // If a recent successful response already told us the hourly quota

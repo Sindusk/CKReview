@@ -88,7 +88,16 @@ function buildAll(rep, actorMap, abilityMap) {
       role: spec.role,
       rangeType: spec.rangeType,
       game: 'wow',
-      damageDone: [], healing: [], casts: [],
+      damageDone: [], casts: [],
+      // target name matters here — the Dusk Crystal rule filters heals by
+      // target === "Dusk Crystal", same as the live wclHealToPlayerEvent.
+      healing: (rep.healing?.data ?? []).filter((e) => e.sourceID === id && (e.amount ?? 0) > 0).map((e) => ({
+        timestamp: e.timestamp - t0,
+        abilityId: e.abilityGameID ?? 0,
+        abilityName: abilityName(e.abilityGameID ?? 0),
+        amount: e.amount ?? 0,
+        target: actorMap.get(e.targetID)?.name,
+      })),
       damageTaken: (rep.damageTaken?.data ?? []).filter((e) => e.targetID === id).map((e) => ({
         timestamp: e.timestamp - t0,
         abilityId: e.abilityGameID ?? 0,
@@ -136,7 +145,19 @@ function buildAll(rep, actorMap, abilityMap) {
     abilityName: abilityName(e.abilityGameID ?? 0),
   }));
 
-  return { players, deaths, enemyCasts, enemyBuffs };
+  // Damage on friendly NPCs (Dusk Crystal Dimming ticks) — mirrors
+  // wclBuildFriendlyNpcDamageEvents in lib/log-transforms.ts.
+  const friendlyNpcDamage = (rep.damageTaken?.data ?? [])
+    .filter((e) => actorMap.get(e.targetID)?.type === 'NPC')
+    .map((e) => ({
+      timestamp: e.timestamp - t0,
+      actorId: e.targetID,
+      actorName: actorMap.get(e.targetID)?.name || `NPC${e.targetID}`,
+      abilityId: e.abilityGameID ?? 0,
+      abilityName: abilityName(e.abilityGameID ?? 0),
+    }));
+
+  return { players, deaths, enemyCasts, enemyBuffs, friendlyNpcDamage };
 }
 
 const explicitDir = process.argv[2] ? path.resolve(process.argv[2]) : null;
@@ -160,15 +181,18 @@ for (const dir of reportDirs) {
   console.log(`  ${pulls.length} pull(s)`);
 
   for (const { bossName, pullNumber, rep } of pulls) {
-    const { players, deaths, enemyCasts, enemyBuffs } = buildAll(rep, actorMap, abilityMap);
-    const errors = detectMidnightFallsErrors(players, deaths, enemyCasts, enemyBuffs);
+    const { players, deaths, enemyCasts, enemyBuffs, friendlyNpcDamage } = buildAll(rep, actorMap, abilityMap);
+    const errors = detectMidnightFallsErrors(players, deaths, enemyCasts, enemyBuffs, friendlyNpcDamage);
     console.log('='.repeat(70));
     console.log(`${bossName} Pull ${pullNumber} ->`, errors.length, 'errors');
     for (const e of errors) {
       console.log(`  [${e.severity}] [${e.ruleId}] t=+${(e.timestamp / 1000).toFixed(1)}s ${e.player ?? '(raid)'}: ${e.name}`);
-      // Light's End descriptions carry the detonation-source attribution —
-      // print them so regressions in annotateLightsEndSources are visible.
-      if (e.ruleId === 'wow-raid-lights-end') console.log(`      ${e.description}`);
+      // These rules put their real payload in the description (Light's End
+      // source attribution, crystal healer breakdown, Terminate no-hit
+      // downgrade) — print it so regressions are visible.
+      if (['wow-raid-lights-end', 'wow-raid-dusk-crystal-unhealed', 'wow-raid-terminate-cast'].includes(e.ruleId)) {
+        console.log(`      ${e.description}`);
+      }
     }
   }
 }

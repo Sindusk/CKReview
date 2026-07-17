@@ -61,7 +61,11 @@ async function main() {
   });
 
   const fflClient = requireTsFromRoot('lib/ffl-client.ts', {
-    './log-auth': { getFFAccessToken: nodeAuth.getAccessToken },
+    './log-auth': {
+      getFFAccessToken:     nodeAuth.getAccessToken,
+      refreshFFAccessToken: nodeAuth.forceRefreshAccessToken,
+      ffLogout:             () => {},
+    },
   });
 
   fs.mkdirSync(outDir, { recursive: true });

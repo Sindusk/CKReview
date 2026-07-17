@@ -24,7 +24,14 @@
 //             "Dissonance" AoE raid-wide (~120-200k each) — 10 deaths in
 //             MFPull11's third wave.
 //   +88→91    1253915 "Heaven's Glaives" cast → 1254076 killing blows on
-//             failed soakers ~3s later.
+//             failed soakers ~3s later. Casts complete at ~+29/+91/+153;
+//             the first two follow Dusk Crystal waves (below), the third
+//             has no crystals.
+//   dusk      Dusk Crystals (2 waves of 3, spawning ~13-16s before their
+//             Heaven's Glaives) tick THEMSELVES with 1252975 "Dimming"
+//             once/sec (ramping ~4k→56k) until healed to full, at which
+//             point they're "restored"/pickupable and the ticks stop —
+//             see detectDuskCrystalHealing.
 //   +171→174  1285708 "Grim Symphony" cast.
 //   +184→190.6  1255743 "Total Eclipse" cast; on completion the boss
 //             keeps the buff ~30s — this is the intermission. During it:
@@ -103,22 +110,8 @@ const MIDNIGHT_FALLS_RULES: PullErrorRule[] = [
     abilityId:    1282469,         // Dark Quasar beam
   },
 
-  // Verified against MFTerminateFailPull2.json (fight 2, actor 55
-  // "Termination Matrix"): 1284934 is the "Terminate" CAST spell — the ID
-  // that shows up as a "cast"-type completion in the enemyCasts stream,
-  // which is what the "enemyCast" trigger reads. 1286276 is a distinct
-  // "Terminate"-named ability WCL uses for the killing blow/damage effect
-  // and never appears in enemyCasts — using it here (as an early version
-  // of this rule did) meant the trigger could never match.
-  {
-    id:          "wow-raid-terminate-cast",
-    game:        "wow",
-    severity:    "Raid",
-    name:        "Terminate Cast",
-    description: "The interrupt on the termination matrix's Terminate cast was missed.",
-    trigger:     "enemyCast",
-    abilityId:    1284934,         // Terminate (cast)
-  },
+  // Terminate lives in detectTerminateCasts below (not this table) — its
+  // severity depends on whether the cast actually hit anyone.
 
   // Verified against MFDissonanceFailPull1.json vs MFDissonanceSuccessPull55.json:
   // 1249584 is the "Dissonance" DEBUFF applied to the player who dropped
@@ -259,6 +252,155 @@ function detectStarsplinterOverlap(
   return errors;
 }
 
+// ─── Terminate (Termination Matrix) ─────────────────────────────────────────
+//
+// 1284934 is the "Terminate" CAST spell — the ID that shows up as a
+// "cast"-type completion in the enemyCasts stream. 1286276 is a distinct
+// "Terminate"-named ability WCL uses for the damage/killing-blow effect and
+// never appears in enemyCasts (verified against xvQbZ6Cwkm1XaHPD Pull 2's
+// Termination Matrix). This used to be a declarative enemyCast Raid rule,
+// but ground truth (Pull 1 VOD, 2026-07-17: cast completed at +9.58,
+// nobody hit, nothing actually went wrong) demoted the harmless case:
+// a Terminate that goes off but hits NOBODY is a Minor error, not Raid.
+//
+// Multiple Termination Matrices complete casts near-simultaneously (three
+// within 0.5s in Pull 3), so casts are grouped with the same 2s window
+// suppressDuplicateRaidErrors uses — one error per volley, Raid if ANY
+// cast in the volley hit someone. Across all 42 pulls of xvQbZ6Cwkm1XaHPD
+// the damage lands 0.03-0.15s after its cast completion and volleys are
+// ≥0.9s apart, so the 750ms hit window can't bleed into the next volley.
+const TERMINATE_CAST_ID     = 1284934;
+const TERMINATE_DAMAGE_ID   = 1286276;
+const TERMINATE_HIT_WINDOW_MS   = 750;
+const TERMINATE_GROUP_WINDOW_MS = 2000; // matches RAID_ERROR_SUPPRESS_WINDOW_MS
+export const MIDNIGHTFALLS_TERMINATE_RULE_ID = "wow-raid-terminate-cast";
+
+function detectTerminateCasts(players: PlayerInfo[], enemyCasts: EnemyEvent[]): PullError[] {
+  const casts = enemyCasts
+    .filter((e) => e.abilityId === TERMINATE_CAST_ID)
+    .sort((a, b) => a.timestamp - b.timestamp);
+  if (casts.length === 0) return [];
+
+  const hitTimes: number[] = [];
+  for (const p of players) {
+    for (const h of p.damageTaken) {
+      if (h.abilityId === TERMINATE_DAMAGE_ID && (h.amount ?? 0) > 0) hitTimes.push(h.timestamp);
+    }
+  }
+
+  const errors: PullError[] = [];
+  let group: EnemyEvent[] = [];
+  const flush = () => {
+    if (group.length === 0) return;
+    const anyHit = group.some((c) =>
+      hitTimes.some((t) => t >= c.timestamp - 100 && t <= c.timestamp + TERMINATE_HIT_WINDOW_MS)
+    );
+    errors.push({
+      ruleId:      MIDNIGHTFALLS_TERMINATE_RULE_ID,
+      severity:    anyHit ? "Raid" : "Minor",
+      name:        "Terminate Cast",
+      description: anyHit
+        ? "The interrupt on the termination matrix's Terminate cast was missed."
+        : "The interrupt on the termination matrix's Terminate cast was missed, but nobody was hit.",
+      timestamp:   group[0].timestamp,
+      abilityId:   TERMINATE_CAST_ID,
+      abilityName: group[0].abilityName,
+      abilityIcon: group[0].abilityIcon,
+    });
+    group = [];
+  };
+  for (const c of casts) {
+    if (group.length > 0 && c.timestamp - group[0].timestamp > TERMINATE_GROUP_WINDOW_MS) flush();
+    group.push(c);
+  }
+  flush();
+  return errors;
+}
+
+// ─── Dusk Crystal healing (phase 1 crystal waves) ───────────────────────────
+//
+// Twice during phase 1, 3 Dusk Crystals spawn and must be HEALED to full
+// to become restorable/pickupable; an unrestored crystal in the path of
+// Heaven's Glaives detonates and wipes the raid (Pull 2's wipe). Ground
+// truth rule (2026-07-17): a crystal must be fully healed by 2 SECONDS
+// before the boss finishes casting Heaven's Glaives.
+//
+// Detection signal: while below full health a Dusk Crystal damages ITSELF
+// with 1252975 "Dimming" once per second (ramping ~4k→56k); the ticks stop
+// the instant it reaches full. So "still Dimming inside the 2s deadline" =
+// not restored in time — no per-crystal instance data needed (WCL's
+// healing stream carries no targetInstance, so the 3 concurrent crystals
+// are indistinguishable there anyway). Calibration across all 42
+// xvQbZ6Cwkm1XaHPD pulls: failed waves' last tick lands 0.30-1.12s before
+// the cast completes (Pulls 2/30/40 — Pull 2 confirmed by VOD, crystal
+// reached full ~0.2-0.5s before the glaives); every clean wave's last tick
+// is ≥2.30s before, so the 2s deadline sits in a natural gap. The third
+// Heaven's Glaives (+153) has no crystal wave and produces no ticks.
+//
+// Per product decision the error is Raid with NO blame — but it lists
+// every healer's total healing into that wave's crystals so what went
+// wrong is analyzable. (Totals are summed across the wave's 3 crystals —
+// see the instance note above — and only count the healers' own casts;
+// totem/pet healing isn't attributed.)
+const DUSK_CRYSTAL_NAME           = "Dusk Crystal";
+const DIMMING_TICK_ID             = 1252975;   // Dimming (crystal self-damage while unhealed)
+const HEAVENS_GLAIVES_CAST_ID     = 1253915;
+const CRYSTAL_RESTORE_DEADLINE_MS = 2000;
+// Crystal waves start ~13-16s before their Heaven's Glaives; 40s cleanly
+// separates each cast's wave from the previous one (casts are ~62s apart).
+const CRYSTAL_WAVE_WINDOW_MS      = 40000;
+export const MIDNIGHTFALLS_DUSK_CRYSTAL_RULE_ID = "wow-raid-dusk-crystal-unhealed";
+
+function detectDuskCrystalHealing(
+  players:           PlayerInfo[],
+  enemyCasts:        EnemyEvent[],
+  friendlyNpcDamage: EnemyEvent[]
+): PullError[] {
+  const tickTimes = friendlyNpcDamage
+    .filter((e) => e.actorName === DUSK_CRYSTAL_NAME && e.abilityId === DIMMING_TICK_ID)
+    .map((e) => e.timestamp);
+  if (tickTimes.length === 0) return [];
+
+  const errors: PullError[] = [];
+  for (const cast of enemyCasts) {
+    if (cast.abilityId !== HEAVENS_GLAIVES_CAST_ID) continue;
+
+    const wave = tickTimes.filter((t) => t <= cast.timestamp && cast.timestamp - t <= CRYSTAL_WAVE_WINDOW_MS);
+    if (wave.length === 0) continue;             // no crystal wave for this cast
+    const lastTick = Math.max(...wave);
+    const gapMs = cast.timestamp - lastTick;
+    if (gapMs > CRYSTAL_RESTORE_DEADLINE_MS) continue; // every crystal restored in time
+
+    const waveStart = Math.min(...wave) - 2000;  // ticks start ~1s after spawn
+    const healerTotals = players
+      .filter((p) => p.role === "Healer")
+      .map((p) => ({
+        name:  p.name,
+        total: p.healing
+          .filter((h) => h.target === DUSK_CRYSTAL_NAME && h.timestamp >= waveStart && h.timestamp <= cast.timestamp)
+          .reduce((sum, h) => sum + (h.amount ?? 0), 0),
+      }))
+      .sort((a, b) => b.total - a.total);
+    const breakdown = healerTotals.map((h) => `${h.name} ${Math.round(h.total / 1000)}k`).join(", ");
+
+    errors.push({
+      ruleId:      MIDNIGHTFALLS_DUSK_CRYSTAL_RULE_ID,
+      severity:    "Raid",
+      name:        "Dusk Crystal Not Restored",
+      description:
+        `A Dusk Crystal did not receive sufficient healing before Heaven's Glaives finished casting — ` +
+        `it was still below full health ~${(gapMs / 1000).toFixed(1)}s before the glaives fired ` +
+        `(crystals must be fully healed 2s before the cast completes). ` +
+        `Healing into this wave's crystals: ${breakdown}.`,
+      timestamp:   cast.timestamp,
+      abilityId:   HEAVENS_GLAIVES_CAST_ID,
+      abilityName: cast.abilityName,
+      abilityIcon: cast.abilityIcon,
+    });
+  }
+  return errors;
+}
+
 // ─── Public entry point ─────────────────────────────────────────────────────
 
 // Raid errors whose "damage" trigger necessarily lands on some arbitrary
@@ -349,10 +491,29 @@ function annotateLightsEndSources(
       (c) => c.timestamp <= e.timestamp && e.timestamp - c.timestamp <= LIGHTS_END_CARRIER_DEATH_WINDOW_MS
     );
     if (dyingCarriers.length > 0) {
-      const names = [...new Set(dyingCarriers.map((c) => c.playerName))].join(", ");
+      // Ground truth (Pull 3, 2026-07-17): when a carrier's death broke the
+      // crystal, the error should carry THAT player's name instead of
+      // reading as "Raid-Wide" — the FIRST carrier to die is the one whose
+      // crystal broke. Severity stays Raid (the wipe is raid-level; the
+      // death itself is already flagged by its own cause, per the fallout
+      // philosophy) — the UI shows PullError.player when present.
+      const ordered = [...dyingCarriers].sort((a, b) => a.timestamp - b.timestamp);
+      const first   = ordered[0];
+      const info    = players.find((p) => p.name === first.playerName);
+      const others  = [...new Set(ordered.slice(1).map((c) => c.playerName))]
+        .filter((n) => n !== first.playerName);
+      const alsoDied = others.length > 0
+        ? ` ${others.join(" and ")} also died carrying a crystal.`
+        : "";
       return {
         ...e,
-        description: `${e.description} Followed ${names} dying while carrying a crystal.`,
+        player:      first.playerName,
+        class:       info?.className,
+        specId:      info?.specId,
+        role:        info?.role,
+        description:
+          `${first.playerName} died while carrying a crystal. ` +
+          `The Dawn Crystal was destroyed, unleashing Light's End.${alsoDied}`,
       };
     }
 
@@ -360,15 +521,22 @@ function annotateLightsEndSources(
   });
 }
 
+// friendlyNpcDamage: damage events landing on FRIENDLY NPCs (the crystals),
+// in the same EnemyEvent shape with actor = the NPC that was hit — built by
+// wclBuildFriendlyNpcDamageEvents in log-transforms.ts. Feeds the Dusk
+// Crystal Dimming-tick detection above.
 export function detectMidnightFallsErrors(
-  players:     PlayerInfo[],
-  deathEvents: DeathEvent[] = [],
-  enemyCasts:  EnemyEvent[] = [],
-  enemyBuffs:  EnemyEvent[] = []
+  players:           PlayerInfo[],
+  deathEvents:       DeathEvent[] = [],
+  enemyCasts:        EnemyEvent[] = [],
+  enemyBuffs:        EnemyEvent[] = [],
+  friendlyNpcDamage: EnemyEvent[] = []
 ): PullError[] {
   const errors = [
     ...evaluateRuleSet(MIDNIGHT_FALLS_RULES, players, deathEvents, enemyCasts, enemyBuffs),
     ...detectStarsplinterOverlap(players, deathEvents),
+    ...detectTerminateCasts(players, enemyCasts),
+    ...detectDuskCrystalHealing(players, enemyCasts, friendlyNpcDamage),
   ].map((e) =>
     ANONYMOUS_RAID_RULE_IDS.has(e.ruleId)
       ? { ...e, player: undefined, class: undefined, specId: undefined, role: undefined }

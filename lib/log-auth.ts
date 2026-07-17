@@ -173,8 +173,33 @@ function createLogAuth(config: ProviderConfig) {
   }
 
   /**
+   * Forces a token refresh and returns the new access token. Used by the
+   * API clients when a request comes back 401 despite a locally-unexpired
+   * token — which happens when the token was revoked SERVER-side, e.g.
+   * another consumer (the scripts/fetch-*-report.js Node tooling, before
+   * its credentials file got its own grant) refreshing on the same grant
+   * lineage. If the refresh itself fails, the stored session is cleared so
+   * isAuthenticated() reflects reality — the burger menu only offers
+   * "Connect <provider>" when no token is stored — and a login-shaped
+   * error is thrown instead of a raw HTTP failure.
+   */
+  async function forceRefreshAccessToken(): Promise<string> {
+    try {
+      await refreshTokens();
+    } catch {
+      logout();
+      throw new Error(
+        `${providerLabel} session expired — open the menu and use "Connect ${providerLabel}" to log in again.`
+      );
+    }
+    return localStorage.getItem(storageKeys.accessToken)!;
+  }
+
+  /**
    * Returns a valid access token, proactively refreshing if within 60s of
-   * expiry. Throws if the user has never authenticated.
+   * expiry. Throws if the user has never authenticated. A failed proactive
+   * refresh clears the session (see forceRefreshAccessToken) rather than
+   * leaving dead tokens around that keep the UI looking "Connected".
    */
   async function getAccessToken(): Promise<string> {
     const token = localStorage.getItem(storageKeys.accessToken);
@@ -184,8 +209,7 @@ function createLogAuth(config: ProviderConfig) {
     const nearExpiry = Date.now() > expiresAt - 60_000;
 
     if (nearExpiry) {
-      await refreshTokens();
-      return localStorage.getItem(storageKeys.accessToken)!;
+      return forceRefreshAccessToken();
     }
 
     return token;
@@ -199,7 +223,7 @@ function createLogAuth(config: ProviderConfig) {
     Object.values(storageKeys).forEach((k) => localStorage.removeItem(k));
   }
 
-  return { login, exchangeCodeForTokens, getAccessToken, isAuthenticated, logout };
+  return { login, exchangeCodeForTokens, getAccessToken, forceRefreshAccessToken, isAuthenticated, logout };
 }
 
 // ─── WarcraftLogs instance ──────────────────────────────────────────────────
@@ -226,11 +250,12 @@ const wclAuth = createLogAuth({
   },
 });
 
-export const loginWithWarcraftLogs = wclAuth.login;
-export const exchangeCodeForTokens = wclAuth.exchangeCodeForTokens;
-export const getAccessToken        = wclAuth.getAccessToken;
-export const isAuthenticated       = wclAuth.isAuthenticated;
-export const logout                = wclAuth.logout;
+export const loginWithWarcraftLogs  = wclAuth.login;
+export const exchangeCodeForTokens  = wclAuth.exchangeCodeForTokens;
+export const getAccessToken         = wclAuth.getAccessToken;
+export const refreshWCLAccessToken  = wclAuth.forceRefreshAccessToken;
+export const isAuthenticated        = wclAuth.isAuthenticated;
+export const logout                 = wclAuth.logout;
 
 // ─── FFLogs instance ────────────────────────────────────────────────────────
 
@@ -252,8 +277,9 @@ const fflAuth = createLogAuth({
   },
 });
 
-export const loginWithFFLogs        = fflAuth.login;
+export const loginWithFFLogs         = fflAuth.login;
 export const exchangeFFCodeForTokens = fflAuth.exchangeCodeForTokens;
-export const getFFAccessToken       = fflAuth.getAccessToken;
-export const isFFAuthenticated      = fflAuth.isAuthenticated;
-export const ffLogout               = fflAuth.logout;
+export const getFFAccessToken        = fflAuth.getAccessToken;
+export const refreshFFAccessToken    = fflAuth.forceRefreshAccessToken;
+export const isFFAuthenticated       = fflAuth.isAuthenticated;
+export const ffLogout                = fflAuth.logout;

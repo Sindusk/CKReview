@@ -4,7 +4,7 @@
 // All queries are typed end-to-end; raw WCL shapes live here and
 // log-transforms.ts converts them into app-internal Pull / DeathEvent types.
 
-import { getAccessToken } from "./log-auth";
+import { getAccessToken, refreshWCLAccessToken, logout } from "./log-auth";
 import {
   RateLimitTracker,
   buildRateLimitErrorMessage,
@@ -47,7 +47,8 @@ const MAX_RETRIES = 5;
 // (used for fetchFightData's per-page requests, which get ONE merged dump
 // at the end instead — see fetchFightData).
 async function gql<T>(query: string, variables?: Record<string, unknown>, logLabel?: string | false): Promise<T> {
-  const token = await getAccessToken();
+  let token = await getAccessToken();
+  let authRetried = false;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     const res = await fetch(GQL_ENDPOINT, {
@@ -58,6 +59,26 @@ async function gql<T>(query: string, variables?: Record<string, unknown>, logLab
       },
       body: JSON.stringify({ query, variables }),
     });
+
+    if (res.status === 401) {
+      // 401 despite a locally-unexpired token = revoked server-side (seen
+      // 2026-07-17: the Node fetch scripts refreshing on a shared grant
+      // lineage revoked the browser's token). Refresh once and retry; if
+      // the refresh fails, refreshWCLAccessToken clears the stored session
+      // (so the menu shows "Connect WarcraftLogs" again) and throws a
+      // login-shaped error. A second 401 after a successful refresh gets
+      // the same treatment — the grant itself is dead.
+      if (!authRetried) {
+        authRetried = true;
+        token = await refreshWCLAccessToken();
+        attempt--; // don't spend the 429 retry budget on the auth retry
+        continue;
+      }
+      logout();
+      throw new Error(
+        'WarcraftLogs session expired — open the menu and use "Connect WarcraftLogs" to log in again.'
+      );
+    }
 
     if (res.status === 429) {
       // If a recent successful response already told us the hourly quota

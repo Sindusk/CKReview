@@ -81,7 +81,16 @@ function createNodeLogAuth({ providerLabel, clientId, tokenUrl, credsPath }) {
     return creds.access_token;
   }
 
-  return { getAccessToken };
+  // Node counterpart of lib/log-auth.ts's forceRefreshAccessToken — the
+  // browser clients call it on a 401, so the fetch scripts' `./log-auth`
+  // shims expose it too. Unconditional refresh, no session-clearing (the
+  // creds file is the session; if the refresh fails the thrown error's
+  // message already says to re-seed).
+  async function forceRefreshAccessToken() {
+    return (await refresh(loadCreds(credsPath, providerLabel))).access_token;
+  }
+
+  return { getAccessToken, forceRefreshAccessToken };
 }
 
 module.exports = { createNodeLogAuth };

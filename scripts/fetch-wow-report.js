@@ -80,7 +80,11 @@ async function main() {
   });
 
   const wclClient = requireTsFromRoot('lib/wcl-client.ts', {
-    './log-auth': { getAccessToken: nodeAuth.getAccessToken },
+    './log-auth': {
+      getAccessToken:        nodeAuth.getAccessToken,
+      refreshWCLAccessToken: nodeAuth.forceRefreshAccessToken,
+      logout:                () => {},
+    },
   });
 
   fs.mkdirSync(outDir, { recursive: true });

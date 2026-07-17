@@ -366,6 +366,29 @@ function wclBuildEnemyBuffEvents(
     }));
 }
 
+// Damage landing on FRIENDLY NPCs — e.g. Midnight Falls' Dusk Crystals
+// damaging themselves with Dimming while unhealed. The damageTaken fetch
+// (friendly hostility) includes these; they're invisible to per-player
+// streams since the target isn't a player. Same EnemyEvent shape, with
+// actor = the NPC that was hit.
+function wclBuildFriendlyNpcDamageEvents(
+  damageTakenEvents: WCLDamageEvent[],
+  actorMap:          Map<number, WCLActor>,
+  abilityMap:        Map<number, AbilityInfo>,
+  fightStart:        number
+): EnemyEvent[] {
+  return damageTakenEvents
+    .filter((e) => actorMap.get(e.targetID)?.type === "NPC")
+    .map((e) => ({
+      timestamp:   e.timestamp - fightStart,
+      actorId:     e.targetID,
+      actorName:   actorMap.get(e.targetID)?.name ?? `Unknown (${e.targetID})`,
+      abilityId:   e.abilityGameID ?? 0,
+      abilityName: wclAbilityName(e, abilityMap),
+      abilityIcon: wclAbilityIcon(e, abilityMap),
+    }));
+}
+
 function wclBuildPlayers(
   combatantInfos:    WCLCombatantInfoEvent[],
   actorMap:          Map<number, WCLActor>,
@@ -465,10 +488,11 @@ export function transformFightToPull(
   // hostilityType: "Enemies" fetches — NOT data.castEvents/debuffEvents.
   const enemyCastEvents = wclBuildEnemyCastEvents(data.enemyCastEvents ?? [], actorMap, abilityMap, fightStart);
   const enemyBuffEvents = wclBuildEnemyBuffEvents(data.enemyBuffEvents ?? [], actorMap, abilityMap, fightStart);
+  const friendlyNpcDamageEvents = wclBuildFriendlyNpcDamageEvents(data.damageTakenEvents ?? [], actorMap, abilityMap, fightStart);
 
   const errors = [
     ...detectPullErrors(players, deathEvents, enemyCastEvents, enemyBuffEvents),
-    ...detectMidnightFallsErrors(players, deathEvents, enemyCastEvents, enemyBuffEvents),
+    ...detectMidnightFallsErrors(players, deathEvents, enemyCastEvents, enemyBuffEvents, friendlyNpcDamageEvents),
   ].sort((a, b) => a.timestamp - b.timestamp);
 
   const fightDurationMs = data.fight.endTime - data.fight.startTime;
