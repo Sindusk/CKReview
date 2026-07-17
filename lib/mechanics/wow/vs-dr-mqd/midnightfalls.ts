@@ -40,19 +40,28 @@
 //                 detonation — read as being caught inside someone
 //                 else's splinter blast, i.e. failure to spread. That's
 //                 what the Starsplinter check below flags.
-//   any time  1284699 "Light's End" — a Dawn Crystal detonating. NOTE:
+//   crystals  1253031 "Glimmering" (private aura, +20% size, 1s periodic
+//             dummy; its damage twin 1254398 continuously ticks the same
+//             players) = CARRYING a Dawn Crystal. 3 pickups at ~+16-20,
+//             3 more at ~+86-90 (6 crystals total); carriers swap
+//             constantly (hot potato — the ticking hurts). applydebuff =
+//             pickup, removedebuff = drop (or death-strip). Ground truth
+//             (7-16 VOD review): a Starsplinter detonating on a crystal —
+//             held OR dropped on the floor — breaks it.
+//   any time  1284699 "Light's End" — a Dawn Crystal breaking. NOTE:
 //             earlier model (MFLightsEndPull31) saw it hit only 1-2
 //             players; the 7-16 pulls show the full version hits the
 //             ENTIRE raid for a flat ~190-310k regardless of position,
 //             and can fire more than once (two crystals ~5.5s apart in
 //             MFPull21/MFPull13). It is the terminal wipe event in 3 of
-//             the 4 7-16 pulls. WHAT destroys the crystal is not yet
-//             attributable from these dumps — their damageDone stream
-//             only captured the first pagination page (+0..+50s), so
-//             nobody's damage to the crystal is visible. Re-verify once
-//             a full capture exists; in MFPull4 a Dark Quasar player
-//             death (+199.5) preceded Light's End by 2.4s, suggesting an
-//             unaimed/dropped beam can be the trigger.
+//             the 4 7-16 pulls. Every INTERMISSION Light's End is
+//             preceded 0.1-0.3s by a Starsplinter detonation (see
+//             annotateLightsEndSources); the pre-intermission ones
+//             (MFPull13 +95.3, and MFPull11's mid-Dissonance-wipe one
+//             coinciding with a carrier's death) have no such marker and
+//             their break cause is still unresolved — the 7-16 dumps'
+//             damageDone stream only captured pagination page 1
+//             (+0..+50s), so damage TO the crystal is invisible.
 //   +198.7    1282470 "Dark Quasar" (cast + debuff on one player) — the
 //             player aims the beam; 1282469 is the beam's damage. In
 //             MFPull4 the debuffed player took 4 beam ticks themselves
@@ -170,6 +179,7 @@ const MIDNIGHT_FALLS_RULES: PullErrorRule[] = [
 
 const STARSPLINTER_MARKER_IDS   = [1285510, 1279512]; // 3s private-aura marks
 const STARSPLINTER_SPLASH_ID    = 1279581;            // hit on a NON-marked player
+const GLIMMERING_CARRIER_ID     = 1253031;            // carrying a Dawn Crystal
 export const MIDNIGHTFALLS_STARSPLINTER_RULE_ID = "wow-mf-starsplinter-overlap";
 
 // A splash hit is attributed to the detonation whose marker removal
@@ -183,12 +193,11 @@ const SPLASH_ATTRIBUTION_WINDOW_MS = 600;
 const WIPE_DEATHS_WINDOW_MS = 15000;
 const WIPE_DEATHS_THRESHOLD = 2;
 
-function detectStarsplinterOverlap(
-  players:     PlayerInfo[],
-  deathEvents: DeathEvent[]
-): PullError[] {
-  // Every marker removal = one detonation instant, with its owner.
-  const detonations: Array<{ timestamp: number; playerName: string }> = [];
+type Detonation = { timestamp: number; playerName: string };
+
+/** Every Starsplinter marker removal = one detonation instant, with its owner. */
+function buildDetonations(players: PlayerInfo[]): Detonation[] {
+  const detonations: Detonation[] = [];
   for (const player of players) {
     for (const d of player.debuffs) {
       if (d.debuffStatus !== "removed") continue;
@@ -196,6 +205,14 @@ function detectStarsplinterOverlap(
       detonations.push({ timestamp: d.timestamp, playerName: player.name });
     }
   }
+  return detonations;
+}
+
+function detectStarsplinterOverlap(
+  players:     PlayerInfo[],
+  deathEvents: DeathEvent[]
+): PullError[] {
+  const detonations = buildDetonations(players);
 
   const deathTimestamps = deathEvents.map((d) => d.timestamp);
   const isWipeUnderway = (atTime: number) =>
@@ -251,6 +268,98 @@ function detectStarsplinterOverlap(
 // the actual out-of-order rune player.
 const ANONYMOUS_RAID_RULE_IDS = new Set(["wow-raid-lights-end", "wow-raid-naaru-lament"]);
 
+// ─── Light's End source attribution ─────────────────────────────────────────
+//
+// Every INTERMISSION Light's End observed is immediately preceded by a
+// Starsplinter detonation — the splinter blast is what breaks the crystal:
+//   MFPull4  LE +201.91 ← detonation +201.63 (0.28s), whose owner never
+//            carried a crystal; the broken crystal had been dropped ~11.7yd
+//            away 4.5s earlier by the Dark Quasar victim.
+//   MFPull21 LE +214.97 ← detonation +214.86 (0.11s) by a player who had
+//            dropped their own crystal at their feet 1.2s earlier — their
+//            splinter broke their own crystal and the blast killed them.
+//   MFPull21 LE +220.68 ← three marker removals within 0.1s, but two were
+//            death-strips (owners already dead) — only the living owner's
+//            was a real detonation, hence the alive check below.
+// Pre-intermission Light's Ends (MFPull11 +183.7 during the Dissonance
+// wipe — simultaneous with a crystal CARRIER's death — and MFPull13 +95.3)
+// have no markers in existence, so no source is claimed for them.
+//
+// The named player is the raid error's "source", NOT its blame — per
+// ground truth, fault can lie with whoever dropped the crystal there, the
+// detonating player's movement, or a third party forcing that movement —
+// so this stays a Raid error and the source goes in the description only.
+const LIGHTS_END_RULE_ID = "wow-raid-lights-end";
+const LIGHTS_END_DETONATION_WINDOW_MS = 800;
+
+// The second observed break cause: a CARRIER dying with the crystal in
+// hand. Signature: the carrier's Glimmering removal coincides with their
+// death (strip) and Light's End follows within this window — MFPull13
+// (two Heaven's Glaives victims carrying, removals 0.96s/0.12s before LE)
+// and MFPull11 (Dissonance-wipe carrier death 0.03s before LE).
+const LIGHTS_END_CARRIER_DEATH_WINDOW_MS = 1500;
+const CARRIER_DEATH_STRIP_TOLERANCE_MS   = 1000;
+
+function annotateLightsEndSources(
+  errors:      PullError[],
+  detonations: Detonation[],
+  players:     PlayerInfo[],
+  deathEvents: DeathEvent[]
+): PullError[] {
+  const isDeadAt = (playerName: string, atTime: number) =>
+    deathEvents.some((d) => d.player === playerName && d.timestamp <= atTime);
+
+  // Glimmering removals that are death-strips: the carrier died within
+  // the tolerance before the removal — i.e. died holding the crystal.
+  const carrierDeaths: Array<{ timestamp: number; playerName: string }> = [];
+  for (const player of players) {
+    for (const d of player.debuffs) {
+      if (d.abilityId !== GLIMMERING_CARRIER_ID || d.debuffStatus !== "removed") continue;
+      // WCL orders the strip a few ms BEFORE the death event itself, so
+      // the death may sit on either side of the removal — match within
+      // the tolerance in both directions.
+      const died = deathEvents.some(
+        (de) => de.player === player.name &&
+          Math.abs(d.timestamp - de.timestamp) <= CARRIER_DEATH_STRIP_TOLERANCE_MS
+      );
+      if (died) carrierDeaths.push({ timestamp: d.timestamp, playerName: player.name });
+    }
+  }
+
+  return errors.map((e) => {
+    if (e.ruleId !== LIGHTS_END_RULE_ID) return e;
+
+    let source: Detonation | undefined;
+    for (const det of detonations) {
+      if (det.timestamp > e.timestamp) continue;
+      if (e.timestamp - det.timestamp > LIGHTS_END_DETONATION_WINDOW_MS) continue;
+      if (isDeadAt(det.playerName, det.timestamp)) continue; // death-strip, not a detonation
+      if (!source || det.timestamp > source.timestamp) source = det;
+    }
+    if (source) {
+      return {
+        ...e,
+        description:
+          `${e.description} Broken by ${source.playerName}'s Starsplinter detonation ` +
+          `${((e.timestamp - source.timestamp) / 1000).toFixed(2)}s earlier.`,
+      };
+    }
+
+    const dyingCarriers = carrierDeaths.filter(
+      (c) => c.timestamp <= e.timestamp && e.timestamp - c.timestamp <= LIGHTS_END_CARRIER_DEATH_WINDOW_MS
+    );
+    if (dyingCarriers.length > 0) {
+      const names = [...new Set(dyingCarriers.map((c) => c.playerName))].join(", ");
+      return {
+        ...e,
+        description: `${e.description} Followed ${names} dying while carrying a crystal.`,
+      };
+    }
+
+    return e;
+  });
+}
+
 export function detectMidnightFallsErrors(
   players:     PlayerInfo[],
   deathEvents: DeathEvent[] = [],
@@ -266,5 +375,12 @@ export function detectMidnightFallsErrors(
       : e
   );
 
-  return suppressDuplicateRaidErrors(errors).sort((a, b) => a.timestamp - b.timestamp);
+  // Annotate after dedup so each surviving Light's End error (= one
+  // crystal detonation, timestamped at its first hit) gets its source.
+  return annotateLightsEndSources(
+    suppressDuplicateRaidErrors(errors),
+    buildDetonations(players),
+    players,
+    deathEvents
+  ).sort((a, b) => a.timestamp - b.timestamp);
 }

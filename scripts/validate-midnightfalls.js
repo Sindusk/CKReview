@@ -17,21 +17,31 @@
 // Expected results (any deviation is a regression):
 //   7-16/MFPull4   -> P9 Heaven's Glaives death (+91s); P2 Death to Dark
 //                     Quasar (+199.5s); ONE Light's End raid error
-//                     (+201.9s — 18 near-simultaneous hits deduped)
+//                     (+201.9s — 18 near-simultaneous hits deduped),
+//                     description names P14's Starsplinter detonation
+//                     0.28s earlier as the breaker
 //   7-16/MFPull11  -> P15 Death to Dark Quasar (+125.2s); ONE Dissonance
 //                     raid error attributed to P14 (+174.5s — first of 4
 //                     recipients within 0.5s, rest suppressed as chain
-//                     fallout); ONE Light's End raid error (+183.7s)
+//                     fallout); ONE Light's End raid error (+183.7s),
+//                     description notes carrier P6 dying with the crystal
 //   7-16/MFPull13  -> P10/P28/P6 Heaven's Glaives deaths (+94-95s); ONE
 //                     Light's End raid error (+95.3s; the second
 //                     detonation at +99.1s only landed 0/81k hits on the
-//                     already-dead raid, filtered by minEffectiveDamage);
-//                     ONE Naaru's Lament raid error (+97.8s — 13 hits
-//                     deduped)
+//                     already-dead raid, filtered by minEffectiveDamage),
+//                     description notes carriers P10 and P6 dying with
+//                     crystals in hand (their Glaives deaths stripped
+//                     Glimmering 0.96s/0.12s before the LE); ONE Naaru's
+//                     Lament raid error (+97.8s — 13 hits deduped)
 //   7-16/MFPull21  -> P17 Caught in Starsplinter (+195.0s, ~487k splash
 //                     attributed to P22's detonation 0.28s earlier); TWO
 //                     Light's End raid errors (+215.0s and +220.7s — two
-//                     separate crystals 5.7s apart, correctly NOT deduped)
+//                     separate crystals 5.7s apart, correctly NOT
+//                     deduped): #1 names P2's detonation 0.11s earlier
+//                     (P2 had dropped their own crystal at their feet
+//                     1.2s before), #2 names P12's detonation (the other
+//                     two simultaneous marker removals were death-strips
+//                     of already-dead owners and must NOT be named)
 //   7-16/MFPull22, MFPull33 -> 0 errors (stale-cursor captures, event
 //                     streams empty)
 //   MFDissonanceFailPull1    -> ONE Dissonance raid error (was 5 before
@@ -40,7 +50,8 @@
 //   MFDissonanceSuccessPull55-> no Dissonance error
 //   MFTerminateFailPull2     -> ONE Terminate Cast raid error
 //   MFLightsEndPull31        -> Light's End + Naaru's Lament raid errors
-//                               (one each)
+//                               (one each); the LE names carriers
+//                               P27/P17/P7 dying with crystals
 const fs = require('fs');
 const path = require('path');
 const ROOT = path.join(__dirname, '..');
@@ -153,5 +164,8 @@ for (const f of FILES) {
   console.log(f, '->', errors.length, 'errors');
   for (const e of errors) {
     console.log(`  [${e.severity}] [${e.ruleId}] t=+${(e.timestamp / 1000).toFixed(1)}s ${e.player ?? '(raid)'}: ${e.name}`);
+    // Light's End descriptions carry the detonation-source attribution —
+    // print them so regressions in annotateLightsEndSources are visible.
+    if (e.ruleId === 'wow-raid-lights-end') console.log(`      ${e.description}`);
   }
 }
