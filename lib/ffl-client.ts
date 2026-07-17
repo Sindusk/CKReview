@@ -551,7 +551,9 @@ export async function fetchFFightData(
   reportCode: string,
   fight:      FFLFight,
   actors:     FFLActor[],
-  logLabel?:  string      // e.g. from buildFFFightLogLabels — tags console dumps
+  logLabel?:  string,      // e.g. from buildFFFightLogLabels — tags console dumps
+  skipConsoleDump = false  // true for callers (e.g. scripts/fetch-ff-report.js) that
+                            // persist the result themselves
 ): Promise<FFLFightData> {
   const endTime = fight.endTime;
   const label   = logLabel ?? `${fight.name ?? "Unknown Fight"} (fight ${fight.id})`;
@@ -616,19 +618,21 @@ export async function fetchFFightData(
   // ONE console dump per fight, all pages merged — see the WCL client's
   // fetchFightData for the full rationale. Same {query, variables, json}
   // shape a per-page dump used, so a saved file is a drop-in replacement.
-  console.log(`[FFL raw response] — ${label} (${page} page${page === 1 ? "" : "s"} merged)`, {
-    query:     FIGHT_EVENTS_QUERY,
-    variables: { code: reportCode, fightIDs: [fight.id], endTime },
-    json: {
-      data: {
-        reportData: {
-          report: Object.fromEntries(
-            STREAM_KEYS.map((key) => [key, { data: collected[key], nextPageTimestamp: null }])
-          ),
+  if (!skipConsoleDump) {
+    console.log(`[FFL raw response] — ${label} (${page} page${page === 1 ? "" : "s"} merged)`, {
+      query:     FIGHT_EVENTS_QUERY,
+      variables: { code: reportCode, fightIDs: [fight.id], endTime },
+      json: {
+        data: {
+          reportData: {
+            report: Object.fromEntries(
+              STREAM_KEYS.map((key) => [key, { data: collected[key], nextPageTimestamp: null }])
+            ),
+          },
         },
       },
-    },
-  });
+    });
+  }
 
   return {
     fight,

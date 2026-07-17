@@ -512,7 +512,10 @@ export async function fetchFightData(
   reportCode: string,
   fight:      WCLFight,
   actors:     WCLActor[],
-  logLabel?:  string      // e.g. from buildFightLogLabels — tags console dumps
+  logLabel?:  string,      // e.g. from buildFightLogLabels — tags console dumps
+  skipConsoleDump = false  // true for callers (e.g. scripts/fetch-wow-report.js) that
+                            // persist the result themselves — the browser UI leaves
+                            // this false so the dump stays available for sample-data collection
 ): Promise<WCLFightData> {
   const endTime = fight.endTime;
   const label   = logLabel ?? `${fight.name} (fight ${fight.id})`;
@@ -576,19 +579,21 @@ export async function fetchFightData(
   // reportData.report.<stream>.data is the FULL merged array — so a file
   // saved from this one log entry is a drop-in replacement for what used
   // to require pasting multiple page files together.
-  console.log(`[WCL raw response] — ${label} (${page} page${page === 1 ? "" : "s"} merged)`, {
-    query:     FIGHT_EVENTS_QUERY,
-    variables: { code: reportCode, fightIDs: [fight.id], endTime },
-    json: {
-      data: {
-        reportData: {
-          report: Object.fromEntries(
-            STREAM_KEYS.map((key) => [key, { data: collected[key], nextPageTimestamp: null }])
-          ),
+  if (!skipConsoleDump) {
+    console.log(`[WCL raw response] — ${label} (${page} page${page === 1 ? "" : "s"} merged)`, {
+      query:     FIGHT_EVENTS_QUERY,
+      variables: { code: reportCode, fightIDs: [fight.id], endTime },
+      json: {
+        data: {
+          reportData: {
+            report: Object.fromEntries(
+              STREAM_KEYS.map((key) => [key, { data: collected[key], nextPageTimestamp: null }])
+            ),
+          },
         },
       },
-    },
-  });
+    });
+  }
 
   return {
     fight,

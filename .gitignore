@@ -5,3 +5,4 @@ data/sessions/
 node_modules/
 public/
 sampledata/
+.credentials/

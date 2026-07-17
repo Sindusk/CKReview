@@ -111,9 +111,23 @@ const { detectMidnightFallsErrors } = midnightfalls;
 const DATA_DIR = path.join(ROOT, 'sampledata', 'wow');
 const STREAM_KEYS = ['deaths', 'combatantInfo', 'casts', 'damageDone', 'damageTaken', 'healing', 'debuffs', 'enemyCasts', 'enemyBuffs'];
 
-/** Reads one raw dump file (the {query, variables, json} console-log shape) down to its report object. */
+/**
+ * Reads one raw dump file (the {query, variables, json} console-log
+ * shape) down to its report object, or null if the file is empty/corrupt
+ * — e.g. a clipboard copy that silently truncated on a big pull (see
+ * scripts/fetch-wow-report.js, built specifically to stop this from
+ * happening for new captures). Callers should skip nulls with a warning
+ * rather than crash the whole run over one bad file.
+ */
 function readReport(filePath) {
-  return JSON.parse(fs.readFileSync(filePath, 'utf8')).json.data.reportData.report;
+  const raw = fs.readFileSync(filePath, 'utf8');
+  if (raw.trim().length === 0) return null;
+  try {
+    return JSON.parse(raw).json.data.reportData.report;
+  } catch (err) {
+    console.warn(`  WARNING: ${filePath} failed to parse (${err.message}) — skipping`);
+    return null;
+  }
 }
 
 /** Concatenates every stream's .data array across an ordered list of page reports into one merged report. */
@@ -126,9 +140,12 @@ function mergeReports(reports) {
 }
 
 /**
- * Discovers every "MFPull<N>P<M>.json" (or page-less "MFPull<N>.json")
+ * Discovers every "...Pull<N>P<M>.json" (or page-less "...Pull<N>.json")
  * file in sampledata/wow/7-16/, groups by pull number N, sorts each
  * group's pages, and returns [{ label, rep }] with pages pre-merged.
+ * Matches both the hand-copied "MFPull<N>.json" convention and
+ * scripts/fetch-wow-report.js's "<Boss Name>_Pull<N>.json" output — the
+ * regex only anchors on the "Pull<N>" suffix, not any particular prefix.
  */
 function discover7_16Pulls() {
   const dir = path.join(DATA_DIR, '7-16');
@@ -136,7 +153,7 @@ function discover7_16Pulls() {
 
   const groups = new Map(); // pullNumber -> [{page, filePath}]
   for (const name of fs.readdirSync(dir)) {
-    const m = name.match(/^MFPull(\d+)(?:P(\d+))?\.json$/);
+    const m = name.match(/Pull(\d+)(?:P(\d+))?\.json$/);
     if (!m) continue;
     const pullNumber = Number(m[1]);
     const page = m[2] ? Number(m[2]) : 1;
@@ -145,13 +162,23 @@ function discover7_16Pulls() {
     groups.set(pullNumber, list);
   }
 
-  return [...groups.entries()]
-    .sort((a, b) => a[0] - b[0])
-    .map(([pullNumber, pages]) => {
-      pages.sort((a, b) => a.page - b.page);
-      const rep = mergeReports(pages.map((p) => readReport(p.filePath)));
-      return { label: `7-16 Pull ${pullNumber} (${pages.length} page${pages.length === 1 ? '' : 's'})`, rep };
+  const results = [];
+  for (const [pullNumber, pages] of [...groups.entries()].sort((a, b) => a[0] - b[0])) {
+    pages.sort((a, b) => a.page - b.page);
+    const reports = pages.map((p) => readReport(p.filePath)).filter((r) => r !== null);
+    if (reports.length === 0) {
+      console.warn(`  WARNING: 7-16 Pull ${pullNumber} — all ${pages.length} page(s) empty/unparseable, skipping`);
+      continue;
+    }
+    if (reports.length < pages.length) {
+      console.warn(`  WARNING: 7-16 Pull ${pullNumber} — only ${reports.length}/${pages.length} page(s) readable, results may be incomplete`);
+    }
+    results.push({
+      label: `7-16 Pull ${pullNumber} (${reports.length}/${pages.length} page${pages.length === 1 ? '' : 's'})`,
+      rep: mergeReports(reports),
     });
+  }
+  return results;
 }
 
 function fightStartOf(rep) {
