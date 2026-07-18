@@ -23,15 +23,28 @@
 // WITHIN a trio shuffles freely pull-to-pull — it's just which matrix's
 // cast came up first. All three waves of a pull use the same rotation.
 //
-// LIMITATION (why per-matrix assignment isn't detected): WCL provides no
+// LIMITATION (why per-matrix assignment isn't DETECTED): WCL provides no
 // instance data anywhere on this fight's matrix events — no
 // sourceInstance on the matrices' begincast/cast events, no
 // targetInstance on players' interrupt casts (verified by refetching with
 // those fields kept — the API simply doesn't send them here), and the
-// Terminate damage is credited to L'ura (the boss), not a matrix. So
-// "who kicks in which round" is fully recoverable, "who covers which of
-// the three matrices" is not. Rounds are therefore presented as unranked
-// trios.
+// Terminate damage is credited to L'ura (the boss), not a matrix. Every
+// indirect signal was also tested against the user's ground-truth chains
+// (2026-07-17) and failed:
+//   · timing — same-chain successor gaps (med 1.10s) are indistinguishable
+//     from cross-chain gaps (med 1.14s); players kick when their round
+//     comes up, not on their matrix's cadence;
+//   · order preservation — a chain's position within round r carries to
+//     round r+1 only 39% of the time (96/245 transitions);
+//   · position — the raid stacks, so even melee kickers' x/y at kick time
+//     forms one blob (~15yd between per-player means), not three clusters.
+// So "who kicks in which round" is fully recoverable, "who covers which
+// matrix" is not — hence KNOWN_KICK_CHAINS below: the raid's boss-frame
+// macro assignment, supplied by the user as ground truth. When the
+// detected rounds are consistent with it (each chain's Nth member sits in
+// detected round N), the strategy is presented as per-frame chains; any
+// mismatch (roster swap, strategy change, different raid) falls back to
+// the detected unranked rounds.
 //
 // Detection: collect interrupt-spell casts targeting "Termination
 // Matrix", split each pull's kicks into waves on a >20s gap, rank each
@@ -78,6 +91,17 @@ const CORE_WAVE_FRACTION = 0.5;
 // One kicker per concurrent matrix per round.
 const MATRICES_PER_WAVE = 3;
 
+// Ground-truth kick assignment (user-supplied 2026-07-17): each player
+// macros their interrupt to a boss frame; frame 1 is L'ura, frames 2-4
+// are the three Termination Matrices. Chain order = kick order on that
+// frame. Cannot be derived from logs (see the limitation note above) —
+// it's declared here and VALIDATED against the detected rounds instead.
+export const KNOWN_KICK_CHAINS: Array<{ label: string; members: string[] }> = [
+  { label: "Boss Frame 2", members: ["Mythnarra",   "Sindusk",    "Hervous",  "Cocoroach"] },
+  { label: "Boss Frame 3", members: ["Religiouspp", "Shadowmeld", "Neptune",  "Polpo"] },
+  { label: "Boss Frame 4", members: ["Laedria",     "Nearly",     "Neximage", "Pnkphnx"] },
+];
+
 export type KickSlot = {
   player:     string;
   className?: string;
@@ -86,11 +110,20 @@ export type KickSlot = {
   wavesSeen:  number;  // how many wave-sequences they kicked in
 };
 
+export type KickChain = {
+  label: string;      // e.g. "Boss Frame 2"
+  slots: KickSlot[];  // kick order on that frame (detected members only)
+};
+
 export type TerminateKickStrategy = {
   pullsAnalyzed: number;      // pulls that contained at least one kick
   wavesAnalyzed: number;      // total matrix-wave sequences aggregated
   rounds:        KickSlot[][]; // rotation order; each round is an unranked trio
   fillIns:       KickSlot[];   // sub-threshold kickers (subs/backups)
+  // KNOWN_KICK_CHAINS re-validated against the detected rounds — null when
+  // the detection disagrees with the declared assignment (roster/strategy
+  // change), in which case the UI falls back to `rounds`.
+  chains:        KickChain[] | null;
 };
 
 export function detectTerminateKickOrder(
@@ -166,5 +199,37 @@ export function detectTerminateKickOrder(
     wavesAnalyzed,
     rounds,
     fillIns: fillIns.map((r) => r.slot),
+    chains:  buildValidatedChains(rounds),
   };
+}
+
+// Cross-checks KNOWN_KICK_CHAINS against the detected rounds: every
+// detected core kicker must be a declared chain member sitting in the
+// round matching their position in the chain. Members who never kicked
+// (absent player) are simply omitted from the returned chain; any actual
+// CONTRADICTION — a detected kicker the declaration doesn't know, or one
+// detected in the wrong round — voids the whole mapping (returns null)
+// rather than showing a half-wrong strategy.
+function buildValidatedChains(rounds: KickSlot[][]): KickChain[] | null {
+  const declared = new Map<string, { chain: number; depth: number }>();
+  KNOWN_KICK_CHAINS.forEach((c, chainIdx) =>
+    c.members.forEach((name, depth) => declared.set(name, { chain: chainIdx, depth }))
+  );
+
+  for (let roundIdx = 0; roundIdx < rounds.length; roundIdx++) {
+    for (const slot of rounds[roundIdx]) {
+      const d = declared.get(slot.player);
+      if (!d || d.depth !== roundIdx) return null;
+    }
+  }
+
+  const slotByName = new Map(rounds.flat().map((s) => [s.player, s]));
+  const chains = KNOWN_KICK_CHAINS.map((c) => ({
+    label: c.label,
+    slots: c.members
+      .map((name) => slotByName.get(name))
+      .filter((s): s is KickSlot => s !== undefined),
+  }));
+
+  return chains.some((c) => c.slots.length > 0) ? chains : null;
 }

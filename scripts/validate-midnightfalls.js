@@ -54,11 +54,13 @@ function loadModule(relPath, shims) {
 // type-only imports are erased at transpile time, so an empty shim works.
 const errorRules     = loadModule('lib/error-rules.ts', { '@/types/PullError': {} });
 const errorDetection = loadModule('lib/error-detection.ts', { './error-rules': errorRules });
+const terminateKicks = loadModule('lib/mechanics/wow/vs-dr-mqd/terminate-kicks.ts', {});
 const midnightfalls  = loadModule('lib/mechanics/wow/vs-dr-mqd/midnightfalls.ts', {
   '../../../error-detection': errorDetection,
+  './terminate-kicks':        terminateKicks,
 });
 const { detectMidnightFallsErrors } = midnightfalls;
-const { detectTerminateKickOrder } = loadModule('lib/mechanics/wow/vs-dr-mqd/terminate-kicks.ts', {});
+const { detectTerminateKickOrder } = terminateKicks;
 const { getSpecInfo } = loadModule('lib/spec-data.ts', {});
 
 const WOW_DATA_DIR = path.join(ROOT, 'sampledata', 'wow');
@@ -215,9 +217,16 @@ for (const dir of reportDirs) {
     console.log('Terminate kick order: no interrupt data detected');
   } else {
     console.log(`Terminate kick order (${strategy.pullsAnalyzed} pulls, ${strategy.wavesAnalyzed} waves):`);
-    strategy.rounds.forEach((round, i) => {
-      console.log(`  Round ${i + 1}: ${round.map((s) => `${s.player} (${s.ability})`).join(' / ')}`);
-    });
+    if (strategy.chains) {
+      for (const chain of strategy.chains) {
+        console.log(`  ${chain.label}: ${chain.slots.map((s) => `${s.player} (${s.ability})`).join(' -> ')}`);
+      }
+    } else {
+      console.log('  (declared boss-frame chains did NOT validate against detection — showing raw rounds)');
+      strategy.rounds.forEach((round, i) => {
+        console.log(`  Round ${i + 1}: ${round.map((s) => `${s.player} (${s.ability})`).join(' / ')}`);
+      });
+    }
     if (strategy.fillIns.length) {
       console.log(`  Fill-ins: ${strategy.fillIns.map((s) => `${s.player} (${s.ability}, ${s.wavesSeen}/${strategy.wavesAnalyzed} waves)`).join(', ')}`);
     }

@@ -85,6 +85,7 @@ import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { DeathEvent } from "@/types/DeathEvent";
 import type { PullError, PullErrorRule, EnemyEvent } from "@/types/PullError";
 import { evaluateRuleSet, suppressDuplicateRaidErrors } from "../../../error-detection";
+import { KNOWN_KICK_CHAINS, TERMINATE_INTERRUPT_IDS } from "./terminate-kicks";
 
 // ─── Declarative rules (moved verbatim from lib/error-rules.ts) ────────────
 
@@ -265,17 +266,45 @@ function detectStarsplinterOverlap(
 //
 // Multiple Termination Matrices complete casts near-simultaneously (three
 // within 0.5s in Pull 3), so casts are grouped with the same 2s window
-// suppressDuplicateRaidErrors uses — one error per volley, Raid if ANY
-// cast in the volley hit someone. Across all 42 pulls of xvQbZ6Cwkm1XaHPD
-// the damage lands 0.03-0.15s after its cast completion and volleys are
-// ≥0.9s apart, so the 750ms hit window can't bleed into the next volley.
+// suppressDuplicateRaidErrors uses — one error per volley. Across all 42
+// pulls of xvQbZ6Cwkm1XaHPD the damage lands 0.03-0.15s after its cast
+// completion and volleys are ≥0.9s apart, so the 750ms hit window can't
+// bleed into the next volley.
+//
+// SEVERITY (ground truth 2026-07-17): keyed on Terminate KILLS, not hits —
+// 2+ players killed = Raid, exactly one = Major, none = Minor (a fully
+// survived Terminate did no lasting harm).
+//
+// ATTRIBUTION — "the player who missed that specific interrupt", only
+// when knowable FOR SURE. Uses KNOWN_KICK_CHAINS (terminate-kicks.ts):
+// each matrix is kicked by one declared chain, in order. An interrupted
+// matrix recasts ~0.5s later and Terminate's cast time is ~2s, so a
+// matrix whose chain kicked within the last 2s CANNOT be the one that
+// completed. For a single-completion volley, exclude recently-kicked
+// chains; if exactly ONE chain remains and it has an un-kicked member
+// left, that first un-kicked member is the misser (validated across the
+// 42-pull capture — e.g. Pull 1 +9.58 lands on Nearly, who kicked 0.12s
+// AFTER the cast completed). Attribution is skipped whenever it isn't
+// airtight: multi-completion volleys, waves containing kicks by
+// non-chain fill-ins (their chain is unknowable), ambiguity after
+// exclusion, or an exhausted chain (5th cast has no assigned kicker).
+// If the misser was already DEAD before the cast went off, that leads
+// the description (their miss is fallout of their death — the death
+// itself is flagged by its own cause).
 const TERMINATE_CAST_ID     = 1284934;
 const TERMINATE_DAMAGE_ID   = 1286276;
 const TERMINATE_HIT_WINDOW_MS   = 750;
-const TERMINATE_GROUP_WINDOW_MS = 2000; // matches RAID_ERROR_SUPPRESS_WINDOW_MS
+const TERMINATE_GROUP_WINDOW_MS = 2000;  // matches RAID_ERROR_SUPPRESS_WINDOW_MS
+const TERMINATE_WAVE_WINDOW_MS  = 30000; // kicks belonging to this matrix set (~12s spread, sets ~62s apart)
+const TERMINATE_CHAIN_EXCLUSION_MS = 2000; // interrupted matrix can't complete again this fast
+const MATRIX_NAME = "Termination Matrix";
 export const MIDNIGHTFALLS_TERMINATE_RULE_ID = "wow-raid-terminate-cast";
 
-function detectTerminateCasts(players: PlayerInfo[], enemyCasts: EnemyEvent[]): PullError[] {
+function detectTerminateCasts(
+  players:     PlayerInfo[],
+  enemyCasts:  EnemyEvent[],
+  deathEvents: DeathEvent[]
+): PullError[] {
   const casts = enemyCasts
     .filter((e) => e.abilityId === TERMINATE_CAST_ID)
     .sort((a, b) => a.timestamp - b.timestamp);
@@ -290,6 +319,36 @@ function detectTerminateCasts(players: PlayerInfo[], enemyCasts: EnemyEvent[]): 
     }
   }
 
+  // Every interrupt landed on a matrix, for chain reconstruction.
+  const chainMembers = new Set(KNOWN_KICK_CHAINS.flatMap((c) => c.members));
+  const kicks: Array<{ timestamp: number; playerName: string }> = [];
+  for (const p of players) {
+    for (const c of p.casts) {
+      if (c.target === MATRIX_NAME && TERMINATE_INTERRUPT_IDS.has(c.abilityId)) {
+        kicks.push({ timestamp: c.timestamp, playerName: p.name });
+      }
+    }
+  }
+
+  // The chain-elimination attribution described in the header comment.
+  // Returns the misser only when exactly one chain can be responsible.
+  const attributeMiss = (completionTime: number): string | undefined => {
+    const wave = kicks.filter(
+      (k) => k.timestamp > completionTime - TERMINATE_WAVE_WINDOW_MS && k.timestamp <= completionTime
+    );
+    if (wave.some((k) => !chainMembers.has(k.playerName))) return undefined; // fill-in kicked — chains unknowable
+    const candidates: string[] = [];
+    for (const chain of KNOWN_KICK_CHAINS) {
+      const chainKicks = wave.filter((k) => chain.members.includes(k.playerName));
+      const lastKick = chainKicks.length ? Math.max(...chainKicks.map((k) => k.timestamp)) : -Infinity;
+      if (completionTime - lastKick < TERMINATE_CHAIN_EXCLUSION_MS) continue; // just kicked — excluded
+      const nextDue = chain.members.find((m) => !chainKicks.some((k) => k.playerName === m));
+      if (nextDue !== undefined) candidates.push(nextDue);
+      else return undefined; // an exhausted chain is a candidate with no assigned kicker — not airtight
+    }
+    return candidates.length === 1 ? candidates[0] : undefined;
+  };
+
   const errors: PullError[] = [];
   let group: EnemyEvent[] = [];
   const flush = () => {
@@ -297,20 +356,41 @@ function detectTerminateCasts(players: PlayerInfo[], enemyCasts: EnemyEvent[]): 
     const inWindow = (t: number) =>
       group.some((c) => t >= c.timestamp - 100 && t <= c.timestamp + TERMINATE_HIT_WINDOW_MS);
     // Everyone hit by this volley, in hit order (ground truth request,
-    // Pull 6: the Raid error should name all the victims).
+    // Pull 6: the error should name all the victims).
     const victims = [...new Set(
       hits.filter((h) => inWindow(h.timestamp))
         .sort((a, b) => a.timestamp - b.timestamp)
         .map((h) => h.playerName)
     )];
+    const killed = new Set(
+      deathEvents
+        .filter((d) => d.killingAbilityGameId === TERMINATE_DAMAGE_ID && inWindow(d.timestamp))
+        .map((d) => d.player)
+    );
+
+    const misser = group.length === 1 ? attributeMiss(group[0].timestamp) : undefined;
+    const misserInfo = misser ? players.find((p) => p.name === misser) : undefined;
+    const misserDead = misser !== undefined &&
+      deathEvents.some((d) => d.player === misser && d.timestamp <= group[0].timestamp);
+
+    const lead =
+      misser === undefined
+        ? "The interrupt on the termination matrix's Terminate cast was missed."
+        : misserDead
+          ? `${misser} was dead before their Terminate interrupt came up. The termination matrix's Terminate cast went off.`
+          : `${misser} missed their Terminate interrupt — the termination matrix's Terminate cast went off.`;
+    const tail = victims.length > 0 ? ` Hit: ${victims.join(", ")}.` : " Nobody was hit.";
+
     errors.push({
       ruleId:      MIDNIGHTFALLS_TERMINATE_RULE_ID,
-      severity:    victims.length > 0 ? "Raid" : "Minor",
+      severity:    killed.size >= 2 ? "Raid" : killed.size === 1 ? "Major" : "Minor",
       name:        "Terminate Cast",
-      description: victims.length > 0
-        ? `The interrupt on the termination matrix's Terminate cast was missed. Hit: ${victims.join(", ")}.`
-        : "The interrupt on the termination matrix's Terminate cast was missed, but nobody was hit.",
+      description: lead + tail,
       timestamp:   group[0].timestamp,
+      player:      misser,
+      class:       misserInfo?.className,
+      specId:      misserInfo?.specId,
+      role:        misserInfo?.role,
       abilityId:   TERMINATE_CAST_ID,
       abilityName: group[0].abilityName,
       abilityIcon: group[0].abilityIcon,
@@ -543,7 +623,7 @@ export function detectMidnightFallsErrors(
   const errors = [
     ...evaluateRuleSet(MIDNIGHT_FALLS_RULES, players, deathEvents, enemyCasts, enemyBuffs),
     ...detectStarsplinterOverlap(players, deathEvents),
-    ...detectTerminateCasts(players, enemyCasts),
+    ...detectTerminateCasts(players, enemyCasts, deathEvents),
     ...detectDuskCrystalHealing(players, enemyCasts, friendlyNpcDamage),
   ].map((e) =>
     ANONYMOUS_RAID_RULE_IDS.has(e.ruleId)

@@ -90,35 +90,66 @@ export default function StrategyDialog({ open, onClose, strategy }: StrategyDial
             </div>
             <div style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "12px" }}>
               Detected from {strategy.pullsAnalyzed} pull{strategy.pullsAnalyzed === 1 ? "" : "s"} ·{" "}
-              {strategy.wavesAnalyzed} matrix wave{strategy.wavesAnalyzed === 1 ? "" : "s"}. Three matrices
-              cast in parallel — each round is one interrupt per matrix. The logs
-              don&apos;t record which matrix each player covers, so names within a
-              round aren&apos;t ordered.
+              {strategy.wavesAnalyzed} matrix wave{strategy.wavesAnalyzed === 1 ? "" : "s"}.{" "}
+              {strategy.chains
+                ? "Each matrix is kicked in the order shown on its boss frame."
+                : "Three matrices cast in parallel — each round is one interrupt per matrix. The logs don't record which matrix each player covers, so names within a round aren't ordered."}
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              {strategy.rounds.map((round, i) => (
-                <div
-                  key={i}
-                  style={{
-                    display: "flex",
-                    alignItems: "baseline",
-                    gap: "10px",
-                    padding: "8px 12px",
-                    backgroundColor: "#1a1a1a",
-                    border: "1px solid #333",
-                    borderRadius: "6px",
-                  }}
-                >
-                  <span style={{ fontSize: "11px", fontWeight: 700, color: "#60a5fa", flexShrink: 0, width: "56px" }}>
-                    Round {i + 1}
-                  </span>
-                  <span style={{ display: "flex", flexWrap: "wrap", columnGap: "14px", rowGap: "4px" }}>
-                    {round.map((slot) => <KickSlotChip key={slot.player} slot={slot} />)}
-                  </span>
-                </div>
-              ))}
-            </div>
+            {strategy.chains ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                {strategy.chains.map((chain) => (
+                  <div
+                    key={chain.label}
+                    style={{
+                      display: "flex",
+                      alignItems: "baseline",
+                      gap: "10px",
+                      padding: "8px 12px",
+                      backgroundColor: "#1a1a1a",
+                      border: "1px solid #333",
+                      borderRadius: "6px",
+                    }}
+                  >
+                    <span style={{ fontSize: "11px", fontWeight: 700, color: "#60a5fa", flexShrink: 0, width: "84px" }}>
+                      {chain.label}
+                    </span>
+                    <span style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", columnGap: "8px", rowGap: "4px" }}>
+                      {chain.slots.map((slot, i) => (
+                        <span key={slot.player} style={{ display: "inline-flex", alignItems: "baseline", gap: "8px" }}>
+                          {i > 0 && <span style={{ color: "#555", fontSize: "11px" }}>→</span>}
+                          <KickSlotChip slot={slot} />
+                        </span>
+                      ))}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                {strategy.rounds.map((round, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      display: "flex",
+                      alignItems: "baseline",
+                      gap: "10px",
+                      padding: "8px 12px",
+                      backgroundColor: "#1a1a1a",
+                      border: "1px solid #333",
+                      borderRadius: "6px",
+                    }}
+                  >
+                    <span style={{ fontSize: "11px", fontWeight: 700, color: "#60a5fa", flexShrink: 0, width: "56px" }}>
+                      Round {i + 1}
+                    </span>
+                    <span style={{ display: "flex", flexWrap: "wrap", columnGap: "14px", rowGap: "4px" }}>
+                      {round.map((slot) => <KickSlotChip key={slot.player} slot={slot} />)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {strategy.fillIns.length > 0 && (
               <div style={{ marginTop: "12px" }}>
