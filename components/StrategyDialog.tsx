@@ -11,12 +11,14 @@
 // covers is not (see the detection module's header).
 
 import type { TerminateKickStrategy, KickSlot } from "@/lib/mechanics/wow/vs-dr-mqd/terminate-kicks";
+import type { CrystalAssignmentStrategy, CrystalSlot } from "@/lib/mechanics/wow/vs-dr-mqd/crystal-assignments";
 import { getClassColor } from "@/lib/player-display";
 
 type StrategyDialogProps = {
   open:     boolean;
   onClose:  () => void;
   strategy: TerminateKickStrategy | null;
+  crystals: CrystalAssignmentStrategy | null;
 };
 
 function KickSlotChip({ slot }: { slot: KickSlot }) {
@@ -29,7 +31,34 @@ function KickSlotChip({ slot }: { slot: KickSlot }) {
   );
 }
 
-export default function StrategyDialog({ open, onClose, strategy }: StrategyDialogProps) {
+function CrystalSlotChip({ slot }: { slot: CrystalSlot }) {
+  const color = slot.className ? getClassColor("wow", slot.className) : "#ccc";
+  return (
+    <span style={{ color, fontWeight: 600, fontSize: "13px", whiteSpace: "nowrap" }}>
+      {slot.player}
+    </span>
+  );
+}
+
+const strategyRowStyle = {
+  display: "flex",
+  alignItems: "baseline" as const,
+  gap: "10px",
+  padding: "8px 12px",
+  backgroundColor: "#1a1a1a",
+  border: "1px solid #333",
+  borderRadius: "6px",
+};
+
+const strategyRowLabelStyle = {
+  fontSize: "11px",
+  fontWeight: 700,
+  color: "#60a5fa",
+  flexShrink: 0,
+  width: "84px",
+};
+
+export default function StrategyDialog({ open, onClose, strategy, crystals }: StrategyDialogProps) {
   if (!open) return null;
 
   return (
@@ -77,14 +106,16 @@ export default function StrategyDialog({ open, onClose, strategy }: StrategyDial
           </button>
         </div>
 
-        {!strategy ? (
+        {!strategy && !crystals ? (
           <p style={{ fontSize: "13px", color: "#ccc", lineHeight: 1.5 }}>
             No strategy detected yet. Import a report with Midnight Falls pulls —
-            the Terminate interrupt rotation is derived automatically from the
-            raid&apos;s interrupt casts.
+            the Terminate interrupt rotation and Dawn Crystal assignments are
+            derived automatically from the raid&apos;s casts and debuffs.
           </p>
         ) : (
           <>
+            {strategy && (
+            <>
             <div style={{ fontSize: "13px", fontWeight: 600, color: "#e2e8f0", marginBottom: "2px" }}>
               Terminate Interrupt Order
             </div>
@@ -164,6 +195,48 @@ export default function StrategyDialog({ open, onClose, strategy }: StrategyDial
                         {slot.wavesSeen}/{strategy.wavesAnalyzed} waves
                       </span>
                     </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            </>
+            )}
+
+            {crystals && (
+              <div style={{ marginTop: strategy ? "18px" : 0 }}>
+                <div style={{ fontSize: "13px", fontWeight: 600, color: "#e2e8f0", marginBottom: "2px" }}>
+                  Dawn Crystal Assignments
+                </div>
+                <div style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "12px" }}>
+                  Detected from {crystals.pullsAnalyzed} pull{crystals.pullsAnalyzed === 1 ? "" : "s"}.{" "}
+                  Assigned carriers hold their crystal from its wave until the
+                  intermission, when two crystals hand off to the tanks.
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <div style={strategyRowStyle}>
+                    <span style={strategyRowLabelStyle}>First Set</span>
+                    <span style={{ display: "flex", flexWrap: "wrap", columnGap: "14px", rowGap: "4px" }}>
+                      {crystals.set1.map((slot) => <CrystalSlotChip key={slot.player} slot={slot} />)}
+                    </span>
+                  </div>
+                  <div style={strategyRowStyle}>
+                    <span style={strategyRowLabelStyle}>Second Set</span>
+                    <span style={{ display: "flex", flexWrap: "wrap", columnGap: "14px", rowGap: "4px" }}>
+                      {crystals.set2.map((slot) => <CrystalSlotChip key={slot.player} slot={slot} />)}
+                    </span>
+                  </div>
+                  {crystals.swaps.map((swap) => (
+                    <div key={`${swap.from.player}-${swap.to.player}`} style={strategyRowStyle}>
+                      <span style={strategyRowLabelStyle}>Intermission</span>
+                      <span style={{ display: "inline-flex", alignItems: "baseline", gap: "8px" }}>
+                        <CrystalSlotChip slot={swap.from} />
+                        <span style={{ color: "#555", fontSize: "11px" }}>→</span>
+                        <CrystalSlotChip slot={swap.to} />
+                        <span style={{ color: "#666", fontSize: "10px" }}>
+                          {swap.pullsSeen}/{crystals.pullsAnalyzed} pulls
+                        </span>
+                      </span>
+                    </div>
                   ))}
                 </div>
               </div>

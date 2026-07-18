@@ -15,6 +15,7 @@ import RosterPanel from "../components/RosterPanel";
 import TimelinePanel from "@/components/TimelinePanel";
 import StrategyDialog from "@/components/StrategyDialog";
 import { detectTerminateKickOrder } from "@/lib/mechanics/wow/vs-dr-mqd/terminate-kicks";
+import { detectCrystalAssignments } from "@/lib/mechanics/wow/vs-dr-mqd/crystal-assignments";
 import type { Pull } from "../types/Pull";
 import { createCallWipeError, CALL_WIPE_RULE_ID, createManualError, type ManualErrorInput } from "@/types/PullError";
 import type { SavedSession } from "@/types/Session";
@@ -98,10 +99,11 @@ export default function Home() {
 
   const [pulls, setPulls] = useState<Pull[]>([]);
   const [showStrategy, setShowStrategy] = useState(false);
-  // Report-level strategy detection (currently the Midnight Falls
-  // Terminate kick rotation) — recomputed whenever the pull set changes,
-  // e.g. live-log polling appending new fights.
+  // Report-level strategy detection (the Midnight Falls Terminate kick
+  // rotation and Dawn Crystal carry assignments) — recomputed whenever the
+  // pull set changes, e.g. live-log polling appending new fights.
   const kickStrategy = useMemo(() => detectTerminateKickOrder(pulls), [pulls]);
+  const crystalStrategy = useMemo(() => detectCrystalAssignments(pulls), [pulls]);
   const [selectedPullId, setSelectedPullId] = useState<number | null>(null);
 
   const [importError, setImportError] = useState<string | null>(null);
@@ -816,6 +818,7 @@ export default function Home() {
         open={showStrategy}
         onClose={() => setShowStrategy(false)}
         strategy={kickStrategy}
+        crystals={crystalStrategy}
       />
 
       <div

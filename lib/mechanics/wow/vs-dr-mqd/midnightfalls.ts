@@ -98,6 +98,7 @@ import type { DeathEvent } from "@/types/DeathEvent";
 import type { PullError, PullErrorRule, EnemyEvent } from "@/types/PullError";
 import { evaluateRuleSet, suppressDuplicateRaidErrors } from "../../../error-detection";
 import { KNOWN_KICK_CHAINS, TERMINATE_INTERRUPT_IDS } from "./terminate-kicks";
+import { KNOWN_CRYSTAL_ASSIGNMENTS, CRYSTAL_WAVE_BOUNDARY_MS } from "./crystal-assignments";
 
 // ─── Declarative rules (moved verbatim from lib/error-rules.ts) ────────────
 
@@ -584,6 +585,22 @@ const SOAK_FOLLOW_WINDOW_MAX_MS = 4500;
 const HOLDER_HIT_SUPPRESS_MS    = 5000;       // one error per carrier per soak wave
 export const MIDNIGHTFALLS_CRYSTAL_HOLDER_HIT_RULE_ID = "wow-mf-crystal-holder-hit";
 
+/** Reconstructs a player's Glimmering carry windows: isCarrying(t). */
+function buildCarryChecker(player: PlayerInfo): (t: number) => boolean {
+  const transitions = player.debuffs
+    .filter((d) => d.abilityId === GLIMMERING_CARRIER_ID &&
+      (d.debuffStatus === "applied" || d.debuffStatus === "removed"))
+    .sort((a, b) => a.timestamp - b.timestamp);
+  return (t: number) => {
+    let carrying = false;
+    for (const tr of transitions) {
+      if (tr.timestamp > t) break;
+      carrying = tr.debuffStatus === "applied";
+    }
+    return carrying;
+  };
+}
+
 function detectCrystalHolderSoaks(players: PlayerInfo[]): PullError[] {
   // All soak resolutions in the pull, plus whether any lament fired near
   // each (for the outcome sentence).
@@ -599,19 +616,7 @@ function detectCrystalHolderSoaks(players: PlayerInfo[]): PullError[] {
 
   const errors: PullError[] = [];
   for (const player of players) {
-    // Reconstruct this player's Glimmering carry windows.
-    const transitions = player.debuffs
-      .filter((d) => d.abilityId === GLIMMERING_CARRIER_ID &&
-        (d.debuffStatus === "applied" || d.debuffStatus === "removed"))
-      .sort((a, b) => a.timestamp - b.timestamp);
-    const isCarrying = (t: number) => {
-      let carrying = false;
-      for (const tr of transitions) {
-        if (tr.timestamp > t) break;
-        carrying = tr.debuffStatus === "applied";
-      }
-      return carrying;
-    };
+    const isCarrying = buildCarryChecker(player);
 
     let lastFlagged = -Infinity;
     const hits = [...player.damageTaken].sort((a, b) => a.timestamp - b.timestamp);
@@ -651,6 +656,275 @@ function detectCrystalHolderSoaks(players: PlayerInfo[]): PullError[] {
     }
   }
   return errors.sort((a, b) => a.timestamp - b.timestamp);
+}
+
+// ─── Radiance (Dawn Crystal left unclaimed) ────────────────────────────────
+//
+// A Dawn Crystal sitting on the ground unclaimed for ~6s starts pulsing
+// 1282458 "Radiance" — a raid-wide once-per-second hit whose damage RAMPS
+// (~40-70k → 200k → 300k+ in Pull 32) until someone picks the crystal up.
+// Per the declared assignment (KNOWN_CRYSTAL_ASSIGNMENTS), the wave-1
+// trio should be holding from ~+20 and the wave-2 trio from ~+90, each
+// until the intermission — so when Radiance starts, the error belongs to
+// the assigned carrier(s) not holding at that moment (verified across
+// every non-wipe episode in the capture: P9 +21.4 → Cococaines picked up
+// at +22, P37 +28.5 → Religiouspp at +30, P33 +89.5 → Cocoroach covered
+// by Mythnarra at +90, P32 +97.2 → Sindusk AND Polpo both crystal-less).
+//
+// Severity (ground truth, Pull 32): ONE assigned player missing their
+// crystal = Major on that player; TWO OR MORE = Raid, naming everyone
+// without their crystal. A slot also counts as covered when its
+// intermission swap tank is holding instead. Suppressed during wipes
+// (2+ deaths in the 10s before the episode — a death-stripped crystal
+// pulsing mid-wipe is fallout; the 10s window matters: Pull 32's real
+// Raid error has 2 stray deaths 5-14s earlier that a 15s window would
+// misread as a wipe) and after the intermission starts (crystals are
+// juggled deliberately from there, so "assigned carrier" stops meaning
+// anything).
+const RADIANCE_ID = 1282458;
+const RADIANCE_EPISODE_GAP_MS = 5000;   // pulses are 1s apart; >5s = new unclaimed crystal
+const RADIANCE_SET1_ACTIVE_MS = 20000;  // earliest observed episode +21.4; pickups done ~+25
+const RADIANCE_SET2_ACTIVE_MS = 84000;  // wave-2 pickups start ~+84
+const RADIANCE_WIPE_WINDOW_MS = 10000;
+const RADIANCE_WIPE_DEATHS    = 2;
+const TOTAL_ECLIPSE_CAST_ID   = 1255743;
+export const MIDNIGHTFALLS_RADIANCE_RULE_ID = "wow-mf-radiance";
+
+// The per-pull crystal errors only make sense for the roster the declared
+// assignment describes — on any other raid's log the names won't resolve.
+function crystalAssignmentApplies(players: PlayerInfo[]): boolean {
+  const names = new Set(players.map((p) => p.name));
+  return [...KNOWN_CRYSTAL_ASSIGNMENTS.set1, ...KNOWN_CRYSTAL_ASSIGNMENTS.set2]
+    .every((n) => names.has(n));
+}
+
+function intermissionStartOf(enemyCasts: EnemyEvent[]): number {
+  const eclipse = enemyCasts.find((e) => e.abilityId === TOTAL_ECLIPSE_CAST_ID);
+  return eclipse ? eclipse.timestamp : Infinity;
+}
+
+function detectRadiance(
+  players:     PlayerInfo[],
+  deathEvents: DeathEvent[],
+  enemyCasts:  EnemyEvent[]
+): PullError[] {
+  if (!crystalAssignmentApplies(players)) return [];
+
+  const pulses: Array<{ timestamp: number; amount: number }> = [];
+  for (const p of players) {
+    for (const h of p.damageTaken) {
+      if (h.abilityId === RADIANCE_ID) pulses.push({ timestamp: h.timestamp, amount: h.amount ?? 0 });
+    }
+  }
+  if (pulses.length === 0) return [];
+  pulses.sort((a, b) => a.timestamp - b.timestamp);
+
+  type Episode = { start: number; end: number; total: number };
+  const episodes: Episode[] = [];
+  for (const pulse of pulses) {
+    const cur = episodes[episodes.length - 1];
+    if (cur && pulse.timestamp - cur.end < RADIANCE_EPISODE_GAP_MS) {
+      cur.end = pulse.timestamp;
+      cur.total += pulse.amount;
+    } else {
+      episodes.push({ start: pulse.timestamp, end: pulse.timestamp, total: pulse.amount });
+    }
+  }
+
+  const intermissionStart = intermissionStartOf(enemyCasts);
+  const deathTimes = deathEvents.map((d) => d.timestamp);
+  const isDeadAt = (name: string, t: number) =>
+    deathEvents.some((d) => d.player === name && d.timestamp <= t);
+  const carryCheckers = new Map(players.map((p) => [p.name, buildCarryChecker(p)]));
+  const holdsAt = (name: string, t: number) => carryCheckers.get(name)?.(t) ?? false;
+  const swapTankFor = (name: string) =>
+    KNOWN_CRYSTAL_ASSIGNMENTS.intermissionSwaps.find((s) => s.from === name)?.to;
+
+  const errors: PullError[] = [];
+  for (const ep of episodes) {
+    if (ep.start >= intermissionStart) continue;
+    if (deathTimes.filter((t) => t <= ep.start && ep.start - t <= RADIANCE_WIPE_WINDOW_MS)
+      .length >= RADIANCE_WIPE_DEATHS) continue;
+
+    const expected = [
+      ...(ep.start >= RADIANCE_SET1_ACTIVE_MS ? KNOWN_CRYSTAL_ASSIGNMENTS.set1 : []),
+      ...(ep.start >= RADIANCE_SET2_ACTIVE_MS ? KNOWN_CRYSTAL_ASSIGNMENTS.set2 : []),
+    ];
+    // Checked a hair BEFORE the first pulse: a player who only grabbed the
+    // crystal as the pulse landed (Pull 41 — pickup 0.02s before it) was
+    // still late; the pulse they caused shouldn't exonerate them.
+    const checkAt = ep.start - 100;
+    const missing = expected.filter((name) => {
+      if (holdsAt(name, checkAt)) return false;
+      const tank = swapTankFor(name);
+      return !(tank !== undefined && holdsAt(tank, checkAt));
+    });
+    if (missing.length === 0) continue;
+
+    const stats = ` Radiance pulsed for ~${Math.round(ep.total / 1000000 * 10) / 10}M raid damage over ` +
+      `${((ep.end - ep.start) / 1000 + 1).toFixed(0)}s.`;
+    if (missing.length === 1) {
+      const name = missing[0];
+      const info = players.find((p) => p.name === name);
+      const lead = isDeadAt(name, ep.start)
+        ? `${name} was dead and their Dawn Crystal was left unclaimed — it began pulsing Radiance.`
+        : `${name} did not have their assigned Dawn Crystal when it began pulsing Radiance.`;
+      errors.push({
+        ruleId:      MIDNIGHTFALLS_RADIANCE_RULE_ID,
+        severity:    "Major",
+        name:        "Radiance",
+        description: lead + stats,
+        timestamp:   ep.start,
+        player:      name,
+        class:       info?.className,
+        specId:      info?.specId,
+        role:        info?.role,
+        abilityId:   RADIANCE_ID,
+        abilityName: "Radiance",
+      });
+    } else {
+      errors.push({
+        ruleId:      MIDNIGHTFALLS_RADIANCE_RULE_ID,
+        severity:    "Raid",
+        name:        "Radiance",
+        description:
+          `An unclaimed Dawn Crystal began pulsing Radiance. ` +
+          `Without their assigned crystal: ${missing.join(", ")}.` + stats,
+        timestamp:   ep.start,
+        abilityId:   RADIANCE_ID,
+        abilityName: "Radiance",
+      });
+    }
+  }
+  return errors;
+}
+
+// ─── Accidental crystal pickups ────────────────────────────────────────────
+//
+// Sometimes a player who is NOT assigned a crystal grabs one at the wave
+// spawn (or catches a handoff) — they usually drop it and it finds its way
+// back to the assigned carrier. Ground truth: that's a Minor error on the
+// accidental holder.
+//
+// Detection follows the CRYSTAL, not the player: a chain starts when a
+// non-assigned player picks up, and continues through drop→pickup handoffs
+// (a drop answered by a pickup within 10s is the same crystal changing
+// hands). The chain's verdict decides the flags:
+//   · reaches an ASSIGNED holder for that wave (trio member, or the slot's
+//     intermission swap tank) → every non-assigned holder in the chain is
+//     flagged Minor (e.g. Pull 8: Cranberrlee grabs at +19, drops +40,
+//     Wyrmtongues +47→+68, Neptune finally gets his crystal +69 — both
+//     non-assigned holders flagged);
+//   · ends in a death-strip, the intermission, a handoff to a swap TANK,
+//     or nothing picks it up → no flags. This is what keeps genuine
+//     COVERING unflagged: a player rescuing a dead/absent carrier's
+//     crystal holds it until the wipe, the intermission, or the planned
+//     tank handoff, so their chain never returns to the trio member whose
+//     crystal it was (e.g. Pull 4's Laedria covering the never-picked
+//     third wave-1 crystal, and Pull 4's Mythnarra carrying the dying
+//     Polpo's slot all phase before handing to Legionshifts on schedule).
+// Wave membership comes from the chain's ORIGIN pickup time (before/after
+// the +80s boundary); chains that would start mid-wipe (2+ deaths in the
+// 10s before the pickup — end-of-pull scrambles) or after the intermission
+// never start.
+const ACCIDENTAL_HANDOFF_GAP_MS   = 10000;
+const ACCIDENTAL_DEATH_STRIP_MS   = 1000;
+const ACCIDENTAL_WIPE_WINDOW_MS   = 10000;
+const ACCIDENTAL_WIPE_DEATHS      = 2;
+export const MIDNIGHTFALLS_ACCIDENTAL_PICKUP_RULE_ID = "wow-mf-accidental-crystal-pickup";
+
+function detectAccidentalPickups(
+  players:     PlayerInfo[],
+  deathEvents: DeathEvent[],
+  enemyCasts:  EnemyEvent[]
+): PullError[] {
+  if (!crystalAssignmentApplies(players)) return [];
+
+  const intermissionStart = intermissionStartOf(enemyCasts);
+  const deathTimes = deathEvents.map((d) => d.timestamp);
+  const swapTanks = KNOWN_CRYSTAL_ASSIGNMENTS.intermissionSwaps.map((s) => s.to);
+  const assignedFor = (wave: 1 | 2): Set<string> =>
+    new Set(wave === 1
+      ? KNOWN_CRYSTAL_ASSIGNMENTS.set1
+      : [...KNOWN_CRYSTAL_ASSIGNMENTS.set2, ...swapTanks]);
+
+  type Transition = { t: number; player: PlayerInfo; type: "pickup" | "drop" };
+  const transitions: Transition[] = [];
+  for (const p of players) {
+    for (const d of p.debuffs) {
+      if (d.abilityId !== GLIMMERING_CARRIER_ID) continue;
+      if (d.debuffStatus === "applied") transitions.push({ t: d.timestamp, player: p, type: "pickup" });
+      if (d.debuffStatus === "removed") transitions.push({ t: d.timestamp, player: p, type: "drop" });
+    }
+  }
+  transitions.sort((a, b) => a.t - b.t);
+
+  const isDeathStrip = (drop: Transition) =>
+    deathEvents.some((d) => d.player === drop.player.name &&
+      Math.abs(d.timestamp - drop.t) <= ACCIDENTAL_DEATH_STRIP_MS);
+
+  const errors: PullError[] = [];
+  const flagged = new Set<string>(); // player names already flagged (once per pull is plenty)
+  const consumedPickups = new Set<Transition>();
+
+  for (const origin of transitions) {
+    if (origin.type !== "pickup" || consumedPickups.has(origin)) continue;
+    if (origin.t >= intermissionStart) continue;
+    const wave: 1 | 2 = origin.t < CRYSTAL_WAVE_BOUNDARY_MS ? 1 : 2;
+    const assigned = assignedFor(wave);
+    if (assigned.has(origin.player.name)) continue; // assigned pickups never start a chain
+    if (deathTimes.filter((t) => t <= origin.t && origin.t - t <= ACCIDENTAL_WIPE_WINDOW_MS)
+      .length >= ACCIDENTAL_WIPE_DEATHS) continue;  // wipe scramble, not a mistake
+
+    // Follow the crystal through handoffs until a verdict.
+    const chainHolders: Array<{ player: PlayerInfo; pickup: number; drop?: number }> = [];
+    let holder = origin;
+    let resolvedBy: string | undefined;
+    while (true) {
+      consumedPickups.add(holder);
+      const entry = { player: holder.player, pickup: holder.t, drop: undefined as number | undefined };
+      chainHolders.push(entry);
+      const drop = transitions.find(
+        (d) => d.type === "drop" && d.player.name === holder.player.name && d.t >= holder.t
+      );
+      if (!drop || isDeathStrip(drop)) break;              // died holding / never dropped
+      entry.drop = drop.t;
+      if (drop.t >= intermissionStart) break;              // juggling took over
+      const next = transitions.find(
+        (pk) => pk.type === "pickup" && pk.t >= drop.t &&
+          pk.t - drop.t <= ACCIDENTAL_HANDOFF_GAP_MS && !consumedPickups.has(pk)
+      );
+      if (!next) break;                                    // left on the ground (Radiance covers this)
+      if (assigned.has(next.player.name)) { resolvedBy = next.player.name; break; }
+      holder = next;
+    }
+    // Only a return to the wave's TRIO member proves the pickup was an
+    // accident; a chain ending on a swap tank is indistinguishable from
+    // deliberately covering the slot until the planned handoff.
+    if (resolvedBy === undefined || swapTanks.includes(resolvedBy)) continue;
+
+    for (const h of chainHolders) {
+      if (flagged.has(h.player.name)) continue;
+      flagged.add(h.player.name);
+      const heldSecs = ((h.drop ?? h.pickup) - h.pickup) / 1000;
+      errors.push({
+        ruleId:      MIDNIGHTFALLS_ACCIDENTAL_PICKUP_RULE_ID,
+        severity:    "Minor",
+        name:        "Accidental Crystal Pickup",
+        description:
+          `${h.player.name} picked up a Dawn Crystal they were not assigned ` +
+          `(held ~${heldSecs.toFixed(0)}s) — it was later returned to ${resolvedBy}, its assigned carrier.`,
+        timestamp:   h.pickup,
+        player:      h.player.name,
+        class:       h.player.className,
+        specId:      h.player.specId,
+        role:        h.player.role,
+        abilityId:   GLIMMERING_CARRIER_ID,
+        abilityName: "Glimmering",
+      });
+    }
+  }
+  return errors;
 }
 
 // ─── Public entry point ─────────────────────────────────────────────────────
@@ -791,6 +1065,8 @@ export function detectMidnightFallsErrors(
     ...detectDuskCrystalHealing(players, enemyCasts, friendlyNpcDamage),
     ...detectCosmicFracture(players),
     ...detectCrystalHolderSoaks(players),
+    ...detectRadiance(players, deathEvents, enemyCasts),
+    ...detectAccidentalPickups(players, deathEvents, enemyCasts),
   ].map((e) =>
     ANONYMOUS_RAID_RULE_IDS.has(e.ruleId)
       ? { ...e, player: undefined, class: undefined, specId: undefined, role: undefined }

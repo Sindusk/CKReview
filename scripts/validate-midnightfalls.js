@@ -55,12 +55,15 @@ function loadModule(relPath, shims) {
 const errorRules     = loadModule('lib/error-rules.ts', { '@/types/PullError': {} });
 const errorDetection = loadModule('lib/error-detection.ts', { './error-rules': errorRules });
 const terminateKicks = loadModule('lib/mechanics/wow/vs-dr-mqd/terminate-kicks.ts', {});
+const crystalAssignments = loadModule('lib/mechanics/wow/vs-dr-mqd/crystal-assignments.ts', {});
 const midnightfalls  = loadModule('lib/mechanics/wow/vs-dr-mqd/midnightfalls.ts', {
   '../../../error-detection': errorDetection,
   './terminate-kicks':        terminateKicks,
+  './crystal-assignments':    crystalAssignments,
 });
 const { detectMidnightFallsErrors } = midnightfalls;
 const { detectTerminateKickOrder } = terminateKicks;
+const { detectCrystalAssignments } = crystalAssignments;
 const { getSpecInfo } = loadModule('lib/spec-data.ts', {});
 
 const WOW_DATA_DIR = path.join(ROOT, 'sampledata', 'wow');
@@ -204,7 +207,8 @@ for (const dir of reportDirs) {
       // These rules put their real payload in the description (Light's End
       // source attribution, crystal healer breakdown, Terminate no-hit
       // downgrade) — print it so regressions are visible.
-      if (['wow-raid-lights-end', 'wow-raid-dusk-crystal-unhealed', 'wow-raid-terminate-cast'].includes(e.ruleId)) {
+      if (['wow-raid-lights-end', 'wow-raid-dusk-crystal-unhealed', 'wow-raid-terminate-cast',
+           'wow-mf-radiance', 'wow-mf-accidental-crystal-pickup'].includes(e.ruleId)) {
         console.log(`      ${e.description}`);
       }
     }
@@ -229,6 +233,20 @@ for (const dir of reportDirs) {
     }
     if (strategy.fillIns.length) {
       console.log(`  Fill-ins: ${strategy.fillIns.map((s) => `${s.player} (${s.ability}, ${s.wavesSeen}/${strategy.wavesAnalyzed} waves)`).join(', ')}`);
+    }
+  }
+
+  // Report-level Dawn Crystal assignment detection (feeds the Strategy dialog).
+  const crystals = detectCrystalAssignments(builtPulls);
+  console.log('='.repeat(70));
+  if (!crystals) {
+    console.log('Crystal assignments: no Glimmering data detected');
+  } else {
+    console.log(`Dawn Crystal assignments (${crystals.pullsAnalyzed} pulls, declared match: ${crystals.matchesDeclared}):`);
+    console.log(`  Set 1: ${crystals.set1.map((s) => `${s.player} (${s.pullsSeen})`).join(', ')}`);
+    console.log(`  Set 2: ${crystals.set2.map((s) => `${s.player} (${s.pullsSeen})`).join(', ')}`);
+    for (const swap of crystals.swaps) {
+      console.log(`  Intermission: ${swap.from.player} -> ${swap.to.player} (${swap.pullsSeen} pulls)`);
     }
   }
 }
