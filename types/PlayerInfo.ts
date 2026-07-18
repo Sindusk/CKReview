@@ -56,7 +56,9 @@ export type PlayerInfo = {
 
   // Role derived from specId (via spec-data.ts)
   role:       "Tank" | "Healer" | "DPS";
-  rangeType:  "Melee" | "Ranged";
+  // "Caster" only occurs for FFXIV magical-ranged DPS; WoW specs and FF
+  // healers are always plain "Melee"/"Ranged".
+  rangeType:  "Melee" | "Ranged" | "Caster";
   game:       "wow" | "ffxiv";   // NEW — used to pick the right color table
 
   // Pre-fetched event tabs (populated at import, read from memory thereafter)

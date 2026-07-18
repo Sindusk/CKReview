@@ -216,20 +216,19 @@ function FeedRow({
         {style.icon}
       </span>
 
-      {specIcon && (
-        <img
-          src={specIcon}
-          alt=""
-          width={18}
-          height={18}
-          style={{ borderRadius: "3px", flexShrink: 0, opacity: hasPassed ? 1 : 0.4, transition: "opacity 0.3s" }}
-          onError={(e) => { e.currentTarget.style.display = "none"; }}
-        />
-      )}
-
       <div style={{ flex: 1, minWidth: 0, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px" }}>
         <div style={{ minWidth: 0, flex: 1 }}>
           <div style={{ display: "flex", alignItems: "center", gap: "5px", flexWrap: "wrap" }}>
+            {specIcon && (
+              <img
+                src={specIcon}
+                alt=""
+                width={16}
+                height={16}
+                style={{ borderRadius: "3px", flexShrink: 0, opacity: hasPassed ? 1 : 0.4, transition: "opacity 0.3s" }}
+                onError={(e) => { e.currentTarget.style.display = "none"; }}
+              />
+            )}
             <span
               style={{
                 color: hasPassed ? cls : "#555",

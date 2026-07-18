@@ -9,7 +9,8 @@
 // HOW TO EDIT:
 //   - Each entry is a plain object — just change the values inline.
 //   - `role` is one of: "Tank" | "Healer" | "DPS"
-//   - `rangeType` is one of: "Melee" | "Ranged"
+//   - `rangeType` is one of: "Melee" | "Ranged" | "Caster" ("Caster" is the
+//     magical-ranged DPS category; healers stay plain "Ranged")
 //   - FFLogs uses numeric job IDs that correspond to FFXIV's internal ClassJob IDs.
 //   - Source: https://xivapi.com/ClassJob (for ID reference)
 //
@@ -23,7 +24,7 @@
 export type FFJobInfo = {
   name:      string;   // Display name, e.g. "White Mage"
   role:      "Tank" | "Healer" | "DPS";
-  rangeType: "Melee" | "Ranged";
+  rangeType: "Melee" | "Ranged" | "Caster";
 };
 
 // ─── Lookup by FFLogs subType string (PascalCase) ────────────────────────────
@@ -59,11 +60,11 @@ export const FF_JOB_BY_NAME: Record<string, FFJobInfo> = {
   Dancer:       { name: "Dancer",       role: "DPS",    rangeType: "Ranged" },
 
   // ── Magical Ranged DPS ────────────────────────────────────────────────────
-  BlackMage:    { name: "Black Mage",   role: "DPS",    rangeType: "Ranged" },
-  Summoner:     { name: "Summoner",     role: "DPS",    rangeType: "Ranged" },
-  RedMage:      { name: "Red Mage",     role: "DPS",    rangeType: "Ranged" },
-  Pictomancer:  { name: "Pictomancer",  role: "DPS",    rangeType: "Ranged" },
-  BlueMage:     { name: "Blue Mage",    role: "DPS",    rangeType: "Ranged" },
+  BlackMage:    { name: "Black Mage",   role: "DPS",    rangeType: "Caster" },
+  Summoner:     { name: "Summoner",     role: "DPS",    rangeType: "Caster" },
+  RedMage:      { name: "Red Mage",     role: "DPS",    rangeType: "Caster" },
+  Pictomancer:  { name: "Pictomancer",  role: "DPS",    rangeType: "Caster" },
+  BlueMage:     { name: "Blue Mage",    role: "DPS",    rangeType: "Caster" },
 
   // ── Legacy / base classes (FFLogs may report these for old content) ────────
   Gladiator:    { name: "Gladiator",    role: "Tank",   rangeType: "Melee"  },
@@ -72,8 +73,8 @@ export const FF_JOB_BY_NAME: Record<string, FFJobInfo> = {
   Pugilist:     { name: "Pugilist",     role: "DPS",    rangeType: "Melee"  },
   Lancer:       { name: "Lancer",       role: "DPS",    rangeType: "Melee"  },
   Rogue:        { name: "Rogue",        role: "DPS",    rangeType: "Melee"  },
-  Arcanist:     { name: "Arcanist",     role: "DPS",    rangeType: "Ranged" },
-  Thaumaturge:  { name: "Thaumaturge",  role: "DPS",    rangeType: "Ranged" },
+  Arcanist:     { name: "Arcanist",     role: "DPS",    rangeType: "Caster" },
+  Thaumaturge:  { name: "Thaumaturge",  role: "DPS",    rangeType: "Caster" },
   Archer:       { name: "Archer",       role: "DPS",    rangeType: "Ranged" },
 };
 
@@ -110,11 +111,11 @@ export const FF_JOB_BY_ID: Record<number, FFJobInfo> = {
   38: { name: "Dancer",       role: "DPS",    rangeType: "Ranged" },
 
   // Magical Ranged DPS
-  25: { name: "Black Mage",   role: "DPS",    rangeType: "Ranged" },
-  27: { name: "Summoner",     role: "DPS",    rangeType: "Ranged" },
-  35: { name: "Red Mage",     role: "DPS",    rangeType: "Ranged" },
-  42: { name: "Pictomancer",  role: "DPS",    rangeType: "Ranged" },
-  36: { name: "Blue Mage",    role: "DPS",    rangeType: "Ranged" },
+  25: { name: "Black Mage",   role: "DPS",    rangeType: "Caster" },
+  27: { name: "Summoner",     role: "DPS",    rangeType: "Caster" },
+  35: { name: "Red Mage",     role: "DPS",    rangeType: "Caster" },
+  42: { name: "Pictomancer",  role: "DPS",    rangeType: "Caster" },
+  36: { name: "Blue Mage",    role: "DPS",    rangeType: "Caster" },
 
   // Base classes
   1:  { name: "Gladiator",    role: "Tank",   rangeType: "Melee"  },
@@ -123,8 +124,8 @@ export const FF_JOB_BY_ID: Record<number, FFJobInfo> = {
   2:  { name: "Pugilist",     role: "DPS",    rangeType: "Melee"  },
   4:  { name: "Lancer",       role: "DPS",    rangeType: "Melee"  },
   29: { name: "Rogue",        role: "DPS",    rangeType: "Melee"  },
-  26: { name: "Arcanist",     role: "DPS",    rangeType: "Ranged" },
-  7:  { name: "Thaumaturge",  role: "DPS",    rangeType: "Ranged" },
+  26: { name: "Arcanist",     role: "DPS",    rangeType: "Caster" },
+  7:  { name: "Thaumaturge",  role: "DPS",    rangeType: "Caster" },
   5:  { name: "Archer",       role: "DPS",    rangeType: "Ranged" },
 };
 

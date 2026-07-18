@@ -132,7 +132,9 @@ function PlayerButton({ player, onClick }: { player: PlayerInfo; onClick: () => 
           {player.name}
         </span>
         <span style={{ fontSize: "10px", color: "#555", whiteSpace: "nowrap" }}>
-          <span style={{ color: roleColor }}>{player.role}</span>
+          {/* DPS shows the actual range category (Melee / Ranged, plus
+              Caster for FFXIV) instead of a generic "DPS" label. */}
+          <span style={{ color: roleColor }}>{player.role === "DPS" ? player.rangeType : player.role}</span>
         </span>
       </div>
     </button>
@@ -517,7 +519,12 @@ export default function RosterPanel({ players, playbackTimeMs }: RosterPanelProp
 
   const tankCount = filteredPlayers.filter(player => player.role === "Tank").length;
   const healerCount = filteredPlayers.filter(player => player.role === "Healer").length;
-  const dpsCount = filteredPlayers.filter(player => player.role === "DPS").length;
+  // DPS is broken out by range category — Melee/Ranged for WoW, plus
+  // Caster for FFXIV (WoW specs never carry rangeType "Caster").
+  const dps = filteredPlayers.filter(player => player.role === "DPS");
+  const meleeCount = dps.filter(player => player.rangeType === "Melee").length;
+  const rangedCount = dps.filter(player => player.rangeType === "Ranged").length;
+  const casterCount = dps.filter(player => player.rangeType === "Caster").length;
 
   const COLS = 4;
   const ROWS = 5;
@@ -538,7 +545,9 @@ export default function RosterPanel({ players, playbackTimeMs }: RosterPanelProp
           <span>{filteredPlayers.length} players</span>
           {tankCount > 0 && <span style={{ color: getRoleColor("Tank") }}>Tanks {tankCount}</span>}
           {healerCount > 0 && <span style={{ color: getRoleColor("Healer") }}>Healers {healerCount}</span>}
-          {dpsCount > 0 && <span style={{ color: getRoleColor("DPS") }}>DPS {dpsCount}</span>}
+          {meleeCount > 0 && <span style={{ color: getRoleColor("DPS") }}>Melee {meleeCount}</span>}
+          {rangedCount > 0 && <span style={{ color: getRoleColor("DPS") }}>Ranged {rangedCount}</span>}
+          {casterCount > 0 && <span style={{ color: getRoleColor("DPS") }}>Casters {casterCount}</span>}
         </div>
       </div>
 

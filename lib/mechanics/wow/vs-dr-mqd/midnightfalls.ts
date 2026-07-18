@@ -75,6 +75,18 @@
 //             and died — flagged via the killingBlow rule.
 //   1254256   "Naaru's Lament" — missed-ground-soak punishment,
 //             environmental (sourceID -1), hits ~20 players at once.
+//             Its counterpart 1254257 "Tears of L'ura" is the hit taken by
+//             a player successfully ABSORBING a soak — the two fire at the
+//             same instant (the soak-resolution moment). Soaks spawn when
+//             a Dawn Crystal CARRIER takes avoidable damage and resolve
+//             exactly ~4.0s later — see detectCrystalHolderSoaks.
+//   +75/+137  1251789 "Cosmic Fracture" — Midnight Crystals (3-6 per wave)
+//             begincast a ~12s channel. Killing each crystal in time
+//             interrupts it; the completion is NEVER logged as a "cast"
+//             event, but a surviving crystal's channel going off shows up
+//             as 1251789 damageTaken ticks on the raid (~140k each, 14.9M
+//             total across Pull 7 — the only pull of 42 with any). Any
+//             1251789 damage = a crystal survived = raid error.
 //
 // Raid-severity errors here are deduplicated via
 // suppressDuplicateRaidErrors — one Light's End detonation lands as ~18
@@ -489,6 +501,158 @@ function detectDuskCrystalHealing(
   return errors;
 }
 
+// ─── Cosmic Fracture (Midnight Crystals not killed in time) ────────────────
+//
+// Midnight Crystal waves (~+75 and ~+137) each begincast a ~12s 1251789
+// "Cosmic Fracture" channel; the raid must kill every crystal before it
+// completes. WCL never logs the channel's completion as a "cast" event
+// (same cast-vs-damage split as Terminate/Dissonance), so the only
+// completion signal is 1251789 DAMAGE landing on players — which across
+// the whole 42-pull xvQbZ6Cwkm1XaHPD capture appears in exactly one pull
+// (Pull 7: 106 ticks / 14.9M starting +86.9, 11 killing blows). Ground
+// truth (Pull 7 VOD): raid error, no individual attribution. One error
+// per burst — a completed fracture ticks for ~8s, so consecutive events
+// are clustered with a gap well past the 2s raid-error dedup window.
+const COSMIC_FRACTURE_ID = 1251789;
+const COSMIC_FRACTURE_CLUSTER_GAP_MS = 15000;
+export const MIDNIGHTFALLS_COSMIC_FRACTURE_RULE_ID = "wow-raid-cosmic-fracture";
+
+function detectCosmicFracture(players: PlayerInfo[]): PullError[] {
+  const hits: Array<{ timestamp: number; abilityName: string; abilityIcon?: string }> = [];
+  for (const p of players) {
+    for (const h of p.damageTaken) {
+      if (h.abilityId !== COSMIC_FRACTURE_ID) continue;
+      hits.push({ timestamp: h.timestamp, abilityName: h.abilityName, abilityIcon: h.abilityIcon });
+    }
+  }
+  hits.sort((a, b) => a.timestamp - b.timestamp);
+
+  const errors: PullError[] = [];
+  for (const hit of hits) {
+    const last = errors[errors.length - 1];
+    if (last && hit.timestamp - last.timestamp < COSMIC_FRACTURE_CLUSTER_GAP_MS) continue;
+    errors.push({
+      ruleId:      MIDNIGHTFALLS_COSMIC_FRACTURE_RULE_ID,
+      severity:    "Raid",
+      name:        "Cosmic Fracture",
+      description:
+        "A Midnight Crystal was not killed before its channel completed, " +
+        "unleashing Cosmic Fracture on the raid.",
+      timestamp:   hit.timestamp,
+      abilityId:   COSMIC_FRACTURE_ID,
+      abilityName: hit.abilityName || "Cosmic Fracture",
+      abilityIcon: hit.abilityIcon,
+    });
+  }
+  return errors;
+}
+
+// ─── Crystal holder hit → light soaks (Naaru's Lament source) ──────────────
+//
+// When a Dawn Crystal CARRIER (Glimmering, 1253031) takes avoidable damage,
+// the crystal itself is damaged and sheds light soaks on the ground; each
+// soak must be absorbed by a player (1254257 "Tears of L'ura" hit) or it
+// detonates raid-wide as 1254256 "Naaru's Lament". Ground truth (Pull 8
+// VOD, 2026-07-17): Neptune was clipped by a Heaven's Glaive while
+// carrying, spawning 4 soaks of which some were missed — taking damage
+// while holding a crystal is a MAJOR error on the carrier.
+//
+// Detection: the soak lifetime is EXACTLY ~4.0s — across every
+// soak-resolution wave in the 42-pull capture, the causative carrier hit
+// sits 3.4-4.1s before the wave's first 1254256/1254257 event (first hit
+// of a multi-tick series at 4.0-4.1s, later ticks of the same series
+// 3.4-3.9s). So a carrier hit is flagged only when a soak resolution
+// follows it inside [3300, 4500]ms — outcome gating for free: the game
+// itself doesn't spawn soaks from unavoidable damage (raid-wide 1251649
+// nukes, ambient 1249797, tank hits, and periodic self-damage like
+// paladin 210380 all landed on carriers with no wave following), so the
+// causative-ability list below is every ability observed at the ~4s mark:
+//   1254076 Heaven's Glaives   (Pull 8 and 12 more pulls)
+//   1282469 Dark Quasar beam   (Pull 1/4/5/13/…)
+//   1281473 Starsplinter — the carrier's OWN marked detonation landing
+//            while holding (Pull 13/21/24/30, all with missed soaks)
+// 1284699 Light's End also technically spawns soaks off carriers it hits,
+// but it's the terminal wipe event — flagging carriers for being inside
+// it is noise, so it's deliberately excluded.
+// One error per carrier per wave (a glaive series is up to 6 ticks in
+// ~0.7s); whether the soaks were then absorbed goes in the description.
+const SOAK_ABSORB_ID  = 1254257;              // Tears of L'ura
+const NAARU_LAMENT_ID = 1254256;
+const CRYSTAL_HOLDER_HIT_ABILITY_IDS = new Set([1254076, 1282469, 1281473]);
+const SOAK_FOLLOW_WINDOW_MIN_MS = 3300;
+const SOAK_FOLLOW_WINDOW_MAX_MS = 4500;
+const HOLDER_HIT_SUPPRESS_MS    = 5000;       // one error per carrier per soak wave
+export const MIDNIGHTFALLS_CRYSTAL_HOLDER_HIT_RULE_ID = "wow-mf-crystal-holder-hit";
+
+function detectCrystalHolderSoaks(players: PlayerInfo[]): PullError[] {
+  // All soak resolutions in the pull, plus whether any lament fired near
+  // each (for the outcome sentence).
+  const soakEvents: Array<{ timestamp: number; missed: boolean }> = [];
+  for (const p of players) {
+    for (const h of p.damageTaken) {
+      if (h.abilityId === SOAK_ABSORB_ID)  soakEvents.push({ timestamp: h.timestamp, missed: false });
+      if (h.abilityId === NAARU_LAMENT_ID) soakEvents.push({ timestamp: h.timestamp, missed: true });
+    }
+  }
+  if (soakEvents.length === 0) return [];
+  soakEvents.sort((a, b) => a.timestamp - b.timestamp);
+
+  const errors: PullError[] = [];
+  for (const player of players) {
+    // Reconstruct this player's Glimmering carry windows.
+    const transitions = player.debuffs
+      .filter((d) => d.abilityId === GLIMMERING_CARRIER_ID &&
+        (d.debuffStatus === "applied" || d.debuffStatus === "removed"))
+      .sort((a, b) => a.timestamp - b.timestamp);
+    const isCarrying = (t: number) => {
+      let carrying = false;
+      for (const tr of transitions) {
+        if (tr.timestamp > t) break;
+        carrying = tr.debuffStatus === "applied";
+      }
+      return carrying;
+    };
+
+    let lastFlagged = -Infinity;
+    const hits = [...player.damageTaken].sort((a, b) => a.timestamp - b.timestamp);
+    for (const hit of hits) {
+      if (!CRYSTAL_HOLDER_HIT_ABILITY_IDS.has(hit.abilityId)) continue;
+      if (!isCarrying(hit.timestamp)) continue;
+      if (hit.timestamp - lastFlagged < HOLDER_HIT_SUPPRESS_MS) continue;
+
+      const wave = soakEvents.filter(
+        (s) => s.timestamp - hit.timestamp >= SOAK_FOLLOW_WINDOW_MIN_MS &&
+               s.timestamp - hit.timestamp <= SOAK_FOLLOW_WINDOW_MAX_MS
+      );
+      if (wave.length === 0) continue; // no soaks resolved — not the causative hit
+
+      lastFlagged = hit.timestamp;
+      const anyMissed = wave.some((s) => s.missed);
+      const outcome = anyMissed
+        ? "Not every soak was absorbed — the remainder detonated into Naaru's Lament."
+        : "All of the soaks were absorbed.";
+      errors.push({
+        ruleId:      MIDNIGHTFALLS_CRYSTAL_HOLDER_HIT_RULE_ID,
+        severity:    "Major",
+        name:        "Damaged While Holding Crystal",
+        description:
+          `${player.name} took avoidable damage (${hit.abilityName}` +
+          `${hit.amount ? `, ~${Math.round(hit.amount / 1000)}k` : ""}) while holding a ` +
+          `Dawn Crystal — the damaged crystal shed light soaks onto the ground. ${outcome}`,
+        timestamp:   hit.timestamp,
+        player:      player.name,
+        class:       player.className,
+        specId:      player.specId,
+        role:        player.role,
+        abilityId:   hit.abilityId,
+        abilityName: hit.abilityName,
+        abilityIcon: hit.abilityIcon,
+      });
+    }
+  }
+  return errors.sort((a, b) => a.timestamp - b.timestamp);
+}
+
 // ─── Public entry point ─────────────────────────────────────────────────────
 
 // Raid errors whose "damage" trigger necessarily lands on some arbitrary
@@ -625,6 +789,8 @@ export function detectMidnightFallsErrors(
     ...detectStarsplinterOverlap(players, deathEvents),
     ...detectTerminateCasts(players, enemyCasts, deathEvents),
     ...detectDuskCrystalHealing(players, enemyCasts, friendlyNpcDamage),
+    ...detectCosmicFracture(players),
+    ...detectCrystalHolderSoaks(players),
   ].map((e) =>
     ANONYMOUS_RAID_RULE_IDS.has(e.ruleId)
       ? { ...e, player: undefined, class: undefined, specId: undefined, role: undefined }
