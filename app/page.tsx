@@ -116,6 +116,17 @@ export default function Home() {
   // report for newly-appeared fights (see the polling useEffect below) and
   // appends them as new pulls instead of requiring a manual re-import.
   const [liveLogEnabled, setLiveLogEnabled] = useState(false);
+  // Most recent live-poll failure (rate limit, revoked token, network, …).
+  // Polling previously only console.error'd on failure, so a background
+  // poll could fail silently forever with the "Live" indicator still
+  // showing green. Cleared on the next successful poll or when live log
+  // is toggled off.
+  const [liveLogError, setLiveLogError] = useState<string | null>(null);
+
+  function handleLiveLogEnabledChange(enabled: boolean) {
+    setLiveLogEnabled(enabled);
+    setLiveLogError(null);
+  }
 
   // ── Rate limit display ─────────────────────────────────────────────────────
   //
@@ -538,8 +549,10 @@ export default function Home() {
     let report: WCLReport;
     try {
       report = await fetchReport(reportCode);
+      setLiveLogError(null);
     } catch (err) {
       console.error("Live log poll failed:", err);
+      setLiveLogError(err instanceof Error ? err.message : String(err));
       return;
     }
 
@@ -568,8 +581,10 @@ export default function Home() {
     let report: FFLReport;
     try {
       report = await fetchFFReport(reportCode);
+      setLiveLogError(null);
     } catch (err) {
       console.error("Live log poll failed:", err);
+      setLiveLogError(err instanceof Error ? err.message : String(err));
       return;
     }
 
@@ -792,7 +807,8 @@ export default function Home() {
           importPointsUsed={importPointsUsed}
           rateLimit={liveRateLimit}
           liveLogEnabled={liveLogEnabled}
-          onLiveLogEnabledChange={setLiveLogEnabled}
+          onLiveLogEnabledChange={handleLiveLogEnabledChange}
+          liveLogError={liveLogError}
         />
         <button
           onClick={() => setShowStrategy(true)}
@@ -1034,6 +1050,7 @@ function WCLImportBar({
   rateLimit,
   liveLogEnabled,
   onLiveLogEnabledChange,
+  liveLogError,
 }: {
   value:            string;
   onChange:         (v: string) => void;
@@ -1054,6 +1071,10 @@ function WCLImportBar({
   // useEffect once a report is loaded.
   liveLogEnabled:         boolean;
   onLiveLogEnabledChange: (v: boolean) => void;
+  // Most recent background poll failure, or null if the last poll (or the
+  // initial import) succeeded — see page.tsx's pollWCLForNewFights/
+  // pollFFLForNewFights.
+  liveLogError: string | null;
 }) {
   function handleSubmit() {
     const trimmed = value.trim();
@@ -1081,7 +1102,17 @@ function WCLImportBar({
         </span>
         <span style={{ fontSize: "11px", color: "#94a3b8" }}>Ready for review</span>
 
-        {liveLogEnabled && (
+        {liveLogEnabled && liveLogError && (
+          <span
+            title={liveLogError}
+            style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "11px", color: "#f87171", maxWidth: "320px" }}
+          >
+            <span style={{ width: "6px", height: "6px", borderRadius: "999px", backgroundColor: "#f87171" }} />
+            Live poll failed: {liveLogError}
+          </span>
+        )}
+
+        {liveLogEnabled && !liveLogError && (
           <span style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "11px", color: "#4ade80" }}>
             <span style={{ width: "6px", height: "6px", borderRadius: "999px", backgroundColor: "#4ade80" }} />
             Live — checking for new pulls

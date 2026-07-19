@@ -135,6 +135,16 @@ export function backoffDelayMs(attempt: number): number {
 // message instead.
 export const SHORT_RETRY_CEILING_SECONDS = 60;
 
+// A 429's Retry-After header is sometimes an IP-level Cloudflare block
+// rather than the short per-request burst limit it's normally used for —
+// seen 2026-07-19: retry-after: 2978 (~50 minutes) on a fresh session with
+// no prior rateLimitData to recognize it via SHORT_RETRY_CEILING_SECONDS
+// above. Blindly `sleep()`-ing that long freezes the import UI with no
+// feedback for the entire wait. Any Retry-After beyond this ceiling is
+// treated as fatal-for-this-attempt instead: fail fast with an accurate
+// wait estimate so the UI can show it immediately.
+export const MAX_RETRY_AFTER_SECONDS = 30;
+
 export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }

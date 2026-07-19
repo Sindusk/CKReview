@@ -13,7 +13,9 @@ import {
   buildRateLimitErrorMessage,
   backoffDelayMs,
   sleep,
+  formatWaitTime,
   SHORT_RETRY_CEILING_SECONDS,
+  MAX_RETRY_AFTER_SECONDS,
   type RateLimitStatus,
 } from "./rate-limit";
 
@@ -97,8 +99,19 @@ async function gql<T>(query: string, variables?: Record<string, unknown>, logLab
       // Cloudflare's 429 challenge page doesn't reliably send a
       // Retry-After header, so fall back to exponential backoff + jitter
       // when it's absent.
-      const retryAfterHeader = res.headers.get("retry-after");
-      const waitMs = retryAfterHeader ? Number(retryAfterHeader) * 1000 : backoffDelayMs(attempt);
+      const retryAfterHeader  = res.headers.get("retry-after");
+      const retryAfterSeconds = retryAfterHeader ? Number(retryAfterHeader) : null;
+
+      // A large Retry-After is an IP-level block, not a short burst — see
+      // MAX_RETRY_AFTER_SECONDS. Fail fast instead of sleeping through it.
+      if (retryAfterSeconds !== null && retryAfterSeconds > MAX_RETRY_AFTER_SECONDS) {
+        throw new Error(
+          `FFLogs rate limit (429) — this looks like an IP-level block rather ` +
+          `than a short burst. Retry after ~${formatWaitTime(retryAfterSeconds)}.`
+        );
+      }
+
+      const waitMs = retryAfterSeconds !== null ? retryAfterSeconds * 1000 : backoffDelayMs(attempt);
 
       console.warn(
         `[FFL] 429 rate limited — retrying in ${Math.round(waitMs)}ms ` +
