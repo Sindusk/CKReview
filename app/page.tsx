@@ -5,6 +5,7 @@ import Header from "../components/Header";
 import AddVodDialog from "../components/AddVodDialog";
 import ReportDialog from "../components/ReportDialog";
 import SessionFoundDialog from "@/components/SessionFoundDialog";
+import SampleDataFoundDialog from "@/components/SampleDataFoundDialog";
 import { parseYouTubeUrl, parseLogUrl } from "@/lib/url-parsers";
 import type { Vod } from "../types/Vod";
 import VideoPanel from "../components/VideoPanel";
@@ -33,6 +34,7 @@ import {
 } from "@/lib/log-transforms";
 import { fetchFFReport, fetchFFightData, buildFFFightLogLabels, getFFLRateLimitStatus, isFFLQuotaExhausted, type FFLReport } from "@/lib/ffl-client";
 import { formatWaitTime, type RateLimitStatus } from "@/lib/rate-limit";
+import { tryFetchSampleReportMeta, fetchSampleReport, type SampleReportMeta, type SampleReportPayload } from "@/lib/sample-report-client";
 import {
   lookupSessionForLog,
   fetchSession,
@@ -169,6 +171,20 @@ export default function Home() {
   const [sessionReportUrl, setSessionReportUrl] = useState("");
   const [duplicateMatch, setDuplicateMatch] = useState<SessionLookupMatch | null>(null);
   const [pendingRawInput, setPendingRawInput] = useState<string | null>(null);
+
+  // A report already fetched to disk via scripts/fetch-wow-report.js /
+  // fetch-ff-report.js (see lib/sample-report-store.ts) — offered as a
+  // free alternative to a live re-fetch when found during import. Holds
+  // only the lightweight meta (title/fight count), NOT the full payload —
+  // that can run into the hundreds of MB, so it's only fetched if the
+  // user actually confirms via the dialog (see handleUseSampleData).
+  const [sampleDataFound, setSampleDataFound] = useState<{
+    source: "wcl" | "ffl"; code: string; rawInput: string; meta: SampleReportMeta;
+  } | null>(null);
+  // True once the currently-loaded report came from local sample data
+  // rather than a live fetch — surfaced in the loaded-state badge so it's
+  // never mistaken for a live/current log mid-review.
+  const [loadedFromSampleData, setLoadedFromSampleData] = useState(false);
 
   // Refs mirror the state above so the debounced persistSession() call
   // below always reads current values, even when called synchronously
@@ -404,6 +420,7 @@ export default function Home() {
     // fresh session (never seen a response yet) baselines at 0 rather than
     // missing data entirely.
     const startStatus = getWCLRateLimitStatus();
+    setLoadedFromSampleData(false);
 
     const report = await fetchReport(reportCode);
 
@@ -475,6 +492,7 @@ export default function Home() {
     // used to compute how many points THIS import specifically cost (see
     // the diff against endStatus below).
     const startStatus = getFFLRateLimitStatus();
+    setLoadedFromSampleData(false);
 
     const report = await fetchFFReport(reportCode);
 
@@ -641,7 +659,10 @@ export default function Home() {
 
   // ── Unified import dispatcher ──────────────────────────────────────────────
 
-  async function handleImportReport(rawInput: string, options?: { skipDuplicateCheck?: boolean }) {
+  async function handleImportReport(
+    rawInput: string,
+    options?: { skipDuplicateCheck?: boolean; skipSampleCheck?: boolean }
+  ) {
     const parsed = parseLogUrl(rawInput);
 
     if (!parsed) {
@@ -652,21 +673,46 @@ export default function Home() {
       return;
     }
 
+    // Immediate feedback that the click registered — both pre-checks below
+    // hit local API routes and are normally fast, but clicking Import
+    // shouldn't visibly do nothing while they run (seen 2026-07-19: the
+    // sample-data check used to fetch the ENTIRE report just to decide
+    // whether to prompt, which could take ~10s on a big report with no
+    // loading indicator at all).
+    setImporting(true);
+    setImportError(null);
+    setImportProgress(0);
+    setImportStatus("Checking for an existing session…");
+
     // If a saved session already exists for this exact log — and it isn't
     // the one we're already working from — offer to load it instead of
     // silently spinning up a second session for the same report.
     if (!options?.skipDuplicateCheck) {
       const match = await lookupSessionForLog(parsed.source, parsed.code);
       if (match && match.id !== sessionIdRef.current) {
+        setImporting(false);
         setDuplicateMatch(match);
         setPendingRawInput(rawInput);
         return;
       }
     }
 
-    setImporting(true);
-    setImportError(null);
-    setImportProgress(0);
+    // If this report was already fetched to disk (scripts/fetch-*-report.js,
+    // see lib/sample-report-store.ts), offer to load it instead of spending
+    // more rate-limit points on a live re-fetch. Only the lightweight meta
+    // (title/fight count) is fetched here — the full payload can run into
+    // the hundreds of MB, so it's only worth fetching once the user
+    // actually confirms via the dialog (see handleUseSampleData).
+    if (!options?.skipSampleCheck) {
+      setImportStatus("Checking for local sample data…");
+      const meta = await tryFetchSampleReportMeta(parsed.source, parsed.code);
+      if (meta) {
+        setImporting(false);
+        setSampleDataFound({ source: parsed.source, code: parsed.code, rawInput, meta });
+        return;
+      }
+    }
+
     setImportStatus("Fetching report information…");
     setSessionReportUrl(rawInput);
     // Clear the previous import's rate-limit readout so stale numbers can't
@@ -750,6 +796,68 @@ export default function Home() {
     if (rawInput) handleImportReport(rawInput, { skipDuplicateCheck: true });
   }
 
+  // ── "Local sample data found for this log" prompt ──────────────────────────
+
+  function applySampleReport(payload: SampleReportPayload) {
+    const newPullsRaw = payload.source === "wcl"
+      ? transformReportToPulls(
+          payload.fightDataList,
+          buildWCLAbilityMap(payload.report.masterData.abilities),
+          payload.report.code
+        )
+      : transformFFReportToPulls(
+          payload.fightDataList,
+          buildFFLAbilityMap(payload.report.masterData.abilities),
+          payload.report.code
+        );
+
+    let newPulls = applyPendingWipeCalls(newPullsRaw, pendingWipeCallsRef.current);
+    pendingWipeCallsRef.current = {};
+
+    newPulls = applyPendingManualErrors(newPulls, pendingManualErrorsRef.current);
+    pendingManualErrorsRef.current = {};
+
+    setPulls(newPulls);
+    setSelectedPullId(null);
+    setLoadedReportCode(payload.report.code);
+    setLoadedSource(payload.source);
+    setImportStatus(`Log Loaded: ${payload.report.code} (local sample data)`);
+    setImportProgress(100);
+    setImportPointsUsed(null);
+    setImportError(null);
+    setLoadedFromSampleData(true);
+
+    persistSession();
+  }
+
+  async function handleUseSampleData() {
+    const found = sampleDataFound;
+    setSampleDataFound(null);
+    if (!found) return;
+
+    setImporting(true);
+    setImportError(null);
+    setImportProgress(20);
+    setImportStatus(`Loading ${found.code} from local sample data…`);
+    setSessionReportUrl(found.rawInput);
+
+    try {
+      const payload = await fetchSampleReport(found.source, found.code);
+      applySampleReport(payload);
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : String(err));
+      setImportStatus(null);
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  function handleFetchLiveInstead() {
+    const found = sampleDataFound;
+    setSampleDataFound(null);
+    if (found) handleImportReport(found.rawInput, { skipDuplicateCheck: true, skipSampleCheck: true });
+  }
+
   const isCalibrated = selectedVod?.isCalibrated ?? false;
 
   const videoBottom = isCalibrated ? (
@@ -809,6 +917,7 @@ export default function Home() {
           liveLogEnabled={liveLogEnabled}
           onLiveLogEnabledChange={handleLiveLogEnabledChange}
           liveLogError={liveLogError}
+          loadedFromSampleData={loadedFromSampleData}
         />
         <button
           onClick={() => setShowStrategy(true)}
@@ -958,6 +1067,14 @@ export default function Home() {
         onLoad={handleLoadFoundSession}
         onImportFresh={handleImportFreshInstead}
       />
+
+      <SampleDataFoundDialog
+        open={sampleDataFound !== null}
+        reportCode={sampleDataFound?.code ?? ""}
+        fightCount={sampleDataFound?.meta.fightCount ?? 0}
+        onUseSample={handleUseSampleData}
+        onFetchLive={handleFetchLiveInstead}
+      />
     </div>
   );
 }
@@ -1051,6 +1168,7 @@ function WCLImportBar({
   liveLogEnabled,
   onLiveLogEnabledChange,
   liveLogError,
+  loadedFromSampleData,
 }: {
   value:            string;
   onChange:         (v: string) => void;
@@ -1075,6 +1193,9 @@ function WCLImportBar({
   // initial import) succeeded — see page.tsx's pollWCLForNewFights/
   // pollFFLForNewFights.
   liveLogError: string | null;
+  // True if the currently-loaded report came from lib/sample-report-store.ts
+  // (scripts/fetch-*-report.js's saved output) rather than a live fetch.
+  loadedFromSampleData: boolean;
 }) {
   function handleSubmit() {
     const trimmed = value.trim();
@@ -1101,6 +1222,15 @@ function WCLImportBar({
           Log Loaded: {loadedReportCode}
         </span>
         <span style={{ fontSize: "11px", color: "#94a3b8" }}>Ready for review</span>
+
+        {loadedFromSampleData && (
+          <span
+            title="Loaded from local sample data (scripts/fetch-wow-report.js / fetch-ff-report.js) — not a live fetch"
+            style={{ fontSize: "11px", color: "#c4b5fd", fontWeight: 600 }}
+          >
+            · Local sample data
+          </span>
+        )}
 
         {liveLogEnabled && liveLogError && (
           <span
