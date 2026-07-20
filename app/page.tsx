@@ -17,6 +17,8 @@ import TimelinePanel from "@/components/TimelinePanel";
 import StrategyDialog from "@/components/StrategyDialog";
 import { detectTerminateKickOrder } from "@/lib/mechanics/wow/vs-dr-mqd/terminate-kicks";
 import { detectCrystalAssignments } from "@/lib/mechanics/wow/vs-dr-mqd/crystal-assignments";
+import { getMitigationPlan } from "@/lib/mechanics/ffxiv/dancingmad/mitigation-plan";
+import { detectMitigationErrors } from "@/lib/mechanics/ffxiv/dancingmad/mitigation-detection";
 import type { Pull } from "../types/Pull";
 import { createCallWipeError, CALL_WIPE_RULE_ID, createManualError, type ManualErrorInput } from "@/types/PullError";
 import type { SavedSession } from "@/types/Session";
@@ -128,6 +130,26 @@ export default function Home() {
     if (id) localStorage.setItem("mitigation_plan_id", id);
     else localStorage.removeItem("mitigation_plan_id");
   }
+
+  // Pulls with "Missed Mitigation" errors merged in (see
+  // lib/mechanics/ffxiv/dancingmad/mitigation-detection.ts). Unlike the
+  // other FF mechanic detections, this one depends on a user-selectable
+  // plan, so it can't be baked into pull.errors at import time the way
+  // detectForsakenTowerErrors etc. are (log-transforms.ts) — it's
+  // recomputed here instead, same pattern as kickStrategy/crystalStrategy.
+  // Every downstream consumer of `pulls` (AnalysisPanel, PullList, the
+  // report dialog, ...) should read `displayPulls` instead so mitigation
+  // errors show up everywhere errors normally do; `pulls` itself and
+  // `pullsRef` stay untouched since they're also what gets persisted to
+  // the session (wipe calls / manual errors) and re-derived on plan swap.
+  const mitigationPlan = getMitigationPlan(mitigationPlanId);
+  const displayPulls = useMemo(() => {
+    if (!mitigationPlan) return pulls;
+    return pulls.map((p) => {
+      const mitigationErrors = detectMitigationErrors(p, mitigationPlan);
+      return mitigationErrors.length === 0 ? p : { ...p, errors: [...p.errors, ...mitigationErrors] };
+    });
+  }, [pulls, mitigationPlan]);
   const [selectedPullId, setSelectedPullId] = useState<number | null>(null);
 
   const [importError, setImportError] = useState<string | null>(null);
@@ -224,7 +246,7 @@ export default function Home() {
   useEffect(() => { sessionReportUrlRef.current = sessionReportUrl; }, [sessionReportUrl]);
 
   const selectedVod = vods.find(v => v.id === selectedVodId) ?? null;
-  const activePull  = pulls.find(p => p.id === selectedPullId) ?? null;
+  const activePull  = displayPulls.find(p => p.id === selectedPullId) ?? null;
 
   const handlePullDetected = useCallback((pullId: number) => {
     setSelectedPullId(pullId);
@@ -233,7 +255,7 @@ export default function Home() {
   const timeline = useTimelineController({
     vod:            selectedVod,
     pull:           activePull,
-    pulls,
+    pulls:          displayPulls,
     onPullDetected: handlePullDetected,
   });
 
@@ -1058,7 +1080,7 @@ export default function Home() {
         </div>
 
         <VODSidebar
-          pulls={pulls}
+          pulls={displayPulls}
           selectedPullId={selectedPullId}
           onSelectPull={setSelectedPullId}
           vods={vods}
@@ -1077,7 +1099,7 @@ export default function Home() {
       <ReportDialog
         open={showReport}
         onClose={() => setShowReport(false)}
-        pulls={pulls}
+        pulls={displayPulls}
       />
 
       <TranscriptDialog
