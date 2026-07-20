@@ -47,7 +47,15 @@ function requireTs(absPath, shims = {}) {
   const fakeRequire = (spec) => {
     if (Object.prototype.hasOwnProperty.call(shims, spec)) return shims[spec];
     const resolved = resolveTsPath(dir, spec);
-    return resolved ? requireTs(resolved, shims) : require(spec);
+    if (resolved) return requireTs(resolved, shims);
+    // Non-TS local imports (e.g. .json data modules — the app has
+    // resolveJsonModule on): require by absolute path so relative specs
+    // resolve against the importing module, not this file.
+    if (spec.startsWith('./') || spec.startsWith('../') || spec.startsWith('@/')) {
+      const base = spec.startsWith('@/') ? path.join(ROOT, spec.slice(2)) : path.join(dir, spec);
+      if (fs.existsSync(base)) return require(base);
+    }
+    return require(spec);
   };
 
   new Function('exports', 'require', 'module', transpile(absPath))(mod.exports, fakeRequire, mod);

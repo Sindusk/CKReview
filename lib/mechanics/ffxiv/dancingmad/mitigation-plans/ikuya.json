@@ -1,0 +1,6591 @@
+{
+  "sheetId": "10C3ytfH3irHqkb45rchIq5oqdAs-v_OKTj57M-Twi3k",
+  "sheetUrl": "https://docs.google.com/spreadsheets/d/10C3ytfH3irHqkb45rchIq5oqdAs-v_OKTj57M-Twi3k/htmlview",
+  "fetchedAt": "2026-07-20T02:24:55.952Z",
+  "phases": [
+    {
+      "gid": 161526414,
+      "title": "Phase 1: Kefka",
+      "jobs": [
+        "MT",
+        "OT",
+        "White Mage",
+        "Astrologian",
+        "Scholar",
+        "Sage",
+        "D1",
+        "D2",
+        "D3",
+        "D4",
+        "Extras"
+      ],
+      "mechanics": [
+        {
+          "name": "Mystery Magic",
+          "time": "0:38",
+          "timeSeconds": 38,
+          "phaseTime": "0:38",
+          "phaseTimeSeconds": 38,
+          "assignments": {
+            "MT": [
+              {
+                "raw": "Party Mit (GNB/DRK)",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Party Mit",
+                    "qualifier": "GNB/DRK"
+                  }
+                ]
+              }
+            ],
+            "OT": [
+              {
+                "raw": "Reprisal + Party Mit ¹",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Reprisal"
+                  },
+                  {
+                    "name": "Party Mit",
+                    "footnotes": [
+                      1
+                    ]
+                  }
+                ]
+              }
+            ],
+            "White Mage": [
+              {
+                "raw": "Temperance",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Temperance"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Neutral Sect + Sun Sign",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Neutral Sect"
+                  },
+                  {
+                    "name": "Sun Sign"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Spreadlo + Expedient",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Spreadlo"
+                  },
+                  {
+                    "name": "Expedient"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Kerachole ² + Zoe Shields",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Kerachole",
+                    "footnotes": [
+                      2
+                    ]
+                  },
+                  {
+                    "name": "Zoe Shields"
+                  }
+                ]
+              }
+            ],
+            "D1": [
+              {
+                "raw": "Feint",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Feint"
+                  }
+                ]
+              }
+            ],
+            "D3": [
+              {
+                "raw": "Party Mit ¹",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Party Mit",
+                    "footnotes": [
+                      1
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Wave Cannon",
+          "time": "0:43",
+          "timeSeconds": 43,
+          "phaseTime": "0:43",
+          "phaseTimeSeconds": 43,
+          "assignments": {
+            "MT": [
+              {
+                "raw": "Party Mit (WAR/PLD)",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Party Mit",
+                    "qualifier": "WAR/PLD"
+                  }
+                ]
+              },
+              {
+                "raw": "Party Mit (GNB/DRK)",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Party Mit",
+                    "qualifier": "GNB/DRK"
+                  }
+                ]
+              }
+            ],
+            "White Mage": [
+              {
+                "raw": "Divine Caress",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Divine Caress"
+                  }
+                ]
+              },
+              {
+                "raw": "Temperance",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Temperance"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Neutral Sect + Sun Sign",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Neutral Sect"
+                  },
+                  {
+                    "name": "Sun Sign"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Expedient + Sacred Soil",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Expedient"
+                  },
+                  {
+                    "name": "Sacred Soil"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Holos",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Holos"
+                  }
+                ]
+              },
+              {
+                "raw": "Kerachole",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Kerachole"
+                  }
+                ]
+              }
+            ],
+            "D1": [
+              {
+                "raw": "Feint",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Feint"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Double-Trouble Trap",
+          "time": "0:50",
+          "timeSeconds": 50,
+          "phaseTime": "0:50",
+          "phaseTimeSeconds": 50,
+          "assignments": {
+            "MT": [
+              {
+                "raw": "Party Mit (GNB/DRK)",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Party Mit",
+                    "qualifier": "GNB/DRK"
+                  }
+                ]
+              }
+            ],
+            "White Mage": [
+              {
+                "raw": "Temperance",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Temperance"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Neutral Sect + Sun Sign",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Neutral Sect"
+                  },
+                  {
+                    "name": "Sun Sign"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Sacred Soil",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Sacred Soil"
+                  }
+                ]
+              },
+              {
+                "raw": "Expedient",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Expedient"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Holos",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Holos"
+                  }
+                ]
+              }
+            ],
+            "D1": [
+              {
+                "raw": "Feint",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Feint"
+                  }
+                ]
+              }
+            ],
+            "D4": [
+              {
+                "raw": "Addle",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Addle"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Light of Judgment",
+          "time": "1:03",
+          "timeSeconds": 63,
+          "phaseTime": "1:03",
+          "phaseTimeSeconds": 63,
+          "assignments": {
+            "MT": [
+              {
+                "raw": "Reprisal",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Reprisal"
+                  }
+                ]
+              }
+            ],
+            "White Mage": [
+              {
+                "raw": "Plenary Indulgence",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Plenary Indulgence"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Collective Unconscious",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Collective Unconscious"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Sacred Soil",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Sacred Soil"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Kerachole",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Kerachole"
+                  }
+                ]
+              }
+            ],
+            "D2": [
+              {
+                "raw": "Feint",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Feint"
+                  }
+                ]
+              }
+            ],
+            "D4": [
+              {
+                "raw": "Addle",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Addle"
+                  }
+                ]
+              }
+            ],
+            "Extras": [
+              {
+                "raw": "✔",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "✔"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Gravitas II (Part I)",
+          "time": "1:28",
+          "timeSeconds": 88,
+          "phaseTime": "1:28",
+          "phaseTimeSeconds": 88,
+          "assignments": {
+            "Astrologian": [
+              {
+                "raw": "Macrocosmos",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Macrocosmos"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Sacred Soil + Seraphism ⁴",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Sacred Soil"
+                  },
+                  {
+                    "name": "Seraphism",
+                    "footnotes": [
+                      4
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Gravitas II (Part II)",
+          "time": "1:46",
+          "timeSeconds": 106,
+          "phaseTime": "1:46",
+          "phaseTimeSeconds": 106,
+          "assignments": {
+            "White Mage": [
+              {
+                "raw": "Liturgy of the Bell ³",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Liturgy of the Bell",
+                    "footnotes": [
+                      3
+                    ]
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Serpah + Fey Illumination",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Seraph"
+                  },
+                  {
+                    "name": "Fey Illumination"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Kerachole + Philosophia",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Kerachole"
+                  },
+                  {
+                    "name": "Philosophia"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Double-Trouble Trap",
+          "time": "1:58",
+          "timeSeconds": 118,
+          "phaseTime": "1:58",
+          "phaseTimeSeconds": 118,
+          "assignments": {
+            "OT": [
+              {
+                "raw": "Reprisal + Party Mit",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Reprisal"
+                  },
+                  {
+                    "name": "Party Mit"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Spreadlo + Sacred Soil",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Spreadlo"
+                  },
+                  {
+                    "name": "Sacred Soil"
+                  }
+                ]
+              },
+              {
+                "raw": "Seraph + Fey Illumination",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Seraph"
+                  },
+                  {
+                    "name": "Fey Illumination"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Panhaima + Zoe Shields",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Panhaima"
+                  },
+                  {
+                    "name": "Zoe Shields"
+                  }
+                ]
+              }
+            ],
+            "D3": [
+              {
+                "raw": "Party Mit",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Party Mit"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Light of Judgment",
+          "time": "2:12",
+          "timeSeconds": 132,
+          "phaseTime": "2:12",
+          "phaseTimeSeconds": 132,
+          "assignments": {
+            "MT": [
+              {
+                "raw": "Reprisal + Party Mit",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Reprisal"
+                  },
+                  {
+                    "name": "Party Mit"
+                  }
+                ]
+              }
+            ],
+            "White Mage": [
+              {
+                "raw": "Plenary Indulgence",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Plenary Indulgence"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Collective Unconscious",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Collective Unconscious"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Sacred Soil",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Sacred Soil"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Kerachole",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Kerachole"
+                  }
+                ]
+              },
+              {
+                "raw": "Panhaima",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Panhaima"
+                  }
+                ]
+              }
+            ],
+            "D1": [
+              {
+                "raw": "Feint",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Feint"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Double-Trouble Trap",
+          "time": "2:45",
+          "timeSeconds": 165,
+          "phaseTime": "2:45",
+          "phaseTimeSeconds": 165,
+          "assignments": {
+            "White Mage": [
+              {
+                "raw": "Temperance",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Temperance"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Neutral Sect",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Neutral Sect"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Expedient",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Expedient"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Indulgent Will",
+          "time": "2:53",
+          "timeSeconds": 173,
+          "phaseTime": "2:53",
+          "phaseTimeSeconds": 173,
+          "assignments": {
+            "White Mage": [
+              {
+                "raw": "Divine Caress",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Divine Caress"
+                  }
+                ]
+              },
+              {
+                "raw": "Temperance",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Temperance"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Sun Sign",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Sun Sign"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Sacred Soil",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Sacred Soil"
+                  }
+                ]
+              },
+              {
+                "raw": "Expedient",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Expedient"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Kerachole",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Kerachole"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Mystery Magic",
+          "time": "3:07",
+          "timeSeconds": 187,
+          "phaseTime": "3:07",
+          "phaseTimeSeconds": 187,
+          "assignments": {
+            "OT": [
+              {
+                "raw": "Reprisal",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Reprisal"
+                  }
+                ]
+              }
+            ],
+            "White Mage": [
+              {
+                "raw": "Temperance",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Temperance"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Sun Sign",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Sun Sign"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Sacred Soil",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Sacred Soil"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Kerachole",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Kerachole"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "notes": {
+        "general": [
+          "All mechanics requires shields! | ➔ Indicates Carry Over",
+          "Mitigation for the first Mystery Magic should carry over till the first Double-Trouble trap unless there is a different usage timing below. Targeted mitigation does not work on Wave Cannon, but does apply to Double-Trouble Trap.",
+          "Use mitigation for Light of Judgement late into the castbar so it will cover Hyperdrive."
+        ],
+        "footnotes": {
+          "1": "Use your 90s party mitigation as Kefka re-centres to cast the first Graven Image (WAR/PLD can use after Revolting Ruin III finishes).",
+          "2": "Use your 30s mitigation for the first Mystery Magic after the Graven Image castbar.",
+          "3": "You can alternatively use Bell just before the first set of puddles which will provide an immediate heal when the second set of puddles occurs as the Bell will expire shortly after.",
+          "4": "If you plan to use Dissipation in your opener, use it before Aetherflow. If you use the first Spreadlo earlier, you will get it back for the Double-Trouble Trap in the second Graven Image and be able to use Seraphism earlier/later."
+        }
+      }
+    },
+    {
+      "gid": 583362985,
+      "title": "Phase 2: Forsaken Kefka",
+      "jobs": [
+        "MT",
+        "OT",
+        "White Mage",
+        "Astrologian",
+        "Scholar",
+        "Sage",
+        "D1",
+        "D2",
+        "D3",
+        "D4",
+        "Extras"
+      ],
+      "mechanics": [
+        {
+          "name": "Ultimate Embrace",
+          "time": "3:41",
+          "timeSeconds": 221,
+          "phaseTime": "0:24",
+          "phaseTimeSeconds": 24,
+          "assignments": {
+            "White Mage": [
+              {
+                "raw": "Assist Tanks ¹",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Assist Tanks",
+                    "footnotes": [
+                      1
+                    ]
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Spreadlo ²",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Spreadlo",
+                    "footnotes": [
+                      2
+                    ]
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Holos ³",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Holos",
+                    "footnotes": [
+                      3
+                    ]
+                  }
+                ]
+              }
+            ],
+            "D2": [
+              {
+                "raw": "Feint",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Feint"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Forsaken",
+          "time": "3:56",
+          "timeSeconds": 236,
+          "phaseTime": "0:39",
+          "phaseTimeSeconds": 39,
+          "assignments": {
+            "MT": [
+              {
+                "raw": "Reprisal",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Reprisal"
+                  }
+                ]
+              }
+            ],
+            "OT": [
+              {
+                "raw": "Party Mit",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Party Mit"
+                  }
+                ]
+              }
+            ],
+            "White Mage": [
+              {
+                "raw": "Plenary Indulgence",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Plenary Indulgence"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Collective Unconscious",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Collective Unconscious"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Sacred Soil",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Sacred Soil"
+                  }
+                ]
+              },
+              {
+                "raw": "Spreadlo",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Spreadlo"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Kerachole + Zoe Shields",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Kerachole"
+                  },
+                  {
+                    "name": "Zoe Shields"
+                  }
+                ]
+              },
+              {
+                "raw": "Holos",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Holos"
+                  }
+                ]
+              }
+            ],
+            "D1": [
+              {
+                "raw": "Feint",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Feint"
+                  }
+                ]
+              }
+            ],
+            "D3": [
+              {
+                "raw": "Party Mit",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Party Mit"
+                  }
+                ]
+              }
+            ],
+            "D4": [
+              {
+                "raw": "Addle",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Addle"
+                  }
+                ]
+              }
+            ],
+            "Extras": [
+              {
+                "raw": "✔",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "✔"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Towers I",
+          "time": "4:10",
+          "timeSeconds": 250,
+          "phaseTime": "0:53",
+          "phaseTimeSeconds": 53,
+          "assignments": {
+            "Scholar": [
+              {
+                "raw": "Seraph + Fey Illumination",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Seraph"
+                  },
+                  {
+                    "name": "Fey Illumination"
+                  }
+                ]
+              },
+              {
+                "raw": "Sacred Soil",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Sacred Soil"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Panhaima",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Panhaima"
+                  }
+                ]
+              },
+              {
+                "raw": "Kerachole",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Kerachole"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Towers II (Past/Future's End)",
+          "time": "4:20",
+          "timeSeconds": 260,
+          "phaseTime": "1:03",
+          "phaseTimeSeconds": 63,
+          "assignments": {
+            "Scholar": [
+              {
+                "raw": "Seraph",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Seraph"
+                  }
+                ]
+              },
+              {
+                "raw": "Fey Illumuniation",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Fey Illumination"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Panhaima",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Panhaima"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Towers III (All Things Ending)",
+          "time": "4:31",
+          "timeSeconds": 271,
+          "phaseTime": "1:14",
+          "phaseTimeSeconds": 74,
+          "assignments": {
+            "MT": [
+              {
+                "raw": "Party Mit",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Party Mit"
+                  }
+                ]
+              }
+            ],
+            "OT": [
+              {
+                "raw": "Reprisal",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Reprisal"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Macrocosmos",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Macrocosmos"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Sacred Soil",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Sacred Soil"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Kerachole",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Kerachole"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Towers IV (Past/Future's End)",
+          "time": "4:41",
+          "timeSeconds": 281,
+          "phaseTime": "1:24",
+          "phaseTimeSeconds": 84,
+          "assignments": {
+            "MT": [
+              {
+                "raw": "Party Mit (GNB/DRK)",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Party Mit",
+                    "qualifier": "GNB/DRK"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Sacred Soil",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Sacred Soil"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Kerachole",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Kerachole"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Towers V (All Things Ending)",
+          "time": "4:52",
+          "timeSeconds": 292,
+          "phaseTime": "1:35",
+          "phaseTimeSeconds": 95,
+          "assignments": {
+            "White Mage": [
+              {
+                "raw": "Liturgy of the Bell",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Liturgy of the Bell"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Expedient",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Expedient"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Towers VI (Past/Future's End)",
+          "time": "5:02",
+          "timeSeconds": 302,
+          "phaseTime": "1:45",
+          "phaseTimeSeconds": 105,
+          "assignments": {
+            "MT": [
+              {
+                "raw": "Reprisal",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Reprisal"
+                  }
+                ]
+              }
+            ],
+            "White Mage": [
+              {
+                "raw": "Plenary Indulgence + Temperance",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Plenary Indulgence"
+                  },
+                  {
+                    "name": "Temperance"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Collective Unconscious + Neutral Sect",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Collective Unconscious"
+                  },
+                  {
+                    "name": "Neutral Sect"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Seraphism",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Seraphism"
+                  }
+                ]
+              },
+              {
+                "raw": "Expedient",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Expedient"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Philosophia",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Philosophia"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Towers VII (All Things Ending)",
+          "time": "5:12",
+          "timeSeconds": 312,
+          "phaseTime": "1:55",
+          "phaseTimeSeconds": 115,
+          "assignments": {
+            "White Mage": [
+              {
+                "raw": "Divine Caress",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Divine Caress"
+                  }
+                ]
+              },
+              {
+                "raw": "Temperance",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Temperance"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Sun Sign",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Sun Sign"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Sacred Soil",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Sacred Soil"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Kerachole",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Kerachole"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Towers VIII (Past/Future's End)",
+          "time": "5:23",
+          "timeSeconds": 323,
+          "phaseTime": "2:06",
+          "phaseTimeSeconds": 126,
+          "assignments": {
+            "White Mage": [
+              {
+                "raw": "Temperance",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Temperance"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Sun Sign",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Sun Sign"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Sacred Soil",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Sacred Soil"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Kerachole",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Kerachole"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Light of Judgement",
+          "time": "5:43",
+          "timeSeconds": 343,
+          "phaseTime": "2:26",
+          "phaseTimeSeconds": 146,
+          "assignments": {
+            "OT": [
+              {
+                "raw": "Reprisal + Party Mit",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Reprisal"
+                  },
+                  {
+                    "name": "Party Mit"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Spreadlo + Sacred Soil",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Spreadlo"
+                  },
+                  {
+                    "name": "Sacred Soil"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Kerachole + Holos ³ + Zoe Shields",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Kerachole"
+                  },
+                  {
+                    "name": "Holos",
+                    "footnotes": [
+                      3
+                    ]
+                  },
+                  {
+                    "name": "Zoe Shields"
+                  }
+                ]
+              }
+            ],
+            "D1": [
+              {
+                "raw": "Feint",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Feint"
+                  }
+                ]
+              }
+            ],
+            "D3": [
+              {
+                "raw": "Party Mit",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Party Mit"
+                  }
+                ]
+              }
+            ],
+            "D4": [
+              {
+                "raw": "Addle",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Addle"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Wings of Destruction",
+          "time": "6:11",
+          "timeSeconds": 371,
+          "phaseTime": "2:54",
+          "phaseTimeSeconds": 174,
+          "assignments": {
+            "MT": [
+              {
+                "raw": "Reprisal + Party Mit ⁴",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Reprisal"
+                  },
+                  {
+                    "name": "Party Mit",
+                    "footnotes": [
+                      4
+                    ]
+                  }
+                ]
+              }
+            ],
+            "White Mage": [
+              {
+                "raw": "Plenary Indulgence",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Plenary Indulgence"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Collective Unconscious",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Collective Unconscious"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Sacred Soil + Fey Illumination + Seraph",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Sacred Soil"
+                  },
+                  {
+                    "name": "Fey Illumination"
+                  },
+                  {
+                    "name": "Seraph"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Kerachole + Panhaima",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Kerachole"
+                  },
+                  {
+                    "name": "Panhaima"
+                  }
+                ]
+              }
+            ],
+            "D2": [
+              {
+                "raw": "Feint",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Feint"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Ultimate Embrace",
+          "time": "6:18",
+          "timeSeconds": 378,
+          "phaseTime": "3:01",
+          "phaseTimeSeconds": 181,
+          "assignments": {
+            "MT": [
+              {
+                "raw": "Reprisal + Party Mit",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Reprisal"
+                  },
+                  {
+                    "name": "Party Mit"
+                  }
+                ]
+              }
+            ],
+            "White Mage": [
+              {
+                "raw": "Plenary Indulgence",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Plenary Indulgence"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Collective Unconscious",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Collective Unconscious"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Sacred Soil + Fey Illumination + Seraph",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Sacred Soil"
+                  },
+                  {
+                    "name": "Fey Illumination"
+                  },
+                  {
+                    "name": "Seraph"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Kerachole + Panhaima",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Kerachole"
+                  },
+                  {
+                    "name": "Panhaima"
+                  }
+                ]
+              }
+            ],
+            "D2": [
+              {
+                "raw": "Feint",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Feint"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "notes": {
+        "general": [
+          "All mechanics requires shields! | ➔ Indicates Carry Over"
+        ],
+        "footnotes": {
+          "1": "Provide single target mitigation and GCD shield both tanks in the phase transition for Ultimate Embrace. Also assist tanks with the last Ultimate Embrace.",
+          "2": "Prepare Spreadlo either on the OT shortly beforehand or the MT during Ultimate Embrace to assist the tanks.",
+          "3": "Use Holos during the first Ultimate Embrace so it is back for Light of Judgement and provides mitigation to the tanks. Alternatively, you can use Holos for the Wings of Destruction + Ultimate Embrace.",
+          "4": "Use early to avoid shaking off mitigation if playing WAR."
+        }
+      }
+    },
+    {
+      "gid": 247845947,
+      "title": "Phase 3: Exdeath & Chaos",
+      "jobs": [
+        "MT",
+        "OT",
+        "White Mage",
+        "Astrologian",
+        "Scholar",
+        "Sage",
+        "D1",
+        "D2",
+        "D3",
+        "D4",
+        "Extras"
+      ],
+      "mechanics": [
+        {
+          "name": "Bowels of Agony (Chaos)",
+          "time": "7:30",
+          "timeSeconds": 450,
+          "phaseTime": "1:08",
+          "phaseTimeSeconds": 68,
+          "assignments": {
+            "MT": [
+              {
+                "raw": "Reprisal ⁵",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Reprisal",
+                    "footnotes": [
+                      5
+                    ]
+                  }
+                ]
+              }
+            ],
+            "White Mage": [
+              {
+                "raw": "Plenary Indulgence",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Plenary Indulgence"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Collective Unconscious",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Collective Unconscious"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Sacred Soil ¹",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Sacred Soil",
+                    "footnotes": [
+                      1
+                    ]
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Kerachole ¹",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Kerachole",
+                    "footnotes": [
+                      1
+                    ]
+                  }
+                ]
+              }
+            ],
+            "D1": [
+              {
+                "raw": "Feint (Chaos)",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Feint",
+                    "qualifier": "Chaos"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Stray Flames/Tsunami",
+          "time": "7:50",
+          "timeSeconds": 470,
+          "phaseTime": "1:28",
+          "phaseTimeSeconds": 88,
+          "assignments": {
+            "MT": [
+              {
+                "raw": "Party Mit",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Party Mit"
+                  }
+                ]
+              }
+            ],
+            "OT": [
+              {
+                "raw": "Reprisal",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Reprisal"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Spreadlo ⁹ + Sacred Soil",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Spreadlo",
+                    "footnotes": [
+                      9
+                    ]
+                  },
+                  {
+                    "name": "Sacred Soil"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Zoe Shields ⁹ + Kerachole",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Zoe Shields",
+                    "footnotes": [
+                      9
+                    ]
+                  },
+                  {
+                    "name": "Kerachole"
+                  }
+                ]
+              }
+            ],
+            "Extras": [
+              {
+                "raw": "✔",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "✔"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Thunder III (1st Set)",
+          "time": "7:58",
+          "timeSeconds": 478,
+          "phaseTime": "1:36",
+          "phaseTimeSeconds": 96,
+          "assignments": {
+            "OT": [
+              {
+                "raw": "Reprisal",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Reprisal"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Expedient ²",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Expedient",
+                    "footnotes": [
+                      2
+                    ]
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Holos ²",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Holos",
+                    "footnotes": [
+                      2
+                    ]
+                  }
+                ]
+              }
+            ],
+            "D4": [
+              {
+                "raw": "Addle (Exdeath)",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Addle",
+                    "qualifier": "Exdeath"
+                  }
+                ]
+              }
+            ],
+            "Extras": [
+              {
+                "raw": "✔",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "✔"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Stray Flames/Tsunami",
+          "time": "8:17",
+          "timeSeconds": 497,
+          "phaseTime": "1:55",
+          "phaseTimeSeconds": 115,
+          "assignments": {
+            "OT": [
+              {
+                "raw": "Party Mit",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Party Mit"
+                  }
+                ]
+              }
+            ],
+            "White Mage": [
+              {
+                "raw": "Temperance",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Temperance"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Neutral Sect",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Neutral Sect"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Seraph",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Seraph"
+                  }
+                ]
+              },
+              {
+                "raw": "Expedient",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Expedient"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Holos",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Holos"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Ultima Blaster",
+          "time": "8:27",
+          "timeSeconds": 507,
+          "phaseTime": "2:05",
+          "phaseTimeSeconds": 125,
+          "assignments": {
+            "MT": [
+              {
+                "raw": "Reprisal",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Reprisal"
+                  }
+                ]
+              }
+            ],
+            "White Mage": [
+              {
+                "raw": "Temperance",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Temperance"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Sun Sign",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Sun Sign"
+                  }
+                ]
+              },
+              {
+                "raw": "Neutral Sect",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Neutral Sect"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Sacred Soil + Fey Illumination + Seraphism",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Sacred Soil"
+                  },
+                  {
+                    "name": "Fey Illumination"
+                  },
+                  {
+                    "name": "Seraphism"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Kerachole + Panhaima",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Kerachole"
+                  },
+                  {
+                    "name": "Panhaima"
+                  }
+                ]
+              }
+            ],
+            "D2": [
+              {
+                "raw": "Feint (Chaos)",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Feint",
+                    "qualifier": "Chaos"
+                  }
+                ]
+              }
+            ],
+            "D3": [
+              {
+                "raw": "Party Mit",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Party Mit"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Vacuum Wave",
+          "time": "8:34",
+          "timeSeconds": 514,
+          "phaseTime": "2:12",
+          "phaseTimeSeconds": 132,
+          "assignments": {
+            "MT": [
+              {
+                "raw": "LB3 ⁶",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "LB3",
+                    "footnotes": [
+                      6
+                    ]
+                  }
+                ]
+              },
+              {
+                "raw": "Reprisal",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Reprisal"
+                  }
+                ]
+              }
+            ],
+            "OT": [
+              {
+                "raw": "LB3 ⁶",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "LB3",
+                    "footnotes": [
+                      6
+                    ]
+                  }
+                ]
+              }
+            ],
+            "White Mage": [
+              {
+                "raw": "Plenary Indulgence",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Plenary Indulgence"
+                  }
+                ]
+              },
+              {
+                "raw": "Temperance",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Temperance"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Collective Unconscious",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Collective Unconscious"
+                  }
+                ]
+              },
+              {
+                "raw": "Neutral Sect + Sun Sign",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Neutral Sect"
+                  },
+                  {
+                    "name": "Sun Sign"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Sacred Soil + Fey Illumination",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Sacred Soil"
+                  },
+                  {
+                    "name": "Fey Illumination"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Kerachole + Panhaima",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Kerachole"
+                  },
+                  {
+                    "name": "Panhaima"
+                  }
+                ]
+              }
+            ],
+            "D2": [
+              {
+                "raw": "Feint",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Feint"
+                  }
+                ]
+              }
+            ],
+            "D3": [
+              {
+                "raw": "Party Mit",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Party Mit"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Cyclone",
+          "time": "8:38",
+          "timeSeconds": 518,
+          "phaseTime": "2:16",
+          "phaseTimeSeconds": 136,
+          "assignments": {
+            "MT": [
+              {
+                "raw": "Reprisal",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Reprisal"
+                  }
+                ]
+              }
+            ],
+            "White Mage": [
+              {
+                "raw": "Divine Caress",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Divine Caress"
+                  }
+                ]
+              },
+              {
+                "raw": "Plenary Indulgence",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Plenary Indulgence"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Collective Unconscious + Sun Sign",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Collective Unconscious"
+                  },
+                  {
+                    "name": "Sun Sign"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Sacred Soil + Fey Illumination",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Sacred Soil"
+                  },
+                  {
+                    "name": "Fey Illumination"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Kerachole + Panhaima",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Kerachole"
+                  },
+                  {
+                    "name": "Panhaima"
+                  }
+                ]
+              }
+            ],
+            "D2": [
+              {
+                "raw": "Feint",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Feint"
+                  }
+                ]
+              }
+            ],
+            "D3": [
+              {
+                "raw": "Party Mit",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Party Mit"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "The Decisive Battle",
+          "time": "9:05",
+          "timeSeconds": 545,
+          "phaseTime": "2:43",
+          "phaseTimeSeconds": 163,
+          "assignments": {
+            "OT": [
+              {
+                "raw": "Reprisal (Exdeath)",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Reprisal",
+                    "qualifier": "Exdeath"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Spreadlo ⁸",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Spreadlo",
+                    "footnotes": [
+                      8
+                    ]
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Zoe Shields",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Zoe Shields"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Accretions",
+          "footnotes": [
+            4
+          ],
+          "note": "Healer Accretion 1st | DPS Accretion 2nd\nTanks and DPS should not use any abilities that boosts HP such as Second Wind and Curing Waltz."
+        },
+        {
+          "name": "Earthquake",
+          "time": "9:19",
+          "timeSeconds": 559,
+          "phaseTime": "2:57",
+          "phaseTimeSeconds": 177,
+          "assignments": {
+            "MT": [
+              {
+                "raw": "Party Mit (GNB/DRK)",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Party Mit",
+                    "qualifier": "GNB/DRK"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Macrocosmos",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Macrocosmos"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Sacred Soil",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Sacred Soil"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Kerachole + Philosophia",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Kerachole"
+                  },
+                  {
+                    "name": "Philosophia"
+                  }
+                ]
+              }
+            ],
+            "D1": [
+              {
+                "raw": "Feint (Chaos)",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Feint",
+                    "qualifier": "Chaos"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Shocking Impact/Shockwave",
+          "time": "9:38",
+          "timeSeconds": 578,
+          "phaseTime": "3:16",
+          "phaseTimeSeconds": 196,
+          "assignments": {
+            "MT": [
+              {
+                "raw": "Reprisal + Party Mit (WAR/PLD)",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Reprisal"
+                  },
+                  {
+                    "name": "Party Mit",
+                    "qualifier": "WAR/PLD"
+                  }
+                ]
+              },
+              {
+                "raw": "Party Mit (GNB/DRK)",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Party Mit",
+                    "qualifier": "GNB/DRK"
+                  }
+                ]
+              }
+            ],
+            "White Mage": [
+              {
+                "raw": "Plenary Indulgence",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Plenary Indulgence"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Collective Unconscious",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Collective Unconscious"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Sacred Soil",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Sacred Soil"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Kerachole",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Kerachole"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Shocking Impact/Shockwave",
+          "time": "10:09",
+          "timeSeconds": 609,
+          "phaseTime": "3:47",
+          "phaseTimeSeconds": 227,
+          "assignments": {
+            "OT": [
+              {
+                "raw": "Party Mit (GNB/DRK)",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Party Mit",
+                    "qualifier": "GNB/DRK"
+                  }
+                ]
+              }
+            ],
+            "White Mage": [
+              {
+                "raw": "Liturgy of the Bell",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Liturgy of the Bell"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Expedient + Seraph + Sacred Soil",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Expedient"
+                  },
+                  {
+                    "name": "Seraph"
+                  },
+                  {
+                    "name": "Sacred Soil"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Holos + Kerachole",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Holos"
+                  },
+                  {
+                    "name": "Kerachole"
+                  }
+                ]
+              }
+            ],
+            "Extras": [
+              {
+                "raw": "✔",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "✔"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Black Holes II (3rd Tether Set)",
+          "time": "10:16",
+          "timeSeconds": 616,
+          "phaseTime": "3:54",
+          "phaseTimeSeconds": 234,
+          "assignments": {
+            "OT": [
+              {
+                "raw": "Party Mit (WAR/PLD)",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Party Mit",
+                    "qualifier": "WAR/PLD"
+                  }
+                ]
+              },
+              {
+                "raw": "Party Mit (GNB/DRK)",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Party Mit",
+                    "qualifier": "GNB/DRK"
+                  }
+                ]
+              }
+            ],
+            "White Mage": [
+              {
+                "raw": "Temperance + Divine Caress",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Temperance"
+                  },
+                  {
+                    "name": "Divine Caress"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Neutral Sect + Sun Sign",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Neutral Sect"
+                  },
+                  {
+                    "name": "Sun Sign"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Seraph",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Seraph"
+                  }
+                ]
+              },
+              {
+                "raw": "Expedient + Scared Soil",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Expedient"
+                  },
+                  {
+                    "name": "Sacred Soil"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Holos + Kerachole",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Holos"
+                  },
+                  {
+                    "name": "Kerachole"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Black Holes II (4th Tether Set)",
+          "time": "10:21",
+          "timeSeconds": 621,
+          "phaseTime": "3:59",
+          "phaseTimeSeconds": 239,
+          "assignments": {
+            "OT": [
+              {
+                "raw": "Party Mit (GNB/DRK)",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Party Mit",
+                    "qualifier": "GNB/DRK"
+                  }
+                ]
+              }
+            ],
+            "White Mage": [
+              {
+                "raw": "Temperance",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Temperance"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Neutral Sect + Sun Sign",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Neutral Sect"
+                  },
+                  {
+                    "name": "Sun Sign"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Expedient + Scared Soil",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Expedient"
+                  },
+                  {
+                    "name": "Sacred Soil"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Holos",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Holos"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Black Holes II (5th Tether Set)",
+          "time": "10:26",
+          "timeSeconds": 626,
+          "phaseTime": "4:04",
+          "phaseTimeSeconds": 244,
+          "assignments": {
+            "White Mage": [
+              {
+                "raw": "Temperance",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Temperance"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Neutral Sect + Sun Sign",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Neutral Sect"
+                  },
+                  {
+                    "name": "Sun Sign"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Fey Illumination",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Fey Illumination"
+                  }
+                ]
+              },
+              {
+                "raw": "Expedient",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Expedient"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Holos",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Holos"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Thunder III (5th Set)",
+          "time": "10:37",
+          "timeSeconds": 637,
+          "phaseTime": "4:15",
+          "phaseTimeSeconds": 255,
+          "assignments": {
+            "MT": [
+              {
+                "raw": "Reprisal",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Reprisal"
+                  }
+                ]
+              }
+            ],
+            "White Mage": [
+              {
+                "raw": "Temperance",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Temperance"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Neutral Sect",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Neutral Sect"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Spreadlo + Sacred Soil",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Spreadlo"
+                  },
+                  {
+                    "name": "Sacred Soil"
+                  }
+                ]
+              },
+              {
+                "raw": "Fey Illumination",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Fey Illumination"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Zoe Shields + Kerachole",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Zoe Shields"
+                  },
+                  {
+                    "name": "Kerachole"
+                  }
+                ]
+              }
+            ],
+            "D2": [
+              {
+                "raw": "Feint (Chaos)",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Feint",
+                    "qualifier": "Chaos"
+                  }
+                ]
+              }
+            ],
+            "D4": [
+              {
+                "raw": "Addle (Exdeath)",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Addle",
+                    "qualifier": "Exdeath"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Black Holes III (6th Tether Set)",
+          "time": "10:50",
+          "timeSeconds": 650,
+          "phaseTime": "4:28",
+          "phaseTimeSeconds": 268,
+          "assignments": {
+            "Sage": [
+              {
+                "raw": "Panhaima",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Panhaima"
+                  }
+                ]
+              },
+              {
+                "raw": "Panhaima (7-8th Set)",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Panhaima",
+                    "qualifier": "7-8th Set"
+                  }
+                ]
+              }
+            ],
+            "D3": [
+              {
+                "raw": "Party Mit",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Party Mit"
+                  }
+                ]
+              },
+              {
+                "raw": "Party Mit (7-8th Set)",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Party Mit",
+                    "qualifier": "7-8th Set"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Shocking Impact/Shockwave",
+          "time": "11:17",
+          "timeSeconds": 677,
+          "phaseTime": "4:55",
+          "phaseTimeSeconds": 295,
+          "assignments": {
+            "White Mage": [
+              {
+                "raw": "Plenary Indulgence",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Plenary Indulgence"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Collective Unconscious",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Collective Unconscious"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Sacred Soil",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Sacred Soil"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Kerachole",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Kerachole"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Stomp-a-Mole + Knock Down",
+          "footnotes": [
+            10
+          ],
+          "time": "11:45",
+          "timeSeconds": 705,
+          "phaseTime": "5:23",
+          "phaseTimeSeconds": 323,
+          "assignments": {
+            "MT": [
+              {
+                "raw": "Reprisal ³ + Party Mit",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Reprisal",
+                    "footnotes": [
+                      3
+                    ]
+                  },
+                  {
+                    "name": "Party Mit"
+                  }
+                ]
+              }
+            ],
+            "OT": [
+              {
+                "raw": "Reprisal ³",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Reprisal",
+                    "footnotes": [
+                      3
+                    ]
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Seraphism ⁷ + Sacred Soil",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Seraphism",
+                    "footnotes": [
+                      7
+                    ]
+                  },
+                  {
+                    "name": "Sacred Soil"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Kerachole",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Kerachole"
+                  }
+                ]
+              }
+            ],
+            "D1": [
+              {
+                "raw": "Feint (Chaos)",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Feint",
+                    "qualifier": "Chaos"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "notes": {
+        "general": [
+          "All mechanics requires shields! | ➔ Indicates Carry Over",
+          "Targeted mitigation must be on your firewalled target unless the firewall is down. For the most part, most targeted mitigation is mostly filler and does not work on raidwides. It is mainly used for minimizing tank autos and/or busters.",
+          "Both tanks will get attacked for moderately high damage throughout the entire phase, ensure you are rolling mitigation and heals on them."
+        ],
+        "footnotes": {
+          "1": "At the beginning of the phase, use 30s mitigation after (when the textbox disappears) Kefka says, \"Oh! What other toys can I throw in here...\" to get tank autos and the raidwide + an additional usage for Stray Flames/Tsunami.",
+          "2": "There is a very small period where you can cover both hits of Thunder III and the next Stray Flames/Tsumani, if you miss the timing, you can use it next GCD.",
+          "3": "Use if holding Chaos, otherwise use at the beginning of P4 for autos.",
+          "4": "Non-healers should avoid using any healing abilities that may cause their Accretion to pop early such as Second Wind, Curing Waltz or Divine Veil. If both Accretions are activated in a short amount of time, it will cause a wipe.\nHealers will need to manage HP burst accordingly to ensure that Accretions are not popped together. The H1 and H2 can throw single target heals at whoever has the Accretion between them.\nIf playing AST, ensure the vulnerability has expired before popping Macrocosmos. WHM can use Benediction (if not used earlier) to instantly pop the healer Accretion.",
+          "5": "If you are holding Exdeath instead of Chaos at the beginning, use Reprisal on both before The Decisive Battle finishes.",
+          "6": "Use LB3 at the W of Vacuum Wave. Either tank can press it, discuss beforehand.",
+          "7": "Seraphism can be shifted to P4 if you feel you have sufficient mitigation.",
+          "8": "Prepare Spreadlo on the tanks, prioritizing WAR > DRK > GNB/PLD.",
+          "9": "Prepare immediately after Bowels of Agony.",
+          "10": "Both healers should have instant cast heals prepared to top up the party between the first and second set of stomps."
+        }
+      }
+    },
+    {
+      "gid": 2072785902,
+      "title": "Phase 4: Kefka Says",
+      "jobs": [
+        "MT",
+        "OT",
+        "White Mage",
+        "Astrologian",
+        "Scholar",
+        "Sage",
+        "D1",
+        "D2",
+        "D3",
+        "D4",
+        "Extras"
+      ],
+      "mechanics": [
+        {
+          "name": "Grand Cross",
+          "time": "12:43",
+          "timeSeconds": 763,
+          "phaseTime": "0:29",
+          "phaseTimeSeconds": 29,
+          "assignments": {
+            "White Mage": [
+              {
+                "raw": "Plenary Indulgence",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Plenary Indulgence"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Collective Unconscious",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Collective Unconscious"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Spreadlo + Sacred Soil",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Spreadlo"
+                  },
+                  {
+                    "name": "Sacred Soil"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Kerachole + Philosophia + Holos",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Kerachole"
+                  },
+                  {
+                    "name": "Philosophia"
+                  },
+                  {
+                    "name": "Holos"
+                  }
+                ]
+              }
+            ],
+            "D2": [
+              {
+                "raw": "Feint ¹",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Feint",
+                    "footnotes": [
+                      1
+                    ]
+                  }
+                ]
+              }
+            ],
+            "Extras": [
+              {
+                "raw": "✔",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "✔"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Inferno/Tsunami",
+          "time": "12:49",
+          "timeSeconds": 769,
+          "phaseTime": "0:35",
+          "phaseTimeSeconds": 35,
+          "assignments": {
+            "White Mage": [
+              {
+                "raw": "Plenary Indulgence",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Plenary Indulgence"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Collective Unconscious",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Collective Unconscious"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Sacred Soil",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Sacred Soil"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Kerachole + Holos",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Kerachole"
+                  },
+                  {
+                    "name": "Holos"
+                  }
+                ]
+              }
+            ],
+            "D3": [
+              {
+                "raw": "Party Mit",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Party Mit"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Grand Cross",
+          "time": "12:58",
+          "timeSeconds": 778,
+          "phaseTime": "0:44",
+          "phaseTimeSeconds": 44,
+          "assignments": {
+            "White Mage": [
+              {
+                "raw": "Temperance",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Temperance"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Neutral Sect",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Neutral Sect"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Expedient + Fey Illumination",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Expedient"
+                  },
+                  {
+                    "name": "Fey Illumination"
+                  }
+                ]
+              },
+              {
+                "raw": "Sacred Soil",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Sacred Soil"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Panhaima",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Panhaima"
+                  }
+                ]
+              },
+              {
+                "raw": "Holos",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Holos"
+                  }
+                ]
+              }
+            ],
+            "D3": [
+              {
+                "raw": "Party Mit",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Party Mit"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Inferno/Tsunami",
+          "time": "13:03",
+          "timeSeconds": 783,
+          "phaseTime": "0:49",
+          "phaseTimeSeconds": 49,
+          "assignments": {
+            "OT": [
+              {
+                "raw": "Party Mit (GNB/DRK)",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Party Mit",
+                    "qualifier": "GNB/DRK"
+                  }
+                ]
+              }
+            ],
+            "White Mage": [
+              {
+                "raw": "Temperance",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Temperance"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Sun Sign",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Sun Sign"
+                  }
+                ]
+              },
+              {
+                "raw": "Neutral Sect",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Neutral Sect"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Seraph",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Seraph"
+                  }
+                ]
+              },
+              {
+                "raw": "Expedient + Fey Illumuniation",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Expedient"
+                  },
+                  {
+                    "name": "Fey Illumination"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Panhaima",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Panhaima"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Grand Cross",
+          "time": "13:13",
+          "timeSeconds": 793,
+          "phaseTime": "0:59",
+          "phaseTimeSeconds": 59,
+          "assignments": {
+            "OT": [
+              {
+                "raw": "Party Mit (WAR/PLD)",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Party Mit",
+                    "qualifier": "WAR/PLD"
+                  }
+                ]
+              },
+              {
+                "raw": "Party Mit (GNB/DRK)",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Party Mit",
+                    "qualifier": "GNB/DRK"
+                  }
+                ]
+              }
+            ],
+            "White Mage": [
+              {
+                "raw": "Divine Caress",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Divine Caress"
+                  }
+                ]
+              },
+              {
+                "raw": "Temperance",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Temperance"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Neutral Sect + Sun Sign",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Neutral Sect"
+                  },
+                  {
+                    "name": "Sun Sign"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Seraph",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Seraph"
+                  }
+                ]
+              },
+              {
+                "raw": "Expedient + Fey Illumuniation",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Expedient"
+                  },
+                  {
+                    "name": "Fey Illumination"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Zoe Shields",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Zoe Shields"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Flood of Naught",
+          "time": "13:25",
+          "timeSeconds": 805,
+          "phaseTime": "1:11",
+          "phaseTimeSeconds": 71,
+          "assignments": {
+            "White Mage": [
+              {
+                "raw": "Liturgy of the Bell",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Liturgy of the Bell"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Macrocosmos",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Macrocosmos"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Sacred Soil",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Sacred Soil"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Kerachole",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Kerachole"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Death Bolt/Wave",
+          "time": "13:35",
+          "timeSeconds": 815,
+          "phaseTime": "1:21",
+          "phaseTimeSeconds": 81,
+          "assignments": {
+            "MT": [
+              {
+                "raw": "Party Mit",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Party Mit"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Sacred Soil",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Sacred Soil"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Kerachole",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Kerachole"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Ultima Upsurge",
+          "time": "13:53",
+          "timeSeconds": 833,
+          "phaseTime": "1:39",
+          "phaseTimeSeconds": 99,
+          "assignments": {
+            "MT": [
+              {
+                "raw": "Reprisal",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Reprisal"
+                  }
+                ]
+              }
+            ],
+            "White Mage": [
+              {
+                "raw": "Plenary Indulgence",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Plenary Indulgence"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Collective Unconscious",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Collective Unconscious"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Sacred Soil",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Sacred Soil"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Kerachole",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Kerachole"
+                  }
+                ]
+              }
+            ],
+            "D1": [
+              {
+                "raw": "Feint",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Feint"
+                  }
+                ]
+              }
+            ],
+            "D4": [
+              {
+                "raw": "Addle",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Addle"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Death Bolt/Wave",
+          "time": "14:00",
+          "timeSeconds": 840,
+          "phaseTime": "1:46",
+          "phaseTimeSeconds": 106,
+          "assignments": {
+            "White Mage": [
+              {
+                "raw": "Plenary Indulgence",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Plenary Indulgence"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Collective Unconscious",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Collective Unconscious"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Sacred Soil",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Sacred Soil"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Kerachole",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Kerachole"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Ultima Upsurge",
+          "time": "14:32",
+          "timeSeconds": 872,
+          "phaseTime": "2:18",
+          "phaseTimeSeconds": 138,
+          "assignments": {
+            "OT": [
+              {
+                "raw": "Reprisal",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Reprisal"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Sacred Soil",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Sacred Soil"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Kerachole",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Kerachole"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "notes": {
+        "general": [
+          "All mechanics requires shields! | ➔ Indicates Carry Over",
+          "Targeted mitigation (Reprisal, Addle, etc) only works on Ultima Upsurge, the rest is used to assist in mitigating tank auto attacks."
+        ],
+        "footnotes": {
+          "1": "Use at the beginning of the phase for autos."
+        }
+      }
+    },
+    {
+      "gid": 696382883,
+      "title": "Phase 5: Ultima Kefka",
+      "jobs": [
+        "MT",
+        "OT",
+        "White Mage",
+        "Astrologian",
+        "Scholar",
+        "Sage",
+        "D1",
+        "D2",
+        "D3",
+        "D4",
+        "Extras"
+      ],
+      "mechanics": [
+        {
+          "name": "Ultima Repeater",
+          "time": "15:11",
+          "timeSeconds": 911,
+          "phaseTime": "0:49",
+          "phaseTimeSeconds": 49,
+          "assignments": {
+            "MT": [
+              {
+                "raw": "Reprisal",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Reprisal"
+                  }
+                ]
+              }
+            ],
+            "OT": [
+              {
+                "raw": "Party Mit ¹",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Party Mit",
+                    "footnotes": [
+                      1
+                    ]
+                  }
+                ]
+              }
+            ],
+            "White Mage": [
+              {
+                "raw": "Plenary Indulgence",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Plenary Indulgence"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Collective Unconscious",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Collective Unconscious"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Spreadlo + Sacred Soil",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Spreadlo"
+                  },
+                  {
+                    "name": "Sacred Soil"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Zoe Shields + Holos + Kerachole",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Zoe Shields"
+                  },
+                  {
+                    "name": "Holos"
+                  },
+                  {
+                    "name": "Kerachole"
+                  }
+                ]
+              }
+            ],
+            "D3": [
+              {
+                "raw": "Party Mit ¹",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Party Mit",
+                    "footnotes": [
+                      1
+                    ]
+                  }
+                ]
+              }
+            ],
+            "Extras": [
+              {
+                "raw": "✔",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "✔"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Fell Forces (3x)",
+          "time": "15:16",
+          "timeSeconds": 916,
+          "phaseTime": "0:54",
+          "phaseTimeSeconds": 54,
+          "assignments": {
+            "MT": [
+              {
+                "raw": "Reprisal",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Reprisal"
+                  }
+                ]
+              }
+            ],
+            "White Mage": [
+              {
+                "raw": "Plenary Indulgence",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Plenary Indulgence"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Collective Unconscious",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Collective Unconscious"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Sacred Soil",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Sacred Soil"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Holos + Kerachole",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Holos"
+                  },
+                  {
+                    "name": "Kerachole"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Chaotic Flood",
+          "time": "15:28",
+          "timeSeconds": 928,
+          "phaseTime": "1:06",
+          "phaseTimeSeconds": 66,
+          "assignments": {
+            "White Mage": [
+              {
+                "raw": "Temperance",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Temperance"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Neutral Sect",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Neutral Sect"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Expedient",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Expedient"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Panhaima",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Panhaima"
+                  }
+                ]
+              },
+              {
+                "raw": "Holos",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Holos"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Maddening Orchestra",
+          "time": "15:40",
+          "timeSeconds": 940,
+          "phaseTime": "1:18",
+          "phaseTimeSeconds": 78,
+          "assignments": {
+            "OT": [
+              {
+                "raw": "Reprisal",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Reprisal"
+                  }
+                ]
+              }
+            ],
+            "White Mage": [
+              {
+                "raw": "Divine Caress",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Divine Caress"
+                  }
+                ]
+              },
+              {
+                "raw": "Temperance",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Temperance"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Sun Sign",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Sun Sign"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Sacred Soil + Fey Illumination",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Sacred Soil"
+                  },
+                  {
+                    "name": "Fey Illumination"
+                  }
+                ]
+              },
+              {
+                "raw": "Expedient",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Expedient"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Kerachole",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Kerachole"
+                  }
+                ]
+              }
+            ],
+            "D2": [
+              {
+                "raw": "Feint",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Feint"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Fell Forces (2x)",
+          "footnotes": [
+            2
+          ],
+          "time": "15:53",
+          "timeSeconds": 953,
+          "phaseTime": "1:31",
+          "phaseTimeSeconds": 91,
+          "assignments": {
+            "OT": [
+              {
+                "raw": "Reprisal",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Reprisal"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Sun Sign",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Sun Sign"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Sacred Soil + Fey Illumination",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Sacred Soil"
+                  },
+                  {
+                    "name": "Fey Illumination"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Kerachole",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Kerachole"
+                  }
+                ]
+              }
+            ],
+            "D2": [
+              {
+                "raw": "Feint",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Feint"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Celestriad",
+          "time": "16:11",
+          "timeSeconds": 971,
+          "phaseTime": "1:49",
+          "phaseTimeSeconds": 109,
+          "assignments": {
+            "MT": [
+              {
+                "raw": "Party Mit",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Party Mit"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Seraph ⁴",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Seraph",
+                    "footnotes": [
+                      4
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Ultima Repeater",
+          "time": "16:33",
+          "timeSeconds": 993,
+          "phaseTime": "2:11",
+          "phaseTimeSeconds": 131,
+          "assignments": {
+            "MT": [
+              {
+                "raw": "Reprisal",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Reprisal"
+                  }
+                ]
+              }
+            ],
+            "OT": [
+              {
+                "raw": "Party Mit ¹",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Party Mit",
+                    "footnotes": [
+                      1
+                    ]
+                  }
+                ]
+              }
+            ],
+            "White Mage": [
+              {
+                "raw": "Plenary Indulgence",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Plenary Indulgence"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Collective Unconscious",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Collective Unconscious"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Sacred Soil",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Sacred Soil"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Kerachole",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Kerachole"
+                  }
+                ]
+              }
+            ],
+            "D1": [
+              {
+                "raw": "Feint ⁵",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Feint",
+                    "footnotes": [
+                      5
+                    ]
+                  }
+                ]
+              }
+            ],
+            "D3": [
+              {
+                "raw": "Party Mit ¹",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Party Mit",
+                    "footnotes": [
+                      1
+                    ]
+                  }
+                ]
+              }
+            ],
+            "D4": [
+              {
+                "raw": "Addle ⁵",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Addle",
+                    "footnotes": [
+                      5
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Fell Forces (2x)",
+          "time": "16:38",
+          "timeSeconds": 998,
+          "phaseTime": "2:16",
+          "phaseTimeSeconds": 136,
+          "assignments": {
+            "MT": [
+              {
+                "raw": "Reprisal",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Reprisal"
+                  }
+                ]
+              }
+            ],
+            "OT": [
+              {
+                "raw": "Party Mit",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Party Mit"
+                  }
+                ]
+              }
+            ],
+            "White Mage": [
+              {
+                "raw": "Plenary Indulgence",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Plenary Indulgence"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Collective Unconscious",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Collective Unconscious"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Sacred Soil",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Sacred Soil"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Kerachole",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Kerachole"
+                  }
+                ]
+              }
+            ],
+            "D1": [
+              {
+                "raw": "Feint",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Feint"
+                  }
+                ]
+              }
+            ],
+            "D3": [
+              {
+                "raw": "Party Mit",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Party Mit"
+                  }
+                ]
+              }
+            ],
+            "D4": [
+              {
+                "raw": "Addle",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Addle"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Stray Entropy",
+          "time": "17:04",
+          "timeSeconds": 1024,
+          "phaseTime": "2:42",
+          "phaseTimeSeconds": 162,
+          "assignments": {
+            "OT": [
+              {
+                "raw": "Reprisal ³",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Reprisal",
+                    "footnotes": [
+                      3
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Maddening Orchestra",
+          "time": "17:13",
+          "timeSeconds": 1033,
+          "phaseTime": "2:51",
+          "phaseTimeSeconds": 171,
+          "assignments": {
+            "White Mage": [
+              {
+                "raw": "Assist Tanks ²",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Assist Tanks",
+                    "footnotes": [
+                      2
+                    ]
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Sacred Soil ²",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Sacred Soil",
+                    "footnotes": [
+                      2
+                    ]
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Kerachole ²",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Kerachole",
+                    "footnotes": [
+                      2
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Fell Forces (3x)",
+          "time": "17:25",
+          "timeSeconds": 1045,
+          "phaseTime": "3:03",
+          "phaseTimeSeconds": 183,
+          "assignments": {
+            "White Mage": [
+              {
+                "raw": "Assist Tanks ²",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Assist Tanks",
+                    "footnotes": [
+                      2
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Forsaken",
+          "note": "For Forsaken, use any timed mitigation as late as possible unless otherwise noted.\nIt is important that the new round of mitigation for the 5th hit are applied as the first round of mitigation will fall off."
+        },
+        {
+          "name": "Forsaken (1st Hit)",
+          "time": "17:42",
+          "timeSeconds": 1062,
+          "phaseTime": "3:20",
+          "phaseTimeSeconds": 200,
+          "assignments": {
+            "MT": [
+              {
+                "raw": "Reprisal + Party Mit",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Reprisal"
+                  },
+                  {
+                    "name": "Party Mit"
+                  }
+                ]
+              }
+            ],
+            "White Mage": [
+              {
+                "raw": "Temperance",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Temperance"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Neutral Sect + Collective Unconscious",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Neutral Sect"
+                  },
+                  {
+                    "name": "Collective Unconscious"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Spreadlo + Fey Illumination + Sacred Soil",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Spreadlo"
+                  },
+                  {
+                    "name": "Fey Illumination"
+                  },
+                  {
+                    "name": "Sacred Soil"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Zoe Shields + Holos + Kerachole",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Zoe Shields"
+                  },
+                  {
+                    "name": "Holos"
+                  },
+                  {
+                    "name": "Kerachole"
+                  }
+                ]
+              }
+            ],
+            "D2": [
+              {
+                "raw": "Feint",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Feint"
+                  }
+                ]
+              }
+            ],
+            "Extras": [
+              {
+                "raw": "✔",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "✔"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Forsaken Bonds (2nd Hit)",
+          "time": "17:47",
+          "timeSeconds": 1067,
+          "phaseTime": "3:25",
+          "phaseTimeSeconds": 205,
+          "assignments": {
+            "MT": [
+              {
+                "raw": "Reprisal + Party Mit (GNB/DRK)",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Reprisal"
+                  },
+                  {
+                    "name": "Party Mit",
+                    "qualifier": "GNB/DRK"
+                  }
+                ]
+              }
+            ],
+            "White Mage": [
+              {
+                "raw": "Liturgy of the Bell",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Liturgy of the Bell"
+                  }
+                ]
+              },
+              {
+                "raw": "Temperance",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Temperance"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Neutral Sect + Collective Unconscious",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Neutral Sect"
+                  },
+                  {
+                    "name": "Collective Unconscious"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Seraphism",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Seraphism"
+                  }
+                ]
+              },
+              {
+                "raw": "Fey Illumuniation + Sacred Soil",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Fey Illumination"
+                  },
+                  {
+                    "name": "Sacred Soil"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Philosophia",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Philosophia"
+                  }
+                ]
+              },
+              {
+                "raw": "Holos + Kerachole",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Holos"
+                  },
+                  {
+                    "name": "Kerachole"
+                  }
+                ]
+              }
+            ],
+            "D2": [
+              {
+                "raw": "Feint",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Feint"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Forsaken (3rd Hit)",
+          "time": "17:50",
+          "timeSeconds": 1070,
+          "phaseTime": "3:28",
+          "phaseTimeSeconds": 208,
+          "assignments": {
+            "MT": [
+              {
+                "raw": "Reprisal + Party Mit (GNB/DRK)",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Reprisal"
+                  },
+                  {
+                    "name": "Party Mit",
+                    "qualifier": "GNB/DRK"
+                  }
+                ]
+              }
+            ],
+            "White Mage": [
+              {
+                "raw": "Temperance",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Temperance"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Macrocosmos",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Macrocosmos"
+                  }
+                ]
+              },
+              {
+                "raw": "Neutral Sect + Collective Unconscious",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Neutral Sect"
+                  },
+                  {
+                    "name": "Collective Unconscious"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Expedient",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Expedient"
+                  }
+                ]
+              },
+              {
+                "raw": "Fey Illumuniation + Sacred Soil",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Fey Illumination"
+                  },
+                  {
+                    "name": "Sacred Soil"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Panhaima",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Panhaima"
+                  }
+                ]
+              },
+              {
+                "raw": "Holos + Kerachole",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Holos"
+                  },
+                  {
+                    "name": "Kerachole"
+                  }
+                ]
+              }
+            ],
+            "D2": [
+              {
+                "raw": "Feint",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Feint"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Forsaken Bonds (4th Hit)",
+          "time": "17:56",
+          "timeSeconds": 1076,
+          "phaseTime": "3:34",
+          "phaseTimeSeconds": 214,
+          "assignments": {
+            "MT": [
+              {
+                "raw": "Reprisal + Party Mit (GNB/DRK)",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Reprisal"
+                  },
+                  {
+                    "name": "Party Mit",
+                    "qualifier": "GNB/DRK"
+                  }
+                ]
+              }
+            ],
+            "White Mage": [
+              {
+                "raw": "Temperance",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Temperance"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Neutral Sect",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Neutral Sect"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Fey Illumuniation + Expedient",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Fey Illumination"
+                  },
+                  {
+                    "name": "Expedient"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Holos + Panhaima",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Holos"
+                  },
+                  {
+                    "name": "Panhaima"
+                  }
+                ]
+              }
+            ],
+            "D2": [
+              {
+                "raw": "Feint",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Feint"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Forsaken (5th Hit)",
+          "time": "17:59",
+          "timeSeconds": 1079,
+          "phaseTime": "3:37",
+          "phaseTimeSeconds": 217,
+          "assignments": {
+            "OT": [
+              {
+                "raw": "Reprisal + Party Mit",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Reprisal"
+                  },
+                  {
+                    "name": "Party Mit"
+                  }
+                ]
+              }
+            ],
+            "White Mage": [
+              {
+                "raw": "Divine Caress + Plenary Indulgence",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Divine Caress"
+                  },
+                  {
+                    "name": "Plenary Indulgence"
+                  }
+                ]
+              },
+              {
+                "raw": "Temperance",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Temperance"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Sun Sign",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Sun Sign"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Expedient",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Expedient"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Holos + Panhaima",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Holos"
+                  },
+                  {
+                    "name": "Panhaima"
+                  }
+                ]
+              }
+            ],
+            "D1": [
+              {
+                "raw": "Feint",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Feint"
+                  }
+                ]
+              }
+            ],
+            "D3": [
+              {
+                "raw": "Party Mit",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Party Mit"
+                  }
+                ]
+              }
+            ],
+            "D4": [
+              {
+                "raw": "Addle",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Addle"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Forsaken Bonds (6th Hit)",
+          "time": "18:04",
+          "timeSeconds": 1084,
+          "phaseTime": "3:42",
+          "phaseTimeSeconds": 222,
+          "assignments": {
+            "OT": [
+              {
+                "raw": "Reprisal + Party Mit (GNB/DRK)",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Reprisal"
+                  },
+                  {
+                    "name": "Party Mit",
+                    "qualifier": "GNB/DRK"
+                  }
+                ]
+              }
+            ],
+            "White Mage": [
+              {
+                "raw": "Plenary Indulgence",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Plenary Indulgence"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Sun Sign",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Sun Sign"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Expedient",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Expedient"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Panhaima",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Panhaima"
+                  }
+                ]
+              }
+            ],
+            "D1": [
+              {
+                "raw": "Feint",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Feint"
+                  }
+                ]
+              }
+            ],
+            "D3": [
+              {
+                "raw": "Party Mit",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Party Mit"
+                  }
+                ]
+              }
+            ],
+            "D4": [
+              {
+                "raw": "Addle",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Addle"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Forsaken (7th Hit)",
+          "time": "18:07",
+          "timeSeconds": 1087,
+          "phaseTime": "3:45",
+          "phaseTimeSeconds": 225,
+          "assignments": {
+            "OT": [
+              {
+                "raw": "Reprisal + Party Mit (GNB/DRK)",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Reprisal"
+                  },
+                  {
+                    "name": "Party Mit",
+                    "qualifier": "GNB/DRK"
+                  }
+                ]
+              }
+            ],
+            "White Mage": [
+              {
+                "raw": "Plenary Indulgence",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Plenary Indulgence"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Sun Sign",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Sun Sign"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Seraph",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Seraph"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Panhaima",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Panhaima"
+                  }
+                ]
+              }
+            ],
+            "D1": [
+              {
+                "raw": "Feint",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Feint"
+                  }
+                ]
+              }
+            ],
+            "D3": [
+              {
+                "raw": "Party Mit",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Party Mit"
+                  }
+                ]
+              }
+            ],
+            "D4": [
+              {
+                "raw": "Addle",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Addle"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Forsaken Bonds (8th Hit)",
+          "time": "18:12",
+          "timeSeconds": 1092,
+          "phaseTime": "3:50",
+          "phaseTimeSeconds": 230,
+          "assignments": {
+            "OT": [
+              {
+                "raw": "Reprisal + Party Mit (GNB/DRK)",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Reprisal"
+                  },
+                  {
+                    "name": "Party Mit",
+                    "qualifier": "GNB/DRK"
+                  }
+                ]
+              }
+            ],
+            "Astrologian": [
+              {
+                "raw": "Sun Sign",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Sun Sign"
+                  }
+                ]
+              }
+            ],
+            "Scholar": [
+              {
+                "raw": "Seraph + Sacred Soil",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Seraph"
+                  },
+                  {
+                    "name": "Sacred Soil"
+                  }
+                ]
+              }
+            ],
+            "Sage": [
+              {
+                "raw": "Kerachole",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Kerachole"
+                  }
+                ]
+              }
+            ],
+            "D1": [
+              {
+                "raw": "Feint",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Feint"
+                  }
+                ]
+              }
+            ],
+            "D3": [
+              {
+                "raw": "Party Mit",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Party Mit"
+                  }
+                ]
+              }
+            ],
+            "D4": [
+              {
+                "raw": "Addle",
+                "carryOver": true,
+                "abilities": [
+                  {
+                    "name": "Addle"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "Forsaken Null",
+          "time": "18:46",
+          "timeSeconds": 1126,
+          "phaseTime": "4:24",
+          "phaseTimeSeconds": 264,
+          "assignments": {
+            "MT": [
+              {
+                "raw": "Enrage!",
+                "carryOver": false,
+                "abilities": [
+                  {
+                    "name": "Enrage!"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "notes": {
+        "general": [
+          "All mechanics requires shields! | ➔ Indicates Carry Over",
+          "For Forsaken, use any timed mitigation as late as possible unless otherwise noted."
+        ],
+        "footnotes": {
+          "1": "Use when Kefka brings his staff down to his right side, example here. | The subsequent usages should be pressed immediately off cooldown.",
+          "2": "Healers should monitor the tanks during Maddening Orchestra (especially the Flare tank) and Fell Forces. For WAR/DRK, you will need to have single target burst healing prepared after their invulnerability expires so they can survive the 3rd auto.",
+          "3": "Use two GCDs after the Stray Apocalypse castbar is completed so it is back for Forsaken.",
+          "4": "Use during the Celestriad castbar.",
+          "5": "Use after the third towers in Celestriad resolves."
+        }
+      }
+    }
+  ],
+  "tank": {
+    "gid": 1548551521,
+    "sections": [
+      {
+        "title": "Phase 1: Kefka",
+        "columns": [
+          "MT",
+          "OT"
+        ],
+        "mechanics": [
+          {
+            "name": "Revolting Ruin III",
+            "footnotes": [
+              1
+            ],
+            "time": "0:16",
+            "timeSeconds": 16,
+            "assignments": {
+              "MT": [
+                {
+                  "raw": "Kitchen Sink",
+                  "carryOver": false,
+                  "abilities": [
+                    {
+                      "name": "Kitchen Sink"
+                    }
+                  ]
+                }
+              ],
+              "OT": [
+                {
+                  "raw": "Buddy Mit + Provoke During Castbar",
+                  "carryOver": false,
+                  "abilities": [
+                    {
+                      "name": "Buddy Mit"
+                    },
+                    {
+                      "name": "Provoke During Castbar"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "name": "Hyperdrive (3x)",
+            "footnotes": [
+              2
+            ],
+            "time": "1:05",
+            "timeSeconds": 65,
+            "assignments": {
+              "MT": [
+                {
+                  "raw": "Buddy Mit",
+                  "carryOver": false,
+                  "abilities": [
+                    {
+                      "name": "Buddy Mit"
+                    }
+                  ]
+                }
+              ],
+              "OT": [
+                {
+                  "raw": "Kitchen Sink",
+                  "carryOver": false,
+                  "abilities": [
+                    {
+                      "name": "Kitchen Sink"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "name": "Revolting Ruin III",
+            "footnotes": [
+              1
+            ],
+            "time": "1:38",
+            "timeSeconds": 98,
+            "assignments": {
+              "MT": [
+                {
+                  "raw": "Provoke During Castbar",
+                  "carryOver": false,
+                  "abilities": [
+                    {
+                      "name": "Provoke During Castbar"
+                    }
+                  ]
+                }
+              ],
+              "OT": [
+                {
+                  "raw": "Invulnerability",
+                  "carryOver": false,
+                  "abilities": [
+                    {
+                      "name": "Invulnerability"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "name": "Hyperdrive (3x)",
+            "footnotes": [
+              2
+            ],
+            "time": "2:16",
+            "timeSeconds": 136,
+            "assignments": {
+              "MT": [
+                {
+                  "raw": "Invulnerability ³",
+                  "carryOver": false,
+                  "abilities": [
+                    {
+                      "name": "Invulnerability",
+                      "footnotes": [
+                        3
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "notes": {
+          "general": [],
+          "footnotes": {
+            "1": "Revolting Ruin III targets first in enmity and retargets to second in emity when the castbar ends.",
+            "2": "Hyperdrive does not have a castbar and occurs immediately after Light of Judgement.",
+            "3": "WAR can alternatively kitchen sink this and Holmgang the first Ultimate Embrace, let your party know if you plan to do this."
+          }
+        }
+      },
+      {
+        "title": "Phase 2: Kefka",
+        "columns": [
+          "MT",
+          "OT"
+        ],
+        "mechanics": [
+          {
+            "name": "Ultimate Embrace",
+            "time": "3:40",
+            "timeSeconds": 220,
+            "assignments": {
+              "MT": [
+                {
+                  "raw": "Kitchen Sink",
+                  "carryOver": false,
+                  "abilities": [
+                    {
+                      "name": "Kitchen Sink"
+                    }
+                  ]
+                }
+              ],
+              "OT": [
+                {
+                  "raw": "Kitchen Sink",
+                  "carryOver": false,
+                  "abilities": [
+                    {
+                      "name": "Kitchen Sink"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "name": "Wings of Destruction",
+            "footnotes": [
+              1,
+              3
+            ],
+            "time": "6:11",
+            "timeSeconds": 371,
+            "assignments": {
+              "MT": [
+                {
+                  "raw": "Rampart + 40% + 90s (Close)",
+                  "carryOver": false,
+                  "abilities": [
+                    {
+                      "name": "Rampart"
+                    },
+                    {
+                      "name": "40%"
+                    },
+                    {
+                      "name": "90s",
+                      "qualifier": "Close"
+                    }
+                  ]
+                }
+              ],
+              "OT": [
+                {
+                  "raw": "Rampart + 40% + 90s (Far)",
+                  "carryOver": false,
+                  "abilities": [
+                    {
+                      "name": "Rampart"
+                    },
+                    {
+                      "name": "40%"
+                    },
+                    {
+                      "name": "90s",
+                      "qualifier": "Far"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "name": "Ultimate Embrace",
+            "footnotes": [
+              2
+            ],
+            "time": "6:18",
+            "timeSeconds": 378,
+            "assignments": {
+              "MT": [
+                {
+                  "raw": "Short Mit",
+                  "carryOver": false,
+                  "abilities": [
+                    {
+                      "name": "Short Mit"
+                    }
+                  ]
+                },
+                {
+                  "raw": "Rampart + 40% + 90s",
+                  "carryOver": true,
+                  "abilities": [
+                    {
+                      "name": "Rampart"
+                    },
+                    {
+                      "name": "40%"
+                    },
+                    {
+                      "name": "90s"
+                    }
+                  ]
+                }
+              ],
+              "OT": [
+                {
+                  "raw": "Short Mit",
+                  "carryOver": false,
+                  "abilities": [
+                    {
+                      "name": "Short Mit"
+                    }
+                  ]
+                },
+                {
+                  "raw": "Rampart + 40% + 90s",
+                  "carryOver": true,
+                  "abilities": [
+                    {
+                      "name": "Rampart"
+                    },
+                    {
+                      "name": "40%"
+                    },
+                    {
+                      "name": "90s"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "notes": {
+          "general": [],
+          "footnotes": {
+            "1": "Rampart end of first Wings of Destruction (halfroom) cast, 40% two GCDs later and 10s mitigation at the end of second Wings of Destruction cast.",
+            "2": "Short mitigation before Ultimate Embrace finishes casting.",
+            "3": "PLD can take the Wings of Destruction at the wall to assist their co-tank with no downtime (discuss beforehand if MT)."
+          }
+        }
+      },
+      {
+        "title": "P3: Chaos and Exdeath",
+        "columns": [
+          "Chaos (WAR > DRK > GNB > PLD)",
+          "Exdeath (PLD > GNB > DRK > WAR)"
+        ],
+        "mechanics": [
+          {
+            "name": "Thunder III",
+            "time": "7:59",
+            "timeSeconds": 479,
+            "assignments": {
+              "Chaos (WAR > DRK > GNB > PLD)": [
+                {
+                  "raw": "Rampart + 90s + Short Mit",
+                  "carryOver": false,
+                  "abilities": [
+                    {
+                      "name": "Rampart"
+                    },
+                    {
+                      "name": "90s"
+                    },
+                    {
+                      "name": "Short Mit"
+                    }
+                  ],
+                  "qualifier": "First Hit"
+                }
+              ],
+              "Exdeath (PLD > GNB > DRK > WAR)": [
+                {
+                  "raw": "Rampart + 90s + Short Mit",
+                  "carryOver": false,
+                  "abilities": [
+                    {
+                      "name": "Rampart"
+                    },
+                    {
+                      "name": "90s"
+                    },
+                    {
+                      "name": "Short Mit"
+                    }
+                  ],
+                  "qualifier": "Second Hit"
+                }
+              ]
+            }
+          },
+          {
+            "name": "Thunder III",
+            "time": "8:56",
+            "timeSeconds": 536,
+            "assignments": {
+              "Chaos (WAR > DRK > GNB > PLD)": [
+                {
+                  "raw": "Invulnerability",
+                  "carryOver": false,
+                  "abilities": [
+                    {
+                      "name": "Invulnerability"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "name": "Thunder III",
+            "time": "9:14",
+            "timeSeconds": 554,
+            "assignments": {
+              "Chaos (WAR > DRK > GNB > PLD)": [
+                {
+                  "raw": "40% + Short Mit",
+                  "carryOver": false,
+                  "abilities": [
+                    {
+                      "name": "40%"
+                    },
+                    {
+                      "name": "Short Mit"
+                    }
+                  ],
+                  "qualifier": "Second Hit"
+                }
+              ],
+              "Exdeath (PLD > GNB > DRK > WAR)": [
+                {
+                  "raw": "40% + Short Mit",
+                  "carryOver": false,
+                  "abilities": [
+                    {
+                      "name": "40%"
+                    },
+                    {
+                      "name": "Short Mit"
+                    }
+                  ],
+                  "qualifier": "First Hit"
+                }
+              ]
+            }
+          },
+          {
+            "name": "Thunder III",
+            "time": "9:55",
+            "timeSeconds": 595,
+            "assignments": {
+              "Exdeath (PLD > GNB > DRK > WAR)": [
+                {
+                  "raw": "Invulnerability",
+                  "carryOver": false,
+                  "abilities": [
+                    {
+                      "name": "Invulnerability"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "name": "Thunder III",
+            "time": "10:37",
+            "timeSeconds": 637,
+            "assignments": {
+              "Chaos (WAR > DRK > GNB > PLD)": [
+                {
+                  "raw": "Rampart + 90s + Short Mit",
+                  "carryOver": false,
+                  "abilities": [
+                    {
+                      "name": "Rampart"
+                    },
+                    {
+                      "name": "90s"
+                    },
+                    {
+                      "name": "Short Mit"
+                    }
+                  ],
+                  "qualifier": "Second Hit"
+                }
+              ],
+              "Exdeath (PLD > GNB > DRK > WAR)": [
+                {
+                  "raw": "Rampart + 90s + Short Mit",
+                  "carryOver": false,
+                  "abilities": [
+                    {
+                      "name": "Rampart"
+                    },
+                    {
+                      "name": "90s"
+                    },
+                    {
+                      "name": "Short Mit"
+                    }
+                  ],
+                  "qualifier": "First Hit"
+                }
+              ]
+            }
+          },
+          {
+            "name": "Black Holes IV (10th Tether Set)",
+            "time": "11:31",
+            "timeSeconds": 691,
+            "assignments": {
+              "Chaos (WAR > DRK > GNB > PLD)": [
+                {
+                  "raw": "40% + Short Mit",
+                  "carryOver": false,
+                  "abilities": [
+                    {
+                      "name": "40%"
+                    },
+                    {
+                      "name": "Short Mit"
+                    }
+                  ]
+                }
+              ],
+              "Exdeath (PLD > GNB > DRK > WAR)": [
+                {
+                  "raw": "40% + Short Mit",
+                  "carryOver": false,
+                  "abilities": [
+                    {
+                      "name": "40%"
+                    },
+                    {
+                      "name": "Short Mit"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "notes": {
+          "general": [
+            "Regardless of who is MT or OT, the invulnerability priority overrides this. You will still mitigate (Reprisal & Party Mit) based on whether you are MT or OT on the main page. This is for middle Exdeath only.",
+            "Tanks should use their short mitigation for the autos throughout the phase (WAR use Nascent)."
+          ],
+          "footnotes": {}
+        }
+      },
+      {
+        "title": "P4: Kefka Says",
+        "columns": [
+          "MT",
+          "OT"
+        ],
+        "mechanics": [
+          {
+            "name": "Autos",
+            "time": "12:13+",
+            "timeSeconds": 733,
+            "timeOpenEnded": true,
+            "assignments": {
+              "MT": [
+                {
+                  "raw": "Rampart + 90s + Short Mit",
+                  "carryOver": false,
+                  "abilities": [
+                    {
+                      "name": "Rampart"
+                    },
+                    {
+                      "name": "90s"
+                    },
+                    {
+                      "name": "Short Mit"
+                    }
+                  ]
+                }
+              ],
+              "OT": [
+                {
+                  "raw": "Buddy Mit",
+                  "carryOver": false,
+                  "abilities": [
+                    {
+                      "name": "Buddy Mit"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "notes": {
+          "general": [
+            "Kefka does not do any busters throughout the phase, but he does continously auto the main threat dealing around 75k without any mitigation. Ensure CDs are available for P5."
+          ],
+          "footnotes": {}
+        }
+      },
+      {
+        "title": "Phase 5: Ultima Kefka",
+        "columns": [
+          "WAR > DRK > GNB > PLD",
+          "PLD > GNB > DRK > WAR (Start With Boss) ¹"
+        ],
+        "mechanics": [
+          {
+            "name": "Fell Forces (3x)",
+            "time": "15:16",
+            "timeSeconds": 916,
+            "assignments": {
+              "WAR > DRK > GNB > PLD": [
+                {
+                  "raw": "40% + Short",
+                  "carryOver": false,
+                  "abilities": [
+                    {
+                      "name": "40%"
+                    },
+                    {
+                      "name": "Short Mit"
+                    }
+                  ]
+                }
+              ],
+              "PLD > GNB > DRK > WAR (Start With Boss) ¹": [
+                {
+                  "raw": "40% + Short Mit",
+                  "carryOver": false,
+                  "abilities": [
+                    {
+                      "name": "40%"
+                    },
+                    {
+                      "name": "Short Mit"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "name": "Maddening Orchestra",
+            "time": "15:40",
+            "timeSeconds": 940,
+            "assignments": {
+              "WAR > DRK > GNB > PLD": [
+                {
+                  "raw": "Rampart + Short Mit + Provoke ²",
+                  "carryOver": false,
+                  "abilities": [
+                    {
+                      "name": "Rampart"
+                    },
+                    {
+                      "name": "Short Mit"
+                    },
+                    {
+                      "name": "Provoke",
+                      "footnotes": [
+                        2
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "PLD > GNB > DRK > WAR (Start With Boss) ¹": [
+                {
+                  "raw": "Rampart + Short Mit",
+                  "carryOver": false,
+                  "abilities": [
+                    {
+                      "name": "Rampart"
+                    },
+                    {
+                      "name": "Short Mit"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "name": "Flare/Holy",
+            "time": "15:48",
+            "timeSeconds": 948,
+            "assignments": {
+              "WAR > DRK > GNB > PLD": [
+                {
+                  "raw": "Invulnerability ⁴",
+                  "carryOver": false,
+                  "abilities": [
+                    {
+                      "name": "Invulnerability",
+                      "footnotes": [
+                        4
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "PLD > GNB > DRK > WAR (Start With Boss) ¹": [
+                {
+                  "raw": "Rampart + Short Mit",
+                  "carryOver": true,
+                  "abilities": [
+                    {
+                      "name": "Rampart"
+                    },
+                    {
+                      "name": "Short Mit"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "name": "Fell Forces (2x)",
+            "time": "15:53",
+            "timeSeconds": 953,
+            "assignments": {
+              "WAR > DRK > GNB > PLD": [
+                {
+                  "raw": "Invulnerability (Solo)",
+                  "carryOver": true,
+                  "abilities": [
+                    {
+                      "name": "Invulnerability",
+                      "qualifier": "Solo"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "name": "Fell Forces (2x)",
+            "time": "16:38",
+            "timeSeconds": 998,
+            "assignments": {
+              "WAR > DRK > GNB > PLD": [
+                {
+                  "raw": "90s + Short Mit",
+                  "carryOver": false,
+                  "abilities": [
+                    {
+                      "name": "90s"
+                    },
+                    {
+                      "name": "Short Mit"
+                    }
+                  ]
+                }
+              ],
+              "PLD > GNB > DRK > WAR (Start With Boss) ¹": [
+                {
+                  "raw": "90s + Short Mit",
+                  "carryOver": false,
+                  "abilities": [
+                    {
+                      "name": "90s"
+                    },
+                    {
+                      "name": "Short Mit"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "name": "Maddening Orchestra",
+            "time": "17:13",
+            "timeSeconds": 1033,
+            "assignments": {
+              "WAR > DRK > GNB > PLD": [
+                {
+                  "raw": "Rampart ⁵ + 40%",
+                  "carryOver": false,
+                  "abilities": [
+                    {
+                      "name": "Rampart",
+                      "footnotes": [
+                        5
+                      ]
+                    },
+                    {
+                      "name": "40%"
+                    }
+                  ]
+                }
+              ],
+              "PLD > GNB > DRK > WAR (Start With Boss) ¹": [
+                {
+                  "raw": "Rampart ⁵ + 40% + Short Mit (PLD/DRK) + Provoke ²",
+                  "carryOver": false,
+                  "abilities": [
+                    {
+                      "name": "Rampart",
+                      "footnotes": [
+                        5
+                      ]
+                    },
+                    {
+                      "name": "40%"
+                    },
+                    {
+                      "name": "Short Mit",
+                      "qualifier": "PLD/DRK"
+                    },
+                    {
+                      "name": "Provoke",
+                      "footnotes": [
+                        2
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "name": "Flare/Holy",
+            "time": "17:20",
+            "timeSeconds": 1040,
+            "assignments": {
+              "WAR > DRK > GNB > PLD": [
+                {
+                  "raw": "Rampart + 40%",
+                  "carryOver": true,
+                  "abilities": [
+                    {
+                      "name": "Rampart"
+                    },
+                    {
+                      "name": "40%"
+                    }
+                  ]
+                }
+              ],
+              "PLD > GNB > DRK > WAR (Start With Boss) ¹": [
+                {
+                  "raw": "Invulnerability ⁴",
+                  "carryOver": false,
+                  "abilities": [
+                    {
+                      "name": "Invulnerability",
+                      "footnotes": [
+                        4
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "name": "Fell Forces I",
+            "time": "17:25",
+            "timeSeconds": 1045,
+            "assignments": {
+              "PLD > GNB > DRK > WAR (Start With Boss) ¹": [
+                {
+                  "raw": "Invulnerability (Solo)",
+                  "carryOver": true,
+                  "abilities": [
+                    {
+                      "name": "Invulnerability",
+                      "qualifier": "Solo"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "name": "Fell Forces II",
+            "time": "17:28",
+            "timeSeconds": 1048,
+            "assignments": {
+              "PLD > GNB > DRK > WAR (Start With Boss) ¹": [
+                {
+                  "raw": "Invulnerability (Solo)",
+                  "carryOver": true,
+                  "abilities": [
+                    {
+                      "name": "Invulnerability",
+                      "qualifier": "Solo"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "name": "Fell Forces III",
+            "time": "17:31",
+            "timeSeconds": 1051,
+            "assignments": {
+              "WAR > DRK > GNB > PLD": [
+                {
+                  "raw": "Rampart ⁵ + Short Mit",
+                  "carryOver": false,
+                  "abilities": [
+                    {
+                      "name": "Rampart",
+                      "footnotes": [
+                        5
+                      ]
+                    },
+                    {
+                      "name": "Short Mit"
+                    }
+                  ]
+                }
+              ],
+              "PLD > GNB > DRK > WAR (Start With Boss) ¹": [
+                {
+                  "raw": "Rampart ⁵ + Short Mit",
+                  "carryOver": false,
+                  "abilities": [
+                    {
+                      "name": "Rampart",
+                      "footnotes": [
+                        5
+                      ]
+                    },
+                    {
+                      "name": "Short Mit"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "notes": {
+          "general": [
+            "Regardless of who is MT or OT, the invulnerability priority overrides this. You will still mitigate (Reprisal & Party Mit) based on whether you are MT or OT on the main page."
+          ],
+          "footnotes": {
+            "1": "The tank who is not invulning first must have main threat to not get Holy.",
+            "2": "The invulning tank should Provoke as soon Flare/Holy is applied so Kefka is not pulled and they get main threat for the autos.",
+            "3": "The third auto must be shared as invulnerabilities will run out.",
+            "4": "Invulnerabilities should be used just before the Flare/Holy debuffs expire so that they can cover two autos.",
+            "5": "Rampart shoud be pressed just before the Maddening Orchestra cast is complete so it carries over to the 3rd auto."
+          }
+        }
+      }
+    ]
+  }
+}

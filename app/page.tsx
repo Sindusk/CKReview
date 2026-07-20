@@ -106,6 +106,28 @@ export default function Home() {
   // pull set changes, e.g. live-log polling appending new fights.
   const kickStrategy = useMemo(() => detectTerminateKickOrder(pulls), [pulls]);
   const crystalStrategy = useMemo(() => detectCrystalAssignments(pulls), [pulls]);
+
+  // FFXIV roster for the mitigation-plan section of the Strategy dialog —
+  // the first FF pull with players (rosters are stable within a report; if a
+  // job swap happens mid-session the slot mapping just reflects pull 1).
+  const ffPlayers = useMemo(() => {
+    const ffPull = pulls.find((p) => p.game === "ffxiv" && p.players.length > 0);
+    return ffPull ? ffPull.players : null;
+  }, [pulls]);
+
+  // Selected mitigation plan (per-fight expected mit timeline shown in the
+  // Strategy dialog; later also the input to Mitigation error detection).
+  // Persisted so the choice survives reloads.
+  const [mitigationPlanId, setMitigationPlanId] = useState<string | null>(null);
+  useEffect(() => {
+    const stored = localStorage.getItem("mitigation_plan_id");
+    if (stored) setMitigationPlanId(stored);
+  }, []);
+  function handleMitigationPlanChange(id: string | null) {
+    setMitigationPlanId(id);
+    if (id) localStorage.setItem("mitigation_plan_id", id);
+    else localStorage.removeItem("mitigation_plan_id");
+  }
   const [selectedPullId, setSelectedPullId] = useState<number | null>(null);
 
   const [importError, setImportError] = useState<string | null>(null);
@@ -944,6 +966,9 @@ export default function Home() {
         onClose={() => setShowStrategy(false)}
         strategy={kickStrategy}
         crystals={crystalStrategy}
+        ffPlayers={ffPlayers}
+        mitigationPlanId={mitigationPlanId}
+        onMitigationPlanChange={handleMitigationPlanChange}
       />
 
       <div
