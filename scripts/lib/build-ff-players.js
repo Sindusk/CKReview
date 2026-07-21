@@ -27,11 +27,12 @@ function buildFFPlayers(rep, actorMap, getFFJobByName) {
       damageTaken: dt.filter((e) => e.targetID === id).map((e) => ({
         timestamp: e.timestamp,
         abilityId: e.abilityGameID ?? 0,
-        abilityName: '',
+        abilityName: 'Ability ' + e.abilityGameID,
         amount: e.amount ?? 0,
         sourceInstance: e.sourceInstance,
         x: e.targetResources?.x,
         y: e.targetResources?.y,
+        overkill: e.overkill,
       })),
       debuffs: (rep.debuffs?.data ?? []).filter((e) => e.targetID === id).map((e) => ({
         timestamp: e.timestamp,

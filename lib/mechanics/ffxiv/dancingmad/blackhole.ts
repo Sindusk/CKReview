@@ -81,13 +81,37 @@
 // raid within seconds. (The DoubleTether strategy's m2 is the opposite
 // shape — TWO tethers hitting ONE player — and never triggers this.)
 //
+// ── PRIMORDIAL CRUST: THE THIRD HIT'S SAFETY NET (confirmed 2026-07-21) ────
+//
+// That "big" 3rd hit isn't graduated damage — every single Nothingness hit
+// with `overkill` set (the 3rd/final hit of every conga, clean or not) is
+// effectively the SAME near-9,999,999 raw hit regardless of buffs, always
+// bringing the victim to exactly 0 HP with millions in overkill. What
+// actually decides life or death is Primordial Crust: the 1005454 debuff
+// every player receives at the burst is a once-per-phase "instead of dying,
+// drop to 1 HP" charge, consumed the instant a lethal-magnitude hit lands.
+// On every confirmed-clean soak, the debuff's `removed` event lands at the
+// EXACT millisecond of the player's own big Nothingness hit — that's the
+// crust firing as designed. If something else lethal-magnitude hits the
+// player FIRST (any other raid mechanic, or an earlier stray tether), the
+// crust gets spent there instead, and by the time their real 3rd Nothingness
+// hit arrives they have nothing left to fall back on — full, actually-fatal
+// damage. Confirmed on a real death (report rXBbzFV49hd1QPwf pull 12): a
+// White Mage's crust was consumed 15s early by an unrelated raid AoE
+// ("Slap Happy", 47848); their subsequent 3rd Nothingness hit had no
+// safety net and killed them outright, even though the tether assignment
+// itself was correct and otherwise undetected. The same early-loss pattern
+// (crust consumed by 47884/47850, other raid mechanics) was found on three
+// more players across other pulls in the same report, confirming this
+// isn't a one-off.
+//
 // ── WHAT THIS DOES NOT DO YET ───────────────────────────────────────────
 //
 // It doesn't flag MISSED tether hits (fewer than 3), nor verify the exact
 // per-strategy lane ordering, nor check the earthquake/Accretion soak
 // positioning that follows — every failure observed so far surfaces as an
-// out-of-schedule hit or a multi-player tether hit, which are what's
-// detected here.
+// out-of-schedule hit, a multi-player tether hit, or an early Primordial
+// Crust loss, which are what's detected here.
 
 import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { PullError } from "@/types/PullError";
@@ -98,9 +122,17 @@ const SECOND_IN_LINE_ID = 1003005;
 const THIRD_IN_LINE_ID  = 1003006;
 const ACCRETION_ID      = 1001604;
 const NOTHINGNESS_ABILITY_ID = 47868; // the tether hit
+const EARTHQUAKE_ABILITY_ID  = 47866; // the doubled-earthquake wipe symptom of an earlier missed soak
 
 export const BLACKHOLE_INCORRECT_TETHER_RULE_ID = "ffxiv-blackhole-soaked-incorrect-tether";
 export const BLACKHOLE_MULTI_HIT_TETHER_RULE_ID = "ffxiv-blackhole-tether-hit-multiple-players";
+export const BLACKHOLE_LOST_CRUST_RULE_ID       = "ffxiv-blackhole-lost-primordial-crust";
+
+const PRIMORDIAL_CRUST_ABILITY_ID = 1005454;
+
+// The crust's `removed` event lands at the exact millisecond of whatever
+// hit consumed it — every confirmed case matched within a few ms.
+const CRUST_CONSUMPTION_TOLERANCE_MS = 100;
 
 // The 10 tether moments, as offsets from the debuff burst (see the
 // timetable above). Matched across two independent logs to within 100ms.
@@ -336,6 +368,51 @@ export function detectBlackHoleErrors(
         role:        player.role,
         abilityId:   NOTHINGNESS_ABILITY_ID,
         abilityName: "Nothingness",
+      });
+    }
+  }
+
+  // ── Lost Primordial Crust: the safety net spent on the wrong hit ────────
+  //
+  // See the module comment above. A player's crust should be consumed by
+  // their own big (lethal-magnitude) Nothingness hit — if it's gone before
+  // that hit arrives, they have nothing left when the real one lands.
+  for (const player of players) {
+    for (const removal of player.debuffs) {
+      if (removal.abilityId !== PRIMORDIAL_CRUST_ABILITY_ID || removal.debuffStatus !== "removed") continue;
+      if (isCompromisedMoment(removal.timestamp)) continue; // wipe cascade, not a mistake
+
+      // Whatever lethal-magnitude hit (overkill set — see PlayerEvent) landed
+      // on this player at the exact moment the crust disappeared is what
+      // consumed it. No matching hit at all means the removal can't be
+      // confidently explained (e.g. a duration expiry) — skip rather than
+      // guess.
+      const consumedBy = player.damageTaken.find(
+        (e) => e.overkill !== undefined && Math.abs(e.timestamp - removal.timestamp) <= CRUST_CONSUMPTION_TOLERANCE_MS
+      );
+      if (!consumedBy) continue;
+      if (consumedBy.abilityId === NOTHINGNESS_ABILITY_ID) continue; // spent correctly, on their own big hit
+
+      // Earthquake (47866) is itself the wipe-cascade SYMPTOM of an earlier
+      // missed soak elsewhere (see the module comment) — not an independent
+      // mistake this player made. isCompromisedMoment only catches this once
+      // 2+ deaths have already landed nearby; the cascade's own damage can
+      // arrive before the death event that explains it does, so it needs
+      // its own exclusion here too.
+      if (consumedBy.abilityId === EARTHQUAKE_ABILITY_ID) continue;
+
+      errors.push({
+        ruleId:      BLACKHOLE_LOST_CRUST_RULE_ID,
+        severity:    "Major",
+        name:        "Lost Primordial Crust",
+        description: `Lost Primordial Crust to ${consumedBy.abilityName} instead of their own third Nothingness hit — with no charge left, the next big tether hit had nothing to fall back on and killed them outright.`,
+        timestamp:   removal.timestamp,
+        player:      player.name,
+        class:       player.className,
+        specId:      player.specId,
+        role:        player.role,
+        abilityId:   consumedBy.abilityId,
+        abilityName: consumedBy.abilityName,
       });
     }
   }

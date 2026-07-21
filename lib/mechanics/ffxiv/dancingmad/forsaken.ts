@@ -395,7 +395,7 @@ export function detectForsakenTowerErrors(
   // on. Its confirmedLegitKeys tells the team-based check which players are
   // already proven innocent, so it doesn't re-flag them under a
   // mis-inferred team (see the "stolen stack decrement" case below).
-  const { errors: wrongPositionErrors, confirmedLegitKeys } = detectWrongTowerPositionErrors(players, expectedTimestamps);
+  const { errors: wrongPositionErrors, confirmedLegitKeys } = detectWrongTowerPositionErrors(players, expectedTimestamps, deathEvents);
   errors.push(...detectOvercrowdedTowerErrors(players, teamByPlayer, labelsByPlayer, expectedTimestamps, confirmedLegitKeys));
   errors.push(...wrongPositionErrors);
   errors.push(...detectLethalConeBaitErrors(players, deathEvents, expectedTimestamps));
@@ -579,6 +579,19 @@ const ASSIGNMENT_DEBUFF_IDS = new Set([1005084, 1005085, 1005086]);
 // while ending far before the next resolution 10s later.
 const CONE_FOLLOWUP_ABILITY_ID = 47810;
 const CONE_FIRE_WINDOW_MS      = 3000;
+
+// The 3-player stack aoe planted by a 1005084 (Stack) holder at their soak
+// spot (see the Stack-clip section near the pair loop below). Every clean
+// resolution observed hits EXACTLY 3 people — the Stack holder plus the
+// team's other two non-soaking members; the tower's actual soak PARTNER
+// (whichever debuff they hold) is expected to stand clear of it, same as
+// every other soaker's own spot. When the partner strays too close and
+// gets caught in the plant anyway, the headcount goes to 4+ and the split
+// that normally keeps the hit survivable breaks down.
+const STACK_FOLLOWUP_ABILITY_ID = 47808;
+const STACK_ASSIGNMENT_DEBUFF_ID = 1005084; // "Stack" — see ASSIGNMENT_DEBUFF_IDS above
+const STACK_CLIP_DEATH_WINDOW_MS = 3000;    // fatal hit → death event lag (matches CONE_DEATH_WINDOW_MS)
+const STACK_VOLLEY_GAP_MS        = 200;     // one volley's hits land within ~130ms of each other
 
 const ARENA_CENTER = 10000;
 
@@ -894,7 +907,8 @@ const RESOLUTION_CLUSTER_GAP_MS = 3000;
 
 function detectWrongTowerPositionErrors(
   players:            PlayerInfo[],
-  expectedTimestamps: Map<string, number>
+  expectedTimestamps: Map<string, number>,
+  deathEvents:        DeathEvent[] = []
 ): { errors: PullError[]; confirmedLegitKeys: Set<string> } {
   // Every PoL hit that carries the tower instance and a position snapshot.
   const soaks: TowerSoak[] = [];
@@ -906,6 +920,18 @@ function detectWrongTowerPositionErrors(
     }
   }
   if (soaks.length === 0) return { errors: [], confirmedLegitKeys: new Set() };
+
+  // Every 47808 (Stack follow-up) hit on anyone, keeping the ability's own
+  // sourceInstance — used below to reconstruct each Stack volley's full
+  // victim list (see the Stack-clip section near the pair loop).
+  type StackHit = { timestamp: number; instance: number | undefined; actorId: number };
+  const stackHits: StackHit[] = [];
+  for (const player of players) {
+    for (const e of player.damageTaken) {
+      if (e.abilityId !== STACK_FOLLOWUP_ABILITY_ID) continue;
+      stackHits.push({ timestamp: e.timestamp, instance: e.sourceInstance, actorId: player.actorId });
+    }
+  }
 
   // Every planted-cone (47810) hit on a player, with the victim's distance
   // from arena center — the outcome evidence for the flare check (see the
@@ -1267,11 +1293,89 @@ function detectWrongTowerPositionErrors(
           abilityName: debuff.abilityName,
         });
       });
+
+      // ── Stack clip: the soak partner strayed into the Stack plant ────────
+      //
+      // The two rules above already confirm both soakers cleared their own
+      // spot's distance thresholds — but those thresholds only check
+      // distance from the tower/center, not from EACH OTHER. Observed for
+      // real (report rXBbzFV49hd1QPwf pull 10): a Spread partner sat well
+      // inside their own "outer" distance-to-center requirement, yet still
+      // ended up only ~493 units from the Stack holder — close enough to be
+      // swept into the plant's blast (a clean Stack+Cone pairing the same
+      // pull kept its partner 712 away). The extra body pushed that
+      // volley's hit count to 4 instead of the design's 3, and the split
+      // that normally keeps everyone alive broke down: the Stack holder
+      // (standing exactly where their debuff requires) and the too-close
+      // partner both died outright, while the pull's other two players hit
+      // by the same volley (ordinary idle teammates, not soakers) survived
+      // on the normal shared amount.
+      //
+      // So this is gated the same way as the cone-bait rule: geometry alone
+      // (a single "safe" partner-to-holder distance) isn't trustworthy off
+      // one sample, so the flag requires the OUTCOME to have actually gone
+      // bad — the partner died to 47808 AND that volley hit more than the
+      // clean design's 3 people. The Stack holder itself is never flagged:
+      // they stood at their own required spot, same as any clean pull.
+      const stackIdx = pair.assignments.findIndex((a) => a.abilityId === STACK_ASSIGNMENT_DEBUFF_ID);
+      if (stackIdx !== -1) {
+        const holderSoak  = pair.soaks[stackIdx];
+        const partnerSoak = pair.soaks[1 - stackIdx];
+
+        const partnerDeath = deathEvents.find(
+          (d) =>
+            d.player === partnerSoak.player.name &&
+            d.killingAbilityGameId === STACK_FOLLOWUP_ABILITY_ID &&
+            d.timestamp >= reportTimestamp &&
+            d.timestamp <= reportTimestamp + STACK_CLIP_DEATH_WINDOW_MS
+        );
+
+        if (partnerDeath) {
+          // Reconstruct the volley the Stack holder's own plant fired in,
+          // via its sourceInstance, to get the true victim headcount.
+          const holderHit = stackHits.find(
+            (h) =>
+              h.actorId === holderSoak.player.actorId &&
+              h.timestamp >= reportTimestamp &&
+              h.timestamp <= reportTimestamp + STACK_CLIP_DEATH_WINDOW_MS
+          );
+
+          if (holderHit && holderHit.instance !== undefined) {
+            const volleyVictims = new Set(
+              stackHits
+                .filter(
+                  (h) =>
+                    h.instance === holderHit.instance &&
+                    Math.abs(h.timestamp - holderHit.timestamp) <= STACK_VOLLEY_GAP_MS
+                )
+                .map((h) => h.actorId)
+            );
+
+            if (volleyVictims.size > 3) {
+              errors.push({
+                ruleId:      FORSAKEN_LETHAL_STACK_CLIP_RULE_ID,
+                severity:    "Major",
+                name:        "Stack Clipped Too Close",
+                description: `Stood too close to a planted Forsaken stack${towerLabel} while soaking alongside the Stack holder — the extra body broke the aoe's 3-player split and its full, unmitigated damage killed them outright.`,
+                timestamp:   partnerDeath.timestamp,
+                player:      partnerSoak.player.name,
+                class:       partnerSoak.player.className,
+                specId:      partnerSoak.player.specId,
+                role:        partnerSoak.player.role,
+                abilityId:   STACK_FOLLOWUP_ABILITY_ID,
+                abilityName: "Forsaken Stack",
+              });
+            }
+          }
+        }
+      }
     }
   }
 
   return { errors, confirmedLegitKeys };
 }
+
+export const FORSAKEN_LETHAL_STACK_CLIP_RULE_ID = "ffxiv-forsaken-stack-clipped-too-close";
 
 export const FORSAKEN_LETHAL_CONE_BAIT_RULE_ID = "ffxiv-forsaken-baited-cone-too-close";
 
