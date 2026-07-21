@@ -61,14 +61,61 @@
 // each landing at a visibly different spot with no confirmed VOD ground
 // truth and no overlap/death — left unexplained rather than guessed at;
 // WAVE_CANNON_JOB_POSITIONS was built excluding those outliers.
+//
+// ── TELE-TROUNCING ARROW PLACEMENT (confirmed 2026-07, pulls 6/15) ─────────
+//
+// At ~2:33, all 8 players get 2 stacks of "Tele-Portent" (8 distinct ability
+// IDs — 4 cardinal directions x 2 duration tiers, ~7s and ~10s — see
+// TELE_PORTENT_DIRECTION_BY_ABILITY_ID). When a stack's timer runs out, it
+// drops a directional arrow on the ground at the player's CURRENT position
+// (confirmed by cross-checking analyzer.wtfdig.info's own reverse-engineered
+// formula — see below). All 16 arrows (8 players x 2) must form one
+// continuous clockwise loop around the arena's outer ring so the raid can
+// teleport through it without landing on/killing a confused teammate.
+//
+// The loop lives on a fixed 5-point grid per axis (yalms, relative to arena
+// center 10000,10000): -12, -6, 0, +6, +12 — the outer ring of that 5x5
+// grid (16 cells: 4 corners + 4 edges x 3 middle cells) is exactly the 16
+// arrow slots. Each edge has its own fixed flow direction (clockwise): the
+// N edge (y=-12) flows E, the E edge (x=+12) flows S, the S edge (y=+12)
+// flows W, the W edge (x=-12) flows N. A player's assignment is fully
+// determined by their own 2 debuff directions, independent of every other
+// player — no cross-player resolution needed:
+//   - SAME direction twice ("double-D"): their 2 arrows fill the 2 middle
+//     cells of D's edge that AREN'T claimed by a neighboring corner's
+//     approach arrow (see ARROW_DOUBLE_SLOTS_BY_DIRECTION).
+//   - TWO DIFFERENT directions ("corner player"): the pair is always one of
+//     4 valid clockwise-adjacent combinations (see ARROW_CORNER_TABLE), each
+//     mapping to exactly one arena corner. One direction (the edge that
+//     STARTS there, continuing the clockwise flow) occupies the corner cell
+//     itself; the other (the edge that ENDS there) occupies that edge's
+//     middle cell closest to the corner, pointing into it — e.g. an E+S
+//     player's S arrow sits in the NE corner while their E arrow sits one
+//     cell west of it along the N edge, pointing east into the corner.
+//
+// Position is sampled the same way analyzer.wtfdig.info's own bundle does
+// (reverse-engineered by fetching and reading its minified JS, same
+// technique as blackhole-strategy.ts's cardinal-direction work): the
+// player's x/y from whichever damageTaken/healing event is CLOSEST in time
+// to their Tele-Portent removedebuff. Verified byte-for-byte (to a decimal
+// place) against the analyzer's own displayed table for pull 6.
+//
+// Confirmed failure (pull 6): the Dark Knight's pair was (E, S) — the NE
+// corner — but both arrows landed on the arena's WEST side instead (14-21
+// yalms from their expected slots), an entirely different corner, not just
+// an adjacent-slot slip. Every other player in every other pull sampled
+// (21 of 22) deviates under 6 yalms from their predicted slot (one
+// consistently "sloppy" Paladin included) — see
+// ARROW_OUT_OF_POSITION_THRESHOLD_YALMS for where the line is drawn.
 
-import type { PlayerInfo } from "@/types/PlayerInfo";
+import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import type { PullError } from "@/types/PullError";
 import type { DeathEvent } from "@/types/DeathEvent";
 
 export const BLIZZARD_III_SILENT_KILL_RULE_ID = "ffxiv-phase1-blizzard3-silent-kill";
 export const JUMPED_OFF_ARENA_RULE_ID          = "ffxiv-phase1-jumped-off-arena";
 export const WAVE_CANNON_OUT_OF_POSITION_RULE_ID = "ffxiv-phase1-wave-cannon-out-of-position";
+export const TELE_TROUNCING_ARROW_RULE_ID = "ffxiv-phase1-tele-trouncing-arrow-misplaced";
 
 const BLIZZARD_III_BLOWOUT_ABILITY_IDS = new Set([47765, 47768, 47771, 47774]);
 const DAMAGE_DOWN_ABILITY_ID = 1002911;
@@ -106,6 +153,88 @@ const WAVE_CANNON_JOB_POSITIONS: Readonly<Record<string, { x: number; y: number 
 // Comfortably above the ~1.5-yalm natural jitter seen in every clean job
 // cluster, comfortably below the confirmed failure's ~6.9-yalm deviation.
 const WAVE_CANNON_OUT_OF_POSITION_THRESHOLD_CENTIYALMS = 400;
+
+type Cardinal = "N" | "E" | "S" | "W";
+type Point = { x: number; y: number };
+
+// abilityId -> which cardinal direction the resulting arrow points. Each
+// direction has a short (~7s) and long (~10s) duration variant, which is
+// why there are 8 IDs for 4 directions — see module header.
+const TELE_PORTENT_DIRECTION_BY_ABILITY_ID: Readonly<Record<number, Cardinal>> = {
+  1004876: "N", 1005079: "N",
+  1004878: "E", 1005081: "E",
+  1004877: "S", 1005080: "S",
+  1004879: "W", 1005082: "W",
+};
+
+// The short-duration debuffs on all 8 players expire within ~100ms of each
+// other, then the long-duration ones ~3s later — comfortably inside this
+// window without risking merging the two waves together.
+const TELE_PORTENT_WAVE_CLUSTER_MS = 1500;
+
+const ARROW_GRID_FAR_YALMS = 12;
+const ARROW_GRID_MID_YALMS = 6;
+
+// sorted-pair key -> which of the 2 directions occupies the corner cell
+// itself (the edge that STARTS its clockwise flow there) vs. the adjacent
+// edge's middle cell closest to that corner (the edge that ENDS there),
+// plus the corner cell's [signX, signY] — see module header for the
+// underlying rule. Only these 4 combinations are valid; any other pairing
+// (e.g. opposite directions N+S) never occurs in real data.
+const ARROW_CORNER_TABLE: Readonly<Record<string, { cornerDir: Cardinal; approachDir: Cardinal; signX: number; signY: number }>> = {
+  "E,N": { cornerDir: "E", approachDir: "N", signX: -1, signY: -1 }, // NW
+  "E,S": { cornerDir: "S", approachDir: "E", signX: 1,  signY: -1 }, // NE
+  "S,W": { cornerDir: "W", approachDir: "S", signX: 1,  signY: 1 },  // SE
+  "N,W": { cornerDir: "N", approachDir: "W", signX: -1, signY: 1 },  // SW
+};
+
+function predictCornerSlots(d1: Cardinal, d2: Cardinal) {
+  const key = [d1, d2].sort().join(",");
+  const c = ARROW_CORNER_TABLE[key];
+  if (!c) return null;
+  const cornerPos: Point = { x: c.signX * ARROW_GRID_FAR_YALMS, y: c.signY * ARROW_GRID_FAR_YALMS };
+  const approachPos: Point = c.approachDir === "N" || c.approachDir === "S"
+    ? { x: c.signX * ARROW_GRID_FAR_YALMS, y: c.signY * ARROW_GRID_MID_YALMS }
+    : { x: c.signX * ARROW_GRID_MID_YALMS, y: c.signY * ARROW_GRID_FAR_YALMS };
+  return { cornerDir: c.cornerDir, cornerPos, approachDir: c.approachDir, approachPos };
+}
+
+// A "double-D" player's 2 arrows fill whichever 2 of D's edge's 3 middle
+// cells aren't already claimed by a neighboring corner's approach arrow.
+function predictDoubleSlots(dir: Cardinal): [Point, Point] {
+  switch (dir) {
+    case "N": return [{ x: -ARROW_GRID_FAR_YALMS, y: 0 }, { x: -ARROW_GRID_FAR_YALMS, y: ARROW_GRID_MID_YALMS }];
+    case "E": return [{ x: -ARROW_GRID_MID_YALMS, y: -ARROW_GRID_FAR_YALMS }, { x: 0, y: -ARROW_GRID_FAR_YALMS }];
+    case "S": return [{ x: ARROW_GRID_FAR_YALMS, y: -ARROW_GRID_MID_YALMS }, { x: ARROW_GRID_FAR_YALMS, y: 0 }];
+    case "W": return [{ x: 0, y: ARROW_GRID_FAR_YALMS }, { x: ARROW_GRID_MID_YALMS, y: ARROW_GRID_FAR_YALMS }];
+  }
+}
+
+function pointDistance(a: Point, b: Point): number {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+// FFLogs position (centi-yalms, arena center 10000,10000) -> yalms relative
+// to center, matching analyzer.wtfdig.info's own Ol()/ty() helpers.
+function toRelativeYalms(xRaw: number, yRaw: number): Point {
+  return { x: xRaw / 100 - 100, y: yRaw / 100 - 100 };
+}
+
+function nearestPlayerPosition(events: PlayerEvent[], timestamp: number): Point | null {
+  let best: PlayerEvent | null = null;
+  let bestDiff = Infinity;
+  for (const e of events) {
+    if (e.x === undefined || e.y === undefined) continue;
+    const diff = Math.abs(e.timestamp - timestamp);
+    if (diff < bestDiff) { bestDiff = diff; best = e; }
+  }
+  return best ? toRelativeYalms(best.x!, best.y!) : null;
+}
+
+// Clean max observed (a consistently "sloppy" Paladin's corner arrow, pull
+// 6) is ~5.9 yalms; the confirmed failure's minimum deviation is ~18.5 —
+// wide margin either side of this line.
+const ARROW_OUT_OF_POSITION_THRESHOLD_YALMS = 10;
 
 function detectBlizzardIIIBlowoutSilentKillErrors(players: PlayerInfo[], deathEvents: DeathEvent[]): PullError[] {
   const errors: PullError[] = [];
@@ -259,6 +388,88 @@ function detectWaveCannonOutOfPositionErrors(players: PlayerInfo[], deathEvents:
   return errors;
 }
 
+function detectTeleTrouncingArrowErrors(players: PlayerInfo[]): PullError[] {
+  type Removal = { player: PlayerInfo; timestamp: number; dir: Cardinal };
+  const removals: Removal[] = [];
+  for (const player of players) {
+    for (const d of player.debuffs) {
+      const dir = TELE_PORTENT_DIRECTION_BY_ABILITY_ID[d.abilityId];
+      if (!dir || d.debuffStatus !== "removed") continue;
+      removals.push({ player, timestamp: d.timestamp, dir });
+    }
+  }
+  if (removals.length === 0) return [];
+
+  removals.sort((a, b) => a.timestamp - b.timestamp);
+  const waves: Removal[][] = [];
+  for (const r of removals) {
+    const current = waves[waves.length - 1];
+    if (current && r.timestamp - current[current.length - 1].timestamp <= TELE_PORTENT_WAVE_CLUSTER_MS) {
+      current.push(r);
+    } else {
+      waves.push([r]);
+    }
+  }
+
+  // Each player should appear in exactly 2 waves (one arrow apiece) — group
+  // their 2 removals back together regardless of which wave they landed in.
+  const byPlayer = new Map<number, { player: PlayerInfo; arrows: { timestamp: number; dir: Cardinal }[] }>();
+  for (const wave of waves) {
+    for (const r of wave) {
+      const entry = byPlayer.get(r.player.actorId) ?? { player: r.player, arrows: [] };
+      entry.arrows.push({ timestamp: r.timestamp, dir: r.dir });
+      byPlayer.set(r.player.actorId, entry);
+    }
+  }
+
+  const errors: PullError[] = [];
+
+  for (const { player, arrows } of byPlayer.values()) {
+    if (arrows.length !== 2) continue; // incomplete data — fail closed
+
+    const positionSource = [...player.damageTaken, ...player.healing];
+    const withPos = arrows.map((a) => ({ ...a, pos: nearestPlayerPosition(positionSource, a.timestamp) }));
+    if (withPos.some((a) => a.pos === null)) continue;
+    const [a1, a2] = withPos as { timestamp: number; dir: Cardinal; pos: Point }[];
+
+    const flagIfOutOfPosition = (arrow: { timestamp: number; dir: Cardinal; pos: Point }, expected: Point) => {
+      const deviation = pointDistance(arrow.pos, expected);
+      if (deviation <= ARROW_OUT_OF_POSITION_THRESHOLD_YALMS) return;
+      errors.push({
+        ruleId:      TELE_TROUNCING_ARROW_RULE_ID,
+        severity:    "Major",
+        name:        "Tele-Trouncing Arrow Misplaced",
+        description: `Dropped their ${arrow.dir}-facing arrow roughly ${deviation.toFixed(1)} yalms from its expected spot in the clockwise arrow path.`,
+        timestamp:   arrow.timestamp,
+        player:      player.name,
+        class:       player.className,
+        specId:      player.specId,
+        role:        player.role,
+        abilityId:   47801,
+        abilityName: "Tele-Trouncing",
+      });
+    };
+
+    if (a1.dir === a2.dir) {
+      const [slotA, slotB] = predictDoubleSlots(a1.dir);
+      const straight = pointDistance(a1.pos, slotA) + pointDistance(a2.pos, slotB);
+      const swapped  = pointDistance(a1.pos, slotB) + pointDistance(a2.pos, slotA);
+      const [p1, p2] = straight <= swapped ? [slotA, slotB] : [slotB, slotA];
+      flagIfOutOfPosition(a1, p1);
+      flagIfOutOfPosition(a2, p2);
+    } else {
+      const predicted = predictCornerSlots(a1.dir, a2.dir);
+      if (!predicted) continue; // not a valid clockwise-adjacent pair — unexpected data, skip
+      for (const arrow of [a1, a2]) {
+        const expected = arrow.dir === predicted.cornerDir ? predicted.cornerPos : predicted.approachPos;
+        flagIfOutOfPosition(arrow, expected);
+      }
+    }
+  }
+
+  return errors;
+}
+
 /**
  * Returns [] immediately for any pull that never touches Phase 1's tracked
  * abilities — self-gating the same way exdeath.ts does, so it's safe to
@@ -269,5 +480,6 @@ export function detectPhase1Errors(players: PlayerInfo[], deathEvents: DeathEven
     ...detectBlizzardIIIBlowoutSilentKillErrors(players, deathEvents),
     ...detectJumpedOffArenaError(deathEvents),
     ...detectWaveCannonOutOfPositionErrors(players, deathEvents),
+    ...detectTeleTrouncingArrowErrors(players),
   ].sort((a, b) => a.timestamp - b.timestamp);
 }
