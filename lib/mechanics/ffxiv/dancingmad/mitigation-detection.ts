@@ -208,11 +208,13 @@ function flattenTankMechanics(plan: MitigationPlan): FlatMechanic[] {
 }
 
 // One matched occurrence of a mechanic in THIS pull: which sheet mechanic,
-// and the earliest real timestamp (ms into pull) a death confirmed it at.
-type MatchedOccurrence = { mech: PlanMechanic; anchorMs: number };
+// the earliest real timestamp (ms into pull) a death confirmed it at, and
+// every player whose death matched it (for the error description — see
+// formatPlayerList below).
+type MatchedOccurrence = { mech: PlanMechanic; anchorMs: number; victims: string[] };
 
 function matchDeathsToMechanics(deaths: DeathEvent[], flat: FlatMechanic[]): MatchedOccurrence[] {
-  const byMechanic = new Map<PlanMechanic, number>(); // mech -> earliest death ms
+  const byMechanic = new Map<PlanMechanic, { anchorMs: number; victims: string[] }>();
 
   for (const death of deaths) {
     let best: { mech: PlanMechanic; diff: number } | null = null;
@@ -223,13 +225,25 @@ function matchDeathsToMechanics(deaths: DeathEvent[], flat: FlatMechanic[]): Mat
       if (!best || diff < best.diff) best = { mech, diff };
     }
     if (!best) continue;
-    const prevAnchor = byMechanic.get(best.mech);
-    if (prevAnchor === undefined || death.timestamp < prevAnchor) {
-      byMechanic.set(best.mech, death.timestamp);
+    const existing = byMechanic.get(best.mech);
+    if (!existing) {
+      byMechanic.set(best.mech, { anchorMs: death.timestamp, victims: [death.player] });
+    } else {
+      existing.anchorMs = Math.min(existing.anchorMs, death.timestamp);
+      if (!existing.victims.includes(death.player)) existing.victims.push(death.player);
     }
   }
 
-  return [...byMechanic.entries()].map(([mech, anchorMs]) => ({ mech, anchorMs }));
+  return [...byMechanic.entries()].map(([mech, { anchorMs, victims }]) => ({ mech, anchorMs, victims }));
+}
+
+// "Alice", "Alice and Bob", "Alice, Bob, and Carol" — readable in a
+// PullError description regardless of how many players died to one
+// mechanic occurrence.
+function formatPlayerList(names: string[]): string {
+  if (names.length === 1) return names[0];
+  if (names.length === 2) return `${names[0]} and ${names[1]}`;
+  return `${names.slice(0, -1).join(", ")}, and ${names[names.length - 1]}`;
 }
 
 // ── Cast checking ─────────────────────────────────────────────────────────
@@ -319,7 +333,7 @@ export function detectMitigationErrors(pull: Pull, plan: MitigationPlan | null):
 
   const errors: PullError[] = [];
 
-  for (const { mech, anchorMs } of occurrences) {
+  for (const { mech, anchorMs, victims } of occurrences) {
     for (const [slotLabel, entries] of Object.entries(mech.assignments!)) {
       if (slotLabel === "Extras") continue;
 
@@ -361,7 +375,7 @@ export function detectMitigationErrors(pull: Pull, plan: MitigationPlan | null):
         ruleId:      MITIGATION_MISSED_RULE_ID,
         severity:    "Major",
         name:        "Missed Mitigation",
-        description: `Assigned to cast ${missing.join(", ")} for ${mech.name} (${slotLabel}) — not found before the raid took a death to it.`,
+        description: `Assigned to cast ${missing.join(", ")} for ${mech.name} (${slotLabel}) — not found before ${formatPlayerList(victims)} died to it.`,
         timestamp:   anchorMs,
         player:      player.name,
         class:       player.className,
