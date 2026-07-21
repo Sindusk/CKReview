@@ -847,12 +847,14 @@ function fflBuildEnemyCastEvents(
     .filter((e) => e.type === "cast")
     .filter((e) => actorMap.get(e.sourceID)?.type !== "Player")
     .map((e) => ({
-      timestamp:   Math.max(0, e.timestamp - fightStart),
-      actorId:     e.sourceID,
-      actorName:   actorMap.get(e.sourceID)?.name ?? `Unknown (${e.sourceID})`,
-      abilityId:   e.abilityGameID ?? 0,
-      abilityName: fflAbilityName(e, abilityMap),
-      abilityIcon: fflAbilityIcon(e, abilityMap),
+      timestamp:    Math.max(0, e.timestamp - fightStart),
+      actorId:      e.sourceID,
+      actorName:    actorMap.get(e.sourceID)?.name ?? `Unknown (${e.sourceID})`,
+      abilityId:    e.abilityGameID ?? 0,
+      abilityName:  fflAbilityName(e, abilityMap),
+      abilityIcon:  fflAbilityIcon(e, abilityMap),
+      hitPoints:    e.sourceResources?.hitPoints,
+      maxHitPoints: e.sourceResources?.maxHitPoints,
     }));
 }
 
@@ -1015,7 +1017,7 @@ export function transformFFightToPull(
 
   const errors = [
     ...detectPullErrors(players, deathEvents, enemyCastEvents, enemyBuffEvents),
-    ...detectForsakenTowerErrors(players, deathEvents),
+    ...detectForsakenTowerErrors(players, deathEvents, enemyCastEvents),
     ...detectBlackHoleErrors(players, deathEvents),
     ...detectLimitCutErrors(players, deathEvents),
     ...detectExdeathErrors(players, deathEvents),

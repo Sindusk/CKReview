@@ -169,4 +169,11 @@ export type EnemyEvent = {
   // Fully-resolved icon URL for this ability (via lib/ability-icons.ts),
   // or undefined if unavailable.
   abilityIcon?: string;
+  // The CASTER's own HP at the moment of this cast, straight from FFLogs'
+  // sourceResources (undefined when the source query didn't request/return
+  // them, or for non-cast EnemyEvents). Used by enrage-check style
+  // detections (e.g. Dancing Mad's Ultimate Embrace, forsaken.ts) that need
+  // to know how low the boss's HP was when a specific cast landed.
+  hitPoints?:    number;
+  maxHitPoints?: number;
 };

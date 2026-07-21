@@ -72,11 +72,22 @@
 // mistakes.
 
 import type { PlayerInfo } from "@/types/PlayerInfo";
-import type { PullError } from "@/types/PullError";
+import type { PullError, EnemyEvent } from "@/types/PullError";
 import type { DeathEvent } from "@/types/DeathEvent";
 
 const SPELLS_TROUBLE_ABILITY_ID = 1005083; // "Spell's Trouble" stack counter
 const PATH_OF_LIGHT_ABILITY_ID  = 47806;   // "Path of Light" — the tower-soak damage tick
+
+// "Ultimate Embrace" (Phase 2's enrage check) — Kefka casts this ability
+// TWICE over the course of Phase 2: once early (~92% HP, not the check),
+// and once as the phase's final cast. The raid must have brought his HP
+// down to nearly 0 by the moment that SECOND cast completes, or the fight
+// enrages shortly after. Confirmed against report VtdBqhLQkWJXMvDg's own
+// enemyCasts (2026-07-21): every clean pull's final 49740 completes with
+// Kefka at 0.000-1.06% HP; the one confirmed-failed pull (#3, "a few
+// percentage points off" per the user) completed at 2.69%.
+const ULTIMATE_EMBRACE_ABILITY_ID = 49740;
+const ENRAGE_CHECK_MAX_HP_PERCENT = 1.5; // clean max observed 1.06%, failure observed 2.69%
 
 // Path of Light's associated damage event typically lands ~550-650ms
 // BEFORE the paired stack-loss timestamp — but occasionally the specific
@@ -91,6 +102,40 @@ const PATH_OF_LIGHT_ABILITY_ID  = 47806;   // "Path of Light" — the tower-soak
 const PATH_OF_LIGHT_WINDOW_MS = 2000;
 
 export const FORSAKEN_MISSED_TOWER_RULE_ID = "ffxiv-forsaken-missed-tower";
+export const FORSAKEN_ENRAGE_CHECK_RULE_ID = "ffxiv-forsaken-enrage-check-missed";
+
+/**
+ * Phase 2's enrage check: Kefka's HP must be brought down to nearly 0 by
+ * the moment his SECOND "Ultimate Embrace" (49740) cast completes. Raid-wide
+ * — nobody in particular is at fault, so this is a "Raid" severity error
+ * with no player attribution, same convention as error-rules.ts's raid-wide
+ * "enemyCast" rules. Takes the LAST 49740 completion in the pull (there are
+ * two per Phase 2 in every log seen so far; a pull that wipes before the
+ * second one simply has only one, which is correctly ignored here — no
+ * enrage check was reached at all).
+ */
+function detectEnrageCheckError(enemyCasts: EnemyEvent[]): PullError[] {
+  const embraceCasts = enemyCasts.filter(
+    (e) => e.abilityId === ULTIMATE_EMBRACE_ABILITY_ID && e.hitPoints !== undefined && e.maxHitPoints
+  );
+  if (embraceCasts.length < 2) return [];
+
+  const finalCast = embraceCasts[embraceCasts.length - 1];
+  const hpPercent = (finalCast.hitPoints! / finalCast.maxHitPoints!) * 100;
+  if (hpPercent <= ENRAGE_CHECK_MAX_HP_PERCENT) return [];
+
+  return [
+    {
+      ruleId:      FORSAKEN_ENRAGE_CHECK_RULE_ID,
+      severity:    "Raid",
+      name:        "Missed Enrage Check",
+      description: `Kefka was at ${hpPercent.toFixed(1)}% HP when the final Ultimate Embrace finished casting — should be brought to nearly 0% by then.`,
+      timestamp:   finalCast.timestamp,
+      abilityId:   ULTIMATE_EMBRACE_ABILITY_ID,
+      abilityName: "Ultimate Embrace",
+    },
+  ];
+}
 
 /** Every 1005083 stack-loss instant for one player — both a partial decrement and the final removal. */
 function collectPlayerStackLossEvents(player: PlayerInfo): number[] {
@@ -289,7 +334,8 @@ function buildTowerLabelsByPlayer(
  */
 export function detectForsakenTowerErrors(
   players:     PlayerInfo[],
-  deathEvents: DeathEvent[] = []
+  deathEvents: DeathEvent[] = [],
+  enemyCasts:  EnemyEvent[] = []
 ): PullError[] {
   // Every Path of Light hit on ANYONE — the reference for which stack-loss
   // instants correspond to a tower that actually resolved (see the
@@ -309,7 +355,7 @@ export function detectForsakenTowerErrors(
     lossesByPlayer.set(player.actorId, losses);
   }
 
-  if (lossesByPlayer.size === 0) return [];
+  if (lossesByPlayer.size === 0) return detectEnrageCheckError(enemyCasts);
 
   const teamByPlayer = inferPlayerTeams(lossesByPlayer);
   const labelsByPlayer = buildTowerLabelsByPlayer(lossesByPlayer, teamByPlayer);
@@ -399,6 +445,7 @@ export function detectForsakenTowerErrors(
   errors.push(...detectOvercrowdedTowerErrors(players, teamByPlayer, labelsByPlayer, expectedTimestamps, confirmedLegitKeys));
   errors.push(...wrongPositionErrors);
   errors.push(...detectLethalConeBaitErrors(players, deathEvents, expectedTimestamps, misattributedConeDeaths));
+  errors.push(...detectEnrageCheckError(enemyCasts));
 
   return errors.sort((a, b) => a.timestamp - b.timestamp);
 }

@@ -112,4 +112,22 @@ function buildFFBlackHoleGeometry(rep, actorMap) {
   return { kefkaFacingSamples, spawnCasts };
 }
 
-module.exports = { buildFFPlayers, buildFFDeaths, buildFFBlackHoleGeometry };
+// Mirrors lib/log-transforms.ts's fflBuildEnemyCastEvents — same enemyCasts
+// stream, same "cast" (not "begincast") filter, same hitPoints/maxHitPoints
+// pass-through from sourceResources that forsaken.ts's enrage-check
+// detection reads.
+function buildFFEnemyCastEvents(rep, actorMap) {
+  return (rep.enemyCasts?.data ?? [])
+    .filter((e) => e.type === 'cast' && actorMap.get(e.sourceID)?.type !== 'Player')
+    .map((e) => ({
+      timestamp: e.timestamp,
+      actorId: e.sourceID,
+      actorName: actorMap.get(e.sourceID)?.name || `Unknown (${e.sourceID})`,
+      abilityId: e.abilityGameID ?? 0,
+      abilityName: 'Ability ' + e.abilityGameID,
+      hitPoints: e.sourceResources?.hitPoints,
+      maxHitPoints: e.sourceResources?.maxHitPoints,
+    }));
+}
+
+module.exports = { buildFFPlayers, buildFFDeaths, buildFFBlackHoleGeometry, buildFFEnemyCastEvents };

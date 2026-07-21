@@ -22,7 +22,7 @@ const fs = require('fs');
 const path = require('path');
 const { ROOT, requireTsFromRoot } = require('./lib/require-ts');
 const { discoverReportFolders, loadReportFolder, buildActorMap, buildAbilityMap } = require('./lib/load-report-folder');
-const { buildFFPlayers, buildFFDeaths } = require('./lib/build-ff-players');
+const { buildFFPlayers, buildFFDeaths, buildFFEnemyCastEvents } = require('./lib/build-ff-players');
 
 const { detectForsakenTowerErrors } = requireTsFromRoot('lib/mechanics/ffxiv/dancingmad/forsaken.ts');
 const { getFFJobByName } = requireTsFromRoot('lib/ffl-job-data.ts');
@@ -52,7 +52,8 @@ for (const dir of reportDirs) {
   for (const { bossName, pullNumber, rep } of pulls) {
     const players = buildFFPlayers(rep, actorMap, getFFJobByName, abilityMap);
     const deaths  = buildFFDeaths(rep, actorMap, getFFJobByName);
-    const errors  = detectForsakenTowerErrors(players, deaths);
+    const enemyCasts = buildFFEnemyCastEvents(rep, actorMap);
+    const errors  = detectForsakenTowerErrors(players, deaths, enemyCasts);
     console.log('='.repeat(70));
     console.log(`${bossName} Pull ${pullNumber} ->`, errors.length, 'errors');
     for (const e of errors) {
