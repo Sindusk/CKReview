@@ -788,6 +788,10 @@ function fflHealToPlayerEvent(
     abilityIcon: fflAbilityIcon(event, abilityMap),
     amount:      event.amount,
     target:      target?.name,
+    // The heal TARGET's own position at the moment they were healed — see
+    // the type comment on FFLHealEvent.targetResources.
+    x:           event.targetResources?.x,
+    y:           event.targetResources?.y,
   };
 }
 

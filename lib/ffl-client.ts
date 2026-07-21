@@ -314,6 +314,12 @@ export type FFLHealEvent = {
   } | null;
   amount:        number;
   overheal?:     number;
+  // Same shape as FFLDamageEvent's — the query already requests it
+  // (includeResources: true) but nothing read it until the Forsaken
+  // cone-bait-too-far rule needed a position source for players who
+  // aren't taking damage (an idle bait candidate has no damageTaken
+  // entries to fall back on, but is almost always receiving raid heals).
+  targetResources?: { hitPoints?: number; maxHitPoints?: number; x?: number; y?: number };
 };
 
 export type FFLDebuffEvent = {

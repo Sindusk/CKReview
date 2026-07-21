@@ -23,7 +23,15 @@ function buildFFPlayers(rep, actorMap, getFFJobByName, abilityMap) {
       name: actor?.name || `P${id}`,
       className: actor?.subType || '?',
       specId: 0, specName: job.name, role: job.role, rangeType: job.rangeType, game: 'ffxiv',
-      damageDone: [], healing: [], casts: [],
+      damageDone: [], casts: [],
+      healing: (rep.healing?.data ?? []).filter((e) => e.targetID === id).map((e) => ({
+        timestamp: e.timestamp,
+        abilityId: e.abilityGameID ?? 0,
+        abilityName: 'Ability ' + e.abilityGameID,
+        amount: e.amount ?? 0,
+        x: e.targetResources?.x,
+        y: e.targetResources?.y,
+      })),
       damageTaken: dt.filter((e) => e.targetID === id).map((e) => ({
         timestamp: e.timestamp,
         abilityId: e.abilityGameID ?? 0,

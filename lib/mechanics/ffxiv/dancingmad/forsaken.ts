@@ -905,6 +905,33 @@ type TowerSoak = {
 // resolution moment.
 const RESOLUTION_CLUSTER_GAP_MS = 3000;
 
+/**
+ * Best-effort position for a player at a given moment, for players who
+ * aren't necessarily taking damage right then (an idle Forsaken cone-bait
+ * candidate has no soak of their own to snapshot from). Checks damageTaken
+ * first (most precise when available), then falls back to incoming heals —
+ * an idle player is almost always getting topped by raid healing nearby,
+ * and FFLogs reports the heal TARGET's own position on those events too.
+ * Returns the closest-in-time match within the window, or undefined if
+ * neither stream has anything close enough to trust.
+ */
+function findNearestPosition(
+  player:    PlayerInfo,
+  timestamp: number,
+  windowMs:  number
+): { x: number; y: number } | undefined {
+  let best: { x: number; y: number; delta: number } | undefined;
+  const consider = (t: number, x: number | undefined, y: number | undefined) => {
+    if (x === undefined || y === undefined) return;
+    const delta = Math.abs(t - timestamp);
+    if (delta > windowMs) return;
+    if (best === undefined || delta < best.delta) best = { x, y, delta };
+  };
+  for (const e of player.damageTaken) consider(e.timestamp, e.x, e.y);
+  for (const e of player.healing) consider(e.timestamp, e.x, e.y);
+  return best;
+}
+
 function detectWrongTowerPositionErrors(
   players:            PlayerInfo[],
   expectedTimestamps: Map<string, number>,
@@ -1414,6 +1441,7 @@ function detectWrongTowerPositionErrors(
       // should have been standing close enough to take this one instead.
       const coneIdx = pair.assignments.findIndex((a) => a.abilityId === 1005086);
       if (coneIdx !== -1 && pair.assignments[1 - coneIdx].abilityId === 1005085) {
+        const holderSoak  = pair.soaks[coneIdx];
         const partnerSoak = pair.soaks[1 - coneIdx];
 
         const partnerDeath = deathEvents.find(
@@ -1452,12 +1480,47 @@ function detectWrongTowerPositionErrors(
               !alreadyAccountedFor.has(p.actorId)
           );
 
+          // The partner's OWN cone-hit record (not their earlier PoL soak
+          // position) is the precise distance that actually killed them —
+          // fall back to the soak position only if that hit is missing.
+          const partnerHit = partnerSoak.player.damageTaken.find(
+            (e) =>
+              e.abilityId === CONE_FOLLOWUP_ABILITY_ID &&
+              Math.abs(e.timestamp - partnerDeath.timestamp) <= CONE_FIRE_WINDOW_MS &&
+              e.x !== undefined &&
+              e.y !== undefined
+          );
+          const partnerDist = Math.round(
+            Math.hypot(
+              (partnerHit?.x ?? partnerSoak.x) - holderSoak.x,
+              (partnerHit?.y ?? partnerSoak.y) - holderSoak.y
+            )
+          );
+
           for (const candidate of candidates) {
+            // Best-effort position for the candidate at the moment of the
+            // plant: they're idle, so damageTaken is usually empty — fall
+            // back to their own incoming-heal position (see PlayerEvent.x/y
+            // on the healing tab, added for exactly this case), since an
+            // idle bait candidate is almost always getting topped by raid
+            // heals nearby. Distance omitted from the description if
+            // neither source has anything close enough in time.
+            const candidatePos = findNearestPosition(candidate, reportTimestamp, CONE_FIRE_WINDOW_MS + PATH_OF_LIGHT_WINDOW_MS);
+            const candidateDist =
+              candidatePos !== undefined
+                ? Math.round(Math.hypot(candidatePos.x - holderSoak.x, candidatePos.y - holderSoak.y))
+                : undefined;
+
+            const distanceNote =
+              candidateDist !== undefined
+                ? ` (stood ~${candidateDist} units away — too far to be the closest player, versus ${partnerSoak.player.name}'s ~${partnerDist})`
+                : ` (${partnerSoak.player.name} ended up the closest player instead, at ~${partnerDist} units)`;
+
             errors.push({
               ruleId:      FORSAKEN_CONE_BAIT_TOO_FAR_RULE_ID,
               severity:    "Major",
               name:        "Cone Bait Too Far",
-              description: `Should have been standing close enough to draw the Forsaken cone${towerLabel} away from the tower — instead it latched onto ${partnerSoak.player.name}, the Spread partner soaking alongside the Cone holder, who was never meant to be near it.`,
+              description: `Should have been standing close enough to draw the Forsaken cone${towerLabel} away from the tower${distanceNote} — instead it latched onto ${partnerSoak.player.name}, the Spread partner soaking alongside the Cone holder, who was never meant to be near it.`,
               timestamp:   partnerDeath.timestamp,
               player:      candidate.name,
               class:       candidate.className,
