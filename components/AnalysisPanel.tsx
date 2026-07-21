@@ -203,7 +203,7 @@ function FeedRow({
         style={{
           fontFamily: "monospace",
           fontSize: "11px",
-          color: hasPassed ? "#888" : "#444",
+          color: hasPassed ? "#999" : "#7d7d7d",
           minWidth: "50px",
           flexShrink: 0,
           transition: "color 0.3s",
@@ -231,7 +231,7 @@ function FeedRow({
             )}
             <span
               style={{
-                color: hasPassed ? cls : "#555",
+                color: hasPassed ? cls : "#969696",
                 fontWeight: 600,
                 fontSize: "13px",
                 transition: "color 0.3s",
@@ -240,19 +240,19 @@ function FeedRow({
               {entry.player ?? "Raid-Wide"}
             </span>
             {specLabel && (
-              <span style={{ fontSize: "10px", color: hasPassed ? "#555" : "#333", flexShrink: 0, transition: "color 0.3s" }}>
+              <span style={{ fontSize: "10px", color: hasPassed ? "#777" : "#7d7d7d", flexShrink: 0, transition: "color 0.3s" }}>
                 {specLabel}
               </span>
             )}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "4px", marginTop: "2px" }}>
             <TitleIcon src={entry.titleIcon} abilityId={entry.abilityId} game={entry.game} />
-            <div style={{ fontSize: "11px", color: hasPassed ? style.color : "#3a3a20", transition: "color 0.3s" }}>
+            <div style={{ fontSize: "11px", color: hasPassed ? style.color : "#b3984f", transition: "color 0.3s" }}>
               {entry.kind === "Death" ? "⚔ " : ""}{entry.title}
             </div>
           </div>
           {entry.subtitle && (
-            <div style={{ fontSize: "10px", color: hasPassed ? "#666" : "#333", marginTop: "1px", transition: "color 0.3s" }}>
+            <div style={{ fontSize: "10px", color: "#8f8f8f", marginTop: "1px" }}>
               {entry.subtitle}
             </div>
           )}
@@ -267,8 +267,8 @@ function FeedRow({
                   fontWeight: 700,
                   textTransform: "uppercase",
                   letterSpacing: "0.04em",
-                  color: hasPassed ? style.color : "#444",
-                  border: `1px solid ${hasPassed ? style.color + "44" : "#2a2a2a"}`,
+                  color: hasPassed ? style.color : "#7d7d7d",
+                  border: `1px solid ${hasPassed ? style.color + "44" : "#3a3a3a"}`,
                   borderRadius: "3px",
                   padding: "1px 5px",
                   whiteSpace: "nowrap",
@@ -281,8 +281,8 @@ function FeedRow({
               <span
                 style={{
                   fontSize: "10px",
-                  color: hasPassed ? roleColor : "#444",
-                  border: `1px solid ${hasPassed ? roleColor + "33" : "#2a2a2a"}`,
+                  color: hasPassed ? roleColor : "#7d7d7d",
+                  border: `1px solid ${hasPassed ? roleColor + "33" : "#3a3a3a"}`,
                   borderRadius: "3px",
                   padding: "1px 5px",
                   backgroundColor: hasPassed ? roleColor + "10" : "transparent",
