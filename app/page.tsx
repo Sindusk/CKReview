@@ -15,10 +15,16 @@ import AnalysisPanel from "../components/AnalysisPanel";
 import RosterPanel from "../components/RosterPanel";
 import TimelinePanel from "@/components/TimelinePanel";
 import StrategyDialog from "@/components/StrategyDialog";
+import MitigationDialog from "@/components/MitigationDialog";
 import { detectTerminateKickOrder } from "@/lib/mechanics/wow/vs-dr-mqd/terminate-kicks";
 import { detectCrystalAssignments } from "@/lib/mechanics/wow/vs-dr-mqd/crystal-assignments";
 import { getMitigationPlan } from "@/lib/mechanics/ffxiv/dancingmad/mitigation-plan";
 import { detectMitigationErrors } from "@/lib/mechanics/ffxiv/dancingmad/mitigation-detection";
+import {
+  detectBlackHoleStrategy,
+  detectMissedAssignedTetherErrors,
+  type BlackHoleStrategyId,
+} from "@/lib/mechanics/ffxiv/dancingmad/blackhole-strategy";
 import type { Pull } from "../types/Pull";
 import { createCallWipeError, CALL_WIPE_RULE_ID, createManualError, type ManualErrorInput } from "@/types/PullError";
 import type { SavedSession } from "@/types/Session";
@@ -103,13 +109,14 @@ export default function Home() {
 
   const [pulls, setPulls] = useState<Pull[]>([]);
   const [showStrategy, setShowStrategy] = useState(false);
+  const [showMitigation, setShowMitigation] = useState(false);
   // Report-level strategy detection (the Midnight Falls Terminate kick
   // rotation and Dawn Crystal carry assignments) — recomputed whenever the
   // pull set changes, e.g. live-log polling appending new fights.
   const kickStrategy = useMemo(() => detectTerminateKickOrder(pulls), [pulls]);
   const crystalStrategy = useMemo(() => detectCrystalAssignments(pulls), [pulls]);
 
-  // FFXIV roster for the mitigation-plan section of the Strategy dialog —
+  // FFXIV roster for the mitigation-plan section of the Mitigation dialog —
   // the first FF pull with players (rosters are stable within a report; if a
   // job swap happens mid-session the slot mapping just reflects pull 1).
   const ffPlayers = useMemo(() => {
@@ -118,7 +125,7 @@ export default function Home() {
   }, [pulls]);
 
   // Selected mitigation plan (per-fight expected mit timeline shown in the
-  // Strategy dialog; later also the input to Mitigation error detection).
+  // Mitigation dialog; also the input to Mitigation error detection).
   // Persisted so the choice survives reloads.
   const [mitigationPlanId, setMitigationPlanId] = useState<string | null>(null);
   useEffect(() => {
@@ -131,25 +138,49 @@ export default function Home() {
     else localStorage.removeItem("mitigation_plan_id");
   }
 
-  // Pulls with "Missed Mitigation" errors merged in (see
-  // lib/mechanics/ffxiv/dancingmad/mitigation-detection.ts). Unlike the
-  // other FF mechanic detections, this one depends on a user-selectable
-  // plan, so it can't be baked into pull.errors at import time the way
-  // detectForsakenTowerErrors etc. are (log-transforms.ts) — it's
-  // recomputed here instead, same pattern as kickStrategy/crystalStrategy.
-  // Every downstream consumer of `pulls` (AnalysisPanel, PullList, the
-  // report dialog, ...) should read `displayPulls` instead so mitigation
-  // errors show up everywhere errors normally do; `pulls` itself and
-  // `pullsRef` stay untouched since they're also what gets persisted to
-  // the session (wipe calls / manual errors) and re-derived on plan swap.
+  // Black Hole tether strategy (DSA/SDA/Double Tether) — auto-detected from
+  // whichever moments each named player actually gets hit at across every
+  // pull in the report (see blackhole-strategy.ts). `blackHoleOverrideId`
+  // lets the user force a shape via the Strategy dialog's selector instead
+  // of trusting the auto-detected one; persisted like the mitigation plan.
+  const [blackHoleOverrideId, setBlackHoleOverrideId] = useState<BlackHoleStrategyId | null>(null);
+  useEffect(() => {
+    const stored = localStorage.getItem("blackhole_strategy_id");
+    if (stored) setBlackHoleOverrideId(stored as BlackHoleStrategyId);
+  }, []);
+  function handleBlackHoleOverrideChange(id: BlackHoleStrategyId | null) {
+    setBlackHoleOverrideId(id);
+    if (id) localStorage.setItem("blackhole_strategy_id", id);
+    else localStorage.removeItem("blackhole_strategy_id");
+  }
+  const blackHoleStrategy = useMemo(
+    () => detectBlackHoleStrategy(pulls, blackHoleOverrideId),
+    [pulls, blackHoleOverrideId]
+  );
+
+  // Pulls with "Missed Mitigation" and Black Hole "Missed Assigned Tether"
+  // errors merged in (see lib/mechanics/ffxiv/dancingmad/mitigation-
+  // detection.ts / blackhole-strategy.ts). Unlike the other FF mechanic
+  // detections, both depend on state that isn't known from a single pull
+  // alone (a user-selected plan; a strategy resolved from ALL pulls), so
+  // neither can be baked into pull.errors at import time the way
+  // detectForsakenTowerErrors etc. are (log-transforms.ts) — recomputed
+  // here instead, same pattern as kickStrategy/crystalStrategy. Every
+  // downstream consumer of `pulls` (AnalysisPanel, PullList, the report
+  // dialog, ...) should read `displayPulls` instead so these errors show up
+  // everywhere errors normally do; `pulls` itself and `pullsRef` stay
+  // untouched since they're also what gets persisted to the session (wipe
+  // calls / manual errors) and re-derived on plan/strategy swap.
   const mitigationPlan = getMitigationPlan(mitigationPlanId);
   const displayPulls = useMemo(() => {
-    if (!mitigationPlan) return pulls;
+    if (!mitigationPlan && !blackHoleStrategy) return pulls;
     return pulls.map((p) => {
-      const mitigationErrors = detectMitigationErrors(p, mitigationPlan);
-      return mitigationErrors.length === 0 ? p : { ...p, errors: [...p.errors, ...mitigationErrors] };
+      const mitigationErrors = mitigationPlan ? detectMitigationErrors(p, mitigationPlan) : [];
+      const blackHoleErrors = detectMissedAssignedTetherErrors(p, blackHoleStrategy);
+      const extra = [...mitigationErrors, ...blackHoleErrors];
+      return extra.length === 0 ? p : { ...p, errors: [...p.errors, ...extra] };
     });
-  }, [pulls, mitigationPlan]);
+  }, [pulls, mitigationPlan, blackHoleStrategy]);
   const [selectedPullId, setSelectedPullId] = useState<number | null>(null);
 
   const [importError, setImportError] = useState<string | null>(null);
@@ -964,6 +995,24 @@ export default function Home() {
           loadedFromSampleData={loadedFromSampleData}
         />
         <button
+          onClick={() => setShowMitigation(true)}
+          title="Ikuya mitigation-plan timeline mapped onto this report's roster"
+          style={{
+            backgroundColor: "#1f2937",
+            color:           "#93c5fd",
+            border:          "1px solid #374151",
+            borderRadius:    "6px",
+            padding:         "6px 14px",
+            fontSize:        "12px",
+            fontWeight:      600,
+            cursor:          "pointer",
+            whiteSpace:      "nowrap",
+            flexShrink:      0,
+          }}
+        >
+          Mitigation
+        </button>
+        <button
           onClick={() => setShowStrategy(true)}
           title="Raid strategy detected automatically from this report's pulls"
           style={{
@@ -988,6 +1037,14 @@ export default function Home() {
         onClose={() => setShowStrategy(false)}
         strategy={kickStrategy}
         crystals={crystalStrategy}
+        blackHole={blackHoleStrategy}
+        blackHoleOverrideId={blackHoleOverrideId}
+        onBlackHoleOverrideChange={handleBlackHoleOverrideChange}
+      />
+
+      <MitigationDialog
+        open={showMitigation}
+        onClose={() => setShowMitigation(false)}
         ffPlayers={ffPlayers}
         mitigationPlanId={mitigationPlanId}
         onMitigationPlanChange={handleMitigationPlanChange}

@@ -25,6 +25,7 @@ const { discoverReportFolders, loadReportFolder, buildActorMap, buildAbilityMap 
 const { buildFFPlayers, buildFFDeaths } = require('./lib/build-ff-players');
 
 const { detectBlackHoleErrors } = requireTsFromRoot('lib/mechanics/ffxiv/dancingmad/blackhole.ts');
+const { detectBlackHoleStrategy, detectMissedAssignedTetherErrors } = requireTsFromRoot('lib/mechanics/ffxiv/dancingmad/blackhole-strategy.ts');
 const { getFFJobByName } = requireTsFromRoot('lib/ffl-job-data.ts');
 
 const FF_DATA_DIR = path.join(ROOT, 'sampledata', 'ff');
@@ -49,14 +50,38 @@ for (const dir of reportDirs) {
   console.log(`${meta.title ?? meta.code} (${dir})`);
   console.log(`  ${pulls.length} pull(s)`);
 
-  for (const { bossName, pullNumber, rep } of pulls) {
-    const players = buildFFPlayers(rep, actorMap, getFFJobByName, abilityMap);
-    const deaths  = buildFFDeaths(rep, actorMap, getFFJobByName);
-    const errors  = detectBlackHoleErrors(players, deaths);
+  // Pull-like objects (game/players/deathEvents) — the minimum
+  // detectBlackHoleStrategy/detectMissedAssignedTetherErrors need — built
+  // once so the cross-pull strategy analysis sees every pull in the report,
+  // same as the app's page.tsx does over its live `pulls` state.
+  const pullLikes = pulls.map(({ bossName, pullNumber, rep }) => ({
+    game: 'ffxiv',
+    players: buildFFPlayers(rep, actorMap, getFFJobByName, abilityMap),
+    deathEvents: buildFFDeaths(rep, actorMap, getFFJobByName),
+    bossName, pullNumber,
+  }));
+
+  const strategy = detectBlackHoleStrategy(pullLikes);
+  if (strategy) {
+    console.log('-'.repeat(70));
+    console.log(`  Black Hole strategy: ${strategy.strategyId} (shape: ${strategy.shape}, from ${strategy.pullsAnalyzed} pull(s))`);
+    for (const lane of strategy.lanes) {
+      console.log(`    ${lane.slotLabel.padEnd(20)} ${lane.player} (${lane.className}) -> tethers ${lane.moments.join(',')}`);
+    }
+  } else {
+    console.log('  Black Hole strategy: not enough recognized-composition pulls to resolve');
+  }
+
+  for (const p of pullLikes) {
+    const errors = detectBlackHoleErrors(p.players, p.deathEvents);
+    const missedAssigned = detectMissedAssignedTetherErrors(p, strategy);
     console.log('='.repeat(70));
-    console.log(`${bossName} Pull ${pullNumber} ->`, errors.length, 'errors');
+    console.log(`${p.bossName} Pull ${p.pullNumber} ->`, errors.length, 'errors,', missedAssigned.length, 'missed-assigned-tether errors');
     for (const e of errors) {
       console.log(`  [${e.ruleId}] t=${e.timestamp} ${e.player ?? '(raid)'}: ${e.description}`);
+    }
+    for (const e of missedAssigned) {
+      console.log(`  [${e.ruleId}] t=${e.timestamp} ${e.player}: ${e.description}`);
     }
   }
 }

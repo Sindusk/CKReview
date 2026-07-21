@@ -121,11 +121,10 @@ const FIRST_IN_LINE_ID  = 1003004;
 const SECOND_IN_LINE_ID = 1003005;
 const THIRD_IN_LINE_ID  = 1003006;
 const ACCRETION_ID      = 1001604;
-const NOTHINGNESS_ABILITY_ID = 47868; // the tether hit
+export const NOTHINGNESS_ABILITY_ID = 47868; // the tether hit
 const EARTHQUAKE_ABILITY_ID  = 47866; // the doubled-earthquake wipe symptom of an earlier missed soak
 
 export const BLACKHOLE_INCORRECT_TETHER_RULE_ID = "ffxiv-blackhole-soaked-incorrect-tether";
-export const BLACKHOLE_MULTI_HIT_TETHER_RULE_ID = "ffxiv-blackhole-tether-hit-multiple-players";
 export const BLACKHOLE_LOST_CRUST_RULE_ID       = "ffxiv-blackhole-lost-primordial-crust";
 
 const PRIMORDIAL_CRUST_ABILITY_ID = 1005454;
@@ -136,7 +135,7 @@ const CRUST_CONSUMPTION_TOLERANCE_MS = 100;
 
 // The 10 tether moments, as offsets from the debuff burst (see the
 // timetable above). Matched across two independent logs to within 100ms.
-const TETHER_MOMENT_OFFSETS_MS: readonly number[] = [
+export const TETHER_MOMENT_OFFSETS_MS: readonly number[] = [
   24300, 31400,                 // set 1
   54800, 59900, 65000,          // set 2
   89100, 94100, 99200,          // set 3
@@ -164,9 +163,9 @@ const BURST_MATCH_WINDOW_MS = 2000;
 const WIPE_DEATHS_WINDOW_MS = 15000;
 const WIPE_DEATHS_THRESHOLD = 2;
 
-type LineNumber = 1 | 2 | 3;
+export type LineNumber = 1 | 2 | 3;
 
-type BlackHoleAssignment = {
+export type BlackHoleAssignment = {
   line:         LineNumber;
   hasAccretion: boolean;
   /** 1-based tether moments this player may legitimately be hit at (role-pair union — see module comment). */
@@ -188,7 +187,7 @@ const ROLE_TABLE: ReadonlyArray<{
 ];
 
 /** The burst instant: the earliest "(N) in Line" application in the pull, or undefined if Black Hole never happened. */
-function findBurstTimestamp(players: PlayerInfo[]): number | undefined {
+export function findBurstTimestamp(players: PlayerInfo[]): number | undefined {
   let earliest: number | undefined;
   for (const player of players) {
     for (const d of player.debuffs) {
@@ -208,7 +207,7 @@ function findBurstTimestamp(players: PlayerInfo[]): number | undefined {
  * entry order can't be trusted, and guessing it would risk flagging clean
  * players — so detection bows out entirely instead.
  */
-function buildAssignments(
+export function buildAssignments(
   players: PlayerInfo[],
   burstTimestamp: number
 ): Map<number, BlackHoleAssignment> | undefined {
@@ -256,12 +255,24 @@ function buildAssignments(
 }
 
 /** Maps a hit timestamp to its 1-based tether moment, or undefined when it's not near any scheduled moment. */
-function momentIndexFor(hitTimestamp: number, burstTimestamp: number): number | undefined {
+export function momentIndexFor(hitTimestamp: number, burstTimestamp: number): number | undefined {
   const offset = hitTimestamp - burstTimestamp;
   for (let i = 0; i < TETHER_MOMENT_OFFSETS_MS.length; i++) {
     if (Math.abs(offset - TETHER_MOMENT_OFFSETS_MS[i]) <= TETHER_MOMENT_TOLERANCE_MS) return i + 1;
   }
   return undefined;
+}
+
+/**
+ * Whether a moment (given its timestamp) is compromised by a nearby mass
+ * death — see the module comment's "Wipe suppression" section. Exported so
+ * blackhole-strategy.ts's cross-pull aggregation and per-pull schedule
+ * checks apply the exact same exemption the role-band checks above use.
+ */
+export function isCompromisedMoment(deathEvents: DeathEvent[], momentTimestamp: number): boolean {
+  return deathEvents.filter(
+    (d) => d.timestamp <= momentTimestamp && momentTimestamp - d.timestamp <= WIPE_DEATHS_WINDOW_MS
+  ).length >= WIPE_DEATHS_THRESHOLD;
 }
 
 /**
@@ -292,49 +303,15 @@ export function detectBlackHoleErrors(
 
   const errors: PullError[] = [];
 
-  // ── Raid check: one tether hitting several players ──────────────────────
-  //
-  // Group every Nothingness hit by (moment, tether instance) and count the
-  // DISTINCT players each tether struck. Two-plus means players overlapped
-  // when it fired (see the module comment) — reported once per tether as a
-  // raid-severity error naming everyone hit, on top of any individual
-  // out-of-schedule errors the same firing produces below.
-  type TetherGroup = { firstHit: number; victims: Map<number, string> };
-  const tetherGroups = new Map<string, TetherGroup>();
-
-  for (const player of players) {
-    for (const e of player.damageTaken) {
-      if (e.abilityId !== NOTHINGNESS_ABILITY_ID) continue;
-      if (e.sourceInstance === undefined) continue; // can't tell tethers apart without it
-
-      const moment = momentIndexFor(e.timestamp, burstTimestamp);
-      if (moment === undefined) continue;
-
-      const key = `${moment}:${e.sourceInstance}`;
-      const group = tetherGroups.get(key) ?? { firstHit: e.timestamp, victims: new Map() };
-      group.firstHit = Math.min(group.firstHit, e.timestamp);
-      group.victims.set(player.actorId, player.name);
-      tetherGroups.set(key, group);
-    }
-  }
-
-  for (const [key, group] of tetherGroups) {
-    if (group.victims.size < 2) continue;
-    if (isCompromisedMoment(group.firstHit)) continue;
-
-    const moment = Number(key.split(":")[0]);
-    const names = [...group.victims.values()].join(", ");
-
-    errors.push({
-      ruleId:      BLACKHOLE_MULTI_HIT_TETHER_RULE_ID,
-      severity:    "Raid",
-      name:        "Tether Hit Multiple Players",
-      description: `Black Hole tether #${moment} hit ${group.victims.size} players at once (${names}) — the extra hits burn through the raid's soak budget, leaving the mechanic borderline unresolvable.`,
-      timestamp:   group.firstHit,
-      abilityId:   NOTHINGNESS_ABILITY_ID,
-      abilityName: "Nothingness",
-    });
-  }
+  // NOTE: the old raid-severity "Tether Hit Multiple Players" check (one
+  // tether hitting 2+ players) was removed 2026-07 in favor of
+  // blackhole-strategy.ts's per-player "Missed Assigned Black Hole Tether"
+  // check, which names the specific player who should have soaked the
+  // moment instead of everyone the stray tether happened to catch. See
+  // detectMissedAssignedTetherErrors there — it's applied in the
+  // displayPulls layer (app/page.tsx) once a strategy is resolved/selected,
+  // same pattern as Mitigation detection, since it depends on cross-pull
+  // analysis rather than single-pull debuff data.
 
   // ── Individual check: hit at a moment outside the player's schedule ─────
   for (const player of players) {
