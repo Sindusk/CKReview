@@ -305,6 +305,58 @@ function findAbilityMeta(players: PlayerInfo[], name: string): { abilityId: numb
   return { abilityId: 0 };
 }
 
+// ── "Already dead" exemption ─────────────────────────────────────────────
+//
+// A player who's already dead when a mitigation comes due couldn't have
+// cast it — that's someone else's error (whatever killed them), not theirs
+// (user-confirmed 2026-07-21, report rXBbzFV49hd1QPwf pull 3: the WHM's
+// "missed" Cyclone mitigation at 8:26 was flagged while they'd already been
+// dead for 7+ seconds, from an earlier unrelated Stray Flames death — same
+// player, no revival in between). There's no explicit "resurrection" event
+// in the data, so revival is inferred from the FIRST sign of activity
+// (a cast, a hit taken, or healing received — any of which requires being
+// alive/targetable) after their most recent death before the mitigation's
+// anchor time. A player with no such activity before the anchor is still
+// dead and is exempted entirely; one revived just barely in time (within
+// RESURRECTION_GRACE_MS) is also exempted, in case the "first activity"
+// proxy is itself catching the very moment of resurrection.
+const RESURRECTION_GRACE_MS = 2000;
+
+/** Earliest timestamp, after `afterMs`, that this player shows ANY sign of being alive. */
+function firstActivityAfter(player: PlayerInfo, afterMs: number): number | undefined {
+  let min: number | undefined;
+  for (const stream of [player.casts, player.damageTaken, player.healing]) {
+    for (const e of stream) {
+      if (e.timestamp > afterMs && (min === undefined || e.timestamp < min)) min = e.timestamp;
+    }
+  }
+  return min;
+}
+
+/**
+ * True if `player` should be exempted from a mitigation check at `atMs` —
+ * either still dead (their most recent death before `atMs` has no evidence
+ * of revival before `atMs`), or revived too recently to reasonably expect
+ * them to have acted.
+ *
+ * Strictly BEFORE `atMs`, not at-or-before: a death landing at the exact
+ * same instant as the mitigation's own anchor is that mechanic killing
+ * them (plausibly BECAUSE the mitigation was missed), not a pre-existing
+ * dead state from something else — that player was alive right up until
+ * this hit and should still be checked. Only an earlier, already-resolved
+ * death exempts them.
+ */
+function isDeadOrFreshlyRevived(player: PlayerInfo, deathEvents: DeathEvent[], atMs: number): boolean {
+  const lastDeath = deathEvents
+    .filter((d) => d.player === player.name && d.timestamp < atMs)
+    .sort((a, b) => b.timestamp - a.timestamp)[0];
+  if (!lastDeath) return false;
+
+  const revivedAt = firstActivityAfter(player, lastDeath.timestamp);
+  if (revivedAt === undefined || revivedAt > atMs) return true; // still dead at atMs
+  return atMs - revivedAt < RESURRECTION_GRACE_MS;
+}
+
 // ── Main entry point ─────────────────────────────────────────────────────
 
 /**
@@ -351,6 +403,11 @@ export function detectMitigationErrors(pull: Pull, plan: MitigationPlan | null):
         player = resolveTankPriorityColumn(slotLabel, pull.players);
         if (!player) continue;
       }
+
+      // Already dead (or just barely revived) when this mitigation came
+      // due — not their fault they couldn't cast it (see
+      // isDeadOrFreshlyRevived's comment above).
+      if (isDeadOrFreshlyRevived(player, pull.deathEvents, anchorMs)) continue;
 
       const missing: string[] = [];
       for (const entry of entries) {
