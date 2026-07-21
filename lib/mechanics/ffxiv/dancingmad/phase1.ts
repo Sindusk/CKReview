@@ -427,8 +427,15 @@ function detectTeleTrouncingArrowErrors(players: PlayerInfo[]): PullError[] {
   for (const { player, arrows } of byPlayer.values()) {
     if (arrows.length !== 2) continue; // incomplete data — fail closed
 
-    const positionSource = [...player.damageTaken, ...player.healing];
-    const withPos = arrows.map((a) => ({ ...a, pos: nearestPlayerPosition(positionSource, a.timestamp) }));
+    // damageTaken's x/y is this player's OWN position (the hit victim).
+    // player.healing is NOT usable here despite carrying x/y too — those
+    // coordinates belong to whoever THIS player healed, not to this player
+    // themselves (see fflHealToPlayerEvent's comment on FFLHealEvent.
+    // targetResources) — confirmed as the exact cause of a false positive
+    // (Sage flagged 18y off in pull 6): the nearest-in-time event to one of
+    // their removedebuffs was their own outgoing heal on a raid-wide
+    // support cast (Kardia) whose target was standing across the arena.
+    const withPos = arrows.map((a) => ({ ...a, pos: nearestPlayerPosition(player.damageTaken, a.timestamp) }));
     if (withPos.some((a) => a.pos === null)) continue;
     const [a1, a2] = withPos as { timestamp: number; dir: Cardinal; pos: Point }[];
 
