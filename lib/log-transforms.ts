@@ -717,6 +717,26 @@ function fflDamageDoneToPlayerEvent(
   };
 }
 
+// Decodes FFLogs' "1001191.1001832." dot-separated buff-ID string (see the
+// `buffs` field comment on FFLDamageEvent) into resolved ability names,
+// via the same abilityMap used for cast/damage ability names — buff/status
+// IDs live in the same masterData.abilities list as action IDs, so no
+// separate lookup table is needed. Unresolvable IDs are dropped rather than
+// shown as "Ability N" placeholders, since this list is only ever used for
+// membership checks (mitigation-detection.ts), not display.
+function fflDecodeActiveBuffNames(
+  buffs:      string | undefined,
+  abilityMap: Map<number, AbilityInfo>
+): string[] | undefined {
+  if (!buffs) return undefined;
+  const names = buffs
+    .split(".")
+    .filter(Boolean)
+    .map((idStr) => abilityMap.get(Number(idStr))?.name)
+    .filter((n): n is string => n !== undefined);
+  return names.length > 0 ? names : undefined;
+}
+
 // BUGFIX: FFLogs nests the post-hit health snapshot under
 // `targetResources.hitPoints` / `targetResources.maxHitPoints`, not flat
 // `hitPoints`/`maxHitPoints` on the event the way WCL does (see
@@ -749,6 +769,7 @@ function fflDamageTakenToPlayerEvent(
     maxHealth:    event.targetResources?.maxHitPoints ?? event.maxHitPoints,
     overkill:     event.overkill,
     isDoT:        event.tick === true,   // ← added
+    activeBuffNames: fflDecodeActiveBuffNames(event.buffs, abilityMap),
   };
 }
 

@@ -280,6 +280,13 @@ export type FFLDamageEvent = {
   } | null;
   amount:        number;
   overkill?:     number;
+  // Dot-separated list of ability IDs for every buff active on the TARGET
+  // at the moment of this hit (e.g. "1001191.1001832." = Rampart +
+  // Camouflage), FFLogs' own live view of "what mitigations were up when
+  // this damage landed" — the same data the FFLogs website's damage-taken
+  // panel decorates each hit with. Present on every damage/calculateddamage
+  // event observed so far (report rXBbzFV49hd1QPwf), not just fatal ones.
+  buffs?:        string;
   // Set on a "calculateddamage" event that never receives a matching
   // "damage" event — see the `type` comment above.
   unpaired?:     boolean;

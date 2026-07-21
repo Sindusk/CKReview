@@ -120,6 +120,43 @@ const HEALER_SLOTS = ["White Mage", "Astrologian", "Scholar", "Sage"];
  * healer columns for jobs the party doesn't field are omitted entirely
  * (the sheet lists all four healer jobs; a party has two).
  */
+// Tank-table priority columns (mitigation-plans/ikuya.json's `tank`
+// section — P3/P5) name jobs by their 3-letter abbreviation, not the
+// PlayerInfo.className display name.
+const TANK_JOB_ABBREVIATIONS: Record<string, string> = {
+  WAR: "Warrior",
+  DRK: "Dark Knight",
+  GNB: "Gunbreaker",
+  PLD: "Paladin",
+};
+
+/**
+ * Resolves a tank-table priority-order column label — e.g.
+ * `"Chaos (WAR > DRK > GNB > PLD)"`, or P5's bare `"WAR > DRK > GNB >
+ * PLD"` — to whichever tank in the roster ranks highest in the listed
+ * order. Unlike MT/OT (which the roster alone can't disambiguate — see
+ * resolveMitigationSlots), this IS deterministic: the sheet's priority
+ * list literally means "whichever of these jobs the party brings, on this
+ * side," so the first listed job present among the roster's tanks is
+ * unambiguously correct, not a guess. Returns null for anything that
+ * isn't a priority-order column (plain "MT"/"OT" — use
+ * resolveMitigationSlots for those) or when none of the listed jobs are
+ * present among the roster's tanks.
+ */
+export function resolveTankPriorityColumn(label: string, players: PlayerInfo[]): PlayerInfo | null {
+  const abbrevs = label.match(/[A-Z]{3}/g);
+  if (!abbrevs || abbrevs.length < 2) return null; // not a priority-order column
+
+  const tanks = players.filter((p) => p.role === "Tank");
+  for (const abbr of abbrevs) {
+    const className = TANK_JOB_ABBREVIATIONS[abbr];
+    if (!className) continue;
+    const found = tanks.find((p) => p.className === className);
+    if (found) return found;
+  }
+  return null;
+}
+
 export function resolveMitigationSlots(players: PlayerInfo[]): SlotAssignment[] {
   // getFFRosterSortOrder expects FFLogs subType keys ("DarkKnight");
   // PlayerInfo.className is the display name ("Dark Knight").

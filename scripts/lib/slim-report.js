@@ -84,12 +84,25 @@ const FFL_PROJECTORS = {
     ...pick(e, ['timestamp', 'type', 'sourceID', 'targetID', 'sourceInstance', 'targetInstance', 'abilityGameID']),
     targetResources: pickNested(e, 'targetResources', FF_RESOURCE_SUBKEYS),
   }),
+  // `overkill` and `buffs` used to be dropped here along with the rest of
+  // the ~20-field bloat this module exists to trim — but both turned out to
+  // be load-bearing: `overkill` is read by types/PlayerInfo.ts, and `buffs`
+  // (a dot-separated list of active buff ability IDs at the moment of the
+  // hit) is exactly what lib/mechanics/ffxiv/dancingmad/mitigation-detection.ts
+  // needs to verify a mitigation was actually ACTIVE when a mechanic hit
+  // landed, rather than only checking whether the ability was cast at some
+  // point in a lookback window (confirmed against report rXBbzFV49hd1QPwf
+  // pull 4 — the live API's raw damage event carries buffs/overkill/
+  // unmitigatedAmount/mitigated/absorbed/multiplier; only `buffs` and
+  // `overkill` are consumed anywhere in lib/ right now, so those two are
+  // kept and the rest of the ~20-field bloat (hitType, packetID, blocked,
+  // sourceResources, targetMarker, ...) stays dropped).
   damageDone: (e) => ({
-    ...pick(e, ['timestamp', 'type', 'sourceID', 'targetID', 'sourceInstance', 'targetInstance', 'abilityGameID', 'amount', 'unpaired']),
+    ...pick(e, ['timestamp', 'type', 'sourceID', 'targetID', 'sourceInstance', 'targetInstance', 'abilityGameID', 'amount', 'overkill', 'buffs', 'unpaired']),
     targetResources: pickNested(e, 'targetResources', FF_RESOURCE_SUBKEYS),
   }),
   damageTaken: (e) => ({
-    ...pick(e, ['timestamp', 'type', 'sourceID', 'targetID', 'sourceInstance', 'targetInstance', 'abilityGameID', 'amount', 'unpaired']),
+    ...pick(e, ['timestamp', 'type', 'sourceID', 'targetID', 'sourceInstance', 'targetInstance', 'abilityGameID', 'amount', 'overkill', 'buffs', 'unpaired']),
     targetResources: pickNested(e, 'targetResources', FF_RESOURCE_SUBKEYS),
   }),
   healing: (e) => ({

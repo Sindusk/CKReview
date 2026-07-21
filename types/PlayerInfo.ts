@@ -40,6 +40,15 @@ export type PlayerEvent = {
   maxHealth?:    number;  // for context/formatting
   overkill?:     number;  // set only on fatal hits
 
+  // Damage Taken — FFXIV only. Resolved (via abilityMap) names of every
+  // buff active on the player at the moment this hit landed — FFLogs' own
+  // ground truth for "was a mitigation actually up when this damage hit,"
+  // strictly more reliable than inferring it from cast timing + an assumed
+  // buff duration. Consumed by mitigation-detection.ts; not rendered in the
+  // UI. Undefined on WCL events and on FF events fetched before this field
+  // existed (older cached sample data).
+  activeBuffNames?: string[];
+
   // Debuffs — carries which side of the on/off transition this event
   // represents, so error-detection.ts can reconstruct uptime windows
   // ("was this debuff active on the player at time T?").

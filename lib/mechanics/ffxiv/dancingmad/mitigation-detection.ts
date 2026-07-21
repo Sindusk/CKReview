@@ -54,6 +54,7 @@ import {
   type PlanMechanic,
   type PlanAbility,
   resolveMitigationSlots,
+  resolveTankPriorityColumn,
 } from "./mitigation-plan";
 
 export const MITIGATION_MISSED_RULE_ID = "ffxiv-mitigation-missed";
@@ -90,6 +91,21 @@ const PARTY_MIT_BY_JOB: Record<string, string> = {
   "Dark Knight": "Dark Missionary",
 };
 
+// The tank table (mitigation-plans/ikuya.json's `tank` section) uses
+// GENERIC slot names instead of real ability names — "90s" (a tank's
+// personal ~90s-cooldown mitigation) and "Short Mit" (a shorter, more
+// frequently-available one) — that need a per-job resolution the same way
+// "Party Mit" does above. Only Gunbreaker is filled in so far (confirmed
+// by the user 2026-07-20: Camouflage for "90s", Heart of Corundum for
+// "Short Mit"); other jobs fall through to null (unsupported, skipped —
+// same as an unresolved "LB3") until confirmed rather than guessed.
+const NINETY_SECOND_MIT_BY_JOB: Record<string, string> = {
+  Gunbreaker: "Camouflage",
+};
+const SHORT_MIT_BY_JOB: Record<string, string> = {
+  Gunbreaker: "Heart of Corundum",
+};
+
 // Sheet ability name -> resolver. Returns candidate real ability names
 // (satisfied if the player cast ANY of them) or null if this entry isn't
 // checkable for this player (wrong job for a job-gated term, or a term this
@@ -104,10 +120,33 @@ function resolveRequiredAbilityNames(ability: PlanAbility, player: PlayerInfo): 
       return player.className === "Scholar" ? ["Succor", "Deployment Tactics"] : null;
     case "Zoe Shields":
       return player.className === "Sage" ? ["Zoe", "Eukrasian Prognosis"] : null;
+    case "90s": {
+      const name = NINETY_SECOND_MIT_BY_JOB[player.className];
+      return name ? [name] : null;
+    }
+    case "Short Mit":
+    case "Short": {
+      const name = SHORT_MIT_BY_JOB[player.className];
+      return name ? [name] : null;
+    }
     case "LB3":       // limit break — logged under the specific LB's own
       return null;    // name per job, not a stable string to check against.
     case "✔":
       return null;
+    // Tank-table terms not yet mapped to a real ability for any job —
+    // "Kitchen Sink" (use everything for a huge hit, not one ability),
+    // "40%" / "Invulnerability" / "Buddy Mit" (ally-targeted, checking the
+    // CASTER's own casts is the wrong player entirely). Unsupported rather
+    // than guessed, same as LB3 above.
+    case "Kitchen Sink":
+    case "40%":
+    case "Invulnerability":
+    case "Buddy Mit":
+      return null;
+    // Sheet parsing quirk: the qualifier ("During Castbar") got baked into
+    // the ability name instead of split out — the real ability is Provoke.
+    case "Provoke During Castbar":
+      return ["Provoke"];
     default:
       return [ability.name];
   }
@@ -141,6 +180,28 @@ function flattenPhaseMechanics(plan: MitigationPlan): FlatMechanic[] {
     for (const mech of phase.mechanics) {
       if (mech.timeSeconds === undefined || !mech.assignments) continue;
       out.push({ phaseTitle: phase.title, mech });
+    }
+  }
+  return out;
+}
+
+// The tank table (mitigation-plans/ikuya.json's `tank` section) has its
+// OWN "Thunder III"-named mechanics at essentially the same timestamps as
+// the phase tabs' healer/DPS-column entries for the same real moment —
+// they're two different columns of information about the same occurrence,
+// not two different occurrences. Kept as a SEPARATE flat list (rather than
+// merged into flattenPhaseMechanics' output) specifically so
+// matchDeathsToMechanics runs against each independently below — merging
+// them would make a death match whichever one's sheet timestamp happens to
+// be numerically closer and silently drop the other, losing either the
+// healer-side or the tank-side check for that occurrence.
+function flattenTankMechanics(plan: MitigationPlan): FlatMechanic[] {
+  const out: FlatMechanic[] = [];
+  if (!plan.data.tank) return out;
+  for (const section of plan.data.tank.sections) {
+    for (const mech of section.mechanics) {
+      if (mech.timeSeconds === undefined || !mech.assignments) continue;
+      out.push({ phaseTitle: section.title ?? "Tank", mech });
     }
   }
   return out;
@@ -183,6 +244,42 @@ function hasCastNear(player: PlayerInfo, abilityNames: string[], anchorMs: numbe
   );
 }
 
+// The killing hit's own `activeBuffNames` (see PlayerEvent in
+// types/PlayerInfo.ts) is FFLogs' ground truth for what was actually up on
+// the victim at the instant the damage landed — strictly better evidence
+// than "was the ability cast at some point in a lookback window," which
+// can't tell a mitigation that was cast but already FELL OFF before impact
+// (short-duration buffs like Heart of Corundum's 8s) from one that covered
+// the hit. Party mitigations (Sacred Soil, Divine Veil, ...) apply their
+// buff to allies including the victim, so checking the victim's own list
+// also correctly covers the case where the ASSIGNED caster isn't the
+// player who died. Returns undefined (not false) when no matching hit with
+// buff data could be found, so the caller can fall back to hasCastNear
+// instead of wrongly concluding "missed."
+function wasBuffActiveOnHit(
+  players:      PlayerInfo[],
+  deathEvents:  DeathEvent[],
+  abilityNames: string[],
+  anchorMs:     number
+): boolean | undefined {
+  const wanted = new Set(abilityNames.map((n) => n.toLowerCase()));
+
+  const death = deathEvents.find((d) => Math.abs(d.timestamp - anchorMs) <= CAST_LOOKAHEAD_MS);
+  if (!death) return undefined;
+  const victim = players.find((p) => p.name === death.player);
+  if (!victim) return undefined;
+
+  const fatalHit = victim.damageTaken.find(
+    (e) =>
+      e.abilityId === death.killingAbilityGameId &&
+      Math.abs(e.timestamp - death.timestamp) <= CAST_LOOKAHEAD_MS
+  );
+  if (!fatalHit || fatalHit.activeBuffNames === undefined) return undefined;
+
+  const active = fatalHit.activeBuffNames;
+  return active.some((n) => wanted.has(n.toLowerCase()));
+}
+
 // Best-effort ability id/icon for the missed ability, sourced from ANY
 // player's cast history in this pull that used it (for icon display only —
 // falls back to 0/none if nobody in this pull ever cast it).
@@ -207,8 +304,14 @@ export function detectMitigationErrors(pull: Pull, plan: MitigationPlan | null):
     return [];
   }
 
-  const flat = flattenPhaseMechanics(plan);
-  const occurrences = matchDeathsToMechanics(pull.deathEvents, flat);
+  // Matched as two INDEPENDENT passes (see flattenTankMechanics) so a
+  // death confirms both its phase-tab occurrence (healer/DPS columns) and
+  // its tank-table occurrence (MT/OT or Chaos/Exdeath columns) rather than
+  // whichever sheet timestamp happens to be closer stealing the match.
+  const occurrences = [
+    ...matchDeathsToMechanics(pull.deathEvents, flattenPhaseMechanics(plan)),
+    ...matchDeathsToMechanics(pull.deathEvents, flattenTankMechanics(plan)),
+  ];
   if (occurrences.length === 0) return [];
 
   const slots = resolveMitigationSlots(pull.players);
@@ -219,18 +322,36 @@ export function detectMitigationErrors(pull: Pull, plan: MitigationPlan | null):
   for (const { mech, anchorMs } of occurrences) {
     for (const [slotLabel, entries] of Object.entries(mech.assignments!)) {
       if (slotLabel === "Extras") continue;
-      const assignment = slotByLabel.get(slotLabel);
-      if (!assignment || !assignment.player || assignment.tentative) continue;
-      const player = assignment.player;
+
+      // Plain party slots (MT/OT/healer job/D1-D4) resolve via the roster
+      // mapping; priority-order columns ("Chaos (WAR > DRK > GNB > PLD)")
+      // resolve deterministically via the sheet's own listed order instead
+      // — see resolveTankPriorityColumn for why that one isn't "tentative"
+      // the way MT/OT is.
+      const partySlot = slotByLabel.get(slotLabel);
+      let player: PlayerInfo | null;
+      if (partySlot) {
+        if (!partySlot.player || partySlot.tentative) continue;
+        player = partySlot.player;
+      } else {
+        player = resolveTankPriorityColumn(slotLabel, pull.players);
+        if (!player) continue;
+      }
 
       const missing: string[] = [];
       for (const entry of entries) {
         for (const ability of entry.abilities) {
           const candidates = resolveRequiredAbilityNames(ability, player);
           if (!candidates) continue; // unsupported term or wrong job — not checkable
-          if (!hasCastNear(player, candidates, anchorMs)) {
-            missing.push(candidates[0]);
-          }
+
+          // Ground-truth check first (was it actually active on whoever
+          // took the hit); only fall back to the cast-timing heuristic when
+          // that can't be determined (no buff data on this event — e.g.
+          // older cached sample data, or no matching death for this
+          // occurrence at all).
+          const activeOnHit = wasBuffActiveOnHit(pull.players, pull.deathEvents, candidates, anchorMs);
+          const satisfied = activeOnHit ?? hasCastNear(player, candidates, anchorMs);
+          if (!satisfied) missing.push(candidates[0]);
         }
       }
       if (missing.length === 0) continue;

@@ -388,8 +388,16 @@ export function detectForsakenTowerErrors(
     });
   }
 
-  errors.push(...detectOvercrowdedTowerErrors(players, teamByPlayer, labelsByPlayer, expectedTimestamps));
-  errors.push(...detectWrongTowerPositionErrors(players, expectedTimestamps));
+  // Wrong-position detection runs FIRST because it can decisively resolve
+  // overcrowded towers using debuff+geometry evidence (see
+  // pickLegitimatePair below) — strictly more reliable than the raw
+  // timestamp-based team inference detectOvercrowdedTowerErrors falls back
+  // on. Its confirmedLegitKeys tells the team-based check which players are
+  // already proven innocent, so it doesn't re-flag them under a
+  // mis-inferred team (see the "stolen stack decrement" case below).
+  const { errors: wrongPositionErrors, confirmedLegitKeys } = detectWrongTowerPositionErrors(players, expectedTimestamps);
+  errors.push(...detectOvercrowdedTowerErrors(players, teamByPlayer, labelsByPlayer, expectedTimestamps, confirmedLegitKeys));
+  errors.push(...wrongPositionErrors);
   errors.push(...detectLethalConeBaitErrors(players, deathEvents, expectedTimestamps));
 
   return errors.sort((a, b) => a.timestamp - b.timestamp);
@@ -414,6 +422,21 @@ export const FORSAKEN_EXTRA_PLAYER_RULE_ID = "ffxiv-forsaken-extra-player-in-tow
 // team member is always expected to show up, so their presence is never
 // "extra." A player is attributed as many "extra" occurrences as they
 // wrongly appear in throughout the pull, each at the tower it happened.
+//
+// Team inference (inferPlayerTeams, above) is only as good as each
+// player's OWN first stack-loss timestamp — and that signal breaks under
+// the exact "intruding extra player steals the stack decrement" quirk
+// this rule exists to catch (see the module comment on wipe-cleanup
+// removals). Observed for real (report rXBbzFV49hd1QPwf pull 1): an
+// intruder's stack got decremented at the tower's resolution instant
+// (stealing the legitimate soaker's decrement), while the legitimate
+// soaker's own stack-loss never fired until the later wipe-cleanup —
+// making the LEGITIMATE player's firstLoss land on the wrong team's
+// timing and get themselves mis-teamed and flagged as "extra," while the
+// real intruder went unflagged. `confirmedLegitKeys` (from
+// detectWrongTowerPositionErrors, which resolves overcrowded towers with
+// debuff+geometry evidence instead of timestamps) overrides that
+// mis-teaming for any player it could decisively clear.
 
 /** Every Path of Light hit timestamp for one player. */
 function collectPathOfLightHits(player: PlayerInfo): number[] {
@@ -426,7 +449,8 @@ function detectOvercrowdedTowerErrors(
   players: PlayerInfo[],
   teamByPlayer: Map<number, "first" | "second">,
   labelsByPlayer: Map<number, number[]>,
-  expectedTimestamps: Map<string, number>
+  expectedTimestamps: Map<string, number>,
+  confirmedLegitKeys: Set<string>
 ): PullError[] {
   const pathOfLightHitsByPlayer = new Map<number, number[]>();
   for (const player of players) {
@@ -443,6 +467,10 @@ function detectOvercrowdedTowerErrors(
       // Only players NOT on the resolving team can ever be "extra" —
       // a real team member showing up at their own slot is expected.
       if (teamByPlayer.get(player.actorId) === team) continue;
+
+      // Already decisively cleared by debuff+geometry evidence — trust
+      // that over the timestamp-based team inference (see comment above).
+      if (confirmedLegitKeys.has(`${player.actorId}@${consensusTimestamp}`)) continue;
 
       const hits = pathOfLightHitsByPlayer.get(player.actorId) ?? [];
       const wasPresent = hits.some(
@@ -593,6 +621,18 @@ const ON_TOWER_MAX_DIST = 210;
 // r 1002+ from center; the observed too-shallow failure sat at 944.
 const FLARE_MIN_CENTER_DIST = 975;
 
+// The "outer" spot (1005085 Spread, always) only needs to clear the r=800
+// tower ring, but real logs land right on top of that line: a fully clean
+// Spread resolution (report rXBbzFV49hd1QPwf pull 5 — single-victim 47809
+// self-hit, no deaths) sat at r=795, just inside the naive r>=800 cutoff,
+// and an earlier clean pull already put one at r=828. A flat 800 boundary
+// is narrower than the ring's actual measurement fuzz, so "outer" clears
+// at r>=770 instead — still well clear of every "inner"/"on-tower" spot's
+// clean band (max observed r=740), just no longer false-flagging landings
+// that sit within a few units of the line on a resolution that visibly
+// worked.
+const OUTER_MIN_CENTER_DIST = 770;
+
 /** The spot type a debuff's holder should occupy, given their partner's debuff (see table above). */
 function expectedSpotFor(debuffId: number, partnerDebuffId: number | undefined): SpotType | undefined {
   if (debuffId === 1005085) return "outer";   // outer regardless of partner
@@ -629,7 +669,7 @@ function isAtSpot(
     // (observed r up to 740 from center) or deeper toward the middle.
     case "on-tower": return distToTower <= ON_TOWER_MAX_DIST || distToCenter < 800;
     case "inner":    return distToCenter < 800;
-    case "outer":    return distToCenter >= 800;
+    case "outer":    return distToCenter >= OUTER_MIN_CENTER_DIST;
     case "flare": {
       if (distToCenter < 800) return false;
       if (distToCenter >= FLARE_MIN_CENTER_DIST) return true;
@@ -674,6 +714,132 @@ function distToIdealSpot(soak: TowerSoak, spot: SpotType, tower: readonly [numbe
   const outY = (tower[1] - ARENA_CENTER) / ringDist;
   const offset = SPOT_IDEAL_OFFSET[spot];
   return Math.hypot(soak.x - (tower[0] + outX * offset), soak.y - (tower[1] + outY * offset));
+}
+
+// ── Pure overcrowding: a tower with no waiting lone partner elsewhere ───────
+//
+// The 3+1 split (below) handles an intruder who abandoned their OWN tower
+// to join another, leaving their real partner stranded alone — solvable
+// structurally (removing the intruder must leave both towers valid pairs).
+// But a genuinely uninvolved outsider (their team's OTHER 3 members never
+// got the chance to resolve at all — e.g. the pull wiped after only one
+// team's first tower) leaves no such lone partner to anchor on: it's just
+// one tower sitting at 3 (or more) soakers with no matching orphan.
+//
+// Position ALONE is not reliably decisive here (learned the hard way on a
+// real case, report rXBbzFV49hd1QPwf pull 1): an outsider standing near
+// the tower can accidentally land close enough to a DIFFERENT valid spot
+// that two candidate pairings score within a hair of each other. The
+// strong signal instead is which player's assignment debuff actually
+// ROTATED at this resolution: a genuine soaker's held debuff interval
+// ends almost exactly at the team's consensus stack-loss instant (both
+// driven by the same "you resolved" event — observed exact-millisecond
+// matches on real logs), while an outsider's debuff keeps its PRE-
+// resolution value until whenever it's eventually cleared (a later real
+// resolution or the wipe-cleanup instant). In the confirmed case, the
+// legitimate 2nd soaker's debuff rotated in lockstep with their teammate's
+// while the outsider's didn't rotate until the wipe 8+ seconds later —
+// unambiguous, unlike the 137-vs-172 units the two candidates' positions
+// scored. Position is kept ONLY as a fallback for the rarer case where
+// rotation evidence can't cleanly pick a pair (e.g. the debuff-removed
+// event is missing from the log, or more than 2 candidates show it).
+const ROTATION_TOLERANCE_MS = 100; // matches EXPECTED_TIMESTAMP_CLUSTER_MS
+
+// A player's Spell's Trouble (1005083) decrement landing right at the
+// resolution's own consensus instant is the "stolen decrement" itself
+// (see the wipe-quirk comment near the top of the file) — the game
+// credited THEM with the stack-loss instead of the legitimate 2nd soaker,
+// whose own loss stays pending until whenever it's later cleaned up. So
+// among two candidates where only one has an assignment-debuff rotation
+// (the confirmed 1st soaker), the candidate WITHOUT a matching stack-loss
+// here is the true partner (their loss got stolen); the one WITH it is
+// the intruder who took it. Wider tolerance than ROTATION_TOLERANCE_MS
+// since this is corroborating evidence, not the primary signal.
+const STOLEN_LOSS_TOLERANCE_MS = 500;
+
+function hasStackLossNear(player: PlayerInfo, timestamp: number): boolean {
+  return player.debuffs.some(
+    (d) =>
+      d.abilityId === SPELLS_TROUBLE_ABILITY_ID &&
+      (d.debuffStatus === "removed" || d.debuffStatus === "stackRemoved") &&
+      Math.abs(d.timestamp - timestamp) <= STOLEN_LOSS_TOLERANCE_MS
+  );
+}
+
+/**
+ * Given a >2-person tower group, finds the 2-player subset that are the
+ * real soakers. Prefers whichever players' debuffs demonstrably rotated
+ * at this resolution's consensus instant (decisive on its own, or — when
+ * only ONE candidate rotated — corroborated by which of the rest DIDN'T
+ * also take an anomalous stack-loss here, see hasStackLossNear above).
+ * Falls back to whichever differing-debuff subset's combined distance to
+ * their ideal spots is lowest. Returns `decisive: false` when none of
+ * these can single out a pair confidently — the caller should leave the
+ * group to the (weaker) team-inference fallback rather than risk
+ * misattribution.
+ */
+function pickLegitimatePair(
+  group:              TowerSoak[],
+  assignments:        AssignmentInterval[],
+  tower:              readonly [number, number],
+  consensusTimestamp: number | undefined
+): { pairIdx: [number, number]; extraIdx: number[]; decisive: boolean } | undefined {
+  if (consensusTimestamp !== undefined) {
+    const rotatedIdx = group
+      .map((_, i) => i)
+      .filter(
+        (i) =>
+          assignments[i].end !== Infinity &&
+          Math.abs(assignments[i].end - consensusTimestamp) <= ROTATION_TOLERANCE_MS
+      );
+
+    if (
+      rotatedIdx.length === 2 &&
+      assignments[rotatedIdx[0]].abilityId !== assignments[rotatedIdx[1]].abilityId
+    ) {
+      const extraIdx = group.map((_, i) => i).filter((i) => !rotatedIdx.includes(i));
+      return { pairIdx: [rotatedIdx[0], rotatedIdx[1]], extraIdx, decisive: true };
+    }
+
+    if (rotatedIdx.length === 1) {
+      const confirmedIdx = rotatedIdx[0];
+      const others = group.map((_, i) => i).filter((i) => i !== confirmedIdx);
+      const withoutAnomalousLoss = others.filter(
+        (i) => !hasStackLossNear(group[i].player, consensusTimestamp)
+      );
+
+      if (
+        withoutAnomalousLoss.length === 1 &&
+        assignments[confirmedIdx].abilityId !== assignments[withoutAnomalousLoss[0]].abilityId
+      ) {
+        const partnerIdx = withoutAnomalousLoss[0];
+        const extraIdx = group.map((_, i) => i).filter((i) => i !== confirmedIdx && i !== partnerIdx);
+        return { pairIdx: [confirmedIdx, partnerIdx], extraIdx, decisive: true };
+      }
+    }
+  }
+
+  const PAIR_FIT_MARGIN = 150;
+  const scored: Array<{ pair: [number, number]; score: number }> = [];
+  for (let i = 0; i < group.length; i++) {
+    for (let j = i + 1; j < group.length; j++) {
+      if (assignments[i].abilityId === assignments[j].abilityId) continue;
+      const spotI = expectedSpotFor(assignments[i].abilityId, assignments[j].abilityId);
+      const spotJ = expectedSpotFor(assignments[j].abilityId, assignments[i].abilityId);
+      const distI = spotI !== undefined ? distToIdealSpot(group[i], spotI, tower) : Infinity;
+      const distJ = spotJ !== undefined ? distToIdealSpot(group[j], spotJ, tower) : Infinity;
+      scored.push({ pair: [i, j], score: distI + distJ });
+    }
+  }
+  if (scored.length === 0) return undefined;
+
+  scored.sort((a, b) => a.score - b.score);
+  const best = scored[0];
+  const runnerUp = scored[1];
+  const decisive = runnerUp === undefined || runnerUp.score - best.score > PAIR_FIT_MARGIN;
+
+  const extraIdx = group.map((_, i) => i).filter((i) => !best.pair.includes(i));
+  return { pairIdx: best.pair, extraIdx, decisive };
 }
 
 type AssignmentInterval = { abilityId: number; abilityName: string; start: number; end: number };
@@ -729,7 +895,7 @@ const RESOLUTION_CLUSTER_GAP_MS = 3000;
 function detectWrongTowerPositionErrors(
   players:            PlayerInfo[],
   expectedTimestamps: Map<string, number>
-): PullError[] {
+): { errors: PullError[]; confirmedLegitKeys: Set<string> } {
   // Every PoL hit that carries the tower instance and a position snapshot.
   const soaks: TowerSoak[] = [];
   for (const player of players) {
@@ -739,7 +905,7 @@ function detectWrongTowerPositionErrors(
       soaks.push({ player, timestamp: e.timestamp, towerInstance: e.sourceInstance, x: e.x, y: e.y });
     }
   }
-  if (soaks.length === 0) return [];
+  if (soaks.length === 0) return { errors: [], confirmedLegitKeys: new Set() };
 
   // Every planted-cone (47810) hit on a player, with the victim's distance
   // from arena center — the outcome evidence for the flare check (see the
@@ -776,6 +942,14 @@ function detectWrongTowerPositionErrors(
   }
 
   const errors: PullError[] = [];
+
+  // Every player confirmed (by debuff+geometry, not timestamp-based team
+  // inference) to be a legitimate soaker of SOME tower at a given
+  // consensus/cluster timestamp — populated once `pairs` is finalized for
+  // each resolution below. Handed back to detectOvercrowdedTowerErrors so
+  // it doesn't re-flag someone this function already proved innocent under
+  // a mis-inferred team (see the comment on that function).
+  const confirmedLegitKeys = new Set<string>();
 
   for (const cluster of clusters) {
     const clusterTime = cluster[0].timestamp;
@@ -956,6 +1130,61 @@ function detectWrongTowerPositionErrors(
       }
     }
 
+    // ── Pure overcrowding: no waiting lone partner elsewhere ──────────────
+    //
+    // A tower sitting at 3+ soakers that ISN'T part of the 3+1 split above
+    // (no matching lone group this resolution) means the extra player's
+    // real team never got a chance to resolve at all — e.g. the pull
+    // wiped after only one team's first tower. See pickLegitimatePair for
+    // the geometric method and the real case it was built from.
+    const handledAsSplit =
+      groupList.length === 2 && groupList.some((g) => g.length === 3) && groupList.some((g) => g.length === 1);
+
+    if (!handledAsSplit) {
+      for (const group of towers.values()) {
+        if (group.length < 3) continue;
+        const built = buildGroup(group);
+        if (!built || !built.tower) continue;
+
+        const fit = pickLegitimatePair(built.soaks, built.assignments, built.tower, consensusTimestamp);
+        if (!fit || !fit.decisive) continue;
+
+        const [i, j] = fit.pairIdx;
+        pairs.push({
+          soaks:       [built.soaks[i], built.soaks[j]],
+          assignments: [built.assignments[i], built.assignments[j]],
+          tower:       built.tower,
+        });
+
+        for (const idx of fit.extraIdx) {
+          const soak = built.soaks[idx];
+          errors.push({
+            ruleId:      FORSAKEN_EXTRA_PLAYER_RULE_ID,
+            severity:    "Major",
+            name:        "Extra Player In Tower",
+            description: `Stood in a Forsaken tower${towerLabel} that already had its two legitimate soakers (confirmed by debuff + position), turning it into a 3+ person tower.`,
+            timestamp:   reportTimestamp,
+            player:      soak.player.name,
+            class:       soak.player.className,
+            specId:      soak.player.specId,
+            role:        soak.player.role,
+            abilityId:   built.assignments[idx].abilityId,
+            abilityName: built.assignments[idx].abilityName,
+          });
+        }
+      }
+    }
+
+    // Every soaker in a resolved pair (natural 2-person, 3+1-split
+    // remainder, or pure-overcrowding remainder) is proven legitimate —
+    // record them before the rule checks below so detectOvercrowdedTowerErrors
+    // can trust it over its own weaker team inference.
+    for (const pair of pairs) {
+      for (const soak of pair.soaks) {
+        confirmedLegitKeys.add(`${soak.player.actorId}@${reportTimestamp}`);
+      }
+    }
+
     for (const pair of pairs) {
       const [a, b] = pair.assignments;
 
@@ -1041,7 +1270,7 @@ function detectWrongTowerPositionErrors(
     }
   }
 
-  return errors;
+  return { errors, confirmedLegitKeys };
 }
 
 export const FORSAKEN_LETHAL_CONE_BAIT_RULE_ID = "ffxiv-forsaken-baited-cone-too-close";
