@@ -9,7 +9,7 @@
 // scripts/lib/load-report-folder.js's buildActorMap) via getFFJobByName
 // (lib/ffl-job-data.ts) — no table maintenance needed for new captures.
 
-function buildFFPlayers(rep, actorMap, getFFJobByName) {
+function buildFFPlayers(rep, actorMap, getFFJobByName, abilityMap) {
   const playerIds = [...new Set(rep.combatantInfo?.data?.map((e) => e.sourceID) ?? [])];
   const onlyLanded = (evs) => evs.filter((e) => e.type === 'damage' || (e.type === 'calculateddamage' && e.unpaired === true));
   const dt = onlyLanded(rep.damageTaken?.data ?? []);
@@ -33,6 +33,9 @@ function buildFFPlayers(rep, actorMap, getFFJobByName) {
         x: e.targetResources?.x,
         y: e.targetResources?.y,
         overkill: e.overkill,
+        activeBuffNames: abilityMap
+          ? (e.buffs ?? '').split('.').filter(Boolean).map((id) => abilityMap.get(Number(id))).filter(Boolean)
+          : undefined,
       })),
       debuffs: (rep.debuffs?.data ?? []).filter((e) => e.targetID === id).map((e) => ({
         timestamp: e.timestamp,

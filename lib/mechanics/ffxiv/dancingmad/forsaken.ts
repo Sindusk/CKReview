@@ -395,10 +395,10 @@ export function detectForsakenTowerErrors(
   // on. Its confirmedLegitKeys tells the team-based check which players are
   // already proven innocent, so it doesn't re-flag them under a
   // mis-inferred team (see the "stolen stack decrement" case below).
-  const { errors: wrongPositionErrors, confirmedLegitKeys } = detectWrongTowerPositionErrors(players, expectedTimestamps, deathEvents);
+  const { errors: wrongPositionErrors, confirmedLegitKeys, misattributedConeDeaths } = detectWrongTowerPositionErrors(players, expectedTimestamps, deathEvents);
   errors.push(...detectOvercrowdedTowerErrors(players, teamByPlayer, labelsByPlayer, expectedTimestamps, confirmedLegitKeys));
   errors.push(...wrongPositionErrors);
-  errors.push(...detectLethalConeBaitErrors(players, deathEvents, expectedTimestamps));
+  errors.push(...detectLethalConeBaitErrors(players, deathEvents, expectedTimestamps, misattributedConeDeaths));
 
   return errors.sort((a, b) => a.timestamp - b.timestamp);
 }
@@ -909,7 +909,7 @@ function detectWrongTowerPositionErrors(
   players:            PlayerInfo[],
   expectedTimestamps: Map<string, number>,
   deathEvents:        DeathEvent[] = []
-): { errors: PullError[]; confirmedLegitKeys: Set<string> } {
+): { errors: PullError[]; confirmedLegitKeys: Set<string>; misattributedConeDeaths: Set<string> } {
   // Every PoL hit that carries the tower instance and a position snapshot.
   const soaks: TowerSoak[] = [];
   for (const player of players) {
@@ -919,7 +919,7 @@ function detectWrongTowerPositionErrors(
       soaks.push({ player, timestamp: e.timestamp, towerInstance: e.sourceInstance, x: e.x, y: e.y });
     }
   }
-  if (soaks.length === 0) return { errors: [], confirmedLegitKeys: new Set() };
+  if (soaks.length === 0) return { errors: [], confirmedLegitKeys: new Set(), misattributedConeDeaths: new Set() };
 
   // Every 47808 (Stack follow-up) hit on anyone, keeping the ability's own
   // sourceInstance — used below to reconstruct each Stack volley's full
@@ -936,7 +936,7 @@ function detectWrongTowerPositionErrors(
   // Every planted-cone (47810) hit on a player, with the victim's distance
   // from arena center — the outcome evidence for the flare check (see the
   // flare-outcome comment above the spot table).
-  const coneHits: Array<{ timestamp: number; victimCenterDist: number }> = [];
+  const coneHits: Array<{ timestamp: number; victimCenterDist: number; actorId: number }> = [];
   for (const player of players) {
     for (const e of player.damageTaken) {
       if (e.abilityId !== CONE_FOLLOWUP_ABILITY_ID) continue;
@@ -944,6 +944,7 @@ function detectWrongTowerPositionErrors(
       coneHits.push({
         timestamp:        e.timestamp,
         victimCenterDist: Math.hypot(e.x - ARENA_CENTER, e.y - ARENA_CENTER),
+        actorId:          player.actorId,
       });
     }
   }
@@ -976,6 +977,24 @@ function detectWrongTowerPositionErrors(
   // it doesn't re-flag someone this function already proved innocent under
   // a mis-inferred team (see the comment on that function).
   const confirmedLegitKeys = new Set<string>();
+
+  // A resolution is compromised — and the cone-bait-too-far check below
+  // sits out — once a death has already landed shortly beforehand (mirrors
+  // the wipe-suppression convention used in blackhole.ts). Observed for
+  // real (report Bb4wQtHA6VNmkMFq pull 12): a missed tower a few seconds
+  // earlier already had the raid collapsing, and the resulting cone hit on
+  // the Spread partner is cascade fallout, not a fresh "bait stood too
+  // far" mistake — the two idle-ranged candidates it would otherwise
+  // implicate are innocent.
+  const WIPE_DEATH_WINDOW_MS = 15000;
+  const isResolutionCompromised = (t: number): boolean =>
+    deathEvents.some((d) => d.timestamp <= t && t - d.timestamp <= WIPE_DEATH_WINDOW_MS);
+
+  // Player names whose death to the Cone follow-up is a MISATTRIBUTED
+  // outcome — see the cone-bait-too-far section near the pair loop below —
+  // so detectLethalConeBaitErrors doesn't also flag them as "stood too
+  // close" when the real cause is someone else entirely.
+  const misattributedConeDeaths = new Set<string>();
 
   for (const cluster of clusters) {
     const clusterTime = cluster[0].timestamp;
@@ -1369,13 +1388,95 @@ function detectWrongTowerPositionErrors(
           }
         }
       }
+
+      // ── Cone bait too far: the wrong (soaking) player caught the cone ────
+      //
+      // The Cone follow-up (47810) fires at the closest player in
+      // proximity — but on every confirmed-clean Cone+Spread pairing across
+      // three real reports (80+ resolutions surveyed), that closest player
+      // is NEVER the tower's own Spread partner (who's deliberately far
+      // away, per Spread's "outer"/isolation requirement — see the spot
+      // table). It's always a THIRD, idle non-melee ("ranged") player from
+      // the OTHER team, standing deliberately close (clean band ~410-670
+      // units from the Cone holder) to intentionally bait the cone away
+      // from the raid. Confirmed for real (report VtdBqhLQkWJXMvDg pull 5):
+      // when that designated bait stands just barely too far (674 units —
+      // a hair past the clean maximum), the Spread partner becomes the
+      // closest player instead and takes the point-blank one-shot meant
+      // for the bait. The Spread partner did nothing wrong (they were
+      // exactly where Spread requires); the actual mistake is the bait's
+      // positioning.
+      //
+      // Attribution needs no distance threshold at all: whichever idle
+      // non-melee player ISN'T already accounted for as a DIFFERENT cone's
+      // victim this same resolution (the raid's other simultaneous
+      // Cone+Spread tower has its own bait, confirmed hit) is the one who
+      // should have been standing close enough to take this one instead.
+      const coneIdx = pair.assignments.findIndex((a) => a.abilityId === 1005086);
+      if (coneIdx !== -1 && pair.assignments[1 - coneIdx].abilityId === 1005085) {
+        const partnerSoak = pair.soaks[1 - coneIdx];
+
+        const partnerDeath = deathEvents.find(
+          (d) =>
+            d.player === partnerSoak.player.name &&
+            d.killingAbilityGameId === CONE_FOLLOWUP_ABILITY_ID &&
+            d.timestamp >= reportTimestamp &&
+            d.timestamp <= reportTimestamp + CONE_FIRE_WINDOW_MS + PATH_OF_LIGHT_WINDOW_MS
+        );
+
+        if (partnerDeath) {
+          // The Spread partner is innocent either way (they were exactly
+          // where their debuff requires) — always keep the OLD "stood too
+          // close" rule from re-flagging them, even when the resolution
+          // turns out to be too compromised by wipe chaos to confidently
+          // name the real bait below.
+          misattributedConeDeaths.add(partnerSoak.player.name);
+
+          if (isResolutionCompromised(reportTimestamp)) continue;
+
+          const alreadyAccountedFor = new Set(
+            coneHits
+              .filter(
+                (h) =>
+                  h.timestamp >= clusterTime &&
+                  h.timestamp <= clusterTime + CONE_FIRE_WINDOW_MS &&
+                  h.actorId !== partnerSoak.player.actorId
+              )
+              .map((h) => h.actorId)
+          );
+
+          const candidates = players.filter(
+            (p) =>
+              !seenPlayers.has(p.actorId) &&
+              p.rangeType !== "Melee" &&
+              !alreadyAccountedFor.has(p.actorId)
+          );
+
+          for (const candidate of candidates) {
+            errors.push({
+              ruleId:      FORSAKEN_CONE_BAIT_TOO_FAR_RULE_ID,
+              severity:    "Major",
+              name:        "Cone Bait Too Far",
+              description: `Should have been standing close enough to draw the Forsaken cone${towerLabel} away from the tower — instead it latched onto ${partnerSoak.player.name}, the Spread partner soaking alongside the Cone holder, who was never meant to be near it.`,
+              timestamp:   partnerDeath.timestamp,
+              player:      candidate.name,
+              class:       candidate.className,
+              specId:      candidate.specId,
+              role:        candidate.role,
+              abilityId:   CONE_FOLLOWUP_ABILITY_ID,
+              abilityName: "Forsaken Cone",
+            });
+          }
+        }
+      }
     }
   }
 
-  return { errors, confirmedLegitKeys };
+  return { errors, confirmedLegitKeys, misattributedConeDeaths };
 }
 
 export const FORSAKEN_LETHAL_STACK_CLIP_RULE_ID = "ffxiv-forsaken-stack-clipped-too-close";
+export const FORSAKEN_CONE_BAIT_TOO_FAR_RULE_ID  = "ffxiv-forsaken-cone-bait-too-far";
 
 export const FORSAKEN_LETHAL_CONE_BAIT_RULE_ID = "ffxiv-forsaken-baited-cone-too-close";
 
@@ -1401,9 +1502,10 @@ const CONE_FOLLOWUP_VOLLEY_GAP_MS = 1500; // hits of one firing land ~130ms apar
 const CONE_DEATH_WINDOW_MS        = 3000; // fatal hit → death event lag (observed ~2s)
 
 function detectLethalConeBaitErrors(
-  players:            PlayerInfo[],
-  deathEvents:        DeathEvent[],
-  expectedTimestamps: Map<string, number>
+  players:                 PlayerInfo[],
+  deathEvents:             DeathEvent[],
+  expectedTimestamps:      Map<string, number>,
+  misattributedConeDeaths: Set<string> = new Set()
 ): PullError[] {
   type ConeHit = { player: PlayerInfo; timestamp: number; instance?: number };
   const coneHits: ConeHit[] = [];
@@ -1433,6 +1535,12 @@ function detectLethalConeBaitErrors(
 
   for (const death of deathEvents) {
     if (death.killingAbilityGameId !== CONE_FOLLOWUP_ABILITY_ID) continue;
+
+    // Already explained (and correctly attributed elsewhere) by
+    // detectWrongTowerPositionErrors's cone-bait-too-far check: this
+    // victim was the Cone holder's own Spread partner, not someone who
+    // stood too close of their own accord — see that function's comment.
+    if (misattributedConeDeaths.has(death.player)) continue;
 
     // The volley containing the fatal hit on this player.
     const volley = volleys.find((v) =>

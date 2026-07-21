@@ -1,31 +1,21 @@
-// Regression harness for lib/mechanics/ffxiv/dancingmad/limitcut.ts against
+// Regression harness for lib/mechanics/ffxiv/dancingmad/exdeath.ts against
 // FFLogs report folders in sampledata/ff/ (gitignored) produced by
 // scripts/fetch-ff-report.js. Builds PlayerInfo[]/DeathEvent[] the same
-// way the real pipeline does, runs detectLimitCutErrors, and prints every
+// way the real pipeline does, runs detectExdeathErrors, and prints every
 // error per pull — with REAL player names/classes resolved from each
-// report folder's meta.json via getFFJobByName, not a hand-maintained
-// JOBS table.
+// report folder's meta.json.
 //
-// Run from the repo root:  node scripts/validate-limitcut.js [reportDir]
+// Run from the repo root:  node scripts/validate-exdeath.js [reportDir]
 //
 // With no argument, runs against every report folder found under
 // sampledata/ff/ (any subdirectory containing a meta.json). Pass a
 // specific folder to narrow to one report.
-//
-// 2026-07-17: the flat hand-picked sample files this harness used to
-// reference (ff/LimitCutFail17-9.json, ff/LimitCutFailPull1.json, etc.)
-// were deleted when sampledata/ was reorganized around
-// scripts/fetch-*-report.js report folders — no verified expected-results
-// table exists yet for whatever's currently in sampledata/ff/. This
-// harness's role for now is regression protection (no crashes) plus a
-// per-pull error summary.
-const fs = require('fs');
 const path = require('path');
 const { ROOT, requireTsFromRoot } = require('./lib/require-ts');
 const { discoverReportFolders, loadReportFolder, buildActorMap, buildAbilityMap } = require('./lib/load-report-folder');
 const { buildFFPlayers, buildFFDeaths } = require('./lib/build-ff-players');
 
-const { detectLimitCutErrors } = requireTsFromRoot('lib/mechanics/ffxiv/dancingmad/limitcut.ts');
+const { detectExdeathErrors } = requireTsFromRoot('lib/mechanics/ffxiv/dancingmad/exdeath.ts');
 const { getFFJobByName } = requireTsFromRoot('lib/ffl-job-data.ts');
 
 const FF_DATA_DIR = path.join(ROOT, 'sampledata', 'ff');
@@ -53,7 +43,7 @@ for (const dir of reportDirs) {
   for (const { bossName, pullNumber, rep } of pulls) {
     const players = buildFFPlayers(rep, actorMap, getFFJobByName, abilityMap);
     const deaths  = buildFFDeaths(rep, actorMap, getFFJobByName);
-    const errors  = detectLimitCutErrors(players, deaths);
+    const errors  = detectExdeathErrors(players, deaths);
     console.log('='.repeat(70));
     console.log(`${bossName} Pull ${pullNumber} ->`, errors.length, 'errors');
     for (const e of errors) {
