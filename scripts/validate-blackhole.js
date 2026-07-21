@@ -25,7 +25,7 @@ const { discoverReportFolders, loadReportFolder, buildActorMap, buildAbilityMap 
 const { buildFFPlayers, buildFFDeaths } = require('./lib/build-ff-players');
 
 const { detectBlackHoleErrors } = requireTsFromRoot('lib/mechanics/ffxiv/dancingmad/blackhole.ts');
-const { detectBlackHoleStrategy, detectMissedAssignedTetherErrors } = requireTsFromRoot('lib/mechanics/ffxiv/dancingmad/blackhole-strategy.ts');
+const { detectBlackHoleStrategy, detectMissedAssignedTetherErrors, detectClippedByNeighborTetherErrors } = requireTsFromRoot('lib/mechanics/ffxiv/dancingmad/blackhole-strategy.ts');
 const { getFFJobByName } = requireTsFromRoot('lib/ffl-job-data.ts');
 
 const FF_DATA_DIR = path.join(ROOT, 'sampledata', 'ff');
@@ -75,12 +75,16 @@ for (const dir of reportDirs) {
   for (const p of pullLikes) {
     const errors = detectBlackHoleErrors(p.players, p.deathEvents);
     const missedAssigned = detectMissedAssignedTetherErrors(p, strategy);
+    const clipped = detectClippedByNeighborTetherErrors(p, strategy);
     console.log('='.repeat(70));
-    console.log(`${p.bossName} Pull ${p.pullNumber} ->`, errors.length, 'errors,', missedAssigned.length, 'missed-assigned-tether errors');
+    console.log(`${p.bossName} Pull ${p.pullNumber} ->`, errors.length, 'errors,', missedAssigned.length, 'missed-assigned-tether,', clipped.length, 'clipped-by-neighbor');
     for (const e of errors) {
       console.log(`  [${e.ruleId}] t=${e.timestamp} ${e.player ?? '(raid)'}: ${e.description}`);
     }
     for (const e of missedAssigned) {
+      console.log(`  [${e.ruleId}] t=${e.timestamp} ${e.player}: ${e.description}`);
+    }
+    for (const e of clipped) {
       console.log(`  [${e.ruleId}] t=${e.timestamp} ${e.player}: ${e.description}`);
     }
   }

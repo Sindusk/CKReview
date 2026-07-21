@@ -303,6 +303,56 @@ export function detectBlackHoleStrategy(pulls: Pull[], forcedId?: BlackHoleStrat
   return { shape, strategyId, pullsAnalyzed: resolvable.length, exemplarPullNumber: exemplar.pullNumber, lanes };
 }
 
+function slotLabelFor(moments: readonly number[]): string {
+  return moments === DOUBLE_FIRST_PRIMARY ? "First (Skip m2)"
+    : moments === DOUBLE_FIRST_DOUBLE ? "First (Double m2)"
+    : moments === SPLIT_FIRST_A ? "First (Lane A)"
+    : moments === SPLIT_FIRST_B ? "First (Lane B)"
+    : moments === FIRST_ACC ? "First (Accretion)"
+    : moments === SECOND_A ? "Second (Lane A)"
+    : moments === SECOND_B ? "Second (Lane B)"
+    : moments === SECOND_ACC ? "Second (Accretion)"
+    : moments === THIRD_A ? "Third (Lane A)"
+    : "Third (Lane B)";
+}
+
+/**
+ * Resolves THIS pull's own lane assignment independently from its own hit
+ * data (see module comment on why lane identity isn't reused across
+ * pulls), under the given strategy's SHAPE. Shared by both per-pull checks
+ * below. Returns null when this pull never reaches Black Hole or its
+ * composition is unrecognized.
+ */
+function resolvePullSchedule(
+  pull: Pull,
+  shape: "split" | "double-tether"
+): { burstTimestamp: number; schedule: [NamedPlayer, readonly number[]][] } | null {
+  const burstTimestamp = findBurstTimestamp(pull.players);
+  if (burstTimestamp === undefined) return null;
+  const assignments = buildAssignments(pull.players, burstTimestamp);
+  if (!assignments) return null;
+
+  const groups = groupByRole({ pull, burstTimestamp, assignments });
+  if (!groups) return null;
+
+  const schedule: [NamedPlayer, readonly number[]][] = [];
+  if (shape === "double-tether") {
+    const pairing = bestPairing(groups.firstNonAcc, DOUBLE_FIRST_PRIMARY, DOUBLE_FIRST_DOUBLE);
+    schedule.push([pairing.a, DOUBLE_FIRST_PRIMARY], [pairing.b, DOUBLE_FIRST_DOUBLE]);
+  } else {
+    const pairing = bestPairing(groups.firstNonAcc, SPLIT_FIRST_A, SPLIT_FIRST_B);
+    schedule.push([pairing.a, SPLIT_FIRST_A], [pairing.b, SPLIT_FIRST_B]);
+  }
+  schedule.push([groups.firstAcc[0], FIRST_ACC]);
+  const secondPairing = bestPairing(groups.secondNonAcc, SECOND_A, SECOND_B);
+  schedule.push([secondPairing.a, SECOND_A], [secondPairing.b, SECOND_B]);
+  schedule.push([groups.secondAcc[0], SECOND_ACC]);
+  const thirdPairing = bestPairing(groups.thirdPlayers, THIRD_A, THIRD_B);
+  schedule.push([thirdPairing.a, THIRD_A], [thirdPairing.b, THIRD_B]);
+
+  return { burstTimestamp, schedule };
+}
+
 export const BLACKHOLE_MISSED_ASSIGNED_RULE_ID = "ffxiv-blackhole-missed-assigned-tether";
 
 /**
@@ -326,28 +376,9 @@ export function detectMissedAssignedTetherErrors(pull: Pull, strategy: BlackHole
   if (!strategy) return [];
   if (pull.game !== "ffxiv") return [];
 
-  const burstTimestamp = findBurstTimestamp(pull.players);
-  if (burstTimestamp === undefined) return [];
-  const assignments = buildAssignments(pull.players, burstTimestamp);
-  if (!assignments) return [];
-
-  const groups = groupByRole({ pull, burstTimestamp, assignments });
-  if (!groups) return [];
-
-  const schedule: [NamedPlayer, readonly number[]][] = [];
-  if (strategy.shape === "double-tether") {
-    const pairing = bestPairing(groups.firstNonAcc, DOUBLE_FIRST_PRIMARY, DOUBLE_FIRST_DOUBLE);
-    schedule.push([pairing.a, DOUBLE_FIRST_PRIMARY], [pairing.b, DOUBLE_FIRST_DOUBLE]);
-  } else {
-    const pairing = bestPairing(groups.firstNonAcc, SPLIT_FIRST_A, SPLIT_FIRST_B);
-    schedule.push([pairing.a, SPLIT_FIRST_A], [pairing.b, SPLIT_FIRST_B]);
-  }
-  schedule.push([groups.firstAcc[0], FIRST_ACC]);
-  const secondPairing = bestPairing(groups.secondNonAcc, SECOND_A, SECOND_B);
-  schedule.push([secondPairing.a, SECOND_A], [secondPairing.b, SECOND_B]);
-  schedule.push([groups.secondAcc[0], SECOND_ACC]);
-  const thirdPairing = bestPairing(groups.thirdPlayers, THIRD_A, THIRD_B);
-  schedule.push([thirdPairing.a, THIRD_A], [thirdPairing.b, THIRD_B]);
+  const resolved = resolvePullSchedule(pull, strategy.shape);
+  if (!resolved) return [];
+  const { burstTimestamp, schedule } = resolved;
 
   const errors: PullError[] = [];
 
@@ -358,17 +389,7 @@ export function detectMissedAssignedTetherErrors(pull: Pull, strategy: BlackHole
     const hitCounts = hitCountsForPull(player, burstTimestamp, pull.deathEvents);
     const required = new Map<number, number>();
     for (const m of moments) required.set(m, (required.get(m) ?? 0) + 1);
-
-    const slotLabel = moments === DOUBLE_FIRST_PRIMARY ? "First (Skip m2)"
-      : moments === DOUBLE_FIRST_DOUBLE ? "First (Double m2)"
-      : moments === SPLIT_FIRST_A ? "First (Lane A)"
-      : moments === SPLIT_FIRST_B ? "First (Lane B)"
-      : moments === FIRST_ACC ? "First (Accretion)"
-      : moments === SECOND_A ? "Second (Lane A)"
-      : moments === SECOND_B ? "Second (Lane B)"
-      : moments === SECOND_ACC ? "Second (Accretion)"
-      : moments === THIRD_A ? "Third (Lane A)"
-      : "Third (Lane B)";
+    const slotLabel = slotLabelFor(moments);
 
     for (const [moment, needed] of required) {
       if ((hitCounts.get(moment) ?? 0) >= needed) continue;
@@ -391,6 +412,106 @@ export function detectMissedAssignedTetherErrors(pull: Pull, strategy: BlackHole
         abilityName: "Nothingness",
       });
     }
+  }
+
+  return errors.sort((a, b) => a.timestamp - b.timestamp);
+}
+
+export const BLACKHOLE_CLIPPED_BY_NEIGHBOR_RULE_ID = "ffxiv-blackhole-clipped-by-neighboring-tether";
+
+/**
+ * Per-pull check, the mirror image of detectMissedAssignedTetherErrors: a
+ * player hit MORE times at a moment than their own resolved schedule
+ * requires. Confirmed 2026-07 (report VtdBqhLQkWJXMvDg pull 7, Black Hole
+ * moment 6/7): the Sage was correctly soaking their own East tether
+ * (instance 8) but ALSO took two extra hits from the Dancer's neighboring
+ * North tether (instance 7) at the same moments — the Sage hadn't moved
+ * their own black hole clockwise to its intercardinal position, so the
+ * Dancer's tether (angling toward the eastern black hole) clipped them.
+ * That extra hit isn't "outside their role band" (moments 6/7 ARE within
+ * the Sage's own valid window — it's their own tether firing on schedule),
+ * so blackhole.ts's role-band `soaked-incorrect-tether` check can't catch
+ * it, and detectMissedAssignedTetherErrors only checks for a SHORTFALL —
+ * hence a dedicated check for the opposite direction (a surplus).
+ *
+ * Root-caused to the CLIPPED player, not the tether that reached them —
+ * per the user's correction, the mistake is standing too close to your own
+ * black hole's origin, not the neighbor's positioning.
+ *
+ * ISOLATION GATE — required after regression-testing against every sample
+ * report turned up widespread false positives: a moment only gets flagged
+ * when the surplus is the ONLY discrepancy anywhere in the pull's resolved
+ * schedule at that moment (no other player short OR over their own count).
+ * Two real fallout patterns needed this: (1) a mass wipe-cascade retarget
+ * (report VtdBqhLQkWJXMvDg pull 16 — one player's earlier death left 5
+ * OTHER players simultaneously surplus at the same moment as the tethers
+ * redistributed; isCompromisedMoment's 2+-death threshold didn't catch it
+ * since only ONE distinct player had died) and (2) a paired retarget (pull
+ * 20 — one player's shortfall (missed-assigned-tether, already flagged)
+ * exactly matches another player's surplus at the same moment; that's one
+ * mistake surfacing from two sides, not two). Neither is the isolated
+ * "stood too close to my own origin" case pull 7 actually is, where the
+ * clipped player is the ONLY anomaly at that moment and everyone else's
+ * count is exactly right.
+ */
+export function detectClippedByNeighborTetherErrors(pull: Pull, strategy: BlackHoleStrategyResult | null): PullError[] {
+  if (!strategy) return [];
+  if (pull.game !== "ffxiv") return [];
+
+  const resolved = resolvePullSchedule(pull, strategy.shape);
+  if (!resolved) return [];
+  const { burstTimestamp, schedule } = resolved;
+
+  // Every (player, moment) discrepancy across the whole resolved schedule,
+  // bucketed by moment — the isolation gate needs to see the full picture
+  // before deciding any single surplus is safe to flag.
+  type Discrepancy = { player: Pull["players"][number]; slotLabel: string; kind: "missing" | "extra" };
+  const byMoment = new Map<number, Discrepancy[]>();
+
+  for (const [named, moments] of schedule) {
+    const player = pull.players.find((p) => p.name === named.name);
+    if (!player) continue;
+
+    const hitCounts = hitCountsForPull(player, burstTimestamp, pull.deathEvents);
+    const required = new Map<number, number>();
+    for (const m of moments) required.set(m, (required.get(m) ?? 0) + 1);
+    const slotLabel = slotLabelFor(moments);
+
+    const allMoments = new Set([...required.keys(), ...hitCounts.keys()]);
+    for (const moment of allMoments) {
+      const needed = required.get(moment) ?? 0;
+      const actual = hitCounts.get(moment) ?? 0;
+      if (actual === needed) continue;
+      const arr = byMoment.get(moment) ?? [];
+      arr.push({ player, slotLabel, kind: actual > needed ? "extra" : "missing" });
+      byMoment.set(moment, arr);
+    }
+  }
+
+  const errors: PullError[] = [];
+
+  for (const [moment, discrepancies] of byMoment) {
+    if (discrepancies.length !== 1) continue; // not isolated — mass retarget or a paired miss elsewhere
+    const [only] = discrepancies;
+    if (only.kind !== "extra") continue; // the lone discrepancy is a miss, handled by detectMissedAssignedTetherErrors
+
+    const momentTimestamp = burstTimestamp + TETHER_MOMENT_OFFSETS_MS[moment - 1];
+    if (isCompromisedMoment(pull.deathEvents, momentTimestamp)) continue;
+    if (isDeadAtMoment(pull, only.player.name, momentTimestamp)) continue;
+
+    errors.push({
+      ruleId:      BLACKHOLE_CLIPPED_BY_NEIGHBOR_RULE_ID,
+      severity:    "Major",
+      name:        "Clipped By Neighboring Black Hole",
+      description: `Took an extra hit from a neighboring Black Hole tether at #${moment} on top of their own (${only.slotLabel}) — standing too close to their own black hole's origin let the adjacent tether's beam reach them.`,
+      timestamp:   momentTimestamp,
+      player:      only.player.name,
+      class:       only.player.className,
+      specId:      only.player.specId,
+      role:        only.player.role,
+      abilityId:   NOTHINGNESS_ABILITY_ID,
+      abilityName: "Nothingness",
+    });
   }
 
   return errors.sort((a, b) => a.timestamp - b.timestamp);

@@ -23,6 +23,7 @@ import { detectMitigationErrors } from "@/lib/mechanics/ffxiv/dancingmad/mitigat
 import {
   detectBlackHoleStrategy,
   detectMissedAssignedTetherErrors,
+  detectClippedByNeighborTetherErrors,
   type BlackHoleStrategyId,
 } from "@/lib/mechanics/ffxiv/dancingmad/blackhole-strategy";
 import type { Pull } from "../types/Pull";
@@ -176,7 +177,10 @@ export default function Home() {
     if (!mitigationPlan && !blackHoleStrategy) return pulls;
     return pulls.map((p) => {
       const mitigationErrors = mitigationPlan ? detectMitigationErrors(p, mitigationPlan) : [];
-      const blackHoleErrors = detectMissedAssignedTetherErrors(p, blackHoleStrategy);
+      const blackHoleErrors = [
+        ...detectMissedAssignedTetherErrors(p, blackHoleStrategy),
+        ...detectClippedByNeighborTetherErrors(p, blackHoleStrategy),
+      ];
       const extra = [...mitigationErrors, ...blackHoleErrors];
       return extra.length === 0 ? p : { ...p, errors: [...p.errors, ...extra] };
     });
