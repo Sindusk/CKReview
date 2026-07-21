@@ -69,4 +69,34 @@ function buildFFDeaths(rep, actorMap, getFFJobByName) {
   });
 }
 
-module.exports = { buildFFPlayers, buildFFDeaths };
+// Mirrors lib/log-transforms.ts's fflBuildBlackHoleGeometry — same
+// enemyCasts stream, same actor-name matching ("Kefka" / "black hole"),
+// same output shape (types/Pull.ts's BlackHoleGeometry), so
+// blackhole-strategy.ts's geometry resolvers work unchanged against
+// harness-built pulls. See that module's comment for why Kefka's FACING
+// (not position) is the real directional reference, and why the black
+// hole NPC's own logged spawn position is used instead of inferring
+// cardinal from whichever player got hit.
+function buildFFBlackHoleGeometry(rep, actorMap) {
+  const kefkaIds = new Set([...actorMap.entries()].filter(([, a]) => a.name === 'Kefka').map(([id]) => id));
+  const blackHoleIds = new Set([...actorMap.entries()].filter(([, a]) => a.name === 'black hole').map(([id]) => id));
+  const enemyCasts = rep.enemyCasts?.data ?? [];
+
+  const kefkaFacingSamples = enemyCasts
+    .filter((e) => e.type === 'cast' && kefkaIds.has(e.sourceID) && e.sourceResources?.facing !== undefined && e.sourceResources?.x !== undefined && e.sourceResources?.y !== undefined)
+    .map((e) => ({ timestamp: e.timestamp, x: e.sourceResources.x, y: e.sourceResources.y, facing: e.sourceResources.facing }));
+
+  const spawnCasts = enemyCasts
+    .filter((e) => e.type === 'cast' && blackHoleIds.has(e.sourceID) && e.sourceResources?.x !== undefined && e.sourceResources?.y !== undefined)
+    .map((e) => ({
+      timestamp: e.timestamp,
+      sourceInstance: e.sourceInstance ?? 0,
+      x: e.sourceResources.x,
+      y: e.sourceResources.y,
+      targetActorId: e.targetID !== undefined && e.targetID !== -1 ? e.targetID : null,
+    }));
+
+  return { kefkaFacingSamples, spawnCasts };
+}
+
+module.exports = { buildFFPlayers, buildFFDeaths, buildFFBlackHoleGeometry };

@@ -24,6 +24,7 @@ import {
   detectBlackHoleStrategy,
   detectMissedAssignedTetherErrors,
   detectClippedByNeighborTetherErrors,
+  detectIncorrectBlackHoleDirectionErrors,
   type BlackHoleStrategyId,
 } from "@/lib/mechanics/ffxiv/dancingmad/blackhole-strategy";
 import type { Pull } from "../types/Pull";
@@ -180,6 +181,7 @@ export default function Home() {
       const blackHoleErrors = [
         ...detectMissedAssignedTetherErrors(p, blackHoleStrategy),
         ...detectClippedByNeighborTetherErrors(p, blackHoleStrategy),
+        ...detectIncorrectBlackHoleDirectionErrors(p, blackHoleStrategy),
       ];
       const extra = [...mitigationErrors, ...blackHoleErrors];
       return extra.length === 0 ? p : { ...p, errors: [...p.errors, ...extra] };

@@ -229,6 +229,11 @@ export type FFLCastEvent = {
   // fflBuildEnemyCastEvents), since an interrupted cast never reaches "cast".
   type:          "cast" | "begincast";
   sourceID:      number;
+  // Distinguishes concurrent copies of the same NPC actor — e.g. each Black
+  // Hole tether is a separate instance of the "black hole" NPC; this is the
+  // only field that says which one cast a given tether. Mirrors
+  // FFLDamageEvent.sourceInstance.
+  sourceInstance?: number;
   targetID?:     number;
   abilityGameID: number;
   ability?: {
@@ -236,24 +241,18 @@ export type FFLCastEvent = {
     abilityIcon?: string;
     gameID?:    number;
   } | null;
-  // Resource fields (present when includeResources: true)
-  resourceActor?:   number;
-  classResources?:  Array<{
-    amount:  number;
-    max:     number;
-    type:    number;
-    cost?:   number;
-  }>;
-  hitPoints?:    number;
-  maxHitPoints?: number;
-  attackPower?:  number;
-  spellPower?:   number;
-  armor?:        number;
-  absorb?:       number;
-  x?:            number;
-  y?:            number;
-  facing?:       number;
-  mapID?:        number;
+  // Resource fields (present when includeResources: true) — nested under
+  // sourceResources/targetResources, same shape FFLDamageEvent uses, NOT
+  // flat on the event (an earlier version of this type wrongly declared
+  // flat x/y/facing fields that never matched the real API response and
+  // were consequently never read anywhere). `facing` (present here but not
+  // on damage events) is the actor's orientation at cast time — used by
+  // blackhole-strategy.ts to read Kefka's facing as the Black Hole
+  // mechanic's directional reference, since his logged x/y stays pinned at
+  // arena center the whole phase (see blackhole-strategy.ts's module
+  // comment for the full story).
+  sourceResources?: { x?: number; y?: number; facing?: number; hitPoints?: number; maxHitPoints?: number };
+  targetResources?: { x?: number; y?: number; facing?: number; hitPoints?: number; maxHitPoints?: number };
 };
 
 // 3) Damage event shape (#8) — nested resources, not flat

@@ -22,7 +22,7 @@
 // preferred over the masterData lookup when present — mirrors how
 // fflAbilityName already prefers `ability.name` over the masterData lookup.
 
-import type { Pull }       from "@/types/Pull";
+import type { Pull, BlackHoleGeometry } from "@/types/Pull";
 import type { DeathEvent } from "@/types/DeathEvent";
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import type { EnemyEvent } from "@/types/PullError";
@@ -564,23 +564,16 @@ export type FFLDisplayCastEvent = {
   abilityId:      number;
   abilityName:    string;
   abilityIcon?:   string;
-  resourceActor?: number;
-  classResources?: Array<{
-    amount: number;
-    max:    number;
-    type:   number;
-    cost?:  number;
-  }>;
+  // The cast's TARGET's resources at cast time (FFLogs nests these under
+  // targetResources, not flat on the event — an earlier version of this
+  // type wrongly declared flat resourceActor/classResources/attackPower/
+  // spellPower/armor/x/y/facing/mapID fields that never matched the real
+  // API response and were consequently always undefined, dead code nothing
+  // downstream ever read).
   hitPoints?:    number;
   maxHitPoints?: number;
-  attackPower?:  number;
-  spellPower?:   number;
-  armor?:        number;
-  absorb?:       number;
   x?:            number;
   y?:            number;
-  facing?:       number;
-  mapID?:        number;
 };
 
 function fflBuildActorMap(actors: FFLActor[]): Map<number, FFLActor> {
@@ -686,18 +679,10 @@ function fflTransformCast(
     abilityId:      event.abilityGameID ?? 0,
     abilityName:    fflAbilityName(event, abilityMap),
     abilityIcon:    fflAbilityIcon(event, abilityMap),
-    resourceActor:  event.resourceActor,
-    classResources: event.classResources,
-    hitPoints:      event.hitPoints,
-    maxHitPoints:   event.maxHitPoints,
-    attackPower:    event.attackPower,
-    spellPower:     event.spellPower,
-    armor:          event.armor,
-    absorb:         event.absorb,
-    x:              event.x,
-    y:              event.y,
-    facing:         event.facing,
-    mapID:          event.mapID,
+    hitPoints:      event.targetResources?.hitPoints,
+    maxHitPoints:   event.targetResources?.maxHitPoints,
+    x:              event.targetResources?.x,
+    y:              event.targetResources?.y,
   };
 }
 
@@ -889,6 +874,44 @@ function fflBuildEnemyBuffEvents(
     }));
 }
 
+// Raw geometry data for the Black Hole mechanic's direction/priority
+// detection (see types/Pull.ts's BlackHoleGeometry + blackhole-strategy.ts's
+// module comment). Reads straight from the SAME enemyCastEvents stream
+// fflBuildEnemyCastEvents does — just pulling different fields (position/
+// facing instead of ability/actor name) — so no extra fetch is needed, only
+// extraction that wasn't done before. Actor name match (not subType) is
+// deliberate: "Kefka" and "black hole" are both how FFLogs' masterData
+// actually names these NPCs, confirmed against report VtdBqhLQkWJXMvDg.
+function fflBuildBlackHoleGeometry(
+  enemyCastEvents: FFLCastEvent[],
+  actorMap:        Map<number, FFLActor>,
+  fightStart:      number
+): BlackHoleGeometry {
+  const kefkaIds     = new Set([...actorMap.entries()].filter(([, a]) => a.name === "Kefka").map(([id]) => id));
+  const blackHoleIds = new Set([...actorMap.entries()].filter(([, a]) => a.name === "black hole").map(([id]) => id));
+
+  const kefkaFacingSamples = enemyCastEvents
+    .filter((e) => e.type === "cast" && kefkaIds.has(e.sourceID) && e.sourceResources?.facing !== undefined && e.sourceResources?.x !== undefined && e.sourceResources?.y !== undefined)
+    .map((e) => ({
+      timestamp: Math.max(0, e.timestamp - fightStart),
+      x:         e.sourceResources!.x!,
+      y:         e.sourceResources!.y!,
+      facing:    e.sourceResources!.facing!,
+    }));
+
+  const spawnCasts = enemyCastEvents
+    .filter((e) => e.type === "cast" && blackHoleIds.has(e.sourceID) && e.sourceResources?.x !== undefined && e.sourceResources?.y !== undefined)
+    .map((e) => ({
+      timestamp:      Math.max(0, e.timestamp - fightStart),
+      sourceInstance: e.sourceInstance ?? 0,
+      x:              e.sourceResources!.x!,
+      y:              e.sourceResources!.y!,
+      targetActorId:  e.targetID !== undefined && e.targetID !== -1 ? e.targetID : null,
+    }));
+
+  return { kefkaFacingSamples, spawnCasts };
+}
+
 function buildFFPlayers(
   friendlyPlayerIds: number[],
   actorMap:          Map<number, FFLActor>,
@@ -987,6 +1010,7 @@ export function transformFFightToPull(
   // hostilityType: "Enemies" fetches — NOT data.castEvents/debuffEvents.
   const enemyCastEvents = fflBuildEnemyCastEvents(data.enemyCastEvents ?? [], actorMap, abilityMap, fightStart);
   const enemyBuffEvents = fflBuildEnemyBuffEvents(data.enemyBuffEvents ?? [], actorMap, abilityMap, fightStart);
+  const blackHoleGeometry = fflBuildBlackHoleGeometry(data.enemyCastEvents ?? [], actorMap, fightStart);
 
   const errors = [
     ...detectPullErrors(players, deathEvents, enemyCastEvents, enemyBuffEvents),
@@ -1016,6 +1040,7 @@ export function transformFFightToPull(
     logSource:     "ffl",
     fightId:       data.fight.id,
     castEvents,
+    blackHoleGeometry,
   };
 }
 

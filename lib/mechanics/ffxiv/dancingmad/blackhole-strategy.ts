@@ -69,6 +69,19 @@ import {
   type BlackHoleAssignment,
 } from "./blackhole";
 
+// ── Direction/priority detection (added 2026-07) ─────────────────────────
+//
+// Everything above resolves WHO soaks which tether by moment-count alone —
+// it can't tell a player who stood at the WRONG physical black hole (but
+// still satisfied their own hit quota) from one who stood at the right
+// one. That needs actual geometry: which of the 4 cardinal black holes is
+// which, and which one each Support/DPS/Accretion role is SUPPOSED to
+// take. See detectIncorrectBlackHoleDirectionErrors below for the
+// detection; the module comment there covers how the geometry itself was
+// reverse-engineered (Kefka's facing, not position, as the reference; the
+// black hole NPC's own logged spawn position instead of inferring from
+// whoever got hit).
+
 export type BlackHoleStrategyId = "dsa" | "sda" | "double-tether";
 
 export const BLACK_HOLE_STRATEGIES: ReadonlyArray<{ id: BlackHoleStrategyId; label: string }> = [
@@ -511,6 +524,301 @@ export function detectClippedByNeighborTetherErrors(pull: Pull, strategy: BlackH
       role:        only.player.role,
       abilityId:   NOTHINGNESS_ABILITY_ID,
       abilityName: "Nothingness",
+    });
+  }
+
+  return errors.sort((a, b) => a.timestamp - b.timestamp);
+}
+
+// ─── Black Hole geometry: cardinal direction + priority order ──────────────
+//
+// Black holes spawn at the 4 cardinal points, and which Support/DPS/
+// Accretion role gets which one is determined by Kefka's position: from
+// arena center, going CLOCKWISE from wherever Kefka is, the roles are
+// assigned in priority order — SDA: Support, DPS, Accretion; DSA and
+// Double Tether (per the user, "modified DSA, same priority"): DPS,
+// Support, Accretion. A cardinal that doesn't spawn this tether-set is
+// simply skipped in the clockwise sequence.
+//
+// Getting the reference point right took real reverse-engineering:
+//
+// 1. Kefka's own logged x/y stays pinned at arena center (9999-10000) for
+//    the ENTIRE Black Hole phase in every pull checked — he never visibly
+//    moves, contradicting what's seen on the VOD (he appears to shift
+//    around the arena). The actual signal is his FACING, sampled from his
+//    own enemyCasts (FFLogs' `sourceResources.facing`), while he's
+//    positioned near center (`d <= 3` yalms) — confirmed independently
+//    against a third-party analyzer (analyzer.wtfdig.info) that renders
+//    this exact same "Kefka" reference marker; its bundle's black-hole
+//    module reads Kefka's facing filtered the same way and converts it via
+//    `theta = (-facing - 150*Math.PI)/100` (the `150*Math.PI` term is an
+//    exact multiple of 2*Math.PI and therefore a no-op — most likely dead
+//    leftover from an earlier constant — the conversion is equivalent to
+//    `theta = -facing/100`), then a compass bearing via
+//    `atan2(-sin(theta), cos(theta))`, which simplifies to `bearing =
+//    -theta`. In degrees: `bearing = (facing * 180/PI)/100 + 270 (mod
+//    360)`. Validated against pull 22 (report VtdBqhLQkWJXMvDg): this
+//    reads North for moments 1-2, Northwest for moments 3-5, North again
+//    for moments 6-8 — exactly matching the user's own VOD review, and
+//    Kefka's facing only ever changes at a tether-SET boundary (the same 4
+//    groupings blackhole.ts's mechanic model already uses: {1,2}, {3,4,5},
+//    {6,7,8}, {9,10}), never mid-set.
+//
+// 2. The active cardinal set (which of N/E/S/W actually has a black hole
+//    THIS tether-set — not always all 4) can't be reliably read from which
+//    player got hit, because a genuinely abandoned hole (nobody there at
+//    all) leaves zero trace in player damage-taken data. The FIX: the
+//    "black hole" NPC's own enemyCasts entries carry ITS OWN logged spawn
+//    position (`sourceResources.x/y` — always perfectly axis-aligned, one
+//    coordinate exactly matching arena center) and its intended `targetID`
+//    (absent/-1 when unclaimed) — independent ground truth, regardless of
+//    who (if anyone) actually stood there. Confirmed against pull 22
+//    moment 3: the game logs THREE spawns (north targeting the player who
+//    wrongly went there, west targeting the correct accretion holder, and
+//    south targeting nobody — the hole the player abandoned).
+//
+// Both of these need raw log data the rest of this file's detectors never
+// required — see types/Pull.ts's BlackHoleGeometry and its extraction in
+// lib/log-transforms.ts (fflBuildBlackHoleGeometry) / scripts/lib/
+// build-ff-players.js (buildFFBlackHoleGeometry, mirrored for the harness).
+
+type Cardinal = "north" | "south" | "east" | "west";
+
+const CARDINAL_BEARING: Record<Cardinal, number> = { north: 0, east: 90, south: 180, west: 270 };
+
+/** Simple, unrotated classification — dx>0 east/dx<0 west, dy>0 south/dy<0 north, dominant axis. Deliberately NOT the same as any earlier ad-hoc rotated formula used while investigating this — validated directly against the black hole NPC's own perfectly axis-aligned spawn positions (one of dx/dy always exactly 0), which need no rotation at all. */
+function classifyCardinal(x: number, y: number): Cardinal {
+  const dx = x - 10000, dy = y - 10000;
+  if (Math.abs(dx) >= Math.abs(dy)) return dx > 0 ? "east" : "west";
+  return dy > 0 ? "south" : "north";
+}
+
+// Kefka counts as "near center" (his facing is only meaningful as a Black
+// Hole reference there) within this many centi-yalms — matches the
+// reference analyzer's own `d <= 3` yalm filter.
+const KEFKA_NEAR_CENTER_TOLERANCE = 300;
+
+/** Converts Kefka's raw logged `facing` into a compass bearing (0=N, 90=E, 180=S, 270=W) — see the module comment above for the derivation. */
+function kefkaFacingToBearing(facing: number): number {
+  const deg = (facing * 180) / Math.PI / 100 + 270;
+  return ((deg % 360) + 360) % 360;
+}
+
+// The 4 tether-set groupings blackhole.ts's mechanic model already
+// establishes, given as the 1-based moment each set STARTS on.
+const TETHER_SET_START_MOMENT: readonly number[] = [1, 3, 6, 9];
+
+function tetherSetForMoment(moment: number): number {
+  if (moment <= 2) return 1;
+  if (moment <= 5) return 2;
+  if (moment <= 8) return 3;
+  return 4;
+}
+
+/**
+ * Kefka's bearing for each of the 4 tether sets — the last near-center
+ * facing sample before that set begins. A set with no qualifying sample is
+ * simply absent from the returned map (fails closed for that set only,
+ * same posture as the rest of this module).
+ */
+function resolveKefkaBearingsBySet(pull: Pull, burstTimestamp: number): Map<number, number> {
+  const samples = (pull.blackHoleGeometry?.kefkaFacingSamples ?? [])
+    .filter((s) => Math.hypot(s.x - 10000, s.y - 10000) <= KEFKA_NEAR_CENTER_TOLERANCE)
+    .sort((a, b) => a.timestamp - b.timestamp);
+
+  const bearings = new Map<number, number>();
+  for (let i = 0; i < TETHER_SET_START_MOMENT.length; i++) {
+    const setStart = burstTimestamp + TETHER_MOMENT_OFFSETS_MS[TETHER_SET_START_MOMENT[i] - 1];
+    // First set's lower bound mirrors the reference analyzer's own
+    // fallback (8s before the fight-relevant window opens); later sets are
+    // bounded below by the previous set's own start.
+    const windowStart = i === 0 ? setStart - 30000 : burstTimestamp + TETHER_MOMENT_OFFSETS_MS[TETHER_SET_START_MOMENT[i - 1] - 1];
+
+    let latestFacing: number | undefined;
+    for (const s of samples) {
+      if (s.timestamp < windowStart || s.timestamp >= setStart) continue;
+      latestFacing = s.facing;
+    }
+    if (latestFacing !== undefined) bearings.set(i + 1, kefkaFacingToBearing(latestFacing));
+  }
+  return bearings;
+}
+
+type SpawnInfo = { instance: number; cardinal: Cardinal; targetActorId: number | null };
+
+/** Every black hole's own logged spawn (cardinal + intended target) active at one specific moment — straight from the NPC's own position, not inferred from who got hit. One entry per distinct sourceInstance. */
+function resolveSpawnsForMoment(pull: Pull, burstTimestamp: number, moment: number): SpawnInfo[] {
+  const seen = new Map<number, SpawnInfo>();
+  for (const cast of pull.blackHoleGeometry?.spawnCasts ?? []) {
+    if (momentIndexFor(cast.timestamp, burstTimestamp) !== moment) continue;
+    if (seen.has(cast.sourceInstance)) continue;
+    seen.set(cast.sourceInstance, {
+      instance:      cast.sourceInstance,
+      cardinal:      classifyCardinal(cast.x, cast.y),
+      targetActorId: cast.targetActorId,
+    });
+  }
+  return [...seen.values()];
+}
+
+export const BLACKHOLE_INCORRECT_DIRECTION_RULE_ID = "ffxiv-blackhole-incorrect-direction";
+
+/**
+ * Per-pull check: did each Support/DPS/Accretion role take the physically
+ * CORRECT black hole (by cardinal direction), not just the correct
+ * moment-count? This is the gap detectMissedAssignedTetherErrors and
+ * detectClippedByNeighborTetherErrors can't cover — a player who takes
+ * someone ELSE's tether while that other tether goes unclaimed still
+ * satisfies their own hit-count quota (no shortfall, no surplus), so
+ * neither of those checks sees anything wrong. Confirmed case: report
+ * VtdBqhLQkWJXMvDg pull 22, tether #3 — the DPS (Pictomancer) took the
+ * north hole (the Support/Sage's assignment) while the Sage took none at
+ * all and the DPS's own correct hole (south) sat unclaimed. Root-caused to
+ * the player who went to the wrong spot, per the same attribution
+ * philosophy as the other Black Hole checks.
+ *
+ * Deliberately does NOT reuse resolvePullSchedule's best-fit lane
+ * assignment (bestPairing) — that heuristic infers lane identity FROM
+ * observed hits, which is exactly the kind of error this check exists to
+ * catch (it would just re-explain the mistake as if it were correct).
+ * Instead, Support vs DPS identity is resolved directly from job role
+ * (Healer = Support, anything else = DPS) — deterministic, no fitting.
+ *
+ * GATED TO "sda" ONLY — found via regression-testing, not asked for by the
+ * user. The Healer=Support assumption above is confirmed correct for SDA
+ * (validated against pull 22's known-good moments and its one known-bad
+ * one), but running the exact same logic against "dsa" and "double-tether"
+ * reports produced multiple full-group flags on pulls with no known issue
+ * — e.g. report Bb4wQtHA6VNmkMFq (double-tether) pull 3, tether #3: the
+ * geometry is internally consistent (the Accretion holder's own moments
+ * always land on whichever cardinal is 3rd clockwise, exactly as
+ * designed) but the remaining two-way split lands the Sage — a Healer —
+ * in the DPS-labeled slot, the opposite of what SDA's own data confirms.
+ * That means "Support"/"DPS" in the DSA/Double-Tether cheatsheets isn't
+ * simply "whichever of the two is a Healer" the way it is for SDA — some
+ * other convention decides it there, and shipping a guess would flag real
+ * players on clean pulls. Bows out entirely for those two shapes until
+ * that convention is confirmed.
+ *
+ * Returns [] when this pull never reaches Black Hole, its composition is
+ * unrecognized, `strategy` isn't "sda", or blackHoleGeometry wasn't
+ * captured for this pull (older cached sample data, or a non-FF pull).
+ */
+export function detectIncorrectBlackHoleDirectionErrors(pull: Pull, strategy: BlackHoleStrategyResult | null): PullError[] {
+  if (!strategy) return [];
+  if (strategy.strategyId !== "sda") return [];
+  if (pull.game !== "ffxiv") return [];
+  if (!pull.blackHoleGeometry) return [];
+
+  const burstTimestamp = findBurstTimestamp(pull.players);
+  if (burstTimestamp === undefined) return [];
+  const assignments = buildAssignments(pull.players, burstTimestamp);
+  if (!assignments) return [];
+  const groups = groupByRole({ pull, burstTimestamp, assignments });
+  if (!groups) return [];
+
+  const kefkaBearings = resolveKefkaBearingsBySet(pull, burstTimestamp);
+
+  function supportDps(pair: [NamedPlayer, Map<number, number>][]): { support: NamedPlayer; dps: NamedPlayer } | null {
+    const [a, b] = pair;
+    if (a[0].role === "Healer" && b[0].role !== "Healer") return { support: a[0], dps: b[0] };
+    if (b[0].role === "Healer" && a[0].role !== "Healer") return { support: b[0], dps: a[0] };
+    return null; // both/neither healer — ambiguous, bow out rather than guess
+  }
+
+  const firstSD  = supportDps(groups.firstNonAcc);
+  const secondSD = supportDps(groups.secondNonAcc);
+  // Third-in-line has no Accretion lane, but the user's stated priority
+  // rule ("Supports first clockwise, DPS second" for SDA) is applied here
+  // too for consistency — unconfirmed specifically for Third, but it's the
+  // most natural reading of a general per-line rule rather than one scoped
+  // only to First.
+  const thirdSD  = supportDps(groups.thirdPlayers);
+
+  // SDA puts Support first (clockwise) — always false here given the
+  // "sda"-only gate above. Kept as a named boolean rather than removed so
+  // lifting the gate later, once DSA/Double Tether's own Support/DPS
+  // convention is confirmed, only needs this one line un-hardcoded.
+  const dpsFirst = false;
+
+  type RoleSlot = { player: NamedPlayer; moments: readonly number[]; priority: number };
+  const slots: RoleSlot[] = [];
+  function addLine(
+    sd: { support: NamedPlayer; dps: NamedPlayer } | null,
+    earlierMoments: readonly number[],
+    laterMoments: readonly number[],
+    accretionPlayer?: NamedPlayer,
+    accretionMoments?: readonly number[]
+  ) {
+    if (sd) {
+      const [firstPlayer, secondPlayer] = dpsFirst ? [sd.dps, sd.support] : [sd.support, sd.dps];
+      slots.push({ player: firstPlayer, moments: earlierMoments, priority: 0 });
+      slots.push({ player: secondPlayer, moments: laterMoments, priority: 1 });
+    }
+    if (accretionPlayer && accretionMoments) slots.push({ player: accretionPlayer, moments: accretionMoments, priority: 2 });
+  }
+
+  if (strategy.shape === "double-tether") {
+    addLine(firstSD, DOUBLE_FIRST_PRIMARY, DOUBLE_FIRST_DOUBLE, groups.firstAcc[0], FIRST_ACC);
+  } else {
+    addLine(firstSD, SPLIT_FIRST_A, SPLIT_FIRST_B, groups.firstAcc[0], FIRST_ACC);
+  }
+  addLine(secondSD, SECOND_A, SECOND_B, groups.secondAcc[0], SECOND_ACC);
+  addLine(thirdSD, THIRD_A, THIRD_B);
+
+  const errors: PullError[] = [];
+
+  const checkedMoments = new Set<number>();
+  for (const slot of slots) for (const m of slot.moments) checkedMoments.add(m);
+
+  for (const moment of checkedMoments) {
+    const setIndex = tetherSetForMoment(moment);
+    const kefkaBearing = kefkaBearings.get(setIndex);
+    if (kefkaBearing === undefined) continue;
+
+    const spawns = resolveSpawnsForMoment(pull, burstTimestamp, moment);
+    const activeSlots = slots.filter((s) => s.moments.includes(moment)).sort((a, b) => a.priority - b.priority);
+    // Counts must match to pair them up with confidence — a mismatch means
+    // either a wipe-cascade artifact or an unrecognized shape for this
+    // moment, and guessing which spawn maps to which role would risk a
+    // wrong attribution.
+    if (activeSlots.length === 0 || activeSlots.length !== spawns.length) continue;
+
+    const sortedSpawns = [...spawns].sort((a, b) => {
+      const da = (CARDINAL_BEARING[a.cardinal] - kefkaBearing + 360) % 360;
+      const db = (CARDINAL_BEARING[b.cardinal] - kefkaBearing + 360) % 360;
+      return da - db;
+    });
+
+    const momentTimestamp = burstTimestamp + TETHER_MOMENT_OFFSETS_MS[moment - 1];
+    if (isCompromisedMoment(pull.deathEvents, momentTimestamp)) continue;
+
+    activeSlots.forEach((slot, i) => {
+      const expectedCardinal = sortedSpawns[i].cardinal;
+      const player = pull.players.find((p) => p.name === slot.player.name);
+      if (!player) return;
+
+      const actualHit = player.damageTaken.find(
+        (e) => e.abilityId === NOTHINGNESS_ABILITY_ID && momentIndexFor(e.timestamp, burstTimestamp) === moment
+      );
+      if (!actualHit) return; // no hit at all this moment — detectMissedAssignedTetherErrors' job, not this one's
+
+      const actualSpawn = spawns.find((s) => s.instance === actualHit.sourceInstance);
+      if (!actualSpawn || actualSpawn.cardinal === expectedCardinal) return;
+
+      errors.push({
+        ruleId:      BLACKHOLE_INCORRECT_DIRECTION_RULE_ID,
+        severity:    "Major",
+        name:        "Took Incorrect Black Hole",
+        description: `Assigned the ${expectedCardinal} Black Hole at tether #${moment} but instead took the ${actualSpawn.cardinal} one — leaving their own black hole unclaimed strains the raid's soak schedule.`,
+        timestamp:   momentTimestamp,
+        player:      player.name,
+        class:       player.className,
+        specId:      player.specId,
+        role:        player.role,
+        abilityId:   NOTHINGNESS_ABILITY_ID,
+        abilityName: "Nothingness",
+      });
     });
   }
 
