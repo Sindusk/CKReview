@@ -35,6 +35,20 @@ function toFightRelative(rep) {
   return shifted;
 }
 
+// Mirrors lib/log-transforms.ts's fflBuildEnemyCastEvents — completed casts
+// (not begincast) from non-player actors, minimal EnemyEvent shape.
+function buildFFEnemyCasts(rep, actorMap) {
+  return (rep.enemyCasts?.data ?? [])
+    .filter((e) => e.type === 'cast' && actorMap.get(e.sourceID)?.type !== 'Player')
+    .map((e) => ({
+      timestamp: e.timestamp,
+      actorId: e.sourceID,
+      actorName: actorMap.get(e.sourceID)?.name ?? `Unknown (${e.sourceID})`,
+      abilityId: e.abilityGameID ?? 0,
+      abilityName: 'Ability ' + e.abilityGameID,
+    }));
+}
+
 const explicitDir = process.argv[2] ? path.resolve(process.argv[2]) : null;
 const reportDirs = explicitDir ? [explicitDir] : discoverReportFolders(FF_DATA_DIR);
 
@@ -59,7 +73,8 @@ for (const dir of reportDirs) {
     const rep = toFightRelative(rawRep);
     const players = buildFFPlayers(rep, actorMap, getFFJobByName, abilityMap);
     const deaths  = buildFFDeaths(rep, actorMap, getFFJobByName);
-    const errors  = detectPhase1Errors(players, deaths);
+    const enemyCasts = buildFFEnemyCasts(rep, actorMap);
+    const errors  = detectPhase1Errors(players, deaths, enemyCasts);
     console.log('='.repeat(70));
     console.log(`${bossName} Pull ${pullNumber} ->`, errors.length, 'errors');
     for (const e of errors) {

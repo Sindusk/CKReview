@@ -21,7 +21,15 @@ function buildFFPlayers(rep, actorMap, getFFJobByName, abilityMap) {
     return {
       actorId: id,
       name: actor?.name || `P${id}`,
-      className: actor?.subType || '?',
+      // Matches lib/log-transforms.ts's real buildFFPlayers: className is
+      // the resolved job DISPLAY name (job.name, e.g. "Dark Knight"), not
+      // the raw FFLogs subType ("DarkKnight") — they differ for exactly two
+      // jobs (DarkKnight/WhiteMage lack the space FFLogs' subType strips).
+      // Using the raw subType here silently broke any mechanic module
+      // keying its canonical-position tables by className for those two
+      // jobs (found via phase1.ts's Graven Image detection returning no
+      // errors against real harness data despite a confirmed failure).
+      className: job.name || '?',
       specId: 0, specName: job.name, role: job.role, rangeType: job.rangeType, game: 'ffxiv',
       damageDone: [], casts: [],
       healing: (rep.healing?.data ?? []).filter((e) => e.targetID === id).map((e) => ({

@@ -107,6 +107,15 @@
 // (21 of 22) deviates under 6 yalms from their predicted slot (one
 // consistently "sloppy" Paladin included) — see
 // ARROW_OUT_OF_POSITION_THRESHOLD_YALMS for where the line is drawn.
+//
+// Graven Image's spread mechanic (~0:38, cast "Graven Image", 48370) lives
+// in its own file, graven-image.ts, NOT here — unlike everything else in
+// this module, its "ideal position" can't be hardcoded: which specific job
+// occupies which physical spot is a raid's own strategy choice (confirmed
+// by cross-report testing — a different report's White Mage/Paladin stood
+// somewhere completely different from this report's, consistently, not by
+// mistake). It's cross-pull/learned-per-report instead, same reason
+// blackhole-strategy.ts is split out from blackhole.ts.
 
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import type { PullError } from "@/types/PullError";

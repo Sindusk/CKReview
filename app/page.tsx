@@ -27,6 +27,7 @@ import {
   detectIncorrectBlackHoleDirectionErrors,
   type BlackHoleStrategyId,
 } from "@/lib/mechanics/ffxiv/dancingmad/blackhole-strategy";
+import { learnGravenImageLayout, detectGravenImageSpreadErrors } from "@/lib/mechanics/ffxiv/dancingmad/graven-image";
 import type { Pull } from "../types/Pull";
 import { createCallWipeError, CALL_WIPE_RULE_ID, createManualError, type ManualErrorInput } from "@/types/PullError";
 import type { SavedSession } from "@/types/Session";
@@ -159,6 +160,11 @@ export default function Home() {
     () => detectBlackHoleStrategy(pulls, blackHoleOverrideId),
     [pulls, blackHoleOverrideId]
   );
+  // Graven Image's ideal spread positions are learned fresh from THIS
+  // report's own pulls (which job stands where is a raid strategy choice,
+  // not a game-mechanic constant — see graven-image.ts's module header),
+  // same cross-pull-then-per-pull shape as blackHoleStrategy above.
+  const gravenImageLayout = useMemo(() => learnGravenImageLayout(pulls), [pulls]);
 
   // Pulls with "Missed Mitigation" and Black Hole "Missed Assigned Tether"
   // errors merged in (see lib/mechanics/ffxiv/dancingmad/mitigation-
@@ -175,7 +181,6 @@ export default function Home() {
   // calls / manual errors) and re-derived on plan/strategy swap.
   const mitigationPlan = getMitigationPlan(mitigationPlanId);
   const displayPulls = useMemo(() => {
-    if (!mitigationPlan && !blackHoleStrategy) return pulls;
     return pulls.map((p) => {
       const mitigationErrors = mitigationPlan ? detectMitigationErrors(p, mitigationPlan) : [];
       const blackHoleErrors = [
@@ -183,10 +188,11 @@ export default function Home() {
         ...detectClippedByNeighborTetherErrors(p, blackHoleStrategy),
         ...detectIncorrectBlackHoleDirectionErrors(p, blackHoleStrategy),
       ];
-      const extra = [...mitigationErrors, ...blackHoleErrors];
+      const gravenImageErrors = detectGravenImageSpreadErrors(p, gravenImageLayout);
+      const extra = [...mitigationErrors, ...blackHoleErrors, ...gravenImageErrors];
       return extra.length === 0 ? p : { ...p, errors: [...p.errors, ...extra] };
     });
-  }, [pulls, mitigationPlan, blackHoleStrategy]);
+  }, [pulls, mitigationPlan, blackHoleStrategy, gravenImageLayout]);
   const [selectedPullId, setSelectedPullId] = useState<number | null>(null);
 
   const [importError, setImportError] = useState<string | null>(null);
