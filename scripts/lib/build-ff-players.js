@@ -59,12 +59,17 @@ function buildFFDeaths(rep, actorMap, getFFJobByName) {
   return (rep.deaths?.data ?? []).map((e) => {
     const actor = actorMap.get(e.targetID);
     const job = getFFJobByName(actor?.subType ?? '');
+    const killingId = e.killingAbilityGameID ?? 0;
+    // Mirrors lib/log-transforms.ts's fflTransformDeath: sourceID -1 with no
+    // resolved ability is an environmental death (e.g. jumping off the
+    // arena), used by phase1.ts's jumped-off-arena detection.
+    const cause = killingId ? '' : (e.sourceID === -1 ? 'Environmental' : 'Unknown');
     return {
       timestamp: e.timestamp,
       player: actor?.name || `P${e.targetID}`,
       class: actor?.subType || '?', specId: 0, role: job.role,
-      killingAbilityGameId: e.killingAbilityGameID ?? 0,
-      cause: '',
+      killingAbilityGameId: killingId,
+      cause,
     };
   });
 }

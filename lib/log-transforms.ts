@@ -58,6 +58,7 @@ import { detectForsakenTowerErrors } from "./mechanics/ffxiv/dancingmad/forsaken
 import { detectBlackHoleErrors } from "./mechanics/ffxiv/dancingmad/blackhole";
 import { detectLimitCutErrors } from "./mechanics/ffxiv/dancingmad/limitcut";
 import { detectExdeathErrors } from "./mechanics/ffxiv/dancingmad/exdeath";
+import { detectPhase1Errors } from "./mechanics/ffxiv/dancingmad/phase1";
 import { detectMidnightFallsErrors } from "./mechanics/wow/vs-dr-mqd/midnightfalls";
 
 // Shared shape for both games' ability maps: gameID -> name + raw icon
@@ -1018,6 +1019,7 @@ export function transformFFightToPull(
     ...detectBlackHoleErrors(players, deathEvents),
     ...detectLimitCutErrors(players, deathEvents),
     ...detectExdeathErrors(players, deathEvents),
+    ...detectPhase1Errors(players, deathEvents),
   ].sort((a, b) => a.timestamp - b.timestamp);
 
   const fightDurationMs = data.fight.endTime - data.fight.startTime;
