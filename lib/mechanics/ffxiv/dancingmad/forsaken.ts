@@ -103,6 +103,89 @@ const PATH_OF_LIGHT_WINDOW_MS = 2000;
 
 export const FORSAKEN_MISSED_TOWER_RULE_ID = "ffxiv-forsaken-missed-tower";
 export const FORSAKEN_ENRAGE_CHECK_RULE_ID = "ffxiv-forsaken-enrage-check-missed";
+export const FORSAKEN_CLONE_OVERLAP_RULE_ID = "ffxiv-forsaken-clone-overlap";
+
+// While a tower resolution is soaked by its 4 assigned players, a separate
+// boss "clone" NPC (actor name "Kefka" like the real boss, but a distinct
+// actor id — 3 concurrent instances) hits 3 of the OTHER (currently
+// off-duty) players near the boss's own hitbox, one per instance. On every
+// clean resolution seen across this report each instance hits exactly one
+// distinct player. Confirmed failure (report VtdBqhLQkWJXMvDg pull 14): the
+// Paladin (Kup'o Noodles) was still crossing from the towers toward the
+// boss when TWO distinct clone instances landed on him (45ms apart,
+// sourceInstance 2 and 3) instead of one, and the combined hit killed him —
+// the same "caught in the overlap between two things that should only ever
+// hit one person" shape as blackhole.ts's tether clip and phase1.ts's Wave
+// Cannon tower overlap. The exact canonical "assigned spot" per player
+// isn't solved yet (bearing relative to both boss facing and the tower
+// position was tried and neither clustered cleanly enough to trust — open
+// item), so this is gated purely on the outcome, with no position/distance
+// in the description.
+const CLONE_ABILITY_ID = 47833;
+
+// Distinct hits on different players land within tens of ms of each other
+// on real logs (observed: <100ms apart, mirroring Wave Cannon's own
+// volley); generous without risking merging two separate resolutions.
+const CLONE_HIT_CLUSTER_MS = 300;
+
+/**
+ * Detects a player hit by 2+ distinct Kefka-clone instances (47833) in the
+ * same volley — meant to hit exactly one off-duty player each; see the
+ * module comment above.
+ */
+function detectCloneOverlapErrors(players: PlayerInfo[]): PullError[] {
+  type Hit = { player: PlayerInfo; timestamp: number; sourceInstance: number };
+  const hits: Hit[] = [];
+  for (const player of players) {
+    for (const e of player.damageTaken) {
+      if (e.abilityId !== CLONE_ABILITY_ID || e.sourceInstance === undefined) continue;
+      hits.push({ player, timestamp: e.timestamp, sourceInstance: e.sourceInstance });
+    }
+  }
+  if (hits.length === 0) return [];
+
+  hits.sort((a, b) => a.timestamp - b.timestamp);
+  const clusters: Hit[][] = [];
+  for (const hit of hits) {
+    const current = clusters[clusters.length - 1];
+    if (current && hit.timestamp - current[current.length - 1].timestamp <= CLONE_HIT_CLUSTER_MS) {
+      current.push(hit);
+    } else {
+      clusters.push([hit]);
+    }
+  }
+
+  const errors: PullError[] = [];
+  for (const cluster of clusters) {
+    const byPlayer = new Map<number, Hit[]>();
+    for (const h of cluster) {
+      const list = byPlayer.get(h.player.actorId) ?? [];
+      list.push(h);
+      byPlayer.set(h.player.actorId, list);
+    }
+
+    for (const hs of byPlayer.values()) {
+      const distinctInstances = new Set(hs.map((h) => h.sourceInstance));
+      if (distinctInstances.size < 2) continue;
+
+      errors.push({
+        ruleId:      FORSAKEN_CLONE_OVERLAP_RULE_ID,
+        severity:    "Major",
+        name:        "Caught By Multiple Clones",
+        description: `Was still moving into position when ${distinctInstances.size} separate Kefka clones landed on them instead of one — should have already been at their off-duty spot near the boss.`,
+        timestamp:   hs[0].timestamp,
+        player:      hs[0].player.name,
+        class:       hs[0].player.className,
+        specId:      hs[0].player.specId,
+        role:        hs[0].player.role,
+        abilityId:   CLONE_ABILITY_ID,
+        abilityName: "Kefka Clone",
+      });
+    }
+  }
+
+  return errors;
+}
 
 /**
  * Phase 2's enrage check: Kefka's HP must be brought down to nearly 0 by
@@ -445,6 +528,7 @@ export function detectForsakenTowerErrors(
   errors.push(...detectOvercrowdedTowerErrors(players, teamByPlayer, labelsByPlayer, expectedTimestamps, confirmedLegitKeys));
   errors.push(...wrongPositionErrors);
   errors.push(...detectLethalConeBaitErrors(players, deathEvents, expectedTimestamps, misattributedConeDeaths));
+  errors.push(...detectCloneOverlapErrors(players));
   errors.push(...detectEnrageCheckError(enemyCasts));
 
   return errors.sort((a, b) => a.timestamp - b.timestamp);
