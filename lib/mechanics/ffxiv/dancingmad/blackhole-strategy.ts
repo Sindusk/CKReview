@@ -120,14 +120,29 @@ export type BlackHoleStrategyResult = {
 const SECOND_A: readonly number[] = [4, 5, 6];
 const SECOND_B: readonly number[] = [5, 6, 7];
 const SECOND_ACC: readonly number[] = [6, 7, 8];
-const THIRD_A: readonly number[] = [7, 8, 9];
-const THIRD_B: readonly number[] = [8, 9, 10];
 const FIRST_ACC: readonly number[] = [3, 4, 5];
 
 const SPLIT_FIRST_A: readonly number[] = [1, 2, 3];
 const SPLIT_FIRST_B: readonly number[] = [2, 3, 4];
 const DOUBLE_FIRST_PRIMARY: readonly number[] = [1, 3, 4];
 const DOUBLE_FIRST_DOUBLE: readonly number[] = [2, 2, 3];
+
+// Third-in-Line ALSO differs by shape — confirmed 2026-07-22 (report
+// G7kTFVxjcAC6p1MN, pull 7) after a user-reported false positive: this
+// module previously assumed Third was identical across all three
+// cheatsheets (a single THIRD_A/THIRD_B split, never gated on shape), but
+// real double-tether data shows the same "one lane skips a moment, the
+// other takes both of its tethers" pattern First already has, just shifted
+// one moment later (m9 instead of m2). Confirmed hits: the DPS (Dragoon)
+// took exactly #7/#8/#10 (skipping #9 entirely); the other non-Accretion
+// Third player (Dark Knight) took #8 once and #9 TWICE. Matches
+// sampledata/ff/BlackHoleDoubleTether.png's Third Tethers row. DSA/SDA's
+// simple split ([7,8,9]/[8,9,10]) is unaffected — only used for `shape ===
+// "split"` below.
+const SPLIT_THIRD_A: readonly number[] = [7, 8, 9];
+const SPLIT_THIRD_B: readonly number[] = [8, 9, 10];
+const DOUBLE_THIRD_PRIMARY: readonly number[] = [7, 8, 10];
+const DOUBLE_THIRD_DOUBLE: readonly number[] = [8, 9, 9];
 
 type NamedPlayer = { name: string; className: string; role: "Tank" | "Healer" | "DPS" };
 
@@ -284,7 +299,6 @@ export function detectBlackHoleStrategy(pulls: Pull[], forcedId?: BlackHoleStrat
 
   const { groups } = exemplar;
   const secondPairing = bestPairing(groups.secondNonAcc, SECOND_A, SECOND_B);
-  const thirdPairing  = bestPairing(groups.thirdPlayers, THIRD_A, THIRD_B);
 
   const lanes: BlackHoleLane[] = [];
   function addLane(slotLabel: string, p: NamedPlayer, moments: readonly number[]) {
@@ -310,8 +324,16 @@ export function detectBlackHoleStrategy(pulls: Pull[], forcedId?: BlackHoleStrat
   addLane("Second (Lane A)", secondPairing.a, SECOND_A);
   addLane("Second (Lane B)", secondPairing.b, SECOND_B);
   addLane("Second (Accretion)", groups.secondAcc[0], SECOND_ACC);
-  addLane("Third (Lane A)", thirdPairing.a, THIRD_A);
-  addLane("Third (Lane B)", thirdPairing.b, THIRD_B);
+
+  if (shape === "double-tether") {
+    const thirdPairing = bestPairing(groups.thirdPlayers, DOUBLE_THIRD_PRIMARY, DOUBLE_THIRD_DOUBLE);
+    addLane("Third (Skip m9)", thirdPairing.a, DOUBLE_THIRD_PRIMARY);
+    addLane("Third (Double m9)", thirdPairing.b, DOUBLE_THIRD_DOUBLE);
+  } else {
+    const thirdPairing = bestPairing(groups.thirdPlayers, SPLIT_THIRD_A, SPLIT_THIRD_B);
+    addLane("Third (Lane A)", thirdPairing.a, SPLIT_THIRD_A);
+    addLane("Third (Lane B)", thirdPairing.b, SPLIT_THIRD_B);
+  }
 
   return { shape, strategyId, pullsAnalyzed: resolvable.length, exemplarPullNumber: exemplar.pullNumber, lanes };
 }
@@ -325,7 +347,9 @@ function slotLabelFor(moments: readonly number[]): string {
     : moments === SECOND_A ? "Second (Lane A)"
     : moments === SECOND_B ? "Second (Lane B)"
     : moments === SECOND_ACC ? "Second (Accretion)"
-    : moments === THIRD_A ? "Third (Lane A)"
+    : moments === DOUBLE_THIRD_PRIMARY ? "Third (Skip m9)"
+    : moments === DOUBLE_THIRD_DOUBLE ? "Third (Double m9)"
+    : moments === SPLIT_THIRD_A ? "Third (Lane A)"
     : "Third (Lane B)";
 }
 
@@ -360,8 +384,13 @@ function resolvePullSchedule(
   const secondPairing = bestPairing(groups.secondNonAcc, SECOND_A, SECOND_B);
   schedule.push([secondPairing.a, SECOND_A], [secondPairing.b, SECOND_B]);
   schedule.push([groups.secondAcc[0], SECOND_ACC]);
-  const thirdPairing = bestPairing(groups.thirdPlayers, THIRD_A, THIRD_B);
-  schedule.push([thirdPairing.a, THIRD_A], [thirdPairing.b, THIRD_B]);
+  if (shape === "double-tether") {
+    const thirdPairing = bestPairing(groups.thirdPlayers, DOUBLE_THIRD_PRIMARY, DOUBLE_THIRD_DOUBLE);
+    schedule.push([thirdPairing.a, DOUBLE_THIRD_PRIMARY], [thirdPairing.b, DOUBLE_THIRD_DOUBLE]);
+  } else {
+    const thirdPairing = bestPairing(groups.thirdPlayers, SPLIT_THIRD_A, SPLIT_THIRD_B);
+    schedule.push([thirdPairing.a, SPLIT_THIRD_A], [thirdPairing.b, SPLIT_THIRD_B]);
+  }
 
   return { burstTimestamp, schedule };
 }
@@ -764,7 +793,7 @@ export function detectIncorrectBlackHoleDirectionErrors(pull: Pull, strategy: Bl
     addLine(firstSD, SPLIT_FIRST_A, SPLIT_FIRST_B, groups.firstAcc[0], FIRST_ACC);
   }
   addLine(secondSD, SECOND_A, SECOND_B, groups.secondAcc[0], SECOND_ACC);
-  addLine(thirdSD, THIRD_A, THIRD_B);
+  addLine(thirdSD, SPLIT_THIRD_A, SPLIT_THIRD_B);
 
   const errors: PullError[] = [];
 
