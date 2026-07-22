@@ -89,6 +89,23 @@ const PATH_OF_LIGHT_ABILITY_ID  = 47806;   // "Path of Light" — the tower-soak
 const ULTIMATE_EMBRACE_ABILITY_ID = 49740;
 const ENRAGE_CHECK_MAX_HP_PERCENT = 1.5; // clean max observed 1.06%, failure observed 2.69%
 
+// The cast's OWN sourceResources HP snapshot (taken the instant the cast
+// completes) undercounts how close a pull actually got — confirmed 2026-07,
+// report G7kTFVxjcAC6p1MN pull 6: the final Ultimate Embrace completed at
+// 1.67% HP (would have false-positived under the threshold above), but the
+// raid finished him off just ~3.3s later, landing several more hits that
+// bring him to an exact 0. So this scans every player's own damageDone hits
+// on the boss for up to this many ms after the cast completes, looking for
+// one that actually brings him to exactly 0 HP — NOT for a lower percentage
+// reading (a genuine enrage can ALSO show a lot of extra post-cast damage
+// and a very low HP floor without ever hitting 0: confirmed failure
+// VtdBqhLQkWJXMvDg pull 3 has 33 more hits after its final cast, bottoming
+// out at 0.0875% HP and then stopping dead — the boss survived and the raid
+// wiped to the enrage ~7s later instead. Reaching exactly 0 is the only
+// reliable "he actually died" signal; anything else falls back to the
+// original cast-instant percentage check below).
+const ENRAGE_CHECK_POST_CAST_WINDOW_MS = 6000;
+
 // Path of Light's associated damage event typically lands ~550-650ms
 // BEFORE the paired stack-loss timestamp — but occasionally the specific
 // event that survives FFLogs' damage-dedup (see the onlyLanded fix in
@@ -188,22 +205,39 @@ function detectCloneOverlapErrors(players: PlayerInfo[]): PullError[] {
 }
 
 /**
- * Phase 2's enrage check: Kefka's HP must be brought down to nearly 0 by
- * the moment his SECOND "Ultimate Embrace" (49740) cast completes. Raid-wide
- * — nobody in particular is at fault, so this is a "Raid" severity error
- * with no player attribution, same convention as error-rules.ts's raid-wide
- * "enemyCast" rules. Takes the LAST 49740 completion in the pull (there are
- * two per Phase 2 in every log seen so far; a pull that wipes before the
- * second one simply has only one, which is correctly ignored here — no
- * enrage check was reached at all).
+ * Phase 2's enrage check: Kefka's HP must be brought down to nearly 0 within
+ * a few seconds of his SECOND "Ultimate Embrace" (49740) cast completing.
+ * Raid-wide — nobody in particular is at fault, so this is a "Raid" severity
+ * error with no player attribution, same convention as error-rules.ts's
+ * raid-wide "enemyCast" rules. Takes the LAST 49740 completion in the pull
+ * (there are two per Phase 2 in every log seen so far; a pull that wipes
+ * before the second one simply has only one, which is correctly ignored
+ * here — no enrage check was reached at all).
  */
-function detectEnrageCheckError(enemyCasts: EnemyEvent[]): PullError[] {
+function detectEnrageCheckError(players: PlayerInfo[], enemyCasts: EnemyEvent[]): PullError[] {
   const embraceCasts = enemyCasts.filter(
     (e) => e.abilityId === ULTIMATE_EMBRACE_ABILITY_ID && e.hitPoints !== undefined && e.maxHitPoints
   );
   if (embraceCasts.length < 2) return [];
 
   const finalCast = embraceCasts[embraceCasts.length - 1];
+
+  // The only reliable "he actually died" signal — see
+  // ENRAGE_CHECK_POST_CAST_WINDOW_MS above for why a lower HP reading alone
+  // isn't enough. Falls back to the cast's own instant-of-completion
+  // snapshot (the original check) when nothing in the window actually
+  // zeroes him out.
+  const reachedZeroAfterCast = players
+    .flatMap((p) => p.damageDone)
+    .some(
+      (e) =>
+        e.target === finalCast.actorName &&
+        e.timestamp >= finalCast.timestamp &&
+        e.timestamp <= finalCast.timestamp + ENRAGE_CHECK_POST_CAST_WINDOW_MS &&
+        e.healthAfter === 0
+    );
+  if (reachedZeroAfterCast) return [];
+
   const hpPercent = (finalCast.hitPoints! / finalCast.maxHitPoints!) * 100;
   if (hpPercent <= ENRAGE_CHECK_MAX_HP_PERCENT) return [];
 
@@ -536,7 +570,7 @@ export function detectForsakenTowerErrors(
     lossesByPlayer.set(player.actorId, losses);
   }
 
-  if (lossesByPlayer.size === 0) return detectEnrageCheckError(enemyCasts);
+  if (lossesByPlayer.size === 0) return detectEnrageCheckError(players, enemyCasts);
 
   // Burst-based team inference (see its module comment) is authoritative
   // when this pull's roster matches a known comp; falls back to the older
@@ -636,7 +670,7 @@ export function detectForsakenTowerErrors(
   errors.push(...wrongPositionErrors);
   errors.push(...detectLethalConeBaitErrors(players, deathEvents, expectedTimestamps, misattributedConeDeaths));
   errors.push(...detectCloneOverlapErrors(players));
-  errors.push(...detectEnrageCheckError(enemyCasts));
+  errors.push(...detectEnrageCheckError(players, enemyCasts));
 
   return errors.sort((a, b) => a.timestamp - b.timestamp);
 }

@@ -13,6 +13,7 @@ function buildFFPlayers(rep, actorMap, getFFJobByName, abilityMap) {
   const playerIds = [...new Set(rep.combatantInfo?.data?.map((e) => e.sourceID) ?? [])];
   const onlyLanded = (evs) => evs.filter((e) => e.type === 'damage' || (e.type === 'calculateddamage' && e.unpaired === true));
   const dt = onlyLanded(rep.damageTaken?.data ?? []);
+  const dd = onlyLanded(rep.damageDone?.data ?? []);
   const statusMap = { removedebuff: 'removed', applydebuffstack: 'stack', removedebuffstack: 'stackRemoved' };
 
   return playerIds.map((id) => {
@@ -31,7 +32,16 @@ function buildFFPlayers(rep, actorMap, getFFJobByName, abilityMap) {
       // errors against real harness data despite a confirmed failure).
       className: job.name || '?',
       specId: 0, specName: job.name, role: job.role, rangeType: job.rangeType, game: 'ffxiv',
-      damageDone: [], casts: [],
+      damageDone: dd.filter((e) => e.sourceID === id).map((e) => ({
+        timestamp: e.timestamp,
+        abilityId: e.abilityGameID ?? 0,
+        abilityName: 'Ability ' + e.abilityGameID,
+        amount: e.amount ?? 0,
+        target: actorMap.get(e.targetID)?.name,
+        healthAfter: e.targetResources?.hitPoints,
+        maxHealth: e.targetResources?.maxHitPoints,
+      })),
+      casts: [],
       healing: (rep.healing?.data ?? []).filter((e) => e.targetID === id).map((e) => ({
         timestamp: e.timestamp,
         abilityId: e.abilityGameID ?? 0,

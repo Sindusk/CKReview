@@ -701,6 +701,12 @@ function fflDamageDoneToPlayerEvent(
     abilityIcon: fflAbilityIcon(event, abilityMap),
     amount:      event.amount ?? 0,
     target:      target?.name,
+    // Post-hit target HP snapshot (same targetResources nesting as
+    // fflDamageTakenToPlayerEvent above) — used by forsaken.ts's enrage
+    // check to read the boss's true HP a few seconds after its final
+    // Ultimate Embrace cast completes, rather than only at the cast instant.
+    healthAfter: event.targetResources?.hitPoints,
+    maxHealth:   event.targetResources?.maxHitPoints,
   };
 }
 
