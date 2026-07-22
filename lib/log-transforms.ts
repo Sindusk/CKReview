@@ -944,7 +944,14 @@ function buildFFPlayers(
       if (!actor) return null;
 
       const subType = actor.subType ?? "";
-      const job     = getFFJobByName(subType);
+      // FFLogs includes a pseudo-actor for the raid's shared Limit Break
+      // gauge in fight.friendlyPlayers (subType "LimitBreak", name "Limit
+      // Break" or "Multiple Players", oddly tagged type: "Player") — not a
+      // real party member. Mechanic checks that scan every entry in
+      // `players` (e.g. limitcut.ts's missing-dash-victim detection) would
+      // otherwise flag it for never doing anything a real player does.
+      if (subType === "LimitBreak") return null;
+      const job = getFFJobByName(subType);
 
       return {
         actorId,

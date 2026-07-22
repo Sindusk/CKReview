@@ -416,18 +416,67 @@ function detectDashErrors(
     return best;
   };
 
-  // ── Wrong bait spot: a dash landing away from its fitted slot ───────────
-  //
-  // The dash follows its numbered player (see module comment), so a
-  // single-victim dash landing far off the slot the progression assigns to
-  // that instance means the victim stood at the wrong spot — the confirmed
-  // case was a #6/#7 swap, both dashes landing 45° away on each other's
-  // slots, one victim dying to the ~5x-amplified mispositioned hit. Clean
-  // baits sit within ~8° of their slot; a swap is 45° minimum, so the
-  // half-slot tolerance splits them with room on both sides. Dead-player
-  // re-fires (which also land off-slot, on blameless players) never reach
-  // here — the deadDashMissed gate above returns first.
-  if (slotIndexFor !== undefined) {
+  // A player who was alive for the whole dash set but never appears as a
+  // victim of ANY instance is a different, more severe signature than a
+  // single-instance slot mismatch: their own clone never found them at all
+  // (they were far enough from every valid bait spot that no chord landed
+  // on them), and its dash retargeted wholesale onto some unrelated player
+  // instead. Confirmed 2026-07 (report G7kTFVxjcAC6p1MN pull 12, via the
+  // analyzer.wtfdig.info kefka-lc view): the Samurai was assigned bait #3
+  // but physically stood far off — never hit by any dash, then died to an
+  // unrelated environmental "fall" ~1.3s after the last dash (the same
+  // zero-ability-death signature as the gaze check's own knockback,
+  // confirming they were standing well outside the arena's valid area).
+  // Their own clone's chord instead landed on two OTHER players who were
+  // each standing correctly at their own assigned slot (confirmed against
+  // the fitted progression) — those are pure fallout of the missing
+  // player's redirect, not their own positioning mistakes, so per this
+  // module's own "never blame the victim who took a stray hit" standard
+  // (see module comment) they must NOT be flagged. When a missing player
+  // like this exists, the per-instance slot-mismatch attribution below is
+  // untrustworthy for whoever the redirect actually hit, so it's skipped
+  // entirely in favor of flagging the missing player directly.
+  const hitActorIds = new Set(hits.map((h) => h.player.actorId));
+  // Excludes anyone already dead before the dash set even started (e.g. a
+  // wipe cascade earlier in the fight) — never having reached Limit Cut at
+  // all isn't a positioning mistake.
+  const deadBeforeDash = new Set(
+    deathEvents.filter((d) => d.timestamp < firstDashTime).map((d) => d.player)
+  );
+  const missingPlayers = players.filter(
+    (p) => !hitActorIds.has(p.actorId) && !deadBeforeDash.has(p.name)
+  );
+  const lastDashTime = Math.max(...hits.map((h) => h.timestamp));
+
+  if (missingPlayers.length > 0) {
+    for (const p of missingPlayers) {
+      errors.push({
+        ruleId:      LIMITCUT_WRONG_POSITION_RULE_ID,
+        severity:    "Major",
+        name:        "Wrong Dash Position",
+        description: "Never received their own Limit Cut dash — stood far enough from their assigned bait spot that their clone retargeted onto another player instead.",
+        timestamp:   lastDashTime,
+        player:      p.name,
+        class:       p.className,
+        specId:      p.specId,
+        role:        p.role,
+        abilityId:   DASH_ABILITY_ID,
+        abilityName: "Limit Cut Dash",
+      });
+    }
+  } else if (slotIndexFor !== undefined) {
+    // ── Wrong bait spot: a dash landing away from its fitted slot ─────────
+    //
+    // The dash follows its numbered player (see module comment), so a
+    // single-victim dash landing far off the slot the progression assigns
+    // to that instance means the victim stood at the wrong spot — the
+    // confirmed case was a #6/#7 swap, both dashes landing 45° away on
+    // each other's slots, one victim dying to the ~5x-amplified
+    // mispositioned hit. Clean baits sit within ~8° of their slot; a swap
+    // is 45° minimum, so the half-slot tolerance splits them with room on
+    // both sides. Only trusted when every living player was hit exactly
+    // once each (no missing player above) — otherwise the hit victim may
+    // just be catching someone else's redirect (see above).
     for (const [instance, group] of victimsByInstance) {
       if (group.length !== 1) continue;
       const h = group[0];

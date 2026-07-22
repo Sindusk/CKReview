@@ -524,6 +524,13 @@ export function detectClippedByNeighborTetherErrors(pull: Pull, strategy: BlackH
       const needed = required.get(moment) ?? 0;
       const actual = hitCounts.get(moment) ?? 0;
       if (actual === needed) continue;
+      // needed === 0 means this moment isn't part of the player's schedule
+      // AT ALL — that's not "an extra hit on top of their own" (clipped by
+      // neighbor), it's soaking a tether they were never assigned in the
+      // first place, already covered by blackhole.ts's role-band
+      // soaked-incorrect-tether check. Only a hit count above what's
+      // required WITHIN their own assigned moment counts as a clip.
+      if (needed === 0) continue;
       const arr = byMoment.get(moment) ?? [];
       arr.push({ player, slotLabel, kind: actual > needed ? "extra" : "missing" });
       byMoment.set(moment, arr);
