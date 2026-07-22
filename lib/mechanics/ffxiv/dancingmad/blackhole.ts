@@ -126,6 +126,43 @@ const EARTHQUAKE_ABILITY_ID  = 47866; // the doubled-earthquake wipe symptom of 
 
 export const BLACKHOLE_INCORRECT_TETHER_RULE_ID = "ffxiv-blackhole-soaked-incorrect-tether";
 export const BLACKHOLE_LOST_CRUST_RULE_ID       = "ffxiv-blackhole-lost-primordial-crust";
+export const BLACKHOLE_EARTHQUAKE_DURING_VULN_RULE_ID = "ffxiv-blackhole-earthquake-during-vulnerability";
+
+// ── Accretion earthquake vulnerability overlap (confirmed 2026-07-21,
+//    report VtdBqhLQkWJXMvDg pull 8) ─────────────────────────────────────
+//
+// Separately from the tether conga line, the two Accretion (1001604)
+// holders each trigger their own raid-wide "Earthquake" (47866) the moment
+// they're healed back to full HP — landing on the whole raid and applying
+// debuff 1003372 (a ~2s vulnerability, observed 1960ms) to whoever it hits.
+// If a SECOND Earthquake lands anywhere on the raid before that
+// vulnerability has actually worn off (per real removedebuff timing, not a
+// nominal duration — see below), the still-vulnerable players get dropped
+// to 1 HP instead of taking the hit normally (their Primordial Crust,
+// 1005454, is what actually saves them — see BLACKHOLE_LOST_CRUST_RULE_ID
+// above), and the mechanic's own designed follow-up ("once the debuff
+// expires, an Earthquake is sent out") then finishes the raid off for real
+// since nobody has a crust left. That follow-up cascade is deliberately NOT
+// flagged as its own error — it's the encounter enforcing the wipe, not an
+// independent mistake — so this only ever reports the FIRST overlap found
+// in a pull (the actual root cause).
+//
+// Confirmed on pull 8: the first Earthquake (566391ms) applies 1003372 to 7
+// of 8 players; the second (567589ms, only 1198ms later — from Chauzey
+// Solstice being topped too quickly) lands while all 7 are still under it
+// (their real removedebuff events don't fire until 568212-568478ms). Cross-
+// checked against every other pull with this debuff in the same report:
+// pulls 11/17 show the identical shape (an early overlap, unreviewed by the
+// user yet but consistent with this rule); pulls 7/16/20/22 run multiple
+// clean, non-overlapping Earthquakes with zero false positives.
+const EARTHQUAKE_VULNERABILITY_ABILITY_ID = 1003372;
+
+// Every player hit by the SAME Earthquake gets applydebuff within a few ms
+// of each other (confirmed simultaneous in every log) — used both to
+// cluster one landing's applies together, and as the minimum gap before an
+// interval counts as "from an earlier, distinct landing" rather than the
+// current one.
+const EARTHQUAKE_LANDING_CLUSTER_MS = 100;
 
 const PRIMORDIAL_CRUST_ABILITY_ID = 1005454;
 
@@ -276,6 +313,73 @@ export function isCompromisedMoment(deathEvents: DeathEvent[], momentTimestamp: 
 }
 
 /**
+ * Detects an Accretion Earthquake landing on the raid while an EARLIER
+ * Earthquake's own vulnerability debuff (1003372) hasn't actually worn off
+ * yet — see the module comment above. Builds real applied/removed
+ * intervals per player (ground truth, not a nominal duration), clusters
+ * simultaneous applies into discrete "landings," then walks the landings
+ * in order looking for the first one where some interval from an earlier,
+ * different landing is still open. Only that first overlap is reported —
+ * everything after is the mechanic's own designed (and unavoidable) wipe
+ * cascade, not a fresh mistake.
+ */
+export function detectEarthquakeVulnerabilityOverlapErrors(players: PlayerInfo[]): PullError[] {
+  type Interval = { start: number; end: number };
+  const intervals: Interval[] = [];
+
+  for (const player of players) {
+    const events = player.debuffs
+      .filter((d) => d.abilityId === EARTHQUAKE_VULNERABILITY_ABILITY_ID)
+      .sort((a, b) => a.timestamp - b.timestamp);
+
+    let openStart: number | undefined;
+    for (const e of events) {
+      if (e.debuffStatus === "applied") {
+        openStart = e.timestamp;
+      } else if (e.debuffStatus === "removed" && openStart !== undefined) {
+        intervals.push({ start: openStart, end: e.timestamp });
+        openStart = undefined;
+      }
+    }
+    // Still open at the end of the pull's data (e.g. the wipe) — treat as
+    // open-ended so it can still count as "still active" for any later
+    // landing check within the data we do have.
+    if (openStart !== undefined) intervals.push({ start: openStart, end: Infinity });
+  }
+
+  if (intervals.length === 0) return [];
+
+  const starts = [...new Set(intervals.map((i) => i.start))].sort((a, b) => a - b);
+  const landings: number[] = [];
+  for (const s of starts) {
+    if (landings.length > 0 && s - landings[landings.length - 1] <= EARTHQUAKE_LANDING_CLUSTER_MS) continue;
+    landings.push(s);
+  }
+
+  for (let i = 1; i < landings.length; i++) {
+    const landingTime = landings[i];
+    const stillVulnerable = intervals.filter(
+      (iv) => iv.start < landingTime - EARTHQUAKE_LANDING_CLUSTER_MS && iv.end > landingTime
+    ).length;
+    if (stillVulnerable === 0) continue;
+
+    return [
+      {
+        ruleId:      BLACKHOLE_EARTHQUAKE_DURING_VULN_RULE_ID,
+        severity:    "Raid",
+        name:        "Earthquake Hit Raid While Still Vulnerable",
+        description: `An Accretion Earthquake landed while ${stillVulnerable} player(s) were still under the previous Earthquake's vulnerability — the raid drops to 1 HP, and the mechanic's own follow-up Earthquake finishes the wipe once that runs out.`,
+        timestamp:   landingTime,
+        abilityId:   EARTHQUAKE_ABILITY_ID,
+        abilityName: "Earthquake",
+      },
+    ];
+  }
+
+  return [];
+}
+
+/**
  * Detects Black Hole tether failures: a Nothingness hit landing on a
  * player at a tether moment their debuff assignment doesn't cover.
  *
@@ -393,6 +497,8 @@ export function detectBlackHoleErrors(
       });
     }
   }
+
+  errors.push(...detectEarthquakeVulnerabilityOverlapErrors(players));
 
   return errors.sort((a, b) => a.timestamp - b.timestamp);
 }
