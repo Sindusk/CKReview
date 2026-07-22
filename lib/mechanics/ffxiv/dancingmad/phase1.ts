@@ -62,6 +62,32 @@
 // truth and no overlap/death — left unexplained rather than guessed at;
 // WAVE_CANNON_JOB_POSITIONS was built excluding those outliers.
 //
+// ── WAVE CANNON TOWER OVERLAP (confirmed 2026-07-22, same report, pull 12) ─
+//
+// Each of the 4 Wave Cannon carriers drops a tower (47786) at their own
+// feet the instant they're hit — 4 concurrent tower NPCs (sourceInstance
+// 1-4), resolving ~3s later onto whichever of the OTHER 4 players is
+// standing at that spot to soak it. Clean: 4 towers, 4 distinct soakers,
+// one hit each. Confirmed failure (pull 12): the Pictomancer (Ayumi Emi)
+// stood in the crossing point between two towers' soak spots and was hit
+// by BOTH (sourceInstance 3 and 4, 43ms apart) — one tower's worth of
+// damage would have been fine, but taking two killed her. Detection is
+// gated purely on that outcome (2+ distinct tower instances hitting one
+// target) — the same "gate on outcome" approach as Wave Cannon itself
+// above, just without a position table (there's no single "wrong spot" to
+// measure against; standing between two towers is the mistake).
+//
+// Self-gates on the mechanic having actually resolved cleanly: exactly 4
+// distinct players hit by Wave Cannon itself, none of whom died before
+// their own tower could resolve. Both other overlap-shaped pulls in this
+// report (4, 13) turned out to be fallout of an EARLIER, already-flagged
+// problem rather than a fresh tower mistake — pull 4's Wave Cannon
+// mis-position (see above) killed 2 of the 4 carriers outright, and pull 13
+// had already lost players to an earlier mechanic (Graven Image) before
+// Wave Cannon even fired; both leave too few live carriers to cover 4
+// towers, scrambling who gets hit by what. Excluding both keeps this rule
+// to the one genuinely fresh positioning mistake it was built for.
+//
 // ── TELE-TROUNCING ARROW PLACEMENT (confirmed 2026-07, pulls 6/15) ─────────
 //
 // At ~2:33, all 8 players get 2 stacks of "Tele-Portent" (8 distinct ability
@@ -124,6 +150,7 @@ import type { DeathEvent } from "@/types/DeathEvent";
 export const BLIZZARD_III_SILENT_KILL_RULE_ID = "ffxiv-phase1-blizzard3-silent-kill";
 export const JUMPED_OFF_ARENA_RULE_ID          = "ffxiv-phase1-jumped-off-arena";
 export const WAVE_CANNON_OUT_OF_POSITION_RULE_ID = "ffxiv-phase1-wave-cannon-out-of-position";
+export const WAVE_CANNON_TOWER_OVERLAP_RULE_ID   = "ffxiv-phase1-wave-cannon-tower-overlap";
 export const TELE_TROUNCING_ARROW_RULE_ID = "ffxiv-phase1-tele-trouncing-arrow-misplaced";
 
 const BLIZZARD_III_BLOWOUT_ABILITY_IDS = new Set([47765, 47768, 47771, 47774]);
@@ -162,6 +189,13 @@ const WAVE_CANNON_JOB_POSITIONS: Readonly<Record<string, { x: number; y: number 
 // Comfortably above the ~1.5-yalm natural jitter seen in every clean job
 // cluster, comfortably below the confirmed failure's ~6.9-yalm deviation.
 const WAVE_CANNON_OUT_OF_POSITION_THRESHOLD_CENTIYALMS = 400;
+
+// The tower each of the 4 Wave Cannon carriers drops at their own feet the
+// instant they're hit (begincast fires at the same timestamp as the Wave
+// Cannon hit itself), resolving ~3s later onto whichever of the other 4
+// players is standing there to soak it — see WAVE_CANNON_TOWER_OVERLAP
+// module comment below.
+const WAVE_CANNON_TOWER_ABILITY_ID = 47786;
 
 type Cardinal = "N" | "E" | "S" | "W";
 type Point = { x: number; y: number };
@@ -397,6 +431,64 @@ function detectWaveCannonOutOfPositionErrors(players: PlayerInfo[], deathEvents:
   return errors;
 }
 
+/**
+ * Detects a player caught standing in the overlap between two Wave Cannon
+ * towers, soaking both instead of the one they were meant to. See the
+ * module comment for the mechanic and its cascade-suppression gates.
+ */
+function detectWaveCannonTowerOverlapErrors(players: PlayerInfo[], deathEvents: DeathEvent[]): PullError[] {
+  const waveCannonHitTimestamps: number[] = [];
+  const waveCannonCarriers = new Set<string>();
+  for (const player of players) {
+    for (const e of player.damageTaken) {
+      if (e.abilityId !== WAVE_CANNON_ABILITY_ID) continue;
+      waveCannonCarriers.add(player.name);
+      waveCannonHitTimestamps.push(e.timestamp);
+    }
+  }
+  if (waveCannonHitTimestamps.length === 0) return [];
+
+  // Fewer than 4 carriers means the mechanic didn't resolve as designed —
+  // some players never reached it (an earlier wipe already underway) —
+  // and the remaining towers can't be trusted to mean anything.
+  if (waveCannonCarriers.size !== 4) return [];
+
+  const waveCannonTime = Math.min(...waveCannonHitTimestamps);
+
+  // A carrier who dies before their own tower resolves leaves it to
+  // re-target/scramble the remaining soakers — same cascade-suppression
+  // pattern as limitcut.ts's dead-before-the-dash check.
+  const carrierDiedBeforeTowerResolved = deathEvents.some(
+    (d) =>
+      waveCannonCarriers.has(d.player) &&
+      d.timestamp >= waveCannonTime &&
+      d.timestamp <= waveCannonTime + WAVE_CANNON_VOLLEY_CLUSTER_MS + 5000
+  );
+  if (carrierDiedBeforeTowerResolved) return [];
+
+  const errors: PullError[] = [];
+  for (const player of players) {
+    const towerHits = player.damageTaken.filter((e) => e.abilityId === WAVE_CANNON_TOWER_ABILITY_ID);
+    const distinctInstances = new Set(towerHits.map((e) => e.sourceInstance).filter((i) => i !== undefined));
+    if (distinctInstances.size < 2) continue;
+
+    errors.push({
+      ruleId:      WAVE_CANNON_TOWER_OVERLAP_RULE_ID,
+      severity:    "Major",
+      name:        "Soaked Multiple Wave Cannon Towers",
+      description: `Stood in the overlap between ${distinctInstances.size} Wave Cannon towers and soaked all of them — should only ever take one.`,
+      timestamp:   Math.min(...towerHits.map((e) => e.timestamp)),
+      player:      player.name,
+      class:       player.className,
+      specId:      player.specId,
+      role:        player.role,
+      abilityId:   WAVE_CANNON_TOWER_ABILITY_ID,
+      abilityName: "Wave Cannon Tower",
+    });
+  }
+  return errors;
+}
+
 function detectTeleTrouncingArrowErrors(players: PlayerInfo[]): PullError[] {
   type Removal = { player: PlayerInfo; timestamp: number; dir: Cardinal };
   const removals: Removal[] = [];
@@ -496,6 +588,7 @@ export function detectPhase1Errors(players: PlayerInfo[], deathEvents: DeathEven
     ...detectBlizzardIIIBlowoutSilentKillErrors(players, deathEvents),
     ...detectJumpedOffArenaError(deathEvents),
     ...detectWaveCannonOutOfPositionErrors(players, deathEvents),
+    ...detectWaveCannonTowerOverlapErrors(players, deathEvents),
     ...detectTeleTrouncingArrowErrors(players),
   ].sort((a, b) => a.timestamp - b.timestamp);
 }
