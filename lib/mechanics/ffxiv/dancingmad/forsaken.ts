@@ -1814,120 +1814,150 @@ function detectWrongTowerPositionErrors(
         }
       }
 
-      // ── Cone bait too far: the wrong (soaking) player caught the cone ────
+      // ── Cone bait too far: the wrong player caught the cone ──────────────
       //
       // The Cone follow-up (47810) fires at the closest player in
       // proximity — but on every confirmed-clean Cone+Spread pairing across
       // three real reports (80+ resolutions surveyed), that closest player
       // is NEVER the tower's own Spread partner (who's deliberately far
       // away, per Spread's "outer"/isolation requirement — see the spot
-      // table). It's always a THIRD, idle non-melee ("ranged") player from
-      // the OTHER team, standing deliberately close (clean band ~410-670
-      // units from the Cone holder) to intentionally bait the cone away
-      // from the raid. Confirmed for real (report VtdBqhLQkWJXMvDg pull 5):
-      // when that designated bait stands just barely too far (674 units —
-      // a hair past the clean maximum), the Spread partner becomes the
-      // closest player instead and takes the point-blank one-shot meant
-      // for the bait. The Spread partner did nothing wrong (they were
-      // exactly where Spread requires); the actual mistake is the bait's
-      // positioning.
+      // table), and never a MELEE player either. It's always a THIRD, idle
+      // non-melee ("ranged") player from the OTHER team, standing
+      // deliberately close (clean band ~410-670 units from the Cone holder)
+      // to intentionally bait the cone away from the raid.
       //
-      // Attribution needs no distance threshold at all: whichever idle
-      // non-melee player ISN'T already accounted for as a DIFFERENT cone's
-      // victim this same resolution (the raid's other simultaneous
-      // Cone+Spread tower has its own bait, confirmed hit) is the one who
-      // should have been standing close enough to take this one instead.
+      // Two confirmed-real ways this goes wrong:
+      //  1. (VtdBqhLQkWJXMvDg pull 5) The designated bait stands just
+      //     barely too far (674 units — a hair past the clean maximum) and
+      //     the Spread partner becomes the closest player instead, taking
+      //     the point-blank one-shot meant for the bait. The Spread partner
+      //     did nothing wrong (they were exactly where Spread requires) —
+      //     suppressed from the separate "stood too close" rule below via
+      //     misattributedConeDeaths.
+      //  2. (G7kTFVxjcAC6p1MN pull 8) The designated bait strays even
+      //     further out of position (here: parked next to the tower's own
+      //     Spread soaker instead of near the Cone holder) and the cone
+      //     latches onto an entirely UNRELATED off-duty player who simply
+      //     wandered too close on their own account (a melee tank standing
+      //     near the boss instead of at their own off-duty spot). That
+      //     victim is NOT innocent the way the Spread partner is — they
+      //     have their own separate positioning mistake and the "stood too
+      //     close" rule is right to flag them too — so they are NOT added
+      //     to misattributedConeDeaths here.
+      //
+      // Either way, the real mistake is the missing bait's positioning, and
+      // attribution needs no distance threshold: whichever idle non-melee
+      // player ISN'T already accounted for as a DIFFERENT cone's victim
+      // this same resolution (the raid's other simultaneous Cone+Spread
+      // tower has its own bait, confirmed hit) is the one who should have
+      // been standing close enough to take this one instead.
       const coneIdx = pair.assignments.findIndex((a) => a.abilityId === 1005086);
       if (coneIdx !== -1 && pair.assignments[1 - coneIdx].abilityId === 1005085) {
         const holderSoak  = pair.soaks[coneIdx];
         const partnerSoak = pair.soaks[1 - coneIdx];
 
-        const partnerDeath = deathEvents.find(
-          (d) =>
-            d.player === partnerSoak.player.name &&
-            d.killingAbilityGameId === CONE_FOLLOWUP_ABILITY_ID &&
-            d.timestamp >= reportTimestamp &&
-            d.timestamp <= reportTimestamp + CONE_FIRE_WINDOW_MS + PATH_OF_LIGHT_WINDOW_MS
+        // Whoever actually took THIS holder's own cone — matched by
+        // proximity to the holder's plant spot (their PoL soak position),
+        // NOT just checking the Spread partner's own hit, since a second
+        // Cone+Spread pair can be resolving concurrently from a different
+        // spot (case 2 above: two simultaneous Cone plants fired ~500-570
+        // units from their respective holders, an order of magnitude closer
+        // than either holder was to the OTHER plant's victim, so nearest-
+        // holder matching is unambiguous).
+        const windowHits = players.flatMap((p) =>
+          p.damageTaken
+            .filter(
+              (e) =>
+                e.abilityId === CONE_FOLLOWUP_ABILITY_ID &&
+                e.timestamp >= reportTimestamp &&
+                e.timestamp <= reportTimestamp + CONE_FIRE_WINDOW_MS &&
+                e.x !== undefined &&
+                e.y !== undefined
+            )
+            .map((e) => ({ player: p, timestamp: e.timestamp, x: e.x!, y: e.y! }))
         );
 
-        if (partnerDeath) {
+        let nearestHit: { player: PlayerInfo; timestamp: number; dist: number } | undefined;
+        for (const h of windowHits) {
+          const dist = Math.hypot(h.x - holderSoak.x, h.y - holderSoak.y);
+          if (!nearestHit || dist < nearestHit.dist) nearestHit = { player: h.player, timestamp: h.timestamp, dist };
+        }
+        if (!nearestHit) continue;
+
+        const actualVictim = nearestHit.player;
+        const isSpreadPartner = actualVictim.actorId === partnerSoak.player.actorId;
+        // A valid bait is idle (not one of this cluster's own soakers) and
+        // non-melee — anything else (the Spread partner, or some other
+        // melee/soaking player entirely) means the real bait was missing.
+        const victimIsValidBait = !seenPlayers.has(actualVictim.actorId) && actualVictim.rangeType !== "Melee";
+        if (victimIsValidBait) continue; // this cone worked as intended
+
+        if (isSpreadPartner) {
           // The Spread partner is innocent either way (they were exactly
           // where their debuff requires) — always keep the OLD "stood too
           // close" rule from re-flagging them, even when the resolution
           // turns out to be too compromised by wipe chaos to confidently
           // name the real bait below.
           misattributedConeDeaths.add(partnerSoak.player.name);
+        }
 
-          if (isResolutionCompromised(reportTimestamp)) continue;
+        if (isResolutionCompromised(reportTimestamp)) continue;
 
-          const alreadyAccountedFor = new Set(
-            coneHits
-              .filter(
-                (h) =>
-                  h.timestamp >= clusterTime &&
-                  h.timestamp <= clusterTime + CONE_FIRE_WINDOW_MS &&
-                  h.actorId !== partnerSoak.player.actorId
-              )
-              .map((h) => h.actorId)
-          );
-
-          const candidates = players.filter(
-            (p) =>
-              !seenPlayers.has(p.actorId) &&
-              p.rangeType !== "Melee" &&
-              !alreadyAccountedFor.has(p.actorId)
-          );
-
-          // The partner's OWN cone-hit record (not their earlier PoL soak
-          // position) is the precise distance that actually killed them —
-          // fall back to the soak position only if that hit is missing.
-          const partnerHit = partnerSoak.player.damageTaken.find(
-            (e) =>
-              e.abilityId === CONE_FOLLOWUP_ABILITY_ID &&
-              Math.abs(e.timestamp - partnerDeath.timestamp) <= CONE_FIRE_WINDOW_MS &&
-              e.x !== undefined &&
-              e.y !== undefined
-          );
-          const partnerDist = Math.round(
-            Math.hypot(
-              (partnerHit?.x ?? partnerSoak.x) - holderSoak.x,
-              (partnerHit?.y ?? partnerSoak.y) - holderSoak.y
+        const alreadyAccountedFor = new Set(
+          coneHits
+            .filter(
+              (h) =>
+                h.timestamp >= clusterTime &&
+                h.timestamp <= clusterTime + CONE_FIRE_WINDOW_MS &&
+                h.actorId !== actualVictim.actorId
             )
-          );
+            .map((h) => h.actorId)
+        );
 
-          for (const candidate of candidates) {
-            // Best-effort position for the candidate at the moment of the
-            // plant: they're idle, so damageTaken is usually empty — fall
-            // back to their own incoming-heal position (see PlayerEvent.x/y
-            // on the healing tab, added for exactly this case), since an
-            // idle bait candidate is almost always getting topped by raid
-            // heals nearby. Distance omitted from the description if
-            // neither source has anything close enough in time.
-            const candidatePos = findNearestPosition(candidate, reportTimestamp, CONE_FIRE_WINDOW_MS + PATH_OF_LIGHT_WINDOW_MS);
-            const candidateDist =
-              candidatePos !== undefined
-                ? Math.round(Math.hypot(candidatePos.x - holderSoak.x, candidatePos.y - holderSoak.y))
-                : undefined;
+        const candidates = players.filter(
+          (p) =>
+            !seenPlayers.has(p.actorId) &&
+            p.rangeType !== "Melee" &&
+            !alreadyAccountedFor.has(p.actorId)
+        );
 
-            const distanceNote =
-              candidateDist !== undefined
-                ? ` (stood ~${candidateDist} units away — too far to be the closest player, versus ${partnerSoak.player.name}'s ~${partnerDist})`
-                : ` (${partnerSoak.player.name} ended up the closest player instead, at ~${partnerDist} units)`;
+        const victimDist = Math.round(nearestHit.dist);
+        const victimDescriptor = isSpreadPartner
+          ? `${actualVictim.name}, the Spread partner soaking alongside the Cone holder,`
+          : actualVictim.name;
 
-            errors.push({
-              ruleId:      FORSAKEN_CONE_BAIT_TOO_FAR_RULE_ID,
-              severity:    "Major",
-              name:        "Cone Bait Too Far",
-              description: `Should have been standing close enough to draw the Forsaken cone${towerLabel} away from the tower${distanceNote} — instead it latched onto ${partnerSoak.player.name}, the Spread partner soaking alongside the Cone holder, who was never meant to be near it.`,
-              timestamp:   partnerDeath.timestamp,
-              player:      candidate.name,
-              class:       candidate.className,
-              specId:      candidate.specId,
-              role:        candidate.role,
-              abilityId:   CONE_FOLLOWUP_ABILITY_ID,
-              abilityName: "Forsaken Cone",
-            });
-          }
+        for (const candidate of candidates) {
+          // Best-effort position for the candidate at the moment of the
+          // plant: they're idle, so damageTaken is usually empty — fall
+          // back to their own incoming-heal position (see PlayerEvent.x/y
+          // on the healing tab, added for exactly this case), since an
+          // idle bait candidate is almost always getting topped by raid
+          // heals nearby. Distance omitted from the description if
+          // neither source has anything close enough in time.
+          const candidatePos = findNearestPosition(candidate, reportTimestamp, CONE_FIRE_WINDOW_MS + PATH_OF_LIGHT_WINDOW_MS);
+          const candidateDist =
+            candidatePos !== undefined
+              ? Math.round(Math.hypot(candidatePos.x - holderSoak.x, candidatePos.y - holderSoak.y))
+              : undefined;
+
+          const distanceNote =
+            candidateDist !== undefined
+              ? ` (stood ~${candidateDist} units away — too far to be the closest player, versus ${actualVictim.name}'s ~${victimDist})`
+              : ` (${actualVictim.name} ended up the closest player instead, at ~${victimDist} units)`;
+
+          errors.push({
+            ruleId:      FORSAKEN_CONE_BAIT_TOO_FAR_RULE_ID,
+            severity:    "Major",
+            name:        "Cone Bait Too Far",
+            description: `Should have been standing close enough to draw the Forsaken cone${towerLabel} away from the tower${distanceNote} — instead it latched onto ${victimDescriptor} who was never meant to be near it.`,
+            timestamp:   nearestHit.timestamp,
+            player:      candidate.name,
+            class:       candidate.className,
+            specId:      candidate.specId,
+            role:        candidate.role,
+            abilityId:   CONE_FOLLOWUP_ABILITY_ID,
+            abilityName: "Forsaken Cone",
+          });
         }
       }
     }
