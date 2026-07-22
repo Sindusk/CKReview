@@ -448,13 +448,131 @@ function detectDashErrors(
   );
   const lastDashTime = Math.max(...hits.map((h) => h.timestamp));
 
+  // Recovering the missing player's own assigned number (their bait NUMBER,
+  // not their stood position — see below) via process-of-elimination, the
+  // same technique documented in mechanic-detection-workflow: a "confirmed"
+  // instance->player assignment is a single-victim hit whose OWN position
+  // matches that instance's fitted slot. Whatever's left over — the
+  // missing player(s) plus whichever OTHER player(s) a redirected clone
+  // mis-hit (e.g. pull 12's Further, hit by Galileo's clone #3 while
+  // actually standing correctly at HER OWN #7) — gets resolved in two
+  // passes: first, match each mis-hit player's own (correctly recorded,
+  // since the hit really did land on them) position against whichever
+  // leftover instance's slot it actually fits; second, whatever single
+  // instance/player pair is left over after that must be each other's
+  // match with zero geometry needed (confirmed: this alone recovers
+  // Galileo=#3 on pull 12, matching the analyzer's ground truth exactly).
+  // Deliberately conservative — if more than one instance/player remains
+  // ambiguous, no number is assigned rather than guessing.
+  const assignedNumberByActor = new Map<number, number>();
+  if (slotIndexFor) {
+    for (const [instance, group] of victimsByInstance) {
+      if (group.length !== 1) continue;
+      const h = group[0];
+      if (h.x === undefined || h.y === undefined) continue;
+      if (angularDist(angleOf(h.x, h.y), slotAngle(slotIndexFor(instance))) <= SLOT_SNAP_TOLERANCE_DEG) {
+        assignedNumberByActor.set(h.player.actorId, instance);
+      }
+    }
+
+    const leftoverInstances = new Set(
+      [...victimsByInstance.keys()].filter((i) => ![...assignedNumberByActor.values()].includes(i))
+    );
+    const leftoverPlayers = players.filter(
+      (p) => !assignedNumberByActor.has(p.actorId) && !deadBeforeDash.has(p.name)
+    );
+
+    for (const p of leftoverPlayers) {
+      const ownHit = hits.find((h) => h.player.actorId === p.actorId && h.x !== undefined && h.y !== undefined);
+      if (!ownHit) continue;
+      const matches = [...leftoverInstances].filter(
+        (i) => angularDist(angleOf(ownHit.x!, ownHit.y!), slotAngle(slotIndexFor(i))) <= SLOT_SNAP_TOLERANCE_DEG
+      );
+      if (matches.length === 1) {
+        assignedNumberByActor.set(p.actorId, matches[0]);
+        leftoverInstances.delete(matches[0]);
+      }
+    }
+
+    const stillLeftoverPlayers = leftoverPlayers.filter((p) => !assignedNumberByActor.has(p.actorId));
+    if (leftoverInstances.size === 1 && stillLeftoverPlayers.length === 1) {
+      const [onlyInstance] = leftoverInstances;
+      assignedNumberByActor.set(stillLeftoverPlayers[0].actorId, onlyInstance);
+    }
+  }
+
+  // A missing player never takes a damageTaken hit during the dash window
+  // (that's the whole signature), so their position has to come from
+  // somewhere else. A SELF-cast heal (source === target === this player —
+  // natural HP regen, ability 1302, ticks roughly every 3s for everyone
+  // passively) carries this player's own position under EITHER healing
+  // orientation the two PlayerInfo builders use (see the harness's
+  // build-ff-players.js comment on why they differ): real app healing is
+  // CAST BY this player (target === player.name marks a self-cast), the
+  // harness's is RECEIVED BY this player (source === player.name marks the
+  // same thing) — checking both covers whichever shape fed this call.
+  // Confirmed 2026-07 (pull 12): a regen tick 847ms before the first dash
+  // put Galileo ~2 yalms from bait #6's spot and ~33 yalms from his own
+  // (#3), matching the analyzer's "stood closest to 6" exactly. Capped at
+  // 5s stale — regen fires often enough that a real position is normally
+  // within 1-2s of any given moment; anything older risks catching a
+  // position from before their final, fatal move (a real prior case had a
+  // heal 8s out sitting near arena CENTER, nowhere near the bait ring).
+  const SELF_HEAL_STALENESS_MS = 5000;
+  const findOwnPositionNear = (player: PlayerInfo, atOrBefore: number): { x: number; y: number } | undefined => {
+    let best: { x: number; y: number; timestamp: number } | undefined;
+    for (const h of player.healing) {
+      if (h.target !== player.name && h.source !== player.name) continue;
+      if (h.x === undefined || h.y === undefined) continue;
+      if (h.timestamp > atOrBefore) continue;
+      if (best === undefined || h.timestamp > best.timestamp) best = { x: h.x, y: h.y, timestamp: h.timestamp };
+    }
+    if (!best || atOrBefore - best.timestamp > SELF_HEAL_STALENESS_MS) return undefined;
+    return best;
+  };
+
+  // Slot(k) -> instance, the inverse of slotIndexFor, so an actual stood
+  // position can be reported as "closest to bait #N" rather than a bare
+  // angle.
+  const instanceForSlot = new Map<number, number>();
+  if (slotIndexFor) {
+    for (let instance = 1; instance <= 8; instance++) {
+      instanceForSlot.set(((slotIndexFor(instance) % 8) + 8) % 8, instance);
+    }
+  }
+
   if (missingPlayers.length > 0) {
     for (const p of missingPlayers) {
+      const assignedNumber = assignedNumberByActor.get(p.actorId);
+      const ownPos = findOwnPositionNear(p, lastDashTime);
+
+      let description: string;
+      if (assignedNumber !== undefined && ownPos && slotIndexFor) {
+        const [ix, iy] = slotPoint(slotIndexFor(assignedNumber));
+        const yalms = (Math.hypot(ownPos.x - ix, ownPos.y - iy) / 100).toFixed(1);
+        let closestNote = "";
+        const actualAngle = angleOf(ownPos.x, ownPos.y);
+        let closestK = 0;
+        let closestDist = Infinity;
+        for (let k = 0; k < 8; k++) {
+          const d = angularDist(actualAngle, slotAngle(k));
+          if (d < closestDist) { closestDist = d; closestK = k; }
+        }
+        const closestInstance = instanceForSlot.get(closestK);
+        if (closestInstance !== undefined && closestInstance !== assignedNumber) {
+          closestNote = `, standing closest to bait #${closestInstance}'s spot instead`;
+        }
+        description = `Assigned bait #${assignedNumber} for the Limit Cut dash but was never hit by their own clone — stood ~${yalms} yalms from their assigned spot${closestNote}, so it retargeted onto another player instead.`;
+      } else if (assignedNumber !== undefined) {
+        description = `Assigned bait #${assignedNumber} for the Limit Cut dash but was never hit by their own clone — stood far enough off that it retargeted onto another player instead. Their own stood position couldn't be pinned down (no damage or position event recorded them during the dash window).`;
+      } else {
+        description = "Never received their own Limit Cut dash — stood far enough from their assigned bait spot that their clone retargeted onto another player instead.";
+      }
       errors.push({
         ruleId:      LIMITCUT_WRONG_POSITION_RULE_ID,
         severity:    "Major",
         name:        "Wrong Dash Position",
-        description: "Never received their own Limit Cut dash — stood far enough from their assigned bait spot that their clone retargeted onto another player instead.",
+        description,
         timestamp:   lastDashTime,
         player:      p.name,
         class:       p.className,

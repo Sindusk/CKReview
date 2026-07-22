@@ -42,11 +42,29 @@ function buildFFPlayers(rep, actorMap, getFFJobByName, abilityMap) {
         maxHealth: e.targetResources?.maxHitPoints,
       })),
       casts: [],
+      // NOTE this is oriented OPPOSITE to lib/log-transforms.ts's real
+      // buildFFPlayers, which filters healing by sourceID (heals CAST BY
+      // this player, x/y = RECIPIENT's position). This harness instead
+      // keeps the pre-existing targetID filter (heals RECEIVED by this
+      // player, x/y = THIS PLAYER's own position — always valid, not just
+      // for self-casts) since other already-validated modules read
+      // player.healing expecting exactly that (forsaken.ts's
+      // findNearestPosition, blackhole-strategy.ts's showedSignOfLife) —
+      // flipping the orientation to match the real pipeline changed their
+      // harness output (confirmed via diff), so it stays as-is. `source` is
+      // added (previously absent) so a caller can still isolate SELF-casts
+      // specifically (source === this player's own name) when that's the
+      // only thing being trusted — see limitcut.ts's missing-dash-victim
+      // position recovery, which checks player.name against `source` here
+      // and against `target` on the real pipeline's (oppositely-oriented)
+      // shape, since a self-cast is the one entry safe to read as "this
+      // player's own position" under EITHER orientation.
       healing: (rep.healing?.data ?? []).filter((e) => e.targetID === id).map((e) => ({
         timestamp: e.timestamp,
         abilityId: e.abilityGameID ?? 0,
         abilityName: 'Ability ' + e.abilityGameID,
         amount: e.amount ?? 0,
+        source: actorMap.get(e.sourceID)?.name,
         x: e.targetResources?.x,
         y: e.targetResources?.y,
       })),
