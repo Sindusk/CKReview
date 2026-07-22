@@ -108,8 +108,8 @@ const MIDNIGHT_FALLS_RULES: PullErrorRule[] = [
     id:          "wow-heavens-glaives",
     game:        "wow",
     severity:    "Major",
-    name:        "Hit By Heaven's Glaives",
-    description: "Took damage from Heaven's Glaives.",
+    name:        "Killed by Heaven's Glaives",
+    description: "Died to Heaven's Glaives.",
     trigger:     "killingBlow",
     abilityId:   1254076,          // Heaven's Glaives
   },
