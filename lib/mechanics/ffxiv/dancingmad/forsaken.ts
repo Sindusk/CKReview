@@ -384,6 +384,104 @@ function inferPlayerTeams(lossesByPlayer: Map<number, number[]>): Map<number, "f
   return teamByPlayer;
 }
 
+// ── Team inference from the initial debuff burst + partner pairing ────────
+// (confirmed by the user 2026-07-22, replacing pure guesswork about how the
+// "AAABBBBA" order above is actually DECIDED, not just observed) ──────────
+//
+// At the mechanic's very start (~+237s, "3:57" into the fight — well before
+// any tower resolves), every player receives one of the three assignment
+// debuffs directly, independent of towers. Within each of two 4-player ROLE
+// GROUPS — Healers+Tanks, and the four DPS (M1/M2/R1/R2) — three players get
+// that group's assigned type for the pull (Spread or Cone, whichever the
+// group drew) and the 4th gets Stack. Each player has one fixed PARTNER from
+// their own role group (see FORSAKEN_PARTNER_PAIRS): Healer1/Regen (WHM)
+// with the MT (PLD in this roster), Healer2/Shield (SGE) with the OT (DRK),
+// M1 (RPR) with R1/Phys Ranged (DNC), M2 (VPR) with R2/Caster (PCT). Look at
+// your own and your partner's burst debuff:
+//   - either of you holds Stack           -> BOTH of you are Team A
+//   - neither holds Stack (so, by the role-group construction above, you
+//     BOTH hold the same non-Stack type)  -> BOTH of you are Team B
+// Team A soaks towers 1/2/3/8, Team B soaks towers 4/5/6/7 (see
+// TOWER_ORDER_FIRST_TEAM/SECOND_TEAM above — "first"/"second" here IS
+// Team A/Team B).
+//
+// This is the AUTHORITATIVE team signal — far more reliable than inferring
+// team from resolution TIMING (inferPlayerTeams above), which can only ever
+// describe "who moved when," and breaks down exactly in the cases worth
+// detecting (a player resolving at the wrong tower necessarily also moves
+// at the wrong TIME, corrupting a timing-only inference). Confirmed real
+// misattribution this fixed (report VtdBqhLQkWJXMvDg pull 15): the WHM
+// (Azura Salus) held Cone at the burst, same as her partner the PLD — both
+// Team B, soaking only towers 4-7 — but she stood in tower #3 (a Team A
+// tower). Every OTHER signal available (assignment-debuff rotation, a real
+// Spell's Trouble stack-loss) looked exactly like a genuine soak, purely
+// from standing close enough to catch tower #3's own Path of Light splash —
+// team membership from the burst is the one thing that isn't fooled by
+// that, because it's set before any tower even exists.
+//
+// Job-keyed rather than role-keyed because FFLogs data alone can't tell
+// which tank is MT vs OT, or which healer is "regen" vs "shield" (the same
+// limitation mitigation-plan.ts already documents) — this table is THIS
+// report's specific roster (PLD/DRK/WHM/SGE/RPR/VPR/DNC/PCT) and would need
+// extending (or a different resolution strategy) for a raid running a
+// different composition.
+const FORSAKEN_PARTNER_PAIRS: ReadonlyArray<readonly [string, string]> = [
+  ["White Mage", "Paladin"],     // Healer1/Regen <-> MT
+  ["Sage",       "Dark Knight"], // Healer2/Shield <-> OT
+  ["Reaper",     "Dancer"],      // M1 <-> R1/Phys Ranged
+  ["Viper",      "Pictomancer"], // M2 <-> R2/Caster
+];
+
+/** The player's assignment debuff (1005084/85/86) at the very start of Forsaken — their first "applied" event for any of the three, before any tower has resolved. */
+function findInitialAssignmentDebuff(player: PlayerInfo): number | undefined {
+  const applied = player.debuffs
+    .filter((d) => ASSIGNMENT_DEBUFF_IDS.has(d.abilityId) && d.debuffStatus === "applied")
+    .sort((a, b) => a.timestamp - b.timestamp);
+  return applied[0]?.abilityId;
+}
+
+/**
+ * Infers each player's team from the initial burst debuff + fixed partner
+ * pairing (see the module comment above) — the authoritative method.
+ * Returns undefined if the roster doesn't match FORSAKEN_PARTNER_PAIRS, or
+ * the burst debuffs don't resolve unambiguously (e.g. a pull that wiped
+ * before the burst even landed) — callers fall back to inferPlayerTeams in
+ * that case, same "don't guess" convention as everywhere else in this
+ * module.
+ */
+function inferPlayerTeamsFromBurst(players: PlayerInfo[]): Map<number, "first" | "second"> | undefined {
+  const byClassName = new Map<string, PlayerInfo>();
+  for (const p of players) {
+    if (byClassName.has(p.className)) return undefined; // duplicate job — pairing table can't apply
+    byClassName.set(p.className, p);
+  }
+
+  const teamByPlayer = new Map<number, "first" | "second">();
+  for (const [classA, classB] of FORSAKEN_PARTNER_PAIRS) {
+    const a = byClassName.get(classA);
+    const b = byClassName.get(classB);
+    if (!a || !b) return undefined; // this pull's roster doesn't match the known comp
+
+    const debuffA = findInitialAssignmentDebuff(a);
+    const debuffB = findInitialAssignmentDebuff(b);
+    if (debuffA === undefined || debuffB === undefined) return undefined;
+
+    let team: "first" | "second";
+    if (debuffA === STACK_ASSIGNMENT_DEBUFF_ID || debuffB === STACK_ASSIGNMENT_DEBUFF_ID) {
+      team = "first";
+    } else if (debuffA === debuffB) {
+      team = "second";
+    } else {
+      return undefined; // neither holds Stack but debuffs differ — shouldn't happen; don't guess
+    }
+
+    teamByPlayer.set(a.actorId, team);
+    teamByPlayer.set(b.actorId, team);
+  }
+
+  return teamByPlayer;
+}
+
 /**
  * Assigns each player a global "tower #N" label for each of their personal
  * resolutions, based on which team they're inferred to be on (see above).
@@ -440,7 +538,16 @@ export function detectForsakenTowerErrors(
 
   if (lossesByPlayer.size === 0) return detectEnrageCheckError(enemyCasts);
 
-  const teamByPlayer = inferPlayerTeams(lossesByPlayer);
+  // Burst-based team inference (see its module comment) is authoritative
+  // when this pull's roster matches a known comp; falls back to the older
+  // timing-only inference otherwise. Kept as two separate values: the
+  // merged `teamByPlayer` still drives labeling/expected-timestamps exactly
+  // as before either way, while `burstTeamByPlayer` (only ever set from the
+  // authoritative method, never the fallback) is threaded separately into
+  // the new decisive team checks below so they don't inherit the older
+  // method's known blind spots.
+  const burstTeamByPlayer = inferPlayerTeamsFromBurst(players);
+  const teamByPlayer = burstTeamByPlayer ?? inferPlayerTeams(lossesByPlayer);
   const labelsByPlayer = buildTowerLabelsByPlayer(lossesByPlayer, teamByPlayer);
   const expectedTimestamps = buildExpectedTimestamps(lossesByPlayer, teamByPlayer);
 
@@ -524,7 +631,7 @@ export function detectForsakenTowerErrors(
   // on. Its confirmedLegitKeys tells the team-based check which players are
   // already proven innocent, so it doesn't re-flag them under a
   // mis-inferred team (see the "stolen stack decrement" case below).
-  const { errors: wrongPositionErrors, confirmedLegitKeys, misattributedConeDeaths } = detectWrongTowerPositionErrors(players, expectedTimestamps, deathEvents);
+  const { errors: wrongPositionErrors, confirmedLegitKeys, misattributedConeDeaths } = detectWrongTowerPositionErrors(players, expectedTimestamps, deathEvents, burstTeamByPlayer);
   errors.push(...detectOvercrowdedTowerErrors(players, teamByPlayer, labelsByPlayer, expectedTimestamps, confirmedLegitKeys));
   errors.push(...wrongPositionErrors);
   errors.push(...detectLethalConeBaitErrors(players, deathEvents, expectedTimestamps, misattributedConeDeaths));
@@ -923,11 +1030,37 @@ function hasStackLossNear(player: PlayerInfo, timestamp: number): boolean {
  * misattribution.
  */
 function pickLegitimatePair(
-  group:              TowerSoak[],
-  assignments:        AssignmentInterval[],
-  tower:              readonly [number, number],
-  consensusTimestamp: number | undefined
+  group:                     TowerSoak[],
+  assignments:               AssignmentInterval[],
+  tower:                     readonly [number, number],
+  consensusTimestamp:        number | undefined,
+  resolvingTeam?:            "first" | "second",
+  authoritativeTeamByPlayer?: Map<number, "first" | "second">
 ): { pairIdx: [number, number]; extraIdx: number[]; decisive: boolean } | undefined {
+  // ── Authoritative team check (see inferPlayerTeamsFromBurst's comment) ──
+  //
+  // When every group member's team is independently known from the initial
+  // debuff burst (not inferred from resolution timing or rotation, both of
+  // which an intruder can accidentally mimic), team membership alone
+  // decisively separates the tower's real soakers from an intruder — no
+  // rotation/geometry guessing needed, and it takes priority over every
+  // other signal below. Confirmed real case (report VtdBqhLQkWJXMvDg pull
+  // 15): the WHM's team-mismatched partner (sharing the group's debuff)
+  // showed every OTHER signal a genuine soaker normally shows — assignment
+  // rotation, a real Spell's Trouble stack-loss — purely from catching the
+  // tower's own splash while standing too close; team membership from the
+  // burst was the only signal that wasn't fooled.
+  if (resolvingTeam !== undefined && authoritativeTeamByPlayer !== undefined) {
+    const teams = group.map((s) => authoritativeTeamByPlayer.get(s.player.actorId));
+    if (teams.every((t) => t !== undefined)) {
+      const matchingIdx = group.map((_, i) => i).filter((i) => teams[i] === resolvingTeam);
+      const mismatchedIdx = group.map((_, i) => i).filter((i) => teams[i] !== resolvingTeam);
+      if (matchingIdx.length === 2) {
+        return { pairIdx: [matchingIdx[0], matchingIdx[1]], extraIdx: mismatchedIdx, decisive: true };
+      }
+    }
+  }
+
   if (consensusTimestamp !== undefined) {
     const rotatedIdx = group
       .map((_, i) => i)
@@ -1100,9 +1233,10 @@ function findNearestPosition(
 }
 
 function detectWrongTowerPositionErrors(
-  players:            PlayerInfo[],
-  expectedTimestamps: Map<string, number>,
-  deathEvents:        DeathEvent[] = []
+  players:                    PlayerInfo[],
+  expectedTimestamps:         Map<string, number>,
+  deathEvents:                DeathEvent[] = [],
+  authoritativeTeamByPlayer?: Map<number, "first" | "second">
 ): { errors: PullError[]; confirmedLegitKeys: Set<string>; misattributedConeDeaths: Set<string> } {
   // Every PoL hit that carries the tower instance and a position snapshot.
   const soaks: TowerSoak[] = [];
@@ -1198,11 +1332,13 @@ function detectWrongTowerPositionErrors(
     // importantly, the assignment-debuff lookup below.
     let towerNumber: number | undefined;
     let consensusTimestamp: number | undefined;
+    let resolvingTeam: "first" | "second" | undefined;
     for (const [key, consensus] of expectedTimestamps) {
       if (Math.abs(consensus - clusterTime) > PATH_OF_LIGHT_WINDOW_MS) continue;
       const [team, slotIndexStr] = key.split("-") as ["first" | "second", string];
       towerNumber = (team === "first" ? TOWER_ORDER_FIRST_TEAM : TOWER_ORDER_SECOND_TEAM)[Number(slotIndexStr)];
       consensusTimestamp = consensus;
+      resolvingTeam = team;
       break;
     }
 
@@ -1266,15 +1402,54 @@ function detectWrongTowerPositionErrors(
       };
     };
 
+    const reportTimestamp = consensusTimestamp ?? clusterTime;
+    const towerLabel = towerNumber !== undefined ? ` (tower #${towerNumber})` : "";
+
     const pairs: TowerGroup[] = [];
     for (const group of towers.values()) {
       if (group.length !== 2) continue;
       const built = buildGroup(group);
-      if (built) pairs.push(built);
-    }
+      if (!built) continue;
 
-    const reportTimestamp = consensusTimestamp ?? clusterTime;
-    const towerLabel = towerNumber !== undefined ? ` (tower #${towerNumber})` : "";
+      // A physically-2-person tower was previously always trusted as a
+      // clean pair with zero verification. That's wrong when authoritative
+      // burst-based team data is available and says otherwise — team
+      // mismatch here means the tower's real 2nd soaker never showed up at
+      // all (a missed tower, caught separately by the primary missed-tower
+      // rule) and whoever DID show up in their place is a genuine intruder,
+      // not a legitimate pair, no matter how clean their debuff/position
+      // otherwise looks.
+      if (resolvingTeam !== undefined && authoritativeTeamByPlayer !== undefined) {
+        const mismatched = built.soaks.filter((s) => {
+          const t = authoritativeTeamByPlayer.get(s.player.actorId);
+          return t !== undefined && t !== resolvingTeam;
+        });
+        if (mismatched.length > 0) {
+          for (const soak of mismatched) {
+            const assignment = built.assignments[built.soaks.indexOf(soak)];
+            errors.push({
+              ruleId:      FORSAKEN_EXTRA_PLAYER_RULE_ID,
+              severity:    "Major",
+              name:        "Extra Player In Tower",
+              description: `Stood in a Forsaken tower${towerLabel} assigned to the other team (confirmed by their own initial burst debuff), taking a spot the real soaker never got to fill.`,
+              timestamp:   reportTimestamp,
+              player:      soak.player.name,
+              class:       soak.player.className,
+              specId:      soak.player.specId,
+              role:        soak.player.role,
+              abilityId:   assignment.abilityId,
+              abilityName: assignment.abilityName,
+            });
+            // Already explained — don't let detectOvercrowdedTowerErrors's
+            // weaker team-inference check flag them again.
+            confirmedLegitKeys.add(`${soak.player.actorId}@${reportTimestamp}`);
+          }
+          continue; // not a valid pair — don't feed it to the spot-check rules below
+        }
+      }
+
+      pairs.push(built);
+    }
 
     // ── The 3+1 split: one soaker joined the wrong tower ──────────────────
     //
@@ -1307,19 +1482,35 @@ function detectWrongTowerPositionErrors(
           });
 
         if (candidates.length > 0) {
+          // Team membership from the initial burst (see
+          // inferPlayerTeamsFromBurst's module comment) is authoritative
+          // when available — prefer it outright over the geometric
+          // distance-based guess below whenever exactly one structural
+          // candidate's team doesn't match this resolution's team.
+          const teamMismatchedCandidates =
+            resolvingTeam !== undefined && authoritativeTeamByPlayer !== undefined
+              ? candidates.filter((i) => {
+                  const t = authoritativeTeamByPlayer.get(trio.soaks[i].player.actorId);
+                  return t !== undefined && t !== resolvingTeam;
+                })
+              : [];
+
           // Geometric attribution: the candidate farthest from their own
           // spot's ideal point is the intruder. If the runner-up is within
           // 100 units of the same distance, the call is too close — flag
           // every candidate rather than guess.
-          const distances = candidates.map((i) => {
-            const partnerDebuffId = trio.assignments.find((a, j) => j !== i && a.abilityId !== trio.assignments[i].abilityId)?.abilityId;
-            const spot = expectedSpotFor(trio.assignments[i].abilityId, partnerDebuffId);
-            return spot !== undefined ? distToIdealSpot(trio.soaks[i], spot, trio.tower!) : 0;
-          });
-          const maxDist = Math.max(...distances);
-          const intruders = candidates.filter(
-            (_, k) => distances[k] > maxDist - 100
-          );
+          const intruders =
+            teamMismatchedCandidates.length === 1
+              ? teamMismatchedCandidates
+              : (() => {
+                  const distances = candidates.map((i) => {
+                    const partnerDebuffId = trio.assignments.find((a, j) => j !== i && a.abilityId !== trio.assignments[i].abilityId)?.abilityId;
+                    const spot = expectedSpotFor(trio.assignments[i].abilityId, partnerDebuffId);
+                    return spot !== undefined ? distToIdealSpot(trio.soaks[i], spot, trio.tower!) : 0;
+                  });
+                  const maxDist = Math.max(...distances);
+                  return candidates.filter((_, k) => distances[k] > maxDist - 100);
+                })();
 
           for (const i of intruders) {
             errors.push({
@@ -1385,7 +1576,7 @@ function detectWrongTowerPositionErrors(
         const built = buildGroup(group);
         if (!built || !built.tower) continue;
 
-        const fit = pickLegitimatePair(built.soaks, built.assignments, built.tower, consensusTimestamp);
+        const fit = pickLegitimatePair(built.soaks, built.assignments, built.tower, consensusTimestamp, resolvingTeam, authoritativeTeamByPlayer);
         if (!fit || !fit.decisive) continue;
 
         const [i, j] = fit.pairIdx;
