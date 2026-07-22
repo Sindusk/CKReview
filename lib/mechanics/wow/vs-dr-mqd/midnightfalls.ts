@@ -543,6 +543,17 @@ const CRYSTAL_RESTORE_DEADLINE_MS = 2000;
 const CRYSTAL_WAVE_WINDOW_MS      = 40000;
 export const MIDNIGHTFALLS_DUSK_CRYSTAL_RULE_ID = "wow-raid-dusk-crystal-unhealed";
 
+// OUTCOME GATE (2026-07-22, Pull 5 VOD): an unrestored crystal is a near
+// miss, not a guaranteed wipe — the glaives can simply whiff the crystal
+// (no Light's End follows), in which case the pull continues and nothing
+// actually went wrong. Ground truth: Pull 5's unrestored crystal at +91.0s
+// produced no Light's End at all — Raid was too severe for a non-event.
+// Downgraded to Minor whenever no Light's End (1284699) lands within ~2s
+// of the Heaven's Glaives cast completion (either side, matching the same
+// 2s deadline the restore check itself uses); stays Raid when it does.
+const LIGHTS_END_DAMAGE_ID          = 1284699;
+const LIGHTS_END_PROXIMITY_MS       = 2000;
+
 function detectDuskCrystalHealing(
   players:           PlayerInfo[],
   enemyCasts:        EnemyEvent[],
@@ -575,15 +586,23 @@ function detectDuskCrystalHealing(
       .sort((a, b) => b.total - a.total);
     const breakdown = healerTotals.map((h) => `${h.name} ${Math.round(h.total / 1000)}k`).join(", ");
 
+    const lightsEndFollowed = players.some((p) =>
+      p.damageTaken.some((h) =>
+        h.abilityId === LIGHTS_END_DAMAGE_ID &&
+        Math.abs(h.timestamp - cast.timestamp) <= LIGHTS_END_PROXIMITY_MS
+      )
+    );
+
     errors.push({
       ruleId:      MIDNIGHTFALLS_DUSK_CRYSTAL_RULE_ID,
-      severity:    "Raid",
+      severity:    lightsEndFollowed ? "Raid" : "Minor",
       name:        "Dusk Crystal Not Restored",
       description:
         `A Dusk Crystal did not receive sufficient healing before Heaven's Glaives finished casting — ` +
         `it was still below full health ~${(gapMs / 1000).toFixed(1)}s before the glaives fired ` +
         `(crystals must be fully healed 2s before the cast completes). ` +
-        `Healing into this wave's crystals: ${breakdown}.`,
+        `Healing into this wave's crystals: ${breakdown}.` +
+        (lightsEndFollowed ? "" : " The glaives missed the crystal — no Light's End followed."),
       timestamp:   cast.timestamp,
       abilityId:   HEAVENS_GLAIVES_CAST_ID,
       abilityName: cast.abilityName,
