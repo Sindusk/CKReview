@@ -96,10 +96,18 @@ const MATRICES_PER_WAVE = 3;
 // are the three Termination Matrices. Chain order = kick order on that
 // frame. Cannot be derived from logs (see the limitation note above) —
 // it's declared here and VALIDATED against the detected rounds instead.
-export const KNOWN_KICK_CHAINS: Array<{ label: string; members: string[] }> = [
-  { label: "Boss Frame 2", members: ["Mythnarra",   "Sindusk",    "Hervous",  "Cocoroach"] },
-  { label: "Boss Frame 3", members: ["Religiouspp", "Shadowmeld", "Neptune",  "Polpo"] },
-  { label: "Boss Frame 4", members: ["Laedria",     "Nearly",     "Neximage", "Pnkphnx"] },
+//
+// Each slot lists every player who has held that frame position across
+// reports (roster subs between raid nights) — any ONE of them satisfies
+// the slot for validation/attribution. Confirmed 2026-07-22 (Dn87j4ARzNwYqLvV,
+// 21 pulls): Boss Frame 2's 4th slot was Cocoroach on the original capture
+// night but Cococaines on this one (Cocoroach absent from the roster
+// entirely) — rounds otherwise matched exactly, so this is a straight sub,
+// not a strategy change.
+export const KNOWN_KICK_CHAINS: Array<{ label: string; members: string[][] }> = [
+  { label: "Boss Frame 2", members: [["Mythnarra"],   ["Sindusk"],    ["Hervous"],  ["Cocoroach", "Cococaines"]] },
+  { label: "Boss Frame 3", members: [["Religiouspp"], ["Shadowmeld"], ["Neptune"],  ["Polpo"]] },
+  { label: "Boss Frame 4", members: [["Laedria"],     ["Nearly"],     ["Neximage"], ["Pnkphnx"]] },
 ];
 
 export type KickSlot = {
@@ -213,7 +221,9 @@ export function detectTerminateKickOrder(
 function buildValidatedChains(rounds: KickSlot[][]): KickChain[] | null {
   const declared = new Map<string, { chain: number; depth: number }>();
   KNOWN_KICK_CHAINS.forEach((c, chainIdx) =>
-    c.members.forEach((name, depth) => declared.set(name, { chain: chainIdx, depth }))
+    c.members.forEach((names, depth) =>
+      names.forEach((name) => declared.set(name, { chain: chainIdx, depth }))
+    )
   );
 
   for (let roundIdx = 0; roundIdx < rounds.length; roundIdx++) {
@@ -227,7 +237,7 @@ function buildValidatedChains(rounds: KickSlot[][]): KickChain[] | null {
   const chains = KNOWN_KICK_CHAINS.map((c) => ({
     label: c.label,
     slots: c.members
-      .map((name) => slotByName.get(name))
+      .flatMap((names) => names.map((name) => slotByName.get(name)))
       .filter((s): s is KickSlot => s !== undefined),
   }));
 

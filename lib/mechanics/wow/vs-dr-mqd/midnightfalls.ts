@@ -304,6 +304,21 @@ function detectStarsplinterOverlap(
 // If the misser was already DEAD before the cast went off, that leads
 // the description (their miss is fallout of their death — the death
 // itself is flagged by its own cause).
+//
+// WRONG-TARGET ATTRIBUTION (2026-07-22, Dn87j4ARzNwYqLvV Pull 1 VOD): a
+// separate, unambiguous signal that beats the chain-elimination above
+// whenever it applies — a declared chain member casting one of their own
+// interrupt spells at something OTHER than "Termination Matrix" (almost
+// always the boss, L'ura) during the matrix wave is a directly observable
+// botched kick, regardless of which physical matrix instance or round it
+// was for. Ground truth: Pull 1 +7.77s Mythnarra cast Disrupt on L'ura
+// instead of the matrix (confirmed via VOD as their miss) — cross-checked
+// against L'ura's own cast timeline in every pull of this report (7
+// occurrences across 26 pulls, e.g. Cococaines x2, Pnkphnx x2): none
+// landed near an actual L'ura begincast, ruling out "legitimately
+// interrupting the boss" as an alternative explanation. Scoped to the
+// same wave lookback as chain-elimination; only fires when exactly one
+// chain member mis-targeted in the window (ambiguous otherwise).
 const TERMINATE_CAST_ID     = 1284934;
 const TERMINATE_DAMAGE_ID   = 1286276;
 const TERMINATE_HIT_WINDOW_MS   = 750;
@@ -333,7 +348,7 @@ function detectTerminateCasts(
   }
 
   // Every interrupt landed on a matrix, for chain reconstruction.
-  const chainMembers = new Set(KNOWN_KICK_CHAINS.flatMap((c) => c.members));
+  const chainMembers = new Set(KNOWN_KICK_CHAINS.flatMap((c) => c.members.flat()));
   const kicks: Array<{ timestamp: number; playerName: string }> = [];
   for (const p of players) {
     for (const c of p.casts) {
@@ -352,18 +367,42 @@ function detectTerminateCasts(
     if (wave.some((k) => !chainMembers.has(k.playerName))) return undefined; // fill-in kicked — chains unknowable
     const candidates: string[] = [];
     for (const chain of KNOWN_KICK_CHAINS) {
-      const chainKicks = wave.filter((k) => chain.members.includes(k.playerName));
+      const chainKicks = wave.filter((k) => chain.members.some((names) => names.includes(k.playerName)));
       const lastKick = chainKicks.length ? Math.max(...chainKicks.map((k) => k.timestamp)) : -Infinity;
       if (completionTime - lastKick < TERMINATE_CHAIN_EXCLUSION_MS) continue; // just kicked — excluded
-      const nextDue = chain.members.find((m) => !chainKicks.some((k) => k.playerName === m));
-      if (nextDue !== undefined) candidates.push(nextDue);
-      else return undefined; // an exhausted chain is a candidate with no assigned kicker — not airtight
+      const nextDueNames = chain.members.find(
+        (names) => !chainKicks.some((k) => names.includes(k.playerName))
+      );
+      if (nextDueNames !== undefined) {
+        // Slot may list multiple roster-night alternates (see KNOWN_KICK_CHAINS
+        // comment) — prefer whichever one is actually in tonight's roster.
+        candidates.push(nextDueNames.find((n) => players.some((p) => p.name === n)) ?? nextDueNames[0]);
+      } else return undefined; // an exhausted chain is a candidate with no assigned kicker — not airtight
     }
     return candidates.length === 1 ? candidates[0] : undefined;
   };
 
+  // See "WRONG-TARGET ATTRIBUTION" above. Independent of chain-elimination —
+  // checked first in flush() since it doesn't depend on completion count.
+  const wrongTargetMiss = (fromTime: number, toTime: number): string | undefined => {
+    const offenders = new Set<string>();
+    for (const p of players) {
+      if (!chainMembers.has(p.name)) continue;
+      for (const c of p.casts) {
+        if (!TERMINATE_INTERRUPT_IDS.has(c.abilityId)) continue;
+        if (c.target === MATRIX_NAME) continue;
+        if (c.timestamp < fromTime || c.timestamp > toTime) continue;
+        offenders.add(p.name);
+      }
+    }
+    return offenders.size === 1 ? [...offenders][0] : undefined;
+  };
+
   const errors: PullError[] = [];
   let group: EnemyEvent[] = [];
+  let prevVolleyEnd = -Infinity; // scopes wrongTargetMiss to since the LAST resolved volley,
+                                  // so an old whiff doesn't bleed into a later, unrelated miss
+                                  // in the same 30s wave (see WRONG-TARGET ATTRIBUTION comment).
   const flush = () => {
     if (group.length === 0) return;
     const inWindow = (t: number) =>
@@ -381,7 +420,11 @@ function detectTerminateCasts(
         .map((d) => d.player)
     );
 
-    const misser = group.length === 1 ? attributeMiss(group[0].timestamp) : undefined;
+    const wrongTargetMisser = wrongTargetMiss(
+      Math.max(prevVolleyEnd, group[0].timestamp - TERMINATE_WAVE_WINDOW_MS),
+      group[group.length - 1].timestamp
+    );
+    const misser = wrongTargetMisser ?? (group.length === 1 ? attributeMiss(group[0].timestamp) : undefined);
     const misserInfo = misser ? players.find((p) => p.name === misser) : undefined;
     const misserDead = misser !== undefined &&
       deathEvents.some((d) => d.player === misser && d.timestamp <= group[0].timestamp);
@@ -391,7 +434,9 @@ function detectTerminateCasts(
         ? "The interrupt on the termination matrix's Terminate cast was missed."
         : misserDead
           ? `${misser} was dead before their Terminate interrupt came up. The termination matrix's Terminate cast went off.`
-          : `${misser} missed their Terminate interrupt — the termination matrix's Terminate cast went off.`;
+          : misser === wrongTargetMisser
+            ? `${misser} aimed their interrupt at the wrong target instead of the Termination Matrix — the cast went off.`
+            : `${misser} missed their Terminate interrupt — the termination matrix's Terminate cast went off.`;
     const tail = victims.length > 0 ? ` Hit: ${victims.join(", ")}.` : " Nobody was hit.";
 
     errors.push({
@@ -408,6 +453,7 @@ function detectTerminateCasts(
       abilityName: group[0].abilityName,
       abilityIcon: group[0].abilityIcon,
     });
+    prevVolleyEnd = group[group.length - 1].timestamp;
     group = [];
   };
   for (const c of casts) {
