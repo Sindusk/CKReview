@@ -68,6 +68,10 @@ function buildFFPlayers(rep, actorMap, getFFJobByName, abilityMap) {
         abilityId: e.abilityGameID ?? 0,
         abilityName: 'Debuff ' + e.abilityGameID,
         debuffStatus: statusMap[e.type] ?? 'applied',
+        causeAbilityId: e.extraAbilityGameID,
+        causeAbilityName: e.extraAbilityGameID !== undefined
+          ? (abilityMap?.get(e.extraAbilityGameID) ?? ('Ability ' + e.extraAbilityGameID))
+          : undefined,
       })),
     };
   });

@@ -327,6 +327,12 @@ export type FFLDebuffEvent = {
   sourceID:      number;
   targetID:      number;
   abilityGameID: number;
+  // The specific attack that CAUSED this debuff application (e.g. which
+  // boss cast applied Damage Down) — present on some FFLogs debuff events
+  // (e.g. "Blizzard III Blowout" applying 1002911) without needing any
+  // extra query fields; already came back in every capture checked.
+  // Resolved to a name via abilityMap in fflDebuffToPlayerEvent.
+  extraAbilityGameID?: number;
   ability?: {
     name:        string;
     abilityIcon?: string;

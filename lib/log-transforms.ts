@@ -807,6 +807,10 @@ function fflDebuffToPlayerEvent(
     abilityIcon: fflAbilityIcon(event, abilityMap),
     extra:       source?.name,
     debuffStatus,
+    causeAbilityId:   event.extraAbilityGameID,
+    causeAbilityName: event.extraAbilityGameID !== undefined
+      ? fflAbilityName({ abilityGameID: event.extraAbilityGameID }, abilityMap)
+      : undefined,
   };
 }
 

@@ -53,6 +53,14 @@ export type PlayerEvent = {
   // represents, so error-detection.ts can reconstruct uptime windows
   // ("was this debuff active on the player at time T?").
   debuffStatus?: "applied" | "removed" | "stack" | "stackRemoved";
+
+  // Debuffs — FFXIV only. The specific attack that caused this debuff
+  // application (e.g. which boss cast applied Damage Down), when FFLogs
+  // reports one (see FFLDebuffEvent.extraAbilityGameID). Lets error-
+  // detection.ts's debuffApplied rules name the actual mechanic that was
+  // missed ("Damage Down (Black Spark)") instead of just the debuff name.
+  causeAbilityId?:   number;
+  causeAbilityName?: string;
 };
 
 export type PlayerInfo = {

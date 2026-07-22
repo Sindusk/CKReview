@@ -95,7 +95,10 @@ function evaluateDebuffAppliedRule(rule: PullErrorRule, player: PlayerInfo): Pul
   return applications.map((e) => ({
     ruleId:      rule.id,
     severity:    rule.severity,
-    name:        rule.name,
+    // Names the specific attack that caused this debuff when FFLogs reports
+    // one (e.g. "Damage Down (Black Spark)") instead of just the debuff's
+    // own name — see PlayerEvent.causeAbilityName / fflDebuffToPlayerEvent.
+    name:        e.causeAbilityName ? `${rule.name} (${e.causeAbilityName})` : rule.name,
     description: rule.description,
     timestamp:   e.timestamp,
     player:      player.name,
