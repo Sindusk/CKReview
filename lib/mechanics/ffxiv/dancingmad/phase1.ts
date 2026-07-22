@@ -33,6 +33,15 @@
 // mistakes, so only the FIRST such death in Phase 1 gets a Raid-severity
 // error naming that player; every later one in the same pull is suppressed.
 //
+// **Exception (confirmed 2026-07-22, report G7kTFVxjcAC6p1MN, pull 1):** a
+// player who already has a Damage Down debuff (1002911) at the moment they
+// jump is deliberately clearing that debuff, not signaling a raid reset —
+// jumping is a valid, intentional fix for a mistake they already made and
+// are now correcting. That jump is excluded from consideration entirely
+// (not flagged, and doesn't count as "the first jump" for suppression
+// purposes) — the rule only looks for the first jump among players who did
+// NOT have Damage Down at the time.
+//
 // ── WAVE CANNON OUT OF POSITION (confirmed 2026-07, same report, pull 4) ───
 //
 // Wave Cannon (47784) hits exactly 4 players — one per fixed arena spot —
@@ -279,6 +288,16 @@ function nearestPlayerPosition(events: PlayerEvent[], timestamp: number): Point 
 // wide margin either side of this line.
 const ARROW_OUT_OF_POSITION_THRESHOLD_YALMS = 10;
 
+// "Double-D" (same cardinal direction twice) arrows sit much more tightly
+// on their slot than corner arrows across every report sampled — clean max
+// observed is ~1.8 yalms (vs corner's ~5.9), so this case gets its OWN,
+// much tighter threshold rather than sharing the corner one above.
+// Confirmed 2026-07-22 (report G7kTFVxjcAC6p1MN, pull 1): a Paladin's
+// double-North arrows, both pulled in too far toward the boss, deviated
+// ~4.1 and ~2.4 yalms — comfortably above this line, comfortably below
+// what the corner threshold would have required to catch the same mistake.
+const ARROW_DOUBLE_OUT_OF_POSITION_THRESHOLD_YALMS = 2;
+
 function detectBlizzardIIIBlowoutSilentKillErrors(players: PlayerInfo[], deathEvents: DeathEvent[]): PullError[] {
   const errors: PullError[] = [];
 
@@ -314,9 +333,21 @@ function detectBlizzardIIIBlowoutSilentKillErrors(players: PlayerInfo[], deathEv
   return errors;
 }
 
-function detectJumpedOffArenaError(deathEvents: DeathEvent[]): PullError[] {
+function detectJumpedOffArenaError(players: PlayerInfo[], deathEvents: DeathEvent[]): PullError[] {
+  const hadDamageDownAt = (playerName: string, timestamp: number) => {
+    const player = players.find((p) => p.name === playerName);
+    if (!player) return false;
+    return player.debuffs.some(
+      (d) =>
+        d.abilityId === DAMAGE_DOWN_ABILITY_ID &&
+        d.debuffStatus === "applied" &&
+        d.timestamp <= timestamp
+    );
+  };
+
   const jump = deathEvents
     .filter((d) => d.timestamp <= PHASE_1_END_MS && d.cause === "Environmental")
+    .filter((d) => !hadDamageDownAt(d.player, d.timestamp))
     .sort((a, b) => a.timestamp - b.timestamp)[0];
   if (!jump) return [];
 
@@ -540,9 +571,9 @@ function detectTeleTrouncingArrowErrors(players: PlayerInfo[]): PullError[] {
     if (withPos.some((a) => a.pos === null)) continue;
     const [a1, a2] = withPos as { timestamp: number; dir: Cardinal; pos: Point }[];
 
-    const flagIfOutOfPosition = (arrow: { timestamp: number; dir: Cardinal; pos: Point }, expected: Point) => {
+    const flagIfOutOfPosition = (arrow: { timestamp: number; dir: Cardinal; pos: Point }, expected: Point, threshold: number) => {
       const deviation = pointDistance(arrow.pos, expected);
-      if (deviation <= ARROW_OUT_OF_POSITION_THRESHOLD_YALMS) return;
+      if (deviation <= threshold) return;
       errors.push({
         ruleId:      TELE_TROUNCING_ARROW_RULE_ID,
         severity:    "Major",
@@ -563,14 +594,14 @@ function detectTeleTrouncingArrowErrors(players: PlayerInfo[]): PullError[] {
       const straight = pointDistance(a1.pos, slotA) + pointDistance(a2.pos, slotB);
       const swapped  = pointDistance(a1.pos, slotB) + pointDistance(a2.pos, slotA);
       const [p1, p2] = straight <= swapped ? [slotA, slotB] : [slotB, slotA];
-      flagIfOutOfPosition(a1, p1);
-      flagIfOutOfPosition(a2, p2);
+      flagIfOutOfPosition(a1, p1, ARROW_DOUBLE_OUT_OF_POSITION_THRESHOLD_YALMS);
+      flagIfOutOfPosition(a2, p2, ARROW_DOUBLE_OUT_OF_POSITION_THRESHOLD_YALMS);
     } else {
       const predicted = predictCornerSlots(a1.dir, a2.dir);
       if (!predicted) continue; // not a valid clockwise-adjacent pair — unexpected data, skip
       for (const arrow of [a1, a2]) {
         const expected = arrow.dir === predicted.cornerDir ? predicted.cornerPos : predicted.approachPos;
-        flagIfOutOfPosition(arrow, expected);
+        flagIfOutOfPosition(arrow, expected, ARROW_OUT_OF_POSITION_THRESHOLD_YALMS);
       }
     }
   }
@@ -586,7 +617,7 @@ function detectTeleTrouncingArrowErrors(players: PlayerInfo[]): PullError[] {
 export function detectPhase1Errors(players: PlayerInfo[], deathEvents: DeathEvent[]): PullError[] {
   return [
     ...detectBlizzardIIIBlowoutSilentKillErrors(players, deathEvents),
-    ...detectJumpedOffArenaError(deathEvents),
+    ...detectJumpedOffArenaError(players, deathEvents),
     ...detectWaveCannonOutOfPositionErrors(players, deathEvents),
     ...detectWaveCannonTowerOverlapErrors(players, deathEvents),
     ...detectTeleTrouncingArrowErrors(players),
