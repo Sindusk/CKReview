@@ -1051,6 +1051,79 @@ const ANONYMOUS_RAID_RULE_IDS = new Set(["wow-raid-lights-end", "wow-raid-naaru-
 const LIGHTS_END_RULE_ID = "wow-raid-lights-end";
 const LIGHTS_END_DETONATION_WINDOW_MS = 800;
 
+// ─── Light's End crystal position (2026-07-22, Pull 2 VOD) ──────────────────
+//
+// Light's End itself carries NO usable crystal position — it's a raid-wide
+// hit (every player takes it simultaneously), so its damageTaken x/y is
+// just each victim's OWN position, not the crystal's. The crystal's ground
+// position instead comes from its last carrier's OWN position at the
+// moment they dropped it (Glimmering, 1253031, removed) — WCL doesn't
+// stamp x/y on debuff events, so this reuses that player's nearest
+// damageTaken sample instead (same technique the rest of this file already
+// uses for "where was this player standing" — never `healing`, see
+// [[mechanic-detection-workflow]]'s position-source correction).
+//
+// Ground truth (Pull 2, Dn87j4ARzNwYqLvV): Cococaines dropped a crystal at
+// +214.93 (last carry-tick position 457271,1102426), then moved ~4.1yd
+// before their OWN Starsplinter detonated on it at +216.55 — a self-clip.
+// Cross-checking every player's position at the Light's End timestamp
+// against that dropped-crystal spot correctly picks Cococaines as nearest
+// (~4.1yd, vs. ~10.9yd for the next-closest player, Neximage), confirming
+// the self-clip read without needing to hardcode it.
+//
+// This is a proximity GUESS, not a certain crystal identity (WCL has no
+// per-crystal instance id) — the closest player at break time, to the most
+// recent unclaimed drop before it. Named in the description as "near X",
+// not "held by X".
+const CRYSTAL_DROP_LOOKUP_WINDOW_MS = 30000; // a dropped crystal can sit a while before it's clipped
+const POSITION_LOOKUP_WINDOW_MS     = 3000;  // max staleness for a "current position" sample
+
+/** Nearest damageTaken sample (either side) with defined x/y, within maxMs — the standard "where was this player standing" source in this file (never `healing`). */
+function nearestPosition(player: PlayerInfo, time: number, maxMs = POSITION_LOOKUP_WINDOW_MS): { x: number; y: number } | undefined {
+  let best: { x: number; y: number } | undefined;
+  let bestDiff = Infinity;
+  for (const h of player.damageTaken) {
+    if (h.x === undefined || h.y === undefined) continue;
+    const diff = Math.abs(h.timestamp - time);
+    if (diff < bestDiff) { bestDiff = diff; best = { x: h.x, y: h.y }; }
+  }
+  return best && bestDiff <= maxMs ? best : undefined;
+}
+
+type CrystalDrop = { timestamp: number; playerName: string; x: number; y: number };
+
+/** Every Glimmering (crystal-carry) removal with a resolvable ground position. */
+function buildCrystalDrops(players: PlayerInfo[]): CrystalDrop[] {
+  const drops: CrystalDrop[] = [];
+  for (const player of players) {
+    for (const d of player.debuffs) {
+      if (d.abilityId !== GLIMMERING_CARRIER_ID || d.debuffStatus !== "removed") continue;
+      const pos = nearestPosition(player, d.timestamp);
+      if (pos) drops.push({ timestamp: d.timestamp, playerName: player.name, ...pos });
+    }
+  }
+  return drops.sort((a, b) => a.timestamp - b.timestamp);
+}
+
+/** Closest player (by position at `atTime`) to wherever the crystal was last dropped before `atTime`. */
+function findNearestPlayerToDroppedCrystal(
+  atTime:  number,
+  drops:   CrystalDrop[],
+  players: PlayerInfo[]
+): { playerName: string; distanceYalms: number } | undefined {
+  const drop = [...drops].reverse().find((d) => d.timestamp <= atTime && atTime - d.timestamp <= CRYSTAL_DROP_LOOKUP_WINDOW_MS);
+  if (!drop) return undefined;
+
+  let nearest: { playerName: string; distanceYalms: number } | undefined;
+  for (const player of players) {
+    const pos = nearestPosition(player, atTime);
+    if (!pos) continue;
+    const distanceYalms = Math.hypot(pos.x - drop.x, pos.y - drop.y) / 100;
+    if (!nearest || distanceYalms < nearest.distanceYalms) nearest = { playerName: player.name, distanceYalms };
+  }
+  return nearest;
+}
+
 // The second observed break cause: a CARRIER dying with the crystal in
 // hand. Signature: the carrier's Glimmering removal coincides with their
 // death (strip) and Light's End follows within this window — MFPull13
@@ -1085,6 +1158,8 @@ function annotateLightsEndSources(
     }
   }
 
+  const crystalDrops = buildCrystalDrops(players);
+
   return errors.map((e) => {
     if (e.ruleId !== LIGHTS_END_RULE_ID) return e;
 
@@ -1096,10 +1171,17 @@ function annotateLightsEndSources(
       if (!source || det.timestamp > source.timestamp) source = det;
     }
     if (source) {
+      // See "Light's End crystal position" above — name the crystal by
+      // whoever was closest to its last-known drop spot, when resolvable.
+      const nearest = findNearestPlayerToDroppedCrystal(source.timestamp, crystalDrops, players);
+      const crystalLabel = nearest
+        ? `The Dawn Crystal near ${nearest.playerName} (~${nearest.distanceYalms.toFixed(1)}yd away)`
+        : "A Dawn Crystal";
       return {
         ...e,
         description:
-          `${e.description} Broken by ${source.playerName}'s Starsplinter detonation ` +
+          `${crystalLabel} was destroyed, unleashing Light's End. ` +
+          `Broken by ${source.playerName}'s Starsplinter detonation ` +
           `${((e.timestamp - source.timestamp) / 1000).toFixed(2)}s earlier.`,
       };
     }

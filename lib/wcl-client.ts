@@ -256,6 +256,14 @@ export type WCLDamageEvent = {
   // Resource snapshot — reflects the target's health AFTER this hit landed.
   hitPoints?:    number;
   maxHitPoints?: number;
+  // Target's position at the moment of the hit — WCL includes this on the
+  // raw event regardless of our GraphQL selection (the `events` field
+  // returns an opaque JSON blob, not a strict typed selection set; see
+  // [[sample-data-tooling]]'s note on FFLogs carrying undeclared fields —
+  // same situation here). Centi-yalms. Confirmed 2026-07-22 while building
+  // Midnight Falls' Light's End crystal-position rule.
+  x?:            number;
+  y?:            number;
 };
 
 export type WCLHealEvent = {

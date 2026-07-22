@@ -249,6 +249,8 @@ function wclDamageTakenToPlayerEvent(
     maxHealth:    event.maxHitPoints,
     overkill:     event.overkill,
     isDoT:        event.tick === true,   // ← added
+    x:            event.x,
+    y:            event.y,
   };
 }
 

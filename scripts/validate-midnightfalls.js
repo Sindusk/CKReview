@@ -120,6 +120,8 @@ function buildAll(rep, actorMap, abilityMap) {
         amount: e.amount ?? 0,
         overkill: e.overkill,
         isDoT: e.tick === true,
+        x: e.x,
+        y: e.y,
       })),
       debuffs: (rep.debuffs?.data ?? []).filter((e) => e.targetID === id).map((e) => ({
         timestamp: e.timestamp - t0,
