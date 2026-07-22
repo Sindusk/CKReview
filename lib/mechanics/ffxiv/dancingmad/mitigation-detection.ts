@@ -430,7 +430,7 @@ export function detectMitigationErrors(pull: Pull, plan: MitigationPlan | null):
       const meta = findAbilityMeta(pull.players, missing[0]);
       errors.push({
         ruleId:      MITIGATION_MISSED_RULE_ID,
-        severity:    "Major",
+        severity:    "Minor",
         name:        "Missed Mitigation",
         description: `Assigned to cast ${missing.join(", ")} for ${mech.name} (${slotLabel}) — not found before ${formatPlayerList(victims)} died to it.`,
         timestamp:   anchorMs,
