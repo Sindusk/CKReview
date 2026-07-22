@@ -7,7 +7,11 @@
 // before writing). One-time auth setup: scripts/lib/node-log-auth.js.
 //
 // Usage:
-//   node scripts/fetch-ff-report.js <reportCode> [options]
+//   node scripts/fetch-ff-report.js <reportCode|reportUrl> [options]
+//
+// <reportCode|reportUrl> accepts either the bare code or a full FFLogs
+// report URL (e.g. https://www.fflogs.com/reports/AbCd1234EfGh5678) — the
+// code is extracted automatically.
 //
 // Options:
 //   --out <dir>      Output directory (default: sampledata/ff/<reportCode>)
@@ -41,11 +45,16 @@ function parseArgs(argv) {
       'Usage: node scripts/fetch-ff-report.js <reportCode> [--out dir] [--fight id]... [--boss name] [--creds path]'
     );
   }
-  return { reportCode, ...args };
+  return { reportCode: extractReportCode(reportCode), ...args };
 }
 
 function sanitizeForFilename(name) {
   return name.replace(/[<>:"/\\|?*]/g, '').trim();
+}
+
+function extractReportCode(input) {
+  const match = input.match(/(?:fflogs\.com\/reports\/)?([a-zA-Z0-9]{16,})/);
+  return match ? match[1] : input;
 }
 
 async function main() {

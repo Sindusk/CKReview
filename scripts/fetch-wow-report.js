@@ -19,7 +19,11 @@
 // One-time auth setup — see scripts/lib/node-log-auth.js's header comment.
 //
 // Usage:
-//   node scripts/fetch-wow-report.js <reportCode> [options]
+//   node scripts/fetch-wow-report.js <reportCode|reportUrl> [options]
+//
+// <reportCode|reportUrl> accepts either the bare code or a full
+// WarcraftLogs report URL (e.g. https://www.warcraftlogs.com/reports/AbCd1234EfGh5678)
+// — the code is extracted automatically.
 //
 // Options:
 //   --out <dir>      Output directory (default: sampledata/wow/<reportCode>)
@@ -60,11 +64,16 @@ function parseArgs(argv) {
       'Usage: node scripts/fetch-wow-report.js <reportCode> [--out dir] [--fight id]... [--boss name] [--creds path]'
     );
   }
-  return { reportCode, ...args };
+  return { reportCode: extractReportCode(reportCode), ...args };
 }
 
 function sanitizeForFilename(name) {
   return name.replace(/[<>:"/\\|?*]/g, '').trim();
+}
+
+function extractReportCode(input) {
+  const match = input.match(/(?:warcraftlogs\.com\/reports\/)?([a-zA-Z0-9]{16,})/);
+  return match ? match[1] : input;
 }
 
 async function main() {
