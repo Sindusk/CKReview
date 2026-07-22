@@ -111,6 +111,7 @@ const FALL_GRACE_WINDOW_MS = 10000;
 export const LIMITCUT_PUSHED_OFF_RULE_ID   = "ffxiv-limitcut-pushed-off-arena";
 export const LIMITCUT_DASH_CLIP_RULE_ID    = "ffxiv-limitcut-dash-clipped-other-player";
 export const LIMITCUT_WRONG_POSITION_RULE_ID = "ffxiv-limitcut-wrong-dash-position";
+export const LIMITCUT_DEAD_DURING_MECHANIC_RULE_ID = "ffxiv-limitcut-dead-during-mechanic";
 
 const DASH_ABILITY_ID = 47844;
 
@@ -332,10 +333,32 @@ function detectDashErrors(
   const hitActorNames = new Set(
     [...hitsByActor.keys()].map((id) => players.find((p) => p.actorId === id)?.name)
   );
-  const deadDashMissed = deathEvents.some(
-    (d) => d.timestamp >= gazeStart && d.timestamp < firstDashTime && !hitActorNames.has(d.player)
-  );
-  if (deadDashMissed) return [];
+  // Whoever died between the gaze check and the dash set and was NEVER hit
+  // by a dash was still dead when Limit Cut actually went off — the
+  // mechanic can't resolve around a missing body (their clone has nobody
+  // to dash), so this is raised as its own raid-wide error rather than
+  // silently folded into whatever killed them originally (already flagged
+  // elsewhere, e.g. LIMITCUT_PUSHED_OFF_RULE_ID for a failed facing check).
+  // Also still skips the positional analysis below — a scrambled dash set
+  // can't be trusted for attribution either way (see module comment).
+  const deadPlayersMissingDash = [
+    ...new Set(
+      deathEvents
+        .filter((d) => d.timestamp >= gazeStart && d.timestamp < firstDashTime && !hitActorNames.has(d.player))
+        .map((d) => d.player)
+    ),
+  ];
+  if (deadPlayersMissingDash.length > 0) {
+    return deadPlayersMissingDash.map((player) => ({
+      ruleId:      LIMITCUT_DEAD_DURING_MECHANIC_RULE_ID,
+      severity:    "Raid",
+      name:        "Dead During Limit Cut",
+      description: `${player} was dead during Limit Cut. Mechanic unresolvable.`,
+      timestamp:   firstDashTime,
+      abilityId:   DASH_ABILITY_ID,
+      abilityName: "Limit Cut Dash",
+    }));
+  }
 
   const errors: PullError[] = [];
 
