@@ -139,6 +139,12 @@ async function main() {
       enemyBuffs:    { data: data.enemyBuffEvents },
     });
 
+    // WCL's "Interrupts" tab — a pure aggregate (per-player kick totals +
+    // uninterrupted-completion timestamps), not per-kick detail; see
+    // fetchInterruptsTable's header comment in lib/wcl-client.ts. Not run
+    // through slimWclReport (unknown key, already small/aggregate).
+    const interrupts = await wclClient.fetchInterruptsTable(reportCode, fight);
+
     const pullNumberMatch = label.match(/Pull (\d+)$/);
     const pullSuffix = pullNumberMatch ? `Pull${pullNumberMatch[1]}` : `Fight${fight.id}`;
     const fileName = `${sanitizeForFilename(fight.name)}_${pullSuffix}.json`;
@@ -147,11 +153,12 @@ async function main() {
     // Same {query, variables, json} wrapper shape the browser console dump
     // used, so this is a drop-in replacement for how existing harnesses
     // already read sample files (.json.data.reportData.report.<stream>.data)
-    // — no harness changes needed to consume these.
+    // — no harness changes needed to consume these. `interrupts` is a new,
+    // additive key alongside the existing streams.
     fs.writeFileSync(filePath, JSON.stringify({
       query:     null,
       variables: { code: reportCode, fightIDs: [fight.id] },
-      json:      { data: { reportData: { report: slim } } },
+      json:      { data: { reportData: { report: { ...slim, interrupts } } } },
     }));
 
     const sizeMb = (fs.statSync(filePath).size / 1e6).toFixed(1);

@@ -643,3 +643,75 @@ export async function fetchFightData(
     enemyBuffEvents:   collected.enemyBuffs,
   };
 }
+
+// ─── Query: Interrupts table ─────────────────────────────────────────────────
+//
+// WCL's site "Interrupts" tab, fetched via the same `table(dataType:
+// Interrupts)` field it uses internally. Checked 2026-07-22 against
+// Midnight Falls' Termination Matrix: this is a pure AGGREGATE — total
+// casts begun/completed/interrupted, a per-player tally of how many
+// times they interrupted (with which ability), and a `missedCasts` list
+// of when an uninterrupted cast completed (timestamp only). It does NOT
+// carry per-kick timestamps, target instance IDs, or any other way to
+// tie a specific missed cast to a specific player/matrix — strictly less
+// detailed than what `castEvents`/`enemyCastEvents` already give this
+// codebase (which has full per-kick timestamps). Fetched and persisted
+// anyway (scripts/fetch-{wow,ff}-report.js) for cross-checking against
+// our own cast-derived counts, not as a new detection input.
+export type WCLInterruptsTable = {
+  data: {
+    entries: Array<{
+      entries: Array<{
+        name:                     string;  // interrupted ability's name, e.g. "Terminate"
+        guid:                     number;  // ability id
+        spellsBegun:              number;
+        spellsCompleted:          number;  // uninterrupted completions — misses
+        spellsInterrupted:        number;
+        spellChannelsInterrupted: number;
+        details: Array<{
+          name:      string; // interrupting player's name
+          id:        number;
+          total:     number; // how many times this player interrupted it
+          abilities: Array<{ name: string; total: number; type: number }>;
+        }>;
+        missedCasts: Array<{
+          name:      string; // target NPC name, e.g. "Termination Matrix"
+          id:        number;
+          timestamp: number; // fight-relative ms
+        }>;
+      }>;
+    }>;
+    totalTime: number;
+  };
+};
+
+const INTERRUPTS_TABLE_QUERY = /* graphql */`
+  query GetInterrupts($code: String!, $fightIDs: [Int]!, $startTime: Float, $endTime: Float) {
+    reportData {
+      report(code: $code) {
+        table(fightIDs: $fightIDs, dataType: Interrupts, startTime: $startTime, endTime: $endTime)
+      }
+    }
+  }
+`;
+
+type InterruptsTableQueryResult = {
+  reportData: {
+    report: {
+      table: WCLInterruptsTable;
+    };
+  };
+};
+
+export async function fetchInterruptsTable(
+  reportCode: string,
+  fight:      WCLFight,
+  logLabel?:  string
+): Promise<WCLInterruptsTable> {
+  const data = await gql<InterruptsTableQueryResult>(
+    INTERRUPTS_TABLE_QUERY,
+    { code: reportCode, fightIDs: [fight.id], startTime: fight.startTime, endTime: fight.endTime },
+    logLabel ? `${logLabel} interrupts` : false
+  );
+  return data.reportData.report.table;
+}

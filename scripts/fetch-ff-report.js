@@ -117,6 +117,11 @@ async function main() {
       enemyBuffs:    { data: data.enemyBuffEvents },
     });
 
+    // FFLogs "Interrupts" tab — see lib/ffl-client.ts's fetchFFInterruptsTable
+    // header comment (pure aggregate, not per-kick detail). Not run through
+    // slimFflReport (unknown key, already small/aggregate).
+    const interrupts = await fflClient.fetchFFInterruptsTable(reportCode, fight);
+
     const pullNumberMatch = label.match(/Pull (\d+)$/);
     const pullSuffix = pullNumberMatch ? `Pull${pullNumberMatch[1]}` : `Fight${fight.id}`;
     const fileName = `${sanitizeForFilename(fight.name ?? 'UnknownFight')}_${pullSuffix}.json`;
@@ -125,7 +130,7 @@ async function main() {
     fs.writeFileSync(filePath, JSON.stringify({
       query:     null,
       variables: { code: reportCode, fightIDs: [fight.id] },
-      json:      { data: { reportData: { report: slim } } },
+      json:      { data: { reportData: { report: { ...slim, interrupts } } } },
     }));
 
     const sizeMb = (fs.statSync(filePath).size / 1e6).toFixed(1);

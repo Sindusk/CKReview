@@ -697,3 +697,68 @@ export async function fetchFFightData(
     enemyBuffEvents:   collected.enemyBuffs,
   };
 }
+
+// ─── Query: Interrupts table ─────────────────────────────────────────────────
+//
+// FFLogs mirror of lib/wcl-client.ts's fetchInterruptsTable — see that
+// file's header comment for the full rationale (it's a pure aggregate,
+// no per-kick timestamps or target-instance data beyond what castEvents
+// already gives this codebase). Fetched for cross-checking, not as a new
+// detection input.
+export type FFLInterruptsTable = {
+  data: {
+    entries: Array<{
+      entries: Array<{
+        name:                     string;
+        guid:                     number;
+        spellsBegun:              number;
+        spellsCompleted:          number;
+        spellsInterrupted:        number;
+        spellChannelsInterrupted: number;
+        details: Array<{
+          name:      string;
+          id:        number;
+          total:     number;
+          abilities: Array<{ name: string; total: number; type: number }>;
+        }>;
+        missedCasts: Array<{
+          name:      string;
+          id:        number;
+          timestamp: number;
+        }>;
+      }>;
+    }>;
+    totalTime: number;
+  };
+};
+
+const INTERRUPTS_TABLE_QUERY = /* graphql */`
+  query GetInterrupts($code: String!, $fightIDs: [Int]!, $startTime: Float, $endTime: Float) {
+    reportData {
+      report(code: $code) {
+        table(fightIDs: $fightIDs, dataType: Interrupts, startTime: $startTime, endTime: $endTime)
+      }
+    }
+  }
+`;
+
+type InterruptsTableQueryResult = {
+  reportData: {
+    report: {
+      table: FFLInterruptsTable;
+    };
+  };
+};
+
+export async function fetchFFInterruptsTable(
+  reportCode: string,
+  fight:      FFLFight,
+  logLabel?:  string
+): Promise<FFLInterruptsTable> {
+  const data = await gql<InterruptsTableQueryResult>(
+    INTERRUPTS_TABLE_QUERY,
+    { code: reportCode, fightIDs: [fight.id], startTime: fight.startTime, endTime: fight.endTime },
+    logLabel ? `${logLabel} interrupts` : false
+  );
+  return data.reportData.report.table;
+}

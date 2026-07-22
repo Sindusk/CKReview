@@ -358,6 +358,48 @@ function detectTerminateCasts(
     }
   }
 
+  // ROUND-0 ELIMINATION (2026-07-22, user-proposed): the three matrices'
+  // very first cast bars begin SIMULTANEOUSLY at wave start (confirmed —
+  // all 3 begincasts land within ~1ms of each other), so round 0's three
+  // assigned kickers (chain.members[0]) are the one round where "who
+  // kicked" can be checked in a synchronized time window without any
+  // matrix-instance ambiguity. If 2 of the 3 land a kick near wave start
+  // and the wave has at least one Terminate completion, the 3rd (who
+  // never kicked at all — no cast attempt whatsoever, not even a
+  // wrong-target one) is inferred as that miss's cause. Deliberately NOT
+  // extended to rounds 1+: once any chain has cascaded through an extra
+  // recast cycle (see WRONG-TARGET ATTRIBUTION above), the 3 chains'
+  // rounds drift out of sync in real time, so this same time-window trick
+  // stops being reliable — confirmed unsolvable for round 1+ misses
+  // (Pull 1's Shadowmeld/BF3-round1 case) even with full VOD ground truth.
+  const ROUND0_WINDOW_MS = 3000; // observed clean round-0 kicks land ~0.3-0.5s after wave start
+  const WAVE_GAP_MS = 20000;     // matches terminate-kicks.ts — matrix sets are ~62s apart, a wave's kicks ~12s
+  const waveTimeline = [...kicks.map((k) => k.timestamp), ...casts.map((c) => c.timestamp)].sort((a, b) => a - b);
+  const waves: Array<{ start: number; end: number; round0Misser: string | undefined }> = [];
+  for (const t of waveTimeline) {
+    const last = waves[waves.length - 1];
+    if (last && t - last.end <= WAVE_GAP_MS) last.end = t;
+    else waves.push({ start: t, end: t, round0Misser: undefined });
+  }
+  for (const wave of waves) {
+    const waveHasCompletion = casts.some((c) => c.timestamp >= wave.start && c.timestamp <= wave.end);
+    if (!waveHasCompletion) continue;
+    const round0Engaged = KNOWN_KICK_CHAINS.map((chain) =>
+      kicks.some((k) => chain.members[0].includes(k.playerName) && k.timestamp <= wave.start + ROUND0_WINDOW_MS)
+    );
+    if (round0Engaged.filter((e) => !e).length !== 1) continue; // 0 or 2+ missing — not airtight
+    const missingNames = KNOWN_KICK_CHAINS[round0Engaged.indexOf(false)].members[0];
+    wave.round0Misser = missingNames.find((n) => players.some((p) => p.name === n)) ?? missingNames[0];
+  }
+  // Same anti-bleed scoping wrongTargetMiss uses below (via prevVolleyEnd):
+  // only the FIRST volley resolved within a wave can be round 0's own miss —
+  // otherwise a wave's later, unrelated volleys would all inherit blame for
+  // a gap that's only ever true of the wave's opening round.
+  const round0MissForCompletion = (fromTime: number, completionTime: number): string | undefined => {
+    const wave = waves.find((w) => completionTime >= w.start && completionTime <= w.end);
+    return wave && fromTime <= wave.start ? wave.round0Misser : undefined;
+  };
+
   // The chain-elimination attribution described in the header comment.
   // Returns the misser only when exactly one chain can be responsible.
   const attributeMiss = (completionTime: number): string | undefined => {
@@ -424,7 +466,8 @@ function detectTerminateCasts(
       Math.max(prevVolleyEnd, group[0].timestamp - TERMINATE_WAVE_WINDOW_MS),
       group[group.length - 1].timestamp
     );
-    const misser = wrongTargetMisser ?? (group.length === 1 ? attributeMiss(group[0].timestamp) : undefined);
+    const round0Misser = round0MissForCompletion(prevVolleyEnd, group[0].timestamp);
+    const misser = wrongTargetMisser ?? round0Misser ?? (group.length === 1 ? attributeMiss(group[0].timestamp) : undefined);
     const misserInfo = misser ? players.find((p) => p.name === misser) : undefined;
     const misserDead = misser !== undefined &&
       deathEvents.some((d) => d.player === misser && d.timestamp <= group[0].timestamp);
@@ -436,7 +479,9 @@ function detectTerminateCasts(
           ? `${misser} was dead before their Terminate interrupt came up. The termination matrix's Terminate cast went off.`
           : misser === wrongTargetMisser
             ? `${misser} aimed their interrupt at the wrong target instead of the Termination Matrix — the cast went off.`
-            : `${misser} missed their Terminate interrupt — the termination matrix's Terminate cast went off.`;
+            : misser === round0Misser
+              ? `${misser} never landed their opening interrupt on the Termination Matrix — the cast went off.`
+              : `${misser} missed their Terminate interrupt — the termination matrix's Terminate cast went off.`;
     const tail = victims.length > 0 ? ` Hit: ${victims.join(", ")}.` : " Nobody was hit.";
 
     errors.push({
