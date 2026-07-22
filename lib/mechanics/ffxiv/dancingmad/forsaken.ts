@@ -947,6 +947,42 @@ function pickLegitimatePair(
 
     if (rotatedIdx.length === 1) {
       const confirmedIdx = rotatedIdx[0];
+
+      // A rotated assignment debuff isn't decisive on its own when a SIBLING
+      // in the group holds that exact same debuff — a 3rd party merely
+      // standing close enough to catch the tower's own Path of Light splash
+      // can trigger their own stack-loss AND assignment-rotation just like a
+      // genuine soaker (confirmed real: report VtdBqhLQkWJXMvDg pull 15 —
+      // the designated Cone bait stood too close/"inside" instead of at
+      // their proper bait distance, and both she and the true Cone holder
+      // showed a resolution-instant stack loss; only the bait's own
+      // assignment happened to also rotate, backwards from what the
+      // rotation-first heuristic below assumes). When exactly one sibling
+      // shares the debuff and exactly one OTHER group member holds a
+      // distinct one (giving a spot type to aim for), resolve the tie
+      // geometrically: whichever of the two sits closer to that debuff's
+      // ideal spot is the true holder — this is much sharper than the raw
+      // ring-radius bands (38 units off vs 147, in the confirmed case).
+      const siblingIdx = group
+        .map((_, i) => i)
+        .filter((i) => i !== confirmedIdx && assignments[i].abilityId === assignments[confirmedIdx].abilityId);
+
+      if (siblingIdx.length === 1) {
+        const sibling = siblingIdx[0];
+        const others = group.map((_, i) => i).filter((i) => i !== confirmedIdx && i !== sibling);
+
+        if (others.length === 1) {
+          const spot = expectedSpotFor(assignments[confirmedIdx].abilityId, assignments[others[0]].abilityId);
+          if (spot !== undefined) {
+            const confirmedDist = distToIdealSpot(group[confirmedIdx], spot, tower);
+            const siblingDist = distToIdealSpot(group[sibling], spot, tower);
+            if (siblingDist < confirmedDist) {
+              return { pairIdx: [sibling, others[0]], extraIdx: [confirmedIdx], decisive: true };
+            }
+          }
+        }
+      }
+
       const others = group.map((_, i) => i).filter((i) => i !== confirmedIdx);
       const withoutAnomalousLoss = others.filter(
         (i) => !hasStackLossNear(group[i].player, consensusTimestamp)
@@ -1374,6 +1410,12 @@ function detectWrongTowerPositionErrors(
             abilityId:   built.assignments[idx].abilityId,
             abilityName: built.assignments[idx].abilityName,
           });
+          // Already explained here with the real reason (debuff+position) —
+          // don't let detectOvercrowdedTowerErrors's weaker team-inference
+          // check flag the same player at the same resolution a second time
+          // with a generic description (confirmed real duplicate: report
+          // VtdBqhLQkWJXMvDg pull 15).
+          confirmedLegitKeys.add(`${soak.player.actorId}@${reportTimestamp}`);
         }
       }
     }
