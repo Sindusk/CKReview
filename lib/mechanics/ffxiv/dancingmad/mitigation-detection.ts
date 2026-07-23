@@ -386,6 +386,61 @@ export function hasCastNear(player: PlayerInfo, abilityNames: string[], anchorMs
   return findCastNear(player, abilityNames, anchorMs) !== null;
 }
 
+// ── Per-ability duration OVERRIDE ─────────────────────────────────────────
+//
+// findActiveBuffNear (below) — FFLogs' own recorded activeBuffNames on a
+// nearby damage instance — is the DEFAULT, PRIMARY check: real ground
+// truth for "was this actually up," and correctly handles the common case
+// (a plain timed debuff like Feint, whose single cast should NOT be
+// counted as covering a mechanic long after its real duration elapsed —
+// confirmed working correctly this way 2026-07-24). Only two abilities so
+// far are confirmed to defeat that check specifically, both because
+// activeBuffNames isn't tracking what we actually want to know:
+//   - Divine Veil: a SHIELD whose status gets removed the INSTANT it's
+//     consumed by a hit, often within ~1s of casting — nowhere near its
+//     real ~20s duration, so activeBuffNames says "gone" while the
+//     party's actual mitigation coverage (the regen portion) is still up.
+//   - Liturgy of the Bell: a one-shot cast with NO persistent buff status
+//     in FFLogs at all (the heal fires automatically later) — activeBuff-
+//     Names can never show it as active, ever, even the instant after
+//     casting it.
+// Per the user's explicit correction (2026-07-24): this is an OVERRIDE
+// list for confirmed-broken cases, not a wholesale replacement of the
+// working buff-check — don't add an ability here unless activeBuffNames
+// has been shown not to work for it specifically.
+export const DURATION_OVERRIDE_MS: Record<string, number> = {
+  "Divine Veil":         20_000, // user-confirmed 2026-07-24: shield + 20s party regen; FFLogs drops the status on shield consumption, well before the real duration
+  "Liturgy of the Bell": 20_000, // user-confirmed 2026-07-24: one-shot cast, no persistent buff status in FFLogs at all, but its effect covers 20s
+};
+
+// Same idea as findCastNear, but each candidate ability's own window is
+// derived from DURATION_OVERRIDE_MS (falling back to CAST_LOOKBACK_MS when
+// unmapped, though in practice this is only ever called for abilities
+// already confirmed to be in that map) instead of one flat window shared
+// by every ability. Returns the specific real cast name that covers
+// `anchorMs`, or null.
+export function findCastCoveringMoment(player: PlayerInfo, abilityNames: string[], anchorMs: number): string | null {
+  const wanted = new Set(abilityNames.map((n) => n.toLowerCase()));
+
+  let best: { name: string; timestamp: number } | null = null;
+  for (const c of player.casts) {
+    if (!wanted.has(c.abilityName.toLowerCase())) continue;
+    const duration = DURATION_OVERRIDE_MS[c.abilityName] ?? CAST_LOOKBACK_MS;
+    if (c.timestamp < anchorMs - duration) continue;
+    if (c.timestamp > anchorMs + CAST_LOOKAHEAD_MS) continue;
+    if (!best || c.timestamp > best.timestamp) best = { name: c.abilityName, timestamp: c.timestamp };
+  }
+  return best?.name ?? null;
+}
+
+// True if ANY of `abilityNames` is a confirmed activeBuffNames-doesn't-
+// work override — mitigation-review.ts's buildCell uses this to route the
+// whole either-of group to findCastCoveringMoment instead of the default
+// buff-check.
+export function needsDurationOverride(abilityNames: string[]): boolean {
+  return abilityNames.some((n) => n in DURATION_OVERRIDE_MS);
+}
+
 // The player's own most recent cast of any of `abilityNames` at or before
 // `atMs` — regardless of the hit/miss lookback window (mitigation-
 // review.ts's Review tab shows this in a check's tooltip: "Last Cast: X"
@@ -450,16 +505,15 @@ const BUFF_CHECK_TOLERANCE_MS = 5_000;
 
 // Same ground-truth idea as wasBuffActiveOnHit (FFLogs' own recorded
 // activeBuffNames on a real damage instance beats assuming a cast X seconds
-// ago is still up — this is exactly what catches a short-duration buff
-// like Feint (15s) having already fallen off by a LATER mechanic even
-// though it's still within the cast-timing lookback window), generalized
-// to not require a death: reads the CLOSEST damageTaken event within
-// BUFF_CHECK_TOLERANCE_MS of `anchorMs`, on `player` specifically (their
-// own hit — correct for both personal mitigations and party-wide ones
-// that also apply to them, same reasoning wasBuffActiveOnHit's header
-// gives for checking the victim's own list). Returns undefined (not
-// false) when no nearby damage instance carries buff data at all, so the
-// caller can fall back to findCastNear.
+// ago is still up), generalized to not require a death: reads the CLOSEST
+// damageTaken event within BUFF_CHECK_TOLERANCE_MS of `anchorMs`, on
+// `player` specifically (their own hit — correct for both personal
+// mitigations and party-wide ones that also apply to them, same reasoning
+// wasBuffActiveOnHit's header gives for checking the victim's own list).
+// mitigation-review.ts's buildCell uses this as the DEFAULT check (see
+// DURATION_OVERRIDE_MS above for the two confirmed exceptions). Returns
+// undefined (not false) when no nearby damage instance carries buff data
+// at all, so the caller can fall back to findCastNear.
 export function findActiveBuffNear(
   player:       PlayerInfo,
   abilityNames: string[],

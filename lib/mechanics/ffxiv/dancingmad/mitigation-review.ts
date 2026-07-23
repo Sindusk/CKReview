@@ -69,6 +69,8 @@ import {
   expandRequiredAbilities,
   findCastNear,
   findActiveBuffNear,
+  findCastCoveringMoment,
+  needsDurationOverride,
   findLastCastAtOrBefore,
   isDeadOrFreshlyRevived,
 } from "./mitigation-detection";
@@ -163,26 +165,34 @@ function buildCell(
           continue;
         }
 
-        // Ground truth first: was the buff actually UP on the player's own
-        // nearby hit (FFLogs' own recorded activeBuffNames — catches a
-        // short-duration buff like Feint (15s) that was cast in time for an
-        // EARLIER mechanic but already fell off by this later one, which a
-        // pure cast-timing lookback window can't tell apart from still
-        // being up). Only fall back to cast-timing when there's no nearby
-        // damage instance to read buff state from at all.
-        const buffCheck = findActiveBuffNear(player, candidates, anchorMs);
-        const castMatch = buffCheck === undefined ? findCastNear(player, candidates, anchorMs) : null;
-        const hit = buffCheck !== undefined ? buffCheck.active : castMatch !== null;
-        const matchedName = buffCheck !== undefined ? buffCheck.matchedName : castMatch;
+        // Ground truth first (FFLogs' own recorded activeBuffNames on a
+        // nearby hit) — correctly handles the common case (a plain timed
+        // debuff like Feint, whose single cast must NOT be counted as
+        // covering a mechanic long after its real duration elapsed). Only
+        // reroute to the per-ability duration override for the confirmed
+        // exceptions (a shield whose status drops on consumption, or a
+        // one-shot cast with no persistent status at all — see
+        // DURATION_OVERRIDE_MS's header); fall back to plain cast-timing
+        // when there's no nearby damage instance to read buff state from.
+        let matchedName: string | null;
+        if (needsDurationOverride(candidates)) {
+          matchedName = findCastCoveringMoment(player, candidates, anchorMs);
+        } else {
+          const buffCheck = findActiveBuffNear(player, candidates, anchorMs);
+          matchedName = buffCheck !== undefined
+            ? (buffCheck.active ? buffCheck.matchedName : null)
+            : findCastNear(player, candidates, anchorMs);
+        }
 
-        // Same cutoff findCastNear itself allows for a "hit" (anchor +
-        // lookahead) — so on a hit this returns that exact satisfying
-        // cast's timestamp; on a miss, however long ago they last cast it
-        // (possibly well before the lookback window even opened), or null.
+        // Same cutoff findCastNear/findCastCoveringMoment allow for a "hit"
+        // (anchor + lookahead) — so on a hit this returns that exact
+        // satisfying cast's timestamp; on a miss, however long ago they
+        // last cast it (possibly well before ITS OWN duration would still
+        // cover this moment), or null.
         const lastCastMs = findLastCastAtOrBefore(player, candidates, anchorMs + CAST_LOOKAHEAD_MS);
         checks.push({
-          status:      hit ? "hit" : "missed",
-          abilityName: (hit && matchedName) ? matchedName : candidates.join(" / "),
+          status:      matchedName ? "hit" : "missed",
+          abilityName: matchedName ?? candidates.join(" / "),
           carryOver:   entry.carryOver,
           lastCastMs,
         });
