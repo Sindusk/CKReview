@@ -21,21 +21,35 @@
 //     comp. R1 = physical ranged, R2 = caster (standard party-slot naming).
 //   - MT/OT: NOT resolvable from role alone (both tanks share role="Tank").
 //     Two independent signals, applied in order:
-//       1. Plan-based: if a MitigationPlan is supplied, tally which tank's
-//          JOB the plan's "MT"/"OT" phase-mechanic columns name via a
-//          job-gated ability qualifier ("Party Mit (GNB/DRK)"). Only trusted
-//          when the two columns' votes name two DIFFERENT tank jobs with a
-//          clear majority each — real sheets sometimes list both tank jobs'
+//       1. Opening auto-attack: whichever tank the boss's first "Attack"
+//          (basic auto-attack) damage-taken event of the pull landed on.
+//          Only one enemy is ever in combat at the very start of a pull —
+//          add phases/boss copies (Dancing Mad's Chaos/Exdeath split) only
+//          appear later — so this is naturally scoped to the real boss
+//          without needing to name it. Cross-checked against real sample
+//          data (2026-07): correct in 100% of pulls across three separate
+//          reports (18/18, 16/16, 22/22), and 13/15 on a fourth where the
+//          two misses were a pair of pulls with an identical, apparently
+//          anomalous opening sequence (both tanks' own first hits arrived
+//          within the same ~1s and in the same order — plausibly a
+//          checkpoint/practice-tool resume rather than a real pull-in).
+//          Total damage taken across the WHOLE pull (the previous rule)
+//          was rejected by the user 2026-07-23: this fight's tank-swap-
+//          heavy structure means both tanks end up with similar totals,
+//          making the split effectively random pull to pull — the opening
+//          auto-attack, being a single early snapshot before any swap, does
+//          not have that problem.
+//       2. Plan-based: if a MitigationPlan is supplied and signal 1 found
+//          no "Attack" data at all, tally which tank's JOB the plan's
+//          "MT"/"OT" phase-mechanic columns name via a job-gated ability
+//          qualifier ("Party Mit (GNB/DRK)"). Only trusted when the two
+//          columns' votes name two DIFFERENT tank jobs with a clear
+//          majority each — real sheets sometimes list both tank jobs'
 //          mitigations under the same column (raid-wide mits are up
 //          regardless of who's "MT" for threat purposes), which produces no
-//          majority and safely falls through to signal 2 instead of a wrong
-//          guess.
-//       2. Damage-taken: the user's own heuristic — whichever tank has taken
-//          more total damage across the pull is almost always the one
-//          holding aggro, i.e. the Main Tank. Used whenever the plan signal
-//          didn't resolve, and as the ONLY signal when no plan is loaded.
-//     Falls back to roster order (tentative) only if both tanks somehow took
-//     identical total damage (extremely unlikely in practice).
+//          majority and safely falls through instead of a wrong guess.
+//     Falls back to roster order (tentative) only if neither signal
+//     resolves anything (no logged auto-attacks AND no decisive plan vote).
 //   - M1/M2: genuinely unresolvable from the roster alone when two melee
 //     DPS share... nothing distinguishing (no per-job M1-vs-M2 convention
 //     exists in FFXIV the way MT/OT does) — stays tentative, arbitrary
@@ -73,7 +87,7 @@ export type RoleAssignment = {
   tentative:  boolean;
   // How this slot was resolved — surfaced for the Strategy dialog / future
   // debugging, not load-bearing for detection.
-  source:     "job" | "plan" | "damage" | "order" | "none";
+  source:     "job" | "auto-attack" | "plan" | "order" | "none";
 };
 
 const HEALER_JOBS = ["White Mage", "Astrologian", "Scholar", "Sage"];
@@ -137,15 +151,26 @@ function resolveTanksFromPlan(tanks: PlayerInfo[], plan: MitigationPlan): { mt: 
   return { mt, ot };
 }
 
-function totalDamageTaken(p: PlayerInfo): number {
-  return p.damageTaken.reduce((sum, e) => sum + (e.amount ?? 0), 0);
+// Whichever of the two tanks took the EARLIEST "Attack" (boss basic
+// auto-attack) hit in the pull — see module header for why this beats
+// total damage taken. Returns null if neither tank has a logged "Attack"
+// hit at all (shouldn't happen for any real pull that reached combat).
+function firstAutoAttackTarget(tanks: PlayerInfo[]): PlayerInfo | null {
+  let earliest: { player: PlayerInfo; timestamp: number } | null = null;
+  for (const t of tanks) {
+    for (const e of t.damageTaken) {
+      if (e.abilityName !== "Attack") continue;
+      if (!earliest || e.timestamp < earliest.timestamp) earliest = { player: t, timestamp: e.timestamp };
+    }
+  }
+  return earliest?.player ?? null;
 }
 
 /**
- * Resolves MT/OT for a two-tank roster: plan-based job vote first (if a
- * plan is supplied and decisive), then whichever tank took more total
- * damage across the pull (the user's own heuristic — the tank holding
- * aggro is almost always the one eating the boss's autos/tankbusters).
+ * Resolves MT/OT for a two-tank roster: opening auto-attack first (which
+ * tank the boss's first basic-attack hit landed on), then a plan-based job
+ * vote if that found no data at all — see module header for the full
+ * reasoning and validation numbers.
  */
 function resolveTanks(
   tanks: PlayerInfo[],
@@ -157,21 +182,19 @@ function resolveTanks(
   const sorted = [...tanks].sort((a, b) => sortKey(a) - sortKey(b));
   const [t1, t2] = sorted;
 
+  const mtByAutoAttack = firstAutoAttackTarget(sorted);
+  if (mtByAutoAttack) {
+    const ot = mtByAutoAttack === t1 ? t2 : t1;
+    return { mt: mtByAutoAttack, ot, tentative: false, source: "auto-attack" };
+  }
+
   if (plan) {
     const fromPlan = resolveTanksFromPlan(sorted, plan);
     if (fromPlan) return { mt: fromPlan.mt, ot: fromPlan.ot, tentative: false, source: "plan" };
   }
 
-  const d1 = totalDamageTaken(t1);
-  const d2 = totalDamageTaken(t2);
-  if (d1 !== d2) {
-    return d1 > d2
-      ? { mt: t1, ot: t2, tentative: false, source: "damage" }
-      : { mt: t2, ot: t1, tentative: false, source: "damage" };
-  }
-
-  // Identical damage taken (no combat data, or a genuine tie) — can't
-  // disambiguate; keep roster order but mark tentative.
+  // Neither signal resolved anything — can't disambiguate; keep roster
+  // order but mark tentative.
   return { mt: t1, ot: t2, tentative: true, source: "order" };
 }
 
@@ -220,8 +243,9 @@ function resolveDps(dps: PlayerInfo[]): RoleAssignment[] {
 
 /**
  * Maps every player in `players` onto the eight standard FFXIV party slots.
- * `plan` is an optional extra signal for MT/OT disambiguation (see module
- * header) — omit it (or pass null) to get a damage-taken-only split.
+ * `plan` is an optional extra signal for MT/OT disambiguation, only
+ * consulted when the opening-auto-attack signal finds no data at all (see
+ * module header) — omit it (or pass null) to skip that fallback.
  */
 export function detectFFRoles(players: PlayerInfo[], plan?: MitigationPlan | null): RoleAssignment[] {
   const tanks   = players.filter((p) => p.role === "Tank");
