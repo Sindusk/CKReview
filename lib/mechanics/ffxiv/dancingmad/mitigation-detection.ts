@@ -386,6 +386,25 @@ export function hasCastNear(player: PlayerInfo, abilityNames: string[], anchorMs
   return findCastNear(player, abilityNames, anchorMs) !== null;
 }
 
+// The player's own most recent cast of any of `abilityNames` at or before
+// `atMs` — regardless of the hit/miss lookback window (mitigation-
+// review.ts's Review tab shows this in a check's tooltip: "Last Cast: X"
+// for a hit, or how long ago they last did it even if too stale to count
+// for THIS particular requirement, or "Not Cast Yet This Pull" — see
+// module callers — when null). Deliberately unbounded on the low end,
+// unlike findCastNear/hasCastNear, which only care whether a cast landed
+// close enough to satisfy the requirement.
+export function findLastCastAtOrBefore(player: PlayerInfo, abilityNames: string[], atMs: number): number | null {
+  const wanted = new Set(abilityNames.map((n) => n.toLowerCase()));
+  let latest: number | null = null;
+  for (const c of player.casts) {
+    if (!wanted.has(c.abilityName.toLowerCase())) continue;
+    if (c.timestamp > atMs) continue;
+    if (latest === null || c.timestamp > latest) latest = c.timestamp;
+  }
+  return latest;
+}
+
 // The killing hit's own `activeBuffNames` (see PlayerEvent in
 // types/PlayerInfo.ts) is FFLogs' ground truth for what was actually up on
 // the victim at the instant the damage landed — strictly better evidence

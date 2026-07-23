@@ -141,8 +141,15 @@ export default function MitigationReviewTable({
                   <td key={slot} style={bodyCellStyle}>
                     {cell.checks.map((check, ci) => {
                       const display = STATUS_DISPLAY[check.status];
+                      const lastCastLine =
+                        check.status === "hit" || check.status === "missed"
+                          ? check.lastCastMs != null
+                            ? `Last Cast: ${formatMs(check.lastCastMs)}`
+                            : "Not Cast Yet This Pull"
+                          : undefined;
                       const title = [
                         `${display.label}${cell.slotLabel ? ` (${cell.slotLabel})` : ""}`,
+                        lastCastLine,
                         cell.tentativeSlot ? "Tentative slot assignment — roster couldn't fully disambiguate" : undefined,
                       ].filter(Boolean).join("\n");
                       return (

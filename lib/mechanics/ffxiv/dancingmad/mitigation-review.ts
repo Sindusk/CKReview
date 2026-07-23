@@ -61,12 +61,14 @@ import {
 import {
   type FlatMechanic,
   MECHANIC_MATCH_WINDOW_MS,
+  CAST_LOOKAHEAD_MS,
   flattenPhaseMechanics,
   flattenTankMechanics,
   mechanicMatchesAbilityName,
   resolveRequiredAbilityNames,
   expandRequiredAbilities,
   findCastNear,
+  findLastCastAtOrBefore,
   isDeadOrFreshlyRevived,
 } from "./mitigation-detection";
 
@@ -80,7 +82,16 @@ export type MitigationCellStatus = "hit" | "missed" | "unresolved" | "dead" | "f
 export type MitigationReviewCheck = {
   status:      MitigationCellStatus;
   abilityName: string;
-  carryOver:   boolean;  // true if this requirement carries over from an earlier mechanic (dimmed in the table, same convention as the Plan tab)
+  carryOver:   boolean;    // true if this requirement carries over from an earlier mechanic (dimmed in the table, same convention as the Plan tab)
+  // Timestamp of the player's own most recent cast of this ability at or
+  // before the check's moment (2026-07-24, for the table's tooltip) — the
+  // SAME cast that satisfied a "hit", or however long ago they last did it
+  // even if too stale to count on a "missed", or null ("Not Cast Yet This
+  // Pull") if they never have. Only populated for hit/missed checks —
+  // undefined for unresolved/dead/future, where there's nothing meaningful
+  // to look up (unresolved has no real ability name; dead/future never run
+  // a cast check at all).
+  lastCastMs?: number | null;
 };
 
 export type MitigationReviewCell = {
@@ -152,10 +163,16 @@ function buildCell(
         }
 
         const matched = findCastNear(player, candidates, anchorMs);
+        // Same cutoff findCastNear itself allows for a "hit" (anchor +
+        // lookahead) — so on a hit this returns that exact satisfying
+        // cast's timestamp; on a miss, however long ago they last cast it
+        // (possibly well before the lookback window even opened), or null.
+        const lastCastMs = findLastCastAtOrBefore(player, candidates, anchorMs + CAST_LOOKAHEAD_MS);
         checks.push({
           status:      matched ? "hit" : "missed",
           abilityName: matched ?? candidates.join(" / "),
           carryOver:   entry.carryOver,
+          lastCastMs,
         });
       }
     }
