@@ -74,9 +74,10 @@ import {
   findTankLB3LastCast,
   findLastCastAtOrBefore,
   isDeadOrFreshlyRevived,
+  hasNoEffectOnMechanic,
 } from "./mitigation-detection";
 
-export type MitigationCellStatus = "hit" | "missed" | "unresolved" | "dead" | "future";
+export type MitigationCellStatus = "hit" | "missed" | "unresolved" | "dead" | "future" | "noEffect";
 
 // One independently-evaluated required ability within a cell. `abilityName`
 // is the SPECIFIC real cast that satisfied it on "hit" (useful for an
@@ -139,6 +140,7 @@ export function findBossCastAnchor(mech: PlanMechanic, enemyCasts: { timestamp: 
 }
 
 function buildCell(
+  mechName:  string,
   slotLabel: string,
   player:    PlayerInfo,
   tentative: boolean,
@@ -187,6 +189,10 @@ function buildCell(
           checks.push({ status: "dead", abilityName: candidates.join(" / "), carryOver: entry.carryOver });
           continue;
         }
+        if (hasNoEffectOnMechanic(mechName, candidates)) {
+          checks.push({ status: "noEffect", abilityName: candidates.join(" / "), carryOver: entry.carryOver });
+          continue;
+        }
 
         // Ground truth first (FFLogs' own recorded activeBuffNames on a
         // nearby hit) — correctly handles the common case (a plain timed
@@ -233,15 +239,16 @@ function buildCell(
 // A mechanic that never happened this pull — no casts to check, so every
 // required ability is just previewed (real name if resolvable, else the
 // sheet's own term) with a "future" status rather than a real verdict.
-function buildFutureCell(slotLabel: string, player: PlayerInfo, tentative: boolean, entries: PlanEntry[]): MitigationReviewCell {
+function buildFutureCell(mechName: string, slotLabel: string, player: PlayerInfo, tentative: boolean, entries: PlanEntry[]): MitigationReviewCell {
   const checks: MitigationReviewCheck[] = [];
 
   for (const entry of entries) {
     for (const rawAbility of entry.abilities) {
       for (const ability of expandRequiredAbilities(rawAbility)) {
         const candidates = resolveRequiredAbilityNames(ability, player);
+        const noEffect = candidates !== null && hasNoEffectOnMechanic(mechName, candidates);
         checks.push({
-          status:      "future",
+          status:      noEffect ? "noEffect" : "future",
           abilityName: candidates ? candidates.join(" / ") : ability.name,
           carryOver:   entry.carryOver,
         });
@@ -283,8 +290,8 @@ function buildRowsFrom(flat: FlatMechanic[], pull: Pull, plan: MitigationPlan, e
       cellsByActorId.set(
         player.actorId,
         reached
-          ? buildCell(slotLabel, player, tentative, entries, pull, anchorMs)
-          : buildFutureCell(slotLabel, player, tentative, entries)
+          ? buildCell(mech.name, slotLabel, player, tentative, entries, pull, anchorMs)
+          : buildFutureCell(mech.name, slotLabel, player, tentative, entries)
       );
     }
 

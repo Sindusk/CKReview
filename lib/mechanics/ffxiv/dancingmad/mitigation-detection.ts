@@ -152,6 +152,37 @@ const INVULN_BY_JOB: Record<string, string> = {
   "Dark Knight": "Living Dead",
 };
 
+// ── Manual "sheet lies to us" overrides ──────────────────────────────────
+//
+// Found 2026-07-24 (report LF2yJZabVprjXYvm, pull-by-pull VOD review):
+// Wave Cannon's damage is dealt by "Graven Image" (a separate summoned NPC),
+// NOT Kefka himself — confirmed via a live re-query of the raw event data,
+// decoding actor/ability IDs directly (Kefka = actor 36/40, Graven Image =
+// actor 39). Reprisal/Feint/Addle are debuffs applied to whichever enemy
+// you target when you cast them (normally Kefka) — FFXIV debuffs are
+// per-NPC-instance, so none of them ever reduce Graven Image's own damage
+// regardless of real-world cast timing/duration. This is a genuine
+// mechanical fact about the fight the sheet's "carry-over" notation doesn't
+// (and can't, from a static timeline) capture — not a bug in our duration
+// math or buff-check logic. Keyed by the sheet's own mechanic name (exact
+// match, not the alias/token system above — this is a hand-confirmed list,
+// not a name-matching problem). A check whose candidates are ENTIRELY
+// covered by this list renders as a distinct "no effect" status (dash,
+// brown, "Does not affect this attack" tooltip in the Review tab) instead
+// of a real hit/miss verdict, and is skipped entirely (not flagged) by
+// detectMitigationErrors — extend this table by hand as more sheet lies
+// like this one turn up.
+export const NO_EFFECT_OVERRIDES: Record<string, string[]> = {
+  "Wave Cannon": ["Reprisal", "Feint", "Addle"],
+};
+
+/** True if EVERY candidate for this check is known (via NO_EFFECT_OVERRIDES) to have no real effect on this specific mechanic. */
+export function hasNoEffectOnMechanic(mechName: string, candidates: string[]): boolean {
+  const overridden = NO_EFFECT_OVERRIDES[mechName];
+  if (!overridden) return false;
+  return candidates.every((c) => overridden.includes(c));
+}
+
 // "LB3" (a tank Limit Break) is fundamentally different from every other
 // generic term above: the sheet doesn't care WHICH tank presses it — user-
 // confirmed 2026-07-24 ("the sheet is asking either tank to hit their
@@ -468,6 +499,7 @@ export const ABILITY_DURATION_MS: Record<string, number> = {
   "The Blackest Night":  7_000,  // user-confirmed 2026-07-24 — DRK shield, same reasoning as Divine Veil — FORCE override
   "Divine Caress":       10_000, // user-confirmed 2026-07-24 — WHM shield, same reasoning as Divine Veil — FORCE override
   Provoke:               5_000,  // user-confirmed 2026-07-24 — a taunt, not really a "mitigation duration" in the usual sense; user flagged this may need revisiting — FORCE override (no persistent status to check either way)
+  "Plenary Indulgence":  10_000, // found 2026-07-24 (report LF2yJZabVprjXYvm pull 1, Azura's WHM cast at 2:10 wrongly "missed" for Light of Judgement at 2:13): the cast grants a status named "Confession", not "Plenary Indulgence" — activeBuffNames can never match the cast's own name, so it always reports a false "not active" instead of "no data" — FORCE override
 };
 
 // Abilities where activeBuffNames is CONFIRMED wrong, not just "duration
@@ -478,6 +510,7 @@ const FORCE_DURATION_OVERRIDE = new Set([
   "The Blackest Night",
   "Divine Caress",
   "Provoke",
+  "Plenary Indulgence",
 ]);
 
 // Same idea as findCastNear, but each candidate ability's own window is
@@ -725,6 +758,7 @@ export function detectMitigationErrors(pull: Pull, plan: MitigationPlan | null):
           for (const ability of expandRequiredAbilities(rawAbility)) {
             const candidates = resolveRequiredAbilityNames(ability, player);
             if (!candidates) continue; // unsupported term or wrong job — not checkable
+            if (hasNoEffectOnMechanic(mech.name, candidates)) continue; // sheet lies to us — see NO_EFFECT_OVERRIDES
 
             // Ground-truth check first (was it actually active on whoever
             // took the hit); only fall back to the cast-timing heuristic when

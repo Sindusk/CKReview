@@ -38,6 +38,13 @@ const STATUS_DISPLAY: Record<MitigationCellStatus, { symbol: string; color: stri
   unresolved: { symbol: "?", color: "#64748b", label: "Unresolved — ambiguous sheet term for this job" },
   dead:       { symbol: "–", color: "#666",    label: "Already dead / just revived — not counted" },
   future:     { symbol: "-", color: "#444",    label: "Not reached this pull yet" },
+  // Manual override for sheet mechanics confirmed (via raw event data, not
+  // the sheet's own timeline) to be dealt by a different enemy entity than
+  // whichever the mitigation was cast on — see NO_EFFECT_OVERRIDES in
+  // mitigation-detection.ts. Never a real hit/miss, so distinct dash + color
+  // from both "future" (just hasn't happened yet) and "dead" (player's own
+  // exemption).
+  noEffect:   { symbol: "–", color: "#b45309", label: "Does not affect this attack" },
 };
 
 const headerCellStyle = {
