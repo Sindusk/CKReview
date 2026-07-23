@@ -8,14 +8,17 @@
 // raid strategy selection are unrelated concerns that happened to share one
 // dialog early on.
 //
-// Renders the selected mitigation plan (lib/mechanics/ffxiv/dancingmad/
-// mitigation-plan.ts — currently the Ikuya sheet) as a timeline of expected
-// mitigation casts per player, with the sheet's party slots mapped onto the
-// loaded roster. Tentative mappings (MT vs OT, D1 vs D2 with two melee) are
-// marked with "?" — display only; Mitigation error detection must not blame
-// individuals through a tentative slot.
+// Two tabs (added 2026-07-23 alongside the per-pull selector below):
+//   - "Plan": the sheet's expected-mitigation timeline (unchanged from
+//     before), with party slots mapped onto the SELECTED pull's roster
+//     (previously always the first FF pull in the report — now per-pull,
+//     same as everywhere else this session touched).
+//   - "Review": a per-pull audit table — did each player actually hit their
+//     assigned mitigation, and when (see MitigationReviewTable.tsx /
+//     lib/mechanics/ffxiv/dancingmad/mitigation-review.ts). First-pass
+//     prototype; ambiguous sheet terms show "?" rather than a guess.
 
-import { useMemo } from "react";
+import { useState } from "react";
 import {
   MITIGATION_PLANS,
   getMitigationPlan,
@@ -25,15 +28,19 @@ import {
   type PlanNotes,
   type SlotAssignment,
 } from "@/lib/mechanics/ffxiv/dancingmad/mitigation-plan";
-import type { PlayerInfo } from "@/types/PlayerInfo";
+import { buildMitigationReview } from "@/lib/mechanics/ffxiv/dancingmad/mitigation-review";
+import MitigationReviewTable from "@/components/MitigationReviewTable";
+import { useFFPullSelector } from "@/hooks/useFFPullSelector";
+import type { Pull } from "@/types/Pull";
 import { getClassColor } from "@/lib/player-display";
 
 type MitigationDialogProps = {
   open:     boolean;
   onClose:  () => void;
-  // FFXIV roster of the loaded report (first Dancing Mad pull), or null when
-  // no FF report is loaded.
-  ffPlayers: PlayerInfo[] | null;
+  pulls: Pull[];
+  // The app's globally-selected pull — the dialog's own pull dropdown
+  // resets to this every time it opens (see hooks/useFFPullSelector.ts).
+  currentPullId: number | null;
   mitigationPlanId: string | null;
   onMitigationPlanChange: (id: string | null) => void;
 };
@@ -153,25 +160,46 @@ const mitRowStyle = {
   borderRadius: "6px",
 };
 
+type Tab = "plan" | "review";
+
+const tabButtonStyle = (active: boolean) => ({
+  padding: "5px 12px",
+  fontSize: "12px",
+  fontWeight: 600,
+  borderRadius: "5px",
+  border: active ? "1px solid #60a5fa66" : "1px solid #333",
+  backgroundColor: active ? "#60a5fa18" : "transparent",
+  color: active ? "#60a5fa" : "#888",
+  cursor: "pointer",
+});
+
 export default function MitigationDialog({
   open,
   onClose,
-  ffPlayers,
+  pulls,
+  currentPullId,
   mitigationPlanId,
   onMitigationPlanChange,
 }: MitigationDialogProps) {
   const plan = getMitigationPlan(mitigationPlanId);
+  const [activeTab, setActiveTab] = useState<Tab>("plan");
 
-  // Sheet party slots mapped onto the loaded FF roster (see mitigation-plan.ts).
-  const slotMap = useMemo(() => {
-    const map = new Map<string, SlotAssignment>();
-    if (ffPlayers) for (const a of resolveMitigationSlots(ffPlayers, plan)) map.set(a.slot, a);
-    return map;
-  }, [ffPlayers, plan]);
+  // Pull selector — resets to the app's current pull every time the dialog
+  // opens (see hooks/useFFPullSelector.ts), same pattern as StrategyDialog.
+  const { ffPulls, selectedPullId, setSelectedPullId, selectedPull } =
+    useFFPullSelector(pulls, open, currentPullId);
+
+  // Sheet party slots mapped onto the SELECTED pull's roster (see
+  // mitigation-plan.ts) — used by the Plan tab.
+  const slotMap = new Map<string, SlotAssignment>();
+  if (selectedPull) for (const a of resolveMitigationSlots(selectedPull.players, plan)) slotMap.set(a.slot, a);
+
+  const reviewRows = selectedPull ? buildMitigationReview(selectedPull, plan) : [];
 
   if (!open) return null;
 
-  const showMitigation = ffPlayers !== null && ffPlayers.length > 0;
+  const showMitigation = ffPulls.length > 0 && selectedPull !== null;
+  const wide = activeTab === "review" ? "min(1200px, 96vw)" : "min(880px, 94vw)";
 
   return (
     <div
@@ -192,7 +220,7 @@ export default function MitigationDialog({
           backgroundColor: "#222",
           padding: "22px",
           borderRadius: "10px",
-          width: showMitigation ? "min(880px, 94vw)" : "480px",
+          width: showMitigation ? wide : "480px",
           maxHeight: "80vh",
           overflowY: "auto",
           color: "white",
@@ -220,35 +248,65 @@ export default function MitigationDialog({
 
         {showMitigation ? (
           <div>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "2px" }}>
-              <div style={{ fontSize: "13px", fontWeight: 600, color: "#e2e8f0" }}>
-                Mitigation Plan
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px", flexWrap: "wrap" }}>
+              <div style={{ display: "flex", gap: "6px" }}>
+                <button style={tabButtonStyle(activeTab === "plan")} onClick={() => setActiveTab("plan")}>Plan</button>
+                <button style={tabButtonStyle(activeTab === "review")} onClick={() => setActiveTab("review")}>Review</button>
               </div>
-              <select
-                value={mitigationPlanId ?? ""}
-                onChange={(e) => onMitigationPlanChange(e.target.value || null)}
-                style={{
-                  backgroundColor: "#1a1a1a",
-                  color: "#e2e8f0",
-                  border: "1px solid #444",
-                  borderRadius: "5px",
-                  padding: "3px 8px",
-                  fontSize: "12px",
-                }}
-              >
-                <option value="">None</option>
-                {MITIGATION_PLANS.map((p) => (
-                  <option key={p.id} value={p.id}>{p.label}</option>
-                ))}
-              </select>
+
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <span style={{ fontSize: "11px", color: "#94a3b8" }}>Pull</span>
+                <select
+                  value={selectedPullId ?? ""}
+                  onChange={(e) => setSelectedPullId(Number(e.target.value))}
+                  style={{
+                    backgroundColor: "#1a1a1a",
+                    color: "#e2e8f0",
+                    border: "1px solid #444",
+                    borderRadius: "5px",
+                    padding: "3px 8px",
+                    fontSize: "12px",
+                  }}
+                >
+                  {ffPulls.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name} #{p.pullNumber} ({p.result})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", marginLeft: "auto" }}>
+                <span style={{ fontSize: "11px", color: "#94a3b8" }}>Plan</span>
+                <select
+                  value={mitigationPlanId ?? ""}
+                  onChange={(e) => onMitigationPlanChange(e.target.value || null)}
+                  style={{
+                    backgroundColor: "#1a1a1a",
+                    color: "#e2e8f0",
+                    border: "1px solid #444",
+                    borderRadius: "5px",
+                    padding: "3px 8px",
+                    fontSize: "12px",
+                  }}
+                >
+                  <option value="">None</option>
+                  {MITIGATION_PLANS.map((p) => (
+                    <option key={p.id} value={p.id}>{p.label}</option>
+                  ))}
+                </select>
+              </div>
             </div>
 
-            {plan ? (
+            {!plan ? (
+              <p style={{ fontSize: "12px", color: "#94a3b8", margin: "6px 0 0" }}>
+                Select a mitigation plan to see the expected mitigation casts for
+                each player across the fight timeline.
+              </p>
+            ) : activeTab === "plan" ? (
               <>
                 <div style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "12px" }}>
                   Expected mitigation casts per player, from the {plan.label} sheet.
-                  Party slots are mapped onto this report&apos;s roster; a &quot;?&quot; marks
-                  mappings the roster can&apos;t disambiguate (MT vs OT, D1 vs D2).
+                  Party slots are mapped onto this pull&apos;s roster; a &quot;?&quot; marks
+                  mappings the roster can&apos;t disambiguate (M1 vs M2).
                   Dimmed ➔ entries carry over from an earlier cast. Hover for
                   sheet footnotes.
                 </div>
@@ -290,10 +348,18 @@ export default function MitigationDialog({
                 )}
               </>
             ) : (
-              <p style={{ fontSize: "12px", color: "#94a3b8", margin: "6px 0 0" }}>
-                Select a mitigation plan to see the expected mitigation casts for
-                each player across the fight timeline.
-              </p>
+              <>
+                <div style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "12px" }}>
+                  Every plan mechanic actually matched to a boss cast in this pull,
+                  with a per-player mark: <span style={{ color: "#4ade80" }}>✓</span> hit,{" "}
+                  <span style={{ color: "#f87171" }}>✗</span> missed,{" "}
+                  <span style={{ color: "#64748b" }}>?</span> unresolved sheet term (not
+                  mapped to a real ability for this job yet), <span style={{ color: "#555" }}>–</span> already
+                  dead / just revived. Hover a mark for details. First-pass prototype —
+                  expect gaps until sheet terms are fully mapped.
+                </div>
+                {selectedPull && <MitigationReviewTable pull={selectedPull} plan={plan} rows={reviewRows} />}
+              </>
             )}
           </div>
         ) : (

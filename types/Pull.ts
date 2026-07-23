@@ -2,7 +2,7 @@
 
 import type { DeathEvent } from "./DeathEvent";
 import type { PlayerInfo } from "./PlayerInfo";
-import type { PullError }  from "./PullError";
+import type { PullError, EnemyEvent }  from "./PullError";
 
 // Raw positional data for the Dancing Mad (FFXIV) Black Hole mechanic's
 // direction/priority detection — see lib/mechanics/ffxiv/dancingmad/
@@ -43,4 +43,12 @@ export type Pull = {
   fightId:       number;    // raw fight ID from the log source, for report URLs (?fight=N)
 
   blackHoleGeometry?: BlackHoleGeometry;
+
+  // The boss's own completed casts for this pull (FFXIV only, undefined for
+  // WoW) — persisted (unlike other games' transient enemyCast computations,
+  // which only ever live for the duration of import-time detector calls) so
+  // the Mitigation Review table can anchor each sheet mechanic on the
+  // boss's own real cast time instead of the sheet's static idealized time.
+  // See lib/mechanics/ffxiv/dancingmad/mitigation-review.ts.
+  enemyCasts?: EnemyEvent[];
 };

@@ -14,7 +14,8 @@
 // moved to its own MitigationDialog.tsx / "Mitigation" button, since plan
 // selection and raid-strategy selection are unrelated concerns.)
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo } from "react";
+import { useFFPullSelector } from "@/hooks/useFFPullSelector";
 import type { TerminateKickStrategy, KickSlot } from "@/lib/mechanics/wow/vs-dr-mqd/terminate-kicks";
 import type { CrystalAssignmentStrategy, CrystalSlot } from "@/lib/mechanics/wow/vs-dr-mqd/crystal-assignments";
 import {
@@ -42,6 +43,9 @@ type StrategyDialogProps = {
   // detector's MT/OT split (see lib/mechanics/ffxiv/roles.ts).
   pulls: Pull[];
   mitigationPlan: MitigationPlan | null;
+  // The app's globally-selected pull — the role roster's dropdown resets to
+  // this every time the dialog opens (see hooks/useFFPullSelector.ts).
+  currentPullId: number | null;
 };
 
 // Column layout for the compact roster table — Tank/Healer/Melee/Ranged
@@ -178,20 +182,14 @@ export default function StrategyDialog({
   onBlackHoleOverrideChange,
   pulls,
   mitigationPlan,
+  currentPullId,
 }: StrategyDialogProps) {
   // Pull selector for the role roster — only FF pulls with a resolved
-  // roster are selectable. Defaults to the most recent one; re-picks if the
-  // previously-selected pull disappears (e.g. a fresh report import).
-  const ffPulls = useMemo(
-    () => pulls.filter((p) => p.game === "ffxiv" && p.players.length > 0),
-    [pulls]
-  );
-  const [selectedPullId, setSelectedPullId] = useState<number | null>(null);
-  useEffect(() => {
-    if (selectedPullId !== null && ffPulls.some((p) => p.id === selectedPullId)) return;
-    setSelectedPullId(ffPulls.length > 0 ? ffPulls[ffPulls.length - 1].id : null);
-  }, [ffPulls, selectedPullId]);
-  const selectedPull = ffPulls.find((p) => p.id === selectedPullId) ?? null;
+  // roster are selectable. Resets to the app's current pull every time the
+  // dialog opens (see hooks/useFFPullSelector.ts); self-heals if the
+  // selected pull disappears (e.g. a fresh report import).
+  const { ffPulls, selectedPullId, setSelectedPullId, selectedPull } =
+    useFFPullSelector(pulls, open, currentPullId);
 
   if (!open) return null;
 

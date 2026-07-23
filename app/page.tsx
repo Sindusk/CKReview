@@ -119,14 +119,6 @@ export default function Home() {
   const kickStrategy = useMemo(() => detectTerminateKickOrder(pulls), [pulls]);
   const crystalStrategy = useMemo(() => detectCrystalAssignments(pulls), [pulls]);
 
-  // FFXIV roster for the mitigation-plan section of the Mitigation dialog —
-  // the first FF pull with players (rosters are stable within a report; if a
-  // job swap happens mid-session the slot mapping just reflects pull 1).
-  const ffPlayers = useMemo(() => {
-    const ffPull = pulls.find((p) => p.game === "ffxiv" && p.players.length > 0);
-    return ffPull ? ffPull.players : null;
-  }, [pulls]);
-
   // Selected mitigation plan (per-fight expected mit timeline shown in the
   // Mitigation dialog; also the input to Mitigation error detection).
   // Persisted so the choice survives reloads.
@@ -1054,12 +1046,14 @@ export default function Home() {
         onBlackHoleOverrideChange={handleBlackHoleOverrideChange}
         pulls={pulls}
         mitigationPlan={mitigationPlan}
+        currentPullId={selectedPullId}
       />
 
       <MitigationDialog
         open={showMitigation}
         onClose={() => setShowMitigation(false)}
-        ffPlayers={ffPlayers}
+        pulls={pulls}
+        currentPullId={selectedPullId}
         mitigationPlanId={mitigationPlanId}
         onMitigationPlanChange={handleMitigationPlanChange}
       />

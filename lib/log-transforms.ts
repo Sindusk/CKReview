@@ -1064,6 +1064,7 @@ export function transformFFightToPull(
     fightId:       data.fight.id,
     castEvents,
     blackHoleGeometry,
+    enemyCasts:    enemyCastEvents,
   };
 }
 

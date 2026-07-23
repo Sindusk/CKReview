@@ -63,7 +63,7 @@ export const MITIGATION_MISSED_RULE_ID = "ffxiv-mitigation-missed";
 // to be considered "this mechanic" rather than a coincidence. Generous
 // because real pulls drift from the sheet's idealized pacing (extra deaths/
 // downtime earlier in the pull push everything later).
-const MECHANIC_MATCH_WINDOW_MS = 30_000;
+export const MECHANIC_MATCH_WINDOW_MS = 30_000;
 
 // Window (anchored on the real death time, not the sheet's static time —
 // see header) searched for the assigned player's cast. Mitigation buffs on
@@ -72,8 +72,8 @@ const MECHANIC_MATCH_WINDOW_MS = 30_000;
 // close together, so 45s back comfortably covers a carry-over cast without
 // reaching into a different mechanic's window. A few seconds forward covers
 // a cast logged just after the damage tick due to event ordering.
-const CAST_LOOKBACK_MS  = 45_000;
-const CAST_LOOKAHEAD_MS = 3_000;
+export const CAST_LOOKBACK_MS  = 45_000;
+export const CAST_LOOKAHEAD_MS = 3_000;
 
 // ── Generic-term resolution ──────────────────────────────────────────────
 //
@@ -110,7 +110,7 @@ const SHORT_MIT_BY_JOB: Record<string, string> = {
 // (satisfied if the player cast ANY of them) or null if this entry isn't
 // checkable for this player (wrong job for a job-gated term, or a term this
 // module doesn't support yet — see header).
-function resolveRequiredAbilityNames(ability: PlanAbility, player: PlayerInfo): string[] | null {
+export function resolveRequiredAbilityNames(ability: PlanAbility, player: PlayerInfo): string[] | null {
   switch (ability.name) {
     case "Party Mit": {
       const name = PARTY_MIT_BY_JOB[player.className];
@@ -158,7 +158,12 @@ function resolveRequiredAbilityNames(ability: PlanAbility, player: PlayerInfo): 
 // ("Stray Flames/Tsunami", "Stomp-a-Mole + Knock Down") or append a
 // non-ability qualifier FFLogs won't have ("Thunder III (1st Set)",
 // "Towers II (Past/Future's End)"). Splits into comparable tokens.
-function mechanicNameTokens(mechName: string): string[] {
+//
+// Exported — mitigation-review.ts reuses this against boss enemyCast
+// ability names (not just death killing-ability names) to anchor each
+// mechanic on the boss's own real cast time. Generic string matching, so
+// the "name" parameter doesn't care which kind of ability-name string it is.
+export function mechanicNameTokens(mechName: string): string[] {
   const stripped = mechName.replace(/\s*\([^)]*\)\s*$/, "").trim();
   return stripped
     .split(/\/|\+/)
@@ -166,15 +171,15 @@ function mechanicNameTokens(mechName: string): string[] {
     .filter(Boolean);
 }
 
-function mechanicMatchesDeathCause(mech: PlanMechanic, deathCause: string): boolean {
-  const cause = deathCause.trim().toLowerCase();
-  if (!cause || cause.startsWith("unknown")) return false;
-  return mechanicNameTokens(mech.name).some((t) => t === cause || t.includes(cause) || cause.includes(t));
+export function mechanicMatchesAbilityName(mech: PlanMechanic, abilityName: string): boolean {
+  const name = abilityName.trim().toLowerCase();
+  if (!name || name.startsWith("unknown")) return false;
+  return mechanicNameTokens(mech.name).some((t) => t === name || t.includes(name) || name.includes(t));
 }
 
-type FlatMechanic = { phaseTitle: string; mech: PlanMechanic };
+export type FlatMechanic = { phaseTitle: string; mech: PlanMechanic };
 
-function flattenPhaseMechanics(plan: MitigationPlan): FlatMechanic[] {
+export function flattenPhaseMechanics(plan: MitigationPlan): FlatMechanic[] {
   const out: FlatMechanic[] = [];
   for (const phase of plan.data.phases) {
     for (const mech of phase.mechanics) {
@@ -195,7 +200,7 @@ function flattenPhaseMechanics(plan: MitigationPlan): FlatMechanic[] {
 // them would make a death match whichever one's sheet timestamp happens to
 // be numerically closer and silently drop the other, losing either the
 // healer-side or the tank-side check for that occurrence.
-function flattenTankMechanics(plan: MitigationPlan): FlatMechanic[] {
+export function flattenTankMechanics(plan: MitigationPlan): FlatMechanic[] {
   const out: FlatMechanic[] = [];
   if (!plan.data.tank) return out;
   for (const section of plan.data.tank.sections) {
@@ -219,7 +224,7 @@ function matchDeathsToMechanics(deaths: DeathEvent[], flat: FlatMechanic[]): Mat
   for (const death of deaths) {
     let best: { mech: PlanMechanic; diff: number } | null = null;
     for (const { mech } of flat) {
-      if (!mechanicMatchesDeathCause(mech, death.cause)) continue;
+      if (!mechanicMatchesAbilityName(mech, death.cause)) continue;
       const diff = Math.abs(death.timestamp - mech.timeSeconds! * 1000);
       if (diff > MECHANIC_MATCH_WINDOW_MS) continue;
       if (!best || diff < best.diff) best = { mech, diff };
@@ -248,7 +253,7 @@ function formatPlayerList(names: string[]): string {
 
 // ── Cast checking ─────────────────────────────────────────────────────────
 
-function hasCastNear(player: PlayerInfo, abilityNames: string[], anchorMs: number): boolean {
+export function hasCastNear(player: PlayerInfo, abilityNames: string[], anchorMs: number): boolean {
   const wanted = new Set(abilityNames.map((n) => n.toLowerCase()));
   return player.casts.some(
     (c) =>
@@ -297,7 +302,7 @@ function wasBuffActiveOnHit(
 // Best-effort ability id/icon for the missed ability, sourced from ANY
 // player's cast history in this pull that used it (for icon display only —
 // falls back to 0/none if nobody in this pull ever cast it).
-function findAbilityMeta(players: PlayerInfo[], name: string): { abilityId: number; abilityIcon?: string } {
+export function findAbilityMeta(players: PlayerInfo[], name: string): { abilityId: number; abilityIcon?: string } {
   for (const p of players) {
     const c = p.casts.find((e) => e.abilityName.toLowerCase() === name.toLowerCase());
     if (c) return { abilityId: c.abilityId, abilityIcon: c.abilityIcon };
@@ -346,7 +351,7 @@ function firstActivityAfter(player: PlayerInfo, afterMs: number): number | undef
  * this hit and should still be checked. Only an earlier, already-resolved
  * death exempts them.
  */
-function isDeadOrFreshlyRevived(player: PlayerInfo, deathEvents: DeathEvent[], atMs: number): boolean {
+export function isDeadOrFreshlyRevived(player: PlayerInfo, deathEvents: DeathEvent[], atMs: number): boolean {
   const lastDeath = deathEvents
     .filter((d) => d.player === player.name && d.timestamp < atMs)
     .sort((a, b) => b.timestamp - a.timestamp)[0];

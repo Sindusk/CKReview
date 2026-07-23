@@ -1,0 +1,42 @@
+// Throwaway sanity check for lib/mechanics/ffxiv/dancingmad/mitigation-review.ts
+// Run: node scripts/validate-mitigation-review.js [reportDir]
+const path = require('path');
+const { ROOT, requireTsFromRoot } = require('./lib/require-ts');
+const { discoverReportFolders } = require('./lib/load-report-folder');
+
+const store = requireTsFromRoot('lib/sample-report-store.ts');
+const lt    = requireTsFromRoot('lib/log-transforms.ts', { './log-auth': {} });
+const { getMitigationPlan } = requireTsFromRoot('lib/mechanics/ffxiv/dancingmad/mitigation-plan.ts');
+const { buildMitigationReview } = requireTsFromRoot('lib/mechanics/ffxiv/dancingmad/mitigation-review.ts');
+
+const FF_DATA_DIR = path.join(ROOT, 'sampledata', 'ff');
+const explicitDir = process.argv[2] ? path.resolve(process.argv[2]) : null;
+const reportDirs = explicitDir ? [explicitDir] : discoverReportFolders(FF_DATA_DIR);
+
+const plan = getMitigationPlan('ikuya');
+
+(async () => {
+  for (const dir of reportDirs) {
+    const code = path.basename(dir);
+    if (!(await store.sampleReportExists('ffl', code))) continue;
+    const payload = await store.loadSampleReport('ffl', code);
+    if (payload.source !== 'ffl') continue;
+
+    const abilityMap = lt.buildFFLAbilityMap(payload.report.masterData.abilities);
+    const pulls = lt.transformFFReportToPulls(payload.fightDataList, abilityMap, code);
+
+    console.log(`\n### ${code} — ${pulls.length} pulls`);
+    for (const pull of pulls.slice(0, 3)) {
+      const rows = buildMitigationReview(pull, plan);
+      const enemyCastCount = (pull.enemyCasts || []).length;
+      console.log(`Pull ${pull.pullNumber}: enemyCasts=${enemyCastCount}, review rows=${rows.length}`);
+      for (const row of rows.slice(0, 6)) {
+        const cells = [...row.cellsByActorId.entries()].map(([id, c]) => {
+          const p = pull.players.find(p => p.actorId === id);
+          return `${p ? p.name : id}:${c.status}${c.tentativeSlot ? '?' : ''}(${c.slotLabel})`;
+        }).join(', ');
+        console.log(`  [${(row.anchorMs/1000).toFixed(1)}s] ${row.phaseTitle} / ${row.mech.name} -> ${cells}`);
+      }
+    }
+  }
+})();
