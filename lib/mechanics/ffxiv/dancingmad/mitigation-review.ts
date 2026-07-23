@@ -68,6 +68,7 @@ import {
   resolveRequiredAbilityNames,
   expandRequiredAbilities,
   findCastNear,
+  findActiveBuffNear,
   findLastCastAtOrBefore,
   isDeadOrFreshlyRevived,
 } from "./mitigation-detection";
@@ -162,15 +163,26 @@ function buildCell(
           continue;
         }
 
-        const matched = findCastNear(player, candidates, anchorMs);
+        // Ground truth first: was the buff actually UP on the player's own
+        // nearby hit (FFLogs' own recorded activeBuffNames — catches a
+        // short-duration buff like Feint (15s) that was cast in time for an
+        // EARLIER mechanic but already fell off by this later one, which a
+        // pure cast-timing lookback window can't tell apart from still
+        // being up). Only fall back to cast-timing when there's no nearby
+        // damage instance to read buff state from at all.
+        const buffCheck = findActiveBuffNear(player, candidates, anchorMs);
+        const castMatch = buffCheck === undefined ? findCastNear(player, candidates, anchorMs) : null;
+        const hit = buffCheck !== undefined ? buffCheck.active : castMatch !== null;
+        const matchedName = buffCheck !== undefined ? buffCheck.matchedName : castMatch;
+
         // Same cutoff findCastNear itself allows for a "hit" (anchor +
         // lookahead) — so on a hit this returns that exact satisfying
         // cast's timestamp; on a miss, however long ago they last cast it
         // (possibly well before the lookback window even opened), or null.
         const lastCastMs = findLastCastAtOrBefore(player, candidates, anchorMs + CAST_LOOKAHEAD_MS);
         checks.push({
-          status:      matched ? "hit" : "missed",
-          abilityName: matched ?? candidates.join(" / "),
+          status:      hit ? "hit" : "missed",
+          abilityName: (hit && matchedName) ? matchedName : candidates.join(" / "),
           carryOver:   entry.carryOver,
           lastCastMs,
         });

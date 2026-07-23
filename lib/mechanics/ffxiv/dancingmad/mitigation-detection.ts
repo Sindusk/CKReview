@@ -441,6 +441,45 @@ function wasBuffActiveOnHit(
   return active.some((n) => wanted.has(n.toLowerCase()));
 }
 
+// How far from a check's anchor a damageTaken event can be and still count
+// as "the hit this mechanic was checking" — the actual damage from a boss
+// cast usually lands right at/just after the cast completes (matching
+// CAST_LOOKAHEAD_MS), with a little slop for event-ordering jitter and the
+// anchor itself being a boss CAST timestamp rather than the damage tick.
+const BUFF_CHECK_TOLERANCE_MS = 5_000;
+
+// Same ground-truth idea as wasBuffActiveOnHit (FFLogs' own recorded
+// activeBuffNames on a real damage instance beats assuming a cast X seconds
+// ago is still up — this is exactly what catches a short-duration buff
+// like Feint (15s) having already fallen off by a LATER mechanic even
+// though it's still within the cast-timing lookback window), generalized
+// to not require a death: reads the CLOSEST damageTaken event within
+// BUFF_CHECK_TOLERANCE_MS of `anchorMs`, on `player` specifically (their
+// own hit — correct for both personal mitigations and party-wide ones
+// that also apply to them, same reasoning wasBuffActiveOnHit's header
+// gives for checking the victim's own list). Returns undefined (not
+// false) when no nearby damage instance carries buff data at all, so the
+// caller can fall back to findCastNear.
+export function findActiveBuffNear(
+  player:       PlayerInfo,
+  abilityNames: string[],
+  anchorMs:     number
+): { active: boolean; matchedName: string | null } | undefined {
+  const wanted = new Set(abilityNames.map((n) => n.toLowerCase()));
+
+  let best: { diff: number; activeBuffNames: string[] } | null = null;
+  for (const e of player.damageTaken) {
+    if (e.activeBuffNames === undefined) continue;
+    const diff = Math.abs(e.timestamp - anchorMs);
+    if (diff > BUFF_CHECK_TOLERANCE_MS) continue;
+    if (!best || diff < best.diff) best = { diff, activeBuffNames: e.activeBuffNames };
+  }
+  if (!best) return undefined;
+
+  const matchedName = best.activeBuffNames.find((n) => wanted.has(n.toLowerCase())) ?? null;
+  return { active: matchedName !== null, matchedName };
+}
+
 // Best-effort ability id/icon for the missed ability, sourced from ANY
 // player's cast history in this pull that used it (for icon display only —
 // falls back to 0/none if nobody in this pull ever cast it).
