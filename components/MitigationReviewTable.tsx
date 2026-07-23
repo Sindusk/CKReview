@@ -3,18 +3,21 @@
 // components/MitigationReviewTable.tsx
 //
 // "Review" tab of MitigationDialog.tsx — a per-pull audit table: players
-// across the top (labeled by their auto-detected party role), every
-// mitigation-plan mechanic that actually happened down the side (boss-cast-
-// matched real time, not the sheet's static one — see
-// lib/mechanics/ffxiv/dancingmad/mitigation-review.ts), and a hit/missed/
-// unresolved/dead mark per cell. A cell requiring multiple abilities (e.g.
-// "Reprisal + Party Mit") shows each as its OWN line with its own mark and
-// ability name (2026-07-23, per the user's explicit ask — one being cast
-// and the other not now shows a check on one and an X on the other, with
-// both names visible in the table instead of hidden in the tooltip).
-// First-pass prototype per the user's explicit ask (2026-07-23) — expect
-// refinement once real reports surface sheet-term ambiguities that need
-// mapping.
+// across the top (labeled by their auto-detected party role), EVERY
+// mitigation-plan mechanic across the whole fight down the side (boss-cast-
+// matched real time for ones this pull reached, the sheet's own static time
+// for ones it didn't — see lib/mechanics/ffxiv/dancingmad/mitigation-
+// review.ts), and a hit/missed/unresolved/dead/future mark per cell. A cell
+// requiring multiple abilities (e.g. "Reprisal + Party Mit") shows each as
+// its OWN line with its own mark and ability name (2026-07-23, per the
+// user's explicit ask — one being cast and the other not now shows a check
+// on one and an X on the other, with both names visible in the table
+// instead of hidden in the tooltip). Mechanics the pull never reached still
+// render (2026-07-23, per the user's ask to preview the whole fight every
+// time) — the whole row and every check dim to gray with a "-" mark
+// instead of a real verdict. First-pass prototype per the user's explicit
+// ask (2026-07-23) — expect refinement once real reports surface sheet-term
+// ambiguities that need mapping.
 
 import type { Pull } from "@/types/Pull";
 import type { MitigationReviewRow, MitigationCellStatus } from "@/lib/mechanics/ffxiv/dancingmad/mitigation-review";
@@ -33,7 +36,8 @@ const STATUS_DISPLAY: Record<MitigationCellStatus, { symbol: string; color: stri
   hit:        { symbol: "✓", color: "#4ade80", label: "Hit" },
   missed:     { symbol: "✗", color: "#f87171", label: "Missed" },
   unresolved: { symbol: "?", color: "#64748b", label: "Unresolved — ambiguous sheet term for this job" },
-  dead:       { symbol: "–", color: "#555",    label: "Already dead / just revived — not counted" },
+  dead:       { symbol: "–", color: "#666",    label: "Already dead / just revived — not counted" },
+  future:     { symbol: "-", color: "#444",    label: "Not reached this pull yet" },
 };
 
 const headerCellStyle = {
@@ -122,11 +126,11 @@ export default function MitigationReviewTable({
         </thead>
         <tbody>
           {rows.map((row, i) => (
-            <tr key={`${row.mech.name}-${i}`}>
+            <tr key={`${row.mech.name}-${i}`} style={{ opacity: row.reached ? 1 : 0.5 }}>
               <td style={rowLabelCellStyle}>
                 <div>
-                  <span style={{ color: "#60a5fa", fontWeight: 700, marginRight: "6px" }}>{formatMs(row.anchorMs)}</span>
-                  {row.mech.name}
+                  <span style={{ color: row.reached ? "#60a5fa" : "#666", fontWeight: 700, marginRight: "6px" }}>{formatMs(row.anchorMs)}</span>
+                  <span style={{ color: row.reached ? "#e2e8f0" : "#888" }}>{row.mech.name}</span>
                 </div>
                 <div style={{ color: "#555", fontSize: "10px" }}>({row.phaseTitle})</div>
               </td>
@@ -144,7 +148,7 @@ export default function MitigationReviewTable({
                       return (
                         <div key={ci} style={{ ...checkLineStyle, opacity: check.carryOver ? 0.55 : 1 }} title={title}>
                           <span style={{ color: display.color, fontWeight: 700, flexShrink: 0 }}>{display.symbol}</span>
-                          <span style={{ color: "#cbd5e1", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          <span style={{ color: row.reached ? "#cbd5e1" : "#666", overflow: "hidden", textOverflow: "ellipsis" }}>
                             {check.carryOver ? "➔ " : ""}{check.abilityName}
                           </span>
                         </div>

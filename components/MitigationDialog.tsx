@@ -350,13 +350,14 @@ export default function MitigationDialog({
             ) : (
               <>
                 <div style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "12px" }}>
-                  Every plan mechanic actually matched to a boss cast in this pull,
-                  with a per-player mark: <span style={{ color: "#4ade80" }}>✓</span> hit,{" "}
+                  Every plan mechanic across the whole fight, with a per-player mark:{" "}
+                  <span style={{ color: "#4ade80" }}>✓</span> hit,{" "}
                   <span style={{ color: "#f87171" }}>✗</span> missed,{" "}
                   <span style={{ color: "#64748b" }}>?</span> unresolved sheet term (not
-                  mapped to a real ability for this job yet), <span style={{ color: "#555" }}>–</span> already
-                  dead / just revived. Hover a mark for details. First-pass prototype —
-                  expect gaps until sheet terms are fully mapped.
+                  mapped to a real ability for this job yet), <span style={{ color: "#666" }}>–</span> already
+                  dead / just revived, <span style={{ color: "#444" }}>-</span> grayed out —
+                  mechanic not reached this pull. Hover a mark for details. First-pass
+                  prototype — expect gaps until sheet terms are fully mapped.
                 </div>
                 {selectedPull && <MitigationReviewTable pull={selectedPull} plan={plan} rows={reviewRows} />}
               </>

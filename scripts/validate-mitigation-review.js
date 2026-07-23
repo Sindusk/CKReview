@@ -29,14 +29,18 @@ const plan = getMitigationPlan('ikuya');
     for (const pull of pulls.slice(0, 3)) {
       const rows = buildMitigationReview(pull, plan);
       const enemyCastCount = (pull.enemyCasts || []).length;
-      console.log(`Pull ${pull.pullNumber}: enemyCasts=${enemyCastCount}, review rows=${rows.length}`);
-      for (const row of rows.slice(0, 6)) {
+      const reachedCount = rows.filter(r => r.reached).length;
+      console.log(`Pull ${pull.pullNumber}: enemyCasts=${enemyCastCount}, review rows=${rows.length} (reached=${reachedCount}, future=${rows.length - reachedCount})`);
+      // Print the last reached row and first future row (the boundary) plus the very last row.
+      const lastReachedIdx = rows.map(r => r.reached).lastIndexOf(true);
+      const toShow = [rows[0], rows[lastReachedIdx], rows[lastReachedIdx + 1], rows[rows.length - 1]].filter(Boolean);
+      for (const row of toShow) {
         const cells = [...row.cellsByActorId.entries()].map(([id, c]) => {
           const p = pull.players.find(p => p.actorId === id);
           const checks = c.checks.map(chk => `${chk.status}:${chk.abilityName}${chk.carryOver ? '(carry)' : ''}`).join('+');
           return `${p ? p.name : id}:${checks}${c.tentativeSlot ? '?' : ''}(${c.slotLabel})`;
         }).join(', ');
-        console.log(`  [${(row.anchorMs/1000).toFixed(1)}s] ${row.phaseTitle} / ${row.mech.name} -> ${cells}`);
+        console.log(`  [${(row.anchorMs/1000).toFixed(1)}s] reached=${row.reached} ${row.phaseTitle} / ${row.mech.name} -> ${cells}`);
       }
     }
   }
