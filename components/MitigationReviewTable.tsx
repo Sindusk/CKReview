@@ -37,26 +37,26 @@ const STATUS_DISPLAY: Record<MitigationCellStatus, { symbol: string; color: stri
 };
 
 const headerCellStyle = {
-  padding: "6px 6px",
+  padding: "5px 8px",
   textAlign: "center" as const,
   fontSize: "11px",
   fontWeight: 700,
-  borderBottom: "1px solid #333",
+  borderBottom: "1px solid #3a3a3a",
   whiteSpace: "nowrap" as const,
 };
 
 const rowLabelCellStyle = {
-  padding: "5px 8px",
+  padding: "4px 8px",
   fontSize: "11px",
   color: "#e2e8f0",
-  borderBottom: "1px solid #222",
+  borderBottom: "1px solid #333",
   whiteSpace: "nowrap" as const,
 };
 
 const bodyCellStyle = {
-  padding: "5px 6px",
+  padding: "4px 8px",
   verticalAlign: "top" as const,
-  borderBottom: "1px solid #222",
+  borderBottom: "1px solid #333",
 };
 
 const checkLineStyle = {
@@ -96,17 +96,22 @@ export default function MitigationReviewTable({
 
   return (
     <div style={{ overflowX: "auto" }}>
-      <table style={{ borderCollapse: "collapse", width: "100%", minWidth: `${220 + columns.length * 130}px` }}>
+      {/* table-layout: auto (the default) sizes each column to its own
+          content — a column whose checks are all short ("Feint") stays
+          narrow instead of matching the widest one, which is what was
+          forcing a horizontal scrollbar with a lot of wasted whitespace
+          per column (2026-07-23 fix). */}
+      <table style={{ borderCollapse: "collapse", width: "100%" }}>
         <thead>
           <tr>
-            <th style={{ ...headerCellStyle, textAlign: "left", minWidth: "170px" }}>Mechanic</th>
+            <th style={{ ...headerCellStyle, textAlign: "left" }}>Mechanic</th>
             {columns.map(({ slot, assignment }) => {
               const player = assignment.player!;
               const color = getClassColor("ffxiv", player.className);
               return (
-                <th key={slot} style={{ ...headerCellStyle, textAlign: "left", minWidth: "130px" }} title={player.name}>
+                <th key={slot} style={{ ...headerCellStyle, textAlign: "left" }} title={player.name}>
                   <div style={{ color: "#60a5fa" }}>{slot}{assignment.tentative ? "?" : ""}</div>
-                  <div style={{ color, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", maxWidth: "130px" }}>
+                  <div style={{ color, fontWeight: 600 }}>
                     {player.name}
                   </div>
                 </th>
