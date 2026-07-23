@@ -1219,6 +1219,29 @@ function annotateLightsEndSources(
     const dyingCarriers = carrierDeaths.filter(
       (c) => c.timestamp <= e.timestamp && e.timestamp - c.timestamp <= LIGHTS_END_CARRIER_DEATH_WINDOW_MS
     );
+    if (dyingCarriers.length === 0) {
+      // NAME-ONLY FALLBACK (2026-07-22, Pull 22 VOD): even when the
+      // DETONATOR is unrecoverable (ambiguity guard above — a wipe-cleanup
+      // marker burst), the CRYSTAL's last-known position is still a clean,
+      // independent signal — it comes from real drop timestamps, not the
+      // wipe-artifact marker clearing, so it isn't poisoned the same way.
+      // Anchored on the Light's End event itself rather than a detonation
+      // time (there isn't a trustworthy one here). User-confirmed case:
+      // Pull 22's only crystal drop in the ~1s before LE was Cococaines's
+      // own (+219.85, 1.13s prior), and Cococaines was also the nearest
+      // player to that spot at LE time (~2.7yd) — names the crystal without
+      // claiming a detonator, since THAT part genuinely can't be verified
+      // (15 Starsplinter marks cleared within the same ~0.4s span here).
+      const nearest = findNearestPlayerToDroppedCrystal(e.timestamp, crystalDrops, players);
+      if (nearest) {
+        return {
+          ...e,
+          description:
+            `The Dawn Crystal near ${nearest.playerName} (~${nearest.distanceYalms.toFixed(1)}yd away) ` +
+            `was destroyed, unleashing Light's End.`,
+        };
+      }
+    }
     if (dyingCarriers.length > 0) {
       // Ground truth (Pull 3, 2026-07-17): when a carrier's death broke the
       // crystal, the error should carry THAT player's name instead of
