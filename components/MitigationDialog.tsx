@@ -165,9 +165,9 @@ export default function MitigationDialog({
   // Sheet party slots mapped onto the loaded FF roster (see mitigation-plan.ts).
   const slotMap = useMemo(() => {
     const map = new Map<string, SlotAssignment>();
-    if (ffPlayers) for (const a of resolveMitigationSlots(ffPlayers)) map.set(a.slot, a);
+    if (ffPlayers) for (const a of resolveMitigationSlots(ffPlayers, plan)) map.set(a.slot, a);
     return map;
-  }, [ffPlayers]);
+  }, [ffPlayers, plan]);
 
   if (!open) return null;
 

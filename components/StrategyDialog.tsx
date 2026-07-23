@@ -7,12 +7,14 @@
 // report's pulls — currently the Midnight Falls Terminate interrupt
 // rotation (lib/mechanics/wow/vs-dr-mqd/terminate-kicks.ts) and Dawn
 // Crystal carry assignments for WoW, plus the Dancing Mad Black Hole tether
-// strategy (DSA / SDA / Double Tether) for FFXIV.
+// strategy (DSA / SDA / Double Tether) and a per-pull party-role roster
+// (MT/OT/H1/H2/M1/M2/R1/R2 — lib/mechanics/ffxiv/roles.ts) for FFXIV.
 //
 // (The Ikuya mitigation-plan timeline used to live in this dialog too — it
 // moved to its own MitigationDialog.tsx / "Mitigation" button, since plan
 // selection and raid-strategy selection are unrelated concerns.)
 
+import { useMemo, useState, useEffect } from "react";
 import type { TerminateKickStrategy, KickSlot } from "@/lib/mechanics/wow/vs-dr-mqd/terminate-kicks";
 import type { CrystalAssignmentStrategy, CrystalSlot } from "@/lib/mechanics/wow/vs-dr-mqd/crystal-assignments";
 import {
@@ -20,7 +22,10 @@ import {
   type BlackHoleStrategyResult,
   type BlackHoleStrategyId,
 } from "@/lib/mechanics/ffxiv/dancingmad/blackhole-strategy";
+import { detectFFRoles, FF_ROLE_SLOTS } from "@/lib/mechanics/ffxiv/roles";
+import type { MitigationPlan } from "@/lib/mechanics/ffxiv/dancingmad/mitigation-plan";
 import { getClassColor } from "@/lib/player-display";
+import type { Pull } from "@/types/Pull";
 
 type StrategyDialogProps = {
   open:     boolean;
@@ -32,7 +37,56 @@ type StrategyDialogProps = {
   blackHole: BlackHoleStrategyResult | null;
   blackHoleOverrideId: BlackHoleStrategyId | null;
   onBlackHoleOverrideChange: (id: BlackHoleStrategyId | null) => void;
+  // Full pull list (drives the role roster's per-pull selector below) and
+  // the currently-selected mitigation plan — an extra signal for the role
+  // detector's MT/OT split (see lib/mechanics/ffxiv/roles.ts).
+  pulls: Pull[];
+  mitigationPlan: MitigationPlan | null;
 };
+
+const roleRowStyle = {
+  display: "flex",
+  alignItems: "baseline" as const,
+  gap: "10px",
+  padding: "6px 10px",
+  backgroundColor: "#1a1a1a",
+  border: "1px solid #333",
+  borderRadius: "6px",
+};
+
+// Roster + auto-detected party role (MT/OT/H1/H2/M1/M2/R1/R2) for one
+// selected pull — the foundation the user wants other FF mechanics to
+// eventually build on instead of each guessing roles ad hoc. "?" marks a
+// slot the roster/plan/damage signals couldn't disambiguate (see
+// lib/mechanics/ffxiv/roles.ts's module header for the resolution order).
+function RoleRoster({ pull, plan }: { pull: Pull; plan: MitigationPlan | null }) {
+  const roles = useMemo(() => detectFFRoles(pull.players, plan), [pull, plan]);
+  const bySlot = new Map(roles.map((r) => [r.slot, r]));
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+      {FF_ROLE_SLOTS.map((slot) => {
+        const assignment = bySlot.get(slot);
+        const player = assignment?.player ?? null;
+        const color = player ? getClassColor("ffxiv", player.className) : "#94a3b8";
+        return (
+          <div key={slot} style={roleRowStyle}>
+            <span style={{ fontSize: "11px", fontWeight: 700, color: "#60a5fa", flexShrink: 0, width: "32px" }}>
+              {slot}
+            </span>
+            <span style={{ color, fontWeight: 600, fontSize: "13px", flexShrink: 0, width: "140px" }}>
+              {player ? player.name : "—"}
+              {assignment?.tentative && player ? <span style={{ color: "#64748b" }}> ?</span> : null}
+            </span>
+            <span style={{ color: "#999", fontSize: "11px" }}>
+              {player ? player.className : ""}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 function KickSlotChip({ slot }: { slot: KickSlot }) {
   const color = slot.className ? getClassColor("wow", slot.className) : "#ccc";
@@ -89,10 +143,27 @@ export default function StrategyDialog({
   blackHole,
   blackHoleOverrideId,
   onBlackHoleOverrideChange,
+  pulls,
+  mitigationPlan,
 }: StrategyDialogProps) {
+  // Pull selector for the role roster — only FF pulls with a resolved
+  // roster are selectable. Defaults to the most recent one; re-picks if the
+  // previously-selected pull disappears (e.g. a fresh report import).
+  const ffPulls = useMemo(
+    () => pulls.filter((p) => p.game === "ffxiv" && p.players.length > 0),
+    [pulls]
+  );
+  const [selectedPullId, setSelectedPullId] = useState<number | null>(null);
+  useEffect(() => {
+    if (selectedPullId !== null && ffPulls.some((p) => p.id === selectedPullId)) return;
+    setSelectedPullId(ffPulls.length > 0 ? ffPulls[ffPulls.length - 1].id : null);
+  }, [ffPulls, selectedPullId]);
+  const selectedPull = ffPulls.find((p) => p.id === selectedPullId) ?? null;
+
   if (!open) return null;
 
   const showBlackHole = blackHole !== null;
+  const showRoster = ffPulls.length > 0;
 
   return (
     <div
@@ -113,7 +184,7 @@ export default function StrategyDialog({
           backgroundColor: "#222",
           padding: "22px",
           borderRadius: "10px",
-          width: showBlackHole ? "min(680px, 94vw)" : "480px",
+          width: showBlackHole || showRoster ? "min(680px, 94vw)" : "480px",
           maxHeight: "80vh",
           overflowY: "auto",
           color: "white",
@@ -138,6 +209,42 @@ export default function StrategyDialog({
             ✕
           </button>
         </div>
+
+        {showRoster && selectedPull && (
+          <div style={{ marginBottom: "18px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "2px" }}>
+              <div style={{ fontSize: "13px", fontWeight: 600, color: "#e2e8f0" }}>
+                Party Roles
+              </div>
+              <select
+                value={selectedPullId ?? ""}
+                onChange={(e) => setSelectedPullId(Number(e.target.value))}
+                style={{
+                  backgroundColor: "#1a1a1a",
+                  color: "#e2e8f0",
+                  border: "1px solid #444",
+                  borderRadius: "5px",
+                  padding: "3px 8px",
+                  fontSize: "12px",
+                }}
+              >
+                {ffPulls.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} #{p.pullNumber} ({p.result})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "12px" }}>
+              Auto-detected party role for each player in this pull. MT/OT is
+              resolved from the mitigation plan&apos;s own MT/OT columns where
+              decisive, else from who took more damage across the pull; M1/M2
+              (two melee) can&apos;t be told apart yet and are marked with
+              &quot;?&quot; — best-effort for now, refine as needed.
+            </div>
+            <RoleRoster pull={selectedPull} plan={mitigationPlan} />
+          </div>
+        )}
 
         {showBlackHole && blackHole && (
           <div style={{ marginBottom: strategy || crystals ? "18px" : 0 }}>
@@ -198,7 +305,7 @@ export default function StrategyDialog({
         )}
 
         {!strategy && !crystals ? (
-          showBlackHole ? null : (
+          showBlackHole || showRoster ? null : (
           <p style={{ fontSize: "13px", color: "#ccc", lineHeight: 1.5 }}>
             No strategy detected yet. Import a report with Midnight Falls pulls —
             the Terminate interrupt rotation and Dawn Crystal assignments are

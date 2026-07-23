@@ -1052,6 +1052,8 @@ export default function Home() {
         blackHole={blackHoleStrategy}
         blackHoleOverrideId={blackHoleOverrideId}
         onBlackHoleOverrideChange={handleBlackHoleOverrideChange}
+        pulls={pulls}
+        mitigationPlan={mitigationPlan}
       />
 
       <MitigationDialog

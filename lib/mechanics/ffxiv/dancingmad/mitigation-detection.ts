@@ -380,7 +380,7 @@ export function detectMitigationErrors(pull: Pull, plan: MitigationPlan | null):
   ];
   if (occurrences.length === 0) return [];
 
-  const slots = resolveMitigationSlots(pull.players);
+  const slots = resolveMitigationSlots(pull.players, plan);
   const slotByLabel = new Map(slots.map((s) => [s.slot, s]));
 
   const errors: PullError[] = [];

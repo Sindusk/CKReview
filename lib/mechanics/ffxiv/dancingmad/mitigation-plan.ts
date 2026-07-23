@@ -21,15 +21,17 @@
 //     slots can distinguish (two melee: which is D1?), the mapping is
 //     TENTATIVE — display-worthy, but detection must not blame an individual
 //     on the strength of a tentative slot.
-//   - MT/OT can't be told apart from the roster at all; both tanks are
-//     mapped in roster-sort order and marked tentative.
+//   - MT/OT: delegated to the shared role detector (lib/mechanics/ffxiv/
+//     roles.ts) — resolved via this plan's own MT/OT column job qualifiers
+//     where decisive, else by which tank took more damage across the pull;
+//     only falls back to a tentative roster-order guess on a true tie.
 //   - "Extras" (opt-in extra party mit like Magic Barrier/Dismantle) is
 //     intentionally ignored per product decision — personal/extra mits are
 //     out of scope for the mitigation system.
 
 import type { PlayerInfo } from "@/types/PlayerInfo";
-import { getFFRosterSortOrder } from "@/lib/ffl-job-data";
 import ikuyaData from "./mitigation-plans/ikuya.json";
+import { detectFFRoles, TANK_JOB_ABBREVIATIONS, type FFRoleSlot } from "../roles";
 
 // ─── Plan data shapes (mirror scripts/fetch-mitigation-sheet.js output) ─────
 
@@ -115,22 +117,6 @@ export type SlotAssignment = {
 const HEALER_SLOTS = ["White Mage", "Astrologian", "Scholar", "Sage"];
 
 /**
- * Maps the sheet's party-slot columns onto the loaded report's roster.
- * Returns one SlotAssignment per RESOLVABLE column in sheet order —
- * healer columns for jobs the party doesn't field are omitted entirely
- * (the sheet lists all four healer jobs; a party has two).
- */
-// Tank-table priority columns (mitigation-plans/ikuya.json's `tank`
-// section — P3/P5) name jobs by their 3-letter abbreviation, not the
-// PlayerInfo.className display name.
-const TANK_JOB_ABBREVIATIONS: Record<string, string> = {
-  WAR: "Warrior",
-  DRK: "Dark Knight",
-  GNB: "Gunbreaker",
-  PLD: "Paladin",
-};
-
-/**
  * Resolves a tank-table priority-order column label — e.g.
  * `"Chaos (WAR > DRK > GNB > PLD)"`, or P5's bare `"WAR > DRK > GNB >
  * PLD"` — to whichever tank in the roster ranks highest in the listed
@@ -157,50 +143,39 @@ export function resolveTankPriorityColumn(label: string, players: PlayerInfo[]):
   return null;
 }
 
-export function resolveMitigationSlots(players: PlayerInfo[]): SlotAssignment[] {
-  // getFFRosterSortOrder expects FFLogs subType keys ("DarkKnight");
-  // PlayerInfo.className is the display name ("Dark Knight").
-  const sortKey = (p: PlayerInfo) => getFFRosterSortOrder(p.className.replace(/ /g, ""));
-  const roster = [...players].sort((a, b) => sortKey(a) - sortKey(b));
+// D1-D4 are this sheet's own slot labels (melee/physical-ranged/caster) —
+// map onto the shared role library's M1/M2/R1/R2 naming.
+const D_SLOT_TO_ROLE: Record<string, FFRoleSlot> = { D1: "M1", D2: "M2", D3: "R1", D4: "R2" };
 
-  const tanks   = roster.filter((p) => p.role === "Tank");
-  const dps     = roster.filter((p) => p.role === "DPS");
-  const melee   = dps.filter((p) => p.rangeType === "Melee");
-  const ranged  = dps.filter((p) => p.rangeType === "Ranged");
-  const casters = dps.filter((p) => p.rangeType === "Caster");
+/**
+ * Maps the sheet's party-slot columns onto the loaded report's roster,
+ * built on top of the shared cross-mechanic role detector (lib/mechanics/
+ * ffxiv/roles.ts) — MT/OT/M1/M2/R1/R2 come straight from `detectFFRoles`
+ * (passing `plan` lets its MT/OT job-vote use THIS plan's own phase-mechanic
+ * columns as a signal), just relabeled onto the sheet's own column names.
+ * Healer columns for jobs the party doesn't field are omitted entirely (the
+ * sheet lists all four healer jobs; a party has two).
+ */
+export function resolveMitigationSlots(players: PlayerInfo[], plan?: MitigationPlan | null): SlotAssignment[] {
+  const roles = detectFFRoles(players, plan);
+  const bySlot = new Map(roles.map((r) => [r.slot, r]));
 
   const out: SlotAssignment[] = [];
 
-  out.push({ slot: "MT", player: tanks[0] ?? null, tentative: tanks.length > 1 });
-  out.push({ slot: "OT", player: tanks[1] ?? null, tentative: tanks.length > 1 });
+  const mt = bySlot.get("MT");
+  const ot = bySlot.get("OT");
+  out.push({ slot: "MT", player: mt?.player ?? null, tentative: mt?.tentative ?? false });
+  out.push({ slot: "OT", player: ot?.player ?? null, tentative: ot?.tentative ?? false });
 
   for (const job of HEALER_SLOTS) {
-    const match = roster.find((p) => p.className === job);
+    const match = players.find((p) => p.className === job);
     if (match) out.push({ slot: job, player: match, tentative: false });
   }
 
-  // D1/D2 melee, D3 physical ranged, D4 caster. Off-meta comps (double
-  // caster, no ranged, ...) spill leftover DPS into the unfilled slots in
-  // order, always tentatively.
-  const dSlotPools: PlayerInfo[][] = [melee, melee.slice(1), ranged, casters];
-  const used = new Set<PlayerInfo>();
-  const leftovers = () => dps.filter((p) => !used.has(p));
-
-  ["D1", "D2", "D3", "D4"].forEach((slot, i) => {
-    const preferred = dSlotPools[i].find((p) => !used.has(p));
-    const fallback  = leftovers()[0];
-    const player    = preferred ?? fallback ?? null;
-    if (player) used.add(player);
-    // A slot is certain only when its category had exactly one candidate
-    // (e.g. one caster → D4). The standard two-melee comp leaves both D1
-    // and D2 ambiguous — the roster alone can't say which melee is which.
-    const certain =
-      preferred !== undefined &&
-      ((i === 0 && melee.length === 1) ||
-       (i === 2 && ranged.length === 1) ||
-       (i === 3 && casters.length === 1));
-    out.push({ slot, player, tentative: !certain });
-  });
+  for (const [dLabel, roleSlot] of Object.entries(D_SLOT_TO_ROLE)) {
+    const r = bySlot.get(roleSlot);
+    out.push({ slot: dLabel, player: r?.player ?? null, tentative: r?.tentative ?? false });
+  }
 
   return out;
 }
