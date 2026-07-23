@@ -166,7 +166,11 @@ function buildCell(
           const lastCastMs = findTankLB3LastCast(tanks, anchorMs + CAST_LOOKAHEAD_MS);
           checks.push({
             status:      match ? "hit" : "missed",
-            abilityName: match ? `${match.abilityName} (${match.tank.name})` : "Tank LB3 (either)",
+            // Deliberately no player name here (2026-07-24, per the user —
+            // it was widening the column enough to push other cells into
+            // horizontal scroll territory) — just the ability itself, same
+            // shape as every other check's abilityName.
+            abilityName: match ? match.abilityName : "Tank LB3 (either)",
             carryOver:   entry.carryOver,
             lastCastMs,
           });
