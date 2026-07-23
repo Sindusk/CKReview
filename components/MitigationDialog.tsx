@@ -8,11 +8,12 @@
 // raid strategy selection are unrelated concerns that happened to share one
 // dialog early on.
 //
-// Two tabs (added 2026-07-23 alongside the per-pull selector below):
-//   - "Plan": the sheet's expected-mitigation timeline (unchanged from
-//     before), with party slots mapped onto the SELECTED pull's roster
-//     (previously always the first FF pull in the report — now per-pull,
-//     same as everywhere else this session touched).
+// Two tabs:
+//   - "Heatmap" (2026-07-24, replaces the old static "Plan" tab — see
+//     lib/mechanics/ffxiv/dancingmad/mitigation-heatmap.ts's header for the
+//     full rationale): aggregates every loaded pull's Review-tab data into
+//     one reliability grid — how often did each player actually land their
+//     assigned mitigation, across the whole pull history, not just one pull.
 //   - "Review": a per-pull audit table — did each player actually hit their
 //     assigned mitigation, and when (see MitigationReviewTable.tsx /
 //     lib/mechanics/ffxiv/dancingmad/mitigation-review.ts). First-pass
@@ -22,17 +23,13 @@ import { useState } from "react";
 import {
   MITIGATION_PLANS,
   getMitigationPlan,
-  resolveMitigationSlots,
-  type PlanEntry,
-  type PlanMechanic,
-  type PlanNotes,
-  type SlotAssignment,
 } from "@/lib/mechanics/ffxiv/dancingmad/mitigation-plan";
 import { buildMitigationReview } from "@/lib/mechanics/ffxiv/dancingmad/mitigation-review";
+import { buildMitigationHeatmap } from "@/lib/mechanics/ffxiv/dancingmad/mitigation-heatmap";
 import MitigationReviewTable from "@/components/MitigationReviewTable";
+import MitigationHeatmapTable from "@/components/MitigationHeatmapTable";
 import { useFFPullSelector } from "@/hooks/useFFPullSelector";
 import type { Pull } from "@/types/Pull";
-import { getClassColor } from "@/lib/player-display";
 
 type MitigationDialogProps = {
   open:     boolean;
@@ -45,122 +42,7 @@ type MitigationDialogProps = {
   onMitigationPlanChange: (id: string | null) => void;
 };
 
-function formatEntryText(entries: PlanEntry[]): string {
-  return entries
-    .map((e) => {
-      const abilities = e.abilities
-        .map((a) => a.name + (a.qualifier ? ` (${a.qualifier})` : ""))
-        .join(" + ");
-      return (e.carryOver ? "➔ " : "") + (e.qualifier ? `[${e.qualifier}] ` : "") + abilities;
-    })
-    .join("  ·  ");
-}
-
-// Tooltip text for a chip: the sheet footnotes referenced by its abilities.
-function footnoteTitle(entries: PlanEntry[], notes: PlanNotes | null): string | undefined {
-  if (!notes) return undefined;
-  const refs = new Set<number>();
-  for (const e of entries) for (const a of e.abilities) for (const f of a.footnotes ?? []) refs.add(f);
-  const texts = [...refs].sort((a, b) => a - b).map((n) => notes.footnotes[String(n)]).filter(Boolean);
-  return texts.length ? texts.join("\n") : undefined;
-}
-
-function SlotChip({
-  slotLabel,
-  assignment,
-  entries,
-  notes,
-}: {
-  slotLabel:  string;
-  assignment: SlotAssignment | undefined;
-  entries:    PlanEntry[];
-  notes:      PlanNotes | null;
-}) {
-  const player = assignment?.player ?? null;
-  const color = player ? getClassColor("ffxiv", player.className) : "#94a3b8";
-  // Carry-over-only chips are context, not an expected cast — dim them.
-  const allCarryOver = entries.every((e) => e.carryOver);
-  return (
-    <span
-      title={footnoteTitle(entries, notes)}
-      style={{ display: "inline-flex", alignItems: "baseline", gap: "5px", whiteSpace: "nowrap", opacity: allCarryOver ? 0.5 : 1 }}
-    >
-      <span style={{ color: "#64748b", fontSize: "9px", fontWeight: 700 }}>{slotLabel}</span>
-      <span style={{ color, fontWeight: 600, fontSize: "12px" }}>
-        {player ? player.name : "—"}
-        {assignment?.tentative ? <span style={{ color: "#64748b" }}>?</span> : null}
-      </span>
-      <span style={{ color: "#999", fontSize: "11px", whiteSpace: "normal" }}>{formatEntryText(entries)}</span>
-    </span>
-  );
-}
-
-function MechanicRow({
-  mech,
-  slots,
-  notes,
-}: {
-  mech:  PlanMechanic;
-  slots: Map<string, SlotAssignment>;
-  notes: PlanNotes | null;
-}) {
-  // Prose rows (Accretions rules, Forsaken preamble) have a note, no time.
-  if (mech.note !== undefined) {
-    return (
-      <div style={{ ...mitRowStyle, flexDirection: "column" as const, gap: "4px" }}>
-        <span style={{ fontSize: "11px", fontWeight: 700, color: "#facc15" }}>{mech.name}</span>
-        <span style={{ fontSize: "11px", color: "#94a3b8", whiteSpace: "pre-line" }}>{mech.note}</span>
-      </div>
-    );
-  }
-
-  // Sheet columns to display, in the sheet's own order, skipping "Extras"
-  // (extra opt-in mits — out of scope) and healer-job columns the party
-  // doesn't field (the sheet lists all four healer jobs; a party has two —
-  // an absent job's assignments can't apply to this roster).
-  const HEALER_JOBS = ["White Mage", "Astrologian", "Scholar", "Sage"];
-  const slotLabels = Object.keys(mech.assignments ?? {}).filter(
-    (s) => s !== "Extras" && !(HEALER_JOBS.includes(s) && !slots.has(s))
-  );
-
-  return (
-    <div style={mitRowStyle}>
-      <span style={{ fontSize: "11px", fontWeight: 700, color: "#60a5fa", flexShrink: 0, width: "38px" }}>
-        {/* mech.time already carries a trailing "+" for open-ended rows */}
-        {mech.time ?? ""}
-      </span>
-      <span
-        title={notes && mech.footnotes?.length ? mech.footnotes.map((n) => notes.footnotes[String(n)]).filter(Boolean).join("\n") : undefined}
-        style={{ fontSize: "12px", fontWeight: 600, color: "#e2e8f0", flexShrink: 0, width: "150px" }}
-      >
-        {mech.name}
-      </span>
-      <span style={{ display: "flex", flexWrap: "wrap", columnGap: "16px", rowGap: "4px", minWidth: 0 }}>
-        {slotLabels.map((slot) => (
-          <SlotChip
-            key={slot}
-            slotLabel={slot}
-            assignment={slots.get(slot)}
-            entries={mech.assignments![slot]}
-            notes={notes}
-          />
-        ))}
-      </span>
-    </div>
-  );
-}
-
-const mitRowStyle = {
-  display: "flex",
-  alignItems: "baseline" as const,
-  gap: "10px",
-  padding: "6px 10px",
-  backgroundColor: "#1a1a1a",
-  border: "1px solid #333",
-  borderRadius: "6px",
-};
-
-type Tab = "plan" | "review";
+type Tab = "heatmap" | "review";
 
 const tabButtonStyle = (active: boolean) => ({
   padding: "5px 12px",
@@ -182,24 +64,23 @@ export default function MitigationDialog({
   onMitigationPlanChange,
 }: MitigationDialogProps) {
   const plan = getMitigationPlan(mitigationPlanId);
-  const [activeTab, setActiveTab] = useState<Tab>("plan");
+  const [activeTab, setActiveTab] = useState<Tab>("heatmap");
 
   // Pull selector — resets to the app's current pull every time the dialog
   // opens (see hooks/useFFPullSelector.ts), same pattern as StrategyDialog.
+  // Only the Review tab is per-pull; Heatmap aggregates every loaded pull
+  // regardless of this selection (kept only so Review has one to fall back
+  // to, and so it doesn't reset the moment you flip tabs).
   const { ffPulls, selectedPullId, setSelectedPullId, selectedPull } =
     useFFPullSelector(pulls, open, currentPullId);
 
-  // Sheet party slots mapped onto the SELECTED pull's roster (see
-  // mitigation-plan.ts) — used by the Plan tab.
-  const slotMap = new Map<string, SlotAssignment>();
-  if (selectedPull) for (const a of resolveMitigationSlots(selectedPull.players, plan)) slotMap.set(a.slot, a);
-
-  const reviewRows = selectedPull ? buildMitigationReview(selectedPull, plan) : [];
+  const reviewRows  = selectedPull ? buildMitigationReview(selectedPull, plan) : [];
+  const heatmapRows = buildMitigationHeatmap(pulls, plan);
 
   if (!open) return null;
 
   const showMitigation = ffPulls.length > 0 && selectedPull !== null;
-  const wide = activeTab === "review" ? "min(1200px, 96vw)" : "min(880px, 94vw)";
+  const wide = plan ? "min(1200px, 96vw)" : "min(880px, 94vw)";
 
   return (
     <div
@@ -250,29 +131,32 @@ export default function MitigationDialog({
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px", flexWrap: "wrap" }}>
               <div style={{ display: "flex", gap: "6px" }}>
-                <button style={tabButtonStyle(activeTab === "plan")} onClick={() => setActiveTab("plan")}>Plan</button>
+                <button style={tabButtonStyle(activeTab === "heatmap")} onClick={() => setActiveTab("heatmap")}>Heatmap</button>
                 <button style={tabButtonStyle(activeTab === "review")} onClick={() => setActiveTab("review")}>Review</button>
               </div>
 
-              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                <span style={{ fontSize: "11px", color: "#94a3b8" }}>Pull</span>
-                <select
-                  value={selectedPullId ?? ""}
-                  onChange={(e) => setSelectedPullId(Number(e.target.value))}
-                  style={{
-                    backgroundColor: "#1a1a1a",
-                    color: "#e2e8f0",
-                    border: "1px solid #444",
-                    borderRadius: "5px",
-                    padding: "3px 8px",
-                    fontSize: "12px",
-                  }}
-                >
-                  {ffPulls.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name} #{p.pullNumber} ({p.result})</option>
-                  ))}
-                </select>
-              </div>
+              {/* Heatmap aggregates every loaded pull — the per-pull selector only applies to Review. */}
+              {activeTab === "review" && (
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <span style={{ fontSize: "11px", color: "#94a3b8" }}>Pull</span>
+                  <select
+                    value={selectedPullId ?? ""}
+                    onChange={(e) => setSelectedPullId(Number(e.target.value))}
+                    style={{
+                      backgroundColor: "#1a1a1a",
+                      color: "#e2e8f0",
+                      border: "1px solid #444",
+                      borderRadius: "5px",
+                      padding: "3px 8px",
+                      fontSize: "12px",
+                    }}
+                  >
+                    {ffPulls.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name} #{p.pullNumber} ({p.result})</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div style={{ display: "flex", alignItems: "center", gap: "6px", marginLeft: "auto" }}>
                 <span style={{ fontSize: "11px", color: "#94a3b8" }}>Plan</span>
@@ -298,54 +182,22 @@ export default function MitigationDialog({
 
             {!plan ? (
               <p style={{ fontSize: "12px", color: "#94a3b8", margin: "6px 0 0" }}>
-                Select a mitigation plan to see the expected mitigation casts for
-                each player across the fight timeline.
+                Select a mitigation plan to see how reliably each player is
+                landing their assigned mitigations across every loaded pull.
               </p>
-            ) : activeTab === "plan" ? (
+            ) : activeTab === "heatmap" ? (
               <>
                 <div style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "12px" }}>
-                  Expected mitigation casts per player, from the {plan.label} sheet.
-                  Party slots are mapped onto this pull&apos;s roster; a &quot;?&quot; marks
-                  mappings the roster can&apos;t disambiguate (M1 vs M2).
-                  Dimmed ➔ entries carry over from an earlier cast. Hover for
-                  sheet footnotes.
+                  Every mitigation-plan mechanic reached in at least one loaded
+                  pull, aggregated across ALL of them. Each cell is colored by
+                  pass rate — <span style={{ color: "#22c55e" }}>green</span> reliable,{" "}
+                  <span style={{ color: "#ef4444" }}>red</span> frequently missed
+                  — with an x/y count of hits out of checkable pulls (dead-player
+                  and no-effect samples are excluded from the rate). Hover a cell
+                  for the exact per-pull breakdown, including real cast timing
+                  relative to each pull&apos;s own mechanic hit.
                 </div>
-                {plan.data.phases.map((phase) => (
-                  <div key={phase.gid} style={{ marginBottom: "14px" }}>
-                    <div style={{ fontSize: "12px", fontWeight: 700, color: "#facc15", margin: "0 0 6px" }}>
-                      {phase.title}
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                      {phase.mechanics.map((mech, i) => (
-                        <MechanicRow key={`${mech.name}-${i}`} mech={mech} slots={slotMap} notes={phase.notes} />
-                      ))}
-                    </div>
-                  </div>
-                ))}
-                {plan.data.tank && (
-                  <div>
-                    <div style={{ fontSize: "13px", fontWeight: 600, color: "#e2e8f0", margin: "4px 0 2px" }}>
-                      Tank Cooldowns
-                    </div>
-                    <div style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "10px" }}>
-                      Generic cooldown slots (Kitchen Sink, 40%, 90s, Short Mit, …)
-                      from the sheet&apos;s tank table. P3/P5 columns are invuln
-                      priority orders, not MT/OT.
-                    </div>
-                    {plan.data.tank.sections.map((section, si) => (
-                      <div key={si} style={{ marginBottom: "12px" }}>
-                        <div style={{ fontSize: "12px", fontWeight: 700, color: "#facc15", margin: "0 0 6px" }}>
-                          {section.title ?? `Section ${si + 1}`}
-                        </div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                          {section.mechanics.map((mech, i) => (
-                            <MechanicRow key={`${mech.name}-${i}`} mech={mech} slots={slotMap} notes={section.notes} />
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                {selectedPull && <MitigationHeatmapTable representativePull={selectedPull} plan={plan} rows={heatmapRows} />}
               </>
             ) : (
               <>
