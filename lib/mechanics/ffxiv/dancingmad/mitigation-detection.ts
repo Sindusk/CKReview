@@ -255,6 +255,15 @@ export function mechanicNameTokens(mechName: string): string[] {
 //     (Phase 1's spelling, and the real ability's actual spelling) — a
 //     sheet-side inconsistency between two occurrences of the same
 //     mechanic.
+//   - "Black Holes II/III/IV (Nth Tether Set)" (found 2026-07-24, same
+//     tool, same root cause as Towers): neither "Black Holes N" nor its
+//     "(Nth Tether Set)" qualifier is a real ability — the actual per-
+//     tether-set hit is "Nothingness" (ability 47868, per blackhole.ts's
+//     module header), confirmed present near EVERY one of the 5 tether-set
+//     mechanics the sheet covers (3rd/4th/5th/6th/10th), including the 10th
+//     where a different, unrelated cast ("Look upon Me and Despair")
+//     happened to land even closer — "Nothingness" was still present just
+//     ~0.6s further out, well inside the match window.
 const MECHANIC_NAME_ALIASES: Record<string, string[]> = {
   "Towers I":                        ["The Path of Light"],
   "Towers II (Past/Future's End)":   ["The Path of Light"],
@@ -265,6 +274,11 @@ const MECHANIC_NAME_ALIASES: Record<string, string[]> = {
   "Towers VII (All Things Ending)":  ["The Path of Light"],
   "Towers VIII (Past/Future's End)": ["The Path of Light"],
   "Light of Judgement":              ["Light of Judgment"],
+  "Black Holes II (3rd Tether Set)":  ["Nothingness"],
+  "Black Holes II (4th Tether Set)":  ["Nothingness"],
+  "Black Holes II (5th Tether Set)":  ["Nothingness"],
+  "Black Holes III (6th Tether Set)": ["Nothingness"],
+  "Black Holes IV (10th Tether Set)": ["Nothingness"],
 };
 
 export function mechanicMatchesAbilityName(mech: PlanMechanic, abilityName: string): boolean {
