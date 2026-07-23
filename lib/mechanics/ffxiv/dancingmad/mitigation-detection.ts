@@ -98,19 +98,70 @@ const PARTY_MIT_BY_JOB: Record<string, string> = {
 };
 
 // The tank table (mitigation-plans/ikuya.json's `tank` section) uses
-// GENERIC slot names instead of real ability names — "90s" (a tank's
-// personal ~90s-cooldown mitigation) and "Short Mit" (a shorter, more
-// frequently-available one) — that need a per-job resolution the same way
-// "Party Mit" does above. Only Gunbreaker is filled in so far (confirmed
-// by the user 2026-07-20: Camouflage for "90s", Heart of Corundum for
-// "Short Mit"); other jobs fall through to null (unsupported, skipped —
-// same as an unresolved "LB3") until confirmed rather than guessed.
+// GENERIC slot names instead of real ability names, each needing a per-job
+// resolution the same way "Party Mit" does above.
+//   - "90s": a tank's personal ~90s-cooldown mitigation. Only Gunbreaker
+//     confirmed so far (2026-07-20: Camouflage) — a DIFFERENT ability from
+//     "40%" below, not a duplicate/rename of it.
+//   - "40%" ("40% Mit", ~120s cooldown per the user) / "Short Mit" ("Short",
+//     a shorter-cooldown, more frequent one) / "Buddy Mit" (targets an
+//     ALLY, not the caster — see wasBuffActiveOnHit's header for why
+//     checking the assigned player's OWN casts is still correct even for an
+//     ally-targeted ability: it's still THEIR cast that's required) /
+//     "Invulnerability" — all four confirmed by the user 2026-07-23 for
+//     all four tank jobs.
+//   - "Kitchen Sink" ("use everything for a huge hit") is NOT one ability —
+//     confirmed 2026-07-23 to mean Rampart + "40%" + "Short Mit" all
+//     together. Expanded into three independent requirements by
+//     `expandRequiredAbilities` (called by every consumer BEFORE this
+//     resolver) rather than handled as a single OR-group here, so each of
+//     the three can show its own hit/miss mark instead of one combined
+//     verdict (see mitigation-review.ts's per-check display).
 const NINETY_SECOND_MIT_BY_JOB: Record<string, string> = {
   Gunbreaker: "Camouflage",
 };
-const SHORT_MIT_BY_JOB: Record<string, string> = {
-  Gunbreaker: "Heart of Corundum",
+const FORTY_PERCENT_MIT_BY_JOB: Record<string, string> = {
+  Paladin:      "Guardian",
+  Gunbreaker:   "Great Nebula",
+  Warrior:      "Damnation",
+  "Dark Knight": "Shadowed Vigil",
 };
+const SHORT_MIT_BY_JOB: Record<string, string> = {
+  Paladin:      "Holy Sheltron",
+  Gunbreaker:   "Heart of Corundum",
+  Warrior:      "Bloodwhetting",
+  "Dark Knight": "The Blackest Night",
+};
+// Ally-targeted mitigation — for Paladin/Warrior/Dark Knight a DIFFERENT
+// ability from their own Short Mit; Gunbreaker's kit only has one
+// self/ally-flexible option (Heart of Corundum serves both roles).
+const BUDDY_MIT_BY_JOB: Record<string, string> = {
+  Paladin:      "Intervention",
+  Gunbreaker:   "Heart of Corundum",
+  Warrior:      "Nascent Flash",
+  "Dark Knight": "The Blackest Night",
+};
+const INVULN_BY_JOB: Record<string, string> = {
+  Paladin:      "Hallowed Ground",
+  Gunbreaker:   "Superbolide",
+  Warrior:      "Holmgang",
+  "Dark Knight": "Living Dead",
+};
+
+// "Kitchen Sink" bundles three independently-required abilities rather
+// than being satisfied by any one of them (unlike every other generic term
+// here, which is a plain OR-group) — expand it into three synthetic
+// PlanAbility entries BEFORE calling resolveRequiredAbilityNames, so each
+// becomes its own separately-checked requirement. A no-op for every other
+// ability (returns it unchanged, wrapped in a single-element array).
+export function expandRequiredAbilities(ability: PlanAbility): PlanAbility[] {
+  if (ability.name !== "Kitchen Sink") return [ability];
+  return [
+    { name: "Rampart" },
+    { name: "40%", qualifier: ability.qualifier },
+    { name: "Short Mit", qualifier: ability.qualifier },
+  ];
+}
 
 // Sheet ability name -> resolver. Returns candidate real ability names
 // (satisfied if the player cast ANY of them) or null if this entry isn't
@@ -130,24 +181,31 @@ export function resolveRequiredAbilityNames(ability: PlanAbility, player: Player
       const name = NINETY_SECOND_MIT_BY_JOB[player.className];
       return name ? [name] : null;
     }
+    case "40%": {
+      const name = FORTY_PERCENT_MIT_BY_JOB[player.className];
+      return name ? [name] : null;
+    }
     case "Short Mit":
     case "Short": {
       const name = SHORT_MIT_BY_JOB[player.className];
+      return name ? [name] : null;
+    }
+    case "Buddy Mit": {
+      const name = BUDDY_MIT_BY_JOB[player.className];
+      return name ? [name] : null;
+    }
+    case "Invulnerability": {
+      const name = INVULN_BY_JOB[player.className];
       return name ? [name] : null;
     }
     case "LB3":       // limit break — logged under the specific LB's own
       return null;    // name per job, not a stable string to check against.
     case "✔":
       return null;
-    // Tank-table terms not yet mapped to a real ability for any job —
-    // "Kitchen Sink" (use everything for a huge hit, not one ability),
-    // "40%" / "Invulnerability" / "Buddy Mit" (ally-targeted, checking the
-    // CASTER's own casts is the wrong player entirely). Unsupported rather
-    // than guessed, same as LB3 above.
+    // Handled by expandRequiredAbilities before reaching here — should
+    // never actually be looked up directly, but fall through to
+    // "unsupported" rather than crash if it somehow is.
     case "Kitchen Sink":
-    case "40%":
-    case "Invulnerability":
-    case "Buddy Mit":
       return null;
     // Sheet parsing quirk: the qualifier ("During Castbar") got baked into
     // the ability name instead of split out — the real ability is Provoke.
@@ -431,18 +489,23 @@ export function detectMitigationErrors(pull: Pull, plan: MitigationPlan | null):
 
       const missing: string[] = [];
       for (const entry of entries) {
-        for (const ability of entry.abilities) {
-          const candidates = resolveRequiredAbilityNames(ability, player);
-          if (!candidates) continue; // unsupported term or wrong job — not checkable
+        for (const rawAbility of entry.abilities) {
+          // "Kitchen Sink" expands to 3 independent requirements (Rampart +
+          // 40% + Short Mit) rather than being one OR-group — see
+          // expandRequiredAbilities's header. A no-op for every other term.
+          for (const ability of expandRequiredAbilities(rawAbility)) {
+            const candidates = resolveRequiredAbilityNames(ability, player);
+            if (!candidates) continue; // unsupported term or wrong job — not checkable
 
-          // Ground-truth check first (was it actually active on whoever
-          // took the hit); only fall back to the cast-timing heuristic when
-          // that can't be determined (no buff data on this event — e.g.
-          // older cached sample data, or no matching death for this
-          // occurrence at all).
-          const activeOnHit = wasBuffActiveOnHit(pull.players, pull.deathEvents, candidates, anchorMs);
-          const satisfied = activeOnHit ?? hasCastNear(player, candidates, anchorMs);
-          if (!satisfied) missing.push(candidates[0]);
+            // Ground-truth check first (was it actually active on whoever
+            // took the hit); only fall back to the cast-timing heuristic when
+            // that can't be determined (no buff data on this event — e.g.
+            // older cached sample data, or no matching death for this
+            // occurrence at all).
+            const activeOnHit = wasBuffActiveOnHit(pull.players, pull.deathEvents, candidates, anchorMs);
+            const satisfied = activeOnHit ?? hasCastNear(player, candidates, anchorMs);
+            if (!satisfied) missing.push(candidates[0]);
+          }
         }
       }
       if (missing.length === 0) continue;

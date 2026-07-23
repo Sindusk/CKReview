@@ -58,6 +58,7 @@ import {
   flattenTankMechanics,
   mechanicMatchesAbilityName,
   resolveRequiredAbilityNames,
+  expandRequiredAbilities,
   findCastNear,
   isDeadOrFreshlyRevived,
 } from "./mitigation-detection";
@@ -121,24 +122,29 @@ function buildCell(
   const checks: MitigationReviewCheck[] = [];
 
   for (const entry of entries) {
-    for (const ability of entry.abilities) {
-      const candidates = resolveRequiredAbilityNames(ability, player);
+    for (const rawAbility of entry.abilities) {
+      // "Kitchen Sink" expands to 3 independent requirements (Rampart +
+      // 40% + Short Mit) rather than being one OR-group — see
+      // expandRequiredAbilities's header. A no-op for every other term.
+      for (const ability of expandRequiredAbilities(rawAbility)) {
+        const candidates = resolveRequiredAbilityNames(ability, player);
 
-      if (!candidates) {
-        checks.push({ status: "unresolved", abilityName: ability.name, carryOver: entry.carryOver });
-        continue;
-      }
-      if (dead) {
-        checks.push({ status: "dead", abilityName: candidates.join(" / "), carryOver: entry.carryOver });
-        continue;
-      }
+        if (!candidates) {
+          checks.push({ status: "unresolved", abilityName: ability.name, carryOver: entry.carryOver });
+          continue;
+        }
+        if (dead) {
+          checks.push({ status: "dead", abilityName: candidates.join(" / "), carryOver: entry.carryOver });
+          continue;
+        }
 
-      const matched = findCastNear(player, candidates, anchorMs);
-      checks.push({
-        status:      matched ? "hit" : "missed",
-        abilityName: matched ?? candidates.join(" / "),
-        carryOver:   entry.carryOver,
-      });
+        const matched = findCastNear(player, candidates, anchorMs);
+        checks.push({
+          status:      matched ? "hit" : "missed",
+          abilityName: matched ?? candidates.join(" / "),
+          carryOver:   entry.carryOver,
+        });
+      }
     }
   }
 
