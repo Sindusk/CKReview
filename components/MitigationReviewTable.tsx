@@ -7,9 +7,14 @@
 // mitigation-plan mechanic that actually happened down the side (boss-cast-
 // matched real time, not the sheet's static one — see
 // lib/mechanics/ffxiv/dancingmad/mitigation-review.ts), and a hit/missed/
-// unresolved/dead mark per cell. First-pass prototype per the user's
-// explicit ask (2026-07-23) — expect refinement once real reports surface
-// sheet-term ambiguities that need mapping.
+// unresolved/dead mark per cell. A cell requiring multiple abilities (e.g.
+// "Reprisal + Party Mit") shows each as its OWN line with its own mark and
+// ability name (2026-07-23, per the user's explicit ask — one being cast
+// and the other not now shows a check on one and an X on the other, with
+// both names visible in the table instead of hidden in the tooltip).
+// First-pass prototype per the user's explicit ask (2026-07-23) — expect
+// refinement once real reports surface sheet-term ambiguities that need
+// mapping.
 
 import type { Pull } from "@/types/Pull";
 import type { MitigationReviewRow, MitigationCellStatus } from "@/lib/mechanics/ffxiv/dancingmad/mitigation-review";
@@ -50,10 +55,17 @@ const rowLabelCellStyle = {
 
 const bodyCellStyle = {
   padding: "5px 6px",
-  textAlign: "center" as const,
-  fontSize: "13px",
-  fontWeight: 700,
+  verticalAlign: "top" as const,
   borderBottom: "1px solid #222",
+};
+
+const checkLineStyle = {
+  display: "flex",
+  alignItems: "baseline" as const,
+  gap: "4px",
+  fontSize: "11px",
+  whiteSpace: "nowrap" as const,
+  lineHeight: 1.5,
 };
 
 export default function MitigationReviewTable({
@@ -84,7 +96,7 @@ export default function MitigationReviewTable({
 
   return (
     <div style={{ overflowX: "auto" }}>
-      <table style={{ borderCollapse: "collapse", width: "100%", minWidth: `${220 + columns.length * 60}px` }}>
+      <table style={{ borderCollapse: "collapse", width: "100%", minWidth: `${220 + columns.length * 130}px` }}>
         <thead>
           <tr>
             <th style={{ ...headerCellStyle, textAlign: "left", minWidth: "170px" }}>Mechanic</th>
@@ -92,9 +104,9 @@ export default function MitigationReviewTable({
               const player = assignment.player!;
               const color = getClassColor("ffxiv", player.className);
               return (
-                <th key={slot} style={{ ...headerCellStyle, minWidth: "58px" }} title={player.name}>
+                <th key={slot} style={{ ...headerCellStyle, textAlign: "left", minWidth: "130px" }} title={player.name}>
                   <div style={{ color: "#60a5fa" }}>{slot}{assignment.tentative ? "?" : ""}</div>
-                  <div style={{ color, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", maxWidth: "70px", margin: "0 auto" }}>
+                  <div style={{ color, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", maxWidth: "130px" }}>
                     {player.name}
                   </div>
                 </th>
@@ -113,15 +125,23 @@ export default function MitigationReviewTable({
               {columns.map(({ slot, assignment }) => {
                 const cell = row.cellsByActorId.get(assignment.player!.actorId);
                 if (!cell) return <td key={slot} style={bodyCellStyle} />;
-                const display = STATUS_DISPLAY[cell.status];
-                const title = [
-                  `${display.label}${cell.slotLabel ? ` (${cell.slotLabel})` : ""}`,
-                  cell.abilityNames.length > 0 ? cell.abilityNames.join(" / ") : undefined,
-                  cell.tentativeSlot ? "Tentative slot assignment — roster couldn't fully disambiguate" : undefined,
-                ].filter(Boolean).join("\n");
                 return (
-                  <td key={slot} style={{ ...bodyCellStyle, color: display.color }} title={title}>
-                    {display.symbol}
+                  <td key={slot} style={bodyCellStyle}>
+                    {cell.checks.map((check, ci) => {
+                      const display = STATUS_DISPLAY[check.status];
+                      const title = [
+                        `${display.label}${cell.slotLabel ? ` (${cell.slotLabel})` : ""}`,
+                        cell.tentativeSlot ? "Tentative slot assignment — roster couldn't fully disambiguate" : undefined,
+                      ].filter(Boolean).join("\n");
+                      return (
+                        <div key={ci} style={{ ...checkLineStyle, opacity: check.carryOver ? 0.55 : 1 }} title={title}>
+                          <span style={{ color: display.color, fontWeight: 700, flexShrink: 0 }}>{display.symbol}</span>
+                          <span style={{ color: "#cbd5e1", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {check.carryOver ? "➔ " : ""}{check.abilityName}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </td>
                 );
               })}

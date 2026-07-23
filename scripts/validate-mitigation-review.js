@@ -33,7 +33,8 @@ const plan = getMitigationPlan('ikuya');
       for (const row of rows.slice(0, 6)) {
         const cells = [...row.cellsByActorId.entries()].map(([id, c]) => {
           const p = pull.players.find(p => p.actorId === id);
-          return `${p ? p.name : id}:${c.status}${c.tentativeSlot ? '?' : ''}(${c.slotLabel})`;
+          const checks = c.checks.map(chk => `${chk.status}:${chk.abilityName}${chk.carryOver ? '(carry)' : ''}`).join('+');
+          return `${p ? p.name : id}:${checks}${c.tentativeSlot ? '?' : ''}(${c.slotLabel})`;
         }).join(', ');
         console.log(`  [${(row.anchorMs/1000).toFixed(1)}s] ${row.phaseTitle} / ${row.mech.name} -> ${cells}`);
       }

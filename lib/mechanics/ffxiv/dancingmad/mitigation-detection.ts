@@ -259,14 +259,23 @@ function formatPlayerList(names: string[]): string {
 
 // ── Cast checking ─────────────────────────────────────────────────────────
 
-export function hasCastNear(player: PlayerInfo, abilityNames: string[], anchorMs: number): boolean {
+// Returns the player's own real cast name that satisfied `abilityNames`
+// (useful for an either-of group like Spreadlo's Succor/Deployment Tactics
+// — mitigation-review.ts's Review tab shows exactly which one was actually
+// cast rather than a vague "satisfied"), or null if none matched.
+export function findCastNear(player: PlayerInfo, abilityNames: string[], anchorMs: number): string | null {
   const wanted = new Set(abilityNames.map((n) => n.toLowerCase()));
-  return player.casts.some(
+  const match = player.casts.find(
     (c) =>
       wanted.has(c.abilityName.toLowerCase()) &&
       c.timestamp >= anchorMs - CAST_LOOKBACK_MS &&
       c.timestamp <= anchorMs + CAST_LOOKAHEAD_MS
   );
+  return match?.abilityName ?? null;
+}
+
+export function hasCastNear(player: PlayerInfo, abilityNames: string[], anchorMs: number): boolean {
+  return findCastNear(player, abilityNames, anchorMs) !== null;
 }
 
 // The killing hit's own `activeBuffNames` (see PlayerEvent in

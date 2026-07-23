@@ -30,14 +30,17 @@
 // casts against, and "never happened this pull" is exactly what an omitted
 // row should communicate.
 //
-// ── Ambiguity: reused verbatim from mitigation-detection.ts ───────────────
+// ── Ambiguity: reused from mitigation-detection.ts, but per-ability now ───
 //
 // Sheet shorthand this app can't yet resolve to a real per-job ability
 // (generic tank-table terms, unmapped jobs, "LB3", "✔", ...) makes
-// `resolveRequiredAbilityNames` return null. Per the user's explicit
-// instruction, ANY unresolved ability in a cell's requirement makes the
-// WHOLE cell "unresolved" (a "?") rather than guessing or partially
-// evaluating — safer than reporting "hit" on a half-understood requirement.
+// `resolveRequiredAbilityNames` return null. A mechanic's slot can require
+// MULTIPLE abilities at once (e.g. "Reprisal + Party Mit") — each is its
+// OWN independently-evaluated check (2026-07-23, per the user's explicit
+// ask: casting one but not the other should show a hit mark on one and a
+// miss on the other, not collapse to one verdict for the whole cell). An
+// unresolved sheet term only makes THAT ONE check a "?" — it no longer
+// drags down an otherwise-resolvable sibling requirement in the same cell.
 
 import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { Pull } from "@/types/Pull";
@@ -55,17 +58,27 @@ import {
   flattenTankMechanics,
   mechanicMatchesAbilityName,
   resolveRequiredAbilityNames,
-  hasCastNear,
+  findCastNear,
   isDeadOrFreshlyRevived,
 } from "./mitigation-detection";
 
 export type MitigationCellStatus = "hit" | "missed" | "unresolved" | "dead";
 
+// One independently-evaluated required ability within a cell. `abilityName`
+// is the SPECIFIC real cast that satisfied it on "hit" (useful for an
+// either-of group like Spreadlo's Succor/Deployment Tactics — shows which
+// one was actually used), or the sheet's own term / joined candidate list
+// otherwise (so "missed"/"unresolved" still shows what was expected).
+export type MitigationReviewCheck = {
+  status:      MitigationCellStatus;
+  abilityName: string;
+  carryOver:   boolean;  // true if this requirement carries over from an earlier mechanic (dimmed in the table, same convention as the Plan tab)
+};
+
 export type MitigationReviewCell = {
-  status:        MitigationCellStatus;
-  slotLabel:      string;    // sheet column this cell came from (MT, White Mage, D1, ...)
-  abilityNames:   string[];  // resolved required ability name(s) — empty when unresolved
-  tentativeSlot:  boolean;   // true if the slot→player mapping itself was tentative (e.g. M1 vs M2)
+  slotLabel:      string;   // sheet column this cell came from (MT, White Mage, D1, ...)
+  tentativeSlot:  boolean;  // true if the slot→player mapping itself was tentative (e.g. M1 vs M2)
+  checks:         MitigationReviewCheck[];
 };
 
 export type MitigationReviewRow = {
@@ -104,32 +117,32 @@ function buildCell(
   pull:      Pull,
   anchorMs:  number
 ): MitigationReviewCell {
-  // One "requirement group" per ability slot in this cell — satisfied if
-  // the player cast ANY name within its own group (mirrors
-  // mitigation-detection.ts's either-of handling, e.g. Spreadlo's
-  // Succor/Deployment Tactics pair).
-  const requiredGroups: string[][] = [];
-  let unresolved = false;
+  const dead = isDeadOrFreshlyRevived(player, pull.deathEvents, anchorMs);
+  const checks: MitigationReviewCheck[] = [];
 
   for (const entry of entries) {
     for (const ability of entry.abilities) {
       const candidates = resolveRequiredAbilityNames(ability, player);
-      if (!candidates) { unresolved = true; continue; }
-      requiredGroups.push(candidates);
+
+      if (!candidates) {
+        checks.push({ status: "unresolved", abilityName: ability.name, carryOver: entry.carryOver });
+        continue;
+      }
+      if (dead) {
+        checks.push({ status: "dead", abilityName: candidates.join(" / "), carryOver: entry.carryOver });
+        continue;
+      }
+
+      const matched = findCastNear(player, candidates, anchorMs);
+      checks.push({
+        status:      matched ? "hit" : "missed",
+        abilityName: matched ?? candidates.join(" / "),
+        carryOver:   entry.carryOver,
+      });
     }
   }
 
-  const abilityNames = requiredGroups.map((g) => g[0]);
-
-  if (unresolved || requiredGroups.length === 0) {
-    return { status: "unresolved", slotLabel, abilityNames, tentativeSlot: tentative };
-  }
-  if (isDeadOrFreshlyRevived(player, pull.deathEvents, anchorMs)) {
-    return { status: "dead", slotLabel, abilityNames, tentativeSlot: tentative };
-  }
-
-  const allSatisfied = requiredGroups.every((group) => hasCastNear(player, group, anchorMs));
-  return { status: allSatisfied ? "hit" : "missed", slotLabel, abilityNames, tentativeSlot: tentative };
+  return { slotLabel, tentativeSlot: tentative, checks };
 }
 
 function buildRowsFrom(flat: FlatMechanic[], pull: Pull, plan: MitigationPlan, enemyCasts: { timestamp: number; abilityName: string }[]): MitigationReviewRow[] {
