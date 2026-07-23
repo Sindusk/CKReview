@@ -1182,13 +1182,24 @@ function annotateLightsEndSources(
   return errors.map((e) => {
     if (e.ruleId !== LIGHTS_END_RULE_ID) return e;
 
-    let source: Detonation | undefined;
+    // AMBIGUITY GUARD (2026-07-22, Pull 16 VOD — user-reported misattribution):
+    // near a real wipe, dozens of Starsplinter markers can expire within the
+    // same ~1s span (everyone's marks clearing together as the raid dies),
+    // not one clean detonation — picking "whichever timestamp is latest" in
+    // that cluster is arbitrary and was confirmed WRONG (Pull 16 named
+    // Mythnarra; VOD says it was someone else entirely). Only claim a source
+    // when EXACTLY ONE detonation falls in the window — checked across both
+    // reports: every previously-verified correct case (Cococaines pull2 self-
+    // clip, etc.) already had exactly one candidate; every case with 2+ ties
+    // to a mass-death moment (11, 15, 16 simultaneous candidates seen).
+    const candidates: Detonation[] = [];
     for (const det of detonations) {
       if (det.timestamp > e.timestamp) continue;
       if (e.timestamp - det.timestamp > LIGHTS_END_DETONATION_WINDOW_MS) continue;
       if (isDeadAt(det.playerName, det.timestamp)) continue; // death-strip, not a detonation
-      if (!source || det.timestamp > source.timestamp) source = det;
+      candidates.push(det);
     }
+    const source = candidates.length === 1 ? candidates[0] : undefined;
     if (source) {
       // See "Light's End crystal position" above — name the crystal by
       // whoever was closest to its last-known drop spot, when resolvable.
