@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import { getClassColor, getRoleColor, formatSpecClass, getPlayerSpecIcon } from "@/lib/player-display";
+import { detectFFRoles } from "@/lib/mechanics/ffxiv/roles";
+import type { MitigationPlan } from "@/lib/mechanics/ffxiv/dancingmad/mitigation-plan";
 
 type Tab = "DamageDone" | "DamageTaken" | "Healing" | "Debuffs" | "Casts";
 const TABS: Tab[] = ["DamageDone", "DamageTaken", "Healing", "Debuffs", "Casts"];
@@ -81,7 +83,18 @@ function AbilityIcon({
 // spelled out here; the spec/job icon already carries that information,
 // and the full spec name still shows in the player detail header once
 // clicked (see PlayerDetail below).
-function PlayerButton({ player, onClick }: { player: PlayerInfo; onClick: () => void }) {
+function PlayerButton({
+  player,
+  roleSlot,
+  onClick,
+}: {
+  player:   PlayerInfo;
+  // Auto-detected FFXIV party slot (MT/OT/H1/H2/M1/M2/R1/R2 — see
+  // lib/mechanics/ffxiv/roles.ts), undefined for WoW players or when no
+  // slot resolved.
+  roleSlot?: string;
+  onClick:  () => void;
+}) {
   const [hovered, setHovered] = useState(false);
   const color = getClassColor(player.game, player.className);
   const roleColor = getRoleColor(player.role);
@@ -131,10 +144,11 @@ function PlayerButton({ player, onClick }: { player: PlayerInfo; onClick: () => 
         >
           {player.name}
         </span>
-        <span style={{ fontSize: "10px", color: "#555", whiteSpace: "nowrap" }}>
+        <span style={{ display: "flex", width: "100%", justifyContent: "space-between", alignItems: "baseline", gap: "4px", fontSize: "10px", color: "#555" }}>
           {/* DPS shows the actual range category (Melee / Ranged, plus
               Caster for FFXIV) instead of a generic "DPS" label. */}
-          <span style={{ color: roleColor }}>{player.role === "DPS" ? player.rangeType : player.role}</span>
+          <span style={{ color: roleColor, whiteSpace: "nowrap" }}>{player.role === "DPS" ? player.rangeType : player.role}</span>
+          {roleSlot && <span style={{ color: "#666", fontWeight: 700, flexShrink: 0 }}>{roleSlot}</span>}
         </span>
       </div>
     </button>
@@ -484,9 +498,13 @@ function PlayerDetail({
 type RosterPanelProps = {
   players: PlayerInfo[];
   playbackTimeMs: number;
+  // Currently-selected mitigation plan — an extra signal for the FFXIV role
+  // detector's MT/OT split (see lib/mechanics/ffxiv/roles.ts). Ignored for
+  // WoW rosters.
+  mitigationPlan?: MitigationPlan | null;
 };
 
-export default function RosterPanel({ players, playbackTimeMs }: RosterPanelProps) {
+export default function RosterPanel({ players, playbackTimeMs, mitigationPlan }: RosterPanelProps) {
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerInfo | null>(null);
 
   const filteredPlayers = players.filter(
@@ -495,6 +513,18 @@ export default function RosterPanel({ players, playbackTimeMs }: RosterPanelProp
       p.specName !== "LimitBreak" &&
       p.specName !== "Limit Break"
   );
+
+  // Auto-detected FFXIV party slot per player (MT/OT/H1/H2/M1/M2/R1/R2),
+  // shown right-aligned on the role line below each name. WoW has no
+  // equivalent concept yet, so this stays empty for WoW rosters.
+  const roleSlotByActorId = useMemo(() => {
+    const map = new Map<number, string>();
+    if (filteredPlayers.length === 0 || filteredPlayers[0].game !== "ffxiv") return map;
+    for (const r of detectFFRoles(filteredPlayers, mitigationPlan)) {
+      if (r.player) map.set(r.player.actorId, r.slot);
+    }
+    return map;
+  }, [filteredPlayers, mitigationPlan]);
 
   if (selectedPlayer) {
     return (
@@ -567,7 +597,12 @@ export default function RosterPanel({ players, playbackTimeMs }: RosterPanelProp
             }}
           >
             {group.map(player => (
-              <PlayerButton key={player.actorId} player={player} onClick={() => setSelectedPlayer(player)} />
+              <PlayerButton
+                key={player.actorId}
+                player={player}
+                roleSlot={roleSlotByActorId.get(player.actorId)}
+                onClick={() => setSelectedPlayer(player)}
+              />
             ))}
           </div>
         ))}

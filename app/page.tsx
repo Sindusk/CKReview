@@ -1100,6 +1100,7 @@ export default function Home() {
               key={selectedPullId ?? "none"}
               players={activePull?.players ?? []}
               playbackTimeMs={timeline.playbackTimeMs}
+              mitigationPlan={mitigationPlan}
             />
           </div>
 

@@ -22,7 +22,7 @@ import {
   type BlackHoleStrategyResult,
   type BlackHoleStrategyId,
 } from "@/lib/mechanics/ffxiv/dancingmad/blackhole-strategy";
-import { detectFFRoles, FF_ROLE_SLOTS } from "@/lib/mechanics/ffxiv/roles";
+import { detectFFRoles, type FFRoleSlot } from "@/lib/mechanics/ffxiv/roles";
 import type { MitigationPlan } from "@/lib/mechanics/ffxiv/dancingmad/mitigation-plan";
 import { getClassColor } from "@/lib/player-display";
 import type { Pull } from "@/types/Pull";
@@ -44,46 +44,79 @@ type StrategyDialogProps = {
   mitigationPlan: MitigationPlan | null;
 };
 
-const roleRowStyle = {
+// Column layout for the compact roster table — Tank/Healer/Melee/Ranged
+// across, MT-row then OT-row down (2026-07-23, replaced the earlier
+// one-slot-per-row list per the user's explicit ask for a more compact
+// layout):
+//   Tank   Healer   Melee   Ranged
+//   MT     H1       M1      R1
+//   OT     H2       M2      R2
+const ROLE_TABLE_COLUMNS: { label: string; slots: [FFRoleSlot, FFRoleSlot] }[] = [
+  { label: "Tank",   slots: ["MT", "OT"] },
+  { label: "Healer", slots: ["H1", "H2"] },
+  { label: "Melee",  slots: ["M1", "M2"] },
+  { label: "Ranged", slots: ["R1", "R2"] },
+];
+
+const roleCellStyle = {
   display: "flex",
-  alignItems: "baseline" as const,
-  gap: "10px",
-  padding: "6px 10px",
+  flexDirection: "column" as const,
+  alignItems: "center",
+  gap: "2px",
+  padding: "6px 4px",
   backgroundColor: "#1a1a1a",
   border: "1px solid #333",
   borderRadius: "6px",
+  minWidth: 0,
 };
 
 // Roster + auto-detected party role (MT/OT/H1/H2/M1/M2/R1/R2) for one
 // selected pull — the foundation the user wants other FF mechanics to
 // eventually build on instead of each guessing roles ad hoc. "?" marks a
-// slot the roster/plan/damage signals couldn't disambiguate (see
+// slot the roster/plan/auto-attack signals couldn't disambiguate (see
 // lib/mechanics/ffxiv/roles.ts's module header for the resolution order).
 function RoleRoster({ pull, plan }: { pull: Pull; plan: MitigationPlan | null }) {
   const roles = useMemo(() => detectFFRoles(pull.players, plan), [pull, plan]);
   const bySlot = new Map(roles.map((r) => [r.slot, r]));
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-      {FF_ROLE_SLOTS.map((slot) => {
-        const assignment = bySlot.get(slot);
-        const player = assignment?.player ?? null;
-        const color = player ? getClassColor("ffxiv", player.className) : "#94a3b8";
-        return (
-          <div key={slot} style={roleRowStyle}>
-            <span style={{ fontSize: "11px", fontWeight: 700, color: "#60a5fa", flexShrink: 0, width: "32px" }}>
-              {slot}
-            </span>
-            <span style={{ color, fontWeight: 600, fontSize: "13px", flexShrink: 0, width: "140px" }}>
-              {player ? player.name : "—"}
-              {assignment?.tentative && player ? <span style={{ color: "#64748b" }}> ?</span> : null}
-            </span>
-            <span style={{ color: "#999", fontSize: "11px" }}>
-              {player ? player.className : ""}
-            </span>
-          </div>
-        );
-      })}
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: "6px" }}>
+      {ROLE_TABLE_COLUMNS.map((col) => (
+        <div
+          key={col.label}
+          style={{ fontSize: "10px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", textAlign: "center" }}
+        >
+          {col.label}
+        </div>
+      ))}
+      {([0, 1] as const).map((rowIdx) =>
+        ROLE_TABLE_COLUMNS.map((col) => {
+          const slot = col.slots[rowIdx];
+          const assignment = bySlot.get(slot);
+          const player = assignment?.player ?? null;
+          const color = player ? getClassColor("ffxiv", player.className) : "#94a3b8";
+          return (
+            <div key={`${rowIdx}-${slot}`} style={roleCellStyle}>
+              <span style={{ fontSize: "9px", fontWeight: 700, color: "#60a5fa" }}>{slot}</span>
+              <span
+                style={{
+                  color,
+                  fontWeight: 600,
+                  fontSize: "12px",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  maxWidth: "100%",
+                }}
+                title={player ? player.name : undefined}
+              >
+                {player ? player.name : "—"}
+                {assignment?.tentative && player ? <span style={{ color: "#64748b" }}> ?</span> : null}
+              </span>
+            </div>
+          );
+        })
+      )}
     </div>
   );
 }
