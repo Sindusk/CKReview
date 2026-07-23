@@ -84,11 +84,17 @@ export const CAST_LOOKAHEAD_MS = 3_000;
 // the requirement from the ASSIGNED PLAYER's actual job is exact where the
 // qualifier text ("WAR/PLD" vs "GNB/DRK") would just be redundant.
 
+// Tanks and physical ranged DPS both carry a raid-wide "Party Mit" on their
+// job kit — user-confirmed 2026-07-23 for the three ranged jobs (Bard,
+// Machinist, Dancer), matching the four tank jobs confirmed earlier.
 const PARTY_MIT_BY_JOB: Record<string, string> = {
-  Warrior:     "Shake It Off",
-  Paladin:     "Divine Veil",
-  Gunbreaker:  "Heart of Light",
+  Warrior:      "Shake It Off",
+  Paladin:      "Divine Veil",
+  Gunbreaker:   "Heart of Light",
   "Dark Knight": "Dark Missionary",
+  Bard:         "Troubadour",
+  Machinist:    "Tactician",
+  Dancer:       "Shield Samba",
 };
 
 // The tank table (mitigation-plans/ikuya.json's `tank` section) uses
