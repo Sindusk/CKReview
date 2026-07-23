@@ -1124,14 +1124,42 @@ function buildCrystalDrops(players: PlayerInfo[]): CrystalDrop[] {
   return drops.sort((a, b) => a.timestamp - b.timestamp);
 }
 
-/** Closest player (by position at `atTime`) to wherever the crystal was last dropped before `atTime`. */
+// CLUSTERED-DROP AMBIGUITY GUARD (2026-07-22, Pull 16 VOD — user-reported
+// misattribution): during the post-intermission juggling phase, several
+// different players can each drop a crystal within the same couple of
+// seconds — Pull 16 had FOUR (Legionshifts/Veinglas/Neptune/Sindusk,
+// 218.78-219.69) sitting at once; "closest player to the single most
+// recent drop" named Sindusk, but the VOD says it was near one of the two
+// TANKS (Legionshifts/Veinglas) — the wrong one of several plausible
+// candidates. Tried and REJECTED two alternatives before this one: (a)
+// "pick whichever candidate's own position is the tightest match" flips
+// Pull 16 correctly but flips Pull 2 and Pull 22 (both VOD-confirmed
+// correct as Cococaines) to a DIFFERENT wrong answer — the tight-distance
+// signal is dominated by "am I still standing where I personally dropped
+// something," not "is this the crystal that broke"; (b) a full FIFO
+// unclaimed-crystal-count simulation also over-triggers on Pull 2/22 (no
+// per-crystal instance id exists to track true consumption, so the count
+// itself isn't trustworthy). Landed on (user's explicit choice, given
+// neither alternative reliably beat this trade): if ANY other drop lands
+// within this window of the most recent one, stay silent (anonymous
+// "A Dawn Crystal was destroyed...") rather than name anybody — accepting
+// this ALSO silences Pull 2 and Pull 22 (both had a second drop 1.2-1.4s
+// prior), trading two known-correct names for zero known-wrong ones.
+const CRYSTAL_DROP_CLUSTER_WINDOW_MS = 2000;
+
+/** Closest player (by position at `atTime`) to wherever the crystal was last dropped before `atTime` — silent when 2+ drops cluster together (see the guard above). */
 function findNearestPlayerToDroppedCrystal(
   atTime:  number,
   drops:   CrystalDrop[],
   players: PlayerInfo[]
 ): { playerName: string; distanceYalms: number } | undefined {
-  const drop = [...drops].reverse().find((d) => d.timestamp <= atTime && atTime - d.timestamp <= CRYSTAL_DROP_LOOKUP_WINDOW_MS);
-  if (!drop) return undefined;
+  const inWindow = drops.filter((d) => d.timestamp <= atTime && atTime - d.timestamp <= CRYSTAL_DROP_LOOKUP_WINDOW_MS);
+  if (inWindow.length === 0) return undefined;
+  const drop = inWindow[inWindow.length - 1]; // most recent (drops is time-sorted)
+  const hasCompetingDrop = inWindow.some(
+    (d) => d !== drop && drop.timestamp - d.timestamp <= CRYSTAL_DROP_CLUSTER_WINDOW_MS
+  );
+  if (hasCompetingDrop) return undefined;
 
   let nearest: { playerName: string; distanceYalms: number } | undefined;
   for (const player of players) {
