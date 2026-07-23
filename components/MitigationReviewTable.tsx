@@ -47,6 +47,7 @@ const headerCellStyle = {
 
 const rowLabelCellStyle = {
   padding: "4px 8px",
+  verticalAlign: "top" as const,
   fontSize: "11px",
   color: "#e2e8f0",
   borderBottom: "1px solid #333",
@@ -123,9 +124,11 @@ export default function MitigationReviewTable({
           {rows.map((row, i) => (
             <tr key={`${row.mech.name}-${i}`}>
               <td style={rowLabelCellStyle}>
-                <span style={{ color: "#60a5fa", fontWeight: 700, marginRight: "6px" }}>{formatMs(row.anchorMs)}</span>
-                {row.mech.name}
-                <span style={{ color: "#555", marginLeft: "6px" }}>({row.phaseTitle})</span>
+                <div>
+                  <span style={{ color: "#60a5fa", fontWeight: 700, marginRight: "6px" }}>{formatMs(row.anchorMs)}</span>
+                  {row.mech.name}
+                </div>
+                <div style={{ color: "#555", fontSize: "10px" }}>({row.phaseTitle})</div>
               </td>
               {columns.map(({ slot, assignment }) => {
                 const cell = row.cellsByActorId.get(assignment.player!.actorId);
