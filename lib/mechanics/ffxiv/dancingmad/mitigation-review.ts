@@ -108,7 +108,8 @@ export type MitigationReviewRow = {
  * (mechanic never reached this pull, or its sheet name doesn't match any
  * logged boss ability).
  */
-function findBossCastAnchor(mech: PlanMechanic, enemyCasts: { timestamp: number; abilityName: string }[]): number | null {
+// Exported for scripts/inspect-mitigation-anchors.js's diagnostic dump.
+export function findBossCastAnchor(mech: PlanMechanic, enemyCasts: { timestamp: number; abilityName: string }[]): number | null {
   if (mech.timeSeconds === undefined) return null;
   const sheetMs = mech.timeSeconds * 1000;
 

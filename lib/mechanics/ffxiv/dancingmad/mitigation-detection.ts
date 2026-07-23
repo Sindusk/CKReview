@@ -235,9 +235,45 @@ export function mechanicNameTokens(mechName: string): string[] {
     .filter(Boolean);
 }
 
+// Sheet mechanic name -> real boss ability name(s) that ACTUALLY represent
+// it, for the rare mechanic the automatic tokenizer (mechanicNameTokens)
+// gets wrong. Two known cases, found 2026-07-24 via `scripts/inspect-
+// mitigation-anchors.js` (see that script for how to find more):
+//   - "Towers I" through "Towers VIII": mechanicNameTokens strips a
+//     trailing parenthetical assuming it's a discardable qualifier like
+//     "Thunder III (1st Set)" — true there ("Thunder III" is itself a real
+//     ability), but false here: "(All Things Ending)" / "(Past/Future's
+//     End)" are the ACTUAL cast names, and "Towers I"/"Towers N" alone
+//     isn't a real ability at all (it's just the sheet's own raid-comms
+//     numbering for the 8 sequential tower resolutions). Rather than parse
+//     the qualifier text differently per case, all eight instead share ONE
+//     universal raid-wide cast that fires exactly once per tower
+//     resolution regardless of which specific type it is — "The Path of
+//     Light" — confirmed via real enemyCasts (8 clusters, one per tower,
+//     spaced ~10s apart matching the sheet's own timing).
+//   - "Light of Judgement" (Phase 2's spelling) vs "Light of Judgment"
+//     (Phase 1's spelling, and the real ability's actual spelling) — a
+//     sheet-side inconsistency between two occurrences of the same
+//     mechanic.
+const MECHANIC_NAME_ALIASES: Record<string, string[]> = {
+  "Towers I":                        ["The Path of Light"],
+  "Towers II (Past/Future's End)":   ["The Path of Light"],
+  "Towers III (All Things Ending)":  ["The Path of Light"],
+  "Towers IV (Past/Future's End)":   ["The Path of Light"],
+  "Towers V (All Things Ending)":    ["The Path of Light"],
+  "Towers VI (Past/Future's End)":   ["The Path of Light"],
+  "Towers VII (All Things Ending)":  ["The Path of Light"],
+  "Towers VIII (Past/Future's End)": ["The Path of Light"],
+  "Light of Judgement":              ["Light of Judgment"],
+};
+
 export function mechanicMatchesAbilityName(mech: PlanMechanic, abilityName: string): boolean {
   const name = abilityName.trim().toLowerCase();
   if (!name || name.startsWith("unknown")) return false;
+
+  const aliases = MECHANIC_NAME_ALIASES[mech.name];
+  if (aliases) return aliases.some((a) => a.toLowerCase() === name);
+
   return mechanicNameTokens(mech.name).some((t) => t === name || t.includes(name) || name.includes(t));
 }
 
