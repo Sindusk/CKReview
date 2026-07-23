@@ -67,10 +67,11 @@ import {
   mechanicMatchesAbilityName,
   resolveRequiredAbilityNames,
   expandRequiredAbilities,
-  findCastNear,
   findActiveBuffNear,
   findCastCoveringMoment,
   needsDurationOverride,
+  findTankLB3Near,
+  findTankLB3LastCast,
   findLastCastAtOrBefore,
   isDeadOrFreshlyRevived,
 } from "./mitigation-detection";
@@ -154,6 +155,24 @@ function buildCell(
       // 40% + Short Mit) rather than being one OR-group — see
       // expandRequiredAbilities's header. A no-op for every other term.
       for (const ability of expandRequiredAbilities(rawAbility)) {
+        // "LB3" is a shared party resource — either tank pressing it is a
+        // success, regardless of which one the sheet slot happens to
+        // assign it to (user-confirmed 2026-07-24) — so it's checked
+        // across ALL tanks up front, before the normal per-assigned-
+        // player resolution below even runs.
+        if (ability.name === "LB3") {
+          const tanks = pull.players.filter((p) => p.role === "Tank");
+          const match = findTankLB3Near(tanks, anchorMs);
+          const lastCastMs = findTankLB3LastCast(tanks, anchorMs + CAST_LOOKAHEAD_MS);
+          checks.push({
+            status:      match ? "hit" : "missed",
+            abilityName: match ? `${match.abilityName} (${match.tank.name})` : "Tank LB3 (either)",
+            carryOver:   entry.carryOver,
+            lastCastMs,
+          });
+          continue;
+        }
+
         const candidates = resolveRequiredAbilityNames(ability, player);
 
         if (!candidates) {
@@ -167,13 +186,17 @@ function buildCell(
 
         // Ground truth first (FFLogs' own recorded activeBuffNames on a
         // nearby hit) — correctly handles the common case (a plain timed
-        // debuff like Feint, whose single cast must NOT be counted as
-        // covering a mechanic long after its real duration elapsed). Only
-        // reroute to the per-ability duration override for the confirmed
-        // exceptions (a shield whose status drops on consumption, or a
-        // one-shot cast with no persistent status at all — see
-        // DURATION_OVERRIDE_MS's header); fall back to plain cast-timing
-        // when there's no nearby damage instance to read buff state from.
+        // debuff like Feint/Addle, whose single cast must NOT be counted
+        // as covering a mechanic long after its real duration elapsed).
+        // Only reroute to the per-ability duration override for the
+        // confirmed exceptions (a shield whose status drops on
+        // consumption, or a one-shot cast with no persistent status at
+        // all — see ABILITY_DURATION_MS's header); when there's no nearby
+        // damage instance to read buff state from at all, fall back to
+        // the SAME duration-aware check instead of a blind flat window
+        // (found 2026-07-24: a player untouched by any nearby damage was
+        // otherwise falling through to the old 45s window and wrongly
+        // counting a long-expired Addle as still covering a later hit).
         let matchedName: string | null;
         if (needsDurationOverride(candidates)) {
           matchedName = findCastCoveringMoment(player, candidates, anchorMs);
@@ -181,7 +204,7 @@ function buildCell(
           const buffCheck = findActiveBuffNear(player, candidates, anchorMs);
           matchedName = buffCheck !== undefined
             ? (buffCheck.active ? buffCheck.matchedName : null)
-            : findCastNear(player, candidates, anchorMs);
+            : findCastCoveringMoment(player, candidates, anchorMs);
         }
 
         // Same cutoff findCastNear/findCastCoveringMoment allow for a "hit"

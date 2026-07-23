@@ -100,9 +100,10 @@ const PARTY_MIT_BY_JOB: Record<string, string> = {
 // The tank table (mitigation-plans/ikuya.json's `tank` section) uses
 // GENERIC slot names instead of real ability names, each needing a per-job
 // resolution the same way "Party Mit" does above.
-//   - "90s": a tank's personal ~90s-cooldown mitigation. Only Gunbreaker
-//     confirmed so far (2026-07-20: Camouflage) — a DIFFERENT ability from
-//     "40%" below, not a duplicate/rename of it.
+//   - "90s": a tank's personal ~90s-cooldown mitigation — a DIFFERENT
+//     ability from "40%" below, not a duplicate/rename of it. Gunbreaker
+//     confirmed 2026-07-20 (Camouflage); Paladin/Warrior/Dark Knight
+//     confirmed 2026-07-24 (Bulwark/Thrill of Battle/Dark Mind).
 //   - "40%" ("40% Mit", ~120s cooldown per the user) / "Short Mit" ("Short",
 //     a shorter-cooldown, more frequent one) / "Buddy Mit" (targets an
 //     ALLY, not the caster — see wasBuffActiveOnHit's header for why
@@ -118,7 +119,10 @@ const PARTY_MIT_BY_JOB: Record<string, string> = {
 //     the three can show its own hit/miss mark instead of one combined
 //     verdict (see mitigation-review.ts's per-check display).
 const NINETY_SECOND_MIT_BY_JOB: Record<string, string> = {
-  Gunbreaker: "Camouflage",
+  Paladin:      "Bulwark",
+  Gunbreaker:   "Camouflage",
+  Warrior:      "Thrill of Battle",
+  "Dark Knight": "Dark Mind",
 };
 const FORTY_PERCENT_MIT_BY_JOB: Record<string, string> = {
   Paladin:      "Guardian",
@@ -147,6 +151,48 @@ const INVULN_BY_JOB: Record<string, string> = {
   Warrior:      "Holmgang",
   "Dark Knight": "Living Dead",
 };
+
+// "LB3" (a tank Limit Break) is fundamentally different from every other
+// generic term above: the sheet doesn't care WHICH tank presses it — user-
+// confirmed 2026-07-24 ("the sheet is asking either tank to hit their
+// Limit Break... as long as either tank presses it, that's a success").
+// Every other resolver here answers "what should THIS assigned player
+// cast," checked against that one player's own casts; LB3 needs to check
+// BOTH tanks' casts regardless of which one the sheet slot happens to
+// assign it to. Handled as a special case in mitigation-review.ts's
+// buildCell (and detectMitigationErrors below) via findTankLB3Near/
+// findTankLB3LastCast rather than through resolveRequiredAbilityNames's
+// normal per-player return shape — it still returns null for "LB3" itself
+// so a caller that DOESN'T special-case it fails closed (skips) instead of
+// silently checking only one tank.
+const TANK_LB3_BY_JOB: Record<string, string> = {
+  Paladin:       "Last Bastion",
+  Gunbreaker:    "Gunmetal Soul",
+  Warrior:       "Land Waker",
+  "Dark Knight": "Dark Force",
+};
+
+/** Whichever tank (if any) pressed their own LB3 near `anchorMs` — checked across ALL tanks, not one assigned player. */
+export function findTankLB3Near(tanks: PlayerInfo[], anchorMs: number): { tank: PlayerInfo; abilityName: string } | null {
+  for (const tank of tanks) {
+    const lb3Name = TANK_LB3_BY_JOB[tank.className];
+    if (!lb3Name) continue;
+    if (hasCastNear(tank, [lb3Name], anchorMs)) return { tank, abilityName: lb3Name };
+  }
+  return null;
+}
+
+/** Most recent LB3 press across ALL tanks at or before `atMs`, or null if neither has pressed theirs yet. */
+export function findTankLB3LastCast(tanks: PlayerInfo[], atMs: number): number | null {
+  let latest: number | null = null;
+  for (const tank of tanks) {
+    const lb3Name = TANK_LB3_BY_JOB[tank.className];
+    if (!lb3Name) continue;
+    const t = findLastCastAtOrBefore(tank, [lb3Name], atMs);
+    if (t !== null && (latest === null || t > latest)) latest = t;
+  }
+  return latest;
+}
 
 // "Kitchen Sink" bundles three independently-required abilities rather
 // than being satisfied by any one of them (unlike every other generic term
@@ -391,41 +437,62 @@ export function hasCastNear(player: PlayerInfo, abilityNames: string[], anchorMs
 // findActiveBuffNear (below) — FFLogs' own recorded activeBuffNames on a
 // nearby damage instance — is the DEFAULT, PRIMARY check: real ground
 // truth for "was this actually up," and correctly handles the common case
-// (a plain timed debuff like Feint, whose single cast should NOT be
-// counted as covering a mechanic long after its real duration elapsed —
-// confirmed working correctly this way 2026-07-24). Only two abilities so
-// far are confirmed to defeat that check specifically, both because
-// activeBuffNames isn't tracking what we actually want to know:
-//   - Divine Veil: a SHIELD whose status gets removed the INSTANT it's
-//     consumed by a hit, often within ~1s of casting — nowhere near its
-//     real ~20s duration, so activeBuffNames says "gone" while the
-//     party's actual mitigation coverage (the regen portion) is still up.
-//   - Liturgy of the Bell: a one-shot cast with NO persistent buff status
-//     in FFLogs at all (the heal fires automatically later) — activeBuff-
-//     Names can never show it as active, ever, even the instant after
+// (a plain timed debuff like Feint or Addle, whose single cast should NOT
+// be counted as covering a mechanic long after its real duration elapsed —
+// confirmed working correctly this way 2026-07-24). ABILITY_DURATION_MS
+// below serves TWO distinct roles depending on FORCE_DURATION_OVERRIDE:
+//   - In FORCE_DURATION_OVERRIDE: activeBuffNames is confirmed WRONG for
+//     this ability specifically, so it's skipped entirely — e.g. a SHIELD
+//     (Divine Veil, The Blackest Night, Divine Caress) has its status
+//     removed the INSTANT it's consumed by a hit, often within ~1s of
+//     casting, nowhere near its real duration; a one-shot cast with no
+//     persistent status at all (Liturgy of the Bell, Provoke) can never
+//     show as "active" in activeBuffNames, ever, even the instant after
 //     casting it.
-// Per the user's explicit correction (2026-07-24): this is an OVERRIDE
-// list for confirmed-broken cases, not a wholesale replacement of the
-// working buff-check — don't add an ability here unless activeBuffNames
-// has been shown not to work for it specifically.
-export const DURATION_OVERRIDE_MS: Record<string, number> = {
-  "Divine Veil":         20_000, // user-confirmed 2026-07-24: shield + 20s party regen; FFLogs drops the status on shield consumption, well before the real duration
-  "Liturgy of the Bell": 20_000, // user-confirmed 2026-07-24: one-shot cast, no persistent buff status in FFLogs at all, but its effect covers 20s
+//   - NOT in FORCE_DURATION_OVERRIDE (e.g. Addle): activeBuffNames still
+//     runs FIRST as usual; the duration here is used only as a smarter
+//     FALLBACK lookback window for the (real) case where the assigned
+//     player took no nearby damage at all to read buff state from (found
+//     2026-07-24: Addle showed a false "hit" 22s after its actual 15s
+//     duration lapsed, purely because the assigned player had no damage
+//     instance near that mechanic, so the check fell through to the old
+//     flat 45s window instead of Addle's own much shorter real one).
+// Per the user's explicit correction (2026-07-24): FORCE_DURATION_OVERRIDE
+// is an override list for confirmed-broken cases, not a wholesale
+// replacement of the working buff-check — don't add an ability there
+// unless activeBuffNames has been shown not to work for it specifically.
+export const ABILITY_DURATION_MS: Record<string, number> = {
+  Addle:                 15_000, // user-confirmed 2026-07-24 — plain enemy debuff, activeBuffNames works fine; duration only matters as a fallback (see above)
+  "Divine Veil":         20_000, // user-confirmed 2026-07-24: shield + 20s party regen; FFLogs drops the status on shield consumption, well before the real duration — FORCE override
+  "Liturgy of the Bell": 20_000, // user-confirmed 2026-07-24: one-shot cast, no persistent buff status in FFLogs at all, but its effect covers 20s — FORCE override
+  "The Blackest Night":  7_000,  // user-confirmed 2026-07-24 — DRK shield, same reasoning as Divine Veil — FORCE override
+  "Divine Caress":       10_000, // user-confirmed 2026-07-24 — WHM shield, same reasoning as Divine Veil — FORCE override
+  Provoke:               5_000,  // user-confirmed 2026-07-24 — a taunt, not really a "mitigation duration" in the usual sense; user flagged this may need revisiting — FORCE override (no persistent status to check either way)
 };
 
+// Abilities where activeBuffNames is CONFIRMED wrong, not just "duration
+// used as fallback" — see ABILITY_DURATION_MS's header.
+const FORCE_DURATION_OVERRIDE = new Set([
+  "Divine Veil",
+  "Liturgy of the Bell",
+  "The Blackest Night",
+  "Divine Caress",
+  "Provoke",
+]);
+
 // Same idea as findCastNear, but each candidate ability's own window is
-// derived from DURATION_OVERRIDE_MS (falling back to CAST_LOOKBACK_MS when
-// unmapped, though in practice this is only ever called for abilities
-// already confirmed to be in that map) instead of one flat window shared
-// by every ability. Returns the specific real cast name that covers
-// `anchorMs`, or null.
+// derived from ABILITY_DURATION_MS (falling back to CAST_LOOKBACK_MS when
+// unmapped) instead of one flat window shared by every ability. Used both
+// as the primary check for FORCE_DURATION_OVERRIDE abilities and as the
+// duration-aware fallback when activeBuffNames has no nearby data at all.
+// Returns the specific real cast name that covers `anchorMs`, or null.
 export function findCastCoveringMoment(player: PlayerInfo, abilityNames: string[], anchorMs: number): string | null {
   const wanted = new Set(abilityNames.map((n) => n.toLowerCase()));
 
   let best: { name: string; timestamp: number } | null = null;
   for (const c of player.casts) {
     if (!wanted.has(c.abilityName.toLowerCase())) continue;
-    const duration = DURATION_OVERRIDE_MS[c.abilityName] ?? CAST_LOOKBACK_MS;
+    const duration = ABILITY_DURATION_MS[c.abilityName] ?? CAST_LOOKBACK_MS;
     if (c.timestamp < anchorMs - duration) continue;
     if (c.timestamp > anchorMs + CAST_LOOKAHEAD_MS) continue;
     if (!best || c.timestamp > best.timestamp) best = { name: c.abilityName, timestamp: c.timestamp };
@@ -438,7 +505,7 @@ export function findCastCoveringMoment(player: PlayerInfo, abilityNames: string[
 // whole either-of group to findCastCoveringMoment instead of the default
 // buff-check.
 export function needsDurationOverride(abilityNames: string[]): boolean {
-  return abilityNames.some((n) => n in DURATION_OVERRIDE_MS);
+  return abilityNames.some((n) => FORCE_DURATION_OVERRIDE.has(n));
 }
 
 // The player's own most recent cast of any of `abilityNames` at or before
@@ -511,9 +578,9 @@ const BUFF_CHECK_TOLERANCE_MS = 5_000;
 // mitigations and party-wide ones that also apply to them, same reasoning
 // wasBuffActiveOnHit's header gives for checking the victim's own list).
 // mitigation-review.ts's buildCell uses this as the DEFAULT check (see
-// DURATION_OVERRIDE_MS above for the two confirmed exceptions). Returns
+// FORCE_DURATION_OVERRIDE above for the confirmed exceptions). Returns
 // undefined (not false) when no nearby damage instance carries buff data
-// at all, so the caller can fall back to findCastNear.
+// at all, so the caller can fall back to findCastCoveringMoment.
 export function findActiveBuffNear(
   player:       PlayerInfo,
   abilityNames: string[],
