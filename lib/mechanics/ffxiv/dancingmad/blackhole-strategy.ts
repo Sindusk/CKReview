@@ -651,15 +651,37 @@ function tetherSetForMoment(moment: number): number {
   return 4;
 }
 
+// Kefka casts several different named abilities while standing near center
+// during a tether set's window — "Slap Happy" (his own facing at cast time),
+// its melee follow-up hits (same ability family, logged from each individual
+// slap's position rather than his own), a SECOND "Slap Happy" + "Shockwave"
+// combo immediately after, and unrelated raid-wide casts (Thunder III, Look
+// Upon Me and Despair, ...) that also happen to log him near center. Of all
+// of these, only the FIRST "Slap Happy" cast per set reliably matches VOD
+// ground truth — confirmed on report LF2yJZabVprjXYvm pull 1 (Kefka in the
+// northeast per the user's VOD review; the LATEST near-center sample in that
+// window belongs to the trailing Shockwave combo and reads ~north instead,
+// which is what caused the SDA-only "Took Incorrect Black Hole" false
+// positive on Archidel Del'archi/Kade Kansado at tether #2) and cross-checked
+// against report VtdBqhLQkWJXMvDg pull 22's already-validated NW-for-
+// moments-3-5 finding (the first "Slap Happy" cast there reads ~315°; the
+// later Thunder III/second-Slap-Happy/Shockwave casts in the same window
+// read completely different bearings). Matched by ability NAME, not a fixed
+// ID — "Slap Happy" appears under multiple distinct ability game IDs even
+// within one report.
+const KEFKA_REFERENCE_ABILITY_NAME = "Slap Happy";
+
 /**
- * Kefka's bearing for each of the 4 tether sets — the last near-center
- * facing sample before that set begins. A set with no qualifying sample is
- * simply absent from the returned map (fails closed for that set only,
- * same posture as the rest of this module).
+ * Kefka's bearing for each of the 4 tether sets — the FIRST near-center
+ * "Slap Happy" cast before that set begins (see the constant above for why
+ * "first" and "Slap Happy" specifically). A set with no qualifying sample is
+ * simply absent from the returned map (fails closed for that set only, same
+ * posture as the rest of this module).
  */
 function resolveKefkaBearingsBySet(pull: Pull, burstTimestamp: number): Map<number, number> {
   const samples = (pull.blackHoleGeometry?.kefkaFacingSamples ?? [])
     .filter((s) => Math.hypot(s.x - 10000, s.y - 10000) <= KEFKA_NEAR_CENTER_TOLERANCE)
+    .filter((s) => s.abilityName === KEFKA_REFERENCE_ABILITY_NAME)
     .sort((a, b) => a.timestamp - b.timestamp);
 
   const bearings = new Map<number, number>();
@@ -670,12 +692,8 @@ function resolveKefkaBearingsBySet(pull: Pull, burstTimestamp: number): Map<numb
     // bounded below by the previous set's own start.
     const windowStart = i === 0 ? setStart - 30000 : burstTimestamp + TETHER_MOMENT_OFFSETS_MS[TETHER_SET_START_MOMENT[i - 1] - 1];
 
-    let latestFacing: number | undefined;
-    for (const s of samples) {
-      if (s.timestamp < windowStart || s.timestamp >= setStart) continue;
-      latestFacing = s.facing;
-    }
-    if (latestFacing !== undefined) bearings.set(i + 1, kefkaFacingToBearing(latestFacing));
+    const earliestSample = samples.find((s) => s.timestamp >= windowStart && s.timestamp < setStart);
+    if (earliestSample !== undefined) bearings.set(i + 1, kefkaFacingToBearing(earliestSample.facing));
   }
   return bearings;
 }

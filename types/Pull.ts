@@ -16,7 +16,12 @@ export type BlackHoleGeometry = {
   // the consumer can restrict to samples where he's actually near center
   // (his facing is only meaningful as a Black Hole reference there; other
   // samples reflect whatever else he's doing elsewhere in the fight).
-  kefkaFacingSamples: { timestamp: number; x: number; y: number; facing: number }[];
+  // abilityName lets consumers restrict to a specific cast (see
+  // blackhole-strategy.ts's "Slap Happy" note) — Kefka fires several
+  // different named casts while near center (Slap Happy, Shockwave,
+  // Thunder III, Look Upon Me and Despair, ...) and only one of them
+  // reliably reflects his Black Hole cardinal reference.
+  kefkaFacingSamples: { timestamp: number; x: number; y: number; facing: number; abilityName: string }[];
   // Every "black hole" NPC's own logged spawn: its exact position (always
   // perfectly axis-aligned — one of x/y exactly matches arena center) and
   // its intended target (undefined/no target when nobody claimed it),

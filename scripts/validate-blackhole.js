@@ -58,7 +58,7 @@ for (const dir of reportDirs) {
     game: 'ffxiv',
     players: buildFFPlayers(rep, actorMap, getFFJobByName, abilityMap),
     deathEvents: buildFFDeaths(rep, actorMap, getFFJobByName),
-    blackHoleGeometry: buildFFBlackHoleGeometry(rep, actorMap),
+    blackHoleGeometry: buildFFBlackHoleGeometry(rep, actorMap, abilityMap),
     bossName, pullNumber,
   }));
 

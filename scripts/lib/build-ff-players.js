@@ -122,14 +122,20 @@ function buildFFDeaths(rep, actorMap, getFFJobByName) {
 // (not position) is the real directional reference, and why the black
 // hole NPC's own logged spawn position is used instead of inferring
 // cardinal from whichever player got hit.
-function buildFFBlackHoleGeometry(rep, actorMap) {
+function buildFFBlackHoleGeometry(rep, actorMap, abilityMap) {
   const kefkaIds = new Set([...actorMap.entries()].filter(([, a]) => a.name === 'Kefka').map(([id]) => id));
   const blackHoleIds = new Set([...actorMap.entries()].filter(([, a]) => a.name === 'black hole').map(([id]) => id));
   const enemyCasts = rep.enemyCasts?.data ?? [];
 
   const kefkaFacingSamples = enemyCasts
     .filter((e) => e.type === 'cast' && kefkaIds.has(e.sourceID) && e.sourceResources?.facing !== undefined && e.sourceResources?.x !== undefined && e.sourceResources?.y !== undefined)
-    .map((e) => ({ timestamp: e.timestamp, x: e.sourceResources.x, y: e.sourceResources.y, facing: e.sourceResources.facing }));
+    .map((e) => ({
+      timestamp: e.timestamp,
+      x: e.sourceResources.x,
+      y: e.sourceResources.y,
+      facing: e.sourceResources.facing,
+      abilityName: (abilityMap?.get(e.abilityGameID)) ?? `Ability ${e.abilityGameID}`,
+    }));
 
   const spawnCasts = enemyCasts
     .filter((e) => e.type === 'cast' && blackHoleIds.has(e.sourceID) && e.sourceResources?.x !== undefined && e.sourceResources?.y !== undefined)

@@ -900,6 +900,7 @@ function fflBuildEnemyBuffEvents(
 function fflBuildBlackHoleGeometry(
   enemyCastEvents: FFLCastEvent[],
   actorMap:        Map<number, FFLActor>,
+  abilityMap:      Map<number, AbilityInfo>,
   fightStart:      number
 ): BlackHoleGeometry {
   const kefkaIds     = new Set([...actorMap.entries()].filter(([, a]) => a.name === "Kefka").map(([id]) => id));
@@ -908,10 +909,11 @@ function fflBuildBlackHoleGeometry(
   const kefkaFacingSamples = enemyCastEvents
     .filter((e) => e.type === "cast" && kefkaIds.has(e.sourceID) && e.sourceResources?.facing !== undefined && e.sourceResources?.x !== undefined && e.sourceResources?.y !== undefined)
     .map((e) => ({
-      timestamp: Math.max(0, e.timestamp - fightStart),
-      x:         e.sourceResources!.x!,
-      y:         e.sourceResources!.y!,
-      facing:    e.sourceResources!.facing!,
+      timestamp:   Math.max(0, e.timestamp - fightStart),
+      x:           e.sourceResources!.x!,
+      y:           e.sourceResources!.y!,
+      facing:      e.sourceResources!.facing!,
+      abilityName: fflAbilityName(e, abilityMap),
     }));
 
   const spawnCasts = enemyCastEvents
@@ -1032,7 +1034,7 @@ export function transformFFightToPull(
   // hostilityType: "Enemies" fetches — NOT data.castEvents/debuffEvents.
   const enemyCastEvents = fflBuildEnemyCastEvents(data.enemyCastEvents ?? [], actorMap, abilityMap, fightStart);
   const enemyBuffEvents = fflBuildEnemyBuffEvents(data.enemyBuffEvents ?? [], actorMap, abilityMap, fightStart);
-  const blackHoleGeometry = fflBuildBlackHoleGeometry(data.enemyCastEvents ?? [], actorMap, fightStart);
+  const blackHoleGeometry = fflBuildBlackHoleGeometry(data.enemyCastEvents ?? [], actorMap, abilityMap, fightStart);
 
   const errors = [
     ...detectPullErrors(players, deathEvents, enemyCastEvents, enemyBuffEvents),
