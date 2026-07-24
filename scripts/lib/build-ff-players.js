@@ -154,7 +154,7 @@ function buildFFBlackHoleGeometry(rep, actorMap, abilityMap) {
 // stream, same "cast" (not "begincast") filter, same hitPoints/maxHitPoints
 // pass-through from sourceResources that forsaken.ts's enrage-check
 // detection reads.
-function buildFFEnemyCastEvents(rep, actorMap) {
+function buildFFEnemyCastEvents(rep, actorMap, abilityMap) {
   return (rep.enemyCasts?.data ?? [])
     .filter((e) => e.type === 'cast' && actorMap.get(e.sourceID)?.type !== 'Player')
     .map((e) => ({
@@ -162,10 +162,24 @@ function buildFFEnemyCastEvents(rep, actorMap) {
       actorId: e.sourceID,
       actorName: actorMap.get(e.sourceID)?.name || `Unknown (${e.sourceID})`,
       abilityId: e.abilityGameID ?? 0,
-      abilityName: 'Ability ' + e.abilityGameID,
+      abilityName: (abilityMap?.get(e.abilityGameID)) ?? ('Ability ' + e.abilityGameID),
       hitPoints: e.sourceResources?.hitPoints,
       maxHitPoints: e.sourceResources?.maxHitPoints,
     }));
 }
 
-module.exports = { buildFFPlayers, buildFFDeaths, buildFFBlackHoleGeometry, buildFFEnemyCastEvents };
+// Mirrors lib/log-transforms.ts's fflBuildStompiesPuddleSamples — every
+// "Blizzard III" ghost puddle's own spawn position (Stompies/Earthquake
+// mechanic), matched by ability NAME (not ID — shares "Blizzard III" with
+// Exdeath's own solo announcement cast under a different ID).
+function buildFFStompiesPuddleSamples(rep, actorMap, abilityMap) {
+  return (rep.enemyCasts?.data ?? [])
+    .filter((e) => e.type === 'cast' && (abilityMap?.get(e.abilityGameID)) === 'Blizzard III' && e.sourceResources?.x !== undefined && e.sourceResources?.y !== undefined)
+    .map((e) => ({
+      timestamp: e.timestamp,
+      x: e.sourceResources.x,
+      y: e.sourceResources.y,
+    }));
+}
+
+module.exports = { buildFFPlayers, buildFFDeaths, buildFFBlackHoleGeometry, buildFFEnemyCastEvents, buildFFStompiesPuddleSamples };

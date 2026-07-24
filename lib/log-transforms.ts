@@ -58,6 +58,7 @@ import { detectForsakenTowerErrors } from "./mechanics/ffxiv/dancingmad/forsaken
 import { detectBlackHoleErrors } from "./mechanics/ffxiv/dancingmad/blackhole";
 import { detectLimitCutErrors } from "./mechanics/ffxiv/dancingmad/limitcut";
 import { detectExdeathErrors } from "./mechanics/ffxiv/dancingmad/exdeath";
+import { detectStompiesErrors } from "./mechanics/ffxiv/dancingmad/stompies";
 import { detectPhase1Errors } from "./mechanics/ffxiv/dancingmad/phase1";
 import { detectMidnightFallsErrors } from "./mechanics/wow/vs-dr-mqd/midnightfalls";
 
@@ -929,6 +930,31 @@ function fflBuildBlackHoleGeometry(
   return { kefkaFacingSamples, spawnCasts };
 }
 
+// Every "Blizzard III" ghost puddle's own spawn position (Dancing Mad's
+// Stompies/Earthquake mechanic, lib/mechanics/ffxiv/dancingmad/stompies.ts)
+// — same personal-ground-effect-ghost pattern as Black Hole's tether/spawn
+// casts above, just for a different mechanic's ability. Position comes from
+// the ghost's OWN sourceResources (exactly where the player it belongs to
+// was standing at that instant), not Exdeath's real body position — needed
+// because player-side damageTaken/healing position samples are too sparse/
+// stale to reliably tell "properly spread" from "still near center" at the
+// precise moment a bait resolves (confirmed the hard way: nearest-sample
+// distances didn't cleanly separate confirmed-correct from confirmed-wrong
+// players on report LF2yJZabVprjXYvm pull 1).
+function fflBuildStompiesPuddleSamples(
+  enemyCastEvents: FFLCastEvent[],
+  abilityMap:      Map<number, AbilityInfo>,
+  fightStart:      number
+): { timestamp: number; x: number; y: number }[] {
+  return enemyCastEvents
+    .filter((e) => e.type === "cast" && fflAbilityName(e, abilityMap) === "Blizzard III" && e.sourceResources?.x !== undefined && e.sourceResources?.y !== undefined)
+    .map((e) => ({
+      timestamp: Math.max(0, e.timestamp - fightStart),
+      x:         e.sourceResources!.x!,
+      y:         e.sourceResources!.y!,
+    }));
+}
+
 function buildFFPlayers(
   friendlyPlayerIds: number[],
   actorMap:          Map<number, FFLActor>,
@@ -1035,6 +1061,7 @@ export function transformFFightToPull(
   const enemyCastEvents = fflBuildEnemyCastEvents(data.enemyCastEvents ?? [], actorMap, abilityMap, fightStart);
   const enemyBuffEvents = fflBuildEnemyBuffEvents(data.enemyBuffEvents ?? [], actorMap, abilityMap, fightStart);
   const blackHoleGeometry = fflBuildBlackHoleGeometry(data.enemyCastEvents ?? [], actorMap, abilityMap, fightStart);
+  const stompiesPuddleSamples = fflBuildStompiesPuddleSamples(data.enemyCastEvents ?? [], abilityMap, fightStart);
 
   const errors = [
     ...detectPullErrors(players, deathEvents, enemyCastEvents, enemyBuffEvents),
@@ -1042,6 +1069,7 @@ export function transformFFightToPull(
     ...detectBlackHoleErrors(players, deathEvents),
     ...detectLimitCutErrors(players, deathEvents),
     ...detectExdeathErrors(players, deathEvents),
+    ...detectStompiesErrors(players, deathEvents, enemyCastEvents, blackHoleGeometry, stompiesPuddleSamples),
     ...detectPhase1Errors(players, deathEvents),
   ].sort((a, b) => a.timestamp - b.timestamp);
 

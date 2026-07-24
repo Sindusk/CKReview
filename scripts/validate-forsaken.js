@@ -52,7 +52,7 @@ for (const dir of reportDirs) {
   for (const { bossName, pullNumber, rep } of pulls) {
     const players = buildFFPlayers(rep, actorMap, getFFJobByName, abilityMap);
     const deaths  = buildFFDeaths(rep, actorMap, getFFJobByName);
-    const enemyCasts = buildFFEnemyCastEvents(rep, actorMap);
+    const enemyCasts = buildFFEnemyCastEvents(rep, actorMap, abilityMap);
     const errors  = detectForsakenTowerErrors(players, deaths, enemyCasts);
     console.log('='.repeat(70));
     console.log(`${bossName} Pull ${pullNumber} ->`, errors.length, 'errors');

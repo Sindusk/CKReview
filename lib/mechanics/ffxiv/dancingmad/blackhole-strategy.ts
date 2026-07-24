@@ -635,7 +635,7 @@ function classifyCardinal(x: number, y: number): Cardinal {
 const KEFKA_NEAR_CENTER_TOLERANCE = 300;
 
 /** Converts Kefka's raw logged `facing` into a compass bearing (0=N, 90=E, 180=S, 270=W) — see the module comment above for the derivation. */
-function kefkaFacingToBearing(facing: number): number {
+export function kefkaFacingToBearing(facing: number): number {
   const deg = (facing * 180) / Math.PI / 100 + 270;
   return ((deg % 360) + 360) % 360;
 }
