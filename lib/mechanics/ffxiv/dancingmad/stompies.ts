@@ -61,6 +61,42 @@
 //   Support G1 -> K - 45      Support G2 -> K + 45
 //   DPS G1     -> K + 225     DPS G2     -> K + 135
 //
+// ── TIMING: FIXED DROP-TIME OFFSETS, NOT A LOGGED SIGNAL ─────────────────
+//
+// A puddle's DROP (the ground telegraph appearing under a player, which is
+// when position actually matters) has no logged signal at all — it isn't an
+// attack, just a marker, confirmed absent from both "begincast" (no
+// sourceResources on it in this data) and the later "cast" event (which
+// only fires on DETONATION, several seconds after the drop, matching the
+// raidplan's own "don't actually deal damage until a few seconds later").
+// Checking position at the detonation timestamp instead of the drop
+// genuinely produces a WRONG-time check (confirmed by the user directly
+// against their VOD) — so both checks below are anchored on FIXED offsets
+// from the mechanic-start "Earthquake" cast (EARTHQUAKE_TO_FIRST_DROP_MS,
+// FIRST_TO_SECOND_DROP_MS) instead, per the user's own VOD timing estimate
+// (2026-07-24 session: ~7s to the first drop, ~3s more to the second) —
+// not yet confirmed against a second pull.
+//
+// The two waves need DIFFERENT position sources at that drop-time, though:
+// - Wave 1's ghost puddle data (fflBuildStompiesPuddleSamples) is clean —
+//   8 genuinely distinct positions, one per player, still usable even
+//   though the logged event carrying them fires at detonation, not drop
+//   (see matchPuddlesToPlayers: a ground puddle doesn't move after being
+//   placed, so its position value is identical whether read at drop or
+//   detonation — only the identity match needs a timestamp near the drop).
+// - Wave 2's ghost puddle data is DEGENERATE — confirmed on this pull: all
+//   8 simultaneous "cast" entries carry the IDENTICAL position (10000,
+//   9000), Exdeath's own body snapshot rather than 8 personal ground
+//   markers. Unusable for a per-player check. Falls back to player-side
+//   damageTaken/healing position samples instead, queried at the real
+//   logged wave-2 "cast" (detonation) timestamp specifically — NOT the
+//   estimated drop-time, which is too early for most players to have
+//   arrived yet (confirmed: at the estimated drop-time, Kup'o Noodles'
+//   nearest sample read as within tolerance of his WRONG tower purely
+//   because he hadn't finished walking there). The detonation timestamp is
+//   later than the true drop but empirically the only reliable moment
+//   available; the error is still DISPLAYED at the estimated drop-time.
+//
 // ── ERRORS DETECTED ──────────────────────────────────────────────────────
 //
 // 1. "Bait Positioned Too Close To Center" (Major) — wave 1: a player whose
@@ -77,23 +113,17 @@
 //
 // ── KNOWN LIMITATIONS (first pass, single-pull validation) ─────────────────
 //
-// - Player position comes from the nearest damageTaken/healing-received
-//   sample to the wave's own timestamp (the same approach the rest of the
-//   codebase uses for FFXIV position — there is no continuous position
-//   stream). A sample older than MAX_POSITION_SAMPLE_AGE_MS is treated as no
-//   sample at all (fails closed) rather than risk a stale, misleading
-//   position — this cost real detection power on this very pull (no
-//   sufficiently-fresh sample existed for Sonder Dreams/Kade Kansado near
-//   wave 1, so neither is checked even though the user confirmed both were
-//   fine) but a wrong flag is worse than a missed one.
+// - Wave 2's player-side position sample can go stale (see
+//   MAX_POSITION_SAMPLE_AGE_MS) and fails closed rather than risk a
+//   misleading position — same posture as the rest of this module.
 // - Only wave 1 (bait) and wave 2 (tower) are covered, per explicit user
 //   scope ("if we can just get these first 2 steps detected, that would be
 //   sufficient") — this pull never survived long enough to reach the later
 //   stack-swap/mid/Big-Bang stages (slides 4-7), so there is no real data to
 //   build or validate detection for them yet.
-// - The distance threshold for check 1 and the angle tolerance for check 2
-//   are both first-pass estimates from a single pull's data, not yet cross-
-//   validated against a second report.
+// - The 7s/3s drop-time offsets, the distance threshold for check 1, and
+//   the angle tolerance for check 2 are all first-pass estimates from a
+//   single pull's data, not yet cross-validated against a second report.
 
 import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { PullError } from "@/types/PullError";
@@ -152,12 +182,24 @@ function expectedTowerBearing(kefkaBearing: number, isSupport: boolean, isGroup1
   return ((kefkaBearing + offset) % 360 + 360) % 360;
 }
 
-/** Kefka's own facing bearing at the mechanic-start "Earthquake" cast — the whole sequence's reference. Returns null if this pull never reaches it (or blackHoleGeometry wasn't captured). */
-function resolveKefkaBearing(geometry: BlackHoleGeometry | undefined): number | null {
+// The puddle drops (telegraphs) themselves have no logged signal at all —
+// they're not an attack, just a ground marker appearing under each player,
+// confirmed absent from both begincast (no sourceResources on it here) and
+// "cast" (which only fires later, on DETONATION — see resolveDataWaveTime
+// stamps below). Per the user's direct VOD timing (2026-07-24 session):
+// drop 1 lands ~7s after the mechanic-start "Earthquake" cast, drop 2 ~3s
+// after drop 1 — best-available estimate, not yet confirmed against a
+// second pull. These are what every check in this module is anchored to
+// and displayed at, NOT the later detonation timestamps.
+const EARTHQUAKE_TO_FIRST_DROP_MS = 7000;
+const FIRST_TO_SECOND_DROP_MS     = 3000;
+
+/** Kefka's own facing bearing + timestamp at the mechanic-start "Earthquake" cast — the whole sequence's reference. Returns null if this pull never reaches it (or blackHoleGeometry wasn't captured). */
+function resolveKefkaReference(geometry: BlackHoleGeometry | undefined): { bearing: number; timestamp: number } | null {
   const sample = (geometry?.kefkaFacingSamples ?? [])
     .filter((s) => s.abilityName === EARTHQUAKE_ABILITY_NAME)
     .sort((a, b) => a.timestamp - b.timestamp)[0];
-  return sample ? kefkaFacingToBearing(sample.facing) : null;
+  return sample ? { bearing: kefkaFacingToBearing(sample.facing), timestamp: sample.timestamp } : null;
 }
 
 // A real wave is Exdeath spawning one personal ghost puddle per player
@@ -172,8 +214,19 @@ function resolveKefkaBearing(geometry: BlackHoleGeometry | undefined): number | 
 // Chauzey Solstice/Ayumi Emi, both confirmed correct by the user.
 const MIN_WAVE_CLUSTER_SIZE = 4;
 
-/** The "cast" (resolved) timestamps of the first two Blizzard III waves, clustered from every simultaneous ghost tick. Returns null entries for waves that never happened. */
-function resolveWaveTimestamps(enemyCasts: EnemyEvent[] | undefined): [number | null, number | null] {
+/**
+ * The "cast" (DETONATION, not drop) timestamps of the first two Blizzard III
+ * waves, clustered from every simultaneous ghost tick — used ONLY to find
+ * which timestamp the ghost puddles' own x/y data lives at (see
+ * fflBuildStompiesPuddleSamples). A puddle's ground position is fixed the
+ * instant it's placed and never moves again, so this detonation-time
+ * snapshot is numerically identical to the real drop-time position — but
+ * the actual CHECK timing (what gets displayed, what player positions get
+ * sampled against) always uses the fixed drop-time offsets from
+ * resolveKefkaReference, never this. Returns null entries for waves that
+ * never happened.
+ */
+function resolveDataWaveTimestamps(enemyCasts: EnemyEvent[] | undefined): [number | null, number | null] {
   const timestamps = (enemyCasts ?? [])
     .filter((e) => e.abilityName === BLIZZARD_III_ABILITY_NAME)
     .map((e) => e.timestamp)
@@ -192,11 +245,29 @@ function resolveWaveTimestamps(enemyCasts: EnemyEvent[] | undefined): [number | 
 type Position = { x: number; y: number };
 type PuddleSample = { timestamp: number; x: number; y: number };
 
-/** Nearest damageTaken/healing-received position sample to `timestamp`, or null if nothing is within MAX_POSITION_SAMPLE_AGE_MS (fails closed rather than trust a stale position). */
+/**
+ * Nearest damageTaken/self-targeted-healing position sample to `timestamp`,
+ * or null if nothing is within MAX_POSITION_SAMPLE_AGE_MS (fails closed
+ * rather than trust a stale position).
+ *
+ * `player.healing`'s x/y is only this player's OWN position on a self-heal
+ * — same "check both target and source" pattern limitcut.ts's
+ * findOwnPositionNear already established for exactly this ambiguity: the
+ * real app's healing is CAST BY this player (target === player.name marks a
+ * self-cast, x/y = recipient's position), the validation harness's is
+ * RECEIVED BY this player (source === player.name marks the same thing,
+ * x/y always their own already) — checking both covers whichever shape fed
+ * this call. Confirmed the hard way: this bug passed every harness check
+ * clean (harness's orientation made ANY healing entry a valid self-position
+ * sample) but produced scrambled results in the real app (wrong players
+ * flagged for "Bait Positioned Too Close To Center" on report
+ * LF2yJZabVprjXYvm pull 1) until this filter was added.
+ */
 function nearestPosition(player: PlayerInfo, timestamp: number): Position | null {
   let best: Position | null = null;
   let bestDiff = Infinity;
-  for (const stream of [player.damageTaken, player.healing]) {
+  const selfHeals = player.healing.filter((e) => e.target === player.name || e.source === player.name);
+  for (const stream of [player.damageTaken, selfHeals]) {
     for (const e of stream) {
       if (e.x === undefined || e.y === undefined) continue;
       const diff = Math.abs(e.timestamp - timestamp);
@@ -254,15 +325,15 @@ function matchPuddlesToPlayers(
 function detectBaitTooCloseErrors(
   players: PlayerInfo[],
   deathEvents: DeathEvent[],
-  waveTimestamp: number,
+  dropTimestamp: number,
   slotByName: Map<string, FFRoleSlot>,
   puddleSamples: Position[]
 ): PullError[] {
   const errors: PullError[] = [];
-  const positionByPlayer = matchPuddlesToPlayers(players, puddleSamples, waveTimestamp);
+  const positionByPlayer = matchPuddlesToPlayers(players, puddleSamples, dropTimestamp);
 
   for (const player of players) {
-    if (isDeadBefore(deathEvents, player.name, waveTimestamp)) continue;
+    if (isDeadBefore(deathEvents, player.name, dropTimestamp)) continue;
     const slot = slotByName.get(player.name);
     if (!slot) continue;
 
@@ -277,7 +348,7 @@ function detectBaitTooCloseErrors(
       severity:    "Major",
       name:        "Bait Positioned Too Close To Center",
       description: "Didn't move far enough from center when baiting the first Blizzard III puddle — standing too close to the middle strains the rest of the raid's spread.",
-      timestamp:   waveTimestamp,
+      timestamp:   dropTimestamp,
       player:      player.name,
       class:       player.className,
       specId:      player.specId,
@@ -294,17 +365,18 @@ function detectWrongTowerErrors(
   players: PlayerInfo[],
   deathEvents: DeathEvent[],
   kefkaBearing: number,
-  waveTimestamp: number,
+  dropTimestamp: number,
+  sampleTimestamp: number,
   slotByName: Map<string, FFRoleSlot>
 ): PullError[] {
   const errors: PullError[] = [];
 
   for (const player of players) {
-    if (isDeadBefore(deathEvents, player.name, waveTimestamp)) continue;
+    if (isDeadBefore(deathEvents, player.name, dropTimestamp)) continue;
     const slot = slotByName.get(player.name);
     if (!slot) continue;
 
-    const pos = nearestPosition(player, waveTimestamp);
+    const pos = nearestPosition(player, sampleTimestamp);
     if (!pos) continue;
 
     const isSupport = SUPPORT_SLOTS.includes(slot);
@@ -318,7 +390,7 @@ function detectWrongTowerErrors(
       severity:    "Major",
       name:        "Wrong Tower",
       description: "Moved to the wrong tower for the second Blizzard III bait — not positioned where their role/group assignment required, leaving their intended tower unsoaked.",
-      timestamp:   waveTimestamp,
+      timestamp:   dropTimestamp,
       player:      player.name,
       class:       player.className,
       specId:      player.specId,
@@ -344,24 +416,27 @@ export function detectStompiesErrors(
   geometry:      BlackHoleGeometry | undefined,
   puddleSamples: PuddleSample[] | undefined
 ): PullError[] {
-  const kefkaBearing = resolveKefkaBearing(geometry);
-  if (kefkaBearing === null) return [];
+  const kefkaRef = resolveKefkaReference(geometry);
+  if (kefkaRef === null) return [];
 
-  const [wave1, wave2] = resolveWaveTimestamps(enemyCasts);
-  if (wave1 === null) return [];
+  const [dataWave1, dataWave2] = resolveDataWaveTimestamps(enemyCasts);
+  if (dataWave1 === null) return [];
+
+  const dropTime1 = kefkaRef.timestamp + EARTHQUAKE_TO_FIRST_DROP_MS;
+  const dropTime2 = dropTime1 + FIRST_TO_SECOND_DROP_MS;
 
   const slotByName = new Map<string, FFRoleSlot>();
   for (const assignment of detectFFRoles(players)) {
     if (assignment.player) slotByName.set(assignment.player.name, assignment.slot);
   }
 
-  const wave1Puddles: Position[] = (puddleSamples ?? []).filter((p) => p.timestamp === wave1);
+  const wave1Puddles: Position[] = (puddleSamples ?? []).filter((p) => p.timestamp === dataWave1);
 
   const errors: PullError[] = [
-    ...detectBaitTooCloseErrors(players, deathEvents, wave1, slotByName, wave1Puddles),
+    ...detectBaitTooCloseErrors(players, deathEvents, dropTime1, slotByName, wave1Puddles),
   ];
-  if (wave2 !== null) {
-    errors.push(...detectWrongTowerErrors(players, deathEvents, kefkaBearing, wave2, slotByName));
+  if (dataWave2 !== null) {
+    errors.push(...detectWrongTowerErrors(players, deathEvents, kefkaRef.bearing, dropTime2, dataWave2, slotByName));
   }
 
   return errors.sort((a, b) => a.timestamp - b.timestamp);
