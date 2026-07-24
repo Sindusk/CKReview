@@ -955,6 +955,34 @@ function fflBuildStompiesPuddleSamples(
     }));
 }
 
+// A player's own position from something they DID (landed a hit on the
+// boss), not something that happened TO them — see FIGHT_EVENTS_QUERY's
+// comment in ffl-client.ts for why this needs its OWN query
+// (hostilityType: Enemies + DamageTaken) instead of coming from the
+// friendly-side damageDone/casts streams, which never carry sourceResources
+// at all. Confirmed 2026-07-24 (report LF2yJZabVprjXYvm pull 1): this is
+// the ONLY reliable position source during quiet mechanic-transition
+// windows where a player isn't being hit or healing themselves — e.g. the
+// gap between Black Hole ending and Stompies' first puddle drop, where
+// damageTaken/self-heal samples can go 4-6+ seconds stale for some players.
+// Filtered to actual friendly Player actors (this stream is queried from
+// the BOSS's side, so sourceID is whoever attacked it — almost always a
+// player, but exclude anything that isn't just in case).
+function fflBuildPlayerPositionSamples(
+  enemyDamageTakenEvents: FFLDamageEvent[],
+  actorMap:               Map<number, FFLActor>,
+  fightStart:             number
+): { timestamp: number; playerName: string; x: number; y: number }[] {
+  return enemyDamageTakenEvents
+    .filter((e) => actorMap.get(e.sourceID)?.type === "Player" && e.sourceResources?.x !== undefined && e.sourceResources?.y !== undefined)
+    .map((e) => ({
+      timestamp:  Math.max(0, e.timestamp - fightStart),
+      playerName: actorMap.get(e.sourceID)?.name ?? `Unknown (${e.sourceID})`,
+      x:          e.sourceResources!.x!,
+      y:          e.sourceResources!.y!,
+    }));
+}
+
 function buildFFPlayers(
   friendlyPlayerIds: number[],
   actorMap:          Map<number, FFLActor>,
@@ -1062,6 +1090,7 @@ export function transformFFightToPull(
   const enemyBuffEvents = fflBuildEnemyBuffEvents(data.enemyBuffEvents ?? [], actorMap, abilityMap, fightStart);
   const blackHoleGeometry = fflBuildBlackHoleGeometry(data.enemyCastEvents ?? [], actorMap, abilityMap, fightStart);
   const stompiesPuddleSamples = fflBuildStompiesPuddleSamples(data.enemyCastEvents ?? [], abilityMap, fightStart);
+  const playerPositionSamples = fflBuildPlayerPositionSamples(data.enemyDamageTakenEvents ?? [], actorMap, fightStart);
 
   const errors = [
     ...detectPullErrors(players, deathEvents, enemyCastEvents, enemyBuffEvents),
@@ -1069,7 +1098,7 @@ export function transformFFightToPull(
     ...detectBlackHoleErrors(players, deathEvents),
     ...detectLimitCutErrors(players, deathEvents),
     ...detectExdeathErrors(players, deathEvents),
-    ...detectStompiesErrors(players, deathEvents, enemyCastEvents, blackHoleGeometry, stompiesPuddleSamples),
+    ...detectStompiesErrors(players, deathEvents, enemyCastEvents, blackHoleGeometry, stompiesPuddleSamples, playerPositionSamples),
     ...detectPhase1Errors(players, deathEvents),
   ].sort((a, b) => a.timestamp - b.timestamp);
 

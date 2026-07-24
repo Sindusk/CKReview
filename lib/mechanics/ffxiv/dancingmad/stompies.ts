@@ -88,7 +88,7 @@
 //   8 simultaneous "cast" entries carry the IDENTICAL position (10000,
 //   9000), Exdeath's own body snapshot rather than 8 personal ground
 //   markers. Unusable for a per-player check. Falls back to player-side
-//   damageTaken/healing position samples instead, queried at the real
+//   position samples instead (see nearestPosition), queried at the real
 //   logged wave-2 "cast" (detonation) timestamp specifically — NOT the
 //   estimated drop-time, which is too early for most players to have
 //   arrived yet (confirmed: at the estimated drop-time, Kup'o Noodles'
@@ -96,6 +96,40 @@
 //   because he hadn't finished walking there). The detonation timestamp is
 //   later than the true drop but empirically the only reliable moment
 //   available; the error is still DISPLAYED at the estimated drop-time.
+//
+// ── PLAYER POSITION: THREE SOURCES, ONE OF THEM NEW ─────────────────────
+//
+// nearestPosition (used for wave 1's identity matching AND all of wave 2)
+// draws from three streams, because none of them alone is dense enough to
+// survive a quiet mechanic-transition window where a player isn't being
+// hit, isn't healing themselves, and (for anyone not currently attacking,
+// e.g. a healer mid-GCD-weave) isn't landing hits either:
+//   1. player.damageTaken — their own position when THEY get hit.
+//   2. player.healing, self-targeted only (target/source === player.name)
+//      — their own position on a self-heal. Checking both target and
+//      source covers both this app's real orientation (healing = cast BY
+//      this player, x/y = recipient's) and the validation harness's
+//      (received BY this player, x/y = always their own) — same pattern
+//      limitcut.ts's findOwnPositionNear already established.
+//   3. playerPositionSamples — their own position on a LANDED HIT against
+//      the boss. This is the new one (2026-07-24, prompted directly by the
+//      user pointing at Tomestone's replay viewer showing Ayumi Emi
+//      correctly near center at the drop when neither of the above two
+//      sources had any sample within several seconds of it): FFLogs'
+//      public events API never returns a player's own position on
+//      anything they DID (damageDone, casts both only ever carry
+//      targetResources — confirmed empirically, 0 of several thousand
+//      events checked had sourceResources) — EXCEPT when the same
+//      underlying hits are queried from the boss's side instead
+//      (hostilityType: Enemies + DamageTaken — "damage the enemy took" =
+//      damage players dealt), which DOES carry the attacker's own
+//      sourceResources. See lib/ffl-client.ts's FIGHT_EVENTS_QUERY comment
+//      and log-transforms.ts's fflBuildPlayerPositionSamples. Roughly
+//      GCD-frequency (~every 2.5s) for anyone actively attacking, though
+//      still sparse for a healer weaving mostly heals (confirmed: Archidel
+//      Del'archi had only 17 samples across the ENTIRE pull).
+// All three are pooled and the single nearest-in-time sample wins (see
+// nearestPosition), gated at MAX_POSITION_SAMPLE_AGE_MS.
 //
 // ── ERRORS DETECTED ──────────────────────────────────────────────────────
 //
@@ -113,9 +147,16 @@
 //
 // ── KNOWN LIMITATIONS (first pass, single-pull validation) ─────────────────
 //
-// - Wave 2's player-side position sample can go stale (see
-//   MAX_POSITION_SAMPLE_AGE_MS) and fails closed rather than risk a
-//   misleading position — same posture as the rest of this module.
+// - Wave 1's bait-too-close check still doesn't recover Archidel Del'archi
+//   on this pull even with all three position sources — his best available
+//   sample is 3.5s stale and sits almost exactly equidistant (587 vs 547
+//   units) between the correct puddle and a wrong one, a genuine coin-flip
+//   this module declines to force either way. Two of the three confirmed
+//   players are correctly flagged; the third is a false negative (silent),
+//   not a false positive.
+// - MATCH_DISTANCE_CEILING (wave 1's identity matching) and
+//   MAX_POSITION_SAMPLE_AGE_MS are both first-pass estimates from this one
+//   pull's data, not yet cross-validated against a second report.
 // - Only wave 1 (bait) and wave 2 (tower) are covered, per explicit user
 //   scope ("if we can just get these first 2 steps detected, that would be
 //   sufficient") — this pull never survived long enough to reach the later
@@ -148,7 +189,7 @@ const WAVE_CLUSTER_TOLERANCE_MS = 500;
 
 // A position sample older than this (relative to the wave's own timestamp)
 // is not trusted — see module header.
-const MAX_POSITION_SAMPLE_AGE_MS = 1500;
+const MAX_POSITION_SAMPLE_AGE_MS = 4000;
 
 // First-pass thresholds — see module header's "Known limitations."
 const BAIT_TOO_CLOSE_DISTANCE       = 300;
@@ -244,6 +285,7 @@ function resolveDataWaveTimestamps(enemyCasts: EnemyEvent[] | undefined): [numbe
 
 type Position = { x: number; y: number };
 type PuddleSample = { timestamp: number; x: number; y: number };
+type PlayerPositionSample = { timestamp: number; playerName: string; x: number; y: number };
 
 /**
  * Nearest damageTaken/self-targeted-healing position sample to `timestamp`,
@@ -262,8 +304,18 @@ type PuddleSample = { timestamp: number; x: number; y: number };
  * sample) but produced scrambled results in the real app (wrong players
  * flagged for "Bait Positioned Too Close To Center" on report
  * LF2yJZabVprjXYvm pull 1) until this filter was added.
+ *
+ * A third source, `playerPositionSamples`, covers the gap those two leave —
+ * damageTaken/self-heals both require something to have happened TO this
+ * player, which goes quiet during a pure repositioning window (confirmed:
+ * Ayumi Emi had no such sample within 4.7s of the real puddle-drop moment
+ * on report LF2yJZabVprjXYvm pull 1, during which she covered ~1,650 units
+ * of ground). `playerPositionSamples` instead comes from something the
+ * player DID (landed a hit on the boss) — see fflBuildPlayerPositionSamples
+ * in log-transforms.ts — and is available roughly every GCD, dense enough
+ * to cover exactly this kind of quiet window.
  */
-function nearestPosition(player: PlayerInfo, timestamp: number): Position | null {
+function nearestPosition(player: PlayerInfo, timestamp: number, playerPositionSamples: PlayerPositionSample[]): Position | null {
   let best: Position | null = null;
   let bestDiff = Infinity;
   const selfHeals = player.healing.filter((e) => e.target === player.name || e.source === player.name);
@@ -273,6 +325,11 @@ function nearestPosition(player: PlayerInfo, timestamp: number): Position | null
       const diff = Math.abs(e.timestamp - timestamp);
       if (diff < bestDiff) { bestDiff = diff; best = { x: e.x, y: e.y }; }
     }
+  }
+  for (const e of playerPositionSamples) {
+    if (e.playerName !== player.name) continue;
+    const diff = Math.abs(e.timestamp - timestamp);
+    if (diff < bestDiff) { bestDiff = diff; best = { x: e.x, y: e.y }; }
   }
   return best !== null && bestDiff <= MAX_POSITION_SAMPLE_AGE_MS ? best : null;
 }
@@ -293,21 +350,36 @@ function isDeadBefore(deathEvents: DeathEvent[], playerName: string, timestamp: 
  * in before weaker ones compete for what's left; unmatched players (no
  * player-side sample, or more players than ghosts found) are simply
  * skipped — same fail-closed posture as the rest of this module.
+ *
+ * A match distance beyond MATCH_DISTANCE_CEILING is rejected outright
+ * rather than accepted as "best available." Without this, a pull where
+ * only some players have a usable approximate sample (e.g. a healer who
+ * rarely lands hits on the boss, the only source dense enough for this
+ * quiet mechanic-transition window — see nearestPosition) forces the
+ * REMAINING players into whichever leftover puddle slots are still open,
+ * even when none of them are actually a good fit — confirmed on report
+ * LF2yJZabVprjXYvm pull 1: with only 6 of 8 players having a fresh-enough
+ * sample, Kade Kansado and Chauzey Solstice got force-matched to puddles
+ * 790/1177 units from their real approximate position (both wrong), while
+ * every genuinely good match on the same pull landed under 590.
  */
+const MATCH_DISTANCE_CEILING = 700;
+
 function matchPuddlesToPlayers(
   players: PlayerInfo[],
   puddleSamples: Position[],
-  waveTimestamp: number
+  waveTimestamp: number,
+  playerPositionSamples: PlayerPositionSample[]
 ): Map<string, Position> {
   type Candidate = { playerName: string; puddleIndex: number; distance: number };
   const candidates: Candidate[] = [];
 
   for (const player of players) {
-    const approx = nearestPosition(player, waveTimestamp);
+    const approx = nearestPosition(player, waveTimestamp, playerPositionSamples);
     if (!approx) continue;
     puddleSamples.forEach((puddle, puddleIndex) => {
       const distance = Math.hypot(puddle.x - approx.x, puddle.y - approx.y);
-      candidates.push({ playerName: player.name, puddleIndex, distance });
+      if (distance <= MATCH_DISTANCE_CEILING) candidates.push({ playerName: player.name, puddleIndex, distance });
     });
   }
   candidates.sort((a, b) => a.distance - b.distance);
@@ -327,10 +399,11 @@ function detectBaitTooCloseErrors(
   deathEvents: DeathEvent[],
   dropTimestamp: number,
   slotByName: Map<string, FFRoleSlot>,
-  puddleSamples: Position[]
+  puddleSamples: Position[],
+  playerPositionSamples: PlayerPositionSample[]
 ): PullError[] {
   const errors: PullError[] = [];
-  const positionByPlayer = matchPuddlesToPlayers(players, puddleSamples, dropTimestamp);
+  const positionByPlayer = matchPuddlesToPlayers(players, puddleSamples, dropTimestamp, playerPositionSamples);
 
   for (const player of players) {
     if (isDeadBefore(deathEvents, player.name, dropTimestamp)) continue;
@@ -367,7 +440,8 @@ function detectWrongTowerErrors(
   kefkaBearing: number,
   dropTimestamp: number,
   sampleTimestamp: number,
-  slotByName: Map<string, FFRoleSlot>
+  slotByName: Map<string, FFRoleSlot>,
+  playerPositionSamples: PlayerPositionSample[]
 ): PullError[] {
   const errors: PullError[] = [];
 
@@ -376,7 +450,7 @@ function detectWrongTowerErrors(
     const slot = slotByName.get(player.name);
     if (!slot) continue;
 
-    const pos = nearestPosition(player, sampleTimestamp);
+    const pos = nearestPosition(player, sampleTimestamp, playerPositionSamples);
     if (!pos) continue;
 
     const isSupport = SUPPORT_SLOTS.includes(slot);
@@ -410,11 +484,12 @@ function detectWrongTowerErrors(
  * known limitations.
  */
 export function detectStompiesErrors(
-  players:       PlayerInfo[],
-  deathEvents:   DeathEvent[],
-  enemyCasts:    EnemyEvent[] | undefined,
-  geometry:      BlackHoleGeometry | undefined,
-  puddleSamples: PuddleSample[] | undefined
+  players:               PlayerInfo[],
+  deathEvents:           DeathEvent[],
+  enemyCasts:            EnemyEvent[] | undefined,
+  geometry:              BlackHoleGeometry | undefined,
+  puddleSamples:         PuddleSample[] | undefined,
+  playerPositionSamples: PlayerPositionSample[] | undefined
 ): PullError[] {
   const kefkaRef = resolveKefkaReference(geometry);
   if (kefkaRef === null) return [];
@@ -431,12 +506,13 @@ export function detectStompiesErrors(
   }
 
   const wave1Puddles: Position[] = (puddleSamples ?? []).filter((p) => p.timestamp === dataWave1);
+  const positionSamples = playerPositionSamples ?? [];
 
   const errors: PullError[] = [
-    ...detectBaitTooCloseErrors(players, deathEvents, dropTime1, slotByName, wave1Puddles),
+    ...detectBaitTooCloseErrors(players, deathEvents, dropTime1, slotByName, wave1Puddles, positionSamples),
   ];
   if (dataWave2 !== null) {
-    errors.push(...detectWrongTowerErrors(players, deathEvents, kefkaRef.bearing, dropTime2, dataWave2, slotByName));
+    errors.push(...detectWrongTowerErrors(players, deathEvents, kefkaRef.bearing, dropTime2, dataWave2, slotByName, positionSamples));
   }
 
   return errors.sort((a, b) => a.timestamp - b.timestamp);

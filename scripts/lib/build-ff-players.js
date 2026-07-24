@@ -182,4 +182,20 @@ function buildFFStompiesPuddleSamples(rep, actorMap, abilityMap) {
     }));
 }
 
-module.exports = { buildFFPlayers, buildFFDeaths, buildFFBlackHoleGeometry, buildFFEnemyCastEvents, buildFFStompiesPuddleSamples };
+// Mirrors lib/log-transforms.ts's fflBuildPlayerPositionSamples — a
+// player's own position from something they DID (landed a hit on the
+// boss), via the hostilityType: Enemies + DamageTaken stream, which is the
+// only stream FFLogs populates sourceResources (attacker's own position)
+// on. See that function's comment for why this exists at all.
+function buildFFPlayerPositionSamples(rep, actorMap) {
+  return (rep.enemyDamageTaken?.data ?? [])
+    .filter((e) => (e.type === 'damage' || (e.type === 'calculateddamage' && e.unpaired === true)) && actorMap.get(e.sourceID)?.type === 'Player' && e.sourceResources?.x !== undefined && e.sourceResources?.y !== undefined)
+    .map((e) => ({
+      timestamp: e.timestamp,
+      playerName: actorMap.get(e.sourceID)?.name || `Unknown (${e.sourceID})`,
+      x: e.sourceResources.x,
+      y: e.sourceResources.y,
+    }));
+}
+
+module.exports = { buildFFPlayers, buildFFDeaths, buildFFBlackHoleGeometry, buildFFEnemyCastEvents, buildFFStompiesPuddleSamples, buildFFPlayerPositionSamples };

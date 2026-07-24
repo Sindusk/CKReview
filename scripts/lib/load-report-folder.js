@@ -15,7 +15,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const STREAM_KEYS = ['deaths', 'combatantInfo', 'casts', 'damageDone', 'damageTaken', 'healing', 'debuffs', 'enemyCasts', 'enemyBuffs'];
+const STREAM_KEYS = ['deaths', 'combatantInfo', 'casts', 'damageDone', 'damageTaken', 'healing', 'debuffs', 'enemyCasts', 'enemyBuffs', 'enemyDamageTaken'];
 
 function readJsonReport(filePath) {
   const raw = fs.readFileSync(filePath, 'utf8');

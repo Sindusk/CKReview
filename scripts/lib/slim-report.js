@@ -112,6 +112,16 @@ const FFL_PROJECTORS = {
   debuffs:    (e) => omit(e, ['fight', 'packetID']),
   enemyCasts: (e) => omit(e, ['fight', 'packetID']),
   enemyBuffs: (e) => omit(e, ['fight', 'packetID']),
+  // hostilityType: Enemies + DamageTaken — the ONLY stream that carries a
+  // player's own sourceResources (their position when they landed a hit),
+  // per lib/ffl-client.ts's FIGHT_EVENTS_QUERY comment. Unlike damageDone/
+  // damageTaken above, sourceResources is the whole point here — kept
+  // instead of dropped; targetResources (the boss's own position/health)
+  // isn't needed for anything and is dropped.
+  enemyDamageTaken: (e) => ({
+    ...pick(e, ['timestamp', 'type', 'sourceID', 'targetID', 'abilityGameID', 'unpaired']),
+    sourceResources: pickNested(e, 'sourceResources', FF_RESOURCE_SUBKEYS),
+  }),
 };
 
 function slimFflReport(streams) {

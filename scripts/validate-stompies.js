@@ -8,7 +8,7 @@
 const path = require('path');
 const { ROOT, requireTsFromRoot } = require('./lib/require-ts');
 const { discoverReportFolders, loadReportFolder, buildActorMap, buildAbilityMap } = require('./lib/load-report-folder');
-const { buildFFPlayers, buildFFDeaths, buildFFBlackHoleGeometry, buildFFEnemyCastEvents, buildFFStompiesPuddleSamples } = require('./lib/build-ff-players');
+const { buildFFPlayers, buildFFDeaths, buildFFBlackHoleGeometry, buildFFEnemyCastEvents, buildFFStompiesPuddleSamples, buildFFPlayerPositionSamples } = require('./lib/build-ff-players');
 
 const { detectStompiesErrors } = requireTsFromRoot('lib/mechanics/ffxiv/dancingmad/stompies.ts');
 const { getFFJobByName } = requireTsFromRoot('lib/ffl-job-data.ts');
@@ -39,8 +39,9 @@ for (const dir of reportDirs) {
     const enemyCasts = buildFFEnemyCastEvents(rep, actorMap, abilityMap);
     const geometry = buildFFBlackHoleGeometry(rep, actorMap, abilityMap);
     const puddleSamples = buildFFStompiesPuddleSamples(rep, actorMap, abilityMap);
+    const positionSamples = buildFFPlayerPositionSamples(rep, actorMap);
 
-    const errors = detectStompiesErrors(players, deathEvents, enemyCasts, geometry, puddleSamples);
+    const errors = detectStompiesErrors(players, deathEvents, enemyCasts, geometry, puddleSamples, positionSamples);
     console.log(`${bossName} Pull ${pullNumber} -> ${errors.length} stompies error(s)`);
     for (const e of errors) {
       console.log(`  [${e.ruleId}] t=${e.timestamp} ${e.player}: ${e.description}`);

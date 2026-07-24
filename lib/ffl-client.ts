@@ -478,6 +478,7 @@ const FIGHT_EVENTS_QUERY = /* graphql */`
     $debuffsStart:        Float!
     $enemyCastsStart:     Float!
     $enemyBuffsStart:     Float!
+    $enemyDamageTakenStart: Float!
   ) {
     rateLimitData {
       limitPerHour
@@ -530,6 +531,23 @@ const FIGHT_EVENTS_QUERY = /* graphql */`
           fightIDs: $fightIDs, startTime: $enemyBuffsStart, endTime: $endTime,
           dataType: Buffs, hostilityType: Enemies, includeResources: true
         ) { data nextPageTimestamp }
+
+        // Damage the ENEMY took (hostilityType: Enemies + DamageTaken) is
+        // the same underlying hits as our own "damageDone" above, just
+        // queried from the boss's side — and FFLogs populates
+        // sourceResources (the ATTACKING PLAYER's own position/facing) on
+        // these specifically, where the friendly-side damageDone/casts
+        // queries never do (confirmed 2026-07-24: damageDone/casts always
+        // carry only targetResources — the enemy's position — never
+        // sourceResources, across every event checked). This is the ONLY
+        // way to get a player's own position from something they DID
+        // (attacked) rather than something that happened TO them (hit,
+        // healed) — see lib/mechanics/ffxiv/dancingmad/stompies.ts's
+        // module comment for why that density gap mattered.
+        enemyDamageTaken: events(
+          fightIDs: $fightIDs, startTime: $enemyDamageTakenStart, endTime: $endTime,
+          dataType: DamageTaken, hostilityType: Enemies, includeResources: true
+        ) { data nextPageTimestamp }
       }
     }
   }
@@ -549,6 +567,7 @@ type FightEventsQueryResult = {
       debuffs:        EventStream<FFLDebuffEvent>;
       enemyCasts:     EventStream<FFLCastEvent>;
       enemyBuffs:     EventStream<FFLBuffEvent>;
+      enemyDamageTaken: EventStream<FFLDamageEvent>;
     };
   };
 };
@@ -557,7 +576,7 @@ type FightEventsQueryResult = {
 // it's just used to loop generically over every stream when paginating.
 const STREAM_KEYS = [
   "deaths", "combatantInfo", "casts", "damageDone",
-  "damageTaken", "healing", "debuffs", "enemyCasts", "enemyBuffs",
+  "damageTaken", "healing", "debuffs", "enemyCasts", "enemyBuffs", "enemyDamageTaken",
 ] as const;
 
 type StreamKey = typeof STREAM_KEYS[number];
@@ -581,6 +600,11 @@ export type FFLFightData = {
   debuffEvents:      FFLDebuffEvent[];     // friendly-hostility debuffs (players) — unchanged behavior
   enemyCastEvents:   FFLCastEvent[];       // hostilityType: Enemies, feeds "enemyCast" rules
   enemyBuffEvents:   FFLBuffEvent[];       // hostilityType: Enemies, feeds "enemyBuffApplied" rules
+  // hostilityType: Enemies + DamageTaken — the boss's own damage-taken
+  // events, i.e. damage PLAYERS DEALT. Only reason this is fetched at all:
+  // FFLogs populates sourceResources (the attacking player's own position)
+  // on these specifically — see FIGHT_EVENTS_QUERY's comment.
+  enemyDamageTakenEvents: FFLDamageEvent[];
 };
 
 /**
@@ -611,14 +635,17 @@ export async function fetchFFightData(
     deaths: fight.startTime, combatantInfo: fight.startTime, casts: fight.startTime,
     damageDone: fight.startTime, damageTaken: fight.startTime, healing: fight.startTime,
     debuffs: fight.startTime, enemyCasts: fight.startTime, enemyBuffs: fight.startTime,
+    enemyDamageTaken: fight.startTime,
   };
   const done: Record<StreamKey, boolean> = {
     deaths: false, combatantInfo: false, casts: false, damageDone: false,
     damageTaken: false, healing: false, debuffs: false, enemyCasts: false, enemyBuffs: false,
+    enemyDamageTaken: false,
   };
   const collected: { [K in StreamKey]: FightEventsQueryResult["reportData"]["report"][K]["data"] } = {
     deaths: [], combatantInfo: [], casts: [], damageDone: [],
     damageTaken: [], healing: [], debuffs: [], enemyCasts: [], enemyBuffs: [],
+    enemyDamageTaken: [],
   };
 
   let page = 0;
@@ -638,6 +665,7 @@ export async function fetchFFightData(
       debuffsStart:        cursors.debuffs,
       enemyCastsStart:     cursors.enemyCasts,
       enemyBuffsStart:     cursors.enemyBuffs,
+      enemyDamageTakenStart: cursors.enemyDamageTaken,
     }, false); // per-page dump suppressed — see the single merged dump below
 
     const report = data.reportData.report;
@@ -695,6 +723,7 @@ export async function fetchFFightData(
     debuffEvents:      collected.debuffs,
     enemyCastEvents:   collected.enemyCasts,
     enemyBuffEvents:   collected.enemyBuffs,
+    enemyDamageTakenEvents: onlyLanded(collected.enemyDamageTaken),
   };
 }
 

@@ -115,6 +115,7 @@ async function main() {
       debuffs:       { data: data.debuffEvents },
       enemyCasts:    { data: data.enemyCastEvents },
       enemyBuffs:    { data: data.enemyBuffEvents },
+      enemyDamageTaken: { data: data.enemyDamageTakenEvents },
     });
 
     // FFLogs "Interrupts" tab — see lib/ffl-client.ts's fetchFFInterruptsTable
