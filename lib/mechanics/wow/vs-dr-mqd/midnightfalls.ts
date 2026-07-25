@@ -909,6 +909,151 @@ function detectRadiance(
   return errors;
 }
 
+// ─── Early crystal drop (before the final Resonance) ───────────────────────
+//
+// Ground truth (2026-07-24, Pull 4 of NaKRwHtjFqJAyCPd — a Radiance wipe):
+// an assigned carrier is supposed to hold their Dawn Crystal continuously
+// through the whole Dark Rune "memory game" — at minimum until the THIRD
+// (final) Resonance, ~+164/+174 in the fight timeline, about 2:55 in.
+// Dropping it any earlier leaves the crystal unclaimed well before the
+// intermission handoff window even opens, which is what starts Radiance
+// pulsing (see detectRadiancePulses below) — this rule flags the drop
+// itself as the root cause, on the carrier.
+//
+// In Pull 4, Neptune (a wave-1 assigned carrier per KNOWN_CRYSTAL_
+// ASSIGNMENTS) dropped Glimmering at +69.3s — 1:09 in, ~106s before the
+// deadline — and nobody else ever picked the crystal back up; it sat
+// unclaimed until Radiance's ramping pulses wiped the raid at +81s.
+//
+// A fixed timeline anchor (not a per-pull cast lookup) is used for the
+// deadline: a wipe like Pull 4 never lives long enough to produce a real
+// third-wave Resonance event to anchor on, so this matches the fixed-
+// offset pattern the rest of this file already uses for Radiance's own
+// set-1/set-2 timing (RADIANCE_SET1_ACTIVE_MS etc.) rather than the
+// dynamic-cast-lookup pattern used elsewhere.
+//
+// Checked per-NAME against the known assigned carriers (set1 ∪ set2)
+// rather than gating on the whole roster matching via
+// crystalAssignmentApplies — a roster sub elsewhere (any other slot) must
+// not silence this rule for the specific assigned carrier whose drop we
+// can still identify unambiguously by name.
+//
+// Death-strips are excluded (a carrier killed by something else losing
+// their crystal is fallout of that death, not a dropping mistake — same
+// philosophy as every other rule in this file).
+const CRYSTAL_HOLD_DEADLINE_MS = 175000; // ~2:55 — final Resonance / Dark Rune wave 3
+export const MIDNIGHTFALLS_EARLY_CRYSTAL_DROP_RULE_ID = "wow-mf-early-crystal-drop";
+
+function detectEarlyCrystalDrop(players: PlayerInfo[], deathEvents: DeathEvent[]): PullError[] {
+  const assignedCarriers = new Set([
+    ...KNOWN_CRYSTAL_ASSIGNMENTS.set1,
+    ...KNOWN_CRYSTAL_ASSIGNMENTS.set2,
+  ]);
+
+  const errors: PullError[] = [];
+  for (const player of players) {
+    if (!assignedCarriers.has(player.name)) continue;
+
+    for (const d of player.debuffs) {
+      if (d.abilityId !== GLIMMERING_CARRIER_ID || d.debuffStatus !== "removed") continue;
+      if (d.timestamp >= CRYSTAL_HOLD_DEADLINE_MS) continue;
+
+      const isDeathStrip = deathEvents.some(
+        (de) => de.player === player.name && Math.abs(de.timestamp - d.timestamp) <= CARRIER_DEATH_STRIP_TOLERANCE_MS
+      );
+      if (isDeathStrip) continue;
+
+      errors.push({
+        ruleId:      MIDNIGHTFALLS_EARLY_CRYSTAL_DROP_RULE_ID,
+        severity:    "Major",
+        name:        "Dropped Assigned Crystal Early",
+        description:
+          `${player.name} dropped their assigned Dawn Crystal at ~${(d.timestamp / 1000).toFixed(0)}s — ` +
+          `assigned carriers must hold their crystal until at least the final Resonance ` +
+          `(~2:55, before the Total Eclipse intermission).`,
+        timestamp:   d.timestamp,
+        player:      player.name,
+        class:       player.className,
+        specId:      player.specId,
+        role:        player.role,
+        abilityId:   GLIMMERING_CARRIER_ID,
+        abilityName: "Glimmering",
+      });
+    }
+  }
+  return errors;
+}
+
+// ─── Radiance pulses (raid-wide, every hit) ─────────────────────────────────
+//
+// Ground truth (2026-07-24): independent of WHO is missing their crystal
+// (detectRadiance above), every individual Radiance pulse that lands on
+// the raid is itself worth an error — a raid-wide Minor if it didn't kill
+// anyone (the raid is still fine, just taking damage), or a raid-wide
+// "Raid"-severity error (effectively a wipe) if it did. Unlike
+// detectRadiance's per-episode/per-carrier attribution, this rule doesn't
+// attribute blame or require KNOWN_CRYSTAL_ASSIGNMENTS to apply — it's a
+// pure damage-outcome log of the mechanic actually hitting the raid.
+//
+// Deliberately kept OUT of suppressDuplicateRaidErrors: Radiance ticks
+// land ~1s apart (see module header), well inside that dedup's 2s/ruleId
+// window, which would silently collapse consecutive real pulses (e.g. two
+// back-to-back FATAL ticks 0.84s apart in Pull 4) down to just the first.
+// "Every pulse" means every pulse, so this clusters ticks with its own
+// short window (real spread within one simultaneous raid-wide tick is
+// ≤50-90ms; the next tick is ≥800ms later) and appends its own output
+// after the shared suppression pass runs on everything else.
+const RADIANCE_PULSE_CLUSTER_MS = 400;
+const RADIANCE_PULSE_DEATH_WINDOW_MS = 300;
+export const MIDNIGHTFALLS_RADIANCE_PULSE_RULE_ID = "wow-mf-radiance-pulse";
+
+function detectRadiancePulses(players: PlayerInfo[], deathEvents: DeathEvent[]): PullError[] {
+  const hits: Array<{ timestamp: number; amount: number }> = [];
+  for (const p of players) {
+    for (const h of p.damageTaken) {
+      if (h.abilityId === RADIANCE_ID) hits.push({ timestamp: h.timestamp, amount: h.amount ?? 0 });
+    }
+  }
+  if (hits.length === 0) return [];
+  hits.sort((a, b) => a.timestamp - b.timestamp);
+
+  type Cluster = { start: number; end: number; total: number };
+  const clusters: Cluster[] = [];
+  for (const hit of hits) {
+    const cur = clusters[clusters.length - 1];
+    if (cur && hit.timestamp - cur.end <= RADIANCE_PULSE_CLUSTER_MS) {
+      cur.end = hit.timestamp;
+      cur.total += hit.amount;
+    } else {
+      clusters.push({ start: hit.timestamp, end: hit.timestamp, total: hit.amount });
+    }
+  }
+
+  const errors: PullError[] = [];
+  for (const cluster of clusters) {
+    const killed = new Set(
+      deathEvents
+        .filter((d) => d.killingAbilityGameId === RADIANCE_ID &&
+          d.timestamp >= cluster.start - RADIANCE_PULSE_DEATH_WINDOW_MS &&
+          d.timestamp <= cluster.end + RADIANCE_PULSE_DEATH_WINDOW_MS)
+        .map((d) => d.player)
+    );
+    const totalLabel = `~${Math.round(cluster.total / 1000)}k`;
+    errors.push({
+      ruleId:      MIDNIGHTFALLS_RADIANCE_PULSE_RULE_ID,
+      severity:    killed.size > 0 ? "Raid" : "Minor",
+      name:        "Radiance",
+      description: killed.size > 0
+        ? `Radiance pulsed for ${totalLabel} raid damage and killed the raid (${[...killed].join(", ")}).`
+        : `Radiance pulsed for ${totalLabel} raid damage.`,
+      timestamp:   cluster.start,
+      abilityId:   RADIANCE_ID,
+      abilityName: "Radiance",
+    });
+  }
+  return errors;
+}
+
 // ─── Accidental crystal pickups ────────────────────────────────────────────
 //
 // Sometimes a player who is NOT assigned a crystal grabs one at the wave
@@ -1320,6 +1465,7 @@ export function detectMidnightFallsErrors(
     ...detectCosmicFracture(players),
     ...detectCrystalHolderSoaks(players),
     ...detectRadiance(players, deathEvents, enemyCasts),
+    ...detectEarlyCrystalDrop(players, deathEvents),
     ...detectAccidentalPickups(players, deathEvents, enemyCasts),
   ].map((e) =>
     ANONYMOUS_RAID_RULE_IDS.has(e.ruleId)
@@ -1327,10 +1473,18 @@ export function detectMidnightFallsErrors(
       : e
   );
 
+  // Radiance pulses are deliberately appended AFTER suppressDuplicateRaidErrors
+  // runs on everything else — see detectRadiancePulses' header comment for
+  // why they can't go through that shared 2s/ruleId dedup.
+  const withPulses = [
+    ...suppressDuplicateRaidErrors(errors),
+    ...detectRadiancePulses(players, deathEvents),
+  ];
+
   // Annotate after dedup so each surviving Light's End error (= one
   // crystal detonation, timestamped at its first hit) gets its source.
   return annotateLightsEndSources(
-    suppressDuplicateRaidErrors(errors),
+    withPulses,
     buildDetonations(players),
     players,
     deathEvents
