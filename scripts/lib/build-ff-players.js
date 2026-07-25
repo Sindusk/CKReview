@@ -1,8 +1,8 @@
 // scripts/lib/build-ff-players.js
 //
-// Shared PlayerInfo[]/DeathEvent[] builder for the FFXIV Dancing Mad
-// validate-*.js harnesses (forsaken/limitcut/blackhole). Previously each
-// harness copy-pasted identical logic and resolved names via a hand-
+// Shared PlayerInfo[]/DeathEvent[] builder for scripts/validate.js's FFXIV
+// mechanics. Previously each of the old per-mechanic harnesses
+// copy-pasted identical logic and resolved names via a hand-
 // maintained per-file JOBS table (actorId -> job abbreviation), which had
 // to be updated by hand for every new sample file. Now resolves real
 // names/classes from a report folder's meta.json (see

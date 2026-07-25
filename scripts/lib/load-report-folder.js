@@ -3,10 +3,10 @@
 // Shared loader for report folders produced by scripts/fetch-wow-report.js /
 // scripts/fetch-ff-report.js: a directory containing meta.json (report +
 // fights + masterData, fetched once) plus one "<Boss>_Pull<N>.json" per
-// fight. Used by every validate-*.js harness so the "discover files, merge
+// fight. Used by scripts/validate.js so the "discover files, merge
 // pages, tolerate blank/corrupt captures" logic exists in exactly one
 // place instead of copy-pasted per harness (which is how the old
-// discover7_16Pulls in validate-midnightfalls.js started out).
+// per-mechanic validate-*.js scripts started out).
 //
 // Multi-page grouping ("<Boss>_Pull<N>P<M>.json") is kept for resilience
 // even though the fetch scripts always write one fully-merged file per

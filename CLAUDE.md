@@ -14,6 +14,6 @@ specific mechanic — read it before editing the module.
 Quick facts:
 - Sample data: `sampledata/` (gitignored), fetched via
   `node scripts/fetch-{ff,wow}-report.js <code-or-URL>`.
-- Validation: `node scripts/validate-<mechanic>.js` (no arg = all sample
-  reports), plus `npx tsc --noEmit`, before considering any mechanic change
-  done.
+- Validation: `node scripts/validate.js` (no args = every mechanic against
+  every sample report; args narrow by mechanic name and/or report folder),
+  plus `npx tsc --noEmit`, before considering any mechanic change done.

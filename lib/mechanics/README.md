@@ -131,10 +131,10 @@ This process has produced every module here. In order:
    clean value observed and the best failure value observed, with report
    codes (e.g. `// clean max observed 1.06%, failure observed 2.69%`). This
    is what lets future logs retune a threshold instead of guessing.
-7. **Validate before calling it done:** run the module's
-   `node scripts/validate-<mechanic>.js` (no arg = every report folder under
-   `sampledata/`), run the *other* harnesses too (one pull's log usually
-   exercises several mechanics), and `npx tsc --noEmit`.
+7. **Validate before calling it done:** run `node scripts/validate.js` (no
+   args = every mechanic against every report folder under `sampledata/` —
+   run it all, one pull's log usually exercises several mechanics; pass a
+   mechanic name and/or report folder to narrow), and `npx tsc --noEmit`.
 
 ---
 
@@ -237,12 +237,17 @@ identify WHERE it's missing:
   `node scripts/fetch-ff-report.js <code-or-URL>` /
   `fetch-wow-report.js` (auth: `.credentials/`, see script headers).
   Re-fetching is cheap; don't hand-edit captures.
-- Every `scripts/validate-<mechanic>.js` harness auto-discovers all report
-  folders (any subdirectory containing `meta.json`) and rebuilds
+- `scripts/validate.js` is THE regression harness — one script, all
+  mechanics: `node scripts/validate.js [mechanic ...] [reportDir ...]`
+  (`--list` prints mechanic names; no args = everything). It auto-discovers
+  all report folders (any subdirectory containing `meta.json`) and rebuilds
   `PlayerInfo[]`/`DeathEvent[]`/etc. the same way the live pipeline does,
-  via `scripts/lib/{load-report-folder,build-ff-players,require-ts}.js`.
-- **Regression bar for any mechanic change:** all harnesses run with zero
-  crashes/warnings across every sample report, `npx tsc --noEmit` clean, and
-  manually sanity-check the printed errors for anything touched. (A verified
-  expected-output baseline per report is planned but does not exist yet —
-  until it does, the harness output IS the review surface.)
+  via `scripts/lib/{load-report-folder,build-ff-players,build-wow-players,require-ts}.js`.
+  A new mechanic needs only a new entry in its `MECHANICS` manifest — no
+  new harness file.
+- **Regression bar for any mechanic change:** `node scripts/validate.js`
+  runs with zero crashes/warnings across every sample report,
+  `npx tsc --noEmit` clean, and manually sanity-check the printed errors for
+  anything touched. (A verified expected-output baseline per report is
+  planned but does not exist yet — until it does, the harness output IS the
+  review surface.)
