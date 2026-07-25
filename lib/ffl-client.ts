@@ -532,18 +532,18 @@ const FIGHT_EVENTS_QUERY = /* graphql */`
           dataType: Buffs, hostilityType: Enemies, includeResources: true
         ) { data nextPageTimestamp }
 
-        // Damage the ENEMY took (hostilityType: Enemies + DamageTaken) is
-        // the same underlying hits as our own "damageDone" above, just
-        // queried from the boss's side — and FFLogs populates
-        // sourceResources (the ATTACKING PLAYER's own position/facing) on
-        // these specifically, where the friendly-side damageDone/casts
-        // queries never do (confirmed 2026-07-24: damageDone/casts always
-        // carry only targetResources — the enemy's position — never
-        // sourceResources, across every event checked). This is the ONLY
-        // way to get a player's own position from something they DID
-        // (attacked) rather than something that happened TO them (hit,
-        // healed) — see lib/mechanics/ffxiv/dancingmad/stompies.ts's
-        // module comment for why that density gap mattered.
+        # Damage the ENEMY took (hostilityType: Enemies + DamageTaken) is
+        # the same underlying hits as our own "damageDone" above, just
+        # queried from the boss's side — and FFLogs populates
+        # sourceResources (the ATTACKING PLAYER's own position/facing) on
+        # these specifically, where the friendly-side damageDone/casts
+        # queries never do (confirmed 2026-07-24: damageDone/casts always
+        # carry only targetResources — the enemy's position — never
+        # sourceResources, across every event checked). This is the ONLY
+        # way to get a player's own position from something they DID
+        # (attacked) rather than something that happened TO them (hit,
+        # healed) — see lib/mechanics/ffxiv/dancingmad/stompies.ts's
+        # module comment for why that density gap mattered.
         enemyDamageTaken: events(
           fightIDs: $fightIDs, startTime: $enemyDamageTakenStart, endTime: $endTime,
           dataType: DamageTaken, hostilityType: Enemies, includeResources: true
