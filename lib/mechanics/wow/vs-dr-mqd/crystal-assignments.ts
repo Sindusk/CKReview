@@ -64,12 +64,21 @@ const CRYSTALS_PER_WAVE    = 3;
 // Radiance attribution and accidental-pickup errors (per-pull detection
 // can't aggregate across a report), and validated against the live
 // detection for the Strategy dialog.
+//
+// Each slot lists every player who's held it across different raid nights
+// (roster subs) — any ONE of them satisfies the slot; same pattern as
+// KNOWN_KICK_CHAINS in terminate-kicks.ts. Confirmed 2026-07-24
+// (NaKRwHtjFqJAyCPd, 32 pulls): set2's 2nd slot is Hervous on this capture
+// (Cocoroach absent from the roster entirely) — set1, set2's other two
+// slots, and both intermission swaps all matched exactly otherwise, so
+// this is a straight sub, not a strategy change. Hervous inherits
+// Cocoroach's intermission swap-to-Veinglas too (same slot, same handoff).
 export const KNOWN_CRYSTAL_ASSIGNMENTS = {
-  set1: ["Religiouspp", "Neptune", "Cococaines"],
-  set2: ["Sindusk", "Cocoroach", "Polpo"],
+  set1: [["Religiouspp"], ["Neptune"], ["Cococaines"]],
+  set2: [["Sindusk"], ["Cocoroach", "Hervous"], ["Polpo"]],
   intermissionSwaps: [
-    { from: "Polpo",     to: "Legionshifts" },
-    { from: "Cocoroach", to: "Veinglas" },
+    { from: ["Polpo"],               to: "Legionshifts" },
+    { from: ["Cocoroach", "Hervous"], to: "Veinglas" },
   ],
 };
 
@@ -199,13 +208,17 @@ export function detectCrystalAssignments(
       pullsSeen: c.pulls,
     }));
 
-  const sameTrio = (slots: CrystalSlot[], declared: string[]) =>
-    slots.length === declared.length && slots.every((s) => declared.includes(s.player));
+  // Each declared slot is a list of alternates (roster subs across raid
+  // nights) — a trio matches when every declared slot has SOME detected
+  // holder among its alternates.
+  const sameTrio = (slots: CrystalSlot[], declared: string[][]) =>
+    slots.length === declared.length &&
+    declared.every((alternates) => slots.some((s) => alternates.includes(s.player)));
   const matchesDeclared =
     sameTrio(set1, KNOWN_CRYSTAL_ASSIGNMENTS.set1) &&
     sameTrio(set2, KNOWN_CRYSTAL_ASSIGNMENTS.set2) &&
     KNOWN_CRYSTAL_ASSIGNMENTS.intermissionSwaps.every((declared) =>
-      swaps.some((s) => s.from.player === declared.from && s.to.player === declared.to)
+      swaps.some((s) => declared.from.includes(s.from.player) && s.to.player === declared.to)
     );
 
   return { pullsAnalyzed, set1, set2, swaps, matchesDeclared };

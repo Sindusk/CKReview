@@ -802,10 +802,18 @@ export const MIDNIGHTFALLS_RADIANCE_RULE_ID = "wow-mf-radiance";
 
 // The per-pull crystal errors only make sense for the roster the declared
 // assignment describes — on any other raid's log the names won't resolve.
+// Each slot lists alternates (roster subs across raid nights, see
+// KNOWN_CRYSTAL_ASSIGNMENTS' comment) — a slot is satisfied when ANY ONE
+// of its alternates is in tonight's roster, not all of them.
 function crystalAssignmentApplies(players: PlayerInfo[]): boolean {
   const names = new Set(players.map((p) => p.name));
   return [...KNOWN_CRYSTAL_ASSIGNMENTS.set1, ...KNOWN_CRYSTAL_ASSIGNMENTS.set2]
-    .every((n) => names.has(n));
+    .every((slot) => slot.some((n) => names.has(n)));
+}
+
+/** Whichever declared alternate for a slot is actually in tonight's roster (falls back to the first name if none matched, mirroring terminate-kicks.ts's attributeMiss). */
+function resolveCrystalSlot(slot: string[], players: PlayerInfo[]): string {
+  return slot.find((n) => players.some((p) => p.name === n)) ?? slot[0];
 }
 
 function intermissionStartOf(enemyCasts: EnemyEvent[]): number {
@@ -848,7 +856,7 @@ function detectRadiance(
   const carryCheckers = new Map(players.map((p) => [p.name, buildCarryChecker(p)]));
   const holdsAt = (name: string, t: number) => carryCheckers.get(name)?.(t) ?? false;
   const swapTankFor = (name: string) =>
-    KNOWN_CRYSTAL_ASSIGNMENTS.intermissionSwaps.find((s) => s.from === name)?.to;
+    KNOWN_CRYSTAL_ASSIGNMENTS.intermissionSwaps.find((s) => s.from.includes(name))?.to;
 
   const errors: PullError[] = [];
   for (const ep of episodes) {
@@ -856,10 +864,13 @@ function detectRadiance(
     if (deathTimes.filter((t) => t <= ep.start && ep.start - t <= RADIANCE_WIPE_WINDOW_MS)
       .length >= RADIANCE_WIPE_DEATHS) continue;
 
+    // Each slot resolves to whichever declared alternate is actually in
+    // tonight's roster (see resolveCrystalSlot / KNOWN_CRYSTAL_ASSIGNMENTS'
+    // roster-sub comment) before checking who's holding.
     const expected = [
       ...(ep.start >= RADIANCE_SET1_ACTIVE_MS ? KNOWN_CRYSTAL_ASSIGNMENTS.set1 : []),
       ...(ep.start >= RADIANCE_SET2_ACTIVE_MS ? KNOWN_CRYSTAL_ASSIGNMENTS.set2 : []),
-    ];
+    ].map((slot) => resolveCrystalSlot(slot, players));
     // Checked a hair BEFORE the first pulse: a player who only grabbed the
     // crystal as the pulse landed (Pull 41 — pickup 0.02s before it) was
     // still late; the pulse they caused shouldn't exonerate them.
@@ -946,8 +957,8 @@ export const MIDNIGHTFALLS_EARLY_CRYSTAL_DROP_RULE_ID = "wow-mf-early-crystal-dr
 
 function detectEarlyCrystalDrop(players: PlayerInfo[], deathEvents: DeathEvent[]): PullError[] {
   const assignedCarriers = new Set([
-    ...KNOWN_CRYSTAL_ASSIGNMENTS.set1,
-    ...KNOWN_CRYSTAL_ASSIGNMENTS.set2,
+    ...KNOWN_CRYSTAL_ASSIGNMENTS.set1.flat(),
+    ...KNOWN_CRYSTAL_ASSIGNMENTS.set2.flat(),
   ]);
 
   const errors: PullError[] = [];
@@ -1100,8 +1111,8 @@ function detectAccidentalPickups(
   const swapTanks = KNOWN_CRYSTAL_ASSIGNMENTS.intermissionSwaps.map((s) => s.to);
   const assignedFor = (wave: 1 | 2): Set<string> =>
     new Set(wave === 1
-      ? KNOWN_CRYSTAL_ASSIGNMENTS.set1
-      : [...KNOWN_CRYSTAL_ASSIGNMENTS.set2, ...swapTanks]);
+      ? KNOWN_CRYSTAL_ASSIGNMENTS.set1.flat()
+      : [...KNOWN_CRYSTAL_ASSIGNMENTS.set2.flat(), ...swapTanks]);
 
   type Transition = { t: number; player: PlayerInfo; type: "pickup" | "drop" };
   const transitions: Transition[] = [];
