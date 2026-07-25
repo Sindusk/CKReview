@@ -108,7 +108,12 @@ This process has produced every module here. In order:
 
 1. **Get ground truth first.** A fail log plus a plain-language description
    of what actually happened and who should be flagged ("X was assigned #8
-   and was out of position; only X should flag").
+   and was out of position; only X should flag"). For a NEW mechanic, ask
+   the user to fill in `SPEC-TEMPLATE.md` (same directory) — it collects
+   the mechanic model, assignment scheme, error conditions with fault
+   attribution, and clean/fail evidence in one pass instead of a
+   multi-round conversation; "unknown" fields just mean analysis starts
+   there.
 2. **Reverse-engineer from the raw events.** Standard recipes:
    - Cluster `applydebuff` events by second to find mechanic-start bursts.
    - Sweep damage by ability ID within the mechanic's window.

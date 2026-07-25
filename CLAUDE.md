@@ -9,7 +9,9 @@ It contains the attribution philosophy (which is mandatory, learned through
 user corrections), the working method for building new detections, FFLogs/WCL
 data-shape semantics (especially player-position rules), and known pitfalls.
 Each mechanic module's own header comment is the authoritative model for that
-specific mechanic — read it before editing the module.
+specific mechanic — read it before editing the module. When starting
+detection for a NEW mechanic, offer the user `lib/mechanics/SPEC-TEMPLATE.md`
+to fill in before diving into log analysis.
 
 Quick facts:
 - Sample data: `sampledata/` (gitignored), fetched via
