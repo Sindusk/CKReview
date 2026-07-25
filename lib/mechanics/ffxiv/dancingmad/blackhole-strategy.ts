@@ -68,6 +68,7 @@ import {
   type LineNumber,
   type BlackHoleAssignment,
 } from "./blackhole";
+import { distanceFromCenter, facingToCompassBearing } from "@/lib/mechanics/geometry";
 
 // ── Direction/priority detection (added 2026-07) ─────────────────────────
 //
@@ -634,11 +635,8 @@ function classifyCardinal(x: number, y: number): Cardinal {
 // reference analyzer's own `d <= 3` yalm filter.
 const KEFKA_NEAR_CENTER_TOLERANCE = 300;
 
-/** Converts Kefka's raw logged `facing` into a compass bearing (0=N, 90=E, 180=S, 270=W) — see the module comment above for the derivation. */
-export function kefkaFacingToBearing(facing: number): number {
-  const deg = (facing * 180) / Math.PI / 100 + 270;
-  return ((deg % 360) + 360) % 360;
-}
+/** Converts Kefka's raw logged `facing` into a compass bearing (0=N, 90=E, 180=S, 270=W) — the derivation in the module comment above now lives (condensed) in lib/mechanics/geometry.ts's shared facingToCompassBearing, which this re-exports under its historical name. */
+export const kefkaFacingToBearing = facingToCompassBearing;
 
 // The 4 tether-set groupings blackhole.ts's mechanic model already
 // establishes, given as the 1-based moment each set STARTS on.
@@ -680,7 +678,7 @@ const KEFKA_REFERENCE_ABILITY_NAME = "Slap Happy";
  */
 function resolveKefkaBearingsBySet(pull: Pull, burstTimestamp: number): Map<number, number> {
   const samples = (pull.blackHoleGeometry?.kefkaFacingSamples ?? [])
-    .filter((s) => Math.hypot(s.x - 10000, s.y - 10000) <= KEFKA_NEAR_CENTER_TOLERANCE)
+    .filter((s) => distanceFromCenter(s.x, s.y) <= KEFKA_NEAR_CENTER_TOLERANCE)
     .filter((s) => s.abilityName === KEFKA_REFERENCE_ABILITY_NAME)
     .sort((a, b) => a.timestamp - b.timestamp);
 

@@ -98,6 +98,8 @@
 import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { PullError } from "@/types/PullError";
 import type { DeathEvent } from "@/types/DeathEvent";
+import { findPlayerPosition } from "@/lib/mechanics/player-position";
+import { ARENA_CENTER, polarAngleDeg, angularDistance } from "@/lib/mechanics/geometry";
 
 const GAZE_DEBUFF_IDS = [1001602, 1001603] as const;
 
@@ -123,7 +125,6 @@ const DASH_WINDOW_AFTER_GAZE_MS = 120000;
 
 // The 8 bait slots sit at 22.5° + k*45° around arena center; clean baits
 // stand at r ≈ 1650-1975 (see the dash-set model in the module comment).
-const ARENA_CENTER    = 10000;
 const SLOT_BASE_DEG   = 22.5;
 const SLOT_STEP_DEG   = 45;
 const IDEAL_SLOT_RADIUS = 1880; // middle of the observed clean bait band
@@ -246,13 +247,11 @@ export function detectLimitCutErrors(
 
 type DashHit = { player: PlayerInfo; timestamp: number; instance?: number; x?: number; y?: number };
 
-const angleOf = (x: number, y: number) =>
-  (Math.atan2(y - ARENA_CENTER, x - ARENA_CENTER) * 180 / Math.PI + 360) % 360;
-
-const angularDist = (a: number, b: number) => {
-  const d = Math.abs(a - b) % 360;
-  return d > 180 ? 360 - d : d;
-};
+// POLAR-convention angles (0°=east — see lib/mechanics/geometry.ts's header
+// on the two conventions): this module's slot math is internally consistent
+// in polar and never compared against a compass bearing.
+const angleOf = polarAngleDeg;
+const angularDist = angularDistance;
 
 const slotAngle = (slotIndex: number) =>
   (SLOT_BASE_DEG + SLOT_STEP_DEG * ((slotIndex % 8) + 8)) % 360;
@@ -502,34 +501,25 @@ function detectDashErrors(
   }
 
   // A missing player never takes a damageTaken hit during the dash window
-  // (that's the whole signature), so their position has to come from
-  // somewhere else. A SELF-cast heal (source === target === this player —
-  // natural HP regen, ability 1302, ticks roughly every 3s for everyone
-  // passively) carries this player's own position under EITHER healing
-  // orientation the two PlayerInfo builders use (see the harness's
-  // build-ff-players.js comment on why they differ): real app healing is
-  // CAST BY this player (target === player.name marks a self-cast), the
-  // harness's is RECEIVED BY this player (source === player.name marks the
-  // same thing) — checking both covers whichever shape fed this call.
-  // Confirmed 2026-07 (pull 12): a regen tick 847ms before the first dash
-  // put Galileo ~2 yalms from bait #6's spot and ~33 yalms from his own
-  // (#3), matching the analyzer's "stood closest to 6" exactly. Capped at
-  // 5s stale — regen fires often enough that a real position is normally
-  // within 1-2s of any given moment; anything older risks catching a
-  // position from before their final, fatal move (a real prior case had a
-  // heal 8s out sitting near arena CENTER, nowhere near the bait ring).
+  // (that's the whole signature), so their position comes from self-heals
+  // only (natural HP regen, ability 1302, ~every 3s passively — the
+  // shared lookup's dual-check handles both healing orientations; see
+  // lib/mechanics/player-position.ts). atOrBefore because a later position
+  // would already reflect the dash outcome. Confirmed 2026-07 (pull 12): a
+  // regen tick 847ms before the first dash put Galileo ~2 yalms from bait
+  // #6's spot and ~33 yalms from his own (#3), matching the analyzer's
+  // "stood closest to 6" exactly. Capped at 5s stale — regen fires often
+  // enough that a real position is normally within 1-2s of any given
+  // moment; anything older risks catching a position from before their
+  // final, fatal move (a real prior case had a heal 8s out sitting near
+  // arena CENTER, nowhere near the bait ring).
   const SELF_HEAL_STALENESS_MS = 5000;
-  const findOwnPositionNear = (player: PlayerInfo, atOrBefore: number): { x: number; y: number } | undefined => {
-    let best: { x: number; y: number; timestamp: number } | undefined;
-    for (const h of player.healing) {
-      if (h.target !== player.name && h.source !== player.name) continue;
-      if (h.x === undefined || h.y === undefined) continue;
-      if (h.timestamp > atOrBefore) continue;
-      if (best === undefined || h.timestamp > best.timestamp) best = { x: h.x, y: h.y, timestamp: h.timestamp };
-    }
-    if (!best || atOrBefore - best.timestamp > SELF_HEAL_STALENESS_MS) return undefined;
-    return best;
-  };
+  const findOwnPositionNear = (player: PlayerInfo, atOrBefore: number): { x: number; y: number } | undefined =>
+    findPlayerPosition(player, atOrBefore, {
+      windowMs: SELF_HEAL_STALENESS_MS,
+      direction: "atOrBefore",
+      damageTaken: false,
+    });
 
   // Slot(k) -> instance, the inverse of slotIndexFor, so an actual stood
   // position can be reported as "closest to bait #N" rather than a bare

@@ -147,6 +147,12 @@ This process has produced every module here. In order:
 
 ### Player position semantics (FFLogs)
 
+**Never reimplement position lookup in a module.** The one shared
+implementation is `findPlayerPosition` in `lib/mechanics/player-position.ts`
+(used by forsaken, limitcut, stompies, and midnightfalls via thin wrappers
+that document each module's tuned options: streams, nearest-vs-atOrBefore,
+staleness window). The semantics below are what it encodes.
+
 Every friendly-sourced FFLogs event stream carries position only for the
 event's TARGET — never the source:
 
@@ -161,8 +167,10 @@ event's TARGET — never the source:
   BY the player (x/y = recipient), but the validation harness builds the
   stream the opposite way (heals RECEIVED). Position lookups must check both
   `target === player.name` and `source === player.name` so a self-heal is
-  accepted under either orientation. `limitcut.ts`'s `findOwnPositionNear`
-  established the pattern; reuse it.
+  accepted under either orientation. This is `findPlayerPosition`'s
+  `healing: "self"` default — the only exception is forsaken's grandfathered
+  `healing: "all"`, which predates the dual-check and is preserved because
+  its validated behavior was tuned with it; never use `"all"` in new code.
 - **The one source-side exception:** querying `dataType: DamageTaken,
   hostilityType: Enemies` ("damage the boss took") returns the *attacking
   player's* own position. Wired end-to-end as
@@ -171,11 +179,20 @@ event's TARGET — never the source:
   (17 samples in a 13-min pull, observed) — always gate downstream use with
   a staleness/distance ceiling.
 
-### Coordinates and timestamps
+### Coordinates, angles, and timestamps
 
-- Positions are **centi-yalms**; Dancing Mad arena center is (10000, 10000).
-  Known radii: Forsaken tower ring r=800, Limit Cut bait slots r≈1880,
-  Limit Cut clone spawns r=2000.
+- **Angle/bearing/distance math lives in `lib/mechanics/geometry.ts`** —
+  never reimplement it in a module. Critically, TWO angle conventions
+  coexist (its header explains): `polarAngleDeg` (0°=east, math convention —
+  limitcut's internal slot fitting) vs `compassBearingOf` /
+  `facingToCompassBearing` (0°=north — anything compared against strategy/
+  VOD language or an actor's facing). Never compare an angle from one
+  convention against the other. FFLogs `sourceResources.facing` is in
+  **centi-radians**; convert with `facingToCompassBearing`.
+- Positions are **centi-yalms**; Dancing Mad arena center is (10000, 10000)
+  (`geometry.ts`'s `ARENA_CENTER`). Known radii: Forsaken tower ring r=800,
+  Limit Cut bait slots r≈1880, Limit Cut clone spawns r=2000. The y-axis
+  grows SOUTH (screen-style).
 - Event timestamps are **absolute report milliseconds**. Fight-relative
   offset = t − min(all event timestamps in the pull).
 

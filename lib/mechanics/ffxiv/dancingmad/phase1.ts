@@ -155,6 +155,7 @@
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import type { PullError } from "@/types/PullError";
 import type { DeathEvent } from "@/types/DeathEvent";
+import { distanceBetween } from "@/lib/mechanics/geometry";
 
 export const BLIZZARD_III_SILENT_KILL_RULE_ID = "ffxiv-phase1-blizzard3-silent-kill";
 export const JUMPED_OFF_ARENA_RULE_ID          = "ffxiv-phase1-jumped-off-arena";
@@ -262,9 +263,10 @@ function predictDoubleSlots(dir: Cardinal): [Point, Point] {
   }
 }
 
-function pointDistance(a: Point, b: Point): number {
-  return Math.hypot(a.x - b.x, a.y - b.y);
-}
+// NOTE: this module works in RELATIVE YALMS (see toRelativeYalms below),
+// not raw centi-yalms — distanceBetween is unit-agnostic, but its results
+// here are already yalms, no /100 needed.
+const pointDistance = distanceBetween;
 
 // FFLogs position (centi-yalms, arena center 10000,10000) -> yalms relative
 // to center, matching analyzer.wtfdig.info's own Ol()/ty() helpers.

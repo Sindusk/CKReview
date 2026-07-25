@@ -99,6 +99,7 @@ import type { PullError, PullErrorRule, EnemyEvent } from "@/types/PullError";
 import { evaluateRuleSet, suppressDuplicateRaidErrors } from "../../../error-detection";
 import { KNOWN_KICK_CHAINS, TERMINATE_INTERRUPT_IDS } from "./terminate-kicks";
 import { KNOWN_CRYSTAL_ASSIGNMENTS, CRYSTAL_WAVE_BOUNDARY_MS } from "./crystal-assignments";
+import { findPlayerPosition } from "../../player-position";
 
 // ─── Declarative rules (moved verbatim from lib/error-rules.ts) ────────────
 
@@ -1253,16 +1254,9 @@ const LIGHTS_END_DETONATION_WINDOW_MS = 800;
 const CRYSTAL_DROP_LOOKUP_WINDOW_MS = 30000; // a dropped crystal can sit a while before it's clipped
 const POSITION_LOOKUP_WINDOW_MS     = 3000;  // max staleness for a "current position" sample
 
-/** Nearest damageTaken sample (either side) with defined x/y, within maxMs — the standard "where was this player standing" source in this file (never `healing`). */
+/** Nearest damageTaken sample (either side) with defined x/y, within maxMs — the standard "where was this player standing" source in this file (never `healing`: this app's WoW transforms don't map x/y onto heal events at all — see wclHealToPlayerEvent). Delegates to the shared lookup in lib/mechanics/player-position.ts. */
 function nearestPosition(player: PlayerInfo, time: number, maxMs = POSITION_LOOKUP_WINDOW_MS): { x: number; y: number } | undefined {
-  let best: { x: number; y: number } | undefined;
-  let bestDiff = Infinity;
-  for (const h of player.damageTaken) {
-    if (h.x === undefined || h.y === undefined) continue;
-    const diff = Math.abs(h.timestamp - time);
-    if (diff < bestDiff) { bestDiff = diff; best = { x: h.x, y: h.y }; }
-  }
-  return best && bestDiff <= maxMs ? best : undefined;
+  return findPlayerPosition(player, time, { windowMs: maxMs, healing: "none" });
 }
 
 type CrystalDrop = { timestamp: number; playerName: string; x: number; y: number };

@@ -172,12 +172,12 @@ import type { DeathEvent } from "@/types/DeathEvent";
 import type { EnemyEvent } from "@/types/PullError";
 import type { BlackHoleGeometry } from "@/types/Pull";
 import { detectFFRoles, type FFRoleSlot } from "@/lib/mechanics/ffxiv/roles";
-import { kefkaFacingToBearing } from "./blackhole-strategy";
+import { findPlayerPosition } from "@/lib/mechanics/player-position";
+import { compassBearingOf, angularDistance, distanceFromCenter, facingToCompassBearing as kefkaFacingToBearing } from "@/lib/mechanics/geometry";
 
 export const STOMPIES_BAIT_TOO_CLOSE_RULE_ID = "ffxiv-stompies-bait-too-close-to-center";
 export const STOMPIES_WRONG_TOWER_RULE_ID    = "ffxiv-stompies-wrong-tower";
 
-const ARENA_CENTER = 10000;
 
 const EARTHQUAKE_ABILITY_NAME    = "Earthquake";
 const BLIZZARD_III_ABILITY_NAME  = "Blizzard III";
@@ -204,19 +204,11 @@ const WRONG_TOWER_ANGLE_TOLERANCE   = 60;
 const SUPPORT_SLOTS: readonly FFRoleSlot[] = ["MT", "OT", "H1", "H2"];
 const GROUP1_SLOTS:  readonly FFRoleSlot[] = ["MT", "H1", "M1", "R1"];
 
-function trueBearing(x: number, y: number): number {
-  const dx = x - ARENA_CENTER, dy = y - ARENA_CENTER;
-  return (Math.atan2(dx, -dy) * 180 / Math.PI + 360) % 360;
-}
-
-function distanceFromCenter(x: number, y: number): number {
-  return Math.hypot(x - ARENA_CENTER, y - ARENA_CENTER);
-}
-
-function angleDiff(a: number, b: number): number {
-  const d = Math.abs(a - b) % 360;
-  return d > 180 ? 360 - d : d;
-}
+// COMPASS-convention bearings (0°=N — see lib/mechanics/geometry.ts's
+// header on the two conventions): everything here is compared against
+// strategy/VOD language and Kefka's facing, both compass.
+const trueBearing = compassBearingOf;
+const angleDiff = angularDistance;
 
 function expectedTowerBearing(kefkaBearing: number, isSupport: boolean, isGroup1: boolean): number {
   const offset = isSupport ? (isGroup1 ? -45 : 45) : (isGroup1 ? 225 : 135);
@@ -288,50 +280,26 @@ type PuddleSample = { timestamp: number; x: number; y: number };
 type PlayerPositionSample = { timestamp: number; playerName: string; x: number; y: number };
 
 /**
- * Nearest damageTaken/self-targeted-healing position sample to `timestamp`,
+ * Nearest damageTaken/self-heal/boss-hit position sample to `timestamp`,
  * or null if nothing is within MAX_POSITION_SAMPLE_AGE_MS (fails closed
- * rather than trust a stale position).
+ * rather than trust a stale position). Delegates to the shared lookup
+ * (lib/mechanics/player-position.ts — the self-heal dual-check story and
+ * stream semantics live in that module's header now; the LF2yJZabVprjXYvm
+ * pull 1 scrambled-flags bug that motivated the dual check was found HERE).
  *
- * `player.healing`'s x/y is only this player's OWN position on a self-heal
- * — same "check both target and source" pattern limitcut.ts's
- * findOwnPositionNear already established for exactly this ambiguity: the
- * real app's healing is CAST BY this player (target === player.name marks a
- * self-cast, x/y = recipient's position), the validation harness's is
- * RECEIVED BY this player (source === player.name marks the same thing,
- * x/y always their own already) — checking both covers whichever shape fed
- * this call. Confirmed the hard way: this bug passed every harness check
- * clean (harness's orientation made ANY healing entry a valid self-position
- * sample) but produced scrambled results in the real app (wrong players
- * flagged for "Bait Positioned Too Close To Center" on report
- * LF2yJZabVprjXYvm pull 1) until this filter was added.
- *
- * A third source, `playerPositionSamples`, covers the gap those two leave —
- * damageTaken/self-heals both require something to have happened TO this
- * player, which goes quiet during a pure repositioning window (confirmed:
- * Ayumi Emi had no such sample within 4.7s of the real puddle-drop moment
- * on report LF2yJZabVprjXYvm pull 1, during which she covered ~1,650 units
- * of ground). `playerPositionSamples` instead comes from something the
- * player DID (landed a hit on the boss) — see fflBuildPlayerPositionSamples
- * in log-transforms.ts — and is available roughly every GCD, dense enough
- * to cover exactly this kind of quiet window.
+ * `playerPositionSamples` covers the gap damageTaken/self-heals leave —
+ * both require something to have happened TO this player, which goes quiet
+ * during a pure repositioning window (confirmed: Ayumi Emi had no such
+ * sample within 4.7s of the real puddle-drop moment on report
+ * LF2yJZabVprjXYvm pull 1, during which she covered ~1,650 units of
+ * ground); the boss-hit stream stays ~GCD-dense through exactly that kind
+ * of window.
  */
 function nearestPosition(player: PlayerInfo, timestamp: number, playerPositionSamples: PlayerPositionSample[]): Position | null {
-  let best: Position | null = null;
-  let bestDiff = Infinity;
-  const selfHeals = player.healing.filter((e) => e.target === player.name || e.source === player.name);
-  for (const stream of [player.damageTaken, selfHeals]) {
-    for (const e of stream) {
-      if (e.x === undefined || e.y === undefined) continue;
-      const diff = Math.abs(e.timestamp - timestamp);
-      if (diff < bestDiff) { bestDiff = diff; best = { x: e.x, y: e.y }; }
-    }
-  }
-  for (const e of playerPositionSamples) {
-    if (e.playerName !== player.name) continue;
-    const diff = Math.abs(e.timestamp - timestamp);
-    if (diff < bestDiff) { bestDiff = diff; best = { x: e.x, y: e.y }; }
-  }
-  return best !== null && bestDiff <= MAX_POSITION_SAMPLE_AGE_MS ? best : null;
+  return findPlayerPosition(player, timestamp, {
+    windowMs: MAX_POSITION_SAMPLE_AGE_MS,
+    positionSamples: playerPositionSamples,
+  }) ?? null;
 }
 
 

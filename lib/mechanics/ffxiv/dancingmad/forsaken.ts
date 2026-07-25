@@ -74,6 +74,8 @@
 import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { PullError, EnemyEvent } from "@/types/PullError";
 import type { DeathEvent } from "@/types/DeathEvent";
+import { findPlayerPosition } from "@/lib/mechanics/player-position";
+import { ARENA_CENTER, distanceFromCenter } from "@/lib/mechanics/geometry";
 
 const SPELLS_TROUBLE_ABILITY_ID = 1005083; // "Spell's Trouble" stack counter
 const PATH_OF_LIGHT_ABILITY_ID  = 47806;   // "Path of Light" — the tower-soak damage tick
@@ -865,7 +867,6 @@ const STACK_ASSIGNMENT_DEBUFF_ID = 1005084; // "Stack" — see ASSIGNMENT_DEBUFF
 const STACK_CLIP_DEATH_WINDOW_MS = 3000;    // fatal hit → death event lag (matches CONE_DEATH_WINDOW_MS)
 const STACK_VOLLEY_GAP_MS        = 200;     // one volley's hits land within ~130ms of each other
 
-const ARENA_CENTER = 10000;
 
 // The 8 fixed tower spawn points: 4 diagonal + 4 cardinal, all on the
 // r=800 ring around arena center. Identical across every log observed.
@@ -942,7 +943,7 @@ function isAtSpot(
   partner: TowerSoak | undefined
 ): boolean {
   const distToTower  = Math.hypot(soak.x - tower[0], soak.y - tower[1]);
-  const distToCenter = Math.hypot(soak.x - ARENA_CENTER, soak.y - ARENA_CENTER);
+  const distToCenter = distanceFromCenter(soak.x, soak.y);
 
   switch (spot) {
     // The Stack-with-Cone anchor isn't required to hug the tower: a clean
@@ -968,7 +969,7 @@ function isAtSpot(
 /** Human phrasing of where a soaker actually stood, for error descriptions. */
 function describeStanding(soak: TowerSoak, tower: readonly [number, number]): string {
   if (Math.hypot(soak.x - tower[0], soak.y - tower[1]) <= ON_TOWER_MAX_DIST) return "directly on the tower";
-  return Math.hypot(soak.x - ARENA_CENTER, soak.y - ARENA_CENTER) < 800
+  return distanceFromCenter(soak.x, soak.y) < 800
     ? "off the tower toward the arena center"
     : "off the tower away from the arena center";
 }
@@ -994,7 +995,7 @@ const SPOT_IDEAL_OFFSET: Record<SpotType, number> = {
 
 /** Distance from a soaker to the ideal point of a spot type at the given tower. */
 function distToIdealSpot(soak: TowerSoak, spot: SpotType, tower: readonly [number, number]): number {
-  const ringDist = Math.hypot(tower[0] - ARENA_CENTER, tower[1] - ARENA_CENTER);
+  const ringDist = distanceFromCenter(tower[0], tower[1]);
   const outX = (tower[0] - ARENA_CENTER) / ringDist;
   const outY = (tower[1] - ARENA_CENTER) / ringDist;
   const offset = SPOT_IDEAL_OFFSET[spot];
@@ -1254,16 +1255,11 @@ function findNearestPosition(
   timestamp: number,
   windowMs:  number
 ): { x: number; y: number } | undefined {
-  let best: { x: number; y: number; delta: number } | undefined;
-  const consider = (t: number, x: number | undefined, y: number | undefined) => {
-    if (x === undefined || y === undefined) return;
-    const delta = Math.abs(t - timestamp);
-    if (delta > windowMs) return;
-    if (best === undefined || delta < best.delta) best = { x, y, delta };
-  };
-  for (const e of player.damageTaken) consider(e.timestamp, e.x, e.y);
-  for (const e of player.healing) consider(e.timestamp, e.x, e.y);
-  return best;
+  // healing: "all" is grandfathered — this module's validated behavior was
+  // tuned with EVERY healing entry as a fallback position source, predating
+  // the self-heal dual-check. New code must use the shared default ("self");
+  // see lib/mechanics/player-position.ts's header for why.
+  return findPlayerPosition(player, timestamp, { windowMs, healing: "all" });
 }
 
 function detectWrongTowerPositionErrors(
@@ -1305,7 +1301,7 @@ function detectWrongTowerPositionErrors(
       if (e.x === undefined || e.y === undefined) continue;
       coneHits.push({
         timestamp:        e.timestamp,
-        victimCenterDist: Math.hypot(e.x - ARENA_CENTER, e.y - ARENA_CENTER),
+        victimCenterDist: distanceFromCenter(e.x, e.y),
         actorId:          player.actorId,
       });
     }
