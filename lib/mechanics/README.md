@@ -245,9 +245,58 @@ identify WHERE it's missing:
   via `scripts/lib/{load-report-folder,build-ff-players,build-wow-players,require-ts}.js`.
   A new mechanic needs only a new entry in its `MECHANICS` manifest — no
   new harness file.
-- **Regression bar for any mechanic change:** `node scripts/validate.js`
-  runs with zero crashes/warnings across every sample report,
-  `npx tsc --noEmit` clean, and manually sanity-check the printed errors for
-  anything touched. (A verified expected-output baseline per report is
-  planned but does not exist yet — until it does, the harness output IS the
-  review surface.)
+- **Regression bar for any mechanic change:**
+  `node scripts/validate.js --check` passes (see below) and
+  `npx tsc --noEmit` is clean.
+
+### Expected-output baselines (`expectations/`, gitignored)
+
+`expectations/` holds log-derived data (real player names, error text), so
+like `sampledata/` it stays out of git — both are local development tools,
+not part of the codebase. It records what detection produces for each
+report currently on disk. Two tiers with very different rules:
+
+1. **Snapshots** (`expectations/<game>-<reportCode>.json`) — machine-generated
+   full error output per report. `node scripts/validate.js --check` re-runs
+   detection and reports every added (`+`), removed (`-`), and changed (`~`,
+   with per-field before→after) error vs the baseline, exiting nonzero on any
+   difference. `--update` regenerates them. Both accept the same
+   mechanic/report narrowing args as a normal run.
+2. **Rulings** (`expectations/rulings.json`) — small, hand-curated
+   adjudications the user made during VOD review ("pull 15: only X should
+   flag", "pull 10: Y must NOT flag"). Checked on every `--check`; NEVER
+   written by `--update`. Pin the decision (who flags), not incidental detail
+   like severity or wording, so rulings survive presentation-level changes.
+   Schema and an example live in the file's own `_doc` block.
+
+**Detection philosophy evolves — snapshot changes are the normal case, not a
+test failure to fear.** The baseline's contract is "no behavioral change
+ships unseen", not "output never changes". When a change is intentional
+(e.g. a severity downgrade across a whole rule): make the code change, run
+`--check`, and read the diff as the review artifact — it should show exactly
+the intended delta (e.g. N lines of `severity: Major -> Minor`) and nothing
+else. Then `--update`. An unexpected extra line in that diff is the system
+working — investigate it before updating.
+
+A **ruling** violation is different: it means the change contradicts a call
+the user personally made. Never regenerate around it — either the change is
+wrong, or the user has consciously revised their ruling, in which case edit
+`rulings.json` by hand.
+
+When a new report's pulls get reviewed, run
+`--update sampledata/<game>/<code>` to snapshot it, and capture any explicit
+user adjudications from the session as rulings.
+
+**Sample-data lifecycle — reports are disposable, distilled knowledge is
+not.** Old report folders get deleted to free space (re-fetching is cheap;
+keep a curated subset whose pulls collectively exercise each mechanic's
+known failure modes). A snapshot whose sampledata is gone is unverifiable —
+detection can't re-run against it, so it can never fail again — and is
+therefore dead weight: `--check`/`--update` warn about such orphans, and
+`node scripts/validate.js --prune` deletes them (orphaned *rulings* are only
+listed, never auto-deleted — hand-remove them once their lesson is
+distilled). The one thing to check **before** deleting a report: anything it
+uniquely proved must already be encoded durably — threshold comments with
+clean/failure extremes, README rules, rulings whose lesson made it into the
+module. The snapshot itself is never the long-term record; the code comments
+and this README are.

@@ -6,3 +6,4 @@ node_modules/
 public/
 sampledata/
 .credentials/
+expectations/
