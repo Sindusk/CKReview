@@ -91,6 +91,14 @@
 // clone's re-fire scrambles the set; observed lethal at up to 2.67
 // MILLION via the own-dash vulnerability).
 //
+// A single-victim dash landing on the CORRECT angle is not automatically
+// clean, either: a victim can be on-bearing but pulled in too close to
+// center (short of the clean band's own r≈1650 lower bound), which the
+// angle-only check misses entirely. Confirmed lethal on report
+// xXV3mdnZvFJ8czBP pull 1 (a White Mage took her own correctly-angled dash
+// at r≈1407 instead of the usual ≥1731, for ~1.7x normal damage and died) —
+// flagged as a "Wrong Dash Position" too, see TOO_CLOSE_TO_CENTER_RADIUS.
+//
 // Pulls that wipe before Limit Cut never see 1001602/1001603, so the
 // module self-gates on the debuffs' presence rather than any
 // encounter-name or timing check.
@@ -99,7 +107,7 @@ import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { PullError } from "@/types/PullError";
 import type { DeathEvent } from "@/types/DeathEvent";
 import { findPlayerPosition } from "@/lib/mechanics/player-position";
-import { ARENA_CENTER, polarAngleDeg, angularDistance } from "@/lib/mechanics/geometry";
+import { ARENA_CENTER, polarAngleDeg, angularDistance, distanceFromCenter } from "@/lib/mechanics/geometry";
 
 const GAZE_DEBUFF_IDS = [1001602, 1001603] as const;
 
@@ -132,6 +140,16 @@ const IDEAL_SLOT_RADIUS = 1880; // middle of the observed clean bait band
 // A single-victim dash anchors the slot fit only if its victim stands
 // within half a slot of some slot angle (they always do on real data).
 const SLOT_SNAP_TOLERANCE_DEG = 22.5;
+
+// A player who lands on the correct bait ANGLE but too close to arena
+// center is not caught by the angle-only check above at all — confirmed on
+// report xXV3mdnZvFJ8czBP pull 1: the White Mage (Lily Inverse) took her
+// own instance-7 dash on-angle but at r≈1407, took 205207 damage (173740
+// overkill) and died, while every genuinely clean single-victim dash across
+// 5 reports/dozens of pulls sat at r≥1731 — a clean >300-unit gap, well
+// inside the module's own documented clean band's lower bound (r≈1650).
+// Reusing that already-documented value as the floor.
+const TOO_CLOSE_TO_CENTER_RADIUS = 1650;
 
 // Culprit attribution for a clipped dash compares each victim's distance
 // to their own ideal slot point; calls closer than this margin are too
@@ -591,15 +609,23 @@ function detectDashErrors(
       if (h.x === undefined || h.y === undefined) continue;
 
       const expectedSlot = slotIndexFor(instance);
-      if (angularDist(angleOf(h.x, h.y), slotAngle(expectedSlot)) <= SLOT_SNAP_TOLERANCE_DEG) continue;
+      const wrongAngle = angularDist(angleOf(h.x, h.y), slotAngle(expectedSlot)) > SLOT_SNAP_TOLERANCE_DEG;
+      // On-angle but pulled in too close to center: not a wrong SLOT, but
+      // still off the clean bait band and exposed to nearby dash lanes
+      // crossing closer to the middle — see TOO_CLOSE_TO_CENTER_RADIUS.
+      const tooCloseToCenter = !wrongAngle && distanceFromCenter(h.x, h.y) < TOO_CLOSE_TO_CENTER_RADIUS;
+      if (!wrongAngle && !tooCloseToCenter) continue;
 
       const [ix, iy] = slotPoint(expectedSlot);
       const yalms = (Math.hypot(h.x - ix, h.y - iy) / 100).toFixed(1);
+      const description = wrongAngle
+        ? `Took their Limit Cut dash while standing at another number's bait spot (~${yalms} yalms from their assigned position) — a mispositioned dash hits several times harder and drags its path across the arena.`
+        : `Took their Limit Cut dash while standing too close to arena center for their bait spot (~${yalms} yalms off) — still on the right bearing, but not far enough out on the rim, which exposed them to other dash lanes crossing closer to the middle.`;
       errors.push({
         ruleId:      LIMITCUT_WRONG_POSITION_RULE_ID,
         severity:    "Major",
         name:        "Wrong Dash Position",
-        description: `Took their Limit Cut dash while standing at another number's bait spot (~${yalms} yalms from their assigned position) — a mispositioned dash hits several times harder and drags its path across the arena.`,
+        description,
         timestamp:   h.timestamp,
         player:      h.player.name,
         class:       h.player.className,

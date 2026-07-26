@@ -138,8 +138,12 @@
 // Confirmed failure (pull 6): the Dark Knight's pair was (E, S) — the NE
 // corner — but both arrows landed on the arena's WEST side instead (14-21
 // yalms from their expected slots), an entirely different corner, not just
-// an adjacent-slot slip. Every other player in every other pull sampled
-// (21 of 22) deviates under 6 yalms from their predicted slot (one
+// an adjacent-slot slip. A second, much closer-in failure mode is also
+// confirmed (report xXV3mdnZvFJ8czBP pull 17): a Monk's arrow landed on the
+// right corner/edge but short of the ring itself (~8.3 yalms off, an inner
+// grid point instead of the outer one) — still enough to break the
+// clockwise loop and wipe the raid. Every genuinely clean arrow sampled
+// across every report deviates under 6.6 yalms from its predicted slot (one
 // consistently "sloppy" Paladin included) — see
 // ARROW_OUT_OF_POSITION_THRESHOLD_YALMS for where the line is drawn.
 //
@@ -285,10 +289,19 @@ function nearestPlayerPosition(events: PlayerEvent[], timestamp: number): Point 
   return best ? toRelativeYalms(best.x!, best.y!) : null;
 }
 
-// Clean max observed (a consistently "sloppy" Paladin's corner arrow, pull
-// 6) is ~5.9 yalms; the confirmed failure's minimum deviation is ~18.5 —
-// wide margin either side of this line.
-const ARROW_OUT_OF_POSITION_THRESHOLD_YALMS = 10;
+// Clean max observed (a consistently "sloppy" Paladin's corner arrow) is
+// ~6.6 yalms. Originally set to 10 on a wide margin below the confirmed
+// failure minimum of ~13.9-18.5 — but that gap turned out to hide a real,
+// closer-in failure: report xXV3mdnZvFJ8czBP pull 17's Monk dropped their
+// S arrow at only ~8.3 yalms off (still on-angle-adjacent, just short of
+// the correct grid cell — landed at an inner (6,-6) point instead of the
+// NE corner's (12,-12)), which the old threshold missed entirely and which
+// caused a real wipe (a raid member fell through the arena ~9s after the
+// last arrow landed, the same "jumped off arena" signature Tele-Trouncing
+// failures always produce). 7.5 splits the now 3-tier-confirmed data
+// (6.6 clean / 8.3 failure / 13.9+ failure) with margin on both sides of
+// the closer gap.
+const ARROW_OUT_OF_POSITION_THRESHOLD_YALMS = 7.5;
 
 // "Double-D" (same cardinal direction twice) arrows sit much more tightly
 // on their slot than corner arrows across every report sampled — clean max

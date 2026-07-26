@@ -10,13 +10,12 @@
 //
 // ── THE MECHANIC, AS FAR AS THIS MODULE COVERS ──────────────────────────────
 //
-// Kefka casts "Earthquake" (ability name only — the underlying ID (47866) is
-// shared with Black Hole's unrelated Accretion-triggered Earthquake, and is
-// itself a sub-44-HP ground-effect ghost instance, not his own real actor;
-// matched by name only, same convention blackhole-strategy.ts already uses
-// for "Slap Happy") as this mechanic's start marker. His FACING at that
-// exact cast, run through the SAME kefkaFacingToBearing conversion already
-// validated for Black Hole (imported from blackhole-strategy.ts), gives a
+// Kefka casts "Stomp-a-Mole" (ability name — the real Boss-subtype actor's
+// own cast, always the FIRST of that name in a pull; several NPC-ghost
+// repeats of the same ability name immediately follow and are not this) as
+// this mechanic's start marker. His FACING at that exact cast, run through
+// the SAME kefkaFacingToBearing conversion already validated for Black Hole
+// (imported from blackhole-strategy.ts), gives a
 // bearing K that — confirmed directly against the user's VOD review — reads
 // as "relative north" ALREADY, with no further 180-degree flip needed in
 // code: on report LF2yJZabVprjXYvm pull 1 the user watched Kefka visually
@@ -179,7 +178,7 @@ export const STOMPIES_BAIT_TOO_CLOSE_RULE_ID = "ffxiv-stompies-bait-too-close-to
 export const STOMPIES_WRONG_TOWER_RULE_ID    = "ffxiv-stompies-wrong-tower";
 
 
-const EARTHQUAKE_ABILITY_NAME    = "Earthquake";
+const STOMP_A_MOLE_ABILITY_NAME  = "Stomp-a-Mole";
 const BLIZZARD_III_ABILITY_NAME  = "Blizzard III";
 
 // Multiple simultaneous Blizzard III ghost ticks (one per player) land
@@ -219,20 +218,55 @@ function expectedTowerBearing(kefkaBearing: number, isSupport: boolean, isGroup1
 // they're not an attack, just a ground marker appearing under each player,
 // confirmed absent from both begincast (no sourceResources on it here) and
 // "cast" (which only fires later, on DETONATION — see resolveDataWaveTime
-// stamps below). Per the user's direct VOD timing (2026-07-24 session):
-// drop 1 lands ~7s after the mechanic-start "Earthquake" cast, drop 2 ~3s
-// after drop 1 — best-available estimate, not yet confirmed against a
-// second pull. These are what every check in this module is anchored to
-// and displayed at, NOT the later detonation timestamps.
-const EARTHQUAKE_TO_FIRST_DROP_MS = 7000;
+// stamps below).
+//
+// Timing is anchored off dataWave1 (the real, already-disambiguated
+// >=4-concurrent-cast Blizzard III wave 1 detonation — see
+// resolveDataWaveTimestamps) with a fixed NEGATIVE lead, not off any Kefka
+// cast: an earlier version anchored off the first "Earthquake" cast
+// (ability 47866) attributed to a "Kefka"-named actor, on the assumption
+// that name was this mechanic's unique start marker. It isn't — ability
+// 47866 is ALSO Black Hole's unrelated Accretion-triggered ground effect,
+// cast by a disposable 44-HP ghost instance that, depending on the pull,
+// can itself be named "Kefka" in masterData (not always "Chaos"/"Exdeath" —
+// which of Black Hole's phantom bodies gets the 5th tether set's Earthquake
+// varies pull to pull). Taking the EARLIEST "Kefka"-attributed Earthquake
+// cast in the whole pull then reads that unrelated Black Hole moment as the
+// Stompies start, several minutes early — confirmed root cause of false
+// "Bait Positioned Too Close To Center"/"Wrong Tower" errors on report
+// xXV3mdnZvFJ8czBP pulls 1 and 7, and confirmed ABSENT on pulls 5/13/14 of
+// the same report only because that pull's ghost happened to be sourced
+// from "Chaos"/"Exdeath" instead — the underlying ambiguity was never
+// pull-specific. Worse, on report rXBbzFV49hd1QPwf pull 11 no SECOND,
+// correctly-timed "Kefka"-attributed Earthquake cast exists at all before
+// the real wave 1 — the false one was the ONLY candidate, so no
+// disambiguation of the "Earthquake" stream (e.g. "latest before wave1")
+// could have recovered it. dataWave1 has no such ambiguity: it's derived
+// straight from the real Blizzard III casts, gated at >=4 concurrent
+// ticks, already proven correct for puddle-matching. Per the user's direct
+// VOD timing (2026-07-24 session, cross-checked against dataWave1's own
+// timestamp on report LF2yJZabVprjXYvm pull 1): the real drop lands ~3.4s
+// BEFORE wave 1's detonation timestamp, drop 2 ~3s after drop 1 —
+// best-available estimate, not yet independently re-confirmed against a
+// second VOD.
+const WAVE1_TO_FIRST_DROP_LEAD_MS = 3400;
 const FIRST_TO_SECOND_DROP_MS     = 3000;
 
-/** Kefka's own facing bearing + timestamp at the mechanic-start "Earthquake" cast — the whole sequence's reference. Returns null if this pull never reaches it (or blackHoleGeometry wasn't captured). */
-function resolveKefkaReference(geometry: BlackHoleGeometry | undefined): { bearing: number; timestamp: number } | null {
+/**
+ * Kefka's own facing bearing at his "Stomp-a-Mole" cast — the real,
+ * Boss-subtype-actor-sourced mechanic-start cast (several NPC-ghost repeats
+ * of the same ability name immediately follow; taking the EARLIEST sample
+ * lands on the real Boss-sourced one every time, confirmed across reports
+ * LF2yJZabVprjXYvm/xXV3mdnZvFJ8czBP/rXBbzFV49hd1QPwf). Used ONLY for
+ * bearing now — see WAVE1_TO_FIRST_DROP_LEAD_MS above for why timing comes
+ * from dataWave1 instead. Returns null if this pull never reaches it (or
+ * blackHoleGeometry wasn't captured).
+ */
+function resolveKefkaBearing(geometry: BlackHoleGeometry | undefined): number | null {
   const sample = (geometry?.kefkaFacingSamples ?? [])
-    .filter((s) => s.abilityName === EARTHQUAKE_ABILITY_NAME)
+    .filter((s) => s.abilityName === STOMP_A_MOLE_ABILITY_NAME)
     .sort((a, b) => a.timestamp - b.timestamp)[0];
-  return sample ? { bearing: kefkaFacingToBearing(sample.facing), timestamp: sample.timestamp } : null;
+  return sample ? kefkaFacingToBearing(sample.facing) : null;
 }
 
 // A real wave is Exdeath spawning one personal ghost puddle per player
@@ -459,13 +493,13 @@ export function detectStompiesErrors(
   puddleSamples:         PuddleSample[] | undefined,
   playerPositionSamples: PlayerPositionSample[] | undefined
 ): PullError[] {
-  const kefkaRef = resolveKefkaReference(geometry);
-  if (kefkaRef === null) return [];
-
   const [dataWave1, dataWave2] = resolveDataWaveTimestamps(enemyCasts);
   if (dataWave1 === null) return [];
 
-  const dropTime1 = kefkaRef.timestamp + EARTHQUAKE_TO_FIRST_DROP_MS;
+  const kefkaBearing = resolveKefkaBearing(geometry);
+  if (kefkaBearing === null) return [];
+
+  const dropTime1 = dataWave1 - WAVE1_TO_FIRST_DROP_LEAD_MS;
   const dropTime2 = dropTime1 + FIRST_TO_SECOND_DROP_MS;
 
   const slotByName = new Map<string, FFRoleSlot>();
@@ -480,7 +514,7 @@ export function detectStompiesErrors(
     ...detectBaitTooCloseErrors(players, deathEvents, dropTime1, slotByName, wave1Puddles, positionSamples),
   ];
   if (dataWave2 !== null) {
-    errors.push(...detectWrongTowerErrors(players, deathEvents, kefkaRef.bearing, dropTime2, dataWave2, slotByName, positionSamples));
+    errors.push(...detectWrongTowerErrors(players, deathEvents, kefkaBearing, dropTime2, dataWave2, slotByName, positionSamples));
   }
 
   return errors.sort((a, b) => a.timestamp - b.timestamp);

@@ -898,6 +898,15 @@ function fflBuildEnemyBuffEvents(
 // extraction that wasn't done before. Actor name match (not subType) is
 // deliberate: "Kefka" and "black hole" are both how FFLogs' masterData
 // actually names these NPCs, confirmed against report VtdBqhLQkWJXMvDg.
+// Deliberately includes BOTH the real Boss-subtype Kefka and his 44-HP
+// NPC-subtype ghost instances — Stompies' own real mechanic-start marker
+// ("Stomp-a-Mole") is itself cast by the Boss-subtype actor, but other
+// consumers of this same stream (e.g. blackhole-strategy.ts's "Slap Happy"
+// bearing samples) need the ghost-sourced casts too. Restricting to
+// subType === "Boss" here was tried and reverted — it broke Stompies
+// detection on reports where the mechanic's own real "Stomp-a-Mole" cast is
+// itself NPC-ghost-sourced (see stompies.ts's resolveKefkaReference comment
+// for the actual fix, which disambiguates by ABILITY instead).
 function fflBuildBlackHoleGeometry(
   enemyCastEvents: FFLCastEvent[],
   actorMap:        Map<number, FFLActor>,
