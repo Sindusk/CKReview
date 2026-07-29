@@ -151,6 +151,18 @@
 // shape as every other rule in this file that does this — see
 // detectGraven2DeathWipeError below.
 //
+// The window's own UPPER edge is bounded at the SECOND Confetti
+// detonation (the Gravity III puddle soaks immediately following it are
+// Graven 2's last beat) rather than running all the way to PHASE_1_END_MS
+// — confirmed 2026-07-30, pull 36: an unrelated death well after Graven 2
+// had already resolved (a missed Hyperdrive tankbuster, mid-transition
+// into Tele-Trouncing) was wrongly swept up as a "Graven 2 death" by the
+// old unbounded-to-PHASE_1_END_MS window, since it still technically fell
+// before PHASE_1_END_MS. That Hyperdrive death is deliberately left
+// undetected for now (see CONFETTI_LOST below for what it DOES trigger)
+// — the user wasn't sure what's changed strategically around who should
+// hold Invulnerability for it, so no rule is built for it yet.
+//
 // ── BLIZZARD III BLOWOUT SILENT KILL (confirmed 2026-07, VtdBqhLQkWJXMvDg) ──
 //
 // Blizzard III Blowout (ability IDs vary — 47765/47768/47771/47774, all
@@ -706,11 +718,23 @@ const REVOLTING_RUIN_OCCURRENCE_GAP_MS = 10_000;
 // "Confetti" — this raid's own nickname for the Double-Trouble Trap debuff.
 const DOUBLE_TROUBLE_TRAP_BUFF_ID = 1005078;
 
-// Generous gap between the debuff being applied and a death that should
-// still count as "died carrying Confetti" — see module header (confirmed
-// pull 9: the debuff's own removedebuff fired 2s before the unrelated hit
-// that actually killed the carrier).
+// Generous gap between the debuff being APPLIED and a death that should
+// still count as "died carrying Confetti" — the original, apply-anchored
+// check (see CONFETTI_REMOVE_DEATH_RACE_MS below for the OTHER, much
+// tighter case this rule also covers).
 const CONFETTI_DEATH_WINDOW_MS = 10_000;
+
+// Tight gap between the debuff's own REMOVED event and a death that
+// should STILL count as "died carrying Confetti" even though the apply
+// was long ago — this is specifically the FFLogs race where the
+// removedebuff event fires an instant ahead of the actual killing blow
+// that consumes it (confirmed pull 9 and again pull 36: ~2s in both
+// cases), NOT a general "recently lost it" allowance — a much longer gap
+// (confirmed pull 6: Kade Kansado's debuff legitimately transferred away
+// ~6.7s before an unrelated death during the same wipe's death cascade)
+// is coincidence, not this race, and must NOT be counted. Deliberately
+// much smaller than CONFETTI_DEATH_WINDOW_MS.
+const CONFETTI_REMOVE_DEATH_RACE_MS = 3_000;
 
 // The knockback's own damage/debuff-reapplication ability — distinct from
 // 47782 (the begincast that grants the debuff to its 2 holders) and the
@@ -1837,6 +1861,11 @@ function detectGraven2SpreadMisplacedErrors(players: PlayerInfo[]): PullError[] 
 // intra-occurrence use, etc).
 const GRAVEN_2_DEATH_CLUSTER_MS = 3000;
 
+// See detectGraven2DeathWipeError's own comment on graven2WindowEnd — the
+// gap between an explosion's last recorded damageTaken tick and the death
+// event it actually causes (confirmed pull 34: ~1.9-2s).
+const CONFETTI_EXPLOSION_DEATH_LAG_MS = 5000;
+
 /**
  * Any death from Graven 2's own Gravitas Puddles cast onward makes the
  * rest of the mechanic — and everything chained after it (the tankbuster,
@@ -1846,6 +1875,7 @@ const GRAVEN_2_DEATH_CLUSTER_MS = 3000;
  * that does this.
  */
 function detectGraven2DeathWipeError(
+  players:           PlayerInfo[],
   deathEvents:       DeathEvent[],
   enemyCasts:        EnemyEvent[],
   otherPhase1Errors: PullError[]
@@ -1855,14 +1885,45 @@ function detectGraven2DeathWipeError(
   // across later phases before — see the "Blizzard III" collision noted
   // near BLIZZARD_III_BLOWOUT_ABILITY_IDS) — confirmed the hard way: an
   // unbounded version of this gate matched deaths 6-10+ MINUTES into other
-  // reports' pulls (Phase 3+), nowhere near Graven 2. Bound both the cast
-  // search and the death search to PHASE_1_END_MS, same boundary
-  // JUMPED_OFF_ARENA_RULE_ID already uses for the same reason.
+  // reports' pulls (Phase 3+), nowhere near Graven 2. Bound the cast
+  // search to PHASE_1_END_MS, same boundary JUMPED_OFF_ARENA_RULE_ID
+  // already uses for the same reason.
   const graven2Casts = enemyCasts.filter((e) => e.abilityId === GRAVEN_2_START_ABILITY_ID && e.timestamp <= PHASE_1_END_MS);
   if (graven2Casts.length === 0) return [];
   const graven2Start = Math.min(...graven2Casts.map((e) => e.timestamp));
 
-  const graven2Deaths = deathEvents.filter((d) => d.timestamp >= graven2Start && d.timestamp <= PHASE_1_END_MS);
+  // See module header — the window's UPPER edge is the SECOND Confetti
+  // resolution's own explosion, not PHASE_1_END_MS. Fails open to
+  // PHASE_1_END_MS if that resolution (or its explosion damage) isn't in
+  // the log at all, same fail-open posture as the cast-search fallback
+  // above.
+  const secondResolution = collectConfettiResolutions(players)[1];
+  let graven2WindowEnd = PHASE_1_END_MS;
+  if (secondResolution && secondResolution.holders.length > 0) {
+    const firstWaveTime = secondResolution.holders[0].timestamp;
+    const explosionTimestamps = players
+      .flatMap((p) => p.damageTaken)
+      .filter(
+        (e) =>
+          e.abilityId === CONFETTI_EXPLOSION_ABILITY_ID &&
+          e.timestamp >= firstWaveTime &&
+          e.timestamp <= firstWaveTime + CONFETTI_RESOLUTION_GAP_MS
+      )
+      .map((e) => e.timestamp);
+    if (explosionTimestamps.length > 0) {
+      // +CONFETTI_EXPLOSION_DEATH_LAG_MS: an instakill from an undermanned
+      // explosion (see CONFETTI GROUP MISPLACED / HEADCOUNT REQUIREMENT)
+      // is credited to a DEATH event that lands a couple seconds after
+      // this explosion's own last recorded non-fatal damageTaken tick —
+      // confirmed pull 34: last recorded tick at 120228, but the two
+      // resulting deaths land at 122101/122145, ~1.9-2s later. Without
+      // this buffer those deaths would be wrongly excluded from Graven 2's
+      // own window.
+      graven2WindowEnd = Math.max(...explosionTimestamps) + CONFETTI_EXPLOSION_DEATH_LAG_MS;
+    }
+  }
+
+  const graven2Deaths = deathEvents.filter((d) => d.timestamp >= graven2Start && d.timestamp <= graven2WindowEnd);
   if (graven2Deaths.length === 0) return [];
 
   const firstDeathTime = Math.min(...graven2Deaths.map((d) => d.timestamp));
@@ -1956,11 +2017,22 @@ function detectGraven1DeathWipeError(
 }
 
 /**
- * A player who ever had Double-Trouble Trap ("Confetti") applied dying
- * shortly afterward makes the mechanic unresolvable — a single Raid error
- * fires once, purely as the lib/report-data.ts cutoff marker. See module
- * header for why this checks debuff HISTORY (any application before the
- * death, within a generous window) rather than "still active at death."
+ * A player who was HOLDING Double-Trouble Trap ("Confetti") dying makes
+ * the mechanic unresolvable — a single Raid error fires once, purely as
+ * the lib/report-data.ts cutoff marker. See module header for why this
+ * checks whether the debuff was still active (or just barely removed)
+ * rather than requiring it to be literally active at the death instant.
+ *
+ * Deliberately does NOT anchor on how long ago the debuff was APPLIED —
+ * confirmed pull 36: Salty Dango picked up the (support-side) debuff at
+ * the Graven 2 explosion and held it, unbroken, for ~19.6s before an
+ * unrelated Hyperdrive death, well past a short apply-based window. What
+ * actually matters is whether the debuff was still theirs right up to the
+ * death, not how long they'd had it — checked here as "no REMOVED event
+ * for it, or one within CONFETTI_DEATH_WINDOW_MS of the death" (that
+ * window covers the known FFLogs quirk, confirmed pull 9 and again here,
+ * of the removedebuff firing ~2s ahead of the actual unrelated killing
+ * blow).
  *
  * Excludes deaths whose killing blow WAS the Confetti explosion itself
  * (see module header, CONFETTI GROUP MISPLACED / HEADCOUNT REQUIREMENT) —
@@ -1973,13 +2045,29 @@ function detectConfettiLostError(players: PlayerInfo[], deathEvents: DeathEvent[
   const hadConfettiBefore = (playerName: string, atTime: number) => {
     const player = players.find((p) => p.name === playerName);
     if (!player) return false;
-    return player.debuffs.some(
-      (d) =>
-        d.abilityId === DOUBLE_TROUBLE_TRAP_BUFF_ID &&
-        d.debuffStatus === "applied" &&
-        d.timestamp <= atTime &&
-        atTime - d.timestamp <= CONFETTI_DEATH_WINDOW_MS
+
+    const events = player.debuffs
+      .filter((d) => d.abilityId === DOUBLE_TROUBLE_TRAP_BUFF_ID && d.timestamp <= atTime)
+      .sort((a, b) => a.timestamp - b.timestamp);
+
+    const lastApplied = [...events].reverse().find((d) => d.debuffStatus === "applied");
+    if (!lastApplied) return false;
+
+    // Applied recently enough on its own (the original, narrower check).
+    if (atTime - lastApplied.timestamp <= CONFETTI_DEATH_WINDOW_MS) return true;
+
+    // Held longer than that, but ONLY still counts if there's a matching
+    // REMOVED event for THIS SAME apply that lands close to the death too
+    // (the pull-9/pull-36 quirk: removedebuff fires ~2s ahead of the
+    // actual unrelated killing blow). No matching removed event at all
+    // (e.g. a long-past resolution that was cleanly resolved, whose
+    // removal isn't near this later, unrelated death) must NOT default to
+    // "still active" — that wrongly flagged every old, already-resolved
+    // holder in the pull the first time this was tried.
+    const removedSinceApply = events.find(
+      (d) => d.debuffStatus === "removed" && d.timestamp >= lastApplied.timestamp
     );
+    return !!removedSinceApply && atTime - removedSinceApply.timestamp <= CONFETTI_REMOVE_DEATH_RACE_MS;
   };
 
   const confettiDeath = deathEvents
@@ -2408,7 +2496,7 @@ export function detectPhase1Errors(
     ...detectGravitationalExplosionWipeError(enemyCasts),
     ...detectGraven1DeathWipeError(deathEvents, enemyCasts, blizzardIIISilentKillErrors),
     ...graven2SpreadMisplacedErrors,
-    ...detectGraven2DeathWipeError(deathEvents, enemyCasts, graven2SpreadMisplacedErrors),
+    ...detectGraven2DeathWipeError(players, deathEvents, enemyCasts, graven2SpreadMisplacedErrors),
     ...detectConfettiLostError(players, deathEvents),
     ...detectConfettiKnockbackVictimErrors(players),
     ...detectConfettiHolderMisplacedErrors(players),

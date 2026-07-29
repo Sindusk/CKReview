@@ -9,3 +9,4 @@ public/
 sampledata/
 .credentials/
 expectations/
+tsconfig.tsbuildinfo
