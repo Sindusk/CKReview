@@ -110,6 +110,61 @@
 // towers, scrambling who gets hit by what. Excluding both keeps this rule
 // to the one genuinely fresh positioning mistake it was built for.
 //
+// ── WAVE CANNON TOWER MISSED / UNMITIGATED EXPLOSION WIPE (confirmed ───────
+// ── 2026-07-29, same report, pull 11) ───────────────────────────────────────
+//
+// The flip side of WAVE_CANNON_TOWER_OVERLAP above: a tower that nobody
+// stands in at all, instead of one two people stand in. Verified directly
+// from the raw log (not inferred): the boss's own tower cast (47786,
+// "Explosion") resolves with `targetID: -1` when nobody was in range —
+// FFLogs simply can't resolve a target — and roughly 700ms later the boss
+// casts Unmitigated Explosion (47787) once per unresolved tower instance
+// (cross-checked across every pull in this report: the Unmitigated
+// Explosion cast count matches `4 - <distinct tower instances that hit
+// someone>` exactly, every single time). That cast is what actually
+// applies Damage Down (1002911) raid-wide a moment later — already caught
+// by the generic `ffxiv-damage-down` rule, same relationship
+// BLIZZARD_III_SILENT_KILL has with its own ability.
+//
+// Confirmed failure (pull 11): Azura Salus's own Wave Cannon
+// mis-position (WAVE_CANNON_POSITION_RULE_ID, already flagged separately)
+// overlapped her into Sayacissa's beam, leaving only 3 players never hit
+// by Wave Cannon instead of the usual 4 — Chauzey Solstice and Kade
+// Kansado each soaked one of the 4 towers, but Archidel Del'archi, the
+// third and last non-carrier, took zero tower damage and left BOTH
+// remaining towers (instances 3 and 4) unresolved. One of those two was
+// always going to go unsoaked no matter what (3 people can't cover 4
+// spots) — that part is fallout from Azura's own error, not counted
+// twice. But Archidel could still have covered ONE of the two open towers
+// and didn't cover either, which is what actually causes the wipe here —
+// per the user's own framing, "since Archidel was not hit by a Wave
+// Cannon, their job is to soak a tower," full stop, independent of how
+// many non-carriers happen to be available that pull.
+//
+// Detection doesn't try to reason about which specific tower was "theirs"
+// (no learned per-job assignment exists for this — see wave-cannon.ts's
+// own header on why per-job Wave Cannon spots are learned, not
+// hardcoded; carrier/non-carrier job composition isn't even consistent
+// pull to pull in this report). It just flags every living non-carrier
+// who took zero tower damage, gated on at least one tower actually going
+// unresolved this pull (a non-carrier who's simply not needed — someone
+// else soaked their tower for them, or covered two at once per the
+// overlap rule above — must never be flagged; see the "unsoakedCount <=
+// 0 -> []" gate). A non-carrier who died before the tower could resolve
+// is excluded from consideration entirely — that's cascade fallout from
+// an earlier death, not a fresh personal mistake (same reasoning as
+// WAVE_CANNON_TOWER_OVERLAP's own `carrierDiedBeforeTowerResolved` gate,
+// applied here per-player instead of pull-wide since a non-carrier dying
+// doesn't invalidate every OTHER non-carrier's own soak).
+//
+// The Unmitigated Explosion cast itself also marks the pull as
+// effectively over, same shape as MYSTERY_MAGIC_DEATH_WIPE/CONFETTI_LOST
+// above — a single Raid error fires right at the cast (BEFORE the Damage
+// Down debuffs it applies ~700ms later), so the generic Damage Down
+// Major errors that follow get dropped by lib/report-data.ts's cutoff
+// instead of counting as separate mistakes — per the user, the pull is
+// effectively over the instant this cast fires.
+//
 // ── TELE-TROUNCING ARROW PLACEMENT (confirmed 2026-07, pulls 6/15) ─────────
 //
 // At ~2:33, all 8 players get 2 stacks of "Tele-Portent" (8 distinct ability
@@ -223,13 +278,15 @@
 // blackhole-strategy.ts is split out from blackhole.ts.
 
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
-import type { PullError } from "@/types/PullError";
+import type { PullError, EnemyEvent } from "@/types/PullError";
 import type { DeathEvent } from "@/types/DeathEvent";
 import { distanceBetween } from "@/lib/mechanics/geometry";
 
 export const BLIZZARD_III_SILENT_KILL_RULE_ID = "ffxiv-phase1-blizzard3-silent-kill";
 export const JUMPED_OFF_ARENA_RULE_ID          = "ffxiv-phase1-jumped-off-arena";
 export const WAVE_CANNON_TOWER_OVERLAP_RULE_ID   = "ffxiv-phase1-wave-cannon-tower-overlap";
+export const WAVE_CANNON_TOWER_MISSED_RULE_ID    = "ffxiv-phase1-wave-cannon-tower-missed";
+export const UNMITIGATED_EXPLOSION_WIPE_RULE_ID  = "ffxiv-phase1-unmitigated-explosion-wipe";
 export const TELE_TROUNCING_ARROW_RULE_ID = "ffxiv-phase1-tele-trouncing-arrow-misplaced";
 export const MYSTERY_MAGIC_DEATH_WIPE_RULE_ID = "ffxiv-phase1-mystery-magic-death-wipe";
 export const REVOLTING_RUIN_THREAT_LOSS_RULE_ID = "ffxiv-phase1-revolting-ruin-threat-loss";
@@ -305,6 +362,10 @@ const WAVE_CANNON_VOLLEY_CLUSTER_MS = 250;
 // players is standing there to soak it — see WAVE_CANNON_TOWER_OVERLAP
 // module comment below.
 const WAVE_CANNON_TOWER_ABILITY_ID = 47786;
+
+// Cast once per unresolved (nobody-soaked) tower instance, ~700ms after the
+// tower itself resolves with no target — see module header.
+const UNMITIGATED_EXPLOSION_ABILITY_ID = 47787;
 
 type Cardinal = "N" | "E" | "S" | "W";
 type Point = { x: number; y: number };
@@ -585,6 +646,120 @@ function detectWaveCannonTowerOverlapErrors(players: PlayerInfo[], deathEvents: 
 }
 
 /**
+ * Detects a living non-carrier (never hit by Wave Cannon) who took zero
+ * Wave Cannon Tower damage in a pull where at least one tower actually went
+ * unresolved. See module header — this is the mirror image of
+ * detectWaveCannonTowerOverlapErrors above (missing a soak entirely,
+ * instead of soaking two).
+ */
+function detectWaveCannonTowerMissedErrors(
+  players:     PlayerInfo[],
+  deathEvents: DeathEvent[],
+  enemyCasts:  EnemyEvent[]
+): PullError[] {
+  const waveCannonHits = new Map<number, { player: PlayerInfo; timestamp: number }[]>();
+  const waveCannonCarriers = new Set<string>();
+  for (const player of players) {
+    for (const e of player.damageTaken) {
+      if (e.abilityId !== WAVE_CANNON_ABILITY_ID || e.sourceInstance === undefined) continue;
+      waveCannonCarriers.add(player.name);
+      const list = waveCannonHits.get(e.sourceInstance) ?? [];
+      list.push({ player, timestamp: e.timestamp });
+      waveCannonHits.set(e.sourceInstance, list);
+    }
+  }
+  if (waveCannonHits.size === 0) return [];
+
+  const totalTowers = waveCannonHits.size;
+  const waveCannonTime = Math.min(...[...waveCannonHits.values()].flat().map((h) => h.timestamp));
+
+  const coveredInstances = new Set<number>();
+  const soakedByPlayer = new Set<string>();
+  for (const player of players) {
+    for (const e of player.damageTaken) {
+      if (e.abilityId !== WAVE_CANNON_TOWER_ABILITY_ID || e.sourceInstance === undefined) continue;
+      coveredInstances.add(e.sourceInstance);
+      soakedByPlayer.add(player.name);
+    }
+  }
+
+  // Every tower resolved (soaked once, or soaked twice by an overlapper
+  // already caught by the rule above) — nothing missed.
+  if (coveredInstances.size >= totalTowers) return [];
+
+  // A non-carrier who died before the towers could resolve can't have
+  // soaked anything — that's fallout from an earlier death, not a fresh
+  // mistake here (same reasoning as the overlap rule's own
+  // carrierDiedBeforeTowerResolved gate, applied per-player).
+  const diedBeforeResolve = (playerName: string) =>
+    deathEvents.some(
+      (d) =>
+        d.player === playerName &&
+        d.timestamp >= waveCannonTime &&
+        d.timestamp <= waveCannonTime + WAVE_CANNON_VOLLEY_CLUSTER_MS + 5000
+    );
+
+  const missedSoakers = players.filter(
+    (p) => !waveCannonCarriers.has(p.name) && !soakedByPlayer.has(p.name) && !diedBeforeResolve(p.name)
+  );
+  if (missedSoakers.length === 0) return [];
+
+  // Anchor the description/timestamp on the boss's own tower-resolution
+  // cast (47786) closest to the Wave Cannon volley, falling back to the
+  // volley itself if that stream wasn't fetched.
+  const towerResolveTimestamp = enemyCasts
+    .filter(
+      (e) =>
+        e.abilityId === WAVE_CANNON_TOWER_ABILITY_ID &&
+        e.timestamp >= waveCannonTime &&
+        e.timestamp <= waveCannonTime + WAVE_CANNON_VOLLEY_CLUSTER_MS + 5000
+    )
+    .reduce((min, e) => Math.min(min, e.timestamp), Infinity);
+  const timestamp = Number.isFinite(towerResolveTimestamp) ? towerResolveTimestamp : waveCannonTime + 1;
+
+  return missedSoakers.map((player) => ({
+    ruleId:      WAVE_CANNON_TOWER_MISSED_RULE_ID,
+    severity:    "Major",
+    name:        "Missed Wave Cannon Tower Soak",
+    description: "Was not hit by Wave Cannon, so their job was to soak one of the resulting towers — didn't soak any.",
+    timestamp,
+    player:      player.name,
+    class:       player.className,
+    specId:      player.specId,
+    role:        player.role,
+    abilityId:   WAVE_CANNON_TOWER_ABILITY_ID,
+    abilityName: "Wave Cannon Tower",
+  }));
+}
+
+/**
+ * An Unmitigated Explosion cast (fired once per Wave Cannon tower that goes
+ * unresolved — see module header) marks the pull as over: it applies
+ * raid-wide Damage Down moments later, so this fires a single Raid error
+ * right at the cast itself, BEFORE those Damage Down applications, so
+ * lib/report-data.ts's cutoff drops them as fallout instead of counting
+ * them as fresh mistakes.
+ */
+function detectUnmitigatedExplosionWipeError(enemyCasts: EnemyEvent[]): PullError[] {
+  const casts = enemyCasts.filter((e) => e.abilityId === UNMITIGATED_EXPLOSION_ABILITY_ID);
+  if (casts.length === 0) return [];
+
+  const timestamp = Math.min(...casts.map((e) => e.timestamp));
+
+  return [
+    {
+      ruleId:      UNMITIGATED_EXPLOSION_WIPE_RULE_ID,
+      severity:    "Raid",
+      name:        "Unmitigated Explosion Wipe",
+      description: "A Wave Cannon tower went unsoaked, triggering Unmitigated Explosion — unresolvable from here, the raid wiped.",
+      timestamp,
+      abilityId:   UNMITIGATED_EXPLOSION_ABILITY_ID,
+      abilityName: "Unmitigated Explosion",
+    },
+  ];
+}
+
+/**
  * A death to Mystery Magic's resolution (either spread tick flavor, or
  * Blizzard III Blowout — see MYSTERY_MAGIC_DEATH_ABILITY_IDS) leaves Wave
  * Cannon unresolvable (it already self-gates on 4 live carriers) and marks
@@ -759,7 +934,11 @@ function detectTeleTrouncingArrowErrors(players: PlayerInfo[]): PullError[] {
  * abilities — self-gating the same way exdeath.ts does, so it's safe to
  * always call.
  */
-export function detectPhase1Errors(players: PlayerInfo[], deathEvents: DeathEvent[]): PullError[] {
+export function detectPhase1Errors(
+  players:     PlayerInfo[],
+  deathEvents: DeathEvent[],
+  enemyCasts:  EnemyEvent[] = []
+): PullError[] {
   const blizzardIIISilentKillErrors = detectBlizzardIIIBlowoutSilentKillErrors(players, deathEvents);
 
   return [
@@ -767,6 +946,8 @@ export function detectPhase1Errors(players: PlayerInfo[], deathEvents: DeathEven
     ...blizzardIIISilentKillErrors,
     ...detectJumpedOffArenaError(players, deathEvents),
     ...detectWaveCannonTowerOverlapErrors(players, deathEvents),
+    ...detectWaveCannonTowerMissedErrors(players, deathEvents, enemyCasts),
+    ...detectUnmitigatedExplosionWipeError(enemyCasts),
     ...detectMysteryMagicDeathWipeError(deathEvents, blizzardIIISilentKillErrors),
     ...detectConfettiLostError(players, deathEvents),
     ...detectTeleTrouncingArrowErrors(players),
