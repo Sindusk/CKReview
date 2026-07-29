@@ -236,8 +236,13 @@
 // tolerance/threshold needed — nearest-of-4 is decisive by a wide margin
 // in practice.
 //
-// Scoped to the support side only, per the user's own framing — no
-// equivalent DPS-side conga/priority order has been confirmed yet.
+// Runs over EITHER side of the roster via the same algorithm — see
+// `detectWaveCannonRolePriorityErrors` below, parametrized by the fixed
+// west-to-east conga order for that side. DPS side confirmed 2026-07-30
+// (per the user, same session): M1 - M2 - R1 - R2, west to east
+// (DPS_CONGA_ORDER). `detectWaveCannonSupportPriorityErrors`/
+// `detectWaveCannonDpsPriorityErrors` are thin wrappers that just supply
+// each side's role order and description label.
 //
 // ── TELE-TROUNCING ARROW PLACEMENT (confirmed 2026-07, pulls 6/15) ─────────
 //
@@ -627,6 +632,23 @@ const UNMITIGATED_EXPLOSION_ABILITY_ID = 47787;
 // Fixed west-to-east standing order for the 4 support roles during Wave
 // Cannon — see the WAVE CANNON SUPPORT TOWER PRIORITY module comment above.
 const SUPPORT_CONGA_ORDER: readonly FFRoleSlot[] = ["H2", "H1", "OT", "MT"];
+// Same conga-priority mechanic, DPS side (confirmed 2026-07-30, per the
+// user): M1 - M2 - R1 - R2, west to east.
+const DPS_CONGA_ORDER: readonly FFRoleSlot[] = ["M1", "M2", "R1", "R2"];
+
+// Position window for resolving the DPS side's M1-vs-M2 order near the
+// Wave Cannon moment — same magnitude as CONFETTI_POSITION_WINDOW_MS
+// (players are stacked and largely stationary in the seconds around a
+// mechanic resolution, so a few-second window is generous without being
+// stale).
+const WAVE_CANNON_ROLE_POSITION_WINDOW_MS = 4000;
+
+// Minimal shape detectWaveCannonRolePriorityErrors needs from a role
+// resolution — deliberately NOT roles.ts's RoleAssignment (which requires
+// a `source` tag support's straight detectFFRoles() output already has,
+// but the DPS side's position-resolved M1/M2 doesn't cleanly fit any of
+// roles.ts's existing source values).
+type SideAssignment = { slot: FFRoleSlot; player: PlayerInfo | null; tentative: boolean };
 
 type Cardinal = "N" | "E" | "S" | "W";
 type Point = { x: number; y: number };
@@ -993,18 +1015,91 @@ function detectWaveCannonTowerMissedErrors(
   }));
 }
 
+function firstWaveCannonHitTimestamp(players: PlayerInfo[]): number | null {
+  let earliest: number | null = null;
+  for (const player of players) {
+    for (const e of player.damageTaken) {
+      if (e.abilityId !== WAVE_CANNON_ABILITY_ID) continue;
+      if (earliest === null || e.timestamp < earliest) earliest = e.timestamp;
+    }
+  }
+  return earliest;
+}
+
 /**
- * Detects the specific non-carrier support who should have covered an
- * unsoaked Wave Cannon tower per the fixed west-to-east support priority
- * (H2-H1-OT-MT), when everyone actually took SOME tower damage — the case
- * detectWaveCannonTowerMissedErrors' "zero damage" gate can't catch. See
- * the WAVE CANNON SUPPORT TOWER PRIORITY module comment.
+ * Resolves the DPS side's west-to-east conga order (M1-M2-R1-R2) for THIS
+ * pull, or null if it can't be resolved confidently. R1/R2 (physical
+ * ranged vs. caster) are already decisive from job alone via detectFFRoles
+ * — the standard-comp ambiguity is M1 vs M2, which roles.ts's own header
+ * calls "genuinely arbitrary" for two melee DPS (no job-based signal
+ * distinguishes them, unlike MT/OT's opening-auto-attack tell). Resolved
+ * here by ACTUAL POSITION instead: whichever of the 2 melee DPS is
+ * standing further WEST (lower x) near this pull's own Wave Cannon moment
+ * is labeled M1, matching the same west-to-east convention the support
+ * side's fixed H2-H1-OT-MT order already uses — this only needs a
+ * consistent WITHIN-PULL ordering, not a cross-report learned position
+ * (unlike wave-cannon.ts's per-job spot table), so a single interpolated
+ * position per melee player is enough. Fails closed (null) if either
+ * melee's position can't be recovered near the moment — never guesses.
  */
-function detectWaveCannonSupportPriorityErrors(
-  players:     PlayerInfo[],
-  deathEvents: DeathEvent[],
-  enemyCasts:  EnemyEvent[]
+function resolveDpsSideAssignments(players: PlayerInfo[], waveCannonTime: number): SideAssignment[] | null {
+  const roles = detectFFRoles(players);
+  const r1 = roles.find((a) => a.slot === "R1");
+  const r2 = roles.find((a) => a.slot === "R2");
+  if (!r1?.player || r1.tentative || !r2?.player || r2.tentative) return null;
+
+  const meleePlayers = roles
+    .filter((a) => a.slot === "M1" || a.slot === "M2")
+    .map((a) => a.player)
+    .filter((p): p is PlayerInfo => p !== null);
+  if (meleePlayers.length !== 2) return null;
+
+  const withPosition = meleePlayers.map((player) => ({
+    player,
+    pos: interpolatePlayerPosition(player, waveCannonTime, {
+      windowMs:        WAVE_CANNON_ROLE_POSITION_WINDOW_MS,
+      healing:         "self",
+      healingReceived: "any",
+      casts:           "self",
+    }),
+  }));
+  if (withPosition.some((m) => !m.pos)) return null; // can't confirm — fail closed, don't guess
+
+  withPosition.sort((a, b) => a.pos!.x - b.pos!.x); // ascending x = west to east
+  const [west, east] = withPosition;
+
+  return [
+    { slot: "M1", player: west.player, tentative: false },
+    { slot: "M2", player: east.player, tentative: false },
+    { slot: "R1", player: r1.player,   tentative: false },
+    { slot: "R2", player: r2.player,   tentative: false },
+  ];
+}
+
+/**
+ * Detects the specific non-carrier (on ONE side of the roster — support or
+ * DPS) who should have covered an unsoaked Wave Cannon tower per that
+ * side's fixed west-to-east priority, when everyone on that side actually
+ * took SOME tower damage — the case detectWaveCannonTowerMissedErrors'
+ * "zero damage" gate can't catch. See the WAVE CANNON SUPPORT TOWER
+ * PRIORITY module comment — the DPS side (M1-M2-R1-R2, confirmed
+ * 2026-07-30) runs the identical algorithm, just over the other 4 roster
+ * slots. `sideAssignments` is pre-resolved by the caller (see
+ * `resolveDpsSideAssignments` above for why the DPS side can't just use
+ * detectFFRoles directly).
+ */
+function detectWaveCannonRolePriorityErrors(
+  players:         PlayerInfo[],
+  deathEvents:     DeathEvent[],
+  enemyCasts:      EnemyEvent[],
+  sideAssignments: SideAssignment[],
+  congaOrder:      readonly FFRoleSlot[],
+  congaLabel:      string
 ): PullError[] {
+  // The fixed west-to-east ordering only means something when all 4 of
+  // this side's roles resolved to a real, confident player.
+  if (sideAssignments.length !== 4 || sideAssignments.some((a) => !a.player || a.tentative)) return [];
+
   const waveCannonHits: { player: PlayerInfo; timestamp: number; x?: number; y?: number }[] = [];
   const waveCannonInstances = new Set<number>();
   for (const player of players) {
@@ -1040,30 +1135,24 @@ function detectWaveCannonSupportPriorityErrors(
   }
   if (coveredTowerInstances.size >= waveCannonInstances.size) return [];
 
-  const roles = detectFFRoles(players);
-  const supportAssignments = roles.filter((a) => (SUPPORT_CONGA_ORDER as readonly string[]).includes(a.slot));
-  // The fixed west-to-east ordering only means something when all 4
-  // support roles resolved to a real, confident player.
-  if (supportAssignments.length !== 4 || supportAssignments.some((a) => !a.player || a.tentative)) return [];
+  const orderOf = (slot: FFRoleSlot) => congaOrder.indexOf(slot);
+  const slotByName = new Map(sideAssignments.map((a) => [a.player!.name, a.slot]));
 
-  const orderOf = (slot: FFRoleSlot) => SUPPORT_CONGA_ORDER.indexOf(slot);
-  const slotByName = new Map(supportAssignments.map((a) => [a.player!.name, a.slot]));
-
-  // Carriers whose tower is on the SUPPORT side, each with the position
-  // they were standing at when hit — a tower drops at its carrier's own
-  // feet, so this position IS (approximately) the tower's location.
-  const supportCarriers = waveCannonHits
+  // Carriers whose tower is on THIS side, each with the position they were
+  // standing at when hit — a tower drops at its carrier's own feet, so
+  // this position IS (approximately) the tower's location.
+  const sideCarriers = waveCannonHits
     .filter((h) => slotByName.has(h.player.name) && h.x !== undefined && h.y !== undefined)
     .map((h) => ({ slot: slotByName.get(h.player.name)!, x: h.x!, y: h.y!, order: orderOf(slotByName.get(h.player.name)!) }));
 
-  const nonCarrierSupports = supportAssignments
+  const nonCarriers = sideAssignments
     .filter((a) => !carrierNames.has(a.player!.name))
     .sort((a, b) => orderOf(a.slot) - orderOf(b.slot));
 
-  // Needs exactly as many non-carrier supports as support-side carriers —
-  // guaranteed by the 4-support roster unless a support died and dropped
-  // out entirely, in which case priority attribution isn't safe.
-  if (supportCarriers.length === 0 || supportCarriers.length !== nonCarrierSupports.length) return [];
+  // Needs exactly as many non-carriers as carriers on this side —
+  // guaranteed by the 4-slot roster unless someone died and dropped out
+  // entirely, in which case priority attribution isn't safe.
+  if (sideCarriers.length === 0 || sideCarriers.length !== nonCarriers.length) return [];
 
   // A non-carrier who died before the towers could resolve can't be
   // blamed — cascade fallout, same gate as the other tower rules.
@@ -1074,12 +1163,12 @@ function detectWaveCannonSupportPriorityErrors(
         d.timestamp >= waveCannonTime &&
         d.timestamp <= waveCannonTime + WAVE_CANNON_VOLLEY_CLUSTER_MS + 5000
     );
-  if (nonCarrierSupports.some((a) => diedBeforeResolve(a.player!.name))) return [];
+  if (nonCarriers.some((a) => diedBeforeResolve(a.player!.name))) return [];
 
   // Fixed west-to-east priority: the leftmost non-carrier takes the
-  // leftmost open (support-side) tower, and so on — see module header.
-  const openTowers = [...supportCarriers].sort((a, b) => a.order - b.order);
-  const expectedAssignment = nonCarrierSupports.map((a, i) => ({
+  // leftmost open tower on this side, and so on — see module header.
+  const openTowers = [...sideCarriers].sort((a, b) => a.order - b.order);
+  const expectedAssignment = nonCarriers.map((a, i) => ({
     soaker:    a.player!,
     towerSlot: openTowers[i].slot,
     towerX:    openTowers[i].x,
@@ -1093,10 +1182,10 @@ function detectWaveCannonSupportPriorityErrors(
   // to has to be resolved by NEAREST carrier position instead (see module
   // header) — every soak this loop sees is attributed to whichever of the
   // 4 carriers' own Wave-Cannon-hit position it landed closest to. Matched
-  // against ALL 4 carriers (not just the 2 support ones) so a genuinely
-  // DPS-side soak lands on its real (DPS) carrier and never gets forced
-  // onto the nearer-of-only-2 support option — only kept when the true
-  // nearest carrier turns out to be a support one.
+  // against ALL 4 carriers, both sides (not just this side's 2), so a soak
+  // that's really on the OTHER side lands on its real carrier and never
+  // gets forced onto the nearer-of-only-2 option on this side — only kept
+  // when the true nearest carrier turns out to be on THIS side.
   const soakedTowerSlotsByName = new Map<string, Set<FFRoleSlot>>();
   for (const player of players) {
     for (const e of player.damageTaken) {
@@ -1107,7 +1196,7 @@ function detectWaveCannonSupportPriorityErrors(
         const dist = Math.hypot(e.x - h.x, e.y - h.y);
         if (!nearest || dist < nearest.dist) nearest = { slot: slotByName.get(h.player.name) ?? null, dist };
       }
-      if (!nearest?.slot) continue; // nearest carrier was on the DPS side
+      if (!nearest?.slot) continue; // nearest carrier was on the OTHER side
       const set = soakedTowerSlotsByName.get(player.name) ?? new Set<FFRoleSlot>();
       set.add(nearest.slot);
       soakedTowerSlotsByName.set(player.name, set);
@@ -1118,7 +1207,7 @@ function detectWaveCannonSupportPriorityErrors(
   for (const slots of soakedTowerSlotsByName.values()) {
     for (const slot of slots) coveredSlots.add(slot);
   }
-  // Every support-side tower got soaked by someone — the overlap rule
+  // Every tower on this side got soaked by someone — the overlap rule
   // covers a player soaking 2+ towers; nothing to attribute here.
   if (coveredSlots.size >= openTowers.length) return [];
 
@@ -1150,7 +1239,7 @@ function detectWaveCannonSupportPriorityErrors(
 
     const followedSlot = [...actuallySoaked][0];
 
-    const description = `Support priority order (H2-H1-OT-MT west to east) made them responsible for the ${towerSlot} tower, but they soaked the ${followedSlot} tower alongside a teammate instead, leaving their own unsoaked.`;
+    const description = `${congaLabel} priority order (${congaOrder.join("-")} west to east) made them responsible for the ${towerSlot} tower, but they soaked the ${followedSlot} tower alongside a teammate instead, leaving their own unsoaked.`;
 
     errors.push({
       ruleId:      WAVE_CANNON_TOWER_PRIORITY_RULE_ID,
@@ -1167,6 +1256,27 @@ function detectWaveCannonSupportPriorityErrors(
     });
   }
   return errors;
+}
+
+function detectWaveCannonSupportPriorityErrors(
+  players:     PlayerInfo[],
+  deathEvents: DeathEvent[],
+  enemyCasts:  EnemyEvent[]
+): PullError[] {
+  const supportAssignments = detectFFRoles(players).filter((a) => (SUPPORT_CONGA_ORDER as readonly string[]).includes(a.slot));
+  return detectWaveCannonRolePriorityErrors(players, deathEvents, enemyCasts, supportAssignments, SUPPORT_CONGA_ORDER, "Support");
+}
+
+function detectWaveCannonDpsPriorityErrors(
+  players:     PlayerInfo[],
+  deathEvents: DeathEvent[],
+  enemyCasts:  EnemyEvent[]
+): PullError[] {
+  const waveCannonTime = firstWaveCannonHitTimestamp(players);
+  if (waveCannonTime === null) return [];
+  const dpsAssignments = resolveDpsSideAssignments(players, waveCannonTime);
+  if (!dpsAssignments) return [];
+  return detectWaveCannonRolePriorityErrors(players, deathEvents, enemyCasts, dpsAssignments, DPS_CONGA_ORDER, "DPS");
 }
 
 /**
@@ -1587,6 +1697,7 @@ export function detectPhase1Errors(
     ...detectWaveCannonTowerOverlapErrors(players, deathEvents),
     ...detectWaveCannonTowerMissedErrors(players, deathEvents, enemyCasts),
     ...detectWaveCannonSupportPriorityErrors(players, deathEvents, enemyCasts),
+    ...detectWaveCannonDpsPriorityErrors(players, deathEvents, enemyCasts),
     ...detectUnmitigatedExplosionWipeError(enemyCasts),
     ...detectMysteryMagicDeathWipeError(deathEvents, blizzardIIISilentKillErrors),
     ...detectConfettiLostError(players, deathEvents),
