@@ -79,6 +79,23 @@ function buildFFPlayers(rep, actorMap, getFFJobByName, abilityMap) {
         x: e.targetResources?.x,
         y: e.targetResources?.y,
       })),
+      // PlayerInfo.healingReceived's real-pipeline counterpart — heals
+      // landing on this player from ANY source, unconditionally
+      // trustworthy as this player's own position (see player-position.ts's
+      // `healingReceived: "any"` option). This harness's `healing` above
+      // already has exactly this shape/orientation (targetID filter), so
+      // it's duplicated here under the correctly-named field rather than
+      // renaming `healing` itself (which stays as-is for the reasons in
+      // the comment above it).
+      healingReceived: (rep.healing?.data ?? []).filter((e) => e.targetID === id).map((e) => ({
+        timestamp: e.timestamp,
+        abilityId: e.abilityGameID ?? 0,
+        abilityName: 'Ability ' + e.abilityGameID,
+        amount: e.amount ?? 0,
+        source: actorMap.get(e.sourceID)?.name,
+        x: e.targetResources?.x,
+        y: e.targetResources?.y,
+      })),
       damageTaken: dt.filter((e) => e.targetID === id).map((e) => ({
         timestamp: e.timestamp,
         abilityId: e.abilityGameID ?? 0,

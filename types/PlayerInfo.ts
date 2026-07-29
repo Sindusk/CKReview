@@ -84,4 +84,18 @@ export type PlayerInfo = {
   healing:      PlayerEvent[];
   debuffs:      PlayerEvent[];
   casts:        PlayerEvent[];
+
+  // Heals RECEIVED by this player, from ANY source (not just self-casts —
+  // see `healing` above, which is cast BY this player and only safe as a
+  // position source when self-targeted). FFXIV only: x/y = this player's
+  // OWN position (FFLogs' targetResources always belongs to the target,
+  // and the target here always IS this player, so no orientation caveat
+  // applies at all — unlike `healing`, every entry here is trustworthy).
+  // Confirmed (2026-07-29, report Q3GzJNZg64k1hLRm pull 18): a non-healer
+  // rarely self-heals, starving `healing`-based position lookups, but
+  // raid healers land a heal on nearly every player every ~2.5s GCD —
+  // this is the densest position source available short of damageTaken.
+  // See lib/mechanics/player-position.ts's `healingReceived` option. Empty
+  // for WoW (WCLHealEvent carries no position at all).
+  healingReceived: PlayerEvent[];
 };

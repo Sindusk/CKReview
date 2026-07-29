@@ -444,6 +444,13 @@ function wclBuildPlayers(
           .filter(e => e.sourceID === actorId)
           .map(e => wclHealToPlayerEvent(e, actorMap, abilityMap, fightStart)),
 
+        // See PlayerInfo.healingReceived's type comment — WCLHealEvent
+        // carries no position at all, so this is empty of x/y for WoW
+        // (kept only for type-shape parity with FF).
+        healingReceived: healingEvents
+          .filter(e => e.targetID === actorId)
+          .map(e => wclHealToPlayerEvent(e, actorMap, abilityMap, fightStart)),
+
         debuffs: debuffEvents
           .filter(e => e.targetID === actorId)
           .map(e => wclDebuffToPlayerEvent(e, actorMap, abilityMap, fightStart)),
@@ -797,6 +804,30 @@ function fflHealToPlayerEvent(
   };
 }
 
+// Same underlying event shape as fflHealToPlayerEvent, but built for
+// PlayerInfo.healingReceived (heals landing ON this player, from ANY
+// source) instead of PlayerInfo.healing (heals cast BY this player) — see
+// that field's type comment. `source` (who healed them) replaces `target`
+// (always this player themselves here, so redundant).
+function fflHealReceivedToPlayerEvent(
+  event:      FFLHealEvent,
+  actorMap:   Map<number, FFLActor>,
+  abilityMap: Map<number, AbilityInfo>,
+  fightStart: number
+): PlayerEvent {
+  const source = actorMap.get(event.sourceID);
+  return {
+    timestamp:   Math.max(0, event.timestamp - fightStart),
+    abilityId:   event.abilityGameID ?? 0,
+    abilityName: fflAbilityName(event, abilityMap),
+    abilityIcon: fflAbilityIcon(event, abilityMap),
+    amount:      event.amount,
+    source:      source?.name,
+    x:           event.targetResources?.x,
+    y:           event.targetResources?.y,
+  };
+}
+
 function fflDebuffToPlayerEvent(
   event:      FFLDebuffEvent,
   actorMap:   Map<number, FFLActor>,
@@ -1063,6 +1094,13 @@ function buildFFPlayers(
         healing: healingEvents
           .filter((e) => e.sourceID === actorId)
           .map((e) => fflHealToPlayerEvent(e, actorMap, abilityMap, fightStart)),
+
+        // See PlayerInfo.healingReceived's type comment — heals landing ON
+        // this player, from ANY source, unconditionally trustworthy as
+        // this player's own position (no self-cast caveat needed).
+        healingReceived: healingEvents
+          .filter((e) => e.targetID === actorId)
+          .map((e) => fflHealReceivedToPlayerEvent(e, actorMap, abilityMap, fightStart)),
 
         debuffs: debuffEvents
           .filter((e) => e.targetID === actorId)

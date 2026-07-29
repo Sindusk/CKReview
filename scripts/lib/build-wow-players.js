@@ -60,6 +60,16 @@ function buildWowPull(rep, actorMap, abilityMap, getSpecInfo) {
         amount: e.amount ?? 0,
         target: actorMap.get(e.targetID)?.name,
       })),
+      // PlayerInfo.healingReceived's real-pipeline counterpart — empty of
+      // position for WoW (WCLHealEvent carries none), kept only for
+      // type-shape parity with FF.
+      healingReceived: (rep.healing?.data ?? []).filter((e) => e.targetID === id).map((e) => ({
+        timestamp: e.timestamp - t0,
+        abilityId: e.abilityGameID ?? 0,
+        abilityName: abilityName(e.abilityGameID ?? 0),
+        amount: e.amount ?? 0,
+        source: actorMap.get(e.sourceID)?.name,
+      })),
       damageTaken: (rep.damageTaken?.data ?? []).filter((e) => e.targetID === id).map((e) => ({
         timestamp: e.timestamp - t0,
         abilityId: e.abilityGameID ?? 0,

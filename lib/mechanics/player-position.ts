@@ -49,6 +49,16 @@
 //   `target` always means the same thing. Useful as a last-resort position
 //   source for a player who wasn't hit by anything and isn't a healer
 //   (nothing to self-heal with) — e.g. graven-image.ts's stack-anchor check.
+// - `player.healingReceived` — FFXIV only, heals landing ON this player
+//   from ANY source (not just self-casts). Unlike `player.healing`, no
+//   self/orientation caveat applies at all: targetResources always belongs
+//   to the target, and the target here always IS this player, so every
+//   entry is trustworthy unconditionally. Confirmed (2026-07-29, report
+//   Q3GzJNZg64k1hLRm pull 18): a non-healer (tank/DPS) rarely self-heals,
+//   starving `healing`-based lookups, but lands a raid heal from an actual
+//   healer almost every GCD — by far the densest position source here
+//   short of damageTaken. Prefer this over `healing:"self"` for any new
+//   FF code; empty for WoW (WCLHealEvent carries no position).
 //
 // Always give `windowMs` a deliberate value: a position sample that's too
 // old can predate the player's final, fatal move (a real case had a heal 8s
@@ -100,6 +110,14 @@ export interface FindPlayerPositionOptions {
    * change any existing caller's behavior) — ignore casts entirely.
    */
   casts?: "self" | "none";
+  /**
+   * Whether to trust `player.healingReceived` (heals landing ON this
+   * player, from ANY source — see header) as a position source: "any"
+   * (every entry, no self-cast caveat needed) or "none" (default — opt-in,
+   * like casts, so this brand-new stream doesn't change any existing
+   * caller's behavior).
+   */
+  healingReceived?: "any" | "none";
   /** External per-player samples (FFXIV boss-hit stream); filtered to this player by name. */
   positionSamples?: PositionSample[];
 }
@@ -107,16 +125,16 @@ export interface FindPlayerPositionOptions {
 /**
  * This player's own position closest to `timestamp`, from every stream the
  * options enable, or undefined if nothing lands within `windowMs`.
- * Streams are considered in order (damageTaken, healing, positionSamples)
- * and ties keep the earliest-considered sample, preserving each original
- * implementation's tie-breaking.
+ * Streams are considered in order (damageTaken, healing, casts,
+ * healingReceived, positionSamples) and ties keep the earliest-considered
+ * sample, preserving each original implementation's tie-breaking.
  */
 export function findPlayerPosition(
   player: PlayerInfo,
   timestamp: number,
   options: FindPlayerPositionOptions
 ): Position | undefined {
-  const { windowMs, direction = "nearest", healing = "self", damageTaken = true, casts = "none", positionSamples } = options;
+  const { windowMs, direction = "nearest", healing = "self", damageTaken = true, casts = "none", healingReceived = "none", positionSamples } = options;
 
   let best: Position | undefined;
   let bestScore = Infinity;
@@ -142,6 +160,9 @@ export function findPlayerPosition(
       consider(e.timestamp, e.x, e.y);
     }
   }
+  if (healingReceived === "any") {
+    for (const e of player.healingReceived) consider(e.timestamp, e.x, e.y);
+  }
   if (positionSamples) {
     for (const s of positionSamples) {
       if (s.playerName !== player.name) continue;
@@ -149,6 +170,93 @@ export function findPlayerPosition(
     }
   }
   return best;
+}
+
+function gatherPositionSamples(
+  player:  PlayerInfo,
+  options: Omit<FindPlayerPositionOptions, "windowMs" | "direction">
+): { timestamp: number; x: number; y: number }[] {
+  const { healing = "self", damageTaken = true, casts = "none", healingReceived = "none", positionSamples } = options;
+  const samples: { timestamp: number; x: number; y: number }[] = [];
+  const add = (t: number, x: number | undefined, y: number | undefined) => {
+    if (x !== undefined && y !== undefined) samples.push({ timestamp: t, x, y });
+  };
+
+  if (damageTaken) {
+    for (const e of player.damageTaken) add(e.timestamp, e.x, e.y);
+  }
+  if (healing !== "none") {
+    for (const e of player.healing) {
+      if (healing === "self" && e.target !== player.name && e.source !== player.name) continue;
+      add(e.timestamp, e.x, e.y);
+    }
+  }
+  if (casts === "self") {
+    for (const e of player.casts) {
+      if (e.target !== player.name) continue;
+      add(e.timestamp, e.x, e.y);
+    }
+  }
+  if (healingReceived === "any") {
+    for (const e of player.healingReceived) add(e.timestamp, e.x, e.y);
+  }
+  if (positionSamples) {
+    for (const s of positionSamples) {
+      if (s.playerName !== player.name) continue;
+      add(s.timestamp, s.x, s.y);
+    }
+  }
+  return samples;
+}
+
+/**
+ * Like findPlayerPosition, but INTERPOLATES between the nearest sample
+ * before `timestamp` and the nearest sample after it, instead of just
+ * snapping to whichever single sample is closest — see
+ * lib/mechanics/ffxiv/dancingmad/graven-image.ts's "SNAPSHOT POSITION"
+ * section and phase1.ts's Confetti knockback check for why this matters:
+ * a player who's mid-repositioning between two real samples has no single
+ * sample that reflects where they actually were at the moment in between,
+ * but a straight line between the bracketing samples usually does (players
+ * move at a roughly constant run speed between GCDs, not teleport).
+ *
+ * `windowMs` bounds the gap on EACH side independently (before AND after
+ * must individually be within `windowMs` of `timestamp`) — a large gap on
+ * either side means the interpolation is more guess than measurement, so
+ * this fails closed (undefined) rather than stretch a stale pair across
+ * it. Falls back to a single bracketing sample (the same job
+ * findPlayerPosition does) when only one side has anything within window.
+ */
+export function interpolatePlayerPosition(
+  player:    PlayerInfo,
+  timestamp: number,
+  options:   Omit<FindPlayerPositionOptions, "direction">
+): Position | undefined {
+  const { windowMs } = options;
+  const samples = gatherPositionSamples(player, options).sort((a, b) => a.timestamp - b.timestamp);
+
+  let before: { timestamp: number; x: number; y: number } | undefined;
+  let after:  { timestamp: number; x: number; y: number } | undefined;
+  for (const s of samples) {
+    if (s.timestamp <= timestamp) {
+      if (!before || s.timestamp > before.timestamp) before = s;
+    } else if (!after) {
+      after = s; // samples are time-sorted — first one past `timestamp` is the nearest "after"
+      break;
+    }
+  }
+
+  const withinWindow = (s: { timestamp: number } | undefined, before_: boolean) =>
+    s !== undefined && (before_ ? timestamp - s.timestamp : s.timestamp - timestamp) <= windowMs;
+
+  if (withinWindow(before, true) && withinWindow(after, false)) {
+    const span = after!.timestamp - before!.timestamp;
+    const frac = span === 0 ? 0 : (timestamp - before!.timestamp) / span;
+    return { x: before!.x + frac * (after!.x - before!.x), y: before!.y + frac * (after!.y - before!.y) };
+  }
+  if (withinWindow(before, true)) return { x: before!.x, y: before!.y };
+  if (withinWindow(after, false)) return { x: after!.x, y: after!.y };
+  return undefined;
 }
 
 // Distance/angle/bearing math lives in lib/mechanics/geometry.ts.
