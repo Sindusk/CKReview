@@ -1626,6 +1626,23 @@ function confettiSnapshotTime(players: PlayerInfo[], firstWaveTime: number): num
  * signal here. Only the FIRST resolution's axis is confirmed — see
  * detectConfettiHolderMisplacedErrors' own comment on why later
  * resolutions are left alone for now.
+ *
+ * **The undershoot ("too close") check only applies to Tanks/Healers, not
+ * DPS** (confirmed 2026-07-30, report Q3GzJNZg64k1hLRm pull 28: Kade
+ * Kansado, DPS, sat at ~383 centi-yalms — under the 400 floor that
+ * correctly caught pull 18's confirmed Support failure (Azura Salus,
+ * Healer, ~372) — yet the user confirmed Kade's positioning was correct;
+ * he was cleanly knocked through the boss). DPS-side clean samples span a
+ * much wider range than Support's (Kade ~383, Sonder Dreams ~505-509 in a
+ * different pull, Chauzey Solstice ~554 in the SAME pull as Kade) — DPS
+ * naturally sit closer to the boss for their own uptime, so "too close"
+ * isn't a meaningful DPS mistake the way it is for Support (who have no
+ * such uptime reason to hug the hitbox tighter than the ring). No
+ * confirmed DPS undershoot FAILURE sample exists, so rather than guess a
+ * DPS-specific floor from zero failure data, the check is skipped for DPS
+ * entirely until one surfaces. The overshoot ("too far") check is
+ * unaffected — its only confirmed failure (Ayumi Emi ~1012) clears the
+ * threshold by a wide, unambiguous margin regardless of role.
  */
 function detectConfettiKnockbackVictimErrors(players: PlayerInfo[]): PullError[] {
   const errors: PullError[] = [];
@@ -1651,7 +1668,7 @@ function detectConfettiKnockbackVictimErrors(players: PlayerInfo[]): PullError[]
 
       const dist = distanceFromCenter(pos.x, pos.y);
       const tooFar  = dist > CONFETTI_HITBOX_RADIUS_CENTIYALMS + CONFETTI_STACK_OVERSHOOT_TOLERANCE_CENTIYALMS;
-      const tooNear = dist < CONFETTI_HITBOX_RADIUS_CENTIYALMS - CONFETTI_STACK_UNDERSHOOT_TOLERANCE_CENTIYALMS;
+      const tooNear = player.role !== "DPS" && dist < CONFETTI_HITBOX_RADIUS_CENTIYALMS - CONFETTI_STACK_UNDERSHOOT_TOLERANCE_CENTIYALMS;
       if (!tooFar && !tooNear) continue; // within normal jitter of the hitbox ring
 
       errors.push({
