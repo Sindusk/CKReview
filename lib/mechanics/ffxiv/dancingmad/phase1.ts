@@ -745,19 +745,23 @@ const CONFETTI_HOLDER_ANGLE_TOLERANCE_DEG = 40;
 const CONFETTI_MIN_DIST_FOR_BEARING_CENTIYALMS = 150;
 
 // How far the non-holder "stack" is allowed to sit from the hitbox ring
-// before/behind it, in each direction — deliberately asymmetric. Two
-// confirmed-clean overshoots (Archidel Del'archi ~648, Sayacissa
-// Morsaelth ~652 — ~148-152 over the ring) and one deliberately-ambiguous
-// small overshoot (Kade Kansado ~552, ~52 over — the user's own "could go
-// either way," left unflagged either way by this threshold) all sit
-// comfortably under CONFETTI_STACK_OVERSHOOT_TOLERANCE, while the
-// confirmed failure (Ayumi Emi ~1012, ~512 over) clears it easily. No
-// confirmed-clean UNDERSHOOT sample exists yet (there's no legitimate
-// reason to stand inside the ring at all, unlike standing a bit further
-// back), so CONFETTI_STACK_UNDERSHOOT_TOLERANCE is set much tighter —
-// just above ordinary jitter — catching the one confirmed undershoot
-// failure (Azura Salus ~372, ~128 under).
-const CONFETTI_STACK_OVERSHOOT_TOLERANCE_CENTIYALMS  = 250;
+// before/behind it, in each direction — deliberately asymmetric. Confirmed-
+// clean overshoots: Archidel Del'archi ~648 / Sayacissa Morsaelth ~652
+// (pull 18, ~148-152 over the ring), Kade Kansado ~552 (pull 18, ~52 over
+// — the user's own deliberately-ambiguous "could go either way," left
+// unflagged either way by this threshold), and Archidel Del'archi AGAIN at
+// ~783 (pull 35, ~283 over — confirmed clean by the user directly: "they
+// were positioned well and got knocked across the arena properly," despite
+// the ORIGINAL 250-tolerance threshold of 750 having wrongly flagged her —
+// the original tolerance was calibrated off only the pull-18 samples and
+// turned out too tight). Widened to comfortably clear all 4 confirmed-clean
+// samples while still sitting well under the confirmed failure (Ayumi Emi
+// ~1012, ~512 over, pull 18). No confirmed-clean UNDERSHOOT sample exists
+// yet (there's no legitimate reason to stand inside the ring at all, unlike
+// standing a bit further back), so CONFETTI_STACK_UNDERSHOOT_TOLERANCE is
+// set much tighter — just above ordinary jitter — catching the one
+// confirmed undershoot failure (Azura Salus ~372, ~128 under).
+const CONFETTI_STACK_OVERSHOOT_TOLERANCE_CENTIYALMS  = 400;
 const CONFETTI_STACK_UNDERSHOOT_TOLERANCE_CENTIYALMS = 100;
 
 // How long before the knockback's own damage lands its interpolated
