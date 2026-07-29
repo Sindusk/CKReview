@@ -4,6 +4,38 @@
 // (Kefka's Return) ultimate — everything up through the phase transition
 // at roughly 3:25 (205s) into the fight.
 //
+// ── REVOLTING RUIN III THREAT LOSS (confirmed 2026-07-29, Q3GzJNZg64k1hLRm, ─
+// ── pull 7) ─────────────────────────────────────────────────────────────
+//
+// The opening tankbuster pair (~0:11-0:19, 50179 then 50401, both sharing
+// the in-game name "Revolting Ruin III"): hit 1 always lands on whoever
+// currently holds highest enmity (the MT, in every clean pull sampled);
+// hit 2 lands on whoever holds SECOND-highest enmity at that later moment.
+// This raid's strategy has the OT provoke right after hit 1 specifically
+// so their enmity lead holds through hit 2's resolution, bumping the MT
+// back down to 2nd and making the MT eat BOTH hits (confirmed: hit 1 and
+// hit 2 land on the same tank in 19 of 20 sampled pulls) — the MT only
+// needs to mitigate once, and the OT's own cooldowns stay banked for the
+// next tankbuster pair later in the fight. This is a mechanic aimed
+// specifically at the OT: if their enmity lead doesn't hold (commonly
+// because their tank stance — Iron Will/Defiance/Grit/Royal Guard for
+// Paladin/Warrior/Dark Knight/Gunbreaker — was never turned on, so their
+// own damage can't out-generate the MT's and enmity slides back before
+// hit 2 fires), hit 2 lands on whoever it actually lands on instead — the
+// OT themselves (confirmed pull 7: Sayacissa provoked but had no stance
+// up, Salty Dango's ongoing damage "ripped" 1st back before hit 2, so
+// Sayacissa dropped to 2nd and took it — and died to it, since an
+// un-stanced tank can't survive a hit sized for one). Detection doesn't
+// need to check stance directly (a pure outcome check is sufficient and
+// more robust): if hit 1 resolves to a single clear tank (the MT) and
+// hit 2 does NOT also land on that same tank, the OTHER tank (the OT) is
+// flagged — the mechanic is built entirely around the OT's own threat
+// upkeep, so any deviation from "MT tanks both" is on them, regardless of
+// who the hit actually lands on. Self-gates on exactly 2 tanks and a
+// single unambiguous hit-1 target; pulls where hit 1 itself already hit
+// multiple people (already-scrambled from an earlier problem) are left
+// alone rather than guessed at.
+//
 // ── BLIZZARD III BLOWOUT SILENT KILL (confirmed 2026-07, VtdBqhLQkWJXMvDg) ──
 //
 // Blizzard III Blowout (ability IDs vary — 47765/47768/47771/47774, all
@@ -178,9 +210,29 @@ export const JUMPED_OFF_ARENA_RULE_ID          = "ffxiv-phase1-jumped-off-arena"
 export const WAVE_CANNON_TOWER_OVERLAP_RULE_ID   = "ffxiv-phase1-wave-cannon-tower-overlap";
 export const TELE_TROUNCING_ARROW_RULE_ID = "ffxiv-phase1-tele-trouncing-arrow-misplaced";
 export const MYSTERY_MAGIC_DEATH_WIPE_RULE_ID = "ffxiv-phase1-mystery-magic-death-wipe";
+export const REVOLTING_RUIN_THREAT_LOSS_RULE_ID = "ffxiv-phase1-revolting-ruin-threat-loss";
 
 const BLIZZARD_III_BLOWOUT_ABILITY_IDS = new Set([47765, 47768, 47771, 47774]);
 const DAMAGE_DOWN_ABILITY_ID = 1002911;
+
+const REVOLTING_RUIN_FIRST_HIT_ABILITY_ID  = 50179;
+const REVOLTING_RUIN_SECOND_HIT_ABILITY_ID = 50401;
+
+// Tank stance per job — the thing the OT needs active for their post-
+// provoke enmity lead to hold through Revolting Ruin III's second hit (see
+// module header). Not currently read by detection (a pure outcome check —
+// did hit 2 land on the same tank as hit 1 — proved sufficient and more
+// robust than checking stance directly), kept here per the user's own
+// breakdown for future mitigation-tracking use. Iron Will/Defiance are
+// UNCONFIRMED — no sampled report has a Paladin or Warrior tank to verify
+// their buff IDs against; only Grit and Royal Guard are confirmed (via
+// this report's own debuffs stream).
+const TANK_STANCE_BUFF_ID_BY_CLASS_NAME: Readonly<Record<string, number>> = {
+  "Dark Knight": 1000743, // Grit
+  "Gunbreaker":  1001833, // Royal Guard
+  // "Paladin":  <unconfirmed>, // Iron Will
+  // "Warrior":  <unconfirmed>, // Defiance
+};
 
 // Everything a Mystery Magic death can be credited to — the two confirmed
 // raid-wide resolution tick flavors (Flagrant Fire III, Thrumming Thunder
@@ -323,6 +375,58 @@ const ARROW_OUT_OF_POSITION_THRESHOLD_YALMS = 7.5;
 // ~4.1 and ~2.4 yalms — comfortably above this line, comfortably below
 // what the corner threshold would have required to catch the same mistake.
 const ARROW_DOUBLE_OUT_OF_POSITION_THRESHOLD_YALMS = 2;
+
+/**
+ * Detects the OT failing to hold enmity through Revolting Ruin III's
+ * second hit — see module header for the mechanic and why this is a pure
+ * outcome check (hit 2 landed on someone other than hit 1's tank) rather
+ * than a stance-buff check.
+ */
+function detectRevoltingRuinThreatLossErrors(players: PlayerInfo[]): PullError[] {
+  const tanks = players.filter((p) => p.role === "Tank");
+  if (tanks.length !== 2) return []; // needs the standard 2-tank comp to reason about MT/OT
+
+  const hit1Targets = new Set<string>();
+  let hit1Timestamp: number | undefined;
+  const hit2Targets = new Set<string>();
+  let hit2Timestamp: number | undefined;
+  for (const player of players) {
+    for (const e of player.damageTaken) {
+      if (e.abilityId === REVOLTING_RUIN_FIRST_HIT_ABILITY_ID) {
+        hit1Targets.add(player.name);
+        hit1Timestamp = hit1Timestamp === undefined ? e.timestamp : Math.min(hit1Timestamp, e.timestamp);
+      } else if (e.abilityId === REVOLTING_RUIN_SECOND_HIT_ABILITY_ID) {
+        hit2Targets.add(player.name);
+        hit2Timestamp = hit2Timestamp === undefined ? e.timestamp : Math.min(hit2Timestamp, e.timestamp);
+      }
+    }
+  }
+  // Ambiguous hit 1 (already scrambled by an earlier problem) — don't guess.
+  if (hit1Targets.size !== 1 || hit2Timestamp === undefined) return [];
+
+  const mtName = [...hit1Targets][0];
+  if (hit2Targets.has(mtName)) return []; // clean — the MT tanked both hits
+
+  const mt = tanks.find((t) => t.name === mtName);
+  const ot = tanks.find((t) => t.name !== mtName);
+  if (!mt || !ot) return []; // hit 1 didn't land on either tank at all — not this mechanic's usual shape
+
+  return [
+    {
+      ruleId:      REVOLTING_RUIN_THREAT_LOSS_RULE_ID,
+      severity:    "Major",
+      name:        "Revolting Ruin III Threat Lost",
+      description: `Failed to hold enmity after provoking Revolting Ruin III — the second hit landed on ${[...hit2Targets].join(" and ")} instead of ${mt.name} (${mt.className}) tanking both.`,
+      timestamp:   hit2Timestamp,
+      player:      ot.name,
+      class:       ot.className,
+      specId:      ot.specId,
+      role:        ot.role,
+      abilityId:   REVOLTING_RUIN_SECOND_HIT_ABILITY_ID,
+      abilityName: "Revolting Ruin III",
+    },
+  ];
+}
 
 function detectBlizzardIIIBlowoutSilentKillErrors(players: PlayerInfo[], deathEvents: DeathEvent[]): PullError[] {
   const errors: PullError[] = [];
@@ -589,6 +693,7 @@ export function detectPhase1Errors(players: PlayerInfo[], deathEvents: DeathEven
   const blizzardIIISilentKillErrors = detectBlizzardIIIBlowoutSilentKillErrors(players, deathEvents);
 
   return [
+    ...detectRevoltingRuinThreatLossErrors(players),
     ...blizzardIIISilentKillErrors,
     ...detectJumpedOffArenaError(players, deathEvents),
     ...detectWaveCannonTowerOverlapErrors(players, deathEvents),
