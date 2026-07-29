@@ -165,6 +165,80 @@
 // instead of counting as separate mistakes — per the user, the pull is
 // effectively over the instant this cast fires.
 //
+// ── WAVE CANNON SUPPORT TOWER PRIORITY (confirmed 2026-07-30, same report, ─
+// ── pull 23) ────────────────────────────────────────────────────────────
+//
+// A gap in WAVE_CANNON_TOWER_MISSED above: it only flags a non-carrier who
+// took ZERO tower damage. Confirmed failure (pull 23): Kade Kansado, Ayumi
+// Emi, Sayacissa Morsaelth, and Salty Dango were the 4 carriers (2 DPS +
+// 2 support — Sayacissa and Dango). On the DPS side, Chauzey Solstice and
+// Sonder Dreams each correctly soaked one DPS tower. On the support side,
+// BOTH remaining supports — Azura Salus and Archidel Del'archi — soaked
+// Sayacissa's tower, leaving Salty Dango's completely unsoaked ->
+// Unmitigated Explosion wipe. Because both non-carrier supports took
+// SOME tower damage, WAVE_CANNON_TOWER_MISSED's "zero damage" gate finds
+// nobody to flag — a real miss with no attribution.
+//
+// Per the user, the support half of the roster has a fixed west-to-east
+// standing order during this mechanic: H2 - H1 - OT - MT (SUPPORT_CONGA_
+// ORDER below). Each Wave Cannon carrier's tower spawns at that carrier's
+// own conga slot. Non-carrier supports fill the resulting open tower
+// slots in the SAME west-to-east priority: the leftmost non-carrier takes
+// the leftmost open tower, and so on. In pull 23, the carriers were OT
+// (Sayacissa) and MT (Dango), so the open towers were the OT slot (left)
+// and MT slot (right); the non-carriers were H1 (Azura) and H2 (Archidel).
+// H2 always defers to the leftmost open tower (OT's, matching what
+// actually happened — both Azura and Archidel went there), which means H1
+// was the one required to move right and cover the MT tower instead of
+// following H2. Per the user: "it was Azura that should be soaking the
+// tower" — Azura was H1.
+//
+// This only fires when: (1) all 4 support roles resolve to a real,
+// non-tentative player (detectFFRoles) — the fixed ordering means nothing
+// otherwise; (2) the number of open support towers exactly matches the
+// number of non-carrier supports (guaranteed by the 4-support roster
+// unless a support died and dropped out entirely, in which case
+// attribution isn't safe — see the death gate below, same reasoning as
+// WAVE_CANNON_TOWER_MISSED's own carrierDiedBeforeTowerResolved-style
+// check); and (3) at least one open support tower has ZERO soakers (the
+// generic overlap rule already covers "one player soaked 2+ towers", and
+// a tower soaked by exactly the priority-expected player needs no error).
+// Only the specific non-carrier whose PRIORITY-EXPECTED tower ended up
+// unsoaked is flagged — never every non-carrier, and never guessed when
+// more than one open tower goes unsoaked with an ambiguous cause.
+//
+// ── WHICH TOWER IS WHOSE: POSITION, NOT sourceInstance (found while ────────
+// ── building the above, same pull) ──────────────────────────────────────
+//
+// The first version of this rule matched a Wave Cannon Tower soak back to
+// its carrier by sourceInstance, assuming the beam's instance number (1-4
+// per volley) carries over to the tower NPC it spawns. Confirmed wrong
+// directly from this report's raw data: the SAME volley's beam instances
+// are always 1-4, but the resulting towers' own instances came back as {1,
+// 10} in one pull and {2} in another — an entirely different, apparently
+// pull-wide-incrementing numbering space, not reused per volley. Matching
+// by instance silently attributed pull 23's miss to the wrong player
+// (Archidel instead of Azura) even though the outcome-level detection
+// (which tower went unsoaked) was already correct.
+//
+// Fixed by position instead: a tower spawns at its carrier's own feet the
+// instant they're hit, so the carrier's OWN x/y at their Wave Cannon hit
+// IS (approximately) the tower's location. Every tower soak is attributed
+// to whichever of the 4 carriers' own hit-position it landed nearest to —
+// matched against ALL 4 (not just the 2 support ones), so a genuinely
+// DPS-side soak resolves to its real DPS carrier instead of being forced
+// onto whichever support carrier happens to be nearer of only 2 choices;
+// only kept for this rule when the true nearest carrier is a support one.
+// Confirmed decisive in pull 23: Azura/Archidel's soak position sat ~1.5
+// yalms from Sayacissa's own Wave Cannon position vs. ~6.1 yalms from Salty
+// Dango's (and much further still from either DPS carrier), an unambiguous
+// margin given towers are dropped several yalms apart. No positional
+// tolerance/threshold needed — nearest-of-4 is decisive by a wide margin
+// in practice.
+//
+// Scoped to the support side only, per the user's own framing — no
+// equivalent DPS-side conga/priority order has been confirmed yet.
+//
 // ── TELE-TROUNCING ARROW PLACEMENT (confirmed 2026-07, pulls 6/15) ─────────
 //
 // At ~2:33, all 8 players get 2 stacks of "Tele-Portent" (8 distinct ability
@@ -398,11 +472,13 @@ import type { PullError, EnemyEvent } from "@/types/PullError";
 import type { DeathEvent } from "@/types/DeathEvent";
 import { distanceBetween, distanceFromCenter, ARENA_CENTER } from "@/lib/mechanics/geometry";
 import { interpolatePlayerPosition } from "@/lib/mechanics/player-position";
+import { detectFFRoles, type FFRoleSlot } from "@/lib/mechanics/ffxiv/roles";
 
 export const BLIZZARD_III_SILENT_KILL_RULE_ID = "ffxiv-phase1-blizzard3-silent-kill";
 export const JUMPED_OFF_ARENA_RULE_ID          = "ffxiv-phase1-jumped-off-arena";
 export const WAVE_CANNON_TOWER_OVERLAP_RULE_ID   = "ffxiv-phase1-wave-cannon-tower-overlap";
 export const WAVE_CANNON_TOWER_MISSED_RULE_ID    = "ffxiv-phase1-wave-cannon-tower-missed";
+export const WAVE_CANNON_TOWER_PRIORITY_RULE_ID  = "ffxiv-phase1-wave-cannon-tower-priority-missed";
 export const UNMITIGATED_EXPLOSION_WIPE_RULE_ID  = "ffxiv-phase1-unmitigated-explosion-wipe";
 export const TELE_TROUNCING_ARROW_RULE_ID = "ffxiv-phase1-tele-trouncing-arrow-misplaced";
 export const MYSTERY_MAGIC_DEATH_WIPE_RULE_ID = "ffxiv-phase1-mystery-magic-death-wipe";
@@ -547,6 +623,10 @@ const WAVE_CANNON_TOWER_ABILITY_ID = 47786;
 // Cast once per unresolved (nobody-soaked) tower instance, ~700ms after the
 // tower itself resolves with no target — see module header.
 const UNMITIGATED_EXPLOSION_ABILITY_ID = 47787;
+
+// Fixed west-to-east standing order for the 4 support roles during Wave
+// Cannon — see the WAVE CANNON SUPPORT TOWER PRIORITY module comment above.
+const SUPPORT_CONGA_ORDER: readonly FFRoleSlot[] = ["H2", "H1", "OT", "MT"];
 
 type Cardinal = "N" | "E" | "S" | "W";
 type Point = { x: number; y: number };
@@ -911,6 +991,182 @@ function detectWaveCannonTowerMissedErrors(
     abilityId:   WAVE_CANNON_TOWER_ABILITY_ID,
     abilityName: "Wave Cannon Tower",
   }));
+}
+
+/**
+ * Detects the specific non-carrier support who should have covered an
+ * unsoaked Wave Cannon tower per the fixed west-to-east support priority
+ * (H2-H1-OT-MT), when everyone actually took SOME tower damage — the case
+ * detectWaveCannonTowerMissedErrors' "zero damage" gate can't catch. See
+ * the WAVE CANNON SUPPORT TOWER PRIORITY module comment.
+ */
+function detectWaveCannonSupportPriorityErrors(
+  players:     PlayerInfo[],
+  deathEvents: DeathEvent[],
+  enemyCasts:  EnemyEvent[]
+): PullError[] {
+  const waveCannonHits: { player: PlayerInfo; timestamp: number; x?: number; y?: number }[] = [];
+  const waveCannonInstances = new Set<number>();
+  for (const player of players) {
+    for (const e of player.damageTaken) {
+      if (e.abilityId !== WAVE_CANNON_ABILITY_ID) continue;
+      waveCannonHits.push({ player, timestamp: e.timestamp, x: e.x, y: e.y });
+      if (e.sourceInstance !== undefined) waveCannonInstances.add(e.sourceInstance);
+    }
+  }
+  if (waveCannonHits.length === 0) return [];
+  const waveCannonTime = Math.min(...waveCannonHits.map((h) => h.timestamp));
+  const carrierNames = new Set(waveCannonHits.map((h) => h.player.name));
+
+  // Hard pre-gate, independent of the position-matching below: did a tower
+  // genuinely go completely unsoaked this pull at all? Counts DISTINCT
+  // tower NPC instances hit (any player, any side) against the number of
+  // beam instances that dropped a tower — pure instance counting, not
+  // identity, so it's unaffected by the sourceInstance-numbering mismatch
+  // documented further down (same totalTowers/coveredInstances technique as
+  // detectWaveCannonTowerMissedErrors above). Needed because nearest-
+  // carrier position matching alone isn't reliable when two support
+  // carriers stand close together (confirmed false positive, report
+  // VtdBqhLQkWJXMvDg pull 1: H1/H2 stood ~5.6 yalms apart, both non-
+  // carriers' actual soaks measured nearer to H1 than H2 even though no
+  // Unmitigated Explosion fired — i.e. everything was actually fine).
+  const coveredTowerInstances = new Set<number>();
+  for (const player of players) {
+    for (const e of player.damageTaken) {
+      if (e.abilityId === WAVE_CANNON_TOWER_ABILITY_ID && e.sourceInstance !== undefined) {
+        coveredTowerInstances.add(e.sourceInstance);
+      }
+    }
+  }
+  if (coveredTowerInstances.size >= waveCannonInstances.size) return [];
+
+  const roles = detectFFRoles(players);
+  const supportAssignments = roles.filter((a) => (SUPPORT_CONGA_ORDER as readonly string[]).includes(a.slot));
+  // The fixed west-to-east ordering only means something when all 4
+  // support roles resolved to a real, confident player.
+  if (supportAssignments.length !== 4 || supportAssignments.some((a) => !a.player || a.tentative)) return [];
+
+  const orderOf = (slot: FFRoleSlot) => SUPPORT_CONGA_ORDER.indexOf(slot);
+  const slotByName = new Map(supportAssignments.map((a) => [a.player!.name, a.slot]));
+
+  // Carriers whose tower is on the SUPPORT side, each with the position
+  // they were standing at when hit — a tower drops at its carrier's own
+  // feet, so this position IS (approximately) the tower's location.
+  const supportCarriers = waveCannonHits
+    .filter((h) => slotByName.has(h.player.name) && h.x !== undefined && h.y !== undefined)
+    .map((h) => ({ slot: slotByName.get(h.player.name)!, x: h.x!, y: h.y!, order: orderOf(slotByName.get(h.player.name)!) }));
+
+  const nonCarrierSupports = supportAssignments
+    .filter((a) => !carrierNames.has(a.player!.name))
+    .sort((a, b) => orderOf(a.slot) - orderOf(b.slot));
+
+  // Needs exactly as many non-carrier supports as support-side carriers —
+  // guaranteed by the 4-support roster unless a support died and dropped
+  // out entirely, in which case priority attribution isn't safe.
+  if (supportCarriers.length === 0 || supportCarriers.length !== nonCarrierSupports.length) return [];
+
+  // A non-carrier who died before the towers could resolve can't be
+  // blamed — cascade fallout, same gate as the other tower rules.
+  const diedBeforeResolve = (playerName: string) =>
+    deathEvents.some(
+      (d) =>
+        d.player === playerName &&
+        d.timestamp >= waveCannonTime &&
+        d.timestamp <= waveCannonTime + WAVE_CANNON_VOLLEY_CLUSTER_MS + 5000
+    );
+  if (nonCarrierSupports.some((a) => diedBeforeResolve(a.player!.name))) return [];
+
+  // Fixed west-to-east priority: the leftmost non-carrier takes the
+  // leftmost open (support-side) tower, and so on — see module header.
+  const openTowers = [...supportCarriers].sort((a, b) => a.order - b.order);
+  const expectedAssignment = nonCarrierSupports.map((a, i) => ({
+    soaker:    a.player!,
+    towerSlot: openTowers[i].slot,
+    towerX:    openTowers[i].x,
+    towerY:    openTowers[i].y,
+  }));
+
+  // A tower's own sourceInstance numbering is NOT shared with the Wave
+  // Cannon beam's — confirmed 2026-07-30 (this report): the same volley's
+  // beam instances are 1-4 while its towers' instances came back as 1 and
+  // 10 in one pull, 2 in another. WHICH carrier a given tower soak belongs
+  // to has to be resolved by NEAREST carrier position instead (see module
+  // header) — every soak this loop sees is attributed to whichever of the
+  // 4 carriers' own Wave-Cannon-hit position it landed closest to. Matched
+  // against ALL 4 carriers (not just the 2 support ones) so a genuinely
+  // DPS-side soak lands on its real (DPS) carrier and never gets forced
+  // onto the nearer-of-only-2 support option — only kept when the true
+  // nearest carrier turns out to be a support one.
+  const soakedTowerSlotsByName = new Map<string, Set<FFRoleSlot>>();
+  for (const player of players) {
+    for (const e of player.damageTaken) {
+      if (e.abilityId !== WAVE_CANNON_TOWER_ABILITY_ID || e.x === undefined || e.y === undefined) continue;
+      let nearest: { slot: FFRoleSlot | null; dist: number } | null = null;
+      for (const h of waveCannonHits) {
+        if (h.x === undefined || h.y === undefined) continue;
+        const dist = Math.hypot(e.x - h.x, e.y - h.y);
+        if (!nearest || dist < nearest.dist) nearest = { slot: slotByName.get(h.player.name) ?? null, dist };
+      }
+      if (!nearest?.slot) continue; // nearest carrier was on the DPS side
+      const set = soakedTowerSlotsByName.get(player.name) ?? new Set<FFRoleSlot>();
+      set.add(nearest.slot);
+      soakedTowerSlotsByName.set(player.name, set);
+    }
+  }
+
+  const coveredSlots = new Set<FFRoleSlot>();
+  for (const slots of soakedTowerSlotsByName.values()) {
+    for (const slot of slots) coveredSlots.add(slot);
+  }
+  // Every support-side tower got soaked by someone — the overlap rule
+  // covers a player soaking 2+ towers; nothing to attribute here.
+  if (coveredSlots.size >= openTowers.length) return [];
+
+  const towerResolveTimestamp = enemyCasts
+    .filter(
+      (e) =>
+        e.abilityId === WAVE_CANNON_TOWER_ABILITY_ID &&
+        e.timestamp >= waveCannonTime &&
+        e.timestamp <= waveCannonTime + WAVE_CANNON_VOLLEY_CLUSTER_MS + 5000
+    )
+    .reduce((min, e) => Math.min(min, e.timestamp), Infinity);
+  const timestamp = Number.isFinite(towerResolveTimestamp) ? towerResolveTimestamp : waveCannonTime + 1;
+
+  const errors: PullError[] = [];
+  for (const { soaker, towerSlot } of expectedAssignment) {
+    const actuallySoaked = soakedTowerSlotsByName.get(soaker.name) ?? new Set<FFRoleSlot>();
+    if (actuallySoaked.has(towerSlot)) continue; // covered their assigned tower
+
+    // A player who took ZERO tower damage this pull is already covered by
+    // WAVE_CANNON_TOWER_MISSED's own "zero damage" gate — this rule exists
+    // for the case that one CAN'T catch (took some tower damage, just the
+    // wrong tower). Firing here too would double-flag the same miss.
+    if (actuallySoaked.size === 0) continue;
+
+    // Only flag when the tower they were supposed to cover is the one
+    // that's actually left unsoaked — process of elimination confirms the
+    // miss instead of guessing from priority alone.
+    if (coveredSlots.has(towerSlot)) continue;
+
+    const followedSlot = [...actuallySoaked][0];
+
+    const description = `Support priority order (H2-H1-OT-MT west to east) made them responsible for the ${towerSlot} tower, but they soaked the ${followedSlot} tower alongside a teammate instead, leaving their own unsoaked.`;
+
+    errors.push({
+      ruleId:      WAVE_CANNON_TOWER_PRIORITY_RULE_ID,
+      severity:    "Major",
+      name:        "Missed Wave Cannon Tower Soak",
+      description,
+      timestamp,
+      player:      soaker.name,
+      class:       soaker.className,
+      specId:      soaker.specId,
+      role:        soaker.role,
+      abilityId:   WAVE_CANNON_TOWER_ABILITY_ID,
+      abilityName: "Wave Cannon Tower",
+    });
+  }
+  return errors;
 }
 
 /**
@@ -1330,6 +1586,7 @@ export function detectPhase1Errors(
     ...detectJumpedOffArenaError(players, deathEvents),
     ...detectWaveCannonTowerOverlapErrors(players, deathEvents),
     ...detectWaveCannonTowerMissedErrors(players, deathEvents, enemyCasts),
+    ...detectWaveCannonSupportPriorityErrors(players, deathEvents, enemyCasts),
     ...detectUnmitigatedExplosionWipeError(enemyCasts),
     ...detectMysteryMagicDeathWipeError(deathEvents, blizzardIIISilentKillErrors),
     ...detectConfettiLostError(players, deathEvents),

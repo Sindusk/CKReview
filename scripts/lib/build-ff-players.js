@@ -15,6 +15,15 @@ function buildFFPlayers(rep, actorMap, getFFJobByName, abilityMap) {
   const dt = onlyLanded(rep.damageTaken?.data ?? []);
   const dd = onlyLanded(rep.damageDone?.data ?? []);
   const statusMap = { removedebuff: 'removed', applydebuffstack: 'stack', removedebuffstack: 'stackRemoved' };
+  // Mirrors lib/log-transforms.ts's fflAbilityName — was a hardcoded
+  // 'Ability <id>' placeholder here for every player-sourced stream (never
+  // actually looked the name up), which silently broke any check keyed on
+  // a real ability NAME instead of ID read off a PlayerInfo stream — found
+  // via roles.ts's MT/OT auto-attack detection (checks
+  // damageTaken[].abilityName === "Attack") always falling through to the
+  // tentative roster-order fallback against every report, even though the
+  // raw data has plenty of real "Attack" hits (abilityGameID 49746 etc.).
+  const resolveAbilityName = (id) => abilityMap?.get(id) ?? ('Ability ' + id);
 
   return playerIds.map((id) => {
     const actor = actorMap.get(id);
@@ -35,7 +44,7 @@ function buildFFPlayers(rep, actorMap, getFFJobByName, abilityMap) {
       damageDone: dd.filter((e) => e.sourceID === id).map((e) => ({
         timestamp: e.timestamp,
         abilityId: e.abilityGameID ?? 0,
-        abilityName: 'Ability ' + e.abilityGameID,
+        abilityName: resolveAbilityName(e.abilityGameID),
         amount: e.amount ?? 0,
         target: actorMap.get(e.targetID)?.name,
         healthAfter: e.targetResources?.hitPoints,
@@ -48,7 +57,7 @@ function buildFFPlayers(rep, actorMap, getFFJobByName, abilityMap) {
       casts: (rep.casts?.data ?? []).filter((e) => e.sourceID === id).map((e) => ({
         timestamp: e.timestamp,
         abilityId: e.abilityGameID ?? 0,
-        abilityName: 'Ability ' + e.abilityGameID,
+        abilityName: resolveAbilityName(e.abilityGameID),
         target: actorMap.get(e.targetID)?.name,
         x: e.targetResources?.x,
         y: e.targetResources?.y,
@@ -73,7 +82,7 @@ function buildFFPlayers(rep, actorMap, getFFJobByName, abilityMap) {
       healing: (rep.healing?.data ?? []).filter((e) => e.targetID === id).map((e) => ({
         timestamp: e.timestamp,
         abilityId: e.abilityGameID ?? 0,
-        abilityName: 'Ability ' + e.abilityGameID,
+        abilityName: resolveAbilityName(e.abilityGameID),
         amount: e.amount ?? 0,
         source: actorMap.get(e.sourceID)?.name,
         x: e.targetResources?.x,
@@ -90,7 +99,7 @@ function buildFFPlayers(rep, actorMap, getFFJobByName, abilityMap) {
       healingReceived: (rep.healing?.data ?? []).filter((e) => e.targetID === id).map((e) => ({
         timestamp: e.timestamp,
         abilityId: e.abilityGameID ?? 0,
-        abilityName: 'Ability ' + e.abilityGameID,
+        abilityName: resolveAbilityName(e.abilityGameID),
         amount: e.amount ?? 0,
         source: actorMap.get(e.sourceID)?.name,
         x: e.targetResources?.x,
@@ -99,7 +108,7 @@ function buildFFPlayers(rep, actorMap, getFFJobByName, abilityMap) {
       damageTaken: dt.filter((e) => e.targetID === id).map((e) => ({
         timestamp: e.timestamp,
         abilityId: e.abilityGameID ?? 0,
-        abilityName: 'Ability ' + e.abilityGameID,
+        abilityName: resolveAbilityName(e.abilityGameID),
         amount: e.amount ?? 0,
         sourceInstance: e.sourceInstance,
         x: e.targetResources?.x,
@@ -112,7 +121,7 @@ function buildFFPlayers(rep, actorMap, getFFJobByName, abilityMap) {
       debuffs: (rep.debuffs?.data ?? []).filter((e) => e.targetID === id).map((e) => ({
         timestamp: e.timestamp,
         abilityId: e.abilityGameID ?? 0,
-        abilityName: 'Debuff ' + e.abilityGameID,
+        abilityName: resolveAbilityName(e.abilityGameID),
         debuffStatus: statusMap[e.type] ?? 'applied',
         causeAbilityId: e.extraAbilityGameID,
         causeAbilityName: e.extraAbilityGameID !== undefined
