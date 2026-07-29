@@ -54,11 +54,17 @@
 // sourceInstances this volley (the overlap signature) AND (b) someone in
 // that same overlap died to Flagrant Fire III. Learned-position deviation
 // is used ONLY for attribution among the already-confirmed-bad
-// overlap/death, root-causing to whichever compromised player deviates
-// furthest from their own learned spot (a flat 400-centi-yalm/4-yalm
-// floor below which nobody gets blamed even if technically "furthest" —
-// confirmed case deviated ~440; the correctly-positioned neighbor in the
-// same confirmed case deviated ~120).
+// overlap/death: EVERY compromised player whose deviation clears a flat
+// 400-centi-yalm/4-yalm floor is named, not just whichever one deviates
+// furthest — confirmed both ways: report VtdBqhLQkWJXMvDg pull 4 had one
+// genuinely misplaced player (~440) and one correctly-positioned victim
+// caught in the crossfire (~120, stays unflagged), but report
+// Q3GzJNZg64k1hLRm pull 4 had TWO independently misplaced players whose
+// spreads happened to collide (~531 and ~563 — both real mistakes, not
+// one root cause and one bystander; confirmed by the user directly since
+// both should flag). The floor alone is what separates "real mistake" from
+// "normal jitter caught in someone else's overlap" — furthest-only was
+// specific to the first case and didn't generalize.
 
 import type { Pull } from "@/types/Pull";
 import type { PlayerInfo } from "@/types/PlayerInfo";
@@ -211,8 +217,7 @@ export function detectGravenImageSpreadErrors(pull: Pull, layout: GravenImageLay
 
   const errors: PullError[] = [];
   for (const c of withDeviation) {
-    if (c.distance === null || c.distance < maxKnownDistance) continue; // spared — not the furthest
-    if (c.distance < OUT_OF_POSITION_FLOOR_CENTIYALMS) continue;
+    if (c.distance === null || c.distance < OUT_OF_POSITION_FLOOR_CENTIYALMS) continue; // within normal jitter
 
     const others = lethalGroup
       .filter((o) => o.player.actorId !== c.player.actorId && [...o.instances].some((i) => c.instances.has(i)))
