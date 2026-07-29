@@ -31,6 +31,7 @@ import {
   type BlackHoleStrategyId,
 } from "@/lib/mechanics/ffxiv/dancingmad/blackhole-strategy";
 import { learnGravenImageLayout, detectGravenImageSpreadErrors } from "@/lib/mechanics/ffxiv/dancingmad/graven-image";
+import { learnWaveCannonLayout, detectWaveCannonPositionErrors, detectWaveCannonMitigationIssueErrors } from "@/lib/mechanics/ffxiv/dancingmad/wave-cannon";
 import type { Pull } from "../types/Pull";
 import { createCallWipeError, CALL_WIPE_RULE_ID, createManualError, type ManualErrorInput } from "@/types/PullError";
 import type { SavedSession } from "@/types/Session";
@@ -160,6 +161,10 @@ export default function Home() {
   // not a game-mechanic constant — see graven-image.ts's module header),
   // same cross-pull-then-per-pull shape as blackHoleStrategy above.
   const gravenImageLayout = useMemo(() => learnGravenImageLayout(pulls), [pulls]);
+  // Wave Cannon's ideal beam spots are learned the same way — see
+  // wave-cannon.ts's module header for why a hardcoded table doesn't
+  // generalize across raid teams.
+  const waveCannonLayout = useMemo(() => learnWaveCannonLayout(pulls), [pulls]);
 
   // Pulls with "Missed Mitigation" and Black Hole "Missed Assigned Tether"
   // errors merged in (see lib/mechanics/ffxiv/dancingmad/mitigation-
@@ -184,10 +189,14 @@ export default function Home() {
         ...detectIncorrectBlackHoleDirectionErrors(p, blackHoleStrategy),
       ];
       const gravenImageErrors = detectGravenImageSpreadErrors(p, gravenImageLayout);
-      const extra = [...mitigationErrors, ...blackHoleErrors, ...gravenImageErrors];
+      const waveCannonErrors = [
+        ...detectWaveCannonPositionErrors(p.players, p.deathEvents, waveCannonLayout),
+        ...detectWaveCannonMitigationIssueErrors(p.players, p.deathEvents),
+      ];
+      const extra = [...mitigationErrors, ...blackHoleErrors, ...gravenImageErrors, ...waveCannonErrors];
       return extra.length === 0 ? p : { ...p, errors: [...p.errors, ...extra] };
     });
-  }, [pulls, mitigationPlan, blackHoleStrategy, gravenImageLayout]);
+  }, [pulls, mitigationPlan, blackHoleStrategy, gravenImageLayout, waveCannonLayout]);
   const [selectedPullId, setSelectedPullId] = useState<number | null>(null);
 
   const [importError, setImportError] = useState<string | null>(null);

@@ -42,34 +42,15 @@
 // purposes) — the rule only looks for the first jump among players who did
 // NOT have Damage Down at the time.
 //
-// ── WAVE CANNON OUT OF POSITION (confirmed 2026-07, same report, pull 4) ───
+// ── WAVE CANNON OUT OF POSITION / MITIGATION ISSUE ─────────────────────────
 //
-// Wave Cannon (47784) hits exactly 4 players — one per fixed arena spot —
-// while the other 4 handle towers elsewhere. Each of the 8 possible spots
-// is tied to a specific JOB, not a specific person or a rotating debuff:
-// across every clean resolution in this report (21 of 22 pulls), whichever
-// player happened to be playing a given job always took Wave Cannon at the
-// same spot (centi-yalm coordinates, tight to within ~1.5 yalms of natural
-// standing jitter) — see WAVE_CANNON_JOB_POSITIONS. FFLogs' `sourceInstance`
-// on each hit identifies which of the 4 concurrent beams landed on a
-// target; a clean hit is always exactly one instance per player. The one
-// confirmed failure (pull 4): the Viper stood ~6.9 yalms off their own
-// job's spot, well inside the neighboring Pictomancer's beam — both players
-// took TWO distinct sourceInstance hits that volley (their own plus each
-// other's overlap) and both died. Detection is gated on that overlap
-// outcome (2+ distinct instances hitting the same target in one volley),
-// per this codebase's usual "gate on outcome, use position for attribution"
-// approach — a player standing slightly off their spot with no overlap
-// isn't flagged. Among the overlapping players, only the one whose ACTUAL
-// position deviates well beyond normal jitter from their own job's spot is
-// named; a victim who was standing correctly and just got caught by a
-// neighbor's mistake is not flagged (this codebase's root-cause-only
-// attribution philosophy).
-//
-// Known open item: 3 other pulls in this report (9, 13, 18) show one job
-// each landing at a visibly different spot with no confirmed VOD ground
-// truth and no overlap/death — left unexplained rather than guessed at;
-// WAVE_CANNON_JOB_POSITIONS was built excluding those outliers.
+// Lives in wave-cannon.ts, NOT here — like Graven Image's spread, which job
+// stands where for Wave Cannon turned out to be a raid strategy choice
+// (confirmed cross-report), not a hardcoded game constant, so it has to be
+// LEARNED from the report at hand rather than baked into a constant table.
+// See that module's header for the mechanic, the learning method, and the
+// separate raid-wide "Mitigation Issue" call for a death to a single
+// unavoidable beam.
 //
 // ── WAVE CANNON TOWER OVERLAP (confirmed 2026-07-22, same report, pull 12) ─
 //
@@ -194,7 +175,6 @@ import { distanceBetween } from "@/lib/mechanics/geometry";
 
 export const BLIZZARD_III_SILENT_KILL_RULE_ID = "ffxiv-phase1-blizzard3-silent-kill";
 export const JUMPED_OFF_ARENA_RULE_ID          = "ffxiv-phase1-jumped-off-arena";
-export const WAVE_CANNON_OUT_OF_POSITION_RULE_ID = "ffxiv-phase1-wave-cannon-out-of-position";
 export const WAVE_CANNON_TOWER_OVERLAP_RULE_ID   = "ffxiv-phase1-wave-cannon-tower-overlap";
 export const TELE_TROUNCING_ARROW_RULE_ID = "ffxiv-phase1-tele-trouncing-arrow-misplaced";
 export const MYSTERY_MAGIC_DEATH_WIPE_RULE_ID = "ffxiv-phase1-mystery-magic-death-wipe";
@@ -234,25 +214,6 @@ const WAVE_CANNON_ABILITY_ID = 47784;
 // genuinely separate Wave Cannon activations (which never recur this close
 // together in Phase 1).
 const WAVE_CANNON_VOLLEY_CLUSTER_MS = 250;
-
-// Each job's fixed Wave Cannon spot, centi-yalms (arena center 10000,10000)
-// — centroid of every clean hit in this report (outliers >4y from the
-// per-job median excluded; see module comment). Natural per-pull jitter
-// within a job's own clean cluster tops out around 1.5 yalms (150).
-const WAVE_CANNON_JOB_POSITIONS: Readonly<Record<string, { x: number; y: number }>> = {
-  "Dancer":      { x: 11762, y: 9853 },
-  "Viper":       { x: 10694, y: 10353 },
-  "White Mage":  { x: 8767,  y: 10030 },
-  "Sage":        { x: 8213,  y: 10063 },
-  "Pictomancer": { x: 11219, y: 10011 },
-  "Dark Knight": { x: 9261,  y: 10036 },
-  "Reaper":      { x: 10186, y: 10668 },
-  "Paladin":     { x: 9613,  y: 10427 },
-};
-
-// Comfortably above the ~1.5-yalm natural jitter seen in every clean job
-// cluster, comfortably below the confirmed failure's ~6.9-yalm deviation.
-const WAVE_CANNON_OUT_OF_POSITION_THRESHOLD_CENTIYALMS = 400;
 
 // The tower each of the 4 Wave Cannon carriers drops at their own feet the
 // instant they're hit (begincast fires at the same timestamp as the Wave
@@ -427,104 +388,6 @@ function detectJumpedOffArenaError(players: PlayerInfo[], deathEvents: DeathEven
       abilityName: "Jumped Off The Arena",
     },
   ];
-}
-
-function detectWaveCannonOutOfPositionErrors(players: PlayerInfo[], deathEvents: DeathEvent[]): PullError[] {
-  type Hit = { player: PlayerInfo; timestamp: number; sourceInstance: number; x?: number; y?: number };
-  const hits: Hit[] = [];
-  for (const player of players) {
-    for (const e of player.damageTaken) {
-      if (e.abilityId !== WAVE_CANNON_ABILITY_ID || e.sourceInstance === undefined) continue;
-      hits.push({ player, timestamp: e.timestamp, sourceInstance: e.sourceInstance, x: e.x, y: e.y });
-    }
-  }
-  if (hits.length === 0) return [];
-
-  hits.sort((a, b) => a.timestamp - b.timestamp);
-  const clusters: Hit[][] = [];
-  for (const hit of hits) {
-    const current = clusters[clusters.length - 1];
-    if (current && hit.timestamp - current[current.length - 1].timestamp <= WAVE_CANNON_VOLLEY_CLUSTER_MS) {
-      current.push(hit);
-    } else {
-      clusters.push([hit]);
-    }
-  }
-
-  const errors: PullError[] = [];
-
-  for (const cluster of clusters) {
-    const byPlayer = new Map<number, Hit[]>();
-    for (const h of cluster) {
-      const list = byPlayer.get(h.player.actorId) ?? [];
-      list.push(h);
-      byPlayer.set(h.player.actorId, list);
-    }
-
-    const compromised = [...byPlayer.values()].filter(
-      (hs) => new Set(hs.map((h) => h.sourceInstance)).size >= 2
-    );
-    if (compromised.length === 0) continue; // every hit landed as a clean single beam
-
-    const candidates = compromised
-      .map((hs) => {
-        const canonical = WAVE_CANNON_JOB_POSITIONS[hs[0].player.className];
-        if (!canonical || hs[0].x === undefined || hs[0].y === undefined) return null;
-        const distanceCentiyalms = Math.hypot(hs[0].x - canonical.x, hs[0].y - canonical.y);
-        return { player: hs[0].player, timestamp: hs[0].timestamp, distanceCentiyalms };
-      })
-      .filter((c): c is { player: PlayerInfo; timestamp: number; distanceCentiyalms: number } => c !== null);
-
-    const outOfPosition = candidates.filter(
-      (c) => c.distanceCentiyalms > WAVE_CANNON_OUT_OF_POSITION_THRESHOLD_CENTIYALMS
-    );
-    // A victim standing correctly who just got caught by a neighbor's
-    // mistake stays unflagged — only the one(s) actually off their spot are.
-    if (outOfPosition.length === 0) continue;
-
-    const others = compromised
-      .flatMap((hs) => hs[0].player.name)
-      .filter((name) => !outOfPosition.some((c) => c.player.name === name));
-
-    const diedToWaveCannon = (playerName: string, aroundMs: number) =>
-      deathEvents.some(
-        (d) =>
-          d.player === playerName &&
-          d.killingAbilityGameId === WAVE_CANNON_ABILITY_ID &&
-          Math.abs(d.timestamp - aroundMs) <= WAVE_CANNON_VOLLEY_CLUSTER_MS + 5000
-      );
-
-    for (const { player, timestamp, distanceCentiyalms } of outOfPosition) {
-      const yalmsOff = (distanceCentiyalms / 100).toFixed(1);
-      const deadOthers = others.filter((name) => diedToWaveCannon(name, timestamp));
-      const selfDied = diedToWaveCannon(player.name, timestamp);
-
-      let overlapNote = "";
-      if (others.length > 0) {
-        overlapNote = ` Overlapped with ${others.join(" and ")}'s Wave Cannon`;
-        const bothDied = selfDied && deadOthers.length > 0;
-        if (bothDied) overlapNote += `, killing them both`;
-        else if (deadOthers.length > 0) overlapNote += `, killing ${deadOthers.join(" and ")}`;
-        overlapNote += ".";
-      }
-
-      errors.push({
-        ruleId:      WAVE_CANNON_OUT_OF_POSITION_RULE_ID,
-        severity:    "Major",
-        name:        "Wave Cannon Incorrect Position",
-        description: `Was roughly ${yalmsOff} yalms off their expected Wave Cannon spot.${overlapNote}`,
-        timestamp,
-        player:      player.name,
-        class:       player.className,
-        specId:      player.specId,
-        role:        player.role,
-        abilityId:   WAVE_CANNON_ABILITY_ID,
-        abilityName: "Wave Cannon",
-      });
-    }
-  }
-
-  return errors;
 }
 
 /**
@@ -728,7 +591,6 @@ export function detectPhase1Errors(players: PlayerInfo[], deathEvents: DeathEven
   return [
     ...blizzardIIISilentKillErrors,
     ...detectJumpedOffArenaError(players, deathEvents),
-    ...detectWaveCannonOutOfPositionErrors(players, deathEvents),
     ...detectWaveCannonTowerOverlapErrors(players, deathEvents),
     ...detectMysteryMagicDeathWipeError(deathEvents, blizzardIIISilentKillErrors),
     ...detectTeleTrouncingArrowErrors(players),

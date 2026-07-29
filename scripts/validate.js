@@ -95,6 +95,18 @@ function toFightRelative(rep) {
   return shifted;
 }
 
+// Approximates Pull.fightDuration (real pipeline: fight.endTime -
+// fight.startTime from the WCL/FFLogs fight metadata) from the raw event
+// streams themselves — max minus min timestamp across every stream. This
+// harness never loads meta.json's fights array, so this is the only
+// duration signal available; it undercounts slightly (no events fire in
+// the last instant before a wipe/kill) but that's negligible against the
+// multi-minute thresholds anything here gates on (see wave-cannon.ts).
+function fightDurationMs(rep) {
+  const allTimestamps = STREAM_KEYS.flatMap((k) => (rep[k]?.data ?? []).map((e) => e.timestamp));
+  return Math.max(...allTimestamps) - Math.min(...allTimestamps);
+}
+
 // Lazy, memoized per-pull input builders so pulls are only transformed for
 // the streams a selected mechanic actually needs, and only once per report
 // no matter how many mechanics run.
@@ -108,6 +120,7 @@ function makeFFPullCtx(pull, actorMap, abilityMap, getFFJobByName) {
   return {
     bossName: pull.bossName,
     pullNumber: pull.pullNumber,
+    fightDurationMs: () => memo('fightDurationMs', () => fightDurationMs(pull.rep)),
     players:         () => memo('players', () => ffb.buildFFPlayers(pull.rep, actorMap, getFFJobByName, abilityMap)),
     deaths:          () => memo('deaths', () => ffb.buildFFDeaths(pull.rep, actorMap, getFFJobByName)),
     enemyCasts:      () => memo('enemyCasts', () => ffb.buildFFEnemyCastEvents(pull.rep, actorMap, abilityMap)),
@@ -277,6 +290,35 @@ const MECHANICS = {
       }
 
       for (const p of pullLikes) printPullErrors(p, mod.detectGravenImageSpreadErrors(p, layout));
+    },
+  },
+
+  'wave-cannon': {
+    game: 'ff',
+    load: () => requireTsFromRoot('lib/mechanics/ffxiv/dancingmad/wave-cannon.ts'),
+    run({ mod, ctxs }) {
+      // Cross-pull: learns the report's own layout from its long (2+ min)
+      // pulls only, then checks each pull against it. Fight-relative, like
+      // phase1/graven-image.
+      const pullLikes = ctxs.map((c) => ({
+        fightDuration: c.fightDurationMs(),
+        players: c.relPlayers(),
+        deathEvents: c.relDeaths(),
+        bossName: c.bossName, pullNumber: c.pullNumber,
+      }));
+
+      const layout = mod.learnWaveCannonLayout(pullLikes);
+      console.log('-'.repeat(70));
+      console.log('  Learned layout:');
+      for (const [className, spot] of Object.entries(layout)) {
+        console.log(`    ${className.padEnd(12)} ${spot ? `${spot.x},${spot.y}` : '—'}`);
+      }
+
+      for (const p of pullLikes) {
+        printPullErrors(p, mod.detectWaveCannonPositionErrors(p.players, p.deathEvents, layout), [
+          ['mitigation-issue', mod.detectWaveCannonMitigationIssueErrors(p.players, p.deathEvents)],
+        ]);
+      }
     },
   },
 
