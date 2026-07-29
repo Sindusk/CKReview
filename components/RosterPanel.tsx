@@ -347,7 +347,12 @@ function PlayerDetail({
     switch (activeTab) {
       case "DamageDone":  return player.damageDone;
       case "DamageTaken": return player.damageTaken;
-      case "Healing":     return player.healing;
+      // amount>0 filtered here (not upstream) — a 0-amount (fully
+      // overhealed) entry still carries a real position sample that
+      // player-position.ts's findPlayerPosition relies on, but is just
+      // display noise on this tab. See log-transforms.ts's healing builder
+      // comment.
+      case "Healing":     return player.healing.filter((e) => (e.amount ?? 0) > 0);
       case "Debuffs":     return player.debuffs;
       case "Casts":       return player.casts;
     }

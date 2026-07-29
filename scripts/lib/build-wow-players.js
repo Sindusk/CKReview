@@ -47,7 +47,13 @@ function buildWowPull(rep, actorMap, abilityMap, getSpecInfo) {
       })),
       // target name matters here — the Dusk Crystal rule filters heals by
       // target === "Dusk Crystal", same as the live wclHealToPlayerEvent.
-      healing: (rep.healing?.data ?? []).filter((e) => e.sourceID === id && (e.amount ?? 0) > 0).map((e) => ({
+      // amount>0 deliberately NOT filtered here — matches the real
+      // pipeline (log-transforms.ts) after the FF graven-image.ts
+      // "SNAPSHOT POSITION" fix found 0-amount (fully overhealed) entries
+      // still carry a usable position; the Healing tab UI filters amount>0
+      // itself instead. WoW doesn't currently use healing for position
+      // sampling, but this keeps the harness matching the real pipeline.
+      healing: (rep.healing?.data ?? []).filter((e) => e.sourceID === id).map((e) => ({
         timestamp: e.timestamp - t0,
         abilityId: e.abilityGameID ?? 0,
         abilityName: abilityName(e.abilityGameID ?? 0),

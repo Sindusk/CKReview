@@ -87,6 +87,66 @@
 // self-heal sample in the window at all, precisely the scenario the
 // cast-based fallback exists for).
 //
+// ── MIRRORED, NOT INDEPENDENTLY LEARNED (confirmed 2026-07-29, same ────────
+// ── report, pull 17) ────────────────────────────────────────────────────
+//
+// `learnGravenImageLayout` used to learn each job's north spot and south
+// spot as two fully independent medians. That's wrong: the arena split
+// is symmetric (confirmed across every OTHER job's learned pair — Dancer
+// -1293/+1263, Reaper -645/+570, Gunbreaker -869/+763, all within ~15% of
+// each other), so a job's two halves should always be near-mirror images
+// through center. White Mage's learned pair was NOT — north sat only
+// -151.5 off center while south sat +683 off, a 4.5x mismatch. Confirmed
+// failure (pull 17): Azura Salus (White Mage) stood at essentially that
+// same under-shot "north" spot — only ~120 units north of center, when
+// she needed to be ~683 units north (this pull's telegraph was
+// north-safe-for-Support) — and overlapped into Sayacissa Morsaelth's
+// spot, killing them both. Per the user directly: that position IS close
+// to correct for the OPPOSITE (south-safe) permutation, just mirrored
+// onto the wrong side — meaning the "north" LEARNED VALUE ITSELF was
+// contaminated by this exact under-shoot recurring across other clean
+// pulls that just never happened to overlap anyone fatally, silently
+// baking the mistake in as "normal."
+//
+// Fixed by `mirrorHalves`: instead of trusting each half's own median
+// independently, take the LARGER of the two halves' offset-from-center
+// magnitudes and mirror that single canonical offset onto both sides. A
+// habitual under-shoot only ever shrinks the observed offset relative to
+// the true one, never inflates it past true — so between two mirrored
+// samples, the smaller one is the (possibly) contaminated one and the
+// larger is trustworthy. (An average-based compromise was tried first —
+// it corrects the systemic skew but only pulls Azura's own pull-17
+// deviation to ~3.0 yalms, short of the 4-yalm floor; taking the larger
+// magnitude reaches ~5.7 yalms, comfortably past it.) A job with real
+// samples on only one half still mirrors it entirely (nothing to compare
+// against).
+//
+// ── SNAPSHOT POSITION (confirmed 2026-07-29, same report, pull 12) ─────────
+//
+// FFXIV AoE hit resolution "snapshots" who's in radius roughly half a
+// second before the visual explosion/damage log entry — a player who
+// dodges in that final half-second can still take the hit (or, as here,
+// still cause someone ELSE to get overlapped) even though their FINAL,
+// logged position looks fine. Confirmed failure (pull 12): Azura Salus
+// was flagged, then un-flagged by the mirrorHalves fix above (her hit-
+// time position read as only ~2.9y off, under the floor) — but per the
+// user directly, she was standing on top of Archidel Del'archi and only
+// juked away at the last instant; the damage log's x/y already reflects
+// the POST-juke position, hiding the mistake that actually caused the
+// overlap. Her nearest self-heal tick ~1.9s before the hit (8398, 9974)
+// sits ~7.9y from her true spot and only ~2.15y from Archidel's own
+// position — a far more consistent picture of "standing on top of him."
+//
+// `detectGravenImageSpreadErrors` now checks both the hit-time position
+// AND a pre-hit position (self-heal/self-cast samples only, back to
+// PRIOR_SNAPSHOT_WINDOW_MS — damageTaken is deliberately excluded so this
+// can't just re-find the same hit being evaluated) and uses whichever
+// shows the LARGER deviation — a late dodge only ever shrinks the visible
+// deviation relative to the one that actually caused the overlap, never
+// inflates it, same principle as mirrorHalves' larger-of-two-magnitudes
+// choice above. A player with no usable earlier sample just falls back to
+// their hit-time position, unchanged from before.
+//
 // ── GATING ON OUTCOME, PER THE USER'S EXPLICIT CALL ─────────────────────
 //
 // Per the user: "as long as nobody dies, no error needs to be thrown...
@@ -113,6 +173,7 @@ import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { PullError } from "@/types/PullError";
 import type { DeathEvent } from "@/types/DeathEvent";
 import { findPlayerPosition } from "@/lib/mechanics/player-position";
+import { ARENA_CENTER } from "@/lib/mechanics/geometry";
 
 export const GRAVEN_IMAGE_SPREAD_RULE_ID = "ffxiv-phase1-graven-image-spread-misplaced";
 export const GRAVEN_IMAGE_STACK_RULE_ID  = "ffxiv-phase1-graven-image-stack-misplaced";
@@ -141,6 +202,15 @@ const FIRST_OCCURRENCE_WINDOW_END_MS   = 60_000;
 // Below this, a "furthest of the compromised pair" call isn't trusted —
 // see module header.
 const OUT_OF_POSITION_FLOOR_CENTIYALMS = 400;
+
+// How far back to look for a pre-snapshot position (self-heal/self-cast
+// only) when a compromised player's own hit-time position reads clean —
+// see "SNAPSHOT POSITION" in the module header. Generous: the confirmed
+// case's nearest usable self-heal tick landed ~1.9s before the hit
+// (natural regen ticks roughly every 3s per player-position.ts), so this
+// needs enough room to actually reach one, not just the ~0.5s the
+// underlying game mechanic itself snapshots on.
+const PRIOR_SNAPSHOT_WINDOW_MS = 3000;
 
 // A role-group's shared instance needs at least this many distinct members
 // hit together to unambiguously confirm STACK mode (not a spread overlap,
@@ -230,7 +300,7 @@ export function learnGravenImageLayout(pulls: Pull[]): GravenImageLayout {
     for (const { player, x, y, instances } of grouped) {
       if (instances.size >= 2) continue; // compromised this pull — not a clean sample
       const entry = samplesByClass.get(player.className) ?? { north: [], south: [] };
-      (y < 10000 ? entry.north : entry.south).push({ x, y });
+      (y < ARENA_CENTER ? entry.north : entry.south).push({ x, y });
       samplesByClass.set(player.className, entry);
     }
   }
@@ -245,9 +315,31 @@ export function learnGravenImageLayout(pulls: Pull[]): GravenImageLayout {
 
   const layout: Record<string, { north: Point | null; south: Point | null }> = {};
   for (const [className, { north, south }] of samplesByClass) {
-    layout[className] = { north: centroid(north), south: centroid(south) };
+    layout[className] = mirrorHalves(centroid(north), centroid(south));
   }
   return layout;
+}
+
+/**
+ * Combines a job's two independently-learned halves into one mirror-
+ * symmetric pair — see module header's "MIRRORED, NOT INDEPENDENTLY
+ * LEARNED" section. When both halves have samples, the canonical X is
+ * their average and the canonical Y-offset-from-center is the LARGER of
+ * the two halves' own offset magnitudes (a habitual under-shoot only ever
+ * SHRINKS the observed offset relative to true, never inflates it past
+ * true — so the smaller of the two is the contaminated one, never the
+ * larger), then mirrored onto both sides. A job with samples on only one
+ * half mirrors that half entirely (nothing to compare against); a job
+ * with neither stays null, unchanged from before.
+ */
+function mirrorHalves(north: Point | null, south: Point | null): { north: Point | null; south: Point | null } {
+  if (!north && !south) return { north: null, south: null };
+  if (!north) return { north: { x: south!.x, y: ARENA_CENTER - (south!.y - ARENA_CENTER) }, south };
+  if (!south) return { north, south: { x: north.x, y: ARENA_CENTER + (ARENA_CENTER - north.y) } };
+
+  const x = (north.x + south.x) / 2;
+  const offset = Math.max(ARENA_CENTER - north.y, south.y - ARENA_CENTER);
+  return { north: { x, y: ARENA_CENTER - offset }, south: { x, y: ARENA_CENTER + offset } };
 }
 
 function nearestHalf(spot: { north: Point | null; south: Point | null }, x: number, y: number): { half: Half; point: Point; distance: number } | null {
@@ -295,8 +387,34 @@ export function detectGravenImageSpreadErrors(pull: Pull, layout: GravenImageLay
 
   const withDeviation = lethalGroup.map((c) => {
     const spot = layout[c.player.className];
-    const nearest = spot ? nearestHalf(spot, c.x, c.y) : null;
-    return { ...c, distance: nearest?.distance ?? null };
+    if (!spot) return { ...c, distance: null };
+
+    // The hit's OWN x/y is where this player ended up by the time the
+    // damage log entry was written — which can already reflect a
+    // last-second dodge AFTER the game snapshotted position for hit
+    // resolution (see module header's "SNAPSHOT POSITION" section). Also
+    // check a position from shortly BEFORE the hit (self-heal/self-cast
+    // only — damageTaken is excluded so this can't just re-find the same
+    // hit) and take whichever of the two shows the LARGER deviation, same
+    // "never trust the smaller of two readings" principle as
+    // mirrorHalves above: a late dodge only ever SHRINKS the visible
+    // deviation relative to what actually caused the overlap, never
+    // inflates it.
+    const current = nearestHalf(spot, c.x, c.y);
+    const priorPos = findPlayerPosition(c.player, c.timestamp - 1, {
+      windowMs:    PRIOR_SNAPSHOT_WINDOW_MS,
+      direction:   "atOrBefore",
+      healing:     "self",
+      casts:       "self",
+      damageTaken: false,
+    });
+    const prior = priorPos ? nearestHalf(spot, priorPos.x, priorPos.y) : null;
+
+    const distance = Math.max(current?.distance ?? -1, prior?.distance ?? -1);
+    if (distance < 0) return { ...c, distance: null };
+    return prior && (prior.distance > (current?.distance ?? -1))
+      ? { ...c, x: priorPos!.x, y: priorPos!.y, distance: prior.distance }
+      : { ...c, distance: current!.distance };
   });
 
   const maxKnownDistance = Math.max(...withDeviation.map((c) => c.distance ?? -1));

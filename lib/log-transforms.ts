@@ -432,9 +432,16 @@ function wclBuildPlayers(
           .filter(e => e.targetID === actorId)
           .map(e => wclDamageTakenToPlayerEvent(e, actorMap, abilityMap, fightStart)),
 
+        // NOTE: deliberately NOT filtered to amount>0 here — a fully-
+        // overhealed tick (amount 0) still carries this player's own
+        // position, and player-position.ts's findPlayerPosition relies on
+        // exactly that (natural regen ticks routinely overheal a
+        // near-full-HP player). The Healing tab UI filters amount>0 itself
+        // (RosterPanel.tsx) so 0-amount entries never show as display
+        // noise; see graven-image.ts's "SNAPSHOT POSITION" section for the
+        // failure this filter caused before it was moved.
         healing: healingEvents
           .filter(e => e.sourceID === actorId)
-          .filter(e => (e.amount ?? 0) > 0)
           .map(e => wclHealToPlayerEvent(e, actorMap, abilityMap, fightStart)),
 
         debuffs: debuffEvents
@@ -1045,9 +1052,16 @@ function buildFFPlayers(
           .filter((e) => e.targetID === actorId)
           .map((e) => fflDamageTakenToPlayerEvent(e, actorMap, abilityMap, fightStart)),
 
+        // NOTE: deliberately NOT filtered to amount>0 here — a fully-
+        // overhealed tick (amount 0) still carries this player's own
+        // position, and player-position.ts's findPlayerPosition relies on
+        // exactly that (natural regen ticks routinely overheal a
+        // near-full-HP player). The Healing tab UI filters amount>0 itself
+        // (RosterPanel.tsx) so 0-amount entries never show as display
+        // noise; see graven-image.ts's "SNAPSHOT POSITION" section for the
+        // failure this filter caused before it was moved.
         healing: healingEvents
           .filter((e) => e.sourceID === actorId)
-          .filter((e) => (e.amount ?? 0) > 0)
           .map((e) => fflHealToPlayerEvent(e, actorMap, abilityMap, fightStart)),
 
         debuffs: debuffEvents
