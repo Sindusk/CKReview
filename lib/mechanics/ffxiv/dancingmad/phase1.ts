@@ -284,19 +284,29 @@
 //
 // **Victim-side positioning (confirmed pull 18): Ayumi Emi (too far east,
 // well past the hitbox — should have been hugging it like the rest of her
-// group) and Azura Salus (too close, essentially under the boss).** Both
-// are caught badly enough that they briefly pick up their OWN copy of the
-// Double-Trouble Trap debuff — applied then removed again within under a
-// second — DISTINCT from the original 2 holders' own application. This is
-// a reliable, purely OUTCOME-gated signal requiring no geometry at all:
-// across every pulls in this report with a second debuff-application wave,
-// the players caught in it are 0-2 people (never all 6 non-holders),
-// confirming it's a real, avoidable personal mistake, not a designed
-// recurring feature. Sonder Dreams and Kade Kansado, hit by the SAME
-// knockback instance as Ayumi in this pull, never pick up the debuff
-// themselves — confirmed correct (Sonder) / left deliberately unflagged
-// per the user's own call (Kade — "could go either way," not enforced as
-// a ruling either direction).
+// group) and Azura Salus (too close, essentially under the boss).**
+//
+// **Corrected 2026-07-29 (same session): the FIRST version of this check
+// gated on a player briefly picking up their OWN copy of the Double-
+// Trouble Trap debuff during the detonation, distinct from the original 2
+// holders' own application — this looked reliable (every second-wave
+// pickup in this report was 0-2 people, never all 6) but was WRONG. Per
+// the user directly: the Confetti holder's debuff transfers to a RANDOM
+// member of whoever their blast actually hits, not necessarily the most
+// mispositioned one. Confirmed: Sonder Dreams, Kade Kansado, and Ayumi
+// Emi were ALL hit by the same knockback instance, yet only Ayumi
+// happened to inherit the debuff — Sonder is independently confirmed
+// correctly positioned despite being hit by the exact same blast. Who
+// inherits the debuff is therefore uninformative; only geometry (distance
+// from the hitbox ring — same interpolated-position technique as the
+// holder check below) reliably separates a real mistake from incidental
+// splash exposure. See CONFETTI_STACK_OVERSHOOT_TOLERANCE_CENTIYALMS /
+// CONFETTI_STACK_UNDERSHOOT_TOLERANCE_CENTIYALMS for the confirmed
+// clean/failure distances this was calibrated against (Sonder ~509 on
+// the ring, Archidel Del'archi ~648 / Sayacissa Morsaelth ~652 as clean
+// overshoot, Kade Kansado ~552 as the user's own deliberately-unenforced
+// "could go either way" case, Ayumi ~1012 and Azura ~372 as the two
+// confirmed failures).**
 //
 // **Holder-side positioning (confirmed pull 18): Salty Dango (the Support
 // holder) stood north of the boss instead of west — visually confirmed
@@ -308,20 +318,25 @@
 // below) compared against the expected due-west/due-east bearing for the
 // holder's role.
 //
-// **Open item — a SECOND resolution (confirmed 2026-07-29, report
+// **Open item — 3 independent detonations per fight, per the user
+// directly: Wave Cannon's Confetti detonates a total of THREE times in
+// this fight, and the debuff transfers to a different pair each time —
+// each of the 3 is its OWN independent mechanic with its own stacking
+// geometry, not 3 repeats of the same one. Confirmed so far (report
 // VtdBqhLQkWJXMvDg, every pull long enough to reach it): the same
 // Double-Trouble Trap buff reapplies to a wholly new pair ~69s after the
 // first resolution — clustering (CONFETTI_RESOLUTION_GAP_MS) correctly
-// keeps this from being mistaken for the first resolution's own victims
+// keeps this from being mistaken for the first resolution's own fallout
 // (an earlier version of this code had exactly that bug), but every
-// holder in every one of these second resolutions reads ~85-100° off the
+// holder in every one of these SECOND resolutions reads ~85-100° off the
 // due-west/due-east axis — far too consistent across an entire report to
 // be everyone failing identically, and the tight clustering right around
-// 90° strongly suggests the TRUE axis for this later resolution is
-// north/south, not east/west (a different stacking arrangement entirely,
-// not a wrong call). `detectConfettiHolderMisplacedErrors` deliberately
-// only checks the FIRST resolution until this is confirmed one way or
-// the other with the user.**
+// 90° strongly suggests the TRUE axis for this second resolution is
+// north/south, not east/west. Both `detectConfettiHolderMisplacedErrors`
+// and `detectConfettiKnockbackVictimErrors` deliberately only check the
+// FIRST resolution for now — the 2nd and 3rd each need their own
+// confirmed geometry from the user before detection can be built for
+// them, same working method as everything else in this file.**
 //
 // ── WHY INTERPOLATION, NOT JUST THE NEAREST SAMPLE ─────────────────────────
 //
@@ -381,7 +396,7 @@
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import type { PullError, EnemyEvent } from "@/types/PullError";
 import type { DeathEvent } from "@/types/DeathEvent";
-import { distanceBetween, ARENA_CENTER } from "@/lib/mechanics/geometry";
+import { distanceBetween, distanceFromCenter, ARENA_CENTER } from "@/lib/mechanics/geometry";
 import { interpolatePlayerPosition } from "@/lib/mechanics/player-position";
 
 export const BLIZZARD_III_SILENT_KILL_RULE_ID = "ffxiv-phase1-blizzard3-silent-kill";
@@ -421,15 +436,13 @@ const CONFETTI_EXPLOSION_ABILITY_ID = 47783;
 // application is a victim caught by the detonation — see module header.
 const CONFETTI_HOLDER_WAVE_CLUSTER_MS = 100;
 
-// Kefka's own hitbox radius from arena center is ~500 centiyalms (derived
+// Kefka's own hitbox radius from arena center — ~500 centiyalms, derived
 // from Sonder Dreams' confirmed-correct stack position in
-// Q3GzJNZg64k1hLRm pull 18, ~505 via interpolatePlayerPosition, rounded to
-// a clean 500 — see module header). Both the DPS and Support stacks hug
-// this ring; each Confetti holder stands further out than it. Not used as
-// a literal threshold below (a mispositioned holder can easily end up
-// standing CLOSER to center than this — confirmed: Salty Dango's own
-// failure put him at ~455 — and that closeness is itself part of the
-// mistake, not a reason to exclude him), kept here for context only.
+// Q3GzJNZg64k1hLRm pull 18 (~505/509 via interpolatePlayerPosition
+// depending on exact bracket, rounded to a clean 500 — see module
+// header). Both the DPS and Support stacks hug this ring; each Confetti
+// holder stands further out than it.
+const CONFETTI_HITBOX_RADIUS_CENTIYALMS = 500;
 
 // A holder's bearing from center should be close to due-west (Support) or
 // due-east (DPS) — see module header. Comfortably between the confirmed
@@ -439,9 +452,27 @@ const CONFETTI_HOLDER_ANGLE_TOLERANCE_DEG = 40;
 
 // Below this, a bearing from center is too noisy to trust at all (tiny
 // position errors swing it wildly) — deliberately much smaller than the
-// ~500 hitbox radius above (see that note for why the hitbox radius
-// itself isn't the right floor here).
+// ~500 hitbox radius above: a mispositioned holder can easily end up
+// standing CLOSER to center than the ring itself (confirmed: Salty
+// Dango's own failure put him at ~455, under it), and that closeness is
+// itself part of the mistake, not a reason to skip judging their bearing.
 const CONFETTI_MIN_DIST_FOR_BEARING_CENTIYALMS = 150;
+
+// How far the non-holder "stack" is allowed to sit from the hitbox ring
+// before/behind it, in each direction — deliberately asymmetric. Two
+// confirmed-clean overshoots (Archidel Del'archi ~648, Sayacissa
+// Morsaelth ~652 — ~148-152 over the ring) and one deliberately-ambiguous
+// small overshoot (Kade Kansado ~552, ~52 over — the user's own "could go
+// either way," left unflagged either way by this threshold) all sit
+// comfortably under CONFETTI_STACK_OVERSHOOT_TOLERANCE, while the
+// confirmed failure (Ayumi Emi ~1012, ~512 over) clears it easily. No
+// confirmed-clean UNDERSHOOT sample exists yet (there's no legitimate
+// reason to stand inside the ring at all, unlike standing a bit further
+// back), so CONFETTI_STACK_UNDERSHOOT_TOLERANCE is set much tighter —
+// just above ordinary jitter — catching the one confirmed undershoot
+// failure (Azura Salus ~372, ~128 under).
+const CONFETTI_STACK_OVERSHOOT_TOLERANCE_CENTIYALMS  = 250;
+const CONFETTI_STACK_UNDERSHOOT_TOLERANCE_CENTIYALMS = 100;
 
 // How long before the knockback's own damage lands its interpolated
 // "snapshot" position should be read — see module header's "WHY
@@ -1004,23 +1035,22 @@ function collectConfettiApplies(players: PlayerInfo[]): ConfettiApply[] {
 }
 
 type ConfettiResolution = {
-  holders: ConfettiApply[]; // the original 2 carriers (first sub-wave)
-  victims: ConfettiApply[]; // anyone caught re-applying it in a later sub-wave
+  holders: ConfettiApply[]; // the original 2 carriers (first sub-wave) — see module header on why a later reapplication wave isn't tracked here at all (proved unreliable as a position signal)
 };
 
-// Confirmed across every sampled report: within ONE resolution, the
-// residual "caught by the blast" re-application (if any) lands ~5.7s
-// after the original holders' own application. A genuinely SEPARATE,
-// independent SECOND Confetti resolution later in a long pull starts
-// ~69s after the first — comfortably past this gap, so grouping applies
-// into clusters split at this threshold correctly keeps each resolution's
-// own holders/victims together without a later resolution's legitimate
-// holders being mistaken for the first resolution's victims (confirmed
-// bug: report VtdBqhLQkWJXMvDg pull 2 has 3 waves total — holders,
-// then a residual victim wave 5.7s later, then a WHOLLY SEPARATE second
-// resolution's own 2 holders 68.7s after that — an earlier version of
-// this code treated all 4 non-first-wave players as victims of the first
-// resolution).
+// Confirmed across every sampled report: within ONE resolution, a
+// residual "caught by the blast" debuff reapplication (if any) lands
+// ~5.7s after the original holders' own application. A genuinely
+// SEPARATE, independent SECOND Confetti resolution later in a long pull
+// starts ~69s after the first — comfortably past this gap, so grouping
+// applies into clusters split at this threshold correctly keeps each
+// resolution's own holders together without a later resolution's
+// legitimate holders being mistaken for the first resolution's fallout
+// (confirmed bug: report VtdBqhLQkWJXMvDg pull 2 has 3 waves total —
+// holders, then a residual reapplication 5.7s later, then a WHOLLY
+// SEPARATE second resolution's own 2 holders 68.7s after that — an
+// earlier version of this code treated all 4 non-first-wave players as
+// victims of the first resolution).
 const CONFETTI_RESOLUTION_GAP_MS = 15_000;
 
 function collectConfettiResolutions(players: PlayerInfo[]): ConfettiResolution[] {
@@ -1039,37 +1069,90 @@ function collectConfettiResolutions(players: PlayerInfo[]): ConfettiResolution[]
 
   return groups.map((group) => {
     const firstWaveTime = group[0].timestamp;
-    return {
-      holders: group.filter((a) => a.timestamp - firstWaveTime <= CONFETTI_HOLDER_WAVE_CLUSTER_MS),
-      victims: group.filter((a) => a.timestamp - firstWaveTime > CONFETTI_HOLDER_WAVE_CLUSTER_MS),
-    };
+    return { holders: group.filter((a) => a.timestamp - firstWaveTime <= CONFETTI_HOLDER_WAVE_CLUSTER_MS) };
   });
 }
 
 /**
- * Detects a player caught by the Confetti detonation badly enough to
- * briefly pick up their OWN copy of the Double-Trouble Trap debuff —
- * distinct from that resolution's 2 holders' own application — instead of
- * being cleanly knocked across the arena. See module header: this is
- * purely outcome-gated (no position math), since which players end up in
- * a later application wave already IS the signal.
+ * The moment a resolution's position should be read — ~half a second
+ * before the knockback's own damage lands (see CONFETTI_SNAPSHOT_LEAD_MS)
+ * — anchored on THIS resolution's own explosion hits (within a window
+ * after its holders' application), or undefined if that resolution's
+ * knockback damage isn't in the log at all.
+ */
+function confettiSnapshotTime(players: PlayerInfo[], firstWaveTime: number): number | undefined {
+  const explosionTimestamps = players
+    .flatMap((p) => p.damageTaken)
+    .filter(
+      (e) =>
+        e.abilityId === CONFETTI_EXPLOSION_ABILITY_ID &&
+        e.timestamp >= firstWaveTime &&
+        e.timestamp <= firstWaveTime + CONFETTI_RESOLUTION_GAP_MS
+    )
+    .map((e) => e.timestamp);
+  if (explosionTimestamps.length === 0) return undefined;
+  return Math.min(...explosionTimestamps) - CONFETTI_SNAPSHOT_LEAD_MS;
+}
+
+/**
+ * Detects a non-holder "stack" player standing too far from — or too
+ * close to — the boss's own hitbox ring when their side's Confetti
+ * detonated. See module header: this REPLACES an earlier, DISPROVEN
+ * debuff-reapplication check. Per the user, the transferred Double-
+ * Trouble Trap debuff lands on a RANDOM member of whoever the blast
+ * actually hit, not necessarily the most-mispositioned one — confirmed:
+ * Sonder Dreams, Kade Kansado, and Ayumi Emi were ALL hit by the same
+ * explosion instance, yet only Ayumi happened to inherit the debuff, and
+ * Sonder is independently confirmed correctly positioned despite being
+ * hit too. Geometry (distance from the hitbox ring) is the only reliable
+ * signal here. Only the FIRST resolution's axis is confirmed — see
+ * detectConfettiHolderMisplacedErrors' own comment on why later
+ * resolutions are left alone for now.
  */
 function detectConfettiKnockbackVictimErrors(players: PlayerInfo[]): PullError[] {
-  const victims = collectConfettiResolutions(players).flatMap((r) => r.victims);
+  const errors: PullError[] = [];
 
-  return victims.map((v) => ({
-    ruleId:      CONFETTI_KNOCKBACK_VICTIM_RULE_ID,
-    severity:    "Major",
-    name:        "Confetti Knockback Wrong Position",
-    description: "Was still close enough to the Confetti detonation to briefly pick up the debuff themselves — should have been standing at their stack spot (hugging the boss's hitbox) so the knockback carried them cleanly across the arena.",
-    timestamp:   v.timestamp,
-    player:      v.player.name,
-    class:       v.player.className,
-    specId:      v.player.specId,
-    role:        v.player.role,
-    abilityId:   DOUBLE_TROUBLE_TRAP_BUFF_ID,
-    abilityName: "Double-Trouble Trap",
-  }));
+  for (const { holders } of collectConfettiResolutions(players).slice(0, 1)) {
+    if (holders.length === 0) continue;
+
+    const snapshotTime = confettiSnapshotTime(players, holders[0].timestamp);
+    if (snapshotTime === undefined) continue;
+
+    const holderNames = new Set(holders.map((h) => h.player.name));
+    const stack = players.filter((p) => !holderNames.has(p.name));
+
+    for (const player of stack) {
+      const pos = interpolatePlayerPosition(player, snapshotTime, {
+        windowMs:        CONFETTI_POSITION_WINDOW_MS,
+        healing:         "self",
+        damageTaken:     false,
+        casts:           "self",
+        healingReceived: "any",
+      });
+      if (!pos) continue; // can't confirm their position — fail closed, don't guess
+
+      const dist = distanceFromCenter(pos.x, pos.y);
+      const tooFar  = dist > CONFETTI_HITBOX_RADIUS_CENTIYALMS + CONFETTI_STACK_OVERSHOOT_TOLERANCE_CENTIYALMS;
+      const tooNear = dist < CONFETTI_HITBOX_RADIUS_CENTIYALMS - CONFETTI_STACK_UNDERSHOOT_TOLERANCE_CENTIYALMS;
+      if (!tooFar && !tooNear) continue; // within normal jitter of the hitbox ring
+
+      errors.push({
+        ruleId:      CONFETTI_KNOCKBACK_VICTIM_RULE_ID,
+        severity:    "Major",
+        name:        "Confetti Stack Misplaced",
+        description: `Was roughly ${(dist / 100).toFixed(1)} yalms from the boss when Confetti detonated — ${tooFar ? "too far out" : "too close in"}, should have been hugging the boss's hitbox so the knockback carried them cleanly across the arena.`,
+        timestamp:   snapshotTime,
+        player:      player.name,
+        class:       player.className,
+        specId:      player.specId,
+        role:        player.role,
+        abilityId:   DOUBLE_TROUBLE_TRAP_BUFF_ID,
+        abilityName: "Double-Trouble Trap",
+      });
+    }
+  }
+
+  return errors;
 }
 
 /**
@@ -1077,9 +1160,10 @@ function detectConfettiKnockbackVictimErrors(players: PlayerInfo[]): PullError[]
  * victim of it) standing off the expected due-west (Support) / due-east
  * (DPS) line from arena center — see module header for the mechanic, the
  * interpolated-position technique, and why this needs its own check
- * (holders have no debuff-reapplication signal to gate on, since they ARE
- * the explosion). Runs once per resolution instance (see
- * collectConfettiResolutions — a long pull can have more than one).
+ * (holders have no reliable outcome signal to gate on — see
+ * detectConfettiKnockbackVictimErrors — since they ARE the explosion).
+ * Runs once per resolution instance (see collectConfettiResolutions — a
+ * long pull can have more than one).
  */
 function detectConfettiHolderMisplacedErrors(players: PlayerInfo[]): PullError[] {
   const errors: PullError[] = [];
@@ -1096,22 +1180,8 @@ function detectConfettiHolderMisplacedErrors(players: PlayerInfo[]): PullError[]
   for (const { holders } of collectConfettiResolutions(players).slice(0, 1)) {
     if (holders.length === 0) continue;
 
-    // Anchor on THIS resolution's own knockback damage — whichever comes
-    // first, within a window after these holders' own application — then
-    // read position from ~half a second before that (see
-    // CONFETTI_SNAPSHOT_LEAD_MS).
-    const firstWaveTime = holders[0].timestamp;
-    const explosionTimestamps = players
-      .flatMap((p) => p.damageTaken)
-      .filter(
-        (e) =>
-          e.abilityId === CONFETTI_EXPLOSION_ABILITY_ID &&
-          e.timestamp >= firstWaveTime &&
-          e.timestamp <= firstWaveTime + CONFETTI_RESOLUTION_GAP_MS
-      )
-      .map((e) => e.timestamp);
-    if (explosionTimestamps.length === 0) continue;
-    const snapshotTime = Math.min(...explosionTimestamps) - CONFETTI_SNAPSHOT_LEAD_MS;
+    const snapshotTime = confettiSnapshotTime(players, holders[0].timestamp);
+    if (snapshotTime === undefined) continue;
 
     for (const { player } of holders) {
       const pos = interpolatePlayerPosition(player, snapshotTime, {
