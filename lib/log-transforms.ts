@@ -832,6 +832,13 @@ function fflCastToPlayerEvent(
     abilityName: fflAbilityName(event, abilityMap),
     abilityIcon: fflAbilityIcon(event, abilityMap),
     target,
+    // targetResources' x/y is only this player's OWN position when the cast
+    // targets themselves (target === this player's name, e.g. a self-buff)
+    // — same "only trust it when target===source" caveat as a self-heal.
+    // Never usable when the cast targets the boss or an ally. See
+    // player-position.ts's findPlayerPosition `casts: "self"` option.
+    x: event.targetResources?.x,
+    y: event.targetResources?.y,
   };
 }
 

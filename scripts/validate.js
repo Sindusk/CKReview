@@ -289,7 +289,11 @@ const MECHANICS = {
         console.log(`    ${className.padEnd(12)} north=${north ? `${north.x},${north.y}` : '—'}  south=${south ? `${south.x},${south.y}` : '—'}`);
       }
 
-      for (const p of pullLikes) printPullErrors(p, mod.detectGravenImageSpreadErrors(p, layout));
+      for (const p of pullLikes) {
+        printPullErrors(p, mod.detectGravenImageSpreadErrors(p, layout), [
+          ['stack', mod.detectGravenImageStackErrors(p)],
+        ]);
+      }
     },
   },
 

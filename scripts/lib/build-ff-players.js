@@ -41,7 +41,18 @@ function buildFFPlayers(rep, actorMap, getFFJobByName, abilityMap) {
         healthAfter: e.targetResources?.hitPoints,
         maxHealth: e.targetResources?.maxHitPoints,
       })),
-      casts: [],
+      // x/y here mirror lib/log-transforms.ts's real fflCastToPlayerEvent:
+      // targetResources' x/y, only trustworthy as this player's OWN position
+      // when the cast targets themselves (target === this player's name,
+      // e.g. a self-buff) — see player-position.ts's `casts: "self"` option.
+      casts: (rep.casts?.data ?? []).filter((e) => e.sourceID === id).map((e) => ({
+        timestamp: e.timestamp,
+        abilityId: e.abilityGameID ?? 0,
+        abilityName: 'Ability ' + e.abilityGameID,
+        target: actorMap.get(e.targetID)?.name,
+        x: e.targetResources?.x,
+        y: e.targetResources?.y,
+      })),
       // NOTE this is oriented OPPOSITE to lib/log-transforms.ts's real
       // buildFFPlayers, which filters healing by sourceID (heals CAST BY
       // this player, x/y = RECIPIENT's position). This harness instead

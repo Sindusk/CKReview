@@ -41,6 +41,14 @@
 //   position instead. Grandfathered for forsaken.ts, whose validated
 //   behavior was tuned with this fallback — do NOT use it in new code; use
 //   "self" (the default).
+// - `player.casts` — same shape as healing: x/y belongs to whoever the cast
+//   TARGETED, and only a genuine self-target cast (target === player.name,
+//   e.g. a self-buff) is safe to read as this player's own position. Unlike
+//   healing there's no orientation split to worry about — both the real
+//   pipeline and the harness build `casts` as "cast BY this player", so
+//   `target` always means the same thing. Useful as a last-resort position
+//   source for a player who wasn't hit by anything and isn't a healer
+//   (nothing to self-heal with) — e.g. graven-image.ts's stack-anchor check.
 //
 // Always give `windowMs` a deliberate value: a position sample that's too
 // old can predate the player's final, fatal move (a real case had a heal 8s
@@ -85,6 +93,13 @@ export interface FindPlayerPositionOptions {
   healing?: "self" | "all" | "none";
   /** Include `player.damageTaken` (default true). */
   damageTaken?: boolean;
+  /**
+   * Which cast entries to trust as this player's own position: "self" —
+   * only self-target casts (target === player.name, see header); "none"
+   * (default — opt-in, unlike healing, so this brand-new stream doesn't
+   * change any existing caller's behavior) — ignore casts entirely.
+   */
+  casts?: "self" | "none";
   /** External per-player samples (FFXIV boss-hit stream); filtered to this player by name. */
   positionSamples?: PositionSample[];
 }
@@ -101,7 +116,7 @@ export function findPlayerPosition(
   timestamp: number,
   options: FindPlayerPositionOptions
 ): Position | undefined {
-  const { windowMs, direction = "nearest", healing = "self", damageTaken = true, positionSamples } = options;
+  const { windowMs, direction = "nearest", healing = "self", damageTaken = true, casts = "none", positionSamples } = options;
 
   let best: Position | undefined;
   let bestScore = Infinity;
@@ -118,6 +133,12 @@ export function findPlayerPosition(
   if (healing !== "none") {
     for (const e of player.healing) {
       if (healing === "self" && e.target !== player.name && e.source !== player.name) continue;
+      consider(e.timestamp, e.x, e.y);
+    }
+  }
+  if (casts === "self") {
+    for (const e of player.casts) {
+      if (e.target !== player.name) continue;
       consider(e.timestamp, e.x, e.y);
     }
   }

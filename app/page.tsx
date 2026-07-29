@@ -30,7 +30,7 @@ import {
   detectIncorrectBlackHoleDirectionErrors,
   type BlackHoleStrategyId,
 } from "@/lib/mechanics/ffxiv/dancingmad/blackhole-strategy";
-import { learnGravenImageLayout, detectGravenImageSpreadErrors } from "@/lib/mechanics/ffxiv/dancingmad/graven-image";
+import { learnGravenImageLayout, detectGravenImageSpreadErrors, detectGravenImageStackErrors } from "@/lib/mechanics/ffxiv/dancingmad/graven-image";
 import { learnWaveCannonLayout, detectWaveCannonPositionErrors, detectWaveCannonMitigationIssueErrors } from "@/lib/mechanics/ffxiv/dancingmad/wave-cannon";
 import type { Pull } from "../types/Pull";
 import { createCallWipeError, CALL_WIPE_RULE_ID, createManualError, type ManualErrorInput } from "@/types/PullError";
@@ -188,7 +188,10 @@ export default function Home() {
         ...detectClippedByNeighborTetherErrors(p, blackHoleStrategy),
         ...detectIncorrectBlackHoleDirectionErrors(p, blackHoleStrategy),
       ];
-      const gravenImageErrors = detectGravenImageSpreadErrors(p, gravenImageLayout);
+      const gravenImageErrors = [
+        ...detectGravenImageSpreadErrors(p, gravenImageLayout),
+        ...detectGravenImageStackErrors(p),
+      ];
       const waveCannonErrors = [
         ...detectWaveCannonPositionErrors(p.players, p.deathEvents, waveCannonLayout),
         ...detectWaveCannonMitigationIssueErrors(p.players, p.deathEvents),
