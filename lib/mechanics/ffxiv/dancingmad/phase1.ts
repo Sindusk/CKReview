@@ -147,52 +147,36 @@
 // consistently "sloppy" Paladin included) — see
 // ARROW_OUT_OF_POSITION_THRESHOLD_YALMS for where the line is drawn.
 //
-// ── MYSTERY MAGIC SPREAD OVERLAP + UNRESOLVABLE-WIPE (confirmed 2026-07-28, ──
+// ── MYSTERY MAGIC DEATH -> UNRESOLVABLE WIPE (confirmed 2026-07-28, ─────────
 // ── report Q3GzJNZg64k1hLRm, pulls 1/2) ─────────────────────────────────────
 //
 // Mystery Magic (begincast/cast 47764) fires right after each Graven Image
 // and resolves ~5s later with a raid-wide AoE tick in one of two elemental
 // flavors — Flagrant Fire III (47778/47779) or Thrumming Thunder III
-// (47775/47776/47777) — each landing as one `sourceInstance` per player
-// (their own personal copy of the puddle/tick). A separate concurrent cast,
-// Blizzard III Blowout (BLIZZARD_III_BLOWOUT_ABILITY_IDS above), is also
-// part of the same mechanic package.
+// (47775/47776/47777). A separate concurrent cast, Blizzard III Blowout
+// (BLIZZARD_III_BLOWOUT_ABILITY_IDS above), is also part of the same
+// mechanic package. **A death to any of these makes Wave Cannon
+// unresolvable** — it already self-gates on exactly 4 live carriers (see
+// WAVE_CANNON_TOWER_OVERLAP module comment), so no change was needed there.
 //
-// The 8 players must split into two fixed groups for this resolution:
-// Tank + Healer roles stand on the ARENA WEST side (x < ARENA_CENTER),
-// DPS stand EAST (x > ARENA_CENTER) — confirmed against every clean
-// resolution in this report (pulls 3, 4: all 4 support-role players west,
-// all 4 DPS east, no exceptions). A player standing on the wrong side for
-// their role ends up close enough to a neighbor on the correct side that
-// BOTH take two distinct `sourceInstance` hits that volley (their own
-// puddle plus the neighbor's) instead of one — gated on that outcome, same
-// "gate on outcome, use position for attribution" approach as Wave Cannon
-// above. Confirmed failure (pull 1): Salty Dango (Gunbreaker/Tank) stood on
-// the DPS side; Sonder Dreams (Reaper/DPS), correctly positioned, was caught
-// in the overlap and died alongside her. Per this codebase's root-cause
-// philosophy (confirmed by the user directly, since both took mechanically
-// identical hits and only geometry distinguishes them): only Salty Dango
-// flags — Sonder Dreams' death is fallout of Salty Dango's misplacement, not
-// an independent mistake.
+// What WAS missing: nothing marked the pull as over at the point of death,
+// so later incidental errors (e.g. generic Damage Down procs from a raid
+// already spiraling toward a call) kept counting as real mistakes. A
+// Raid-severity error now fires once, timestamped just after the death,
+// functioning purely as the lib/report-data.ts cutoff marker — see that
+// file's "once a raid-wide mistake has happened... Major errors after that
+// point are dropped" logic, the same mechanism JUMPED_OFF_ARENA relies on
+// above.
 //
-// Separately: **a death to ANY of these resolution abilities makes Wave
-// Cannon unresolvable** — it already self-gates on exactly 4 live carriers
-// (see WAVE_CANNON_TOWER_OVERLAP module comment), so no change was needed
-// there. What WAS missing: nothing marked the pull as over at the point of
-// death, so later incidental errors (e.g. generic Damage Down procs from a
-// raid already spiraling toward a call) kept counting as real mistakes. A
-// Raid-severity error now fires once, timestamped just after the death (and
-// any Major error(s) it produced), functioning purely as the
-// lib/report-data.ts cutoff marker — see that file's "once a raid-wide
-// mistake has happened... Major errors after that point are dropped" logic,
-// the same mechanism JUMPED_OFF_ARENA relies on above. This covers BOTH
-// confirmed pulls: pull 1's spread-overlap death (Salty Dango) and pull 2's
-// single-target death (Azura Salus, personally targeted by Blizzard III
-// Blowout then killed by the immediately-following Flagrant Fire III tick —
-// a different failure shape than the overlap case, deliberately NOT given
-// its own Major rule yet since the log alone can't establish why she in
-// particular didn't survive it; only the wipe cutoff is built for this shape
-// so far).
+// Note: the Flagrant Fire III spread's own per-player position/overlap
+// attribution (who stood in the wrong spot and got a neighbor killed too —
+// pull 1's Salty Dango/Sonder Dreams case) is NOT duplicated here — that's
+// graven-image.ts's `ffxiv-phase1-graven-image-spread-misplaced` rule,
+// which already covers this exact resolution tick with a per-job LEARNED
+// position table (more precise than a hardcoded west/east half) and its own
+// overlap-plus-death gating. An earlier version of this rule set
+// re-implemented that as a coarser role-based half-check and produced a
+// duplicate error for the same mistake — removed 2026-07-28.
 //
 // Graven Image's spread mechanic (~0:38, cast "Graven Image", 48370) lives
 // in its own file, graven-image.ts, NOT here — unlike everything else in
@@ -206,43 +190,29 @@
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import type { PullError } from "@/types/PullError";
 import type { DeathEvent } from "@/types/DeathEvent";
-import { distanceBetween, ARENA_CENTER } from "@/lib/mechanics/geometry";
+import { distanceBetween } from "@/lib/mechanics/geometry";
 
 export const BLIZZARD_III_SILENT_KILL_RULE_ID = "ffxiv-phase1-blizzard3-silent-kill";
 export const JUMPED_OFF_ARENA_RULE_ID          = "ffxiv-phase1-jumped-off-arena";
 export const WAVE_CANNON_OUT_OF_POSITION_RULE_ID = "ffxiv-phase1-wave-cannon-out-of-position";
 export const WAVE_CANNON_TOWER_OVERLAP_RULE_ID   = "ffxiv-phase1-wave-cannon-tower-overlap";
 export const TELE_TROUNCING_ARROW_RULE_ID = "ffxiv-phase1-tele-trouncing-arrow-misplaced";
-export const MYSTERY_MAGIC_SPREAD_OVERLAP_RULE_ID = "ffxiv-phase1-mystery-magic-spread-overlap";
-export const MYSTERY_MAGIC_DEATH_WIPE_RULE_ID      = "ffxiv-phase1-mystery-magic-death-wipe";
+export const MYSTERY_MAGIC_DEATH_WIPE_RULE_ID = "ffxiv-phase1-mystery-magic-death-wipe";
 
 const BLIZZARD_III_BLOWOUT_ABILITY_IDS = new Set([47765, 47768, 47771, 47774]);
 const DAMAGE_DOWN_ABILITY_ID = 1002911;
 
-// The two confirmed elemental flavors Mystery Magic's raid-wide resolution
-// tick can land as — see module comment above. Each lands as one
-// `sourceInstance` per player; a player hit by 2+ distinct instances of
-// either overlapped with a neighbor.
-const FLAGRANT_FIRE_III_ABILITY_IDS = new Set([47778, 47779]);
-const THRUMMING_THUNDER_III_ABILITY_IDS = new Set([47775, 47776, 47777]);
-const MYSTERY_MAGIC_SPREAD_ABILITY_IDS = new Set([
-  ...FLAGRANT_FIRE_III_ABILITY_IDS,
-  ...THRUMMING_THUNDER_III_ABILITY_IDS,
-]);
-
-// Everything a Mystery Magic death can be credited to — the spread tick
-// flavors above, plus Blizzard III Blowout (also part of the same mechanic
-// package — see BLIZZARD_III_SILENT_KILL above). Used only to find the
-// death that marks the pull as unresolvable, not for attribution.
+// Everything a Mystery Magic death can be credited to — the two confirmed
+// raid-wide resolution tick flavors (Flagrant Fire III, Thrumming Thunder
+// III) plus Blizzard III Blowout (also part of the same mechanic package —
+// see BLIZZARD_III_SILENT_KILL above). Used only to find the death that
+// marks the pull as unresolvable, not for attribution (see module comment —
+// attribution for the spread tick itself lives in graven-image.ts).
 const MYSTERY_MAGIC_DEATH_ABILITY_IDS = new Set([
-  ...MYSTERY_MAGIC_SPREAD_ABILITY_IDS,
+  47778, 47779,             // Flagrant Fire III
+  47775, 47776, 47777,      // Thrumming Thunder III
   ...BLIZZARD_III_BLOWOUT_ABILITY_IDS,
 ]);
-
-// Roles expected on the WEST side (x < ARENA_CENTER) of Mystery Magic's
-// spread; everyone else (DPS) is expected EAST. Confirmed against every
-// clean resolution in report Q3GzJNZg64k1hLRm (pulls 3, 4).
-const MYSTERY_MAGIC_WEST_ROLES = new Set(["Tank", "Healer"]);
 
 // A single Mystery Magic resolution's hits/deaths span well under 3s
 // (observed: first hit to final death ~2.7s in pull 1); the next
@@ -616,99 +586,6 @@ function detectWaveCannonTowerOverlapErrors(players: PlayerInfo[], deathEvents: 
 }
 
 /**
- * Detects a player standing on the wrong side of Mystery Magic's spread
- * (west/support vs east/DPS) who overlapped a correctly-positioned neighbor
- * and got both of them killed. See the module comment for the mechanic and
- * why only the wrong-side player is flagged.
- */
-function detectMysteryMagicSpreadOverlapErrors(players: PlayerInfo[], deathEvents: DeathEvent[]): PullError[] {
-  type Hit = { player: PlayerInfo; timestamp: number; sourceInstance: number; x?: number; y?: number };
-  const hits: Hit[] = [];
-  for (const player of players) {
-    for (const e of player.damageTaken) {
-      if (!MYSTERY_MAGIC_SPREAD_ABILITY_IDS.has(e.abilityId) || e.sourceInstance === undefined) continue;
-      hits.push({ player, timestamp: e.timestamp, sourceInstance: e.sourceInstance, x: e.x, y: e.y });
-    }
-  }
-  if (hits.length === 0) return [];
-
-  hits.sort((a, b) => a.timestamp - b.timestamp);
-  const clusters: Hit[][] = [];
-  for (const hit of hits) {
-    const current = clusters[clusters.length - 1];
-    if (current && hit.timestamp - current[current.length - 1].timestamp <= MYSTERY_MAGIC_VOLLEY_CLUSTER_MS) {
-      current.push(hit);
-    } else {
-      clusters.push([hit]);
-    }
-  }
-
-  const errors: PullError[] = [];
-
-  for (const cluster of clusters) {
-    const byPlayer = new Map<number, Hit[]>();
-    for (const h of cluster) {
-      const list = byPlayer.get(h.player.actorId) ?? [];
-      list.push(h);
-      byPlayer.set(h.player.actorId, list);
-    }
-
-    const compromised = [...byPlayer.values()].filter(
-      (hs) => new Set(hs.map((h) => h.sourceInstance)).size >= 2
-    );
-    if (compromised.length === 0) continue; // every hit landed as a clean single tick
-
-    const withSide = compromised
-      .filter((hs) => hs[0].x !== undefined)
-      .map((hs) => ({
-        player:       hs[0].player,
-        timestamp:    hs[0].timestamp,
-        actualWest:   hs[0].x! < ARENA_CENTER,
-        expectedWest: MYSTERY_MAGIC_WEST_ROLES.has(hs[0].player.role),
-      }));
-
-    const wrongSide = withSide.filter((c) => c.actualWest !== c.expectedWest);
-    // A victim standing on their correct side who just got caught by a
-    // neighbor's misplacement stays unflagged — only the misplaced one is.
-    if (wrongSide.length === 0) continue;
-
-    const others = compromised
-      .flatMap((hs) => hs[0].player.name)
-      .filter((name) => !wrongSide.some((c) => c.player.name === name));
-
-    for (const { player, timestamp, expectedWest } of wrongSide) {
-      const deadOthers = others.filter((name) => deathEvents.some((d) => d.player === name));
-      const selfDied = deathEvents.some((d) => d.player === player.name);
-
-      let overlapNote = "";
-      if (others.length > 0) {
-        overlapNote = ` Overlapped with ${others.join(" and ")}'s Mystery Magic spread`;
-        const bothDied = selfDied && deadOthers.length > 0;
-        if (bothDied) overlapNote += `, killing them both`;
-        else if (deadOthers.length > 0) overlapNote += `, killing ${deadOthers.join(" and ")}`;
-        overlapNote += ".";
-      }
-
-      errors.push({
-        ruleId:      MYSTERY_MAGIC_SPREAD_OVERLAP_RULE_ID,
-        severity:    "Major",
-        name:        "Mystery Magic Wrong Side",
-        description: `Stood on the ${expectedWest ? "DPS" : "Tank/Healer"} side of Mystery Magic's spread instead of their own.${overlapNote}`,
-        timestamp,
-        player:      player.name,
-        class:       player.className,
-        specId:      player.specId,
-        role:        player.role,
-        abilityId:   0,
-        abilityName: "Mystery Magic",
-      });
-    }
-  }
-
-  return errors;
-}
-
-/**
  * A death to Mystery Magic's resolution (either spread tick flavor, or
  * Blizzard III Blowout — see MYSTERY_MAGIC_DEATH_ABILITY_IDS) leaves Wave
  * Cannon unresolvable (it already self-gates on 4 live carriers) and marks
@@ -847,15 +724,13 @@ function detectTeleTrouncingArrowErrors(players: PlayerInfo[]): PullError[] {
  */
 export function detectPhase1Errors(players: PlayerInfo[], deathEvents: DeathEvent[]): PullError[] {
   const blizzardIIISilentKillErrors = detectBlizzardIIIBlowoutSilentKillErrors(players, deathEvents);
-  const mysteryMagicSpreadOverlapErrors = detectMysteryMagicSpreadOverlapErrors(players, deathEvents);
 
   return [
     ...blizzardIIISilentKillErrors,
     ...detectJumpedOffArenaError(players, deathEvents),
     ...detectWaveCannonOutOfPositionErrors(players, deathEvents),
     ...detectWaveCannonTowerOverlapErrors(players, deathEvents),
-    ...mysteryMagicSpreadOverlapErrors,
-    ...detectMysteryMagicDeathWipeError(deathEvents, [...blizzardIIISilentKillErrors, ...mysteryMagicSpreadOverlapErrors]),
+    ...detectMysteryMagicDeathWipeError(deathEvents, blizzardIIISilentKillErrors),
     ...detectTeleTrouncingArrowErrors(players),
   ].sort((a, b) => a.timestamp - b.timestamp);
 }
