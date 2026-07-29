@@ -75,6 +75,62 @@
 // cutoff shape as GRAVEN_1_DEATH_WIPE_RULE_ID/CONFETTI_LOST_RULE_ID/
 // UNMITIGATED_EXPLOSION_WIPE_RULE_ID.
 //
+// ── GRAVEN 2 SPREAD MISPLACED (confirmed 2026-07-30, report ─────────────────
+// ── Q3GzJNZg64k1hLRm, pull 31) ───────────────────────────────────────────
+//
+// Graven 2's Gravitas Puddles (47788) stack the raid into its 2 fixed
+// light parties (LP1/LP2, NOT a role split — confirmed both LPs can be a
+// mix of tank/healer/DPS) on opposite sides of the arena. What follows,
+// Vitrophyre (47792, "Spread"), requires ONE role category — Support
+// (Tank+Healer) on some pulls, DPS on others, same random-per-pull
+// telegraph as Graven Image's spread half — to break off and stand
+// individually far enough apart that each of their own personal Vitrophyre
+// explosions doesn't reach anyone else, while the OTHER role category
+// stacks at the boss's own hitbox instead. Per the user and the raid's own
+// strategy sheet (image "Graven2Spread," drawn for the newer 8-player-
+// stack strategy but confirmed identical for this — the tank/melee spread
+// slots don't change between strategies): whichever role fills the "first"
+// slot (MT for Support, M1 for DPS) spreads EAST; whichever fills the
+// "second" slot (OT for Support, M2 for DPS) spreads WEST. The other two
+// spreading slots' own exact positions aren't confirmed yet.
+//
+// Confirmed failure (pull 31, Support spread): Salty Dango (MT) stayed
+// north, near the boss hitbox, instead of moving out east — close enough
+// that his own Vitrophyre explosion (its own FFLogs sourceInstance) also
+// caught Sonder Dreams, who was correctly hugging the hitbox as a DPS that
+// pull. Sonder died to it. Sayacissa Morsaelth (OT) is confirmed in the
+// SAME pull to have correctly spread west (her own instance hit nobody
+// else), giving a clean contrast pair.
+//
+// Detection deliberately does NOT need the exact confirmed compass
+// bearings — a pure OUTCOME/overlap check (a spreader's own instance hit
+// 2+ people) is enough, the same technique WAVE_CANNON_TOWER_OVERLAP_RULE_ID
+// already uses, and it generalizes to the two still-unconfirmed spread
+// slots for free. The only judgment call needed is WHO to blame when an
+// instance catches 2+ people: whichever of them actually belongs to the
+// spreading role category (Support or DPS, whichever is majority among
+// everyone Vitrophyre hit this resolution) is the one who should have
+// been standing apart — an innocent bystander from the OTHER role
+// category (like Sonder here, hugging the hitbox where he belonged) isn't
+// blamed for getting clipped. If an overlap instance has zero or 2+
+// legitimate spreaders sharing it, that's ambiguous — stay silent rather
+// than guess (e.g. two Support players overlapping each other, which
+// slot-assignment mistake actually caused it isn't derivable from this
+// signal alone).
+//
+// ── GRAVEN 2 DEATH -> UNRESOLVABLE (confirmed 2026-07-30, same pull) ────────
+//
+// Per the user: once ANYONE dies during Graven 2 (from the Gravitas
+// Puddles cast onward), the rest of the mechanic — and everything chained
+// after it (the tankbuster, Confetti Knockback, Puddle Soaks) — becomes
+// difficult to impossible to resolve cleanly. Confirmed pull 31: Sonder's
+// death (above) is immediately followed by a genuinely messy back half —
+// the tankbuster's own threat gets scrambled, and the pull ends in a
+// GRAVITATIONAL_EXPLOSION_WIPE_RULE_ID a few seconds later. A single Raid
+// error fires right after the first Graven-2-scoped death, same cutoff
+// shape as every other rule in this file that does this — see
+// detectGraven2DeathWipeError below.
+//
 // ── BLIZZARD III BLOWOUT SILENT KILL (confirmed 2026-07, VtdBqhLQkWJXMvDg) ──
 //
 // Blizzard III Blowout (ability IDs vary — 47765/47768/47771/47774, all
@@ -555,6 +611,8 @@ export const WAVE_CANNON_TOWER_MISSED_RULE_ID    = "ffxiv-phase1-wave-cannon-tow
 export const WAVE_CANNON_TOWER_PRIORITY_RULE_ID  = "ffxiv-phase1-wave-cannon-tower-priority-missed";
 export const UNMITIGATED_EXPLOSION_WIPE_RULE_ID  = "ffxiv-phase1-unmitigated-explosion-wipe";
 export const GRAVITATIONAL_EXPLOSION_WIPE_RULE_ID = "ffxiv-phase1-gravitational-explosion-wipe";
+export const GRAVEN_2_SPREAD_MISPLACED_RULE_ID = "ffxiv-phase1-graven2-spread-misplaced";
+export const GRAVEN_2_DEATH_WIPE_RULE_ID = "ffxiv-phase1-graven2-death-wipe";
 export const TELE_TROUNCING_ARROW_RULE_ID = "ffxiv-phase1-tele-trouncing-arrow-misplaced";
 export const GRAVEN_1_DEATH_WIPE_RULE_ID = "ffxiv-phase1-graven-1-death-wipe";
 export const REVOLTING_RUIN_THREAT_LOSS_RULE_ID = "ffxiv-phase1-revolting-ruin-threat-loss";
@@ -718,6 +776,14 @@ const UNMITIGATED_EXPLOSION_ABILITY_ID = 47787;
 // Q3GzJNZg64k1hLRm pull 29) — see GRAVITATIONAL_EXPLOSION_WIPE_RULE_ID
 // module comment near detectGravitationalExplosionWipeError below.
 const GRAVITATIONAL_EXPLOSION_ABILITY_ID = 47789;
+
+// Graven 2's own opening cast (the Gravitas Puddles stack) — marks the
+// mechanic's start for GRAVEN_2_DEATH_WIPE_RULE_ID's gate below.
+const GRAVEN_2_START_ABILITY_ID = 47788;
+
+// Graven 2's Spread resolution — see GRAVEN_2_SPREAD_MISPLACED_RULE_ID
+// module comment near detectGraven2SpreadMisplacedErrors below.
+const VITROPHYRE_ABILITY_ID = 47792;
 
 // Fixed west-to-east standing order for the 4 support roles during Wave
 // Cannon — see the WAVE CANNON SUPPORT TOWER PRIORITY module comment above.
@@ -1548,6 +1614,146 @@ function detectGravitationalExplosionWipeError(enemyCasts: EnemyEvent[]): PullEr
   ];
 }
 
+// A Vitrophyre resolution's own hits land within ~100ms of each other
+// (confirmed pull 31: all 5 hits at t=92687); two DISTINCT resolutions in
+// the same pull (1st/2nd Spreads) are ~15-20s apart — wide margin.
+const GRAVEN_2_SPREAD_RESOLUTION_GAP_MS = 5000;
+
+/**
+ * Detects a spreading-role player (Support or DPS, whichever role category
+ * is spreading this resolution — see module header) whose own Vitrophyre
+ * explosion instance also caught someone else, meaning they didn't stand
+ * far enough apart. Pure outcome/overlap check — see module header for why
+ * this doesn't need the still-unconfirmed exact spread positions.
+ */
+function detectGraven2SpreadMisplacedErrors(players: PlayerInfo[]): PullError[] {
+  type Hit = { player: PlayerInfo; timestamp: number; sourceInstance: number | undefined };
+  const hits: Hit[] = [];
+  for (const player of players) {
+    for (const e of player.damageTaken) {
+      if (e.abilityId === VITROPHYRE_ABILITY_ID) hits.push({ player, timestamp: e.timestamp, sourceInstance: e.sourceInstance });
+    }
+  }
+  if (hits.length === 0) return [];
+
+  const resolutionStarts: number[] = [];
+  for (const t of [...new Set(hits.map((h) => h.timestamp))].sort((a, b) => a - b)) {
+    if (resolutionStarts.length === 0 || t - resolutionStarts[resolutionStarts.length - 1] > GRAVEN_2_SPREAD_RESOLUTION_GAP_MS) {
+      resolutionStarts.push(t);
+    }
+  }
+
+  const errors: PullError[] = [];
+  for (let i = 0; i < resolutionStarts.length; i++) {
+    const start = resolutionStarts[i];
+    const end = resolutionStarts[i + 1] ?? Infinity;
+    const resolutionHits = hits.filter((h) => h.timestamp >= start && h.timestamp < end);
+
+    // Which role category is spreading this resolution — Support (Tank +
+    // Healer) or DPS — determined by majority among who actually got hit;
+    // the random-per-pull telegraph decides this, same as Graven Image's
+    // spread half.
+    const supportCount = resolutionHits.filter((h) => h.player.role !== "DPS").length;
+    const dpsCount = resolutionHits.length - supportCount;
+    const isLegitimateSpreader = supportCount >= dpsCount
+      ? (p: PlayerInfo) => p.role !== "DPS"
+      : (p: PlayerInfo) => p.role === "DPS";
+
+    const byInstance = new Map<number, Hit[]>();
+    for (const h of resolutionHits) {
+      if (h.sourceInstance === undefined) continue;
+      const list = byInstance.get(h.sourceInstance);
+      if (list) list.push(h); else byInstance.set(h.sourceInstance, [h]);
+    }
+
+    for (const instanceHits of byInstance.values()) {
+      if (instanceHits.length < 2) continue; // clean — hit only themselves
+
+      const legitimateSpreaders = instanceHits.filter((h) => isLegitimateSpreader(h.player));
+      if (legitimateSpreaders.length !== 1) continue; // ambiguous (0 or 2+ legitimate spreaders sharing it) — don't guess
+
+      const spreader = legitimateSpreaders[0];
+      const victims = instanceHits.filter((h) => h !== spreader).map((h) => h.player.name);
+
+      errors.push({
+        ruleId:      GRAVEN_2_SPREAD_MISPLACED_RULE_ID,
+        severity:    "Major",
+        name:        "Graven 2 Spread Misplaced",
+        description: `Did not spread properly during Graven 2 — stood close enough to ${victims.join(" and ")} that their own Vitrophyre explosion clipped them too.`,
+        timestamp:   spreader.timestamp,
+        player:      spreader.player.name,
+        class:       spreader.player.className,
+        specId:      spreader.player.specId,
+        role:        spreader.player.role,
+        abilityId:   VITROPHYRE_ABILITY_ID,
+        abilityName: "Vitrophyre",
+      });
+    }
+  }
+  return errors;
+}
+
+// Same magnitude as the other wipe-cutoff rules' own death-clustering
+// windows (MYSTERY_MAGIC_VOLLEY_CLUSTER_MS, REVOLTING_RUIN_OCCURRENCE_GAP_MS's
+// intra-occurrence use, etc).
+const GRAVEN_2_DEATH_CLUSTER_MS = 3000;
+
+/**
+ * Any death from Graven 2's own Gravitas Puddles cast onward makes the
+ * rest of the mechanic — and everything chained after it (the tankbuster,
+ * Confetti Knockback, Puddle Soaks) — difficult to impossible to resolve
+ * cleanly. See module header. A single Raid error fires right after the
+ * first such death, same cutoff shape as every other rule in this file
+ * that does this.
+ */
+function detectGraven2DeathWipeError(
+  deathEvents:       DeathEvent[],
+  enemyCasts:        EnemyEvent[],
+  otherPhase1Errors: PullError[]
+): PullError[] {
+  // Gravitas (47788) is Graven 2's own opening cast, but its ability ID
+  // isn't provably unique to Phase 1 (this codebase has hit ID/name reuse
+  // across later phases before — see the "Blizzard III" collision noted
+  // near BLIZZARD_III_BLOWOUT_ABILITY_IDS) — confirmed the hard way: an
+  // unbounded version of this gate matched deaths 6-10+ MINUTES into other
+  // reports' pulls (Phase 3+), nowhere near Graven 2. Bound both the cast
+  // search and the death search to PHASE_1_END_MS, same boundary
+  // JUMPED_OFF_ARENA_RULE_ID already uses for the same reason.
+  const graven2Casts = enemyCasts.filter((e) => e.abilityId === GRAVEN_2_START_ABILITY_ID && e.timestamp <= PHASE_1_END_MS);
+  if (graven2Casts.length === 0) return [];
+  const graven2Start = Math.min(...graven2Casts.map((e) => e.timestamp));
+
+  const graven2Deaths = deathEvents.filter((d) => d.timestamp >= graven2Start && d.timestamp <= PHASE_1_END_MS);
+  if (graven2Deaths.length === 0) return [];
+
+  const firstDeathTime = Math.min(...graven2Deaths.map((d) => d.timestamp));
+  const clusterEnd = firstDeathTime + GRAVEN_2_DEATH_CLUSTER_MS;
+
+  const clusterDeaths = graven2Deaths.filter((d) => d.timestamp <= clusterEnd);
+  const clusterMajors = otherPhase1Errors.filter(
+    (e) => e.severity === "Major" && e.timestamp >= firstDeathTime - GRAVEN_2_DEATH_CLUSTER_MS && e.timestamp <= clusterEnd
+  );
+
+  const cutoff = Math.max(
+    ...clusterDeaths.map((d) => d.timestamp),
+    ...clusterMajors.map((e) => e.timestamp)
+  );
+
+  const victims = [...new Set(clusterDeaths.map((d) => d.player))];
+
+  return [
+    {
+      ruleId:      GRAVEN_2_DEATH_WIPE_RULE_ID,
+      severity:    "Raid",
+      name:        "Graven 2 Death",
+      description: `${victims.join(" and ")} died during Graven 2 — the mechanic (and everything chained after it) becomes difficult to impossible to resolve from here; treated as a cutoff point for further per-player analysis this pull.`,
+      timestamp:   cutoff + 1,
+      abilityId:   0,
+      abilityName: "Graven 2",
+    },
+  ];
+}
+
 /**
  * A death to the FIRST Graven Image/Mystery Magic resolution (either spread
  * tick flavor, or Blizzard III Blowout — see MYSTERY_MAGIC_DEATH_ABILITY_IDS)
@@ -1968,6 +2174,7 @@ export function detectPhase1Errors(
 ): PullError[] {
   const blizzardIIISilentKillErrors = detectBlizzardIIIBlowoutSilentKillErrors(players, deathEvents);
   const revoltingRuinThreatLossErrors = detectRevoltingRuinThreatLossErrors(players, deathEvents);
+  const graven2SpreadMisplacedErrors = detectGraven2SpreadMisplacedErrors(players);
 
   return [
     ...revoltingRuinThreatLossErrors,
@@ -1981,6 +2188,8 @@ export function detectPhase1Errors(
     ...detectUnmitigatedExplosionWipeError(enemyCasts),
     ...detectGravitationalExplosionWipeError(enemyCasts),
     ...detectGraven1DeathWipeError(deathEvents, enemyCasts, blizzardIIISilentKillErrors),
+    ...graven2SpreadMisplacedErrors,
+    ...detectGraven2DeathWipeError(deathEvents, enemyCasts, graven2SpreadMisplacedErrors),
     ...detectConfettiLostError(players, deathEvents),
     ...detectConfettiKnockbackVictimErrors(players),
     ...detectConfettiHolderMisplacedErrors(players),
