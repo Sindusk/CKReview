@@ -1,5 +1,7 @@
 .next/
 .claude/
+.env
+.env*.local
 asset-builder/node_modules/
 data/sessions/
 node_modules/

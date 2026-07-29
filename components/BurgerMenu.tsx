@@ -9,6 +9,12 @@ export type BurgerMenuProps = {
   onConnectWCL: () => void;
   onConnectFFL: () => void;
   onOpenReport: () => void;
+  onAddReviewToStatic: () => void;
+  onManageStatics:     () => void;
+  onLogin:              () => void;
+  onLogout:             () => void;
+  currentUser:          { username: string; role: string } | null;
+  hasActiveSession:     boolean;
 };
 
 // ─── Section Divider ──────────────────────────────────────────────────────────
@@ -139,7 +145,17 @@ function MenuLinkItem({
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export default function BurgerMenu({ onConnectWCL, onConnectFFL, onOpenReport }: BurgerMenuProps) {
+export default function BurgerMenu({
+  onConnectWCL,
+  onConnectFFL,
+  onOpenReport,
+  onAddReviewToStatic,
+  onManageStatics,
+  onLogin,
+  onLogout,
+  currentUser,
+  hasActiveSession,
+}: BurgerMenuProps) {
   const [open, setOpen]         = useState(false);
   const [wclReady, setWclReady] = useState(false);
   const [fflReady, setFflReady] = useState(false);
@@ -187,6 +203,26 @@ export default function BurgerMenu({ onConnectWCL, onConnectFFL, onOpenReport }:
   function handleOpenReport() {
     setOpen(false);
     onOpenReport();
+  }
+
+  function handleAddReviewToStatic() {
+    setOpen(false);
+    onAddReviewToStatic();
+  }
+
+  function handleManageStatics() {
+    setOpen(false);
+    onManageStatics();
+  }
+
+  function handleLogin() {
+    setOpen(false);
+    onLogin();
+  }
+
+  function handleLogout() {
+    setOpen(false);
+    onLogout();
   }
 
   return (
@@ -306,6 +342,56 @@ export default function BurgerMenu({ onConnectWCL, onConnectFFL, onOpenReport }:
               label="Connect WarcraftLogs"
               sublabel="Authorize to import WoW reports"
               onClick={handleConnectWCL}
+            />
+          )}
+
+          {/* Thin rule between sections */}
+          <div style={{ height: "1px", backgroundColor: "#2a2a2a", margin: "6px 8px" }} />
+
+          {/* ── Statics ── */}
+          <SectionLabel label="Statics" />
+
+          <MenuItem
+            icon="➕"
+            label="Add Review To Static"
+            sublabel={hasActiveSession ? "Save the current review to a static" : "Save some progress first"}
+            onClick={handleAddReviewToStatic}
+            disabled={!hasActiveSession}
+          />
+
+          <MenuItem
+            icon="🛠️"
+            label="Manage Statics"
+            sublabel="Create or delete your statics"
+            onClick={handleManageStatics}
+          />
+
+          {/* Thin rule between sections */}
+          <div style={{ height: "1px", backgroundColor: "#2a2a2a", margin: "6px 8px" }} />
+
+          {/* ── Account ── */}
+          <SectionLabel label="Account" />
+
+          {currentUser ? (
+            <>
+              <MenuItem
+                icon="👤"
+                label={currentUser.username}
+                sublabel={currentUser.role}
+                disabled
+              />
+              <MenuItem
+                icon="🚪"
+                label="Log Out"
+                onClick={handleLogout}
+              />
+            </>
+          ) : (
+            <MenuItem
+              icon="🔑"
+              label="Log In"
+              sublabel="Required to use Statics"
+              onClick={handleLogin}
             />
           )}
 

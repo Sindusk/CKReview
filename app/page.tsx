@@ -6,6 +6,9 @@ import AddVodDialog from "../components/AddVodDialog";
 import ReportDialog from "../components/ReportDialog";
 import SessionFoundDialog from "@/components/SessionFoundDialog";
 import SampleDataFoundDialog from "@/components/SampleDataFoundDialog";
+import LoginDialog from "@/components/LoginDialog";
+import AddReviewToStaticDialog from "@/components/AddReviewToStaticDialog";
+import ManageStaticsDialog from "@/components/ManageStaticsDialog";
 import { parseYouTubeUrl, parseLogUrl } from "@/lib/url-parsers";
 import type { Vod } from "../types/Vod";
 import VideoPanel from "../components/VideoPanel";
@@ -248,6 +251,24 @@ export default function Home() {
   const [importInput, setImportInput] = useState("");
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [sessionReportUrl, setSessionReportUrl] = useState("");
+
+  // ── Statics (see components/BurgerMenu.tsx "Statics"/"Account" sections) ──
+  const [currentUser, setCurrentUser] = useState<{ username: string; role: string } | null>(null);
+  const [showLoginDialog, setShowLoginDialog] = useState(false);
+  const [showAddReviewToStaticDialog, setShowAddReviewToStaticDialog] = useState(false);
+  const [showManageStaticsDialog, setShowManageStaticsDialog] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then(res => res.json())
+      .then(data => setCurrentUser(data.user))
+      .catch(() => setCurrentUser(null));
+  }, []);
+
+  const handleLogout = useCallback(async () => {
+    await fetch("/api/auth/logout", { method: "POST" });
+    setCurrentUser(null);
+  }, []);
   const [duplicateMatch, setDuplicateMatch] = useState<SessionLookupMatch | null>(null);
   const [pendingRawInput, setPendingRawInput] = useState<string | null>(null);
 
@@ -969,6 +990,12 @@ export default function Home() {
         onConnectWCL={loginWithWarcraftLogs}
         onConnectFFL={loginWithFFLogs}
         onOpenReport={() => setShowReport(true)}
+        onAddReviewToStatic={() => setShowAddReviewToStaticDialog(true)}
+        onManageStatics={() => setShowManageStaticsDialog(true)}
+        onLogin={() => setShowLoginDialog(true)}
+        onLogout={handleLogout}
+        currentUser={currentUser}
+        hasActiveSession={sessionId != null}
       />
 
       <div
@@ -1166,6 +1193,25 @@ export default function Home() {
         open={showReport}
         onClose={() => setShowReport(false)}
         pulls={displayPulls}
+      />
+
+      <LoginDialog
+        open={showLoginDialog}
+        onClose={() => setShowLoginDialog(false)}
+        onLoggedIn={setCurrentUser}
+      />
+
+      <AddReviewToStaticDialog
+        open={showAddReviewToStaticDialog}
+        sessionId={sessionId}
+        reportUrl={sessionReportUrl}
+        onClose={() => setShowAddReviewToStaticDialog(false)}
+        onOpenManageStatics={() => setShowManageStaticsDialog(true)}
+      />
+
+      <ManageStaticsDialog
+        open={showManageStaticsDialog}
+        onClose={() => setShowManageStaticsDialog(false)}
       />
 
       <TranscriptDialog

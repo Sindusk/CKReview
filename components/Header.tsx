@@ -1,13 +1,30 @@
 import BurgerMenu from "./BurgerMenu";
 
 type HeaderProps = {
-  onAddVod:     () => void;
-  onConnectWCL: () => void;
-  onConnectFFL: () => void;
-  onOpenReport: () => void;
+  onAddVod:             () => void;
+  onConnectWCL:         () => void;
+  onConnectFFL:         () => void;
+  onOpenReport:         () => void;
+  onAddReviewToStatic:  () => void;
+  onManageStatics:      () => void;
+  onLogin:              () => void;
+  onLogout:             () => void;
+  currentUser:          { username: string; role: string } | null;
+  hasActiveSession:     boolean;
 };
 
-export default function Header({ onAddVod, onConnectWCL, onConnectFFL, onOpenReport }: HeaderProps) {
+export default function Header({
+  onAddVod,
+  onConnectWCL,
+  onConnectFFL,
+  onOpenReport,
+  onAddReviewToStatic,
+  onManageStatics,
+  onLogin,
+  onLogout,
+  currentUser,
+  hasActiveSession,
+}: HeaderProps) {
   return (
     <header
       style={{
@@ -23,7 +40,17 @@ export default function Header({ onAddVod, onConnectWCL, onConnectFFL, onOpenRep
         zIndex:         100,
       }}
     >
-      <BurgerMenu onConnectWCL={onConnectWCL} onConnectFFL={onConnectFFL} onOpenReport={onOpenReport} />
+      <BurgerMenu
+        onConnectWCL={onConnectWCL}
+        onConnectFFL={onConnectFFL}
+        onOpenReport={onOpenReport}
+        onAddReviewToStatic={onAddReviewToStatic}
+        onManageStatics={onManageStatics}
+        onLogin={onLogin}
+        onLogout={onLogout}
+        currentUser={currentUser}
+        hasActiveSession={hasActiveSession}
+      />
 
       <div
         style={{

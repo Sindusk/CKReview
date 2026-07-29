@@ -1,0 +1,62 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum StaticMemberRole {
+  OWNER
+  MEMBER
+}
+
+model Static {
+  id        Int      @id @default(autoincrement())
+  name      String
+  createdAt DateTime @default(now())
+
+  /// app_user.id from the shared `users` database (see lib/usersDb.ts) — no
+  /// FK, since that DB lives outside this datasource.
+  createdByUserId Int
+
+  members StaticMember[]
+  reviews StaticReview[]
+}
+
+model StaticMember {
+  id       Int              @id @default(autoincrement())
+  staticId Int
+  /// app_user.id from the shared `users` database — no FK, see Static.createdByUserId.
+  userId   Int
+  role     StaticMemberRole @default(MEMBER)
+  addedAt  DateTime         @default(now())
+
+  static Static @relation(fields: [staticId], references: [id], onDelete: Cascade)
+
+  @@unique([staticId, userId])
+  @@index([userId])
+}
+
+model StaticReview {
+  id       Int    @id @default(autoincrement())
+  staticId Int
+  /// id of the file-backed review session in data/sessions/<id>.json (see
+  /// lib/session-store.ts) — deliberately a plain string, not an FK; that
+  /// store lives outside Postgres.
+  sessionId String
+
+  /// Denormalized from the session at add-time so listing a static's
+  /// reviews never needs to touch the file store just to render a list.
+  reportUrl String
+  label     String?
+
+  /// app_user.id from the shared `users` database — no FK, see Static.createdByUserId.
+  addedByUserId Int
+  addedAt       DateTime @default(now())
+
+  static Static @relation(fields: [staticId], references: [id], onDelete: Cascade)
+
+  @@unique([staticId, sessionId])
+  @@index([staticId])
+}
