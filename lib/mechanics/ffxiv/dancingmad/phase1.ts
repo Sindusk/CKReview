@@ -191,6 +191,28 @@
 // re-implemented that as a coarser role-based half-check and produced a
 // duplicate error for the same mistake — removed 2026-07-28.
 //
+// ── CONFETTI LOST -> UNRESOLVABLE WIPE (confirmed 2026-07-30, same report, ──
+// ── pull 9) ─────────────────────────────────────────────────────────────
+//
+// "Confetti" is this raid's own nickname for the Double-Trouble Trap debuff
+// (buff ID 1005078, applied ~45s in, one player per role — confirmed pull
+// 9: Kade Kansado and Salty Dango) that follows Wave Cannon. Same
+// unresolvable-wipe shape as MYSTERY_MAGIC_DEATH_WIPE above: if a player
+// carrying it dies, the mechanic can't resolve and the pull is over from
+// there, even though (confirmed pull 9) the raid may visibly struggle on
+// for another 30-40s before the actual wipe — a Raid-severity error fires
+// once, immediately, purely as the lib/report-data.ts cutoff marker, same
+// reasoning as every other rule in this file that does this.
+//
+// Gated the same way BLIZZARD_III_SILENT_KILL/JUMPED_OFF_ARENA check debuff
+// history — "was it ever applied before this death" (ignoring an earlier
+// removedebuff) rather than "is it active at the literal instant of death":
+// confirmed pull 9's Salty Dango had her Double-Trouble Trap removed 2s
+// before the (unrelated Wave Cannon Tower) hit that actually killed her,
+// yet the user's own call was still "died carrying Confetti" — so the
+// check accepts a short gap between removal and death rather than
+// requiring the debuff to still be literally active at the death instant.
+//
 // Graven Image's spread mechanic (~0:38, cast "Graven Image", 48370) lives
 // in its own file, graven-image.ts, NOT here — unlike everything else in
 // this module, its "ideal position" can't be hardcoded: which specific job
@@ -211,12 +233,22 @@ export const WAVE_CANNON_TOWER_OVERLAP_RULE_ID   = "ffxiv-phase1-wave-cannon-tow
 export const TELE_TROUNCING_ARROW_RULE_ID = "ffxiv-phase1-tele-trouncing-arrow-misplaced";
 export const MYSTERY_MAGIC_DEATH_WIPE_RULE_ID = "ffxiv-phase1-mystery-magic-death-wipe";
 export const REVOLTING_RUIN_THREAT_LOSS_RULE_ID = "ffxiv-phase1-revolting-ruin-threat-loss";
+export const CONFETTI_LOST_RULE_ID = "ffxiv-phase1-confetti-lost";
 
 const BLIZZARD_III_BLOWOUT_ABILITY_IDS = new Set([47765, 47768, 47771, 47774]);
 const DAMAGE_DOWN_ABILITY_ID = 1002911;
 
 const REVOLTING_RUIN_FIRST_HIT_ABILITY_ID  = 50179;
 const REVOLTING_RUIN_SECOND_HIT_ABILITY_ID = 50401;
+
+// "Confetti" — this raid's own nickname for the Double-Trouble Trap debuff.
+const DOUBLE_TROUBLE_TRAP_BUFF_ID = 1005078;
+
+// Generous gap between the debuff being applied and a death that should
+// still count as "died carrying Confetti" — see module header (confirmed
+// pull 9: the debuff's own removedebuff fired 2s before the unrelated hit
+// that actually killed the carrier).
+const CONFETTI_DEATH_WINDOW_MS = 10_000;
 
 // Tank stance per job — the thing the OT needs active for their post-
 // provoke enmity lead to hold through Revolting Ruin III's second hit (see
@@ -595,6 +627,44 @@ function detectMysteryMagicDeathWipeError(
   ];
 }
 
+/**
+ * A player who ever had Double-Trouble Trap ("Confetti") applied dying
+ * shortly afterward makes the mechanic unresolvable — a single Raid error
+ * fires once, purely as the lib/report-data.ts cutoff marker. See module
+ * header for why this checks debuff HISTORY (any application before the
+ * death, within a generous window) rather than "still active at death."
+ */
+function detectConfettiLostError(players: PlayerInfo[], deathEvents: DeathEvent[]): PullError[] {
+  const hadConfettiBefore = (playerName: string, atTime: number) => {
+    const player = players.find((p) => p.name === playerName);
+    if (!player) return false;
+    return player.debuffs.some(
+      (d) =>
+        d.abilityId === DOUBLE_TROUBLE_TRAP_BUFF_ID &&
+        d.debuffStatus === "applied" &&
+        d.timestamp <= atTime &&
+        atTime - d.timestamp <= CONFETTI_DEATH_WINDOW_MS
+    );
+  };
+
+  const confettiDeath = deathEvents
+    .filter((d) => hadConfettiBefore(d.player, d.timestamp))
+    .sort((a, b) => a.timestamp - b.timestamp)[0];
+  if (!confettiDeath) return [];
+
+  return [
+    {
+      ruleId:      CONFETTI_LOST_RULE_ID,
+      severity:    "Raid",
+      name:        "Confetti Lost",
+      description: `${confettiDeath.player} died while carrying Double-Trouble Trap ("Confetti") — unresolvable from here, the raid wiped.`,
+      timestamp:   confettiDeath.timestamp + 1,
+      abilityId:   DOUBLE_TROUBLE_TRAP_BUFF_ID,
+      abilityName: "Double-Trouble Trap",
+    },
+  ];
+}
+
 function detectTeleTrouncingArrowErrors(players: PlayerInfo[]): PullError[] {
   type Removal = { player: PlayerInfo; timestamp: number; dir: Cardinal };
   const removals: Removal[] = [];
@@ -698,6 +768,7 @@ export function detectPhase1Errors(players: PlayerInfo[], deathEvents: DeathEven
     ...detectJumpedOffArenaError(players, deathEvents),
     ...detectWaveCannonTowerOverlapErrors(players, deathEvents),
     ...detectMysteryMagicDeathWipeError(deathEvents, blizzardIIISilentKillErrors),
+    ...detectConfettiLostError(players, deathEvents),
     ...detectTeleTrouncingArrowErrors(players),
   ].sort((a, b) => a.timestamp - b.timestamp);
 }

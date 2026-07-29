@@ -39,6 +39,21 @@
 // attribution, matching every other "gate on outcome" check in this
 // codebase.
 //
+// Two DIFFERENT overlap shapes both count as "compromised," not just one:
+// pull 3's shape is a player hit by 2+ DISTINCT instances (their own beam
+// plus a neighbor's). Confirmed 2026-07-29 (pull 9): a second shape exists
+// where ONE instance simply hits 2 players who stood stacked on top of
+// each other — Salty Dango and Sayacissa Morsaelth shared a single
+// instance, each with only ONE total instance apiece, which an earlier
+// version of `compromised` (instances.size >= 2 per player) completely
+// missed. Fixed by checking every instance a player was hit by for 2+
+// total distinct members, not just counting how many DISTINCT instances
+// hit them. When two players are fully stacked like this there's no way
+// to tell who the beam's real "primary" target was — per the user,
+// attribution has to fall back to pure position (whoever deviates from
+// their own learned spot, same as always) rather than trying to reason
+// about which one "owned" the instance.
+//
 // ── WAVE CANNON MITIGATION ISSUE (confirmed 2026-07-29, same report, ─────
 // ── pull 3) ────────────────────────────────────────────────────────────
 //
@@ -108,6 +123,25 @@ function groupByPlayer(hits: RawHit[]) {
   return [...byPlayer.values()];
 }
 
+// "Compromised" means EITHER overlap shape — this player was hit by 2+
+// distinct instances, OR at least one of their instance(s) also hit
+// someone else (2+ distinct players stacked on one instance) — see module
+// header. A per-player instance COUNT alone misses the second shape.
+function markCompromised(grouped: ReturnType<typeof groupByPlayer>) {
+  const membersByInstance = new Map<number, Set<number>>();
+  for (const g of grouped) {
+    for (const inst of g.instances) {
+      const members = membersByInstance.get(inst) ?? new Set<number>();
+      members.add(g.player.actorId);
+      membersByInstance.set(inst, members);
+    }
+  }
+  return grouped.map((g) => ({
+    ...g,
+    compromised: [...g.instances].some((inst) => (membersByInstance.get(inst)?.size ?? 0) >= 2),
+  }));
+}
+
 /**
  * Learns each job's canonical Wave Cannon spot from this SAME report's own
  * long (2+ minute) pulls — see module header for why short pulls
@@ -120,9 +154,9 @@ export function learnWaveCannonLayout(pulls: Pull[]): WaveCannonLayout {
 
   for (const pull of pulls) {
     if (pull.fightDuration < CLEAN_LEARNING_PULL_DURATION_MS) continue;
-    const grouped = groupByPlayer(extractHits(pull.players));
-    for (const { player, x, y, instances } of grouped) {
-      if (instances.size >= 2) continue; // compromised this pull — not a clean sample
+    const grouped = markCompromised(groupByPlayer(extractHits(pull.players)));
+    for (const { player, x, y, compromised } of grouped) {
+      if (compromised) continue; // not a clean sample — see markCompromised
       const list = samplesByClass.get(player.className) ?? [];
       list.push({ x, y });
       samplesByClass.set(player.className, list);
@@ -143,22 +177,22 @@ export function learnWaveCannonLayout(pulls: Pull[]): WaveCannonLayout {
 }
 
 /**
- * Per-pull: only ever flags a player hit by 2+ distinct Wave Cannon
- * instances this volley (overlapping a neighbor) whose actual position
- * deviates well beyond normal jitter from their learned spot (from
- * `layout`, built once across the report by learnWaveCannonLayout) — see
- * module header. A victim standing correctly who just got caught by a
- * neighbor's misplacement stays unflagged.
+ * Per-pull: only ever flags a player caught in a Wave Cannon overlap this
+ * volley (either compromised shape — see markCompromised) whose actual
+ * position deviates well beyond normal jitter from their learned spot
+ * (from `layout`, built once across the report by learnWaveCannonLayout)
+ * — see module header. A victim standing correctly who just got caught by
+ * a neighbor's misplacement stays unflagged.
  */
 export function detectWaveCannonPositionErrors(
   players:     PlayerInfo[],
   deathEvents: DeathEvent[],
   layout:      WaveCannonLayout
 ): PullError[] {
-  const grouped = groupByPlayer(extractHits(players));
+  const grouped = markCompromised(groupByPlayer(extractHits(players)));
   if (grouped.length === 0) return [];
 
-  const compromised = grouped.filter((g) => g.instances.size >= 2);
+  const compromised = grouped.filter((g) => g.compromised);
   if (compromised.length === 0) return [];
 
   const withDeviation = compromised.map((c) => {
@@ -226,11 +260,11 @@ export function detectWaveCannonPositionErrors(
  * error. See module header.
  */
 export function detectWaveCannonMitigationIssueErrors(players: PlayerInfo[], deathEvents: DeathEvent[]): PullError[] {
-  const grouped = groupByPlayer(extractHits(players));
+  const grouped = markCompromised(groupByPlayer(extractHits(players)));
   if (grouped.length === 0) return [];
 
   const victims = grouped.filter((g) => {
-    if (g.instances.size >= 2) return false; // overlap — covered by the position rule instead
+    if (g.compromised) return false; // overlap — covered by the position rule instead
     return deathEvents.some((d) => d.player === g.player.name && d.killingAbilityGameId === WAVE_CANNON_ABILITY_ID);
   });
   if (victims.length === 0) return [];
