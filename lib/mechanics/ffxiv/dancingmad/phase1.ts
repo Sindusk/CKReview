@@ -562,6 +562,54 @@
 // confirmed geometry from the user before detection can be built for
 // them, same working method as everything else in this file.**
 //
+// ── CONFETTI GROUP MISPLACED / HEADCOUNT REQUIREMENT (confirmed ────────────
+// ── 2026-07-30, same report, pull 34) ───────────────────────────────────────
+//
+// The SECOND resolution above (the one whose axis wasn't confirmed) turns
+// out not to need its exact compass bearing at all — same "outcome over
+// geometry" lesson as REVOLTING_RUIN_OUT_OF_POSITION. Per the user
+// directly: **each Confetti explosion instantly kills everyone it hits
+// unless its holder plus 3 OTHER players are caught in it — 4 total.**
+// This holds for every one of the fight's 3 independent detonations (the
+// first, already built above; this second one; and the third, during
+// Tele-Trouncing/Arrows, not built yet). Confirmed failure (pull 34):
+// Sayacissa Morsaelth (Tank) stacked with the DPS group instead of her
+// own Support group for the second detonation — her own explosion
+// instance (sourceInstance grouping, same technique as
+// GRAVEN_2_SPREAD_MISPLACED) still had its normal 4 (holder Chauzey
+// Solstice + 3 DPS), but the Support explosion (holder Azura Salus) was
+// left with only 2 (Azura + Archidel Del'archi) instead of 4 — one short
+// of 3 — and its damage scaled up massively as a result (confirmed: a
+// clean/full instance in this same pull hits for ~50-100k; the
+// undermanned instance hit for ~204-205k, instakilling both Azura and
+// Archidel, INCLUDING the holder herself). Per the user, this is not
+// Azura's or Archidel's fault — they did nothing wrong; the entire
+// consequence traces back to Sayacissa's misplacement alone.
+//
+// Detection (`detectConfettiGroupMisplacedErrors`) doesn't need to know
+// which compass direction is which, or even which instance is
+// "Support"/"DPS" a priori — same majority-vote-within-an-instance
+// technique GRAVEN_2_SPREAD_MISPLACED already uses: whichever role
+// category is the majority among an instance's non-holder victims is
+// that instance's "home" side, and anyone in the MINORITY role for that
+// instance is the one who stacked with the wrong group. Scoped to only
+// the SECOND resolution for now (`collectConfettiResolutions(...)[1]`),
+// matching the other two confetti checks' own "only what's confirmed"
+// gating — the third (Tele-Trouncing) resolution needs its own confirmed
+// sample before this extends to it.
+//
+// This also required a narrow fix to CONFETTI_LOST above: it originally
+// treated ANY death shortly after a Confetti debuff application as "died
+// carrying Confetti, mechanic never resolved" — but Azura's death here
+// was CAUSED BY the explosion's own damage (killingAbilityGameId ===
+// CONFETTI_EXPLOSION_ABILITY_ID), meaning the debuff DID resolve/detonate
+// normally, just fatally due to being undermanned. That's a different
+// failure shape (already fully covered by GRAVEN_2_DEATH_WIPE, which
+// fires on any death during Graven 2 regardless of cause) — CONFETTI_LOST
+// now excludes deaths whose killing blow was the explosion itself, so it
+// no longer fires a second, redundant "pull is over" cutoff on top of
+// GRAVEN_2_DEATH_WIPE for the exact same death.
+//
 // ── WHY INTERPOLATION, NOT JUST THE NEAREST SAMPLE ─────────────────────────
 //
 // Same snapshot-timing problem as graven-image.ts's own "SNAPSHOT
@@ -641,6 +689,7 @@ export const REVOLTING_RUIN_OUT_OF_POSITION_RULE_ID = "ffxiv-phase1-revolting-ru
 export const CONFETTI_LOST_RULE_ID = "ffxiv-phase1-confetti-lost";
 export const CONFETTI_KNOCKBACK_VICTIM_RULE_ID = "ffxiv-phase1-confetti-knockback-victim-misplaced";
 export const CONFETTI_HOLDER_MISPLACED_RULE_ID = "ffxiv-phase1-confetti-holder-misplaced";
+export const CONFETTI_GROUP_MISPLACED_RULE_ID = "ffxiv-phase1-confetti-group-misplaced";
 
 const BLIZZARD_III_BLOWOUT_ABILITY_IDS = new Set([47765, 47768, 47771, 47774]);
 const DAMAGE_DOWN_ABILITY_ID = 1002911;
@@ -1908,6 +1957,13 @@ function detectGraven1DeathWipeError(
  * fires once, purely as the lib/report-data.ts cutoff marker. See module
  * header for why this checks debuff HISTORY (any application before the
  * death, within a generous window) rather than "still active at death."
+ *
+ * Excludes deaths whose killing blow WAS the Confetti explosion itself
+ * (see module header, CONFETTI GROUP MISPLACED / HEADCOUNT REQUIREMENT) —
+ * that means the debuff DID detonate, just fatally because it was
+ * undermanned, a different failure already covered by
+ * GRAVEN_2_DEATH_WIPE. This rule is only for a carrier dying to something
+ * ELSE before the explosion ever gets to go off.
  */
 function detectConfettiLostError(players: PlayerInfo[], deathEvents: DeathEvent[]): PullError[] {
   const hadConfettiBefore = (playerName: string, atTime: number) => {
@@ -1923,6 +1979,7 @@ function detectConfettiLostError(players: PlayerInfo[], deathEvents: DeathEvent[
   };
 
   const confettiDeath = deathEvents
+    .filter((d) => d.killingAbilityGameId !== CONFETTI_EXPLOSION_ABILITY_ID)
     .filter((d) => hadConfettiBefore(d.player, d.timestamp))
     .sort((a, b) => a.timestamp - b.timestamp)[0];
   if (!confettiDeath) return [];
@@ -2159,6 +2216,77 @@ function detectConfettiHolderMisplacedErrors(players: PlayerInfo[]): PullError[]
   return errors;
 }
 
+/**
+ * Detects a non-holder Confetti victim who stacked with the WRONG side's
+ * group for the SECOND resolution (see module header, CONFETTI GROUP
+ * MISPLACED / HEADCOUNT REQUIREMENT) — an outcome/majority-vote check,
+ * the same technique `detectGraven2SpreadMisplacedErrors` uses: whichever
+ * role category is the majority among an explosion instance's non-holder
+ * victims is that instance's "home" side, and anyone in the minority role
+ * is the one who stacked wrong. Only the second resolution is confirmed
+ * so far — see module header on why the third (Tele-Trouncing) isn't
+ * handled yet.
+ */
+function detectConfettiGroupMisplacedErrors(players: PlayerInfo[]): PullError[] {
+  const resolution = collectConfettiResolutions(players)[1];
+  if (!resolution || resolution.holders.length === 0) return [];
+
+  const holderNames = new Set(resolution.holders.map((h) => h.player.name));
+  const firstWaveTime = resolution.holders[0].timestamp;
+
+  type Hit = { player: PlayerInfo; timestamp: number; sourceInstance: number | undefined };
+  const hits: Hit[] = [];
+  for (const player of players) {
+    if (holderNames.has(player.name)) continue; // holders define a side, they can't be "wrong side"
+    for (const e of player.damageTaken) {
+      if (
+        e.abilityId === CONFETTI_EXPLOSION_ABILITY_ID &&
+        e.timestamp >= firstWaveTime &&
+        e.timestamp <= firstWaveTime + CONFETTI_RESOLUTION_GAP_MS
+      ) {
+        hits.push({ player, timestamp: e.timestamp, sourceInstance: e.sourceInstance });
+      }
+    }
+  }
+  if (hits.length === 0) return [];
+
+  const byInstance = new Map<number, Hit[]>();
+  for (const h of hits) {
+    if (h.sourceInstance === undefined) continue;
+    const list = byInstance.get(h.sourceInstance);
+    if (list) list.push(h); else byInstance.set(h.sourceInstance, [h]);
+  }
+  if (byInstance.size !== 2) return []; // expects exactly one instance per side — ambiguous otherwise, don't guess
+
+  const errors: PullError[] = [];
+  for (const instanceHits of byInstance.values()) {
+    const supportCount = instanceHits.filter((h) => SUPPORT_ROLES.has(h.player.role)).length;
+    const dpsCount = instanceHits.length - supportCount;
+    const isExpectedRole = supportCount >= dpsCount
+      ? (p: PlayerInfo) => SUPPORT_ROLES.has(p.role)
+      : (p: PlayerInfo) => !SUPPORT_ROLES.has(p.role);
+
+    for (const hit of instanceHits) {
+      if (isExpectedRole(hit.player)) continue;
+
+      errors.push({
+        ruleId:      CONFETTI_GROUP_MISPLACED_RULE_ID,
+        severity:    "Major",
+        name:        "Confetti Group Misplaced",
+        description: `Stacked with the wrong Confetti group at the second detonation — should have been with the other ${SUPPORT_ROLES.has(hit.player.role) ? "Support" : "DPS"} players. Each side's explosion needs its holder plus 3 others to go off safely; being short of that instantly kills everyone it hits.`,
+        timestamp:   hit.timestamp,
+        player:      hit.player.name,
+        class:       hit.player.className,
+        specId:      hit.player.specId,
+        role:        hit.player.role,
+        abilityId:   CONFETTI_EXPLOSION_ABILITY_ID,
+        abilityName: "Confetti Knockback",
+      });
+    }
+  }
+  return errors;
+}
+
 function detectTeleTrouncingArrowErrors(players: PlayerInfo[]): PullError[] {
   type Removal = { player: PlayerInfo; timestamp: number; dir: Cardinal };
   const removals: Removal[] = [];
@@ -2280,6 +2408,7 @@ export function detectPhase1Errors(
     ...detectConfettiLostError(players, deathEvents),
     ...detectConfettiKnockbackVictimErrors(players),
     ...detectConfettiHolderMisplacedErrors(players),
+    ...detectConfettiGroupMisplacedErrors(players),
     ...detectTeleTrouncingArrowErrors(players),
   ].sort((a, b) => a.timestamp - b.timestamp);
 }
