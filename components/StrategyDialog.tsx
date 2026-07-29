@@ -24,6 +24,7 @@ import {
   type BlackHoleStrategyId,
 } from "@/lib/mechanics/ffxiv/dancingmad/blackhole-strategy";
 import { detectFFRoles, type FFRoleSlot } from "@/lib/mechanics/ffxiv/roles";
+import { detectGraven2Strategy } from "@/lib/mechanics/ffxiv/dancingmad/graven2-strategy";
 import type { MitigationPlan } from "@/lib/mechanics/ffxiv/dancingmad/mitigation-plan";
 import { getClassColor } from "@/lib/player-display";
 import type { Pull } from "@/types/Pull";
@@ -121,6 +122,35 @@ function RoleRoster({ pull, plan }: { pull: Pull; plan: MitigationPlan | null })
           );
         })
       )}
+    </div>
+  );
+}
+
+// Per-pull Graven 2 strategy readout — see
+// lib/mechanics/ffxiv/dancingmad/graven2-strategy.ts's module header. Unlike
+// Black Hole's cross-pull learned shape, this is resolved fresh from each
+// selected pull's own Gravitas hits (no cross-pull aggregation yet).
+function Graven2StrategyView({ pull }: { pull: Pull }) {
+  const result = useMemo(() => detectGraven2Strategy(pull.players), [pull]);
+
+  if (!result) {
+    return <div style={{ fontSize: "12px", color: "#666" }}>Graven 2 not reached this pull.</div>;
+  }
+
+  const variantLabel = result.variant === "light-party" ? "Light Party" : result.variant === "eight-stack" ? "8-Player Stack" : "Unrecognized";
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+      <div style={{ fontSize: "12px" }}>
+        <span style={{ fontWeight: 700, color: "#60a5fa" }}>{variantLabel}</span>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+        {result.groups.map((group, i) => (
+          <div key={i} style={{ fontSize: "11px", color: "#ccc" }}>
+            Group {i + 1}: {group.players.join(", ")}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -274,6 +304,21 @@ export default function StrategyDialog({
               &quot;?&quot; — best-effort for now, refine as needed.
             </div>
             <RoleRoster pull={selectedPull} plan={mitigationPlan} />
+          </div>
+        )}
+
+        {showRoster && selectedPull && (
+          <div style={{ marginBottom: "18px" }}>
+            <div style={{ fontSize: "13px", fontWeight: 600, color: "#e2e8f0", marginBottom: "2px" }}>
+              Graven 2 Strategy
+            </div>
+            <div style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "12px" }}>
+              Auto-detected per pull from this pull&apos;s own Gravitas hits —
+              Light Party (two 4-player stacks, opposite sides of the arena) vs
+              the newer 8-Player Stack. Identification only for now; no
+              per-player error detection for the stack/spread step itself yet.
+            </div>
+            <Graven2StrategyView pull={selectedPull} />
           </div>
         )}
 

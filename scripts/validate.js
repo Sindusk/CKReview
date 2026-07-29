@@ -326,6 +326,27 @@ const MECHANICS = {
     },
   },
 
+  'graven2-strategy': {
+    game: 'ff',
+    load: () => requireTsFromRoot('lib/mechanics/ffxiv/dancingmad/graven2-strategy.ts'),
+    run({ mod, ctxs }) {
+      // Per-pull only (no cross-pull learning, no PullError output — see
+      // module header) — just prints what each pull's own Gravitas hits
+      // resolve to, for manual eyeballing. Doesn't participate in
+      // --check/--update snapshot diffing since it emits no PullError[].
+      console.log('-'.repeat(70));
+      for (const c of ctxs) {
+        const result = mod.detectGraven2Strategy(c.relPlayers());
+        if (!result) {
+          console.log(`  ${c.bossName} Pull ${c.pullNumber} -> Graven 2 not reached`);
+        } else {
+          const groups = result.groups.map((g) => `[${g.players.join(', ')}]`).join(' vs ');
+          console.log(`  ${c.bossName} Pull ${c.pullNumber} -> Graven 2 variant: ${result.variant} (${groups})`);
+        }
+      }
+    },
+  },
+
   midnightfalls: {
     game: 'wow',
     load: () => ({

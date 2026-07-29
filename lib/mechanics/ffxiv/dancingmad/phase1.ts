@@ -5,7 +5,7 @@
 // at roughly 3:25 (205s) into the fight.
 //
 // ── REVOLTING RUIN III THREAT LOSS (confirmed 2026-07-29, Q3GzJNZg64k1hLRm, ─
-// ── pull 7) ─────────────────────────────────────────────────────────────
+// ── pull 7; recurrence + raid-wipe outcome confirmed 2026-07-30, pull 26) ──
 //
 // The opening tankbuster pair (~0:11-0:19, 50179 then 50401, both sharing
 // the in-game name "Revolting Ruin III"): hit 1 always lands on whoever
@@ -35,6 +35,31 @@
 // single unambiguous hit-1 target; pulls where hit 1 itself already hit
 // multiple people (already-scrambled from an earlier problem) are left
 // alone rather than guessed at.
+//
+// **Revolting Ruin III is NOT a one-time opening mechanic — it recurs**
+// (confirmed pull 26: a second hit-1/hit-2 pair at ~99s, ~83s after the
+// opening pair, immediately following the Light-Party Graven 2 stack/spread
+// resolution). Each occurrence must be judged independently: an early
+// version of this rule pooled every hit-1/hit-2 target across the WHOLE
+// pull into one check, so occurrence 1 resolving cleanly (MT tanked both)
+// masked occurrence 2's real failure (confirmed pull 26: Salty Dango, the
+// MT, died to occurrence 2's hit 1 itself — his own damageTaken record
+// still carried occurrence 1's clean hit-2 landing on him, so the pooled
+// check saw "MT is in hit2Targets" and silently passed). Fixed by
+// clustering hit-1 events into distinct occurrences (grouped by proximity,
+// REVOLTING_RUIN_OCCURRENCE_GAP_MS) and evaluating each occurrence's own
+// hit-1/hit-2 pair against only that occurrence's own event window.
+//
+// **A non-tank dying to either hit is itself a raid-wide unresolvable
+// outcome**, separate from (but usually alongside) the OT attribution above
+// — confirmed pull 26: once Salty Dango died to occurrence 2's hit 1, hit 2
+// hit SIX other players simultaneously (Sonder Dreams, Azura Salus,
+// Archidel Del'archi, Kade Kansado, Ayumi Emi, Chauzey Solstice) and killed
+// them all — a tankbuster sized for a mitigated tank is lethal raid-wide
+// when it lands on an unmitigated non-tank instead. See
+// detectRevoltingRuinNonTankDeathError below — same Raid-severity cutoff
+// shape as GRAVEN_1_DEATH_WIPE_RULE_ID/CONFETTI_LOST_RULE_ID/
+// UNMITIGATED_EXPLOSION_WIPE_RULE_ID.
 //
 // ── BLIZZARD III BLOWOUT SILENT KILL (confirmed 2026-07, VtdBqhLQkWJXMvDg) ──
 //
@@ -294,26 +319,50 @@
 // consistently "sloppy" Paladin included) — see
 // ARROW_OUT_OF_POSITION_THRESHOLD_YALMS for where the line is drawn.
 //
-// ── MYSTERY MAGIC DEATH -> UNRESOLVABLE WIPE (confirmed 2026-07-28, ─────────
-// ── report Q3GzJNZg64k1hLRm, pulls 1/2) ─────────────────────────────────────
+// ── GRAVEN 1 DEATH -> UNRESOLVABLE WIPE (confirmed 2026-07-28, ─────────────
+// ── report Q3GzJNZg64k1hLRm, pulls 1/2; scope-narrowed 2026-07-30, pull 26) ─
 //
-// Mystery Magic (begincast/cast 47764) fires right after each Graven Image
-// and resolves ~5s later with a raid-wide AoE tick in one of two elemental
-// flavors — Flagrant Fire III (47778/47779) or Thrumming Thunder III
-// (47775/47776/47777). A separate concurrent cast, Blizzard III Blowout
-// (BLIZZARD_III_BLOWOUT_ABILITY_IDS above), is also part of the same
-// mechanic package. **A death to any of these makes Wave Cannon
-// unresolvable** — it already self-gates on exactly 4 live carriers (see
-// WAVE_CANNON_TOWER_OVERLAP module comment), so no change was needed there.
+// Mystery Magic (begincast/cast 47764) resolves ~1-16s later with a
+// raid-wide AoE tick in one of two elemental flavors — Flagrant Fire III
+// (47778/47779) or Thrumming Thunder III (47775/47776/47777). A separate
+// concurrent cast, Blizzard III Blowout (BLIZZARD_III_BLOWOUT_ABILITY_IDS
+// above), is also part of the same mechanic package. There can be more than
+// one Mystery Magic occurrence in a pull — confirmed pull 26 has one at
+// ~38s (following the pull's only Graven Image cast, 48370, at ~30s) and a
+// SECOND one at ~55s with no Graven Image cast of its own in between —
+// so this gate keys off Mystery Magic's own cast (47764) directly, not
+// Graven Image.
 //
-// What WAS missing: nothing marked the pull as over at the point of death,
-// so later incidental errors (e.g. generic Damage Down procs from a raid
-// already spiraling toward a call) kept counting as real mistakes. A
-// Raid-severity error now fires once, timestamped just after the death,
-// functioning purely as the lib/report-data.ts cutoff marker — see that
-// file's "once a raid-wide mistake has happened... Major errors after that
-// point are dropped" logic, the same mechanism JUMPED_OFF_ARENA relies on
-// above.
+// **Only the FIRST Mystery Magic in a pull is unconditionally unresolvable
+// on a death.** Confirmed failure (pull 1/2): Wave Cannon directly follows
+// the first Mystery Magic and needs all 8 players alive to resolve (it
+// already self-gates on exactly 4 live carriers — see
+// WAVE_CANNON_TOWER_OVERLAP module comment) — so a death here really does
+// end the pull. Confirmed COUNTEREXAMPLE (pull 26): Azura Salus died to the
+// SECOND Mystery Magic (~55s) — but Wave Cannon had already resolved by
+// then (confirmed at ~43s, between the two Mystery Magic casts), so the
+// raid could simply rez her and continue prog on the next mechanic; this is
+// NOT a wipe and must not cut the pull's per-player analysis short. Gated
+// by taking the timestamp of the pull's SECOND Mystery Magic cast (if any)
+// and only counting deaths strictly before it — a later occurrence's own
+// deaths are real player mistakes (already covered by graven-image.ts /
+// the eventual Graven 2 rules) but don't trigger this cutoff.
+//
+// Renamed from "Mystery Magic Wipe"/MYSTERY_MAGIC_DEATH_WIPE_RULE_ID to be
+// explicitly Graven-1-scoped (name, rule id, and description) now that the
+// rule only ever fires for that first occurrence — the old name implied it
+// covered every Mystery Magic resolution, which was never true even before
+// this fix (a later occurrence's death was never actually a wipe; it just
+// hadn't been proven wrong yet).
+//
+// What WAS missing (still true for the first occurrence): nothing marked
+// the pull as over at the point of death, so later incidental errors (e.g.
+// generic Damage Down procs from a raid already spiraling toward a call)
+// kept counting as real mistakes. A Raid-severity error now fires once,
+// timestamped just after the death, functioning purely as the
+// lib/report-data.ts cutoff marker — see that file's "once a raid-wide
+// mistake has happened... Major errors after that point are dropped"
+// logic, the same mechanism JUMPED_OFF_ARENA relies on above.
 //
 // Note: the Flagrant Fire III spread's own per-player position/overlap
 // attribution (who stood in the wrong spot and got a neighbor killed too —
@@ -324,6 +373,12 @@
 // overlap-plus-death gating. An earlier version of this rule set
 // re-implemented that as a coarser role-based half-check and produced a
 // duplicate error for the same mistake — removed 2026-07-28.
+//
+// Per the user directly: raid-cutoff descriptions across this file should
+// avoid asserting a definitive outcome like "the raid wiped" — a raid-wide
+// mistake this severe is treated as a cutoff point for further per-player
+// analysis regardless of whether the group actually resets or reses and
+// pushes on to prog the next mechanic (pull 26 is exactly that case).
 //
 // ── CONFETTI LOST -> UNRESOLVABLE WIPE (confirmed 2026-07-30, same report, ──
 // ── pull 9) ─────────────────────────────────────────────────────────────
@@ -486,8 +541,9 @@ export const WAVE_CANNON_TOWER_MISSED_RULE_ID    = "ffxiv-phase1-wave-cannon-tow
 export const WAVE_CANNON_TOWER_PRIORITY_RULE_ID  = "ffxiv-phase1-wave-cannon-tower-priority-missed";
 export const UNMITIGATED_EXPLOSION_WIPE_RULE_ID  = "ffxiv-phase1-unmitigated-explosion-wipe";
 export const TELE_TROUNCING_ARROW_RULE_ID = "ffxiv-phase1-tele-trouncing-arrow-misplaced";
-export const MYSTERY_MAGIC_DEATH_WIPE_RULE_ID = "ffxiv-phase1-mystery-magic-death-wipe";
+export const GRAVEN_1_DEATH_WIPE_RULE_ID = "ffxiv-phase1-graven-1-death-wipe";
 export const REVOLTING_RUIN_THREAT_LOSS_RULE_ID = "ffxiv-phase1-revolting-ruin-threat-loss";
+export const REVOLTING_RUIN_NON_TANK_DEATH_RULE_ID = "ffxiv-phase1-revolting-ruin-non-tank-death";
 export const CONFETTI_LOST_RULE_ID = "ffxiv-phase1-confetti-lost";
 export const CONFETTI_KNOCKBACK_VICTIM_RULE_ID = "ffxiv-phase1-confetti-knockback-victim-misplaced";
 export const CONFETTI_HOLDER_MISPLACED_RULE_ID = "ffxiv-phase1-confetti-holder-misplaced";
@@ -497,6 +553,12 @@ const DAMAGE_DOWN_ABILITY_ID = 1002911;
 
 const REVOLTING_RUIN_FIRST_HIT_ABILITY_ID  = 50179;
 const REVOLTING_RUIN_SECOND_HIT_ABILITY_ID = 50401;
+
+// Splits hit-1 events into distinct Revolting Ruin III occurrences — an
+// occurrence's own hit-1 -> hit-2 gap is ~3.1-3.3s (confirmed pulls 7, 26);
+// two DISTINCT occurrences in the same pull are ~83s+ apart (confirmed pull
+// 26: opening pair ~16s, second pair ~99s) — wide margin on both sides.
+const REVOLTING_RUIN_OCCURRENCE_GAP_MS = 10_000;
 
 // "Confetti" — this raid's own nickname for the Double-Trouble Trap debuff.
 const DOUBLE_TROUBLE_TRAP_BUFF_ID = 1005078;
@@ -596,6 +658,14 @@ const MYSTERY_MAGIC_DEATH_ABILITY_IDS = new Set([
   47775, 47776, 47777,      // Thrumming Thunder III
   ...BLIZZARD_III_BLOWOUT_ABILITY_IDS,
 ]);
+
+// Mystery Magic's own begincast/cast (there can be more than one per pull —
+// confirmed pull 26 has two, only the first one's death is unresolvable —
+// see module comment above). GRAVEN_1_DEATH_WIPE_RULE_ID uses this directly
+// rather than the Graven Image cast (48370) that usually precedes it, since
+// a pull can have a second Mystery Magic with no Graven Image cast of its
+// own in between.
+const MYSTERY_MAGIC_CAST_ABILITY_ID = 47764;
 
 // A single Mystery Magic resolution's hits/deaths span well under 3s
 // (observed: first hit to final death ~2.7s in pull 1); the next
@@ -762,42 +832,105 @@ function detectRevoltingRuinThreatLossErrors(players: PlayerInfo[]): PullError[]
   const tanks = players.filter((p) => p.role === "Tank");
   if (tanks.length !== 2) return []; // needs the standard 2-tank comp to reason about MT/OT
 
-  const hit1Targets = new Set<string>();
-  let hit1Timestamp: number | undefined;
-  const hit2Targets = new Set<string>();
-  let hit2Timestamp: number | undefined;
+  type Hit = { timestamp: number; player: string };
+  const hit1Events: Hit[] = [];
+  const hit2Events: Hit[] = [];
   for (const player of players) {
     for (const e of player.damageTaken) {
-      if (e.abilityId === REVOLTING_RUIN_FIRST_HIT_ABILITY_ID) {
-        hit1Targets.add(player.name);
-        hit1Timestamp = hit1Timestamp === undefined ? e.timestamp : Math.min(hit1Timestamp, e.timestamp);
-      } else if (e.abilityId === REVOLTING_RUIN_SECOND_HIT_ABILITY_ID) {
-        hit2Targets.add(player.name);
-        hit2Timestamp = hit2Timestamp === undefined ? e.timestamp : Math.min(hit2Timestamp, e.timestamp);
-      }
+      if (e.abilityId === REVOLTING_RUIN_FIRST_HIT_ABILITY_ID) hit1Events.push({ timestamp: e.timestamp, player: player.name });
+      else if (e.abilityId === REVOLTING_RUIN_SECOND_HIT_ABILITY_ID) hit2Events.push({ timestamp: e.timestamp, player: player.name });
     }
   }
-  // Ambiguous hit 1 (already scrambled by an earlier problem) — don't guess.
-  if (hit1Targets.size !== 1 || hit2Timestamp === undefined) return [];
+  if (hit1Events.length === 0 || hit2Events.length === 0) return [];
+  hit1Events.sort((a, b) => a.timestamp - b.timestamp);
 
-  const mtName = [...hit1Targets][0];
-  if (hit2Targets.has(mtName)) return []; // clean — the MT tanked both hits
+  // Split hit-1 events into distinct occurrences by proximity — see module
+  // header. Each occurrence is judged independently instead of pooling
+  // every occurrence's targets into one check (the bug that hid pull 26's
+  // real failure behind an earlier CLEAN occurrence).
+  const occurrenceStarts: number[] = [];
+  for (const h of hit1Events) {
+    if (occurrenceStarts.length === 0 || h.timestamp - occurrenceStarts[occurrenceStarts.length - 1] > REVOLTING_RUIN_OCCURRENCE_GAP_MS) {
+      occurrenceStarts.push(h.timestamp);
+    }
+  }
 
-  const mt = tanks.find((t) => t.name === mtName);
-  const ot = tanks.find((t) => t.name !== mtName);
-  if (!mt || !ot) return []; // hit 1 didn't land on either tank at all — not this mechanic's usual shape
+  const errors: PullError[] = [];
+  for (let i = 0; i < occurrenceStarts.length; i++) {
+    const start = occurrenceStarts[i];
+    const nextStart = occurrenceStarts[i + 1] ?? Infinity;
 
-  return [
-    {
+    const thisHit1 = hit1Events.filter((h) => h.timestamp >= start && h.timestamp < nextStart && h.timestamp < start + REVOLTING_RUIN_OCCURRENCE_GAP_MS);
+    const hit1Targets = new Set(thisHit1.map((h) => h.player));
+    if (hit1Targets.size !== 1) continue; // ambiguous hit 1 (already scrambled) — don't guess
+
+    const thisHit2 = hit2Events.filter((h) => h.timestamp >= start && h.timestamp < nextStart);
+    if (thisHit2.length === 0) continue; // hit 2 never resolved this occurrence — not this rule's shape
+
+    const mtName = [...hit1Targets][0];
+    const hit2Targets = new Set(thisHit2.map((h) => h.player));
+    if (hit2Targets.has(mtName)) continue; // clean — the MT tanked both hits
+
+    const mt = tanks.find((t) => t.name === mtName);
+    const ot = tanks.find((t) => t.name !== mtName);
+    if (!mt || !ot) continue; // hit 1 didn't land on either tank at all — not this mechanic's usual shape
+
+    errors.push({
       ruleId:      REVOLTING_RUIN_THREAT_LOSS_RULE_ID,
       severity:    "Major",
       name:        "Revolting Ruin III Threat Lost",
       description: `Failed to hold enmity after provoking Revolting Ruin III — the second hit landed on ${[...hit2Targets].join(" and ")} instead of ${mt.name} (${mt.className}) tanking both.`,
-      timestamp:   hit2Timestamp,
+      timestamp:   Math.min(...thisHit2.map((h) => h.timestamp)),
       player:      ot.name,
       class:       ot.className,
       specId:      ot.specId,
       role:        ot.role,
+      abilityId:   REVOLTING_RUIN_SECOND_HIT_ABILITY_ID,
+      abilityName: "Revolting Ruin III",
+    });
+  }
+  return errors;
+}
+
+/**
+ * A non-tank dying to either Revolting Ruin III hit means the tankbuster
+ * resolved onto an unmitigated player — lethal raid-wide, not survivable
+ * the way a mitigated tank surviving it is (confirmed pull 26: 6 non-tanks
+ * died simultaneously to hit 2 once the MT died to hit 1). Raid-severity
+ * cutoff, same shape as GRAVEN_1_DEATH_WIPE_RULE_ID — see module header.
+ */
+function detectRevoltingRuinNonTankDeathError(
+  deathEvents:       DeathEvent[],
+  otherPhase1Errors: PullError[]
+): PullError[] {
+  const nonTankDeaths = deathEvents.filter(
+    (d) => d.role !== "Tank" &&
+      (d.killingAbilityGameId === REVOLTING_RUIN_FIRST_HIT_ABILITY_ID || d.killingAbilityGameId === REVOLTING_RUIN_SECOND_HIT_ABILITY_ID)
+  );
+  if (nonTankDeaths.length === 0) return [];
+
+  const firstDeathTime = Math.min(...nonTankDeaths.map((d) => d.timestamp));
+  const clusterEnd = firstDeathTime + REVOLTING_RUIN_OCCURRENCE_GAP_MS;
+
+  const clusterDeaths = nonTankDeaths.filter((d) => d.timestamp <= clusterEnd);
+  const clusterMajors = otherPhase1Errors.filter(
+    (e) => e.severity === "Major" && e.timestamp >= firstDeathTime - REVOLTING_RUIN_OCCURRENCE_GAP_MS && e.timestamp <= clusterEnd
+  );
+
+  const cutoff = Math.max(
+    ...clusterDeaths.map((d) => d.timestamp),
+    ...clusterMajors.map((e) => e.timestamp)
+  );
+
+  const victims = [...new Set(clusterDeaths.map((d) => d.player))];
+
+  return [
+    {
+      ruleId:      REVOLTING_RUIN_NON_TANK_DEATH_RULE_ID,
+      severity:    "Raid",
+      name:        "Revolting Ruin III Non-Tank Death",
+      description: `${victims.join(" and ")} — a non-tank — died to Revolting Ruin III's tankbuster, meaning the wrong player was holding aggro when it resolved. Unresolvable from here; treated as a cutoff point for further per-player analysis this pull.`,
+      timestamp:   cutoff + 1,
       abilityId:   REVOLTING_RUIN_SECOND_HIT_ABILITY_ID,
       abilityName: "Revolting Ruin III",
     },
@@ -862,7 +995,7 @@ function detectJumpedOffArenaError(players: PlayerInfo[], deathEvents: DeathEven
       ruleId:      JUMPED_OFF_ARENA_RULE_ID,
       severity:    "Raid",
       name:        "Jumped Off The Arena",
-      description: `${jump.player} jumped off the arena, signaling a raid wipe and reset.`,
+      description: `${jump.player} jumped off the arena, signaling the raid is calling this pull — treated as a cutoff point for further per-player analysis.`,
       timestamp:   jump.timestamp,
       abilityId:   0,
       abilityName: "Jumped Off The Arena",
@@ -1298,7 +1431,7 @@ function detectUnmitigatedExplosionWipeError(enemyCasts: EnemyEvent[]): PullErro
       ruleId:      UNMITIGATED_EXPLOSION_WIPE_RULE_ID,
       severity:    "Raid",
       name:        "Unmitigated Explosion Wipe",
-      description: "A Wave Cannon tower went unsoaked, triggering Unmitigated Explosion — unresolvable from here, the raid wiped.",
+      description: "A Wave Cannon tower went unsoaked, triggering Unmitigated Explosion — unresolvable from here; treated as a cutoff point for further per-player analysis this pull.",
       timestamp,
       abilityId:   UNMITIGATED_EXPLOSION_ABILITY_ID,
       abilityName: "Unmitigated Explosion",
@@ -1307,24 +1440,43 @@ function detectUnmitigatedExplosionWipeError(enemyCasts: EnemyEvent[]): PullErro
 }
 
 /**
- * A death to Mystery Magic's resolution (either spread tick flavor, or
- * Blizzard III Blowout — see MYSTERY_MAGIC_DEATH_ABILITY_IDS) leaves Wave
- * Cannon unresolvable (it already self-gates on 4 live carriers) and marks
- * the pull as over. This fires a single Raid error just after the death
- * (and any Major error(s) it produced) purely to serve as the
- * lib/report-data.ts cutoff — see module comment.
+ * A death to the FIRST Graven Image/Mystery Magic resolution (either spread
+ * tick flavor, or Blizzard III Blowout — see MYSTERY_MAGIC_DEATH_ABILITY_IDS)
+ * leaves Wave Cannon unresolvable (it already self-gates on 4 live carriers)
+ * and marks the pull as over. This fires a single Raid error just after the
+ * death (and any Major error(s) it produced) purely to serve as the
+ * lib/report-data.ts cutoff — see module comment. A death to a LATER Graven
+ * Image occurrence in the same pull (Graven 2+) is deliberately excluded —
+ * Wave Cannon has already resolved by then, so the raid can rez and continue.
  */
-function detectMysteryMagicDeathWipeError(
-  deathEvents:      DeathEvent[],
+function detectGraven1DeathWipeError(
+  deathEvents:       DeathEvent[],
+  enemyCasts:        EnemyEvent[],
   otherPhase1Errors: PullError[]
 ): PullError[] {
   const mysteryMagicDeaths = deathEvents.filter((d) => MYSTERY_MAGIC_DEATH_ABILITY_IDS.has(d.killingAbilityGameId));
   if (mysteryMagicDeaths.length === 0) return [];
 
-  const firstDeathTime = Math.min(...mysteryMagicDeaths.map((d) => d.timestamp));
+  // Mystery Magic's own cast-to-resolution delay varies too widely for a
+  // fixed short window (confirmed pull 26: first cast at 38269ms resolves
+  // at 39071ms, but Blizzard III Blowout deaths from it land as late as
+  // 57167ms — an ~19s span from cast to last death) — so gate on the
+  // SECOND Mystery Magic cast directly: any Mystery Magic death before it
+  // belongs to the first occurrence, whatever its own resolution timing.
+  const mysteryMagicCasts = enemyCasts
+    .filter((e) => e.abilityId === MYSTERY_MAGIC_CAST_ABILITY_ID)
+    .sort((a, b) => a.timestamp - b.timestamp);
+  // No Mystery Magic cast on record at all (shouldn't happen alongside a
+  // real Mystery Magic death, but fail open rather than silently dropping
+  // one) — fall back to the pre-fix behavior of trusting every such death.
+  const graven1WindowEnd = mysteryMagicCasts.length >= 2 ? mysteryMagicCasts[1].timestamp : Infinity;
+  const graven1Deaths = mysteryMagicDeaths.filter((d) => d.timestamp < graven1WindowEnd);
+  if (graven1Deaths.length === 0) return [];
+
+  const firstDeathTime = Math.min(...graven1Deaths.map((d) => d.timestamp));
   const clusterEnd = firstDeathTime + MYSTERY_MAGIC_VOLLEY_CLUSTER_MS;
 
-  const clusterDeaths = mysteryMagicDeaths.filter((d) => d.timestamp <= clusterEnd);
+  const clusterDeaths = graven1Deaths.filter((d) => d.timestamp <= clusterEnd);
   const clusterMajors = otherPhase1Errors.filter(
     (e) => e.severity === "Major" && e.timestamp >= firstDeathTime - MYSTERY_MAGIC_VOLLEY_CLUSTER_MS && e.timestamp <= clusterEnd
   );
@@ -1338,10 +1490,10 @@ function detectMysteryMagicDeathWipeError(
 
   return [
     {
-      ruleId:      MYSTERY_MAGIC_DEATH_WIPE_RULE_ID,
+      ruleId:      GRAVEN_1_DEATH_WIPE_RULE_ID,
       severity:    "Raid",
-      name:        "Mystery Magic Wipe",
-      description: `${victims.join(" and ")} died during Mystery Magic — unresolvable from here, the raid wiped.`,
+      name:        "Graven 1 Wipe",
+      description: `${victims.join(" and ")} died during Graven 1's Mystery Magic resolution — Wave Cannon needs all 8 players alive to resolve, so this is treated as a cutoff point for further per-player analysis this pull.`,
       timestamp:   cutoff + 1,
       abilityId:   0,
       abilityName: "Mystery Magic",
@@ -1379,7 +1531,7 @@ function detectConfettiLostError(players: PlayerInfo[], deathEvents: DeathEvent[
       ruleId:      CONFETTI_LOST_RULE_ID,
       severity:    "Raid",
       name:        "Confetti Lost",
-      description: `${confettiDeath.player} died while carrying Double-Trouble Trap ("Confetti") — unresolvable from here, the raid wiped.`,
+      description: `${confettiDeath.player} died while carrying Double-Trouble Trap ("Confetti") — unresolvable from here; treated as a cutoff point for further per-player analysis this pull.`,
       timestamp:   confettiDeath.timestamp + 1,
       abilityId:   DOUBLE_TROUBLE_TRAP_BUFF_ID,
       abilityName: "Double-Trouble Trap",
@@ -1689,9 +1841,11 @@ export function detectPhase1Errors(
   enemyCasts:  EnemyEvent[] = []
 ): PullError[] {
   const blizzardIIISilentKillErrors = detectBlizzardIIIBlowoutSilentKillErrors(players, deathEvents);
+  const revoltingRuinThreatLossErrors = detectRevoltingRuinThreatLossErrors(players);
 
   return [
-    ...detectRevoltingRuinThreatLossErrors(players),
+    ...revoltingRuinThreatLossErrors,
+    ...detectRevoltingRuinNonTankDeathError(deathEvents, revoltingRuinThreatLossErrors),
     ...blizzardIIISilentKillErrors,
     ...detectJumpedOffArenaError(players, deathEvents),
     ...detectWaveCannonTowerOverlapErrors(players, deathEvents),
@@ -1699,7 +1853,7 @@ export function detectPhase1Errors(
     ...detectWaveCannonSupportPriorityErrors(players, deathEvents, enemyCasts),
     ...detectWaveCannonDpsPriorityErrors(players, deathEvents, enemyCasts),
     ...detectUnmitigatedExplosionWipeError(enemyCasts),
-    ...detectMysteryMagicDeathWipeError(deathEvents, blizzardIIISilentKillErrors),
+    ...detectGraven1DeathWipeError(deathEvents, enemyCasts, blizzardIIISilentKillErrors),
     ...detectConfettiLostError(players, deathEvents),
     ...detectConfettiKnockbackVictimErrors(players),
     ...detectConfettiHolderMisplacedErrors(players),

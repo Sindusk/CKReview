@@ -99,6 +99,14 @@ every mechanic, in every game. When in doubt, come back here.
 7. **Narrow overrides over wholesale replacement.** When a working check
    fails for one specific case, add a narrow override for that case — do not
    swap the whole mechanism for a new one that handles the exception.
+8. **Raid-severity descriptions shouldn't assert a definitive outcome like
+   "the raid wiped."** A raid can rez and keep pushing prog past a mistake
+   this severe even though detection treats it as a cutoff point for further
+   per-player analysis (confirmed 2026-07-30, Dancing Mad report
+   Q3GzJNZg64k1hLRm pull 26: a death to the raid's SECOND Graven Image/
+   Mystery Magic did not end the pull, unlike the first — see phase1.ts's
+   GRAVEN_1_DEATH_WIPE_RULE_ID). Phrase these as "unresolvable from here" /
+   "treated as a cutoff point," not "the raid wiped."
 
 ---
 
