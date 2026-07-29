@@ -75,6 +75,26 @@
 // cutoff shape as GRAVEN_1_DEATH_WIPE_RULE_ID/CONFETTI_LOST_RULE_ID/
 // UNMITIGATED_EXPLOSION_WIPE_RULE_ID.
 //
+// **Revolting Ruin III is a CONE AoE, and only a tank is supposed to ever
+// get hit by it** (confirmed 2026-07-30, pull 29, revisited after further
+// VOD review — supersedes the original read that Azura Salus's death that
+// pull was pure unavoidable splash). Confirmed failure: Azura Salus
+// (Healer) walked north into the cone's range before hit 2 landed, right
+// next to the tanking Dango, and died to it. Detection is deliberately an
+// OUTCOME check (did the cone's own damage actually land on them — i.e.
+// are they in hit 1 or hit 2's own target set), NOT a north/south position
+// check — a position-based first version produced a false-positive
+// pattern on a DIFFERENT report/team's melee DPS (G7kTFVxjcAC6p1MN:
+// Sayacissa Morsaelth, a Dragoon, consistently measured slightly north
+// almost every pull without ever actually being hit — per the user, melee
+// routinely drift north chasing positionals and that's fine as long as
+// they stay outside the cone's actual radius; only getting hit is the real
+// mistake). BOTH tanks are exempt, not just whichever one actually tanked
+// hit 1 that occurrence — which tank ends up holding it varies (sometimes
+// MT, sometimes OT provokes and takes over), and either way the other tank
+// may legitimately also be caught by it. See
+// detectRevoltingRuinOutOfPositionErrors below.
+//
 // ── GRAVEN 2 SPREAD MISPLACED (confirmed 2026-07-30, report ─────────────────
 // ── Q3GzJNZg64k1hLRm, pull 31) ───────────────────────────────────────────
 //
@@ -617,6 +637,7 @@ export const TELE_TROUNCING_ARROW_RULE_ID = "ffxiv-phase1-tele-trouncing-arrow-m
 export const GRAVEN_1_DEATH_WIPE_RULE_ID = "ffxiv-phase1-graven-1-death-wipe";
 export const REVOLTING_RUIN_THREAT_LOSS_RULE_ID = "ffxiv-phase1-revolting-ruin-threat-loss";
 export const REVOLTING_RUIN_NON_TANK_DEATH_RULE_ID = "ffxiv-phase1-revolting-ruin-non-tank-death";
+export const REVOLTING_RUIN_OUT_OF_POSITION_RULE_ID = "ffxiv-phase1-revolting-ruin-out-of-position";
 export const CONFETTI_LOST_RULE_ID = "ffxiv-phase1-confetti-lost";
 export const CONFETTI_KNOCKBACK_VICTIM_RULE_ID = "ffxiv-phase1-confetti-knockback-victim-misplaced";
 export const CONFETTI_HOLDER_MISPLACED_RULE_ID = "ffxiv-phase1-confetti-holder-misplaced";
@@ -912,6 +933,8 @@ type RevoltingRuinOccurrence = {
   start:             number;
   end:               number; // exclusive — next occurrence's start, or Infinity
   mtName:            string | null; // null when hit 1 was ambiguous (already scrambled)
+  hit1Targets:       Set<string>;
+  hit1Time:          number | null; // null when hit 1 was ambiguous (mtName also null in that case)
   hit2Targets:        Set<string>;
   hit2Time:           number | null; // null when hit 2 never resolved this occurrence
   mtDiedBeforeHit2:   boolean;
@@ -954,6 +977,7 @@ function resolveRevoltingRuinOccurrences(players: PlayerInfo[], deathEvents: Dea
     const thisHit1 = hit1Events.filter((h) => h.timestamp >= start && h.timestamp < nextStart && h.timestamp < start + REVOLTING_RUIN_OCCURRENCE_GAP_MS);
     const hit1Targets = new Set(thisHit1.map((h) => h.player));
     const mtName = hit1Targets.size === 1 ? [...hit1Targets][0] : null;
+    const hit1Time = thisHit1.length > 0 ? Math.min(...thisHit1.map((h) => h.timestamp)) : null;
 
     const thisHit2 = hit2Events.filter((h) => h.timestamp >= start && h.timestamp < nextStart);
     const hit2Targets = new Set(thisHit2.map((h) => h.player));
@@ -970,7 +994,7 @@ function resolveRevoltingRuinOccurrences(players: PlayerInfo[], deathEvents: Dea
     // alive check keeps the definition airtight either way).
     const clean = mtName !== null && hit2Targets.has(mtName) && !mtDiedBeforeHit2;
 
-    return { start, end: nextStart, mtName, hit2Targets, hit2Time, mtDiedBeforeHit2, clean };
+    return { start, end: nextStart, mtName, hit1Targets, hit1Time, hit2Targets, hit2Time, mtDiedBeforeHit2, clean };
   });
 }
 
@@ -1077,6 +1101,68 @@ function detectRevoltingRuinNonTankDeathError(
       abilityName: "Revolting Ruin III",
     },
   ];
+}
+
+/**
+ * Detects a non-tank player actually HIT by either of Revolting Ruin III's
+ * cone hits — see module header. Deliberately an OUTCOME check (did the
+ * cone actually catch them), not a position/geometry check — confirmed
+ * 2026-07-30, per the user, after a position-based version (flagging
+ * anyone found north of arena center) produced a false-positive pattern on
+ * a DIFFERENT report/team's melee DPS (G7kTFVxjcAC6p1MN: Sayacissa
+ * Morsaelth, a Dragoon, consistently measured slightly north almost every
+ * pull without ever actually being hit): melee routinely drift north of
+ * center chasing positionals, which is fine as long as they stay outside
+ * the cone's actual radius — only getting hit is the real mistake. Exempts
+ * tanks (either one may legitimately eat the hit, see the threat-loss rule
+ * above) — everyone else who appears in hit 1 or hit 2's own target set is
+ * flagged, using the game's own outcome as ground truth instead of
+ * modeling the cone's geometry.
+ *
+ * Scoped to CLEAN occurrences only (the tank legitimately tanked hit 2) —
+ * a non-clean occurrence's mass hit-2 splash (confirmed several pulls:
+ * everyone except the dead MT catching it simultaneously) is fallout of
+ * the SAME already-flagged threat/mitigation failure
+ * (REVOLTING_RUIN_THREAT_LOSS_RULE_ID / REVOLTING_RUIN_NON_TANK_DEATH_RULE_ID),
+ * not each victim's own independent positioning mistake — flagging all of
+ * them here too would be the "death fallout is never flagged" trap again,
+ * just with more names on it.
+ */
+function detectRevoltingRuinOutOfPositionErrors(players: PlayerInfo[], deathEvents: DeathEvent[]): PullError[] {
+  const errors: PullError[] = [];
+  const playerByName = new Map(players.map((p) => [p.name, p]));
+
+  for (const occ of resolveRevoltingRuinOccurrences(players, deathEvents)) {
+    if (!occ.clean) continue;
+
+    const hitTargets: { name: string; timestamp: number }[] = [
+      ...(occ.hit1Time !== null ? [...occ.hit1Targets].map((name) => ({ name, timestamp: occ.hit1Time! })) : []),
+      ...(occ.hit2Time !== null ? [...occ.hit2Targets].map((name) => ({ name, timestamp: occ.hit2Time! })) : []),
+    ];
+
+    const flagged = new Set<string>(); // one error per player per occurrence, even if hit by both
+    for (const { name, timestamp } of hitTargets) {
+      if (flagged.has(name)) continue;
+      const player = playerByName.get(name);
+      if (!player || player.role === "Tank") continue; // either tank may legitimately eat the hit
+      flagged.add(name);
+
+      errors.push({
+        ruleId:      REVOLTING_RUIN_OUT_OF_POSITION_RULE_ID,
+        severity:    "Major",
+        name:        "Revolting Ruin III Out Of Position",
+        description: "Was caught by Revolting Ruin III's cone — only a tank should ever be hit by it; everyone else needs to stay clear.",
+        timestamp,
+        player:      player.name,
+        class:       player.className,
+        specId:      player.specId,
+        role:        player.role,
+        abilityId:   REVOLTING_RUIN_SECOND_HIT_ABILITY_ID,
+        abilityName: "Revolting Ruin III",
+      });
+    }
+  }
+  return errors;
 }
 
 function detectBlizzardIIIBlowoutSilentKillErrors(players: PlayerInfo[], deathEvents: DeathEvent[]): PullError[] {
@@ -2179,6 +2265,7 @@ export function detectPhase1Errors(
   return [
     ...revoltingRuinThreatLossErrors,
     ...detectRevoltingRuinNonTankDeathError(players, deathEvents, revoltingRuinThreatLossErrors),
+    ...detectRevoltingRuinOutOfPositionErrors(players, deathEvents),
     ...blizzardIIISilentKillErrors,
     ...detectJumpedOffArenaError(players, deathEvents),
     ...detectWaveCannonTowerOverlapErrors(players, deathEvents),
