@@ -163,6 +163,38 @@
 // — the user wasn't sure what's changed strategically around who should
 // hold Invulnerability for it, so no rule is built for it yet.
 //
+// ── GRAVEN 2 PUDDLE PROXIMITY (confirmed 2026-07-30, report ─────────────────
+// ── Q3GzJNZg64k1hLRm, pull 51) ───────────────────────────────────────────
+//
+// The per-player cause behind GRAVITATIONAL_EXPLOSION_WIPE_RULE_ID above,
+// for the specific shape the user could actually attribute from the VOD:
+// a spreader landing too close to the OTHER lingering Gravitas puddle from
+// this same stack/spread beat (see module header's opening paragraph),
+// rather than too close to another spreader (that's
+// GRAVEN_2_SPREAD_MISPLACED_RULE_ID). The 2 puddles sit wherever each
+// light party stacked for the Gravitas Puddles (47788) cast — computed
+// as the centroid of each LP's own damageTaken position at that moment
+// (all 4 members share one spot), split north/south of arena center, the
+// same technique graven-image.ts's layout learner uses for its own two
+// mirrored halves.
+//
+// Confirmed failure (pull 51): Archidel Del'archi spread to within ~1032
+// centiyalms of the nearest puddle centroid and the Gravitational
+// Explosion (47789) fired moments later, wiping the raid. The other 3
+// spreaders that same resolution were clean with real margin: Salty Dango
+// ~1334, Sayacissa Morsaelth ~1443, Azura Salus ~1581 — floor set at the
+// midpoint between the failure and the nearest clean sample.
+//
+// Gated on GRAVITATIONAL_EXPLOSION_WIPE_RULE_ID actually firing this pull
+// — with only one confirmed failure sample to calibrate from, staying
+// silent on pulls that resolved cleanly avoids risking a false positive
+// on a merely-close-but-fine spread (same "only check on failure"
+// precedent as detectWaveCannonRolePriorityErrors, per the user directly).
+// Timestamped 1ms before the wipe cutoff's own cast timestamp (not the
+// spreader's own Vitrophyre hit, which lands slightly AFTER the
+// explosion's cast fires) so it sorts immediately before the wipe entry,
+// same ordering trick detectTeleTrouncingDeathWipeError's `cutoff + 1` uses.
+//
 // ── BLIZZARD III BLOWOUT SILENT KILL (confirmed 2026-07, VtdBqhLQkWJXMvDg) ──
 //
 // Blizzard III Blowout (ability IDs vary — 47765/47768/47771/47774, all
@@ -739,6 +771,7 @@ export const WAVE_CANNON_TOWER_PRIORITY_RULE_ID  = "ffxiv-phase1-wave-cannon-tow
 export const UNMITIGATED_EXPLOSION_WIPE_RULE_ID  = "ffxiv-phase1-unmitigated-explosion-wipe";
 export const GRAVITATIONAL_EXPLOSION_WIPE_RULE_ID = "ffxiv-phase1-gravitational-explosion-wipe";
 export const GRAVEN_2_SPREAD_MISPLACED_RULE_ID = "ffxiv-phase1-graven2-spread-misplaced";
+export const GRAVEN_2_PUDDLE_PROXIMITY_RULE_ID = "ffxiv-phase1-graven2-puddle-proximity";
 export const GRAVEN_2_DEATH_WIPE_RULE_ID = "ffxiv-phase1-graven2-death-wipe";
 export const TELE_TROUNCING_ARROW_RULE_ID = "ffxiv-phase1-tele-trouncing-arrow-misplaced";
 export const TELE_TROUNCING_DEATH_WIPE_RULE_ID = "ffxiv-phase1-tele-trouncing-death-wipe";
@@ -2006,6 +2039,97 @@ function detectGraven2SpreadMisplacedErrors(players: PlayerInfo[]): PullError[] 
   return errors;
 }
 
+// A single puddle-drop's own 4 apply hits land within ~150ms of each
+// other (confirmed pull 51: 107484-107617); two distinct drops (1st/2nd
+// stack) are ~18s apart — wide margin, same magnitude as
+// GRAVEN_2_SPREAD_RESOLUTION_GAP_MS above.
+const GRAVEN_2_PUDDLE_DROP_GAP_MS = 5000;
+
+// Confirmed failure vs. clean, pull 51 — see module header's "GRAVEN 2
+// PUDDLE PROXIMITY" section for the full calibration story.
+const GRAVEN_2_PUDDLE_PROXIMITY_TOLERANCE_CENTIYALMS = 1180;
+
+/**
+ * Detects a Graven 2 spreader who landed too close to a lingering Gravitas
+ * puddle from the same stack/spread beat — see module header for the
+ * mechanic, the puddle-centroid technique, and why this only fires when
+ * GRAVITATIONAL_EXPLOSION_WIPE_RULE_ID actually does this pull.
+ */
+function detectGraven2PuddleProximityErrors(players: PlayerInfo[], enemyCasts: EnemyEvent[]): PullError[] {
+  const explosionCasts = enemyCasts.filter((e) => e.abilityId === GRAVITATIONAL_EXPLOSION_ABILITY_ID);
+  if (explosionCasts.length === 0) return [];
+  const explosionCastTime = Math.min(...explosionCasts.map((e) => e.timestamp));
+
+  type Hit = { player: PlayerInfo; timestamp: number; x: number; y: number };
+  const puddleHits: Hit[] = [];
+  const spreadHits: Hit[] = [];
+  for (const player of players) {
+    for (const e of player.damageTaken) {
+      if (e.x === undefined || e.y === undefined) continue;
+      if (e.abilityId === GRAVEN_2_START_ABILITY_ID) puddleHits.push({ player, timestamp: e.timestamp, x: e.x, y: e.y });
+      if (e.abilityId === VITROPHYRE_ABILITY_ID) spreadHits.push({ player, timestamp: e.timestamp, x: e.x, y: e.y });
+    }
+  }
+  if (puddleHits.length === 0 || spreadHits.length === 0) return [];
+
+  // Puddle drops cluster into groups (1st/2nd stack) — the LAST group is
+  // the one the wipe-causing spread resolution follows.
+  const dropTimes = [...new Set(puddleHits.map((h) => h.timestamp))].sort((a, b) => a - b);
+  let lastDropGroupStart = dropTimes[0];
+  for (let i = 1; i < dropTimes.length; i++) {
+    if (dropTimes[i] - dropTimes[i - 1] > GRAVEN_2_PUDDLE_DROP_GAP_MS) lastDropGroupStart = dropTimes[i];
+  }
+  const lastDrop = puddleHits.filter((h) => h.timestamp >= lastDropGroupStart);
+
+  // One position per player — both of a player's puddle-apply hits share
+  // the same spot (see module header on the doubled instances).
+  const dropPosByPlayer = new Map<string, Hit>();
+  for (const h of lastDrop) if (!dropPosByPlayer.has(h.player.name)) dropPosByPlayer.set(h.player.name, h);
+
+  // The 2 puddles sit on opposite sides of arena center, one per light
+  // party — same north/south split graven-image.ts's layout learner uses.
+  const centroid = (hits: Hit[]): { x: number; y: number } | null =>
+    hits.length === 0 ? null : { x: hits.reduce((s, h) => s + h.x, 0) / hits.length, y: hits.reduce((s, h) => s + h.y, 0) / hits.length };
+  const grouped = [...dropPosByPlayer.values()];
+  const puddles = [
+    centroid(grouped.filter((h) => h.y < ARENA_CENTER)),
+    centroid(grouped.filter((h) => h.y >= ARENA_CENTER)),
+  ].filter((p): p is { x: number; y: number } => p !== null);
+  if (puddles.length === 0) return [];
+
+  // The spread resolution that immediately follows the last puddle drop.
+  const spreadAfterDrop = spreadHits.filter((h) => h.timestamp >= lastDropGroupStart).sort((a, b) => a.timestamp - b.timestamp);
+  if (spreadAfterDrop.length === 0) return [];
+  const spreadStart = spreadAfterDrop[0].timestamp;
+  const spreadResolutionHits = spreadHits.filter((h) => Math.abs(h.timestamp - spreadStart) < GRAVEN_2_SPREAD_RESOLUTION_GAP_MS);
+
+  // One position per player — a spreader can take 2 near-simultaneous
+  // Vitrophyre hits (same doubled-instance shape the puddle applies have).
+  const spreaderByPlayer = new Map<string, Hit>();
+  for (const h of spreadResolutionHits) if (!spreaderByPlayer.has(h.player.name)) spreaderByPlayer.set(h.player.name, h);
+
+  const errors: PullError[] = [];
+  for (const spreader of spreaderByPlayer.values()) {
+    const nearest = Math.min(...puddles.map((p) => distanceBetween({ x: spreader.x, y: spreader.y }, p)));
+    if (nearest >= GRAVEN_2_PUDDLE_PROXIMITY_TOLERANCE_CENTIYALMS) continue;
+
+    errors.push({
+      ruleId:      GRAVEN_2_PUDDLE_PROXIMITY_RULE_ID,
+      severity:    "Major",
+      name:        "Graven 2 Puddle Proximity",
+      description: `Spread only ${(nearest / 100).toFixed(1)} yalms from a lingering Gravitas puddle — too close, triggering the Gravitational Explosion.`,
+      timestamp:   explosionCastTime - 1,
+      player:      spreader.player.name,
+      class:       spreader.player.className,
+      specId:      spreader.player.specId,
+      role:        spreader.player.role,
+      abilityId:   GRAVITATIONAL_EXPLOSION_ABILITY_ID,
+      abilityName: "Gravitational Explosion",
+    });
+  }
+  return errors;
+}
+
 // Same magnitude as the other wipe-cutoff rules' own death-clustering
 // windows (MYSTERY_MAGIC_VOLLEY_CLUSTER_MS, REVOLTING_RUIN_OCCURRENCE_GAP_MS's
 // intra-occurrence use, etc).
@@ -2737,6 +2861,7 @@ export function detectPhase1Errors(
     ...detectWaveCannonSupportPriorityErrors(players, deathEvents, enemyCasts),
     ...detectWaveCannonDpsPriorityErrors(players, deathEvents, enemyCasts),
     ...detectUnmitigatedExplosionWipeError(enemyCasts),
+    ...detectGraven2PuddleProximityErrors(players, enemyCasts),
     ...detectGravitationalExplosionWipeError(enemyCasts),
     ...detectGraven1DeathWipeError(deathEvents, enemyCasts, blizzardIIISilentKillErrors),
     ...graven2SpreadMisplacedErrors,
