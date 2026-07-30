@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import type { StaticReviewPullData } from "@/lib/static-review-data";
 
 async function requireMembership(staticId: number, userId: number) {
   return prisma.staticMember.findUnique({
@@ -53,6 +54,7 @@ export async function POST(
   const sessionId = String(body?.sessionId || "").trim();
   const reportUrl = String(body?.reportUrl || "").trim();
   const label = typeof body?.label === "string" && body.label.trim() ? body.label.trim() : null;
+  const pulls: StaticReviewPullData[] = Array.isArray(body?.pulls) ? body.pulls : [];
 
   if (!sessionId || !reportUrl) {
     return NextResponse.json({ error: "sessionId and reportUrl are required" }, { status: 400 });
@@ -60,7 +62,30 @@ export async function POST(
 
   try {
     const review = await prisma.staticReview.create({
-      data: { staticId, sessionId, reportUrl, label, addedByUserId: user.id },
+      data: {
+        staticId,
+        sessionId,
+        reportUrl,
+        label,
+        addedByUserId: user.id,
+        pulls: {
+          create: pulls.map((p) => ({
+            fightId:    p.fightId,
+            pullNumber: p.pullNumber,
+            bossName:   p.bossName,
+            result:     p.result,
+            startTime:  p.startTime,
+            endTime:    p.endTime,
+            playerErrors: {
+              create: p.players.map((pl) => ({
+                player:     pl.player,
+                majorCount: pl.majorCount,
+                minorCount: pl.minorCount,
+              })),
+            },
+          })),
+        },
+      },
     });
     return NextResponse.json({ review });
   } catch (err) {

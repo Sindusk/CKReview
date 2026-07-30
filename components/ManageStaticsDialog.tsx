@@ -8,6 +8,7 @@
 // but this dialog doesn't expose them yet.
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import ConfirmDialog from "./ConfirmDialog";
 
 type StaticSummary = {
@@ -174,23 +175,41 @@ export default function ManageStaticsDialog({ open, onClose }: ManageStaticsDial
                   <div style={{ fontSize: "13px" }}>{s.name}</div>
                   <div style={{ fontSize: "11px", color: "#777" }}>{s.role}</div>
                 </div>
-                {s.role === "OWNER" && (
-                  <button
-                    onClick={() => setPendingDeleteId(s.id)}
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <Link
+                    href={`/statics/${s.id}`}
+                    onClick={onClose}
                     style={{
                       backgroundColor: "transparent",
-                      color: "#f87171",
-                      border: "1px solid #5c2626",
+                      color: "#93c5fd",
+                      border: "1px solid #2f4f7a",
                       borderRadius: "6px",
                       padding: "4px 10px",
                       fontSize: "12px",
                       fontWeight: 600,
-                      cursor: "pointer",
+                      textDecoration: "none",
                     }}
                   >
-                    Delete
-                  </button>
-                )}
+                    View
+                  </Link>
+                  {s.role === "OWNER" && (
+                    <button
+                      onClick={() => setPendingDeleteId(s.id)}
+                      style={{
+                        backgroundColor: "transparent",
+                        color: "#f87171",
+                        border: "1px solid #5c2626",
+                        borderRadius: "6px",
+                        padding: "4px 10px",
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
               </div>
             ))
           )}

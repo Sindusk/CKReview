@@ -58,12 +58,20 @@ type CriticalEvent = {
 // players scrambling/jumping into fire to end the pull faster would get
 // unfairly dinged for "mistakes" that only happened because the pull was
 // already over.
-function getPullCriticalEvents(pull: Pull): CriticalEvent[] {
+// The earliest Raid-severity error's timestamp (auto-detected or a manual
+// Call Wipe), or null if the pull has none. Shared by getPullCriticalEvents
+// below and by computeStaticReviewPullData (lib/static-review-data.ts) —
+// both need to drop anything logged after the raid was already wiping.
+export function getPullRaidCutoff(pull: Pull): number | null {
   const raidTimestamps = pull.errors
     .filter((e) => e.severity === "Raid")
     .map((e) => e.timestamp);
 
-  const cutoff = raidTimestamps.length > 0 ? Math.min(...raidTimestamps) : null;
+  return raidTimestamps.length > 0 ? Math.min(...raidTimestamps) : null;
+}
+
+function getPullCriticalEvents(pull: Pull): CriticalEvent[] {
+  const cutoff = getPullRaidCutoff(pull);
 
   const majors: CriticalEvent[] = pull.errors
     .filter((e) => e.severity === "Major")

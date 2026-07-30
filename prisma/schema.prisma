@@ -56,7 +56,62 @@ model StaticReview {
   addedAt       DateTime @default(now())
 
   static Static @relation(fields: [staticId], references: [id], onDelete: Cascade)
+  pulls  StaticReviewPull[]
 
   @@unique([staticId, sessionId])
   @@index([staticId])
+}
+
+/// One row per imported pull within a review — the per-pull data backing the
+/// cross-pull error charts and notes. Populated at import time from the
+/// session's Pull[] (see types/Pull.ts), not hand-entered.
+model StaticReviewPull {
+  id             Int    @id @default(autoincrement())
+  staticReviewId Int
+  /// Raw fight ID from the log source (Pull.fightId) — stable identity for
+  /// this pull within the review, independent of display numbering.
+  fightId        Int
+  /// Sequential per-boss pull number (Pull.pullNumber), as shown in the UI
+  /// ("#N") and used as the chart's x-axis.
+  pullNumber     Int
+  /// Boss/encounter name (Pull.name) — a review is expected to cover one
+  /// encounter, but this is stored per-pull rather than assumed.
+  bossName       String
+  result         String // "Wipe" | "Kill" (Pull.result)
+  startTime      Int
+  endTime        Int
+
+  /// Freeform notes on what happened/went wrong during this pull. Nullable —
+  /// most pulls won't have one unless someone writes it in during review.
+  summary        String?
+
+  createdAt DateTime @default(now())
+
+  review       StaticReview                 @relation(fields: [staticReviewId], references: [id], onDelete: Cascade)
+  playerErrors StaticReviewPullPlayerError[]
+
+  @@unique([staticReviewId, fightId])
+  @@index([staticReviewId])
+}
+
+/// Per-player error counts for one pull, computed at import time using the
+/// same cutoff rule as the Report tab (lib/report-data.ts's
+/// getPullCriticalEvents): only Major errors up to the earliest Raid-severity
+/// error (auto-detected or a manual Call Wipe) count. Major/Minor are kept
+/// separate so future charts can filter or weight by severity rather than
+/// only ever showing a combined total.
+model StaticReviewPullPlayerError {
+  id     Int    @id @default(autoincrement())
+  pullId Int
+  /// Player name — joined across pulls the same way report-data.ts's roster
+  /// is (by name, since actorId is only stable within a single pull/report).
+  player String
+
+  majorCount Int @default(0)
+  minorCount Int @default(0)
+
+  pull StaticReviewPull @relation(fields: [pullId], references: [id], onDelete: Cascade)
+
+  @@unique([pullId, player])
+  @@index([pullId])
 }

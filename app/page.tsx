@@ -1217,6 +1217,7 @@ export default function Home() {
         open={showAddReviewToStaticDialog}
         sessionId={sessionId}
         reportUrl={sessionReportUrl}
+        pulls={pulls}
         onClose={() => setShowAddReviewToStaticDialog(false)}
         onOpenManageStatics={() => setShowManageStaticsDialog(true)}
       />

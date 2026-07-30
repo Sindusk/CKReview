@@ -8,6 +8,8 @@
 // the underlying session in data/sessions/<id>.json is untouched.
 
 import { useEffect, useState } from "react";
+import type { Pull } from "@/types/Pull";
+import { computeStaticReviewPullData } from "@/lib/static-review-data";
 
 type StaticSummary = {
   id:   number;
@@ -19,6 +21,7 @@ type AddReviewToStaticDialogProps = {
   open:               boolean;
   sessionId:          string | null;
   reportUrl:          string;
+  pulls:              Pull[];
   onClose:            () => void;
   onOpenManageStatics: () => void;
 };
@@ -27,6 +30,7 @@ export default function AddReviewToStaticDialog({
   open,
   sessionId,
   reportUrl,
+  pulls,
   onClose,
   onOpenManageStatics,
 }: AddReviewToStaticDialogProps) {
@@ -70,7 +74,12 @@ export default function AddReviewToStaticDialog({
       const res = await fetch(`/api/statics/${selectedId}/reviews`, {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ sessionId, reportUrl, label: label.trim() || undefined }),
+        body:    JSON.stringify({
+          sessionId,
+          reportUrl,
+          label: label.trim() || undefined,
+          pulls: computeStaticReviewPullData(pulls),
+        }),
       });
       const data = await res.json();
 
