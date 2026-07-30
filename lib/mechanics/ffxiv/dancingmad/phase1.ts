@@ -831,20 +831,25 @@ const CONFETTI_MIN_DIST_FOR_BEARING_CENTIYALMS = 150;
 // samples while still sitting well under the confirmed failure (Ayumi Emi
 // ~1012, ~512 over, pull 18).
 //
-// UNDERSHOOT is much tighter — just above ordinary jitter — but had to be
-// re-tightened again (2026-07-30, pull 38): Salty Dango (~388) and Azura
-// Salus (~382) were both confirmed clean by the user ("in a reasonable
-// spot, get knocked across cleanly") despite sitting under the original
-// 400 threshold. That threshold had been calibrated off a SINGLE confirmed
-// failure sample (Azura Salus ~372, pull 18) with no clean undershoot
-// sample to bound it from the other side — pull 38 supplies that missing
-// bound. The floor now sits at 377, roughly the midpoint between 372
-// (still caught) and 382 (now clear) — a deliberately narrow gap since
-// that's genuinely how close together the two confirmed samples are, not
-// a threshold that can be widened for extra margin without either
-// re-breaking pull 18 or re-breaking pull 38.
+// UNDERSHOOT was re-tightened once (2026-07-30, pull 38: Dango ~388 and
+// Azura Salus ~382 confirmed clean, floor moved to 377) against what was
+// then believed to be a confirmed failure at ~372 (Azura Salus, pull 18).
+// That pull-18 "failure" was itself OVERTURNED the same day, while
+// investigating pull 48: Archidel Del'archi sat at ~257 centiyalms —
+// clearly closer to the boss than even the old 372 "failure" — and was
+// confirmed clean by the user ("within reasonable limits, got knocked
+// across the arena properly"). Re-reviewing pull 18 from the VOD showed
+// Azura's resolution actually failed because Salty Dango (the holder)
+// stood north instead of west, not because of Azura's own distance —
+// so the ~372 sample was never a genuine undershoot failure to begin
+// with. With that sample gone, there is currently NO confirmed undershoot
+// failure at all (Kade Kansado's ~383 is DPS, already excluded below), so
+// the floor is set generously below the lowest confirmed-clean sample
+// (Archidel ~257) rather than hugging it — this check now only exists to
+// catch someone genuinely standing on top of the boss, not to split hairs
+// on a few dozen centiyalms.
 const CONFETTI_STACK_OVERSHOOT_TOLERANCE_CENTIYALMS  = 400;
-const CONFETTI_STACK_UNDERSHOOT_TOLERANCE_CENTIYALMS = 123;
+const CONFETTI_STACK_UNDERSHOOT_TOLERANCE_CENTIYALMS = 350;
 
 // How long before the knockback's own damage lands its interpolated
 // "snapshot" position should be read — see module header's "WHY
@@ -2324,17 +2329,16 @@ function confettiSnapshotTime(players: PlayerInfo[], firstWaveTime: number): num
  *
  * **The undershoot ("too close") check only applies to Tanks/Healers, not
  * DPS** (confirmed 2026-07-30, report Q3GzJNZg64k1hLRm pull 28: Kade
- * Kansado, DPS, sat at ~383 centi-yalms — under the 400 floor that
- * correctly caught pull 18's confirmed Support failure (Azura Salus,
- * Healer, ~372) — yet the user confirmed Kade's positioning was correct;
- * he was cleanly knocked through the boss). DPS-side clean samples span a
- * much wider range than Support's (Kade ~383, Sonder Dreams ~505-509 in a
- * different pull, Chauzey Solstice ~554 in the SAME pull as Kade) — DPS
- * naturally sit closer to the boss for their own uptime, so "too close"
- * isn't a meaningful DPS mistake the way it is for Support (who have no
- * such uptime reason to hug the hitbox tighter than the ring). No
- * confirmed DPS undershoot FAILURE sample exists, so rather than guess a
- * DPS-specific floor from zero failure data, the check is skipped for DPS
+ * Kansado, DPS, sat at ~383 centi-yalms, yet the user confirmed his
+ * positioning was correct — he was cleanly knocked through the boss).
+ * DPS-side clean samples span a much wider range than Support's (Kade
+ * ~383, Sonder Dreams ~505-509 in a different pull, Chauzey Solstice ~554
+ * in the SAME pull as Kade) — DPS naturally sit closer to the boss for
+ * their own uptime, so "too close" isn't a meaningful DPS mistake the way
+ * it is for Support (who have no such uptime reason to hug the hitbox
+ * tighter than the ring). No confirmed DPS undershoot FAILURE sample
+ * exists, so rather than guess a DPS-specific floor from zero failure
+ * data, the check is skipped for DPS
  * entirely until one surfaces. The overshoot ("too far") check is
  * unaffected — its only confirmed failure (Ayumi Emi ~1012) clears the
  * threshold by a wide, unambiguous margin regardless of role.
