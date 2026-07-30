@@ -614,7 +614,7 @@
 // After the arrows are placed (above) AND the third/final Confetti
 // detonates (see CONFETTI FINAL POSITION), the raid gets tethered offscreen
 // to a statue and split into 2 tagged groups: one side (Idyllic Will,
-// TELE_TROUNCING_WILL_ABILITY_ID) takes an AoE that kills anyone standing
+// TELE_TROUNCING_WILL_ABILITY_IDS) takes an AoE that kills anyone standing
 // near the target, followed by Sleep; the other (Indulgent Will) gets
 // Confused (auto-walks toward the nearest ally and, on reaching melee
 // range, one-shots them). Resolution: the Slept player baits the nearest
@@ -633,9 +633,17 @@
 // is deferred to a cleaner sample.
 //
 // What IS built for now: a simple Raid-severity cutoff (same shape as
-// CONFETTI_LOST/GRAVEN_1_DEATH_WIPE) on a death to the AoE side's own
-// damage (Idyllic Will) — per the user, dying to this initial hit means
-// the mechanic never gets a chance to resolve via baiting at all.
+// CONFETTI_LOST/GRAVEN_1_DEATH_WIPE) on a death to either side's own
+// initial hit (Idyllic Will's AoE, or Indulgent Will — confirmed pull 57
+// can credit Indulgent Will directly as the killing blow too, not just as
+// a tag) or the mechanic's own "Double-Trouble Trap" trap (confirmed pull
+// 57: Azura Salus and Sayacissa Morsaelth both died to it shortly after
+// the arrows landed) — per the user, dying to any of these means the
+// mechanic never gets a chance to resolve via baiting at all. Note this
+// trap ability's ID (47783) is REUSED from the earlier, unrelated
+// Confetti explosion (CONFETTI_EXPLOSION_ABILITY_ID) — see
+// detectTeleTrouncingDeathWipeError's own comment for how that's
+// disambiguated.
 // Confirmed pull 41: 4 players (Ayumi Emi, Chauzey Solstice, Kade Kansado,
 // Sonder Dreams) died to Idyllic Will within 45ms of each other — clustered
 // too close together, so each one's own AoE also caught the others.
@@ -1207,7 +1215,30 @@ const TELE_PORTENT_WAVE_CLUSTER_MS = 1500;
 // OWN damage is what killed all 4 of them in this pull (they were
 // clustered together, so each one's own AoE caught the others too — not
 // just one death, a chain).
-const TELE_TROUNCING_WILL_ABILITY_ID = 47798;
+//
+// Confirmed 2026-07-30 (pull 57): 47797 (Indulgent Will) can ALSO be the
+// killing blow directly, not just a tag — Ayumi Emi and Kade Kansado both
+// died with killingAbilityGameId 47797 (presumably a Confused player's
+// own 1-shot melee attack getting logged under 47797 rather than a
+// distinct ability). Both IDs now count as this rule's own "will" deaths.
+const TELE_TROUNCING_WILL_ABILITY_IDS: readonly number[] = [47797, 47798];
+
+// Same pull (57): Azura Salus and Sayacissa Morsaelth both died to
+// killingAbilityGameId 47783 ("Double-Trouble Trap") shortly after the
+// arrows landed (~168877, well after the first Tele-Trouncing cast
+// 47802 at ~160446) — the SAME ability ID (and in-game name) as
+// CONFETTI_EXPLOSION_ABILITY_ID from the earlier, unrelated Confetti
+// mechanic (confirmed: this pull's own genuine Confetti resolutions used
+// the same ID at ~50530 and ~119194, both well before Tele-Trouncing
+// even starts). Scoped to AFTER the first Tele-Trouncing cast in
+// detectTeleTrouncingDeathWipeError so an earlier, already-independently-
+// handled Confetti-phase death never gets swept up here by mistake.
+const TELE_TROUNCING_TRAP_ABILITY_ID = CONFETTI_EXPLOSION_ABILITY_ID;
+
+// Tele-Trouncing's own arrow-placement cast — marks the mechanic's start,
+// used to disambiguate TELE_TROUNCING_TRAP_ABILITY_ID's reused ID from an
+// earlier Confetti-phase occurrence (see above).
+const TELE_TROUNCING_START_ABILITY_ID = 47802;
 
 // Same clustering window as MYSTERY_MAGIC_VOLLEY_CLUSTER_MS — this pull's
 // own 4 simultaneous deaths landed within 45ms of each other, comfortably
@@ -3224,15 +3255,29 @@ function detectTeleTrouncingArrowErrors(players: PlayerInfo[]): PullError[] {
 }
 
 /**
- * A death to the AoE side's own damage (Idyllic Will) during Tele-
- * Trouncing's resolution — see module header. Per-player attribution for
- * WHO baited wrong isn't built yet (see FIXED BAIT note above), so this is
- * a pure Raid-severity cutoff, same shape as GRAVEN_1_DEATH_WIPE/
- * CONFETTI_LOST — clusters every death in the same near-simultaneous
- * volley into one error rather than firing once per victim.
+ * A death during Tele-Trouncing's resolution — either side's own damage
+ * (Idyllic Will's AoE, or Indulgent Will crediting a Confused player's
+ * own 1-shot melee hit directly) or the mechanic's reused "Double-Trouble
+ * Trap" trap ability (same ID as the earlier Confetti explosion — see
+ * module header). Per-player attribution for WHO baited wrong isn't
+ * built yet (see FIXED BAIT note above), so this is a pure Raid-severity
+ * cutoff, same shape as GRAVEN_1_DEATH_WIPE/CONFETTI_LOST — clusters
+ * every death in the same near-simultaneous volley into one error rather
+ * than firing once per victim.
  */
-function detectTeleTrouncingDeathWipeError(deathEvents: DeathEvent[]): PullError[] {
-  const willDeaths = deathEvents.filter((d) => d.killingAbilityGameId === TELE_TROUNCING_WILL_ABILITY_ID);
+function detectTeleTrouncingDeathWipeError(deathEvents: DeathEvent[], enemyCasts: EnemyEvent[]): PullError[] {
+  const teleTrouncingCasts = enemyCasts.filter((e) => e.abilityId === TELE_TROUNCING_START_ABILITY_ID).map((e) => e.timestamp);
+
+  const isTeleTrouncingDeath = (d: DeathEvent) => {
+    if (TELE_TROUNCING_WILL_ABILITY_IDS.includes(d.killingAbilityGameId)) return true;
+    // The trap ability's ID is reused from the earlier Confetti mechanic
+    // — only count it here if it lands AFTER Tele-Trouncing has actually
+    // started (see module header for why this guard is needed).
+    if (d.killingAbilityGameId === TELE_TROUNCING_TRAP_ABILITY_ID && teleTrouncingCasts.length > 0 && d.timestamp >= Math.min(...teleTrouncingCasts)) return true;
+    return false;
+  };
+
+  const willDeaths = deathEvents.filter(isTeleTrouncingDeath);
   if (willDeaths.length === 0) return [];
 
   const firstDeathTime = Math.min(...willDeaths.map((d) => d.timestamp));
@@ -3245,9 +3290,9 @@ function detectTeleTrouncingDeathWipeError(deathEvents: DeathEvent[]): PullError
       ruleId:      TELE_TROUNCING_DEATH_WIPE_RULE_ID,
       severity:    "Raid",
       name:        "Tele-Trouncing Wipe",
-      description: `${victims.join(" and ")} died before the arrows resolved — unresolvable from here; treated as a cutoff point for further per-player analysis this pull.`,
+      description: `${victims.join(" and ")} died during Tele-Trouncing (Arrows) — unresolvable from here; treated as a cutoff point for further per-player analysis this pull.`,
       timestamp:   cutoff + 1,
-      abilityId:   TELE_TROUNCING_WILL_ABILITY_ID,
+      abilityId:   TELE_TROUNCING_WILL_ABILITY_IDS[1],
       abilityName: "Idyllic Will",
     },
   ];
@@ -3291,6 +3336,6 @@ export function detectPhase1Errors(
     ...detectConfettiGroupMisplacedErrors(players),
     ...detectConfettiFinalPositionMisplacedErrors(players),
     ...detectTeleTrouncingArrowErrors(players),
-    ...detectTeleTrouncingDeathWipeError(deathEvents),
+    ...detectTeleTrouncingDeathWipeError(deathEvents, enemyCasts),
   ].sort((a, b) => a.timestamp - b.timestamp);
 }
