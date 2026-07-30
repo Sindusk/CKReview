@@ -40,6 +40,7 @@ export default function AddReviewToStaticDialog({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+  const [resynced, setResynced] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -88,6 +89,7 @@ export default function AddReviewToStaticDialog({
         return;
       }
 
+      setResynced(!!data.resynced);
       setDone(true);
     } catch {
       setError("Failed to add review — check your connection and try again");
@@ -128,7 +130,9 @@ export default function AddReviewToStaticDialog({
             Save some progress first — add a VOD or call a wipe — then this review can be attached to a static.
           </p>
         ) : done ? (
-          <p style={{ fontSize: "13px", color: "#4ade80" }}>Added.</p>
+          <p style={{ fontSize: "13px", color: "#4ade80" }}>
+            {resynced ? "Resynced — pull/error data refreshed from the current session." : "Added."}
+          </p>
         ) : statics === null ? (
           <p style={{ fontSize: "13px", color: "#999" }}>Loading your statics...</p>
         ) : error ? null : statics.length === 0 ? (

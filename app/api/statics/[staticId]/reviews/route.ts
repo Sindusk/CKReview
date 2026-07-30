@@ -89,13 +89,58 @@ export async function POST(
     });
     return NextResponse.json({ review });
   } catch (err) {
-    // A user double-clicking "Add" is an expected case, not an error — the
-    // @@unique([staticId, sessionId]) constraint makes it idempotent.
+    // Re-adding an already-linked review (double-click, or deliberately
+    // re-clicking "Add" after linking a mitigation sheet / fixing a
+    // detection rule) is expected, not an error — the
+    // @@unique([staticId, sessionId]) constraint just means we UPSERT: wipe
+    // and recreate the pulls/player-error rows from the current pulls[]
+    // payload, since that's the only place fresher data can come from (the
+    // server never re-derives it itself — see computeStaticReviewPullData's
+    // module comment).
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
       const existing = await prisma.staticReview.findUnique({
         where: { staticId_sessionId: { staticId, sessionId } },
       });
-      return NextResponse.json({ review: existing, alreadyAdded: true });
+      if (!existing) throw err;
+
+      const review = await prisma.$transaction(async (tx) => {
+        // Carry forward hand-written notes (StaticReviewPull.summary) by
+        // fightId — a resync should refresh the auto-detected error counts
+        // without wiping out something a reviewer typed in by hand.
+        const priorPulls = await tx.staticReviewPull.findMany({
+          where:  { staticReviewId: existing.id },
+          select: { fightId: true, summary: true },
+        });
+        const priorSummaries = new Map(priorPulls.map((p) => [p.fightId, p.summary]));
+
+        await tx.staticReviewPull.deleteMany({ where: { staticReviewId: existing.id } });
+
+        return tx.staticReview.update({
+          where: { id: existing.id },
+          data: {
+            label: label ?? existing.label,
+            pulls: {
+              create: pulls.map((p) => ({
+                fightId:    p.fightId,
+                pullNumber: p.pullNumber,
+                bossName:   p.bossName,
+                result:     p.result,
+                startTime:  p.startTime,
+                endTime:    p.endTime,
+                summary:    priorSummaries.get(p.fightId) ?? null,
+                playerErrors: {
+                  create: p.players.map((pl) => ({
+                    player:     pl.player,
+                    majorCount: pl.majorCount,
+                    minorCount: pl.minorCount,
+                  })),
+                },
+              })),
+            },
+          },
+        });
+      });
+      return NextResponse.json({ review, resynced: true });
     }
     throw err;
   }
