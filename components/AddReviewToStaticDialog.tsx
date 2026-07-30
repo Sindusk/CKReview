@@ -41,6 +41,11 @@ export default function AddReviewToStaticDialog({
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [resynced, setResynced] = useState(false);
+  // Whether `sessionId` is already linked to the currently-selected static —
+  // checked per-static (not just once) since switching the dropdown can
+  // move from "new" to "already linked" or back. Drives the Add/Resync
+  // button label so it's clear up front which one is about to happen.
+  const [alreadyLinked, setAlreadyLinked] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -62,6 +67,25 @@ export default function AddReviewToStaticDialog({
       })
       .catch(() => setError("Failed to load your statics"));
   }, [open]);
+
+  useEffect(() => {
+    if (!open || selectedId == null || !sessionId) {
+      setAlreadyLinked(false);
+      return;
+    }
+
+    let cancelled = false;
+    fetch(`/api/statics/${selectedId}/reviews`)
+      .then(async res => {
+        const data = await res.json();
+        if (!res.ok || cancelled) return;
+        const reviews: { sessionId: string }[] = data.reviews ?? [];
+        setAlreadyLinked(reviews.some(r => r.sessionId === sessionId));
+      })
+      .catch(() => {});
+
+    return () => { cancelled = true; };
+  }, [open, selectedId, sessionId]);
 
   if (!open) return null;
 
@@ -220,7 +244,7 @@ export default function AddReviewToStaticDialog({
                 opacity: submitting ? 0.6 : 1,
               }}
             >
-              {submitting ? "Adding..." : "Add"}
+              {submitting ? (alreadyLinked ? "Resyncing..." : "Adding...") : (alreadyLinked ? "Resync" : "Add")}
             </button>
           )}
         </div>
