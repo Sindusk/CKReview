@@ -2,6 +2,13 @@
 
 set -euo pipefail
 
+echo "Pulling latest code..."
+git fetch origin main
+git reset --hard origin/main
+
+echo "Installing dependencies..."
+npm install
+
 echo "Generating Prisma client..."
 npx prisma generate
 
