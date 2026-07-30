@@ -607,8 +607,24 @@
 // instance is the one who stacked with the wrong group. Scoped to only
 // the SECOND resolution for now (`collectConfettiResolutions(...)[1]`),
 // matching the other two confetti checks' own "only what's confirmed"
-// gating — the third (Tele-Trouncing) resolution needs its own confirmed
-// sample before this extends to it.
+// gating.
+//
+// ── CONFETTI FINAL POSITION (confirmed 2026-07-30, pull 41) ────────────────
+//
+// The THIRD (final) detonation, right before Tele-Trouncing's arrows
+// resolve, is a QUADRANT check rather than an axis or outcome check: per
+// the user directly, Support hugs the hitbox northwest of arena center
+// with their holder standing a bit further northwest behind them (not
+// moving), knocking the other 3 Support players southeast across the
+// arena; DPS mirrors it in the southeast quadrant, holder slightly
+// further out. Unlike the first resolution's stack-only check, this one
+// judges the HOLDER's position too — the holder not moving is as much a
+// part of the mechanic as the stack's positioning. `detectConfettiFinal
+// PositionMisplacedErrors` reads its holders from `collectResolutions`'s
+// LAST group (this detonation is final — it never transfers to a fresh
+// pair the way the first two do) and only judges compass bearing for now;
+// per the user, precise distance-from-hitbox positioning for this
+// resolution isn't tackled yet.
 //
 // This also required a narrow fix to CONFETTI_LOST above: it originally
 // treated ANY death shortly after a Confetti debuff application as "died
@@ -680,7 +696,7 @@
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import type { PullError, EnemyEvent } from "@/types/PullError";
 import type { DeathEvent } from "@/types/DeathEvent";
-import { distanceBetween, distanceFromCenter, ARENA_CENTER } from "@/lib/mechanics/geometry";
+import { distanceBetween, distanceFromCenter, ARENA_CENTER, compassBearingOf, angularDistance } from "@/lib/mechanics/geometry";
 import { interpolatePlayerPosition } from "@/lib/mechanics/player-position";
 import { detectFFRoles, type FFRoleSlot } from "@/lib/mechanics/ffxiv/roles";
 
@@ -702,6 +718,7 @@ export const CONFETTI_LOST_RULE_ID = "ffxiv-phase1-confetti-lost";
 export const CONFETTI_KNOCKBACK_VICTIM_RULE_ID = "ffxiv-phase1-confetti-knockback-victim-misplaced";
 export const CONFETTI_HOLDER_MISPLACED_RULE_ID = "ffxiv-phase1-confetti-holder-misplaced";
 export const CONFETTI_GROUP_MISPLACED_RULE_ID = "ffxiv-phase1-confetti-group-misplaced";
+export const CONFETTI_FINAL_POSITION_MISPLACED_RULE_ID = "ffxiv-phase1-confetti-final-position-misplaced";
 
 const BLIZZARD_III_BLOWOUT_ABILITY_IDS = new Set([47765, 47768, 47771, 47774]);
 const DAMAGE_DOWN_ABILITY_ID = 1002911;
@@ -810,6 +827,27 @@ const CONFETTI_SNAPSHOT_LEAD_MS = 500;
 const CONFETTI_POSITION_WINDOW_MS = 4000;
 
 const SUPPORT_ROLES = new Set(["Tank", "Healer"]);
+
+// The THIRD (final) Confetti detonation, right before Tele-Trouncing's
+// arrows resolve — see CONFETTI FINAL POSITION module comment. Unlike the
+// first resolution's due-west/due-east axis, this one is a compass
+// QUADRANT: Support hugs the hitbox northwest of center with their holder
+// slightly further northwest behind them, DPS mirrors it southeast.
+// Confirmed 2026-07-30, pull 41 (compass bearings from center, 0=N/90=E/
+// 180=S/270=W): clean stack — Chauzey Solstice 140°, Sonder Dreams 135°,
+// Kade Kansado 144° (all DPS, expected 135°), Archidel Del'archi 307°,
+// Azura Salus 288° (both Support, expected 315°, the widest confirmed-
+// clean miss at 27° off). Confirmed WRONG (the 3 the user named from the
+// VOD): Salty Dango (Support HOLDER) 58° (103° off — nowhere near NW, this
+// pull's holder never even reached the correct half of the arena),
+// Sayacissa Morsaelth (Support stack) 29° (74° off, also sitting only
+// ~200 centi-yalms from center — well inside the hitbox ring itself, not
+// just the wrong bearing), Ayumi Emi (DPS HOLDER) 213° (78° off — SW
+// instead of SE). Tolerance sits comfortably between the widest confirmed-
+// clean miss (27°) and the narrowest confirmed failure (74°).
+const CONFETTI_FINAL_SUPPORT_BEARING_DEG = 315; // northwest
+const CONFETTI_FINAL_DPS_BEARING_DEG     = 135; // southeast
+const CONFETTI_FINAL_QUADRANT_TOLERANCE_DEG = 45;
 
 // Tank stance per job — the thing the OT needs active for their post-
 // provoke enmity lead to hold through Revolting Ruin III's second hit (see
@@ -2437,6 +2475,71 @@ function detectConfettiGroupMisplacedErrors(players: PlayerInfo[]): PullError[] 
   return errors;
 }
 
+/**
+ * Detects a player (holder OR stack, unlike the first resolution's
+ * stack-only check — see module comment) out of position for the THIRD
+ * (final) Confetti detonation, right before Tele-Trouncing's arrows
+ * resolve. Unlike the first two resolutions, this one never produces a
+ * fresh debuff APPLY event of its own — the debuff just detonates on
+ * whoever picked it up at the second resolution (Support and DPS each
+ * keep their own holder from there through to this final blast) — so its
+ * holders are read from `collectConfettiResolutions`'s LAST group instead
+ * of a dedicated one, and its own snapshot moment is found as the last
+ * Confetti-explosion damage in the pull, after that group's own window.
+ */
+function detectConfettiFinalPositionMisplacedErrors(players: PlayerInfo[]): PullError[] {
+  const resolutions = collectConfettiResolutions(players);
+  if (resolutions.length < 2) return []; // no second (Graven 2) resolution to carry a holder into a third at all
+
+  const finalHolders = resolutions[resolutions.length - 1].holders;
+  if (finalHolders.length === 0) return [];
+
+  const holderWindowEnd = finalHolders[0].timestamp + CONFETTI_RESOLUTION_GAP_MS;
+  const explosionTimestamps = players
+    .flatMap((p) => p.damageTaken)
+    .filter((e) => e.abilityId === CONFETTI_EXPLOSION_ABILITY_ID && e.timestamp > holderWindowEnd)
+    .map((e) => e.timestamp);
+  if (explosionTimestamps.length === 0) return []; // final detonation isn't in the log (e.g. a holder died first, see CONFETTI_LOST)
+
+  const snapshotTime = Math.min(...explosionTimestamps) - CONFETTI_SNAPSHOT_LEAD_MS;
+  const holderNames = new Set(finalHolders.map((h) => h.player.name));
+
+  const errors: PullError[] = [];
+  for (const player of players) {
+    const pos = interpolatePlayerPosition(player, snapshotTime, {
+      windowMs:        CONFETTI_POSITION_WINDOW_MS,
+      healing:         "self",
+      damageTaken:     false,
+      casts:           "self",
+      healingReceived: "any",
+    });
+    if (!pos) continue; // can't confirm their position — fail closed, don't guess
+
+    const bearing = compassBearingOf(pos.x, pos.y);
+    const isSupport = SUPPORT_ROLES.has(player.role);
+    const expectedBearing = isSupport ? CONFETTI_FINAL_SUPPORT_BEARING_DEG : CONFETTI_FINAL_DPS_BEARING_DEG;
+    const off = angularDistance(bearing, expectedBearing);
+    if (off < CONFETTI_FINAL_QUADRANT_TOLERANCE_DEG) continue; // within normal jitter of the expected quadrant
+
+    const expectedDir = isSupport ? "northwest" : "southeast";
+    const isHolder = holderNames.has(player.name);
+    errors.push({
+      ruleId:      CONFETTI_FINAL_POSITION_MISPLACED_RULE_ID,
+      severity:    "Major",
+      name:        "Confetti Final Position Misplaced",
+      description: `Was roughly ${off.toFixed(0)}° off the expected ${expectedDir} quadrant when the final Confetti detonated — should have been ${isHolder ? `standing further ${expectedDir}, behind their own ${isSupport ? "Support" : "DPS"} stack` : `hugging the boss's hitbox ${expectedDir} of center`}.`,
+      timestamp:   snapshotTime,
+      player:      player.name,
+      class:       player.className,
+      specId:      player.specId,
+      role:        player.role,
+      abilityId:   DOUBLE_TROUBLE_TRAP_BUFF_ID,
+      abilityName: "Double-Trouble Trap",
+    });
+  }
+  return errors;
+}
+
 function detectTeleTrouncingArrowErrors(players: PlayerInfo[]): PullError[] {
   type Removal = { player: PlayerInfo; timestamp: number; dir: Cardinal };
   const removals: Removal[] = [];
@@ -2559,6 +2662,7 @@ export function detectPhase1Errors(
     ...detectConfettiKnockbackVictimErrors(players),
     ...detectConfettiHolderMisplacedErrors(players),
     ...detectConfettiGroupMisplacedErrors(players),
+    ...detectConfettiFinalPositionMisplacedErrors(players),
     ...detectTeleTrouncingArrowErrors(players),
   ].sort((a, b) => a.timestamp - b.timestamp);
 }
