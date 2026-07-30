@@ -182,18 +182,59 @@
 // centiyalms of the nearest puddle centroid and the Gravitational
 // Explosion (47789) fired moments later, wiping the raid. The other 3
 // spreaders that same resolution were clean with real margin: Salty Dango
-// ~1334, Sayacissa Morsaelth ~1443, Azura Salus ~1581 — floor set at the
-// midpoint between the failure and the nearest clean sample.
+// ~1334, Sayacissa Morsaelth ~1443, Azura Salus ~1581.
+//
+// **Re-reviewed 2026-07-30 against pulls 18/21/24/27/33 (all pulls with
+// this wipe that predate 51) and 3 more issues surfaced:**
+//
+// 1. Confirmed failure (pull 24): Ayumi Emi ~977 centiyalms, the sole
+//    cause per the user; Kade Kansado ~1098 and Sonder Dreams ~1110 were
+//    both confirmed CLEAN despite being close to the old 1180 floor —
+//    tightened to 1065, the midpoint between 1032 (still caught) and 1098
+//    (now clear).
+// 2. Confirmed bug (pull 21): a Support-spread resolution was pulling in 2
+//    DPS (Chauzey Solstice, Sonder Dreams) who had no spread to resolve at
+//    all that beat — Vitrophyre can still tick a STACKED player who
+//    happens to stand near a spreader's own instance, without them being
+//    a legitimate spread candidate. Fixed with the exact same
+//    majority-vote isLegitimateSpreader technique
+//    detectGraven2SpreadMisplacedErrors already uses.
+// 3. Confirmed false attribution (pull 18): flagged Azura Salus off a
+//    ~13-SECOND-old spread sample — the raid had already wiped to an
+//    unrelated tankbuster ~11s before this explosion cast, so the
+//    "nearest preceding spread" found was stale leftover data, not the
+//    actual (nonexistent) cause. Every genuinely-linked sample across 6
+//    pulls sits within ~2s of the explosion cast either direction;
+//    gated on GRAVEN_2_PUDDLE_PROXIMITY_MAX_CAUSAL_GAP_MS (5000ms,
+//    generous margin over the ~2s max confirmed-linked gap, nowhere near
+//    the ~13s confirmed-unlinked one).
+// 4. Confirmed unreliable (pull 27): 2 players (Archidel Del'archi, Kade
+//    Kansado) died from direct puddle CONTACT (47788, not the later
+//    explosion) in the gap between the drop and the spread resolving —
+//    the user flagged Ayumi Emi as our pick but read Sonder Dreams as the
+//    real cause from the VOD, with real uncertainty either way. Once
+//    players have already died mid-resolution the remaining survivors'
+//    geometry no longer reflects what a clean spread would have looked
+//    like, so this rule now stays silent whenever any death (of any
+//    cause) falls between the puddle drop and the spread it's attributed
+//    to, rather than guess.
+//
+// Pull 33 (Salty Dango ~774, correctly attributed despite an EARLIER,
+// unrelated death in the same pull from a missed tankbuster) confirms the
+// intervening-death gate is scoped correctly: it only cares about a death
+// falling inside THIS SPECIFIC drop-to-spread window, not merely "a death
+// happened somewhere earlier in the pull."
 //
 // Gated on GRAVITATIONAL_EXPLOSION_WIPE_RULE_ID actually firing this pull
-// — with only one confirmed failure sample to calibrate from, staying
-// silent on pulls that resolved cleanly avoids risking a false positive
-// on a merely-close-but-fine spread (same "only check on failure"
-// precedent as detectWaveCannonRolePriorityErrors, per the user directly).
+// — with few confirmed samples to calibrate from, staying silent on pulls
+// that resolved cleanly avoids risking a false positive on a merely-
+// close-but-fine spread (same "only check on failure" precedent as
+// detectWaveCannonRolePriorityErrors, per the user directly).
 // Timestamped 1ms before the wipe cutoff's own cast timestamp (not the
-// spreader's own Vitrophyre hit, which lands slightly AFTER the
-// explosion's cast fires) so it sorts immediately before the wipe entry,
-// same ordering trick detectTeleTrouncingDeathWipeError's `cutoff + 1` uses.
+// spreader's own Vitrophyre hit, which can land slightly before OR after
+// the explosion's cast fires) so it sorts immediately before the wipe
+// entry, same ordering trick detectTeleTrouncingDeathWipeError's
+// `cutoff + 1` uses.
 //
 // ── BLIZZARD III BLOWOUT SILENT KILL (confirmed 2026-07, VtdBqhLQkWJXMvDg) ──
 //
@@ -2045,9 +2086,18 @@ function detectGraven2SpreadMisplacedErrors(players: PlayerInfo[]): PullError[] 
 // GRAVEN_2_SPREAD_RESOLUTION_GAP_MS above.
 const GRAVEN_2_PUDDLE_DROP_GAP_MS = 5000;
 
-// Confirmed failure vs. clean, pull 51 — see module header's "GRAVEN 2
-// PUDDLE PROXIMITY" section for the full calibration story.
-const GRAVEN_2_PUDDLE_PROXIMITY_TOLERANCE_CENTIYALMS = 1180;
+// Confirmed failure vs. clean, pulls 24 & 51 — see module header's
+// "GRAVEN 2 PUDDLE PROXIMITY" section for the full calibration story.
+const GRAVEN_2_PUDDLE_PROXIMITY_TOLERANCE_CENTIYALMS = 1065;
+
+// The explosion cast should land within a beat of the spread resolution it's
+// actually attributed to — confirmed clean gaps span -1916ms to +45ms across
+// 5 pulls (the cast can fire slightly before OR after the Vitrophyre tick).
+// Confirmed NOT causally linked (pull 18): a ~13s gap, where the "spread"
+// found was a leftover position from an EARLIER, already-resolved beat and
+// the explosion was a late/unrelated cast firing after the raid had already
+// wiped to something else entirely. Comfortably between the two.
+const GRAVEN_2_PUDDLE_PROXIMITY_MAX_CAUSAL_GAP_MS = 5000;
 
 /**
  * Detects a Graven 2 spreader who landed too close to a lingering Gravitas
@@ -2055,7 +2105,7 @@ const GRAVEN_2_PUDDLE_PROXIMITY_TOLERANCE_CENTIYALMS = 1180;
  * mechanic, the puddle-centroid technique, and why this only fires when
  * GRAVITATIONAL_EXPLOSION_WIPE_RULE_ID actually does this pull.
  */
-function detectGraven2PuddleProximityErrors(players: PlayerInfo[], enemyCasts: EnemyEvent[]): PullError[] {
+function detectGraven2PuddleProximityErrors(players: PlayerInfo[], deathEvents: DeathEvent[], enemyCasts: EnemyEvent[]): PullError[] {
   const explosionCasts = enemyCasts.filter((e) => e.abilityId === GRAVITATIONAL_EXPLOSION_ABILITY_ID);
   if (explosionCasts.length === 0) return [];
   const explosionCastTime = Math.min(...explosionCasts.map((e) => e.timestamp));
@@ -2101,12 +2151,38 @@ function detectGraven2PuddleProximityErrors(players: PlayerInfo[], enemyCasts: E
   const spreadAfterDrop = spreadHits.filter((h) => h.timestamp >= lastDropGroupStart).sort((a, b) => a.timestamp - b.timestamp);
   if (spreadAfterDrop.length === 0) return [];
   const spreadStart = spreadAfterDrop[0].timestamp;
+
+  // The explosion has to actually belong to THIS spread beat — see the
+  // MAX_CAUSAL_GAP constant above for the confirmed pull-18 counterexample.
+  if (Math.abs(explosionCastTime - spreadStart) > GRAVEN_2_PUDDLE_PROXIMITY_MAX_CAUSAL_GAP_MS) return [];
+
+  // If anyone died between the puddle drop and this spread resolving, the
+  // survivor group's geometry no longer reflects what the spread was
+  // supposed to look like — confirmed pull 27 (2 direct puddle-contact
+  // deaths landed in this exact window): stay silent rather than guess.
+  if (deathEvents.some((d) => d.timestamp >= lastDropGroupStart && d.timestamp < spreadStart)) return [];
+
   const spreadResolutionHits = spreadHits.filter((h) => Math.abs(h.timestamp - spreadStart) < GRAVEN_2_SPREAD_RESOLUTION_GAP_MS);
+
+  // Which role category is actually spreading this resolution — Support or
+  // DPS, majority vote among who got hit — same technique
+  // detectGraven2SpreadMisplacedErrors uses; the OTHER category is stacked
+  // at the hitbox and can still take a stray Vitrophyre tick from standing
+  // near a spreader's own instance without being a legitimate candidate
+  // themselves (confirmed pull 21: 2 DPS caught in a Support-spread beat).
+  const supportCount = spreadResolutionHits.filter((h) => h.player.role !== "DPS").length;
+  const dpsCount = spreadResolutionHits.length - supportCount;
+  const isLegitimateSpreader = supportCount >= dpsCount
+    ? (p: PlayerInfo) => p.role !== "DPS"
+    : (p: PlayerInfo) => p.role === "DPS";
 
   // One position per player — a spreader can take 2 near-simultaneous
   // Vitrophyre hits (same doubled-instance shape the puddle applies have).
   const spreaderByPlayer = new Map<string, Hit>();
-  for (const h of spreadResolutionHits) if (!spreaderByPlayer.has(h.player.name)) spreaderByPlayer.set(h.player.name, h);
+  for (const h of spreadResolutionHits) {
+    if (!isLegitimateSpreader(h.player)) continue;
+    if (!spreaderByPlayer.has(h.player.name)) spreaderByPlayer.set(h.player.name, h);
+  }
 
   const errors: PullError[] = [];
   for (const spreader of spreaderByPlayer.values()) {
@@ -2861,7 +2937,7 @@ export function detectPhase1Errors(
     ...detectWaveCannonSupportPriorityErrors(players, deathEvents, enemyCasts),
     ...detectWaveCannonDpsPriorityErrors(players, deathEvents, enemyCasts),
     ...detectUnmitigatedExplosionWipeError(enemyCasts),
-    ...detectGraven2PuddleProximityErrors(players, enemyCasts),
+    ...detectGraven2PuddleProximityErrors(players, deathEvents, enemyCasts),
     ...detectGravitationalExplosionWipeError(enemyCasts),
     ...detectGraven1DeathWipeError(deathEvents, enemyCasts, blizzardIIISilentKillErrors),
     ...graven2SpreadMisplacedErrors,
