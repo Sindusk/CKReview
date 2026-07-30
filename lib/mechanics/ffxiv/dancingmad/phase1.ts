@@ -236,6 +236,67 @@
 // entry, same ordering trick detectTeleTrouncingDeathWipeError's
 // `cutoff + 1` uses.
 //
+// ── GRAVEN 2 PUDDLE PLACEMENT (confirmed 2026-07-30, report ────────────────
+// ── Q3GzJNZg64k1hLRm, pulls 11/39/56) ────────────────────────────────────
+//
+// A THIRD per-player cause behind GRAVITATIONAL_EXPLOSION_WIPE_RULE_ID,
+// upstream of GRAVEN_2_PUDDLE_PROXIMITY_RULE_ID above: a player standing
+// too close to the boss itself at the moment the puddle's spawn point
+// snapshots pins the puddle against the boss's own hitbox instead of the
+// arena's outside edge, making it unavoidable once it resolves. Per the
+// user: "the puddles must be placed towards the outside of the arena."
+// Confirmed case: pull 56's Kade Kansado stayed in melee on the boss
+// right up to the last instant, then dashed back to his light party —
+// the puddle had already snapshotted near the boss by then, per Kade's
+// own account on VOD comms (the VOD's own footage isn't clean enough to
+// see the exact moment; "this is going to be tricky since it comes down
+// to milliseconds").
+//
+// **First attempt, reverted**: an ABSOLUTE distance-from-center threshold
+// at the Gravitas cast's own snapshot instant does isolate Kade in pull
+// 56, but the whole raid typically reads 400-1400 centiyalms from center
+// at that exact instant in EVERY Graven-2-explosion pull regardless of
+// outcome (mid-transit toward their stack spot) — an absolute threshold
+// produced 90 false positives across ~15 unrelated pulls. A "last hit
+// landed on the boss before the snapshot" proxy doesn't discriminate
+// either — ranged/DoT jobs land hits from well outside melee range.
+//
+// **Working technique**: instead of absolute distance from center, each
+// player's deviation from their OWN light party's snapshot-time
+// position — computed leave-one-out (each player's own position isn't
+// part of the centroid it's compared against, so one outlier doesn't
+// drag its own comparison point; with only 4 players per LP this matters
+// a lot). LP membership is read from the SAME north/south hemisphere
+// split GRAVEN_2_PUDDLE_PROXIMITY_RULE_ID already uses on the puddle-
+// apply hits. Confirmed: pull 56's Kade deviates ~501 centiyalms from
+// his 3 light-party mates at the snapshot instant — next-highest that
+// same pull is Ayumi at ~248. Pull 11's Azura Salus reads ~313 despite
+// being visibly late to the stack on VOD ("the actual stack is a bit
+// close") — confirmed CLEAN by the user regardless ("Azura manages to
+// get to the stack position with the rest of the group in time...the
+// puddle ends up correct"). Threshold set to 400, the midpoint between
+// those two confirmed samples.
+//
+// Pull 39's Salty Dango is the other direction's confirmed trap: his
+// damageTaken position for the Gravitas hit reads dangerously close to
+// the boss, but per the user directly he was actually AT the arena edge
+// when the puddle snapshotted and only dashed in toward the boss AFTER
+// it had already visually dropped — a complete false positive if judged
+// off the damage-taken position (same trap Salty Dango sprung in pull 56
+// too, in the original investigation). The leave-one-out snapshot-time
+// technique reads him at only ~139, correctly clean.
+//
+// Gated on the explosion firing with ZERO Vitrophyre (47792) hits at
+// all — meaning no spread stage happened between the puddle drop and the
+// explosion, structurally distinct from GRAVEN_2_PUDDLE_PROXIMITY_RULE_ID's
+// spread-resolution shape. This report has exactly 4 pulls matching that
+// shape (9, 11, 39, 56), all reviewed by the user. Pull 9 was chaotic
+// ("almost everyone is wrong... any additional flags here are
+// acceptable") and every player's deviation there (233-338) sits safely
+// under the 400 threshold either way — not used for calibration, but
+// doesn't conflict with it either. Same causal-gap gate as
+// GRAVEN_2_PUDDLE_PROXIMITY_MAX_CAUSAL_GAP_MS for the same reason.
+//
 // ── BLIZZARD III BLOWOUT SILENT KILL (confirmed 2026-07, VtdBqhLQkWJXMvDg) ──
 //
 // Blizzard III Blowout (ability IDs vary — 47765/47768/47771/47774, all
@@ -813,6 +874,7 @@ export const UNMITIGATED_EXPLOSION_WIPE_RULE_ID  = "ffxiv-phase1-unmitigated-exp
 export const GRAVITATIONAL_EXPLOSION_WIPE_RULE_ID = "ffxiv-phase1-gravitational-explosion-wipe";
 export const GRAVEN_2_SPREAD_MISPLACED_RULE_ID = "ffxiv-phase1-graven2-spread-misplaced";
 export const GRAVEN_2_PUDDLE_PROXIMITY_RULE_ID = "ffxiv-phase1-graven2-puddle-proximity";
+export const GRAVEN_2_PUDDLE_PLACEMENT_RULE_ID = "ffxiv-phase1-graven2-puddle-placement";
 export const GRAVEN_2_DEATH_WIPE_RULE_ID = "ffxiv-phase1-graven2-death-wipe";
 export const TELE_TROUNCING_ARROW_RULE_ID = "ffxiv-phase1-tele-trouncing-arrow-misplaced";
 export const TELE_TROUNCING_DEATH_WIPE_RULE_ID = "ffxiv-phase1-tele-trouncing-death-wipe";
@@ -2206,6 +2268,125 @@ function detectGraven2PuddleProximityErrors(players: PlayerInfo[], deathEvents: 
   return errors;
 }
 
+// Same magnitude as CONFETTI_POSITION_WINDOW_MS — generous enough that a
+// nearby damageTaken/healing/self-cast sample brackets the Gravitas cast
+// instant without stretching a stale pair across it.
+const GRAVEN_2_PUDDLE_PLACEMENT_POSITION_WINDOW_MS = 4000;
+
+// Midpoint between 2 confirmed samples (leave-one-out deviation from a
+// player's own light party at the Gravitas snapshot instant) — see
+// module header's "GRAVEN 2 PUDDLE PLACEMENT" section: pull 56's Kade
+// Kansado ~501 (fail) vs. pull 11's Azura Salus ~313 (confirmed clean
+// despite visibly cutting it close on VOD).
+const GRAVEN_2_PUDDLE_PLACEMENT_DEVIATION_CENTIYALMS = 400;
+
+/**
+ * Detects a Graven 2 player who was standing too close to the boss —
+ * specifically, too far from their OWN light party's stack position — at
+ * the instant the Gravitas puddle's spawn point snapshots, pinning the
+ * puddle against the boss's hitbox instead of the arena's outside edge.
+ * See module header for the mechanic, the leave-one-out technique, and
+ * why this only applies to a pure placement-caused wipe (zero Vitrophyre
+ * spread hits — GRAVEN_2_PUDDLE_PROXIMITY_RULE_ID covers the spread-
+ * caused shape instead).
+ */
+function detectGraven2PuddlePlacementErrors(players: PlayerInfo[], enemyCasts: EnemyEvent[]): PullError[] {
+  const explosionCasts = enemyCasts.filter((e) => e.abilityId === GRAVITATIONAL_EXPLOSION_ABILITY_ID);
+  if (explosionCasts.length === 0) return [];
+  const explosionCastTime = Math.min(...explosionCasts.map((e) => e.timestamp));
+
+  // Only a PURE placement-caused wipe — see module header for why this
+  // gate structurally separates this rule's territory from the sibling
+  // spread-based one.
+  const hasSpreadHits = players.some((p) => p.damageTaken.some((e) => e.abilityId === VITROPHYRE_ABILITY_ID));
+  if (hasSpreadHits) return [];
+
+  // The Gravitas cast itself (not its damageTaken hits, which land
+  // ~600-750ms later) marks the actual snapshot instant. Same
+  // PHASE_1_END_MS bound detectGraven2DeathWipeError uses, since 47788
+  // isn't provably unique to Phase 1.
+  const gravitasCasts = enemyCasts
+    .filter((e) => e.abilityId === GRAVEN_2_START_ABILITY_ID && e.timestamp <= PHASE_1_END_MS && e.timestamp <= explosionCastTime)
+    .map((e) => e.timestamp);
+  if (gravitasCasts.length === 0) return [];
+  const snapshotTime = Math.max(...gravitasCasts);
+
+  // The explosion has to actually belong to THIS puddle drop — same
+  // causal-gap gate (and same constant) GRAVEN_2_PUDDLE_PROXIMITY_RULE_ID
+  // uses for the same reason.
+  if (explosionCastTime - snapshotTime > GRAVEN_2_PUDDLE_PROXIMITY_MAX_CAUSAL_GAP_MS) return [];
+
+  // Light party membership, read from the puddle-apply hits' own
+  // north/south hemisphere split — same technique
+  // GRAVEN_2_PUDDLE_PROXIMITY_RULE_ID uses to find the 2 puddles
+  // themselves.
+  type Hit = { player: PlayerInfo; timestamp: number; x: number; y: number };
+  const puddleHits: Hit[] = [];
+  for (const player of players) {
+    for (const e of player.damageTaken) {
+      if (e.abilityId === GRAVEN_2_START_ABILITY_ID && e.x !== undefined && e.y !== undefined) {
+        puddleHits.push({ player, timestamp: e.timestamp, x: e.x, y: e.y });
+      }
+    }
+  }
+  if (puddleHits.length === 0) return [];
+  const dropTimes = [...new Set(puddleHits.map((h) => h.timestamp))].sort((a, b) => a - b);
+  let lastDropGroupStart = dropTimes[0];
+  for (let i = 1; i < dropTimes.length; i++) {
+    if (dropTimes[i] - dropTimes[i - 1] > GRAVEN_2_PUDDLE_DROP_GAP_MS) lastDropGroupStart = dropTimes[i];
+  }
+  const lastDrop = puddleHits.filter((h) => h.timestamp >= lastDropGroupStart);
+  const dropPosByPlayer = new Map<string, Hit>();
+  for (const h of lastDrop) if (!dropPosByPlayer.has(h.player.name)) dropPosByPlayer.set(h.player.name, h);
+
+  const northGroup = [...dropPosByPlayer.values()].filter((h) => h.y < ARENA_CENTER).map((h) => h.player);
+  const southGroup = [...dropPosByPlayer.values()].filter((h) => h.y >= ARENA_CENTER).map((h) => h.player);
+
+  const errors: PullError[] = [];
+  for (const group of [northGroup, southGroup]) {
+    const snapPositions = new Map<string, { x: number; y: number }>();
+    for (const player of group) {
+      const pos = interpolatePlayerPosition(player, snapshotTime, {
+        windowMs:        GRAVEN_2_PUDDLE_PLACEMENT_POSITION_WINDOW_MS,
+        healing:         "self",
+        damageTaken:     true,
+        casts:           "self",
+        healingReceived: "any",
+      });
+      if (pos) snapPositions.set(player.name, pos);
+    }
+    if (snapPositions.size < 3) continue; // need at least 2 others to form a meaningful comparison centroid
+
+    for (const player of group) {
+      const pos = snapPositions.get(player.name);
+      if (!pos) continue; // can't confirm their position — fail closed, don't guess
+
+      const others = [...snapPositions.entries()].filter(([name]) => name !== player.name).map(([, p]) => p);
+      const centroid = {
+        x: others.reduce((s, p) => s + p.x, 0) / others.length,
+        y: others.reduce((s, p) => s + p.y, 0) / others.length,
+      };
+      const deviation = distanceBetween(pos, centroid);
+      if (deviation < GRAVEN_2_PUDDLE_PLACEMENT_DEVIATION_CENTIYALMS) continue;
+
+      errors.push({
+        ruleId:      GRAVEN_2_PUDDLE_PLACEMENT_RULE_ID,
+        severity:    "Major",
+        name:        "Graven 2 Puddle Placement",
+        description: `Was ${(deviation / 100).toFixed(1)} yalms out of position from the rest of their light party when the Gravitas puddle's spawn point snapshotted — pinned the puddle against the boss instead of the arena's outside edge, making the Gravitational Explosion undodgeable.`,
+        timestamp:   explosionCastTime - 1,
+        player:      player.name,
+        class:       player.className,
+        specId:      player.specId,
+        role:        player.role,
+        abilityId:   GRAVITATIONAL_EXPLOSION_ABILITY_ID,
+        abilityName: "Gravitational Explosion",
+      });
+    }
+  }
+  return errors;
+}
+
 // Same magnitude as the other wipe-cutoff rules' own death-clustering
 // windows (MYSTERY_MAGIC_VOLLEY_CLUSTER_MS, REVOLTING_RUIN_OCCURRENCE_GAP_MS's
 // intra-occurrence use, etc).
@@ -2937,6 +3118,7 @@ export function detectPhase1Errors(
     ...detectWaveCannonSupportPriorityErrors(players, deathEvents, enemyCasts),
     ...detectWaveCannonDpsPriorityErrors(players, deathEvents, enemyCasts),
     ...detectUnmitigatedExplosionWipeError(enemyCasts),
+    ...detectGraven2PuddlePlacementErrors(players, enemyCasts),
     ...detectGraven2PuddleProximityErrors(players, deathEvents, enemyCasts),
     ...detectGravitationalExplosionWipeError(enemyCasts),
     ...detectGraven1DeathWipeError(deathEvents, enemyCasts, blizzardIIISilentKillErrors),
