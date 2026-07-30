@@ -286,16 +286,70 @@
 // too, in the original investigation). The leave-one-out snapshot-time
 // technique reads him at only ~139, correctly clean.
 //
-// Gated on the explosion firing with ZERO Vitrophyre (47792) hits at
-// all — meaning no spread stage happened between the puddle drop and the
-// explosion, structurally distinct from GRAVEN_2_PUDDLE_PROXIMITY_RULE_ID's
-// spread-resolution shape. This report has exactly 4 pulls matching that
-// shape (9, 11, 39, 56), all reviewed by the user. Pull 9 was chaotic
+// Gated on the explosion firing with ZERO Vitrophyre (47792) hits AFTER
+// THE LAST puddle drop — meaning no spread stage happened between that
+// drop and the explosion, structurally distinct from
+// GRAVEN_2_PUDDLE_PROXIMITY_RULE_ID's spread-resolution shape. Scoped to
+// the last drop specifically, not "anywhere in the pull": a pull can have
+// an earlier drop that resolved its spread cleanly (real Vitrophyre
+// hits) followed by a later, unresolved drop — confirmed pulls 31 and 49
+// (per the user, both "had instances where someone triggered the
+// gravitational explosion"), same shape as GRAVEN_2_PUDDLE_LINGER_RULE_ID's
+// own pull 58. This report has 6 pulls total matching the "zero spread
+// after last drop" shape (9, 11, 31, 39, 49, 56), all reviewed by the
+// user. Pull 9 was chaotic
 // ("almost everyone is wrong... any additional flags here are
 // acceptable") and every player's deviation there (233-338) sits safely
 // under the 400 threshold either way — not used for calibration, but
 // doesn't conflict with it either. Same causal-gap gate as
 // GRAVEN_2_PUDDLE_PROXIMITY_MAX_CAUSAL_GAP_MS for the same reason.
+//
+// ── GRAVEN 2 PUDDLE LINGER (confirmed 2026-07-30, report ───────────────────
+// ── Q3GzJNZg64k1hLRm, pull 58) ───────────────────────────────────────────
+//
+// A FOURTH per-player cause behind GRAVITATIONAL_EXPLOSION_WIPE_RULE_ID:
+// instead of a bad SPREAD position or a bad PLACEMENT snapshot, a player
+// simply never leaves the puddle at all after it lands, and their
+// continued presence detonates it. Per the user: "Azura Salus stays too
+// long in the puddle causing it to detonate, releasing the Gravitational
+// Explosion and wiping the raid."
+//
+// **Technique**: compare each player's position at the puddle-drop hit
+// itself (GRAVEN_2_START_ABILITY_ID's own damageTaken x/y — exact, no
+// interpolation needed) against their most recent known position AT OR
+// BEFORE the explosion's own cast (findPlayerPosition,
+// direction:"atOrBefore", tightly bounded windowMs so a stale sample
+// doesn't get mistaken for "didn't move" — see below). Confirmed: Azura
+// Salus's own position barely changes at all across this whole window in
+// pull 58 (9975,8818 at the drop -> 9975,8823 at her last sample before
+// the explosion, ~1.2s of real elapsed time) — a straight-line
+// displacement of only ~5 centiyalms. Every other player in the same
+// pull visibly walks away, from ~98 (Salty Dango) up to ~1566 (Chauzey
+// Solstice, who runs most of the way across the arena). Threshold set to
+// 50, the midpoint between Azura's ~5 (fail) and Salty Dango's ~98 (the
+// nearest confirmed-clean sample) — same single-pull-calibration caveat
+// as this file's other freshly-built rules.
+//
+// **Two gates keep this from misfiring elsewhere:**
+// 1. `windowMs` on the "current position" lookup is tightly bounded
+//    (1200ms) rather than the generous 4000ms other checks in this file
+//    use — a player with genuinely NO position data between the drop and
+//    the explosion (confirmed: Archidel Del'archi in this same pull, last
+//    sample ~1.7s stale) reads as "barely moved" purely from data
+//    sparsity, not real stillness, and would be a false positive under a
+//    looser window. Verified against every OTHER explosion pull in this
+//    report with this same "zero spread after last drop" shape (9, 11,
+//    39, 56) — nobody else's displacement reads anywhere near this
+//    rule's threshold once the staleness gate is applied.
+// 2. A MINIMUM elapsed time between the puddle drop and the explosion
+//    cast (GRAVEN_2_PUDDLE_LINGER_MIN_REACT_TIME_MS, 1500ms) — pull 56's
+//    placement-caused wipe detonates only ~628ms after the drop, nowhere
+//    near enough time for anyone to plausibly move away regardless of
+//    intent, and every displacement in that pull reads near-zero for
+//    EVERYONE as a result (a pure timing artifact, not evidence of
+//    lingering). Every "zero spread after last drop" pull with a real
+//    reaction window reads 2700-2850ms instead — comfortably clear of
+//    this floor.
 //
 // ── BLIZZARD III BLOWOUT SILENT KILL (confirmed 2026-07, VtdBqhLQkWJXMvDg) ──
 //
@@ -862,7 +916,7 @@ import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import type { PullError, EnemyEvent } from "@/types/PullError";
 import type { DeathEvent } from "@/types/DeathEvent";
 import { distanceBetween, distanceFromCenter, ARENA_CENTER, compassBearingOf, angularDistance } from "@/lib/mechanics/geometry";
-import { interpolatePlayerPosition } from "@/lib/mechanics/player-position";
+import { interpolatePlayerPosition, findPlayerPosition } from "@/lib/mechanics/player-position";
 import { detectFFRoles, type FFRoleSlot } from "@/lib/mechanics/ffxiv/roles";
 
 export const BLIZZARD_III_SILENT_KILL_RULE_ID = "ffxiv-phase1-blizzard3-silent-kill";
@@ -875,6 +929,7 @@ export const GRAVITATIONAL_EXPLOSION_WIPE_RULE_ID = "ffxiv-phase1-gravitational-
 export const GRAVEN_2_SPREAD_MISPLACED_RULE_ID = "ffxiv-phase1-graven2-spread-misplaced";
 export const GRAVEN_2_PUDDLE_PROXIMITY_RULE_ID = "ffxiv-phase1-graven2-puddle-proximity";
 export const GRAVEN_2_PUDDLE_PLACEMENT_RULE_ID = "ffxiv-phase1-graven2-puddle-placement";
+export const GRAVEN_2_PUDDLE_LINGER_RULE_ID = "ffxiv-phase1-graven2-puddle-linger";
 export const GRAVEN_2_DEATH_WIPE_RULE_ID = "ffxiv-phase1-graven2-death-wipe";
 export const TELE_TROUNCING_ARROW_RULE_ID = "ffxiv-phase1-tele-trouncing-arrow-misplaced";
 export const TELE_TROUNCING_DEATH_WIPE_RULE_ID = "ffxiv-phase1-tele-trouncing-death-wipe";
@@ -2295,12 +2350,6 @@ function detectGraven2PuddlePlacementErrors(players: PlayerInfo[], enemyCasts: E
   if (explosionCasts.length === 0) return [];
   const explosionCastTime = Math.min(...explosionCasts.map((e) => e.timestamp));
 
-  // Only a PURE placement-caused wipe — see module header for why this
-  // gate structurally separates this rule's territory from the sibling
-  // spread-based one.
-  const hasSpreadHits = players.some((p) => p.damageTaken.some((e) => e.abilityId === VITROPHYRE_ABILITY_ID));
-  if (hasSpreadHits) return [];
-
   // The Gravitas cast itself (not its damageTaken hits, which land
   // ~600-750ms later) marks the actual snapshot instant. Same
   // PHASE_1_END_MS bound detectGraven2DeathWipeError uses, since 47788
@@ -2335,6 +2384,16 @@ function detectGraven2PuddlePlacementErrors(players: PlayerInfo[], enemyCasts: E
   for (let i = 1; i < dropTimes.length; i++) {
     if (dropTimes[i] - dropTimes[i - 1] > GRAVEN_2_PUDDLE_DROP_GAP_MS) lastDropGroupStart = dropTimes[i];
   }
+
+  // Only a PURE placement-caused wipe for THIS specific drop — a pull can
+  // have an earlier drop that resolved its spread cleanly (real
+  // Vitrophyre hits) followed by a later, unresolved drop (confirmed
+  // pulls 31, 49, same shape as GRAVEN_2_PUDDLE_LINGER_RULE_ID's own pull
+  // 58) — see module header for why this is scoped to the LAST drop
+  // specifically, not "anywhere in the pull."
+  const hasSpreadAfterLastDrop = players.some((p) => p.damageTaken.some((e) => e.abilityId === VITROPHYRE_ABILITY_ID && e.timestamp >= lastDropGroupStart));
+  if (hasSpreadAfterLastDrop) return [];
+
   const lastDrop = puddleHits.filter((h) => h.timestamp >= lastDropGroupStart);
   const dropPosByPlayer = new Map<string, Hit>();
   for (const h of lastDrop) if (!dropPosByPlayer.has(h.player.name)) dropPosByPlayer.set(h.player.name, h);
@@ -2383,6 +2442,107 @@ function detectGraven2PuddlePlacementErrors(players: PlayerInfo[], enemyCasts: E
         abilityName: "Gravitational Explosion",
       });
     }
+  }
+  return errors;
+}
+
+// Tightly bounded (vs. the 4000ms most other checks in this file use) —
+// see module header's "GRAVEN 2 PUDDLE LINGER" section: a looser window
+// lets a player with no real position data between the drop and the
+// explosion read as "didn't move" purely from data sparsity (confirmed
+// false-positive risk: pull 58's Archidel Del'archi, ~1.7s stale).
+const GRAVEN_2_PUDDLE_LINGER_POSITION_WINDOW_MS = 1200;
+
+// Below this, the explosion detonates too fast for anyone to plausibly
+// have reacted at all — confirmed pull 56 (a PLACEMENT-caused wipe, see
+// above): only ~628ms between the drop and the explosion, vs. every
+// "zero spread after last drop" pull with a genuine reaction window
+// reading 2700-2850ms. See module header.
+const GRAVEN_2_PUDDLE_LINGER_MIN_REACT_TIME_MS = 1500;
+
+// Midpoint between 2 confirmed samples — pull 58's Azura Salus ~5
+// centiyalms of displacement (fail) vs. Salty Dango's ~98 (nearest
+// confirmed-clean sample, same pull). Single-pull-calibration caveat, as
+// with every other freshly-built rule in this file.
+const GRAVEN_2_PUDDLE_LINGER_DISPLACEMENT_CENTIYALMS = 50;
+
+/**
+ * Detects a Graven 2 player who never left the Gravitas puddle after it
+ * landed, their continued presence detonating it. See module header for
+ * the mechanic, the staleness/reaction-time gates, and why this only
+ * applies to a pure linger-caused wipe (zero Vitrophyre spread hits
+ * after the last puddle drop — GRAVEN_2_PUDDLE_PROXIMITY_RULE_ID and
+ * GRAVEN_2_PUDDLE_PLACEMENT_RULE_ID cover the other 2 shapes).
+ */
+function detectGraven2PuddleLingerErrors(players: PlayerInfo[], enemyCasts: EnemyEvent[]): PullError[] {
+  const explosionCasts = enemyCasts.filter((e) => e.abilityId === GRAVITATIONAL_EXPLOSION_ABILITY_ID);
+  if (explosionCasts.length === 0) return [];
+  const explosionCastTime = Math.min(...explosionCasts.map((e) => e.timestamp));
+
+  const gravitasCasts = enemyCasts
+    .filter((e) => e.abilityId === GRAVEN_2_START_ABILITY_ID && e.timestamp <= PHASE_1_END_MS && e.timestamp <= explosionCastTime)
+    .map((e) => e.timestamp);
+  if (gravitasCasts.length === 0) return [];
+  const snapshotTime = Math.max(...gravitasCasts);
+
+  if (explosionCastTime - snapshotTime > GRAVEN_2_PUDDLE_PROXIMITY_MAX_CAUSAL_GAP_MS) return [];
+  if (explosionCastTime - snapshotTime < GRAVEN_2_PUDDLE_LINGER_MIN_REACT_TIME_MS) return [];
+
+  type Hit = { player: PlayerInfo; timestamp: number; x: number; y: number };
+  const puddleHits: Hit[] = [];
+  for (const player of players) {
+    for (const e of player.damageTaken) {
+      if (e.abilityId === GRAVEN_2_START_ABILITY_ID && e.x !== undefined && e.y !== undefined) {
+        puddleHits.push({ player, timestamp: e.timestamp, x: e.x, y: e.y });
+      }
+    }
+  }
+  if (puddleHits.length === 0) return [];
+  const dropTimes = [...new Set(puddleHits.map((h) => h.timestamp))].sort((a, b) => a - b);
+  let lastDropGroupStart = dropTimes[0];
+  for (let i = 1; i < dropTimes.length; i++) {
+    if (dropTimes[i] - dropTimes[i - 1] > GRAVEN_2_PUDDLE_DROP_GAP_MS) lastDropGroupStart = dropTimes[i];
+  }
+
+  // Only a PURE linger-caused wipe for THIS specific drop — same
+  // last-drop scoping GRAVEN_2_PUDDLE_PLACEMENT_RULE_ID uses, for the
+  // same reason (a pull can have an earlier drop that resolved its
+  // spread cleanly followed by a later, unresolved one).
+  const hasSpreadAfterLastDrop = players.some((p) => p.damageTaken.some((e) => e.abilityId === VITROPHYRE_ABILITY_ID && e.timestamp >= lastDropGroupStart));
+  if (hasSpreadAfterLastDrop) return [];
+
+  const lastDrop = puddleHits.filter((h) => h.timestamp >= lastDropGroupStart);
+  const dropPosByPlayer = new Map<string, Hit>();
+  for (const h of lastDrop) if (!dropPosByPlayer.has(h.player.name)) dropPosByPlayer.set(h.player.name, h);
+
+  const errors: PullError[] = [];
+  for (const drop of dropPosByPlayer.values()) {
+    const currentPos = findPlayerPosition(drop.player, explosionCastTime, {
+      windowMs:        GRAVEN_2_PUDDLE_LINGER_POSITION_WINDOW_MS,
+      direction:       "atOrBefore",
+      healing:         "self",
+      damageTaken:     true,
+      casts:           "self",
+      healingReceived: "any",
+    });
+    if (!currentPos) continue; // no reliably-recent position — fail closed, don't guess
+
+    const displacement = distanceBetween({ x: drop.x, y: drop.y }, currentPos);
+    if (displacement >= GRAVEN_2_PUDDLE_LINGER_DISPLACEMENT_CENTIYALMS) continue;
+
+    errors.push({
+      ruleId:      GRAVEN_2_PUDDLE_LINGER_RULE_ID,
+      severity:    "Major",
+      name:        "Graven 2 Puddle Linger",
+      description: `Stayed put in the Gravitas puddle instead of moving away — barely ${(displacement / 100).toFixed(1)} yalms of movement before it detonated into the Gravitational Explosion.`,
+      timestamp:   explosionCastTime - 1,
+      player:      drop.player.name,
+      class:       drop.player.className,
+      specId:      drop.player.specId,
+      role:        drop.player.role,
+      abilityId:   GRAVITATIONAL_EXPLOSION_ABILITY_ID,
+      abilityName: "Gravitational Explosion",
+    });
   }
   return errors;
 }
@@ -3119,6 +3279,7 @@ export function detectPhase1Errors(
     ...detectWaveCannonDpsPriorityErrors(players, deathEvents, enemyCasts),
     ...detectUnmitigatedExplosionWipeError(enemyCasts),
     ...detectGraven2PuddlePlacementErrors(players, enemyCasts),
+    ...detectGraven2PuddleLingerErrors(players, enemyCasts),
     ...detectGraven2PuddleProximityErrors(players, deathEvents, enemyCasts),
     ...detectGravitationalExplosionWipeError(enemyCasts),
     ...detectGraven1DeathWipeError(deathEvents, enemyCasts, blizzardIIISilentKillErrors),
