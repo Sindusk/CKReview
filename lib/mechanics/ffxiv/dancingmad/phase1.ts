@@ -780,13 +780,22 @@ const CONFETTI_MIN_DIST_FOR_BEARING_CENTIYALMS = 150;
 // the original tolerance was calibrated off only the pull-18 samples and
 // turned out too tight). Widened to comfortably clear all 4 confirmed-clean
 // samples while still sitting well under the confirmed failure (Ayumi Emi
-// ~1012, ~512 over, pull 18). No confirmed-clean UNDERSHOOT sample exists
-// yet (there's no legitimate reason to stand inside the ring at all, unlike
-// standing a bit further back), so CONFETTI_STACK_UNDERSHOOT_TOLERANCE is
-// set much tighter — just above ordinary jitter — catching the one
-// confirmed undershoot failure (Azura Salus ~372, ~128 under).
+// ~1012, ~512 over, pull 18).
+//
+// UNDERSHOOT is much tighter — just above ordinary jitter — but had to be
+// re-tightened again (2026-07-30, pull 38): Salty Dango (~388) and Azura
+// Salus (~382) were both confirmed clean by the user ("in a reasonable
+// spot, get knocked across cleanly") despite sitting under the original
+// 400 threshold. That threshold had been calibrated off a SINGLE confirmed
+// failure sample (Azura Salus ~372, pull 18) with no clean undershoot
+// sample to bound it from the other side — pull 38 supplies that missing
+// bound. The floor now sits at 377, roughly the midpoint between 372
+// (still caught) and 382 (now clear) — a deliberately narrow gap since
+// that's genuinely how close together the two confirmed samples are, not
+// a threshold that can be widened for extra margin without either
+// re-breaking pull 18 or re-breaking pull 38.
 const CONFETTI_STACK_OVERSHOOT_TOLERANCE_CENTIYALMS  = 400;
-const CONFETTI_STACK_UNDERSHOOT_TOLERANCE_CENTIYALMS = 100;
+const CONFETTI_STACK_UNDERSHOOT_TOLERANCE_CENTIYALMS = 123;
 
 // How long before the knockback's own damage lands its interpolated
 // "snapshot" position should be read — see module header's "WHY
@@ -2224,7 +2233,7 @@ function detectConfettiKnockbackVictimErrors(players: PlayerInfo[]): PullError[]
       errors.push({
         ruleId:      CONFETTI_KNOCKBACK_VICTIM_RULE_ID,
         severity:    "Major",
-        name:        "Confetti Stack Misplaced",
+        name:        "Incorrect Confetti Knockback",
         description: `Was roughly ${(dist / 100).toFixed(1)} yalms from the boss when Confetti detonated — ${tooFar ? "too far out" : "too close in"}, should have been hugging the boss's hitbox so the knockback carried them cleanly across the arena.`,
         timestamp:   snapshotTime,
         player:      player.name,
