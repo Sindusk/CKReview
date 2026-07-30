@@ -421,6 +421,37 @@
 // consistently "sloppy" Paladin included) — see
 // ARROW_OUT_OF_POSITION_THRESHOLD_YALMS for where the line is drawn.
 //
+// ── TELE-TROUNCING RESOLUTION (confirmed 2026-07-30, pull 41) ──────────────
+//
+// After the arrows are placed (above) AND the third/final Confetti
+// detonates (see CONFETTI FINAL POSITION), the raid gets tethered offscreen
+// to a statue and split into 2 tagged groups: one side (Idyllic Will,
+// TELE_TROUNCING_WILL_ABILITY_ID) takes an AoE that kills anyone standing
+// near the target, followed by Sleep; the other (Indulgent Will) gets
+// Confused (auto-walks toward the nearest ally and, on reaching melee
+// range, one-shots them). Resolution: the Slept player baits the nearest
+// Confused player onto their own Tele-Trouncing arrow, riding the
+// teleport it drops long enough that the Confused player never gets an
+// attack off. If any arrow doesn't get soaked this way, Phase 2 (required
+// before Phase 3) can't be passed.
+//
+// Per the user directly, the assignment uses FIXED BAIT positions on the
+// same N/E/S/W ring the arrows already use — melee on the INSIDE of their
+// arrow, ranged on the OUTSIDE: MT+R1 north, OT+R2 west, M1+H1 south,
+// M2+H2 east (see DMUGraven3FixedTether reference image). Not yet built —
+// pull 41 was too chaotic (only Sayacissa Morsaelth and Archidel Del'archi
+// were correctly positioned; the rest were off by varying degrees) to
+// calibrate a distance/position threshold from, so positioning detection
+// is deferred to a cleaner sample.
+//
+// What IS built for now: a simple Raid-severity cutoff (same shape as
+// CONFETTI_LOST/GRAVEN_1_DEATH_WIPE) on a death to the AoE side's own
+// damage (Idyllic Will) — per the user, dying to this initial hit means
+// the mechanic never gets a chance to resolve via baiting at all.
+// Confirmed pull 41: 4 players (Ayumi Emi, Chauzey Solstice, Kade Kansado,
+// Sonder Dreams) died to Idyllic Will within 45ms of each other — clustered
+// too close together, so each one's own AoE also caught the others.
+//
 // ── GRAVEN 1 DEATH -> UNRESOLVABLE WIPE (confirmed 2026-07-28, ─────────────
 // ── report Q3GzJNZg64k1hLRm, pulls 1/2; scope-narrowed 2026-07-30, pull 26) ─
 //
@@ -710,6 +741,7 @@ export const GRAVITATIONAL_EXPLOSION_WIPE_RULE_ID = "ffxiv-phase1-gravitational-
 export const GRAVEN_2_SPREAD_MISPLACED_RULE_ID = "ffxiv-phase1-graven2-spread-misplaced";
 export const GRAVEN_2_DEATH_WIPE_RULE_ID = "ffxiv-phase1-graven2-death-wipe";
 export const TELE_TROUNCING_ARROW_RULE_ID = "ffxiv-phase1-tele-trouncing-arrow-misplaced";
+export const TELE_TROUNCING_DEATH_WIPE_RULE_ID = "ffxiv-phase1-tele-trouncing-death-wipe";
 export const GRAVEN_1_DEATH_WIPE_RULE_ID = "ffxiv-phase1-graven-1-death-wipe";
 export const REVOLTING_RUIN_THREAT_LOSS_RULE_ID = "ffxiv-phase1-revolting-ruin-threat-loss";
 export const REVOLTING_RUIN_NON_TANK_DEATH_RULE_ID = "ffxiv-phase1-revolting-ruin-non-tank-death";
@@ -968,6 +1000,23 @@ const TELE_PORTENT_DIRECTION_BY_ABILITY_ID: Readonly<Record<number, Cardinal>> =
 // other, then the long-duration ones ~3s later — comfortably inside this
 // window without risking merging the two waves together.
 const TELE_PORTENT_WAVE_CLUSTER_MS = 1500;
+
+// Tele-Trouncing's RESOLUTION step (arrows already placed, now the raid
+// gets tethered offscreen to a statue and split into 2 tagged groups —
+// see module header) — killing blow ability for the "AoE that kills
+// anyone near you, followed by Sleep" side. Confirmed pull 41: 47797
+// (Indulgent Will) tags the OTHER 4 players, the ones who go on to get
+// Confused (1001283) and threaten a 1-shot melee kill on whoever they
+// reach; 47798 (Idyllic Will) tags the 4 who take the AoE hit, and its
+// OWN damage is what killed all 4 of them in this pull (they were
+// clustered together, so each one's own AoE caught the others too — not
+// just one death, a chain).
+const TELE_TROUNCING_WILL_ABILITY_ID = 47798;
+
+// Same clustering window as MYSTERY_MAGIC_VOLLEY_CLUSTER_MS — this pull's
+// own 4 simultaneous deaths landed within 45ms of each other, comfortably
+// inside it.
+const TELE_TROUNCING_DEATH_CLUSTER_MS = 3000;
 
 const ARROW_GRID_FAR_YALMS = 12;
 const ARROW_GRID_MID_YALMS = 6;
@@ -2630,6 +2679,36 @@ function detectTeleTrouncingArrowErrors(players: PlayerInfo[]): PullError[] {
 }
 
 /**
+ * A death to the AoE side's own damage (Idyllic Will) during Tele-
+ * Trouncing's resolution — see module header. Per-player attribution for
+ * WHO baited wrong isn't built yet (see FIXED BAIT note above), so this is
+ * a pure Raid-severity cutoff, same shape as GRAVEN_1_DEATH_WIPE/
+ * CONFETTI_LOST — clusters every death in the same near-simultaneous
+ * volley into one error rather than firing once per victim.
+ */
+function detectTeleTrouncingDeathWipeError(deathEvents: DeathEvent[]): PullError[] {
+  const willDeaths = deathEvents.filter((d) => d.killingAbilityGameId === TELE_TROUNCING_WILL_ABILITY_ID);
+  if (willDeaths.length === 0) return [];
+
+  const firstDeathTime = Math.min(...willDeaths.map((d) => d.timestamp));
+  const clusterDeaths = willDeaths.filter((d) => d.timestamp <= firstDeathTime + TELE_TROUNCING_DEATH_CLUSTER_MS);
+  const victims = [...new Set(clusterDeaths.map((d) => d.player))];
+  const cutoff = Math.max(...clusterDeaths.map((d) => d.timestamp));
+
+  return [
+    {
+      ruleId:      TELE_TROUNCING_DEATH_WIPE_RULE_ID,
+      severity:    "Raid",
+      name:        "Tele-Trouncing Wipe",
+      description: `${victims.join(" and ")} died before the arrows resolved — unresolvable from here; treated as a cutoff point for further per-player analysis this pull.`,
+      timestamp:   cutoff + 1,
+      abilityId:   TELE_TROUNCING_WILL_ABILITY_ID,
+      abilityName: "Idyllic Will",
+    },
+  ];
+}
+
+/**
  * Returns [] immediately for any pull that never touches Phase 1's tracked
  * abilities — self-gating the same way exdeath.ts does, so it's safe to
  * always call.
@@ -2664,5 +2743,6 @@ export function detectPhase1Errors(
     ...detectConfettiGroupMisplacedErrors(players),
     ...detectConfettiFinalPositionMisplacedErrors(players),
     ...detectTeleTrouncingArrowErrors(players),
+    ...detectTeleTrouncingDeathWipeError(deathEvents),
   ].sort((a, b) => a.timestamp - b.timestamp);
 }
