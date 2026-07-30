@@ -1534,6 +1534,16 @@ function resolveDpsSideAssignments(players: PlayerInfo[], waveCannonTime: number
  * slots. `sideAssignments` is pre-resolved by the caller (see
  * `resolveDpsSideAssignments` above for why the DPS side can't just use
  * detectFFRoles directly).
+ *
+ * Per the user directly (2026-07-30, pull 39): this priority order is only
+ * meant to be CHECKED when something actually goes wrong — a tower goes
+ * unsoaked (this rule) or someone dies to one. Two stack players regularly
+ * end up in each other's tower with no consequence at all (confirmed:
+ * Chauzey Solstice and Ayumi Emi swap spots often) — this is already
+ * naturally handled by the `coveredSlots.size >= openTowers.length` early
+ * return just below: if every tower on this side ends up soaked by
+ * SOMEONE, the swap is invisible and correctly never flagged, priority
+ * order only matters once a tower is left short.
  */
 function detectWaveCannonRolePriorityErrors(
   players:         PlayerInfo[],
@@ -1633,21 +1643,60 @@ function detectWaveCannonRolePriorityErrors(
   // that's really on the OTHER side lands on its real carrier and never
   // gets forced onto the nearer-of-only-2 option on this side — only kept
   // when the true nearest carrier turns out to be on THIS side.
-  const soakedTowerSlotsByName = new Map<string, Set<FFRoleSlot>>();
+  //
+  // Soaks are grouped by the TOWER's own sourceInstance FIRST, then matched
+  // to a carrier as a group, rather than matching each soaker's position
+  // independently — confirmed 2026-07-30, pull 39: Ayumi Emi stood in the
+  // M2 tower (same sourceInstance as Chauzey Solstice's confirmed-correct
+  // M2 soak) but immediately moved toward M1 right as the hit landed, so
+  // HER OWN recorded x/y read closer to M1's carrier than M2's — matched
+  // solo, that flipped her attribution to M1 and made both towers look
+  // covered. Two soaks sharing a sourceInstance are, definitionally, the
+  // same tower, so the group is matched as a whole (summed distance to
+  // each candidate carrier) — Chauzey's own unambiguous M2 position pulls
+  // the group's total toward M2, correctly overriding Ayumi's drifted
+  // sample instead of letting it vote on its own.
+  const towerHitsByInstance = new Map<number, { player: PlayerInfo; x: number; y: number }[]>();
+  const towerHitsNoInstance: { player: PlayerInfo; x: number; y: number }[] = [];
   for (const player of players) {
     for (const e of player.damageTaken) {
       if (e.abilityId !== WAVE_CANNON_TOWER_ABILITY_ID || e.x === undefined || e.y === undefined) continue;
-      let nearest: { slot: FFRoleSlot | null; dist: number } | null = null;
-      for (const h of waveCannonHits) {
-        if (h.x === undefined || h.y === undefined) continue;
-        const dist = Math.hypot(e.x - h.x, e.y - h.y);
-        if (!nearest || dist < nearest.dist) nearest = { slot: slotByName.get(h.player.name) ?? null, dist };
-      }
-      if (!nearest?.slot) continue; // nearest carrier was on the OTHER side
-      const set = soakedTowerSlotsByName.get(player.name) ?? new Set<FFRoleSlot>();
-      set.add(nearest.slot);
-      soakedTowerSlotsByName.set(player.name, set);
+      const hit = { player, x: e.x, y: e.y };
+      if (e.sourceInstance === undefined) { towerHitsNoInstance.push(hit); continue; }
+      const list = towerHitsByInstance.get(e.sourceInstance);
+      if (list) list.push(hit); else towerHitsByInstance.set(e.sourceInstance, [hit]);
     }
+  }
+
+  // Nearest carrier is resolved against ALL 4 carriers, both sides (not
+  // just this side's 2) — same as before — so a group that's really on
+  // the OTHER side lands on its real carrier and correctly returns null
+  // here (filtered out below) instead of being forced onto the
+  // nearer-of-only-this-side's-2 option.
+  const nearestCarrierSlot = (members: { x: number; y: number }[]): FFRoleSlot | null => {
+    let best: { player: PlayerInfo; total: number } | null = null;
+    for (const h of waveCannonHits) {
+      if (h.x === undefined || h.y === undefined) continue;
+      const total = members.reduce((sum, m) => sum + Math.hypot(m.x - h.x!, m.y - h.y!), 0);
+      if (!best || total < best.total) best = { player: h.player, total };
+    }
+    return best ? slotByName.get(best.player.name) ?? null : null;
+  };
+
+  const soakedTowerSlotsByName = new Map<string, Set<FFRoleSlot>>();
+  const addSoak = (playerName: string, slot: FFRoleSlot) => {
+    const set = soakedTowerSlotsByName.get(playerName) ?? new Set<FFRoleSlot>();
+    set.add(slot);
+    soakedTowerSlotsByName.set(playerName, set);
+  };
+  for (const members of towerHitsByInstance.values()) {
+    const slot = nearestCarrierSlot(members);
+    if (!slot) continue; // nearest carrier was on the OTHER side
+    for (const m of members) addSoak(m.player.name, slot);
+  }
+  for (const hit of towerHitsNoInstance) {
+    const slot = nearestCarrierSlot([hit]);
+    if (slot) addSoak(hit.player.name, slot);
   }
 
   const coveredSlots = new Set<FFRoleSlot>();
