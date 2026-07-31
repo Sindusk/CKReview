@@ -117,6 +117,29 @@
 // this codebase, rather than guessing. This is the same "nearest-of-4,
 // decisive by a wide margin" reasoning phase1.ts's tower-soak matching
 // already uses instead of an absolute distance table.
+//
+// ── extractHits WAS MISSING THE healingReceived STREAM (confirmed ─────────
+// ── 2026-07-31, same report, pull 12) ───────────────────────────────────
+//
+// Sonder Dreams/Salty Dango overlapped on Wave Cannon this pull, but the
+// cluster failed CULPRIT_MARGIN_RATIO (Dango only ~1.88x Sonder's deviation)
+// — confirmed by the user directly as a real miss: Dango was genuinely out
+// of position and Sonder was stationary, correctly positioned, well before
+// the hit. Root cause: `extractHits`'s call to `interpolatePlayerPosition`
+// only enabled `healing: "self"`, whose nearest sample before Sonder's hit
+// was a natural-regen tick 1.3s earlier, mid a small positional drift —
+// interpolating linearly across that whole 1.3s gap manufactured a "still
+// walking" position he was never actually at (he'd arrived and stopped
+// moving well before the snapshot instant). `player.healingReceived` (heals
+// landing on a player from ANY source, added to player-position.ts in an
+// earlier session — see that file's header) had a sample only ~700ms
+// before the hit, right at his true stationary spot; wiring it in here too
+// (this module simply predates that capability) tightens Sonder's read
+// from ~2.53y off to ~1.80y — back in line with every other clean Reaper
+// sample this report (max observed ~1.38y) — and correspondingly widens
+// Dango's read relative to his (~4.90y vs Sonder's 1.80y, a decisive 2.72x)
+// so the existing CULPRIT_MARGIN_RATIO catches it with NO threshold change
+// at all. A capability gap, not a miscalibrated constant.
 
 import type { Pull } from "@/types/Pull";
 import type { PlayerInfo } from "@/types/PlayerInfo";
@@ -159,8 +182,9 @@ function extractHits(players: PlayerInfo[]): RawHit[] {
     for (const e of player.damageTaken) {
       if (e.abilityId !== WAVE_CANNON_ABILITY_ID || e.x === undefined || e.y === undefined) continue;
       const snapshot = interpolatePlayerPosition(player, e.timestamp - WAVE_CANNON_SNAPSHOT_OFFSET_MS, {
-        windowMs: WAVE_CANNON_POSITION_WINDOW_MS,
-        healing:  "self",
+        windowMs:        WAVE_CANNON_POSITION_WINDOW_MS,
+        healing:         "self",
+        healingReceived: "any",
       });
       const { x, y } = snapshot ?? { x: e.x, y: e.y };
       hits.push({ actorId: player.actorId, player, timestamp: e.timestamp, sourceInstance: e.sourceInstance, x, y });
