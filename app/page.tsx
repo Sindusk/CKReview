@@ -175,8 +175,9 @@ export default function Home() {
   // detectForsakenTowerErrors etc. are (log-transforms.ts) — recomputed
   // here instead, same pattern as kickStrategy/crystalStrategy. Every
   // downstream consumer of `pulls` (AnalysisPanel, PullList, the report
-  // dialog, ...) should read `displayPulls` instead so these errors show up
-  // everywhere errors normally do; `pulls` itself and `pullsRef` stay
+  // dialog, AddReviewToStaticDialog, ...) should read `displayPulls` instead
+  // so these errors show up everywhere errors normally do; `pulls` itself
+  // and `pullsRef` stay
   // untouched since they're also what gets persisted to the session (wipe
   // calls / manual errors) and re-derived on plan/strategy swap.
   const mitigationPlan = getMitigationPlan(mitigationPlanId);
@@ -1217,7 +1218,7 @@ export default function Home() {
         open={showAddReviewToStaticDialog}
         sessionId={sessionId}
         reportUrl={sessionReportUrl}
-        pulls={pulls}
+        pulls={displayPulls}
         onClose={() => setShowAddReviewToStaticDialog(false)}
         onOpenManageStatics={() => setShowManageStaticsDialog(true)}
       />
