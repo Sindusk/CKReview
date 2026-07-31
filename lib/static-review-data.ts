@@ -13,18 +13,31 @@ import { getPullRaidCutoff } from "@/lib/report-data";
 
 export type StaticReviewPullPlayerErrorData = {
   player:     string;
+  // This player's job/spec/role in THIS pull (from Pull.players, not
+  // derived from the error rows — populated even for a player with zero
+  // errors here). See StaticReviewPullPlayerError's schema comment for why
+  // this is snapshotted per pull rather than assumed constant.
+  className?: string;
+  specId?:    number;
+  role?:      "Tank" | "Healer" | "DPS";
   majorCount: number;
   minorCount: number;
 };
 
 export type StaticReviewPullData = {
-  fightId:    number;
-  pullNumber: number;
-  bossName:   string;
-  result:     "Wipe" | "Kill";
-  startTime:  number;
-  endTime:    number;
-  players:    StaticReviewPullPlayerErrorData[];
+  fightId:       number;
+  pullNumber:    number;
+  bossName:      string;
+  result:        "Wipe" | "Kill";
+  game:          "wow" | "ffxiv";
+  startTime:     number;
+  endTime:       number;
+  // Pull.fightDuration, ms — the pull's own length (fallback display value
+  // when there's no raid-severity error to anchor on).
+  durationMs:    number;
+  // ms into the pull when the earliest Raid-severity error fired, or null.
+  raidErrorAtMs: number | null;
+  players:       StaticReviewPullPlayerErrorData[];
 };
 
 /**
@@ -32,7 +45,10 @@ export type StaticReviewPullData = {
  * raid-wipe cutoff used by the Report tab (see report-data.ts's
  * getPullRaidCutoff): once the earliest Raid-severity error has fired,
  * anything after it is dropped, Major or Minor, since the raid is already
- * wiping by that point.
+ * wiping by that point. Only players with at least one counted error get a
+ * row (same as before) — but each row's job/spec/role is looked up from
+ * Pull.players rather than the error itself, since a Raid-severity error
+ * (the only kind allowed to have no player) never carries one.
  */
 export function computeStaticReviewPullData(pulls: Pull[]): StaticReviewPullData[] {
   return pulls.map((pull) => {
@@ -51,16 +67,29 @@ export function computeStaticReviewPullData(pulls: Pull[]): StaticReviewPullData
     }
 
     const players: StaticReviewPullPlayerErrorData[] = Array.from(counts.entries()).map(
-      ([player, c]) => ({ player, majorCount: c.major, minorCount: c.minor })
+      ([player, c]) => {
+        const info = pull.players.find((p) => p.name === player);
+        return {
+          player,
+          className:  info?.className,
+          specId:     info?.specId,
+          role:       info?.role,
+          majorCount: c.major,
+          minorCount: c.minor,
+        };
+      }
     );
 
     return {
-      fightId:    pull.fightId,
-      pullNumber: pull.pullNumber,
-      bossName:   pull.name,
-      result:     pull.result,
-      startTime:  pull.startTime,
-      endTime:    pull.endTime,
+      fightId:       pull.fightId,
+      pullNumber:    pull.pullNumber,
+      bossName:      pull.name,
+      result:        pull.result,
+      game:          pull.game,
+      startTime:     pull.startTime,
+      endTime:       pull.endTime,
+      durationMs:    pull.fightDuration,
+      raidErrorAtMs: cutoff,
       players,
     };
   });

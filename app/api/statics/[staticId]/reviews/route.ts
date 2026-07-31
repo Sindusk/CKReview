@@ -5,11 +5,37 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import type { StaticReviewPullData } from "@/lib/static-review-data";
+import { resolvePlayerIdentities } from "@/lib/static-player-identity";
 
 async function requireMembership(staticId: number, userId: number) {
   return prisma.staticMember.findUnique({
     where: { staticId_userId: { staticId, userId } },
   });
+}
+
+function buildPullsCreateData(pulls: StaticReviewPullData[], identities: Map<string, number>) {
+  return pulls.map((p) => ({
+    fightId:       p.fightId,
+    pullNumber:    p.pullNumber,
+    bossName:      p.bossName,
+    result:        p.result,
+    game:          p.game,
+    startTime:     p.startTime,
+    endTime:       p.endTime,
+    durationMs:    p.durationMs,
+    raidErrorAtMs: p.raidErrorAtMs,
+    playerErrors: {
+      create: p.players.map((pl) => ({
+        player:     pl.player,
+        className:  pl.className ?? null,
+        specId:     pl.specId ?? null,
+        role:       pl.role ?? null,
+        majorCount: pl.majorCount,
+        minorCount: pl.minorCount,
+        identityId: identities.get(pl.player) ?? null,
+      })),
+    },
+  }));
 }
 
 export async function GET(
@@ -55,37 +81,25 @@ export async function POST(
   const reportUrl = String(body?.reportUrl || "").trim();
   const label = typeof body?.label === "string" && body.label.trim() ? body.label.trim() : null;
   const pulls: StaticReviewPullData[] = Array.isArray(body?.pulls) ? body.pulls : [];
+  const allPlayerNames = pulls.flatMap((p) => p.players.map((pl) => pl.player));
 
   if (!sessionId || !reportUrl) {
     return NextResponse.json({ error: "sessionId and reportUrl are required" }, { status: 400 });
   }
 
   try {
-    const review = await prisma.staticReview.create({
-      data: {
-        staticId,
-        sessionId,
-        reportUrl,
-        label,
-        addedByUserId: user.id,
-        pulls: {
-          create: pulls.map((p) => ({
-            fightId:    p.fightId,
-            pullNumber: p.pullNumber,
-            bossName:   p.bossName,
-            result:     p.result,
-            startTime:  p.startTime,
-            endTime:    p.endTime,
-            playerErrors: {
-              create: p.players.map((pl) => ({
-                player:     pl.player,
-                majorCount: pl.majorCount,
-                minorCount: pl.minorCount,
-              })),
-            },
-          })),
+    const review = await prisma.$transaction(async (tx) => {
+      const identities = await resolvePlayerIdentities(tx, staticId, allPlayerNames);
+      return tx.staticReview.create({
+        data: {
+          staticId,
+          sessionId,
+          reportUrl,
+          label,
+          addedByUserId: user.id,
+          pulls: { create: buildPullsCreateData(pulls, identities) },
         },
-      },
+      });
     });
     return NextResponse.json({ review });
   } catch (err) {
@@ -113,30 +127,20 @@ export async function POST(
         });
         const priorSummaries = new Map(priorPulls.map((p) => [p.fightId, p.summary]));
 
+        const identities = await resolvePlayerIdentities(tx, staticId, allPlayerNames);
+
         await tx.staticReviewPull.deleteMany({ where: { staticReviewId: existing.id } });
+
+        const pullsCreateData = buildPullsCreateData(pulls, identities).map((p) => ({
+          ...p,
+          summary: priorSummaries.get(p.fightId) ?? null,
+        }));
 
         return tx.staticReview.update({
           where: { id: existing.id },
           data: {
             label: label ?? existing.label,
-            pulls: {
-              create: pulls.map((p) => ({
-                fightId:    p.fightId,
-                pullNumber: p.pullNumber,
-                bossName:   p.bossName,
-                result:     p.result,
-                startTime:  p.startTime,
-                endTime:    p.endTime,
-                summary:    priorSummaries.get(p.fightId) ?? null,
-                playerErrors: {
-                  create: p.players.map((pl) => ({
-                    player:     pl.player,
-                    majorCount: pl.majorCount,
-                    minorCount: pl.minorCount,
-                  })),
-                },
-              })),
-            },
+            pulls: { create: pullsCreateData },
           },
         });
       });

@@ -8,76 +8,125 @@
 // rebuilt from StaticReviewPull/StaticReviewPullPlayerError instead of being
 // hand-maintained.
 //
-// Colors are the dataviz-skill reference palette's dark categorical steps
-// (see palette.md), assigned in fixed order by player name so a given
-// player's line color is stable across re-renders/filtering. The 8-slot
-// palette is only guaranteed CVD-safe up to 8 simultaneous series — WoW
-// rosters can exceed that, so the legend's checkboxes exist specifically to
-// let the viewer narrow down to a readable subset, and colors past slot 8
-// cycle rather than guarantee separation.
+// Series are keyed by resolved player IDENTITY (StaticPlayerIdentity), not
+// raw log name — a player who changed their in-game name mid-static (e.g.
+// "Salty Dango" -> "Kup'o Noodles") still draws as one continuous line once
+// a reviewer merges those names together (see the static dashboard's
+// Players panel). Rows written before identity resolution existed fall
+// back to keying on the raw name.
+//
+// Colors are each identity's own class/job color (lib/player-display.ts),
+// not a generic categorical palette — raid tools' users already read class
+// colors instinctively, and pairing the color with that job's icon (see the
+// legend/tooltip) gives a second, color-independent way to tell lines apart
+// on top of that. A player who changed job mid-static is colored/iconed by
+// whichever job appears most often across their pulls, since a line can't
+// sensibly change color partway through.
 
 import { useMemo, useState } from "react";
+import { getClassColor, getPlayerSpecIcon } from "@/lib/player-display";
 
 export type ChartPullPlayerError = {
-  player:     string;
-  majorCount: number;
-  minorCount: number;
+  player:       string;
+  identityId:   number | null;
+  identityName: string;
+  className:    string | null;
+  specId:       number | null;
+  role:         string | null;
+  majorCount:   number;
+  minorCount:   number;
 };
 
 export type ChartPull = {
-  id:          number;
-  reviewId:    number;
-  reviewLabel: string | null;
-  fightId:     number;
-  pullNumber:  number;
-  bossName:    string;
-  result:      string;
-  summary?:    string | null;
-  players:     ChartPullPlayerError[];
+  id:            number;
+  reviewId:      number;
+  reviewLabel:   string | null;
+  fightId:       number;
+  pullNumber:    number;
+  bossName:      string;
+  result:        string;
+  game:          string;
+  durationMs:    number;
+  raidErrorAtMs: number | null;
+  summary?:      string | null;
+  players:       ChartPullPlayerError[];
 };
-
-const CATEGORICAL_DARK = [
-  "#3987e5", // blue
-  "#d95926", // orange
-  "#199e70", // aqua
-  "#c98500", // yellow
-  "#d55181", // magenta
-  "#008300", // green
-  "#9085e9", // violet
-  "#e66767", // red
-];
 
 const INK_PRIMARY   = "#ffffff";
 const INK_SECONDARY = "#c3c2b7";
 const INK_MUTED     = "#898781";
 const GRIDLINE      = "#2c2c2a";
 const BASELINE      = "#383835";
+const FALLBACK_COLOR = "#aaaaaa";
 
 type Mode = "total" | "majorOnly";
 
+function identityKey(p: ChartPullPlayerError): string {
+  return p.identityId != null ? `id:${p.identityId}` : `name:${p.player}`;
+}
+
+type SeriesPlayer = {
+  key:  string;
+  name: string;
+  game: string | null;
+  className: string | null;
+  specId: number | null;
+};
+
 function buildSeries(pulls: ChartPull[], mode: Mode) {
-  const players = new Set<string>();
-  for (const pull of pulls) {
-    for (const p of pull.players) players.add(p.player);
-  }
-  const sortedPlayers = Array.from(players).sort((a, b) => a.localeCompare(b));
-
-  const running = new Map<string, number>();
-  const series = new Map<string, number[]>();
-  for (const player of sortedPlayers) series.set(player, []);
+  const info = new Map<string, SeriesPlayer>();
+  // Tally (game, className, specId) occurrences per identity so a job
+  // change mid-static still resolves to one stable color/icon — the most
+  // frequently-seen combo wins.
+  const jobTally = new Map<string, Map<string, { count: number; game: string; className: string; specId: number | null }>>();
 
   for (const pull of pulls) {
-    const byPlayer = new Map(pull.players.map((p) => [p.player, p]));
-    for (const player of sortedPlayers) {
-      const entry = byPlayer.get(player);
-      const delta = entry ? (mode === "majorOnly" ? entry.majorCount : entry.majorCount + entry.minorCount) : 0;
-      const next = (running.get(player) ?? 0) + delta;
-      running.set(player, next);
-      series.get(player)!.push(next);
+    for (const p of pull.players) {
+      const key = identityKey(p);
+      if (!info.has(key)) info.set(key, { key, name: p.identityName, game: null, className: null, specId: null });
+
+      if (p.className) {
+        const tally = jobTally.get(key) ?? new Map();
+        const jobKey = `${pull.game}::${p.className}::${p.specId ?? ""}`;
+        const entry = tally.get(jobKey) ?? { count: 0, game: pull.game, className: p.className, specId: p.specId };
+        entry.count += 1;
+        tally.set(jobKey, entry);
+        jobTally.set(key, tally);
+      }
     }
   }
 
-  return { players: sortedPlayers, series };
+  for (const [key, tally] of jobTally.entries()) {
+    let best: { count: number; game: string; className: string; specId: number | null } | null = null;
+    for (const entry of tally.values()) {
+      if (!best || entry.count > best.count) best = entry;
+    }
+    if (best) {
+      const player = info.get(key)!;
+      player.game = best.game;
+      player.className = best.className;
+      player.specId = best.specId;
+    }
+  }
+
+  const players = Array.from(info.values()).sort((a, b) => a.name.localeCompare(b.name));
+
+  const running = new Map<string, number>();
+  const series = new Map<string, number[]>();
+  for (const player of players) series.set(player.key, []);
+
+  for (const pull of pulls) {
+    const byKey = new Map(pull.players.map((p) => [identityKey(p), p]));
+    for (const player of players) {
+      const entry = byKey.get(player.key);
+      const delta = entry ? (mode === "majorOnly" ? entry.majorCount : entry.majorCount + entry.minorCount) : 0;
+      const next = (running.get(player.key) ?? 0) + delta;
+      running.set(player.key, next);
+      series.get(player.key)!.push(next);
+    }
+  }
+
+  return { players, series };
 }
 
 const CHART_HEIGHT = 320;
@@ -94,14 +143,19 @@ export default function StaticErrorChart({ pulls }: { pulls: ChartPull[] }) {
   const [showTable, setShowTable] = useState(false);
 
   const { players, series } = useMemo(() => buildSeries(pulls, mode), [pulls, mode]);
-  const colorFor = (player: string) => CATEGORICAL_DARK[players.indexOf(player) % CATEGORICAL_DARK.length];
+  const colorFor = (player: SeriesPlayer) =>
+    player.className ? getClassColor(player.game as "wow" | "ffxiv", player.className) : FALLBACK_COLOR;
+  const iconFor = (player: SeriesPlayer) =>
+    player.className && player.game
+      ? getPlayerSpecIcon(player.game as "wow" | "ffxiv", player.specId ?? 0, player.className)
+      : null;
 
-  const visiblePlayers = players.filter((p) => !hidden.has(p));
+  const visiblePlayers = players.filter((p) => !hidden.has(p.key));
 
   const maxY = useMemo(() => {
     let max = 0;
     for (const player of visiblePlayers) {
-      const vals = series.get(player) ?? [];
+      const vals = series.get(player.key) ?? [];
       for (const v of vals) if (v > max) max = v;
     }
     return Math.max(max, 1);
@@ -119,11 +173,11 @@ export default function StaticErrorChart({ pulls }: { pulls: ChartPull[] }) {
     return PAD_TOP + innerHeight - (v / maxY) * innerHeight;
   }
 
-  function toggle(player: string) {
+  function toggle(key: string) {
     setHidden((prev) => {
       const next = new Set(prev);
-      if (next.has(player)) next.delete(player);
-      else next.add(player);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   }
@@ -140,6 +194,11 @@ export default function StaticErrorChart({ pulls }: { pulls: ChartPull[] }) {
   const tickVals = Array.from({ length: yTicks + 1 }, (_, i) => Math.round((maxY / yTicks) * i));
 
   const hoverPull = hoverIdx != null ? pulls[hoverIdx] : null;
+  // Hover rows are sorted by their value AT the hovered pull — reflecting
+  // the data at that point, not the legend's static alphabetical order.
+  const hoverRows = hoverIdx != null
+    ? [...visiblePlayers].sort((a, b) => (series.get(b.key)?.[hoverIdx] ?? 0) - (series.get(a.key)?.[hoverIdx] ?? 0))
+    : [];
 
   return (
     <div>
@@ -188,11 +247,12 @@ export default function StaticErrorChart({ pulls }: { pulls: ChartPull[] }) {
       {/* Legend — also the visibility toggle */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 14px", marginBottom: "12px" }}>
         {players.map((player) => {
-          const isHidden = hidden.has(player);
+          const isHidden = hidden.has(player.key);
+          const icon = iconFor(player);
           return (
             <button
-              key={player}
-              onClick={() => toggle(player)}
+              key={player.key}
+              onClick={() => toggle(player.key)}
               style={{
                 display:      "flex",
                 alignItems:   "center",
@@ -205,18 +265,23 @@ export default function StaticErrorChart({ pulls }: { pulls: ChartPull[] }) {
                 fontSize:     "12px",
                 color:        INK_SECONDARY,
               }}
-              title={isHidden ? `Show ${player}` : `Hide ${player}`}
+              title={isHidden ? `Show ${player.name}` : `Hide ${player.name}`}
             >
-              <span
-                style={{
-                  width:           "10px",
-                  height:          "10px",
-                  borderRadius:    "2px",
-                  backgroundColor: colorFor(player),
-                  flexShrink:      0,
-                }}
-              />
-              {player}
+              {icon ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={icon} alt="" width={16} height={16} style={{ borderRadius: "2px", flexShrink: 0 }} />
+              ) : (
+                <span
+                  style={{
+                    width:           "10px",
+                    height:          "10px",
+                    borderRadius:    "2px",
+                    backgroundColor: colorFor(player),
+                    flexShrink:      0,
+                  }}
+                />
+              )}
+              <span style={{ color: colorFor(player) }}>{player.name}</span>
             </button>
           );
         })}
@@ -230,8 +295,8 @@ export default function StaticErrorChart({ pulls }: { pulls: ChartPull[] }) {
                 <th style={{ textAlign: "left", padding: "6px 8px", color: INK_MUTED, borderBottom: `1px solid ${GRIDLINE}` }}>Pull</th>
                 <th style={{ textAlign: "left", padding: "6px 8px", color: INK_MUTED, borderBottom: `1px solid ${GRIDLINE}` }}>Result</th>
                 {visiblePlayers.map((p) => (
-                  <th key={p} style={{ textAlign: "right", padding: "6px 8px", color: colorFor(p), borderBottom: `1px solid ${GRIDLINE}` }}>
-                    {p}
+                  <th key={p.key} style={{ textAlign: "right", padding: "6px 8px", color: colorFor(p), borderBottom: `1px solid ${GRIDLINE}` }}>
+                    {p.name}
                   </th>
                 ))}
               </tr>
@@ -242,8 +307,8 @@ export default function StaticErrorChart({ pulls }: { pulls: ChartPull[] }) {
                   <td style={{ padding: "6px 8px", color: INK_PRIMARY }}>{pull.bossName} #{pull.pullNumber}</td>
                   <td style={{ padding: "6px 8px", color: pull.result === "Kill" ? "#0ca30c" : INK_SECONDARY }}>{pull.result}</td>
                   {visiblePlayers.map((p) => (
-                    <td key={p} style={{ padding: "6px 8px", textAlign: "right", color: INK_SECONDARY, fontVariantNumeric: "tabular-nums" }}>
-                      {series.get(p)?.[i] ?? 0}
+                    <td key={p.key} style={{ padding: "6px 8px", textAlign: "right", color: INK_SECONDARY, fontVariantNumeric: "tabular-nums" }}>
+                      {series.get(p.key)?.[i] ?? 0}
                     </td>
                   ))}
                 </tr>
@@ -284,11 +349,11 @@ export default function StaticErrorChart({ pulls }: { pulls: ChartPull[] }) {
 
             {/* series lines */}
             {visiblePlayers.map((player) => {
-              const vals = series.get(player) ?? [];
+              const vals = series.get(player.key) ?? [];
               const d = vals.map((v, i) => `${i === 0 ? "M" : "L"} ${xAt(i)} ${yAt(v)}`).join(" ");
               return (
                 <path
-                  key={player}
+                  key={player.key}
                   d={d}
                   fill="none"
                   stroke={colorFor(player)}
@@ -302,10 +367,10 @@ export default function StaticErrorChart({ pulls }: { pulls: ChartPull[] }) {
             {/* hover dots */}
             {hoverIdx != null &&
               visiblePlayers.map((player) => {
-                const v = series.get(player)?.[hoverIdx] ?? 0;
+                const v = series.get(player.key)?.[hoverIdx] ?? 0;
                 return (
                   <circle
-                    key={player}
+                    key={player.key}
                     cx={xAt(hoverIdx)}
                     cy={yAt(v)}
                     r={4}
@@ -351,10 +416,10 @@ export default function StaticErrorChart({ pulls }: { pulls: ChartPull[] }) {
                 {hoverPull.bossName} #{hoverPull.pullNumber} — {hoverPull.result}
               </div>
               {hoverPull.reviewLabel && <div style={{ marginBottom: "4px" }}>{hoverPull.reviewLabel}</div>}
-              {visiblePlayers.map((p) => (
-                <div key={p} style={{ display: "flex", justifyContent: "space-between", gap: "12px" }}>
-                  <span style={{ color: colorFor(p) }}>{p}</span>
-                  <span style={{ fontVariantNumeric: "tabular-nums" }}>{series.get(p)?.[hoverIdx!] ?? 0}</span>
+              {hoverRows.map((p) => (
+                <div key={p.key} style={{ display: "flex", justifyContent: "space-between", gap: "12px" }}>
+                  <span style={{ color: colorFor(p) }}>{p.name}</span>
+                  <span style={{ fontVariantNumeric: "tabular-nums" }}>{series.get(p.key)?.[hoverIdx!] ?? 0}</span>
                 </div>
               ))}
             </div>

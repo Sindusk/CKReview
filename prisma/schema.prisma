@@ -20,8 +20,10 @@ model Static {
   /// FK, since that DB lives outside this datasource.
   createdByUserId Int
 
-  members StaticMember[]
-  reviews StaticReview[]
+  members    StaticMember[]
+  reviews    StaticReview[]
+  identities StaticPlayerIdentity[]
+  aliases    StaticPlayerAlias[]
 }
 
 model StaticMember {
@@ -78,8 +80,18 @@ model StaticReviewPull {
   /// encounter, but this is stored per-pull rather than assumed.
   bossName       String
   result         String // "Wipe" | "Kill" (Pull.result)
+  /// "wow" | "ffxiv" (Pull.game) — determines which job-color/icon table a
+  /// player's errors in this pull are read against.
+  game           String
   startTime      Int
   endTime        Int
+  /// Pull.fightDuration, ms — the pull's own length, used as the fallback
+  /// "how long did this pull last" figure when raidErrorAtMs is null.
+  durationMs     Int
+  /// ms into the pull when the earliest Raid-severity error fired (see
+  /// lib/report-data.ts's getPullRaidCutoff) — null if the pull has none.
+  /// Shown as "wiped at" in the pull list; falls back to durationMs.
+  raidErrorAtMs  Int?
 
   /// Freeform notes on what happened/went wrong during this pull. Nullable —
   /// most pulls won't have one unless someone writes it in during review.
@@ -103,15 +115,70 @@ model StaticReviewPull {
 model StaticReviewPullPlayerError {
   id     Int    @id @default(autoincrement())
   pullId Int
-  /// Player name — joined across pulls the same way report-data.ts's roster
-  /// is (by name, since actorId is only stable within a single pull/report).
+  /// Raw player name as it appeared in THIS pull's log — kept verbatim
+  /// (never edited) for provenance even after `identity` resolves it to a
+  /// merged canonical player (see StaticPlayerIdentity's header comment for
+  /// why raw log names alone aren't a stable join key across reports).
   player String
+
+  /// This player's class/spec/role in THIS pull, snapshotted from
+  /// Pull.players (not derived from the error rows, so it's populated even
+  /// for players who racked up zero errors here) — a player can change job
+  /// between reports, or in principle mid-report, so this is captured per
+  /// pull rather than assumed constant for the whole static.
+  className String?
+  specId    Int?
+  role      String?
 
   majorCount Int @default(0)
   minorCount Int @default(0)
 
-  pull StaticReviewPull @relation(fields: [pullId], references: [id], onDelete: Cascade)
+  pull     StaticReviewPull      @relation(fields: [pullId], references: [id], onDelete: Cascade)
+  /// Resolved canonical player across name changes (see
+  /// StaticPlayerIdentity) — nullable only because rows written before this
+  /// column existed have none; every row from here on gets one.
+  identityId Int?
+  identity   StaticPlayerIdentity? @relation(fields: [identityId], references: [id], onDelete: SetNull)
 
   @@unique([pullId, player])
   @@index([pullId])
+  @@index([identityId])
+}
+
+/// A canonical player identity within one static, so error counts/charts
+/// still group correctly when someone's log name changes across reports
+/// (observed 2026-07-31: "Salty Dango" -> "Kup'o Noodles" across sessions of
+/// the same static). Auto-created the first time a never-before-seen name
+/// is imported (1 identity = 1 alias = that name); merged manually
+/// afterward via POST /api/statics/[staticId]/players/merge once a
+/// reviewer recognizes two names as the same person. `name` is the
+/// canonical display name shown in the chart/legend — defaults to
+/// whichever name was first seen, editable afterward.
+model StaticPlayerIdentity {
+  id        Int      @id @default(autoincrement())
+  staticId  Int
+  name      String
+  createdAt DateTime @default(now())
+
+  static  Static                       @relation(fields: [staticId], references: [id], onDelete: Cascade)
+  aliases StaticPlayerAlias[]
+  errors  StaticReviewPullPlayerError[]
+
+  @@index([staticId])
+}
+
+/// One raw log name that has resolved to a given identity. A fresh name
+/// starts as its own identity with exactly one alias (itself); merging two
+/// identities moves the loser's aliases here onto the winner.
+model StaticPlayerAlias {
+  id         Int    @id @default(autoincrement())
+  staticId   Int
+  identityId Int
+  name       String
+
+  identity StaticPlayerIdentity @relation(fields: [identityId], references: [id], onDelete: Cascade)
+  static   Static               @relation(fields: [staticId], references: [id], onDelete: Cascade)
+
+  @@unique([staticId, name])
+  @@index([identityId])
 }

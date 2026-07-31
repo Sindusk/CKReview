@@ -1,12 +1,13 @@
 // app/api/statics/[staticId]/chart-data/route.ts
 //
-// Feeds StaticErrorChart (components/StaticErrorChart.tsx): every pull ever
-// imported into this static's reviews, in chronological order (by review
-// addedAt, then pullNumber within a review), with each player's per-pull
-// Major/Minor error counts. The client computes the cumulative running
-// totals shown on the chart — this route just hands over the raw per-pull
-// numbers so the client can also support a Major-only toggle without a
-// second round-trip.
+// Feeds StaticErrorChart and the static dashboard's pull list: every pull
+// ever imported into this static's reviews, in chronological order (by
+// review addedAt, then pullNumber within a review), with each player's
+// per-pull Major/Minor error counts, resolved player identity (see
+// StaticPlayerIdentity), and job/spec snapshot. The client computes the
+// cumulative running totals shown on the chart — this route just hands
+// over the raw per-pull numbers so the client can also support a
+// Major-only toggle without a second round-trip.
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -35,25 +36,35 @@ export async function GET(
     include: {
       pulls: {
         orderBy: { pullNumber: "asc" },
-        include: { playerErrors: true },
+        include: { playerErrors: { include: { identity: true } } },
       },
     },
   });
 
   const pulls = reviews.flatMap((review) =>
     review.pulls.map((pull) => ({
-      id:          pull.id,
-      reviewId:    review.id,
-      reviewLabel: review.label,
-      fightId:     pull.fightId,
-      pullNumber:  pull.pullNumber,
-      bossName:    pull.bossName,
-      result:      pull.result,
-      summary:     pull.summary,
-      players:     pull.playerErrors.map((pe) => ({
-        player:     pe.player,
-        majorCount: pe.majorCount,
-        minorCount: pe.minorCount,
+      id:            pull.id,
+      reviewId:      review.id,
+      reviewLabel:   review.label,
+      fightId:       pull.fightId,
+      pullNumber:    pull.pullNumber,
+      bossName:      pull.bossName,
+      result:        pull.result,
+      game:          pull.game,
+      durationMs:    pull.durationMs,
+      raidErrorAtMs: pull.raidErrorAtMs,
+      summary:       pull.summary,
+      players:       pull.playerErrors.map((pe) => ({
+        player:      pe.player,
+        identityId:  pe.identityId,
+        // Falls back to the raw log name for rows written before identity
+        // resolution existed (identityId null) — see the schema comment.
+        identityName: pe.identity?.name ?? pe.player,
+        className:   pe.className,
+        specId:      pe.specId,
+        role:        pe.role,
+        majorCount:  pe.majorCount,
+        minorCount:  pe.minorCount,
       })),
     }))
   );
