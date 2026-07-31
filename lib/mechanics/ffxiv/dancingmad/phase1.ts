@@ -626,11 +626,38 @@
 // Per the user directly, the assignment uses FIXED BAIT positions on the
 // same N/E/S/W ring the arrows already use — melee on the INSIDE of their
 // arrow, ranged on the OUTSIDE: MT+R1 north, OT+R2 west, M1+H1 south,
-// M2+H2 east (see DMUGraven3FixedTether reference image). Not yet built —
-// pull 41 was too chaotic (only Sayacissa Morsaelth and Archidel Del'archi
-// were correctly positioned; the rest were off by varying degrees) to
-// calibrate a distance/position threshold from, so positioning detection
-// is deferred to a cleaner sample.
+// M2+H2 east (see DMUGraven3FixedTether reference image). Confirmed
+// correct examples (report Q3GzJNZg64k1hLRm pull 41): Sayacissa Morsaelth
+// (OT, melee-side, inside) at ~4.6y from center; Archidel Del'archi (H2,
+// ranged-side, outside) at ~14.9y.
+//
+// ── TELE-TROUNCING BAIT POSITION (confirmed 2026-07-31, h2JvDkntZCaBgmLF ───
+// ── pull 10) ────────────────────────────────────────────────────────────
+//
+// Per the user: the ranged-side player in each pair (R1/R2/H1/H2) needs to
+// stay close enough to the boss that their own melee partner can actually
+// reach them if THAT melee ends up the one Confused — standing too far out
+// toward the wall risks their partner's nearest-ally search finding some
+// OTHER melee instead (melees all cluster near center, so a distant ranged
+// partner can lose that comparison) and getting misdirected into a
+// different pairing's territory entirely.
+//
+// Confirmed failure (pull 10): 3 of the 4 ranged-side players — Chauzey
+// Solstice (R1), Azura Salus (H1), Archidel Del'archi (H2) — stood at
+// ~18.4-18.5y from center at the Idyllic/Indulgent Will cast, clearly
+// further out than both Ayumi Emi (R2, correctly positioned this SAME
+// pull, ~17.5y) and the confirmed-good Archidel/H2 reading above
+// (~14.9y, a DIFFERENT report/pull). Checked purely as a radius-from-
+// center threshold (TELE_TROUNCING_BAIT_RADIUS_THRESHOLD_YALMS) rather
+// than a literal "closer to some other melee than their own partner"
+// geometric trigger — at this snapshot, every ranged player's own partner
+// was still their closest melee by a wide margin (Chauzey-to-Dango 7.7y
+// vs. her next-closest melee at 19.5y), so the pure relative-distance
+// version of this check would have stayed silent on all 3 confirmed
+// failures. The description still names the partner's own nearest OTHER
+// melee neighbor as the illustrative at-risk target, even though the
+// actual cross-attraction hasn't geometrically triggered yet in this
+// data — see detectTeleTrouncingBaitPositionErrors.
 //
 // What IS built for now: a simple Raid-severity cutoff (same shape as
 // CONFETTI_LOST/GRAVEN_1_DEATH_WIPE) on a death to either side's own
@@ -941,6 +968,7 @@ export const GRAVEN_2_PUDDLE_LINGER_RULE_ID = "ffxiv-phase1-graven2-puddle-linge
 export const GRAVEN_2_DEATH_WIPE_RULE_ID = "ffxiv-phase1-graven2-death-wipe";
 export const TELE_TROUNCING_ARROW_RULE_ID = "ffxiv-phase1-tele-trouncing-arrow-misplaced";
 export const TELE_TROUNCING_DEATH_WIPE_RULE_ID = "ffxiv-phase1-tele-trouncing-death-wipe";
+export const TELE_TROUNCING_BAIT_POSITION_RULE_ID = "ffxiv-phase1-tele-trouncing-bait-position";
 export const GRAVEN_1_DEATH_WIPE_RULE_ID = "ffxiv-phase1-graven-1-death-wipe";
 export const REVOLTING_RUIN_THREAT_LOSS_RULE_ID = "ffxiv-phase1-revolting-ruin-threat-loss";
 export const REVOLTING_RUIN_NON_TANK_DEATH_RULE_ID = "ffxiv-phase1-revolting-ruin-non-tank-death";
@@ -1252,6 +1280,20 @@ const TELE_TROUNCING_TRAP_ABILITY_ID = CONFETTI_EXPLOSION_ABILITY_ID;
 // used to disambiguate TELE_TROUNCING_TRAP_ABILITY_ID's reused ID from an
 // earlier Confetti-phase occurrence (see above).
 const TELE_TROUNCING_START_ABILITY_ID = 47802;
+
+// Position snapshot window for the bait-position check — same magnitude as
+// CONFETTI_POSITION_WINDOW_MS; players should already be stationary at
+// their fixed bait spot well before the Will cast resolves.
+const TELE_TROUNCING_BAIT_POSITION_WINDOW_MS = 4000;
+
+// Confirmed-good ranged-side readings: ~14.9y (Q3GzJNZg64k1hLRm pull 41,
+// Archidel Del'archi/H2) and ~17.5y (h2JvDkntZCaBgmLF pull 10, Ayumi
+// Emi/R2, the one ranged player NOT flagged that pull). Confirmed-bad:
+// ~18.4-18.5y (same pull 10, the other 3 ranged players). 18 splits the
+// two with a small margin on each side — see module header (search "BAIT
+// POSITION") for the full confirmed data and why this is a pure radius
+// check rather than the literal relative-distance version.
+const TELE_TROUNCING_BAIT_RADIUS_THRESHOLD_YALMS = 18;
 
 // Same clustering window as MYSTERY_MAGIC_VOLLEY_CLUSTER_MS — this pull's
 // own 4 simultaneous deaths landed within 45ms of each other, comfortably
@@ -3365,6 +3407,88 @@ function detectTeleTrouncingDeathWipeError(deathEvents: DeathEvent[], enemyCasts
   ];
 }
 
+// rangedSlot's fixed melee partner on the same cardinal — see module
+// header's "FIXED BAIT positions" paragraph.
+const TELE_TROUNCING_BAIT_PARTNER_BY_RANGED_SLOT: Readonly<Record<string, FFRoleSlot>> = {
+  R1: "MT",
+  R2: "OT",
+  H1: "M1",
+  H2: "M2",
+};
+const TELE_TROUNCING_BAIT_MELEE_SLOTS: readonly FFRoleSlot[] = ["MT", "OT", "M1", "M2"];
+
+/**
+ * Detects a ranged-side player (R1/R2/H1/H2) standing too far from the
+ * boss at the Tele-Trouncing resolution's Will cast — see module header
+ * (search "BAIT POSITION") for the mechanic and confirmed failure case.
+ * Purely a radius-from-center threshold, not the literal "closer to some
+ * other melee than their own partner" version — see header for why.
+ */
+function detectTeleTrouncingBaitPositionErrors(players: PlayerInfo[], enemyCasts: EnemyEvent[]): PullError[] {
+  const willCastTimes = enemyCasts.filter((e) => TELE_TROUNCING_WILL_ABILITY_IDS.includes(e.abilityId)).map((e) => e.timestamp);
+  if (willCastTimes.length === 0) return [];
+  const snapshotTime = Math.min(...willCastTimes);
+
+  const slots = detectFFRoles(players);
+  const bySlot = new Map(slots.map((s) => [s.slot, s.player]));
+
+  // Nearest-sample, not interpolated — these players should already be
+  // holding a stationary bait position well before the Will cast resolves,
+  // so a single closest-in-time sample is the true reading; interpolating
+  // between bracketing samples pulled 2 of the 3 confirmed-failure players
+  // toward a blended, mid-motion point that read as within threshold.
+  const positionOf = (player: PlayerInfo) =>
+    findPlayerPosition(player, snapshotTime, {
+      windowMs:        TELE_TROUNCING_BAIT_POSITION_WINDOW_MS,
+      healing:         "self",
+      casts:           "self",
+      healingReceived: "any",
+    });
+
+  const errors: PullError[] = [];
+  for (const [rangedSlot, meleeSlot] of Object.entries(TELE_TROUNCING_BAIT_PARTNER_BY_RANGED_SLOT)) {
+    const ranged = bySlot.get(rangedSlot as FFRoleSlot);
+    const partner = bySlot.get(meleeSlot);
+    if (!ranged || !partner) continue;
+
+    const rangedPos = positionOf(ranged);
+    if (!rangedPos) continue;
+    const radius = distanceFromCenter(rangedPos.x, rangedPos.y) / 100;
+    if (radius <= TELE_TROUNCING_BAIT_RADIUS_THRESHOLD_YALMS) continue;
+
+    const partnerPos = positionOf(partner);
+    let atRiskMelee: string | null = null;
+    if (partnerPos) {
+      let bestDist = Infinity;
+      for (const otherSlot of TELE_TROUNCING_BAIT_MELEE_SLOTS) {
+        if (otherSlot === meleeSlot) continue;
+        const other = bySlot.get(otherSlot);
+        if (!other) continue;
+        const otherPos = positionOf(other);
+        if (!otherPos) continue;
+        const dist = pointDistance(toRelativeYalms(partnerPos.x, partnerPos.y), toRelativeYalms(otherPos.x, otherPos.y));
+        if (dist < bestDist) { bestDist = dist; atRiskMelee = other.name; }
+      }
+    }
+
+    errors.push({
+      ruleId:      TELE_TROUNCING_BAIT_POSITION_RULE_ID,
+      severity:    "Major",
+      name:        "Tele-Trouncing Bait Position",
+      description: `Stood roughly ${radius.toFixed(1)} yalms from the boss for the Tele-Trouncing bait — too far toward the wall, should be closer in so ${partner.name} can reach them if Confused${atRiskMelee ? `; as positioned, ${partner.name} risks being drawn to ${atRiskMelee} instead` : ""}.`,
+      timestamp:   snapshotTime,
+      player:      ranged.name,
+      class:       ranged.className,
+      specId:      ranged.specId,
+      role:        ranged.role,
+      abilityId:   TELE_TROUNCING_WILL_ABILITY_IDS[1],
+      abilityName: "Idyllic Will",
+    });
+  }
+
+  return errors;
+}
+
 /**
  * Returns [] immediately for any pull that never touches Phase 1's tracked
  * abilities — self-gating the same way exdeath.ts does, so it's safe to
@@ -3404,6 +3528,7 @@ export function detectPhase1Errors(
     ...detectConfettiGroupMisplacedErrors(players),
     ...detectConfettiFinalPositionMisplacedErrors(players),
     ...detectTeleTrouncingArrowErrors(players),
+    ...detectTeleTrouncingBaitPositionErrors(players, enemyCasts),
     ...detectTeleTrouncingDeathWipeError(deathEvents, enemyCasts),
   ].sort((a, b) => a.timestamp - b.timestamp);
 }
