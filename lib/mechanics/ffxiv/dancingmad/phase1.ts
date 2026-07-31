@@ -713,12 +713,21 @@
 // vs M2 that pull (the label itself flips after pull 38; their actual
 // spots never move). So this may be a standing habit rather than a
 // pull-14-specific mistake, or wrong regardless and just never singly
-// confirmed — no ruling was recorded either way for this pull. If a
-// future report cleanly separates a correct pull from an incorrect one,
-// build a per-player learned-spot check (same shape as
-// TELE_TROUNCING_BAIT_RADIUS/MIN_RADIUS above) rather than a hardcoded
-// N/S/E/W-by-slot table, since the fixed-slot assumption already failed
-// once here.
+// confirmed — no ruling was recorded either way for this pull.
+//
+// **Melee/ranged partner pairing is now computed dynamically, not from a
+// fixed slot table (fixed 2026-07-31).** The M1/M2 label flip above was
+// real but harmless to the geometry — Sonder and Kade never actually
+// swap spots, only which of them detectFFRoles calls M1 vs M2 that pull.
+// A hardcoded MT->R1/OT->R2/M1->H1/M2->H2 table broke on that flip
+// though: it pairs by LABEL, so if H1/H2 (or M1/M2) draw a different
+// label than the report's earlier pulls, it silently pairs the wrong two
+// people and the description names the wrong "partner". Fixed by pairing
+// each melee with whichever ranged player is bearing-closest to them at
+// the snapshot (and vice versa, independently) instead of by slot name —
+// self-corrects regardless of which label either side drew. See
+// rangedPartnerOfMelee/meleePartnerOfRanged in
+// detectTeleTrouncingBaitPositionErrors.
 //
 // What IS built for now: a simple Raid-severity cutoff (same shape as
 // CONFETTI_LOST/GRAVEN_1_DEATH_WIPE) on a death to either side's own
@@ -3538,12 +3547,6 @@ function detectTeleTrouncingDeathWipeError(deathEvents: DeathEvent[], enemyCasts
 // meleeSlot's own STRATEGIC ranged partner — see module header's "FIXED
 // BAIT positions" paragraph. Not a mechanic-enforced pairing, just the
 // strategy's intended anchor.
-const TELE_TROUNCING_BAIT_RANGED_PARTNER_BY_MELEE_SLOT: Readonly<Record<string, FFRoleSlot>> = {
-  MT: "R1",
-  OT: "R2",
-  M1: "H1",
-  M2: "H2",
-};
 const TELE_TROUNCING_BAIT_MELEE_SLOTS: readonly FFRoleSlot[] = ["MT", "OT", "M1", "M2"];
 
 const TELE_TROUNCING_BAIT_RANGED_SLOTS: readonly FFRoleSlot[] = ["R1", "R2", "H1", "H2"];
@@ -3590,6 +3593,45 @@ function detectTeleTrouncingBaitPositionErrors(players: PlayerInfo[], enemyCasts
     posBySlot.set(slot, toRelativeYalms(pos.x, pos.y));
   }
 
+  // The strategy pairs melee/ranged by shared N/E/S/W ring SIDE, not by
+  // role-slot label — detectFFRoles can flip which of two same-role
+  // players gets called M1 vs M2 (or H1 vs H2) pull-to-pull even though
+  // their actual bait spot never moves (see module header, "What did NOT
+  // make it into a rule"). A fixed slot->slot table would then pair the
+  // wrong two people whenever that flip happens. So pair dynamically by
+  // bearing instead, as a proper one-to-one MATCHING (not two independent
+  // "nearest" lookups — that can let two different ranged players both
+  // pick the same melee as their bearing-nearest while that melee's own
+  // nearest-ranged is a third player, producing a description that names
+  // one ranged player but reports another's distance). Greedily pair off
+  // the globally closest bearing (melee, ranged) combo first, repeating
+  // until all 4 pairs are assigned — self-corrects regardless of which
+  // label either side drew this pull, and stays symmetric both ways.
+  const bearingBySlot = new Map<FFRoleSlot, number>();
+  for (const [slot, pos] of rawPosBySlot) {
+    bearingBySlot.set(slot, compassBearingOf(pos.x, pos.y));
+  }
+  const rangedPartnerOfMelee = new Map<FFRoleSlot, FFRoleSlot>();
+  const meleePartnerOfRanged = new Map<FFRoleSlot, FFRoleSlot>();
+  {
+    const candidates: { m: FFRoleSlot; r: FFRoleSlot; diff: number }[] = [];
+    for (const m of TELE_TROUNCING_BAIT_MELEE_SLOTS) {
+      const mBearing = bearingBySlot.get(m);
+      if (mBearing === undefined) continue;
+      for (const r of TELE_TROUNCING_BAIT_RANGED_SLOTS) {
+        const rBearing = bearingBySlot.get(r);
+        if (rBearing === undefined) continue;
+        candidates.push({ m, r, diff: angularDistance(mBearing, rBearing) });
+      }
+    }
+    candidates.sort((a, b) => a.diff - b.diff);
+    for (const { m, r } of candidates) {
+      if (rangedPartnerOfMelee.has(m) || meleePartnerOfRanged.has(r)) continue;
+      rangedPartnerOfMelee.set(m, r);
+      meleePartnerOfRanged.set(r, m);
+    }
+  }
+
   // For each melee: distance to their own ranged partner, and the
   // nearest OTHER melee (+ that distance) — used both to decide whether
   // this melee is at risk, and to check mutuality below.
@@ -3597,8 +3639,8 @@ function detectTeleTrouncingBaitPositionErrors(players: PlayerInfo[], enemyCasts
   const readings = new Map<FFRoleSlot, MeleeReading>();
   for (const m of TELE_TROUNCING_BAIT_MELEE_SLOTS) {
     const mPos = posBySlot.get(m);
-    const rangedSlot = TELE_TROUNCING_BAIT_RANGED_PARTNER_BY_MELEE_SLOT[m];
-    const rPos = posBySlot.get(rangedSlot);
+    const rangedSlot = rangedPartnerOfMelee.get(m);
+    const rPos = rangedSlot ? posBySlot.get(rangedSlot) : undefined;
     if (!mPos || !rPos) continue;
 
     let nearestOtherSlot: FFRoleSlot | null = null;
@@ -3614,15 +3656,10 @@ function detectTeleTrouncingBaitPositionErrors(players: PlayerInfo[], enemyCasts
     readings.set(m, { ownPartnerDist: pointDistance(mPos, rPos), nearestOtherSlot, nearestOtherDist });
   }
 
-  const meleeSlotOfRanged = new Map<FFRoleSlot, FFRoleSlot>();
-  for (const [meleeSlot, rangedSlot] of Object.entries(TELE_TROUNCING_BAIT_RANGED_PARTNER_BY_MELEE_SLOT)) {
-    meleeSlotOfRanged.set(rangedSlot as FFRoleSlot, meleeSlot as FFRoleSlot);
-  }
-
   const errors: PullError[] = [];
   for (const rangedSlot of TELE_TROUNCING_BAIT_RANGED_SLOTS) {
     const ranged = bySlot.get(rangedSlot);
-    const meleeSlot = meleeSlotOfRanged.get(rangedSlot);
+    const meleeSlot = meleePartnerOfRanged.get(rangedSlot);
     const melee = meleeSlot ? bySlot.get(meleeSlot) : undefined;
     if (!ranged || !melee || !meleeSlot) continue;
 
@@ -3676,8 +3713,8 @@ function detectTeleTrouncingBaitPositionErrors(players: PlayerInfo[], enemyCasts
   // TELE_TROUNCING_BAIT_MIN_RADIUS_THRESHOLD_YALMS.
   for (const meleeSlot of TELE_TROUNCING_BAIT_MELEE_SLOTS) {
     const melee = bySlot.get(meleeSlot);
-    const rangedSlot = TELE_TROUNCING_BAIT_RANGED_PARTNER_BY_MELEE_SLOT[meleeSlot];
-    const ranged = bySlot.get(rangedSlot);
+    const rangedSlot = rangedPartnerOfMelee.get(meleeSlot);
+    const ranged = rangedSlot ? bySlot.get(rangedSlot) : undefined;
     if (!melee || !ranged) continue;
 
     const meleeRawPos = rawPosBySlot.get(meleeSlot);
