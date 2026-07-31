@@ -8,7 +8,7 @@
 // BurgerMenu's "Manage Statics" dialog — the "View" link there routes here.
 
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import StaticErrorChart, { type ChartPull } from "@/components/StaticErrorChart";
 import StaticPlayersPanel from "@/components/StaticPlayersPanel";
@@ -59,6 +59,12 @@ function groupIntoSessions(pulls: ChartPull[], reviews: ReviewSummary[]): Sessio
 export default function StaticDashboardPage() {
   const params = useParams();
   const staticId = Number(params.staticId);
+  // Round-tripped from ManageStaticsDialog's "View" link — lets Back
+  // restore the report that was open before navigating here (see
+  // app/page.tsx's session-restore effect) instead of landing on a blank
+  // page.
+  const fromSessionId = useSearchParams().get("session");
+  const backHref = fromSessionId ? `/?session=${fromSessionId}&restore=1` : "/";
 
   const [staticInfo, setStaticInfo] = useState<StaticInfo | null>(null);
   const [reviews, setReviews] = useState<ReviewSummary[] | null>(null);
@@ -130,7 +136,7 @@ export default function StaticDashboardPage() {
   return (
     <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "32px 20px", color: "#eee" }}>
       <div style={{ marginBottom: "20px" }}>
-        <Link href="/" style={{ color: "#888", fontSize: "13px", textDecoration: "none" }}>&larr; Back</Link>
+        <Link href={backHref} style={{ color: "#888", fontSize: "13px", textDecoration: "none" }}>&larr; Back</Link>
         <h1 style={{ margin: "6px 0 0", fontSize: "24px" }}>{staticInfo?.name ?? "Loading..."}</h1>
       </div>
 

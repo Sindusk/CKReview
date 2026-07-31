@@ -45,10 +45,13 @@ export type StaticReviewPullData = {
  * raid-wipe cutoff used by the Report tab (see report-data.ts's
  * getPullRaidCutoff): once the earliest Raid-severity error has fired,
  * anything after it is dropped, Major or Minor, since the raid is already
- * wiping by that point. Only players with at least one counted error get a
- * row (same as before) — but each row's job/spec/role is looked up from
- * Pull.players rather than the error itself, since a Raid-severity error
- * (the only kind allowed to have no player) never carries one.
+ * wiping by that point.
+ *
+ * Every roster player gets a row (even 0/0), not just ones with a counted
+ * error — the Players panel's "pulls they were in" / error-rate stats need
+ * genuine participation counts to mean anything once substitutes are in
+ * the mix, and a player who only ever had 0 errors would otherwise never
+ * appear at all.
  */
 export function computeStaticReviewPullData(pulls: Pull[]): StaticReviewPullData[] {
   return pulls.map((pull) => {
@@ -66,19 +69,19 @@ export function computeStaticReviewPullData(pulls: Pull[]): StaticReviewPullData
       counts.set(e.player, entry);
     }
 
-    const players: StaticReviewPullPlayerErrorData[] = Array.from(counts.entries()).map(
-      ([player, c]) => {
-        const info = pull.players.find((p) => p.name === player);
+    const players: StaticReviewPullPlayerErrorData[] = pull.players
+      .filter((p) => p.name !== "Multiple Players" && p.specName !== "LimitBreak" && p.specName !== "Limit Break")
+      .map((p) => {
+        const c = counts.get(p.name);
         return {
-          player,
-          className:  info?.className,
-          specId:     info?.specId,
-          role:       info?.role,
-          majorCount: c.major,
-          minorCount: c.minor,
+          player:     p.name,
+          className:  p.className,
+          specId:     p.specId,
+          role:       p.role,
+          majorCount: c?.major ?? 0,
+          minorCount: c?.minor ?? 0,
         };
-      }
-    );
+      });
 
     return {
       fightId:       pull.fightId,

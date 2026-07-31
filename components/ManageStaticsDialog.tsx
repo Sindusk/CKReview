@@ -19,11 +19,15 @@ type StaticSummary = {
 };
 
 type ManageStaticsDialogProps = {
-  open:    boolean;
-  onClose: () => void;
+  open:      boolean;
+  // Current report session, if any — carried into the static dashboard's
+  // URL so its "Back" link can round-trip it (see app/statics/[staticId]/
+  // page.tsx), restoring the report instead of landing on a blank page.
+  sessionId: string | null;
+  onClose:   () => void;
 };
 
-export default function ManageStaticsDialog({ open, onClose }: ManageStaticsDialogProps) {
+export default function ManageStaticsDialog({ open, sessionId, onClose }: ManageStaticsDialogProps) {
   const [statics, setStatics] = useState<StaticSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
@@ -177,7 +181,7 @@ export default function ManageStaticsDialog({ open, onClose }: ManageStaticsDial
                 </div>
                 <div style={{ display: "flex", gap: "8px" }}>
                   <Link
-                    href={`/statics/${s.id}`}
+                    href={sessionId ? `/statics/${s.id}?session=${sessionId}` : `/statics/${s.id}`}
                     onClick={onClose}
                     style={{
                       backgroundColor: "transparent",
