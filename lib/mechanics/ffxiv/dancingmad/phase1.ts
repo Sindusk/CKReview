@@ -3684,11 +3684,30 @@ function detectTeleTrouncingBaitPositionErrors(players: PlayerInfo[], enemyCasts
     const tooCloseRadius = meleeRawPos ? distanceFromCenter(meleeRawPos.x, meleeRawPos.y) / 100 : null;
     if (tooCloseRadius === null || tooCloseRadius >= TELE_TROUNCING_BAIT_MIN_RADIUS_THRESHOLD_YALMS) continue;
 
+    const parts: string[] = [
+      `Stood roughly ${tooCloseRadius.toFixed(1)} yalms from the boss for the Tele-Trouncing bait — too close in, should hang back near ${ranged.name} for the bait to line up.`,
+    ];
+
+    // Same cross-latch reading already computed for the ranged-side check
+    // above — a melee standing too close in is often ALSO the one who
+    // ends up nearer some other melee than their own ranged partner
+    // (confirmed pull 14: Salty Dango walked to and killed Kade Kansado
+    // instead of baiting onto Chauzey Solstice). Report it here too so the
+    // description names who they actually end up drawn to, not just the
+    // raw distance.
+    const reading = readings.get(meleeSlot);
+    const otherMelee = reading?.nearestOtherSlot ? bySlot.get(reading.nearestOtherSlot) : undefined;
+    if (reading && otherMelee && reading.nearestOtherDist < reading.ownPartnerDist) {
+      parts.push(
+        `${melee.name} was ${reading.ownPartnerDist.toFixed(1)} yalms from ${ranged.name}, but only ${reading.nearestOtherDist.toFixed(1)} yalms from ${otherMelee.name} — risks being drawn to ${otherMelee.name} instead if Confused.`
+      );
+    }
+
     errors.push({
       ruleId:      TELE_TROUNCING_BAIT_POSITION_RULE_ID,
       severity:    "Major",
       name:        "Tele-Trouncing Bait Position",
-      description: `Stood roughly ${tooCloseRadius.toFixed(1)} yalms from the boss for the Tele-Trouncing bait — too close in, should hang back near ${ranged.name} for the bait to line up.`,
+      description: parts.join(" "),
       timestamp:   snapshotTime,
       player:      melee.name,
       class:       melee.className,
