@@ -408,7 +408,20 @@ export function detectWaveCannonMitigationIssueErrors(players: PlayerInfo[], dea
   if (victims.length === 0) return [];
 
   const names = victims.map((v) => v.player.name);
-  const timestamp = Math.max(...victims.map((v) => v.timestamp));
+  // Anchor on the DEATH, not the beam hit — confirmed (h2JvDkntZCaBgmLF pull
+  // 5) the two can be ~2s apart (a delayed kill), and mitigation-detection.ts's
+  // own "Missed Mitigation" Minor error for the same death anchors on the
+  // death too. Anchoring this Raid error on the earlier hit instead put it
+  // BEFORE the Minor error that explains it, so report-data.ts's raid-cutoff
+  // (anything after the earliest Raid error is dropped) silently ate the
+  // real root-cause Minor error. Same "anchor on the latest thing this error
+  // depends on" pattern phase1.ts's REVOLTING_RUIN_NON_TANK_DEATH already uses.
+  const timestamp = Math.max(
+    ...victims.map((v) => {
+      const death = deathEvents.find((d) => d.player === v.player.name && d.killingAbilityGameId === WAVE_CANNON_ABILITY_ID);
+      return death ? death.timestamp : v.timestamp;
+    })
+  );
 
   return [
     {
