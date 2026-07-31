@@ -72,30 +72,37 @@ export default function useTimelineController({
   // Playback time in MS for AnalysisPanel event comparisons
   const playbackTimeMs = useMemo(() => playbackTime * 1000, [playbackTime]);
 
-  // ─── Seek to pull start when pull or vod changes ──────────────────────────
-
-  // Tracks which pull the previous seek was for, so a VOD swap (pull
-  // unchanged) can be told apart from an actual pull change: swapping VODs
-  // mid-pull should land on the same position in the pull, not jump back
-  // to its start.
+  // ─── Seek to pull position when pull or vod changes ────────────────────────
+  //
+  // Computed DURING RENDER (React's documented "adjust state while
+  // rendering" pattern — https://react.dev/learn/you-might-not-need-an-effect)
+  // instead of in a useEffect. VideoPanel is a child component, and within
+  // one commit a child's effects fire BEFORE its parent's. If this seek
+  // target were only computed in an effect here, VideoPanel's own
+  // create/swap effect would run first and see the PREVIOUS render's
+  // (stale) seekRequest — for a VOD swap that stale target belongs to the
+  // old VOD's offset and can easily be wrong or clamp to 0 on the new
+  // video, with the correction only landing a render later. Computing it
+  // here means the SAME render that gives VideoPanel a new `vod` prop also
+  // gives it the right `seekRequest`, no race.
   const prevPullIdRef = useRef<number | null>(null);
-  const playbackTimeRef = useRef(playbackTime);
-  playbackTimeRef.current = playbackTime;
+  const autoSeekKeyRef = useRef<string | null>(null);
+  const autoSeekKey = vod && pull ? `${vod.id}:${pull.id}` : null;
 
-  useEffect(() => {
-    if (!vod || !pull) return;
-
-    // Only auto-seek if the VOD is calibrated; otherwise leave video where it is
-    if (!vod.isCalibrated) return;
+  if (vod && pull && vod.isCalibrated && autoSeekKey !== autoSeekKeyRef.current) {
+    autoSeekKeyRef.current = autoSeekKey;
 
     const pullChanged = prevPullIdRef.current !== pull.id;
     prevPullIdRef.current = pull.id;
 
-    const withinPull = pullChanged ? 0 : playbackTimeRef.current;
+    const withinPull = pullChanged ? 0 : playbackTime;
     if (pullChanged) setPlaybackTime(0);
 
-    emitSeek((vod.offset ?? 0) + pull.startTime + withinPull);
-  }, [vod?.id, pull?.id]);
+    seekTokenRef.current += 1;
+    const target = (vod.offset ?? 0) + pull.startTime + withinPull;
+    pendingSeekRef.current = { time: target, issuedAt: Date.now() };
+    setSeekRequest({ time: target, token: seekTokenRef.current });
+  }
 
   // Reset playback when pull is cleared
   useEffect(() => {
@@ -103,6 +110,7 @@ export default function useTimelineController({
       setPlaybackTime(0);
       setSeekRequest(null);
       prevPullIdRef.current = null;
+      autoSeekKeyRef.current = null;
     }
   }, [pull?.id]);
 
