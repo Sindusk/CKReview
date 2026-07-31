@@ -1318,29 +1318,36 @@ function nearestPlayerPosition(events: PlayerEvent[], timestamp: number): Point 
   return best ? toRelativeYalms(best.x!, best.y!) : null;
 }
 
-// Clean max observed (a consistently "sloppy" Paladin's corner arrow) is
-// ~6.6 yalms. Originally set to 10 on a wide margin below the confirmed
-// failure minimum of ~13.9-18.5 — but that gap turned out to hide a real,
-// closer-in failure: report xXV3mdnZvFJ8czBP pull 17's Monk dropped their
-// S arrow at only ~8.3 yalms off (still on-angle-adjacent, just short of
-// the correct grid cell — landed at an inner (6,-6) point instead of the
-// NE corner's (12,-12)), which the old threshold missed entirely and which
-// caused a real wipe (a raid member fell through the arena ~9s after the
-// last arrow landed, the same "jumped off arena" signature Tele-Trouncing
-// failures always produce). 7.5 splits the now 3-tier-confirmed data
-// (6.6 clean / 8.3 failure / 13.9+ failure) with margin on both sides of
-// the closer gap.
-const ARROW_OUT_OF_POSITION_THRESHOLD_YALMS = 7.5;
+// Originally 7.5, splitting a 3-tier dataset (6.6 clean / 8.3 failure /
+// 13.9+ failure) with margin on both sides — see history below. Lowered to
+// 4.5, 2026-07-31 (report h2JvDkntZCaBgmLF pull 10): per the user, having
+// checked both the VOD and analyzer.wtfdig.info directly, Sonder Dreams's W
+// arrow (4.60y off — (7.58,10.73) vs its (12,12) slot) was a real placement
+// mistake, not jitter. A full survey across every sampled report found NO
+// natural gap anywhere in the corner-arrow deviation range at all — it's a
+// dense, unbroken continuum from ~3y to ~8y (e.g. a 5.85y Sonder reading in
+// this SAME report's pull 49, and a 6.86y Dango reading in pull 9, neither
+// individually VOD-reviewed) — so unlike the original 7.5 pick, this
+// threshold can no longer claim a confirmed clean/failure split. Per the
+// user's explicit choice, lowered just enough to catch the one confirmed
+// case, accepting that this will also newly flag a number of other,
+// not-yet-VOD-reviewed pulls across other reports — those get triaged as
+// the per-pull review reaches them, same as any other rule surfacing a
+// previously-silent case.
+const ARROW_OUT_OF_POSITION_THRESHOLD_YALMS = 4.5;
 
 // "Double-D" (same cardinal direction twice) arrows sit much more tightly
-// on their slot than corner arrows across every report sampled — clean max
-// observed is ~1.8 yalms (vs corner's ~5.9), so this case gets its OWN,
-// much tighter threshold rather than sharing the corner one above.
-// Confirmed 2026-07-22 (report G7kTFVxjcAC6p1MN, pull 1): a Paladin's
-// double-North arrows, both pulled in too far toward the boss, deviated
-// ~4.1 and ~2.4 yalms — comfortably above this line, comfortably below
-// what the corner threshold would have required to catch the same mistake.
-const ARROW_DOUBLE_OUT_OF_POSITION_THRESHOLD_YALMS = 2;
+// on their slot than corner arrows across every report sampled. Originally
+// 2, splitting a confirmed clean max (~1.8) from a confirmed failure min
+// (~2.4, report G7kTFVxjcAC6p1MN pull 1) — see history below. Lowered to
+// 1.75, 2026-07-31 (same h2JvDkntZCaBgmLF pull 10 review): Salty Dango's
+// 2nd (W) arrow deviated 1.80y, confirmed a real mistake by the user via
+// VOD + analyzer.wtfdig.info — landing almost exactly on the old "clean
+// max" data point. Same dense-continuum finding as the corner threshold
+// above (no gap anywhere in the 1-3y range); lowered just enough to catch
+// this one confirmed case, same "accept broader flagging, triage as
+// reviewed" tradeoff.
+const ARROW_DOUBLE_OUT_OF_POSITION_THRESHOLD_YALMS = 1.75;
 
 type RevoltingRuinOccurrence = {
   start:             number;
