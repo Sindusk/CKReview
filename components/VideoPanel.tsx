@@ -16,15 +16,11 @@ type YTPlayer = {
   seekTo(seconds: number, allowSeekAhead: boolean): void;
   playVideo(): void;
   getCurrentTime(): number;
+  getDuration(): number;
   loadVideoById(options: { videoId: string; startSeconds?: number }): void;
 };
 
 type YTPlayerEvent = {
-  target: YTPlayer;
-};
-
-type YTOnStateChangeEvent = {
-  data: number;
   target: YTPlayer;
 };
 
@@ -81,18 +77,34 @@ export default function VideoPanel({
   const latestSeekRef = useRef<SeekRequest | null>(seekRequest);
   latestSeekRef.current = seekRequest;
 
-  // Set right before a loadVideoById() reuse-swap. VideoPanel is a child
-  // component, so its effects run BEFORE the parent hook's effect that
-  // recomputes the correct seek target for the new VOD — meaning the
-  // startSeconds passed to loadVideoById here is often one render stale.
-  // A seekTo() issued immediately after (from the SEEK HANDLER effect,
-  // once the corrected target lands) can get silently dropped because the
-  // player is still loading the newly-swapped video. This flag makes the
-  // NEXT state-change event re-apply whatever the freshest known target is
-  // (read at fire time, so it's correct by then) exactly once.
-  const awaitingReuseLoadRef = useRef(false);
+  // Bumped on every reuse-swap so an in-flight readiness poll (below) from
+  // an earlier swap can tell it's been superseded and stop.
+  const swapGenerationRef = useRef(0);
 
   const [playerReady, setPlayerReady] = useState(false);
+
+  /**
+   * Polls getDuration() until it's non-zero — the reliable signal that a
+   * freshly loadVideoById()'d video has actually loaded its metadata —
+   * then applies the exact target seek. Calling seekTo() any earlier
+   * (e.g. from the first onStateChange event) gets silently dropped by
+   * the YouTube IFrame API and the video just plays from 0 instead.
+   */
+  function seekOnceReady(generation: number) {
+    const player = playerRef.current;
+    if (!player || swapGenerationRef.current !== generation) return;
+
+    if (player.getDuration() > 0) {
+      const target = latestSeekRef.current?.time;
+      if (target !== undefined) {
+        player.seekTo(target, true);
+        player.playVideo();
+      }
+      return;
+    }
+
+    setTimeout(() => seekOnceReady(generation), 50);
+  }
 
   /**
    * =========================
@@ -121,13 +133,11 @@ export default function VideoPanel({
 
     // Reuse the existing player: swap the video in place.
     if (playerRef.current && playerReadyRef.current) {
-      awaitingReuseLoadRef.current = true;
-      console.log(`[VideoPanel] REUSE swap videoId=${vod.videoId} startTime=${startTime} seekRequest.time=${seekRequest?.time} seekRequest.token=${seekRequest?.token}`);
+      swapGenerationRef.current += 1;
       playerRef.current.loadVideoById({ videoId: vod.videoId, startSeconds: startTime });
+      seekOnceReady(swapGenerationRef.current);
       return;
     }
-
-    console.log(`[VideoPanel] CREATE new player videoId=${vod.videoId} startTime=${startTime} seekRequest.time=${seekRequest?.time} hadPlayer=${!!playerRef.current} wasReady=${playerReadyRef.current}`);
 
     if (!containerRef.current) return;
 
@@ -164,20 +174,6 @@ export default function VideoPanel({
             }
             event.target.playVideo();
           },
-
-          onStateChange: (event: YTOnStateChangeEvent) => {
-            const curTime = playerRef.current?.getCurrentTime();
-            console.log(`[VideoPanel] onStateChange data=${event.data} awaiting=${awaitingReuseLoadRef.current} target=${latestSeekRef.current?.time} currentTime=${curTime}`);
-            if (!awaitingReuseLoadRef.current || !playerRef.current) return;
-            awaitingReuseLoadRef.current = false;
-
-            const target = latestSeekRef.current?.time;
-            if (target !== undefined) {
-              console.log(`[VideoPanel] onStateChange applying correction seekTo(${target})`);
-              playerRef.current.seekTo(target, true);
-              playerRef.current.playVideo();
-            }
-          },
         }
       });
     });
@@ -207,11 +203,9 @@ export default function VideoPanel({
    * "play, backtrack, play again" stutter.
    */
   useEffect(() => {
-    console.log(`[VideoPanel] SEEK HANDLER effect time=${seekRequest?.time} token=${seekRequest?.token} hasPlayer=${!!playerRef.current} ready=${playerReadyRef.current}`);
     if (seekRequest === null) return;
     if (!playerRef.current || !playerReadyRef.current) return;
 
-    console.log(`[VideoPanel] SEEK HANDLER calling seekTo(${seekRequest.time})`);
     playerRef.current.seekTo(seekRequest.time, true);
     playerRef.current.playVideo();
   }, [seekRequest]);
