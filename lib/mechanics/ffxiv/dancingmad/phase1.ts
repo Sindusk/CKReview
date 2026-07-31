@@ -666,16 +666,30 @@
 // melee's pair (Azura, Archidel) — their job was to stay close enough to
 // keep their own melee anchored, and neither did.
 //
-// A first version of this check used a simple radius-from-center threshold
-// instead (flagging any ranged player past ~18y), which also caught Chauzey
-// Solstice (R1, MT Salty Dango's partner) this same pull — but Dango's own
-// nearest OTHER melee (Kade, 11.8y) was still farther than his distance to
-// Chauzey (7.7y), so no actual cross-latch risk existed for that pair
-// despite Chauzey also standing far from center. The radius-only version
-// couldn't tell "far from center" apart from "actually at risk of a
-// cross-latch" — replaced with the relative melee-to-melee comparison
-// above, which naturally excludes Chauzey while still catching the 2
-// confirmed-real cases. See detectTeleTrouncingBaitPositionErrors.
+// **A second, INDEPENDENT check is also needed — per the user, the two
+// aren't a replacement for each other.** Chauzey Solstice (R1) standing
+// ~18.4y from center this same pull is STILL wrong even though it never
+// produced an actual cross-latch (Dango's own distance to Chauzey, 7.7y,
+// stayed under his distance to any other melee, 11.8y+) — the strategy
+// requires the ranged player to stay in close regardless of outcome, and
+// Dango not drifting far enough to lose that comparison is itself partly
+// luck (Dango was ALSO somewhat out of position this pull) rather than
+// something that makes Chauzey's placement acceptable. So this rule runs
+// BOTH checks per ranged/melee pair, independently:
+// 1. **Radius-from-center** (TELE_TROUNCING_BAIT_RADIUS_THRESHOLD_YALMS) —
+//    fires regardless of the melee-side geometry; description says this
+//    risks the strategy generally.
+// 2. **Relative melee-to-melee** (as above) — fires only when an actual
+//    cross-latch risk exists; description states the exact distance from
+//    the ranged player's melee partner to them, and the melee partner's
+//    distance to whichever other melee is now nearer (e.g. Archidel
+//    Del'archi's error names both her distance to Kade Kansado AND Kade's
+//    distance to Sonder Dreams), phrased as a mutual attack when the other
+//    melee independently prefers the same swap back.
+// A ranged player can fail either, both, or neither independently — pull
+// 10's 3 confirmed failures: Chauzey (radius only), Azura and Archidel
+// (both). Ayumi (R2) fails neither. See
+// detectTeleTrouncingBaitPositionErrors.
 //
 // What IS built for now: a simple Raid-severity cutoff (same shape as
 // CONFETTI_LOST/GRAVEN_1_DEATH_WIPE) on a death to either side's own
@@ -1311,6 +1325,21 @@ const TELE_TROUNCING_BAIT_POSITION_WINDOW_MS = 4000;
 // every other Tele-Trouncing rule in this file), but worth having a named
 // constant for any future verification/debug work.
 const TELE_TROUNCING_CONFUSED_ATTACK_ABILITY_ID = 50445;
+
+// Independent of the relative (melee-to-melee) check below: the strategy
+// itself requires the ranged-side player to stay within a certain distance
+// of the boss, regardless of whether any specific pull's melee geometry
+// happens to also produce a cross-latch — confirmed pull 10, Chauzey
+// Solstice (R1) stood ~18.4y from center (same as Azura/Archidel that
+// pull) but her melee partner Salty Dango never actually lost the
+// nearest-ally comparison, since HE also happened to stay close in. Per
+// the user: that doesn't make Chauzey's positioning correct — Dango
+// staying in is partly BECAUSE he drifted less than expected himself, not
+// something Chauzey should get credit for. Confirmed-good ranged-side
+// readings: ~14.9y (Q3GzJNZg64k1hLRm pull 41, Archidel Del'archi/H2) and
+// ~17.5y (h2JvDkntZCaBgmLF pull 10, Ayumi Emi/R2). Confirmed-bad: ~18.4-
+// 18.5y (same pull 10, the other 3 ranged players). 18 splits the two.
+const TELE_TROUNCING_BAIT_RADIUS_THRESHOLD_YALMS = 18;
 
 // Same clustering window as MYSTERY_MAGIC_VOLLEY_CLUSTER_MS — this pull's
 // own 4 simultaneous deaths landed within 45ms of each other, comfortably
@@ -3435,13 +3464,22 @@ const TELE_TROUNCING_BAIT_RANGED_PARTNER_BY_MELEE_SLOT: Readonly<Record<string, 
 };
 const TELE_TROUNCING_BAIT_MELEE_SLOTS: readonly FFRoleSlot[] = ["MT", "OT", "M1", "M2"];
 
+const TELE_TROUNCING_BAIT_RANGED_SLOTS: readonly FFRoleSlot[] = ["R1", "R2", "H1", "H2"];
+
 /**
- * Detects a melee (MT/OT/M1/M2) whose distance to some OTHER melee is
- * LESS than their distance to their own strategic ranged partner at the
- * Tele-Trouncing resolution's Will cast — see module header (search "BAIT
- * POSITION") for the mechanic and confirmed failure case. Fault is
- * attributed to the RANGED side of the affected pair (their job was to
- * stay close enough to keep their melee anchored), not the melee itself.
+ * Detects a ranged-side player (R1/R2/H1/H2) failing either or both of 2
+ * INDEPENDENT checks at the Tele-Trouncing resolution's Will cast — see
+ * module header (search "BAIT POSITION") for the mechanic and confirmed
+ * failure case:
+ * 1. Radius-from-center past TELE_TROUNCING_BAIT_RADIUS_THRESHOLD_YALMS —
+ *    the strategy itself requires staying this close, regardless of
+ *    whether this pull's melee-side geometry happens to also produce a
+ *    cross-latch.
+ * 2. Their own melee partner ending up closer to some OTHER melee than to
+ *    them — the actual mechanical risk (a Confused player latches onto
+ *    whichever ally is nearest, not their intended partner specifically).
+ * A ranged player can fail either, both, or neither; the description
+ * reports whichever check(s) actually fired.
  */
 function detectTeleTrouncingBaitPositionErrors(players: PlayerInfo[], enemyCasts: EnemyEvent[]): PullError[] {
   const willCastTimes = enemyCasts.filter((e) => TELE_TROUNCING_WILL_ABILITY_IDS.includes(e.abilityId)).map((e) => e.timestamp);
@@ -3465,11 +3503,14 @@ function detectTeleTrouncingBaitPositionErrors(players: PlayerInfo[], enemyCasts
     });
 
   const posBySlot = new Map<FFRoleSlot, Point>();
-  for (const slot of [...TELE_TROUNCING_BAIT_MELEE_SLOTS, "R1", "R2", "H1", "H2"] as FFRoleSlot[]) {
+  const rawPosBySlot = new Map<FFRoleSlot, Point>(); // un-converted (FFLogs raw centi-yalms), for the radius check
+  for (const slot of [...TELE_TROUNCING_BAIT_MELEE_SLOTS, ...TELE_TROUNCING_BAIT_RANGED_SLOTS]) {
     const player = bySlot.get(slot);
     if (!player) continue;
     const pos = positionOf(player);
-    if (pos) posBySlot.set(slot, toRelativeYalms(pos.x, pos.y));
+    if (!pos) continue;
+    rawPosBySlot.set(slot, pos);
+    posBySlot.set(slot, toRelativeYalms(pos.x, pos.y));
   }
 
   // For each melee: distance to their own ranged partner, and the
@@ -3496,31 +3537,52 @@ function detectTeleTrouncingBaitPositionErrors(players: PlayerInfo[], enemyCasts
     readings.set(m, { ownPartnerDist: pointDistance(mPos, rPos), nearestOtherSlot, nearestOtherDist });
   }
 
+  const meleeSlotOfRanged = new Map<FFRoleSlot, FFRoleSlot>();
+  for (const [meleeSlot, rangedSlot] of Object.entries(TELE_TROUNCING_BAIT_RANGED_PARTNER_BY_MELEE_SLOT)) {
+    meleeSlotOfRanged.set(rangedSlot as FFRoleSlot, meleeSlot as FFRoleSlot);
+  }
+
   const errors: PullError[] = [];
-  for (const m of TELE_TROUNCING_BAIT_MELEE_SLOTS) {
-    const reading = readings.get(m);
-    if (!reading || reading.nearestOtherSlot === null) continue;
-    if (reading.nearestOtherDist >= reading.ownPartnerDist) continue; // own partner still nearest — fine
-
-    const rangedSlot = TELE_TROUNCING_BAIT_RANGED_PARTNER_BY_MELEE_SLOT[m];
+  for (const rangedSlot of TELE_TROUNCING_BAIT_RANGED_SLOTS) {
     const ranged = bySlot.get(rangedSlot);
-    const melee = bySlot.get(m);
-    const otherMelee = bySlot.get(reading.nearestOtherSlot);
-    if (!ranged || !melee || !otherMelee) continue;
+    const meleeSlot = meleeSlotOfRanged.get(rangedSlot);
+    const melee = meleeSlot ? bySlot.get(meleeSlot) : undefined;
+    if (!ranged || !melee || !meleeSlot) continue;
 
-    // Mutual: the other melee ALSO prefers this melee's proximity over
-    // their own ranged partner — the confirmed pull-10 shape (2 melees
-    // drifting toward each other, killing each other with basic attacks).
-    const otherReading = readings.get(reading.nearestOtherSlot);
-    const mutual = !!otherReading && otherReading.nearestOtherSlot === m && otherReading.nearestOtherDist < otherReading.ownPartnerDist;
+    const rangedRawPos = rawPosBySlot.get(rangedSlot);
+    const tooFarRadius = rangedRawPos ? distanceFromCenter(rangedRawPos.x, rangedRawPos.y) / 100 : null;
+    const tooFar = tooFarRadius !== null && tooFarRadius > TELE_TROUNCING_BAIT_RADIUS_THRESHOLD_YALMS;
+
+    const reading = readings.get(meleeSlot);
+    const otherMelee = reading?.nearestOtherSlot ? bySlot.get(reading.nearestOtherSlot) : undefined;
+    const crossLatch = !!reading && reading.nearestOtherSlot !== null && reading.nearestOtherDist < reading.ownPartnerDist && !!otherMelee;
+
+    if (!tooFar && !crossLatch) continue;
+
+    const parts: string[] = [];
+    if (tooFar) {
+      parts.push(`Stood roughly ${tooFarRadius!.toFixed(1)} yalms from the boss for the Tele-Trouncing bait — too far out, risking the strategy.`);
+    }
+    if (crossLatch && reading && otherMelee) {
+      // Mutual: the other melee ALSO prefers this melee's proximity over
+      // their own ranged partner — the confirmed pull-10 shape (2 melees
+      // drifting toward each other, killing each other with basic attacks).
+      const otherReading = readings.get(reading.nearestOtherSlot!);
+      const mutual = !!otherReading && otherReading.nearestOtherSlot === meleeSlot && otherReading.nearestOtherDist < otherReading.ownPartnerDist;
+
+      parts.push(
+        `${melee.name} was ${reading.ownPartnerDist.toFixed(1)} yalms from them, but only ${reading.nearestOtherDist.toFixed(1)} yalms from ${otherMelee.name} — ` +
+        (mutual
+          ? `${melee.name} and ${otherMelee.name} will attack each other instead if either is Confused.`
+          : `${melee.name} risks being drawn to ${otherMelee.name} instead if Confused.`)
+      );
+    }
 
     errors.push({
       ruleId:      TELE_TROUNCING_BAIT_POSITION_RULE_ID,
       severity:    "Major",
       name:        "Tele-Trouncing Bait Position",
-      description: mutual
-        ? `Stood too far from ${melee.name} for the Tele-Trouncing bait — ${melee.name} ended up closer to ${otherMelee.name} than to their own ranged partners, so if either is Confused they attack each other instead.`
-        : `Stood too far from ${melee.name} for the Tele-Trouncing bait — ${melee.name} is now closer to ${otherMelee.name} than to them, risking being drawn to ${otherMelee.name} instead if Confused.`,
+      description: parts.join(" "),
       timestamp:   snapshotTime,
       player:      ranged.name,
       class:       ranged.className,
