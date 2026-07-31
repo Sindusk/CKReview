@@ -110,6 +110,7 @@ function buildFFPlayers(rep, actorMap, getFFJobByName, abilityMap) {
         abilityId: e.abilityGameID ?? 0,
         abilityName: resolveAbilityName(e.abilityGameID),
         amount: e.amount ?? 0,
+        source: actorMap.get(e.sourceID)?.name,
         sourceInstance: e.sourceInstance,
         x: e.targetResources?.x,
         y: e.targetResources?.y,
