@@ -59,12 +59,13 @@ function groupIntoSessions(pulls: ChartPull[], reviews: ReviewSummary[]): Sessio
 export default function StaticDashboardPage() {
   const params = useParams();
   const staticId = Number(params.staticId);
-  // Round-tripped from ManageStaticsDialog's "View" link — lets Back
-  // restore the report that was open before navigating here (see
-  // app/page.tsx's session-restore effect) instead of landing on a blank
-  // page.
+  // Round-tripped from ManageStaticsDialog's "View" link — lets Back land
+  // on the session that was open before navigating here (see app/page.tsx's
+  // session-restore effect) instead of a blank page. Pre-fills the import
+  // box/VODs; re-importing the report itself is still a manual click, same
+  // as any other `?session=` link — see that effect's header for why.
   const fromSessionId = useSearchParams().get("session");
-  const backHref = fromSessionId ? `/?session=${fromSessionId}&restore=1` : "/";
+  const backHref = fromSessionId ? `/?session=${fromSessionId}` : "/";
 
   const [staticInfo, setStaticInfo] = useState<StaticInfo | null>(null);
   const [reviews, setReviews] = useState<ReviewSummary[] | null>(null);

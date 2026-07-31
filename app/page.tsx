@@ -380,29 +380,13 @@ export default function Home() {
   }, []);
 
   // Restore a saved session from ?session=<id> on first load. Pre-fills
-  // the import box and restores VODs with their calibration already
-  // applied, but does NOT auto-import by default — re-fetching from
-  // WCL/FFLogs spends real rate-limit points, so a bare page refresh on a
-  // `?session=` URL (which every active session sits on, per the autosave
-  // effect above) shouldn't silently re-spend them.
-  //
-  // The one exception is `&restore=1`, set only by the static dashboard's
-  // "Back" link (see ManageStaticsDialog + app/statics/[staticId]/page.tsx)
-  // — that link exists specifically so navigating away and back doesn't
-  // land on a blank page, so it's worth the extra fetch. The flag is
-  // stripped from the URL right after so a later manual refresh of the same
-  // URL falls back to the normal pre-fill-only behavior.
+  // the import box (does NOT auto-import) and restores VODs with their
+  // calibration already applied. Wipe calls are stashed in a ref and
+  // reattached once the log is actually imported and pulls exist.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const id = params.get("session");
     if (!id) return;
-    const shouldAutoImport = params.get("restore") === "1";
-
-    if (shouldAutoImport) {
-      const url = new URL(window.location.href);
-      url.searchParams.delete("restore");
-      window.history.replaceState({}, "", url.toString());
-    }
 
     (async () => {
       const session = await fetchSession(id);
@@ -414,10 +398,6 @@ export default function Home() {
       setImportInput(session.reportUrl);
       pendingWipeCallsRef.current = session.wipeCalls ?? {};
       pendingManualErrorsRef.current = session.manualErrors ?? {};
-
-      if (shouldAutoImport) {
-        handleImportReport(session.reportUrl, { skipDuplicateCheck: true });
-      }
 
       const restoredVods: Vod[] = session.vods.map((v, i) => {
         const parsedYt = parseYouTubeUrl(v.url);
