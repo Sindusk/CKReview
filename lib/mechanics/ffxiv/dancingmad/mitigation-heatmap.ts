@@ -110,6 +110,19 @@ export function buildMitigationHeatmap(pulls: Pull[], plan: MitigationPlan | nul
     if (entry.cells.size === 0) continue; // never reached in ANY loaded pull — nothing to show
     rows.push({ phaseTitle, mech, cellsByActorId: entry.cells });
   }
+
+  // `flat`'s concatenation order (every phase mechanic, THEN every tank
+  // mechanic) is only a grouping convenience for matchDeathsToMechanics —
+  // it doesn't reflect real pull chronology, since tank-table mechanics
+  // land at the same real moments as phase-tab ones (see
+  // flattenTankMechanics' header comment). The Review tab instead sorts by
+  // each mechanic's real detected anchor time (buildMitigationReview sorts
+  // by anchorMs); this aggregate view has no single "real" anchor to sort
+  // by since it spans many pulls, so it falls back to the sheet's own
+  // static timeSeconds — same relative order, and what keeps e.g. "Black
+  // Holes III" from jumping to 10:50 before "Revolting Ruin III" at 0:16.
+  rows.sort((a, b) => (a.mech.timeSeconds ?? 0) - (b.mech.timeSeconds ?? 0));
+
   return rows;
 }
 
