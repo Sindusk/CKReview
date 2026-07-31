@@ -635,6 +635,23 @@
 // battlefield didn't look right on review, so her reading can't actually
 // be trusted as clean or not.
 //
+// **Which side gets which tag is a per-pull SUPPORT vs DPS split, not
+// fixed to specific players (noted 2026-07-31, h2JvDkntZCaBgmLF pull 14,
+// no detection built yet — just recording the finding for later).**
+// Verified directly from this pull's raw debuffs: Indulgent Will (47797)
+// applied Confused (1001283) to all 4 SUPPORTS (Salty Dango/GNB,
+// Sayacissa Morsaelth/DRK, Archidel Del'archi/SGE, Azura Salus/WHM) —
+// SUPPORT_ROLES, i.e. Tank+Healer, regardless of their Tele-Trouncing
+// bait-side slot (MT/OT are melee-side, H1/H2 are ranged-side). Idyllic
+// Will (47798) tagged all 4 DPS (Sonder Dreams/RPR, Kade Kansado/SAM,
+// Ayumi Emi/PCT, Chauzey Solstice/DNC) with the AoE + Sleep debuff
+// (1004894). Per the user, this can flip pull-to-pull — supports get
+// Sleep and DPS get Confused instead — but it's always ONE role (Tank+
+// Healer or Melee+Ranged DPS) wholesale on each side, never a mix. This
+// split is orthogonal to the bait-position geometry above (which is
+// melee-vs-ranged, not support-vs-DPS) — a support tank and a DPS melee
+// can share a bait pair while being on opposite sides of this tag.
+//
 // ── TELE-TROUNCING BAIT POSITION (confirmed 2026-07-31, h2JvDkntZCaBgmLF ───
 // ── pull 10) ────────────────────────────────────────────────────────────
 //
