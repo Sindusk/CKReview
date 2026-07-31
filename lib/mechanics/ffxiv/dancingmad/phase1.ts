@@ -225,6 +225,24 @@
 // falling inside THIS SPECIFIC drop-to-spread window, not merely "a death
 // happened somewhere earlier in the pull."
 //
+// **Tolerance now depends on which Graven 2 strategy the pull ran
+// (confirmed 2026-07-31, h2JvDkntZCaBgmLF pull 18).** The raid switched to
+// the EIGHT-STACK strategy (see graven2-strategy.ts) for this pull: the
+// whole raid stacks together in ONE spot instead of splitting into 2 light
+// parties, so there's only a single, 8-person Gravitas puddle instead of 2
+// separate 4-person ones (the north/south hemisphere split above naturally
+// collapses to 1 non-empty group in this case — no separate detection
+// needed to tell the shapes apart here). Confirmed failure: Ayumi Emi
+// spread only ~1145 centiyalms from that single puddle, causing the wipe —
+// but that's ABOVE the light-party-calibrated tolerance's confirmed clean
+// floor (Kade Kansado, ~1098, a different report/strategy entirely), so
+// one global threshold can't separate both. Consistent with the puddle's
+// radius scaling with how many people stacked in it (common FFXIV AoE
+// behavior) — the pull's other 3 confirmed-clean spreaders (Sonder Dreams
+// ~1393, Kade Kansado ~1545, Chauzey Solstice ~2282) support a materially
+// larger safe radius for this variant. See
+// GRAVEN_2_PUDDLE_PROXIMITY_TOLERANCE_EIGHT_STACK_CENTIYALMS.
+//
 // Gated on GRAVITATIONAL_EXPLOSION_WIPE_RULE_ID actually firing this pull
 // — with few confirmed samples to calibrate from, staying silent on pulls
 // that resolved cleanly avoids risking a false positive on a merely-
@@ -2508,7 +2526,23 @@ const GRAVEN_2_PUDDLE_DROP_GAP_MS = 5000;
 
 // Confirmed failure vs. clean, pulls 24 & 51 — see module header's
 // "GRAVEN 2 PUDDLE PROXIMITY" section for the full calibration story.
+// Only valid for the LIGHT-PARTY strategy's 2 separate 4-person puddles —
+// see GRAVEN_2_PUDDLE_PROXIMITY_TOLERANCE_EIGHT_STACK_CENTIYALMS below for
+// the other variant.
 const GRAVEN_2_PUDDLE_PROXIMITY_TOLERANCE_CENTIYALMS = 1065;
+
+// The EIGHT-STACK variant's single 8-person puddle needs a LARGER
+// clearance than the light-party variant's 4-person ones — confirmed
+// h2JvDkntZCaBgmLF pull 18 (Ayumi Emi, ~1145 fail) sits ABOVE the
+// light-party clean floor above (Kade Kansado, ~1098 clean, a DIFFERENT
+// report/strategy) that calibrated the constant above; a single global
+// threshold can't separate them. Consistent with a puddle whose radius
+// scales with headcount (a common FFXIV AoE pattern) — the same pull's
+// other 3 legitimate spreaders (Sonder Dreams ~1393, Kade Kansado ~1545,
+// Chauzey Solstice ~2282) are all confirmed clean per the user (only
+// Ayumi was blamed for the wipe), so the value sits at the midpoint
+// between Ayumi's failure and the next-closest clean sample (Sonder).
+const GRAVEN_2_PUDDLE_PROXIMITY_TOLERANCE_EIGHT_STACK_CENTIYALMS = 1270;
 
 // The explosion cast should land within a beat of the spread resolution it's
 // actually attributed to — confirmed clean gaps span -1916ms to +45ms across
@@ -2567,6 +2601,14 @@ function detectGraven2PuddleProximityErrors(players: PlayerInfo[], deathEvents: 
   ].filter((p): p is { x: number; y: number } => p !== null);
   if (puddles.length === 0) return [];
 
+  // Both hemispheres non-empty means light-party's 2 separate 4-person
+  // puddles; only one non-empty (the whole raid stacked on the same side)
+  // means the eight-stack variant's single 8-person puddle, which needs
+  // more clearance — see the constant's own comment above.
+  const proximityTolerance = puddles.length === 1
+    ? GRAVEN_2_PUDDLE_PROXIMITY_TOLERANCE_EIGHT_STACK_CENTIYALMS
+    : GRAVEN_2_PUDDLE_PROXIMITY_TOLERANCE_CENTIYALMS;
+
   // The spread resolution that immediately follows the last puddle drop.
   const spreadAfterDrop = spreadHits.filter((h) => h.timestamp >= lastDropGroupStart).sort((a, b) => a.timestamp - b.timestamp);
   if (spreadAfterDrop.length === 0) return [];
@@ -2607,7 +2649,7 @@ function detectGraven2PuddleProximityErrors(players: PlayerInfo[], deathEvents: 
   const errors: PullError[] = [];
   for (const spreader of spreaderByPlayer.values()) {
     const nearest = Math.min(...puddles.map((p) => distanceBetween({ x: spreader.x, y: spreader.y }, p)));
-    if (nearest >= GRAVEN_2_PUDDLE_PROXIMITY_TOLERANCE_CENTIYALMS) continue;
+    if (nearest >= proximityTolerance) continue;
 
     errors.push({
       ruleId:      GRAVEN_2_PUDDLE_PROXIMITY_RULE_ID,
