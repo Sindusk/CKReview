@@ -199,6 +199,29 @@
 // entirely shortly after (same date) — every stream is now always
 // checked, so both call sites below only ever pass `windowMs`/`direction`
 // now. See player-position.ts's own header for the full reasoning.
+//
+// ── WRONG HALF, NOT JUST WRONG SPOT (confirmed 2026-07-31, pull 15) ────────
+//
+// Confirmed failure: Salty Dango (Gunbreaker, Support) stood NORTH this
+// pull when south was the support-safe half, overlapping Sonder Dreams'
+// spread and killing them both — but `nearestHalf` reported a clean ~3.0y
+// deviation, not the ~12.4y that actually caused the death. The reason:
+// `nearestHalf` just picks whichever of a job's two LEARNED spots (north
+// or south) is physically closer, with no idea which one was actually
+// safe this pull. Dango's true position happened to closely reproduce
+// Gunbreaker's learned NORTH pattern — the correct spot for a support
+// standing north on a pull where north is support-safe — so the check
+// scored him as "basically home," when he was actually on the wrong half
+// of the ENTIRE ARENA for this pull's telegraph.
+//
+// Fixed with `determineSupportSafeHalf`: read which half is actually
+// support-safe THIS pull straight from the pull's own data (majority vote
+// of every support's own hit position — a single misplaced support like
+// Dango is outvoted 3-1 by the others who went to the correct side), then
+// measure each player's deviation against the learned spot for their
+// EXPECTED half (derived from their own role) specifically, not nearest-
+// of-either. Falls back to the old nearest-of-either behavior only when
+// the vote can't be resolved (no support samples, or an exact tie).
 
 import type { Pull } from "@/types/Pull";
 import type { PlayerInfo } from "@/types/PlayerInfo";
@@ -234,6 +257,8 @@ const FIRST_OCCURRENCE_WINDOW_END_MS   = 60_000;
 // Below this, a "furthest of the compromised pair" call isn't trusted —
 // see module header.
 const OUT_OF_POSITION_FLOOR_CENTIYALMS = 400;
+
+const SUPPORT_ROLES = new Set(["Tank", "Healer"]);
 
 // How far back to look for a pre-snapshot position (self-heal/self-cast
 // only) when a compromised player's own hit-time position reads clean —
@@ -382,6 +407,33 @@ function nearestHalf(spot: { north: Point | null; south: Point | null }, x: numb
   return { half: "south", point: spot.south!, distance: distSouth! };
 }
 
+// Which half (N/S) is actually SUPPORT-safe this pull, read from the pull's
+// own data instead of assumed — the split flips pull to pull (see module
+// header). Majority vote across every support's OWN single-instance hit
+// this volley: a single misplaced support (the exact failure mode this
+// exists to catch) is outvoted by the other 3 who did go to the correct
+// side. Returns null only if there's no support sample at all, or an exact
+// tie (never happens with the normal 4-support roster, but a report could
+// theoretically be missing combatants).
+function determineSupportSafeHalf(grouped: ReturnType<typeof groupByPlayer>): Half | null {
+  let north = 0;
+  let south = 0;
+  for (const g of grouped) {
+    if (!SUPPORT_ROLES.has(g.player.role)) continue;
+    if (g.y < ARENA_CENTER) north++;
+    else south++;
+  }
+  if (north === south) return null;
+  return north > south ? "north" : "south";
+}
+
+function expectedHalfForRole(role: string, supportSafeHalf: Half | null): Half | null {
+  if (!supportSafeHalf) return null;
+  const isSupport = SUPPORT_ROLES.has(role);
+  if (supportSafeHalf === "north") return isSupport ? "north" : "south";
+  return isSupport ? "south" : "north";
+}
+
 function diedToFlagrantFireInPull(deathEvents: DeathEvent[], playerName: string, aroundMs: number): boolean {
   return deathEvents.some(
     (d) =>
@@ -417,9 +469,35 @@ export function detectGravenImageSpreadErrors(pull: Pull, layout: GravenImageLay
   );
   if (lethalGroup.length === 0) return [];
 
+  // Which half is actually support-safe THIS pull (flips pull to pull —
+  // see module header), read from the pull's own support positions rather
+  // than assumed. Needed below because `nearestHalf` alone can't tell a
+  // player "close to their job's spot on the WRONG half" apart from
+  // "correctly positioned" — see "WRONG HALF, NOT JUST WRONG SPOT" in the
+  // module header.
+  const supportSafeHalf = determineSupportSafeHalf(grouped);
+
   const withDeviation = lethalGroup.map((c) => {
     const spot = layout[c.player.className];
     if (!spot) return { ...c, distance: null };
+
+    // A learned job spot is symmetric (mirrorHalves) but which physical
+    // N/S half is correct for THIS player's role flips pull to pull.
+    // `nearestHalf` just picks whichever of the two learned points is
+    // closer — which silently hides a player standing on the WRONG half
+    // entirely if their position happens to reproduce their job's
+    // characteristic offset pattern for the OTHER (unsafe-this-pull) half.
+    // When the pull's own data can tell us which half was actually correct
+    // for this role, measure against THAT half specifically instead; only
+    // fall back to nearest-of-either when it can't be determined.
+    const expectedHalf = expectedHalfForRole(c.player.role, supportSafeHalf);
+    const halfDistance = (x: number, y: number): { half: Half; distance: number } | null => {
+      if (expectedHalf) {
+        const point = spot[expectedHalf];
+        return point ? { half: expectedHalf, distance: Math.hypot(x - point.x, y - point.y) } : nearestHalf(spot, x, y);
+      }
+      return nearestHalf(spot, x, y);
+    };
 
     // The hit's OWN x/y is where this player ended up by the time the
     // damage log entry was written — which can already reflect a
@@ -432,12 +510,12 @@ export function detectGravenImageSpreadErrors(pull: Pull, layout: GravenImageLay
     // mirrorHalves above: a late dodge only ever SHRINKS the visible
     // deviation relative to what actually caused the overlap, never
     // inflates it.
-    const current = nearestHalf(spot, c.x, c.y);
+    const current = halfDistance(c.x, c.y);
     const priorPos = findPlayerPosition(c.player, c.timestamp - 1, {
       windowMs:  PRIOR_SNAPSHOT_WINDOW_MS,
       direction: "atOrBefore",
     });
-    const prior = priorPos ? nearestHalf(spot, priorPos.x, priorPos.y) : null;
+    const prior = priorPos ? halfDistance(priorPos.x, priorPos.y) : null;
 
     const distance = Math.max(current?.distance ?? -1, prior?.distance ?? -1);
     if (distance < 0) return { ...c, distance: null };
@@ -491,8 +569,6 @@ const STACK_OUT_OF_POSITION_THRESHOLD_CENTIYALMS = 400;
 // of the stack resolving (confirmed case used one ~1.9s prior) without
 // risking a genuinely stale sample from earlier in the pull.
 const STACK_POSITION_WINDOW_MS = 5000;
-
-const SUPPORT_ROLES = new Set(["Tank", "Healer"]);
 
 type StackGroupMember = ReturnType<typeof groupByPlayer>[number];
 
