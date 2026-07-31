@@ -122,9 +122,12 @@ export default function VideoPanel({
     // Reuse the existing player: swap the video in place.
     if (playerRef.current && playerReadyRef.current) {
       awaitingReuseLoadRef.current = true;
+      console.log("[VideoPanel] REUSE swap", { vodId: vod.videoId, startTime, seekRequestProp: seekRequest });
       playerRef.current.loadVideoById({ videoId: vod.videoId, startSeconds: startTime });
       return;
     }
+
+    console.log("[VideoPanel] CREATE new player", { vodId: vod.videoId, startTime, seekRequestProp: seekRequest, hadPlayer: !!playerRef.current, wasReady: playerReadyRef.current });
 
     if (!containerRef.current) return;
 
@@ -162,7 +165,8 @@ export default function VideoPanel({
             event.target.playVideo();
           },
 
-          onStateChange: () => {
+          onStateChange: (event: YTOnStateChangeEvent) => {
+            console.log("[VideoPanel] onStateChange", { data: event.data, awaiting: awaitingReuseLoadRef.current, target: latestSeekRef.current?.time });
             if (!awaitingReuseLoadRef.current || !playerRef.current) return;
             awaitingReuseLoadRef.current = false;
 
@@ -201,6 +205,7 @@ export default function VideoPanel({
    * "play, backtrack, play again" stutter.
    */
   useEffect(() => {
+    console.log("[VideoPanel] SEEK HANDLER effect", { seekRequest, hasPlayer: !!playerRef.current, ready: playerReadyRef.current });
     if (seekRequest === null) return;
     if (!playerRef.current || !playerReadyRef.current) return;
 

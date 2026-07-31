@@ -101,6 +101,7 @@ export default function useTimelineController({
     seekTokenRef.current += 1;
     const target = (vod.offset ?? 0) + pull.startTime + withinPull;
     pendingSeekRef.current = { time: target, issuedAt: Date.now() };
+    console.log("[timeline] auto-seek computed", { vodId: vod.id, vodOffset: vod.offset, pullId: pull.id, pullStart: pull.startTime, pullChanged, withinPull, target });
     setSeekRequest({ time: target, token: seekTokenRef.current });
   }
 
