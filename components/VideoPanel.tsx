@@ -73,19 +73,27 @@ export default function VideoPanel({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const playerRef = useRef<YTPlayer | null>(null);
   const playerReadyRef = useRef(false);
-  const pendingSeekRef = useRef<number | null>(null);
+
+  // Mirrors the latest `seekRequest` synchronously (not via useEffect) so
+  // that the player-creation effect always sees the up-to-date target even
+  // when `vod` and `seekRequest` change together in the same render.
+  const latestSeekRef = useRef<SeekRequest | null>(seekRequest);
+  latestSeekRef.current = seekRequest;
+
   const [playerReady, setPlayerReady] = useState(false);
 
   /**
    * =========================
    * CREATE / DESTROY PLAYER
    * =========================
+   * Loads the video cued to its target start time (via playerVars.start)
+   * instead of starting at 0 and seeking afterward — that "play from 0,
+   * then jump" is what caused the visible backtrack/stutter on VOD switch.
    */
   useEffect(() => {
     if (!vod || !containerRef.current) return;
 
     playerReadyRef.current = false;
-    pendingSeekRef.current = null;
     setPlayerReady(false);
 
     if (playerRef.current) {
@@ -96,6 +104,8 @@ export default function VideoPanel({
     const div = document.createElement("div");
     containerRef.current.innerHTML = "";
     containerRef.current.appendChild(div);
+
+    const startTime = latestSeekRef.current?.time;
 
     loadYouTubeAPI().then(() => {
       if (!containerRef.current) return;
@@ -108,31 +118,20 @@ export default function VideoPanel({
           autoplay: 1,
           mute: 1,
           enablejsapi: 1,
+          ...(startTime !== undefined ? { start: Math.max(0, Math.floor(startTime)) } : {}),
         },
         events: {
           onReady: (event: YTPlayerEvent) => {
             playerReadyRef.current = true;
             setPlayerReady(true);
 
-            if (pendingSeekRef.current !== null) {
-              const time = pendingSeekRef.current;
-
-              event.target.seekTo(time, true);
-              event.target.playVideo();
+            // `start` only has integer-second precision — nudge to the
+            // exact target once, then let the video play uninterrupted.
+            const target = latestSeekRef.current?.time;
+            if (target !== undefined) {
+              event.target.seekTo(target, true);
             }
-          },
-
-          onStateChange: (event: YTOnStateChangeEvent) => {
-            // 1 = playing
-            if (event.data === 1 && pendingSeekRef.current !== null) {
-              const time = pendingSeekRef.current;
-
-              event.target.seekTo(time, true);
-              pendingSeekRef.current = null;
-
-              // ensure playback continues after late seek
-              event.target.playVideo();
-            }
+            event.target.playVideo();
           },
         }
       });
@@ -156,18 +155,16 @@ export default function VideoPanel({
    * Depends on the whole `seekRequest` object (not just its time), so a
    * repeat click on the same timestamp — which bumps `token` and creates a
    * new object — still re-triggers this effect and re-seeks the player.
+   *
+   * Fires a single seekTo/playVideo call and nothing else — no follow-up
+   * re-seek on a later state-change event, which was what produced the
+   * "play, backtrack, play again" stutter.
    */
   useEffect(() => {
     if (seekRequest === null) return;
-
-    const { time } = seekRequest;
-
-    // Always store latest seek
-    pendingSeekRef.current = time;
-
     if (!playerRef.current || !playerReadyRef.current) return;
 
-    playerRef.current.seekTo(time, true);
+    playerRef.current.seekTo(seekRequest.time, true);
     playerRef.current.playVideo();
   }, [seekRequest]);
 
@@ -191,21 +188,6 @@ export default function VideoPanel({
 
     return () => clearInterval(interval);
   }, [onCurrentTimeChange, playerReady, vod?.id]);
-
-  /**
-   * Fix for seeking not occurring when swapping VOD's.
-   */
-  useEffect(() => {
-    if (!vod || seekRequest === null) return;
-
-    // When VOD changes, ALWAYS re-arm seek
-    pendingSeekRef.current = seekRequest.time;
-
-    if (playerRef.current && playerReadyRef.current) {
-      playerRef.current.seekTo(seekRequest.time, true);
-      playerRef.current.playVideo();
-    }
-  }, [vod?.id]);
 
   return (
     <div

@@ -34,10 +34,20 @@ export default function useTimelineController({
   const [seekRequest, setSeekRequest] = useState<SeekRequest | null>(null);
   const seekTokenRef = useRef(0);
 
+  // Tracks the target/issue-time of the most recent seek we requested.
+  // While the player hasn't yet caught up to that target, updateFromVideo()
+  // ignores its auto pull-detection — the player briefly reports stale
+  // (pre-seek) positions after a seek, and trusting those would let the
+  // detector "correct" the selection back to the old pull, which re-emits
+  // a seek to the old pull's start, which the detector then "corrects"
+  // again — an infinite back-and-forth when pulls are switched quickly.
+  const pendingSeekRef = useRef<{ time: number; issuedAt: number } | null>(null);
+
   // Always emits a brand-new object so repeated seeks to the same time
   // still trigger VideoPanel's effect.
   const emitSeek = useCallback((time: number) => {
     seekTokenRef.current += 1;
+    pendingSeekRef.current = { time, issuedAt: Date.now() };
     setSeekRequest({ time, token: seekTokenRef.current });
   }, []);
 
@@ -111,6 +121,21 @@ export default function useTimelineController({
     if (pull) {
       const t = rawVideoTime - offset - pull.startTime;
       setPlaybackTime(Math.max(0, Math.min(t, pullDuration)));
+    }
+
+    // While a manual seek is still landing, don't trust this reading for
+    // auto-detection — wait until playback catches up to the target (or
+    // give up after 4s so a failed/slow seek can't wedge detection off).
+    if (pendingSeekRef.current) {
+      const { time, issuedAt } = pendingSeekRef.current;
+      const closeEnough = Math.abs(rawVideoTime - time) <= 2;
+      const timedOut = Date.now() - issuedAt > 4000;
+
+      if (closeEnough || timedOut) {
+        pendingSeekRef.current = null;
+      } else {
+        return;
+      }
     }
 
     // 2. Auto-detect which pull we're in (only when calibrated)
