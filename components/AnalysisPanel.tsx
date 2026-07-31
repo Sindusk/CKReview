@@ -32,7 +32,6 @@ type AnalysisPanelProps = {
 // what's worth talking through after a pull: Raid + Major errors, no
 // deaths (mostly consequences) and no Minor noise.
 type Tab = "Overall" | "Deaths" | "Review" | "Raid" | "Major" | "Minor";
-const TABS: Tab[] = ["Overall", "Deaths", "Review", "Raid", "Major", "Minor"];
 
 // Unified shape for anything that can appear in the timeline feed —
 // a death, or a Raid/Major/Minor error.
@@ -331,6 +330,12 @@ function StatPill({ label, value, color = "#ccc" }: { label: string; value: stri
   );
 }
 
+// Only "Overall" and "Review" remain as a plain nav-style tab bar below the
+// stats row — Deaths/Raid/Major/Minor moved up into the stat pills
+// themselves (see StatTabPill below) so their counts can't wrap Minor onto
+// a second row.
+const BOTTOM_TABS: Tab[] = ["Overall", "Review"];
+
 function TabBar({ value, onChange, counts }: { value: Tab; onChange: (t: Tab) => void; counts: Record<Tab, number> }) {
   return (
     <div
@@ -344,16 +349,10 @@ function TabBar({ value, onChange, counts }: { value: Tab; onChange: (t: Tab) =>
         flexWrap: "wrap",
       }}
     >
-      {TABS.map((tab) => {
+      {BOTTOM_TABS.map((tab) => {
         const active = tab === value;
         const count = counts[tab];
-        const badgeColor =
-          tab === "Raid" ? "#c084fc" :
-          tab === "Major" ? "#fb923c" :
-          tab === "Minor" ? "#fbbf24" :
-          tab === "Deaths" ? "#f87171" :
-          tab === "Review" ? "#60a5fa" :
-          "#94a3b8";
+        const badgeColor = tab === "Review" ? "#60a5fa" : "#94a3b8";
 
         return (
           <button
@@ -393,6 +392,46 @@ function TabBar({ value, onChange, counts }: { value: Tab; onChange: (t: Tab) =>
         );
       })}
     </div>
+  );
+}
+
+// Doubles as both a stat display AND a tab-select button — replaces the
+// plain (non-interactive) StatPill for Deaths/Raid/Major/Minor so the same
+// row that used to just show counts now also drives tab selection, without
+// adding a 5th/6th button elsewhere that could wrap onto a second row.
+function StatTabPill({
+  label,
+  value,
+  color,
+  active,
+  onClick,
+}: {
+  label: string;
+  value: string;
+  color: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: "1px",
+        padding: "2px 8px",
+        border: active ? `1px solid ${color}55` : "1px solid transparent",
+        borderRadius: "4px",
+        backgroundColor: active ? color + "14" : "transparent",
+        cursor: "pointer",
+        textAlign: "left",
+      }}
+    >
+      <span style={{ fontSize: "9px", color: "#555", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+        {label}
+      </span>
+      <span style={{ fontSize: "13px", fontWeight: 600, color }}>{value}</span>
+    </button>
   );
 }
 
@@ -592,10 +631,34 @@ export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime, onCa
         }}
       >
         <StatPill label="Duration" value={formatDuration(pull.fightDuration)} />
-        <StatPill label="Deaths" value={String(deaths.length)} color={deaths.length > 0 ? "#f87171" : "#4ade80"} />
-        <StatPill label="Raid" value={String(raids.length)} color={raids.length > 0 ? "#c084fc" : "#4ade80"} />
-        <StatPill label="Major" value={String(majors.length)} color={majors.length > 0 ? "#fb923c" : "#4ade80"} />
-        <StatPill label="Minor" value={String(minors.length)} color={minors.length > 0 ? "#fbbf24" : "#4ade80"} />
+        <StatTabPill
+          label="Deaths"
+          value={String(deaths.length)}
+          color={deaths.length > 0 ? "#f87171" : "#4ade80"}
+          active={activeTab === "Deaths"}
+          onClick={() => setActiveTab("Deaths")}
+        />
+        <StatTabPill
+          label="Raid"
+          value={String(raids.length)}
+          color={raids.length > 0 ? "#c084fc" : "#4ade80"}
+          active={activeTab === "Raid"}
+          onClick={() => setActiveTab("Raid")}
+        />
+        <StatTabPill
+          label="Major"
+          value={String(majors.length)}
+          color={majors.length > 0 ? "#fb923c" : "#4ade80"}
+          active={activeTab === "Major"}
+          onClick={() => setActiveTab("Major")}
+        />
+        <StatTabPill
+          label="Minor"
+          value={String(minors.length)}
+          color={minors.length > 0 ? "#fbbf24" : "#4ade80"}
+          active={activeTab === "Minor"}
+          onClick={() => setActiveTab("Minor")}
+        />
       </div>
 
       <TabBar value={activeTab} onChange={setActiveTab} counts={counts} />

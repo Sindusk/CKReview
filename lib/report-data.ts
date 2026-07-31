@@ -24,12 +24,13 @@ export type PlayerReportStats = {
   // Column 3 — firstErrorCount / total pulls, as a 0–100 percentage.
   firstErrorPct:   number;
 
-  // Column 4 — how many times this player's error was among the
-  // first 3 Major errors of a pull (a player can be credited twice
-  // in the same pull if they account for 2 of the first 3 events).
-  top3Count:       number;
-  // Column 5 — top3Count / total pulls, as a 0–100 percentage.
-  top3Pct:         number;
+  // Column 4 — total pre-wipe (or pre-raid-error) Major errors this player
+  // caused across every pull, not just the first one — see
+  // getPullCriticalEvents' cutoff logic below.
+  totalCount:      number;
+  // Column 5 — totalCount / total pulls, as a 0–100 percentage. Can exceed
+  // 100% since a player may cause multiple pre-wipe errors in one pull.
+  totalPct:        number;
 
   // Combined "early mistakes" score used to rank the pedestal — lower is
   // better. Simple sum of the two raw counts above.
@@ -122,7 +123,7 @@ export function computePlayerReportStats(pulls: Pull[]): PlayerReportStats[] {
   const roster        = buildRoster(pulls);
   const totalPulls     = pulls.length;
   const firstErrorMap = new Map<string, number>();
-  const top3Map        = new Map<string, number>();
+  const totalMap        = new Map<string, number>();
 
   for (const pull of pulls) {
     const events = getPullCriticalEvents(pull);
@@ -131,8 +132,8 @@ export function computePlayerReportStats(pulls: Pull[]): PlayerReportStats[] {
     const first = events[0];
     firstErrorMap.set(first.player, (firstErrorMap.get(first.player) ?? 0) + 1);
 
-    for (const e of events.slice(0, 3)) {
-      top3Map.set(e.player, (top3Map.get(e.player) ?? 0) + 1);
+    for (const e of events) {
+      totalMap.set(e.player, (totalMap.get(e.player) ?? 0) + 1);
     }
   }
 
@@ -140,7 +141,7 @@ export function computePlayerReportStats(pulls: Pull[]): PlayerReportStats[] {
 
   for (const [name, info] of roster.entries()) {
     const firstErrorCount = firstErrorMap.get(name) ?? 0;
-    const top3Count       = top3Map.get(name) ?? 0;
+    const totalCount      = totalMap.get(name) ?? 0;
 
     stats.push({
       name,
@@ -150,15 +151,15 @@ export function computePlayerReportStats(pulls: Pull[]): PlayerReportStats[] {
       game:            info.game,
       firstErrorCount,
       firstErrorPct:   totalPulls > 0 ? (firstErrorCount / totalPulls) * 100 : 0,
-      top3Count,
-      top3Pct:         totalPulls > 0 ? (top3Count / totalPulls) * 100 : 0,
-      combinedScore:   firstErrorCount + top3Count,
+      totalCount,
+      totalPct:        totalPulls > 0 ? (totalCount / totalPulls) * 100 : 0,
+      combinedScore:   firstErrorCount + totalCount,
     });
   }
 
   stats.sort((a, b) => {
     if (b.firstErrorPct !== a.firstErrorPct) return b.firstErrorPct - a.firstErrorPct;
-    if (b.top3Pct !== a.top3Pct) return b.top3Pct - a.top3Pct;
+    if (b.totalPct !== a.totalPct) return b.totalPct - a.totalPct;
     return a.name.localeCompare(b.name);
   });
 

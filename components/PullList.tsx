@@ -1,6 +1,7 @@
 "use client";
 
 import type { Pull } from "@/types/Pull";
+import { getPullRaidCutoff } from "@/lib/report-data";
 
 type PullListProps = {
   pulls:          Pull[];
@@ -46,8 +47,13 @@ export default function PullList({ pulls, selectedPullId, onSelectPull }: PullLi
           const isKill = pull.result === "Kill";
           const deaths = pull.deathEvents.length;
           const raids = pull.errors.filter(e => e.severity === "Raid");
-          const majors = pull.errors.filter(e => e.severity === "Major");
-          const minors = pull.errors.filter(e => e.severity === "Minor");
+          // #4 — Major/Minor errors after the raid was already wiping aren't
+          // real analysis-worthy mistakes, so they're excluded from these
+          // counts — same cutoff the Report's per-player stats use (see
+          // getPullRaidCutoff / getPullCriticalEvents in report-data.ts).
+          const cutoff = getPullRaidCutoff(pull);
+          const majors = pull.errors.filter(e => e.severity === "Major" && (cutoff === null || e.timestamp <= cutoff));
+          const minors = pull.errors.filter(e => e.severity === "Minor" && (cutoff === null || e.timestamp <= cutoff));
 
           const firstRaidTime = raids.length > 0 ? Math.min(...raids.map(e => e.timestamp)) : null;
           const resultBadgeText = isKill

@@ -1111,11 +1111,14 @@ export default function Home() {
         <div style={{ display: "flex", flexDirection: "column", gap: "10px", overflow: "hidden", minHeight: 0 }}>
           <div
             style={{
-              // Fixed to fit exactly one column of 5 players (header + 5 rows).
-              // Drilling into a player's detail tabs scrolls WITHIN this
-              // height instead of expanding the panel.
+              // WoW's generic grid is fixed to fit exactly one column of 5
+              // players (header + 5 rows). FFXIV's fixed 8-man comp only
+              // ever needs 2 rows (Tanks/Healers/Melee/Ranged columns), so
+              // it gets a much shorter panel, leaving the saved space for
+              // AnalysisPanel below. Drilling into a player's detail tabs
+              // scrolls WITHIN this height instead of expanding the panel.
               flex:          "0 0 auto",
-              height:        "300px",
+              height:        activePull?.game === "ffxiv" ? "140px" : "300px",
               border:        "1px solid #333",
               overflow:      "hidden",
               display:       "flex",

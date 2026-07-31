@@ -25,3 +25,10 @@ Quick facts:
   `expectations/` and `sampledata/` are both gitignored local dev tools
   (log-derived data stays off GitHub); `--prune` drops snapshots for
   deleted reports.
+
+Git workflow: once a change is working (validate.js + tsc pass, or for
+non-mechanic UI work it's been reviewed), commit and push to `main` on
+GitHub without stopping to ask first — this is standing authorization, not
+a one-off. Deploying is a separate, deliberately manual step: never SSH
+into the production server or run `./deploy.sh` — the user runs that
+themselves for oversight after pulling your pushed commits.

@@ -120,8 +120,8 @@ export default function ReportDialog({ open, onClose, pulls }: ReportDialogProps
                         <th style={thStyle}>Player</th>
                         <th style={{ ...thStyle, textAlign: "right" }}>First Errors</th>
                         <th style={{ ...thStyle, textAlign: "right" }}>First Error %</th>
-                        <th style={{ ...thStyle, textAlign: "right" }}>In First 3</th>
-                        <th style={{ ...thStyle, textAlign: "right" }}>In First 3 %</th>
+                        <th style={{ ...thStyle, textAlign: "right" }}>Total</th>
+                        <th style={{ ...thStyle, textAlign: "right" }}>Total %</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -162,9 +162,9 @@ export default function ReportDialog({ open, onClose, pulls }: ReportDialogProps
                             <td style={{ ...tdStyle, textAlign: "right", color: "#f87171", fontWeight: 600 }}>
                               {p.firstErrorPct.toFixed(1)}%
                             </td>
-                            <td style={{ ...tdStyle, textAlign: "right" }}>{p.top3Count}</td>
+                            <td style={{ ...tdStyle, textAlign: "right" }}>{p.totalCount}</td>
                             <td style={{ ...tdStyle, textAlign: "right", color: "#fb923c" }}>
-                              {p.top3Pct.toFixed(1)}%
+                              {p.totalPct.toFixed(1)}%
                             </td>
                           </tr>
                         );

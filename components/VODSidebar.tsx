@@ -105,7 +105,8 @@ export default function VODSidebar({
               }}
             >
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "4px" }}>
-                <div style={{ fontWeight: "bold", fontSize: "12px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <div style={{ width: "16px", flexShrink: 0 }} />
+                <div style={{ fontWeight: "bold", fontSize: "12px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center", flex: 1 }}>
                   {vod.player}
                 </div>
                 <button
@@ -128,8 +129,14 @@ export default function VODSidebar({
                   T
                 </button>
               </div>
-              <div style={{ fontSize: "10px", color: "#aaa", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {vod.url.length > 18 ? vod.url.slice(0, 18) + "..." : vod.url}
+              <div style={{ display: "flex", justifyContent: "center", alignItems: "center", flex: 1 }}>
+                {/* YouTube icon — every VOD is a YouTube video (see types/Vod.ts's
+                    videoId/embedUrl), so this just marks that at a glance instead
+                    of spelling out the URL as plain text. */}
+                <svg viewBox="0 0 28 20" width="28" height="20" aria-hidden="true">
+                  <rect x="0" y="0" width="28" height="20" rx="5" fill="#f87171" opacity="0.85" />
+                  <path d="M11 6 L19 10 L11 14 Z" fill="#1a1a1a" />
+                </svg>
               </div>
             </div>
           );

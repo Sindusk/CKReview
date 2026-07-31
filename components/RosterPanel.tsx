@@ -561,6 +561,29 @@ export default function RosterPanel({ players, playbackTimeMs, mitigationPlan }:
   const rangedCount = dps.filter(player => player.rangeType === "Ranged").length;
   const casterCount = dps.filter(player => player.rangeType === "Caster").length;
 
+  // FFXIV has a fixed 8-man comp, so it gets a dedicated 4-column layout —
+  // Tanks / Healers / Melee / Ranged+Caster, each column sorted by its
+  // auto-detected party slot (MT before OT, H1 before H2, etc.) — instead
+  // of the generic WoW grid below, which has to handle arbitrary raid sizes.
+  const isFF = filteredPlayers[0]?.game === "ffxiv";
+
+  function sortBySlot(list: PlayerInfo[]): PlayerInfo[] {
+    return [...list].sort((a, b) => {
+      const sa = roleSlotByActorId.get(a.actorId) ?? "";
+      const sb = roleSlotByActorId.get(b.actorId) ?? "";
+      return sa.localeCompare(sb);
+    });
+  }
+
+  const ffColumns = isFF
+    ? [
+        { label: "Tanks",   players: sortBySlot(filteredPlayers.filter(p => p.role === "Tank")) },
+        { label: "Healers", players: sortBySlot(filteredPlayers.filter(p => p.role === "Healer")) },
+        { label: "Melee",   players: sortBySlot(filteredPlayers.filter(p => p.role === "DPS" && p.rangeType === "Melee")) },
+        { label: "Ranged",  players: sortBySlot(filteredPlayers.filter(p => p.role === "DPS" && p.rangeType !== "Melee")) },
+      ]
+    : [];
+
   const COLS = 4;
   const ROWS = 5;
   const GROUP_SIZE = COLS * ROWS;
@@ -586,32 +609,49 @@ export default function RosterPanel({ players, playbackTimeMs, mitigationPlan }:
         </div>
       </div>
 
-      <div style={{ overflowX: needsScroll ? "auto" : "hidden", overflowY: "hidden", display: "flex", gap: "8px", padding: "8px", boxSizing: "border-box" }}>
-        {groups.map((group, gi) => (
-          <div
-            key={gi}
-            style={{
-              display: "grid",
-              gridTemplateColumns: `repeat(${COLS}, minmax(0, 1fr))`,
-              gridTemplateRows: `repeat(${ROWS}, auto)`,
-              gridAutoFlow: "column",
-              gap: "4px",
-              flexShrink: 0,
-              width: gi === 0 && !needsScroll ? "100%" : `${COLS * 80}px`,
-              minWidth: `${COLS * 72}px`,
-            }}
-          >
-            {group.map(player => (
-              <PlayerButton
-                key={player.actorId}
-                player={player}
-                roleSlot={roleSlotByActorId.get(player.actorId)}
-                onClick={() => setSelectedPlayer(player)}
-              />
-            ))}
-          </div>
-        ))}
-      </div>
+      {isFF ? (
+        <div style={{ flex: 1, display: "flex", gap: "8px", padding: "8px", boxSizing: "border-box", overflow: "hidden" }}>
+          {ffColumns.map(col => (
+            <div key={col.label} style={{ flex: 1, display: "flex", flexDirection: "column", gap: "4px", minWidth: 0 }}>
+              {col.players.map(player => (
+                <PlayerButton
+                  key={player.actorId}
+                  player={player}
+                  roleSlot={roleSlotByActorId.get(player.actorId)}
+                  onClick={() => setSelectedPlayer(player)}
+                />
+              ))}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ overflowX: needsScroll ? "auto" : "hidden", overflowY: "hidden", display: "flex", gap: "8px", padding: "8px", boxSizing: "border-box" }}>
+          {groups.map((group, gi) => (
+            <div
+              key={gi}
+              style={{
+                display: "grid",
+                gridTemplateColumns: `repeat(${COLS}, minmax(0, 1fr))`,
+                gridTemplateRows: `repeat(${ROWS}, auto)`,
+                gridAutoFlow: "column",
+                gap: "4px",
+                flexShrink: 0,
+                width: gi === 0 && !needsScroll ? "100%" : `${COLS * 80}px`,
+                minWidth: `${COLS * 72}px`,
+              }}
+            >
+              {group.map(player => (
+                <PlayerButton
+                  key={player.actorId}
+                  player={player}
+                  roleSlot={roleSlotByActorId.get(player.actorId)}
+                  onClick={() => setSelectedPlayer(player)}
+                />
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
