@@ -950,9 +950,22 @@ export const CONFETTI_KNOCKBACK_VICTIM_RULE_ID = "ffxiv-phase1-confetti-knockbac
 export const CONFETTI_HOLDER_MISPLACED_RULE_ID = "ffxiv-phase1-confetti-holder-misplaced";
 export const CONFETTI_GROUP_MISPLACED_RULE_ID = "ffxiv-phase1-confetti-group-misplaced";
 export const CONFETTI_FINAL_POSITION_MISPLACED_RULE_ID = "ffxiv-phase1-confetti-final-position-misplaced";
+export const HYPERDRIVE_OUT_OF_POSITION_RULE_ID = "ffxiv-phase1-hyperdrive-out-of-position";
 
 const BLIZZARD_III_BLOWOUT_ABILITY_IDS = new Set([47765, 47768, 47771, 47774]);
 const DAMAGE_DOWN_ABILITY_ID = 1002911;
+
+// Hyperdrive (49739): an untelegraphed tankbuster, no castbar of its own —
+// per the raid's strategy sheet, it fires immediately after Light of
+// Judgement resolves. Hits the current tank 3x in quick succession; every
+// clean pull sampled (h2JvDkntZCaBgmLF pulls 2-5) shows ONLY the tank in its
+// damageTaken, standing north of arena center (y<ARENA_CENTER) near the
+// boss. Confirmed failure (pull 9): Ayumi Emi (DPS) stood north, stacked
+// with the tank, and was caught by it too — died at (10459, 9728), ~2s
+// before her death event actually lands (same hit-then-death lag pattern as
+// WAVE_CANNON_MITIGATION_ISSUE). See detectHyperdriveOutOfPositionErrors.
+const HYPERDRIVE_ABILITY_ID = 49739;
+const HYPERDRIVE_POSITION_WINDOW_MS = 3000;
 
 const REVOLTING_RUIN_FIRST_HIT_ABILITY_ID  = 50179;
 const REVOLTING_RUIN_SECOND_HIT_ABILITY_ID = 50401;
@@ -1594,6 +1607,53 @@ function detectBlizzardIIIBlowoutSilentKillErrors(players: PlayerInfo[], deathEv
       role:        death.role,
       abilityId:   death.killingAbilityGameId,
       abilityName: "Blizzard III Blowout",
+    });
+  }
+
+  return errors;
+}
+
+/**
+ * Detects a non-tank killed by Hyperdrive while standing north of arena
+ * center — the tank's side, where the repeated hits are meant to land. See
+ * the module header (search "Hyperdrive") for the mechanic and confirmed
+ * failure case.
+ *
+ * Deliberately a death+position check, not a pure outcome check like
+ * REVOLTING_RUIN_OUT_OF_POSITION: Hyperdrive's own damageTaken never shows
+ * anyone but the tank in a clean resolution, so requiring an actual death
+ * (rather than flagging anyone merely caught by incidental splash) keeps
+ * this narrowly scoped to the one confirmed failure shape.
+ */
+function detectHyperdriveOutOfPositionErrors(players: PlayerInfo[], deathEvents: DeathEvent[]): PullError[] {
+  const errors: PullError[] = [];
+
+  for (const death of deathEvents) {
+    if (death.killingAbilityGameId !== HYPERDRIVE_ABILITY_ID) continue;
+    if (death.role === "Tank") continue;
+
+    const player = players.find((p) => p.name === death.player);
+    if (!player) continue;
+
+    const hit = player.damageTaken
+      .filter((e) => e.abilityId === HYPERDRIVE_ABILITY_ID && e.x !== undefined && e.y !== undefined)
+      .filter((e) => Math.abs(e.timestamp - death.timestamp) <= HYPERDRIVE_POSITION_WINDOW_MS)
+      .sort((a, b) => Math.abs(a.timestamp - death.timestamp) - Math.abs(b.timestamp - death.timestamp))[0];
+    if (!hit) continue;
+    if (hit.y! >= ARENA_CENTER) continue; // south of center — correct side
+
+    errors.push({
+      ruleId:      HYPERDRIVE_OUT_OF_POSITION_RULE_ID,
+      severity:    "Major",
+      name:        "Hyperdrive Out Of Position",
+      description: "Died to Hyperdrive while standing north of the boss, on the tank's side — only a tank should ever be there when it resolves.",
+      timestamp:   death.timestamp,
+      player:      death.player,
+      class:       death.class,
+      specId:      death.specId,
+      role:        death.role,
+      abilityId:   HYPERDRIVE_ABILITY_ID,
+      abilityName: "Hyperdrive",
     });
   }
 
@@ -3316,6 +3376,7 @@ export function detectPhase1Errors(
     ...revoltingRuinThreatLossErrors,
     ...detectRevoltingRuinNonTankDeathError(players, deathEvents, revoltingRuinThreatLossErrors),
     ...detectRevoltingRuinOutOfPositionErrors(players, deathEvents),
+    ...detectHyperdriveOutOfPositionErrors(players, deathEvents),
     ...blizzardIIISilentKillErrors,
     ...detectJumpedOffArenaError(players, deathEvents),
     ...detectWaveCannonTowerOverlapErrors(players, deathEvents),
