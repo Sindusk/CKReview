@@ -81,6 +81,17 @@ export default function VideoPanel({
   const latestSeekRef = useRef<SeekRequest | null>(seekRequest);
   latestSeekRef.current = seekRequest;
 
+  // Set right before a loadVideoById() reuse-swap. VideoPanel is a child
+  // component, so its effects run BEFORE the parent hook's effect that
+  // recomputes the correct seek target for the new VOD — meaning the
+  // startSeconds passed to loadVideoById here is often one render stale.
+  // A seekTo() issued immediately after (from the SEEK HANDLER effect,
+  // once the corrected target lands) can get silently dropped because the
+  // player is still loading the newly-swapped video. This flag makes the
+  // NEXT state-change event re-apply whatever the freshest known target is
+  // (read at fire time, so it's correct by then) exactly once.
+  const awaitingReuseLoadRef = useRef(false);
+
   const [playerReady, setPlayerReady] = useState(false);
 
   /**
@@ -110,6 +121,7 @@ export default function VideoPanel({
 
     // Reuse the existing player: swap the video in place.
     if (playerRef.current && playerReadyRef.current) {
+      awaitingReuseLoadRef.current = true;
       playerRef.current.loadVideoById({ videoId: vod.videoId, startSeconds: startTime });
       return;
     }
@@ -148,6 +160,17 @@ export default function VideoPanel({
               event.target.seekTo(target, true);
             }
             event.target.playVideo();
+          },
+
+          onStateChange: () => {
+            if (!awaitingReuseLoadRef.current || !playerRef.current) return;
+            awaitingReuseLoadRef.current = false;
+
+            const target = latestSeekRef.current?.time;
+            if (target !== undefined) {
+              playerRef.current.seekTo(target, true);
+              playerRef.current.playVideo();
+            }
           },
         }
       });
