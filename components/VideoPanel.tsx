@@ -122,12 +122,12 @@ export default function VideoPanel({
     // Reuse the existing player: swap the video in place.
     if (playerRef.current && playerReadyRef.current) {
       awaitingReuseLoadRef.current = true;
-      console.log("[VideoPanel] REUSE swap", { vodId: vod.videoId, startTime, seekRequestProp: seekRequest });
+      console.log(`[VideoPanel] REUSE swap videoId=${vod.videoId} startTime=${startTime} seekRequest.time=${seekRequest?.time} seekRequest.token=${seekRequest?.token}`);
       playerRef.current.loadVideoById({ videoId: vod.videoId, startSeconds: startTime });
       return;
     }
 
-    console.log("[VideoPanel] CREATE new player", { vodId: vod.videoId, startTime, seekRequestProp: seekRequest, hadPlayer: !!playerRef.current, wasReady: playerReadyRef.current });
+    console.log(`[VideoPanel] CREATE new player videoId=${vod.videoId} startTime=${startTime} seekRequest.time=${seekRequest?.time} hadPlayer=${!!playerRef.current} wasReady=${playerReadyRef.current}`);
 
     if (!containerRef.current) return;
 
@@ -166,12 +166,14 @@ export default function VideoPanel({
           },
 
           onStateChange: (event: YTOnStateChangeEvent) => {
-            console.log("[VideoPanel] onStateChange", { data: event.data, awaiting: awaitingReuseLoadRef.current, target: latestSeekRef.current?.time });
+            const curTime = playerRef.current?.getCurrentTime();
+            console.log(`[VideoPanel] onStateChange data=${event.data} awaiting=${awaitingReuseLoadRef.current} target=${latestSeekRef.current?.time} currentTime=${curTime}`);
             if (!awaitingReuseLoadRef.current || !playerRef.current) return;
             awaitingReuseLoadRef.current = false;
 
             const target = latestSeekRef.current?.time;
             if (target !== undefined) {
+              console.log(`[VideoPanel] onStateChange applying correction seekTo(${target})`);
               playerRef.current.seekTo(target, true);
               playerRef.current.playVideo();
             }
@@ -205,10 +207,11 @@ export default function VideoPanel({
    * "play, backtrack, play again" stutter.
    */
   useEffect(() => {
-    console.log("[VideoPanel] SEEK HANDLER effect", { seekRequest, hasPlayer: !!playerRef.current, ready: playerReadyRef.current });
+    console.log(`[VideoPanel] SEEK HANDLER effect time=${seekRequest?.time} token=${seekRequest?.token} hasPlayer=${!!playerRef.current} ready=${playerReadyRef.current}`);
     if (seekRequest === null) return;
     if (!playerRef.current || !playerReadyRef.current) return;
 
+    console.log(`[VideoPanel] SEEK HANDLER calling seekTo(${seekRequest.time})`);
     playerRef.current.seekTo(seekRequest.time, true);
     playerRef.current.playVideo();
   }, [seekRequest]);
