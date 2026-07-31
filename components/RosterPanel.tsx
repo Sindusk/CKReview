@@ -96,8 +96,10 @@ function PlayerButton({
   roleSlot?: string;
   onClick:  () => void;
   // FFXIV's 4-row (2-column) layout has a lot fewer buttons to fit than
-  // WoW's 5-row grid, so it scales everything up ~50% to use the freed-up
-  // vertical space instead of leaving it blank — see RosterPanel's ffRows.
+  // WoW's 5-row grid, so it scales everything up (~30% over the WoW
+  // baseline, after dialing back an initial 50% bump that read too big)
+  // to use the freed-up vertical space instead of leaving it blank — see
+  // RosterPanel's ffRows.
   large?:   boolean;
 }) {
   const [hovered, setHovered] = useState(false);
@@ -105,7 +107,7 @@ function PlayerButton({
   const roleColor = getRoleColor(player.role);
   const iconSrc = getPlayerSpecIcon(player.game, player.specId, player.className);
 
-  const iconSize = large ? 39 : 26;
+  const iconSize = large ? 33 : 26;
 
   return (
     <button
@@ -117,9 +119,9 @@ function PlayerButton({
         display: "flex",
         flexDirection: "row",
         alignItems: "center",
-        gap: large ? "10px" : "6px",
-        padding: large ? "6px 10px" : "3px 5px",
-        borderRadius: large ? "6px" : "4px",
+        gap: large ? "8px" : "6px",
+        padding: large ? "5px 8px" : "3px 5px",
+        borderRadius: large ? "5px" : "4px",
         border: `1px solid ${hovered ? color + "66" : "#2a2a2a"}`,
         backgroundColor: hovered ? "#1a1a1a" : "#0d0d0d",
         cursor: "pointer",
@@ -133,7 +135,7 @@ function PlayerButton({
         alt=""
         width={iconSize}
         height={iconSize}
-        style={{ borderRadius: large ? "6px" : "4px", flexShrink: 0, border: `1px solid ${color}44` }}
+        style={{ borderRadius: large ? "5px" : "4px", flexShrink: 0, border: `1px solid ${color}44` }}
         onError={(e) => { e.currentTarget.style.visibility = "hidden"; }}
       />
       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", minWidth: 0, flex: 1 }}>
@@ -141,7 +143,7 @@ function PlayerButton({
           style={{
             color,
             fontWeight: 600,
-            fontSize: large ? "17px" : "12px",
+            fontSize: large ? "15px" : "12px",
             whiteSpace: "nowrap",
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -151,7 +153,7 @@ function PlayerButton({
         >
           {player.name}
         </span>
-        <span style={{ display: "flex", width: "100%", justifyContent: "space-between", alignItems: "baseline", gap: "4px", fontSize: large ? "14px" : "10px", color: "#555" }}>
+        <span style={{ display: "flex", width: "100%", justifyContent: "space-between", alignItems: "baseline", gap: "4px", fontSize: large ? "12px" : "10px", color: "#555" }}>
           {/* DPS shows the actual range category (Melee / Ranged, plus
               Caster for FFXIV) instead of a generic "DPS" label. */}
           <span style={{ color: roleColor, whiteSpace: "nowrap" }}>{player.role === "DPS" ? player.rangeType : player.role}</span>
