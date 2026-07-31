@@ -399,6 +399,30 @@
 // separate raid-wide "Mitigation Issue" call for a death to a single
 // unavoidable beam.
 //
+// ── WAVE CANNON BEAM OVERLAP (confirmed 2026-07-31, report h2JvDkntZCaBgmLF, ─
+// ── pull 12) ────────────────────────────────────────────────────────────
+//
+// Distinct from WAVE_CANNON_TOWER_OVERLAP below: this is an overlap on the
+// Wave Cannon BEAM itself (47784), before any tower even spawns. The 4
+// beams are cast as concurrent volleys (sourceInstance 1-4) at 4 separate
+// players; standing where two volleys' hitboxes cross gets a carrier hit by
+// BOTH — confirmed pull 12: Sonder Dreams and Salty Dango were each hit by
+// instances 1 and 4, ~45ms apart, and the doubled damage killed both of
+// them outright (killingAbilityGameId 47784). A full survey across every
+// sampled report found this same double-instance shape on 47784 in over a
+// dozen other pulls, and every single one was fatal — no clean/surviving
+// case exists in the data, so this is gated purely on outcome (2+ distinct
+// beam instances hitting one target), same "gate on outcome, no position
+// table" approach WAVE_CANNON_TOWER_OVERLAP already uses one mechanic beat
+// later.
+//
+// Losing 2 of the pull's 4 carriers this way is what starves
+// WAVE_CANNON_TOWER_OVERLAP/WAVE_CANNON_TOWER_MISSED below of any real
+// signal (see their own carrierDiedBeforeTowerResolved-style gates) — this
+// rule is what actually explains the resulting cascade, not a competing
+// theory. See GRAVEN_1_DEATH_WIPE_RULE_ID below for why a death here also
+// now ends the pull.
+//
 // ── WAVE CANNON TOWER OVERLAP (confirmed 2026-07-22, same report, pull 12) ─
 //
 // Each of the 4 Wave Cannon carriers drops a tower (47786) at their own
@@ -762,6 +786,22 @@
 // re-implemented that as a coarser role-based half-check and produced a
 // duplicate error for the same mistake — removed 2026-07-28.
 //
+// **Gap fixed 2026-07-31 (report h2JvDkntZCaBgmLF, pull 12):** the window
+// above ("first Mystery Magic cast through the second") was always meant to
+// cover Wave Cannon too (see the pull 1/2 confirmation right above) — but
+// the code only ever matched deaths whose killing blow was one of Mystery
+// Magic's own elemental ticks (MYSTERY_MAGIC_DEATH_ABILITY_IDS), so a death
+// to Wave Cannon's own beam (47784, see WAVE_CANNON_BEAM_OVERLAP above) fell
+// straight through the filter and never cut the pull short. Confirmed pull
+// 12: Sonder Dreams and Salty Dango died to overlapping Wave Cannon beams
+// well inside this same window (between the pull's two Mystery Magic
+// casts), and every other player then died within the next ~15s trying to
+// continue Confetti Knockback shorthanded — exactly the "Wave Cannon needs
+// all 8 alive" failure this rule already described in prose but didn't
+// actually check for in code. Fixed by widening the qualifying-death filter
+// to also include WAVE_CANNON_ABILITY_ID, with the description branching on
+// which cause actually applies.
+//
 // Per the user directly: raid-cutoff descriptions across this file should
 // avoid asserting a definitive outcome like "the raid wiped" — a raid-wide
 // mistake this severe is treated as a cutoff point for further per-player
@@ -988,6 +1028,7 @@ import { detectFFRoles, type FFRoleSlot } from "@/lib/mechanics/ffxiv/roles";
 
 export const BLIZZARD_III_SILENT_KILL_RULE_ID = "ffxiv-phase1-blizzard3-silent-kill";
 export const JUMPED_OFF_ARENA_RULE_ID          = "ffxiv-phase1-jumped-off-arena";
+export const WAVE_CANNON_BEAM_OVERLAP_RULE_ID    = "ffxiv-phase1-wave-cannon-beam-overlap";
 export const WAVE_CANNON_TOWER_OVERLAP_RULE_ID   = "ffxiv-phase1-wave-cannon-tower-overlap";
 export const WAVE_CANNON_TOWER_MISSED_RULE_ID    = "ffxiv-phase1-wave-cannon-tower-missed";
 export const WAVE_CANNON_TOWER_PRIORITY_RULE_ID  = "ffxiv-phase1-wave-cannon-tower-priority-missed";
@@ -1784,6 +1825,37 @@ function detectJumpedOffArenaError(players: PlayerInfo[], deathEvents: DeathEven
       abilityName: "Jumped Off The Arena",
     },
   ];
+}
+
+/**
+ * Detects a player caught standing in the overlap between two Wave Cannon
+ * BEAM volleys (before any tower even spawns), hit by both instead of the
+ * one they were meant to soak. See WAVE_CANNON_BEAM_OVERLAP module comment
+ * — gated purely on outcome (2+ distinct beam instances on one target),
+ * confirmed fatal every time it's happened across the full sample set.
+ */
+function detectWaveCannonBeamOverlapErrors(players: PlayerInfo[]): PullError[] {
+  const errors: PullError[] = [];
+  for (const player of players) {
+    const beamHits = player.damageTaken.filter((e) => e.abilityId === WAVE_CANNON_ABILITY_ID);
+    const distinctInstances = new Set(beamHits.map((e) => e.sourceInstance).filter((i) => i !== undefined));
+    if (distinctInstances.size < 2) continue;
+
+    errors.push({
+      ruleId:      WAVE_CANNON_BEAM_OVERLAP_RULE_ID,
+      severity:    "Major",
+      name:        "Soaked Multiple Wave Cannon Beams",
+      description: `Stood in the overlap between ${distinctInstances.size} Wave Cannon volleys and was hit by all of them — should only ever take one.`,
+      timestamp:   Math.min(...beamHits.map((e) => e.timestamp)),
+      player:      player.name,
+      class:       player.className,
+      specId:      player.specId,
+      role:        player.role,
+      abilityId:   WAVE_CANNON_ABILITY_ID,
+      abilityName: "Wave Cannon",
+    });
+  }
+  return errors;
 }
 
 /**
@@ -2846,7 +2918,13 @@ function detectGraven1DeathWipeError(
   enemyCasts:        EnemyEvent[],
   otherPhase1Errors: PullError[]
 ): PullError[] {
-  const mysteryMagicDeaths = deathEvents.filter((d) => MYSTERY_MAGIC_DEATH_ABILITY_IDS.has(d.killingAbilityGameId));
+  // Wave Cannon directly follows the first Mystery Magic and needs all 8
+  // players alive to resolve (see module comment) — so a death to Wave
+  // Cannon's own beam counts as a Graven-1-window death here too, not just
+  // Mystery Magic's own elemental resolution.
+  const mysteryMagicDeaths = deathEvents.filter(
+    (d) => MYSTERY_MAGIC_DEATH_ABILITY_IDS.has(d.killingAbilityGameId) || d.killingAbilityGameId === WAVE_CANNON_ABILITY_ID
+  );
   if (mysteryMagicDeaths.length === 0) return [];
 
   // Mystery Magic's own cast-to-resolution delay varies too widely for a
@@ -2879,16 +2957,21 @@ function detectGraven1DeathWipeError(
   );
 
   const victims = [...new Set(clusterDeaths.map((d) => d.player))];
+  const diedToWaveCannon = clusterDeaths.some((d) => d.killingAbilityGameId === WAVE_CANNON_ABILITY_ID);
+
+  const description = diedToWaveCannon
+    ? `${victims.join(" and ")} died to Wave Cannon before Graven 1 could fully resolve — needs all 8 players alive to reach Wave Cannon and Confetti, so this is treated as a cutoff point for further per-player analysis this pull.`
+    : `${victims.join(" and ")} died during Graven 1's Mystery Magic resolution — Wave Cannon needs all 8 players alive to resolve, so this is treated as a cutoff point for further per-player analysis this pull.`;
 
   return [
     {
       ruleId:      GRAVEN_1_DEATH_WIPE_RULE_ID,
       severity:    "Raid",
       name:        "Graven 1 Wipe",
-      description: `${victims.join(" and ")} died during Graven 1's Mystery Magic resolution — Wave Cannon needs all 8 players alive to resolve, so this is treated as a cutoff point for further per-player analysis this pull.`,
+      description,
       timestamp:   cutoff + 1,
       abilityId:   0,
-      abilityName: "Mystery Magic",
+      abilityName: diedToWaveCannon ? "Wave Cannon" : "Mystery Magic",
     },
   ];
 }
@@ -3617,6 +3700,7 @@ export function detectPhase1Errors(
     ...detectHyperdriveOutOfPositionErrors(players, deathEvents),
     ...blizzardIIISilentKillErrors,
     ...detectJumpedOffArenaError(players, deathEvents),
+    ...detectWaveCannonBeamOverlapErrors(players),
     ...detectWaveCannonTowerOverlapErrors(players, deathEvents),
     ...detectWaveCannonTowerMissedErrors(players, deathEvents, enemyCasts),
     ...detectWaveCannonSupportPriorityErrors(players, deathEvents, enemyCasts),
