@@ -535,11 +535,8 @@ function detectDashErrors(
   const SELF_HEAL_STALENESS_MS = 5000;
   const findOwnPositionNear = (player: PlayerInfo, atOrBefore: number): { x: number; y: number } | undefined =>
     findPlayerPosition(player, atOrBefore, {
-      windowMs:        SELF_HEAL_STALENESS_MS,
-      direction:       "atOrBefore",
-      healing:         "self",
-      healingReceived: "any",
-      casts:           "self",
+      windowMs:  SELF_HEAL_STALENESS_MS,
+      direction: "atOrBefore",
     });
 
   // Slot(k) -> instance, the inverse of slotIndexFor, so an actual stood

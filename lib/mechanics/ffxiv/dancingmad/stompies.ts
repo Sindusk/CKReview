@@ -333,8 +333,6 @@ function nearestPosition(player: PlayerInfo, timestamp: number, playerPositionSa
   return findPlayerPosition(player, timestamp, {
     windowMs:        MAX_POSITION_SAMPLE_AGE_MS,
     positionSamples: playerPositionSamples,
-    healingReceived: "any",
-    casts:           "self",
   }) ?? null;
 }
 

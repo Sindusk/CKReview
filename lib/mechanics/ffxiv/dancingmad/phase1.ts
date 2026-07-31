@@ -1003,7 +1003,10 @@
 // Ayumi Emi) is unaffected — in practice a player almost always takes
 // SOME other incidental damage before the explosion within the position
 // window, which correctly out-competes the explosion hit as the nearer
-// bracket. Left on.
+// bracket. Left on — and shortly after this, stream selection was removed
+// from `findPlayerPosition`/`interpolatePlayerPosition` entirely (every
+// stream is now always checked), so these call sites no longer pass
+// `damageTaken`/`healing`/`casts`/`healingReceived` at all.
 //
 // Graven Image's spread mechanic (~0:38, cast "Graven Image", 48370) lives
 // in its own file, graven-image.ts, NOT here — unlike everything else in
@@ -2008,10 +2011,7 @@ function resolveDpsSideAssignments(players: PlayerInfo[], waveCannonTime: number
   const withPosition = meleePlayers.map((player) => ({
     player,
     pos: interpolatePlayerPosition(player, waveCannonTime, {
-      windowMs:        WAVE_CANNON_ROLE_POSITION_WINDOW_MS,
-      healing:         "self",
-      healingReceived: "any",
-      casts:           "self",
+      windowMs: WAVE_CANNON_ROLE_POSITION_WINDOW_MS,
     }),
   }));
   if (withPosition.some((m) => !m.pos)) return null; // can't confirm — fail closed, don't guess
@@ -2627,11 +2627,7 @@ function detectGraven2PuddlePlacementErrors(players: PlayerInfo[], enemyCasts: E
     const snapPositions = new Map<string, { x: number; y: number }>();
     for (const player of group) {
       const pos = interpolatePlayerPosition(player, snapshotTime, {
-        windowMs:        GRAVEN_2_PUDDLE_PLACEMENT_POSITION_WINDOW_MS,
-        healing:         "self",
-        damageTaken:     true,
-        casts:           "self",
-        healingReceived: "any",
+        windowMs: GRAVEN_2_PUDDLE_PLACEMENT_POSITION_WINDOW_MS,
       });
       if (pos) snapPositions.set(player.name, pos);
     }
@@ -2739,12 +2735,8 @@ function detectGraven2PuddleLingerErrors(players: PlayerInfo[], enemyCasts: Enem
   const errors: PullError[] = [];
   for (const drop of dropPosByPlayer.values()) {
     const currentPos = findPlayerPosition(drop.player, explosionCastTime, {
-      windowMs:        GRAVEN_2_PUDDLE_LINGER_POSITION_WINDOW_MS,
-      direction:       "atOrBefore",
-      healing:         "self",
-      damageTaken:     true,
-      casts:           "self",
-      healingReceived: "any",
+      windowMs:  GRAVEN_2_PUDDLE_LINGER_POSITION_WINDOW_MS,
+      direction: "atOrBefore",
     });
     if (!currentPos) continue; // no reliably-recent position — fail closed, don't guess
 
@@ -3130,11 +3122,7 @@ function detectConfettiKnockbackVictimErrors(players: PlayerInfo[]): PullError[]
 
     for (const player of stack) {
       const pos = interpolatePlayerPosition(player, snapshotTime, {
-        windowMs:        CONFETTI_POSITION_WINDOW_MS,
-        healing:         "self",
-        damageTaken:     true,
-        casts:           "self",
-        healingReceived: "any",
+        windowMs: CONFETTI_POSITION_WINDOW_MS,
       });
       if (!pos) continue; // can't confirm their position — fail closed, don't guess
 
@@ -3192,11 +3180,7 @@ function detectConfettiHolderMisplacedErrors(players: PlayerInfo[]): PullError[]
 
     for (const { player } of holders) {
       const pos = interpolatePlayerPosition(player, snapshotTime, {
-        windowMs:        CONFETTI_POSITION_WINDOW_MS,
-        healing:         "self",
-        damageTaken:     true,
-        casts:           "self",
-        healingReceived: "any",
+        windowMs: CONFETTI_POSITION_WINDOW_MS,
       });
       if (!pos) continue; // can't confirm their position — fail closed, don't guess
 
@@ -3333,11 +3317,7 @@ function detectConfettiFinalPositionMisplacedErrors(players: PlayerInfo[]): Pull
   const errors: PullError[] = [];
   for (const player of players) {
     const pos = interpolatePlayerPosition(player, snapshotTime, {
-      windowMs:        CONFETTI_POSITION_WINDOW_MS,
-      healing:         "self",
-      damageTaken:     true,
-      casts:           "self",
-      healingReceived: "any",
+      windowMs: CONFETTI_POSITION_WINDOW_MS,
     });
     if (!pos) continue; // can't confirm their position — fail closed, don't guess
 
@@ -3541,12 +3521,7 @@ function detectTeleTrouncingBaitPositionErrors(players: PlayerInfo[], enemyCasts
   // between bracketing samples pulled 2 of the 3 confirmed-failure players
   // toward a blended, mid-motion point that read as within threshold.
   const positionOf = (player: PlayerInfo) =>
-    findPlayerPosition(player, snapshotTime, {
-      windowMs:        TELE_TROUNCING_BAIT_POSITION_WINDOW_MS,
-      healing:         "self",
-      casts:           "self",
-      healingReceived: "any",
-    });
+    findPlayerPosition(player, snapshotTime, { windowMs: TELE_TROUNCING_BAIT_POSITION_WINDOW_MS });
 
   const posBySlot = new Map<FFRoleSlot, Point>();
   const rawPosBySlot = new Map<FFRoleSlot, Point>(); // un-converted (FFLogs raw centi-yalms), for the radius check

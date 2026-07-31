@@ -1254,23 +1254,17 @@ function findNearestPosition(
   timestamp: number,
   windowMs:  number
 ): { x: number; y: number } | undefined {
-  // Was `healing: "all"` — grandfathered, since it trusts EVERY healing
+  // Was `healing: "all"` — grandfathered, since it trusted EVERY healing
   // entry as this player's own position, which is only safe under the
   // harness's received-heals orientation; under the real app's cast-heals
-  // orientation it can read the position of whoever THIS PLAYER healed
-  // instead (see player-position.ts's header). Fixed 2026-07-31 (per the
-  // user: use every available stream, always, everywhere) by swapping to
-  // the correctly-oriented pair that covers strictly MORE ground than
-  // "all" ever safely could: `healing: "self"` (this player's own
-  // self-heals) plus `healingReceived: "any"` (heals landing on this
-  // player from ANY source — unconditionally trustworthy, no orientation
-  // caveat) and `casts: "self"` (a self-target cast, e.g. a self-buff).
-  return findPlayerPosition(player, timestamp, {
-    windowMs,
-    healing:         "self",
-    healingReceived: "any",
-    casts:           "self",
-  });
+  // orientation it could read the position of whoever THIS PLAYER healed
+  // instead (see player-position.ts's header). Fixed 2026-07-31 by
+  // switching to the shared lookup's now-unconditional stream set, which
+  // covers strictly MORE ground than "all" ever safely could without the
+  // orientation risk (self-heals, self-casts, and `healingReceived` —
+  // heals landing on this player from ANY source, unconditionally
+  // trustworthy, no orientation caveat).
+  return findPlayerPosition(player, timestamp, { windowMs });
 }
 
 function detectWrongTowerPositionErrors(

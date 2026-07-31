@@ -194,6 +194,11 @@
 // timestamp 1ms before that hit, so the hit itself was never actually
 // reachable through this option regardless. Enabled it anyway; verified
 // zero ruling violations.
+//
+// Stream selection was removed from `findPlayerPosition`'s options
+// entirely shortly after (same date) — every stream is now always
+// checked, so both call sites below only ever pass `windowMs`/`direction`
+// now. See player-position.ts's own header for the full reasoning.
 
 import type { Pull } from "@/types/Pull";
 import type { PlayerInfo } from "@/types/PlayerInfo";
@@ -429,12 +434,8 @@ export function detectGravenImageSpreadErrors(pull: Pull, layout: GravenImageLay
     // inflates it.
     const current = nearestHalf(spot, c.x, c.y);
     const priorPos = findPlayerPosition(c.player, c.timestamp - 1, {
-      windowMs:        PRIOR_SNAPSHOT_WINDOW_MS,
-      direction:       "atOrBefore",
-      healing:         "self",
-      casts:           "self",
-      damageTaken:     true,
-      healingReceived: "any",
+      windowMs:  PRIOR_SNAPSHOT_WINDOW_MS,
+      direction: "atOrBefore",
     });
     const prior = priorPos ? nearestHalf(spot, priorPos.x, priorPos.y) : null;
 
@@ -552,12 +553,7 @@ export function detectGravenImageStackErrors(pull: Pull): PullError[] {
     const missing = side.members.filter((m) => !group.some((g) => g.player.actorId === m.actorId));
 
     for (const player of missing) {
-      const pos = findPlayerPosition(player, anchorTimestamp, {
-        windowMs:        STACK_POSITION_WINDOW_MS,
-        healing:         "self",
-        casts:           "self",
-        healingReceived: "any",
-      });
+      const pos = findPlayerPosition(player, anchorTimestamp, { windowMs: STACK_POSITION_WINDOW_MS });
       if (!pos) continue; // can't confirm they were actually away — fail closed, don't guess
 
       const distance = Math.hypot(pos.x - anchorX, pos.y - anchorY);

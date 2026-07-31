@@ -4,9 +4,7 @@
 // every mechanic module (FFXIV and WoW). Replaces four near-identical
 // per-module implementations (forsaken's findNearestPosition, limitcut's
 // findOwnPositionNear, stompies' and midnightfalls' nearestPosition) that
-// had drifted into small variations — the variations were real, though
-// (each module's streams/direction/window are tuned to validated behavior),
-// so they're expressed here as options and each module passes its own.
+// had drifted into small variations.
 //
 // ── WHICH EVENT STREAMS CARRY A PLAYER'S OWN POSITION (the whole reason
 //    this is subtle — see lib/mechanics/README.md's position-semantics
@@ -22,25 +20,21 @@
 //   self-heal), the validation harness's is heals RECEIVED BY this player
 //   (source === player.name marks the same thing). A SELF-heal is the one
 //   entry safe to read as "this player's own position" under EITHER
-//   orientation, which is why `healing: "self"` checks BOTH target and
-//   source against the player's name. This dual-check exists because the
-//   single-sided version passed every harness run clean and still produced
-//   scrambled results in the real app (wrong players flagged on report
-//   LF2yJZabVprjXYvm pull 1) — the harness's orientation made ANY healing
-//   entry a valid self-position sample, hiding the bug.
-//   Natural HP regen (ability 1302, ~every 3s in FFXIV) makes self-heals a
-//   dependable passive position source even for idle players.
+//   orientation — checked via BOTH target and source against the player's
+//   name. This dual-check exists because the single-sided version passed
+//   every harness run clean and still produced scrambled results in the
+//   real app (wrong players flagged on report LF2yJZabVprjXYvm pull 1) —
+//   the harness's orientation made ANY healing entry a valid self-position
+//   sample, hiding the bug. Natural HP regen (ability 1302, ~every 3s in
+//   FFXIV) makes self-heals a dependable passive position source even for
+//   idle players.
 // - `positionSamples` — positions from something the player DID (landed a
 //   hit on the boss), via FFLogs' hostilityType:Enemies + DamageTaken
 //   stream (fflBuildPlayerPositionSamples). ~GCD-density for anyone
 //   actively attacking; the only stream that stays live through a pure
-//   repositioning window where nothing happens TO the player. FFXIV-only.
-// - `healing: "all"` — trusts every healing entry's x/y as this player's
-//   position. Only correct under the harness's received-heals orientation;
-//   under the app's cast-heals orientation it can return a heal RECIPIENT's
-//   position instead. Grandfathered for forsaken.ts, whose validated
-//   behavior was tuned with this fallback — do NOT use it in new code; use
-//   "self" (the default).
+//   repositioning window where nothing happens TO the player. FFXIV-only,
+//   and the only stream that isn't part of PlayerInfo itself — a mechanic
+//   module builds this array separately and passes it in per call.
 // - `player.casts` — same shape as healing: x/y belongs to whoever the cast
 //   TARGETED, and only a genuine self-target cast (target === player.name,
 //   e.g. a self-buff) is safe to read as this player's own position. Unlike
@@ -57,8 +51,7 @@
 //   Q3GzJNZg64k1hLRm pull 18): a non-healer (tank/DPS) rarely self-heals,
 //   starving `healing`-based lookups, but lands a raid heal from an actual
 //   healer almost every GCD — by far the densest position source here
-//   short of damageTaken. Prefer this over `healing:"self"` for any new
-//   FF code; empty for WoW (WCLHealEvent carries no position).
+//   short of damageTaken. Empty for WoW (WCLHealEvent carries no position).
 //
 // Always give `windowMs` a deliberate value: a position sample that's too
 // old can predate the player's final, fatal move (a real case had a heal 8s
@@ -66,41 +59,37 @@
 // on). Fail closed — returning undefined is better than trusting a stale
 // position.
 //
-// ── STANDING POLICY (2026-07-31): USE EVERY STREAM, ALWAYS ─────────────────
+// ── EVERY STREAM IS ALWAYS CHECKED — NOT CONFIGURABLE (2026-07-31) ────────
 //
-// Per the user directly: every call site here should request every stream
-// capable of carrying real position data — `healing: "self"`,
-// `healingReceived: "any"`, `casts: "self"`, `damageTaken` (default true),
-// plus `positionSamples` wherever a mechanic has them — never a
-// deliberately narrowed subset "for accuracy" or out of caution. Found via
-// a real, confirmed bug: wave-cannon.ts's snapshot-offset interpolation
-// only enabled `healing: "self"`, so a stale 1.3s-old self-heal bracket
-// manufactured a "still walking" position for a player the user confirmed
-// via VOD was already stationary — `healingReceived` (added 2026-07-29,
-// see above) would have supplied a bracket sample ~700ms closer to the
-// truth the whole time. Audited and fixed every call site across every FF
-// module the same day (forsaken.ts, graven-image.ts, limitcut.ts,
-// phase1.ts, stompies.ts, wave-cannon.ts) plus WoW's midnightfalls.ts
-// (a no-op there today — WoW's healing/cast events carry no x/y at all,
-// see wclHealToPlayerEvent — but enabled anyway for parity and in case
-// that ever changes).
+// This used to be a per-call-site choice (`healing: "self"|"all"|"none"`,
+// `casts: "self"|"none"`, `healingReceived: "any"|"none"`, `damageTaken:
+// boolean`) so each module could opt in gradually as streams were added.
+// That configurability turned into a real bug: wave-cannon.ts's
+// snapshot-offset interpolation only ever enabled `healing: "self"`, so a
+// stale 1.3s-old self-heal bracket manufactured a "still walking" position
+// for a player the user confirmed via VOD was already stationary —
+// `healingReceived` (added 2026-07-29) would have supplied a bracket
+// sample ~700ms closer to the truth the whole time, but nobody had gone
+// back to wire it in. A full audit (2026-07-31) found every other module
+// in the same state to varying degrees (forsaken.ts was even using the
+// unsafe `healing: "all"` fallback). Per the user directly: there is no
+// good reason a position lookup should ever deliberately ignore a stream
+// that could carry real data, so the choice was removed rather than left
+// as a footgun for the next mechanic to quietly under-use. `damageTaken`,
+// `healing` (self dual-check), `casts` (self-target), and
+// `healingReceived` are now ALWAYS checked — the only remaining knobs are
+// `windowMs` (staleness bound, still genuinely per-call), `direction`
+// (temporal semantics — "nearest" vs "atOrBefore" — not a stream choice),
+// and `positionSamples` (an external array a caller must supply, not a
+// toggle on data that already lives on PlayerInfo).
 //
-// The one exception that's NOT a violation of this: a call site that
-// deliberately excludes the SAME event it's independently cross-checking
-// against (e.g. graven-image.ts's "prior position" fallback used to
-// exclude damageTaken specifically so it couldn't just re-find the hit
-// it's meant to double-check) is about avoiding a tautological read, not
-// about narrowing real data — verify whether the exclusion is actually
-// reachable before assuming it's needed (that graven-image.ts case turned
-// out to already be structurally unreachable via its `atOrBefore` timing,
-// and was enabled anyway once confirmed safe). When adding a NEW call
-// site, request everything by default and only exclude a stream if there
-// is a specific, documented, self-reference reason to.
-//
-// Any new gap like this should be treated as a bug to fix, not a
-// pre-existing narrower stream to leave alone — audit newly-written call
-// sites against this list whenever a new position-sampling helper is added
-// to a mechanic module.
+// If a future mechanic genuinely needs to exclude a stream (e.g. to avoid
+// re-finding the exact same event it's independently cross-checking
+// against — the shape graven-image.ts's "prior position" fallback used to
+// worry about, though that case turned out to already be unreachable via
+// its own `atOrBefore` timing), that's a deliberate, visible change to
+// THIS shared function, not a quiet per-call-site opt-out — treat it as
+// rare enough to warrant its own review, not a default anyone reaches for.
 
 import type { PlayerInfo } from "@/types/PlayerInfo";
 
@@ -130,47 +119,23 @@ export interface FindPlayerPositionOptions {
    * (e.g. where someone stood BEFORE a dash resolved).
    */
   direction?: "nearest" | "atOrBefore";
-  /**
-   * Which healing entries to trust as this player's own position:
-   * "self" (default) — only self-heals, via the target-AND-source dual
-   * check (see header); "all" — every entry (grandfathered, forsaken only);
-   * "none" — ignore healing entirely (WoW midnightfalls' convention).
-   */
-  healing?: "self" | "all" | "none";
-  /** Include `player.damageTaken` (default true). */
-  damageTaken?: boolean;
-  /**
-   * Which cast entries to trust as this player's own position: "self" —
-   * only self-target casts (target === player.name, see header); "none"
-   * (default — opt-in, unlike healing, so this brand-new stream doesn't
-   * change any existing caller's behavior) — ignore casts entirely.
-   */
-  casts?: "self" | "none";
-  /**
-   * Whether to trust `player.healingReceived` (heals landing ON this
-   * player, from ANY source — see header) as a position source: "any"
-   * (every entry, no self-cast caveat needed) or "none" (default — opt-in,
-   * like casts, so this brand-new stream doesn't change any existing
-   * caller's behavior).
-   */
-  healingReceived?: "any" | "none";
   /** External per-player samples (FFXIV boss-hit stream); filtered to this player by name. */
   positionSamples?: PositionSample[];
 }
 
 /**
- * This player's own position closest to `timestamp`, from every stream the
- * options enable, or undefined if nothing lands within `windowMs`.
- * Streams are considered in order (damageTaken, healing, casts,
- * healingReceived, positionSamples) and ties keep the earliest-considered
- * sample, preserving each original implementation's tie-breaking.
+ * This player's own position closest to `timestamp`, from every stream that
+ * can carry one (damageTaken, self-heals, self-casts, healingReceived, plus
+ * `positionSamples` if given), or undefined if nothing lands within
+ * `windowMs`. Streams are considered in that order and ties keep the
+ * earliest-considered sample.
  */
 export function findPlayerPosition(
   player: PlayerInfo,
   timestamp: number,
   options: FindPlayerPositionOptions
 ): Position | undefined {
-  const { windowMs, direction = "nearest", healing = "self", damageTaken = true, casts = "none", healingReceived = "none", positionSamples } = options;
+  const { windowMs, direction = "nearest", positionSamples } = options;
 
   let best: Position | undefined;
   let bestScore = Infinity;
@@ -181,24 +146,16 @@ export function findPlayerPosition(
     if (score < bestScore) { bestScore = score; best = { x, y }; }
   };
 
-  if (damageTaken) {
-    for (const e of player.damageTaken) consider(e.timestamp, e.x, e.y);
+  for (const e of player.damageTaken) consider(e.timestamp, e.x, e.y);
+  for (const e of player.healing) {
+    if (e.target !== player.name && e.source !== player.name) continue;
+    consider(e.timestamp, e.x, e.y);
   }
-  if (healing !== "none") {
-    for (const e of player.healing) {
-      if (healing === "self" && e.target !== player.name && e.source !== player.name) continue;
-      consider(e.timestamp, e.x, e.y);
-    }
+  for (const e of player.casts) {
+    if (e.target !== player.name) continue;
+    consider(e.timestamp, e.x, e.y);
   }
-  if (casts === "self") {
-    for (const e of player.casts) {
-      if (e.target !== player.name) continue;
-      consider(e.timestamp, e.x, e.y);
-    }
-  }
-  if (healingReceived === "any") {
-    for (const e of player.healingReceived) consider(e.timestamp, e.x, e.y);
-  }
+  for (const e of player.healingReceived) consider(e.timestamp, e.x, e.y);
   if (positionSamples) {
     for (const s of positionSamples) {
       if (s.playerName !== player.name) continue;
@@ -210,32 +167,24 @@ export function findPlayerPosition(
 
 function gatherPositionSamples(
   player:  PlayerInfo,
-  options: Omit<FindPlayerPositionOptions, "windowMs" | "direction">
+  options: Pick<FindPlayerPositionOptions, "positionSamples">
 ): { timestamp: number; x: number; y: number }[] {
-  const { healing = "self", damageTaken = true, casts = "none", healingReceived = "none", positionSamples } = options;
+  const { positionSamples } = options;
   const samples: { timestamp: number; x: number; y: number }[] = [];
   const add = (t: number, x: number | undefined, y: number | undefined) => {
     if (x !== undefined && y !== undefined) samples.push({ timestamp: t, x, y });
   };
 
-  if (damageTaken) {
-    for (const e of player.damageTaken) add(e.timestamp, e.x, e.y);
+  for (const e of player.damageTaken) add(e.timestamp, e.x, e.y);
+  for (const e of player.healing) {
+    if (e.target !== player.name && e.source !== player.name) continue;
+    add(e.timestamp, e.x, e.y);
   }
-  if (healing !== "none") {
-    for (const e of player.healing) {
-      if (healing === "self" && e.target !== player.name && e.source !== player.name) continue;
-      add(e.timestamp, e.x, e.y);
-    }
+  for (const e of player.casts) {
+    if (e.target !== player.name) continue;
+    add(e.timestamp, e.x, e.y);
   }
-  if (casts === "self") {
-    for (const e of player.casts) {
-      if (e.target !== player.name) continue;
-      add(e.timestamp, e.x, e.y);
-    }
-  }
-  if (healingReceived === "any") {
-    for (const e of player.healingReceived) add(e.timestamp, e.x, e.y);
-  }
+  for (const e of player.healingReceived) add(e.timestamp, e.x, e.y);
   if (positionSamples) {
     for (const s of positionSamples) {
       if (s.playerName !== player.name) continue;

@@ -182,10 +182,7 @@ function extractHits(players: PlayerInfo[]): RawHit[] {
     for (const e of player.damageTaken) {
       if (e.abilityId !== WAVE_CANNON_ABILITY_ID || e.x === undefined || e.y === undefined) continue;
       const snapshot = interpolatePlayerPosition(player, e.timestamp - WAVE_CANNON_SNAPSHOT_OFFSET_MS, {
-        windowMs:        WAVE_CANNON_POSITION_WINDOW_MS,
-        healing:         "self",
-        healingReceived: "any",
-        casts:           "self",
+        windowMs: WAVE_CANNON_POSITION_WINDOW_MS,
       });
       const { x, y } = snapshot ?? { x: e.x, y: e.y };
       hits.push({ actorId: player.actorId, player, timestamp: e.timestamp, sourceInstance: e.sourceInstance, x, y });
