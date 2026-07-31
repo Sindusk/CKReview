@@ -561,10 +561,12 @@ export default function RosterPanel({ players, playbackTimeMs, mitigationPlan }:
   const rangedCount = dps.filter(player => player.rangeType === "Ranged").length;
   const casterCount = dps.filter(player => player.rangeType === "Caster").length;
 
-  // FFXIV has a fixed 8-man comp, so it gets a dedicated 4-column layout —
-  // Tanks / Healers / Melee / Ranged+Caster, each column sorted by its
-  // auto-detected party slot (MT before OT, H1 before H2, etc.) — instead
-  // of the generic WoW grid below, which has to handle arbitrary raid sizes.
+  // FFXIV has a fixed 8-man comp, so it gets a dedicated layout — 2 columns
+  // x 4 rows, paired by role (MT/OT, H1/H2, M1/M2, R1/R2), each pair sorted
+  // by its auto-detected party slot — instead of the generic WoW grid
+  // below, which has to handle arbitrary raid sizes. Two wide columns give
+  // FFXIV's longer first+last-name player names much more room than the
+  // old 4-column grid did.
   const isFF = filteredPlayers[0]?.game === "ffxiv";
 
   function sortBySlot(list: PlayerInfo[]): PlayerInfo[] {
@@ -575,13 +577,19 @@ export default function RosterPanel({ players, playbackTimeMs, mitigationPlan }:
     });
   }
 
-  const ffColumns = isFF
+  const ffRows: (PlayerInfo | null)[][] = isFF
     ? [
-        { label: "Tanks",   players: sortBySlot(filteredPlayers.filter(p => p.role === "Tank")) },
-        { label: "Healers", players: sortBySlot(filteredPlayers.filter(p => p.role === "Healer")) },
-        { label: "Melee",   players: sortBySlot(filteredPlayers.filter(p => p.role === "DPS" && p.rangeType === "Melee")) },
-        { label: "Ranged",  players: sortBySlot(filteredPlayers.filter(p => p.role === "DPS" && p.rangeType !== "Melee")) },
-      ]
+        sortBySlot(filteredPlayers.filter(p => p.role === "Tank")),
+        sortBySlot(filteredPlayers.filter(p => p.role === "Healer")),
+        sortBySlot(filteredPlayers.filter(p => p.role === "DPS" && p.rangeType === "Melee")),
+        sortBySlot(filteredPlayers.filter(p => p.role === "DPS" && p.rangeType !== "Melee")),
+      ].flatMap(group => {
+        const pairs: (PlayerInfo | null)[][] = [];
+        for (let i = 0; i < group.length; i += 2) {
+          pairs.push([group[i], group[i + 1] ?? null]);
+        }
+        return pairs;
+      })
     : [];
 
   const COLS = 4;
@@ -610,17 +618,21 @@ export default function RosterPanel({ players, playbackTimeMs, mitigationPlan }:
       </div>
 
       {isFF ? (
-        <div style={{ flex: 1, display: "flex", gap: "8px", padding: "8px", boxSizing: "border-box", overflow: "hidden" }}>
-          {ffColumns.map(col => (
-            <div key={col.label} style={{ flex: 1, display: "flex", flexDirection: "column", gap: "4px", minWidth: 0 }}>
-              {col.players.map(player => (
-                <PlayerButton
-                  key={player.actorId}
-                  player={player}
-                  roleSlot={roleSlotByActorId.get(player.actorId)}
-                  onClick={() => setSelectedPlayer(player)}
-                />
-              ))}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "4px", padding: "8px", boxSizing: "border-box", overflow: "hidden" }}>
+          {ffRows.map((row, ri) => (
+            <div key={ri} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
+              {row.map((player, ci) =>
+                player ? (
+                  <PlayerButton
+                    key={player.actorId}
+                    player={player}
+                    roleSlot={roleSlotByActorId.get(player.actorId)}
+                    onClick={() => setSelectedPlayer(player)}
+                  />
+                ) : (
+                  <div key={ci} />
+                )
+              )}
             </div>
           ))}
         </div>

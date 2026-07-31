@@ -1,8 +1,42 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { Vod } from "../types/Vod";
 import PullList from "../components/PullList";
 import type { Pull } from "../types/Pull";
+
+// Module-level cache (not component state) so switching pulls/remounting
+// this sidebar doesn't re-fetch a title we already have this session.
+const titleCache = new Map<string, string>();
+
+// YouTube's oEmbed endpoint is public, keyless, and CORS-enabled — good
+// enough for a "what video is this" label without wiring up a real API key
+// or persisting the title alongside the VOD.
+function useYouTubeTitle(videoId: string): string | null {
+  const [title, setTitle] = useState<string | null>(titleCache.get(videoId) ?? null);
+
+  useEffect(() => {
+    const cached = titleCache.get(videoId);
+    if (cached) {
+      setTitle(cached);
+      return;
+    }
+
+    let cancelled = false;
+    fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${videoId}`)}&format=json`)
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => {
+        if (cancelled || !data?.title) return;
+        titleCache.set(videoId, data.title);
+        setTitle(data.title);
+      })
+      .catch(() => {});
+
+    return () => { cancelled = true; };
+  }, [videoId]);
+
+  return title;
+}
 
 type VODSidebarProps = {
   vods: Vod[];
@@ -56,7 +90,7 @@ export default function VODSidebar({
       <div
         style={{
           flex:       "0 0 auto",
-          height:     "86px",
+          height:     "112px",
           minHeight:  0,
           overflowX:  "auto",
           overflowY:  "hidden",
@@ -73,74 +107,15 @@ export default function VODSidebar({
           </div>
         )}
 
-        {vods.map(vod => {
-          const isSelected = vod.id === selectedVodId;
-
-          return (
-            <div
-              key={vod.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => onSelectVod(vod.id)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  onSelectVod(vod.id);
-                }
-              }}
-              style={{
-                textAlign: "left",
-                padding: "8px 6px",
-                borderRadius: "6px",
-                border: isSelected ? "1px solid #3b82f6" : "1px solid #333",
-                backgroundColor: isSelected ? "#1e293b" : "#111",
-                color: "white",
-                cursor: "pointer",
-                width: "130px",
-                flexShrink: 0,
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "space-between",
-                overflow: "hidden",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "4px" }}>
-                <div style={{ width: "16px", flexShrink: 0 }} />
-                <div style={{ fontWeight: "bold", fontSize: "12px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center", flex: 1 }}>
-                  {vod.player}
-                </div>
-                <button
-                  title="View transcript"
-                  onClick={(e) => { e.stopPropagation(); onOpenTranscript(vod.id); }}
-                  style={{
-                    flexShrink: 0,
-                    width: "16px",
-                    height: "16px",
-                    lineHeight: "16px",
-                    padding: 0,
-                    fontSize: "10px",
-                    color: "#94a3b8",
-                    backgroundColor: "#1f1f1f",
-                    border: "1px solid #333",
-                    borderRadius: "4px",
-                    cursor: "pointer",
-                  }}
-                >
-                  T
-                </button>
-              </div>
-              <div style={{ display: "flex", justifyContent: "center", alignItems: "center", flex: 1 }}>
-                {/* YouTube icon — every VOD is a YouTube video (see types/Vod.ts's
-                    videoId/embedUrl), so this just marks that at a glance instead
-                    of spelling out the URL as plain text. */}
-                <svg viewBox="0 0 28 20" width="28" height="20" aria-hidden="true">
-                  <rect x="0" y="0" width="28" height="20" rx="5" fill="#f87171" opacity="0.85" />
-                  <path d="M11 6 L19 10 L11 14 Z" fill="#1a1a1a" />
-                </svg>
-              </div>
-            </div>
-          );
-        })}
+        {vods.map(vod => (
+          <VodCard
+            key={vod.id}
+            vod={vod}
+            isSelected={vod.id === selectedVodId}
+            onSelectVod={onSelectVod}
+            onOpenTranscript={onOpenTranscript}
+          />
+        ))}
       </div>
 
       <PullList
@@ -148,6 +123,101 @@ export default function VODSidebar({
         selectedPullId={selectedPullId}
         onSelectPull={onSelectPull}
       />
+    </div>
+  );
+}
+
+function VodCard({
+  vod,
+  isSelected,
+  onSelectVod,
+  onOpenTranscript,
+}: {
+  vod: Vod;
+  isSelected: boolean;
+  onSelectVod: (id: number) => void;
+  onOpenTranscript: (id: number) => void;
+}) {
+  const title = useYouTubeTitle(vod.videoId);
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => onSelectVod(vod.id)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelectVod(vod.id);
+        }
+      }}
+      style={{
+        textAlign: "left",
+        padding: "8px 6px",
+        borderRadius: "6px",
+        border: isSelected ? "1px solid #3b82f6" : "1px solid #333",
+        backgroundColor: isSelected ? "#1e293b" : "#111",
+        color: "white",
+        cursor: "pointer",
+        width: "150px",
+        flexShrink: 0,
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "space-between",
+        overflow: "hidden",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "4px" }}>
+        <div style={{ width: "16px", flexShrink: 0 }} />
+        <div style={{ fontWeight: "bold", fontSize: "12px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center", flex: 1 }}>
+          {vod.player}
+        </div>
+        <button
+          title="View transcript"
+          onClick={(e) => { e.stopPropagation(); onOpenTranscript(vod.id); }}
+          style={{
+            flexShrink: 0,
+            width: "16px",
+            height: "16px",
+            lineHeight: "16px",
+            padding: 0,
+            fontSize: "10px",
+            color: "#94a3b8",
+            backgroundColor: "#1f1f1f",
+            border: "1px solid #333",
+            borderRadius: "4px",
+            cursor: "pointer",
+          }}
+        >
+          T
+        </button>
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: "4px 0" }}>
+        {/* YouTube icon — every VOD is a YouTube video (see types/Vod.ts's
+            videoId/embedUrl), so this just marks that at a glance instead
+            of spelling out the URL as plain text. */}
+        <svg viewBox="0 0 28 20" width="24" height="17" aria-hidden="true">
+          <rect x="0" y="0" width="28" height="20" rx="5" fill="#f87171" opacity="0.85" />
+          <path d="M11 6 L19 10 L11 14 Z" fill="#1a1a1a" />
+        </svg>
+      </div>
+
+      {/* Video title, fetched from YouTube's oEmbed endpoint — replaces the
+          old plain truncated URL with something actually meaningful. */}
+      <div
+        title={title ?? undefined}
+        style={{
+          fontSize: "10px",
+          color: "#aaa",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+          textAlign: "center",
+        }}
+      >
+        {title ?? " "}
+      </div>
     </div>
   );
 }

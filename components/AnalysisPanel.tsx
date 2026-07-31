@@ -412,19 +412,24 @@ function StatTabPill({
   active: boolean;
   onClick: () => void;
 }) {
+  const [hovered, setHovered] = useState(false);
+
   return (
     <button
       onClick={onClick}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       style={{
         display: "flex",
         flexDirection: "column",
         gap: "1px",
         padding: "2px 8px",
-        border: active ? `1px solid ${color}55` : "1px solid transparent",
+        border: `1px solid ${active ? color + "88" : hovered ? color + "44" : "#333"}`,
         borderRadius: "4px",
         backgroundColor: active ? color + "14" : "transparent",
         cursor: "pointer",
         textAlign: "left",
+        transition: "border-color 0.15s",
       }}
     >
       <span style={{ fontSize: "9px", color: "#555", textTransform: "uppercase", letterSpacing: "0.06em" }}>
@@ -622,6 +627,8 @@ export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime, onCa
       <div
         style={{
           display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
           gap: "16px",
           padding: "10px 12px",
           backgroundColor: "#0d0d0d",
@@ -630,35 +637,40 @@ export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime, onCa
           flexWrap: "wrap",
         }}
       >
+        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+          <StatTabPill
+            label="Deaths"
+            value={String(deaths.length)}
+            color={deaths.length > 0 ? "#f87171" : "#4ade80"}
+            active={activeTab === "Deaths"}
+            onClick={() => setActiveTab("Deaths")}
+          />
+          <StatTabPill
+            label="Raid"
+            value={String(raids.length)}
+            color={raids.length > 0 ? "#c084fc" : "#4ade80"}
+            active={activeTab === "Raid"}
+            onClick={() => setActiveTab("Raid")}
+          />
+          <StatTabPill
+            label="Major"
+            value={String(majors.length)}
+            color={majors.length > 0 ? "#fb923c" : "#4ade80"}
+            active={activeTab === "Major"}
+            onClick={() => setActiveTab("Major")}
+          />
+          <StatTabPill
+            label="Minor"
+            value={String(minors.length)}
+            color={minors.length > 0 ? "#fbbf24" : "#4ade80"}
+            active={activeTab === "Minor"}
+            onClick={() => setActiveTab("Minor")}
+          />
+        </div>
+
+        {/* Right-aligned and border-free, separated from the stat-tab
+            buttons — makes clear this one isn't clickable. */}
         <StatPill label="Duration" value={formatDuration(pull.fightDuration)} />
-        <StatTabPill
-          label="Deaths"
-          value={String(deaths.length)}
-          color={deaths.length > 0 ? "#f87171" : "#4ade80"}
-          active={activeTab === "Deaths"}
-          onClick={() => setActiveTab("Deaths")}
-        />
-        <StatTabPill
-          label="Raid"
-          value={String(raids.length)}
-          color={raids.length > 0 ? "#c084fc" : "#4ade80"}
-          active={activeTab === "Raid"}
-          onClick={() => setActiveTab("Raid")}
-        />
-        <StatTabPill
-          label="Major"
-          value={String(majors.length)}
-          color={majors.length > 0 ? "#fb923c" : "#4ade80"}
-          active={activeTab === "Major"}
-          onClick={() => setActiveTab("Major")}
-        />
-        <StatTabPill
-          label="Minor"
-          value={String(minors.length)}
-          color={minors.length > 0 ? "#fbbf24" : "#4ade80"}
-          active={activeTab === "Minor"}
-          onClick={() => setActiveTab("Minor")}
-        />
       </div>
 
       <TabBar value={activeTab} onChange={setActiveTab} counts={counts} />
