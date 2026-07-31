@@ -74,15 +74,27 @@ export default function useTimelineController({
 
   // ─── Seek to pull start when pull or vod changes ──────────────────────────
 
+  // Tracks which pull the previous seek was for, so a VOD swap (pull
+  // unchanged) can be told apart from an actual pull change: swapping VODs
+  // mid-pull should land on the same position in the pull, not jump back
+  // to its start.
+  const prevPullIdRef = useRef<number | null>(null);
+  const playbackTimeRef = useRef(playbackTime);
+  playbackTimeRef.current = playbackTime;
+
   useEffect(() => {
     if (!vod || !pull) return;
 
     // Only auto-seek if the VOD is calibrated; otherwise leave video where it is
     if (!vod.isCalibrated) return;
 
-    const base = (vod.offset ?? 0) + pull.startTime;
-    setPlaybackTime(0);
-    emitSeek(base);
+    const pullChanged = prevPullIdRef.current !== pull.id;
+    prevPullIdRef.current = pull.id;
+
+    const withinPull = pullChanged ? 0 : playbackTimeRef.current;
+    if (pullChanged) setPlaybackTime(0);
+
+    emitSeek((vod.offset ?? 0) + pull.startTime + withinPull);
   }, [vod?.id, pull?.id]);
 
   // Reset playback when pull is cleared
@@ -90,6 +102,7 @@ export default function useTimelineController({
     if (!pull) {
       setPlaybackTime(0);
       setSeekRequest(null);
+      prevPullIdRef.current = null;
     }
   }, [pull?.id]);
 
