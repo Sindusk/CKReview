@@ -627,9 +627,13 @@
 // same N/E/S/W ring the arrows already use — melee on the INSIDE of their
 // arrow, ranged on the OUTSIDE: MT+R1 north, OT+R2 west, M1+H1 south,
 // M2+H2 east (see DMUGraven3FixedTether reference image). Confirmed
-// correct examples (report Q3GzJNZg64k1hLRm pull 41): Sayacissa Morsaelth
-// (OT, melee-side, inside) at ~4.6y from center; Archidel Del'archi (H2,
-// ranged-side, outside) at ~14.9y.
+// correct example (report Q3GzJNZg64k1hLRm pull 41): Archidel Del'archi
+// (H2, ranged-side, outside) at ~14.9y. Sayacissa Morsaelth's ~4.6y in
+// that same pull was ALSO cited here as confirmed-correct at the time,
+// but retracted 2026-07-31 (see TELE_TROUNCING_BAIT_MIN_RADIUS_THRESHOLD_
+// YALMS) — that pull's arrows were placed incorrectly and the resulting
+// battlefield didn't look right on review, so her reading can't actually
+// be trusted as clean or not.
 //
 // ── TELE-TROUNCING BAIT POSITION (confirmed 2026-07-31, h2JvDkntZCaBgmLF ───
 // ── pull 10) ────────────────────────────────────────────────────────────
@@ -690,6 +694,31 @@
 // 10's 3 confirmed failures: Chauzey (radius only), Azura and Archidel
 // (both). Ayumi (R2) fails neither. See
 // detectTeleTrouncingBaitPositionErrors.
+//
+// **A THIRD, independent check on the MELEE side** (confirmed 2026-07-31,
+// h2JvDkntZCaBgmLF pull 14): a melee standing too CLOSE to center instead
+// of holding their ring spot also breaks the strategy, even with no
+// cross-latch — Salty Dango (MT) at ~4.8y, well inside his own normal
+// range every other pull. Attributed to the melee themselves (there's no
+// ranged-side failure to blame here) — see
+// TELE_TROUNCING_BAIT_MIN_RADIUS_THRESHOLD_YALMS.
+//
+// **What did NOT make it into a rule (retracted 2026-07-31):** the user
+// initially read pull 14 as Sonder Dreams (M1) and Kade Kansado (M2)
+// swapping their N/S/E/W bait spots, expecting a 90°-off-their-mark
+// error on both. Checked against every pull in h2JvDkntZCaBgmLF that
+// reaches Tele-Trouncing: Sonder sits at bearing ~180° (south) and Kade
+// at ~90° (east) in EVERY one, pull 14 included — indistinguishable from
+// every other pull, whichever of them detectFFRoles happens to label M1
+// vs M2 that pull (the label itself flips after pull 38; their actual
+// spots never move). So this may be a standing habit rather than a
+// pull-14-specific mistake, or wrong regardless and just never singly
+// confirmed — no ruling was recorded either way for this pull. If a
+// future report cleanly separates a correct pull from an incorrect one,
+// build a per-player learned-spot check (same shape as
+// TELE_TROUNCING_BAIT_RADIUS/MIN_RADIUS above) rather than a hardcoded
+// N/S/E/W-by-slot table, since the fixed-slot assumption already failed
+// once here.
 //
 // What IS built for now: a simple Raid-severity cutoff (same shape as
 // CONFETTI_LOST/GRAVEN_1_DEATH_WIPE) on a death to either side's own
@@ -1376,8 +1405,35 @@ const TELE_TROUNCING_CONFUSED_ATTACK_ABILITY_ID = 50445;
 // something Chauzey should get credit for. Confirmed-good ranged-side
 // readings: ~14.9y (Q3GzJNZg64k1hLRm pull 41, Archidel Del'archi/H2) and
 // ~17.5y (h2JvDkntZCaBgmLF pull 10, Ayumi Emi/R2). Confirmed-bad: ~18.4-
-// 18.5y (same pull 10, the other 3 ranged players). 18 splits the two.
-const TELE_TROUNCING_BAIT_RADIUS_THRESHOLD_YALMS = 18;
+// 18.5y (same pull 10, the other 3 ranged players), and ~17.9y (h2JvDk...
+// pull 14, Azura Salus/H1, confirmed 2026-07-31) — lowering the split
+// from 18 down to 17.7 (between the 17.5 good and the 17.9 bad reading).
+const TELE_TROUNCING_BAIT_RADIUS_THRESHOLD_YALMS = 17.7;
+
+// A THIRD, independent failure mode on the MELEE side (confirmed 2026-07-31,
+// h2JvDkntZCaBgmLF pull 14): a melee standing too CLOSE to the boss instead
+// of holding their fixed bait spot on the ring. Salty Dango (MT) stood only
+// ~4.8y from center — well inside his usual 6.4-11.3y range across every
+// other pull in this report — which per the user is itself the problem
+// (independent of Chauzey/his ranged partner's own radius error): a melee
+// too close in isn't standing where the bait chain needs him, regardless of
+// whether it happens to also produce a cross-latch this particular pull.
+// Fault is attributed to the MELEE themselves, not their ranged partner —
+// unlike the cross-latch check above, there's no ranged-side failure to
+// point to here. Only one confirmed-bad sample exists so far (4.8y); the
+// next-lowest reading anywhere else in this report is ~5.3y (unreviewed).
+// Provisional threshold pending more reviewed pulls — see module header.
+//
+// NOTE: a candidate counterexample (Sayacissa Morsaelth, ~4.6y,
+// Q3GzJNZg64k1hLRm pull 41) was checked and retracted 2026-07-31 — that
+// pull's arrows were placed incorrectly and the whole battlefield read
+// wrong on review, so her position there can't be trusted as clean
+// either way and doesn't constrain this threshold. If a genuinely clean
+// pull later produces a melee reading at or below this value, this
+// threshold needs to come down (or the check needs to stop being a flat
+// yalm floor and become per-player-learned instead — see module header's
+// retracted-swap note for the same caveat applied to bait spot/bearing).
+const TELE_TROUNCING_BAIT_MIN_RADIUS_THRESHOLD_YALMS = 5.5;
 
 // Same clustering window as MYSTERY_MAGIC_VOLLEY_CLUSTER_MS — this pull's
 // own 4 simultaneous deaths landed within 45ms of each other, comfortably
@@ -3609,6 +3665,35 @@ function detectTeleTrouncingBaitPositionErrors(players: PlayerInfo[], enemyCasts
       class:       ranged.className,
       specId:      ranged.specId,
       role:        ranged.role,
+      abilityId:   TELE_TROUNCING_WILL_ABILITY_IDS[1],
+      abilityName: "Idyllic Will",
+    });
+  }
+
+  // Third, independent check — a melee too CLOSE to center instead of
+  // holding their ring spot. Attributed to the melee themselves, not their
+  // ranged partner (there's no ranged-side failure here). See
+  // TELE_TROUNCING_BAIT_MIN_RADIUS_THRESHOLD_YALMS.
+  for (const meleeSlot of TELE_TROUNCING_BAIT_MELEE_SLOTS) {
+    const melee = bySlot.get(meleeSlot);
+    const rangedSlot = TELE_TROUNCING_BAIT_RANGED_PARTNER_BY_MELEE_SLOT[meleeSlot];
+    const ranged = bySlot.get(rangedSlot);
+    if (!melee || !ranged) continue;
+
+    const meleeRawPos = rawPosBySlot.get(meleeSlot);
+    const tooCloseRadius = meleeRawPos ? distanceFromCenter(meleeRawPos.x, meleeRawPos.y) / 100 : null;
+    if (tooCloseRadius === null || tooCloseRadius >= TELE_TROUNCING_BAIT_MIN_RADIUS_THRESHOLD_YALMS) continue;
+
+    errors.push({
+      ruleId:      TELE_TROUNCING_BAIT_POSITION_RULE_ID,
+      severity:    "Major",
+      name:        "Tele-Trouncing Bait Position",
+      description: `Stood roughly ${tooCloseRadius.toFixed(1)} yalms from the boss for the Tele-Trouncing bait — too close in, should hang back near ${ranged.name} for the bait to line up.`,
+      timestamp:   snapshotTime,
+      player:      melee.name,
+      class:       melee.className,
+      specId:      melee.specId,
+      role:        melee.role,
       abilityId:   TELE_TROUNCING_WILL_ABILITY_IDS[1],
       abilityName: "Idyllic Will",
     });
