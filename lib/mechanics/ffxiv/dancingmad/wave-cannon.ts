@@ -65,11 +65,64 @@
 // root-cause. A Raid-severity error fires once per pull for the set of
 // such victims — same severity philosophy as phase1.ts's
 // MYSTERY_MAGIC_DEATH_WIPE — separately from any position error above.
+//
+// ── POSITION IS READ ~0.65s BEFORE THE DAMAGE EVENT, NOT AT IT (confirmed ──
+// ── 2026-07-31, report h2JvDkntZCaBgmLF, pull 3) ───────────────────────────
+//
+// Per the user, the beam's targeting actually snapshots each player's
+// position ~0.65s before the damage number appears — the damage TIMESTAMP
+// lags the real targeting moment. Confirmed failure: Azura Salus (WHM) and
+// Archidel Del'archi (SGE) were both hit by the same beam instance, but
+// read at their OWN hit-tick position, neither deviated past the
+// out-of-position threshold (Azura ~0.2y, Archidel ~1.7y off their learned
+// spots) — an unresolvable, silent case. Archidel's own position samples
+// in the surrounding seconds showed her still walking steadily toward her
+// spot right through the hit tick, while Azura had already been stationary
+// on hers for 578ms+ before it. Interpolating each player's position back
+// to hitTimestamp − 650ms (WAVE_CANNON_SNAPSHOT_OFFSET_MS) via the shared
+// `interpolatePlayerPosition` — using the same damageTaken/self-heal
+// streams as `findPlayerPosition`, just walking the timeline back before
+// using it — widens the gap between them (Azura ~0.4y, Archidel ~2.3y off
+// their own learned spots after `learnWaveCannonLayout` is rebuilt from the
+// same pre-snapshot positions). Falls back to the raw hit-tick position
+// when no bracketing sample exists within the window (idle player near the
+// very start of a pull, no damage/self-heal yet) rather than dropping the
+// sample outright.
+//
+// ── ATTRIBUTION IS RELATIVE TO THE OVERLAP PARTNER, NOT A FIXED YALM ───────
+// ── CUTOFF (confirmed 2026-07-31, same report/pull) ────────────────────────
+//
+// Reading positions ~0.65s earlier makes EVERY player's absolute deviation
+// noisier (most players are still mid-correction at that point, not fully
+// settled), so the report-wide compromised-vs-clean gap that used to
+// justify OUT_OF_POSITION_THRESHOLD_CENTIYALMS collapses: across every
+// sample report, compromised pairs' deviations form a smooth continuum from
+// ~0.3y to ~11.6y with no natural gap, and Azura/Archidel's own absolute
+// numbers (0.4y / 2.3y) are both individually unremarkable against that
+// spread — no single fixed cutoff both catches Archidel here and leaves
+// every other report's already-reviewed pulls alone.
+//
+// What DOES hold up: Archidel's deviation is ~6x Azura's, decisively larger
+// than her own overlap partner's, even though neither number alone stands
+// out globally. `detectWaveCannonPositionErrors` groups compromised players
+// into overlap CLUSTERS (union-find over shared tower-beam instance
+// membership, so a 3+-way pileup is compared as one group, not pairwise),
+// then within each cluster flags only the member(s) whose deviation clears
+// BOTH `CULPRIT_MARGIN_RATIO` (this player's deviation vs. the cluster's
+// best-positioned member) AND `CULPRIT_MARGIN_ABS_CENTIYALMS` (an absolute
+// floor so two near-identical good positions, e.g. 0.3y vs 0.6y, never spuriously
+// trip the ratio alone). A cluster where nobody clears both — or where a
+// member's class has no learned layout spot to compare against — flags
+// nobody, same "ambiguous means silent" philosophy as everywhere else in
+// this codebase, rather than guessing. This is the same "nearest-of-4,
+// decisive by a wide margin" reasoning phase1.ts's tower-soak matching
+// already uses instead of an absolute distance table.
 
 import type { Pull } from "@/types/Pull";
 import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { PullError } from "@/types/PullError";
 import type { DeathEvent } from "@/types/DeathEvent";
+import { interpolatePlayerPosition } from "@/lib/mechanics/player-position";
 
 export const WAVE_CANNON_POSITION_RULE_ID = "ffxiv-phase1-wave-cannon-out-of-position";
 export const WAVE_CANNON_MITIGATION_ISSUE_RULE_ID = "ffxiv-phase1-wave-cannon-mitigation-issue";
@@ -84,10 +137,15 @@ const WAVE_CANNON_VOLLEY_CLUSTER_MS = 250;
 // Only pulls lasting this long feed the learned layout — see module header.
 const CLEAN_LEARNING_PULL_DURATION_MS = 120_000;
 
-// Comfortably above the worst clean deviation observed in this report (4.6
-// yalms, WhiteMage), comfortably below the confirmed failure (10.6 yalms,
-// pull 3's Salty Dango).
-const OUT_OF_POSITION_THRESHOLD_CENTIYALMS = 500;
+// See module header's "POSITION IS READ ~0.65s BEFORE THE DAMAGE EVENT"
+// section — the beam's real targeting snapshot lags the damage event by
+// this much.
+const WAVE_CANNON_SNAPSHOT_OFFSET_MS = 650;
+
+// Bounds interpolatePlayerPosition's search on EACH side of the snapshot
+// moment. Comfortably above the largest real gap observed between position
+// samples around this window (~1.1s, h2JvDkntZCaBgmLF pull 3).
+const WAVE_CANNON_POSITION_WINDOW_MS = 2000;
 
 type Point = { x: number; y: number };
 
@@ -100,7 +158,12 @@ function extractHits(players: PlayerInfo[]): RawHit[] {
   for (const player of players) {
     for (const e of player.damageTaken) {
       if (e.abilityId !== WAVE_CANNON_ABILITY_ID || e.x === undefined || e.y === undefined) continue;
-      hits.push({ actorId: player.actorId, player, timestamp: e.timestamp, sourceInstance: e.sourceInstance, x: e.x, y: e.y });
+      const snapshot = interpolatePlayerPosition(player, e.timestamp - WAVE_CANNON_SNAPSHOT_OFFSET_MS, {
+        windowMs: WAVE_CANNON_POSITION_WINDOW_MS,
+        healing:  "self",
+      });
+      const { x, y } = snapshot ?? { x: e.x, y: e.y };
+      hits.push({ actorId: player.actorId, player, timestamp: e.timestamp, sourceInstance: e.sourceInstance, x, y });
     }
   }
   return hits;
@@ -176,13 +239,79 @@ export function learnWaveCannonLayout(pulls: Pull[]): WaveCannonLayout {
   return layout;
 }
 
+// Groups compromised players into overlap clusters via union-find over
+// shared beam-instance membership, so a 3+-way pileup is compared as one
+// group instead of pairwise. See module header's "ATTRIBUTION IS RELATIVE"
+// section for why clusters (not a fixed yalm cutoff) decide who flags.
+function buildOverlapClusters(
+  compromised: ReturnType<typeof markCompromised>
+): ReturnType<typeof markCompromised>[number][][] {
+  const parent = new Map<number, number>();
+  const find = (id: number): number => {
+    if (!parent.has(id)) parent.set(id, id);
+    let root = id;
+    while (parent.get(root) !== root) root = parent.get(root)!;
+    parent.set(id, root);
+    return root;
+  };
+  const union = (a: number, b: number) => {
+    const ra = find(a);
+    const rb = find(b);
+    if (ra !== rb) parent.set(ra, rb);
+  };
+
+  const membersByInstance = new Map<number, number[]>();
+  for (const g of compromised) {
+    find(g.player.actorId);
+    for (const inst of g.instances) {
+      const list = membersByInstance.get(inst) ?? [];
+      list.push(g.player.actorId);
+      membersByInstance.set(inst, list);
+    }
+  }
+  for (const ids of membersByInstance.values()) {
+    for (let i = 1; i < ids.length; i++) union(ids[0], ids[i]);
+  }
+
+  const clusters = new Map<number, ReturnType<typeof markCompromised>[number][]>();
+  for (const g of compromised) {
+    const root = find(g.player.actorId);
+    const list = clusters.get(root) ?? [];
+    list.push(g);
+    clusters.set(root, list);
+  }
+  return [...clusters.values()];
+}
+
+// The cluster's WORST-deviating member must beat its best-positioned member
+// by BOTH this ratio AND the absolute floor below to count as the culprit
+// — see module header. The ratio alone would flag e.g. 0.3y vs 0.6y
+// (technically 2x, but both are fine); the absolute floor alone would flag
+// a whole cluster that's uniformly a few yalms off together.
+const CULPRIT_MARGIN_RATIO = 2;
+const CULPRIT_MARGIN_ABS_CENTIYALMS = 100;
+
+// Only the worst-deviating cluster member(s) flag, not everyone who merely
+// clears the margin over the baseline — confirmed necessary (Q3GzJNZg64k1hLRm
+// pull 3): a 3-way beam pileup put Salty Dango (~10.8y off, the true root
+// cause) and Kade Kansado (~5.1y off, standing correctly at HIS OWN spot,
+// just caught by Salty's overlap) both past the ratio/floor over the
+// cluster's best member (Sonder Dreams, ~2.5y) — Kade is explicitly
+// documented above as NOT flagged. Comparing only to the WORST member
+// (within this tie tolerance) instead of to the baseline correctly leaves
+// Kade silent (10.8 vs 5.1 isn't a tie) while still catching genuine
+// same-severity double mistakes as a tie if they ever occur.
+const CULPRIT_TIE_EPSILON_CENTIYALMS = 50;
+
 /**
- * Per-pull: only ever flags a player caught in a Wave Cannon overlap this
- * volley (either compromised shape — see markCompromised) whose actual
- * position deviates well beyond normal jitter from their learned spot
- * (from `layout`, built once across the report by learnWaveCannonLayout)
- * — see module header. A victim standing correctly who just got caught by
- * a neighbor's misplacement stays unflagged.
+ * Per-pull: only ever flags the WORST-deviating player (or exact ties) in
+ * a Wave Cannon overlap cluster (either compromised shape — see
+ * markCompromised) — from `layout`, built once across the report by
+ * learnWaveCannonLayout — see module header's "ATTRIBUTION IS RELATIVE"
+ * section. A cluster flags nobody when its worst member doesn't clear both
+ * margins over its best-positioned member, or when a member's class has no
+ * learned spot to compare against — same "ambiguous means silent"
+ * philosophy as everywhere else in this codebase.
  */
 export function detectWaveCannonPositionErrors(
   players:     PlayerInfo[],
@@ -195,23 +324,6 @@ export function detectWaveCannonPositionErrors(
   const compromised = grouped.filter((g) => g.compromised);
   if (compromised.length === 0) return [];
 
-  const withDeviation = compromised.map((c) => {
-    const spot = layout[c.player.className];
-    const distance = spot ? Math.hypot(c.x - spot.x, c.y - spot.y) : null;
-    return { ...c, distance };
-  });
-
-  const outOfPosition = withDeviation.filter(
-    (c) => c.distance !== null && c.distance > OUT_OF_POSITION_THRESHOLD_CENTIYALMS
-  );
-  // A victim standing correctly who just got caught by a neighbor's
-  // mistake stays unflagged — only the one(s) actually off their spot are.
-  if (outOfPosition.length === 0) return [];
-
-  const others = compromised
-    .map((c) => c.player.name)
-    .filter((name) => !outOfPosition.some((o) => o.player.name === name));
-
   const diedToWaveCannon = (playerName: string, aroundMs: number) =>
     deathEvents.some(
       (d) =>
@@ -221,33 +333,59 @@ export function detectWaveCannonPositionErrors(
     );
 
   const errors: PullError[] = [];
-  for (const c of outOfPosition) {
-    const yalmsOff = (c.distance! / 100).toFixed(1);
-    const deadOthers = others.filter((name) => diedToWaveCannon(name, c.timestamp));
-    const selfDied = diedToWaveCannon(c.player.name, c.timestamp);
 
-    let overlapNote = "";
-    if (others.length > 0) {
-      overlapNote = ` Overlapped with ${others.join(" and ")}'s Wave Cannon`;
-      const bothDied = selfDied && deadOthers.length > 0;
-      if (bothDied) overlapNote += `, killing them both`;
-      else if (deadOthers.length > 0) overlapNote += `, killing ${deadOthers.join(" and ")}`;
-      overlapNote += ".";
+  for (const cluster of buildOverlapClusters(compromised)) {
+    const withDistance = cluster
+      .map((c) => {
+        const spot = layout[c.player.className];
+        return spot === null || spot === undefined ? null : { ...c, distance: Math.hypot(c.x - spot.x, c.y - spot.y) };
+      })
+      .filter((c): c is NonNullable<typeof c> => c !== null);
+
+    // Need at least 2 known spots in the cluster to compare — a lone known
+    // spot (or none) can't establish a baseline.
+    if (withDistance.length < 2) continue;
+
+    const baseline = Math.min(...withDistance.map((c) => c.distance));
+    const worst = Math.max(...withDistance.map((c) => c.distance));
+    const decisive = worst - baseline >= CULPRIT_MARGIN_ABS_CENTIYALMS && worst >= baseline * CULPRIT_MARGIN_RATIO;
+    const culprits = decisive
+      ? withDistance.filter((c) => worst - c.distance <= CULPRIT_TIE_EPSILON_CENTIYALMS)
+      : [];
+    if (culprits.length === 0) continue;
+
+    const others = cluster
+      .map((c) => c.player.name)
+      .filter((name) => !culprits.some((o) => o.player.name === name));
+
+    for (const c of culprits) {
+      const yalmsOff = (c.distance / 100).toFixed(1);
+      const deadOthers = others.filter((name) => diedToWaveCannon(name, c.timestamp));
+      const selfDied = diedToWaveCannon(c.player.name, c.timestamp);
+
+      let overlapNote = "";
+      if (others.length > 0) {
+        overlapNote = ` Overlapped with ${others.join(" and ")}'s Wave Cannon`;
+        const bothDied = selfDied && deadOthers.length > 0;
+        if (bothDied) overlapNote += `, killing them both`;
+        else if (deadOthers.length > 0) overlapNote += `, killing ${deadOthers.join(" and ")}`;
+        overlapNote += ".";
+      }
+
+      errors.push({
+        ruleId:      WAVE_CANNON_POSITION_RULE_ID,
+        severity:    "Major",
+        name:        "Wave Cannon Incorrect Position",
+        description: `Was roughly ${yalmsOff} yalms off their expected Wave Cannon spot.${overlapNote}`,
+        timestamp:   c.timestamp,
+        player:      c.player.name,
+        class:       c.player.className,
+        specId:      c.player.specId,
+        role:        c.player.role,
+        abilityId:   WAVE_CANNON_ABILITY_ID,
+        abilityName: "Wave Cannon",
+      });
     }
-
-    errors.push({
-      ruleId:      WAVE_CANNON_POSITION_RULE_ID,
-      severity:    "Major",
-      name:        "Wave Cannon Incorrect Position",
-      description: `Was roughly ${yalmsOff} yalms off their expected Wave Cannon spot.${overlapNote}`,
-      timestamp:   c.timestamp,
-      player:      c.player.name,
-      class:       c.player.className,
-      specId:      c.player.specId,
-      role:        c.player.role,
-      abilityId:   WAVE_CANNON_ABILITY_ID,
-      abilityName: "Wave Cannon",
-    });
   }
 
   return errors;
