@@ -1244,22 +1244,33 @@ const RESOLUTION_CLUSTER_GAP_MS = 3000;
  * Best-effort position for a player at a given moment, for players who
  * aren't necessarily taking damage right then (an idle Forsaken cone-bait
  * candidate has no soak of their own to snapshot from). Checks damageTaken
- * first (most precise when available), then falls back to incoming heals —
- * an idle player is almost always getting topped by raid healing nearby,
- * and FFLogs reports the heal TARGET's own position on those events too.
- * Returns the closest-in-time match within the window, or undefined if
- * neither stream has anything close enough to trust.
+ * first (most precise when available), then falls back to every other
+ * available stream — an idle player is almost always getting topped by
+ * raid healing nearby. Returns the closest-in-time match within the
+ * window, or undefined if nothing has anything close enough to trust.
  */
 function findNearestPosition(
   player:    PlayerInfo,
   timestamp: number,
   windowMs:  number
 ): { x: number; y: number } | undefined {
-  // healing: "all" is grandfathered — this module's validated behavior was
-  // tuned with EVERY healing entry as a fallback position source, predating
-  // the self-heal dual-check. New code must use the shared default ("self");
-  // see lib/mechanics/player-position.ts's header for why.
-  return findPlayerPosition(player, timestamp, { windowMs, healing: "all" });
+  // Was `healing: "all"` — grandfathered, since it trusts EVERY healing
+  // entry as this player's own position, which is only safe under the
+  // harness's received-heals orientation; under the real app's cast-heals
+  // orientation it can read the position of whoever THIS PLAYER healed
+  // instead (see player-position.ts's header). Fixed 2026-07-31 (per the
+  // user: use every available stream, always, everywhere) by swapping to
+  // the correctly-oriented pair that covers strictly MORE ground than
+  // "all" ever safely could: `healing: "self"` (this player's own
+  // self-heals) plus `healingReceived: "any"` (heals landing on this
+  // player from ANY source — unconditionally trustworthy, no orientation
+  // caveat) and `casts: "self"` (a self-target cast, e.g. a self-buff).
+  return findPlayerPosition(player, timestamp, {
+    windowMs,
+    healing:         "self",
+    healingReceived: "any",
+    casts:           "self",
+  });
 }
 
 function detectWrongTowerPositionErrors(

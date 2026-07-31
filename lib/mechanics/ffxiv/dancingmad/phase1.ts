@@ -987,6 +987,24 @@
 // damageTaken. See types/PlayerInfo.ts's field comment and
 // player-position.ts's `healingReceived: "any"` option.
 //
+// ── damageTaken WAS EXCLUDED HERE, RE-ENABLED 2026-07-31 (per the user: ────
+// ── use every available stream, always) ─────────────────────────────────
+//
+// All 3 of this section's `interpolatePlayerPosition` calls originally set
+// `damageTaken: false` — the snapshot moment is deliberately BEFORE the
+// knockback's own damage lands (`CONFETTI_SNAPSHOT_LEAD_MS`), and the
+// worry was that enabling damageTaken could let interpolation bracket
+// against the explosion's OWN hit as its "after" sample, re-introducing
+// the exact already-fixed problem this section is about (the hit-time
+// position reflecting where a victim ended up AFTER being flung, not
+// before). Tested empirically instead of assuming: re-enabling it across
+// every sampled report produced zero ruling violations, and this file's
+// own confirmed calibration case (Q3GzJNZg64k1hLRm pull 18, Salty Dango/
+// Ayumi Emi) is unaffected — in practice a player almost always takes
+// SOME other incidental damage before the explosion within the position
+// window, which correctly out-competes the explosion hit as the nearer
+// bracket. Left on.
+//
 // Graven Image's spread mechanic (~0:38, cast "Graven Image", 48370) lives
 // in its own file, graven-image.ts, NOT here — unlike everything else in
 // this module, its "ideal position" can't be hardcoded: which specific job
@@ -3114,7 +3132,7 @@ function detectConfettiKnockbackVictimErrors(players: PlayerInfo[]): PullError[]
       const pos = interpolatePlayerPosition(player, snapshotTime, {
         windowMs:        CONFETTI_POSITION_WINDOW_MS,
         healing:         "self",
-        damageTaken:     false,
+        damageTaken:     true,
         casts:           "self",
         healingReceived: "any",
       });
@@ -3176,7 +3194,7 @@ function detectConfettiHolderMisplacedErrors(players: PlayerInfo[]): PullError[]
       const pos = interpolatePlayerPosition(player, snapshotTime, {
         windowMs:        CONFETTI_POSITION_WINDOW_MS,
         healing:         "self",
-        damageTaken:     false,
+        damageTaken:     true,
         casts:           "self",
         healingReceived: "any",
       });
@@ -3317,7 +3335,7 @@ function detectConfettiFinalPositionMisplacedErrors(players: PlayerInfo[]): Pull
     const pos = interpolatePlayerPosition(player, snapshotTime, {
       windowMs:        CONFETTI_POSITION_WINDOW_MS,
       healing:         "self",
-      damageTaken:     false,
+      damageTaken:     true,
       casts:           "self",
       healingReceived: "any",
     });

@@ -1254,9 +1254,25 @@ const LIGHTS_END_DETONATION_WINDOW_MS = 800;
 const CRYSTAL_DROP_LOOKUP_WINDOW_MS = 30000; // a dropped crystal can sit a while before it's clipped
 const POSITION_LOOKUP_WINDOW_MS     = 3000;  // max staleness for a "current position" sample
 
-/** Nearest damageTaken sample (either side) with defined x/y, within maxMs — the standard "where was this player standing" source in this file (never `healing`: this app's WoW transforms don't map x/y onto heal events at all — see wclHealToPlayerEvent). Delegates to the shared lookup in lib/mechanics/player-position.ts. */
+/**
+ * Nearest position sample (either side) with defined x/y, within maxMs —
+ * the standard "where was this player standing" source in this file.
+ * Requests every stream the shared lookup supports (per the user: always
+ * use everything, never deliberately narrow); in practice only
+ * `damageTaken` ever carries usable data for WoW today — this app's WoW
+ * transforms don't map x/y onto healing/cast events at all (see
+ * wclHealToPlayerEvent) — so `healing`/`healingReceived`/`casts` are
+ * harmless no-ops here rather than genuinely narrowed sources, kept
+ * enabled for parity with the FFXIV modules and in case that ever changes.
+ * Delegates to the shared lookup in lib/mechanics/player-position.ts.
+ */
 function nearestPosition(player: PlayerInfo, time: number, maxMs = POSITION_LOOKUP_WINDOW_MS): { x: number; y: number } | undefined {
-  return findPlayerPosition(player, time, { windowMs: maxMs, healing: "none" });
+  return findPlayerPosition(player, time, {
+    windowMs:        maxMs,
+    healing:         "self",
+    healingReceived: "any",
+    casts:           "self",
+  });
 }
 
 type CrystalDrop = { timestamp: number; playerName: string; x: number; y: number };

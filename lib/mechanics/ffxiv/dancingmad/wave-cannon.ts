@@ -185,6 +185,7 @@ function extractHits(players: PlayerInfo[]): RawHit[] {
         windowMs:        WAVE_CANNON_POSITION_WINDOW_MS,
         healing:         "self",
         healingReceived: "any",
+        casts:           "self",
       });
       const { x, y } = snapshot ?? { x: e.x, y: e.y };
       hits.push({ actorId: player.actorId, player, timestamp: e.timestamp, sourceInstance: e.sourceInstance, x, y });

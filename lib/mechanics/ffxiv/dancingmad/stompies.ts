@@ -331,8 +331,10 @@ type PlayerPositionSample = { timestamp: number; playerName: string; x: number; 
  */
 function nearestPosition(player: PlayerInfo, timestamp: number, playerPositionSamples: PlayerPositionSample[]): Position | null {
   return findPlayerPosition(player, timestamp, {
-    windowMs: MAX_POSITION_SAMPLE_AGE_MS,
+    windowMs:        MAX_POSITION_SAMPLE_AGE_MS,
     positionSamples: playerPositionSamples,
+    healingReceived: "any",
+    casts:           "self",
   }) ?? null;
 }
 

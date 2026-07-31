@@ -184,6 +184,16 @@
 // call site already does. Verified against the full sample set: zero
 // existing ruling violations, only description-level distance corrections
 // plus a handful of new/removed flags on previously-unconfirmed pulls.
+//
+// Per the user (same date): every position lookup, everywhere, should
+// always draw from every stream that could carry real data — no
+// deliberately-narrowed stream selection, ever. The spread check's "prior
+// position" fallback also had an explicit `damageTaken: false` left over
+// (worry: re-finding the SAME hit it's meant to be an independent
+// cross-check against) — but its query is already `atOrBefore` a
+// timestamp 1ms before that hit, so the hit itself was never actually
+// reachable through this option regardless. Enabled it anyway; verified
+// zero ruling violations.
 
 import type { Pull } from "@/types/Pull";
 import type { PlayerInfo } from "@/types/PlayerInfo";
@@ -423,7 +433,7 @@ export function detectGravenImageSpreadErrors(pull: Pull, layout: GravenImageLay
       direction:       "atOrBefore",
       healing:         "self",
       casts:           "self",
-      damageTaken:     false,
+      damageTaken:     true,
       healingReceived: "any",
     });
     const prior = priorPos ? nearestHalf(spot, priorPos.x, priorPos.y) : null;

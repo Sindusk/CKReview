@@ -518,25 +518,28 @@ function detectDashErrors(
     }
   }
 
-  // A missing player never takes a damageTaken hit during the dash window
-  // (that's the whole signature), so their position comes from self-heals
-  // only (natural HP regen, ability 1302, ~every 3s passively — the
-  // shared lookup's dual-check handles both healing orientations; see
-  // lib/mechanics/player-position.ts). atOrBefore because a later position
-  // would already reflect the dash outcome. Confirmed 2026-07 (pull 12): a
-  // regen tick 847ms before the first dash put Galileo ~2 yalms from bait
-  // #6's spot and ~33 yalms from his own (#3), matching the analyzer's
-  // "stood closest to 6" exactly. Capped at 5s stale — regen fires often
-  // enough that a real position is normally within 1-2s of any given
-  // moment; anything older risks catching a position from before their
-  // final, fatal move (a real prior case had a heal 8s out sitting near
-  // arena CENTER, nowhere near the bait ring).
+  // A missing player never takes a damageTaken hit FROM THE DASH ITSELF
+  // (that's the whole signature) within this window, but they could still
+  // take damage from something else nearby, or receive a heal from
+  // someone other than themselves — every stream is checked (natural HP
+  // regen, ability 1302, ~every 3s passively, is just the densest one when
+  // nothing else is happening). atOrBefore because a later position would
+  // already reflect the dash outcome. Confirmed 2026-07 (pull 12): a regen
+  // tick 847ms before the first dash put Galileo ~2 yalms from bait #6's
+  // spot and ~33 yalms from his own (#3), matching the analyzer's "stood
+  // closest to 6" exactly. Capped at 5s stale — regen fires often enough
+  // that a real position is normally within 1-2s of any given moment;
+  // anything older risks catching a position from before their final,
+  // fatal move (a real prior case had a heal 8s out sitting near arena
+  // CENTER, nowhere near the bait ring).
   const SELF_HEAL_STALENESS_MS = 5000;
   const findOwnPositionNear = (player: PlayerInfo, atOrBefore: number): { x: number; y: number } | undefined =>
     findPlayerPosition(player, atOrBefore, {
-      windowMs: SELF_HEAL_STALENESS_MS,
-      direction: "atOrBefore",
-      damageTaken: false,
+      windowMs:        SELF_HEAL_STALENESS_MS,
+      direction:       "atOrBefore",
+      healing:         "self",
+      healingReceived: "any",
+      casts:           "self",
     });
 
   // Slot(k) -> instance, the inverse of slotIndexFor, so an actual stood

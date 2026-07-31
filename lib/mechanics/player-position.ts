@@ -65,6 +65,42 @@
 // out sitting near arena center, nowhere near the bait ring the player died
 // on). Fail closed — returning undefined is better than trusting a stale
 // position.
+//
+// ── STANDING POLICY (2026-07-31): USE EVERY STREAM, ALWAYS ─────────────────
+//
+// Per the user directly: every call site here should request every stream
+// capable of carrying real position data — `healing: "self"`,
+// `healingReceived: "any"`, `casts: "self"`, `damageTaken` (default true),
+// plus `positionSamples` wherever a mechanic has them — never a
+// deliberately narrowed subset "for accuracy" or out of caution. Found via
+// a real, confirmed bug: wave-cannon.ts's snapshot-offset interpolation
+// only enabled `healing: "self"`, so a stale 1.3s-old self-heal bracket
+// manufactured a "still walking" position for a player the user confirmed
+// via VOD was already stationary — `healingReceived` (added 2026-07-29,
+// see above) would have supplied a bracket sample ~700ms closer to the
+// truth the whole time. Audited and fixed every call site across every FF
+// module the same day (forsaken.ts, graven-image.ts, limitcut.ts,
+// phase1.ts, stompies.ts, wave-cannon.ts) plus WoW's midnightfalls.ts
+// (a no-op there today — WoW's healing/cast events carry no x/y at all,
+// see wclHealToPlayerEvent — but enabled anyway for parity and in case
+// that ever changes).
+//
+// The one exception that's NOT a violation of this: a call site that
+// deliberately excludes the SAME event it's independently cross-checking
+// against (e.g. graven-image.ts's "prior position" fallback used to
+// exclude damageTaken specifically so it couldn't just re-find the hit
+// it's meant to double-check) is about avoiding a tautological read, not
+// about narrowing real data — verify whether the exclusion is actually
+// reachable before assuming it's needed (that graven-image.ts case turned
+// out to already be structurally unreachable via its `atOrBefore` timing,
+// and was enabled anyway once confirmed safe). When adding a NEW call
+// site, request everything by default and only exclude a stream if there
+// is a specific, documented, self-reference reason to.
+//
+// Any new gap like this should be treated as a bug to fix, not a
+// pre-existing narrower stream to leave alone — audit newly-written call
+// sites against this list whenever a new position-sampling helper is added
+// to a mechanic module.
 
 import type { PlayerInfo } from "@/types/PlayerInfo";
 
