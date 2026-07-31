@@ -16,6 +16,7 @@ type YTPlayer = {
   seekTo(seconds: number, allowSeekAhead: boolean): void;
   playVideo(): void;
   getCurrentTime(): number;
+  loadVideoById(options: { videoId: string; startSeconds?: number }): void;
 };
 
 type YTPlayerEvent = {
@@ -84,28 +85,43 @@ export default function VideoPanel({
 
   /**
    * =========================
-   * CREATE / DESTROY PLAYER
+   * CREATE / SWAP PLAYER
    * =========================
-   * Loads the video cued to its target start time (via playerVars.start)
-   * instead of starting at 0 and seeking afterward — that "play from 0,
-   * then jump" is what caused the visible backtrack/stutter on VOD switch.
+   * The first VOD selected creates a real YT.Player (cued to its target
+   * start time via playerVars.start, so it doesn't start at 0 and jump).
+   * Every VOD switch after that REUSES the same player/iframe via
+   * loadVideoById instead of destroying and recreating it — tearing down
+   * and rebuilding the whole IFrame API embed on every switch was the
+   * main source of the load-time delay between VODs.
    */
   useEffect(() => {
-    if (!vod || !containerRef.current) return;
+    if (!vod) {
+      playerReadyRef.current = false;
+      setPlayerReady(false);
+
+      if (playerRef.current) {
+        playerRef.current.destroy();
+        playerRef.current = null;
+      }
+      return;
+    }
+
+    const startTime = latestSeekRef.current?.time;
+
+    // Reuse the existing player: swap the video in place.
+    if (playerRef.current && playerReadyRef.current) {
+      playerRef.current.loadVideoById({ videoId: vod.videoId, startSeconds: startTime });
+      return;
+    }
+
+    if (!containerRef.current) return;
 
     playerReadyRef.current = false;
     setPlayerReady(false);
 
-    if (playerRef.current) {
-      playerRef.current.destroy();
-      playerRef.current = null;
-    }
-
     const div = document.createElement("div");
     containerRef.current.innerHTML = "";
     containerRef.current.appendChild(div);
-
-    const startTime = latestSeekRef.current?.time;
 
     loadYouTubeAPI().then(() => {
       if (!containerRef.current) return;
@@ -136,17 +152,18 @@ export default function VideoPanel({
         }
       });
     });
+  }, [vod?.id]);
 
+  // Destroy the player only when the component actually unmounts — VOD
+  // switches while mounted reuse the player above instead.
+  useEffect(() => {
     return () => {
-      playerReadyRef.current = false;
-      setPlayerReady(false);
-
       if (playerRef.current) {
         playerRef.current.destroy();
         playerRef.current = null;
       }
     };
-  }, [vod?.id]);
+  }, []);
 
   /**
    * =========================
