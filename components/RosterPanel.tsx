@@ -87,6 +87,7 @@ function PlayerButton({
   player,
   roleSlot,
   onClick,
+  large,
 }: {
   player:   PlayerInfo;
   // Auto-detected FFXIV party slot (MT/OT/H1/H2/M1/M2/R1/R2 — see
@@ -94,11 +95,17 @@ function PlayerButton({
   // slot resolved.
   roleSlot?: string;
   onClick:  () => void;
+  // FFXIV's 4-row (2-column) layout has a lot fewer buttons to fit than
+  // WoW's 5-row grid, so it scales everything up ~50% to use the freed-up
+  // vertical space instead of leaving it blank — see RosterPanel's ffRows.
+  large?:   boolean;
 }) {
   const [hovered, setHovered] = useState(false);
   const color = getClassColor(player.game, player.className);
   const roleColor = getRoleColor(player.role);
   const iconSrc = getPlayerSpecIcon(player.game, player.specId, player.className);
+
+  const iconSize = large ? 39 : 26;
 
   return (
     <button
@@ -110,9 +117,9 @@ function PlayerButton({
         display: "flex",
         flexDirection: "row",
         alignItems: "center",
-        gap: "6px",
-        padding: "3px 5px",
-        borderRadius: "4px",
+        gap: large ? "10px" : "6px",
+        padding: large ? "6px 10px" : "3px 5px",
+        borderRadius: large ? "6px" : "4px",
         border: `1px solid ${hovered ? color + "66" : "#2a2a2a"}`,
         backgroundColor: hovered ? "#1a1a1a" : "#0d0d0d",
         cursor: "pointer",
@@ -124,9 +131,9 @@ function PlayerButton({
       <img
         src={iconSrc}
         alt=""
-        width={26}
-        height={26}
-        style={{ borderRadius: "4px", flexShrink: 0, border: `1px solid ${color}44` }}
+        width={iconSize}
+        height={iconSize}
+        style={{ borderRadius: large ? "6px" : "4px", flexShrink: 0, border: `1px solid ${color}44` }}
         onError={(e) => { e.currentTarget.style.visibility = "hidden"; }}
       />
       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", minWidth: 0, flex: 1 }}>
@@ -134,7 +141,7 @@ function PlayerButton({
           style={{
             color,
             fontWeight: 600,
-            fontSize: "12px",
+            fontSize: large ? "17px" : "12px",
             whiteSpace: "nowrap",
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -144,7 +151,7 @@ function PlayerButton({
         >
           {player.name}
         </span>
-        <span style={{ display: "flex", width: "100%", justifyContent: "space-between", alignItems: "baseline", gap: "4px", fontSize: "10px", color: "#555" }}>
+        <span style={{ display: "flex", width: "100%", justifyContent: "space-between", alignItems: "baseline", gap: "4px", fontSize: large ? "14px" : "10px", color: "#555" }}>
           {/* DPS shows the actual range category (Melee / Ranged, plus
               Caster for FFXIV) instead of a generic "DPS" label. */}
           <span style={{ color: roleColor, whiteSpace: "nowrap" }}>{player.role === "DPS" ? player.rangeType : player.role}</span>
@@ -618,9 +625,12 @@ export default function RosterPanel({ players, playbackTimeMs, mitigationPlan }:
       </div>
 
       {isFF ? (
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "4px", padding: "8px", boxSizing: "border-box", overflow: "hidden" }}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "8px", padding: "8px", boxSizing: "border-box", overflow: "hidden" }}>
           {ffRows.map((row, ri) => (
-            <div key={ri} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
+            // flex:1 on every row (instead of auto height) — 4 rows stretch
+            // to evenly fill whatever vertical space the panel has, rather
+            // than leaving blank space below a short, fixed-height stack.
+            <div key={ri} style={{ flex: 1, display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
               {row.map((player, ci) =>
                 player ? (
                   <PlayerButton
@@ -628,6 +638,7 @@ export default function RosterPanel({ players, playbackTimeMs, mitigationPlan }:
                     player={player}
                     roleSlot={roleSlotByActorId.get(player.actorId)}
                     onClick={() => setSelectedPlayer(player)}
+                    large
                   />
                 ) : (
                   <div key={ci} />

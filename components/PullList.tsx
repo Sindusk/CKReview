@@ -77,13 +77,6 @@ export default function PullList({ pulls, selectedPullId, onSelectPull }: PullLi
                   border: "1px solid #7f1d1d",
                 };
 
-          // #6 — earliest Major error or death, ignoring Minor errors
-          const issueTimestamps = [
-            ...majors.map(e => e.timestamp),
-            ...pull.deathEvents.map(d => d.timestamp),
-          ];
-          const firstIssueTime = issueTimestamps.length > 0 ? Math.min(...issueTimestamps) : null;
-
           return (
             <div
               key={pull.id}
@@ -102,71 +95,63 @@ export default function PullList({ pulls, selectedPullId, onSelectPull }: PullLi
                 flexShrink: 0,
               }}
             >
-              {/* Line 1 — name/kill badge/raid badge/log link */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px", gap: "8px" }}>
-                <span style={{ fontWeight: 600, fontSize: "13px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {/* Line 1 — name on the left, kill/wipe badge centered, log link on the right */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", marginBottom: "4px", gap: "8px" }}>
+                <span style={{ fontWeight: 600, fontSize: "13px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", justifySelf: "start" }}>
                   #{pull.pullNumber} {pull.name}
                 </span>
 
-                <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
-                  <span
-                    style={{
-                      fontSize: "10px",
-                      fontWeight: 700,
-                      padding: "2px 6px",
-                      borderRadius: "4px",
-                      letterSpacing: "0.04em",
-                      whiteSpace: "nowrap",
-                      ...resultBadgeStyle,
-                    }}
-                  >
-                    {resultBadgeText}
-                  </span>
+                <span
+                  style={{
+                    fontSize: "10px",
+                    fontWeight: 700,
+                    padding: "2px 6px",
+                    borderRadius: "4px",
+                    letterSpacing: "0.04em",
+                    whiteSpace: "nowrap",
+                    justifySelf: "center",
+                    ...resultBadgeStyle,
+                  }}
+                >
+                  {resultBadgeText}
+                </span>
 
-                  {/* #3 — link to the source report, scoped to this fight */}
-                  <a
-                    href={buildLogUrl(pull)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    title={`Open in ${pull.logSource === "ffl" ? "FFLogs" : "WarcraftLogs"}`}
-                    style={{
-                      fontSize: "10px",
-                      color: "#60a5fa",
-                      textDecoration: "none",
-                      border: "1px solid #1e3a5f",
-                      borderRadius: "4px",
-                      padding: "2px 5px",
-                      lineHeight: 1,
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    Log ↗
-                  </a>
-                </div>
+                {/* #3 — link to the source report, scoped to this fight */}
+                <a
+                  href={buildLogUrl(pull)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  title={`Open in ${pull.logSource === "ffl" ? "FFLogs" : "WarcraftLogs"}`}
+                  style={{
+                    fontSize: "10px",
+                    color: "#60a5fa",
+                    textDecoration: "none",
+                    border: "1px solid #1e3a5f",
+                    borderRadius: "4px",
+                    padding: "2px 5px",
+                    lineHeight: 1,
+                    whiteSpace: "nowrap",
+                    justifySelf: "end",
+                  }}
+                >
+                  Log ↗
+                </a>
               </div>
 
-              {/* Line 2 — stats on the left, first issue time on the right */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px" }}>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", fontSize: "11px", color: "#666", minWidth: 0 }}>
-                  <span>⏱ {formatDuration(pull.fightDuration)}</span>
-                  {deaths > 0 ? (
-                    <span style={{ color: "#ef4444" }}>💀 {deaths} death{deaths !== 1 ? "s" : ""}</span>
-                  ) : (
-                    <span style={{ color: "#22c55e" }}>✓ No deaths</span>
-                  )}
-                  {majors.length > 0 && (
-                    <span style={{ color: "#fb923c" }}>⛔ {majors.length} major</span>
-                  )}
-                  {minors.length > 0 && (
-                    <span style={{ color: "#fbbf24" }}>⚠️ {minors.length} minor</span>
-                  )}
-                </div>
-
-                {firstIssueTime !== null && (
-                  <span style={{ fontSize: "10px", color: "#7a7a7a", flexShrink: 0, whiteSpace: "nowrap" }}>
-                    First issue at {formatDuration(firstIssueTime)}
-                  </span>
+              {/* Line 2 — pull stats */}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", fontSize: "11px", color: "#666", minWidth: 0 }}>
+                <span style={{ color: "#999" }}>⏱ {formatDuration(pull.fightDuration)}</span>
+                {deaths > 0 ? (
+                  <span style={{ color: "#ef4444" }}>💀 {deaths} death{deaths !== 1 ? "s" : ""}</span>
+                ) : (
+                  <span style={{ color: "#22c55e" }}>✓ No deaths</span>
+                )}
+                {majors.length > 0 && (
+                  <span style={{ color: "#fb923c" }}>⛔ {majors.length} major</span>
+                )}
+                {minors.length > 0 && (
+                  <span style={{ color: "#fbbf24" }}>⚠️ {minors.length} minor</span>
                 )}
               </div>
             </div>

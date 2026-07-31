@@ -81,11 +81,12 @@ function formatMs(ms: number): string {
   return `${m}:${s.toFixed(2).padStart(5, "0")}`;
 }
 
+// MM:SS — the format players actually use for pull timers, not "Xm XXs".
 function formatDuration(ms: number): string {
   const totalSec = Math.floor(ms / 1000);
   const m = Math.floor(totalSec / 60);
   const s = totalSec % 60;
-  return `${m}m ${s}s`;
+  return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
 function formatCallTime(ms: number): string {
@@ -435,7 +436,7 @@ function StatTabPill({
       <span style={{ fontSize: "9px", color: "#555", textTransform: "uppercase", letterSpacing: "0.06em" }}>
         {label}
       </span>
-      <span style={{ fontSize: "13px", fontWeight: 600, color }}>{value}</span>
+      <span style={{ fontSize: "13px", fontWeight: 600, color, textAlign: "center", width: "100%" }}>{value}</span>
     </button>
   );
 }
