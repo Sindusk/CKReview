@@ -167,6 +167,23 @@
 // both should flag). The floor alone is what separates "real mistake" from
 // "normal jitter caught in someone else's overlap" — furthest-only was
 // specific to the first case and didn't generalize.
+//
+// ── BOTH findPlayerPosition CALLS WERE MISSING healingReceived (fixed ──────
+// ── 2026-07-31, found while auditing wave-cannon.ts's identical bug) ───────
+//
+// This module's last substantive edit predates `player.healingReceived`
+// (heals landing on a player from ANY source — added to player-position.ts
+// 2026-07-29 for the Confetti Knockback work), so both position lookups
+// here — the spread check's "prior position" fallback and the stack
+// check's missing-player lookup — only ever had `healing: "self"` (+
+// `casts: "self"`) to bracket from. Same category of gap as
+// wave-cannon.ts's confirmed bug (see that module's own header): a sparse
+// self-heal-only stream can leave a stale, far-apart bracket where a much
+// closer sample from an actual healer would have existed. Wired in
+// `healingReceived: "any"` at both call sites — same as every phase1.ts
+// call site already does. Verified against the full sample set: zero
+// existing ruling violations, only description-level distance corrections
+// plus a handful of new/removed flags on previously-unconfirmed pulls.
 
 import type { Pull } from "@/types/Pull";
 import type { PlayerInfo } from "@/types/PlayerInfo";
@@ -402,11 +419,12 @@ export function detectGravenImageSpreadErrors(pull: Pull, layout: GravenImageLay
     // inflates it.
     const current = nearestHalf(spot, c.x, c.y);
     const priorPos = findPlayerPosition(c.player, c.timestamp - 1, {
-      windowMs:    PRIOR_SNAPSHOT_WINDOW_MS,
-      direction:   "atOrBefore",
-      healing:     "self",
-      casts:       "self",
-      damageTaken: false,
+      windowMs:        PRIOR_SNAPSHOT_WINDOW_MS,
+      direction:       "atOrBefore",
+      healing:         "self",
+      casts:           "self",
+      damageTaken:     false,
+      healingReceived: "any",
     });
     const prior = priorPos ? nearestHalf(spot, priorPos.x, priorPos.y) : null;
 
@@ -525,9 +543,10 @@ export function detectGravenImageStackErrors(pull: Pull): PullError[] {
 
     for (const player of missing) {
       const pos = findPlayerPosition(player, anchorTimestamp, {
-        windowMs: STACK_POSITION_WINDOW_MS,
-        healing:  "self",
-        casts:    "self",
+        windowMs:        STACK_POSITION_WINDOW_MS,
+        healing:         "self",
+        casts:           "self",
+        healingReceived: "any",
       });
       if (!pos) continue; // can't confirm they were actually away — fail closed, don't guess
 
