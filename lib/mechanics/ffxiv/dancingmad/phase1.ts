@@ -369,6 +369,29 @@
 //    reaction window reads 2700-2850ms instead — comfortably clear of
 //    this floor.
 //
+// **EIGHT-STACK variant needs its own, much larger displacement floor**
+// (confirmed 2026-07-31, h2JvDkntZCaBgmLF pull 22, same story as GRAVEN_2_
+// PUDDLE_PROXIMITY_RULE_ID's own eight-stack tolerance): a single 8-person
+// puddle is physically bigger than a 4-person light-party one, so "didn't
+// move away" needs more clearance. Confirmed: Azura Salus (the linger
+// culprit) displaced only ~459.5 centiyalms between the drop and the
+// explosion, while every other player that pull displaced 779-1620 — a
+// wide, clean gap, but nowhere near the light-party-calibrated 50 floor.
+// Selected via the same puddle-hemisphere check GRAVEN_2_PUDDLE_PROXIMITY_
+// RULE_ID already uses (1 non-empty hemisphere = eight-stack).
+//
+// ── GRAVEN 2 PUDDLE SOAK MISSED (confirmed 2026-07-31, report ──────────────
+// ── h2JvDkntZCaBgmLF, pull 21) ────────────────────────────────────────────
+//
+// A FIFTH per-player cause behind Graven 2 wipes, this one for Gravity III
+// (47791) — the mechanic's LAST beat, immediately after the second Confetti
+// detonation (~2:04): each light party lands in a puddle that ticks 4
+// times, once per member, splitting the damage 4 ways as long as everyone
+// actually stands in it. Confirmed failure: Salty Dango took only 1 of the
+// 4 ticks his light party's puddle produced — the other 3 landed on nobody,
+// scaling the damage up enough on his group's remaining 3 members to kill 2
+// of them (Ayumi Emi, Chauzey Solstice). See detectGraven2PuddleSoakMissedErrors.
+//
 // ── BLIZZARD III BLOWOUT SILENT KILL (confirmed 2026-07, VtdBqhLQkWJXMvDg) ──
 //
 // Blizzard III Blowout (ability IDs vary — 47765/47768/47771/47774, all
@@ -858,6 +881,21 @@
 // analysis regardless of whether the group actually resets or reses and
 // pushes on to prog the next mechanic (pull 26 is exactly that case).
 //
+// **Gap fixed 2026-07-31 (report h2JvDkntZCaBgmLF, pull 19):** the
+// qualifying-death filter still only recognized Wave Cannon's own BEAM
+// (WAVE_CANNON_ABILITY_ID, 47784, fixed for pull 12) — but a death to a
+// Wave Cannon TOWER's resolving explosion (WAVE_CANNON_TOWER_ABILITY_ID,
+// 47786, the same ability WAVE_CANNON_TOWER_OVERLAP_RULE_ID/WAVE_CANNON_
+// TOWER_MISSED_RULE_ID already model) falls through the same gap for the
+// same underlying reason. Confirmed: Sayacissa Morsaelth and Salty Dango
+// both died to overlapping Wave Cannon towers (killingAbilityGameId 47786)
+// immediately after the beam volley — Wave Cannon needs all 8 players
+// alive through its towers resolving, not just through the beam itself, so
+// this is exactly the same "needs all 8 alive" failure the rule already
+// covers for the beam. Fixed by widening the filter (and the wave-cannon-
+// caused description branch) to include the tower ability alongside the
+// beam.
+//
 // ── CONFETTI LOST -> UNRESOLVABLE WIPE (confirmed 2026-07-30, same report, ──
 // ── pull 9) ─────────────────────────────────────────────────────────────
 //
@@ -1081,6 +1119,92 @@
 // stream is now always checked), so these call sites no longer pass
 // `damageTaken`/`healing`/`casts`/`healingReceived` at all.
 //
+// ── GRAVEN 3 MYSTERY MAGIC (begun 2026-07-31, pull 27) ──────────────────────
+//
+// The FINAL Phase 1 mechanic, right before the enrage check — a third
+// Mystery Magic cast (47764, same ability as Graven 1's own opening two
+// occurrences) resolving via Flagrant Fire III (47778/47779, reused same
+// as Graven 1's own spread/stack tick) some ~700-800ms later. Per the
+// user, this creates 2 diagonal bands of safety across the arena; players
+// must dodge into whichever band is safe AND resolve either a STACK or a
+// SPREAD (random per pull — only stack is modeled so far, see below).
+// Detected as simply the LAST Mystery Magic cast (47764) in the whole
+// pull — Graven 1's own 2 occurrences are always much earlier (~30-90s),
+// this one fires post-Tele-Trouncing (~180s+), wide margin either way.
+//
+// **STACK variant (confirmed 2026-07-31, pull 27):** DPS stack northwest,
+// Support (Tank+Healer) stacks southeast — same shared-FFLogs-sourceInstance
+// signature graven-image.ts's own `detectGravenImageStackErrors` and this
+// file's GRAVEN_2 stack-shaped rules already use (all legitimate stackers
+// share ONE instance; the hit's damage divides by however many actually
+// joined). Confirmed failure: Salty Dango (MT, Support) did not join the
+// 3-person Support stack (Sayacissa Morsaelth/Archidel Del'archi/Azura
+// Salus, all sharing one instance, clustered ~10400-10440/10390-10480) —
+// his own position at that moment (10062, 9771, from findPlayerPosition)
+// sits ~759 centiyalms away, well outside the group, splitting the hit
+// only 3 ways instead of 4 and killing 2 of the 3 who DID stack (Azura,
+// Archidel). Unlike Graven Image's own random-per-pull N/S telegraph, this
+// side assignment is fixed by ROLE (DPS vs Support), not learned or
+// randomized — so, unlike graven-image.ts, no cross-pull layout is needed;
+// the anchor is simply the centroid of whoever actually shares the
+// resolving group's own instance, same "self-derived, no learning needed"
+// technique GRAVEN_2's own stack-shaped Gravity III soak-missed rule uses.
+// Gated on outcome exactly like graven-image.ts's stack check: only fires
+// when the miss actually killed someone in the group. See
+// detectGraven3StackErrors.
+//
+// **SNAPSHOT POSITION — checked at the CAST, not the hit (confirmed ────────
+// 2026-07-31, pull 28), same problem graven-image.ts's own "SNAPSHOT
+// POSITION" section already solved for the spread check.** Confirmed
+// failure: Salty Dango again didn't stack with the other 3 Supports
+// (Sayacissa Morsaelth/Archidel Del'archi/Azura Salus) — killing Azura and
+// Archidel — but this time his FINAL logged position at the hit itself
+// (188693ms) sits right ON TOP of the other 3 (~1.4y away, sharing their
+// own FFLogs sourceInstance) because he dashed in during the last ~800ms
+// before the resolution tick landed. His position a full second-plus
+// EARLIER — at the Mystery Magic CAST itself (187178ms) — reads ~7.5y
+// away instead, while the other 3 Supports were ALREADY settled at their
+// final spot well before the cast (confirmed both pulls 27 and 28: their
+// own nearest pre-cast samples read within ~2.5-3.5y of the eventual
+// anchor). So `detectGraven3StackErrors` no longer only checks players
+// ABSENT from the group's own shared instance — it checks EVERY side
+// member's position AT-OR-BEFORE the Mystery Magic cast specifically
+// (not "before the hit," which is too close in time to recover a late
+// dash once a dense stream like healing/healingReceived has samples
+// landing every ~500ms). A player who genuinely shares the instance AND
+// was already in place pre-cast (the normal case) reads a small,
+// under-threshold deviation regardless — this only surfaces someone whose
+// TRUE position at the decision moment doesn't match their eventual
+// logged spot.
+//
+// **SPREAD variant (NOT yet built, informational only):** per the user, a
+// future pull will need this instead — melee follow a rough priority (MT
+// northeast edge of the boss hitbox, OT southeast, M1 northwest, M2
+// southwest, falling back to directly under the boss if the diagonal
+// safety bands make their assigned edge unsafe that pull) while ranged
+// hold roughly 15 yalms out on their own cardinal (H1 south, H2 east, R1
+// north, R2 west) with generous wiggle room. Deliberately not implemented
+// yet — no failure sample exists to calibrate against, and the "diagonal
+// safety band" geometry itself isn't derived from data yet either; this is
+// recorded here purely so a future session has the full context in one
+// place, same "declare now, build once confirmed" precedent as this
+// file's other forward-looking notes.
+//
+// ── ENRAGE CHECK (begun calibrating 2026-07-31, pull 23) ────────────────────
+//
+// Kefka's DPS/enrage check, ~3:20 into the fight: per the user, he must be
+// brought below 15% HP by the moment he becomes untargetable to transition
+// to Phase 2, or the raid wipes. His own "Light of Judgment" cast (47803 —
+// distinct from an earlier same-named tankbuster cast, ability 50722, which
+// carries no HP snapshot) fires once near this timing in every sampled
+// pull that reaches it, carrying his own hitPoints/maxHitPoints — same
+// signal forsaken.ts's Phase-2 enrage check already uses off a boss cast's
+// own sourceResources. First-pass calibration only: every pull sampled so
+// far reads above the 15% floor (15.2%-68.7% observed across the whole
+// sample set) and the raid dies shortly after — no confirmed PASSING
+// sample exists yet to validate the other side of the threshold. See
+// detectEnrageCheckError.
+//
 // Graven Image's spread mechanic (~0:38, cast "Graven Image", 48370) lives
 // in its own file, graven-image.ts, NOT here — unlike everything else in
 // this module, its "ideal position" can't be hardcoded: which specific job
@@ -1108,6 +1232,7 @@ export const GRAVEN_2_SPREAD_MISPLACED_RULE_ID = "ffxiv-phase1-graven2-spread-mi
 export const GRAVEN_2_PUDDLE_PROXIMITY_RULE_ID = "ffxiv-phase1-graven2-puddle-proximity";
 export const GRAVEN_2_PUDDLE_PLACEMENT_RULE_ID = "ffxiv-phase1-graven2-puddle-placement";
 export const GRAVEN_2_PUDDLE_LINGER_RULE_ID = "ffxiv-phase1-graven2-puddle-linger";
+export const GRAVEN_2_PUDDLE_SOAK_MISSED_RULE_ID = "ffxiv-phase1-graven2-puddle-soak-missed";
 export const GRAVEN_2_DEATH_WIPE_RULE_ID = "ffxiv-phase1-graven2-death-wipe";
 export const TELE_TROUNCING_ARROW_RULE_ID = "ffxiv-phase1-tele-trouncing-arrow-misplaced";
 export const TELE_TROUNCING_DEATH_WIPE_RULE_ID = "ffxiv-phase1-tele-trouncing-death-wipe";
@@ -1122,6 +1247,8 @@ export const CONFETTI_HOLDER_MISPLACED_RULE_ID = "ffxiv-phase1-confetti-holder-m
 export const CONFETTI_GROUP_MISPLACED_RULE_ID = "ffxiv-phase1-confetti-group-misplaced";
 export const CONFETTI_FINAL_POSITION_MISPLACED_RULE_ID = "ffxiv-phase1-confetti-final-position-misplaced";
 export const HYPERDRIVE_OUT_OF_POSITION_RULE_ID = "ffxiv-phase1-hyperdrive-out-of-position";
+export const ENRAGE_CHECK_RULE_ID = "ffxiv-phase1-enrage-check-missed";
+export const GRAVEN_3_STACK_RULE_ID = "ffxiv-phase1-graven3-stack-missed";
 
 const BLIZZARD_III_BLOWOUT_ABILITY_IDS = new Set([47765, 47768, 47771, 47774]);
 const DAMAGE_DOWN_ABILITY_ID = 1002911;
@@ -1477,7 +1604,7 @@ const TELE_TROUNCING_BAIT_RADIUS_THRESHOLD_YALMS = 17.7;
 // threshold needs to come down (or the check needs to stop being a flat
 // yalm floor and become per-player-learned instead — see module header's
 // retracted-swap note for the same caveat applied to bait spot/bearing).
-const TELE_TROUNCING_BAIT_MIN_RADIUS_THRESHOLD_YALMS = 5.5;
+const TELE_TROUNCING_BAIT_MIN_RADIUS_THRESHOLD_YALMS = 6.5;
 
 // Same clustering window as MYSTERY_MAGIC_VOLLEY_CLUSTER_MS — this pull's
 // own 4 simultaneous deaths landed within 45ms of each other, comfortably
@@ -1560,7 +1687,46 @@ function nearestPlayerPosition(events: PlayerEvent[], timestamp: number): Point 
 // not-yet-VOD-reviewed pulls across other reports — those get triaged as
 // the per-pull review reaches them, same as any other rule surfacing a
 // previously-silent case.
-const ARROW_OUT_OF_POSITION_THRESHOLD_YALMS = 4.5;
+//
+// Lowered again to 3.4, 2026-07-31 (same report, pull 20): Salty Dango's W
+// (corner) arrow deviated 3.5116y, confirmed a real (Major) mistake by the
+// user — the previous 4.5 floor missed it entirely. Same dense-continuum
+// situation as before (no natural gap to split), so lowered with just
+// enough margin below the confirmed case and above the report's own
+// next-highest unreviewed corner sample (3.3284y, h2JvDkntZCaBgmLF, a
+// different pull/player — left to the new MINOR tier below rather than
+// promoted to Major without its own confirmation).
+//
+// Lowered again to 2.65, 2026-07-31 (same report, pull 23): Salty Dango's
+// first (E, corner) arrow deviated 2.7122y — confirmed a real MAJOR
+// mistake by the user, missed by the 3.4 floor (it was landing as Minor
+// instead). Same pull's Sayacissa Morsaelth N arrow (1.6416y, confirmed
+// Minor, not Major) sets the lower bound this can't cross — 2.65 sits
+// comfortably between the two.
+//
+// Lowered again to 1.95, 2026-07-31 (same report, pull 28): Salty Dango's
+// second (S, corner) arrow deviated 2.0554y — confirmed a real MAJOR
+// mistake by the user, missed by the 2.65 floor (landing as Minor
+// instead). Comfortably above every confirmed-Minor corner sample so far
+// (Sayacissa Morsaelth pull 23, 1.6416y; Archidel Del'archi pull 20,
+// 1.6184y). Same pull's Salty Dango FIRST (E) arrow (1.2297y) was
+// explicitly left the user's call either way ("if no error, that's fine
+// too") — stays clean under both the old and new minor floor (1.6),
+// nothing to change there.
+const ARROW_OUT_OF_POSITION_THRESHOLD_YALMS = 1.95;
+
+// NEW 2026-07-31 (same report, pull 20): a Minor-severity tier below the
+// Major corner threshold above, for a corner arrow that's noticeably off
+// but not egregiously so. Per the user, "roughly half of what the current
+// major severity is for distance" — half of 3.4 is 1.7; nudged down to 1.6
+// so it comfortably clears the confirmed case (Archidel Del'archi's E
+// arrow, 1.6184y — a real but much smaller miss than Dango's same-pull
+// corner mistake above) rather than sitting right on top of it. Only
+// applies to CORNER-pair arrows — the "double-D" pair (below) has no
+// confirmed Minor-tier sample yet to calibrate a lower bound from, so it
+// stays a simple Major-or-clean check per the "don't guess ahead of
+// confirmation" method.
+const ARROW_MINOR_OUT_OF_POSITION_THRESHOLD_YALMS = 1.6;
 
 // "Double-D" (same cardinal direction twice) arrows sit much more tightly
 // on their slot than corner arrows across every report sampled. Originally
@@ -2807,6 +2973,23 @@ const GRAVEN_2_PUDDLE_LINGER_MIN_REACT_TIME_MS = 1500;
 // with every other freshly-built rule in this file.
 const GRAVEN_2_PUDDLE_LINGER_DISPLACEMENT_CENTIYALMS = 50;
 
+// EIGHT-STACK variant needs its own, much larger floor (confirmed
+// 2026-07-31, h2JvDkntZCaBgmLF pull 22) — same reasoning as
+// GRAVEN_2_PUDDLE_PROXIMITY_TOLERANCE_EIGHT_STACK_CENTIYALMS: an 8-person
+// puddle is physically bigger than a 4-person one, so a "safe" amount of
+// movement away from the drop spot scales up too. Confirmed: Azura Salus
+// (the user's named lingerer) displaced only ~459.5 centiyalms between the
+// puddle drop and the explosion, while every other player in the same pull
+// displaced 779-1620 — a clean, wide gap.
+//
+// Widened again to 750, 2026-07-31 (same report, pull 25): per the user,
+// BOTH Ayumi Emi (~727.7) and Azura Salus (~634.5) were lingering that
+// pull — the previous 620 floor (calibrated off pull 22 alone) missed
+// both. 750 sits between Ayumi's ~727.7 (now caught) and the nearest
+// confirmed-clean eight-stack sample across both pulls (Archidel
+// Del'archi, pull 22, ~779.1) — still comfortably clear.
+const GRAVEN_2_PUDDLE_LINGER_DISPLACEMENT_EIGHT_STACK_CENTIYALMS = 750;
+
 /**
  * Detects a Graven 2 player who never left the Gravitas puddle after it
  * landed, their continued presence detonating it. See module header for
@@ -2856,6 +3039,20 @@ function detectGraven2PuddleLingerErrors(players: PlayerInfo[], enemyCasts: Enem
   const dropPosByPlayer = new Map<string, Hit>();
   for (const h of lastDrop) if (!dropPosByPlayer.has(h.player.name)) dropPosByPlayer.set(h.player.name, h);
 
+  // Eight-stack (whole raid in ONE puddle) vs. light-party (2 separate
+  // 4-person puddles, split north/south of arena center) — same hemisphere
+  // check GRAVEN_2_PUDDLE_PROXIMITY_RULE_ID uses. An 8-person puddle is
+  // physically bigger, so "didn't move away" needs a much larger floor —
+  // see GRAVEN_2_PUDDLE_LINGER_DISPLACEMENT_EIGHT_STACK_CENTIYALMS.
+  const grouped = [...dropPosByPlayer.values()];
+  const nonEmptyHemispheres = [
+    grouped.some((h) => h.y < ARENA_CENTER),
+    grouped.some((h) => h.y >= ARENA_CENTER),
+  ].filter(Boolean).length;
+  const displacementThreshold = nonEmptyHemispheres === 1
+    ? GRAVEN_2_PUDDLE_LINGER_DISPLACEMENT_EIGHT_STACK_CENTIYALMS
+    : GRAVEN_2_PUDDLE_LINGER_DISPLACEMENT_CENTIYALMS;
+
   const errors: PullError[] = [];
   for (const drop of dropPosByPlayer.values()) {
     const currentPos = findPlayerPosition(drop.player, explosionCastTime, {
@@ -2865,7 +3062,7 @@ function detectGraven2PuddleLingerErrors(players: PlayerInfo[], enemyCasts: Enem
     if (!currentPos) continue; // no reliably-recent position — fail closed, don't guess
 
     const displacement = distanceBetween({ x: drop.x, y: drop.y }, currentPos);
-    if (displacement >= GRAVEN_2_PUDDLE_LINGER_DISPLACEMENT_CENTIYALMS) continue;
+    if (displacement >= displacementThreshold) continue;
 
     errors.push({
       ruleId:      GRAVEN_2_PUDDLE_LINGER_RULE_ID,
@@ -2880,6 +3077,112 @@ function detectGraven2PuddleLingerErrors(players: PlayerInfo[], enemyCasts: Enem
       abilityId:   GRAVITATIONAL_EXPLOSION_ABILITY_ID,
       abilityName: "Gravitational Explosion",
     });
+  }
+  return errors;
+}
+
+// Gravity III (47791) — Graven 2's LAST beat, immediately after the second
+// Confetti detonation (~2:04 in a real pull): the 2 light parties (same
+// grouping the puddle drop already split them into) each land in a puddle
+// that ticks 4 times, once per member, splitting the damage 4 ways as long
+// as all 4 actually stand in it. Confirmed 2026-07-31 (h2JvDkntZCaBgmLF
+// pull 21): every clean member of Salty Dango's light party took exactly 4
+// hits, but Dango himself took only 1 — the other 3 ticks landed on nobody,
+// scaling up the damage on whoever WAS standing there and killing 2 of them
+// (Ayumi Emi, Chauzey Solstice, both killingAbilityGameId 47791). Every
+// OTHER sampled pull in this report either never reaches this resolution at
+// all (0 hits across the whole roster — an earlier wipe) or resolves with a
+// clean, uniform 4-hits-per-player split (pulls 27, 33) — no natural
+// in-between case exists yet to calibrate a partial-miss floor from, so
+// this only fires on an unambiguous "everyone else in the group got the
+// full count, this player got meaningfully fewer" shape, gated on the
+// outcome (someone else in the same group actually dying to it) per the
+// module's usual "gate on outcome" philosophy.
+const GRAVITY_III_ABILITY_ID = 47791;
+
+// Confirmed intra-group spread (pulls 21/27/33) tops out around ~235
+// centi-yalms; the two light parties' own puddles sit well over 1600
+// centi-yalms apart (same order of magnitude as GRAVEN2_CLUSTER_RADIUS_
+// CENTIYALMS in graven2-strategy.ts, which this mirrors) — wide margin for
+// a single clustering radius to separate "same puddle" from "the other
+// puddle."
+const GRAVITY_III_CLUSTER_RADIUS_CENTIYALMS = 800;
+
+// A full, uncompromised puddle hits every one of its 4 members exactly 4
+// times (confirmed pulls 21/27/33). Below half that count is an unambiguous
+// miss — Salty Dango's confirmed failure (1 hit) sits far under this floor;
+// no partial-miss (e.g. 2-3 hits) sample exists yet to tighten against.
+const GRAVITY_III_SOAK_MISS_MAX_HIT_FRACTION = 0.5;
+
+/**
+ * Detects a player who didn't fully stand in their light party's Gravity
+ * III puddle during Graven 2's final beat — see module comment above for
+ * the mechanic and calibration. Gated on outcome: only fires when another
+ * member of the SAME puddle group actually died to Gravity III, the same
+ * "don't guess ahead of a confirmed consequence" approach every other rule
+ * in this file uses.
+ */
+function detectGraven2PuddleSoakMissedErrors(players: PlayerInfo[], deathEvents: DeathEvent[]): PullError[] {
+  type Hit = { player: PlayerInfo; timestamp: number; x: number; y: number };
+  const hitsByPlayer = new Map<number, Hit[]>();
+  for (const player of players) {
+    const hits = player.damageTaken.filter(
+      (e) => e.abilityId === GRAVITY_III_ABILITY_ID && e.x !== undefined && e.y !== undefined
+    );
+    if (hits.length === 0) continue;
+    hitsByPlayer.set(player.actorId, hits.map((e) => ({ player, timestamp: e.timestamp, x: e.x!, y: e.y! })));
+  }
+  if (hitsByPlayer.size === 0) return [];
+
+  // Cluster by mutual proximity of each player's median hit position — see
+  // module comment. A player with 1+ hits always has SOME position to
+  // cluster from, even a partial-miss one (confirmed: Dango's single hit
+  // still landed right at his light party's own spot).
+  type Member = { player: PlayerInfo; count: number; x: number; y: number };
+  const members: Member[] = [...hitsByPlayer.values()].map((hits) => {
+    const x = hits.reduce((sum, h) => sum + h.x, 0) / hits.length;
+    const y = hits.reduce((sum, h) => sum + h.y, 0) / hits.length;
+    return { player: hits[0].player, count: hits.length, x, y };
+  });
+
+  const clusters: Member[][] = [];
+  for (const m of members) {
+    const cluster = clusters.find((c) => c.some((o) => distanceBetween(o, m) < GRAVITY_III_CLUSTER_RADIUS_CENTIYALMS));
+    if (cluster) cluster.push(m);
+    else clusters.push([m]);
+  }
+
+  const errors: PullError[] = [];
+  for (const cluster of clusters) {
+    if (cluster.length < 3) continue; // too few members to trust a "everyone else" comparison
+    const maxCount = Math.max(...cluster.map((m) => m.count));
+    if (maxCount === 0) continue;
+
+    const underSoakers = cluster.filter((m) => m.count <= maxCount * GRAVITY_III_SOAK_MISS_MAX_HIT_FRACTION);
+    if (underSoakers.length === 0) continue;
+
+    const groupNames = new Set(cluster.map((m) => m.player.name));
+    const groupDeaths = deathEvents.filter((d) => d.killingAbilityGameId === GRAVITY_III_ABILITY_ID && groupNames.has(d.player));
+    if (groupDeaths.length === 0) continue; // nobody actually paid for it — stay silent
+
+    const lastHitTime = Math.max(...cluster.flatMap((m) => (hitsByPlayer.get(m.player.actorId) ?? []).map((h) => h.timestamp)));
+    const victimNames = [...new Set(groupDeaths.map((d) => d.player))];
+
+    for (const under of underSoakers) {
+      errors.push({
+        ruleId:      GRAVEN_2_PUDDLE_SOAK_MISSED_RULE_ID,
+        severity:    "Major",
+        name:        "Graven 2 Puddle Soak Missed",
+        description: `Only took ${under.count} of ${maxCount} Gravity III ticks in their light party's puddle — the unsoaked ticks scaled up the damage on the rest of the group instead, killing ${victimNames.join(" and ")}.`,
+        timestamp:   lastHitTime,
+        player:      under.player.name,
+        class:       under.player.className,
+        specId:      under.player.specId,
+        role:        under.player.role,
+        abilityId:   GRAVITY_III_ABILITY_ID,
+        abilityName: "Gravity III",
+      });
+    }
   }
   return errors;
 }
@@ -2948,6 +3251,40 @@ function detectGraven2DeathWipeError(
       // this buffer those deaths would be wrongly excluded from Graven 2's
       // own window.
       graven2WindowEnd = Math.max(...explosionTimestamps) + CONFETTI_EXPLOSION_DEATH_LAG_MS;
+
+      // But never past the START of Gravity III (47791) — the puddle-soak
+      // beat immediately following the knockback (see GRAVITY_III_ABILITY_ID
+      // above) — UNLESS this pull's own Gravity III resolution was a real
+      // mechanical failure (GRAVEN_2_PUDDLE_SOAK_MISSED_RULE_ID fired),
+      // not just an ordinary death mid-resolution. Confirmed 2026-07-31,
+      // two pulls in the SAME report pulling in opposite directions:
+      // pull 28's Archidel Del'archi died to a routine, fully-soaked
+      // Gravity III tick (~4.9s after the confetti resolution's last tick,
+      // well inside the ~5s LAG buffer above) — per the user, once all 8
+      // players are alive after the Confetti Knockback resolves the
+      // mechanic is recoverable, so a plain mitigation-issue death during
+      // the LATER Gravity III beat must NOT count as a Graven-2 wipe.
+      // Pull 21's Ayumi Emi/Chauzey Solstice, by contrast, died BECAUSE
+      // Salty Dango failed to soak his own puddle (already flagged
+      // separately) — a genuine mechanical failure that DOES still need
+      // to cut the pull off, so their Gravity-III deaths must NOT be
+      // excluded. Distinguishing signal: whether GRAVEN_2_PUDDLE_SOAK_
+      // MISSED_RULE_ID actually fired this pull (passed in via
+      // otherPhase1Errors, same array already used for the clusterMajors
+      // window below). Doesn't affect the LAG buffer's own original
+      // confirmed case (pull 34, Q3GzJNZg64k1hLRm): both those deaths land
+      // BEFORE Gravity III even starts, so the cap never applies there
+      // regardless.
+      const hadPuddleSoakMiss = otherPhase1Errors.some((e) => e.ruleId === GRAVEN_2_PUDDLE_SOAK_MISSED_RULE_ID);
+      if (!hadPuddleSoakMiss) {
+        const gravityIIIStart = players
+          .flatMap((p) => p.damageTaken)
+          .filter((e) => e.abilityId === GRAVITY_III_ABILITY_ID && e.timestamp > firstWaveTime)
+          .map((e) => e.timestamp);
+        if (gravityIIIStart.length > 0) {
+          graven2WindowEnd = Math.min(graven2WindowEnd, Math.min(...gravityIIIStart));
+        }
+      }
     }
   }
 
@@ -3002,7 +3339,10 @@ function detectGraven1DeathWipeError(
   // Cannon's own beam counts as a Graven-1-window death here too, not just
   // Mystery Magic's own elemental resolution.
   const mysteryMagicDeaths = deathEvents.filter(
-    (d) => MYSTERY_MAGIC_DEATH_ABILITY_IDS.has(d.killingAbilityGameId) || d.killingAbilityGameId === WAVE_CANNON_ABILITY_ID
+    (d) =>
+      MYSTERY_MAGIC_DEATH_ABILITY_IDS.has(d.killingAbilityGameId) ||
+      d.killingAbilityGameId === WAVE_CANNON_ABILITY_ID ||
+      d.killingAbilityGameId === WAVE_CANNON_TOWER_ABILITY_ID
   );
   if (mysteryMagicDeaths.length === 0) return [];
 
@@ -3036,7 +3376,9 @@ function detectGraven1DeathWipeError(
   );
 
   const victims = [...new Set(clusterDeaths.map((d) => d.player))];
-  const diedToWaveCannon = clusterDeaths.some((d) => d.killingAbilityGameId === WAVE_CANNON_ABILITY_ID);
+  const diedToWaveCannon = clusterDeaths.some(
+    (d) => d.killingAbilityGameId === WAVE_CANNON_ABILITY_ID || d.killingAbilityGameId === WAVE_CANNON_TOWER_ABILITY_ID
+  );
 
   const description = diedToWaveCannon
     ? `${victims.join(" and ")} died to Wave Cannon before Graven 1 could fully resolve — needs all 8 players alive to reach Wave Cannon and Confetti, so this is treated as a cutoff point for further per-player analysis this pull.`
@@ -3521,12 +3863,19 @@ function detectTeleTrouncingArrowErrors(players: PlayerInfo[]): PullError[] {
     if (withPos.some((a) => a.pos === null)) continue;
     const [a1, a2] = withPos as { timestamp: number; dir: Cardinal; pos: Point }[];
 
-    const flagIfOutOfPosition = (arrow: { timestamp: number; dir: Cardinal; pos: Point }, expected: Point, threshold: number) => {
+    const flagIfOutOfPosition = (
+      arrow: { timestamp: number; dir: Cardinal; pos: Point },
+      expected: Point,
+      majorThreshold: number,
+      minorThreshold: number | null = null
+    ) => {
       const deviation = pointDistance(arrow.pos, expected);
-      if (deviation <= threshold) return;
+      const severity: "Major" | "Minor" | null =
+        deviation > majorThreshold ? "Major" : minorThreshold !== null && deviation > minorThreshold ? "Minor" : null;
+      if (!severity) return;
       errors.push({
         ruleId:      TELE_TROUNCING_ARROW_RULE_ID,
-        severity:    "Major",
+        severity,
         name:        "Tele-Trouncing Arrow Misplaced",
         description: `Dropped their ${arrow.dir}-facing arrow roughly ${deviation.toFixed(1)} yalms from its expected spot in the clockwise arrow path.`,
         timestamp:   arrow.timestamp,
@@ -3551,7 +3900,7 @@ function detectTeleTrouncingArrowErrors(players: PlayerInfo[]): PullError[] {
       if (!predicted) continue; // not a valid clockwise-adjacent pair — unexpected data, skip
       for (const arrow of [a1, a2]) {
         const expected = arrow.dir === predicted.cornerDir ? predicted.cornerPos : predicted.approachPos;
-        flagIfOutOfPosition(arrow, expected, ARROW_OUT_OF_POSITION_THRESHOLD_YALMS);
+        flagIfOutOfPosition(arrow, expected, ARROW_OUT_OF_POSITION_THRESHOLD_YALMS, ARROW_MINOR_OUT_OF_POSITION_THRESHOLD_YALMS);
       }
     }
   }
@@ -3599,6 +3948,196 @@ function detectTeleTrouncingDeathWipeError(deathEvents: DeathEvent[], enemyCasts
       timestamp:   cutoff + 1,
       abilityId:   TELE_TROUNCING_WILL_ABILITY_IDS[1],
       abilityName: "Idyllic Will",
+    },
+  ];
+}
+
+// Kefka's DPS/enrage check, ~3:20 into the fight — begun calibrating
+// 2026-07-31 (h2JvDkntZCaBgmLF, pull 23). Per the user: Kefka must be below
+// 15% HP at the moment he becomes untargetable to transition into Phase 2;
+// missing that check wipes the raid instead. Confirmed signature: Kefka's
+// own "Light of Judgment" cast (47803, distinct from the earlier same-named
+// tankbuster cast 50722 — see HYPERDRIVE_ABILITY_ID's own comment for that
+// one) fires exactly once per pull near this timing (~203-204s across every
+// sampled pull that reaches it) and carries his own hitPoints/maxHitPoints
+// snapshot, same "cast's own sourceResources" signal FORSAKEN_ENRAGE_CHECK_
+// RULE_ID already uses in forsaken.ts. Every pull in this report's sample
+// set that reaches this cast so far reads well above 15% (15.2%-24.7%
+// observed) and dies shortly after (killingAbilityGameId 47803 — the same
+// ability ID doubling as both the boss's own cast and its lethal
+// raid-wide follow-up, same ability-ID-reuse pattern as CONFETTI_EXPLOSION_
+// ABILITY_ID elsewhere in this file) — no confirmed PASSING sample exists
+// yet in this report to validate the other side of the threshold, so this
+// is explicitly a first-pass calibration per the user's own framing, not a
+// fully proven check.
+// Graven 3's own resolution tick, reused from Graven 1's Flagrant Fire III.
+const GRAVEN_3_RESOLUTION_ABILITY_IDS = new Set([47778, 47779]);
+
+// Generous window from the final Mystery Magic cast to its Flagrant Fire
+// III resolution — confirmed pull 27's own gap was ~800-1560ms (cast
+// 187520, hits 188948-189081); comfortably inside this without risking
+// bleeding into an unrelated later hit.
+const GRAVEN_3_RESOLUTION_WINDOW_MS = 5000;
+
+// A stack instance needs at least this many distinct members hit together
+// to unambiguously confirm stack mode — same STACK_GROUP_MIN_SIZE
+// reasoning graven-image.ts uses (a pair alone can't be told apart from a
+// spread overlap).
+const GRAVEN_3_STACK_GROUP_MIN_SIZE = 3;
+
+// Same floor as graven-image.ts's own STACK_OUT_OF_POSITION_THRESHOLD_
+// CENTIYALMS / this file's GRAVITY_III soak-missed rule — comfortably
+// under Salty Dango's confirmed miss (~759 centiyalms from the Support
+// stack's own centroid, pull 27).
+const GRAVEN_3_STACK_OUT_OF_POSITION_CENTIYALMS = 400;
+
+// Generous enough to reach a player's nearest AT-OR-BEFORE-cast position
+// sample a couple seconds prior — confirmed pulls 27/28 both had a usable
+// sample ~1.3-1.7s before the Mystery Magic cast. Same magnitude as
+// graven-image.ts's own STACK_POSITION_WINDOW_MS.
+const GRAVEN_3_STACK_POSITION_WINDOW_MS = 5000;
+
+/**
+ * Detects a Support or DPS player who didn't join their role's Graven 3
+ * stack — see module header ("GRAVEN 3 MYSTERY MAGIC", STACK variant) for
+ * the mechanic and the confirmed pull-27 failure. Self-derived per pull
+ * (no cross-pull learning needed, unlike graven-image.ts — this side
+ * assignment is fixed by role, not randomized): the anchor is just the
+ * centroid of whoever actually shares the resolving group's own FFLogs
+ * sourceInstance. Gated on outcome — only fires when the miss actually
+ * killed someone in the group.
+ */
+function detectGraven3StackErrors(players: PlayerInfo[], deathEvents: DeathEvent[], enemyCasts: EnemyEvent[]): PullError[] {
+  const mysteryMagicCasts = enemyCasts.filter((e) => e.abilityId === MYSTERY_MAGIC_CAST_ABILITY_ID).map((e) => e.timestamp);
+  if (mysteryMagicCasts.length < 3) return []; // Graven 3 is always the 3rd+ occurrence in a pull
+  const graven3CastTime = Math.max(...mysteryMagicCasts);
+
+  type Hit = { player: PlayerInfo; timestamp: number; x: number; y: number; sourceInstance?: number; abilityId: number };
+  const hits: Hit[] = [];
+  for (const player of players) {
+    for (const e of player.damageTaken) {
+      if (!GRAVEN_3_RESOLUTION_ABILITY_IDS.has(e.abilityId) || e.x === undefined || e.y === undefined) continue;
+      if (e.timestamp < graven3CastTime || e.timestamp > graven3CastTime + GRAVEN_3_RESOLUTION_WINDOW_MS) continue;
+      hits.push({ player, timestamp: e.timestamp, x: e.x, y: e.y, sourceInstance: e.sourceInstance, abilityId: e.abilityId });
+    }
+  }
+  if (hits.length === 0) return [];
+
+  type Grouped = { player: PlayerInfo; timestamp: number; x: number; y: number; abilityId: number; instances: Set<number> };
+  const byPlayer = new Map<number, Grouped>();
+  for (const h of hits.sort((a, b) => a.timestamp - b.timestamp)) {
+    const entry = byPlayer.get(h.player.actorId);
+    if (!entry) {
+      byPlayer.set(h.player.actorId, { player: h.player, timestamp: h.timestamp, x: h.x, y: h.y, abilityId: h.abilityId, instances: new Set(h.sourceInstance !== undefined ? [h.sourceInstance] : []) });
+    } else if (h.sourceInstance !== undefined) {
+      entry.instances.add(h.sourceInstance);
+    }
+  }
+  const grouped = [...byPlayer.values()];
+
+  const byInstance = new Map<number, Grouped[]>();
+  for (const g of grouped) {
+    for (const inst of g.instances) {
+      const list = byInstance.get(inst) ?? [];
+      list.push(g);
+      byInstance.set(inst, list);
+    }
+  }
+
+  const sides = [
+    { label: "Support", isMember: (p: PlayerInfo) => SUPPORT_ROLES.has(p.role) },
+    { label: "DPS",      isMember: (p: PlayerInfo) => p.role === "DPS" },
+  ] as const;
+
+  const diedToResolution = (playerName: string, aroundMs: number) =>
+    deathEvents.some(
+      (d) => d.player === playerName && GRAVEN_3_RESOLUTION_ABILITY_IDS.has(d.killingAbilityGameId) && Math.abs(d.timestamp - aroundMs) <= 5000
+    );
+
+  const errors: PullError[] = [];
+  for (const side of sides) {
+    const members = players.filter((p) => side.isMember(p));
+    let best: Grouped[] | null = null;
+    for (const participants of byInstance.values()) {
+      const allThisSide = participants.every((p) => members.some((m) => m.actorId === p.player.actorId));
+      if (!allThisSide) continue;
+      if (best === null || participants.length > best.length) best = participants;
+    }
+    if (!best || best.length < GRAVEN_3_STACK_GROUP_MIN_SIZE) continue; // not an unambiguous stack signature
+
+    const anyDied = best.some((g) => diedToResolution(g.player.name, g.timestamp));
+    if (!anyDied) continue; // stack held up (or the miss wasn't lethal) — nothing to flag
+
+    const anchorX = best.reduce((sum, g) => sum + g.x, 0) / best.length;
+    const anchorY = best.reduce((sum, g) => sum + g.y, 0) / best.length;
+    const anchorTimestamp = Math.max(...best.map((g) => g.timestamp));
+    const groupNames = best.map((g) => g.player.name);
+
+    // Checked against EVERY side member, not just those absent from the
+    // group's own shared instance — see module header's "SNAPSHOT
+    // POSITION" note (pull 28): a player who dashes in just before the
+    // hit lands can still end up sharing the group's instance/final
+    // position, hiding a real out-of-position mistake at the moment that
+    // actually matters. Position is read AT-OR-BEFORE the Mystery Magic
+    // CAST itself (graven3CastTime), not the later hit resolution — same
+    // "prior position" principle graven-image.ts's spread check uses, but
+    // anchored to the cast specifically since (confirmed pulls 27/28) the
+    // 3 genuinely-early stackers already show a clean, stable position
+    // well before the cast, while a late arrival's nearest-before-the-HIT
+    // sample is too dense/recent to recover their true lateness — only a
+    // cast-anchored read does.
+    for (const player of members) {
+      const pos = findPlayerPosition(player, graven3CastTime, { windowMs: GRAVEN_3_STACK_POSITION_WINDOW_MS, direction: "atOrBefore" });
+      if (!pos) continue; // can't confirm they were actually away — fail closed, don't guess
+
+      const distance = distanceBetween(pos, { x: anchorX, y: anchorY });
+      if (distance < GRAVEN_3_STACK_OUT_OF_POSITION_CENTIYALMS) continue; // within normal jitter
+
+      // A late arrival can still share the group's own hit instance (see
+      // comment above) — exclude them from their own "overkilling ___"
+      // list.
+      const overkilled = groupNames.filter((name) => name !== player.name);
+
+      errors.push({
+        ruleId:      GRAVEN_3_STACK_RULE_ID,
+        severity:    "Major",
+        name:        "Graven 3 Stack Missed",
+        description: `Was roughly ${(distance / 100).toFixed(1)} yalms from the ${side.label} stack, splitting the hit fewer ways and overkilling ${overkilled.join(", ")}.`,
+        timestamp:   anchorTimestamp,
+        player:      player.name,
+        class:       player.className,
+        specId:      player.specId,
+        role:        player.role,
+        abilityId:   best[0].abilityId,
+        abilityName: "Flagrant Fire III",
+      });
+    }
+  }
+  return errors;
+}
+
+const LIGHT_OF_JUDGMENT_ENRAGE_CHECK_ABILITY_ID = 47803;
+const ENRAGE_CHECK_MAX_HP_PERCENT = 15;
+
+function detectEnrageCheckError(enemyCasts: EnemyEvent[]): PullError[] {
+  const checkCasts = enemyCasts.filter(
+    (e) => e.abilityId === LIGHT_OF_JUDGMENT_ENRAGE_CHECK_ABILITY_ID && e.hitPoints !== undefined && e.maxHitPoints
+  );
+  if (checkCasts.length === 0) return [];
+  const finalCast = checkCasts[checkCasts.length - 1];
+
+  const hpPercent = (finalCast.hitPoints! / finalCast.maxHitPoints!) * 100;
+  if (hpPercent <= ENRAGE_CHECK_MAX_HP_PERCENT) return [];
+
+  return [
+    {
+      ruleId:      ENRAGE_CHECK_RULE_ID,
+      severity:    "Raid",
+      name:        "Missed Enrage Check",
+      description: `Kefka was at ${hpPercent.toFixed(1)}% HP when he became untargetable — should be brought below 15% by then to proceed to the next phase.`,
+      timestamp:   finalCast.timestamp,
+      abilityId:   LIGHT_OF_JUDGMENT_ENRAGE_CHECK_ABILITY_ID,
+      abilityName: "Light of Judgment",
     },
   ];
 }
@@ -3830,6 +4369,7 @@ export function detectPhase1Errors(
   const blizzardIIISilentKillErrors = detectBlizzardIIIBlowoutSilentKillErrors(players, deathEvents);
   const revoltingRuinThreatLossErrors = detectRevoltingRuinThreatLossErrors(players, deathEvents);
   const graven2SpreadMisplacedErrors = detectGraven2SpreadMisplacedErrors(players);
+  const graven2PuddleSoakMissedErrors = detectGraven2PuddleSoakMissedErrors(players, deathEvents);
 
   return [
     ...revoltingRuinThreatLossErrors,
@@ -3846,10 +4386,11 @@ export function detectPhase1Errors(
     ...detectGraven2PuddlePlacementErrors(players, enemyCasts),
     ...detectGraven2PuddleLingerErrors(players, enemyCasts),
     ...detectGraven2PuddleProximityErrors(players, deathEvents, enemyCasts),
+    ...graven2PuddleSoakMissedErrors,
     ...detectGravitationalExplosionWipeError(enemyCasts),
     ...detectGraven1DeathWipeError(deathEvents, enemyCasts, blizzardIIISilentKillErrors),
     ...graven2SpreadMisplacedErrors,
-    ...detectGraven2DeathWipeError(players, deathEvents, enemyCasts, graven2SpreadMisplacedErrors),
+    ...detectGraven2DeathWipeError(players, deathEvents, enemyCasts, [...graven2SpreadMisplacedErrors, ...graven2PuddleSoakMissedErrors]),
     ...detectConfettiLostError(players, deathEvents),
     ...detectConfettiKnockbackVictimErrors(players),
     ...detectConfettiHolderMisplacedErrors(players),
@@ -3858,5 +4399,7 @@ export function detectPhase1Errors(
     ...detectTeleTrouncingArrowErrors(players),
     ...detectTeleTrouncingBaitPositionErrors(players, enemyCasts),
     ...detectTeleTrouncingDeathWipeError(deathEvents, enemyCasts),
+    ...detectGraven3StackErrors(players, deathEvents, enemyCasts),
+    ...detectEnrageCheckError(enemyCasts),
   ].sort((a, b) => a.timestamp - b.timestamp);
 }
