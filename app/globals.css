@@ -23,6 +23,11 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  /* The project has no postcss/tailwind config, so the `@import "tailwindcss"`
+     above is inert and its preflight reset never lands — leaving the UA's
+     default 8px body margin in place. Against a 100vh app root that margin is
+     16px of document overflow, i.e. a permanent thin vertical scrollbar. */
+  margin: 0;
 }
 
 * {
