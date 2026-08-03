@@ -2,6 +2,7 @@
 
 import type { Pull } from "@/types/Pull";
 import { getPullRaidCutoff } from "@/lib/report-data";
+import { SeverityIcon, SEVERITY_COLOR } from "./SeverityIcon";
 
 type PullListProps = {
   pulls:          Pull[];
@@ -143,15 +144,21 @@ export default function PullList({ pulls, selectedPullId, onSelectPull }: PullLi
               <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", fontSize: "11px", color: "#666", minWidth: 0 }}>
                 <span style={{ color: "#999" }}>⏱ {formatDuration(pull.fightDuration)}</span>
                 {deaths > 0 ? (
-                  <span style={{ color: "#ef4444" }}>💀 {deaths} death{deaths !== 1 ? "s" : ""}</span>
+                  <span style={{ color: SEVERITY_COLOR.Death, display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                    <SeverityIcon kind="Death" size={12} /> {deaths} death{deaths !== 1 ? "s" : ""}
+                  </span>
                 ) : (
                   <span style={{ color: "#22c55e" }}>✓ No deaths</span>
                 )}
                 {majors.length > 0 && (
-                  <span style={{ color: "#fb923c" }}>⛔ {majors.length} major</span>
+                  <span style={{ color: SEVERITY_COLOR.Major, display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                    <SeverityIcon kind="Major" size={12} /> {majors.length} major
+                  </span>
                 )}
                 {minors.length > 0 && (
-                  <span style={{ color: "#fbbf24" }}>⚠️ {minors.length} minor</span>
+                  <span style={{ color: SEVERITY_COLOR.Minor, display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                    <SeverityIcon kind="Minor" size={12} /> {minors.length} minor
+                  </span>
                 )}
               </div>
             </div>

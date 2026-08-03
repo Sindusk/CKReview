@@ -9,6 +9,7 @@ import { getClassColor, getRoleColor, formatClassName, getPlayerSpecIcon } from 
 import { getSpecInfo } from "@/lib/spec-data";
 import ConfirmDialog from "./ConfirmDialog";
 import AddErrorDialog from "./AddErrorDialog";
+import { SeverityIcon, SEVERITY_COLOR, type SeverityKind } from "./SeverityIcon";
 
 type AnalysisPanelProps = {
   pull: Pull | null;
@@ -67,11 +68,11 @@ function errorToFeedEntry(e: PullError, game: "wow" | "ffxiv"): FeedEntry {
   return { kind: e.severity, timestamp: e.timestamp, player: e.player, class: e.class, specId: e.specId, role: e.role, title: e.name, titleIcon: e.abilityIcon, abilityId: e.abilityId, subtitle: e.description, game, id: e.id, ruleId: e.ruleId };
 }
 
-const FEED_KIND_STYLE: Record<FeedKind, { icon: string; color: string; label: string }> = {
-  Death: { icon: "💀", color: "#f87171", label: "Death" },
-  Raid:  { icon: "🚨", color: "#c084fc", label: "Raid" },
-  Major: { icon: "⛔", color: "#fb923c", label: "Major" },
-  Minor: { icon: "⚠️", color: "#fbbf24", label: "Minor" },
+const FEED_KIND_STYLE: Record<FeedKind, { color: string; label: string }> = {
+  Death: { color: SEVERITY_COLOR.Death, label: "Death" },
+  Raid:  { color: SEVERITY_COLOR.Raid,  label: "Raid" },
+  Major: { color: SEVERITY_COLOR.Major, label: "Major" },
+  Minor: { color: SEVERITY_COLOR.Minor, label: "Minor" },
 };
 
 function formatMs(ms: number): string {
@@ -212,9 +213,12 @@ function FeedRow({
         {formatMs(entry.timestamp)}
       </span>
 
-      <span style={{ fontSize: "13px", flexShrink: 0, opacity: hasPassed ? 1 : 0.3, transition: "opacity 0.3s" }}>
-        {style.icon}
-      </span>
+      <SeverityIcon
+        kind={entry.kind}
+        size={16}
+        color={style.color}
+        style={{ opacity: hasPassed ? 1 : 0.3, transition: "opacity 0.3s" }}
+      />
 
       <div style={{ flex: 1, minWidth: 0, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px" }}>
         <div style={{ minWidth: 0, flex: 1 }}>
@@ -406,12 +410,14 @@ function StatTabPill({
   color,
   active,
   onClick,
+  icon,
 }: {
   label: string;
   value: string;
   color: string;
   active: boolean;
   onClick: () => void;
+  icon?: SeverityKind;
 }) {
   const [hovered, setHovered] = useState(false);
 
@@ -433,7 +439,8 @@ function StatTabPill({
         transition: "border-color 0.15s",
       }}
     >
-      <span style={{ fontSize: "9px", color: "#555", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+      <span style={{ display: "flex", alignItems: "center", gap: "3px", fontSize: "9px", color: "#555", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+        {icon && <SeverityIcon kind={icon} size={9} color={active ? color : "#555"} />}
         {label}
       </span>
       <span style={{ fontSize: "13px", fontWeight: 600, color, textAlign: "center", width: "100%" }}>{value}</span>
@@ -641,29 +648,33 @@ export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime, onCa
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
           <StatTabPill
             label="Deaths"
+            icon="Death"
             value={String(deaths.length)}
-            color={deaths.length > 0 ? "#f87171" : "#4ade80"}
+            color={deaths.length > 0 ? SEVERITY_COLOR.Death : "#4ade80"}
             active={activeTab === "Deaths"}
             onClick={() => setActiveTab("Deaths")}
           />
           <StatTabPill
             label="Raid"
+            icon="Raid"
             value={String(raids.length)}
-            color={raids.length > 0 ? "#c084fc" : "#4ade80"}
+            color={raids.length > 0 ? SEVERITY_COLOR.Raid : "#4ade80"}
             active={activeTab === "Raid"}
             onClick={() => setActiveTab("Raid")}
           />
           <StatTabPill
             label="Major"
+            icon="Major"
             value={String(majors.length)}
-            color={majors.length > 0 ? "#fb923c" : "#4ade80"}
+            color={majors.length > 0 ? SEVERITY_COLOR.Major : "#4ade80"}
             active={activeTab === "Major"}
             onClick={() => setActiveTab("Major")}
           />
           <StatTabPill
             label="Minor"
+            icon="Minor"
             value={String(minors.length)}
-            color={minors.length > 0 ? "#fbbf24" : "#4ade80"}
+            color={minors.length > 0 ? SEVERITY_COLOR.Minor : "#4ade80"}
             active={activeTab === "Minor"}
             onClick={() => setActiveTab("Minor")}
           />

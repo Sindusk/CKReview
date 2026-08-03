@@ -12,6 +12,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import StaticErrorChart, { type ChartPull } from "@/components/StaticErrorChart";
 import StaticPlayersPanel from "@/components/StaticPlayersPanel";
+import { SeverityIcon, SEVERITY_COLOR } from "@/components/SeverityIcon";
 
 type StaticInfo = { id: number; name: string; role: "OWNER" | "MEMBER" };
 
@@ -207,8 +208,12 @@ export default function StaticDashboardPage() {
                             <div style={{ fontSize: "13px", display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
                               <strong>{pull.bossName} #{pull.pullNumber}</strong>
                               <span style={{ color: pull.result === "Kill" ? "#4ade80" : "#999" }}>{pull.result}</span>
-                              <span style={{ color: "#f87171", fontSize: "12px" }}>{totalMajor} Major</span>
-                              <span style={{ color: "#facc15", fontSize: "12px" }}>{totalMinor} Minor</span>
+                              <span style={{ color: SEVERITY_COLOR.Major, fontSize: "12px", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                                <SeverityIcon kind="Major" size={12} /> {totalMajor} Major
+                              </span>
+                              <span style={{ color: SEVERITY_COLOR.Minor, fontSize: "12px", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                                <SeverityIcon kind="Minor" size={12} /> {totalMinor} Minor
+                              </span>
                               <span style={{ color: "#777", fontSize: "12px" }}>
                                 {pull.raidErrorAtMs != null ? `wiped at ${durationLabel}` : `lasted ${durationLabel}`}
                               </span>
