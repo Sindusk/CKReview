@@ -379,6 +379,34 @@ export default function Home() {
     }, 400);
   }, []);
 
+  // Importing a DIFFERENT log must start a NEW session. Without this,
+  // sessionIdRef stays pointed at the previous report's session and the next
+  // persistSession() overwrites that session in place with the new report's
+  // url/VODs/wipe calls. That also silently re-points anything keyed on the
+  // session id — notably StaticReview, which is unique on
+  // (staticId, sessionId): adding a second night's log to a static then hit
+  // the "resync" path and wiped the first night's pulls (seen 2026-08-03
+  // with J4TnhjdNBtDK6LMx + mhLjAT4vDyJgZcBk).
+  const startNewSessionIfDifferentLog = useCallback((rawInput: string) => {
+    if (!sessionIdRef.current) return;
+
+    const current = parseLogUrl(sessionReportUrlRef.current ?? "");
+    const next    = parseLogUrl(rawInput);
+    if (!next) return;
+    if (current && current.source === next.source && current.code === next.code) return;
+
+    sessionIdRef.current = null;
+    setSessionId(null);
+    pendingWipeCallsRef.current    = {};
+    pendingManualErrorsRef.current = {};
+
+    // Drop ?session=<id> so a reload doesn't restore the old report on top of
+    // the one being imported; persistSession() stamps the new id shortly.
+    const url = new URL(window.location.href);
+    url.searchParams.delete("session");
+    window.history.replaceState({}, "", url.toString());
+  }, []);
+
   // Restore a saved session from ?session=<id> on first load. Pre-fills
   // the import box (does NOT auto-import) and restores VODs with their
   // calibration already applied. Wipe calls are stashed in a ref and
@@ -395,6 +423,7 @@ export default function Home() {
       sessionIdRef.current = id;
       setSessionId(id);
       setSessionReportUrl(session.reportUrl);
+      sessionReportUrlRef.current = session.reportUrl;
       setImportInput(session.reportUrl);
       pendingWipeCallsRef.current = session.wipeCalls ?? {};
       pendingManualErrorsRef.current = session.manualErrors ?? {};
@@ -827,7 +856,9 @@ export default function Home() {
     }
 
     setImportStatus("Fetching report information…");
+    startNewSessionIfDifferentLog(rawInput);
     setSessionReportUrl(rawInput);
+    sessionReportUrlRef.current = rawInput;
     // Clear the previous import's rate-limit readout so stale numbers can't
     // briefly show once this new import finishes and loadedReportCode is
     // still momentarily set from the last one.
@@ -868,6 +899,11 @@ export default function Home() {
     sessionIdRef.current = match.id;
     setSessionId(match.id);
     setSessionReportUrl(session.reportUrl);
+    // Eagerly, not just via the mirroring effect: the handleImportReport()
+    // call below runs before that effect flushes, and its
+    // startNewSessionIfDifferentLog() check would otherwise compare against
+    // the PREVIOUS report's url and discard the session just adopted here.
+    sessionReportUrlRef.current = session.reportUrl;
     pendingWipeCallsRef.current = session.wipeCalls ?? {};
     pendingManualErrorsRef.current = session.manualErrors ?? {};
 
@@ -952,7 +988,9 @@ export default function Home() {
     setImportError(null);
     setImportProgress(20);
     setImportStatus(`Loading ${found.code} from local sample data…`);
+    startNewSessionIfDifferentLog(found.rawInput);
     setSessionReportUrl(found.rawInput);
+    sessionReportUrlRef.current = found.rawInput;
 
     try {
       const payload = await fetchSampleReport(found.source, found.code);

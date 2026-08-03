@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import type { StaticReviewPullData } from "@/lib/static-review-data";
 import { resolvePlayerIdentities } from "@/lib/static-player-identity";
+import { parseLogUrl } from "@/lib/url-parsers";
 
 async function requireMembership(staticId: number, userId: number) {
   return prisma.staticMember.findUnique({
@@ -116,6 +117,24 @@ export async function POST(
         where: { staticId_sessionId: { staticId, sessionId } },
       });
       if (!existing) throw err;
+
+      // ...but only when it's genuinely the SAME log. A session that got
+      // re-pointed at a different report (see app/page.tsx's
+      // startNewSessionIfDifferentLog) would otherwise resync one night's
+      // review into another night's pulls, destroying the original. Compare
+      // parsed report codes, not raw urls, so cosmetic url differences
+      // (#fight=… fragments, www., etc.) don't trip this.
+      const existingLog = parseLogUrl(existing.reportUrl);
+      const incomingLog = parseLogUrl(reportUrl);
+      if (existingLog && incomingLog &&
+          (existingLog.source !== incomingLog.source || existingLog.code !== incomingLog.code)) {
+        return NextResponse.json({
+          error:
+            `This static already has a review linked to session "${sessionId}", but for a ` +
+            `different report (${existingLog.code}). Import ${incomingLog.code} in a fresh ` +
+            `session and add that instead — resyncing here would overwrite the other report's pulls.`,
+        }, { status: 409 });
+      }
 
       const review = await prisma.$transaction(async (tx) => {
         // Carry forward hand-written notes (StaticReviewPull.summary) by
