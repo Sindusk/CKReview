@@ -1034,6 +1034,12 @@ export default function Home() {
         flexDirection:   "column",
         backgroundColor: "#121212",
         color:           "white",
+        // This is a fixed-viewport dashboard — every scrollable region is an
+        // inner panel, so the document itself must never scroll. Without this
+        // a row that overflows horizontally (the header's fixed-width banner
+        // artwork on a narrow window) spills onto the body, and the resulting
+        // horizontal bar then eats enough height to also trip a vertical one.
+        overflow:        "hidden",
       }}
     >
       <Header
