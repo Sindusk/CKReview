@@ -1,4 +1,5 @@
 import BurgerMenu from "./BurgerMenu";
+import BrandBanner from "./BrandBanner";
 
 type HeaderProps = {
   onAddVod:             () => void;
@@ -63,20 +64,9 @@ export default function Header({
           padding:        "0 8px",
         }}
       >
-        <img
-          src="/ckreviewv9.png"
-          alt="Consistency Kings Raid Review"
-          style={{
-            display:        "block",
-            width:          "100%",
-            maxWidth:       "1536px",
-            height:         "auto",
-            maxHeight:      "100%",
-            objectFit:      "scale-down",
-            objectPosition: "center",
-            background:     "transparent",
-          }}
-        />
+        {/* 1b heraldic banner carrying the 2a duck mark — see BrandBanner.tsx.
+            72px leaves a little breathing room inside the 80px header. */}
+        <BrandBanner height={72} />
       </div>
 
       <div style={{ width: "120px", display: "flex", justifyContent: "flex-end" }}>

@@ -1,6 +1,16 @@
 import type { Metadata } from "next";
 import Script from "next/script";
+import { Cinzel } from "next/font/google";
 import "./globals.css";
+
+// Display face for the brand banner (BrandBanner.tsx). Self-hosted by
+// next/font so the header lockup doesn't flash in an unstyled fallback.
+const cinzel = Cinzel({
+  subsets:  ["latin"],
+  weight:   ["600", "900"],
+  variable: "--font-cinzel",
+  display:  "swap",
+});
 
 export const metadata: Metadata = {
   title: "Consistency Kings Raid Review",
@@ -9,7 +19,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className={cinzel.variable}>
       <body>
         {children}
 
