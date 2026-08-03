@@ -26,6 +26,12 @@ const DESIGN_H = 150;
    falls back to a wider serif. */
 const CLUSTER_W = DESIGN_W;
 
+/* Scaling by height/DESIGN_H wastes the design's vertical padding: the
+   tallest ink (the title column) is only ~120 of the 150. Scaling against
+   that ink height instead renders the artwork ~25% larger in the same band,
+   with the leftover slack clipped rather than drawn. */
+const ART_H = 120;
+
 /** The 2a duck mark: crown + head, no frame. Sized to fill its parent. */
 function DuckMark() {
   return (
@@ -119,7 +125,11 @@ type BrandBannerProps = {
 };
 
 export default function BrandBanner({ height = DESIGN_H, title = "Consistency Kings Raid Review" }: BrandBannerProps) {
-  const scale = height / DESIGN_H;
+  const scale = height / ART_H;
+  /* scale() runs from the top-left corner, so the 150-tall design box lands
+     taller than the band and its contents sit low; lift it by half the
+     overhang to put the ink back on the band's centre line. */
+  const lift = (DESIGN_H * scale - height) / 2;
 
   return (
     <div
@@ -143,7 +153,7 @@ export default function BrandBanner({ height = DESIGN_H, title = "Consistency Ki
       <div style={{ position: "absolute", inset: 0, background: "repeating-linear-gradient(135deg, rgba(242,193,78,0.05) 0 2px, transparent 2px 12px)", pointerEvents: "none" }} />
 
       {/* scaled footprint of the artwork cluster, so flex centring still works */}
-      <div style={{ width: `${CLUSTER_W * scale}px`, height: `${height}px`, flex: "none", position: "relative" }}>
+      <div style={{ width: `${CLUSTER_W * scale}px`, height: `${height}px`, flex: "none", position: "relative", overflow: "hidden" }}>
         <div
           style={{
             width:           `${CLUSTER_W}px`,
@@ -153,7 +163,7 @@ export default function BrandBanner({ height = DESIGN_H, title = "Consistency Ki
             alignItems:      "center",
             justifyContent:  "center",
             gap:             "70px",
-            transform:       `scale(${scale})`,
+            transform:       `translateY(${-lift}px) scale(${scale})`,
             transformOrigin: "top left",
           }}
         >

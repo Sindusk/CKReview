@@ -1,8 +1,11 @@
 import BurgerMenu from "./BurgerMenu";
 import BrandBanner from "./BrandBanner";
 
-/** Header height in px; the banner artwork scales to fill it. */
-const HEADER_H = 96;
+/** Header height in px; the banner artwork scales to fill it. Kept at the
+    pre-banner 80px so the header takes no vertical budget from the panels
+    below — the artwork gets its size from BrandBanner's ART_H basis, not
+    from a taller bar. */
+const HEADER_H = 80;
 
 type HeaderProps = {
   onAddVod:             () => void;
