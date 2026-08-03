@@ -341,7 +341,16 @@ export function mechanicNameTokens(mechName: string): string[] {
 //     where a different, unrelated cast ("Look upon Me and Despair")
 //     happened to land even closer — "Nothingness" was still present just
 //     ~0.6s further out, well inside the match window.
+//   - "Double-Trouble Trap" also answers for "Gravity III" (user-specified
+//     2026-08-03, report h2JvDkntZCaBgmLF pull 35): the Gravity III raid hit
+//     lands a few seconds after the ~2:00 Double-Trouble Trap and is covered
+//     by the SAME mitigation window (Dark Missionary/Panhaima/Shield Samba
+//     are all still up for it), so for mitigation purposes it's part of that
+//     mechanic rather than an unmitigated moment of its own. Sonder Dreams
+//     died to Gravity III at 124.4s with the 118s row's mitigation missing,
+//     and nothing flagged because no death matched the row's own name.
 const MECHANIC_NAME_ALIASES: Record<string, string[]> = {
+  "Double-Trouble Trap":             ["Double-Trouble Trap", "Gravity III"],
   "Towers I":                        ["The Path of Light"],
   "Towers II (Past/Future's End)":   ["The Path of Light"],
   "Towers III (All Things Ending)":  ["The Path of Light"],

@@ -62,6 +62,14 @@
 // the wrong bait and cleaved half the raid. See the Phase-2 section below
 // for the full geometry model and attribution rules.
 //
+// ── PHASE 3: WHEN THE MECHANIC IS OVER (see DEATH DURING FORSAKEN below) ────
+//
+// A death anywhere between the initial Forsaken cast and the 7th tower
+// leaves the remaining towers short a soaker, so it fires one Raid-severity
+// error and cuts off per-player attribution from the NEXT tower resolution
+// onward (the fatal tower's own errors survive — its lethal follow-ups land
+// seconds after the resolution they belong to).
+//
 // ── WHAT THIS DOES NOT DO YET ───────────────────────────────────────────────
 //
 // It does not directly verify where the follow-up aoes (47808/47809/47810
@@ -254,6 +262,122 @@ function detectEnrageCheckError(players: PlayerInfo[], enemyCasts: EnemyEvent[])
       abilityName: "Ultimate Embrace",
     },
   ];
+}
+
+// ── DEATH DURING FORSAKEN -> UNRESOLVABLE (confirmed 2026-08-03, report ────
+// ── h2JvDkntZCaBgmLF, pulls 33/34/45/46/50) ──────────────────────────────
+//
+// Forsaken needs all 8 players for its full run of towers: each of the 8
+// resolutions is soaked by 4 players carrying rotating assignment debuffs,
+// so a single death mid-mechanic leaves a tower short from that point on and
+// everything after it is cascade, not independent mistakes. Per the user, a
+// death anywhere from the initial "Forsaken" cast (47804, ~4:00 into the
+// fight) through the SEVENTH tower resolution (~5:12) is the cutoff; the
+// EIGHTH and final tower is explicitly exempt — by then the mechanic is
+// effectively over and a death there doesn't cost the raid the mechanic.
+//
+// Confirmed shapes in that report: pulls 33/34/45 die to the Forsaken cast
+// itself (47804 killing blow, ~3.5-4s after the cast completes), pulls 46/50
+// die to a tower's follow-up aoe (Spelldriver/Spellscatter/Spellwave/River of
+// Light) a few seconds after a tower resolves.
+const FORSAKEN_CAST_ABILITY_ID = 47804;
+
+// Tower cadence is metronomic across every report on disk (57 pulls that
+// reach 8 towers, 6 reports): tower 1 lands cast + 13.2-13.5s, and each
+// subsequent tower exactly ~10.05s later, putting tower 7 at cast + ~76.4s
+// and tower 8 at cast + ~86.4s. Actual resolutions are read from the log
+// when the pull got that far; these offsets are the fallback for the (much
+// more common) pull that wiped before tower 7 ever fired, where any death is
+// inside the window anyway.
+const FORSAKEN_SEVENTH_TOWER_OFFSET_MS = 76400;
+
+// A tower's lethal follow-ups land ~3.5-4s after the resolution itself
+// (observed 249.5 -> 253.3, 259.7 -> 263.5), so deaths CAUSED by tower 7
+// still count. Kept comfortably under the ~10s gap to tower 8 so a death
+// belonging to the exempt final tower can't be swept in.
+const FORSAKEN_TOWER_DEATH_GRACE_MS = 6000;
+
+export const FORSAKEN_DEATH_WIPE_RULE_ID = "ffxiv-forsaken-death-during-forsaken";
+
+/**
+ * Locates the resolution instants of Forsaken's towers from the boss's own
+ * "The Path of Light" (47806) casts — several fire per tower (one per
+ * soaker), so they're clustered into one entry per resolution.
+ */
+function forsakenTowerResolutionTimes(enemyCasts: EnemyEvent[]): number[] {
+  const times = enemyCasts
+    .filter((e) => e.abilityId === PATH_OF_LIGHT_ABILITY_ID)
+    .map((e) => e.timestamp)
+    .sort((a, b) => a - b);
+
+  const resolutions: number[] = [];
+  for (const t of times) {
+    if (resolutions.length === 0 || t - resolutions[resolutions.length - 1] > 3000) resolutions.push(t);
+  }
+  return resolutions;
+}
+
+/**
+ * Any death between the Forsaken cast and the 7th tower — see the section
+ * comment above. Raid severity: the mechanic is short a body from here on,
+ * so nothing after it is independently attributable.
+ *
+ * Returns the errors plus the cutoff timestamp, which
+ * detectForsakenTowerErrors uses to drop the player-attributed tower errors
+ * that follow (they're cascade from the missing player, and per the
+ * attribution philosophy death fallout is never flagged).
+ *
+ * The cutoff is deliberately the NEXT tower resolution after the death, not
+ * the death instant itself: a tower's own errors are timestamped at the
+ * resolution, but its lethal follow-ups land seconds later, so cutting at
+ * the death would erase the very mistake that caused it (confirmed against
+ * report rXBbzFV49hd1QPwf pull 10, where the stack-clip error that killed
+ * Austin Takehiko is timestamped 134ms AFTER his own death event). Cutting
+ * at the next resolution keeps the fatal tower's own attribution intact and
+ * drops only the towers that were genuinely short a body.
+ */
+function detectForsakenDeathWipeError(
+  deathEvents: DeathEvent[],
+  enemyCasts:  EnemyEvent[]
+): { errors: PullError[]; cutoff: number | null } {
+  const forsakenCast = enemyCasts
+    .filter((e) => e.abilityId === FORSAKEN_CAST_ABILITY_ID)
+    .sort((a, b) => a.timestamp - b.timestamp)[0];
+  if (!forsakenCast) return { errors: [], cutoff: null };
+
+  const resolutions = forsakenTowerResolutionTimes(enemyCasts);
+  const seventhTower =
+    resolutions.length >= 7
+      ? resolutions[6]
+      : forsakenCast.timestamp + FORSAKEN_SEVENTH_TOWER_OFFSET_MS;
+  const windowEnd = seventhTower + FORSAKEN_TOWER_DEATH_GRACE_MS;
+
+  const deaths = deathEvents
+    .filter((d) => d.timestamp >= forsakenCast.timestamp && d.timestamp <= windowEnd)
+    .sort((a, b) => a.timestamp - b.timestamp);
+  if (deaths.length === 0) return { errors: [], cutoff: null };
+
+  // Everyone who died in the same instant as the first death is named — the
+  // Forsaken cast itself routinely kills several people at once — but the
+  // cutoff is the first death, since that's where the mechanic broke.
+  const first = deaths[0];
+  const simultaneous = deaths.filter((d) => d.timestamp - first.timestamp <= 1000);
+  const names = [...new Set(simultaneous.map((d) => d.player))];
+
+  return {
+    cutoff: resolutions.find((t) => t > first.timestamp) ?? null,
+    errors: [
+      {
+        ruleId:      FORSAKEN_DEATH_WIPE_RULE_ID,
+        severity:    "Raid",
+        name:        "Death During Forsaken",
+        description: `${names.join(" and ")} died during Forsaken — its remaining towers are short a soaker from here, so this is treated as a cutoff point for further per-player analysis this pull.`,
+        timestamp:   first.timestamp,
+        abilityId:   FORSAKEN_CAST_ABILITY_ID,
+        abilityName: "Forsaken",
+      },
+    ],
+  };
 }
 
 /** Every 1005083 stack-loss instant for one player — both a partial decrement and the final removal. */
@@ -457,15 +581,19 @@ function inferPlayerTeams(lossesByPlayer: Map<number, number[]>): Map<number, "f
 //
 // Job-keyed rather than role-keyed because FFLogs data alone can't tell
 // which tank is MT vs OT, or which healer is "regen" vs "shield" (the same
-// limitation mitigation-plan.ts already documents) — this table is THIS
-// report's specific roster (PLD/DRK/WHM/SGE/RPR/VPR/DNC/PCT) and would need
-// extending (or a different resolution strategy) for a raid running a
-// different composition.
-const FORSAKEN_PARTNER_PAIRS: ReadonlyArray<readonly [string, string]> = [
-  ["White Mage", "Paladin"],     // Healer1/Regen <-> MT
-  ["Sage",       "Dark Knight"], // Healer2/Shield <-> OT
-  ["Reaper",     "Dancer"],      // M1 <-> R1/Phys Ranged
-  ["Viper",      "Pictomancer"], // M2 <-> R2/Caster
+// limitation mitigation-plan.ts already documents). Each side lists the
+// job(s) that can fill that slot; exactly ONE of them must be present in the
+// pull's roster or the whole inference bails (see below) rather than guess.
+// The MT slot carries alternates because the raid's main tank job changed
+// between reports — PLD in VtdBqhLQkWJXMvDg/G7kTFVxjcAC6p1MN, GNB in
+// h2JvDkntZCaBgmLF, whose pairing the user confirmed directly 2026-08-03
+// ("Azura and Kade got stack ... Azura + partner (Salty)", i.e. WHM ↔ GNB).
+// Every other slot has only ever been seen filled by one job.
+const FORSAKEN_PARTNER_PAIRS: ReadonlyArray<readonly [readonly string[], readonly string[]]> = [
+  [["White Mage"], ["Paladin", "Gunbreaker"]], // Healer1/Regen <-> MT
+  [["Sage"],       ["Dark Knight"]],           // Healer2/Shield <-> OT
+  [["Reaper"],     ["Dancer"]],                // M1 <-> R1/Phys Ranged
+  [["Viper"],      ["Pictomancer"]],           // M2 <-> R2/Caster
 ];
 
 /** The player's assignment debuff (1005084/85/86) at the very start of Forsaken — their first "applied" event for any of the three, before any tower has resolved. */
@@ -492,10 +620,18 @@ function inferPlayerTeamsFromBurst(players: PlayerInfo[]): Map<number, "first" |
     byClassName.set(p.className, p);
   }
 
+  // Exactly one of a slot's candidate jobs must be on the roster — zero
+  // means this comp isn't modeled, two means the slot is ambiguous. Either
+  // way, bail to the timing-based fallback rather than guess.
+  const soleMatch = (jobs: readonly string[]): PlayerInfo | undefined => {
+    const found = jobs.map((j) => byClassName.get(j)).filter((p): p is PlayerInfo => p !== undefined);
+    return found.length === 1 ? found[0] : undefined;
+  };
+
   const teamByPlayer = new Map<number, "first" | "second">();
-  for (const [classA, classB] of FORSAKEN_PARTNER_PAIRS) {
-    const a = byClassName.get(classA);
-    const b = byClassName.get(classB);
+  for (const [jobsA, jobsB] of FORSAKEN_PARTNER_PAIRS) {
+    const a = soleMatch(jobsA);
+    const b = soleMatch(jobsB);
     if (!a || !b) return undefined; // this pull's roster doesn't match the known comp
 
     const debuffA = findInitialAssignmentDebuff(a);
@@ -563,6 +699,13 @@ export function detectForsakenTowerErrors(
       .map((e) => e.timestamp)
   );
 
+  // A death mid-Forsaken is the cutoff for per-player attribution (see the
+  // DEATH DURING FORSAKEN section) — everything the towers do after it is
+  // short a body, i.e. fallout rather than an independent mistake.
+  const { errors: deathWipeErrors, cutoff } = detectForsakenDeathWipeError(deathEvents, enemyCasts);
+  const afterCutoff = (e: PullError) =>
+    cutoff !== null && e.severity !== "Raid" && e.timestamp >= cutoff;
+
   const lossesByPlayer = new Map<number, number[]>();
 
   for (const player of players) {
@@ -572,7 +715,11 @@ export function detectForsakenTowerErrors(
     lossesByPlayer.set(player.actorId, losses);
   }
 
-  if (lossesByPlayer.size === 0) return detectEnrageCheckError(players, enemyCasts);
+  if (lossesByPlayer.size === 0) {
+    return [...deathWipeErrors, ...detectEnrageCheckError(players, enemyCasts)].sort(
+      (a, b) => a.timestamp - b.timestamp
+    );
+  }
 
   // Burst-based team inference (see its module comment) is authoritative
   // when this pull's roster matches a known comp; falls back to the older
@@ -674,7 +821,9 @@ export function detectForsakenTowerErrors(
   errors.push(...detectCloneOverlapErrors(players));
   errors.push(...detectEnrageCheckError(players, enemyCasts));
 
-  return errors.sort((a, b) => a.timestamp - b.timestamp);
+  return [...errors.filter((e) => !afterCutoff(e)), ...deathWipeErrors].sort(
+    (a, b) => a.timestamp - b.timestamp
+  );
 }
 
 export const FORSAKEN_EXTRA_PLAYER_RULE_ID = "ffxiv-forsaken-extra-player-in-tower";
@@ -1775,27 +1924,57 @@ function detectWrongTowerPositionErrors(
             d.timestamp <= reportTimestamp + STACK_CLIP_DEATH_WINDOW_MS
         );
 
+        // Reconstruct the volley the Stack holder's own plant fired in, via
+        // its sourceInstance, to get the true victim headcount — used by
+        // both the too-many (clip) and too-few (missed) checks below.
+        const holderHit = stackHits.find(
+          (h) =>
+            h.actorId === holderSoak.player.actorId &&
+            h.timestamp >= reportTimestamp &&
+            h.timestamp <= reportTimestamp + STACK_CLIP_DEATH_WINDOW_MS
+        );
+        const volleyVictims =
+          holderHit && holderHit.instance !== undefined
+            ? new Set(
+                stackHits
+                  .filter(
+                    (h) =>
+                      h.instance === holderHit.instance &&
+                      Math.abs(h.timestamp - holderHit.timestamp) <= STACK_VOLLEY_GAP_MS
+                  )
+                  .map((h) => h.actorId)
+              )
+            : undefined;
+
+        // ── Stack missed: the plant landed where its bodies couldn't reach ──
+        //
+        // The mirror of the clip case below. Across every report on disk,
+        // 492 of 492 stack volleys on a resolution with no death anywhere
+        // near it hit EXACTLY 3 people — the design's split — so a volley
+        // that catches FEWER than 3 is as unambiguous a signal as one that
+        // catches more. Confirmed 2026-08-03 (report h2JvDkntZCaBgmLF pull
+        // 50): Archidel Del'archi soaked ~228 units inside his tower, toward
+        // the boss, and his stack fired on only 2 people. Attribution is the
+        // Stack HOLDER (opposite of the clip case): the plant follows their
+        // body, so a plant nobody could reach is theirs.
+        if (volleyVictims !== undefined && volleyVictims.size < 3 && !partnerDeath) {
+          errors.push({
+            ruleId:      FORSAKEN_STACK_MISSED_RULE_ID,
+            severity:    "Major",
+            name:        "Stack Misplaced",
+            description: `Planted their Forsaken stack${towerLabel} where the rest of the team couldn't reach it (${describeStanding(holderSoak, pair.tower!)}) — only ${volleyVictims.size} of the expected 3 players were caught in it, so it hit far harder than the split allows.`,
+            timestamp:   holderHit!.timestamp,
+            player:      holderSoak.player.name,
+            class:       holderSoak.player.className,
+            specId:      holderSoak.player.specId,
+            role:        holderSoak.player.role,
+            abilityId:   STACK_FOLLOWUP_ABILITY_ID,
+            abilityName: "Forsaken Stack",
+          });
+        }
+
         if (partnerDeath) {
-          // Reconstruct the volley the Stack holder's own plant fired in,
-          // via its sourceInstance, to get the true victim headcount.
-          const holderHit = stackHits.find(
-            (h) =>
-              h.actorId === holderSoak.player.actorId &&
-              h.timestamp >= reportTimestamp &&
-              h.timestamp <= reportTimestamp + STACK_CLIP_DEATH_WINDOW_MS
-          );
-
-          if (holderHit && holderHit.instance !== undefined) {
-            const volleyVictims = new Set(
-              stackHits
-                .filter(
-                  (h) =>
-                    h.instance === holderHit.instance &&
-                    Math.abs(h.timestamp - holderHit.timestamp) <= STACK_VOLLEY_GAP_MS
-                )
-                .map((h) => h.actorId)
-            );
-
+          if (volleyVictims !== undefined) {
             if (volleyVictims.size > 3) {
               errors.push({
                 ruleId:      FORSAKEN_LETHAL_STACK_CLIP_RULE_ID,
@@ -1968,6 +2147,7 @@ function detectWrongTowerPositionErrors(
 }
 
 export const FORSAKEN_LETHAL_STACK_CLIP_RULE_ID = "ffxiv-forsaken-stack-clipped-too-close";
+export const FORSAKEN_STACK_MISSED_RULE_ID      = "ffxiv-forsaken-stack-misplaced";
 export const FORSAKEN_CONE_BAIT_TOO_FAR_RULE_ID  = "ffxiv-forsaken-cone-bait-too-far";
 
 export const FORSAKEN_LETHAL_CONE_BAIT_RULE_ID = "ffxiv-forsaken-baited-cone-too-close";

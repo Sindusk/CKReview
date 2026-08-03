@@ -1396,6 +1396,17 @@ const CONFETTI_FINAL_SUPPORT_BEARING_DEG = 315; // northwest
 const CONFETTI_FINAL_DPS_BEARING_DEG     = 135; // southeast
 const CONFETTI_FINAL_QUADRANT_TOLERANCE_DEG = 45;
 
+// This check is a pure QUADRANT call, so a bad interpolation doesn't just
+// shift the answer a few yalms — it can land a player in the opposite half
+// of the arena. Confirmed false positive (report h2JvDkntZCaBgmLF pull 39):
+// Ayumi Emi's only bracketing samples sat 4.9s apart while she crossed from
+// her arrow drop to the DPS stack, and the straight-line midpoint put her
+// northwest when the VOD shows her planted southeast ~0.3s before the
+// detonation. Anything wider than a bracket that's plausibly one player
+// standing still (or taking one short step) is refused outright rather than
+// guessed at — see interpolatePlayerPosition's `maxSpanMs`.
+const CONFETTI_FINAL_MAX_BRACKET_SPAN_MS = 3000;
+
 // Tank stance per job — the thing the OT needs active for their post-
 // provoke enmity lead to hold through Revolting Ruin III's second hit (see
 // module header). Not currently read by detection (a pure outcome check —
@@ -3338,14 +3349,6 @@ function detectGraven1DeathWipeError(
   // players alive to resolve (see module comment) — so a death to Wave
   // Cannon's own beam counts as a Graven-1-window death here too, not just
   // Mystery Magic's own elemental resolution.
-  const mysteryMagicDeaths = deathEvents.filter(
-    (d) =>
-      MYSTERY_MAGIC_DEATH_ABILITY_IDS.has(d.killingAbilityGameId) ||
-      d.killingAbilityGameId === WAVE_CANNON_ABILITY_ID ||
-      d.killingAbilityGameId === WAVE_CANNON_TOWER_ABILITY_ID
-  );
-  if (mysteryMagicDeaths.length === 0) return [];
-
   // Mystery Magic's own cast-to-resolution delay varies too widely for a
   // fixed short window (confirmed pull 26: first cast at 38269ms resolves
   // at 39071ms, but Blizzard III Blowout deaths from it land as late as
@@ -3359,28 +3362,64 @@ function detectGraven1DeathWipeError(
   // real Mystery Magic death, but fail open rather than silently dropping
   // one) — fall back to the pre-fix behavior of trusting every such death.
   const graven1WindowEnd = mysteryMagicCasts.length >= 2 ? mysteryMagicCasts[1].timestamp : Infinity;
+
+  // A player jumping off the arena INSIDE the Graven 1 window ends the
+  // mechanic exactly the way a death to it does — Wave Cannon still needs
+  // all 8 bodies, and it doesn't care why one is gone. Per the user
+  // (2026-08-03, report h2JvDkntZCaBgmLF pull 47): Ayumi Emi and Kade
+  // Kansado jumped at 43.1s/43.4s right after their Damage Downs, and the
+  // FIRST of those jumps is what should mark the wipe — not, as it did
+  // before, Chauzey Solstice's Wave Cannon death 2.5s later. Bounded by the
+  // FIRST Mystery Magic cast on the near side too: a jump before Graven 1
+  // has even started is an ordinary early reset (pulls 36/44/48), already
+  // covered by JUMPED_OFF_ARENA_RULE_ID, and has no Graven 1 to ruin.
+  const graven1WindowStart = mysteryMagicCasts[0]?.timestamp ?? Infinity;
+
+  const mysteryMagicDeaths = deathEvents.filter(
+    (d) =>
+      MYSTERY_MAGIC_DEATH_ABILITY_IDS.has(d.killingAbilityGameId) ||
+      d.killingAbilityGameId === WAVE_CANNON_ABILITY_ID ||
+      d.killingAbilityGameId === WAVE_CANNON_TOWER_ABILITY_ID ||
+      (d.cause === "Environmental" && d.timestamp >= graven1WindowStart)
+  );
+  if (mysteryMagicDeaths.length === 0) return [];
+
   const graven1Deaths = mysteryMagicDeaths.filter((d) => d.timestamp < graven1WindowEnd);
   if (graven1Deaths.length === 0) return [];
 
   const firstDeathTime = Math.min(...graven1Deaths.map((d) => d.timestamp));
   const clusterEnd = firstDeathTime + MYSTERY_MAGIC_VOLLEY_CLUSTER_MS;
 
-  const clusterDeaths = graven1Deaths.filter((d) => d.timestamp <= clusterEnd);
+  // When the pull ends with someone JUMPING rather than dying to the
+  // mechanic, the wipe starts at that jump — not at the tail of the volley
+  // that follows it. The normal cutoff deliberately sits at the END of the
+  // death cluster so Major errors from the same volley still land at or
+  // before it and stay in the report; a deliberate jump has no such errors
+  // to preserve, and everything after it (including whatever the abandoned
+  // mechanic then does to the rest of the raid) is the reset, not a
+  // mistake. Per the user (report h2JvDkntZCaBgmLF pull 47): "the first
+  // jump should have triggered the Graven 1 Death raid error".
+  const jumpAnchored = graven1Deaths.some((d) => d.timestamp === firstDeathTime && d.cause === "Environmental");
+
+  const clusterDeaths = graven1Deaths.filter(
+    (d) => d.timestamp <= clusterEnd && (!jumpAnchored || d.cause === "Environmental")
+  );
   const clusterMajors = otherPhase1Errors.filter(
     (e) => e.severity === "Major" && e.timestamp >= firstDeathTime - MYSTERY_MAGIC_VOLLEY_CLUSTER_MS && e.timestamp <= clusterEnd
   );
 
-  const cutoff = Math.max(
-    ...clusterDeaths.map((d) => d.timestamp),
-    ...clusterMajors.map((e) => e.timestamp)
-  );
+  const cutoff = jumpAnchored
+    ? firstDeathTime
+    : Math.max(...clusterDeaths.map((d) => d.timestamp), ...clusterMajors.map((e) => e.timestamp));
 
   const victims = [...new Set(clusterDeaths.map((d) => d.player))];
   const diedToWaveCannon = clusterDeaths.some(
     (d) => d.killingAbilityGameId === WAVE_CANNON_ABILITY_ID || d.killingAbilityGameId === WAVE_CANNON_TOWER_ABILITY_ID
   );
 
-  const description = diedToWaveCannon
+  const description = jumpAnchored
+    ? `${victims.join(" and ")} jumped off the arena during Graven 1 — Wave Cannon needs all 8 players alive to resolve, so this is treated as a cutoff point for further per-player analysis this pull.`
+    : diedToWaveCannon
     ? `${victims.join(" and ")} died to Wave Cannon before Graven 1 could fully resolve — needs all 8 players alive to reach Wave Cannon and Confetti, so this is treated as a cutoff point for further per-player analysis this pull.`
     : `${victims.join(" and ")} died during Graven 1's Mystery Magic resolution — Wave Cannon needs all 8 players alive to resolve, so this is treated as a cutoff point for further per-player analysis this pull.`;
 
@@ -3783,7 +3822,8 @@ function detectConfettiFinalPositionMisplacedErrors(players: PlayerInfo[]): Pull
   const errors: PullError[] = [];
   for (const player of players) {
     const pos = interpolatePlayerPosition(player, snapshotTime, {
-      windowMs: CONFETTI_POSITION_WINDOW_MS,
+      windowMs:  CONFETTI_POSITION_WINDOW_MS,
+      maxSpanMs: CONFETTI_FINAL_MAX_BRACKET_SPAN_MS,
     });
     if (!pos) continue; // can't confirm their position — fail closed, don't guess
 
@@ -3890,9 +3930,26 @@ function detectTeleTrouncingArrowErrors(players: PlayerInfo[]): PullError[] {
 
     if (a1.dir === a2.dir) {
       const [slotA, slotB] = predictDoubleSlots(a1.dir);
-      const straight = pointDistance(a1.pos, slotA) + pointDistance(a2.pos, slotB);
-      const swapped  = pointDistance(a1.pos, slotB) + pointDistance(a2.pos, slotA);
-      const [p1, p2] = straight <= swapped ? [slotA, slotB] : [slotB, slotA];
+
+      // Which of the player's 2 arrows belongs to which of their 2 slots is
+      // decided by ANCHORING on the single strongest arrow-to-slot match,
+      // then giving the other arrow whatever slot is left — not by which
+      // pairing minimises the TOTAL distance. Total-distance ties itself in
+      // knots exactly when one arrow is badly misplaced: the two pairings'
+      // sums then differ by a rounding error, and the loser is picked half
+      // the time, smearing one real mistake across both arrows. Confirmed
+      // false positives (2026-08-03, report h2JvDkntZCaBgmLF): Kade
+      // Kansado's pull-50 arrows scored 11.45 straight vs 11.51 swapped
+      // (0.06 apart) and Sayacissa Morsaelth's pull-49 arrows 8.03 vs 8.20
+      // (0.17 apart) — in both cases one arrow sat dead on a real slot
+      // (0.41 and 0.20 yalms off) and got flagged anyway, while the arrow
+      // that was genuinely lost got credited with the near-perfect slot.
+      // Anchoring keeps the good arrow clean and puts the whole error on
+      // the arrow that actually earned it.
+      const pairings: [Point, Point][] = [[slotA, slotB], [slotB, slotA]];
+      const anchorScore = ([s1, s2]: [Point, Point]) =>
+        Math.min(pointDistance(a1.pos, s1), pointDistance(a2.pos, s2));
+      const [p1, p2] = anchorScore(pairings[0]) <= anchorScore(pairings[1]) ? pairings[0] : pairings[1];
       flagIfOutOfPosition(a1, p1, ARROW_DOUBLE_OUT_OF_POSITION_THRESHOLD_YALMS);
       flagIfOutOfPosition(a2, p2, ARROW_DOUBLE_OUT_OF_POSITION_THRESHOLD_YALMS);
     } else {
@@ -4057,6 +4114,32 @@ function detectGraven3StackErrors(players: PlayerInfo[], deathEvents: DeathEvent
   const errors: PullError[] = [];
   for (const side of sides) {
     const members = players.filter((p) => side.isMember(p));
+
+    // A side that's already down a body splits its hit 3 ways no matter how
+    // perfectly the survivors stack, so the `anyDied` outcome gate below
+    // stops meaning "somebody was out of position" and starts meaning
+    // "somebody died earlier" — pure death fallout, which is never flagged.
+    // Confirmed false positive (2026-08-03, report h2JvDkntZCaBgmLF pull
+    // 39): Chauzey Solstice died at 182.8s, and the three surviving DPS
+    // stacked correctly (within 2.7 yalms of each other at the hit, all
+    // three taking Flagrant Fire III) yet still overkilled each other —
+    // Kade Kansado and Ayumi Emi were flagged purely because their
+    // pre-cast positions were still ~4.5 yalms out while they converged.
+    //
+    // "Down a body" needs BOTH signals, not just the death: a player who
+    // died earlier and got REZZED is back for the resolution and owes it a
+    // real stack (report h2JvDkntZCaBgmLF pull 28 — Archidel Del'archi died
+    // at 124.7s, was up again by the cast, and taking the death alone as
+    // proof of a short side wrongly cleared Salty Dango's confirmed miss on
+    // that same side). Absence from the resolution entirely — no Graven 3
+    // hit at all — is what actually marks the missing body.
+    const shortABody = members.some(
+      (m) =>
+        !byPlayer.has(m.actorId) &&
+        deathEvents.some((d) => d.player === m.name && d.timestamp < graven3CastTime)
+    );
+    if (shortABody) continue;
+
     let best: Grouped[] | null = null;
     for (const participants of byInstance.values()) {
       const allThisSide = participants.every((p) => members.some((m) => m.actorId === p.player.actorId));

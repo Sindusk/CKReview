@@ -211,13 +211,25 @@ function gatherPositionSamples(
  * this fails closed (undefined) rather than stretch a stale pair across
  * it. Falls back to a single bracketing sample (the same job
  * findPlayerPosition does) when only one side has anything within window.
+ *
+ * `maxSpanMs` (optional) additionally bounds the bracket's TOTAL width:
+ * two samples each individually inside `windowMs` can still sit seconds
+ * apart from each other, and the straight-line assumption degrades fast
+ * over that distance — a player who runs out and back covers a path the
+ * interpolation reads as "stood in the middle the whole time". Confirmed
+ * false positive (2026-08-03, report h2JvDkntZCaBgmLF pull 39): Ayumi Emi
+ * was bracketed by samples 4.9s apart while crossing the arena, and the
+ * midpoint landed her in the exact opposite quadrant from where the VOD
+ * shows her planted. When the span is too wide this fails closed rather
+ * than falling back to a single side — with the player demonstrably
+ * moving, neither endpoint is evidence of where they ended up either.
  */
 export function interpolatePlayerPosition(
   player:    PlayerInfo,
   timestamp: number,
-  options:   Omit<FindPlayerPositionOptions, "direction">
+  options:   Omit<FindPlayerPositionOptions, "direction"> & { maxSpanMs?: number }
 ): Position | undefined {
-  const { windowMs } = options;
+  const { windowMs, maxSpanMs } = options;
   const samples = gatherPositionSamples(player, options).sort((a, b) => a.timestamp - b.timestamp);
 
   let before: { timestamp: number; x: number; y: number } | undefined;
@@ -236,6 +248,7 @@ export function interpolatePlayerPosition(
 
   if (withinWindow(before, true) && withinWindow(after, false)) {
     const span = after!.timestamp - before!.timestamp;
+    if (maxSpanMs !== undefined && span > maxSpanMs) return undefined;
     const frac = span === 0 ? 0 : (timestamp - before!.timestamp) / span;
     return { x: before!.x + frac * (after!.x - before!.x), y: before!.y + frac * (after!.y - before!.y) };
   }
