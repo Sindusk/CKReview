@@ -1,6 +1,9 @@
 import BurgerMenu from "./BurgerMenu";
 import BrandBanner from "./BrandBanner";
 
+/** Header height in px; the banner artwork scales to fill it. */
+const HEADER_H = 96;
+
 type HeaderProps = {
   onAddVod:             () => void;
   onConnectWCL:         () => void;
@@ -32,44 +35,37 @@ export default function Header({
         display:        "flex",
         alignItems:     "center",
         justifyContent: "space-between",
-        height:         "80px",
+        height:         `${HEADER_H}px`,
+        flexShrink:     0,
         padding:        "0 20px",
-        borderBottom:   "1px solid #444",
         background:     "#06070a",
         overflow:       "visible",   // was "hidden" — must be visible so the burger dropdown can escape
         position:       "relative",  // establishes stacking context above the grid below
         zIndex:         100,
       }}
     >
-      <BurgerMenu
-        onConnectWCL={onConnectWCL}
-        onConnectFFL={onConnectFFL}
-        onOpenReport={onOpenReport}
-        onAddReviewToStatic={onAddReviewToStatic}
-        onManageStatics={onManageStatics}
-        onLogin={onLogin}
-        onLogout={onLogout}
-        currentUser={currentUser}
-        hasActiveSession={hasActiveSession}
-      />
-
-      <div
-        style={{
-          display:        "flex",
-          alignItems:     "center",
-          justifyContent: "center",
-          flex:           1,
-          height:         "100%",
-          minWidth:       0,
-          padding:        "0 8px",
-        }}
-      >
-        {/* 1b heraldic banner carrying the 2a duck mark — see BrandBanner.tsx.
-            72px leaves a little breathing room inside the 80px header. */}
-        <BrandBanner height={72} />
+      {/* The heraldic band is the header's background: it spans edge to edge
+          behind the controls rather than sitting as a boxed-in centre panel.
+          See BrandBanner.tsx for the 1b/2a design. */}
+      <div style={{ position: "absolute", inset: 0, zIndex: 0 }}>
+        <BrandBanner height={HEADER_H} />
       </div>
 
-      <div style={{ width: "120px", display: "flex", justifyContent: "flex-end" }}>
+      <div style={{ position: "relative", zIndex: 1 }}>
+        <BurgerMenu
+          onConnectWCL={onConnectWCL}
+          onConnectFFL={onConnectFFL}
+          onOpenReport={onOpenReport}
+          onAddReviewToStatic={onAddReviewToStatic}
+          onManageStatics={onManageStatics}
+          onLogin={onLogin}
+          onLogout={onLogout}
+          currentUser={currentUser}
+          hasActiveSession={hasActiveSession}
+        />
+      </div>
+
+      <div style={{ position: "relative", zIndex: 1, width: "120px", display: "flex", justifyContent: "flex-end" }}>
         <button
           onClick={onAddVod}
           style={{

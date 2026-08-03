@@ -11,12 +11,20 @@ import type { CSSProperties } from "react";
   The design is authored at a fixed 1500x150; rather than re-deriving every
   offset for a fluid layout, the whole thing is laid out at that natural
   size and scaled with a transform, so the proportions stay exactly as
-  drawn. `height` drives the scale — the outer box reports the scaled
-  footprint so normal flex layout still works around it.
+  drawn. `height` drives the scale.
+
+  The band itself (gradient, gilt rules, weave) lives on the outer box and
+  stretches to whatever width it's given — normally the full header — while
+  only the artwork cluster is scaled and centred inside it.
 */
 
 const DESIGN_W = 1500;
 const DESIGN_H = 150;
+
+/* The artwork cluster is centred inside the design width; keeping the full
+   1500 here leaves slack at both ends so nothing clips if the title font
+   falls back to a wider serif. */
+const CLUSTER_W = DESIGN_W;
 
 /** The 2a duck mark: crown + head, no frame. Sized to fill its parent. */
 function DuckMark() {
@@ -101,8 +109,8 @@ function WowSigil({ w, h }: { w: number; h: number }) {
   );
 }
 
-const RULE_LEFT:  CSSProperties = { width: "90px", height: "1px", background: "linear-gradient(90deg, transparent, #6b5222)" };
-const RULE_RIGHT: CSSProperties = { width: "90px", height: "1px", background: "linear-gradient(90deg, #6b5222, transparent)" };
+const RULE_LEFT:  CSSProperties = { width: "170px", height: "1px", background: "linear-gradient(90deg, transparent, #6b5222)" };
+const RULE_RIGHT: CSSProperties = { width: "170px", height: "1px", background: "linear-gradient(90deg, #6b5222, transparent)" };
 
 type BrandBannerProps = {
   /** Rendered height in px; the 1500x150 artwork scales to match. */
@@ -118,73 +126,78 @@ export default function BrandBanner({ height = DESIGN_H, title = "Consistency Ki
       role="img"
       aria-label={title}
       style={{
-        width:    `${DESIGN_W * scale}px`,
-        height:   `${height}px`,
-        flex:     "none",
-        overflow: "hidden",
+        width:          "100%",
+        height:         "100%",
+        boxSizing:      "border-box",
+        display:        "flex",
+        alignItems:     "center",
+        justifyContent: "center",
+        overflow:       "hidden",
+        background:     "linear-gradient(180deg, #171310 0%, #0d0b09 100%)",
+        borderTop:      "2px solid #a37a24",
+        borderBottom:   "2px solid #a37a24",
+        position:       "relative",
       }}
     >
-      <div
-        style={{
-          width:           `${DESIGN_W}px`,
-          height:          `${DESIGN_H}px`,
-          boxSizing:       "border-box",
-          display:         "flex",
-          alignItems:      "center",
-          justifyContent:  "center",
-          gap:             "40px",
-          padding:         "0 30px",
-          background:      "linear-gradient(180deg, #171310 0%, #0d0b09 100%)",
-          borderTop:       "2px solid #a37a24",
-          borderBottom:    "2px solid #a37a24",
-          position:        "relative",
-          transform:       `scale(${scale})`,
-          transformOrigin: "top left",
-        }}
-      >
-        {/* faint diagonal weave over the whole band */}
-        <div style={{ position: "absolute", inset: 0, background: "repeating-linear-gradient(135deg, rgba(242,193,78,0.05) 0 2px, transparent 2px 12px)", pointerEvents: "none" }} />
+      {/* faint diagonal weave over the whole band */}
+      <div style={{ position: "absolute", inset: 0, background: "repeating-linear-gradient(135deg, rgba(242,193,78,0.05) 0 2px, transparent 2px 12px)", pointerEvents: "none" }} />
 
-        <div style={{ display: "flex", alignItems: "center", gap: "16px", flex: "none" }}>
-          <CrystalSigil w={28} h={40} />
-          <WowSigil w={34} h={38} />
-          <div style={RULE_LEFT} />
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: "22px", flex: "none" }}>
-          <Crest size={92} />
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "9px" }}>
-              <div style={{ width: "9px",  height: "9px",  background: "oklch(0.66 0.13 250)", transform: "rotate(45deg)" }} />
-              <div style={{ width: "11px", height: "11px", background: "linear-gradient(150deg, #ff8f6b, #c8231f)", transform: "rotate(45deg)", boxShadow: "0 0 12px rgba(220,60,40,0.5)" }} />
-              <div style={{ width: "9px",  height: "9px",  background: "oklch(0.66 0.13 150)", transform: "rotate(45deg)" }} />
-            </div>
-            <div
-              style={{
-                fontFamily:         "var(--font-cinzel), serif",
-                fontWeight:         900,
-                fontSize:           "46px",
-                lineHeight:         0.95,
-                letterSpacing:      "0.055em",
-                background:         "linear-gradient(180deg, #fff6dc 0%, #f2c96a 48%, #b9821c 100%)",
-                WebkitBackgroundClip: "text",
-                backgroundClip:     "text",
-                color:              "transparent",
-                whiteSpace:         "nowrap",
-              }}
-            >
-              CONSISTENCY KINGS
-            </div>
-            <div style={{ fontFamily: "var(--font-cinzel), serif", fontWeight: 600, fontSize: "16px", letterSpacing: "0.55em", color: "#c9b58c", paddingLeft: "0.55em", whiteSpace: "nowrap" }}>
-              RAID REVIEW
+      {/* scaled footprint of the artwork cluster, so flex centring still works */}
+      <div style={{ width: `${CLUSTER_W * scale}px`, height: `${height}px`, flex: "none", position: "relative" }}>
+        <div
+          style={{
+            width:           `${CLUSTER_W}px`,
+            height:          `${DESIGN_H}px`,
+            boxSizing:       "border-box",
+            display:         "flex",
+            alignItems:      "center",
+            justifyContent:  "center",
+            gap:             "70px",
+            transform:       `scale(${scale})`,
+            transformOrigin: "top left",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "16px", flex: "none" }}>
+            <CrystalSigil w={28} h={40} />
+            <WowSigil w={34} h={38} />
+            <div style={RULE_LEFT} />
+          </div>
+  
+          <div style={{ display: "flex", alignItems: "center", gap: "22px", flex: "none" }}>
+            <Crest size={92} />
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "9px" }}>
+                <div style={{ width: "9px",  height: "9px",  background: "oklch(0.66 0.13 250)", transform: "rotate(45deg)" }} />
+                <div style={{ width: "11px", height: "11px", background: "linear-gradient(150deg, #ff8f6b, #c8231f)", transform: "rotate(45deg)", boxShadow: "0 0 12px rgba(220,60,40,0.5)" }} />
+                <div style={{ width: "9px",  height: "9px",  background: "oklch(0.66 0.13 150)", transform: "rotate(45deg)" }} />
+              </div>
+              <div
+                style={{
+                  fontFamily:         "var(--font-cinzel), serif",
+                  fontWeight:         900,
+                  fontSize:           "46px",
+                  lineHeight:         0.95,
+                  letterSpacing:      "0.055em",
+                  background:         "linear-gradient(180deg, #fff6dc 0%, #f2c96a 48%, #b9821c 100%)",
+                  WebkitBackgroundClip: "text",
+                  backgroundClip:     "text",
+                  color:              "transparent",
+                  whiteSpace:         "nowrap",
+                }}
+              >
+                CONSISTENCY KINGS
+              </div>
+              <div style={{ fontFamily: "var(--font-cinzel), serif", fontWeight: 600, fontSize: "16px", letterSpacing: "0.55em", color: "#c9b58c", paddingLeft: "0.55em", whiteSpace: "nowrap" }}>
+                RAID REVIEW
+              </div>
             </div>
           </div>
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: "16px", flex: "none" }}>
-          <div style={RULE_RIGHT} />
-          <WowSigil w={34} h={38} />
-          <CrystalSigil w={28} h={40} />
+  
+          <div style={{ display: "flex", alignItems: "center", gap: "16px", flex: "none" }}>
+            <div style={RULE_RIGHT} />
+            <WowSigil w={34} h={38} />
+            <CrystalSigil w={28} h={40} />
+          </div>
         </div>
       </div>
     </div>
