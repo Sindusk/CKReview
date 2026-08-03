@@ -1563,6 +1563,67 @@ function detectWrongTowerPositionErrors(
       (windowConeHits.length > conePlantCount ||
         windowConeHits.some((h) => h.victimCenterDist < 800));
 
+    // ── Stack overlapped the cone bait: the plant sat too far OUT ───────────
+    //
+    // The Stack holder's real positioning requirement (user, 2026-08-03):
+    // stand just outside / on the edge of the boss hitbox — far enough in that
+    // the stack aoe doesn't reach past the BACK of the tower, but not so far
+    // in that they bait the cone themselves. Neither bound is a distance this
+    // module can measure directly, but the far side has a perfect outcome
+    // signal: the planted cone's designated bait stands well beyond the tower
+    // (r 1012+), so a stack that reaches them was planted much too far out.
+    // Across every report on disk, 0 of 492 stack volleys on a resolution with
+    // no death anywhere near it caught that resolution's cone victim — a
+    // completely clean separation, and one the headcount rule below slips
+    // right past (this shape can land a textbook 3 victims, just the WRONG
+    // three). Confirmed h2JvDkntZCaBgmLF pull 46: Azura Salus's stack caught
+    // Archidel Del'archi, who was baiting the cone, and the cone plus the
+    // stack together killed him outright. Attribution is the Stack HOLDER —
+    // the plant follows their body.
+    //
+    // The tower's own soak PARTNER is excluded: a partner swept into the plant
+    // is the separate clip case (their mistake, not the holder's).
+    //
+    // Defined at cluster scope rather than inside the pair loop because it's
+    // also needed for a tower REJECTED as a valid pair: when an intruder from
+    // the other team fills in for a no-show, the spot checks can't run (the
+    // pairing is meaningless), but the legitimate Stack holder's own plant
+    // still landed where it landed — which is exactly pull 46's shape.
+    const stackConeOverlapError = (
+      holderSoak:    TowerSoak,
+      partnerSoak:   TowerSoak | undefined,
+      tower:         readonly [number, number],
+      volleyVictims: Set<number> | undefined,
+      holderHit:     { timestamp: number } | undefined
+    ): PullError | null => {
+      if (volleyVictims === undefined || holderHit === undefined) return null;
+
+      const baitVictims = [...volleyVictims].filter(
+        (actorId) =>
+          actorId !== partnerSoak?.player.actorId &&
+          windowConeHits.some((h) => h.actorId === actorId)
+      );
+      if (baitVictims.length === 0) return null;
+
+      const baitNames = baitVictims
+        .map((actorId) => players.find((p) => p.actorId === actorId)?.name)
+        .filter((n): n is string => n !== undefined);
+
+      return {
+        ruleId:      FORSAKEN_STACK_CONE_OVERLAP_RULE_ID,
+        severity:    "Major",
+        name:        "Stack Overlapped Cone Bait",
+        description: `Planted their Forsaken stack${towerLabel} too far out from the boss (${describeStanding(holderSoak, tower)}, ${Math.round(distanceFromCenter(holderSoak.x, holderSoak.y))} units from center) — it reached past the tower and caught ${baitNames.join(" and ")}, out there baiting the planted cone.`,
+        timestamp:   holderHit.timestamp,
+        player:      holderSoak.player.name,
+        class:       holderSoak.player.className,
+        specId:      holderSoak.player.specId,
+        role:        holderSoak.player.role,
+        abilityId:   STACK_FOLLOWUP_ABILITY_ID,
+        abilityName: "Forsaken Stack",
+      };
+    };
+
     // Resolve each tower group to its soakers' held assignment debuffs and
     // its snapped tower position. 2-person groups are the normal case;
     // the 3+1 split (one player joined the wrong tower, leaving their
@@ -1628,6 +1689,38 @@ function detectWrongTowerPositionErrors(
             // weaker team-inference check flag them again.
             confirmedLegitKeys.add(`${soak.player.actorId}@${reportTimestamp}`);
           }
+
+          // The pairing is meaningless, so no spot check can run — but the
+          // legitimate soaker's own Stack plant still landed somewhere, and
+          // its outcome doesn't depend on who filled the other slot. See
+          // stackConeOverlapError's comment (h2JvDkntZCaBgmLF pull 46).
+          const legit = built.soaks.filter((s) => !mismatched.includes(s));
+          const stackIdx = built.assignments.findIndex((a) => a.abilityId === STACK_ASSIGNMENT_DEBUFF_ID);
+          const holderSoak = stackIdx === -1 ? undefined : built.soaks[stackIdx];
+          if (holderSoak && built.tower && legit.includes(holderSoak)) {
+            const holderHit = stackHits.find(
+              (h) =>
+                h.actorId === holderSoak.player.actorId &&
+                h.timestamp >= reportTimestamp &&
+                h.timestamp <= reportTimestamp + STACK_CLIP_DEATH_WINDOW_MS
+            );
+            const volleyVictims =
+              holderHit && holderHit.instance !== undefined
+                ? new Set(
+                    stackHits
+                      .filter(
+                        (h) =>
+                          h.instance === holderHit.instance &&
+                          Math.abs(h.timestamp - holderHit.timestamp) <= STACK_VOLLEY_GAP_MS
+                      )
+                      .map((h) => h.actorId)
+                  )
+                : undefined;
+            // No partner to exclude — the player who stood there wasn't one.
+            const err = stackConeOverlapError(holderSoak, undefined, built.tower, volleyVictims, holderHit);
+            if (err) errors.push(err);
+          }
+
           continue; // not a valid pair — don't feed it to the spot-check rules below
         }
       }
@@ -1946,6 +2039,10 @@ function detectWrongTowerPositionErrors(
               )
             : undefined;
 
+        const coneOverlapError = stackConeOverlapError(holderSoak, partnerSoak, pair.tower!, volleyVictims, holderHit);
+        const overlappedConeBait = coneOverlapError !== null;
+        if (coneOverlapError) errors.push(coneOverlapError);
+
         // ── Stack missed: the plant landed where its bodies couldn't reach ──
         //
         // The mirror of the clip case below. Across every report on disk,
@@ -1957,7 +2054,10 @@ function detectWrongTowerPositionErrors(
         // the boss, and his stack fired on only 2 people. Attribution is the
         // Stack HOLDER (opposite of the clip case): the plant follows their
         // body, so a plant nobody could reach is theirs.
-        if (volleyVictims !== undefined && volleyVictims.size < 3 && !partnerDeath) {
+        // (Skipped when the cone-bait overlap above already fired — both
+        // rules blame the holder for the same misplaced plant, and the
+        // overlap is the more specific diagnosis.)
+        if (volleyVictims !== undefined && volleyVictims.size < 3 && !partnerDeath && !overlappedConeBait) {
           errors.push({
             ruleId:      FORSAKEN_STACK_MISSED_RULE_ID,
             severity:    "Major",
@@ -2148,6 +2248,7 @@ function detectWrongTowerPositionErrors(
 
 export const FORSAKEN_LETHAL_STACK_CLIP_RULE_ID = "ffxiv-forsaken-stack-clipped-too-close";
 export const FORSAKEN_STACK_MISSED_RULE_ID      = "ffxiv-forsaken-stack-misplaced";
+export const FORSAKEN_STACK_CONE_OVERLAP_RULE_ID = "ffxiv-forsaken-stack-overlapped-cone-bait";
 export const FORSAKEN_CONE_BAIT_TOO_FAR_RULE_ID  = "ffxiv-forsaken-cone-bait-too-far";
 
 export const FORSAKEN_LETHAL_CONE_BAIT_RULE_ID = "ffxiv-forsaken-baited-cone-too-close";
