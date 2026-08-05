@@ -120,8 +120,14 @@ export default function ReportDialog({ open, onClose, pulls }: ReportDialogProps
                         <th style={thStyle}>Player</th>
                         <th style={{ ...thStyle, textAlign: "right" }}>First Errors</th>
                         <th style={{ ...thStyle, textAlign: "right" }}>First Error %</th>
-                        <th style={{ ...thStyle, textAlign: "right" }}>Total</th>
+                        <th style={{ ...thStyle, textAlign: "right" }}>Total Major Errors</th>
                         <th style={{ ...thStyle, textAlign: "right" }}>Total %</th>
+                        <th
+                          style={{ ...thStyle, textAlign: "right" }}
+                          title="Pulls this player was present for — both percentages are per pull played, not per pull in the report."
+                        >
+                          Pulls
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -165,6 +171,9 @@ export default function ReportDialog({ open, onClose, pulls }: ReportDialogProps
                             <td style={{ ...tdStyle, textAlign: "right" }}>{p.totalCount}</td>
                             <td style={{ ...tdStyle, textAlign: "right", color: "#fb923c" }}>
                               {p.totalPct.toFixed(1)}%
+                            </td>
+                            <td style={{ ...tdStyle, textAlign: "right", color: "#888" }}>
+                              {p.pullCount}
                             </td>
                           </tr>
                         );

@@ -21,16 +21,22 @@ export type PlayerReportStats = {
   // Column 2 — how many pulls this player caused the very first
   // Major error.
   firstErrorCount: number;
-  // Column 3 — firstErrorCount / total pulls, as a 0–100 percentage.
+  // Column 3 — firstErrorCount / pullCount, as a 0–100 percentage.
   firstErrorPct:   number;
 
   // Column 4 — total pre-wipe (or pre-raid-error) Major errors this player
   // caused across every pull, not just the first one — see
   // getPullCriticalEvents' cutoff logic below.
   totalCount:      number;
-  // Column 5 — totalCount / total pulls, as a 0–100 percentage. Can exceed
+  // Column 5 — totalCount / pullCount, as a 0–100 percentage. Can exceed
   // 100% since a player may cause multiple pre-wipe errors in one pull.
   totalPct:        number;
+
+  // Column 6 — how many of the report's pulls this player was actually
+  // present for (i.e. appears in pull.players). Both percentages above are
+  // per-pull-played, NOT per-report-pull: someone who showed up for the
+  // last 10 of 50 pulls is rated against those 10.
+  pullCount:       number;
 
   // Combined "early mistakes" score used to rank the pedestal — lower is
   // better. Simple sum of the two raw counts above.
@@ -91,20 +97,45 @@ function getPullCriticalEvents(pull: Pull): CriticalEvent[] {
 
 // Roster info keyed by player name. Names are used as the join key across
 // pulls since actorId is only stable within a single pull/report.
-type RosterEntry = { className: string; specId: number; role: ReportRole; game: ReportGame };
+//
+// `pullCount` is how many pulls the player was actually in — the report's
+// rates are per-pull-played, so a raider who joined halfway through the
+// night isn't flattered by the pulls they sat out.
+type RosterEntry = {
+  className: string;
+  specId:    number;
+  role:      ReportRole;
+  game:      ReportGame;
+  pullCount: number;
+};
 
 function buildRoster(pulls: Pull[]): Map<string, RosterEntry> {
   const roster = new Map<string, RosterEntry>();
 
   for (const pull of pulls) {
+    // A name should only ever count once per pull, however many entries the
+    // log produced for it.
+    const seenThisPull = new Set<string>();
+
     for (const p of pull.players) {
       // Same exclusions RosterPanel already applies — these aren't real
       // individual players and shouldn't show up in the report.
       if (p.name === "Multiple Players") continue;
       if (p.specName === "LimitBreak" || p.specName === "Limit Break") continue;
+      if (seenThisPull.has(p.name)) continue;
+      seenThisPull.add(p.name);
 
-      if (!roster.has(p.name)) {
-        roster.set(p.name, { className: p.className, specId: p.specId, role: p.role, game: pull.game });
+      const existing = roster.get(p.name);
+      if (existing) {
+        existing.pullCount += 1;
+      } else {
+        roster.set(p.name, {
+          className: p.className,
+          specId:    p.specId,
+          role:      p.role,
+          game:      pull.game,
+          pullCount: 1,
+        });
       }
     }
   }
@@ -116,12 +147,11 @@ function buildRoster(pulls: Pull[]): Map<string, RosterEntry> {
  * Computes the per-player First Errors / Top 3 stats table for every player
  * who appears anywhere in the given pulls.
  *
- * Sorted descending by firstErrorPct (column 3) — the players most likely
- * to be the first mistake of a pull rise to the top.
+ * Sorted descending by total Major errors (column 4) — the biggest
+ * contributors of Major mistakes rise to the top.
  */
 export function computePlayerReportStats(pulls: Pull[]): PlayerReportStats[] {
   const roster        = buildRoster(pulls);
-  const totalPulls     = pulls.length;
   const firstErrorMap = new Map<string, number>();
   const totalMap        = new Map<string, number>();
 
@@ -142,6 +172,7 @@ export function computePlayerReportStats(pulls: Pull[]): PlayerReportStats[] {
   for (const [name, info] of roster.entries()) {
     const firstErrorCount = firstErrorMap.get(name) ?? 0;
     const totalCount      = totalMap.get(name) ?? 0;
+    const pullCount       = info.pullCount;
 
     stats.push({
       name,
@@ -150,16 +181,18 @@ export function computePlayerReportStats(pulls: Pull[]): PlayerReportStats[] {
       role:            info.role,
       game:            info.game,
       firstErrorCount,
-      firstErrorPct:   totalPulls > 0 ? (firstErrorCount / totalPulls) * 100 : 0,
+      firstErrorPct:   pullCount > 0 ? (firstErrorCount / pullCount) * 100 : 0,
       totalCount,
-      totalPct:        totalPulls > 0 ? (totalCount / totalPulls) * 100 : 0,
+      totalPct:        pullCount > 0 ? (totalCount / pullCount) * 100 : 0,
+      pullCount,
       combinedScore:   firstErrorCount + totalCount,
     });
   }
 
   stats.sort((a, b) => {
-    if (b.firstErrorPct !== a.firstErrorPct) return b.firstErrorPct - a.firstErrorPct;
+    if (b.totalCount !== a.totalCount) return b.totalCount - a.totalCount;
     if (b.totalPct !== a.totalPct) return b.totalPct - a.totalPct;
+    if (b.firstErrorCount !== a.firstErrorCount) return b.firstErrorCount - a.firstErrorCount;
     return a.name.localeCompare(b.name);
   });
 
