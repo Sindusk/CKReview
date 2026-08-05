@@ -58,8 +58,6 @@ export const ERROR_RULES: PullErrorRule[] = [
     trigger:            "damage",
     abilityId:           1243866,   // Voidlight Rupture
     minEffectiveDamage:  300000,
-    // Tanks are expected to eat this — only healers/DPS taking it is a mistake.
-    excludeRoles:       ["Tank"],
   },
 
   {
@@ -72,6 +70,8 @@ export const ERROR_RULES: PullErrorRule[] = [
     abilityId:          1242815,   // Void Flames
     requiredDebuffId:   1241162,   // Light Feather
     excludeTicks:       true,
+    // Tanks are expected to eat the flames — only healers/DPS are at fault.
+    excludeRoles:       ["Tank"],
   },
 
   {
@@ -84,6 +84,8 @@ export const ERROR_RULES: PullErrorRule[] = [
     abilityId:          1242803,   // Light Flames
     requiredDebuffId:   1241163,   // Void Feather
     excludeTicks:       true,
+    // Tanks are expected to eat the flames — only healers/DPS are at fault.
+    excludeRoles:       ["Tank"],
   },
 
   {
