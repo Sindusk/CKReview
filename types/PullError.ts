@@ -6,6 +6,7 @@
 
 export type ErrorSeverity = "Major" | "Minor" | "Raid";
 export type ErrorGame = "wow" | "ffxiv";
+export type PlayerRole = "Tank" | "Healer" | "DPS";
 
 // A rule is triggered one of four ways:
 //
@@ -44,6 +45,12 @@ export type PullErrorRule = {
   trigger:     "damage" | "debuffApplied" | "enemyCast" | "enemyBuffApplied" | "killingBlow";
   abilityId:   number;             // ability id relevant to the trigger
 
+  // Roles for which this rule never fires — for mechanics where one role is
+  // expected to eat the hit (e.g. a tank soaking a rupture). Applies to the
+  // player-attributable triggers only ("damage", "debuffApplied",
+  // "killingBlow"); the raid-wide triggers have no player to check.
+  excludeRoles?: PlayerRole[];
+
   // ── "damage" trigger only ────────────────────────────────────────────────
   minEffectiveDamage?: number;     // event.amount must be STRICTLY greater than this
   requiredDebuffId?:   number;     // player must currently be carrying this debuff
@@ -74,7 +81,7 @@ export type PullError = {
   player?:     string;
   class?:      string;
   specId?:     number;
-  role?:       "Tank" | "Healer" | "DPS";
+  role?:       PlayerRole;
   abilityId:   number;
   abilityName: string;
   abilityIcon?: string;
@@ -132,7 +139,7 @@ export type ManualErrorInput = {
   player?:     string;
   class?:      string;
   specId?:     number;
-  role?:       "Tank" | "Healer" | "DPS";
+  role?:       PlayerRole;
 };
 
 /**

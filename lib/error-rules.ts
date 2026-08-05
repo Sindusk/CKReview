@@ -24,6 +24,10 @@
 //                                  `abilityId`. Raid-wide — not attributable
 //                                  to a specific player.
 //
+// excludeRoles: ["Tank"] — the player-attributable triggers ("damage",
+// "debuffApplied", "killingBlow") skip players in the listed roles, for
+// mechanics where a role is supposed to take the hit.
+//
 // severity: "Major" | "Minor" | "Raid". Raid errors are for raid-wide
 // mistakes that aren't any one person's fault and almost always mean a
 // wipe — see AnalysisPanel's Raid tab and the Report's truncation logic in
@@ -54,6 +58,8 @@ export const ERROR_RULES: PullErrorRule[] = [
     trigger:            "damage",
     abilityId:           1243866,   // Voidlight Rupture
     minEffectiveDamage:  300000,
+    // Tanks are expected to eat this — only healers/DPS taking it is a mistake.
+    excludeRoles:       ["Tank"],
   },
 
   {

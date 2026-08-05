@@ -10,7 +10,7 @@
 
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import type { DeathEvent } from "@/types/DeathEvent";
-import type { PullError, PullErrorRule, EnemyEvent } from "@/types/PullError";
+import type { PullError, PullErrorRule, EnemyEvent, PlayerRole } from "@/types/PullError";
 import { ERROR_RULES } from "./error-rules";
 
 // ─── Debuff-uptime helper ──────────────────────────────────────────────────
@@ -39,7 +39,15 @@ function isDebuffActiveAt(
 
 // ─── Rule evaluation — player-attributable ─────────────────────────────────
 
+// A rule can opt a whole role out (rule.excludeRoles) — e.g. a tank taking a
+// hit the rest of the raid must avoid isn't a mistake.
+function isRoleExcluded(rule: PullErrorRule, role: PlayerRole | undefined): boolean {
+  return role !== undefined && (rule.excludeRoles?.includes(role) ?? false);
+}
+
 function evaluateDamageRule(rule: PullErrorRule, player: PlayerInfo): PullError[] {
+  if (isRoleExcluded(rule, player.role)) return [];
+
   const hits = player.damageTaken
     .filter((e) => e.abilityId === rule.abilityId)
     .filter((e) => !rule.excludeTicks || !e.isDoT);
@@ -88,6 +96,8 @@ function evaluateDamageRule(rule: PullErrorRule, player: PlayerInfo): PullError[
 }
 
 function evaluateDebuffAppliedRule(rule: PullErrorRule, player: PlayerInfo): PullError[] {
+  if (isRoleExcluded(rule, player.role)) return [];
+
   const applications = player.debuffs.filter(
     (e) => e.abilityId === rule.abilityId && e.debuffStatus === "applied"
   );
@@ -116,6 +126,7 @@ function evaluateDebuffAppliedRule(rule: PullErrorRule, player: PlayerInfo): Pul
 function evaluateKillingBlowRule(rule: PullErrorRule, deathEvents: DeathEvent[]): PullError[] {
   return deathEvents
     .filter((d) => d.killingAbilityGameId === rule.abilityId)
+    .filter((d) => !isRoleExcluded(rule, d.role))
     .map((d) => ({
       ruleId:      rule.id,
       severity:    rule.severity,
