@@ -23,7 +23,7 @@
 // whichever job appears most often across their pulls, since a line can't
 // sensibly change color partway through.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getClassColor, getPlayerSpecIcon } from "@/lib/player-display";
 
 export type ChartPullPlayerError = {
@@ -134,13 +134,48 @@ const PAD_TOP = 16;
 const PAD_BOTTOM = 28;
 const PAD_LEFT = 40;
 const PAD_RIGHT = 16;
-const PULL_SPACING = 14; // px per pull along the x-axis
+
+// The chart is width-driven, not spacing-driven: it always fits the space
+// it's given rather than growing past it into a horizontal scrollbar, so
+// pull-to-pull spacing is whatever the available width divides into. These
+// only bound the hit-target width used for hover detection — a hair wider
+// than the gap makes neighbouring pulls easy to land on when a long static
+// squeezes them together, and the cap stops one lone pull from claiming the
+// entire plot area.
+const MIN_HIT_WIDTH = 6;
+const MAX_HIT_WIDTH = 28;
+
+// Fallback plot width for the first render, before the ResizeObserver has
+// measured the container (and for any environment without one).
+const FALLBACK_WIDTH = 720;
+
+// Fixed-width column holding the hover readout, to the RIGHT of the plot —
+// it used to float over the lines, where it both covered the data it was
+// describing and got clipped on pulls near the right edge.
+const HOVER_PANEL_WIDTH = 210;
 
 export default function StaticErrorChart({ pulls }: { pulls: ChartPull[] }) {
-  const [mode, setMode] = useState<Mode>("total");
+  // Major-only is the default view: Minor errors are noise-level mistakes
+  // and burying the Majors under them is not how this chart gets read.
+  const [mode, setMode] = useState<Mode>("majorOnly");
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const [showTable, setShowTable] = useState(false);
+
+  const plotRef = useRef<HTMLDivElement | null>(null);
+  const [plotWidth, setPlotWidth] = useState(FALLBACK_WIDTH);
+
+  useEffect(() => {
+    const el = plotRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+
+    const observer = new ResizeObserver(([entry]) => {
+      const next = entry.contentRect.width;
+      if (next > 0) setPlotWidth(next);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [showTable]);
 
   const { players, series } = useMemo(() => buildSeries(pulls, mode), [pulls, mode]);
   const colorFor = (player: SeriesPlayer) =>
@@ -162,9 +197,13 @@ export default function StaticErrorChart({ pulls }: { pulls: ChartPull[] }) {
   }, [series, visiblePlayers]);
 
   const n = pulls.length;
-  const innerWidth = Math.max(n - 1, 1) * PULL_SPACING;
-  const width = innerWidth + PAD_LEFT + PAD_RIGHT;
+  const width = Math.max(plotWidth, PAD_LEFT + PAD_RIGHT + 40);
+  const innerWidth = width - PAD_LEFT - PAD_RIGHT;
   const innerHeight = CHART_HEIGHT - PAD_TOP - PAD_BOTTOM;
+  const hitWidth = Math.min(
+    MAX_HIT_WIDTH,
+    Math.max(MIN_HIT_WIDTH, n <= 1 ? MAX_HIT_WIDTH : (innerWidth / (n - 1)) * 1.2)
+  );
 
   function xAt(i: number) {
     return PAD_LEFT + (n <= 1 ? 0 : (i / (n - 1)) * innerWidth);
@@ -203,11 +242,13 @@ export default function StaticErrorChart({ pulls }: { pulls: ChartPull[] }) {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px", flexWrap: "wrap", gap: "10px" }}>
-        <h3 style={{ margin: 0, fontSize: "16px", color: INK_PRIMARY }}>Total Errors — Cumulative Over All Pulls</h3>
+        <h3 style={{ margin: 0, fontSize: "16px", color: INK_PRIMARY }}>
+          {mode === "majorOnly" ? "Major Errors" : "Total Errors"} — Cumulative Over All Pulls
+        </h3>
 
         <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
           <div style={{ display: "flex", border: "1px solid #444", borderRadius: "6px", overflow: "hidden" }}>
-            {(["total", "majorOnly"] as Mode[]).map((m) => (
+            {(["majorOnly", "total"] as Mode[]).map((m) => (
               <button
                 key={m}
                 onClick={() => setMode(m)}
@@ -317,7 +358,12 @@ export default function StaticErrorChart({ pulls }: { pulls: ChartPull[] }) {
           </table>
         </div>
       ) : (
-        <div style={{ overflowX: "auto", position: "relative" }}>
+        // Plot and readout sit side by side: the plot takes whatever width
+        // is left (minWidth 0 is what actually lets a flex child shrink
+        // below its content), the readout gets a fixed column so hovering
+        // never reflows the chart underneath the cursor.
+        <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
+          <div ref={plotRef} style={{ flex: "1 1 auto", minWidth: 0 }}>
           <svg
             width={width}
             height={CHART_HEIGHT}
@@ -385,45 +431,56 @@ export default function StaticErrorChart({ pulls }: { pulls: ChartPull[] }) {
             {pulls.map((_, i) => (
               <rect
                 key={i}
-                x={xAt(i) - PULL_SPACING / 2}
+                x={xAt(i) - hitWidth / 2}
                 y={PAD_TOP}
-                width={PULL_SPACING}
+                width={hitWidth}
                 height={innerHeight}
                 fill="transparent"
                 onMouseEnter={() => setHoverIdx(i)}
               />
             ))}
           </svg>
+          </div>
 
-          {hoverPull && (
-            <div
-              style={{
-                position:        "absolute",
-                left:            Math.min(xAt(hoverIdx!) + 8, width - 190),
-                top:             PAD_TOP,
-                backgroundColor: "#111",
-                border:          "1px solid #444",
-                borderRadius:    "6px",
-                padding:         "8px 10px",
-                fontSize:        "11px",
-                color:           INK_SECONDARY,
-                pointerEvents:   "none",
-                whiteSpace:      "nowrap",
-                boxShadow:       "0 6px 16px rgba(0,0,0,0.4)",
-              }}
-            >
-              <div style={{ color: INK_PRIMARY, fontWeight: 600, marginBottom: "4px" }}>
-                {hoverPull.bossName} #{hoverPull.pullNumber} — {hoverPull.result}
-              </div>
-              {hoverPull.reviewLabel && <div style={{ marginBottom: "4px" }}>{hoverPull.reviewLabel}</div>}
-              {hoverRows.map((p) => (
-                <div key={p.key} style={{ display: "flex", justifyContent: "space-between", gap: "12px" }}>
-                  <span style={{ color: colorFor(p) }}>{p.name}</span>
-                  <span style={{ fontVariantNumeric: "tabular-nums" }}>{series.get(p.key)?.[hoverIdx!] ?? 0}</span>
+          {/* Hover readout — always occupies its column, so the plot width
+              (and therefore the x positions being hovered) never shifts
+              between the hovered and un-hovered states. */}
+          <div
+            style={{
+              width:           `${HOVER_PANEL_WIDTH}px`,
+              flexShrink:      0,
+              backgroundColor: "#111",
+              border:          "1px solid #2c2c2a",
+              borderRadius:    "6px",
+              padding:         "8px 10px",
+              fontSize:        "11px",
+              color:           INK_SECONDARY,
+              maxHeight:       `${CHART_HEIGHT}px`,
+              overflowY:       "auto",
+              boxSizing:       "border-box",
+            }}
+          >
+            {hoverPull ? (
+              <>
+                <div style={{ color: INK_PRIMARY, fontWeight: 600, marginBottom: "4px" }}>
+                  {hoverPull.bossName} #{hoverPull.pullNumber} — {hoverPull.result}
                 </div>
-              ))}
-            </div>
-          )}
+                {hoverPull.reviewLabel && (
+                  <div style={{ marginBottom: "4px", color: INK_MUTED }}>{hoverPull.reviewLabel}</div>
+                )}
+                {hoverRows.map((p) => (
+                  <div key={p.key} style={{ display: "flex", justifyContent: "space-between", gap: "12px" }}>
+                    <span style={{ color: colorFor(p), overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {p.name}
+                    </span>
+                    <span style={{ fontVariantNumeric: "tabular-nums" }}>{series.get(p.key)?.[hoverIdx!] ?? 0}</span>
+                  </div>
+                ))}
+              </>
+            ) : (
+              <div style={{ color: INK_MUTED }}>Hover a pull to see totals at that point.</div>
+            )}
+          </div>
         </div>
       )}
     </div>

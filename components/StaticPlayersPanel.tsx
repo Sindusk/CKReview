@@ -13,7 +13,7 @@
 // every visit, and a full roster (soon including substitutes) takes up
 // real space once opened.
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { getClassColor, getPlayerSpecIcon } from "@/lib/player-display";
 
 type PlayerJob = { game: string; className: string; specId: number | null } | null;
@@ -23,14 +23,33 @@ type PlayerIdentity = {
   name:         string;
   aliases:      string[];
   job:          PlayerJob;
+  majorErrors:  number;
+  minorErrors:  number;
   totalErrors:  number;
   pullsCount:   number;
+  // Majors per pull as a 0–100+ percentage — Minors deliberately excluded,
+  // see the /players route's header comment.
   errorRatePct: number;
 };
+
+// Every column the table can be ordered by. `name` sorts ascending by
+// default (A→Z reads naturally); the numeric columns start descending,
+// since "who has the most" is the question being asked of them.
+type SortKey = "name" | "minorErrors" | "majorErrors" | "totalErrors" | "pullsCount" | "errorRatePct";
+
+const NUMERIC_COLUMNS: { key: SortKey; label: string }[] = [
+  { key: "minorErrors",  label: "Minor Errors" },
+  { key: "majorErrors",  label: "Major Errors" },
+  { key: "totalErrors",  label: "Total Errors" },
+  { key: "pullsCount",   label: "Pulls" },
+  { key: "errorRatePct", label: "% Error Rate" },
+];
 
 export default function StaticPlayersPanel({ staticId }: { staticId: number }) {
   const [open, setOpen] = useState(false);
   const [players, setPlayers] = useState<PlayerIdentity[] | null>(null);
+  const [sortKey, setSortKey] = useState<SortKey>("majorErrors");
+  const [sortAsc, setSortAsc] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mergeFrom, setMergeFrom] = useState<number | null>(null);
   const [mergeInto, setMergeInto] = useState<number | null>(null);
@@ -51,6 +70,28 @@ export default function StaticPlayersPanel({ staticId }: { staticId: number }) {
   useEffect(() => {
     if (open && players == null && Number.isInteger(staticId)) reload();
   }, [open, staticId]);
+
+  // Ties fall back to name so the order is stable when several players
+  // share a count (very common early in a static's life, when everyone is
+  // still on 0).
+  const sortedPlayers = useMemo(() => {
+    if (!players) return null;
+    const dir = sortAsc ? 1 : -1;
+    return [...players].sort((a, b) => {
+      if (sortKey === "name") return a.name.localeCompare(b.name) * dir;
+      const diff = (a[sortKey] - b[sortKey]) * dir;
+      return diff !== 0 ? diff : a.name.localeCompare(b.name);
+    });
+  }, [players, sortKey, sortAsc]);
+
+  function toggleSort(key: SortKey) {
+    if (key === sortKey) {
+      setSortAsc((v) => !v);
+    } else {
+      setSortKey(key);
+      setSortAsc(key === "name");
+    }
+  }
 
   async function handleMerge() {
     if (mergeFrom == null || mergeInto == null || mergeFrom === mergeInto) return;
@@ -119,24 +160,39 @@ export default function StaticPlayersPanel({ staticId }: { staticId: number }) {
         <div style={{ marginTop: "14px" }}>
           {error && <p style={{ color: "#f87171", fontSize: "12px", marginBottom: "10px" }}>{error}</p>}
 
-          {players == null ? (
+          {sortedPlayers == null ? (
             <p style={{ fontSize: "13px", color: "#999" }}>Loading players...</p>
-          ) : players.length === 0 ? (
+          ) : sortedPlayers.length === 0 ? (
             <p style={{ fontSize: "13px", color: "#999" }}>No players seen yet — import a review first.</p>
           ) : (
             <div style={{ overflowX: "auto", marginBottom: "16px" }}>
               <table style={{ borderCollapse: "collapse", width: "100%", fontSize: "12px" }}>
                 <thead>
                   <tr>
-                    <th style={thStyle("left")}>Player</th>
-                    <th style={thStyle("right")}>Total Errors</th>
-                    <th style={thStyle("right")}>Pulls</th>
-                    <th style={thStyle("right")}>% Error Rate</th>
+                    <SortableTh
+                      label="Player"
+                      align="left"
+                      column="name"
+                      sortKey={sortKey}
+                      sortAsc={sortAsc}
+                      onSort={toggleSort}
+                    />
+                    {NUMERIC_COLUMNS.map((col) => (
+                      <SortableTh
+                        key={col.key}
+                        label={col.label}
+                        align="right"
+                        column={col.key}
+                        sortKey={sortKey}
+                        sortAsc={sortAsc}
+                        onSort={toggleSort}
+                      />
+                    ))}
                     <th style={thStyle("left")}></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {players.map((p) => {
+                  {sortedPlayers.map((p) => {
                     const color = p.job ? getClassColor(p.job.game as "wow" | "ffxiv", p.job.className) : "#aaa";
                     const icon = p.job ? getPlayerSpecIcon(p.job.game as "wow" | "ffxiv", p.job.specId ?? 0, p.job.className) : null;
                     return (
@@ -171,9 +227,11 @@ export default function StaticPlayersPanel({ staticId }: { staticId: number }) {
                             </div>
                           )}
                         </td>
+                        <td style={tdStyle("right")}>{p.minorErrors}</td>
+                        <td style={tdStyle("right")}>{p.majorErrors}</td>
                         <td style={tdStyle("right")}>{p.totalErrors}</td>
                         <td style={tdStyle("right")}>{p.pullsCount}</td>
-                        <td style={tdStyle("right")}>{p.errorRatePct.toFixed(0)}%</td>
+                        <td style={tdStyle("right")} title="Major errors per pull">{p.errorRatePct.toFixed(0)}%</td>
                         <td style={{ padding: "6px 8px", textAlign: "right" }}>
                           {renamingId !== p.id && (
                             <button onClick={() => { setRenamingId(p.id); setRenameDraft(p.name); }} style={btnStyle("transparent", "#aaa")}>
@@ -213,6 +271,45 @@ export default function StaticPlayersPanel({ staticId }: { staticId: number }) {
         </div>
       )}
     </div>
+  );
+}
+
+function SortableTh({
+  label,
+  align,
+  column,
+  sortKey,
+  sortAsc,
+  onSort,
+}: {
+  label:   string;
+  align:   "left" | "right";
+  column:  SortKey;
+  sortKey: SortKey;
+  sortAsc: boolean;
+  onSort:  (key: SortKey) => void;
+}) {
+  const active = sortKey === column;
+
+  return (
+    <th style={{ ...thStyle(align), cursor: "pointer", userSelect: "none", color: active ? "#e8e6dd" : "#898781" }}>
+      <span
+        onClick={() => onSort(column)}
+        style={{
+          display:        "inline-flex",
+          alignItems:     "center",
+          gap:            "4px",
+          justifyContent: align === "right" ? "flex-end" : "flex-start",
+        }}
+        title={`Sort by ${label}`}
+      >
+        {label}
+        {/* Reserved-width caret so the header doesn't jump as sorting moves. */}
+        <span style={{ width: "8px", fontSize: "9px", color: active ? "#e8e6dd" : "transparent" }}>
+          {sortAsc ? "▲" : "▼"}
+        </span>
+      </span>
+    </th>
   );
 }
 

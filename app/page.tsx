@@ -208,6 +208,12 @@ export default function Home() {
   const [importProgress, setImportProgress] = useState(0);
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const [loadedReportCode, setLoadedReportCode] = useState<string | null>(null);
+  // Epoch ms the loaded log started recording (WCL/FFLogs report.startTime).
+  // Only used when attaching this session to a static, so the static
+  // dashboard can show the night the raid actually happened rather than the
+  // day someone got round to adding it — see StaticReview.reportStartedAt.
+  // Null for sample-data imports captured before the field was queried.
+  const [loadedReportStartedAt, setLoadedReportStartedAt] = useState<number | null>(null);
 
   // "Live log" — opt-in, off by default. When on, keeps polling the loaded
   // report for newly-appeared fights (see the polling useEffect below) and
@@ -610,6 +616,7 @@ export default function Home() {
     setPulls(newPulls);
     setSelectedPullId(null);
     setLoadedReportCode(report.code);
+    setLoadedReportStartedAt(report.startTime ?? null);
     setLoadedSource("wcl");
     setImportStatus(`Log Loaded: ${report.code}`);
     setImportProgress(100);
@@ -676,6 +683,7 @@ export default function Home() {
     setPulls(newPulls);
     setSelectedPullId(null);
     setLoadedReportCode(report.code);
+    setLoadedReportStartedAt(report.startTime ?? null);
     setLoadedSource("ffl");
     setImportStatus(`Log Loaded: ${report.code}`);
     setImportProgress(100);
@@ -874,6 +882,7 @@ export default function Home() {
       setImportError(err instanceof Error ? err.message : String(err));
       setImportStatus(null);
       setLoadedReportCode(null);
+      setLoadedReportStartedAt(null);
     } finally {
       setImporting(false);
     }
@@ -969,6 +978,7 @@ export default function Home() {
     setPulls(newPulls);
     setSelectedPullId(null);
     setLoadedReportCode(payload.report.code);
+    setLoadedReportStartedAt(payload.report.startTime ?? null);
     setLoadedSource(payload.source);
     setImportStatus(`Log Loaded: ${payload.report.code} (local sample data)`);
     setImportProgress(100);
@@ -1264,6 +1274,7 @@ export default function Home() {
         open={showAddReviewToStaticDialog}
         sessionId={sessionId}
         reportUrl={sessionReportUrl}
+        reportStartedAt={loadedReportStartedAt}
         pulls={displayPulls}
         onClose={() => setShowAddReviewToStaticDialog(false)}
         onOpenManageStatics={() => setShowManageStaticsDialog(true)}

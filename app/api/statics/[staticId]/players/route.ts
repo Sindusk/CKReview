@@ -8,6 +8,11 @@
 // computeStaticReviewPullData's header on why 0-error rows are stored at
 // all), so `errorRatePct` means something once substitutes are in the mix
 // instead of just reflecting "how many pulls had >=1 error."
+//
+// Major and Minor counts are reported separately (with `totalErrors` kept
+// as their sum) because the Players panel sorts and rates on Majors alone —
+// Minors are noise-level mistakes that shouldn't drag a player's rate
+// around. `errorRatePct` is therefore MAJORS per pull, not all errors.
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -48,11 +53,13 @@ export async function GET(
   });
 
   const players = identities.map((identity) => {
-    let totalErrors = 0;
+    let majorErrors = 0;
+    let minorErrors = 0;
     const tally = new Map<string, { count: number; game: string; className: string; specId: number | null }>();
 
     for (const e of identity.errors) {
-      totalErrors += e.majorCount + e.minorCount;
+      majorErrors += e.majorCount;
+      minorErrors += e.minorCount;
       if (!e.className) continue;
       const key = `${e.pull.game}::${e.className}::${e.specId ?? ""}`;
       const entry = tally.get(key) ?? { count: 0, game: e.pull.game, className: e.className, specId: e.specId };
@@ -73,9 +80,11 @@ export async function GET(
       name:         identity.name,
       aliases:      identity.aliases.map((a) => a.name),
       job,
-      totalErrors,
+      majorErrors,
+      minorErrors,
+      totalErrors:  majorErrors + minorErrors,
       pullsCount,
-      errorRatePct: pullsCount > 0 ? (totalErrors / pullsCount) * 100 : 0,
+      errorRatePct: pullsCount > 0 ? (majorErrors / pullsCount) * 100 : 0,
     };
   });
 

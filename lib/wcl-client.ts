@@ -320,6 +320,12 @@ export type WCLEvent =
 export type WCLReport = {
   title:      string;
   code:       string;
+  // Epoch ms of when the log itself started recording — the anchor every
+  // fight's report-relative startTime is measured from. Used by the static
+  // dashboard to show when a session was actually played (see
+  // StaticReview.reportStartedAt); optional so a report captured before
+  // this field was queried (sampledata/ meta.json) still typechecks.
+  startTime?: number;
   fights:     WCLFight[];
   masterData: {
     actors:    WCLActor[];
@@ -340,6 +346,7 @@ const REPORT_QUERY = /* graphql */`
       report(code: $code) {
         title
         code
+        startTime
         fights(killType: Encounters) {
           id
           name

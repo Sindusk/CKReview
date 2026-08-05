@@ -369,6 +369,9 @@ export type FFLEvent =
 export type FFLReport = {
   title:      string;
   code:       string;
+  // Epoch ms of when the log itself started recording — see WCLReport's
+  // matching field for why this is optional.
+  startTime?: number;
   fights:     FFLFight[];
   masterData: {
     actors:    FFLActor[];
@@ -389,6 +392,7 @@ const REPORT_QUERY = /* graphql */`
       report(code: $code) {
         title
         code
+        startTime
         fights(killType: Encounters) {
           id
           name

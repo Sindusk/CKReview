@@ -21,6 +21,11 @@ type AddReviewToStaticDialogProps = {
   open:               boolean;
   sessionId:          string | null;
   reportUrl:          string;
+  // Epoch ms the log started recording, or null when it isn't known (a
+  // sample-data import predating the field). Persisted as the review's
+  // reportStartedAt so the static dashboard can date sessions by when they
+  // were played rather than when they were added.
+  reportStartedAt:    number | null;
   pulls:              Pull[];
   onClose:            () => void;
   onOpenManageStatics: () => void;
@@ -30,6 +35,7 @@ export default function AddReviewToStaticDialog({
   open,
   sessionId,
   reportUrl,
+  reportStartedAt,
   pulls,
   onClose,
   onOpenManageStatics,
@@ -102,6 +108,7 @@ export default function AddReviewToStaticDialog({
         body:    JSON.stringify({
           sessionId,
           reportUrl,
+          reportStartedAt,
           label: label.trim() || undefined,
           pulls: computeStaticReviewPullData(pulls),
         }),

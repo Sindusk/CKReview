@@ -81,6 +81,13 @@ export async function POST(
   const sessionId = String(body?.sessionId || "").trim();
   const reportUrl = String(body?.reportUrl || "").trim();
   const label = typeof body?.label === "string" && body.label.trim() ? body.label.trim() : null;
+  // Epoch ms from the client's loaded report (WCL/FFLogs report.startTime).
+  // Absent for sample-data imports and for older clients, in which case the
+  // review keeps whatever it already had rather than being cleared.
+  const reportStartedAt =
+    typeof body?.reportStartedAt === "number" && Number.isFinite(body.reportStartedAt)
+      ? new Date(body.reportStartedAt)
+      : null;
   const pulls: StaticReviewPullData[] = Array.isArray(body?.pulls) ? body.pulls : [];
   const allPlayerNames = pulls.flatMap((p) => p.players.map((pl) => pl.player));
 
@@ -97,6 +104,7 @@ export async function POST(
           sessionId,
           reportUrl,
           label,
+          reportStartedAt,
           addedByUserId: user.id,
           pulls: { create: buildPullsCreateData(pulls, identities) },
         },
@@ -159,6 +167,10 @@ export async function POST(
           where: { id: existing.id },
           data: {
             label: label ?? existing.label,
+            // A resync is how pre-existing reviews acquire a report date at
+            // all, so fill it in — but never blank out a known date just
+            // because this particular client couldn't supply one.
+            reportStartedAt: reportStartedAt ?? existing.reportStartedAt,
             pulls: { create: pullsCreateData },
           },
         });

@@ -21,6 +21,10 @@ type ReviewSummary = {
   reportUrl: string;
   label:     string | null;
   addedAt:   string;
+  // ISO date the LOG was recorded (StaticReview.reportStartedAt) — null for
+  // reviews added before that column existed; those show a dash until
+  // they're resynced from a client that has the report open.
+  reportStartedAt: string | null;
 };
 
 type Session = {
@@ -75,6 +79,8 @@ export default function StaticDashboardPage() {
   const [editingPull, setEditingPull] = useState<number | null>(null);
   const [summaryDraft, setSummaryDraft] = useState("");
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  const [editingReview, setEditingReview] = useState<number | null>(null);
+  const [labelDraft, setLabelDraft] = useState("");
 
   useEffect(() => {
     if (!Number.isInteger(staticId)) return;
@@ -121,6 +127,21 @@ export default function StaticDashboardPage() {
     setSummaryDraft(current ?? "");
   }
 
+  async function saveLabel(reviewId: number) {
+    const label = labelDraft.trim();
+    await fetch(`/api/statics/${staticId}/reviews/${reviewId}`, {
+      method:  "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ label }),
+    });
+    setEditingReview(null);
+    setReviews((prev) => prev?.map((r) => (r.id === reviewId ? { ...r, label: label || null } : r)) ?? null);
+    // The chart's hover readout shows reviewLabel too, so keep the
+    // separately-fetched pull data in step rather than making the user
+    // reload to see the rename take.
+    setPulls((prev) => prev?.map((p) => (p.reviewId === reviewId ? { ...p, reviewLabel: label || null } : p)) ?? null);
+  }
+
   async function saveSummary(pull: ChartPull) {
     await fetch(`/api/statics/${staticId}/pulls/${pull.id}`, {
       method:  "PATCH",
@@ -164,35 +185,110 @@ export default function StaticDashboardPage() {
         ) : (
           sessions.map((session, sessionIdx) => {
             const isOpen = expanded.has(session.review.id);
+            const isEditingLabel = editingReview === session.review.id;
+            const recordedAt = session.review.reportStartedAt;
+
             return (
               <div key={session.review.id} style={{ backgroundColor: "#1a1a1a", border: "1px solid #333", borderRadius: "10px", overflow: "hidden" }}>
-                <button
-                  onClick={() => toggleSession(session.review.id)}
+                {/* Header is a row, not a single <button>, so the label
+                    editor can live inside it — a form control nested in a
+                    button is neither valid HTML nor clickable. */}
+                <div
                   style={{
                     display:         "flex",
                     alignItems:      "center",
                     justifyContent:  "space-between",
-                    width:           "100%",
+                    gap:             "10px",
                     padding:         "12px 16px",
-                    background:      "none",
-                    border:          "none",
-                    cursor:          "pointer",
                     color:           "#eee",
-                    textAlign:       "left",
                   }}
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <span style={{ transform: isOpen ? "rotate(90deg)" : "none", transition: "transform 0.1s", display: "inline-block", fontSize: "11px", color: "#888" }}>
-                      &#9654;
-                    </span>
-                    <strong style={{ fontSize: "14px" }}>Session {sessionIdx + 1}</strong>
-                    {session.review.label && <span style={{ fontSize: "13px", color: "#aaa" }}>— {session.review.label}</span>}
-                    <span style={{ fontSize: "12px", color: "#666" }}>{session.pulls.length} pulls</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0, flex: "1 1 auto" }}>
+                    <button
+                      onClick={() => toggleSession(session.review.id)}
+                      style={{
+                        display:     "flex",
+                        alignItems:  "center",
+                        gap:         "10px",
+                        background:  "none",
+                        border:      "none",
+                        cursor:      "pointer",
+                        color:       "#eee",
+                        padding:     0,
+                        textAlign:   "left",
+                        flexShrink:  0,
+                      }}
+                    >
+                      <span style={{ transform: isOpen ? "rotate(90deg)" : "none", transition: "transform 0.1s", display: "inline-block", fontSize: "11px", color: "#888" }}>
+                        &#9654;
+                      </span>
+                      <strong style={{ fontSize: "14px" }}>Session {sessionIdx + 1}</strong>
+                    </button>
+
+                    {isEditingLabel ? (
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px", flex: "1 1 auto", minWidth: 0 }}>
+                        <input
+                          className="ck-input"
+                          value={labelDraft}
+                          onChange={(e) => setLabelDraft(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") saveLabel(session.review.id);
+                            if (e.key === "Escape") setEditingReview(null);
+                          }}
+                          placeholder="e.g. Week 4 progression"
+                          style={{ fontSize: "13px", flex: "1 1 auto", minWidth: 0 }}
+                          autoFocus
+                        />
+                        <button
+                          onClick={() => saveLabel(session.review.id)}
+                          style={{ backgroundColor: "#2563eb", color: "#fff", border: "none", borderRadius: "5px", padding: "4px 10px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={() => setEditingReview(null)}
+                          style={{ background: "none", color: "#aaa", border: "1px solid #444", borderRadius: "5px", padding: "4px 10px", fontSize: "12px", cursor: "pointer" }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => { setEditingReview(session.review.id); setLabelDraft(session.review.label ?? ""); }}
+                          title="Rename this session"
+                          style={{
+                            background:  "none",
+                            border:      "none",
+                            cursor:      "pointer",
+                            padding:     "2px 4px",
+                            fontSize:    "13px",
+                            color:       session.review.label ? "#aaa" : "#666",
+                            fontStyle:   session.review.label ? "normal" : "italic",
+                            textAlign:   "left",
+                            overflow:    "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace:  "nowrap",
+                          }}
+                        >
+                          {session.review.label ? `— ${session.review.label}` : "— add a label"}
+                        </button>
+                        <span style={{ fontSize: "12px", color: "#666", flexShrink: 0 }}>{session.pulls.length} pulls</span>
+                      </>
+                    )}
                   </div>
-                  <span style={{ fontSize: "11px", color: "#666" }}>
-                    {new Date(session.review.addedAt).toLocaleDateString()}
+
+                  <span
+                    style={{ fontSize: "11px", color: "#666", flexShrink: 0 }}
+                    title={
+                      recordedAt
+                        ? "Date the log was recorded"
+                        : "This review predates report-date tracking — resync it from the app to fill this in"
+                    }
+                  >
+                    {recordedAt ? new Date(recordedAt).toLocaleDateString() : "—"}
                   </span>
-                </button>
+                </div>
 
                 {isOpen && (
                   <div style={{ borderTop: "1px solid #2a2a2a" }}>

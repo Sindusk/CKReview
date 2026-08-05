@@ -57,6 +57,14 @@ model StaticReview {
   addedByUserId Int
   addedAt       DateTime @default(now())
 
+  /// When the underlying log was RECORDED — the WCL/FFLogs report's own
+  /// `startTime`, captured at add/resync time from the client that has the
+  /// report open. Distinct from addedAt (when someone attached the session
+  /// to this static), which can be days later. Nullable: reviews added
+  /// before this column existed have no value and render as "—" on the
+  /// static dashboard until they're resynced.
+  reportStartedAt DateTime?
+
   static Static @relation(fields: [staticId], references: [id], onDelete: Cascade)
   pulls  StaticReviewPull[]
 
