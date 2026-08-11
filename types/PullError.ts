@@ -59,6 +59,15 @@ export type PullErrorRule = {
   // the rule — only the initial (non-tick) hit does. Needed for abilities
   // like Void Flames/Light Flames that hit once on impact and then tick.
   excludeTicks?:       boolean;
+
+  // ── "debuffApplied" trigger only ─────────────────────────────────────────
+  // Ability IDs (PlayerEvent.causeAbilityId, from FFLogs' extraAbilityGameID)
+  // whose applications of this debuff are NOT a player mistake and must never
+  // be flagged. Dancing Mad's generic Damage Down is the motivating case: it
+  // is usually a real punish, but a handful of abilities apply it raid-wide
+  // as an unavoidable part of the fight (see DAMAGE_DOWN_BLAMELESS_CAUSES in
+  // lib/error-rules.ts).
+  excludeCauseAbilityIds?: number[];
 };
 
 // A concrete occurrence of a rule firing during a specific pull.

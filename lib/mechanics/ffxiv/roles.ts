@@ -50,11 +50,28 @@
 //          majority and safely falls through instead of a wrong guess.
 //     Falls back to roster order (tentative) only if neither signal
 //     resolves anything (no logged auto-attacks AND no decisive plan vote).
-//   - M1/M2: genuinely unresolvable from the roster alone when two melee
-//     DPS share... nothing distinguishing (no per-job M1-vs-M2 convention
-//     exists in FFXIV the way MT/OT does) — stays tentative, arbitrary
-//     stable order. Room to improve later (e.g. raid-marker position) but
-//     no signal for it yet.
+//   - M1/M2: no per-job M1-vs-M2 convention exists in FFXIV the way MT/OT
+//     does, so the roster alone can't split them. Resolved instead from the
+//     raid's own WAVE CANNON conga order, per pull: the four DPS line up
+//     M1-M2-R1-R2 west to east for the Wave Cannon towers (already encoded
+//     in phase1.ts's DPS_CONGA_ORDER), so whichever melee's own Wave Cannon
+//     hit position is further WEST is M1. Falls back to the old arbitrary,
+//     tentative roster order when the pull never reaches Wave Cannon or
+//     either melee has no logged hit position.
+//
+//     Confirmed 2026-08-10 against report PM8HY9nJ7kTR4tdQ, where the user
+//     stated the ground truth directly ("Sonder in this report is Melee 1,
+//     Sachi is Melee 2") and asked for exactly this — slots learned from the
+//     assigned spread positions rather than guessed. That report's learned
+//     Wave Cannon spots put Sonder Dreams (Reaper) at x=10179 and Sachi Gaen
+//     (Samurai) at x=10546: Sonder west, so Sonder is M1. The same west-to-
+//     east reading of the SUPPORT conga (H2-H1-OT-MT) independently
+//     reproduces that report's MT/OT split — Sage 8238, White Mage 8809,
+//     Dark Knight 9271, Paladin 9629, giving OT=Sayacissa Morsaelth and
+//     MT=Kup'o Noodles, which is exactly what the (already 100%-validated)
+//     opening-auto-attack signal resolves. That cross-check is why the conga
+//     order is trusted here; MT/OT itself still comes from the auto-attack,
+//     which needs no such derivation.
 //
 // Off-meta comps (no ranged, double caster, 3+ tanks, ...) degrade
 // gracefully: leftover DPS spill into unfilled slots in stable order,
@@ -62,6 +79,7 @@
 
 import type { PlayerInfo } from "@/types/PlayerInfo";
 import { getFFRosterSortOrder } from "@/lib/ffl-job-data";
+import { findPlayerPosition } from "@/lib/mechanics/player-position";
 // Type-only — avoids a runtime circular dependency with mitigation-plan.ts,
 // which imports THIS module's detectFFRoles/TANK_JOB_ABBREVIATIONS.
 import type { MitigationPlan } from "./dancingmad/mitigation-plan";
@@ -87,7 +105,7 @@ export type RoleAssignment = {
   tentative:  boolean;
   // How this slot was resolved — surfaced for the Strategy dialog / future
   // debugging, not load-bearing for detection.
-  source:     "job" | "auto-attack" | "plan" | "order" | "none";
+  source:     "job" | "auto-attack" | "plan" | "wave-cannon" | "order" | "none";
 };
 
 const HEALER_JOBS = ["White Mage", "Astrologian", "Scholar", "Sage"];
@@ -208,10 +226,61 @@ function resolveHealers(healers: PlayerInfo[]): [RoleAssignment, RoleAssignment]
   ];
 }
 
-// ── M1/M2/R1/R2 — melee unresolvable, ranged/caster decisive by rangeType ─
+// ── M1/M2/R1/R2 — melee from Wave Cannon order, ranged/caster by rangeType ─
 
-function resolveDps(dps: PlayerInfo[]): RoleAssignment[] {
-  const melee   = dps.filter((p) => p.rangeType === "Melee").sort((a, b) => sortKey(a) - sortKey(b));
+// Wave Cannon (47784) — the tower volley whose west-to-east conga order the
+// M1/M2 split is read from. See module header.
+const WAVE_CANNON_ABILITY_ID = 47784;
+
+// Bounds the position lookup around the volley for a melee who took no Wave
+// Cannon hit of their own (they were never targeted, or died first). Wide
+// enough to reach a sparse stream's nearest sample without drifting into the
+// raid's next movement — the conga line is held for several seconds.
+const WAVE_CANNON_ROLE_POSITION_WINDOW_MS = 3000;
+
+/** The pull's first Wave Cannon hit on anyone — the volley's own instant. */
+function firstWaveCannonTimestamp(players: PlayerInfo[]): number | null {
+  let earliest: number | null = null;
+  for (const p of players) {
+    for (const e of p.damageTaken) {
+      if (e.abilityId !== WAVE_CANNON_ABILITY_ID) continue;
+      if (earliest === null || e.timestamp < earliest) earliest = e.timestamp;
+    }
+  }
+  return earliest;
+}
+
+/**
+ * Orders exactly two melee west-to-east by where they stood for the Wave
+ * Cannon conga, so index 0 is M1. Each melee's own hit position is used when
+ * they were targeted; otherwise their position at the volley is recovered
+ * from every stream (see lib/mechanics/player-position.ts). Returns null when
+ * either can't be placed — the caller then keeps the old tentative roster
+ * order rather than guessing.
+ */
+function meleeByWaveCannonOrder(melee: PlayerInfo[], players: PlayerInfo[]): PlayerInfo[] | null {
+  if (melee.length !== 2) return null;
+  const volley = firstWaveCannonTimestamp(players);
+  if (volley === null) return null;
+
+  const xs = melee.map((player) => {
+    const ownHit = player.damageTaken
+      .filter((e) => e.abilityId === WAVE_CANNON_ABILITY_ID && e.x !== undefined)
+      .sort((a, b) => a.timestamp - b.timestamp)[0];
+    if (ownHit) return { player, x: ownHit.x! };
+    const pos = findPlayerPosition(player, volley, { windowMs: WAVE_CANNON_ROLE_POSITION_WINDOW_MS });
+    return { player, x: pos?.x ?? null };
+  });
+
+  if (xs.some((m) => m.x === null)) return null;
+  if (xs[0].x === xs[1].x) return null; // dead tie — no order to read
+  return xs.sort((a, b) => a.x! - b.x!).map((m) => m.player);
+}
+
+function resolveDps(dps: PlayerInfo[], players: PlayerInfo[]): RoleAssignment[] {
+  const meleeByRoster = dps.filter((p) => p.rangeType === "Melee").sort((a, b) => sortKey(a) - sortKey(b));
+  const meleeOrdered  = meleeByWaveCannonOrder(meleeByRoster, players);
+  const melee   = meleeOrdered ?? meleeByRoster;
   const ranged  = dps.filter((p) => p.rangeType === "Ranged").sort((a, b) => sortKey(a) - sortKey(b));
   const casters = dps.filter((p) => p.rangeType === "Caster").sort((a, b) => sortKey(a) - sortKey(b));
 
@@ -227,17 +296,22 @@ function resolveDps(dps: PlayerInfo[]): RoleAssignment[] {
     const player = preferred ?? leftovers()[0] ?? null;
     if (player) used.add(player);
 
-    // Certain only when the category had exactly one candidate: a lone
-    // melee is unambiguously M1 (M2 empty); a lone ranged/caster is
-    // unambiguously R1/R2. Two melee (the standard comp) leaves M1 vs M2
-    // genuinely arbitrary — see module header.
+    // Certain when the category had exactly one candidate (a lone melee is
+    // unambiguously M1; a lone ranged/caster unambiguously R1/R2), or — for
+    // the melee pair — when the Wave Cannon conga order resolved them. Two
+    // melee with no Wave Cannon data left stays arbitrary and tentative.
     const certain =
       preferred !== undefined &&
-      ((slot === "M1" && melee.length === 1) ||
+      (((slot === "M1" || slot === "M2") && (melee.length === 1 || meleeOrdered !== null)) ||
        (slot === "R1" && ranged.length === 1) ||
        (slot === "R2" && casters.length === 1));
 
-    return { slot, player, tentative: !certain, source: player ? (certain ? "job" : "order") : "none" } as RoleAssignment;
+    const source: RoleAssignment["source"] = !player
+      ? "none"
+      : certain
+      ? ((slot === "M1" || slot === "M2") && meleeOrdered !== null ? "wave-cannon" : "job")
+      : "order";
+    return { slot, player, tentative: !certain, source } as RoleAssignment;
   });
 }
 
@@ -254,7 +328,7 @@ export function detectFFRoles(players: PlayerInfo[], plan?: MitigationPlan | nul
 
   const { mt, ot, tentative: tanksTentative, source: tanksSource } = resolveTanks(tanks, plan);
   const [h1, h2] = resolveHealers(healers);
-  const dpsSlots = resolveDps(dps);
+  const dpsSlots = resolveDps(dps, players);
 
   return [
     { slot: "MT", player: mt, tentative: tanksTentative, source: mt ? tanksSource : "none" },

@@ -126,6 +126,8 @@ const EARTHQUAKE_ABILITY_ID  = 47866; // the doubled-earthquake wipe symptom of 
 
 export const BLACKHOLE_INCORRECT_TETHER_RULE_ID = "ffxiv-blackhole-soaked-incorrect-tether";
 export const BLACKHOLE_LOST_CRUST_RULE_ID       = "ffxiv-blackhole-lost-primordial-crust";
+export const BLACKHOLE_STOLE_TETHER_RULE_ID     = "ffxiv-blackhole-stole-assigned-tether";
+export const BLACKHOLE_TETHER_CLEAVED_RULE_ID   = "ffxiv-blackhole-tether-cleaved-party";
 export const BLACKHOLE_EARTHQUAKE_DURING_VULN_RULE_ID = "ffxiv-blackhole-earthquake-during-vulnerability";
 
 // ── Accretion earthquake vulnerability overlap (confirmed 2026-07-21,
@@ -365,6 +367,141 @@ export function momentIndexFor(hitTimestamp: number, burstTimestamp: number): nu
     if (Math.abs(offset - TETHER_MOMENT_OFFSETS_MS[i]) <= TETHER_MOMENT_TOLERANCE_MS) return i + 1;
   }
   return undefined;
+}
+
+// ── Tether lanes: who holds which tether instance, moment by moment ───────
+//
+// Every tether is a separate `sourceInstance` of the Nothingness caster, and
+// an instance persists across the moments it fires — it is the physical
+// tether being passed down the conga line. Reading the hits as (moment,
+// instance) -> holders makes two failure shapes visible that the per-player
+// "was this moment in your role band?" check cannot see on its own, because
+// in both of them the WRONG player's moment is perfectly legal:
+//
+//   TETHER STEAL (confirmed 2026-08-10, report PM8HY9nJ7kTR4tdQ pulls 1 and
+//   25, both at moment 8): the Third-in-Line player taking over at moment 8
+//   grabbed the wrong lane. In pull 1 Ayumi Emi took instance 8 — Azura
+//   Salus's in-progress lane, which still owed Azura her third hit — instead
+//   of instance 7, the lane Sachi Gaen had already finished on. Moment 8 is
+//   inside Third in Line's own band {7,8,9,10}, so nothing about Ayumi looked
+//   wrong; the damage surfaced entirely on her victims (Azura short one hit,
+//   Sachi taking an unrelieved FOURTH hit and dying). Pull 25 is the same
+//   shape with Chauzey Solstice and Sonder Dreams as the victims — Ayumi
+//   again the taker. Per the user both victims must be cleared and the taker
+//   flagged.
+//
+//   TETHER CLEAVE (confirmed 2026-08-10, same report pull 7, moment 9): the
+//   legitimate holder took their tether but never walked it out of the
+//   middle, so instance 11 hit Sayacissa Morsaelth and then cleaved four
+//   teammates standing under the boss 100-200ms later. Those four were the
+//   ones flagged ("soaked incorrect tether"), which is backwards — they were
+//   where they were supposed to be. Per the user, the holder owns this.
+//
+// Both are read off hit data alone; neither needs a resolved strategy.
+
+export type TetherLaneMap = {
+  /** moment -> sourceInstance -> the players that instance hit at that moment, earliest hit first. */
+  byMoment: Map<number, Map<number, PlayerInfo[]>>;
+  /** actorId -> total Nothingness hits taken across the whole mechanic. */
+  totalHits: Map<number, number>;
+  /** "moment:actorId" -> the instance that player held at that moment (only when unambiguous). */
+  instanceHeld: Map<string, number>;
+};
+
+export function buildTetherLaneMap(players: PlayerInfo[], burstTimestamp: number): TetherLaneMap {
+  const byMoment = new Map<number, Map<number, PlayerInfo[]>>();
+  const totalHits = new Map<number, number>();
+  const instanceHeld = new Map<string, number>();
+  const seen = new Set<string>();
+
+  type Row = { moment: number; instance: number; player: PlayerInfo; timestamp: number };
+  const rows: Row[] = [];
+  for (const player of players) {
+    for (const e of player.damageTaken) {
+      if (e.abilityId !== NOTHINGNESS_ABILITY_ID) continue;
+      const moment = momentIndexFor(e.timestamp, burstTimestamp);
+      if (moment === undefined || e.sourceInstance === undefined) continue;
+      rows.push({ moment, instance: e.sourceInstance, player, timestamp: e.timestamp });
+    }
+  }
+  rows.sort((a, b) => a.timestamp - b.timestamp);
+
+  for (const r of rows) {
+    // One tether firing can surface as several damage records for the same
+    // player — count each (moment, instance, player) once.
+    const key = `${r.moment}:${r.instance}:${r.player.actorId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    const perInstance = byMoment.get(r.moment) ?? new Map<number, PlayerInfo[]>();
+    perInstance.set(r.instance, [...(perInstance.get(r.instance) ?? []), r.player]);
+    byMoment.set(r.moment, perInstance);
+
+    totalHits.set(r.player.actorId, (totalHits.get(r.player.actorId) ?? 0) + 1);
+
+    const heldKey = `${r.moment}:${r.player.actorId}`;
+    // A player on two instances in one moment has no single "lane" — the
+    // Double Tether strategy's m2 does this legitimately. Leave it unset
+    // rather than pick one.
+    if (instanceHeld.has(heldKey)) instanceHeld.delete(heldKey);
+    else instanceHeld.set(heldKey, r.instance);
+  }
+
+  return { byMoment, totalHits, instanceHeld };
+}
+
+/** Every hit at `moment` where one instance caught 2+ distinct players. */
+function cleavedInstancesAt(lanes: TetherLaneMap, moment: number): [number, PlayerInfo[]][] {
+  return [...(lanes.byMoment.get(moment) ?? new Map()).entries()].filter(([, hit]) => hit.length >= 2);
+}
+
+/**
+ * Lanes stolen at `moment`: an instance whose previous-moment holder still
+ * owed themselves a hit, taken over by somebody else instead. Returns
+ * { instance, robbed, takers }.
+ */
+function stolenLanesAt(
+  lanes: TetherLaneMap,
+  moment: number
+): { instance: number; robbed: PlayerInfo; takers: PlayerInfo[] }[] {
+  const stolen: { instance: number; robbed: PlayerInfo; takers: PlayerInfo[] }[] = [];
+  const prev = lanes.byMoment.get(moment - 1);
+  const now = lanes.byMoment.get(moment);
+  if (!prev || !now) return stolen;
+
+  for (const [instance, prevHolders] of prev) {
+    if (prevHolders.length !== 1) continue; // a cleaved lane has no single owner to rob
+    const robbed = prevHolders[0];
+    const nowHolders = now.get(instance);
+    if (!nowHolders || nowHolders.length === 0) continue;              // lane simply ended
+    if (nowHolders.some((p) => p.actorId === robbed.actorId)) continue; // they kept it
+    if ((lanes.totalHits.get(robbed.actorId) ?? 0) >= 3) continue;      // their conga finished — a normal handoff
+
+    // Anyone continuing their OWN lane into this instance isn't taking it
+    // over; only a player arriving from elsewhere is.
+    const takers = nowHolders.filter((p) => lanes.instanceHeld.get(`${moment - 1}:${p.actorId}`) !== instance);
+    if (takers.length === 0) continue;
+
+    stolen.push({ instance, robbed, takers });
+  }
+  return stolen;
+}
+
+/**
+ * "moment:playerName" for every player whose in-progress tether lane was
+ * taken over by somebody else — see stolenLanesAt. Exported so
+ * blackhole-strategy.ts's Missed Assigned Tether check can defer to
+ * BLACKHOLE_STOLE_TETHER_RULE_ID instead of blaming the robbed player for a
+ * hit that was taken off them (lib/mechanics/README.md: flag the root cause,
+ * never the victim).
+ */
+export function robbedTetherMoments(players: PlayerInfo[], burstTimestamp: number): Set<string> {
+  const lanes = buildTetherLaneMap(players, burstTimestamp);
+  const robbed = new Set<string>();
+  for (const moment of lanes.byMoment.keys()) {
+    for (const s of stolenLanesAt(lanes, moment)) robbed.add(`${moment}:${s.robbed.name}`);
+  }
+  return robbed;
 }
 
 /**
@@ -639,6 +776,79 @@ export function detectBlackHoleErrors(
   // same pattern as Mitigation detection, since it depends on cross-pull
   // analysis rather than single-pull debuff data.
 
+  // ── Lane-level checks: tether steals and tether cleaves ─────────────────
+  //
+  // See buildTetherLaneMap's comment. Both run before the per-moment role-band
+  // check below and record the (player, moment) pairs that check must stay
+  // quiet about, because in both shapes the players it would name are the
+  // victims rather than the cause.
+  const lanes = buildTetherLaneMap(players, burstTimestamp);
+  const laneVictims = new Set<string>();  // "moment:actorId" the role-band check must skip
+
+  for (const moment of [...lanes.byMoment.keys()].sort((a, b) => a - b)) {
+    const momentTimestamp = burstTimestamp + TETHER_MOMENT_OFFSETS_MS[moment - 1];
+    if (isCompromisedMoment(momentTimestamp)) continue;
+
+    for (const { instance, robbed, takers } of stolenLanesAt(lanes, moment)) {
+      // The robbed player's own shortfall is reported by
+      // blackhole-strategy.ts's Missed Assigned Tether check, which defers to
+      // this rule when a taker is identified — see detectMissedAssignedTetherErrors.
+      laneVictims.add(`${moment}:${robbed.actorId}`);
+
+      // Whoever was left holding their own already-complete lane at this
+      // moment is the other victim: nobody came to relieve them, so their
+      // extra hit is the steal's fallout, not a tether they took.
+      for (const [otherInstance, holders] of lanes.byMoment.get(moment) ?? []) {
+        if (otherInstance === instance) continue;
+        for (const p of holders) {
+          if (lanes.instanceHeld.get(`${moment - 1}:${p.actorId}`) === otherInstance) {
+            laneVictims.add(`${moment}:${p.actorId}`);
+          }
+        }
+      }
+
+      for (const taker of takers) {
+        errors.push({
+          ruleId:      BLACKHOLE_STOLE_TETHER_RULE_ID,
+          severity:    "Major",
+          name:        "Stole a Teammate's Black Hole Tether",
+          description: `Took over ${robbed.name}'s tether at moment #${moment} instead of the lane that was finishing — ${robbed.name} was left one hit short, and the teammate who should have been relieved had to eat an extra Nothingness.`,
+          timestamp:   momentTimestamp,
+          player:      taker.name,
+          class:       taker.className,
+          specId:      taker.specId,
+          role:        taker.role,
+          abilityId:   NOTHINGNESS_ABILITY_ID,
+          abilityName: "Nothingness",
+        });
+      }
+    }
+
+    for (const [, caught] of cleavedInstancesAt(lanes, moment)) {
+      // The tether belongs to whoever's own role band covers this moment;
+      // everyone else it touched was standing where they were supposed to be
+      // and is pure fallout.
+      const holder = caught.find((p) => assignments?.get(p.actorId)?.allowedMoments.has(moment));
+      if (!holder) continue; // can't tell whose tether it was — stay silent rather than guess
+      const cleaved = caught.filter((p) => p.actorId !== holder.actorId);
+      for (const p of cleaved) laneVictims.add(`${moment}:${p.actorId}`);
+
+      errors.push({
+        ruleId:      BLACKHOLE_TETHER_CLEAVED_RULE_ID,
+        severity:    "Major",
+        name:        "Tether Cleaved the Party",
+        description: `Held tether #${moment} but didn't walk it clear of the group — it also caught ${cleaved.map((p) => p.name).join(", ")}, burning hits none of them were due and leaving the rest of the schedule unresolvable.`,
+        timestamp:   momentTimestamp,
+        player:      holder.name,
+        class:       holder.className,
+        specId:      holder.specId,
+        role:        holder.role,
+        abilityId:   NOTHINGNESS_ABILITY_ID,
+        abilityName: "Nothingness",
+      });
+    }
+  }
+
   // ── Individual check: hit at a moment outside the player's schedule ─────
   for (const player of players) {
     const assignment = assignments?.get(player.actorId);
@@ -657,6 +867,7 @@ export function detectBlackHoleErrors(
       if (assignment.allowedMoments.has(moment)) continue;
       if (flaggedMoments.has(moment)) continue;
       if (isCompromisedMoment(e.timestamp)) continue;
+      if (laneVictims.has(`${moment}:${player.actorId}`)) continue; // fallout of a steal/cleave, already attributed
 
       flaggedMoments.add(moment);
       errors.push({

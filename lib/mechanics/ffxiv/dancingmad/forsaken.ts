@@ -2057,7 +2057,27 @@ function detectWrongTowerPositionErrors(
         // (Skipped when the cone-bait overlap above already fired — both
         // rules blame the holder for the same misplaced plant, and the
         // overlap is the more specific diagnosis.)
-        if (volleyVictims !== undefined && volleyVictims.size < 3 && !partnerDeath && !overlappedConeBait) {
+        // An UNINVITED third body in this same tower makes the headcount
+        // unreadable: the intruder both crowds the plant and (being an extra
+        // target for the resolution) changes who the volley lands on, so a
+        // short count no longer proves the holder planted badly. The
+        // intruder is already flagged by FORSAKEN_EXTRA_PLAYER_RULE_ID and
+        // is the root cause; blaming the holder on top of that is exactly
+        // the fallout-blaming lib/mechanics/README.md rule 1 forbids.
+        // Confirmed false positive (2026-08-10, report PM8HY9nJ7kTR4tdQ pull
+        // 9, tower #1): Sachi Gaen stood in a tower that already had its two
+        // soakers, and Sonder Dreams' stack then fired on only 2 people —
+        // per the user, "Sonder is properly positioned for the stack; it was
+        // Sachi being in the incorrect position that caused the stack to
+        // fail."
+        const crowdedByIntruder = errors.some(
+          (e) =>
+            e.ruleId === FORSAKEN_EXTRA_PLAYER_RULE_ID &&
+            e.timestamp === reportTimestamp &&
+            (towerLabel === "" || e.description.includes(towerLabel))
+        );
+
+        if (volleyVictims !== undefined && volleyVictims.size < 3 && !partnerDeath && !overlappedConeBait && !crowdedByIntruder) {
           errors.push({
             ruleId:      FORSAKEN_STACK_MISSED_RULE_ID,
             severity:    "Major",

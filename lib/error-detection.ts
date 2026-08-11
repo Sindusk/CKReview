@@ -95,12 +95,46 @@ function evaluateDamageRule(rule: PullErrorRule, player: PlayerInfo): PullError[
   return results;
 }
 
+// A debuff that gets rapidly re-applied (remove/apply within the same burst)
+// sometimes loses its causeAbilityId on the later applications — FFLogs only
+// reports extraAbilityGameID on some of them. Observed on Dancing Mad's
+// Damage Down (PM8HY9nJ7kTR4tdQ pull 23: three All Things Ending
+// re-applications 100ms apart, the middle one with no cause at all). Without
+// this, a cause-based exclusion silences two of the three and lets the
+// orphan through as a phantom error, so an apply with no cause of its own
+// inherits the preceding apply's cause when it lands inside the burst window.
+const DEBUFF_CAUSE_CARRY_FORWARD_MS = 2000;
+
+function resolveDebuffCauseIds(applications: PlayerEvent[]): (number | undefined)[] {
+  let lastCause: number | undefined;
+  let lastCauseAt = -Infinity;
+
+  return applications.map((e) => {
+    if (e.causeAbilityId !== undefined) {
+      lastCause = e.causeAbilityId;
+      lastCauseAt = e.timestamp;
+      return e.causeAbilityId;
+    }
+    return e.timestamp - lastCauseAt <= DEBUFF_CAUSE_CARRY_FORWARD_MS ? lastCause : undefined;
+  });
+}
+
 function evaluateDebuffAppliedRule(rule: PullErrorRule, player: PlayerInfo): PullError[] {
   if (isRoleExcluded(rule, player.role)) return [];
 
-  const applications = player.debuffs.filter(
+  const allApplications = player.debuffs.filter(
     (e) => e.abilityId === rule.abilityId && e.debuffStatus === "applied"
   );
+
+  // Applications caused by an ability on the rule's blameless list aren't the
+  // recipient's mistake — see PullErrorRule.excludeCauseAbilityIds.
+  const causeIds = resolveDebuffCauseIds(allApplications);
+  const applications = rule.excludeCauseAbilityIds
+    ? allApplications.filter((_, i) => {
+        const cause = causeIds[i];
+        return cause === undefined || !rule.excludeCauseAbilityIds!.includes(cause);
+      })
+    : allApplications;
 
   return applications.map((e) => ({
     ruleId:      rule.id,

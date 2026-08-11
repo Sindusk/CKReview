@@ -139,6 +139,18 @@ export const ERROR_RULES: PullErrorRule[] = [
 
   // ── FFXIV ────────────────────────────────────────────────────────────────
 
+  // Abilities whose Damage Down is NOT the recipient's fault. Damage Down is
+  // normally a reliable "you personally missed a mechanic" marker, which is
+  // why the rule below fires on the debuff itself rather than on any specific
+  // attack — but a few Dancing Mad abilities hand it out as an unavoidable
+  // raid-wide consequence of something else going wrong, and blaming whoever
+  // caught it violates the root-cause rule (lib/mechanics/README.md).
+  // Confirmed in report PM8HY9nJ7kTR4tdQ during VOD review:
+  //   pull 1  — White Hole blanketed 6 players at once
+  //   pull 9  — The River of Light, raid-wide
+  //   pull 23 — All Things Ending (two IDs, one per boss copy)
+  // The underlying failure still surfaces through whatever mechanic module
+  // owns it; only the derivative Damage Down is silenced.
   {
     id:          "ffxiv-damage-down",
     game:        "ffxiv",
@@ -147,6 +159,12 @@ export const ERROR_RULES: PullErrorRule[] = [
     description: "Received the Damage Down debuff — a mechanic was missed or failed.",
     trigger:    "debuffApplied",
     abilityId:   1002911,          // Damage Down
+    excludeCauseAbilityIds: [
+      48486,   // White Hole
+      47807,   // The River of Light
+      47836,   // All Things Ending (Exdeath)
+      47837,   // All Things Ending (Chaos)
+    ],
   },
 
   // ── Raid-wide errors (severity: "Raid") ─────────────────────────────────

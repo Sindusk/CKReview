@@ -1358,7 +1358,15 @@ const CONFETTI_MIN_DIST_FOR_BEARING_CENTIYALMS = 150;
 // (Archidel ~257) rather than hugging it — this check now only exists to
 // catch someone genuinely standing on top of the boss, not to split hairs
 // on a few dozen centiyalms.
-const CONFETTI_STACK_OVERSHOOT_TOLERANCE_CENTIYALMS  = 400;
+//
+// Widened once more (2026-08-10, report PM8HY9nJ7kTR4tdQ pull 14) from 400
+// to 430: Archidel Del'archi read ~920 and the user confirmed him clean —
+// "he slidecasted into a reasonable position right as the explosion went
+// off, and was sent to the other side of the arena properly." That makes
+// ~920 the new widest confirmed-clean overshoot; the nearest confirmed
+// FAILURE is still Ayumi Emi's ~1012 (Q3GzJNZg64k1hLRm pull 18), so the
+// ceiling sits at 930 — above every clean sample, below every failure.
+const CONFETTI_STACK_OVERSHOOT_TOLERANCE_CENTIYALMS  = 430;
 const CONFETTI_STACK_UNDERSHOOT_TOLERANCE_CENTIYALMS = 350;
 
 // How long before the knockback's own damage lands its interpolated
@@ -1617,6 +1625,26 @@ const TELE_TROUNCING_BAIT_RADIUS_THRESHOLD_YALMS = 17.7;
 // retracted-swap note for the same caveat applied to bait spot/bearing).
 const TELE_TROUNCING_BAIT_MIN_RADIUS_THRESHOLD_YALMS = 6.5;
 
+// How much CLOSER a melee has to be to another melee than to their own
+// ranged partner before the cross-latch risk is real. The check used to be a
+// bare `nearestOtherDist < ownPartnerDist`, which turns a symmetric-by-design
+// formation into a coin flip: with all four melee spaced evenly around the
+// ring, whichever pair happens to be a few dozen centi-yalms tighter that
+// frame gets flagged, and the "risk" is nothing a Confusion would actually
+// act on.
+//
+// Confirmed false positives (2026-08-10, report PM8HY9nJ7kTR4tdQ): pull 4
+// Ayumi Emi (partner 9.8y vs 9.5y — a 0.3y margin), pull 9 Archidel
+// Del'archi (10.6 vs 10.4 — 0.2y), pull 19 Ayumi Emi (10.0 vs 9.5 — 0.5y).
+// In pulls 4 and 19 the user was explicit that the RANGED player's spot was
+// fine and the melee (Sayacissa Morsaelth, too close to the boss) was the
+// real problem — already caught by TELE_TROUNCING_BAIT_MIN_RADIUS_THRESHOLD_
+// YALMS. Widest confirmed clean margin 0.7y (pull 22, Azura Salus, 6.6 vs
+// 5.9 — same shape, unreviewed but indistinguishable); narrowest genuine
+// cross-latch 3.1y (pull 24, Chauzey Solstice, 12.4 vs 9.3), running up to
+// 19.3y in the blatant cases.
+const TELE_TROUNCING_BAIT_CROSS_LATCH_MARGIN_YALMS = 1.5;
+
 // Same clustering window as MYSTERY_MAGIC_VOLLEY_CLUSTER_MS — this pull's
 // own 4 simultaneous deaths landed within 45ms of each other, comfortably
 // inside it.
@@ -1647,6 +1675,47 @@ function predictCornerSlots(d1: Cardinal, d2: Cardinal) {
     ? { x: c.signX * ARROW_GRID_FAR_YALMS, y: c.signY * ARROW_GRID_MID_YALMS }
     : { x: c.signX * ARROW_GRID_MID_YALMS, y: c.signY * ARROW_GRID_FAR_YALMS };
   return { cornerDir: c.cornerDir, cornerPos, approachDir: c.approachDir, approachPos };
+}
+
+// ── UPTIME ARROWS (confirmed 2026-08-10, report PM8HY9nJ7kTR4tdQ) ──────────
+//
+// An advanced variant the raid runs deliberately: instead of parking the
+// corner elbow on the outer ring, the corner player pulls BOTH their arrows
+// one grid cell inward so the loop cuts the corner diagonally, keeping them
+// close enough to the boss to keep attacking through the mechanic. The chain
+// stays unbroken because the two inner cells sit exactly on the path between
+// the edges they join.
+//
+// Confirmed correct (pull 19, Sachi Gaen, SW corner — the user: "the Uptime
+// Arrows was executed correctly, the chain remained unbroken, even though it
+// was unorthodox"): the N corner arrow went to (-6,+12) instead of
+// (-12,+12), and the W approach arrow to (-6,+6) instead of (-6,+12).
+// Reading the whole ring that pull confirms the loop: the S edge runs west
+// through (0,+12), turns north at Sachi's (-6,+12), west again at his
+// (-6,+6), and rejoins the W edge at Kup'o Noodles' (-12,+6).
+//
+// **Only the NE and SW corners may do this** — per the user, "that cannot be
+// done in the northwest or southeast." Confirmed by the counter-example
+// (pull 24, Sachi Gaen again, SE corner): the same maneuver in the SE is a
+// Major error and must keep flagging. So this table covers exactly two of
+// the four corners; NW/SE fall through to the standard slots only.
+//
+// Both legal corners collapse to the same formula — corner arrow at
+// (6·signX, 12·signY), approach arrow at (6·signX, 6·signY) — SW derived
+// from the pull-19 sample above, NE by mirror symmetry through arena center.
+const ARROW_UPTIME_CORNER_KEYS: ReadonlySet<string> = new Set(["E,S", "N,W"]); // NE and SW
+
+function predictUptimeCornerSlots(d1: Cardinal, d2: Cardinal) {
+  const key = [d1, d2].sort().join(",");
+  if (!ARROW_UPTIME_CORNER_KEYS.has(key)) return null;
+  const c = ARROW_CORNER_TABLE[key];
+  if (!c) return null;
+  return {
+    cornerDir:   c.cornerDir,
+    cornerPos:   { x: c.signX * ARROW_GRID_MID_YALMS, y: c.signY * ARROW_GRID_FAR_YALMS } as Point,
+    approachDir: c.approachDir,
+    approachPos: { x: c.signX * ARROW_GRID_MID_YALMS, y: c.signY * ARROW_GRID_MID_YALMS } as Point,
+  };
 }
 
 // A "double-D" player's 2 arrows fill whichever 2 of D's edge's 3 middle
@@ -3001,6 +3070,31 @@ const GRAVEN_2_PUDDLE_LINGER_DISPLACEMENT_CENTIYALMS = 50;
 // Del'archi, pull 22, ~779.1) — still comfortably clear.
 const GRAVEN_2_PUDDLE_LINGER_DISPLACEMENT_EIGHT_STACK_CENTIYALMS = 750;
 
+// The absolute floors above turned out not to be separable on their own: the
+// eight-stack one has a confirmed FAILURE at ~634 centiyalms
+// (h2JvDkntZCaBgmLF pull 25, Azura Salus) and a confirmed CLEAN reading at
+// ~657/660 (2026-08-10, report PM8HY9nJ7kTR4tdQ pull 10, Sayacissa Morsaelth
+// and Sonder Dreams — the user: "This is incorrect and a false positive").
+// Twenty-five centiyalms apart, in opposite directions: no threshold exists.
+//
+// What DOES separate them is how far the rest of the raid moved on that same
+// puddle drop. How much distance "getting out" takes depends on where the
+// puddle landed and how much room the spread had, and every player on the
+// drop faces the same version of that problem — so the raid's own median
+// displacement is the natural yardstick, the same relative-to-the-cluster
+// framing wave-cannon.ts adopted for its own overlap attribution.
+//
+//   report / pull            flagged (ratio)        nearest clean (ratio)
+//   PM8HY9nJ7kTR4tdQ p10     71 (0.10), 89 (0.12)   657 (0.90)
+//   h2JvDkntZCaBgmLF p22     459 (0.49)             779 (0.83)
+//   h2JvDkntZCaBgmLF p25     634 (0.63), 728 (0.72) 859 (0.85)
+//
+// Worst confirmed failure 0.72, best confirmed clean 0.83. This gate is
+// applied ON TOP of the absolute floors, never instead of them, so it can
+// only ever remove a flag — a pull where the whole raid genuinely fails to
+// move keeps behaving exactly as before.
+const GRAVEN_2_PUDDLE_LINGER_MEDIAN_FRACTION = 0.78;
+
 /**
  * Detects a Graven 2 player who never left the Gravitas puddle after it
  * landed, their continued presence detonating it. See module header for
@@ -3064,16 +3158,30 @@ function detectGraven2PuddleLingerErrors(players: PlayerInfo[], enemyCasts: Enem
     ? GRAVEN_2_PUDDLE_LINGER_DISPLACEMENT_EIGHT_STACK_CENTIYALMS
     : GRAVEN_2_PUDDLE_LINGER_DISPLACEMENT_CENTIYALMS;
 
-  const errors: PullError[] = [];
+  const displacementByPlayer = new Map<string, number>();
   for (const drop of dropPosByPlayer.values()) {
     const currentPos = findPlayerPosition(drop.player, explosionCastTime, {
       windowMs:  GRAVEN_2_PUDDLE_LINGER_POSITION_WINDOW_MS,
       direction: "atOrBefore",
     });
     if (!currentPos) continue; // no reliably-recent position — fail closed, don't guess
+    displacementByPlayer.set(drop.player.name, distanceBetween({ x: drop.x, y: drop.y }, currentPos));
+  }
+  if (displacementByPlayer.size === 0) return [];
 
-    const displacement = distanceBetween({ x: drop.x, y: drop.y }, currentPos);
+  // See GRAVEN_2_PUDDLE_LINGER_MEDIAN_FRACTION — how far everyone else got
+  // out is the yardstick for whether this player moved.
+  const sorted = [...displacementByPlayer.values()].sort((a, b) => a - b);
+  const median = sorted.length % 2
+    ? sorted[(sorted.length - 1) / 2]
+    : (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2;
+
+  const errors: PullError[] = [];
+  for (const drop of dropPosByPlayer.values()) {
+    const displacement = displacementByPlayer.get(drop.player.name);
+    if (displacement === undefined) continue;
     if (displacement >= displacementThreshold) continue;
+    if (median > 0 && displacement / median >= GRAVEN_2_PUDDLE_LINGER_MEDIAN_FRACTION) continue;
 
     errors.push({
       ruleId:      GRAVEN_2_PUDDLE_LINGER_RULE_ID,
@@ -3375,6 +3483,21 @@ function detectGraven1DeathWipeError(
   // covered by JUMPED_OFF_ARENA_RULE_ID, and has no Graven 1 to ruin.
   const graven1WindowStart = mysteryMagicCasts[0]?.timestamp ?? Infinity;
 
+  // A Wave Cannon tower going UNSOAKED because someone took two of them
+  // ends Graven 1 on the spot — there is no way back from a missing tower,
+  // and everything the raid does afterwards is already-doomed flailing. Per
+  // the user (2026-08-10, report PM8HY9nJ7kTR4tdQ pull 21, Sachi Gaen):
+  // "This should have instantly triggered Graven 1 Wipe immediately after
+  // the error instead of multiple additional errors being detected before
+  // the raid error was added." Anchoring here moves the cutoff from the
+  // eventual deaths (51.1s that pull) up to the overlap itself (47.2s), so
+  // the four Confetti flags in between fall outside the cutoff instead of
+  // reading as fresh mistakes. Only used when it is EARLIER than the
+  // death-derived cutoff below — a late overlap never delays the wipe.
+  const towerOverlap = otherPhase1Errors
+    .filter((e) => e.ruleId === WAVE_CANNON_TOWER_OVERLAP_RULE_ID)
+    .sort((a, b) => a.timestamp - b.timestamp)[0];
+
   const mysteryMagicDeaths = deathEvents.filter(
     (d) =>
       MYSTERY_MAGIC_DEATH_ABILITY_IDS.has(d.killingAbilityGameId) ||
@@ -3408,16 +3531,22 @@ function detectGraven1DeathWipeError(
     (e) => e.severity === "Major" && e.timestamp >= firstDeathTime - MYSTERY_MAGIC_VOLLEY_CLUSTER_MS && e.timestamp <= clusterEnd
   );
 
-  const cutoff = jumpAnchored
+  const deathCutoff = jumpAnchored
     ? firstDeathTime
     : Math.max(...clusterDeaths.map((d) => d.timestamp), ...clusterMajors.map((e) => e.timestamp));
+
+  // See the towerOverlap comment above.
+  const overlapAnchored = towerOverlap !== undefined && towerOverlap.timestamp < deathCutoff;
+  const cutoff = overlapAnchored ? towerOverlap!.timestamp : deathCutoff;
 
   const victims = [...new Set(clusterDeaths.map((d) => d.player))];
   const diedToWaveCannon = clusterDeaths.some(
     (d) => d.killingAbilityGameId === WAVE_CANNON_ABILITY_ID || d.killingAbilityGameId === WAVE_CANNON_TOWER_ABILITY_ID
   );
 
-  const description = jumpAnchored
+  const description = overlapAnchored
+    ? `${towerOverlap!.player} soaked more than one Wave Cannon tower, leaving another unsoaked — Graven 1 can't resolve from here, so this is treated as a cutoff point for further per-player analysis this pull.`
+    : jumpAnchored
     ? `${victims.join(" and ")} jumped off the arena during Graven 1 — Wave Cannon needs all 8 players alive to resolve, so this is treated as a cutoff point for further per-player analysis this pull.`
     : diedToWaveCannon
     ? `${victims.join(" and ")} died to Wave Cannon before Graven 1 could fully resolve — needs all 8 players alive to reach Wave Cannon and Confetti, so this is treated as a cutoff point for further per-player analysis this pull.`
@@ -3431,7 +3560,7 @@ function detectGraven1DeathWipeError(
       description,
       timestamp:   cutoff + 1,
       abilityId:   0,
-      abilityName: diedToWaveCannon ? "Wave Cannon" : "Mystery Magic",
+      abilityName: overlapAnchored || diedToWaveCannon ? "Wave Cannon" : "Mystery Magic",
     },
   ];
 }
@@ -3953,8 +4082,27 @@ function detectTeleTrouncingArrowErrors(players: PlayerInfo[]): PullError[] {
       flagIfOutOfPosition(a1, p1, ARROW_DOUBLE_OUT_OF_POSITION_THRESHOLD_YALMS);
       flagIfOutOfPosition(a2, p2, ARROW_DOUBLE_OUT_OF_POSITION_THRESHOLD_YALMS);
     } else {
-      const predicted = predictCornerSlots(a1.dir, a2.dir);
-      if (!predicted) continue; // not a valid clockwise-adjacent pair — unexpected data, skip
+      const standard = predictCornerSlots(a1.dir, a2.dir);
+      if (!standard) continue; // not a valid clockwise-adjacent pair — unexpected data, skip
+
+      // NE/SW corners may legally run the inward "uptime" variant (see
+      // predictUptimeCornerSlots) — judge the pair against whichever legal
+      // layout it actually fits, so a correct uptime placement reads as
+      // clean instead of ~6 yalms off the standard corner.
+      // The uptime layout is only accepted when BOTH arrows land cleanly on
+      // it — not merely closer to it than to the standard slots. A pair
+      // that's simply lost can score better against the inner cells purely
+      // by being nearer the middle of the arena, and letting a best-fit win
+      // there would rewrite (and in one case downgrade) genuine failures
+      // across the sample set. Confirmed uptime placement is exact: pull
+      // 19's two arrows sit 0.1 and 0.2 yalms off their inner cells.
+      const uptime = predictUptimeCornerSlots(a1.dir, a2.dir);
+      const fitsCleanly = (layout: NonNullable<typeof standard>) =>
+        [a1, a2].every(
+          (arrow) => pointDistance(arrow.pos, arrow.dir === layout.cornerDir ? layout.cornerPos : layout.approachPos) <= ARROW_OUT_OF_POSITION_THRESHOLD_YALMS
+        );
+      const predicted = uptime && fitsCleanly(uptime) ? uptime : standard;
+
       for (const arrow of [a1, a2]) {
         const expected = arrow.dir === predicted.cornerDir ? predicted.cornerPos : predicted.approachPos;
         flagIfOutOfPosition(arrow, expected, ARROW_OUT_OF_POSITION_THRESHOLD_YALMS, ARROW_MINOR_OUT_OF_POSITION_THRESHOLD_YALMS);
@@ -4148,9 +4296,6 @@ function detectGraven3StackErrors(players: PlayerInfo[], deathEvents: DeathEvent
     }
     if (!best || best.length < GRAVEN_3_STACK_GROUP_MIN_SIZE) continue; // not an unambiguous stack signature
 
-    const anyDied = best.some((g) => diedToResolution(g.player.name, g.timestamp));
-    if (!anyDied) continue; // stack held up (or the miss wasn't lethal) — nothing to flag
-
     const anchorX = best.reduce((sum, g) => sum + g.x, 0) / best.length;
     const anchorY = best.reduce((sum, g) => sum + g.y, 0) / best.length;
     const anchorTimestamp = Math.max(...best.map((g) => g.timestamp));
@@ -4169,6 +4314,8 @@ function detectGraven3StackErrors(players: PlayerInfo[], deathEvents: DeathEvent
     // well before the cast, while a late arrival's nearest-before-the-HIT
     // sample is too dense/recent to recover their true lateness — only a
     // cast-anchored read does.
+    type Candidate = { player: PlayerInfo; distance: number; caught: boolean };
+    const candidates: Candidate[] = [];
     for (const player of members) {
       const pos = findPlayerPosition(player, graven3CastTime, { windowMs: GRAVEN_3_STACK_POSITION_WINDOW_MS, direction: "atOrBefore" });
       if (!pos) continue; // can't confirm they were actually away — fail closed, don't guess
@@ -4176,6 +4323,52 @@ function detectGraven3StackErrors(players: PlayerInfo[], deathEvents: DeathEvent
       const distance = distanceBetween(pos, { x: anchorX, y: anchorY });
       if (distance < GRAVEN_3_STACK_OUT_OF_POSITION_CENTIYALMS) continue; // within normal jitter
 
+      candidates.push({ player, distance, caught: best.some((g) => g.player.actorId === player.actorId) });
+    }
+    if (candidates.length === 0) continue;
+
+    // OUTCOME GATE — the death that proves the split failed has to belong to
+    // someone who did their job. This rule's whole premise is "you split the
+    // hit fewer ways and it overkilled your teammates"; if the only casualty
+    // is a candidate themselves, nobody else was hurt by the split and all
+    // that's been shown is that one player was low on HP.
+    //
+    // Confirmed false positive (2026-08-10, report PM8HY9nJ7kTR4tdQ pull 1):
+    // all four DPS shared the resolution's own instance in a tight ~1.6y
+    // cluster and the user confirmed from the VOD that the stack resolved
+    // correctly — but Ayumi Emi (still 9.7y out at the cast, converging) and
+    // Sachi Gaen (5.5y) were both flagged because Ayumi died. Her hit was the
+    // SMALLEST of the four (68k against 139-163k for the rest), i.e. the exact
+    // opposite of an under-split — she simply entered the resolution low.
+    // Excluding candidates' own deaths clears the whole side, while the
+    // confirmed real failures still pass the gate on non-candidate deaths
+    // (h2JvDkntZCaBgmLF pulls 27/28: Azura Salus and Archidel Del'archi both
+    // stacked correctly and both died).
+    const candidateIds = new Set(candidates.map((c) => c.player.actorId));
+    const bystanderDied = best.some(
+      (g) => !candidateIds.has(g.player.actorId) && diedToResolution(g.player.name, g.timestamp)
+    );
+    if (!bystanderDied) continue;
+
+    // ABSENT BEATS LATE — process of elimination (see lib/mechanics/README.md
+    // rule 5). When one candidate never reached the resolution at all while
+    // another was merely still converging at the cast but DID get caught by
+    // the group's own instance, the split failed because of the absentee, and
+    // the late-but-present teammate is not independently at fault.
+    //
+    // Confirmed false positive (2026-08-10, PM8HY9nJ7kTR4tdQ pull 4, Support
+    // side): Kup'o Noodles never took Flagrant Fire III at all (16.8y out) and
+    // is the real miss; Archidel Del'archi read 8.3y at the cast but arrived,
+    // shared instance 2, and ate his quarter of the hit — the user confirmed
+    // "Archidel did make it to the stack and got hit by Flagrant Fire III."
+    // This deliberately does NOT clear a caught-but-late player when there is
+    // no absentee to pin it on — h2JvDkntZCaBgmLF pull 28's Salty Dango
+    // dashed in during the last ~800ms with the Support side otherwise at
+    // full headcount, and stays flagged.
+    const absentees = candidates.filter((c) => !c.caught);
+    const blamed = absentees.length > 0 ? absentees : candidates;
+
+    for (const { player, distance } of blamed) {
       // A late arrival can still share the group's own hit instance (see
       // comment above) — exclude them from their own "overkilling ___"
       // list.
@@ -4350,7 +4543,7 @@ function detectTeleTrouncingBaitPositionErrors(players: PlayerInfo[], enemyCasts
 
     const reading = readings.get(meleeSlot);
     const otherMelee = reading?.nearestOtherSlot ? bySlot.get(reading.nearestOtherSlot) : undefined;
-    const crossLatch = !!reading && reading.nearestOtherSlot !== null && reading.nearestOtherDist < reading.ownPartnerDist && !!otherMelee;
+    const crossLatch = !!reading && reading.nearestOtherSlot !== null && reading.nearestOtherDist < reading.ownPartnerDist - TELE_TROUNCING_BAIT_CROSS_LATCH_MARGIN_YALMS && !!otherMelee;
 
     if (!tooFar && !crossLatch) continue;
 
@@ -4363,7 +4556,7 @@ function detectTeleTrouncingBaitPositionErrors(players: PlayerInfo[], enemyCasts
       // their own ranged partner — the confirmed pull-10 shape (2 melees
       // drifting toward each other, killing each other with basic attacks).
       const otherReading = readings.get(reading.nearestOtherSlot!);
-      const mutual = !!otherReading && otherReading.nearestOtherSlot === meleeSlot && otherReading.nearestOtherDist < otherReading.ownPartnerDist;
+      const mutual = !!otherReading && otherReading.nearestOtherSlot === meleeSlot && otherReading.nearestOtherDist < otherReading.ownPartnerDist - TELE_TROUNCING_BAIT_CROSS_LATCH_MARGIN_YALMS;
 
       parts.push(
         `${melee.name} was ${reading.ownPartnerDist.toFixed(1)} yalms from them, but only ${reading.nearestOtherDist.toFixed(1)} yalms from ${otherMelee.name} — ` +
@@ -4453,6 +4646,7 @@ export function detectPhase1Errors(
   const revoltingRuinThreatLossErrors = detectRevoltingRuinThreatLossErrors(players, deathEvents);
   const graven2SpreadMisplacedErrors = detectGraven2SpreadMisplacedErrors(players);
   const graven2PuddleSoakMissedErrors = detectGraven2PuddleSoakMissedErrors(players, deathEvents);
+  const waveCannonTowerOverlapErrors = detectWaveCannonTowerOverlapErrors(players, deathEvents);
 
   return [
     ...revoltingRuinThreatLossErrors,
@@ -4461,7 +4655,7 @@ export function detectPhase1Errors(
     ...detectHyperdriveOutOfPositionErrors(players, deathEvents),
     ...blizzardIIISilentKillErrors,
     ...detectJumpedOffArenaError(players, deathEvents),
-    ...detectWaveCannonTowerOverlapErrors(players, deathEvents),
+    ...waveCannonTowerOverlapErrors,
     ...detectWaveCannonTowerMissedErrors(players, deathEvents, enemyCasts),
     ...detectWaveCannonSupportPriorityErrors(players, deathEvents, enemyCasts),
     ...detectWaveCannonDpsPriorityErrors(players, deathEvents, enemyCasts),
@@ -4471,7 +4665,7 @@ export function detectPhase1Errors(
     ...detectGraven2PuddleProximityErrors(players, deathEvents, enemyCasts),
     ...graven2PuddleSoakMissedErrors,
     ...detectGravitationalExplosionWipeError(enemyCasts),
-    ...detectGraven1DeathWipeError(deathEvents, enemyCasts, blizzardIIISilentKillErrors),
+    ...detectGraven1DeathWipeError(deathEvents, enemyCasts, [...blizzardIIISilentKillErrors, ...waveCannonTowerOverlapErrors]),
     ...graven2SpreadMisplacedErrors,
     ...detectGraven2DeathWipeError(players, deathEvents, enemyCasts, [...graven2SpreadMisplacedErrors, ...graven2PuddleSoakMissedErrors]),
     ...detectConfettiLostError(players, deathEvents),

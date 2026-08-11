@@ -310,8 +310,21 @@ function buildOverlapClusters(
 // — see module header. The ratio alone would flag e.g. 0.3y vs 0.6y
 // (technically 2x, but both are fine); the absolute floor alone would flag
 // a whole cluster that's uniformly a few yalms off together.
-const CULPRIT_MARGIN_RATIO = 2;
-const CULPRIT_MARGIN_ABS_CENTIYALMS = 100;
+//
+// Both loosened slightly 2026-08-10 (report PM8HY9nJ7kTR4tdQ pull 11): one
+// beam caught Sonder Dreams (~0.6y off his learned spot) and Sachi Gaen
+// (~1.2y off), and per the user "Sachi is too close to Sonder for Wave
+// Cannon and ends up overlapping as a result, getting a vulnerability from
+// Sonder's Wave Cannon" — a Major error. The pair missed BOTH old margins by
+// a hair (58 centiyalms of separation against a 100 floor; a 1.98x ratio
+// against 2x), so the culprit went unnamed even though the overlap itself
+// was detected. Note how small the absolute numbers are here: this report's
+// learned Samurai and Reaper spots sit only ~6.5y apart to begin with, so a
+// single yalm of drift is enough to merge the two beams. That is exactly the
+// case relative attribution exists for, and it is why these margins are
+// ratios-plus-floor rather than a fixed distance.
+const CULPRIT_MARGIN_RATIO = 1.9;
+const CULPRIT_MARGIN_ABS_CENTIYALMS = 50;
 
 // Only the worst-deviating cluster member(s) flag, not everyone who merely
 // clears the margin over the baseline — confirmed necessary (Q3GzJNZg64k1hLRm

@@ -99,7 +99,19 @@ every mechanic, in every game. When in doubt, come back here.
 7. **Narrow overrides over wholesale replacement.** When a working check
    fails for one specific case, add a narrow override for that case — do not
    swap the whole mechanism for a new one that handles the exception.
-8. **Raid-severity descriptions shouldn't assert a definitive outcome like
+8. **A ruling's `mechanic` is the HARNESS key, not the ruleId's prefix.**
+   Several rules are namespaced `ffxiv-phase1-*` but are emitted by a
+   different runner (every `ffxiv-phase1-wave-cannon-*` error comes from the
+   `wave-cannon` mechanic, not `phase1`). A ruling scoped to the wrong
+   mechanic silently matches nothing and fails as a phantom violation —
+   check `--list` and the actual run output, not the ruleId.
+9. **Pin a `mustNotFlag` tightly enough that it can't swallow a real error.**
+   A player-only matcher forbids EVERY firing of that rule for that player in
+   that pull. When the same rule legitimately fires again later (Dancing
+   Mad's Damage Down does this constantly — a blameless raid-wide one
+   followed seconds later by a real personal one), add `t` so the ruling
+   pins the specific occurrence the user adjudicated.
+10. **Raid-severity descriptions shouldn't assert a definitive outcome like
    "the raid wiped."** A raid can rez and keep pushing prog past a mistake
    this severe even though detection treats it as a cutoff point for further
    per-player analysis (confirmed 2026-07-30, Dancing Mad report
@@ -268,7 +280,10 @@ identify WHERE it's missing:
   `fetch-wow-report.js` (auth: `.credentials/`, see script headers).
   Re-fetching is cheap; don't hand-edit captures.
 - `scripts/validate.js` is THE regression harness — one script, all
-  mechanics: `node scripts/validate.js [mechanic ...] [reportDir ...]`
+  mechanics (plus a `rules` entry that runs the declarative
+  `lib/error-rules.ts` table through `detectPullErrors`, so single-ability
+  rules get the same snapshot coverage the correlation modules have):
+  `node scripts/validate.js [mechanic ...] [reportDir ...]`
   (`--list` prints mechanic names; no args = everything). It auto-discovers
   all report folders (any subdirectory containing `meta.json`) and rebuilds
   `PlayerInfo[]`/`DeathEvent[]`/etc. the same way the live pipeline does,

@@ -63,6 +63,7 @@ import {
   buildAssignments,
   momentIndexFor,
   isCompromisedMoment,
+  robbedTetherMoments,
   NOTHINGNESS_ABILITY_ID,
   TETHER_MOMENT_OFFSETS_MS,
   type LineNumber,
@@ -425,6 +426,13 @@ export function detectMissedAssignedTetherErrors(pull: Pull, strategy: BlackHole
 
   const errors: PullError[] = [];
 
+  // A shortfall caused by another player physically taking over this
+  // player's lane is that other player's mistake, reported by blackhole.ts's
+  // BLACKHOLE_STOLE_TETHER_RULE_ID — the assigned player was in position and
+  // owed the hit, so flagging them here too would double-blame the victim.
+  // Confirmed 2026-08-10 (report PM8HY9nJ7kTR4tdQ pulls 1 and 25, moment 8).
+  const robbed = robbedTetherMoments(pull.players, burstTimestamp);
+
   for (const [named, moments] of schedule) {
     const player = pull.players.find((p) => p.name === named.name);
     if (!player) continue;
@@ -440,6 +448,7 @@ export function detectMissedAssignedTetherErrors(pull: Pull, strategy: BlackHole
       const momentTimestamp = burstTimestamp + TETHER_MOMENT_OFFSETS_MS[moment - 1];
       if (isCompromisedMoment(pull.deathEvents, momentTimestamp)) continue;
       if (isDeadAtMoment(pull, player.name, momentTimestamp)) continue;
+      if (robbed.has(`${moment}:${player.name}`)) continue; // taken off them — see robbedTetherMoments
 
       errors.push({
         ruleId:      BLACKHOLE_MISSED_ASSIGNED_RULE_ID,

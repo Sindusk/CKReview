@@ -200,6 +200,27 @@ const BAIT_TOO_CLOSE_DISTANCE       = 300;
 // groups on this pull's data; see module header's known-limitations note.
 const WRONG_TOWER_ANGLE_TOLERANCE   = 60;
 
+// EVERY TOWER SOAKED => NOBODY PICKED A WRONG TOWER (2026-08-10, report
+// PM8HY9nJ7kTR4tdQ pulls 3 and 16). There is one Stomp-a-Mole tower per
+// player, so when every living player takes a Stomp-a-Mole hit the towers
+// were all covered and the mechanic resolved — whatever a position sample
+// says, no one can have been at the wrong one. This is the outcome gate
+// lib/mechanics/README.md rule 4 calls for, and it is needed because the
+// towers are preceded by a CENTER STACK: a sample taken from that stack (or
+// a stale one that never left it) sits a few dozen units from arena center,
+// where the bearing this check reads is pure noise — a hundred units of
+// jitter swings it through 180°.
+//
+// Confirmed false positives: Archidel Del'archi flagged in both pulls,
+// reading (10098,10056) — 112 units from center — and (9914,10030) — 91
+// units — while the user confirmed from the VOD that he soaked the center
+// stack and then moved out to his own tower with Sayacissa Morsaelth and
+// soaked that too. Both pulls have all 8 players on Stomp-a-Mole. Every
+// confirmed genuine failure keeps flagging, because those pulls left towers
+// empty: LF2yJZabVprjXYvm pull 1 (5 of 8 soaked), pull 3 (5 of 8), and
+// G7kTFVxjcAC6p1MN pull 7 (6 of 8).
+const STOMP_A_MOLE_SOAK_WINDOW_MS = 20000;
+
 const SUPPORT_SLOTS: readonly FFRoleSlot[] = ["MT", "OT", "H1", "H2"];
 const GROUP1_SLOTS:  readonly FFRoleSlot[] = ["MT", "H1", "M1", "R1"];
 
@@ -446,6 +467,16 @@ function detectWrongTowerErrors(
   playerPositionSamples: PlayerPositionSample[]
 ): PullError[] {
   const errors: PullError[] = [];
+
+  // See STOMP_A_MOLE_SOAK_WINDOW_MS: if every player still alive soaked a
+  // tower, the mechanic resolved and nobody was at the wrong one.
+  const living = players.filter((p) => !isDeadBefore(deathEvents, p.name, dropTimestamp));
+  const soaked = living.filter((p) =>
+    p.damageTaken.some(
+      (e) => e.abilityName === STOMP_A_MOLE_ABILITY_NAME && Math.abs(e.timestamp - dropTimestamp) <= STOMP_A_MOLE_SOAK_WINDOW_MS
+    )
+  );
+  if (living.length > 0 && soaked.length === living.length) return [];
 
   for (const player of players) {
     if (isDeadBefore(deathEvents, player.name, dropTimestamp)) continue;

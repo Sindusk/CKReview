@@ -188,6 +188,18 @@ function sortEntries(entries) {
 //   the report itself by code and only works for folders under sampledata/.
 
 const MECHANICS = {
+  // The declarative single-ability table (lib/error-rules.ts) run through the
+  // real evaluator. Not a "mechanic" module, but it produces PullErrors the
+  // same way and had no regression coverage at all before — which mattered
+  // once Damage Down grew a blameless-cause exclusion list.
+  rules: {
+    game: 'ff',
+    load: () => requireTsFromRoot('lib/error-detection.ts'),
+    run({ mod, ctxs }) {
+      for (const c of ctxs) printPullErrors(c, mod.detectPullErrors(c.relPlayers(), c.relDeaths(), c.relEnemyCasts()));
+    },
+  },
+
   forsaken: {
     game: 'ff',
     load: () => requireTsFromRoot('lib/mechanics/ffxiv/dancingmad/forsaken.ts'),
