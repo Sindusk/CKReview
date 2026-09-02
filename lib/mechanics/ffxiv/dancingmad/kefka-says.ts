@@ -435,13 +435,21 @@
 // this check keeps working on captures that predate the enemyDebuffs stream
 // (see lib/ffl-client.ts) — no 1002056 signal required.
 //
-// The log confirms the color rule mechanically rather than by assumption:
-// across all 8 Flood resolutions, the Antilight matching a player's wound
-// deals their FULL health and the opposite color deals a fixed chip amount.
-// Detection deliberately keys on the color relationship rather than on that
-// damage split, because the chip number varies by report (999 in
-// 3MfQX7h29vPV4xYz, 66000 in dQ8wmb1VhKt6yBXk pull 1) while the color
-// relationship does not.
+// Detection keys on the color relationship and deliberately never reads the
+// damage amounts, which turn out to be no signal at all. Across the 8
+// observed Flood resolutions the magnitudes fall into two entirely
+// different regimes:
+//
+//   Beyond Death takes FULL HP, Allagan Field takes 999
+//     3MfQX7h29vPV4xYz p17, dQ8wmb1VhKt6yBXk p2 / p3 / p9
+//   Beyond Death takes 999, Allagan Field takes 66000
+//     Vmbf6WYw3QGcMntx p20, dQ8wmb1VhKt6yBXk p1 / p11 / p15
+//
+// and the regimes do NOT track Flood's real/fake bit (p17 is real and p2 is
+// fake, yet both land in the first group; p20 is real and p11 fake, yet both
+// land in the second). An earlier version of this comment claimed the
+// matching color always deals full health — that held only in the pull it
+// was written from. Anything reading these amounts would be reading noise.
 //
 // ── The confirmed failure ─────────────────────────────────────────────────
 //
