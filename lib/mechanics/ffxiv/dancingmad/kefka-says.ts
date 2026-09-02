@@ -4,10 +4,23 @@
 // document how the wtfdig Kefka Says analyzer determines whether the Phase 4
 // mechanics and their associated debuffs are real or fake from FFLogs.
 //
-// Only ONE check is implemented so far - the Flood of Naught side call (see
-// detectFloodOfNaughtErrors at the bottom of this file). Everything else in
-// these notes is the model a future implementation should build on; the
-// per-debuff stack/spread/gaze/acceleration checks are NOT written yet.
+// THREE checks are implemented, all at the bottom of this file:
+//
+//   detectFloodOfNaughtErrors      - wrong half of Flood of Naught
+//   detectResolutionBlockErrors    - spread/stack on a resolution block
+//   detectAccelerationBombErrors   - stillness/motion on Acceleration Bomb
+//
+// plus a shared first-death cutoff that emits one Raid marker and stops all
+// three, since the phase cannot be resolved with anyone dead.
+//
+// NOT written yet, and still only modelled in these notes: Kefka's three
+// Mystery Magic ice/lightning dodges, Cursed Shriek gaze direction, the
+// Chaos Entropy / Dynamic Fluid move-vs-stay, Mana Charge / Mana Release,
+// Flood's middle-overlap failure, and the phase-end HP check. Each needs a
+// log with a confirmed failure before it can be built - none of the pulls
+// on disk fails any of them. Note also that head markers ARE fetched
+// (lib/ffl-client.ts) but are not yet transformed or passed in here, which
+// is what the ice/lightning and Mana Release checks would need.
 //
 // -- PRIMARY REAL/FAKE SIGNAL -------------------------------------------------
 //
@@ -749,6 +762,23 @@ const RESOLUTION_HIT_WINDOW_MS = 2500;
 // bottom out at 11.3y.
 const ISOLATION_THRESHOLD_YALMS = 7;
 
+// A stack marker holder needs their whole group with them, not merely one
+// neighbour: nearest-neighbour distance alone would pass a player standing
+// with a single straggler, or one who drifted onto the wrong cluster.
+// Across all 5 clean blocks every correctly-stacked marker holder has
+// EXACTLY 2 others inside the isolation radius (6 stackers split 3/3), and
+// every correct spread has 0. Vmbf p20's Karna Ferrous has 0 while owing a
+// stack; Archidel Del'archi has 3 there, because Monsieur Mittens wrongly
+// joined his group, and correctly stays unflagged.
+const MIN_STACK_COMPANIONS = 2;
+
+// Observed 9.05-9.09s across every Phase 4 pull on disk.
+const SIGNAL_TO_CAST_MIN_MS = 6_000;
+const SIGNAL_TO_CAST_MAX_MS = 12_000;
+
+// Kefka Says — the phase anchor. Completed cast only.
+const KEFKA_SAYS_ABILITY_ID = 49884;
+
 // How far back from a DeathEvent to find the hit that actually killed —
 // FFLogs' lag is ~2.0s in every case measured.
 const DEATH_HIT_LOOKBACK_MS = 3_000;
@@ -776,10 +806,17 @@ const DEATH_MARKER_SORT_OFFSET_MS = 1;
 // FFLogs positions are centi-yalms.
 const CENTI_YALMS_PER_YALM = 100;
 
+/** One Grand Cross cast, with its decoded state (null = signal missing). */
+type GrandCross = {
+  ordinal:   number;
+  timestamp: number;
+  state:     "REAL" | "FAKE" | null;
+};
+
 type Elemental = {
   player: PlayerInfo;
   kind:   "Forked Lightning" | "Compressed Water";
-  grandCrossIndex: number;
+  grandCrossOrdinal: number;
   grandCrossState: "REAL" | "FAKE";
   resolvesAt: number;
 };
@@ -796,7 +833,7 @@ function distanceYalms(a: { x: number; y: number }, b: { x: number; y: number })
 function grandCrossStates(
   enemyCastEvents: EnemyEvent[],
   stateSignals:    KefkaSaysStateSignal[]
-): { timestamp: number; state: "REAL" | "FAKE" }[] {
+): GrandCross[] {
   const casts = enemyCastEvents
     .filter((e) => e.abilityId === GRAND_CROSS_ABILITY_ID)
     .map((e) => e.timestamp)
@@ -806,10 +843,27 @@ function grandCrossStates(
     .filter((s) => /neo exdeath/i.test(s.actorName))
     .sort((a, b) => a.timestamp - b.timestamp);
 
-  return casts.map((timestamp, i) => ({
-    timestamp,
-    state: (neo[i] ? (neo[i].value % 2 === 0 ? "REAL" : "FAKE") : null) as "REAL" | "FAKE",
-  })).filter((c) => c.state !== null);
+  return casts.map((timestamp, i) => {
+    // Matched TEMPORALLY, never by array index. Index pairing silently
+    // shifts every later round's state when one signal is missing — a
+    // dropped signal for round 1 would hand round 1's answer to round 2
+    // instead of leaving round 1 unknown, which is exactly the guessing
+    // this module refuses to do. The signal lands a very consistent
+    // 9.05-9.09s before its cast across all 9 Phase 4 pulls on disk, so
+    // the 6-12s window has ~3s of margin on either side.
+    const signal = neo.find(
+      (sig) =>
+        timestamp - sig.timestamp >= SIGNAL_TO_CAST_MIN_MS &&
+        timestamp - sig.timestamp <= SIGNAL_TO_CAST_MAX_MS
+    );
+    return {
+      // 1-based round number, kept even when the state is unknown, so a
+      // missing signal can never renumber the rounds around it.
+      ordinal:   i + 1,
+      timestamp,
+      state:     signal ? (signal.value % 2 === 0 ? "REAL" : "FAKE") : null,
+    } as GrandCross;
+  });
 }
 
 /**
@@ -855,7 +909,7 @@ function firstPhaseDeath(
 
 function detectResolutionBlockErrors(
   players: PlayerInfo[],
-  crosses: { timestamp: number; state: "REAL" | "FAKE" }[],
+  crosses: GrandCross[],
   cutoff:  number
 ): PullError[] {
   // Every elemental application, tagged with the Grand Cross that applied it
@@ -868,8 +922,8 @@ function detectResolutionBlockErrors(
       const isWater     = d.abilityId === COMPRESSED_WATER_ABILITY_ID;
       if (!isLightning && !isWater) continue;
 
-      const gcIndex = crosses.findIndex((c) => Math.abs(d.timestamp - c.timestamp) <= GRAND_CROSS_MATCH_WINDOW_MS);
-      if (gcIndex === -1) continue;
+      const cross = crosses.find((c) => Math.abs(d.timestamp - c.timestamp) <= GRAND_CROSS_MATCH_WINDOW_MS);
+      if (!cross || cross.state === null) continue; // unknown state — never guess
 
       const removal = player.debuffs.find(
         (r) => r.abilityId === d.abilityId && r.debuffStatus === "removed" && r.timestamp > d.timestamp
@@ -879,8 +933,8 @@ function detectResolutionBlockErrors(
       elementals.push({
         player,
         kind:            isLightning ? "Forked Lightning" : "Compressed Water",
-        grandCrossIndex: gcIndex,
-        grandCrossState: crosses[gcIndex].state,
+        grandCrossOrdinal: cross.ordinal,
+        grandCrossState:   cross.state,
         resolvesAt:      removal.timestamp,
       });
     }
@@ -907,7 +961,7 @@ function detectResolutionBlockErrors(
     if (block.filter((el) => el.kind === "Forked Lightning").length !== ELEMENTALS_PER_BLOCK / 2) continue;
     // All four from one Grand Cross — the filter that rejects a wipe's
     // death-removals masquerading as a block (see the notes above).
-    if (new Set(block.map((el) => el.grandCrossIndex)).size !== 1) continue;
+    if (new Set(block.map((el) => el.grandCrossOrdinal)).size !== 1) continue;
 
     const blockTime = block[0].resolvesAt;
 
@@ -928,15 +982,19 @@ function detectResolutionBlockErrors(
     }
     if (positions.size < 2) continue; // no usable positions — unknown, not wrong
 
-    const nearestOther = (actorId: number): number | null => {
+    /** Nearest other player, and how many sit inside the isolation radius. */
+    const neighbourhood = (actorId: number): { nearest: number; companions: number } | null => {
       const self = positions.get(actorId);
       if (!self) return null;
-      let best = Infinity;
+      let nearest = Infinity;
+      let companions = 0;
       for (const [otherId, other] of positions) {
         if (otherId === actorId) continue;
-        best = Math.min(best, distanceYalms(self, other));
+        const d = distanceYalms(self, other);
+        nearest = Math.min(nearest, d);
+        if (d <= ISOLATION_THRESHOLD_YALMS) companions += 1;
       }
-      return Number.isFinite(best) ? best : null;
+      return Number.isFinite(nearest) ? { nearest, companions } : null;
     };
 
     const blockErrors: PullError[] = [];
@@ -947,15 +1005,23 @@ function detectResolutionBlockErrors(
           ? el.kind === "Forked Lightning"
           : el.kind === "Compressed Water";
 
-      const nearest = nearestOther(el.player.actorId);
-      if (nearest === null) continue;
+      const around = neighbourhood(el.player.actorId);
+      if (around === null) continue;
 
-      const isolated = nearest > ISOLATION_THRESHOLD_YALMS;
-      if (isolated === mustSpread) continue; // did the right thing
+      // A spread must be alone; a stack must have its whole group, not just
+      // one neighbour (see MIN_STACK_COMPANIONS).
+      const resolvedCorrectly = mustSpread
+        ? around.companions === 0
+        : around.companions >= MIN_STACK_COMPANIONS;
+      if (resolvedCorrectly) continue;
 
-      const cross = `Grand Cross ${el.grandCrossIndex + 1}`;
+      const cross = `Grand Cross ${el.grandCrossOrdinal}`;
       const state = el.grandCrossState === "REAL" ? "real" : "fake";
-      const distance = nearest.toFixed(1);
+      const distance = around.nearest.toFixed(1);
+      const shortStack =
+        !mustSpread && around.companions > 0
+          ? `only ${around.companions} of their group within ${ISOLATION_THRESHOLD_YALMS} yalms`
+          : `~${distance} yalms from the nearest player`;
 
       blockErrors.push({
         ruleId:      mustSpread ? FAILED_TO_SPREAD_RULE_ID : FAILED_TO_STACK_RULE_ID,
@@ -963,7 +1029,7 @@ function detectResolutionBlockErrors(
         name:        mustSpread ? "Failed To Spread" : "Failed To Stack",
         description: mustSpread
           ? `Held ${el.kind} from ${cross}, which was ${state}, so they had to spread away from the party before it expired. They were still packed in with the group instead — nearest player ~${distance} yalms away — dropping their spread on top of it.`
-          : `Held ${el.kind} from ${cross}, which was ${state}, so they had to stay stacked with their group before it expired. They were off on their own instead — ~${distance} yalms from the nearest player — leaving the stack short and taking the hit alone.`,
+          : `Held ${el.kind} from ${cross}, which was ${state}, so they had to stay stacked with their group before it expired. They were not — ${shortStack} — leaving the stack short.`,
         timestamp:   blockTime,
         player:      el.player.name,
         class:       el.player.className,
@@ -1017,12 +1083,13 @@ const ACCELERATION_BOMB_ABILITY_ID = 1005546;
 // Death Bomb lands shortly after the debuff falls off (270ms in dQ8w p15).
 const BOMB_RESOLUTION_WINDOW_MS = 1000;
 
-// How close an action has to be to the expiry to be named as the cause.
+// How far BEFORE the expiry an action still counts as having broken the
+// stillness. Never applied forwards — see the comment at the use site.
 const BREAKING_ACTION_WINDOW_MS = 500;
 
 function detectAccelerationBombErrors(
   players: PlayerInfo[],
-  crosses: { timestamp: number; state: "REAL" | "FAKE" }[],
+  crosses: GrandCross[],
   cutoff:  number
 ): PullError[] {
   const errors: PullError[] = [];
@@ -1051,23 +1118,33 @@ function detectAccelerationBombErrors(
         .pop();
       if (!application) continue;
 
-      const crossIndex = crosses.findIndex(
+      const cross = crosses.find(
         (c) => Math.abs(application.timestamp - c.timestamp) <= GRAND_CROSS_MATCH_WINDOW_MS
       );
-      if (crossIndex === -1) continue; // unknown provenance — never guess
+      if (!cross || cross.state === null) continue; // unknown provenance — never guess
 
-      const state    = crosses[crossIndex].state;
-      const required = state === "REAL" ? "stillness" : "motion";
+      const stillness = cross.state === "REAL";
 
-      // Name the action that broke it, when there is one.
-      const breakingAction = player.casts.find(
-        (c) => Math.abs(c.timestamp - removal.timestamp) <= BREAKING_ACTION_WINDOW_MS
-      );
+      // Evidence is only attached for a STILLNESS bomb, and only for an
+      // action at or immediately BEFORE the expiry. Three reasons the naive
+      // +/-500ms search was wrong: an action AFTER the bomb already resolved
+      // is innocent; a fake/motion bomb is not failed by acting at all, so
+      // naming a cast there accuses the wrong thing; and the window has to
+      // be tight enough to exclude ordinary rotation. Alerry Han's First
+      // Legacy lands at exactly 0ms from his expiry (dQ8w p15) while his own
+      // previous GCD is 714ms earlier and No Ri's last action is 1,470ms
+      // earlier — the 500ms window separates them cleanly.
+      const breakingAction = stillness
+        ? player.casts.find(
+            (c) =>
+              c.timestamp <= removal.timestamp &&
+              c.timestamp >= removal.timestamp - BREAKING_ACTION_WINDOW_MS
+          )
+        : undefined;
 
-      const requirement =
-        required === "stillness"
-          ? "they had to be completely still — no movement and no actions — as it expired"
-          : "they had to be moving as it expired";
+      const requirement = stillness
+        ? "they had to be completely still — no movement and no actions — as it expired"
+        : "they had to be moving as it expired";
       const evidence = breakingAction
         ? ` They used ${breakingAction.abilityName} at the moment it went off.`
         : "";
@@ -1075,8 +1152,8 @@ function detectAccelerationBombErrors(
       errors.push({
         ruleId:      ACCELERATION_BOMB_RULE_ID,
         severity:    "Major",
-        name:        required === "stillness" ? "Moved With Acceleration Bomb" : "Stood Still With Acceleration Bomb",
-        description: `Held Acceleration Bomb from Grand Cross ${crossIndex + 1}, which was ${state === "REAL" ? "real" : "fake"}, so ${requirement}.${evidence} Death Bomb detonated on them for ${bomb.amount?.toLocaleString() ?? "?"}.`,
+        name:        stillness ? "Broke Stillness With Acceleration Bomb" : "Stood Still With Acceleration Bomb",
+        description: `Held Acceleration Bomb from Grand Cross ${cross.ordinal}, which was ${stillness ? "real" : "fake"}, so ${requirement}.${evidence} Death Bomb detonated on them for ${bomb.amount?.toLocaleString() ?? "?"}.`,
         timestamp:   bomb.timestamp,
         player:      player.name,
         class:       player.className,
@@ -1112,22 +1189,28 @@ export function detectKefkaSaysErrors(
   enemyCastEvents: EnemyEvent[] = [],
   stateSignals:    KefkaSaysStateSignal[] = []
 ): PullError[] {
-  const floodErrors = detectFloodOfNaughtErrors(players);
-
   const crosses = grandCrossStates(enemyCastEvents, stateSignals);
-  if (crosses.length === 0) return floodErrors.sort((a, b) => a.timestamp - b.timestamp);
 
-  // Scoped to the phase (Grand Cross 1 onward), NOT the whole pull: a death
-  // in an earlier phase that the party rezzed through says nothing about
-  // whether Kefka Says is still resolvable. Vmbf6WYw3QGcMntx pull 20 is
-  // exactly that case — Sayacissa Morsaelth dies in Phase 3 and is raised
-  // well before Phase 4 — and an unscoped cutoff suppressed every error in
-  // the pull.
-  const death  = firstPhaseDeath(players, deathEvents, crosses[0].timestamp);
+  // Phase anchor: Kefka's completed Kefka Says cast, which opens the phase.
+  // Grand Cross 1 is ~14s later, so anchoring there missed any death during
+  // the opening Mystery Magic / Grand Cross cast window. Falls back to the
+  // first Grand Cross when the anchor cast is absent, and to nothing at all
+  // when neither is (no phase, no cutoff).
+  const kefkaSays = enemyCastEvents
+    .filter((e) => e.abilityId === KEFKA_SAYS_ABILITY_ID)
+    .map((e) => e.timestamp)
+    .sort((a, b) => a - b)[0];
+  const phaseStart = kefkaSays ?? crosses[0]?.timestamp;
+
+  const death  = phaseStart === undefined ? null : firstPhaseDeath(players, deathEvents, phaseStart);
   const cutoff = death ? death.timestamp : Number.POSITIVE_INFINITY;
 
+  // Every check is cut off at the first death, Flood included — an earlier
+  // version ran Flood outside the cutoff entirely, so a wrong Flood side
+  // taken after someone had already died was still reported as a mistake
+  // even though the module treats everything past that point as fallout.
   const errors = [
-    ...floodErrors,
+    ...detectFloodOfNaughtErrors(players).filter((e) => e.timestamp <= cutoff),
     ...detectResolutionBlockErrors(players, crosses, cutoff),
     ...detectAccelerationBombErrors(players, crosses, cutoff),
   ].sort((a, b) => a.timestamp - b.timestamp);
