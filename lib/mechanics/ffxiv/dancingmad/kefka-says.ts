@@ -757,6 +757,22 @@ const DEATH_HIT_LOOKBACK_MS = 3_000;
 // landed shortly before it.
 const DEATH_ATTRIBUTION_WINDOW_MS = 30_000;
 
+// The Raid marker is stamped 1ms past the lethal hit, and that 1ms is
+// load-bearing — do not "tidy" it away.
+//
+// The killing blow usually IS the error's own resolution, so the marker and
+// the Major errors that caused it share a millisecond (dQ8w pull 15: both
+// Acceleration Bomb errors and the marker land on the same Death Bomb at
+// +832.303s). AnalysisPanel's feed concatenates raids BEFORE majors and then
+// stable-sorts by timestamp, so an exact tie renders the wipe marker above
+// the mistakes that caused it, which reads backwards.
+//
+// One millisecond is enough to order it correctly without disturbing the
+// other constraint this marker has to satisfy: it must still sort AHEAD of
+// the Damage Down / Petrification errors the death itself produces (Vmbf
+// pull 20: marker +809.381s, shriek Damage Downs from +809.957s).
+const DEATH_MARKER_SORT_OFFSET_MS = 1;
+
 // FFLogs positions are centi-yalms.
 const CENTI_YALMS_PER_YALM = 100;
 
@@ -1136,7 +1152,7 @@ export function detectKefkaSaysErrors(
       severity:    "Raid",
       name:        "Phase Unresolvable After Death",
       description: `${death.playerName} ${namedCause ? `was killed by ${death.abilityName}` : "died"}. Kefka Says needs all eight players alive to finish resolving — every remaining debuff, gaze and replay from here is treated as fallout and is not analysed further.`,
-      timestamp:   death.timestamp,
+      timestamp:   death.timestamp + DEATH_MARKER_SORT_OFFSET_MS,
       abilityId:   death.abilityId,
       abilityName: death.abilityName,
     });
