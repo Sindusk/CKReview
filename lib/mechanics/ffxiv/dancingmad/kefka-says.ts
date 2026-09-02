@@ -1,8 +1,13 @@
 // lib/mechanics/ffxiv/dancingmad/kefka-says.ts
 //
-// IMPLEMENTATION NOTES ONLY - this file intentionally contains no executable
-// code. It documents how the wtfdig Kefka Says analyzer determines whether the
-// Phase 4 mechanics and their associated debuffs are real or fake from FFLogs.
+// Phase 4 ("Kefka Says") error detection, plus the implementation notes that
+// document how the wtfdig Kefka Says analyzer determines whether the Phase 4
+// mechanics and their associated debuffs are real or fake from FFLogs.
+//
+// Only ONE check is implemented so far - the Flood of Naught side call (see
+// detectFloodOfNaughtErrors at the bottom of this file). Everything else in
+// these notes is the model a future implementation should build on; the
+// per-debuff stack/spread/gaze/acceleration checks are NOT written yet.
 //
 // -- PRIMARY REAL/FAKE SIGNAL -------------------------------------------------
 //
@@ -403,3 +408,198 @@
 // based on a guessed state. Finally, keep strategy-neutral mechanic correctness
 // (spread vs stack, move vs stay, correct gaze/color) separate from optional
 // checks for one group's preferred positions.
+
+// ═══════════════════════════════════════════════════════════════════════════
+// IMPLEMENTATION: FLOOD OF NAUGHT SIDE CALL
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Confirmed 2026-09-02 against 3MfQX7h29vPV4xYz pull 17 (the one failure the
+// user adjudicated), plus 7 clean Flood resolutions across
+// Vmbf6WYw3QGcMntx pull 20 and dQ8wmb1VhKt6yBXk pulls 1/2/3/9/11/15 —
+// 64 player-resolutions in total, exactly one flagged.
+//
+// ── Why this check needs NO real/fake input ────────────────────────────────
+//
+// The notes above derive each player's required side from Flood's decoded
+// real/fake bit plus the telegraphed colors. That is the PLAYER's solve — it
+// is not what detection needs, because the log records the EFFECTIVE color
+// that actually hit each player (a fake Flood swaps which color lands on
+// which half, and FFLogs reports the one that landed). So the requirement
+// collapses to a pure outcome check against the player's own wound:
+//
+//   Beyond Death  -> must be hit by the Antilight MATCHING their wound color
+//                     (the lethal one; Beyond Death is what lets them live)
+//   Allagan Field -> must be hit by the OPPOSITE color (the survivable one)
+//
+// This is the README's "gate on OUTCOME, not position" rule, and it means
+// this check keeps working on captures that predate the enemyDebuffs stream
+// (see lib/ffl-client.ts) — no 1002056 signal required.
+//
+// The log confirms the color rule mechanically rather than by assumption:
+// across all 8 Flood resolutions, the Antilight matching a player's wound
+// deals their FULL health and the opposite color deals a fixed chip amount.
+// Detection deliberately keys on the color relationship rather than on that
+// damage split, because the chip number varies by report (999 in
+// 3MfQX7h29vPV4xYz, 66000 in dQ8wmb1VhKt6yBXk pull 1) while the color
+// relationship does not.
+//
+// ── The confirmed failure ─────────────────────────────────────────────────
+//
+// 3MfQX7h29vPV4xYz pull 17, 13:25.10: Sayacissa Morsaelth held Beyond Death
+// + Black Wound and needed the Black Antilight. She took White instead. Two
+// observable consequences, both present in the log:
+//   - her wound SWAPPED B->W, the transition an Allagan Field player makes,
+//     instead of being consumed along with Beyond Death, and
+//   - Beyond Death was never removed at the hit; it expired unresolved 2.5s
+//     later at 13:27.69 and killed her (that death carries no killing
+//     ability id at all, so no killingBlow rule can ever catch this).
+// Detection anchors on the Antilight hit rather than either consequence —
+// the wound swap and the death are both downstream of the same mistake, and
+// the hit is the moment the player actually got it wrong.
+//
+// ── Timestamp precision matters here ──────────────────────────────────────
+//
+// The wound swap / Beyond Death removal land at the EXACT millisecond of the
+// Antilight hit. Reading a player's wound with a "<=" cutoff therefore reads
+// the POST-resolution state and makes every single player look correct (this
+// cost a debugging pass). The cutoff must be strictly "<".
+//
+// ── Ability id drift ──────────────────────────────────────────────────────
+//
+// The wound and Beyond Death statuses each have TWO ids live in these
+// reports, and both appear within a single pull (Vmbf6WYw3QGcMntx pull 20
+// and dQ8wmb1VhKt6yBXk pulls 1/11/15 carry both sets). The Antilight damage
+// ids are the stable anchor and have not drifted. Any id added here must
+// come from a real capture — see the README's note that Dancing Mad ability
+// ids differ between reports.
+
+import type { PlayerInfo } from "@/types/PlayerInfo";
+import type { PullError } from "@/types/PullError";
+
+export const FLOOD_WRONG_SIDE_RULE_ID = "ffxiv-kefka-says-flood-wrong-side";
+
+// Damage abilities for the two half-room attacks. Stable across every report
+// checked; these are what the detection self-gates on.
+const WHITE_ANTILIGHT_ABILITY_ID = 50068;
+const BLACK_ANTILIGHT_ABILITY_ID = 50069;
+
+// Wound statuses. Both id pairs observed live — see "Ability id drift" above.
+const WHITE_WOUND_ABILITY_IDS = new Set([1005541, 1004887]);
+const BLACK_WOUND_ABILITY_IDS = new Set([1005542, 1004888]);
+
+// The two instruction debuffs Grand Cross 3 hands out alongside the wound.
+const ALLAGAN_FIELD_ABILITY_IDS = new Set([1000454]);
+const BEYOND_DEATH_ABILITY_IDS  = new Set([1001382, 1005464]);
+
+type WoundColor = "White" | "Black";
+type Instruction = "Beyond Death" | "Allagan Field";
+
+function woundColorOf(abilityId: number): WoundColor | null {
+  if (WHITE_WOUND_ABILITY_IDS.has(abilityId)) return "White";
+  if (BLACK_WOUND_ABILITY_IDS.has(abilityId)) return "Black";
+  return null;
+}
+
+/**
+ * Replays a player's debuff timeline up to (but NOT including — see the
+ * timestamp note above) `before`, returning the wound color and Grand Cross 3
+ * instruction they were carrying when the Antilight landed.
+ */
+function stateBefore(
+  player: PlayerInfo,
+  before: number
+): { wound: WoundColor | null; instruction: Instruction | null } {
+  let wound: WoundColor | null = null;
+  let instruction: Instruction | null = null;
+
+  for (const d of player.debuffs) {
+    if (d.timestamp >= before) continue;
+
+    const color = woundColorOf(d.abilityId);
+    if (color && d.debuffStatus === "applied") wound = color;
+
+    const isField  = ALLAGAN_FIELD_ABILITY_IDS.has(d.abilityId);
+    const isBeyond = BEYOND_DEATH_ABILITY_IDS.has(d.abilityId);
+    if (!isField && !isBeyond) continue;
+
+    const which: Instruction = isBeyond ? "Beyond Death" : "Allagan Field";
+    if (d.debuffStatus === "applied") instruction = which;
+    else if (d.debuffStatus === "removed" && instruction === which) instruction = null;
+  }
+
+  return { wound, instruction };
+}
+
+/**
+ * Flags a player who stood in the wrong half of Flood of Naught.
+ *
+ * Self-gates on Antilight damage, so it is safe to run on every pull — one
+ * that never reaches Phase 4 returns [] without touching anything else.
+ */
+function detectFloodOfNaughtErrors(players: PlayerInfo[]): PullError[] {
+  const errors: PullError[] = [];
+
+  for (const player of players) {
+    const hits = player.damageTaken.filter(
+      (e) => e.abilityId === WHITE_ANTILIGHT_ABILITY_ID || e.abilityId === BLACK_ANTILIGHT_ABILITY_ID
+    );
+    if (hits.length === 0) continue;
+
+    // Caught in the overlap near the middle, where both halves connect (the
+    // notes above call this out as its own failure). That is a DIFFERENT
+    // mistake from picking the wrong side, and no confirmed case exists yet
+    // to model it — per the README's attribution rules, stay silent rather
+    // than force it through this check and flag the wrong thing.
+    const colorsTaken = new Set(
+      hits.map((e) => (e.abilityId === WHITE_ANTILIGHT_ABILITY_ID ? "White" : "Black"))
+    );
+    if (colorsTaken.size > 1) continue;
+
+    const hit = hits.reduce((a, b) => (a.timestamp <= b.timestamp ? a : b));
+    const took: WoundColor = hit.abilityId === WHITE_ANTILIGHT_ABILITY_ID ? "White" : "Black";
+
+    const { wound, instruction } = stateBefore(player, hit.timestamp);
+    // No wound or no instruction means Grand Cross 3 never resolved onto this
+    // player the way the model expects — unknown, not wrong.
+    if (!wound || !instruction) continue;
+
+    const opposite: WoundColor = wound === "White" ? "Black" : "White";
+    const required: WoundColor = instruction === "Beyond Death" ? wound : opposite;
+    if (took === required) continue;
+
+    const explanation =
+      instruction === "Beyond Death"
+        ? "held Beyond Death with a " + wound + " Wound, so they had to take the " + required +
+          " Antilight — the one matching their wound — and let Beyond Death carry them through it. They took " +
+          took + " instead, leaving Beyond Death unresolved."
+        : "held Allagan Field with a " + wound + " Wound, so they had to take the " + required +
+          " Antilight — the opposite of their wound. They took " + took +
+          " instead, which is the lethal side for that wound.";
+
+    errors.push({
+      ruleId:      FLOOD_WRONG_SIDE_RULE_ID,
+      severity:    "Major",
+      name:        "Wrong Side On Flood of Naught",
+      description: "Stood in the wrong half of Flood of Naught: " + explanation,
+      timestamp:   hit.timestamp,
+      player:      player.name,
+      class:       player.className,
+      specId:      player.specId,
+      role:        player.role,
+      abilityId:   hit.abilityId,
+      abilityName: hit.abilityName,
+      amount:      hit.amount,
+    });
+  }
+
+  return errors;
+}
+
+/**
+ * Phase 4 ("Kefka Says") detection entry point. Returns [] for any pull that
+ * never reaches Flood of Naught — self-gating on Antilight damage rather than
+ * an encounter-name check, so it is safe to always call.
+ */
+export function detectKefkaSaysErrors(players: PlayerInfo[]): PullError[] {
+  return detectFloodOfNaughtErrors(players).sort((a, b) => a.timestamp - b.timestamp);
+}

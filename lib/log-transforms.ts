@@ -60,6 +60,7 @@ import { detectLimitCutErrors } from "./mechanics/ffxiv/dancingmad/limitcut";
 import { detectExdeathErrors } from "./mechanics/ffxiv/dancingmad/exdeath";
 import { detectStompiesErrors } from "./mechanics/ffxiv/dancingmad/stompies";
 import { detectPhase1Errors } from "./mechanics/ffxiv/dancingmad/phase1";
+import { detectKefkaSaysErrors } from "./mechanics/ffxiv/dancingmad/kefka-says";
 import { detectMidnightFallsErrors } from "./mechanics/wow/vs-dr-mqd/midnightfalls";
 
 // Shared shape for both games' ability maps: gameID -> name + raw icon
@@ -1168,6 +1169,7 @@ export function transformFFightToPull(
     ...detectExdeathErrors(players, deathEvents),
     ...detectStompiesErrors(players, deathEvents, enemyCastEvents, blackHoleGeometry, stompiesPuddleSamples, playerPositionSamples),
     ...detectPhase1Errors(players, deathEvents, enemyCastEvents),
+    ...detectKefkaSaysErrors(players),
   ].sort((a, b) => a.timestamp - b.timestamp);
 
   const fightDurationMs = data.fight.endTime - data.fight.startTime;

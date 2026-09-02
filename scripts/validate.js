@@ -224,6 +224,14 @@ const MECHANICS = {
     },
   },
 
+  'kefka-says': {
+    game: 'ff',
+    load: () => requireTsFromRoot('lib/mechanics/ffxiv/dancingmad/kefka-says.ts'),
+    run({ mod, ctxs }) {
+      for (const c of ctxs) printPullErrors(c, mod.detectKefkaSaysErrors(c.relPlayers()));
+    },
+  },
+
   phase1: {
     game: 'ff',
     load: () => requireTsFromRoot('lib/mechanics/ffxiv/dancingmad/phase1.ts'),
