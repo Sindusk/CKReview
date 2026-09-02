@@ -333,11 +333,36 @@ export type FFLDebuffEvent = {
   // extra query fields; already came back in every capture checked.
   // Resolved to a name via abilityMap in fflDebuffToPlayerEvent.
   extraAbilityGameID?: number;
+  // Opaque per-application payload FFLogs passes through from the game's
+  // StatusEffect packet. Almost always absent/meaningless, but Dancing Mad
+  // Phase 4 uses it as the ONLY machine-readable real/fake signal: status
+  // 1002056 applied to Neo Exdeath / Chaos carries an even value for a REAL
+  // mechanic and an odd one for a FAKE one (see
+  // lib/mechanics/ffxiv/dancingmad/kefka-says.ts). Only ever populated on
+  // the ENEMY-hostility debuff stream — see enemyDebuffEvents below.
+  extraInfo?: number;
   ability?: {
     name:        string;
     abilityIcon?: string;
     gameID?:     number;
   } | null;
+};
+
+// Head markers (the icons the game paints over an actor's head). FFLogs
+// exposes these ONLY through `dataType: All`, so they're fetched with a
+// server-side filterExpression rather than a dataType of their own — see
+// FIGHT_EVENTS_QUERY. `markerID` is the game's marker index; Dancing Mad
+// Phase 4 encodes Kefka's ice/lightning real-vs-fake state in it
+// (675 ice fake / 676 ice real / 677 lightning fake / 678 lightning real).
+// `abilityGameID` is always 0 on these — the marker is the whole payload.
+export type FFLHeadMarkerEvent = {
+  timestamp:      number;
+  type:           "headmarker";
+  sourceID:       number;
+  sourceInstance?: number;
+  targetID:       number;
+  abilityGameID:  number;
+  markerID:       number;
 };
 
 // Mirrors FFLDebuffEvent, but for buffs. Needed for the "enemyBuffApplied"
@@ -364,7 +389,8 @@ export type FFLEvent =
   | FFLDamageEvent
   | FFLHealEvent
   | FFLDebuffEvent
-  | FFLBuffEvent;
+  | FFLBuffEvent
+  | FFLHeadMarkerEvent;
 
 export type FFLReport = {
   title:      string;
@@ -466,8 +492,17 @@ export function buildFFFightLogLabels(fights: FFLFight[]): Map<number, string> {
 // same $code/$fightIDs/$endTime).
 //
 // This also satisfies the "request only the specific fields you need"
-// guidance — every one of these 9 fields is actually consumed by
-// log-transforms.ts, so nothing extraneous is being pulled in per fight.
+// guidance — every one of these streams is actually consumed by
+// log-transforms.ts or by a mechanic module, so nothing extraneous is
+// being pulled in per fight.
+//
+// TWO EDITING PITFALLS inside this template literal, each of which has
+// cost a debugging session:
+//   - A "//" comment breaks FFLogs' GraphQL parser (it reports a stray
+//     "\/"). Use "#" for comments in here.
+//   - A backtick anywhere in those comments TERMINATES the template
+//     literal and produces a wall of nonsense TS syntax errors. Never
+//     quote an identifier with backticks in this block.
 const FIGHT_EVENTS_QUERY = /* graphql */`
   query GetFFightEvents(
     $code:               String!
@@ -483,6 +518,10 @@ const FIGHT_EVENTS_QUERY = /* graphql */`
     $enemyCastsStart:     Float!
     $enemyBuffsStart:     Float!
     $enemyDamageTakenStart: Float!
+    $enemyDebuffsStart:   Float!
+    $enemyDebuffFilter:   String!
+    $headMarkersStart:    Float!
+    $headMarkerFilter:    String!
   ) {
     rateLimitData {
       limitPerHour
@@ -552,6 +591,37 @@ const FIGHT_EVENTS_QUERY = /* graphql */`
           fightIDs: $fightIDs, startTime: $enemyDamageTakenStart, endTime: $endTime,
           dataType: DamageTaken, hostilityType: Enemies, includeResources: true
         ) { data nextPageTimestamp }
+
+        # Debuffs on NPCs. Distinct from debuffs above (friendlies only) and
+        # from enemyBuffs (Buffs, not Debuffs) — neither returns these.
+        # Carries the hidden extraInfo real/fake signal Dancing Mad Phase 4
+        # needs (status 1002056 on Neo Exdeath / Chaos, even = real,
+        # odd = fake); see FFLDebuffEvent.extraInfo and
+        # lib/mechanics/ffxiv/dancingmad/kefka-says.ts.
+        #
+        # Filtered by target.type rather than hostilityType: Enemies, which
+        # LOOKS like the right argument and silently returns a subset.
+        # Confirmed on dQ8wmb1VhKt6yBXk fight 11: hostilityType: Enemies
+        # returns Neo Exdeath's four 1002056 signals but none of Chaos's two,
+        # because FFLogs does not classify that Chaos actor as an enemy —
+        # the target-type filter returns all six. Cheap either way: a whole
+        # 16-minute Dancing Mad pull is ~300 events in one page.
+        enemyDebuffs: events(
+          fightIDs: $fightIDs, startTime: $enemyDebuffsStart, endTime: $endTime,
+          dataType: All, filterExpression: $enemyDebuffFilter, includeResources: false
+        ) { data nextPageTimestamp }
+
+        # Head markers. FFLogs has no dataType for these — they come back
+        # ONLY under dataType: All, which for a long pull is ~50k events
+        # across ~5 pages. filterExpression pushes the filter server-side
+        # so the same fight returns 73 events in ONE page instead. The
+        # expression is passed as a variable ($headMarkerFilter) rather than
+        # inlined because it contains double quotes, which would otherwise
+        # need escaping inside this template literal.
+        headMarkers: events(
+          fightIDs: $fightIDs, startTime: $headMarkersStart, endTime: $endTime,
+          dataType: All, filterExpression: $headMarkerFilter, includeResources: false
+        ) { data nextPageTimestamp }
       }
     }
   }
@@ -572,6 +642,8 @@ type FightEventsQueryResult = {
       enemyCasts:     EventStream<FFLCastEvent>;
       enemyBuffs:     EventStream<FFLBuffEvent>;
       enemyDamageTaken: EventStream<FFLDamageEvent>;
+      enemyDebuffs:   EventStream<FFLDebuffEvent>;
+      headMarkers:    EventStream<FFLHeadMarkerEvent>;
     };
   };
 };
@@ -581,9 +653,16 @@ type FightEventsQueryResult = {
 const STREAM_KEYS = [
   "deaths", "combatantInfo", "casts", "damageDone",
   "damageTaken", "healing", "debuffs", "enemyCasts", "enemyBuffs", "enemyDamageTaken",
+  "enemyDebuffs", "headMarkers",
 ] as const;
 
 type StreamKey = typeof STREAM_KEYS[number];
+
+// FFLogs filterExpressions for the two dataType: All aliases — see the query
+// comments for why each needs one.
+const HEAD_MARKER_FILTER  = 'type="headmarker"';
+const ENEMY_DEBUFF_FILTER =
+  'target.type="npc" and (type="applydebuff" or type="removedebuff" or type="refreshdebuff")';
 
 // Safety valve — an unexpected/never-terminating pagination loop shouldn't
 // be able to hang an import forever. 200 pages per fight is already far
@@ -609,6 +688,12 @@ export type FFLFightData = {
   // FFLogs populates sourceResources (the attacking player's own position)
   // on these specifically — see FIGHT_EVENTS_QUERY's comment.
   enemyDamageTakenEvents: FFLDamageEvent[];
+  // Debuffs applied to NPCs (target.type filter, NOT hostilityType — see the
+  // query comment). Fetched for the `extraInfo` real/fake signal Dancing Mad
+  // Phase 4 encodes there.
+  enemyDebuffEvents: FFLDebuffEvent[];
+  // dataType: All filtered server-side to type="headmarker".
+  headMarkerEvents:  FFLHeadMarkerEvent[];
 };
 
 /**
@@ -639,17 +724,18 @@ export async function fetchFFightData(
     deaths: fight.startTime, combatantInfo: fight.startTime, casts: fight.startTime,
     damageDone: fight.startTime, damageTaken: fight.startTime, healing: fight.startTime,
     debuffs: fight.startTime, enemyCasts: fight.startTime, enemyBuffs: fight.startTime,
-    enemyDamageTaken: fight.startTime,
+    enemyDamageTaken: fight.startTime, enemyDebuffs: fight.startTime,
+    headMarkers: fight.startTime,
   };
   const done: Record<StreamKey, boolean> = {
     deaths: false, combatantInfo: false, casts: false, damageDone: false,
     damageTaken: false, healing: false, debuffs: false, enemyCasts: false, enemyBuffs: false,
-    enemyDamageTaken: false,
+    enemyDamageTaken: false, enemyDebuffs: false, headMarkers: false,
   };
   const collected: { [K in StreamKey]: FightEventsQueryResult["reportData"]["report"][K]["data"] } = {
     deaths: [], combatantInfo: [], casts: [], damageDone: [],
     damageTaken: [], healing: [], debuffs: [], enemyCasts: [], enemyBuffs: [],
-    enemyDamageTaken: [],
+    enemyDamageTaken: [], enemyDebuffs: [], headMarkers: [],
   };
 
   let page = 0;
@@ -670,6 +756,10 @@ export async function fetchFFightData(
       enemyCastsStart:     cursors.enemyCasts,
       enemyBuffsStart:     cursors.enemyBuffs,
       enemyDamageTakenStart: cursors.enemyDamageTaken,
+      enemyDebuffsStart:   cursors.enemyDebuffs,
+      enemyDebuffFilter:   ENEMY_DEBUFF_FILTER,
+      headMarkersStart:    cursors.headMarkers,
+      headMarkerFilter:    HEAD_MARKER_FILTER,
     }, false); // per-page dump suppressed — see the single merged dump below
 
     const report = data.reportData.report;
@@ -728,6 +818,8 @@ export async function fetchFFightData(
     enemyCastEvents:   collected.enemyCasts,
     enemyBuffEvents:   collected.enemyBuffs,
     enemyDamageTakenEvents: onlyLanded(collected.enemyDamageTaken),
+    enemyDebuffEvents: collected.enemyDebuffs,
+    headMarkerEvents:  collected.headMarkers,
   };
 }
 

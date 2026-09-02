@@ -122,6 +122,16 @@ const FFL_PROJECTORS = {
     ...pick(e, ['timestamp', 'type', 'sourceID', 'targetID', 'abilityGameID', 'unpaired']),
     sourceResources: pickNested(e, 'sourceResources', FF_RESOURCE_SUBKEYS),
   }),
+  // Debuffs on the BOSS (hostilityType: Enemies). Same low-count/omit-only
+  // treatment as `debuffs` — and `extraInfo` in particular MUST survive:
+  // it's the hidden real/fake bit Dancing Mad Phase 4 encodes on status
+  // 1002056 (see lib/mechanics/ffxiv/dancingmad/kefka-says.ts).
+  enemyDebuffs: (e) => omit(e, ['fight', 'packetID']),
+  // Head markers — already filtered server-side to type="headmarker", so a
+  // whole pull is a few dozen events. `markerID` is the payload;
+  // abilityGameID is always 0 and targetID always -1 (the marker rides on
+  // the SOURCE actor), so neither is worth keeping.
+  headMarkers: (e) => pick(e, ['timestamp', 'type', 'sourceID', 'sourceInstance', 'markerID']),
 };
 
 function slimFflReport(streams) {
