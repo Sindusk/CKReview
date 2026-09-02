@@ -473,8 +473,8 @@
 // come from a real capture — see the README's note that Dancing Mad ability
 // ids differ between reports.
 
-import type { PlayerInfo } from "@/types/PlayerInfo";
-import type { PullError } from "@/types/PullError";
+import type { PlayerEvent, PlayerInfo } from "@/types/PlayerInfo";
+import type { EnemyEvent, PullError } from "@/types/PullError";
 
 export const FLOOD_WRONG_SIDE_RULE_ID = "ffxiv-kefka-says-flood-wrong-side";
 
@@ -595,11 +595,387 @@ function detectFloodOfNaughtErrors(players: PlayerInfo[]): PullError[] {
   return errors;
 }
 
+
+// ═══════════════════════════════════════════════════════════════════════════
+// IMPLEMENTATION: SHORT / LONG RESOLUTION BLOCK SPREAD-vs-STACK
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Confirmed 2026-09-02 against Vmbf6WYw3QGcMntx pull 20 (the adjudicated
+// failure) and 5 clean blocks across dQ8wmb1VhKt6yBXk pulls 9/11/15.
+//
+// ── What resolves, and what the log calls it ──────────────────────────────
+//
+// When a block's Compressed Water / Forked Lightning expire, two attacks
+// land at once. Which NAME is the isolated one depends on which element
+// spreads, so neither name can be hard-coded as "the spread":
+//
+//   Grand Cross REAL -> Forked Lightning spreads -> Death Bolt hits ONLY
+//                        the two spread players; Death Wave hits the rest.
+//   Grand Cross FAKE -> Compressed Water spreads -> Death Wave hits ONLY
+//                        the two spread players; Death Bolt hits the rest.
+//
+// Verified on all 6 observed blocks (dQ8w p9 both blocks REAL, p15 both
+// REAL, p11 block 2 REAL, p11 block 1 FAKE — the FAKE one has exactly the
+// inverted Bolt/Wave assignment). Detection never needs this mapping: it
+// only uses those hits as a POSITION SOURCE (see below).
+//
+// ── Finding the blocks ────────────────────────────────────────────────────
+//
+// PlayerInfo.debuffs carries no duration, so a block's resolution time comes
+// from the elemental REMOVAL event, which fires exactly at expiry. Removals
+// are clustered within 300ms, and a cluster only counts as a real block when
+// it satisfies ALL of the invariants every clean block shows:
+//
+//   - exactly 4 elemental removals,
+//   - on 4 distinct players,
+//   - split 2 Forked Lightning / 2 Compressed Water,
+//   - ALL FOUR applied by the SAME Grand Cross.
+//
+// Those filters are what keep a wipe from being read as a resolution:
+// debuffs also fall off when a player dies. 3MfQX7h29vPV4xYz pull 17 wiped
+// before either block and produces only clusters of 1 and 7 — rejected on
+// size. Vmbf6WYw3QGcMntx pull 20 gives one true block of 4 followed by
+// death-removal clusters of 2 and 2.
+//
+// The same-Grand-Cross rule is the one that isn't obvious, and it was added
+// after a real false positive. 3MfQX7h29vPV4xYz pull 12 wipes mid-phase and
+// its death-removals happen to form a cluster of exactly 4 that is even
+// split 2 FL / 2 CW — indistinguishable from a real block on size and
+// composition alone, and it produced two phantom "failed to spread" errors.
+// But three of those four elementals came from Grand Cross 1 and the fourth
+// from Grand Cross 2, which a real resolution never does: the short set is
+// one Grand Cross's four elementals and the long set is the other's,
+// confirmed on all 6 real blocks (dQ8w p9/p11/p15 both blocks each, Vmbf
+// p20 block 1).
+//
+// ── Judging position ──────────────────────────────────────────────────────
+//
+// Deliberately strategy-neutral, per the model notes above: the check asks
+// only whether a player was ISOLATED (nearest other player beyond a
+// threshold), never whether they stood on a particular compass point. The
+// groups observed here all use support-spread-west / DPS-spread-east with
+// support stacked north and DPS south, but that's one valid strategy and
+// the check must not require it.
+//
+// Nearest-neighbour distance separates the two cases with an enormous gap:
+//
+//   correct STACK  0.0 - 2.8 yalms  (worst: dQ8w p11 block 1, Annania 2.8)
+//   correct SPREAD 11.3 - 15.7      (best:  dQ8w p15 block 2, Rika 11.3)
+//
+// so the 7-yalm threshold sits in dead space with ~4y of margin on each
+// side. The confirmed failures land nowhere near it: Monsieur Mittens 1.7
+// and Ayumi Emi 0.7 (both owed a spread, both still in a stack), Karna
+// Ferrous 16.2 (owed a stack, standing on a spread spot).
+//
+// Positions come from the Death Bolt / Death Wave damage events themselves —
+// targetResources on the resolution hit, i.e. each player's own position at
+// the exact instant the block resolved. No interpolation, no staleness
+// window. Both damage ids per attack are accepted because FFLogs emits an
+// unpaired "calculateddamage" preview under a second id (47897 / 47899)
+// alongside the landed hit; the preview's position is identical, and its
+// amount is nonsense (10,142,198 on a 325,090-HP player in Vmbf p20) so
+// nothing here reads the amount.
+//
+// ── Death ends the analysis ───────────────────────────────────────────────
+//
+// Per the user's ruling (2026-09-02): the phase cannot be resolved unless
+// everyone is alive, so the FIRST death caused by one of these errors emits
+// a Raid-severity marker and analysis stops — later blocks are fallout and
+// are never flagged. This is the same cutoff pattern phase1.ts's Graven
+// Image death-wipe rule uses, and the description follows the README's rule
+// that a Raid error must not assert "the raid wiped" (a raid can rez and
+// keep pushing).
+//
+// The marker is anchored on the LETHAL HIT (the damage event that took a
+// player to 0 HP), NOT on the DeathEvent. FFLogs records the death event
+// ~2s after the killing blow, which would sort the marker AFTER the
+// Damage Down / Petrification errors that the death itself causes. In
+// Vmbf p20 the lethal Death Wave lands at +809.38s and the Petrification
+// Damage Downs at +809.56s, so anchoring on the hit puts the marker where
+// it belongs: before its own fallout.
+
+
+/**
+ * One decoded real/fake signal (FFLogs status 1002056 on a boss actor).
+ * Built by the transform layer / validation harness from the enemyDebuffs
+ * stream; `value` is the raw extraInfo, decoded by parity here rather than
+ * at the build site so the rule stays in one place.
+ */
+export type KefkaSaysStateSignal = {
+  timestamp: number;  // ms into the pull
+  actorName: string;  // e.g. "Neo Exdeath", "Chaos"
+  value:     number;  // extraInfo — even = real, odd = fake
+};
+
+export const FAILED_TO_SPREAD_RULE_ID   = "ffxiv-kefka-says-failed-to-spread";
+export const FAILED_TO_STACK_RULE_ID    = "ffxiv-kefka-says-failed-to-stack";
+export const PHASE_UNRESOLVABLE_RULE_ID = "ffxiv-kefka-says-death-unresolvable";
+
+const GRAND_CROSS_ABILITY_ID     = 47892;
+const FORKED_LIGHTNING_ABILITY_ID = 1005544;
+const COMPRESSED_WATER_ABILITY_ID = 1005545;
+
+// Both ids per attack — the second is FFLogs' unpaired calculateddamage
+// preview. Position source only; amounts are never read from these.
+const RESOLUTION_HIT_ABILITY_IDS = new Set([47896, 47897, 47898, 47899]);
+
+const STATE_SIGNAL_ABILITY_ID = 1002056;
+
+// Removals from one expiry land within a few ms; 300 is generous without
+// merging the death-removal clusters that follow ~760ms later in Vmbf p20.
+const REMOVAL_CLUSTER_TOLERANCE_MS = 300;
+
+// Every clean block resolves exactly 2 Forked Lightning + 2 Compressed Water.
+const ELEMENTALS_PER_BLOCK = 4;
+
+// A debuff application belongs to the Grand Cross cast within this window —
+// in practice they share a timestamp exactly.
+const GRAND_CROSS_MATCH_WINDOW_MS = 2000;
+
+// Position window around the block's resolution to accept a resolution hit.
+const RESOLUTION_HIT_WINDOW_MS = 2500;
+
+// See "Judging position" above: clean stacks top out at 2.8y, clean spreads
+// bottom out at 11.3y.
+const ISOLATION_THRESHOLD_YALMS = 7;
+
+// How far past a block to look for the death it caused.
+const DEATH_LOOKAHEAD_MS = 30_000;
+
+// FFLogs positions are centi-yalms.
+const CENTI_YALMS_PER_YALM = 100;
+
+type Elemental = {
+  player: PlayerInfo;
+  kind:   "Forked Lightning" | "Compressed Water";
+  grandCrossIndex: number;
+  grandCrossState: "REAL" | "FAKE";
+  resolvesAt: number;
+};
+
+function distanceYalms(a: { x: number; y: number }, b: { x: number; y: number }): number {
+  return Math.hypot(a.x - b.x, a.y - b.y) / CENTI_YALMS_PER_YALM;
+}
+
+/**
+ * Pairs each Grand Cross cast with the Neo Exdeath state signal that precedes
+ * it, per the "PHASE ANCHOR AND ROUND ASSOCIATION" notes above: signals sorted
+ * by time, then matched positionally to the sorted casts.
+ */
+function grandCrossStates(
+  enemyCastEvents: EnemyEvent[],
+  stateSignals:    KefkaSaysStateSignal[]
+): { timestamp: number; state: "REAL" | "FAKE" }[] {
+  const casts = enemyCastEvents
+    .filter((e) => e.abilityId === GRAND_CROSS_ABILITY_ID)
+    .map((e) => e.timestamp)
+    .sort((a, b) => a - b);
+
+  const neo = stateSignals
+    .filter((s) => /neo exdeath/i.test(s.actorName))
+    .sort((a, b) => a.timestamp - b.timestamp);
+
+  return casts.map((timestamp, i) => ({
+    timestamp,
+    state: (neo[i] ? (neo[i].value % 2 === 0 ? "REAL" : "FAKE") : null) as "REAL" | "FAKE",
+  })).filter((c) => c.state !== null);
+}
+
+/**
+ * The earliest damage event that took any player to 0 HP at or after `from`.
+ * `within` bounds the search when asking "did THIS block kill someone"; omit
+ * it to ask "has anyone died at all yet".
+ *
+ * Deliberately keyed on the lethal HIT rather than DeathEvent — see the
+ * "Death ends the analysis" note above for why the ~2s DeathEvent lag would
+ * mis-order the Raid marker against its own fallout.
+ */
+function firstLethalHit(
+  players: PlayerInfo[],
+  from:    number,
+  within?: number
+): { timestamp: number; player: PlayerInfo; event: PlayerEvent } | null {
+  let best: { timestamp: number; player: PlayerInfo; event: PlayerEvent } | null = null;
+  for (const player of players) {
+    for (const e of player.damageTaken) {
+      if (e.timestamp < from) continue;
+      if (within !== undefined && e.timestamp > from + within) continue;
+      if (e.healthAfter !== 0) continue;
+      if (!best || e.timestamp < best.timestamp) best = { timestamp: e.timestamp, player, event: e };
+    }
+  }
+  return best;
+}
+
+function detectResolutionBlockErrors(
+  players:         PlayerInfo[],
+  enemyCastEvents: EnemyEvent[],
+  stateSignals:    KefkaSaysStateSignal[]
+): PullError[] {
+  const crosses = grandCrossStates(enemyCastEvents, stateSignals);
+  if (crosses.length === 0) return []; // no decoded state — unknown, never guess
+
+  // Every elemental application, tagged with the Grand Cross that applied it
+  // and the removal (= expiry) that resolves it.
+  const elementals: Elemental[] = [];
+  for (const player of players) {
+    for (const d of player.debuffs) {
+      if (d.debuffStatus !== "applied") continue;
+      const isLightning = d.abilityId === FORKED_LIGHTNING_ABILITY_ID;
+      const isWater     = d.abilityId === COMPRESSED_WATER_ABILITY_ID;
+      if (!isLightning && !isWater) continue;
+
+      const gcIndex = crosses.findIndex((c) => Math.abs(d.timestamp - c.timestamp) <= GRAND_CROSS_MATCH_WINDOW_MS);
+      if (gcIndex === -1) continue;
+
+      const removal = player.debuffs.find(
+        (r) => r.abilityId === d.abilityId && r.debuffStatus === "removed" && r.timestamp > d.timestamp
+      );
+      if (!removal) continue; // never resolved (pull ended first) — nothing to judge
+
+      elementals.push({
+        player,
+        kind:            isLightning ? "Forked Lightning" : "Compressed Water",
+        grandCrossIndex: gcIndex,
+        grandCrossState: crosses[gcIndex].state,
+        resolvesAt:      removal.timestamp,
+      });
+    }
+  }
+  if (elementals.length === 0) return [];
+
+  // Cluster by resolution time; only a cluster of exactly 4 is a real block.
+  elementals.sort((a, b) => a.resolvesAt - b.resolvesAt);
+  const clusters: Elemental[][] = [];
+  for (const el of elementals) {
+    const current = clusters[clusters.length - 1];
+    if (current && el.resolvesAt - current[current.length - 1].resolvesAt <= REMOVAL_CLUSTER_TOLERANCE_MS) {
+      current.push(el);
+    } else {
+      clusters.push([el]);
+    }
+  }
+
+  const errors: PullError[] = [];
+
+  for (const block of clusters) {
+    if (block.length !== ELEMENTALS_PER_BLOCK) continue;
+    if (new Set(block.map((el) => el.player.actorId)).size !== ELEMENTALS_PER_BLOCK) continue;
+    if (block.filter((el) => el.kind === "Forked Lightning").length !== ELEMENTALS_PER_BLOCK / 2) continue;
+    // All four from one Grand Cross — the filter that rejects a wipe's
+    // death-removals masquerading as a block (see the notes above).
+    if (new Set(block.map((el) => el.grandCrossIndex)).size !== 1) continue;
+
+    const blockTime = block[0].resolvesAt;
+
+    // Death ends the phase — anything from here on is fallout (see notes).
+    // Scoped to the phase (from Grand Cross 1 onward), NOT the whole pull:
+    // a death in an earlier phase that the party rezzed through says nothing
+    // about whether Kefka Says is still resolvable. Vmbf6WYw3QGcMntx pull 20
+    // is exactly that case — Sayacissa Morsaelth dies at +687s in Phase 3
+    // and is raised well before Phase 4 — and an unscoped check silently
+    // suppressed every error in the pull.
+    const priorDeath = firstLethalHit(players, crosses[0].timestamp);
+    if (priorDeath && priorDeath.timestamp < blockTime) break;
+
+    // Everyone's position at the instant the block resolved.
+    const positions = new Map<number, { x: number; y: number }>();
+    for (const player of players) {
+      const hit = player.damageTaken.find(
+        (e) =>
+          RESOLUTION_HIT_ABILITY_IDS.has(e.abilityId) &&
+          e.x !== undefined && e.y !== undefined &&
+          e.timestamp >= blockTime - RESOLUTION_HIT_WINDOW_MS &&
+          e.timestamp <= blockTime + RESOLUTION_HIT_WINDOW_MS
+      );
+      if (hit) positions.set(player.actorId, { x: hit.x as number, y: hit.y as number });
+    }
+    if (positions.size < 2) continue; // no usable positions — unknown, not wrong
+
+    const nearestOther = (actorId: number): number | null => {
+      const self = positions.get(actorId);
+      if (!self) return null;
+      let best = Infinity;
+      for (const [otherId, other] of positions) {
+        if (otherId === actorId) continue;
+        best = Math.min(best, distanceYalms(self, other));
+      }
+      return Number.isFinite(best) ? best : null;
+    };
+
+    const blockErrors: PullError[] = [];
+
+    for (const el of block) {
+      const mustSpread =
+        el.grandCrossState === "REAL"
+          ? el.kind === "Forked Lightning"
+          : el.kind === "Compressed Water";
+
+      const nearest = nearestOther(el.player.actorId);
+      if (nearest === null) continue;
+
+      const isolated = nearest > ISOLATION_THRESHOLD_YALMS;
+      if (isolated === mustSpread) continue; // did the right thing
+
+      const cross = `Grand Cross ${el.grandCrossIndex + 1}`;
+      const state = el.grandCrossState === "REAL" ? "real" : "fake";
+      const distance = nearest.toFixed(1);
+
+      blockErrors.push({
+        ruleId:      mustSpread ? FAILED_TO_SPREAD_RULE_ID : FAILED_TO_STACK_RULE_ID,
+        severity:    "Major",
+        name:        mustSpread ? "Failed To Spread" : "Failed To Stack",
+        description: mustSpread
+          ? `Held ${el.kind} from ${cross}, which was ${state}, so they had to spread away from the party before it expired. They were still packed in with the group instead — nearest player ~${distance} yalms away — dropping their spread on top of it.`
+          : `Held ${el.kind} from ${cross}, which was ${state}, so they had to stay stacked with their group before it expired. They were off on their own instead — ~${distance} yalms from the nearest player — leaving the stack short and taking the hit alone.`,
+        timestamp:   blockTime,
+        player:      el.player.name,
+        class:       el.player.className,
+        specId:      el.player.specId,
+        role:        el.player.role,
+        abilityId:   el.kind === "Forked Lightning" ? FORKED_LIGHTNING_ABILITY_ID : COMPRESSED_WATER_ABILITY_ID,
+        abilityName: el.kind,
+      });
+    }
+
+    errors.push(...blockErrors);
+    if (blockErrors.length === 0) continue;
+
+    // Did this block's mistakes kill someone? If so the phase is over.
+    const lethal = firstLethalHit(players, blockTime, DEATH_LOOKAHEAD_MS);
+    if (!lethal) continue;
+
+    errors.push({
+      ruleId:      PHASE_UNRESOLVABLE_RULE_ID,
+      severity:    "Raid",
+      name:        "Phase Unresolvable After Death",
+      description: `${lethal.player.name} was killed by ${lethal.event.abilityName} resolving this block. Kefka Says needs all eight players alive to finish resolving — every remaining debuff, gaze and replay from here is treated as fallout and is not analysed further.`,
+      timestamp:   lethal.timestamp,
+      abilityId:   lethal.event.abilityId,
+      abilityName: lethal.event.abilityName,
+    });
+    break;
+  }
+
+  return errors;
+}
+
 /**
  * Phase 4 ("Kefka Says") detection entry point. Returns [] for any pull that
- * never reaches Flood of Naught — self-gating on Antilight damage rather than
- * an encounter-name check, so it is safe to always call.
+ * never reaches the phase — both checks self-gate on their own evidence
+ * (Antilight damage; a resolved block of 4 elementals plus a decoded Grand
+ * Cross state) rather than on an encounter-name check, so it is safe to
+ * always call. `stateSignals` may be empty on captures fetched before
+ * lib/ffl-client.ts started requesting enemy debuffs — the block check then
+ * reports nothing rather than guessing.
  */
-export function detectKefkaSaysErrors(players: PlayerInfo[]): PullError[] {
-  return detectFloodOfNaughtErrors(players).sort((a, b) => a.timestamp - b.timestamp);
+export function detectKefkaSaysErrors(
+  players:         PlayerInfo[],
+  enemyCastEvents: EnemyEvent[] = [],
+  stateSignals:    KefkaSaysStateSignal[] = []
+): PullError[] {
+  return [
+    ...detectFloodOfNaughtErrors(players),
+    ...detectResolutionBlockErrors(players, enemyCastEvents, stateSignals),
+  ].sort((a, b) => a.timestamp - b.timestamp);
 }

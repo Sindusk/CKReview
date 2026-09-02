@@ -130,6 +130,7 @@ function makeFFPullCtx(pull, actorMap, abilityMap, getFFJobByName) {
     relPlayers:      () => memo('relPlayers', () => ffb.buildFFPlayers(rel(), actorMap, getFFJobByName, abilityMap)),
     relDeaths:       () => memo('relDeaths', () => ffb.buildFFDeaths(rel(), actorMap, getFFJobByName)),
     relEnemyCasts:   () => memo('relEnemyCasts', () => ffb.buildFFEnemyCastEvents(rel(), actorMap, abilityMap)),
+    relStateSignals: () => memo('relStateSignals', () => ffb.buildFFKefkaSaysStateSignals(rel(), actorMap)),
   };
 }
 
@@ -228,7 +229,7 @@ const MECHANICS = {
     game: 'ff',
     load: () => requireTsFromRoot('lib/mechanics/ffxiv/dancingmad/kefka-says.ts'),
     run({ mod, ctxs }) {
-      for (const c of ctxs) printPullErrors(c, mod.detectKefkaSaysErrors(c.relPlayers()));
+      for (const c of ctxs) printPullErrors(c, mod.detectKefkaSaysErrors(c.relPlayers(), c.relEnemyCasts(), c.relStateSignals()));
     },
   },
 

@@ -114,6 +114,13 @@ function buildFFPlayers(rep, actorMap, getFFJobByName, abilityMap) {
         sourceInstance: e.sourceInstance,
         x: e.targetResources?.x,
         y: e.targetResources?.y,
+        // Post-hit HP snapshot. The live pipeline
+        // (lib/log-transforms.ts's fflDamageTakenToPlayerEvent) has always
+        // set these; this builder did not, so a mechanic reading
+        // healthAfter worked in the app and silently found nothing in the
+        // harness (hit while building kefka-says.ts's lethal-hit anchor).
+        healthAfter: e.targetResources?.hitPoints,
+        maxHealth: e.targetResources?.maxHitPoints,
         overkill: e.overkill,
         activeBuffNames: abilityMap
           ? (e.buffs ?? '').split('.').filter(Boolean).map((id) => abilityMap.get(Number(id))).filter(Boolean)
@@ -206,6 +213,21 @@ function buildFFEnemyCastEvents(rep, actorMap, abilityMap) {
     }));
 }
 
+// Mirrors lib/log-transforms.ts's fflBuildKefkaSaysStateSignals — the hidden
+// real/fake bit Dancing Mad Phase 4 stamps on a boss actor (status 1002056,
+// extraInfo even = real / odd = fake). Lives on the enemyDebuffs stream,
+// which older captures predate — those yield [] and the mechanic reports
+// nothing rather than guessing.
+function buildFFKefkaSaysStateSignals(rep, actorMap) {
+  return (rep.enemyDebuffs?.data ?? [])
+    .filter((e) => e.type === 'applydebuff' && e.abilityGameID === 1002056 && e.extraInfo !== undefined)
+    .map((e) => ({
+      timestamp: e.timestamp,
+      actorName: actorMap.get(e.targetID)?.name || `Unknown (${e.targetID})`,
+      value: e.extraInfo,
+    }));
+}
+
 // Mirrors lib/log-transforms.ts's fflBuildStompiesPuddleSamples — every
 // "Blizzard III" ghost puddle's own spawn position (Stompies/Earthquake
 // mechanic), matched by ability NAME (not ID — shares "Blizzard III" with
@@ -236,4 +258,4 @@ function buildFFPlayerPositionSamples(rep, actorMap) {
     }));
 }
 
-module.exports = { buildFFPlayers, buildFFDeaths, buildFFBlackHoleGeometry, buildFFEnemyCastEvents, buildFFStompiesPuddleSamples, buildFFPlayerPositionSamples };
+module.exports = { buildFFPlayers, buildFFDeaths, buildFFBlackHoleGeometry, buildFFEnemyCastEvents, buildFFKefkaSaysStateSignals, buildFFStompiesPuddleSamples, buildFFPlayerPositionSamples };

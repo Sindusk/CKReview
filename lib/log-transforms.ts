@@ -61,6 +61,7 @@ import { detectExdeathErrors } from "./mechanics/ffxiv/dancingmad/exdeath";
 import { detectStompiesErrors } from "./mechanics/ffxiv/dancingmad/stompies";
 import { detectPhase1Errors } from "./mechanics/ffxiv/dancingmad/phase1";
 import { detectKefkaSaysErrors } from "./mechanics/ffxiv/dancingmad/kefka-says";
+import type { KefkaSaysStateSignal } from "./mechanics/ffxiv/dancingmad/kefka-says";
 import { detectMidnightFallsErrors } from "./mechanics/wow/vs-dr-mqd/midnightfalls";
 
 // Shared shape for both games' ability maps: gameID -> name + raw icon
@@ -936,6 +937,30 @@ function fflBuildEnemyBuffEvents(
     }));
 }
 
+// Dancing Mad Phase 4's hidden real/fake bit. FFLogs stamps status 1002056
+// on a boss actor with an `extraInfo` payload that is even for a REAL
+// mechanic and odd for a FAKE one — the only machine-readable signal for it
+// anywhere in the log (see lib/mechanics/ffxiv/dancingmad/kefka-says.ts).
+// Reads the enemyDebuffs stream, which is scoped by target.type rather than
+// hostilityType precisely so the Chaos-actor signals aren't dropped — see
+// FIGHT_EVENTS_QUERY's comment in lib/ffl-client.ts.
+function fflBuildKefkaSaysStateSignals(
+  enemyDebuffEvents: FFLDebuffEvent[],
+  actorMap:          Map<number, FFLActor>,
+  fightStart:        number
+): KefkaSaysStateSignal[] {
+  return enemyDebuffEvents
+    .filter((e) => e.type === "applydebuff" && e.abilityGameID === KEFKA_SAYS_STATE_ABILITY_ID)
+    .filter((e) => e.extraInfo !== undefined)
+    .map((e) => ({
+      timestamp: Math.max(0, e.timestamp - fightStart),
+      actorName: actorMap.get(e.targetID)?.name ?? `Unknown (${e.targetID})`,
+      value:     e.extraInfo as number,
+    }));
+}
+
+const KEFKA_SAYS_STATE_ABILITY_ID = 1002056;
+
 // Raw geometry data for the Black Hole mechanic's direction/priority
 // detection (see types/Pull.ts's BlackHoleGeometry + blackhole-strategy.ts's
 // module comment). Reads straight from the SAME enemyCastEvents stream
@@ -1157,6 +1182,7 @@ export function transformFFightToPull(
   // hostilityType: "Enemies" fetches — NOT data.castEvents/debuffEvents.
   const enemyCastEvents = fflBuildEnemyCastEvents(data.enemyCastEvents ?? [], actorMap, abilityMap, fightStart);
   const enemyBuffEvents = fflBuildEnemyBuffEvents(data.enemyBuffEvents ?? [], actorMap, abilityMap, fightStart);
+  const kefkaSaysSignals = fflBuildKefkaSaysStateSignals(data.enemyDebuffEvents ?? [], actorMap, fightStart);
   const blackHoleGeometry = fflBuildBlackHoleGeometry(data.enemyCastEvents ?? [], actorMap, abilityMap, fightStart);
   const stompiesPuddleSamples = fflBuildStompiesPuddleSamples(data.enemyCastEvents ?? [], abilityMap, fightStart);
   const playerPositionSamples = fflBuildPlayerPositionSamples(data.enemyDamageTakenEvents ?? [], actorMap, fightStart);
@@ -1169,7 +1195,7 @@ export function transformFFightToPull(
     ...detectExdeathErrors(players, deathEvents),
     ...detectStompiesErrors(players, deathEvents, enemyCastEvents, blackHoleGeometry, stompiesPuddleSamples, playerPositionSamples),
     ...detectPhase1Errors(players, deathEvents, enemyCastEvents),
-    ...detectKefkaSaysErrors(players),
+    ...detectKefkaSaysErrors(players, enemyCastEvents, kefkaSaysSignals),
   ].sort((a, b) => a.timestamp - b.timestamp);
 
   const fightDurationMs = data.fight.endTime - data.fight.startTime;
