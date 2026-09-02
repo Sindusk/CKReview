@@ -1195,7 +1195,7 @@ export function transformFFightToPull(
     ...detectExdeathErrors(players, deathEvents),
     ...detectStompiesErrors(players, deathEvents, enemyCastEvents, blackHoleGeometry, stompiesPuddleSamples, playerPositionSamples),
     ...detectPhase1Errors(players, deathEvents, enemyCastEvents),
-    ...detectKefkaSaysErrors(players, enemyCastEvents, kefkaSaysSignals),
+    ...detectKefkaSaysErrors(players, deathEvents, enemyCastEvents, kefkaSaysSignals),
   ].sort((a, b) => a.timestamp - b.timestamp);
 
   const fightDurationMs = data.fight.endTime - data.fight.startTime;

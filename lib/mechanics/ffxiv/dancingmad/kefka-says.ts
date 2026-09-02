@@ -483,6 +483,7 @@
 
 import type { PlayerEvent, PlayerInfo } from "@/types/PlayerInfo";
 import type { EnemyEvent, PullError } from "@/types/PullError";
+import type { DeathEvent } from "@/types/DeathEvent";
 
 export const FLOOD_WRONG_SIDE_RULE_ID = "ffxiv-kefka-says-flood-wrong-side";
 
@@ -717,6 +718,7 @@ export type KefkaSaysStateSignal = {
 
 export const FAILED_TO_SPREAD_RULE_ID   = "ffxiv-kefka-says-failed-to-spread";
 export const FAILED_TO_STACK_RULE_ID    = "ffxiv-kefka-says-failed-to-stack";
+export const ACCELERATION_BOMB_RULE_ID  = "ffxiv-kefka-says-acceleration-bomb";
 export const PHASE_UNRESOLVABLE_RULE_ID = "ffxiv-kefka-says-death-unresolvable";
 
 const GRAND_CROSS_ABILITY_ID     = 47892;
@@ -747,8 +749,13 @@ const RESOLUTION_HIT_WINDOW_MS = 2500;
 // bottom out at 11.3y.
 const ISOLATION_THRESHOLD_YALMS = 7;
 
-// How far past a block to look for the death it caused.
-const DEATH_LOOKAHEAD_MS = 30_000;
+// How far back from a DeathEvent to find the hit that actually killed —
+// FFLogs' lag is ~2.0s in every case measured.
+const DEATH_HIT_LOOKBACK_MS = 3_000;
+
+// A death only ends the phase "because of an error" when one of these errors
+// landed shortly before it.
+const DEATH_ATTRIBUTION_WINDOW_MS = 30_000;
 
 // FFLogs positions are centi-yalms.
 const CENTI_YALMS_PER_YALM = 100;
@@ -790,39 +797,51 @@ function grandCrossStates(
 }
 
 /**
- * The earliest damage event that took any player to 0 HP at or after `from`.
- * `within` bounds the search when asking "did THIS block kill someone"; omit
- * it to ask "has anyone died at all yet".
+ * The first death of the phase, timestamped at the LETHAL HIT rather than at
+ * the DeathEvent.
  *
- * Deliberately keyed on the lethal HIT rather than DeathEvent — see the
- * "Death ends the analysis" note above for why the ~2s DeathEvent lag would
- * mis-order the Raid marker against its own fallout.
+ * Both halves of that matter. DeathEvent is the only trustworthy signal that
+ * someone actually died — an earlier version of this scanned for a damage
+ * event leaving the target at 0 HP, which a Dark Knight's Living Dead
+ * produces without dying at all (dQ8w pull 15 has three such hits on Kitsune
+ * Cassie minutes before Phase 4). But FFLogs records the DeathEvent ~2.0s
+ * after the killing blow, and a marker placed there would sort AFTER the
+ * Damage Down / Petrification errors the death itself causes. So the death
+ * is taken from deathEvents and its timestamp from the 0-HP hit just before
+ * it, falling back to the DeathEvent when the kill left no damage event at
+ * all (Vmbf p20 Archidel: death at +811.38s, lethal hit at +809.38s; 3MfQ
+ * p17 Sayacissa dies to an unresolved Beyond Death expiring, which carries
+ * no damage event and no killing ability id, so the fallback applies).
  */
-function firstLethalHit(
-  players: PlayerInfo[],
-  from:    number,
-  within?: number
-): { timestamp: number; player: PlayerInfo; event: PlayerEvent } | null {
-  let best: { timestamp: number; player: PlayerInfo; event: PlayerEvent } | null = null;
-  for (const player of players) {
-    for (const e of player.damageTaken) {
-      if (e.timestamp < from) continue;
-      if (within !== undefined && e.timestamp > from + within) continue;
-      if (e.healthAfter !== 0) continue;
-      if (!best || e.timestamp < best.timestamp) best = { timestamp: e.timestamp, player, event: e };
-    }
-  }
-  return best;
+function firstPhaseDeath(
+  players:     PlayerInfo[],
+  deathEvents: DeathEvent[],
+  from:        number
+): { timestamp: number; playerName: string; abilityId: number; abilityName: string } | null {
+  const deaths = deathEvents
+    .filter((d) => d.timestamp >= from)
+    .sort((a, b) => a.timestamp - b.timestamp);
+  const death = deaths[0];
+  if (!death) return null;
+
+  const victim = players.find((p) => p.name === death.player);
+  const lethal = victim?.damageTaken
+    .filter((e) => e.healthAfter === 0 && e.timestamp <= death.timestamp && e.timestamp >= death.timestamp - DEATH_HIT_LOOKBACK_MS)
+    .sort((a, b) => b.timestamp - a.timestamp)[0];
+
+  return {
+    timestamp:   lethal?.timestamp ?? death.timestamp,
+    playerName:  death.player,
+    abilityId:   lethal?.abilityId ?? death.killingAbilityGameId,
+    abilityName: lethal?.abilityName ?? death.cause,
+  };
 }
 
 function detectResolutionBlockErrors(
-  players:         PlayerInfo[],
-  enemyCastEvents: EnemyEvent[],
-  stateSignals:    KefkaSaysStateSignal[]
+  players: PlayerInfo[],
+  crosses: { timestamp: number; state: "REAL" | "FAKE" }[],
+  cutoff:  number
 ): PullError[] {
-  const crosses = grandCrossStates(enemyCastEvents, stateSignals);
-  if (crosses.length === 0) return []; // no decoded state — unknown, never guess
-
   // Every elemental application, tagged with the Grand Cross that applied it
   // and the removal (= expiry) that resolves it.
   const elementals: Elemental[] = [];
@@ -877,14 +896,7 @@ function detectResolutionBlockErrors(
     const blockTime = block[0].resolvesAt;
 
     // Death ends the phase — anything from here on is fallout (see notes).
-    // Scoped to the phase (from Grand Cross 1 onward), NOT the whole pull:
-    // a death in an earlier phase that the party rezzed through says nothing
-    // about whether Kefka Says is still resolvable. Vmbf6WYw3QGcMntx pull 20
-    // is exactly that case — Sayacissa Morsaelth dies at +687s in Phase 3
-    // and is raised well before Phase 4 — and an unscoped check silently
-    // suppressed every error in the pull.
-    const priorDeath = firstLethalHit(players, crosses[0].timestamp);
-    if (priorDeath && priorDeath.timestamp < blockTime) break;
+    if (blockTime > cutoff) break;
 
     // Everyone's position at the instant the block resolved.
     const positions = new Map<number, { x: number; y: number }>();
@@ -947,22 +959,118 @@ function detectResolutionBlockErrors(
     }
 
     errors.push(...blockErrors);
-    if (blockErrors.length === 0) continue;
+  }
 
-    // Did this block's mistakes kill someone? If so the phase is over.
-    const lethal = firstLethalHit(players, blockTime, DEATH_LOOKAHEAD_MS);
-    if (!lethal) continue;
+  return errors;
+}
 
-    errors.push({
-      ruleId:      PHASE_UNRESOLVABLE_RULE_ID,
-      severity:    "Raid",
-      name:        "Phase Unresolvable After Death",
-      description: `${lethal.player.name} was killed by ${lethal.event.abilityName} resolving this block. Kefka Says needs all eight players alive to finish resolving — every remaining debuff, gaze and replay from here is treated as fallout and is not analysed further.`,
-      timestamp:   lethal.timestamp,
-      abilityId:   lethal.event.abilityId,
-      abilityName: lethal.event.abilityName,
-    });
-    break;
+// ═══════════════════════════════════════════════════════════════════════════
+// IMPLEMENTATION: ACCELERATION BOMB STILLNESS / MOTION
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Confirmed 2026-09-02 against dQ8wmb1VhKt6yBXk pull 15 (both failures
+// adjudicated by the user) with a second instance in pull 3.
+//
+// Acceleration Bomb resolves with the state of the Grand Cross that applied
+// it: REAL means stillness (no movement, no actions as it expires), FAKE
+// means motion. The punish for getting it wrong is its own ability:
+//
+//   47893  Death Bomb
+//
+// Death Bomb is a pure failure signal — it appears exactly 3 times in every
+// FF report on disk (dQ8w pull 15 on No Ri and Alerry Han, pull 3 on No Ri)
+// and never on a correctly-resolved bomb. So detection anchors on the hit
+// itself rather than trying to prove movement: player movement is not
+// directly observable in FFLogs, and the position stream is far too sparse
+// to infer it. This is the README's "gate on OUTCOME" rule again.
+//
+// The required behavior still has to be named in the error, which is why the
+// check walks back from the Death Bomb to the Acceleration Bomb removal that
+// resolved (within 1s — observed 270ms in pull 15), then to the application
+// that removal closes, and finally to the Grand Cross that applied it.
+//
+// Where an action broke the stillness the log names it outright: Alerry Han
+// cast First Legacy at +832.03s, the exact millisecond his bomb expired, and
+// took 226,668 (his full health). No Ri has no action anywhere near his
+// expiry, so his break was movement — the description omits the clause
+// rather than inventing one.
+
+const DEATH_BOMB_ABILITY_ID       = 47893;
+const ACCELERATION_BOMB_ABILITY_ID = 1005546;
+
+// Death Bomb lands shortly after the debuff falls off (270ms in dQ8w p15).
+const BOMB_RESOLUTION_WINDOW_MS = 1000;
+
+// How close an action has to be to the expiry to be named as the cause.
+const BREAKING_ACTION_WINDOW_MS = 500;
+
+function detectAccelerationBombErrors(
+  players: PlayerInfo[],
+  crosses: { timestamp: number; state: "REAL" | "FAKE" }[],
+  cutoff:  number
+): PullError[] {
+  const errors: PullError[] = [];
+
+  for (const player of players) {
+    for (const bomb of player.damageTaken) {
+      if (bomb.abilityId !== DEATH_BOMB_ABILITY_ID) continue;
+      if (bomb.timestamp > cutoff) continue;
+
+      // The Acceleration Bomb this punished, and the Grand Cross behind it.
+      const removal = player.debuffs.find(
+        (d) =>
+          d.abilityId === ACCELERATION_BOMB_ABILITY_ID &&
+          d.debuffStatus === "removed" &&
+          Math.abs(d.timestamp - bomb.timestamp) <= BOMB_RESOLUTION_WINDOW_MS
+      );
+      if (!removal) continue;
+
+      const application = player.debuffs
+        .filter(
+          (d) =>
+            d.abilityId === ACCELERATION_BOMB_ABILITY_ID &&
+            d.debuffStatus === "applied" &&
+            d.timestamp < removal.timestamp
+        )
+        .pop();
+      if (!application) continue;
+
+      const crossIndex = crosses.findIndex(
+        (c) => Math.abs(application.timestamp - c.timestamp) <= GRAND_CROSS_MATCH_WINDOW_MS
+      );
+      if (crossIndex === -1) continue; // unknown provenance — never guess
+
+      const state    = crosses[crossIndex].state;
+      const required = state === "REAL" ? "stillness" : "motion";
+
+      // Name the action that broke it, when there is one.
+      const breakingAction = player.casts.find(
+        (c) => Math.abs(c.timestamp - removal.timestamp) <= BREAKING_ACTION_WINDOW_MS
+      );
+
+      const requirement =
+        required === "stillness"
+          ? "they had to be completely still — no movement and no actions — as it expired"
+          : "they had to be moving as it expired";
+      const evidence = breakingAction
+        ? ` They used ${breakingAction.abilityName} at the moment it went off.`
+        : "";
+
+      errors.push({
+        ruleId:      ACCELERATION_BOMB_RULE_ID,
+        severity:    "Major",
+        name:        required === "stillness" ? "Moved With Acceleration Bomb" : "Stood Still With Acceleration Bomb",
+        description: `Held Acceleration Bomb from Grand Cross ${crossIndex + 1}, which was ${state === "REAL" ? "real" : "fake"}, so ${requirement}.${evidence} Death Bomb detonated on them for ${bomb.amount?.toLocaleString() ?? "?"}.`,
+        timestamp:   bomb.timestamp,
+        player:      player.name,
+        class:       player.className,
+        specId:      player.specId,
+        role:        player.role,
+        abilityId:   DEATH_BOMB_ABILITY_ID,
+        abilityName: bomb.abilityName,
+        amount:      bomb.amount,
+      });
+    }
   }
 
   return errors;
@@ -970,20 +1078,69 @@ function detectResolutionBlockErrors(
 
 /**
  * Phase 4 ("Kefka Says") detection entry point. Returns [] for any pull that
- * never reaches the phase — both checks self-gate on their own evidence
- * (Antilight damage; a resolved block of 4 elementals plus a decoded Grand
- * Cross state) rather than on an encounter-name check, so it is safe to
- * always call. `stateSignals` may be empty on captures fetched before
- * lib/ffl-client.ts started requesting enemy debuffs — the block check then
- * reports nothing rather than guessing.
+ * never reaches the phase — every check self-gates on its own evidence
+ * (Antilight damage; a resolved block of 4 elementals; a Death Bomb) rather
+ * than on an encounter-name check, so it is safe to always call.
+ * `stateSignals` may be empty on captures fetched before lib/ffl-client.ts
+ * started requesting enemy debuffs — the state-dependent checks then report
+ * nothing rather than guessing.
+ *
+ * The phase cutoff and the Raid marker live here rather than inside any one
+ * check, because a pull has exactly ONE first death no matter which mistake
+ * caused it: whichever check fires, the marker is emitted once and everything
+ * after it is fallout.
  */
 export function detectKefkaSaysErrors(
   players:         PlayerInfo[],
+  deathEvents:     DeathEvent[] = [],
   enemyCastEvents: EnemyEvent[] = [],
   stateSignals:    KefkaSaysStateSignal[] = []
 ): PullError[] {
-  return [
-    ...detectFloodOfNaughtErrors(players),
-    ...detectResolutionBlockErrors(players, enemyCastEvents, stateSignals),
+  const floodErrors = detectFloodOfNaughtErrors(players);
+
+  const crosses = grandCrossStates(enemyCastEvents, stateSignals);
+  if (crosses.length === 0) return floodErrors.sort((a, b) => a.timestamp - b.timestamp);
+
+  // Scoped to the phase (Grand Cross 1 onward), NOT the whole pull: a death
+  // in an earlier phase that the party rezzed through says nothing about
+  // whether Kefka Says is still resolvable. Vmbf6WYw3QGcMntx pull 20 is
+  // exactly that case — Sayacissa Morsaelth dies in Phase 3 and is raised
+  // well before Phase 4 — and an unscoped cutoff suppressed every error in
+  // the pull.
+  const death  = firstPhaseDeath(players, deathEvents, crosses[0].timestamp);
+  const cutoff = death ? death.timestamp : Number.POSITIVE_INFINITY;
+
+  const errors = [
+    ...floodErrors,
+    ...detectResolutionBlockErrors(players, crosses, cutoff),
+    ...detectAccelerationBombErrors(players, crosses, cutoff),
   ].sort((a, b) => a.timestamp - b.timestamp);
+
+  // The death only ends the phase "because of an error" if one of these
+  // errors landed shortly before it — otherwise it is someone else's
+  // problem and this module has nothing to say about it.
+  const causedByError = death
+    ? errors.some(
+        (e) => e.timestamp <= death.timestamp && e.timestamp >= death.timestamp - DEATH_ATTRIBUTION_WINDOW_MS
+      )
+    : false;
+
+  if (death && causedByError) {
+    // Not every kill has a named ability: 3MfQX7h29vPV4xYz pull 17's
+    // Sayacissa dies to an unresolved Beyond Death simply expiring, which
+    // FFLogs records with killingAbilityGameId 0 and resolves to the
+    // placeholder "Environmental". Say "died" rather than name that.
+    const namedCause = death.abilityId !== 0 && !/^environmental$/i.test(death.abilityName ?? "");
+    errors.push({
+      ruleId:      PHASE_UNRESOLVABLE_RULE_ID,
+      severity:    "Raid",
+      name:        "Phase Unresolvable After Death",
+      description: `${death.playerName} ${namedCause ? `was killed by ${death.abilityName}` : "died"}. Kefka Says needs all eight players alive to finish resolving — every remaining debuff, gaze and replay from here is treated as fallout and is not analysed further.`,
+      timestamp:   death.timestamp,
+      abilityId:   death.abilityId,
+      abilityName: death.abilityName,
+    });
+  }
+
+  return errors;
 }
