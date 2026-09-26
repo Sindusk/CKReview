@@ -63,6 +63,7 @@ import { detectPhase1Errors } from "./mechanics/ffxiv/dancingmad/phase1";
 import { detectKefkaSaysErrors } from "./mechanics/ffxiv/dancingmad/kefka-says";
 import type { KefkaSaysStateSignal } from "./mechanics/ffxiv/dancingmad/kefka-says";
 import { detectMidnightFallsErrors } from "./mechanics/wow/vs-dr-mqd/midnightfalls";
+import { detectEntombedSentinelsErrors } from "./mechanics/wow/va/entombed-sentinels";
 
 // Shared shape for both games' ability maps: gameID -> name + raw icon
 // filename (not yet resolved to a URL — that happens per-game via
@@ -294,6 +295,7 @@ function wclDebuffToPlayerEvent(
     abilityIcon: wclAbilityIcon(event, abilityMap),
     extra:       source?.name,
     debuffStatus,
+    stack:       event.stack,
   };
 }
 
@@ -514,6 +516,7 @@ export function transformFightToPull(
   const errors = [
     ...detectPullErrors(players, deathEvents, enemyCastEvents, enemyBuffEvents),
     ...detectMidnightFallsErrors(players, deathEvents, enemyCastEvents, enemyBuffEvents, friendlyNpcDamageEvents),
+    ...detectEntombedSentinelsErrors(players, deathEvents, enemyCastEvents),
   ].sort((a, b) => a.timestamp - b.timestamp);
 
   const fightDurationMs = data.fight.endTime - data.fight.startTime;

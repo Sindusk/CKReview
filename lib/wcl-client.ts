@@ -291,6 +291,8 @@ export type WCLDebuffEvent = {
   ability?: {
     name: string;
   };
+  // New stack count, present on "applydebuffstack" events.
+  stack?:        number;
 };
 
 // Mirrors WCLDebuffEvent, but for buffs. Needed for the "enemyBuffApplied"

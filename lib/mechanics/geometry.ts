@@ -48,6 +48,19 @@ export function distanceBetween(a: Position, b: Position): number {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
+/**
+ * Shortest distance from `p` to the line SEGMENT a→b (clamped to the
+ * endpoints), in raw log units. Used for projectile paths (Entombed
+ * Sentinels' returning Living Venom travels in a straight line).
+ */
+export function distanceToSegment(p: Position, a: Position, b: Position): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const lenSq = dx * dx + dy * dy;
+  const t = lenSq === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq));
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+}
+
 /** Distance from the Dancing Mad arena center, in raw log units. */
 export function distanceFromCenter(x: number, y: number): number {
   return Math.hypot(x - ARENA_CENTER, y - ARENA_CENTER);

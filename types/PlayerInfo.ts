@@ -54,6 +54,12 @@ export type PlayerEvent = {
   // ("was this debuff active on the player at time T?").
   debuffStatus?: "applied" | "removed" | "stack" | "stackRemoved";
 
+  // Debuffs — WCL only. The NEW stack count carried on a "stack" event
+  // (WCL's applydebuffstack `stack` field). Entombed Sentinels' Helical
+  // Toxins reports the combined toxin total here when two players collide
+  // (see lib/mechanics/wow/va/entombed-sentinels.ts).
+  stack?: number;
+
   // Debuffs — FFXIV only. The specific attack that caused this debuff
   // application (e.g. which boss cast applied Damage Down), when FFLogs
   // reports one (see FFLDebuffEvent.extraAbilityGameID). Lets error-

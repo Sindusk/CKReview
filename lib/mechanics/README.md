@@ -22,6 +22,9 @@ lib/mechanics/
       midnightfalls.ts        — Midnight Falls per-pull rules
       terminate-kicks.ts      — cross-pull Terminate kick-order detection
       crystal-assignments.ts  — declared crystal assignments
+    va/                       — The Venomous Abyss
+      entombed-sentinels.ts   — Entombed Sentinels per-pull rules (orbs, Living Venom,
+                                Helical Toxins, Protovenom, Miasma soak, pools)
 ```
 
 **Read the header comment of a module before touching it.** Each module's

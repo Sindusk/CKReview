@@ -75,6 +75,10 @@ function buildWowPull(rep, actorMap, abilityMap, getSpecInfo) {
         abilityId: e.abilityGameID ?? 0,
         abilityName: abilityName(e.abilityGameID ?? 0),
         amount: e.amount ?? 0,
+        // Same derivation as the live wclDamageTakenToPlayerEvent.
+        healthBefore: e.hitPoints !== undefined ? e.hitPoints + (e.amount ?? 0) : undefined,
+        healthAfter: e.hitPoints,
+        maxHealth: e.maxHitPoints,
         overkill: e.overkill,
         isDoT: e.tick === true,
         x: e.x,
@@ -88,6 +92,7 @@ function buildWowPull(rep, actorMap, abilityMap, getSpecInfo) {
           e.type === 'removedebuff' ? 'removed' :
           e.type === 'applydebuffstack' ? 'stack' :
           e.type === 'removedebuffstack' ? 'stackRemoved' : 'applied',
+        stack: e.stack,
       })),
     };
   });
