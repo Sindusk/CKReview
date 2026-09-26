@@ -589,6 +589,11 @@ function inferPlayerTeams(lossesByPlayer: Map<number, number[]>): Map<number, "f
 // h2JvDkntZCaBgmLF, whose pairing the user confirmed directly 2026-08-03
 // ("Azura and Kade got stack ... Azura + partner (Salty)", i.e. WHM ↔ GNB).
 // Every other slot has only ever been seen filled by one job.
+//
+// The burst partner decides TEAM membership only, not who shares your tower:
+// across every report on disk, observed co-soakers matched burst partners on
+// just 144 of 334 clean 2-person towers. Don't derive a player's expected
+// soak spot from their burst partner's debuff (tried 2026-08-03, abandoned).
 const FORSAKEN_PARTNER_PAIRS: ReadonlyArray<readonly [readonly string[], readonly string[]]> = [
   [["White Mage"], ["Paladin", "Gunbreaker"]], // Healer1/Regen <-> MT
   [["Sage"],       ["Dark Knight"]],           // Healer2/Shield <-> OT

@@ -1,45 +1,105 @@
-# VoD Coding
+# VoD Coding (CKReview)
 
-Raid log analysis app (Next.js) that imports WCL/FFLogs reports and flags
-per-pull player errors for VOD review. FFXIV (Dancing Mad ultimate) and WoW
-(Midnight Falls, The Venomous Abyss) are the active encounters.
+Instructions for **any** agent working in this repo. The file name is
+historical; [AGENTS.md](AGENTS.md) points here.
 
-**Before doing ANY mechanic-detection work, read `lib/mechanics/README.md`.**
-It contains:
-- the severity definitions and attribution philosophy (mandatory; learned
-  through user corrections)
+Raid log analysis app (Next.js + Prisma/Postgres) that imports Warcraft Logs
+(WoW) and FFLogs (FFXIV) reports and flags per-pull player errors for VOD
+review. Active encounters:
+- FFXIV: Dancing Mad ultimate
+- WoW: Midnight Falls, The Venomous Abyss
+
+## Docs map — read the one that matches your task
+
+| Task | Read |
+|---|---|
+| Researching a boss/mechanic model | [lib/mechanics/MODEL-RESEARCH-GUIDE.md](lib/mechanics/MODEL-RESEARCH-GUIDE.md) |
+| Building or changing mechanic detection | [lib/mechanics/README.md](lib/mechanics/README.md), then the module's own header comment |
+| App features, UI, data flow | [docs/app-architecture.md](docs/app-architecture.md) |
+| Sample data, auth tokens, scripts, browser checks, deploy pipeline | [docs/dev-tooling.md](docs/dev-tooling.md) |
+| What's unfinished or waiting on a user decision | [docs/open-items.md](docs/open-items.md) |
+| Which ports are taken locally and in production | [PORTS.md](PORTS.md) |
+
+**Mechanic detection is mandatory-reading territory.** `lib/mechanics/README.md`
+holds:
+- the severity definitions and the attribution philosophy (learned through
+  user corrections)
 - the four-stage workflow for a new boss
-- FFLogs/WCL data-shape semantics
-- known pitfalls
+- log data semantics and known pitfalls
 
 Each mechanic module's own header comment is the authoritative model for
-that specific mechanic — read it before editing the module.
+that mechanic — read it before editing the module.
 
-How new detection starts:
-- **Researchers:** a researcher (Codex) first writes the boss's encounter
-  model into the module header. **Anyone researching or writing such a
-  model must follow `lib/mechanics/MODEL-RESEARCH-GUIDE.md`.**
-- **Claude:** verifies that model against a real report the user provides,
-  then builds detection from the verified model.
-- **The user:** reviews the result on VOD. That feedback is ground truth
-  and becomes code changes plus `expectations/rulings.json` entries.
+## Roles in the detection workflow
 
-Quick facts:
-- Sample data: `sampledata/` (gitignored), fetched via
-  `node scripts/fetch-{ff,wow}-report.js <code-or-URL>`.
-- Validation: `node scripts/validate.js --check` (compares every mechanic's
-  output against local `expectations/` baselines + rulings; args narrow by
-  mechanic name and/or report folder), plus `npx tsc --noEmit`, before
-  considering any mechanic change done. Intended behavior changes: verify
-  the `--check` diff is exactly the intended delta, then `--update`.
-  `expectations/rulings.json` is hand-edited only — never regenerated.
-  `expectations/` and `sampledata/` are both gitignored local dev tools
-  (log-derived data stays off GitHub); `--prune` drops snapshots for
+1. **Research** — an agent writes the boss's encounter model into the module
+   header. Follow the research guide.
+2. **Verification and detection** — an agent checks that model against a real
+   report the user supplies, then builds the rules.
+3. **Review** — the user watches the pulls on VOD. **Their feedback is ground
+   truth.** It becomes code changes plus hand-written entries in
+   `expectations/rulings.json`.
+
+Any agent may take roles 1 or 2. The user has used Codex for research and
+Claude for detection so far, but nothing in the repo depends on that split.
+
+## Working with the user
+
+These are standing preferences, each learned from a real correction:
+- **Git: commit and push to `main` without asking**, once a change works:
+  validate.js and tsc pass, or, for UI work, the change has been reviewed.
+  This is standing authorization. The local remote is named **`CKReview`**,
+  not `origin` (`git push CKReview main`).
+- **Never deploy.** Don't SSH into the production server or run
+  `./deploy.sh`. The user deploys themselves for oversight after pulling
+  your commits. When done, say the change is ready to deploy.
+- **The GitHub repo is public.** Before committing anything that documents
+  infrastructure, credentials, hostnames, logins, internal URLs or personal
+  data, look at what it contains and offer the user three options: redact,
+  push as-is, or gitignore. Prefer redacting the sensitive lines over
+  dropping the file. `sampledata/`, `expectations/`, `.credentials/` and
+  `.env` are gitignored on purpose.
+- **VOD review arrives in batches.** The user writes up a whole night's
+  pulls in one message, so take the whole batch.
+  - Verify each fix independently with `validate.js --check`.
+  - Group related mechanics rather than going strictly pull by pull.
+  - Write rulings at the end, once detection has settled.
+  - When the user's account and the log disagree, pin only the confirmed
+    part and ask about the rest.
+- **Narrow overrides, not wholesale replacement.** When a working mechanism
+  fails for one specific case, add a scoped override for that case. Don't
+  swap the whole mechanism.
+- **After ~2 failed fixes with the same symptom, stop guessing.** Add
+  labeled diagnostic logging (plain strings, not objects) at the decision
+  points, or measure in a headless browser (docs/dev-tooling.md). Then get
+  one real trace. Remove the logging once the bug is fixed.
+- **Small UI tweaks: don't run a visual verification loop.** The user is
+  usually driving the running app and checks visually themselves. Make the
+  edit, typecheck, and stop. Measure only when a symptom survives repeated
+  fixes, or when asked.
+- **Research before planning non-trivial features.** Get exact signatures,
+  types and existing idioms before designing.
+- **No hidden costs on navigation.** A Back link or route change must never
+  silently trigger a fetch. WCL/FFLogs are rate-limited, so re-fetching is
+  an explicit button the user clicks.
+- **"Check if X exists" should be metadata-only.** Never fetch a full
+  payload just to decide whether to prompt; a 277MB report once stalled the
+  UI for 10s that way.
+
+## Quick facts
+
+- **Sample data:** `sampledata/` is gitignored. Fetch it with
+  `node scripts/fetch-{ff,wow}-report.js <code-or-URL>`; setup is in
+  docs/dev-tooling.md.
+- **Validation:** before considering any mechanic change done, run:
+  - `node scripts/validate.js --check`, which compares every mechanic's
+    output against local `expectations/` baselines and rulings. Args narrow
+    it by mechanic name and/or report folder.
+  - `npx tsc --noEmit`
+
+  For an intended behavior change, verify the `--check` diff is exactly the
+  intended delta, then run `--update`. `expectations/rulings.json` is
+  hand-edited only and never regenerated. `--prune` drops snapshots for
   deleted reports.
-
-Git workflow: once a change is working (validate.js + tsc pass, or for
-non-mechanic UI work it's been reviewed), commit and push to `main` on
-GitHub without stopping to ask first — this is standing authorization, not
-a one-off. Deploying is a separate, deliberately manual step: never SSH
-into the production server or run `./deploy.sh` — the user runs that
-themselves for oversight after pulling your pushed commits.
+- **No Tailwind reset is active.** The app is styled with inline `style`
+  objects, and browser default styles apply (see docs/app-architecture.md).

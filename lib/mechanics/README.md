@@ -5,16 +5,23 @@ organized per game and per raid:
 
 ```
 lib/mechanics/
+  MODEL-RESEARCH-GUIDE.md     — how to write a boss's encounter model (research stage)
+  player-position.ts          — THE shared "where was player X at time T" lookup
+  geometry.ts                 — distances/angles (two angle conventions — read its header)
   ffxiv/
-    roles.ts                  — MT/OT/H1/H2/M1/M2/R1/R2 party-role detector
+    roles.ts                  — MT/OT/H1/H2/M1/M2/R1/R2 party-role detector (MT = the
+                                boss's first auto-attack target)
     dancingmad/               — Dancing Mad (Kefka's Return) ultimate
-      phase1.ts               — Phase 1 rules (Blizzard III, Wave Cannon, Tele-Trouncing, ...)
+      phase1.ts               — Phase 1 rules (Blizzard III, Tele-Trouncing, Confetti, ...)
+      wave-cannon.ts          — Phase 1 Wave Cannon beams + towers
+      kefka-says.ts           — Kefka Says / Mystery Magic rules
+      graven-image.ts         — cross-pull Graven Image spread analysis
+      graven2-strategy.ts     — Graven Image 2 strategy declaration
       forsaken.ts             — tower-soak mechanic (Phase 2)
       limitcut.ts             — gaze + numbered dash mechanic
       blackhole.ts            — tether/Earthquake mechanic
       stompies.ts             — post-Black-Hole Earthquake baits/towers
       exdeath.ts              — Phase 3 Thunder III / Shockwave
-      graven-image.ts         — cross-pull Graven Image spread analysis
       blackhole-strategy.ts   — cross-pull strategy auto-detect (DSA/SDA/Double Tether)
       mitigation-*.ts         — mitigation sheet import / detection / review / heatmap
   wow/
@@ -234,7 +241,18 @@ The same principles apply when refining any module:
    clean value observed and the best failure value observed, with report
    codes (e.g. `// clean max observed 1.06%, failure observed 2.69%`). This
    is what lets future logs retune a threshold instead of guessing.
-4. **Validate before calling it done:** run `node scripts/validate.js` (no
+4. **Sometimes there is no clean/failure gap.** Some deviations form an
+   unbroken continuum (Tele-Trouncing arrows, Wave Cannon positions). Then
+   an absolute threshold is a judgment call. Either switch to relative
+   attribution (Wave Cannon flags only the worst member of an overlap
+   cluster), or ask the user where to draw the line. Don't silently pick
+   one.
+5. **Before hardcoding a cross-report threshold from one pull, run
+   `--check` with no arguments.** A "confirmed good" reading from another
+   report, possibly cited only in a header comment, can contradict the new
+   ground truth. Resolve that with the user instead of choosing a threshold
+   that quietly satisfies neither.
+6. **Validate before calling it done:** run `node scripts/validate.js` (no
    args = every mechanic against every report folder under `sampledata/` —
    run it all, one pull's log usually exercises several mechanics; pass a
    mechanic name and/or report folder to narrow), and `npx tsc --noEmit`.
@@ -246,10 +264,25 @@ The same principles apply when refining any module:
 ### Player position semantics (FFLogs)
 
 **Never reimplement position lookup in a module.** The one shared
-implementation is `findPlayerPosition` in `lib/mechanics/player-position.ts`
-(used by forsaken, limitcut, stompies, and midnightfalls via thin wrappers
-that document each module's tuned options: streams, nearest-vs-atOrBefore,
-staleness window). The semantics below are what it encodes.
+implementation is `findPlayerPosition` / `interpolatePlayerPosition` in
+`lib/mechanics/player-position.ts`.
+
+**It always checks every stream that can carry a player's own position, and
+this is not configurable.** Per-call stream toggles were removed on
+2026-07-31. A module that had quietly narrowed its streams produced a real
+false positive: a stale sample made a stationary player look like they were
+still walking.
+
+The remaining per-call options are:
+- `windowMs` — the staleness cutoff; always choose it deliberately
+- `direction` — nearest vs at-or-before
+- `maxSpanMs` — how far apart the two interpolation brackets may be; a 4.9s
+  bracket once put a player in the wrong quadrant
+- `positionSamples` — the FFXIV boss-hit stream (see below)
+
+If a mechanic genuinely needs to exclude a stream, change the shared
+function visibly, as a reviewed change. The semantics below are what it
+encodes.
 
 Every friendly-sourced FFLogs event stream carries position only for the
 event's TARGET — never the source:
@@ -258,24 +291,27 @@ event's TARGET — never the source:
 |---------------|---------------------------------|------------------------------------------|
 | `damageTaken` | the player (they're the target) | yes, always                              |
 | `healing`     | the heal recipient              | only self-heals — see dual-check below   |
-| `casts`       | the enemy being cast at         | never                                    |
+| `healingReceived` | the player (heals landing on them) | yes, always (FFXIV; often the densest non-damage source) |
+| `casts`       | the cast's target               | only self-targeted casts                 |
 | `damageDone`  | the enemy being hit             | never                                    |
 
-- **The `healing` dual-check:** `PlayerInfo.healing` in the app is heals CAST
-  BY the player (x/y = recipient), but the validation harness builds the
-  stream the opposite way (heals RECEIVED). Position lookups must check both
-  `target === player.name` and `source === player.name` so a self-heal is
-  accepted under either orientation. This is `findPlayerPosition`'s
-  `healing: "self"` default — the only exception is forsaken's grandfathered
-  `healing: "all"`, which predates the dual-check and is preserved because
-  its validated behavior was tuned with it; never use `"all"` in new code.
+- **The `healing` dual-check:** `PlayerInfo.healing` in the app is heals
+  CAST BY the player, so its x/y is the recipient's. The validation harness
+  builds the stream the opposite way, as heals RECEIVED. Position lookups
+  therefore check both `target === player.name` and
+  `source === player.name`, so a self-heal counts under either orientation.
+  Natural HP regen (ability 1302, ~3s) makes self-heals a dependable
+  passive source.
 - **The one source-side exception:** querying `dataType: DamageTaken,
   hostilityType: Enemies` ("damage the boss took") returns the *attacking
-  player's* own position. Wired end-to-end as
-  `fflBuildPlayerPositionSamples` / `buildFFPlayerPositionSamples`. Density
-  is ~GCD-frequency for active attackers but can be very sparse for healers
-  (17 samples in a 13-min pull, observed) — always gate downstream use with
-  a staleness/distance ceiling.
+  player's* own position.
+  - It is wired end-to-end as `fflBuildPlayerPositionSamples` /
+    `buildFFPlayerPositionSamples`.
+  - Density varies a lot: roughly one sample per GCD for active attackers,
+    but very sparse for healers (17 samples in a 13-min pull) and on some
+    fights almost none.
+  - Always gate its use with a staleness or distance ceiling, and prefer
+    interpolation over trusting any single sample.
 
 ### WoW (Warcraft Logs) event semantics
 
