@@ -32,8 +32,24 @@ file's header comment. Mechanic detection has its own guide:
   - Example: the default 8px `body` margin once produced a permanent
     scrollbar that looked like an over-tall header. It is now zeroed
     explicitly.
-  - Assume nothing is reset. Everything is styled with inline `style={{}}`
+  - Assume nothing is reset. Layout is styled with inline `style={{}}`
     objects.
+- **Visual theme** (`app/theme.css`, `components/ui/Panel.tsx`). Inline
+  styles can't do hover/focus or pseudo-element ornaments, so a small
+  shared class layer holds those: tokens (`--ck-*`), the gilt `Panel`
+  frame with SVG corner/diamond ornaments (`components/ui/ornaments/`,
+  bundled through relative CSS `url()`s — `public/` is gitignored), and
+  `.ck-btn`/`.ck-tab`/`.ck-card`/`.ck-tile`/`.ck-entry`/`.ck-stat`/
+  `.ck-badge`.
+  - Gold framing is for top-level panels only. Cards inside use neutral
+    borders; selection and active tabs are arcane blue, never gold.
+  - Per-instance colours (class, severity) go in through the inline
+    `color` or the `--ck-accent` custom property.
+  - The panel ornaments hang ~5px outside the frame, so a `Panel`'s parent
+    must not clip. The `Panel` body does the clipping.
+  - Fonts: Cinzel (`--font-cinzel`) for titles only; Inter
+    (`--font-inter`) for everything else. Use `.ck-num` (tabular numbers)
+    for timestamps and counts rather than `monospace`.
 - **Header branding.** `components/BrandBanner.tsx` is a component, not an
   image. It lays out at 1500x150 and scales to fit.
   - The band stretches full width; only the artwork is scaled.

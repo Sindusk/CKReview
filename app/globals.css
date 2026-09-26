@@ -22,7 +22,7 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-inter), Arial, Helvetica, sans-serif;
   /* The project has no postcss/tailwind config, so the `@import "tailwindcss"`
      above is inert and its preflight reset never lands — leaving the UA's
      default 8px body margin in place. Against a 100vh app root that margin is
@@ -30,29 +30,29 @@ body {
   margin: 0;
 }
 
+/* Chromium 121+ and Firefox honour only the standard pair below; the
+   ::-webkit-scrollbar rules are the fallback for older WebKit. */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #2563eb #111;
+  scrollbar-color: #2e5578 rgba(0, 0, 0, 0.3);
 }
 
 *::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 7px;
+  height: 7px;
 }
 
 *::-webkit-scrollbar-track {
-  background: #111;
-  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.3);
 }
 
 *::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #3b82f6, #1d4ed8);
-  border-radius: 999px;
-  border: 2px solid #111;
+  background: #2e5578;
+  border-radius: 4px;
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #60a5fa, #2563eb);
+  background: #467aa6;
 }
 
 #youtube-container iframe {

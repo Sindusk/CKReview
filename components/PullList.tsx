@@ -3,6 +3,7 @@
 import type { Pull } from "@/types/Pull";
 import { getPullRaidCutoff } from "@/lib/report-data";
 import { SeverityIcon, SEVERITY_COLOR } from "./SeverityIcon";
+import { PanelHeader } from "./ui/Panel";
 
 type PullListProps = {
   pulls:          Pull[];
@@ -26,23 +27,16 @@ function buildLogUrl(pull: Pull): string {
 
 export default function PullList({ pulls, selectedPullId, onSelectPull }: PullListProps) {
   return (
-    <div style={{ borderTop: "1px solid #333", paddingTop: "10px", display: "flex", flexDirection: "column", minHeight: 0, flex: 1, overflow: "hidden" }}>
-      <div style={{ fontWeight: "bold", marginBottom: "8px", fontSize: "13px", color: "#ccc", paddingLeft: "2px", flexShrink: 0 }}>
-        Pulls
-        {pulls.length > 0 && (
-          <span style={{ color: "#555", fontWeight: "normal", marginLeft: "6px" }}>
-            ({pulls.length})
-          </span>
-        )}
-      </div>
+    <div style={{ display: "flex", flexDirection: "column", minHeight: 0, flex: 1, overflow: "hidden" }}>
+      <PanelHeader title="Pulls" count={pulls.length > 0 ? `(${pulls.length})` : undefined} />
 
       {pulls.length === 0 && (
-        <div style={{ color: "#555", fontSize: "12px", paddingLeft: "2px" }}>
+        <div style={{ color: "var(--ck-text-3)", fontSize: "12px", padding: "10px 12px" }}>
           No pull data yet
         </div>
       )}
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "5px", overflowY: "auto", flex: 1 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "5px", overflowY: "auto", flex: 1, padding: "8px 6px 8px 8px" }}>
         {pulls.map(pull => {
           const active = pull.id === selectedPullId;
           const isKill = pull.result === "Kill";
@@ -60,60 +54,40 @@ export default function PullList({ pulls, selectedPullId, onSelectPull }: PullLi
           const resultBadgeText = isKill
             ? "KILL"
             : `WIPE${firstRaidTime !== null ? ` (${formatDuration(firstRaidTime)})` : ""}`;
-          const resultBadgeStyle = isKill
-            ? {
-                backgroundColor: "rgba(74,222,128,0.15)",
-                color: "#4ade80",
-                border: "1px solid #166534",
-              }
+          // Kill green / raid-called purple / plain-wipe red. The badge's
+          // border and fill derive from this colour (.ck-badge).
+          const resultBadgeColor = isKill
+            ? "#4ade80"
             : firstRaidTime !== null
-              ? {
-                  backgroundColor: "rgba(192,132,252,0.15)",
-                  color: "#c084fc",
-                  border: "1px solid #6b21a8",
-                }
-              : {
-                  backgroundColor: "rgba(248,113,113,0.12)",
-                  color: "#f87171",
-                  border: "1px solid #7f1d1d",
-                };
+              ? "#c084fc"
+              : "#f87171";
 
           return (
             <div
               key={pull.id}
               role="button"
               tabIndex={0}
+              aria-pressed={active}
               onClick={() => onSelectPull(pull.id)}
               onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onSelectPull(pull.id)}
+              className={`ck-card ck-card--interactive${active ? " ck-card--selected" : ""}`}
               style={{
                 textAlign: "left",
-                padding: "8px 10px",
-                borderRadius: "6px",
-                border: active ? "1px solid #3b82f6" : "1px solid #2a2a2a",
-                backgroundColor: active ? "#1e293b" : "#111",
-                color: "white",
-                cursor: "pointer",
+                padding: "7px 10px 8px",
+                color: "var(--ck-text)",
                 flexShrink: 0,
               }}
             >
               {/* Line 1 — name on the left, kill/wipe badge centered, log link on the right */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", marginBottom: "4px", gap: "8px" }}>
-                <span style={{ fontWeight: 600, fontSize: "13px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", justifySelf: "start" }}>
-                  #{pull.pullNumber} {pull.name}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", marginBottom: "5px", gap: "8px" }}>
+                <span style={{ fontWeight: 600, fontSize: "13px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", justifySelf: "start", maxWidth: "100%" }}>
+                  <span className="ck-num" style={{ color: active ? "var(--ck-arcane-text)" : "var(--ck-text-gold)", marginRight: "5px" }}>
+                    #{pull.pullNumber}
+                  </span>
+                  {pull.name}
                 </span>
 
-                <span
-                  style={{
-                    fontSize: "10px",
-                    fontWeight: 700,
-                    padding: "2px 6px",
-                    borderRadius: "4px",
-                    letterSpacing: "0.04em",
-                    whiteSpace: "nowrap",
-                    justifySelf: "center",
-                    ...resultBadgeStyle,
-                  }}
-                >
+                <span className="ck-badge ck-num" style={{ color: resultBadgeColor, justifySelf: "center" }}>
                   {resultBadgeText}
                 </span>
 
@@ -124,25 +98,16 @@ export default function PullList({ pulls, selectedPullId, onSelectPull }: PullLi
                   rel="noopener noreferrer"
                   onClick={(e) => e.stopPropagation()}
                   title={`Open in ${pull.logSource === "ffl" ? "FFLogs" : "WarcraftLogs"}`}
-                  style={{
-                    fontSize: "10px",
-                    color: "#60a5fa",
-                    textDecoration: "none",
-                    border: "1px solid #1e3a5f",
-                    borderRadius: "4px",
-                    padding: "2px 5px",
-                    lineHeight: 1,
-                    whiteSpace: "nowrap",
-                    justifySelf: "end",
-                  }}
+                  className="ck-btn ck-btn--arcane ck-btn--xs"
+                  style={{ justifySelf: "end" }}
                 >
                   Log ↗
                 </a>
               </div>
 
               {/* Line 2 — pull stats */}
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", fontSize: "11px", color: "#666", minWidth: 0 }}>
-                <span style={{ color: "#999" }}>⏱ {formatDuration(pull.fightDuration)}</span>
+              <div className="ck-num" style={{ display: "flex", flexWrap: "wrap", gap: "12px", fontSize: "11px", fontWeight: 500, color: "var(--ck-text-3)", minWidth: 0 }}>
+                <span style={{ color: "var(--ck-text-2)" }}>⏱ {formatDuration(pull.fightDuration)}</span>
                 {deaths > 0 ? (
                   <span style={{ color: SEVERITY_COLOR.Death, display: "inline-flex", alignItems: "center", gap: "4px" }}>
                     <SeverityIcon kind="Death" size={12} /> {deaths} death{deaths !== 1 ? "s" : ""}

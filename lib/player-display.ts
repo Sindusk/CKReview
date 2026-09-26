@@ -41,9 +41,11 @@ export function formatSpecClass(specName: string, className: string): string {
 // RosterPanel, AnalysisPanel, and ReportDialog/ReportPedestal.
 
 const ROLE_COLORS: Record<Role, string> = {
-  Tank: "#60a5fa",
-  Healer: "#4ade80",
-  DPS: "#f87171",
+  // Saturated rather than pastel so small role labels hold up against the
+  // dark panels.
+  Tank: "#3d9bff",
+  Healer: "#2fd866",
+  DPS: "#ff5252",
 };
 
 export function getRoleColor(role: Role | string | undefined): string {

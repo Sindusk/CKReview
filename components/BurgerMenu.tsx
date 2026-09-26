@@ -235,20 +235,15 @@ export default function BurgerMenu({
         onClick={() => setOpen((v) => !v)}
         aria-label="Open menu"
         aria-expanded={open}
+        className="ck-btn"
         style={{
-          display:        "flex",
           flexDirection:  "column",
-          justifyContent: "center",
+          alignItems:     "stretch",
           gap:            "5px",
           width:          "40px",
           height:         "40px",
           padding:        "8px",
-          background:     open ? "#2a2a2a" : "transparent",
-          border:         "1px solid",
-          borderColor:    open ? "#555" : "#333",
-          borderRadius:   "6px",
-          cursor:         "pointer",
-          transition:     "background 0.15s, border-color 0.15s",
+          ...(open ? { borderColor: "rgba(225,189,106,0.85)" } : {}),
         }}
       >
         {[0, 1, 2].map((i) => (
@@ -258,7 +253,7 @@ export default function BurgerMenu({
               display:         "block",
               height:          "2px",
               borderRadius:    "2px",
-              backgroundColor: "#ccc",
+              backgroundColor: "var(--ck-text-gold)",
               transition:      "transform 0.2s, opacity 0.2s",
               transformOrigin: "center",
               opacity:    open && i === 1 ? 0 : 1,

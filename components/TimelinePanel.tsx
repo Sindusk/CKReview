@@ -75,20 +75,16 @@ export default function TimelinePanel({
   }
 
   return (
-    <div
-      style={{
-        padding:     "10px",
-        background:  "#181818",
-        borderTop:   "1px solid #333",
-      }}
-    >
+    <div className="ck-rule" style={{ padding: "10px 14px 12px" }}>
       {/* Time labels */}
       <div
+        className="ck-num"
         style={{
           display:        "flex",
           justifyContent: "space-between",
           fontSize:       "12px",
-          color:          "#bbb",
+          fontWeight:     600,
+          color:          "var(--ck-text-2)",
           marginBottom:   "6px",
         }}
       >
@@ -110,7 +106,8 @@ export default function TimelinePanel({
             top:          "50%",
             height:       "4px",
             transform:    "translateY(-50%)",
-            background:   "#444",
+            background:   "rgba(0,0,0,0.55)",
+            boxShadow:    "0 0 0 1px rgba(255,255,255,0.08)",
             borderRadius: "999px",
           }}
         />
@@ -123,22 +120,25 @@ export default function TimelinePanel({
             width:        `${displayPercent * 100}%`,
             height:       "4px",
             transform:    "translateY(-50%)",
-            background:   "#3b82f6",
+            background:   "linear-gradient(90deg, #1f5fae, #53a9ff)",
             borderRadius: "999px",
+            boxShadow:    "0 0 6px rgba(83,169,255,0.35)",
           }}
         />
         {/* Thumb */}
         <div
           style={{
             position:     "absolute",
-            left:         `calc(${displayPercent * 100}% - 6px)`,
+            left:         `calc(${displayPercent * 100}% - 7px)`,
             top:          "50%",
-            width:        "12px",
-            height:       "12px",
+            width:        "14px",
+            height:       "14px",
+            boxSizing:    "border-box",
             transform:    "translateY(-50%)",
             borderRadius: "50%",
-            background:   "#60a5fa",
-            border:       "2px solid white",
+            background:   "radial-gradient(circle at 35% 35%, #d8ecff, #53a9ff 60%, #1f5fae)",
+            border:       "2px solid #0b0e12",
+            boxShadow:    "0 0 0 1px rgba(83,169,255,0.8), 0 0 8px rgba(83,169,255,0.5)",
             pointerEvents: "none",
           }}
         />

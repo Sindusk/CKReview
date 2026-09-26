@@ -69,18 +69,7 @@ export default function Header({
       </div>
 
       <div style={{ position: "relative", zIndex: 1, width: "120px", display: "flex", justifyContent: "flex-end" }}>
-        <button
-          onClick={onAddVod}
-          style={{
-            backgroundColor: "#2563eb",
-            color:           "white",
-            border:          "none",
-            borderRadius:    "6px",
-            padding:         "10px 18px",
-            fontWeight:      "bold",
-            cursor:          "pointer",
-          }}
-        >
+        <button className="ck-btn ck-btn--primary ck-btn--lg" onClick={onAddVod}>
           Add VOD
         </button>
       </div>

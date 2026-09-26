@@ -1,14 +1,23 @@
 import type { Metadata } from "next";
 import Script from "next/script";
-import { Cinzel } from "next/font/google";
+import { Cinzel, Inter } from "next/font/google";
 import "./globals.css";
+import "./theme.css";
 
-// Display face for the brand banner (BrandBanner.tsx). Self-hosted by
-// next/font so the header lockup doesn't flash in an unstyled fallback.
+// Display face for the brand banner (BrandBanner.tsx) and panel titles
+// (.ck-panel-title in globals.css). Self-hosted by next/font so headings
+// don't flash in an unstyled fallback.
 const cinzel = Cinzel({
   subsets:  ["latin"],
-  weight:   ["600", "900"],
+  weight:   ["600", "700", "900"],
   variable: "--font-cinzel",
+  display:  "swap",
+});
+
+// UI face for everything else — names, timestamps, counts, log text.
+const inter = Inter({
+  subsets:  ["latin"],
+  variable: "--font-inter",
   display:  "swap",
 });
 
@@ -19,7 +28,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={cinzel.variable}>
+    <html lang="en" className={`${cinzel.variable} ${inter.variable}`}>
       <body>
         {children}
 

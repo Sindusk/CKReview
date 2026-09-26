@@ -13,6 +13,7 @@ import { parseYouTubeUrl, parseLogUrl } from "@/lib/url-parsers";
 import type { Vod } from "../types/Vod";
 import VideoPanel from "../components/VideoPanel";
 import VODSidebar from "../components/VODSidebar";
+import { Panel } from "../components/ui/Panel";
 import TranscriptDialog from "../components/TranscriptDialog";
 import AnalysisPanel from "../components/AnalysisPanel";
 import RosterPanel from "../components/RosterPanel";
@@ -1038,12 +1039,11 @@ export default function Home() {
 
   return (
     <div
+      className="ck-app"
       style={{
         height:          "100vh",
         display:         "flex",
         flexDirection:   "column",
-        backgroundColor: "#121212",
-        color:           "white",
         // This is a fixed-viewport dashboard — every scrollable region is an
         // inner panel, so the document itself must never scroll. Without this
         // a row that overflows horizontally (the header's fixed-width banner
@@ -1066,14 +1066,15 @@ export default function Home() {
       />
 
       <div
+        className="ck-strip"
         style={{
           display:         "flex",
           alignItems:      "center",
-          gap:             "12px",
+          gap:             "8px",
           padding:         "6px 16px",
-          backgroundColor: "#181818",
-          borderBottom:    "1px solid #2a2a2a",
           flexShrink:      0,
+          position:        "relative",
+          zIndex:          1,
         }}
       >
         <WCLImportBar
@@ -1093,38 +1094,16 @@ export default function Home() {
           loadedFromSampleData={loadedFromSampleData}
         />
         <button
+          className="ck-btn"
           onClick={() => setShowMitigation(true)}
           title="Ikuya mitigation-plan timeline mapped onto this report's roster"
-          style={{
-            backgroundColor: "#1f2937",
-            color:           "#93c5fd",
-            border:          "1px solid #374151",
-            borderRadius:    "6px",
-            padding:         "6px 14px",
-            fontSize:        "12px",
-            fontWeight:      600,
-            cursor:          "pointer",
-            whiteSpace:      "nowrap",
-            flexShrink:      0,
-          }}
         >
           Mitigation
         </button>
         <button
+          className="ck-btn"
           onClick={() => setShowStrategy(true)}
           title="Raid strategy detected automatically from this report's pulls"
-          style={{
-            backgroundColor: "#1f2937",
-            color:           "#93c5fd",
-            border:          "1px solid #374151",
-            borderRadius:    "6px",
-            padding:         "6px 14px",
-            fontSize:        "12px",
-            fontWeight:      600,
-            cursor:          "pointer",
-            whiteSpace:      "nowrap",
-            flexShrink:      0,
-          }}
         >
           Strategy
         </button>
@@ -1157,13 +1136,19 @@ export default function Home() {
           flex:                1,
           display:             "grid",
           gridTemplateColumns: "1fr 2fr 1fr",
-          gap:                 "10px",
-          padding:             "10px",
+          gridTemplateRows:    "minmax(0, 1fr)",
+          // Gaps and padding leave room for the Panel corner ornaments,
+          // which hang ~5px outside each frame.
+          gap:                 "14px",
+          padding:             "14px 12px 12px",
           overflow:            "hidden",
+          minHeight:           0,
         }}
       >
-        <div style={{ display: "flex", flexDirection: "column", gap: "10px", overflow: "hidden", minHeight: 0 }}>
-          <div
+        {/* The column itself must not clip — the Panels' corner ornaments
+            overhang it. Each Panel clips its own body instead. */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "14px", minHeight: 0 }}>
+          <Panel
             style={{
               // Fixed to fit exactly one column of 5 players (header + 5 rows)
               // for WoW, and 4 rows of paired players (MT/OT, H1/H2, M1/M2,
@@ -1172,11 +1157,6 @@ export default function Home() {
               // scrolls WITHIN this height instead of expanding the panel.
               flex:          "0 0 auto",
               height:        "300px",
-              border:        "1px solid #333",
-              overflow:      "hidden",
-              display:       "flex",
-              flexDirection: "column",
-              minHeight:     0,
             }}
           >
             {/*
@@ -1192,18 +1172,9 @@ export default function Home() {
               playbackTimeMs={timeline.playbackTimeMs}
               mitigationPlan={mitigationPlan}
             />
-          </div>
+          </Panel>
 
-          <div
-            style={{
-              flex:          "1 1 0",
-              border:        "1px solid #333",
-              overflow:      "hidden",
-              display:       "flex",
-              flexDirection: "column",
-              minHeight:     0,
-            }}
-          >
+          <Panel style={{ flex: "1 1 0" }}>
             <AnalysisPanel
               pull={activePull}
               playbackTimeMs={timeline.playbackTimeMs}
@@ -1213,33 +1184,22 @@ export default function Home() {
               onRemoveError={handleRemoveError}
               vodTimeAvailable={isCalibrated}
             />
-          </div>
+          </Panel>
         </div>
 
-        <div
-          style={{
-            border:        "1px solid #333",
-            padding:       "10px",
-            overflow:      "hidden",
-            display:       "flex",
-            flexDirection: "column",
-            minHeight:     0,
-          }}
-        >
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
-            <div style={{ flex: 1, minHeight: 0 }}>
-              <VideoPanel
-                vod={selectedVod}
-                seekRequest={timeline.seekRequest}
-                onCurrentTimeChange={handleVideoTimeUpdate}
-                onUnsync={handleUnsyncVod}
-              />
-            </div>
-            <div style={{ flexShrink: 0 }}>
-              {videoBottom}
-            </div>
+        <Panel diamondBottom>
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <VideoPanel
+              vod={selectedVod}
+              seekRequest={timeline.seekRequest}
+              onCurrentTimeChange={handleVideoTimeUpdate}
+              onUnsync={handleUnsyncVod}
+            />
           </div>
-        </div>
+          <div style={{ flexShrink: 0 }}>
+            {videoBottom}
+          </div>
+        </Panel>
 
         <VODSidebar
           pulls={displayPulls}
@@ -1333,45 +1293,33 @@ function SyncToPullButton({
 
   return (
     <div
+      className="ck-rule"
       style={{
-        padding:        "10px",
-        background:     "#181818",
-        borderTop:      "1px solid #333",
+        padding:        "10px 12px",
         display:        "flex",
         alignItems:     "center",
         justifyContent: "space-between",
         gap:            "12px",
       }}
     >
-      <div style={{ fontSize: "12px", color: "#555", lineHeight: "1.4" }}>
+      <div style={{ fontSize: "12px", color: "var(--ck-text-3)", lineHeight: "1.4" }}>
         {!hasVod && "Add a VOD to begin."}
         {hasVod && !hasPull && "Select a pull to sync."}
         {hasVod && hasPull && rawVideoTime !== null && (
           <>
-            <span style={{ color: "#888" }}>Video at </span>
-            <span style={{ color: "#94a3b8", fontFamily: "monospace" }}>
+            <span style={{ color: "var(--ck-text-2)" }}>Video at </span>
+            <span className="ck-num" style={{ color: "var(--ck-arcane-text)", fontWeight: 600 }}>
               {formatTime(rawVideoTime)}
             </span>
-            <span style={{ color: "#555" }}> — seek to the pull start, then sync.</span>
+            <span> — seek to the pull start, then sync.</span>
           </>
         )}
       </div>
 
       <button
+        className="ck-btn ck-btn--arcane"
         onClick={onSync}
         disabled={!ready}
-        style={{
-          backgroundColor: ready ? "#1e3a5f" : "#111",
-          color:           ready ? "#60a5fa" : "#444",
-          border:          `1px solid ${ready ? "#2563eb" : "#2a2a2a"}`,
-          borderRadius:    "6px",
-          padding:         "6px 16px",
-          fontSize:        "12px",
-          fontWeight:      600,
-          cursor:          ready ? "pointer" : "default",
-          whiteSpace:      "nowrap",
-          flexShrink:      0,
-        }}
       >
         Sync to Pull
       </button>
@@ -1440,19 +1388,11 @@ function WCLImportBar({
   if (loadedReportCode && !importing) {
     return (
       <div style={{ display: "flex", alignItems: "center", gap: "8px", flex: 1, flexWrap: "wrap", rowGap: "4px" }}>
-        <span
-          style={{
-            padding:         "6px 12px",
-            borderRadius:    "999px",
-            backgroundColor: "#1e293b",
-            color:           "#93c5fd",
-            fontSize:        "12px",
-            fontWeight:      600,
-          }}
-        >
-          Log Loaded: {loadedReportCode}
+        <span className="ck-chip">
+          <span style={{ color: "var(--ck-text-2)", fontWeight: 500 }}>Log Loaded:</span>
+          {loadedReportCode}
         </span>
-        <span style={{ fontSize: "11px", color: "#94a3b8" }}>Ready for review</span>
+        <span style={{ fontSize: "11px", color: "var(--ck-text-2)" }}>Ready for review</span>
 
         {loadedFromSampleData && (
           <span
@@ -1483,7 +1423,8 @@ function WCLImportBar({
         {rateLimit && (
           <span
             title="API points used to import this log, total points used this hour, and when the hourly quota resets"
-            style={{ fontSize: "11px", color: "#666", whiteSpace: "nowrap" }}
+            className="ck-num"
+            style={{ fontSize: "11px", color: "var(--ck-text-3)", whiteSpace: "nowrap" }}
           >
             · {importPointsUsed !== null && importPointsUsed !== undefined && (
               <>{importPointsUsed.toLocaleString()} pts this import · </>
@@ -1531,17 +1472,8 @@ function WCLImportBar({
         onChange={e => onChange(e.target.value)}
         onKeyDown={e => e.key === "Enter" && handleSubmit()}
         placeholder="Paste a WarcraftLogs or FFLogs report URL…"
-        style={{
-          flex:            1,
-          maxWidth:        "480px",
-          padding:         "6px 10px",
-          backgroundColor: "#111",
-          border:          "1px solid #333",
-          borderRadius:    "6px",
-          color:           "#ccc",
-          fontSize:        "12px",
-          outline:         "none",
-        }}
+        className="ck-field"
+        style={{ flex: 1, maxWidth: "480px" }}
       />
       <label
         title="Keep checking this report for new fights and import them automatically as they occur"
@@ -1555,19 +1487,9 @@ function WCLImportBar({
         Live log
       </label>
       <button
+        className="ck-btn ck-btn--primary"
         onClick={handleSubmit}
         disabled={!value.trim()}
-        style={{
-          backgroundColor: "#2563eb",
-          color:           "white",
-          border:          "none",
-          borderRadius:    "6px",
-          padding:         "6px 14px",
-          fontSize:        "12px",
-          fontWeight:      600,
-          cursor:          value.trim() ? "pointer" : "default",
-          opacity:         value.trim() ? 1 : 0.7,
-        }}
       >
         Import
       </button>

@@ -143,9 +143,17 @@ export default function BrandBanner({ height = DESIGN_H, title = "Consistency Ki
         alignItems:     "center",
         justifyContent: "center",
         overflow:       "hidden",
-        background:     "linear-gradient(180deg, #171310 0%, #0d0b09 100%)",
-        borderTop:      "2px solid #a37a24",
-        borderBottom:   "2px solid #a37a24",
+        /* Faint arcane glow on the left and ember glow on the right (the
+           FFXIV crystal / WoW sigil palette) keep the band from reading as
+           a flat bar without needing any raster art. */
+        background: [
+          "radial-gradient(ellipse 32% 140% at 10% 50%, rgba(70,130,210,0.16), transparent 70%)",
+          "radial-gradient(ellipse 32% 140% at 90% 50%, rgba(200,80,40,0.14), transparent 70%)",
+          "radial-gradient(ellipse 30% 120% at 50% 50%, rgba(185,134,50,0.10), transparent 70%)",
+          "linear-gradient(180deg, #14110e 0%, #0a0908 100%)",
+        ].join(", "),
+        borderBottom:   "1px solid #a37a24",
+        boxShadow:      "inset 0 -2px 0 rgba(0,0,0,0.7), inset 0 -3px 0 rgba(225,189,106,0.12)",
         position:       "relative",
       }}
     >

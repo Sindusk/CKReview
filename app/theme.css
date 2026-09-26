@@ -1,0 +1,580 @@
+/* ─── Consistency Kings visual system ─────────────────────────────────────
+   The app is styled with inline style objects (see docs/app-architecture.md),
+   but inline styles can't express hover/focus states or pseudo-element
+   ornaments. This file holds only that shared layer: tokens plus a small set
+   of classes. Layout stays inline in the components.
+
+   Hierarchy (keep it — it is what stops the theme turning into noise):
+   1. Major panels (.ck-panel + components/ui/Panel.tsx) get the gilt frame,
+      corner ornaments and a Cinzel title. Nothing else gets gold framing.
+   2. Interactive cards (.ck-card, .ck-tile, .ck-entry) get a neutral dark
+      border; selection is arcane blue, never gold.
+   3. Internal grouping gets a faint hairline only.
+   Glow is reserved for state (selected / active), never decoration.
+   Severity colours still come from SEVERITY_COLOR in SeverityIcon.tsx and
+   are passed in inline or through the --ck-accent custom property. */
+
+:root {
+  /* Surfaces */
+  --ck-bg-page:    #07090b;
+  --ck-bg-panel:   #13171a;
+  --ck-bg-deep:    #0a0c0e;
+  --ck-bg-card:    rgba(15, 18, 21, 0.9);
+  --ck-bg-card-hi: rgba(24, 28, 32, 0.95);
+
+  /* Gilt frame family */
+  --ck-gold-1: #ecd08e;
+  --ck-gold-2: #b98632;
+  --ck-gold-3: #75501f;
+  --ck-frame:       rgba(185, 134, 50, 0.72);
+  --ck-frame-soft:  rgba(185, 134, 50, 0.32);
+  --ck-frame-faint: rgba(185, 134, 50, 0.16);
+
+  /* Arcane accent — selection and focus */
+  --ck-arcane:      #53a9ff;
+  --ck-arcane-edge: rgba(83, 169, 255, 0.75);
+  --ck-arcane-text: #9ccbff;
+
+  /* Text */
+  --ck-text:      #ece8df;
+  --ck-text-2:    #b3afa6;
+  --ck-text-3:    #80848a;
+  --ck-text-gold: #e2c47f;
+
+  /* Neutral lines */
+  --ck-line:   rgba(255, 255, 255, 0.07);
+  --ck-line-2: rgba(255, 255, 255, 0.12);
+}
+
+/* ─── Page ─────────────────────────────────────────────────────────────── */
+
+.ck-app {
+  background:
+    radial-gradient(ellipse 70% 45% at 50% 0%, rgba(43, 60, 78, 0.22), transparent 70%),
+    var(--ck-bg-page);
+  color: var(--ck-text);
+}
+
+.ck-num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Utility strip under the banner */
+.ck-strip {
+  background: linear-gradient(180deg, #0e1319, #0a0d11);
+  border-bottom: 1px solid var(--ck-frame-soft);
+  box-shadow: 0 1px 0 #000, inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.ck-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid rgba(83, 169, 255, 0.45);
+  border-radius: 3px;
+  background: linear-gradient(180deg, #11213a, #0c1727);
+  color: var(--ck-arcane-text);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.ck-field {
+  padding: 6px 10px;
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--ck-text);
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--ck-line-2);
+  border-radius: 3px;
+  outline: none;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+.ck-field::placeholder {
+  color: var(--ck-text-3);
+}
+
+.ck-field:focus {
+  border-color: var(--ck-arcane-edge);
+}
+
+/* ─── Major panel frame ────────────────────────────────────────────────── */
+
+.ck-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  box-sizing: border-box;
+  padding: 3px;
+  background: linear-gradient(180deg, var(--ck-bg-panel), var(--ck-bg-deep));
+  border: 1px solid;
+  border-image: linear-gradient(180deg, #c99a4a, #6f4c1e) 1;
+  box-shadow:
+    0 0 0 1px #040302,
+    0 6px 18px rgba(0, 0, 0, 0.55),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.8),
+    inset 0 0 0 2px rgba(225, 189, 106, 0.13);
+}
+
+.ck-panel__body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.ck-corner {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  /* Relative url(): Next bundles the file. (public/ is gitignored, so an
+     asset there would never reach production.) */
+  background: url("../components/ui/ornaments/frame-corner.svg") center / contain no-repeat;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.ck-corner--tl { top: -5px;    left: -5px; }
+.ck-corner--tr { top: -5px;    right: -5px; transform: scaleX(-1); }
+.ck-corner--bl { bottom: -5px; left: -5px;  transform: scaleY(-1); }
+.ck-corner--br { bottom: -5px; right: -5px; transform: scale(-1); }
+
+.ck-diamond {
+  position: absolute;
+  left: 50%;
+  top: -8px;
+  width: 44px;
+  height: 14px;
+  transform: translateX(-50%);
+  background: url("../components/ui/ornaments/frame-diamond.svg") center / contain no-repeat;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.ck-diamond--bottom {
+  top: auto;
+  bottom: -8px;
+}
+
+/* Panel header — the Cinzel title bar every major panel opens with */
+.ck-panel-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 38px;
+  padding: 6px 12px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  background:
+    linear-gradient(90deg, rgba(185, 134, 50, 0.12), rgba(185, 134, 50, 0.03) 55%, transparent),
+    linear-gradient(180deg, #1a1e22, #111417);
+  border-bottom: 1px solid var(--ck-frame-soft);
+}
+
+.ck-panel-header::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: -3px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(225, 189, 106, 0.2), transparent);
+  pointer-events: none;
+}
+
+/* Titles hold their width and the meta side wraps instead; a title that
+   can be long (a pull/boss name) opts into shrinking with --shrink. */
+.ck-panel-title {
+  margin: 0;
+  flex-shrink: 0;
+  min-width: 0;
+  font-family: var(--font-cinzel), serif;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: 0.04em;
+  color: var(--ck-text-gold);
+  text-shadow: 0 1px 1px #000, 0 0 10px rgba(211, 158, 65, 0.15);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ck-panel-title--shrink {
+  flex-shrink: 1;
+}
+
+.ck-panel-title__count {
+  margin-left: 6px;
+  font-family: var(--font-inter), sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--ck-text-3);
+  text-shadow: none;
+}
+
+.ck-panel-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* Thin gilt rule inside a panel, e.g. above the timeline controls */
+.ck-rule {
+  border-top: 1px solid var(--ck-frame-faint);
+}
+
+/* ─── Buttons ──────────────────────────────────────────────────────────── */
+
+.ck-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 5px 12px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: #ddd6c6;
+  background: linear-gradient(180deg, #23282d, #14171b);
+  border: 1px solid rgba(185, 134, 50, 0.5);
+  border-radius: 3px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 1px 3px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  white-space: nowrap;
+  text-decoration: none;
+  flex-shrink: 0;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+
+.ck-btn:hover:not(:disabled) {
+  color: #fff4dc;
+  border-color: rgba(225, 189, 106, 0.85);
+  background: linear-gradient(180deg, #2b3136, #181c20);
+}
+
+.ck-btn:active:not(:disabled) {
+  background: linear-gradient(180deg, #111417, #1a1e22);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+.ck-btn:focus-visible,
+.ck-tab:focus-visible,
+.ck-card:focus-visible,
+.ck-tile:focus-visible,
+.ck-stat:focus-visible {
+  outline: 2px solid var(--ck-arcane);
+  outline-offset: 1px;
+}
+
+.ck-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.ck-btn--sm {
+  padding: 3px 9px;
+  font-size: 11px;
+}
+
+.ck-btn--xs {
+  padding: 2px 6px;
+  font-size: 10px;
+}
+
+.ck-btn--lg {
+  padding: 8px 18px;
+  font-size: 13px;
+}
+
+/* Primary: the one or two headline actions (Add VOD, Import) */
+.ck-btn--primary {
+  color: #fff;
+  background: linear-gradient(180deg, #2d6fd8, #1a4ca6);
+  border-color: rgba(140, 190, 255, 0.55);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 1px 4px rgba(0, 0, 0, 0.55);
+}
+
+.ck-btn--primary:hover:not(:disabled) {
+  color: #fff;
+  border-color: rgba(170, 210, 255, 0.85);
+  background: linear-gradient(180deg, #3a7eea, #1f58bd);
+}
+
+/* Arcane: secondary actions tied to the VOD/timeline (Add Error, Unsync, Log) */
+.ck-btn--arcane {
+  color: var(--ck-arcane-text);
+  background: linear-gradient(180deg, #14212f, #0d151e);
+  border-color: rgba(83, 169, 255, 0.45);
+}
+
+.ck-btn--arcane:hover:not(:disabled) {
+  color: #d4e9ff;
+  border-color: var(--ck-arcane-edge);
+  background: linear-gradient(180deg, #1a2b3e, #111c28);
+}
+
+/* Raid: purple, matching SEVERITY_COLOR.Raid (Call Wipe) */
+.ck-btn--raid {
+  color: #d3adff;
+  background: linear-gradient(180deg, #221731, #140d1e);
+  border-color: rgba(176, 124, 232, 0.5);
+}
+
+.ck-btn--raid:hover:not(:disabled) {
+  color: #ecdcff;
+  border-color: rgba(196, 150, 245, 0.85);
+  background: linear-gradient(180deg, #2b1d3f, #1a1128);
+}
+
+.ck-btn--danger {
+  color: #ffa3a3;
+  background: linear-gradient(180deg, #2b1515, #1a0c0c);
+  border-color: rgba(224, 90, 90, 0.5);
+}
+
+.ck-btn--danger:hover:not(:disabled) {
+  color: #ffd0d0;
+  border-color: rgba(240, 120, 120, 0.85);
+  background: linear-gradient(180deg, #361a1a, #200f0f);
+}
+
+/* ─── Tabs ─────────────────────────────────────────────────────────────── */
+
+.ck-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ck-text-2);
+  background: #0f1215;
+  border: 1px solid var(--ck-line-2);
+  border-radius: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.ck-tab:hover {
+  color: var(--ck-text);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.ck-tab--active,
+.ck-tab--active:hover {
+  color: #e1f0ff;
+  font-weight: 600;
+  background: linear-gradient(180deg, #16263a, #0e1824);
+  border-color: var(--ck-arcane-edge);
+  box-shadow: inset 0 0 10px rgba(83, 169, 255, 0.12), 0 0 6px rgba(83, 169, 255, 0.12);
+}
+
+.ck-tab--sm {
+  padding: 3px 9px;
+  font-size: 11px;
+}
+
+.ck-count {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 6px;
+  min-height: 15px;
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ck-text-3);
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--ck-line-2);
+  border-radius: 8px;
+}
+
+.ck-tab--active .ck-count {
+  color: var(--ck-arcane-text);
+  border-color: rgba(83, 169, 255, 0.35);
+}
+
+/* ─── Badges ───────────────────────────────────────────────────────────── */
+/* Colour comes from the inline `color`; border and fill derive from it. */
+
+.ck-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  border: 1px solid color-mix(in srgb, currentColor 50%, transparent);
+  border-radius: 3px;
+  background: color-mix(in srgb, currentColor 10%, rgba(0, 0, 0, 0.35));
+}
+
+.ck-badge--plain {
+  text-transform: none;
+  letter-spacing: 0.02em;
+  font-weight: 600;
+}
+
+/* ─── Level-2 cards ────────────────────────────────────────────────────── */
+
+.ck-card {
+  background: var(--ck-bg-card);
+  border: 1px solid var(--ck-line);
+  border-radius: 3px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.ck-card--interactive {
+  cursor: pointer;
+}
+
+.ck-card--interactive:hover {
+  background: var(--ck-bg-card-hi);
+  border-color: rgba(185, 134, 50, 0.32);
+}
+
+.ck-card--selected,
+.ck-card--selected:hover {
+  background: linear-gradient(180deg, rgba(23, 39, 58, 0.96), rgba(14, 25, 39, 0.96));
+  border-color: var(--ck-arcane-edge);
+  box-shadow: inset 0 0 14px rgba(83, 169, 255, 0.1), 0 0 7px rgba(83, 169, 255, 0.14);
+}
+
+/* Roster tile. --ck-accent is the player's class colour (hover edge). */
+.ck-tile {
+  font-family: inherit;
+  background: linear-gradient(180deg, #13171a, #0b0e10);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 1px 2px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.ck-tile:hover {
+  border-color: var(--ck-accent, rgba(185, 134, 50, 0.45));
+  background: linear-gradient(180deg, #1a1f23, #0f1215);
+}
+
+/* Review-feed entry. --ck-accent is the severity colour (left edge). */
+.ck-entry {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px 7px 9px;
+  margin-bottom: 5px;
+  background: rgba(16, 19, 22, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  border-left: 3px solid var(--ck-accent, #333);
+  border-radius: 3px;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+.ck-entry--seekable {
+  cursor: pointer;
+}
+
+.ck-entry--seekable:hover {
+  border-top-color: rgba(255, 255, 255, 0.12);
+  border-right-color: rgba(255, 255, 255, 0.12);
+  border-bottom-color: rgba(255, 255, 255, 0.12);
+}
+
+/* Stat instrument (Deaths / Raid / Major / Minor / Duration).
+   --ck-accent is the stat's semantic colour, used for the active edge. */
+.ck-stat {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 5px 8px;
+  font-family: inherit;
+  color: inherit;
+  text-align: left;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--ck-frame-faint);
+  border-radius: 3px;
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.35);
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+}
+
+button.ck-stat {
+  cursor: pointer;
+}
+
+button.ck-stat:hover {
+  border-color: rgba(185, 134, 50, 0.42);
+}
+
+/* Zero count: a faint green wash marks a clean result. The text and icon
+   keep their severity colour. */
+.ck-stat--clear {
+  background: rgba(47, 216, 102, 0.07);
+}
+
+.ck-stat--active,
+.ck-stat--active:hover {
+  background: color-mix(in srgb, var(--ck-accent) 9%, rgba(0, 0, 0, 0.3));
+  border-color: color-mix(in srgb, var(--ck-accent) 70%, transparent);
+  box-shadow:
+    inset 0 0 12px color-mix(in srgb, var(--ck-accent) 16%, transparent),
+    0 0 6px color-mix(in srgb, var(--ck-accent) 14%, transparent);
+}
+
+.ck-stat__label {
+  display: block;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ck-text-3);
+  white-space: nowrap;
+}
+
+.ck-stat__value {
+  display: block;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Small uppercase label with a trailing hairline */
+.ck-section-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 6px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ck-text-3);
+}
+
+.ck-section-label::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, var(--ck-frame-faint), transparent);
+}

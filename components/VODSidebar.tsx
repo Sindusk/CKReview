@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { Vod } from "../types/Vod";
 import PullList from "../components/PullList";
+import { Panel, PanelHeader } from "./ui/Panel";
 import type { Pull } from "../types/Pull";
 
 // Module-level cache (not component state) so switching pulls/remounting
@@ -58,6 +59,9 @@ export default function VODSidebar({
   selectedPullId,
   onSelectPull,
 }: VODSidebarProps) {
+  // Two stacked Panels, mirroring the Roster/Analysis pair in the left
+  // column. The column itself doesn't clip: the Panels' corner ornaments
+  // overhang it.
   return (
     <div
       style={{
@@ -65,64 +69,57 @@ export default function VODSidebar({
         height: "100%",
         display: "flex",
         flexDirection: "column",
-        border: "1px solid #333",
-        backgroundColor: "#0f0f0f",
-        overflow: "hidden",
+        gap: "14px",
+        minHeight: 0,
       }}
     >
-      <div
-        style={{
-          padding: "10px",
-          borderBottom: "1px solid #333",
-          fontWeight: "bold",
-          backgroundColor: "#1a1a1a",
-          flexShrink: 0,
-        }}
-      >
-        VODs
-      </div>
+      <Panel style={{ flex: "0 0 auto" }}>
+        <PanelHeader title="VODs" count={vods.length > 0 ? `(${vods.length})` : undefined} />
 
-      {/*
-        Fixed to the height of a single row of VOD cards. With ~3 VODs this
-        never needs to scroll; a 4th+ VOD just scrolls horizontally instead
-        of eating vertical space that PullList needs below.
-      */}
-      <div
-        style={{
-          flex:       "0 0 auto",
-          height:     "112px",
-          minHeight:  0,
-          overflowX:  "auto",
-          overflowY:  "hidden",
-          padding:    "8px",
-          display:    "flex",
-          flexWrap:   "nowrap",
-          gap:        "8px",
-          borderBottom: "1px solid #333",
-        }}
-      >
-        {vods.length === 0 && (
-          <div style={{ color: "#777", fontSize: "14px", alignSelf: "center" }}>
-            No VODs added yet
-          </div>
-        )}
+        {/*
+          Fixed to the height of a single row of VOD cards. With ~3 VODs this
+          never needs to scroll; a 4th+ VOD just scrolls horizontally instead
+          of eating vertical space that PullList needs below.
+        */}
+        <div
+          style={{
+            flex:       "0 0 auto",
+            height:     "112px",
+            minHeight:  0,
+            overflowX:  "auto",
+            overflowY:  "hidden",
+            padding:    "8px",
+            boxSizing:  "border-box",
+            display:    "flex",
+            flexWrap:   "nowrap",
+            gap:        "8px",
+          }}
+        >
+          {vods.length === 0 && (
+            <div style={{ color: "var(--ck-text-3)", fontSize: "13px", alignSelf: "center", paddingLeft: "4px" }}>
+              No VODs added yet
+            </div>
+          )}
 
-        {vods.map(vod => (
-          <VodCard
-            key={vod.id}
-            vod={vod}
-            isSelected={vod.id === selectedVodId}
-            onSelectVod={onSelectVod}
-            onOpenTranscript={onOpenTranscript}
-          />
-        ))}
-      </div>
+          {vods.map(vod => (
+            <VodCard
+              key={vod.id}
+              vod={vod}
+              isSelected={vod.id === selectedVodId}
+              onSelectVod={onSelectVod}
+              onOpenTranscript={onOpenTranscript}
+            />
+          ))}
+        </div>
+      </Panel>
 
-      <PullList
-        pulls={pulls}
-        selectedPullId={selectedPullId}
-        onSelectPull={onSelectPull}
-      />
+      <Panel style={{ flex: "1 1 0" }}>
+        <PullList
+          pulls={pulls}
+          selectedPullId={selectedPullId}
+          onSelectPull={onSelectPull}
+        />
+      </Panel>
     </div>
   );
 }
@@ -151,14 +148,12 @@ function VodCard({
           onSelectVod(vod.id);
         }
       }}
+      className={`ck-card ck-card--interactive${isSelected ? " ck-card--selected" : ""}`}
       style={{
         textAlign: "left",
         padding: "8px 6px",
-        borderRadius: "6px",
-        border: isSelected ? "1px solid #3b82f6" : "1px solid #333",
-        backgroundColor: isSelected ? "#1e293b" : "#111",
-        color: "white",
-        cursor: "pointer",
+        boxSizing: "border-box",
+        color: "var(--ck-text)",
         width: "150px",
         flexShrink: 0,
         display: "flex",
@@ -168,26 +163,15 @@ function VodCard({
       }}
     >
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "4px" }}>
-        <div style={{ width: "16px", flexShrink: 0 }} />
-        <div style={{ fontWeight: "bold", fontSize: "12px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center", flex: 1 }}>
+        <div style={{ width: "18px", flexShrink: 0 }} />
+        <div style={{ fontWeight: 700, fontSize: "12px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center", flex: 1, color: isSelected ? "#e1f0ff" : "var(--ck-text)" }}>
           {vod.player}
         </div>
         <button
+          className="ck-btn"
           title="View transcript"
           onClick={(e) => { e.stopPropagation(); onOpenTranscript(vod.id); }}
-          style={{
-            flexShrink: 0,
-            width: "16px",
-            height: "16px",
-            lineHeight: "16px",
-            padding: 0,
-            fontSize: "10px",
-            color: "#94a3b8",
-            backgroundColor: "#1f1f1f",
-            border: "1px solid #333",
-            borderRadius: "4px",
-            cursor: "pointer",
-          }}
+          style={{ width: "18px", height: "18px", padding: 0, fontSize: "10px" }}
         >
           T
         </button>
@@ -209,7 +193,7 @@ function VodCard({
         title={title ?? undefined}
         style={{
           fontSize: "10px",
-          color: "#aaa",
+          color: "var(--ck-text-2)",
           overflow: "hidden",
           textOverflow: "ellipsis",
           whiteSpace: "nowrap",

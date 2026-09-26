@@ -10,6 +10,7 @@ import { getSpecInfo } from "@/lib/spec-data";
 import ConfirmDialog from "./ConfirmDialog";
 import AddErrorDialog from "./AddErrorDialog";
 import { SeverityIcon, SEVERITY_COLOR, type SeverityKind } from "./SeverityIcon";
+import { PanelHeader } from "./ui/Panel";
 
 type AnalysisPanelProps = {
   pull: Pull | null;
@@ -134,25 +135,9 @@ function TitleIcon({ src, abilityId, game }: { src?: string; abilityId?: number;
 
 function SectionLabel({ label, count }: { label: string; count?: number }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: "8px", margin: "12px 0 6px" }}>
-      <span style={{ fontSize: "10px", color: "#555", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-        {label}
-      </span>
-      {count !== undefined && (
-        <span
-          style={{
-            fontSize: "10px",
-            color: "#444",
-            backgroundColor: "#1a1a1a",
-            border: "1px solid #2a2a2a",
-            borderRadius: "10px",
-            padding: "1px 6px",
-          }}
-        >
-          {count}
-        </span>
-      )}
-      <div style={{ flex: 1, height: "1px", backgroundColor: "#1e1e1e" }} />
+    <div className="ck-section-label">
+      <span>{label}</span>
+      {count !== undefined && <span className="ck-count">{count}</span>}
     </div>
   );
 }
@@ -187,24 +172,24 @@ function FeedRow({
       onClick={() => onSeek?.(seekTarget)}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      className={`ck-entry${onSeek ? " ck-entry--seekable" : ""}`}
       style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "8px",
-        padding: "6px 10px",
-        borderRadius: "5px",
-        backgroundColor: hovered ? style.color + "12" : hasPassed ? style.color + "18" : "transparent",
-        borderLeft: `2px solid ${hasPassed ? roleColor : "#2a2a2a"}`,
-        marginBottom: "4px",
-        cursor: onSeek ? "pointer" : "default",
-        transition: "background-color 0.2s, border-color 0.3s",
+        // Left edge carries the severity colour; it brightens once the
+        // playhead passes the entry.
+        ["--ck-accent" as string]: hasPassed ? style.color : style.color + "55",
+        backgroundColor: hovered
+          ? `color-mix(in srgb, ${style.color} 10%, rgba(22,26,30,0.95))`
+          : hasPassed
+            ? `color-mix(in srgb, ${style.color} 7%, rgba(16,19,22,0.9))`
+            : undefined,
       }}
     >
       <span
+        className="ck-num"
         style={{
-          fontFamily: "monospace",
           fontSize: "11px",
-          color: hasPassed ? "#999" : "#7d7d7d",
+          fontWeight: 500,
+          color: hasPassed ? "var(--ck-text-2)" : "var(--ck-text-3)",
           minWidth: "50px",
           flexShrink: 0,
           transition: "color 0.3s",
@@ -235,7 +220,7 @@ function FeedRow({
             )}
             <span
               style={{
-                color: hasPassed ? cls : "#969696",
+                color: hasPassed ? cls : "#a3a3a3",
                 fontWeight: 600,
                 fontSize: "13px",
                 transition: "color 0.3s",
@@ -244,19 +229,19 @@ function FeedRow({
               {entry.player ?? "Raid-Wide"}
             </span>
             {specLabel && (
-              <span style={{ fontSize: "10px", color: hasPassed ? "#777" : "#7d7d7d", flexShrink: 0, transition: "color 0.3s" }}>
+              <span style={{ fontSize: "10px", color: "var(--ck-text-3)", flexShrink: 0 }}>
                 {specLabel}
               </span>
             )}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "4px", marginTop: "2px" }}>
             <TitleIcon src={entry.titleIcon} abilityId={entry.abilityId} game={entry.game} />
-            <div style={{ fontSize: "11px", color: hasPassed ? style.color : "#b3984f", transition: "color 0.3s" }}>
+            <div style={{ fontSize: "11px", fontWeight: 500, color: hasPassed ? style.color : "#b3984f", transition: "color 0.3s" }}>
               {entry.kind === "Death" ? "⚔ " : ""}{entry.title}
             </div>
           </div>
           {entry.subtitle && (
-            <div style={{ fontSize: "10px", color: "#8f8f8f", marginTop: "1px" }}>
+            <div style={{ fontSize: "11px", lineHeight: 1.4, color: "var(--ck-text-2)", marginTop: "2px" }}>
               {entry.subtitle}
             </div>
           )}
@@ -265,35 +250,12 @@ function FeedRow({
         <div style={{ display: "flex", alignItems: "flex-start", gap: "6px", flexShrink: 0 }}>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "3px" }}>
             {showKindBadge && (
-              <span
-                style={{
-                  fontSize: "9px",
-                  fontWeight: 700,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.04em",
-                  color: hasPassed ? style.color : "#7d7d7d",
-                  border: `1px solid ${hasPassed ? style.color + "44" : "#3a3a3a"}`,
-                  borderRadius: "3px",
-                  padding: "1px 5px",
-                  whiteSpace: "nowrap",
-                }}
-              >
+              <span className="ck-badge" style={{ color: hasPassed ? style.color : "#8a8a8a", fontSize: "9px" }}>
                 {style.label}
               </span>
             )}
             {entry.role && (
-              <span
-                style={{
-                  fontSize: "10px",
-                  color: hasPassed ? roleColor : "#7d7d7d",
-                  border: `1px solid ${hasPassed ? roleColor + "33" : "#3a3a3a"}`,
-                  borderRadius: "3px",
-                  padding: "1px 5px",
-                  backgroundColor: hasPassed ? roleColor + "10" : "transparent",
-                  whiteSpace: "nowrap",
-                  transition: "all 0.3s",
-                }}
-              >
+              <span className="ck-badge ck-badge--plain" style={{ color: hasPassed ? roleColor : "#8a8a8a", transition: "color 0.3s" }}>
                 {entry.role}
               </span>
             )}
@@ -301,19 +263,9 @@ function FeedRow({
 
           {isDeletableManualError && (
             <button
+              className={`ck-btn ck-btn--xs${hovered ? " ck-btn--danger" : ""}`}
               onClick={(e) => { e.stopPropagation(); onRequestRemove?.(entry); }}
               title="Remove this error"
-              style={{
-                background: "transparent",
-                border: "1px solid #333",
-                borderRadius: "4px",
-                color: hovered ? "#f87171" : "#555",
-                fontSize: "11px",
-                lineHeight: 1,
-                padding: "3px 6px",
-                cursor: "pointer",
-                flexShrink: 0,
-              }}
             >
               ✕
             </button>
@@ -324,13 +276,15 @@ function FeedRow({
   );
 }
 
-function StatPill({ label, value, color = "#ccc" }: { label: string; value: string; color?: string }) {
+// Non-interactive instrument (Duration). Same box as StatTabPill but no
+// hover/active states, and centred so it doesn't read as a fifth tab.
+function StatPill({ label, value, color = "var(--ck-text)" }: { label: string; value: string; color?: string }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "1px" }}>
-      <span style={{ fontSize: "9px", color: "#555", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-        {label}
-      </span>
-      <span style={{ fontSize: "13px", fontWeight: 600, color }}>{value}</span>
+    <div className="ck-stat" style={{ justifyContent: "center", textAlign: "center" }}>
+      <div>
+        <span className="ck-stat__label">{label}</span>
+        <span className="ck-stat__value" style={{ color }}>{value}</span>
+      </div>
     </div>
   );
 }
@@ -346,53 +300,23 @@ function TabBar({ value, onChange, counts }: { value: Tab; onChange: (t: Tab) =>
     <div
       style={{
         display: "flex",
-        gap: "2px",
-        padding: "4px 6px",
-        backgroundColor: "#0d0d0d",
-        borderBottom: "1px solid #1e1e1e",
+        gap: "6px",
+        padding: "0 12px 8px",
+        borderBottom: "1px solid var(--ck-line)",
         flexShrink: 0,
         flexWrap: "wrap",
       }}
     >
       {BOTTOM_TABS.map((tab) => {
-        const active = tab === value;
         const count = counts[tab];
-        const badgeColor = tab === "Review" ? "#60a5fa" : "#94a3b8";
-
         return (
           <button
             key={tab}
             onClick={() => onChange(tab)}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "5px",
-              padding: "3px 8px",
-              fontSize: "11px",
-              borderRadius: "3px",
-              border: active ? `1px solid ${badgeColor}44` : "1px solid #222",
-              backgroundColor: active ? badgeColor + "18" : "transparent",
-              color: active ? badgeColor : "#555",
-              cursor: "pointer",
-              fontWeight: active ? 600 : 400,
-              whiteSpace: "nowrap",
-            }}
+            className={`ck-tab${tab === value ? " ck-tab--active" : ""}`}
           >
             {tab}
-            {count > 0 && (
-              <span
-                style={{
-                  fontSize: "9px",
-                  color: active ? badgeColor : "#555",
-                  backgroundColor: "#1a1a1a",
-                  border: "1px solid #2a2a2a",
-                  borderRadius: "10px",
-                  padding: "0 5px",
-                }}
-              >
-                {count}
-              </span>
-            )}
+            {count > 0 && <span className="ck-count">{count}</span>}
           </button>
         );
       })}
@@ -419,31 +343,29 @@ function StatTabPill({
   onClick: () => void;
   icon?: SeverityKind;
 }) {
-  const [hovered, setHovered] = useState(false);
+  // A zero count keeps its severity colour (the colour identifies the
+  // category) and only gets a faint green wash to mark a clean result.
+  const clear = value === "0";
 
   return (
     <button
       onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: "1px",
-        padding: "2px 8px",
-        border: `1px solid ${active ? color + "88" : hovered ? color + "44" : "#333"}`,
-        borderRadius: "4px",
-        backgroundColor: active ? color + "14" : "transparent",
-        cursor: "pointer",
-        textAlign: "left",
-        transition: "border-color 0.15s",
-      }}
+      aria-pressed={active}
+      className={`ck-stat${clear ? " ck-stat--clear" : ""}${active ? " ck-stat--active" : ""}`}
+      style={{ ["--ck-accent" as string]: color }}
     >
-      <span style={{ display: "flex", alignItems: "center", gap: "3px", fontSize: "9px", color: "#555", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-        {icon && <SeverityIcon kind={icon} size={9} color={active ? color : "#555"} />}
-        {label}
+      {icon && (
+        <SeverityIcon
+          kind={icon}
+          size={16}
+          color={color}
+          style={{ flexShrink: 0, opacity: active ? 1 : 0.75 }}
+        />
+      )}
+      <span style={{ minWidth: 0 }}>
+        <span className="ck-stat__label" style={active ? { color: "var(--ck-text-2)" } : undefined}>{label}</span>
+        <span className="ck-stat__value" style={{ color }}>{value}</span>
       </span>
-      <span style={{ fontSize: "13px", fontWeight: 600, color, textAlign: "center", width: "100%" }}>{value}</span>
     </button>
   );
 }
@@ -468,23 +390,25 @@ export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime, onCa
 
   if (!pull) {
     return (
-      <div
-        style={{
-          height: "100%",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: "8px",
-          color: "#333",
-          padding: "20px",
-          textAlign: "center",
-        }}
-      >
-        <span style={{ fontSize: "28px" }}>📋</span>
-        <span style={{ fontSize: "13px", color: "#555", lineHeight: "1.5" }}>
-          Select a pull to see its timeline
-        </span>
+      <div style={{ height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <PanelHeader title="Pull Review" />
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "8px",
+            padding: "20px",
+            textAlign: "center",
+          }}
+        >
+          <span style={{ fontSize: "28px", opacity: 0.5 }}>📋</span>
+          <span style={{ fontSize: "13px", color: "var(--ck-text-3)", lineHeight: "1.5" }}>
+            Select a pull to see its timeline
+          </span>
+        </div>
       </div>
     );
   }
@@ -548,109 +472,56 @@ export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime, onCa
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-      <div style={{ padding: "10px 12px", borderBottom: "1px solid #1e1e1e", backgroundColor: "#111", flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
-          <span style={{ fontWeight: 700, fontSize: "14px", color: "#e2e8f0" }}>{pull.name}</span>
+      <PanelHeader title={pull.name} shrinkTitle>
+        <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
+          <span className="ck-badge" style={{ color: isKill ? "#4ade80" : "#f87171", fontSize: "11px" }}>
+            {isKill ? "KILL" : "WIPE"}
+          </span>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
-            <span
-              style={{
-                fontSize: "11px",
-                fontWeight: 700,
-                padding: "2px 8px",
-                borderRadius: "4px",
-                backgroundColor: isKill ? "rgba(74,222,128,0.12)" : "rgba(248,113,113,0.1)",
-                color: isKill ? "#4ade80" : "#f87171",
-                border: `1px solid ${isKill ? "#166534" : "#7f1d1d"}`,
-                whiteSpace: "nowrap",
-              }}
+          {/* "Add Error" — sits to the left of Call Wipe */}
+          {onAddError && (
+            <button className="ck-btn ck-btn--arcane ck-btn--sm" onClick={() => setShowAddErrorDialog(true)}>
+              Add Error
+            </button>
+          )}
+
+          {/* "Call Wipe" — now a button when it exists, opening a confirm
+              dialog to remove it, instead of a static badge. */}
+          {callWipeError ? (
+            <button
+              className="ck-btn ck-btn--raid ck-btn--sm"
+              onClick={() => setConfirmRemoveWipe(true)}
+              title="Click to remove this wipe call"
+              style={{ background: "linear-gradient(180deg, #34204d, #221535)" }}
             >
-              {isKill ? "KILL" : "WIPE"}
-            </span>
-
-            {/* "Add Error" — sits to the left of Call Wipe */}
-            {onAddError && (
-              <button
-                onClick={() => setShowAddErrorDialog(true)}
-                style={{
-                  fontSize: "11px",
-                  fontWeight: 600,
-                  color: "#60a5fa",
-                  border: "1px solid #1e3a8a",
-                  borderRadius: "4px",
-                  padding: "3px 8px",
-                  backgroundColor: "transparent",
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                Add Error
+              <span className="ck-num">Wipe called {formatCallTime(callWipeError.timestamp)}</span>
+            </button>
+          ) : (
+            onCallWipe && (
+              <button className="ck-btn ck-btn--raid ck-btn--sm" onClick={() => onCallWipe(pull.id, playbackTimeMs)}>
+                Call Wipe
               </button>
-            )}
-
-            {/* "Call Wipe" — now a button when it exists, opening a confirm
-                dialog to remove it, instead of a static badge. */}
-            {callWipeError ? (
-              <button
-                onClick={() => setConfirmRemoveWipe(true)}
-                title="Click to remove this wipe call"
-                style={{
-                  fontSize: "11px",
-                  fontWeight: 600,
-                  color: "#c084fc",
-                  border: "1px solid #6b21a8",
-                  borderRadius: "4px",
-                  padding: "3px 8px",
-                  backgroundColor: "rgba(192,132,252,0.1)",
-                  whiteSpace: "nowrap",
-                  cursor: "pointer",
-                }}
-              >
-                Wipe called {formatCallTime(callWipeError.timestamp)}
-              </button>
-            ) : (
-              onCallWipe && (
-                <button
-                  onClick={() => onCallWipe(pull.id, playbackTimeMs)}
-                  style={{
-                    fontSize: "11px",
-                    fontWeight: 600,
-                    color: "#c084fc",
-                    border: "1px solid #6b21a8",
-                    borderRadius: "4px",
-                    padding: "3px 8px",
-                    backgroundColor: "transparent",
-                    cursor: "pointer",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  Call Wipe
-                </button>
-              )
-            )}
-          </div>
+            )
+          )}
         </div>
-      </div>
+      </PanelHeader>
 
       <div
         style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: "16px",
-          padding: "10px 12px",
-          backgroundColor: "#0d0d0d",
-          borderBottom: "1px solid #1a1a1a",
+          display: "grid",
+          // Four stat tabs plus Duration, equal width so the row reads as
+          // one instrument cluster.
+          gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
+          gap: "6px",
+          padding: "10px 12px 8px",
           flexShrink: 0,
-          flexWrap: "wrap",
         }}
       >
-        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
           <StatTabPill
             label="Deaths"
             icon="Death"
             value={String(deaths.length)}
-            color={deaths.length > 0 ? SEVERITY_COLOR.Death : "#4ade80"}
+            color={SEVERITY_COLOR.Death}
             active={activeTab === "Deaths"}
             onClick={() => setActiveTab("Deaths")}
           />
@@ -658,7 +529,7 @@ export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime, onCa
             label="Raid"
             icon="Raid"
             value={String(raids.length)}
-            color={raids.length > 0 ? SEVERITY_COLOR.Raid : "#4ade80"}
+            color={SEVERITY_COLOR.Raid}
             active={activeTab === "Raid"}
             onClick={() => setActiveTab("Raid")}
           />
@@ -666,7 +537,7 @@ export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime, onCa
             label="Major"
             icon="Major"
             value={String(majors.length)}
-            color={majors.length > 0 ? SEVERITY_COLOR.Major : "#4ade80"}
+            color={SEVERITY_COLOR.Major}
             active={activeTab === "Major"}
             onClick={() => setActiveTab("Major")}
           />
@@ -674,20 +545,19 @@ export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime, onCa
             label="Minor"
             icon="Minor"
             value={String(minors.length)}
-            color={minors.length > 0 ? SEVERITY_COLOR.Minor : "#4ade80"}
+            color={SEVERITY_COLOR.Minor}
             active={activeTab === "Minor"}
             onClick={() => setActiveTab("Minor")}
           />
-        </div>
 
-        {/* Right-aligned and border-free, separated from the stat-tab
-            buttons — makes clear this one isn't clickable. */}
+        {/* Centred and without hover/active states — makes clear this one
+            isn't clickable. */}
         <StatPill label="Duration" value={formatDuration(pull.fightDuration)} />
       </div>
 
       <TabBar value={activeTab} onChange={setActiveTab} counts={counts} />
 
-      <div style={{ flex: 1, overflowY: "auto", padding: "4px 10px 12px" }}>
+      <div style={{ flex: 1, overflowY: "auto", padding: "2px 8px 12px 10px" }}>
         {feed.length > 0 ? (
           <>
             <SectionLabel label={activeTab} count={feed.length} />

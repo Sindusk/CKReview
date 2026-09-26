@@ -6,6 +6,7 @@ import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import { getClassColor, getRoleColor, formatSpecClass, getPlayerSpecIcon } from "@/lib/player-display";
 import { detectFFRoles } from "@/lib/mechanics/ffxiv/roles";
 import type { MitigationPlan } from "@/lib/mechanics/ffxiv/dancingmad/mitigation-plan";
+import { PanelHeader } from "./ui/Panel";
 
 type Tab = "DamageDone" | "DamageTaken" | "Healing" | "Debuffs" | "Casts";
 const TABS: Tab[] = ["DamageDone", "DamageTaken", "Healing", "Debuffs", "Casts"];
@@ -102,7 +103,6 @@ function PlayerButton({
   // RosterPanel's ffRows.
   large?:   boolean;
 }) {
-  const [hovered, setHovered] = useState(false);
   const color = getClassColor(player.game, player.className);
   const roleColor = getRoleColor(player.role);
   const iconSrc = getPlayerSpecIcon(player.game, player.specId, player.className);
@@ -112,21 +112,17 @@ function PlayerButton({
   return (
     <button
       onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
       title={`${player.name} — ${formatSpecClass(player.specName, player.className)}`}
+      className="ck-tile"
       style={{
+        // Hover edge picks up the class colour (see .ck-tile in theme.css).
+        ["--ck-accent" as string]: color + "88",
         display: "flex",
         flexDirection: "row",
         alignItems: "center",
         gap: large ? "8px" : "6px",
-        padding: large ? "5px 8px" : "3px 5px",
-        borderRadius: large ? "5px" : "4px",
-        border: `1px solid ${hovered ? color + "66" : "#2a2a2a"}`,
-        backgroundColor: hovered ? "#1a1a1a" : "#0d0d0d",
-        cursor: "pointer",
+        padding: large ? "5px 8px" : "4px 5px",
         minWidth: 0,
-        transition: "border-color 0.15s, background-color 0.15s",
         width: "100%",
       }}
     >
@@ -135,7 +131,7 @@ function PlayerButton({
         alt=""
         width={iconSize}
         height={iconSize}
-        style={{ borderRadius: large ? "5px" : "4px", flexShrink: 0, border: `1px solid ${color}44` }}
+        style={{ borderRadius: "3px", flexShrink: 0, border: `1px solid ${color}44`, boxShadow: "0 1px 2px rgba(0,0,0,0.6)" }}
         onError={(e) => { e.currentTarget.style.visibility = "hidden"; }}
       />
       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", minWidth: 0, flex: 1 }}>
@@ -153,11 +149,11 @@ function PlayerButton({
         >
           {player.name}
         </span>
-        <span style={{ display: "flex", width: "100%", justifyContent: "space-between", alignItems: "baseline", gap: "4px", fontSize: large ? "12px" : "10px", color: "#555" }}>
+        <span style={{ display: "flex", width: "100%", justifyContent: "space-between", alignItems: "baseline", gap: "4px", fontSize: large ? "12px" : "10px", color: "var(--ck-text-3)" }}>
           {/* DPS shows the actual range category (Melee / Ranged, plus
               Caster for FFXIV) instead of a generic "DPS" label. */}
-          <span style={{ color: roleColor, whiteSpace: "nowrap" }}>{player.role === "DPS" ? player.rangeType : player.role}</span>
-          {roleSlot && <span style={{ color: "#666", fontWeight: 700, flexShrink: 0 }}>{roleSlot}</span>}
+          <span style={{ color: roleColor, fontWeight: 600, whiteSpace: "nowrap" }}>{player.role === "DPS" ? player.rangeType : player.role}</span>
+          {roleSlot && <span style={{ color: "var(--ck-text-3)", fontWeight: 700, flexShrink: 0 }}>{roleSlot}</span>}
         </span>
       </div>
     </button>
@@ -170,7 +166,7 @@ function rowBackground(hasPassed: boolean): string {
 
 const rowShellStyle: CSSProperties = {
   padding: "5px 10px",
-  borderBottom: "1px solid #111",
+  borderBottom: "1px solid var(--ck-line)",
   transition: "background-color 0.3s",
 };
 
@@ -182,8 +178,8 @@ const line1Style: CSSProperties = {
 };
 
 const timeStyle: CSSProperties = {
-  fontFamily: "monospace",
-  color: "#555",
+  fontVariantNumeric: "tabular-nums",
+  color: "var(--ck-text-3)",
   minWidth: "34px",
   flexShrink: 0,
 };
@@ -402,37 +398,15 @@ function PlayerDetail({
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "8px",
-          padding: "6px 8px",
-          borderBottom: "1px solid #1e1e1e",
-          backgroundColor: "#111",
-          flexShrink: 0,
-        }}
-      >
-        <button
-          onClick={onBack}
-          style={{
-            padding: "3px 8px",
-            fontSize: "11px",
-            backgroundColor: "#1e1e1e",
-            border: "1px solid #333",
-            borderRadius: "4px",
-            color: "#888",
-            cursor: "pointer",
-            flexShrink: 0,
-          }}
-        >
+      <div className="ck-panel-header" style={{ justifyContent: "flex-start" }}>
+        <button className="ck-btn ck-btn--sm" onClick={onBack}>
           ← Back
         </button>
-        <div style={{ minWidth: 0 }}>
+        <div style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {/* Full spec + class name still lives here — this is the one
               place specialization text remains, per product decision. */}
-          <span style={{ color, fontWeight: 700, fontSize: "13px" }}>{player.name}</span>
-          <span style={{ color: "#555", fontSize: "11px", marginLeft: "6px" }}>
+          <span style={{ color, fontWeight: 700, fontSize: "14px" }}>{player.name}</span>
+          <span style={{ color: "var(--ck-text-3)", fontSize: "11px", marginLeft: "6px" }}>
             {formatSpecClass(player.specName, player.className)}
           </span>
         </div>
@@ -444,36 +418,22 @@ function PlayerDetail({
           alignItems: "center",
           justifyContent: "space-between",
           gap: "8px",
-          padding: "4px 6px",
-          backgroundColor: "#0d0d0d",
-          borderBottom: "1px solid #1e1e1e",
+          padding: "6px 8px",
+          borderBottom: "1px solid var(--ck-line)",
           flexShrink: 0,
           flexWrap: "wrap",
         }}
       >
-        <div style={{ display: "flex", gap: "2px", flexWrap: "wrap" }}>
-          {TABS.map(tab => {
-            const active = tab === activeTab;
-            return (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                style={{
-                  padding: "3px 8px",
-                  fontSize: "11px",
-                  borderRadius: "3px",
-                  border: active ? `1px solid ${color}44` : "1px solid #222",
-                  backgroundColor: active ? color + "18" : "transparent",
-                  color: active ? color : "#555",
-                  cursor: "pointer",
-                  fontWeight: active ? 600 : 400,
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {TAB_LABELS[tab]}
-              </button>
-            );
-          })}
+        <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
+          {TABS.map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`ck-tab ck-tab--sm${tab === activeTab ? " ck-tab--active" : ""}`}
+            >
+              {TAB_LABELS[tab]}
+            </button>
+          ))}
         </div>
 
         {/* #4 — search/filter by ability name */}
@@ -481,22 +441,14 @@ function PlayerDetail({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Filter by ability…"
-          style={{
-            padding: "3px 8px",
-            fontSize: "11px",
-            backgroundColor: "#111",
-            border: "1px solid #333",
-            borderRadius: "4px",
-            color: "#ccc",
-            outline: "none",
-            minWidth: "140px",
-          }}
+          className="ck-field"
+          style={{ padding: "3px 8px", fontSize: "11px", minWidth: "140px" }}
         />
       </div>
 
       <div ref={scrollContainerRef} style={{ flex: 1, overflowY: "auto" }}>
         {filteredEvents.length === 0 ? (
-          <div style={{ padding: "16px", textAlign: "center", color: "#333", fontSize: "12px" }}>
+          <div style={{ padding: "16px", textAlign: "center", color: "var(--ck-text-3)", fontSize: "12px" }}>
             {events.length === 0
               ? `No ${TAB_LABELS[activeTab].toLowerCase()} events for this pull`
               : `No results matching "${search}"`}
@@ -552,11 +504,14 @@ export default function RosterPanel({ players, playbackTimeMs, mitigationPlan }:
 
   if (filteredPlayers.length === 0) {
     return (
-      <div style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "6px", color: "#333", padding: "12px", textAlign: "center" }}>
-        <span style={{ fontSize: "22px" }}>👥</span>
-        <span style={{ fontSize: "12px", color: "#444", lineHeight: "1.5" }}>
-          Select a pull to see the roster
-        </span>
+      <div style={{ height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <PanelHeader title="Roster" />
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "6px", padding: "12px", textAlign: "center" }}>
+          <span style={{ fontSize: "22px", opacity: 0.5 }}>👥</span>
+          <span style={{ fontSize: "12px", color: "var(--ck-text-3)", lineHeight: "1.5" }}>
+            Select a pull to see the roster
+          </span>
+        </div>
       </div>
     );
   }
@@ -614,9 +569,8 @@ export default function RosterPanel({ players, playbackTimeMs, mitigationPlan }:
 
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-      <div style={{ padding: "6px 10px", fontSize: "10px", color: "#555", textTransform: "uppercase", letterSpacing: "0.08em", borderBottom: "1px solid #1a1a1a", backgroundColor: "#0d0d0d", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
-        <span>Roster</span>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#777", flexWrap: "wrap", justifyContent: "flex-end" }}>
+      <PanelHeader title="Roster">
+        <div className="ck-num" style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ck-text-3)", flexWrap: "wrap", justifyContent: "flex-end" }}>
           <span>{filteredPlayers.length} players</span>
           {tankCount > 0 && <span style={{ color: getRoleColor("Tank") }}>Tanks {tankCount}</span>}
           {healerCount > 0 && <span style={{ color: getRoleColor("Healer") }}>Healers {healerCount}</span>}
@@ -624,7 +578,7 @@ export default function RosterPanel({ players, playbackTimeMs, mitigationPlan }:
           {rangedCount > 0 && <span style={{ color: getRoleColor("DPS") }}>Ranged {rangedCount}</span>}
           {casterCount > 0 && <span style={{ color: getRoleColor("DPS") }}>Casters {casterCount}</span>}
         </div>
-      </div>
+      </PanelHeader>
 
       {isFF ? (
         <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "8px", padding: "8px", boxSizing: "border-box", overflow: "hidden" }}>

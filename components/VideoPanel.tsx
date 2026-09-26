@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Vod } from "@/types/Vod";
 import type { SeekRequest } from "@/hooks/useTimelineController";
+import { PanelHeader } from "./ui/Panel";
 
 declare global {
   interface Window {
@@ -240,52 +241,34 @@ export default function VideoPanel({
         flexDirection: "column",
       }}
     >
-      <div
-        style={{
-          padding: "8px 10px",
-          background: "#1a1a1a",
-          borderBottom: "1px solid #2a2a2a",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: "10px",
-        }}
-      >
-        <span style={{ fontWeight: 700, color: "#f8fafc", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {vod ? vod.player : "No VOD Selected"}
-        </span>
-
+      <PanelHeader title={vod ? vod.player : "No VOD Selected"} shrinkTitle>
         {vod?.isCalibrated && onUnsync && (
           <button
+            className="ck-btn ck-btn--arcane ck-btn--sm"
             onClick={() => onUnsync(vod.id)}
             title="Clear this VOD's sync so it can be re-aligned"
-            style={{
-              backgroundColor: "transparent",
-              color: "#60a5fa",
-              border: "1px solid #2563eb",
-              borderRadius: "6px",
-              padding: "4px 10px",
-              fontSize: "11px",
-              fontWeight: 600,
-              cursor: "pointer",
-              whiteSpace: "nowrap",
-              flexShrink: 0,
-            }}
           >
             Unsync
           </button>
         )}
-      </div>
+      </PanelHeader>
 
-      <div
-        ref={containerRef}
-        style={{
-          flex: 1,
-          position: "relative",
-          width: "100%",
-          height: "100%",
-        }}
-      />
+      {/* Inset well around the player — nothing is drawn over the iframe. */}
+      <div style={{ flex: 1, minHeight: 0, display: "flex", padding: "8px 8px 0" }}>
+        <div
+          ref={containerRef}
+          style={{
+            flex: 1,
+            position: "relative",
+            width: "100%",
+            height: "100%",
+            background: vod ? "#000" : "rgba(0,0,0,0.3)",
+            boxShadow: vod
+              ? "0 0 0 1px rgba(255,255,255,0.06), 0 2px 10px rgba(0,0,0,0.6)"
+              : "inset 0 0 24px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05)",
+          }}
+        />
+      </div>
     </div>
   );
 }
