@@ -108,7 +108,8 @@
 //   wow-es-living-venom         hit by a returning Living Venom (current
 //                               Breath tank exempt — every venom converges
 //                               on the boss)
-//   wow-es-helical-overload     collided toxins to a total above 4
+//   wow-es-helical-overload     collided toxins to a total above 4 (always
+//                               Major — unrecoverable once it happens)
 //   wow-es-helical-unresolved   still holding toxins at expiry
 //   wow-es-helical-collapse     Raid at the first overload of a Stasis (or
 //                               >=3 toxin deaths without one)
@@ -237,6 +238,13 @@ const CULTIVATED_BURST_DOT     = 1284948;
 
 // Kills at which an unattributable raid-wide event is treated as the wipe.
 const RAID_WIPE_KILLS = 3;
+// A Raid marker usually shares its millisecond with the Major errors that
+// caused it (both players' overload merge is one event). AnalysisPanel
+// lists raids before majors and then stable-sorts by timestamp, so an exact
+// tie shows the marker FIRST; 1ms later orders it after its causes without
+// affecting the cutoff (which keeps errors at or before the marker). Same
+// fix as kefka-says.ts's DEATH_MARKER_SORT_OFFSET_MS.
+const RAID_MARKER_SORT_OFFSET_MS = 1;
 // Noxious Blast: counting deaths of its victims within 3s, every blast
 // with 2+ kills ended the pull (pulls 10/12/13/15/22/26); single kills did
 // not (pull 26 +268 continued ~45s).
@@ -628,9 +636,12 @@ function detectHelicalToxins(
         : [HELICAL_TOXINS_TICK, CULTIVATED_BURST, CULTIVATED_BURST_DOT].includes(d.killingAbilityGameId)
           ? ` The overloaded toxin killed them (${d.cause}).`
           : ` ${burstText} and they died ${sec(d.timestamp - (burst?.timestamp ?? d.timestamp))}s later (${d.cause}).`;
+      // Always Major: an overloaded toxin can never be cleared, so the
+      // Cultivated Burst it ends in is locked in the moment it happens
+      // (per user ruling — even when the pull resets before the Burst).
       errors.push(playerError(p, {
         ruleId:      ES_HELICAL_OVERLOAD_RULE_ID,
-        severity:    d ? "Major" : "Minor",
+        severity:    "Major",
         name:        "Helical Toxins Overload",
         description: `Combined Helical Toxins with ${parts.join(", then with ")} — pairs must total exactly ${HELICAL_EXACT_TOTAL}, and an overloaded toxin can no longer be cleared.${outcome}`,
         timestamp:   t,
@@ -692,7 +703,7 @@ function detectHelicalToxins(
           `an overloaded toxin can't be cleared and ends in Cultivated Burst` +
           (overloadNotes.size > 2 ? `; ${overloadNotes.size} players ended up overloaded this Stasis` : "") +
           `. Treated as the point the pull was over.`,
-        timestamp:   firstOverload.t,
+        timestamp:   firstOverload.t + RAID_MARKER_SORT_OFFSET_MS,
         abilityId:   HELICAL_TOXINS,
         abilityName: "Helical Toxins",
       });
@@ -703,7 +714,7 @@ function detectHelicalToxins(
         name:        "Helical Toxins Failed",
         description: `${killed.length} players died to overloaded or unresolved Helical Toxins this Stasis (${joinNames(killed.map((d) => d.player))}). ` +
           "Unresolvable from here; treated as a cutoff point.",
-        timestamp:   killed[0].timestamp,
+        timestamp:   killed[0].timestamp + RAID_MARKER_SORT_OFFSET_MS,
         abilityId:   CULTIVATED_BURST,
         abilityName: "Cultivated Burst",
       });
@@ -1206,7 +1217,7 @@ function detectPullOver(
 ): PullError[] {
   const candidates: PullError[] = [];
   const marker = (timestamp: number, name: string, description: string, abilityId: number, abilityName: string) =>
-    candidates.push({ ruleId: ES_PULL_OVER_RULE_ID, severity: "Raid", name, description, timestamp, abilityId, abilityName });
+    candidates.push({ ruleId: ES_PULL_OVER_RULE_ID, severity: "Raid", name, description, timestamp: timestamp + RAID_MARKER_SORT_OFFSET_MS, abilityId, abilityName });
   const byName = new Map(players.map((p) => [p.name, p]));
   const sorted = [...deaths].sort((a, b) => a.timestamp - b.timestamp);
 
