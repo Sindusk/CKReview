@@ -103,8 +103,16 @@ function toFightRelative(rep) {
 // the last instant before a wipe/kill) but that's negligible against the
 // multi-minute thresholds anything here gates on (see wave-cannon.ts).
 function fightDurationMs(rep) {
-  const allTimestamps = STREAM_KEYS.flatMap((k) => (rep[k]?.data ?? []).map((e) => e.timestamp));
-  return Math.max(...allTimestamps) - Math.min(...allTimestamps);
+  // Loop, not Math.max(...spread): large WoW pulls exceed the call-stack
+  // argument limit.
+  let min = Infinity, max = -Infinity;
+  for (const k of STREAM_KEYS) {
+    for (const e of (rep[k]?.data ?? [])) {
+      if (e.timestamp < min) min = e.timestamp;
+      if (e.timestamp > max) max = e.timestamp;
+    }
+  }
+  return max - min;
 }
 
 // Lazy, memoized per-pull input builders so pulls are only transformed for
@@ -443,8 +451,8 @@ const MECHANICS = {
     }),
     run({ mod, pulls, actorMap, abilityMap }) {
       for (const { bossName, pullNumber, rep } of pulls) {
-        const { players, deaths, enemyCasts } = buildWowPull(rep, actorMap, abilityMap, mod.getSpecInfo);
-        const errors = mod.detectEntombedSentinelsErrors(players, deaths, enemyCasts);
+        const { players, deaths, enemyCasts, enemyBuffs, enemyBuffRemovals } = buildWowPull(rep, actorMap, abilityMap, mod.getSpecInfo);
+        const errors = mod.detectEntombedSentinelsErrors(players, deaths, enemyCasts, enemyBuffs, enemyBuffRemovals, fightDurationMs(rep));
         console.log('='.repeat(70));
         console.log(`${bossName} Pull ${pullNumber} ->`, errors.length, 'errors');
         for (const e of errors) {

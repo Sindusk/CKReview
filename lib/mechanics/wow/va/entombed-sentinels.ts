@@ -102,14 +102,16 @@
 // pull's cutoff). Player-less errors are only ever Minor or Raid —
 // report-data.ts assumes every Major carries a player.
 //
-//   wow-es-noxious-blast        missed orbs (raid-wide; Raid at >=3 kills)
+//   wow-es-noxious-blast        missed orbs (raid-wide; Raid when >=2 of its
+//                               victims die within 3s)
 //   wow-es-droplet-pickup-death died collecting an orb (Major)
 //   wow-es-living-venom         hit by a returning Living Venom (current
 //                               Breath tank exempt — every venom converges
 //                               on the boss)
 //   wow-es-helical-overload     collided toxins to a total above 4
 //   wow-es-helical-unresolved   still holding toxins at expiry
-//   wow-es-helical-collapse     >=3 toxin deaths in one Stasis (Raid)
+//   wow-es-helical-collapse     Raid at the first overload of a Stasis (or
+//                               >=3 toxin deaths without one)
 //   wow-es-protovenom-eruption  marked<->unmarked collision (both flagged)
 //   wow-es-protovenom-ticks     died to Protovenom ticks before pairing
 //   wow-es-miasma-missed-soak   thin Miasma soak: flags the Blood-team
@@ -122,6 +124,10 @@
 //                               flagged; player-less when it hit nobody)
 //   wow-es-contaminate          a slime outlived a normal kill (>=25s) and
 //                               Contaminate killed players
+//   wow-es-pull-over            generic "the pull was over here" Raid marker
+//                               (5+ dead, tank death, untanked boss, bosses
+//                               not separated, Berserk) when no mechanic Raid
+//                               error came first — see "When was the pull over?"
 //
 // Deliberately NOT flagged (see above): Mark deaths, Contaminate ticks,
 // Helical Toxins ticks on a pairing player, tank-buster hits/deaths, the
@@ -230,9 +236,12 @@ const CULTIVATED_BURST_DOT     = 1284948;
 // ─── Thresholds ──────────────────────────────────────────────────────────────
 
 // Kills at which an unattributable raid-wide event is treated as the wipe.
-// Noxious Blast: 1 kill never ended a pull (pull 10 +152 continued ~30s);
-// 3+ kills always coincided with the pull's collapse (pulls 6/12/13/15/26).
 const RAID_WIPE_KILLS = 3;
+// Noxious Blast: counting deaths of its victims within 3s, every blast
+// with 2+ kills ended the pull (pulls 10/12/13/15/22/26); single kills did
+// not (pull 26 +268 continued ~45s).
+const NOXIOUS_RAID_KILLS = 2;
+const NOXIOUS_KILL_WINDOW_MS = 3000;
 
 // Unstable Miasma: clean soaks were 8-10 players; 7 (pulls 9/22/24) cost
 // ~490-540k per soaker, 6 killed a soaker (pull 25 +192). Flag <= 7.
@@ -393,10 +402,13 @@ function detectMissedOrbs(players: PlayerInfo[], deaths: DeathEvent[]): PullErro
     const end = set[set.length - 1].end;
     const orbs = set.reduce((n, b) => n + Math.max(1, Math.round(b.hits / b.targets.size)), 0);
     const victims = new Set(set.flatMap((b) => [...b.targets]));
+    // A ~250-330k hit on everyone also finishes off players who die to the
+    // next tick of something else (pull 22 +97.5: two Clinging Murk deaths
+    // 0.7s later; pull 10 +152: two Contaminate deaths 2.2s later).
     const killed = deaths
-      .filter((d) => d.killingAbilityGameId === NOXIOUS_BLAST && d.timestamp >= start - 200 && d.timestamp <= end + 1000)
+      .filter((d) => victims.has(d.player) && d.timestamp >= start - 200 && d.timestamp <= end + NOXIOUS_KILL_WINDOW_MS)
       .map((d) => d.player);
-    const raid = killed.length >= RAID_WIPE_KILLS;
+    const raid = killed.length >= NOXIOUS_RAID_KILLS;
     const orbText = `${orbs} Toxic Droplet orb${orbs === 1 ? " was" : "s were"} not collected`;
     return {
       ruleId:      ES_NOXIOUS_BLAST_RULE_ID,
@@ -404,7 +416,7 @@ function detectMissedOrbs(players: PlayerInfo[], deaths: DeathEvent[]): PullErro
       name:        "Missed Toxic Droplet",
       description: killed.length === 0
         ? `${orbText} — Noxious Blast hit all ${victims.size} living players.`
-        : `${orbText} — Noxious Blast hit all ${victims.size} living players and killed ${joinNames(killed)}.` +
+        : `${orbText} — Noxious Blast hit all ${victims.size} living players; ${joinNames(killed)} died within ${NOXIOUS_KILL_WINDOW_MS / 1000}s.` +
           (raid ? " Unresolvable from here; treated as a cutoff point." : ""),
       timestamp:   start,
       abilityId:   NOXIOUS_BLAST,
@@ -663,9 +675,28 @@ function detectHelicalToxins(
       }
     }
 
-    // ── Collapse: enough toxin deaths in one Stasis to end the pull.
+    // ── Collapse. Every Stasis with an overload ended the pull within
+    // 19-35s (11 of 11; pull 15 +366 took 52s and wiped anyway): the
+    // overloaded pair can't clear and take Cultivated Burst, and this raid
+    // resets on it. So the first overload IS the point the pull was over.
+    // Without an overload, 3+ toxin deaths (unresolved expiries) also end it.
+    const firstOverload = [...overloadNotes.values()].sort((a, b) => a.t - b.t)[0];
     const killed = holders.map((p) => toxinDeath(p)).filter((d): d is DeathEvent => !!d).sort((a, b) => a.timestamp - b.timestamp);
-    if (killed.length >= RAID_WIPE_KILLS) {
+    if (firstOverload) {
+      const pair = merges.find((m) => m.t === firstOverload.t && m.total > HELICAL_EXACT_TOTAL && m.members.includes(firstOverload.p));
+      errors.push({
+        ruleId:      ES_HELICAL_COLLAPSE_RULE_ID,
+        severity:    "Raid",
+        name:        "Helical Toxins Overloaded",
+        description: `${joinNames((pair?.members ?? [firstOverload.p]).map((m) => m.name))} combined Helical Toxins for a total of ${pair?.total ?? "more than 4"} — ` +
+          `an overloaded toxin can't be cleared and ends in Cultivated Burst` +
+          (overloadNotes.size > 2 ? `; ${overloadNotes.size} players ended up overloaded this Stasis` : "") +
+          `. Treated as the point the pull was over.`,
+        timestamp:   firstOverload.t,
+        abilityId:   HELICAL_TOXINS,
+        abilityName: "Helical Toxins",
+      });
+    } else if (killed.length >= RAID_WIPE_KILLS) {
       errors.push({
         ruleId:      ES_HELICAL_COLLAPSE_RULE_ID,
         severity:    "Raid",
@@ -1118,12 +1149,142 @@ function detectContaminateKills(players: PlayerInfo[], deaths: DeathEvent[], ene
   return errors;
 }
 
+// ─── When was the pull over? ─────────────────────────────────────────────────
+//
+// Surveyed every pull of Mvz3r1AnVKYpdFTH for what ended it. The
+// mechanic-specific Raid errors above cover most (Helical overload: 11
+// pulls; Noxious Blast with 2+ deaths: 6). The rest ended through:
+//
+//   · 5+ players dead at once (battle-rezzes subtracted — this raid rezzes
+//     a lot): every pull that reached it wiped; the most any continuing
+//     pull had was 4 (pull 20 +254/+288, pull 16 +265). Typical causes:
+//     Mark ticks of ~140k/2s on everyone at a late Stasis (pulls 4/18),
+//     Contaminate/Mark attrition (pulls 3/6/25), eruption chains (7/29).
+//   · A tank death: every one ended the pull unless the tank was rezzed
+//     within seconds AND the pull went on (pull 12 +223: rezzed after 8s,
+//     continued 70s). Pull 21 +72: rezzed after 6s, reset 2s later anyway.
+//   · A tank buster landing on a non-tank (nobody tanking that boss —
+//     pull 30 +8).
+//   · Ula'tek's Dominance staying up after Stasis (bosses never separated,
+//     both at 99% damage reduction): pull 8, 13s, reset 4s after it ended.
+//     Normal post-Stasis episodes last 1-5s; long ones elsewhere followed a
+//     tank death.
+//   · Berserk (pull 24 +420).
+//
+// Only the EARLIEST of these generic markers is emitted, and only when no
+// mechanic-specific Raid error came before it. Unexplained by the log:
+// pull 16 (reset at +296 with 2 dead) and pull 27 (reset 9s after two
+// deaths) — use Call Wipe for those.
+
+export const ES_PULL_OVER_RULE_ID = "wow-es-pull-over";
+
+const BERSERK = 26662;
+const DOMINANCE = 1290189;             // Blood's copy; Breath's (1290193) mirrors it
+const BLOODVENOM_INJECTION_HIT = 1284487;
+const COLLAPSE_DEAD = 5;
+const TANK_REZ_GRACE_MS = 15000;
+const TANK_DEATH_CONTINUE_MS = 30000;
+const DOMINANCE_LONG_MS = 10000;
+const DOMINANCE_END_GRACE_MS = 15000;
+
+/** When this player was next active (hit or casting) after dying — i.e. battle-rezzed — if ever. */
+function rezzedAt(p: PlayerInfo, deathT: number, nextDeathT: number): number | undefined {
+  const t = [...p.damageTaken, ...p.casts]
+    .map((e) => e.timestamp)
+    .filter((x) => x > deathT + 2000 && x < nextDeathT)
+    .sort((a, b) => a - b)[0];
+  return t;
+}
+
+function detectPullOver(
+  players:          PlayerInfo[],
+  deaths:           DeathEvent[],
+  enemyCasts:       EnemyEvent[],
+  enemyBuffs:       EnemyEvent[],
+  enemyBuffRemoves: EnemyEvent[],
+  pullEnd:          number
+): PullError[] {
+  const candidates: PullError[] = [];
+  const marker = (timestamp: number, name: string, description: string, abilityId: number, abilityName: string) =>
+    candidates.push({ ruleId: ES_PULL_OVER_RULE_ID, severity: "Raid", name, description, timestamp, abilityId, abilityName });
+  const byName = new Map(players.map((p) => [p.name, p]));
+  const sorted = [...deaths].sort((a, b) => a.timestamp - b.timestamp);
+
+  // Deaths with their rez time, for the concurrent-dead count.
+  const lives = sorted.map((d) => {
+    const next = sorted.find((o) => o.player === d.player && o.timestamp > d.timestamp)?.timestamp ?? Infinity;
+    const p = byName.get(d.player);
+    return { d, rez: p ? rezzedAt(p, d.timestamp, next) : undefined };
+  });
+
+  // ── 5+ dead at once.
+  for (const { d } of lives) {
+    const dead = lives.filter((l) => l.d.timestamp <= d.timestamp && (l.rez === undefined || l.rez > d.timestamp));
+    if (dead.length >= COLLAPSE_DEAD) {
+      marker(d.timestamp, "Raid Collapse",
+        `${dead.length} players dead at once: ${joinNames(dead.map((l) => `${l.d.player} (${l.d.cause}, +${sec(l.d.timestamp)}s)`))}. ` +
+        "Treated as the point the pull was over.",
+        d.killingAbilityGameId, d.cause);
+      break;
+    }
+  }
+
+  // ── Tank deaths.
+  for (const { d, rez } of lives) {
+    if (byName.get(d.player)?.role !== "Tank") continue;
+    const recovered = rez !== undefined && rez - d.timestamp <= TANK_REZ_GRACE_MS && pullEnd - d.timestamp >= TANK_DEATH_CONTINUE_MS;
+    if (recovered) continue;
+    marker(d.timestamp, "Tank Died",
+      `Tank ${d.player} died (${d.cause})` +
+      (rez !== undefined ? ` — rezzed ${sec(rez - d.timestamp)}s later, but the pull ended ${sec(pullEnd - d.timestamp)}s after the death.`
+                         : ` and wasn't rezzed, leaving one tank for two bosses.`) +
+      " Treated as the point the pull was over.",
+      d.killingAbilityGameId, d.cause);
+  }
+
+  // ── Tank buster on a non-tank.
+  for (const p of players) {
+    if (p.role === "Tank") continue;
+    const h = p.damageTaken.find((e) => e.abilityId === EMPOWERING_SLAM || e.abilityId === BLOODVENOM_INJECTION_HIT);
+    if (!h) continue;
+    const boss = h.abilityId === EMPOWERING_SLAM ? "Breath of Ula'tek" : "Blood of Ula'tek";
+    marker(h.timestamp, "Boss Not Tanked",
+      `${h.abilityName} hit ${p.name} (${p.role}) — nobody was tanking ${boss}. Treated as the point the pull was over.`,
+      h.abilityId, h.abilityName);
+  }
+
+  // ── Bosses left together after Stasis.
+  const stasisEnds = enemyBuffRemoves.filter((e) => e.abilityId === STASIS_CAST).map((e) => e.timestamp);
+  for (const a of enemyBuffs.filter((e) => e.abilityId === DOMINANCE)) {
+    const r = enemyBuffRemoves.find((e) => e.abilityId === DOMINANCE && e.timestamp > a.timestamp);
+    const end = r?.timestamp ?? pullEnd;
+    const afterStasis = stasisEnds.some((s) => a.timestamp >= s && a.timestamp - s <= 15000);
+    if (!afterStasis || end - a.timestamp < DOMINANCE_LONG_MS || pullEnd - end > DOMINANCE_END_GRACE_MS) continue;
+    marker(a.timestamp, "Bosses Not Separated",
+      `Ula'tek's Dominance stayed on both bosses for ${sec(end - a.timestamp)}s after Vitriolic Stasis — they were never pulled ` +
+      "apart and took 99% reduced damage. Treated as the point the pull was over.",
+      DOMINANCE, "Ula'tek's Dominance");
+  }
+
+  // ── Enrage.
+  const berserk = enemyCasts.find((e) => e.abilityId === BERSERK && e.actorName.includes("Ula'tek"));
+  if (berserk) marker(berserk.timestamp, "Berserk", "The Sentinels went Berserk (enrage timer).", BERSERK, "Berserk");
+
+  // Earliest wins; within 1s a specific cause (tank death, Berserk, ...)
+  // beats the generic head-count (pull 20 +306.7: the 5th death WAS the tank).
+  const rank = (e: PullError) => e.timestamp + (e.name === "Raid Collapse" ? 1000 : 0);
+  return candidates.sort((a, b) => rank(a) - rank(b)).slice(0, 1);
+}
+
 // ─── Entry point ─────────────────────────────────────────────────────────────
 
 export function detectEntombedSentinelsErrors(
-  players:    PlayerInfo[],
-  deaths:     DeathEvent[] = [],
-  enemyCasts: EnemyEvent[] = []
+  players:          PlayerInfo[],
+  deaths:           DeathEvent[] = [],
+  enemyCasts:       EnemyEvent[] = [],
+  enemyBuffs:       EnemyEvent[] = [],
+  enemyBuffRemoves: EnemyEvent[] = [],
+  pullDurationMs?:  number
 ): PullError[] {
   const stasis = stasisTimes(enemyCasts);
   const errors = [
@@ -1139,5 +1300,16 @@ export function detectEntombedSentinelsErrors(
     ...detectBlightedPools(players, deaths),
     ...detectContaminateKills(players, deaths, enemyCasts),
   ];
+
+  // Self-gate the generic markers: tank deaths / Berserk happen in every
+  // WoW fight, so only run them on pulls that are this encounter.
+  if (stasis.length > 0 || players.some((p) => p.debuffs.some((e) => e.abilityId === MARK_OF_ACID || e.abilityId === MARK_OF_BLOOD))) {
+    const pullEnd = pullDurationMs ?? players.reduce((m, p) =>
+      [...p.damageTaken, ...p.casts].reduce((mm, e) => Math.max(mm, e.timestamp), m), 0);
+    const firstRaid = Math.min(Infinity, ...errors.filter((e) => e.severity === "Raid").map((e) => e.timestamp));
+    errors.push(...detectPullOver(players, deaths, enemyCasts, enemyBuffs, enemyBuffRemoves, pullEnd)
+      .filter((e) => e.timestamp < firstRaid));
+  }
+
   return suppressDuplicateRaidErrors(errors.sort((a, b) => a.timestamp - b.timestamp));
 }

@@ -124,6 +124,15 @@ function buildWowPull(rep, actorMap, abilityMap, getSpecInfo) {
     abilityName: abilityName(e.abilityGameID ?? 0),
   }));
 
+  // "removebuff" twin of enemyBuffs — mirrors wclBuildEnemyBuffRemovalEvents.
+  const enemyBuffRemovals = (rep.enemyBuffs?.data ?? []).filter((e) => e.type === 'removebuff').map((e) => ({
+    timestamp: e.timestamp - t0,
+    actorId: e.targetID,
+    actorName: actorMap.get(e.targetID)?.name || `NPC${e.targetID}`,
+    abilityId: e.abilityGameID ?? 0,
+    abilityName: abilityName(e.abilityGameID ?? 0),
+  }));
+
   // Damage on friendly NPCs (Dusk Crystal Dimming ticks) — mirrors
   // wclBuildFriendlyNpcDamageEvents in lib/log-transforms.ts.
   const friendlyNpcDamage = (rep.damageTaken?.data ?? [])
@@ -136,7 +145,7 @@ function buildWowPull(rep, actorMap, abilityMap, getSpecInfo) {
       abilityName: abilityName(e.abilityGameID ?? 0),
     }));
 
-  return { players, deaths, enemyCasts, enemyBuffs, friendlyNpcDamage };
+  return { players, deaths, enemyCasts, enemyBuffs, enemyBuffRemovals, friendlyNpcDamage };
 }
 
 module.exports = { buildWowPull, fightStartOf };

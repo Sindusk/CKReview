@@ -375,6 +375,28 @@ function wclBuildEnemyBuffEvents(
     }));
 }
 
+// Same shape as wclBuildEnemyBuffEvents, for "removebuff" — kept as a
+// separate stream so the "enemyBuffApplied" rules never see removals.
+// Entombed Sentinels uses it to time how long Ula'tek's Dominance stayed up.
+function wclBuildEnemyBuffRemovalEvents(
+  enemyBuffEvents: WCLBuffEvent[],
+  actorMap:        Map<number, WCLActor>,
+  abilityMap:      Map<number, AbilityInfo>,
+  fightStart:      number
+): EnemyEvent[] {
+  return enemyBuffEvents
+    .filter((e) => e.type === "removebuff")
+    .filter((e) => actorMap.get(e.targetID)?.type !== "Player")
+    .map((e) => ({
+      timestamp:   e.timestamp - fightStart,
+      actorId:     e.targetID,
+      actorName:   actorMap.get(e.targetID)?.name ?? `Unknown (${e.targetID})`,
+      abilityId:   e.abilityGameID ?? 0,
+      abilityName: wclAbilityName(e, abilityMap),
+      abilityIcon: wclAbilityIcon(e, abilityMap),
+    }));
+}
+
 // Damage landing on FRIENDLY NPCs — e.g. Midnight Falls' Dusk Crystals
 // damaging themselves with Dimming while unhealed. The damageTaken fetch
 // (friendly hostility) includes these; they're invisible to per-player
@@ -516,7 +538,11 @@ export function transformFightToPull(
   const errors = [
     ...detectPullErrors(players, deathEvents, enemyCastEvents, enemyBuffEvents),
     ...detectMidnightFallsErrors(players, deathEvents, enemyCastEvents, enemyBuffEvents, friendlyNpcDamageEvents),
-    ...detectEntombedSentinelsErrors(players, deathEvents, enemyCastEvents),
+    ...detectEntombedSentinelsErrors(
+      players, deathEvents, enemyCastEvents, enemyBuffEvents,
+      wclBuildEnemyBuffRemovalEvents(data.enemyBuffEvents ?? [], actorMap, abilityMap, fightStart),
+      data.fight.endTime - data.fight.startTime
+    ),
   ].sort((a, b) => a.timestamp - b.timestamp);
 
   const fightDurationMs = data.fight.endTime - data.fight.startTime;
