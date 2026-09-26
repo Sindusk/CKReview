@@ -18,6 +18,8 @@ lib/mechanics/
       blackhole-strategy.ts   — cross-pull strategy auto-detect (DSA/SDA/Double Tether)
       mitigation-*.ts         — mitigation sheet import / detection / review / heatmap
   wow/
+    common.ts                 — shared WoW helpers (debuff windows, playerError,
+                                battle-rez detection, Raid-marker sort offset)
     vs-dr-mqd/                — Voidspire, Dreamrift, March on Quel'Danas
       midnightfalls.ts        — Midnight Falls per-pull rules
       terminate-kicks.ts      — cross-pull Terminate kick-order detection
@@ -25,6 +27,8 @@ lib/mechanics/
     va/                       — The Venomous Abyss
       entombed-sentinels.ts   — Entombed Sentinels per-pull rules (orbs, Living Venom,
                                 Helical Toxins, Protovenom, Miasma soak, pools)
+      vashnik.ts              — Vashnik per-pull rules (Malignant Totems, Exploding
+                                Infection, Plague Froth/Wave, Bile, venoms, Fangs)
 ```
 
 **Read the header comment of a module before touching it.** Each module's

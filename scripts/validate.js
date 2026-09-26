@@ -463,6 +463,26 @@ const MECHANICS = {
     },
   },
 
+  vashnik: {
+    game: 'wow',
+    load: () => ({
+      ...requireTsFromRoot('lib/mechanics/wow/va/vashnik.ts'),
+      ...requireTsFromRoot('lib/spec-data.ts'),
+    }),
+    run({ mod, pulls, actorMap, abilityMap }) {
+      for (const { bossName, pullNumber, rep } of pulls) {
+        const { players, deaths, enemyCasts } = buildWowPull(rep, actorMap, abilityMap, mod.getSpecInfo);
+        const errors = mod.detectVashnikErrors(players, deaths, enemyCasts, fightDurationMs(rep));
+        console.log('='.repeat(70));
+        console.log(`${bossName} Pull ${pullNumber} ->`, errors.length, 'errors');
+        for (const e of errors) {
+          console.log(`  [${e.severity}] [${e.ruleId}] t=+${(e.timestamp / 1000).toFixed(1)}s ${e.player ?? '(raid)'}: ${e.description}`);
+        }
+        recordErrors(bossName, pullNumber, errors);
+      }
+    },
+  },
+
   mitigation: {
     game: 'ff',
     // Goes through the real pipeline (sample-report-store + log-transforms'

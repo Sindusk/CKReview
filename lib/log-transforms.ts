@@ -64,6 +64,7 @@ import { detectKefkaSaysErrors } from "./mechanics/ffxiv/dancingmad/kefka-says";
 import type { KefkaSaysStateSignal } from "./mechanics/ffxiv/dancingmad/kefka-says";
 import { detectMidnightFallsErrors } from "./mechanics/wow/vs-dr-mqd/midnightfalls";
 import { detectEntombedSentinelsErrors } from "./mechanics/wow/va/entombed-sentinels";
+import { detectVashnikErrors } from "./mechanics/wow/va/vashnik";
 
 // Shared shape for both games' ability maps: gameID -> name + raw icon
 // filename (not yet resolved to a URL — that happens per-game via
@@ -543,6 +544,7 @@ export function transformFightToPull(
       wclBuildEnemyBuffRemovalEvents(data.enemyBuffEvents ?? [], actorMap, abilityMap, fightStart),
       data.fight.endTime - data.fight.startTime
     ),
+    ...detectVashnikErrors(players, deathEvents, enemyCastEvents, data.fight.endTime - data.fight.startTime),
   ].sort((a, b) => a.timestamp - b.timestamp);
 
   const fightDurationMs = data.fight.endTime - data.fight.startTime;

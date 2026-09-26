@@ -1,8 +1,9 @@
 // lib/mechanics/wow/va/entombed-sentinels.ts
 //
 // Mythic Entombed Sentinels (The Venomous Abyss) — per-pull error detection.
-// Called from transformFightToPull in lib/log-transforms.ts; every check
-// self-gates on this encounter's ability IDs, so it is safe on any WoW pull.
+// Called from transformFightToPull in lib/log-transforms.ts; it self-gates
+// on this encounter (Stasis casts or Mark debuffs), so it is safe on any WoW
+// pull.
 //
 // The second half of this header is the guide-derived encounter model
 // (written 2026-09-25 from Method / Wowhead / Icy Veins before any log was
@@ -207,6 +208,9 @@ import type { PullError, EnemyEvent, ErrorSeverity } from "@/types/PullError";
 import { suppressDuplicateRaidErrors } from "../../../error-detection";
 import { findPlayerPosition, type Position } from "../../player-position";
 import { distanceBetween, distanceToSegment } from "../../geometry";
+import {
+  RAID_MARKER_SORT_OFFSET_MS, yd, kFmt, sec, debuffIntervals, hitsOf, deathOf, joinNames, playerError, rezzedAt, lastPlayerEventMs,
+} from "../common";
 
 // ─── Ability IDs (all verified in Mvz3r1AnVKYpdFTH) ──────────────────────────
 
@@ -238,13 +242,8 @@ const CULTIVATED_BURST_DOT     = 1284948;
 
 // Kills at which an unattributable raid-wide event is treated as the wipe.
 const RAID_WIPE_KILLS = 3;
-// A Raid marker usually shares its millisecond with the Major errors that
-// caused it (both players' overload merge is one event). AnalysisPanel
-// lists raids before majors and then stable-sorts by timestamp, so an exact
-// tie shows the marker FIRST; 1ms later orders it after its causes without
-// affecting the cutoff (which keeps errors at or before the marker). Same
-// fix as kefka-says.ts's DEATH_MARKER_SORT_OFFSET_MS.
-const RAID_MARKER_SORT_OFFSET_MS = 1;
+// Raid markers sit RAID_MARKER_SORT_OFFSET_MS (../common.ts) after the Major
+// errors that caused them (both players' overload merge is one event).
 // Noxious Blast: counting deaths of its victims within 3s, every blast
 // with 2+ kills ended the pull (pulls 10/12/13/15/22/26); single kills did
 // not (pull 26 +268 continued ~45s).
@@ -298,48 +297,7 @@ const BURST_DEATH_WINDOW_MS = 5000;
 const BLIGHTED_UNDISPELLED_MS = 6000;
 
 // ─── Small helpers ───────────────────────────────────────────────────────────
-
-const yd  = (units: number) => (units / 100).toFixed(1);
-const kFmt = (n: number) => `~${Math.round(n / 1000)}k`;
-const sec = (ms: number) => (ms / 1000).toFixed(1);
-
-type Interval = { start: number; end: number }; // end = Infinity while still active
-
-/** Active windows of `abilityId` on `player` (refresh/stack events keep a window open). */
-function debuffIntervals(player: PlayerInfo, abilityId: number): Interval[] {
-  const out: Interval[] = [];
-  let open: number | null = null;
-  for (const e of player.debuffs) {
-    if (e.abilityId !== abilityId) continue;
-    if (e.debuffStatus === "removed") {
-      if (open !== null) out.push({ start: open, end: e.timestamp });
-      open = null;
-    } else if (open === null) {
-      open = e.timestamp;
-    }
-  }
-  if (open !== null) out.push({ start: open, end: Infinity });
-  return out;
-}
-
-function hitsOf(player: PlayerInfo, abilityId: number): PlayerEvent[] {
-  return player.damageTaken.filter((e) => e.abilityId === abilityId);
-}
-
-function deathOf(deaths: DeathEvent[], name: string): DeathEvent | undefined {
-  return deaths.find((d) => d.player === name);
-}
-
-function joinNames(names: string[]): string {
-  return names.length <= 1 ? (names[0] ?? "") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
-}
-
-function playerError(
-  p: PlayerInfo,
-  e: Omit<PullError, "player" | "class" | "specId" | "role">
-): PullError {
-  return { ...e, player: p.name, class: p.className, specId: p.specId, role: p.role };
-}
+// (Shared helpers — debuffIntervals, hitsOf, playerError, ... — live in ../common.ts.)
 
 function stasisTimes(enemyCasts: EnemyEvent[]): number[] {
   return enemyCasts.filter((e) => e.abilityId === STASIS_CAST).map((e) => e.timestamp).sort((a, b) => a - b);
@@ -1198,15 +1156,6 @@ const TANK_DEATH_CONTINUE_MS = 30000;
 const DOMINANCE_LONG_MS = 10000;
 const DOMINANCE_END_GRACE_MS = 15000;
 
-/** When this player was next active (hit or casting) after dying — i.e. battle-rezzed — if ever. */
-function rezzedAt(p: PlayerInfo, deathT: number, nextDeathT: number): number | undefined {
-  const t = [...p.damageTaken, ...p.casts]
-    .map((e) => e.timestamp)
-    .filter((x) => x > deathT + 2000 && x < nextDeathT)
-    .sort((a, b) => a - b)[0];
-  return t;
-}
-
 function detectPullOver(
   players:          PlayerInfo[],
   deaths:           DeathEvent[],
@@ -1298,6 +1247,12 @@ export function detectEntombedSentinelsErrors(
   pullDurationMs?:  number
 ): PullError[] {
   const stasis = stasisTimes(enemyCasts);
+  // Self-gate: Deadly Venom (the arena-edge venom) also rims Vashnik's
+  // arena, and tank deaths / Berserk happen in every WoW fight, so only run
+  // on pulls that are this encounter.
+  if (stasis.length === 0 && !players.some((p) => p.debuffs.some((e) => e.abilityId === MARK_OF_ACID || e.abilityId === MARK_OF_BLOOD))) {
+    return [];
+  }
   const errors = [
     ...detectMissedOrbs(players, deaths),
     ...detectPickupDeaths(players, deaths),
@@ -1312,15 +1267,10 @@ export function detectEntombedSentinelsErrors(
     ...detectContaminateKills(players, deaths, enemyCasts),
   ];
 
-  // Self-gate the generic markers: tank deaths / Berserk happen in every
-  // WoW fight, so only run them on pulls that are this encounter.
-  if (stasis.length > 0 || players.some((p) => p.debuffs.some((e) => e.abilityId === MARK_OF_ACID || e.abilityId === MARK_OF_BLOOD))) {
-    const pullEnd = pullDurationMs ?? players.reduce((m, p) =>
-      [...p.damageTaken, ...p.casts].reduce((mm, e) => Math.max(mm, e.timestamp), m), 0);
-    const firstRaid = Math.min(Infinity, ...errors.filter((e) => e.severity === "Raid").map((e) => e.timestamp));
-    errors.push(...detectPullOver(players, deaths, enemyCasts, enemyBuffs, enemyBuffRemoves, pullEnd)
-      .filter((e) => e.timestamp < firstRaid));
-  }
+  const pullEnd = pullDurationMs ?? lastPlayerEventMs(players);
+  const firstRaid = Math.min(Infinity, ...errors.filter((e) => e.severity === "Raid").map((e) => e.timestamp));
+  errors.push(...detectPullOver(players, deaths, enemyCasts, enemyBuffs, enemyBuffRemoves, pullEnd)
+    .filter((e) => e.timestamp < firstRaid));
 
   return suppressDuplicateRaidErrors(errors.sort((a, b) => a.timestamp - b.timestamp));
 }
