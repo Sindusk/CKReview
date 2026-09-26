@@ -32,10 +32,18 @@ lib/mechanics/
 ```
 
 **Read the header comment of a module before touching it.** Each module's
-header is the authoritative, reverse-engineered model of how that mechanic
-actually works — confirmed against real logs, with the specific report codes
-and pull numbers that proved each claim. This README covers what is *common*
-across all of them.
+header is the authoritative model of how that mechanic works. In newer
+modules the header has three parts, top to bottom:
+
+1. **VERIFIED AGAINST LOGS** — what real reports showed, with report codes
+   and pull numbers. This part wins any disagreement.
+2. **RULES IMPLEMENTED** — rule IDs and their severities.
+3. **GUIDE-DERIVED MODEL** — the researcher's pre-log model (see
+   [MODEL-RESEARCH-GUIDE.md](MODEL-RESEARCH-GUIDE.md)).
+
+Older modules (FFXIV, Midnight Falls) predate the research step, so their
+headers are log-derived only. This README covers what is *common* across all
+modules.
 
 ---
 
@@ -48,7 +56,8 @@ can also hold their own declarative rule tables and run them through
 `evaluateRuleSet()` (midnightfalls.ts does this).
 
 **2. Per-pull correlation modules** (forsaken.ts, blackhole.ts, limitcut.ts,
-stompies.ts, exdeath.ts, phase1.ts, midnightfalls.ts) exist because they
+stompies.ts, exdeath.ts, phase1.ts, midnightfalls.ts, entombed-sentinels.ts,
+vashnik.ts) exist because they
 correlate *multiple* event streams — e.g. a stack-counter debuff against a
 specific damage tick, or positions against an assignment schedule. Each
 exports a `detectXErrors(players, deathEvents[, enemyCasts, enemyBuffs, ...])`
@@ -60,8 +69,11 @@ function called from the transform layer in `lib/log-transforms.ts`
   mechanic. No caller-side gating.
 - Duplicate raid-level errors are suppressed by `suppressDuplicateRaidErrors`
   (2s per-ruleId window, keeps the first).
-- `PullError` severity `"Raid"` means no player attribution
-  (see `types/PullError.ts`).
+- `PullError` severity `"Raid"` is usually player-less and marks the pull's
+  cutoff (see `types/PullError.ts` and philosophy point 4).
+- Encounter modules (the WoW `va/*.ts` ones) are one module per boss, with
+  a single `detect<Boss>Errors` entry point running every rule for that
+  fight plus the pull-over markers.
 
 **3. Cross-pull / strategy-driven detection** (terminate-kicks.ts,
 blackhole-strategy.ts, graven-image.ts, crystal-assignments.ts, the
@@ -95,14 +107,30 @@ every mechanic, in every game. When in doubt, come back here.
 3. **When attribution is ambiguous, flag all candidates rather than guess.**
    When fallout vs. genuine error can't be distinguished at all, stay silent.
    A false accusation is worse than a miss.
-4. **Raid severity for raid-level consequences** — errors with no meaningful
-   single-player attribution get severity `"Raid"` instead of a forced name.
+4. **Severity means consequence, not the kind of mistake.**
+   - **Minor** = avoidable damage that didn't kill anyone or cause the wipe.
+   - **Major** = caused the death of the player or another player, or led to
+     the wipe.
+   - **Raid** = leads to an inevitable wipe. A Raid error is the pull's
+     cutoff point; errors after it don't count toward Report/PullList/statics
+     totals.
+
+   A Major must name a player (`report-data.ts` asserts `e.player!` on
+   Majors). A failure nobody can be blamed for from the log (assigned by
+   callout, dispel duty, ...) is therefore Minor or Raid, never a forced
+   name. When a player-attributable failure also dooms the pull, emit the
+   Major(s) on the players **and** a separate Raid marker. Put the marker
+   `RAID_MARKER_SORT_OFFSET_MS` (1ms) after them, so the Analysis panel
+   lists the causes first.
 5. **Put distances/specifics in descriptions.** "~5.6 yalms off their spot"
    is the desired style — the number goes in the error *description*, even
    when the attribution decision itself didn't need geometry.
-6. **Expect iteration.** The first version of a rule will not be perfect. The
-   user tests against new logs and reports precise ground truth ("only X
-   should flag"); tune to that, don't defend the first guess.
+6. **The user's review is ground truth.** The first version of a rule will
+   not be perfect. The user reviews pulls on VOD and reports precise
+   corrections, e.g. "only X should flag" or "overload is always Major".
+   Tune to that (code change plus a ruling) instead of defending the first
+   guess. The research model and the logs are evidence; the user's call
+   overrides both.
 7. **Narrow overrides over wholesale replacement.** When a working check
    fails for one specific case, add a narrow override for that case — do not
    swap the whole mechanism for a new one that handles the exception.
@@ -131,39 +159,82 @@ every mechanic, in every game. When in doubt, come back here.
 
 ## The working method for building a new detection
 
-This process has produced every module here. In order:
+Since the Venomous Abyss raid (Entombed Sentinels, Vashnik), a new boss goes
+through four stages:
 
-1. **Get ground truth first.** A fail log plus a plain-language description
-   of what actually happened and who should be flagged ("X was assigned #8
-   and was out of position; only X should flag"). For a NEW mechanic, ask
-   the user to fill in `SPEC-TEMPLATE.md` (same directory) — it collects
-   the mechanic model, assignment scheme, error conditions with fault
-   attribution, and clean/fail evidence in one pass instead of a
-   multi-round conversation; "unknown" fields just mean analysis starts
-   there.
-2. **Reverse-engineer from the raw events.** Standard recipes:
-   - Cluster `applydebuff` events by second to find mechanic-start bursts.
-   - Sweep damage by ability ID within the mechanic's window.
-   - Group enemy events by `sourceInstance` to separate concurrent copies of
-     one NPC.
-   - Trace deaths via `killingAbilityGameID`.
-   - Recover positions per the position-semantics table below.
-3. **Derive the invariant from CLEAN pulls first, across multiple logs.**
-   Only then look for what uniquely separates the failure.
-4. **Geometry often fully overlaps between clean and failed pulls** (proven
+1. **Research model.** A researcher (Codex) writes the encounter model as
+   the module's header comment, following
+   [MODEL-RESEARCH-GUIDE.md](MODEL-RESEARCH-GUIDE.md), and commits it with no
+   detector code. The model supplies how the fight works, correct play,
+   failure modes with their expected log signal, fault, and consequence,
+   strategy variance, and what is NOT an error. It is a strong starting
+   point, but its spell IDs are journal links and usually wrong for the log.
+2. **Verify against a real report.** The user supplies a log, ideally with
+   many wipes and a kill. Fetch it
+   (`node scripts/fetch-wow-report.js <URL> --boss "<name>"`) and check the
+   model claim by claim. Write what the log showed as a
+   `VERIFIED AGAINST LOGS` section above the model; the log wins every
+   disagreement. In particular:
+   - **Map every candidate spell to its real log IDs by event type** (cast
+     vs begincast vs player aura vs boss aura vs damage vs tick vs penalty).
+     Sweep ability names per stream across all pulls first; the name is
+     more reliable than the journal ID.
+   - **Use the kill as the clean baseline.** A rule that fires a lot in the
+     kill is either measuring normal play or needs a threshold. Derive
+     invariants from clean resolutions first, then look for what uniquely
+     separates the failure.
+   - **Confirm or refute each failure mode's log signal.** Record counts,
+     cadences and thresholds with the evidence behind them (the worst clean
+     value and the best failure value, with pull numbers).
+   - **Check attribution feasibility.** When the model's "who is at fault"
+     isn't recoverable from the log (e.g. Vashnik's missed totems: the
+     nearest Froth lane missed each one by 3-10yd), fall back to a Raid or
+     player-less Minor error and say why in the header.
+3. **Survey every wipe for what ended it.** Every wipe should get one Raid
+   error marking "the pull was basically over", in one of two forms:
+   - a mechanic-specific Raid error (e.g. a missed-totem Malignance, a
+     Helical overload), or
+   - a generic pull-over marker when no mechanic caused it: 5+ players dead
+     net of battle-rezzes, a tank death not recovered by a quick rez, a
+     boss left untanked, or Berserk.
+
+   Emit only the earliest generic marker, and only when no mechanic Raid
+   came first. List any wipe the log can't explain in the header, since the
+   user can Call Wipe those.
+4. **Implement, validate, ship, report.** Build the rules (Architecture
+   above; shared WoW helpers are in `wow/common.ts`). Wire the module into
+   `lib/log-transforms.ts` and add a `scripts/validate.js` manifest entry,
+   then pass the regression bar (below). Commit and push. Then tell the user
+   what each wipe's cutoff was, and list the attribution calls you were
+   unsure of as explicit questions. Their VOD review answers them (principle
+   6 above).
+
+Useful event-level recipes during verification:
+- Cluster `applydebuff` events by second to find mechanic-start bursts.
+- Sweep damage by ability ID within the mechanic's window.
+- Group enemy events by `sourceInstance` to separate concurrent copies of
+  one NPC.
+- Trace deaths via `killingAbilityGameID`.
+- For a debuff whose removal triggers something, check whether the removal
+  was a death: a death within ~300ms of it.
+- Recover positions per the position-semantics table below.
+
+The same principles apply when refining any module:
+
+1. **Geometry often fully overlaps between clean and failed pulls** (proven
    repeatedly: Forsaken flare plants, Forsaken cone-bait distances). When it
    does, gate on OUTCOME — who the follow-up actually hit, who died to what —
    instead of position. Reserve exact distance math for the error
    *description*.
-5. **Process of elimination beats precise position matching** for
+2. **Process of elimination beats precise position matching** for
    attribution: if there are exactly N interchangeable candidates and N−1
    are already accounted for in the same resolution, the remaining candidate
    is decisive with zero geometry.
-6. **Encode every threshold with both extremes in a comment** — the worst
+3. **Encode every threshold with both extremes in a comment** — the worst
    clean value observed and the best failure value observed, with report
    codes (e.g. `// clean max observed 1.06%, failure observed 2.69%`). This
    is what lets future logs retune a threshold instead of guessing.
-7. **Validate before calling it done:** run `node scripts/validate.js` (no
+4. **Validate before calling it done:** run `node scripts/validate.js` (no
    args = every mechanic against every report folder under `sampledata/` —
    run it all, one pull's log usually exercises several mechanics; pass a
    mechanic name and/or report folder to narrow), and `npx tsc --noEmit`.
@@ -205,6 +276,30 @@ event's TARGET — never the source:
   is ~GCD-frequency for active attackers but can be very sparse for healers
   (17 samples in a 13-min pull, observed) — always gate downstream use with
   a staleness/distance ceiling.
+
+### WoW (Warcraft Logs) event semantics
+
+- **`damageTaken` x/y is the victim's (the player's) position.** It is the
+  main source of player positions for WoW.
+- **Enemy events are filtered in the live pipeline.** `enemyCasts` holds
+  completed `cast` events only; a `begincast` that never completes is
+  invisible. That is what makes "the cast completed" a failure signal
+  (Vashnik's Malignance). `enemyBuffs` is `applybuff` only; removals are a
+  separate stream (`wclBuildEnemyBuffRemovalEvents`). Raw enemy cast events
+  also carry the caster's x/y, but `EnemyEvent` doesn't expose it yet. Add
+  it when a rule needs an object's position.
+- **Debuff stack counts** arrive on `applydebuffstack` as
+  `PlayerEvent.stack`. Sometimes the stack is the only visible form of a
+  mechanic's state (Helical Toxins merge totals, Dripping Fangs double hits).
+- **Aura removals don't say why.** Expiry, dispel and death all look alike.
+  A death within ~300ms means it was death-stripped. A dispeller shows up
+  only as a player cast (Purify, Cleanse, ...) targeting the holder at that
+  instant.
+- **Journal spell IDs rarely match log IDs.** Map by ability name across all
+  streams first (see MODEL-RESEARCH-GUIDE.md for real examples).
+- **Shared ability IDs cross encounters.** The arena-edge Deadly Venom
+  (1297338) rims more than one Venomous Abyss arena, so every module must
+  self-gate on its own encounter's signature before running any rule.
 
 ### Coordinates, angles, and timestamps
 

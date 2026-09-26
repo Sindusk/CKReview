@@ -2,16 +2,27 @@
 
 Raid log analysis app (Next.js) that imports WCL/FFLogs reports and flags
 per-pull player errors for VOD review. FFXIV (Dancing Mad ultimate) and WoW
-(Midnight Falls) are the active encounters.
+(Midnight Falls, The Venomous Abyss) are the active encounters.
 
 **Before doing ANY mechanic-detection work, read `lib/mechanics/README.md`.**
-It contains the attribution philosophy (which is mandatory, learned through
-user corrections), the working method for building new detections, FFLogs/WCL
-data-shape semantics (especially player-position rules), and known pitfalls.
-Each mechanic module's own header comment is the authoritative model for that
-specific mechanic — read it before editing the module. When starting
-detection for a NEW mechanic, offer the user `lib/mechanics/SPEC-TEMPLATE.md`
-to fill in before diving into log analysis.
+It contains:
+- the severity definitions and attribution philosophy (mandatory; learned
+  through user corrections)
+- the four-stage workflow for a new boss
+- FFLogs/WCL data-shape semantics
+- known pitfalls
+
+Each mechanic module's own header comment is the authoritative model for
+that specific mechanic — read it before editing the module.
+
+How new detection starts:
+- **Researchers:** a researcher (Codex) first writes the boss's encounter
+  model into the module header. **Anyone researching or writing such a
+  model must follow `lib/mechanics/MODEL-RESEARCH-GUIDE.md`.**
+- **Claude:** verifies that model against a real report the user provides,
+  then builds detection from the verified model.
+- **The user:** reviews the result on VOD. That feedback is ground truth
+  and becomes code changes plus `expectations/rulings.json` entries.
 
 Quick facts:
 - Sample data: `sampledata/` (gitignored), fetched via
