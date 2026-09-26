@@ -10,6 +10,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import ConfirmDialog from "./ConfirmDialog";
+import { Dialog } from "./ui/Dialog";
 
 type StaticSummary = {
   id:        number;
@@ -95,36 +96,16 @@ export default function ManageStaticsDialog({ open, sessionId, onClose }: Manage
   const deleteTarget = statics?.find(s => s.id === pendingDeleteId) ?? null;
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        backgroundColor: "rgba(0,0,0,0.6)",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        zIndex: 1000,
-      }}
-      onClick={onClose}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          backgroundColor: "#222",
-          padding: "24px",
-          borderRadius: "10px",
-          width: "440px",
-          maxHeight: "70vh",
-          display: "flex",
-          flexDirection: "column",
-          color: "white",
-          border: "1px solid #444",
-          boxShadow: "0 12px 32px rgba(0,0,0,0.35)",
-        }}
+    <>
+      <Dialog
+        title="Manage Statics"
+        width="460px"
+        maxHeight="70vh"
+        onBackdropClick={onClose}
+        footer={<button className="ck-btn ck-btn--md" onClick={onClose}>Close</button>}
+        bodyStyle={{ display: "flex", flexDirection: "column" }}
       >
-        <h2 style={{ marginTop: 0, marginBottom: "16px", fontSize: "20px" }}>Manage Statics</h2>
-
-        <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
+        <div style={{ display: "flex", gap: "8px", marginBottom: "14px", flexShrink: 0 }}>
           <input
             className="ck-input"
             style={{ flex: 1 }}
@@ -134,108 +115,61 @@ export default function ManageStaticsDialog({ open, sessionId, onClose }: Manage
             placeholder="New static name"
           />
           <button
+            className="ck-btn ck-btn--md ck-btn--primary"
             onClick={handleCreate}
             disabled={creating || !newName.trim()}
-            style={{
-              backgroundColor: "#2563eb",
-              color: "white",
-              border: "none",
-              borderRadius: "6px",
-              padding: "8px 14px",
-              fontWeight: 600,
-              cursor: creating ? "default" : "pointer",
-              opacity: creating ? 0.6 : 1,
-              whiteSpace: "nowrap",
-            }}
           >
             Create
           </button>
         </div>
 
-        {error && (
-          <p style={{ color: "#f87171", fontSize: "12px", marginBottom: "10px" }}>{error}</p>
-        )}
+        {error && <p className="ck-error-text">{error}</p>}
 
-        <div style={{ overflowY: "auto", flex: 1 }}>
-          {statics === null ? (
-            <p style={{ fontSize: "13px", color: "#999" }}>Loading...</p>
-          ) : statics.length === 0 ? (
-            <p style={{ fontSize: "13px", color: "#999" }}>No statics yet.</p>
-          ) : (
-            statics.map(s => (
-              <div
-                key={s.id}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "8px 10px",
-                  borderRadius: "6px",
-                  marginBottom: "4px",
-                  backgroundColor: "#1a1a1a",
-                }}
-              >
-                <div>
-                  <div style={{ fontSize: "13px" }}>{s.name}</div>
-                  <div style={{ fontSize: "11px", color: "#777" }}>{s.role}</div>
-                </div>
-                <div style={{ display: "flex", gap: "8px" }}>
-                  <Link
-                    href={sessionId ? `/statics/${s.id}?session=${sessionId}` : `/statics/${s.id}`}
-                    onClick={onClose}
-                    style={{
-                      backgroundColor: "transparent",
-                      color: "#93c5fd",
-                      border: "1px solid #2f4f7a",
-                      borderRadius: "6px",
-                      padding: "4px 10px",
-                      fontSize: "12px",
-                      fontWeight: 600,
-                      textDecoration: "none",
-                    }}
-                  >
-                    View
-                  </Link>
-                  {s.role === "OWNER" && (
-                    <button
-                      onClick={() => setPendingDeleteId(s.id)}
-                      style={{
-                        backgroundColor: "transparent",
-                        color: "#f87171",
-                        border: "1px solid #5c2626",
-                        borderRadius: "6px",
-                        padding: "4px 10px",
-                        fontSize: "12px",
-                        fontWeight: 600,
-                        cursor: "pointer",
-                      }}
-                    >
-                      Delete
-                    </button>
-                  )}
+        <div className="ck-section-label" style={{ marginTop: 0 }}>Your statics</div>
+
+        {statics === null ? (
+          <p className="ck-dialog-text">Loading...</p>
+        ) : statics.length === 0 ? (
+          <p className="ck-dialog-text">No statics yet.</p>
+        ) : (
+          statics.map(s => (
+            <div
+              key={s.id}
+              className="ck-card"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "8px",
+                padding: "8px 10px",
+                marginBottom: "5px",
+                flexShrink: 0,
+              }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: "13px", fontWeight: 600 }}>{s.name}</div>
+                <div style={{ fontSize: "10px", fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: s.role === "OWNER" ? "var(--ck-text-gold)" : "var(--ck-text-3)" }}>
+                  {s.role}
                 </div>
               </div>
-            ))
-          )}
-        </div>
-
-        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "16px" }}>
-          <button
-            onClick={onClose}
-            style={{
-              backgroundColor: "#2f2f2f",
-              color: "#f3f4f6",
-              border: "1px solid #555",
-              borderRadius: "6px",
-              padding: "8px 14px",
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >
-            Close
-          </button>
-        </div>
-      </div>
+              <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+                <Link
+                  href={sessionId ? `/statics/${s.id}?session=${sessionId}` : `/statics/${s.id}`}
+                  onClick={onClose}
+                  className="ck-btn ck-btn--sm ck-btn--arcane"
+                >
+                  View
+                </Link>
+                {s.role === "OWNER" && (
+                  <button className="ck-btn ck-btn--sm ck-btn--danger" onClick={() => setPendingDeleteId(s.id)}>
+                    Delete
+                  </button>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+      </Dialog>
 
       <ConfirmDialog
         open={pendingDeleteId != null}
@@ -245,6 +179,6 @@ export default function ManageStaticsDialog({ open, sessionId, onClose }: Manage
         onConfirm={() => pendingDeleteId != null && handleDelete(pendingDeleteId)}
         onCancel={() => setPendingDeleteId(null)}
       />
-    </div>
+    </>
   );
 }

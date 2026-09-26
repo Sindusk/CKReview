@@ -230,7 +230,8 @@ export default function StaticErrorChart({ pulls }: { pulls: ChartPull[] }) {
   }
 
   const yTicks = 5;
-  const tickVals = Array.from({ length: yTicks + 1 }, (_, i) => Math.round((maxY / yTicks) * i));
+  // Deduped: when maxY < yTicks, rounding repeats values (0,1,1,2,…).
+  const tickVals = [...new Set(Array.from({ length: yTicks + 1 }, (_, i) => Math.round((maxY / yTicks) * i)))];
 
   const hoverPull = hoverIdx != null ? pulls[hoverIdx] : null;
   // Hover rows are sorted by their value AT the hovered pull — reflecting
@@ -242,44 +243,24 @@ export default function StaticErrorChart({ pulls }: { pulls: ChartPull[] }) {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px", flexWrap: "wrap", gap: "10px" }}>
-        <h3 style={{ margin: 0, fontSize: "16px", color: INK_PRIMARY }}>
+        <h3 className="ck-subheading" style={{ margin: 0 }}>
           {mode === "majorOnly" ? "Major Errors" : "Total Errors"} — Cumulative Over All Pulls
         </h3>
 
         <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-          <div style={{ display: "flex", border: "1px solid #444", borderRadius: "6px", overflow: "hidden" }}>
+          <div style={{ display: "flex", gap: "4px" }}>
             {(["majorOnly", "total"] as Mode[]).map((m) => (
               <button
                 key={m}
                 onClick={() => setMode(m)}
-                style={{
-                  padding:      "5px 10px",
-                  fontSize:     "12px",
-                  fontWeight:   600,
-                  border:       "none",
-                  cursor:       "pointer",
-                  backgroundColor: mode === m ? "#2563eb" : "transparent",
-                  color:        mode === m ? "#fff" : INK_SECONDARY,
-                }}
+                className={`ck-tab${mode === m ? " ck-tab--active" : ""}`}
               >
                 {m === "total" ? "Major + Minor" : "Major Only"}
               </button>
             ))}
           </div>
 
-          <button
-            onClick={() => setShowTable((v) => !v)}
-            style={{
-              padding:      "5px 10px",
-              fontSize:     "12px",
-              fontWeight:   600,
-              border:       "1px solid #444",
-              borderRadius: "6px",
-              cursor:       "pointer",
-              backgroundColor: showTable ? "#2563eb" : "transparent",
-              color:        showTable ? "#fff" : INK_SECONDARY,
-            }}
-          >
+          <button className="ck-btn" onClick={() => setShowTable((v) => !v)}>
             {showTable ? "Show Chart" : "Show Table"}
           </button>
         </div>
@@ -449,8 +430,8 @@ export default function StaticErrorChart({ pulls }: { pulls: ChartPull[] }) {
             style={{
               width:           `${HOVER_PANEL_WIDTH}px`,
               flexShrink:      0,
-              backgroundColor: "#111",
-              border:          "1px solid #2c2c2a",
+              backgroundColor: "rgba(0,0,0,0.3)",
+              border:          "1px solid var(--ck-line-2)",
               borderRadius:    "6px",
               padding:         "8px 10px",
               fontSize:        "11px",

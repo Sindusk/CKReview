@@ -40,22 +40,34 @@ export function Panel({
 export function PanelHeader({
   title,
   count,
+  subtitle,
   children,
   shrinkTitle,
 }: {
   title:        ReactNode;
   /** Rendered after the title in muted sans, e.g. "(26)". */
   count?:       ReactNode;
+  /** Small sans line under the title. */
+  subtitle?:    ReactNode;
   children?:    ReactNode;
   /** Let a long title ellipsize instead of pushing the controls to wrap. */
   shrinkTitle?: boolean;
 }) {
+  const heading = (
+    <h2 className={`ck-panel-title${shrinkTitle ? " ck-panel-title--shrink" : ""}`} title={typeof title === "string" ? title : undefined}>
+      {title}
+      {count !== undefined && <span className="ck-panel-title__count">{count}</span>}
+    </h2>
+  );
+
   return (
     <div className="ck-panel-header">
-      <h2 className={`ck-panel-title${shrinkTitle ? " ck-panel-title--shrink" : ""}`} title={typeof title === "string" ? title : undefined}>
-        {title}
-        {count !== undefined && <span className="ck-panel-title__count">{count}</span>}
-      </h2>
+      {subtitle ? (
+        <div style={{ minWidth: 0, flexShrink: shrinkTitle ? 1 : 0, display: "flex", flexDirection: "column" }}>
+          {heading}
+          <div className="ck-panel-subtitle">{subtitle}</div>
+        </div>
+      ) : heading}
       {children && <div className="ck-panel-meta">{children}</div>}
     </div>
   );

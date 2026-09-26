@@ -30,6 +30,7 @@ import MitigationReviewTable from "@/components/MitigationReviewTable";
 import MitigationHeatmapTable from "@/components/MitigationHeatmapTable";
 import { useFFPullSelector } from "@/hooks/useFFPullSelector";
 import type { Pull } from "@/types/Pull";
+import { Dialog } from "./ui/Dialog";
 
 type MitigationDialogProps = {
   open:     boolean;
@@ -43,17 +44,6 @@ type MitigationDialogProps = {
 };
 
 type Tab = "heatmap" | "review";
-
-const tabButtonStyle = (active: boolean) => ({
-  padding: "5px 12px",
-  fontSize: "12px",
-  fontWeight: 600,
-  borderRadius: "5px",
-  border: active ? "1px solid #60a5fa66" : "1px solid #333",
-  backgroundColor: active ? "#60a5fa18" : "transparent",
-  color: active ? "#60a5fa" : "#888",
-  cursor: "pointer",
-});
 
 export default function MitigationDialog({
   open,
@@ -83,73 +73,31 @@ export default function MitigationDialog({
   const wide = plan ? "min(1200px, 96vw)" : "min(880px, 94vw)";
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        backgroundColor: "rgba(0,0,0,0.6)",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        zIndex: 1100,
-      }}
-      onClick={onClose}
+    <Dialog
+      title="Mitigation"
+      width={showMitigation ? wide : "480px"}
+      maxHeight="80vh"
+      zIndex={1100}
+      onBackdropClick={onClose}
+      onClose={onClose}
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          backgroundColor: "#222",
-          padding: "22px",
-          borderRadius: "10px",
-          width: showMitigation ? wide : "480px",
-          maxHeight: "80vh",
-          overflowY: "auto",
-          color: "white",
-          border: "1px solid #444",
-          boxShadow: "0 12px 32px rgba(0,0,0,0.35)",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
-          <h3 style={{ margin: 0, fontSize: "16px" }}>Mitigation</h3>
-          <button
-            onClick={onClose}
-            aria-label="Close"
-            style={{
-              background: "transparent",
-              border: "none",
-              color: "#888",
-              fontSize: "18px",
-              cursor: "pointer",
-              lineHeight: 1,
-            }}
-          >
-            ✕
-          </button>
-        </div>
-
         {showMitigation ? (
           <div>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px", flexWrap: "wrap" }}>
               <div style={{ display: "flex", gap: "6px" }}>
-                <button style={tabButtonStyle(activeTab === "heatmap")} onClick={() => setActiveTab("heatmap")}>Heatmap</button>
-                <button style={tabButtonStyle(activeTab === "review")} onClick={() => setActiveTab("review")}>Review</button>
+                <button className={`ck-tab${activeTab === "heatmap" ? " ck-tab--active" : ""}`} onClick={() => setActiveTab("heatmap")}>Heatmap</button>
+                <button className={`ck-tab${activeTab === "review" ? " ck-tab--active" : ""}`} onClick={() => setActiveTab("review")}>Review</button>
               </div>
 
               {/* Heatmap aggregates every loaded pull — the per-pull selector only applies to Review. */}
               {activeTab === "review" && (
                 <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <span style={{ fontSize: "11px", color: "#94a3b8" }}>Pull</span>
+                  <span className="ck-label" style={{ margin: 0 }}>Pull</span>
                   <select
+                    className="ck-field"
                     value={selectedPullId ?? ""}
                     onChange={(e) => setSelectedPullId(Number(e.target.value))}
-                    style={{
-                      backgroundColor: "#1a1a1a",
-                      color: "#e2e8f0",
-                      border: "1px solid #444",
-                      borderRadius: "5px",
-                      padding: "3px 8px",
-                      fontSize: "12px",
-                    }}
+                    style={{ padding: "3px 8px" }}
                   >
                     {ffPulls.map((p) => (
                       <option key={p.id} value={p.id}>{p.name} #{p.pullNumber} ({p.result})</option>
@@ -159,18 +107,12 @@ export default function MitigationDialog({
               )}
 
               <div style={{ display: "flex", alignItems: "center", gap: "6px", marginLeft: "auto" }}>
-                <span style={{ fontSize: "11px", color: "#94a3b8" }}>Plan</span>
+                <span className="ck-label" style={{ margin: 0 }}>Plan</span>
                 <select
+                  className="ck-field"
                   value={mitigationPlanId ?? ""}
                   onChange={(e) => onMitigationPlanChange(e.target.value || null)}
-                  style={{
-                    backgroundColor: "#1a1a1a",
-                    color: "#e2e8f0",
-                    border: "1px solid #444",
-                    borderRadius: "5px",
-                    padding: "3px 8px",
-                    fontSize: "12px",
-                  }}
+                  style={{ padding: "3px 8px" }}
                 >
                   <option value="">None</option>
                   {MITIGATION_PLANS.map((p) => (
@@ -181,13 +123,13 @@ export default function MitigationDialog({
             </div>
 
             {!plan ? (
-              <p style={{ fontSize: "12px", color: "#94a3b8", margin: "6px 0 0" }}>
+              <p className="ck-dialog-text" style={{ margin: "6px 0 0" }}>
                 Select a mitigation plan to see how reliably each player is
                 landing their assigned mitigations across every loaded pull.
               </p>
             ) : activeTab === "heatmap" ? (
               <>
-                <div style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "12px" }}>
+                <div className="ck-help">
                   Every mitigation-plan mechanic reached in at least one loaded
                   pull, aggregated across ALL of them. Each cell is colored by
                   pass rate — <span style={{ color: "#22c55e" }}>green</span> reliable,{" "}
@@ -201,7 +143,7 @@ export default function MitigationDialog({
               </>
             ) : (
               <>
-                <div style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "12px" }}>
+                <div className="ck-help">
                   Every plan mechanic across the whole fight, with a per-player mark:{" "}
                   <span style={{ color: "#4ade80" }}>✓</span> hit,{" "}
                   <span style={{ color: "#f87171" }}>✗</span> missed,{" "}
@@ -216,12 +158,11 @@ export default function MitigationDialog({
             )}
           </div>
         ) : (
-          <p style={{ fontSize: "13px", color: "#ccc", lineHeight: 1.5 }}>
+          <p className="ck-dialog-text">
             No FFXIV report loaded. Import a Dancing Mad report to select a
             mitigation plan and see the expected casts mapped onto the roster.
           </p>
         )}
-      </div>
-    </div>
+    </Dialog>
   );
 }

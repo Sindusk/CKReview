@@ -13,6 +13,8 @@ import Link from "next/link";
 import StaticErrorChart, { type ChartPull } from "@/components/StaticErrorChart";
 import StaticPlayersPanel from "@/components/StaticPlayersPanel";
 import { SeverityIcon, SEVERITY_COLOR } from "@/components/SeverityIcon";
+import BrandBanner from "@/components/BrandBanner";
+import { Panel, PanelHeader } from "@/components/ui/Panel";
 
 type StaticInfo = { id: number; name: string; role: "OWNER" | "MEMBER" };
 
@@ -152,36 +154,63 @@ export default function StaticDashboardPage() {
     setPulls((prev) => prev?.map((p) => (p.id === pull.id ? { ...p, summary: summaryDraft || null } : p)) ?? null);
   }
 
+  // Same brand band as the review screen, with Back where the burger sits.
+  const header = (
+    <header style={{ position: "relative", height: "80px", display: "flex", alignItems: "center", padding: "0 20px" }}>
+      <div style={{ position: "absolute", inset: 0 }}>
+        <BrandBanner height={80} />
+      </div>
+      <Link href={backHref} className="ck-btn ck-btn--md" style={{ position: "relative" }}>&larr; Back</Link>
+    </header>
+  );
+
   if (error) {
-    return <div style={{ padding: "40px", color: "#f87171" }}>{error}</div>;
+    return (
+      <div className="ck-app" style={{ minHeight: "100vh" }}>
+        {header}
+        <div style={{ padding: "40px", color: "#ff8a8a" }}>{error}</div>
+      </div>
+    );
   }
 
+  const sectionGap = "28px";
+
   return (
-    <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "32px 20px", color: "#eee" }}>
-      <div style={{ marginBottom: "20px" }}>
-        <Link href={backHref} style={{ color: "#888", fontSize: "13px", textDecoration: "none" }}>&larr; Back</Link>
-        <h1 style={{ margin: "6px 0 0", fontSize: "24px" }}>{staticInfo?.name ?? "Loading..."}</h1>
-      </div>
+    <div className="ck-app" style={{ minHeight: "100vh" }}>
+      {header}
 
-      <div style={{ backgroundColor: "#1a1a1a", border: "1px solid #333", borderRadius: "10px", padding: "20px", marginBottom: "24px" }}>
-        {pulls == null ? (
-          <p style={{ fontSize: "13px", color: "#999" }}>Loading chart...</p>
-        ) : (
-          <StaticErrorChart pulls={pulls} />
-        )}
-      </div>
+      <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "28px 20px 48px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "22px" }}>
+          <h1 className="ck-panel-title" style={{ fontSize: "28px" }}>{staticInfo?.name ?? "Loading..."}</h1>
+          {staticInfo && (
+            <span className="ck-badge ck-badge--plain" style={{ color: staticInfo.role === "OWNER" ? "var(--ck-text-gold)" : "var(--ck-text-2)" }}>
+              {staticInfo.role === "OWNER" ? "Owner" : "Member"}
+            </span>
+          )}
+        </div>
 
-      <h2 style={{ fontSize: "18px", marginBottom: "10px" }}>Players</h2>
-      <div style={{ backgroundColor: "#1a1a1a", border: "1px solid #333", borderRadius: "10px", padding: "16px", marginBottom: "24px" }}>
-        {Number.isInteger(staticId) && <StaticPlayersPanel staticId={staticId} />}
-      </div>
+        <Panel style={{ marginBottom: sectionGap }}>
+          <PanelHeader title="Error Trends" />
+          <div style={{ padding: "16px 18px 18px" }}>
+            {pulls == null ? (
+              <p className="ck-dialog-text">Loading chart...</p>
+            ) : (
+              <StaticErrorChart pulls={pulls} />
+            )}
+          </div>
+        </Panel>
 
-      <h2 style={{ fontSize: "18px", marginBottom: "10px" }}>Sessions</h2>
-      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+        <Panel style={{ marginBottom: sectionGap }}>
+          {Number.isInteger(staticId) && <StaticPlayersPanel staticId={staticId} />}
+        </Panel>
+
+        <Panel>
+          <PanelHeader title="Sessions" count={sessions ? `(${sessions.length})` : undefined} />
+      <div style={{ display: "flex", flexDirection: "column", gap: "8px", padding: "12px" }}>
         {sessions == null ? (
-          <p style={{ fontSize: "13px", color: "#999" }}>Loading sessions...</p>
+          <p className="ck-dialog-text">Loading sessions...</p>
         ) : sessions.length === 0 ? (
-          <p style={{ fontSize: "13px", color: "#999" }}>No pulls imported yet.</p>
+          <p className="ck-dialog-text">No pulls imported yet.</p>
         ) : (
           sessions.map((session, sessionIdx) => {
             const isOpen = expanded.has(session.review.id);
@@ -189,7 +218,7 @@ export default function StaticDashboardPage() {
             const recordedAt = session.review.reportStartedAt;
 
             return (
-              <div key={session.review.id} style={{ backgroundColor: "#1a1a1a", border: "1px solid #333", borderRadius: "10px", overflow: "hidden" }}>
+              <div key={session.review.id} className={`ck-card${isOpen ? " ck-card--selected" : ""}`} style={{ overflow: "hidden" }}>
                 {/* Header is a row, not a single <button>, so the label
                     editor can live inside it — a form control nested in a
                     button is neither valid HTML nor clickable. */}
@@ -199,13 +228,13 @@ export default function StaticDashboardPage() {
                     alignItems:      "center",
                     justifyContent:  "space-between",
                     gap:             "10px",
-                    padding:         "12px 16px",
-                    color:           "#eee",
+                    padding:         "10px 14px",
                   }}
                 >
                   <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0, flex: "1 1 auto" }}>
                     <button
                       onClick={() => toggleSession(session.review.id)}
+                      aria-expanded={isOpen}
                       style={{
                         display:     "flex",
                         alignItems:  "center",
@@ -213,13 +242,14 @@ export default function StaticDashboardPage() {
                         background:  "none",
                         border:      "none",
                         cursor:      "pointer",
-                        color:       "#eee",
+                        color:       "var(--ck-text)",
+                        fontFamily:  "inherit",
                         padding:     0,
                         textAlign:   "left",
                         flexShrink:  0,
                       }}
                     >
-                      <span style={{ transform: isOpen ? "rotate(90deg)" : "none", transition: "transform 0.1s", display: "inline-block", fontSize: "11px", color: "#888" }}>
+                      <span style={{ transform: isOpen ? "rotate(90deg)" : "none", transition: "transform 0.1s", display: "inline-block", fontSize: "10px", color: "var(--ck-text-gold)" }}>
                         &#9654;
                       </span>
                       <strong style={{ fontSize: "14px" }}>Session {sessionIdx + 1}</strong>
@@ -239,16 +269,10 @@ export default function StaticDashboardPage() {
                           style={{ fontSize: "13px", flex: "1 1 auto", minWidth: 0 }}
                           autoFocus
                         />
-                        <button
-                          onClick={() => saveLabel(session.review.id)}
-                          style={{ backgroundColor: "#2563eb", color: "#fff", border: "none", borderRadius: "5px", padding: "4px 10px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
-                        >
+                        <button className="ck-btn ck-btn--sm ck-btn--primary" onClick={() => saveLabel(session.review.id)}>
                           Save
                         </button>
-                        <button
-                          onClick={() => setEditingReview(null)}
-                          style={{ background: "none", color: "#aaa", border: "1px solid #444", borderRadius: "5px", padding: "4px 10px", fontSize: "12px", cursor: "pointer" }}
-                        >
+                        <button className="ck-btn ck-btn--sm" onClick={() => setEditingReview(null)}>
                           Cancel
                         </button>
                       </div>
@@ -263,7 +287,8 @@ export default function StaticDashboardPage() {
                             cursor:      "pointer",
                             padding:     "2px 4px",
                             fontSize:    "13px",
-                            color:       session.review.label ? "#aaa" : "#666",
+                            fontFamily:  "inherit",
+                            color:       session.review.label ? "var(--ck-text-2)" : "var(--ck-text-3)",
                             fontStyle:   session.review.label ? "normal" : "italic",
                             textAlign:   "left",
                             overflow:    "hidden",
@@ -273,13 +298,14 @@ export default function StaticDashboardPage() {
                         >
                           {session.review.label ? `— ${session.review.label}` : "— add a label"}
                         </button>
-                        <span style={{ fontSize: "12px", color: "#666", flexShrink: 0 }}>{session.pulls.length} pulls</span>
+                        <span className="ck-count" style={{ flexShrink: 0 }}>{session.pulls.length} pulls</span>
                       </>
                     )}
                   </div>
 
                   <span
-                    style={{ fontSize: "11px", color: "#666", flexShrink: 0 }}
+                    className="ck-num"
+                    style={{ fontSize: "11px", color: "var(--ck-text-3)", flexShrink: 0 }}
                     title={
                       recordedAt
                         ? "Date the log was recorded"
@@ -291,7 +317,7 @@ export default function StaticDashboardPage() {
                 </div>
 
                 {isOpen && (
-                  <div style={{ borderTop: "1px solid #2a2a2a" }}>
+                  <div style={{ borderTop: "1px solid var(--ck-line-2)", background: "rgba(0,0,0,0.2)" }}>
                     {session.pulls.map((pull) => {
                       const isEditing = editingPull === pull.id;
                       const totalMajor = pull.players.reduce((sum, p) => sum + p.majorCount, 0);
@@ -299,26 +325,25 @@ export default function StaticDashboardPage() {
                       const durationLabel = formatDuration(pull.raidErrorAtMs ?? pull.durationMs);
 
                       return (
-                        <div key={pull.id} style={{ padding: "10px 16px", borderBottom: "1px solid #232323" }}>
+                        <div key={pull.id} style={{ padding: "9px 16px", borderBottom: "1px solid var(--ck-line)" }}>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
-                            <div style={{ fontSize: "13px", display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
-                              <strong>{pull.bossName} #{pull.pullNumber}</strong>
-                              <span style={{ color: pull.result === "Kill" ? "#4ade80" : "#999" }}>{pull.result}</span>
+                            <div className="ck-num" style={{ fontSize: "13px", display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                              <strong>
+                                {pull.bossName} <span style={{ color: "var(--ck-text-gold)" }}>#{pull.pullNumber}</span>
+                              </strong>
+                              <span className="ck-badge" style={{ color: pull.result === "Kill" ? "#4ade80" : "#f87171" }}>{pull.result}</span>
                               <span style={{ color: SEVERITY_COLOR.Major, fontSize: "12px", display: "inline-flex", alignItems: "center", gap: "4px" }}>
                                 <SeverityIcon kind="Major" size={12} /> {totalMajor} Major
                               </span>
                               <span style={{ color: SEVERITY_COLOR.Minor, fontSize: "12px", display: "inline-flex", alignItems: "center", gap: "4px" }}>
                                 <SeverityIcon kind="Minor" size={12} /> {totalMinor} Minor
                               </span>
-                              <span style={{ color: "#777", fontSize: "12px" }}>
+                              <span style={{ color: "var(--ck-text-3)", fontSize: "12px" }}>
                                 {pull.raidErrorAtMs != null ? `wiped at ${durationLabel}` : `lasted ${durationLabel}`}
                               </span>
                             </div>
                             {!isEditing && (
-                              <button
-                                onClick={() => startEditingSummary(pull.id, pull.summary ?? null)}
-                                style={{ background: "none", border: "1px solid #444", borderRadius: "5px", color: "#aaa", fontSize: "11px", padding: "3px 8px", cursor: "pointer" }}
-                              >
+                              <button className="ck-btn ck-btn--xs" onClick={() => startEditingSummary(pull.id, pull.summary ?? null)}>
                                 {pull.summary ? "Edit note" : "Add note"}
                               </button>
                             )}
@@ -327,30 +352,23 @@ export default function StaticDashboardPage() {
                           {isEditing ? (
                             <div style={{ marginTop: "8px" }}>
                               <textarea
-                                className="ck-input"
+                                className="ck-textarea"
                                 value={summaryDraft}
                                 onChange={(e) => setSummaryDraft(e.target.value)}
                                 placeholder="What happened / went wrong on this pull..."
                                 rows={3}
-                                style={{ width: "100%", resize: "vertical" }}
                               />
                               <div style={{ display: "flex", gap: "8px", marginTop: "6px" }}>
-                                <button
-                                  onClick={() => saveSummary(pull)}
-                                  style={{ backgroundColor: "#2563eb", color: "#fff", border: "none", borderRadius: "5px", padding: "5px 12px", fontSize: "12px", fontWeight: 600, cursor: "pointer" }}
-                                >
+                                <button className="ck-btn ck-btn--sm ck-btn--primary" onClick={() => saveSummary(pull)}>
                                   Save
                                 </button>
-                                <button
-                                  onClick={() => setEditingPull(null)}
-                                  style={{ background: "none", color: "#aaa", border: "1px solid #444", borderRadius: "5px", padding: "5px 12px", fontSize: "12px", cursor: "pointer" }}
-                                >
+                                <button className="ck-btn ck-btn--sm" onClick={() => setEditingPull(null)}>
                                   Cancel
                                 </button>
                               </div>
                             </div>
                           ) : pull.summary ? (
-                            <p style={{ fontSize: "12px", color: "#bbb", marginTop: "6px", whiteSpace: "pre-wrap" }}>{pull.summary}</p>
+                            <p style={{ fontSize: "12px", lineHeight: 1.5, color: "var(--ck-text-2)", margin: "6px 0 0", whiteSpace: "pre-wrap" }}>{pull.summary}</p>
                           ) : null}
                         </div>
                       );
@@ -361,6 +379,8 @@ export default function StaticDashboardPage() {
             );
           })
         )}
+      </div>
+        </Panel>
       </div>
     </div>
   );

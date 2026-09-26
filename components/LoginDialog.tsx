@@ -7,6 +7,7 @@
 // account with whatever PIN is entered; there's no separate signup flow.
 
 import { useState } from "react";
+import { Dialog, Field } from "./ui/Dialog";
 
 type LoginDialogProps = {
   open:       boolean;
@@ -56,100 +57,43 @@ export default function LoginDialog({ open, onClose, onLoggedIn }: LoginDialogPr
   }
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        backgroundColor: "rgba(0,0,0,0.6)",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        zIndex: 1000,
-      }}
-      onClick={onClose}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          backgroundColor: "#222",
-          padding: "24px",
-          borderRadius: "10px",
-          width: "360px",
-          color: "white",
-          border: "1px solid #444",
-          boxShadow: "0 12px 32px rgba(0,0,0,0.35)",
-        }}
-      >
-        <h2 style={{ marginTop: 0, marginBottom: "6px", fontSize: "20px" }}>Log In</h2>
-        <p style={{ marginTop: 0, marginBottom: "16px", fontSize: "12px", color: "#999" }}>
-          Same account as Stonks. An unknown username creates a new account.
-        </p>
-
-        <div style={{ marginBottom: "14px" }}>
-          <label style={{ display: "block", marginBottom: "4px", fontSize: "13px", color: "#ddd" }}>
-            Username
-          </label>
-          <input
-            className="ck-input"
-            value={username}
-            onChange={e => setUsername(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && handleSubmit()}
-            autoFocus
-          />
-        </div>
-
-        <div style={{ marginBottom: "10px" }}>
-          <label style={{ display: "block", marginBottom: "4px", fontSize: "13px", color: "#ddd" }}>
-            4-Digit PIN
-          </label>
-          <input
-            className="ck-input"
-            type="password"
-            inputMode="numeric"
-            maxLength={4}
-            value={pin}
-            onChange={e => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
-            onKeyDown={e => e.key === "Enter" && handleSubmit()}
-          />
-        </div>
-
-        {error && (
-          <p style={{ color: "#f87171", fontSize: "12px", marginBottom: "10px" }}>{error}</p>
-        )}
-
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "10px" }}>
-          <button
-            onClick={onClose}
-            style={{
-              backgroundColor: "#2f2f2f",
-              color: "#f3f4f6",
-              border: "1px solid #555",
-              borderRadius: "6px",
-              padding: "8px 14px",
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={submitting}
-            style={{
-              backgroundColor: "#2563eb",
-              color: "white",
-              border: "none",
-              borderRadius: "6px",
-              padding: "8px 14px",
-              fontWeight: 600,
-              cursor: submitting ? "default" : "pointer",
-              opacity: submitting ? 0.6 : 1,
-            }}
-          >
+    <Dialog
+      title="Log In"
+      subtitle="Same account as Stonks. An unknown username creates a new account."
+      width="380px"
+      onBackdropClick={onClose}
+      footer={
+        <>
+          <button className="ck-btn ck-btn--md" onClick={onClose}>Cancel</button>
+          <button className="ck-btn ck-btn--md ck-btn--primary" onClick={handleSubmit} disabled={submitting}>
             {submitting ? "Logging in..." : "Log In"}
           </button>
-        </div>
-      </div>
-    </div>
+        </>
+      }
+    >
+      <Field label="Username">
+        <input
+          className="ck-input"
+          value={username}
+          onChange={e => setUsername(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && handleSubmit()}
+          autoFocus
+        />
+      </Field>
+
+      <Field label="4-Digit PIN" style={{ marginBottom: error ? "10px" : 0 }}>
+        <input
+          className="ck-input"
+          type="password"
+          inputMode="numeric"
+          maxLength={4}
+          value={pin}
+          onChange={e => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+          onKeyDown={e => e.key === "Enter" && handleSubmit()}
+        />
+      </Field>
+
+      {error && <p className="ck-error-text" style={{ marginBottom: 0 }}>{error}</p>}
+    </Dialog>
   );
 }

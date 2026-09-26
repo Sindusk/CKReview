@@ -59,7 +59,8 @@ const headerCellStyle = {
   textAlign: "center" as const,
   fontSize: "11px",
   fontWeight: 700,
-  borderBottom: "1px solid #3a3a3a",
+  background: "linear-gradient(180deg, #1a1e22, #121518)",
+  borderBottom: "1px solid var(--ck-frame-soft)",
   whiteSpace: "nowrap" as const,
 };
 
@@ -67,15 +68,15 @@ const rowLabelCellStyle = {
   padding: "4px 8px",
   verticalAlign: "top" as const,
   fontSize: "11px",
-  color: "#e2e8f0",
-  borderBottom: "1px solid #333",
+  color: "var(--ck-text)",
+  borderBottom: "1px solid var(--ck-line)",
   whiteSpace: "nowrap" as const,
 };
 
 const bodyCellStyle = {
   padding: "0",
   verticalAlign: "middle" as const,
-  borderBottom: "1px solid #333",
+  borderBottom: "1px solid var(--ck-line)",
   textAlign: "center" as const,
 };
 
@@ -96,7 +97,7 @@ export default function MitigationHeatmapTable({
 
   if (rows.length === 0) {
     return (
-      <p style={{ fontSize: "12px", color: "#94a3b8", margin: "6px 0 0" }}>
+      <p className="ck-dialog-text" style={{ margin: "6px 0 0" }}>
         No reviewable mechanics found across the loaded pulls yet — either
         none of them reached far enough, or these pulls were fetched before
         enemy cast data was persisted (re-fetch the report to pick it up).
@@ -115,7 +116,7 @@ export default function MitigationHeatmapTable({
               const color = getClassColor("ffxiv", player.className);
               return (
                 <th key={slot} style={headerCellStyle} title={player.name}>
-                  <div style={{ color: "#60a5fa" }}>{slot}{assignment.tentative ? "?" : ""}</div>
+                  <div style={{ color: "var(--ck-text-gold)" }}>{slot}{assignment.tentative ? "?" : ""}</div>
                   <div style={{ color, fontWeight: 600 }}>{player.name}</div>
                 </th>
               );
@@ -127,10 +128,10 @@ export default function MitigationHeatmapTable({
             <tr key={`${row.mech.name}-${i}`}>
               <td style={rowLabelCellStyle}>
                 <div>
-                  <span style={{ color: "#60a5fa", fontWeight: 700, marginRight: "6px" }}>{row.mech.time ?? ""}</span>
-                  <span style={{ color: "#e2e8f0" }}>{row.mech.name}</span>
+                  <span className="ck-num" style={{ color: "var(--ck-arcane-text)", fontWeight: 700, marginRight: "6px" }}>{row.mech.time ?? ""}</span>
+                  <span style={{ color: "var(--ck-text)" }}>{row.mech.name}</span>
                 </div>
-                <div style={{ color: "#555", fontSize: "10px" }}>({row.phaseTitle})</div>
+                <div style={{ color: "var(--ck-text-3)", fontSize: "10px" }}>({row.phaseTitle})</div>
               </td>
               {columns.map(({ slot, assignment }) => {
                 const cell = row.cellsByActorId.get(assignment.player!.actorId);

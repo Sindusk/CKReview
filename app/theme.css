@@ -92,6 +92,11 @@
   box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5);
 }
 
+.ck-field option {
+  background-color: #14171a;
+  color: #e5e7eb;
+}
+
 .ck-field::placeholder {
   color: var(--ck-text-3);
 }
@@ -230,6 +235,178 @@
   min-width: 0;
 }
 
+.ck-panel-subtitle {
+  margin-top: 3px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--ck-text-3);
+}
+
+/* ─── Dialogs (components/ui/Dialog.tsx) ───────────────────────────────── */
+
+.ck-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  box-sizing: border-box;
+  background: radial-gradient(ellipse at center, rgba(4, 6, 9, 0.62), rgba(2, 3, 5, 0.82));
+}
+
+.ck-dialog-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 12px 18px;
+  border-top: 1px solid var(--ck-frame-faint);
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.ck-dialog-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ck-text-2);
+}
+
+.ck-dialog-text strong {
+  color: var(--ck-text);
+}
+
+/* Section heading inside a dialog or page panel (smaller than a panel title) */
+.ck-subheading {
+  font-family: var(--font-cinzel), serif;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: var(--ck-text-gold);
+  text-shadow: 0 1px 1px #000;
+}
+
+/* Explanatory note under a heading */
+.ck-help {
+  margin-bottom: 12px;
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--ck-text-2);
+}
+
+.ck-label {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ck-text-3);
+}
+
+.ck-error-text {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: #ff8a8a;
+}
+
+/* ─── Dropdown menus (burger menu, custom selects) ─────────────────────── */
+
+.ck-menu {
+  background: linear-gradient(180deg, #171b1f, #0e1114);
+  border: 1px solid var(--ck-frame-soft);
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px #040302, 0 10px 28px rgba(0, 0, 0, 0.65);
+}
+
+.ck-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--ck-text);
+  text-align: left;
+  text-decoration: none;
+  background: transparent;
+  border: none;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+
+.ck-menu-item:hover:not(:disabled),
+.ck-menu-item--selected {
+  color: #fff4dc;
+  background: rgba(185, 134, 50, 0.12);
+}
+
+.ck-menu-item:disabled {
+  color: var(--ck-text-3);
+  cursor: default;
+}
+
+.ck-menu-label {
+  padding: 6px 12px 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ck-text-gold);
+  opacity: 0.75;
+}
+
+.ck-menu-divider {
+  height: 1px;
+  margin: 6px 8px;
+  background: linear-gradient(90deg, transparent, var(--ck-frame-soft), transparent);
+}
+
+/* ─── Tables ───────────────────────────────────────────────────────────── */
+
+.ck-table-wrap {
+  border: 1px solid var(--ck-line-2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.ck-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.ck-table th {
+  padding: 8px 12px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: left;
+  color: var(--ck-text-gold);
+  background: linear-gradient(180deg, #1a1e22, #121518);
+  border-bottom: 1px solid var(--ck-frame-soft);
+}
+
+.ck-table td {
+  padding: 7px 12px;
+  color: var(--ck-text-2);
+  border-top: 1px solid var(--ck-line);
+}
+
+.ck-table tbody tr:nth-child(even) td {
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.ck-table tbody tr:hover td {
+  background: rgba(185, 134, 50, 0.06);
+}
+
 /* Thin gilt rule inside a panel, e.g. above the timeline controls */
 .ck-rule {
   border-top: 1px solid var(--ck-frame-faint);
@@ -292,6 +469,11 @@
 .ck-btn--xs {
   padding: 2px 6px;
   font-size: 10px;
+}
+
+.ck-btn--md {
+  padding: 7px 14px;
+  font-size: 13px;
 }
 
 .ck-btn--lg {

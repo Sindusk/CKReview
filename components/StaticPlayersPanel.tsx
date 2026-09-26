@@ -134,39 +134,44 @@ export default function StaticPlayersPanel({ staticId }: { staticId: number }) {
 
   return (
     <div>
+      {/* The collapse toggle doubles as the enclosing Panel's title bar. */}
       <button
         onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="ck-panel-header"
         style={{
-          display:        "flex",
-          alignItems:      "center",
-          gap:             "10px",
-          width:           "100%",
-          background:      "none",
-          border:          "none",
-          cursor:          "pointer",
-          color:           "#eee",
-          padding:         0,
-          textAlign:       "left",
+          width:          "100%",
+          justifyContent: "flex-start",
+          cursor:         "pointer",
+          fontFamily:     "inherit",
+          color:          "inherit",
+          textAlign:      "left",
+          borderTop:      0,
+          borderLeft:     0,
+          borderRight:    0,
+          ...(open ? {} : { borderBottomColor: "transparent" }),
         }}
       >
-        <span style={{ transform: open ? "rotate(90deg)" : "none", transition: "transform 0.1s", display: "inline-block", fontSize: "11px", color: "#888" }}>
+        <span style={{ transform: open ? "rotate(90deg)" : "none", transition: "transform 0.1s", display: "inline-block", fontSize: "10px", color: "var(--ck-text-gold)" }}>
           &#9654;
         </span>
-        <strong style={{ fontSize: "14px" }}>Players</strong>
-        {players && <span style={{ fontSize: "12px", color: "#666" }}>{players.length}</span>}
+        <span className="ck-panel-title">
+          Players
+          {players && <span className="ck-panel-title__count">({players.length})</span>}
+        </span>
       </button>
 
       {open && (
-        <div style={{ marginTop: "14px" }}>
-          {error && <p style={{ color: "#f87171", fontSize: "12px", marginBottom: "10px" }}>{error}</p>}
+        <div style={{ padding: "14px 16px 16px" }}>
+          {error && <p className="ck-error-text">{error}</p>}
 
           {sortedPlayers == null ? (
-            <p style={{ fontSize: "13px", color: "#999" }}>Loading players...</p>
+            <p className="ck-dialog-text">Loading players...</p>
           ) : sortedPlayers.length === 0 ? (
-            <p style={{ fontSize: "13px", color: "#999" }}>No players seen yet — import a review first.</p>
+            <p className="ck-dialog-text">No players seen yet — import a review first.</p>
           ) : (
-            <div style={{ overflowX: "auto", marginBottom: "16px" }}>
-              <table style={{ borderCollapse: "collapse", width: "100%", fontSize: "12px" }}>
+            <div className="ck-table-wrap" style={{ overflowX: "auto", marginBottom: "16px" }}>
+              <table className="ck-table" style={{ fontSize: "12px" }}>
                 <thead>
                   <tr>
                     <SortableTh
@@ -196,19 +201,19 @@ export default function StaticPlayersPanel({ staticId }: { staticId: number }) {
                     const color = p.job ? getClassColor(p.job.game as "wow" | "ffxiv", p.job.className) : "#aaa";
                     const icon = p.job ? getPlayerSpecIcon(p.job.game as "wow" | "ffxiv", p.job.specId ?? 0, p.job.className) : null;
                     return (
-                      <tr key={p.id} style={{ borderBottom: "1px solid #2a2a2a" }}>
+                      <tr key={p.id}>
                         <td style={{ padding: "6px 8px" }}>
                           {renamingId === p.id ? (
-                            <div style={{ display: "flex", gap: "6px" }}>
+                            <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
                               <input
-                                className="ck-input"
+                                className="ck-field"
                                 value={renameDraft}
                                 onChange={(e) => setRenameDraft(e.target.value)}
-                                style={{ fontSize: "12px" }}
+                                style={{ fontSize: "12px", padding: "4px 8px" }}
                                 autoFocus
                               />
-                              <button onClick={() => handleRename(p.id)} disabled={busy} style={btnStyle("#2563eb", "#fff")}>Save</button>
-                              <button onClick={() => setRenamingId(null)} style={btnStyle("transparent", "#aaa")}>Cancel</button>
+                              <button className="ck-btn ck-btn--sm ck-btn--primary" onClick={() => handleRename(p.id)} disabled={busy}>Save</button>
+                              <button className="ck-btn ck-btn--sm" onClick={() => setRenamingId(null)}>Cancel</button>
                             </div>
                           ) : (
                             <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -220,7 +225,7 @@ export default function StaticPlayersPanel({ staticId }: { staticId: number }) {
                               )}
                               <span style={{ color }}>{p.name}</span>
                               {p.aliases.length > 1 && (
-                                <span style={{ fontSize: "11px", color: "#777" }}>
+                                <span style={{ fontSize: "11px", color: "var(--ck-text-3)" }}>
                                   ({p.aliases.filter((a) => a !== p.name).join(", ")})
                                 </span>
                               )}
@@ -234,7 +239,7 @@ export default function StaticPlayersPanel({ staticId }: { staticId: number }) {
                         <td style={tdStyle("right")} title="Major errors per pull">{p.errorRatePct.toFixed(0)}%</td>
                         <td style={{ padding: "6px 8px", textAlign: "right" }}>
                           {renamingId !== p.id && (
-                            <button onClick={() => { setRenamingId(p.id); setRenameDraft(p.name); }} style={btnStyle("transparent", "#aaa")}>
+                            <button className="ck-btn ck-btn--xs" onClick={() => { setRenamingId(p.id); setRenameDraft(p.name); }}>
                               Rename
                             </button>
                           )}
@@ -249,20 +254,20 @@ export default function StaticPlayersPanel({ staticId }: { staticId: number }) {
 
           {players && players.length > 1 && (
             <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-              <span style={{ fontSize: "12px", color: "#999" }}>Merge</span>
-              <select className="ck-input" value={mergeFrom ?? ""} onChange={(e) => setMergeFrom(Number(e.target.value) || null)} style={{ fontSize: "12px" }}>
+              <span className="ck-label" style={{ margin: 0 }}>Merge</span>
+              <select className="ck-field" value={mergeFrom ?? ""} onChange={(e) => setMergeFrom(Number(e.target.value) || null)} style={{ padding: "4px 8px" }}>
                 <option value="">Select player…</option>
                 {players.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
-              <span style={{ fontSize: "12px", color: "#999" }}>into</span>
-              <select className="ck-input" value={mergeInto ?? ""} onChange={(e) => setMergeInto(Number(e.target.value) || null)} style={{ fontSize: "12px" }}>
+              <span className="ck-label" style={{ margin: 0 }}>into</span>
+              <select className="ck-field" value={mergeInto ?? ""} onChange={(e) => setMergeInto(Number(e.target.value) || null)} style={{ padding: "4px 8px" }}>
                 <option value="">Select player…</option>
                 {players.filter((p) => p.id !== mergeFrom).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
               <button
+                className="ck-btn ck-btn--sm ck-btn--primary"
                 onClick={handleMerge}
                 disabled={busy || mergeFrom == null || mergeInto == null}
-                style={btnStyle("#2563eb", "#fff")}
               >
                 Merge
               </button>
@@ -292,7 +297,7 @@ function SortableTh({
   const active = sortKey === column;
 
   return (
-    <th style={{ ...thStyle(align), cursor: "pointer", userSelect: "none", color: active ? "#e8e6dd" : "#898781" }}>
+    <th style={{ ...thStyle(align), cursor: "pointer", userSelect: "none", color: active ? "#f4dca0" : undefined }}>
       <span
         onClick={() => onSort(column)}
         style={{
@@ -305,7 +310,7 @@ function SortableTh({
       >
         {label}
         {/* Reserved-width caret so the header doesn't jump as sorting moves. */}
-        <span style={{ width: "8px", fontSize: "9px", color: active ? "#e8e6dd" : "transparent" }}>
+        <span style={{ width: "8px", fontSize: "9px", color: active ? "#f4dca0" : "transparent" }}>
           {sortAsc ? "▲" : "▼"}
         </span>
       </span>
@@ -313,23 +318,11 @@ function SortableTh({
   );
 }
 
+// Colours, borders and header styling come from .ck-table (app/theme.css).
 function thStyle(align: "left" | "right"): CSSProperties {
-  return { textAlign: align, padding: "6px 8px", color: "#898781", borderBottom: "1px solid #2c2c2a", fontWeight: 600 };
+  return { textAlign: align, padding: "7px 8px" };
 }
 
 function tdStyle(align: "left" | "right"): CSSProperties {
-  return { textAlign: align, padding: "6px 8px", color: "#c3c2b7", fontVariantNumeric: "tabular-nums" };
-}
-
-function btnStyle(bg: string, color: string): CSSProperties {
-  return {
-    backgroundColor: bg,
-    color,
-    border:          bg === "transparent" ? "1px solid #444" : "none",
-    borderRadius:    "5px",
-    padding:         "5px 10px",
-    fontSize:        "12px",
-    fontWeight:      600,
-    cursor:          "pointer",
-  };
+  return { textAlign: align, padding: "6px 8px" };
 }

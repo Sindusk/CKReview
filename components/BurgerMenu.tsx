@@ -20,19 +20,7 @@ export type BurgerMenuProps = {
 // ─── Section Divider ──────────────────────────────────────────────────────────
 
 function SectionLabel({ label }: { label: string }) {
-  return (
-    <div
-      style={{
-        fontSize:      "10px",
-        color:         "#555",
-        textTransform: "uppercase",
-        letterSpacing: "0.08em",
-        padding:       "4px 14px 6px",
-      }}
-    >
-      {label}
-    </div>
-  );
+  return <div className="ck-menu-label">{label}</div>;
 }
 
 // ─── Menu Item ────────────────────────────────────────────────────────────────
@@ -50,37 +38,15 @@ function MenuItem({
   onClick?:  () => void;
   disabled?: boolean;
 }) {
-  const [hovered, setHovered] = useState(false);
-
   return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        display:      "flex",
-        alignItems:   "center",
-        gap:          "10px",
-        width:        "100%",
-        padding:      "9px 14px",
-        background:   !disabled && hovered ? "#2a2a2a" : "transparent",
-        border:       "none",
-        borderRadius: "5px",
-        color:        disabled ? "#555" : hovered ? "#fff" : "#ccc",
-        fontSize:     "13px",
-        cursor:       disabled ? "default" : "pointer",
-        textAlign:    "left",
-        transition:   "background 0.1s, color 0.1s",
-      }}
-    >
-      <span style={{ fontSize: "15px", width: "18px", textAlign: "center", flexShrink: 0 }}>
+    <button className="ck-menu-item" onClick={onClick} disabled={disabled}>
+      <span style={{ fontSize: "15px", width: "18px", textAlign: "center", flexShrink: 0, opacity: disabled ? 0.4 : 1 }}>
         {icon}
       </span>
       <div style={{ display: "flex", flexDirection: "column", gap: "1px" }}>
         <span>{label}</span>
         {sublabel && (
-          <span style={{ fontSize: "11px", color: disabled ? "#3a3a3a" : "#555" }}>
+          <span style={{ fontSize: "11px", color: "var(--ck-text-3)", opacity: disabled ? 0.6 : 1 }}>
             {sublabel}
           </span>
         )}
@@ -110,30 +76,13 @@ function MenuLinkItem({
   onNavigate?: () => void;
   newTab?:    boolean;
 }) {
-  const [hovered, setHovered] = useState(false);
-
   return (
     <a
+      className="ck-menu-item"
       href={href}
       target={newTab ? "_blank" : undefined}
       rel={newTab ? "noopener noreferrer" : undefined}
       onClick={onNavigate}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        display:        "flex",
-        alignItems:     "center",
-        gap:            "10px",
-        width:          "100%",
-        padding:        "9px 14px",
-        background:     hovered ? "#2a2a2a" : "transparent",
-        borderRadius:   "5px",
-        color:          hovered ? "#fff" : "#ccc",
-        fontSize:       "13px",
-        textDecoration: "none",
-        boxSizing:      "border-box",
-        transition:     "background 0.1s, color 0.1s",
-      }}
     >
       <span style={{ fontSize: "15px", width: "18px", textAlign: "center", flexShrink: 0 }}>
         {icon}
@@ -271,17 +220,14 @@ export default function BurgerMenu({
           elements) that sit below the header in the page layout. */}
       {open && (
         <div
+          className="ck-menu"
           style={{
-            position:        "absolute",
-            top:             "calc(100% + 8px)",
-            left:            0,
-            minWidth:        "260px",
-            backgroundColor: "#1a1a1a",
-            border:          "1px solid #333",
-            borderRadius:    "8px",
-            padding:         "6px",
-            boxShadow:       "0 8px 24px rgba(0,0,0,0.6)",
-            zIndex:          300,
+            position: "absolute",
+            top:      "calc(100% + 8px)",
+            left:     0,
+            minWidth: "260px",
+            padding:  "6px",
+            zIndex:   300,
           }}
         >
           {/* ── Review ── */}
@@ -303,7 +249,7 @@ export default function BurgerMenu({
           />
 
           {/* Thin rule between sections */}
-          <div style={{ height: "1px", backgroundColor: "#2a2a2a", margin: "6px 8px" }} />
+          <div className="ck-menu-divider" />
 
           {/* ── Integrations ── */}
           <SectionLabel label="Integrations" />
@@ -341,7 +287,7 @@ export default function BurgerMenu({
           )}
 
           {/* Thin rule between sections */}
-          <div style={{ height: "1px", backgroundColor: "#2a2a2a", margin: "6px 8px" }} />
+          <div className="ck-menu-divider" />
 
           {/* ── Statics ── */}
           <SectionLabel label="Statics" />
@@ -362,7 +308,7 @@ export default function BurgerMenu({
           />
 
           {/* Thin rule between sections */}
-          <div style={{ height: "1px", backgroundColor: "#2a2a2a", margin: "6px 8px" }} />
+          <div className="ck-menu-divider" />
 
           {/* ── Account ── */}
           <SectionLabel label="Account" />
@@ -391,7 +337,7 @@ export default function BurgerMenu({
           )}
 
           {/* Thin rule between sections */}
-          <div style={{ height: "1px", backgroundColor: "#2a2a2a", margin: "6px 8px" }} />
+          <div className="ck-menu-divider" />
 
           {/* ── About ── */}
           <SectionLabel label="About" />

@@ -11,6 +11,7 @@ import {
   type RaidTimeline,
 } from "@/lib/report-data";
 import { getClassColor, getRoleColor, formatClassName, getPlayerSpecIcon } from "@/lib/player-display";
+import { Dialog } from "./ui/Dialog";
 
 type ReportDialogProps = {
   open:    boolean;
@@ -26,72 +27,16 @@ export default function ReportDialog({ open, onClose, pulls }: ReportDialogProps
   if (!open) return null;
 
   return (
-    <div
-      style={{
-        position:        "fixed",
-        inset:            0,
-        backgroundColor: "rgba(0,0,0,0.65)",
-        display:         "flex",
-        justifyContent:  "center",
-        alignItems:      "center",
-        zIndex:          1000,
-        padding:         "24px",
-      }}
-      onClick={onClose}
+    <Dialog
+      title="Raid Report"
+      subtitle={`${pulls.length} pull${pulls.length === 1 ? "" : "s"} analyzed`}
+      width="min(920px, 100%)"
+      onBackdropClick={onClose}
+      onClose={onClose}
+      bodyStyle={{ padding: "8px 20px 24px" }}
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          backgroundColor: "#161616",
-          border:          "1px solid #333",
-          borderRadius:    "10px",
-          boxShadow:       "0 12px 32px rgba(0,0,0,0.5)",
-          width:           "min(920px, 100%)",
-          maxHeight:       "90vh",
-          display:         "flex",
-          flexDirection:   "column",
-          overflow:        "hidden",
-        }}
-      >
-        {/* Header */}
-        <div
-          style={{
-            display:         "flex",
-            alignItems:      "center",
-            justifyContent:  "space-between",
-            padding:         "16px 20px",
-            borderBottom:    "1px solid #2a2a2a",
-            backgroundColor: "#1a1a1a",
-            flexShrink:      0,
-          }}
-        >
-          <div>
-            <h2 style={{ margin: 0, fontSize: "18px", color: "#f1f5f9" }}>Raid Report</h2>
-            <div style={{ fontSize: "12px", color: "#666", marginTop: "2px" }}>
-              {pulls.length} pull{pulls.length === 1 ? "" : "s"} analyzed
-            </div>
-          </div>
-
-          <button
-            onClick={onClose}
-            style={{
-              backgroundColor: "#1f1f1f",
-              color:           "#ccc",
-              border:          "1px solid #333",
-              borderRadius:    "6px",
-              padding:         "6px 12px",
-              cursor:          "pointer",
-              fontSize:        "13px",
-            }}
-          >
-            Close
-          </button>
-        </div>
-
-        {/* Body */}
-        <div style={{ overflowY: "auto", padding: "8px 20px 24px" }}>
           {pulls.length === 0 ? (
-            <div style={{ color: "#555", fontSize: "13px", padding: "40px 0", textAlign: "center" }}>
+            <div style={{ color: "var(--ck-text-3)", fontSize: "13px", padding: "40px 0", textAlign: "center" }}>
               Import a report to generate the raid review.
             </div>
           ) : (
@@ -101,29 +46,19 @@ export default function ReportDialog({ open, onClose, pulls }: ReportDialogProps
 
               {/* Table */}
               <div style={{ marginTop: "22px" }}>
-                <div
-                  style={{
-                    fontSize:      "11px",
-                    color:         "#555",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.08em",
-                    marginBottom:  "8px",
-                  }}
-                >
-                  Player Breakdown
-                </div>
+                <div className="ck-section-label">Player Breakdown</div>
 
-                <div style={{ border: "1px solid #262626", borderRadius: "8px", overflow: "hidden" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+                <div className="ck-table-wrap">
+                  <table className="ck-table">
                     <thead>
-                      <tr style={{ backgroundColor: "#1c1c1c", color: "#888", textAlign: "left" }}>
-                        <th style={thStyle}>Player</th>
-                        <th style={{ ...thStyle, textAlign: "right" }}>First Errors</th>
-                        <th style={{ ...thStyle, textAlign: "right" }}>First Error %</th>
-                        <th style={{ ...thStyle, textAlign: "right" }}>Total Major Errors</th>
-                        <th style={{ ...thStyle, textAlign: "right" }}>Total %</th>
+                      <tr>
+                        <th>Player</th>
+                        <th style={{ textAlign: "right" }}>First Errors</th>
+                        <th style={{ textAlign: "right" }}>First Error %</th>
+                        <th style={{ textAlign: "right" }}>Total Major Errors</th>
+                        <th style={{ textAlign: "right" }}>Total %</th>
                         <th
-                          style={{ ...thStyle, textAlign: "right" }}
+                          style={{ textAlign: "right" }}
                           title="Pulls this player was present for — both percentages are per pull played, not per pull in the report."
                         >
                           Pulls
@@ -131,18 +66,12 @@ export default function ReportDialog({ open, onClose, pulls }: ReportDialogProps
                       </tr>
                     </thead>
                     <tbody>
-                      {stats.map((p, i) => {
+                      {stats.map((p) => {
                         const color = getClassColor(p.game, p.className);
                         const roleColor = getRoleColor(p.role);
 
                         return (
-                          <tr
-                            key={p.name}
-                            style={{
-                              backgroundColor: i % 2 === 0 ? "#141414" : "#171717",
-                              borderTop:       "1px solid #222",
-                            }}
-                          >
+                          <tr key={p.name}>
                             <td style={tdStyle}>
                               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                                 <img
@@ -150,15 +79,15 @@ export default function ReportDialog({ open, onClose, pulls }: ReportDialogProps
                                   alt=""
                                   width={20}
                                   height={20}
-                                  style={{ borderRadius: "4px", flexShrink: 0 }}
+                                  style={{ borderRadius: "3px", flexShrink: 0 }}
                                   onError={(e) => { e.currentTarget.style.display = "none"; }}
                                 />
                                 <span>
                                   <span style={{ color, fontWeight: 600 }}>{p.name}</span>
-                                  <span style={{ color: roleColor, fontSize: "11px", marginLeft: "8px" }}>
+                                  <span style={{ color: roleColor, fontSize: "11px", fontWeight: 600, marginLeft: "8px" }}>
                                     {p.role}
                                   </span>
-                                  <span style={{ color: "#555", fontSize: "11px", marginLeft: "6px" }}>
+                                  <span style={{ color: "var(--ck-text-3)", fontSize: "11px", marginLeft: "6px" }}>
                                     {formatClassName(p.className)}
                                   </span>
                                 </span>
@@ -172,7 +101,7 @@ export default function ReportDialog({ open, onClose, pulls }: ReportDialogProps
                             <td style={{ ...tdStyle, textAlign: "right", color: "#fb923c" }}>
                               {p.totalPct.toFixed(1)}%
                             </td>
-                            <td style={{ ...tdStyle, textAlign: "right", color: "#888" }}>
+                            <td style={{ ...tdStyle, textAlign: "right", color: "var(--ck-text-3)" }}>
                               {p.pullCount}
                             </td>
                           </tr>
@@ -185,36 +114,18 @@ export default function ReportDialog({ open, onClose, pulls }: ReportDialogProps
 
               {/* Timeline */}
               <div style={{ marginTop: "22px" }}>
-                <div
-                  style={{
-                    fontSize:      "11px",
-                    color:         "#555",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.08em",
-                    marginBottom:  "8px",
-                  }}
-                >
-                  Raid Timeline
-                </div>
+                <div className="ck-section-label">Raid Timeline</div>
                 <RaidTimelineView timeline={timeline} />
               </div>
             </>
           )}
-        </div>
-      </div>
-    </div>
+    </Dialog>
   );
 }
 
-const thStyle: React.CSSProperties = {
-  padding:    "8px 12px",
-  fontWeight: 600,
-  fontSize:   "11px",
-};
-
+// Padding/borders come from .ck-table; this only sets the body text tone.
 const tdStyle: React.CSSProperties = {
-  padding: "7px 12px",
-  color:   "#ccc",
+  color: "var(--ck-text)",
 };
 
 // ─── Pedestal (formerly components/report/ReportPedestal.tsx) ─────────────
@@ -301,7 +212,7 @@ function PedestalCard({
       )}
 
       {player && (
-        <div style={{ fontSize: "10px", color: "#777", marginBottom: "8px" }}>
+        <div style={{ fontSize: "10px", color: "var(--ck-text-3)", marginBottom: "8px" }}>
           {player.combinedScore} early mistake{player.combinedScore === 1 ? "" : "s"}
         </div>
       )}
@@ -342,7 +253,7 @@ function Pedestal({ players }: { players: PlayerReportStats[] }) {
       }}
     >
       {players.length === 0 ? (
-        <div style={{ color: "#555", fontSize: "13px", padding: "20px 0" }}>
+        <div style={{ color: "var(--ck-text-3)", fontSize: "13px", padding: "20px 0" }}>
           Not enough data yet to crown an MVP.
         </div>
       ) : (
@@ -364,7 +275,7 @@ function RaidTimelineView({ timeline }: { timeline: RaidTimeline }) {
 
   if (totalDurationSec <= 0) {
     return (
-      <div style={{ color: "#555", fontSize: "13px", padding: "12px 0" }}>
+      <div style={{ color: "var(--ck-text-3)", fontSize: "13px", padding: "12px 0" }}>
         No pull data yet to build a timeline.
       </div>
     );
@@ -377,7 +288,7 @@ function RaidTimelineView({ timeline }: { timeline: RaidTimeline }) {
           display: "flex",
           justifyContent: "space-between",
           fontSize: "11px",
-          color: "#777",
+          color: "var(--ck-text-3)",
           marginBottom: "6px",
         }}
       >
@@ -392,7 +303,7 @@ function RaidTimelineView({ timeline }: { timeline: RaidTimeline }) {
           height:       "22px",
           borderRadius: "5px",
           overflow:     "hidden",
-          border:       "1px solid #2a2a2a",
+          border:       "1px solid var(--ck-line-2)",
         }}
       >
         {segments.map((seg, i) => {
@@ -426,7 +337,7 @@ function RaidTimelineView({ timeline }: { timeline: RaidTimeline }) {
           marginTop:      "10px",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "14px", fontSize: "11px", color: "#888" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "14px", fontSize: "11px", color: "var(--ck-text-2)" }}>
           <span style={{ display: "flex", alignItems: "center", gap: "5px" }}>
             <span style={{ width: "10px", height: "10px", borderRadius: "2px", background: "#22c55e", display: "inline-block" }} />
             Combat

@@ -10,6 +10,7 @@
 import { useEffect, useState } from "react";
 import type { Pull } from "@/types/Pull";
 import { computeStaticReviewPullData } from "@/lib/static-review-data";
+import { Dialog, Field } from "./ui/Dialog";
 
 type StaticSummary = {
   id:   number;
@@ -130,132 +131,72 @@ export default function AddReviewToStaticDialog({
   }
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        backgroundColor: "rgba(0,0,0,0.6)",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        zIndex: 1000,
-      }}
-      onClick={onClose}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          backgroundColor: "#222",
-          padding: "24px",
-          borderRadius: "10px",
-          width: "420px",
-          color: "white",
-          border: "1px solid #444",
-          boxShadow: "0 12px 32px rgba(0,0,0,0.35)",
-        }}
-      >
-        <h2 style={{ marginTop: 0, marginBottom: "16px", fontSize: "20px" }}>Add Review To Static</h2>
-
-        {!sessionId ? (
-          <p style={{ fontSize: "13px", color: "#ccc" }}>
-            Save some progress first — add a VOD or call a wipe — then this review can be attached to a static.
-          </p>
-        ) : done ? (
-          <p style={{ fontSize: "13px", color: "#4ade80" }}>
-            {resynced ? "Resynced — pull/error data refreshed from the current session." : "Added."}
-          </p>
-        ) : statics === null ? (
-          <p style={{ fontSize: "13px", color: "#999" }}>Loading your statics...</p>
-        ) : error ? null : statics.length === 0 ? (
-          <div>
-            <p style={{ fontSize: "13px", color: "#ccc", marginBottom: "14px" }}>
-              You don't have any statics yet.
-            </p>
-            <button
-              onClick={() => { onClose(); onOpenManageStatics(); }}
-              style={{
-                backgroundColor: "#2563eb",
-                color: "white",
-                border: "none",
-                borderRadius: "6px",
-                padding: "8px 14px",
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
-              Create a Static
-            </button>
-          </div>
-        ) : (
-          <>
-            <div style={{ marginBottom: "14px" }}>
-              <label style={{ display: "block", marginBottom: "4px", fontSize: "13px", color: "#ddd" }}>
-                Static
-              </label>
-              <select
-                className="ck-input"
-                value={selectedId ?? ""}
-                onChange={e => setSelectedId(Number(e.target.value))}
-              >
-                {statics.map(s => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div style={{ marginBottom: "20px" }}>
-              <label style={{ display: "block", marginBottom: "4px", fontSize: "13px", color: "#ddd" }}>
-                Label (optional)
-              </label>
-              <input
-                className="ck-input"
-                value={label}
-                onChange={e => setLabel(e.target.value)}
-                placeholder="e.g. Week 4 progression"
-              />
-            </div>
-          </>
-        )}
-
-        {error && (
-          <p style={{ color: "#f87171", fontSize: "12px", marginBottom: "10px" }}>{error}</p>
-        )}
-
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
-          <button
-            onClick={onClose}
-            style={{
-              backgroundColor: "#2f2f2f",
-              color: "#f3f4f6",
-              border: "1px solid #555",
-              borderRadius: "6px",
-              padding: "8px 14px",
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >
+    <Dialog
+      title="Add Review To Static"
+      width="440px"
+      onBackdropClick={onClose}
+      footer={
+        <>
+          <button className="ck-btn ck-btn--md" onClick={onClose}>
             {done ? "Close" : "Cancel"}
           </button>
           {sessionId && !done && statics && statics.length > 0 && (
             <button
+              className="ck-btn ck-btn--md ck-btn--primary"
               onClick={handleSubmit}
               disabled={submitting || selectedId == null}
-              style={{
-                backgroundColor: "#2563eb",
-                color: "white",
-                border: "none",
-                borderRadius: "6px",
-                padding: "8px 14px",
-                fontWeight: 600,
-                cursor: submitting ? "default" : "pointer",
-                opacity: submitting ? 0.6 : 1,
-              }}
             >
               {submitting ? (alreadyLinked ? "Resyncing..." : "Adding...") : (alreadyLinked ? "Resync" : "Add")}
             </button>
           )}
+        </>
+      }
+    >
+      {!sessionId ? (
+        <p className="ck-dialog-text">
+          Save some progress first — add a VOD or call a wipe — then this review can be attached to a static.
+        </p>
+      ) : done ? (
+        <p className="ck-dialog-text" style={{ color: "#4ade80" }}>
+          {resynced ? "Resynced — pull/error data refreshed from the current session." : "Added."}
+        </p>
+      ) : statics === null ? (
+        <p className="ck-dialog-text">Loading your statics...</p>
+      ) : error ? null : statics.length === 0 ? (
+        <div>
+          <p className="ck-dialog-text" style={{ marginBottom: "14px" }}>
+            You don&apos;t have any statics yet.
+          </p>
+          <button className="ck-btn ck-btn--md ck-btn--primary" onClick={() => { onClose(); onOpenManageStatics(); }}>
+            Create a Static
+          </button>
         </div>
-      </div>
-    </div>
+      ) : (
+        <>
+          <Field label="Static">
+            <select
+              className="ck-select"
+              value={selectedId ?? ""}
+              onChange={e => setSelectedId(Number(e.target.value))}
+            >
+              {statics.map(s => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          </Field>
+
+          <Field label="Label (optional)" style={{ marginBottom: error ? "14px" : 0 }}>
+            <input
+              className="ck-input"
+              value={label}
+              onChange={e => setLabel(e.target.value)}
+              placeholder="e.g. Week 4 progression"
+            />
+          </Field>
+        </>
+      )}
+
+      {error && <p className="ck-error-text" style={{ marginBottom: 0 }}>{error}</p>}
+    </Dialog>
   );
 }

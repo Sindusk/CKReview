@@ -28,6 +28,7 @@ import { detectGraven2Strategy } from "@/lib/mechanics/ffxiv/dancingmad/graven2-
 import type { MitigationPlan } from "@/lib/mechanics/ffxiv/dancingmad/mitigation-plan";
 import { getClassColor } from "@/lib/player-display";
 import type { Pull } from "@/types/Pull";
+import { Dialog } from "./ui/Dialog";
 
 type StrategyDialogProps = {
   open:     boolean;
@@ -69,9 +70,6 @@ const roleCellStyle = {
   alignItems: "center",
   gap: "2px",
   padding: "6px 4px",
-  backgroundColor: "#1a1a1a",
-  border: "1px solid #333",
-  borderRadius: "6px",
   minWidth: 0,
 };
 
@@ -89,7 +87,8 @@ function RoleRoster({ pull, plan }: { pull: Pull; plan: MitigationPlan | null })
       {ROLE_TABLE_COLUMNS.map((col) => (
         <div
           key={col.label}
-          style={{ fontSize: "10px", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", textAlign: "center" }}
+          className="ck-label"
+          style={{ textAlign: "center", margin: 0 }}
         >
           {col.label}
         </div>
@@ -101,8 +100,8 @@ function RoleRoster({ pull, plan }: { pull: Pull; plan: MitigationPlan | null })
           const player = assignment?.player ?? null;
           const color = player ? getClassColor("ffxiv", player.className) : "#94a3b8";
           return (
-            <div key={`${rowIdx}-${slot}`} style={roleCellStyle}>
-              <span style={{ fontSize: "9px", fontWeight: 700, color: "#60a5fa" }}>{slot}</span>
+            <div key={`${rowIdx}-${slot}`} className="ck-card" style={roleCellStyle}>
+              <span style={{ fontSize: "9px", fontWeight: 700, color: "var(--ck-text-gold)" }}>{slot}</span>
               <span
                 style={{
                   color,
@@ -116,7 +115,7 @@ function RoleRoster({ pull, plan }: { pull: Pull; plan: MitigationPlan | null })
                 title={player ? player.name : undefined}
               >
                 {player ? player.name : "—"}
-                {assignment?.tentative && player ? <span style={{ color: "#64748b" }}> ?</span> : null}
+                {assignment?.tentative && player ? <span style={{ color: "var(--ck-text-3)" }}> ?</span> : null}
               </span>
             </div>
           );
@@ -134,7 +133,7 @@ function Graven2StrategyView({ pull }: { pull: Pull }) {
   const result = useMemo(() => detectGraven2Strategy(pull.players), [pull]);
 
   if (!result) {
-    return <div style={{ fontSize: "12px", color: "#666" }}>Graven 2 not reached this pull.</div>;
+    return <div style={{ fontSize: "12px", color: "var(--ck-text-3)" }}>Graven 2 not reached this pull.</div>;
   }
 
   const variantLabel = result.variant === "light-party" ? "Light Party" : result.variant === "eight-stack" ? "8-Player Stack" : "Unrecognized";
@@ -142,11 +141,11 @@ function Graven2StrategyView({ pull }: { pull: Pull }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
       <div style={{ fontSize: "12px" }}>
-        <span style={{ fontWeight: 700, color: "#60a5fa" }}>{variantLabel}</span>
+        <span className="ck-badge ck-badge--plain" style={{ color: "var(--ck-arcane-text)", fontSize: "11px" }}>{variantLabel}</span>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
         {result.groups.map((group, i) => (
-          <div key={i} style={{ fontSize: "11px", color: "#ccc" }}>
+          <div key={i} style={{ fontSize: "12px", color: "var(--ck-text-2)" }}>
             Group {i + 1}: {group.players.join(", ")}
           </div>
         ))}
@@ -160,7 +159,7 @@ function KickSlotChip({ slot }: { slot: KickSlot }) {
   return (
     <span style={{ display: "inline-flex", alignItems: "baseline", gap: "5px", whiteSpace: "nowrap" }}>
       <span style={{ color, fontWeight: 600, fontSize: "13px" }}>{slot.player}</span>
-      <span style={{ color: "#888", fontSize: "11px" }}>{slot.ability}</span>
+      <span style={{ color: "var(--ck-text-3)", fontSize: "11px" }}>{slot.ability}</span>
     </span>
   );
 }
@@ -174,14 +173,12 @@ function CrystalSlotChip({ slot }: { slot: CrystalSlot }) {
   );
 }
 
+// Row boxes pair with className="ck-card" (background/border come from it).
 const mitRowStyle = {
   display: "flex",
   alignItems: "baseline" as const,
   gap: "10px",
   padding: "6px 10px",
-  backgroundColor: "#1a1a1a",
-  border: "1px solid #333",
-  borderRadius: "6px",
 };
 
 const strategyRowStyle = {
@@ -189,15 +186,14 @@ const strategyRowStyle = {
   alignItems: "baseline" as const,
   gap: "10px",
   padding: "8px 12px",
-  backgroundColor: "#1a1a1a",
-  border: "1px solid #333",
-  borderRadius: "6px",
 };
+
+const rowLabelColor = "var(--ck-text-gold)";
 
 const strategyRowLabelStyle = {
   fontSize: "11px",
   fontWeight: 700,
-  color: "#60a5fa",
+  color: rowLabelColor,
   flexShrink: 0,
   width: "84px",
 };
@@ -227,67 +223,23 @@ export default function StrategyDialog({
   const showRoster = ffPulls.length > 0;
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        backgroundColor: "rgba(0,0,0,0.6)",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        zIndex: 1100,
-      }}
-      onClick={onClose}
+    <Dialog
+      title="Strategy"
+      width={showBlackHole || showRoster ? "min(680px, 94vw)" : "480px"}
+      maxHeight="80vh"
+      zIndex={1100}
+      onBackdropClick={onClose}
+      onClose={onClose}
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          backgroundColor: "#222",
-          padding: "22px",
-          borderRadius: "10px",
-          width: showBlackHole || showRoster ? "min(680px, 94vw)" : "480px",
-          maxHeight: "80vh",
-          overflowY: "auto",
-          color: "white",
-          border: "1px solid #444",
-          boxShadow: "0 12px 32px rgba(0,0,0,0.35)",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
-          <h3 style={{ margin: 0, fontSize: "16px" }}>Strategy</h3>
-          <button
-            onClick={onClose}
-            aria-label="Close"
-            style={{
-              background: "transparent",
-              border: "none",
-              color: "#888",
-              fontSize: "18px",
-              cursor: "pointer",
-              lineHeight: 1,
-            }}
-          >
-            ✕
-          </button>
-        </div>
-
         {showRoster && selectedPull && (
-          <div style={{ marginBottom: "18px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "2px" }}>
-              <div style={{ fontSize: "13px", fontWeight: 600, color: "#e2e8f0" }}>
-                Party Roles
-              </div>
+          <div style={{ marginBottom: "20px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px" }}>
+              <div className="ck-subheading">Party Roles</div>
               <select
+                className="ck-field"
                 value={selectedPullId ?? ""}
                 onChange={(e) => setSelectedPullId(Number(e.target.value))}
-                style={{
-                  backgroundColor: "#1a1a1a",
-                  color: "#e2e8f0",
-                  border: "1px solid #444",
-                  borderRadius: "5px",
-                  padding: "3px 8px",
-                  fontSize: "12px",
-                }}
+                style={{ padding: "3px 8px" }}
               >
                 {ffPulls.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -296,7 +248,7 @@ export default function StrategyDialog({
                 ))}
               </select>
             </div>
-            <div style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "12px" }}>
+            <div className="ck-help">
               Auto-detected party role for each player in this pull. MT/OT is
               resolved from the mitigation plan&apos;s own MT/OT columns where
               decisive, else from who took more damage across the pull; M1/M2
@@ -308,11 +260,9 @@ export default function StrategyDialog({
         )}
 
         {showRoster && selectedPull && (
-          <div style={{ marginBottom: "18px" }}>
-            <div style={{ fontSize: "13px", fontWeight: 600, color: "#e2e8f0", marginBottom: "2px" }}>
-              Graven 2 Strategy
-            </div>
-            <div style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "12px" }}>
+          <div style={{ marginBottom: "20px" }}>
+            <div className="ck-subheading" style={{ marginBottom: "4px" }}>Graven 2 Strategy</div>
+            <div className="ck-help">
               Auto-detected per pull from this pull&apos;s own Gravitas hits —
               Light Party (two 4-player stacks, opposite sides of the arena) vs
               the newer 8-Player Stack. Identification only for now; no
@@ -323,22 +273,14 @@ export default function StrategyDialog({
         )}
 
         {showBlackHole && blackHole && (
-          <div style={{ marginBottom: strategy || crystals ? "18px" : 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "2px" }}>
-              <div style={{ fontSize: "13px", fontWeight: 600, color: "#e2e8f0" }}>
-                Black Hole Strategy
-              </div>
+          <div style={{ marginBottom: strategy || crystals ? "20px" : 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px", flexWrap: "wrap" }}>
+              <div className="ck-subheading">Black Hole Strategy</div>
               <select
+                className="ck-field"
                 value={blackHoleOverrideId ?? ""}
                 onChange={(e) => onBlackHoleOverrideChange((e.target.value || null) as BlackHoleStrategyId | null)}
-                style={{
-                  backgroundColor: "#1a1a1a",
-                  color: "#e2e8f0",
-                  border: "1px solid #444",
-                  borderRadius: "5px",
-                  padding: "3px 8px",
-                  fontSize: "12px",
-                }}
+                style={{ padding: "3px 8px" }}
               >
                 <option value="">Auto-detect</option>
                 {BLACK_HOLE_STRATEGIES.map((s) => (
@@ -346,12 +288,12 @@ export default function StrategyDialog({
                 ))}
               </select>
               {!blackHoleOverrideId && (
-                <span style={{ fontSize: "11px", color: "#60a5fa", fontWeight: 600 }}>
+                <span className="ck-badge ck-badge--plain" style={{ color: "var(--ck-arcane-text)" }}>
                   Detected: {BLACK_HOLE_STRATEGIES.find((s) => s.id === blackHole.strategyId)?.label ?? blackHole.strategyId}
                 </span>
               )}
             </div>
-            <div style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "12px" }}>
+            <div className="ck-help">
               Shape auto-detected from {blackHole.pullsAnalyzed} pull{blackHole.pullsAnalyzed === 1 ? "" : "s"} of real
               tether hits. The First/Second/Third-in-Line debuffs are handed
               out per pull, not to fixed players, so the lanes below are an
@@ -364,14 +306,14 @@ export default function StrategyDialog({
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
               {blackHole.lanes.map((lane) => (
-                <div key={lane.slotLabel} style={mitRowStyle}>
-                  <span style={{ fontSize: "11px", fontWeight: 700, color: "#60a5fa", flexShrink: 0, width: "140px" }}>
+                <div key={lane.slotLabel} className="ck-card" style={mitRowStyle}>
+                  <span style={{ fontSize: "11px", fontWeight: 700, color: rowLabelColor, flexShrink: 0, width: "140px" }}>
                     {lane.slotLabel}
                   </span>
                   <span style={{ color: getClassColor("ffxiv", lane.className), fontWeight: 600, fontSize: "12px", flexShrink: 0, width: "120px" }}>
                     {lane.player}
                   </span>
-                  <span style={{ color: "#999", fontSize: "11px" }}>
+                  <span style={{ color: "var(--ck-text-3)", fontSize: "11px" }}>
                     Tether{lane.moments.length > 1 ? "s" : ""} #{lane.moments.join(", #")}
                   </span>
                 </div>
@@ -382,7 +324,7 @@ export default function StrategyDialog({
 
         {!strategy && !crystals ? (
           showBlackHole || showRoster ? null : (
-          <p style={{ fontSize: "13px", color: "#ccc", lineHeight: 1.5 }}>
+          <p className="ck-dialog-text">
             No strategy detected yet. Import a report with Midnight Falls pulls —
             the Terminate interrupt rotation and Dawn Crystal assignments are
             derived automatically from the raid&apos;s casts and debuffs.
@@ -392,10 +334,8 @@ export default function StrategyDialog({
           <>
             {strategy && (
             <>
-            <div style={{ fontSize: "13px", fontWeight: 600, color: "#e2e8f0", marginBottom: "2px" }}>
-              Terminate Interrupt Order
-            </div>
-            <div style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "12px" }}>
+            <div className="ck-subheading" style={{ marginBottom: "4px" }}>Terminate Interrupt Order</div>
+            <div className="ck-help">
               Detected from {strategy.pullsAnalyzed} pull{strategy.pullsAnalyzed === 1 ? "" : "s"} ·{" "}
               {strategy.wavesAnalyzed} matrix wave{strategy.wavesAnalyzed === 1 ? "" : "s"}.{" "}
               {strategy.chains
@@ -406,25 +346,14 @@ export default function StrategyDialog({
             {strategy.chains ? (
               <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                 {strategy.chains.map((chain) => (
-                  <div
-                    key={chain.label}
-                    style={{
-                      display: "flex",
-                      alignItems: "baseline",
-                      gap: "10px",
-                      padding: "8px 12px",
-                      backgroundColor: "#1a1a1a",
-                      border: "1px solid #333",
-                      borderRadius: "6px",
-                    }}
-                  >
-                    <span style={{ fontSize: "11px", fontWeight: 700, color: "#60a5fa", flexShrink: 0, width: "84px" }}>
+                  <div key={chain.label} className="ck-card" style={strategyRowStyle}>
+                    <span style={strategyRowLabelStyle}>
                       {chain.label}
                     </span>
                     <span style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", columnGap: "8px", rowGap: "4px" }}>
                       {chain.slots.map((slot, i) => (
                         <span key={slot.player} style={{ display: "inline-flex", alignItems: "baseline", gap: "8px" }}>
-                          {i > 0 && <span style={{ color: "#555", fontSize: "11px" }}>→</span>}
+                          {i > 0 && <span style={{ color: "var(--ck-text-3)", fontSize: "11px" }}>→</span>}
                           <KickSlotChip slot={slot} />
                         </span>
                       ))}
@@ -435,19 +364,8 @@ export default function StrategyDialog({
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                 {strategy.rounds.map((round, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      display: "flex",
-                      alignItems: "baseline",
-                      gap: "10px",
-                      padding: "8px 12px",
-                      backgroundColor: "#1a1a1a",
-                      border: "1px solid #333",
-                      borderRadius: "6px",
-                    }}
-                  >
-                    <span style={{ fontSize: "11px", fontWeight: 700, color: "#60a5fa", flexShrink: 0, width: "56px" }}>
+                  <div key={i} className="ck-card" style={strategyRowStyle}>
+                    <span style={{ ...strategyRowLabelStyle, width: "56px" }}>
                       Round {i + 1}
                     </span>
                     <span style={{ display: "flex", flexWrap: "wrap", columnGap: "14px", rowGap: "4px" }}>
@@ -460,14 +378,12 @@ export default function StrategyDialog({
 
             {strategy.fillIns.length > 0 && (
               <div style={{ marginTop: "12px" }}>
-                <div style={{ fontSize: "11px", fontWeight: 600, color: "#94a3b8", marginBottom: "4px" }}>
-                  Fill-in / backup kicks
-                </div>
+                <div className="ck-label">Fill-in / backup kicks</div>
                 <div style={{ display: "flex", flexWrap: "wrap", columnGap: "14px", rowGap: "4px" }}>
                   {strategy.fillIns.map((slot) => (
                     <span key={slot.player} style={{ display: "inline-flex", alignItems: "baseline", gap: "5px" }}>
                       <KickSlotChip slot={slot} />
-                      <span style={{ color: "#666", fontSize: "10px" }}>
+                      <span className="ck-num" style={{ color: "var(--ck-text-3)", fontSize: "10px" }}>
                         {slot.wavesSeen}/{strategy.wavesAnalyzed} waves
                       </span>
                     </span>
@@ -479,36 +395,34 @@ export default function StrategyDialog({
             )}
 
             {crystals && (
-              <div style={{ marginTop: strategy ? "18px" : 0 }}>
-                <div style={{ fontSize: "13px", fontWeight: 600, color: "#e2e8f0", marginBottom: "2px" }}>
-                  Dawn Crystal Assignments
-                </div>
-                <div style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "12px" }}>
+              <div style={{ marginTop: strategy ? "20px" : 0 }}>
+                <div className="ck-subheading" style={{ marginBottom: "4px" }}>Dawn Crystal Assignments</div>
+                <div className="ck-help">
                   Detected from {crystals.pullsAnalyzed} pull{crystals.pullsAnalyzed === 1 ? "" : "s"}.{" "}
                   Assigned carriers hold their crystal from its wave until the
                   intermission, when two crystals hand off to the tanks.
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                  <div style={strategyRowStyle}>
+                  <div className="ck-card" style={strategyRowStyle}>
                     <span style={strategyRowLabelStyle}>First Set</span>
                     <span style={{ display: "flex", flexWrap: "wrap", columnGap: "14px", rowGap: "4px" }}>
                       {crystals.set1.map((slot) => <CrystalSlotChip key={slot.player} slot={slot} />)}
                     </span>
                   </div>
-                  <div style={strategyRowStyle}>
+                  <div className="ck-card" style={strategyRowStyle}>
                     <span style={strategyRowLabelStyle}>Second Set</span>
                     <span style={{ display: "flex", flexWrap: "wrap", columnGap: "14px", rowGap: "4px" }}>
                       {crystals.set2.map((slot) => <CrystalSlotChip key={slot.player} slot={slot} />)}
                     </span>
                   </div>
                   {crystals.swaps.map((swap) => (
-                    <div key={`${swap.from.player}-${swap.to.player}`} style={strategyRowStyle}>
+                    <div key={`${swap.from.player}-${swap.to.player}`} className="ck-card" style={strategyRowStyle}>
                       <span style={strategyRowLabelStyle}>Intermission</span>
                       <span style={{ display: "inline-flex", alignItems: "baseline", gap: "8px" }}>
                         <CrystalSlotChip slot={swap.from} />
-                        <span style={{ color: "#555", fontSize: "11px" }}>→</span>
+                        <span style={{ color: "var(--ck-text-3)", fontSize: "11px" }}>→</span>
                         <CrystalSlotChip slot={swap.to} />
-                        <span style={{ color: "#666", fontSize: "10px" }}>
+                        <span className="ck-num" style={{ color: "var(--ck-text-3)", fontSize: "10px" }}>
                           {swap.pullsSeen}/{crystals.pullsAnalyzed} pulls
                         </span>
                       </span>
@@ -519,7 +433,6 @@ export default function StrategyDialog({
             )}
           </>
         )}
-      </div>
-    </div>
+    </Dialog>
   );
 }

@@ -52,7 +52,8 @@ const headerCellStyle = {
   textAlign: "center" as const,
   fontSize: "11px",
   fontWeight: 700,
-  borderBottom: "1px solid #3a3a3a",
+  background: "linear-gradient(180deg, #1a1e22, #121518)",
+  borderBottom: "1px solid var(--ck-frame-soft)",
   whiteSpace: "nowrap" as const,
 };
 
@@ -60,15 +61,15 @@ const rowLabelCellStyle = {
   padding: "4px 8px",
   verticalAlign: "top" as const,
   fontSize: "11px",
-  color: "#e2e8f0",
-  borderBottom: "1px solid #333",
+  color: "var(--ck-text)",
+  borderBottom: "1px solid var(--ck-line)",
   whiteSpace: "nowrap" as const,
 };
 
 const bodyCellStyle = {
   padding: "4px 8px",
   verticalAlign: "top" as const,
-  borderBottom: "1px solid #333",
+  borderBottom: "1px solid var(--ck-line)",
 };
 
 const checkLineStyle = {
@@ -97,7 +98,7 @@ export default function MitigationReviewTable({
 
   if (rows.length === 0) {
     return (
-      <p style={{ fontSize: "12px", color: "#94a3b8", margin: "6px 0 0" }}>
+      <p className="ck-dialog-text" style={{ margin: "6px 0 0" }}>
         No reviewable mechanics found for this pull — either the boss&apos;s
         own casts weren&apos;t matched to any sheet mechanic (this pull may
         not have reached far enough), or this pull was fetched before enemy
@@ -122,7 +123,7 @@ export default function MitigationReviewTable({
               const color = getClassColor("ffxiv", player.className);
               return (
                 <th key={slot} style={{ ...headerCellStyle, textAlign: "left" }} title={player.name}>
-                  <div style={{ color: "#60a5fa" }}>{slot}{assignment.tentative ? "?" : ""}</div>
+                  <div style={{ color: "var(--ck-text-gold)" }}>{slot}{assignment.tentative ? "?" : ""}</div>
                   <div style={{ color, fontWeight: 600 }}>
                     {player.name}
                   </div>
@@ -136,10 +137,10 @@ export default function MitigationReviewTable({
             <tr key={`${row.mech.name}-${i}`} style={{ opacity: row.reached ? 1 : 0.5 }}>
               <td style={rowLabelCellStyle}>
                 <div>
-                  <span style={{ color: row.reached ? "#60a5fa" : "#666", fontWeight: 700, marginRight: "6px" }}>{formatMs(row.anchorMs)}</span>
-                  <span style={{ color: row.reached ? "#e2e8f0" : "#888" }}>{row.mech.name}</span>
+                  <span className="ck-num" style={{ color: row.reached ? "var(--ck-arcane-text)" : "#666", fontWeight: 700, marginRight: "6px" }}>{formatMs(row.anchorMs)}</span>
+                  <span style={{ color: row.reached ? "var(--ck-text)" : "#888" }}>{row.mech.name}</span>
                 </div>
-                <div style={{ color: "#555", fontSize: "10px" }}>({row.phaseTitle})</div>
+                <div style={{ color: "var(--ck-text-3)", fontSize: "10px" }}>({row.phaseTitle})</div>
               </td>
               {columns.map(({ slot, assignment }) => {
                 const cell = row.cellsByActorId.get(assignment.player!.actorId);

@@ -43,6 +43,10 @@ file's header comment. Mechanic detection has its own guide:
   `.ck-badge`.
   - Gold framing is for top-level panels only. Cards inside use neutral
     borders; selection and active tabs are arcane blue, never gold.
+  - Every modal uses `components/ui/Dialog.tsx` (frame, title bar,
+    footer, `Field` rows). Form dialogs omit `onBackdropClick` so a stray
+    click can't discard input. Dropdown menus use `.ck-menu`/
+    `.ck-menu-item`; data tables use `.ck-table`.
   - Per-instance colours (class, severity) go in through the inline
     `color` or the `--ck-accent` custom property.
   - The panel ornaments hang ~5px outside the frame, so a `Panel`'s parent

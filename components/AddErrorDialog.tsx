@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from "react";
 import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { ManualErrorInput } from "@/types/PullError";
 import { getPlayerSpecIcon } from "@/lib/player-display";
+import { Dialog, Field } from "./ui/Dialog";
 
 type Severity = "Major" | "Minor" | "Raid";
 
@@ -96,63 +97,50 @@ function PlayerSelect({
             alt=""
             width={20}
             height={20}
-            style={{ borderRadius: "4px", flexShrink: 0 }}
+            style={{ borderRadius: "3px", flexShrink: 0 }}
             onError={(e) => { e.currentTarget.style.visibility = "hidden"; }}
           />
         )}
         <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {selected?.name ?? "Select a player"}
         </span>
-        <span style={{ fontSize: "10px", color: "#888", flexShrink: 0 }}>▾</span>
+        <span style={{ fontSize: "10px", color: "var(--ck-text-gold)", flexShrink: 0 }}>▾</span>
       </button>
 
       {open && (
         <div
+          className="ck-menu"
           style={{
-            position:        "absolute",
-            top:             "calc(100% + 4px)",
-            left:            0,
-            right:           0,
-            backgroundColor: "#1a1a1a",
-            border:          "1px solid #444",
-            borderRadius:    "6px",
-            maxHeight:       "220px",
-            overflowY:       "auto",
-            zIndex:          20,
-            boxShadow:       "0 8px 24px rgba(0,0,0,0.4)",
+            position:  "absolute",
+            top:       "calc(100% + 4px)",
+            left:      0,
+            right:     0,
+            padding:   "4px",
+            maxHeight: "220px",
+            overflowY: "auto",
+            zIndex:    20,
           }}
         >
-          {players.map((p) => {
-            const isSelected = p.name === value;
-            return (
-              <div
-                key={p.actorId}
-                onClick={() => { onChange(p.name); setOpen(false); }}
-                style={{
-                  display:         "flex",
-                  alignItems:      "center",
-                  gap:             "8px",
-                  padding:         "7px 10px",
-                  cursor:          "pointer",
-                  backgroundColor: isSelected ? "#2a2a2a" : "transparent",
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "#2a2a2a"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = isSelected ? "#2a2a2a" : "transparent"; }}
-              >
-                <img
-                  src={getPlayerSpecIcon(p.game, p.specId, p.className)}
-                  alt=""
-                  width={20}
-                  height={20}
-                  style={{ borderRadius: "4px", flexShrink: 0 }}
-                  onError={(e) => { e.currentTarget.style.visibility = "hidden"; }}
-                />
-                <span style={{ fontSize: "13px", color: "#e5e7eb", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {p.name}
-                </span>
-              </div>
-            );
-          })}
+          {players.map((p) => (
+            <div
+              key={p.actorId}
+              onClick={() => { onChange(p.name); setOpen(false); }}
+              className={`ck-menu-item${p.name === value ? " ck-menu-item--selected" : ""}`}
+              style={{ gap: "8px", padding: "6px 8px" }}
+            >
+              <img
+                src={getPlayerSpecIcon(p.game, p.specId, p.className)}
+                alt=""
+                width={20}
+                height={20}
+                style={{ borderRadius: "3px", flexShrink: 0 }}
+                onError={(e) => { e.currentTarget.style.visibility = "hidden"; }}
+              />
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {p.name}
+              </span>
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -214,131 +202,71 @@ export default function AddErrorDialog({
   }
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        backgroundColor: "rgba(0,0,0,0.6)",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        zIndex: 1000,
-      }}
+    <Dialog
+      title="Add Error"
+      width="460px"
+      // The body must not clip: the player dropdown overhangs it.
+      bodyStyle={{ overflowY: "visible" }}
+      footer={
+        <>
+          <button className="ck-btn ck-btn--md" onClick={onCancel}>Cancel</button>
+          <button className="ck-btn ck-btn--md ck-btn--primary" onClick={handleAdd} disabled={!canSubmit}>Add</button>
+        </>
+      }
     >
-      <div
-        style={{
-          backgroundColor: "#222",
-          padding: "24px",
-          borderRadius: "10px",
-          width: "440px",
-          color: "white",
-          border: "1px solid #444",
-          boxShadow: "0 12px 32px rgba(0,0,0,0.35)",
-        }}
-      >
-        <h2 style={{ marginTop: 0, marginBottom: "16px", fontSize: "20px" }}>Add Error</h2>
+      {needsPlayer && (
+        <Field label="Player">
+          {players.length === 0 ? (
+            <div style={{ fontSize: "12px", color: "var(--ck-text-3)" }}>
+              No players available on this pull&apos;s roster.
+            </div>
+          ) : (
+            <PlayerSelect players={players} value={playerName} onChange={setPlayerName} />
+          )}
+        </Field>
+      )}
 
-        {needsPlayer && (
-          <div style={{ marginBottom: "14px" }}>
-            <label style={{ display: "block", marginBottom: "4px", fontSize: "13px", color: "#ddd" }}>
-              Player
-            </label>
-            {players.length === 0 ? (
-              <div style={{ fontSize: "12px", color: "#888" }}>
-                No players available on this pull's roster.
-              </div>
-            ) : (
-              <PlayerSelect players={players} value={playerName} onChange={setPlayerName} />
-            )}
-          </div>
-        )}
+      <div style={{ display: "flex", gap: "10px" }}>
+        <Field label="Type" style={{ flex: 1 }}>
+          <select
+            value={severity}
+            onChange={(e) => setSeverity(e.target.value as Severity)}
+            className="ck-select"
+          >
+            {SEVERITIES.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+        </Field>
 
-        <div style={{ marginBottom: "14px", display: "flex", gap: "10px" }}>
-          <div style={{ flex: 1 }}>
-            <label style={{ display: "block", marginBottom: "4px", fontSize: "13px", color: "#ddd" }}>
-              Type
-            </label>
-            <select
-              value={severity}
-              onChange={(e) => setSeverity(e.target.value as Severity)}
-              className="ck-select"
-            >
-              {SEVERITIES.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-          </div>
-
-          <div style={{ width: "120px" }}>
-            <label style={{ display: "block", marginBottom: "4px", fontSize: "13px", color: "#ddd" }}>
-              Timestamp
-            </label>
-            <input
-              value={timeInput}
-              onChange={(e) => setTimeInput(e.target.value)}
-              placeholder="0:00"
-              className="ck-input"
-            />
-          </div>
-        </div>
-
-        <div style={{ marginBottom: "14px" }}>
-          <label style={{ display: "block", marginBottom: "4px", fontSize: "13px", color: "#ddd" }}>
-            Name
-          </label>
+        <Field label="Timestamp" style={{ width: "120px" }}>
           <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Stood in Void Zone"
-            className="ck-input"
+            value={timeInput}
+            onChange={(e) => setTimeInput(e.target.value)}
+            placeholder="0:00"
+            className="ck-input ck-num"
           />
-        </div>
-
-        <div style={{ marginBottom: "20px" }}>
-          <label style={{ display: "block", marginBottom: "4px", fontSize: "13px", color: "#ddd" }}>
-            Note
-          </label>
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Optional details…"
-            rows={3}
-            className="ck-textarea"
-          />
-        </div>
-
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
-          <button
-            onClick={onCancel}
-            style={{
-              backgroundColor: "#2f2f2f",
-              color: "#f3f4f6",
-              border: "1px solid #555",
-              borderRadius: "6px",
-              padding: "8px 14px",
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleAdd}
-            disabled={!canSubmit}
-            style={{
-              backgroundColor: canSubmit ? "#2563eb" : "#1e3a5f",
-              color: canSubmit ? "white" : "#5b7699",
-              border: "none",
-              borderRadius: "6px",
-              padding: "8px 14px",
-              fontWeight: 600,
-              cursor: canSubmit ? "pointer" : "default",
-            }}
-          >
-            Add
-          </button>
-        </div>
+        </Field>
       </div>
-    </div>
+
+      <Field label="Name">
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g. Stood in Void Zone"
+          className="ck-input"
+        />
+      </Field>
+
+      <Field label="Note" style={{ marginBottom: 0 }}>
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Optional details…"
+          rows={3}
+          className="ck-textarea"
+        />
+      </Field>
+    </Dialog>
   );
 }
