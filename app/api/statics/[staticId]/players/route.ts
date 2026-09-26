@@ -7,7 +7,8 @@
 // EVERY pull this identity appeared in (including 0-error ones — see
 // computeStaticReviewPullData's header on why 0-error rows are stored at
 // all), so `errorRatePct` means something once substitutes are in the mix
-// instead of just reflecting "how many pulls had >=1 error."
+// instead of just reflecting "how many pulls had >=1 error." Identities
+// with no pulls at all are left out (see the filter below).
 //
 // Major and Minor counts are reported separately (with `totalErrors` kept
 // as their sum) because the Players panel sorts and rates on Majors alone —
@@ -52,7 +53,11 @@ export async function GET(
     },
   });
 
-  const players = identities.map((identity) => {
+  // Identities with no pulls left (every review they appeared in was removed
+  // from the static) are hidden rather than deleted: resolvePlayerIdentities
+  // matches re-imported names by alias, so if a removed review is added back
+  // the old identity — with any rename/merge — picks its rows up again.
+  const players = identities.filter((identity) => identity.errors.length > 0).map((identity) => {
     let majorErrors = 0;
     let minorErrors = 0;
     const tally = new Map<string, { count: number; game: string; className: string; specId: number | null }>();
