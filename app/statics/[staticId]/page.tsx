@@ -14,6 +14,7 @@ import StaticErrorChart, { type ChartPull } from "@/components/StaticErrorChart"
 import StaticPlayersPanel from "@/components/StaticPlayersPanel";
 import { SeverityIcon, SEVERITY_COLOR } from "@/components/SeverityIcon";
 import BrandBanner from "@/components/BrandBanner";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import { Panel, PanelHeader } from "@/components/ui/Panel";
 
 type StaticInfo = { id: number; name: string; role: "OWNER" | "MEMBER" };
@@ -83,6 +84,8 @@ export default function StaticDashboardPage() {
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [editingReview, setEditingReview] = useState<number | null>(null);
   const [labelDraft, setLabelDraft] = useState("");
+  const [pendingRemove, setPendingRemove] = useState<{ review: ReviewSummary; number: number } | null>(null);
+  const [removeError, setRemoveError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!Number.isInteger(staticId)) return;
@@ -142,6 +145,34 @@ export default function StaticDashboardPage() {
     // separately-fetched pull data in step rather than making the user
     // reload to see the rename take.
     setPulls((prev) => prev?.map((p) => (p.reviewId === reviewId ? { ...p, reviewLabel: label || null } : p)) ?? null);
+  }
+
+  // Detaches one review from this static. The DELETE route cascades to that
+  // review's pulls and per-player error rows only; the saved session itself
+  // and every other review are untouched. Only an owner or the member who
+  // added the review may do it — the route enforces that and its message is
+  // surfaced here.
+  async function removeReview(reviewId: number) {
+    setPendingRemove(null);
+    setRemoveError(null);
+    try {
+      const res = await fetch(`/api/statics/${staticId}/reviews/${reviewId}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setRemoveError(data.error || "Failed to remove session");
+        return;
+      }
+    } catch {
+      setRemoveError("Failed to remove session — check your connection and try again");
+      return;
+    }
+    setReviews((prev) => prev?.filter((r) => r.id !== reviewId) ?? null);
+    setPulls((prev) => prev?.filter((p) => p.reviewId !== reviewId) ?? null);
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      next.delete(reviewId);
+      return next;
+    });
   }
 
   async function saveSummary(pull: ChartPull) {
@@ -207,6 +238,7 @@ export default function StaticDashboardPage() {
         <Panel>
           <PanelHeader title="Sessions" count={sessions ? `(${sessions.length})` : undefined} />
       <div style={{ display: "flex", flexDirection: "column", gap: "8px", padding: "12px" }}>
+        {removeError && <p className="ck-error-text" style={{ margin: "0 2px" }}>{removeError}</p>}
         {sessions == null ? (
           <p className="ck-dialog-text">Loading sessions...</p>
         ) : sessions.length === 0 ? (
@@ -303,17 +335,26 @@ export default function StaticDashboardPage() {
                     )}
                   </div>
 
-                  <span
-                    className="ck-num"
-                    style={{ fontSize: "11px", color: "var(--ck-text-3)", flexShrink: 0 }}
-                    title={
-                      recordedAt
-                        ? "Date the log was recorded"
-                        : "This review predates report-date tracking — resync it from the app to fill this in"
-                    }
-                  >
-                    {recordedAt ? new Date(recordedAt).toLocaleDateString() : "—"}
-                  </span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
+                    <span
+                      className="ck-num"
+                      style={{ fontSize: "11px", color: "var(--ck-text-3)" }}
+                      title={
+                        recordedAt
+                          ? "Date the log was recorded"
+                          : "This review predates report-date tracking — resync it from the app to fill this in"
+                      }
+                    >
+                      {recordedAt ? new Date(recordedAt).toLocaleDateString() : "—"}
+                    </span>
+                    <button
+                      className="ck-btn ck-btn--xs ck-btn--danger"
+                      onClick={() => setPendingRemove({ review: session.review, number: sessionIdx + 1 })}
+                      title="Remove this session from the static"
+                    >
+                      Remove
+                    </button>
+                  </div>
                 </div>
 
                 {isOpen && (
@@ -382,6 +423,20 @@ export default function StaticDashboardPage() {
       </div>
         </Panel>
       </div>
+
+      <ConfirmDialog
+        open={pendingRemove !== null}
+        title="Remove this session?"
+        message={
+          pendingRemove
+            ? `Session ${pendingRemove.number}${pendingRemove.review.label ? ` (${pendingRemove.review.label})` : ""} and its pulls, notes and error counts will be removed from this static. Other sessions are not affected, and the review itself can be added again later.`
+            : undefined
+        }
+        confirmLabel="Remove"
+        cancelLabel="Cancel"
+        onConfirm={() => pendingRemove && removeReview(pendingRemove.review.id)}
+        onCancel={() => setPendingRemove(null)}
+      />
     </div>
   );
 }
