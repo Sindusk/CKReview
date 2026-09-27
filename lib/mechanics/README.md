@@ -39,6 +39,9 @@ lib/mechanics/
       sszorak.ts              — Sszorak per-pull rules (Serpent's Fury/Virulence,
                                 Mutilate groups, Ravage, Tempest, Crosswinds,
                                 Viscous Cysts, Howling Maelstrom)
+      nekzali.ts              — Nek'zali per-pull rules (Vessel revivals, Ritual/
+                                Uncoiled Rage, Pyre soaks, Barrage, pools, Mythic
+                                well Curse/Soul Exhaustion, Invoke silence)
 ```
 
 **Read the header comment of a module before touching it.** Each module's
@@ -67,7 +70,7 @@ can also hold their own declarative rule tables and run them through
 
 **2. Per-pull correlation modules** (forsaken.ts, blackhole.ts, limitcut.ts,
 stompies.ts, exdeath.ts, phase1.ts, midnightfalls.ts, entombed-sentinels.ts,
-vashnik.ts, sszorak.ts) exist because they
+vashnik.ts, sszorak.ts, nekzali.ts) exist because they
 correlate *multiple* event streams — e.g. a stack-counter debuff against a
 specific damage tick, or positions against an assignment schedule. Each
 exports a `detectXErrors(players, deathEvents[, enemyCasts, enemyBuffs, ...])`

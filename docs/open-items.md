@@ -50,6 +50,31 @@ it's resolved. Module headers carry the full context for mechanic items.
     actually wiped them. Keep 5 as the threshold?
   - **Not flagged:** Caustic Claws (no target in the log) and Caustic
     Residue (constant brief contact, one death in 36 pulls). Wanted?
+- **Nek'zali** (report nRGxQ1b8LdMvzC4D; only 6 pulls exist, one a kill; no
+  VOD ground truth yet — most thresholds rest on one or two failures):
+  - **Latent Cultist volume.** Every pool contact is flagged (31 Minors in
+    the kill). Groups of 4+ at once are annotated "pool may have moved onto
+    the group". Keep all, drop single ticks, or drop the group cases?
+  - **Vessel revival blame.** Revivals are player-less: every revived corpse
+    was a first-wave phase 1 Amani, but flames detonated 0.4-10yd from some
+    corpses that still rose, and pulls 3/4 revived only after the fourth
+    Pyre. What actually decides which corpses rise, and who should own it?
+  - **Possession Barrage** blames the targeted tank when the median raid
+    hit is ≥100k (clean 50-68k, one failure at 137k). Is it the tank's
+    distance, or could the raid have been stacked on the path?
+  - **Pyre under-soak** (≤6 soakers) and **uncompleted Curse** are
+    player-less. Is there an assignment (soak group, kick order) that
+    would let them name players?
+  - **Invoke silence** is a Minor per silenced caster (8 in the kill). Keep?
+  - **Well re-entry with Soul Exhaustion** is only flagged when the player
+    died; the kill re-entered with 5-13s left every phase 2 window.
+  - **Unverified rule:** `wow-nek-unscheduled-rite` (Rite outside Ignition/
+    Invoke). Its only firing is 4 +355.3, after the Vessel cutoff — likely a
+    revived Amani reaching the well; not confirmed.
+  - **Not flagged:** Hollowing Strikes stacks (17-18 on the Blood DK in the
+    kill), Swirling Spirit ticks, Grasping Depths/Uncoiling raid damage.
+  - **Tank-death marker** only fires when the pull ends within 30s (5
+    +452.9 lost a tank at 12% and fought 67s more). Right call?
 
 ### Midnight Falls (WoW)
 

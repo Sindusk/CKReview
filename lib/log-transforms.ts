@@ -66,6 +66,7 @@ import { detectMidnightFallsErrors } from "./mechanics/wow/vs-dr-mqd/midnightfal
 import { detectEntombedSentinelsErrors } from "./mechanics/wow/va/entombed-sentinels";
 import { detectVashnikErrors } from "./mechanics/wow/va/vashnik";
 import { detectSszorakErrors } from "./mechanics/wow/va/sszorak";
+import { detectNekzaliErrors } from "./mechanics/wow/va/nekzali";
 
 // Shared shape for both games' ability maps: gameID -> name + raw icon
 // filename (not yet resolved to a URL — that happens per-game via
@@ -547,6 +548,7 @@ export function transformFightToPull(
     ),
     ...detectVashnikErrors(players, deathEvents, enemyCastEvents, data.fight.endTime - data.fight.startTime),
     ...detectSszorakErrors(players, deathEvents, enemyCastEvents, enemyBuffEvents, data.fight.endTime - data.fight.startTime),
+    ...detectNekzaliErrors(players, deathEvents, enemyCastEvents, enemyBuffEvents, data.fight.endTime - data.fight.startTime),
   ].sort((a, b) => a.timestamp - b.timestamp);
 
   const fightDurationMs = data.fight.endTime - data.fight.startTime;
