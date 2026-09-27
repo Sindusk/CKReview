@@ -171,18 +171,6 @@ export type WCLFight = {
 /** WCL `difficulty` of a Mythic raid fight — the only kind static stats import. */
 export const WCL_MYTHIC_DIFFICULTY = 5;
 
-/** WCL `difficulty` of a Mythic+ dungeon run (logged as one 20-30 minute "fight"). */
-export const WCL_MYTHIC_PLUS_DIFFICULTY = 10;
-
-/**
- * Whether the app should load this fight. Mythic+ runs are skipped: no
- * detection exists for dungeons, and each run is several times the size of
- * a raid pull, so they dominated load time in mixed raid + key logs.
- */
-export function isReviewableFight(f: WCLFight): boolean {
-  return f.endTime > f.startTime && f.difficulty !== WCL_MYTHIC_PLUS_DIFFICULTY;
-}
-
 export type WCLActor = {
   id:      number;
   name:    string;
