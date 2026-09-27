@@ -6,11 +6,22 @@ validation harness (`scripts/validate.js`, `expectations/`), see
 
 ## Fetching sample data
 
-- **Fetch command:** `node scripts/fetch-wow-report.js <code-or-URL> [--boss "<name>"] [--fight <id>]...`
+- **Fetch command:** `node scripts/fetch-wow-report.js <code-or-URL> [--boss "<name>"] [--fight <id>]... [--refetch]`
   (or `fetch-ff-report.js`).
 - **Output:** writes `sampledata/{wow,ff}/<code>/meta.json` plus one
   `<Boss>_Pull<N>.json` per fight. Pull numbers match the app's per-boss
   numbering. A pasted full URL works.
+- **Kills first, resumable, rate-limit tolerant** (`scripts/lib/fetch-plan.js`):
+  - Kills download before wipes, so a rate limit never costs the clean
+    baseline. Only the order changes; file names still use the real
+    per-boss pull number (a last-pull kill is still `<Boss>_Pull25.json`).
+  - Pulls already on disk are skipped, so re-running the same command
+    resumes it. Files are written to `.tmp` and renamed, so an existing
+    file is complete. `--refetch` downloads them again.
+  - On a WCL/FFLogs rate limit (including the ~1h IP-level block big
+    reports hit after ~850MB) the script prints the reset time, sleeps
+    until then plus a minute, and retries the same pull. It gives up after
+    four waits. Run long fetches in the background.
 - **Late phases only (FFXIV).** `--min-minutes <n>` fetches only fights
   lasting at least n minutes; `--from-minutes <n>` starts every stream
   except deaths and combatantInfo n minutes into each fight. Ultimate
@@ -34,6 +45,31 @@ validation harness (`scripts/validate.js`, `expectations/`), see
 - **Storage policy.** Reports are disposable, since re-fetching is cheap.
   Before deleting one, make sure anything it uniquely proved is already
   written into code comments or rulings.
+
+## Analyzing a report (`scripts/analyze-report.js`)
+
+The standard investigation recipes for verifying a model or debugging a
+rule, on any fetched report (WoW or FFXIV), read-only:
+`node scripts/analyze-report.js <code> <command> [args] [--pulls 1,3-5] [--kill] [--boss name]`.
+`--help` prints the full reference. Ability arguments take IDs or a name
+regex (`"Caustic Waves"`), and times are seconds from the pull start.
+
+| Command | Answers |
+|---|---|
+| `pulls` | Which pulls exist, which is the kill, how long, how many deaths |
+| `sweep [nameRe]` | Every boss ability ID by stream and event type, with pull and source counts |
+| `timeline <pull>` | The boss clock: casts, casts that never finished (kicks), key enemy buffs, deaths |
+| `deaths [--mark abilities]` | Every pull's deaths with killing blow and tank/healer tag, beside marker casts |
+| `hits <abilities>` | Each resolution of a damage ability: time, hits, players, amounts, deaths |
+| `window <pull> <from> <to> <abilities>` | Everything those abilities did in a time window |
+| `adds <npcRe>` | Each NPC instance's lifecycle: buffs, casts, hits on players |
+| `bursts <debuffs>` | A debuff landing on many players at once (raid penalties, hatches) |
+| `soakers <casts> <debuffs>` | How many players got a debuff at each cast (soak counts via lockout debuffs) |
+| `collapse` | Seconds from the Nth concurrent death to the pull end (the "N dead" threshold) |
+| `players [pull]` | Roster with spec and role |
+
+It loads pulls lazily and keeps three in memory, so narrowing with
+`--pulls` keeps big WoW reports (50MB+ per pull) quick.
 
 ## Script auth (`.credentials/`, gitignored)
 

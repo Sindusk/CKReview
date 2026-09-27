@@ -414,18 +414,60 @@ it's resolved. Module headers carry the full context for mechanic items.
 
 ## Workflow backlog (deferred ideas, in recommended order)
 
-1. **An analysis CLI** (`scripts/analyze-report.js`). It would put the
-   standard investigation recipes behind flags on one script: debuff-burst
-   clustering, ability sweeps, deaths dump, positions around a timestamp.
-   This replaces throwaway analysis scripts.
+1. **A `/build-boss-detection` skill** — see the plan below.
 2. **A reusable "review pull" command/skill.** It would take the user's
    VOD account, run the harness on that pull, propose the narrowest fix,
-   and record the ruling.
+   and record the ruling. Same mechanism as item 1.
 3. **Fixture curation.** Keep the smallest set of reports that exercises
    every rule's known failure modes.
 4. **Baselines for cross-pull strategy output** (Black Hole lanes, kick
    chains) in `expectations/`. Do this only if a regression slips through.
 5. **npm script aliases** (`npm run check`).
+
+### Plan: a `/build-boss-detection` skill
+
+**What a skill is.** A skill is a folder in the repo, `.claude/skills/<name>/`,
+holding a `SKILL.md` file: a short description at the top plus
+instructions in plain Markdown. Claude Code lists every skill's
+description at the start of a session. When the user types `/<name>` (or
+asks for something the description matches), the full instructions load
+into that session and the agent follows them. It is a saved, versioned
+prompt that lives with the code. Committing it means every future session,
+and anyone who clones the repo, gets the same procedure. A skill can also
+ship helper files (checklists, templates) next to `SKILL.md`, which it
+reads only when needed.
+
+**Why it helps here.** Today a new session has to find and read
+CLAUDE.md, lib/mechanics/README.md (~45KB, mostly per-boss lessons),
+the research guide and dev-tooling before it knows the procedure. The
+skill would hold only the procedure, in order, and point to the long docs
+for reference. The kickoff prompt becomes:
+`/build-boss-detection https://www.warcraftlogs.com/reports/<code> <Boss>`.
+
+**Rough implementation:**
+1. Create `.claude/skills/build-boss-detection/SKILL.md` with a description
+   such as "Build per-pull mechanic detection for a new WoW/FFXIV boss from
+   a report URL", and arguments: the report URL and the boss name.
+2. Body: the checklist, each step naming the exact command.
+   - Read the boss module's research header; ask the user whether they have
+     raid assignments or a raid plan (see CLAUDE.md).
+   - Fetch in the background: `fetch-wow-report.js <url> --boss "<Boss>"`.
+   - `analyze-report.js`: `pulls`, `sweep`, `timeline` of the kill, `deaths`,
+     then `hits`/`bursts`/`soakers`/`adds` per mechanic.
+   - Write the VERIFIED section with the wipe survey; build rules using
+     `wow/common.ts` helpers and `pullOverMarker`.
+   - Register in `wow/registry.ts`; `validate.js --check`, then `--update`
+     for the new report; `tsc --noEmit`.
+   - Update the README lessons, the research-guide lessons and open-items;
+     check the diff for player names; commit and push; report cutoffs and
+     questions.
+3. Move the per-boss "Lessons from ..." sections out of the README into a
+   `lessons.md` next to the skill, distilled into a checklist of pitfalls.
+   The skill reads it at the verification step.
+4. Try it on the next boss, then fix whatever step the session stumbled on.
+
+The same pattern fits the backlog's item 2 (`/review-pulls` for a night's
+VOD notes) and a `/research-boss` skill for the model-writing stage.
 
 CI was explicitly rejected: sample data and expectations are local by
 design.

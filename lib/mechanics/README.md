@@ -28,9 +28,13 @@ lib/mechanics/
       blackhole-strategy.ts   — cross-pull strategy auto-detect (DSA/SDA/Double Tether)
       mitigation-*.ts         — mitigation sheet import / detection / review / heatmap
   wow/
-    common.ts                 — shared WoW helpers (debuff windows, playerError,
-                                battle-rez detection, dead-at-time, clustering,
-                                Raid-marker sort offset)
+    registry.ts               — THE list of per-pull WoW modules; the app and
+                                validate.js both run it (a new boss = one line)
+    common.ts                 — shared WoW helpers: WowPullContext, debuff
+                                windows, playerError, battle-rez / dead-at /
+                                alive-at, clustering, hit episodes, raidMarker,
+                                and pullOverMarker (the generic "N dead / tank
+                                died / wipe called" cutoff every boss ends with)
     vs-dr-mqd/                — Voidspire, Dreamrift, March on Quel'Danas
       midnightfalls.ts        — Midnight Falls per-pull rules
       terminate-kicks.ts      — cross-pull Terminate kick-order detection
@@ -92,10 +96,13 @@ can also hold their own declarative rule tables and run them through
 stompies.ts, exdeath.ts, phase1.ts, ultimate-kefka.ts, midnightfalls.ts, entombed-sentinels.ts,
 vashnik.ts, sszorak.ts, nekzali.ts, lost-explorers.ts, twin-fangs.ts, coiled-altar.ts, ulatek.ts) exist because they
 correlate *multiple* event streams — e.g. a stack-counter debuff against a
-specific damage tick, or positions against an assignment schedule. Each
-exports a `detectXErrors(players, deathEvents[, enemyCasts, enemyBuffs, ...])`
-function called from the transform layer in `lib/log-transforms.ts`
-(`transformFFightToPull` for FFXIV, `transformFightToPull` for WoW).
+specific damage tick, or positions against an assignment schedule. FFXIV
+modules export a `detectXErrors(players, deathEvents[, enemyCasts, ...])`
+function called from `transformFFightToPull` in `lib/log-transforms.ts`.
+WoW boss modules export `detectXErrors(ctx: WowPullContext)` (players,
+deaths, enemy casts/buffs/buff removals, friendly-NPC damage, pull length)
+and are listed once in `wow/registry.ts`, which both `transformFightToPull`
+and `scripts/validate.js` iterate.
 
 - **Self-gate on the mechanic's signature debuffs/abilities** so the module
   can run safely on every pull, including pulls that never reach the
@@ -235,22 +242,31 @@ through four stages:
    came first. List any wipe the log can't explain in the header, since the
    user can Call Wipe those.
 4. **Implement, validate, ship, report.** Build the rules (Architecture
-   above; shared WoW helpers are in `wow/common.ts`). Wire the module into
-   `lib/log-transforms.ts` and add a `scripts/validate.js` manifest entry,
-   then pass the regression bar (below). Commit and push. Then tell the user
+   above; shared WoW helpers are in `wow/common.ts` — use `pullOverMarker`
+   for the generic cutoff rather than writing a new one). Register the
+   module with one line in `wow/registry.ts`; that wires it into the app and
+   gives it a `scripts/validate.js` mechanic of the same name. Then pass
+   the regression bar (below). Commit and push. Then tell the user
    what each wipe's cutoff was, and list the attribution calls you were
    unsure of as explicit questions. Their VOD review answers them (principle
    6 above).
 
-Useful event-level recipes during verification:
-- Cluster `applydebuff` events by second to find mechanic-start bursts.
-- Sweep damage by ability ID within the mechanic's window.
-- Group enemy events by `sourceInstance` to separate concurrent copies of
-  one NPC.
-- Trace deaths via `killingAbilityGameID`.
+Useful event-level recipes during verification — most are commands of
+`node scripts/analyze-report.js <code> <command>` (`--help` lists them;
+see docs/dev-tooling.md):
+- `pulls`, `sweep` and `timeline <pull>` first: every ability ID by
+  stream, then the boss's clock (casts that never finished are kicks).
+- `bursts <debuff>` finds mechanic starts and raid-wide penalties.
+- `hits <abilities>` sweeps damage by ability, clustered per resolution.
+- `adds <npc>` separates concurrent copies of one NPC by `sourceInstance`.
+- `deaths` traces deaths via `killingAbilityGameID`; `collapse` sets the
+  "N dead" threshold; `soakers` counts players per cast via a debuff.
+- `window <pull> <from> <to> <abilities>` reads one moment in detail.
 - For a debuff whose removal triggers something, check whether the removal
   was a death: a death within ~300ms of it.
 - Recover positions per the position-semantics table below.
+Write a scratchpad probe only for questions the CLI can't answer, and
+consider adding the recipe to it afterwards.
 
 The same principles apply when refining any module:
 
@@ -287,11 +303,10 @@ The same principles apply when refining any module:
 
 - **Fetch one boss, not the whole report:** pass `--boss "<name>"` to
   the fetch script. Without it every fight in the report is downloaded.
-- **Throwaway analysis scripts go in the session scratchpad,** written
+- **Use `scripts/analyze-report.js` before writing probes.** Anything it
+  can't do goes in a throwaway script in the session scratchpad, written
   with the file-write tool; the user's shell hook blocks heredoc/redirect
-  writes. A small shared loader (meta.json actor/ability maps + a
-  `load(pullN)` returning the report and fight start) keeps each probe
-  to a few lines.
+  writes.
 - **Sweep first, then read.** One pass printing `stream | event type |
   abilityId | name | count | pulls | sources` over every pull maps nearly
   all IDs at once. Then print a per-pull timeline of the boss's casts,
@@ -386,9 +401,8 @@ The same principles apply when refining any module:
 
 - **Big pulls hit the WCL rate limit.** Coiled Altar pulls are 10-52MB
   each; the fetch was blocked (429, "IP-level", ~19 min) after 17 of 30.
-  Fetch the kill FIRST (`--fight <id>` with the kill's WCL fight id from
-  meta.json), then the wipes, so a rate limit never costs the baseline.
-  `--fight` keeps the per-boss pull numbering in file names.
+  The fetch scripts now download kills first and wait out rate limits on
+  their own (see docs/dev-tooling.md).
 - **Without a kill, calibrate against the wipes' clean stretches.** Every
   wipe has minutes of correct play before it fails. Normal Venom Rupture
   ticks (worst 615k) vs eruptions (848k+ median) came from comparing the
@@ -427,11 +441,9 @@ The same principles apply when refining any module:
 
 ### Lessons from Ula'tek (20 wipes + the kill of one 25-pull report)
 
-- **Restart a running fetch to get the kill first.** The kill was the last
-  pull. Stopping the fetch after pull 1 and re-running `--fight <killId>`,
-  then the wipes, cost one pull; the IP-level 429 came after ~850MB (pull
-  21), so the kill would otherwise have been lost. Queue the remaining
-  pulls as one background command that sleeps out the block.
+- **The kill was the last pull and the 429 came after ~850MB** (pull 21 of
+  25). That is why the fetch scripts now download kills first, skip pulls
+  already on disk, and sleep through a rate limit instead of exiting.
 - **Hidden object state shows up as a raid-wide burst.** An egg hatching
   has no event of its own: Putrid Membrane lands on 16-20 players in the
   same second. Cluster those bursts, then read what happened to a
