@@ -263,6 +263,44 @@ The same principles apply when refining any module:
    run it all, one pull's log usually exercises several mechanics; pass a
    mechanic name and/or report folder to narrow), and `npx tsc --noEmit`.
 
+### Lessons from building new bosses (Sszorak, Nek'zali)
+
+- **Fetch one boss, not the whole report:** pass `--boss "<name>"` to
+  the fetch script. Without it every fight in the report is downloaded.
+- **Throwaway analysis scripts go in the session scratchpad,** written
+  with the file-write tool; the user's shell hook blocks heredoc/redirect
+  writes. A small shared loader (meta.json actor/ability maps + a
+  `load(pullN)` returning the report and fight start) keeps each probe
+  to a few lines.
+- **Sweep first, then read.** One pass printing `stream | event type |
+  abilityId | name | count | pulls | sources` over every pull maps nearly
+  all IDs at once. Then print a per-pull timeline of the boss's casts,
+  boss buffs and deaths; the fight's fixed timings usually fall out of it.
+- **Split scripted from failed occurrences before blaming.** The same
+  spell can be expected in one context and a mistake in another (Soulcoil
+  Rite from Ignition/Invoke vs. from an add leak). Classify every
+  occurrence by its scripted window first; only the remainder is a rule.
+- **Check the kill before calling a guide's "dangerous" state an error.**
+  Nek'zali's well team re-entered with Soul Exhaustion every phase 2
+  window of the kill, and the tank ran 17-18 Hollowing stacks. When the
+  kill does it routinely, gate on the outcome (a death), not the state.
+- **Measure enrages from the phase start across pulls.** An identical
+  offset in every pull (183.4s) means a timer-driven check, not a
+  resource the raid can influence; phrase the Raid error accordingly.
+- **After an enrage buff, drop per-player errors.** Once the boss
+  one-shots everything, pools and hits are enrage fallout. The Raid
+  marker still counts as the cutoff, even on a kill.
+- **Tune the generic tank-death marker per boss.** Some fights carry on
+  with one tank (Nek'zali pull 5 fought 67s more); gate on whether the
+  pull actually ended soon after.
+- **With few pulls, annotate instead of exempting.** When a heuristic
+  might excuse a player but only one or two pulls support it, add the
+  context to the description (e.g. "4 others stepped into pools within
+  3s") and list the question in docs/open-items.md.
+- **No character names in committed code or docs.** The repo is public;
+  refer to players by pull + offset and role/spec in headers and
+  comments. Names belong only in the gitignored `expectations/`.
+
 ---
 
 ## Data-shape knowledge (read before designing any new check)
@@ -342,6 +380,21 @@ event's TARGET — never the source:
 - **Shared ability IDs cross encounters.** The arena-edge Deadly Venom
   (1297338) rims more than one Venomous Abyss arena, so every module must
   self-gate on its own encounter's signature before running any rule.
+- **Raw enemy casts carry the caster's resources.** Besides x/y, each raw
+  enemy `cast` has `classResources` (boss energy/rage, e.g. Nek'zali's
+  type 3 energy), `hitPoints`/`maxHitPoints` and `facing`. Sampling them
+  across a pull recovers the boss's energy curve and HP% at any cast —
+  that is how Nek'zali's "no passive energy in phase 1" and "Uncoiled Rage
+  at exactly phase 2 +183.4s" were found. `EnemyEvent` exposes only
+  `hitPoints` (FFXIV); add fields when a rule needs them.
+- **Instance numbers are reused.** A new spawn takes a freed instance
+  number, so an instance casting its spawn ability a second time is NOT
+  proof of a revival. Confirm with a companion event at the same instant
+  (Nek'zali: Gravebound Advance + Vessel of Awakening, same millisecond).
+- **Add deaths without enemy HP.** Sampled `damageDone` has no
+  `targetInstance` or target HP, so an add's death time isn't directly
+  visible. When the add has an on-death spell (Corpse Blight), its damage
+  events' `sourceInstance` + timestamp give each copy's death.
 
 ### Coordinates, angles, and timestamps
 

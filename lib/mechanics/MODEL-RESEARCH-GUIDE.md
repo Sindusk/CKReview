@@ -183,6 +183,46 @@ made the source carrier identifiable.
 including when they appear. Vashnik's edge venom only ever showed up once
 the raid had called a wipe.
 
+## Lessons from Nek'zali
+
+Where the Nek'zali model and its log (nRGxQ1b8LdMvzC4D) disagreed, the gap
+was usually one of these. Cover them explicitly in future models.
+
+- **Say how a resource moves, per phase.** The model said energy "rises
+  passively throughout". The log showed no passive gain in phase 1 (only
+  +5 per scripted Rite), a reset at phase 2, then passive gain. For every
+  energy/rage bar, give the gain per phase, what resets it, and whether the
+  resulting enrage lands at a fixed time or depends on raid play.
+- **Give every intermission its failure outcome.** What happens when the
+  timer runs out before the objective (here: the Ritual finished, the boss
+  came out at 100 energy, and the pull ended)? Guides tend to omit this,
+  and it is exactly the Raid error detection must mark.
+- **Separate "dangerous" from "routine".** Guides warned about re-entering
+  the well with Soul Exhaustion; the kill did it every window with a few
+  seconds left. Say how the raid actually uses a risky state in practice,
+  and what turns it into a failure (here: dying with it, not having it).
+- **Treat "also hurts nearby players" claims as open questions.**
+  Cremation was described as damaging allies near the carrier; in six
+  pulls it hit only its own carrier. List such side effects under open
+  questions rather than as failure modes.
+- **Describe add lifecycles end to end.** For each add: spawn cadence and
+  count per wave, spawn locations, the spell it casts on spawn, any
+  on-death spell (e.g. Corpse Blight) and any revival and its signal.
+  Detection uses the on-death spell to time deaths and the spawn cast to
+  spot revivals. If the guides say *which* corpses revive (age, location,
+  phase), say so; it could not be recovered from the log.
+- **Name both ends of beams and lines.** Soul Transfer ran from the active
+  Echo to the well and one-shot anyone in between. Knowing the endpoints is
+  what makes a line hit attributable.
+- **For distance-scaled damage, name who controls the distance.**
+  Possession Barrage hits the raid harder the shorter its path to the
+  targeted tank; the model should say whose positioning sets that path.
+- **Give interrupt casts' cast time and the completion result.** The
+  Drowned Echo's Curse took ~10s and mind-controlled the well team 7.5s
+  after it completed. Cast time and consequence decide severity.
+
+## General guidance
+
 **Leave implementation to the detection stage.** Instructions such as "do
 not hard-code X" or "correlate Y with Z" belong in the open-questions list
 as questions, not scattered through the model. What the model is uniquely
