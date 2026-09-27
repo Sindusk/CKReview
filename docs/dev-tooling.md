@@ -11,6 +11,12 @@ validation harness (`scripts/validate.js`, `expectations/`), see
 - **Output:** writes `sampledata/{wow,ff}/<code>/meta.json` plus one
   `<Boss>_Pull<N>.json` per fight. Pull numbers match the app's per-boss
   numbering. A pasted full URL works.
+- **Late phases only (FFXIV).** `--min-minutes <n>` fetches only fights
+  lasting at least n minutes; `--from-minutes <n>` starts every stream
+  except deaths and combatantInfo n minutes into each fight. Ultimate
+  Kefka used `--min-minutes 15 --from-minutes 14` (~1MB per pull instead
+  of 5-7MB). `validate.js` detects these captures and runs only
+  `lateCapture` mechanics on them.
 - **Same queries as the app.** The scripts reuse `lib/wcl-client.ts` /
   `lib/ffl-client.ts` unchanged, loaded under Node by
   `scripts/lib/require-ts.js`, so their queries can't drift from the app's.

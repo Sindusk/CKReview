@@ -192,4 +192,11 @@ export type EnemyEvent = {
   // to know how low the boss's HP was when a specific cast landed.
   hitPoints?:    number;
   maxHitPoints?: number;
+  // FFXIV casts only: which copy of the caster fired (matches the
+  // `sourceInstance` on the player damage it caused) and the caster's own
+  // position. Lets a module tie each hit to its cast, e.g. one Celestriad
+  // tower or one Holy circle (ultimate-kefka.ts).
+  sourceInstance?: number;
+  x?:              number;
+  y?:              number;
 };

@@ -210,6 +210,9 @@ function buildFFEnemyCastEvents(rep, actorMap, abilityMap) {
       abilityName: (abilityMap?.get(e.abilityGameID)) ?? ('Ability ' + e.abilityGameID),
       hitPoints: e.sourceResources?.hitPoints,
       maxHitPoints: e.sourceResources?.maxHitPoints,
+      sourceInstance: e.sourceInstance,
+      x: e.sourceResources?.x,
+      y: e.sourceResources?.y,
     }));
 }
 

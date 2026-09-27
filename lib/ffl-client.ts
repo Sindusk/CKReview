@@ -714,18 +714,22 @@ export async function fetchFFightData(
   fight:      FFLFight,
   actors:     FFLActor[],
   logLabel?:  string,      // e.g. from buildFFFightLogLabels — tags console dumps
-  skipConsoleDump = false  // true for callers (e.g. scripts/fetch-ff-report.js) that
+  skipConsoleDump = false, // true for callers (e.g. scripts/fetch-ff-report.js) that
                             // persist the result themselves
+  eventsFrom?: number       // sample scripts only: absolute report-ms where the bulky
+                            // streams start. deaths/combatantInfo still start at
+                            // fight.startTime, so fight-relative offsets still hold.
 ): Promise<FFLFightData> {
   const endTime = fight.endTime;
   const label   = logLabel ?? `${fight.name ?? "Unknown Fight"} (fight ${fight.id})`;
+  const from    = Math.max(fight.startTime, eventsFrom ?? fight.startTime);
 
   const cursors: Record<StreamKey, number> = {
-    deaths: fight.startTime, combatantInfo: fight.startTime, casts: fight.startTime,
-    damageDone: fight.startTime, damageTaken: fight.startTime, healing: fight.startTime,
-    debuffs: fight.startTime, enemyCasts: fight.startTime, enemyBuffs: fight.startTime,
-    enemyDamageTaken: fight.startTime, enemyDebuffs: fight.startTime,
-    headMarkers: fight.startTime,
+    deaths: fight.startTime, combatantInfo: fight.startTime, casts: from,
+    damageDone: from, damageTaken: from, healing: from,
+    debuffs: from, enemyCasts: from, enemyBuffs: from,
+    enemyDamageTaken: from, enemyDebuffs: from,
+    headMarkers: from,
   };
   const done: Record<StreamKey, boolean> = {
     deaths: false, combatantInfo: false, casts: false, damageDone: false,

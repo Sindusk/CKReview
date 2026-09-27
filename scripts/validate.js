@@ -249,6 +249,15 @@ const MECHANICS = {
     },
   },
 
+  'ultimate-kefka': {
+    game: 'ff',
+    lateCapture: true, // Phase 5 only — safe on --from-minutes captures (see isLateCapture)
+    load: () => requireTsFromRoot('lib/mechanics/ffxiv/dancingmad/ultimate-kefka.ts'),
+    run({ mod, ctxs }) {
+      for (const c of ctxs) printPullErrors(c, mod.detectUltimateKefkaErrors(c.relPlayers(), c.relDeaths(), c.relEnemyCasts()));
+    },
+  },
+
   stompies: {
     game: 'ff',
     load: () => requireTsFromRoot('lib/mechanics/ffxiv/dancingmad/stompies.ts'),
@@ -640,6 +649,19 @@ function readSnapshot(game, code) {
 // --update: replace the snapshot's entries for the mechanics that ran,
 // keeping entries of mechanics that didn't (so narrowed runs don't wipe the
 // rest of the file).
+// True when every pull's damage stream starts 5+ minutes after its
+// combatantinfo events (the pull start) — a `fetch-ff-report.js
+// --from-minutes` capture. Detected from the data so captures never need
+// hand-editing.
+function isLateCapture(pulls) {
+  const LATE_MS = 5 * 60000;
+  return pulls.length > 0 && pulls.every((p) => {
+    const start = Math.min(...(p.rep.combatantInfo?.data ?? []).map((e) => e.timestamp));
+    const firstHit = (p.rep.damageTaken?.data ?? [])[0]?.timestamp;
+    return Number.isFinite(start) && firstHit !== undefined && firstHit - start >= LATE_MS;
+  });
+}
+
 function writeSnapshot(game, code, mechsRun, entries) {
   const existing = readSnapshot(game, code);
   const kept = (existing?.errors ?? []).filter((e) => !mechsRun.includes(e.mechanic));
@@ -866,10 +888,17 @@ function gamesOfDir(dir) {
       console.log(`${meta.title ?? meta.code} (${dir})`);
       console.log(`  ${pulls.length} pull(s)`);
 
+      // A capture fetched with --from-minutes has deaths from the pull start
+      // but every other stream only from late in the pull. Early-phase
+      // mechanics would misread it, so only `lateCapture` mechanics run.
+      const late = game === 'ff' && isLateCapture(pulls);
+      const dirMechs = late ? mechs.filter((n) => MECHANICS[n].lateCapture) : mechs;
+      if (late) console.log(`  late-start capture: running only ${dirMechs.join(', ') || '(none)'}`);
+
       const ctxs = game === 'ff' ? pulls.map((p) => makeFFPullCtx(p, actorMap, abilityMap, getFFJobByName)) : null;
 
       currentEntries = [];
-      for (const name of mechs) {
+      for (const name of dirMechs) {
         console.log('~'.repeat(70));
         console.log(`~ mechanic: ${name}`);
         currentMechanic = name;
@@ -880,7 +909,7 @@ function gamesOfDir(dir) {
       const code = meta.code ?? path.basename(dir);
 
       if (mode === 'update') {
-        writeSnapshot(game, code, mechs, entries);
+        writeSnapshot(game, code, dirMechs, entries);
       } else if (mode === 'check') {
         console.log('~'.repeat(70));
         const snapshot = readSnapshot(game, code);
@@ -889,7 +918,7 @@ function gamesOfDir(dir) {
           failures.push(`${game}-${code}: no baseline`);
         } else {
           // Narrowed runs only compare the mechanics that actually ran.
-          const baseline = snapshot.errors.filter((e) => mechs.includes(e.mechanic));
+          const baseline = snapshot.errors.filter((e) => dirMechs.includes(e.mechanic));
           const diff = diffEntries(baseline, entries);
           const total = diff.added.length + diff.removed.length + diff.changed.length;
           if (total === 0) {
@@ -899,7 +928,7 @@ function gamesOfDir(dir) {
             printDiff(diff);
             failures.push(`${game}-${code}: ${total} snapshot difference(s)`);
           }
-          const violations = checkRulings(rulings, code, mechs, entries);
+          const violations = checkRulings(rulings, code, dirMechs, entries);
           for (const v of violations) {
             const where = [v.ruling.mechanic, v.ruling.boss, v.ruling.pull !== undefined ? `Pull ${v.ruling.pull}` : null].filter(Boolean).join(' ');
             if (v.kind === 'mustFlag') {

@@ -164,6 +164,15 @@ export const ERROR_RULES: PullErrorRule[] = [
       47807,   // The River of Light
       47836,   // All Things Ending (Exdeath)
       47837,   // All Things Ending (Chaos)
+      // Phase 5: ultimate-kefka.ts owns these with mechanic-specific errors.
+      // Stardust is the party-wide penalty for an unsoaked Celestriad tower.
+      49769,   // Flood (line)
+      47946,   // Quake
+      47947,   // Tornado
+      47933,   // Stray Apocalypse
+      47942,   // Stardust Fire III
+      47943,   // Stardust Blizzard III
+      47944,   // Stardust Thunder III
     ],
   },
 

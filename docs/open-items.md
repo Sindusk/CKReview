@@ -174,7 +174,10 @@ it's resolved. Module headers carry the full context for mechanic items.
     unmodeled.
 - **Exdeath:**
   - **Thunder III marking two non-tanks** is a distinct, unexplained
-    failure.
+    failure. It may be Phase 5's Lightning Resistance Down II, which shares
+    ID 1002998 and goes to two players at once. exdeath.ts now ignores
+    marks whose cause isn't Thunder III (47884), so recheck whether the
+    observation survives.
   - The Warrior/Gunbreaker mitigation name lists are empty.
   - Shockwave role-stack markers are unmodeled.
 - **Stompies:**
@@ -182,6 +185,64 @@ it's resolved. Module headers carry the full context for mechanic items.
   - The drop-time offsets are single-pull estimates.
   - Bait-too-close is unfixable on report PM8HY9nJ7kTR4tdQ pull 3: the
     puddle positions are duplicated and grid-snapped.
+- **Phase 5 / Ultimate Kefka (`ultimate-kefka.ts`)**: first pass built
+  2026-09-27 from 12 reports (29 pulls reach Phase 5, no kill; no VOD
+  ground truth yet). Pulls are cited as `<first 4 chars of the report
+  code>#<pull>` with offsets from Ultima Repeater #1's begincast; the
+  module header maps the prefixes to full codes and has the full evidence.
+  - **VOD review — please verify:**
+    - **Third tank Fell Forces after Orchestra 2 (+145).** The tank who
+      invulned for Surprise Holy soloed it and died (KZXy#7, ZADQ#3, ZADQ#5,
+      dQ8w#2), where pulls that shared it survived. The rule flags the other
+      tank for not joining. Is that the owner, or was the invuln used too
+      early? ZADQ#1 the Paladin died at the second volley (+142.6) with
+      Hallowed Ground already gone; q4K9#9 the Dark Knight soloed the first
+      volley while the Paladin used no invuln. Both flag the absent tank.
+    - **Enmity at Orchestra 1** (1Vxz#7, bpAx#5): the Viper got a Flare
+      while both tanks lived. The rule blames the tank without a Surprise
+      aura (the Dark Knight). Tank stance off, or the Viper's enmity?
+    - **On-time Flare Diffusion hits** (1Vxz#5 Black Mage, 2aVk#4 White
+      Mage, q4K9#9 Sage, 3kzF#2 Dragoon): each victim stood 20-26y from the
+      carrier, who was ~19y from center. The victim is flagged. Did they
+      stand too close, or did the carrier go to the wrong edge?
+    - **n3Td#17**: the Surprise Flare Paladin died with no killing ability
+      at ~20.6y from center, and Diffusion wiped the party. Arena edge?
+    - **Missed towers** flag the living player(s) who soaked nothing when a
+      tower was left solo or empty (ZADQ#7, KZXy#7, q4K9#3, rWVf#16,
+      KZXy#10: three idle players for three missing slots). Right owners?
+    - **Group errors name nobody:** Flood lines q4K9#7 (5 caught, Raid) and
+      1Vxz#7 (3 caught, 2 dead, Minor); Quake 2aVk#4 (5, Raid); Tornado
+      rWVf#16 (3, Minor). Group movement, or someone leading it wrong?
+    - **Missed role stacks:** healers split after Repeater 2 (rWVf#16 +91.8,
+      q4K9#3 +91.8/+95.0, ZADQ#11 +139.0), a DPS out at NW9t#4 +95.0. Real
+      mistakes, or a deliberate spread?
+    - **Holy overlap** fires only with three living eligible baiters.
+      1Vxz#5 Orchestra 1 was skipped because the Bard was mid-raise. Right?
+    - **Severity:** every Stray Apocalypse hit is Major, because it applies
+      Damage Down (40 in 29 pulls), matching the generic Damage Down rule.
+      Keep that, or make survived hits Minor?
+    - **Collapse marker at 4 dead** (17 of 29 cutoffs). No pull recovered
+      from 4 mid-phase. Right threshold?
+    - **Not flagged:** deaths to Ultima Repeater (rWVf#16, PQVa#15, NW9t#7,
+      ZADQ#7, all at Repeater 2), to Forsaken Bonds/pulses with everyone in
+      the stack (e.g. ZADQ#1 +186), and tank deaths to shared Fell Forces
+      after Repeater 2. Want healing or mitigation errors for these?
+  - **Model research:** lessons for the next model are in
+    MODEL-RESEARCH-GUIDE.md ("Lessons from Ultimate Kefka").
+  - **Implementation notes:**
+    - The module anchors on Ultima Repeater's completed cast; every P5 ID
+      is unique to the phase.
+    - `EnemyEvent` gained optional `sourceInstance`/`x`/`y` (FFXIV casts)
+      to tie each tower or Holy circle to its hits.
+    - Flood lines, Quake, Tornado, Stray Apocalypse and Stardust are
+      excluded from the generic `ffxiv-damage-down` rule; the module owns
+      them.
+    - Fallout gates assume the observed strategy (tanks hold both Surprise
+      auras; the Holy tank solos under an invuln). A group that plays it
+      differently may need a declared-strategy override.
+    - **Not built:** a missed Chaotic Flood / Forsaken Bonds stack (never
+      observed), Forsaken bait placement (no signal), Stray Entropy overlap
+      (built but never fired).
 - **Roles (`ffxiv/roles.ts`):**
   - M1 vs M2 has no signal and is always tentative.
   - MT/OT misses on very short or anomalous-opening pulls.

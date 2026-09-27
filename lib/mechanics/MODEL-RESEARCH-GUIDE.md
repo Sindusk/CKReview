@@ -263,6 +263,45 @@ Where the Lost Explorers model and its logs (nRGxQ1b8LdMvzC4D,
   full health and no killing blow logged. Knowing this signature up front
   saves a round of misattributed tank-death and collapse markers.
 
+## Lessons from Ultimate Kefka (Dancing Mad Phase 5)
+
+The model was checked against 29 Phase 5 pulls from 12 reports (see
+ultimate-kefka.ts's VERIFIED section). Its timeline, volley counts and
+nine tower positions were right, and every candidate ID mapped. Those IDs
+came from a local report's ability table, which is worth repeating. Where
+it fell short:
+
+- **Check what "stack" means.** The model called Fell Forces fixed
+  per-victim damage and read "role stacks" as positioning only. In the log
+  it is a split stack: every member of the role group takes the hit and the
+  damage divides (a lone DPS took ~4x the normal share). When a guide says
+  "stack" or "fixed damage", say whether the damage divides, and mark the
+  claim unverified if no source shows numbers.
+- **Say what a delayed effect does when its carrier dies.** Surprise Flare
+  goes off early on the carrier's death, and that early Flare Diffusion
+  kills the whole party. The model left this as an open question; it
+  turned out to be the most common way Orchestra ended a pull. For any
+  debuff that resolves on expiry, ask what death, dispel or leaving range
+  does, and give the guides' answer if they have one.
+- **Name the penalty for an unsoaked tower.** An empty Celestriad tower
+  casts Stardust Fire/Blizzard/Thunder III on the whole party with a 180s
+  Damage Down, and a solo soak takes ~1.2M. Both are what detection keys
+  on; give the penalty's name and scope when guides mention it.
+- **Record the common tank strategy.** Both statics solo the tank Fell
+  Forces under an invulnerability after each Orchestra and share the third
+  volley after Orchestra 2. Knowing the standard plan up front separates a
+  strategy from a mistake.
+- **Don't infer meaning from paired cast IDs.** Catastrophic Choice's two
+  IDs mark the first and second cast, not earth vs wind; the resolving
+  Quake/Tornado names the element.
+- **List status IDs that earlier phases already use.** Lightning Resistance
+  Down II shares 1002998 with Exdeath's Thunder III mark, and the older
+  module misfired on it. A later-phase model should note any reused ID.
+- **Mark which failure signals were seen in a log.** Several failure modes
+  (split Chaotic Flood / Forsaken Bonds stacks, Stray Entropy overlap)
+  never happened in 29 pulls. Saying "guide-inferred, not observed" per
+  failure lets detection skip or deprioritize them.
+
 ## General guidance
 
 **Leave implementation to the detection stage.** Instructions such as "do

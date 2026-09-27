@@ -62,6 +62,7 @@ import { detectStompiesErrors } from "./mechanics/ffxiv/dancingmad/stompies";
 import { detectPhase1Errors } from "./mechanics/ffxiv/dancingmad/phase1";
 import { detectKefkaSaysErrors } from "./mechanics/ffxiv/dancingmad/kefka-says";
 import type { KefkaSaysStateSignal } from "./mechanics/ffxiv/dancingmad/kefka-says";
+import { detectUltimateKefkaErrors } from "./mechanics/ffxiv/dancingmad/ultimate-kefka";
 import { detectMidnightFallsErrors } from "./mechanics/wow/vs-dr-mqd/midnightfalls";
 import { detectEntombedSentinelsErrors } from "./mechanics/wow/va/entombed-sentinels";
 import { detectVashnikErrors } from "./mechanics/wow/va/vashnik";
@@ -952,6 +953,9 @@ function fflBuildEnemyCastEvents(
       abilityIcon:  fflAbilityIcon(e, abilityMap),
       hitPoints:    e.sourceResources?.hitPoints,
       maxHitPoints: e.sourceResources?.maxHitPoints,
+      sourceInstance: e.sourceInstance,
+      x:            e.sourceResources?.x,
+      y:            e.sourceResources?.y,
     }));
 }
 
@@ -1233,6 +1237,7 @@ export function transformFFightToPull(
     ...detectStompiesErrors(players, deathEvents, enemyCastEvents, blackHoleGeometry, stompiesPuddleSamples, playerPositionSamples),
     ...detectPhase1Errors(players, deathEvents, enemyCastEvents),
     ...detectKefkaSaysErrors(players, deathEvents, enemyCastEvents, kefkaSaysSignals),
+    ...detectUltimateKefkaErrors(players, deathEvents, enemyCastEvents),
   ].sort((a, b) => a.timestamp - b.timestamp);
 
   const fightDurationMs = data.fight.endTime - data.fight.startTime;

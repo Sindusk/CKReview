@@ -22,6 +22,9 @@ lib/mechanics/
       blackhole.ts            — tether/Earthquake mechanic
       stompies.ts             — post-Black-Hole Earthquake baits/towers
       exdeath.ts              — Phase 3 Thunder III / Shockwave
+      ultimate-kefka.ts       — Phase 5 per-pull rules (Flood, Fell Forces stacks,
+                                Maddening Orchestra, Celestriad towers, Stray
+                                Apocalypse, Forsaken ground, Null enrage, collapse)
       blackhole-strategy.ts   — cross-pull strategy auto-detect (DSA/SDA/Double Tether)
       mitigation-*.ts         — mitigation sheet import / detection / review / heatmap
   wow/
@@ -73,7 +76,7 @@ can also hold their own declarative rule tables and run them through
 `evaluateRuleSet()` (midnightfalls.ts does this).
 
 **2. Per-pull correlation modules** (forsaken.ts, blackhole.ts, limitcut.ts,
-stompies.ts, exdeath.ts, phase1.ts, midnightfalls.ts, entombed-sentinels.ts,
+stompies.ts, exdeath.ts, phase1.ts, ultimate-kefka.ts, midnightfalls.ts, entombed-sentinels.ts,
 vashnik.ts, sszorak.ts, nekzali.ts, lost-explorers.ts) exist because they
 correlate *multiple* event streams — e.g. a stack-counter debuff against a
 specific damage tick, or positions against an assignment schedule. Each
@@ -333,6 +336,32 @@ The same principles apply when refining any module:
   fish is a player cast; its time relative to Final Ascension's completion
   is the whole story (in time, late, or never), so the late case names the
   thrower and the no-fish case stays player-less.
+
+### Lessons from Ultimate Kefka (a late phase, 29 pulls, no kill)
+
+- **Fetch only the late part.** `fetch-ff-report.js --min-minutes 15
+  --from-minutes 14` skips short pulls and starts the bulky streams 14
+  minutes in, cutting each capture to ~1MB. Deaths and combatantInfo stay
+  whole, so offsets hold. `validate.js` detects such a capture and runs
+  only mechanics marked `lateCapture` on it; early-phase rules would read
+  deaths without their damage and misfire.
+- **Status IDs are reused across phases.** Celestriad's Lightning
+  Resistance Down II is the same ID (1002998) as Exdeath's Thunder III
+  mark, which made exdeath.ts flag both tanks in Phase 5. Sweep a new
+  phase's IDs against the older modules; the debuff's cause ID
+  (`causeAbilityId`) usually tells the two apart.
+- **FFLogs death events land ~2.0s after the fatal hit.** Use the hit, not
+  the death event, when deciding who was alive at a mechanic.
+- **A later death proves an unseen raise.** With a late-start capture, a
+  raise can fall outside the data; don't leave the player dead forever.
+- **Gate on "the slots didn't shift" before judging a bait.** One tank
+  death moves Flare onto a non-tank; one dead DPS moves Holy onto the
+  tanks; a dead role group's Fell Forces retargets onto another group.
+  Every such case in the sample was fallout, so the rules check that both
+  tanks hold the auras and that enough baiters were alive first.
+- **Test a guide's "stack" or "fixed damage" claim against the damage.**
+  Fell Forces looked like fixed per-victim damage in the guides but split
+  across the group in the log (a lone DPS took 4x the normal hit).
 
 ---
 

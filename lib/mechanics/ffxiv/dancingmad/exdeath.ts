@@ -113,6 +113,11 @@ function detectThunderIIIErrors(players: PlayerInfo[]): PullError[] {
   for (const player of players) {
     for (const d of player.debuffs) {
       if (d.abilityId !== THUNDER_III_MARK_ABILITY_ID || d.debuffStatus !== "applied") continue;
+      // 1002998 is also Phase 5's Lightning Resistance Down II (Celestriad
+      // hands it to two players at once, cause-less or caused by a Thunder
+      // III tower 47941). Every real Exdeath mark carries cause 47884 (609/609
+      // across all captures, 2026-09-27).
+      if (d.causeAbilityId !== THUNDER_III_DAMAGE_ABILITY_ID) continue;
       marks.push({ player, timestamp: d.timestamp });
     }
   }
