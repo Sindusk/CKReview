@@ -58,6 +58,10 @@ lib/mechanics/
                                 eruptions, Guillotine soaks, Dreadmarch / ghosts /
                                 Malevolent Resonance, Soulcoiler Wails and shields,
                                 Nightfall, Spirit Erasure, frontals, avoidables)
+      ulatek.ts               — Ula'tek per-pull rules (egg hatches and their
+                                carrier, Caustic Waves, Spectral Coil soaks,
+                                Serpent's Bite / Calcified Corpse, Volatile Purge,
+                                Mother's Wrath, Blight Vein, add casts, enrage)
 ```
 
 **Read the header comment of a module before touching it.** Each module's
@@ -86,7 +90,7 @@ can also hold their own declarative rule tables and run them through
 
 **2. Per-pull correlation modules** (forsaken.ts, blackhole.ts, limitcut.ts,
 stompies.ts, exdeath.ts, phase1.ts, ultimate-kefka.ts, midnightfalls.ts, entombed-sentinels.ts,
-vashnik.ts, sszorak.ts, nekzali.ts, lost-explorers.ts, twin-fangs.ts, coiled-altar.ts) exist because they
+vashnik.ts, sszorak.ts, nekzali.ts, lost-explorers.ts, twin-fangs.ts, coiled-altar.ts, ulatek.ts) exist because they
 correlate *multiple* event streams — e.g. a stack-counter debuff against a
 specific damage tick, or positions against an assignment schedule. Each
 exports a `detectXErrors(players, deathEvents[, enemyCasts, enemyBuffs, ...])`
@@ -420,6 +424,48 @@ The same principles apply when refining any module:
   soak and frontal rules unless the player died.
 - **Shared helpers moved to `wow/common.ts`:** `clusterByGap` and `deadAt`
   (from twin-fangs.ts) are now exported for every WoW module.
+
+### Lessons from Ula'tek (20 wipes + the kill of one 25-pull report)
+
+- **Restart a running fetch to get the kill first.** The kill was the last
+  pull. Stopping the fetch after pull 1 and re-running `--fight <killId>`,
+  then the wipes, cost one pull; the IP-level 429 came after ~850MB (pull
+  21), so the kill would otherwise have been lost. Queue the remaining
+  pulls as one background command that sleeps out the block.
+- **Hidden object state shows up as a raid-wide burst.** An egg hatching
+  has no event of its own: Putrid Membrane lands on 16-20 players in the
+  same second. Cluster those bursts, then read what happened to a
+  carrier's debuff at that millisecond: removed at a Caustic Waves hit,
+  removed with a Noxious Splash on two carriers, or removed at the
+  carrier's death. Only the first two blame anyone.
+- **A lockout debuff counts the soakers.** Spectral Coils damage all 20
+  players the same way, so the damage can't tell who mitigated. Soul
+  Constrictor (the "you just soaked" lockout) is applied to each mitigator
+  at the impact millisecond. Look for the lockout before trying positions.
+- **Companion debuffs at the mark turn a soak into arithmetic.** Ingested
+  Venom lands on every Serpent's Bite helper at the Bite's own millisecond
+  (one application per target they stand by). Counting helpers showed the
+  requirement: 4 cleared it at 14s, 5 at 11s, 3 calcified.
+- **"Applied" includes refreshes.** `refreshdebuff` maps to
+  `debuffStatus: "applied"`. Count distinct players, not events, for
+  anything that can refresh (Membrane, Ingested Venom).
+- **Countdown buffs change ID at the enrage.** A Rawling's Boiling Venom
+  1313758 is removed at death *or* at ~25s, when 1313757 replaces it in the
+  same millisecond. A removal is only a death without the successor.
+- **Count repeats when the first occurrence is routine.** Both Shriekers
+  cast Acidic Expulsion once in every stage-3 pull, the kill included.
+  Tracking casts per `sourceInstance` and flagging the second one kept the
+  kill clean and still caught the P2 wipe.
+- **Count by outcome, not by egg GUID.** Egg actors reuse instance numbers
+  across waves and stages. Rawling spawns at each Coil impact (6 + 2 per
+  stage-1 pair, 8 per intermission) account for every egg without tracking
+  each one.
+- **Gate the head-count marker on the pull ending.** 7 dead ended every
+  pull within 28s except one, where 13 players fought on for 90s in stage
+  3. The collapse marker now also needs the pull to end within 45s.
+- **Journal counts can be off by one.** Toxic Incubation logged 5 hits per
+  interceptor, not the journal's four shots; Stage 2 had four Doomscale
+  Eggs and four Weakened Doomscales, not one per side.
 
 ### Lessons from Ultimate Kefka (a late phase, 29 pulls, no kill)
 

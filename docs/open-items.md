@@ -216,6 +216,60 @@ it's resolved. Module headers carry the full context for mechanic items.
   - **Soulbound** (the survivor's berserk) was never reached in pulls
     1-17; no rule yet.
 
+- **Ula'tek** (report JZp82Rm7TzycM94a, 25 pulls with the kill in pull 25;
+  first pass built from pulls 1-20 and the kill; no VOD ground truth yet —
+  each wipe's cutoff is in the module header's wipe survey):
+  - **Fetch pulls 21-24** if the queued retry after the rate limit didn't
+    land (`node scripts/fetch-wow-report.js JZp82Rm7TzycM94a --fight 25
+    --fight 26 --fight 27 --fight 28`), then `--check` and `--update`.
+  - **Egg carriers in Caustic Waves.** Every stage-1 wipe except P7 began
+    with Ula'tek's +113 waves hitting a second-wave egg carrier at +117-129
+    (P1 +121.3, P6 +117.2, P10 +118.9/+122.6, P15 +121.0/+128.9). The
+    carrier is blamed (Major, plus a Raid marker). Was it the carrier's
+    movement, or the carriers' assigned spot / the wave's aim?
+  - **Noxious Splash** blames both carriers (P1 +132.5, P10 +128.0). Or only
+    the one who walked into the other?
+  - **Hatches with no one to blame** are player-less Minors: a carrier
+    dying with the egg (P8 +342.5/+344.5 to Coils, P14 +244.1 to Noxious
+    Shell), a Slithering Clutch reaching the venom (P3 +413.9). P19 +379.9
+    had no carrier event at all, at the stage-3 platform break, and is that
+    pull's Raid cutoff. What hatched there?
+  - **Caustic Waves volume:** 122 flags in 21 pulls, ~46 of them on the two
+    tanks, 4 in the kill (3 on tanks). Are tank hits avoidable, and should
+    a hit that didn't kill stay Minor?
+  - **Spectral Coils** are player-less: ≤3 mitigators (clean impacts had
+    5-10) is Minor, 3+ Coil deaths in one impact is Raid. P11 +355.1 had 5
+    mitigators and still lost 6. Is there a soak-group assignment that would
+    let detection name who was missing?
+  - **Calcified Corpse** is a player-less Raid naming the Bite targets and
+    helpers (P5 +585.7: 3 helpers, 4 needed). Should the missing fourth
+    helper's group be named? P3 +570.0: a player died to Necrotic Vapors
+    just as the Bite went out and calcified — their death, or the Bite?
+  - **Volatile Purge deaths** are Major on the helper (the kill lost one at
+    +421.8; also P3, P12, P17, P18). Each took ~1.0-1.2M alone. A missing
+    defensive, or expected? Tanks overlapping purges isn't flagged (the kill
+    did it too).
+  - **Shrieker's second Acidic Expulsion** is the P2 cutoff (+551.3, 3
+    dead). Both Shriekers' first cast (~+519) is routine and not flagged.
+    Rawling Expulsions (P2, P4, P8, P16) are player-less Minors.
+  - **Mother's Wrath on the raid:** P12 +540.2 (both tanks dead) and P19
+    +387.2 (both tanks alive, the raid collapsing). Right as player-less?
+  - **Blight Vein (P16 +220.6):** two tethered players died to Grasping
+    Fangs (Major each) and the last tether broke 6s after the rest (6
+    stacks, 12 dead). Should the late breaker be named?
+  - **Falling Debris** flags every hit, including tanks (2 in the kill).
+    Do tanks take debris on purpose?
+  - **Fester Burst** flags players when 3+ are hit by one cast (P18 +70.6:
+    9). The kill had one player hit per cast. Right threshold?
+  - **Not flagged:** Necrotic Vapors, Mephitic Thrash, Noxious Shell
+    ticks, Warden's Protection, Poisonous Bite, Toxic Burn, Blight Vein ≤5
+    stacks, Weakened Doomscale death spread (2.1s in the kill, up to 11s in
+    wipes; Revenge had no visible effect), Unchecked Rage, non-lethal
+    Deadly Venom. Wanted?
+  - **Never observed:** Mother's Boon (unintercepted Incubation), Mass
+    Gestation and Rattler Slam have no rule. A completed Hatching Doom
+    (Ravenous Doomscale) is flagged by `wow-ula-add-cast` but never fired.
+
 ### Midnight Falls (WoW)
 
 - **Resume point.** VOD review of report Dn87j4ARzNwYqLvV should resume at

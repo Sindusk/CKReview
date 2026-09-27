@@ -390,6 +390,49 @@ fell short:
   fragment. When a mechanic's actor is invisible, say so, so detection
   plans for a player-less rule.
 
+## Lessons from Ula'tek
+
+The model was checked against JZp82Rm7TzycM94a (20 wipes + the kill); see
+ulatek.ts's VERIFIED section. Its hotfix notes were right (8 eggs per
+stage-1 wave, 12 per side in stage 2, the 5s Soul Constrictor), its phase
+order held, and most cast IDs matched. Where it fell short:
+
+- **Give the soak requirement as a number, and how helpers are counted.**
+  The model said the Serpent's Bite threshold "needs log validation". The
+  log answered it: 4 helpers per Bite (3 calcified every target). Guides
+  often state it ("4 soakers per bite"); copy it. Also say *when* the soak
+  is taken: here helpers were counted at the Bite's first millisecond, not
+  over its 15s.
+- **Name the lockout or "recently soaked" debuff for every soak.** Soul
+  Constrictor turned out to be the only record of who mitigated a Coil. For
+  any soak, rotation or intercept, give the name of the debuff it leaves.
+- **Separate "minimum damage" thresholds from pass/fail ones.** Blizzard's
+  "40% of the raid for minimum damage" read like a requirement of 8. The
+  raid ran intermission Coils with 5-8 and no deaths; failures were 0-3.
+  Say whether missing a threshold scales the damage or triggers a penalty.
+- **Give add counts per side, not per stage.** Stage 2 had four Doomscale
+  Eggs and four Weakened Doomscales (two per side), where the model implied
+  one per side.
+- **Say which "failure" signals are routine.** Both Shriekers cast Acidic
+  Expulsion once in every pull that reached stage 3, the kill included, and
+  11 Rawlings enraged in the kill without consequence. If a guide's plan
+  accepts an add enrage or a first cast, say so; otherwise detection flags
+  the kill.
+- **Say what happens when a marked player dies.** A Serpent's Bite target
+  dying calcified at once and wiped the raid; one player died just as the
+  Bite went out and still calcified. For every mark, give the death case.
+- **Give the hard enrage time.** Fury Unleashed landed at +608.8 in all
+  three pulls that reached it; the kill ended at +598.6.
+- **Mark mechanics no pull ever triggered.** Mother's Boon, Hatching Doom
+  (Ravenous Doomscale / Dread Roar), Mass Gestation and Rattler Slam never
+  appeared in 21 pulls; Noxious Splash only twice. Label a failure
+  "guide-inferred" when no source shows it happening, so detection knows it
+  may be dormant.
+- **Describe the dangerous overlap by clock.** Every stage-1 wipe came
+  from Ula'tek's +113 Caustic Waves reaching the second wave's egg
+  carriers at +117-129. When two mechanics collide at a fixed time, give
+  that time; it is where the pulls end.
+
 ## General guidance
 
 **Leave implementation to the detection stage.** Instructions such as "do

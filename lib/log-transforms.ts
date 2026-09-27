@@ -71,6 +71,7 @@ import { detectNekzaliErrors } from "./mechanics/wow/va/nekzali";
 import { detectLostExplorersErrors } from "./mechanics/wow/va/lost-explorers";
 import { detectTwinFangsErrors } from "./mechanics/wow/va/twin-fangs";
 import { detectCoiledAltarErrors } from "./mechanics/wow/va/coiled-altar";
+import { detectUlatekErrors } from "./mechanics/wow/va/ulatek";
 
 // Shared shape for both games' ability maps: gameID -> name + raw icon
 // filename (not yet resolved to a URL — that happens per-game via
@@ -562,6 +563,11 @@ export function transformFightToPull(
     ...detectTwinFangsErrors(players, deathEvents, enemyCastEvents, enemyBuffEvents, data.fight.endTime - data.fight.startTime),
     ...detectCoiledAltarErrors(
       players, deathEvents, enemyCastEvents, enemyBuffEvents,
+      wclBuildEnemyBuffRemovalEvents(data.enemyBuffEvents ?? [], actorMap, abilityMap, fightStart),
+      data.fight.endTime - data.fight.startTime
+    ),
+    ...detectUlatekErrors(
+      players, deathEvents, enemyCastEvents,
       wclBuildEnemyBuffRemovalEvents(data.enemyBuffEvents ?? [], actorMap, abilityMap, fightStart),
       data.fight.endTime - data.fight.startTime
     ),
