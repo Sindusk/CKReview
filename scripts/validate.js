@@ -572,6 +572,26 @@ const MECHANICS = {
     },
   },
 
+  'coiled-altar': {
+    game: 'wow',
+    load: () => ({
+      ...requireTsFromRoot('lib/mechanics/wow/va/coiled-altar.ts'),
+      ...requireTsFromRoot('lib/spec-data.ts'),
+    }),
+    run({ mod, pulls, actorMap, abilityMap }) {
+      for (const { bossName, pullNumber, rep } of pulls) {
+        const { players, deaths, enemyCasts, enemyBuffs, enemyBuffRemovals } = buildWowPull(rep, actorMap, abilityMap, mod.getSpecInfo);
+        const errors = mod.detectCoiledAltarErrors(players, deaths, enemyCasts, enemyBuffs, enemyBuffRemovals, fightDurationMs(rep));
+        console.log('='.repeat(70));
+        console.log(`${bossName} Pull ${pullNumber} ->`, errors.length, 'errors');
+        for (const e of errors) {
+          console.log(`  [${e.severity}] [${e.ruleId}] t=+${(e.timestamp / 1000).toFixed(1)}s ${e.player ?? '(raid)'}: ${e.description}`);
+        }
+        recordErrors(bossName, pullNumber, errors);
+      }
+    },
+  },
+
   mitigation: {
     game: 'ff',
     // Goes through the real pipeline (sample-report-store + log-transforms'

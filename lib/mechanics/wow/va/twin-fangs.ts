@@ -382,6 +382,7 @@ import type { PullError, EnemyEvent } from "@/types/PullError";
 import { suppressDuplicateRaidErrors } from "../../../error-detection";
 import {
   RAID_MARKER_SORT_OFFSET_MS, kFmt, sec, joinNames, playerError, rezzedAt, lastPlayerEventMs,
+  clusterByGap, deadAt,
 } from "../common";
 
 // ─── Ability IDs (log-verified, reports 6Jnq8ycwgkYZpHND + xKP1M6gwC8WpnrBc) ─
@@ -477,32 +478,6 @@ const TANK_DEATH_END_MS = 30000;
 const WRATH_MIN_SURVIVAL_MS = 5000;
 
 // ─── Small helpers ───────────────────────────────────────────────────────────
-
-/** Split time-sorted items wherever consecutive items are more than `gapMs` apart. */
-function clusterByGap<T>(items: T[], at: (x: T) => number, gapMs: number): T[][] {
-  const groups: T[][] = [];
-  let lastT = -Infinity;
-  for (const x of [...items].sort((a, b) => at(a) - at(b))) {
-    if (at(x) - lastT > gapMs || groups.length === 0) groups.push([x]);
-    else groups[groups.length - 1].push(x);
-    lastT = at(x);
-  }
-  return groups;
-}
-
-/** Players dead at `t`, net of battle-rezzes. */
-function deadAt(players: PlayerInfo[], deaths: DeathEvent[], t: number): DeathEvent[] {
-  const byName = new Map(players.map((p) => [p.name, p]));
-  const sorted = [...deaths].sort((a, b) => a.timestamp - b.timestamp);
-  return sorted.filter((d) => {
-    if (d.timestamp > t) return false;
-    const next = sorted.find((o) => o.player === d.player && o.timestamp > d.timestamp)?.timestamp ?? Infinity;
-    if (next <= t) return false; // a later death supersedes this one
-    const p = byName.get(d.player);
-    const rez = p ? rezzedAt(p, d.timestamp, next) : undefined;
-    return rez === undefined || rez > t;
-  });
-}
 
 const died = (d: DeathEvent | undefined, from: number) =>
   !d ? "" : d.timestamp - from < 100 ? " and died to it" : ` and died ${sec(d.timestamp - from)}s later`;

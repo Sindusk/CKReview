@@ -70,6 +70,7 @@ import { detectSszorakErrors } from "./mechanics/wow/va/sszorak";
 import { detectNekzaliErrors } from "./mechanics/wow/va/nekzali";
 import { detectLostExplorersErrors } from "./mechanics/wow/va/lost-explorers";
 import { detectTwinFangsErrors } from "./mechanics/wow/va/twin-fangs";
+import { detectCoiledAltarErrors } from "./mechanics/wow/va/coiled-altar";
 
 // Shared shape for both games' ability maps: gameID -> name + raw icon
 // filename (not yet resolved to a URL — that happens per-game via
@@ -379,6 +380,9 @@ function wclBuildEnemyBuffEvents(
       abilityId:   e.abilityGameID ?? 0,
       abilityName: wclAbilityName(e, abilityMap),
       abilityIcon: wclAbilityIcon(e, abilityMap),
+      // For a buff, the "instance" is the buffed NPC's (e.g. which Spiteful
+      // Soulcoiler holds Spirit Shield — coiled-altar.ts).
+      sourceInstance: e.targetInstance,
     }));
 }
 
@@ -401,6 +405,7 @@ function wclBuildEnemyBuffRemovalEvents(
       abilityId:   e.abilityGameID ?? 0,
       abilityName: wclAbilityName(e, abilityMap),
       abilityIcon: wclAbilityIcon(e, abilityMap),
+      sourceInstance: e.targetInstance,
     }));
 }
 
@@ -555,6 +560,11 @@ export function transformFightToPull(
     ...detectNekzaliErrors(players, deathEvents, enemyCastEvents, enemyBuffEvents, data.fight.endTime - data.fight.startTime),
     ...detectLostExplorersErrors(players, deathEvents, enemyCastEvents, enemyBuffEvents, data.fight.endTime - data.fight.startTime),
     ...detectTwinFangsErrors(players, deathEvents, enemyCastEvents, enemyBuffEvents, data.fight.endTime - data.fight.startTime),
+    ...detectCoiledAltarErrors(
+      players, deathEvents, enemyCastEvents, enemyBuffEvents,
+      wclBuildEnemyBuffRemovalEvents(data.enemyBuffEvents ?? [], actorMap, abilityMap, fightStart),
+      data.fight.endTime - data.fight.startTime
+    ),
   ].sort((a, b) => a.timestamp - b.timestamp);
 
   const fightDurationMs = data.fight.endTime - data.fight.startTime;

@@ -347,6 +347,49 @@ up. Where it fell short:
   "tanks may alternate"; knowing the norm is what lets detection name the
   tank whose turn it was.
 
+## Lessons from The Coiled Altar
+
+The model was checked against wThYvpJkbK6Pjrdc pulls 1-17 (wipes only;
+see coiled-altar.ts's VERIFIED section). Its patch-sensitivity notes, stage
+structure and failure list were strong, and most cast IDs matched. Where it
+fell short:
+
+- **Mechanics in the journal may not exist in the current Mythic.** Tainted
+  Blood, the Virulent Cyst and Caustic Secretion never appeared in 17
+  pulls. When a guide's Mythic-only branch isn't confirmed by a recent
+  log, video or boss-mod timer, mark it "journal only, unconfirmed".
+- **Describe collisions by who touches what.** The fight's most common
+  stage-1 wipe was a purple orb touching another orb (two purple carriers
+  meeting; a carrier grabbing a purple). Say which combinations explode
+  (carrier + carrier, carrier + grounded orb, purple + normal, purple +
+  purple) and the damage scale; that is what separates a collision from a
+  planned Sever clear.
+- **Say what a phase overrun does.** If the boss isn't pushed before the
+  next scripted cast (here a fifth Toxic Deluge at +172, which detonated
+  the leftover Mutations and killed the raid), that is a soft enrage.
+  Give the timing of the first cast that would fall after a normal push.
+- **Name every way a player can die without a killing blow.** Walking off
+  the platform under Dreadmarch, falling while feared by Wail of Terror,
+  and a called wipe all log a death with no ability. List the edges and
+  forced-movement effects so detection can tell a fall from a reset.
+- **Describe cascades.** When a ghost's player dies, the ghost refixates on
+  someone new, who may already be touching another ghost (Malevolent
+  Resonance killed 7 in a row that way). Say where a dead player's
+  personal add, fixate or debuff goes next.
+- **Give add waves as counts and a clock.** Two Soulcoilers per
+  Spiritcackle, five waves in stage 2 at fixed offsets, a 10s Wail, 2
+  Spirit Shield stacks each, 4 Gloombombs per cast. Counts like these are
+  what let detection say "this add kept its shield" or "this Wail was
+  never kicked".
+- **Name the interrupt's log shape if guides mention it.** A kicked Wail
+  shows as a separate "Wail of Terror" cast (1308011, the relocation)
+  before the next begincast. Relocation, teleport or reset effects on a
+  kick are the only way to see a kick land on an add nobody logs casts on.
+- **Say whether intercepts are visible.** The intermission's fragment
+  intercepts hit the whole raid; nothing records who stepped on the
+  fragment. When a mechanic's actor is invisible, say so, so detection
+  plans for a player-less rule.
+
 ## General guidance
 
 **Leave implementation to the detection stage.** Instructions such as "do

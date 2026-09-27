@@ -123,6 +123,7 @@ function buildWowPull(rep, actorMap, abilityMap, getSpecInfo) {
     actorName: actorMap.get(e.targetID)?.name || `NPC${e.targetID}`,
     abilityId: e.abilityGameID ?? 0,
     abilityName: abilityName(e.abilityGameID ?? 0),
+    sourceInstance: e.targetInstance,
   }));
 
   // "removebuff" twin of enemyBuffs — mirrors wclBuildEnemyBuffRemovalEvents.
@@ -132,6 +133,7 @@ function buildWowPull(rep, actorMap, abilityMap, getSpecInfo) {
     actorName: actorMap.get(e.targetID)?.name || `NPC${e.targetID}`,
     abilityId: e.abilityGameID ?? 0,
     abilityName: abilityName(e.abilityGameID ?? 0),
+    sourceInstance: e.targetInstance,
   }));
 
   // Damage on friendly NPCs (Dusk Crystal Dimming ticks) — mirrors

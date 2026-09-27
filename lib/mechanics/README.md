@@ -29,7 +29,8 @@ lib/mechanics/
       mitigation-*.ts         — mitigation sheet import / detection / review / heatmap
   wow/
     common.ts                 — shared WoW helpers (debuff windows, playerError,
-                                battle-rez detection, Raid-marker sort offset)
+                                battle-rez detection, dead-at-time, clustering,
+                                Raid-marker sort offset)
     vs-dr-mqd/                — Voidspire, Dreamrift, March on Quel'Danas
       midnightfalls.ts        — Midnight Falls per-pull rules
       terminate-kicks.ts      — cross-pull Terminate kick-order detection
@@ -53,6 +54,10 @@ lib/mechanics/
                                 and soft enrage, globule bursts/pickups, Feast
                                 bites, Visceral Burst kicks, Stone Breaker soaks,
                                 Tainted Burst, avoidables)
+      coiled-altar.ts         — The Coiled Altar per-pull rules (Venom orb
+                                eruptions, Guillotine soaks, Dreadmarch / ghosts /
+                                Malevolent Resonance, Soulcoiler Wails and shields,
+                                Nightfall, Spirit Erasure, frontals, avoidables)
 ```
 
 **Read the header comment of a module before touching it.** Each module's
@@ -81,7 +86,7 @@ can also hold their own declarative rule tables and run them through
 
 **2. Per-pull correlation modules** (forsaken.ts, blackhole.ts, limitcut.ts,
 stompies.ts, exdeath.ts, phase1.ts, ultimate-kefka.ts, midnightfalls.ts, entombed-sentinels.ts,
-vashnik.ts, sszorak.ts, nekzali.ts, lost-explorers.ts, twin-fangs.ts) exist because they
+vashnik.ts, sszorak.ts, nekzali.ts, lost-explorers.ts, twin-fangs.ts, coiled-altar.ts) exist because they
 correlate *multiple* event streams — e.g. a stack-counter debuff against a
 specific damage tick, or positions against an assignment schedule. Each
 exports a `detectXErrors(players, deathEvents[, enemyCasts, enemyBuffs, ...])`
@@ -373,6 +378,49 @@ The same principles apply when refining any module:
   9 Congealed Gore episodes; they're flagged Minor and listed as volume
   questions rather than silently dropped.
 
+### Lessons from The Coiled Altar (17 of 30 pulls, no kill fetched)
+
+- **Big pulls hit the WCL rate limit.** Coiled Altar pulls are 10-52MB
+  each; the fetch was blocked (429, "IP-level", ~19 min) after 17 of 30.
+  Fetch the kill FIRST (`--fight <id>` with the kill's WCL fight id from
+  meta.json), then the wipes, so a rate limit never costs the baseline.
+  `--fight` keeps the per-boss pull numbering in file names.
+- **Without a kill, calibrate against the wipes' clean stretches.** Every
+  wipe has minutes of correct play before it fails. Normal Venom Rupture
+  ticks (worst 615k) vs eruptions (848k+ median) came from comparing the
+  same ability inside and outside the failure moments across 17 pulls.
+- **Invisible objects leave player-side traces.** The orbs have actor
+  entries but no events. Pickups are carrier debuffs; clears are Rupture
+  stacks at the Sever millisecond (one stack per orb); a collision is a
+  carrier debuff that starts or ends early within 0.4s before a huge hit.
+- **"Who caused it" can be the player whose own debuff ended at that
+  instant.** A ghost reaching its player shows only as an off-cycle
+  Dreadmarch (no Malacrass cast in the last 1.5s) at the same millisecond
+  that player's Unnerving Fixation ends.
+- **Deaths with no killing blow have several meanings here.** A Dreadmarch
+  walk-off (debuff removed with the absorb unbroken, death at that
+  instant), a called wipe (4+ within 10s), and feared players falling.
+  Classify falls before counting a called wipe.
+- **Scope escalations to the failure's own aftermath.** A completed Wail
+  preceded later, unrelated mechanic wipes; counting every death in the
+  next 15s made it the cutoff wrongly. Count deaths only up to the next
+  mechanic Raid, and require the pull to end soon after (35s).
+- **Cascades need an "inherited" exemption.** A player who dies to
+  Malevolent Resonance passes their ghost to someone new, often already
+  touching another ghost. Treat an episode that starts within 1.5s of a
+  fixate taken from a dying player as fallout, and merge a player's
+  back-to-back contacts into one episode so the exemption covers them.
+- **Multi-spawn adds need instance numbers on buffs too.** Enemy buff
+  events now carry `sourceInstance` (from WCL's `targetInstance`, the
+  buffed NPC's copy), in both the live builders and the harness, so each
+  Soulcoiler's Spirit Shield and death can be tracked. WCL logs some add
+  applybuffs twice; dedupe by instance.
+- **Immunity soaks are strategy.** The second Guillotine always included
+  two previously-marked players taking 0 damage. Skip zero-damage hits on
+  soak and frontal rules unless the player died.
+- **Shared helpers moved to `wow/common.ts`:** `clusterByGap` and `deadAt`
+  (from twin-fangs.ts) are now exported for every WoW module.
+
 ### Lessons from Ultimate Kefka (a late phase, 29 pulls, no kill)
 
 - **Fetch only the late part.** `fetch-ff-report.js --min-minutes 15
@@ -463,7 +511,8 @@ event's TARGET — never the source:
   completed `cast` events only; a `begincast` that never completes is
   invisible. That is what makes "the cast completed" a failure signal
   (Vashnik's Malignance). `enemyBuffs` is `applybuff` only; removals are a
-  separate stream (`wclBuildEnemyBuffRemovalEvents`). Raw enemy cast events
+  separate stream (`wclBuildEnemyBuffRemovalEvents`). Both buff streams
+  carry `sourceInstance` = the buffed NPC's instance. Raw enemy cast events
   also carry the caster's x/y, but `EnemyEvent` doesn't expose it yet. Add
   it when a rule needs an object's position.
 - **Debuff stack counts** arrive on `applydebuffstack` as

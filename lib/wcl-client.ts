@@ -305,6 +305,7 @@ export type WCLBuffEvent = {
   type:          "applybuff" | "removebuff" | "applybuffstack";
   sourceID:      number;
   targetID:      number;
+  targetInstance?: number; // which copy of the buffed NPC (multi-spawn adds)
   abilityGameID: number;
   ability?: {
     name: string;

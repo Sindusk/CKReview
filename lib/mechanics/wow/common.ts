@@ -67,6 +67,32 @@ export function rezzedAt(p: PlayerInfo, deathT: number, nextDeathT: number): num
   return t;
 }
 
+/** Split time-sorted items wherever consecutive items are more than `gapMs` apart. */
+export function clusterByGap<T>(items: T[], at: (x: T) => number, gapMs: number): T[][] {
+  const groups: T[][] = [];
+  let lastT = -Infinity;
+  for (const x of [...items].sort((a, b) => at(a) - at(b))) {
+    if (at(x) - lastT > gapMs || groups.length === 0) groups.push([x]);
+    else groups[groups.length - 1].push(x);
+    lastT = at(x);
+  }
+  return groups;
+}
+
+/** Players dead at `t`, net of battle-rezzes. */
+export function deadAt(players: PlayerInfo[], deaths: DeathEvent[], t: number): DeathEvent[] {
+  const byName = new Map(players.map((p) => [p.name, p]));
+  const sorted = [...deaths].sort((a, b) => a.timestamp - b.timestamp);
+  return sorted.filter((d) => {
+    if (d.timestamp > t) return false;
+    const next = sorted.find((o) => o.player === d.player && o.timestamp > d.timestamp)?.timestamp ?? Infinity;
+    if (next <= t) return false; // a later death supersedes this one
+    const p = byName.get(d.player);
+    const rez = p ? rezzedAt(p, d.timestamp, next) : undefined;
+    return rez === undefined || rez > t;
+  });
+}
+
 /** Last event timestamp across every player — a fallback pull length. */
 export function lastPlayerEventMs(players: PlayerInfo[]): number {
   return players.reduce((m, p) =>
