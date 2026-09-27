@@ -22,6 +22,10 @@
 //   --from-minutes <n> Start the bulky event streams n minutes into each fight.
 //                      deaths/combatantInfo stay whole, so offsets still hold.
 //                      Saves API points when only a late phase matters.
+//   --refetch        Download pulls again even if their file already exists
+//
+// Kills are downloaded first, pulls already on disk are skipped, and a rate
+// limit is waited out rather than ending the run — see scripts/lib/fetch-plan.js.
 //
 // Example:
 //   node scripts/fetch-ff-report.js AbCd1234EfGh5678 --boss "Kefka"
@@ -31,9 +35,10 @@ const path = require('path');
 const { requireTsFromRoot, ROOT } = require('./lib/require-ts');
 const { createNodeLogAuth } = require('./lib/node-log-auth');
 const { slimFflReport } = require('./lib/slim-report');
+const { killsFirst, withRateLimitWait, writeAtomic } = require('./lib/fetch-plan');
 
 function parseArgs(argv) {
-  const args = { fights: [], out: null, boss: null, creds: null, minMinutes: 0, fromMinutes: 0 };
+  const args = { fights: [], out: null, boss: null, creds: null, minMinutes: 0, fromMinutes: 0, refetch: false };
   let reportCode = null;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -43,12 +48,14 @@ function parseArgs(argv) {
     else if (a === '--creds') args.creds = argv[++i];
     else if (a === '--min-minutes') args.minMinutes = Number(argv[++i]);
     else if (a === '--from-minutes') args.fromMinutes = Number(argv[++i]);
+    else if (a === '--refetch') args.refetch = true;
     else if (!reportCode) reportCode = a;
     else throw new Error(`Unrecognized argument: ${a}`);
   }
   if (!reportCode) {
     throw new Error(
-      'Usage: node scripts/fetch-ff-report.js <reportCode> [--out dir] [--fight id]... [--boss name] [--creds path]'
+      'Usage: node scripts/fetch-ff-report.js <reportCode> [--out dir] [--fight id]... [--boss name] [--creds path] ' +
+      '[--min-minutes n] [--from-minutes n] [--refetch]'
     );
   }
   return { reportCode: extractReportCode(reportCode), ...args };
@@ -64,7 +71,7 @@ function extractReportCode(input) {
 }
 
 async function main() {
-  const { reportCode, out, fights, boss, creds, minMinutes, fromMinutes } = parseArgs(process.argv.slice(2));
+  const { reportCode, out, fights, boss, creds, minMinutes, fromMinutes, refetch } = parseArgs(process.argv.slice(2));
   const outDir    = out   ? path.resolve(out)   : path.join(ROOT, 'sampledata', 'ff', reportCode);
   const credsPath = creds ? path.resolve(creds) : path.join(ROOT, '.credentials', 'ffl-token.json');
 
@@ -86,7 +93,7 @@ async function main() {
   fs.mkdirSync(outDir, { recursive: true });
 
   console.log(`Fetching report ${reportCode}...`);
-  const report = await fflClient.fetchFFReport(reportCode);
+  const report = await withRateLimitWait(() => fflClient.fetchFFReport(reportCode), 'the report');
 
   fs.writeFileSync(
     path.join(outDir, 'meta.json'),
@@ -94,7 +101,7 @@ async function main() {
   );
   console.log(`  wrote meta.json (${report.fights.length} fights, ${report.masterData.actors.length} actors)`);
 
-  let targetFights = report.fights.filter((f) => f.endTime > f.startTime);
+  let targetFights = killsFirst(report.fights.filter((f) => f.endTime > f.startTime));
   if (fights.length > 0) targetFights = targetFights.filter((f) => fights.includes(f.id));
   if (boss) targetFights = targetFights.filter((f) => (f.name ?? '').toLowerCase().includes(boss.toLowerCase()));
   if (minMinutes > 0) targetFights = targetFights.filter((f) => f.endTime - f.startTime >= minMinutes * 60000);
@@ -108,10 +115,24 @@ async function main() {
 
   for (const fight of targetFights) {
     const label = labels.get(fight.id) ?? `${fight.name ?? 'Unknown Fight'} (fight ${fight.id})`;
-    process.stdout.write(`Fetching ${label}... `);
+    const pullNumberMatch = label.match(/Pull (\d+)$/);
+    const pullSuffix = pullNumberMatch ? `Pull${pullNumberMatch[1]}` : `Fight${fight.id}`;
+    const fileName = `${sanitizeForFilename(fight.name ?? 'UnknownFight')}_${pullSuffix}.json`;
+    const filePath = path.join(outDir, fileName);
+    if (!refetch && fs.existsSync(filePath)) {
+      console.log(`Skipping ${label}${fight.kill ? ' (kill)' : ''}: ${fileName} already exists`);
+      continue;
+    }
+    process.stdout.write(`Fetching ${label}${fight.kill ? ' (kill)' : ''}... `);
 
-    const data = await fflClient.fetchFFightData(reportCode, fight, report.masterData.actors, label, true /* skipConsoleDump */,
-      fromMinutes > 0 ? fight.startTime + fromMinutes * 60000 : undefined);
+    const { data, interrupts } = await withRateLimitWait(async () => {
+      const d = await fflClient.fetchFFightData(reportCode, fight, report.masterData.actors, label, true /* skipConsoleDump */,
+        fromMinutes > 0 ? fight.startTime + fromMinutes * 60000 : undefined);
+      // FFLogs "Interrupts" tab — see lib/ffl-client.ts's fetchFFInterruptsTable
+      // header comment (pure aggregate, not per-kick detail). Not run through
+      // slimFflReport (unknown key, already small/aggregate).
+      return { data: d, interrupts: fromMinutes > 0 ? null : await fflClient.fetchFFInterruptsTable(reportCode, fight) };
+    }, label);
 
     const slim = slimFflReport({
       deaths:        { data: data.deathEvents },
@@ -128,17 +149,7 @@ async function main() {
       headMarkers:   { data: data.headMarkerEvents },
     });
 
-    // FFLogs "Interrupts" tab — see lib/ffl-client.ts's fetchFFInterruptsTable
-    // header comment (pure aggregate, not per-kick detail). Not run through
-    // slimFflReport (unknown key, already small/aggregate).
-    const interrupts = fromMinutes > 0 ? null : await fflClient.fetchFFInterruptsTable(reportCode, fight);
-
-    const pullNumberMatch = label.match(/Pull (\d+)$/);
-    const pullSuffix = pullNumberMatch ? `Pull${pullNumberMatch[1]}` : `Fight${fight.id}`;
-    const fileName = `${sanitizeForFilename(fight.name ?? 'UnknownFight')}_${pullSuffix}.json`;
-    const filePath = path.join(outDir, fileName);
-
-    fs.writeFileSync(filePath, JSON.stringify({
+    writeAtomic(filePath, JSON.stringify({
       query:     null,
       variables: { code: reportCode, fightIDs: [fight.id] },
       json:      { data: { reportData: { report: { ...slim, interrupts } } } },

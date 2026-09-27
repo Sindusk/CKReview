@@ -30,6 +30,11 @@
 //   --fight <id>     Restrict to this WCL fight id — repeatable
 //   --boss <name>    Restrict to fights whose name contains this (case-insensitive)
 //   --creds <path>   Credentials file (default: .credentials/wcl-token.json)
+//   --refetch        Download pulls again even if their file already exists
+//
+// Kills are downloaded first, pulls already on disk are skipped, and a rate
+// limit is waited out rather than ending the run — see scripts/lib/fetch-plan.js.
+// So re-running the same command after an interruption resumes it.
 //
 // Output: <outDir>/meta.json (report + fights + actors + abilities, once)
 // plus one <outDir>/<Boss>_Pull<N>.json per fight — N is the SAME
@@ -46,9 +51,10 @@ const path = require('path');
 const { requireTsFromRoot, ROOT } = require('./lib/require-ts');
 const { createNodeLogAuth } = require('./lib/node-log-auth');
 const { slimWclReport } = require('./lib/slim-report');
+const { killsFirst, withRateLimitWait, writeAtomic } = require('./lib/fetch-plan');
 
 function parseArgs(argv) {
-  const args = { fights: [], out: null, boss: null, creds: null };
+  const args = { fights: [], out: null, boss: null, creds: null, refetch: false };
   let reportCode = null;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -56,12 +62,13 @@ function parseArgs(argv) {
     else if (a === '--fight') args.fights.push(Number(argv[++i]));
     else if (a === '--boss') args.boss = argv[++i];
     else if (a === '--creds') args.creds = argv[++i];
+    else if (a === '--refetch') args.refetch = true;
     else if (!reportCode) reportCode = a;
     else throw new Error(`Unrecognized argument: ${a}`);
   }
   if (!reportCode) {
     throw new Error(
-      'Usage: node scripts/fetch-wow-report.js <reportCode> [--out dir] [--fight id]... [--boss name] [--creds path]'
+      'Usage: node scripts/fetch-wow-report.js <reportCode> [--out dir] [--fight id]... [--boss name] [--creds path] [--refetch]'
     );
   }
   return { reportCode: extractReportCode(reportCode), ...args };
@@ -77,7 +84,7 @@ function extractReportCode(input) {
 }
 
 async function main() {
-  const { reportCode, out, fights, boss, creds } = parseArgs(process.argv.slice(2));
+  const { reportCode, out, fights, boss, creds, refetch } = parseArgs(process.argv.slice(2));
   const outDir    = out   ? path.resolve(out)   : path.join(ROOT, 'sampledata', 'wow', reportCode);
   const credsPath = creds ? path.resolve(creds) : path.join(ROOT, '.credentials', 'wcl-token.json');
 
@@ -99,7 +106,7 @@ async function main() {
   fs.mkdirSync(outDir, { recursive: true });
 
   console.log(`Fetching report ${reportCode}...`);
-  const report = await wclClient.fetchReport(reportCode);
+  const report = await withRateLimitWait(() => wclClient.fetchReport(reportCode), 'the report');
 
   fs.writeFileSync(
     path.join(outDir, 'meta.json'),
@@ -107,7 +114,7 @@ async function main() {
   );
   console.log(`  wrote meta.json (${report.fights.length} fights, ${report.masterData.actors.length} actors)`);
 
-  let targetFights = report.fights.filter((f) => f.endTime > f.startTime);
+  let targetFights = killsFirst(report.fights.filter((f) => f.endTime > f.startTime));
   if (fights.length > 0) targetFights = targetFights.filter((f) => fights.includes(f.id));
   if (boss) targetFights = targetFights.filter((f) => f.name.toLowerCase().includes(boss.toLowerCase()));
 
@@ -123,9 +130,24 @@ async function main() {
 
   for (const fight of targetFights) {
     const label = labels.get(fight.id) ?? `${fight.name} (fight ${fight.id})`;
-    process.stdout.write(`Fetching ${label}... `);
+    const pullNumberMatch = label.match(/Pull (\d+)$/);
+    const pullSuffix = pullNumberMatch ? `Pull${pullNumberMatch[1]}` : `Fight${fight.id}`;
+    const fileName = `${sanitizeForFilename(fight.name)}_${pullSuffix}.json`;
+    const filePath = path.join(outDir, fileName);
+    if (!refetch && fs.existsSync(filePath)) {
+      console.log(`Skipping ${label}${fight.kill ? ' (kill)' : ''}: ${fileName} already exists`);
+      continue;
+    }
+    process.stdout.write(`Fetching ${label}${fight.kill ? ' (kill)' : ''}... `);
 
-    const data = await wclClient.fetchFightData(reportCode, fight, report.masterData.actors, label, true /* skipConsoleDump */);
+    const { data, interrupts } = await withRateLimitWait(async () => {
+      const d = await wclClient.fetchFightData(reportCode, fight, report.masterData.actors, label, true /* skipConsoleDump */);
+      // WCL's "Interrupts" tab — a pure aggregate (per-player kick totals +
+      // uninterrupted-completion timestamps), not per-kick detail; see
+      // fetchInterruptsTable's header comment in lib/wcl-client.ts. Not run
+      // through slimWclReport (unknown key, already small/aggregate).
+      return { data: d, interrupts: await wclClient.fetchInterruptsTable(reportCode, fight) };
+    }, label);
 
     const slim = slimWclReport({
       deaths:        { data: data.deathEvents },
@@ -139,23 +161,12 @@ async function main() {
       enemyBuffs:    { data: data.enemyBuffEvents },
     });
 
-    // WCL's "Interrupts" tab — a pure aggregate (per-player kick totals +
-    // uninterrupted-completion timestamps), not per-kick detail; see
-    // fetchInterruptsTable's header comment in lib/wcl-client.ts. Not run
-    // through slimWclReport (unknown key, already small/aggregate).
-    const interrupts = await wclClient.fetchInterruptsTable(reportCode, fight);
-
-    const pullNumberMatch = label.match(/Pull (\d+)$/);
-    const pullSuffix = pullNumberMatch ? `Pull${pullNumberMatch[1]}` : `Fight${fight.id}`;
-    const fileName = `${sanitizeForFilename(fight.name)}_${pullSuffix}.json`;
-    const filePath = path.join(outDir, fileName);
-
     // Same {query, variables, json} wrapper shape the browser console dump
     // used, so this is a drop-in replacement for how existing harnesses
     // already read sample files (.json.data.reportData.report.<stream>.data)
     // — no harness changes needed to consume these. `interrupts` is a new,
     // additive key alongside the existing streams.
-    fs.writeFileSync(filePath, JSON.stringify({
+    writeAtomic(filePath, JSON.stringify({
       query:     null,
       variables: { code: reportCode, fightIDs: [fight.id] },
       json:      { data: { reportData: { report: { ...slim, interrupts } } } },
