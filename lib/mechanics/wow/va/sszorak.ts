@@ -8,33 +8,6 @@
 // (written 2026-09-26 before any log was available). The first half is what
 // the logs actually showed; where the two disagree, the log section wins.
 //
-// ── OPEN QUESTIONS FOR VOD REVIEW ────────────────────────────────────────────
-//
-// The first pass was built from a report with no VOD available, so every
-// attribution call below is unconfirmed. Ask these at the first review:
-//
-//   1. Tempest: every tornado pass is flagged (~15 per pull, ~4 on tanks).
-//      Should tank hits count, and should a single hit stay Minor?
-//   2. Missed Mutilate soaks: the most frequent misses were one player
-//      skipping their group's first soak, players knocked back by
-//      Crosswinds 7s before the +55 soak, and the Serpent's Fury mark
-//      holder. The description names the knockback / mark. Real errors,
-//      or assigned exceptions to exclude?
-//   3. Virulence reinfection flags BOTH the spreader and the reinfected
-//      player. Correct, or only one of them?
-//   4. Early cyst pops blame whoever stood nearest the cyst's drop spot
-//      (within 8yd). A tank dragging the boss is often nearest. Is that
-//      the real popper, or is the boss/tank pathing the cause?
-//   5. Two cysts popped in one Maelstrom gale is a player-less error that
-//      names both droppers. Should blame go to a dropper (placement) or
-//      to the raid's positioning instead?
-//   6. A Crosswinds fall flags only the player who fell and names their
-//      opposite-direction partners. Should a partner share the blame?
-//   7. The generic "5 dead" marker ended two pulls 20-70s before Unbound
-//      Ferocity actually wiped them. Keep 5 as the threshold?
-//   8. Caustic Claws (no target in the log) and Caustic Residue (constant
-//      brief contact, one death in 36 pulls) are not flagged. Wanted?
-//
 // ── VERIFIED AGAINST LOGS (report rNL38zFGMbyADRTh, 36 Mythic pulls, all
 //    wipes, longest +289s; offsets fight-relative) ───────────────────────────
 //

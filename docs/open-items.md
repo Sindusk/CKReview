@@ -28,11 +28,28 @@ it's resolved. Module headers carry the full context for mechanic items.
     Keep it, drop it, or make it a raid-wide healing error?
   - **Player-less errors.** Missed totems and undispelled Exploding
     Infection name no player. Should they?
-- **Sszorak** (report rNL38zFGMbyADRTh; not the user's group, no VOD):
-  eight attribution questions (Tempest volume, Mutilate exceptions,
-  Virulence/cyst/Crosswinds blame, the 5-dead threshold, Claws/Residue)
-  are listed at the top of `lib/mechanics/wow/va/sszorak.ts`. Ask them
-  once the user's group reaches the boss.
+- **Sszorak** (report rNL38zFGMbyADRTh; not the user's group, no VOD —
+  ask once the user's group reaches the boss):
+  - **Tempest volume.** Every tornado pass is flagged (~15 per pull, ~4 on
+    tanks). Should tank hits count, and should a single hit stay Minor?
+  - **Missed Mutilate soaks.** The most frequent misses were a player
+    skipping their group's first soak, players knocked back by Crosswinds
+    7s before the +55 soak, and the Serpent's Fury mark holder. The
+    description names the knockback / mark. Real errors, or assigned
+    exceptions to exclude?
+  - **Virulence blame.** A reinfection flags both the spreader and the
+    reinfected player. Correct, or only one of them?
+  - **Early cyst pops** blame whoever stood nearest the drop spot (within
+    8yd). A tank dragging the boss is often nearest. Is that the real
+    popper, or is the boss/tank pathing the cause?
+  - **Two cysts in one gale** is player-less and names both droppers.
+    Should blame go to a dropper (placement) or the raid's positioning?
+  - **Crosswinds fall** flags only the player who fell and names their
+    opposite-direction partners. Should a partner share the blame?
+  - **"5 dead" marker** ended two pulls 20-70s before Unbound Ferocity
+    actually wiped them. Keep 5 as the threshold?
+  - **Not flagged:** Caustic Claws (no target in the log) and Caustic
+    Residue (constant brief contact, one death in 36 pulls). Wanted?
 
 ### Midnight Falls (WoW)
 
