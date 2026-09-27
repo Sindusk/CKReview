@@ -36,6 +36,9 @@ lib/mechanics/
                                 Helical Toxins, Protovenom, Miasma soak, pools)
       vashnik.ts              — Vashnik per-pull rules (Malignant Totems, Exploding
                                 Infection, Plague Froth/Wave, Bile, venoms, Fangs)
+      sszorak.ts              — Sszorak per-pull rules (Serpent's Fury/Virulence,
+                                Mutilate groups, Ravage, Tempest, Crosswinds,
+                                Viscous Cysts, Howling Maelstrom)
 ```
 
 **Read the header comment of a module before touching it.** Each module's
@@ -64,7 +67,7 @@ can also hold their own declarative rule tables and run them through
 
 **2. Per-pull correlation modules** (forsaken.ts, blackhole.ts, limitcut.ts,
 stompies.ts, exdeath.ts, phase1.ts, midnightfalls.ts, entombed-sentinels.ts,
-vashnik.ts) exist because they
+vashnik.ts, sszorak.ts) exist because they
 correlate *multiple* event streams — e.g. a stack-counter debuff against a
 specific damage tick, or positions against an assignment schedule. Each
 exports a `detectXErrors(players, deathEvents[, enemyCasts, enemyBuffs, ...])`
