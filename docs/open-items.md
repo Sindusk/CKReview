@@ -75,6 +75,52 @@ it's resolved. Module headers carry the full context for mechanic items.
     kill), Swirling Spirit ticks, Grasping Depths/Uncoiling raid damage.
   - **Tank-death marker** only fires when the pull ends within 30s (5
     +452.9 lost a tank at 12% and fought 67s more). Right call?
+- **The Lost Explorers** (A = nRGxQ1b8LdMvzC4D, 15 wipes; B =
+  8PQFgdDh3R9BW71t, 19 wipes + kill in pull 20; no VOD ground truth yet —
+  cutoffs per pull are in the module header's wipe survey):
+  - **Late fish blame.** A Final Ascension that completes before the Command
+    blames the fish thrower (Major if it killed anyone): A1 +66.7, A6
+    +185.8, B7 +312.8 (Raid-level) and B1 +187.5, B12 +183.9 (no deaths).
+    Is the thrower the right owner, or was the fish late for another
+    reason (crate opened late, carrier moving, the call)?
+  - **No fish at all** (B2 +65, 12 dead) is player-less. What happened to
+    the fish that cycle? The log can't show who picked it up.
+  - **Blast Wave.** Every player hit flags, with the timing in the text:
+    no bounce, bounced too late (hit 0.1-1.4s into the Bounce) or too early
+    (landed 0.1-1.1s before the wave). Several "too early" deaths bounced
+    exactly 2.5-2.6s before the wave — stepping on the mushroom too soon, or
+    a mushroom auto-launch? Should any of these not be the victim's fault?
+  - **Nobody bounced** over a wave five times (A15 +381, B3/B4/B6/B10
+    second wave), player-less. The mushroom existed in the log each time.
+    Who places the mushroom — was it baited somewhere unreachable?
+  - **Elemental Explosion** flags every Burning Flames holder within 12.5yd
+    of a Frost missile's target (A5: 2, A8: 4, A10: 1; A9: nobody placeable).
+    Should the missile's target also share blame, and is 12.5yd too wide?
+  - **Mighty Thud under-soak** (≤8 soakers) is player-less and names the
+    marked player. B11 +327.8 and B7 +333.4: the marked player was alone.
+    Did they run from the group, or did the group not follow?
+  - **Icebound Flames** completions are player-less Minors (15, one in the
+    kill). Is there a kick rotation that would let them name the missed
+    kicker?
+  - **Shredding Shards** flags a tank at 9+ stacks (two casts without a
+    swap). Should the other tank (who didn't taunt) share it?
+  - **Splinters overlap isn't flagged.** Nobody can be named (the stomper
+    isn't in the log), and the kill ran 3-4 stacks routinely. B3 +98.7 junk
+    landed on the stacked raid and opened five at once (10 dead) — the
+    Throw Junk hits are flagged, the generic 7-dead marker is the cutoff.
+    Want a Raid error for "5 crates at once"?
+  - **Blink Nova deaths aren't flagged** (damage didn't fall off with
+    distance in the log). Any positioning or defensive expectation that
+    should make them someone's fault?
+  - **Minor volume:** Aftershock (84), Throw Junk (72), Evil Eyes (43) and
+    Spreading Flames (19) flag every hit. The kill had 5 Aftershock, 3 Evil
+    Eyes, 2 Spreading Flames, 1 Throw Junk. Keep all?
+  - **Not flagged:** United Defense (the kill had 4.7s windows; wipes up to
+    8.9s), Shell Spin stuns (14 in the kill), Steady Strikes stacks, Fire/
+    Frost patch ticks, Haunting Spirits debuffs, Falling.
+  - **Thresholds changed from other bosses:** the collapse marker is 7 dead
+    (5-6 was survived 50-120s here), and a burst of deaths with no killing
+    blow logged is read as a called wipe. Right calls?
 
 ### Midnight Falls (WoW)
 

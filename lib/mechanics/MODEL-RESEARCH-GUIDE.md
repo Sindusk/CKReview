@@ -221,6 +221,48 @@ was usually one of these. Cover them explicitly in future models.
   Drowned Echo's Curse took ~10s and mind-controlled the well team 7.5s
   after it completed. Cast time and consequence decide severity.
 
+## Lessons from The Lost Explorers
+
+Where the Lost Explorers model and its logs (nRGxQ1b8LdMvzC4D,
+8PQFgdDh3R9BW71t) disagreed or fell short, the gap was usually one of these.
+
+- **Player-triggered actions can be ordinary player casts.** The model
+  warned that the fish's extra action "may not appear as an ordinary player
+  cast". It did: Disgusting Fish 1296535, cast by the carrier on the
+  explorer. The Command then landed 4.3-5.1s later as a boss buff on that
+  explorer, with a separate ID per explorer. Name every extra-action button
+  and say who presses it; the cast's source and target are the best
+  attribution signal the log has.
+- **Give the clock as numbers, from the pull.** The "fish clock" turned out
+  to be completely fixed: a 60s charge, a 5s cast, a 60s Command, and a
+  fourth Final Ascension (~+425s) that is the hard enrage once all three
+  explorers are fed. Give each timer, what resets it, and what happens when
+  there is nothing left to reset it with. "Feed with ~4s left" was a
+  strategy note; the real deadline is the cast start, because of the fish's
+  travel time.
+- **Distance falloff claims need checking, not assuming.** Blink Nova's
+  "damage decreasing by distance" was not visible at all (60-80yd took as
+  much as 20yd). Say how steep a falloff is when a guide gives numbers;
+  otherwise list it as an open question, because detection would otherwise
+  blame positions for healing deaths.
+- **Raid-wide penalties on deliberate actions hide the actor.** Every crate
+  opening put Splinters on all 20 players, so the log never shows who
+  stomped. When a mechanic's cost falls on everyone, say so and expect it
+  to be player-less.
+- **Describe object lifecycles with their timing.** Crates: thrown at fixed
+  cycle offsets (+20/+24/+28 fish crate/+51/+55), a Relic Rupture warning
+  cast ~22.5s after landing, and 10s later the detonation. Mushrooms: spawn
+  3s after the Toss cast, used via a 1.5s Bounce debuff. These times are
+  what let detection tell "late" from "never".
+- **Jump/avoid-by-timing mechanics need the timing window.** Blast Wave
+  deaths split into no jump, jumped too late (hit 0.1-1.4s into Bounce) and
+  jumped too early (landed before the wave). If a guide gives the window
+  (how long before the wave to jump), include it; detection could only
+  describe the timing, not judge it.
+- **Say how the raid resets.** Twelve pulls ended with players dying at
+  full health and no killing blow logged. Knowing this signature up front
+  saves a round of misattributed tank-death and collapse markers.
+
 ## General guidance
 
 **Leave implementation to the detection stage.** Instructions such as "do

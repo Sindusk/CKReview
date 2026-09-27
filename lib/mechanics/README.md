@@ -42,6 +42,10 @@ lib/mechanics/
       nekzali.ts              — Nek'zali per-pull rules (Vessel revivals, Ritual/
                                 Uncoiled Rage, Pyre soaks, Barrage, pools, Mythic
                                 well Curse/Soul Exhaustion, Invoke silence)
+      lost-explorers.ts       — The Lost Explorers per-pull rules (fish clock /
+                                Final Ascension, Relic Rupture, Blast Wave
+                                bounces, Elemental Explosion, Mighty Thud soaks,
+                                Shredding Shards swaps, avoidables, called wipes)
 ```
 
 **Read the header comment of a module before touching it.** Each module's
@@ -70,7 +74,7 @@ can also hold their own declarative rule tables and run them through
 
 **2. Per-pull correlation modules** (forsaken.ts, blackhole.ts, limitcut.ts,
 stompies.ts, exdeath.ts, phase1.ts, midnightfalls.ts, entombed-sentinels.ts,
-vashnik.ts, sszorak.ts, nekzali.ts) exist because they
+vashnik.ts, sszorak.ts, nekzali.ts, lost-explorers.ts) exist because they
 correlate *multiple* event streams — e.g. a stack-counter debuff against a
 specific damage tick, or positions against an assignment schedule. Each
 exports a `detectXErrors(players, deathEvents[, enemyCasts, enemyBuffs, ...])`
@@ -300,6 +304,35 @@ The same principles apply when refining any module:
 - **No character names in committed code or docs.** The repo is public;
   refer to players by pull + offset and role/spec in headers and
   comments. Names belong only in the gitignored `expectations/`.
+
+### Lessons from The Lost Explorers (two reports, 34 wipes + a kill)
+
+- **Two reports from different raids beat one big one.** Report A fed
+  Iku -> Nama -> Gebbo, report B Gebbo -> Iku -> Nama, so every ultimate was
+  seen early and late. Label them A/B with their codes at the top of the
+  header and cite pulls as `A6 +188.9`.
+- **Tabulate a failure's outcomes before choosing blame.** For Blast Wave, a
+  per-detonation table (each hit player's Bounce start/end relative to the
+  hit) split deaths into no-bounce, too-late and too-early, and exposed
+  five waves where *nobody* bounced. Those became one player-less error
+  instead of 5-13 individual Majors.
+- **Check the generic "N dead" threshold against how long pulls survived
+  it.** For each pull, print the time from reaching 5/6/7/8 dead to the pull
+  end. Here 5-6 dead was survived for 50-120s in four pulls, while every
+  pull that reached 7 ended within 31s, so the threshold is 7 for this fight.
+- **Deaths with no killing blow, in bulk, are a called wipe.** Players at
+  full health dying with `killingAbilityGameID` absent, several within
+  seconds, shortly before the pull ends. Detect that first and ignore the
+  deaths after it; otherwise the first tank among them becomes a false
+  "Tank Died" cutoff.
+- **Stack counts need an overlap allowance.** Shredding Shards is 7 per
+  cast and every clean pull peaked at 7, but a swap can leak one shard (8)
+  onto the old tank. The rule starts at 9, and skips when the other tank is
+  dead (there was nobody to swap to).
+- **When one player's cast starts the chain, blame the cast's timing.** The
+  fish is a player cast; its time relative to Final Ascension's completion
+  is the whole story (in time, late, or never), so the late case names the
+  thrower and the no-fish case stays player-less.
 
 ---
 
