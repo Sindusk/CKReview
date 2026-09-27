@@ -69,6 +69,7 @@ import { detectVashnikErrors } from "./mechanics/wow/va/vashnik";
 import { detectSszorakErrors } from "./mechanics/wow/va/sszorak";
 import { detectNekzaliErrors } from "./mechanics/wow/va/nekzali";
 import { detectLostExplorersErrors } from "./mechanics/wow/va/lost-explorers";
+import { detectTwinFangsErrors } from "./mechanics/wow/va/twin-fangs";
 
 // Shared shape for both games' ability maps: gameID -> name + raw icon
 // filename (not yet resolved to a URL — that happens per-game via
@@ -358,6 +359,7 @@ function wclBuildEnemyCastEvents(
       abilityId:   e.abilityGameID ?? 0,
       abilityName: wclAbilityName(e, abilityMap),
       abilityIcon: wclAbilityIcon(e, abilityMap),
+      sourceInstance: e.sourceInstance,
     }));
 }
 
@@ -552,6 +554,7 @@ export function transformFightToPull(
     ...detectSszorakErrors(players, deathEvents, enemyCastEvents, enemyBuffEvents, data.fight.endTime - data.fight.startTime),
     ...detectNekzaliErrors(players, deathEvents, enemyCastEvents, enemyBuffEvents, data.fight.endTime - data.fight.startTime),
     ...detectLostExplorersErrors(players, deathEvents, enemyCastEvents, enemyBuffEvents, data.fight.endTime - data.fight.startTime),
+    ...detectTwinFangsErrors(players, deathEvents, enemyCastEvents, enemyBuffEvents, data.fight.endTime - data.fight.startTime),
   ].sort((a, b) => a.timestamp - b.timestamp);
 
   const fightDurationMs = data.fight.endTime - data.fight.startTime;

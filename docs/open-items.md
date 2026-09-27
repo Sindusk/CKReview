@@ -122,6 +122,52 @@ it's resolved. Module headers carry the full context for mechanic items.
     (5-6 was survived 50-120s here), and a burst of deaths with no killing
     blow logged is read as a called wipe. Right calls?
 
+- **The Twin Fangs** (A = 6Jnq8ycwgkYZpHND, 24 wipes + kill in pull 25;
+  B = xKP1M6gwC8WpnrBc, 14 wipes; no VOD ground truth yet — each wipe's
+  cutoff is in the module header's wipe survey):
+  - **Venom cap deaths** name the player as Major (67 of them), with the
+    10th stack's source and their stack history in the text. Most final
+    stacks came from Venomous Emergence (unavoidable) or a globule pickup.
+    Is the player at fault, or should an Emergence cap be player-less
+    unless they took avoidable stacks earlier?
+  - **Soft enrage.** 3+ players capped by one Emergence is a Raid
+    "overflow". The kill lost 2 at its +407 Emergence (flagged as 2
+    Majors). Should the +407 Emergence cap count as the enrage regardless
+    of how many die?
+  - **Globule bursts** are player-less (who should have taken the globule
+    isn't in the log). Is there a soak assignment (groups, markers) that
+    would let detection name someone? Bursts from globules released by
+    deaths killed 13-18 at once (A1 +58.5, A12 +300.8, B8 +126.5, B13
+    +155.3) — who is meant to pick those up?
+  - **Globule pickup deaths** (52) blame the picker; many took 2-3
+    globules within 2s at low health. Double pickups were survived 47
+    times, so they aren't flagged alone. Right?
+  - **Visceral Burst** completions are player-less: the kick order changed
+    every pull. Is there a kick assignment (by spawn order or marker) the
+    raid uses? A declared order would let detection name the missed kicker.
+  - **Feast raid bite** (A13, A14, B1, B11, B12) is player-less. Can the
+    under-soaked bite group be named — who was assigned to it?
+  - **Stone Breaker** blames the tank whose set it was (the one soaking the
+    other impacts, or the one who didn't soak the previous set). Right
+    owner, or could a DPS be assigned to help?
+  - **Corrosive Spit** flags an unmarked player in the line and names the
+    marked target. Should the target share blame for aiming it at people?
+  - **Stir the Depths waves** (debuff 1292807) land all through the pull,
+    not only during the Stir cast — 240 Minors in A, 21 in the kill,
+    several on tanks. What are they on screen, and are they avoidable?
+  - **Minor volume in the kill:** Stir waves 21, Sanguine Storm 13,
+    Congealed Gore 9, Noxious Slick 7, Deadly Venom 6, Deluge splash 2.
+    Keep all, drop some, or exempt tanks?
+  - **Out-of-range casts** (Concentrated Spittle / Clotted Bolt) are
+    player-less Minors naming who was hit. Should the tank of that boss be
+    named instead?
+  - **Collapse marker at 6 dead** (every pull reaching 6 ended within
+    31s). Right threshold?
+  - **Not flagged:** Coiling Ichor damage (the marked players' own DoT),
+    Tainted Blood absorb ticks, Blood Torrent, Caustic Deluge on its tank,
+    deaths to Eternal Venom ticks below the cap, marked Spit targets dying,
+    Barbed Bulwark kill/stun assignments.
+
 ### Midnight Falls (WoW)
 
 - **Resume point.** VOD review of report Dn87j4ARzNwYqLvV should resume at

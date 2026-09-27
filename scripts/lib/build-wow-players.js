@@ -114,6 +114,7 @@ function buildWowPull(rep, actorMap, abilityMap, getSpecInfo) {
     actorName: actorMap.get(e.sourceID)?.name || `NPC${e.sourceID}`,
     abilityId: e.abilityGameID ?? 0,
     abilityName: abilityName(e.abilityGameID ?? 0),
+    sourceInstance: e.sourceInstance,
   }));
 
   const enemyBuffs = (rep.enemyBuffs?.data ?? []).filter((e) => e.type === 'applybuff').map((e) => ({

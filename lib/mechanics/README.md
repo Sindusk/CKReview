@@ -49,6 +49,10 @@ lib/mechanics/
                                 Final Ascension, Relic Rupture, Blast Wave
                                 bounces, Elemental Explosion, Mighty Thud soaks,
                                 Shredding Shards swaps, avoidables, called wipes)
+      twin-fangs.ts           — The Twin Fangs per-pull rules (Eternal Venom cap
+                                and soft enrage, globule bursts/pickups, Feast
+                                bites, Visceral Burst kicks, Stone Breaker soaks,
+                                Tainted Burst, avoidables)
 ```
 
 **Read the header comment of a module before touching it.** Each module's
@@ -77,7 +81,7 @@ can also hold their own declarative rule tables and run them through
 
 **2. Per-pull correlation modules** (forsaken.ts, blackhole.ts, limitcut.ts,
 stompies.ts, exdeath.ts, phase1.ts, ultimate-kefka.ts, midnightfalls.ts, entombed-sentinels.ts,
-vashnik.ts, sszorak.ts, nekzali.ts, lost-explorers.ts) exist because they
+vashnik.ts, sszorak.ts, nekzali.ts, lost-explorers.ts, twin-fangs.ts) exist because they
 correlate *multiple* event streams — e.g. a stack-counter debuff against a
 specific damage tick, or positions against an assignment schedule. Each
 exports a `detectXErrors(players, deathEvents[, enemyCasts, enemyBuffs, ...])`
@@ -336,6 +340,38 @@ The same principles apply when refining any module:
   fish is a player cast; its time relative to Final Ascension's completion
   is the whole story (in time, late, or never), so the late case names the
   thrower and the no-fish case stays player-less.
+
+### Lessons from The Twin Fangs (two reports, 38 wipes + a kill)
+
+- **Fetch the reports one at a time.** Both are rate-limited on the same
+  token; each Twin Fangs report took a few minutes with `--boss`. Probe the
+  first one while the second downloads.
+- **A stack resource with a lethal cap needs a ledger, not a threshold.**
+  Eternal Venom's 10th application has no debuff event: the player dies to
+  a separate "Eternal Venom" killing blow instead. Classify every
+  application by the hit at the same millisecond (pickup, burst, Emergence,
+  Spit, wave, ...), and find the fatal one as the latest venom-applying hit
+  in the 1.2s before the death that did NOT already produce a logged stack.
+  Start the ledger at the latest fresh `applied` (a death and rez resets it).
+- **Enemy casts with a player target can be the cleanest per-stack record.**
+  WCL logs an enemy "Eternal Venom" *cast* (1290336, source Vexhul or a
+  Spawn) at each application, targeting the player, including the fatal
+  10th. `EnemyEvent` doesn't carry the target yet; add it if a future rule
+  needs per-application attribution beyond the damage-coincidence method.
+- **Deaths can spawn the failure.** Every venomous death released 3 more
+  globules ~2s later, and those bursts killed 13-18 at once. Tag a burst by
+  its timing (12-17s after a Deluge = the Deluge's own globules; anything
+  else = death-released) and list the deaths before it in the description.
+- **A "min targets" penalty shows up as the NEXT hit, not a separate
+  spell.** An under-soaked Ravenous Feast bite (<4 targets) was followed
+  ~0.4s later by the same bite ID on 15-19 players. Gate on the victim
+  count (clean max 9, failure min 15), not a penalty ID.
+- **Multi-spawn adds need `sourceInstance`.** WoW `EnemyEvent`s now carry
+  it (previously FFXIV only) so a recasting broodling counts once.
+- **Check the kill for "avoidable" volume before trusting a hit as a
+  mistake.** The kill still took 21 Stir waves, 13 Sanguine Storm hits and
+  9 Congealed Gore episodes; they're flagged Minor and listed as volume
+  questions rather than silently dropped.
 
 ### Lessons from Ultimate Kefka (a late phase, 29 pulls, no kill)
 

@@ -302,6 +302,51 @@ it fell short:
   never happened in 29 pulls. Saying "guide-inferred, not observed" per
   failure lets detection skip or deprioritize them.
 
+## Lessons from The Twin Fangs
+
+The model was checked against 6Jnq8ycwgkYZpHND (24 wipes + kill) and
+xKP1M6gwC8WpnrBc (14 wipes); see twin-fangs.ts's VERIFIED section. Its
+mechanic list, the September hotfix numbers (10 Venom stacks, 10
+broodlings, 4-target Feast minimum) and most journal IDs for casts held
+up. Where it fell short:
+
+- **Give the fight's clock as offsets when the fight is timed.** Every
+  Twin Fangs pull followed the same 155s cycle to the tenth of a second
+  (Deluge +9, Stone Breaker +24.5, Emergence/Rouse +36, Feast +61.2, a
+  second half-cycle at +70, Storm/Flood +136). The model gave only an order
+  and "about every two minutes". If a guide has a timeline or boss-mod
+  timers, copy the numbers; say whether energy is time-driven or earned.
+- **Say what a resource's net rate is.** Eternal Venom gains +1 per
+  Emergence (every 61s, unavoidable) and ~0.75 per player per Deluge from
+  globule pickups, while Feast removes only 1 per 61s. The model called
+  Venom "the central resource" but didn't spell out that it only climbs,
+  which makes the late Emergence a soft enrage (+407s: the kill ended 4.5s
+  after it). For any stacking resource, give gain and removal per cycle.
+- **Death side effects can dominate the fight.** The model mentioned in one
+  sentence that a death with Venom spawns extra globules. In the logs it
+  is the main way pulls ended: each death released 3 globules, and their
+  bursts killed 13-18. Put such mechanics in their own block with counts
+  and timing, not as an aside.
+- **Name what the penalty looks like when there is no penalty spell.** An
+  under-soaked Feast bite didn't have its own spell; the next strike simply
+  hit the whole raid with the same bite ID. "The bite hits everyone" was
+  the signal. When a guide says "otherwise X hits the raid", say whether X
+  is a new spell or the same one with more targets.
+- **Describe interrupt assignments, or say there are none.** The
+  broodlings' kick order was different in every pull, so a missed kick
+  can't be owned from the log. If guides recommend a fixed kick rotation
+  (by spawn order or marker), say so; that is what would make blame
+  possible.
+- **List unexplained actors and ground effects.** A "Writhing Behemoth"
+  NPC and a Stir the Depths wave debuff that lands outside the Stir window
+  (~20 per pull, in the kill too) weren't in the model. If a guide mentions
+  lurking adds or leftover waves, include them; otherwise flag the ability
+  names you couldn't place.
+- **Tank-soak patterns are worth stating.** One tank soaked all three
+  Stone Breaker impacts and the tanks alternated sets. The model said
+  "tanks may alternate"; knowing the norm is what lets detection name the
+  tank whose turn it was.
+
 ## General guidance
 
 **Leave implementation to the detection stage.** Instructions such as "do

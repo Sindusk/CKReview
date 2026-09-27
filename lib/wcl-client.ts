@@ -214,6 +214,7 @@ export type WCLCastEvent = {
   // would prevent "cast" from ever firing.
   type:          "cast" | "begincast";
   sourceID:      number;
+  sourceInstance?: number; // which copy of a multi-spawn NPC cast it (e.g. one Broodling of Ithraz)
   targetID?:     number;  // -1 or absent = no meaningful target (self-cast/ground-targeted/etc.)
   abilityGameID: number;
   ability?: {
