@@ -368,7 +368,8 @@ import type { DeathEvent } from "@/types/DeathEvent";
 import type { PullError, EnemyEvent } from "@/types/PullError";
 import { suppressDuplicateRaidErrors } from "../../../error-detection";
 import {
-  RAID_MARKER_SORT_OFFSET_MS, kFmt, sec, yd, debuffIntervals, joinNames, playerError, rezzedAt, lastPlayerEventMs,
+  RAID_MARKER_SORT_OFFSET_MS, kFmt, sec, yd, debuffIntervals, joinNames, playerError, lastPlayerEventMs,
+  deadAt, landed, total, died, raidMarker, hitEpisodes, annotateGroups as annotateGroupsBy, pullOverMarker,
 } from "../common";
 
 // ─── Ability IDs (log-verified, reports nRGxQ1b8LdMvzC4D + 8PQFgdDh3R9BW71t) ─
@@ -478,25 +479,6 @@ function clusterByGap<T>(items: T[], at: (x: T) => number, gapMs: number): T[][]
   return groups;
 }
 
-/** Players dead at `t`, net of battle-rezzes. */
-function deadAt(players: PlayerInfo[], deaths: DeathEvent[], t: number): DeathEvent[] {
-  const byName = new Map(players.map((p) => [p.name, p]));
-  const sorted = [...deaths].sort((a, b) => a.timestamp - b.timestamp);
-  return sorted.filter((d) => {
-    if (d.timestamp > t) return false;
-    const next = sorted.find((o) => o.player === d.player && o.timestamp > d.timestamp)?.timestamp ?? Infinity;
-    if (next <= t) return false; // a later death supersedes this one
-    const p = byName.get(d.player);
-    const rez = p ? rezzedAt(p, d.timestamp, next) : undefined;
-    return rez === undefined || rez > t;
-  });
-}
-
-const died = (d: DeathEvent | undefined, from: number) =>
-  !d ? "" : d.timestamp - from < 100 ? " and died to it" : ` and died ${sec(d.timestamp - from)}s later`;
-
-const landed = (e: PlayerEvent) => (e.amount ?? 0) > 0;
-
 /** This player's position from their nearest positioned hit within `POSITION_WINDOW_MS` of `t`. */
 function positionAt(p: PlayerInfo, t: number): { x: number; y: number } | undefined {
   let best: PlayerEvent | undefined;
@@ -517,27 +499,13 @@ function avoidableHits(
   players: PlayerInfo[], deaths: DeathEvent[], ids: Set<number>, gapMs: number,
   make: (p: PlayerInfo, hits: PlayerEvent[], death: DeathEvent | undefined) => PullError,
 ): PullError[] {
-  const errors: PullError[] = [];
-  for (const p of players) {
-    const hits = p.damageTaken.filter((e) => ids.has(e.abilityId) && landed(e));
-    for (const g of clusterByGap(hits, (e) => e.timestamp, gapMs)) {
-      const death = deaths.find((d) => d.player === p.name && ids.has(d.killingAbilityGameId) &&
-        d.timestamp >= g[0].timestamp - 100 && d.timestamp <= g[g.length - 1].timestamp + HIT_DEATH_WINDOW_MS);
-      errors.push(make(p, g, death));
-    }
-  }
-  return errors;
+  return hitEpisodes(players, deaths, (p) => p.damageTaken.filter((e) => ids.has(e.abilityId) && landed(e)),
+    [...ids], gapMs, make, HIT_DEATH_WINDOW_MS);
 }
 
 /** Annotate errors of one rule that happened to 4+ players within a second. */
-function annotateGroups(errors: PullError[], note: (others: number) => string): PullError[] {
-  return errors.map((e) => {
-    const others = errors.filter((o) => o.player !== e.player && Math.abs(o.timestamp - e.timestamp) <= GROUP_HIT_MS);
-    return others.length + 1 >= GROUP_HIT_MIN ? { ...e, description: `${e.description} ${note(others.length)}` } : e;
-  });
-}
-
-const total = (g: PlayerEvent[]) => kFmt(g.reduce((s, e) => s + (e.amount ?? 0), 0));
+const annotateGroups = (errors: PullError[], note: (others: number) => string) =>
+  annotateGroupsBy(errors, note, GROUP_HIT_MS, GROUP_HIT_MIN);
 
 // ─── Final Ascension: the fish clock ran out ─────────────────────────────────
 //
@@ -865,12 +833,6 @@ function detectAvoidable(players: PlayerInfo[], deaths: DeathEvent[]): PullError
 export const LE_PULL_OVER_RULE_ID = "wow-le-pull-over";
 
 function detectPullOver(players: PlayerInfo[], deaths: DeathEvent[], pullEnd: number): PullError[] {
-  const candidates: PullError[] = [];
-  const marker = (timestamp: number, name: string, description: string, abilityId: number, abilityName: string) =>
-    candidates.push({ ruleId: LE_PULL_OVER_RULE_ID, severity: "Raid", name, description, timestamp: timestamp + RAID_MARKER_SORT_OFFSET_MS, abilityId, abilityName });
-  const byName = new Map(players.map((p) => [p.name, p]));
-  const cause = (d: DeathEvent) => (d.killingAbilityGameId ? d.cause : "no killing blow logged");
-
   // A called wipe: players die at full health with no killing blow logged,
   // several at once, just before the pull ends (A3, A8, A14, B6, B9, B10,
   // B13, B16, B19: 5-15 such deaths within 6-17s of the end). Deaths from
@@ -878,42 +840,21 @@ function detectPullOver(players: PlayerInfo[], deaths: DeathEvent[], pullEnd: nu
   const unlogged = deaths.filter((d) => !d.killingAbilityGameId).sort((a, b) => a.timestamp - b.timestamp);
   const wipeCall = unlogged.find((d) => pullEnd - d.timestamp <= CALLED_WIPE_END_MS &&
     unlogged.filter((o) => o.timestamp >= d.timestamp && o.timestamp <= d.timestamp + CALLED_WIPE_SPAN_MS).length >= CALLED_WIPE_MIN);
-  const cutoff = wipeCall?.timestamp ?? Infinity;
-  if (wipeCall) {
-    const n = unlogged.filter((o) => o.timestamp >= cutoff).length;
-    marker(cutoff, "Wipe Called",
-      `${n} players died with no killing blow logged from +${sec(cutoff)}s, ${sec(pullEnd - cutoff)}s before the pull ended: the raid reset the pull. ` +
+  const called = wipeCall && {
+    at: wipeCall.timestamp,
+    marker: raidMarker(LE_PULL_OVER_RULE_ID, "Wipe Called",
+      `${unlogged.filter((o) => o.timestamp >= wipeCall.timestamp).length} players died with no killing blow logged from ` +
+      `+${sec(wipeCall.timestamp)}s, ${sec(pullEnd - wipeCall.timestamp)}s before the pull ended: the raid reset the pull. ` +
       "Treated as the point the pull was over.",
-      0, "Wipe Called");
-  }
-  const sorted = [...deaths].filter((d) => d.timestamp < cutoff).sort((a, b) => a.timestamp - b.timestamp);
-
-  for (const d of sorted) {
-    const dead = deadAt(players, deaths, d.timestamp);
-    if (dead.length >= COLLAPSE_DEAD) {
-      marker(d.timestamp, "Raid Collapse",
-        `${dead.length} players dead at once: ${joinNames(dead.map((x) => `${x.player} (${cause(x)}, +${sec(x.timestamp)}s)`))}. ` +
-        "Treated as the point the pull was over.",
-        d.killingAbilityGameId, cause(d));
-      break;
-    }
-  }
-
-  for (const d of sorted) {
-    if (byName.get(d.player)?.role !== "Tank") continue;
-    const next = sorted.find((o) => o.player === d.player && o.timestamp > d.timestamp)?.timestamp ?? Infinity;
-    const rez = rezzedAt(byName.get(d.player)!, d.timestamp, next);
-    if (rez !== undefined && rez - d.timestamp <= TANK_REZ_GRACE_MS) continue;
-    if (pullEnd - d.timestamp > TANK_DEATH_END_MS) continue;
-    marker(d.timestamp, "Tank Died",
-      `Tank ${d.player} died (${cause(d)})` + (rez !== undefined ? ` and wasn't rezzed until ${sec(rez - d.timestamp)}s later` : " and wasn't rezzed") +
-      `; the pull ended ${sec(pullEnd - d.timestamp)}s after. Treated as the point the pull was over.`,
-      d.killingAbilityGameId, cause(d));
-  }
-
-  // Earliest wins; within 1s a specific cause beats the generic head-count.
-  const rank = (e: PullError) => e.timestamp + (e.name === "Raid Collapse" ? 1000 : 0);
-  return candidates.sort((a, b) => rank(a) - rank(b)).slice(0, 1);
+      wipeCall.timestamp, 0, "Wipe Called"),
+  };
+  return pullOverMarker(players, deaths, pullEnd, {
+    ruleId: LE_PULL_OVER_RULE_ID,
+    collapseDead: COLLAPSE_DEAD,
+    cause: (d) => (d.killingAbilityGameId ? d.cause : "no killing blow logged"),
+    tankDeath: { kind: "pullEnded", rezGraceMs: TANK_REZ_GRACE_MS, endMs: TANK_DEATH_END_MS },
+    calledWipe: called,
+  });
 }
 
 // ─── Entry point ─────────────────────────────────────────────────────────────

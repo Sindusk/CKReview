@@ -429,13 +429,14 @@
 // If positions or direct pickup events are absent, report uncertain egg
 // attribution instead of fabricating an individual carrier error.
 
-import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
+import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { DeathEvent } from "@/types/DeathEvent";
 import type { PullError, EnemyEvent } from "@/types/PullError";
 import { suppressDuplicateRaidErrors } from "../../../error-detection";
 import {
-  RAID_MARKER_SORT_OFFSET_MS, kFmt, sec, joinNames, playerError, rezzedAt, lastPlayerEventMs,
-  clusterByGap, deadAt,
+  kFmt, sec, joinNames, playerError, lastPlayerEventMs, clusterByGap, deadAt,
+  landed, total, died, deathsBy, applied, removed, near, raidMarker, playerlessMinor,
+  pullOverMarker, calledWipe,
 } from "../common";
 
 // ─── Ability IDs (log-verified, report JZp82Rm7TzycM94a) ────────────────────
@@ -499,26 +500,6 @@ const TANK_REZ_GRACE_MS = 15000;
 const TANK_DEATH_END_MS = 30000;
 const CALLED_WIPE_DEATHS = 4;
 const CALLED_WIPE_WINDOW_MS = 10000;
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-const landed = (e: PlayerEvent) => (e.amount ?? 0) > 0;
-const total = (g: PlayerEvent[]) => kFmt(g.reduce((s, e) => s + (e.amount ?? 0), 0));
-const died = (d: DeathEvent | undefined, from: number) =>
-  !d ? "" : d.timestamp - from < 100 ? " and died to it" : ` and died ${sec(d.timestamp - from)}s later`;
-const deathsBy = (deaths: DeathEvent[], ids: number[], from: number, to: number) =>
-  deaths.filter((d) => ids.includes(d.killingAbilityGameId) && d.timestamp >= from - 100 && d.timestamp <= to);
-const applied = (p: PlayerInfo, id: number) => p.debuffs.filter((e) => e.abilityId === id && e.debuffStatus === "applied");
-const removed = (p: PlayerInfo, id: number) => p.debuffs.filter((e) => e.abilityId === id && e.debuffStatus === "removed");
-const near = (t: number, ms: number) => (e: { timestamp: number }) => Math.abs(e.timestamp - t) <= ms;
-
-function raidMarker(ruleId: string, name: string, description: string, timestamp: number, abilityId: number, abilityName: string): PullError {
-  return { ruleId, severity: "Raid", name, description, timestamp: timestamp + RAID_MARKER_SORT_OFFSET_MS, abilityId, abilityName };
-}
-
-function raidless(ruleId: string, name: string, description: string, timestamp: number, abilityId: number, abilityName: string): PullError {
-  return { ruleId, severity: "Minor", name, description, timestamp, abilityId, abilityName };
-}
 
 // ─── Eggs hatching into Vipers ───────────────────────────────────────────────
 //
@@ -590,7 +571,7 @@ function detectHatches(
         : clutch
           ? "A Slithering Clutch hatched into a Viper (it wasn't broken before it reached the venom)"
           : "An egg hatched into a Viper with no carrier event logged (left unattended, or a clutch reached the venom)";
-      errors.push(raidless(ULA_HATCH_RULE_ID, "Egg Hatched", `${why}${fallout}.`, t, PUTRID_MEMBRANE, "Putrid Membrane"));
+      errors.push(playerlessMinor(ULA_HATCH_RULE_ID, "Egg Hatched", `${why}${fallout}.`, t, PUTRID_MEMBRANE, "Putrid Membrane"));
     }
 
     if (wipe && (blameable || !fellWith.length)) {
@@ -646,7 +627,7 @@ function detectCoils(players: PlayerInfo[], deaths: DeathEvent[], enemyCasts: En
         `${killed.length} (${joinNames(killed.map((d) => d.player))}). Treated as the point the pull was over.`,
         t, COIL_DAMAGE, "Spectral Coils"));
     } else if (soakers.length <= COIL_UNDERSOAK && alive >= COIL_MIN_ALIVE) {
-      errors.push(raidless(ULA_COILS_RULE_ID, "Spectral Coils Under-Soaked",
+      errors.push(playerlessMinor(ULA_COILS_RULE_ID, "Spectral Coils Under-Soaked",
         `Only ${soakers.length} player${soakers.length === 1 ? "" : "s"} mitigated a Spectral Coils impact${who} ` +
         `(clean impacts had 5-10)${killed.length ? `; it killed ${joinNames(killed.map((d) => d.player))}` : ""}.`,
         t, COIL_DAMAGE, "Spectral Coils"));
@@ -721,7 +702,7 @@ function detectWrath(players: PlayerInfo[], deaths: DeathEvent[], enemyCasts: En
       `Stone Venom on ${stoned.length} players${killed.length ? `, killing ${killed.length}` : ""}.`;
     return [killed.length >= RAID_DEATHS
       ? raidMarker(ULA_WRATH_RULE_ID, "Mother's Wrath on the Raid", `${desc} Treated as the point the pull was over.`, c.timestamp, MOTHERS_WRATH, "Mother's Wrath")
-      : raidless(ULA_WRATH_RULE_ID, "Mother's Wrath on the Raid", desc, c.timestamp, MOTHERS_WRATH, "Mother's Wrath")];
+      : playerlessMinor(ULA_WRATH_RULE_ID, "Mother's Wrath on the Raid", desc, c.timestamp, MOTHERS_WRATH, "Mother's Wrath")];
   });
 }
 
@@ -783,7 +764,7 @@ function detectAddCasts(deaths: DeathEvent[], enemyCasts: EnemyEvent[]): PullErr
       `${killed.length ? `; ${killed.length} died to it (${joinNames(killed.map((d) => d.player))})` : ""}.`;
     errors.push(killed.length >= RAID_DEATHS
       ? raidMarker(ULA_ADD_CAST_RULE_ID, `${c.abilityName} Completed`, `${desc} Treated as the point the pull was over.`, c.timestamp, c.abilityId, c.abilityName)
-      : raidless(ULA_ADD_CAST_RULE_ID, `${c.abilityName} Completed`, desc, c.timestamp, c.abilityId, c.abilityName));
+      : playerlessMinor(ULA_ADD_CAST_RULE_ID, `${c.abilityName} Completed`, desc, c.timestamp, c.abilityId, c.abilityName));
   }
   return errors;
 }
@@ -850,48 +831,14 @@ function detectEnrage(players: PlayerInfo[]): PullError[] {
 export const ULA_PULL_OVER_RULE_ID = "wow-ula-pull-over";
 
 function detectPullOver(players: PlayerInfo[], deaths: DeathEvent[], pullEnd: number): PullError[] {
-  const candidates: PullError[] = [];
-  const byName = new Map(players.map((p) => [p.name, p]));
-  const cause = (d: DeathEvent) => (d.killingAbilityGameId ? d.cause : "no killing blow logged");
-  const sorted = [...deaths].sort((a, b) => a.timestamp - b.timestamp);
-
-  const silent = sorted.filter((d) => !d.killingAbilityGameId);
-  let calledAt = Infinity;
-  for (let i = 0; i + CALLED_WIPE_DEATHS - 1 < silent.length; i++) {
-    if (silent[i + CALLED_WIPE_DEATHS - 1].timestamp - silent[i].timestamp <= CALLED_WIPE_WINDOW_MS) {
-      calledAt = silent[i].timestamp;
-      candidates.push(raidMarker(ULA_PULL_OVER_RULE_ID, "Wipe Called",
-        `${CALLED_WIPE_DEATHS}+ players died with no killing blow within ${CALLED_WIPE_WINDOW_MS / 1000}s — the raid reset. Treated as the point the pull was over.`,
-        calledAt, 0, "Wipe"));
-      break;
-    }
-  }
-
-  for (const d of sorted.filter((x) => x.timestamp < calledAt)) {
-    const dead = deadAt(players, deaths, d.timestamp);
-    if (dead.length >= COLLAPSE_DEAD && pullEnd - d.timestamp <= COLLAPSE_END_MS) {
-      candidates.push(raidMarker(ULA_PULL_OVER_RULE_ID, "Raid Collapse",
-        `${dead.length} players dead at once: ${joinNames(dead.map((x) => `${x.player} (${cause(x)}, +${sec(x.timestamp)}s)`))}. ` +
-        "Treated as the point the pull was over.", d.timestamp, d.killingAbilityGameId, cause(d)));
-      break;
-    }
-  }
-
-  for (const d of sorted.filter((x) => x.timestamp < calledAt)) {
-    if (byName.get(d.player)?.role !== "Tank") continue;
-    const next = sorted.find((o) => o.player === d.player && o.timestamp > d.timestamp)?.timestamp ?? Infinity;
-    const rez = rezzedAt(byName.get(d.player)!, d.timestamp, next);
-    if (rez !== undefined && rez - d.timestamp <= TANK_REZ_GRACE_MS) continue;
-    if (pullEnd - d.timestamp > TANK_DEATH_END_MS) continue;
-    candidates.push(raidMarker(ULA_PULL_OVER_RULE_ID, "Tank Died",
-      `Tank ${d.player} died (${cause(d)})` + (rez !== undefined ? ` and wasn't rezzed until ${sec(rez - d.timestamp)}s later` : " and wasn't rezzed") +
-      `; the pull ended ${sec(pullEnd - d.timestamp)}s after. Treated as the point the pull was over.`,
-      d.timestamp, d.killingAbilityGameId, cause(d)));
-  }
-
-  // Earliest wins; within 1s a specific cause beats the generic head-count.
-  const rank = (e: PullError) => e.timestamp + (e.name === "Raid Collapse" ? 1000 : 0);
-  return candidates.sort((a, b) => rank(a) - rank(b)).slice(0, 1);
+  return pullOverMarker(players, deaths, pullEnd, {
+    ruleId: ULA_PULL_OVER_RULE_ID,
+    collapseDead: COLLAPSE_DEAD,
+    collapseEndMs: COLLAPSE_END_MS,
+    cause: (d) => (d.killingAbilityGameId ? d.cause : "no killing blow logged"),
+    tankDeath: { kind: "pullEnded", rezGraceMs: TANK_REZ_GRACE_MS, endMs: TANK_DEATH_END_MS },
+    calledWipe: calledWipe(deaths, ULA_PULL_OVER_RULE_ID, CALLED_WIPE_DEATHS, CALLED_WIPE_WINDOW_MS),
+  });
 }
 
 // ─── Entry point ─────────────────────────────────────────────────────────────

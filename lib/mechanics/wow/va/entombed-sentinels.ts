@@ -209,7 +209,8 @@ import { suppressDuplicateRaidErrors } from "../../../error-detection";
 import { findPlayerPosition, type Position } from "../../player-position";
 import { distanceBetween, distanceToSegment } from "../../geometry";
 import {
-  RAID_MARKER_SORT_OFFSET_MS, yd, kFmt, sec, debuffIntervals, hitsOf, deathOf, joinNames, playerError, rezzedAt, lastPlayerEventMs,
+  RAID_MARKER_SORT_OFFSET_MS, yd, kFmt, sec, debuffIntervals, hitsOf, deathOf, joinNames, playerError, lastPlayerEventMs,
+  raidMarker, pullOverMarker,
 } from "../common";
 
 // ─── Ability IDs (all verified in Mvz3r1AnVKYpdFTH) ──────────────────────────
@@ -1166,41 +1167,7 @@ function detectPullOver(
 ): PullError[] {
   const candidates: PullError[] = [];
   const marker = (timestamp: number, name: string, description: string, abilityId: number, abilityName: string) =>
-    candidates.push({ ruleId: ES_PULL_OVER_RULE_ID, severity: "Raid", name, description, timestamp: timestamp + RAID_MARKER_SORT_OFFSET_MS, abilityId, abilityName });
-  const byName = new Map(players.map((p) => [p.name, p]));
-  const sorted = [...deaths].sort((a, b) => a.timestamp - b.timestamp);
-
-  // Deaths with their rez time, for the concurrent-dead count.
-  const lives = sorted.map((d) => {
-    const next = sorted.find((o) => o.player === d.player && o.timestamp > d.timestamp)?.timestamp ?? Infinity;
-    const p = byName.get(d.player);
-    return { d, rez: p ? rezzedAt(p, d.timestamp, next) : undefined };
-  });
-
-  // ── 5+ dead at once.
-  for (const { d } of lives) {
-    const dead = lives.filter((l) => l.d.timestamp <= d.timestamp && (l.rez === undefined || l.rez > d.timestamp));
-    if (dead.length >= COLLAPSE_DEAD) {
-      marker(d.timestamp, "Raid Collapse",
-        `${dead.length} players dead at once: ${joinNames(dead.map((l) => `${l.d.player} (${l.d.cause}, +${sec(l.d.timestamp)}s)`))}. ` +
-        "Treated as the point the pull was over.",
-        d.killingAbilityGameId, d.cause);
-      break;
-    }
-  }
-
-  // ── Tank deaths.
-  for (const { d, rez } of lives) {
-    if (byName.get(d.player)?.role !== "Tank") continue;
-    const recovered = rez !== undefined && rez - d.timestamp <= TANK_REZ_GRACE_MS && pullEnd - d.timestamp >= TANK_DEATH_CONTINUE_MS;
-    if (recovered) continue;
-    marker(d.timestamp, "Tank Died",
-      `Tank ${d.player} died (${d.cause})` +
-      (rez !== undefined ? ` — rezzed ${sec(rez - d.timestamp)}s later, but the pull ended ${sec(pullEnd - d.timestamp)}s after the death.`
-                         : ` and wasn't rezzed, leaving one tank for two bosses.`) +
-      " Treated as the point the pull was over.",
-      d.killingAbilityGameId, d.cause);
-  }
+    candidates.push(raidMarker(ES_PULL_OVER_RULE_ID, name, description, timestamp, abilityId, abilityName));
 
   // ── Tank buster on a non-tank.
   for (const p of players) {
@@ -1232,8 +1199,13 @@ function detectPullOver(
 
   // Earliest wins; within 1s a specific cause (tank death, Berserk, ...)
   // beats the generic head-count (pull 20 +306.7: the 5th death WAS the tank).
-  const rank = (e: PullError) => e.timestamp + (e.name === "Raid Collapse" ? 1000 : 0);
-  return candidates.sort((a, b) => rank(a) - rank(b)).slice(0, 1);
+  return pullOverMarker(players, deaths, pullEnd, {
+    ruleId: ES_PULL_OVER_RULE_ID,
+    collapseDead: COLLAPSE_DEAD,
+    tankDeath: { kind: "recovered", rezGraceMs: TANK_REZ_GRACE_MS, continueMs: TANK_DEATH_CONTINUE_MS,
+      noRezText: " and wasn't rezzed, leaving one tank for two bosses." },
+    extra: candidates,
+  });
 }
 
 // ─── Entry point ─────────────────────────────────────────────────────────────

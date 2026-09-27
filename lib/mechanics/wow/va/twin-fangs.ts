@@ -381,8 +381,8 @@ import type { DeathEvent } from "@/types/DeathEvent";
 import type { PullError, EnemyEvent } from "@/types/PullError";
 import { suppressDuplicateRaidErrors } from "../../../error-detection";
 import {
-  RAID_MARKER_SORT_OFFSET_MS, kFmt, sec, joinNames, playerError, rezzedAt, lastPlayerEventMs,
-  clusterByGap, deadAt,
+  RAID_MARKER_SORT_OFFSET_MS, kFmt, sec, joinNames, playerError, lastPlayerEventMs,
+  clusterByGap, deadAt, landed, total, died, deathsBy, pullOverMarker, hitEpisodes, annotateGroups as annotateGroupsBy,
 } from "../common";
 
 // ─── Ability IDs (log-verified, reports 6Jnq8ycwgkYZpHND + xKP1M6gwC8WpnrBc) ─
@@ -479,13 +479,6 @@ const WRATH_MIN_SURVIVAL_MS = 5000;
 
 // ─── Small helpers ───────────────────────────────────────────────────────────
 
-const died = (d: DeathEvent | undefined, from: number) =>
-  !d ? "" : d.timestamp - from < 100 ? " and died to it" : ` and died ${sec(d.timestamp - from)}s later`;
-
-const landed = (e: PlayerEvent) => (e.amount ?? 0) > 0;
-const total = (g: PlayerEvent[]) => kFmt(g.reduce((s, e) => s + (e.amount ?? 0), 0));
-const killedBy = (deaths: DeathEvent[], ids: number[], from: number, to: number) =>
-  deaths.filter((d) => ids.includes(d.killingAbilityGameId) && d.timestamp >= from - 100 && d.timestamp <= to);
 
 // ─── Eternal Venom sources ───────────────────────────────────────────────────
 //
@@ -695,7 +688,7 @@ function detectFeast(players: PlayerInfo[], deaths: DeathEvent[], feasts: number
       const t = bite[0].e.timestamp;
       const end = bite[bite.length - 1].e.timestamp + HIT_DEATH_WINDOW_MS;
       if (bite.length >= FEAST_RAID_BITE) {
-        const killed = killedBy(deaths, [FEAST_BITE], t, end);
+        const killed = deathsBy(deaths, [FEAST_BITE], t, end);
         const prev = bites[i - 1];
         errors.push({
           ruleId:      TF_FEAST_RAID_RULE_ID,
@@ -741,7 +734,7 @@ function detectTaintedBurst(players: PlayerInfo[], deaths: DeathEvent[]): PullEr
   const hits = players.flatMap((p) => p.damageTaken.filter((e) => e.abilityId === TAINTED_BURST));
   return clusterByGap(hits, (e) => e.timestamp, BURST_CLUSTER_MS).map((g) => {
     const t = g[0].timestamp;
-    const killed = killedBy(deaths, [TAINTED_BURST], t, g[g.length - 1].timestamp + HIT_DEATH_WINDOW_MS);
+    const killed = deathsBy(deaths, [TAINTED_BURST], t, g[g.length - 1].timestamp + HIT_DEATH_WINDOW_MS);
     const raid = killed.length >= BURST_RAID_DEATHS;
     return {
       ruleId:      TF_TAINTED_BURST_RULE_ID,
@@ -774,7 +767,7 @@ function detectVisceralBurst(deaths: DeathEvent[], enemyCasts: EnemyEvent[]): Pu
     if (done.length === 0) continue;
     const broodlings = new Set(done.map((e) => e.sourceInstance ?? e.timestamp)).size;
     const t = done[0].timestamp;
-    const killed = killedBy(deaths, [VISCERAL_BURST_HIT], t, done[done.length - 1].timestamp + BROOD_DEATH_TAIL_MS);
+    const killed = deathsBy(deaths, [VISCERAL_BURST_HIT], t, done[done.length - 1].timestamp + BROOD_DEATH_TAIL_MS);
     const raid = killed.length >= BROOD_RAID_DEATHS;
     errors.push({
       ruleId:      TF_VISCERAL_BURST_RULE_ID,
@@ -816,7 +809,7 @@ function detectStoneBreaker(players: PlayerInfo[], deaths: DeathEvent[], enemyCa
     for (const [i, t] of set.entries()) {
       const hit = players.flatMap((p) => p.damageTaken.filter((e) => e.abilityId === STONE_UNSOAKED && e.timestamp >= t - 100 && e.timestamp <= t + STONE_HIT_MS));
       if (hit.length === 0) continue;
-      const killed = killedBy(deaths, [STONE_UNSOAKED], t, t + HIT_DEATH_WINDOW_MS);
+      const killed = deathsBy(deaths, [STONE_UNSOAKED], t, t + HIT_DEATH_WINDOW_MS);
       const dutyDead = duty && deadAt(players, deaths, t).some((d) => d.player === duty.name);
       const outcome = `hit ${hit.length} players` + (killed.length ? ` and killed ${killed.length}: ${joinNames(killed.map((d) => d.player))}` : "");
       const base = { ruleId: TF_STONE_BREAKER_RULE_ID, name: "Stone Breaker Not Soaked", timestamp: t, abilityId: STONE_UNSOAKED, abilityName: "Stone Breaker", abilityIcon: hit[0].abilityIcon };
@@ -867,24 +860,12 @@ function avoidableHits(
   players: PlayerInfo[], deaths: DeathEvent[], hitsOf: (p: PlayerInfo) => PlayerEvent[], killIds: number[], gapMs: number,
   make: (p: PlayerInfo, hits: PlayerEvent[], death: DeathEvent | undefined) => PullError,
 ): PullError[] {
-  const errors: PullError[] = [];
-  for (const p of players) {
-    for (const g of clusterByGap(hitsOf(p), (e) => e.timestamp, gapMs)) {
-      const death = deaths.find((d) => d.player === p.name && killIds.includes(d.killingAbilityGameId) &&
-        d.timestamp >= g[0].timestamp - 100 && d.timestamp <= g[g.length - 1].timestamp + HIT_DEATH_WINDOW_MS);
-      errors.push(make(p, g, death));
-    }
-  }
-  return errors;
+  return hitEpisodes(players, deaths, hitsOf, killIds, gapMs, make, HIT_DEATH_WINDOW_MS);
 }
 
 /** Annotate errors of one rule that happened to 4+ players within a second. */
-function annotateGroups(errors: PullError[], note: (others: number) => string): PullError[] {
-  return errors.map((e) => {
-    const others = errors.filter((o) => o.player !== e.player && Math.abs(o.timestamp - e.timestamp) <= GROUP_HIT_MS);
-    return others.length + 1 >= GROUP_HIT_MIN ? { ...e, description: `${e.description} ${note(others.length)}` } : e;
-  });
-}
+const annotateGroups = (errors: PullError[], note: (others: number) => string) =>
+  annotateGroupsBy(errors, note, GROUP_HIT_MS, GROUP_HIT_MIN);
 
 function detectAvoidable(players: PlayerInfo[], deaths: DeathEvent[]): PullError[] {
   // A hit that gave the 10th stack is reported by the cap rule; keep it Minor here.
@@ -949,7 +930,7 @@ function detectOutOfRange(players: PlayerInfo[], deaths: DeathEvent[], enemyCast
   return enemyCasts.filter((e) => OUT_OF_RANGE_CASTS.has(e.abilityId)).flatMap((c) => {
     const hit = players.filter((p) => p.damageTaken.some((e) => e.abilityId === c.abilityId && landed(e) && Math.abs(e.timestamp - c.timestamp) <= 1500));
     if (hit.length === 0) return [];
-    const killed = killedBy(deaths, [c.abilityId], c.timestamp, c.timestamp + 3000);
+    const killed = deathsBy(deaths, [c.abilityId], c.timestamp, c.timestamp + 3000);
     return [{
       ruleId:      TF_OUT_OF_RANGE_RULE_ID,
       severity:    "Minor" as const,
@@ -993,39 +974,12 @@ function detectUncoiledWrath(enemyBuffs: EnemyEvent[], pullEnd: number): PullErr
 export const TF_PULL_OVER_RULE_ID = "wow-tf-pull-over";
 
 function detectPullOver(players: PlayerInfo[], deaths: DeathEvent[], pullEnd: number): PullError[] {
-  const candidates: PullError[] = [];
-  const marker = (timestamp: number, name: string, description: string, abilityId: number, abilityName: string) =>
-    candidates.push({ ruleId: TF_PULL_OVER_RULE_ID, severity: "Raid", name, description, timestamp: timestamp + RAID_MARKER_SORT_OFFSET_MS, abilityId, abilityName });
-  const byName = new Map(players.map((p) => [p.name, p]));
-  const cause = (d: DeathEvent) => (d.killingAbilityGameId ? d.cause : "no killing blow logged");
-  const sorted = [...deaths].sort((a, b) => a.timestamp - b.timestamp);
-
-  for (const d of sorted) {
-    const dead = deadAt(players, deaths, d.timestamp);
-    if (dead.length >= COLLAPSE_DEAD) {
-      marker(d.timestamp, "Raid Collapse",
-        `${dead.length} players dead at once: ${joinNames(dead.map((x) => `${x.player} (${cause(x)}, +${sec(x.timestamp)}s)`))}. ` +
-        "Treated as the point the pull was over.",
-        d.killingAbilityGameId, cause(d));
-      break;
-    }
-  }
-
-  for (const d of sorted) {
-    if (byName.get(d.player)?.role !== "Tank") continue;
-    const next = sorted.find((o) => o.player === d.player && o.timestamp > d.timestamp)?.timestamp ?? Infinity;
-    const rez = rezzedAt(byName.get(d.player)!, d.timestamp, next);
-    if (rez !== undefined && rez - d.timestamp <= TANK_REZ_GRACE_MS) continue;
-    if (pullEnd - d.timestamp > TANK_DEATH_END_MS) continue;
-    marker(d.timestamp, "Tank Died",
-      `Tank ${d.player} died (${cause(d)})` + (rez !== undefined ? ` and wasn't rezzed until ${sec(rez - d.timestamp)}s later` : " and wasn't rezzed") +
-      `; the pull ended ${sec(pullEnd - d.timestamp)}s after. Treated as the point the pull was over.`,
-      d.killingAbilityGameId, cause(d));
-  }
-
-  // Earliest wins; within 1s a specific cause beats the generic head-count.
-  const rank = (e: PullError) => e.timestamp + (e.name === "Raid Collapse" ? 1000 : 0);
-  return candidates.sort((a, b) => rank(a) - rank(b)).slice(0, 1);
+  return pullOverMarker(players, deaths, pullEnd, {
+    ruleId: TF_PULL_OVER_RULE_ID,
+    collapseDead: COLLAPSE_DEAD,
+    cause: (d) => (d.killingAbilityGameId ? d.cause : "no killing blow logged"),
+    tankDeath: { kind: "pullEnded", rezGraceMs: TANK_REZ_GRACE_MS, endMs: TANK_DEATH_END_MS },
+  });
 }
 
 // ─── Entry point ─────────────────────────────────────────────────────────────

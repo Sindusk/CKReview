@@ -332,7 +332,8 @@ import type { DeathEvent } from "@/types/DeathEvent";
 import type { PullError, EnemyEvent } from "@/types/PullError";
 import { suppressDuplicateRaidErrors } from "../../../error-detection";
 import {
-  RAID_MARKER_SORT_OFFSET_MS, kFmt, sec, debuffIntervals, joinNames, playerError, rezzedAt, lastPlayerEventMs,
+  kFmt, sec, debuffIntervals, joinNames, playerError, lastPlayerEventMs,
+  clusterByGap, deadAt, died, hitEpisodes, pullOverMarker,
 } from "../common";
 
 // ─── Ability IDs (log-verified, report nRGxQ1b8LdMvzC4D) ─────────────────────
@@ -413,35 +414,6 @@ const TANK_DEATH_END_MS = 30000;
 
 // ─── Small helpers ───────────────────────────────────────────────────────────
 
-/** Split time-sorted items wherever consecutive items are more than `gapMs` apart. */
-function clusterByGap<T>(items: T[], at: (x: T) => number, gapMs: number): T[][] {
-  const groups: T[][] = [];
-  let lastT = -Infinity;
-  for (const x of [...items].sort((a, b) => at(a) - at(b))) {
-    if (at(x) - lastT > gapMs || groups.length === 0) groups.push([x]);
-    else groups[groups.length - 1].push(x);
-    lastT = at(x);
-  }
-  return groups;
-}
-
-/** Players dead at `t`, net of battle-rezzes. */
-function deadAt(players: PlayerInfo[], deaths: DeathEvent[], t: number): DeathEvent[] {
-  const byName = new Map(players.map((p) => [p.name, p]));
-  const sorted = [...deaths].sort((a, b) => a.timestamp - b.timestamp);
-  return sorted.filter((d) => {
-    if (d.timestamp > t) return false;
-    const next = sorted.find((o) => o.player === d.player && o.timestamp > d.timestamp)?.timestamp ?? Infinity;
-    if (next <= t) return false; // a later death supersedes this one
-    const p = byName.get(d.player);
-    const rez = p ? rezzedAt(p, d.timestamp, next) : undefined;
-    return rez === undefined || rez > t;
-  });
-}
-
-const died = (d: DeathEvent | undefined, from: number) =>
-  !d ? "" : d.timestamp - from < 100 ? " and died to it" : ` and died ${sec(d.timestamp - from)}s later`;
-
 function median(xs: number[]): number {
   const s = [...xs].sort((a, b) => a - b);
   return s.length ? s[Math.floor(s.length / 2)] : 0;
@@ -455,16 +427,7 @@ function avoidableHits(
   players: PlayerInfo[], deaths: DeathEvent[], ids: Set<number>, gapMs: number,
   make: (p: PlayerInfo, hits: PlayerEvent[], death: DeathEvent | undefined) => PullError,
 ): PullError[] {
-  const errors: PullError[] = [];
-  for (const p of players) {
-    const hits = p.damageTaken.filter((e) => ids.has(e.abilityId));
-    for (const g of clusterByGap(hits, (e) => e.timestamp, gapMs)) {
-      const death = deaths.find((d) => d.player === p.name && ids.has(d.killingAbilityGameId) &&
-        d.timestamp >= g[0].timestamp - 100 && d.timestamp <= g[g.length - 1].timestamp + HIT_DEATH_WINDOW_MS);
-      errors.push(make(p, g, death));
-    }
-  }
-  return errors;
+  return hitEpisodes(players, deaths, (p) => p.damageTaken.filter((e) => ids.has(e.abilityId)), [...ids], gapMs, make, HIT_DEATH_WINDOW_MS);
 }
 
 // ─── Vessel of Awakening: unburned corpses revived ───────────────────────────
@@ -776,39 +739,12 @@ function detectUnscheduledRite(players: PlayerInfo[], deaths: DeathEvent[], enem
 export const NEK_PULL_OVER_RULE_ID = "wow-nek-pull-over";
 
 function detectPullOver(players: PlayerInfo[], deaths: DeathEvent[], pullEnd: number): PullError[] {
-  const candidates: PullError[] = [];
-  const marker = (timestamp: number, name: string, description: string, abilityId: number, abilityName: string) =>
-    candidates.push({ ruleId: NEK_PULL_OVER_RULE_ID, severity: "Raid", name, description, timestamp: timestamp + RAID_MARKER_SORT_OFFSET_MS, abilityId, abilityName });
-  const byName = new Map(players.map((p) => [p.name, p]));
-  const sorted = [...deaths].sort((a, b) => a.timestamp - b.timestamp);
-  const cause = (d: DeathEvent) => (d.killingAbilityGameId ? d.cause : "unknown");
-
-  for (const d of sorted) {
-    const dead = deadAt(players, deaths, d.timestamp);
-    if (dead.length >= COLLAPSE_DEAD) {
-      marker(d.timestamp, "Raid Collapse",
-        `${dead.length} players dead at once: ${joinNames(dead.map((x) => `${x.player} (${cause(x)}, +${sec(x.timestamp)}s)`))}. ` +
-        "Treated as the point the pull was over.",
-        d.killingAbilityGameId, cause(d));
-      break;
-    }
-  }
-
-  for (const d of sorted) {
-    if (byName.get(d.player)?.role !== "Tank") continue;
-    const next = sorted.find((o) => o.player === d.player && o.timestamp > d.timestamp)?.timestamp ?? Infinity;
-    const rez = rezzedAt(byName.get(d.player)!, d.timestamp, next);
-    if (rez !== undefined && rez - d.timestamp <= TANK_REZ_GRACE_MS) continue;
-    if (pullEnd - d.timestamp > TANK_DEATH_END_MS) continue;
-    marker(d.timestamp, "Tank Died",
-      `Tank ${d.player} died (${cause(d)})` + (rez !== undefined ? ` and wasn't rezzed until ${sec(rez - d.timestamp)}s later` : " and wasn't rezzed") +
-      `; the pull ended ${sec(pullEnd - d.timestamp)}s after. Treated as the point the pull was over.`,
-      d.killingAbilityGameId, cause(d));
-  }
-
-  // Earliest wins; within 1s a specific cause beats the generic head-count.
-  const rank = (e: PullError) => e.timestamp + (e.name === "Raid Collapse" ? 1000 : 0);
-  return candidates.sort((a, b) => rank(a) - rank(b)).slice(0, 1);
+  return pullOverMarker(players, deaths, pullEnd, {
+    ruleId: NEK_PULL_OVER_RULE_ID,
+    collapseDead: COLLAPSE_DEAD,
+    cause: (d) => (d.killingAbilityGameId ? d.cause : "unknown"),
+    tankDeath: { kind: "pullEnded", rezGraceMs: TANK_REZ_GRACE_MS, endMs: TANK_DEATH_END_MS },
+  });
 }
 
 // ─── Entry point ─────────────────────────────────────────────────────────────

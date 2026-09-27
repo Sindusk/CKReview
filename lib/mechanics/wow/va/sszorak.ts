@@ -336,6 +336,7 @@ import { interpolatePlayerPosition, type Position } from "../../player-position"
 import { distanceBetween } from "../../geometry";
 import {
   RAID_MARKER_SORT_OFFSET_MS, kFmt, sec, yd, debuffIntervals, joinNames, playerError, rezzedAt, lastPlayerEventMs,
+  aliveAt, raidMarker, pullOverMarker,
 } from "../common";
 
 // ─── Ability IDs (log-verified, report rNL38zFGMbyADRTh) ─────────────────────
@@ -443,16 +444,6 @@ function posAt(p: PlayerInfo, t: number): Position | undefined {
 
 function distYd(a: Position | undefined, b: Position | undefined): number | undefined {
   return a && b ? distanceBetween(a, b) : undefined;
-}
-
-/** Whether `p` is alive at `t`, allowing for battle-rezzes. */
-function aliveAt(p: PlayerInfo, deaths: DeathEvent[], t: number): boolean {
-  const mine = deaths.filter((d) => d.player === p.name).sort((a, b) => a.timestamp - b.timestamp);
-  const last = mine.filter((d) => d.timestamp <= t).pop();
-  if (!last) return true;
-  const next = mine.find((d) => d.timestamp > last.timestamp)?.timestamp ?? Infinity;
-  const rez = rezzedAt(p, last.timestamp, next);
-  return rez !== undefined && rez <= t;
 }
 
 function deathIn(deaths: DeathEvent[], name: string, from: number, to: number): DeathEvent | undefined {
@@ -959,7 +950,7 @@ export const SSZ_PULL_OVER_RULE_ID = "wow-ssz-pull-over";
 function detectPullOver(players: PlayerInfo[], deaths: DeathEvent[], enemyCasts: EnemyEvent[], pullEnd: number): PullError[] {
   const candidates: PullError[] = [];
   const marker = (timestamp: number, name: string, description: string, abilityId: number, abilityName: string) =>
-    candidates.push({ ruleId: SSZ_PULL_OVER_RULE_ID, severity: "Raid", name, description, timestamp: timestamp + RAID_MARKER_SORT_OFFSET_MS, abilityId, abilityName });
+    candidates.push(raidMarker(SSZ_PULL_OVER_RULE_ID, name, description, timestamp, abilityId, abilityName));
   const byName = new Map(players.map((p) => [p.name, p]));
   const sorted = [...deaths].sort((a, b) => a.timestamp - b.timestamp);
   const lives = sorted.map((d) => {
@@ -968,17 +959,6 @@ function detectPullOver(players: PlayerInfo[], deaths: DeathEvent[], enemyCasts:
     return { d, rez: p ? rezzedAt(p, d.timestamp, next) : undefined };
   });
   const cause = (d: DeathEvent) => (d.killingAbilityGameId ? d.cause : isFall(byName.get(d.player), d) ? "fell" : "unknown");
-
-  for (const { d } of lives) {
-    const dead = lives.filter((l) => l.d.timestamp <= d.timestamp && (l.rez === undefined || l.rez > d.timestamp));
-    if (dead.length >= COLLAPSE_DEAD) {
-      marker(d.timestamp, "Raid Collapse",
-        `${dead.length} players dead at once: ${joinNames(dead.map((l) => `${l.d.player} (${cause(l.d)}, +${sec(l.d.timestamp)}s)`))}. ` +
-        "Treated as the point the pull was over.",
-        d.killingAbilityGameId, cause(d));
-      break;
-    }
-  }
 
   // The other tank holds Sszorak alone until the next Apex Predator combo
   // (Mutilate needs both tanks' groups), so a rez before then also counts
@@ -1001,9 +981,7 @@ function detectPullOver(players: PlayerInfo[], deaths: DeathEvent[], enemyCasts:
   const berserk = enemyCasts.find((e) => e.abilityId === BERSERK && e.actorName === "Sszorak");
   if (berserk) marker(berserk.timestamp, "Berserk", "Sszorak went Berserk (enrage timer).", BERSERK, "Berserk");
 
-  // Earliest wins; within 1s a specific cause beats the generic head-count.
-  const rank = (e: PullError) => e.timestamp + (e.name === "Raid Collapse" ? 1000 : 0);
-  return candidates.sort((a, b) => rank(a) - rank(b)).slice(0, 1);
+  return pullOverMarker(players, deaths, pullEnd, { ruleId: SSZ_PULL_OVER_RULE_ID, collapseDead: COLLAPSE_DEAD, cause, extra: candidates });
 }
 
 // ─── Entry point ─────────────────────────────────────────────────────────────

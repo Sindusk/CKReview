@@ -312,7 +312,8 @@ import type { DeathEvent } from "@/types/DeathEvent";
 import type { PullError, EnemyEvent, ErrorSeverity } from "@/types/PullError";
 import { suppressDuplicateRaidErrors } from "../../../error-detection";
 import {
-  RAID_MARKER_SORT_OFFSET_MS, kFmt, sec, debuffIntervals, hitsOf, joinNames, playerError, rezzedAt, lastPlayerEventMs,
+  kFmt, sec, debuffIntervals, hitsOf, joinNames, playerError, lastPlayerEventMs,
+  aliveAt, raidMarker, pullOverMarker,
 } from "../common";
 
 // ─── Ability IDs (log-verified, report kGVX7tafBT2pM1N3) ─────────────────────
@@ -417,16 +418,6 @@ function maxStack(p: PlayerInfo, abilityId: number, start: number, end: number):
   return p.debuffs
     .filter((e) => e.abilityId === abilityId && e.timestamp >= start && e.timestamp <= end)
     .reduce((m, e) => Math.max(m, e.stack ?? 1), 1);
-}
-
-/** Whether `p` is alive at `t`, allowing for battle-rezzes. */
-function aliveAt(p: PlayerInfo, deaths: DeathEvent[], t: number): boolean {
-  const mine = deaths.filter((d) => d.player === p.name).sort((a, b) => a.timestamp - b.timestamp);
-  const last = mine.filter((d) => d.timestamp <= t).pop();
-  if (!last) return true;
-  const next = mine.find((d) => d.timestamp > last.timestamp)?.timestamp ?? Infinity;
-  const rez = rezzedAt(p, last.timestamp, next);
-  return rez !== undefined && rez <= t;
 }
 
 const hitTotal = (hits: PlayerEvent[]) => hits.reduce((s, e) => s + (e.amount ?? 0), 0);
@@ -808,46 +799,13 @@ function detectFangsSwap(players: PlayerInfo[], deaths: DeathEvent[]): PullError
 export const VASH_PULL_OVER_RULE_ID = "wow-vash-pull-over";
 
 function detectPullOver(players: PlayerInfo[], deaths: DeathEvent[], enemyCasts: EnemyEvent[], pullEnd: number): PullError[] {
-  const candidates: PullError[] = [];
-  const marker = (timestamp: number, name: string, description: string, abilityId: number, abilityName: string) =>
-    candidates.push({ ruleId: VASH_PULL_OVER_RULE_ID, severity: "Raid", name, description, timestamp: timestamp + RAID_MARKER_SORT_OFFSET_MS, abilityId, abilityName });
-  const byName = new Map(players.map((p) => [p.name, p]));
-  const sorted = [...deaths].sort((a, b) => a.timestamp - b.timestamp);
-  const lives = sorted.map((d) => {
-    const next = sorted.find((o) => o.player === d.player && o.timestamp > d.timestamp)?.timestamp ?? Infinity;
-    const p = byName.get(d.player);
-    return { d, rez: p ? rezzedAt(p, d.timestamp, next) : undefined };
-  });
-
-  for (const { d } of lives) {
-    const dead = lives.filter((l) => l.d.timestamp <= d.timestamp && (l.rez === undefined || l.rez > d.timestamp));
-    if (dead.length >= COLLAPSE_DEAD) {
-      marker(d.timestamp, "Raid Collapse",
-        `${dead.length} players dead at once: ${joinNames(dead.map((l) => `${l.d.player} (${l.d.cause}, +${sec(l.d.timestamp)}s)`))}. ` +
-        "Treated as the point the pull was over.",
-        d.killingAbilityGameId, d.cause);
-      break;
-    }
-  }
-
-  for (const { d, rez } of lives) {
-    if (byName.get(d.player)?.role !== "Tank") continue;
-    const recovered = rez !== undefined && rez - d.timestamp <= TANK_REZ_GRACE_MS && pullEnd - d.timestamp >= TANK_DEATH_CONTINUE_MS;
-    if (recovered) continue;
-    marker(d.timestamp, "Tank Died",
-      `Tank ${d.player} died (${d.cause})` +
-      (rez !== undefined ? ` — rezzed ${sec(rez - d.timestamp)}s later, but the pull ended ${sec(pullEnd - d.timestamp)}s after the death.`
-                         : " and wasn't rezzed.") +
-      " Treated as the point the pull was over.",
-      d.killingAbilityGameId, d.cause);
-  }
-
   const berserk = enemyCasts.find((e) => e.abilityId === BERSERK && e.actorName === "Vashnik");
-  if (berserk) marker(berserk.timestamp, "Berserk", "Vashnik went Berserk (enrage timer).", BERSERK, "Berserk");
-
-  // Earliest wins; within 1s a specific cause beats the generic head-count.
-  const rank = (e: PullError) => e.timestamp + (e.name === "Raid Collapse" ? 1000 : 0);
-  return candidates.sort((a, b) => rank(a) - rank(b)).slice(0, 1);
+  return pullOverMarker(players, deaths, pullEnd, {
+    ruleId: VASH_PULL_OVER_RULE_ID,
+    collapseDead: COLLAPSE_DEAD,
+    tankDeath: { kind: "recovered", rezGraceMs: TANK_REZ_GRACE_MS, continueMs: TANK_DEATH_CONTINUE_MS },
+    extra: berserk ? [raidMarker(VASH_PULL_OVER_RULE_ID, "Berserk", "Vashnik went Berserk (enrage timer).", berserk.timestamp, BERSERK, "Berserk")] : [],
+  });
 }
 
 // ─── Entry point ─────────────────────────────────────────────────────────────
