@@ -315,6 +315,7 @@ import {
   kFmt, sec, debuffIntervals, hitsOf, joinNames, playerError, lastPlayerEventMs,
   aliveAt, raidMarker, pullOverMarker,
 } from "../common";
+import type { WowPullContext } from "../common";
 
 // ─── Ability IDs (log-verified, report kGVX7tafBT2pM1N3) ─────────────────────
 
@@ -810,12 +811,8 @@ function detectPullOver(players: PlayerInfo[], deaths: DeathEvent[], enemyCasts:
 
 // ─── Entry point ─────────────────────────────────────────────────────────────
 
-export function detectVashnikErrors(
-  players:         PlayerInfo[],
-  deaths:          DeathEvent[] = [],
-  enemyCasts:      EnemyEvent[] = [],
-  pullDurationMs?: number
-): PullError[] {
+export function detectVashnikErrors(ctx: WowPullContext): PullError[] {
+  const { players, deaths, enemyCasts, pullDurationMs } = ctx;
   // Self-gate: tank deaths / Berserk exist in every fight.
   const isVashnik = enemyCasts.some((e) => e.abilityId === IMBIBE) ||
     players.some((p) => p.debuffs.some((e) => e.abilityId === PLAGUE_FROTH || e.abilityId === DRIPPING_FANGS_DEBUFF));

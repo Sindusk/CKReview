@@ -212,6 +212,7 @@ import {
   RAID_MARKER_SORT_OFFSET_MS, yd, kFmt, sec, debuffIntervals, hitsOf, deathOf, joinNames, playerError, lastPlayerEventMs,
   raidMarker, pullOverMarker,
 } from "../common";
+import type { WowPullContext } from "../common";
 
 // ─── Ability IDs (all verified in Mvz3r1AnVKYpdFTH) ──────────────────────────
 
@@ -1210,14 +1211,8 @@ function detectPullOver(
 
 // ─── Entry point ─────────────────────────────────────────────────────────────
 
-export function detectEntombedSentinelsErrors(
-  players:          PlayerInfo[],
-  deaths:           DeathEvent[] = [],
-  enemyCasts:       EnemyEvent[] = [],
-  enemyBuffs:       EnemyEvent[] = [],
-  enemyBuffRemoves: EnemyEvent[] = [],
-  pullDurationMs?:  number
-): PullError[] {
+export function detectEntombedSentinelsErrors(ctx: WowPullContext): PullError[] {
+  const { players, deaths, enemyCasts, enemyBuffs, enemyBuffRemovals: enemyBuffRemoves, pullDurationMs } = ctx;
   const stasis = stasisTimes(enemyCasts);
   // Self-gate: Deadly Venom (the arena-edge venom) also rims Vashnik's
   // arena, and tank deaths / Berserk happen in every WoW fight, so only run

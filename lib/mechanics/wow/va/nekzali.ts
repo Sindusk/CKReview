@@ -335,6 +335,7 @@ import {
   kFmt, sec, debuffIntervals, joinNames, playerError, lastPlayerEventMs,
   clusterByGap, deadAt, died, hitEpisodes, pullOverMarker,
 } from "../common";
+import type { WowPullContext } from "../common";
 
 // ─── Ability IDs (log-verified, report nRGxQ1b8LdMvzC4D) ─────────────────────
 
@@ -749,13 +750,8 @@ function detectPullOver(players: PlayerInfo[], deaths: DeathEvent[], pullEnd: nu
 
 // ─── Entry point ─────────────────────────────────────────────────────────────
 
-export function detectNekzaliErrors(
-  players:         PlayerInfo[],
-  deaths:          DeathEvent[] = [],
-  enemyCasts:      EnemyEvent[] = [],
-  enemyBuffs:      EnemyEvent[] = [],
-  pullDurationMs?: number
-): PullError[] {
+export function detectNekzaliErrors(ctx: WowPullContext): PullError[] {
+  const { players, deaths, enemyCasts, enemyBuffs, pullDurationMs } = ctx;
   // Self-gate: tank deaths exist in every fight.
   const isNekzali = players.some((p) => p.debuffs.some((e: PlayerEvent) => NEKZALI_SIGNATURE.has(e.abilityId)));
   if (!isNekzali) return [];

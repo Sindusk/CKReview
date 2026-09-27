@@ -384,6 +384,7 @@ import {
   RAID_MARKER_SORT_OFFSET_MS, kFmt, sec, joinNames, playerError, lastPlayerEventMs,
   clusterByGap, deadAt, landed, total, died, deathsBy, pullOverMarker, hitEpisodes, annotateGroups as annotateGroupsBy,
 } from "../common";
+import type { WowPullContext } from "../common";
 
 // ─── Ability IDs (log-verified, reports 6Jnq8ycwgkYZpHND + xKP1M6gwC8WpnrBc) ─
 
@@ -984,13 +985,8 @@ function detectPullOver(players: PlayerInfo[], deaths: DeathEvent[], pullEnd: nu
 
 // ─── Entry point ─────────────────────────────────────────────────────────────
 
-export function detectTwinFangsErrors(
-  players:         PlayerInfo[],
-  deaths:          DeathEvent[] = [],
-  enemyCasts:      EnemyEvent[] = [],
-  enemyBuffs:      EnemyEvent[] = [],
-  pullDurationMs?: number
-): PullError[] {
+export function detectTwinFangsErrors(ctx: WowPullContext): PullError[] {
+  const { players, deaths, enemyCasts, enemyBuffs, pullDurationMs } = ctx;
   // Self-gate: tank deaths and generic damage exist in every fight.
   const isTwinFangs = players.some((p) => p.debuffs.some((e: PlayerEvent) => TWIN_FANGS_SIGNATURE.has(e.abilityId)));
   if (!isTwinFangs) return [];

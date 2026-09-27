@@ -438,6 +438,7 @@ import {
   landed, total, died, deathsBy, applied, removed, near, raidMarker, playerlessMinor,
   pullOverMarker, calledWipe,
 } from "../common";
+import type { WowPullContext } from "../common";
 
 // ─── Ability IDs (log-verified, report JZp82Rm7TzycM94a) ────────────────────
 
@@ -843,13 +844,8 @@ function detectPullOver(players: PlayerInfo[], deaths: DeathEvent[], pullEnd: nu
 
 // ─── Entry point ─────────────────────────────────────────────────────────────
 
-export function detectUlatekErrors(
-  players:           PlayerInfo[],
-  deaths:            DeathEvent[] = [],
-  enemyCasts:        EnemyEvent[] = [],
-  enemyBuffRemovals: EnemyEvent[] = [],
-  pullDurationMs?:   number
-): PullError[] {
+export function detectUlatekErrors(ctx: WowPullContext): PullError[] {
+  const { players, deaths, enemyCasts, enemyBuffRemovals, pullDurationMs } = ctx;
   // Self-gate: Deadly Venom and generic deaths exist in other Venomous Abyss fights.
   const isUlatek = players.some((p) => p.debuffs.some((e) => ULATEK_SIGNATURE.has(e.abilityId)));
   if (!isUlatek) return [];

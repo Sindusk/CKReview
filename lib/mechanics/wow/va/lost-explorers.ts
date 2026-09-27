@@ -371,6 +371,7 @@ import {
   RAID_MARKER_SORT_OFFSET_MS, kFmt, sec, yd, debuffIntervals, joinNames, playerError, lastPlayerEventMs,
   deadAt, landed, total, died, raidMarker, hitEpisodes, annotateGroups as annotateGroupsBy, pullOverMarker,
 } from "../common";
+import type { WowPullContext } from "../common";
 
 // ─── Ability IDs (log-verified, reports nRGxQ1b8LdMvzC4D + 8PQFgdDh3R9BW71t) ─
 
@@ -859,13 +860,8 @@ function detectPullOver(players: PlayerInfo[], deaths: DeathEvent[], pullEnd: nu
 
 // ─── Entry point ─────────────────────────────────────────────────────────────
 
-export function detectLostExplorersErrors(
-  players:         PlayerInfo[],
-  deaths:          DeathEvent[] = [],
-  enemyCasts:      EnemyEvent[] = [],
-  enemyBuffs:      EnemyEvent[] = [],
-  pullDurationMs?: number
-): PullError[] {
+export function detectLostExplorersErrors(ctx: WowPullContext): PullError[] {
+  const { players, deaths, enemyCasts, enemyBuffs, pullDurationMs } = ctx;
   // Self-gate: tank deaths and generic damage exist in every fight.
   const isLostExplorers = players.some((p) => p.debuffs.some((e: PlayerEvent) => LOST_EXPLORERS_SIGNATURE.has(e.abilityId)));
   if (!isLostExplorers) return [];

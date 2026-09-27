@@ -142,6 +142,19 @@ function makeFFPullCtx(pull, actorMap, abilityMap, getFFJobByName) {
   };
 }
 
+// WoW pull inputs (a WowPullContext, see lib/mechanics/wow/common.ts), built
+// once per pull and shared by every WoW mechanic — the live pipeline hands
+// all modules the same objects too. Keyed on the pull object, so a report's
+// contexts are freed once the driver moves on to the next report.
+const wowPullCache = new WeakMap();
+function wowPullContext(pull, actorMap, abilityMap, getSpecInfo) {
+  if (!wowPullCache.has(pull)) {
+    const built = buildWowPull(pull.rep, actorMap, abilityMap, getSpecInfo);
+    wowPullCache.set(pull, { ...built, pullDurationMs: fightDurationMs(pull.rep) });
+  }
+  return wowPullCache.get(pull);
+}
+
 function printPullErrors(ctx, errors, extraLists = []) {
   const all = [...errors, ...extraLists.flatMap(([, list]) => list)];
   const extraSummary = extraLists.map(([label, list]) => `, ${list.length} ${label}`).join('');
@@ -191,7 +204,9 @@ function sortEntries(entries) {
 // load(): transpile + return the detection module(s); called once, lazily.
 // run({ mod, ctxs, ... }): process ONE report and print its results.
 //   FF entries get `ctxs` (one lazy pull context per pull, see above);
-//   the wow entry builds its own pulls; the mitigation pair goes through the
+//   WoW entries share one memoized context per pull (wowPullContext), and
+//   most are generated from lib/mechanics/wow/registry.ts (see
+//   addWowRegistryEntries); the mitigation pair goes through the
 //   real app pipeline (lib/sample-report-store.ts + lib/log-transforms.ts)
 //   instead, because it needs properly-resolved ability names — so it loads
 //   the report itself by code and only works for folders under sampledata/.
@@ -395,8 +410,9 @@ const MECHANICS = {
     }),
     run({ mod, pulls, actorMap, abilityMap }) {
       const builtPulls = [];
-      for (const { bossName, pullNumber, rep } of pulls) {
-        const { players, deaths, enemyCasts, enemyBuffs, friendlyNpcDamage } = buildWowPull(rep, actorMap, abilityMap, mod.getSpecInfo);
+      for (const pull of pulls) {
+        const { bossName, pullNumber } = pull;
+        const { players, deaths, enemyCasts, enemyBuffs, friendlyNpcDamage } = wowPullContext(pull, actorMap, abilityMap, mod.getSpecInfo);
         builtPulls.push({ players });
         const errors = mod.detectMidnightFallsErrors(players, deaths, enemyCasts, enemyBuffs, friendlyNpcDamage);
         console.log('='.repeat(70));
@@ -452,165 +468,8 @@ const MECHANICS = {
     },
   },
 
-  'entombed-sentinels': {
-    game: 'wow',
-    load: () => ({
-      ...requireTsFromRoot('lib/mechanics/wow/va/entombed-sentinels.ts'),
-      ...requireTsFromRoot('lib/spec-data.ts'),
-    }),
-    run({ mod, pulls, actorMap, abilityMap }) {
-      for (const { bossName, pullNumber, rep } of pulls) {
-        const { players, deaths, enemyCasts, enemyBuffs, enemyBuffRemovals } = buildWowPull(rep, actorMap, abilityMap, mod.getSpecInfo);
-        const errors = mod.detectEntombedSentinelsErrors(players, deaths, enemyCasts, enemyBuffs, enemyBuffRemovals, fightDurationMs(rep));
-        console.log('='.repeat(70));
-        console.log(`${bossName} Pull ${pullNumber} ->`, errors.length, 'errors');
-        for (const e of errors) {
-          console.log(`  [${e.severity}] [${e.ruleId}] t=+${(e.timestamp / 1000).toFixed(1)}s ${e.player ?? '(raid)'}: ${e.description}`);
-        }
-        recordErrors(bossName, pullNumber, errors);
-      }
-    },
-  },
-
-  vashnik: {
-    game: 'wow',
-    load: () => ({
-      ...requireTsFromRoot('lib/mechanics/wow/va/vashnik.ts'),
-      ...requireTsFromRoot('lib/spec-data.ts'),
-    }),
-    run({ mod, pulls, actorMap, abilityMap }) {
-      for (const { bossName, pullNumber, rep } of pulls) {
-        const { players, deaths, enemyCasts } = buildWowPull(rep, actorMap, abilityMap, mod.getSpecInfo);
-        const errors = mod.detectVashnikErrors(players, deaths, enemyCasts, fightDurationMs(rep));
-        console.log('='.repeat(70));
-        console.log(`${bossName} Pull ${pullNumber} ->`, errors.length, 'errors');
-        for (const e of errors) {
-          console.log(`  [${e.severity}] [${e.ruleId}] t=+${(e.timestamp / 1000).toFixed(1)}s ${e.player ?? '(raid)'}: ${e.description}`);
-        }
-        recordErrors(bossName, pullNumber, errors);
-      }
-    },
-  },
-
-  sszorak: {
-    game: 'wow',
-    load: () => ({
-      ...requireTsFromRoot('lib/mechanics/wow/va/sszorak.ts'),
-      ...requireTsFromRoot('lib/spec-data.ts'),
-    }),
-    run({ mod, pulls, actorMap, abilityMap }) {
-      for (const { bossName, pullNumber, rep } of pulls) {
-        const { players, deaths, enemyCasts, enemyBuffs } = buildWowPull(rep, actorMap, abilityMap, mod.getSpecInfo);
-        const errors = mod.detectSszorakErrors(players, deaths, enemyCasts, enemyBuffs, fightDurationMs(rep));
-        console.log('='.repeat(70));
-        console.log(`${bossName} Pull ${pullNumber} ->`, errors.length, 'errors');
-        for (const e of errors) {
-          console.log(`  [${e.severity}] [${e.ruleId}] t=+${(e.timestamp / 1000).toFixed(1)}s ${e.player ?? '(raid)'}: ${e.description}`);
-        }
-        recordErrors(bossName, pullNumber, errors);
-      }
-    },
-  },
-
-  nekzali: {
-    game: 'wow',
-    load: () => ({
-      ...requireTsFromRoot('lib/mechanics/wow/va/nekzali.ts'),
-      ...requireTsFromRoot('lib/spec-data.ts'),
-    }),
-    run({ mod, pulls, actorMap, abilityMap }) {
-      for (const { bossName, pullNumber, rep } of pulls) {
-        const { players, deaths, enemyCasts, enemyBuffs } = buildWowPull(rep, actorMap, abilityMap, mod.getSpecInfo);
-        const errors = mod.detectNekzaliErrors(players, deaths, enemyCasts, enemyBuffs, fightDurationMs(rep));
-        console.log('='.repeat(70));
-        console.log(`${bossName} Pull ${pullNumber} ->`, errors.length, 'errors');
-        for (const e of errors) {
-          console.log(`  [${e.severity}] [${e.ruleId}] t=+${(e.timestamp / 1000).toFixed(1)}s ${e.player ?? '(raid)'}: ${e.description}`);
-        }
-        recordErrors(bossName, pullNumber, errors);
-      }
-    },
-  },
-
-  'lost-explorers': {
-    game: 'wow',
-    load: () => ({
-      ...requireTsFromRoot('lib/mechanics/wow/va/lost-explorers.ts'),
-      ...requireTsFromRoot('lib/spec-data.ts'),
-    }),
-    run({ mod, pulls, actorMap, abilityMap }) {
-      for (const { bossName, pullNumber, rep } of pulls) {
-        const { players, deaths, enemyCasts, enemyBuffs } = buildWowPull(rep, actorMap, abilityMap, mod.getSpecInfo);
-        const errors = mod.detectLostExplorersErrors(players, deaths, enemyCasts, enemyBuffs, fightDurationMs(rep));
-        console.log('='.repeat(70));
-        console.log(`${bossName} Pull ${pullNumber} ->`, errors.length, 'errors');
-        for (const e of errors) {
-          console.log(`  [${e.severity}] [${e.ruleId}] t=+${(e.timestamp / 1000).toFixed(1)}s ${e.player ?? '(raid)'}: ${e.description}`);
-        }
-        recordErrors(bossName, pullNumber, errors);
-      }
-    },
-  },
-
-  'twin-fangs': {
-    game: 'wow',
-    load: () => ({
-      ...requireTsFromRoot('lib/mechanics/wow/va/twin-fangs.ts'),
-      ...requireTsFromRoot('lib/spec-data.ts'),
-    }),
-    run({ mod, pulls, actorMap, abilityMap }) {
-      for (const { bossName, pullNumber, rep } of pulls) {
-        const { players, deaths, enemyCasts, enemyBuffs } = buildWowPull(rep, actorMap, abilityMap, mod.getSpecInfo);
-        const errors = mod.detectTwinFangsErrors(players, deaths, enemyCasts, enemyBuffs, fightDurationMs(rep));
-        console.log('='.repeat(70));
-        console.log(`${bossName} Pull ${pullNumber} ->`, errors.length, 'errors');
-        for (const e of errors) {
-          console.log(`  [${e.severity}] [${e.ruleId}] t=+${(e.timestamp / 1000).toFixed(1)}s ${e.player ?? '(raid)'}: ${e.description}`);
-        }
-        recordErrors(bossName, pullNumber, errors);
-      }
-    },
-  },
-
-  'coiled-altar': {
-    game: 'wow',
-    load: () => ({
-      ...requireTsFromRoot('lib/mechanics/wow/va/coiled-altar.ts'),
-      ...requireTsFromRoot('lib/spec-data.ts'),
-    }),
-    run({ mod, pulls, actorMap, abilityMap }) {
-      for (const { bossName, pullNumber, rep } of pulls) {
-        const { players, deaths, enemyCasts, enemyBuffs, enemyBuffRemovals } = buildWowPull(rep, actorMap, abilityMap, mod.getSpecInfo);
-        const errors = mod.detectCoiledAltarErrors(players, deaths, enemyCasts, enemyBuffs, enemyBuffRemovals, fightDurationMs(rep));
-        console.log('='.repeat(70));
-        console.log(`${bossName} Pull ${pullNumber} ->`, errors.length, 'errors');
-        for (const e of errors) {
-          console.log(`  [${e.severity}] [${e.ruleId}] t=+${(e.timestamp / 1000).toFixed(1)}s ${e.player ?? '(raid)'}: ${e.description}`);
-        }
-        recordErrors(bossName, pullNumber, errors);
-      }
-    },
-  },
-
-  ulatek: {
-    game: 'wow',
-    load: () => ({
-      ...requireTsFromRoot('lib/mechanics/wow/va/ulatek.ts'),
-      ...requireTsFromRoot('lib/spec-data.ts'),
-    }),
-    run({ mod, pulls, actorMap, abilityMap }) {
-      for (const { bossName, pullNumber, rep } of pulls) {
-        const { players, deaths, enemyCasts, enemyBuffRemovals } = buildWowPull(rep, actorMap, abilityMap, mod.getSpecInfo);
-        const errors = mod.detectUlatekErrors(players, deaths, enemyCasts, enemyBuffRemovals, fightDurationMs(rep));
-        console.log('='.repeat(70));
-        console.log(`${bossName} Pull ${pullNumber} ->`, errors.length, 'errors');
-        for (const e of errors) {
-          console.log(`  [${e.severity}] [${e.ruleId}] t=+${(e.timestamp / 1000).toFixed(1)}s ${e.player ?? '(raid)'}: ${e.description}`);
-        }
-        recordErrors(bossName, pullNumber, errors);
-      }
-    },
-  },
+  // The other per-pull WoW modules get generated entries from
+  // lib/mechanics/wow/registry.ts (see addWowRegistryEntries below).
 
   mitigation: {
     game: 'ff',
@@ -674,6 +533,32 @@ const MECHANICS = {
     },
   },
 };
+
+// One generated entry per module in lib/mechanics/wow/registry.ts (except
+// those with a hand-written entry above, marked customHarness there). A new
+// WoW boss module needs no change here.
+function addWowRegistryEntries() {
+  const registry = requireTsFromRoot('lib/mechanics/wow/registry.ts');
+  for (const m of registry.WOW_ENCOUNTER_MODULES) {
+    if (m.customHarness || MECHANICS[m.name]) continue;
+    MECHANICS[m.name] = {
+      game: 'wow',
+      load: () => requireTsFromRoot('lib/spec-data.ts'),
+      run({ mod, pulls, actorMap, abilityMap }) {
+        for (const pull of pulls) {
+          const errors = m.detect(wowPullContext(pull, actorMap, abilityMap, mod.getSpecInfo));
+          console.log('='.repeat(70));
+          console.log(`${pull.bossName} Pull ${pull.pullNumber} ->`, errors.length, 'errors');
+          for (const e of errors) {
+            console.log(`  [${e.severity}] [${e.ruleId}] t=+${(e.timestamp / 1000).toFixed(1)}s ${e.player ?? '(raid)'}: ${e.description}`);
+          }
+          recordErrors(pull.bossName, pull.pullNumber, errors);
+        }
+      },
+    };
+  }
+}
+addWowRegistryEntries();
 
 // Shared by the two mitigation entries: resolve the report folder to a code,
 // load it through the app's own sample-report-store, and transform it with

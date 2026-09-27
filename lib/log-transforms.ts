@@ -63,15 +63,7 @@ import { detectPhase1Errors } from "./mechanics/ffxiv/dancingmad/phase1";
 import { detectKefkaSaysErrors } from "./mechanics/ffxiv/dancingmad/kefka-says";
 import type { KefkaSaysStateSignal } from "./mechanics/ffxiv/dancingmad/kefka-says";
 import { detectUltimateKefkaErrors } from "./mechanics/ffxiv/dancingmad/ultimate-kefka";
-import { detectMidnightFallsErrors } from "./mechanics/wow/vs-dr-mqd/midnightfalls";
-import { detectEntombedSentinelsErrors } from "./mechanics/wow/va/entombed-sentinels";
-import { detectVashnikErrors } from "./mechanics/wow/va/vashnik";
-import { detectSszorakErrors } from "./mechanics/wow/va/sszorak";
-import { detectNekzaliErrors } from "./mechanics/wow/va/nekzali";
-import { detectLostExplorersErrors } from "./mechanics/wow/va/lost-explorers";
-import { detectTwinFangsErrors } from "./mechanics/wow/va/twin-fangs";
-import { detectCoiledAltarErrors } from "./mechanics/wow/va/coiled-altar";
-import { detectUlatekErrors } from "./mechanics/wow/va/ulatek";
+import { detectWowEncounterErrors } from "./mechanics/wow/registry";
 
 // Shared shape for both games' ability maps: gameID -> name + raw icon
 // filename (not yet resolved to a URL — that happens per-game via
@@ -548,29 +540,18 @@ export function transformFightToPull(
   const enemyBuffEvents = wclBuildEnemyBuffEvents(data.enemyBuffEvents ?? [], actorMap, abilityMap, fightStart);
   const friendlyNpcDamageEvents = wclBuildFriendlyNpcDamageEvents(data.damageTakenEvents ?? [], actorMap, abilityMap, fightStart);
 
+  // Per-boss encounter modules: see lib/mechanics/wow/registry.ts.
   const errors = [
     ...detectPullErrors(players, deathEvents, enemyCastEvents, enemyBuffEvents),
-    ...detectMidnightFallsErrors(players, deathEvents, enemyCastEvents, enemyBuffEvents, friendlyNpcDamageEvents),
-    ...detectEntombedSentinelsErrors(
-      players, deathEvents, enemyCastEvents, enemyBuffEvents,
-      wclBuildEnemyBuffRemovalEvents(data.enemyBuffEvents ?? [], actorMap, abilityMap, fightStart),
-      data.fight.endTime - data.fight.startTime
-    ),
-    ...detectVashnikErrors(players, deathEvents, enemyCastEvents, data.fight.endTime - data.fight.startTime),
-    ...detectSszorakErrors(players, deathEvents, enemyCastEvents, enemyBuffEvents, data.fight.endTime - data.fight.startTime),
-    ...detectNekzaliErrors(players, deathEvents, enemyCastEvents, enemyBuffEvents, data.fight.endTime - data.fight.startTime),
-    ...detectLostExplorersErrors(players, deathEvents, enemyCastEvents, enemyBuffEvents, data.fight.endTime - data.fight.startTime),
-    ...detectTwinFangsErrors(players, deathEvents, enemyCastEvents, enemyBuffEvents, data.fight.endTime - data.fight.startTime),
-    ...detectCoiledAltarErrors(
-      players, deathEvents, enemyCastEvents, enemyBuffEvents,
-      wclBuildEnemyBuffRemovalEvents(data.enemyBuffEvents ?? [], actorMap, abilityMap, fightStart),
-      data.fight.endTime - data.fight.startTime
-    ),
-    ...detectUlatekErrors(
-      players, deathEvents, enemyCastEvents,
-      wclBuildEnemyBuffRemovalEvents(data.enemyBuffEvents ?? [], actorMap, abilityMap, fightStart),
-      data.fight.endTime - data.fight.startTime
-    ),
+    ...detectWowEncounterErrors({
+      players,
+      deaths:            deathEvents,
+      enemyCasts:        enemyCastEvents,
+      enemyBuffs:        enemyBuffEvents,
+      enemyBuffRemovals: wclBuildEnemyBuffRemovalEvents(data.enemyBuffEvents ?? [], actorMap, abilityMap, fightStart),
+      friendlyNpcDamage: friendlyNpcDamageEvents,
+      pullDurationMs:    data.fight.endTime - data.fight.startTime,
+    }),
   ].sort((a, b) => a.timestamp - b.timestamp);
 
   const fightDurationMs = data.fight.endTime - data.fight.startTime;

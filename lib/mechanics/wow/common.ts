@@ -10,7 +10,24 @@
 
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import type { DeathEvent } from "@/types/DeathEvent";
-import type { PullError } from "@/types/PullError";
+import type { PullError, EnemyEvent } from "@/types/PullError";
+
+/**
+ * Everything a per-pull WoW encounter module receives (see registry.ts).
+ * Timestamps are fight-relative ms. enemyCasts holds completed casts only;
+ * enemyBuffs holds applybuff only, and enemyBuffRemovals the removebuffs.
+ */
+export type WowPullContext = {
+  players:           PlayerInfo[];
+  deaths:            DeathEvent[];
+  enemyCasts:        EnemyEvent[];
+  enemyBuffs:        EnemyEvent[];
+  enemyBuffRemovals: EnemyEvent[];
+  /** Damage landing on friendly NPCs (Midnight Falls' crystals). */
+  friendlyNpcDamage: EnemyEvent[];
+  /** fight.endTime - fight.startTime (the harness approximates it from events). */
+  pullDurationMs:    number;
+};
 
 // A Raid marker usually shares its millisecond with the Major errors that
 // caused it. AnalysisPanel lists raids before majors and then stable-sorts

@@ -430,6 +430,7 @@ import {
   kFmt, sec, joinNames, playerError, lastPlayerEventMs, clusterByGap, debuffIntervals,
   landed, total, died, deathsBy, applied, removed, raidMarker, pullOverMarker, calledWipe,
 } from "../common";
+import type { WowPullContext } from "../common";
 
 // ─── Ability IDs (log-verified, report wThYvpJkbK6Pjrdc) ────────────────────
 
@@ -905,14 +906,8 @@ function detectPullOver(players: PlayerInfo[], deaths: DeathEvent[], pullEnd: nu
 
 // ─── Entry point ─────────────────────────────────────────────────────────────
 
-export function detectCoiledAltarErrors(
-  players:           PlayerInfo[],
-  deaths:            DeathEvent[] = [],
-  enemyCasts:        EnemyEvent[] = [],
-  enemyBuffs:        EnemyEvent[] = [],
-  enemyBuffRemovals: EnemyEvent[] = [],
-  pullDurationMs?:   number
-): PullError[] {
+export function detectCoiledAltarErrors(ctx: WowPullContext): PullError[] {
+  const { players, deaths, enemyCasts, enemyBuffs, enemyBuffRemovals, pullDurationMs } = ctx;
   // Self-gate: tank deaths and generic damage exist in every fight.
   const isCoiledAltar = players.some((p) => p.debuffs.some((e) => COILED_ALTAR_SIGNATURE.has(e.abilityId)));
   if (!isCoiledAltar) return [];

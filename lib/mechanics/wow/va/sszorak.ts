@@ -338,6 +338,7 @@ import {
   RAID_MARKER_SORT_OFFSET_MS, kFmt, sec, yd, debuffIntervals, joinNames, playerError, rezzedAt, lastPlayerEventMs,
   aliveAt, raidMarker, pullOverMarker,
 } from "../common";
+import type { WowPullContext } from "../common";
 
 // ─── Ability IDs (log-verified, report rNL38zFGMbyADRTh) ─────────────────────
 
@@ -986,13 +987,8 @@ function detectPullOver(players: PlayerInfo[], deaths: DeathEvent[], enemyCasts:
 
 // ─── Entry point ─────────────────────────────────────────────────────────────
 
-export function detectSszorakErrors(
-  players:         PlayerInfo[],
-  deaths:          DeathEvent[] = [],
-  enemyCasts:      EnemyEvent[] = [],
-  enemyBuffs:      EnemyEvent[] = [],
-  pullDurationMs?: number
-): PullError[] {
+export function detectSszorakErrors(ctx: WowPullContext): PullError[] {
+  const { players, deaths, enemyCasts, enemyBuffs, pullDurationMs } = ctx;
   // Self-gate: tank deaths / Berserk exist in every fight.
   const isSszorak = players.some((p) => p.debuffs.some((e: PlayerEvent) => SSZORAK_SIGNATURE.has(e.abilityId)));
   if (!isSszorak) return [];
