@@ -38,7 +38,7 @@ import { createCallWipeError, CALL_WIPE_RULE_ID, createManualError, type ManualE
 import type { SavedSession } from "@/types/Session";
 import useTimelineController from "@/hooks/useTimelineController";
 import { loginWithWarcraftLogs, loginWithFFLogs } from "@/lib/log-auth";
-import { fetchReport, fetchFightData, buildFightLogLabels, getWCLRateLimitStatus, isWCLQuotaExhausted, type WCLReport } from "@/lib/wcl-client";
+import { fetchReport, fetchFightData, buildFightLogLabels, getWCLRateLimitStatus, isWCLQuotaExhausted, isReviewableFight, type WCLReport } from "@/lib/wcl-client";
 import {
   transformReportToPulls,
   transformFFReportToPulls,
@@ -574,8 +574,9 @@ export default function Home() {
     const report = await fetchReport(reportCode);
 
     // Extra safety net beyond killType: Encounters — drop any fight with a
-    // degenerate/zero duration rather than showing it as a pull (#7).
-    const validFights = report.fights.filter(f => f.endTime > f.startTime);
+    // degenerate/zero duration rather than showing it as a pull (#7) — and
+    // skip Mythic+ dungeon runs, which have no detection and are huge.
+    const validFights = report.fights.filter(isReviewableFight);
 
     setImportProgress(10);
     setImportStatus(`Loading ${validFights.length} fight${validFights.length === 1 ? "" : "s"}…`);
@@ -726,7 +727,7 @@ export default function Home() {
     }
 
     const knownFightIds = new Set(pullsRef.current.map(p => p.fightId));
-    const newFights = report.fights.filter(f => f.endTime > f.startTime && !knownFightIds.has(f.id));
+    const newFights = report.fights.filter(f => isReviewableFight(f) && !knownFightIds.has(f.id));
     if (newFights.length === 0) return;
 
     const abilityMap = buildWCLAbilityMap(report.masterData.abilities);
