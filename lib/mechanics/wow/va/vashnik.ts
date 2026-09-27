@@ -8,6 +8,20 @@
 // (written 2026-09-26 before any log was available). The first half is what
 // the logs actually showed; where the two disagree, the log section wins.
 //
+// ── OPEN QUESTIONS FOR VOD REVIEW ────────────────────────────────────────────
+//
+// The first pass was built from a report with no VOD available, so these
+// attribution calls are unconfirmed. Ask them at the first review:
+//
+//   1. Plague Wave: only the player hit is flagged. Should the Froth
+//      carrier whose lane it was share the blame? The description already
+//      names the carrier.
+//   2. Stygian Burst on players other than the holder is a Minor (92 in
+//      the report) and may not be dodgeable. Keep it, drop it, or make it
+//      a raid-wide healing error?
+//   3. Missed totems (Malignance) and undispelled Exploding Infection name
+//      no player. Should they?
+//
 // ── VERIFIED AGAINST LOGS (report kGVX7tafBT2pM1N3, 19 Mythic pulls, kill
 //    on pull 19; offsets fight-relative) ─────────────────────────────────────
 //

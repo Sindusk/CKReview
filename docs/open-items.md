@@ -28,6 +28,11 @@ it's resolved. Module headers carry the full context for mechanic items.
     Keep it, drop it, or make it a raid-wide healing error?
   - **Player-less errors.** Missed totems and undispelled Exploding
     Infection name no player. Should they?
+- **Sszorak** (report rNL38zFGMbyADRTh; not the user's group, no VOD):
+  eight attribution questions (Tempest volume, Mutilate exceptions,
+  Virulence/cyst/Crosswinds blame, the 5-dead threshold, Claws/Residue)
+  are listed at the top of `lib/mechanics/wow/va/sszorak.ts`. Ask them
+  once the user's group reaches the boss.
 
 ### Midnight Falls (WoW)
 
