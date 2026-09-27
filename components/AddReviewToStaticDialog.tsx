@@ -9,7 +9,7 @@
 
 import { useEffect, useState } from "react";
 import type { Pull } from "@/types/Pull";
-import { computeStaticReviewPullData } from "@/lib/static-review-data";
+import { computeStaticReviewPullData, staticEligiblePulls } from "@/lib/static-review-data";
 import { Dialog, Field } from "./ui/Dialog";
 
 type StaticSummary = {
@@ -96,8 +96,13 @@ export default function AddReviewToStaticDialog({
 
   if (!open) return null;
 
+  // WoW statics track Mythic raid progress only: Normal/Heroic raid pulls
+  // and Mythic+ dungeons in the same log are left out.
+  const eligiblePulls = staticEligiblePulls(pulls);
+  const skippedPulls = pulls.length - eligiblePulls.length;
+
   async function handleSubmit() {
-    if (!sessionId || selectedId == null) return;
+    if (!sessionId || selectedId == null || eligiblePulls.length === 0) return;
 
     setSubmitting(true);
     setError(null);
@@ -111,7 +116,7 @@ export default function AddReviewToStaticDialog({
           reportUrl,
           reportStartedAt,
           label: label.trim() || undefined,
-          pulls: computeStaticReviewPullData(pulls),
+          pulls: computeStaticReviewPullData(eligiblePulls),
         }),
       });
       const data = await res.json();
@@ -144,7 +149,7 @@ export default function AddReviewToStaticDialog({
             <button
               className="ck-btn ck-btn--md ck-btn--primary"
               onClick={handleSubmit}
-              disabled={submitting || selectedId == null}
+              disabled={submitting || selectedId == null || eligiblePulls.length === 0}
             >
               {submitting ? (alreadyLinked ? "Resyncing..." : "Adding...") : (alreadyLinked ? "Resync" : "Add")}
             </button>
@@ -185,7 +190,7 @@ export default function AddReviewToStaticDialog({
             </select>
           </Field>
 
-          <Field label="Label (optional)" style={{ marginBottom: error ? "14px" : 0 }}>
+          <Field label="Label (optional)" style={{ marginBottom: error || skippedPulls > 0 ? "14px" : 0 }}>
             <input
               className="ck-input"
               value={label}
@@ -193,6 +198,15 @@ export default function AddReviewToStaticDialog({
               placeholder="e.g. Week 4 progression"
             />
           </Field>
+
+          {skippedPulls > 0 && (
+            <p className="ck-dialog-text" style={{ marginBottom: error ? "14px" : 0 }}>
+              {eligiblePulls.length === 0
+                ? "This log has no Mythic raid pulls — nothing to add. Statics only track Mythic raids."
+                : `${eligiblePulls.length} Mythic raid pull${eligiblePulls.length === 1 ? "" : "s"} will be added; ` +
+                  `${skippedPulls} Normal/Heroic raid or Mythic+ pull${skippedPulls === 1 ? " is" : "s are"} left out.`}
+            </p>
+          )}
         </>
       )}
 

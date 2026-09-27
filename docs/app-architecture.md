@@ -114,6 +114,13 @@ file's header comment. Mechanic detection has its own guide:
   - **Detection changes do not reach existing statics until the user
     Resyncs.**
   - Hand-written pull summaries are preserved by `fightId`.
+- **WoW statics hold Mythic raid pulls only.** `staticEligiblePulls`
+  drops WoW pulls whose WCL `difficulty` isn't 5 (Mythic): Normal/Heroic
+  raids and Mythic+ dungeons logged the same night never reach a static.
+  The dialog says how many pulls it left out. Pulls from sessions saved
+  before `Pull.difficulty` existed have no difficulty and are kept, so an
+  old mixed log needs a fresh import before its Resync filters correctly.
+  FFXIV pulls are not filtered.
 - **Review sessions:**
   - **The review-session id is the identity of "one night's log".**
     `StaticReview` is unique on `(staticId, sessionId)`.

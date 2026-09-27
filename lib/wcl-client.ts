@@ -159,7 +159,17 @@ export type WCLFight = {
   endTime:         number;    // ms from report start
   kill:            boolean | null;
   friendlyPlayers: number[];
+  // WCL difficulty id: 1 LFR, 3 Normal, 4 Heroic, 5 Mythic, 10 Mythic+
+  // dungeon. Only Mythic raid pulls count toward a static's stats
+  // (see WCL_MYTHIC_DIFFICULTY). Absent in reports fetched before it was
+  // requested.
+  difficulty?:     number | null;
+  // Mythic+ keystone level (dungeon fights only).
+  keystoneLevel?:  number | null;
 };
+
+/** WCL `difficulty` of a Mythic raid fight — the only kind static stats import. */
+export const WCL_MYTHIC_DIFFICULTY = 5;
 
 export type WCLActor = {
   id:      number;
@@ -358,6 +368,8 @@ const REPORT_QUERY = /* graphql */`
           endTime
           kill
           friendlyPlayers
+          difficulty
+          keystoneLevel
         }
         masterData(translate: true) {
           actors {

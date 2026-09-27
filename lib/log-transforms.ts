@@ -573,6 +573,7 @@ export function transformFightToPull(
     reportCode,
     logSource:     "wcl",
     fightId:       data.fight.id,
+    difficulty:    data.fight.difficulty ?? undefined,
     castEvents,
   };
 }

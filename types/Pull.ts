@@ -47,6 +47,12 @@ export type Pull = {
   logSource:     "wcl" | "ffl";
   fightId:       number;    // raw fight ID from the log source, for report URLs (?fight=N)
 
+  // WoW only: WCL difficulty id (3 Normal, 4 Heroic, 5 Mythic, 10 Mythic+
+  // dungeon). Only Mythic raid pulls are added to a static's stats (see
+  // staticEligiblePulls in lib/static-review-data.ts). Undefined for FFXIV
+  // and for WoW pulls saved before the field existed.
+  difficulty?:   number;
+
   blackHoleGeometry?: BlackHoleGeometry;
 
   // The boss's own completed casts for this pull (FFXIV only, undefined for

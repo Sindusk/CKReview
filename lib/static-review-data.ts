@@ -10,6 +10,17 @@
 
 import type { Pull } from "@/types/Pull";
 import { getPullRaidCutoff } from "@/lib/report-data";
+import { WCL_MYTHIC_DIFFICULTY } from "@/lib/wcl-client";
+
+/**
+ * The pulls that count toward a static's stats. WoW: Mythic raid pulls
+ * only — Normal/Heroic raids and Mythic+ dungeons in the same log are
+ * dropped. A WoW pull with no recorded difficulty (a session saved before
+ * the field existed) is kept, since it can't be told apart. FFXIV: all.
+ */
+export function staticEligiblePulls(pulls: Pull[]): Pull[] {
+  return pulls.filter((p) => p.game !== "wow" || p.difficulty === undefined || p.difficulty === WCL_MYTHIC_DIFFICULTY);
+}
 
 export type StaticReviewPullPlayerErrorData = {
   player:     string;
