@@ -17,6 +17,7 @@ review. Active encounters:
 | Building or changing mechanic detection | [lib/mechanics/README.md](lib/mechanics/README.md) (includes the working method and "Lessons from building new bosses"), then the module's own header comment |
 | App features, UI, data flow | [docs/app-architecture.md](docs/app-architecture.md) |
 | Sample data, auth tokens, scripts, browser checks, deploy pipeline | [docs/dev-tooling.md](docs/dev-tooling.md) |
+| Damage output / rotation analysis, or tooling for it | [docs/dps-analysis.md](docs/dps-analysis.md) |
 | What's unfinished or waiting on a user decision | [docs/open-items.md](docs/open-items.md) |
 | Which ports are taken locally and in production | [PORTS.md](PORTS.md) |
 

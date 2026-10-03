@@ -46,6 +46,13 @@ validation harness (`scripts/validate.js`, `expectations/`), see
   Before deleting one, make sure anything it uniquely proved is already
   written into code comments or rulings.
 
+## Damage output analysis (FFXIV)
+
+`scripts/fetch-ff-dps.js` downloads aggregated damage tables and player
+casts, about 15 API points per fight. `scripts/analyze-dps.js` then compares
+one group's pulls against other groups' clears. The method and its pitfalls
+are in [dps-analysis.md](dps-analysis.md).
+
 ## Analyzing a report (`scripts/analyze-report.js`)
 
 The standard investigation recipes for verifying a model or debugging a
