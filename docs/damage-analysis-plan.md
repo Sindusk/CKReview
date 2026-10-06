@@ -181,40 +181,138 @@ Pitfalls).
 
 ## Data changes
 
-- **Begin-cast events.** `lib/log-transforms.ts` (~line 1205) keeps only
-  `type === "cast"` and drops `begincast`, though the query returns both.
-  Keep begin-casts in a separate field: interruptions and cast-time
-  analysis need them.
-- **Buffs on players** (raid buffs, self-buffs, procs). **Revised by the
-  mitigation build** (see "Data check findings" in
-  [mitigation-redesign.md](mitigation-redesign.md)): every FFLogs damage
-  event carries `buffs`, a snapshot of status IDs, and on outgoing
-  `damageDone` events it already listed raid buffs (Battle Litany,
-  Technical Finish). The mitigation work therefore built no player-buff
-  stream. First check how far `buffs` on `damageDone` goes:
-  - Does it list self-buffs and debuffs on the boss (Chain Stratagem,
-    Dokumori), and is it the attacker's or the target's statuses?
-  - It can't show a proc that expired unused, or exactly when a buff was
-    applied and removed. Proc and buff-window checks may still need
-    apply/remove events.
-  Add a stream only for what `buffs` can't answer, filtered on the server
-  to the needed status IDs (`filterExpression`, as `enemyDebuffs` and
-  `headMarkers` already do). Remember the template-literal pitfalls in
-  `FIGHT_EVENTS_QUERY` (no `//` comments, no backticks). Note the `buffs`
-  snapshot lag found there: it reflects when the hit was calculated, up to
-  about 0.85s before it landed.
-- **Damage-done detail:** the mitigation build confirmed that raw
-  `damageTaken` events carry `hitType`, `multiplier`, `unmitigatedAmount`
-  and more, and that ability damage type comes from `masterData.abilities
-  { type }` (already requested now). Confirm the same fields on
-  `damageDone` (crit and direct hit in `hitType`, the multiplier from
-  raid buffs), and keep them on `PlayerEvent` the same way.
-  `scripts/lib/slim-report.js` was widened for the damage-taken fields;
-  widen it for these too.
+Revised after the data check (findings in the next section).
+
+- **Begin-cast events.** `transformFFightToPull` in
+  `lib/log-transforms.ts` keeps only `type === "cast"` and drops
+  `begincast`, though the query returns both. Keep begin-casts, with their
+  `duration`, in a separate `PlayerInfo` field: interruptions and
+  cast-time analysis need them. `slim-report.js` drops `duration` from
+  casts today; keep it.
+- **Damage-done detail on `PlayerEvent`:** `statusIds` (decoded `buffs`),
+  `multiplier`, `hitType`, `directHit`, `bonusPercent`, `isDoT` (`tick`)
+  and, on simulated DoT ticks, `actorPotencyRatio`. Widen the
+  `damageDone` projector in `scripts/lib/slim-report.js` to match.
+- **A new player-buff stream is needed** (the `buffs` snapshot covers only
+  damage modifiers): friendly `dataType: Buffs`, filtered on the server
+  to the job statuses the checks use (procs, job buffs, raid buffs,
+  Swiftcast), not mitigation, food or shields. Take the ID list from the
+  ported status table. Remember the template-literal pitfalls in
+  `FIGHT_EVENTS_QUERY` (no `//` comments, no backticks).
+- **Boss debuff windows** (Chain Stratagem, Dokumori, Mug) already arrive
+  in the `enemyDebuffs` stream, which is fetched unfiltered for NPC
+  targets but reaches `Pull` only as Kefka Says signals. Carry its
+  apply/remove events through for the damage engine.
 - **Truncated tables.** The DamageDone table returns only each player's
   top 5 abilities; per-ability totals need events.
 - Pulls stored before these changes lack the new data. Re-fetching is an
   explicit user action; the dialog says when a pull needs a re-fetch.
+  Existing samples need `--refetch`.
+
+## Data check findings (2026-10-06)
+
+Checked on `dQ8wmb1VhKt6yBXk` fight 11 (988s, reached P5; party GNB,
+DRK, SCH, AST, SAM, VPR, DNC, PCT):
+- the whole slimmed sample pull
+- one unslimmed fetch of its first 90s (friendly `DamageDone`, `Buffs`
+  and `Casts`; 1.3k, 1.0k and 0.6k events)
+
+### 1. `buffs` on `damageDone` is a damage-modifier snapshot only
+
+- **Whose statuses:**
+  - the attacker's damage-affecting statuses, self-applied and received:
+    No Mercy, Fugetsu, Hunter's Instinct, Standard Finish, Devilment,
+    Technical Finish, Divination, Starry Muse, The Balance / The Spear,
+    Medicated
+  - the attacker's penalty debuffs (Weakness, Damage Down)
+  - debuffs on the **hit's target** (Chain Stratagem)
+- **Chain Stratagem is listed per target.** In P3 (Chaos and Exdeath),
+  hits on the boss without it don't list it (0 of 179 across both
+  windows). Dokumori and Mug are unconfirmed: no Ninja or Rogue in the
+  sample.
+- **No procs and no non-damage job statuses.** Silken Symmetry, the Fan
+  Dance procs, Ready to Rip, Hyperphantasia, Hammer Time, Swiftcast,
+  Meikyo Shisui and Lightspeed all appear in the Buffs stream but never in
+  `buffs`. The field is omitted when no listed status is active (about
+  37% of hits).
+- **DoT ticks carry the snapshot from when the DoT was applied.**
+  Biolysis and Higanbana ticks list Chain Stratagem after it fell off.
+  Ground DoTs (Salted Earth, "Combined DoTs") carry no `buffs`.
+- The `damageTaken` `buffs` list is wider (Well Fed, every shield and
+  mitigation), but it is also without procs.
+
+### 2. What still needs apply/remove events
+
+The Buffs stream gives everything the snapshot can't:
+- apply / refresh / remove, with `duration` on applies and `stack` on
+  stack changes
+- **expired procs are detectable:** a consumed proc's `removebuff` lands
+  within 150ms of the consuming cast (Jugular Rip, Reverse Cascade,
+  Hammer Stamp ...); an expired one lands at apply + `duration` with no
+  cast (Lightspeed 15.1s of 15s, Giant Dominance 10.0s of 10s)
+- exact raid-buff windows on every target, so GCDs inside a window can
+  be counted without the ~0.85s snapshot lag
+
+**So one new stream is needed.** Volume: about 11 events/s unfiltered,
+half of them self-applied (111 distinct self statuses in 90s), so roughly
+10k events for a 16-minute pull. Filtering to the ported status IDs cuts
+that further.
+
+### 3. `damageDone` fields
+
+Present on every landed hit:
+- **`hitType`:** 1 normal, 2 crit.
+- **`directHit: true`** marks a direct hit. It is a separate field, not
+  part of `hitType`.
+- **`multiplier`:** the product of the **damage %** modifiers only
+  (Standard Finish 1.05, Fugetsu + Standard Finish 1.19, full burst
+  1.54). Crit and direct-hit rate buffs (Chain Stratagem, Devilment) are
+  not in it, and Medicated counts as 1.05. So a hit normalises as
+  amount ÷ multiplier ÷ crit factor ÷ 1.25 for a direct hit.
+- **`unmitigatedAmount`** equals `amount` on outgoing hits.
+- **`bonusPercent`** appears on combo and positional actions only
+  (Gekko 61, Souleater 45, Hindsbane Fang 60 or 48). Different values on
+  one action look like positional hit vs miss. Map them per action when
+  porting the melee batch, against xivanalysis's positional data.
+- **DoT ticks** have `tick: true`. Most are `simulated: true`, carrying
+  `expectedAmount`, `expectedCritRate`, `directHitPercentage` and
+  **`actorPotencyRatio`**: FFLogs' own damage-per-potency estimate for
+  the player (AST 115, SCH 114, SAM 87, GNB 70 in this pull). The engine's
+  potency-to-damage conversion can be checked against it.
+- `calculateddamage` previews: one per hit. `onlyLanded` already drops
+  them; keep that.
+
+### 4. Begin-casts
+
+- `begincast` carries **`duration`**, the cast time after speed (Broil IV
+  1437ms, Fall Malefic 1447ms, motifs 3000ms).
+- **The `cast` event lands about 505ms before the cast bar ends**
+  (1437ms → 932ms after begin, every cast-time action in the window). It
+  marks the slidecast point, not the end of the cast. GCD-gap math must
+  use begin + `duration` as the end of the cast lock.
+- **Interrupted casts** are begin-casts with no `cast`: 4 of 731 in the
+  pull (three Fall Malefic, one Broil IV).
+- They reach the samples (the slim projector keeps `begincast`), but
+  without `duration`.
+
+### Design impact
+
+1. **One new stream: a filtered friendly `Buffs`.** It is needed for
+   procs, job buffs, raid-buff windows and expired procs. The snapshot
+   alone can't answer them.
+2. **The snapshot is still useful,** as the check of what each hit
+   actually got (raid buffs, Chain Stratagem on that target, Damage Down
+   on the attacker). Use the stream for windows and the snapshot to
+   confirm hits inside them.
+3. **The GCD model must read begin-casts with `duration`,** because the
+   `cast` event comes before the cast ends.
+4. **Penalty debuff time already reaches `Pull`** through the friendly
+   `debuffs` stream (Damage Down, Weakness). The snapshot confirms which
+   hits they reduced.
+5. **The Layer 3 stacked-spender check gets simpler:** `multiplier`,
+   `hitType` and `directHit` are on every hit, so the per-hit
+   normalisation needs no guessing. Only the crit factor stays an
+   approximation (it depends on the player's crit stat).
 
 ## UI: the Damage dialog
 
@@ -243,9 +341,11 @@ job module a `validate.js` runner so baselines catch regressions.
 
 ## Suggested build order
 
-1. **Data check (no app changes):** on one Dancing Mad sample, confirm
-   what begin-casts, damage-done fields and a filtered player-buff stream
-   return. Write findings into this doc.
+1. **Data check (no app changes):** done 2026-10-06; see "Data check
+   findings". The data changes above, and the Healing-tab fix (shield
+   absorbs and `calculatedheal` previews counted as heals, from
+   [mitigation-redesign.md](mitigation-redesign.md)), come before the
+   engine.
 2. **Port the data tables** with attribution and the sync script.
 3. **Engine** with the generic checks and potency scoring, plus a
    `validate.js` runner that prints findings for a sample report.
