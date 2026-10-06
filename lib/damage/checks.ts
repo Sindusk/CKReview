@@ -208,6 +208,48 @@ export function checkDisengages(ctx: PlayerCheckContext): DamageFinding[] {
     });
 }
 
+// ── Positionals ────────────────────────────────────────────────────────
+// Ported from xivanalysis's core Positionals module: a positional action's
+// first hit per cast missed when its bonusPercent is one the potency table
+// gives without the positional (GameAction.positional). A combo step with
+// no bonusPercent at all is left to the broken-combo check. Lost = the
+// missed hit's own amount × the potency the positional would have added.
+// One finding per action per phase.
+
+export function checkPositionals(ctx: PlayerCheckContext): DamageFinding[] {
+  const groups = new Map<string, { name: string; phaseId?: number; misses: number; casts: number; lost: number; start: number; end: number; cost: number }>();
+  let last: { id: number; t: number } | undefined;
+  for (const e of ctx.player.damageDone) {
+    if (e.timestamp >= ctx.endMs || e.isDoT) continue;
+    const a = ctx.game.action(e.abilityId);
+    if (!a?.positional) continue;
+    if (last && last.id === e.abilityId && e.timestamp - last.t < 500) continue; // same cast, another target
+    last = { id: e.abilityId, t: e.timestamp };
+    const phaseId = ctx.phaseOf(e.timestamp);
+    const key = `${e.abilityId}|${phaseId}`;
+    const g = groups.get(key) ?? { name: e.abilityName, phaseId, misses: 0, casts: 0, lost: 0, start: e.timestamp, end: e.timestamp, cost: a.positional.missCost };
+    g.casts++;
+    groups.set(key, g);
+    if (e.bonusPercent === undefined && a.comboFrom) continue;
+    if (!a.positional.missedBonus.includes(e.bonusPercent ?? 0)) continue;
+    g.misses++;
+    g.lost += (e.amount ?? 0) * a.positional.missCost;
+    g.end = e.timestamp;
+  }
+  const out: DamageFinding[] = [];
+  for (const g of groups.values()) {
+    if (g.misses === 0) continue;
+    out.push({
+      player: ctx.player.name, job: ctx.player.className, phaseId: g.phaseId, phase: ctx.phaseName(g.phaseId),
+      kind: "positional", startMs: g.start, endMs: g.end, forced: false, lostDamage: g.lost,
+      label: `${g.name} positional missed`,
+      basis: `each missed hit × ${Math.round(g.cost * 100)}% (the potency the positional adds)`,
+      detail: `${g.name}: ${g.misses} of ${g.casts} positionals missed in ${ctx.phaseName(g.phaseId) ?? "the pull"}`,
+    });
+  }
+  return out;
+}
+
 // ── Broken combos ──────────────────────────────────────────────────────
 // A combo step's damage event carries `bonusPercent` (the share of its
 // potency that came from the combo, plus any positional) only when the

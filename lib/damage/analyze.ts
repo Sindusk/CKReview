@@ -20,7 +20,7 @@ import type {
   PlayerDamageSummary, PullDamageAnalysis,
 } from "./types";
 import {
-  checkCombos, checkCooldownDrift, checkDeaths, checkDisengages, checkGcdGaps, checkInterrupts, checkPenalties, checkProcs,
+  checkCombos, checkCooldownDrift, checkDeaths, checkDisengages, checkPositionals, checkGcdGaps, checkInterrupts, checkPenalties, checkProcs,
   type PlayerCheckContext,
 } from "./checks";
 import {
@@ -96,6 +96,7 @@ export function analyzePullDamage(pull: Pull, game: DamageGame, context?: Damage
       ...checkInterrupts(ctx),
       ...checkCombos(ctx),
       ...checkDisengages(ctx),
+      ...checkPositionals(ctx),
       ...game.jobChecks(player.className).flatMap((check) => check(ctx)),
     ].sort((a, b) => Number(a.forced) - Number(b.forced) || b.lostDamage - a.lostDamage);
 

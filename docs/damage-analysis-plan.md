@@ -420,6 +420,24 @@ user will refine each job later with the people who play it:
 - WHM and SGE are unverified: no sample has them.
 - `PlayerEvent.overheal` is now kept on heals.
 
+**Melee batch** (step 6, third role, 2026-10-06), no review yet:
+- **Positionals** (engine, `checkPositionals`), ported from xivanalysis.
+  A hit missed when its `bonusPercent` is one the potency table gives
+  without the positional. Checked: the SAM's Gekko shows 61 = 1 − 160/420.
+  Lost = the missed hit × the potency the positional adds.
+- **Melee disengages:** Enpi, Piercing Talon, Throwing Dagger, Harpe and
+  Writhing Snap join the disengage check.
+- **Buff uptime:** SAM Fugetsu (+13%, from the multiplier), VPR Hunter's
+  Instinct (+10%, from the multiplier), DRG Power Surge.
+- **Windows** (`jobs/melee.ts`): SAM Meikyo (3 Sen GCDs), VPR Reawaken
+  (4 Generations, 4 Legacies, Ouroboros), MNK Riddle of Fire, DRG Lance
+  Charge, NIN Kunai's Bane (an enemy debuff, read from
+  `Pull.bossDebuffs`), RPR Enshroud. Arcane Circle's window isn't ported.
+- **Tracked cooldowns:** SAM, VPR, DRG, NIN. SAM Guren and Senei now share
+  one recast; before, each was judged alone and showed hundreds of seconds
+  of drift.
+- MNK, DRG, NIN and RPR are unverified: no sample has them.
+
 Open:
 - **Per-player busy windows** (tower soaks, debuff carriers, baits) aren't
   in the Dancing Mad context yet. Gaps during a mechanic are labelled

@@ -50,6 +50,35 @@ export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
     { actions: ["ONSLAUGHT"], firstUseOffsetMs: 18500 },
   ],
 
+  // ── Melee (from xivanalysis sam/vpr/drg/nin OGCDDowntime) ───────────
+  // Samurai and Viper allow 2.18s of hold (one GCD), Meikyo two.
+  "Samurai": [
+    { actions: ["MEIKYO_SHISUI"], holdMs: 4360 },
+    { actions: ["HISSATSU_GUREN", "HISSATSU_SENEI"], firstUseOffsetMs: 13400, holdMs: 2180 },
+    { actions: ["IKISHOTEN"], firstUseOffsetMs: 2500, holdMs: 2180 },
+  ],
+  "Viper": [
+    { actions: ["SERPENTS_IRE"], firstUseOffsetMs: 2500, holdMs: 2180 },
+    { actions: ["VICEWINDER", "VICEPIT"], firstUseOffsetMs: 7500, holdMs: 2180 },
+  ],
+  "Dragoon": [
+    { actions: ["HIGH_JUMP"], firstUseOffsetMs: 14500 },
+    { actions: ["GEIRSKOGUL"], firstUseOffsetMs: 14500 },
+    { actions: ["DRAGONFIRE_DIVE"], firstUseOffsetMs: 14500 },
+    { actions: ["LIFE_SURGE"], firstUseOffsetMs: 12000 },
+    { actions: ["LANCE_CHARGE"], firstUseOffsetMs: 7000 },
+    { actions: ["BATTLE_LITANY"], firstUseOffsetMs: 7000 },
+  ],
+  "Ninja": [
+    { actions: ["KASSATSU"], firstUseOffsetMs: 1000 },
+    { actions: ["DOKUMORI"], firstUseOffsetMs: 6000 },
+    { actions: ["BUNSHIN"], firstUseOffsetMs: 7000 },
+    { actions: ["KUNAIS_BANE"], firstUseOffsetMs: 10000 },
+    { actions: ["DREAM_WITHIN_A_DREAM"], firstUseOffsetMs: 12250 },
+    { actions: ["TEN_CHI_JIN"], firstUseOffsetMs: 17250 },
+    { actions: ["MEISUI"], firstUseOffsetMs: 20750 },
+  ],
+
   // ── From xivanalysis ────────────────────────────────────────────────
   "Monk": [
     { actions: ["BROTHERHOOD"], firstUseOffsetMs: 7000 },
@@ -88,9 +117,7 @@ export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
   // Not in xivanalysis; unverified (no White Mage in any sample).
   "White Mage":  [{ actions: ["PRESENCE_OF_MIND"] }],
   "Dancer":      [{ actions: ["TECHNICAL_STEP"] }],
-  "Dragoon":     [{ actions: ["BATTLE_LITANY"] }],
   "Red Mage":    [{ actions: ["EMBOLDEN"] }],
   "Summoner":    [{ actions: ["SEARING_LIGHT"] }],
   "Bard":        [{ actions: ["RADIANT_FINALE"] }, { actions: ["BATTLE_VOICE"] }],
-  "Ninja":       [{ actions: ["DOKUMORI"] }],
 };

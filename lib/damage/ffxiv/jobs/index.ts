@@ -1,13 +1,15 @@
 // lib/damage/ffxiv/jobs/index.ts
 //
 // Job display name (lib/ffl-job-data.ts) → that job's checks. Filled in by
-// role batch (docs/damage-analysis-plan.md, Layer 3): tanks and healers so far.
+// role batch (docs/damage-analysis-plan.md, Layer 3): tanks, healers and
+// melee so far.
 
 import type { JobCheck } from "../../types";
 import { GNB_CHECKS } from "./gnb";
 import { DRK_CHECKS } from "./drk";
 import { PLD_CHECKS, WAR_CHECKS } from "./pld-war";
 import { AST_CHECKS, SCH_CHECKS, SGE_CHECKS, WHM_CHECKS } from "./healer";
+import { DRG_CHECKS, MNK_CHECKS, NIN_CHECKS, RPR_CHECKS, SAM_CHECKS, VPR_CHECKS } from "./melee";
 
 export const JOB_CHECKS: Record<string, JobCheck[]> = {
   "Gunbreaker":  GNB_CHECKS,
@@ -18,4 +20,10 @@ export const JOB_CHECKS: Record<string, JobCheck[]> = {
   "Astrologian": AST_CHECKS,
   "White Mage":  WHM_CHECKS,
   "Sage":        SGE_CHECKS,
+  "Samurai":     SAM_CHECKS,
+  "Viper":       VPR_CHECKS,
+  "Monk":        MNK_CHECKS,
+  "Dragoon":     DRG_CHECKS,
+  "Ninja":       NIN_CHECKS,
+  "Reaper":      RPR_CHECKS,
 };

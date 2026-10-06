@@ -60,7 +60,33 @@ function toGameAction(a: XivaAction): GameAction {
     limitBreak:  a.job === "LIMIT_BREAK" ? true : undefined,
     comboFrom:   a.combo?.from === undefined ? undefined : Array.isArray(a.combo.from) ? a.combo.from : [a.combo.from],
     autoAttack:  a.autoAttack,
+    positional:  positionalInfo(a),
   };
+}
+
+// Ported from xivanalysis src/parser/core/modules/Positionals.tsx
+// (missedPositionalBonusPercents): a hit missed its positional when its
+// bonusPercent is one a non-positional potency pair produces, 0 included.
+// Checked on dQ8wmb1VhKt6yBXk: the SAM's Gekko shows 61 = 1 − 160/420
+// (combo + positional).
+function positionalInfo(a: XivaAction): GameAction["positional"] {
+  const pots = a.potencies ?? [];
+  if (!pots.some((p) => p.bonusModifiers.includes("POSITIONAL"))) return undefined;
+  const missed = new Set<number>([0]);
+  const bases = pots.filter((p) => p.bonusModifiers.length === 0 ||
+    (p.bonusModifiers.length === 1 && p.bonusModifiers[0] === "COMBO"));
+  for (const base of bases) {
+    for (const bonus of pots) {
+      if (bonus.bonusModifiers.includes("POSITIONAL") || bonus.value <= base.value) continue;
+      missed.add(Math.trunc(100 * (1 - base.value / bonus.value)));
+    }
+  }
+  const hit = pots.filter((p) => p.bonusModifiers.includes("POSITIONAL")).sort((x, y) => y.value - x.value)[0];
+  const sameState = (p: (typeof pots)[number]) =>
+    p.bonusModifiers.includes("COMBO") === hit.bonusModifiers.includes("COMBO") &&
+    (p.baseModifiers ?? []).join() === (hit.baseModifiers ?? []).join();
+  const miss = pots.filter((p) => !p.bonusModifiers.includes("POSITIONAL") && sameState(p)).sort((x, y) => y.value - x.value)[0];
+  return { missedBonus: [...missed], missCost: miss ? hit.value / miss.value - 1 : 0 };
 }
 
 const ACTIONS = new Map<number, GameAction>(
@@ -85,8 +111,10 @@ const TRACKED = new Map<string, TrackedCooldown[]>(
 const ids = (keys: string[]) => new Set(keys.map((k) => XIVA_ACTIONS[k]?.id).filter((id): id is number => id !== undefined));
 const TANK_SWAP_IDS = ids(["PROVOKE", "SHIRK"]);
 // xivanalysis's DisengageGcds tracks Lightning Shot and Tomahawk; Unmend and
-// Shield Lob are the DRK and PLD equivalents.
-const DISENGAGE_IDS = ids(["LIGHTNING_SHOT", "TOMAHAWK", "UNMEND", "SHIELD_LOB"]);
+// Shield Lob are the DRK and PLD equivalents, and the melee have their own
+// (xivanalysis's VPR Snaps module tracks Writhing Snap).
+const DISENGAGE_IDS = ids(["LIGHTNING_SHOT", "TOMAHAWK", "UNMEND", "SHIELD_LOB",
+  "ENPI", "PIERCING_TALON", "THROWING_DAGGER", "HARPE", "WRITHING_SNAP"]);
 
 export const FFXIV_DAMAGE: DamageGame = {
   action: (id) => ACTIONS.get(id),

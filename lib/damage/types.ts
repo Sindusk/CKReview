@@ -29,6 +29,10 @@ export type GameAction = {
   // one of them). Undefined for combo starters and non-combo actions.
   comboFrom?:    number[];
   autoAttack?:   boolean;
+  // A positional action: the bonusPercent values its hit shows when the
+  // positional was missed, and what a miss costs (hit potency ÷ miss
+  // potency − 1, applied to the missed hit).
+  positional?:   { missedBonus: number[]; missCost: number };
 };
 
 export type DamageGame = {
@@ -107,6 +111,7 @@ export type FindingKind =
   | "interrupted-cast"  // a cast that never went off
   | "combo-broken"      // a combo step that landed without its combo bonus
   | "disengage"         // a ranged filler GCD (Lightning Shot) instead of a real one
+  | "positional"        // positionals missed
   | "burst-window"      // the job's own burst buff missing GCDs or actions
   | "buff-uptime"       // a job damage buff (Darkside, Surging Tempest) down
   | "gauge-overcap"     // job gauge wasted at its cap

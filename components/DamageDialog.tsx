@@ -50,6 +50,7 @@ const KIND_LABEL: Record<DamageFinding["kind"], string> = {
   "gcd-clipping":     "Clipping",
   "combo-broken":     "Broken combo",
   "disengage":        "Disengage",
+  "positional":       "Positional",
   "burst-window":     "Burst window",
   "buff-uptime":      "Buff uptime",
   "gauge-overcap":    "Overcap",

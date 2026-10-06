@@ -91,11 +91,33 @@ export type BurstWindowSpec = {
   bonusBasis:    string;      // where the bonus value comes from
   expectedGcds?: (ctx: PlayerCheckContext) => number;
   expected:      (ctx: PlayerCheckContext, casts: PlayerEvent[]) => ExpectedAction[];
+  // The status is a debuff the player puts on the enemy (Kunai's Bane),
+  // read from Pull.bossDebuffs instead of the player-buff stream.
+  onEnemy?:      boolean;
+  inference?:    boolean;
 };
+
+/** Windows where the player's own debuff is on any enemy. */
+export function enemyStatusWindows(ctx: PlayerCheckContext, statusId: number): Window[] {
+  const out: Window[] = [];
+  const open = new Map<string, number>();
+  for (const e of (ctx.pull.bossDebuffs ?? []).filter((x) => x.statusId === statusId && x.sourceName === ctx.player.name)) {
+    const key = `${e.targetActorId}.${e.targetInstance ?? 1}`;
+    if (e.status === "removed") {
+      const start = open.get(key);
+      if (start !== undefined) { out.push({ startMs: start, endMs: e.timestamp }); open.delete(key); }
+    } else if (e.status === "applied" && !open.has(key)) {
+      open.set(key, e.timestamp);
+    }
+  }
+  for (const start of open.values()) out.push({ startMs: start, endMs: ctx.endMs + 1 });
+  return mergeWindows(out);
+}
 
 export function burstWindowFindings(ctx: PlayerCheckContext, spec: BurstWindowSpec): DamageFinding[] {
   const out: DamageFinding[] = [];
-  for (const w of statusWindows(ctx, spec.statusId)) {
+  const windows = spec.onEnemy ? enemyStatusWindows(ctx, spec.statusId) : statusWindows(ctx, spec.statusId);
+  for (const w of windows) {
     if (w.endMs > ctx.endMs) continue;
     // Inclusive end: a stack-consumed buff (Delirium) loses its last stack
     // at the same timestamp as the cast that used it.
@@ -127,6 +149,7 @@ export function burstWindowFindings(ctx: PlayerCheckContext, spec: BurstWindowSp
       forced: forced.ms >= 1_500, cause: forced.ms >= 1_500 ? forced.cause : undefined,
       label: `${spec.name} window`,
       lostDamage: lostGcds + missing.reduce((a, m) => a + m.value, 0),
+      inference: spec.inference,
       basis: [
         missingGcds ? `${missingGcds} GCD${missingGcds > 1 ? "s" : ""} × ${k(gcdValue)} average × ${Math.round(spec.bonus * 100)}%` : undefined,
         missing.length ? `each missing action × its average × ${Math.round(spec.bonus * 100)}% (used outside the window instead; a never-used one shows as drift)` : undefined,
