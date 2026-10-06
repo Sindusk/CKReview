@@ -9,7 +9,13 @@ instead of reopening every report:
 - "Am I getting better at the spread about a minute in?"
 
 The direction was agreed with the user on 2026-10-06; this doc is the build
-brief. Nothing in it is implemented yet. Applies to both games.
+brief. Applies to both games.
+
+**Status (2026-10-06):** build steps 1–4 are done, and so are the step 5
+API routes and raid view (the Mechanics panel). Still to build: the
+player dropdown (the rest of step 5) and mechanic occurrences per boss
+module (step 6). The analysis routes already serve the player data
+(`analysis/players/[identityId]`).
 
 ## Why this needs new data
 
