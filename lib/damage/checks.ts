@@ -55,6 +55,10 @@ export const PROC_CONSUME_MS = 200;
 export const PROC_EXPIRY_SLACK_MS = 600;
 export const PROC_MIN_REMOVALS = 3;
 export const PROC_CONSUMED_SHARE = 0.6;
+// A double weave is normal; a third oGCD between two GCDs clips.
+export const CLIP_WEAVES = 3;
+export const CLIP_FINDING_MS = 500;
+export const COMBO_TIMEOUT_MS = 30_000;
 
 export type PlayerCheckContext = {
   pull:        Pull;
@@ -76,7 +80,7 @@ export type PlayerCheckContext = {
   decidingPhaseStart?: number;
 };
 
-function finding(ctx: PlayerCheckContext, f: Omit<DamageFinding, "player" | "job" | "phaseId" | "phase">): DamageFinding {
+export function finding(ctx: PlayerCheckContext, f: Omit<DamageFinding, "player" | "job" | "phaseId" | "phase">): DamageFinding {
   const phaseId = ctx.phaseOf(f.startMs);
   return { player: ctx.player.name, job: ctx.player.className, phaseId, phase: ctx.phaseName(phaseId), ...f };
 }
@@ -90,9 +94,15 @@ export function checkGcdGaps(ctx: PlayerCheckContext): DamageFinding[] {
   const out: DamageFinding[] = [];
   const uses = ctx.uses.filter((u) => u.startMs < ctx.endMs);
   if (uses.length === 0) return out;
-  const small = new Map<number | undefined, { ms: number; lost: number; start: number; end: number; n: number }>();
+  type Bucket = { ms: number; lost: number; start: number; end: number; n: number; defensives: Map<string, number> };
+  const small = new Map<number | undefined, Bucket>();
+  const clipped = new Map<number | undefined, Bucket>();
+  const ogcds = ctx.player.casts.filter((c) => {
+    const a = ctx.game.action(c.abilityId);
+    return a !== undefined && !a.onGcd && !a.autoAttack;
+  });
 
-  const consider = (from: number, to: number, after: string) => {
+  const consider = (gcdStart: number, from: number, to: number, after: string) => {
     const idle = to - from - GCD_TOLERANCE_MS;
     if (idle <= 0) return;
     const start = from, end = to - GCD_TOLERANCE_MS;
@@ -102,20 +112,32 @@ export function checkGcdGaps(ctx: PlayerCheckContext): DamageFinding[] {
     const phaseId = ctx.phaseOf(mid);
     const value = ctx.values.gcdValue(phaseId, inWindows(mid, ctx.buffWindows));
     const perMs = value / ctx.baseGcdMs;
+    const weaves = ogcds.filter((c) => c.timestamp > gcdStart && c.timestamp < to);
+    const swap = weaves.find((c) => ctx.game.tankSwapActionIds.has(c.abilityId)) ??
+      ctx.player.casts.find((c) => ctx.game.tankSwapActionIds.has(c.abilityId) && c.timestamp >= start - 3_000 && c.timestamp <= end);
     if (unforced >= GAP_FINDING_MS) {
       const during = ctx.mechanicAround(start, end);
+      const cause = swap ? `tank swap (${swap.abilityName})` : during ? `during ${during}` : undefined;
       out.push(finding(ctx, {
         kind: "gcd-gap", startMs: start, endMs: end, forced: false,
-        label: during ? `GCD gap during ${during}` : "GCD gap",
+        label: swap ? "GCD gap at a tank swap" : during ? `GCD gap during ${during}` : "GCD gap",
         lostDamage: unforced * perMs,
-        cause: during ? `during ${during}` : undefined,
+        cause,
         basis: `${s(unforced)} idle ÷ ${s(ctx.baseGcdMs)} GCD × ${k(value)} average GCD${inWindows(mid, ctx.buffWindows) ? " in raid buffs" : ""}`,
-        detail: `No GCD for ${s(unforced)} after ${after}${forced.ms > 0 ? ` (plus ${s(forced.ms)} forced: ${forced.cause})` : ""}`,
+        detail: `No GCD for ${s(unforced)} after ${after}${forced.ms > 0 ? ` (plus ${s(forced.ms)} forced: ${forced.cause})` : ""}` +
+          (weaves.length >= CLIP_WEAVES ? `; ${weaves.length} weaves: ${weaves.map((w) => w.abilityName).join(", ")}` : ""),
       }));
     } else if (unforced > 0) {
-      const acc = small.get(phaseId) ?? { ms: 0, lost: 0, start, end, n: 0 };
+      // Three or more oGCDs between two GCDs: the delay is the weaving.
+      const bucketMap = weaves.length >= CLIP_WEAVES ? clipped : small;
+      const acc = bucketMap.get(phaseId) ?? { ms: 0, lost: 0, start, end, n: 0, defensives: new Map<string, number>() };
       acc.ms += unforced; acc.lost += unforced * perMs; acc.end = end; acc.n++;
-      small.set(phaseId, acc);
+      if (bucketMap === clipped) {
+        for (const w of weaves) {
+          if (ctx.game.isDefensive(w.abilityId)) acc.defensives.set(w.abilityName, (acc.defensives.get(w.abilityName) ?? 0) + 1);
+        }
+      }
+      bucketMap.set(phaseId, acc);
     }
     if (forced.ms >= 2 * ctx.baseGcdMs && unforced < GAP_FINDING_MS) {
       out.push(finding(ctx, {
@@ -130,10 +152,10 @@ export function checkGcdGaps(ctx: PlayerCheckContext): DamageFinding[] {
 
   for (let i = 1; i < uses.length; i++) {
     const prev = uses[i - 1];
-    consider(prev.startMs + gcdLockMs(prev, ctx.factor), uses[i].startMs, prev.abilityName);
+    consider(prev.startMs, prev.startMs + gcdLockMs(prev, ctx.factor), uses[i].startMs, prev.abilityName);
   }
   const last = uses[uses.length - 1];
-  consider(last.startMs + gcdLockMs(last, ctx.factor), ctx.endMs + GCD_TOLERANCE_MS, `${last.abilityName} (to the end)`);
+  consider(last.startMs, last.startMs + gcdLockMs(last, ctx.factor), ctx.endMs + GCD_TOLERANCE_MS, `${last.abilityName} (to the end)`);
 
   for (const [phaseId, acc] of small) {
     if (acc.ms < ctx.baseGcdMs) continue;
@@ -144,6 +166,88 @@ export function checkGcdGaps(ctx: PlayerCheckContext): DamageFinding[] {
       basis: `${acc.n} delays under 1s, ${s(acc.ms)} in total, valued at the phase's average GCD`,
       detail: `${s(acc.ms)} of small GCD delays (${acc.n}) in ${ctx.phaseName(phaseId) ?? "the pull"}`,
     });
+  }
+  for (const [phaseId, acc] of clipped) {
+    if (acc.ms < CLIP_FINDING_MS) continue;
+    const defs = [...acc.defensives.entries()].sort((a, b) => b[1] - a[1]).map(([n, c]) => `${n} ×${c}`).join(", ");
+    out.push({
+      player: ctx.player.name, job: ctx.player.className, phaseId, phase: ctx.phaseName(phaseId),
+      kind: "gcd-clipping", startMs: acc.start, endMs: acc.end, forced: false, lostDamage: acc.lost,
+      label: "GCD clipped by triple weaves",
+      basis: `${acc.n} delays with ${CLIP_WEAVES}+ oGCDs between GCDs, ${s(acc.ms)} in total, valued at the phase's average GCD`,
+      detail: `${s(acc.ms)} of GCD delay from triple weaves (${acc.n}) in ${ctx.phaseName(phaseId) ?? "the pull"}` +
+        (defs ? `; defensives woven: ${defs}` : ""),
+    });
+  }
+  return out;
+}
+
+// ── Disengage GCDs ─────────────────────────────────────────────────────
+// A ranged filler (Lightning Shot, Unmend, Tomahawk, Shield Lob) pressed
+// out of melee range. Lost = the player's average GCD in that phase minus
+// the filler's own average. Labelled with the mechanic at the time, but
+// still counted: per-player forced movement isn't modelled yet.
+
+export function checkDisengages(ctx: PlayerCheckContext): DamageFinding[] {
+  return ctx.uses
+    .filter((u) => u.startMs < ctx.endMs && ctx.game.disengageActionIds.has(u.action.id))
+    .map((u) => {
+      const phaseId = ctx.phaseOf(u.startMs);
+      const value = ctx.values.gcdValue(phaseId, inWindows(u.startMs, ctx.buffWindows));
+      const own = ctx.values.perUse(u.action.id);
+      const forced = forcedPart(u.startMs - 1, u.startMs + 1, ctx.forced);
+      const during = ctx.mechanicAround(u.startMs, u.startMs);
+      return finding(ctx, {
+        kind: "disengage", startMs: u.startMs, endMs: u.startMs,
+        forced: forced.ms > 0, cause: forced.ms > 0 ? forced.cause : during ? `during ${during}` : undefined,
+        label: during ? `${u.abilityName} during ${during}` : u.abilityName,
+        lostDamage: Math.max(0, value - own),
+        basis: `${k(value)} average GCD − ${k(own)} average ${u.abilityName}`,
+        detail: `${u.abilityName} instead of a melee GCD`,
+      });
+    });
+}
+
+// ── Broken combos ──────────────────────────────────────────────────────
+// A combo step's damage event carries `bonusPercent` (the share of its
+// potency that came from the combo, plus any positional) only when the
+// combo landed: on dQ8wmb1VhKt6yBXk pull 11 every Solid Barrel had 47 and
+// every Souleater 45. So a combo step whose first hit has no bonusPercent,
+// for an action that shows one elsewhere in the pull, landed without its
+// combo. Lost = the action's average per cast × its smallest observed
+// bonus share (the combo part alone). A break right after forced time
+// (death, downtime, or 30s+ since the last GCD, when the combo timer ran
+// out) is forced.
+
+export function checkCombos(ctx: PlayerCheckContext): DamageFinding[] {
+  const out: DamageFinding[] = [];
+  const hits = ctx.player.damageDone.filter((e) => !e.isDoT && (e.amount ?? 0) > 0);
+  const minBonus = new Map<number, number>();
+  for (const e of hits) {
+    if (e.bonusPercent === undefined) continue;
+    minBonus.set(e.abilityId, Math.min(minBonus.get(e.abilityId) ?? Infinity, e.bonusPercent));
+  }
+  const uses = ctx.uses;
+  for (let i = 0; i < uses.length; i++) {
+    const u = uses[i];
+    if (u.startMs >= ctx.endMs || !u.action.comboFrom) continue;
+    const bonus = minBonus.get(u.action.id);
+    if (bonus === undefined) continue;
+    const hit = hits.find((e) => e.abilityId === u.action.id && e.timestamp >= u.startMs && e.timestamp <= u.startMs + u.castMs + 1_500);
+    if (!hit || hit.bonusPercent !== undefined) continue;
+    const prev = uses[i - 1];
+    const since = prev ? u.startMs - prev.startMs : Infinity;
+    const forcedBefore = prev ? forcedPart(prev.startMs, u.startMs, ctx.forced) : { ms: 0 };
+    const forced = since >= COMBO_TIMEOUT_MS || forcedBefore.ms >= GAP_FINDING_MS;
+    const perUse = ctx.values.perUse(u.action.id);
+    out.push(finding(ctx, {
+      kind: "combo-broken", startMs: u.startMs, endMs: u.startMs, forced,
+      cause: forced ? (since >= COMBO_TIMEOUT_MS ? "combo timed out" : forcedBefore.cause) : prev ? `after ${prev.abilityName}` : undefined,
+      label: `${u.abilityName} without combo`,
+      lostDamage: perUse * bonus / 100,
+      basis: `${k(perUse)} average ${u.abilityName} × ${bonus}% combo share (its bonusPercent when combo'd)`,
+      detail: `${u.abilityName} landed without its combo bonus`,
+    }));
   }
   return out;
 }
@@ -172,7 +276,7 @@ export function checkCooldownDrift(ctx: PlayerCheckContext): DamageFinding[] {
       const forced = ctx.decidingPhaseStart !== undefined && w.endMs >= ctx.decidingPhaseStart
         ? overlapMs(w.startMs, w.endMs, withDeciding) : plain;
       heldForDeciding += forced - plain;
-      const allowance = COOLDOWN_HOLD_MS + (w.startMs === 0 ? cd.firstUseOffsetMs : 0);
+      const allowance = (cd.holdMs ?? COOLDOWN_HOLD_MS) + (w.startMs === 0 ? cd.firstUseOffsetMs : 0);
       const held = Math.max(0, len - forced - allowance);
       unforced += held;
       if (held > 0 && (!longest || len > longest.endMs - longest.startMs)) longest = w;

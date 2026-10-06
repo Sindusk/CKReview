@@ -366,6 +366,35 @@ Departures from the plan, found while building:
   so losses there are shown as forced. Revisit this if P4 turns out to
   have its own check.
 
+**Tank batch** (step 6, first role, 2026-10-06), awaiting the user's review:
+- **Engine, every job:**
+  - **Broken combos**, measured: a combo step's hit carries `bonusPercent`
+    only when the combo landed (every Solid Barrel 47, every Souleater 45
+    on `dQ8wmb1VhKt6yBXk` pull 11).
+  - **Triple-weave clipping**, with the defensives woven named.
+  - **Tank-swap labels** on gaps near Provoke or Shirk.
+  - **Disengage GCDs** (Lightning Shot, Unmend, Tomahawk, Shield Lob),
+    each valued at the player's average GCD minus the filler.
+- **Job modules** in `lib/damage/ffxiv/jobs/`. The shared helpers cover a
+  job's burst window, a damage buff's uptime, and a gauge simulated from
+  casts that checks itself: if the simulation goes below zero, its
+  findings become inference.
+  - **GNB:**
+    - No Mercy contents: 9 GCDs (8 at 2.47s+) plus the expected actions
+    - cartridge overcap, with Bloodfest's 7.4 cap of 6
+    - tracked cooldowns (Sonic Break left out: it needs No Mercy's proc)
+  - **DRK:**
+    - Delirium contents
+    - Darkside uptime, simulated: it's a gauge timer, and FFLogs'
+      multiplier doesn't include it
+    - Blood overcap, with Blood Weapon gains read from its stack removals
+    - tracked cooldowns
+  - **PLD and WAR**, unverified (no sample has them): Fight or Flight
+    contents, Surging Tempest uptime, and tracked cooldowns.
+- **Window end:** windows include their removal's own timestamp.
+  Delirium's last stack goes at the same instant as the GCD that uses it;
+  without this, every Delirium read as one GCD short.
+
 Open:
 - **Per-player busy windows** (tower soaks, debuff carriers, baits) aren't
   in the Dancing Mad context yet. Gaps during a mechanic are labelled

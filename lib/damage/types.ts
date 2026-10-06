@@ -7,6 +7,7 @@
 // PullError: findings only feed the Damage dialog.
 
 import type { Pull } from "@/types/Pull";
+import type { PlayerCheckContext } from "./checks";
 
 // ── Game layer ─────────────────────────────────────────────────────────
 
@@ -24,6 +25,10 @@ export type GameAction = {
   appliesStatusIds: number[];
   // A limit break: its animation lock is forced downtime.
   limitBreak?:   boolean;
+  // Combo steps this action continues (it gets its combo bonus only after
+  // one of them). Undefined for combo starters and non-combo actions.
+  comboFrom?:    number[];
+  autoAttack?:   boolean;
 };
 
 export type DamageGame = {
@@ -37,7 +42,17 @@ export type DamageGame = {
   isTickAbility(abilityId: number): boolean;
   // Cooldowns the drift check judges for a job (display name).
   trackedCooldowns(job: string): TrackedCooldown[];
+  // Defensive actions (mitigation), named when they clip a GCD.
+  isDefensive(actionId: number): boolean;
+  // Enmity swaps (Provoke, Shirk): a gap around one is labelled a tank swap.
+  tankSwapActionIds: Set<number>;
+  // Ranged filler GCDs used when out of melee range (Lightning Shot).
+  disengageActionIds: Set<number>;
+  // Job-specific checks (Layer 3), by job display name.
+  jobChecks(job: string): JobCheck[];
 };
+
+export type JobCheck = (ctx: PlayerCheckContext) => DamageFinding[];
 
 export type TrackedCooldown = {
   name:             string;
@@ -45,6 +60,7 @@ export type TrackedCooldown = {
   cooldownMs:       number;
   charges:          number;
   firstUseOffsetMs: number;
+  holdMs?:          number;     // allowed hold per ready stretch; default COOLDOWN_HOLD_MS
 };
 
 // ── Fight context (per boss) ───────────────────────────────────────────
@@ -83,11 +99,17 @@ export type DamageContext = {
 export type FindingKind =
   | "gcd-gap"           // one idle stretch of 1s+
   | "gcd-delays"        // the sum of a phase's small delays
+  | "gcd-clipping"      // small delays with three or more weaves between GCDs
   | "cooldown-drift"    // a cooldown held long enough to lose a use
   | "death"             // time dead
   | "penalty"           // damage dealt under Damage Down / Weakness
-  | "proc-lost"         // a proc that expired or was overwritten unused
-  | "interrupted-cast"; // a cast that never went off
+  | "proc-lost"         // a proc that expired unused
+  | "interrupted-cast"  // a cast that never went off
+  | "combo-broken"      // a combo step that landed without its combo bonus
+  | "disengage"         // a ranged filler GCD (Lightning Shot) instead of a real one
+  | "burst-window"      // the job's own burst buff missing GCDs or actions
+  | "buff-uptime"       // a job damage buff (Darkside, Surging Tempest) down
+  | "gauge-overcap";    // job gauge wasted at its cap
 
 export type DamageFinding = {
   player:     string;

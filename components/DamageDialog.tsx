@@ -47,6 +47,12 @@ const KIND_LABEL: Record<DamageFinding["kind"], string> = {
   "penalty":          "Penalty",
   "proc-lost":        "Lost proc",
   "interrupted-cast": "Cancelled cast",
+  "gcd-clipping":     "Clipping",
+  "combo-broken":     "Broken combo",
+  "disengage":        "Disengage",
+  "burst-window":     "Burst window",
+  "buff-uptime":      "Buff uptime",
+  "gauge-overcap":    "Overcap",
 };
 
 export default function DamageDialog({ open, onClose, pulls, currentPullId }: DamageDialogProps) {

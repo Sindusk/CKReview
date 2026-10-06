@@ -23,6 +23,8 @@
 
 import { XIVA_ACTIONS, XIVA_STATUSES, type XivaAction } from "./xiva-data";
 import { TRACKED_COOLDOWNS } from "./tracked-cooldowns";
+import { JOB_CHECKS } from "./jobs";
+import { FFXIV_ACTION_INDEX } from "../../mitigation/ffxiv-catalog";
 import type { DamageGame, GameAction, TrackedCooldown } from "../types";
 
 const RAID_BUFF_KEYS = [
@@ -56,6 +58,8 @@ function toGameAction(a: XivaAction): GameAction {
       .map((key) => XIVA_STATUSES[key]?.id)
       .filter((id): id is number => id !== undefined),
     limitBreak:  a.job === "LIMIT_BREAK" ? true : undefined,
+    comboFrom:   a.combo?.from === undefined ? undefined : Array.isArray(a.combo.from) ? a.combo.from : [a.combo.from],
+    autoAttack:  a.autoAttack,
   };
 }
 
@@ -73,9 +77,16 @@ const TRACKED = new Map<string, TrackedCooldown[]>(
       cooldownMs:       actions[0].cooldown ?? 0,
       charges:          actions[0].charges ?? 1,
       firstUseOffsetMs: spec.firstUseOffsetMs ?? 0,
+      holdMs:           spec.holdMs,
     }];
   })]),
 );
+
+const ids = (keys: string[]) => new Set(keys.map((k) => XIVA_ACTIONS[k]?.id).filter((id): id is number => id !== undefined));
+const TANK_SWAP_IDS = ids(["PROVOKE", "SHIRK"]);
+// xivanalysis's DisengageGcds tracks Lightning Shot and Tomahawk; Unmend and
+// Shield Lob are the DRK and PLD equivalents.
+const DISENGAGE_IDS = ids(["LIGHTNING_SHOT", "TOMAHAWK", "UNMEND", "SHIELD_LOB"]);
 
 export const FFXIV_DAMAGE: DamageGame = {
   action: (id) => ACTIONS.get(id),
@@ -86,4 +97,8 @@ export const FFXIV_DAMAGE: DamageGame = {
   // FFLogs logs DoT ticks under the status id (+1000000).
   isTickAbility: (abilityId) => abilityId >= 1_000_000,
   trackedCooldowns: (job) => TRACKED.get(job) ?? [],
+  isDefensive: (actionId) => FFXIV_ACTION_INDEX.has(actionId),
+  tankSwapActionIds: TANK_SWAP_IDS,
+  disengageActionIds: DISENGAGE_IDS,
+  jobChecks: (job) => JOB_CHECKS[job] ?? [],
 };

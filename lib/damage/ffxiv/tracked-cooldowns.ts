@@ -6,23 +6,50 @@
 // Mog of the Ages, Dancer's Finishing Move, Samurai's Guren) sits "ready"
 // on its timer while it can't be used, and reads as drift.
 //
-// The Monk, Paladin, Pictomancer, Reaper, Sage and Scholar lists (groups
-// and first-use offsets) are ported from xivanalysis's per-job
-// CooldownDowntime modules (src/parser/jobs/<job>/modules/), the only jobs
-// it tracks.
+// The lists below are ported from xivanalysis's per-job cooldown modules
+// (src/parser/jobs/<job>/modules/CooldownDowntime.ts, and the tanks'
+// Cooldowns / OGCDDowntime): groups, first-use offsets and hold allowances.
 //
 //   Copyright (c) 2018 Saxon Landers & contributors
 //   MIT License; full text in THIRD_PARTY_NOTICES.md.
 //
-// Every other job tracks only its two-minute party buff here; the role
-// batches (docs/damage-analysis-plan.md, Layer 3) add the rest.
+// Jobs whose batch hasn't come yet track only their two-minute party buff;
+// the role batches (docs/damage-analysis-plan.md, Layer 3) add the rest.
 
 export type TrackedCooldownSpec = {
   actions:           string[];  // xivanalysis action keys; several = one shared recast
   firstUseOffsetMs?: number;    // how late the opener normally uses it
+  holdMs?:           number;    // allowed hold per ready stretch (xivanalysis allowedAverageDowntime)
 };
 
 export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
+  // ── Tanks (from xivanalysis gnb/Cooldowns.tsx, drk/OGCDDowntime.ts,
+  //    war/OGCDDowntime.ts; its 7.4 values) ───────────────────────────
+  // Sonic Break is left out: in 7.x it needs Ready to Break from No Mercy,
+  // so its "drift" only repeats No Mercy's.
+  "Gunbreaker": [
+    { actions: ["GNASHING_FANG"], firstUseOffsetMs: 12500 },
+    { actions: ["BLASTING_ZONE", "DANGER_ZONE"], firstUseOffsetMs: 12500 },
+    { actions: ["NO_MERCY"], firstUseOffsetMs: 5000 },
+    { actions: ["BOW_SHOCK"], firstUseOffsetMs: 10000 },
+    { actions: ["DOUBLE_DOWN"], firstUseOffsetMs: 10000 },
+    { actions: ["BLOODFEST"], firstUseOffsetMs: 2500, holdMs: 0 },
+  ],
+  "Dark Knight": [
+    { actions: ["DELIRIUM"], firstUseOffsetMs: 10000 },
+    { actions: ["SALTED_EARTH"], firstUseOffsetMs: 12500 },
+    { actions: ["CARVE_AND_SPIT", "ABYSSAL_DRAIN"], firstUseOffsetMs: 17500 },
+    { actions: ["SHADOWBRINGER"], firstUseOffsetMs: 20000 },
+    { actions: ["LIVING_SHADOW"], firstUseOffsetMs: 5000 },
+  ],
+  // Infuriate is left out: Fell Cleave and its kin refund 5s of its
+  // cooldown, which the drift check doesn't model.
+  "Warrior": [
+    { actions: ["INNER_RELEASE"], firstUseOffsetMs: 15000, holdMs: 2500 },
+    { actions: ["UPHEAVAL", "OROGENY"], firstUseOffsetMs: 12500 },
+    { actions: ["ONSLAUGHT"], firstUseOffsetMs: 18500 },
+  ],
+
   // ── From xivanalysis ────────────────────────────────────────────────
   "Monk": [
     { actions: ["BROTHERHOOD"], firstUseOffsetMs: 7000 },
