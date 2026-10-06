@@ -68,12 +68,20 @@ export type Pull = {
 
   blackHoleGeometry?: BlackHoleGeometry;
 
-  // The boss's own completed casts for this pull (FFXIV only, undefined for
-  // WoW) — persisted (unlike other games' transient enemyCast computations,
-  // which only ever live for the duration of import-time detector calls) so
-  // the mitigation analysis can attach the boss cast to each raidwide hit
-  // (lib/mitigation/analyze.ts).
+  // The boss's own completed casts for this pull — persisted (unlike the
+  // transient enemyCast computations that only live for the duration of
+  // import-time detector calls) so the mitigation analysis can attach the
+  // boss cast to each raidwide hit (lib/mitigation/analyze.ts, FFXIV) and
+  // the WoW damage contexts can find a mechanic's timing (lib/mechanics/
+  // wow/va/*-damage-context.ts). WoW since 2026-10-06; undefined on pulls
+  // saved before.
   enemyCasts?: EnemyEvent[];
+  // WoW only: buffs gained and lost by enemies (the same lists the WoW
+  // encounter modules get as enemyBuffs / enemyBuffRemovals), for the damage
+  // contexts' untargetable and shielded windows. Undefined on pulls saved
+  // before 2026-10-06.
+  enemyBuffs?:        EnemyEvent[];
+  enemyBuffRemovals?: EnemyEvent[];
 
   // Statuses players put on enemies (FFXIV: Chain Stratagem, DoTs,
   // Reprisal, ...; WoW: DoTs and the debuffs their spells apply, pets'

@@ -250,9 +250,10 @@ through four stages, plus a fifth for the damage analysis:
    unsure of as explicit questions. Their VOD review answers them (principle
    6 above).
 
-5. **Damage context (FFXIV so far), after detection settles.** Write the
-   boss's `DamageContext` (`lib/damage/types.ts`) in a sibling
-   `damage-context.ts` and register it in `lib/damage/contexts.ts`. It holds:
+5. **Damage context, after detection settles.** Write the boss's
+   `DamageContext` (`lib/damage/types.ts`) in a sibling `damage-context.ts`
+   (WoW: `<boss>-damage-context.ts` beside the module) and register it in
+   `lib/damage/contexts.ts`. It holds:
    - phase pools: fixed or not, carries over or not, which phase decides
      the enrage, and any phase whose damage doesn't count
    - forced windows the log can't infer: per-player busy time such as
@@ -263,6 +264,20 @@ through four stages, plus a fifth for the damage analysis:
    Check it with `node scripts/validate.js damage-analysis
    sampledata/ff/<code>`. The method and pitfalls are in
    [docs/dps-analysis.md](../../docs/dps-analysis.md).
+
+   **WoW** (every Venomous Abyss boss has one, `lib/mechanics/wow/va/`):
+   - WoW raids are rarely fully untargetable (there's nearly always an add
+     to hit), so the inferred raid downtime almost never fires. The
+     context's windows do most of the work.
+   - Build them from `lib/damage/wow/context-helpers.ts`, which turns
+     player debuffs, boss casts and enemy buffs into windows. Melee-only is
+     common: ranged usually keep casting while moving.
+   - Excuse a mechanic only when measured. Compare holders' cast rate (or
+     2.5s+ cast gaps) with everyone else's in the same window, on a real
+     pull, and record the numbers in the header. Several plausible
+     mechanics measured as no loss at all.
+   - Check it with `node scripts/validate.js damage-analysis-wow
+     sampledata/wow/<code> --pulls=<n>`.
 
 Useful event-level recipes during verification — most are commands of
 `node scripts/analyze-report.js <code> <command>` (`--help` lists them;

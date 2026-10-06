@@ -673,6 +673,7 @@ export function transformFightToPull(
   // hostilityType: "Enemies" fetches — NOT data.castEvents/debuffEvents.
   const enemyCastEvents = wclBuildEnemyCastEvents(data.enemyCastEvents ?? [], actorMap, abilityMap, fightStart);
   const enemyBuffEvents = wclBuildEnemyBuffEvents(data.enemyBuffEvents ?? [], actorMap, abilityMap, fightStart);
+  const enemyBuffRemovalEvents = wclBuildEnemyBuffRemovalEvents(data.enemyBuffEvents ?? [], actorMap, abilityMap, fightStart);
   const friendlyNpcDamageEvents = wclBuildFriendlyNpcDamageEvents(data.damageTakenEvents ?? [], actorMap, abilityMap, fightStart);
 
   // Per-boss encounter modules: see lib/mechanics/wow/registry.ts.
@@ -683,7 +684,7 @@ export function transformFightToPull(
       deaths:            deathEvents,
       enemyCasts:        enemyCastEvents,
       enemyBuffs:        enemyBuffEvents,
-      enemyBuffRemovals: wclBuildEnemyBuffRemovalEvents(data.enemyBuffEvents ?? [], actorMap, abilityMap, fightStart),
+      enemyBuffRemovals: enemyBuffRemovalEvents,
       friendlyNpcDamage: friendlyNpcDamageEvents,
       pullDurationMs:    data.fight.endTime - data.fight.startTime,
     }),
@@ -716,6 +717,10 @@ export function transformFightToPull(
     bossDebuffs:     data.enemyDebuffEvents && data.damageDoneEvents.some((e) => e.buffs !== undefined)
       ? wclBuildBossDebuffs(data.enemyDebuffEvents, actorMap, abilityMap, fightStart)
       : undefined,
+    // For the WoW damage contexts (types/Pull.ts).
+    enemyCasts:        enemyCastEvents,
+    enemyBuffs:        enemyBuffEvents,
+    enemyBuffRemovals: enemyBuffRemovalEvents,
     castEvents,
   };
 }

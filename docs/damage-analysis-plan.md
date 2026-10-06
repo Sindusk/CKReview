@@ -822,6 +822,42 @@ against them and refine it later.
     window: the Ula'tek Rogue's GCDs averaged 1.63M there against 226k
     elsewhere.
 
+**Step 4** (2026-10-06): a damage context for every Venomous Abyss boss
+(`lib/mechanics/wow/va/<boss>-damage-context.ts`, registered in
+`lib/damage/contexts.ts`). Each header records what was measured and
+where.
+- **Data:** WoW pulls now keep the boss's casts and enemy buffs
+  (`Pull.enemyCasts`, `enemyBuffs`, `enemyBuffRemovals`).
+- **Helpers:** `lib/damage/wow/context-helpers.ts` turns debuffs, boss
+  casts and enemy buffs into forced windows.
+- **Method:** each mechanic was measured on real pulls by comparing
+  holders' cast rate with the rest of the raid in the same window. A
+  mechanic is excused only when the loss is real, and often for melee only.
+- **Per boss:**
+
+| Boss | Phases | Forced windows |
+|---|---|---|
+| Entombed Sentinels | P2 Vitriolic Stasis `damageCounts: false` (99% damage reduction) | 1.5s rush before Stasis; 3s boss swap after |
+| Vashnik | none | melee Plague Froth carriers (+2s walk back) |
+| Sszorak | P2 Dig In noted as a burn window | melee Raging Crosswinds; Venomous Surge holders; melee after each charge (Serpent's Fury removal +1s to +7s) |
+| Nymrissa | none (no detection module) | none measured |
+| Nek'zali | P2 multi-target; P3 decides the enrage | well team (entry −6s to exit +4.5s); Soulcoiled; melee Essence Rend knockback; melee Pyre flame carriers |
+| Lost Explorers | all multi-target (council) | melee Blink Nova and Explosive Surprise; fish thrower (−20s to +4s); Blast Wave bounces |
+| Twin Fangs | none (two bosses, cleaved) | everyone 3.5s before Sanguine Storm; melee during it (18s); melee Coiling Ichor |
+| Coiled Altar | not in these captures | S1→S2 (~8s); Malacrass immune → Zul'jan (4.2s); Dreadmarch; Wail fear |
+| Ula'tek | P2 multi-target; P3 `damageCounts: false`; P4 multi-target | P1→P2 transition; Circling Prey (5s); P2 egg clear; melee Doomscale egg |
+
+- **Effect:** on the Ula'tek kill, the intermission's counted loss went
+  from 15.9M to 0.3M, and the Rogue's from 47.3M to 37.4M (7.2M forced).
+- **Known gaps:**
+  - PhaseContext.multiTarget is per phase, so fights without log phases
+    (Vashnik's Venoms, Twin Fangs, Nymrissa's Bubblefins) can't mark their
+    add windows yet.
+  - Partial losses (a mechanic that halves a melee's uptime) are excused
+    in full or not at all.
+  - Coiled Altar's phase ids need a fresh capture.
+  - Enrage timers are mostly unobserved in these wipes.
+
 ## UI: the Damage dialog
 
 - **Header button** "Damage", directly left of "Mitigation".
