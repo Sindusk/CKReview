@@ -2,7 +2,8 @@
 
 // app/statics/[staticId]/page.tsx
 //
-// A static's dashboard: the cross-pull error chart (StaticErrorChart), a
+// A static's dashboard: the cross-pull error chart (StaticErrorChart), the
+// per-mechanic and wipe-cause analysis (StaticMechanicsPanel), a
 // collapsible per-review ("Session") list of pulls with error counts/notes,
 // and the player-identity merge panel (StaticPlayersPanel). Reachable from
 // BurgerMenu's "Manage Statics" dialog — the "View" link there routes here.
@@ -12,6 +13,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import StaticErrorChart, { type ChartPull } from "@/components/StaticErrorChart";
 import StaticPlayersPanel from "@/components/StaticPlayersPanel";
+import StaticMechanicsPanel from "@/components/StaticMechanicsPanel";
 import { SeverityIcon, SEVERITY_COLOR } from "@/components/SeverityIcon";
 import BrandBanner from "@/components/BrandBanner";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -229,6 +231,10 @@ export default function StaticDashboardPage() {
               <StaticErrorChart pulls={pulls} />
             )}
           </div>
+        </Panel>
+
+        <Panel style={{ marginBottom: sectionGap }}>
+          {Number.isInteger(staticId) && <StaticMechanicsPanel staticId={staticId} />}
         </Panel>
 
         <Panel style={{ marginBottom: sectionGap }}>
