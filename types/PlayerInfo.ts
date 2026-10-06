@@ -107,8 +107,9 @@ export type PlayerEvent = {
   // Undefined for WoW and for pulls fetched before it was kept. Count heals
   // with isLandedHeal().
   healType?: "heal" | "calculatedheal" | "absorbed" | "removebuff";
-  // Healing — FFXIV only: the part of the heal that went over full HP
-  // (absent when 0). Read by the damage analysis's heal-GCD check.
+  // Healing: the part of the heal that went over full HP (absent when 0).
+  // Read by the damage analysis's heal-GCD checks (FFXIV; WoW since
+  // 2026-10-06).
   overheal?: number;
 
   // Debuffs — carries which side of the on/off transition this event

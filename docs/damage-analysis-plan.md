@@ -916,6 +916,34 @@ go by role in the FFXIV order, the specs with the most sample players first.
   player's casts. That's an upper bound on the real recast, so drift errs
   lenient.
 
+**Step 6, healer batch** (2026-10-06), `lib/damage/wow/specs/healer.ts`:
+- **Heal-GCD efficiency** for every healer spec: the FFXIV headline (what
+  each heal GCD actually healed), adapted to WCL's healing stream.
+  - On the Vashnik kill, `heal` events carry amount and overheal: the raid
+    overhealed 522M against 572M effective. `absorbed` events are shields
+    that took damage (128M).
+  - A shield that expires unused leaves no amount, so wasted shields
+    aren't visible.
+  - Healing is matched by spell name (Prayer of Mending heals under
+    another ID) on the cast's own target, so the several Rejuvenations
+    running at once don't mix. Spells that land on several players at once
+    (Wild Growth, Chain Heal) count on anyone.
+  - Under 20% effective = a wasted GCD, valued at the healer's damage
+    filler and marked inference. Grouped per spell per phase, since WoW
+    healers press ~300 GCDs a pull.
+- **WoW heal events** now keep `overheal`.
+- **Specs:** Holy Priest (12 sample players), Restoration Druid (10),
+  Holy Paladin, Restoration Shaman, Preservation Evoker (9 each),
+  Mistweaver (2, unverified), Discipline (none in the samples,
+  unverified).
+- **First look** (Ula'tek kill): the Holy Priest's Benediction and Holy
+  Word: Serenity, the Holy Paladin's Flash of Light and Eternal Flame, and
+  the Evokers' Echo show casts under 20% effective, mostly in P1 and P3.
+- **Not judged:**
+  - Healer DoTs: WoW healers aren't expected to keep them up.
+  - Power Infusion's recast: its casts log in pairs 1ms apart, and the
+    median gap (23s) is no recast. It still counts in the rDPS split.
+
 ## UI: the Damage dialog
 
 - **Header button** "Damage", directly left of "Mitigation".

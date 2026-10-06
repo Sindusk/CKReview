@@ -381,6 +381,8 @@ function wclHealToPlayerEvent(
     abilityIcon: wclAbilityIcon(event, abilityMap),
     amount:      event.amount,
     target:      target?.name,
+    // For the damage analysis's heal-GCD check (lib/damage/wow/specs/healer.ts).
+    overheal:    event.overheal || undefined,
   };
 }
 
