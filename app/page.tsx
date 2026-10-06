@@ -1127,8 +1127,6 @@ export default function Home() {
         onClose={() => setShowMitigation(false)}
         pulls={pulls}
         currentPullId={selectedPullId}
-        mitigationPlanId={mitigationPlanId}
-        onMitigationPlanChange={handleMitigationPlanChange}
       />
 
       <div
