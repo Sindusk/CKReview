@@ -119,6 +119,9 @@ differ from the FFLogs fight id. In one report, "pull 11" was fight 12.
 
 ## Ideas for app tooling
 
+These are folded into the build plan,
+[damage-analysis-plan.md](damage-analysis-plan.md).
+
 - Phase-pool detection, and the equal-window comparison against
   user-supplied clear logs.
 - An rDPS split per player (own, received, given), so buffers aren't blamed
