@@ -527,6 +527,49 @@ MECHANICS['mitigation-analysis'] = {
   },
 };
 
+// Print-only (no PullErrors, nothing snapshotted yet): the damage analysis
+// (lib/damage/analyze.ts) for every pull: phase summary, then each player's
+// estimated loss and top findings. `--all-findings` prints every finding.
+// docs/damage-analysis-plan.md describes the model.
+MECHANICS['damage-analysis'] = {
+  game: 'ff',
+  load: () => ({
+    store: requireTsFromRoot('lib/sample-report-store.ts'),
+    lt: requireTsFromRoot('lib/log-transforms.ts', { './log-auth': {} }),
+    ...requireTsFromRoot('lib/damage/analyze.ts'),
+    ...requireTsFromRoot('lib/damage/contexts.ts'),
+    ...requireTsFromRoot('lib/damage/ffxiv/game.ts'),
+  }),
+  async run({ mod, dir }) {
+    const pulls = await loadThroughRealPipeline(mod, dir);
+    if (!pulls) return;
+    const all = process.argv.includes('--all-findings');
+    const M = (n) => (Math.abs(n) >= 1e6 ? `${(n / 1e6).toFixed(2)}M` : `${Math.round(n / 1000)}k`);
+    const t = (ms) => `${(ms / 1000).toFixed(1)}s`;
+    for (const pull of pulls) {
+      const a = mod.analyzePullDamage(pull, mod.FFXIV_DAMAGE, mod.getDamageContext(pull.name));
+      console.log('='.repeat(70));
+      console.log(`${pull.name} Pull ${pull.pullNumber} (${pull.result}): analysed to ${t(a.endMs)}` +
+        `${a.collapseMs !== undefined ? ' (wipe collapse)' : ''}, context ${a.context ?? 'MISSING'}` +
+        `${a.missingData.length ? `, missing: ${a.missingData.join('; ')}` : ''}`);
+      for (const ph of a.phases) {
+        console.log(`  ${ph.name.padEnd(24)} ${t(ph.startMs).padStart(7)}-${t(ph.endMs).padEnd(7)} raid ${M(ph.raidDamage).padStart(7)}` +
+          ` lost ${M(ph.raidLostDamage).padStart(6)}${ph.context?.decidesEnrage ? ' DECIDES ENRAGE' : ''}` +
+          `${ph.bossHpLeft !== undefined ? ` boss HP left ${M(ph.bossHpLeft)}` : ''}`);
+      }
+      for (const p of a.players) {
+        console.log(`  ${p.job.padEnd(12)} ${p.player.padEnd(18)} dealt ${M(p.damage).padStart(7)} lost ${M(p.lostDamage).padStart(6)}` +
+          ` (forced ${M(p.forcedDamage)}) GCD ${t(p.baseGcdMs)} x${p.gcds}, in buffs ${p.buffWindowGcds.used}/${p.buffWindowGcds.fit}`);
+        const shown = all ? p.findings : p.findings.filter((f) => !f.forced).slice(0, 4);
+        for (const f of shown) {
+          console.log(`      ${f.forced ? '(forced) ' : ''}${f.kind} ${t(f.startMs)} ${f.phase ?? ''}: ${M(f.lostDamage)} — ${f.detail}` +
+            `${f.cause ? ` [${f.cause}]` : ''}${all ? `\n          basis: ${f.basis}` : ''}`);
+        }
+      }
+    }
+  },
+};
+
 // One generated entry per module in lib/mechanics/wow/registry.ts (except
 // those with a hand-written entry above, marked customHarness there). A new
 // WoW boss module needs no change here.

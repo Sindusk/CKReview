@@ -283,6 +283,14 @@ export function staticRuleKey(ruleId: string, ruleName: string): string {
   return `${ruleId}::${ruleName}`;
 }
 
+/** A grouped mechanic's label by its key, or undefined for an ungrouped one. */
+export function mechanicLabelForKey(mechanicKey: string): string | undefined {
+  for (const entry of Object.values(RULE_META)) {
+    if (entry.mechanicKey === mechanicKey && entry.mechanicLabel) return entry.mechanicLabel;
+  }
+  return undefined;
+}
+
 /** The error's mechanic, falling back to the rule itself (see header). */
 export function getRuleMeta(ruleId: string, ruleName: string): RuleMeta {
   const entry = RULE_META[ruleId];

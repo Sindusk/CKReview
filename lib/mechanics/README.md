@@ -199,7 +199,7 @@ every mechanic, in every game. When in doubt, come back here.
 ## The working method for building a new detection
 
 Since the Venomous Abyss raid (Entombed Sentinels, Vashnik), a new boss goes
-through four stages:
+through four stages, plus a fifth for the damage analysis:
 
 1. **Research model.** A researcher (Codex) writes the encounter model as
    the module's header comment, following
@@ -249,6 +249,20 @@ through four stages:
    what each wipe's cutoff was, and list the attribution calls you were
    unsure of as explicit questions. Their VOD review answers them (principle
    6 above).
+
+5. **Damage context (FFXIV so far), after detection settles.** Write the
+   boss's `DamageContext` (`lib/damage/types.ts`) in a sibling
+   `damage-context.ts` and register it in `lib/damage/contexts.ts`. It holds:
+   - phase pools: fixed or not, carries over or not, which phase decides
+     the enrage, and any phase whose damage doesn't count
+   - forced windows the log can't infer: per-player busy time such as
+     tower soaks, debuff carriers and forced movement. Raid-wide
+     untargetable time is inferred automatically.
+   - labels for the mechanic occurrence keys
+   `lib/mechanics/ffxiv/dancingmad/damage-context.ts` is the first one.
+   Check it with `node scripts/validate.js damage-analysis
+   sampledata/ff/<code>`. The method and pitfalls are in
+   [docs/dps-analysis.md](../../docs/dps-analysis.md).
 
 Useful event-level recipes during verification — most are commands of
 `node scripts/analyze-report.js <code> <command>` (`--help` lists them;

@@ -102,6 +102,22 @@ It loads pulls lazily and keeps three in memory, so narrowing with
   - **Fix:** log in again in the app, which mints an independent grant.
     **Do not** re-seed the file, since that re-creates the shared lineage.
 
+## Damage analysis (FFXIV)
+
+- **Analysis without the UI.**
+  `node scripts/validate.js damage-analysis sampledata/ff/<code>` prints
+  each pull's phase summary and every player's estimated loss with their
+  top findings. Add `--all-findings` for every finding and its basis.
+  Print-only. It needs a capture fetched after 2026-10-06 (player buffs,
+  begin-cast durations, damage detail); `dQ8wmb1VhKt6yBXk` has them.
+- **xivanalysis data.** `lib/damage/ffxiv/xiva-data.ts` is generated.
+  Refresh it with
+  `git clone --depth 1 https://github.com/xivanalysis/xivanalysis.git <new-empty-dir>`
+  and then `node scripts/sync-xiva-data.js <that-dir>`. The script parses
+  their files and never runs them. Clone outside the repo, and don't run
+  anything inside the clone.
+- Model and choices: [damage-analysis-plan.md](damage-analysis-plan.md).
+
 ## Mitigation analysis (FFXIV)
 
 - **Catalog check.** `node scripts/check-mitigation-catalog.js` checks
