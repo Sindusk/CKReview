@@ -519,6 +519,188 @@ Open:
 - The runner is print-only. Snapshots and rulings come once findings have
   survived player feedback.
 
+## WoW port (step 8)
+
+Same shape as FFXIV: the engine in `lib/damage/` stays game-neutral, a
+WoW layer goes in `lib/damage/wow/` (spell data, tracked cooldowns,
+`specs/` grouped by role like `ffxiv/jobs/`), and each Venomous Abyss
+boss gets a `damage-context.ts` next to its module. The engine changes
+only where WoW can't be expressed through `DamageGame`, and the module
+header says why.
+
+### Borrowing from WoWAnalyzer
+
+[WoWAnalyzer](https://github.com/WoWAnalyzer/WoWAnalyzer) is
+**AGPL-3.0** (checked 2026-10-06 through GitHub's licence API, `midnight`
+branch). The user decided not to take on the AGPL, so unlike xivanalysis
+it is a reference only:
+- Read it to learn the rules (which cooldowns matter, what a burst window
+  holds, how procs work); write our own code in our own structure.
+- Copy no code, data tables or comments, verbatim or lightly edited, and
+  write no sync script.
+- Spell and aura IDs come from real WCL logs (`scripts/analyze-report.js`,
+  the report's `masterData.abilities`) and `lib/spell-data.ts`; each ID's
+  comment names its source log.
+- The dialog's About text credits it as a plain link ("rules informed by
+  WoWAnalyzer"), not a licence notice.
+- If a rule can only be had by copying, stop and ask the user.
+
+### Data check findings (2026-10-06)
+
+Checked on `kGVX7tafBT2pM1N3` fight 29: Vashnik the Malignant kill,
+438s, 20 players. Used the slimmed sample pull plus one unslimmed fetch of
+its first 90s: friendly `Casts`, `DamageDone` and `Buffs`, and `Debuffs`
+on enemies (2.3k, 13.4k, 14.4k and 4.8k events).
+
+#### 1. Casts and GCD timing
+
+- **The `cast` event lands at the end of the cast,** not 0.5s before it
+  as in FFXIV. Smite: begin → cast median 764ms; Lightning Bolt 1200ms;
+  Arcane Blast 991ms (hasted, under Heroism).
+- **Begin-casts carry no `duration`.** The cast time is cast − begin-cast
+  of the same ability. Off-GCD casts can land in between (Fire Blast during
+  a Fireball), so match by ability, not by the next event.
+- **Instant procs show as begin-cast and cast at the same ms:** 104 of
+  411 begin-casts. Pyroblast 44 (Hot Streak), Lava Burst 17, Starfire 15,
+  Shadow Bolt 14. A proc consumption is visible on the cast itself.
+- **Cancelled or interrupted casts:** a begin-cast with no cast of that
+  ability before the next begin-cast. 16 in 90s. Several are re-casts of
+  the same spell (Elemental Blast, Shadow Bolt), so moving or cancelling.
+- **Channels** (Mind Flay) log one `cast` at the start and no end event.
+  The lock must come from the channel's damage ticks or the next cast.
+- **Empowered spells** (Fire Breath, Dream Breath) log `empowerstart` and
+  `cast` at the same ms, then `empowerend` with `empowermentLevel` at
+  release.
+- **`fake: true` casts** are WCL-made, not button presses: Shadowy
+  Apparition (73), Reclamation (39), Twin Flame (26), Infliction of Sorrow
+  (24) and others. Exclude them from GCD counts.
+- **WCL gives no GCD information.** No on-GCD flag, no recast, no haste.
+  The GCD table (on-GCD, 1.5s or 1.0s base, cooldown, charges) is ours to
+  write per spec. Source each entry from cast spacing in real logs.
+- **Haste changes inside a pull:** Heroism (+30%) on the whole raid at
+  2.9s, Power Infusion on single players. The engine's one speed factor
+  per player would read every lust GCD as normal and every normal GCD
+  after lust as slow.
+- **`classResources` on casts:** the primary resource on every cast
+  (amount, max and cost). The secondary appears on spenders, as the amount
+  before the spend: Eviscerate `4: 7/7, cost 7` (combo points), Eternal
+  Flame `9: 5/5` (Holy Power), Echo `19: 5/5` (Essence). So "finisher
+  below max" is measured, not simulated. Builder overcap isn't directly
+  visible: builders show only the primary resource.
+- Today: `player.casts` holds completed casts only (`fake` ones
+  included); begin-casts and `classResources` are dropped by both the
+  transform and `slim-report.js`.
+
+#### 2. Buffs: snapshot and stream
+
+- **The per-hit `buffs` snapshot holds every aura on the attacker,**
+  unlike FFXIV's damage-modifier-only list:
+  - procs (Heating Up, Hot Streak!), cooldowns (Combustion), Heroism and
+    Power Infusion (PI on the Warlock's hits from 3.1s to 18.0s)
+  - flasks, augment runes, forms
+  - passive talent auras applied before the pull (unnamed IDs in the
+    report's ability list)
+  - not HoTs or shields from others (Echo of Light, Rejuvenation, Renew)
+  - not target debuffs: Chaos Brand, Mystic Touch and Hunter's Mark are on
+    0 of 13.4k hits
+- **It is big:** 14.5 statuses per hit on average (max 27), 107 bytes, 276
+  distinct IDs. That's about 8.6MB of strings for this kill's 80k hits. So
+  decode only the IDs the game layer asks for into `statusIds`.
+- **The Buffs stream** gives apply/refresh/remove and stack changes, with
+  the source (Heroism: the Shaman, on all 20 players at 2.9s; PI: the
+  Priest, on themselves and on the Warlock). **There is no `duration` on
+  applies,** so an expired proc is a removal with no consuming cast, judged
+  against a duration we write down.
+- **Unfiltered volume:** about 160 events/s for 20 players, 436 distinct
+  statuses, 78% self-applied. The top statuses are passive procs and HoTs
+  (Rune of Critical Power, Elemental Resistance, Echo of Light). A server
+  filter on 9 IDs (lust, PI, Hot Streak, Heating Up, Combustion) cut 60s
+  from 10.0k events to 90.
+
+#### 3. Damage events
+
+- **No `multiplier`, `directHit` or `bonusPercent`.** WoW has no
+  direct hit, and no combo or positional bonus field.
+- **`hitType`:** 1 normal, 2 crit, 0 miss, 8 parry, 10 immune. Parries (18)
+  and misses (77) were on Vashnik. Immunes were on Burning Venom (63) and
+  Vashnik (8).
+- **`unmitigatedAmount`** is before crit and before target-side modifiers
+  (armor, vulnerabilities). Caster-side buffs are already in it.
+  amount ÷ unmitigated: normal hits median 1.00 (quartiles 0.76–1.06),
+  crits median 2.21.
+- **DoT ticks:** `tick: true`, 29% of hits, and they crit.
+- **Pets: 12.3% of raid damage, and dropped today.** Damage is filtered by
+  player `sourceID`, and the actor query doesn't fetch `petOwner`. With
+  `petOwner` (metadata only), over the whole kill: the two BM Hunters'
+  pets 10.0M and 10.6M, Shaman
+  Ancestor and elementals 4.2M, Warlock Darkglare and demons 2.6M, DK Rune
+  Weapon 1.8M.
+- **Player debuffs on enemies** (DoTs, Mortal Wounds, Atrophic Poison)
+  aren't in the WoW fetch. Unfiltered it's about 53 events/s, mostly from
+  players, some from pets.
+
+#### 4. Query cost
+
+Measured with `rateLimitData` before and after single queries over the
+same 60s:
+- **About 1 point per sub-stream per request, whatever its size.**
+  Unfiltered Buffs (10.0k events) and filtered Buffs (90) cost the same.
+- **A finished stream still costs a point on every later page.**
+  `fetchFightData` pins it at `endTime` and keeps requesting it; an empty
+  window measured the same 1 point.
+- This kill has 80k damage-done and 95k healing events, so about 10
+  merged pages × 9 streams ≈ 90 points today. Two more streams, filtered,
+  would add about 20.
+
+### Design impact
+
+1. **Keep the per-fight cost flat by dropping finished streams.** Give
+   each alias in `FIGHT_EVENTS_QUERY` an `@include(if: $want…)` and turn it
+   off once its stream is done. Then only page 1 pays for every stream;
+   later pages pay for damage done and healing (≈ 11 + 9 × 3 ≈ 38 points on
+   this kill instead of ≈ 90). That pays for the two new streams below with
+   room to spare. Re-measure on a real fetch when building.
+2. **Two new filtered streams, same pattern as `ffxiv/buff-stream.ts`:**
+   - friendly `Buffs` on the game layer's ID list: raid buffs (the lust
+     family, PI, and others as found) plus each spec's procs and burst
+     cooldowns as its batch lands
+   - `Debuffs` on enemies, filtered to each spec's DoTs and party debuffs,
+     into `Pull.bossDebuffs`
+3. **Begin-casts map onto the FFXIV shape.** The transform pairs each WoW
+   begin-cast with its cast and stores `durationMs` = cast − begin, so
+   `gcdUses` and the interrupted-cast check work unchanged. Empowers get
+   `durationMs` = empowerend − empowerstart. `fake` casts are dropped from
+   the engine's view.
+4. **Engine change: haste over time.** Replace the per-player speed factor
+   with one per window (in and out of Heroism and PI, from the buff
+   stream), else lust GCDs look normal and later ones look slow. The FFXIV
+   result must not change; check with `validate.js --check`.
+5. **Engine change: channels.** A channelled GCD locks until its last tick
+   or the next cast, whichever is first. The game layer marks channels.
+6. **Snapshot: keep, but filtered.** Decode only the game layer's IDs
+   into `statusIds`. The snapshot then confirms what each hit had (Combustion,
+   lust, PI), as on FFXIV; the stream gives the windows and expiries.
+7. **Buff value without a multiplier.** A damage-% buff is measured as
+   the median `unmitigatedAmount` of the same ability with it ÷ without it,
+   per pull. Haste buffs (lust, PI) add GCDs instead of hit size, so their
+   share of the rDPS split is an estimate (extra GCDs × GCD value) and
+   marked approximate. `DamageGame.partyBuff` needs a `haste` field.
+8. **Pets.** Add `petOwner` to the actor query, credit pet damage to the
+   owner (marked as pet so it doesn't skew GCD values), and count pet DoTs.
+9. **Resources on casts** (`classResources`, kept in a new cast field) let
+   spender checks read the real amount. Gauge simulation is the fallback
+   only for builder overcap.
+10. **The GCD and spell table is hand-written,** per spec, with each
+    entry's source log. No `xiva-data.ts` equivalent and no sync script.
+11. **Existing WoW samples need `--refetch`** after the projector keeps
+    `buffs`, `hitType`, `unmitigatedAmount`, `classResources`,
+    `begincast`, `fake` and the new streams. Live pulls stored before then
+    say so in the dialog, as on FFXIV.
+
+All of the Venomous Abyss samples are from groups the user doesn't know.
+The first spec batch should also be checked on a log from the user's
+static.
+
 ## UI: the Damage dialog
 
 - **Header button** "Damage", directly left of "Mitigation".
@@ -563,7 +745,10 @@ job module a `validate.js` runner so baselines catch regressions.
    Done 2026-10-06 for every combat job. The user will refine each job
    with its players over time (see "Build status").
 7. **Reference-clear comparison.** Done 2026-10-06.
-8. **Later:** automatic search for comparable clears; the WoW port.
+8. **The WoW port** ("WoW port (step 8)"). Step 1, the data check, done
+   2026-10-06; the build waits on the user's go-ahead and their static's
+   specs.
+9. **Later:** automatic search for comparable clears.
 
 Verify each step the usual way: `node scripts/validate.js --check` and
 `npx tsc --noEmit`. The user reviews the UI.
