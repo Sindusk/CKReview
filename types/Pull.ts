@@ -74,4 +74,20 @@ export type Pull = {
   // the mitigation analysis can attach the boss cast to each raidwide hit
   // (lib/mitigation/analyze.ts).
   enemyCasts?: EnemyEvent[];
+
+  // FFXIV only: statuses players put on enemies (Chain Stratagem, DoTs,
+  // Reprisal, ...), for the damage analysis's buff windows. Undefined for
+  // WoW and for pulls fetched without the enemyDebuffs stream.
+  bossDebuffs?: BossDebuffEvent[];
+};
+
+export type BossDebuffEvent = {
+  timestamp:       number;   // ms into the pull
+  statusId:        number;   // FFLogs status id (+1000000)
+  statusName:      string;
+  status:          "applied" | "refreshed" | "removed";
+  sourceName:      string;   // the player who applied it
+  targetActorId:   number;   // the boss is several actors across phases
+  targetInstance?: number;
+  targetName:      string;
 };

@@ -147,6 +147,7 @@ async function main() {
       enemyDamageTaken: { data: data.enemyDamageTakenEvents },
       enemyDebuffs:  { data: data.enemyDebuffEvents },
       headMarkers:   { data: data.headMarkerEvents },
+      playerBuffs:   { data: data.playerBuffEvents },
     });
 
     writeAtomic(filePath, JSON.stringify({

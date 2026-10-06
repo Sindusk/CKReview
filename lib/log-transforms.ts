@@ -22,7 +22,7 @@
 // preferred over the masterData lookup when present — mirrors how
 // fflAbilityName already prefers `ability.name` over the masterData lookup.
 
-import type { Pull, BlackHoleGeometry } from "@/types/Pull";
+import type { Pull, BlackHoleGeometry, BossDebuffEvent } from "@/types/Pull";
 import type { DeathEvent } from "@/types/DeathEvent";
 import type { PlayerInfo, PlayerEvent, ShieldAbsorb } from "@/types/PlayerInfo";
 import type { EnemyEvent } from "@/types/PullError";
@@ -773,7 +773,91 @@ function fflDamageDoneToPlayerEvent(
     // Ultimate Embrace cast completes, rather than only at the cast instant.
     healthAfter: event.targetResources?.hitPoints,
     maxHealth:   event.targetResources?.maxHitPoints,
+    // Damage analysis fields (types/PlayerInfo.ts, "Damage Done").
+    isDoT:             event.tick === true,
+    statusIds:         fflDecodeStatusIds(event.buffs),
+    multiplier:        event.multiplier,
+    hitType:           event.hitType,
+    directHit:         event.directHit,
+    bonusPercent:      event.bonusPercent,
+    actorPotencyRatio: event.actorPotencyRatio,
+    targetActorId:     event.targetID,
+    targetInstance:    event.targetInstance,
   };
+}
+
+function fflBeginCastToPlayerEvent(
+  event:      FFLCastEvent,
+  actorMap:   Map<number, FFLActor>,
+  abilityMap: Map<number, AbilityInfo>,
+  fightStart: number
+): PlayerEvent {
+  const hasTarget = event.targetID !== undefined && event.targetID !== -1;
+  return {
+    timestamp:   Math.max(0, event.timestamp - fightStart),
+    abilityId:   event.abilityGameID ?? 0,
+    abilityName: fflAbilityName(event, abilityMap),
+    abilityIcon: fflAbilityIcon(event, abilityMap),
+    target:      hasTarget ? actorMap.get(event.targetID as number)?.name : undefined,
+    durationMs:  event.duration,
+  };
+}
+
+const FFL_BUFF_STATUS: Record<FFLBuffEvent["type"], NonNullable<PlayerEvent["buffStatus"]>> = {
+  applybuff:       "applied",
+  refreshbuff:     "refreshed",
+  removebuff:      "removed",
+  applybuffstack:  "stack",
+  removebuffstack: "stackRemoved",
+};
+
+function fflBuffToPlayerEvent(
+  event:      FFLBuffEvent,
+  actorMap:   Map<number, FFLActor>,
+  abilityMap: Map<number, AbilityInfo>,
+  fightStart: number
+): PlayerEvent {
+  return {
+    timestamp:   Math.max(0, event.timestamp - fightStart),
+    abilityId:   event.abilityGameID ?? 0,
+    abilityName: fflAbilityName(event, abilityMap),
+    abilityIcon: fflAbilityIcon(event, abilityMap),
+    source:      actorMap.get(event.sourceID)?.name,
+    buffStatus:  FFL_BUFF_STATUS[event.type] ?? "applied",
+    durationMs:  event.duration,
+    stack:       event.stack,
+  };
+}
+
+// Statuses players put on enemies (Chain Stratagem, DoTs, Reprisal, ...),
+// from the enemyDebuffs stream. Player-sourced only (the report query
+// doesn't fetch pet owners). For the damage analysis's buff windows;
+// Kefka Says reads the same stream separately.
+function fflBuildBossDebuffs(
+  enemyDebuffEvents: FFLDebuffEvent[],
+  actorMap:          Map<number, FFLActor>,
+  abilityMap:        Map<number, AbilityInfo>,
+  fightStart:        number
+): BossDebuffEvent[] {
+  const out: BossDebuffEvent[] = [];
+  for (const e of enemyDebuffEvents) {
+    const source = actorMap.get(e.sourceID);
+    if (source?.type !== "Player") continue;
+    const sourceName = source.name;
+    const status: BossDebuffEvent["status"] =
+      e.type === "removedebuff" ? "removed" : e.type === "refreshdebuff" ? "refreshed" : "applied";
+    out.push({
+      timestamp:      Math.max(0, e.timestamp - fightStart),
+      statusId:       e.abilityGameID,
+      statusName:     fflAbilityName(e, abilityMap),
+      status,
+      sourceName,
+      targetActorId:  e.targetID,
+      targetInstance: e.targetInstance,
+      targetName:     actorMap.get(e.targetID)?.name ?? `Unknown (${e.targetID})`,
+    });
+  }
+  return out;
 }
 
 // Decodes FFLogs' "1001191.1001832." dot-separated buff-ID string (see the
@@ -1157,7 +1241,9 @@ function buildFFPlayers(
   damageTakenEvents: FFLDamageEvent[],
   healingEvents:     FFLHealEvent[],
   debuffEvents:      FFLDebuffEvent[],
-  fightStart:        number
+  fightStart:        number,
+  beginCastEvents:   FFLCastEvent[],
+  playerBuffEvents:  FFLBuffEvent[] | undefined
 ): PlayerInfo[] {
   const uniqueIds = [...new Set(friendlyPlayerIds)];
 
@@ -1222,6 +1308,16 @@ function buildFFPlayers(
         casts: castEvents
           .filter((e) => e.sourceID === actorId)
           .map((e) => fflCastToPlayerEvent(e, actorMap, abilityMap, fightStart)),
+
+        beginCasts: beginCastEvents
+          .filter((e) => e.sourceID === actorId)
+          .map((e) => fflBeginCastToPlayerEvent(e, actorMap, abilityMap, fightStart)),
+
+        // Undefined (not empty) when the stream wasn't fetched, so the
+        // damage analysis can say the pull needs a re-fetch.
+        buffs: playerBuffEvents
+          ?.filter((e) => e.targetID === actorId)
+          .map((e) => fflBuffToPlayerEvent(e, actorMap, abilityMap, fightStart)),
       };
     })
     .filter((p): p is PlayerInfo => p !== null)
@@ -1262,7 +1358,9 @@ export function transformFFightToPull(
     data.damageTakenEvents,
     data.healingEvents,
     data.debuffEvents,
-    fightStart
+    fightStart,
+    data.castEvents.filter((e) => e.type === "begincast"),
+    data.playerBuffEvents
   );
 
   // NOTE: sourced from data.enemyCastEvents / data.enemyBuffEvents — the
@@ -1311,6 +1409,9 @@ export function transformFFightToPull(
     castEvents,
     blackHoleGeometry,
     enemyCasts:    enemyCastEvents,
+    bossDebuffs:   data.enemyDebuffEvents
+      ? fflBuildBossDebuffs(data.enemyDebuffEvents, actorMap, abilityMap, fightStart)
+      : undefined,
   };
 }
 

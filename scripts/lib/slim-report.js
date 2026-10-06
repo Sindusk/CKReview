@@ -80,8 +80,9 @@ const FFL_PROJECTORS = {
   // for FF at all, roster comes from fight.friendlyPlayers instead) —
   // the gear/auras/stat block this stream otherwise carries is pure bloat.
   combatantInfo: (e) => pick(e, ['timestamp', 'type', 'sourceID']),
+  // `duration` is a begincast's cast time (damage analysis).
   casts: (e) => ({
-    ...pick(e, ['timestamp', 'type', 'sourceID', 'targetID', 'sourceInstance', 'targetInstance', 'abilityGameID']),
+    ...pick(e, ['timestamp', 'type', 'sourceID', 'targetID', 'sourceInstance', 'targetInstance', 'abilityGameID', 'duration']),
     targetResources: pickNested(e, 'targetResources', FF_RESOURCE_SUBKEYS),
   }),
   // `overkill` and `buffs` used to be dropped here along with the rest of
@@ -97,8 +98,11 @@ const FFL_PROJECTORS = {
   // only `buffs` and `overkill` are consumed, so those two are kept and the
   // rest (packetID, sourceResources, targetMarker, ...) stays dropped —
   // damageTaken below also keeps the mitigation breakdown).
+  // hitType ... actorPotencyRatio are read by the damage analysis
+  // (lib/damage/); see docs/damage-analysis-plan.md "Data check findings".
   damageDone: (e) => ({
-    ...pick(e, ['timestamp', 'type', 'sourceID', 'targetID', 'sourceInstance', 'targetInstance', 'abilityGameID', 'amount', 'overkill', 'buffs', 'unpaired']),
+    ...pick(e, ['timestamp', 'type', 'sourceID', 'targetID', 'sourceInstance', 'targetInstance', 'abilityGameID', 'amount', 'overkill', 'buffs', 'unpaired',
+      'hitType', 'directHit', 'multiplier', 'bonusPercent', 'tick', 'simulated', 'actorPotencyRatio']),
     targetResources: pickNested(e, 'targetResources', FF_RESOURCE_SUBKEYS),
   }),
   // The mitigation breakdown fields (unmitigatedAmount ... hitType) are read
@@ -137,6 +141,8 @@ const FFL_PROJECTORS = {
   // abilityGameID is always 0 and targetID always -1 (the marker rides on
   // the SOURCE actor), so neither is worth keeping.
   headMarkers: (e) => pick(e, ['timestamp', 'type', 'sourceID', 'sourceInstance', 'markerID']),
+  // Player buffs for the damage analysis, already filtered server-side.
+  playerBuffs: (e) => pick(e, ['timestamp', 'type', 'sourceID', 'targetID', 'abilityGameID', 'duration', 'stack']),
 };
 
 function slimFflReport(streams) {

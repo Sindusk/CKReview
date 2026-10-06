@@ -66,6 +66,23 @@ export type PlayerEvent = {
   hitType?:           number;
   damageType?:        number;
 
+  // Damage Done — FFXIV only, for the damage analysis (lib/damage/; docs/
+  // damage-analysis-plan.md, "Data check findings"). `statusIds` (above)
+  // here is the damage-modifier snapshot: the attacker's damage buffs and
+  // penalties plus debuffs on the hit's target (Chain Stratagem), never
+  // procs; DoT ticks carry the snapshot from when the DoT was applied.
+  // `multiplier` holds damage-% modifiers only. hitType 2 = crit.
+  directHit?:         boolean;
+  bonusPercent?:      number;  // combo/positional actions only
+  actorPotencyRatio?: number;  // simulated DoT ticks: FFLogs' damage per potency
+  targetActorId?:     number;
+  targetInstance?:    number;
+
+  // Begin-casts and player buffs — FFXIV only. Cast time after speed for a
+  // begin-cast; full status length for a buff apply/refresh.
+  durationMs?:   number;
+  buffStatus?:   "applied" | "refreshed" | "removed" | "stack" | "stackRemoved";
+
   // Healing / healingReceived — FFXIV only. The FFLogs healing stream's
   // event type: real heals, plus shield "absorbed" events, the shield's
   // "removebuff" and "calculatedheal" previews (which duplicate a heal).
@@ -141,6 +158,17 @@ export type PlayerInfo = {
   // which hit it absorbed. Undefined for WoW and for pulls fetched before
   // it existed.
   shieldAbsorbs?: ShieldAbsorb[];
+
+  // FFXIV only, for the damage analysis. Undefined for WoW and for pulls
+  // fetched before they existed.
+  // - beginCasts: every begin-cast with its cast time (`durationMs`). The
+  //   completed "cast" in `casts` lands ~0.5s before the bar ends; a
+  //   begin-cast with no matching cast was interrupted.
+  // - buffs: apply/refresh/remove/stack events of this player's job,
+  //   proc and raid-buff statuses (lib/damage/ffxiv/buff-stream.ts), with
+  //   `source` = who applied it and `durationMs` on applies/refreshes.
+  beginCasts?: PlayerEvent[];
+  buffs?:      PlayerEvent[];
 };
 
 export type ShieldAbsorb = {

@@ -51,6 +51,10 @@ const STREAM_TO_FIELD = {
   debuffs:       "debuffEvents",
   enemyCasts:    "enemyCastEvents",
   enemyBuffs:    "enemyBuffEvents",
+  enemyDamageTaken: "enemyDamageTakenEvents",
+  enemyDebuffs:  "enemyDebuffEvents",
+  headMarkers:   "headMarkerEvents",
+  playerBuffs:   "playerBuffEvents",
 } as const;
 
 export type SampleReportPayload =

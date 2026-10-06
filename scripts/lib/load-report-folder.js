@@ -19,7 +19,7 @@ const path = require('path');
 // report folders simply won't have them, which mergeReports already handles
 // (`r[key]?.data ?? []`). Anything reading them must tolerate an empty array
 // and report "unknown" rather than guessing; re-fetch the report to fill them.
-const STREAM_KEYS = ['deaths', 'combatantInfo', 'casts', 'damageDone', 'damageTaken', 'healing', 'debuffs', 'enemyCasts', 'enemyBuffs', 'enemyDamageTaken', 'enemyDebuffs', 'headMarkers'];
+const STREAM_KEYS = ['deaths', 'combatantInfo', 'casts', 'damageDone', 'damageTaken', 'healing', 'debuffs', 'enemyCasts', 'enemyBuffs', 'enemyDamageTaken', 'enemyDebuffs', 'headMarkers', 'playerBuffs'];
 
 function readJsonReport(filePath) {
   const raw = fs.readFileSync(filePath, 'utf8');

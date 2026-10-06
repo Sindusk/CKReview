@@ -19,6 +19,7 @@ import {
   type RateLimitStatus,
 } from "./rate-limit";
 import { attachEncounterPhases, type EncounterPhase, type ReportEncounterPhases } from "./pull-phases";
+import { PLAYER_BUFF_FILTER } from "./damage/ffxiv/buff-stream";
 
 const GQL_ENDPOINT = "https://www.fflogs.com/api/v2/user";
 
@@ -266,6 +267,10 @@ export type FFLCastEvent = {
   // comment for the full story).
   sourceResources?: { x?: number; y?: number; facing?: number; hitPoints?: number; maxHitPoints?: number };
   targetResources?: { x?: number; y?: number; facing?: number; hitPoints?: number; maxHitPoints?: number };
+  // "begincast" only: the cast time after speed, in ms. The matching "cast"
+  // lands ~0.5s before the bar ends (the slidecast point), so the cast
+  // lock ends at begincast + duration, not at the "cast" event.
+  duration?:     number;
 };
 
 // 3) Damage event shape (#8) — nested resources, not flat
@@ -322,6 +327,16 @@ export type FFLDamageEvent = {
   mitigated?:    number;
   blocked?:      number;
   hitType?:      number;
+  // Outgoing damage (docs/damage-analysis-plan.md, "Data check findings"):
+  // hitType 2 = crit; `directHit` is separate. On damageDone, `multiplier`
+  // holds only damage-% modifiers, not crit/DH-rate buffs. `bonusPercent`
+  // appears on combo and positional actions. Simulated DoT ticks carry
+  // FFLogs' own damage-per-potency estimate, `actorPotencyRatio`.
+  directHit?:    boolean;
+  bonusPercent?: number;
+  simulated?:    boolean;
+  actorPotencyRatio?: number;
+  targetInstance?: number;
 };
 
 export type FFLHealEvent = {
@@ -354,9 +369,11 @@ export type FFLHealEvent = {
 
 export type FFLDebuffEvent = {
   timestamp:     number;
-  type:          "applydebuff" | "removedebuff" | "applydebuffstack" | "removedebuffstack";
+  // "refreshdebuff" only comes back on the enemyDebuffs stream.
+  type:          "applydebuff" | "removedebuff" | "refreshdebuff" | "applydebuffstack" | "removedebuffstack";
   sourceID:      number;
   targetID:      number;
+  targetInstance?: number;
   abilityGameID: number;
   // The specific attack that CAUSED this debuff application (e.g. which
   // boss cast applied Damage Down) — present on some FFLogs debuff events
@@ -402,10 +419,15 @@ export type FFLHeadMarkerEvent = {
 // buff, not a player).
 export type FFLBuffEvent = {
   timestamp:     number;
-  type:          "applybuff" | "removebuff" | "applybuffstack";
+  type:          "applybuff" | "removebuff" | "refreshbuff" | "applybuffstack" | "removebuffstack";
   sourceID:      number;
   targetID:      number;
   abilityGameID: number;
+  // On applies/refreshes: the status's full length in ms (the player-buff
+  // stream uses it to tell an expired proc from a consumed one).
+  duration?:     number;
+  // On stack changes: the new stack count.
+  stack?:        number;
   ability?: {
     name:        string;
     abilityIcon?: string;
@@ -573,6 +595,8 @@ const FIGHT_EVENTS_QUERY = /* graphql */`
     $enemyDebuffFilter:   String!
     $headMarkersStart:    Float!
     $headMarkerFilter:    String!
+    $playerBuffsStart:    Float!
+    $playerBuffFilter:    String!
   ) {
     rateLimitData {
       limitPerHour
@@ -673,6 +697,16 @@ const FIGHT_EVENTS_QUERY = /* graphql */`
           fightIDs: $fightIDs, startTime: $headMarkersStart, endTime: $endTime,
           dataType: All, filterExpression: $headMarkerFilter, includeResources: false
         ) { data nextPageTimestamp }
+
+        # Buffs on players, for the damage analysis: procs, job buffs and
+        # raid-buff windows, which the damage-done buffs snapshot never
+        # lists. Filtered server-side to the status ids in
+        # lib/damage/ffxiv/buff-stream.ts (no mitigation, shields or food),
+        # which cuts the stream by ~40%.
+        playerBuffs: events(
+          fightIDs: $fightIDs, startTime: $playerBuffsStart, endTime: $endTime,
+          dataType: Buffs, filterExpression: $playerBuffFilter, includeResources: false
+        ) { data nextPageTimestamp }
       }
     }
   }
@@ -695,6 +729,7 @@ type FightEventsQueryResult = {
       enemyDamageTaken: EventStream<FFLDamageEvent>;
       enemyDebuffs:   EventStream<FFLDebuffEvent>;
       headMarkers:    EventStream<FFLHeadMarkerEvent>;
+      playerBuffs:    EventStream<FFLBuffEvent>;
     };
   };
 };
@@ -704,7 +739,7 @@ type FightEventsQueryResult = {
 const STREAM_KEYS = [
   "deaths", "combatantInfo", "casts", "damageDone",
   "damageTaken", "healing", "debuffs", "enemyCasts", "enemyBuffs", "enemyDamageTaken",
-  "enemyDebuffs", "headMarkers",
+  "enemyDebuffs", "headMarkers", "playerBuffs",
 ] as const;
 
 type StreamKey = typeof STREAM_KEYS[number];
@@ -745,6 +780,9 @@ export type FFLFightData = {
   enemyDebuffEvents: FFLDebuffEvent[];
   // dataType: All filtered server-side to type="headmarker".
   headMarkerEvents:  FFLHeadMarkerEvent[];
+  // Friendly Buffs, filtered to PLAYER_BUFF_FILTER. Absent on samples
+  // fetched before the stream existed.
+  playerBuffEvents?: FFLBuffEvent[];
 };
 
 /**
@@ -780,17 +818,17 @@ export async function fetchFFightData(
     damageDone: from, damageTaken: from, healing: from,
     debuffs: from, enemyCasts: from, enemyBuffs: from,
     enemyDamageTaken: from, enemyDebuffs: from,
-    headMarkers: from,
+    headMarkers: from, playerBuffs: from,
   };
   const done: Record<StreamKey, boolean> = {
     deaths: false, combatantInfo: false, casts: false, damageDone: false,
     damageTaken: false, healing: false, debuffs: false, enemyCasts: false, enemyBuffs: false,
-    enemyDamageTaken: false, enemyDebuffs: false, headMarkers: false,
+    enemyDamageTaken: false, enemyDebuffs: false, headMarkers: false, playerBuffs: false,
   };
   const collected: { [K in StreamKey]: FightEventsQueryResult["reportData"]["report"][K]["data"] } = {
     deaths: [], combatantInfo: [], casts: [], damageDone: [],
     damageTaken: [], healing: [], debuffs: [], enemyCasts: [], enemyBuffs: [],
-    enemyDamageTaken: [], enemyDebuffs: [], headMarkers: [],
+    enemyDamageTaken: [], enemyDebuffs: [], headMarkers: [], playerBuffs: [],
   };
 
   let page = 0;
@@ -815,6 +853,8 @@ export async function fetchFFightData(
       enemyDebuffFilter:   ENEMY_DEBUFF_FILTER,
       headMarkersStart:    cursors.headMarkers,
       headMarkerFilter:    HEAD_MARKER_FILTER,
+      playerBuffsStart:    cursors.playerBuffs,
+      playerBuffFilter:    PLAYER_BUFF_FILTER,
     }, false); // per-page dump suppressed — see the single merged dump below
 
     const report = data.reportData.report;
@@ -875,6 +915,7 @@ export async function fetchFFightData(
     enemyDamageTakenEvents: onlyLanded(collected.enemyDamageTaken),
     enemyDebuffEvents: collected.enemyDebuffs,
     headMarkerEvents:  collected.headMarkers,
+    playerBuffEvents:  collected.playerBuffs,
   };
 }
 
