@@ -144,13 +144,13 @@ model StaticReviewPull {
   @@index([staticReviewId])
 }
 
-/// One detection rule as seen by a static (lookup for StaticReviewPullError).
-/// `ruleKey` is the rule id, except manually-added errors, which share one
-/// rule id and are keyed by their name ("manual-added-error:<name>").
-/// `name` is a snapshot from the latest import, so rows stay readable after
-/// a rule is renamed or removed. Mechanic label and phase hint come from
-/// lib/mechanics/rule-meta.ts and are refreshed on every import, so
-/// relabeling a rule regroups old sessions too.
+/// One detection rule and error name as seen by a static (lookup for
+/// StaticReviewPullError). `ruleKey` is "<ruleId>::<name>": generic rules
+/// name each error after its ability, so the pair is what identifies it.
+/// `name` keeps the snapshot readable after a rule is renamed or removed.
+/// Mechanic key, label and phase hint come from lib/mechanics/rule-meta.ts
+/// and are refreshed on every import, so relabeling a rule regroups old
+/// sessions too.
 model StaticRule {
   id            Int     @id @default(autoincrement())
   staticId      Int

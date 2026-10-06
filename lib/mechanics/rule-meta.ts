@@ -15,6 +15,15 @@
 // Labels are copied into the static's StaticRule rows at import, and every
 // import refreshes the rows for the rules it contains, so a relabel reaches
 // a static's older sessions too once a session using that rule is imported.
+//
+// Generic rules: some rule ids cover many different abilities and name
+// each error after the ability (ffxiv-damage-down → "Damage Down (Big
+// Bang)", wow-ula-avoidable → "Hit by Falling Debris", every *-pull-over →
+// "Raid Collapse" / "Tank Died"). Those are split by name: each name is its
+// own mechanic. Rules whose name only varies cosmetically ("Egg Hatched" /
+// "Viper Hatched") are grouped with mechanic() instead. A rule that is
+// neither keeps one mechanic per rule id, so renaming it doesn't break its
+// trend.
 
 export type RuleMeta = {
   mechanicKey:   string;
@@ -26,6 +35,21 @@ export type RuleMeta = {
 type RuleMetaEntry = Partial<RuleMeta>;
 
 const RULE_META: Record<string, RuleMetaEntry> = {};
+
+/** Generic rules split into one mechanic per error name (see header). */
+const SPLIT_BY_NAME = new Set<string>([
+  "manual-added-error",  // MANUAL_ERROR_RULE_ID: the reviewer's own label
+  "ffxiv-damage-down",
+  "wow-ula-avoidable",
+  "wow-ula-add-cast",
+  "wow-ca-avoidable",
+  "wow-ca-frontal",
+  "wow-tf-out-of-range",
+]);
+
+function isSplitByName(ruleId: string): boolean {
+  return SPLIT_BY_NAME.has(ruleId) || ruleId.endsWith("-pull-over");
+}
 
 /** Several rules forming one mechanic. */
 function mechanic(mechanicKey: string, mechanicLabel: string, phaseHint: number | undefined, ruleIds: string[]): void {
@@ -244,12 +268,28 @@ mechanic("tf-globules", "Globules", undefined, [
   "wow-tf-globule-burst",
   "wow-tf-globule-pickup-death",
 ]);
+// One rule id, several names for the same mechanic.
+mechanic("ula-eggs", "Eggs", undefined, ["wow-ula-egg-hatch"]);
+mechanic("ula-spectral-coils", "Spectral Coils", undefined, ["wow-ula-spectral-coils"]);
+mechanic("ula-blight-vein", "Blight Vein", undefined, ["wow-ula-blight-vein"]);
+mechanic("le-final-ascension", "Final Ascension", undefined, ["wow-le-final-ascension"]);
+mechanic("vash-plague-froth", "Plague Froth", undefined, ["wow-vash-plague-froth"]);
+mechanic("ca-venom-eruption", "Venom Eruption", undefined, ["wow-ca-venom-eruption"]);
 
-/** The rule's mechanic, falling back to the rule itself. */
+/**
+ * StaticRule key for an error: rule id plus name, so every distinct name a
+ * rule produces keeps an exact snapshot.
+ */
+export function staticRuleKey(ruleId: string, ruleName: string): string {
+  return `${ruleId}::${ruleName}`;
+}
+
+/** The error's mechanic, falling back to the rule itself (see header). */
 export function getRuleMeta(ruleId: string, ruleName: string): RuleMeta {
   const entry = RULE_META[ruleId];
+  const split = isSplitByName(ruleId);
   return {
-    mechanicKey:   entry?.mechanicKey ?? ruleId,
+    mechanicKey:   entry?.mechanicKey ?? (split ? staticRuleKey(ruleId, ruleName) : ruleId),
     mechanicLabel: entry?.mechanicLabel ?? ruleName,
     phaseHint:     entry?.phaseHint,
   };

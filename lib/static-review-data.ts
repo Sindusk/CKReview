@@ -12,11 +12,11 @@
 // the server.
 
 import type { Pull } from "@/types/Pull";
-import { CALL_WIPE_RULE_ID, MANUAL_ERROR_RULE_ID, type PullError } from "@/types/PullError";
+import { CALL_WIPE_RULE_ID, type PullError } from "@/types/PullError";
 import { getPullRaidCutoff } from "@/lib/report-data";
 import { WCL_MYTHIC_DIFFICULTY } from "@/lib/wcl-client";
 import { phaseAt, type EncounterPhase } from "@/lib/pull-phases";
-import { getRuleMeta } from "@/lib/mechanics/rule-meta";
+import { getRuleMeta, staticRuleKey } from "@/lib/mechanics/rule-meta";
 
 /**
  * Shape version of the detail rows (StaticReview.detailVersion). Bump when
@@ -124,12 +124,9 @@ export type StaticReviewPayload = {
 const DEATH_CHAIN_GAP_MS = 10_000;
 const DEATH_CHAIN_END_WINDOW_MS = 15_000;
 
-/**
- * StaticRule key for an error. Manually added errors share one rule id, so
- * their name (what the reviewer typed) tells them apart.
- */
-export function staticRuleKey(e: PullError): string {
-  return e.ruleId === MANUAL_ERROR_RULE_ID ? `${MANUAL_ERROR_RULE_ID}:${e.name}` : e.ruleId;
+/** StaticRule key for an error: rule id plus name (lib/mechanics/rule-meta.ts). */
+function errorRuleKey(e: PullError): string {
+  return staticRuleKey(e.ruleId, e.name);
 }
 
 /**
@@ -156,7 +153,7 @@ export function computeWipeCause(pull: Pull): StaticWipeCause | null {
     const atCutoff = raidErrors.filter((e) => e.timestamp === firstAt);
     const detected = atCutoff.find((e) => e.ruleId !== CALL_WIPE_RULE_ID);
     if (detected) {
-      return { kind: "raidError", ruleKey: staticRuleKey(detected), ability: detected.abilityName || null, atMs: detected.timestamp, phase: phaseOf(detected.timestamp) };
+      return { kind: "raidError", ruleKey: errorRuleKey(detected), ability: detected.abilityName || null, atMs: detected.timestamp, phase: phaseOf(detected.timestamp) };
     }
 
     const lastMajor = pull.errors
@@ -166,7 +163,7 @@ export function computeWipeCause(pull: Pull): StaticWipeCause | null {
       .filter((d) => d.timestamp <= firstAt)
       .sort((a, b) => b.timestamp - a.timestamp)[0];
     if (lastMajor && (!lastDeath || lastMajor.timestamp >= lastDeath.timestamp)) {
-      return { kind: "called", ruleKey: staticRuleKey(lastMajor), ability: lastMajor.abilityName || null, atMs: lastMajor.timestamp, phase: phaseOf(lastMajor.timestamp) };
+      return { kind: "called", ruleKey: errorRuleKey(lastMajor), ability: lastMajor.abilityName || null, atMs: lastMajor.timestamp, phase: phaseOf(lastMajor.timestamp) };
     }
     if (lastDeath) {
       return { kind: "called", ruleKey: null, ability: lastDeath.cause || null, atMs: lastDeath.timestamp, phase: phaseOf(lastDeath.timestamp) };
@@ -187,7 +184,7 @@ export function computeWipeCause(pull: Pull): StaticWipeCause | null {
 function computePullErrorDetail(pull: Pull, cutoff: number | null): StaticReviewErrorData[] {
   return pull.errors.map((e) => ({
     player:      e.player ?? null,
-    ruleKey:     staticRuleKey(e),
+    ruleKey:     errorRuleKey(e),
     severity:    e.severity,
     timestampMs: Math.round(e.timestamp),
     phase:       phaseAt(pull.phaseSegments, e.timestamp),
@@ -206,13 +203,13 @@ export function buildStaticReviewPayload(pulls: Pull[]): StaticReviewPayload {
   const rules = new Map<string, StaticRuleData>();
   for (const pull of pulls) {
     for (const e of pull.errors) {
-      const ruleKey = staticRuleKey(e);
+      const ruleKey = errorRuleKey(e);
       const meta = getRuleMeta(e.ruleId, e.name);
       rules.set(ruleKey, {
         ruleKey,
         name:          e.name,
-        mechanicKey:   e.ruleId === MANUAL_ERROR_RULE_ID ? ruleKey : meta.mechanicKey,
-        mechanicLabel: e.ruleId === MANUAL_ERROR_RULE_ID ? e.name : meta.mechanicLabel,
+        mechanicKey:   meta.mechanicKey,
+        mechanicLabel: meta.mechanicLabel,
         phaseHint:     meta.phaseHint ?? null,
       });
     }
