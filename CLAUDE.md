@@ -53,6 +53,10 @@ These are standing preferences, each learned from a real correction:
   validate.js and tsc pass, or, for UI work, the change has been reviewed.
   This is standing authorization. The local remote is named **`CKReview`**,
   not `origin` (`git push CKReview main`).
+- **Credit Claude as co-author.** Since 2026-10-06, every commit an agent
+  makes ends with a blank line and this trailer, so GitHub shows Claude as a
+  co-author:
+  `Co-Authored-By: Claude <noreply@anthropic.com>`
 - **Never deploy.** Don't SSH into the production server or run
   `./deploy.sh`. The user deploys themselves for oversight after pulling
   your commits. When done, say the change is ready to deploy.
