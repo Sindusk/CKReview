@@ -24,7 +24,7 @@ import {
   type PlayerCheckContext,
 } from "./checks";
 import {
-  deadWindows, gcdUses, inWindows, limitBreakWindows, playerValues, raidBuffWindows, raidDowntime,
+  deadWindows, gcdKinds, gcdUses, inWindows, limitBreakWindows, playerValues, raidBuffWindows, raidDowntime,
   speedFactor, wipeCollapseMs, type Window,
 } from "./timeline";
 
@@ -99,6 +99,9 @@ export function analyzePullDamage(pull: Pull, game: DamageGame, context?: Damage
       ...game.jobChecks(player.className).flatMap((check) => check(ctx)),
     ].sort((a, b) => Number(a.forced) - Number(b.forced) || b.lostDamage - a.lostDamage);
 
+    const kinds = gcdKinds(player, pull, uses);
+    const gcdSplit = { heal: 0, damage: 0, other: 0 };
+    for (const u of uses) if (u.startMs < endMs) gcdSplit[kinds.get(u.action.id) ?? "other"]++;
     const used = uses.filter((u) => u.startMs < endMs && inWindows(u.startMs, buffWindows)).length;
     const fit = buffWindows.reduce((n, w) => n + Math.floor((Math.min(w.endMs, endMs) - w.startMs) / ctx.baseGcdMs), 0);
     players.push({
@@ -109,6 +112,7 @@ export function analyzePullDamage(pull: Pull, game: DamageGame, context?: Damage
       gcds: uses.filter((u) => u.startMs < endMs).length,
       baseGcdMs: ctx.baseGcdMs,
       buffWindowGcds: { used, fit },
+      gcdSplit,
       findings,
       timeline: {
         gcdStarts: uses.filter((u) => u.startMs < endMs).map((u) => u.startMs),
@@ -126,13 +130,15 @@ export function analyzePullDamage(pull: Pull, game: DamageGame, context?: Damage
       const inPhase = (t: number) => t >= sgm.startMs && t < end;
       const raidDamage = pull.players.reduce((a, p) =>
         a + p.damageDone.filter((e) => inPhase(e.timestamp)).reduce((x, e) => x + (e.amount ?? 0), 0), 0);
+      const raidDamageTaken = pull.players.reduce((a, p) =>
+        a + p.damageTaken.filter((e) => inPhase(e.timestamp)).reduce((x, e) => x + (e.amount ?? 0) + (e.absorbed ?? 0), 0), 0);
       const raidLostDamage = players.reduce((a, p) =>
         a + p.findings.filter((f) => !f.forced && f.phaseId === sgm.phase && inPhase(f.startMs)).reduce((x, f) => x + f.lostDamage, 0), 0);
       return {
         phaseId: sgm.phase, name: phaseName(sgm.phase) ?? `Phase ${sgm.phase}`,
         startMs: sgm.startMs, endMs: end,
         context: context?.phases[sgm.phase],
-        raidDamage, raidLostDamage,
+        raidDamage, raidLostDamage, raidDamageTaken,
         bossHpLeft: pull.result !== "Kill" && sgm.endMs >= pull.fightDuration ? bossHpAt(pull, endMs) : undefined,
       };
     });

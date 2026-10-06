@@ -53,6 +53,9 @@ const KIND_LABEL: Record<DamageFinding["kind"], string> = {
   "burst-window":     "Burst window",
   "buff-uptime":      "Buff uptime",
   "gauge-overcap":    "Overcap",
+  "heal-gcd":         "Heal GCD",
+  "dot-uptime":       "DoT uptime",
+  "dot-clip":         "DoT clipping",
 };
 
 export default function DamageDialog({ open, onClose, pulls, currentPullId }: DamageDialogProps) {
@@ -179,7 +182,11 @@ function PhaseTable({ phases }: { phases: PhaseDamageSummary[] }) {
       <div className="ck-table-wrap">
         <table className="ck-table" style={{ fontSize: 12 }}>
           <thead>
-            <tr><th>Phase</th><th style={{ textAlign: "right" }}>Raid dmg</th><th style={{ textAlign: "right" }}>Est. lost</th></tr>
+            <tr>
+              <th>Phase</th><th style={{ textAlign: "right" }}>Raid dmg</th>
+              <th style={{ textAlign: "right" }} title="Damage the party took, shields included">Taken</th>
+              <th style={{ textAlign: "right" }}>Est. lost</th>
+            </tr>
           </thead>
           <tbody>
             {phases.map((p) => (
@@ -190,6 +197,7 @@ function PhaseTable({ phases }: { phases: PhaseDamageSummary[] }) {
                   {p.context?.damageCounts === false && <span className="ck-badge ck-badge--plain" style={{ marginLeft: 6 }}>Doesn&apos;t count</span>}
                 </td>
                 <td className="ck-num" style={{ textAlign: "right" }}>{fmtDamage(p.raidDamage)}</td>
+                <td className="ck-num" style={{ textAlign: "right" }}>{fmtDamage(p.raidDamageTaken)}</td>
                 <td className="ck-num" style={{ textAlign: "right", color: p.raidLostDamage > 0 ? LOSS_COLOR : undefined }}>
                   {p.context?.damageCounts === false ? "—" : fmtDamage(p.raidLostDamage)}
                 </td>
@@ -241,6 +249,10 @@ function PlayerDetail({ summary, analysis }: { summary: PlayerDamageSummary; ana
         <span className="ck-help" style={{ margin: 0 }}>
           GCD <span className="ck-num">{(summary.baseGcdMs / 1000).toFixed(2)}s</span> · {summary.gcds} GCDs ·
           in raid buffs <span className="ck-num">{summary.buffWindowGcds.used}/{summary.buffWindowGcds.fit}</span> that fit
+          {summary.gcdSplit.heal > 0 && <>
+            {" "}· heal GCDs <span className="ck-num">{summary.gcdSplit.heal}</span> vs damage{" "}
+            <span className="ck-num">{summary.gcdSplit.damage}</span>
+          </>}
         </span>
       </div>
       <TimelineStrip summary={summary} analysis={analysis} />

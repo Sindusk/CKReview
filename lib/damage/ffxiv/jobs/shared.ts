@@ -178,6 +178,88 @@ export function uptimeFindings(ctx: PlayerCheckContext, spec: UptimeSpec): Damag
   return out;
 }
 
+// ── DoTs ───────────────────────────────────────────────────────────────
+// Modelled on xivanalysis's core DoTs module: uptime and clipping of the
+// player's own DoT, read from Pull.bossDebuffs (the statuses players put
+// on enemies). Uptime counts the DoT on ANY enemy (P3 has two bosses), from
+// its first application, less forced time, ignoring gaps under one GCD +
+// 1s (time to reapply). Clipping: a refresh with time left overwrites it.
+// Lost damage is in the player's own average tick (ticks every 3s).
+
+export type DotSpec = { statusIds: number[]; name: string; durationMs: number };
+
+const DOT_TICK_MS = 3_000;
+
+export function dotFindings(ctx: PlayerCheckContext, spec: DotSpec): DamageFinding[] {
+  const out: DamageFinding[] = [];
+  const ids = new Set(spec.statusIds);
+  const events = (ctx.pull.bossDebuffs ?? [])
+    .filter((e) => ids.has(e.statusId) && e.sourceName === ctx.player.name && e.timestamp < ctx.endMs)
+    .sort((a, b) => a.timestamp - b.timestamp);
+  if (events.length === 0) return out;
+  const ticks = ctx.player.damageDone.filter((e) => ids.has(e.abilityId));
+  const avgTick = ticks.length ? ticks.reduce((a, e) => a + (e.amount ?? 0), 0) / ticks.length : 0;
+
+  const windows: Window[] = [];
+  const open = new Map<string, { start: number; lastApply: number }>();
+  const clips = new Map<number | undefined, { ms: number; n: number; start: number; end: number }>();
+  for (const e of events) {
+    const key = `${e.targetActorId}.${e.targetInstance ?? 1}`;
+    const o = open.get(key);
+    if (e.status === "removed") {
+      if (o) { windows.push({ startMs: o.start, endMs: e.timestamp }); open.delete(key); }
+      continue;
+    }
+    if (o) {
+      const left = spec.durationMs - (e.timestamp - o.lastApply);
+      if (left > 0) {
+        const phaseId = ctx.phaseOf(e.timestamp);
+        const c = clips.get(phaseId) ?? { ms: 0, n: 0, start: e.timestamp, end: e.timestamp };
+        c.ms += left; c.n++; c.end = e.timestamp;
+        clips.set(phaseId, c);
+      }
+      o.lastApply = e.timestamp;
+    } else {
+      open.set(key, { start: e.timestamp, lastApply: e.timestamp });
+    }
+  }
+  for (const o of open.values()) windows.push({ startMs: o.start, endMs: ctx.endMs });
+
+  const active = mergeWindows(windows);
+  const forced = mergeWindows(ctx.forced);
+  const grace = ctx.baseGcdMs + 1_000;
+  let cursor = active[0].startMs;
+  for (const w of [...active, { startMs: ctx.endMs, endMs: ctx.endMs }]) {
+    if (w.startMs > cursor) {
+      const len = w.startMs - cursor - overlapMs(cursor, w.startMs, forced);
+      if (len >= grace) {
+        out.push(finding(ctx, {
+          kind: "dot-uptime", startMs: cursor, endMs: w.startMs, forced: false,
+          label: `${spec.name} off the boss`,
+          lostDamage: (len / DOT_TICK_MS) * avgTick,
+          basis: `${s(len)} ÷ 3s ticks × ${k(avgTick)} average tick`,
+          detail: `${spec.name} wasn't on the boss for ${s(len)}`,
+        }));
+      }
+    }
+    cursor = Math.max(cursor, w.endMs);
+  }
+  for (const [phaseId, c] of clips) {
+    if (c.ms < DOT_CLIP_FINDING_MS) continue;
+    out.push(finding(ctx, {
+      kind: "dot-clip", startMs: c.start, endMs: c.end, forced: false,
+      label: `${spec.name} refreshed early`,
+      lostDamage: (c.ms / DOT_TICK_MS) * avgTick,
+      basis: `${s(c.ms)} of remaining DoT overwritten ÷ 3s ticks × ${k(avgTick)} average tick`,
+      detail: `${spec.name} refreshed early ${c.n} time${c.n > 1 ? "s" : ""} in ${ctx.phaseName(phaseId) ?? "the pull"}, ${s(c.ms)} of ticks overwritten`,
+    }));
+  }
+  return out;
+}
+
+// xivanalysis's healer DoT modules start flagging clipping at 6s per minute.
+const DOT_CLIP_FINDING_MS = 6_000;
+
 // ── Gauges ─────────────────────────────────────────────────────────────
 
 export type GaugeEvent =

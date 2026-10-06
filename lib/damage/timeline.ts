@@ -123,6 +123,7 @@ export type GcdUse = {
   castMs:      number;      // cast time after speed; 0 for instants
   action:      GameAction;
   abilityName: string;
+  target?:     string;      // the cast's target name, when it has one
 };
 
 export function gcdUses(player: PlayerInfo, game: DamageGame): GcdUse[] {
@@ -135,7 +136,7 @@ export function gcdUses(player: PlayerInfo, game: DamageGame): GcdUse[] {
     const b = begins.find((x) => !used.has(x) && x.abilityId === c.abilityId &&
       c.timestamp >= x.timestamp && c.timestamp <= x.timestamp + (x.durationMs ?? 0) + 300);
     if (b) used.add(b);
-    out.push({ startMs: b?.timestamp ?? c.timestamp, castMs: b?.durationMs ?? 0, action, abilityName: c.abilityName });
+    out.push({ startMs: b?.timestamp ?? c.timestamp, castMs: b?.durationMs ?? 0, action, abilityName: c.abilityName, target: c.target });
   }
   return out.sort((a, b) => a.startMs - b.startMs);
 }
@@ -197,6 +198,36 @@ export function raidBuffWindows(player: PlayerInfo, pull: Pull, game: DamageGame
   }
   for (const start of open.values()) out.push({ startMs: start, endMs });
   return mergeWindows(out);
+}
+
+// ── What each GCD did ──────────────────────────────────────────────────
+
+export type GcdKind = "heal" | "damage" | "other";
+
+/**
+ * Per GCD ability: "damage" if it (or a DoT it applies) shows in the
+ * player's damage done; else "heal" if it (or a HoT / shield it applies)
+ * shows in their landed heals or anyone's shield absorbs; else "other"
+ * (raises, Esuna). A GCD that does both counts as damage.
+ */
+export function gcdKinds(player: PlayerInfo, pull: Pull, uses: GcdUse[]): Map<number, GcdKind> {
+  const damageIds = new Set(player.damageDone.map((e) => e.abilityId));
+  const healIds = new Set(player.healing
+    .filter((e) => (e.healType === undefined || e.healType === "heal") && ((e.amount ?? 0) > 0 || (e.overheal ?? 0) > 0))
+    .map((e) => e.abilityId));
+  const shieldIds = new Set(pull.players.flatMap((p) => p.shieldAbsorbs ?? [])
+    .filter((a) => a.caster === player.name).map((a) => a.statusId));
+  const out = new Map<number, GcdKind>();
+  for (const u of uses) {
+    const a = u.action;
+    if (out.has(a.id)) continue;
+    const ids = [a.id, ...a.appliesStatusIds];
+    out.set(a.id,
+      ids.some((id) => damageIds.has(id)) ? "damage"
+        : ids.some((id) => healIds.has(id) || shieldIds.has(id)) ? "heal"
+          : "other");
+  }
+  return out;
 }
 
 // ── Observed damage values ─────────────────────────────────────────────

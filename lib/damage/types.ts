@@ -109,7 +109,10 @@ export type FindingKind =
   | "disengage"         // a ranged filler GCD (Lightning Shot) instead of a real one
   | "burst-window"      // the job's own burst buff missing GCDs or actions
   | "buff-uptime"       // a job damage buff (Darkside, Surging Tempest) down
-  | "gauge-overcap";    // job gauge wasted at its cap
+  | "gauge-overcap"     // job gauge wasted at its cap
+  | "heal-gcd"          // a heal GCD that mostly overhealed
+  | "dot-uptime"        // the player's DoT off the boss
+  | "dot-clip";         // the player's DoT refreshed early
 
 export type DamageFinding = {
   player:     string;
@@ -146,6 +149,9 @@ export type PlayerDamageSummary = {
   baseGcdMs:     number;     // the player's observed GCD
   // GCD starts inside raid-buff windows vs how many fit.
   buffWindowGcds: { used: number; fit: number };
+  // GCDs by what they did: heal (landed heals or shields), damage, other
+  // (raises, Esuna). The healer headline: heal GCDs against damage taken.
+  gcdSplit:      { heal: number; damage: number; other: number };
   findings:      DamageFinding[];
   // For the dialog's timeline strip.
   timeline: {
@@ -163,6 +169,8 @@ export type PhaseDamageSummary = {
   context?:       PhaseContext;
   raidDamage:     number;
   raidLostDamage: number;    // unforced
+  // Damage the party took (to health plus what shields absorbed).
+  raidDamageTaken: number;
   // The pull ended in this phase with the boss alive: its HP at the end.
   bossHpLeft?:    number;
 };

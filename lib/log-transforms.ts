@@ -964,6 +964,7 @@ function fflHealToPlayerEvent(
     amount:      event.amount,
     target:      target?.name,
     healType:    event.type,
+    overheal:    event.overheal,
     // The heal TARGET's own position at the moment they were healed — see
     // the type comment on FFLHealEvent.targetResources.
     x:           event.targetResources?.x,
@@ -991,6 +992,7 @@ function fflHealReceivedToPlayerEvent(
     amount:      event.amount,
     source:      source?.name,
     healType:    event.type,
+    overheal:    event.overheal,
     x:           event.targetResources?.x,
     y:           event.targetResources?.y,
   };

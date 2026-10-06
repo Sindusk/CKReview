@@ -395,6 +395,31 @@ Departures from the plan, found while building:
   Delirium's last stack goes at the same instant as the GCD that uses it;
   without this, every Delirium read as one GCD short.
 
+**Healer batch** (step 6, second role, 2026-10-06), no review yet. The
+user will refine each job later with the people who play it:
+- **Heal-GCD efficiency** (`jobs/healer.ts`), the first study's biggest
+  gap measured per cast. It counts:
+  - the direct heal and its overheal
+  - HoT ticks of the statuses the GCD applies
+  - shield absorbs, credited to the latest cast that applied the shield
+    to that player
+  Under 20% effective is a finding, valued at the healer's damage filler
+  and marked inference (whether the heal was needed for safety is the
+  healer's call). During forced time it's free. The dialog shows heal vs
+  damage GCDs per player and the raid's damage taken per phase.
+- **On `dQ8wmb1VhKt6yBXk`:** the AST's Helios Conjunction is the
+  recurring finding (its HoT alone overhealed 17.0M against 10.4M
+  effective in pull 11). The SCH's three Adloquiums on one tank in 7s
+  before P2 overwrote each other: only the last absorbed, but it was
+  downtime, so forced.
+- **DoT uptime and early refreshes** (`shared.ts dotFindings`) from
+  `Pull.bossDebuffs`: Biolysis, Combust III, Dia, Eukrasian Dosis III /
+  Dyskrasia.
+- **AST Divination contents** (8 GCDs, Lord of Crowns, Oracle, Combust
+  III). Cooldown drift as before; WHM Presence of Mind added (unverified).
+- WHM and SGE are unverified: no sample has them.
+- `PlayerEvent.overheal` is now kept on heals.
+
 Open:
 - **Per-player busy windows** (tower soaks, debuff carriers, baits) aren't
   in the Dancing Mad context yet. Gaps during a mechanic are labelled

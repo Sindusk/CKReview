@@ -85,6 +85,8 @@ export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
 
   // ── Party buffs only, until the job's batch ─────────────────────────
   "Astrologian": [{ actions: ["DIVINATION"] }],
+  // Not in xivanalysis; unverified (no White Mage in any sample).
+  "White Mage":  [{ actions: ["PRESENCE_OF_MIND"] }],
   "Dancer":      [{ actions: ["TECHNICAL_STEP"] }],
   "Dragoon":     [{ actions: ["BATTLE_LITANY"] }],
   "Red Mage":    [{ actions: ["EMBOLDEN"] }],
