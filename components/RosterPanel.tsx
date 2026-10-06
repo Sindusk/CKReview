@@ -5,7 +5,6 @@ import type { CSSProperties } from "react";
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import { getClassColor, getRoleColor, formatSpecClass, getPlayerSpecIcon } from "@/lib/player-display";
 import { detectFFRoles } from "@/lib/mechanics/ffxiv/roles";
-import type { MitigationPlan } from "@/lib/mechanics/ffxiv/dancingmad/mitigation-plan";
 import { PanelHeader } from "./ui/Panel";
 
 type Tab = "DamageDone" | "DamageTaken" | "Healing" | "Debuffs" | "Casts";
@@ -464,13 +463,9 @@ function PlayerDetail({
 type RosterPanelProps = {
   players: PlayerInfo[];
   playbackTimeMs: number;
-  // Currently-selected mitigation plan — an extra signal for the FFXIV role
-  // detector's MT/OT split (see lib/mechanics/ffxiv/roles.ts). Ignored for
-  // WoW rosters.
-  mitigationPlan?: MitigationPlan | null;
 };
 
-export default function RosterPanel({ players, playbackTimeMs, mitigationPlan }: RosterPanelProps) {
+export default function RosterPanel({ players, playbackTimeMs }: RosterPanelProps) {
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerInfo | null>(null);
 
   const filteredPlayers = players.filter(
@@ -486,11 +481,11 @@ export default function RosterPanel({ players, playbackTimeMs, mitigationPlan }:
   const roleSlotByActorId = useMemo(() => {
     const map = new Map<number, string>();
     if (filteredPlayers.length === 0 || filteredPlayers[0].game !== "ffxiv") return map;
-    for (const r of detectFFRoles(filteredPlayers, mitigationPlan)) {
+    for (const r of detectFFRoles(filteredPlayers)) {
       if (r.player) map.set(r.player.actorId, r.slot);
     }
     return map;
-  }, [filteredPlayers, mitigationPlan]);
+  }, [filteredPlayers]);
 
   if (selectedPlayer) {
     return (

@@ -428,6 +428,16 @@ Choices made while building, open to tuning with the user:
 
 ## What gets removed
 
+**Done 2026-10-06.** Everything below is gone. `--check` showed exactly
+125 `ffxiv-mitigation-missed` errors leaving the snapshots (three
+full-capture reports) before the `--update`. The one ruling citing the
+rule (h2JvDkntZCaBgmLF pull 35, already orphaned) was removed with the
+user's OK; its lesson, that Double-Trouble Trap's mitigation also has to
+carry the Gravity III hit seconds later, is covered by follow-up damage
+in the margin. The user also chose to remove Wave Cannon's Mitigation
+Issue rule (answer to the open question below). `roles.ts` lost its
+plan-based MT/OT fallback, which only a selected sheet could feed.
+
 - `lib/mechanics/ffxiv/dancingmad/mitigation-plan.ts`,
   `mitigation-detection.ts`, `mitigation-review.ts`,
   `mitigation-heatmap.ts`, `mitigation-plans/ikuya.json`

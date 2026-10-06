@@ -397,12 +397,14 @@ picked up; it stays only as a record.
 - **Roles (`ffxiv/roles.ts`):**
   - M1 vs M2 has no signal and is always tentative.
   - MT/OT misses on very short or anomalous-opening pulls.
-- **Mitigation:**
-  - Being redesigned: the Ikuya-sheet system (Heatmap/Review tabs,
-    missed-mitigation errors) is to be replaced by log-derived analysis.
-    The plan is [mitigation-redesign.md](mitigation-redesign.md).
-  - The old Heatmap threads (a player at 0/12, color-scale feedback) are
-    moot once it's replaced.
+- **Mitigation** ([mitigation-redesign.md](mitigation-redesign.md)):
+  - The log-derived analysis replaced the Ikuya sheet on 2026-10-06, and
+    the user is reviewing the timeline on production. Thresholds (verdict,
+    droppable floor, raidwide size) are still to be tuned with them.
+  - Catalog entries for Warrior, Machinist (Dismantle), Red Mage, Ninja,
+    Monk and Summoner are unverified until a log with those jobs is fetched.
+  - Later phases: what-if sandbox, tank busters, optional plan reference,
+    WoW port.
 
 ## App
 

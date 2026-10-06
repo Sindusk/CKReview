@@ -26,7 +26,6 @@ lib/mechanics/
                                 Maddening Orchestra, Celestriad towers, Stray
                                 Apocalypse, Forsaken ground, Null enrage, collapse)
       blackhole-strategy.ts   — cross-pull strategy auto-detect (DSA/SDA/Double Tether)
-      mitigation-*.ts         — mitigation sheet import / detection / review / heatmap
   wow/
     registry.ts               — THE list of per-pull WoW modules; the app and
                                 validate.js both run it (a new boss = one line)
@@ -116,8 +115,8 @@ and `scripts/validate.js` iterate.
   fight plus the pull-over markers.
 
 **3. Cross-pull / strategy-driven detection** (terminate-kicks.ts,
-blackhole-strategy.ts, graven-image.ts, crystal-assignments.ts, the
-mitigation trio) runs over ALL of a report's pulls and is NOT called from the
+blackhole-strategy.ts, graven-image.ts, crystal-assignments.ts) runs over
+ALL of a report's pulls and is NOT called from the
 transform layer — `app/page.tsx` recomputes it (typically into a separate
 `displayPulls` layer or the Strategy dialog) because it depends on
 report-wide context or user-selectable configuration.

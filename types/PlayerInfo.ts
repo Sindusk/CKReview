@@ -44,8 +44,8 @@ export type PlayerEvent = {
   // buff active on the player at the moment this hit landed — FFLogs' own
   // ground truth for "was a mitigation actually up when this damage hit,"
   // strictly more reliable than inferring it from cast timing + an assumed
-  // buff duration. Consumed by mitigation-detection.ts; not rendered in the
-  // UI. Undefined on WCL events and on FF events fetched before this field
+  // buff duration. Read by exdeath.ts, ultimate-kefka.ts and lib/mitigation/
+  // (vulnerability check); not rendered in the UI. Undefined on WCL events and on FF events fetched before this field
   // existed (older cached sample data).
   activeBuffNames?: string[];
 

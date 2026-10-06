@@ -71,8 +71,7 @@ export type Pull = {
   // The boss's own completed casts for this pull (FFXIV only, undefined for
   // WoW) — persisted (unlike other games' transient enemyCast computations,
   // which only ever live for the duration of import-time detector calls) so
-  // the Mitigation Review table can anchor each sheet mechanic on the
-  // boss's own real cast time instead of the sheet's static idealized time.
-  // See lib/mechanics/ffxiv/dancingmad/mitigation-review.ts.
+  // the mitigation analysis can attach the boss cast to each raidwide hit
+  // (lib/mitigation/analyze.ts).
   enemyCasts?: EnemyEvent[];
 };

@@ -782,7 +782,7 @@ function fflDamageDoneToPlayerEvent(
 // IDs live in the same masterData.abilities list as action IDs, so no
 // separate lookup table is needed. Unresolvable IDs are dropped rather than
 // shown as "Ability N" placeholders, since this list is only ever used for
-// membership checks (mitigation-detection.ts), not display.
+// membership checks, not display.
 function fflDecodeActiveBuffNames(
   buffs:      string | undefined,
   abilityMap: Map<number, AbilityInfo>

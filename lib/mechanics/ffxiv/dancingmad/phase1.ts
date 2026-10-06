@@ -1457,9 +1457,8 @@ const MYSTERY_MAGIC_CAST_ABILITY_ID = 47764;
 // margin on both sides.
 const MYSTERY_MAGIC_VOLLEY_CLUSTER_MS = 3000;
 
-// Phase 1 runs roughly 0-205s (the "~3:25" phase transition the user's own
-// mitigation plan already anchors on — see mitigation-plans/ikuya.json's
-// phaseTimeSeconds: 205 entry for Phase 2's start). Generous past that
+// Phase 1 runs roughly 0-205s (the "~3:25" phase transition; the retired
+// Ikuya mitigation sheet put Phase 2's start at 205s). Generous past that
 // point costs nothing (a genuine jump this late would still be a fair
 // catch), so this is a soft upper bound, not a tight one.
 const PHASE_1_END_MS = 210_000;

@@ -28,8 +28,8 @@
 //
 // Attribution: FFLogs' own `activeBuffNames` on each tank's Thunder III
 // damage tick is ground truth for what mitigation they personally had up at
-// the moment of the hit (same technique already used in
-// mitigation-detection.ts). On the confirmed case, the correctly-targeted
+// the moment of the hit (the same snapshot lib/mitigation/ reads). On the
+// confirmed case, the correctly-targeted
 // Paladin had Holy Sheltron + Knight's Resolve active; the wrongly-caught
 // Dark Knight had Dark Mind up (a low-commitment, habitually-kept-up
 // mitigation present on BOTH this erroneous hit and every legitimate one —

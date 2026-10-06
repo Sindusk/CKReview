@@ -22,8 +22,6 @@ import StrategyDialog from "@/components/StrategyDialog";
 import MitigationDialog from "@/components/MitigationDialog";
 import { detectTerminateKickOrder } from "@/lib/mechanics/wow/vs-dr-mqd/terminate-kicks";
 import { detectCrystalAssignments } from "@/lib/mechanics/wow/vs-dr-mqd/crystal-assignments";
-import { getMitigationPlan } from "@/lib/mechanics/ffxiv/dancingmad/mitigation-plan";
-import { detectMitigationErrors } from "@/lib/mechanics/ffxiv/dancingmad/mitigation-detection";
 import {
   detectBlackHoleStrategy,
   detectMissedAssignedTetherErrors,
@@ -32,7 +30,7 @@ import {
   type BlackHoleStrategyId,
 } from "@/lib/mechanics/ffxiv/dancingmad/blackhole-strategy";
 import { learnGravenImageLayout, detectGravenImageSpreadErrors, detectGravenImageStackErrors } from "@/lib/mechanics/ffxiv/dancingmad/graven-image";
-import { learnWaveCannonLayout, detectWaveCannonPositionErrors, detectWaveCannonMitigationIssueErrors } from "@/lib/mechanics/ffxiv/dancingmad/wave-cannon";
+import { learnWaveCannonLayout, detectWaveCannonPositionErrors } from "@/lib/mechanics/ffxiv/dancingmad/wave-cannon";
 import type { Pull } from "../types/Pull";
 import { createCallWipeError, CALL_WIPE_RULE_ID, createManualError, type ManualErrorInput } from "@/types/PullError";
 import type { SavedSession } from "@/types/Session";
@@ -124,20 +122,6 @@ export default function Home() {
   const kickStrategy = useMemo(() => detectTerminateKickOrder(pulls), [pulls]);
   const crystalStrategy = useMemo(() => detectCrystalAssignments(pulls), [pulls]);
 
-  // Selected mitigation plan (per-fight expected mit timeline shown in the
-  // Mitigation dialog; also the input to Mitigation error detection).
-  // Persisted so the choice survives reloads.
-  const [mitigationPlanId, setMitigationPlanId] = useState<string | null>(null);
-  useEffect(() => {
-    const stored = localStorage.getItem("mitigation_plan_id");
-    if (stored) setMitigationPlanId(stored);
-  }, []);
-  function handleMitigationPlanChange(id: string | null) {
-    setMitigationPlanId(id);
-    if (id) localStorage.setItem("mitigation_plan_id", id);
-    else localStorage.removeItem("mitigation_plan_id");
-  }
-
   // Black Hole tether strategy (DSA/SDA/Double Tether) — auto-detected from
   // whichever moments each named player actually gets hit at across every
   // pull in the report (see blackhole-strategy.ts). `blackHoleOverrideId`
@@ -167,12 +151,11 @@ export default function Home() {
   // generalize across raid teams.
   const waveCannonLayout = useMemo(() => learnWaveCannonLayout(pulls), [pulls]);
 
-  // Pulls with "Missed Mitigation" and Black Hole "Missed Assigned Tether"
-  // errors merged in (see lib/mechanics/ffxiv/dancingmad/mitigation-
-  // detection.ts / blackhole-strategy.ts). Unlike the other FF mechanic
-  // detections, both depend on state that isn't known from a single pull
-  // alone (a user-selected plan; a strategy resolved from ALL pulls), so
-  // neither can be baked into pull.errors at import time the way
+  // Pulls with the cross-pull errors merged in: Black Hole "Missed Assigned
+  // Tether" (blackhole-strategy.ts), Graven Image and Wave Cannon. Unlike
+  // the other FF mechanic detections, these depend on state that isn't
+  // known from a single pull alone (a strategy or layout resolved from ALL
+  // pulls), so they can't be baked into pull.errors at import time the way
   // detectForsakenTowerErrors etc. are (log-transforms.ts) — recomputed
   // here instead, same pattern as kickStrategy/crystalStrategy. Every
   // downstream consumer of `pulls` (AnalysisPanel, PullList, the report
@@ -180,11 +163,9 @@ export default function Home() {
   // so these errors show up everywhere errors normally do; `pulls` itself
   // and `pullsRef` stay
   // untouched since they're also what gets persisted to the session (wipe
-  // calls / manual errors) and re-derived on plan/strategy swap.
-  const mitigationPlan = getMitigationPlan(mitigationPlanId);
+  // calls / manual errors) and re-derived on strategy swap.
   const displayPulls = useMemo(() => {
     return pulls.map((p) => {
-      const mitigationErrors = mitigationPlan ? detectMitigationErrors(p, mitigationPlan) : [];
       const blackHoleErrors = [
         ...detectMissedAssignedTetherErrors(p, blackHoleStrategy),
         ...detectClippedByNeighborTetherErrors(p, blackHoleStrategy),
@@ -194,14 +175,11 @@ export default function Home() {
         ...detectGravenImageSpreadErrors(p, gravenImageLayout),
         ...detectGravenImageStackErrors(p),
       ];
-      const waveCannonErrors = [
-        ...detectWaveCannonPositionErrors(p.players, p.deathEvents, waveCannonLayout),
-        ...detectWaveCannonMitigationIssueErrors(p.players, p.deathEvents),
-      ];
-      const extra = [...mitigationErrors, ...blackHoleErrors, ...gravenImageErrors, ...waveCannonErrors];
+      const waveCannonErrors = detectWaveCannonPositionErrors(p.players, p.deathEvents, waveCannonLayout);
+      const extra = [...blackHoleErrors, ...gravenImageErrors, ...waveCannonErrors];
       return extra.length === 0 ? p : { ...p, errors: [...p.errors, ...extra] };
     });
-  }, [pulls, mitigationPlan, blackHoleStrategy, gravenImageLayout, waveCannonLayout]);
+  }, [pulls, blackHoleStrategy, gravenImageLayout, waveCannonLayout]);
   const [selectedPullId, setSelectedPullId] = useState<number | null>(null);
 
   const [importError, setImportError] = useState<string | null>(null);
@@ -1096,7 +1074,7 @@ export default function Home() {
         <button
           className="ck-btn"
           onClick={() => setShowMitigation(true)}
-          title="Ikuya mitigation-plan timeline mapped onto this report's roster"
+          title="The party's mitigation on each raidwide, read from the log"
         >
           Mitigation
         </button>
@@ -1118,7 +1096,6 @@ export default function Home() {
         blackHoleOverrideId={blackHoleOverrideId}
         onBlackHoleOverrideChange={handleBlackHoleOverrideChange}
         pulls={pulls}
-        mitigationPlan={mitigationPlan}
         currentPullId={selectedPullId}
       />
 
@@ -1168,7 +1145,6 @@ export default function Home() {
               key={selectedPullId ?? "none"}
               players={activePull?.players ?? []}
               playbackTimeMs={timeline.playbackTimeMs}
-              mitigationPlan={mitigationPlan}
             />
           </Panel>
 

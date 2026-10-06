@@ -102,15 +102,16 @@ It loads pulls lazily and keeps three in memory, so narrowing with
   - **Fix:** log in again in the app, which mints an independent grant.
     **Do not** re-seed the file, since that re-creates the shared lineage.
 
-## Mitigation sheet (FFXIV)
+## Mitigation analysis (FFXIV)
 
-- **Fetching.** `node scripts/fetch-mitigation-sheet.js` pulls the public
-  Google Sheet as CSV per tab. It regenerates both the local copy
-  (`sampledata/ff/mitigation/`) and the committed
-  `lib/mechanics/ffxiv/dancingmad/mitigation-plans/ikuya.json`.
-- **Anchor debugging.** `node scripts/inspect-mitigation-anchors.js` shows
-  which sheet mechanics failed to match a boss cast (`UNMATCHED`). Those
-  need an entry in `MECHANIC_NAME_ALIASES`.
+- **Catalog check.** `node scripts/check-mitigation-catalog.js` checks
+  `lib/mitigation/ffxiv-catalog.ts` against the samples: action and status
+  IDs, every hit's FFLogs multiplier, and cooldowns from real cast spacing.
+- **Analysis without the UI.**
+  `node scripts/validate.js mitigation-analysis sampledata/ff/<code>`
+  prints every raidwide hit per pull, then the cross-pull aggregate.
+  Print-only; it needs a full capture fetched after 2026-10-06.
+- Design and tuning choices: [mitigation-redesign.md](mitigation-redesign.md).
 
 ## Verifying UI in a real browser
 

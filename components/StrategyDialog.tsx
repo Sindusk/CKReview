@@ -10,9 +10,6 @@
 // strategy (DSA / SDA / Double Tether) and a per-pull party-role roster
 // (MT/OT/H1/H2/M1/M2/R1/R2 — lib/mechanics/ffxiv/roles.ts) for FFXIV.
 //
-// (The Ikuya mitigation-plan timeline used to live in this dialog too — it
-// moved to its own MitigationDialog.tsx / "Mitigation" button, since plan
-// selection and raid-strategy selection are unrelated concerns.)
 
 import { useMemo } from "react";
 import { useFFPullSelector } from "@/hooks/useFFPullSelector";
@@ -25,7 +22,6 @@ import {
 } from "@/lib/mechanics/ffxiv/dancingmad/blackhole-strategy";
 import { detectFFRoles, type FFRoleSlot } from "@/lib/mechanics/ffxiv/roles";
 import { detectGraven2Strategy } from "@/lib/mechanics/ffxiv/dancingmad/graven2-strategy";
-import type { MitigationPlan } from "@/lib/mechanics/ffxiv/dancingmad/mitigation-plan";
 import { getClassColor } from "@/lib/player-display";
 import type { Pull } from "@/types/Pull";
 import { Dialog } from "./ui/Dialog";
@@ -40,11 +36,8 @@ type StrategyDialogProps = {
   blackHole: BlackHoleStrategyResult | null;
   blackHoleOverrideId: BlackHoleStrategyId | null;
   onBlackHoleOverrideChange: (id: BlackHoleStrategyId | null) => void;
-  // Full pull list (drives the role roster's per-pull selector below) and
-  // the currently-selected mitigation plan — an extra signal for the role
-  // detector's MT/OT split (see lib/mechanics/ffxiv/roles.ts).
+  // Full pull list (drives the role roster's per-pull selector below).
   pulls: Pull[];
-  mitigationPlan: MitigationPlan | null;
   // The app's globally-selected pull — the role roster's dropdown resets to
   // this every time the dialog opens (see hooks/useFFPullSelector.ts).
   currentPullId: number | null;
@@ -76,10 +69,10 @@ const roleCellStyle = {
 // Roster + auto-detected party role (MT/OT/H1/H2/M1/M2/R1/R2) for one
 // selected pull — the foundation the user wants other FF mechanics to
 // eventually build on instead of each guessing roles ad hoc. "?" marks a
-// slot the roster/plan/auto-attack signals couldn't disambiguate (see
+// slot the roster/auto-attack signals couldn't disambiguate (see
 // lib/mechanics/ffxiv/roles.ts's module header for the resolution order).
-function RoleRoster({ pull, plan }: { pull: Pull; plan: MitigationPlan | null }) {
-  const roles = useMemo(() => detectFFRoles(pull.players, plan), [pull, plan]);
+function RoleRoster({ pull }: { pull: Pull }) {
+  const roles = useMemo(() => detectFFRoles(pull.players), [pull]);
   const bySlot = new Map(roles.map((r) => [r.slot, r]));
 
   return (
@@ -207,7 +200,6 @@ export default function StrategyDialog({
   blackHoleOverrideId,
   onBlackHoleOverrideChange,
   pulls,
-  mitigationPlan,
   currentPullId,
 }: StrategyDialogProps) {
   // Pull selector for the role roster — only FF pulls with a resolved
@@ -249,13 +241,12 @@ export default function StrategyDialog({
               </select>
             </div>
             <div className="ck-help">
-              Auto-detected party role for each player in this pull. MT/OT is
-              resolved from the mitigation plan&apos;s own MT/OT columns where
-              decisive, else from who took more damage across the pull; M1/M2
-              (two melee) can&apos;t be told apart yet and are marked with
-              &quot;?&quot; — best-effort for now, refine as needed.
+              Auto-detected party role for each player in this pull. MT is
+              whoever took the boss&apos;s first auto-attack; M1/M2 come from
+              the Wave Cannon line-up. A slot that couldn&apos;t be told apart
+              is marked with &quot;?&quot;.
             </div>
-            <RoleRoster pull={selectedPull} plan={mitigationPlan} />
+            <RoleRoster pull={selectedPull} />
           </div>
         )}
 

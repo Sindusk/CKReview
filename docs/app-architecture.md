@@ -15,7 +15,7 @@ file's header comment. Mechanic detection has its own guide:
    from every mechanic module.
 3. **Cross-pull layer.** Some detection needs report-wide context or user
    configuration: Black Hole strategy, Terminate kick chains, crystal
-   assignments, Graven Image, and mitigation. `page.tsx` recomputes it into
+   assignments, Graven Image and Wave Cannon. `page.tsx` recomputes it into
    a separate **`displayPulls`** memo.
    - **`pulls` never contains those cross-pull errors.** Anything that
      counts or persists errors must read `displayPulls`. Wiring the wrong

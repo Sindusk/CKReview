@@ -54,17 +54,13 @@
 // their own learned spot, same as always) rather than trying to reason
 // about which one "owned" the instance.
 //
-// ── WAVE CANNON MITIGATION ISSUE (confirmed 2026-07-29, same report, ─────
-// ── pull 3) ────────────────────────────────────────────────────────────
+// ── A DEATH TO ONE CLEAN BEAM IS NOT AN ERROR ───────────────────────────
 //
-// Chauzey Solstice and Kade Kansado each died to their OWN single beam —
-// exactly one sourceInstance, no overlap, nobody out of position — in the
-// same pull. That's not a positioning mistake: standing in the right spot
-// and still dying to one beam means the raid's mitigation/healing on Wave
-// Cannon wasn't enough, a raid-wide problem with no single player to
-// root-cause. A Raid-severity error fires once per pull for the set of
-// such victims — same severity philosophy as phase1.ts's
-// MYSTERY_MAGIC_DEATH_WIPE — separately from any position error above.
+// A player who died to their own single beam (no overlap, nobody out of
+// position) used to raise a Raid-severity "Wave Cannon Mitigation Issue".
+// Removed 2026-10-06 with the rest of the mitigation PullErrors: mitigation
+// is a team planning problem and lives only in the Mitigation dialog
+// (docs/mitigation-redesign.md).
 //
 // ── POSITION IS READ ~0.65s BEFORE THE DAMAGE EVENT, NOT AT IT (confirmed ──
 // ── 2026-07-31, report h2JvDkntZCaBgmLF, pull 3) ───────────────────────────
@@ -148,7 +144,6 @@ import type { DeathEvent } from "@/types/DeathEvent";
 import { interpolatePlayerPosition } from "@/lib/mechanics/player-position";
 
 export const WAVE_CANNON_POSITION_RULE_ID = "ffxiv-phase1-wave-cannon-out-of-position";
-export const WAVE_CANNON_MITIGATION_ISSUE_RULE_ID = "ffxiv-phase1-wave-cannon-mitigation-issue";
 
 const WAVE_CANNON_ABILITY_ID = 47784;
 
@@ -424,49 +419,4 @@ export function detectWaveCannonPositionErrors(
   }
 
   return errors;
-}
-
-/**
- * A player killed by exactly ONE Wave Cannon beam (no overlap) died despite
- * standing correctly — a raid mitigation/healing shortfall, not anyone's
- * personal mistake. Bundles every such victim in the pull into one Raid
- * error. See module header.
- */
-export function detectWaveCannonMitigationIssueErrors(players: PlayerInfo[], deathEvents: DeathEvent[]): PullError[] {
-  const grouped = markCompromised(groupByPlayer(extractHits(players)));
-  if (grouped.length === 0) return [];
-
-  const victims = grouped.filter((g) => {
-    if (g.compromised) return false; // overlap — covered by the position rule instead
-    return deathEvents.some((d) => d.player === g.player.name && d.killingAbilityGameId === WAVE_CANNON_ABILITY_ID);
-  });
-  if (victims.length === 0) return [];
-
-  const names = victims.map((v) => v.player.name);
-  // Anchor on the DEATH, not the beam hit — confirmed (h2JvDkntZCaBgmLF pull
-  // 5) the two can be ~2s apart (a delayed kill), and mitigation-detection.ts's
-  // own "Missed Mitigation" Minor error for the same death anchors on the
-  // death too. Anchoring this Raid error on the earlier hit instead put it
-  // BEFORE the Minor error that explains it, so report-data.ts's raid-cutoff
-  // (anything after the earliest Raid error is dropped) silently ate the
-  // real root-cause Minor error. Same "anchor on the latest thing this error
-  // depends on" pattern phase1.ts's REVOLTING_RUIN_NON_TANK_DEATH already uses.
-  const timestamp = Math.max(
-    ...victims.map((v) => {
-      const death = deathEvents.find((d) => d.player === v.player.name && d.killingAbilityGameId === WAVE_CANNON_ABILITY_ID);
-      return death ? death.timestamp : v.timestamp;
-    })
-  );
-
-  return [
-    {
-      ruleId:      WAVE_CANNON_MITIGATION_ISSUE_RULE_ID,
-      severity:    "Raid",
-      name:        "Wave Cannon Mitigation Issue",
-      description: `${names.join(" and ")} died to a single, unavoidable Wave Cannon beam — no positioning overlap involved, so the raid's mitigation/healing on it wasn't enough.`,
-      timestamp:   timestamp + 1,
-      abilityId:   WAVE_CANNON_ABILITY_ID,
-      abilityName: "Wave Cannon",
-    },
-  ];
 }

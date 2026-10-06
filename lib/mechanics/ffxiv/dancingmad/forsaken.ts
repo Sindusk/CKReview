@@ -581,7 +581,7 @@ function inferPlayerTeams(lossesByPlayer: Map<number, number[]>): Map<number, "f
 //
 // Job-keyed rather than role-keyed because FFLogs data alone can't tell
 // which tank is MT vs OT, or which healer is "regen" vs "shield" (the same
-// limitation mitigation-plan.ts already documents). Each side lists the
+// limitation lib/mechanics/ffxiv/roles.ts documents). Each side lists the
 // job(s) that can fill that slot; exactly ONE of them must be present in the
 // pull's roster or the whole inference bails (see below) rather than guess.
 // The MT slot carries alternates because the raid's main tank job changed

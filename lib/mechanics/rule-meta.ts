@@ -94,7 +94,6 @@ mechanic("dm-confetti", "Confetti", 1, [
   "ffxiv-phase1-confetti-lost",
 ]);
 mechanic("dm-wave-cannon", "Wave Cannon", 1, [
-  "ffxiv-phase1-wave-cannon-mitigation-issue",
   "ffxiv-phase1-wave-cannon-out-of-position",
   "ffxiv-phase1-wave-cannon-tower-missed",
   "ffxiv-phase1-wave-cannon-tower-overlap",

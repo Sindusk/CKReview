@@ -88,8 +88,8 @@ const FFL_PROJECTORS = {
   // the ~20-field bloat this module exists to trim — but both turned out to
   // be load-bearing: `overkill` is read by types/PlayerInfo.ts, and `buffs`
   // (a dot-separated list of active buff ability IDs at the moment of the
-  // hit) is exactly what lib/mechanics/ffxiv/dancingmad/mitigation-detection.ts
-  // needs to verify a mitigation was actually ACTIVE when a mechanic hit
+  // hit) is what the mitigation analysis (lib/mitigation/) uses
+  // to verify a mitigation was actually ACTIVE when a mechanic hit
   // landed, rather than only checking whether the ability was cast at some
   // point in a lookback window (confirmed against report rXBbzFV49hd1QPwf
   // pull 4 — the live API's raw damage event carries buffs/overkill/

@@ -2,13 +2,9 @@
 //
 // Cross-mechanic FFXIV role detection — maps every player in a pull's roster
 // onto the eight standard party slots (MT, OT, H1, H2, M1, M2, R1, R2).
-// Pulled out of the Mitigation system's roster-slot mapping (mitigation-
-// plan.ts's resolveMitigationSlots, which now delegates here) so any other
-// Dancing Mad mechanic module can resolve "who is the tank taking tankbuster
-// hits" or "who is the second melee" without depending on the mitigation
-// plan at all — a MitigationPlan is an OPTIONAL extra signal, not a
-// requirement (mechanics with no plan loaded still get MT/OT/H1/H2/M1/M2/
-// R1/R2, just with a lower-confidence tank split).
+// Shared by every Dancing Mad mechanic module that needs "who is the tank
+// taking tankbuster hits" or "who is the second melee", and by the
+// roster, Strategy and Mitigation views for slot order.
 //
 // Resolution strategy per slot, cheapest/most-certain signal first:
 //   - H1/H2: healer JOB alone is enough (a party fields exactly one of each
@@ -39,17 +35,9 @@
 //          making the split effectively random pull to pull — the opening
 //          auto-attack, being a single early snapshot before any swap, does
 //          not have that problem.
-//       2. Plan-based: if a MitigationPlan is supplied and signal 1 found
-//          no "Attack" data at all, tally which tank's JOB the plan's
-//          "MT"/"OT" phase-mechanic columns name via a job-gated ability
-//          qualifier ("Party Mit (GNB/DRK)"). Only trusted when the two
-//          columns' votes name two DIFFERENT tank jobs with a clear
-//          majority each — real sheets sometimes list both tank jobs'
-//          mitigations under the same column (raid-wide mits are up
-//          regardless of who's "MT" for threat purposes), which produces no
-//          majority and safely falls through instead of a wrong guess.
-//     Falls back to roster order (tentative) only if neither signal
-//     resolves anything (no logged auto-attacks AND no decisive plan vote).
+//     Falls back to roster order (tentative) when no auto-attack was
+//     logged. (A second, plan-based vote was removed with the Ikuya
+//     mitigation sheet on 2026-10-06.)
 //   - M1/M2: no per-job M1-vs-M2 convention exists in FFXIV the way MT/OT
 //     does, so the roster alone can't split them. Resolved instead from the
 //     raid's own WAVE CANNON conga order, per pull: the four DPS line up
@@ -80,21 +68,6 @@
 import type { PlayerInfo } from "@/types/PlayerInfo";
 import { getFFRosterSortOrder } from "@/lib/ffl-job-data";
 import { findPlayerPosition } from "@/lib/mechanics/player-position";
-// Type-only — avoids a runtime circular dependency with mitigation-plan.ts,
-// which imports THIS module's detectFFRoles/TANK_JOB_ABBREVIATIONS.
-import type { MitigationPlan } from "./dancingmad/mitigation-plan";
-
-// Sheet/tank-table qualifiers name jobs by 3-letter abbreviation ("GNB",
-// "WAR", ...) rather than PlayerInfo.className's display name. Lives here
-// (not mitigation-plan.ts) since it's needed by both this module's plan-
-// based MT/OT vote and mitigation-plan.ts's resolveTankPriorityColumn.
-export const TANK_JOB_ABBREVIATIONS: Record<string, string> = {
-  WAR: "Warrior",
-  DRK: "Dark Knight",
-  GNB: "Gunbreaker",
-  PLD: "Paladin",
-};
-
 export type FFRoleSlot = "MT" | "OT" | "H1" | "H2" | "M1" | "M2" | "R1" | "R2";
 
 export const FF_ROLE_SLOTS: FFRoleSlot[] = ["MT", "OT", "H1", "H2", "M1", "M2", "R1", "R2"];
@@ -105,68 +78,13 @@ export type RoleAssignment = {
   tentative:  boolean;
   // How this slot was resolved — surfaced for the Strategy dialog / future
   // debugging, not load-bearing for detection.
-  source:     "job" | "auto-attack" | "plan" | "wave-cannon" | "order" | "none";
+  source:     "job" | "auto-attack" | "wave-cannon" | "order" | "none";
 };
 
 const HEALER_JOBS = ["White Mage", "Astrologian", "Scholar", "Sage"];
 
 function sortKey(p: PlayerInfo): number {
   return getFFRosterSortOrder(p.className.replace(/ /g, ""));
-}
-
-// ── MT/OT — plan-based job vote ──────────────────────────────────────────
-
-/**
- * Tallies which tank JOB the plan's "MT"/"OT" phase-mechanic columns name,
- * via job-gated ability qualifiers like "Party Mit (GNB/DRK)". Returns null
- * unless both columns resolve to a clear, DIFFERENT majority job — see
- * module header for why a mixed/ambiguous signal must fall through rather
- * than guess.
- */
-function resolveTanksFromPlan(tanks: PlayerInfo[], plan: MitigationPlan): { mt: PlayerInfo; ot: PlayerInfo } | null {
-  if (tanks.length !== 2) return null;
-
-  const votes: Record<"MT" | "OT", Map<string, number>> = { MT: new Map(), OT: new Map() };
-
-  for (const phase of plan.data.phases) {
-    for (const mech of phase.mechanics) {
-      if (!mech.assignments) continue;
-      for (const col of ["MT", "OT"] as const) {
-        const entries = mech.assignments[col];
-        if (!entries) continue;
-        for (const entry of entries) {
-          for (const ability of entry.abilities) {
-            const abbrevs = ability.qualifier?.match(/[A-Z]{3}/g);
-            if (!abbrevs) continue;
-            const matches = tanks.filter((t) => abbrevs.some((a) => TANK_JOB_ABBREVIATIONS[a] === t.className));
-            if (matches.length !== 1) continue; // names both/neither of our tanks — not decisive
-            const job = matches[0].className;
-            votes[col].set(job, (votes[col].get(job) ?? 0) + 1);
-          }
-        }
-      }
-    }
-  }
-
-  const argmax = (m: Map<string, number>): string | null => {
-    let best: string | null = null;
-    let bestCount = 0;
-    let tied = false;
-    for (const [job, count] of m) {
-      if (count > bestCount) { best = job; bestCount = count; tied = false; }
-      else if (count === bestCount) tied = true;
-    }
-    return tied ? null : best;
-  };
-
-  const mtJob = argmax(votes.MT);
-  const otJob = argmax(votes.OT);
-  if (!mtJob || !otJob || mtJob === otJob) return null;
-
-  const mt = tanks.find((t) => t.className === mtJob);
-  const ot = tanks.find((t) => t.className === otJob);
-  if (!mt || !ot) return null;
-  return { mt, ot };
 }
 
 // Whichever of the two tanks took the EARLIEST "Attack" (boss basic
@@ -186,13 +104,11 @@ function firstAutoAttackTarget(tanks: PlayerInfo[]): PlayerInfo | null {
 
 /**
  * Resolves MT/OT for a two-tank roster: opening auto-attack first (which
- * tank the boss's first basic-attack hit landed on), then a plan-based job
- * vote if that found no data at all — see module header for the full
- * reasoning and validation numbers.
+ * tank the boss's first basic-attack hit landed on) — see module header for
+ * the full reasoning and validation numbers.
  */
 function resolveTanks(
   tanks: PlayerInfo[],
-  plan:  MitigationPlan | null | undefined
 ): { mt: PlayerInfo | null; ot: PlayerInfo | null; tentative: boolean; source: RoleAssignment["source"] } {
   if (tanks.length === 0) return { mt: null, ot: null, tentative: false, source: "none" };
   if (tanks.length === 1) return { mt: tanks[0], ot: null, tentative: false, source: "job" };
@@ -206,13 +122,8 @@ function resolveTanks(
     return { mt: mtByAutoAttack, ot, tentative: false, source: "auto-attack" };
   }
 
-  if (plan) {
-    const fromPlan = resolveTanksFromPlan(sorted, plan);
-    if (fromPlan) return { mt: fromPlan.mt, ot: fromPlan.ot, tentative: false, source: "plan" };
-  }
-
-  // Neither signal resolved anything — can't disambiguate; keep roster
-  // order but mark tentative.
+  // No auto-attack logged — can't disambiguate; keep roster order but mark
+  // tentative.
   return { mt: t1, ot: t2, tentative: true, source: "order" };
 }
 
@@ -317,16 +228,13 @@ function resolveDps(dps: PlayerInfo[], players: PlayerInfo[]): RoleAssignment[] 
 
 /**
  * Maps every player in `players` onto the eight standard FFXIV party slots.
- * `plan` is an optional extra signal for MT/OT disambiguation, only
- * consulted when the opening-auto-attack signal finds no data at all (see
- * module header) — omit it (or pass null) to skip that fallback.
  */
-export function detectFFRoles(players: PlayerInfo[], plan?: MitigationPlan | null): RoleAssignment[] {
+export function detectFFRoles(players: PlayerInfo[]): RoleAssignment[] {
   const tanks   = players.filter((p) => p.role === "Tank");
   const healers = players.filter((p) => p.role === "Healer");
   const dps     = players.filter((p) => p.role === "DPS");
 
-  const { mt, ot, tentative: tanksTentative, source: tanksSource } = resolveTanks(tanks, plan);
+  const { mt, ot, tentative: tanksTentative, source: tanksSource } = resolveTanks(tanks);
   const [h1, h2] = resolveHealers(healers);
   const dpsSlots = resolveDps(dps, players);
 

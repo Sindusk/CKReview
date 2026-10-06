@@ -50,7 +50,7 @@
 //    silently regenerated away. Severity-only philosophy shifts don't touch
 //    rulings at all (a ruling pins who flags, not how severely).
 //
-// mitigation-review is sanity-print only and contributes nothing to
+// mitigation-analysis is sanity-print only and contributes nothing to
 // snapshots; cross-pull summary sections (Black Hole strategy, kick order,
 // crystal assignments, Graven layout) are printed but not snapshotted —
 // only PullErrors are.
@@ -169,7 +169,7 @@ function printPullErrors(ctx, errors, extraLists = []) {
 // ── snapshot recording ──────────────────────────────────────────────────────
 //
 // Every runner funnels its PullErrors through recordErrors (printPullErrors
-// does it automatically; the midnightfalls/mitigation runners call it
+// does it automatically; the midnightfalls runner calls it
 // directly since their print formats differ). The driver collects entries
 // per report for --check / --update.
 let currentMechanic = null;
@@ -206,7 +206,7 @@ function sortEntries(entries) {
 //   FF entries get `ctxs` (one lazy pull context per pull, see above);
 //   WoW entries share one memoized context per pull (wowPullContext), and
 //   most are generated from lib/mechanics/wow/registry.ts (see
-//   addWowRegistryEntries); the mitigation pair goes through the
+//   addWowRegistryEntries); mitigation-analysis goes through the
 //   real app pipeline (lib/sample-report-store.ts + lib/log-transforms.ts)
 //   instead, because it needs properly-resolved ability names — so it loads
 //   the report itself by code and only works for folders under sampledata/.
@@ -372,9 +372,7 @@ const MECHANICS = {
       }
 
       for (const p of pullLikes) {
-        printPullErrors(p, mod.detectWaveCannonPositionErrors(p.players, p.deathEvents, layout), [
-          ['mitigation-issue', mod.detectWaveCannonMitigationIssueErrors(p.players, p.deathEvents)],
-        ]);
+        printPullErrors(p, mod.detectWaveCannonPositionErrors(p.players, p.deathEvents, layout));
       }
     },
   },
@@ -471,67 +469,6 @@ const MECHANICS = {
   // The other per-pull WoW modules get generated entries from
   // lib/mechanics/wow/registry.ts (see addWowRegistryEntries below).
 
-  mitigation: {
-    game: 'ff',
-    // Goes through the real pipeline (sample-report-store + log-transforms'
-    // transformFFReportToPulls) rather than build-ff-players — mitigation
-    // detection needs properly-resolved ability names on casts/deaths, not
-    // the shortcut '' placeholders the shared raw builder uses.
-    load: () => ({
-      store: requireTsFromRoot('lib/sample-report-store.ts'),
-      lt: requireTsFromRoot('lib/log-transforms.ts', { './log-auth': {} }),
-      ...requireTsFromRoot('lib/mechanics/ffxiv/dancingmad/mitigation-plan.ts'),
-      ...requireTsFromRoot('lib/mechanics/ffxiv/dancingmad/mitigation-detection.ts'),
-    }),
-    async run({ mod, dir }) {
-      const pulls = await loadThroughRealPipeline(mod, dir);
-      if (!pulls) return;
-      const plan = mod.getMitigationPlan('ikuya');
-      for (const pull of pulls) {
-        if (pull.name !== 'Dancing Mad' && !/Kefka/i.test(pull.name)) continue;
-        const errors = mod.detectMitigationErrors(pull, plan);
-        console.log('='.repeat(70));
-        console.log(`${pull.name} Pull ${pull.pullNumber} (${pull.deathEvents.length} deaths) ->`, errors.length, 'mitigation errors');
-        for (const e of errors) {
-          console.log(`  t=${(e.timestamp / 1000).toFixed(1)}s ${e.player} (${e.class}): ${e.description}`);
-        }
-        recordErrors(pull.name, pull.pullNumber, errors);
-      }
-    },
-  },
-
-  'mitigation-review': {
-    game: 'ff',
-    load: () => ({
-      store: requireTsFromRoot('lib/sample-report-store.ts'),
-      lt: requireTsFromRoot('lib/log-transforms.ts', { './log-auth': {} }),
-      ...requireTsFromRoot('lib/mechanics/ffxiv/dancingmad/mitigation-plan.ts'),
-      ...requireTsFromRoot('lib/mechanics/ffxiv/dancingmad/mitigation-review.ts'),
-    }),
-    // Sanity check of the Review-tab row builder: first 3 pulls per report,
-    // printing each pull's row counts plus the reached/future boundary rows.
-    async run({ mod, dir }) {
-      const pulls = await loadThroughRealPipeline(mod, dir);
-      if (!pulls) return;
-      const plan = mod.getMitigationPlan('ikuya');
-      for (const pull of pulls.slice(0, 3)) {
-        const rows = mod.buildMitigationReview(pull, plan);
-        const enemyCastCount = (pull.enemyCasts || []).length;
-        const reachedCount = rows.filter((r) => r.reached).length;
-        console.log(`Pull ${pull.pullNumber}: enemyCasts=${enemyCastCount}, review rows=${rows.length} (reached=${reachedCount}, future=${rows.length - reachedCount})`);
-        const lastReachedIdx = rows.map((r) => r.reached).lastIndexOf(true);
-        const toShow = [rows[0], rows[lastReachedIdx], rows[lastReachedIdx + 1], rows[rows.length - 1]].filter(Boolean);
-        for (const row of toShow) {
-          const cells = [...row.cellsByActorId.entries()].map(([id, c]) => {
-            const p = pull.players.find((pl) => pl.actorId === id);
-            const checks = c.checks.map((chk) => `${chk.status}:${chk.abilityName}${chk.carryOver ? '(carry)' : ''}`).join('+');
-            return `${p ? p.name : id}:${checks}${c.tentativeSlot ? '?' : ''}(${c.slotLabel})`;
-          }).join(', ');
-          console.log(`  [${(row.anchorMs / 1000).toFixed(1)}s] reached=${row.reached} ${row.phaseTitle} / ${row.mech.name} -> ${cells}`);
-        }
-      }
-    },
-  },
 };
 
 // Print-only (no PullErrors, nothing snapshotted): the new mitigation
