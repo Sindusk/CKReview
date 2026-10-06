@@ -2,15 +2,27 @@
 //
 // Pure transform from an already-imported Pull[] to the per-pull,
 // per-player shape persisted by POST /api/statics/[staticId]/reviews
-// (StaticReviewPull + StaticReviewPullPlayerError, see prisma/schema.prisma).
+// (StaticReviewPull + StaticReviewPullPlayerError, see prisma/schema.prisma),
+// plus the detail rows behind the mechanic/phase analysis: every error,
+// phase segments and the wipe cause (buildStaticReviewPayload; see
+// docs/static-player-analysis-plan.md).
 // Computed client-side at "Add Review To Static" time — the app only ever
 // has real Pull[] data in the browser (freshly fetched from WCL/FFL and run
 // through detectPullErrors), so this can't be recomputed from scratch on
 // the server.
 
 import type { Pull } from "@/types/Pull";
+import { CALL_WIPE_RULE_ID, MANUAL_ERROR_RULE_ID, type PullError } from "@/types/PullError";
 import { getPullRaidCutoff } from "@/lib/report-data";
 import { WCL_MYTHIC_DIFFICULTY } from "@/lib/wcl-client";
+import { phaseAt, type EncounterPhase } from "@/lib/pull-phases";
+import { getRuleMeta } from "@/lib/mechanics/rule-meta";
+
+/**
+ * Shape version of the detail rows (StaticReview.detailVersion). Bump when
+ * the stored detail changes meaning, so the views can tell sessions apart.
+ */
+export const STATIC_DETAIL_VERSION = 1;
 
 /**
  * The pulls that count toward a static's stats. WoW: Mythic raid pulls
@@ -49,7 +61,175 @@ export type StaticReviewPullData = {
   // ms into the pull when the earliest Raid-severity error fired, or null.
   raidErrorAtMs: number | null;
   players:       StaticReviewPullPlayerErrorData[];
+
+  // ── Detail (detailVersion ≥ 1; absent from older clients) ─────────────
+  // Highest log phase id reached, null without phase data.
+  lastPhase?:    number | null;
+  phases?:       { phase: number; startMs: number; endMs: number }[];
+  errors?:       StaticReviewErrorData[];
+  mechanics?:    StaticReviewMechanicData[];
+  endCause?:     StaticWipeCause | null;
 };
+
+/** One error of any severity, cutoff errors included and flagged. */
+export type StaticReviewErrorData = {
+  player:      string | null;
+  ruleKey:     string;
+  severity:    "Major" | "Minor" | "Raid";
+  timestampMs: number;
+  phase:       number | null;
+  occurrence:  number | null;
+  afterCutoff: boolean;
+};
+
+/** One mechanic instance the pull reached (filled per boss module later). */
+export type StaticReviewMechanicData = {
+  mechanicKey: string;
+  occurrence:  number;
+  timestampMs: number;
+  phase:       number | null;
+};
+
+/** What ended a wiped pull (see computeWipeCause). */
+export type StaticWipeCause = {
+  kind:    "raidError" | "deathChain" | "called";
+  // Rule behind the cause (raidError; the nearest Major for a called wipe).
+  ruleKey: string | null;
+  // Ability behind the cause (the error's ability, or the killing ability).
+  ability: string | null;
+  atMs:    number;
+  phase:   number | null;
+};
+
+/** StaticRule row content, deduplicated per payload. */
+export type StaticRuleData = {
+  ruleKey:       string;
+  name:          string;
+  mechanicKey:   string;
+  mechanicLabel: string;
+  phaseHint:     number | null;
+};
+
+/** Everything POST /api/statics/[staticId]/reviews takes besides session info. */
+export type StaticReviewPayload = {
+  detailVersion: number;
+  pulls:         StaticReviewPullData[];
+  rules:         StaticRuleData[];
+  phaseNames:    { bossName: string; phases: EncounterPhase[] }[];
+};
+
+// Death chain tuning for computeWipeCause. Measured 2026-10-06 on sample
+// wipes: FFXIV wipes end ~2 s after the last death; the WoW wipes without a
+// Raid error were resets, one with its last death 30 s before the end.
+const DEATH_CHAIN_GAP_MS = 10_000;
+const DEATH_CHAIN_END_WINDOW_MS = 15_000;
+
+/**
+ * StaticRule key for an error. Manually added errors share one rule id, so
+ * their name (what the reviewer typed) tells them apart.
+ */
+export function staticRuleKey(e: PullError): string {
+  return e.ruleId === MANUAL_ERROR_RULE_ID ? `${MANUAL_ERROR_RULE_ID}:${e.name}` : e.ruleId;
+}
+
+/**
+ * What ended a wiped pull, or null for a kill or when nothing qualifies.
+ * First that applies:
+ * 1. The pull's first Raid error (the getPullRaidCutoff error).
+ * 2. A manual Call Wipe as that first Raid error: "called", pointing at the
+ *    nearest Major error or death before the call.
+ * 3. No Raid error: the final death chain — walking back from the last
+ *    death while deaths are ≤ DEATH_CHAIN_GAP_MS apart; the cause is the
+ *    first death's killing ability. The chain must end within
+ *    DEATH_CHAIN_END_WINDOW_MS of the pull end, otherwise the raid reset
+ *    while alive and the cause is unknown.
+ */
+export function computeWipeCause(pull: Pull): StaticWipeCause | null {
+  if (pull.result !== "Wipe") return null;
+  const phaseOf = (ms: number) => phaseAt(pull.phaseSegments, ms);
+
+  const raidErrors = pull.errors
+    .filter((e) => e.severity === "Raid")
+    .sort((a, b) => a.timestamp - b.timestamp);
+  if (raidErrors.length > 0) {
+    const firstAt = raidErrors[0].timestamp;
+    const atCutoff = raidErrors.filter((e) => e.timestamp === firstAt);
+    const detected = atCutoff.find((e) => e.ruleId !== CALL_WIPE_RULE_ID);
+    if (detected) {
+      return { kind: "raidError", ruleKey: staticRuleKey(detected), ability: detected.abilityName || null, atMs: detected.timestamp, phase: phaseOf(detected.timestamp) };
+    }
+
+    const lastMajor = pull.errors
+      .filter((e) => e.severity === "Major" && e.timestamp <= firstAt)
+      .sort((a, b) => b.timestamp - a.timestamp)[0];
+    const lastDeath = pull.deathEvents
+      .filter((d) => d.timestamp <= firstAt)
+      .sort((a, b) => b.timestamp - a.timestamp)[0];
+    if (lastMajor && (!lastDeath || lastMajor.timestamp >= lastDeath.timestamp)) {
+      return { kind: "called", ruleKey: staticRuleKey(lastMajor), ability: lastMajor.abilityName || null, atMs: lastMajor.timestamp, phase: phaseOf(lastMajor.timestamp) };
+    }
+    if (lastDeath) {
+      return { kind: "called", ruleKey: null, ability: lastDeath.cause || null, atMs: lastDeath.timestamp, phase: phaseOf(lastDeath.timestamp) };
+    }
+    return { kind: "called", ruleKey: null, ability: null, atMs: firstAt, phase: phaseOf(firstAt) };
+  }
+
+  const deaths = [...pull.deathEvents].sort((a, b) => a.timestamp - b.timestamp);
+  if (deaths.length === 0) return null;
+  if (pull.fightDuration - deaths[deaths.length - 1].timestamp > DEATH_CHAIN_END_WINDOW_MS) return null;
+  let i = deaths.length - 1;
+  while (i > 0 && deaths[i].timestamp - deaths[i - 1].timestamp <= DEATH_CHAIN_GAP_MS) i--;
+  const first = deaths[i];
+  return { kind: "deathChain", ruleKey: null, ability: first.cause || null, atMs: first.timestamp, phase: phaseOf(first.timestamp) };
+}
+
+/** Per-error detail for one pull (all severities, cutoff flagged). */
+function computePullErrorDetail(pull: Pull, cutoff: number | null): StaticReviewErrorData[] {
+  return pull.errors.map((e) => ({
+    player:      e.player ?? null,
+    ruleKey:     staticRuleKey(e),
+    severity:    e.severity,
+    timestampMs: Math.round(e.timestamp),
+    phase:       phaseAt(pull.phaseSegments, e.timestamp),
+    occurrence:  null,
+    afterCutoff: cutoff !== null && e.timestamp > cutoff,
+  }));
+}
+
+/**
+ * The full POST payload: count rows plus detail rows, the rules they
+ * reference and the phase names. Run against displayPulls (never pulls —
+ * the cross-pull errors live only in displayPulls, see
+ * docs/app-architecture.md).
+ */
+export function buildStaticReviewPayload(pulls: Pull[]): StaticReviewPayload {
+  const rules = new Map<string, StaticRuleData>();
+  for (const pull of pulls) {
+    for (const e of pull.errors) {
+      const ruleKey = staticRuleKey(e);
+      const meta = getRuleMeta(e.ruleId, e.name);
+      rules.set(ruleKey, {
+        ruleKey,
+        name:          e.name,
+        mechanicKey:   e.ruleId === MANUAL_ERROR_RULE_ID ? ruleKey : meta.mechanicKey,
+        mechanicLabel: e.ruleId === MANUAL_ERROR_RULE_ID ? e.name : meta.mechanicLabel,
+        phaseHint:     meta.phaseHint ?? null,
+      });
+    }
+  }
+
+  const phaseNames = new Map<string, EncounterPhase[]>();
+  for (const pull of pulls) {
+    if (pull.encounterPhases?.length) phaseNames.set(pull.name, pull.encounterPhases);
+  }
+
+  return {
+    detailVersion: STATIC_DETAIL_VERSION,
+    pulls:         computeStaticReviewPullData(pulls),
+    rules:         [...rules.values()],
+    phaseNames:    [...phaseNames].map(([bossName, phases]) => ({ bossName, phases })),
+  };
+}
 
 /**
  * Per pull, counts each player's Major/Minor errors up through the same
@@ -105,6 +285,11 @@ export function computeStaticReviewPullData(pulls: Pull[]): StaticReviewPullData
       durationMs:    pull.fightDuration,
       raidErrorAtMs: cutoff,
       players,
+      lastPhase:     pull.phaseSegments?.length ? Math.max(...pull.phaseSegments.map((s) => s.phase)) : null,
+      phases:        (pull.phaseSegments ?? []).map((s) => ({ phase: s.phase, startMs: s.startMs, endMs: s.endMs })),
+      errors:        computePullErrorDetail(pull, cutoff),
+      mechanics:     [],
+      endCause:      computeWipeCause(pull),
     };
   });
 }

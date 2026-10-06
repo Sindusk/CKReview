@@ -9,7 +9,7 @@
 
 import { useEffect, useState } from "react";
 import type { Pull } from "@/types/Pull";
-import { computeStaticReviewPullData, staticEligiblePulls } from "@/lib/static-review-data";
+import { buildStaticReviewPayload, staticEligiblePulls } from "@/lib/static-review-data";
 import { Dialog, Field } from "./ui/Dialog";
 
 type StaticSummary = {
@@ -116,7 +116,7 @@ export default function AddReviewToStaticDialog({
           reportUrl,
           reportStartedAt,
           label: label.trim() || undefined,
-          pulls: computeStaticReviewPullData(eligiblePulls),
+          ...buildStaticReviewPayload(eligiblePulls),
         }),
       });
       const data = await res.json();

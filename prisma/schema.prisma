@@ -24,6 +24,8 @@ model Static {
   reviews    StaticReview[]
   identities StaticPlayerIdentity[]
   aliases    StaticPlayerAlias[]
+  rules      StaticRule[]
+  phases     StaticPhase[]
 }
 
 model StaticMember {
@@ -65,6 +67,13 @@ model StaticReview {
   /// static dashboard until they're resynced.
   reportStartedAt DateTime?
 
+  /// Shape version of the per-error/per-phase detail rows
+  /// (StaticReviewPullError, StaticReviewPullPhase, the wipe cause) — null
+  /// for sessions imported before detailed tracking, which keep only their
+  /// count rows and stay out of the mechanic/phase views until resynced.
+  /// See docs/static-player-analysis-plan.md.
+  detailVersion Int?
+
   static Static @relation(fields: [staticId], references: [id], onDelete: Cascade)
   pulls  StaticReviewPull[]
 
@@ -105,13 +114,136 @@ model StaticReviewPull {
   /// most pulls won't have one unless someone writes it in during review.
   summary        String?
 
+  /// Highest log phase id the pull reached (StaticReviewPullPhase.phase),
+  /// derived from the phase transitions — not the log's own `lastPhase`,
+  /// which is a stage ordinal (see lib/pull-phases.ts). Null without phase
+  /// data or on sessions imported before detailed tracking.
+  lastPhase      Int?
+
+  /// What ended the pull (lib/static-review-data.ts computeWipeCause):
+  /// "raidError" | "deathChain" | "called", or null for kills and wipes
+  /// with no identifiable cause. The rule (raidError, or the Major error
+  /// nearest a called wipe) or the killing ability (death chain, or the
+  /// death nearest a called wipe) says which mechanic it was.
+  endCauseKind     String?
+  endCauseRuleId   Int?
+  endCauseAbility  String?
+  endCauseAtMs     Int?
+  endCausePhase    Int?
+
   createdAt DateTime @default(now())
 
   review       StaticReview                 @relation(fields: [staticReviewId], references: [id], onDelete: Cascade)
   playerErrors StaticReviewPullPlayerError[]
+  errors       StaticReviewPullError[]
+  phases       StaticReviewPullPhase[]
+  mechanics    StaticReviewPullMechanic[]
+  endCauseRule StaticRule?                  @relation(fields: [endCauseRuleId], references: [id], onDelete: SetNull)
 
   @@unique([staticReviewId, fightId])
   @@index([staticReviewId])
+}
+
+/// One detection rule as seen by a static (lookup for StaticReviewPullError).
+/// `ruleKey` is the rule id, except manually-added errors, which share one
+/// rule id and are keyed by their name ("manual-added-error:<name>").
+/// `name` is a snapshot from the latest import, so rows stay readable after
+/// a rule is renamed or removed. Mechanic label and phase hint come from
+/// lib/mechanics/rule-meta.ts and are refreshed on every import, so
+/// relabeling a rule regroups old sessions too.
+model StaticRule {
+  id            Int     @id @default(autoincrement())
+  staticId      Int
+  ruleKey       String
+  name          String
+  mechanicKey   String
+  mechanicLabel String
+  /// Log phase id the rule belongs to, used when a pull has no phase data.
+  phaseHint     Int?
+
+  static    Static                  @relation(fields: [staticId], references: [id], onDelete: Cascade)
+  errors    StaticReviewPullError[]
+  endCauses StaticReviewPull[]
+
+  @@unique([staticId, ruleKey])
+}
+
+/// A phase's name for one boss in one static, from the report's phase
+/// metadata (lib/pull-phases.ts) — so the UI can label phase ids without an
+/// API call. Intermissions are phases of their own.
+model StaticPhase {
+  id             Int     @id @default(autoincrement())
+  staticId       Int
+  bossName       String
+  phaseId        Int
+  name           String
+  isIntermission Boolean @default(false)
+
+  static Static @relation(fields: [staticId], references: [id], onDelete: Cascade)
+
+  @@unique([staticId, bossName, phaseId])
+}
+
+/// One detected error in a pull, every severity, including player-less Raid
+/// errors and errors after the raid cutoff (flagged, not dropped — rankings
+/// exclude them so they stay consistent with the count rows).
+model StaticReviewPullError {
+  id          Int     @id @default(autoincrement())
+  pullId      Int
+  /// Null for player-less errors and for names outside the pull's roster.
+  identityId  Int?
+  /// Raw log name in this pull (provenance), null for player-less errors.
+  player      String?
+  ruleRefId   Int
+  severity    String  // "Major" | "Minor" | "Raid"
+  timestampMs Int
+  /// Log phase id at timestampMs, null without phase data.
+  phase       Int?
+  /// Which instance of the mechanic (e.g. spread #2); null until the boss
+  /// module reports mechanic occurrences.
+  occurrence  Int?
+  /// After the pull's first Raid error (getPullRaidCutoff).
+  afterCutoff Boolean @default(false)
+
+  pull     StaticReviewPull      @relation(fields: [pullId], references: [id], onDelete: Cascade)
+  identity StaticPlayerIdentity? @relation(fields: [identityId], references: [id], onDelete: SetNull)
+  rule     StaticRule            @relation(fields: [ruleRefId], references: [id], onDelete: Cascade)
+
+  @@index([pullId])
+  @@index([identityId])
+  @@index([ruleRefId])
+}
+
+/// One phase segment of a pull. Alternating encounters (Entombed Sentinels,
+/// Sszorak) visit the same phase many times, so this is one row per visit;
+/// "pulls that reached phase X" is a distinct count over pullId.
+model StaticReviewPullPhase {
+  id      Int @id @default(autoincrement())
+  pullId  Int
+  seq     Int
+  phase   Int
+  startMs Int
+  endMs   Int
+
+  pull StaticReviewPull @relation(fields: [pullId], references: [id], onDelete: Cascade)
+
+  @@unique([pullId, seq])
+}
+
+/// One mechanic instance the pull reached, failed or not — the denominator
+/// for "failed 4 of 9 times". Filled per boss module as they gain
+/// occurrence output; mechanics without it fall back to phase exposure.
+model StaticReviewPullMechanic {
+  id          Int    @id @default(autoincrement())
+  pullId      Int
+  mechanicKey String
+  occurrence  Int
+  timestampMs Int
+  phase       Int?
+
+  pull StaticReviewPull @relation(fields: [pullId], references: [id], onDelete: Cascade)
+
+  @@index([pullId])
 }
 
 /// Per-player error counts for one pull, computed at import time using the
@@ -171,6 +303,7 @@ model StaticPlayerIdentity {
   static  Static                       @relation(fields: [staticId], references: [id], onDelete: Cascade)
   aliases StaticPlayerAlias[]
   errors  StaticReviewPullPlayerError[]
+  detailErrors StaticReviewPullError[]
 
   @@index([staticId])
 }

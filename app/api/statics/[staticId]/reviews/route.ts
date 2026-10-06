@@ -4,9 +4,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
-import type { StaticReviewPullData } from "@/lib/static-review-data";
+import type { StaticReviewPayload, StaticReviewPullData } from "@/lib/static-review-data";
 import { resolvePlayerIdentities } from "@/lib/static-player-identity";
 import { parseLogUrl } from "@/lib/url-parsers";
+
+// A 65-pull night writes a few thousand detail rows; the 5 s default
+// interactive-transaction timeout is too tight for that.
+const IMPORT_TX_OPTIONS = { timeout: 60_000, maxWait: 10_000 };
 
 async function requireMembership(staticId: number, userId: number) {
   return prisma.staticMember.findUnique({
@@ -14,7 +18,51 @@ async function requireMembership(staticId: number, userId: number) {
   });
 }
 
-function buildPullsCreateData(pulls: StaticReviewPullData[], identities: Map<string, number>) {
+/**
+ * Upserts the static's rule and phase-name lookups for this payload and
+ * returns ruleKey -> StaticRule.id. Labels are refreshed on every import
+ * (see lib/mechanics/rule-meta.ts).
+ */
+async function upsertDetailLookups(
+  tx:         Prisma.TransactionClient,
+  staticId:   number,
+  rules:      StaticReviewPayload["rules"],
+  phaseNames: StaticReviewPayload["phaseNames"],
+): Promise<Map<string, number>> {
+  const ruleIds = new Map<string, number>();
+  for (const r of rules) {
+    const data = {
+      name:          String(r.name),
+      mechanicKey:   String(r.mechanicKey),
+      mechanicLabel: String(r.mechanicLabel),
+      phaseHint:     Number.isInteger(r.phaseHint) ? r.phaseHint : null,
+    };
+    const row = await tx.staticRule.upsert({
+      where:  { staticId_ruleKey: { staticId, ruleKey: String(r.ruleKey) } },
+      create: { staticId, ruleKey: String(r.ruleKey), ...data },
+      update: data,
+      select: { id: true },
+    });
+    ruleIds.set(r.ruleKey, row.id);
+  }
+  for (const { bossName, phases } of phaseNames) {
+    for (const ph of phases) {
+      const data = { name: String(ph.name), isIntermission: !!ph.isIntermission };
+      await tx.staticPhase.upsert({
+        where:  { staticId_bossName_phaseId: { staticId, bossName, phaseId: ph.id } },
+        create: { staticId, bossName, phaseId: ph.id, ...data },
+        update: data,
+      });
+    }
+  }
+  return ruleIds;
+}
+
+function buildPullsCreateData(
+  pulls:      StaticReviewPullData[],
+  identities: Map<string, number>,
+  ruleIds:    Map<string, number>,
+) {
   return pulls.map((p) => ({
     fightId:       p.fightId,
     pullNumber:    p.pullNumber,
@@ -25,6 +73,45 @@ function buildPullsCreateData(pulls: StaticReviewPullData[], identities: Map<str
     endTime:       p.endTime,
     durationMs:    p.durationMs,
     raidErrorAtMs: p.raidErrorAtMs,
+    lastPhase:       p.lastPhase ?? null,
+    endCauseKind:    p.endCause?.kind ?? null,
+    endCauseRuleId:  p.endCause?.ruleKey ? ruleIds.get(p.endCause.ruleKey) ?? null : null,
+    endCauseAbility: p.endCause?.ability ?? null,
+    endCauseAtMs:    p.endCause ? Math.round(p.endCause.atMs) : null,
+    endCausePhase:   p.endCause?.phase ?? null,
+    errors: {
+      createMany: {
+        data: (p.errors ?? [])
+          .filter((e) => ruleIds.has(e.ruleKey))
+          .map((e) => ({
+            // Only roster names resolve to an identity; anything else
+            // (pets, "Multiple Players") keeps its raw name only.
+            identityId:  e.player ? identities.get(e.player) ?? null : null,
+            player:      e.player ?? null,
+            ruleRefId:   ruleIds.get(e.ruleKey)!,
+            severity:    e.severity,
+            timestampMs: Math.round(e.timestampMs),
+            phase:       e.phase ?? null,
+            occurrence:  e.occurrence ?? null,
+            afterCutoff: !!e.afterCutoff,
+          })),
+      },
+    },
+    phases: {
+      createMany: {
+        data: (p.phases ?? []).map((s, seq) => ({
+          seq, phase: s.phase, startMs: Math.round(s.startMs), endMs: Math.round(s.endMs),
+        })),
+      },
+    },
+    mechanics: {
+      createMany: {
+        data: (p.mechanics ?? []).map((m) => ({
+          mechanicKey: m.mechanicKey, occurrence: m.occurrence,
+          timestampMs: Math.round(m.timestampMs), phase: m.phase ?? null,
+        })),
+      },
+    },
     playerErrors: {
       create: p.players.map((pl) => ({
         player:     pl.player,
@@ -90,6 +177,17 @@ export async function POST(
       : null;
   const pulls: StaticReviewPullData[] = Array.isArray(body?.pulls) ? body.pulls : [];
   const allPlayerNames = pulls.flatMap((p) => p.players.map((pl) => pl.player));
+  // Detail rows (docs/static-player-analysis-plan.md) come only from
+  // clients that send a detailVersion; an older client's payload imports
+  // counts only and leaves the session undetailed.
+  const detailVersion =
+    Number.isInteger(body?.detailVersion) && body.detailVersion > 0 ? body.detailVersion as number : null;
+  const rules: StaticReviewPayload["rules"] = detailVersion && Array.isArray(body?.rules) ? body.rules : [];
+  const phaseNames: StaticReviewPayload["phaseNames"] =
+    detailVersion && Array.isArray(body?.phaseNames) ? body.phaseNames : [];
+  if (!detailVersion) {
+    for (const p of pulls) { delete p.errors; delete p.phases; delete p.mechanics; delete p.endCause; delete p.lastPhase; }
+  }
 
   if (!sessionId || !reportUrl) {
     return NextResponse.json({ error: "sessionId and reportUrl are required" }, { status: 400 });
@@ -98,6 +196,7 @@ export async function POST(
   try {
     const review = await prisma.$transaction(async (tx) => {
       const identities = await resolvePlayerIdentities(tx, staticId, allPlayerNames);
+      const ruleIds = await upsertDetailLookups(tx, staticId, rules, phaseNames);
       return tx.staticReview.create({
         data: {
           staticId,
@@ -105,11 +204,12 @@ export async function POST(
           reportUrl,
           label,
           reportStartedAt,
+          detailVersion,
           addedByUserId: user.id,
-          pulls: { create: buildPullsCreateData(pulls, identities) },
+          pulls: { create: buildPullsCreateData(pulls, identities, ruleIds) },
         },
       });
-    });
+    }, IMPORT_TX_OPTIONS);
     return NextResponse.json({ review });
   } catch (err) {
     // Re-adding an already-linked review (double-click, or deliberately
@@ -155,10 +255,12 @@ export async function POST(
         const priorSummaries = new Map(priorPulls.map((p) => [p.fightId, p.summary]));
 
         const identities = await resolvePlayerIdentities(tx, staticId, allPlayerNames);
+        const ruleIds = await upsertDetailLookups(tx, staticId, rules, phaseNames);
 
+        // Cascades to the count rows and every detail row of these pulls.
         await tx.staticReviewPull.deleteMany({ where: { staticReviewId: existing.id } });
 
-        const pullsCreateData = buildPullsCreateData(pulls, identities).map((p) => ({
+        const pullsCreateData = buildPullsCreateData(pulls, identities, ruleIds).map((p) => ({
           ...p,
           summary: priorSummaries.get(p.fightId) ?? null,
         }));
@@ -171,10 +273,13 @@ export async function POST(
             // all, so fill it in — but never blank out a known date just
             // because this particular client couldn't supply one.
             reportStartedAt: reportStartedAt ?? existing.reportStartedAt,
+            // The pulls were just rebuilt from this payload, so the detail
+            // level is whatever this client sent.
+            detailVersion,
             pulls: { create: pullsCreateData },
           },
         });
-      });
+      }, IMPORT_TX_OPTIONS);
       return NextResponse.json({ review, resynced: true });
     }
     throw err;

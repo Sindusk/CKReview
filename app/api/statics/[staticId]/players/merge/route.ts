@@ -57,6 +57,10 @@ export async function POST(
       where: { identityId: fromIdentityId },
       data:  { identityId: intoIdentityId },
     }),
+    prisma.staticReviewPullError.updateMany({
+      where: { identityId: fromIdentityId },
+      data:  { identityId: intoIdentityId },
+    }),
     prisma.staticPlayerIdentity.delete({ where: { id: fromIdentityId } }),
   ]);
 

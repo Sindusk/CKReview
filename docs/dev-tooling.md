@@ -28,6 +28,12 @@ validation harness (`scripts/validate.js`, `expectations/`), see
   Kefka used `--min-minutes 15 --from-minutes 14` (~1MB per pull instead
   of 5-7MB). `validate.js` detects these captures and runs only
   `lateCapture` mechanics on them.
+  - **Re-running a fetch on such a folder must repeat its flags.** A
+    plain re-run downloads every pull the capture skipped, at full size.
+    The folder then mixes full and late captures, so validate stops
+    treating it as late and `--check` fails with additions on every pull.
+    There is no meta-only mode; to refresh `meta.json` alone (for example
+    to pick up the phase fields), re-run with the original flags.
 - **Same queries as the app.** The scripts reuse `lib/wcl-client.ts` /
   `lib/ffl-client.ts` unchanged, loaded under Node by
   `scripts/lib/require-ts.js`, so their queries can't drift from the app's.

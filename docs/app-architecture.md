@@ -102,6 +102,15 @@ file's header comment. Mechanic detection has its own guide:
   - `StaticReviewPull`, one row per pull.
   - `StaticReviewPullPlayerError`, one row per roster player per pull,
     **including 0/0 rows**, so the "pulls played" rates work for subs.
+  - **Detail rows** (sessions with `StaticReview.detailVersion` set, i.e.
+    imported or resynced after 2026-10-06): `StaticReviewPullError` (every
+    error, cutoff errors flagged), `StaticReviewPullPhase` (phase
+    segments), `StaticReviewPullMechanic`, the wipe cause on
+    `StaticReviewPull`, and the `StaticRule` / `StaticPhase` lookups. They
+    feed the mechanic and phase analysis
+    ([static-player-analysis-plan.md](static-player-analysis-plan.md)). The
+    count rows above stay the source for the existing chart and Players
+    panel.
 - **Player identity.** A player's name can change between logs, so
   `StaticPlayerIdentity` and `StaticPlayerAlias` hold a canonical player per
   static. Aliases are auto-created at import time
