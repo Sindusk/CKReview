@@ -65,6 +65,7 @@ import type { KefkaSaysStateSignal } from "./mechanics/ffxiv/dancingmad/kefka-sa
 import { detectUltimateKefkaErrors } from "./mechanics/ffxiv/dancingmad/ultimate-kefka";
 import { detectWowEncounterErrors } from "./mechanics/wow/registry";
 import { buildPullPhaseSegments } from "./pull-phases";
+import { computeMechanicOccurrences } from "./mechanics/occurrences";
 
 // Shared shape for both games' ability maps: gameID -> name + raw icon
 // filename (not yet resolved to a URL — that happens per-game via
@@ -1265,6 +1266,7 @@ export function transformFFightToPull(
     fightId:       data.fight.id,
     phaseSegments:   buildPullPhaseSegments(data.fight),
     encounterPhases: data.fight.encounterPhases,
+    mechanicOccurrences: computeMechanicOccurrences(data.fight.name ?? "", enemyCastEvents),
     castEvents,
     blackHoleGeometry,
     enemyCasts:    enemyCastEvents,

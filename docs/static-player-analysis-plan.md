@@ -11,11 +11,13 @@ instead of reopening every report:
 The direction was agreed with the user on 2026-10-06; this doc is the build
 brief. Applies to both games.
 
-**Status (2026-10-06):** build steps 1–4 are done, and so are the step 5
-API routes and raid view (the Mechanics panel). Still to build: the
-player dropdown (the rest of step 5) and mechanic occurrences per boss
-module (step 6). The analysis routes already serve the player data
-(`analysis/players/[identityId]`).
+**Status (2026-10-06):** steps 1–5 are done: the Mechanics panel (raid
+view) and the Player Analysis panel. Step 6 is done for Dancing Mad:
+`lib/mechanics/occurrences.ts` anchors each grouped mechanic on the boss's
+own cast. Not anchored yet: the Kefka Says instructions, the generic
+Damage Down splits, and every WoW boss. Those fall back to phase or pull
+exposure. Midnight Falls needs a sample report before its anchors can be
+verified.
 
 ## Why this needs new data
 

@@ -4,6 +4,7 @@ import type { DeathEvent } from "./DeathEvent";
 import type { PlayerInfo } from "./PlayerInfo";
 import type { PullError, EnemyEvent }  from "./PullError";
 import type { EncounterPhase, PullPhaseSegment } from "../lib/pull-phases";
+import type { MechanicOccurrence } from "../lib/mechanics/occurrences";
 
 // Raw positional data for the Dancing Mad (FFXIV) Black Hole mechanic's
 // direction/priority detection — see lib/mechanics/ffxiv/dancingmad/
@@ -60,6 +61,10 @@ export type Pull = {
   // pulls saved before the fields existed.
   phaseSegments?:   PullPhaseSegment[];
   encounterPhases?: EncounterPhase[];
+
+  // Every instance of an anchored mechanic the pull reached (see
+  // lib/mechanics/occurrences.ts). Undefined for bosses without anchors.
+  mechanicOccurrences?: MechanicOccurrence[];
 
   blackHoleGeometry?: BlackHoleGeometry;
 

@@ -17,6 +17,7 @@ import { getPullRaidCutoff } from "@/lib/report-data";
 import { WCL_MYTHIC_DIFFICULTY } from "@/lib/wcl-client";
 import { phaseAt, type EncounterPhase } from "@/lib/pull-phases";
 import { getRuleMeta, staticRuleKey } from "@/lib/mechanics/rule-meta";
+import { occurrenceForError } from "@/lib/mechanics/occurrences";
 
 /**
  * Shape version of the detail rows (StaticReview.detailVersion). Bump when
@@ -188,7 +189,7 @@ function computePullErrorDetail(pull: Pull, cutoff: number | null): StaticReview
     severity:    e.severity,
     timestampMs: Math.round(e.timestamp),
     phase:       phaseAt(pull.phaseSegments, e.timestamp),
-    occurrence:  null,
+    occurrence:  occurrenceForError(pull.mechanicOccurrences, getRuleMeta(e.ruleId, e.name).mechanicKey, e.timestamp),
     afterCutoff: cutoff !== null && e.timestamp > cutoff,
   }));
 }
@@ -285,7 +286,12 @@ export function computeStaticReviewPullData(pulls: Pull[]): StaticReviewPullData
       lastPhase:     pull.phaseSegments?.length ? Math.max(...pull.phaseSegments.map((s) => s.phase)) : null,
       phases:        (pull.phaseSegments ?? []).map((s) => ({ phase: s.phase, startMs: s.startMs, endMs: s.endMs })),
       errors:        computePullErrorDetail(pull, cutoff),
-      mechanics:     [],
+      mechanics:     (pull.mechanicOccurrences ?? []).map((o) => ({
+        mechanicKey: o.mechanicKey,
+        occurrence:  o.occurrence,
+        timestampMs: Math.round(o.timestamp),
+        phase:       phaseAt(pull.phaseSegments, o.timestamp),
+      })),
       endCause:      computeWipeCause(pull),
     };
   });
