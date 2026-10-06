@@ -128,6 +128,13 @@ It loads pulls lazily and keeps three in memory, so narrowing with
 
 ## Damage analysis (WoW)
 
+- **Analysis without the UI.**
+  `node scripts/validate.js damage-analysis-wow sampledata/wow/<code> --pulls=19`
+  prints the same report as the FFXIV runner through the live WoW
+  transform. `--boss=<name>` narrows by boss and `--all-findings` adds
+  every finding with its basis. It runs only when named: plain `--check`
+  skips it.
+
 - **Spell tables are measured, not copied.** WoWAnalyzer is AGPL, so
   `lib/damage/wow/spell-data.ts` is generated from our own logs:
   1. `node scripts/survey-wow-spells.js <code> --kills` (or

@@ -548,11 +548,71 @@ MECHANICS['damage-analysis'] = {
   async run({ mod, dir }) {
     const pulls = await loadThroughRealPipeline(mod, dir);
     if (!pulls) return;
+    printDamageAnalysis(mod, pulls, mod.FFXIV_DAMAGE);
+  },
+};
+
+// The WoW counterpart: same print, WOW_DAMAGE. Runs only when named (WoW
+// pulls are big and go through the whole live transform):
+//   node scripts/validate.js damage-analysis-wow sampledata/wow/<code> [--pulls=1,3] [--boss=Vashnik]
+// Needs a capture fetched after 2026-10-06 (docs/damage-analysis-plan.md,
+// "Build status (WoW)").
+MECHANICS['damage-analysis-wow'] = {
+  game: 'wow',
+  namedOnly: true,
+  load: () => ({
+    lt: requireTsFromRoot('lib/log-transforms.ts', { './log-auth': {} }),
+    ...requireTsFromRoot('lib/damage/analyze.ts'),
+    ...requireTsFromRoot('lib/damage/contexts.ts'),
+    ...requireTsFromRoot('lib/damage/wow/game.ts'),
+  }),
+  async run({ mod, dir, meta }) {
+    printDamageAnalysis(mod, loadWowThroughRealPipeline(mod, dir, meta), mod.WOW_DAMAGE);
+  },
+};
+
+/**
+ * WoW sample pulls through the live transform (lib/log-transforms.ts
+ * transformFightToPull), one file at a time. `--pulls=1,3` and
+ * `--boss=<substring>` narrow it; pull numbers come from the file names.
+ */
+function loadWowThroughRealPipeline(mod, dir, meta) {
+  const pullsArg = process.argv.find((a) => a.startsWith('--pulls='))?.slice('--pulls='.length);
+  const wanted = pullsArg ? new Set(pullsArg.split(',').map(Number)) : null;
+  const boss = process.argv.find((a) => a.startsWith('--boss='))?.slice('--boss='.length)?.toLowerCase();
+  const abilityMap = mod.lt.buildWCLAbilityMap(meta.masterData.abilities);
+  const fightById = new Map(meta.fights.map((f) => [f.id, f]));
+  const out = [];
+  for (const file of fs.readdirSync(dir).sort()) {
+    const m = file.match(/^(.*)_Pull(\d+)\.json$/);
+    if (!m) continue;
+    if (wanted && !wanted.has(Number(m[2]))) continue;
+    if (boss && !m[1].toLowerCase().includes(boss)) continue;
+    const raw = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'));
+    const fight = fightById.get(raw?.variables?.fightIDs?.[0]);
+    if (!fight) continue;
+    const s = raw.json.data.reportData.report;
+    const d = (k) => s[k]?.data ?? [];
+    const pull = mod.lt.transformFightToPull({
+      fight, actors: meta.masterData.actors,
+      deathEvents: d('deaths'), combatantInfos: d('combatantInfo'), castEvents: d('casts'),
+      damageDoneEvents: d('damageDone'), damageTakenEvents: d('damageTaken'), healingEvents: d('healing'),
+      debuffEvents: d('debuffs'), enemyCastEvents: d('enemyCasts'), enemyBuffEvents: d('enemyBuffs'),
+      playerBuffEvents: d('playerBuffs'), enemyDebuffEvents: d('enemyDebuffs'),
+    }, abilityMap, meta.code);
+    pull.pullNumber = Number(m[2]);
+    out.push(pull);
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name) || a.pullNumber - b.pullNumber);
+}
+
+function printDamageAnalysis(mod, pulls, game) {
+  {
     const all = process.argv.includes('--all-findings');
     const M = (n) => (Math.abs(n) >= 1e6 ? `${(n / 1e6).toFixed(2)}M` : `${Math.round(n / 1000)}k`);
     const t = (ms) => `${(ms / 1000).toFixed(1)}s`;
     for (const pull of pulls) {
-      const a = mod.analyzePullDamage(pull, mod.FFXIV_DAMAGE, mod.getDamageContext(pull.name));
+      const a = mod.analyzePullDamage(pull, game, mod.getDamageContext(pull.name));
       console.log('='.repeat(70));
       console.log(`${pull.name} Pull ${pull.pullNumber} (${pull.result}): analysed to ${t(a.endMs)}` +
         `${a.collapseMs !== undefined ? ' (wipe collapse)' : ''}, context ${a.context ?? 'MISSING'}` +
@@ -574,8 +634,8 @@ MECHANICS['damage-analysis'] = {
         }
       }
     }
-  },
-};
+  }
+}
 
 // Print-only: the reference-clear comparison (lib/damage/compare.ts) of
 // every pull in the folder that reached the deciding phase, against the
@@ -878,7 +938,8 @@ for (const a of rawArgs) {
   if (MECHANICS[a]) selectedNames.push(a);
   else explicitDirs.push(path.resolve(a));
 }
-const selected = selectedNames.length ? selectedNames : Object.keys(MECHANICS);
+// `namedOnly` entries (heavy, print-only) run only when named.
+const selected = selectedNames.length ? selectedNames : Object.keys(MECHANICS).filter((n) => !MECHANICS[n].namedOnly);
 
 // A report folder's game: from its sampledata/{ff,wow}/ path segment when
 // present; folders elsewhere run against both games' mechanics (every

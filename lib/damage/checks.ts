@@ -68,7 +68,9 @@ export type PlayerCheckContext = {
   context?:    DamageContext;
   endMs:       number;
   uses:        GcdUse[];
-  factor:      number;          // GCD speed factor
+  job:         string;          // DamageGame.jobOf, else className
+  factor:      number;          // GCD speed factor (outside haste windows)
+  factorAt(t: number): number;  // the factor for a GCD starting at t
   baseGcdMs:   number;
   forced:      ForcedWindow[];  // every forced window for this player
   dead:        Window[];
@@ -84,7 +86,7 @@ export type PlayerCheckContext = {
 
 export function finding(ctx: PlayerCheckContext, f: Omit<DamageFinding, "player" | "job" | "phaseId" | "phase">): DamageFinding {
   const phaseId = ctx.phaseOf(f.startMs);
-  return { player: ctx.player.name, job: ctx.player.className, phaseId, phase: ctx.phaseName(phaseId), ...f };
+  return { player: ctx.player.name, job: ctx.job, phaseId, phase: ctx.phaseName(phaseId), ...f };
 }
 
 const s = (ms: number) => `${(ms / 1000).toFixed(1)}s`;
@@ -154,15 +156,15 @@ export function checkGcdGaps(ctx: PlayerCheckContext): DamageFinding[] {
 
   for (let i = 1; i < uses.length; i++) {
     const prev = uses[i - 1];
-    consider(prev.startMs, prev.startMs + gcdLockMs(prev, ctx.factor), uses[i].startMs, prev.abilityName);
+    consider(prev.startMs, prev.startMs + gcdLockMs(prev, ctx.factorAt(prev.startMs)), uses[i].startMs, prev.abilityName);
   }
   const last = uses[uses.length - 1];
-  consider(last.startMs, last.startMs + gcdLockMs(last, ctx.factor), ctx.endMs + GCD_TOLERANCE_MS, `${last.abilityName} (to the end)`);
+  consider(last.startMs, last.startMs + gcdLockMs(last, ctx.factorAt(last.startMs)), ctx.endMs + GCD_TOLERANCE_MS, `${last.abilityName} (to the end)`);
 
   for (const [phaseId, acc] of small) {
     if (acc.ms < ctx.baseGcdMs) continue;
     out.push({
-      player: ctx.player.name, job: ctx.player.className, phaseId, phase: ctx.phaseName(phaseId),
+      player: ctx.player.name, job: ctx.job, phaseId, phase: ctx.phaseName(phaseId),
       kind: "gcd-delays", startMs: acc.start, endMs: acc.end, forced: false, lostDamage: acc.lost,
       label: "Small GCD delays",
       basis: `${acc.n} delays under 1s, ${s(acc.ms)} in total, valued at the phase's average GCD`,
@@ -173,7 +175,7 @@ export function checkGcdGaps(ctx: PlayerCheckContext): DamageFinding[] {
     if (acc.ms < CLIP_FINDING_MS) continue;
     const defs = [...acc.defensives.entries()].sort((a, b) => b[1] - a[1]).map(([n, c]) => `${n} ×${c}`).join(", ");
     out.push({
-      player: ctx.player.name, job: ctx.player.className, phaseId, phase: ctx.phaseName(phaseId),
+      player: ctx.player.name, job: ctx.job, phaseId, phase: ctx.phaseName(phaseId),
       kind: "gcd-clipping", startMs: acc.start, endMs: acc.end, forced: false, lostDamage: acc.lost,
       label: "GCD clipped by triple weaves",
       basis: `${acc.n} delays with ${CLIP_WEAVES}+ oGCDs between GCDs, ${s(acc.ms)} in total, valued at the phase's average GCD`,
@@ -242,7 +244,7 @@ export function checkPositionals(ctx: PlayerCheckContext): DamageFinding[] {
   for (const g of groups.values()) {
     if (g.misses === 0) continue;
     out.push({
-      player: ctx.player.name, job: ctx.player.className, phaseId: g.phaseId, phase: ctx.phaseName(g.phaseId),
+      player: ctx.player.name, job: ctx.job, phaseId: g.phaseId, phase: ctx.phaseName(g.phaseId),
       kind: "positional", startMs: g.start, endMs: g.end, forced: false, lostDamage: g.lost,
       label: `${g.name} positional missed`,
       basis: `each missed hit × ${Math.round(g.cost * 100)}% (the potency the positional adds)`,
@@ -305,7 +307,7 @@ export function checkCooldownDrift(ctx: PlayerCheckContext): DamageFinding[] {
     ? mergeWindows([...ctx.forced, { startMs: 0, endMs: ctx.decidingPhaseStart, cause: "held for the deciding phase" }])
     : forcedMerged;
 
-  for (const cd of ctx.game.trackedCooldowns(ctx.player.className)) {
+  for (const cd of ctx.game.trackedCooldowns(ctx.job)) {
     const ids = new Set(cd.actionIds);
     const casts = ctx.player.casts
       .filter((c) => ids.has(c.abilityId) && c.timestamp < ctx.endMs)

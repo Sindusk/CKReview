@@ -14,6 +14,13 @@
 // dQ8wmb1VhKt6yBXk pull 11: the modes were 2.50 (tanks, PCT), 2.40
 // (healers), 2.15 (SAM) and 2.10 (VPR) and matched their gear.
 //
+// WoW (DamageGame's optional hooks, lib/damage/wow/game.ts): `fake` casts
+// are skipped; a channel's lock runs to its last tick (channelLocks); the
+// base is the player's most common recast (1.5s hasted, or 1.0s fixed and
+// never scaled); and GCDs inside haste windows (Bloodlust, Power Infusion)
+// get their own factor (speedProfile). With the hooks unset, FFXIV's output
+// is unchanged (checked byte for byte on dQ8wmb1VhKt6yBXk, 2026-10-06).
+//
 // ── Raid downtime ──────────────────────────────────────────────────────
 // Inferred from the log: any stretch of RAID_DOWNTIME_MIN_MS+ in which no
 // player landed a direct hit on an enemy, plus the time before the first
@@ -131,6 +138,7 @@ export function gcdUses(player: PlayerInfo, game: DamageGame): GcdUse[] {
   const used = new Set<PlayerEvent>();
   const out: GcdUse[] = [];
   for (const c of player.casts) {
+    if (c.fake) continue; // made by the log (WoW), not pressed
     const action = game.action(c.abilityId);
     if (!action?.onGcd) continue;
     const b = begins.find((x) => !used.has(x) && x.abilityId === c.abilityId &&
@@ -138,7 +146,40 @@ export function gcdUses(player: PlayerInfo, game: DamageGame): GcdUse[] {
     if (b) used.add(b);
     out.push({ startMs: b?.timestamp ?? c.timestamp, castMs: b?.durationMs ?? 0, action, abilityName: c.abilityName, target: c.target });
   }
-  return out.sort((a, b) => a.startMs - b.startMs);
+  out.sort((a, b) => a.startMs - b.startMs);
+  if (game.isChannel) channelLocks(player, game, out);
+  return out;
+}
+
+/**
+ * A channel logs its cast at the start and nothing at the end (WoW), so its
+ * lock runs to the last tick of the same ability (damage or heal) before the
+ * next GCD starts. Ticks are matched by ability name: they often log under
+ * another id (Arcane Missiles 5143 → 7268, Eye Beam 198013 → 198030, Fists
+ * of Fury 113656 → 117418 on kGVX7tafBT2pM1N3 pull 19). A channel with no
+ * ticks keeps the plain GCD lock.
+ */
+function channelLocks(player: PlayerInfo, game: DamageGame, uses: GcdUse[]): void {
+  const ticks = new Map<string, number[]>();
+  for (const e of [...player.damageDone, ...player.healing]) {
+    if (e.pet) continue;
+    const list = ticks.get(e.abilityName) ?? [];
+    list.push(e.timestamp);
+    ticks.set(e.abilityName, list);
+  }
+  for (const list of ticks.values()) list.sort((a, b) => a - b);
+  for (let i = 0; i < uses.length; i++) {
+    const u = uses[i];
+    if (!game.isChannel!(u.action.id)) continue;
+    const until = uses[i + 1]?.startMs ?? Infinity;
+    let last: number | undefined;
+    for (const t of ticks.get(u.abilityName) ?? []) {
+      if (t <= u.startMs) continue;
+      if (t > until) break;
+      last = t;
+    }
+    if (last !== undefined) u.castMs = Math.max(u.castMs, last - u.startMs);
+  }
 }
 
 // A limit break locks the player out for roughly this long after it goes
@@ -153,19 +194,85 @@ export function limitBreakWindows(uses: GcdUse[]): ForcedWindow[] {
 }
 
 /** Observed GCD ÷ 2.5s, from the most common interval between plain GCDs. */
-export function speedFactor(uses: GcdUse[]): number {
-  const counts = new Map<number, number>();
+export function speedFactor(uses: GcdUse[], game?: DamageGame): number {
+  return speedProfile(uses, game, []).factor;
+}
+
+export type SpeedProfile = {
+  baseRecastMs: number;           // the plain GCD the factor scales (FFXIV 2.5s)
+  factor:       number;           // outside haste windows
+  at(t: number): number;          // the factor for a GCD starting at t
+  hasteFactor?: number;           // inside haste windows, when there are any
+};
+
+// A haste window with too few GCDs to measure falls back to this (Bloodlust's
+// +30%).
+const FALLBACK_HASTE = 1.3;
+
+/**
+ * The player's GCD speed: the most common interval between two plain GCDs
+ * (speed-scaled, recast = the base, not a hard cast longer than it), ÷ the
+ * base. FFXIV's base is 2.5s; a game with `speed` set (WoW) uses the
+ * player's most common speed-scaled recast instead. GCDs starting inside
+ * `hasteWindows` (Bloodlust, Power Infusion) are measured apart, so a
+ * pull's lust doesn't drag the normal factor down or the reverse.
+ */
+export function speedProfile(uses: GcdUse[], game: DamageGame | undefined, hasteWindows: Window[]): SpeedProfile {
+  const minShare = game?.speed?.minIntervalShare ?? 0.6;
+  const minFactor = game?.speed?.minFactor ?? 0.7;
+  let base = 2500, baseScaled = true;
+  if (game?.speed) {
+    // The player's most common GCD recast. When it isn't speed-scaled
+    // (WoW's fixed 1.0s specs), the factor stays 1: a Windwalker's
+    // occasional hasted Vivify mustn't set their GCD.
+    const recasts = new Map<string, { r: number; scaled: boolean; n: number }>();
+    for (const u of uses) {
+      const key = `${u.action.recastMs}|${u.action.speedScaled}`;
+      const x = recasts.get(key) ?? { r: u.action.recastMs, scaled: u.action.speedScaled, n: 0 };
+      x.n++;
+      recasts.set(key, x);
+    }
+    let n = 0;
+    for (const x of recasts.values()) if (x.n > n) { base = x.r; baseScaled = x.scaled; n = x.n; }
+  }
+  if (!baseScaled) return { baseRecastMs: base, factor: 1, at: () => 1 };
+  const counts = [new Map<number, number>(), new Map<number, number>()]; // outside, inside haste
   for (let i = 1; i < uses.length; i++) {
     const prev = uses[i - 1];
-    if (prev.action.recastMs !== 2500 || !prev.action.speedScaled || prev.castMs > 2500) continue;
+    if (prev.action.recastMs !== base || !prev.action.speedScaled || prev.castMs > base) continue;
     const iv = uses[i].startMs - prev.startMs;
-    if (iv < 1500 || iv > 2600) continue;
+    if (iv < base * minShare || iv > base * 1.04) continue;
     const bucket = Math.round(iv / 10) * 10;
-    counts.set(bucket, (counts.get(bucket) ?? 0) + 1);
+    const m = counts[inWindows(prev.startMs, hasteWindows) ? 1 : 0];
+    m.set(bucket, (m.get(bucket) ?? 0) + 1);
   }
-  let best = 2500, bestN = 0;
-  for (const [b, n] of counts) if (n > bestN) { best = b; bestN = n; }
-  return Math.min(1, Math.max(0.7, best / 2500));
+  const mode = (m: Map<number, number>, min: number) => {
+    let best: number | undefined, bestN = 0;
+    for (const [b, n] of m) if (n > bestN) { best = b; bestN = n; }
+    return bestN >= min ? best : undefined;
+  };
+  const clamp = (f: number) => Math.min(1, Math.max(minFactor, f));
+  const factor = clamp((mode(counts[0], 1) ?? base) / base);
+  if (hasteWindows.length === 0) return { baseRecastMs: base, factor, at: () => factor };
+  const inside = mode(counts[1], 5);
+  const hasteFactor = inside !== undefined ? clamp(inside / base) : clamp(factor / FALLBACK_HASTE);
+  return { baseRecastMs: base, factor, hasteFactor, at: (t) => (inWindows(t, hasteWindows) ? hasteFactor : factor) };
+}
+
+/** Windows where any of `statusIds` is on the player (player-buff stream). */
+export function statusWindows(player: PlayerInfo, statusIds: Set<number> | undefined, endMs: number): Window[] {
+  if (!statusIds || statusIds.size === 0) return [];
+  const out: Window[] = [];
+  const open = new Map<number, number>();
+  for (const e of player.buffs ?? []) {
+    if (!statusIds.has(e.abilityId)) continue;
+    if (e.buffStatus === "removed") {
+      const s = open.get(e.abilityId);
+      if (s !== undefined) { out.push({ startMs: s, endMs: e.timestamp }); open.delete(e.abilityId); }
+    } else if (!open.has(e.abilityId)) open.set(e.abilityId, e.timestamp);
+  }
+  for (const s of open.values()) out.push({ startMs: s, endMs });
+  return mergeWindows(out);
 }
 
 /** How long a GCD use blocks the next one. */
@@ -266,7 +373,10 @@ export function playerValues(
     const ph = phaseOf(e.timestamp);
     phaseDmg.set(ph, (phaseDmg.get(ph) ?? 0) + amt);
     perAbility.set(e.abilityId, (perAbility.get(e.abilityId) ?? 0) + amt);
-    if (game.isTickAbility(e.abilityId) || e.isDoT || game.action(e.abilityId)?.onGcd) {
+    const gcdDamage = game.isGcdDamage
+      ? game.isGcdDamage(e)
+      : game.isTickAbility(e.abilityId) || e.isDoT || game.action(e.abilityId)?.onGcd;
+    if (gcdDamage) {
       for (const k of [key(ph, inWindows(e.timestamp, buffWindows)), key(ph, false) + "all", "all"]) {
         gcdDmg.set(k, (gcdDmg.get(k) ?? 0) + amt);
       }

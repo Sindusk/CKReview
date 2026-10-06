@@ -96,7 +96,7 @@ export function windowStats(log: CompareLog, game: DamageGame, startMs: number, 
     const own = dealt - c.received;
     const inWin = (t: number) => t >= startMs && t < endMs;
     return {
-      player: p.name, job: p.className, role: p.role,
+      player: p.name, job: game.jobOf?.(p) ?? p.className, role: p.role,
       dps: dealt / secs,
       ownDps: own / secs,
       givenDps: c.given / secs,

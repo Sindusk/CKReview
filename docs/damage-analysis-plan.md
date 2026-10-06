@@ -780,6 +780,48 @@ against them and refine it later.
   - Mistweaver's observed GCD (740ms, 2 players) is suspect.
   - On-GCD inference needs 5+ casts, so rare abilities are `null`.
 
+**Step 3** (2026-10-06): engine and game layer.
+- **`lib/damage/wow/game.ts`** (`WOW_DAMAGE`), built on `spell-data.ts`.
+  - **Base GCD:** 1.0s fixed for every Rogue, Feral, Brewmaster and
+    Windwalker; 1.5s hasted for everyone else.
+  - **Burst windows:** the lust family plus Power Infusion.
+  - **rDPS split:** only Power Infusion is credited, as +20% haste
+    (estimated). Lust is left out on purpose.
+  - **Taunts:** they label tank-swap gaps.
+  - **Channels:** a hand list of cast IDs.
+  - `tracked-cooldowns.ts` and `specs/index.ts` are empty until the spec
+    batches.
+- **Engine changes**, each an optional `DamageGame` hook; with them unset
+  FFXIV is unchanged. The full `dQ8wmb1VhKt6yBXk` damage-analysis output
+  and a reference-clear comparison are byte-identical before and after.
+  - `jobOf`: findings, spec checks and cooldowns key on "<spec> <class>".
+  - `speed`, `hasteStatusIds`: a speed factor measured separately inside
+    and outside Bloodlust and Power Infusion. The base is the player's most
+    common recast, so fixed-GCD specs stay at 1.0s; a Windwalker's
+    occasional Vivify had set theirs to 0.9s.
+  - `isChannel`: a channel's lock runs to its last tick before the next
+    GCD, matched by ability name, because ticks often log under another
+    ID (Arcane Missiles 5143 → 7268, Eye Beam → 198030, Fists of Fury →
+    117418). It cut one Arcane Mage's GCD-gap loss from 8.2M to 2.7M.
+  - `isGcdDamage`: a gap is priced at the player's own on-GCD abilities
+    (hits and the DoT ticks that share their ID), not pets or procs.
+  - `fake` casts are skipped. Buff-window "fit" counts at the window's own
+    speed. `PartyBuff.haste` exists for Power Infusion.
+- **Runner:**
+  `node scripts/validate.js damage-analysis-wow sampledata/wow/<code> [--pulls=1,3] [--boss=<name>]`.
+  It runs only when named (`namedOnly`), since WoW pulls are big.
+- **First look** (Vashnik kill `kGVX7tafBT2pM1N3` pull 19, Ula'tek kill
+  `JZp82Rm7TzycM94a` pull 25), no boss context yet:
+  - Observed GCDs read right: 0.9–1.4s hasted, 1.0s fixed.
+  - Tank gaps near Dark Command are labelled as tank swaps.
+  - Losses are mostly GCD gaps and small delays. Many big gaps are
+    movement (Glide, Shadowstep, Roll), which only a boss context can
+    excuse (step 4). WoW raids are rarely fully untargetable, so the
+    log-inferred downtime rarely fires.
+  - A gap inside lust can be priced high when lust lines up with an AoE
+    window: the Ula'tek Rogue's GCDs averaged 1.63M there against 226k
+    elsewhere.
+
 ## UI: the Damage dialog
 
 - **Header button** "Damage", directly left of "Mitigation".

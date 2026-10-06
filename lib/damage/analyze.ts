@@ -25,7 +25,7 @@ import {
 } from "./checks";
 import {
   deadWindows, gcdKinds, gcdUses, inWindows, limitBreakWindows, playerValues, raidBuffWindows, raidDowntime,
-  speedFactor, wipeCollapseMs, type Window,
+  speedProfile, statusWindows, wipeCollapseMs, type Window,
 } from "./timeline";
 import { buildBuffLedger, checkBuffCoverage } from "./buffs";
 
@@ -80,12 +80,15 @@ export function analyzePullDamage(pull: Pull, game: DamageGame, context?: Damage
       ...contextForced.filter((w) => !w.players || w.players.includes(player.name)),
       ...phaseForced,
     ];
-    const factor = speedFactor(uses);
+    const speed = speedProfile(uses, game, statusWindows(player, game.hasteStatusIds, endMs));
+    const factor = speed.factor;
+    const job = game.jobOf?.(player) ?? player.className;
     const buffWindows = raidBuffWindows(player, pull, game, endMs);
     const values = playerValues(player, game, uses, buffWindows, dead, phaseOf, phaseBounds, endMs);
 
     const ctx: PlayerCheckContext = {
-      pull, player, game, context, endMs, uses, factor, baseGcdMs: 2500 * factor,
+      pull, player, game, context, endMs, uses, job, factor, factorAt: speed.at,
+      baseGcdMs: speed.baseRecastMs * factor,
       forced, dead, buffWindows, values, phaseOf, phaseName, mechanicAround,
       decidingPhaseStart: decidingSegment?.startMs,
       ledger,
@@ -101,16 +104,18 @@ export function analyzePullDamage(pull: Pull, game: DamageGame, context?: Damage
       ...checkDisengages(ctx),
       ...checkPositionals(ctx),
       ...checkBuffCoverage(ctx),
-      ...game.jobChecks(player.className).flatMap((check) => check(ctx)),
+      ...game.jobChecks(job).flatMap((check) => check(ctx)),
     ].sort((a, b) => Number(a.forced) - Number(b.forced) || b.lostDamage - a.lostDamage);
 
     const kinds = gcdKinds(player, pull, uses);
     const gcdSplit = { heal: 0, damage: 0, other: 0 };
     for (const u of uses) if (u.startMs < endMs) gcdSplit[kinds.get(u.action.id) ?? "other"]++;
     const used = uses.filter((u) => u.startMs < endMs && inWindows(u.startMs, buffWindows)).length;
-    const fit = buffWindows.reduce((n, w) => n + Math.floor((Math.min(w.endMs, endMs) - w.startMs) / ctx.baseGcdMs), 0);
+    // At the speed the player had in the window (haste windows are faster).
+    const fit = buffWindows.reduce((n, w) =>
+      n + Math.floor((Math.min(w.endMs, endMs) - w.startMs) / (speed.baseRecastMs * speed.at(w.startMs))), 0);
     players.push({
-      player: player.name, job: player.className, role: player.role,
+      player: player.name, job, role: player.role,
       damage: values.total,
       lostDamage: findings.filter((f) => !f.forced).reduce((a, f) => a + f.lostDamage, 0),
       forcedDamage: findings.filter((f) => f.forced).reduce((a, f) => a + f.lostDamage, 0),
@@ -178,12 +183,13 @@ function missingData(pull: Pull): string[] {
       players.some((p) => (p.beginCasts ?? []).some((b) => b.durationMs === undefined))) {
     out.push("cast times (begin-casts)");
   }
+  const wow = pull.game === "wow";
   if (players.some((p) => p.damageDone.length > 0 && p.damageDone.every((e) => e.hitType === undefined))) {
-    out.push("crit / direct-hit detail");
+    out.push(wow ? "crit detail" : "crit / direct-hit detail");
   }
   if (players.some((p) => p.damageDone.length > 0 && p.damageDone.every((e) => e.statusIds === undefined))) {
-    out.push("damage buff snapshots (penalty debuffs can't be measured)");
+    out.push(wow ? "aura snapshots on hits" : "damage buff snapshots (penalty debuffs can't be measured)");
   }
-  if (pull.bossDebuffs === undefined) out.push("boss debuffs (Chain Stratagem windows)");
+  if (pull.bossDebuffs === undefined) out.push(wow ? "boss debuffs (DoTs)" : "boss debuffs (Chain Stratagem windows)");
   return out;
 }

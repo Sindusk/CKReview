@@ -2,11 +2,13 @@
 //
 // Game-neutral shapes for the damage analysis
 // (docs/damage-analysis-plan.md). A game supplies a DamageGame
-// (lib/damage/ffxiv/game.ts); a boss may supply a DamageContext; the
+// (lib/damage/ffxiv/game.ts, lib/damage/wow/game.ts); a boss may supply a
+// DamageContext; the
 // engine (lib/damage/analyze.ts) does the rest. Nothing here is a
 // PullError: findings only feed the Damage dialog.
 
 import type { Pull } from "@/types/Pull";
+import type { PlayerEvent, PlayerInfo } from "@/types/PlayerInfo";
 import type { PlayerCheckContext } from "./checks";
 
 // ── Game layer ─────────────────────────────────────────────────────────
@@ -59,6 +61,28 @@ export type DamageGame = {
   disengageActionIds: Set<number>;
   // Job-specific checks (Layer 3), by job display name.
   jobChecks(job: string): JobCheck[];
+
+  // ── Optional, for games unlike FFXIV (WoW, lib/damage/wow/game.ts) ──
+  // Unset, each behaves as FFXIV always has.
+  // The key jobChecks/trackedCooldowns and findings use (default:
+  // className). WoW keys by spec ("Fire Mage"): the class alone doesn't
+  // say what the player plays.
+  jobOf?(player: PlayerInfo): string;
+  // The observed-GCD measurement (timeline.ts speedFactor): intervals count
+  // from minIntervalShare × the recast, and the factor is clamped at
+  // minFactor (default 0.6 and 0.7; WoW's haste goes further).
+  speed?: { minIntervalShare: number; minFactor: number };
+  // Statuses that speed up GCDs for their duration (Bloodlust, Power
+  // Infusion): GCDs under them get their own speed factor.
+  hasteStatusIds?: Set<number>;
+  // Channelled GCDs: they log no end, so their lock runs to their last
+  // tick before the next GCD (timeline.ts gcdUses).
+  isChannel?(actionId: number): boolean;
+  // Which damage events make up the player's average GCD value (the price
+  // of a GCD gap). Default: on-GCD actions' hits plus every DoT tick.
+  // WoW: only the player's own on-GCD abilities (hits and their DoT ticks);
+  // procs, trinkets and pets keep going during a gap.
+  isGcdDamage?(e: PlayerEvent): boolean;
 };
 
 export type JobCheck = (ctx: PlayerCheckContext) => DamageFinding[];
@@ -68,6 +92,9 @@ export type PartyBuff = {
   damage?:    number;     // +5% = 0.05
   crit?:      number;     // crit rate, +10% = 0.10
   directHit?: number;     // direct-hit rate
+  // Haste (WoW Power Infusion): more casts, not bigger hits. Its share of a
+  // hit is estimated as haste ÷ (1 + haste), and marked approximate.
+  haste?:     number;
   // Role-dependent % (Astrologian cards): melee/tanks vs ranged/healers.
   damageByRange?: { melee: number; ranged: number };
   partyWide:  boolean;

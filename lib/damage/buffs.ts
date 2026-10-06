@@ -95,8 +95,10 @@ export function buildBuffLedger(pull: Pull, game: DamageGame, endMs: number, fro
     }
     if (b.crit) share += (b.crit * (CRIT_M - 1)) / (1 + (CRIT_P + b.crit) * (CRIT_M - 1));
     if (b.directHit) share += (b.directHit * (DH_M - 1)) / (1 + (DH_P + b.directHit) * (DH_M - 1));
+    if (b.haste) share += b.haste / (1 + b.haste);
     return share;
   };
+  const isApprox = (b: PartyBuff) => b.crit !== undefined || b.directHit !== undefined || b.haste !== undefined;
 
   // Sources: applications on each player, and boss debuffs.
   const applied = new Map<string, Map<number, { t: number; source: string }[]>>();
@@ -141,7 +143,7 @@ export function buildBuffLedger(pull: Pull, game: DamageGame, endMs: number, fro
         const src = sourceAt(mine.get(id) ?? bossApplied.get(id), e.timestamp);
         if (!src || src === p.name || !contributions.has(src)) continue;
         const add = (e.amount ?? 0) * shareOf(id, b, p);
-        const approx = b.crit !== undefined || b.directHit !== undefined;
+        const approx = isApprox(b);
         const giver = entry(src), taker = entry(p.name);
         giver.given += add; taker.received += add;
         if (approx) { giver.approximate = true; taker.approximate = true; }
@@ -172,7 +174,7 @@ export function buildBuffLedger(pull: Pull, game: DamageGame, endMs: number, fro
   const dead = new Map(players.map((p) => [p.name, deadWindows(p, pull, endMs)]));
   return {
     share: (statusId, recipient) => { const b = game.partyBuff(statusId); return b ? shareOf(statusId, b, recipient) : 0; },
-    approximate: (statusId) => { const b = game.partyBuff(statusId); return !!b && (b.crit !== undefined || b.directHit !== undefined); },
+    approximate: (statusId) => { const b = game.partyBuff(statusId); return !!b && isApprox(b); },
     contributions, casts, dead,
   };
 }
