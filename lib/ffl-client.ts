@@ -197,6 +197,11 @@ export type FFLGameAbility = {
   gameID: number;
   name:   string;
   icon?:  string;
+  // Damage type as a numeric string: "128" physical, "1024" magical, "32"
+  // unaspected (% mitigation doesn't apply). Read by the mitigation
+  // analysis (lib/mitigation/). Absent in reports fetched before the field
+  // was requested.
+  type?:  string;
 };
 
 // FFLogs death events — the killing ability is carried on the event itself.
@@ -306,13 +311,31 @@ export type FFLDamageEvent = {
   // Kept as a fallback only — rarely populated on FFLogs "damage" events.
   hitPoints?:    number;
   maxHitPoints?: number;
+  // Mitigation breakdown (docs/mitigation-redesign.md, "Data check
+  // findings"). amount + absorbed + mitigated = unmitigatedAmount.
+  // `multiplier` is the product of every % modifier on the hit, rounded to
+  // 2 decimals; it includes vulnerability-up and excludes block. All four
+  // are absent on 0-amount hits (full absorbs, invulnerable, unpaired).
+  unmitigatedAmount?: number;
+  multiplier?:   number;
+  absorbed?:     number;
+  mitigated?:    number;
+  blocked?:      number;
+  hitType?:      number;
 };
 
 export type FFLHealEvent = {
   timestamp:     number;
-  type:          "heal";
+  // The healing stream also carries shield absorbs ("absorbed", one per
+  // shield on the target per hit, 0-amount when that shield took nothing),
+  // the shield's "removebuff", and "calculatedheal" previews.
+  type:          "heal" | "calculatedheal" | "absorbed" | "removebuff";
   sourceID:      number;
   targetID:      number;
+  // "absorbed" only: the actor whose hit was absorbed, and that hit's
+  // ability.
+  attackerID?:   number;
+  extraAbilityGameID?: number;
   abilityGameID: number;
   ability?: {
     name:        string;
@@ -463,6 +486,7 @@ const REPORT_QUERY = /* graphql */`
             gameID
             name
             icon
+            type
           }
         }
       }

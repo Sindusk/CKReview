@@ -49,6 +49,23 @@ export type PlayerEvent = {
   // existed (older cached sample data).
   activeBuffNames?: string[];
 
+  // Damage Taken — FFXIV only. The raw status IDs behind activeBuffNames,
+  // in log order. A snapshot from when the hit was calculated: it includes
+  // debuffs on the attacking boss (Reprisal, Feint, Addle) and shields, and
+  // can still list a status removed up to ~1s before the hit landed. The
+  // fields below it are FFLogs' own mitigation breakdown (see
+  // FFLDamageEvent): absent on 0-amount hits and on pulls fetched before
+  // they were kept. `damageType` is the ability's FFLogs type (128
+  // physical, 1024 magical, 32 unaspected). Read by lib/mitigation/.
+  statusIds?:         number[];
+  unmitigatedAmount?: number;
+  multiplier?:        number;
+  absorbed?:          number;
+  mitigated?:         number;
+  blocked?:           number;
+  hitType?:           number;
+  damageType?:        number;
+
   // Debuffs — carries which side of the on/off transition this event
   // represents, so error-detection.ts can reconstruct uptime windows
   // ("was this debuff active on the player at time T?").
@@ -104,4 +121,20 @@ export type PlayerInfo = {
   // See lib/mechanics/player-position.ts's `healingReceived` option. Empty
   // for WoW (WCLHealEvent carries no position at all).
   healingReceived: PlayerEvent[];
+
+  // FFXIV only: every shield absorb on this player, one per shield per hit
+  // (0-amount when that shield took nothing). These events also sit in
+  // `healingReceived` untyped; this list keeps who cast the shield and
+  // which hit it absorbed. Undefined for WoW and for pulls fetched before
+  // it existed.
+  shieldAbsorbs?: ShieldAbsorb[];
+};
+
+export type ShieldAbsorb = {
+  timestamp:        number;  // ms into the pull; equals the absorbed hit's
+  statusId:         number;  // the shield's status
+  statusName:       string;
+  caster?:          string;  // who cast the shield
+  amount:           number;
+  hitAbilityId?:    number;  // the boss ability that was absorbed
 };

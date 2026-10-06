@@ -24,7 +24,7 @@
 
 import type { Pull, BlackHoleGeometry } from "@/types/Pull";
 import type { DeathEvent } from "@/types/DeathEvent";
-import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
+import type { PlayerInfo, PlayerEvent, ShieldAbsorb } from "@/types/PlayerInfo";
 import type { EnemyEvent } from "@/types/PullError";
 import type {
   WCLFightData,
@@ -72,7 +72,8 @@ import { computeMechanicOccurrences } from "./mechanics/occurrences";
 // getWCLAbilityIconUrl/getFFAbilityIconUrl at the point of use, since the
 // same raw filename format could theoretically differ in meaning between
 // the two APIs).
-type AbilityInfo = { name: string; icon?: string };
+// `type` is FFLogs' damage type (FFXIV only; see FFLGameAbility.type).
+type AbilityInfo = { name: string; icon?: string; type?: number };
 
 // ─────────────────────────────────────────────────────────────────────────
 // ═══ WarcraftLogs (WoW) ═════════════════════════════════════════════════
@@ -615,7 +616,10 @@ export function transformReportToPulls(
 // ─────────────────────────────────────────────────────────────────────────
 
 export function buildFFLAbilityMap(abilities: FFLGameAbility[]): Map<number, AbilityInfo> {
-  return new Map(abilities.map((a) => [a.gameID, { name: a.name, icon: a.icon }]));
+  return new Map(abilities.map((a) => [
+    a.gameID,
+    { name: a.name, icon: a.icon, type: a.type !== undefined ? Number(a.type) : undefined },
+  ]));
 }
 
 export type FFLDisplayCastEvent = {
@@ -825,7 +829,40 @@ function fflDamageTakenToPlayerEvent(
     overkill:     event.overkill,
     isDoT:        event.tick === true,   // ← added
     activeBuffNames: fflDecodeActiveBuffNames(event.buffs, abilityMap),
+    statusIds:         fflDecodeStatusIds(event.buffs),
+    unmitigatedAmount: event.unmitigatedAmount,
+    multiplier:        event.multiplier,
+    absorbed:          event.absorbed,
+    mitigated:         event.mitigated,
+    blocked:           event.blocked,
+    hitType:           event.hitType,
+    damageType:        abilityMap.get(event.abilityGameID)?.type,
   };
+}
+
+function fflDecodeStatusIds(buffs: string | undefined): number[] | undefined {
+  if (!buffs) return undefined;
+  const ids = buffs.split(".").filter(Boolean).map(Number).filter((n) => Number.isFinite(n));
+  return ids.length > 0 ? ids : undefined;
+}
+
+function fflShieldAbsorbs(
+  healingEvents: FFLHealEvent[],
+  actorId:       number,
+  actorMap:      Map<number, FFLActor>,
+  abilityMap:    Map<number, AbilityInfo>,
+  fightStart:    number
+): ShieldAbsorb[] {
+  return healingEvents
+    .filter((e) => e.type === "absorbed" && e.targetID === actorId)
+    .map((e) => ({
+      timestamp:    Math.max(0, e.timestamp - fightStart),
+      statusId:     e.abilityGameID,
+      statusName:   fflAbilityName(e, abilityMap),
+      caster:       actorMap.get(e.sourceID)?.name,
+      amount:       e.amount ?? 0,
+      hitAbilityId: e.extraAbilityGameID,
+    }));
 }
 
 function fflHealToPlayerEvent(
@@ -1173,6 +1210,8 @@ function buildFFPlayers(
         healingReceived: healingEvents
           .filter((e) => e.targetID === actorId)
           .map((e) => fflHealReceivedToPlayerEvent(e, actorMap, abilityMap, fightStart)),
+
+        shieldAbsorbs: fflShieldAbsorbs(healingEvents, actorId, actorMap, abilityMap, fightStart),
 
         debuffs: debuffEvents
           .filter((e) => e.targetID === actorId)

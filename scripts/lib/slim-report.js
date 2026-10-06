@@ -93,20 +93,25 @@ const FFL_PROJECTORS = {
   // landed, rather than only checking whether the ability was cast at some
   // point in a lookback window (confirmed against report rXBbzFV49hd1QPwf
   // pull 4 — the live API's raw damage event carries buffs/overkill/
-  // unmitigatedAmount/mitigated/absorbed/multiplier; only `buffs` and
-  // `overkill` are consumed anywhere in lib/ right now, so those two are
-  // kept and the rest of the ~20-field bloat (hitType, packetID, blocked,
-  // sourceResources, targetMarker, ...) stays dropped).
+  // unmitigatedAmount/mitigated/absorbed/multiplier; for outgoing damage
+  // only `buffs` and `overkill` are consumed, so those two are kept and the
+  // rest (packetID, sourceResources, targetMarker, ...) stays dropped —
+  // damageTaken below also keeps the mitigation breakdown).
   damageDone: (e) => ({
     ...pick(e, ['timestamp', 'type', 'sourceID', 'targetID', 'sourceInstance', 'targetInstance', 'abilityGameID', 'amount', 'overkill', 'buffs', 'unpaired']),
     targetResources: pickNested(e, 'targetResources', FF_RESOURCE_SUBKEYS),
   }),
+  // The mitigation breakdown fields (unmitigatedAmount ... hitType) are read
+  // by lib/mitigation/; see docs/mitigation-redesign.md "Data check findings".
   damageTaken: (e) => ({
-    ...pick(e, ['timestamp', 'type', 'sourceID', 'targetID', 'sourceInstance', 'targetInstance', 'abilityGameID', 'amount', 'overkill', 'buffs', 'unpaired']),
+    ...pick(e, ['timestamp', 'type', 'sourceID', 'targetID', 'sourceInstance', 'targetInstance', 'abilityGameID', 'amount', 'overkill', 'buffs', 'unpaired',
+      'unmitigatedAmount', 'multiplier', 'absorbed', 'mitigated', 'blocked', 'hitType']),
     targetResources: pickNested(e, 'targetResources', FF_RESOURCE_SUBKEYS),
   }),
+  // attackerID / extraAbilityGameID only exist on shield "absorbed" events.
   healing: (e) => ({
-    ...pick(e, ['timestamp', 'type', 'sourceID', 'targetID', 'sourceInstance', 'abilityGameID', 'amount', 'overheal', 'unpaired']),
+    ...pick(e, ['timestamp', 'type', 'sourceID', 'targetID', 'sourceInstance', 'abilityGameID', 'amount', 'overheal', 'unpaired',
+      'attackerID', 'extraAbilityGameID']),
     targetResources: pickNested(e, 'targetResources', FF_RESOURCE_SUBKEYS),
   }),
   debuffs:    (e) => omit(e, ['fight', 'packetID']),
