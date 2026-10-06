@@ -877,6 +877,45 @@ where.
   link; FFXIV keeps its xivanalysis credit.
 - **Compare with clears** says it isn't built for WoW yet (step 7).
 
+**Step 6, tank batch** (2026-10-06). There's no WoW static, so the batches
+go by role in the FFXIV order, the specs with the most sample players first.
+- **Rules:** which windows and resources matter was informed by
+  WoWAnalyzer (read, not copied). Every ID and number is from our own logs.
+- **Helpers** (`lib/damage/wow/specs/shared.ts`, beside FFXIV's
+  game-neutral ones):
+  - **Burst-window GCD count:** GCDs that fit, at the player's speed in
+    the window, less one. Each GCD short is valued at only the window's
+    bonus, since the gap is already its own finding.
+  - **DoT uptime:** valued at the DoT's own damage per second of uptime;
+    WoW ticks are hasted, so there's no fixed 3s tick.
+  - **Resource cap:** a cast that doesn't spend the resource, made at its
+    max. Each ability's gain is measured from consecutive casts, and the
+    loss is valued at the spenders' damage per unit.
+  - **Observed window bonus:** median unmitigatedAmount inside the window
+    vs outside, capped at 30%. Uncapped, Sentinel read +118%, since
+    trinkets and lust line up with it.
+- **Blood Death Knight** (15 sample players):
+  - Dancing Rune Weapon GCDs, valued at the Rune Weapon's measured share
+    (12–48% per window).
+  - Blood Plague uptime.
+  - Runic Power at the cap: it's logged on every cast, builders included.
+    One DK wasted ~405 Runic Power on the Vashnik kill, ~1.2M at Death
+    Strike's damage per point.
+  - Tracked cooldowns: Dancing Rune Weapon 90s, Raise Dead 120s.
+- **Protection Paladin** (8): Sentinel GCDs (bonus observed, inference);
+  Sentinel and Divine Toll 60s. Holy Power is logged only on spenders,
+  so overcap isn't judged.
+- **Brewmaster Monk, Vengeance Demon Hunter** (2 and 1 players,
+  unverified):
+  - Tracked cooldowns only: Exploding Keg 60s; Sigil of Spite 63s and
+    Sigil of Flame 31s.
+  - Brewmaster's energy is at 100 on 39 of 183 casts, but time at the cap
+    isn't in the log.
+- **Guardian Druid, Protection Warrior:** not in any sample, so nothing yet.
+- **Cooldown recasts** are the shortest interval measured between one
+  player's casts. That's an upper bound on the real recast, so drift errs
+  lenient.
+
 ## UI: the Damage dialog
 
 - **Header button** "Damage", directly left of "Mitigation".
