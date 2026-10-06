@@ -30,7 +30,10 @@
 //   --fight <id>     Restrict to this WCL fight id — repeatable
 //   --boss <name>    Restrict to fights whose name contains this (case-insensitive)
 //   --creds <path>   Credentials file (default: .credentials/wcl-token.json)
-//   --refetch        Download pulls again even if their file already exists
+//   --refetch        Download again the pulls whose file already exists. Pulls
+//                    not on disk are skipped (a report can hold dozens of other
+//                    fights — dungeons, other bosses — that would burn API
+//                    points); name them with --fight to add them.
 //
 // Kills are downloaded first, pulls already on disk are skipped, and a rate
 // limit is waited out rather than ending the run — see scripts/lib/fetch-plan.js.
@@ -140,6 +143,7 @@ async function main() {
       console.log(`Skipping ${label}${fight.kill ? ' (kill)' : ''}: ${fileName} already exists`);
       continue;
     }
+    if (refetch && !fs.existsSync(filePath) && !fights.includes(fight.id)) continue; // --refetch: only pulls already on disk
     process.stdout.write(`Fetching ${label}${fight.kill ? ' (kill)' : ''}... `);
 
     const { data, interrupts } = await withRateLimitWait(async () => {

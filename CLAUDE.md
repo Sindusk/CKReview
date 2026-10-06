@@ -109,6 +109,11 @@ These are standing preferences, each learned from a real correction:
 - **"Check if X exists" should be metadata-only.** Never fetch a full
   payload just to decide whether to prompt; a 277MB report once stalled the
   UI for 10s that way.
+- **Fetch only the pulls the task uses, and don't block on fetches.**
+  Sample reports often hold many unrelated fights (dungeons, other
+  bosses). Name pulls with `--fight` rather than refetching whole reports,
+  and keep working from the data on hand rather than waiting for a long
+  download (user, 2026-10-06).
 
 ## Quick facts
 

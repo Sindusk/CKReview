@@ -17,7 +17,11 @@ validation harness (`scripts/validate.js`, `expectations/`), see
     per-boss pull number (a last-pull kill is still `<Boss>_Pull25.json`).
   - Pulls already on disk are skipped, so re-running the same command
     resumes it. Files are written to `.tmp` and renamed, so an existing
-    file is complete. `--refetch` downloads them again.
+    file is complete. `--refetch` downloads them again, and only them:
+    fights not already on disk are skipped unless named with `--fight`.
+    A report can hold dozens of other fights (dungeons, other bosses), and
+    an earlier `--refetch` that fetched them all burned points and added
+    pulls with no baselines.
   - On a WCL/FFLogs rate limit (including the ~1h IP-level block big
     reports hit after ~850MB) the script prints the reset time, sleeps
     until then plus a minute, and retries the same pull. It gives up after
@@ -141,10 +145,6 @@ It loads pulls lazily and keeps three in memory, so narrowing with
 - **WoW samples need a capture fetched after 2026-10-06** for the damage
   fields (aura snapshot, hit type, resources, pets, player buffs, enemy
   debuffs). Older captures load with those fields undefined.
-- **`--refetch` downloads every fight in the report,** not only the pulls
-  already on disk. Pulls new to the folder have no baseline, so
-  `validate.js --check` fails on them with additions only. Delete them, or
-  narrow the refetch with `--boss`.
 - **The harness ignores the two damage streams for timing.**
   `build-wow-players.js` (pull start) and `validate.js`
   (`fightDurationMs`) leave out `playerBuffs` and `enemyDebuffs` on WoW.

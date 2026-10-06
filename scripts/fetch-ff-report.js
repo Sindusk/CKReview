@@ -22,7 +22,8 @@
 //   --from-minutes <n> Start the bulky event streams n minutes into each fight.
 //                      deaths/combatantInfo stay whole, so offsets still hold.
 //                      Saves API points when only a late phase matters.
-//   --refetch        Download pulls again even if their file already exists
+//   --refetch        Download again the pulls whose file already exists. Pulls
+//                    not on disk are skipped; name them with --fight to add them.
 //
 // Kills are downloaded first, pulls already on disk are skipped, and a rate
 // limit is waited out rather than ending the run — see scripts/lib/fetch-plan.js.
@@ -123,6 +124,7 @@ async function main() {
       console.log(`Skipping ${label}${fight.kill ? ' (kill)' : ''}: ${fileName} already exists`);
       continue;
     }
+    if (refetch && !fs.existsSync(filePath) && !fights.includes(fight.id)) continue; // --refetch: only pulls already on disk
     process.stdout.write(`Fetching ${label}${fight.kill ? ' (kill)' : ''}... `);
 
     const { data, interrupts } = await withRateLimitWait(async () => {
