@@ -483,6 +483,32 @@ is complete:
   duration gives casters their real cast locks. Slidecast timing isn't
   observable (no movement data), so it isn't judged.
 
+**Reference-clear comparison** (step 7, 2026-10-06):
+- **`lib/damage/compare.ts`.** Equal windows from the start of the
+  deciding phase. Each own pull is measured over its own length (capped
+  at the shortest reference phase) against the clears over that same
+  length; several own pulls combine by median. Per player: rDPS = own +
+  given (the buff ledger restricted to the window), GCDs and heal GCDs per
+  minute, deaths, and the analysis's estimated loss in the window, each
+  against the median of the clears' players of the same job. Role rows sum
+  tanks (2), healers (2) and DPS (4) per log.
+- **Dialog:** a "Compare with clears" tab (`components/DamageCompare.tsx`).
+  Paste an FFLogs URL with `?fight=` and press Fetch clear
+  (`lib/damage/reference-clears.ts`). It loads local sample data if
+  present, else one fight from FFLogs. Kills of the same fight only.
+  Clears stay loaded while the app is open.
+- **Runner:** `node scripts/validate.js damage-compare sampledata/ff/<own>
+  --refs=<code>,<code>`.
+- **First run:** the user picked six clears (2 with GNB + DRK, 2 with AST
+  + SCH, one PCT, one DNC): `tjwXMZ76G8TJWDPv`, `y6Hmp1W2KLXYnTq7`,
+  `bfjJWH9hGKgMtnvk`, `WmpQRyZ62LzdvM3x`, `6GbNrpW137ncCVZ2`,
+  `LpaxT1wMF39JWzjG`. Against them, `dQ8wmb1VhKt6yBXk`'s three P5 pulls
+  reproduce the first study's manual result:
+  - healers −22% rDPS (AST −16%, SCH −24%), with the AST at 7.5 heal GCDs
+    per minute against the clears' 5.4
+  - tanks −3%
+  - DPS +2%
+
 Open:
 - **Per-player busy windows** (tower soaks, debuff carriers, baits) aren't
   in the Dancing Mad context yet. Gaps during a mechanic are labelled
@@ -536,7 +562,7 @@ job module a `validate.js` runner so baselines catch regressions.
 6. **Tank batch**, user review, then Healer, Melee, Ranged, Caster.
    Done 2026-10-06 for every combat job. The user will refine each job
    with its players over time (see "Build status").
-7. **Reference-clear comparison.**
+7. **Reference-clear comparison.** Done 2026-10-06.
 8. **Later:** automatic search for comparable clears; the WoW port.
 
 Verify each step the usual way: `node scripts/validate.js --check` and

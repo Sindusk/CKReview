@@ -122,6 +122,7 @@ export function analyzePullDamage(pull: Pull, game: DamageGame, context?: Damage
       findings,
       timeline: {
         gcdStarts: uses.filter((u) => u.startMs < endMs).map((u) => u.startMs),
+        healGcdStarts: uses.filter((u) => u.startMs < endMs && kinds.get(u.action.id) === "heal").map((u) => u.startMs),
         buffWindows,
         forced: forced.filter((w) => w.startMs < endMs),
       },

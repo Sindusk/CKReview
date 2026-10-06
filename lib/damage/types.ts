@@ -182,6 +182,7 @@ export type PlayerDamageSummary = {
   // For the dialog's timeline strip.
   timeline: {
     gcdStarts:   number[];
+    healGcdStarts: number[];
     buffWindows: { startMs: number; endMs: number }[];
     forced:      ForcedWindow[];
   };

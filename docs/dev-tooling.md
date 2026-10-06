@@ -110,6 +110,10 @@ It loads pulls lazily and keeps three in memory, so narrowing with
   top findings. Add `--all-findings` for every finding and its basis.
   Print-only. It needs a capture fetched after 2026-10-06 (player buffs,
   begin-cast durations, damage detail); `dQ8wmb1VhKt6yBXk` has them.
+- **Reference clears.** `node scripts/validate.js damage-compare
+  sampledata/ff/<own> --refs=<code>,<code>` compares the folder's pulls
+  with clear folders over equal windows. Fetch a clear's one kill with
+  `node scripts/fetch-ff-report.js <code> --fight <id>`.
 - **xivanalysis data.** `lib/damage/ffxiv/xiva-data.ts` is generated.
   Refresh it with
   `git clone --depth 1 https://github.com/xivanalysis/xivanalysis.git <new-empty-dir>`

@@ -52,7 +52,12 @@ export type BuffLedger = {
 
 const rangeOf = (p: PlayerInfo) => (p.role === "Tank" || p.rangeType === "Melee" ? "melee" : "ranged");
 
-export function buildBuffLedger(pull: Pull, game: DamageGame, endMs: number): BuffLedger {
+/**
+ * `fromMs` limits the given/received totals to hits from then on (the
+ * reference-clear comparison's equal window); buff factors are still
+ * measured over the whole pull.
+ */
+export function buildBuffLedger(pull: Pull, game: DamageGame, endMs: number, fromMs = 0): BuffLedger {
   const players = pull.players;
 
   // Measured damage factors.
@@ -128,7 +133,7 @@ export function buildBuffLedger(pull: Pull, game: DamageGame, endMs: number): Bu
   for (const p of players) {
     const mine = applied.get(p.name)!;
     for (const e of p.damageDone) {
-      if (!e.statusIds || e.timestamp >= endMs) continue;
+      if (!e.statusIds || e.timestamp >= endMs || e.timestamp < fromMs) continue;
       // A dance partner's hits list Devilment's status id twice.
       for (const id of new Set(e.statusIds)) {
         const b = game.partyBuff(id);

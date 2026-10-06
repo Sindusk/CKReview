@@ -572,6 +572,56 @@ MECHANICS['damage-analysis'] = {
   },
 };
 
+// Print-only: the reference-clear comparison (lib/damage/compare.ts) of
+// every pull in the folder that reached the deciding phase, against the
+// clears named with --refs=<code>[,<code>...] (sample folders under
+// sampledata/ff/). Equal windows from the start of that phase.
+MECHANICS['damage-compare'] = {
+  game: 'ff',
+  load: () => ({
+    store: requireTsFromRoot('lib/sample-report-store.ts'),
+    lt: requireTsFromRoot('lib/log-transforms.ts', { './log-auth': {} }),
+    ...requireTsFromRoot('lib/damage/analyze.ts'),
+    ...requireTsFromRoot('lib/damage/compare.ts'),
+    ...requireTsFromRoot('lib/damage/contexts.ts'),
+    ...requireTsFromRoot('lib/damage/ffxiv/game.ts'),
+  }),
+  async run({ mod, dir }) {
+    const refArg = process.argv.find((a) => a.startsWith('--refs='))?.slice('--refs='.length);
+    if (!refArg) { console.log('  (needs --refs=<code>[,<code>...])'); return; }
+    const toLogs = async (pulls, label) => pulls.map((pull) => ({
+      pull, analysis: mod.analyzePullDamage(pull, mod.FFXIV_DAMAGE, mod.getDamageContext(pull.name)),
+      label: `${label} #${pull.fightId}`,
+    }));
+    const refs = [];
+    for (const code of refArg.split(',')) {
+      const pulls = await loadThroughRealPipeline(mod, path.join(path.dirname(dir), code));
+      refs.push(...(await toLogs((pulls ?? []).filter((p) => p.result === 'Kill'), code)));
+    }
+    const own = await toLogs(await loadThroughRealPipeline(mod, dir) ?? [], path.basename(dir));
+    const ctx = mod.getDamageContext(own[0]?.pull.name ?? '');
+    const k = (n) => (Number.isFinite(n) ? `${(n / 1000).toFixed(1)}k` : '-');
+    const pct = (a, b) => (Number.isFinite(b) && b > 0 ? `${a >= b ? '+' : ''}${(((a - b) / b) * 100).toFixed(0)}%` : '');
+    const show = (title, logs) => {
+      const r = mod.compareWithReferences(logs, refs, mod.FFXIV_DAMAGE, ctx);
+      console.log('='.repeat(70));
+      if (r.error) { console.log(`${title}: ${r.error}`); return; }
+      console.log(`${title}: ${r.phaseName}, first ${(r.windowMs / 1000).toFixed(0)}s, ${r.ownPulls} own pull(s) vs ${r.refs.length} clears`);
+      console.log(`  raid DPS ${k(r.raid.dps)} vs ${k(r.raid.refDps)} ${pct(r.raid.dps, r.raid.refDps)}`);
+      for (const ro of r.roles) console.log(`  ${ro.role.padEnd(7)} rDPS ${k(ro.rdps)} vs ${k(ro.refRdps)} ${pct(ro.rdps, ro.refRdps)}`);
+      for (const p of r.rows) {
+        console.log(`  ${p.job.padEnd(12)} ${p.player.padEnd(18)} rDPS ${k(p.rdps)} vs ${k(p.ref?.rdps)} ${pct(p.rdps, p.ref?.rdps)} (n=${p.refCount})` +
+          ` own ${k(p.ownDps)}/${k(p.ref?.ownDps)} given ${k(p.givenDps)}/${k(p.ref?.givenDps)}` +
+          ` GCD/min ${p.gcdsPerMin.toFixed(1)}/${(p.ref?.gcdsPerMin ?? NaN).toFixed(1)}` +
+          `${p.healGcdsPerMin || p.ref?.healGcdsPerMin ? ` heal/min ${p.healGcdsPerMin.toFixed(1)}/${(p.ref?.healGcdsPerMin ?? NaN).toFixed(1)}` : ''}` +
+          ` deaths ${p.deaths.toFixed(1)} est.loss ${k(p.lostDps)}/s`);
+      }
+    };
+    for (const o of own) show(`${o.pull.name} Pull ${o.pull.pullNumber}`, [o]);
+    show('ALL PULLS', own);
+  },
+};
+
 // One generated entry per module in lib/mechanics/wow/registry.ts (except
 // those with a hand-written entry above, marked customHarness there). A new
 // WoW boss module needs no change here.

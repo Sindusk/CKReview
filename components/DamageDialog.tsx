@@ -25,6 +25,7 @@ import { useFFPullSelector } from "@/hooks/useFFPullSelector";
 import { SEVERITY_COLOR } from "./SeverityIcon";
 import { fmtTime } from "./MitigationTimeline";
 import { Dialog } from "./ui/Dialog";
+import DamageCompare, { type ReferenceClear } from "./DamageCompare";
 
 type DamageDialogProps = {
   open:          boolean;
@@ -65,6 +66,10 @@ export default function DamageDialog({ open, onClose, pulls, currentPullId }: Da
     useFFPullSelector(pulls, open, currentPullId);
   const [allPulls, setAllPulls] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
+  const [view, setView] = useState<"findings" | "compare">("findings");
+  // Reference clears stay loaded while the app is open (this component
+  // stays mounted when the dialog closes); re-adding one is a user action.
+  const [refs, setRefs] = useState<ReferenceClear[]>([]);
 
   // Only computed while open; the analysis reads every damage event.
   const analyses = useMemo(() => {
@@ -98,6 +103,12 @@ export default function DamageDialog({ open, onClose, pulls, currentPullId }: Da
       ) : (
         <>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 4 }}>
+              <button className={`ck-tab ck-tab--sm${view === "findings" ? " ck-tab--active" : ""}`} onClick={() => setView("findings")}>Findings</button>
+              <button className={`ck-tab ck-tab--sm${view === "compare" ? " ck-tab--active" : ""}`} onClick={() => setView("compare")}>
+                Compare with clears{refs.length ? ` (${refs.length})` : ""}
+              </button>
+            </div>
             <span className="ck-label" style={{ margin: 0 }}>Pulls</span>
             <select
               className="ck-field"
@@ -128,6 +139,16 @@ export default function DamageDialog({ open, onClose, pulls, currentPullId }: Da
             </span>
           </div>
 
+          {view === "compare" ? (
+            <div style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto" }}>
+              <DamageCompare
+                ownPulls={allPulls ? ffPulls : selectedPull ? [selectedPull] : []}
+                analyses={analyses}
+                refs={refs}
+                onRefsChange={setRefs}
+              />
+            </div>
+          ) : (
           <div style={{ flex: "1 1 auto", minHeight: 0, display: "grid", gridTemplateColumns: "340px minmax(0, 1fr)", gap: 12 }}>
             <div style={{ minHeight: 0, overflowY: "auto", paddingRight: 4 }}>
               {!allPulls && analysis && <PhaseTable phases={analysis.phases} />}
@@ -160,6 +181,7 @@ export default function DamageDialog({ open, onClose, pulls, currentPullId }: Da
               )}
             </div>
           </div>
+          )}
 
           <p className="ck-help" style={{ margin: "10px 0 0" }}>
             Losses are estimates in each player&apos;s own damage from the pull; every line shows its basis.
