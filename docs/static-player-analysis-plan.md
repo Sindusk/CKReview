@@ -76,10 +76,18 @@ mitigation redesign removes one).
   rankings exclude them, so counts stay consistent with the Report tab.
 - Indexes: `pullId`, `identityId`, `ruleRef`.
 
-**`StaticReviewPullPhase`** (one row per phase the pull reached):
-`pullId`, `phase`, `startMs`, `endMs`. This is the exposure data: "out of
-the pulls that reached P5". Also store the furthest phase on
-`StaticReviewPull` (`lastPhase`) for quick filtering.
+**`StaticReviewPullPhase`** (one row per phase **segment**; alternating
+encounters visit the same phase many times): `pullId`, `seq`, `phase`
+(the log's phase id), `startMs`, `endMs`. This is the exposure data: "out
+of the pulls that reached P5" is a distinct count over pulls. Also store the
+highest phase id reached on `StaticReviewPull` (`lastPhase`, derived from
+the transitions, never the API's `lastPhase`) for quick filtering.
+
+**`StaticPhase`** (lookup, one row per static per boss per phase):
+`staticId`, `bossName`, `phaseId`, `name`, `isIntermission`. Upserted at
+import from the report's phase metadata, so the UI can label phases
+("Intermission: Total Eclipse") without an API call. The phase filter lists
+intermissions as phases of their own, in id order.
 
 **`StaticReviewPullMechanic`** (one row per mechanic occurrence the pull
 reached, failed or not): `pullId`, `mechanicKey`, `occurrence`,

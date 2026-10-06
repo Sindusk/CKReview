@@ -15,6 +15,7 @@ import {
   MAX_RETRY_AFTER_SECONDS,
   type RateLimitStatus,
 } from "./rate-limit";
+import { attachEncounterPhases, type EncounterPhase, type ReportEncounterPhases } from "./pull-phases";
 
 const GQL_ENDPOINT = "https://www.warcraftlogs.com/api/v2/user";
 
@@ -166,6 +167,13 @@ export type WCLFight = {
   difficulty?:     number | null;
   // Mythic+ keystone level (dungeon fights only).
   keystoneLevel?:  number | null;
+  // Phase metadata (lib/pull-phases.ts). Absent in reports fetched before
+  // it was requested. `lastPhase` is a stage ordinal, not a phase id.
+  encounterID?:      number | null;
+  lastPhase?:        number | null;
+  phaseTransitions?: { id: number; startTime: number }[] | null;
+  // Not from the API: set by fetchReport from the report-level `phases`.
+  encounterPhases?:  EncounterPhase[];
 };
 
 /** WCL `difficulty` of a Mythic raid fight — the only kind static stats import. */
@@ -340,6 +348,9 @@ export type WCLReport = {
   // StaticReview.reportStartedAt); optional so a report captured before
   // this field was queried (sampledata/ meta.json) still typechecks.
   startTime?: number;
+  // Phase names per encounter (lib/pull-phases.ts); null for encounters
+  // without phases, absent in reports fetched before it was requested.
+  phases?:    ReportEncounterPhases[] | null;
   fights:     WCLFight[];
   masterData: {
     actors:    WCLActor[];
@@ -361,6 +372,15 @@ const REPORT_QUERY = /* graphql */`
         title
         code
         startTime
+        phases {
+          encounterID
+          separatesWipes
+          phases {
+            id
+            name
+            isIntermission
+          }
+        }
         fights(killType: Encounters) {
           id
           name
@@ -370,6 +390,12 @@ const REPORT_QUERY = /* graphql */`
           friendlyPlayers
           difficulty
           keystoneLevel
+          encounterID
+          lastPhase
+          phaseTransitions {
+            id
+            startTime
+          }
         }
         masterData(translate: true) {
           actors {
@@ -397,7 +423,9 @@ type ReportQueryResult = {
 
 export async function fetchReport(reportCode: string): Promise<WCLReport> {
   const data = await gql<ReportQueryResult>(REPORT_QUERY, { code: reportCode }, `report ${reportCode}`);
-  return data.reportData.report;
+  const report = data.reportData.report;
+  attachEncounterPhases(report.fights, report.phases);
+  return report;
 }
 
 /**

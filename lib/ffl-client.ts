@@ -18,6 +18,7 @@ import {
   MAX_RETRY_AFTER_SECONDS,
   type RateLimitStatus,
 } from "./rate-limit";
+import { attachEncounterPhases, type EncounterPhase, type ReportEncounterPhases } from "./pull-phases";
 
 const GQL_ENDPOINT = "https://www.fflogs.com/api/v2/user";
 
@@ -160,6 +161,13 @@ export type FFLFight = {
   endTime:         number;    // ms from report start
   kill:            boolean | null;
   friendlyPlayers: number[];
+  // Phase metadata (lib/pull-phases.ts). Absent in reports fetched before
+  // it was requested; transitions can be null on a whole report.
+  encounterID?:      number | null;
+  lastPhase?:        number | null;
+  phaseTransitions?: { id: number; startTime: number }[] | null;
+  // Not from the API: set by fetchFFReport from the report-level `phases`.
+  encounterPhases?:  EncounterPhase[];
 };
 
 export type FFLActor = {
@@ -398,6 +406,8 @@ export type FFLReport = {
   // Epoch ms of when the log itself started recording — see WCLReport's
   // matching field for why this is optional.
   startTime?: number;
+  // Phase names per encounter (lib/pull-phases.ts).
+  phases?:    ReportEncounterPhases[] | null;
   fights:     FFLFight[];
   masterData: {
     actors:    FFLActor[];
@@ -419,6 +429,15 @@ const REPORT_QUERY = /* graphql */`
         title
         code
         startTime
+        phases {
+          encounterID
+          separatesWipes
+          phases {
+            id
+            name
+            isIntermission
+          }
+        }
         fights(killType: Encounters) {
           id
           name
@@ -426,6 +445,12 @@ const REPORT_QUERY = /* graphql */`
           endTime
           kill
           friendlyPlayers
+          encounterID
+          lastPhase
+          phaseTransitions {
+            id
+            startTime
+          }
         }
         masterData(translate: true) {
           actors {
@@ -453,7 +478,9 @@ type ReportQueryResult = {
 
 export async function fetchFFReport(reportCode: string): Promise<FFLReport> {
   const data = await gql<ReportQueryResult>(REPORT_QUERY, { code: reportCode }, `report ${reportCode}`);
-  return data.reportData.report;
+  const report = data.reportData.report;
+  attachEncounterPhases(report.fights, report.phases);
+  return report;
 }
 
 /**

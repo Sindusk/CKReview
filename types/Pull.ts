@@ -3,6 +3,7 @@
 import type { DeathEvent } from "./DeathEvent";
 import type { PlayerInfo } from "./PlayerInfo";
 import type { PullError, EnemyEvent }  from "./PullError";
+import type { EncounterPhase, PullPhaseSegment } from "../lib/pull-phases";
 
 // Raw positional data for the Dancing Mad (FFXIV) Black Hole mechanic's
 // direction/priority detection — see lib/mechanics/ffxiv/dancingmad/
@@ -52,6 +53,13 @@ export type Pull = {
   // staticEligiblePulls in lib/static-review-data.ts). Undefined for FFXIV
   // and for WoW pulls saved before the field existed.
   difficulty?:   number;
+
+  // Phase segments from the log's fight metadata, ms from pull start (see
+  // lib/pull-phases.ts), and the encounter's phase list for naming them.
+  // Undefined when the log has no phase data for the encounter, and for
+  // pulls saved before the fields existed.
+  phaseSegments?:   PullPhaseSegment[];
+  encounterPhases?: EncounterPhase[];
 
   blackHoleGeometry?: BlackHoleGeometry;
 
