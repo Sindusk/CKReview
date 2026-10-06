@@ -159,13 +159,20 @@ export type ResourceCapSpec = {
   spenderIds:  number[] | "auto";
 };
 
-// WCL classResources types seen on melee casts (2026-10-06 samples) and how
-// they're logged: Rage and Runic Power ×10 (max 1000 / 1250).
+// WCL classResources types logged on every cast (builders included) in the
+// 2026-10-06 samples, and how they're scaled: Rage, Runic Power and Astral
+// Power ×10 (max 1000 / 1250 / 1000–1400), Insanity ×100 (max 10000).
+// Mana is left out (casters' only resource for Mages; not a damage
+// resource), and Soul Shards, Holy Power, combo points and Essence are
+// logged on their spenders only, so they can't show waste.
 export const PRIMARY_RESOURCES: Record<number, { name: string; scale: number }> = {
   1:  { name: "Rage", scale: 10 },
   2:  { name: "Focus", scale: 1 },
   3:  { name: "Energy", scale: 1 },
   6:  { name: "Runic Power", scale: 10 },
+  8:  { name: "Astral Power", scale: 10 },
+  11: { name: "Maelstrom", scale: 1 },
+  13: { name: "Insanity", scale: 100 },
   17: { name: "Fury", scale: 1 },
 };
 

@@ -976,6 +976,41 @@ go by role in the FFXIV order, the specs with the most sample players first.
   automatic second cast (282449, cast 65ms apart). Energy at the cap is
   still waste, but its gain estimate there includes regen.
 
+**Step 6, ranged and caster batch** (2026-10-06),
+`lib/damage/wow/specs/ranged.ts`. Step 6 is complete.
+- **Specs:** Arcane 19 sample players, Elemental 13, Beast Mastery 11,
+  Balance 11, Shadow 9, Demonology 9, Marksmanship 8, Devastation 7,
+  Affliction 6. Augmentation, Fire, Devourer, Frost Mage and Destruction
+  have 1–3 players and are unverified.
+- **Main cooldown window:** Arcane Surge, Combustion, Incarnation, Bestial
+  Wrath, Trueshot, Voidform, Ascendance, Malevolence, Demonic Tyrant,
+  Dragonrage.
+- **Resource at the cap:** Maelstrom, Insanity (logged ×100), Astral Power
+  (×10) and Focus are logged on every cast. Mages log only mana; Soul
+  Shards and Essence appear on their spenders only, so they aren't judged.
+- **DoT uptime:**
+  - Shadow: Shadow Word: Pain, Vampiric Touch
+  - Affliction: Agony, Unstable Affliction, Wither / Corruption
+  - Balance: Moonfire, Sunfire
+  - Elemental: Flame Shock
+  - Destruction: Wither
+- **Tracked cooldowns** use the same consistency rule. Fury of Elune,
+  Incarnation, Stormkeeper, Meteor and Tip the Scales spread too far.
+  Call Dreadstalkers costs Soul Shards.
+- **First look** (Ula'tek and Vashnik kills):
+  - Beast Mastery Hunters cast Barbed Shot at full Focus 19–28 times a
+    pull (~510 Focus).
+  - The Affliction Warlock let Unstable Affliction drop for 9–13s at a
+    time.
+  - Arcane Surge windows ran 2–5 GCDs short.
+  - The Marksmanship Hunter cast Rapid Fire at full Focus.
+- **Known gaps:**
+  - Drift on a cooldown that deals no direct damage (Combustion, Bestial
+    Wrath, Breath of Eons), or whose damage logs under another ID (Halo),
+    is found but not valued. The engine says so and marks it inference.
+  - Augmentation's support damage isn't in the rDPS split.
+  - Frost Mage has no window: Icy Veins wasn't cast in the samples.
+
 ## UI: the Damage dialog
 
 - **Header button** "Damage", directly left of "Mitigation".

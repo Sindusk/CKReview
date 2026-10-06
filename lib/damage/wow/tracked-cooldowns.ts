@@ -94,4 +94,60 @@ export const WOW_TRACKED_COOLDOWNS: Record<string, TrackedCooldown[]> = {
   "Survival Hunter": [   // unverified (1 player)
     { name: "Takedown", actionIds: [1250646], cooldownMs: 61_000, charges: 1, firstUseOffsetMs: 36_000 },  // 61.4 / 62.5s, 35.6s
   ],
+
+  // ── Ranged and casters ─────────────────────────────────────────────
+  // Not tracked: Balance's Fury of Elune (19.7 / 25.9s) and Incarnation
+  // (20.8 / 104.7s), Elemental's Stormkeeper (38.2 / 48.9s), Fire's Meteor
+  // (53.9 / 68.7s), Augmentation's Tip the Scales (47.8 / 64.0s): spread too
+  // far. Demonology's Call Dreadstalkers costs Soul Shards.
+  "Arcane Mage": [
+    { name: "Touch of the Magi", actionIds: [321507], cooldownMs: 45_000, charges: 1, firstUseOffsetMs: 4_000 }, // 45.0 / 46.8s, 3.2s
+    { name: "Arcane Surge", actionIds: [365350], cooldownMs: 91_000, charges: 1, firstUseOffsetMs: 2_000 },      // 91.0 / 94.4s, 0.9s
+  ],
+  "Fire Mage": [   // unverified (2 players)
+    { name: "Combustion", actionIds: [190319], cooldownMs: 60_000, charges: 1, firstUseOffsetMs: 23_000 },  // 60.0 / 60.9s, 22.4s
+  ],
+  "Frost Mage": [   // unverified (1 player)
+    { name: "Frozen Orb", actionIds: [84714], cooldownMs: 60_000, charges: 1, firstUseOffsetMs: 2_000 },   // 60.3 / 62.2s, 1.8s
+    { name: "Comet Storm", actionIds: [153595], cooldownMs: 43_000, charges: 1, firstUseOffsetMs: 7_000 }, // 43.0 / 46.3s, 6.8s
+    { name: "Ray of Frost", actionIds: [205021], cooldownMs: 44_000, charges: 1, firstUseOffsetMs: 3_000 },// 44.8 / 47.5s, 2.7s
+  ],
+  "Beast Mastery Hunter": [
+    { name: "Bestial Wrath", actionIds: [19574], cooldownMs: 30_000, charges: 1, firstUseOffsetMs: 3_000 },  // 30.0 / 31.0s, 2.4s
+  ],
+  "Marksmanship Hunter": [
+    { name: "Volley", actionIds: [260243], cooldownMs: 45_000, charges: 1, firstUseOffsetMs: 4_000 },     // 45.0 / 51.5s, 3.7s
+    { name: "Trueshot", actionIds: [288613], cooldownMs: 120_000, charges: 1, firstUseOffsetMs: 4_000 },  // 120.3 / 132.5s, 4.0s
+  ],
+  "Shadow Priest": [
+    { name: "Halo", actionIds: [120644], cooldownMs: 60_000, charges: 1, firstUseOffsetMs: 6_000 },           // 60.6 / 62.9s, 6.0s
+    { name: "Voidform", actionIds: [228260], cooldownMs: 120_000, charges: 1, firstUseOffsetMs: 8_000 },      // 120.6 / 126.9s, 7.2s
+    { name: "Void Torrent", actionIds: [263165], cooldownMs: 30_000, charges: 1, firstUseOffsetMs: 11_000 },  // 30.0 / 33.5s, 10.8s
+  ],
+  "Elemental Shaman": [
+    { name: "Ascendance", actionIds: [114050], cooldownMs: 120_000, charges: 1, firstUseOffsetMs: 2_000 },  // 120.2 / 139.9s, 1.6s
+  ],
+  "Affliction Warlock": [
+    { name: "Malevolence", actionIds: [442726], cooldownMs: 60_000, charges: 1, firstUseOffsetMs: 4_000 },       // 60.0 / 62.3s, 3.9s
+    { name: "Summon Darkglare", actionIds: [205180], cooldownMs: 120_000, charges: 1, firstUseOffsetMs: 3_000 }, // 120.0 / 123.2s, 3.0s
+  ],
+  "Demonology Warlock": [
+    { name: "Summon Demonic Tyrant", actionIds: [265187], cooldownMs: 60_000, charges: 1, firstUseOffsetMs: 5_000 },  // 60.8 / 63.0s, 5.0s
+  ],
+  "Destruction Warlock": [   // unverified (1 player)
+    { name: "Summon Infernal", actionIds: [1122], cooldownMs: 95_000, charges: 1, firstUseOffsetMs: 2_000 },   // 95.2 / 100.6s, 1.8s
+    { name: "Malevolence", actionIds: [442726], cooldownMs: 95_000, charges: 1, firstUseOffsetMs: 3_000 },     // 95.5 / 100.5s, 2.8s
+    { name: "Soul Fire", actionIds: [6353], cooldownMs: 46_000, charges: 1, firstUseOffsetMs: 1_000 },         // 46.7 / 52.3s, 0.4s
+  ],
+  "Devastation Evoker": [
+    { name: "Dragonrage", actionIds: [375087], cooldownMs: 120_000, charges: 1, firstUseOffsetMs: 3_000 },     // 120.0 / 122.5s, 2.8s
+    { name: "Tip the Scales", actionIds: [370553], cooldownMs: 120_000, charges: 1, firstUseOffsetMs: 4_000 }, // 120.7 / 123.4s, 3.0s
+  ],
+  "Augmentation Evoker": [   // unverified (3 players)
+    { name: "Breath of Eons", actionIds: [403631], cooldownMs: 74_000, charges: 1, firstUseOffsetMs: 2_000 },  // 74.6 / 91.3s, 1.6s
+    { name: "Time Skip", actionIds: [404977], cooldownMs: 135_000, charges: 1, firstUseOffsetMs: 8_000 },     // 135.8 / 155.8s, 7.2s
+  ],
+  "Devourer Demon Hunter": [   // unverified (2 players)
+    { name: "The Hunt", actionIds: [1246167], cooldownMs: 91_000, charges: 1, firstUseOffsetMs: 11_000 },  // 91.6 / 105.6s, 10.7s
+  ],
 };
