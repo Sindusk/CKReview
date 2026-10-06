@@ -9,8 +9,10 @@
 import type { JobCheck } from "../../types";
 import { BLOOD_CHECKS, PROT_PALADIN_CHECKS } from "./tank";
 import { HEALER_CHECKS } from "./healer";
+import { MELEE_CHECKS } from "./melee";
 
 export const WOW_SPEC_CHECKS: Record<string, JobCheck[]> = {
+  ...MELEE_CHECKS,
   "Blood Death Knight":  BLOOD_CHECKS,
   "Protection Paladin":  PROT_PALADIN_CHECKS,
   "Holy Priest":         HEALER_CHECKS,

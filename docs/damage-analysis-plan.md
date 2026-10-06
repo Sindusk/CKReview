@@ -944,6 +944,38 @@ go by role in the FFXIV order, the specs with the most sample players first.
   - Power Infusion's recast: its casts log in pairs 1ms apart, and the
     median gap (23s) is no recast. It still counts in the rDPS split.
 
+**Step 6, melee batch** (2026-10-06), `lib/damage/wow/specs/melee.ts`:
+- **Every melee spec** (Arms 19 sample players, Windwalker 10, Havoc 9,
+  Retribution 8, Assassination 6, Subtlety 4, Unholy 3; Frost DK, Fury,
+  Feral, Survival and Outlaw at 1–2, unverified) gets:
+  - **Its main cooldown's window** (Avatar, Recklessness, Avenging Wrath,
+    Metamorphosis, Invoke Xuen, Pillar of Frost, Dark Transformation,
+    Kingsbane, Shadow Blades, Adrenaline Rush, Berserk, Takedown): GCDs
+    that fit vs GCDs pressed, bonus read from the hits (inference).
+  - **Its main resource at the cap** (Rage, Fury, Runic Power, Energy,
+    Focus, whichever its casts log most):
+    - An ability is a spender if any of its casts logged a cost; some of
+      Mortal Strike's log none, and it read as waste.
+    - Spender damage is matched by name, because Annihilation's hits log
+      under another ID.
+    - Energy and Focus waste is mostly invisible, since their spenders
+      cost them.
+- **Tracked cooldowns:** only when the median interval is within 1.25× of
+  the shortest. A bigger spread means resets or cooldown reduction
+  (Retribution's Divine Toll: shortest 30s, median 62s), and the shortest
+  would invent drift. Arms' Avatar and Colossus Smash spread too far, and
+  resource- or charge-gated ones (Eye Beam, Breath of Sindragosa, Shadow
+  Dance) stay out.
+- **First look** (Ula'tek and Vashnik kills):
+  - Arms Warriors cast Overpower at full Rage 10–20 times a pull (~150–420
+    Rage).
+  - The Havoc's Essence Break sat ready ~110s (about 3 uses).
+  - The Assassination Rogue's Kingsbane sat ready 203s (about 3 uses).
+  - Frost DK cast Exterminate at full Runic Power.
+- **Soft spot:** Subtlety's Energy-cap reads come from Secret Technique's
+  automatic second cast (282449, cast 65ms apart). Energy at the cap is
+  still waste, but its gain estimate there includes regen.
+
 ## UI: the Damage dialog
 
 - **Header button** "Damage", directly left of "Mitigation".

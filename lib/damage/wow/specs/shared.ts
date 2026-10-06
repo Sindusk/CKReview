@@ -154,8 +154,29 @@ export type ResourceCapSpec = {
   type:        number;     // WCL classResources type (6 Runic Power)
   name:        string;     // "Runic Power"
   scale:       number;     // logged units per displayed unit (Runic Power logs ×10)
-  spenderIds:  number[];   // abilities that spend it (value per unit comes from these)
+  // Abilities that spend it (value per unit comes from these); "auto": every
+  // cast that logged a cost of it.
+  spenderIds:  number[] | "auto";
 };
+
+// WCL classResources types seen on melee casts (2026-10-06 samples) and how
+// they're logged: Rage and Runic Power ×10 (max 1000 / 1250).
+export const PRIMARY_RESOURCES: Record<number, { name: string; scale: number }> = {
+  1:  { name: "Rage", scale: 10 },
+  2:  { name: "Focus", scale: 1 },
+  3:  { name: "Energy", scale: 1 },
+  6:  { name: "Runic Power", scale: 10 },
+  17: { name: "Fury", scale: 1 },
+};
+
+/** The player's most-logged resource among PRIMARY_RESOURCES, capped (resourceCapFindings). */
+export function primaryResourceCapFindings(ctx: PlayerCheckContext): DamageFinding[] {
+  const counts = new Map<number, number>();
+  for (const c of ctx.player.casts) for (const r of c.resources ?? []) if (PRIMARY_RESOURCES[r.type]) counts.set(r.type, (counts.get(r.type) ?? 0) + 1);
+  const type = [...counts].sort((a, b) => b[1] - a[1])[0]?.[0];
+  if (type === undefined) return [];
+  return resourceCapFindings(ctx, { type, ...PRIMARY_RESOURCES[type], spenderIds: "auto" });
+}
 
 const GAIN_PAIR_MS = 3_000;
 
@@ -183,19 +204,31 @@ export function resourceCapFindings(ctx: PlayerCheckContext, spec: ResourceCapSp
     return xs && xs.length >= 3 ? [...xs].sort((p, q) => p - q)[Math.floor(xs.length / 2)] : undefined;
   };
 
-  // Damage per unit from the spenders.
+  // Damage per unit from the spenders. An ability is a spender if any of its
+  // casts logged a cost (some casts of Mortal Strike log none). Its damage
+  // is matched by name: Annihilation's hits log under another id than its
+  // cast.
+  const spenderIds = new Set(spec.spenderIds === "auto"
+    ? casts.filter((x) => (x.r.cost ?? 0) > 0).map((x) => x.c.abilityId)
+    : spec.spenderIds);
+  const damageByName = new Map<string, number>();
+  for (const e of ctx.player.damageDone) {
+    if (e.pet || e.timestamp >= ctx.endMs) continue;
+    damageByName.set(e.abilityName, (damageByName.get(e.abilityName) ?? 0) + (e.amount ?? 0));
+  }
   let spentUnits = 0, spenderDamage = 0;
-  for (const id of spec.spenderIds) {
-    const uses = casts.filter((x) => x.c.abilityId === id && (x.r.cost ?? 0) > 0);
-    spentUnits += uses.reduce((a, x) => a + (x.r.cost ?? 0), 0);
-    spenderDamage += ctx.values.perUse(id) * uses.length;
+  const countedNames = new Set<string>();
+  for (const x of casts) {
+    if (!spenderIds.has(x.c.abilityId)) continue;
+    spentUnits += x.r.cost ?? 0;
+    if (!countedNames.has(x.c.abilityName)) { countedNames.add(x.c.abilityName); spenderDamage += damageByName.get(x.c.abilityName) ?? 0; }
   }
   const perUnit = spentUnits > 0 ? spenderDamage / spentUnits : 0;
 
   const forced = mergeWindows(ctx.forced);
   const byPhase = new Map<number | undefined, { units: number; n: number; start: number; end: number; names: Map<string, number> }>();
   for (const x of casts) {
-    if ((x.r.cost ?? 0) > 0 || x.r.amount < max) continue;
+    if (spenderIds.has(x.c.abilityId) || x.r.amount < max) continue;
     const gain = gainOf(x.c.abilityId);
     if (!gain || inWindows(x.c.timestamp, forced)) continue;
     const ph = ctx.phaseOf(x.c.timestamp);
