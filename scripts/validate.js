@@ -534,6 +534,62 @@ const MECHANICS = {
   },
 };
 
+// Print-only (no PullErrors, nothing snapshotted): the new mitigation
+// analysis (lib/mitigation/analyze.ts) for every pull, one line per raidwide
+// hit plus its active mitigations, free ones and droppable set.
+// docs/mitigation-redesign.md describes the columns.
+MECHANICS['mitigation-analysis'] = {
+  game: 'ff',
+  load: () => ({
+    store: requireTsFromRoot('lib/sample-report-store.ts'),
+    lt: requireTsFromRoot('lib/log-transforms.ts', { './log-auth': {} }),
+    ...requireTsFromRoot('lib/mitigation/analyze.ts'),
+    ...requireTsFromRoot('lib/mitigation/aggregate.ts'),
+    ...requireTsFromRoot('lib/mitigation/ffxiv-catalog.ts'),
+  }),
+  async run({ mod, dir }) {
+    const pulls = await loadThroughRealPipeline(mod, dir);
+    if (!pulls) return;
+    const pctOf = (x) => `${Math.round(x * 100)}%`;
+    const perPull = [];
+    for (const pull of pulls) {
+      const hits = mod.analyzePullMitigation(pull, mod.FFXIV_MITIGATION);
+      perPull.push({ pullId: pull.id, pullNumber: pull.pullNumber, hits });
+      const targets = hits.flatMap((h) => h.targets);
+      const withMult = targets.filter((t) => t.multiplier !== undefined);
+      console.log('='.repeat(70));
+      console.log(`${pull.name} Pull ${pull.pullNumber}: ${hits.length} raidwide hits, catalog matches multiplier on ` +
+        `${withMult.filter((t) => t.consistent).length}/${withMult.length} targets`);
+      for (const h of hits) {
+        const active = h.active.map((a) => `${a.name}${a.casters.length ? `(${a.casters.map((c) => c.split(' ')[0]).join('/')})` : ''}`).join(', ');
+        const free = h.players.filter((p) => p.state === 'free').map((p) => `${p.name}(${p.player.split(' ')[0]})`).join(', ');
+        const ineff = h.players.filter((p) => p.state === 'ineffective').map((p) => `${p.name}(${p.player.split(' ')[0]})`).join(', ');
+        const deathInfo = h.targets.filter((t) => t.died).map((t) => `${t.player.split(' ')[0]}:${t.deathCause}`).join(' ');
+        console.log(`  [${(h.timestampMs / 1000).toFixed(1)}s] seq${h.sequenceId} ${h.abilityName} #${h.occurrence} (${h.phase ?? '-'}, ${h.damageColumn ?? '?'}) ` +
+          `n=${h.targets.length} margin=${pctOf(h.margin)} seq=${pctOf(h.sequenceMargin)} ${h.verdict.toUpperCase()}` +
+          `${h.deaths ? ` deaths=${h.deaths} [${deathInfo}]` : ''}`);
+        console.log(`      active: ${active || '-'}`);
+        if (free) console.log(`      free: ${free}`);
+        if (ineff) console.log(`      ineffective: ${ineff}`);
+        if (h.droppable.keys.length) console.log(`      droppable: ${h.droppable.names.join(', ')} -> lowest ${pctOf(h.droppable.worstMargin)}`);
+      }
+    }
+    console.log('='.repeat(70));
+    console.log(`ALL PULLS (${perPull.length}): hits seen in 2+ pulls`);
+    for (const a of mod.aggregateMitigation(perPull, mod.FFXIV_MITIGATION)) {
+      if (a.pulls < 2) continue;
+      const usual = a.active.filter((m) => m.pulls * 2 >= a.pulls).map((m) => m.name).join(', ');
+      const free = a.free.filter((f) => f.pulls * 2 >= a.pulls).map((f) => `${f.name}(${f.player.split(' ')[0]})`).join(', ');
+      console.log(`  ${(a.medianMs / 1000).toFixed(0).padStart(4)}s ${a.phase ?? '-'} | ${a.abilityName} #${a.occurrence} pulls=${a.pulls} ` +
+        `median=${pctOf(a.medianMargin)} worst=${pctOf(a.worstMargin)} ${a.verdict.toUpperCase()}` +
+        `${a.deaths ? ` deaths=${a.deaths} in ${a.deathPulls} pull(s)` : ''}`);
+      console.log(`      usual: ${usual || '-'}`);
+      if (free) console.log(`      usually free: ${free}`);
+      if (a.droppable.keys.length) console.log(`      droppable (worst pull): ${a.droppable.names.join(', ')} -> lowest ${pctOf(a.droppable.worstMargin)}`);
+    }
+  },
+};
+
 // One generated entry per module in lib/mechanics/wow/registry.ts (except
 // those with a hand-written entry above, marked customHarness there). A new
 // WoW boss module needs no change here.

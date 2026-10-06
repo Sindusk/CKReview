@@ -34,7 +34,7 @@
 // 10% physical / 5% magical, Addle the reverse). Unaspected hits (FFLogs
 // ability type 32) ignore % mitigation entirely; only shields apply.
 
-import type { CatalogEntry, CatalogStatus } from "./types";
+import type { CatalogEntry, CatalogStatus, MitigationGame } from "./types";
 
 const pct = (id: number, name: string, physical: number, magical = physical): CatalogStatus =>
   ({ id, name, physical, magical });
@@ -63,7 +63,7 @@ export const FFXIV_MITIGATION_CATALOG: CatalogEntry[] = [
     kind: "shield", reach: "party", durationMs: 20_000, cooldownMs: 90_000, verified: true },
   { key: "passage-of-arms", name: "Passage of Arms", jobs: ["Paladin"], actionIds: [7385],
     statuses: [pct(1001176, "Arms Up", 0.15), marker(1001175, "Passage of Arms")],
-    kind: "partyBuff", reach: "party", durationMs: 18_000, cooldownMs: 120_000, verified: true },
+    kind: "partyBuff", reach: "party", durationMs: 18_000, cooldownMs: 120_000, variableDuration: true, verified: true },
   { key: "guardian", name: "Guardian", jobs: ["Paladin"], actionIds: [36920],
     statuses: [pct(1003829, "Guardian", 0.40), shield(1003830, "Guardian's Will")],
     kind: "personal", reach: "self", durationMs: 15_000, cooldownMs: 120_000, verified: true },
@@ -153,7 +153,7 @@ export const FFXIV_MITIGATION_CATALOG: CatalogEntry[] = [
   // ── Scholar ─────────────────────────────────────────────────────────
   { key: "sacred-soil", name: "Sacred Soil", jobs: ["Scholar"], actionIds: [188],
     statuses: [pct(1000299, "Sacred Soil", 0.10), marker(1001944, "Sacred Soil")],
-    kind: "partyBuff", reach: "party", durationMs: 15_000, cooldownMs: 30_000, gated: "Aetherflow", verified: true },
+    kind: "partyBuff", reach: "party", durationMs: 15_000, cooldownMs: 30_000, gated: "Aetherflow", variableDuration: true, verified: true },
   { key: "expedient", name: "Expedient", jobs: ["Scholar"], actionIds: [25868],
     statuses: [pct(1002711, "Desperate Measures", 0.10), marker(1002712, "Expedience")],
     kind: "partyBuff", reach: "party", durationMs: 20_000, cooldownMs: 120_000, verified: true },
@@ -168,9 +168,10 @@ export const FFXIV_MITIGATION_CATALOG: CatalogEntry[] = [
     kind: "shield", reach: "party", durationMs: 30_000, cooldownMs: 0, verified: true },
 
   // ── Astrologian ─────────────────────────────────────────────────────
+  // A channel of up to 18s; the 10% lingers briefly after it ends.
   { key: "collective-unconscious", name: "Collective Unconscious", jobs: ["Astrologian"], actionIds: [3613],
     statuses: [pct(1000849, "Collective Unconscious", 0.10), pct(1000848, "Collective Unconscious", 0.10)],
-    kind: "partyBuff", reach: "party", durationMs: 5_000, cooldownMs: 60_000, verified: true },
+    kind: "partyBuff", reach: "party", durationMs: 18_000, cooldownMs: 60_000, variableDuration: true, verified: true },
   // The cast itself only buffs healing; the party shields (status "Neutral
   // Sect") come from the Aspected Helios / Helios Conjunction that follows.
   { key: "neutral-sect", name: "Neutral Sect", jobs: ["Astrologian"], actionIds: [16559],
@@ -267,5 +268,17 @@ export const FFXIV_ACTION_INDEX: Map<number, CatalogEntry> = new Map(
 );
 
 // FFLogs ability `type` values (masterData). Anything else is treated as
-// magical-or-physical-unknown by the analysis.
+// unknown by the analysis.
 export const FFXIV_DAMAGE_TYPE = { physical: 128, magical: 1024, unaspected: 32 } as const;
+
+export const FFXIV_MITIGATION: MitigationGame = {
+  catalog:     FFXIV_MITIGATION_CATALOG,
+  statusIndex: FFXIV_STATUS_INDEX,
+  actionIndex: FFXIV_ACTION_INDEX,
+  damageColumn(type) {
+    if (type === FFXIV_DAMAGE_TYPE.physical) return "physical";
+    if (type === FFXIV_DAMAGE_TYPE.magical) return "magical";
+    if (type === FFXIV_DAMAGE_TYPE.unaspected) return "none";
+    return undefined;
+  },
+};

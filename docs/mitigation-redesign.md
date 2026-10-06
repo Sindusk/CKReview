@@ -2,10 +2,11 @@
 
 Plan for replacing the sheet-based mitigation system with one that reads
 the party's actual mitigation from the log. The direction was agreed with
-the user on 2026-10-06; this doc is the build brief. Nothing in it is
-implemented yet. Build step 1 (the data check) is done; its results are in
+the user on 2026-10-06; this doc is the build brief. Build step 1 (the
+data check) is done; its results are in
 [Data check findings](#data-check-findings-2026-10-06) and override the
-Model sections where they disagree.
+Model sections where they disagree. Steps 2–4 are built; see
+[Build status](#build-status).
 
 ## Why
 
@@ -232,7 +233,8 @@ no page scroll, panels clip internally.
 ## Data check findings (2026-10-06)
 
 Checked on slimmed Dancing Mad samples `ZADQVgGzTm8HNc2W` (fight 12, a
-19-minute P5 wipe) and `2aVkjzJnNAgCw1FL` (fight 4), plus one fresh
+19-minute P5 wipe, late-phase capture) and `2aVkjzJnNAgCw1FL` (fight 4),
+plus one fresh
 **unslimmed** fetch of `ZADQVgGzTm8HNc2W` fight 2 (283s, P1–P2) through
 `fetchFFightData`, and one `masterData.abilities { type }` query on the
 same report.
@@ -370,6 +372,49 @@ Catalog values checked against the multiplier, on magical hits:
    - Widen `slim-report.js` to keep the same fields, so samples have
      them; existing samples need `--refetch`.
    - Per-fight query cost stays flat.
+
+## Build status
+
+Built (2026-10-06), no UI yet:
+- **Data:** `PlayerEvent` carries `statusIds`, `unmitigatedAmount`,
+  `multiplier`, `absorbed`, `mitigated`, `blocked`, `hitType` and
+  `damageType`. `PlayerInfo.shieldAbsorbs` lists shield absorbs with their
+  caster. The report query requests ability `type`. Pulls fetched before
+  this lack all of it; the UI must say so (re-fetch stays a user action).
+- **Catalog:** `lib/mitigation/ffxiv-catalog.ts`.
+  `node scripts/check-mitigation-catalog.js` checks it against the
+  samples: IDs, every hit's multiplier, and cooldowns from cast spacing.
+  Warrior, Machinist (including Dismantle), Red Mage, Ninja, Monk and
+  Summoner entries are unverified; no sample pull has those jobs.
+- **Analysis:** `lib/mitigation/analyze.ts`, `(pull, game) → hits[]`. Its
+  header documents each rule. `marginWithout` is the pure function the
+  what-if sandbox will reuse.
+- **Aggregate:** `lib/mitigation/aggregate.ts`, hits matched across pulls
+  by phase + ability name + occurrence within the phase.
+- **Check without the UI:**
+  `node scripts/validate.js mitigation-analysis sampledata/ff/<code>`
+  prints every hit per pull, then the cross-pull aggregate. It is
+  print-only and adds nothing to snapshots. Only full captures have
+  enough data; `dQ8wmb1VhKt6yBXk` was re-fetched with the new fields.
+  The static's own sample folders are all late-phase captures.
+
+Choices made while building, open to tuning with the user:
+- **Raidwide:** 4+ targets and 75%+ of the living party. 4-of-8 spreads
+  and towers (Wave Cannon, The Path of Light) are not raidwides.
+- **Verdict thresholds:** the plan's 5% / 20%, judged on the sequence
+  margin. On `dQ8wmb1VhKt6yBXk` (a heavily mitigating group) that gives
+  489 over, 48 tight and 17 under across 554 hits.
+- **Follow-up damage:** each player's later drop counts all enemy damage
+  chained within 5s of the hit, up to 15s. A hit bigger than a whole
+  health bar (a failed mechanic) is skipped.
+- **Droppable:** only mitigations with a 30s+ cooldown, or a tank LB, are
+  candidates. GCD shields and short personals are treated as always used.
+  The result keeps the lowest player at 5%+ after a 5% damage-roll buffer.
+- **Aggregate verdict:** median margin across pulls; the worst margin and
+  deaths are shown beside it.
+- **"Ineffective"** (cast and within its duration but not on the hit) is
+  shown only for boss debuffs and fixed-duration party buffs. It catches
+  Reprisal and Addle on Wave Cannon, which Graven Image deals.
 
 ## What gets removed
 
