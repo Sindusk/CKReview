@@ -395,9 +395,11 @@ it's resolved. Module headers carry the full context for mechanic items.
   - M1 vs M2 has no signal and is always tentative.
   - MT/OT misses on very short or anomalous-opening pulls.
 - **Mitigation:**
-  - Paused.
-  - Next threads: one player showing 0/12 on the Heatmap, and the user's
-    color-scale and grouping feedback once they've used it.
+  - Being redesigned: the Ikuya-sheet system (Heatmap/Review tabs,
+    missed-mitigation errors) is to be replaced by log-derived analysis.
+    The plan is [mitigation-redesign.md](mitigation-redesign.md).
+  - The old Heatmap threads (a player at 0/12, color-scale feedback) are
+    moot once it's replaced.
 
 ## App
 

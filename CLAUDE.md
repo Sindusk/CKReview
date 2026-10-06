@@ -18,6 +18,7 @@ review. Active encounters:
 | App features, UI, data flow | [docs/app-architecture.md](docs/app-architecture.md) |
 | Sample data, auth tokens, scripts, browser checks, deploy pipeline | [docs/dev-tooling.md](docs/dev-tooling.md) |
 | Damage output / rotation analysis, or tooling for it | [docs/dps-analysis.md](docs/dps-analysis.md) |
+| Mitigation analysis (redesign plan, replaces the Ikuya-sheet system) | [docs/mitigation-redesign.md](docs/mitigation-redesign.md) |
 | What's unfinished or waiting on a user decision | [docs/open-items.md](docs/open-items.md) |
 | Which ports are taken locally and in production | [PORTS.md](PORTS.md) |
 
