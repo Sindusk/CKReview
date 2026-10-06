@@ -107,6 +107,11 @@ export function analyzePullDamage(pull: Pull, game: DamageGame, context?: Damage
       baseGcdMs: ctx.baseGcdMs,
       buffWindowGcds: { used, fit },
       findings,
+      timeline: {
+        gcdStarts: uses.filter((u) => u.startMs < endMs).map((u) => u.startMs),
+        buffWindows,
+        forced: forced.filter((w) => w.startMs < endMs),
+      },
     });
   }
   players.sort((a, b) => b.lostDamage - a.lostDamage);

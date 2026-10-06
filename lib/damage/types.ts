@@ -105,6 +105,9 @@ export type DamageFinding = {
   cause?:     string;
   basis:      string;    // how lostDamage was estimated
   detail:     string;    // one line for the dialog
+  // Short and pull-independent ("Technical Step", "gap during Limit Cut"):
+  // the same label in two pulls is the same recurring finding.
+  label:      string;
   inference?: boolean;   // rests on inference rather than a measured value
 };
 
@@ -122,6 +125,12 @@ export type PlayerDamageSummary = {
   // GCD starts inside raid-buff windows vs how many fit.
   buffWindowGcds: { used: number; fit: number };
   findings:      DamageFinding[];
+  // For the dialog's timeline strip.
+  timeline: {
+    gcdStarts:   number[];
+    buffWindows: { startMs: number; endMs: number }[];
+    forced:      ForcedWindow[];
+  };
 };
 
 export type PhaseDamageSummary = {

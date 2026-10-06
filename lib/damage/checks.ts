@@ -106,6 +106,7 @@ export function checkGcdGaps(ctx: PlayerCheckContext): DamageFinding[] {
       const during = ctx.mechanicAround(start, end);
       out.push(finding(ctx, {
         kind: "gcd-gap", startMs: start, endMs: end, forced: false,
+        label: during ? `GCD gap during ${during}` : "GCD gap",
         lostDamage: unforced * perMs,
         cause: during ? `during ${during}` : undefined,
         basis: `${s(unforced)} idle ÷ ${s(ctx.baseGcdMs)} GCD × ${k(value)} average GCD${inWindows(mid, ctx.buffWindows) ? " in raid buffs" : ""}`,
@@ -119,6 +120,7 @@ export function checkGcdGaps(ctx: PlayerCheckContext): DamageFinding[] {
     if (forced.ms >= 2 * ctx.baseGcdMs && unforced < GAP_FINDING_MS) {
       out.push(finding(ctx, {
         kind: "gcd-gap", startMs: start, endMs: end, forced: true,
+        label: `GCD gap (${forced.cause})`,
         lostDamage: forced.ms * perMs, cause: forced.cause,
         basis: `${s(forced.ms)} forced idle × ${k(value)} average GCD`,
         detail: `No GCD for ${s(idle)} after ${after}`,
@@ -138,6 +140,7 @@ export function checkGcdGaps(ctx: PlayerCheckContext): DamageFinding[] {
     out.push({
       player: ctx.player.name, job: ctx.player.className, phaseId, phase: ctx.phaseName(phaseId),
       kind: "gcd-delays", startMs: acc.start, endMs: acc.end, forced: false, lostDamage: acc.lost,
+      label: "Small GCD delays",
       basis: `${acc.n} delays under 1s, ${s(acc.ms)} in total, valued at the phase's average GCD`,
       detail: `${s(acc.ms)} of small GCD delays (${acc.n}) in ${ctx.phaseName(phaseId) ?? "the pull"}`,
     });
@@ -180,6 +183,7 @@ export function checkCooldownDrift(ctx: PlayerCheckContext): DamageFinding[] {
     const uses = (n: number) => `${n} use${n === 1 ? "" : "s"}`;
     out.push(finding(ctx, {
       kind: "cooldown-drift", startMs: longest.startMs, endMs: longest.endMs, forced: false,
+      label: `${cd.name} drift`,
       lostDamage: lostUses * perUse,
       basis: perUse > 0
         ? `${uses(lostUses)} × ${k(perUse)} average per ${cd.name}`
@@ -225,6 +229,7 @@ export function checkDeaths(ctx: PlayerCheckContext): DamageFinding[] {
     const forced = forcedPart(w.startMs, w.endMs, ctx.forced.filter((f) => f.cause.startsWith("phase damage")));
     return finding(ctx, {
       kind: "death", startMs: w.startMs, endMs: w.endMs,
+      label: death ? `Death (${death.cause})` : "Death",
       forced: forced.ms >= (w.endMs - w.startMs) / 2, cause: death?.cause,
       lostDamage: (w.endMs - w.startMs) * rate,
       basis: `${s(w.endMs - w.startMs)} dead × ${k(rate * 1000)}/s (their damage per second alive in this phase); the Weakness after a raise is its own finding`,
@@ -268,6 +273,7 @@ export function checkPenalties(ctx: PlayerCheckContext): DamageFinding[] {
       const dealt = part.reduce((a, e) => a + (e.amount ?? 0), 0);
       out.push(finding(ctx, {
         kind: "penalty", startMs: part[0].timestamp, endMs: Math.min(end, part[part.length - 1].timestamp),
+        label: w.cause ? `${w.name} (${w.cause})` : w.name,
         forced,
         cause: forced ? forcedPart(part[0].timestamp - 1, part[0].timestamp + 1, ctx.forced).cause
           : w.statusId === 1000043 ? "raised" : w.cause,
@@ -320,6 +326,7 @@ export function checkProcs(ctx: PlayerCheckContext): DamageFinding[] {
       const forced = inWindows(t, mergeWindows(ctx.forced));
       out.push(finding(ctx, {
         kind: "proc-lost", startMs: t, endMs: t, forced,
+        label: `${e.abilityName} ${how}`,
         cause: forced ? forcedPart(t - 1, t + 1, ctx.forced).cause : undefined,
         lostDamage: value, inference: true,
         basis: `${n} × ${k(ctx.values.perUse(consumerId))} average ${consumerName} (upper bound: the GCD used instead did some damage)`,
@@ -354,6 +361,7 @@ export function checkInterrupts(ctx: PlayerCheckContext): DamageFinding[] {
     const dead = inWindows(end, ctx.dead) || overlapMs(b.timestamp, end + 500, ctx.dead) > 0;
     out.push(finding(ctx, {
       kind: "interrupted-cast", startMs: b.timestamp, endMs: end,
+      label: `${b.abilityName} cancelled`,
       forced: dead, cause: dead ? "died while casting" : ctx.mechanicAround(b.timestamp, end),
       lostDamage: 0,
       basis: "the lost time is counted in the GCD gap that follows",

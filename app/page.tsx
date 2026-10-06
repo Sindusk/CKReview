@@ -20,6 +20,7 @@ import RosterPanel from "../components/RosterPanel";
 import TimelinePanel from "@/components/TimelinePanel";
 import StrategyDialog from "@/components/StrategyDialog";
 import MitigationDialog from "@/components/MitigationDialog";
+import DamageDialog from "@/components/DamageDialog";
 import { detectTerminateKickOrder } from "@/lib/mechanics/wow/vs-dr-mqd/terminate-kicks";
 import { detectCrystalAssignments } from "@/lib/mechanics/wow/vs-dr-mqd/crystal-assignments";
 import {
@@ -116,6 +117,7 @@ export default function Home() {
   const [pulls, setPulls] = useState<Pull[]>([]);
   const [showStrategy, setShowStrategy] = useState(false);
   const [showMitigation, setShowMitigation] = useState(false);
+  const [showDamage, setShowDamage] = useState(false);
   // Report-level strategy detection (the Midnight Falls Terminate kick
   // rotation and Dawn Crystal carry assignments) — recomputed whenever the
   // pull set changes, e.g. live-log polling appending new fights.
@@ -1073,6 +1075,13 @@ export default function Home() {
         />
         <button
           className="ck-btn"
+          onClick={() => setShowDamage(true)}
+          title="Where each player lost damage, scored in their own damage and checked against the fight"
+        >
+          Damage
+        </button>
+        <button
+          className="ck-btn"
           onClick={() => setShowMitigation(true)}
           title="The party's mitigation on each raidwide, read from the log"
         >
@@ -1095,6 +1104,13 @@ export default function Home() {
         blackHole={blackHoleStrategy}
         blackHoleOverrideId={blackHoleOverrideId}
         onBlackHoleOverrideChange={handleBlackHoleOverrideChange}
+        pulls={pulls}
+        currentPullId={selectedPullId}
+      />
+
+      <DamageDialog
+        open={showDamage}
+        onClose={() => setShowDamage(false)}
         pulls={pulls}
         currentPullId={selectedPullId}
       />
