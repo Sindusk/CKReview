@@ -13,10 +13,13 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Pull } from "@/types/Pull";
 
-export function useFFPullSelector(pulls: Pull[], open: boolean, currentPullId: number | null) {
+// `games`: which games' pulls the dialog lists (default FFXIV only; the
+// Damage dialog takes both). The result keeps the name `ffPulls`.
+export function useFFPullSelector(pulls: Pull[], open: boolean, currentPullId: number | null, games: Pull["game"][] = ["ffxiv"]) {
+  const gamesKey = games.join(",");
   const ffPulls = useMemo(
-    () => pulls.filter((p) => p.game === "ffxiv" && p.players.length > 0),
-    [pulls]
+    () => pulls.filter((p) => gamesKey.split(",").includes(p.game) && p.players.length > 0),
+    [pulls, gamesKey]
   );
 
   const [selectedPullId, setSelectedPullId] = useState<number | null>(null);

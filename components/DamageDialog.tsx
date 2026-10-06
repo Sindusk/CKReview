@@ -12,13 +12,20 @@
 // Pure view over lib/damage/; nothing is fetched here. Pulls fetched before
 // the damage fields existed say so; re-fetching stays an explicit action
 // elsewhere in the app.
+//
+// Both games (docs/damage-analysis-plan.md, "WoW build order" step 5): each
+// pull is analysed with its own game layer (FFXIV_DAMAGE / WOW_DAMAGE). WoW
+// pulls are big, so pulls are analysed when first shown (one pull, or every
+// pull for the "all loaded pulls" view) and cached for the open dialog.
+// Reference clears are FFXIV-only until the WoW port's step 7.
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { Pull } from "@/types/Pull";
 import { analyzePullDamage } from "@/lib/damage/analyze";
 import { aggregateDamage, type PlayerDamageAggregate } from "@/lib/damage/aggregate";
 import { getDamageContext } from "@/lib/damage/contexts";
 import { FFXIV_DAMAGE } from "@/lib/damage/ffxiv/game";
+import { WOW_DAMAGE } from "@/lib/damage/wow/game";
 import type { DamageFinding, PhaseDamageSummary, PlayerDamageSummary, PullDamageAnalysis } from "@/lib/damage/types";
 import { getClassColor } from "@/lib/player-display";
 import { useFFPullSelector } from "@/hooks/useFFPullSelector";
@@ -61,9 +68,11 @@ const KIND_LABEL: Record<DamageFinding["kind"], string> = {
   "dot-clip":         "DoT clipping",
 };
 
+const gameOf = (p: Pull) => (p.game === "wow" ? WOW_DAMAGE : FFXIV_DAMAGE);
+
 export default function DamageDialog({ open, onClose, pulls, currentPullId }: DamageDialogProps) {
-  const { ffPulls, selectedPullId, setSelectedPullId, selectedPull } =
-    useFFPullSelector(pulls, open, currentPullId);
+  const { ffPulls: gamePulls, selectedPullId, setSelectedPullId, selectedPull } =
+    useFFPullSelector(pulls, open, currentPullId, ["ffxiv", "wow"]);
   const [allPulls, setAllPulls] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
   const [view, setView] = useState<"findings" | "compare">("findings");
@@ -71,18 +80,34 @@ export default function DamageDialog({ open, onClose, pulls, currentPullId }: Da
   // stays mounted when the dialog closes); re-adding one is a user action.
   const [refs, setRefs] = useState<ReferenceClear[]>([]);
 
-  // Only computed while open; the analysis reads every damage event.
+  // Analyses are computed only for the pulls on show and cached per Pull
+  // object; a re-import replaces the objects, so stale entries never match.
+  const cache = useRef(new WeakMap<Pull, PullDamageAnalysis>());
   const analyses = useMemo(() => {
-    if (!open) return new Map<number, PullDamageAnalysis>();
-    return new Map(ffPulls.map((p) => [p.id, analyzePullDamage(p, FFXIV_DAMAGE, getDamageContext(p.name))]));
-  }, [open, ffPulls]);
+    const out = new Map<number, PullDamageAnalysis>();
+    if (!open) return out;
+    const shown = allPulls ? gamePulls : selectedPull ? [selectedPull] : [];
+    for (const p of shown) {
+      let a = cache.current.get(p);
+      if (!a) { a = analyzePullDamage(p, gameOf(p), getDamageContext(p.name)); cache.current.set(p, a); }
+      out.set(p.id, a);
+    }
+    return out;
+  }, [open, allPulls, gamePulls, selectedPull]);
   const aggregate = useMemo(() => (allPulls ? aggregateDamage([...analyses.values()]) : []), [allPulls, analyses]);
 
   if (!open) return null;
 
+  const isWow = (selectedPull ?? gamePulls[gamePulls.length - 1])?.game === "wow";
+  const colorGame = isWow ? "wow" : "ffxiv";
+  // WoW findings name the spec ("Fire Mage"); class colours key on the class.
+  const classOf = new Map<string, string>();
+  for (const p of (allPulls ? gamePulls : selectedPull ? [selectedPull] : [])) for (const pl of p.players) classOf.set(pl.name, pl.className);
+  const colorFor = (player: string, job: string) => getClassColor(colorGame, isWow ? classOf.get(player) ?? job : job);
+
   const analysis = selectedPull ? analyses.get(selectedPull.id) : undefined;
   const needRefetch = [...analyses.values()].filter((a) => a.missingData.length > 0).length;
-  const contextName = (allPulls ? ffPulls[ffPulls.length - 1] : selectedPull)?.name;
+  const contextName = (allPulls ? gamePulls[gamePulls.length - 1] : selectedPull)?.name;
   const hasContext = contextName ? getDamageContext(contextName) !== undefined : false;
 
   const playerNames = allPulls ? aggregate.map((a) => a.player) : analysis?.players.map((p) => p.player) ?? [];
@@ -91,15 +116,15 @@ export default function DamageDialog({ open, onClose, pulls, currentPullId }: Da
   return (
     <Dialog
       title="Damage"
-      width={ffPulls.length > 0 ? "min(1400px, 97vw)" : "480px"}
+      width={gamePulls.length > 0 ? "min(1400px, 97vw)" : "480px"}
       maxHeight="88vh"
       zIndex={1100}
       onBackdropClick={onClose}
       onClose={onClose}
       bodyStyle={{ display: "flex", flexDirection: "column", overflow: "hidden" }}
     >
-      {ffPulls.length === 0 ? (
-        <p className="ck-dialog-text">No FFXIV report loaded. Import a report to see where each player lost damage.</p>
+      {gamePulls.length === 0 ? (
+        <p className="ck-dialog-text">No report loaded. Import a report to see where each player lost damage.</p>
       ) : (
         <>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
@@ -120,8 +145,8 @@ export default function DamageDialog({ open, onClose, pulls, currentPullId }: Da
               }}
               style={{ padding: "3px 8px" }}
             >
-              <option value="all">All loaded pulls ({ffPulls.length})</option>
-              {ffPulls.map((p) => (
+              <option value="all">All loaded pulls ({gamePulls.length})</option>
+              {gamePulls.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name} #{p.pullNumber} ({p.result}){analyses.get(p.id)?.missingData.length ? " — needs re-fetch" : ""}
                 </option>
@@ -134,19 +159,23 @@ export default function DamageDialog({ open, onClose, pulls, currentPullId }: Da
               {!allPulls && analysis?.missingData.length
                 ? ` This pull was fetched without ${analysis.missingData.join(", ")}; re-fetch the report for the full analysis.`
                 : allPulls && needRefetch > 0
-                  ? ` ${needRefetch} of ${ffPulls.length} pulls were fetched before the damage data existed; re-fetch the report for the full analysis.`
+                  ? ` ${needRefetch} of ${gamePulls.length} pulls were fetched before the damage data existed; re-fetch the report for the full analysis.`
                   : ""}
             </span>
           </div>
 
           {view === "compare" ? (
             <div style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto" }}>
-              <DamageCompare
-                ownPulls={allPulls ? ffPulls : selectedPull ? [selectedPull] : []}
-                analyses={analyses}
-                refs={refs}
-                onRefsChange={setRefs}
-              />
+              {isWow ? (
+                <p className="ck-dialog-text">Comparing with reference clears isn&apos;t built for WoW yet.</p>
+              ) : (
+                <DamageCompare
+                  ownPulls={allPulls ? gamePulls.filter((p) => p.game === "ffxiv") : selectedPull ? [selectedPull] : []}
+                  analyses={analyses}
+                  refs={refs}
+                  onRefsChange={setRefs}
+                />
+              )}
             </div>
           ) : (
           <div style={{ flex: "1 1 auto", minHeight: 0, display: "grid", gridTemplateColumns: "340px minmax(0, 1fr)", gap: 12 }}>
@@ -157,12 +186,12 @@ export default function DamageDialog({ open, onClose, pulls, currentPullId }: Da
               </div>
               {allPulls
                 ? aggregate.map((a) => (
-                  <PlayerCard key={a.player} name={a.player} job={a.job} lost={a.lostPerPull} forced={a.forcedPerPull}
+                  <PlayerCard key={a.player} name={a.player} job={a.job} color={colorFor(a.player, a.job)} lost={a.lostPerPull} forced={a.forcedPerPull}
                     sub={`${a.pulls} pull${a.pulls === 1 ? "" : "s"}`}
                     selected={a.player === activePlayer} onClick={() => setSelectedPlayer(a.player)} />
                 ))
                 : analysis?.players.map((p) => (
-                  <PlayerCard key={p.player} name={p.player} job={p.job} lost={p.lostDamage} forced={p.forcedDamage}
+                  <PlayerCard key={p.player} name={p.player} job={p.job} color={colorFor(p.player, p.job)} lost={p.lostDamage} forced={p.forcedDamage}
                     sub={`dealt ${fmtDamage(p.damage)}`}
                     selected={p.player === activePlayer} onClick={() => setSelectedPlayer(p.player)} />
                 ))}
@@ -170,11 +199,12 @@ export default function DamageDialog({ open, onClose, pulls, currentPullId }: Da
 
             <div style={{ minHeight: 0, overflowY: "auto", border: "1px solid var(--ck-line-2)", borderRadius: 3, padding: 12 }}>
               {allPulls ? (
-                <AggregateDetail agg={aggregate.find((a) => a.player === activePlayer)} totalPulls={ffPulls.length} />
+                <AggregateDetail agg={aggregate.find((a) => a.player === activePlayer)} totalPulls={gamePulls.length} colorFor={colorFor} />
               ) : analysis && activePlayer ? (
                 <PlayerDetail
                   summary={analysis.players.find((p) => p.player === activePlayer)!}
                   analysis={analysis}
+                  colorFor={colorFor}
                 />
               ) : (
                 <p className="ck-dialog-text">No players in this pull.</p>
@@ -183,14 +213,26 @@ export default function DamageDialog({ open, onClose, pulls, currentPullId }: Da
           </div>
           )}
 
-          <p className="ck-help" style={{ margin: "10px 0 0" }}>
-            Losses are estimates in each player&apos;s own damage from the pull; every line shows its basis.
-            Greyed lines are forced (untargetable, dead, a limit break, or a phase whose damage doesn&apos;t count)
-            and aren&apos;t counted. Action and status data and parts of the method are adapted from{" "}
-            <a href="https://github.com/xivanalysis/xivanalysis" target="_blank" rel="noreferrer" style={{ color: "var(--ck-arcane-text)" }}>
-              xivanalysis
-            </a>{" "}(MIT).
-          </p>
+          {isWow ? (
+            <p className="ck-help" style={{ margin: "10px 0 0" }}>
+              Losses are estimates in each player&apos;s own damage from the pull; every line shows its basis.
+              Greyed lines are forced (untargetable, dead, a boss mechanic that keeps the player off the boss, or a
+              phase whose damage doesn&apos;t count) and aren&apos;t counted. Spell timings are measured from logs;
+              rules informed by{" "}
+              <a href="https://github.com/WoWAnalyzer/WoWAnalyzer" target="_blank" rel="noreferrer" style={{ color: "var(--ck-arcane-text)" }}>
+                WoWAnalyzer
+              </a>.
+            </p>
+          ) : (
+            <p className="ck-help" style={{ margin: "10px 0 0" }}>
+              Losses are estimates in each player&apos;s own damage from the pull; every line shows its basis.
+              Greyed lines are forced (untargetable, dead, a limit break, or a phase whose damage doesn&apos;t count)
+              and aren&apos;t counted. Action and status data and parts of the method are adapted from{" "}
+              <a href="https://github.com/xivanalysis/xivanalysis" target="_blank" rel="noreferrer" style={{ color: "var(--ck-arcane-text)" }}>
+                xivanalysis
+              </a>{" "}(MIT).
+            </p>
+          )}
         </>
       )}
     </Dialog>
@@ -241,8 +283,10 @@ function PhaseTable({ phases }: { phases: PhaseDamageSummary[] }) {
   );
 }
 
-function PlayerCard({ name, job, lost, forced, sub, selected, onClick }: {
-  name: string; job: string; lost: number; forced: number; sub: string; selected: boolean; onClick: () => void;
+type ColorFor = (player: string, job: string) => string;
+
+function PlayerCard({ name, job, color, lost, forced, sub, selected, onClick }: {
+  name: string; job: string; color: string; lost: number; forced: number; sub: string; selected: boolean; onClick: () => void;
 }) {
   return (
     <div
@@ -250,7 +294,7 @@ function PlayerCard({ name, job, lost, forced, sub, selected, onClick }: {
       onClick={onClick}
       style={{ padding: "7px 10px", marginBottom: 6, display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}
     >
-      <span style={{ width: 4, alignSelf: "stretch", borderRadius: 2, background: getClassColor("ffxiv", job) }} />
+      <span style={{ width: 4, alignSelf: "stretch", borderRadius: 2, background: color }} />
       <div style={{ flex: "1 1 auto", minWidth: 0 }}>
         <div style={{ color: "var(--ck-text)", fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</div>
         <div style={{ color: "var(--ck-text-3)", fontSize: 11 }}>{job} · {sub}</div>
@@ -263,12 +307,12 @@ function PlayerCard({ name, job, lost, forced, sub, selected, onClick }: {
   );
 }
 
-function PlayerDetail({ summary, analysis }: { summary: PlayerDamageSummary; analysis: PullDamageAnalysis }) {
+function PlayerDetail({ summary, analysis, colorFor }: { summary: PlayerDamageSummary; analysis: PullDamageAnalysis; colorFor: ColorFor }) {
   const shown = summary.findings.filter((f) => f.lostDamage >= 1 || f.kind === "interrupted-cast");
   return (
     <div>
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
-        <span style={{ color: getClassColor("ffxiv", summary.job), fontSize: 15, fontWeight: 600 }}>{summary.player}</span>
+        <span style={{ color: colorFor(summary.player, summary.job), fontSize: 15, fontWeight: 600 }}>{summary.player}</span>
         <span style={{ color: "var(--ck-text-3)", fontSize: 12 }}>{summary.job}</span>
         <span className="ck-help" style={{ margin: 0 }}>
           GCD <span className="ck-num">{(summary.baseGcdMs / 1000).toFixed(2)}s</span> · {summary.gcds} GCDs ·
@@ -357,13 +401,13 @@ function TimelineStrip({ summary, analysis }: { summary: PlayerDamageSummary; an
   );
 }
 
-function AggregateDetail({ agg, totalPulls }: { agg: PlayerDamageAggregate | undefined; totalPulls: number }) {
+function AggregateDetail({ agg, totalPulls, colorFor }: { agg: PlayerDamageAggregate | undefined; totalPulls: number; colorFor: ColorFor }) {
   if (!agg) return <p className="ck-dialog-text">No players.</p>;
   const rows = agg.recurring.filter((r) => r.lostDamage >= 1 || r.kind === "interrupted-cast");
   return (
     <div>
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 8 }}>
-        <span style={{ color: getClassColor("ffxiv", agg.job), fontSize: 15, fontWeight: 600 }}>{agg.player}</span>
+        <span style={{ color: colorFor(agg.player, agg.job), fontSize: 15, fontWeight: 600 }}>{agg.player}</span>
         <span style={{ color: "var(--ck-text-3)", fontSize: 12 }}>{agg.job} · in {agg.pulls} of {totalPulls} pulls</span>
       </div>
       <div className="ck-table-wrap">

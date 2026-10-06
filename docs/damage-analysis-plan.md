@@ -855,8 +855,27 @@ where.
     add windows yet.
   - Partial losses (a mechanic that halves a melee's uptime) are excused
     in full or not at all.
-  - Coiled Altar's phase ids need a fresh capture.
   - Enrage timers are mostly unobserved in these wipes.
+- **Refetched for the contexts** (5 pulls, 171 points):
+  - Coiled Altar pull 11 (gave its phase ids: 1–2 stages, 3
+    intermission, 4 Stage Three)
+  - the Twin Fangs (`6Jnq8ycwgkYZpHND` 25) and Lost Explorers
+    (`8PQFgdDh3R9BW71t` 20) kills
+  - Entombed Sentinels pulls 15 and 24
+
+**Step 5** (2026-10-06): the Damage dialog shows WoW pulls
+(`components/DamageDialog.tsx`).
+- **Game layer per pull:** each pull uses its own (`WOW_DAMAGE` or
+  `FFXIV_DAMAGE`). `useFFPullSelector` takes an optional games list; the
+  other dialogs keep FFXIV only.
+- **Lazy analysis:** a pull is analysed when first shown and cached for
+  the open dialog. Before, every loaded pull was analysed on open. One WoW
+  pull takes ~0.3s (the 598s Ula'tek kill). "All loaded pulls" analyses
+  them all, so a 25-pull WoW report takes several seconds there.
+- **Colours and credit:** WoW players are coloured by class (findings name
+  the spec). The About line reads "rules informed by WoWAnalyzer", a plain
+  link; FFXIV keeps its xivanalysis credit.
+- **Compare with clears** says it isn't built for WoW yet (step 7).
 
 ## UI: the Damage dialog
 

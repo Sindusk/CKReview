@@ -4,9 +4,9 @@
 // (docs/damage-analysis-plan.md, "WoW build order" step 4;
 // lib/damage/types.ts DamageContext). Measured on wThYvpJkbK6Pjrdc pulls
 // 1–17 (wipes; the kill is only in the spell survey), 2026-10-06. The
-// encounter model is coiled-altar.ts's header. These captures carry no
-// phase data, so the log's phase ids are unknown and phases are left
-// empty; refetch a pull to add them.
+// encounter model is coiled-altar.ts's header. Phase ids from pull 11
+// (refetched with phase data): 1 Stage One, 2 Stage Two, 3 Intermission,
+// 4 Stage Three.
 //
 // ── Stages (names from the header) ─────────────────────────────────────
 // S1 Serpent's Bargain (Zul'jan), S2 Usurper's Reprisal (Malacrass, from
@@ -38,7 +38,12 @@ const WAIL_FEAR = 1286399;
 
 export const COILED_ALTAR_DAMAGE_CONTEXT: DamageContext = {
   encounter: "The Coiled Altar",
-  phases: {},
+  phases: {
+    1: { note: "Serpent's Bargain: Zul'jan" },
+    2: { multiTarget: true, note: "Usurper's Reprisal: Malacrass and Spiteful Soulcoilers" },
+    3: { note: "The Claimed Vessel: Zul'jan takes +100%; Malacrass is immune" },
+    4: { multiTarget: true, note: "Coiled Union: both bosses, health kept balanced" },
+  },
   forcedWindows: (pull) => {
     const first = (id: number) => [...(pull.enemyCasts ?? []), ...(pull.enemyBuffs ?? [])]
       .filter((e) => e.abilityId === id).map((e) => e.timestamp).sort((a, b) => a - b)[0];
