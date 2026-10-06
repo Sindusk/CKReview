@@ -367,6 +367,7 @@ function buildAvailability(
   for (const tl of casts) {
     const { player, entry } = tl;
     if (entry.cooldownMs === 0 || entry.kind === "invuln" || entry.kind === "limitBreak") continue;
+    if (entry.inSheet === false) continue;
     // A self-only mitigation matters only if this player was hit.
     if (entry.reach === "self" && !targeted.has(player.name)) continue;
 
@@ -513,8 +514,11 @@ export function findDroppable(hits: MitigationHit[], game: MitigationGame): Drop
   const removed = new Set<string>();
   const candidates = [...names.keys()].filter((key) => {
     const entry = game.catalog.find((e) => e.key === key);
-    if (!entry || entry.kind === "invuln") return false;
-    if (entry.kind !== "limitBreak" && entry.cooldownMs < DROP_MIN_COOLDOWN_MS) return false;
+    // Only party-wide mitigation is offered (user, 2026-10-06): the result
+    // is shown as a count of party mitigations the hit could do without.
+    if (!entry || entry.reach !== "party" || entry.inSheet === false) return false;
+    if (entry.kind === "invuln" || entry.kind === "limitBreak") return false;
+    if (entry.cooldownMs < DROP_MIN_COOLDOWN_MS) return false;
     // Skip what had no effect (a % mitigation on an unaspected hit, a
     // shield that absorbed nothing).
     const without = new Set([key]);

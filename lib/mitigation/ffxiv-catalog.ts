@@ -184,10 +184,12 @@ export const FFXIV_MITIGATION_CATALOG: CatalogEntry[] = [
   { key: "celestial-intersection", name: "Celestial Intersection", jobs: ["Astrologian"], actionIds: [16556],
     statuses: [shield(1001889, "Intersection")],
     kind: "shield", reach: "target", durationMs: 30_000, cooldownMs: 30_000, charges: 2, verified: true },
+  // Cards are not planned as mitigation (user, 2026-10-06): kept so their
+  // statuses are understood on a hit, but out of the sheet.
   { key: "the-bole", name: "The Bole", jobs: ["Astrologian"], actionIds: [37027], statuses: [pct(1003890, "The Bole", 0.10)],
-    kind: "personal", reach: "target", durationMs: 15_000, cooldownMs: 60_000, gated: "Card draw", verified: true },
+    kind: "personal", reach: "target", durationMs: 15_000, cooldownMs: 60_000, gated: "Card draw", inSheet: false, verified: true },
   { key: "the-spire", name: "The Spire", jobs: ["Astrologian"], actionIds: [37025], statuses: [shield(1003892, "The Spire")],
-    kind: "shield", reach: "target", durationMs: 15_000, cooldownMs: 60_000, gated: "Card draw", verified: true },
+    kind: "shield", reach: "target", durationMs: 15_000, cooldownMs: 60_000, gated: "Card draw", inSheet: false, verified: true },
 
   // ── Sage ────────────────────────────────────────────────────────────
   { key: "kerachole", name: "Kerachole", jobs: ["Sage"], actionIds: [24298], statuses: [pct(1002618, "Kerachole", 0.10)],

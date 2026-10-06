@@ -407,9 +407,19 @@ Choices made while building, open to tuning with the user:
 - **Follow-up damage:** each player's later drop counts all enemy damage
   chained within 5s of the hit, up to 15s. A hit bigger than a whole
   health bar (a failed mechanic) is skipped.
-- **Droppable:** only mitigations with a 30s+ cooldown, or a tank LB, are
-  candidates. GCD shields and short personals are treated as always used.
-  The result keeps the lowest player at 5%+ after a 5% damage-roll buffer.
+- **Droppable:** only party-wide mitigations with a 30s+ cooldown are
+  candidates. The result keeps the lowest player at 5%+ after a 5%
+  damage-roll buffer. The UI shows only the count (user, 2026-10-06: a
+  list of names read as "drop all of these"); the validate runner prints
+  the names for tuning.
+- **Sheet columns** (user review, 2026-10-06): grouped per player in
+  MT, OT, H1, H2, M1, M2, R1, R2 order with a rule between players.
+  Party-wide mitigation shows by default; personal mitigation expands per
+  player. Astrologian cards are out of the sheet (`inSheet: false`) but
+  still understood on hits.
+- **Free** = a full cooldown since the player's last cast AND a full
+  cooldown before their next one (multi-charge abilities are simulated).
+  In all-pulls mode a ◆ needs it free in at least half the pulls.
 - **Aggregate verdict:** median margin across pulls; the worst margin and
   deaths are shown beside it.
 - **"Ineffective"** (cast and within its duration but not on the hit) is

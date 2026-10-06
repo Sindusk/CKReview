@@ -21,7 +21,7 @@ import { aggregateMitigation } from "@/lib/mitigation/aggregate";
 import { FFXIV_MITIGATION } from "@/lib/mitigation/ffxiv-catalog";
 import { useFFPullSelector } from "@/hooks/useFFPullSelector";
 import {
-  AggregateTimeline, PullTimeline, TimelineLegend, buildColumns, hasMitigationData,
+  AggregateTimeline, PullTimeline, TimelineLegend, buildPlayerGroups, hasMitigationData,
 } from "./MitigationTimeline";
 import { Dialog } from "./ui/Dialog";
 
@@ -38,6 +38,13 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId }
   const { ffPulls, selectedPullId, setSelectedPullId, selectedPull } =
     useFFPullSelector(pulls, open, currentPullId);
   const [allPulls, setAllPulls] = useState(true);
+  // Players whose personal mitigation columns are open (collapsed by default).
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toggleExpanded = (player: string) => setExpanded((prev) => {
+    const next = new Set(prev);
+    if (next.has(player)) next.delete(player); else next.add(player);
+    return next;
+  });
 
   const analyzable = useMemo(() => ffPulls.filter(hasMitigationData), [ffPulls]);
   const stale = ffPulls.length - analyzable.length;
@@ -50,7 +57,7 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId }
     }));
   }, [open, analyzable]);
   const aggregate = useMemo(() => (allPulls ? aggregateMitigation(perPull, FFXIV_MITIGATION) : []), [allPulls, perPull]);
-  const columns = useMemo(() => buildColumns(allPulls ? analyzable : selectedPull ? [selectedPull] : []),
+  const groups = useMemo(() => buildPlayerGroups(allPulls ? analyzable : selectedPull ? [selectedPull] : []),
     [allPulls, analyzable, selectedPull]);
 
   if (!open) return null;
@@ -109,9 +116,9 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId }
             ) : allPulls ? (
               analyzable.length === 0
                 ? <p className="ck-dialog-text" style={{ padding: 12 }}>No loaded pull has mitigation data yet. Re-fetch the report to analyze it.</p>
-                : <AggregateTimeline rows={aggregate} columns={columns} />
+                : <AggregateTimeline rows={aggregate} groups={groups} expanded={expanded} onToggle={toggleExpanded} />
             ) : selectedHits && selectedHits.length > 0 ? (
-              <PullTimeline hits={selectedHits} columns={columns} />
+              <PullTimeline hits={selectedHits} groups={groups} expanded={expanded} onToggle={toggleExpanded} />
             ) : (
               <p className="ck-dialog-text" style={{ padding: 12 }}>No raidwide hits in this pull.</p>
             )}

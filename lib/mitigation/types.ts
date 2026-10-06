@@ -42,6 +42,10 @@ export type CatalogEntry = {
   // Can end before durationMs (a channel, or a ground effect players leave),
   // so being within its duration doesn't mean it should be on a hit.
   variableDuration?: boolean;
+  // false: recognized on hits (so the math stays right) but never shown as
+  // a column, graded for availability or offered as droppable. For things
+  // the group doesn't plan as mitigation (Astrologian cards, per the user).
+  inSheet?:   false;
   // True once the action and status IDs were seen in a real log.
   verified:   boolean;
 };
