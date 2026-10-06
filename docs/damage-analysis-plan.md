@@ -185,16 +185,32 @@ Pitfalls).
   `type === "cast"` and drops `begincast`, though the query returns both.
   Keep begin-casts in a separate field: interruptions and cast-time
   analysis need them.
-- **Buffs on players** (raid buffs, self-buffs, procs). Not fetched today:
-  the query has player debuffs, enemy buffs and enemy debuffs only. Add a
-  stream filtered on the server to status IDs from the catalog
-  (`filterExpression`, as `enemyDebuffs` and `headMarkers` already do) to
-  keep the payload small. The mitigation redesign needs player buffs too;
-  build one shared stream for both features. Remember the template-literal
-  pitfalls in `FIGHT_EVENTS_QUERY` (no `//` comments, no backticks).
-- **Damage-done detail:** hit type (crit / direct hit) and the event
-  multiplier, needed for stack checks and buff contribution. Confirm which
-  fields the v2 API returns before designing on them.
+- **Buffs on players** (raid buffs, self-buffs, procs). **Revised by the
+  mitigation build** (see "Data check findings" in
+  [mitigation-redesign.md](mitigation-redesign.md)): every FFLogs damage
+  event carries `buffs`, a snapshot of status IDs, and on outgoing
+  `damageDone` events it already listed raid buffs (Battle Litany,
+  Technical Finish). The mitigation work therefore built no player-buff
+  stream. First check how far `buffs` on `damageDone` goes:
+  - Does it list self-buffs and debuffs on the boss (Chain Stratagem,
+    Dokumori), and is it the attacker's or the target's statuses?
+  - It can't show a proc that expired unused, or exactly when a buff was
+    applied and removed. Proc and buff-window checks may still need
+    apply/remove events.
+  Add a stream only for what `buffs` can't answer, filtered on the server
+  to the needed status IDs (`filterExpression`, as `enemyDebuffs` and
+  `headMarkers` already do). Remember the template-literal pitfalls in
+  `FIGHT_EVENTS_QUERY` (no `//` comments, no backticks). Note the `buffs`
+  snapshot lag found there: it reflects when the hit was calculated, up to
+  about 0.85s before it landed.
+- **Damage-done detail:** the mitigation build confirmed that raw
+  `damageTaken` events carry `hitType`, `multiplier`, `unmitigatedAmount`
+  and more, and that ability damage type comes from `masterData.abilities
+  { type }` (already requested now). Confirm the same fields on
+  `damageDone` (crit and direct hit in `hitType`, the multiplier from
+  raid buffs), and keep them on `PlayerEvent` the same way.
+  `scripts/lib/slim-report.js` was widened for the damage-taken fields;
+  widen it for these too.
 - **Truncated tables.** The DamageDone table returns only each player's
   top 5 abilities; per-ability totals need events.
 - Pulls stored before these changes lack the new data. Re-fetching is an
