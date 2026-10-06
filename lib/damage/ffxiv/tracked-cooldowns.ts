@@ -106,6 +106,31 @@ export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
     { actions: ["CHAIN_SAW"], firstUseOffsetMs: 12500, holdMs: 100 },
   ],
 
+  // ── Casters (from xivanalysis blm/OGCDDowntime, smn/GeneralCDDowntime,
+  //    rdm/GeneralCDDowntime) ─────────────────────────────────────────
+  // Black Mage allows 5s of hold and a 15s first-use offset by default.
+  "Black Mage": [
+    { actions: ["LEY_LINES"], firstUseOffsetMs: 15000, holdMs: 5000 },
+    { actions: ["MANAFONT"], firstUseOffsetMs: 25000, holdMs: 5000 },
+    { actions: ["TRIPLECAST"], firstUseOffsetMs: 15000, holdMs: 5000 },
+    { actions: ["AMPLIFIER"], firstUseOffsetMs: 15000, holdMs: 5000 },
+  ],
+  "Summoner": [
+    { actions: ["SUMMON_BAHAMUT", "SUMMON_PHOENIX", "SUMMON_SOLAR_BAHAMUT"], firstUseOffsetMs: 4500 },
+    { actions: ["SMN_ENERGY_DRAIN", "ENERGY_SIPHON"], firstUseOffsetMs: 7500 },
+    { actions: ["SEARING_LIGHT"], firstUseOffsetMs: 3500 },
+  ],
+  // Red Mage allows 1s of hold by default.
+  "Red Mage": [
+    { actions: ["ACCELERATION"], holdMs: 4000 },
+    { actions: ["MANAFICATION"], firstUseOffsetMs: 17500, holdMs: 1000 },
+    { actions: ["EMBOLDEN"], firstUseOffsetMs: 7500, holdMs: 1000 },
+    { actions: ["FLECHE"], holdMs: 1000 },
+    { actions: ["CONTRE_SIXTE"], holdMs: 1000 },
+    { actions: ["CORPS_A_CORPS"], holdMs: 1000 },
+    { actions: ["ENGAGEMENT", "DISPLACEMENT"], holdMs: 1000 },
+  ],
+
   // ── From xivanalysis ────────────────────────────────────────────────
   "Monk": [
     { actions: ["BROTHERHOOD"], firstUseOffsetMs: 7000 },
@@ -139,10 +164,8 @@ export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
     { actions: ["AETHERFLOW"], firstUseOffsetMs: 7500 },
   ],
 
-  // ── Party buffs only, until the job's batch ─────────────────────────
+  // ── Jobs xivanalysis doesn't track: party buff only ─────────────────
   "Astrologian": [{ actions: ["DIVINATION"] }],
-  // Not in xivanalysis; unverified (no White Mage in any sample).
+  // Unverified (no White Mage in any sample).
   "White Mage":  [{ actions: ["PRESENCE_OF_MIND"] }],
-  "Red Mage":    [{ actions: ["EMBOLDEN"] }],
-  "Summoner":    [{ actions: ["SEARING_LIGHT"] }],
 };

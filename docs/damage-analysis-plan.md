@@ -461,6 +461,28 @@ yet:
 - **BRD and MCH**, unverified: BRD DoTs and cooldowns; MCH Wildfire (an
   enemy debuff), Hypercharge and cooldowns.
 
+**Caster batch** (step 6, last role, 2026-10-06), no review yet. Step 6
+is complete:
+- **PCT** (`jobs/caster.ts`):
+  - **Starry Muse contents** (xivanalysis StarryMuse): a missing action is
+    valued at the window's bonus measured from the multiplier (`bonus:
+    "observed"` in `shared.ts`), since Starry Muse lines up with the
+    party's buffs.
+  - **Additive spells inside Starry Muse**, an upper bound. In P3 they're
+    mostly Holy in White during movement.
+  - **The Hammers question:** on `dQ8wmb1VhKt6yBXk` every Starry Muse
+    holds only one Hammer (Hammer Time starts at the window's end). It's
+    consistent across pulls, so probably a chosen line; confirm with the
+    player.
+  - **Dropped:** a "motif painted in uptime" check (~20 per pull: the
+    standard rotation repaints in uptime). Doing it properly needs
+    knowledge of upcoming downtime.
+- **BLM, SMN and RDM**, unverified: BLM High Thunder DoTs; SMN Searing
+  Light with Searing Flash; cooldowns for all three (xivanalysis lists).
+- **Cast interruptions** were already an engine check; begin-cast +
+  duration gives casters their real cast locks. Slidecast timing isn't
+  observable (no movement data), so it isn't judged.
+
 Open:
 - **Per-player busy windows** (tower soaks, debuff carriers, baits) aren't
   in the Dancing Mad context yet. Gaps during a mechanic are labelled
@@ -512,6 +534,8 @@ job module a `validate.js` runner so baselines catch regressions.
 5. **Damage dialog**: the header button, per-player findings and the
    phase summary.
 6. **Tank batch**, user review, then Healer, Melee, Ranged, Caster.
+   Done 2026-10-06 for every combat job. The user will refine each job
+   with its players over time (see "Build status").
 7. **Reference-clear comparison.**
 8. **Later:** automatic search for comparable clears; the WoW port.
 

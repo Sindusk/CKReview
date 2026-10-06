@@ -87,7 +87,11 @@ export type ExpectedAction = {
 export type BurstWindowSpec = {
   statusId:      number;
   name:          string;
-  bonus:         number;      // the window's damage bonus, 0.2 = +20%
+  // The window's damage bonus, 0.2 = +20%. "observed": measured per window
+  // from FFLogs' multiplier, the player's average inside the window over
+  // their median outside raid buffs, for windows that line up with the
+  // party's buffs (Starry Muse). Crit/DH buffs aren't in it, so it's a floor.
+  bonus:         number | "observed";
   bonusBasis:    string;      // where the bonus value comes from
   expectedGcds?: (ctx: PlayerCheckContext) => number;
   expected:      (ctx: PlayerCheckContext, casts: PlayerEvent[]) => ExpectedAction[];
@@ -114,11 +118,22 @@ export function enemyStatusWindows(ctx: PlayerCheckContext, statusId: number): W
   return mergeWindows(out);
 }
 
-export function burstWindowFindings(ctx: PlayerCheckContext, spec: BurstWindowSpec): DamageFinding[] {
+/** The player's average hit multiplier in a window over their median outside raid buffs, minus 1. */
+export function observedBonus(ctx: PlayerCheckContext, w: Window): number {
+  const hits = ctx.player.damageDone.filter((e) => !e.isDoT && e.multiplier !== undefined && (e.amount ?? 0) > 0);
+  const inside = hits.filter((e) => e.timestamp >= w.startMs && e.timestamp <= w.endMs).map((e) => e.multiplier!);
+  const outside = hits.filter((e) => !inWindows(e.timestamp, ctx.buffWindows)).map((e) => e.multiplier!).sort((a, b) => a - b);
+  if (inside.length === 0 || outside.length === 0) return 0;
+  const base = outside[Math.floor(outside.length / 2)];
+  return Math.max(0, inside.reduce((a, m) => a + m, 0) / inside.length / base - 1);
+}
+
+export function burstWindowFindings(ctx: PlayerCheckContext, specIn: BurstWindowSpec): DamageFinding[] {
   const out: DamageFinding[] = [];
-  const windows = spec.onEnemy ? enemyStatusWindows(ctx, spec.statusId) : statusWindows(ctx, spec.statusId);
+  const windows = specIn.onEnemy ? enemyStatusWindows(ctx, specIn.statusId) : statusWindows(ctx, specIn.statusId);
   for (const w of windows) {
     if (w.endMs > ctx.endMs) continue;
+    const spec = { ...specIn, bonus: specIn.bonus === "observed" ? observedBonus(ctx, w) : specIn.bonus };
     // Inclusive end: a stack-consumed buff (Delirium) loses its last stack
     // at the same timestamp as the cast that used it.
     const end = w.endMs + SAME_TIMESTAMP_MS;
