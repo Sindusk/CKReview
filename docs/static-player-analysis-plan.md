@@ -106,10 +106,90 @@ data in fight metadata, which costs no event download:
 
 Add these to the report query in `lib/ffl-client.ts` (`fights(killType:
 Encounters)`, ~line 422) and `lib/wcl-client.ts` (~line 364), and carry
-them on `Pull`. **Verify on real reports first:** which encounters return
-phase data (Dancing Mad should; check Midnight Falls and the Venomous Abyss
-bosses), and the field names. Where the log has no phases, fall back to the
-rule's `phaseHint` and leave exposure at pull level.
+them on `Pull`. Where the log has no phases, fall back to the rule's
+`phaseHint` and leave exposure at pull level. The data check below settles
+which encounters have phases and how to read them.
+
+### Data check findings (2026-10-06)
+
+Checked with metadata-only report queries (no events), about 100 API
+points in total:
+- FFLogs: all 93 Dancing Mad reports in the statics database.
+- WCL: all 6 Midnight Falls reports in the database, plus one sample report
+  per Venomous Abyss boss.
+
+The field names in the plan are correct on both sites, with the same shapes:
+- `ReportFight`: `phaseTransitions { id startTime }`, `lastPhase`,
+  `lastPhaseIsIntermission`, `lastPhaseAsAbsoluteIndex`.
+- report-level `phases { encounterID separatesWipes phases { id name
+  isIntermission } }`.
+
+**Which encounters have phase data:**
+
+| Encounter (id) | Phases from the log | Shape |
+|---|---|---|
+| Dancing Mad (1085) | P1: Kefka … P5: Ultima Kefka | progression, no intermissions |
+| Midnight Falls (3183) | Stage One, Intermission: Total Eclipse, Stage Two, Stage Three, Stage Four | progression; id 2 is an intermission |
+| Ula'tek (3492) | Stage One, Stage Two, Intermission: The Shattering, Stage Three | progression; id 3 is an intermission |
+| Nek'zali the Soulcoiler (3470) | Stage One, Intermission: Ritual of Awakening, Stage Two | progression; id 2 is an intermission |
+| The Coiled Altar (3429) | Stage One, Stage Two, Intermission: The Claimed Vessel, Stage Three | progression; id 3 is an intermission |
+| Entombed Sentinels (3445) | Stage One ↔ Intermission: Vitriolic Stasis | **alternating**, up to 9 segments per pull |
+| Sszorak (3420) | Sszorak ↔ Howling Maelstrom | **alternating** |
+| The Lost Explorers (3497) | base phase 1, plus one "Binding Anguish" phase per sub-boss (ids 2–4) | **alternating**: 1→2→1→3→1→4→1 |
+| Vashnik the Malignant (3455) | none | `lastPhase` 0, no transitions, absent from report `phases` |
+| The Twin Fangs (3421) | none | same |
+| Nymrissa Wavecaller (3379) | none | same |
+
+Belo'ren (3182, also in the database) alternates 1↔2 like Sentinels.
+Midnight Falls pulls in the database reach only Stage Two, so Stages Three
+and Four are known from the names only.
+
+**How to read the fields:**
+- **Phase identity is `phaseTransitions[].id`**, which matches
+  `phases[].id`.
+- **`lastPhase` is not a phase id.** It is a stage ordinal that skips
+  intermissions. A Midnight Falls pull that went 1 → 2 (Intermission) → 3
+  (Stage Two) reports `lastPhase: 2`; Ula'tek in Stage Three (id 4) reports
+  `lastPhase: 3`. Dancing Mad has no intermissions, so the two agree there
+  by coincidence.
+- **`lastPhaseAsAbsoluteIndex` is the index of the last transition** (it
+  reaches 8 on a 2-phase Sentinels pull), not an index into `phases`.
+- Don't store either one. Derive the furthest phase and the last phase from
+  the transitions.
+- **Time base:** `phaseTransitions[].startTime` is report-absolute ms, the
+  same base as `fight.startTime`. The first transition equals the fight
+  start. Subtract the fight start to get pull-relative ms. The last segment
+  ends at `fight.endTime`.
+- **`separatesWipes`** is true for every progression encounter above and
+  false for every alternating one. It's a useful signal, but not a
+  documented contract, so don't rely on it alone.
+- **Missing transitions on FFLogs.** 2 of the 93 Dancing Mad reports return
+  `phaseTransitions: null` on every fight, with `lastPhase: 1`. Both are
+  large P1-only nights: no pull longer than 209 s, and every pull ended
+  above 91% fight progress. Fallback: when transitions are missing and
+  `lastPhase` is 1, record one segment of phase 1 covering the whole pull.
+  Otherwise treat the pull as having no phase data.
+- **Encounters without phases** (Vashnik, Twin Fangs, Nymrissa) use the
+  plan's fallback as written: `phaseHint` on the rule, pull-level exposure.
+
+**Design changes these findings require:**
+1. **`StaticReviewPullPhase` stores one row per segment, not one per
+   phase.** Alternating encounters visit the same phase many times. Add a
+   `seq` column (the segment's order in the pull). "Pulls that reached
+   phase X" becomes a distinct count over pulls.
+2. **`StaticReviewPull.lastPhase` holds the highest phase id reached**,
+   derived from the transitions, not the API's `lastPhase`. For
+   progression encounters that is the furthest phase. For alternating
+   encounters it only shows which sub-phases came up, which is still what
+   the filter needs.
+3. **Phase names need a home.** Errors and segments store the integer phase
+   id. Add a small lookup per static: `StaticPhase` (`staticId`, `bossName`,
+   `phaseId`, `name`, `isIntermission`), upserted at import from the report
+   metadata, so the UI can label "Intermission: Total Eclipse" without
+   another API call.
+4. **Intermissions are real phases in the filter.** They have their own ids
+   and their own mechanics, so the phase filter lists them by name, in id
+   order.
 
 ### Mechanic labels
 
