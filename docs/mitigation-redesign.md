@@ -3,7 +3,9 @@
 Plan for replacing the sheet-based mitigation system with one that reads
 the party's actual mitigation from the log. The direction was agreed with
 the user on 2026-10-06; this doc is the build brief. Nothing in it is
-implemented yet.
+implemented yet. Build step 1 (the data check) is done; its results are in
+[Data check findings](#data-check-findings-2026-10-06) and override the
+Model sections where they disagree.
 
 ## Why
 
@@ -226,6 +228,148 @@ no page scroll, panels clip internally.
   Re-fetching stays an explicit user action (CLAUDE.md: no hidden costs
   on navigation). The UI should say when a pull needs a re-fetch for
   mitigation data.
+
+## Data check findings (2026-10-06)
+
+Checked on slimmed Dancing Mad samples `ZADQVgGzTm8HNc2W` (fight 12, a
+19-minute P5 wipe) and `2aVkjzJnNAgCw1FL` (fight 4), plus one fresh
+**unslimmed** fetch of `ZADQVgGzTm8HNc2W` fight 2 (283s, P1–P2) through
+`fetchFFightData`, and one `masterData.abilities { type }` query on the
+same report.
+
+### 1. Status IDs on damage-taken events
+
+- `buffs` is on ~97% of `damageTaken` events (all but a few unpaired or
+  0-amount records). It is a dot-separated list of status IDs (`1001193.`
+  = Reprisal, `1002618.` = Kerachole, ...), the same IDs the catalog will
+  key on. `fflDecodeActiveBuffNames` currently throws the IDs away.
+- **It also carries the boss-side debuffs.** Reprisal, Feint and Addle
+  appear in the *target's* `buffs` string when they are on the boss that
+  dealt the hit. Shields (Eukrasian Prognosis, Divine Veil, Holosakos, ...)
+  appear there too, as do tank personals and invulnerabilities.
+- **It is a snapshot from when the hit was calculated, not from when it
+  landed.** Hits land staggered (about 45ms per target), and the `buffs`
+  list still contains Addle on hits landing 0.5–0.85s *after* Addle's
+  `removedebuff`. The multiplier on those hits confirms Addle applied.
+- Non-mitigation statuses are mixed in (Well Fed, Battle Litany, songs).
+  Filter by catalog ID.
+
+### 2. Boss debuffs in `enemyDebuffs`
+
+- Reprisal, Feint and Addle are all present, with the right actors:
+  `sourceID` is the player who cast it, and `targetID` is the boss actor
+  (Kefka). The apply event also carries `duration` (15000) and
+  `extraAbilityGameID`, the casting action (7535 Reprisal, 7549 Feint,
+  7560 Addle). That gives the catalog its cast-ID ↔ status-ID pairs from
+  the log.
+- The boss is several actors across phases: one pull applied Reprisal to
+  two different Kefka actor IDs.
+- **Reconstructing windows on the hit's source actor does not work.** On
+  the raw fight, 107 of the 209 hits whose `buffs` lists Reprisal, Feint or
+  Addle had no matching window. Most come from helper actors (for example
+  Double-Trouble Trap, Gravity III), which never carry the debuff, but the
+  game still applies it (the multiplier shows it). The rest are the
+  snapshot lag above.
+- **Dismantle is unconfirmed.** No pull in any local sample has a
+  Machinist. The Machinists listed in report actors were outside the
+  pulls. Reprisal/Feint/Addle behave identically, so Dismantle very likely
+  does too, but it needs one pull with a Machinist to confirm.
+
+### 3. Shield `absorbed` events
+
+- They arrive in the **`healing`** stream (`type: "absorbed"`), followed
+  later by a `removebuff` in the same stream when the shield breaks or
+  expires. `calculatedheal` previews are in that stream too.
+- Raw fields: `sourceID` (who cast the shield), `targetID`,
+  `abilityGameID` (the shield's status ID), `amount`, `attackerID`,
+  `extraAbilityGameID` (the boss ability that was absorbed) and
+  `attackerInstance`. Every shield on the target gets an event per hit,
+  0-amount for shields that absorbed nothing. Timestamps equal the damage
+  event's.
+- **They reach `Pull`, but unusably.** `buildFFPlayers` maps the whole
+  healing stream into `PlayerInfo.healing` / `healingReceived` without
+  `type`, `attackerID` or `extraAbilityGameID`. An absorb is
+  indistinguishable from a heal there.
+  - Side effect today: the roster's Healing tab counts absorbs and
+    `calculatedheal` previews as heals (the latter double counts). Not in
+    scope; noted for later.
+  - The slim projector drops `attackerID` and `extraAbilityGameID`, so the
+    samples can't recover them either.
+- The damage event's own `absorbed` field gives the total absorbed on that
+  hit, which is all the margin math needs. The `absorbed` events are only
+  needed to say *whose* shield took it.
+
+### 4. `unmitigatedAmount`, `multiplier` and damage type
+
+**Present on the raw API; missing from samples only because
+`slim-report.js` drops them.** Raw `damageTaken` fields:
+- `unmitigatedAmount` (218 of 301 events): the hit before mitigation,
+  shields and block.
+- `mitigated`: the amount removed by % mitigation plus block.
+- `absorbed`: the amount shields took.
+- `multiplier` (286 of 301): the product of every % modifier on the hit,
+  rounded to 2 decimals. It **includes vulnerability-up** (2.69 seen) and
+  **excludes block**.
+- `blocked` on tank block hits (`hitType` 4), plus `hitType`.
+
+Checks on the raw fight:
+- `amount + absorbed + mitigated = unmitigatedAmount` on 217 of 218 events.
+- `(amount + absorbed) / unmitigatedAmount = multiplier` within 0.01 on
+  192 of 218; the 26 misses are all blocked hits.
+- `unmitigatedAmount` is missing exactly on 0-amount events: full absorbs,
+  invulnerable/immune hits (`hitType` 7, 10, 20), and unpaired
+  `calculateddamage`.
+
+**Damage type is on the ability, not the event:**
+`masterData.abilities { type }`.
+- `128` = physical (the boss auto-attack).
+- `1024` = magical (every raidwide checked).
+- `32` = unaspected: The Path of Light and Ave Maria show multiplier 1
+  even with Kerachole up, so % mitigation does not apply.
+
+Catalog values checked against the multiplier, on magical hits:
+- Light of Judgment, Addle × Feint × Reprisal × Kerachole:
+  0.9 × 0.95 × 0.9 × 0.9 = 0.69, matching the logged 0.69.
+- Gravity III, Reprisal × Feint × Dark Missionary × Sun Sign × Kerachole:
+  0.9 × 0.95 × 0.9 × 0.9 × 0.9 = 0.62, matching the logged 0.62.
+
+### Design impact
+
+1. **"Active" comes from `buffs` alone,** target-side and boss-side. Drop
+   the `enemyDebuffs` window reconstruction from section 3. Use
+   `enemyDebuffs` apply events only to say *who* cast a boss debuff (the
+   latest apply before the hit, by status ID and boss actor, because the
+   hit's source actor is often a helper).
+2. **Section 5's estimate becomes arithmetic.** Use `unmitigatedAmount`,
+   `multiplier` and `absorbed` from the event. Removing mitigation *r*
+   raises the hit to `unmitigatedAmount × multiplier / (1 − r)` before
+   shields. Fall back to an estimate only for 0-amount hits, from the same
+   ability's other targets in the cluster.
+   - The ability's damage type comes from `masterData` `type`, so no
+     inference and no override table.
+   - Type `32` is unmitigable by %: only shields matter for it.
+   - The logged multiplier double-checks the catalog. A hit where the
+     catalog product disagrees with it flags a wrong catalog value or a
+     missing status.
+3. **Vulnerability-up is visible in the multiplier** (above 1 on its own),
+   so section 4's vuln exclusion can read it from there.
+4. **No new event stream is needed for mitigation.** `buffs` gives the
+   active set; casts give cooldowns; `enemyDebuffs` and the
+   absorbed events give attribution.
+   - The planned buffs-on-players stream is therefore not a mitigation
+     dependency.
+   - `buffs` on *outgoing* `damageDone` events already lists raid buffs
+     (Battle Litany, Technical Finish and others were seen there), which
+     may cover the Damage dialog too.
+5. **Data changes become:**
+   - Request `type` in `REPORT_QUERY`'s abilities (no extra request).
+   - Keep the status ID list, `unmitigatedAmount`, `multiplier`,
+     `absorbed`, `mitigated`, `blocked` and `hitType` on `PlayerEvent`.
+   - Keep `type`, `attackerID` and `extraAbilityGameID` on healing-stream
+     events (or split absorbs into their own list).
+   - Widen `slim-report.js` to keep the same fields, so samples have
+     them; existing samples need `--refetch`.
+   - Per-fight query cost stays flat.
 
 ## What gets removed
 
