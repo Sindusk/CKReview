@@ -48,7 +48,7 @@ export type XivaAction = {
   job:             string;    // xivanalysis root file: GNB, ROLE, ITEMS, ...
   onGcd?:          boolean;
   breaksCombo?:    boolean;
-  combo?:          { start?: true; from?: number | number[]; end?: true };
+  combo?:          { start?: boolean; from?: number | number[]; end?: boolean; potency?: number };
   castTime?:       number;    // ms
   cooldown?:       number;    // ms; the recast for GCDs
   gcdRecast?:      number;    // ms; GCD lock of a GCD with its own cooldown
@@ -61,6 +61,8 @@ export type XivaAction = {
   speedAttribute?: string;    // "SKILL_SPEED" | "SPELL_SPEED"
   potencies?:      XivaPotency[];
   potency?:        number | number[];
+  pet?:            boolean;   // cast by the player's pet
+  duration?:       number;    // ms; effect length on a few actions
 };
 
 export type XivaStatus = {
@@ -70,6 +72,7 @@ export type XivaStatus = {
   duration?:      number;     // ms
   stacksApplied?: number;
   speedModifier?: number;
+  amount?:        number;
 };
 
 export const XIVA_SOURCE = {"commit":"f532855e635bdfb4211cec8128d582dadfdc6a75","commitDate":"2026-09-25","patches":["7.01","7.05","7.1","7.2","7.3","7.4"]} as const;
@@ -83,247 +86,247 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
  "ATTACK": {
   "id": 7,
   "name": "Attack",
-  "autoAttack": true,
-  "job": "SHARED"
+  "job": "SHARED",
+  "autoAttack": true
  },
  "SHOT": {
   "id": 8,
   "name": "Shot",
-  "autoAttack": true,
-  "job": "SHARED"
+  "job": "SHARED",
+  "autoAttack": true
  },
  "MALEFIC": {
   "id": 3596,
   "name": "Malefic",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 1500,
-  "mpCost": 400,
   "job": "AST",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 1500,
+  "cooldown": 2500,
+  "mpCost": 400,
+  "speedAttribute": "SPELL_SPEED"
  },
  "BENEFIC": {
   "id": 3594,
   "name": "Benefic",
+  "job": "AST",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "castTime": 1500,
-  "mpCost": 400,
+  "cooldown": 2500,
   "statusesApplied": [
    "ENHANCED_BENEFIC_II"
   ],
-  "job": "AST",
-  "cooldown": 2500
+  "mpCost": 400,
+  "speedAttribute": "SPELL_SPEED"
  },
  "COMBUST": {
   "id": 3599,
   "name": "Combust",
+  "job": "AST",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "mpCost": 400,
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "COMBUST"
   ],
-  "job": "AST",
-  "castTime": 0,
-  "cooldown": 2500
+  "mpCost": 400,
+  "speedAttribute": "SPELL_SPEED"
  },
  "LIGHTSPEED": {
   "id": 3606,
   "name": "Lightspeed",
+  "job": "AST",
   "cooldown": 60000,
   "cooldownGroup": 19,
   "statusesApplied": [
    "LIGHTSPEED"
   ],
-  "job": "AST",
   "charges": 2
  },
  "HELIOS": {
   "id": 3600,
   "name": "Helios",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 1500,
-  "mpCost": 700,
   "job": "AST",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 1500,
+  "cooldown": 2500,
+  "mpCost": 700,
+  "speedAttribute": "SPELL_SPEED"
  },
  "ASCEND": {
   "id": 3603,
   "name": "Ascend",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 8000,
-  "mpCost": 2400,
   "job": "AST",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 8000,
+  "cooldown": 2500,
+  "mpCost": 2400,
+  "speedAttribute": "SPELL_SPEED"
  },
  "ESSENTIAL_DIGNITY": {
   "id": 3614,
   "name": "Essential Dignity",
+  "job": "AST",
   "cooldown": 40000,
   "cooldownGroup": 9,
-  "charges": 3,
-  "job": "AST"
+  "charges": 3
  },
  "BENEFIC_II": {
   "id": 3610,
   "name": "Benefic II",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 1500,
-  "mpCost": 700,
   "job": "AST",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 1500,
+  "cooldown": 2500,
+  "mpCost": 700,
+  "speedAttribute": "SPELL_SPEED"
  },
  "ASTRAL_DRAW": {
   "id": 37017,
   "name": "Astral Draw",
+  "job": "AST",
   "cooldown": 55000,
-  "cooldownGroup": 15,
-  "job": "AST"
+  "cooldownGroup": 15
  },
  "UMBRAL_DRAW": {
   "id": 37018,
   "name": "Umbral Draw",
+  "job": "AST",
   "cooldown": 55000,
-  "cooldownGroup": 15,
-  "job": "AST"
+  "cooldownGroup": 15
  },
  "PLAY_I": {
   "id": 37019,
   "name": "Play I",
+  "job": "AST",
   "cooldown": 1000,
-  "cooldownGroup": 2,
-  "job": "AST"
+  "cooldownGroup": 2
  },
  "PLAY_II": {
   "id": 37020,
   "name": "Play II",
+  "job": "AST",
   "cooldown": 1000,
-  "cooldownGroup": 3,
-  "job": "AST"
+  "cooldownGroup": 3
  },
  "PLAY_III": {
   "id": 37021,
   "name": "Play III",
+  "job": "AST",
   "cooldown": 1000,
-  "cooldownGroup": 4,
-  "job": "AST"
+  "cooldownGroup": 4
  },
  "ASPECTED_BENEFIC": {
   "id": 3595,
   "name": "Aspected Benefic",
+  "job": "AST",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "castTime": 0,
-  "mpCost": 400,
+  "cooldown": 2500,
   "statusesApplied": [
    "ASPECTED_BENEFIC"
   ],
-  "job": "AST",
-  "cooldown": 2500
+  "mpCost": 400,
+  "speedAttribute": "SPELL_SPEED"
  },
  "ASPECTED_HELIOS": {
   "id": 3601,
   "name": "Aspected Helios",
+  "job": "AST",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "castTime": 1500,
-  "mpCost": 800,
+  "cooldown": 2500,
   "statusesApplied": [
    "ASPECTED_HELIOS"
   ],
-  "job": "AST",
-  "cooldown": 2500
+  "mpCost": 800,
+  "speedAttribute": "SPELL_SPEED"
  },
  "GRAVITY": {
   "id": 3615,
   "name": "Gravity",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 1500,
-  "mpCost": 400,
   "job": "AST",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 1500,
+  "cooldown": 2500,
+  "mpCost": 400,
+  "speedAttribute": "SPELL_SPEED"
  },
  "COMBUST_II": {
   "id": 3608,
   "name": "Combust II",
+  "job": "AST",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "mpCost": 400,
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "COMBUST_II"
   ],
-  "job": "AST",
-  "castTime": 0,
-  "cooldown": 2500
+  "mpCost": 400,
+  "speedAttribute": "SPELL_SPEED"
  },
  "SYNASTRY": {
   "id": 3612,
   "name": "Synastry",
+  "job": "AST",
   "cooldown": 120000,
   "cooldownGroup": 20,
   "statusesApplied": [
    "SYNASTRY_SELF",
    "SYNASTRY"
-  ],
-  "job": "AST"
+  ]
  },
  "DIVINATION": {
   "id": 16552,
   "name": "Divination",
+  "job": "AST",
   "cooldown": 120000,
   "cooldownGroup": 21,
   "statusesApplied": [
    "DIVINATION"
-  ],
-  "job": "AST"
+  ]
  },
  "MALEFIC_II": {
   "id": 3598,
   "name": "Malefic II",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 1500,
-  "mpCost": 400,
   "job": "AST",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 1500,
+  "cooldown": 2500,
+  "mpCost": 400,
+  "speedAttribute": "SPELL_SPEED"
  },
  "COLLECTIVE_UNCONSCIOUS": {
   "id": 3613,
   "name": "Collective Unconscious",
+  "job": "AST",
   "cooldown": 60000,
   "cooldownGroup": 10,
   "statusesApplied": [
    "COLLECTIVE_UNCONSCIOUS_MITIGATION",
    "COLLECTIVE_UNCONSCIOUS",
    "WHEEL_OF_FORTUNE"
-  ],
-  "job": "AST"
+  ]
  },
  "CELESTIAL_OPPOSITION": {
   "id": 16553,
   "name": "Celestial Opposition",
+  "job": "AST",
   "cooldown": 60000,
   "cooldownGroup": 12,
   "statusesApplied": [
    "OPPOSITION"
-  ],
-  "job": "AST"
+  ]
  },
  "EARTHLY_STAR": {
   "id": 7439,
   "name": "Earthly Star",
+  "job": "AST",
   "cooldown": 60000,
   "cooldownGroup": 11,
   "statusesApplied": [
    "EARTHLY_DOMINANCE",
    "GIANT_DOMINANCE"
-  ],
-  "job": "AST"
+  ]
  },
  "STELLAR_BURST": {
   "id": 7440,
@@ -338,1240 +341,1241 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
  "STELLAR_DETONATION": {
   "id": 8324,
   "name": "Stellar Detonation",
+  "job": "AST",
   "cooldown": 3000,
-  "cooldownGroup": 7,
-  "job": "AST"
+  "cooldownGroup": 7
  },
  "MALEFIC_III": {
   "id": 7442,
   "name": "Malefic III",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 1500,
-  "mpCost": 400,
   "job": "AST",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 1500,
+  "cooldown": 2500,
+  "mpCost": 400,
+  "speedAttribute": "SPELL_SPEED"
  },
  "MINOR_ARCANA": {
   "id": 37022,
   "name": "Minor Arcana",
+  "job": "AST",
   "cooldown": 1000,
-  "cooldownGroup": 5,
-  "job": "AST"
+  "cooldownGroup": 5
  },
  "COMBUST_III": {
   "id": 16554,
   "name": "Combust III",
+  "job": "AST",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "mpCost": 400,
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "COMBUST_III"
   ],
-  "job": "AST",
-  "castTime": 0,
-  "cooldown": 2500
+  "mpCost": 400,
+  "speedAttribute": "SPELL_SPEED"
  },
  "MALEFIC_IV": {
   "id": 16555,
   "name": "Malefic IV",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 1500,
-  "mpCost": 400,
   "job": "AST",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 1500,
+  "cooldown": 2500,
+  "mpCost": 400,
+  "speedAttribute": "SPELL_SPEED"
  },
  "CELESTIAL_INTERSECTION": {
   "id": 16556,
   "name": "Celestial Intersection",
+  "job": "AST",
   "cooldown": 30000,
   "cooldownGroup": 8,
-  "charges": 2,
   "statusesApplied": [
    "INTERSECTION"
   ],
-  "job": "AST"
+  "charges": 2
  },
  "HOROSCOPE": {
   "id": 16557,
   "name": "Horoscope",
+  "job": "AST",
   "cooldown": 60000,
   "cooldownGroup": 13,
   "statusesApplied": [
    "HOROSCOPE",
    "HOROSCOPE_HELIOS"
-  ],
-  "job": "AST"
+  ]
  },
  "HOROSCOPE_ACTIVATION": {
   "id": 16558,
   "name": "Horoscope Activation",
-  "cooldown": 0,
-  "job": "AST"
+  "job": "AST",
+  "cooldown": 0
  },
  "NEUTRAL_SECT": {
   "id": 16559,
   "name": "Neutral Sect",
+  "job": "AST",
   "cooldown": 120000,
   "cooldownGroup": 22,
   "statusesApplied": [
    "NEUTRAL_SECT",
    "NEUTRAL_SECT_OTHERS"
-  ],
-  "job": "AST"
+  ]
  },
  "FALL_MALEFIC": {
   "id": 25871,
   "name": "Fall Malefic",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 1500,
-  "mpCost": 400,
   "job": "AST",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 1500,
+  "cooldown": 2500,
+  "mpCost": 400,
+  "speedAttribute": "SPELL_SPEED"
  },
  "GRAVITY_II": {
   "id": 25872,
   "name": "Gravity II",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 1500,
-  "mpCost": 400,
   "job": "AST",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 1500,
+  "cooldown": 2500,
+  "mpCost": 400,
+  "speedAttribute": "SPELL_SPEED"
  },
  "EXALTATION": {
   "id": 25873,
   "name": "Exaltation",
+  "job": "AST",
   "cooldown": 60000,
   "cooldownGroup": 14,
   "statusesApplied": [
    "EXALTATION"
-  ],
-  "job": "AST"
+  ]
  },
  "MACROCOSMOS": {
   "id": 25874,
   "name": "Macrocosmos",
-  "cooldown": 180000,
+  "job": "AST",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "mpCost": 600,
+  "castTime": 0,
+  "cooldown": 180000,
+  "gcdRecast": 2500,
   "cooldownGroup": 23,
   "statusesApplied": [
    "MACROCOSMOS"
   ],
-  "gcdRecast": 2500,
-  "job": "AST",
-  "castTime": 0
+  "mpCost": 600,
+  "speedAttribute": "SPELL_SPEED"
  },
  "MICROCOSMOS": {
   "id": 25875,
   "name": "Microcosmos",
+  "job": "AST",
   "cooldown": 1000,
-  "cooldownGroup": 1,
-  "job": "AST"
+  "cooldownGroup": 1
  },
  "ORACLE": {
   "id": 37029,
   "name": "Oracle",
+  "job": "AST",
   "cooldown": 1000,
-  "cooldownGroup": 3,
-  "job": "AST"
+  "cooldownGroup": 3
  },
  "HELIOS_CONJUNCTION": {
   "id": 37030,
   "name": "Helios Conjunction",
+  "job": "AST",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "castTime": 1500,
-  "mpCost": 800,
+  "cooldown": 2500,
   "statusesApplied": [
    "HELIOS_CONJUNCTION"
   ],
-  "job": "AST",
-  "cooldown": 2500
+  "mpCost": 800,
+  "speedAttribute": "SPELL_SPEED"
  },
  "SUN_SIGN": {
   "id": 37031,
   "name": "Sun Sign",
+  "job": "AST",
   "cooldown": 1000,
+  "cooldownGroup": 6,
   "statusesApplied": [
    "SUN_SIGN"
-  ],
-  "cooldownGroup": 6,
-  "job": "AST"
+  ]
  },
  "THE_BALANCE": {
   "id": 37023,
   "name": "The Balance",
+  "job": "AST",
   "cooldown": 1000,
+  "cooldownGroup": 2,
   "statusesApplied": [
    "THE_BALANCE"
-  ],
-  "cooldownGroup": 2,
-  "job": "AST"
+  ]
  },
  "THE_SPEAR": {
   "id": 37026,
   "name": "The Spear",
+  "job": "AST",
   "cooldown": 1000,
+  "cooldownGroup": 2,
   "statusesApplied": [
    "THE_SPEAR"
-  ],
-  "cooldownGroup": 2,
-  "job": "AST"
+  ]
  },
  "THE_ARROW": {
   "id": 37024,
   "name": "The Arrow",
+  "job": "AST",
   "cooldown": 1000,
+  "cooldownGroup": 3,
   "statusesApplied": [
    "THE_ARROW"
-  ],
-  "cooldownGroup": 3,
-  "job": "AST"
+  ]
  },
  "THE_BOLE": {
   "id": 37027,
   "name": "The Bole",
+  "job": "AST",
   "cooldown": 1000,
+  "cooldownGroup": 3,
   "statusesApplied": [
    "THE_BOLE"
-  ],
-  "cooldownGroup": 3,
-  "job": "AST"
+  ]
  },
  "THE_EWER": {
   "id": 37028,
   "name": "The Ewer",
+  "job": "AST",
   "cooldown": 1000,
+  "cooldownGroup": 4,
   "statusesApplied": [
    "THE_EWER"
-  ],
-  "cooldownGroup": 4,
-  "job": "AST"
+  ]
  },
  "THE_SPIRE": {
   "id": 37025,
   "name": "The Spire",
+  "job": "AST",
   "cooldown": 1000,
+  "cooldownGroup": 4,
   "statusesApplied": [
    "THE_SPIRE"
-  ],
-  "cooldownGroup": 4,
-  "job": "AST"
+  ]
  },
  "LADY_OF_CROWNS": {
   "id": 7445,
   "name": "Lady Of Crowns",
+  "job": "AST",
   "cooldown": 1000,
-  "cooldownGroup": 5,
-  "job": "AST"
+  "cooldownGroup": 5
  },
  "LORD_OF_CROWNS": {
   "id": 7444,
   "name": "Lord Of Crowns",
+  "job": "AST",
   "cooldown": 1000,
-  "cooldownGroup": 5,
-  "job": "AST"
+  "cooldownGroup": 5
  },
  "BLIZZARD_I": {
   "id": 142,
   "name": "Blizzard",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 2000,
-  "mpCost": 400,
   "job": "BLM",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 2000,
+  "cooldown": 2500,
+  "mpCost": 400,
+  "speedAttribute": "SPELL_SPEED"
  },
  "BLIZZARD_II": {
   "id": 25793,
   "name": "Blizzard II",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 3000,
-  "mpCost": 800,
   "job": "BLM",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 3000,
+  "cooldown": 2500,
+  "mpCost": 800,
+  "speedAttribute": "SPELL_SPEED"
  },
  "BLIZZARD_III": {
   "id": 154,
   "name": "Blizzard III",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 3500,
-  "mpCost": 800,
   "job": "BLM",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 3500,
+  "cooldown": 2500,
+  "mpCost": 800,
+  "speedAttribute": "SPELL_SPEED"
  },
  "BLIZZARD_IV": {
   "id": 3576,
   "name": "Blizzard IV",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 2000,
-  "mpCost": 800,
   "job": "BLM",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 2000,
+  "cooldown": 2500,
+  "mpCost": 800,
+  "speedAttribute": "SPELL_SPEED"
  },
  "FREEZE": {
   "id": 159,
   "name": "Freeze",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 2000,
-  "mpCost": 1000,
   "job": "BLM",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 2000,
+  "cooldown": 2500,
+  "mpCost": 1000,
+  "speedAttribute": "SPELL_SPEED"
  },
  "UMBRAL_SOUL": {
   "id": 16506,
   "name": "Umbral Soul",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "job": "BLM",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "FIRE_I": {
   "id": 141,
   "name": "Fire",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 2000,
-  "mpCost": 800,
   "job": "BLM",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 2000,
+  "cooldown": 2500,
+  "mpCost": 800,
+  "speedAttribute": "SPELL_SPEED"
  },
  "FIRE_II": {
   "id": 147,
   "name": "Fire II",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 3000,
-  "mpCost": 1500,
   "job": "BLM",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 3000,
+  "cooldown": 2500,
+  "mpCost": 1500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "FIRE_III": {
   "id": 152,
   "name": "Fire III",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 3500,
-  "mpCost": 2000,
   "job": "BLM",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 3500,
+  "cooldown": 2500,
+  "mpCost": 2000,
+  "speedAttribute": "SPELL_SPEED"
  },
  "FIRE_IV": {
   "id": 3577,
   "name": "Fire IV",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 2000,
-  "mpCost": 800,
   "job": "BLM",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 2000,
+  "cooldown": 2500,
+  "mpCost": 800,
+  "speedAttribute": "SPELL_SPEED"
  },
  "FLARE": {
   "id": 162,
   "name": "Flare",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 2000,
   "job": "BLM",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 2000,
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "DESPAIR": {
   "id": 16505,
   "name": "Despair",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 0,
   "job": "BLM",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 0,
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "FLARE_STAR": {
   "id": 36989,
   "name": "Flare Star",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 2000,
   "job": "BLM",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 2000,
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "THUNDER_III": {
   "id": 153,
   "name": "Thunder III",
+  "job": "BLM",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "THUNDER_III"
   ],
-  "job": "BLM",
-  "castTime": 0,
-  "cooldown": 2500
+  "speedAttribute": "SPELL_SPEED"
  },
  "HIGH_THUNDER": {
   "id": 36986,
   "name": "High Thunder",
+  "job": "BLM",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "HIGH_THUNDER"
   ],
-  "job": "BLM",
-  "castTime": 0,
-  "cooldown": 2500
+  "speedAttribute": "SPELL_SPEED"
  },
  "THUNDER_IV": {
   "id": 7420,
   "name": "Thunder IV",
+  "job": "BLM",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "THUNDER_IV"
   ],
-  "job": "BLM",
-  "castTime": 0,
-  "cooldown": 2500
+  "speedAttribute": "SPELL_SPEED"
  },
  "HIGH_THUNDER_II": {
   "id": 36987,
   "name": "High Thunder II",
+  "job": "BLM",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "HIGH_THUNDER_II"
   ],
-  "job": "BLM",
-  "castTime": 0,
-  "cooldown": 2500
+  "speedAttribute": "SPELL_SPEED"
  },
  "SCATHE": {
   "id": 156,
   "name": "Scathe",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "mpCost": 800,
   "job": "BLM",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "mpCost": 800,
+  "speedAttribute": "SPELL_SPEED"
  },
  "FOUL": {
   "id": 7422,
   "name": "Foul",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "job": "BLM",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "XENOGLOSSY": {
   "id": 16507,
   "name": "Xenoglossy",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "job": "BLM",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "TRANSPOSE": {
   "id": 149,
   "name": "Transpose",
-  "cooldown": 5000,
-  "job": "BLM"
+  "job": "BLM",
+  "cooldown": 5000
  },
  "MANAFONT": {
   "id": 158,
   "name": "Manafont",
-  "cooldown": 100000,
-  "job": "BLM"
+  "job": "BLM",
+  "cooldown": 100000
  },
  "MANAWARD": {
   "id": 157,
   "name": "Manaward",
+  "job": "BLM",
   "cooldown": 120000,
   "statusesApplied": [
    "MANAWARD"
-  ],
-  "job": "BLM"
+  ]
  },
  "AETHERIAL_MANIPULATION": {
   "id": 155,
   "name": "Aetherial Manipulation",
-  "cooldown": 10000,
-  "job": "BLM"
+  "job": "BLM",
+  "cooldown": 10000
  },
  "LEY_LINES": {
   "id": 3573,
   "name": "Ley Lines",
+  "job": "BLM",
   "cooldown": 120000,
   "statusesApplied": [
    "LEY_LINES"
   ],
-  "job": "BLM",
   "charges": 2
  },
  "BETWEEN_THE_LINES": {
   "id": 7419,
   "name": "Between the Lines",
-  "cooldown": 3000,
-  "job": "BLM"
+  "job": "BLM",
+  "cooldown": 3000
  },
  "RETRACE": {
   "id": 36988,
   "name": "Retrace",
-  "cooldown": 40000,
-  "job": "BLM"
+  "job": "BLM",
+  "cooldown": 40000
  },
  "TRIPLECAST": {
   "id": 7421,
   "name": "Triplecast",
+  "job": "BLM",
   "cooldown": 60000,
   "statusesApplied": [
    "TRIPLECAST"
   ],
-  "charges": 2,
-  "job": "BLM"
+  "charges": 2
  },
  "HIGH_FIRE_II": {
   "id": 25794,
   "name": "High Fire II",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 3000,
-  "mpCost": 1500,
   "job": "BLM",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 3000,
+  "cooldown": 2500,
+  "mpCost": 1500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "HIGH_BLIZZARD_II": {
   "id": 25795,
   "name": "High Blizzard II",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 3000,
-  "mpCost": 800,
   "job": "BLM",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 3000,
+  "cooldown": 2500,
+  "mpCost": 800,
+  "speedAttribute": "SPELL_SPEED"
  },
  "AMPLIFIER": {
   "id": 25796,
   "name": "Amplifier",
-  "cooldown": 120000,
-  "job": "BLM"
+  "job": "BLM",
+  "cooldown": 120000
  },
  "PARADOX": {
   "id": 25797,
   "name": "Paradox",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "mpCost": 1600,
   "job": "BLM",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "mpCost": 1600,
+  "speedAttribute": "SPELL_SPEED"
  },
  "HEAVY_SHOT": {
   "id": 97,
   "name": "Heavy Shot",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "potency": 160,
   "job": "BRD",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED",
+  "potency": 160
  },
  "VENOMOUS_BITE": {
   "id": 100,
   "name": "Venomous Bite",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "potency": 15,
   "job": "BRD",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED",
+  "potency": 15
  },
  "QUICK_NOCK": {
   "id": 106,
   "name": "Quick Nock",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "potency": 110,
   "job": "BRD",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED",
+  "potency": 110
  },
  "BLOODLETTER": {
   "id": 110,
   "name": "Bloodletter",
+  "job": "BRD",
   "onGcd": false,
-  "speedAttribute": "SKILL_SPEED",
   "cooldown": 15000,
-  "potency": 130,
   "cooldownGroup": 5,
   "charges": 3,
-  "job": "BRD"
+  "speedAttribute": "SKILL_SPEED",
+  "potency": 130
  },
  "STRAIGHT_SHOT": {
   "id": 98,
   "name": "Straight Shot",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "potency": 200,
   "job": "BRD",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED",
+  "potency": 200
  },
  "BARRAGE": {
   "id": 107,
   "name": "Barrage",
+  "job": "BRD",
   "onGcd": false,
   "cooldown": 120000,
   "statusesApplied": [
    "BARRAGE"
-  ],
-  "job": "BRD"
+  ]
  },
  "WINDBITE": {
   "id": 113,
   "name": "Windbite",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "potency": 20,
   "job": "BRD",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED",
+  "potency": 20
  },
  "RAGING_STRIKES": {
   "id": 101,
   "name": "Raging Strikes",
+  "job": "BRD",
   "onGcd": false,
   "cooldown": 120000,
   "statusesApplied": [
    "RAGING_STRIKES"
-  ],
-  "job": "BRD"
+  ]
  },
  "REPELLING_SHOT": {
   "id": 112,
   "name": "Repelling Shot",
+  "job": "BRD",
   "onGcd": false,
-  "cooldown": 30000,
-  "job": "BRD"
+  "cooldown": 30000
  },
  "WIDE_VOLLEY": {
   "id": 111,
   "name": "Wide Volley",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "potency": 140,
   "job": "BRD",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED",
+  "potency": 140
  },
  "MAGES_BALLAD": {
   "id": 114,
   "name": "Mage's Ballad",
+  "job": "BRD",
   "onGcd": false,
-  "cooldown": 120000,
-  "job": "BRD"
+  "cooldown": 120000
  },
  "ARMYS_PAEON": {
   "id": 116,
   "name": "Army's Paeon",
+  "job": "BRD",
   "onGcd": false,
-  "cooldown": 120000,
-  "job": "BRD"
+  "cooldown": 120000
  },
  "RAIN_OF_DEATH": {
   "id": 117,
   "name": "Rain Of Death",
+  "job": "BRD",
   "onGcd": false,
   "cooldown": 15000,
-  "potency": 100,
   "cooldownGroup": 5,
   "charges": 3,
-  "job": "BRD"
+  "potency": 100
  },
  "BATTLE_VOICE": {
   "id": 118,
   "name": "Battle Voice",
+  "job": "BRD",
   "onGcd": false,
   "cooldown": 120000,
   "statusesApplied": [
    "BATTLE_VOICE"
-  ],
-  "job": "BRD"
+  ]
  },
  "EMPYREAL_ARROW": {
   "id": 3558,
   "name": "Empyreal Arrow",
+  "job": "BRD",
   "onGcd": false,
   "cooldown": 15000,
-  "potency": 260,
-  "job": "BRD"
+  "potency": 260
  },
  "THE_WANDERERS_MINUET": {
   "id": 3559,
   "name": "The Wanderer's Minuet",
+  "job": "BRD",
   "onGcd": false,
-  "cooldown": 120000,
-  "job": "BRD"
+  "cooldown": 120000
  },
  "IRON_JAWS": {
   "id": 3560,
   "name": "Iron Jaws",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "potency": 100,
   "job": "BRD",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED",
+  "potency": 100
  },
  "THE_WARDENS_PAEAN": {
   "id": 3561,
   "name": "The Warden's Paean",
+  "job": "BRD",
   "onGcd": false,
   "cooldown": 45000,
   "statusesApplied": [
    "THE_WARDENS_PAEAN"
-  ],
-  "job": "BRD"
+  ]
  },
  "SIDEWINDER": {
   "id": 3562,
   "name": "Sidewinder",
+  "job": "BRD",
   "onGcd": false,
   "cooldown": 60000,
-  "potency": 400,
-  "job": "BRD"
+  "potency": 400
  },
  "PITCH_PERFECT": {
   "id": 7404,
   "name": "Pitch Perfect",
+  "job": "BRD",
   "onGcd": false,
   "cooldown": 1000,
   "potency": [
    100,
    220,
    360
-  ],
-  "job": "BRD"
+  ]
  },
  "TROUBADOUR": {
   "id": 7405,
   "name": "Troubadour",
+  "job": "BRD",
   "onGcd": false,
   "cooldown": 90000,
   "statusesApplied": [
    "TROUBADOUR"
-  ],
-  "job": "BRD"
+  ]
  },
  "CAUSTIC_BITE": {
   "id": 7406,
   "name": "Caustic Bite",
+  "job": "BRD",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "potency": 20,
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "CAUSTIC_BITE"
   ],
-  "job": "BRD",
-  "castTime": 0,
-  "cooldown": 2500
+  "speedAttribute": "SKILL_SPEED",
+  "potency": 20
  },
  "STORMBITE": {
   "id": 7407,
   "name": "Stormbite",
+  "job": "BRD",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "potency": 25,
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "STORMBITE"
   ],
-  "job": "BRD",
-  "castTime": 0,
-  "cooldown": 2500
+  "speedAttribute": "SKILL_SPEED",
+  "potency": 25
  },
  "NATURES_MINNE": {
   "id": 7408,
   "name": "Nature's Minne",
+  "job": "BRD",
   "onGcd": false,
   "cooldown": 120000,
   "statusesApplied": [
    "NATURES_MINNE"
-  ],
-  "job": "BRD"
+  ]
  },
  "REFULGENT_ARROW": {
   "id": 7409,
   "name": "Refulgent Arrow",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "potency": 280,
   "job": "BRD",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED",
+  "potency": 280
  },
  "SHADOWBITE": {
   "id": 16494,
   "name": "Shadowbite",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "potency": 180,
   "job": "BRD",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED",
+  "potency": 180
  },
  "BURST_SHOT": {
   "id": 16495,
   "name": "Burst Shot",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "potency": 220,
   "job": "BRD",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED",
+  "potency": 220
  },
  "APEX_ARROW": {
   "id": 16496,
   "name": "Apex Arow",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "potency": 700,
   "job": "BRD",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED",
+  "potency": 700
  },
  "LADONSBITE": {
   "id": 25783,
   "name": "Ladonsbite",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "potency": 140,
   "job": "BRD",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED",
+  "potency": 140
  },
  "BLAST_ARROW": {
   "id": 25784,
   "name": "Blast Arrow",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "potency": 700,
   "job": "BRD",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED",
+  "potency": 700
  },
  "RADIANT_FINALE": {
   "id": 25785,
   "name": "Radiant Finale",
+  "job": "BRD",
   "onGcd": false,
   "cooldown": 110000,
   "statusesApplied": [
    "RADIANT_FINALE"
-  ],
-  "job": "BRD"
+  ]
  },
  "HEARTBREAK_SHOT": {
   "id": 36975,
   "name": "Heartbreak Shot",
+  "job": "BRD",
   "onGcd": false,
-  "speedAttribute": "SKILL_SPEED",
   "cooldown": 15000,
-  "potency": 180,
   "cooldownGroup": 5,
   "charges": 3,
-  "job": "BRD"
+  "speedAttribute": "SKILL_SPEED",
+  "potency": 180
  },
  "RESONANT_ARROW": {
   "id": 36976,
   "name": "Resonant Arrow",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "potency": 700,
   "job": "BRD",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED",
+  "potency": 700
  },
  "RADIANT_ENCORE": {
   "id": 36977,
   "name": "Radiant Encore",
+  "job": "BRD",
   "onGcd": true,
+  "castTime": 0,
+  "cooldown": 2500,
   "speedAttribute": "SKILL_SPEED",
   "potency": [
    700,
    800,
    1100
-  ],
-  "job": "BRD",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
  "STANDARD_FINISH": {
   "id": 16003,
   "name": "Standard Finish",
-  "onGcd": true,
-  "cooldown": 1500,
   "job": "DNC",
-  "castTime": 0
+  "onGcd": true,
+  "castTime": 0,
+  "cooldown": 1500
  },
  "SINGLE_STANDARD_FINISH": {
   "id": 16191,
   "name": "Single Standard Finish",
-  "onGcd": true,
-  "cooldown": 1500,
   "job": "DNC",
-  "castTime": 0
+  "onGcd": true,
+  "castTime": 0,
+  "cooldown": 1500
  },
  "DOUBLE_STANDARD_FINISH": {
   "id": 16192,
   "name": "Double Standard Finish",
+  "job": "DNC",
   "onGcd": true,
+  "castTime": 0,
   "cooldown": 1500,
   "statusesApplied": [
    "STANDARD_FINISH",
    "STANDARD_FINISH_PARTNER",
    "ESPRIT",
    "LAST_DANCE_READY"
-  ],
-  "job": "DNC",
-  "castTime": 0
+  ]
  },
  "FINISHING_MOVE": {
   "id": 36984,
   "name": "Finishing Move",
-  "onGcd": true,
-  "gcdRecast": 2500,
-  "speedAttribute": "SKILL_SPEED",
-  "cooldown": 30000,
-  "cooldownGroup": 7,
   "job": "DNC",
-  "castTime": 0
+  "onGcd": true,
+  "castTime": 0,
+  "cooldown": 30000,
+  "gcdRecast": 2500,
+  "cooldownGroup": 7,
+  "speedAttribute": "SKILL_SPEED"
  },
  "LAST_DANCE": {
   "id": 36983,
   "name": "Last Dance",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "job": "DNC",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "TECHNICAL_FINISH": {
   "id": 16004,
   "name": "Technical Finish",
-  "onGcd": true,
-  "cooldown": 1500,
   "job": "DNC",
-  "castTime": 0
+  "onGcd": true,
+  "castTime": 0,
+  "cooldown": 1500
  },
  "SINGLE_TECHNICAL_FINISH": {
   "id": 16193,
   "name": "Single Technical Finish",
-  "onGcd": true,
-  "cooldown": 1500,
   "job": "DNC",
-  "castTime": 0
+  "onGcd": true,
+  "castTime": 0,
+  "cooldown": 1500
  },
  "DOUBLE_TECHNICAL_FINISH": {
   "id": 16194,
   "name": "Double Technical Finish",
-  "onGcd": true,
-  "cooldown": 1500,
   "job": "DNC",
-  "castTime": 0
+  "onGcd": true,
+  "castTime": 0,
+  "cooldown": 1500
  },
  "TRIPLE_TECHNICAL_FINISH": {
   "id": 16195,
   "name": "Triple Technical Finish",
-  "onGcd": true,
-  "cooldown": 1500,
   "job": "DNC",
-  "castTime": 0
+  "onGcd": true,
+  "castTime": 0,
+  "cooldown": 1500
  },
  "QUADRUPLE_TECHNICAL_FINISH": {
   "id": 16196,
   "name": "Quadruple Technical Finish",
+  "job": "DNC",
   "onGcd": true,
+  "castTime": 0,
   "cooldown": 1500,
   "statusesApplied": [
    "TECHNICAL_FINISH",
    "ESPRIT_TECHNICAL",
    "FLOURISHING_FINISH",
    "DANCE_OF_THE_DAWN_READY"
-  ],
-  "job": "DNC",
-  "castTime": 0
+  ]
  },
  "TILLANA": {
   "id": 25790,
   "name": "Tillana",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "job": "DNC",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "CASCADE": {
   "id": 15989,
   "name": "Cascade",
+  "job": "DNC",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "start": true
   },
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "SILKEN_SYMMETRY"
   ],
-  "job": "DNC",
-  "castTime": 0,
-  "cooldown": 2500
+  "speedAttribute": "SKILL_SPEED"
  },
  "FOUNTAIN": {
   "id": 15990,
   "name": "Fountain",
+  "job": "DNC",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": 15989,
    "end": true
   },
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "SILKEN_FLOW"
   ],
-  "job": "DNC",
-  "castTime": 0,
-  "cooldown": 2500
+  "speedAttribute": "SKILL_SPEED"
  },
  "REVERSE_CASCADE": {
   "id": 15991,
   "name": "Reverse Cascade",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "job": "DNC",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "FOUNTAINFALL": {
   "id": 15992,
   "name": "Fountainfall",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "job": "DNC",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "WINDMILL": {
   "id": 15993,
   "name": "Windmill",
+  "job": "DNC",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "start": true
   },
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "SILKEN_SYMMETRY"
   ],
-  "job": "DNC",
-  "castTime": 0,
-  "cooldown": 2500
+  "speedAttribute": "SKILL_SPEED"
  },
  "BLADESHOWER": {
   "id": 15994,
   "name": "Bladeshower",
+  "job": "DNC",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": 15993,
    "end": true
   },
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "SILKEN_FLOW"
   ],
-  "job": "DNC",
-  "castTime": 0,
-  "cooldown": 2500
+  "speedAttribute": "SKILL_SPEED"
  },
  "RISING_WINDMILL": {
   "id": 15995,
   "name": "Rising Windmill",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "job": "DNC",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "BLOODSHOWER": {
   "id": 15996,
   "name": "Bloodshower",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "job": "DNC",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "STANDARD_STEP": {
   "id": 15997,
   "name": "Standard Step",
+  "job": "DNC",
   "onGcd": true,
+  "castTime": 0,
   "cooldown": 30000,
   "gcdRecast": 1500,
   "cooldownGroup": 7,
   "statusesApplied": [
    "STANDARD_STEP"
-  ],
-  "job": "DNC",
-  "castTime": 0
+  ]
  },
  "TECHNICAL_STEP": {
   "id": 15998,
   "name": "Technical Step",
+  "job": "DNC",
   "onGcd": true,
+  "castTime": 0,
   "cooldown": 120000,
   "gcdRecast": 1500,
   "statusesApplied": [
    "TECHNICAL_STEP"
-  ],
-  "job": "DNC",
-  "castTime": 0
+  ]
  },
  "EMBOITE": {
   "id": 15999,
   "name": "Emboite",
-  "onGcd": true,
-  "cooldown": 1000,
   "job": "DNC",
-  "castTime": 0
+  "onGcd": true,
+  "castTime": 0,
+  "cooldown": 1000
  },
  "ENTRECHAT": {
   "id": 16000,
   "name": "Entrechat",
-  "onGcd": true,
-  "cooldown": 1000,
   "job": "DNC",
-  "castTime": 0
+  "onGcd": true,
+  "castTime": 0,
+  "cooldown": 1000
  },
  "JETE": {
   "id": 16001,
   "name": "Jete",
-  "onGcd": true,
-  "cooldown": 1000,
   "job": "DNC",
-  "castTime": 0
+  "onGcd": true,
+  "castTime": 0,
+  "cooldown": 1000
  },
  "PIROUETTE": {
   "id": 16002,
   "name": "Pirouette",
-  "onGcd": true,
-  "cooldown": 1000,
   "job": "DNC",
-  "castTime": 0
+  "onGcd": true,
+  "castTime": 0,
+  "cooldown": 1000
  },
  "SABER_DANCE": {
   "id": 16005,
   "name": "Saber Dance",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "job": "DNC",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "DANCE_OF_THE_DAWN": {
   "id": 36985,
   "name": "Dance of the Dawn",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "job": "DNC",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "CLOSED_POSITION": {
   "id": 16006,
   "name": "Closed Position",
+  "job": "DNC",
   "onGcd": false,
-  "cooldown": 30000,
-  "job": "DNC"
+  "cooldown": 30000
  },
  "FAN_DANCE": {
   "id": 16007,
   "name": "Fan Dance",
+  "job": "DNC",
   "onGcd": false,
   "cooldown": 1000,
   "statusesApplied": [
    "THREEFOLD_FAN_DANCE"
-  ],
-  "job": "DNC"
+  ]
  },
  "FAN_DANCE_II": {
   "id": 16008,
   "name": "Fan Dance II",
+  "job": "DNC",
   "onGcd": false,
   "cooldown": 1000,
   "statusesApplied": [
    "THREEFOLD_FAN_DANCE"
-  ],
-  "job": "DNC"
+  ]
  },
  "FAN_DANCE_III": {
   "id": 16009,
   "name": "Fan Dance III",
+  "job": "DNC",
   "onGcd": false,
-  "cooldown": 1000,
-  "job": "DNC"
+  "cooldown": 1000
  },
  "FAN_DANCE_IV": {
   "id": 25791,
   "name": "Fan Dance IV",
+  "job": "DNC",
   "onGcd": false,
-  "cooldown": 1000,
-  "job": "DNC"
+  "cooldown": 1000
  },
  "EN_AVANT": {
   "id": 16010,
   "name": "En Avant",
+  "job": "DNC",
   "onGcd": false,
   "cooldown": 30000,
-  "charges": 3,
-  "job": "DNC"
+  "charges": 3
  },
  "DEVILMENT": {
   "id": 16011,
   "name": "Devilment",
+  "job": "DNC",
   "onGcd": false,
   "cooldown": 120000,
   "statusesApplied": [
    "DEVILMENT",
    "FLOURISHING_STARFALL"
-  ],
-  "job": "DNC"
+  ]
  },
  "STARFALL_DANCE": {
   "id": 25792,
   "name": "Starfall Dance",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "job": "DNC",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "SHIELD_SAMBA": {
   "id": 16012,
   "name": "Shield Samba",
+  "job": "DNC",
   "onGcd": false,
   "cooldown": 90000,
   "statusesApplied": [
    "SHIELD_SAMBA"
-  ],
-  "job": "DNC"
+  ]
  },
  "FLOURISH": {
   "id": 16013,
   "name": "Flourish",
+  "job": "DNC",
   "onGcd": false,
   "cooldown": 60000,
   "statusesApplied": [
@@ -1580,96 +1584,95 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
    "THREEFOLD_FAN_DANCE",
    "FOURFOLD_FAN_DANCE",
    "FINISHING_MOVE_READY"
-  ],
-  "job": "DNC"
+  ]
  },
  "IMPROVISATION": {
   "id": 16014,
   "name": "Improvisation",
+  "job": "DNC",
   "onGcd": false,
   "cooldown": 120000,
   "statusesApplied": [
    "IMPROVISATION",
    "IMPROVISATION_REGEN",
    "RISING_RHYTHM"
-  ],
-  "job": "DNC"
+  ]
  },
  "IMPROVISED_FINISH": {
   "id": 25789,
   "name": "Improvised Finish",
+  "job": "DNC",
   "onGcd": false,
   "cooldown": 120000,
   "statusesApplied": [
    "IMPROVISED_FINISH"
-  ],
-  "job": "DNC"
+  ]
  },
  "CURING_WALTZ": {
   "id": 16015,
   "name": "Curing Waltz",
+  "job": "DNC",
   "onGcd": false,
-  "cooldown": 60000,
-  "job": "DNC"
+  "cooldown": 60000
  },
  "ENDING": {
   "id": 18073,
   "name": "Ending",
+  "job": "DNC",
   "onGcd": false,
-  "cooldown": 1000,
-  "job": "DNC"
+  "cooldown": 1000
  },
  "TRUE_THRUST": {
   "id": 75,
   "name": "True Thrust",
+  "job": "DRG",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "start": true
   },
-  "job": "DRG",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "VORPAL_THRUST": {
   "id": 78,
   "name": "Vorpal Thrust",
+  "job": "DRG",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": [
     75,
     16479
    ]
   },
-  "job": "DRG",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "LANCE_BARRAGE": {
   "id": 36954,
   "name": "Lance Barrage",
+  "job": "DRG",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": [
     75,
     16479
    ]
   },
-  "job": "DRG",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "PIERCING_TALON": {
   "id": 90,
   "name": "Piercing Talon",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "breaksCombo": false,
   "job": "DRG",
+  "onGcd": true,
+  "breaksCombo": false,
   "castTime": 0,
   "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
     "value": 200,
@@ -1687,29 +1690,32 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
  "FULL_THRUST": {
   "id": 84,
   "name": "Full Thrust",
+  "job": "DRG",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": [
     78,
     36954
    ]
   },
-  "job": "DRG",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "HEAVENS_THRUST": {
   "id": 25771,
   "name": "Heavens' Thrust",
+  "job": "DRG",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": [
     78,
     36954
    ]
   },
+  "castTime": 0,
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
     "value": 160,
@@ -1721,73 +1727,76 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
      "COMBO"
     ]
    }
-  ],
-  "job": "DRG",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
  "DISEMBOWEL": {
   "id": 87,
   "name": "Disembowel",
+  "job": "DRG",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": [
     75,
     16479
    ]
   },
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "POWER_SURGE"
   ],
-  "job": "DRG",
-  "castTime": 0,
-  "cooldown": 2500
+  "speedAttribute": "SKILL_SPEED"
  },
  "SPIRAL_BLOW": {
   "id": 36955,
   "name": "Spiral Blow",
+  "job": "DRG",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": [
     75,
     16479
    ]
   },
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "POWER_SURGE"
   ],
-  "job": "DRG",
-  "castTime": 0,
-  "cooldown": 2500
+  "speedAttribute": "SKILL_SPEED"
  },
  "CHAOS_THRUST": {
   "id": 88,
   "name": "Chaos Thrust",
+  "job": "DRG",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": 87
   },
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "CHAOS_THRUST"
   ],
-  "job": "DRG",
-  "castTime": 0,
-  "cooldown": 2500
+  "speedAttribute": "SKILL_SPEED"
  },
  "CHAOTIC_SPRING": {
   "id": 25772,
   "name": "Chaotic Spring",
+  "job": "DRG",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": [
     87,
     36955
    ]
   },
+  "castTime": 0,
+  "cooldown": 2500,
+  "statusesApplied": [
+   "CHAOTIC_SPRING"
+  ],
+  "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
     "value": 140,
@@ -1812,19 +1821,13 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
      "POSITIONAL"
     ]
    }
-  ],
-  "statusesApplied": [
-   "CHAOTIC_SPRING"
-  ],
-  "job": "DRG",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
  "DRAKESBANE": {
   "id": 36952,
   "name": "Drakesbane",
+  "job": "DRG",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": [
     3554,
@@ -1832,89 +1835,56 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
    ],
    "end": true
   },
+  "castTime": 0,
+  "cooldown": 2500,
+  "statusesApplied": [
+   "DRACONIAN_FIRE"
+  ],
+  "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
     "value": 460,
     "bonusModifiers": []
    }
-  ],
-  "statusesApplied": [
-   "DRACONIAN_FIRE"
-  ],
-  "job": "DRG",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
  "DOOM_SPIKE": {
   "id": 86,
   "name": "Doom Spike",
+  "job": "DRG",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "start": true
   },
-  "job": "DRG",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "DRACONIAN_FURY": {
   "id": 25770,
   "name": "Draconian Fury",
+  "job": "DRG",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "start": true
   },
-  "job": "DRG",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "FANG_AND_CLAW": {
   "id": 3554,
   "name": "Fang and Claw",
+  "job": "DRG",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "potencies": [
-   {
-    "value": 140,
-    "bonusModifiers": [],
-    "baseModifiers": []
-   },
-   {
-    "value": 180,
-    "bonusModifiers": [
-     "POSITIONAL"
-    ],
-    "baseModifiers": []
-   },
-   {
-    "value": 300,
-    "bonusModifiers": [
-     "COMBO"
-    ]
-   },
-   {
-    "value": 340,
-    "bonusModifiers": [
-     "POSITIONAL",
-     "COMBO"
-    ]
-   }
-  ],
   "combo": {
    "from": [
     84,
     25771
    ]
   },
-  "job": "DRG",
   "castTime": 0,
-  "cooldown": 2500
- },
- "WHEELING_THRUST": {
-  "id": 3556,
-  "name": "Wheeling Thrust",
-  "onGcd": true,
+  "cooldown": 2500,
   "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
@@ -1942,102 +1912,135 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
      "COMBO"
     ]
    }
-  ],
+  ]
+ },
+ "WHEELING_THRUST": {
+  "id": 3556,
+  "name": "Wheeling Thrust",
+  "job": "DRG",
+  "onGcd": true,
   "combo": {
    "from": [
     88,
     25772
    ]
   },
-  "job": "DRG",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED",
+  "potencies": [
+   {
+    "value": 140,
+    "bonusModifiers": [],
+    "baseModifiers": []
+   },
+   {
+    "value": 180,
+    "bonusModifiers": [
+     "POSITIONAL"
+    ],
+    "baseModifiers": []
+   },
+   {
+    "value": 300,
+    "bonusModifiers": [
+     "COMBO"
+    ]
+   },
+   {
+    "value": 340,
+    "bonusModifiers": [
+     "POSITIONAL",
+     "COMBO"
+    ]
+   }
+  ]
  },
  "RAIDEN_THRUST": {
   "id": 16479,
   "name": "Raiden Thrust",
+  "job": "DRG",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "start": true
   },
-  "job": "DRG",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "SONIC_THRUST": {
   "id": 7397,
   "name": "Sonic Thrust",
+  "job": "DRG",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": [
     86,
     25770
    ]
   },
-  "job": "DRG",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "COERTHAN_TORMENT": {
   "id": 16477,
   "name": "Coerthan Torment",
+  "job": "DRG",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": 7397,
    "end": true
   },
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "DRACONIAN_FIRE"
   ],
-  "job": "DRG",
-  "castTime": 0,
-  "cooldown": 2500
+  "speedAttribute": "SKILL_SPEED"
  },
  "LIFE_SURGE": {
   "id": 83,
   "name": "Life Surge",
+  "job": "DRG",
   "cooldown": 40000,
   "statusesApplied": [
    "LIFE_SURGE"
   ],
-  "charges": 2,
-  "job": "DRG"
+  "charges": 2
  },
  "LANCE_CHARGE": {
   "id": 85,
   "name": "Lance Charge",
+  "job": "DRG",
   "cooldown": 60000,
   "statusesApplied": [
    "LANCE_CHARGE"
-  ],
-  "job": "DRG"
+  ]
  },
  "JUMP": {
   "id": 92,
   "name": "Jump",
+  "job": "DRG",
   "cooldown": 30000,
   "statusesApplied": [
    "DIVE_READY"
-  ],
-  "job": "DRG"
+  ]
  },
  "HIGH_JUMP": {
   "id": 16478,
   "name": "High Jump",
+  "job": "DRG",
   "cooldown": 30000,
   "statusesApplied": [
    "DIVE_READY"
-  ],
-  "job": "DRG"
+  ]
  },
  "ELUSIVE_JUMP": {
   "id": 94,
   "name": "Elusive Jump",
-  "cooldown": 30000,
   "job": "DRG",
+  "cooldown": 30000,
   "statusesApplied": [
    "ENHANCED_PIERCING_TALON"
   ]
@@ -2045,48 +2048,48 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
  "SPINESHATTER_DIVE": {
   "id": 95,
   "name": "Spineshatter Dive",
+  "job": "DRG",
   "cooldown": 60000,
-  "charges": 2,
-  "job": "DRG"
+  "charges": 2
  },
  "DRAGONFIRE_DIVE": {
   "id": 96,
   "name": "Dragonfire Dive",
+  "job": "DRG",
   "cooldown": 120000,
   "statusesApplied": [
    "DRAGONS_FLIGHT"
-  ],
-  "job": "DRG"
+  ]
  },
  "RISE_OF_THE_DRAGON": {
   "id": 36953,
   "name": "Rise of the Dragon",
-  "cooldown": 1000,
-  "job": "DRG"
+  "job": "DRG",
+  "cooldown": 1000
  },
  "BATTLE_LITANY": {
   "id": 3557,
   "name": "Battle Litany",
+  "job": "DRG",
   "cooldown": 120000,
   "statusesApplied": [
    "BATTLE_LITANY"
-  ],
-  "job": "DRG"
+  ]
  },
  "GEIRSKOGUL": {
   "id": 3555,
   "name": "Geirskogul",
+  "job": "DRG",
   "cooldown": 60000,
   "statusesApplied": [
    "NASTROND_READY"
-  ],
-  "job": "DRG"
+  ]
  },
  "MIRAGE_DIVE": {
   "id": 7399,
   "name": "Mirage Dive",
-  "cooldown": 1000,
   "job": "DRG",
+  "cooldown": 1000,
   "potencies": [
    {
     "value": 380,
@@ -2097,8 +2100,8 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
  "NASTROND": {
   "id": 7400,
   "name": "Nastrond",
-  "cooldown": 10000,
   "job": "DRG",
+  "cooldown": 10000,
   "potencies": [
    {
     "value": 720,
@@ -2109,6 +2112,7 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
  "STARDIVER": {
   "id": 16480,
   "name": "Stardiver",
+  "job": "DRG",
   "cooldown": 30000,
   "statusesApplied": [
    "STARCROSS_READY"
@@ -2118,60 +2122,62 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
     "value": 840,
     "bonusModifiers": []
    }
-  ],
-  "job": "DRG"
+  ]
  },
  "STARCROSS": {
   "id": 36956,
   "name": "Starcross",
+  "job": "DRG",
   "cooldown": 1000,
   "potencies": [
    {
     "value": 1000,
     "bonusModifiers": []
    }
-  ],
-  "job": "DRG"
+  ]
  },
  "WYRMWIND_THRUST": {
   "id": 25773,
   "name": "Wyrmwind Thrust",
-  "cooldown": 10000,
-  "job": "DRG"
+  "job": "DRG",
+  "cooldown": 10000
  },
  "WINGED_GLIDE": {
   "id": 36951,
   "name": "Winged Glide",
-  "charges": 2,
+  "job": "DRG",
   "cooldown": 60000,
-  "job": "DRG"
+  "charges": 2
  },
  "HARD_SLASH": {
   "id": 3617,
   "name": "Hard Slash",
+  "job": "DRK",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "start": true
   },
+  "castTime": 0,
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
     "value": 300,
     "bonusModifiers": []
    }
-  ],
-  "job": "DRK",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
  "SYPHON_STRIKE": {
   "id": 3623,
   "name": "Syphon Strike",
+  "job": "DRK",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": 3617
   },
+  "castTime": 0,
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
     "value": 240,
@@ -2183,61 +2189,61 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
      "COMBO"
     ]
    }
-  ],
-  "job": "DRK",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
  "UNLEASH": {
   "id": 3621,
   "name": "Unleash",
+  "job": "DRK",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "combo": {
    "start": true
   },
+  "castTime": 0,
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED",
   "potencies": [
    {
     "value": 120,
     "bonusModifiers": []
    }
-  ],
-  "job": "DRK",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
  "GRIT": {
   "id": 3629,
   "name": "Grit",
-  "cooldown": 2000,
-  "job": "DRK"
+  "job": "DRK",
+  "cooldown": 2000
  },
  "RELEASE_GRIT": {
   "id": 32067,
   "name": "Release Grit",
+  "job": "DRK",
   "onGcd": false,
-  "cooldown": 1000,
-  "job": "DRK"
+  "cooldown": 1000
  },
  "UNMEND": {
   "id": 3624,
   "name": "Unmend",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "breaksCombo": false,
   "job": "DRK",
+  "onGcd": true,
+  "breaksCombo": false,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "SOULEATER": {
   "id": 3632,
   "name": "Souleater",
+  "job": "DRK",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": 3623,
    "end": true
   },
+  "castTime": 0,
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
     "value": 260,
@@ -2249,35 +2255,35 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
      "COMBO"
     ]
    }
-  ],
-  "job": "DRK",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
  "BLOOD_WEAPON": {
   "id": 3625,
   "name": "Blood Weapon",
-  "cooldown": 60000,
-  "job": "DRK"
+  "job": "DRK",
+  "cooldown": 60000
  },
  "SHADOW_WALL": {
   "id": 3636,
   "name": "Shadow Wall",
+  "job": "DRK",
   "cooldown": 120000,
   "statusesApplied": [
    "SHADOW_WALL"
-  ],
-  "job": "DRK"
+  ]
  },
  "STALWART_SOUL": {
   "id": 16468,
   "name": "Stalwart Soul",
+  "job": "DRK",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "combo": {
    "from": 3621,
    "end": true
   },
+  "castTime": 0,
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED",
   "potencies": [
    {
     "value": 120,
@@ -2289,49 +2295,47 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
      "COMBO"
     ]
    }
-  ],
-  "job": "DRK",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
  "DARK_MIND": {
   "id": 3634,
   "name": "Dark Mind",
+  "job": "DRK",
   "cooldown": 60000,
   "statusesApplied": [
    "DARK_MIND"
-  ],
-  "job": "DRK"
+  ]
  },
  "LIVING_DEAD": {
   "id": 3638,
   "name": "Living Dead",
+  "job": "DRK",
   "cooldown": 300000,
   "statusesApplied": [
    "LIVING_DEAD",
    "WALKING_DEAD"
-  ],
-  "job": "DRK"
+  ]
  },
  "SALTED_EARTH": {
   "id": 3639,
   "name": "Salted Earth",
+  "job": "DRK",
   "cooldown": 90000,
   "statusesApplied": [
    "SALTED_EARTH"
-  ],
-  "job": "DRK"
+  ]
  },
  "SHADOWSTRIDE": {
   "id": 36926,
   "name": "Shadowstride",
+  "job": "DRK",
   "cooldown": 30000,
-  "charges": 2,
-  "job": "DRK"
+  "charges": 2
  },
  "ABYSSAL_DRAIN": {
   "id": 3641,
   "name": "Abyssal Drain",
+  "job": "DRK",
   "cooldown": 60000,
   "cooldownGroup": 14,
   "potencies": [
@@ -2339,12 +2343,12 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
     "value": 240,
     "bonusModifiers": []
    }
-  ],
-  "job": "DRK"
+  ]
  },
  "CARVE_AND_SPIT": {
   "id": 3643,
   "name": "Carve and Spit",
+  "job": "DRK",
   "cooldown": 60000,
   "cooldownGroup": 14,
   "potencies": [
@@ -2352,225 +2356,224 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
     "value": 540,
     "bonusModifiers": []
    }
-  ],
-  "job": "DRK"
+  ]
  },
  "BLOODSPILLER": {
   "id": 7392,
   "name": "Bloodspiller",
+  "job": "DRK",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "breaksCombo": false,
+  "castTime": 0,
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
     "value": 600,
     "bonusModifiers": []
    }
-  ],
-  "job": "DRK",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
  "QUIETUS": {
   "id": 7391,
   "name": "Quietus",
+  "job": "DRK",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "breaksCombo": false,
+  "castTime": 0,
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
     "value": 240,
     "bonusModifiers": []
    }
-  ],
-  "job": "DRK",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
  "DELIRIUM": {
   "id": 7390,
   "name": "Delirium",
+  "job": "DRK",
   "cooldown": 60000,
   "statusesApplied": [
    "DELIRIUM",
    "BLOOD_WEAPON"
-  ],
-  "job": "DRK"
+  ]
  },
  "THE_BLACKEST_NIGHT": {
   "id": 7393,
   "name": "The Blackest Night",
+  "job": "DRK",
   "cooldown": 15000,
   "statusesApplied": [
    "BLACKEST_NIGHT"
-  ],
-  "job": "DRK"
+  ]
  },
  "FLOOD_OF_DARKNESS": {
   "id": 16466,
   "name": "Flood of Darkness",
-  "cooldown": 1000,
-  "job": "DRK"
+  "job": "DRK",
+  "cooldown": 1000
  },
  "FLOOD_OF_SHADOW": {
   "id": 16469,
   "name": "Flood of Shadow",
+  "job": "DRK",
   "cooldown": 1000,
   "potencies": [
    {
     "value": 100,
     "bonusModifiers": []
    }
-  ],
-  "job": "DRK"
+  ]
  },
  "EDGE_OF_DARKNESS": {
   "id": 16467,
   "name": "Edge of Darkness",
-  "cooldown": 1000,
-  "job": "DRK"
+  "job": "DRK",
+  "cooldown": 1000
  },
  "EDGE_OF_SHADOW": {
   "id": 16470,
   "name": "Edge of Shadow",
+  "job": "DRK",
   "cooldown": 1000,
   "potencies": [
    {
     "value": 300,
     "bonusModifiers": []
    }
-  ],
-  "job": "DRK"
+  ]
  },
  "DARK_MISSIONARY": {
   "id": 16471,
   "name": "Dark Missionary",
+  "job": "DRK",
   "cooldown": 90000,
   "statusesApplied": [
    "DARK_MISSIONARY"
-  ],
-  "job": "DRK"
+  ]
  },
  "LIVING_SHADOW": {
   "id": 16472,
   "name": "Living Shadow",
-  "cooldown": 120000,
-  "job": "DRK"
+  "job": "DRK",
+  "cooldown": 120000
  },
  "OBLATION": {
   "id": 25754,
   "name": "Oblation",
+  "job": "DRK",
   "cooldown": 60000,
   "statusesApplied": [
    "OBLATION"
   ],
-  "charges": 2,
-  "job": "DRK"
+  "charges": 2
  },
  "SALT_AND_DARKNESS": {
   "id": 25755,
   "name": "Salt and Darkness",
-  "cooldown": 20000,
-  "job": "DRK"
+  "job": "DRK",
+  "cooldown": 20000
  },
  "SALT_AND_DARKNESS_DAMAGE": {
   "id": 25756,
   "name": "Salt and Darkness",
-  "cooldown": 20000,
-  "job": "DRK"
+  "job": "DRK",
+  "cooldown": 20000
  },
  "SHADOWBRINGER": {
   "id": 25757,
   "name": "Shadowbringer",
+  "job": "DRK",
   "cooldown": 60000,
-  "charges": 2,
-  "job": "DRK"
+  "charges": 2
  },
  "SHADOWED_VIGIL": {
   "id": 36927,
   "name": "Shadowed Vigil",
-  "cooldown": 120000,
-  "job": "DRK"
+  "job": "DRK",
+  "cooldown": 120000
  },
  "SCARLET_DELIRIUM": {
   "id": 36928,
   "name": "Scarlet Delirium",
+  "job": "DRK",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "breaksCombo": false,
+  "castTime": 0,
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
     "value": 620,
     "bonusModifiers": []
    }
-  ],
-  "job": "DRK",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
  "COMEUPPANCE": {
   "id": 36929,
   "name": "Comeuppance",
+  "job": "DRK",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "breaksCombo": false,
+  "castTime": 0,
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
     "value": 720,
     "bonusModifiers": []
    }
-  ],
-  "job": "DRK",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
  "TORCLEAVER": {
   "id": 36930,
   "name": "Torcleaver",
+  "job": "DRK",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "breaksCombo": false,
+  "castTime": 0,
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
     "value": 820,
     "bonusModifiers": []
    }
-  ],
-  "job": "DRK",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
  "IMPALEMENT": {
   "id": 36931,
   "name": "Impalement",
+  "job": "DRK",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "breaksCombo": false,
+  "castTime": 0,
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
     "value": 320,
     "bonusModifiers": []
    }
-  ],
-  "job": "DRK",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
  "DISESTEEM": {
   "id": 36932,
   "name": "Disesteem",
+  "job": "DRK",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "breaksCombo": false,
+  "castTime": 0,
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
     "value": 1000,
     "bonusModifiers": []
    }
-  ],
-  "job": "DRK",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
  "ESTEEM_ABYSSAL_DRAIN": {
   "id": 17904,
@@ -2615,496 +2618,496 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
  "KEEN_EDGE": {
   "id": 16137,
   "name": "Keen Edge",
+  "job": "GNB",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "start": true
   },
-  "job": "GNB",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "BRUTAL_SHELL": {
   "id": 16139,
   "name": "Brutal Shell",
+  "job": "GNB",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": 16137
   },
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "BRUTAL_SHELL"
   ],
-  "job": "GNB",
-  "castTime": 0,
-  "cooldown": 2500
+  "speedAttribute": "SKILL_SPEED"
  },
  "SOLID_BARREL": {
   "id": 16145,
   "name": "Solid Barrel",
+  "job": "GNB",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": 16139,
    "end": true
   },
-  "job": "GNB",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "BURST_STRIKE": {
   "id": 16162,
   "name": "Burst Strike",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "breaksCombo": false,
   "job": "GNB",
+  "onGcd": true,
+  "breaksCombo": false,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "LIGHTNING_SHOT": {
   "id": 16143,
   "name": "Lightning Shot",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "breaksCombo": false,
   "job": "GNB",
+  "onGcd": true,
+  "breaksCombo": false,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "GNASHING_FANG": {
   "id": 16146,
   "name": "Gnashing Fang",
+  "job": "GNB",
   "onGcd": true,
   "breaksCombo": false,
+  "castTime": 0,
   "cooldown": 30000,
   "gcdRecast": 2500,
-  "job": "GNB",
-  "castTime": 0,
   "charges": 2
  },
  "SAVAGE_CLAW": {
   "id": 16147,
   "name": "Savage Claw",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "breaksCombo": false,
   "job": "GNB",
+  "onGcd": true,
+  "breaksCombo": false,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "WICKED_TALON": {
   "id": 16150,
   "name": "Wicked Talon",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "breaksCombo": false,
   "job": "GNB",
+  "onGcd": true,
+  "breaksCombo": false,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "SONIC_BREAK": {
   "id": 16153,
   "name": "Sonic Break",
+  "job": "GNB",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "breaksCombo": false,
+  "castTime": 0,
   "cooldown": 60000,
   "gcdRecast": 2500,
   "statusesApplied": [
    "SONIC_BREAK"
   ],
-  "job": "GNB",
-  "castTime": 0
+  "speedAttribute": "SKILL_SPEED"
  },
  "DEMON_SLICE": {
   "id": 16141,
   "name": "Demon Slice",
+  "job": "GNB",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "start": true
   },
-  "job": "GNB",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "DEMON_SLAUGHTER": {
   "id": 16149,
   "name": "Demon Slaughter",
+  "job": "GNB",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": 16141,
    "end": true
   },
-  "job": "GNB",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "FATED_CIRCLE": {
   "id": 16163,
   "name": "Fated Circle",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "breaksCombo": false,
   "job": "GNB",
+  "onGcd": true,
+  "breaksCombo": false,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "DOUBLE_DOWN": {
   "id": 25760,
   "name": "Double Down",
-  "onGcd": true,
-  "gcdRecast": 2500,
-  "cooldown": 60000,
-  "speedAttribute": "SKILL_SPEED",
   "job": "GNB",
-  "castTime": 0
+  "onGcd": true,
+  "castTime": 0,
+  "cooldown": 60000,
+  "gcdRecast": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "REIGN_OF_BEASTS": {
   "id": 36937,
   "name": "Reign of Beasts",
-  "onGcd": true,
-  "gcdRecast": 2500,
-  "speedAttribute": "SKILL_SPEED",
   "job": "GNB",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "NOBLE_BLOOD": {
   "id": 36938,
   "name": "Noble Blood",
+  "job": "GNB",
   "onGcd": true,
   "breaksCombo": false,
-  "gcdRecast": 2500,
-  "speedAttribute": "SKILL_SPEED",
-  "job": "GNB",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "LION_HEART": {
   "id": 36939,
   "name": "Lion Heart",
+  "job": "GNB",
   "onGcd": true,
   "breaksCombo": false,
-  "gcdRecast": 2500,
-  "speedAttribute": "SKILL_SPEED",
-  "job": "GNB",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "NO_MERCY": {
   "id": 16138,
   "name": "No Mercy",
+  "job": "GNB",
   "onGcd": false,
   "cooldown": 60000,
   "statusesApplied": [
    "NO_MERCY"
-  ],
-  "job": "GNB"
+  ]
  },
  "BLOODFEST": {
   "id": 16164,
   "name": "Bloodfest",
+  "job": "GNB",
   "onGcd": false,
-  "cooldown": 60000,
-  "job": "GNB"
+  "cooldown": 60000
  },
  "JUGULAR_RIP": {
   "id": 16156,
   "name": "Jugular Rip",
+  "job": "GNB",
   "onGcd": false,
   "cooldown": 1000,
-  "cooldownGroup": 1,
-  "job": "GNB"
+  "cooldownGroup": 1
  },
  "ABDOMEN_TEAR": {
   "id": 16157,
   "name": "Abdomen Tear",
+  "job": "GNB",
   "onGcd": false,
   "cooldown": 1000,
-  "cooldownGroup": 1,
-  "job": "GNB"
+  "cooldownGroup": 1
  },
  "EYE_GOUGE": {
   "id": 16158,
   "name": "Eye Gouge",
+  "job": "GNB",
   "onGcd": false,
   "cooldown": 1000,
-  "cooldownGroup": 1,
-  "job": "GNB"
+  "cooldownGroup": 1
  },
  "HYPERVELOCITY": {
   "id": 25759,
   "name": "Hypervelocity",
+  "job": "GNB",
   "onGcd": false,
   "cooldown": 1000,
-  "cooldownGroup": 1,
-  "job": "GNB"
+  "cooldownGroup": 1
  },
  "FATED_BRAND": {
   "id": 36936,
   "name": "Fated Brand",
+  "job": "GNB",
   "onGcd": false,
   "cooldown": 1000,
-  "cooldownGroup": 1,
-  "job": "GNB"
+  "cooldownGroup": 1
  },
  "DANGER_ZONE": {
   "id": 16144,
   "name": "Danger Zone",
+  "job": "GNB",
   "onGcd": false,
-  "cooldown": 30000,
-  "job": "GNB"
+  "cooldown": 30000
  },
  "BLASTING_ZONE": {
   "id": 16165,
   "name": "Blasting Zone",
+  "job": "GNB",
   "onGcd": false,
-  "cooldown": 30000,
-  "job": "GNB"
+  "cooldown": 30000
  },
  "BOW_SHOCK": {
   "id": 16159,
   "name": "Bow Shock",
+  "job": "GNB",
   "onGcd": false,
   "cooldown": 60000,
   "statusesApplied": [
    "BOW_SHOCK"
-  ],
-  "job": "GNB"
+  ]
  },
  "TRAJECTORY": {
   "id": 36934,
   "name": "Trajectory",
+  "job": "GNB",
   "onGcd": false,
   "cooldown": 30000,
-  "charges": 2,
-  "job": "GNB"
+  "charges": 2
  },
  "ROYAL_GUARD": {
   "id": 16142,
   "name": "Royal Guard",
+  "job": "GNB",
   "onGcd": false,
-  "cooldown": 2000,
-  "job": "GNB"
+  "cooldown": 2000
  },
  "RELEASE_ROYAL_GUARD": {
   "id": 32068,
   "name": "Release Royal Guard",
+  "job": "GNB",
   "onGcd": false,
-  "cooldown": 1000,
-  "job": "GNB"
+  "cooldown": 1000
  },
  "AURORA": {
   "id": 16151,
   "name": "Aurora",
+  "job": "GNB",
   "onGcd": false,
   "cooldown": 60000,
   "statusesApplied": [
    "AURORA"
-  ],
-  "job": "GNB"
+  ]
  },
  "SUPERBOLIDE": {
   "id": 16152,
   "name": "Superbolide",
+  "job": "GNB",
   "onGcd": false,
   "cooldown": 360000,
   "statusesApplied": [
    "SUPERBOLIDE"
-  ],
-  "job": "GNB"
+  ]
  },
  "CAMOUFLAGE": {
   "id": 16140,
   "name": "Camouflage",
+  "job": "GNB",
   "onGcd": false,
   "cooldown": 90000,
   "statusesApplied": [
    "CAMOUFLAGE"
-  ],
-  "job": "GNB"
+  ]
  },
  "NEBULA": {
   "id": 16148,
   "name": "Nebula",
+  "job": "GNB",
   "onGcd": false,
   "cooldown": 120000,
   "statusesApplied": [
    "NEBULA"
-  ],
-  "job": "GNB"
+  ]
  },
  "GREAT_NEBULA": {
   "id": 36935,
   "name": "Great Nebula",
+  "job": "GNB",
   "onGcd": false,
   "cooldown": 120000,
   "statusesApplied": [
    "GREAT_NEBULA"
-  ],
-  "job": "GNB"
+  ]
  },
  "HEART_OF_STONE": {
   "id": 16161,
   "name": "Heart of Stone",
+  "job": "GNB",
   "onGcd": false,
   "cooldown": 25000,
   "statusesApplied": [
    "HEART_OF_STONE"
-  ],
-  "job": "GNB"
+  ]
  },
  "HEART_OF_LIGHT": {
   "id": 16160,
   "name": "Heart of Light",
+  "job": "GNB",
   "onGcd": false,
   "cooldown": 90000,
   "statusesApplied": [
    "HEART_OF_LIGHT"
-  ],
-  "job": "GNB"
+  ]
  },
  "CONTINUATION": {
   "id": 16155,
   "name": "Continuation",
+  "job": "GNB",
   "onGcd": false,
   "cooldown": 1000,
-  "cooldownGroup": 1,
-  "job": "GNB"
+  "cooldownGroup": 1
  },
  "HEART_OF_CORUNDUM": {
   "id": 25758,
   "name": "Heart of Corundum",
+  "job": "GNB",
   "onGcd": false,
   "cooldown": 25000,
   "statusesApplied": [
    "HEART_OF_CORUNDUM",
    "CATHARSIS_OF_CORUNDUM"
-  ],
-  "job": "GNB"
+  ]
  },
  "INFUSION_STR": {
   "id": 1019886,
   "name": "Infusion of Strength",
-  "duration": 30,
-  "job": "ITEMS"
+  "job": "ITEMS",
+  "duration": 30
  },
  "INFUSION_DEX": {
   "id": 1019887,
   "name": "Infusion of Dexterity",
-  "duration": 30,
-  "job": "ITEMS"
+  "job": "ITEMS",
+  "duration": 30
  },
  "INFUSION_VIT": {
   "id": 1019888,
   "name": "Infusion of Vitality",
-  "duration": 30,
-  "job": "ITEMS"
+  "job": "ITEMS",
+  "duration": 30
  },
  "INFUSION_INT": {
   "id": 1019889,
   "name": "Infusion of Intelligence",
-  "duration": 30,
-  "job": "ITEMS"
+  "job": "ITEMS",
+  "duration": 30
  },
  "INFUSION_MND": {
   "id": 1019890,
   "name": "Infusion of Mind",
-  "duration": 30,
-  "job": "ITEMS"
+  "job": "ITEMS",
+  "duration": 30
  },
  "G2_INFUSION_STR": {
   "id": 1022447,
   "name": "Grade 2 Infusion of Strength",
-  "duration": 30,
-  "job": "ITEMS"
+  "job": "ITEMS",
+  "duration": 30
  },
  "G2_INFUSION_DEX": {
   "id": 1022448,
   "name": "Grade 2 Infusion of Dexterity",
-  "duration": 30,
-  "job": "ITEMS"
+  "job": "ITEMS",
+  "duration": 30
  },
  "G2_INFUSION_VIT": {
   "id": 1022449,
   "name": "Grade 2 Infusion of Vitality",
-  "duration": 30,
-  "job": "ITEMS"
+  "job": "ITEMS",
+  "duration": 30
  },
  "G2_INFUSION_INT": {
   "id": 1022450,
   "name": "Grade 2 Infusion of Intelligence",
-  "duration": 30,
-  "job": "ITEMS"
+  "job": "ITEMS",
+  "duration": 30
  },
  "G2_INFUSION_MND": {
   "id": 1022451,
   "name": "Grade 2 Infusion of Mind",
-  "duration": 30,
-  "job": "ITEMS"
+  "job": "ITEMS",
+  "duration": 30
  },
  "G3_INFUSION_STR": {
   "id": 1022451,
   "name": "Grade 3 Infusion of Strength",
-  "duration": 30,
-  "job": "ITEMS"
+  "job": "ITEMS",
+  "duration": 30
  },
  "G3_INFUSION_DEX": {
   "id": 1024261,
   "name": "Grade 3 Infusion of Dexterity",
-  "duration": 30,
-  "job": "ITEMS"
+  "job": "ITEMS",
+  "duration": 30
  },
  "G3_INFUSION_VIT": {
   "id": 1024262,
   "name": "Grade 3 Infusion of Vitality",
-  "duration": 30,
-  "job": "ITEMS"
+  "job": "ITEMS",
+  "duration": 30
  },
  "G3_INFUSION_INT": {
   "id": 1024264,
   "name": "Grade 3 Infusion of Intelligence",
-  "duration": 30,
-  "job": "ITEMS"
+  "job": "ITEMS",
+  "duration": 30
  },
  "G3_INFUSION_MND": {
   "id": 1024265,
   "name": "Grade 3 Infusion of Mind",
-  "duration": 30,
-  "job": "ITEMS"
+  "job": "ITEMS",
+  "duration": 30
  },
  "G2_GEMDRAUGHT_MND": {
   "id": 1044166,
   "name": "Grade 2 Gemdraught of Mind",
-  "duration": 30,
-  "job": "ITEMS"
+  "job": "ITEMS",
+  "duration": 30
  },
  "G2_GEMDRAUGHT_STR": {
   "id": 1044162,
   "name": "Grade 2 Gemdraught of Strength",
-  "duration": 30,
-  "job": "ITEMS"
+  "job": "ITEMS",
+  "duration": 30
  },
  "G2_GEMDRAUGHT_VIT": {
   "id": 1044164,
   "name": "Grade 2 Gemdraught of Vitality",
-  "duration": 30,
-  "job": "ITEMS"
+  "job": "ITEMS",
+  "duration": 30
  },
  "G2_GEMDRAUGHT_DEX": {
   "id": 1044163,
   "name": "Grade 2 Gemdraught of Dexterity",
-  "duration": 30,
-  "job": "ITEMS"
+  "job": "ITEMS",
+  "duration": 30
  },
  "G2_GEMDRAUGHT_INT": {
   "id": 1044165,
   "name": "Grade 2 Gemdraught of Intelligence",
-  "duration": 30,
-  "job": "ITEMS"
+  "job": "ITEMS",
+  "duration": 30
  },
  "SUPER_ETHER": {
   "id": 23168,
@@ -3114,334 +3117,334 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
  "SHIELD_WALL": {
   "id": 197,
   "name": "Shield Wall",
-  "onGcd": true,
-  "gcdRecast": 1930,
   "job": "LIMIT_BREAK",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 1930
  },
  "STRONGHOLD": {
   "id": 198,
   "name": "Stronghold",
-  "onGcd": true,
-  "gcdRecast": 3860,
   "job": "LIMIT_BREAK",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 3860
  },
  "LAST_BASTION": {
   "id": 199,
   "name": "Last Bastion",
-  "onGcd": true,
-  "gcdRecast": 3860,
   "job": "LIMIT_BREAK",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 3860
  },
  "LAND_WAKER": {
   "id": 4240,
   "name": "Land Waker",
-  "onGcd": true,
-  "gcdRecast": 3860,
   "job": "LIMIT_BREAK",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 3860
  },
  "DARK_FORCE": {
   "id": 4241,
   "name": "Dark Force",
-  "onGcd": true,
-  "gcdRecast": 3860,
   "job": "LIMIT_BREAK",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 3860
  },
  "GUNMETAL_SOUL": {
   "id": 17105,
   "name": "Gunmetal Soul",
-  "onGcd": true,
-  "gcdRecast": 3860,
   "job": "LIMIT_BREAK",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 3860
  },
  "HEALING_WIND": {
   "id": 206,
   "name": "Healing Wind",
+  "job": "LIMIT_BREAK",
   "onGcd": true,
   "castTime": 2000,
-  "gcdRecast": 4100,
-  "job": "LIMIT_BREAK",
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 4100
  },
  "BREATH_OF_THE_EARTH": {
   "id": 207,
   "name": "Breath of the Earth",
+  "job": "LIMIT_BREAK",
   "onGcd": true,
   "castTime": 2000,
-  "gcdRecast": 7130,
-  "job": "LIMIT_BREAK",
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 7130
  },
  "PULSE_OF_LIFE": {
   "id": 208,
   "name": "Pulse of Life",
+  "job": "LIMIT_BREAK",
   "onGcd": true,
   "castTime": 2000,
-  "gcdRecast": 10100,
-  "job": "LIMIT_BREAK",
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 10100
  },
  "ANGEL_FEATHERS": {
   "id": 4247,
   "name": "Angel Feathers",
+  "job": "LIMIT_BREAK",
   "onGcd": true,
   "castTime": 2000,
-  "gcdRecast": 10100,
-  "job": "LIMIT_BREAK",
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 10100
  },
  "ASTRAL_STASIS": {
   "id": 4248,
   "name": "Astral Stasis",
+  "job": "LIMIT_BREAK",
   "onGcd": true,
   "castTime": 2000,
-  "gcdRecast": 10100,
-  "job": "LIMIT_BREAK",
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 10100
  },
  "TECHNE_MAKRE": {
   "id": 24859,
   "name": "Techne Makre",
+  "job": "LIMIT_BREAK",
   "onGcd": true,
   "castTime": 2000,
-  "gcdRecast": 10100,
-  "job": "LIMIT_BREAK",
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 10100
  },
  "BRAVER": {
   "id": 200,
   "name": "Braver",
+  "job": "LIMIT_BREAK",
   "onGcd": true,
   "castTime": 2000,
-  "gcdRecast": 5860,
-  "job": "LIMIT_BREAK",
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 5860
  },
  "BLADEDANCE": {
   "id": 201,
   "name": "Bladedance",
+  "job": "LIMIT_BREAK",
   "onGcd": true,
   "castTime": 3000,
-  "gcdRecast": 6860,
-  "job": "LIMIT_BREAK",
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 6860
  },
  "FINAL_HEAVEN": {
   "id": 202,
   "name": "Final Heaven",
+  "job": "LIMIT_BREAK",
   "onGcd": true,
   "castTime": 4500,
-  "gcdRecast": 8200,
-  "job": "LIMIT_BREAK",
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 8200
  },
  "DRAGONSONG_DIVE": {
   "id": 4242,
   "name": "Dragonsong Dive",
+  "job": "LIMIT_BREAK",
   "onGcd": true,
   "castTime": 4500,
-  "gcdRecast": 8200,
-  "job": "LIMIT_BREAK",
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 8200
  },
  "CHIMATSURI": {
   "id": 4243,
   "name": "Chimatsuri",
+  "job": "LIMIT_BREAK",
   "onGcd": true,
   "castTime": 4500,
-  "gcdRecast": 8200,
-  "job": "LIMIT_BREAK",
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 8200
  },
  "DOOM_OF_THE_LIVING": {
   "id": 7861,
   "name": "Doom of the Living",
+  "job": "LIMIT_BREAK",
   "onGcd": true,
   "castTime": 4500,
-  "gcdRecast": 8200,
-  "job": "LIMIT_BREAK",
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 8200
  },
  "THE_END": {
   "id": 24858,
   "name": "the End",
+  "job": "LIMIT_BREAK",
   "onGcd": true,
   "castTime": 4500,
-  "gcdRecast": 8200,
-  "job": "LIMIT_BREAK",
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 8200
  },
  "WORLD_SWALLOWER": {
   "id": 34866,
   "name": "World-swallower",
+  "job": "LIMIT_BREAK",
   "onGcd": true,
   "castTime": 4500,
-  "gcdRecast": 8200,
-  "job": "LIMIT_BREAK",
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 8200
  },
  "BIG_SHOT": {
   "id": 4238,
   "name": "Big Shot",
+  "job": "LIMIT_BREAK",
   "onGcd": true,
   "castTime": 2000,
-  "gcdRecast": 5100,
-  "job": "LIMIT_BREAK",
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 5100
  },
  "DESPERADO": {
   "id": 4239,
   "name": "Desperado",
+  "job": "LIMIT_BREAK",
   "onGcd": true,
   "castTime": 3100,
-  "gcdRecast": 6100,
-  "job": "LIMIT_BREAK",
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 6100
  },
  "SAGITTARIUS_ARROW": {
   "id": 4244,
   "name": "Sagittarius Arrow",
+  "job": "LIMIT_BREAK",
   "onGcd": true,
   "castTime": 4500,
-  "gcdRecast": 8200,
-  "job": "LIMIT_BREAK",
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 8200
  },
  "SATELLITE_BEAM": {
   "id": 4245,
   "name": "Satellite Beam",
+  "job": "LIMIT_BREAK",
   "onGcd": true,
   "castTime": 4500,
-  "gcdRecast": 8200,
-  "job": "LIMIT_BREAK",
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 8200
  },
  "CRIMSON_LOTUS": {
   "id": 17106,
   "name": "Crimson Lotus",
+  "job": "LIMIT_BREAK",
   "onGcd": true,
   "castTime": 4500,
-  "gcdRecast": 8200,
-  "job": "LIMIT_BREAK",
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 8200
  },
  "SKYSHARD": {
   "id": 203,
   "name": "Skyshard",
+  "job": "LIMIT_BREAK",
   "onGcd": true,
   "castTime": 2000,
-  "gcdRecast": 5100,
-  "job": "LIMIT_BREAK",
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 5100
  },
  "STARSTORM": {
   "id": 204,
   "name": "Starstorm",
+  "job": "LIMIT_BREAK",
   "onGcd": true,
   "castTime": 3000,
-  "gcdRecast": 8100,
-  "job": "LIMIT_BREAK",
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 8100
  },
  "METEOR": {
   "id": 205,
   "name": "Meteor",
+  "job": "LIMIT_BREAK",
   "onGcd": true,
   "castTime": 4500,
-  "gcdRecast": 12600,
-  "job": "LIMIT_BREAK",
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 12600
  },
  "TERAFLARE": {
   "id": 4246,
   "name": "Teraflare",
+  "job": "LIMIT_BREAK",
   "onGcd": true,
   "castTime": 4500,
-  "gcdRecast": 12600,
-  "job": "LIMIT_BREAK",
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 12600
  },
  "VERMILION_SCOURGE": {
   "id": 7862,
   "name": "Vermilion Scourge",
+  "job": "LIMIT_BREAK",
   "onGcd": true,
   "castTime": 4500,
-  "gcdRecast": 12600,
-  "job": "LIMIT_BREAK",
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 12600
  },
  "CHROMATIC_FANTASY": {
   "id": 34867,
   "name": "Chromatic Fantasy",
+  "job": "LIMIT_BREAK",
   "onGcd": true,
   "castTime": 4500,
-  "gcdRecast": 12600,
-  "job": "LIMIT_BREAK",
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 12600
  },
  "SPLIT_SHOT": {
   "id": 2866,
   "name": "Split Shot",
+  "job": "MCH",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "start": true
   },
-  "job": "MCH",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "SLUG_SHOT": {
   "id": 2868,
   "name": "Slug Shot",
+  "job": "MCH",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": [
     2866,
     7411
    ]
   },
-  "job": "MCH",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "SPREAD_SHOT": {
   "id": 2870,
   "name": "Spread Shot",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "breaksCombo": true,
   "job": "MCH",
+  "onGcd": true,
+  "breaksCombo": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "HOT_SHOT": {
   "id": 2872,
   "name": "Hot Shot",
+  "job": "MCH",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
+  "castTime": 0,
   "cooldown": 40000,
   "gcdRecast": 2500,
-  "job": "MCH",
-  "castTime": 0
+  "speedAttribute": "SKILL_SPEED"
  },
  "CLEAN_SHOT": {
   "id": 2873,
   "name": "Clean Shot",
+  "job": "MCH",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": [
     2868,
@@ -3449,284 +3452,284 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
    ],
    "end": true
   },
-  "job": "MCH",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "HEATED_SPLIT_SHOT": {
   "id": 7411,
   "name": "Heated Split Shot",
+  "job": "MCH",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "start": true
   },
-  "job": "MCH",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "HEATED_SLUG_SHOT": {
   "id": 7412,
   "name": "Heated Slug Shot",
+  "job": "MCH",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": 7411
   },
-  "job": "MCH",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "HEATED_CLEAN_SHOT": {
   "id": 7413,
   "name": "Heated Clean Shot",
+  "job": "MCH",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": 7412,
    "end": true
   },
-  "job": "MCH",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "HEAT_BLAST": {
   "id": 7410,
   "name": "Heat Blast",
-  "onGcd": true,
-  "cooldown": 1500,
   "job": "MCH",
-  "castTime": 0
+  "onGcd": true,
+  "castTime": 0,
+  "cooldown": 1500
  },
  "AUTO_CROSSBOW": {
   "id": 16497,
   "name": "Auto Crossbow",
-  "onGcd": true,
   "job": "MCH",
+  "onGcd": true,
   "castTime": 0,
   "cooldown": 2500
  },
  "DRILL": {
   "id": 16498,
   "name": "Drill",
-  "onGcd": true,
-  "charges": 2,
-  "cooldown": 20000,
-  "cooldownGroup": 16498,
-  "gcdRecast": 2500,
   "job": "MCH",
-  "castTime": 0
+  "onGcd": true,
+  "castTime": 0,
+  "cooldown": 20000,
+  "gcdRecast": 2500,
+  "cooldownGroup": 16498,
+  "charges": 2
  },
  "BIOBLASTER": {
   "id": 16499,
   "name": "Bioblaster",
+  "job": "MCH",
   "onGcd": true,
-  "charges": 2,
+  "castTime": 0,
   "cooldown": 20000,
-  "cooldownGroup": 16498,
   "gcdRecast": 2500,
+  "cooldownGroup": 16498,
   "statusesApplied": [
    "BIOBLASTER"
   ],
-  "job": "MCH",
-  "castTime": 0
+  "charges": 2
  },
  "AIR_ANCHOR": {
   "id": 16500,
   "name": "Air Anchor",
+  "job": "MCH",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
+  "castTime": 0,
   "cooldown": 40000,
   "gcdRecast": 2500,
-  "job": "MCH",
-  "castTime": 0
+  "speedAttribute": "SKILL_SPEED"
  },
  "SCATTERGUN": {
   "id": 25786,
   "name": "Scattergun",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "breaksCombo": true,
   "job": "MCH",
+  "onGcd": true,
+  "breaksCombo": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "CHAIN_SAW": {
   "id": 25788,
   "name": "Chain Saw",
+  "job": "MCH",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
+  "castTime": 0,
   "cooldown": 60000,
   "gcdRecast": 2500,
   "statusesApplied": [
    "EXCAVATOR_READY"
   ],
-  "job": "MCH",
-  "castTime": 0
+  "speedAttribute": "SKILL_SPEED"
  },
  "BLAZING_SHOT": {
   "id": 36978,
   "name": "Blazing Shot",
-  "onGcd": true,
-  "cooldown": 1500,
   "job": "MCH",
-  "castTime": 0
+  "onGcd": true,
+  "castTime": 0,
+  "cooldown": 1500
  },
  "EXCAVATOR": {
   "id": 36981,
   "name": "Excavator",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "gcdRecast": 2500,
   "job": "MCH",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "FULL_METAL_FIELD": {
   "id": 36982,
   "name": "Full Metal Field",
-  "onGcd": true,
-  "gcdRecast": 2500,
   "job": "MCH",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 2500
  },
  "REASSEMBLE": {
   "id": 2876,
   "name": "Reassemble",
+  "job": "MCH",
   "onGcd": false,
   "cooldown": 55000,
-  "charges": 2,
   "statusesApplied": [
    "REASSEMBLED"
   ],
-  "job": "MCH"
+  "charges": 2
  },
  "WILDFIRE": {
   "id": 2878,
   "name": "Wildfire",
+  "job": "MCH",
   "onGcd": false,
   "cooldown": 120000,
   "statusesApplied": [
    "WILDFIRE_SELF"
-  ],
-  "job": "MCH"
+  ]
  },
  "DETONATOR": {
   "id": 16766,
   "name": "Detonator",
+  "job": "MCH",
   "onGcd": false,
-  "cooldown": 1000,
-  "job": "MCH"
+  "cooldown": 1000
  },
  "ROOK_AUTOTURRET": {
   "id": 2864,
   "name": "Rook Autoturret",
+  "job": "MCH",
   "onGcd": false,
-  "cooldown": 6000,
-  "job": "MCH"
+  "cooldown": 6000
  },
  "GAUSS_ROUND": {
   "id": 2874,
   "name": "Gauss Round",
+  "job": "MCH",
   "onGcd": false,
   "cooldown": 30000,
-  "charges": 3,
-  "job": "MCH"
+  "charges": 3
  },
  "HYPERCHARGE": {
   "id": 17209,
   "name": "Hypercharge",
+  "job": "MCH",
   "onGcd": false,
   "cooldown": 10000,
   "statusesApplied": [
    "OVERHEATED"
-  ],
-  "job": "MCH"
+  ]
  },
  "RICOCHET": {
   "id": 2890,
   "name": "Ricochet",
+  "job": "MCH",
   "onGcd": false,
   "cooldown": 30000,
-  "charges": 3,
-  "job": "MCH"
+  "charges": 3
  },
  "BARREL_STABILIZER": {
   "id": 7414,
   "name": "Barrel Stabilizer",
+  "job": "MCH",
   "onGcd": false,
   "cooldown": 120000,
   "statusesApplied": [
    "HYPERCHARGED",
    "FULL_METAL_MACHINIST"
-  ],
-  "job": "MCH"
+  ]
  },
  "ROOK_OVERDRIVE": {
   "id": 7415,
   "name": "Rook Overdrive",
+  "job": "MCH",
   "onGcd": false,
-  "cooldown": 15000,
-  "job": "MCH"
+  "cooldown": 15000
  },
  "FLAMETHROWER": {
   "id": 7418,
   "name": "Flamethrower",
+  "job": "MCH",
   "onGcd": true,
+  "castTime": 0,
   "cooldown": 60000,
   "statusesApplied": [
    "FLAMETHROWER"
-  ],
-  "job": "MCH",
-  "castTime": 0
+  ]
  },
  "TACTICIAN": {
   "id": 16889,
   "name": "Tactician",
+  "job": "MCH",
   "onGcd": false,
   "cooldown": 90000,
   "statusesApplied": [
    "TACTICIAN"
-  ],
-  "job": "MCH"
+  ]
  },
  "DISMANTLE": {
   "id": 2887,
   "name": "Dismantle",
+  "job": "MCH",
   "onGcd": false,
-  "cooldown": 120000,
-  "job": "MCH"
+  "cooldown": 120000
  },
  "AUTOMATON_QUEEN": {
   "id": 16501,
   "name": "Automaton Queen",
+  "job": "MCH",
   "onGcd": false,
-  "cooldown": 6000,
-  "job": "MCH"
+  "cooldown": 6000
  },
  "QUEEN_OVERDRIVE": {
   "id": 16502,
   "name": "Queen Overdrive",
+  "job": "MCH",
   "onGcd": false,
-  "cooldown": 15000,
-  "job": "MCH"
+  "cooldown": 15000
  },
  "DOUBLE_CHECK": {
   "id": 36979,
   "name": "Double Check",
+  "job": "MCH",
   "onGcd": false,
   "cooldown": 30000,
-  "charges": 3,
-  "job": "MCH"
+  "charges": 3
  },
  "CHECKMATE": {
   "id": 36980,
   "name": "Checkmate",
+  "job": "MCH",
   "onGcd": false,
   "cooldown": 30000,
-  "charges": 3,
-  "job": "MCH"
+  "charges": 3
  },
  "VOLLEY_FIRE": {
   "id": 2891,
@@ -3741,17 +3744,17 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
  "ROLLER_DASH": {
   "id": 17206,
   "name": "Roller Dash",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "job": "MCH",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "ARM_PUNCH": {
   "id": 16504,
   "name": "Arm Punch",
-  "onGcd": true,
   "job": "MCH",
+  "onGcd": true,
   "castTime": 0,
   "cooldown": 2500
  },
@@ -3768,7 +3771,10 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
  "BOOTSHINE": {
   "id": 53,
   "name": "Bootshine",
+  "job": "MNK",
   "onGcd": true,
+  "castTime": 0,
+  "cooldown": 2500,
   "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
@@ -3782,15 +3788,15 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
      "MNK_OPO_OPOS_FURY"
     ]
    }
-  ],
-  "job": "MNK",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
  "TRUE_STRIKE": {
   "id": 54,
   "name": "True Strike",
+  "job": "MNK",
   "onGcd": true,
+  "castTime": 0,
+  "cooldown": 2500,
   "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
@@ -3804,15 +3810,15 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
      "MNK_RAPTORS_FURY"
     ]
    }
-  ],
-  "job": "MNK",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
  "SNAP_PUNCH": {
   "id": 56,
   "name": "Snap Punch",
+  "job": "MNK",
   "onGcd": true,
+  "castTime": 0,
+  "cooldown": 2500,
   "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
@@ -3841,48 +3847,48 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
      "MNK_COEURLS_FURY"
     ]
    }
-  ],
-  "job": "MNK",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
  "TWIN_SNAKES": {
   "id": 61,
   "name": "Twin Snakes",
+  "job": "MNK",
   "onGcd": true,
+  "castTime": 0,
+  "cooldown": 2500,
   "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
     "value": 380,
     "bonusModifiers": []
    }
-  ],
-  "job": "MNK",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
  "ARM_OF_THE_DESTROYER": {
   "id": 62,
   "name": "Arm of the Destroyer",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "job": "MNK",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "SHADOW_OF_THE_DESTROYER": {
   "id": 25767,
   "name": "Shadow of the Destroyer",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "job": "MNK",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "DEMOLISH": {
   "id": 66,
   "name": "Demolish",
+  "job": "MNK",
   "onGcd": true,
+  "castTime": 0,
+  "cooldown": 2500,
   "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
@@ -3895,67 +3901,67 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
      "POSITIONAL"
     ]
    }
-  ],
-  "job": "MNK",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
  "ROCKBREAKER": {
   "id": 70,
   "name": "Rockbreaker",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "job": "MNK",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "DRAGON_KICK": {
   "id": 74,
   "name": "Dragon Kick",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "job": "MNK",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "FORM_SHIFT": {
   "id": 4262,
   "name": "Form Shift",
+  "job": "MNK",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "FORMLESS_FIST"
   ],
-  "job": "MNK",
-  "castTime": 0,
-  "cooldown": 2500
+  "speedAttribute": "SKILL_SPEED"
  },
  "FOUR_POINT_FURY": {
   "id": 16473,
   "name": "Four-Point Fury",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "job": "MNK",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "SIX_SIDED_STAR": {
   "id": 16476,
   "name": "Six-sided Star",
+  "job": "MNK",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
+  "castTime": 0,
+  "cooldown": 2500,
   "gcdRecast": 5000,
   "statusesApplied": [
    "SIX_SIDED_STAR"
   ],
-  "job": "MNK",
-  "castTime": 0,
-  "cooldown": 2500
+  "speedAttribute": "SKILL_SPEED"
  },
  "LEAPING_OPO": {
   "id": 36945,
   "name": "Leaping Opo",
+  "job": "MNK",
   "onGcd": true,
+  "castTime": 0,
+  "cooldown": 2500,
   "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
@@ -3969,15 +3975,15 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
      "MNK_OPO_OPOS_FURY"
     ]
    }
-  ],
-  "job": "MNK",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
  "RISING_RAPTOR": {
   "id": 36946,
   "name": "Rising Raptor",
+  "job": "MNK",
   "onGcd": true,
+  "castTime": 0,
+  "cooldown": 2500,
   "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
@@ -3991,15 +3997,15 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
      "MNK_RAPTORS_FURY"
     ]
    }
-  ],
-  "job": "MNK",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
  "POUNCING_COEURL": {
   "id": 36947,
   "name": "Pouncing Coeurl",
+  "job": "MNK",
   "onGcd": true,
+  "castTime": 0,
+  "cooldown": 2500,
   "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
@@ -4028,340 +4034,339 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
      "MNK_COEURLS_FURY"
     ]
    }
-  ],
-  "job": "MNK",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
  "MASTERFUL_BLITZ": {
   "id": 25764,
   "name": "Masterful Blitz",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "job": "MNK",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "ELIXIR_FIELD": {
   "id": 3545,
   "name": "Elixir Field",
+  "job": "MNK",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "FORMLESS_FIST"
   ],
+  "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
     "value": 800,
     "bonusModifiers": []
    }
-  ],
-  "job": "MNK",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
  "FLINT_STRIKE": {
   "id": 25882,
   "name": "Flint Strike",
+  "job": "MNK",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "FORMLESS_FIST"
   ],
+  "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
     "value": 600,
     "bonusModifiers": []
    }
-  ],
-  "job": "MNK",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
  "CELESTIAL_REVOLUTION": {
   "id": 25765,
   "name": "Celestial Revolution",
+  "job": "MNK",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "FORMLESS_FIST"
   ],
+  "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
     "value": 600,
     "bonusModifiers": []
    }
-  ],
-  "job": "MNK",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
  "TORNADO_KICK": {
   "id": 3543,
   "name": "Tornado Kick",
+  "job": "MNK",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "FORMLESS_FIST"
   ],
+  "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
     "value": 850,
     "bonusModifiers": []
    }
-  ],
-  "job": "MNK",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
  "RISING_PHOENIX": {
   "id": 25768,
   "name": "Rising Phoenix",
+  "job": "MNK",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "FORMLESS_FIST"
   ],
+  "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
     "value": 900,
     "bonusModifiers": []
    }
-  ],
-  "job": "MNK",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
  "PHANTOM_RUSH": {
   "id": 25769,
   "name": "Phantom Rush",
+  "job": "MNK",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "FORMLESS_FIST"
   ],
+  "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
     "value": 1500,
     "bonusModifiers": []
    }
-  ],
-  "job": "MNK",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
  "ELIXIR_BURST": {
   "id": 36948,
   "name": "Elixir Burst",
+  "job": "MNK",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "FORMLESS_FIST"
   ],
+  "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
     "value": 900,
     "bonusModifiers": []
    }
-  ],
-  "job": "MNK",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
  "WINDS_REPLY": {
   "id": 36949,
   "name": "Wind's Reply",
+  "job": "MNK",
   "onGcd": true,
+  "castTime": 0,
+  "cooldown": 2500,
   "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
     "value": 1040,
     "bonusModifiers": []
    }
-  ],
-  "job": "MNK",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
  "FIRES_REPLY": {
   "id": 36950,
   "name": "Fire's Reply",
+  "job": "MNK",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "FORMLESS_FIST"
   ],
+  "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
     "value": 1400,
     "bonusModifiers": []
    }
-  ],
-  "job": "MNK",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
  "STEELED_MEDITATION": {
   "id": 36940,
   "name": "Steeled Meditation",
-  "onGcd": true,
-  "cooldown": 1000,
   "job": "MNK",
-  "castTime": 0
+  "onGcd": true,
+  "castTime": 0,
+  "cooldown": 1000
  },
  "FORBIDDEN_MEDITATION": {
   "id": 36942,
   "name": "Forbidden Meditation",
-  "onGcd": true,
-  "cooldown": 1000,
   "job": "MNK",
-  "castTime": 0
+  "onGcd": true,
+  "castTime": 0,
+  "cooldown": 1000
  },
  "ENLIGHTENED_MEDITATION": {
   "id": 36943,
   "name": "Enlightened Meditation",
-  "onGcd": true,
-  "cooldown": 1000,
   "job": "MNK",
-  "castTime": 0
+  "onGcd": true,
+  "castTime": 0,
+  "cooldown": 1000
  },
  "MANTRA": {
   "id": 65,
   "name": "Mantra",
+  "job": "MNK",
   "cooldown": 90000,
   "statusesApplied": [
    "MANTRA"
-  ],
-  "job": "MNK"
+  ]
  },
  "PERFECT_BALANCE": {
   "id": 69,
   "name": "Perfect Balance",
+  "job": "MNK",
   "cooldown": 40000,
-  "charges": 2,
   "statusesApplied": [
    "PERFECT_BALANCE"
   ],
-  "job": "MNK"
+  "charges": 2
  },
  "BROTHERHOOD": {
   "id": 7396,
   "name": "Brotherhood",
+  "job": "MNK",
   "cooldown": 120000,
   "statusesApplied": [
    "BROTHERHOOD",
    "MEDITATIVE_BROTHERHOOD"
-  ],
-  "job": "MNK"
+  ]
  },
  "RIDDLE_OF_EARTH": {
   "id": 7394,
   "name": "Riddle of Earth",
+  "job": "MNK",
   "cooldown": 120000,
   "statusesApplied": [
    "RIDDLE_OF_EARTH",
    "EARTHS_RUMINATION"
-  ],
-  "job": "MNK"
+  ]
  },
  "RIDDLE_OF_FIRE": {
   "id": 7395,
   "name": "Riddle of Fire",
+  "job": "MNK",
   "cooldown": 60000,
   "statusesApplied": [
    "RIDDLE_OF_FIRE",
    "FIRES_RUMINATION"
-  ],
-  "job": "MNK"
+  ]
  },
  "RIDDLE_OF_WIND": {
   "id": 25766,
   "name": "Riddle of Wind",
+  "job": "MNK",
   "cooldown": 90000,
   "statusesApplied": [
    "RIDDLE_OF_WIND",
    "WINDS_RUMINATION"
-  ],
-  "job": "MNK"
+  ]
  },
  "STEEL_PEAK": {
   "id": 25761,
   "name": "Steel Peak",
+  "job": "MNK",
   "cooldown": 1000,
-  "cooldownGroup": 1,
-  "job": "MNK"
+  "cooldownGroup": 1
  },
  "HOWLING_FIST": {
   "id": 25763,
   "name": "Howling Fist",
+  "job": "MNK",
   "cooldown": 1000,
-  "cooldownGroup": 1,
-  "job": "MNK"
+  "cooldownGroup": 1
  },
  "THE_FORBIDDEN_CHAKRA": {
   "id": 3547,
   "name": "The Forbidden Chakra",
+  "job": "MNK",
   "cooldown": 1000,
   "cooldownGroup": 1,
-  "potency": 400,
-  "job": "MNK"
+  "potency": 400
  },
  "ENLIGHTENMENT": {
   "id": 16474,
   "name": "Enlightenment",
+  "job": "MNK",
   "cooldown": 1000,
-  "cooldownGroup": 1,
-  "job": "MNK"
+  "cooldownGroup": 1
  },
  "THUNDERCLAP": {
   "id": 25762,
   "name": "Thunderclap",
+  "job": "MNK",
   "cooldown": 30000,
-  "charges": 3,
-  "job": "MNK"
+  "charges": 3
  },
  "EARTHS_REPLY": {
   "id": 36944,
   "name": "Earth's Reply",
+  "job": "MNK",
   "statusesApplied": [
    "EARTHS_REPLY"
-  ],
-  "job": "MNK"
+  ]
  },
  "SPINNING_EDGE": {
   "id": 2240,
   "name": "Spinning Edge",
+  "job": "NIN",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "start": true
   },
-  "job": "NIN",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "GUST_SLASH": {
   "id": 2242,
   "name": "Gust Slash",
+  "job": "NIN",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": 2240
   },
-  "job": "NIN",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "AEOLIAN_EDGE": {
   "id": 2255,
   "name": "Aeolian Edge",
+  "job": "NIN",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "potency": 200,
   "combo": {
    "from": 2242,
    "end": true
   },
+  "castTime": 0,
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
     "value": 200,
@@ -4387,41 +4392,41 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
     ]
    }
   ],
-  "job": "NIN",
-  "castTime": 0,
-  "cooldown": 2500
+  "potency": 200
  },
  "DEATH_BLOSSOM": {
   "id": 2254,
   "name": "Death Blossom",
+  "job": "NIN",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "start": true
   },
-  "job": "NIN",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "THROWING_DAGGER": {
   "id": 2247,
   "name": "Throwing Dagger",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "job": "NIN",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "ARMOR_CRUSH": {
   "id": 3563,
   "name": "Armor Crush",
+  "job": "NIN",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "potency": 220,
   "combo": {
    "from": 2242,
    "end": true
   },
+  "castTime": 0,
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
     "value": 220,
@@ -4447,317 +4452,316 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
     ]
    }
   ],
-  "job": "NIN",
-  "castTime": 0,
-  "cooldown": 2500
+  "potency": 220
  },
  "HAKKE_MUJINSATSU": {
   "id": 16488,
   "name": "Hakke Mujinsatsu",
+  "job": "NIN",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": 2254,
    "end": true
   },
-  "job": "NIN",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "FORKED_RAIJU": {
   "id": 25777,
   "name": "Forked Raiju",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "job": "NIN",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "FLEETING_RAIJU": {
   "id": 25778,
   "name": "Fleeting Raiju",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "job": "NIN",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "PHANTOM_KAMAITACHI": {
   "id": 25774,
   "name": "Phantom Kamaitachi",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "job": "NIN",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "PHANTOM_KAMAITACHI_BUNSHIN": {
   "id": 25775,
   "name": "Phantom Kamaitachi",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "job": "NIN",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "TEN": {
   "id": 2259,
   "name": "Ten",
+  "job": "NIN",
   "onGcd": true,
+  "castTime": 0,
   "cooldown": 20000,
   "gcdRecast": 500,
-  "charges": 2,
   "cooldownGroup": 9,
-  "job": "NIN",
-  "castTime": 0
+  "charges": 2
  },
  "TEN_KASSATSU": {
   "id": 18805,
   "name": "Ten",
-  "onGcd": true,
-  "cooldown": 500,
   "job": "NIN",
-  "castTime": 0
+  "onGcd": true,
+  "castTime": 0,
+  "cooldown": 500
  },
  "CHI": {
   "id": 2261,
   "name": "Chi",
+  "job": "NIN",
   "onGcd": true,
+  "castTime": 0,
   "cooldown": 20000,
   "gcdRecast": 500,
-  "charges": 2,
   "cooldownGroup": 9,
-  "job": "NIN",
-  "castTime": 0
+  "charges": 2
  },
  "CHI_KASSATSU": {
   "id": 18806,
   "name": "Chi",
-  "onGcd": true,
-  "cooldown": 500,
   "job": "NIN",
-  "castTime": 0
+  "onGcd": true,
+  "castTime": 0,
+  "cooldown": 500
  },
  "JIN": {
   "id": 2263,
   "name": "Jin",
+  "job": "NIN",
   "onGcd": true,
+  "castTime": 0,
   "cooldown": 20000,
   "gcdRecast": 500,
-  "charges": 2,
   "cooldownGroup": 9,
-  "job": "NIN",
-  "castTime": 0
+  "charges": 2
  },
  "JIN_KASSATSU": {
   "id": 18807,
   "name": "Jin",
-  "onGcd": true,
-  "cooldown": 500,
   "job": "NIN",
-  "castTime": 0
+  "onGcd": true,
+  "castTime": 0,
+  "cooldown": 500
  },
  "NINJUTSU": {
   "id": 2260,
   "name": "Ninjutsu",
-  "onGcd": true,
-  "cooldown": 1500,
   "job": "NIN",
-  "castTime": 0
+  "onGcd": true,
+  "castTime": 0,
+  "cooldown": 1500
  },
  "FUMA_SHURIKEN": {
   "id": 2265,
   "name": "Fuma Shuriken",
-  "onGcd": true,
-  "cooldown": 1500,
   "job": "NIN",
-  "castTime": 0
+  "onGcd": true,
+  "castTime": 0,
+  "cooldown": 1500
  },
  "FUMA_SHURIKEN_TCJ_TEN": {
   "id": 18873,
   "name": "Fuma Shuriken",
-  "onGcd": true,
-  "cooldown": 1000,
   "job": "NIN",
-  "castTime": 0
+  "onGcd": true,
+  "castTime": 0,
+  "cooldown": 1000
  },
  "FUMA_SHURIKEN_TCJ_CHI": {
   "id": 18874,
   "name": "Fuma Shuriken",
-  "onGcd": true,
-  "cooldown": 1000,
   "job": "NIN",
-  "castTime": 0
+  "onGcd": true,
+  "castTime": 0,
+  "cooldown": 1000
  },
  "FUMA_SHURIKEN_TCJ_JIN": {
   "id": 18875,
   "name": "Fuma Shuriken",
-  "onGcd": true,
-  "cooldown": 1000,
   "job": "NIN",
-  "castTime": 0
+  "onGcd": true,
+  "castTime": 0,
+  "cooldown": 1000
  },
  "KATON": {
   "id": 2266,
   "name": "Katon",
-  "onGcd": true,
-  "cooldown": 1500,
   "job": "NIN",
-  "castTime": 0
+  "onGcd": true,
+  "castTime": 0,
+  "cooldown": 1500
  },
  "KATON_TCJ": {
   "id": 18876,
   "name": "Katon",
-  "onGcd": true,
-  "cooldown": 1000,
   "job": "NIN",
-  "castTime": 0
+  "onGcd": true,
+  "castTime": 0,
+  "cooldown": 1000
  },
  "GOKA_MEKKYAKU": {
   "id": 16491,
   "name": "Goka Mekkyaku",
-  "onGcd": true,
-  "cooldown": 1500,
   "job": "NIN",
-  "castTime": 0
+  "onGcd": true,
+  "castTime": 0,
+  "cooldown": 1500
  },
  "RAITON": {
   "id": 2267,
   "name": "Raiton",
+  "job": "NIN",
   "onGcd": true,
+  "castTime": 0,
   "cooldown": 1500,
   "statusesApplied": [
    "RAIJU_READY"
-  ],
-  "job": "NIN",
-  "castTime": 0
+  ]
  },
  "RAITON_TCJ": {
   "id": 18877,
   "name": "Raiton",
-  "onGcd": true,
-  "cooldown": 1000,
   "job": "NIN",
-  "castTime": 0
+  "onGcd": true,
+  "castTime": 0,
+  "cooldown": 1000
  },
  "HYOTON": {
   "id": 2268,
   "name": "Hyoton",
-  "onGcd": true,
-  "cooldown": 1500,
   "job": "NIN",
-  "castTime": 0
+  "onGcd": true,
+  "castTime": 0,
+  "cooldown": 1500
  },
  "HYOTON_TCJ": {
   "id": 18878,
   "name": "Hyoton",
-  "onGcd": true,
-  "cooldown": 1000,
   "job": "NIN",
-  "castTime": 0
+  "onGcd": true,
+  "castTime": 0,
+  "cooldown": 1000
  },
  "HYOSHO_RANRYU": {
   "id": 16492,
   "name": "Hyosho Ranryu",
-  "onGcd": true,
-  "cooldown": 1500,
   "job": "NIN",
-  "castTime": 0
+  "onGcd": true,
+  "castTime": 0,
+  "cooldown": 1500
  },
  "HUTON": {
   "id": 2269,
   "name": "Huton",
+  "job": "NIN",
   "onGcd": true,
+  "castTime": 0,
   "cooldown": 1500,
   "statusesApplied": [
    "SHADOW_WALKER"
-  ],
-  "job": "NIN",
-  "castTime": 0
+  ]
  },
  "HUTON_TCJ": {
   "id": 18879,
   "name": "Huton",
+  "job": "NIN",
   "onGcd": true,
+  "castTime": 0,
   "cooldown": 1500,
   "statusesApplied": [
    "SHADOW_WALKER"
-  ],
-  "job": "NIN",
-  "castTime": 0
+  ]
  },
  "DOTON": {
   "id": 2270,
   "name": "Doton",
+  "job": "NIN",
   "onGcd": true,
+  "castTime": 0,
   "cooldown": 1500,
   "statusesApplied": [
    "DOTON"
-  ],
-  "job": "NIN",
-  "castTime": 0
+  ]
  },
  "DOTON_TCJ": {
   "id": 18880,
   "name": "Doton",
+  "job": "NIN",
   "onGcd": true,
+  "castTime": 0,
   "cooldown": 1500,
   "statusesApplied": [
    "DOTON"
-  ],
-  "job": "NIN",
-  "castTime": 0
+  ]
  },
  "SUITON": {
   "id": 2271,
   "name": "Suiton",
+  "job": "NIN",
   "onGcd": true,
+  "castTime": 0,
   "cooldown": 1500,
   "statusesApplied": [
    "SHADOW_WALKER"
-  ],
-  "job": "NIN",
-  "castTime": 0
+  ]
  },
  "SUITON_TCJ": {
   "id": 18881,
   "name": "Suiton",
+  "job": "NIN",
   "onGcd": true,
+  "castTime": 0,
   "cooldown": 1500,
   "statusesApplied": [
    "SHADOW_WALKER"
-  ],
-  "job": "NIN",
-  "castTime": 0
+  ]
  },
  "RABBIT_MEDIUM": {
   "id": 2272,
   "name": "Rabbit Medium",
-  "onGcd": true,
-  "cooldown": 1500,
   "job": "NIN",
-  "castTime": 0
+  "onGcd": true,
+  "castTime": 0,
+  "cooldown": 1500
  },
  "MUG": {
   "id": 2248,
   "name": "Mug",
+  "job": "NIN",
   "onGcd": false,
   "cooldown": 120000,
   "statusesApplied": [
    "MUG"
-  ],
-  "job": "NIN"
+  ]
  },
  "ASSASSINATE": {
   "id": 2246,
   "name": "Assassinate",
+  "job": "NIN",
   "onGcd": false,
-  "cooldown": 60000,
-  "job": "NIN"
+  "cooldown": 60000
  },
  "TRICK_ATTACK": {
   "id": 2258,
   "name": "Trick Attack",
+  "job": "NIN",
   "onGcd": false,
   "cooldown": 60000,
   "statusesApplied": [
@@ -4774,313 +4778,312 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
      "POSITIONAL"
     ]
    }
-  ],
-  "job": "NIN"
+  ]
  },
  "SHADE_SHIFT": {
   "id": 2241,
   "name": "Shade Shift",
+  "job": "NIN",
   "onGcd": false,
   "cooldown": 120000,
   "statusesApplied": [
    "SHADE_SHIFT"
-  ],
-  "job": "NIN"
+  ]
  },
  "KASSATSU": {
   "id": 2264,
   "name": "Kassatsu",
+  "job": "NIN",
   "onGcd": false,
   "cooldown": 60000,
   "statusesApplied": [
    "KASSATSU"
-  ],
-  "job": "NIN"
+  ]
  },
  "DREAM_WITHIN_A_DREAM": {
   "id": 3566,
   "name": "Dream Within A Dream",
+  "job": "NIN",
   "onGcd": false,
-  "cooldown": 60000,
-  "job": "NIN"
+  "cooldown": 60000
  },
  "HELLFROG_MEDIUM": {
   "id": 7401,
   "name": "Hellfrog Medium",
+  "job": "NIN",
   "onGcd": false,
-  "cooldown": 1000,
-  "job": "NIN"
+  "cooldown": 1000
  },
  "DOKUMORI": {
   "id": 36957,
   "name": "Dokumori",
+  "job": "NIN",
   "onGcd": false,
   "cooldown": 120000,
   "statusesApplied": [
    "DOKUMORI",
    "HIGI"
-  ],
-  "job": "NIN"
+  ]
  },
  "BHAVACAKRA": {
   "id": 7402,
   "name": "Bhavacakra",
+  "job": "NIN",
   "onGcd": false,
-  "cooldown": 1000,
-  "job": "NIN"
+  "cooldown": 1000
  },
  "TEN_CHI_JIN": {
   "id": 7403,
   "name": "Ten Chi Jin",
+  "job": "NIN",
   "onGcd": false,
   "cooldown": 120000,
   "statusesApplied": [
    "TEN_CHI_JIN",
    "TENRI_JINDO_READY"
-  ],
-  "job": "NIN"
+  ]
  },
  "SHUKUCHI": {
   "id": 2262,
   "name": "Shukuchi",
+  "job": "NIN",
   "onGcd": false,
   "cooldown": 60000,
-  "charges": 2,
-  "job": "NIN"
+  "charges": 2
  },
  "MEISUI": {
   "id": 16489,
   "name": "Meisui",
+  "job": "NIN",
   "onGcd": false,
   "cooldown": 120000,
   "statusesApplied": [
    "MEISUI"
-  ],
-  "job": "NIN"
+  ]
  },
  "BUNSHIN": {
   "id": 16493,
   "name": "Bunshin",
+  "job": "NIN",
   "onGcd": false,
   "cooldown": 90000,
   "statusesApplied": [
    "BUNSHIN",
    "PHANTOM_KAMAITACHI_READY"
-  ],
-  "job": "NIN"
+  ]
  },
  "KUNAIS_BANE": {
   "id": 36958,
   "name": "Kunai's Bane",
+  "job": "NIN",
   "onGcd": false,
   "cooldown": 60000,
   "statusesApplied": [
    "KUNAIS_BANE"
-  ],
-  "job": "NIN"
+  ]
  },
  "DEATHFROG_MEDIUM": {
   "id": 36959,
   "name": "Deathfrog Medium",
+  "job": "NIN",
   "onGcd": false,
-  "cooldown": 1000,
-  "job": "NIN"
+  "cooldown": 1000
  },
  "ZESHO_MEPPO": {
   "id": 36960,
   "name": "Zesho Meppo",
+  "job": "NIN",
   "onGcd": false,
-  "cooldown": 1000,
-  "job": "NIN"
+  "cooldown": 1000
  },
  "TENRI_JINDO": {
   "id": 36961,
   "name": "Tenri Jindo",
+  "job": "NIN",
   "onGcd": false,
-  "cooldown": 1000,
-  "job": "NIN"
+  "cooldown": 1000
  },
  "FIRE_IN_RED": {
   "id": 34650,
   "name": "Fire in Red",
+  "job": "PCT",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "castTime": 1500,
-  "mpCost": 300,
+  "cooldown": 2500,
   "statusesApplied": [
    "AETHERHUES"
   ],
-  "job": "PCT",
-  "cooldown": 2500
+  "mpCost": 300,
+  "speedAttribute": "SPELL_SPEED"
  },
  "AERO_IN_GREEN": {
   "id": 34651,
   "name": "Aero in Green",
+  "job": "PCT",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "castTime": 1500,
-  "mpCost": 300,
+  "cooldown": 2500,
   "statusesApplied": [
    "AETHERHUES_II"
   ],
-  "job": "PCT",
-  "cooldown": 2500
+  "mpCost": 300,
+  "speedAttribute": "SPELL_SPEED"
  },
  "WATER_IN_BLUE": {
   "id": 34652,
   "name": "Water in Blue",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 1500,
-  "mpCost": 300,
   "job": "PCT",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 1500,
+  "cooldown": 2500,
+  "mpCost": 300,
+  "speedAttribute": "SPELL_SPEED"
  },
  "FIRE_II_IN_RED": {
   "id": 34656,
   "name": "Fire II in Red",
+  "job": "PCT",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "castTime": 1500,
-  "mpCost": 300,
+  "cooldown": 2500,
   "statusesApplied": [
    "AETHERHUES"
   ],
-  "job": "PCT",
-  "cooldown": 2500
+  "mpCost": 300,
+  "speedAttribute": "SPELL_SPEED"
  },
  "AERO_II_IN_GREEN": {
   "id": 34657,
   "name": "Aero II in Green",
+  "job": "PCT",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "castTime": 1500,
-  "mpCost": 300,
+  "cooldown": 2500,
   "statusesApplied": [
    "AETHERHUES_II"
   ],
-  "job": "PCT",
-  "cooldown": 2500
+  "mpCost": 300,
+  "speedAttribute": "SPELL_SPEED"
  },
  "WATER_II_IN_BLUE": {
   "id": 34658,
   "name": "Water II in Blue",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 1500,
-  "mpCost": 300,
   "job": "PCT",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 1500,
+  "cooldown": 2500,
+  "mpCost": 300,
+  "speedAttribute": "SPELL_SPEED"
  },
  "HOLY_IN_WHITE": {
   "id": 34662,
   "name": "Holy in White",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "mpCost": 200,
   "job": "PCT",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "mpCost": 200,
+  "speedAttribute": "SPELL_SPEED"
  },
  "BLIZZARD_IN_CYAN": {
   "id": 34653,
   "name": "Blizzard in Cyan",
+  "job": "PCT",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "castTime": 2300,
   "cooldown": 3300,
-  "mpCost": 300,
   "statusesApplied": [
    "AETHERHUES"
   ],
-  "job": "PCT"
+  "mpCost": 300,
+  "speedAttribute": "SPELL_SPEED"
  },
  "STONE_IN_YELLOW": {
   "id": 34654,
   "name": "Stone in Yellow",
+  "job": "PCT",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "castTime": 2300,
   "cooldown": 3300,
-  "mpCost": 300,
   "statusesApplied": [
    "AETHERHUES_II"
   ],
-  "job": "PCT"
+  "mpCost": 300,
+  "speedAttribute": "SPELL_SPEED"
  },
  "THUNDER_IN_MAGENTA": {
   "id": 34655,
   "name": "Thunder in Magenta",
+  "job": "PCT",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "castTime": 2300,
   "cooldown": 3300,
   "mpCost": 300,
-  "job": "PCT"
+  "speedAttribute": "SPELL_SPEED"
  },
  "BLIZZARD_II_IN_CYAN": {
   "id": 34659,
   "name": "Blizzard II in Cyan",
+  "job": "PCT",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "castTime": 2300,
   "cooldown": 3300,
-  "mpCost": 400,
   "statusesApplied": [
    "AETHERHUES"
   ],
-  "job": "PCT"
+  "mpCost": 400,
+  "speedAttribute": "SPELL_SPEED"
  },
  "STONE_II_IN_YELLOW": {
   "id": 34660,
   "name": "Stone II in Yellow",
+  "job": "PCT",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "castTime": 2300,
   "cooldown": 3300,
-  "mpCost": 400,
   "statusesApplied": [
    "AETHERHUES_II"
   ],
-  "job": "PCT"
+  "mpCost": 400,
+  "speedAttribute": "SPELL_SPEED"
  },
  "THUNDER_II_IN_MAGENTA": {
   "id": 34661,
   "name": "Thunder II in Magenta",
+  "job": "PCT",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "castTime": 2300,
   "cooldown": 3300,
   "mpCost": 400,
-  "job": "PCT"
+  "speedAttribute": "SPELL_SPEED"
  },
  "COMET_IN_BLACK": {
   "id": 34663,
   "name": "Comet in Black",
+  "job": "PCT",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
+  "castTime": 0,
   "cooldown": 3300,
   "mpCost": 300,
-  "job": "PCT",
-  "castTime": 0
+  "speedAttribute": "SPELL_SPEED"
  },
  "RAINBOW_DRIP": {
   "id": 34688,
   "name": "Rainbow Drip",
+  "job": "PCT",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "castTime": 4000,
   "cooldown": 6000,
-  "job": "PCT"
+  "speedAttribute": "SPELL_SPEED"
  },
  "STAR_PRISM": {
   "id": 34681,
   "name": "Star Prism",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "job": "PCT",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "STAR_PRISM_CURE": {
   "id": 34682,
@@ -5090,185 +5093,186 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
  "CREATURE_MOTIF": {
   "id": 34689,
   "name": "Creature Motif",
+  "job": "PCT",
   "onGcd": true,
   "castTime": 3000,
-  "cooldown": 4000,
-  "job": "PCT"
+  "cooldown": 4000
  },
  "POM_MOTIF": {
   "id": 34664,
   "name": "Pom Motif",
+  "job": "PCT",
   "onGcd": true,
   "castTime": 3000,
-  "cooldown": 4000,
-  "job": "PCT"
+  "cooldown": 4000
  },
  "WING_MOTIF": {
   "id": 34665,
   "name": "Wing Motif",
+  "job": "PCT",
   "onGcd": true,
   "castTime": 3000,
-  "cooldown": 4000,
-  "job": "PCT"
+  "cooldown": 4000
  },
  "CLAW_MOTIF": {
   "id": 34666,
   "name": "Claw Motif",
+  "job": "PCT",
   "onGcd": true,
   "castTime": 3000,
-  "cooldown": 4000,
-  "job": "PCT"
+  "cooldown": 4000
  },
  "MAW_MOTIF": {
   "id": 34667,
   "name": "Maw Motif",
+  "job": "PCT",
   "onGcd": true,
   "castTime": 3000,
-  "cooldown": 4000,
-  "job": "PCT"
+  "cooldown": 4000
  },
  "LIVING_MUSE": {
   "id": 35347,
   "name": "Living Muse",
+  "job": "PCT",
   "cooldown": 40000,
-  "charges": 3,
   "cooldownGroup": 19,
-  "job": "PCT"
+  "charges": 3
  },
  "POM_MUSE": {
   "id": 34670,
   "name": "Pom Muse",
+  "job": "PCT",
   "cooldown": 40000,
-  "charges": 3,
   "cooldownGroup": 19,
-  "job": "PCT"
+  "charges": 3
  },
  "WINGED_MUSE": {
   "id": 34671,
   "name": "Winged Muse",
+  "job": "PCT",
   "cooldown": 40000,
-  "charges": 3,
   "cooldownGroup": 19,
-  "job": "PCT"
+  "charges": 3
  },
  "MOG_OF_THE_AGES": {
   "id": 34676,
   "name": "Mog of the Ages",
+  "job": "PCT",
   "cooldown": 30000,
-  "cooldownGroup": 7,
-  "job": "PCT"
+  "cooldownGroup": 7
  },
  "CLAWED_MUSE": {
   "id": 34672,
   "name": "Clawed Muse",
+  "job": "PCT",
   "cooldown": 40000,
-  "charges": 3,
   "cooldownGroup": 19,
-  "job": "PCT"
+  "charges": 3
  },
  "FANGED_MUSE": {
   "id": 34673,
   "name": "Fanged Muse",
+  "job": "PCT",
   "cooldown": 40000,
-  "charges": 3,
   "cooldownGroup": 19,
-  "job": "PCT"
+  "charges": 3
  },
  "RETRIBUTION_OF_THE_MADEEN": {
   "id": 34677,
   "name": "Mog of the Ages",
+  "job": "PCT",
   "cooldown": 30000,
-  "cooldownGroup": 7,
-  "job": "PCT"
+  "cooldownGroup": 7
  },
  "WEAPON_MOTIF": {
   "id": 34690,
   "name": "Weapon Motif",
+  "job": "PCT",
   "onGcd": true,
   "castTime": 3000,
-  "cooldown": 4000,
-  "job": "PCT"
+  "cooldown": 4000
  },
  "HAMMER_MOTIF": {
   "id": 34668,
   "name": "Hammer Motif",
+  "job": "PCT",
   "onGcd": true,
   "castTime": 3000,
-  "cooldown": 4000,
-  "job": "PCT"
+  "cooldown": 4000
  },
  "HAMMER_STAMP": {
   "id": 34678,
   "name": "Hammer Stamp",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "job": "PCT",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "HAMMER_BRUSH": {
   "id": 34679,
   "name": "Hammer Brush",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "job": "PCT",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "POLISHING_HAMMER": {
   "id": 34680,
   "name": "Polishing Hammer",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "job": "PCT",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "STEEL_MUSE": {
   "id": 35348,
   "name": "Steel Muse",
+  "job": "PCT",
   "cooldown": 60000,
-  "charges": 2,
   "cooldownGroup": 20,
-  "job": "PCT"
+  "charges": 2
  },
  "STRIKING_MUSE": {
   "id": 34674,
   "name": "Striking Muse",
+  "job": "PCT",
   "cooldown": 60000,
-  "charges": 2,
   "cooldownGroup": 20,
   "statusesApplied": [
    "HAMMER_TIME"
   ],
-  "job": "PCT"
+  "charges": 2
  },
  "LANDSCAPE_MOTIF": {
   "id": 34691,
   "name": "Lendscape Motif",
+  "job": "PCT",
   "onGcd": true,
   "castTime": 3000,
-  "cooldown": 4000,
-  "job": "PCT"
+  "cooldown": 4000
  },
  "STARRY_SKY_MOTIF": {
   "id": 34669,
   "name": "Starry Sky Motif",
+  "job": "PCT",
   "onGcd": true,
   "castTime": 3000,
-  "cooldown": 4000,
-  "job": "PCT"
+  "cooldown": 4000
  },
  "SCENIC_MUSE": {
   "id": 35349,
   "name": "Scenic Muse",
+  "job": "PCT",
   "cooldown": 120000,
-  "cooldownGroup": 21,
-  "job": "PCT"
+  "cooldownGroup": 21
  },
  "STARRY_MUSE": {
   "id": 34675,
   "name": "Starry Muse",
+  "job": "PCT",
   "cooldown": 120000,
   "cooldownGroup": 21,
   "statusesApplied": [
@@ -5277,613 +5281,611 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
    "INSPIRATION",
    "HYPERPHANTASIA",
    "STARSTRUCK"
-  ],
-  "job": "PCT"
+  ]
  },
  "TEMPERA_COAT": {
   "id": 34685,
   "name": "Tempera Coat",
+  "job": "PCT",
   "cooldown": 120000,
   "statusesApplied": [
    "TEMPERA_COAT"
-  ],
-  "job": "PCT"
+  ]
  },
  "TEMPERA_GRASSA": {
   "id": 34686,
   "name": "Tempera Grassa",
+  "job": "PCT",
   "cooldown": 1000,
   "statusesApplied": [
    "TEMPERA_GRASSA"
-  ],
-  "job": "PCT"
+  ]
  },
  "SMUDGE": {
   "id": 34684,
   "name": "Smudge",
+  "job": "PCT",
   "cooldown": 20000,
   "statusesApplied": [
    "SMUDGE"
-  ],
-  "job": "PCT"
+  ]
  },
  "SUBTRACTIVE_PALETTE": {
   "id": 34683,
   "name": "Subtractive Palette",
+  "job": "PCT",
   "cooldown": 20000,
   "statusesApplied": [
    "SUBTRACTIVE_PALETTE",
    "MONOCHROME_TONES"
-  ],
-  "job": "PCT"
+  ]
  },
  "FAST_BLADE": {
   "id": 9,
   "name": "Fast Blade",
+  "job": "PLD",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "start": true
   },
-  "job": "PLD",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "RIOT_BLADE": {
   "id": 15,
   "name": "Riot Blade",
+  "job": "PLD",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": 9
   },
-  "job": "PLD",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "RAGE_OF_HALONE": {
   "id": 21,
   "name": "Rage Of Halone",
+  "job": "PLD",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": 15,
    "end": true
   },
-  "job": "PLD",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "ROYAL_AUTHORITY": {
   "id": 3539,
   "name": "Royal Authority",
+  "job": "PLD",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": 15,
    "end": true
   },
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "ATONEMENT_READY",
    "DIVINE_MIGHT"
   ],
-  "job": "PLD",
-  "castTime": 0,
-  "cooldown": 2500
+  "speedAttribute": "SKILL_SPEED"
  },
  "SHIELD_LOB": {
   "id": 24,
   "name": "Shield Lob",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "job": "PLD",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "SHIELD_BASH": {
   "id": 16,
   "name": "Shield Bash",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "breaksCombo": true,
   "job": "PLD",
+  "onGcd": true,
+  "breaksCombo": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "TOTAL_ECLIPSE": {
   "id": 7381,
   "name": "Total Eclipse",
+  "job": "PLD",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "start": true
   },
-  "job": "PLD",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "PROMINENCE": {
   "id": 16457,
   "name": "Prominence",
+  "job": "PLD",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": 7381,
    "end": true
   },
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "DIVINE_MIGHT"
   ],
-  "job": "PLD",
-  "castTime": 0,
-  "cooldown": 2500
+  "speedAttribute": "SKILL_SPEED"
  },
  "GORING_BLADE": {
   "id": 3538,
   "name": "Goring Blade",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "job": "PLD",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "CLEMENCY": {
   "id": 3541,
   "name": "Clemency",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 1500,
   "job": "PLD",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 1500,
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "HOLY_SPIRIT": {
   "id": 7384,
   "name": "Holy Spirit",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 1500,
   "job": "PLD",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 1500,
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "HOLY_CIRCLE": {
   "id": 16458,
   "name": "Holy Circle",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 1500,
   "job": "PLD",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 1500,
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "ATONEMENT": {
   "id": 16460,
   "name": "Atonement",
+  "job": "PLD",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
+  "breaksCombo": false,
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "SUPPLICATION_READY"
   ],
-  "breaksCombo": false,
-  "job": "PLD",
-  "castTime": 0,
-  "cooldown": 2500
+  "speedAttribute": "SKILL_SPEED"
  },
  "SUPPLICATION": {
   "id": 36918,
   "name": "Supplication",
+  "job": "PLD",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
+  "breaksCombo": false,
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "SEPULCHRE_READY"
   ],
-  "breaksCombo": false,
-  "job": "PLD",
-  "castTime": 0,
-  "cooldown": 2500
+  "speedAttribute": "SKILL_SPEED"
  },
  "SEPULCHRE": {
   "id": 36919,
   "name": "Sepulchre",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "breaksCombo": false,
   "job": "PLD",
+  "onGcd": true,
+  "breaksCombo": false,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "CONFITEOR": {
   "id": 16459,
   "name": "Confiteor",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "job": "PLD",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "BLADE_OF_FAITH": {
   "id": 25748,
   "name": "Blade of Faith",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "job": "PLD",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "BLADE_OF_TRUTH": {
   "id": 25749,
   "name": "Blade of Truth",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "job": "PLD",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "BLADE_OF_VALOR": {
   "id": 25750,
   "name": "Blade of Valor",
+  "job": "PLD",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "BLADE_OF_HONOR_READY"
   ],
-  "job": "PLD",
-  "castTime": 0,
-  "cooldown": 2500
+  "speedAttribute": "SPELL_SPEED"
  },
  "FIGHT_OR_FLIGHT": {
   "id": 20,
   "name": "Fight Or Flight",
+  "job": "PLD",
   "onGcd": false,
   "cooldown": 60000,
   "statusesApplied": [
    "FIGHT_OR_FLIGHT",
    "GORING_BLADE_READY"
-  ],
-  "job": "PLD"
+  ]
  },
  "IRON_WILL": {
   "id": 28,
   "name": "Iron Will",
+  "job": "PLD",
   "onGcd": false,
-  "cooldown": 2000,
-  "job": "PLD"
+  "cooldown": 2000
  },
  "RELEASE_IRON_WILL": {
   "id": 32065,
   "name": "Release Iron Will",
+  "job": "PLD",
   "onGcd": false,
-  "cooldown": 1000,
-  "job": "PLD"
+  "cooldown": 1000
  },
  "SENTINEL": {
   "id": 17,
   "name": "Sentinel",
+  "job": "PLD",
   "onGcd": false,
   "cooldown": 120000,
   "statusesApplied": [
    "SENTINEL"
-  ],
-  "job": "PLD"
+  ]
  },
  "CIRCLE_OF_SCORN": {
   "id": 23,
   "name": "Circle Of Scorn",
+  "job": "PLD",
   "onGcd": false,
   "cooldown": 30000,
   "statusesApplied": [
    "CIRCLE_OF_SCORN"
-  ],
-  "job": "PLD"
+  ]
  },
  "COVER": {
   "id": 27,
   "name": "Cover",
+  "job": "PLD",
   "onGcd": false,
   "cooldown": 120000,
   "statusesApplied": [
    "COVER",
    "COVERED"
-  ],
-  "job": "PLD"
+  ]
  },
  "SPIRITS_WITHIN": {
   "id": 29,
   "name": "Spirits Within",
+  "job": "PLD",
   "onGcd": false,
-  "cooldown": 30000,
-  "job": "PLD"
+  "cooldown": 30000
  },
  "HALLOWED_GROUND": {
   "id": 30,
   "name": "Hallowed Ground",
+  "job": "PLD",
   "onGcd": false,
   "cooldown": 420000,
   "statusesApplied": [
    "HALLOWED_GROUND"
-  ],
-  "job": "PLD"
+  ]
  },
  "BULWARK": {
   "id": 22,
   "name": "Bulwark",
+  "job": "PLD",
   "onGcd": false,
   "cooldown": 90000,
   "statusesApplied": [
    "BULWARK"
-  ],
-  "job": "PLD"
+  ]
  },
  "SHELTRON": {
   "id": 3542,
   "name": "Sheltron",
+  "job": "PLD",
   "onGcd": false,
   "cooldown": 5000,
   "statusesApplied": [
    "SHELTRON"
-  ],
-  "job": "PLD"
+  ]
  },
  "DIVINE_VEIL": {
   "id": 3540,
   "name": "Divine Veil",
+  "job": "PLD",
   "onGcd": false,
   "cooldown": 90000,
   "statusesApplied": [
    "DIVINE_VEIL"
-  ],
-  "job": "PLD"
+  ]
  },
  "INTERVENTION": {
   "id": 7382,
   "name": "Intervention",
+  "job": "PLD",
   "onGcd": false,
   "cooldown": 10000,
   "statusesApplied": [
    "INTERVENTION"
-  ],
-  "job": "PLD"
+  ]
  },
  "REQUIESCAT": {
   "id": 7383,
   "name": "Requiescat",
+  "job": "PLD",
   "onGcd": false,
   "cooldown": 60000,
   "statusesApplied": [
    "REQUIESCAT",
    "CONFITEOR_READY"
-  ],
-  "job": "PLD"
+  ]
  },
  "PASSAGE_OF_ARMS": {
   "id": 7385,
   "name": "Passage Of Arms",
+  "job": "PLD",
   "onGcd": false,
   "cooldown": 120000,
   "statusesApplied": [
    "PASSAGE_OF_ARMS"
-  ],
-  "job": "PLD"
+  ]
  },
  "INTERVENE": {
   "id": 16461,
   "name": "Intervene",
+  "job": "PLD",
   "onGcd": false,
   "cooldown": 30000,
-  "charges": 2,
-  "job": "PLD"
+  "charges": 2
  },
  "HOLY_SHELTRON": {
   "id": 25746,
   "name": "Holy Sheltron",
+  "job": "PLD",
   "onGcd": false,
   "cooldown": 5000,
   "statusesApplied": [
    "HOLY_SHELTRON"
-  ],
-  "job": "PLD"
+  ]
  },
  "EXPIACION": {
   "id": 25747,
   "name": "Expiacion",
+  "job": "PLD",
   "onGcd": false,
-  "cooldown": 30000,
-  "job": "PLD"
+  "cooldown": 30000
  },
  "IMPERATOR": {
   "id": 36921,
   "name": "Imperator",
+  "job": "PLD",
   "onGcd": false,
   "cooldown": 60000,
   "statusesApplied": [
    "REQUIESCAT",
    "CONFITEOR_READY"
-  ],
-  "job": "PLD"
+  ]
  },
  "BLADE_OF_HONOR": {
   "id": 36922,
   "name": "Blade of Honor",
+  "job": "PLD",
   "onGcd": false,
-  "cooldown": 1000,
-  "job": "PLD"
+  "cooldown": 1000
  },
  "GUARDIAN": {
   "id": 36920,
   "name": "Guardian",
+  "job": "PLD",
   "onGcd": false,
   "cooldown": 120000,
   "statusesApplied": [
    "GUARDIAN",
    "GUARDIANS_WILL"
-  ],
-  "job": "PLD"
+  ]
  },
  "EMBOLDEN": {
   "id": 7520,
   "name": "Embolden",
+  "job": "RDM",
   "cooldown": 120000,
   "statusesApplied": [
    "EMBOLDEN_SELF",
    "EMBOLDEN_PARTY",
    "THORNED_FLOURISH"
-  ],
-  "job": "RDM"
+  ]
  },
  "ACCELERATION": {
   "id": 7518,
   "name": "Acceleration",
+  "job": "RDM",
   "cooldown": 55000,
   "statusesApplied": [
    "ACCELERATION",
    "GRAND_IMPACT_READY"
   ],
-  "charges": 2,
-  "job": "RDM"
+  "charges": 2
  },
  "MANAFICATION": {
   "id": 7521,
   "name": "Manafication",
-  "cooldown": 110000,
+  "job": "RDM",
   "breaksCombo": true,
+  "cooldown": 110000,
   "statusesApplied": [
    "MANAFICATION",
    "PREFULGENCE_READY"
-  ],
-  "job": "RDM"
+  ]
  },
  "CONTRE_SIXTE": {
   "id": 7519,
   "name": "Contre Sixte",
-  "cooldown": 35000,
-  "potency": 400,
   "job": "RDM",
+  "cooldown": 35000,
   "potencies": [
    {
     "value": 420,
     "bonusModifiers": []
    }
-  ]
+  ],
+  "potency": 400
  },
  "DISPLACEMENT": {
   "id": 7515,
   "name": "Displacement",
+  "job": "RDM",
   "cooldown": 35000,
-  "potency": 180,
   "cooldownGroup": 10,
   "charges": 2,
-  "job": "RDM"
+  "potency": 180
  },
  "ENGAGEMENT": {
   "id": 16527,
   "name": "Engagement",
+  "job": "RDM",
   "cooldown": 35000,
-  "potency": 180,
   "cooldownGroup": 10,
   "charges": 2,
-  "job": "RDM"
+  "potency": 180
  },
  "CORPS_A_CORPS": {
   "id": 7506,
   "name": "Corps-a-corps",
+  "job": "RDM",
   "cooldown": 35000,
-  "potency": 130,
   "charges": 2,
-  "job": "RDM"
+  "potency": 130
  },
  "FLECHE": {
   "id": 7517,
   "name": "Fleche",
+  "job": "RDM",
   "cooldown": 25000,
-  "potency": 480,
-  "job": "RDM"
+  "potency": 480
  },
  "VICE_OF_THORNS": {
   "id": 37005,
   "name": "Vice of Thorns",
-  "potency": 800,
-  "job": "RDM"
+  "job": "RDM",
+  "potency": 800
  },
  "GRAND_IMPACT": {
   "id": 37006,
   "name": "Grand Impact",
-  "potency": 600,
-  "onGcd": true,
-  "cooldown": 2500,
-  "breaksCombo": true,
   "job": "RDM",
-  "castTime": 0
+  "onGcd": true,
+  "breaksCombo": true,
+  "castTime": 0,
+  "cooldown": 2500,
+  "potency": 600
  },
  "PREFULGENCE": {
   "id": 37007,
   "name": "Prefulgence",
-  "potency": 1000,
-  "job": "RDM"
+  "job": "RDM",
+  "potency": 1000
  },
  "MAGICK_BARRIER": {
   "id": 25857,
   "name": "Magick Barrier",
+  "job": "RDM",
   "cooldown": 120000,
   "statusesApplied": [
    "MAGICK_BARRIER"
-  ],
-  "job": "RDM"
+  ]
  },
  "RIPOSTE": {
   "id": 7504,
   "name": "Riposte",
+  "job": "RDM",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "cooldown": 2500,
-  "potency": 130,
   "combo": {
    "start": true
   },
-  "job": "RDM",
-  "castTime": 0
+  "castTime": 0,
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED",
+  "potency": 130
  },
  "ENCHANTED_RIPOSTE": {
   "id": 7527,
   "name": "Enchanted Riposte",
+  "job": "RDM",
   "onGcd": true,
-  "cooldown": 1500,
-  "potency": 300,
   "combo": {
    "start": true
   },
-  "job": "RDM",
-  "castTime": 0
+  "castTime": 0,
+  "cooldown": 1500,
+  "potency": 300
  },
  "MANAFICATION_ENCHANTED_RIPOSTE": {
   "id": 45960,
   "name": "Enchanted Riposte",
+  "job": "RDM",
   "onGcd": true,
-  "cooldown": 1500,
-  "potency": 300,
   "combo": {
    "start": true
   },
-  "job": "RDM",
-  "castTime": 0
+  "castTime": 0,
+  "cooldown": 1500,
+  "potency": 300
  },
  "ZWERCHHAU": {
   "id": 7512,
   "name": "Zwerchhau",
+  "job": "RDM",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "cooldown": 2500,
-  "potency": 100,
   "combo": {
    "from": 7504,
    "potency": 150
   },
-  "job": "RDM",
-  "castTime": 0
+  "castTime": 0,
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED",
+  "potency": 100
  },
  "ENCHANTED_ZWERCHHAU": {
   "id": 7528,
   "name": "Enchanted Zwerchhau",
+  "job": "RDM",
   "onGcd": true,
-  "cooldown": 1500,
-  "potency": 170,
   "combo": {
    "from": [
     7527,
@@ -5891,15 +5893,15 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
    ],
    "potency": 360
   },
-  "job": "RDM",
-  "castTime": 0
+  "castTime": 0,
+  "cooldown": 1500,
+  "potency": 170
  },
  "MANAFICATION_ENCHANTED_ZWERCHHAU": {
   "id": 45961,
   "name": "Enchanted Zwerchhau",
+  "job": "RDM",
   "onGcd": true,
-  "cooldown": 1500,
-  "potency": 170,
   "combo": {
    "from": [
     7527,
@@ -5907,31 +5909,30 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
    ],
    "potency": 360
   },
-  "job": "RDM",
-  "castTime": 0
+  "castTime": 0,
+  "cooldown": 1500,
+  "potency": 170
  },
  "REDOUBLEMENT": {
   "id": 7516,
   "name": "Redoublement",
+  "job": "RDM",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "cooldown": 2500,
-  "potency": 100,
   "combo": {
    "from": 7512,
    "potency": 230,
    "end": true
   },
-  "job": "RDM",
-  "castTime": 0
+  "castTime": 0,
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED",
+  "potency": 100
  },
  "ENCHANTED_REDOUBLEMENT": {
   "id": 7529,
   "name": "Enchanted Redoublement",
+  "job": "RDM",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "cooldown": 2200,
-  "potency": 170,
   "combo": {
    "from": [
     7528,
@@ -5940,16 +5941,16 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
    "potency": 540,
    "end": true
   },
-  "job": "RDM",
-  "castTime": 0
+  "castTime": 0,
+  "cooldown": 2200,
+  "speedAttribute": "SKILL_SPEED",
+  "potency": 170
  },
  "MANAFICATION_ENCHANTED_REDOUBLEMENT": {
   "id": 45962,
   "name": "Enchanted Redoublement",
+  "job": "RDM",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "cooldown": 2200,
-  "potency": 170,
   "combo": {
    "from": [
     7528,
@@ -5958,68 +5959,68 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
    "potency": 540,
    "end": true
   },
-  "job": "RDM",
-  "castTime": 0
+  "castTime": 0,
+  "cooldown": 2200,
+  "speedAttribute": "SKILL_SPEED",
+  "potency": 170
  },
  "REPRISE": {
   "id": 16529,
   "name": "Reprise",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "cooldown": 2500,
-  "potency": 100,
   "job": "RDM",
-  "castTime": 0
+  "onGcd": true,
+  "castTime": 0,
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED",
+  "potency": 100
  },
  "ENCHANTED_REPRISE": {
   "id": 16528,
   "name": "Enchanted Reprise",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "cooldown": 2500,
-  "potency": 380,
   "job": "RDM",
+  "onGcd": true,
   "castTime": 0,
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
     "value": 420,
     "bonusModifiers": []
    }
-  ]
+  ],
+  "potency": 380
  },
  "VERFLARE": {
   "id": 7525,
   "name": "Verflare",
+  "job": "RDM",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "cooldown": 2500,
-  "potency": 650,
   "combo": {
    "start": true
   },
-  "job": "RDM",
-  "castTime": 0
+  "castTime": 0,
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED",
+  "potency": 650
  },
  "VERHOLY": {
   "id": 7526,
   "name": "Verholy",
+  "job": "RDM",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "cooldown": 2500,
-  "potency": 650,
   "combo": {
    "start": true
   },
-  "job": "RDM",
-  "castTime": 0
+  "castTime": 0,
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED",
+  "potency": 650
  },
  "SCORCH": {
   "id": 16530,
   "name": "Scorch",
+  "job": "RDM",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "cooldown": 2500,
-  "potency": 750,
   "combo": {
    "from": [
     7525,
@@ -6027,617 +6028,621 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
    ],
    "potency": 680
   },
-  "job": "RDM",
-  "castTime": 0
+  "castTime": 0,
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED",
+  "potency": 750
  },
  "RESOLUTION": {
   "id": 25858,
   "name": "Resolution",
+  "job": "RDM",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "cooldown": 2500,
-  "potency": 850,
   "combo": {
    "from": 16530,
    "potency": 800,
    "end": true
   },
-  "job": "RDM",
-  "castTime": 0
+  "castTime": 0,
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED",
+  "potency": 850
  },
  "JOLT": {
   "id": 7503,
   "name": "Jolt",
+  "job": "RDM",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "cooldown": 2500,
-  "potency": 170,
-  "castTime": 2000,
   "breaksCombo": true,
-  "job": "RDM"
+  "castTime": 2000,
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED",
+  "potency": 170
  },
  "JOLT_II": {
   "id": 7524,
   "name": "Jolt II",
+  "job": "RDM",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "cooldown": 2500,
-  "castTime": 2000,
-  "potency": 280,
   "breaksCombo": true,
-  "job": "RDM"
+  "castTime": 2000,
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED",
+  "potency": 280
  },
  "JOLT_III": {
   "id": 37004,
   "name": "Jolt III",
+  "job": "RDM",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "cooldown": 2500,
-  "castTime": 2000,
-  "potency": 360,
   "breaksCombo": true,
-  "job": "RDM"
+  "castTime": 2000,
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED",
+  "potency": 360
  },
  "IMPACT": {
   "id": 16526,
   "name": "Impact",
+  "job": "RDM",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "cooldown": 2500,
-  "castTime": 5000,
-  "potency": 210,
   "breaksCombo": true,
-  "job": "RDM"
+  "castTime": 5000,
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED",
+  "potency": 210
  },
  "VERTHUNDER": {
   "id": 7505,
   "name": "Verthunder",
+  "job": "RDM",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "cooldown": 2500,
-  "castTime": 5000,
-  "potency": 360,
   "breaksCombo": true,
-  "job": "RDM"
+  "castTime": 5000,
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED",
+  "potency": 360
  },
  "VERTHUNDER_II": {
   "id": 16524,
   "name": "Verthunder II",
+  "job": "RDM",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "cooldown": 2500,
-  "castTime": 2000,
-  "potency": 140,
   "breaksCombo": true,
-  "job": "RDM"
+  "castTime": 2000,
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED",
+  "potency": 140
  },
  "VERTHUNDER_III": {
   "id": 25855,
   "name": "Verthunder III",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "cooldown": 2500,
-  "castTime": 5000,
-  "potency": 420,
-  "breaksCombo": true,
   "job": "RDM",
+  "onGcd": true,
+  "breaksCombo": true,
+  "castTime": 5000,
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED",
   "potencies": [
    {
     "value": 440,
     "bonusModifiers": []
    }
-  ]
+  ],
+  "potency": 420
  },
  "VERFIRE": {
   "id": 7510,
   "name": "Verfire",
+  "job": "RDM",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "cooldown": 2500,
-  "castTime": 2000,
-  "potency": 380,
   "breaksCombo": true,
-  "job": "RDM"
+  "castTime": 2000,
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED",
+  "potency": 380
  },
  "VERAERO": {
   "id": 7507,
   "name": "Veraero",
+  "job": "RDM",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "cooldown": 2500,
-  "castTime": 5000,
-  "potency": 360,
   "breaksCombo": true,
-  "job": "RDM"
+  "castTime": 5000,
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED",
+  "potency": 360
  },
  "VERAERO_II": {
   "id": 16525,
   "name": "Veraero II",
+  "job": "RDM",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "cooldown": 2500,
-  "castTime": 2000,
-  "potency": 140,
   "breaksCombo": true,
-  "job": "RDM"
+  "castTime": 2000,
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED",
+  "potency": 140
  },
  "VERAERO_III": {
   "id": 25856,
   "name": "Veraero III",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "cooldown": 2500,
-  "castTime": 5000,
-  "potency": 420,
-  "breaksCombo": true,
   "job": "RDM",
+  "onGcd": true,
+  "breaksCombo": true,
+  "castTime": 5000,
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED",
   "potencies": [
    {
     "value": 440,
     "bonusModifiers": []
    }
-  ]
+  ],
+  "potency": 420
  },
  "VERSTONE": {
   "id": 7511,
   "name": "Verstone",
+  "job": "RDM",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "cooldown": 2500,
-  "castTime": 2000,
-  "potency": 380,
   "breaksCombo": true,
-  "job": "RDM"
+  "castTime": 2000,
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED",
+  "potency": 380
  },
  "SCATTER": {
   "id": 7509,
   "name": "Scatter",
+  "job": "RDM",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "cooldown": 2500,
-  "castTime": 5000,
-  "potency": 120,
   "breaksCombo": true,
-  "job": "RDM"
+  "castTime": 5000,
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED",
+  "potency": 120
  },
  "MOULINET": {
   "id": 7513,
   "name": "Moulinet",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "cooldown": 2500,
-  "potency": 60,
-  "breaksCombo": true,
   "job": "RDM",
-  "castTime": 0
+  "onGcd": true,
+  "breaksCombo": true,
+  "castTime": 0,
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED",
+  "potency": 60
  },
  "ENCHANTED_MOULINET": {
   "id": 7530,
   "name": "Enchanted Moulinet",
+  "job": "RDM",
   "onGcd": true,
-  "cooldown": 1500,
-  "potency": 130,
   "combo": {
    "start": true
   },
-  "job": "RDM",
-  "castTime": 0
+  "castTime": 0,
+  "cooldown": 1500,
+  "potency": 130
  },
  "ENCHANTED_MOULINET_DEUX": {
   "id": 37002,
   "name": "Enchanted Moulinet Deux",
+  "job": "RDM",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "cooldown": 2500,
-  "potency": 140,
   "combo": {
    "from": 7530,
    "potency": 140
   },
-  "job": "RDM",
-  "castTime": 0
+  "castTime": 0,
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED",
+  "potency": 140
  },
  "ENCHANTED_MOULINET_TROIS": {
   "id": 37003,
   "name": "Enchanted Moulinet Trois",
+  "job": "RDM",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "cooldown": 2500,
-  "potency": 150,
   "combo": {
    "from": 37002,
    "potency": 150,
    "end": true
   },
-  "job": "RDM",
-  "castTime": 0
+  "castTime": 0,
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED",
+  "potency": 150
  },
  "VERCURE": {
   "id": 7514,
   "name": "Vercure",
+  "job": "RDM",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "cooldown": 2500,
-  "castTime": 2000,
-  "potency": 350,
   "breaksCombo": true,
-  "job": "RDM"
+  "castTime": 2000,
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED",
+  "potency": 350
  },
  "VERRAISE": {
   "id": 7523,
   "name": "Verraise",
+  "job": "RDM",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "cooldown": 2500,
-  "castTime": 10000,
   "breaksCombo": true,
-  "job": "RDM"
+  "castTime": 10000,
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "RAMPART": {
   "id": 7531,
   "name": "Rampart",
+  "job": "ROLE",
   "cooldown": 90000,
   "statusesApplied": [
    "RAMPART"
-  ],
-  "job": "ROLE"
+  ]
  },
  "LOW_BLOW": {
   "id": 7540,
   "name": "Low Blow",
-  "cooldown": 25000,
-  "job": "ROLE"
+  "job": "ROLE",
+  "cooldown": 25000
  },
  "PROVOKE": {
   "id": 7533,
   "name": "Provoke",
-  "cooldown": 30000,
-  "job": "ROLE"
+  "job": "ROLE",
+  "cooldown": 30000
  },
  "REPRISAL": {
   "id": 7535,
   "name": "Reprisal",
+  "job": "ROLE",
   "cooldown": 60000,
   "statusesApplied": [
    "REPRISAL"
-  ],
-  "job": "ROLE"
+  ]
  },
  "INTERJECT": {
   "id": 7538,
   "name": "Interject",
-  "cooldown": 30000,
-  "job": "ROLE"
+  "job": "ROLE",
+  "cooldown": 30000
  },
  "SHIRK": {
   "id": 7537,
   "name": "Shirk",
-  "cooldown": 120000,
-  "job": "ROLE"
+  "job": "ROLE",
+  "cooldown": 120000
  },
  "ESUNA": {
   "id": 7568,
   "name": "Esuna",
+  "job": "ROLE",
   "onGcd": true,
   "castTime": 0,
   "cooldown": 2500,
-  "mpCost": 600,
-  "mpCostFactor": 5,
-  "job": "ROLE"
+  "mpCost": 600
  },
  "LUCID_DREAMING": {
   "id": 7562,
   "name": "Lucid Dreaming",
+  "job": "ROLE",
   "cooldown": 60000,
   "statusesApplied": [
    "LUCID_DREAMING"
-  ],
-  "job": "ROLE"
+  ]
  },
  "SWIFTCAST": {
   "id": 7561,
   "name": "Swiftcast",
+  "job": "ROLE",
   "cooldown": 40000,
   "statusesApplied": [
    "SWIFTCAST"
-  ],
-  "job": "ROLE"
+  ]
  },
  "SURECAST": {
   "id": 7559,
   "name": "Surecast",
+  "job": "ROLE",
   "cooldown": 120000,
   "statusesApplied": [
    "SURECAST"
-  ],
-  "job": "ROLE"
+  ]
  },
  "RESCUE": {
   "id": 7571,
   "name": "Rescue",
-  "cooldown": 120000,
-  "job": "ROLE"
+  "job": "ROLE",
+  "cooldown": 120000
  },
  "SECOND_WIND": {
   "id": 7541,
   "name": "Second Wind",
-  "cooldown": 120000,
-  "job": "ROLE"
+  "job": "ROLE",
+  "cooldown": 120000
  },
  "FOOT_GRAZE": {
   "id": 7553,
   "name": "Foot Graze",
-  "cooldown": 30000,
-  "job": "ROLE"
+  "job": "ROLE",
+  "cooldown": 30000
  },
  "LEG_GRAZE": {
   "id": 7554,
   "name": "Leg Graze",
-  "cooldown": 30000,
-  "job": "ROLE"
+  "job": "ROLE",
+  "cooldown": 30000
  },
  "PELOTON": {
   "id": 7557,
   "name": "Peloton",
-  "cooldown": 5000,
-  "job": "ROLE"
+  "job": "ROLE",
+  "cooldown": 5000
  },
  "HEAD_GRAZE": {
   "id": 7551,
   "name": "Head Graze",
-  "cooldown": 30000,
-  "job": "ROLE"
+  "job": "ROLE",
+  "cooldown": 30000
  },
  "ADDLE": {
   "id": 7560,
   "name": "Addle",
+  "job": "ROLE",
   "cooldown": 90000,
   "statusesApplied": [
    "ADDLE"
-  ],
-  "job": "ROLE"
+  ]
  },
  "SLEEP": {
   "id": 25880,
   "name": "Sleep",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 2500,
-  "mpCost": 800,
   "job": "ROLE",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 2500,
+  "cooldown": 2500,
+  "mpCost": 800,
+  "speedAttribute": "SPELL_SPEED"
  },
  "ARMS_LENGTH": {
   "id": 7548,
   "name": "Arm's Length",
+  "job": "ROLE",
   "cooldown": 120000,
   "statusesApplied": [
    "ARMS_LENGTH"
-  ],
-  "job": "ROLE"
+  ]
  },
  "LEG_SWEEP": {
   "id": 7863,
   "name": "Leg Sweep",
-  "cooldown": 40000,
-  "job": "ROLE"
+  "job": "ROLE",
+  "cooldown": 40000
  },
  "BLOODBATH": {
   "id": 7542,
   "name": "Bloodbath",
+  "job": "ROLE",
   "cooldown": 90000,
   "statusesApplied": [
    "BLOODBATH"
-  ],
-  "job": "ROLE"
+  ]
  },
  "FEINT": {
   "id": 7549,
   "name": "Feint",
+  "job": "ROLE",
   "cooldown": 90000,
   "statusesApplied": [
    "FEINT"
-  ],
-  "job": "ROLE"
+  ]
  },
  "TRUE_NORTH": {
   "id": 7546,
   "name": "True North",
+  "job": "ROLE",
   "cooldown": 45000,
-  "charges": 2,
   "statusesApplied": [
    "TRUE_NORTH"
   ],
-  "job": "ROLE"
+  "charges": 2
  },
  "SLICE": {
   "id": 24373,
   "name": "Slice",
+  "job": "RPR",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "start": true
   },
-  "job": "RPR",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "WAXING_SLICE": {
   "id": 24374,
   "name": "Waxing Slice",
+  "job": "RPR",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": 24373
   },
-  "job": "RPR",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "INFERNAL_SLICE": {
   "id": 24375,
   "name": "Infernal Slice",
+  "job": "RPR",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": 24374,
    "end": true
   },
-  "job": "RPR",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "SHADOW_OF_DEATH": {
   "id": 24378,
   "name": "Shadow of Death",
+  "job": "RPR",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "DEATHS_DESIGN"
   ],
-  "job": "RPR",
-  "castTime": 0,
-  "cooldown": 2500
+  "speedAttribute": "SKILL_SPEED"
  },
  "HARPE": {
   "id": 24386,
   "name": "Harpe",
+  "job": "RPR",
   "onGcd": true,
   "castTime": 1300,
-  "speedAttribute": "SPELL_SPEED",
-  "job": "RPR",
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "SPINNING_SCYTHE": {
   "id": 24376,
   "name": "Spinning Scythe",
+  "job": "RPR",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "start": true
   },
-  "job": "RPR",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "NIGHTMARE_SCYTHE": {
   "id": 24377,
   "name": "Nightmare Scythe",
+  "job": "RPR",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": 24376,
    "end": true
   },
-  "job": "RPR",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "WHORL_OF_DEATH": {
   "id": 24379,
   "name": "Whorl of Death",
+  "job": "RPR",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "DEATHS_DESIGN"
   ],
-  "job": "RPR",
-  "castTime": 0,
-  "cooldown": 2500
+  "speedAttribute": "SKILL_SPEED"
  },
  "SOULSOW": {
   "id": 24387,
   "name": "Soulsow",
+  "job": "RPR",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "castTime": 5000,
+  "cooldown": 2500,
   "statusesApplied": [
    "SOULSOW"
   ],
-  "job": "RPR",
-  "cooldown": 2500
+  "speedAttribute": "SPELL_SPEED"
  },
  "HARVEST_MOON": {
   "id": 24388,
   "name": "Harvest Moon",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "job": "RPR",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "PLENTIFUL_HARVEST": {
   "id": 24385,
   "name": "Plentiful Harvest",
+  "job": "RPR",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "PERFECTIO_OCCULTA",
    "IDEAL_HOST"
   ],
-  "job": "RPR",
-  "castTime": 0,
-  "cooldown": 2500
+  "speedAttribute": "SKILL_SPEED"
  },
  "VOID_REAPING": {
   "id": 24395,
   "name": "Void Reaping",
+  "job": "RPR",
   "onGcd": true,
+  "castTime": 0,
   "cooldown": 1500,
   "statusesApplied": [
    "ENHANCED_CROSS_REAPING"
-  ],
-  "job": "RPR",
-  "castTime": 0
+  ]
  },
  "CROSS_REAPING": {
   "id": 24396,
   "name": "Cross Reaping",
+  "job": "RPR",
   "onGcd": true,
+  "castTime": 0,
   "cooldown": 1500,
   "statusesApplied": [
    "ENHANCED_VOID_REAPING"
-  ],
-  "job": "RPR",
-  "castTime": 0
+  ]
  },
  "GRIM_REAPING": {
   "id": 24397,
   "name": "Grim Reaping",
-  "onGcd": true,
-  "cooldown": 1500,
   "job": "RPR",
-  "castTime": 0
+  "onGcd": true,
+  "castTime": 0,
+  "cooldown": 1500
  },
  "COMMUNIO": {
   "id": 24398,
   "name": "Communio",
+  "job": "RPR",
   "onGcd": true,
   "castTime": 1300,
-  "speedAttribute": "SPELL_SPEED",
+  "cooldown": 2500,
   "statusesApplied": [
    "PERFECTIO_PARATA"
   ],
-  "job": "RPR",
-  "cooldown": 2500
+  "speedAttribute": "SPELL_SPEED"
  },
  "PERFECTIO": {
   "id": 36973,
   "name": "Perfectio",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "job": "RPR",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "GALLOWS": {
   "id": 24383,
   "name": "Gallows",
+  "job": "RPR",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "ENHANCED_GIBBET"
   ],
+  "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
     "value": 500,
@@ -6667,19 +6672,19 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
      "ENHANCED_GALLOWS"
     ]
    }
-  ],
-  "job": "RPR",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
  "EXECUTIONERS_GALLOWS": {
   "id": 36971,
   "name": "Executioner's Gallows",
+  "job": "RPR",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "ENHANCED_GIBBET"
   ],
+  "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
     "value": 700,
@@ -6709,19 +6714,19 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
      "ENHANCED_GALLOWS"
     ]
    }
-  ],
-  "job": "RPR",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
  "GIBBET": {
   "id": 24382,
   "name": "Gibbet",
+  "job": "RPR",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "ENHANCED_GALLOWS"
   ],
+  "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
     "value": 500,
@@ -6751,19 +6756,19 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
      "ENHANCED_GIBBET"
     ]
    }
-  ],
-  "job": "RPR",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
  "EXECUTIONERS_GIBBET": {
   "id": 36970,
   "name": "Executioner's Gibbet",
+  "job": "RPR",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "ENHANCED_GALLOWS"
   ],
+  "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
     "value": 700,
@@ -6793,340 +6798,263 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
      "ENHANCED_GIBBET"
     ]
    }
-  ],
-  "job": "RPR",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
  "GUILLOTINE": {
   "id": 24384,
   "name": "Guillotine",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "job": "RPR",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "EXECUTIONERS_GUILLOTINE": {
   "id": 36972,
   "name": "Executioner's Guillotine",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "job": "RPR",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "SOUL_SLICE": {
   "id": 24380,
   "name": "Soul Slice",
+  "job": "RPR",
   "onGcd": true,
+  "castTime": 0,
   "cooldown": 30000,
   "gcdRecast": 2500,
   "cooldownGroup": 5,
-  "charges": 2,
-  "job": "RPR",
-  "castTime": 0
+  "charges": 2
  },
  "SOUL_SCYTHE": {
   "id": 24381,
   "name": "Soul Scythe",
+  "job": "RPR",
   "onGcd": true,
+  "castTime": 0,
   "cooldown": 30000,
   "gcdRecast": 2500,
   "cooldownGroup": 5,
-  "charges": 2,
-  "job": "RPR",
-  "castTime": 0
+  "charges": 2
  },
  "HELLS_INGRESS": {
   "id": 24401,
   "name": "Hell's Ingress",
+  "job": "RPR",
   "cooldown": 20000,
   "cooldownGroup": 4,
   "statusesApplied": [
    "ENHANCED_HARPE"
-  ],
-  "job": "RPR"
+  ]
  },
  "HELLS_EGRESS": {
   "id": 24402,
   "name": "Hell's Egress",
+  "job": "RPR",
   "cooldown": 20000,
   "cooldownGroup": 4,
   "statusesApplied": [
    "ENHANCED_HARPE"
-  ],
-  "job": "RPR"
+  ]
  },
  "REGRESS": {
   "id": 24403,
   "name": "Regress",
-  "cooldown": 10000,
-  "job": "RPR"
+  "job": "RPR",
+  "cooldown": 10000
  },
  "ARCANE_CIRCLE": {
   "id": 24405,
   "name": "Arcane Circle",
+  "job": "RPR",
   "cooldown": 120000,
   "statusesApplied": [
    "ARCANE_CIRCLE",
    "CIRCLE_OF_SACRIFICE",
    "BLOODSOWN_CIRCLE",
    "IMMORTAL_SACRIFICE"
-  ],
-  "job": "RPR"
+  ]
  },
  "ARCANE_CREST": {
   "id": 24404,
   "name": "Arcane Crest",
+  "job": "RPR",
   "cooldown": 30000,
   "statusesApplied": [
    "CREST_OF_TIME_BORROWED"
-  ],
-  "job": "RPR"
+  ]
  },
  "ENSHROUD": {
   "id": 24394,
   "name": "Enshroud",
+  "job": "RPR",
   "cooldown": 5000,
   "statusesApplied": [
    "ENSHROUDED"
-  ],
-  "job": "RPR"
+  ]
  },
  "LEMURES_SLICE": {
   "id": 24399,
   "name": "Lemure's Slice",
-  "cooldown": 1000,
-  "job": "RPR"
+  "job": "RPR",
+  "cooldown": 1000
  },
  "LEMURES_SCYTHE": {
   "id": 24400,
   "name": "Lemure's Scythe",
-  "cooldown": 1000,
-  "job": "RPR"
+  "job": "RPR",
+  "cooldown": 1000
  },
  "SACRIFICIUM": {
   "id": 36969,
   "name": "Sacrificium",
-  "cooldown": 1000,
-  "job": "RPR"
+  "job": "RPR",
+  "cooldown": 1000
  },
  "GLUTTONY": {
   "id": 24393,
   "name": "Gluttony",
+  "job": "RPR",
   "cooldown": 60000,
   "statusesApplied": [
    "EXECUTIONER"
-  ],
-  "job": "RPR"
+  ]
  },
  "BLOOD_STALK": {
   "id": 24389,
   "name": "Blood Stalk",
+  "job": "RPR",
   "cooldown": 1000,
   "statusesApplied": [
    "SOUL_REAVER"
-  ],
-  "job": "RPR"
+  ]
  },
  "UNVEILED_GALLOWS": {
   "id": 24391,
   "name": "Unveiled Gallows",
-  "cooldown": 1000,
-  "job": "RPR"
+  "job": "RPR",
+  "cooldown": 1000
  },
  "UNVEILED_GIBBET": {
   "id": 24390,
   "name": "Unveiled Gibbet",
-  "cooldown": 1000,
-  "job": "RPR"
+  "job": "RPR",
+  "cooldown": 1000
  },
  "GRIM_SWATHE": {
   "id": 24392,
   "name": "Grim Swathe",
+  "job": "RPR",
   "cooldown": 1000,
   "statusesApplied": [
    "SOUL_REAVER"
-  ],
-  "job": "RPR"
+  ]
  },
  "HAKAZE": {
   "id": 7477,
   "name": "Hakaze",
+  "job": "SAM",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "start": true
   },
-  "job": "SAM",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "GYOFU": {
   "id": 36963,
   "name": "Gyofu",
+  "job": "SAM",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "start": true
   },
-  "job": "SAM",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "JINPU": {
   "id": 7478,
   "name": "Jinpu",
+  "job": "SAM",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": [
     7477,
     36963
    ]
   },
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "FUGETSU"
   ],
-  "job": "SAM",
-  "castTime": 0,
-  "cooldown": 2500
+  "speedAttribute": "SKILL_SPEED"
  },
  "ENPI": {
   "id": 7486,
   "name": "Enpi",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "breaksCombo": false,
   "job": "SAM",
+  "onGcd": true,
+  "breaksCombo": false,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "SHIFU": {
   "id": 7479,
   "name": "Shifu",
+  "job": "SAM",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": [
     7477,
     36963
    ]
   },
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "FUKA"
   ],
-  "job": "SAM",
-  "castTime": 0,
-  "cooldown": 2500
+  "speedAttribute": "SKILL_SPEED"
  },
  "IAIJUTSU": {
   "id": 7867,
   "name": "Iaijutsu",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "castTime": 1300,
   "job": "SAM",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 1300,
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "HIGANBANA": {
   "id": 7489,
   "name": "Higanbana",
+  "job": "SAM",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "castTime": 1300,
+  "cooldown": 2500,
   "statusesApplied": [
    "HIGANBANA"
   ],
-  "job": "SAM",
-  "cooldown": 2500
+  "speedAttribute": "SKILL_SPEED"
  },
  "GEKKO": {
   "id": 7481,
   "name": "Gekko",
+  "job": "SAM",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "potencies": [
-   {
-    "value": 160,
-    "bonusModifiers": []
-   },
-   {
-    "value": 210,
-    "bonusModifiers": [
-     "POSITIONAL"
-    ]
-   },
-   {
-    "value": 370,
-    "bonusModifiers": [
-     "COMBO"
-    ]
-   },
-   {
-    "value": 420,
-    "bonusModifiers": [
-     "POSITIONAL",
-     "COMBO"
-    ]
-   }
-  ],
   "combo": {
    "from": 7478,
    "end": true
   },
-  "job": "SAM",
   "castTime": 0,
-  "cooldown": 2500
- },
- "MANGETSU": {
-  "id": 7484,
-  "name": "Mangetsu",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "combo": {
-   "from": [
-    25780
-   ],
-   "end": true
-  },
-  "statusesApplied": [
-   "FUGETSU"
-  ],
-  "job": "SAM",
-  "castTime": 0,
-  "cooldown": 2500
- },
- "TENKA_GOKEN": {
-  "id": 7488,
-  "name": "Tenka Goken",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "castTime": 1300,
-  "job": "SAM",
   "cooldown": 2500,
-  "statusesApplied": [
-   "TSUBAME_GAESHI_READY"
-  ]
- },
- "TENDO_GOKEN": {
-  "id": 36965,
-  "name": "Tendo Goken",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "castTime": 1300,
-  "job": "SAM",
-  "cooldown": 2500,
-  "gcdRecast": 2500,
-  "statusesApplied": [
-   "TSUBAME_GAESHI_READY"
-  ]
- },
- "KASHA": {
-  "id": 7482,
-  "name": "Kasha",
-  "onGcd": true,
   "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
@@ -7152,63 +7080,137 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
      "COMBO"
     ]
    }
-  ],
-  "combo": {
-   "from": 7479,
-   "end": true
-  },
-  "job": "SAM",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
- "OKA": {
-  "id": 7485,
-  "name": "Oka",
+ "MANGETSU": {
+  "id": 7484,
+  "name": "Mangetsu",
+  "job": "SAM",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": [
     25780
    ],
    "end": true
   },
+  "castTime": 0,
+  "cooldown": 2500,
+  "statusesApplied": [
+   "FUGETSU"
+  ],
+  "speedAttribute": "SKILL_SPEED"
+ },
+ "TENKA_GOKEN": {
+  "id": 7488,
+  "name": "Tenka Goken",
+  "job": "SAM",
+  "onGcd": true,
+  "castTime": 1300,
+  "cooldown": 2500,
+  "statusesApplied": [
+   "TSUBAME_GAESHI_READY"
+  ],
+  "speedAttribute": "SKILL_SPEED"
+ },
+ "TENDO_GOKEN": {
+  "id": 36965,
+  "name": "Tendo Goken",
+  "job": "SAM",
+  "onGcd": true,
+  "castTime": 1300,
+  "cooldown": 2500,
+  "gcdRecast": 2500,
+  "statusesApplied": [
+   "TSUBAME_GAESHI_READY"
+  ],
+  "speedAttribute": "SKILL_SPEED"
+ },
+ "KASHA": {
+  "id": 7482,
+  "name": "Kasha",
+  "job": "SAM",
+  "onGcd": true,
+  "combo": {
+   "from": 7479,
+   "end": true
+  },
+  "castTime": 0,
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED",
+  "potencies": [
+   {
+    "value": 160,
+    "bonusModifiers": []
+   },
+   {
+    "value": 210,
+    "bonusModifiers": [
+     "POSITIONAL"
+    ]
+   },
+   {
+    "value": 370,
+    "bonusModifiers": [
+     "COMBO"
+    ]
+   },
+   {
+    "value": 420,
+    "bonusModifiers": [
+     "POSITIONAL",
+     "COMBO"
+    ]
+   }
+  ]
+ },
+ "OKA": {
+  "id": 7485,
+  "name": "Oka",
+  "job": "SAM",
+  "onGcd": true,
+  "combo": {
+   "from": [
+    25780
+   ],
+   "end": true
+  },
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "FUKA"
   ],
-  "job": "SAM",
-  "castTime": 0,
-  "cooldown": 2500
+  "speedAttribute": "SKILL_SPEED"
  },
  "MIDARE_SETSUGEKKA": {
   "id": 7487,
   "name": "Midare Setsugekka",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "castTime": 1300,
   "job": "SAM",
+  "onGcd": true,
+  "castTime": 1300,
   "cooldown": 2500,
   "statusesApplied": [
    "TSUBAME_GAESHI_READY"
-  ]
+  ],
+  "speedAttribute": "SKILL_SPEED"
  },
  "TENDO_SETSUGEKKA": {
   "id": 36966,
   "name": "Tendo Setsugekka",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "castTime": 1300,
-  "gcdRecast": 2500,
   "job": "SAM",
+  "onGcd": true,
+  "castTime": 1300,
   "cooldown": 2500,
+  "gcdRecast": 2500,
   "statusesApplied": [
    "TSUBAME_GAESHI_READY"
-  ]
+  ],
+  "speedAttribute": "SKILL_SPEED"
  },
  "YUKIKAZE": {
   "id": 7480,
   "name": "Yukikaze",
+  "job": "SAM",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": [
     7477,
@@ -7216,793 +7218,793 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
    ],
    "end": true
   },
-  "job": "SAM",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "FUKO": {
   "id": 25780,
   "name": "Fuko",
+  "job": "SAM",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "start": true
   },
-  "job": "SAM",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "TSUBAME_GAESHI": {
   "id": 16483,
   "name": "Tsubame Gaeshi",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "job": "SAM",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "KAESHI_GOKEN": {
   "id": 16485,
   "name": "Kaeshi: Goken",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "gcdRecast": 2500,
   "job": "SAM",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "KAESHI_SETSUGEKKA": {
   "id": 16486,
   "name": "Kaeshi: Setsugekka",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "gcdRecast": 2500,
   "job": "SAM",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "TENDO_KAESHI_GOKEN": {
   "id": 36967,
   "name": "Tendo Kaeshi Goken",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "gcdRecast": 2500,
   "job": "SAM",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "TENDO_KAESHI_SETSUGEKKA": {
   "id": 36968,
   "name": "Tendo Kaeshi Setsugekka",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "gcdRecast": 3200,
   "job": "SAM",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 3200,
+  "speedAttribute": "SKILL_SPEED"
  },
  "OGI_NAMIKIRI": {
   "id": 25781,
   "name": "Ogi Namikiri",
+  "job": "SAM",
   "onGcd": true,
   "castTime": 1300,
-  "speedAttribute": "SKILL_SPEED",
-  "job": "SAM",
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "KAESHI_NAMIKIRI": {
   "id": 25782,
   "name": "Kaeshi: Namikiri",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "job": "SAM",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "THIRD_EYE": {
   "id": 7498,
   "name": "Third Eye",
+  "job": "SAM",
   "cooldown": 15000,
   "statusesApplied": [
    "THIRD_EYE"
-  ],
-  "job": "SAM"
+  ]
  },
  "TENGENTSU": {
   "id": 36962,
   "name": "Tengentsu",
+  "job": "SAM",
   "cooldown": 15000,
   "statusesApplied": [
    "TENGENTSU"
-  ],
-  "job": "SAM"
+  ]
  },
  "MEIKYO_SHISUI": {
   "id": 7499,
   "name": "Meikyo Shisui",
+  "job": "SAM",
+  "breaksCombo": true,
   "cooldown": 55000,
   "statusesApplied": [
    "MEIKYO_SHISUI"
   ],
-  "charges": 2,
-  "breaksCombo": true,
-  "job": "SAM"
+  "charges": 2
  },
  "HISSATSU_GYOTEN": {
   "id": 7492,
   "name": "Hissatsu: Gyoten",
-  "cooldown": 5000,
-  "job": "SAM"
+  "job": "SAM",
+  "cooldown": 5000
  },
  "HISSATSU_YATEN": {
   "id": 7493,
   "name": "Hissatsu: Yaten",
+  "job": "SAM",
   "cooldown": 10000,
   "statusesApplied": [
    "ENHANCED_ENPI"
-  ],
-  "job": "SAM"
+  ]
  },
  "MEDITATE": {
   "id": 7497,
   "name": "Meditate",
+  "job": "SAM",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
+  "castTime": 0,
   "cooldown": 60000,
   "gcdRecast": 2500,
   "statusesApplied": [
    "MEDITATE",
    "MEDITATION"
   ],
-  "job": "SAM",
-  "castTime": 0
+  "speedAttribute": "SKILL_SPEED"
  },
  "HISSATSU_SHINTEN": {
   "id": 7490,
   "name": "Hissatsu: Shinten",
-  "cooldown": 1000,
-  "job": "SAM"
+  "job": "SAM",
+  "cooldown": 1000
  },
  "HISSATSU_KYUTEN": {
   "id": 7491,
   "name": "Hissatsu: Kyuten",
-  "cooldown": 1000,
-  "job": "SAM"
+  "job": "SAM",
+  "cooldown": 1000
  },
  "HAGAKURE": {
   "id": 7495,
   "name": "Hagakure",
-  "cooldown": 40000,
-  "job": "SAM"
+  "job": "SAM",
+  "cooldown": 40000
  },
  "IKISHOTEN": {
   "id": 16482,
   "name": "Ikishoten",
+  "job": "SAM",
   "cooldown": 120000,
   "statusesApplied": [
    "OGI_NAMIKIRI_READY",
    "ZANSHIN_READY"
-  ],
-  "job": "SAM"
+  ]
  },
  "HISSATSU_GUREN": {
   "id": 7496,
   "name": "Hissatsu: Guren",
+  "job": "SAM",
   "cooldown": 60000,
-  "cooldownGroup": 10,
-  "job": "SAM"
+  "cooldownGroup": 10
  },
  "HISSATSU_SENEI": {
   "id": 16481,
   "name": "Hissatsu: Senei",
+  "job": "SAM",
   "cooldown": 60000,
-  "cooldownGroup": 10,
-  "job": "SAM"
+  "cooldownGroup": 10
  },
  "SHOHA": {
   "id": 16487,
   "name": "Shoha",
-  "cooldown": 15000,
-  "job": "SAM"
+  "job": "SAM",
+  "cooldown": 15000
  },
  "ZANSHIN": {
   "id": 36964,
   "name": "Zanshin",
-  "cooldown": 1000,
-  "job": "SAM"
+  "job": "SAM",
+  "cooldown": 1000
  },
  "BROIL_IV": {
   "id": 25865,
   "name": "Broil IV",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 1500,
   "job": "SCH",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 1500,
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "AETHERFLOW": {
   "id": 166,
   "name": "Aetherflow",
-  "cooldown": 60000,
-  "job": "SCH"
+  "job": "SCH",
+  "cooldown": 60000
  },
  "RESURRECTION": {
   "id": 173,
   "name": "Resurrection",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 8000,
   "job": "SCH",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 8000,
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "SCH_PHYSICK": {
   "id": 190,
   "name": "Physick",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 1500,
   "job": "SCH",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 1500,
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "BIOLYSIS": {
   "id": 16540,
   "name": "Biolysis",
+  "job": "SCH",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "BIOLYSIS"
   ],
-  "job": "SCH",
-  "castTime": 0,
-  "cooldown": 2500
+  "speedAttribute": "SPELL_SPEED"
  },
  "ADLOQUIUM": {
   "id": 185,
   "name": "Adloquium",
+  "job": "SCH",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "castTime": 2000,
+  "cooldown": 2500,
   "statusesApplied": [
    "GALVANIZE",
    "CATALYZE"
   ],
-  "job": "SCH",
-  "cooldown": 2500
+  "speedAttribute": "SPELL_SPEED"
  },
  "BROIL_III": {
   "id": 16541,
   "name": "Broil III",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 1500,
   "job": "SCH",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 1500,
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "SCH_RUIN_II": {
   "id": 17870,
   "name": "Ruin II",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "job": "SCH",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "RECITATION": {
   "id": 16542,
   "name": "Recitation",
-  "cooldown": 60000,
-  "job": "SCH"
+  "job": "SCH",
+  "cooldown": 60000
  },
  "SCH_FEY_BLESSING": {
   "id": 16543,
   "name": "Fey Blessing",
-  "cooldown": 60000,
-  "job": "SCH"
+  "job": "SCH",
+  "cooldown": 60000
  },
  "SUMMON_SERAPH": {
   "id": 16545,
   "name": "Summon Seraph",
-  "cooldown": 120000,
-  "job": "SCH"
+  "job": "SCH",
+  "cooldown": 120000
  },
  "SCH_CONSOLATION": {
   "id": 16546,
   "name": "Consolation",
+  "job": "SCH",
   "cooldown": 30000,
-  "charges": 2,
-  "job": "SCH"
+  "charges": 2
  },
  "SUCCOR": {
   "id": 186,
   "name": "Succor",
+  "job": "SCH",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "castTime": 2000,
+  "cooldown": 2500,
   "statusesApplied": [
    "GALVANIZE"
   ],
-  "job": "SCH",
-  "cooldown": 2500
+  "speedAttribute": "SPELL_SPEED"
  },
  "CONCITATION": {
   "id": 37013,
   "name": "Concitation",
+  "job": "SCH",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "castTime": 2000,
+  "cooldown": 2500,
   "statusesApplied": [
    "GALVANIZE"
   ],
-  "job": "SCH",
-  "cooldown": 2500
+  "speedAttribute": "SPELL_SPEED"
  },
  "SACRED_SOIL": {
   "id": 188,
   "name": "Sacred Soil",
-  "cooldown": 30000,
-  "job": "SCH"
+  "job": "SCH",
+  "cooldown": 30000
  },
  "LUSTRATE": {
   "id": 189,
   "name": "Lustrate",
-  "cooldown": 1000,
-  "job": "SCH"
+  "job": "SCH",
+  "cooldown": 1000
  },
  "ART_OF_WAR": {
   "id": 16539,
   "name": "Art of War",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "job": "SCH",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "ART_OF_WAR_II": {
   "id": 25866,
   "name": "Art of War II",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "job": "SCH",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "PROTRACTION": {
   "id": 25867,
   "name": "Protraction",
+  "job": "SCH",
   "cooldown": 60000,
   "statusesApplied": [
    "PROTRACTION"
-  ],
-  "job": "SCH"
+  ]
  },
  "EXPEDIENT": {
   "id": 25868,
   "name": "Expedient",
+  "job": "SCH",
   "cooldown": 120000,
   "statusesApplied": [
    "EXPEDIENCE",
    "DESPERATE_MEASURES"
-  ],
-  "job": "SCH"
+  ]
  },
  "INDOMITABILITY": {
   "id": 3583,
   "name": "Indomitability",
-  "cooldown": 30000,
-  "job": "SCH"
+  "job": "SCH",
+  "cooldown": 30000
  },
  "BROIL": {
   "id": 3584,
   "name": "Broil",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 1500,
   "job": "SCH",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 1500,
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "DEPLOYMENT_TACTICS": {
   "id": 3585,
   "name": "Deployment Tactics",
-  "cooldown": 90000,
-  "job": "SCH"
+  "job": "SCH",
+  "cooldown": 90000
  },
  "EMERGENCY_TACTICS": {
   "id": 3586,
   "name": "Emergency Tactics",
+  "job": "SCH",
   "cooldown": 15000,
   "statusesApplied": [
    "EMERGENCY_TACTICS"
-  ],
-  "job": "SCH"
+  ]
  },
  "DISSIPATION": {
   "id": 3587,
   "name": "Dissipation",
+  "job": "SCH",
   "cooldown": 180000,
   "statusesApplied": [
    "DISSIPATION"
-  ],
-  "job": "SCH"
+  ]
  },
  "EXCOGITATION": {
   "id": 7434,
   "name": "Excogitation",
+  "job": "SCH",
   "cooldown": 45000,
   "statusesApplied": [
    "EXCOGITATION"
-  ],
-  "job": "SCH"
+  ]
  },
  "BROIL_II": {
   "id": 7435,
   "name": "Broil II",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 1500,
   "job": "SCH",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 1500,
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "BIO_II": {
   "id": 17865,
   "name": "Bio II",
+  "job": "SCH",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "BIO_II"
   ],
-  "job": "SCH",
-  "castTime": 0,
-  "cooldown": 2500
+  "speedAttribute": "SPELL_SPEED"
  },
  "CHAIN_STRATAGEM": {
   "id": 7436,
   "name": "Chain Stratagem",
+  "job": "SCH",
   "cooldown": 120000,
   "statusesApplied": [
    "CHAIN_STRATAGEM",
    "IMPACT_IMMINENT"
-  ],
-  "job": "SCH"
+  ]
  },
  "BANEFUL_IMPACTION": {
   "id": 37012,
   "name": "Baneful Impaction",
+  "job": "SCH",
   "cooldown": 300,
   "statusesApplied": [
    "BANEFUL_IMPACTION"
-  ],
-  "job": "SCH"
+  ]
  },
  "SCH_AETHERPACT": {
   "id": 7437,
   "name": "Aetherpact",
-  "cooldown": 3000,
-  "job": "SCH"
+  "job": "SCH",
+  "cooldown": 3000
  },
  "DISSOLVE_UNION": {
   "id": 7869,
   "name": "Dissolve Union",
-  "cooldown": 1000,
-  "job": "SCH"
+  "job": "SCH",
+  "cooldown": 1000
  },
  "SCH_WHISPERING_DAWN": {
   "id": 16537,
   "name": "Whispering Dawn",
+  "job": "SCH",
   "cooldown": 60000,
   "statusesApplied": [
    "WHISPERING_DAWN"
-  ],
-  "job": "SCH"
+  ]
  },
  "SCH_FEY_ILLUMINATION": {
   "id": 16538,
   "name": "Fey Illumination",
-  "cooldown": 120000,
-  "job": "SCH"
+  "job": "SCH",
+  "cooldown": 120000
  },
  "SCH_ENERGY_DRAIN": {
   "id": 167,
   "name": "Energy Drain",
-  "cooldown": 1000,
-  "job": "SCH"
+  "job": "SCH",
+  "cooldown": 1000
  },
  "SUMMON_EOS": {
   "id": 17215,
   "name": "Summon Eos",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 1500,
   "job": "SCH",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 1500,
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "SUMMON_SELENE": {
   "id": 17216,
   "name": "Summon Selene",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 1500,
   "job": "SCH",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 1500,
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "EMBRACE": {
   "id": 802,
   "name": "Embrace",
+  "job": "SCH",
   "cooldown": 3000,
-  "pet": true,
-  "job": "SCH"
+  "pet": true
  },
  "WHISPERING_DAWN": {
   "id": 803,
   "name": "Whispering Dawn",
-  "pet": true,
-  "job": "SCH"
+  "job": "SCH",
+  "pet": true
  },
  "FEY_ILLUMINATION": {
   "id": 805,
   "name": "Fey Illumination",
-  "pet": true,
-  "job": "SCH"
+  "job": "SCH",
+  "pet": true
  },
  "FEY_BLESSING": {
   "id": 16544,
   "name": "Fey Blessing",
-  "pet": true,
-  "job": "SCH"
+  "job": "SCH",
+  "pet": true
  },
  "SERAPHIC_VEIL": {
   "id": 16548,
   "name": "Seraphic Veil",
-  "pet": true,
-  "job": "SCH"
+  "job": "SCH",
+  "pet": true
  },
  "CONSOLATION": {
   "id": 16547,
   "name": "Consolation",
-  "pet": true,
-  "job": "SCH"
+  "job": "SCH",
+  "pet": true
  },
  "ANGELS_WHISPER": {
   "id": 16550,
   "name": "Angel's Whisper",
-  "pet": true,
-  "job": "SCH"
+  "job": "SCH",
+  "pet": true
  },
  "FEY_UNION": {
   "id": 7438,
   "name": "Fey Union",
-  "pet": true,
-  "job": "SCH"
+  "job": "SCH",
+  "pet": true
  },
  "SERAPHIC_ILLUMINATION": {
   "id": 16551,
   "name": "Seraphic Illumination",
-  "pet": true,
-  "job": "SCH"
+  "job": "SCH",
+  "pet": true
  },
  "SERAPHISM": {
   "id": 37014,
   "name": "Seraphism",
-  "pet": false,
+  "job": "SCH",
+  "cooldown": 180000,
   "statusesApplied": [
    "SERAPHISM"
   ],
-  "cooldown": 180000,
-  "job": "SCH"
+  "pet": false
  },
  "MANIFESTATION": {
   "id": 37015,
   "name": "Manifestation",
+  "job": "SCH",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "GALVANIZE",
    "CATALYZE"
   ],
-  "job": "SCH",
-  "castTime": 0,
-  "cooldown": 2500
+  "speedAttribute": "SPELL_SPEED"
  },
  "ACCESSION": {
   "id": 37016,
   "name": "Accession",
+  "job": "SCH",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "GALVANIZE",
    "CATALYZE"
   ],
-  "job": "SCH",
-  "castTime": 0,
-  "cooldown": 2500
+  "speedAttribute": "SPELL_SPEED"
  },
  "DIAGNOSIS": {
   "id": 24284,
   "name": "Diagnosis",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 1500,
-  "mpCost": 400,
   "job": "SGE",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 1500,
+  "cooldown": 2500,
+  "mpCost": 400,
+  "speedAttribute": "SPELL_SPEED"
  },
  "EUKRASIAN_DIAGNOSIS": {
   "id": 24291,
   "name": "Eukrasian Diagnosis",
+  "job": "SGE",
   "onGcd": true,
+  "castTime": 0,
+  "cooldown": 2500,
   "gcdRecast": 1500,
-  "mpCost": 800,
   "statusesApplied": [
    "EUKRASIAN_DIAGNOSIS",
    "DIFFERENTIAL_DIAGNOSIS"
   ],
-  "job": "SGE",
-  "castTime": 0,
-  "cooldown": 2500
+  "mpCost": 800
  },
  "HAIMA": {
   "id": 24305,
   "name": "Haima",
+  "job": "SGE",
   "cooldown": 120000,
   "statusesApplied": [
    "HAIMA",
    "HAIMATINON"
-  ],
-  "job": "SGE"
+  ]
  },
  "EGEIRO": {
   "id": 24287,
   "name": "Egeiro",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 8000,
-  "mpCost": 2400,
   "job": "SGE",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 8000,
+  "cooldown": 2500,
+  "mpCost": 2400,
+  "speedAttribute": "SPELL_SPEED"
  },
  "PROGNOSIS": {
   "id": 24286,
   "name": "Prognosis",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 2000,
-  "mpCost": 700,
   "job": "SGE",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 2000,
+  "cooldown": 2500,
+  "mpCost": 700,
+  "speedAttribute": "SPELL_SPEED"
  },
  "EUKRASIAN_PROGNOSIS": {
   "id": 24292,
   "name": "Eukrasian Prognosis",
+  "job": "SGE",
   "onGcd": true,
+  "castTime": 0,
+  "cooldown": 2500,
   "gcdRecast": 1500,
-  "mpCost": 800,
   "statusesApplied": [
    "EUKRASIAN_PROGNOSIS"
   ],
-  "job": "SGE",
-  "castTime": 0,
-  "cooldown": 2500
+  "mpCost": 800
  },
  "EUKRASIAN_PROGNOSIS_II": {
   "id": 37034,
   "name": "Eukrasian Prognosis II",
+  "job": "SGE",
   "onGcd": true,
+  "castTime": 0,
+  "cooldown": 2500,
   "gcdRecast": 1500,
-  "mpCost": 800,
   "statusesApplied": [
    "EUKRASIAN_PROGNOSIS"
   ],
-  "job": "SGE",
-  "castTime": 0,
-  "cooldown": 2500
+  "mpCost": 800
  },
  "PANHAIMA": {
   "id": 24311,
   "name": "Panhaima",
+  "job": "SGE",
   "cooldown": 120000,
   "statusesApplied": [
    "PANHAIMA",
    "PANHAIMATINON"
-  ],
-  "job": "SGE"
+  ]
  },
  "PHYSIS": {
   "id": 24288,
   "name": "Physis",
+  "job": "SGE",
   "cooldown": 60000,
   "statusesApplied": [
    "PHYSIS"
-  ],
-  "job": "SGE"
+  ]
  },
  "PHYSIS_II": {
   "id": 24302,
   "name": "Physis II",
+  "job": "SGE",
   "cooldown": 60000,
   "statusesApplied": [
    "PHYSIS_II",
    "AUTOPHYSIS"
-  ],
-  "job": "SGE"
+  ]
  },
  "HOLOS": {
   "id": 24310,
   "name": "Holos",
+  "job": "SGE",
   "cooldown": 120000,
   "statusesApplied": [
    "HOLOS",
    "HOLOSAKOS"
-  ],
-  "job": "SGE"
+  ]
  },
  "PEPSIS": {
   "id": 24301,
   "name": "Pepsis",
-  "cooldown": 15000,
-  "job": "SGE"
+  "job": "SGE",
+  "cooldown": 15000
  },
  "KARDIA": {
   "id": 24285,
   "name": "Kardia",
+  "job": "SGE",
   "cooldown": 5000,
   "statusesApplied": [
    "KARDIA",
    "KARDION"
-  ],
-  "job": "SGE"
+  ]
  },
  "EUKRASIA": {
   "id": 24290,
   "name": "Eukrasia",
+  "job": "SGE",
   "onGcd": true,
+  "castTime": 0,
+  "cooldown": 2500,
   "gcdRecast": 1000,
   "statusesApplied": [
    "EUKRASIA"
-  ],
-  "job": "SGE",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
  "SOTERIA": {
   "id": 24294,
   "name": "Soteria",
+  "job": "SGE",
   "cooldown": 60000,
   "statusesApplied": [
    "SOTERIA"
-  ],
-  "job": "SGE"
+  ]
  },
  "ICARUS": {
   "id": 24295,
   "name": "Icarus",
-  "cooldown": 45000,
-  "job": "SGE"
+  "job": "SGE",
+  "cooldown": 45000
  },
  "ZOE": {
   "id": 24300,
   "name": "Zoe",
+  "job": "SGE",
   "cooldown": 90000,
   "statusesApplied": [
    "ZOE"
-  ],
-  "job": "SGE"
+  ]
  },
  "KRASIS": {
   "id": 24317,
   "name": "Krasis",
+  "job": "SGE",
   "cooldown": 60000,
   "statusesApplied": [
    "KRASIS"
-  ],
-  "job": "SGE"
+  ]
  },
  "PHILOSOPHIA": {
   "id": 37035,
   "name": "Philosophia",
+  "job": "SGE",
   "cooldown": 180000,
   "statusesApplied": [
    "EUDAIMONIA"
-  ],
-  "job": "SGE"
+  ]
  },
  "EUDAIMONIA": {
   "id": 37036,
@@ -8012,216 +8014,216 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
  "RHIZOMATA": {
   "id": 24309,
   "name": "Rhizomata",
-  "cooldown": 90000,
-  "job": "SGE"
+  "job": "SGE",
+  "cooldown": 90000
  },
  "DRUOCHOLE": {
   "id": 24296,
   "name": "Druochole",
-  "cooldown": 1000,
-  "job": "SGE"
+  "job": "SGE",
+  "cooldown": 1000
  },
  "IXOCHOLE": {
   "id": 24299,
   "name": "Ixochole",
-  "cooldown": 30000,
-  "job": "SGE"
+  "job": "SGE",
+  "cooldown": 30000
  },
  "KERACHOLE": {
   "id": 24298,
   "name": "Kerachole",
+  "job": "SGE",
   "cooldown": 30000,
   "statusesApplied": [
    "KERACHOLE",
    "KERAKEIA"
-  ],
-  "job": "SGE"
+  ]
  },
  "TAUROCHOLE": {
   "id": 24303,
   "name": "Taurochole",
+  "job": "SGE",
   "cooldown": 45000,
   "statusesApplied": [
    "TAUROCHOLE"
-  ],
-  "job": "SGE"
+  ]
  },
  "DOSIS": {
   "id": 24283,
   "name": "Dosis",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 1500,
-  "mpCost": 400,
   "job": "SGE",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 1500,
+  "cooldown": 2500,
+  "mpCost": 400,
+  "speedAttribute": "SPELL_SPEED"
  },
  "DOSIS_II": {
   "id": 24306,
   "name": "Dosis II",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 1500,
-  "mpCost": 400,
   "job": "SGE",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 1500,
+  "cooldown": 2500,
+  "mpCost": 400,
+  "speedAttribute": "SPELL_SPEED"
  },
  "DOSIS_III": {
   "id": 24312,
   "name": "Dosis III",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 1500,
-  "mpCost": 400,
   "job": "SGE",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 1500,
+  "cooldown": 2500,
+  "mpCost": 400,
+  "speedAttribute": "SPELL_SPEED"
  },
  "EUKRASIAN_DOSIS": {
   "id": 24293,
   "name": "Eukrasian Dosis",
+  "job": "SGE",
   "onGcd": true,
+  "castTime": 0,
+  "cooldown": 2500,
   "gcdRecast": 1500,
-  "mpCost": 400,
   "statusesApplied": [
    "EUKRASIAN_DOSIS"
   ],
-  "job": "SGE",
-  "castTime": 0,
-  "cooldown": 2500
+  "mpCost": 400
  },
  "EUKRASIAN_DOSIS_II": {
   "id": 24308,
   "name": "Eukrasian Dosis II",
+  "job": "SGE",
   "onGcd": true,
+  "castTime": 0,
+  "cooldown": 2500,
   "gcdRecast": 1500,
-  "mpCost": 500,
   "statusesApplied": [
    "EUKRASIAN_DOSIS_II"
   ],
-  "job": "SGE",
-  "castTime": 0,
-  "cooldown": 2500
+  "mpCost": 500
  },
  "EUKRASIAN_DOSIS_III": {
   "id": 24314,
   "name": "Eukrasian Dosis III",
+  "job": "SGE",
   "onGcd": true,
+  "castTime": 0,
+  "cooldown": 2500,
   "gcdRecast": 1500,
-  "mpCost": 600,
   "statusesApplied": [
    "EUKRASIAN_DOSIS_III"
   ],
-  "job": "SGE",
-  "castTime": 0,
-  "cooldown": 2500
+  "mpCost": 600
  },
  "TOXIKON": {
   "id": 24304,
   "name": "Toxikon",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "job": "SGE",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "TOXIKON_II": {
   "id": 24316,
   "name": "Toxikon II",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "job": "SGE",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "DYSKRASIA": {
   "id": 24297,
   "name": "Dyskrasia",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "mpCost": 400,
   "job": "SGE",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "mpCost": 400,
+  "speedAttribute": "SPELL_SPEED"
  },
  "DYSKRASIA_II": {
   "id": 24315,
   "name": "Dyskrasia II",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "mpCost": 400,
   "job": "SGE",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "mpCost": 400,
+  "speedAttribute": "SPELL_SPEED"
  },
  "EUKRASIAN_DYSKRASIA": {
   "id": 37032,
   "name": "Eukrasian Dyskrasia",
+  "job": "SGE",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "mpCost": 400,
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "EUKRASIAN_DYSKRASIA"
   ],
-  "job": "SGE",
-  "castTime": 0,
-  "cooldown": 2500
+  "mpCost": 400,
+  "speedAttribute": "SPELL_SPEED"
  },
  "PHLEGMA": {
   "id": 24289,
   "name": "Phlegma",
+  "job": "SGE",
   "onGcd": true,
-  "gcdRecast": 2500,
-  "speedAttribute": "SPELL_SPEED",
+  "castTime": 0,
   "cooldown": 40000,
+  "gcdRecast": 2500,
   "charges": 2,
   "mpCost": 400,
-  "job": "SGE",
-  "castTime": 0
+  "speedAttribute": "SPELL_SPEED"
  },
  "PHLEGMA_II": {
   "id": 24307,
   "name": "Phlegma II",
+  "job": "SGE",
   "onGcd": true,
-  "gcdRecast": 2500,
-  "speedAttribute": "SPELL_SPEED",
+  "castTime": 0,
   "cooldown": 40000,
+  "gcdRecast": 2500,
   "charges": 2,
   "mpCost": 400,
-  "job": "SGE",
-  "castTime": 0
+  "speedAttribute": "SPELL_SPEED"
  },
  "PHLEGMA_III": {
   "id": 24313,
   "name": "Phlegma III",
+  "job": "SGE",
   "onGcd": true,
-  "gcdRecast": 2500,
-  "speedAttribute": "SPELL_SPEED",
+  "castTime": 0,
   "cooldown": 40000,
+  "gcdRecast": 2500,
   "charges": 2,
   "mpCost": 400,
-  "job": "SGE",
-  "castTime": 0
+  "speedAttribute": "SPELL_SPEED"
  },
  "PSYCHE": {
   "id": 37033,
   "name": "Psyche",
+  "job": "SGE",
   "onGcd": false,
-  "cooldown": 60000,
-  "job": "SGE"
+  "cooldown": 60000
  },
  "PNEUMA": {
   "id": 24318,
   "name": "Pneuma",
+  "job": "SGE",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "castTime": 1500,
-  "gcdRecast": 2500,
   "cooldown": 120000,
-  "mpCost": 700,
+  "gcdRecast": 2500,
   "statusesApplied": [
    "PNEUMA"
   ],
-  "job": "SGE"
+  "mpCost": 700,
+  "speedAttribute": "SPELL_SPEED"
  },
  "PNEUMA_HEAL": {
   "id": 27524,
@@ -8231,473 +8233,473 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
  "SUMMON_CARBUNCLE": {
   "id": 25798,
   "name": "Summon Carbuncle",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 2500,
   "job": "SMN",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 2500,
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "RADIANT_AEGIS": {
   "id": 25799,
   "name": "Radiant Aegis",
+  "job": "SMN",
   "cooldown": 60000,
-  "charges": 2,
-  "job": "SMN"
+  "charges": 2
  },
  "SMN_PHYSICK": {
   "id": 16230,
   "name": "Physick",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 1500,
   "job": "SMN",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 1500,
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "GEMSHINE": {
   "id": 25883,
   "name": "Gemshine",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 2500,
   "job": "SMN",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 2500,
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "FESTER": {
   "id": 181,
   "name": "Fester",
-  "cooldown": 1000,
-  "job": "SMN"
+  "job": "SMN",
+  "cooldown": 1000
  },
  "SMN_ENERGY_DRAIN": {
   "id": 16508,
   "name": "Energy Drain",
+  "job": "SMN",
   "cooldown": 60000,
   "cooldownGroup": 8,
   "statusesApplied": [
    "FURTHER_RUIN"
-  ],
-  "job": "SMN"
+  ]
  },
  "PRECIOUS_BRILLIANCE": {
   "id": 25884,
   "name": "Precious Brilliance",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 2500,
   "job": "SMN",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 2500,
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "PAINFLARE": {
   "id": 3578,
   "name": "Painflare",
-  "cooldown": 1000,
-  "job": "SMN"
+  "job": "SMN",
+  "cooldown": 1000
  },
  "ENERGY_SIPHON": {
   "id": 16510,
   "name": "Energy Siphon",
+  "job": "SMN",
   "cooldown": 60000,
   "cooldownGroup": 8,
   "statusesApplied": [
    "FURTHER_RUIN"
-  ],
-  "job": "SMN"
+  ]
  },
  "RUIN_III": {
   "id": 3579,
   "name": "Ruin III",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 1500,
   "job": "SMN",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 1500,
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "ASTRAL_IMPULSE": {
   "id": 25820,
   "name": "Astral Impulse",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "job": "SMN",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "ASTRAL_FLARE": {
   "id": 25821,
   "name": "Astral Flare",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "job": "SMN",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "ASTRAL_FLOW": {
   "id": 25822,
   "name": "Astral Flow",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "job": "SMN",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "DEATHFLARE": {
   "id": 3582,
   "name": "Deathflare",
-  "cooldown": 20000,
-  "job": "SMN"
+  "job": "SMN",
+  "cooldown": 20000
  },
  "RUIN_IV": {
   "id": 7426,
   "name": "Ruin IV",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "job": "SMN",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "SEARING_LIGHT": {
   "id": 25801,
   "name": "Searing Light",
+  "job": "SMN",
   "cooldown": 120000,
   "statusesApplied": [
    "SEARING_LIGHT"
-  ],
-  "job": "SMN"
+  ]
  },
  "SUMMON_BAHAMUT": {
   "id": 7427,
   "name": "Summon Bahamut",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "gcdRecast": 2500,
-  "cooldown": 60000,
-  "cooldownGroup": 15,
   "job": "SMN",
-  "castTime": 0
+  "onGcd": true,
+  "castTime": 0,
+  "cooldown": 60000,
+  "gcdRecast": 2500,
+  "cooldownGroup": 15,
+  "speedAttribute": "SPELL_SPEED"
  },
  "ENKINDLE_BAHAMUT": {
   "id": 7429,
   "name": "Enkindle Bahamut",
-  "cooldown": 20000,
-  "job": "SMN"
+  "job": "SMN",
+  "cooldown": 20000
  },
  "RUBY_RUIN_III": {
   "id": 25817,
   "name": "Ruby Ruin III",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 2800,
-  "gcdRecast": 3000,
   "job": "SMN",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 2800,
+  "cooldown": 2500,
+  "gcdRecast": 3000,
+  "speedAttribute": "SPELL_SPEED"
  },
  "RUBY_RITE": {
   "id": 25823,
   "name": "Ruby Rite",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 2800,
-  "gcdRecast": 3000,
   "job": "SMN",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 2800,
+  "cooldown": 2500,
+  "gcdRecast": 3000,
+  "speedAttribute": "SPELL_SPEED"
  },
  "TOPAZ_RUIN_III": {
   "id": 25818,
   "name": "Topaz Ruin III",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "job": "SMN",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "TOPAZ_RITE": {
   "id": 25824,
   "name": "Topaz Rite",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "job": "SMN",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "EMERALD_RUIN_III": {
   "id": 25819,
   "name": "Emerald Ruin III",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "cooldown": 1500,
   "job": "SMN",
-  "castTime": 0
+  "onGcd": true,
+  "castTime": 0,
+  "cooldown": 1500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "EMERALD_RITE": {
   "id": 25825,
   "name": "Emerald Rite",
-  "onGcd": true,
-  "cooldown": 1500,
   "job": "SMN",
-  "castTime": 0
+  "onGcd": true,
+  "castTime": 0,
+  "cooldown": 1500
  },
  "TRI_DISASTER": {
   "id": 25826,
   "name": "Tri-Disaster",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 1500,
   "job": "SMN",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 1500,
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "FOUNTAIN_OF_FIRE": {
   "id": 16514,
   "name": "Fountain Of Fire",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "job": "SMN",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "BRAND_OF_PURGATORY": {
   "id": 16515,
   "name": "Brand Of Purgatory",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "job": "SMN",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "SUMMON_PHOENIX": {
   "id": 25831,
   "name": "Summon Phoenix",
+  "job": "SMN",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "gcdRecast": 2500,
+  "castTime": 0,
   "cooldown": 60000,
+  "gcdRecast": 2500,
   "cooldownGroup": 15,
   "statusesApplied": [
    "EVERLASTING_FLIGHT"
   ],
-  "job": "SMN",
-  "castTime": 0
+  "speedAttribute": "SPELL_SPEED"
  },
  "ENKINDLE_PHOENIX": {
   "id": 16516,
   "name": "Enkindle Phoenix",
-  "cooldown": 20000,
-  "job": "SMN"
+  "job": "SMN",
+  "cooldown": 20000
  },
  "REKINDLE": {
   "id": 25830,
   "name": "Rekindle",
+  "job": "SMN",
   "cooldown": 20000,
   "statusesApplied": [
    "REKINDLE",
    "UNDYING_FLAME"
-  ],
-  "job": "SMN"
+  ]
  },
  "RUBY_OUTBURST": {
   "id": 25814,
   "name": "Ruby Outburst",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 2800,
-  "gcdRecast": 3000,
   "job": "SMN",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 2800,
+  "cooldown": 2500,
+  "gcdRecast": 3000,
+  "speedAttribute": "SPELL_SPEED"
  },
  "RUBY_CATASTROPHE": {
   "id": 25832,
   "name": "Ruby Catastrophe",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 2800,
-  "gcdRecast": 3000,
   "job": "SMN",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 2800,
+  "cooldown": 2500,
+  "gcdRecast": 3000,
+  "speedAttribute": "SPELL_SPEED"
  },
  "TOPAZ_OUTBURST": {
   "id": 25815,
   "name": "Topaz Outburst",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "job": "SMN",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "TOPAZ_CATASTROPHE": {
   "id": 25833,
   "name": "Topaz Catastrophe",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "job": "SMN",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "EMERALD_OUTBURST": {
   "id": 25816,
   "name": "Emerald Outburst",
-  "onGcd": true,
-  "cooldown": 1500,
   "job": "SMN",
-  "castTime": 0
+  "onGcd": true,
+  "castTime": 0,
+  "cooldown": 1500
  },
  "EMERALD_CATASTROPHE": {
   "id": 25834,
   "name": "Emerald Catastrophe",
-  "onGcd": true,
-  "cooldown": 1500,
   "job": "SMN",
-  "castTime": 0
+  "onGcd": true,
+  "castTime": 0,
+  "cooldown": 1500
  },
  "CRIMSON_CYCLONE": {
   "id": 25835,
   "name": "Crimson Cyclone",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "job": "SMN",
+  "onGcd": true,
   "castTime": 0,
   "cooldown": 2500,
   "statusesApplied": [
    "CRIMSON_STRIKE_READY"
-  ]
+  ],
+  "speedAttribute": "SPELL_SPEED"
  },
  "CRIMSON_STRIKE": {
   "id": 25885,
   "name": "Crimson Strike",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "job": "SMN",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "SMN_MOUNTAIN_BUSTER": {
   "id": 25836,
   "name": "Mountain Buster",
-  "cooldown": 1000,
-  "job": "SMN"
+  "job": "SMN",
+  "cooldown": 1000
  },
  "SLIPSTREAM": {
   "id": 25837,
   "name": "Slipstream",
+  "job": "SMN",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "castTime": 3000,
+  "cooldown": 2500,
   "gcdRecast": 3500,
   "statusesApplied": [
    "SLIPSTREAM"
   ],
-  "job": "SMN",
-  "cooldown": 2500
+  "speedAttribute": "SPELL_SPEED"
  },
  "SUMMON_IFRIT": {
   "id": 25805,
   "name": "Summon Ifrit",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "job": "SMN",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "SUMMON_IFRIT_II": {
   "id": 25838,
   "name": "Summon Ifrit II",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "job": "SMN",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "SUMMON_TITAN": {
   "id": 25806,
   "name": "Summon Titan",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "job": "SMN",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "SUMMON_TITAN_II": {
   "id": 25839,
   "name": "Summon Titan II",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "job": "SMN",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "SUMMON_GARUDA": {
   "id": 25807,
   "name": "Summon Garuda",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "job": "SMN",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "SUMMON_GARUDA_II": {
   "id": 25840,
   "name": "Summon Garuda II",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "job": "SMN",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "NECROTIZE": {
   "id": 36990,
   "name": "Necrotize",
-  "cooldown": 1000,
-  "job": "SMN"
+  "job": "SMN",
+  "cooldown": 1000
  },
  "SEARING_FLASH": {
   "id": 36991,
   "name": "Searing Flash",
-  "cooldown": 1000,
-  "job": "SMN"
+  "job": "SMN",
+  "cooldown": 1000
  },
  "LUX_SOLARIS": {
   "id": 36997,
   "name": "Lux Solaris",
-  "cooldown": 1000,
-  "job": "SMN"
+  "job": "SMN",
+  "cooldown": 1000
  },
  "SUMMON_SOLAR_BAHAMUT": {
   "id": 36992,
   "name": "Summon Solar Bahamut",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "gcdRecast": 2500,
-  "cooldown": 60000,
-  "cooldownGroup": 15,
   "job": "SMN",
-  "castTime": 0
+  "onGcd": true,
+  "castTime": 0,
+  "cooldown": 60000,
+  "gcdRecast": 2500,
+  "cooldownGroup": 15,
+  "speedAttribute": "SPELL_SPEED"
  },
  "ENKINDLE_SOLAR_BAHAMUT": {
   "id": 36998,
   "name": "Enkindle Solar Bahamut",
-  "cooldown": 20000,
-  "job": "SMN"
+  "job": "SMN",
+  "cooldown": 20000
  },
  "UMBRAL_IMPULSE": {
   "id": 36994,
   "name": "Umbral Impulse",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "job": "SMN",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "UMBRAL_FLARE": {
   "id": 36995,
   "name": "Umbral Flare",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "job": "SMN",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "SUNFLARE": {
   "id": 36996,
   "name": "Sunflare",
-  "cooldown": 20000,
-  "job": "SMN"
+  "job": "SMN",
+  "cooldown": 20000
  },
  "WYRMWAVE": {
   "id": 7428,
@@ -8722,10 +8724,10 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
  "EVERLASTING_FLIGHT": {
   "id": 16517,
   "name": "Everlasting Flight",
+  "job": "SMN",
   "statusesApplied": [
    "EVERLASTING_FLIGHT"
-  ],
-  "job": "SMN"
+  ]
  },
  "LUXWAVE": {
   "id": 36993,
@@ -8755,10 +8757,10 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
  "PET_RADIANT_AEGIS": {
   "id": 25841,
   "name": "Radiant Aegis",
+  "job": "SMN",
   "statusesApplied": [
    "RADIANT_AEGIS"
-  ],
-  "job": "SMN"
+  ]
  },
  "PET_SEARING_LIGHT": {
   "id": 25842,
@@ -8768,41 +8770,41 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
  "STEEL_FANGS": {
   "id": 34606,
   "name": "Steel Fangs",
+  "job": "VPR",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "start": true
   },
-  "job": "VPR",
   "castTime": 0,
   "cooldown": 2500,
   "statusesApplied": [
    "HONED_REAVERS"
-  ]
+  ],
+  "speedAttribute": "SKILL_SPEED"
  },
  "HUNTERS_STING": {
   "id": 34608,
   "name": "Hunter's Sting",
+  "job": "VPR",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": [
     34606,
     34607
    ]
   },
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "HUNTERS_INSTINCT"
   ],
-  "job": "VPR",
-  "castTime": 0,
-  "cooldown": 2500
+  "speedAttribute": "SKILL_SPEED"
  },
  "HINDSTING_STRIKE": {
   "id": 34612,
   "name": "Hindsting Strike",
+  "job": "VPR",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": [
     34608,
@@ -8810,9 +8812,12 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
    ],
    "end": true
   },
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "FLANKSBANE_VENOM"
   ],
+  "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
     "value": 120,
@@ -8859,16 +8864,13 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
      "HINDSTUNG_VENOM"
     ]
    }
-  ],
-  "job": "VPR",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
  "FLANKSTING_STRIKE": {
   "id": 34610,
   "name": "Flanksting Strike",
+  "job": "VPR",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": [
     34608,
@@ -8876,9 +8878,12 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
    ],
    "end": true
   },
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "HINDSTUNG_VENOM"
   ],
+  "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
     "value": 120,
@@ -8925,48 +8930,45 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
      "FLANKSTUNG_VENOM"
     ]
    }
-  ],
-  "job": "VPR",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
  "REAVING_FANGS": {
   "id": 34607,
   "name": "Reaving Fangs",
+  "job": "VPR",
+  "onGcd": true,
+  "combo": {
+   "start": true
+  },
   "cooldown": 2500,
   "statusesApplied": [
    "HONED_STEEL"
   ],
-  "job": "VPR",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "combo": {
-   "start": true
-  }
+  "speedAttribute": "SKILL_SPEED"
  },
  "SWIFTSKINS_STING": {
   "id": 34609,
   "name": "Swiftskin's Sting",
+  "job": "VPR",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": [
     34606,
     34607
    ]
   },
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "SWIFTSCALED"
   ],
-  "job": "VPR",
-  "castTime": 0,
-  "cooldown": 2500
+  "speedAttribute": "SKILL_SPEED"
  },
  "HINDSBANE_FANG": {
   "id": 34613,
   "name": "Hindbane Fang",
+  "job": "VPR",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": [
     34608,
@@ -8974,9 +8976,12 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
    ],
    "end": true
   },
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "FLANKSTUNG_VENOM"
   ],
+  "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
     "value": 120,
@@ -9023,16 +9028,13 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
      "HINDSBANE_VENOM"
     ]
    }
-  ],
-  "job": "VPR",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
  "FLANKSBANE_FANG": {
   "id": 34611,
   "name": "Flanksbane Fang",
+  "job": "VPR",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": [
     34608,
@@ -9040,9 +9042,12 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
    ],
    "end": true
   },
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "HINDSBANE_VENOM"
   ],
+  "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
     "value": 120,
@@ -9089,44 +9094,44 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
      "FLANKSBANE_VENOM"
     ]
    }
-  ],
-  "job": "VPR",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
  "WRITHING_SNAP": {
   "id": 34632,
   "name": "Writhing Snap",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "breaksCombo": false,
   "job": "VPR",
+  "onGcd": true,
+  "breaksCombo": false,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "VICEWINDER": {
   "id": 34620,
   "name": "Vicewinder",
-  "cooldown": 40000,
-  "statusesApplied": [],
   "job": "VPR",
   "onGcd": true,
   "breaksCombo": false,
+  "cooldown": 40000,
   "gcdRecast": 3000,
-  "charges": 2,
-  "cooldownGroup": 15
+  "cooldownGroup": 15,
+  "statusesApplied": [],
+  "charges": 2
  },
  "HUNTERS_COIL": {
   "id": 34621,
   "name": "Hunter's Coil",
+  "job": "VPR",
   "onGcd": true,
-  "gcdRecast": 3000,
   "breaksCombo": false,
-  "speedAttribute": "SKILL_SPEED",
+  "castTime": 0,
+  "cooldown": 2500,
+  "gcdRecast": 3000,
   "statusesApplied": [
    "HUNTERS_INSTINCT",
    "HUNTERS_VENOM"
   ],
+  "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
     "value": 570,
@@ -9138,22 +9143,22 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
      "POSITIONAL"
     ]
    }
-  ],
-  "job": "VPR",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
  "SWIFTSKINS_COIL": {
   "id": 34622,
   "name": "Swiftskin's Coil",
+  "job": "VPR",
   "onGcd": true,
-  "gcdRecast": 3000,
   "breaksCombo": false,
-  "speedAttribute": "SKILL_SPEED",
+  "castTime": 0,
+  "cooldown": 2500,
+  "gcdRecast": 3000,
   "statusesApplied": [
    "SWIFTSCALED",
    "SWIFTSKINS_VENOM"
   ],
+  "speedAttribute": "SKILL_SPEED",
   "potencies": [
    {
     "value": 570,
@@ -9165,49 +9170,46 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
      "POSITIONAL"
     ]
    }
-  ],
-  "job": "VPR",
-  "castTime": 0,
-  "cooldown": 2500
+  ]
  },
  "STEEL_MAW": {
   "id": 34614,
   "name": "Steel Maw",
+  "job": "VPR",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "start": true
   },
-  "job": "VPR",
   "castTime": 0,
   "cooldown": 2500,
   "statusesApplied": [
    "HONED_REAVERS"
-  ]
+  ],
+  "speedAttribute": "SKILL_SPEED"
  },
  "HUNTERS_BITE": {
   "id": 34616,
   "name": "Hunter's Bite",
+  "job": "VPR",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": [
     34614,
     34615
    ]
   },
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "HUNTERS_INSTINCT"
   ],
-  "job": "VPR",
-  "castTime": 0,
-  "cooldown": 2500
+  "speedAttribute": "SKILL_SPEED"
  },
  "JAGGED_MAW": {
   "id": 34618,
   "name": "Jagged Maw",
+  "job": "VPR",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": [
     34616,
@@ -9215,47 +9217,47 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
    ],
    "end": true
   },
-  "job": "VPR",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "REAVING_MAW": {
   "id": 34615,
   "name": "Reaving Maw",
+  "job": "VPR",
+  "onGcd": true,
+  "combo": {
+   "start": true
+  },
   "cooldown": 2500,
   "statusesApplied": [
    "HONED_STEEL"
   ],
-  "job": "VPR",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "combo": {
-   "start": true
-  }
+  "speedAttribute": "SKILL_SPEED"
  },
  "SWIFTSKINS_BITE": {
   "id": 34617,
   "name": "Swiftskin's Bite",
+  "job": "VPR",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": [
     34614,
     34615
    ]
   },
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "SWIFTSCALED"
   ],
-  "job": "VPR",
-  "castTime": 0,
-  "cooldown": 2500
+  "speedAttribute": "SKILL_SPEED"
  },
  "BLOODIED_MAW": {
   "id": 34619,
   "name": "Bloodied Maw",
+  "job": "VPR",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": [
     34616,
@@ -9263,465 +9265,466 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
    ],
    "end": true
   },
-  "job": "VPR",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "VICEPIT": {
   "id": 34623,
   "name": "Vicepit",
-  "cooldown": 40000,
-  "statusesApplied": [],
   "job": "VPR",
   "onGcd": true,
-  "gcdRecast": 3000,
   "breaksCombo": false,
-  "charges": 2,
-  "cooldownGroup": 15
+  "cooldown": 40000,
+  "gcdRecast": 3000,
+  "cooldownGroup": 15,
+  "statusesApplied": [],
+  "charges": 2
  },
  "HUNTERS_DEN": {
   "id": 34624,
   "name": "Hunter's Den",
+  "job": "VPR",
   "onGcd": true,
-  "gcdRecast": 3000,
-  "speedAttribute": "SKILL_SPEED",
   "breaksCombo": false,
+  "castTime": 0,
+  "cooldown": 2500,
+  "gcdRecast": 3000,
   "statusesApplied": [
    "HUNTERS_INSTINCT",
    "FELLHUNTERS_VENOM"
   ],
-  "job": "VPR",
-  "castTime": 0,
-  "cooldown": 2500
+  "speedAttribute": "SKILL_SPEED"
  },
  "SWIFTSKINS_DEN": {
   "id": 34625,
   "name": "Swiftskin's Den",
+  "job": "VPR",
   "onGcd": true,
-  "gcdRecast": 3000,
-  "speedAttribute": "SKILL_SPEED",
   "breaksCombo": false,
+  "castTime": 0,
+  "cooldown": 2500,
+  "gcdRecast": 3000,
   "statusesApplied": [
    "SWIFTSCALED",
    "FELLSKINS_VENOM"
   ],
-  "job": "VPR",
-  "castTime": 0,
-  "cooldown": 2500
+  "speedAttribute": "SKILL_SPEED"
  },
  "UNCOILED_FURY": {
   "id": 34633,
   "name": "Uncoiled Fury",
+  "job": "VPR",
   "onGcd": true,
-  "gcdRecast": 3500,
-  "speedAttribute": "SKILL_SPEED",
   "breaksCombo": false,
+  "castTime": 0,
+  "cooldown": 2500,
+  "gcdRecast": 3500,
   "statusesApplied": [
    "POISED_FOR_TWINFANG"
   ],
-  "job": "VPR",
-  "castTime": 0,
-  "cooldown": 2500
+  "speedAttribute": "SKILL_SPEED"
  },
  "REAWAKEN": {
   "id": 34626,
   "name": "Reawaken",
+  "job": "VPR",
   "onGcd": true,
-  "gcdRecast": 2200,
   "breaksCombo": false,
-  "speedAttribute": "SKILL_SPEED",
+  "castTime": 0,
+  "cooldown": 2500,
+  "gcdRecast": 2200,
   "statusesApplied": [
    "REAWAKENED"
   ],
-  "job": "VPR",
-  "castTime": 0,
-  "cooldown": 2500
+  "speedAttribute": "SKILL_SPEED"
  },
  "FIRST_GENERATION": {
   "id": 34627,
   "name": "First Generation",
+  "job": "VPR",
   "onGcd": true,
   "breaksCombo": false,
-  "gcdRecast": 2000,
-  "speedAttribute": "SKILL_SPEED",
-  "job": "VPR",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 2000,
+  "speedAttribute": "SKILL_SPEED"
  },
  "SECOND_GENERATION": {
   "id": 34628,
   "name": "Second Generation",
+  "job": "VPR",
   "onGcd": true,
   "breaksCombo": false,
-  "gcdRecast": 2000,
-  "speedAttribute": "SKILL_SPEED",
-  "job": "VPR",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 2000,
+  "speedAttribute": "SKILL_SPEED"
  },
  "THIRD_GENERATION": {
   "id": 34629,
   "name": "Third Generation",
+  "job": "VPR",
   "onGcd": true,
   "breaksCombo": false,
-  "gcdRecast": 2000,
-  "speedAttribute": "SKILL_SPEED",
-  "job": "VPR",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 2000,
+  "speedAttribute": "SKILL_SPEED"
  },
  "FOURTH_GENERATION": {
   "id": 34630,
   "name": "Fourth Generation",
+  "job": "VPR",
   "onGcd": true,
   "breaksCombo": false,
-  "gcdRecast": 2000,
-  "speedAttribute": "SKILL_SPEED",
-  "job": "VPR",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 2000,
+  "speedAttribute": "SKILL_SPEED"
  },
  "OUROBOROS": {
   "id": 34631,
   "name": "Ouroboros",
-  "onGcd": true,
-  "gcdRecast": 3000,
-  "speedAttribute": "SKILL_SPEED",
-  "breaksCombo": false,
   "job": "VPR",
+  "onGcd": true,
+  "breaksCombo": false,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "gcdRecast": 3000,
+  "speedAttribute": "SKILL_SPEED"
  },
  "SERPENTS_IRE": {
   "id": 34647,
   "name": "Serpent's Ire",
+  "job": "VPR",
   "cooldown": 120000,
   "statusesApplied": [
    "READY_TO_REAWAKEN"
-  ],
-  "job": "VPR"
+  ]
  },
  "SLITHER": {
   "id": 34646,
   "name": "Slither",
+  "job": "VPR",
   "cooldown": 30000,
-  "charges": 3,
-  "job": "VPR"
+  "charges": 3
  },
  "SERPENTS_TAIL": {
   "id": 35920,
   "name": "Serpent's Tail",
-  "cooldown": 1000,
-  "job": "VPR"
+  "job": "VPR",
+  "cooldown": 1000
  },
  "DEATH_RATTLE": {
   "id": 34634,
   "name": "Death Rattle",
-  "cooldown": 1000,
-  "job": "VPR"
+  "job": "VPR",
+  "cooldown": 1000
  },
  "LAST_LASH": {
   "id": 34635,
   "name": "Last Lash",
-  "cooldown": 1000,
-  "job": "VPR"
+  "job": "VPR",
+  "cooldown": 1000
  },
  "FIRST_LEGACY": {
   "id": 34640,
   "name": "First Legacy",
-  "cooldown": 1000,
-  "job": "VPR"
+  "job": "VPR",
+  "cooldown": 1000
  },
  "SECOND_LEGACY": {
   "id": 34641,
   "name": "Second Legacy",
-  "cooldown": 1000,
-  "job": "VPR"
+  "job": "VPR",
+  "cooldown": 1000
  },
  "THIRD_LEGACY": {
   "id": 34642,
   "name": "Third Legacy",
-  "cooldown": 1000,
-  "job": "VPR"
+  "job": "VPR",
+  "cooldown": 1000
  },
  "FOURTH_LEGACY": {
   "id": 34643,
   "name": "Fourth Legacy",
-  "cooldown": 1000,
-  "job": "VPR"
+  "job": "VPR",
+  "cooldown": 1000
  },
  "TWINBLOOD": {
   "id": 35922,
   "name": "Twinblood",
-  "cooldown": 1000,
-  "job": "VPR"
+  "job": "VPR",
+  "cooldown": 1000
  },
  "TWINBLOOD_BITE": {
   "id": 34637,
   "name": "Twinblood Bite",
+  "job": "VPR",
   "cooldown": 1000,
   "statusesApplied": [
    "HUNTERS_VENOM"
-  ],
-  "job": "VPR"
+  ]
  },
  "TWINBLOOD_THRESH": {
   "id": 34639,
   "name": "Twinblood Thresh",
+  "job": "VPR",
   "cooldown": 1000,
   "statusesApplied": [
    "FELLHUNTERS_VENOM"
-  ],
-  "job": "VPR"
+  ]
  },
  "UNCOILED_TWINBLOOD": {
   "id": 34645,
   "name": "Uncoiled Twinblood",
-  "cooldown": 1000,
-  "job": "VPR"
+  "job": "VPR",
+  "cooldown": 1000
  },
  "TWINFANG": {
   "id": 35921,
   "name": "Twinfang",
-  "cooldown": 1000,
-  "job": "VPR"
+  "job": "VPR",
+  "cooldown": 1000
  },
  "TWINFANG_BITE": {
   "id": 34636,
   "name": "Twinfang Bite",
+  "job": "VPR",
   "cooldown": 1000,
   "statusesApplied": [
    "SWIFTSKINS_VENOM"
-  ],
-  "job": "VPR"
+  ]
  },
  "TWINFANG_THRESH": {
   "id": 34638,
   "name": "Twinfang Thresh",
+  "job": "VPR",
   "cooldown": 1000,
   "statusesApplied": [
    "FELLSKINS_VENOM"
-  ],
-  "job": "VPR"
+  ]
  },
  "UNCOILED_TWINFANG": {
   "id": 34644,
   "name": "Uncoiled Twinfang",
+  "job": "VPR",
   "cooldown": 1000,
   "statusesApplied": [
    "POISED_FOR_TWINBLOOD"
-  ],
-  "job": "VPR"
+  ]
  },
  "TOMAHAWK": {
   "id": 46,
   "name": "Tomahawk",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "breaksCombo": false,
   "job": "WAR",
+  "onGcd": true,
+  "breaksCombo": false,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "HEAVY_SWING": {
   "id": 31,
   "name": "Heavy Swing",
+  "job": "WAR",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "start": true
   },
-  "job": "WAR",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "MAIM": {
   "id": 37,
   "name": "Maim",
+  "job": "WAR",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": 31
   },
-  "job": "WAR",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "STORMS_PATH": {
   "id": 42,
   "name": "Storm's Path",
+  "job": "WAR",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "from": 37,
    "end": true
   },
-  "job": "WAR",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "STORMS_EYE": {
   "id": 45,
   "name": "Storm's Eye",
+  "job": "WAR",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "statusesApplied": [
-   "SURGING_TEMPEST"
-  ],
   "combo": {
    "from": 37,
    "end": true
   },
-  "job": "WAR",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "statusesApplied": [
+   "SURGING_TEMPEST"
+  ],
+  "speedAttribute": "SKILL_SPEED"
  },
  "FELL_CLEAVE": {
   "id": 3549,
   "name": "Fell Cleave",
+  "job": "WAR",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "breaksCombo": false,
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "BURGEONING_FURY",
    "WRATHFUL"
   ],
-  "job": "WAR",
-  "castTime": 0,
-  "cooldown": 2500
+  "speedAttribute": "SKILL_SPEED"
  },
  "INNER_CHAOS": {
   "id": 16465,
   "name": "Inner Chaos",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "breaksCombo": false,
   "job": "WAR",
+  "onGcd": true,
+  "breaksCombo": false,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "OVERPOWER": {
   "id": 41,
   "name": "Overpower",
+  "job": "WAR",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
   "combo": {
    "start": true
   },
-  "job": "WAR",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "MYTHRIL_TEMPEST": {
   "id": 16462,
   "name": "Mythril Tempest",
+  "job": "WAR",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "statusesApplied": [
-   "SURGING_TEMPEST"
-  ],
   "combo": {
    "from": 41,
    "end": true
   },
-  "job": "WAR",
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "statusesApplied": [
+   "SURGING_TEMPEST"
+  ],
+  "speedAttribute": "SKILL_SPEED"
  },
  "DECIMATE": {
   "id": 3550,
   "name": "Decimate",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "breaksCombo": false,
   "job": "WAR",
+  "onGcd": true,
+  "breaksCombo": false,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "CHAOTIC_CYCLONE": {
   "id": 16463,
   "name": "Chaotic Cyclone",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "breaksCombo": false,
   "job": "WAR",
+  "onGcd": true,
+  "breaksCombo": false,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "PRIMAL_REND": {
   "id": 25753,
   "name": "Primal Rend",
+  "job": "WAR",
   "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
+  "breaksCombo": false,
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "PRIMAL_RUINATION_READY"
   ],
-  "breaksCombo": false,
-  "job": "WAR",
-  "castTime": 0,
-  "cooldown": 2500
+  "speedAttribute": "SKILL_SPEED"
  },
  "PRIMAL_RUINATION": {
   "id": 36925,
   "name": "Primal Ruination",
-  "onGcd": true,
-  "speedAttribute": "SKILL_SPEED",
-  "breaksCombo": false,
   "job": "WAR",
+  "onGcd": true,
+  "breaksCombo": false,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SKILL_SPEED"
  },
  "EQUILIBRIUM": {
   "id": 3552,
   "name": "Equilibrium",
+  "job": "WAR",
   "cooldown": 60000,
   "statusesApplied": [
    "EQUILIBRIUM"
-  ],
-  "job": "WAR"
+  ]
  },
  "THRILL_OF_BATTLE": {
   "id": 40,
   "name": "Thrill of Battle",
+  "job": "WAR",
   "cooldown": 90000,
   "statusesApplied": [
    "THRILL_OF_BATTLE"
-  ],
-  "job": "WAR"
+  ]
  },
  "HOLMGANG": {
   "id": 43,
   "name": "Holmgang",
+  "job": "WAR",
   "cooldown": 240000,
   "statusesApplied": [
    "HOLMGANG"
-  ],
-  "job": "WAR"
+  ]
  },
  "VENGEANCE": {
   "id": 44,
   "name": "Vengeance",
+  "job": "WAR",
   "cooldown": 120000,
   "statusesApplied": [
    "VENGEANCE"
-  ],
-  "job": "WAR"
+  ]
  },
  "BLOODWHETTING": {
   "id": 25751,
   "name": "Bloodwhetting",
+  "job": "WAR",
   "cooldown": 25000,
   "cooldownGroup": 4,
   "statusesApplied": [
    "BLOODWHETTING",
    "STEM_THE_FLOW",
    "STEM_THE_TIDE"
-  ],
-  "job": "WAR"
+  ]
  },
  "NASCENT_FLASH": {
   "id": 16464,
   "name": "Nascent Flash",
+  "job": "WAR",
   "cooldown": 25000,
   "cooldownGroup": 4,
   "statusesApplied": [
@@ -9729,132 +9732,131 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
    "NASCENT_GLINT",
    "STEM_THE_FLOW",
    "STEM_THE_TIDE"
-  ],
-  "job": "WAR"
+  ]
  },
  "SHAKE_IT_OFF": {
   "id": 7388,
   "name": "Shake It Off",
+  "job": "WAR",
   "cooldown": 90000,
   "statusesApplied": [
    "SHAKE_IT_OFF",
    "SHAKE_IT_OFF_OVER_TIME"
-  ],
-  "job": "WAR"
+  ]
  },
  "ONSLAUGHT": {
   "id": 7386,
   "name": "Onslaught",
+  "job": "WAR",
   "cooldown": 30000,
-  "charges": 3,
-  "job": "WAR"
+  "charges": 3
  },
  "UPHEAVAL": {
   "id": 7387,
   "name": "Upheaval",
+  "job": "WAR",
   "cooldown": 30000,
-  "cooldownGroup": 6,
-  "job": "WAR"
+  "cooldownGroup": 6
  },
  "OROGENY": {
   "id": 25752,
   "name": "Orogeny",
+  "job": "WAR",
   "cooldown": 30000,
-  "cooldownGroup": 6,
-  "job": "WAR"
+  "cooldownGroup": 6
  },
  "INNER_RELEASE": {
   "id": 7389,
   "name": "Inner Release",
+  "job": "WAR",
   "cooldown": 60000,
   "statusesApplied": [
    "INNER_RELEASE",
    "PRIMAL_REND_READY"
-  ],
-  "job": "WAR"
+  ]
  },
  "INFURIATE": {
   "id": 52,
   "name": "Infuriate",
+  "job": "WAR",
   "cooldown": 60000,
-  "charges": 2,
   "statusesApplied": [
    "NASCENT_CHAOS"
   ],
-  "job": "WAR"
+  "charges": 2
  },
  "DEFIANCE": {
   "id": 48,
   "name": "Defiance",
+  "job": "WAR",
   "cooldown": 2000,
   "cooldownGroup": 3,
   "statusesApplied": [
    "DEFIANCE"
-  ],
-  "job": "WAR"
+  ]
  },
  "RELEASE_DEFIANCE": {
   "id": 32066,
   "name": "Release Defiance",
+  "job": "WAR",
   "onGcd": false,
-  "cooldown": 1000,
-  "job": "WAR"
+  "cooldown": 1000
  },
  "PRIMAL_WRATH": {
   "id": 36924,
   "name": "Primal Wrath",
+  "job": "WAR",
   "onGcd": false,
-  "cooldown": 1000,
-  "job": "WAR"
+  "cooldown": 1000
  },
  "DAMNATION": {
   "id": 36923,
   "name": "Damnation",
+  "job": "WAR",
   "onGcd": false,
   "cooldown": 120000,
   "cooldownGroup": 22,
   "statusesApplied": [
    "DAMNATION",
    "PRIMEVAL_IMPULSE"
-  ],
-  "job": "WAR"
+  ]
  },
  "DIVINE_CARESS": {
   "id": 37011,
   "name": "Divine Caress",
+  "job": "WHM",
   "cooldown": 1000,
   "statusesApplied": [
    "DIVINE_CARESS"
-  ],
-  "job": "WHM"
+  ]
  },
  "MEDICA_III": {
   "id": 37010,
   "name": "Medica III",
-  "castTime": 2000,
+  "job": "WHM",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "mpCost": 1000,
+  "castTime": 2000,
+  "cooldown": 2500,
   "statusesApplied": [
    "MEDICA_III"
   ],
-  "job": "WHM",
-  "cooldown": 2500
+  "mpCost": 1000,
+  "speedAttribute": "SPELL_SPEED"
  },
  "GLARE_IV": {
   "id": 37009,
   "name": "Glare IV",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "job": "WHM",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "LITURGY_OF_THE_BELL_ACTIVATION": {
   "id": 28509,
   "name": "Liturgy of the Bell (Detonate)",
-  "cooldown": 1000,
-  "job": "WHM"
+  "job": "WHM",
+  "cooldown": 1000
  },
  "LITURGY_OF_THE_BELL_ON_EXPIRY": {
   "id": 25864,
@@ -9869,332 +9871,332 @@ export const XIVA_ACTIONS: Record<string, XivaAction> = {
  "LITURGY_OF_THE_BELL": {
   "id": 25862,
   "name": "Liturgy of the Bell",
+  "job": "WHM",
   "cooldown": 180000,
   "statusesApplied": [
    "LITURGY_OF_THE_BELL"
-  ],
-  "job": "WHM"
+  ]
  },
  "AQUAVEIL": {
   "id": 25861,
   "name": "Aquaveil",
+  "job": "WHM",
   "cooldown": 60000,
   "statusesApplied": [
    "AQUAVEIL"
-  ],
-  "job": "WHM"
+  ]
  },
  "HOLY_III": {
   "id": 25860,
   "name": "Holy III",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 1500,
-  "mpCost": 400,
   "job": "WHM",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 1500,
+  "cooldown": 2500,
+  "mpCost": 400,
+  "speedAttribute": "SPELL_SPEED"
  },
  "GLARE_III": {
   "id": 25859,
   "name": "Glare III",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 1500,
-  "mpCost": 400,
   "job": "WHM",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 1500,
+  "cooldown": 2500,
+  "mpCost": 400,
+  "speedAttribute": "SPELL_SPEED"
  },
  "TEMPERANCE": {
   "id": 16536,
   "name": "Temperance",
+  "job": "WHM",
   "cooldown": 120000,
   "statusesApplied": [
    "TEMPERANCE",
    "DIVINE_GRACE"
-  ],
-  "job": "WHM"
+  ]
  },
  "AFFLATUS_MISERY": {
   "id": 16535,
   "name": "Afflatus Misery",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "job": "WHM",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "AFFLATUS_RAPTURE": {
   "id": 16534,
   "name": "Afflatus Rapture",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "job": "WHM",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "AFFLATUS_SOLACE": {
   "id": 16531,
   "name": "Afflatus Solace",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "job": "WHM",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "DIA": {
   "id": 16532,
   "name": "Dia",
+  "job": "WHM",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "DIA"
   ],
   "mpCost": 400,
-  "job": "WHM",
-  "castTime": 0,
-  "cooldown": 2500
+  "speedAttribute": "SPELL_SPEED"
  },
  "GLARE": {
   "id": 16533,
   "name": "Glare",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 1500,
-  "mpCost": 400,
   "job": "WHM",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 1500,
+  "cooldown": 2500,
+  "mpCost": 400,
+  "speedAttribute": "SPELL_SPEED"
  },
  "PLENARY_INDULGENCE": {
   "id": 7433,
   "name": "Plenary Indulgence",
+  "job": "WHM",
   "cooldown": 60000,
   "statusesApplied": [
    "CONFESSION"
-  ],
-  "job": "WHM"
+  ]
  },
  "STONE_IV": {
   "id": 7431,
   "name": "Stone IV",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 1500,
-  "mpCost": 400,
   "job": "WHM",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 1500,
+  "cooldown": 2500,
+  "mpCost": 400,
+  "speedAttribute": "SPELL_SPEED"
  },
  "TETRAGRAMMATON": {
   "id": 3570,
   "name": "Tetragrammaton",
+  "job": "WHM",
   "cooldown": 60000,
-  "charges": 2,
-  "job": "WHM"
+  "charges": 2
  },
  "ASSIZE": {
   "id": 3571,
   "name": "Assize",
-  "cooldown": 40000,
-  "job": "WHM"
+  "job": "WHM",
+  "cooldown": 40000
  },
  "ASYLUM": {
   "id": 3569,
   "name": "Asylum",
+  "job": "WHM",
   "cooldown": 90000,
   "statusesApplied": [
    "ASYLUM"
-  ],
-  "job": "WHM"
+  ]
  },
  "BENEDICTION": {
   "id": 140,
   "name": "Benediction",
-  "cooldown": 180000,
-  "job": "WHM"
+  "job": "WHM",
+  "cooldown": 180000
  },
  "HOLY": {
   "id": 139,
   "name": "Holy",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 1500,
-  "mpCost": 400,
   "job": "WHM",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 1500,
+  "cooldown": 2500,
+  "mpCost": 400,
+  "speedAttribute": "SPELL_SPEED"
  },
  "PRESENCE_OF_MIND": {
   "id": 136,
   "name": "Presence of Mind",
+  "job": "WHM",
   "cooldown": 120000,
   "statusesApplied": [
    "PRESENCE_OF_MIND",
    "SACRED_SIGHT"
-  ],
-  "job": "WHM"
+  ]
  },
  "STONE_III": {
   "id": 3568,
   "name": "Stone III",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 1500,
-  "mpCost": 400,
   "job": "WHM",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 1500,
+  "cooldown": 2500,
+  "mpCost": 400,
+  "speedAttribute": "SPELL_SPEED"
  },
  "DIVINE_BENISON": {
   "id": 7432,
   "name": "Divine Benison",
+  "job": "WHM",
   "cooldown": 30000,
   "statusesApplied": [
    "DIVINE_BENISON"
   ],
-  "charges": 2,
-  "job": "WHM"
+  "charges": 2
  },
  "THIN_AIR": {
   "id": 7430,
   "name": "Thin Air",
+  "job": "WHM",
   "cooldown": 120000,
   "statusesApplied": [
    "THIN_AIR"
   ],
-  "charges": 2,
-  "job": "WHM"
+  "charges": 2
  },
  "AERO_III": {
   "id": 3572,
   "name": "Aero III",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 2500,
-  "mpCost": 400,
   "job": "WHM",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 2500,
+  "cooldown": 2500,
+  "mpCost": 400,
+  "speedAttribute": "SPELL_SPEED"
  },
  "MEDICA_II": {
   "id": 133,
   "name": "Medica II",
+  "job": "WHM",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
   "castTime": 2000,
+  "cooldown": 2500,
   "statusesApplied": [
    "MEDICA_II"
   ],
   "mpCost": 1000,
-  "job": "WHM",
-  "cooldown": 2500
+  "speedAttribute": "SPELL_SPEED"
  },
  "RAISE": {
   "id": 125,
   "name": "Raise",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 8000,
-  "mpCost": 2400,
   "job": "WHM",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 8000,
+  "cooldown": 2500,
+  "mpCost": 2400,
+  "speedAttribute": "SPELL_SPEED"
  },
  "CURE_II": {
   "id": 135,
   "name": "Cure II",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 2000,
-  "mpCost": 1000,
   "job": "WHM",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 2000,
+  "cooldown": 2500,
+  "mpCost": 1000,
+  "speedAttribute": "SPELL_SPEED"
  },
  "CURE_III": {
   "id": 131,
   "name": "Cure III",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 2000,
-  "mpCost": 1500,
   "job": "WHM",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 2000,
+  "cooldown": 2500,
+  "mpCost": 1500,
+  "speedAttribute": "SPELL_SPEED"
  },
  "REGEN": {
   "id": 137,
   "name": "Regen",
+  "job": "WHM",
   "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
+  "castTime": 0,
+  "cooldown": 2500,
   "statusesApplied": [
    "REGEN"
   ],
   "mpCost": 400,
-  "job": "WHM",
-  "castTime": 0,
-  "cooldown": 2500
+  "speedAttribute": "SPELL_SPEED"
  },
  "MEDICA": {
   "id": 124,
   "name": "Medica",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 2000,
-  "mpCost": 900,
   "job": "WHM",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 2000,
+  "cooldown": 2500,
+  "mpCost": 900,
+  "speedAttribute": "SPELL_SPEED"
  },
  "STONE": {
   "id": 119,
   "name": "Stone",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 1500,
-  "mpCost": 400,
   "job": "WHM",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 1500,
+  "cooldown": 2500,
+  "mpCost": 400,
+  "speedAttribute": "SPELL_SPEED"
  },
  "AERO_II": {
   "id": 132,
   "name": "Aero II",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "mpCost": 400,
   "job": "WHM",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "mpCost": 400,
+  "speedAttribute": "SPELL_SPEED"
  },
  "AERO": {
   "id": 121,
   "name": "Aero",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "mpCost": 400,
   "job": "WHM",
+  "onGcd": true,
   "castTime": 0,
-  "cooldown": 2500
+  "cooldown": 2500,
+  "mpCost": 400,
+  "speedAttribute": "SPELL_SPEED"
  },
  "REPOSE": {
   "id": 128,
   "name": "Repose",
+  "job": "WHM",
   "onGcd": true,
   "castTime": 2500,
-  "mpCost": 600,
-  "job": "WHM",
-  "cooldown": 2500
+  "cooldown": 2500,
+  "mpCost": 600
  },
  "STONE_II": {
   "id": 127,
   "name": "Stone II",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 1500,
-  "mpCost": 400,
   "job": "WHM",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 1500,
+  "cooldown": 2500,
+  "mpCost": 400,
+  "speedAttribute": "SPELL_SPEED"
  },
  "CURE": {
   "id": 120,
   "name": "Cure",
-  "onGcd": true,
-  "speedAttribute": "SPELL_SPEED",
-  "castTime": 1500,
-  "mpCost": 400,
   "job": "WHM",
-  "cooldown": 2500
+  "onGcd": true,
+  "castTime": 1500,
+  "cooldown": 2500,
+  "mpCost": 400,
+  "speedAttribute": "SPELL_SPEED"
  }
 };
 
@@ -10217,8 +10219,8 @@ export const XIVA_STATUSES: Record<string, XivaStatus> = {
  "TRANSCENDENT": {
   "id": 1000418,
   "name": "Transcendent",
-  "duration": 5000,
-  "job": "SHARED"
+  "job": "SHARED",
+  "duration": 5000
  },
  "MEDICATED": {
   "id": 1000049,
@@ -10238,200 +10240,200 @@ export const XIVA_STATUSES: Record<string, XivaStatus> = {
  "COMBUST": {
   "id": 1000838,
   "name": "Combust",
-  "duration": 30000,
-  "job": "AST"
+  "job": "AST",
+  "duration": 30000
  },
  "COMBUST_II": {
   "id": 1000843,
   "name": "Combust II",
-  "duration": 30000,
-  "job": "AST"
+  "job": "AST",
+  "duration": 30000
  },
  "COMBUST_III": {
   "id": 1001881,
   "name": "Combust III",
-  "duration": 30000,
-  "job": "AST"
+  "job": "AST",
+  "duration": 30000
  },
  "ASPECTED_BENEFIC": {
   "id": 1000835,
   "name": "Aspected Benefic",
-  "duration": 15000,
-  "job": "AST"
+  "job": "AST",
+  "duration": 15000
  },
  "ASPECTED_HELIOS": {
   "id": 1000836,
   "name": "Aspected Helios",
-  "duration": 15000,
-  "job": "AST"
+  "job": "AST",
+  "duration": 15000
  },
  "ENHANCED_BENEFIC_II": {
   "id": 1000815,
   "name": "Enhanced Benefic II",
-  "duration": 15000,
-  "job": "AST"
+  "job": "AST",
+  "duration": 15000
  },
  "LIGHTSPEED": {
   "id": 1000841,
   "name": "Lightspeed",
-  "duration": 15000,
-  "job": "AST"
+  "job": "AST",
+  "duration": 15000
  },
  "SYNASTRY_SELF": {
   "id": 1000845,
   "name": "Synastry (self)",
-  "duration": 20000,
-  "job": "AST"
+  "job": "AST",
+  "duration": 20000
  },
  "SYNASTRY": {
   "id": 1000846,
   "name": "Synastry",
-  "duration": 20000,
-  "job": "AST"
+  "job": "AST",
+  "duration": 20000
  },
  "COLLECTIVE_UNCONSCIOUS": {
   "id": 1000848,
   "name": "Collective Unconscious",
-  "duration": 18000,
-  "job": "AST"
+  "job": "AST",
+  "duration": 18000
  },
  "COLLECTIVE_UNCONSCIOUS_MITIGATION": {
   "id": 1000849,
   "name": "Collective Unconscious (Mitigation)",
-  "duration": 10000,
-  "job": "AST"
+  "job": "AST",
+  "duration": 10000
  },
  "WHEEL_OF_FORTUNE": {
   "id": 1000956,
   "name": "Wheel Of Fortune",
-  "duration": 15000,
-  "job": "AST"
+  "job": "AST",
+  "duration": 15000
  },
  "EARTHLY_DOMINANCE": {
   "id": 1001224,
   "name": "Earthly Dominance",
-  "duration": 10000,
-  "job": "AST"
+  "job": "AST",
+  "duration": 10000
  },
  "GIANT_DOMINANCE": {
   "id": 1001248,
   "name": "Giant Dominance",
-  "duration": 10000,
-  "job": "AST"
+  "job": "AST",
+  "duration": 10000
  },
  "HOROSCOPE": {
   "id": 1001890,
   "name": "Horoscope",
-  "duration": 10000,
-  "job": "AST"
+  "job": "AST",
+  "duration": 10000
  },
  "HOROSCOPE_HELIOS": {
   "id": 1001891,
   "name": "Horoscope Helios",
-  "duration": 30000,
-  "job": "AST"
+  "job": "AST",
+  "duration": 30000
  },
  "NEUTRAL_SECT": {
   "id": 1001892,
   "name": "Neutral Sect (Healing Potency)",
-  "duration": 20000,
-  "job": "AST"
+  "job": "AST",
+  "duration": 20000
  },
  "NEUTRAL_SECT_OTHERS": {
   "id": 1001921,
   "name": "Neutral Sect (Barrier)",
-  "duration": 30000,
-  "job": "AST"
+  "job": "AST",
+  "duration": 30000
  },
  "INTERSECTION": {
   "id": 1001889,
   "name": "Intersection",
-  "duration": 30000,
-  "job": "AST"
+  "job": "AST",
+  "duration": 30000
  },
  "OPPOSITION": {
   "id": 1001879,
   "name": "Opposition",
-  "duration": 15000,
-  "job": "AST"
+  "job": "AST",
+  "duration": 15000
  },
  "DIVINATION": {
   "id": 1001878,
   "name": "Divination",
-  "duration": 20000,
-  "job": "AST"
+  "job": "AST",
+  "duration": 20000
  },
  "EXALTATION": {
   "id": 1002717,
   "name": "Exaltation",
-  "duration": 8000,
-  "job": "AST"
+  "job": "AST",
+  "duration": 8000
  },
  "MACROCOSMOS": {
   "id": 1002718,
   "name": "Macrocosmos",
-  "duration": 15000,
-  "job": "AST"
+  "job": "AST",
+  "duration": 15000
  },
  "DIVINING": {
   "id": 1003893,
   "name": "Divining",
-  "duration": 30000,
-  "job": "AST"
+  "job": "AST",
+  "duration": 30000
  },
  "HELIOS_CONJUNCTION": {
   "id": 1003894,
   "name": "Helios Conjunction",
-  "duration": 15000,
-  "job": "AST"
+  "job": "AST",
+  "duration": 15000
  },
  "SUN_TOUCHED": {
   "id": 1003895,
   "name": "Suntouched",
-  "duration": 30000,
-  "job": "AST"
+  "job": "AST",
+  "duration": 30000
  },
  "SUN_SIGN": {
   "id": 1003896,
   "name": "Sun Sign",
-  "duration": 15000,
-  "job": "AST"
+  "job": "AST",
+  "duration": 15000
  },
  "THE_BALANCE": {
   "id": 1003887,
   "name": "The Balance",
-  "duration": 15000,
-  "job": "AST"
+  "job": "AST",
+  "duration": 15000
  },
  "THE_BOLE": {
   "id": 1003890,
   "name": "The Bole",
-  "duration": 15000,
-  "job": "AST"
+  "job": "AST",
+  "duration": 15000
  },
  "THE_ARROW": {
   "id": 1003888,
   "name": "The Arrow",
-  "duration": 15000,
-  "job": "AST"
+  "job": "AST",
+  "duration": 15000
  },
  "THE_SPEAR": {
   "id": 1003889,
   "name": "The Spear",
-  "duration": 15000,
-  "job": "AST"
+  "job": "AST",
+  "duration": 15000
  },
  "THE_EWER": {
   "id": 1003891,
   "name": "The Ewer",
-  "duration": 15000,
-  "job": "AST"
+  "job": "AST",
+  "duration": 15000
  },
  "THE_SPIRE": {
   "id": 1003892,
   "name": "The Spire",
-  "duration": 15000,
-  "job": "AST"
+  "job": "AST",
+  "duration": 15000
  },
  "BALANCE_DRAWN": {
   "id": 1000913,
@@ -10476,26 +10478,26 @@ export const XIVA_STATUSES: Record<string, XivaStatus> = {
  "THUNDER_III": {
   "id": 1000163,
   "name": "Thunder III",
-  "duration": 27000,
-  "job": "BLM"
+  "job": "BLM",
+  "duration": 27000
  },
  "THUNDER_IV": {
   "id": 1001210,
   "name": "Thunder IV",
-  "duration": 21000,
-  "job": "BLM"
+  "job": "BLM",
+  "duration": 21000
  },
  "HIGH_THUNDER": {
   "id": 1003871,
   "name": "High Thunder",
-  "duration": 30000,
-  "job": "BLM"
+  "job": "BLM",
+  "duration": 30000
  },
  "HIGH_THUNDER_II": {
   "id": 1003872,
   "name": "High Thunder II",
-  "duration": 24000,
-  "job": "BLM"
+  "job": "BLM",
+  "duration": 24000
  },
  "TRIPLECAST": {
   "id": 1001211,
@@ -10515,232 +10517,232 @@ export const XIVA_STATUSES: Record<string, XivaStatus> = {
  "LEY_LINES": {
   "id": 1000737,
   "name": "Ley Lines",
-  "duration": 20000,
-  "job": "BLM"
+  "job": "BLM",
+  "duration": 20000
  },
  "CIRCLE_OF_POWER": {
   "id": 1000738,
   "name": "Circle Of Power",
-  "speedModifier": 0.85,
-  "job": "BLM"
+  "job": "BLM",
+  "speedModifier": 0.85
  },
  "MANAWARD": {
   "id": 1000168,
   "name": "Manaward",
-  "duration": 20000,
-  "job": "BLM"
+  "job": "BLM",
+  "duration": 20000
  },
  "HAWKS_EYE": {
   "id": 1003861,
   "name": "Hawk's Eye",
-  "duration": 30000,
-  "job": "BRD"
+  "job": "BRD",
+  "duration": 30000
  },
  "RAGING_STRIKES": {
   "id": 1000125,
   "name": "Raging Strikes",
+  "job": "BRD",
   "duration": 20000,
-  "amount": 0.15,
-  "job": "BRD"
+  "amount": 0.15
  },
  "BARRAGE": {
   "id": 1000128,
   "name": "Barrage",
+  "job": "BRD",
   "duration": 10000,
-  "amount": 3,
-  "job": "BRD"
+  "amount": 3
  },
  "ARMYS_MUSE": {
   "id": 1001932,
   "name": "Army's Muse",
-  "duration": 10000,
-  "job": "BRD"
+  "job": "BRD",
+  "duration": 10000
  },
  "ARMYS_ETHOS": {
   "id": 1001933,
   "name": "Army's Ethos",
-  "duration": 30000,
-  "job": "BRD"
+  "job": "BRD",
+  "duration": 30000
  },
  "BLAST_ARROW_READY": {
   "id": 1002692,
   "name": "Blast Arrow Ready",
-  "duration": 10000,
-  "job": "BRD"
+  "job": "BRD",
+  "duration": 10000
  },
  "RESONANT_ARROW_READY": {
   "id": 1003862,
   "name": "Resonant Arrow Ready",
-  "duration": 30000,
-  "job": "BRD"
+  "job": "BRD",
+  "duration": 30000
  },
  "RADIANT_ENCORE_READY": {
   "id": 1003863,
   "name": "Radiant Encore Ready",
-  "duration": 30000,
-  "job": "BRD"
+  "job": "BRD",
+  "duration": 30000
  },
  "VENOMOUS_BITE": {
   "id": 1000124,
   "name": "Venomous Bite",
-  "duration": 45000,
-  "job": "BRD"
+  "job": "BRD",
+  "duration": 45000
  },
  "WINDBITE": {
   "id": 1000129,
   "name": "Windbite",
-  "duration": 45000,
-  "job": "BRD"
+  "job": "BRD",
+  "duration": 45000
  },
  "CAUSTIC_BITE": {
   "id": 1001200,
   "name": "Caustic Bite",
-  "duration": 45000,
-  "job": "BRD"
+  "job": "BRD",
+  "duration": 45000
  },
  "STORMBITE": {
   "id": 1001201,
   "name": "Stormbite",
-  "duration": 45000,
-  "job": "BRD"
+  "job": "BRD",
+  "duration": 45000
  },
  "MAGES_BALLAD": {
   "id": 1002217,
   "name": "Mage's Ballad",
-  "duration": 45000,
-  "job": "BRD"
+  "job": "BRD",
+  "duration": 45000
  },
  "ARMYS_PAEON": {
   "id": 1002218,
   "name": "Army's Paeon",
-  "duration": 45000,
-  "job": "BRD"
+  "job": "BRD",
+  "duration": 45000
  },
  "THE_WANDERERS_MINUET": {
   "id": 1002216,
   "name": "The Wanderer's Minuet",
-  "duration": 45000,
-  "job": "BRD"
+  "job": "BRD",
+  "duration": 45000
  },
  "BATTLE_VOICE": {
   "id": 1000141,
   "name": "Battle Voice",
-  "duration": 20000,
-  "job": "BRD"
+  "job": "BRD",
+  "duration": 20000
  },
  "THE_WARDENS_PAEAN": {
   "id": 1000866,
   "name": "The Warden's Paean",
-  "duration": 30000,
-  "job": "BRD"
+  "job": "BRD",
+  "duration": 30000
  },
  "TROUBADOUR": {
   "id": 1001934,
   "name": "Troubadour",
-  "duration": 15000,
-  "job": "BRD"
+  "job": "BRD",
+  "duration": 15000
  },
  "NATURES_MINNE": {
   "id": 1001202,
   "name": "Nature's Minne",
-  "duration": 15000,
-  "job": "BRD"
+  "job": "BRD",
+  "duration": 15000
  },
  "RADIANT_FINALE": {
   "id": 1002964,
   "name": "Radiant Finale",
-  "duration": 20000,
-  "job": "BRD"
+  "job": "BRD",
+  "duration": 20000
  },
  "SILKEN_SYMMETRY": {
   "id": 1002693,
   "name": "Silken Symmetry",
-  "duration": 30000,
-  "job": "DNC"
+  "job": "DNC",
+  "duration": 30000
  },
  "SILKEN_FLOW": {
   "id": 1002694,
   "name": "Silken Flow",
-  "duration": 30000,
-  "job": "DNC"
+  "job": "DNC",
+  "duration": 30000
  },
  "FLOURISHING_SYMMETRY": {
   "id": 1003017,
   "name": "Flourishing Symmetry",
-  "duration": 30000,
-  "job": "DNC"
+  "job": "DNC",
+  "duration": 30000
  },
  "FLOURISHING_FLOW": {
   "id": 1003018,
   "name": "Flourishing Flow",
-  "duration": 30000,
-  "job": "DNC"
+  "job": "DNC",
+  "duration": 30000
  },
  "THREEFOLD_FAN_DANCE": {
   "id": 1001820,
   "name": "Threefold Fan Dance",
-  "duration": 30000,
-  "job": "DNC"
+  "job": "DNC",
+  "duration": 30000
  },
  "FOURFOLD_FAN_DANCE": {
   "id": 1002699,
   "name": "Fourfold Fan Dance",
-  "duration": 30000,
-  "job": "DNC"
+  "job": "DNC",
+  "duration": 30000
  },
  "FINISHING_MOVE_READY": {
   "id": 1003868,
   "name": "Finishing Move Ready",
-  "duration": 30000,
-  "job": "DNC"
+  "job": "DNC",
+  "duration": 30000
  },
  "FLOURISHING_STARFALL": {
   "id": 1002700,
   "name": "Flourishing Starfall",
-  "duration": 20000,
-  "job": "DNC"
+  "job": "DNC",
+  "duration": 20000
  },
  "STANDARD_STEP": {
   "id": 1001818,
   "name": "Standard Step",
-  "duration": 15000,
-  "job": "DNC"
+  "job": "DNC",
+  "duration": 15000
  },
  "TECHNICAL_STEP": {
   "id": 1001819,
   "name": "Technical Step",
-  "duration": 15000,
-  "job": "DNC"
+  "job": "DNC",
+  "duration": 15000
  },
  "STANDARD_FINISH": {
   "id": 1001821,
   "name": "Standard Finish",
-  "duration": 60000,
-  "job": "DNC"
+  "job": "DNC",
+  "duration": 60000
  },
  "LAST_DANCE_READY": {
   "id": 1003867,
   "name": "Last Dance Ready",
-  "duration": 30000,
-  "job": "DNC"
+  "job": "DNC",
+  "duration": 30000
  },
  "TECHNICAL_FINISH": {
   "id": 1001822,
   "name": "Technical Finish",
-  "duration": 20000,
-  "job": "DNC"
+  "job": "DNC",
+  "duration": 20000
  },
  "DANCE_OF_THE_DAWN_READY": {
   "id": 1003869,
   "name": "Dance of the Dawn Ready",
-  "duration": 30000,
-  "job": "DNC"
+  "job": "DNC",
+  "duration": 30000
  },
  "FLOURISHING_FINISH": {
   "id": 1002698,
   "name": "Flourishing Finish",
-  "duration": 30000,
-  "job": "DNC"
+  "job": "DNC",
+  "duration": 30000
  },
  "CLOSED_POSITION": {
   "id": 1001823,
@@ -10755,122 +10757,122 @@ export const XIVA_STATUSES: Record<string, XivaStatus> = {
  "DEVILMENT": {
   "id": 1001825,
   "name": "Devilment",
-  "duration": 20000,
-  "job": "DNC"
+  "job": "DNC",
+  "duration": 20000
  },
  "SHIELD_SAMBA": {
   "id": 1001826,
   "name": "Shield Samba",
-  "duration": 15000,
-  "job": "DNC"
+  "job": "DNC",
+  "duration": 15000
  },
  "IMPROVISATION": {
   "id": 1001827,
   "name": "Improvisation",
-  "duration": 15000,
-  "job": "DNC"
+  "job": "DNC",
+  "duration": 15000
  },
  "RISING_RHYTHM": {
   "id": 1002696,
   "name": "Rising Rhythm",
-  "duration": 15000,
-  "job": "DNC"
+  "job": "DNC",
+  "duration": 15000
  },
  "IMPROVISATION_REGEN": {
   "id": 1002695,
   "name": "Improvisation",
-  "duration": 15000,
-  "job": "DNC"
+  "job": "DNC",
+  "duration": 15000
  },
  "IMPROVISED_FINISH": {
   "id": 1002697,
   "name": "Improvised Finish",
-  "duration": 30000,
-  "job": "DNC"
+  "job": "DNC",
+  "duration": 30000
  },
  "ESPRIT": {
   "id": 1001847,
   "name": "Esprit",
-  "duration": 60000,
-  "job": "DNC"
+  "job": "DNC",
+  "duration": 60000
  },
  "ESPRIT_TECHNICAL": {
   "id": 1001848,
   "name": "Esprit",
-  "duration": 20000,
-  "job": "DNC"
+  "job": "DNC",
+  "duration": 20000
  },
  "STANDARD_FINISH_PARTNER": {
   "id": 1002105,
   "name": "Standard Finish",
-  "duration": 60000,
-  "job": "DNC"
+  "job": "DNC",
+  "duration": 60000
  },
  "BATTLE_LITANY": {
   "id": 1000786,
   "name": "Battle Litany",
-  "duration": 20000,
-  "job": "DRG"
+  "job": "DRG",
+  "duration": 20000
  },
  "POWER_SURGE": {
   "id": 1002720,
   "name": "Power Surge",
-  "duration": 30000,
-  "job": "DRG"
+  "job": "DRG",
+  "duration": 30000
  },
  "LANCE_CHARGE": {
   "id": 1001864,
   "name": "Lance Charge",
-  "duration": 20000,
-  "job": "DRG"
+  "job": "DRG",
+  "duration": 20000
  },
  "CHAOS_THRUST": {
   "id": 1000118,
   "name": "Chaos Thrust",
-  "duration": 24000,
-  "job": "DRG"
+  "job": "DRG",
+  "duration": 24000
  },
  "CHAOTIC_SPRING": {
   "id": 1002719,
   "name": "Chaotic Spring",
-  "duration": 24000,
-  "job": "DRG"
+  "job": "DRG",
+  "duration": 24000
  },
  "DIVE_READY": {
   "id": 1001243,
   "name": "Dive Ready",
-  "duration": 15000,
-  "job": "DRG"
+  "job": "DRG",
+  "duration": 15000
  },
  "DRAGONS_FLIGHT": {
   "id": 1003845,
   "name": "Dragon's Flight",
-  "duration": 30000,
-  "job": "DRG"
+  "job": "DRG",
+  "duration": 30000
  },
  "STARCROSS_READY": {
   "id": 1003846,
   "name": "Starcross Ready",
-  "duration": 20000,
-  "job": "DRG"
+  "job": "DRG",
+  "duration": 20000
  },
  "LIFE_SURGE": {
   "id": 1000116,
   "name": "Life Surge",
-  "duration": 5000,
-  "job": "DRG"
+  "job": "DRG",
+  "duration": 5000
  },
  "DRACONIAN_FIRE": {
   "id": 1001863,
   "name": "Draconian Fire",
-  "duration": 30000,
-  "job": "DRG"
+  "job": "DRG",
+  "duration": 30000
  },
  "NASTROND_READY": {
   "id": 1003844,
   "name": "Nastrond Ready",
-  "duration": 20000,
-  "job": "DRG"
+  "job": "DRG",
+  "duration": 20000
  },
  "ENHANCED_PIERCING_TALON": {
   "id": 1001870,
@@ -10886,27 +10888,27 @@ export const XIVA_STATUSES: Record<string, XivaStatus> = {
  "BLOOD_WEAPON": {
   "id": 1000742,
   "name": "Blood Weapon",
+  "job": "DRK",
   "duration": 15000,
-  "stacksApplied": 3,
-  "job": "DRK"
+  "stacksApplied": 3
  },
  "BLACKEST_NIGHT": {
   "id": 1001178,
   "name": "Blackest Night",
-  "duration": 7000,
-  "job": "DRK"
+  "job": "DRK",
+  "duration": 7000
  },
  "SALTED_EARTH": {
   "id": 1000749,
   "name": "Salted Earth",
-  "duration": 15000,
-  "job": "DRK"
+  "job": "DRK",
+  "duration": 15000
  },
  "DARK_MISSIONARY": {
   "id": 1001894,
   "name": "Dark Missionary",
-  "duration": 15000,
-  "job": "DRK"
+  "job": "DRK",
+  "duration": 15000
  },
  "LIVING_DEAD": {
   "id": 1000810,
@@ -10916,8 +10918,8 @@ export const XIVA_STATUSES: Record<string, XivaStatus> = {
  "WALKING_DEAD": {
   "id": 1000811,
   "name": "Walking Dead",
-  "duration": 10000,
-  "job": "DRK"
+  "job": "DRK",
+  "duration": 10000
  },
  "UNDEAD_REBIRTH": {
   "id": 1003255,
@@ -10927,45 +10929,45 @@ export const XIVA_STATUSES: Record<string, XivaStatus> = {
  "DARK_MIND": {
   "id": 1000746,
   "name": "Dark Mind",
-  "duration": 10000,
-  "job": "DRK"
+  "job": "DRK",
+  "duration": 10000
  },
  "SHADOW_WALL": {
   "id": 1000747,
   "name": "Shadow Wall",
-  "duration": 15000,
-  "job": "DRK"
+  "job": "DRK",
+  "duration": 15000
  },
  "DELIRIUM": {
   "id": 1003836,
   "name": "Delirium",
+  "job": "DRK",
   "duration": 15000,
-  "stacksApplied": 3,
-  "job": "DRK"
+  "stacksApplied": 3
  },
  "OBLATION": {
   "id": 1002682,
   "name": "Oblation",
-  "duration": 10000,
-  "job": "DRK"
+  "job": "DRK",
+  "duration": 10000
  },
  "SHADOWED_VIGIL": {
   "id": 1003835,
   "name": "Shadowed Vigil",
-  "duration": 15000,
-  "job": "DRK"
+  "job": "DRK",
+  "duration": 15000
  },
  "VIGILANT": {
   "id": 1003902,
   "name": "Vigilant",
-  "duration": 20000,
-  "job": "DRK"
+  "job": "DRK",
+  "duration": 20000
  },
  "SCORN": {
   "id": 1003837,
   "name": "Scorn",
-  "duration": 30000,
-  "job": "DRK"
+  "job": "DRK",
+  "duration": 30000
  },
  "TEMPORAL_DISPLACEMENT_INTERMISSION": {
   "id": 1001119,
@@ -10980,122 +10982,122 @@ export const XIVA_STATUSES: Record<string, XivaStatus> = {
  "SONIC_BREAK": {
   "id": 1001837,
   "name": "Sonic Break",
-  "duration": 15000,
-  "job": "GNB"
+  "job": "GNB",
+  "duration": 15000
  },
  "BRUTAL_SHELL": {
   "id": 1001898,
   "name": "Brutal Shell",
-  "duration": 30000,
-  "job": "GNB"
+  "job": "GNB",
+  "duration": 30000
  },
  "BOW_SHOCK": {
   "id": 1001838,
   "name": "Bow Shock",
-  "duration": 15000,
-  "job": "GNB"
+  "job": "GNB",
+  "duration": 15000
  },
  "NO_MERCY": {
   "id": 1001831,
   "name": "No Mercy",
-  "duration": 20000,
-  "job": "GNB"
+  "job": "GNB",
+  "duration": 20000
  },
  "READY_TO_RIP": {
   "id": 1001842,
   "name": "Ready to Rip",
-  "duration": 10000,
-  "job": "GNB"
+  "job": "GNB",
+  "duration": 10000
  },
  "READY_TO_TEAR": {
   "id": 1001843,
   "name": "Ready to Tear",
-  "duration": 10000,
-  "job": "GNB"
+  "job": "GNB",
+  "duration": 10000
  },
  "READY_TO_GOUGE": {
   "id": 1001844,
   "name": "Ready to Gouge",
-  "duration": 10000,
-  "job": "GNB"
+  "job": "GNB",
+  "duration": 10000
  },
  "READY_TO_BLAST": {
   "id": 1002686,
   "name": "Ready to Blast",
-  "duration": 10000,
-  "job": "GNB"
+  "job": "GNB",
+  "duration": 10000
  },
  "READY_TO_RAZE": {
   "id": 1003839,
   "name": "Ready to Raze",
-  "duration": 10000,
-  "job": "GNB"
+  "job": "GNB",
+  "duration": 10000
  },
  "READY_TO_BREAK": {
   "id": 1003886,
   "name": "Ready to Break",
-  "duration": 30000,
-  "job": "GNB"
+  "job": "GNB",
+  "duration": 30000
  },
  "READY_TO_REIGN": {
   "id": 1003840,
   "name": "Ready to Reign",
-  "duration": 30000,
-  "job": "GNB"
+  "job": "GNB",
+  "duration": 30000
  },
  "AURORA": {
   "id": 1001835,
   "name": "Aurora",
-  "duration": 18000,
-  "job": "GNB"
+  "job": "GNB",
+  "duration": 18000
  },
  "HEART_OF_STONE": {
   "id": 1001840,
   "name": "Heart of Stone",
-  "duration": 7000,
-  "job": "GNB"
+  "job": "GNB",
+  "duration": 7000
  },
  "HEART_OF_LIGHT": {
   "id": 1001839,
   "name": "Heart of Light",
-  "duration": 15000,
-  "job": "GNB"
+  "job": "GNB",
+  "duration": 15000
  },
  "HEART_OF_CORUNDUM": {
   "id": 1002683,
   "name": "Heart of Corundum",
-  "duration": 15000,
-  "job": "GNB"
+  "job": "GNB",
+  "duration": 15000
  },
  "CATHARSIS_OF_CORUNDUM": {
   "id": 1002685,
   "name": "Catharsis of Corundum",
-  "duration": 4000,
-  "job": "GNB"
+  "job": "GNB",
+  "duration": 4000
  },
  "CAMOUFLAGE": {
   "id": 1001832,
   "name": "Camouflage",
-  "duration": 20000,
-  "job": "GNB"
+  "job": "GNB",
+  "duration": 20000
  },
  "NEBULA": {
   "id": 1001834,
   "name": "Nebula",
-  "duration": 15000,
-  "job": "GNB"
+  "job": "GNB",
+  "duration": 15000
  },
  "GREAT_NEBULA": {
   "id": 1003838,
   "name": "Great Nebula",
-  "duration": 15000,
-  "job": "GNB"
+  "job": "GNB",
+  "duration": 15000
  },
  "SUPERBOLIDE": {
   "id": 1001836,
   "name": "Superbolide",
-  "duration": 8000,
-  "job": "GNB"
+  "job": "GNB",
+  "duration": 8000
  },
  "BLOODFEST": {
   "id": 1005051,
@@ -11106,293 +11108,293 @@ export const XIVA_STATUSES: Record<string, XivaStatus> = {
  "REASSEMBLED": {
   "id": 1000851,
   "name": "Reassembled",
-  "duration": 5000,
-  "job": "MCH"
+  "job": "MCH",
+  "duration": 5000
  },
  "OVERHEATED": {
   "id": 1002688,
   "name": "Overheated",
-  "duration": 10000,
-  "job": "MCH"
+  "job": "MCH",
+  "duration": 10000
  },
  "WILDFIRE": {
   "id": 1000861,
   "name": "Wildfire",
-  "duration": 10000,
-  "job": "MCH"
+  "job": "MCH",
+  "duration": 10000
  },
  "WILDFIRE_SELF": {
   "id": 1001946,
   "name": "Wildfire",
-  "duration": 10000,
-  "job": "MCH"
+  "job": "MCH",
+  "duration": 10000
  },
  "FLAMETHROWER": {
   "id": 1001205,
   "name": "Flamethrower",
-  "duration": 10000,
-  "job": "MCH"
+  "job": "MCH",
+  "duration": 10000
  },
  "BIOBLASTER": {
   "id": 1001866,
   "name": "Bioblaster",
-  "duration": 15000,
-  "job": "MCH"
+  "job": "MCH",
+  "duration": 15000
  },
  "TACTICIAN": {
   "id": 1001951,
   "name": "Tactician",
-  "duration": 15000,
-  "job": "MCH"
+  "job": "MCH",
+  "duration": 15000
  },
  "HYPERCHARGED": {
   "id": 1003864,
   "name": "Hypercharged",
-  "duration": 30000,
-  "job": "MCH"
+  "job": "MCH",
+  "duration": 30000
  },
  "EXCAVATOR_READY": {
   "id": 1003865,
   "name": "Excavator Ready",
-  "duration": 30000,
-  "job": "MCH"
+  "job": "MCH",
+  "duration": 30000
  },
  "FULL_METAL_MACHINIST": {
   "id": 1003866,
   "name": "Full Metal Machinist",
-  "duration": 30000,
-  "job": "MCH"
+  "job": "MCH",
+  "duration": 30000
  },
  "OPO_OPO_FORM": {
   "id": 1000107,
   "name": "Opo-Opo Form",
-  "duration": 30000,
-  "job": "MNK"
+  "job": "MNK",
+  "duration": 30000
  },
  "RAPTOR_FORM": {
   "id": 1000108,
   "name": "Raptor Form",
-  "duration": 30000,
-  "job": "MNK"
+  "job": "MNK",
+  "duration": 30000
  },
  "COEURL_FORM": {
   "id": 1000109,
   "name": "Coeurl Form",
-  "duration": 30000,
-  "job": "MNK"
+  "job": "MNK",
+  "duration": 30000
  },
  "MANTRA": {
   "id": 1000102,
   "name": "Mantra",
-  "duration": 15000,
-  "job": "MNK"
+  "job": "MNK",
+  "duration": 15000
  },
  "PERFECT_BALANCE": {
   "id": 1000110,
   "name": "Perfect Balance",
+  "job": "MNK",
   "duration": 30000,
-  "stacksApplied": 3,
-  "job": "MNK"
+  "stacksApplied": 3
  },
  "BROTHERHOOD": {
   "id": 1001185,
   "name": "Brotherhood",
-  "duration": 20000,
-  "job": "MNK"
+  "job": "MNK",
+  "duration": 20000
  },
  "MEDITATIVE_BROTHERHOOD": {
   "id": 1001182,
   "name": "Meditative Brotherhood",
-  "duration": 20000,
-  "job": "MNK"
+  "job": "MNK",
+  "duration": 20000
  },
  "RIDDLE_OF_EARTH": {
   "id": 1001179,
   "name": "Riddle of Earth",
-  "duration": 10000,
-  "job": "MNK"
+  "job": "MNK",
+  "duration": 10000
  },
  "EARTHS_REPLY": {
   "id": 1001180,
   "name": "Earth's Reply",
-  "duration": 15000,
-  "job": "MNK"
+  "job": "MNK",
+  "duration": 15000
  },
  "EARTHS_RUMINATION": {
   "id": 1003841,
   "name": "Earth's Rumination",
-  "duration": 30000,
-  "job": "MNK"
+  "job": "MNK",
+  "duration": 30000
  },
  "RIDDLE_OF_FIRE": {
   "id": 1001181,
   "name": "Riddle of Fire",
-  "duration": 20000,
-  "job": "MNK"
+  "job": "MNK",
+  "duration": 20000
  },
  "FIRES_RUMINATION": {
   "id": 1003843,
   "name": "Fire's Rumination",
-  "duration": 20000,
-  "job": "MNK"
+  "job": "MNK",
+  "duration": 20000
  },
  "RIDDLE_OF_WIND": {
   "id": 1002687,
   "name": "Riddle of Wind",
-  "duration": 15000,
-  "job": "MNK"
+  "job": "MNK",
+  "duration": 15000
  },
  "WINDS_RUMINATION": {
   "id": 1003842,
   "name": "Wind's Rumination",
-  "duration": 15000,
-  "job": "MNK"
+  "job": "MNK",
+  "duration": 15000
  },
  "FORMLESS_FIST": {
   "id": 1002513,
   "name": "Formless Fist",
-  "duration": 30000,
-  "job": "MNK"
+  "job": "MNK",
+  "duration": 30000
  },
  "SIX_SIDED_STAR": {
   "id": 1002514,
   "name": "Six-sided Star",
-  "duration": 5000,
-  "job": "MNK"
+  "job": "MNK",
+  "duration": 5000
  },
  "TRICK_ATTACK": {
   "id": 1003254,
   "name": "Trick Attack",
-  "duration": 15000,
-  "job": "NIN"
+  "job": "NIN",
+  "duration": 15000
  },
  "KUNAIS_BANE": {
   "id": 1003906,
   "name": "Kunai's Bane",
-  "duration": 15000,
-  "job": "NIN"
+  "job": "NIN",
+  "duration": 15000
  },
  "MUG": {
   "id": 1003183,
   "name": "Mug",
-  "duration": 20000,
-  "job": "NIN"
+  "job": "NIN",
+  "duration": 20000
  },
  "DOKUMORI": {
   "id": 1003849,
   "name": "Dokumori",
-  "duration": 20000,
-  "job": "NIN"
+  "job": "NIN",
+  "duration": 20000
  },
  "HIGI": {
   "id": 1003850,
   "name": "HIGI",
-  "duration": 30000,
-  "job": "NIN"
+  "job": "NIN",
+  "duration": 30000
  },
  "KASSATSU": {
   "id": 1000497,
   "name": "Kassatsu",
-  "duration": 15000,
-  "job": "NIN"
+  "job": "NIN",
+  "duration": 15000
  },
  "DOTON": {
   "id": 1000501,
   "name": "Doton",
-  "duration": 24000,
-  "job": "NIN"
+  "job": "NIN",
+  "duration": 24000
  },
  "SHADOW_WALKER": {
   "id": 1003848,
   "name": "Shadow Walker",
-  "duration": 20000,
-  "job": "NIN"
+  "job": "NIN",
+  "duration": 20000
  },
  "TEN_CHI_JIN": {
   "id": 1001186,
   "name": "Ten Chi Jin",
-  "duration": 6000,
-  "job": "NIN"
+  "job": "NIN",
+  "duration": 6000
  },
  "TENRI_JINDO_READY": {
   "id": 1003851,
   "name": "Tenri Jindo Ready",
-  "duration": 30000,
-  "job": "NIN"
+  "job": "NIN",
+  "duration": 30000
  },
  "BUNSHIN": {
   "id": 1001954,
   "name": "Bunshin",
-  "duration": 30000,
-  "job": "NIN"
+  "job": "NIN",
+  "duration": 30000
  },
  "SHADE_SHIFT": {
   "id": 1000488,
   "name": "Shade Shift",
-  "duration": 20000,
-  "job": "NIN"
+  "job": "NIN",
+  "duration": 20000
  },
  "MEISUI": {
   "id": 1002689,
   "name": "Meisui",
-  "duration": 30000,
-  "job": "NIN"
+  "job": "NIN",
+  "duration": 30000
  },
  "RAIJU_READY": {
   "id": 1002690,
   "name": "Raiju Ready",
-  "duration": 30000,
-  "job": "NIN"
+  "job": "NIN",
+  "duration": 30000
  },
  "PHANTOM_KAMAITACHI_READY": {
   "id": 1002723,
   "name": "Phantom Kamaitachi Ready",
-  "duration": 45000,
-  "job": "NIN"
+  "job": "NIN",
+  "duration": 45000
  },
  "AETHERHUES": {
   "id": 1003675,
   "name": "Aetherhues",
-  "duration": 30000,
-  "job": "PCT"
+  "job": "PCT",
+  "duration": 30000
  },
  "AETHERHUES_II": {
   "id": 1003676,
   "name": "Aetherhues II",
-  "duration": 30000,
-  "job": "PCT"
+  "job": "PCT",
+  "duration": 30000
  },
  "TEMPERA_COAT": {
   "id": 1003686,
   "name": "Tempera Coat",
-  "duration": 10000,
-  "job": "PCT"
+  "job": "PCT",
+  "duration": 10000
  },
  "TEMPERA_GRASSA": {
   "id": 1003687,
   "name": "Tempera Grassa",
-  "duration": 10000,
-  "job": "PCT"
+  "job": "PCT",
+  "duration": 10000
  },
  "SMUDGE": {
   "id": 1003684,
   "name": "Smudge",
-  "duration": 5000,
-  "job": "PCT"
+  "job": "PCT",
+  "duration": 5000
  },
  "HAMMER_TIME": {
   "id": 1003680,
   "name": "Hammer Time",
+  "job": "PCT",
   "duration": 30000,
-  "stacksApplied": 3,
-  "job": "PCT"
+  "stacksApplied": 3
  },
  "SUBTRACTIVE_PALETTE": {
   "id": 1003674,
   "name": "Subtractive Palette",
+  "job": "PCT",
   "duration": 30000,
-  "stacksApplied": 3,
-  "job": "PCT"
+  "stacksApplied": 3
  },
  "MONOCHROME_TONES": {
   "id": 1003691,
@@ -11402,40 +11404,40 @@ export const XIVA_STATUSES: Record<string, XivaStatus> = {
  "STARRY_MUSE": {
   "id": 1003685,
   "name": "Starry Muse",
-  "duration": 20000,
-  "job": "PCT"
+  "job": "PCT",
+  "duration": 20000
  },
  "SUBTRACTIVE_SPECTRUM": {
   "id": 1003690,
   "name": "Subtractive Spectrum",
-  "duration": 30000,
-  "job": "PCT"
+  "job": "PCT",
+  "duration": 30000
  },
  "INSPIRATION": {
   "id": 1003689,
   "name": "Inspiration",
+  "job": "PCT",
   "duration": 30000,
-  "speedModifier": 0.75,
-  "job": "PCT"
+  "speedModifier": 0.75
  },
  "HYPERPHANTASIA": {
   "id": 1003688,
   "name": "Hyperphantasia",
+  "job": "PCT",
   "duration": 30000,
-  "stacksApplied": 5,
-  "job": "PCT"
+  "stacksApplied": 5
  },
  "STARSTRUCK": {
   "id": 1003681,
   "name": "Starstruck",
-  "duration": 20000,
-  "job": "PCT"
+  "job": "PCT",
+  "duration": 20000
  },
  "RAINBOW_BRIGHT": {
   "id": 1003679,
   "name": "Rainbow Bright",
-  "duration": 20000,
-  "job": "PCT"
+  "job": "PCT",
+  "duration": 20000
  },
  "STAR_PRISM": {
   "id": 1003683,
@@ -11445,21 +11447,21 @@ export const XIVA_STATUSES: Record<string, XivaStatus> = {
  "CIRCLE_OF_SCORN": {
   "id": 1000248,
   "name": "Circle Of Scorn",
-  "duration": 15000,
-  "job": "PLD"
+  "job": "PLD",
+  "duration": 15000
  },
  "REQUIESCAT": {
   "id": 1001368,
   "name": "Requiescat",
+  "job": "PLD",
   "duration": 30000,
-  "stacksApplied": 4,
-  "job": "PLD"
+  "stacksApplied": 4
  },
  "FIGHT_OR_FLIGHT": {
   "id": 1000076,
   "name": "Fight Or Flight",
-  "duration": 20000,
-  "job": "PLD"
+  "job": "PLD",
+  "duration": 20000
  },
  "IRON_WILL": {
   "id": 1000079,
@@ -11469,269 +11471,269 @@ export const XIVA_STATUSES: Record<string, XivaStatus> = {
  "SENTINEL": {
   "id": 1000074,
   "name": "Sentinel",
-  "duration": 15000,
-  "job": "PLD"
+  "job": "PLD",
+  "duration": 15000
  },
  "DIVINE_MIGHT": {
   "id": 1002673,
   "name": "Divine Might",
+  "job": "PLD",
   "duration": 30000,
-  "stacksApplied": 1,
-  "job": "PLD"
+  "stacksApplied": 1
  },
  "SHELTRON": {
   "id": 1001856,
   "name": "Sheltron",
-  "duration": 6000,
-  "job": "PLD"
+  "job": "PLD",
+  "duration": 6000
  },
  "INTERVENTION": {
   "id": 1001174,
   "name": "Intervention",
-  "duration": 6000,
-  "job": "PLD"
+  "job": "PLD",
+  "duration": 6000
  },
  "PASSAGE_OF_ARMS": {
   "id": 1001175,
   "name": "Passage Of Arms",
-  "duration": 18000,
-  "job": "PLD"
+  "job": "PLD",
+  "duration": 18000
  },
  "DIVINE_VEIL": {
   "id": 1000727,
   "name": "Divine Veil",
-  "duration": 30000,
-  "job": "PLD"
+  "job": "PLD",
+  "duration": 30000
  },
  "COVER": {
   "id": 1000080,
   "name": "Cover",
-  "duration": 12000,
-  "job": "PLD"
+  "job": "PLD",
+  "duration": 12000
  },
  "COVERED": {
   "id": 1000081,
   "name": "Covered",
-  "duration": 12000,
-  "job": "PLD"
+  "job": "PLD",
+  "duration": 12000
  },
  "HALLOWED_GROUND": {
   "id": 1000082,
   "name": "Hallowed Ground",
-  "duration": 10000,
-  "job": "PLD"
+  "job": "PLD",
+  "duration": 10000
  },
  "BULWARK": {
   "id": 1000077,
   "name": "Bulwark",
-  "duration": 10000,
-  "job": "PLD"
+  "job": "PLD",
+  "duration": 10000
  },
  "HOLY_SHELTRON": {
   "id": 1002674,
   "name": "Holy Sheltron",
-  "duration": 8000,
-  "job": "PLD"
+  "job": "PLD",
+  "duration": 8000
  },
  "KNIGHTS_RESOLVE": {
   "id": 1002675,
   "name": "Knight's Resolve",
-  "duration": 4000,
-  "job": "PLD"
+  "job": "PLD",
+  "duration": 4000
  },
  "KNIGHTS_BENEDICTION": {
   "id": 1002676,
   "name": "Knight's Benediction",
-  "duration": 12000,
-  "job": "PLD"
+  "job": "PLD",
+  "duration": 12000
  },
  "CONFITEOR_READY": {
   "id": 1003019,
   "name": "Confiteor Ready",
-  "duration": 30000,
-  "job": "PLD"
+  "job": "PLD",
+  "duration": 30000
  },
  "ATONEMENT_READY": {
   "id": 1001902,
   "name": "Atonement Ready",
-  "duration": 30000,
-  "job": "PLD"
+  "job": "PLD",
+  "duration": 30000
  },
  "SUPPLICATION_READY": {
   "id": 1003827,
   "name": "Supplication Ready",
-  "duration": 30000,
-  "job": "PLD"
+  "job": "PLD",
+  "duration": 30000
  },
  "SEPULCHRE_READY": {
   "id": 1003828,
   "name": "Sepulchre Ready",
-  "duration": 30000,
-  "job": "PLD"
+  "job": "PLD",
+  "duration": 30000
  },
  "BLADE_OF_HONOR_READY": {
   "id": 1003831,
   "name": "Blade of Honor Ready",
-  "duration": 30000,
-  "job": "PLD"
+  "job": "PLD",
+  "duration": 30000
  },
  "GORING_BLADE_READY": {
   "id": 1003847,
   "name": "Goring Blade Ready",
-  "duration": 30000,
-  "job": "PLD"
+  "job": "PLD",
+  "duration": 30000
  },
  "GUARDIAN": {
   "id": 1003829,
   "name": "Guardian",
-  "duration": 15000,
-  "job": "PLD"
+  "job": "PLD",
+  "duration": 15000
  },
  "GUARDIANS_WILL": {
   "id": 1003830,
   "name": "Guardian's Will",
-  "duration": 15000,
-  "job": "PLD"
+  "job": "PLD",
+  "duration": 15000
  },
  "DUALCAST": {
   "id": 1001249,
   "name": "Dualcast",
-  "duration": 15000,
-  "job": "RDM"
+  "job": "RDM",
+  "duration": 15000
  },
  "VERSTONE_READY": {
   "id": 1001235,
   "name": "Verstone Ready",
-  "duration": 30000,
-  "job": "RDM"
+  "job": "RDM",
+  "duration": 30000
  },
  "VERFIRE_READY": {
   "id": 1001234,
   "name": "Verfire Ready",
-  "duration": 30000,
-  "job": "RDM"
+  "job": "RDM",
+  "duration": 30000
  },
  "ACCELERATION": {
   "id": 1001238,
   "name": "Acceleration",
-  "duration": 20000,
-  "job": "RDM"
+  "job": "RDM",
+  "duration": 20000
  },
  "EMBOLDEN_PARTY": {
   "id": 1001297,
   "name": "Embolden",
-  "duration": 20000,
-  "job": "RDM"
+  "job": "RDM",
+  "duration": 20000
  },
  "EMBOLDEN_SELF": {
   "id": 1001239,
   "name": "Embolden",
-  "duration": 20000,
-  "job": "RDM"
+  "job": "RDM",
+  "duration": 20000
  },
  "MANAFICATION": {
   "id": 1001971,
   "name": "Manafication",
+  "job": "RDM",
   "duration": 30000,
-  "stacksApplied": 3,
-  "job": "RDM"
+  "stacksApplied": 3
  },
  "MAGICK_BARRIER": {
   "id": 1002707,
   "name": "Magick Barrier",
-  "duration": 10000,
-  "job": "RDM"
+  "job": "RDM",
+  "duration": 10000
  },
  "THORNED_FLOURISH": {
   "id": 1003876,
   "name": "Thorned Flourish",
-  "duration": 30000,
-  "job": "RDM"
+  "job": "RDM",
+  "duration": 30000
  },
  "GRAND_IMPACT_READY": {
   "id": 1003877,
   "name": "Grand Impact Ready",
-  "duration": 30000,
-  "job": "RDM"
+  "job": "RDM",
+  "duration": 30000
  },
  "PREFULGENCE_READY": {
   "id": 1003878,
   "name": "Prefulgence Ready",
-  "duration": 30000,
-  "job": "RDM"
+  "job": "RDM",
+  "duration": 30000
  },
  "MAGICKED_SWORDPLAY": {
   "id": 1003875,
   "name": "Magicked Swordplay",
+  "job": "RDM",
   "duration": 30000,
-  "stacksApplied": 3,
-  "job": "RDM"
+  "stacksApplied": 3
  },
  "SWIFTCAST": {
   "id": 1000167,
   "name": "Swiftcast",
-  "duration": 10000,
-  "job": "ROLE"
+  "job": "ROLE",
+  "duration": 10000
  },
  "LUCID_DREAMING": {
   "id": 1001204,
   "name": "Lucid Dreaming",
-  "duration": 21000,
-  "job": "ROLE"
+  "job": "ROLE",
+  "duration": 21000
  },
  "SURECAST": {
   "id": 1000160,
   "name": "Surecast",
-  "duration": 6000,
-  "job": "ROLE"
+  "job": "ROLE",
+  "duration": 6000
  },
  "RAMPART": {
   "id": 1001191,
   "name": "Rampart",
-  "duration": 20000,
-  "job": "ROLE"
+  "job": "ROLE",
+  "duration": 20000
  },
  "REPRISAL": {
   "id": 1001193,
   "name": "Reprisal",
-  "duration": 15000,
-  "job": "ROLE"
+  "job": "ROLE",
+  "duration": 15000
  },
  "ARMS_LENGTH": {
   "id": 1001209,
   "name": "Arm's Length",
-  "duration": 6000,
-  "job": "ROLE"
+  "job": "ROLE",
+  "duration": 6000
  },
  "ADDLE": {
   "id": 1001203,
   "name": "Addle",
-  "duration": 15000,
-  "job": "ROLE"
+  "job": "ROLE",
+  "duration": 15000
  },
  "BLOODBATH": {
   "id": 1000084,
   "name": "Bloodbath",
-  "duration": 20000,
-  "job": "ROLE"
+  "job": "ROLE",
+  "duration": 20000
  },
  "FEINT": {
   "id": 1001195,
   "name": "Feint",
-  "duration": 15000,
-  "job": "ROLE"
+  "job": "ROLE",
+  "duration": 15000
  },
  "TRUE_NORTH": {
   "id": 1001250,
   "name": "True North",
-  "duration": 10000,
-  "job": "ROLE"
+  "job": "ROLE",
+  "duration": 10000
  },
  "DEATHS_DESIGN": {
   "id": 1002586,
   "name": "Death's Design",
-  "duration": 30000,
-  "job": "RPR"
+  "job": "RPR",
+  "duration": 30000
  },
  "SOULSOW": {
   "id": 1002594,
@@ -11741,178 +11743,178 @@ export const XIVA_STATUSES: Record<string, XivaStatus> = {
  "SOUL_REAVER": {
   "id": 1002587,
   "name": "Soul Reaver",
-  "duration": 30000,
-  "job": "RPR"
+  "job": "RPR",
+  "duration": 30000
  },
  "ENHANCED_HARPE": {
   "id": 1002845,
   "name": "Enhanced Harpe",
-  "duration": 20000,
-  "job": "RPR"
+  "job": "RPR",
+  "duration": 20000
  },
  "ENHANCED_CROSS_REAPING": {
   "id": 1002591,
   "name": "Enhanced Cross Reaping",
-  "duration": 30000,
-  "job": "RPR"
+  "job": "RPR",
+  "duration": 30000
  },
  "ENHANCED_VOID_REAPING": {
   "id": 1002590,
   "name": "Enhanced Void Reaping",
-  "duration": 30000,
-  "job": "RPR"
+  "job": "RPR",
+  "duration": 30000
  },
  "ENHANCED_GALLOWS": {
   "id": 1002589,
   "name": "Enhanced Gallows",
-  "duration": 60000,
-  "job": "RPR"
+  "job": "RPR",
+  "duration": 60000
  },
  "ENHANCED_GIBBET": {
   "id": 1002588,
   "name": "Enhanced Gibbet",
-  "duration": 60000,
-  "job": "RPR"
+  "job": "RPR",
+  "duration": 60000
  },
  "ARCANE_CIRCLE": {
   "id": 1002599,
   "name": "Arcane Circle",
-  "duration": 20000,
-  "job": "RPR"
+  "job": "RPR",
+  "duration": 20000
  },
  "CIRCLE_OF_SACRIFICE": {
   "id": 1002600,
   "name": "Circle of Sacrifice",
-  "duration": 5000,
-  "job": "RPR"
+  "job": "RPR",
+  "duration": 5000
  },
  "BLOODSOWN_CIRCLE": {
   "id": 1002972,
   "name": "Bloodsown Circle",
-  "duration": 6000,
-  "job": "RPR"
+  "job": "RPR",
+  "duration": 6000
  },
  "IMMORTAL_SACRIFICE": {
   "id": 1002592,
   "name": "Immortal Sacrifice",
-  "duration": 30000,
-  "job": "RPR"
+  "job": "RPR",
+  "duration": 30000
  },
  "CREST_OF_TIME_BORROWED": {
   "id": 1002597,
   "name": "Crest of Time Borrowed",
-  "duration": 5000,
-  "job": "RPR"
+  "job": "RPR",
+  "duration": 5000
  },
  "CREST_OF_TIME_RETURNED": {
   "id": 1002598,
   "name": "Crest of Time Returned",
-  "duration": 15000,
-  "job": "RPR"
+  "job": "RPR",
+  "duration": 15000
  },
  "ENSHROUDED": {
   "id": 1002593,
   "name": "Enshrouded",
-  "duration": 30000,
-  "job": "RPR"
+  "job": "RPR",
+  "duration": 30000
  },
  "IDEAL_HOST": {
   "id": 1003905,
   "name": "Ideal Host",
-  "duration": 30000,
-  "job": "RPR"
+  "job": "RPR",
+  "duration": 30000
  },
  "PERFECTIO_OCCULTA": {
   "id": 1003859,
   "name": "Perfectio Occulta",
-  "duration": 30000,
-  "job": "RPR"
+  "job": "RPR",
+  "duration": 30000
  },
  "PERFECTIO_PARATA": {
   "id": 1003860,
   "name": "Perfectio Parata",
-  "duration": 30000,
-  "job": "RPR"
+  "job": "RPR",
+  "duration": 30000
  },
  "EXECUTIONER": {
   "id": 1003858,
   "name": "Executioner",
-  "duration": 30000,
-  "job": "RPR"
+  "job": "RPR",
+  "duration": 30000
  },
  "THIRD_EYE": {
   "id": 1001232,
   "name": "Third Eye",
-  "duration": 4000,
-  "job": "SAM"
+  "job": "SAM",
+  "duration": 4000
  },
  "TENGENTSU": {
   "id": 1003853,
   "name": "Tengentsu",
-  "duration": 4000,
-  "job": "SAM"
+  "job": "SAM",
+  "duration": 4000
  },
  "TENGENTSU_FORESIGHT": {
   "id": 1003854,
   "name": "Tengentsu's Foresight",
-  "duration": 9000,
-  "job": "SAM"
+  "job": "SAM",
+  "duration": 9000
  },
  "FUGETSU": {
   "id": 1001298,
   "name": "Fugetsu",
-  "duration": 40000,
-  "job": "SAM"
+  "job": "SAM",
+  "duration": 40000
  },
  "FUKA": {
   "id": 1001299,
   "name": "Fuka",
+  "job": "SAM",
   "duration": 40000,
-  "speedModifier": 0.87,
-  "job": "SAM"
+  "speedModifier": 0.87
  },
  "MEDITATE": {
   "id": 1001231,
   "name": "Meditate",
-  "duration": 15000,
-  "job": "SAM"
+  "job": "SAM",
+  "duration": 15000
  },
  "MEDITATION": {
   "id": 1001865,
   "name": "Meditation",
-  "duration": 45000,
-  "job": "SAM"
+  "job": "SAM",
+  "duration": 45000
  },
  "HIGANBANA": {
   "id": 1001228,
   "name": "Higanbana",
-  "duration": 60000,
-  "job": "SAM"
+  "job": "SAM",
+  "duration": 60000
  },
  "MEIKYO_SHISUI": {
   "id": 1001233,
   "name": "Meikyo Shisui",
+  "job": "SAM",
   "duration": 15000,
-  "stacksApplied": 3,
-  "job": "SAM"
+  "stacksApplied": 3
  },
  "ENHANCED_ENPI": {
   "id": 1001236,
   "name": "Enhanced Enpi",
-  "duration": 15000,
-  "job": "SAM"
+  "job": "SAM",
+  "duration": 15000
  },
  "OGI_NAMIKIRI_READY": {
   "id": 1002959,
   "name": "Ogi Namikiri Ready",
-  "duration": 30000,
-  "job": "SAM"
+  "job": "SAM",
+  "duration": 30000
  },
  "TSUBAME_GAESHI_READY": {
   "id": 1003852,
   "name": "Tsubame-Gaeshi Ready",
-  "duration": 30000,
-  "job": "SAM"
+  "job": "SAM",
+  "duration": 30000
  },
  "TSUBAME_GAESHI_MIDARE": {
   "id": 1004216,
@@ -11935,116 +11937,116 @@ export const XIVA_STATUSES: Record<string, XivaStatus> = {
  "ZANSHIN_READY": {
   "id": 1003855,
   "name": "Zanshin Ready",
-  "duration": 30000,
-  "job": "SAM"
+  "job": "SAM",
+  "duration": 30000
  },
  "TENDO": {
   "id": 1003856,
   "name": "Tendo",
-  "duration": 30000,
-  "job": "SAM"
+  "job": "SAM",
+  "duration": 30000
  },
  "BIO_II": {
   "id": 1000189,
   "name": "Bio II",
-  "duration": 30000,
-  "job": "SCH"
+  "job": "SCH",
+  "duration": 30000
  },
  "BIOLYSIS": {
   "id": 1001895,
   "name": "Biolysis",
-  "duration": 30000,
-  "job": "SCH"
+  "job": "SCH",
+  "duration": 30000
  },
  "CHAIN_STRATAGEM": {
   "id": 1001221,
   "name": "Chain Stratagem",
-  "duration": 20000,
-  "job": "SCH"
+  "job": "SCH",
+  "duration": 20000
  },
  "BANEFUL_IMPACTION": {
   "id": 1003883,
   "name": "Baneful Impaction",
-  "duration": 15000,
-  "job": "SCH"
+  "job": "SCH",
+  "duration": 15000
  },
  "GALVANIZE": {
   "id": 1000297,
   "name": "Galvanize",
-  "duration": 30000,
-  "job": "SCH"
+  "job": "SCH",
+  "duration": 30000
  },
  "CATALYZE": {
   "id": 1001918,
   "name": "Catalyze",
-  "duration": 30000,
-  "job": "SCH"
+  "job": "SCH",
+  "duration": 30000
  },
  "RECITATION": {
   "id": 1001896,
   "name": "Recitation",
-  "duration": 15000,
-  "job": "SCH"
+  "job": "SCH",
+  "duration": 15000
  },
  "DISSIPATION": {
   "id": 1000791,
   "name": "Dissipation",
-  "duration": 30000,
-  "job": "SCH"
+  "job": "SCH",
+  "duration": 30000
  },
  "EXCOGITATION": {
   "id": 1001220,
   "name": "Excogitation",
-  "duration": 45000,
-  "job": "SCH"
+  "job": "SCH",
+  "duration": 45000
  },
  "SACRED_SOIL": {
   "id": 1001944,
   "name": "Sacred Soil",
-  "duration": 15000,
-  "job": "SCH"
+  "job": "SCH",
+  "duration": 15000
  },
  "EMERGENCY_TACTICS": {
   "id": 1000792,
   "name": "Emergency Tactics",
-  "duration": 45000,
-  "job": "SCH"
+  "job": "SCH",
+  "duration": 45000
  },
  "PROTRACTION": {
   "id": 1002710,
   "name": "Protraction",
-  "duration": 10000,
-  "job": "SCH"
+  "job": "SCH",
+  "duration": 10000
  },
  "DESPERATE_MEASURES": {
   "id": 1002711,
   "name": "Desperate Measures",
-  "duration": 20000,
-  "job": "SCH"
+  "job": "SCH",
+  "duration": 20000
  },
  "EXPEDIENCE": {
   "id": 1002712,
   "name": "Expedience",
-  "duration": 10000,
-  "job": "SCH"
+  "job": "SCH",
+  "duration": 10000
  },
  "IMPACT_IMMINENT": {
   "id": 1003882,
   "name": "Impact Imminent",
-  "duration": 30000,
-  "job": "SCH"
+  "job": "SCH",
+  "duration": 30000
  },
  "SERAPHISM": {
   "id": 1003884,
   "name": "Seraphism",
-  "duration": 20000,
-  "job": "SCH"
+  "job": "SCH",
+  "duration": 20000
  },
  "SERAPHISM_HOT": {
   "id": 1003885,
   "name": "Seraphism",
-  "duration": 20000,
-  "job": "SCH"
+  "job": "SCH",
+  "duration": 20000
  },
  "FEY_UNION": {
   "id": 1001223,
@@ -12054,14 +12056,14 @@ export const XIVA_STATUSES: Record<string, XivaStatus> = {
  "WHISPERING_DAWN": {
   "id": 1000315,
   "name": "Whispering Dawn",
-  "duration": 21000,
-  "job": "SCH"
+  "job": "SCH",
+  "duration": 21000
  },
  "ANGELS_WHISPER": {
   "id": 1001874,
   "name": "Angel's Whisper",
-  "duration": 21000,
-  "job": "SCH"
+  "job": "SCH",
+  "duration": 21000
  },
  "EUKRASIA": {
   "id": 1002606,
@@ -12071,62 +12073,62 @@ export const XIVA_STATUSES: Record<string, XivaStatus> = {
  "EUKRASIAN_DIAGNOSIS": {
   "id": 1002607,
   "name": "Eukrasian Diagnosis",
-  "duration": 30000,
-  "job": "SGE"
+  "job": "SGE",
+  "duration": 30000
  },
  "DIFFERENTIAL_DIAGNOSIS": {
   "id": 1002608,
   "name": "Differential Diagnosis",
-  "duration": 30000,
-  "job": "SGE"
+  "job": "SGE",
+  "duration": 30000
  },
  "HAIMA": {
   "id": 1002612,
   "name": "Haima",
-  "duration": 15000,
-  "job": "SGE"
+  "job": "SGE",
+  "duration": 15000
  },
  "HAIMATINON": {
   "id": 1002642,
   "name": "Haimatinon",
-  "duration": 15000,
-  "job": "SGE"
+  "job": "SGE",
+  "duration": 15000
  },
  "EUKRASIAN_PROGNOSIS": {
   "id": 1002609,
   "name": "Eukrasian Prognosis",
-  "duration": 30000,
-  "job": "SGE"
+  "job": "SGE",
+  "duration": 30000
  },
  "PANHAIMA": {
   "id": 1002613,
   "name": "Panhaima",
-  "duration": 15000,
-  "job": "SGE"
+  "job": "SGE",
+  "duration": 15000
  },
  "PANHAIMATINON": {
   "id": 1002643,
   "name": "Panhaimatinon",
-  "duration": 15000,
-  "job": "SGE"
+  "job": "SGE",
+  "duration": 15000
  },
  "PHYSIS": {
   "id": 1002617,
   "name": "Physis",
-  "duration": 15000,
-  "job": "SGE"
+  "job": "SGE",
+  "duration": 15000
  },
  "PHYSIS_II": {
   "id": 1002620,
   "name": "Physis II",
-  "duration": 15000,
-  "job": "SGE"
+  "job": "SGE",
+  "duration": 15000
  },
  "AUTOPHYSIS": {
   "id": 1002621,
   "name": "Autophysis",
-  "duration": 15000,
-  "job": "SGE"
+  "job": "SGE",
+  "duration": 15000
  },
  "KARDIA": {
   "id": 1002604,
@@ -12141,135 +12143,135 @@ export const XIVA_STATUSES: Record<string, XivaStatus> = {
  "PHILOSOPHIA": {
   "id": 1003898,
   "name": "Philosophia",
-  "duration": 20000,
-  "job": "SGE"
+  "job": "SGE",
+  "duration": 20000
  },
  "EUDAIMONIA": {
   "id": 1003899,
   "name": "Eudaimonia",
-  "duration": 20000,
-  "job": "SGE"
+  "job": "SGE",
+  "duration": 20000
  },
  "SOTERIA": {
   "id": 1002610,
   "name": "Soteria",
+  "job": "SGE",
   "duration": 15000,
-  "stacksApplied": 4,
-  "job": "SGE"
+  "stacksApplied": 4
  },
  "ZOE": {
   "id": 1002611,
   "name": "Zoe",
-  "duration": 30000,
-  "job": "SGE"
+  "job": "SGE",
+  "duration": 30000
  },
  "KRASIS": {
   "id": 1002622,
   "name": "Krasis",
-  "duration": 10000,
-  "job": "SGE"
+  "job": "SGE",
+  "duration": 10000
  },
  "KERACHOLE": {
   "id": 1002618,
   "name": "Kerachole",
-  "duration": 15000,
-  "job": "SGE"
+  "job": "SGE",
+  "duration": 15000
  },
  "KERAKEIA": {
   "id": 1002938,
   "name": "Kerakeia",
-  "duration": 15000,
-  "job": "SGE"
+  "job": "SGE",
+  "duration": 15000
  },
  "TAUROCHOLE": {
   "id": 1002619,
   "name": "Taurochole",
-  "duration": 15000,
-  "job": "SGE"
+  "job": "SGE",
+  "duration": 15000
  },
  "EUKRASIAN_DOSIS": {
   "id": 1002614,
   "name": "Eukrasian Dosis",
-  "duration": 30000,
-  "job": "SGE"
+  "job": "SGE",
+  "duration": 30000
  },
  "EUKRASIAN_DOSIS_II": {
   "id": 1002615,
   "name": "Eukrasian Dosis II",
-  "duration": 30000,
-  "job": "SGE"
+  "job": "SGE",
+  "duration": 30000
  },
  "EUKRASIAN_DOSIS_III": {
   "id": 1002616,
   "name": "Eukrasian Dosis III",
-  "duration": 30000,
-  "job": "SGE"
+  "job": "SGE",
+  "duration": 30000
  },
  "EUKRASIAN_DYSKRASIA": {
   "id": 1003897,
   "name": "Eukrasian Dyskrasia",
-  "duration": 30000,
-  "job": "SGE"
+  "job": "SGE",
+  "duration": 30000
  },
  "PNEUMA": {
   "id": 1002623,
   "name": "Pneuma",
-  "duration": 20000,
-  "job": "SGE"
+  "job": "SGE",
+  "duration": 20000
  },
  "HOLOS": {
   "id": 1003003,
   "name": "Holos",
-  "duration": 20000,
-  "job": "SGE"
+  "job": "SGE",
+  "duration": 20000
  },
  "HOLOSAKOS": {
   "id": 1003365,
   "name": "Holosakos",
-  "duration": 30000,
-  "job": "SGE"
+  "job": "SGE",
+  "duration": 30000
  },
  "RADIANT_AEGIS": {
   "id": 1002702,
   "name": "Radiant Aegis",
-  "duration": 30000,
-  "job": "SMN"
+  "job": "SMN",
+  "duration": 30000
  },
  "FURTHER_RUIN": {
   "id": 1001212,
   "name": "Further Ruin",
-  "duration": 60000,
-  "job": "SMN"
+  "job": "SMN",
+  "duration": 60000
  },
  "SEARING_LIGHT": {
   "id": 1002703,
   "name": "Searing Light",
-  "duration": 30000,
-  "job": "SMN"
+  "job": "SMN",
+  "duration": 30000
  },
  "EVERLASTING_FLIGHT": {
   "id": 1001868,
   "name": "Everlasting Flight",
-  "duration": 21000,
-  "job": "SMN"
+  "job": "SMN",
+  "duration": 21000
  },
  "REKINDLE": {
   "id": 1002704,
   "name": "Rekindle",
-  "duration": 30000,
-  "job": "SMN"
+  "job": "SMN",
+  "duration": 30000
  },
  "UNDYING_FLAME": {
   "id": 1002705,
   "name": "Undying Flame",
-  "duration": 15000,
-  "job": "SMN"
+  "job": "SMN",
+  "duration": 15000
  },
  "SLIPSTREAM": {
   "id": 1002706,
   "name": "Slipstream",
-  "duration": 15000,
-  "job": "SMN"
+  "job": "SMN",
+  "duration": 15000
  },
  "CRIMSON_STRIKE_READY": {
   "id": 1004403,
@@ -12292,99 +12294,99 @@ export const XIVA_STATUSES: Record<string, XivaStatus> = {
  "HUNTERS_INSTINCT": {
   "id": 1003668,
   "name": "Hunter's Instinct",
-  "duration": 40000,
-  "job": "VPR"
+  "job": "VPR",
+  "duration": 40000
  },
  "SWIFTSCALED": {
   "id": 1003669,
   "name": "Swiftscaled",
+  "job": "VPR",
   "duration": 40000,
-  "speedModifier": 0.85,
-  "job": "VPR"
+  "speedModifier": 0.85
  },
  "FLANKSTUNG_VENOM": {
   "id": 1003645,
   "name": "Flankstung Venom",
-  "duration": 60000,
-  "job": "VPR"
+  "job": "VPR",
+  "duration": 60000
  },
  "FLANKSBANE_VENOM": {
   "id": 1003646,
   "name": "Flanksbane Venom",
-  "duration": 60000,
-  "job": "VPR"
+  "job": "VPR",
+  "duration": 60000
  },
  "HINDSTUNG_VENOM": {
   "id": 1003647,
   "name": "Hindstung Venom",
-  "duration": 60000,
-  "job": "VPR"
+  "job": "VPR",
+  "duration": 60000
  },
  "HINDSBANE_VENOM": {
   "id": 1003648,
   "name": "Hindsbane Venom",
-  "duration": 60000,
-  "job": "VPR"
+  "job": "VPR",
+  "duration": 60000
  },
  "GRIMHUNTERS_VENOM": {
   "id": 1003649,
   "name": "Grimhunter's Venom",
-  "duration": 60000,
-  "job": "VPR"
+  "job": "VPR",
+  "duration": 60000
  },
  "GRIMSKINS_VENOM": {
   "id": 1003650,
   "name": "Grimskin's Venom",
-  "duration": 60000,
-  "job": "VPR"
+  "job": "VPR",
+  "duration": 60000
  },
  "HUNTERS_VENOM": {
   "id": 1003657,
   "name": "Hunter's Venom",
-  "duration": 30000,
-  "job": "VPR"
+  "job": "VPR",
+  "duration": 30000
  },
  "SWIFTSKINS_VENOM": {
   "id": 1003658,
   "name": "Swiftskin's Venom",
-  "duration": 30000,
-  "job": "VPR"
+  "job": "VPR",
+  "duration": 30000
  },
  "FELLHUNTERS_VENOM": {
   "id": 1003659,
   "name": "Fellhunter's Venom",
-  "duration": 30000,
-  "job": "VPR"
+  "job": "VPR",
+  "duration": 30000
  },
  "FELLSKINS_VENOM": {
   "id": 1003660,
   "name": "Fellskin's Venom",
-  "duration": 30000,
-  "job": "VPR"
+  "job": "VPR",
+  "duration": 30000
  },
  "POISED_FOR_TWINFANG": {
   "id": 1003665,
   "name": "Poised for Twinfang",
-  "duration": 60000,
-  "job": "VPR"
+  "job": "VPR",
+  "duration": 60000
  },
  "POISED_FOR_TWINBLOOD": {
   "id": 1003666,
   "name": "Poised for Twinblood",
-  "duration": 60000,
-  "job": "VPR"
+  "job": "VPR",
+  "duration": 60000
  },
  "READY_TO_REAWAKEN": {
   "id": 1003671,
   "name": "Ready to Reawaken",
-  "duration": 30000,
-  "job": "VPR"
+  "job": "VPR",
+  "duration": 30000
  },
  "REAWAKENED": {
   "id": 1003670,
   "name": "Reawakened",
-  "duration": 30000,
-  "job": "VPR"
+  "job": "VPR",
+  "duration": 30000
  },
  "DEFIANCE": {
   "id": 1000091,
@@ -12394,197 +12396,197 @@ export const XIVA_STATUSES: Record<string, XivaStatus> = {
  "SURGING_TEMPEST": {
   "id": 1002677,
   "name": "Surging Tempest",
-  "duration": 60000,
-  "job": "WAR"
+  "job": "WAR",
+  "duration": 60000
  },
  "EQUILIBRIUM": {
   "id": 1002681,
   "name": "Equilibrium",
-  "duration": 15000,
-  "job": "WAR"
+  "job": "WAR",
+  "duration": 15000
  },
  "THRILL_OF_BATTLE": {
   "id": 1000087,
   "name": "Thrill Of Battle",
-  "duration": 10000,
-  "job": "WAR"
+  "job": "WAR",
+  "duration": 10000
  },
  "HOLMGANG": {
   "id": 1000409,
   "name": "Holmgang",
-  "duration": 10000,
-  "job": "WAR"
+  "job": "WAR",
+  "duration": 10000
  },
  "VENGEANCE": {
   "id": 1000089,
   "name": "Vengeance",
-  "duration": 15000,
-  "job": "WAR"
+  "job": "WAR",
+  "duration": 15000
  },
  "BLOODWHETTING": {
   "id": 1002678,
   "name": "Bloodwhetting",
-  "duration": 8000,
-  "job": "WAR"
+  "job": "WAR",
+  "duration": 8000
  },
  "STEM_THE_FLOW": {
   "id": 1002679,
   "name": "Stem the Flow",
-  "duration": 4000,
-  "job": "WAR"
+  "job": "WAR",
+  "duration": 4000
  },
  "STEM_THE_TIDE": {
   "id": 1002680,
   "name": "Stem the Tide",
-  "duration": 20000,
-  "job": "WAR"
+  "job": "WAR",
+  "duration": 20000
  },
  "NASCENT_FLASH": {
   "id": 1001857,
   "name": "Nascent Flash",
-  "duration": 8000,
-  "job": "WAR"
+  "job": "WAR",
+  "duration": 8000
  },
  "NASCENT_GLINT": {
   "id": 1001858,
   "name": "Nascent Glint",
-  "duration": 8000,
-  "job": "WAR"
+  "job": "WAR",
+  "duration": 8000
  },
  "SHAKE_IT_OFF": {
   "id": 1001457,
   "name": "Shake It Off",
-  "duration": 30000,
-  "job": "WAR"
+  "job": "WAR",
+  "duration": 30000
  },
  "SHAKE_IT_OFF_OVER_TIME": {
   "id": 1002108,
   "name": "Shake It Off (Over Time)",
-  "duration": 15000,
-  "job": "WAR"
+  "job": "WAR",
+  "duration": 15000
  },
  "NASCENT_CHAOS": {
   "id": 1001897,
   "name": "Nascent Chaos",
-  "duration": 30000,
-  "job": "WAR"
+  "job": "WAR",
+  "duration": 30000
  },
  "INNER_RELEASE": {
   "id": 1001177,
   "name": "Inner Release",
+  "job": "WAR",
   "duration": 15000,
-  "stacksApplied": 3,
-  "job": "WAR"
+  "stacksApplied": 3
  },
  "PRIMAL_REND_READY": {
   "id": 1002624,
   "name": "Primal Rend Ready",
-  "duration": 30000,
-  "job": "WAR"
+  "job": "WAR",
+  "duration": 30000
  },
  "PRIMAL_RUINATION_READY": {
   "id": 1003834,
   "name": "Primal Ruination Ready",
-  "duration": 20000,
-  "job": "WAR"
+  "job": "WAR",
+  "duration": 20000
  },
  "BURGEONING_FURY": {
   "id": 1003833,
   "name": "Burgeoning Fury",
-  "duration": 30000,
-  "job": "WAR"
+  "job": "WAR",
+  "duration": 30000
  },
  "WRATHFUL": {
   "id": 1003901,
   "name": "Wrathful",
-  "duration": 30000,
-  "job": "WAR"
+  "job": "WAR",
+  "duration": 30000
  },
  "DAMNATION": {
   "id": 1003832,
   "name": "Damnation",
-  "duration": 15000,
-  "job": "WAR"
+  "job": "WAR",
+  "duration": 15000
  },
  "PRIMEVAL_IMPULSE": {
   "id": 1003900,
   "name": "Primeval Impulse",
-  "duration": 15000,
-  "job": "WAR"
+  "job": "WAR",
+  "duration": 15000
  },
  "DIVINE_AURA": {
   "id": 1003904,
   "name": "Divine Aura",
-  "duration": 15000,
-  "job": "WHM"
+  "job": "WHM",
+  "duration": 15000
  },
  "DIVINE_CARESS": {
   "id": 1003903,
   "name": "Divine Caress",
-  "duration": 10000,
-  "job": "WHM"
+  "job": "WHM",
+  "duration": 10000
  },
  "DIVINE_GRACE": {
   "id": 1003881,
   "name": "Divine Grace",
-  "duration": 30000,
-  "job": "WHM"
+  "job": "WHM",
+  "duration": 30000
  },
  "MEDICA_III": {
   "id": 1003880,
   "name": "Medica III",
-  "duration": 15000,
-  "job": "WHM"
+  "job": "WHM",
+  "duration": 15000
  },
  "SACRED_SIGHT": {
   "id": 1003879,
   "name": "Sacred Sight",
+  "job": "WHM",
   "duration": 30000,
-  "stacksApplied": 3,
-  "job": "WHM"
+  "stacksApplied": 3
  },
  "LITURGY_OF_THE_BELL": {
   "id": 1002709,
   "name": "Liturgy of the Bell",
+  "job": "WHM",
   "duration": 20000,
-  "stacksApplied": 5,
-  "job": "WHM"
+  "stacksApplied": 5
  },
  "AQUAVEIL": {
   "id": 1002708,
   "name": "Aquaveil",
-  "duration": 8000,
-  "job": "WHM"
+  "job": "WHM",
+  "duration": 8000
  },
  "DIA": {
   "id": 1001871,
   "name": "Dia",
-  "duration": 30000,
-  "job": "WHM"
+  "job": "WHM",
+  "duration": 30000
  },
  "TEMPERANCE": {
   "id": 1001872,
   "name": "Temperance",
-  "duration": 20000,
-  "job": "WHM"
+  "job": "WHM",
+  "duration": 20000
  },
  "CONFESSION": {
   "id": 1001219,
   "name": "Confession",
-  "duration": 10000,
-  "job": "WHM"
+  "job": "WHM",
+  "duration": 10000
  },
  "REGEN": {
   "id": 1000158,
   "name": "Regen",
-  "duration": 18000,
-  "job": "WHM"
+  "job": "WHM",
+  "duration": 18000
  },
  "MEDICA_II": {
   "id": 1000150,
   "name": "Medica II",
-  "duration": 15000,
-  "job": "WHM"
+  "job": "WHM",
+  "duration": 15000
  },
  "AERO": {
   "id": 1000143,
@@ -12604,26 +12606,26 @@ export const XIVA_STATUSES: Record<string, XivaStatus> = {
  "DIVINE_BENISON": {
   "id": 1001218,
   "name": "Divine Benison",
-  "duration": 15000,
-  "job": "WHM"
+  "job": "WHM",
+  "duration": 15000
  },
  "ASYLUM": {
   "id": 1001911,
   "name": "Asylum",
-  "duration": 24000,
-  "job": "WHM"
+  "job": "WHM",
+  "duration": 24000
  },
  "THIN_AIR": {
   "id": 1001217,
   "name": "Thin Air",
-  "duration": 12000,
-  "job": "WHM"
+  "job": "WHM",
+  "duration": 12000
  },
  "PRESENCE_OF_MIND": {
   "id": 1000157,
   "name": "Presence of Mind",
+  "job": "WHM",
   "duration": 15000,
-  "speedModifier": 0.8,
-  "job": "WHM"
+  "speedModifier": 0.8
  }
 };

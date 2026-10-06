@@ -41,6 +41,19 @@ const STATUS_ID_OFFSET = 1000000;
 const ITEM_ID_OFFSET = 1000000;
 const KNOWN_CONSTANTS = { ITEM_ID_OFFSET, STATUS_ID_OFFSET };
 
+// Fields carried into the output; must match XivaAction / XivaStatus below,
+// so a new upstream field can't break the typecheck.
+const ACTION_FIELDS = ['id', 'name', 'job', 'onGcd', 'breaksCombo', 'combo', 'castTime', 'cooldown', 'gcdRecast',
+  'cooldownGroup', 'autoAttack', 'statusesApplied', 'charges', 'mpCost', 'damageType', 'speedAttribute',
+  'potencies', 'potency', 'pet', 'duration'];
+const STATUS_FIELDS = ['id', 'name', 'job', 'duration', 'stacksApplied', 'speedModifier', 'amount'];
+
+function pickFields(record, fields) {
+  for (const [key, entry] of Object.entries(record)) {
+    record[key] = Object.fromEntries(fields.filter((f) => entry[f] !== undefined).map((f) => [f, entry[f]]));
+  }
+}
+
 const warnings = [];
 
 // ─── Literal evaluator ─────────────────────────────────────────────────────
@@ -218,6 +231,8 @@ function main() {
     s.id += STATUS_ID_OFFSET;
   }
   for (const [key, a] of Object.entries(actions.merged)) if (a.id <= 0) delete actions.merged[key];
+  pickFields(actions.merged, ACTION_FIELDS);
+  pickFields(statuses.merged, STATUS_FIELDS);
 
   const patches = [...new Set([...actionLayers, ...statusLayers].map((l) => l.patch))]
     .sort((a, b) => Number(a) - Number(b));
@@ -257,7 +272,7 @@ export type XivaAction = {
   job:             string;    // xivanalysis root file: GNB, ROLE, ITEMS, ...
   onGcd?:          boolean;
   breaksCombo?:    boolean;
-  combo?:          { start?: true; from?: number | number[]; end?: true };
+  combo?:          { start?: boolean; from?: number | number[]; end?: boolean; potency?: number };
   castTime?:       number;    // ms
   cooldown?:       number;    // ms; the recast for GCDs
   gcdRecast?:      number;    // ms; GCD lock of a GCD with its own cooldown
@@ -270,6 +285,8 @@ export type XivaAction = {
   speedAttribute?: string;    // "SKILL_SPEED" | "SPELL_SPEED"
   potencies?:      XivaPotency[];
   potency?:        number | number[];
+  pet?:            boolean;   // cast by the player's pet
+  duration?:       number;    // ms; effect length on a few actions
 };
 
 export type XivaStatus = {
@@ -279,6 +296,7 @@ export type XivaStatus = {
   duration?:      number;     // ms
   stacksApplied?: number;
   speedModifier?: number;
+  amount?:        number;
 };
 
 export const XIVA_SOURCE = ${JSON.stringify({ commit, commitDate, patches })} as const;
