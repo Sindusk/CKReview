@@ -122,6 +122,34 @@ It loads pulls lazily and keeps three in memory, so narrowing with
   anything inside the clone.
 - Model and choices: [damage-analysis-plan.md](damage-analysis-plan.md).
 
+## Damage analysis (WoW)
+
+- **Spell tables are measured, not copied.** WoWAnalyzer is AGPL, so
+  `lib/damage/wow/spell-data.ts` is generated from our own logs:
+  1. `node scripts/survey-wow-spells.js <code> --kills` (or
+     `--fight <id>...`) fetches four unfiltered streams for each fight and
+     keeps only per-spec statistics, in
+     `sampledata/wow/<code>/survey/<fightId>.json`. A long kill costs
+     about 25 points.
+  2. `node scripts/build-wow-spell-data.js` rebuilds `spell-data.ts` from
+     every survey on disk. The edit gate blocks it as a script that writes
+     source; run it with `ALLOW_SHELL_EDITS=1`.
+
+  Survey more fights (new specs, a new tier) and rebuild. The fetch
+  filters (`lib/damage/wow/buff-stream.ts`) follow the table, so samples
+  fetched before a rebuild may lack newly tracked auras.
+- **WoW samples need a capture fetched after 2026-10-06** for the damage
+  fields (aura snapshot, hit type, resources, pets, player buffs, enemy
+  debuffs). Older captures load with those fields undefined.
+- **`--refetch` downloads every fight in the report,** not only the pulls
+  already on disk. Pulls new to the folder have no baseline, so
+  `validate.js --check` fails on them with additions only. Delete them, or
+  narrow the refetch with `--boss`.
+- **The harness ignores the two damage streams for timing.**
+  `build-wow-players.js` (pull start) and `validate.js`
+  (`fightDurationMs`) leave out `playerBuffs` and `enemyDebuffs` on WoW.
+  Counting them moved Ula'tek's "pull ended N s later" by 0.1s.
+
 ## Mitigation analysis (FFXIV)
 
 - **Catalog check.** `node scripts/check-mitigation-catalog.js` checks

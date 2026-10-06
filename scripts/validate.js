@@ -102,11 +102,15 @@ function toFightRelative(rep) {
 // duration signal available; it undercounts slightly (no events fire in
 // the last instant before a wipe/kill) but that's negligible against the
 // multi-minute thresholds anything here gates on (see wave-cannon.ts).
-function fightDurationMs(rep) {
+// `ignore`: streams left out. WoW leaves out the damage analysis's
+// playerBuffs/enemyDebuffs (added 2026-10-06), whose edge events shifted
+// mechanic timings by ~0.1s; FFXIV baselines were built with them counted.
+function fightDurationMs(rep, ignore = new Set()) {
   // Loop, not Math.max(...spread): large WoW pulls exceed the call-stack
   // argument limit.
   let min = Infinity, max = -Infinity;
   for (const k of STREAM_KEYS) {
+    if (ignore.has(k)) continue;
     for (const e of (rep[k]?.data ?? [])) {
       if (e.timestamp < min) min = e.timestamp;
       if (e.timestamp > max) max = e.timestamp;
@@ -147,10 +151,11 @@ function makeFFPullCtx(pull, actorMap, abilityMap, getFFJobByName) {
 // all modules the same objects too. Keyed on the pull object, so a report's
 // contexts are freed once the driver moves on to the next report.
 const wowPullCache = new WeakMap();
+const WOW_DURATION_IGNORED_STREAMS = new Set(['playerBuffs', 'enemyDebuffs']);
 function wowPullContext(pull, actorMap, abilityMap, getSpecInfo) {
   if (!wowPullCache.has(pull)) {
     const built = buildWowPull(pull.rep, actorMap, abilityMap, getSpecInfo);
-    wowPullCache.set(pull, { ...built, pullDurationMs: fightDurationMs(pull.rep) });
+    wowPullCache.set(pull, { ...built, pullDurationMs: fightDurationMs(pull.rep, WOW_DURATION_IGNORED_STREAMS) });
   }
   return wowPullCache.get(pull);
 }

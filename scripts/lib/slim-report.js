@@ -56,17 +56,39 @@ function project(streams, projectors) {
 const WCL_PROJECTORS = {
   deaths:        (e) => omit(e, ['fight']),
   combatantInfo: (e) => pick(e, ['timestamp', 'type', 'sourceID', 'specID']),
-  casts:         (e) => pick(e, ['timestamp', 'type', 'sourceID', 'targetID', 'targetInstance', 'sourceInstance', 'abilityGameID', 'x', 'y']),
-  damageDone:    (e) => pick(e, ['timestamp', 'type', 'sourceID', 'targetID', 'abilityGameID', 'amount', 'overkill', 'tick', 'x', 'y', 'sourceInstance']),
+  // Damage analysis (docs/damage-analysis-plan.md, "WoW port"): `fake`,
+  // `empowermentLevel` and the caster's `classResources` on casts; on
+  // damage done, the aura snapshot (cut to the tracked ids, see
+  // slimWclReport), hitType, unmitigatedAmount, the target's HP after the
+  // hit and its instance.
+  casts:         (e) => pick(e, ['timestamp', 'type', 'sourceID', 'targetID', 'targetInstance', 'sourceInstance', 'abilityGameID', 'x', 'y',
+    'fake', 'empowermentLevel', 'resourceActor', ...(e.resourceActor === 1 ? ['classResources'] : [])]),
+  damageDone:    (e) => pick(e, ['timestamp', 'type', 'sourceID', 'targetID', 'abilityGameID', 'amount', 'overkill', 'tick', 'x', 'y', 'sourceInstance',
+    'buffs', 'hitType', 'unmitigatedAmount', 'hitPoints', 'maxHitPoints', 'targetInstance']),
   damageTaken:   (e) => pick(e, ['timestamp', 'type', 'sourceID', 'targetID', 'abilityGameID', 'amount', 'overkill', 'tick', 'hitPoints', 'maxHitPoints', 'x', 'y', 'sourceInstance']),
   healing:       (e) => pick(e, ['timestamp', 'type', 'sourceID', 'targetID', 'targetInstance', 'abilityGameID', 'amount', 'overheal', 'hitPoints', 'maxHitPoints']),
   debuffs:       (e) => omit(e, ['fight']),
   enemyCasts:    (e) => omit(e, ['fight']),
   enemyBuffs:    (e) => omit(e, ['fight']),
+  playerBuffs:   (e) => omit(e, ['fight']),
+  enemyDebuffs:  (e) => omit(e, ['fight']),
 };
 
-function slimWclReport(streams) {
-  return project(streams, WCL_PROJECTORS);
+// `trackedIds` (lib/damage/wow/buff-stream.ts WOW_PLAYER_BUFF_IDS): the
+// damage-done aura snapshot keeps only these. WCL lists ~14 auras per hit;
+// all of them would add ~8.6MB to a long pull. The string stays in WCL's
+// own "id.id." form so the live transform reads samples unchanged.
+function slimWclReport(streams, trackedIds) {
+  const out = project(streams, WCL_PROJECTORS);
+  if (trackedIds) {
+    const keep = new Set(trackedIds.map(String));
+    for (const e of out.damageDone.data) {
+      if (e.buffs === undefined) continue;
+      const ids = e.buffs.split('.').filter((id) => id && keep.has(id));
+      e.buffs = ids.length ? ids.join('.') + '.' : '';
+    }
+  }
+  return out;
 }
 
 // ─── FFLogs (FFXIV) ─────────────────────────────────────────────────────────

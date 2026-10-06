@@ -16,6 +16,7 @@ import {
   type RateLimitStatus,
 } from "./rate-limit";
 import { attachEncounterPhases, type EncounterPhase, type ReportEncounterPhases } from "./pull-phases";
+import { WOW_ENEMY_DEBUFF_FILTER, WOW_PLAYER_BUFF_FILTER } from "./damage/wow/buff-stream";
 
 const GQL_ENDPOINT = "https://www.warcraftlogs.com/api/v2/user";
 
@@ -190,6 +191,10 @@ export type WCLActor = {
                       // rules) treats anything NOT "Player" as a valid enemy
                       // source — see log-transforms.ts.
   subType: string;    // spec name, e.g. "Arms", "Holy" — empty/irrelevant for NPCs
+  // The owning player's actor id, on pets and guardians (Rune Weapon,
+  // Darkglare, Hunter pets). Pet damage is credited to its owner for the
+  // damage analysis. Absent in reports fetched before it was requested.
+  petOwner?: number | null;
 };
 
 // A single ability/spell used anywhere in the report (players, NPCs, bosses —
@@ -230,7 +235,9 @@ export type WCLCastEvent = {
   // surface both — enemyCast raid-error rules only count "cast" (see
   // log-transforms.ts wclBuildEnemyCastEvents), matching how a real interrupt
   // would prevent "cast" from ever firing.
-  type:          "cast" | "begincast";
+  // Evoker empowered spells log "empowerstart" (with a "cast" at the same
+  // ms) and "empowerend" (with `empowermentLevel`) at release.
+  type:          "cast" | "begincast" | "empowerstart" | "empowerend";
   sourceID:      number;
   sourceInstance?: number; // which copy of a multi-spawn NPC cast it (e.g. one Broodling of Ithraz)
   targetID?:     number;  // -1 or absent = no meaningful target (self-cast/ground-targeted/etc.)
@@ -238,6 +245,12 @@ export type WCLCastEvent = {
   ability?: {
     name: string;
   };
+  // Made by WCL, not a button press (Shadowy Apparition, Reclamation, ...).
+  fake?:             boolean;
+  empowermentLevel?: number;
+  // 1 = classResources are the caster's (always so on player casts):
+  // amount before the cast, max and cost. The secondary resource (combo
+  // points, Holy Power, Essence) appears on its spenders only.
   resourceActor?: number;
   classResources?: Array<{
     amount: number;
@@ -283,6 +296,15 @@ export type WCLDamageEvent = {
   // Midnight Falls' Light's End crystal-position rule.
   x?:            number;
   y?:            number;
+  // Damage analysis (docs/damage-analysis-plan.md, "WoW port"): every aura
+  // on the attacker as a "id.id.id." string (procs included; HoTs, shields
+  // and target debuffs not); 1 normal, 2 crit, 0 miss, 8 parry, 10 immune;
+  // the amount before crit and target-side modifiers.
+  buffs?:             string;
+  hitType?:           number;
+  unmitigatedAmount?: number;
+  sourceInstance?:    number;
+  targetInstance?:    number;
 };
 
 export type WCLHealEvent = {
@@ -328,6 +350,29 @@ export type WCLBuffEvent = {
   ability?: {
     name: string;
   };
+};
+
+// Damage analysis streams (docs/damage-analysis-plan.md, "WoW port"):
+// friendly Buffs filtered to lib/damage/wow/buff-stream.ts's list, and
+// Debuffs players put on enemies filtered to their DoTs and party debuffs.
+// No `duration` on applies (unlike FFLogs).
+export type WCLPlayerBuffEvent = {
+  timestamp:     number;
+  type:          "applybuff" | "refreshbuff" | "removebuff" | "applybuffstack" | "removebuffstack";
+  sourceID:      number;
+  targetID:      number;
+  abilityGameID: number;
+  stack?:        number;
+};
+
+export type WCLEnemyDebuffEvent = {
+  timestamp:       number;
+  type:            "applydebuff" | "refreshdebuff" | "removedebuff" | "applydebuffstack" | "removedebuffstack";
+  sourceID:        number;
+  targetID:        number;
+  targetInstance?: number;
+  abilityGameID:   number;
+  stack?:          number;
 };
 
 export type WCLEvent =
@@ -403,6 +448,7 @@ const REPORT_QUERY = /* graphql */`
             name
             type
             subType
+            petOwner
           }
           abilities {
             gameID
@@ -467,22 +513,44 @@ export function buildFightLogLabels(fights: WCLFight[]): Map<number, string> {
 // same $code/$fightIDs/$endTime).
 //
 // This also satisfies the "request only the specific fields you need"
-// guidance — every one of these 9 fields is actually consumed by
+// guidance — every one of these fields is actually consumed by
 // log-transforms.ts, so nothing extraneous is being pulled in per fight.
+//
+// ── Cost: finished streams are dropped ─────────────────────────────────
+// WCL charges about one point per aliased stream per request, whatever
+// its size, and an empty stream pinned at endTime costs the same
+// (measured 2026-10-06, docs/damage-analysis-plan.md "WoW port"). So each
+// alias carries `@include(if: $<key>Want)` and a finished stream is turned
+// off: page 1 pays for every stream, later pages only for the busy ones
+// (damage done, healing). That also pays for the two damage-analysis
+// streams, playerBuffs and enemyDebuffs, which are filtered on the server
+// to lib/damage/wow/buff-stream.ts's lists.
+const STREAM_ARGS = {
+  deaths:        "dataType: Deaths, includeResources: true",
+  combatantInfo: "dataType: CombatantInfo, includeResources: true",
+  casts:         "dataType: Casts, includeResources: true",
+  damageDone:    "dataType: DamageDone, includeResources: true",
+  damageTaken:   "dataType: DamageTaken, includeResources: true",
+  healing:       "dataType: Healing, includeResources: true",
+  debuffs:       "dataType: Debuffs, includeResources: true",
+  enemyCasts:    "dataType: Casts, hostilityType: Enemies, includeResources: true",
+  enemyBuffs:    "dataType: Buffs, hostilityType: Enemies, includeResources: true",
+  playerBuffs:   "dataType: Buffs, filterExpression: $playerBuffFilter",
+  enemyDebuffs:  "dataType: Debuffs, hostilityType: Enemies, filterExpression: $enemyDebuffFilter",
+} as const;
+
+// One entry per alias in FIGHT_EVENTS_QUERY. Order doesn't matter, it's
+// just used to loop generically over every stream when paginating.
+const STREAM_KEYS = Object.keys(STREAM_ARGS) as (keyof typeof STREAM_ARGS)[];
+
 const FIGHT_EVENTS_QUERY = /* graphql */`
   query GetFightEvents(
-    $code:               String!
-    $fightIDs:            [Int]!
-    $endTime:             Float!
-    $deathsStart:         Float!
-    $combatantInfoStart:  Float!
-    $castsStart:          Float!
-    $damageDoneStart:     Float!
-    $damageTakenStart:    Float!
-    $healingStart:        Float!
-    $debuffsStart:        Float!
-    $enemyCastsStart:     Float!
-    $enemyBuffsStart:     Float!
+    $code:              String!
+    $fightIDs:          [Int]!
+    $endTime:           Float!
+    $playerBuffFilter:  String
+    $enemyDebuffFilter: String
+    ${STREAM_KEYS.map((k) => `$${k}Start: Float!\n    $${k}Want: Boolean!`).join("\n    ")}
   ) {
     rateLimitData {
       limitPerHour
@@ -491,50 +559,10 @@ const FIGHT_EVENTS_QUERY = /* graphql */`
     }
     reportData {
       report(code: $code) {
-        deaths: events(
-          fightIDs: $fightIDs, startTime: $deathsStart, endTime: $endTime,
-          dataType: Deaths, includeResources: true
-        ) { data nextPageTimestamp }
-
-        combatantInfo: events(
-          fightIDs: $fightIDs, startTime: $combatantInfoStart, endTime: $endTime,
-          dataType: CombatantInfo, includeResources: true
-        ) { data nextPageTimestamp }
-
-        casts: events(
-          fightIDs: $fightIDs, startTime: $castsStart, endTime: $endTime,
-          dataType: Casts, includeResources: true
-        ) { data nextPageTimestamp }
-
-        damageDone: events(
-          fightIDs: $fightIDs, startTime: $damageDoneStart, endTime: $endTime,
-          dataType: DamageDone, includeResources: true
-        ) { data nextPageTimestamp }
-
-        damageTaken: events(
-          fightIDs: $fightIDs, startTime: $damageTakenStart, endTime: $endTime,
-          dataType: DamageTaken, includeResources: true
-        ) { data nextPageTimestamp }
-
-        healing: events(
-          fightIDs: $fightIDs, startTime: $healingStart, endTime: $endTime,
-          dataType: Healing, includeResources: true
-        ) { data nextPageTimestamp }
-
-        debuffs: events(
-          fightIDs: $fightIDs, startTime: $debuffsStart, endTime: $endTime,
-          dataType: Debuffs, includeResources: true
-        ) { data nextPageTimestamp }
-
-        enemyCasts: events(
-          fightIDs: $fightIDs, startTime: $enemyCastsStart, endTime: $endTime,
-          dataType: Casts, hostilityType: Enemies, includeResources: true
-        ) { data nextPageTimestamp }
-
-        enemyBuffs: events(
-          fightIDs: $fightIDs, startTime: $enemyBuffsStart, endTime: $endTime,
-          dataType: Buffs, hostilityType: Enemies, includeResources: true
-        ) { data nextPageTimestamp }
+        ${STREAM_KEYS.map((k) => `${k}: events(
+          fightIDs: $fightIDs, startTime: $${k}Start, endTime: $endTime,
+          ${STREAM_ARGS[k]}
+        ) @include(if: $${k}Want) { data nextPageTimestamp }`).join("\n\n        ")}
       }
     }
   }
@@ -554,16 +582,11 @@ type FightEventsQueryResult = {
       debuffs:        EventStream<WCLDebuffEvent>;
       enemyCasts:     EventStream<WCLCastEvent>;
       enemyBuffs:     EventStream<WCLBuffEvent>;
+      playerBuffs:    EventStream<WCLPlayerBuffEvent>;
+      enemyDebuffs:   EventStream<WCLEnemyDebuffEvent>;
     };
   };
 };
-
-// One entry per alias in FIGHT_EVENTS_QUERY above. Order doesn't matter,
-// it's just used to loop generically over every stream when paginating.
-const STREAM_KEYS = [
-  "deaths", "combatantInfo", "casts", "damageDone",
-  "damageTaken", "healing", "debuffs", "enemyCasts", "enemyBuffs",
-] as const;
 
 type StreamKey = typeof STREAM_KEYS[number];
 
@@ -586,17 +609,20 @@ export type WCLFightData = {
   debuffEvents:      WCLDebuffEvent[];     // friendly-hostility debuffs (players) — unchanged behavior
   enemyCastEvents:   WCLCastEvent[];       // hostilityType: Enemies, feeds "enemyCast" rules
   enemyBuffEvents:   WCLBuffEvent[];       // hostilityType: Enemies, feeds "enemyBuffApplied" rules
+  // Damage analysis streams. Absent on samples fetched before they existed.
+  playerBuffEvents?:  WCLPlayerBuffEvent[];
+  enemyDebuffEvents?: WCLEnemyDebuffEvent[];
 };
 
 /**
  * Fetches all event types for a single fight — as ONE merged GraphQL
- * request per page (see FIGHT_EVENTS_QUERY above), instead of the previous
- * 9 parallel requests. Each of the 9 event streams paginates independently
- * via its own cursor: once a stream's nextPageTimestamp comes back null (or
- * >= the fight's endTime) it's "done" and its cursor is pinned to endTime,
- * so subsequent merged requests cost it a cheap empty page instead of a
- * whole separate HTTP round-trip. In the common case (no single event type
- * needs more than one page) this whole function costs exactly ONE request.
+ * request per page (see FIGHT_EVENTS_QUERY above), instead of separate
+ * parallel requests. Each event stream paginates independently via its
+ * own cursor: once a stream's nextPageTimestamp comes back null (or >= the
+ * fight's endTime) it's "done" and left out of later pages (its @include
+ * flag goes false), so it stops costing points. In the common case (no
+ * single event type needs more than one page) this whole function costs
+ * exactly ONE request.
  *
  * Actors are passed in from report-level masterData to avoid re-fetching.
  * All data is fetched eagerly so downstream components read from memory only.
@@ -613,43 +639,32 @@ export async function fetchFightData(
   const endTime = fight.endTime;
   const label   = logLabel ?? `${fight.name} (fight ${fight.id})`;
 
-  const cursors: Record<StreamKey, number> = {
-    deaths: fight.startTime, combatantInfo: fight.startTime, casts: fight.startTime,
-    damageDone: fight.startTime, damageTaken: fight.startTime, healing: fight.startTime,
-    debuffs: fight.startTime, enemyCasts: fight.startTime, enemyBuffs: fight.startTime,
-  };
-  const done: Record<StreamKey, boolean> = {
-    deaths: false, combatantInfo: false, casts: false, damageDone: false,
-    damageTaken: false, healing: false, debuffs: false, enemyCasts: false, enemyBuffs: false,
-  };
-  const collected: { [K in StreamKey]: FightEventsQueryResult["reportData"]["report"][K]["data"] } = {
-    deaths: [], combatantInfo: [], casts: [], damageDone: [],
-    damageTaken: [], healing: [], debuffs: [], enemyCasts: [], enemyBuffs: [],
-  };
+  const cursors = Object.fromEntries(STREAM_KEYS.map((k) => [k, fight.startTime])) as Record<StreamKey, number>;
+  const done = Object.fromEntries(STREAM_KEYS.map((k) => [k, false])) as Record<StreamKey, boolean>;
+  const collected = Object.fromEntries(STREAM_KEYS.map((k) => [k, []])) as unknown as
+    { [K in StreamKey]: FightEventsQueryResult["reportData"]["report"][K]["data"] };
 
   let page = 0;
   while (STREAM_KEYS.some((k) => !done[k]) && page < MAX_PAGES_PER_FIGHT) {
     page += 1;
 
-    const data = await gql<FightEventsQueryResult>(FIGHT_EVENTS_QUERY, {
-      code:                reportCode,
-      fightIDs:            [fight.id],
+    const vars: Record<string, unknown> = {
+      code:              reportCode,
+      fightIDs:          [fight.id],
       endTime,
-      deathsStart:         cursors.deaths,
-      combatantInfoStart:  cursors.combatantInfo,
-      castsStart:          cursors.casts,
-      damageDoneStart:     cursors.damageDone,
-      damageTakenStart:    cursors.damageTaken,
-      healingStart:        cursors.healing,
-      debuffsStart:        cursors.debuffs,
-      enemyCastsStart:     cursors.enemyCasts,
-      enemyBuffsStart:     cursors.enemyBuffs,
-    }, false); // per-page dump suppressed — see the single merged dump below
+      playerBuffFilter:  WOW_PLAYER_BUFF_FILTER,
+      enemyDebuffFilter: WOW_ENEMY_DEBUFF_FILTER,
+    };
+    for (const k of STREAM_KEYS) {
+      vars[`${k}Start`] = cursors[k];
+      vars[`${k}Want`]  = !done[k];
+    }
+    const data = await gql<FightEventsQueryResult>(FIGHT_EVENTS_QUERY, vars, false); // per-page dump suppressed — see the single merged dump below
 
     const report = data.reportData.report;
 
     for (const key of STREAM_KEYS) {
-      if (done[key]) continue; // already finished — ignore the (cheap, empty) page we still requested for it
+      if (done[key]) continue; // already finished — left out of this page
 
       const stream = report[key];
       (collected[key] as unknown[]).push(...stream.data);
@@ -700,6 +715,8 @@ export async function fetchFightData(
     debuffEvents:      collected.debuffs,
     enemyCastEvents:   collected.enemyCasts,
     enemyBuffEvents:   collected.enemyBuffs,
+    playerBuffEvents:  collected.playerBuffs,
+    enemyDebuffEvents: collected.enemyDebuffs,
   };
 }
 

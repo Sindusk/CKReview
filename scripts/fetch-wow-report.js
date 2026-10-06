@@ -103,6 +103,8 @@ async function main() {
     },
   });
 
+  const { WOW_PLAYER_BUFF_IDS } = requireTsFromRoot('lib/damage/wow/buff-stream.ts');
+
   fs.mkdirSync(outDir, { recursive: true });
 
   console.log(`Fetching report ${reportCode}...`);
@@ -159,7 +161,9 @@ async function main() {
       debuffs:       { data: data.debuffEvents },
       enemyCasts:    { data: data.enemyCastEvents },
       enemyBuffs:    { data: data.enemyBuffEvents },
-    });
+      playerBuffs:   { data: data.playerBuffEvents ?? [] },
+      enemyDebuffs:  { data: data.enemyDebuffEvents ?? [] },
+    }, WOW_PLAYER_BUFF_IDS);
 
     // Same {query, variables, json} wrapper shape the browser console dump
     // used, so this is a drop-in replacement for how existing harnesses

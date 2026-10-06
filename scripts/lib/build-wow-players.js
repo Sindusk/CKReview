@@ -9,9 +9,15 @@
 // `getSpecInfo` is passed in (transpiled from lib/spec-data.ts by the
 // caller) rather than required here, keeping this file dependency-free.
 
+// The damage analysis's streams (playerBuffs, enemyDebuffs; added
+// 2026-10-06) are left out: a buff event before the first of the others
+// moved t0 and shifted mechanic timings by ~0.1s.
+const T0_IGNORED_STREAMS = new Set(['playerBuffs', 'enemyDebuffs']);
+
 function fightStartOf(rep) {
   let t0 = Infinity;
   for (const k of Object.keys(rep)) {
+    if (T0_IGNORED_STREAMS.has(k)) continue;
     for (const e of (rep[k]?.data ?? [])) if (e.timestamp < t0) t0 = e.timestamp;
   }
   return t0 === Infinity ? 0 : t0;

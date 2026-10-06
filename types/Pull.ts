@@ -75,9 +75,10 @@ export type Pull = {
   // (lib/mitigation/analyze.ts).
   enemyCasts?: EnemyEvent[];
 
-  // FFXIV only: statuses players put on enemies (Chain Stratagem, DoTs,
-  // Reprisal, ...), for the damage analysis's buff windows. Undefined for
-  // WoW and for pulls fetched without the enemyDebuffs stream.
+  // Statuses players put on enemies (FFXIV: Chain Stratagem, DoTs,
+  // Reprisal, ...; WoW: DoTs and the debuffs their spells apply, pets'
+  // credited to the owner), for the damage analysis. Undefined for pulls
+  // fetched without the enemyDebuffs stream.
   bossDebuffs?: BossDebuffEvent[];
 };
 

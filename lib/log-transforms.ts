@@ -37,7 +37,10 @@ import type {
   WCLHealEvent,
   WCLDebuffEvent,
   WCLBuffEvent,
+  WCLPlayerBuffEvent,
+  WCLEnemyDebuffEvent,
 } from "./wcl-client";
+import { decodeWowSnapshot } from "./damage/wow/buff-stream";
 import type {
   FFLFightData,
   FFLActor,
@@ -220,7 +223,8 @@ function wclDamageDoneToPlayerEvent(
   event:      WCLDamageEvent,
   actorMap:   Map<number, WCLActor>,
   abilityMap: Map<number, AbilityInfo>,
-  fightStart: number
+  fightStart: number,
+  pet?:       string
 ): PlayerEvent {
   const target = actorMap.get(event.targetID);
   return {
@@ -231,7 +235,109 @@ function wclDamageDoneToPlayerEvent(
     amount:      event.amount,
     target:      target?.name,
     isDoT:       event.tick === true,
+    // Damage analysis fields (types/PlayerInfo.ts, "Damage Done — WoW").
+    // hitPoints on an outgoing hit is the target's, after the hit.
+    pet,
+    statusIds:         decodeWowSnapshot(event.buffs),
+    hitType:           event.hitType,
+    unmitigatedAmount: event.unmitigatedAmount,
+    healthAfter:       event.hitPoints,
+    maxHealth:         event.maxHitPoints,
+    targetActorId:     event.targetID,
+    targetInstance:    event.targetInstance,
   };
+}
+
+const WCL_BUFF_STATUS: Record<WCLPlayerBuffEvent["type"], NonNullable<PlayerEvent["buffStatus"]>> = {
+  applybuff:       "applied",
+  refreshbuff:     "refreshed",
+  removebuff:      "removed",
+  applybuffstack:  "stack",
+  removebuffstack: "stackRemoved",
+};
+
+function wclBuffToPlayerEvent(
+  event:      WCLPlayerBuffEvent,
+  actorMap:   Map<number, WCLActor>,
+  abilityMap: Map<number, AbilityInfo>,
+  fightStart: number
+): PlayerEvent {
+  return {
+    timestamp:   event.timestamp - fightStart,
+    abilityId:   event.abilityGameID ?? 0,
+    abilityName: wclAbilityName(event, abilityMap),
+    abilityIcon: wclAbilityIcon(event, abilityMap),
+    source:      actorMap.get(event.sourceID)?.name,
+    buffStatus:  WCL_BUFF_STATUS[event.type] ?? "applied",
+    stack:       event.stack,
+  };
+}
+
+/**
+ * A player's begin-casts with their cast times (types/PlayerInfo.ts
+ * beginCasts). WoW's "cast" lands at the end of the cast, so a begin-cast's
+ * time is begin → the next cast of the same ability, as long as no other
+ * begin-cast came first; off-GCD casts in between (Fire Blast during a
+ * Fireball) don't break the pair. An empowerstart runs to its empowerend.
+ * A begin-cast that never went off gets the time until the player's next
+ * cast or begin-cast. `events` must be this player's, in log order.
+ */
+function wclBuildBeginCasts(
+  events:     WCLCastEvent[],
+  abilityMap: Map<number, AbilityInfo>,
+  fightStart: number
+): PlayerEvent[] {
+  const out: PlayerEvent[] = [];
+  for (let i = 0; i < events.length; i++) {
+    const b = events[i];
+    if (b.type !== "begincast" && b.type !== "empowerstart") continue;
+    const endType = b.type === "begincast" ? "cast" : "empowerend";
+    let durationMs: number | undefined;
+    let nextOther: number | undefined;
+    for (let j = i + 1; j < events.length; j++) {
+      const e = events[j];
+      if (e.type === endType && e.abilityGameID === b.abilityGameID) { durationMs = e.timestamp - b.timestamp; break; }
+      if (e.type === "begincast" || e.type === "empowerstart") { nextOther ??= e.timestamp; break; }
+      if (e.type === "cast" && !e.fake) nextOther ??= e.timestamp;
+    }
+    out.push({
+      timestamp:   b.timestamp - fightStart,
+      abilityId:   b.abilityGameID ?? 0,
+      abilityName: wclAbilityName(b, abilityMap),
+      abilityIcon: wclAbilityIcon(b, abilityMap),
+      durationMs:  durationMs ?? (nextOther !== undefined ? nextOther - b.timestamp : 0),
+    });
+  }
+  return out;
+}
+
+// Statuses players (and their pets, credited to the owner) put on enemies,
+// from the filtered enemyDebuffs stream. Same shape as FFXIV's
+// fflBuildBossDebuffs; stack changes are left out.
+function wclBuildBossDebuffs(
+  events:     WCLEnemyDebuffEvent[],
+  actorMap:   Map<number, WCLActor>,
+  abilityMap: Map<number, AbilityInfo>,
+  fightStart: number
+): BossDebuffEvent[] {
+  const out: BossDebuffEvent[] = [];
+  for (const e of events) {
+    let source = actorMap.get(e.sourceID);
+    if (source?.type === "Pet" && source.petOwner) source = actorMap.get(source.petOwner);
+    if (source?.type !== "Player") continue;
+    if (e.type === "applydebuffstack" || e.type === "removedebuffstack") continue;
+    out.push({
+      timestamp:      e.timestamp - fightStart,
+      statusId:       e.abilityGameID,
+      statusName:     wclAbilityName(e, abilityMap),
+      status:         e.type === "removedebuff" ? "removed" : e.type === "refreshdebuff" ? "refreshed" : "applied",
+      sourceName:     source.name,
+      targetActorId:  e.targetID,
+      targetInstance: e.targetInstance,
+      targetName:     actorMap.get(e.targetID)?.name ?? `Unknown (${e.targetID})`,
+    });
+  }
+  return out;
 }
 
 function wclDamageTakenToPlayerEvent(
@@ -317,6 +423,8 @@ function wclCastToPlayerEvent(
     abilityName: wclAbilityName(event, abilityMap),
     abilityIcon: wclAbilityIcon(event, abilityMap),
     target,
+    fake:        event.fake || undefined,
+    resources:   event.resourceActor === 1 ? event.classResources : undefined,
   };
 }
 
@@ -438,7 +546,10 @@ function wclBuildPlayers(
   damageTakenEvents: WCLDamageEvent[],
   healingEvents:     WCLHealEvent[],
   debuffEvents:      WCLDebuffEvent[],
-  fightStart:        number
+  fightStart:        number,
+  // Damage analysis inputs (undefined on samples fetched before them).
+  allCastEvents:     WCLCastEvent[],
+  playerBuffEvents?: WCLPlayerBuffEvent[],
 ): PlayerInfo[] {
   return combatantInfos
     .map((ci): PlayerInfo => {
@@ -447,6 +558,16 @@ function wclBuildPlayers(
       const spec   = getSpecInfo(specId);
 
       const actorId = ci.sourceID;
+      // Pets and guardians credited to this player (needs petOwner, absent
+      // on reports fetched before it was requested).
+      const petName = (sourceID: number) => {
+        const a = actorMap.get(sourceID);
+        return a?.type === "Pet" && a.petOwner === actorId ? a.name : undefined;
+      };
+      const hasBeginCasts = allCastEvents.some((e) => e.type === "begincast" || e.type === "empowerstart");
+      // The damage stream's aura snapshot marks a capture that kept the new
+      // fields; older samples had them stripped (scripts/lib/slim-report.js).
+      const hasAnalysisFields = damageDoneEvents.some((e) => e.buffs !== undefined);
 
       return {
         actorId,
@@ -459,8 +580,8 @@ function wclBuildPlayers(
         game:       "wow",
 
         damageDone: damageDoneEvents
-          .filter(e => e.sourceID === actorId)
-          .map(e => wclDamageDoneToPlayerEvent(e, actorMap, abilityMap, fightStart)),
+          .filter(e => e.sourceID === actorId || petName(e.sourceID) !== undefined)
+          .map(e => wclDamageDoneToPlayerEvent(e, actorMap, abilityMap, fightStart, petName(e.sourceID))),
 
         damageTaken: damageTakenEvents
           .filter(e => e.targetID === actorId)
@@ -492,6 +613,15 @@ function wclBuildPlayers(
         casts: castEvents
           .filter(e => e.sourceID === actorId)
           .map(e => wclCastToPlayerEvent(e, actorMap, abilityMap, fightStart)),
+
+        beginCasts: hasBeginCasts && hasAnalysisFields
+          ? wclBuildBeginCasts(allCastEvents.filter((e) => e.sourceID === actorId), abilityMap, fightStart)
+          : undefined,
+        buffs: playerBuffEvents && hasAnalysisFields
+          ? playerBuffEvents
+            .filter((e) => e.targetID === actorId)
+            .map((e) => wclBuffToPlayerEvent(e, actorMap, abilityMap, fightStart))
+          : undefined,
       };
     })
     .sort((a, b) => getRosterSortOrder(a.specId) - getRosterSortOrder(b.specId));
@@ -534,7 +664,9 @@ export function transformFightToPull(
     data.damageTakenEvents,
     data.healingEvents,
     data.debuffEvents,
-    fightStart
+    fightStart,
+    data.castEvents,
+    data.playerBuffEvents,
   );
 
   // NOTE: sourced from data.enemyCastEvents / data.enemyBuffEvents — the
@@ -579,6 +711,11 @@ export function transformFightToPull(
     difficulty:    data.fight.difficulty ?? undefined,
     phaseSegments:   buildPullPhaseSegments(data.fight),
     encounterPhases: data.fight.encounterPhases,
+    // The sample loader turns a missing stream into []; a capture without
+    // the damage stream's aura snapshot predates this stream.
+    bossDebuffs:     data.enemyDebuffEvents && data.damageDoneEvents.some((e) => e.buffs !== undefined)
+      ? wclBuildBossDebuffs(data.enemyDebuffEvents, actorMap, abilityMap, fightStart)
+      : undefined,
     castEvents,
   };
 }

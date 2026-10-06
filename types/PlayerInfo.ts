@@ -78,8 +78,26 @@ export type PlayerEvent = {
   targetActorId?:     number;
   targetInstance?:    number;
 
-  // Begin-casts and player buffs — FFXIV only. Cast time after speed for a
-  // begin-cast; full status length for a buff apply/refresh.
+  // Damage Done — WoW, for the damage analysis (docs/damage-analysis-plan.md,
+  // "WoW port"). `statusIds` holds the tracked auras on the attacker
+  // (lib/damage/wow/buff-stream.ts; procs included, unlike FFXIV); there is
+  // no `multiplier`. `unmitigatedAmount` is before crit and target-side
+  // modifiers. `pet` names the pet or guardian that dealt a hit credited
+  // to its owner.
+  pet?:          string;
+
+  // Casts — WoW. `fake`: made by WCL, not a button press (Shadowy
+  // Apparition). `resources`: the caster's resources before the cast; the
+  // secondary one (combo points, Holy Power) appears on spenders only.
+  fake?:         boolean;
+  resources?:    { type: number; amount: number; max: number; cost?: number }[];
+  empowerLevel?: number;
+
+  // Begin-casts and player buffs. Cast time after speed for a begin-cast
+  // (WoW: begin → cast of the same ability, 0 for an instant proc; for a
+  // cast that never went off, how long it ran before the player's next
+  // cast); full status length for an FFXIV buff apply/refresh (WoW buffs
+  // carry none).
   durationMs?:   number;
   buffStatus?:   "applied" | "refreshed" | "removed" | "stack" | "stackRemoved";
 
@@ -162,14 +180,15 @@ export type PlayerInfo = {
   // it existed.
   shieldAbsorbs?: ShieldAbsorb[];
 
-  // FFXIV only, for the damage analysis. Undefined for WoW and for pulls
-  // fetched before they existed.
-  // - beginCasts: every begin-cast with its cast time (`durationMs`). The
-  //   completed "cast" in `casts` lands ~0.5s before the bar ends; a
-  //   begin-cast with no matching cast was interrupted.
+  // For the damage analysis. Undefined for pulls fetched before they
+  // existed.
+  // - beginCasts: every begin-cast with its cast time (`durationMs`). FFXIV:
+  //   the completed "cast" in `casts` lands ~0.5s before the bar ends. WoW:
+  //   it lands at the end, and empowered spells' empowerstart counts as a
+  //   begin-cast. A begin-cast with no matching cast was interrupted.
   // - buffs: apply/refresh/remove/stack events of this player's job,
-  //   proc and raid-buff statuses (lib/damage/ffxiv/buff-stream.ts), with
-  //   `source` = who applied it and `durationMs` on applies/refreshes.
+  //   proc and raid-buff statuses (lib/damage/{ffxiv,wow}/buff-stream.ts),
+  //   with `source` = who applied it; FFXIV also has `durationMs`.
   beginCasts?: PlayerEvent[];
   buffs?:      PlayerEvent[];
 };
