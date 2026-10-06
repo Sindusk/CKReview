@@ -16,8 +16,7 @@ view) and the Player Analysis panel. Step 6 is done for Dancing Mad:
 `lib/mechanics/occurrences.ts` anchors each grouped mechanic on the boss's
 own cast. Not anchored yet: the Kefka Says instructions, the generic
 Damage Down splits, and every WoW boss. Those fall back to phase or pull
-exposure. Midnight Falls needs a sample report before its anchors can be
-verified.
+exposure. Midnight Falls is deprecated and won't get anchors.
 
 ## Why this needs new data
 

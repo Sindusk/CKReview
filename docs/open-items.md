@@ -270,7 +270,10 @@ it's resolved. Module headers carry the full context for mechanic items.
     Gestation and Rattler Slam have no rule. A completed Hatching Doom
     (Ravenous Doomscale) is flagged by `wow-ula-add-cast` but never fired.
 
-### Midnight Falls (WoW)
+### Midnight Falls (WoW) — deprecated
+
+The user deprecated this fight on 2026-10-06. Nothing below will be
+picked up; it stays only as a record.
 
 - **Resume point.** VOD review of report Dn87j4ARzNwYqLvV should resume at
   pull 3. Pulls 1/2/5/16/22 are done. Phase 2 has never been reached in any

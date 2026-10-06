@@ -7,7 +7,11 @@ Raid log analysis app (Next.js + Prisma/Postgres) that imports Warcraft Logs
 (WoW) and FFLogs (FFXIV) reports and flags per-pull player errors for VOD
 review. Active encounters:
 - FFXIV: Dancing Mad ultimate
-- WoW: Midnight Falls, The Venomous Abyss
+- WoW: The Venomous Abyss
+
+Midnight Falls is **deprecated** (user, 2026-10-06): its detection stays
+in place for old statics, but spend no time extending, reviewing or
+sampling it.
 
 ## Docs map — read the one that matches your task
 
