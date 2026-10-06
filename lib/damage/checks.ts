@@ -43,6 +43,7 @@
 import type { Pull } from "@/types/Pull";
 import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { DamageContext, DamageFinding, DamageGame, ForcedWindow } from "./types";
+import type { BuffLedger } from "./buffs";
 import {
   forcedPart, gcdLockMs, inWindows, overlapMs, mergeWindows,
   type GcdUse, type PlayerValues, type Window,
@@ -78,6 +79,7 @@ export type PlayerCheckContext = {
   // What mechanic was happening around [startMs, endMs], for labelling.
   mechanicAround(startMs: number, endMs: number): string | undefined;
   decidingPhaseStart?: number;
+  ledger?:     BuffLedger;      // party buffs across the pull (lib/damage/buffs.ts)
 };
 
 export function finding(ctx: PlayerCheckContext, f: Omit<DamageFinding, "player" | "job" | "phaseId" | "phase">): DamageFinding {

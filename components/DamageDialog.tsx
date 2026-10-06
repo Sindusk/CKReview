@@ -51,6 +51,7 @@ const KIND_LABEL: Record<DamageFinding["kind"], string> = {
   "combo-broken":     "Broken combo",
   "disengage":        "Disengage",
   "positional":       "Positional",
+  "buff-coverage":    "Buff coverage",
   "burst-window":     "Burst window",
   "buff-uptime":      "Buff uptime",
   "gauge-overcap":    "Overcap",
@@ -255,6 +256,12 @@ function PlayerDetail({ summary, analysis }: { summary: PlayerDamageSummary; ana
             <span className="ck-num">{summary.gcdSplit.damage}</span>
           </>}
         </span>
+      </div>
+      <div className="ck-help" style={{ margin: "-4px 0 8px" }}
+        title="The rDPS split: own damage excludes what others' buffs added; buffs given is what this player's buffs added to the party">
+        Own damage <span className="ck-num">{fmtDamage(summary.damage - summary.buffs.received)}</span>
+        {" "}· buffs given to the party <span className="ck-num">{summary.buffs.approximate ? "≈" : ""}{fmtDamage(summary.buffs.given)}</span>
+        {" "}· received <span className="ck-num">{summary.buffs.approximate ? "≈" : ""}{fmtDamage(summary.buffs.received)}</span>
       </div>
       <TimelineStrip summary={summary} analysis={analysis} />
       {shown.length === 0 ? (

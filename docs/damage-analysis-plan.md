@@ -438,6 +438,29 @@ user will refine each job later with the people who play it:
   of drift.
 - MNK, DRG, NIN and RPR are unverified: no sample has them.
 
+**Physical ranged batch** (step 6, fourth role, 2026-10-06), no review
+yet:
+- **rDPS split for every player** (`lib/damage/buffs.ts`, shown in the
+  dialog and the runner): own damage, buffs given, buffs received.
+  - Each party buff on a hit is attributed to whoever applied it.
+  - % buffs are re-measured per pull from hits carrying them alone, which
+    covers Radiant Finale and the card role split.
+  - Crit and direct-hit buffs are estimated and marked ≈.
+  - A dance partner's hits list Devilment twice, so status ids are
+    de-duplicated.
+  - On `dQ8wmb1VhKt6yBXk` pull 11 the DNC gave ≈6.9M (Devilment and
+    Standard Finish on her partner, Technical Finish on the party). The SAM
+    received the most, 6.2M.
+- **Buff coverage** (every buffer): a party-wide cast that missed a living
+  party member who was dealing damage is a finding. Checked: 269 casts in
+  the sample report; the 4 that reached fewer than 8 players all missed
+  someone dead or idle.
+- **DNC** (`jobs/ranged.ts`): Technical Finish contents (xivanalysis
+  Technicalities), filler GCDs inside it (an upper bound: Fountainfall is
+  fine when out of Esprit), and tracked cooldowns.
+- **BRD and MCH**, unverified: BRD DoTs and cooldowns; MCH Wildfire (an
+  enemy debuff), Hypercharge and cooldowns.
+
 Open:
 - **Per-player busy windows** (tower soaks, debuff carriers, baits) aren't
   in the Dancing Mad context yet. Gaps during a mechanic are labelled

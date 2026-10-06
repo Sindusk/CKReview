@@ -27,6 +27,7 @@ import {
   deadWindows, gcdKinds, gcdUses, inWindows, limitBreakWindows, playerValues, raidBuffWindows, raidDowntime,
   speedFactor, wipeCollapseMs, type Window,
 } from "./timeline";
+import { buildBuffLedger, checkBuffCoverage } from "./buffs";
 
 // A mechanic occurrence labels a gap when it starts this long before the
 // gap, or inside it.
@@ -67,6 +68,7 @@ export function analyzePullDamage(pull: Pull, game: DamageGame, context?: Damage
     return context?.mechanicLabel?.(occ.mechanicKey) ?? occ.mechanicKey;
   };
 
+  const ledger = buildBuffLedger(pull, game, endMs);
   const players: PlayerDamageSummary[] = [];
   for (const player of pull.players) {
     const dead = deadWindows(player, pull, endMs);
@@ -86,6 +88,7 @@ export function analyzePullDamage(pull: Pull, game: DamageGame, context?: Damage
       pull, player, game, context, endMs, uses, factor, baseGcdMs: 2500 * factor,
       forced, dead, buffWindows, values, phaseOf, phaseName, mechanicAround,
       decidingPhaseStart: decidingSegment?.startMs,
+      ledger,
     };
     const findings: DamageFinding[] = [
       ...checkGcdGaps(ctx),
@@ -97,6 +100,7 @@ export function analyzePullDamage(pull: Pull, game: DamageGame, context?: Damage
       ...checkCombos(ctx),
       ...checkDisengages(ctx),
       ...checkPositionals(ctx),
+      ...checkBuffCoverage(ctx),
       ...game.jobChecks(player.className).flatMap((check) => check(ctx)),
     ].sort((a, b) => Number(a.forced) - Number(b.forced) || b.lostDamage - a.lostDamage);
 
@@ -114,6 +118,7 @@ export function analyzePullDamage(pull: Pull, game: DamageGame, context?: Damage
       baseGcdMs: ctx.baseGcdMs,
       buffWindowGcds: { used, fit },
       gcdSplit,
+      buffs: ledger.contributions.get(player.name) ?? { given: 0, received: 0, approximate: false },
       findings,
       timeline: {
         gcdStarts: uses.filter((u) => u.startMs < endMs).map((u) => u.startMs),

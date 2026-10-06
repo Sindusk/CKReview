@@ -79,6 +79,33 @@ export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
     { actions: ["MEISUI"], firstUseOffsetMs: 20750 },
   ],
 
+  // ── Physical ranged (from xivanalysis dnc/OGCDDowntime, brd/OGCDDowntime,
+  //    mch/GeneralCDDowntime) ─────────────────────────────────────────
+  // Their negative first-use offsets (Standard Step, Reassemble: used
+  // before the pull) become 0 here.
+  "Dancer": [
+    { actions: ["TECHNICAL_STEP"], holdMs: 250 },
+    { actions: ["STANDARD_STEP", "FINISHING_MOVE"], holdMs: 250 },
+    { actions: ["DEVILMENT"] },
+    { actions: ["FLOURISH"] },
+  ],
+  "Bard": [
+    { actions: ["EMPYREAL_ARROW"], firstUseOffsetMs: 4000, holdMs: 1 },
+    { actions: ["BATTLE_VOICE"], firstUseOffsetMs: 7500 },
+    { actions: ["RADIANT_FINALE"], firstUseOffsetMs: 7500, holdMs: 10000 },
+    { actions: ["RAGING_STRIKES"], firstUseOffsetMs: 2500 },
+    { actions: ["BARRAGE"], firstUseOffsetMs: 12000 },
+    { actions: ["SIDEWINDER"], firstUseOffsetMs: 12000 },
+  ],
+  "Machinist": [
+    { actions: ["WILDFIRE"], firstUseOffsetMs: 10000 },
+    { actions: ["BARREL_STABILIZER"], firstUseOffsetMs: 3000 },
+    { actions: ["REASSEMBLE"], holdMs: 5000 },
+    { actions: ["AIR_ANCHOR"], holdMs: 100 },
+    { actions: ["DRILL", "BIOBLASTER"], firstUseOffsetMs: 2500, holdMs: 100 },
+    { actions: ["CHAIN_SAW"], firstUseOffsetMs: 12500, holdMs: 100 },
+  ],
+
   // ── From xivanalysis ────────────────────────────────────────────────
   "Monk": [
     { actions: ["BROTHERHOOD"], firstUseOffsetMs: 7000 },
@@ -116,8 +143,6 @@ export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
   "Astrologian": [{ actions: ["DIVINATION"] }],
   // Not in xivanalysis; unverified (no White Mage in any sample).
   "White Mage":  [{ actions: ["PRESENCE_OF_MIND"] }],
-  "Dancer":      [{ actions: ["TECHNICAL_STEP"] }],
   "Red Mage":    [{ actions: ["EMBOLDEN"] }],
   "Summoner":    [{ actions: ["SEARING_LIGHT"] }],
-  "Bard":        [{ actions: ["RADIANT_FINALE"] }, { actions: ["BATTLE_VOICE"] }],
 };

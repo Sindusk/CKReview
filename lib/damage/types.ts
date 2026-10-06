@@ -42,6 +42,11 @@ export type DamageGame = {
   penaltyFactor(statusId: number): number | undefined;
   // Party damage buffs and enemy debuffs that make up burst windows.
   raidBuffStatusIds: Set<number>;
+  // What a party buff adds to a hit it's on, for the rDPS split and buff
+  // coverage. "damage" = a % multiplier (measured per pull where possible),
+  // "crit" / "directHit" = a rate increase. partyWide: one cast reaches
+  // the whole party (cards and dance partner buffs don't).
+  partyBuff(statusId: number): PartyBuff | undefined;
   // Damage events whose ability id is a status (DoT ticks).
   isTickAbility(abilityId: number): boolean;
   // Cooldowns the drift check judges for a job (display name).
@@ -57,6 +62,16 @@ export type DamageGame = {
 };
 
 export type JobCheck = (ctx: PlayerCheckContext) => DamageFinding[];
+
+export type PartyBuff = {
+  name:       string;
+  damage?:    number;     // +5% = 0.05
+  crit?:      number;     // crit rate, +10% = 0.10
+  directHit?: number;     // direct-hit rate
+  // Role-dependent % (Astrologian cards): melee/tanks vs ranged/healers.
+  damageByRange?: { melee: number; ranged: number };
+  partyWide:  boolean;
+};
 
 export type TrackedCooldown = {
   name:             string;
@@ -112,6 +127,7 @@ export type FindingKind =
   | "combo-broken"      // a combo step that landed without its combo bonus
   | "disengage"         // a ranged filler GCD (Lightning Shot) instead of a real one
   | "positional"        // positionals missed
+  | "buff-coverage"     // a party buff that missed living players
   | "burst-window"      // the job's own burst buff missing GCDs or actions
   | "buff-uptime"       // a job damage buff (Darkside, Surging Tempest) down
   | "gauge-overcap"     // job gauge wasted at its cap
@@ -157,6 +173,11 @@ export type PlayerDamageSummary = {
   // GCDs by what they did: heal (landed heals or shields), damage, other
   // (raises, Esuna). The healer headline: heal GCDs against damage taken.
   gcdSplit:      { heal: number; damage: number; other: number };
+  // The rDPS split (docs/dps-analysis.md method step 5): what this player's
+  // party buffs added to others' hits, and what others' buffs added to
+  // theirs. `approximate` when crit or direct-hit buffs were involved
+  // (their value is estimated, not read from the multiplier).
+  buffs:         { given: number; received: number; approximate: boolean };
   findings:      DamageFinding[];
   // For the dialog's timeline strip.
   timeline: {

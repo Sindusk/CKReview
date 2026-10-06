@@ -25,7 +25,7 @@ import { XIVA_ACTIONS, XIVA_STATUSES, type XivaAction } from "./xiva-data";
 import { TRACKED_COOLDOWNS } from "./tracked-cooldowns";
 import { JOB_CHECKS } from "./jobs";
 import { FFXIV_ACTION_INDEX } from "../../mitigation/ffxiv-catalog";
-import type { DamageGame, GameAction, TrackedCooldown } from "../types";
+import type { DamageGame, GameAction, PartyBuff, TrackedCooldown } from "../types";
 
 const RAID_BUFF_KEYS = [
   "THE_BALANCE", "THE_SPEAR", "DIVINATION", "BATTLE_LITANY", "BATTLE_VOICE",
@@ -41,6 +41,37 @@ const PENALTIES = new Map<number, number>([
 ]);
 
 const GCD_BASE_MS = 2500;
+
+// Party buffs (7.x tooltips). The damage % values for Technical Finish,
+// Standard Finish, Divination and Starry Muse match FFLogs' multiplier on
+// dQ8wmb1VhKt6yBXk (1.05, 1.05, 1.06, 1.05); the engine also re-measures
+// each % buff per pull from hits that carry it alone (lib/damage/buffs.ts),
+// which covers Radiant Finale's 2/4/6% and the cards' role split.
+const PARTY_BUFFS: Record<string, Omit<PartyBuff, "name">> = {
+  TECHNICAL_FINISH:        { damage: 0.05, partyWide: true },
+  STANDARD_FINISH_PARTNER: { damage: 0.05, partyWide: false },
+  DIVINATION:              { damage: 0.06, partyWide: true },
+  STARRY_MUSE:             { damage: 0.05, partyWide: true },
+  EMBOLDEN_PARTY:          { damage: 0.05, partyWide: true },
+  BROTHERHOOD:             { damage: 0.05, partyWide: true },
+  SEARING_LIGHT:           { damage: 0.05, partyWide: true },
+  ARCANE_CIRCLE:           { damage: 0.03, partyWide: true },
+  RADIANT_FINALE:          { damage: 0.06, partyWide: true },
+  DOKUMORI:                { damage: 0.05, partyWide: true },
+  MUG:                     { damage: 0.05, partyWide: true },
+  THE_BALANCE:             { damageByRange: { melee: 0.06, ranged: 0.03 }, partyWide: false },
+  THE_SPEAR:               { damageByRange: { melee: 0.03, ranged: 0.06 }, partyWide: false },
+  CHAIN_STRATAGEM:         { crit: 0.10, partyWide: true },
+  BATTLE_LITANY:           { crit: 0.10, partyWide: true },
+  BATTLE_VOICE:            { directHit: 0.20, partyWide: true },
+  DEVILMENT:               { crit: 0.20, directHit: 0.20, partyWide: false },
+};
+const PARTY_BUFF_BY_ID = new Map<number, PartyBuff>(
+  Object.entries(PARTY_BUFFS).flatMap(([key, b]) => {
+    const st = XIVA_STATUSES[key];
+    return st ? [[st.id, { name: st.name, ...b }] as const] : [];
+  }),
+);
 
 function toGameAction(a: XivaAction): GameAction {
   const onGcd = a.onGcd === true;
@@ -122,6 +153,7 @@ export const FFXIV_DAMAGE: DamageGame = {
   raidBuffStatusIds: new Set(
     RAID_BUFF_KEYS.map((k) => XIVA_STATUSES[k]?.id).filter((id): id is number => id !== undefined),
   ),
+  partyBuff: (statusId) => PARTY_BUFF_BY_ID.get(statusId),
   // FFLogs logs DoT ticks under the status id (+1000000).
   isTickAbility: (abilityId) => abilityId >= 1_000_000,
   trackedCooldowns: (job) => TRACKED.get(job) ?? [],
