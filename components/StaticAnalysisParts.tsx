@@ -14,6 +14,9 @@ import { SEVERITY_COLOR } from "@/components/SeverityIcon";
 
 export type { AnalysisPhase, AnalysisSession, MechanicStats };
 
+/** One session's failures out of chances (MechanicStats.perSession). */
+export type SessionTallyPoint = { sessionId: number; failed: number; chances: number };
+
 /** Context every analysis response carries (contextSummary). */
 export type AnalysisContextResponse = {
   boss:               string | null;
@@ -122,9 +125,10 @@ export function AnalysisFilterBar({
 }
 
 /** One line on what the numbers cover and what they leave out. */
-export function AnalysisCoverageNote({ context }: { context: AnalysisContextResponse }) {
+export function AnalysisCoverageNote({ context, extra }: { context: AnalysisContextResponse; extra?: string }) {
   const parts: string[] = [];
   parts.push(`${context.sessions.length} session${context.sessions.length === 1 ? "" : "s"}, ${context.pulls} pull${context.pulls === 1 ? "" : "s"}`);
+  if (extra) parts.push(extra);
   if (context.undetailedSessions > 0) {
     parts.push(`${context.undetailedSessions} earlier session${context.undetailedSessions === 1 ? "" : "s"} predate detailed tracking (resync to include)`);
   }
@@ -155,6 +159,8 @@ export function MechanicTable({
   sessions,
   showPlayers = true,
   extraColumn,
+  selectedKey,
+  onSelect,
 }: {
   mechanics:    MechanicStats[];
   phases:       AnalysisPhase[];
@@ -162,6 +168,9 @@ export function MechanicTable({
   showPlayers?: boolean;
   /** Optional trailing column (the player view's first-vs-last comparison). */
   extraColumn?: { header: string; title?: string; render: (m: MechanicStats) => ReactNode };
+  /** Clickable rows: the selected mechanic is highlighted. */
+  selectedKey?: string | null;
+  onSelect?:    (mechanicKey: string) => void;
 }) {
   if (mechanics.length === 0) {
     return <p className="ck-dialog-text" style={{ margin: 0 }}>No counted errors for this filter.</p>;
@@ -186,7 +195,15 @@ export function MechanicTable({
             const thin = m.chances < MIN_CHANCES;
             const ratePct = m.rate !== null ? Math.round(m.rate * 100) : null;
             return (
-              <tr key={m.mechanicKey} style={thin ? { opacity: 0.6 } : undefined}>
+              <tr
+                key={m.mechanicKey}
+                onClick={onSelect ? () => onSelect(m.mechanicKey) : undefined}
+                style={{
+                  ...(thin ? { opacity: 0.6 } : {}),
+                  ...(onSelect ? { cursor: "pointer" } : {}),
+                  ...(selectedKey === m.mechanicKey ? { background: "rgba(83, 169, 255, 0.12)", boxShadow: "inset 2px 0 0 var(--ck-arcane)" } : {}),
+                }}
+              >
                 <td style={td("left")} title={m.rules.map((r) => `${r.name}: ${r.errors}`).join("\n")}>{m.label}</td>
                 <td style={{ ...td("left"), color: "var(--ck-text-2)", whiteSpace: "nowrap" }} title={phaseName(phases, m.phase)}>
                   {shortPhaseName(phases, m.phase)}
