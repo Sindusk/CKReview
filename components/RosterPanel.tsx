@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
+import { isLandedHeal, type PlayerInfo, type PlayerEvent } from "@/types/PlayerInfo";
 import { getClassColor, getRoleColor, formatSpecClass, getPlayerSpecIcon } from "@/lib/player-display";
 import { detectFFRoles } from "@/lib/mechanics/ffxiv/roles";
 import { PanelHeader } from "./ui/Panel";
@@ -355,8 +355,9 @@ function PlayerDetail({
       // overhealed) entry still carries a real position sample that
       // player-position.ts's findPlayerPosition relies on, but is just
       // display noise on this tab. See log-transforms.ts's healing builder
-      // comment.
-      case "Healing":     return player.healing.filter((e) => (e.amount ?? 0) > 0);
+      // comment. Shield absorbs and calculatedheal previews share the
+      // stream and aren't heals (previews would double count).
+      case "Healing":     return player.healing.filter((e) => (e.amount ?? 0) > 0 && isLandedHeal(e));
       case "Debuffs":     return player.debuffs;
       case "Casts":       return player.casts;
     }

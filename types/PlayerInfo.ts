@@ -66,6 +66,13 @@ export type PlayerEvent = {
   hitType?:           number;
   damageType?:        number;
 
+  // Healing / healingReceived — FFXIV only. The FFLogs healing stream's
+  // event type: real heals, plus shield "absorbed" events, the shield's
+  // "removebuff" and "calculatedheal" previews (which duplicate a heal).
+  // Undefined for WoW and for pulls fetched before it was kept. Count heals
+  // with isLandedHeal().
+  healType?: "heal" | "calculatedheal" | "absorbed" | "removebuff";
+
   // Debuffs — carries which side of the on/off transition this event
   // represents, so error-detection.ts can reconstruct uptime windows
   // ("was this debuff active on the player at time T?").
@@ -85,6 +92,12 @@ export type PlayerEvent = {
   causeAbilityId?:   number;
   causeAbilityName?: string;
 };
+
+// A heal that landed: not a shield absorb, shield removal or preview.
+// Legacy FFXIV pulls (no healType) can't be told apart and pass through.
+export function isLandedHeal(e: PlayerEvent): boolean {
+  return e.healType === undefined || e.healType === "heal";
+}
 
 export type PlayerInfo = {
   // Identity

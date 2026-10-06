@@ -292,9 +292,10 @@ same report.
   healing stream into `PlayerInfo.healing` / `healingReceived` without
   `type`, `attackerID` or `extraAbilityGameID`. An absorb is
   indistinguishable from a heal there.
-  - Side effect today: the roster's Healing tab counts absorbs and
-    `calculatedheal` previews as heals (the latter double counts). Not in
-    scope; noted for later.
+  - The roster's Healing tab used to count absorbs and `calculatedheal`
+    previews as heals (the latter double counts). Fixed 2026-10-06:
+    healing-stream events keep `healType`, and `isLandedHeal()` filters
+    the tab. Pulls fetched before that have no type and still mix them.
   - The slim projector drops `attackerID` and `extraAbilityGameID`, so the
     samples can't recover them either.
 - The damage event's own `absorbed` field gives the total absorbed on that
