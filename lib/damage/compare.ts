@@ -23,7 +23,12 @@
 //
 // ── Per role ───────────────────────────────────────────────────────────
 // Tanks, healers and DPS are summed per log (every log has 2 / 2 / 4), so
-// the role rows compare like with like even when the DPS jobs differ.
+// the role rows compare like with like even when the DPS jobs differ. WoW
+// raid comps vary (2 tanks, 4–5 healers, 13–14 DPS), so there the rows are
+// per-player averages (DamageGame.compareRolesPerPlayer), and a fight whose
+// context names no deciding phase is compared from the pull start
+// (compareFromPullStart). Players are matched by DamageGame.jobOf: the job
+// in FFXIV, the spec in WoW.
 //
 // Pitfall (docs/dps-analysis.md, window-edge artifacts): a burst that
 // straddles the window's end reads as a missing cast. The dialog says so.
@@ -62,6 +67,7 @@ export type CompareResult = {
   ownPulls:   number;
   rows:       CompareRow[];
   roles:      RoleRow[];
+  rolesPerPlayer: boolean;   // role rows are per-player averages (WoW), not sums
   raid:       { dps: number; refDps?: number };
   refs:       { label: string; windowMs: number }[];
 };
@@ -77,8 +83,13 @@ const median = (xs: number[]) => {
 
 const ROLE_ORDER = ["Tank", "Healer", "DPS"];
 
+// Phase id meaning "from the pull start": fights whose context names no
+// deciding phase (most WoW bosses) are compared from the pull.
+export const WHOLE_PULL = 0;
+
 /** The compared phase's [start, end) in a log, end cut at the analysis end. */
 function phaseSpan(log: CompareLog, phaseId: number): { startMs: number; endMs: number } | undefined {
+  if (phaseId === WHOLE_PULL) return { startMs: 0, endMs: log.analysis.endMs };
   const seg = log.pull.phaseSegments?.find((s) => s.phase === phaseId);
   if (!seg) return undefined;
   return { startMs: seg.startMs, endMs: Math.min(seg.endMs, log.analysis.endMs) };
@@ -117,8 +128,8 @@ export function compareWithReferences(
   phaseIdOpt?: number,
 ): CompareResult | CompareError {
   if (refs.length === 0) return { error: "Add at least one reference clear." };
-  const phaseId = phaseIdOpt
-    ?? Number(Object.entries(context?.phases ?? {}).find(([, p]) => p.decidesEnrage)?.[0] ?? NaN);
+  const deciding = Number(Object.entries(context?.phases ?? {}).find(([, p]) => p.decidesEnrage)?.[0] ?? NaN);
+  const phaseId = phaseIdOpt ?? (Number.isFinite(deciding) ? deciding : game.compareFromPullStart ? WHOLE_PULL : NaN);
   if (!Number.isFinite(phaseId)) return { error: "This fight has no deciding phase in its context; pick a phase." };
 
   const refSpans = refs.map((r) => ({ log: r, span: phaseSpan(r, phaseId) }));
@@ -129,7 +140,8 @@ export function compareWithReferences(
   const ownSpans = own.map((o) => ({ log: o, span: phaseSpan(o, phaseId) })).filter((o) => o.span && o.span.endMs - o.span.startMs >= 10_000);
   if (ownSpans.length === 0) return { error: "No selected pull reached that phase (10s or more)." };
 
-  const phaseName = own[0].pull.encounterPhases?.find((p) => p.id === phaseId)?.name ?? `Phase ${phaseId}`;
+  const phaseName = phaseId === WHOLE_PULL ? "The pull"
+    : own[0].pull.encounterPhases?.find((p) => p.id === phaseId)?.name ?? `Phase ${phaseId}`;
   const perPlayer = new Map<string, { stats: PlayerWindowStats[]; refs: PlayerWindowStats[][] }>();
   const roleOwn = new Map<string, number[]>(), roleRef = new Map<string, number[]>();
   const raidOwn: number[] = [], raidRef: number[] = [];
@@ -146,7 +158,13 @@ export function compareWithReferences(
       e.refs.push(refStats.flat().filter((r) => r.job === s.job));
       perPlayer.set(s.player, e);
     }
-    const byRole = (list: PlayerWindowStats[], role: string) => list.filter((x) => x.role === role).reduce((a, x) => a + x.rdps, 0);
+    // FFXIV parties are always 2 / 2 / 4, so a role's sum compares like with
+    // like; WoW raid comps vary, so there it's the per-player average.
+    const byRole = (list: PlayerWindowStats[], role: string) => {
+      const inRole = list.filter((x) => x.role === role);
+      const sum = inRole.reduce((a, x) => a + x.rdps, 0);
+      return game.compareRolesPerPlayer ? (inRole.length ? sum / inRole.length : NaN) : sum;
+    };
     for (const role of ROLE_ORDER) {
       (roleOwn.get(role) ?? roleOwn.set(role, []).get(role)!).push(byRole(ownStats, role));
       (roleRef.get(role) ?? roleRef.set(role, []).get(role)!).push(median(refStats.map((rs) => byRole(rs, role))));
@@ -177,6 +195,7 @@ export function compareWithReferences(
     phaseId, phaseName, windowMs: median(windows), ownPulls: ownSpans.length,
     rows,
     roles: ROLE_ORDER.map((role) => ({ role, rdps: median(roleOwn.get(role) ?? []), refRdps: median(roleRef.get(role) ?? []), refCount: refs.length })),
+    rolesPerPlayer: game.compareRolesPerPlayer === true,
     raid: { dps: median(raidOwn), refDps: median(raidRef) },
     refs: refSpans.map((r) => ({ label: r.log.label, windowMs: r.span!.endMs - r.span!.startMs })),
   };

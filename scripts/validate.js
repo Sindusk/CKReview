@@ -576,10 +576,10 @@ MECHANICS['damage-analysis-wow'] = {
  * transformFightToPull), one file at a time. `--pulls=1,3` and
  * `--boss=<substring>` narrow it; pull numbers come from the file names.
  */
-function loadWowThroughRealPipeline(mod, dir, meta) {
-  const pullsArg = process.argv.find((a) => a.startsWith('--pulls='))?.slice('--pulls='.length);
+function loadWowThroughRealPipeline(mod, dir, meta, narrow = true) {
+  const pullsArg = narrow ? process.argv.find((a) => a.startsWith('--pulls='))?.slice('--pulls='.length) : undefined;
   const wanted = pullsArg ? new Set(pullsArg.split(',').map(Number)) : null;
-  const boss = process.argv.find((a) => a.startsWith('--boss='))?.slice('--boss='.length)?.toLowerCase();
+  const boss = narrow ? process.argv.find((a) => a.startsWith('--boss='))?.slice('--boss='.length)?.toLowerCase() : undefined;
   const abilityMap = mod.lt.buildWCLAbilityMap(meta.masterData.abilities);
   const fightById = new Map(meta.fights.map((f) => [f.id, f]));
   const out = [];
@@ -664,11 +664,51 @@ MECHANICS['damage-compare'] = {
       refs.push(...(await toLogs((pulls ?? []).filter((p) => p.result === 'Kill'), code)));
     }
     const own = await toLogs(await loadThroughRealPipeline(mod, dir) ?? [], path.basename(dir));
+    printComparison(mod, mod.FFXIV_DAMAGE, own, refs);
+  },
+};
+
+// The WoW counterpart: own pulls from the folder (--pulls / --boss narrow
+// them), clears from sampledata/wow/<code> folders named with --refs (their
+// kills). Runs only when named.
+//   node scripts/validate.js damage-compare-wow sampledata/wow/<own> --refs=<code>,<code> [--pulls=1,3]
+MECHANICS['damage-compare-wow'] = {
+  game: 'wow',
+  namedOnly: true,
+  load: () => ({
+    lt: requireTsFromRoot('lib/log-transforms.ts', { './log-auth': {} }),
+    ...requireTsFromRoot('lib/damage/analyze.ts'),
+    ...requireTsFromRoot('lib/damage/compare.ts'),
+    ...requireTsFromRoot('lib/damage/contexts.ts'),
+    ...requireTsFromRoot('lib/damage/wow/game.ts'),
+  }),
+  async run({ mod, dir, meta }) {
+    const refArg = process.argv.find((a) => a.startsWith('--refs='))?.slice('--refs='.length);
+    if (!refArg) { console.log('  (needs --refs=<code>[,<code>...])'); return; }
+    const toLogs = (pulls, label) => pulls.map((pull) => ({
+      pull, analysis: mod.analyzePullDamage(pull, mod.WOW_DAMAGE, mod.getDamageContext(pull.name)),
+      label: `${label} #${pull.fightId}`,
+    }));
+    const own = toLogs(loadWowThroughRealPipeline(mod, dir, meta), path.basename(dir));
+    const boss = own[0]?.pull.name;
+    const refs = [];
+    for (const code of refArg.split(',')) {
+      const refDir = path.join(path.dirname(dir), code);
+      const refMeta = JSON.parse(fs.readFileSync(path.join(refDir, 'meta.json'), 'utf8'));
+      const kills = loadWowThroughRealPipeline(mod, refDir, refMeta, false).filter((p) => p.result === 'Kill' && (!boss || p.name === boss));
+      refs.push(...toLogs(kills, code));
+    }
+    printComparison(mod, mod.WOW_DAMAGE, own, refs);
+  },
+};
+
+function printComparison(mod, game, own, refs) {
+  {
     const ctx = mod.getDamageContext(own[0]?.pull.name ?? '');
     const k = (n) => (Number.isFinite(n) ? `${(n / 1000).toFixed(1)}k` : '-');
     const pct = (a, b) => (Number.isFinite(b) && b > 0 ? `${a >= b ? '+' : ''}${(((a - b) / b) * 100).toFixed(0)}%` : '');
     const show = (title, logs) => {
-      const r = mod.compareWithReferences(logs, refs, mod.FFXIV_DAMAGE, ctx);
+      const r = mod.compareWithReferences(logs, refs, game, ctx);
       console.log('='.repeat(70));
       if (r.error) { console.log(`${title}: ${r.error}`); return; }
       console.log(`${title}: ${r.phaseName}, first ${(r.windowMs / 1000).toFixed(0)}s, ${r.ownPulls} own pull(s) vs ${r.refs.length} clears`);
@@ -684,8 +724,8 @@ MECHANICS['damage-compare'] = {
     };
     for (const o of own) show(`${o.pull.name} Pull ${o.pull.pullNumber}`, [o]);
     show('ALL PULLS', own);
-  },
-};
+  }
+}
 
 // One generated entry per module in lib/mechanics/wow/registry.ts (except
 // those with a hand-written entry above, marked customHarness there). A new

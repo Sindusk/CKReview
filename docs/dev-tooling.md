@@ -134,6 +134,12 @@ It loads pulls lazily and keeps three in memory, so narrowing with
   transform. `--boss=<name>` narrows by boss and `--all-findings` adds
   every finding with its basis. It runs only when named: plain `--check`
   skips it.
+- **Reference clears.** `node scripts/validate.js damage-compare-wow
+  sampledata/wow/<own> --refs=<code>,<code> [--pulls=30,36]` compares the
+  folder's pulls with the clears' kills over equal windows. Fetch a clear's
+  kill with `node scripts/fetch-wow-report.js <code> --fight <id>`, then
+  give the new folder a baseline (`validate.js --update
+  sampledata/wow/<code>`), or `--check` reports it as missing one.
 
 - **Spell tables are measured, not copied.** WoWAnalyzer is AGPL, so
   `lib/damage/wow/spell-data.ts` is generated from our own logs:

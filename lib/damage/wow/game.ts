@@ -145,4 +145,6 @@ export const WOW_DAMAGE: DamageGame = {
   // DoT ticks share their spell's id (Agony 980, Shadow Word: Pain 589), so
   // an on-GCD action's ticks count too.
   isGcdDamage: (e) => !e.pet && ACTIONS.get(e.abilityId)?.onGcd === true,
+  compareFromPullStart: true,
+  compareRolesPerPlayer: true,
 };

@@ -83,6 +83,11 @@ export type DamageGame = {
   // WoW: only the player's own on-GCD abilities (hits and their DoT ticks);
   // procs, trinkets and pets keep going during a gap.
   isGcdDamage?(e: PlayerEvent): boolean;
+  // Reference-clear comparison (lib/damage/compare.ts): compare from the
+  // pull start when the context names no deciding phase, and show role
+  // rows as per-player averages (WoW raid comps vary; FFXIV's are 2/2/4).
+  compareFromPullStart?: boolean;
+  compareRolesPerPlayer?: boolean;
 };
 
 export type JobCheck = (ctx: PlayerCheckContext) => DamageFinding[];

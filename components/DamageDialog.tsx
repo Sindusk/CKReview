@@ -17,7 +17,7 @@
 // pull is analysed with its own game layer (FFXIV_DAMAGE / WOW_DAMAGE). WoW
 // pulls are big, so pulls are analysed when first shown (one pull, or every
 // pull for the "all loaded pulls" view) and cached for the open dialog.
-// Reference clears are FFXIV-only until the WoW port's step 7.
+// Reference clears work for both (WarcraftLogs clears for WoW pulls).
 
 import { useMemo, useRef, useState } from "react";
 import type { Pull } from "@/types/Pull";
@@ -166,16 +166,13 @@ export default function DamageDialog({ open, onClose, pulls, currentPullId }: Da
 
           {view === "compare" ? (
             <div style={{ flex: "1 1 auto", minHeight: 0, overflowY: "auto" }}>
-              {isWow ? (
-                <p className="ck-dialog-text">Comparing with reference clears isn&apos;t built for WoW yet.</p>
-              ) : (
-                <DamageCompare
-                  ownPulls={allPulls ? gamePulls.filter((p) => p.game === "ffxiv") : selectedPull ? [selectedPull] : []}
-                  analyses={analyses}
-                  refs={refs}
-                  onRefsChange={setRefs}
-                />
-              )}
+              <DamageCompare
+                ownPulls={allPulls ? gamePulls.filter((p) => p.game === (isWow ? "wow" : "ffxiv")) : selectedPull ? [selectedPull] : []}
+                analyses={analyses}
+                refs={refs}
+                onRefsChange={setRefs}
+                colorFor={colorFor}
+              />
             </div>
           ) : (
           <div style={{ flex: "1 1 auto", minHeight: 0, display: "grid", gridTemplateColumns: "340px minmax(0, 1fr)", gap: 12 }}>

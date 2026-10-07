@@ -1011,6 +1011,35 @@ go by role in the FFXIV order, the specs with the most sample players first.
   - Augmentation's support damage isn't in the rDPS split.
   - Frost Mage has no window: Icy Veins wasn't cast in the samples.
 
+**Step 7** (2026-10-06): reference clears for WoW. The port's build
+order is complete.
+- **Engine** (`lib/damage/compare.ts`), through two more `DamageGame`
+  options:
+  - `compareFromPullStart`: a fight whose context names no deciding phase
+    (most WoW bosses) is compared from the pull start over equal windows.
+  - `compareRolesPerPlayer`: role rows are per-player averages, since WoW
+    raid comps vary; FFXIV's are 2/2/4 sums.
+  - Players are matched by spec (`jobOf`). FFXIV output is unchanged.
+- **Loading:** `lib/damage/reference-clears.ts` loads a WarcraftLogs clear
+  (local sample, else that one fight from WCL).
+- **Dialog:** `DamageCompare` takes WoW pulls. Clears are kept per game,
+  and its wording names WarcraftLogs and specs.
+- **Runner:** `node scripts/validate.js damage-compare-wow
+  sampledata/wow/<own> --refs=<code>,... [--pulls=...]` (named-only).
+- **First run:** the user picked five Sszorak Mythic kills:
+  `CxN2KfnRkQrDVHFp` #49, `B6F7xYpk98JjG4KA` #40, `yTaBKpVx8CRzQL1M` #43,
+  `FP9bBaztWZXQw67q` #16, `qvyz4bngQH13LjWa` #1. Each was fetched as one
+  fight, and they have mechanic baselines like any sample.
+  - Against them, `rNL38zFGMbyADRTh`'s four longest wipes (pulls 30 and
+    34–36), over the first 208s, show:
+    - raid damage −12%
+    - per player by role: tanks −28%, healers −27%, DPS −10%
+    - at par: the Beast Mastery Hunters and the Shadow Priest
+    - furthest behind: the Demonology Warlock −24%, one Arms Warrior
+      −21%, the Arcane Mage −17%, the Windwalker −16%
+  - That group isn't the user's, so these are numbers to check the tool
+    by, not findings to act on.
+
 ## UI: the Damage dialog
 
 - **Header button** "Damage", directly left of "Mitigation".
