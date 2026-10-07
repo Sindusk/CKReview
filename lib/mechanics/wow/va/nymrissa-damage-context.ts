@@ -1,7 +1,7 @@
 // lib/mechanics/wow/va/nymrissa-damage-context.ts
 //
 // Nymrissa Wavecaller's fight context for the damage analysis
-// (docs/damage-analysis-plan.md, "WoW build order" step 4;
+// (docs/archive/damage-analysis-plan.md, "WoW build order" step 4;
 // lib/damage/types.ts DamageContext). There is no detection module for this
 // boss yet, so this is from the logs alone: the Mythic kill
 // rNL38zFGMbyADRTh pull 2 (395.7s), 2026-10-06. (nRGxQ1b8LdMvzC4D pull 1 is

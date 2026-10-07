@@ -177,7 +177,7 @@ export async function POST(
       : null;
   const pulls: StaticReviewPullData[] = Array.isArray(body?.pulls) ? body.pulls : [];
   const allPlayerNames = pulls.flatMap((p) => p.players.map((pl) => pl.player));
-  // Detail rows (docs/static-player-analysis-plan.md) come only from
+  // Detail rows (docs/archive/static-player-analysis-plan.md) come only from
   // clients that send a detailVersion; an older client's payload imports
   // counts only and leaves the session undetailed.
   const detailVersion =

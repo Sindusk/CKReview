@@ -1,7 +1,7 @@
 // lib/damage/wow/context-helpers.ts
 //
 // Building blocks for the WoW bosses' damage contexts (lib/mechanics/wow/
-// va/*-damage-context.ts; docs/damage-analysis-plan.md, "WoW build order"
+// va/*-damage-context.ts; docs/archive/damage-analysis-plan.md, "WoW build order"
 // step 4). Each turns a log signal into forced windows: time a player (or
 // the raid) can't be expected to press GCDs, so the engine shows a gap
 // there as forced instead of counting it.

@@ -1,6 +1,6 @@
 // lib/damage/checks.ts
 //
-// The engine's generic checks (docs/damage-analysis-plan.md, Layer 1).
+// The engine's generic checks (docs/archive/damage-analysis-plan.md, Layer 1).
 // Each takes one player's context and returns findings. Lost damage is in
 // the player's own observed damage (timeline.ts PlayerValues), not
 // potency: the vendored xivanalysis tables carry potencies for only a few

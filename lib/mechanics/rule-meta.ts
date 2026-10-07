@@ -1,7 +1,7 @@
 // lib/mechanics/rule-meta.ts
 //
 // Curated mechanic grouping for the Statics analysis views
-// (docs/static-player-analysis-plan.md): ruleId → the mechanic it belongs
+// (docs/archive/static-player-analysis-plan.md): ruleId → the mechanic it belongs
 // to. Several rules can share one mechanicKey ("hit by spread" and "spread
 // too close" are one mechanic). A rule without an entry is its own mechanic:
 // key = its ruleId, label = its rule name. Nothing breaks for an unlabeled

@@ -1,7 +1,7 @@
 // lib/mechanics/wow/va/entombed-sentinels-damage-context.ts
 //
 // Entombed Sentinels' fight context for the damage analysis
-// (docs/damage-analysis-plan.md, "WoW build order" step 4;
+// (docs/archive/damage-analysis-plan.md, "WoW build order" step 4;
 // lib/damage/types.ts DamageContext). Measured on Mvz3r1AnVKYpdFTH (30
 // Mythic wipes), 2026-10-06. The encounter model is entombed-sentinels.ts's
 // header.

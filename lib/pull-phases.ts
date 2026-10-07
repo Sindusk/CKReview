@@ -2,7 +2,7 @@
 //
 // Phase data for a pull, read from the report metadata both FFLogs and WCL
 // return with the fight list (no event download). Feeds the Statics
-// per-phase analysis (docs/static-player-analysis-plan.md, "Data check
+// per-phase analysis (docs/archive/static-player-analysis-plan.md, "Data check
 // findings").
 //
 // How the log's fields behave (checked 2026-10-06 on Dancing Mad, Midnight

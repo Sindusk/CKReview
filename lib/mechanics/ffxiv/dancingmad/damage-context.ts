@@ -1,7 +1,7 @@
 // lib/mechanics/ffxiv/dancingmad/damage-context.ts
 //
 // Dancing Mad's fight context for the damage analysis
-// (docs/damage-analysis-plan.md, Layer 2; lib/damage/types.ts DamageContext).
+// (docs/archive/damage-analysis-plan.md, Layer 2; lib/damage/types.ts DamageContext).
 //
 // Phase pools are from the first DPS study (docs/dps-analysis.md, method
 // step 1): every log showed the same damage total for P2, P3 and P5, so

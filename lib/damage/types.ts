@@ -1,7 +1,7 @@
 // lib/damage/types.ts
 //
 // Game-neutral shapes for the damage analysis
-// (docs/damage-analysis-plan.md). A game supplies a DamageGame
+// (docs/archive/damage-analysis-plan.md). A game supplies a DamageGame
 // (lib/damage/ffxiv/game.ts, lib/damage/wow/game.ts); a boss may supply a
 // DamageContext; the
 // engine (lib/damage/analyze.ts) does the rest. Nothing here is a

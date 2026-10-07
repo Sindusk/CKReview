@@ -1,6 +1,6 @@
 // lib/damage/ffxiv/jobs/shared.ts
 //
-// Building blocks for the job checks (docs/damage-analysis-plan.md,
+// Building blocks for the job checks (docs/archive/damage-analysis-plan.md,
 // Layer 3): a job's own burst window, a job damage buff's uptime, and a
 // job gauge simulated from casts. Each returns findings in the engine's
 // shape and states its basis.

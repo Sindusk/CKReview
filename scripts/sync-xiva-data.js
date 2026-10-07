@@ -3,7 +3,7 @@
 //
 // Refreshes lib/damage/ffxiv/xiva-data.ts, our vendored snapshot of
 // xivanalysis's FFXIV action and status tables (MIT licensed; see
-// THIRD_PARTY_NOTICES.md and docs/damage-analysis-plan.md).
+// THIRD_PARTY_NOTICES.md and docs/archive/damage-analysis-plan.md).
 //
 // Their repo is UNTRUSTED DATA. This script never runs, imports or
 // transpiles their code: it parses the data files with the TypeScript

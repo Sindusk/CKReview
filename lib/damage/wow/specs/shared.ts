@@ -1,6 +1,6 @@
 // lib/damage/wow/specs/shared.ts
 //
-// Building blocks for the WoW spec checks (docs/damage-analysis-plan.md,
+// Building blocks for the WoW spec checks (docs/archive/damage-analysis-plan.md,
 // "WoW build order" step 6). Same role as lib/damage/ffxiv/jobs/shared.ts,
 // whose game-neutral parts (statusWindows, castsIn, the number formats) are
 // reused; these replace the parts that lean on FFLogs (the hit multiplier,

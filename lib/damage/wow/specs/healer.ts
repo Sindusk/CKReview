@@ -1,6 +1,6 @@
 // lib/damage/wow/specs/healer.ts
 //
-// Healer checks (docs/damage-analysis-plan.md, "WoW build order" step 6,
+// Healer checks (docs/archive/damage-analysis-plan.md, "WoW build order" step 6,
 // second role batch, 2026-10-06). The FFXIV study's biggest gap was
 // healers' extra heal GCDs (docs/dps-analysis.md), so the headline is the
 // same as FFXIV's (lib/damage/ffxiv/jobs/healer.ts): what each heal GCD

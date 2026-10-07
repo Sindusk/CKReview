@@ -1,7 +1,7 @@
 // lib/mechanics/wow/va/nekzali-damage-context.ts
 //
 // Nek'zali the Soulcoiler's fight context for the damage analysis
-// (docs/damage-analysis-plan.md, "WoW build order" step 4;
+// (docs/archive/damage-analysis-plan.md, "WoW build order" step 4;
 // lib/damage/types.ts DamageContext). Measured on nRGxQ1b8LdMvzC4D pull 6
 // (the 494.0s kill) and pulls 1, 3–5, 2026-10-06. The encounter model is
 // nekzali.ts's header.

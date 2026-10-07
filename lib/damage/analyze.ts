@@ -1,6 +1,6 @@
 // lib/damage/analyze.ts
 //
-// Per-pull damage analysis (docs/damage-analysis-plan.md). Pure:
+// Per-pull damage analysis (docs/archive/damage-analysis-plan.md). Pure:
 // (pull, game, context?) → PullDamageAnalysis. Nothing here is a
 // PullError; the result only feeds the Damage dialog.
 //

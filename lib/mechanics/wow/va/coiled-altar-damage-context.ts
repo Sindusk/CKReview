@@ -1,7 +1,7 @@
 // lib/mechanics/wow/va/coiled-altar-damage-context.ts
 //
 // The Coiled Altar's fight context for the damage analysis
-// (docs/damage-analysis-plan.md, "WoW build order" step 4;
+// (docs/archive/damage-analysis-plan.md, "WoW build order" step 4;
 // lib/damage/types.ts DamageContext). Measured on wThYvpJkbK6Pjrdc pulls
 // 1–17 (wipes; the kill is only in the spell survey), 2026-10-06. The
 // encounter model is coiled-altar.ts's header. Phase ids from pull 11

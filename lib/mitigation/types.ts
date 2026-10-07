@@ -1,7 +1,7 @@
 // lib/mitigation/types.ts
 //
 // Game-neutral shapes for the mitigation analysis
-// (docs/mitigation-redesign.md). A game supplies a catalog of these
+// (docs/archive/mitigation-redesign.md). A game supplies a catalog of these
 // entries; lib/mitigation/analyze.ts does the rest.
 
 export type MitigationKind =

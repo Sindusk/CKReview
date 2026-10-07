@@ -4,7 +4,7 @@
 // (FIGHT_EVENTS_QUERY's playerBuffs alias in lib/ffl-client.ts). The
 // damage-done `buffs` snapshot lists damage modifiers only, never procs,
 // so proc, job-buff and buff-window checks need apply/remove events
-// (docs/damage-analysis-plan.md, "Data check findings").
+// (docs/archive/damage-analysis-plan.md, "Data check findings").
 //
 // The list is every xivanalysis player status (lib/damage/ffxiv/xiva-data.ts)
 // except mitigation and shields (the damage-taken snapshot already answers

@@ -1,6 +1,6 @@
 // lib/mitigation/aggregate.ts
 //
-// Cross-pull view of the mitigation analysis (docs/mitigation-redesign.md,
+// Cross-pull view of the mitigation analysis (docs/archive/mitigation-redesign.md,
 // Model section 6). One pull is too noisy to plan from, so the plan view
 // reads this: each hit matched across pulls by MitigationHit.id (phase +
 // ability name + occurrence within the phase), with median and worst

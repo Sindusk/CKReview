@@ -1,7 +1,7 @@
 // lib/mechanics/wow/va/vashnik-damage-context.ts
 //
 // Vashnik the Malignant's fight context for the damage analysis
-// (docs/damage-analysis-plan.md, "WoW build order" step 4;
+// (docs/archive/damage-analysis-plan.md, "WoW build order" step 4;
 // lib/damage/types.ts DamageContext). Measured on kGVX7tafBT2pM1N3 pull 19
 // (the 438.6s kill), 2026-10-06. The encounter model is vashnik.ts's
 // header.

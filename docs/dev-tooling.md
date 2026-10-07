@@ -124,7 +124,7 @@ It loads pulls lazily and keeps three in memory, so narrowing with
   and then `node scripts/sync-xiva-data.js <that-dir>`. The script parses
   their files and never runs them. Clone outside the repo, and don't run
   anything inside the clone.
-- Model and choices: [damage-analysis-plan.md](damage-analysis-plan.md).
+- Model and choices: [damage-analysis-plan.md](archive/damage-analysis-plan.md).
 
 ## Damage analysis (WoW)
 
@@ -172,7 +172,7 @@ It loads pulls lazily and keeps three in memory, so narrowing with
   `node scripts/validate.js mitigation-analysis sampledata/ff/<code>`
   prints every raidwide hit per pull, then the cross-pull aggregate.
   Print-only; it needs a full capture fetched after 2026-10-06.
-- Design and tuning choices: [mitigation-redesign.md](mitigation-redesign.md).
+- Design and tuning choices: [mitigation-redesign.md](archive/mitigation-redesign.md).
 
 ## Verifying UI in a real browser
 

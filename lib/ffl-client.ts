@@ -316,7 +316,7 @@ export type FFLDamageEvent = {
   // Kept as a fallback only — rarely populated on FFLogs "damage" events.
   hitPoints?:    number;
   maxHitPoints?: number;
-  // Mitigation breakdown (docs/mitigation-redesign.md, "Data check
+  // Mitigation breakdown (docs/archive/mitigation-redesign.md, "Data check
   // findings"). amount + absorbed + mitigated = unmitigatedAmount.
   // `multiplier` is the product of every % modifier on the hit, rounded to
   // 2 decimals; it includes vulnerability-up and excludes block. All four
@@ -327,7 +327,7 @@ export type FFLDamageEvent = {
   mitigated?:    number;
   blocked?:      number;
   hitType?:      number;
-  // Outgoing damage (docs/damage-analysis-plan.md, "Data check findings"):
+  // Outgoing damage (docs/archive/damage-analysis-plan.md, "Data check findings"):
   // hitType 2 = crit; `directHit` is separate. On damageDone, `multiplier`
   // holds only damage-% modifiers, not crit/DH-rate buffs. `bonusPercent`
   // appears on combo and positional actions. Simulated DoT ticks carry

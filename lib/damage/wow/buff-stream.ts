@@ -3,7 +3,7 @@
 // What the WoW damage-analysis streams fetch (FIGHT_EVENTS_QUERY's
 // playerBuffs and enemyDebuffs aliases in lib/wcl-client.ts), and which
 // aura ids the transform keeps from each hit's aura snapshot. Same role as
-// lib/damage/ffxiv/buff-stream.ts. Data check: docs/damage-analysis-plan.md,
+// lib/damage/ffxiv/buff-stream.ts. Data check: docs/archive/damage-analysis-plan.md,
 // "WoW port".
 //
 // All ids come from lib/damage/wow/spell-data.ts, which is measured from

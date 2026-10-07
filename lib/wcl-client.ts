@@ -296,7 +296,7 @@ export type WCLDamageEvent = {
   // Midnight Falls' Light's End crystal-position rule.
   x?:            number;
   y?:            number;
-  // Damage analysis (docs/damage-analysis-plan.md, "WoW port"): every aura
+  // Damage analysis (docs/archive/damage-analysis-plan.md, "WoW port"): every aura
   // on the attacker as a "id.id.id." string (procs included; HoTs, shields
   // and target debuffs not); 1 normal, 2 crit, 0 miss, 8 parry, 10 immune;
   // the amount before crit and target-side modifiers.
@@ -352,7 +352,7 @@ export type WCLBuffEvent = {
   };
 };
 
-// Damage analysis streams (docs/damage-analysis-plan.md, "WoW port"):
+// Damage analysis streams (docs/archive/damage-analysis-plan.md, "WoW port"):
 // friendly Buffs filtered to lib/damage/wow/buff-stream.ts's list, and
 // Debuffs players put on enemies filtered to their DoTs and party debuffs.
 // No `duration` on applies (unlike FFLogs).
@@ -519,7 +519,7 @@ export function buildFightLogLabels(fights: WCLFight[]): Map<number, string> {
 // ── Cost: finished streams are dropped ─────────────────────────────────
 // WCL charges about one point per aliased stream per request, whatever
 // its size, and an empty stream pinned at endTime costs the same
-// (measured 2026-10-06, docs/damage-analysis-plan.md "WoW port"). So each
+// (measured 2026-10-06, docs/archive/damage-analysis-plan.md "WoW port"). So each
 // alias carries `@include(if: $<key>Want)` and a finished stream is turned
 // off: page 1 pays for every stream, later pages only for the busy ones
 // (damage done, healing). That also pays for the two damage-analysis

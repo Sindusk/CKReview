@@ -1,12 +1,18 @@
 # Damage Analysis Plan (FFXIV)
 
+> **Archived 2026-10-06.** Built for FFXIV and WoW. Open questions moved to
+> [open-items.md](../open-items.md). Kept as the design record: code
+> comments cite its sections, and its data-check findings are still the
+> reference for log semantics. Module headers are authoritative for current
+> behaviour.
+
 Plan for in-app damage and rotation analysis: a new **Damage** dialog
 that finds rotation and uptime losses per player, scores them in lost
 damage, and explains them using what we know about the fight. The
 direction was agreed with the user on 2026-10-06; this doc is the build
 brief. Steps 1–4 are built; see "Build status".
 
-Read [dps-analysis.md](dps-analysis.md) first. It records the manual
+Read [dps-analysis.md](../dps-analysis.md) first. It records the manual
 method and the pitfalls from the first study, where player feedback
 overturned two of three rotation claims. This plan turns that method into
 app code.

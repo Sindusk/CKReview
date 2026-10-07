@@ -1,7 +1,7 @@
 // lib/damage/ffxiv/jobs/index.ts
 //
 // Job display name (lib/ffl-job-data.ts) → that job's checks. Filled in by
-// role batch (docs/damage-analysis-plan.md, Layer 3): every combat job.
+// role batch (docs/archive/damage-analysis-plan.md, Layer 3): every combat job.
 
 import type { JobCheck } from "../../types";
 import { GNB_CHECKS } from "./gnb";

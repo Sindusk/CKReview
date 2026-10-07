@@ -1,6 +1,6 @@
 // lib/damage/wow/specs/tank.ts
 //
-// Tank checks (docs/damage-analysis-plan.md, "WoW build order" step 6, first
+// Tank checks (docs/archive/damage-analysis-plan.md, "WoW build order" step 6, first
 // role batch, 2026-10-06). Which windows and resources matter was informed
 // by WoWAnalyzer's spec modules (read, not copied: AGPL); every id and number
 // here is from our own logs (lib/damage/wow/spell-data.ts and the pulls

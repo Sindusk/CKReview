@@ -108,7 +108,7 @@ file's header comment. Mechanic detection has its own guide:
     segments), `StaticReviewPullMechanic`, the wipe cause on
     `StaticReviewPull`, and the `StaticRule` / `StaticPhase` lookups. They
     feed the mechanic and phase analysis
-    ([static-player-analysis-plan.md](static-player-analysis-plan.md)). The
+    ([static-player-analysis-plan.md](archive/static-player-analysis-plan.md)). The
     count rows above stay the source for the existing chart and Players
     panel.
 - **Player identity.** A player's name can change between logs, so

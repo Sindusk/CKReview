@@ -2,7 +2,7 @@
 //
 // Every instance of a mechanic a pull reached, failed or not — the
 // denominator for the Statics analysis ("failed 4 of the 9 times it
-// happened", docs/static-player-analysis-plan.md step 6). Carried on
+// happened", docs/archive/static-player-analysis-plan.md step 6). Carried on
 // Pull.mechanicOccurrences and stored per pull at import.
 //
 // Each instance is anchored on the boss's own completed cast (enemyCasts),

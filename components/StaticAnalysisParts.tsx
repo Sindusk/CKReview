@@ -6,7 +6,7 @@
 // raid, StaticPlayerAnalysisPanel for one player): the filter bar, the
 // ranked mechanic table with its per-session trend, and the response types
 // of /api/statics/[staticId]/analysis/*. Counting rules live in
-// lib/static-analysis.ts; docs/static-player-analysis-plan.md has the why.
+// lib/static-analysis.ts; docs/archive/static-player-analysis-plan.md has the why.
 
 import type { CSSProperties, ReactNode } from "react";
 import type { AnalysisPhase, AnalysisSession, MechanicStats } from "@/lib/static-analysis";

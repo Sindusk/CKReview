@@ -1,7 +1,7 @@
 // lib/mitigation/ffxiv-catalog.ts
 //
 // Every FFXIV mitigation the analysis recognizes, shared by all fights
-// (docs/mitigation-redesign.md, Model section 2). Keyed by FFLogs IDs:
+// (docs/archive/mitigation-redesign.md, Model section 2). Keyed by FFLogs IDs:
 // action IDs are the cast's abilityGameID; status IDs are FFLogs' status
 // IDs (game status ID + 1,000,000), the values in a damage event's `buffs`.
 //

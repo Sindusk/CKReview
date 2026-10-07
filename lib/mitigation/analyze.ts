@@ -1,6 +1,6 @@
 // lib/mitigation/analyze.ts
 //
-// Per-pull mitigation analysis (docs/mitigation-redesign.md, Model sections
+// Per-pull mitigation analysis (docs/archive/mitigation-redesign.md, Model sections
 // 1, 3, 4 and 5). Pure: (pull, game) -> MitigationHit[]. Nothing here is a
 // PullError; the result only feeds the Mitigation dialog.
 //

@@ -1,6 +1,6 @@
 // lib/damage/compare.ts
 //
-// Reference-clear comparison (docs/damage-analysis-plan.md, Layer 4; the
+// Reference-clear comparison (docs/archive/damage-analysis-plan.md, Layer 4; the
 // method is docs/dps-analysis.md steps 2, 3 and 5). Pure.
 //
 // ── Equal windows ──────────────────────────────────────────────────────

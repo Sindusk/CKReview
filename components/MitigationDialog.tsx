@@ -3,7 +3,7 @@
 // components/MitigationDialog.tsx
 //
 // "Mitigation" modal opened from the header bar. Shows the party's actual
-// mitigation per raidwide hit, read from the log (docs/mitigation-redesign.md):
+// mitigation per raidwide hit, read from the log (docs/archive/mitigation-redesign.md):
 // what was used and by whom, what was free, how close the raid came to
 // dying, and what could be dropped. No plan input and no PullErrors; this
 // replaced the Ikuya-sheet Heatmap and Review tabs on 2026-10-06.

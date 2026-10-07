@@ -2,7 +2,7 @@
 
 // components/DamageDialog.tsx
 //
-// "Damage" modal opened from the header bar (docs/damage-analysis-plan.md,
+// "Damage" modal opened from the header bar (docs/archive/damage-analysis-plan.md,
 // UI). Shows where each player lost damage, scored in their own observed
 // damage, with fight context from the boss's DamageContext:
 //   - one pull: the phase summary, players ranked by estimated loss, and
@@ -13,7 +13,7 @@
 // the damage fields existed say so; re-fetching stays an explicit action
 // elsewhere in the app.
 //
-// Both games (docs/damage-analysis-plan.md, "WoW build order" step 5): each
+// Both games (docs/archive/damage-analysis-plan.md, "WoW build order" step 5): each
 // pull is analysed with its own game layer (FFXIV_DAMAGE / WOW_DAMAGE). WoW
 // pulls are big, so pulls are analysed when first shown (one pull, or every
 // pull for the "all loaded pulls" view) and cached for the open dialog.

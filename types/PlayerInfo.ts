@@ -78,7 +78,7 @@ export type PlayerEvent = {
   targetActorId?:     number;
   targetInstance?:    number;
 
-  // Damage Done — WoW, for the damage analysis (docs/damage-analysis-plan.md,
+  // Damage Done — WoW, for the damage analysis (docs/archive/damage-analysis-plan.md,
   // "WoW port"). `statusIds` holds the tracked auras on the attacker
   // (lib/damage/wow/buff-stream.ts; procs included, unlike FFXIV); there is
   // no `multiplier`. `unmitigatedAmount` is before crit and target-side

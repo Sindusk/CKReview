@@ -14,7 +14,7 @@
 //   MIT License; full text in THIRD_PARTY_NOTICES.md.
 //
 // Jobs whose batch hasn't come yet track only their two-minute party buff;
-// the role batches (docs/damage-analysis-plan.md, Layer 3) add the rest.
+// the role batches (docs/archive/damage-analysis-plan.md, Layer 3) add the rest.
 
 export type TrackedCooldownSpec = {
   actions:           string[];  // xivanalysis action keys; several = one shared recast

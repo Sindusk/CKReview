@@ -4,7 +4,7 @@
 // Collects per-spec spell and aura statistics from real WCL fights, for
 // scripts/build-wow-spell-data.js (which writes lib/damage/wow/spell-data.ts).
 // WCL carries no GCD, cooldown or aura metadata, and WoWAnalyzer's tables are
-// AGPL (docs/damage-analysis-plan.md, "WoW port"), so every spell fact the
+// AGPL (docs/archive/damage-analysis-plan.md, "WoW port"), so every spell fact the
 // WoW damage analysis uses is measured from logs like these.
 //
 // Fetches four unfiltered streams for each fight: friendly Casts,

@@ -119,8 +119,8 @@ differ from the FFLogs fight id. In one report, "pull 11" was fight 12.
 
 ## Ideas for app tooling
 
-These are folded into the build plan,
-[damage-analysis-plan.md](damage-analysis-plan.md).
+All of these are built in the Damage dialog (`lib/damage/`). The build
+record is [damage-analysis-plan.md](archive/damage-analysis-plan.md).
 
 - Phase-pool detection, and the equal-window comparison against
   user-supplied clear logs.

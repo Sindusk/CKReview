@@ -1,6 +1,6 @@
 // lib/mechanics/wow/va/ulatek-damage-context.ts
 //
-// Ula'tek's fight context for the damage analysis (docs/damage-analysis-plan.md,
+// Ula'tek's fight context for the damage analysis (docs/archive/damage-analysis-plan.md,
 // "WoW build order" step 4; lib/damage/types.ts DamageContext). Measured on
 // JZp82Rm7TzycM94a pull 25 (the 598.6s kill), 2026-10-06. The encounter
 // model is ulatek.ts's header.

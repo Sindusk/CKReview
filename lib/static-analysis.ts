@@ -3,7 +3,7 @@
 // Server-only. Loads a static's detailed sessions (StaticReview.detailVersion
 // set) and aggregates them for the analysis routes under
 // app/api/statics/[staticId]/analysis/ — per-mechanic rates for the raid or
-// one player, and wipe causes. See docs/static-player-analysis-plan.md.
+// one player, and wipe causes. See docs/archive/static-player-analysis-plan.md.
 //
 // Counting rules (settled with the user, see the plan's "Decisions"):
 // - Majors only by default; `includeMinors` adds Minors. Raid errors are not

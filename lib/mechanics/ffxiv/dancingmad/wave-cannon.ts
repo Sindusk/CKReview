@@ -60,7 +60,7 @@
 // position) used to raise a Raid-severity "Wave Cannon Mitigation Issue".
 // Removed 2026-10-06 with the rest of the mitigation PullErrors: mitigation
 // is a team planning problem and lives only in the Mitigation dialog
-// (docs/mitigation-redesign.md).
+// (docs/archive/mitigation-redesign.md).
 //
 // ── POSITION IS READ ~0.65s BEFORE THE DAMAGE EVENT, NOT AT IT (confirmed ──
 // ── 2026-07-31, report h2JvDkntZCaBgmLF, pull 3) ───────────────────────────

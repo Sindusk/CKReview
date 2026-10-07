@@ -6,7 +6,7 @@
 //
 // ── GCD uses ───────────────────────────────────────────────────────────
 // A GCD starts at its begin-cast when it has one (the "cast" event lands
-// ~0.5s before the cast bar ends, docs/damage-analysis-plan.md "Data check
+// ~0.5s before the cast bar ends, docs/archive/damage-analysis-plan.md "Data check
 // findings"), else at the cast. It locks the next GCD for
 // max(recast × speed factor, cast time). The speed factor is the player's
 // most common interval between two plain 2.5s GCDs, ÷ 2.5s: their skill or

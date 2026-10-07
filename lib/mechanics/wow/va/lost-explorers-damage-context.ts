@@ -1,7 +1,7 @@
 // lib/mechanics/wow/va/lost-explorers-damage-context.ts
 //
 // The Lost Explorers' fight context for the damage analysis
-// (docs/damage-analysis-plan.md, "WoW build order" step 4;
+// (docs/archive/damage-analysis-plan.md, "WoW build order" step 4;
 // lib/damage/types.ts DamageContext). Measured on 8PQFgdDh3R9BW71t pull 20
 // (the 409.3s kill) and nRGxQ1b8LdMvzC4D pulls 11, 12 and 15 (phase ids),
 // 2026-10-06. The encounter model is lost-explorers.ts's header.

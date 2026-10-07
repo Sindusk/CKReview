@@ -397,14 +397,102 @@ picked up; it stays only as a record.
 - **Roles (`ffxiv/roles.ts`):**
   - M1 vs M2 has no signal and is always tentative.
   - MT/OT misses on very short or anomalous-opening pulls.
-- **Mitigation** ([mitigation-redesign.md](mitigation-redesign.md)):
-  - The log-derived analysis replaced the Ikuya sheet on 2026-10-06, and
-    the user is reviewing the timeline on production. Thresholds (verdict,
-    droppable floor, raidwide size) are still to be tuned with them.
-  - Catalog entries for Warrior, Machinist (Dismantle), Red Mage, Ninja,
-    Monk and Summoner are unverified until a log with those jobs is fetched.
-  - Later phases: what-if sandbox, tank busters, optional plan reference,
-    WoW port.
+## Analysis systems: Damage, Mitigation, Statics
+
+All three were built on 2026-10-06 and are waiting on the user's review.
+Their plans are archived in [archive/](archive/) as the design record.
+Module headers hold the current rules.
+
+**Unverified jobs and specs** are the main risk across Damage and
+Mitigation: their checks were written from game data and xivanalysis or
+WoWAnalyzer rules, but never run against a real log. When a static or a
+reference clear includes one, fetch it as a sample and check its findings
+before anyone relies on them.
+
+### Mitigation (FFXIV)
+
+- **Thresholds to tune with the user**, all chosen by the builder:
+  - raidwide: 4+ targets and 75%+ of the living party
+  - verdict: under below 5%, tight 5–20%, over 20%+, judged on the
+    sequence margin
+  - follow-up damage: enemy damage chained within 5s of the hit, up to 15s
+  - droppable: party-wide mitigations with a 30s+ cooldown only, keeping
+    the lowest player at 5%+ after a 5% damage-roll buffer
+  - free: a full cooldown since the last cast and before the next; in
+    all-pulls mode, free in at least half the pulls
+  - the cross-pull verdict uses the median margin
+- **Unverified catalog entries:** Warrior, Machinist (Dismantle), Red Mage,
+  Ninja, Monk, Summoner.
+- **Deferred:** what-if sandbox (reuse `marginWithout`), tank busters, an
+  optional published plan to compare against, a WoW port.
+
+### Damage (both games)
+
+- **Nothing reviewed yet.** The user will refine each job or spec with
+  the people who play it. The validate runners are print-only;
+  snapshots and rulings come once findings survive player feedback.
+- **Deferred:** automatic search for comparable clears.
+- "All loaded pulls" on a 25-pull WoW report takes several seconds.
+
+**FFXIV:**
+- **Unverified jobs** (no sample has them): PLD, WAR, WHM, SGE, MNK, DRG,
+  NIN, RPR, BRD, MCH, BLM, SMN, RDM.
+- **Per-player busy windows** (tower soaks, debuff carriers, baits) aren't
+  in the Dancing Mad context. Gaps during a mechanic are labelled but
+  still counted. Candidate: the DRK's 4.6–4.9s idle after LB3 during Limit
+  Cut, in every pull.
+- **P4 is marked `damageCounts: false`** because its damage doesn't carry
+  over. Revisit if P4 turns out to have its own damage check.
+- **PCT Hammers:** every Starry Muse on `dQ8wmb1VhKt6yBXk` holds only one
+  Hammer. Consistent across pulls, so probably a chosen line; confirm with
+  the player.
+- **Not built:** proc overwrites, "the right actions inside buffs" beyond
+  the ported windows, Arcane Circle's window, and a "motif painted in
+  uptime" check (needs knowledge of upcoming downtime).
+
+**WoW:**
+- **Built against groups the user doesn't know**, with no WoW static yet.
+  It's a raw implementation to refine.
+- **Unverified specs:** Brewmaster and Vengeance (tracked cooldowns only),
+  Mistweaver (its 740ms observed GCD is suspect), Discipline, Frost DK,
+  Fury, Feral, Survival, Outlaw, Augmentation, Fire, Devourer, Frost Mage,
+  Destruction. Guardian Druid and Protection Warrior have nothing.
+- **Fight-context gaps:**
+  - Multi-target is set per phase, so fights without log phases
+    (Vashnik's Venoms, Twin Fangs, Nymrissa's Bubblefins) can't mark add
+    windows.
+  - Partial losses (a mechanic that halves a melee's uptime) are excused
+    in full or not at all.
+  - Enrage timers are mostly unobserved in the sample wipes.
+  - Nymrissa has no detection module, so its context has no forced
+    windows.
+- **Not judged or not valued:**
+  - drift on cooldowns with no direct damage (Combustion, Bestial Wrath,
+    Breath of Eons) or whose damage logs under another ID (Halo): found,
+    marked inference, not valued
+  - Augmentation's support damage in the rDPS split
+  - Frost Mage's window (Icy Veins wasn't cast in the samples)
+  - overcap for resources logged only on spenders (Holy Power, Soul
+    Shards, Essence); Energy and Focus waste is mostly invisible
+  - shields that expire unused
+- **Data slack:**
+  - A few non-DoT debuffs pass the enemy-debuff filter (Rune of
+    Lingering, Banish, Mortal Coil) because they share an ID with
+    something a spec casts.
+  - On-GCD inference needs 5+ casts, so rare abilities are unknown.
+  - Cooldown recasts are the shortest measured interval, an upper bound,
+    so drift errs lenient.
+  - Subtlety's Energy-cap gain estimate includes regen.
+
+### Statics analysis
+
+- **Mechanic anchors missing** for the Kefka Says instructions, the
+  generic Damage Down splits and every Venomous Abyss boss. Those fall back
+  to phase exposure, or pull exposure on bosses without log phases.
+- **Values never tuned with the user:** death-chain gap 10s and end window
+  15s (`lib/static-review-data.ts`), a trend needs 5+ chances
+  (`MIN_CHANCES`), "first vs last" compares 3 sessions
+  (`COMPARE_SESSIONS`).
 
 ## App
 

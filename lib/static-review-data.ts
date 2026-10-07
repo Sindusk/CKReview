@@ -5,7 +5,7 @@
 // (StaticReviewPull + StaticReviewPullPlayerError, see prisma/schema.prisma),
 // plus the detail rows behind the mechanic/phase analysis: every error,
 // phase segments and the wipe cause (buildStaticReviewPayload; see
-// docs/static-player-analysis-plan.md).
+// docs/archive/static-player-analysis-plan.md).
 // Computed client-side at "Add Review To Static" time — the app only ever
 // has real Pull[] data in the browser (freshly fetched from WCL/FFL and run
 // through detectPullErrors), so this can't be recomputed from scratch on

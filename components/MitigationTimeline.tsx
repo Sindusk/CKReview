@@ -2,7 +2,7 @@
 
 // components/MitigationTimeline.tsx
 //
-// The Mitigation dialog's timeline (docs/mitigation-redesign.md, UI): one
+// The Mitigation dialog's timeline (docs/archive/mitigation-redesign.md, UI): one
 // row per raidwide hit in fight order, grouped by phase. Columns are grouped
 // per player in party-slot order (MT, OT, H1, H2, M1, M2, R1, R2), with a
 // rule between players. Each group shows that player's party-wide

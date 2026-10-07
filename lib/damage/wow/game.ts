@@ -1,6 +1,6 @@
 // lib/damage/wow/game.ts
 //
-// The WoW game layer for the damage analysis (docs/damage-analysis-plan.md,
+// The WoW game layer for the damage analysis (docs/archive/damage-analysis-plan.md,
 // "WoW port"). Same role as lib/damage/ffxiv/game.ts, built on our own
 // measured table (spell-data.ts, generated from WCL logs) instead of a
 // vendored one: WoWAnalyzer is AGPL, so nothing here is taken from it.

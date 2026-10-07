@@ -1,6 +1,6 @@
 // lib/damage/wow/specs/melee.ts
 //
-// Melee checks (docs/damage-analysis-plan.md, "WoW build order" step 6, third
+// Melee checks (docs/archive/damage-analysis-plan.md, "WoW build order" step 6, third
 // role batch, 2026-10-06). Which cooldowns and windows matter was informed
 // by WoWAnalyzer (read, not copied: AGPL); every id is from our own logs
 // (lib/damage/wow/spell-data.ts, the status the spec's cooldown puts on

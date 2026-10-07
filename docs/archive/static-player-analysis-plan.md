@@ -1,5 +1,11 @@
 # Static Player Analysis Plan
 
+> **Archived 2026-10-06.** Built. Open questions moved to
+> [open-items.md](../open-items.md). Kept as the design record: code
+> comments cite its sections, and its data-check findings are still the
+> reference for log semantics. Module headers are authoritative for current
+> behaviour.
+
 Plan for per-player and per-mechanic analysis in the Statics window, so
 questions like these can be answered from a static's consolidated history
 instead of reopening every report:

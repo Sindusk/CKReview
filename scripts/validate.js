@@ -479,7 +479,7 @@ const MECHANICS = {
 // Print-only (no PullErrors, nothing snapshotted): the new mitigation
 // analysis (lib/mitigation/analyze.ts) for every pull, one line per raidwide
 // hit plus its active mitigations, free ones and droppable set.
-// docs/mitigation-redesign.md describes the columns.
+// docs/archive/mitigation-redesign.md describes the columns.
 MECHANICS['mitigation-analysis'] = {
   game: 'ff',
   load: () => ({
@@ -535,7 +535,7 @@ MECHANICS['mitigation-analysis'] = {
 // Print-only (no PullErrors, nothing snapshotted yet): the damage analysis
 // (lib/damage/analyze.ts) for every pull: phase summary, then each player's
 // estimated loss and top findings. `--all-findings` prints every finding.
-// docs/damage-analysis-plan.md describes the model.
+// docs/archive/damage-analysis-plan.md describes the model.
 MECHANICS['damage-analysis'] = {
   game: 'ff',
   load: () => ({
@@ -555,7 +555,7 @@ MECHANICS['damage-analysis'] = {
 // The WoW counterpart: same print, WOW_DAMAGE. Runs only when named (WoW
 // pulls are big and go through the whole live transform):
 //   node scripts/validate.js damage-analysis-wow sampledata/wow/<code> [--pulls=1,3] [--boss=Vashnik]
-// Needs a capture fetched after 2026-10-06 (docs/damage-analysis-plan.md,
+// Needs a capture fetched after 2026-10-06 (docs/archive/damage-analysis-plan.md,
 // "Build status (WoW)").
 MECHANICS['damage-analysis-wow'] = {
   game: 'wow',

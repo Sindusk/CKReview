@@ -1,6 +1,6 @@
 // lib/mechanics/wow/va/sszorak-damage-context.ts
 //
-// Sszorak's fight context for the damage analysis (docs/damage-analysis-plan.md,
+// Sszorak's fight context for the damage analysis (docs/archive/damage-analysis-plan.md,
 // "WoW build order" step 4; lib/damage/types.ts DamageContext). Measured on
 // rNL38zFGMbyADRTh (36 Mythic wipes; no kill on disk), 2026-10-06. The
 // encounter model is sszorak.ts's header. "Idle" below = share of time a

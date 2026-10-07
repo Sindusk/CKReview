@@ -1,5 +1,11 @@
 # Mitigation Redesign Plan (FFXIV)
 
+> **Archived 2026-10-06.** Built. Open questions moved to
+> [open-items.md](../open-items.md). Kept as the design record: code
+> comments cite its sections, and its data-check findings are still the
+> reference for log semantics. Module headers are authoritative for current
+> behaviour.
+
 Plan for replacing the sheet-based mitigation system with one that reads
 the party's actual mitigation from the log. The direction was agreed with
 the user on 2026-10-06; this doc is the build brief. Build step 1 (the

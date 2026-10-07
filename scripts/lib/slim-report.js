@@ -56,7 +56,7 @@ function project(streams, projectors) {
 const WCL_PROJECTORS = {
   deaths:        (e) => omit(e, ['fight']),
   combatantInfo: (e) => pick(e, ['timestamp', 'type', 'sourceID', 'specID']),
-  // Damage analysis (docs/damage-analysis-plan.md, "WoW port"): `fake`,
+  // Damage analysis (docs/archive/damage-analysis-plan.md, "WoW port"): `fake`,
   // `empowermentLevel` and the caster's `classResources` on casts; on
   // damage done, the aura snapshot (cut to the tracked ids, see
   // slimWclReport), hitType, unmitigatedAmount, the target's HP after the
@@ -121,14 +121,14 @@ const FFL_PROJECTORS = {
   // rest (packetID, sourceResources, targetMarker, ...) stays dropped —
   // damageTaken below also keeps the mitigation breakdown).
   // hitType ... actorPotencyRatio are read by the damage analysis
-  // (lib/damage/); see docs/damage-analysis-plan.md "Data check findings".
+  // (lib/damage/); see docs/archive/damage-analysis-plan.md "Data check findings".
   damageDone: (e) => ({
     ...pick(e, ['timestamp', 'type', 'sourceID', 'targetID', 'sourceInstance', 'targetInstance', 'abilityGameID', 'amount', 'overkill', 'buffs', 'unpaired',
       'hitType', 'directHit', 'multiplier', 'bonusPercent', 'tick', 'simulated', 'actorPotencyRatio']),
     targetResources: pickNested(e, 'targetResources', FF_RESOURCE_SUBKEYS),
   }),
   // The mitigation breakdown fields (unmitigatedAmount ... hitType) are read
-  // by lib/mitigation/; see docs/mitigation-redesign.md "Data check findings".
+  // by lib/mitigation/; see docs/archive/mitigation-redesign.md "Data check findings".
   damageTaken: (e) => ({
     ...pick(e, ['timestamp', 'type', 'sourceID', 'targetID', 'sourceInstance', 'targetInstance', 'abilityGameID', 'amount', 'overkill', 'buffs', 'unpaired',
       'unmitigatedAmount', 'multiplier', 'absorbed', 'mitigated', 'blocked', 'hitType']),

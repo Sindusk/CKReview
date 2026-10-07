@@ -1,6 +1,6 @@
 // lib/damage/wow/specs/ranged.ts
 //
-// Ranged and caster checks (docs/damage-analysis-plan.md, "WoW build order"
+// Ranged and caster checks (docs/archive/damage-analysis-plan.md, "WoW build order"
 // step 6, last role batch, 2026-10-06). Which cooldowns, DoTs and resources
 // matter was informed by WoWAnalyzer (read, not copied: AGPL); every id is
 // from our own logs (lib/damage/wow/spell-data.ts). Sample players: Arcane

@@ -1,7 +1,7 @@
 // lib/mechanics/wow/va/twin-fangs-damage-context.ts
 //
 // The Twin Fangs' fight context for the damage analysis
-// (docs/damage-analysis-plan.md, "WoW build order" step 4;
+// (docs/archive/damage-analysis-plan.md, "WoW build order" step 4;
 // lib/damage/types.ts DamageContext). Measured on 6Jnq8ycwgkYZpHND (kill,
 // pull 25) and xKP1M6gwC8WpnrBc (14 wipes), 2026-10-06. The encounter model
 // is twin-fangs.ts's header. "Idle" = share of time a DPS player sat in a

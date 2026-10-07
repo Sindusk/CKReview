@@ -2,7 +2,7 @@
 
 // components/DamageCompare.tsx
 //
-// The Damage dialog's "Compare with clears" view (docs/damage-analysis-plan.md,
+// The Damage dialog's "Compare with clears" view (docs/archive/damage-analysis-plan.md,
 // Layer 4; lib/damage/compare.ts). The user pastes reference clears and
 // presses Fetch: nothing loads on its own (CLAUDE.md: no hidden costs).
 // Shows raid, role and per-player rDPS over equal windows from the start of

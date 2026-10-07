@@ -4,7 +4,7 @@
 // Writes lib/damage/wow/spell-data.ts from the survey files that
 // scripts/survey-wow-spells.js leaves in sampledata/wow/<code>/survey/.
 // Everything in the output is measured from those logs; nothing comes from
-// WoWAnalyzer (AGPL; docs/damage-analysis-plan.md, "WoW port"). Re-run it
+// WoWAnalyzer (AGPL; docs/archive/damage-analysis-plan.md, "WoW port"). Re-run it
 // after surveying more fights.
 //
 // Per spec (combatantInfo specID), across every surveyed player of it:
