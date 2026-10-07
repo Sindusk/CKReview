@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import Header from "../components/Header";
-import AddVodDialog from "../components/AddVodDialog";
+import AddVodDialog, { type AddVodSource } from "../components/AddVodDialog";
 import ReportDialog from "../components/ReportDialog";
 import SessionFoundDialog from "@/components/SessionFoundDialog";
 import SampleDataFoundDialog from "@/components/SampleDataFoundDialog";
@@ -10,7 +10,8 @@ import LoginDialog from "@/components/LoginDialog";
 import AddReviewToStaticDialog from "@/components/AddReviewToStaticDialog";
 import ManageStaticsDialog from "@/components/ManageStaticsDialog";
 import { parseYouTubeUrl, parseLogUrl } from "@/lib/url-parsers";
-import type { Vod } from "../types/Vod";
+import { isLocalVod, type Vod } from "../types/Vod";
+import { loadLocalVodOffset, saveLocalVodOffset, clearLocalVodOffset } from "@/lib/local-vod-sync";
 import VideoPanel from "../components/VideoPanel";
 import VODSidebar from "../components/VODSidebar";
 import { Panel } from "../components/ui/Panel";
@@ -103,6 +104,15 @@ async function mapWithConcurrency<T, R>(
   await Promise.all(Array.from({ length: workerCount }, () => worker()));
 
   return results;
+}
+
+// The ONE place VODs are chosen for sending to the server (persistSession's
+// app/api/sessions payload). Local-file VODs are dropped: they exist only
+// in this tab, and neither the file nor a placeholder entry may reach the
+// server (docs/local-vod-plan.md). Anything new that sends VODs anywhere
+// must go through this too.
+function serverSavableVods(vods: Vod[]): Vod[] {
+  return vods.filter(v => !isLocalVod(v));
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -298,6 +308,22 @@ export default function Home() {
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => { vodsRef.current = vods; }, [vods]);
+
+  // Release a local VOD's object URL once it leaves the list (e.g. a session
+  // restore replaces the VODs), and all of them when the page unmounts.
+  const localVodUrlsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const current = new Set(
+      vods.flatMap(v => (v.localFile ? [v.localFile.objectUrl] : []))
+    );
+    for (const url of localVodUrlsRef.current) {
+      if (!current.has(url)) URL.revokeObjectURL(url);
+    }
+    localVodUrlsRef.current = current;
+  }, [vods]);
+  useEffect(() => () => {
+    for (const url of localVodUrlsRef.current) URL.revokeObjectURL(url);
+  }, []);
   useEffect(() => { pullsRef.current = pulls; }, [pulls]);
   useEffect(() => { sessionReportUrlRef.current = sessionReportUrl; }, [sessionReportUrl]);
 
@@ -336,7 +362,7 @@ export default function Home() {
     saveTimeoutRef.current = setTimeout(async () => {
       const payload: Omit<SavedSession, "createdAt"> = {
         reportUrl: sessionReportUrlRef.current ?? "",
-        vods: vodsRef.current.map(v => ({
+        vods: serverSavableVods(vodsRef.current).map(v => ({
           player: v.player,
           url:    v.url,
           offset: v.isCalibrated ? v.offset : undefined,
@@ -486,7 +512,52 @@ export default function Home() {
     persistSession();
   }, [persistSession]);
 
-  function handleAddVod(player: string, url: string) {
+  // Report half of a local VOD's remembered-sync key (lib/local-vod-sync.ts):
+  // the same file's offset only applies to the log it was calibrated on.
+  function currentReportKey(): string {
+    const parsed = parseLogUrl(sessionReportUrlRef.current ?? "");
+    return parsed ? `${parsed.source}:${parsed.code}` : "";
+  }
+
+  function handleAddVod(player: string, source: AddVodSource) {
+    if (source.kind === "local") {
+      const { file } = source;
+      const localFile = {
+        objectUrl:    URL.createObjectURL(file),
+        name:         file.name,
+        size:         file.size,
+        lastModified: file.lastModified,
+      };
+      // Re-picking a file calibrated earlier on this log restores its sync.
+      const rememberedOffset = loadLocalVodOffset(localFile, currentReportKey());
+      const newVod: Vod = {
+        id:         Date.now(),
+        source:     "local",
+        localFile,
+        offset:       rememberedOffset,
+        isCalibrated: rememberedOffset !== undefined,
+        player,
+        url:        "",
+        videoId:    "",
+        embedUrl:   "",
+        class:      "Unknown",
+        role:       "DPS",
+        raid:       "Unknown Raid",
+        boss:       "Unknown Boss",
+        difficulty: "Unknown",
+        uploadedBy: "local-user",
+      };
+
+      setVods(prev => [...prev, newVod]);
+      setSelectedVodId(newVod.id);
+      setShowDialog(false);
+      // Saves the report url etc. as usual; serverSavableVods() keeps this
+      // VOD out of the payload.
+      persistSession();
+      return;
+    }
+
+    const { url } = source;
     const parsed = parseYouTubeUrl(url);
     if (!parsed) {
       alert("Invalid YouTube URL");
@@ -516,6 +587,9 @@ export default function Home() {
   function syncToPull() {
     if (!selectedVod || !activePull || timeline.rawVideoTime === null) return;
     const offset = timeline.calibrate(timeline.rawVideoTime, activePull);
+    if (selectedVod.localFile) {
+      saveLocalVodOffset(selectedVod.localFile, currentReportKey(), offset);
+    }
     setVods(prev =>
       prev.map(v =>
         v.id === selectedVod.id
@@ -530,6 +604,8 @@ export default function Home() {
   // counterpart to syncToPull() above. Triggered from the "Unsync" button
   // in VideoPanel's title bar (only shown while the VOD is calibrated).
   function handleUnsyncVod(vodId: number) {
+    const localFile = vods.find(v => v.id === vodId)?.localFile;
+    if (localFile) clearLocalVodOffset(localFile, currentReportKey());
     setVods(prev =>
       prev.map(v =>
         v.id === vodId

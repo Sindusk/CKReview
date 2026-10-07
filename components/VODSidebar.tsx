@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Vod } from "../types/Vod";
+import { isLocalVod, type Vod } from "../types/Vod";
 import PullList from "../components/PullList";
 import { Panel, PanelHeader } from "./ui/Panel";
 import type { Pull } from "../types/Pull";
@@ -13,10 +13,12 @@ const titleCache = new Map<string, string>();
 // YouTube's oEmbed endpoint is public, keyless, and CORS-enabled — good
 // enough for a "what video is this" label without wiring up a real API key
 // or persisting the title alongside the VOD.
-function useYouTubeTitle(videoId: string): string | null {
-  const [title, setTitle] = useState<string | null>(titleCache.get(videoId) ?? null);
+// Pass null to skip the fetch (local VODs have no YouTube video).
+function useYouTubeTitle(videoId: string | null): string | null {
+  const [title, setTitle] = useState<string | null>(videoId ? titleCache.get(videoId) ?? null : null);
 
   useEffect(() => {
+    if (!videoId) return;
     const cached = titleCache.get(videoId);
     if (cached) {
       setTitle(cached);
@@ -135,7 +137,9 @@ function VodCard({
   onSelectVod: (id: number) => void;
   onOpenTranscript: (id: number) => void;
 }) {
-  const title = useYouTubeTitle(vod.videoId);
+  const local = isLocalVod(vod);
+  const youTubeTitle = useYouTubeTitle(local ? null : vod.videoId);
+  const title = local ? vod.localFile?.name ?? null : youTubeTitle;
 
   return (
     <div
@@ -167,28 +171,41 @@ function VodCard({
         <div style={{ fontWeight: 700, fontSize: "12px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", textAlign: "center", flex: 1, color: isSelected ? "#e1f0ff" : "var(--ck-text)" }}>
           {vod.player}
         </div>
-        <button
-          className="ck-btn"
-          title="View transcript"
-          onClick={(e) => { e.stopPropagation(); onOpenTranscript(vod.id); }}
-          style={{ width: "18px", height: "18px", padding: 0, fontSize: "10px" }}
-        >
-          T
-        </button>
+        {/* Transcripts come from YouTube, so local files have none. The
+            spacer keeps the player name centred either way. */}
+        {local ? (
+          <div style={{ width: "18px", flexShrink: 0 }} />
+        ) : (
+          <button
+            className="ck-btn"
+            title="View transcript"
+            onClick={(e) => { e.stopPropagation(); onOpenTranscript(vod.id); }}
+            style={{ width: "18px", height: "18px", padding: 0, fontSize: "10px" }}
+          >
+            T
+          </button>
+        )}
       </div>
 
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: "4px 0" }}>
-        {/* YouTube icon — every VOD is a YouTube video (see types/Vod.ts's
-            videoId/embedUrl), so this just marks that at a glance instead
-            of spelling out the URL as plain text. */}
-        <svg viewBox="0 0 28 20" width="24" height="17" aria-hidden="true">
-          <rect x="0" y="0" width="28" height="20" rx="5" fill="#f87171" opacity="0.85" />
-          <path d="M11 6 L19 10 L11 14 Z" fill="#1a1a1a" />
-        </svg>
+        {local ? (
+          <span
+            className="ck-badge"
+            title="Local file: plays from this device only and is never uploaded. Pick it again after a refresh."
+          >
+            Local
+          </span>
+        ) : (
+          // YouTube icon — marks the source at a glance instead of
+          // spelling out the URL as plain text.
+          <svg viewBox="0 0 28 20" width="24" height="17" aria-hidden="true">
+            <rect x="0" y="0" width="28" height="20" rx="5" fill="#f87171" opacity="0.85" />
+            <path d="M11 6 L19 10 L11 14 Z" fill="#1a1a1a" />
+          </svg>
+        )}
       </div>
 
-      {/* Video title, fetched from YouTube's oEmbed endpoint — replaces the
-          old plain truncated URL with something actually meaningful. */}
+      {/* YouTube title from the oEmbed endpoint, or the local file's name. */}
       <div
         title={title ?? undefined}
         style={{

@@ -4,7 +4,8 @@ Let a user load a video file from their own disk as a VOD source,
 alongside YouTube VODs. The file is played in the browser and **never
 leaves the user's machine**: no upload, nothing stored on the server, gone
 when the tab closes. Agreed with the user on 2026-10-06; this doc is the
-build brief. Nothing in it is implemented yet.
+build brief. **Status:** all six items built 2026-10-06; the user
+confirmed item 6 (remembered sync, `lib/local-vod-sync.ts`).
 
 ## Why
 

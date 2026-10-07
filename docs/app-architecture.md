@@ -168,8 +168,18 @@ file's header comment. Mechanic detection has its own guide:
 
 ## VOD playback (`components/VideoPanel.tsx`, `hooks/useTimelineController.ts`)
 
-- **One YouTube player for the component's lifetime.** VOD switches reuse it
-  via `loadVideoById()`; destroy-and-recreate was the multi-second delay.
+- **Two sources behind one `PlayerAdapter`** (seek, play, current time,
+  duration): the YouTube iframe player, and an HTML5 `<video>` for local
+  files (`Vod.source === "local"`).
+- **Local VODs never reach the server.** The file plays from an object URL
+  held only in the tab, and `serverSavableVods()` in `app/page.tsx` drops
+  them from the session payload. Route any new code that sends VODs
+  anywhere through that function. Their calibration is remembered in
+  `localStorage` instead (`lib/local-vod-sync.ts`), keyed on file name,
+  size, `lastModified` and report, so re-picking the file restores sync.
+- **One YouTube player while YouTube VODs are showing.** VOD switches reuse
+  it via `loadVideoById()`; destroy-and-recreate was the multi-second
+  delay. Selecting a local VOD destroys it.
 - **YouTube API quirk:** a `seekTo()` right after `loadVideoById()` is
   silently dropped until metadata loads, and `onStateChange` fires too
   early to rely on. `seekOnceReady()` polls `getDuration() > 0` first.
@@ -181,7 +191,8 @@ file's header comment. Mechanic detection has its own guide:
 - **Auto pull-detection.** It ignores readings until the player lands
   within 2s of a manual seek (or 4s pass), which prevents seek ping-pong.
 - **VOD card titles.** They come from YouTube's keyless `oembed` endpoint
-  and are cached in memory.
+  and are cached in memory. Local VODs show the file name and have no
+  transcript button.
 - **Transcripts** (`app/api/transcript/[videoId]/route.ts`) use the keyless
   youtube-transcript.ai service, because official and scraped YouTube
   caption routes need owner OAuth or a PoToken.
