@@ -50,8 +50,12 @@ const STATE_STYLE: Record<MitigationState, { mark: string; color: string; label:
   available:   { mark: "○", color: "#94a3b8", label: "Available, but using it here would delay their next use" },
   cooldown:    { mark: "·", color: "#475569", label: "On cooldown" },
   ineffective: { mark: "✕", color: "#f87171", label: "Cast and still running, but not on this hit (wrong target or out of range)" },
-  dead:        { mark: "–", color: "#666",    label: "Dead or just raised" },
+  dead:        { mark: "☠", color: "#ef4444", label: "Dead or just raised" },
 };
+
+// A dead player's cells are tinted too, so their stretch of the fight reads
+// as one band across the row rather than a mark among cooldown dots.
+const DEAD_CELL_BG = "rgba(239, 68, 68, 0.12)";
 
 const VERDICT_STYLE: Record<HitVerdict, { color: string; label: string }> = {
   fail:  { color: "#ef4444", label: "Fail" },
@@ -185,7 +189,7 @@ function TimelineHead({ groups, expanded, onToggle, aggregate }: {
             </th>
           );
         })}
-        <th rowSpan={2} style={{ ...th, zIndex: 3, verticalAlign: "bottom", borderLeft: GROUP_RULE }} title={HEADER_TIPS.Notes}>Notes</th>
+        <th rowSpan={2} style={{ ...th, ...notesWidth, zIndex: 3, verticalAlign: "bottom", borderLeft: GROUP_RULE }} title={HEADER_TIPS.Notes}>Notes</th>
       </tr>
       <tr>
         {groups.flatMap(({ group, columns }) => columns.map((col, i) => {
@@ -208,26 +212,57 @@ function TimelineHead({ groups, expanded, onToggle, aggregate }: {
 
 const pctHp = (x: number) => pct(Math.max(0, x));
 
+/** Who died to the hit, or, when nobody did, who ended lowest. */
+function outcomeTip(hit: MitigationHit): string {
+  const dead = hit.targets.filter((t) => t.died);
+  if (dead.length) {
+    return `Died: ${dead.map((t) => `${t.player}${t.vulnerable ? " (vulnerable)" : ""}`).join(", ")}`;
+  }
+  const graded = hit.targets.filter((t) => !t.vulnerable && !t.invulnerable);
+  const low = [...graded].sort((a, b) => a.margin - b.margin)[0];
+  return low ? `Lowest after: ${low.player} at ${pctHp(low.margin)}` : "";
+}
+
+/** Who went into the hit lowest. */
+function beforeTip(hit: MitigationHit): string {
+  const graded = hit.targets.filter((t) => !t.vulnerable && !t.invulnerable);
+  const low = [...graded].sort((a, b) => a.healthBefore / a.maxHealth - b.healthBefore / b.maxHealth)[0];
+  return low ? `Lowest before: ${low.player} at ${pctHp(low.healthBefore / low.maxHealth)}` : "";
+}
+
+/** A per-hit tip for each pull that reached the hit. */
+function perPullTip(row: AggregatedHit, tip: (hit: MitigationHit) => string): string {
+  return row.byPull.map(({ pullNumber, hit }) => `Pull ${pullNumber}: ${tip(hit)}`).join("\n");
+}
+
 // Raw, Taken, HP% Before and HP% After.
-function NumberCells({ raw, taken, absorbed, before, after, worst }: {
-  raw?: number; taken: number; absorbed?: number; before: number; after: number; worst?: number;
+function NumberCells({ raw, taken, absorbed, before, after, worst, beforeTip, afterTip }: {
+  raw?: number; taken: number; absorbed?: number; before: number; after: number; worst?: number; beforeTip: string; afterTip: string;
 }) {
   return [
     <td key="raw" style={td} className="ck-num">{raw === undefined ? <span style={{ color: "var(--ck-text-3)" }}>—</span> : fmtDamage(raw)}</td>,
     <td key="taken" style={td} className="ck-num" title={absorbed ? `${fmtDamage(absorbed)} more absorbed by shields` : undefined}>{fmtDamage(taken)}</td>,
-    <td key="before" style={{ ...td, color: beforeColor(before) }} className="ck-num">{pctHp(before)}</td>,
-    <td key="after" style={td} className="ck-num">
+    <td key="before" style={{ ...td, color: beforeColor(before), cursor: "help" }} className="ck-num" title={beforeTip}>{pctHp(before)}</td>,
+    <td key="after" style={{ ...td, cursor: "help" }} className="ck-num" title={afterTip}>
       <span style={{ color: afterColor(after) }}>{pctHp(after)}</span>
       {worst !== undefined && <span style={{ color: afterColor(worst) }}> / {pctHp(worst)}</span>}
     </td>,
   ];
 }
 
-// One line, cut with an ellipsis; the full note is in the tooltip.
+// One line, cut with an ellipsis; the full note is in the tooltip. The
+// table is full width and this column takes whatever the others leave
+// (width 100% with maxWidth 0), so it grows on pulls with few columns and
+// shrinks, down to NOTES_MIN_WIDTH, when personal columns open, instead of
+// pushing the table into a horizontal scroll.
+const NOTES_MIN_WIDTH = 140;
+const notesWidth: CSSProperties = { width: "100%", maxWidth: 0, minWidth: NOTES_MIN_WIDTH };
+const tableStyle: CSSProperties = { borderCollapse: "separate", borderSpacing: 0, width: "100%" };
+
 function NoteCell({ note }: { note: string }) {
   return (
     <td title={note || undefined} style={{
-      ...td, maxWidth: 300, overflow: "hidden", textOverflow: "ellipsis", borderLeft: GROUP_RULE, color: "var(--ck-text)",
+      ...td, ...notesWidth, overflow: "hidden", textOverflow: "ellipsis", borderLeft: GROUP_RULE, color: "var(--ck-text)",
     }}>
       {note || <span style={{ color: "var(--ck-text-3)" }}>—</span>}
     </td>
@@ -322,7 +357,7 @@ export function PullTimeline({ hits, groups, expanded, onToggle }: TimelineProps
   const span = spanOf(visible);
   let lastPhase: string | undefined;
   return (
-    <table style={{ borderCollapse: "separate", borderSpacing: 0 }}>
+    <table style={tableStyle}>
       <TimelineHead groups={visible} expanded={expanded} onToggle={onToggle} aggregate={false} />
       <tbody>
         {hits.map((hit) => {
@@ -334,9 +369,11 @@ export function PullTimeline({ hits, groups, expanded, onToggle }: TimelineProps
             <tr key={hit.id}>
               {sideCells(fmtTime(hit.timestampMs),
                 <MechanicLabel name={hit.abilityName} occurrence={hit.occurrence} waves={hit.waves} tankOnly={hit.tankOnly} />, hitTooltip(hit))}
-              <NumberCells raw={hit.rawDamage} taken={hit.takenDamage} absorbed={hit.absorbedDamage} before={hit.lowestBefore} after={hit.margin} />
-              <td style={td}>
-                <VerdictPill verdict={hit.verdict} />              </td>
+              <NumberCells raw={hit.rawDamage} taken={hit.takenDamage} absorbed={hit.absorbedDamage} before={hit.lowestBefore} after={hit.margin}
+                beforeTip={beforeTip(hit)} afterTip={outcomeTip(hit)} />
+              <td style={{ ...td, cursor: "help" }} title={outcomeTip(hit)}>
+                <VerdictPill verdict={hit.verdict} />
+              </td>
               <DroppableCell count={hit.droppable.keys.length} worstMargin={hit.droppable.worstMargin} />
               {visible.flatMap(({ group, columns }) => columns.map((c, i) => {
                 if (!c) return <td key={`${group.player}|empty`} style={{ ...cellTd, ...ruled(i === 0) }} />;
@@ -344,7 +381,10 @@ export function PullTimeline({ hits, groups, expanded, onToggle }: TimelineProps
                 if (!s) return <td key={colKey(c)} style={{ ...cellTd, ...ruled(i === 0) }} />;
                 const st = STATE_STYLE[s.state];
                 return (
-                  <td key={colKey(c)} style={{ ...cellTd, ...ruled(i === 0), color: st.color, cursor: "help" }} title={stateTooltip(c, s, hit.timestampMs)}>
+                  <td key={colKey(c)} title={stateTooltip(c, s, hit.timestampMs)} style={{
+                    ...cellTd, ...ruled(i === 0), color: st.color, cursor: "help", fontSize: s.state === "dead" ? 11 : cellTd.fontSize,
+                    ...(s.state === "dead" ? { background: DEAD_CELL_BG } : {}),
+                  }}>
                     {st.mark}
                   </td>
                 );
@@ -365,7 +405,7 @@ export function AggregateTimeline({ rows, groups, expanded, onToggle }: Timeline
   const span = spanOf(visible);
   let lastPhase: string | undefined;
   return (
-    <table style={{ borderCollapse: "separate", borderSpacing: 0 }}>
+    <table style={tableStyle}>
       <TimelineHead groups={visible} expanded={expanded} onToggle={onToggle} aggregate />
       <tbody>
         {rows.map((row) => {
@@ -388,9 +428,11 @@ export function AggregateTimeline({ rows, groups, expanded, onToggle }: Timeline
                 <MechanicLabel name={row.abilityName} occurrence={row.occurrence} pulls={row.pulls}
                   waves={Math.max(...row.byPull.map((b) => b.hit.waves))} tankOnly={row.byPull.every((b) => b.hit.tankOnly)} />,
                 `${row.abilityName} #${row.occurrence}, reached in ${row.pulls} pull(s)\nActive:\n${usual}`)}
-              <NumberCells raw={row.rawDamage} taken={row.takenDamage} before={row.lowestBefore} after={row.medianMargin} worst={row.worstMargin} />
-              <td style={td} title={row.deaths ? `${row.deaths} death(s) in ${row.deathPulls} pull(s), vulnerable players left out` : undefined}>
-                <VerdictPill verdict={row.verdict} />              </td>
+              <NumberCells raw={row.rawDamage} taken={row.takenDamage} before={row.lowestBefore} after={row.medianMargin} worst={row.worstMargin}
+                beforeTip={perPullTip(row, beforeTip)} afterTip={perPullTip(row, outcomeTip)} />
+              <td style={{ ...td, cursor: "help" }} title={perPullTip(row, outcomeTip)}>
+                <VerdictPill verdict={row.verdict} />
+              </td>
               <DroppableCell count={row.droppable.keys.length} worstMargin={row.droppable.worstMargin} />
               {visible.flatMap(({ group, columns }) => columns.map((c, i) => {
                 if (!c) return <td key={`${group.player}|empty`} style={{ ...cellTd, ...ruled(i === 0) }} />;
