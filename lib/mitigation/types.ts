@@ -75,12 +75,14 @@ export type MitigationGame = {
 export type HitVerdict = "fail" | "under" | "good" | "over";
 
 // One damage event of a hit on one player. A multi-hit attack (Brutal Rain
-// hits four times about a second apart) gives each target several parts.
+// hits four times about a second apart), or hits joined because they land
+// within seconds of each other, give each target several parts.
 export type HitPart = {
   timestampMs:   number;
   damage:        number;          // to health, overkill included
   absorbed:      number;          // by shields
-  healthAfter:   number;          // negative = overkill
+  healthAfter:   number;          // as logged (healing before it included); negative = overkill
+  column?:       "physical" | "magical" | "none";  // this part's damage type
   statusIds:     number[];        // catalog statuses on the target for this part
   shieldAbsorbs: { statusId: number; caster?: string; amount: number }[];
 };
@@ -91,7 +93,9 @@ export type HitTarget = {
   tank:          boolean;
   maxHealth:     number;
   healthBefore:  number;          // before the first part
-  healthAfter:   number;          // lowest after any part
+  // healthBefore minus every part's damage: as if all parts landed at once,
+  // so healing between them doesn't flatter the mitigation.
+  healthAfter:   number;
   damage:        number;          // to health, all parts, overkill included
   absorbed:      number;          // by shields, all parts
   // Damage before any mitigation, all parts: FFLogs' unmitigatedAmount, or
@@ -162,7 +166,8 @@ export type DroppableResult = {
 export type MitigationHit = {
   id:            string;  // `${phase}|${abilityName}#${occurrence}`, the cross-pull match key
   abilityId:     number;
-  abilityName:   string;
+  abilityName:   string;  // the first ability; names the hit and its id
+  abilityNames:  string[];  // every ability in a joined hit, in order
   occurrence:    number;  // 1-based, per ability name within its phase
   timestampMs:   number;  // first damage of the hit, ms into the pull
   endMs:         number;  // last damage of the hit
@@ -185,7 +190,7 @@ export type MitigationHit = {
   absorbedDamage: number; // by shields
   // Lowest player's health before the hit, vulnerable players left out.
   lowestBefore:  number;
-  // Lowest player's health after the hit (at its low point across parts),
+  // Lowest player's health after the hit (all parts landing at once),
   // vulnerable players left out.
   margin:        number;
   // The same, after subtracting each player's laterDrop.

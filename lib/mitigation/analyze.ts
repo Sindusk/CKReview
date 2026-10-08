@@ -8,8 +8,12 @@
 // One enemy ability's damage, consecutive events no more than
 // HIT_CLUSTER_GAP_MS apart (the game staggers a hit's events ~45ms per
 // target), landing on HIT_MIN_TARGETS+ players or on tanks only (a tank
-// buster, TANK_HIT_MIN_RAW). A multi-hit attack's waves fall inside the gap, so they make one
-// hit whose targets each have several parts (HitPart). DoT ticks and
+// buster, TANK_HIT_MIN_RAW). A multi-hit attack's waves fall inside the
+// gap, and hits starting within JOIN_GAP_MS of the previous one's end are
+// joined to it whatever the ability, so either way one hit can give its
+// targets several parts (HitPart). Each target is judged as if every part
+// landed at once: health before the first part minus all their damage,
+// with no healing in between (user, 2026-10-08). DoT ticks and
 // auto-attacks are never hits (MitigationGame.isTick / isAutoAttack) but
 // count toward a sequence's later damage. Dead players' bodies still log
 // hits (immune, at 0 HP); those are left out. A hit whose targets were
@@ -42,7 +46,7 @@
 // command was seen: two Fey Illuminations 12.8s apart).
 //
 // ── Margin, verdict, sequences and droppable ───────────────────────────
-// margin = lowest health after any part / maxHealth, per target; the hit's
+// margin = all-at-once health after (above) / maxHealth, per target; the hit's
 // margin is the lowest, leaving out vulnerable players (they inflate the
 // worst case). Verdict (user, 2026-10-08): fail when a non-vulnerable
 // player died, under below MARGIN_UNDER (someone else should add a safety
@@ -95,7 +99,7 @@ type TargetEvent = { player: PlayerInfo; event: PlayerEvent };
 
 export function analyzePullMitigation(pull: Pull, game: MitigationGame): MitigationHit[] {
   const playerNames = new Set(pull.players.map((p) => p.name));
-  const clusters = findHitClusters(pull, playerNames, game);
+  const clusters = joinClusters(findHitClusters(pull, playerNames, game));
   const casts = buildCastTimelines(pull.players, game);
 
   // Numbered by name within the phase: one mechanic can use several ability
@@ -113,7 +117,7 @@ export function analyzePullMitigation(pull: Pull, game: MitigationGame): Mitigat
     const n = (occurrence.get(counter) ?? 0) + 1;
     occurrence.set(counter, n);
     const timestampMs = first.timestamp;
-    const endMs = cluster[cluster.length - 1].event.timestamp;
+    const endMs = Math.max(...cluster.map((t) => t.event.timestamp));
     if (timestampMs - lastEnd > SEQUENCE_GAP_MS) sequenceId++;
     lastEnd = Math.max(lastEnd, endMs);
 
@@ -219,6 +223,33 @@ function findHitClusters(pull: Pull, playerNames: Set<string>, game: MitigationG
   return clusters.sort((a, b) => a[0].event.timestamp - b[0].event.timestamp);
 }
 
+// Hits in quick succession are judged as one (user, 2026-10-08): a cluster
+// starting within JOIN_GAP_MS of the previous one's end joins it, whatever
+// the ability (Red Hot and Deep Blue's Pyrotation: three 4-target hits 2s
+// apart). A chain stops growing at JOIN_MAX_SPAN_MS, so a long run of
+// small hits can't fold a whole phase into one row.
+export const JOIN_GAP_MS = 3_000;
+export const JOIN_MAX_SPAN_MS = 10_000;
+
+function joinClusters(clusters: TargetEvent[][]): TargetEvent[][] {
+  const out: TargetEvent[][] = [];
+  for (const cluster of clusters) {
+    const prev = out[out.length - 1];
+    const start = cluster[0].event.timestamp;
+    if (prev) {
+      const prevStart = prev[0].event.timestamp;
+      const prevEnd = Math.max(...prev.map((t) => t.event.timestamp));
+      if (start - prevEnd <= JOIN_GAP_MS && start - prevStart <= JOIN_MAX_SPAN_MS) {
+        prev.push(...cluster);
+        continue;
+      }
+    }
+    out.push([...cluster]);
+  }
+  for (const hit of out) hit.sort((a, b) => a.event.timestamp - b.event.timestamp);
+  return out;
+}
+
 // ── Cast timelines and cooldown simulation ─────────────────────────────
 
 type CastTimeline = { player: PlayerInfo; entry: CatalogEntry; casts: number[] };
@@ -318,6 +349,7 @@ function buildHit(
     id:           `${phaseName(pull, at.timestampMs) ?? ""}|${first.abilityName}#${at.occurrence}`,
     abilityId:    first.abilityId,
     abilityName:  first.abilityName,
+    abilityNames: [...new Set(cluster.map((t) => t.event.abilityName))],
     occurrence:   at.occurrence,
     timestampMs:  at.timestampMs,
     endMs:        at.endMs,
@@ -374,13 +406,15 @@ function buildTarget(
       damage:      (event.amount ?? 0) + overkill,
       absorbed:    event.absorbed ?? 0,
       healthAfter: fatal && overkill ? -overkill : event.healthAfter!,
+      column:      game.damageColumn(event.damageType),
       statusIds:   (event.statusIds ?? []).filter((id) => game.statusIndex.has(id)),
       shieldAbsorbs: (player.shieldAbsorbs ?? [])
         .filter((a) => a.amount > 0 && Math.abs(a.timestamp - event.timestamp) <= SAME_HIT_MS)
         .map((a) => ({ statusId: a.statusId, caster: a.caster, amount: a.amount })),
     });
   }
-  const healthAfter = Math.min(...parts.map((p) => p.healthAfter));
+  // As if every part landed at once: no healing between them counts.
+  const healthAfter = first.healthBefore! - parts.reduce((s, p) => s + p.damage, 0);
   const died = fatalBefore !== undefined;
   const catalogProduct = percentProduct(parts[0].statusIds, game, column);
   const multiplier = first.multiplier;
@@ -532,7 +566,10 @@ function applySequenceDrops(hits: MitigationHit[], pull: Pull, playerNames: Set<
         .filter((e) => e.timestamp > hit.endMs + SAME_HIT_MS && e.timestamp <= hit.endMs + FOLLOW_UP_MAX_MS
           && !!e.source && !playerNames.has(e.source))
         .sort((a, b) => a.timestamp - b.timestamp);
-      let low = t.healthAfter;
+      // From the health actually logged after the last part: later events'
+      // health is real too, unlike the all-at-once healthAfter.
+      const start = t.parts[t.parts.length - 1].healthAfter;
+      let low = start;
       let last = hit.endMs;
       for (const e of later) {
         if (e.timestamp - last > SEQUENCE_GAP_MS) break;
@@ -545,7 +582,7 @@ function applySequenceDrops(hits: MitigationHit[], pull: Pull, playerNames: Set<
         const after = e.healthAfter === undefined ? undefined : Math.max(0, e.healthAfter);
         if (after !== undefined && after < low) low = after;
       }
-      t.laterDrop = Math.max(0, (t.healthAfter - low) / t.maxHealth);
+      t.laterDrop = Math.max(0, (start - low) / t.maxHealth);
     }
   }
 }
@@ -594,8 +631,8 @@ export function statusReduction(statusId: number, game: MitigationGame, column: 
  * A target's margin with the given mitigations removed. Pure, so the later
  * what-if sandbox can reuse it. `rollBuffer` scales the rebuilt damage
  * (DAMAGE_ROLL_BUFFER for planning, 1 for "what would have happened").
- * Each part's extra damage is added on from that part on, and the margin is
- * the lowest point; healing between parts is kept as it was.
+ * Like the margin itself, every part is taken to land at once, each with
+ * its own damage type. `column` is only the fallback for a part without one.
  * `sequenceMargin` also scales the target's laterDrop by the removed %
  * mitigations, assuming they covered the follow-up damage too (they
  * usually outlast it; when they didn't, this is conservative).
@@ -607,8 +644,7 @@ export function marginWithout(
   column: Column,
   rollBuffer = 1,
 ): { margin: number; sequenceMargin: number } {
-  let extra = 0;
-  let low = Infinity;
+  let toHealthTotal = 0;
   let factor = 1;
   for (const part of target.parts) {
     let shieldBack = 0;
@@ -620,15 +656,13 @@ export function marginWithout(
     for (const id of new Set(part.statusIds)) {
       const s = game.statusIndex.get(id);
       if (!s || !removeKeys.has(s.entry.key)) continue;
-      const r = statusReduction(id, game, column);
+      const r = statusReduction(id, game, part.column ?? column);
       if (r < 1) factor *= 1 - r;
     }
     const beforeShields = (part.damage + part.absorbed) / factor * rollBuffer;
-    const toHealth = Math.max(0, beforeShields - (part.absorbed - shieldBack));
-    extra += toHealth - part.damage;
-    low = Math.min(low, part.healthAfter - extra);
+    toHealthTotal += Math.max(0, beforeShields - (part.absorbed - shieldBack));
   }
-  const margin = low / target.maxHealth;
+  const margin = (target.healthBefore - toHealthTotal) / target.maxHealth;
   return { margin, sequenceMargin: margin - target.laterDrop / factor * rollBuffer };
 }
 

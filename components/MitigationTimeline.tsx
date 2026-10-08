@@ -321,7 +321,7 @@ function stateTooltip(col: MitigationColumn, s: PlayerMitigation, hitMs: number)
 }
 
 function hitTooltip(hit: MitigationHit): string {
-  const lines = [`${hit.abilityName} #${hit.occurrence}: ${hit.targets.length} players hit${hit.waves > 1 ? ` up to ${hit.waves} times` : ""}, ${hit.damageColumn ?? "unknown"} damage`];
+  const lines = [`${hit.abilityNames.join(" + ")} #${hit.occurrence}: ${hit.targets.length} players hit${hit.waves > 1 ? ` up to ${hit.waves} times` : ""}, ${hit.damageColumn ?? "unknown"} damage`];
   lines.push("Active:");
   for (const a of hit.active) lines.push(`  ${a.name} (${a.casters.join(", ") || "caster not found"}) on ${a.targets}`);
   const graded = hit.targets.filter((t) => !t.vulnerable && !t.invulnerable);
@@ -368,7 +368,7 @@ export function PullTimeline({ hits, groups, expanded, onToggle }: TimelineProps
             phaseRow,
             <tr key={hit.id}>
               {sideCells(fmtTime(hit.timestampMs),
-                <MechanicLabel name={hit.abilityName} occurrence={hit.occurrence} waves={hit.waves} tankOnly={hit.tankOnly} />, hitTooltip(hit))}
+                <MechanicLabel name={hit.abilityNames.join(" + ")} occurrence={hit.occurrence} waves={hit.waves} tankOnly={hit.tankOnly} />, hitTooltip(hit))}
               <NumberCells raw={hit.rawDamage} taken={hit.takenDamage} absorbed={hit.absorbedDamage} before={hit.lowestBefore} after={hit.margin}
                 beforeTip={beforeTip(hit)} afterTip={outcomeTip(hit)} />
               <td style={{ ...td, cursor: "help" }} title={outcomeTip(hit)}>
@@ -425,7 +425,7 @@ export function AggregateTimeline({ rows, groups, expanded, onToggle }: Timeline
             phaseRow,
             <tr key={row.id}>
               {sideCells(fmtTime(row.medianMs),
-                <MechanicLabel name={row.abilityName} occurrence={row.occurrence} pulls={row.pulls}
+                <MechanicLabel name={row.byPull[0].hit.abilityNames.join(" + ")} occurrence={row.occurrence} pulls={row.pulls}
                   waves={Math.max(...row.byPull.map((b) => b.hit.waves))} tankOnly={row.byPull.every((b) => b.hit.tankOnly)} />,
                 `${row.abilityName} #${row.occurrence}, reached in ${row.pulls} pull(s)\nActive:\n${usual}`)}
               <NumberCells raw={row.rawDamage} taken={row.takenDamage} before={row.lowestBefore} after={row.medianMargin} worst={row.worstMargin}

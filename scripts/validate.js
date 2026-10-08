@@ -545,7 +545,7 @@ MECHANICS['mitigation-analysis'] = {
         const free = h.players.filter((p) => p.state === 'free').map((p) => `${p.name}(${p.player.split(' ')[0]})`).join(', ');
         const ineff = h.players.filter((p) => p.state === 'ineffective').map((p) => `${p.name}(${p.player.split(' ')[0]})`).join(', ');
         const deathInfo = h.targets.filter((t) => t.died).map((t) => `${t.player.split(' ')[0]}:${t.deathCause}`).join(' ');
-        console.log(`  [${(h.timestampMs / 1000).toFixed(1)}s] seq${h.sequenceId} ${h.abilityName} #${h.occurrence}${h.waves > 1 ? ` x${h.waves}` : ''}` +
+        console.log(`  [${(h.timestampMs / 1000).toFixed(1)}s] seq${h.sequenceId} ${h.abilityNames.join(' + ')} #${h.occurrence}${h.waves > 1 ? ` x${h.waves}` : ''}` +
           `${h.tankOnly ? ' TANK' : ''} (${h.phase ?? '-'}, ${h.damageColumn ?? '?'}) ` +
           `n=${h.targets.length} raw=${k(h.rawDamage)} taken=${k(h.takenDamage)} before=${pctOf(h.lowestBefore)} ` +
           `after=${pctOf(h.margin)} seq=${pctOf(h.sequenceMargin)} ${h.verdict.toUpperCase()}` +
