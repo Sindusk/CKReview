@@ -61,6 +61,9 @@ const VERDICT_STYLE: Record<HitVerdict, { color: string; label: string }> = {
 
 // Health after a hit, colored like the verdict it lands in.
 const afterColor = (margin: number) => VERDICT_STYLE[verdictFor(margin, 0)].color;
+// Health going into a hit: full, nearly full, or already dented.
+const beforeColor = (health: number) =>
+  health >= 0.995 ? VERDICT_STYLE.good.color : health >= 0.8 ? VERDICT_STYLE.over.color : VERDICT_STYLE.under.color;
 
 const KIND_ORDER: MitigationKind[] = ["bossDebuff", "partyBuff", "shield", "personal", "limitBreak", "invuln"];
 
@@ -208,7 +211,7 @@ function NumberCells({ raw, taken, absorbed, before, after, worst }: {
   return [
     <td key="raw" style={td} className="ck-num">{raw === undefined ? <span style={{ color: "var(--ck-text-3)" }}>—</span> : fmtDamage(raw)}</td>,
     <td key="taken" style={td} className="ck-num" title={absorbed ? `${fmtDamage(absorbed)} more absorbed by shields` : undefined}>{fmtDamage(taken)}</td>,
-    <td key="before" style={td} className="ck-num">{pctHp(before)}</td>,
+    <td key="before" style={{ ...td, color: beforeColor(before) }} className="ck-num">{pctHp(before)}</td>,
     <td key="after" style={td} className="ck-num">
       <span style={{ color: afterColor(after) }}>{pctHp(after)}</span>
       {worst !== undefined && <span style={{ color: afterColor(worst) }}> / {pctHp(worst)}</span>}
@@ -216,9 +219,12 @@ function NumberCells({ raw, taken, absorbed, before, after, worst }: {
   ];
 }
 
+// One line, cut with an ellipsis; the full note is in the tooltip.
 function NoteCell({ note }: { note: string }) {
   return (
-    <td style={{ ...td, whiteSpace: "normal", minWidth: 280, maxWidth: 420, borderLeft: GROUP_RULE, color: "var(--ck-text)" }}>
+    <td title={note || undefined} style={{
+      ...td, maxWidth: 300, overflow: "hidden", textOverflow: "ellipsis", borderLeft: GROUP_RULE, color: "var(--ck-text)",
+    }}>
       {note || <span style={{ color: "var(--ck-text-3)" }}>—</span>}
     </td>
   );
@@ -326,9 +332,7 @@ export function PullTimeline({ hits, groups, expanded, onToggle }: TimelineProps
                 <MechanicLabel name={hit.abilityName} occurrence={hit.occurrence} waves={hit.waves} tankOnly={hit.tankOnly} />, hitTooltip(hit))}
               <NumberCells raw={hit.rawDamage} taken={hit.takenDamage} absorbed={hit.absorbedDamage} before={hit.lowestBefore} after={hit.margin} />
               <td style={td}>
-                <VerdictPill verdict={hit.verdict} />
-                {hit.deaths > 0 && <span style={{ color: "#ef4444", fontSize: 11 }}> ☠{hit.deaths}</span>}
-              </td>
+                <VerdictPill verdict={hit.verdict} />              </td>
               <DroppableCell count={hit.droppable.keys.length} worstMargin={hit.droppable.worstMargin} />
               {visible.flatMap(({ group, columns }) => columns.map((c, i) => {
                 if (!c) return <td key={`${group.player}|empty`} style={{ ...cellTd, ...ruled(i === 0) }} />;
@@ -382,9 +386,7 @@ export function AggregateTimeline({ rows, groups, expanded, onToggle }: Timeline
                 `${row.abilityName} #${row.occurrence}, reached in ${row.pulls} pull(s)\nActive:\n${usual}`)}
               <NumberCells raw={row.rawDamage} taken={row.takenDamage} before={row.lowestBefore} after={row.medianMargin} worst={row.worstMargin} />
               <td style={td} title={row.deaths ? `${row.deaths} death(s) in ${row.deathPulls} pull(s), vulnerable players left out` : undefined}>
-                <VerdictPill verdict={row.verdict} />
-                {row.deaths > 0 && <span style={{ color: "#ef4444", fontSize: 11 }}> ☠{row.deathPulls}</span>}
-              </td>
+                <VerdictPill verdict={row.verdict} />              </td>
               <DroppableCell count={row.droppable.keys.length} worstMargin={row.droppable.worstMargin} />
               {visible.flatMap(({ group, columns }) => columns.map((c, i) => {
                 if (!c) return <td key={`${group.player}|empty`} style={{ ...cellTd, ...ruled(i === 0) }} />;
@@ -416,22 +418,43 @@ export function AggregateTimeline({ rows, groups, expanded, onToggle }: Timeline
   );
 }
 
+// Two blocks, in the same order as the table's sections below: the hit
+// columns (HP colors, verdicts) on the left, the mitigation marks on the right.
 export function TimelineLegend({ aggregate }: { aggregate: boolean }) {
-  const item = (mark: string, color: string, text: string) => (
-    <span key={text} style={{ marginRight: 12, whiteSpace: "nowrap" }}><span style={{ color }}>{mark}</span> {text}</span>
+  const under = Math.round(MARGIN_UNDER * 100);
+  const over = Math.round(MARGIN_OVER * 100);
+  const swatch = (color: string, label: string, text: string) => (
+    <span key={label} style={{ marginRight: 12, whiteSpace: "nowrap" }}><span style={{ color }}>{label}</span> {text}</span>
   );
+  const heading: CSSProperties = { color: "var(--ck-text-gold)", fontWeight: 600, marginBottom: 2 };
+  const line: CSSProperties = { marginBottom: 2 };
+  const marks = aggregate
+    ? [swatch("var(--ck-text)", "12", "pulls it was used on this hit (greener = more often)"),
+       swatch(STATE_STYLE.free.color, "◆", "never used, free in half the pulls or more")]
+    : (Object.keys(STATE_STYLE) as MitigationState[]).map((s) => swatch(STATE_STYLE[s].color, STATE_STYLE[s].mark, s));
   return (
-    <div className="ck-help" style={{ marginBottom: 8 }}>
-      {aggregate
-        ? [item("12", "var(--ck-text)", "pulls it was used on this hit (greener = more often)"), item("◆", STATE_STYLE.free.color, "never used here, and free in at least half the pulls")]
-        : (Object.keys(STATE_STYLE) as MitigationState[]).map((s) => item(STATE_STYLE[s].mark, STATE_STYLE[s].color, s))}
-      <span style={{ whiteSpace: "nowrap" }}>
-        Party-wide mitigation shown; +N on a player opens their personal ones. Verdict on the lowest player after the hit:{" "}
-        <span style={{ color: VERDICT_STYLE.fail.color }}>fail</span> someone died,{" "}
-        <span style={{ color: VERDICT_STYLE.under.color }}>under</span> &lt;{Math.round(MARGIN_UNDER * 100)}%,{" "}
-        <span style={{ color: VERDICT_STYLE.good.color }}>good</span> {Math.round(MARGIN_UNDER * 100)}–{Math.round(MARGIN_OVER * 100)}%,{" "}
-        <span style={{ color: VERDICT_STYLE.over.color }}>over</span> {Math.round(MARGIN_OVER * 100)}%+.
-      </span>
+    <div className="ck-help" style={{ display: "flex", gap: 32, flexWrap: "wrap", marginBottom: 8 }}>
+      <div>
+        <div style={heading}>Hit</div>
+        <div style={line}>
+          Verdict on the lowest player after the hit:{" "}
+          {swatch(VERDICT_STYLE.fail.color, "Fail", "someone died")}
+          {swatch(VERDICT_STYLE.under.color, "Under", `<${under}%`)}
+          {swatch(VERDICT_STYLE.good.color, "Good", `${under}–${over}%`)}
+          {swatch(VERDICT_STYLE.over.color, "Over", `${over}%+`)}
+        </div>
+        <div style={line}>
+          HP% Before:{" "}
+          {swatch(VERDICT_STYLE.good.color, "100%", "full")}
+          {swatch(VERDICT_STYLE.over.color, "80%+", "")}
+          {swatch(VERDICT_STYLE.under.color, "<80%", "")}
+        </div>
+      </div>
+      <div>
+        <div style={heading}>Mitigation</div>
+        <div style={line}>{marks}</div>
+        <div style={line}>Party-wide mitigation shown; +N on a player opens their personal ones.</div>
+      </div>
     </div>
   );
 }

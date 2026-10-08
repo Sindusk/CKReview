@@ -1,29 +1,29 @@
 // lib/mitigation/notes.ts
 //
-// The Notes column of the Mitigation timeline: one short sentence per hit
-// on what could change (user, 2026-10-08). Built from the analysis, never
-// from timestamps (the row shows the time).
-//   - over: what could be dropped and still land good (the droppable set,
-//     or each single alternative when one drop is enough).
-//   - under / fail: which unused mitigations were off cooldown and would
-//     have reached the hit. Free ones first; ones that would delay a later
-//     use only when nothing was free.
+// The Notes column of the Mitigation timeline: a terse hint per hit on what
+// could change (user, 2026-10-08). It must fit on one line beside the
+// mitigation columns, so it is a verb and a list, never a sentence, and
+// never a timestamp (the row shows the time).
+//   - over: "Drop A + B" (the droppable set), or "Drop one: A / B / C" when
+//     any single drop is enough. Nothing when the hit carried no planned
+//     mitigation: it simply didn't need mitigating.
+//   - under / fail: "Add A / B": unused mitigations that were off cooldown
+//     and would have reached the hit. Free ones first; ones that would delay
+//     a later use only when nothing was free.
 //   - good: nothing.
 
 import type { CatalogEntry, DroppableResult, MitigationGame, MitigationHit, PlayerMitigation } from "./types";
 import type { AggregatedHit } from "./aggregate";
 
-const MAX_LISTED = 4;
+const MAX_LISTED = 3;
 
 const firstName = (player: string) => player.split(" ")[0];
 
-/** "A", "A or B", "A, B or C" (and "and N more" past MAX_LISTED). */
-export function joinList(items: string[], word: "or" | "and"): string {
+/** Items joined by `sep`, with "+N" past MAX_LISTED. */
+export function joinList(items: string[], sep: " / " | " + "): string {
   const shown = items.slice(0, MAX_LISTED);
   const more = items.length - shown.length;
-  if (more > 0) return `${shown.join(", ")} ${word} ${more} more`;
-  if (shown.length <= 1) return shown[0] ?? "";
-  return `${shown.slice(0, -1).join(", ")} ${word} ${shown[shown.length - 1]}`;
+  return shown.join(sep) + (more > 0 ? ` +${more}` : "");
 }
 
 /**
@@ -49,22 +49,19 @@ function labels(list: { name: string; player: string }[]): string[] {
   return [...byName].map(([name, players]) => withCasters(name, players));
 }
 
-function suggestions(free: PlayerMitigation[], available: PlayerMitigation[]): string {
-  if (free.length) return `could also use ${joinList(labels(free), "or")}, free here.`;
-  if (available.length) {
-    const names = labels(available);
-    return `${joinList(names, "or")} ${names.length > 1 ? "were" : "was"} available, at the cost of delaying a later use.`;
-  }
-  return "nothing else that reaches this hit was off cooldown.";
+function addText(free: PlayerMitigation[], available: PlayerMitigation[]): string {
+  if (free.length) return `Add ${joinList(labels(free), " / ")}`;
+  if (available.length) return `Add (delays later) ${joinList(labels(available), " / ")}`;
+  return "Nothing else available";
 }
 
 function dropText(drop: DroppableResult, casters: Map<string, string[]>): string {
   const { names, alternatives } = drop;
   const label = (n: string) => withCasters(n, casters.get(n) ?? []);
-  if (drop.candidates === 0) return "Over without any planned mitigation; nothing to drop.";
-  if (names.length === 0) return "Overmitigated, but nothing can be dropped without going under.";
-  if (names.length === 1 && alternatives.length > 1) return `Overmitigated: could drop ${joinList(alternatives.map(label), "or")}.`;
-  return `Overmitigated: could drop ${joinList(names.map(label), "and")}.`;
+  if (drop.candidates === 0) return "";
+  if (names.length === 0) return "Nothing droppable";
+  if (names.length === 1 && alternatives.length > 1) return `Drop one: ${joinList(alternatives.map(label), " / ")}`;
+  return `Drop ${joinList(names.map(label), " + ")}`;
 }
 
 export function hitNote(hit: MitigationHit, game: MitigationGame): string {
@@ -76,35 +73,28 @@ export function hitNote(hit: MitigationHit, game: MitigationGame): string {
 
   const entryOf = (key: string) => game.catalog.find((e) => e.key === key);
   const unused = hit.players.filter((p) => wouldHelp(entryOf(p.key), hit.tankOnly, hit.damageColumn));
-  const free = unused.filter((p) => p.state === "free");
-  const available = unused.filter((p) => p.state === "available");
-  const help = suggestions(free, available);
+  const add = addText(unused.filter((p) => p.state === "free"), unused.filter((p) => p.state === "available"));
 
   if (hit.verdict === "fail") {
     const dead = hit.targets.filter((t) => t.died && !t.vulnerable);
-    const names = joinList(dead.map((t) => firstName(t.player)), "and");
-    const healing = dead.every((t) => t.deathCause === "healing");
-    const cause = healing ? " from low health (healing before the hit)" : "";
-    return `${names} died${cause}; ${help}`;
+    // Deaths from low health are a healing problem first.
+    if (dead.every((t) => t.deathCause === "healing")) return `Low HP before. ${add}`;
   }
-  return `Undermitigated: ${help}`;
+  return add;
 }
 
 export function aggregateNote(row: AggregatedHit, game: MitigationGame): string {
-  const deaths = row.deathPulls > 0 ? `Deaths in ${row.deathPulls} of ${row.pulls} pulls. ` : "";
+  const deaths = row.deathPulls > 0 ? `Deaths ${row.deathPulls}/${row.pulls}. ` : "";
   if (row.verdict === "good") return deaths.trim();
   if (row.verdict === "over") {
     const casters = new Map(row.active.map((a) => [
       a.name, Object.entries(a.casters).sort((x, y) => y[1] - x[1]).slice(0, 1).map(([c]) => c),
     ]));
-    return deaths + dropText(row.droppable, casters);
+    return (deaths + dropText(row.droppable, casters)).trim();
   }
   const first = row.byPull[0]?.hit;
   const entryOf = (key: string) => game.catalog.find((e) => e.key === key);
   const usuallyFree = labels(row.free
     .filter((f) => f.pulls * 2 >= row.pulls && wouldHelp(entryOf(f.key), !!first?.tankOnly, row.damageColumn)));
-  const help = usuallyFree.length
-    ? `could also use ${joinList(usuallyFree, "or")}, usually free here.`
-    : "nothing else that reaches this hit was usually free.";
-  return `${deaths}${row.verdict === "fail" ? "Failed" : "Undermitigated"}: ${help}`;
+  return deaths + (usuallyFree.length ? `Add ${joinList(usuallyFree, " / ")}` : "Nothing else usually free");
 }

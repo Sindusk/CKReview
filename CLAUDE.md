@@ -54,7 +54,8 @@ Claude for detection so far, but nothing in the repo depends on that split.
 
 These are standing preferences, each learned from a real correction:
 - **Git: commit and push to `main` without asking**, once a change works:
-  validate.js and tsc pass, or, for UI work, the change has been reviewed.
+  validate.js and tsc pass. This includes UI changes: commit them as soon
+  as tsc passes rather than holding them for review (user, 2026-10-08).
   This is standing authorization. The local remote is named **`CKReview`**,
   not `origin` (`git push CKReview main`).
 - **Credit the authoring AI model as co-author.** Since 2026-10-08, every
