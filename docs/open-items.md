@@ -304,7 +304,7 @@ module. Open:
 Report jN3XDrf2z8PmLgRJ; the user has the VOD for pull 1, none reviewed
 yet. Header of `lib/mechanics/ffxiv/arcadion/vamp-fatale.ts` has the
 evidence.
-- **Pull 1 +39.1, MT bat hit:** his own explosion went off at +38.6, then
+- **Pull 1 +39.5, MT bat hit:** his own explosion went off at +38.6, then
   a bat killed him. Did he walk into it after cleansing, or was he hit
   where he stood? Flagged Major on him.
 - **Saw / Doornail puddle contact** is Minor (no Damage Down; 4x in the
