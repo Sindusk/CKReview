@@ -6,6 +6,11 @@ organized per game and per raid:
 ```
 lib/mechanics/
   MODEL-RESEARCH-GUIDE.md     — how to write a boss's encounter model (research stage)
+  fallback.ts                 — the fallback model for bosses with no module: learns
+                                each ability's normal targets from the report's
+                                own pulls, then flags doubled-up, wrong-target,
+                                avoidable and unsurvivable hits, penalties and
+                                the pull's cutoff. Boss-agnostic; FFXIV only so far
   player-position.ts          — THE shared "where was player X at time T" lookup
   geometry.ts                 — distances/angles (two angle conventions — read its header)
   ffxiv/
@@ -120,6 +125,13 @@ ALL of a report's pulls and is NOT called from the
 transform layer — `app/page.tsx` recomputes it (typically into a separate
 `displayPulls` layer or the Strategy dialog) because it depends on
 report-wide context or user-selectable configuration.
+
+**The fallback model** (`fallback.ts`) is cross-pull detection for every
+boss without an encounter module. It is listed by fight name in its
+`COVERED_ENCOUNTERS`, so **a new boss module must add its fight name
+there**, or the fallback keeps running beside it. On fallback pulls it
+replaces the generic `ffxiv-damage-down` rule. Keep it boss-agnostic: a fix
+for one boss belongs in that boss's module, not here.
 
 **The declared-strategy pattern** (worth reusing): when ground truth is NOT
 derivable from logs (e.g. per-matrix kick assignments — the log carries no
@@ -244,7 +256,9 @@ through four stages, plus a fifth for the damage analysis:
    above; shared WoW helpers are in `wow/common.ts` — use `pullOverMarker`
    for the generic cutoff rather than writing a new one). Register the
    module with one line in `wow/registry.ts`; that wires it into the app and
-   gives it a `scripts/validate.js` mechanic of the same name. Then pass
+   gives it a `scripts/validate.js` mechanic of the same name. Add the
+   boss's fight name to `COVERED_ENCOUNTERS` in `fallback.ts` so the
+   fallback model stops running on it. Then pass
    the regression bar (below). Commit and push. Then tell the user
    what each wipe's cutoff was, and list the attribution calls you were
    unsure of as explicit questions. Their VOD review answers them (principle

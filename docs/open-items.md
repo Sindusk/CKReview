@@ -290,6 +290,25 @@ picked up; it stays only as a record.
 - **Late-kick Terminate misses** are unattributable: WCL has no per-matrix
   instance id.
 
+### Fallback model (`lib/mechanics/fallback.ts`)
+
+Built blind against Vamp Fatale (jN3XDrf2z8PmLgRJ); the user has the VOD
+for its pull 1. Open:
+- **VOD questions on Vamp pull 1:** what the raid got wrong on the
+  +221.4 Hardcore (the log only shows it hit 4 non-tanks that clean
+  resolutions never hit), whether the +249.8/+252.2 deaths with no
+  killing blow were a reset, and whether Kade walked into the Vampette's
+  Blast Beat at +39.5 or was hit where he stood.
+- **Blame on a double-up.** The victim is named. When the second hit was
+  another player's bomb or spread, should the carrier share it?
+- **Stack/share mechanics** with too few players read as "unsurvivable" on
+  the victims. Should the fallback learn each ability's normal target count
+  and blame the stack instead?
+- **"Died Without a Hit"** before the cutoff is Major on the player (likely
+  fell off). Right call?
+- **WoW.** Enabled for FFXIV only. Turn on when a WoW boss without a
+  module is tested (Nymrissa Wavecaller is the obvious candidate).
+
 ### Dancing Mad (FFXIV)
 
 - **Phase 1 (graven-image / phase1.ts):**

@@ -5,8 +5,10 @@
 // player error construction, battle-rez detection, and the shared "pull was
 // over" marker (pullOverMarker).
 //
-// These stay WoW-only on purpose: the FFXIV modules use absolute report
-// timestamps and different event shapes, and share no identical helpers.
+// The FFXIV encounter modules don't use these: they read absolute report
+// timestamps and different event shapes. The fallback model
+// (lib/mechanics/fallback.ts) does, since it works on fight-relative Pulls
+// of either game.
 
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import type { DeathEvent } from "@/types/DeathEvent";

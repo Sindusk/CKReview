@@ -8,7 +8,9 @@
 // One enemy ability's damage landing on RAIDWIDE_MIN_TARGETS+ players,
 // consecutive events no more than HIT_CLUSTER_GAP_MS apart (the game
 // staggers a raidwide's events ~45ms per target). DoT ticks are left out of
-// hit detection but count toward a sequence's later damage.
+// hit detection but count toward a sequence's later damage. A hit whose
+// targets were mostly killed by damage no mitigation saves (beyondMitigation)
+// isn't a raidwide: a mechanic hit the wrong players, or an enrage.
 //
 // ── Where the numbers come from ────────────────────────────────────────
 // Everything about the hit itself is read from FFLogs, not estimated:
@@ -113,6 +115,21 @@ export function analyzePullMitigation(pull: Pull, game: MitigationGame): Mitigat
 
 // ── Hit detection ───────────────────────────────────────────────────────
 
+// Damage before mitigation, as a multiple of max HP, that no mitigation
+// survives. Tanks get more room: clean tank busters reach 1.36x (Vamp
+// Fatale). Only a hit that killed counts: Dancing Mad's Forsaken and Light
+// of Judgment log 1.5x+ raw on players who then survive at 35-52%, so raw
+// damage alone can't tell. Vulnerable targets are left to the margin rules.
+const BEYOND_MITIGATION_RATIO = 1.5;
+const TANK_BEYOND_MITIGATION_RATIO = 2.0;
+
+function beyondMitigation({ player, event }: TargetEvent): boolean {
+  if (!event.maxHealth || event.unmitigatedAmount === undefined || !event.overkill) return false;
+  if ((event.activeBuffNames ?? []).some((b) => /Vulnerability Up/.test(b))) return false;
+  const limit = player.role === "Tank" ? TANK_BEYOND_MITIGATION_RATIO : BEYOND_MITIGATION_RATIO;
+  return event.unmitigatedAmount >= limit * event.maxHealth;
+}
+
 function findRaidwideClusters(pull: Pull, playerNames: Set<string>): TargetEvent[][] {
   const byAbility = new Map<number, TargetEvent[]>();
   for (const player of pull.players) {
@@ -134,6 +151,7 @@ function findRaidwideClusters(pull: Pull, playerNames: Set<string>): TargetEvent
       // cluster is a different resolution (or a stack splash), keep the first.
       const seen = new Set<string>();
       const unique = current.filter((t) => !seen.has(t.player.name) && seen.add(t.player.name));
+      const beyond = new Set(current.filter(beyondMitigation).map((t) => t.player.name));
       current = [];
       if (unique.length === 0) return;
       const at = unique[0].event.timestamp;
@@ -142,7 +160,12 @@ function findRaidwideClusters(pull: Pull, playerNames: Set<string>): TargetEvent
       // A hit nobody took damage from (a gaze that was looked away from) is
       // not a damaging mechanic.
       const dealt = unique.some((t) => (t.event.amount ?? 0) + (t.event.absorbed ?? 0) > 0);
-      if (unique.length >= needed && dealt) clusters.push(unique);
+      // A hit is no raidwide when most of its targets were killed by damage
+      // no mitigation could have saved: they were hit by something not meant
+      // for them (Vamp Fatale pull 1 +221.4, a tank buster's 3.4-3.8x max HP
+      // killing four non-tanks), or by an enrage.
+      const mitigable = unique.filter((t) => !beyond.has(t.player.name));
+      if (unique.length >= needed && mitigable.length >= RAIDWIDE_MIN_TARGETS && dealt) clusters.push(unique);
     };
     for (const t of list) {
       const prev = current[current.length - 1];

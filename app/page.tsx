@@ -33,6 +33,7 @@ import {
 } from "@/lib/mechanics/ffxiv/dancingmad/blackhole-strategy";
 import { learnGravenImageLayout, detectGravenImageSpreadErrors, detectGravenImageStackErrors } from "@/lib/mechanics/ffxiv/dancingmad/graven-image";
 import { learnWaveCannonLayout, detectWaveCannonPositionErrors } from "@/lib/mechanics/ffxiv/dancingmad/wave-cannon";
+import { applyFallback, buildFallbackProfiles } from "@/lib/mechanics/fallback";
 import type { Pull } from "../types/Pull";
 import { createCallWipeError, CALL_WIPE_RULE_ID, createManualError, type ManualErrorInput } from "@/types/PullError";
 import type { SavedSession } from "@/types/Session";
@@ -162,9 +163,15 @@ export default function Home() {
   // wave-cannon.ts's module header for why a hardcoded table doesn't
   // generalize across raid teams.
   const waveCannonLayout = useMemo(() => learnWaveCannonLayout(pulls), [pulls]);
+  // Bosses without an encounter module get the fallback model, which learns
+  // each ability's normal targets from all of the report's pulls of that
+  // boss (lib/mechanics/fallback.ts).
+  const fallbackProfiles = useMemo(() => buildFallbackProfiles(pulls), [pulls]);
 
   // Pulls with the cross-pull errors merged in: Black Hole "Missed Assigned
-  // Tether" (blackhole-strategy.ts), Graven Image and Wave Cannon. Unlike
+  // Tether" (blackhole-strategy.ts), Graven Image, Wave Cannon, and the
+  // fallback model on bosses without a module (which also drops the
+  // generic Damage Down rule there, since it owns penalties). Unlike
   // the other FF mechanic detections, these depend on state that isn't
   // known from a single pull alone (a strategy or layout resolved from ALL
   // pulls), so they can't be baked into pull.errors at import time the way
@@ -177,7 +184,8 @@ export default function Home() {
   // untouched since they're also what gets persisted to the session (wipe
   // calls / manual errors) and re-derived on strategy swap.
   const displayPulls = useMemo(() => {
-    return pulls.map((p) => {
+    return pulls.map((pull) => {
+      const p = applyFallback(pull, fallbackProfiles);
       const blackHoleErrors = [
         ...detectMissedAssignedTetherErrors(p, blackHoleStrategy),
         ...detectClippedByNeighborTetherErrors(p, blackHoleStrategy),
@@ -191,7 +199,7 @@ export default function Home() {
       const extra = [...blackHoleErrors, ...gravenImageErrors, ...waveCannonErrors];
       return extra.length === 0 ? p : { ...p, errors: [...p.errors, ...extra] };
     });
-  }, [pulls, blackHoleStrategy, gravenImageLayout, waveCannonLayout]);
+  }, [pulls, blackHoleStrategy, gravenImageLayout, waveCannonLayout, fallbackProfiles]);
   const [selectedPullId, setSelectedPullId] = useState<number | null>(null);
 
   const [importError, setImportError] = useState<string | null>(null);

@@ -476,6 +476,35 @@ const MECHANICS = {
 
 };
 
+// The fallback model (lib/mechanics/fallback.ts) for bosses without an
+// encounter module. Cross-pull: one ability profile per boss from every pull
+// in the folder, then each pull is checked against it, as page.tsx does.
+// Runs through the real pipeline (it reads statusIds, maxHealth and
+// unmitigatedAmount), and skips folders whose fights all have a module.
+MECHANICS.fallback = {
+  game: 'ff',
+  load: () => ({
+    store: requireTsFromRoot('lib/sample-report-store.ts'),
+    lt: requireTsFromRoot('lib/log-transforms.ts', { './log-auth': {} }),
+    ...requireTsFromRoot('lib/mechanics/fallback.ts'),
+  }),
+  async run({ mod, dir, meta }) {
+    const names = (meta.fights ?? meta.report?.fights ?? []).map((f) => f.name);
+    if (!names.some((name) => mod.fallbackApplies({ game: 'ffxiv', name }))) return;
+    const pulls = (await loadThroughRealPipeline(mod, dir) ?? []).filter(mod.fallbackApplies);
+    const profiles = mod.buildFallbackProfiles(pulls);
+    for (const pull of pulls) {
+      const errors = mod.detectFallbackErrors(pull, profiles.get(pull.name));
+      console.log('='.repeat(70));
+      console.log(`${pull.name} Pull ${pull.pullNumber} (${pull.result}) ->`, errors.length, 'errors');
+      for (const e of errors) {
+        console.log(`  [${e.severity}] [${e.ruleId}] +${(e.timestamp / 1000).toFixed(1)}s ${e.player ?? '(raid)'}: ${e.description}`);
+      }
+      recordErrors(pull.name, pull.pullNumber, errors);
+    }
+  },
+};
+
 // Print-only (no PullErrors, nothing snapshotted): the new mitigation
 // analysis (lib/mitigation/analyze.ts) for every pull, one line per raidwide
 // hit plus its active mitigations, free ones and droppable set.
