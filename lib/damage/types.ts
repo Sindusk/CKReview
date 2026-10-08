@@ -157,9 +157,9 @@ export type FindingKind =
   | "cooldown-drift"    // a cooldown held long enough to lose a use
   | "death"             // time dead
   | "penalty"           // damage dealt under Damage Down / Weakness
-  | "proc-lost"         // a proc that expired unused
+  | "proc-lost"         // a proc that expired unused or was overwritten
   | "interrupted-cast"  // a cast that never went off
-  | "combo-broken"      // a combo step that landed without its combo bonus
+  | "combo-broken"      // a combo step that landed without its combo bonus, or a combo dropped
   | "disengage"         // a ranged filler GCD (Lightning Shot) instead of a real one
   | "positional"        // positionals missed
   | "buff-coverage"     // a party buff that missed living players

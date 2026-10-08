@@ -17,6 +17,16 @@ review: as ground truth that the log analysis must survive.
 |---|---|
 | `node scripts/fetch-ff-dps.js <code-or-URL> [--pull n]... [--fight id]... [--hits Job:ids]` | Downloads aggregated tables and the player cast stream into `sampledata/ff/<code>/dps/`. It costs about 15 API points per fight and fetches one fight at a time. A pasted `?fight=` URL selects that fight. |
 | `node scripts/analyze-dps.js <command> <ours>... --vs <theirs>...` | Read-only comparisons. Commands: `phases`, `players`, `window`, `casts`, `buffs`, `rdps`, `taken`, `debuffs`, `stacks`, `songs`. Run it with no arguments for the reference. |
+| `node scripts/dump-player-events.js <code> "<boss>" <pull> "<player>" [--from M:SS] [--to M:SS] [--all-buffs \| --hits [name...]]` | One player's casts and own buffs (or damage hits with `bonusPercent` and `multiplier`) from a fetched sample, through the app's own transform. Use it to check a Damage-dialog finding, or a claim from xivanalysis, against the log. |
+
+**Checking xivanalysis claims.** When the user pastes xivanalysis output,
+check each claim in the log before building anything:
+- Some claims hold: the DNC proc overwrite, the dropped proc and the
+  dropped combo on jN3XDrf2z8PmLgRJ Vamp pull 8.
+- Some hold but cost nothing: a Devilment woven 0.67s late still covered
+  every GCD of the window.
+- Some can't be seen in the log at all: feathers are gauge, so xivanalysis
+  only says one "may have been lost".
 
 **Fetch options worth knowing:**
 - `--phase` / `--window` / `--bin` set the comparison window: which phase,

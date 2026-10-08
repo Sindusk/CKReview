@@ -468,8 +468,19 @@ grouped by exact roster. The module headers hold the rules.
 - "All loaded pulls" on a 25-pull WoW report takes several seconds.
 
 **FFXIV:**
-- **Unverified jobs** (no sample has them): PLD, WAR, WHM, SGE, MNK, DRG,
-  NIN, RPR, BRD, MCH, BLM, SMN, RDM.
+- **Unverified jobs:** PLD, WAR, WHM, SGE, MNK, DRG, NIN, RPR, BRD, MCH,
+  BLM, SMN, RDM. `jN3XDrf2z8PmLgRJ` (the user's Vamp Fatale prog, no
+  damage context) has PLD, SGE, RPR, DRG and RDM; the user is reviewing
+  it job by job against VODs and xivanalysis.
+- **Dancer review on jN3XDrf2z8PmLgRJ, started 2026-10-08.** xivanalysis's
+  claims on the Vamp kill were checked in the log. Built from them:
+  - proc overwrites (Dancer only)
+  - dropped combos (every job)
+  - a later expiry tolerance for lost procs
+
+  Rejected: the late Devilment (no loss) and feather overcap (not in the
+  log). Its one "weaving" delay was 0.3s, which already counts toward
+  the pull's small GCD delays (under one GCD in total, so not shown).
 - **Per-player busy windows** (tower soaks, debuff carriers, baits) aren't
   in the Dancing Mad context. Gaps during a mechanic are labelled but
   still counted. Candidate: the DRK's 4.6–4.9s idle after LB3 during Limit
@@ -479,7 +490,7 @@ grouped by exact roster. The module headers hold the rules.
 - **PCT Hammers:** every Starry Muse on `dQ8wmb1VhKt6yBXk` holds only one
   Hammer. Consistent across pulls, so probably a chosen line; confirm with
   the player.
-- **Not built:** proc overwrites, "the right actions inside buffs" beyond
+- **Not built:** proc overwrites for jobs other than Dancer, "the right actions inside buffs" beyond
   the ported windows, Arcane Circle's window, and a "motif painted in
   uptime" check (needs knowledge of upcoming downtime).
 

@@ -16,6 +16,18 @@
 //     each one is the player's average Saber Dance minus the filler's own
 //     average. xivanalysis allows Fountainfall when out of Esprit; this
 //     counts it, so treat the filler finding as an upper bound.
+//   Proc overwrites (xivanalysis Procs.tsx, checked on jN3XDrf2z8PmLgRJ
+//   Vamp pull 8): a Silken / Flourishing Symmetry or Flow, Threefold or
+//   Fourfold Fan Dance "refreshed" within 600ms of one of the Dancer's casts
+//   is a proc that rolled while one was held: one lost. The refresh can
+//   log 0.3s after the cast (Fan Dance at 4:15). Fan Dance III / IV are
+//   oGCDs, lost outright at their average; a Symmetry or Flow is its
+//   consumer's average minus the GCD used instead (inference). Last Dance
+//   Ready also logs a "refreshed" 2s after every Finishing Move with no
+//   cast near it: a log artifact, not an overwrite, so it isn't tracked.
+//   Not checked: feather overcap. Feathers are gauge, never logged, and
+//   come from 50% procs, so a lost one can't be told from the log
+//   (xivanalysis says "may have been lost").
 // Bard (unverified): Caustic Bite / Stormbite uptime and clipping
 //   (DoTs.tsx), cooldowns (OGCDDowntime.ts).
 // Machinist (unverified): Wildfire on the enemy, 6 GCDs (Wildfire.tsx);
@@ -74,6 +86,44 @@ const technicalFillers: JobCheck = (ctx): DamageFinding[] => {
   return out;
 };
 
+const OVERWRITE_CAST_MS = 600;
+// Proc status → its consumers, and whether the consumer is an oGCD.
+const DNC_PROCS: [string, string[], boolean][] = [
+  ["SILKEN_SYMMETRY", ["REVERSE_CASCADE", "RISING_WINDMILL"], false],
+  ["FLOURISHING_SYMMETRY", ["REVERSE_CASCADE", "RISING_WINDMILL"], false],
+  ["SILKEN_FLOW", ["FOUNTAINFALL", "BLOODSHOWER"], false],
+  ["FLOURISHING_FLOW", ["FOUNTAINFALL", "BLOODSHOWER"], false],
+  ["THREEFOLD_FAN_DANCE", ["FAN_DANCE_III"], true],
+  ["FOURFOLD_FAN_DANCE", ["FAN_DANCE_IV"], true],
+];
+
+const dancerOverwrites: JobCheck = (ctx): DamageFinding[] => {
+  const out: DamageFinding[] = [];
+  const procs = new Map(DNC_PROCS.filter(([s]) => S[s]).map(([s, consumers, ogcd]) => [S[s].id, { consumers, ogcd }]));
+  for (const e of ctx.player.buffs ?? []) {
+    if (e.buffStatus !== "refreshed" || e.source !== ctx.player.name || e.timestamp >= ctx.endMs) continue;
+    const proc = procs.get(e.abilityId);
+    if (!proc) continue;
+    const cast = ctx.player.casts.find((c) => c.timestamp <= e.timestamp + 100 && c.timestamp >= e.timestamp - OVERWRITE_CAST_MS);
+    if (!cast) continue;
+    const consumerIds = ids(...proc.consumers);
+    const best = consumerIds.sort((a, b) => ctx.values.perUse(b) - ctx.values.perUse(a))[0];
+    const avg = best === undefined ? 0 : ctx.values.perUse(best);
+    const consumerName = ctx.player.casts.find((c) => c.abilityId === best)?.abilityName ?? proc.consumers[0];
+    const lost = proc.ogcd ? avg : replacedGcd(...proc.consumers)(ctx);
+    out.push(finding(ctx, {
+      kind: "proc-lost", startMs: e.timestamp, endMs: e.timestamp, forced: false, inference: !proc.ogcd,
+      label: `${e.abilityName} overwritten`,
+      lostDamage: lost,
+      basis: proc.ogcd
+        ? `one ${consumerName} lost (${k(avg)} average)`
+        : `${k(avg)} average ${consumerName} minus the GCD used instead`,
+      detail: `${cast.abilityName} gave ${e.abilityName} while one was still held`,
+    }));
+  }
+  return out;
+};
+
 // ── Bard, Machinist (unverified) ───────────────────────────────────────
 
 const bardDots: JobCheck = (ctx) => [
@@ -97,6 +147,6 @@ const hypercharge: JobCheck = (ctx) => burstWindowFindings(ctx, {
   }],
 });
 
-export const DNC_CHECKS: JobCheck[] = [technical, technicalFillers];
+export const DNC_CHECKS: JobCheck[] = [technical, technicalFillers, dancerOverwrites];
 export const BRD_CHECKS: JobCheck[] = [bardDots];
 export const MCH_CHECKS: JobCheck[] = [wildfire, hypercharge];

@@ -34,7 +34,11 @@
 // same ability. A looser rule (any cast near any removal) made timed buffs
 // into "procs": healers press a GCD every ~2.4s, so No Mercy, True North
 // and Opposition looked consumed by coincidence. A removal with no cast
-// nearby, at apply + duration, is an expiry. Overwrites (refresh while up)
+// nearby, at apply + duration, is an expiry: up to PROC_EXPIRY_EARLY_MS
+// before it, or PROC_EXPIRY_LATE_MS after (the removal can log late: a
+// Dancer's Silken Symmetry on jN3XDrf2z8PmLgRJ Vamp pull 8 went 0.77s
+// after its 30s ran out, and a symmetric 0.6s slack missed it, which
+// xivanalysis caught). Overwrites (refresh while up)
 // are left to the job modules: whether one loses anything depends on the
 // job (a Dancer opener refreshes Last Dance Ready on purpose). Lost damage
 // = the consumer's average damage (an upper bound: the GCD used instead did
@@ -53,7 +57,8 @@ export const GCD_TOLERANCE_MS = 150;
 export const GAP_FINDING_MS = 1_000;
 export const COOLDOWN_HOLD_MS = 1_250;
 export const PROC_CONSUME_MS = 200;
-export const PROC_EXPIRY_SLACK_MS = 600;
+export const PROC_EXPIRY_EARLY_MS = 600;
+export const PROC_EXPIRY_LATE_MS = 1_500;
 export const PROC_MIN_REMOVALS = 3;
 export const PROC_CONSUMED_SHARE = 0.6;
 // A double weave is normal; a third oGCD between two GCDs clips.
@@ -287,6 +292,19 @@ export function checkPositionals(ctx: PlayerCheckContext): DamageFinding[] {
 // bonus share (the combo part alone). A break right after forced time
 // (death, downtime, or 30s+ since the last GCD, when the combo timer ran
 // out) is forced.
+//
+// A dropped combo never shows on a damage event: the step that would have
+// carried the bonus is never pressed. So the chain is followed in the
+// casts too. A combo action whose next action in the same chain (actions
+// linked by comboFrom) isn't one of its follow-ups within COMBO_TIMEOUT_MS
+// lost that follow-up's combo part, valued like a break (the best
+// follow-up's average × its bonus share). A wrong step that lands is left
+// to the bonusPercent check above, so only a restart (a chain starter),
+// nothing, or a step after the timer counts here. The combo running into
+// the end of the analysis is skipped; one whose timer ran through 1s+ of
+// forced time is forced. Found by xivanalysis on jN3XDrf2z8PmLgRJ Vamp pull
+// 8: the Dancer's Cascade before Technical Step had no Fountain left after
+// the eight window GCDs.
 
 export function checkCombos(ctx: PlayerCheckContext): DamageFinding[] {
   const out: DamageFinding[] = [];
@@ -297,6 +315,7 @@ export function checkCombos(ctx: PlayerCheckContext): DamageFinding[] {
     minBonus.set(e.abilityId, Math.min(minBonus.get(e.abilityId) ?? Infinity, e.bonusPercent));
   }
   const uses = ctx.uses;
+  const broken = new Set<GcdUse>();
   for (let i = 0; i < uses.length; i++) {
     const u = uses[i];
     if (u.startMs >= ctx.endMs || !u.action.comboFrom) continue;
@@ -304,6 +323,7 @@ export function checkCombos(ctx: PlayerCheckContext): DamageFinding[] {
     if (bonus === undefined) continue;
     const hit = hits.find((e) => e.abilityId === u.action.id && e.timestamp >= u.startMs && e.timestamp <= u.startMs + u.castMs + 1_500);
     if (!hit || hit.bonusPercent !== undefined) continue;
+    broken.add(u);
     const prev = uses[i - 1];
     const since = prev ? u.startMs - prev.startMs : Infinity;
     const forcedBefore = prev ? forcedPart(prev.startMs, u.startMs, ctx.forced) : { ms: 0 };
@@ -316,6 +336,61 @@ export function checkCombos(ctx: PlayerCheckContext): DamageFinding[] {
       lostDamage: perUse * bonus / 100,
       basis: `${k(perUse)} average ${u.abilityName} × ${bonus}% combo share (its bonusPercent when combo'd)`,
       detail: `${u.abilityName} landed without its combo bonus`,
+    }));
+  }
+  out.push(...droppedCombos(ctx, minBonus, broken));
+  return out;
+}
+
+// `broken`: steps that landed without their combo. Those carried no combo
+// forward, so they can't drop one.
+function droppedCombos(ctx: PlayerCheckContext, minBonus: Map<number, number>, broken: Set<GcdUse>): DamageFinding[] {
+  const out: DamageFinding[] = [];
+  const uses = ctx.uses;
+  const next = new Map<number, Set<number>>();
+  const parent = new Map<number, number>();
+  const root = (id: number): number => {
+    const p = parent.get(id) ?? id;
+    return p === id ? id : root(p);
+  };
+  for (const u of uses) {
+    for (const from of u.action.comboFrom ?? []) {
+      next.set(from, (next.get(from) ?? new Set<number>()).add(u.action.id));
+      const a = root(from), b = root(u.action.id);
+      if (!parent.has(a)) parent.set(a, a);
+      if (!parent.has(b)) parent.set(b, b);
+      if (a !== b) parent.set(b, a);
+    }
+  }
+  const names = new Map(uses.map((u) => [u.action.id, u.abilityName]));
+  for (let i = 0; i < uses.length; i++) {
+    const u = uses[i];
+    const follow = next.get(u.action.id);
+    if (!follow || u.startMs >= ctx.endMs || broken.has(u)) continue;
+    const expiry = u.startMs + COMBO_TIMEOUT_MS;
+    if (expiry > ctx.endMs) continue;
+    const chain = root(u.action.id);
+    const after = uses.slice(i + 1).find((v) => parent.has(v.action.id) && root(v.action.id) === chain);
+    const inTime = after !== undefined && after.startMs <= expiry;
+    if (inTime && (follow.has(after.action.id) || after.action.comboFrom)) continue;
+    const best = [...follow]
+      .map((id) => ({ id, value: ctx.values.perUse(id) * (minBonus.get(id) ?? 0) / 100 }))
+      .sort((a, b) => b.value - a.value)[0];
+    if (!best || best.value <= 0) continue;
+    const until = inTime ? after.startMs : expiry;
+    const forcedBefore = forcedPart(u.startMs, until, ctx.forced);
+    const forced = forcedBefore.ms >= GAP_FINDING_MS;
+    const bonus = minBonus.get(best.id) ?? 0;
+    const bestName = names.get(best.id) ?? "its follow-up";
+    out.push(finding(ctx, {
+      kind: "combo-broken", startMs: u.startMs, endMs: until, forced,
+      cause: forced ? forcedBefore.cause : undefined,
+      label: `${u.abilityName} combo dropped`,
+      lostDamage: best.value,
+      basis: `${k(ctx.values.perUse(best.id))} average ${bestName} × ${bonus}% combo share (its bonusPercent when combo'd)`,
+      detail: inTime
+        ? `${u.abilityName} wasn't followed up: the chain restarted with ${after.abilityName}`
+        : `${u.abilityName}'s combo ran out before ${[...new Set([...follow].map((id) => names.get(id) ?? "?"))].join(" or ")}`,
     }));
   }
   return out;
@@ -520,11 +595,21 @@ export function checkProcs(ctx: PlayerCheckContext): DamageFinding[] {
   const castNear = (t: number) => casts.find((c) => Math.abs(c.timestamp - t) <= PROC_CONSUME_MS);
 
   // Which statuses one ability consistently consumes.
+  // A removal at the status's natural expiry isn't a consumption, even
+  // with a cast beside it: timed buffs (Power Surge, Dissipation) ended
+  // next to a High Jump or Broil often enough to pass as procs.
   const removals = new Map<number, number>();
   const consumedBy = new Map<number, Map<number, number>>();
+  const expiry = new Map<number, number>();
   for (const e of own) {
+    if (e.buffStatus === "applied" || e.buffStatus === "refreshed") {
+      if (e.durationMs) expiry.set(e.abilityId, e.timestamp + e.durationMs);
+      continue;
+    }
     if (e.buffStatus !== "removed" && e.buffStatus !== "stackRemoved") continue;
     removals.set(e.abilityId, (removals.get(e.abilityId) ?? 0) + 1);
+    const ends = expiry.get(e.abilityId);
+    if (e.buffStatus === "removed" && ends !== undefined && e.timestamp >= ends - PROC_EXPIRY_EARLY_MS) continue;
     for (const c of casts.filter((x) => Math.abs(x.timestamp - e.timestamp) <= PROC_CONSUME_MS)) {
       const m = consumedBy.get(e.abilityId) ?? new Map<number, number>();
       m.set(c.abilityId, (m.get(c.abilityId) ?? 0) + 1);
@@ -546,6 +631,9 @@ export function checkProcs(ctx: PlayerCheckContext): DamageFinding[] {
     const lose = (t: number, n: number, how: string) => {
       const consumerName = casts.find((c) => c.abilityId === consumerId)?.abilityName ?? "its consumer";
       const value = ctx.values.perUse(consumerId) * n;
+      // A consumer with no damage of its own (Horoscope detonates at
+      // expiry by design) loses nothing.
+      if (value <= 0) return;
       const forced = inWindows(t, mergeWindows(ctx.forced));
       out.push(finding(ctx, {
         kind: "proc-lost", startMs: t, endMs: t, forced,
@@ -562,7 +650,7 @@ export function checkProcs(ctx: PlayerCheckContext): DamageFinding[] {
       if (st) st.stacks = e.stack ?? st.stacks;
     } else if (e.buffStatus === "removed") {
       if (st?.expiresAt !== undefined && !castNear(e.timestamp) &&
-          Math.abs(e.timestamp - st.expiresAt) <= PROC_EXPIRY_SLACK_MS) {
+          e.timestamp >= st.expiresAt - PROC_EXPIRY_EARLY_MS && e.timestamp <= st.expiresAt + PROC_EXPIRY_LATE_MS) {
         lose(e.timestamp, Math.max(1, st.stacks), "expired unused");
       }
       state.delete(e.abilityId);
