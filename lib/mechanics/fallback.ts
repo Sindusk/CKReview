@@ -75,13 +75,15 @@
 // Wrong-target, unsurvivable, full-HP and too-few-players errors also give
 // the enemy stack counters beside their clean range. Vamp's Satisfied
 // enlarges Hardcore (user, VOD of pull 1, which died at 10 stacks).
-// Non-fatal hits (Minor, one per player per ability per CLUSTER_GAP_MS):
-// wrong target, avoidable, then hit while vulnerable, in that priority.
+// Non-fatal hits (one per player per ability per CLUSTER_GAP_MS): wrong
+// target, avoidable, then hit while vulnerable, in that priority. Major in
+// FFXIV, Minor in WoW (avoidableSeverity).
 // Penalties: a Damage Down is folded into the hit that caused it; on its
-// own it is a Minor. One applied to PENALTY_RAIDWIDE_MIN+ players at once
-// is player-less (Dancing Mad showed raid-wide Damage Downs that weren't
-// the recipients' fault). On fallback pulls, these replace the generic
-// ffxiv-damage-down rule.
+// own it is a Major on each player who got it, raid-wide ones included
+// (the description says how many got it at once). Never suppressed: the
+// fallback is for week-1 bosses, where a Damage Down is what costs the
+// enrage check (user, 2026-10-08). On fallback pulls, these replace the
+// generic ffxiv-damage-down rule, so a penalty and its hit are one error.
 //
 // ── The cutoff (Raid) ──────────────────────────────────────────────────
 // The earliest of:
@@ -103,7 +105,7 @@
 import type { EnemyStackEvent, Pull } from "@/types/Pull";
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import type { DeathEvent } from "@/types/DeathEvent";
-import type { PlayerRole, PullError } from "@/types/PullError";
+import type { ErrorSeverity, PlayerRole, PullError } from "@/types/PullError";
 import { calledWipe, clusterByGap, joinNames, playerError, pullOverMarker, sec } from "./wow/common";
 
 export const FALLBACK_RULE_PREFIX = "fallback-";
@@ -152,6 +154,13 @@ const VULN_RE = /Vulnerability Up/;
 const PENALTY_RE = /^Damage Down$/;
 const GENERIC_DAMAGE_DOWN_RULE = "ffxiv-damage-down";
 
+/**
+ * Avoidable damage that killed nobody. In FFXIV it's Major: it hands out a
+ * Damage Down, and that costs the enrage check (user, 2026-10-08). In WoW
+ * it's Minor, per the attribution philosophy.
+ */
+const avoidableSeverity = (pull: Pull): ErrorSeverity => (pull.game === "ffxiv" ? "Major" : "Minor");
+
 export function fallbackApplies(pull: Pull): boolean {
   return pull.game === "ffxiv" && !COVERED_ENCOUNTERS[pull.game].has(pull.name);
 }
@@ -177,8 +186,6 @@ type StackRange = { min: number; max: number; n: number };
 export type FallbackProfile = {
   byId: Map<number, AbilityStats>;
   byName: Map<string, AbilityStats>;
-  /** Abilities that gave PENALTY_RAIDWIDE_MIN+ players a penalty at once in a kill. */
-  raidwidePenaltiesInKills: Set<number>;
   /**
    * Enemy stack counts at the start of clean episodes, keyed by
    * "<ability name>#<episode>" and then "<enemy>|<status>".
@@ -273,7 +280,7 @@ export function buildFallbackProfiles(pulls: Pull[]): Map<string, FallbackProfil
     if (!fallbackApplies(pull)) continue;
     let profile = out.get(pull.name);
     if (!profile) {
-      out.set(pull.name, profile = { byId: new Map(), byName: new Map(), raidwidePenaltiesInKills: new Set(), stackRanges: new Map() });
+      out.set(pull.name, profile = { byId: new Map(), byName: new Map(), stackRanges: new Map() });
     }
     for (const [name, list] of episodes(pull)) {
       list.forEach((episode, i) => {
@@ -286,11 +293,6 @@ export function buildFallbackProfiles(pulls: Pull[]): Map<string, FallbackProfil
         }
         profile!.stackRanges.set(id, ranges);
       });
-    }
-    if (pull.result === "Kill") {
-      for (const same of penaltyGroups(pull)) {
-        if (same.length >= PENALTY_RAIDWIDE_MIN) profile.raidwidePenaltiesInKills.add(same[0].d.causeAbilityId ?? 0);
-      }
     }
     const statsFor = (id: number, name: string) => {
       if (!profile!.byId.has(id)) profile!.byId.set(id, emptyStats());
@@ -501,7 +503,7 @@ export function detectFallbackErrors(pull: Pull, profile: FallbackProfile): Pull
     if (under.everyone && under.missing.length > 0 && under.missing.length <= MAX_NAMED_MISSING) {
       for (const p of under.missing) {
         errors.push(playerError(p, {
-          ...base, ruleId: "fallback-missed-share", severity: died.length ? "Major" : "Minor", name: "Missed a Shared Hit",
+          ...base, ruleId: "fallback-missed-share", severity: died.length ? "Major" : avoidableSeverity(pull), name: "Missed a Shared Hit",
           description: `Wasn't in ${e.abilityName}: only ${took} of ${under.normal} living took it, where clean resolutions hit everyone.${deathText}`,
         }));
       }
@@ -623,7 +625,7 @@ export function detectFallbackErrors(pull: Pull, profile: FallbackProfile): Pull
       hitErrors.push({
         player, abilityId: event.abilityId,
         error: playerError(player, {
-          ruleId: flag.rule, severity: "Minor", name: flag.name,
+          ruleId: flag.rule, severity: avoidableSeverity(pull), name: flag.name,
           description: `Hit by ${event.abilityName}${fromSource(event)}${count} (${pct(Math.max(...episode.map((h) => ratioOf(h.event))))} max HP), ${flag.text}.`,
           timestamp: event.timestamp, abilityId: event.abilityId, abilityName: event.abilityName, amount: total,
         }),
@@ -636,16 +638,7 @@ export function detectFallbackErrors(pull: Pull, profile: FallbackProfile): Pull
     const first = same[0].d;
     if (first.timestamp >= cutoff) continue;
     const causeName = first.causeAbilityName ?? "an unknown source";
-    if (same.length >= PENALTY_RAIDWIDE_MIN) {
-      // The kill took it too: part of the fight, not a failure.
-      if (profile.raidwidePenaltiesInKills.has(first.causeAbilityId ?? 0)) continue;
-      errors.push({
-        ruleId: "fallback-penalty-raidwide", severity: "Minor", name: `Raid-Wide ${first.abilityName}`,
-        description: `${same.length} players got ${first.abilityName} from ${causeName} at once: a raid-wide penalty, not one player's mistake.`,
-        timestamp: first.timestamp, abilityId: first.abilityId, abilityName: first.abilityName,
-      });
-      continue;
-    }
+    const together = same.length >= PENALTY_RAIDWIDE_MIN ? ` ${same.length} players got it at once.` : "";
     for (const { player, d } of same) {
       const hit = hitErrors.find((x) => x.player === player &&
         (x.abilityId === d.causeAbilityId || x.error.abilityName === d.causeAbilityName) &&
@@ -656,8 +649,8 @@ export function detectFallbackErrors(pull: Pull, profile: FallbackProfile): Pull
       }
       if (errors.some((x) => x.player === player.name && x.severity === "Major" && Math.abs(x.timestamp - d.timestamp) <= PENALTY_MATCH_MS)) continue;
       errors.push(playerError(player, {
-        ruleId: "fallback-penalty", severity: "Minor", name: d.abilityName,
-        description: `Got ${d.abilityName} from ${causeName}: a mechanic was missed or failed.`,
+        ruleId: "fallback-penalty", severity: "Major", name: d.abilityName,
+        description: `Got ${d.abilityName} from ${causeName}: a mechanic was missed or failed.${together}`,
         timestamp: d.timestamp, abilityId: d.abilityId, abilityName: d.abilityName,
       }));
     }

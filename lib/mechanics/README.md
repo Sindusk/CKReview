@@ -165,6 +165,10 @@ every mechanic, in every game. When in doubt, come back here.
    - **Raid** = leads to an inevitable wipe. A Raid error is the pull's
      cutoff point; errors after it don't count toward Report/PullList/statics
      totals.
+   - **FFXIV exception:** avoidable damage is Major even when nobody died.
+     It hands out a Damage Down, which costs the group the enrage check
+     (user, 2026-10-08). A Damage Down is never suppressed or downgraded by
+     default.
 
    A Major must name a player (`report-data.ts` asserts `e.player!` on
    Majors). A failure nobody can be blamed for from the log (assigned by
