@@ -187,7 +187,13 @@ export type DamageFinding = {
   // the same label in two pulls is the same recurring finding.
   label:      string;
   inference?: boolean;   // rests on inference rather than a measured value
+  // A summary over separate moments (small GCD delays, early DoT refreshes,
+  // missed positionals): when each happened. The dialog's strip marks these
+  // instead of the whole startMs–endMs span, which can cover the pull.
+  moments?:   Window[];
 };
+
+type Window = { startMs: number; endMs: number };
 
 // ── Analysis output ────────────────────────────────────────────────────
 

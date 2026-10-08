@@ -241,7 +241,7 @@ export function dotFindings(ctx: PlayerCheckContext, spec: DotSpec): DamageFindi
 
   const windows: Window[] = [];
   const open = new Map<string, { start: number; lastApply: number }>();
-  const clips = new Map<number | undefined, { ms: number; n: number; start: number; end: number }>();
+  const clips = new Map<number | undefined, { ms: number; n: number; start: number; end: number; moments: Window[] }>();
   for (const e of events) {
     const key = `${e.targetActorId}.${e.targetInstance ?? 1}`;
     const o = open.get(key);
@@ -253,8 +253,9 @@ export function dotFindings(ctx: PlayerCheckContext, spec: DotSpec): DamageFindi
       const left = spec.durationMs - (e.timestamp - o.lastApply);
       if (left > 0) {
         const phaseId = ctx.phaseOf(e.timestamp);
-        const c = clips.get(phaseId) ?? { ms: 0, n: 0, start: e.timestamp, end: e.timestamp };
+        const c = clips.get(phaseId) ?? { ms: 0, n: 0, start: e.timestamp, end: e.timestamp, moments: [] };
         c.ms += left; c.n++; c.end = e.timestamp;
+        c.moments.push({ startMs: e.timestamp, endMs: e.timestamp });
         clips.set(phaseId, c);
       }
       o.lastApply = e.timestamp;
@@ -286,7 +287,7 @@ export function dotFindings(ctx: PlayerCheckContext, spec: DotSpec): DamageFindi
   for (const [phaseId, c] of clips) {
     if (c.ms < DOT_CLIP_FINDING_MS) continue;
     out.push(finding(ctx, {
-      kind: "dot-clip", startMs: c.start, endMs: c.end, forced: false,
+      kind: "dot-clip", startMs: c.start, endMs: c.end, forced: false, moments: c.moments,
       label: `${spec.name} refreshed early`,
       lostDamage: (c.ms / DOT_TICK_MS) * avgTick,
       basis: `${s(c.ms)} of remaining DoT overwritten ÷ 3s ticks × ${k(avgTick)} average tick`,

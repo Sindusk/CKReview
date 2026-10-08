@@ -98,7 +98,7 @@ export function checkGcdGaps(ctx: PlayerCheckContext): DamageFinding[] {
   const out: DamageFinding[] = [];
   const uses = ctx.uses.filter((u) => u.startMs < ctx.endMs);
   if (uses.length === 0) return out;
-  type Bucket = { ms: number; lost: number; start: number; end: number; n: number; defensives: Map<string, number> };
+  type Bucket = { ms: number; lost: number; start: number; end: number; n: number; defensives: Map<string, number>; moments: Window[] };
   const small = new Map<number | undefined, Bucket>();
   const clipped = new Map<number | undefined, Bucket>();
   const ogcds = ctx.player.casts.filter((c) => {
@@ -134,8 +134,9 @@ export function checkGcdGaps(ctx: PlayerCheckContext): DamageFinding[] {
     } else if (unforced > 0) {
       // Three or more oGCDs between two GCDs: the delay is the weaving.
       const bucketMap = weaves.length >= CLIP_WEAVES ? clipped : small;
-      const acc = bucketMap.get(phaseId) ?? { ms: 0, lost: 0, start, end, n: 0, defensives: new Map<string, number>() };
+      const acc = bucketMap.get(phaseId) ?? { ms: 0, lost: 0, start, end, n: 0, defensives: new Map<string, number>(), moments: [] };
       acc.ms += unforced; acc.lost += unforced * perMs; acc.end = end; acc.n++;
+      acc.moments.push({ startMs: start, endMs: end });
       if (bucketMap === clipped) {
         for (const w of weaves) {
           if (ctx.game.isDefensive(w.abilityId)) acc.defensives.set(w.abilityName, (acc.defensives.get(w.abilityName) ?? 0) + 1);
@@ -165,7 +166,7 @@ export function checkGcdGaps(ctx: PlayerCheckContext): DamageFinding[] {
     if (acc.ms < ctx.baseGcdMs) continue;
     out.push({
       player: ctx.player.name, job: ctx.job, phaseId, phase: ctx.phaseName(phaseId),
-      kind: "gcd-delays", startMs: acc.start, endMs: acc.end, forced: false, lostDamage: acc.lost,
+      kind: "gcd-delays", startMs: acc.start, endMs: acc.end, forced: false, lostDamage: acc.lost, moments: acc.moments,
       label: "Small GCD delays",
       basis: `${acc.n} delays under 1s, ${s(acc.ms)} in total, valued at the phase's average GCD`,
       detail: `${s(acc.ms)} of small GCD delays (${acc.n}) in ${ctx.phaseName(phaseId) ?? "the pull"}`,
@@ -176,7 +177,7 @@ export function checkGcdGaps(ctx: PlayerCheckContext): DamageFinding[] {
     const defs = [...acc.defensives.entries()].sort((a, b) => b[1] - a[1]).map(([n, c]) => `${n} ×${c}`).join(", ");
     out.push({
       player: ctx.player.name, job: ctx.job, phaseId, phase: ctx.phaseName(phaseId),
-      kind: "gcd-clipping", startMs: acc.start, endMs: acc.end, forced: false, lostDamage: acc.lost,
+      kind: "gcd-clipping", startMs: acc.start, endMs: acc.end, forced: false, lostDamage: acc.lost, moments: acc.moments,
       label: "GCD clipped by triple weaves",
       basis: `${acc.n} delays with ${CLIP_WEAVES}+ oGCDs between GCDs, ${s(acc.ms)} in total, valued at the phase's average GCD`,
       detail: `${s(acc.ms)} of GCD delay from triple weaves (${acc.n}) in ${ctx.phaseName(phaseId) ?? "the pull"}` +
@@ -242,7 +243,7 @@ export function checkDisengages(ctx: PlayerCheckContext): DamageFinding[] {
 // One finding per action per phase.
 
 export function checkPositionals(ctx: PlayerCheckContext): DamageFinding[] {
-  const groups = new Map<string, { name: string; phaseId?: number; misses: number; casts: number; lost: number; start: number; end: number; cost: number }>();
+  const groups = new Map<string, { name: string; phaseId?: number; misses: number; casts: number; lost: number; start: number; end: number; cost: number; moments: Window[] }>();
   let last: { id: number; t: number } | undefined;
   for (const e of ctx.player.damageDone) {
     if (e.timestamp >= ctx.endMs || e.isDoT) continue;
@@ -252,7 +253,7 @@ export function checkPositionals(ctx: PlayerCheckContext): DamageFinding[] {
     last = { id: e.abilityId, t: e.timestamp };
     const phaseId = ctx.phaseOf(e.timestamp);
     const key = `${e.abilityId}|${phaseId}`;
-    const g = groups.get(key) ?? { name: e.abilityName, phaseId, misses: 0, casts: 0, lost: 0, start: e.timestamp, end: e.timestamp, cost: a.positional.missCost };
+    const g = groups.get(key) ?? { name: e.abilityName, phaseId, misses: 0, casts: 0, lost: 0, start: e.timestamp, end: e.timestamp, cost: a.positional.missCost, moments: [] };
     g.casts++;
     groups.set(key, g);
     if (e.bonusPercent === undefined && a.comboFrom) continue;
@@ -260,13 +261,14 @@ export function checkPositionals(ctx: PlayerCheckContext): DamageFinding[] {
     g.misses++;
     g.lost += (e.amount ?? 0) * a.positional.missCost;
     g.end = e.timestamp;
+    g.moments.push({ startMs: e.timestamp, endMs: e.timestamp });
   }
   const out: DamageFinding[] = [];
   for (const g of groups.values()) {
     if (g.misses === 0) continue;
     out.push({
       player: ctx.player.name, job: ctx.job, phaseId: g.phaseId, phase: ctx.phaseName(g.phaseId),
-      kind: "positional", startMs: g.start, endMs: g.end, forced: false, lostDamage: g.lost,
+      kind: "positional", startMs: g.start, endMs: g.end, forced: false, lostDamage: g.lost, moments: g.moments,
       label: `${g.name} positional missed`,
       basis: `each missed hit × ${Math.round(g.cost * 100)}% (the potency the positional adds)`,
       detail: `${g.name}: ${g.misses} of ${g.casts} positionals missed in ${ctx.phaseName(g.phaseId) ?? "the pull"}`,

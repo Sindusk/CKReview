@@ -42,7 +42,9 @@ type DamageDialogProps = {
   currentPullId: number | null;
 };
 
-const LOSS_COLOR = SEVERITY_COLOR.Major;
+// Red, not the Major orange: beside the raid-buff gold the orange read as
+// the same colour.
+const LOSS_COLOR = SEVERITY_COLOR.Death;
 
 const fmtDamage = (n: number) =>
   n >= 1e6 ? `${(n / 1e6).toFixed(2)}M` : n >= 1000 ? `${Math.round(n / 1000)}k` : `${Math.round(n)}`;
@@ -393,14 +395,17 @@ function TimelineStrip({ summary, analysis }: { summary: PlayerDamageSummary; an
           <div key={`p${p.phaseId}-${p.startMs}`} title={p.name}
             style={{ position: "absolute", top: 0, bottom: 0, left: pct(p.startMs), width: 1, background: "var(--ck-frame)" }} />
         ))}
-        {summary.findings.filter((f) => !f.forced && f.lostDamage >= 1).map((f, i) => (
-          <div key={`x${i}`} title={`${fmtTime(f.startMs)} ${f.detail} (${fmtDamage(f.lostDamage)})`}
-            style={{ position: "absolute", bottom: 0, height: 6, left: pct(f.startMs), width: `max(3px, ${width(f.startMs, f.endMs)})`, background: LOSS_COLOR }} />
-        ))}
+        {/* A summary finding (small delays, early DoT refreshes, missed
+            positionals) marks each of its moments, not its first-to-last span. */}
+        {summary.findings.filter((f) => !f.forced && f.lostDamage >= 1).flatMap((f, i) =>
+          (f.moments ?? [{ startMs: f.startMs, endMs: f.endMs }]).map((m, j) => (
+            <div key={`x${i}-${j}`} title={`${fmtTime(m.startMs)} ${f.detail} (${fmtDamage(f.lostDamage)})`}
+              style={{ position: "absolute", bottom: 0, height: 6, left: pct(m.startMs), width: `max(3px, ${width(m.startMs, m.endMs)})`, background: LOSS_COLOR }} />
+          )))}
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", color: "var(--ck-text-3)", fontSize: 10, marginTop: 2 }}>
         <span className="ck-num">0:00</span>
-        <span>gold: raid buffs · shaded: forced · ticks: GCDs · orange: counted losses</span>
+        <span>gold: raid buffs · shaded: forced · ticks: GCDs · red: counted losses</span>
         <span className="ck-num">{fmtTime(total)}</span>
       </div>
     </div>

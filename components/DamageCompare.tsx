@@ -31,7 +31,7 @@ const rate = (n: number | undefined) => (n === undefined || !Number.isFinite(n) 
 function Delta({ value, base }: { value: number; base?: number }) {
   if (base === undefined || !Number.isFinite(base) || base <= 0) return <span style={{ color: "var(--ck-text-3)" }}>—</span>;
   const d = (value - base) / base;
-  const color = d <= -0.03 ? SEVERITY_COLOR.Major : d >= 0.03 ? "var(--ck-arcane-text)" : "var(--ck-text-2)";
+  const color = d <= -0.03 ? SEVERITY_COLOR.Death : d >= 0.03 ? "var(--ck-arcane-text)" : "var(--ck-text-2)";
   return <span className="ck-num" style={{ color }}>{d >= 0 ? "+" : ""}{(d * 100).toFixed(0)}%</span>;
 }
 
