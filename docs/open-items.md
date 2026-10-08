@@ -304,10 +304,6 @@ module. Open:
 Report jN3XDrf2z8PmLgRJ; pulls 1 and 3 partly reviewed (rulings in
 expectations/). Header of `lib/mechanics/ffxiv/arcadion/vamp-fatale.ts`
 has the evidence.
-- **Missed cell tower as a cutoff.** The user called pull 3 over the
-  moment a cell tower was missed (6:42). Pull 5 (7:04) and pull 9 (6:41)
-  also missed one; pull 5 lived another 80s. Should every missed cell
-  tower be a Raid cutoff, or only some (first set? two towers?)
 - **Stomp overlap blame** goes to whoever stood further from their clock
   spot (45+ degrees), both when neither did. Confirm on pulls 1/3/13.
 - **Third Brutal Rain deaths (pulls 5, 7)** are a player-less Raid

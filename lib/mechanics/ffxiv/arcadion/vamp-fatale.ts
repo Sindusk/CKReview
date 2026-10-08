@@ -91,8 +91,9 @@
 //   was survived 87s (P6), so the marker is 5 plus "ended within 45s".
 //
 // Cutoff per pull (first Raid error): P1 Hardcore party +221.4, P2 overlap
-// +198.5, P3 collapse +441.9, P4 collapse +483.5, P5 Rain +505.8, P6 enrage
-// +604.9, P7 Rain +505.5, P8 kill (none), P9 collapse +418.0, P10 overlap
+// +198.5, P3 cell tower +402.0, P4 collapse +483.5, P5 cell tower +424.6,
+// P6 enrage +604.9, P7 Rain +505.5, P8 kill (none), P9 cell tower +401.8,
+// P10 overlap
 // +200.2, P11 Hardcore party +221.1, P12 Doornail +357.4, P13 overlap
 // +200.1. No wipe is unexplained.
 //
@@ -117,7 +118,8 @@
 // ffxiv-vf-flail-tower (Major on the living tank who soaked no Plummet);
 //   ffxiv-vf-barbed-burst (player-less Minor; Raid if 3+ died);
 //   ffxiv-vf-doornail (Raid).
-// ffxiv-vf-cell-tower (Major on living set-group members who didn't soak);
+// ffxiv-vf-cell-tower (Major on living set-group members who didn't soak,
+//   then a Raid cutoff: a missed cell tower ends the pull, per the user);
 //   ffxiv-vf-cell-cone (Major on the outside tank whose cone hit an inmate
 //   or another outside player: the tank's spot aims it; Amp/45982 on an
 //   inmate is player-less Minor); ffxiv-vf-last-lash (Major on the inmate).
@@ -1001,10 +1003,12 @@ function detectCells(players: PlayerInfo[], life: Life, casts: EnemyEvent[], slo
           timestamp: t + 1200, abilityId: UNMITIGATED_EXPL, abilityName: "Unmitigated Explosion",
         }));
       }
-      if (absent.length < unsoaked) {
-        errors.push(playerlessMinor(VF_CELL_TOWER_RULE_ID, "Missed a Cell Tower",
-          `${unsoaked} Hell in a Cell tower${unsoaked > 1 ? "s" : ""} went unsoaked${absent.length ? `, ${absent.length} of them by a living group member` : ""}; the rest belonged to dead players.`,
-          t + 1200, UNMITIGATED_EXPL, "Unmitigated Explosion"));
+      // A missed cell tower is the cutoff (user, 2026-10-08): the raid can
+      // sometimes outgear it, but nothing after it is worth reviewing.
+      if (!errors.some((e) => e.severity === "Raid" && e.ruleId === VF_CELL_TOWER_RULE_ID)) errors.push(raidMarker(VF_CELL_TOWER_RULE_ID, "Missed a Cell Tower",
+        `${unsoaked} Hell in a Cell tower${unsoaked > 1 ? "s" : ""} went unsoaked${absent.length ? ` (${namesOf(absent)})` : " (their soakers were dead)"}: Unmitigated Explosion and Sustained Damage on everyone. Treated as the cutoff point.`,
+        t + 1200, UNMITIGATED_EXPL, "Unmitigated Explosion"));
+      {
       }
     }
 
