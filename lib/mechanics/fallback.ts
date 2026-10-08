@@ -687,13 +687,13 @@ export function detectFallbackErrors(pull: Pull, profile: FallbackProfile): Pull
       for (const y of player.damageTaken) {
         if (y.abilityId === x.abilityId && Math.abs(y.timestamp - x.timestamp) <= CLUSTER_GAP_MS) handled.add(y);
       }
-      const what = doubled.has(x) ? `they ${doubledText(x)}`
-        : wrongTarget(profile, { player, event: x }) ? `${x.abilityName} hit them, a role it isn't meant for`
-        : `they were hit by ${x.abilityName}, which rarely hits anyone`;
+      const what = doubled.has(x) ? doubledText(x)
+        : wrongTarget(profile, { player, event: x }) ? `hit by ${x.abilityName} (not meant for their role)`
+        : `hit by ${x.abilityName} (rarely hits anyone)`;
       errors.push(playerError(player, {
         timestamp: x.timestamp, abilityId: x.abilityId, abilityName: x.abilityName, amount: x.amount,
         ruleId: "fallback-death-after-hit", severity: "Major", name: "Died After a Mistake",
-        description: `At +${sec(x.timestamp)}s ${what}, which left them at ${pct((x.healthAfter ?? 0) / (x.maxHealth ?? 1))} HP; ` +
+        description: `${what[0].toUpperCase()}${what.slice(1)}, which left them at ${pct((x.healthAfter ?? 0) / (x.maxHealth ?? 1))} HP; ` +
           `${e.abilityName}${e.isDoT ? " (a tick)" : ""} finished them ${sec(e.timestamp - x.timestamp)}s later.`,
       }));
     }
