@@ -25,20 +25,27 @@ export type PlayerDamageAggregate = {
   pulls:           number;   // pulls this player was in
   lostPerPull:     number;   // unforced
   forcedPerPull:   number;
+  // Over every pull's eligible time together (alive, boss targetable): 0-1.
+  gcdUptime:       number;
   recurring:       RecurringFinding[];
 };
 
 export function aggregateDamage(analyses: PullDamageAnalysis[]): PlayerDamageAggregate[] {
-  const byPlayer = new Map<string, PlayerDamageAggregate & { lost: number; forcedLost: number; groups: Map<string, RecurringFinding & { pullIds: Set<number> }> }>();
+  const byPlayer = new Map<string, PlayerDamageAggregate & {
+    lost: number; forcedLost: number; activeMs: number; eligibleMs: number;
+    groups: Map<string, RecurringFinding & { pullIds: Set<number> }>;
+  }>();
   for (const a of analyses) {
     for (const p of a.players) {
       const agg = byPlayer.get(p.player) ?? {
-        player: p.player, job: p.job, role: p.role, pulls: 0, lostPerPull: 0, forcedPerPull: 0, recurring: [],
-        lost: 0, forcedLost: 0, groups: new Map(),
+        player: p.player, job: p.job, role: p.role, pulls: 0, lostPerPull: 0, forcedPerPull: 0, gcdUptime: 0, recurring: [],
+        lost: 0, forcedLost: 0, activeMs: 0, eligibleMs: 0, groups: new Map(),
       };
       agg.pulls++;
       agg.lost += p.lostDamage;
       agg.forcedLost += p.forcedDamage;
+      agg.activeMs += p.gcdUptime.activeMs;
+      agg.eligibleMs += p.gcdUptime.eligibleMs;
       for (const f of p.findings) {
         const key = `${f.kind}|${f.phase ?? ""}|${f.label}|${f.forced}`;
         const g = agg.groups.get(key) ?? {
@@ -59,6 +66,7 @@ export function aggregateDamage(analyses: PullDamageAnalysis[]): PlayerDamageAgg
     player: agg.player, job: agg.job, role: agg.role, pulls: agg.pulls,
     lostPerPull: agg.lost / agg.pulls,
     forcedPerPull: agg.forcedLost / agg.pulls,
+    gcdUptime: agg.eligibleMs > 0 ? agg.activeMs / agg.eligibleMs : 0,
     recurring: [...agg.groups.values()]
       .map(({ pullIds: _ids, ...g }) => g)
       .sort((a, b) => Number(a.forced) - Number(b.forced) || b.lostDamage - a.lostDamage),

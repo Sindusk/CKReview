@@ -34,10 +34,12 @@ const RAID_BUFF_KEYS = [
   "STARRY_MUSE",
 ];
 
+// Fallbacks only: checkPenalties measures each penalty per pull from hit
+// multipliers (lib/damage/checks.ts), since Damage Down varies by fight.
 const PENALTIES = new Map<number, number>([
-  [1002911, 0.10], // Damage Down (Dancing Mad)
-  [1000043, 0.75], // Weakness
-  [1000044, 0.50], // Brink of Death (unverified)
+  [1002911, 0.75], // Damage Down: 0.75 in Vamp Fatale, 0.10 in Dancing Mad
+  [1000043, 0.75], // Weakness (measured 0.75, Vamp Fatale kill)
+  [1000044, 0.50], // Brink of Death (measured 0.50, Vamp Fatale kill)
 ]);
 
 const GCD_BASE_MS = 2500;
@@ -106,9 +108,14 @@ function positionalInfo(a: XivaAction): GameAction["positional"] {
   const missed = new Set<number>([0]);
   const bases = pots.filter((p) => p.bonusModifiers.length === 0 ||
     (p.bonusModifiers.length === 1 && p.bonusModifiers[0] === "COMBO"));
+  // Only potencies in the same base state pair up: Executioner's Gibbet's
+  // Enhanced 760 isn't a bonus over its plain 700. Pairing them made 7%,
+  // the bonus a hit positional shows (1 − 700/760, 1 − 760/820), read as
+  // a miss: "8 of 8 missed" on the Vamp Fatale kill (jN3XDrf2z8PmLgRJ).
+  const baseState = (p: (typeof pots)[number]) => (p.baseModifiers ?? []).join();
   for (const base of bases) {
     for (const bonus of pots) {
-      if (bonus.bonusModifiers.includes("POSITIONAL") || bonus.value <= base.value) continue;
+      if (bonus.bonusModifiers.includes("POSITIONAL") || bonus.value <= base.value || baseState(bonus) !== baseState(base)) continue;
       missed.add(Math.trunc(100 * (1 - base.value / bonus.value)));
     }
   }

@@ -24,7 +24,7 @@ import {
   type PlayerCheckContext,
 } from "./checks";
 import {
-  deadWindows, gcdKinds, gcdUses, inWindows, limitBreakWindows, playerValues, raidBuffWindows, raidDowntime,
+  deadWindows, gcdKinds, gcdUptime, gcdUses, inWindows, limitBreakWindows, playerValues, raidBuffWindows, raidDowntime,
   speedProfile, statusWindows, wipeCollapseMs, type Window,
 } from "./timeline";
 import { buildBuffLedger, checkBuffCoverage } from "./buffs";
@@ -121,6 +121,7 @@ export function analyzePullDamage(pull: Pull, game: DamageGame, context?: Damage
       forcedDamage: findings.filter((f) => f.forced).reduce((a, f) => a + f.lostDamage, 0),
       gcds: uses.filter((u) => u.startMs < endMs).length,
       baseGcdMs: ctx.baseGcdMs,
+      gcdUptime: gcdUptime(uses, speed.at, [...downtime, ...dead, ...limitBreakWindows(uses)], endMs),
       buffWindowGcds: { used, fit },
       gcdSplit,
       buffs: ledger.contributions.get(player.name) ?? { given: 0, received: 0, approximate: false },

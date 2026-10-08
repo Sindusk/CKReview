@@ -41,7 +41,7 @@
 // some damage too, so this is marked inference).
 
 import type { Pull } from "@/types/Pull";
-import type { PlayerInfo } from "@/types/PlayerInfo";
+import type { PlayerEvent, PlayerInfo } from "@/types/PlayerInfo";
 import type { DamageContext, DamageFinding, DamageGame, ForcedWindow } from "./types";
 import type { BuffLedger } from "./buffs";
 import {
@@ -189,17 +189,38 @@ export function checkGcdGaps(ctx: PlayerCheckContext): DamageFinding[] {
 // ── Disengage GCDs ─────────────────────────────────────────────────────
 // A ranged filler (Lightning Shot, Unmend, Tomahawk, Shield Lob) pressed
 // out of melee range. Lost = the player's average GCD in that phase minus
-// the filler's own average. Labelled with the mechanic at the time, but
-// still counted: per-player forced movement isn't modelled yet.
+// the filler's own average. Labelled with the mechanic at the time.
+// When another player also used a ranged filler within SHARED_DISENGAGE_MS,
+// a mechanic moved the boss or the melee out of reach, so it's forced: on
+// the Vamp Fatale kill (jN3XDrf2z8PmLgRJ) 13 of the DRK's 17 Unmends
+// lined up with another melee's or tank's filler (bombs at 0:35, boss
+// movement at 1:25, 3:17, 3:53, 5:48, 8:33).
+
+const SHARED_DISENGAGE_MS = 3_000;
+const disengageCache = new WeakMap<Pull, { player: string; t: number }[]>();
+
+function disengagesOf(pull: Pull, game: DamageGame): { player: string; t: number }[] {
+  let out = disengageCache.get(pull);
+  if (!out) {
+    out = pull.players.flatMap((p) => p.casts.filter((c) => game.disengageActionIds.has(c.abilityId)).map((c) => ({ player: p.name, t: c.timestamp })));
+    disengageCache.set(pull, out);
+  }
+  return out;
+}
 
 export function checkDisengages(ctx: PlayerCheckContext): DamageFinding[] {
+  const others = disengagesOf(ctx.pull, ctx.game).filter((d) => d.player !== ctx.player.name);
   return ctx.uses
     .filter((u) => u.startMs < ctx.endMs && ctx.game.disengageActionIds.has(u.action.id))
     .map((u) => {
       const phaseId = ctx.phaseOf(u.startMs);
       const value = ctx.values.gcdValue(phaseId, inWindows(u.startMs, ctx.buffWindows));
       const own = ctx.values.perUse(u.action.id);
-      const forced = forcedPart(u.startMs - 1, u.startMs + 1, ctx.forced);
+      const window = forcedPart(u.startMs - 1, u.startMs + 1, ctx.forced);
+      const shared = others.filter((d) => Math.abs(d.t - u.startMs) <= SHARED_DISENGAGE_MS);
+      const forced = window.ms > 0 ? window
+        : shared.length > 0 ? { ms: 1, cause: `${[...new Set(shared.map((d) => d.player))].join(", ")} out of reach too` }
+        : window;
       const during = ctx.mechanicAround(u.startMs, u.startMs);
       return finding(ctx, {
         kind: "disengage", startMs: u.startMs, endMs: u.startMs,
@@ -327,18 +348,22 @@ export function checkCooldownDrift(ctx: PlayerCheckContext): DamageFinding[] {
       unforced += held;
       if (held > 0 && (!longest || len > longest.endMs - longest.startMs)) longest = w;
     }
-    const lostUses = Math.floor(unforced / cd.cooldownMs);
+    // Never more lost uses than the pull had room for: Vamp's Dancer used
+    // Standard Step 19 times in 587s (room for 20), yet its ready time
+    // summed to 163s, "5 lost", because each use came a few seconds late.
+    const room = cd.charges + Math.floor(Math.max(0, ctx.endMs - cd.firstUseOffsetMs - overlapMs(0, ctx.endMs, forcedMerged)) / cd.cooldownMs);
+    const lostUses = Math.min(Math.floor(unforced / cd.cooldownMs), Math.max(0, room - casts.length));
     if (lostUses < 1 || !longest) continue;
     const perUse = cd.actionIds.reduce((a, id) => Math.max(a, ctx.values.perUse(id)), 0);
+    // A cooldown that deals no damage itself (Devilment) has no estimate,
+    // and a 0 line says nothing.
+    if (perUse === 0) continue;
     const uses = (n: number) => `${n} use${n === 1 ? "" : "s"}`;
     out.push(finding(ctx, {
       kind: "cooldown-drift", startMs: longest.startMs, endMs: longest.endMs, forced: false,
       label: `${cd.name} drift`,
       lostDamage: lostUses * perUse,
-      basis: perUse > 0
-        ? `${uses(lostUses)} × ${k(perUse)} average per ${cd.name}`
-        : `${cd.name} deals no damage itself; its value isn't estimated yet`,
-      inference: perUse === 0 ? true : undefined,
+      basis: `${uses(lostUses)} × ${k(perUse)} average per ${cd.name}; room for ${room} in the pull`,
       detail: `${cd.name} sat ready for ${s(unforced)} in total (${uses(casts.length)}): about ${uses(lostUses)} lost` +
         (heldForDeciding > 0 ? `; ${s(heldForDeciding)} more held for the deciding phase is fine` : ""),
     }));
@@ -389,6 +414,40 @@ export function checkDeaths(ctx: PlayerCheckContext): DamageFinding[] {
 }
 
 // ── Penalty debuffs ────────────────────────────────────────────────────
+// What a penalty does differs by fight: Damage Down is ×0.10 in Dancing
+// Mad but ×0.75 in Vamp Fatale (jN3XDrf2z8PmLgRJ, the kill: every player's
+// hits under it), so the factor is measured per pull. For each player and
+// ability with 2+ hits both with and without the status, the ratio of the
+// median FFLogs multipliers; the factor is the median ratio over all of
+// them. The game's table is the fallback when fewer than
+// PENALTY_MIN_SAMPLES pairs exist. Vamp kill: Damage Down 0.75 (23 pairs),
+// Weakness 0.75, Brink of Death 0.50.
+
+const PENALTY_MIN_SAMPLES = 3;
+// Weakness, Brink of Death: the price of being raised.
+const RAISE_PENALTIES = new Set([1000043, 1000044]);
+const penaltyCache = new WeakMap<Pull, Map<number, { factor: number; samples: number } | undefined>>();
+
+export function measuredPenaltyFactor(pull: Pull, statusId: number): { factor: number; samples: number } | undefined {
+  let cache = penaltyCache.get(pull);
+  if (!cache) penaltyCache.set(pull, cache = new Map());
+  if (cache.has(statusId)) return cache.get(statusId);
+  const med = (xs: number[]) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)];
+  const ratios: number[] = [];
+  for (const player of pull.players) {
+    const byAbility = new Map<number, { on: number[]; off: number[] }>();
+    for (const e of player.damageDone) {
+      if (e.multiplier === undefined || !(e.amount && e.amount > 0)) continue;
+      const s = byAbility.get(e.abilityId) ?? { on: [], off: [] };
+      (e.statusIds?.includes(statusId) ? s.on : s.off).push(e.multiplier);
+      byAbility.set(e.abilityId, s);
+    }
+    for (const s of byAbility.values()) if (s.on.length >= 2 && s.off.length >= 2) ratios.push(med(s.on) / med(s.off));
+  }
+  const out = ratios.length >= PENALTY_MIN_SAMPLES ? { factor: med(ratios), samples: ratios.length } : undefined;
+  cache.set(statusId, out);
+  return out;
+}
 
 export function checkPenalties(ctx: PlayerCheckContext): DamageFinding[] {
   const out: DamageFinding[] = [];
@@ -410,7 +469,8 @@ export function checkPenalties(ctx: PlayerCheckContext): DamageFinding[] {
   const noCount = mergeWindows(ctx.forced.filter((x) => x.cause.startsWith("phase damage")));
   for (const w of windows) {
     if (w.startMs >= ctx.endMs) continue;
-    const f = game.penaltyFactor(w.statusId)!;
+    const measured = measuredPenaltyFactor(ctx.pull, w.statusId);
+    const f = measured?.factor ?? game.penaltyFactor(w.statusId)!;
     // The snapshot says which hits it reduced (DoT ticks included, which
     // snapshot at application); allow for the snapshot lag at the edges.
     const hits = player.damageDone.filter((e) =>
@@ -426,9 +486,11 @@ export function checkPenalties(ctx: PlayerCheckContext): DamageFinding[] {
         label: w.cause ? `${w.name} (${w.cause})` : w.name,
         forced,
         cause: forced ? forcedPart(part[0].timestamp - 1, part[0].timestamp + 1, ctx.forced).cause
-          : w.statusId === 1000043 ? "raised" : w.cause,
+          : RAISE_PENALTIES.has(w.statusId) ? "raised" : w.cause,
         lostDamage: dealt * (1 / f - 1),
-        basis: `${k(dealt)} dealt under it (${part.length} hits) × (1 ÷ ${f} − 1)`,
+        basis: `${k(dealt)} dealt under it (${part.length} hits) × (1 ÷ ${f.toFixed(2)} − 1); ` +
+          (measured ? `×${f.toFixed(2)} measured in this pull from ${measured.samples} abilities' hits with and without it`
+            : `×${f} assumed (too few hits in this pull to measure it)`),
         detail: `${w.name}${w.cause ? ` from ${w.cause}` : ""} for ${s(end - w.startMs)}`,
       }));
     }
@@ -500,23 +562,37 @@ export function checkProcs(ctx: PlayerCheckContext): DamageFinding[] {
 
 // ── Interrupted casts ──────────────────────────────────────────────────
 
+// One finding per player for the whole pull, not one per cast: a caster
+// moving through mechanics cancels a dozen (Vamp kill: 15 on the Red
+// Mage), and a 0k line each buried everything else. Casts cut short by a
+// death are left out; the death covers them.
+
 export function checkInterrupts(ctx: PlayerCheckContext): DamageFinding[] {
-  const out: DamageFinding[] = [];
+  const cancelled: PlayerEvent[] = [];
   for (const b of ctx.player.beginCasts ?? []) {
     if (b.timestamp >= ctx.endMs || !b.durationMs) continue;
     const done = ctx.player.casts.some((c) => c.abilityId === b.abilityId &&
       c.timestamp >= b.timestamp && c.timestamp <= b.timestamp + b.durationMs + 500);
     if (done) continue;
     const end = b.timestamp + b.durationMs;
-    const dead = inWindows(end, ctx.dead) || overlapMs(b.timestamp, end + 500, ctx.dead) > 0;
-    out.push(finding(ctx, {
-      kind: "interrupted-cast", startMs: b.timestamp, endMs: end,
-      label: `${b.abilityName} cancelled`,
-      forced: dead, cause: dead ? "died while casting" : ctx.mechanicAround(b.timestamp, end),
-      lostDamage: 0,
-      basis: "the lost time is counted in the GCD gap that follows",
-      detail: `${b.abilityName} cast started and never went off`,
-    }));
+    if (inWindows(end, ctx.dead) || overlapMs(b.timestamp, end + 500, ctx.dead) > 0) continue;
+    cancelled.push(b);
   }
-  return out;
+  if (cancelled.length === 0) return [];
+  const byName = new Map<string, number>();
+  for (const b of cancelled) byName.set(b.abilityName, (byName.get(b.abilityName) ?? 0) + 1);
+  const names = [...byName].sort((a, b) => b[1] - a[1]).map(([n, c]) => (c > 1 ? `${n} ×${c}` : n)).join(", ");
+  const first = cancelled[0], last = cancelled[cancelled.length - 1];
+  return [finding(ctx, {
+    kind: "interrupted-cast", startMs: first.timestamp, endMs: last.timestamp + (last.durationMs ?? 0),
+    label: "Cancelled casts", forced: false,
+    lostDamage: 0,
+    basis: `the lost time is counted in the GCD gaps that follow; at ${cancelled.map((b) => clock(b.timestamp)).join(", ")}`,
+    detail: `${cancelled.length} cast${cancelled.length === 1 ? "" : "s"} started and never went off: ${names}`,
+  })];
 }
+
+const clock = (ms: number) => {
+  const t = Math.max(0, Math.round(ms / 1000));
+  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
+};

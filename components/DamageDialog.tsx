@@ -184,12 +184,12 @@ export default function DamageDialog({ open, onClose, pulls, currentPullId }: Da
               {allPulls
                 ? aggregate.map((a) => (
                   <PlayerCard key={a.player} name={a.player} job={a.job} color={colorFor(a.player, a.job)} lost={a.lostPerPull} forced={a.forcedPerPull}
-                    sub={`${a.pulls} pull${a.pulls === 1 ? "" : "s"}`}
+                    uptime={a.gcdUptime} sub={`${a.pulls} pull${a.pulls === 1 ? "" : "s"}`}
                     selected={a.player === activePlayer} onClick={() => setSelectedPlayer(a.player)} />
                 ))
                 : analysis?.players.map((p) => (
                   <PlayerCard key={p.player} name={p.player} job={p.job} color={colorFor(p.player, p.job)} lost={p.lostDamage} forced={p.forcedDamage}
-                    sub={`dealt ${fmtDamage(p.damage)}`}
+                    uptime={p.gcdUptime.pct} sub={`dealt ${fmtDamage(p.damage)}`}
                     selected={p.player === activePlayer} onClick={() => setSelectedPlayer(p.player)} />
                 ))}
             </div>
@@ -282,8 +282,10 @@ function PhaseTable({ phases }: { phases: PhaseDamageSummary[] }) {
 
 type ColorFor = (player: string, job: string) => string;
 
-function PlayerCard({ name, job, color, lost, forced, sub, selected, onClick }: {
-  name: string; job: string; color: string; lost: number; forced: number; sub: string; selected: boolean; onClick: () => void;
+const fmtUptime = (pct: number) => `${(pct * 100).toFixed(1)}%`;
+
+function PlayerCard({ name, job, color, lost, forced, uptime, sub, selected, onClick }: {
+  name: string; job: string; color: string; lost: number; forced: number; uptime: number; sub: string; selected: boolean; onClick: () => void;
 }) {
   return (
     <div
@@ -296,7 +298,11 @@ function PlayerCard({ name, job, color, lost, forced, sub, selected, onClick }: 
         <div style={{ color: "var(--ck-text)", fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</div>
         <div style={{ color: "var(--ck-text-3)", fontSize: 11 }}>{job} · {sub}</div>
       </div>
-      <div style={{ textAlign: "right" }}>
+      <div style={{ textAlign: "right" }} title="GCD uptime while alive and the boss was targetable">
+        <div className="ck-num" style={{ color: "var(--ck-text)", fontSize: 14, fontWeight: 600 }}>{fmtUptime(uptime)}</div>
+        <div style={{ color: "var(--ck-text-3)", fontSize: 11 }}>uptime</div>
+      </div>
+      <div style={{ textAlign: "right", minWidth: 56 }}>
         <div className="ck-num" style={{ color: lost > 0 ? LOSS_COLOR : "var(--ck-text-2)", fontSize: 14, fontWeight: 600 }}>{fmtDamage(lost)}</div>
         <div className="ck-num" style={{ color: "var(--ck-text-3)", fontSize: 11 }}>forced {fmtDamage(forced)}</div>
       </div>
@@ -311,7 +317,10 @@ function PlayerDetail({ summary, analysis, colorFor }: { summary: PlayerDamageSu
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
         <span style={{ color: colorFor(summary.player, summary.job), fontSize: 15, fontWeight: 600 }}>{summary.player}</span>
         <span style={{ color: "var(--ck-text-3)", fontSize: 12 }}>{summary.job}</span>
-        <span className="ck-help" style={{ margin: 0 }}>
+        <span className="ck-help" style={{ margin: 0 }}
+          title="GCD locks over the time this player was alive and the boss was targetable (deaths, untargetable time and limit breaks excluded)">
+          GCD uptime <span className="ck-num" style={{ color: "var(--ck-text)", fontWeight: 600 }}>{fmtUptime(summary.gcdUptime.pct)}</span>
+          {" "}of <span className="ck-num">{fmtTime(summary.gcdUptime.eligibleMs)}</span> alive and targetable ·
           GCD <span className="ck-num">{(summary.baseGcdMs / 1000).toFixed(2)}s</span> · {summary.gcds} GCDs ·
           in raid buffs <span className="ck-num">{summary.buffWindowGcds.used}/{summary.buffWindowGcds.fit}</span> that fit
           {summary.gcdSplit.heal > 0 && <>
@@ -406,6 +415,9 @@ function AggregateDetail({ agg, totalPulls, colorFor }: { agg: PlayerDamageAggre
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 8 }}>
         <span style={{ color: colorFor(agg.player, agg.job), fontSize: 15, fontWeight: 600 }}>{agg.player}</span>
         <span style={{ color: "var(--ck-text-3)", fontSize: 12 }}>{agg.job} · in {agg.pulls} of {totalPulls} pulls</span>
+        <span className="ck-help" style={{ margin: 0 }} title="GCD locks over the time this player was alive and the boss was targetable, all pulls together">
+          GCD uptime <span className="ck-num" style={{ color: "var(--ck-text)", fontWeight: 600 }}>{fmtUptime(agg.gcdUptime)}</span>
+        </span>
       </div>
       <div className="ck-table-wrap">
         <table className="ck-table" style={{ fontSize: 12 }}>

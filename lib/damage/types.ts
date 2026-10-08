@@ -200,6 +200,9 @@ export type PlayerDamageSummary = {
   forcedDamage:  number;     // forced findings
   gcds:          number;
   baseGcdMs:     number;     // the player's observed GCD
+  // GCD locks over the time the player was alive, the boss targetable and
+  // no limit break running (timeline.ts gcdUptime). pct is 0-1.
+  gcdUptime:     { pct: number; activeMs: number; eligibleMs: number };
   // GCD starts inside raid-buff windows vs how many fit.
   buffWindowGcds: { used: number; fit: number };
   // GCDs by what they did: heal (landed heals or shields), damage, other

@@ -79,6 +79,26 @@ export function forcedPart(startMs: number, endMs: number, forced: ForcedWindow[
   return { ms, cause: best?.cause };
 }
 
+/**
+ * GCD uptime: the share of the time the player could have been pressing
+ * GCDs that a GCD lock covered. Each GCD counts from its start for its lock,
+ * cut at the next GCD. Excluded time (dead, boss untargetable, a limit
+ * break) counts on neither side, so a death or a jump doesn't lower it.
+ */
+export function gcdUptime(
+  uses: GcdUse[], factorAt: (t: number) => number, excluded: Window[], endMs: number,
+): { pct: number; activeMs: number; eligibleMs: number } {
+  const out = mergeWindows(excluded);
+  const eligibleMs = endMs - overlapMs(0, endMs, out);
+  const shown = uses.filter((u) => u.startMs < endMs);
+  let activeMs = 0;
+  shown.forEach((u, i) => {
+    const end = Math.min(u.startMs + gcdLockMs(u, factorAt(u.startMs)), shown[i + 1]?.startMs ?? endMs, endMs);
+    if (end > u.startMs) activeMs += end - u.startMs - overlapMs(u.startMs, end, out);
+  });
+  return { pct: eligibleMs > 0 ? Math.min(1, activeMs / eligibleMs) : 0, activeMs, eligibleMs };
+}
+
 // ── Pull-wide ──────────────────────────────────────────────────────────
 
 /** The 6th death within 15s, or undefined if the raid never collapsed. */

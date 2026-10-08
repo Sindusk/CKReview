@@ -156,7 +156,8 @@ export function burstWindowFindings(ctx: PlayerCheckContext, specIn: BurstWindow
     const lostGcds = missingGcds * gcdValue * spec.bonus;
     const forced = forcedPart(w.startMs, w.endMs, ctx.forced);
     const parts = [
-      expectedGcds !== undefined ? `${gcds.length}/${expectedGcds} GCDs` : undefined,
+      // Only a shortfall is worth saying ("9/8" read as an error).
+      missingGcds > 0 ? `${gcds.length}/${expectedGcds} GCDs` : undefined,
       missing.length ? `missing ${missing.map((m) => (m.n > 1 ? `${m.name} ×${m.n}` : m.name)).join(", ")}` : undefined,
     ].filter(Boolean);
     out.push(finding(ctx, {
