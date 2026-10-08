@@ -8,8 +8,8 @@
 // roster, P9-P13 a second one (alts) running the same Toxic/Hector plan.
 // Cited as P<n> +<seconds from pull start>. No VOD review yet.
 //
-// Clock (identical every pull, +/-0.3s; the model's order is wrong after
-// Aetherletting): Killer Voice +11, Hardcore +21.7, Stomp #1 +30.5 (cleanses
+// Clock (identical every pull, +/-0.3s; the model's [TL] times held within
+// ~2s): Killer Voice +11, Hardcore +21.7, Stomp #1 +30.5 (cleanses
 // +35..+41), Rain +48 (3 hits), Screech +61, Coffinmaker +68..+125 (Half
 // Moon/Coffinfiller pairs +76/+79, +94/+97, +111/+114, +121/+124), Screech
 // +138, Crowd Kill +148, Finale +172, Aetherletting +191 (drops +194/+196/

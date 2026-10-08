@@ -433,6 +433,60 @@ order held, and most cast IDs matched. Where it fell short:
   carriers at +117-129. When two mechanics collide at a fixed time, give
   that time; it is where the pulls end.
 
+## Lessons from Vamp Fatale (M9S)
+
+The model was checked against jN3XDrf2z8PmLgRJ (12 wipes + the kill, two
+rosters) and reviewed against the user's VOD; see vamp-fatale.ts's
+VERIFIED section. Its timeline held within ~2s to the enrage (+605), its
+Rain counts (3/4/6) were right, and nearly every candidate cast ID mapped.
+The plan section was the most useful part of any model so far. Where it
+could have gone further:
+
+- **Positions per slot are what make blame possible. Keep giving them.**
+  The Toxic/Hector Stomp clock and static drop spots held to ~15 degrees
+  in every clean pull. Detection used them to learn who is MT/OT/M1/M2
+  each pull and to decide which of two overlapping players was out of
+  place. For every spread, drop or soak, give each slot's spot as a
+  compass direction and rough distance (center, mid, wall).
+- **Say which slots the job decides.** Both rosters followed the usual
+  convention (H1 regen healer, H2 shield healer, R1 physical ranged, R2
+  caster), so only the tank and melee pairs needed positions. If a plan
+  breaks that convention, say so.
+- **Split every same-name ability into its parts.** "Aetherletting" was
+  five IDs: the controller cast, rotating cones, each player's own drop,
+  the puddle's delayed lines, and a penalty when two puddles touch.
+  "Blast Beat" was a carrier's own explosion and a bat's. "Explosion" was
+  a bat chain and the Doornail. "Bloody Bondage" was the cell towers and
+  the Deathmatch towers. List each part separately with its role
+  (expected, avoidable, or penalty).
+- **Ask what happens when two player-placed objects touch.** The model
+  never mentioned the Aetherletting puddle-overlap penalty, and it ended
+  three of 12 wipes. For any drop, puddle or explosion, say what an
+  overlap does and how big it is.
+- **Give the tolerance for a safe spot.** "Stack exactly center" turned
+  out to mean within 1 yalm of the boss (user ruling). Inside that, a hit
+  is the dropper's fault; outside it, the player's. When a guide names a
+  safe spot, give its size, and the line widths or radii that make it
+  safe.
+- **Say who aims each baited attack and how.** The cell tank cone is aimed
+  by the outside tank standing between the two far-apart towers. That is
+  what blames the tank, not the player it hit. For every cone or line
+  baited by a position, name the aimer and the spot.
+- **Say whether each avoidable hit gives Damage Down.** In FFXIV that sets
+  the severity: a Damage Down hit is Major, and a healable DoT with no
+  Damage Down (the saws, the Doornail puddle) is Minor. Also say when a
+  mistake's debuff turns a later expected hit lethal. A bat's Magic
+  Vulnerability Up made the player's own Bombpyre explosion kill them a
+  second later.
+- **Say which failures end the pull in practice.** The user calls a missed
+  Hell in a Cell tower the end of the pull, even though one pull lived
+  80s after it. Guides and community notes often say "this is a wipe,
+  but you can sometimes push through with gear." Copy that judgment;
+  detection can't infer it from survival time.
+- **Say whether a section is timed.** The model guessed the Coffinmaker
+  section was kill-dependent. Its advances ran on a fixed clock in every
+  pull, the kill included.
+
 ## General guidance
 
 **Leave implementation to the detection stage.** Instructions such as "do
