@@ -278,6 +278,14 @@ const MECHANICS = {
     },
   },
 
+  'vamp-fatale': {
+    game: 'ff',
+    load: () => requireTsFromRoot('lib/mechanics/ffxiv/arcadion/vamp-fatale.ts'),
+    run({ mod, ctxs }) {
+      for (const c of ctxs) printPullErrors(c, mod.detectVampFataleErrors(c.relPlayers(), c.relDeaths(), c.relEnemyCasts()));
+    },
+  },
+
   stompies: {
     game: 'ff',
     load: () => requireTsFromRoot('lib/mechanics/ffxiv/dancingmad/stompies.ts'),

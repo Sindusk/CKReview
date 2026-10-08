@@ -173,6 +173,20 @@ export const ERROR_RULES: PullErrorRule[] = [
       47942,   // Stardust Fire III
       47943,   // Stardust Blizzard III
       47944,   // Stardust Thunder III
+      // Vamp Fatale: vamp-fatale.ts owns every one of its penalty causes
+      // (avoidable hits, bats, chains, puddle lines and overlaps) and the
+      // raid-wide ones (Barbed Burst, Doornail Explosion) blame nobody.
+      45928, 45929, 45930,                                   // Coffinfiller
+      45943, 45944, 45945, 45946, 45947, 45948, 45949, 45950, // Half Moon
+      45939,   // Pulping Pulse
+      45941,   // Blast Beat (bat)
+      45969, 45971, 45972,                                   // Aetherletting cone / line / overlap
+      45965,   // Barbed Burst
+      45966,   // Explosion (Deadly Doornail)
+      45976,   // Naughty Knot
+      45987,   // Explosion (bat chain)
+      45989, 45991,                                          // Sanguine Scratch
+      45992, 45993, 45994, 45995,                            // Breakdown Drop / Breakwing Beat
     ],
   },
 

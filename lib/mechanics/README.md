@@ -32,6 +32,11 @@ lib/mechanics/
                                 Maddening Orchestra, Celestriad towers, Stray
                                 Apocalypse, Forsaken ground, Null enrage, collapse)
       blackhole-strategy.ts   — cross-pull strategy auto-detect (DSA/SDA/Double Tether)
+    arcadion/                 — AAC Heavyweight (Savage)
+      vamp-fatale.ts          — Vamp Fatale (M9S) per-pull rules (Stomp bats and
+                                Bombpyre overlaps, Aetherletting drops/lines/overlap,
+                                Hardcore, Rain, saws/towers/Flails/Doornail, cells,
+                                Deathmatch, enrage)
   wow/
     registry.ts               — THE list of per-pull WoW modules; the app and
                                 validate.js both run it (a new boss = one line)

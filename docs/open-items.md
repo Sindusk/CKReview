@@ -292,14 +292,34 @@ picked up; it stays only as a record.
 
 ### Fallback model (`lib/mechanics/fallback.ts`)
 
-Built blind against Vamp Fatale (jN3XDrf2z8PmLgRJ); the user has the VOD
-for its pull 1. Open:
-- **Kade at Vamp pull 1 +39.5:** did he walk into the Vampette's Blast
-  Beat after his own went off, or was he hit where he stood?
+Built blind against Vamp Fatale (jN3XDrf2z8PmLgRJ), which now has its own
+module. Open:
 - **Blame on a double-up.** The victim is named. When the second hit was
   another player's bomb or spread, should the carrier share it?
 - **WoW.** Enabled for FFXIV only. Turn on when a WoW boss without a
   module is tested (Nymrissa Wavecaller is the obvious candidate).
+
+### Vamp Fatale (FFXIV)
+
+Report jN3XDrf2z8PmLgRJ; the user has the VOD for pull 1, none reviewed
+yet. Header of `lib/mechanics/ffxiv/arcadion/vamp-fatale.ts` has the
+evidence.
+- **Pull 1 +39.1, MT bat hit:** his own explosion went off at +38.6, then
+  a bat killed him. Did he walk into it after cleansing, or was he hit
+  where he stood? Flagged Major on him.
+- **Saw / Doornail puddle contact** is Minor (no Damage Down; 4x in the
+  kill) unless the player died with the DoT on. Right severity?
+- **Stomp overlap blame** goes to whoever stood further from their clock
+  spot (45+ degrees), both when neither did. Confirm on P1/P3/P13.
+- **Aetherletting lines:** the owner is blamed when the center was within
+  5.5y of the line (P3/P11/P12), otherwise the victim (P1's M2 at 2.6y
+  from center, P9, P11's MT at 2.2y). Confirm.
+- **Hardcore party wipes (P1, P11)** are player-less Raids. Should the
+  tanks (not running out for the enlarged version) be named?
+- **Tank cone in cells:** an outside non-tank in the tank's cone is blamed,
+  not the aiming tank (P3 +417). Right call?
+- **Third Brutal Rain deaths (P5, P7)** are a player-less Raid (healing
+  check). Should anyone be named?
 
 ### Dancing Mad (FFXIV)
 

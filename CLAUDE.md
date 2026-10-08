@@ -95,9 +95,10 @@ These are standing preferences, each learned from a real correction:
   types and existing idioms before designing.
 - **Ask for raid assignments before building a boss module.** Assignments
   (soak groups, kick orders, carriers, helpers) are what let detection name
-  a player where the log alone can't. If the user's request doesn't include
-  a raid plan or assignments, ask once, before fetching or analyzing, with
-  two options:
+  a player where the log alone can't. First check the boss's module header:
+  the research model often already records the plan and assignments. Ask
+  only if neither the request nor the model includes them, once, before
+  fetching or analyzing, with two options:
   - **Yes** — pause and wait for the user to supply them.
   - **No** — continue without them, and keep log-unattributable failures
     player-less.
