@@ -382,6 +382,13 @@ Catalog values checked against the multiplier, on magical hits:
 
 ## Build status
 
+**Superseded in part on 2026-10-08** after the user's review: the verdict
+bands, what counts as a hit (any non-DoT, non-auto hit on 4+ players or a
+tank buster), joined hits, droppable scope and the cross-pull grouping all
+changed. The module headers in `lib/mitigation/` and
+[open-items.md](../open-items.md) hold the current rules; the list below
+is the original build.
+
 Built (2026-10-06), no UI yet:
 - **Data:** `PlayerEvent` carries `statusIds`, `unmitigatedAmount`,
   `multiplier`, `absorbed`, `mitigated`, `blocked`, `hitType` and

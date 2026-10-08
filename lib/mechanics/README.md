@@ -671,6 +671,26 @@ event's TARGET — never the source:
   grows SOUTH (screen-style).
 - Event timestamps are **absolute report milliseconds**. Fight-relative
   offset = t − min(all event timestamps in the pull).
+- **`Pull.startTime`/`endTime` are seconds into the report** in transformed
+  FFXIV pulls (Vamp Fatale pull 1: 180 → 435); the pull's length in ms is
+  `Pull.fightDuration`. Subtracting the two gave 255 "ms" and silently
+  broke the mitigation rarity check (2026-10-08).
+
+### FFLogs damage-taken semantics (found building the mitigation analysis)
+
+- **DoT damage has no `tick` flag.** It arrives under the status's ID
+  (1,000,000+: "Sustained Damage", "Flesh Wound", "Electrocution") or the
+  500000 "Combined DoTs" pseudo-ability, so `PlayerEvent.isDoT` misses it.
+  `FFXIV_MITIGATION.isTick` encodes the ID rule.
+- **Enemy auto-attacks are named "Attack"** (several ability IDs).
+- **A dead player's body still logs hits:** `hitType` 10 (immune), amount
+  0, `hitPoints` 0. Anything that counts targets must drop
+  `healthBefore === 0`.
+- **A tank invulnerability can leave 0 HP with no death:** a Living Dead
+  hit logged 294,989 damage to 0 HP, multiplier 1, no overkill or death
+  event. Check for the invuln status before reading 0 HP as a failure.
+- **`unmitigatedAmount` is missing on fully absorbed hits.** Rebuild it as
+  (amount + absorbed + overkill) / multiplier.
 
 ### Fields that exist but aren't in the TypeScript types
 

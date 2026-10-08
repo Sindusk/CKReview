@@ -170,8 +170,15 @@ It loads pulls lazily and keeps three in memory, so narrowing with
   IDs, every hit's FFLogs multiplier, and cooldowns from real cast spacing.
 - **Analysis without the UI.**
   `node scripts/validate.js mitigation-analysis sampledata/ff/<code>`
-  prints every raidwide hit per pull, then the cross-pull aggregate.
+  prints every hit per pull (raw/taken damage, HP before/after, verdict,
+  note), then the all-pulls aggregate per boss and roster, the way the
+  dialog groups it; `pulls=1/8 RARE` marks a hidden rare hit.
   Print-only; it needs a full capture fetched after 2026-10-06.
+- **Inspecting one hit:** load pulls the way the runner does
+  (`lib/sample-report-store.ts` `loadSampleReport` →
+  `lib/log-transforms.ts` `transformFFReportToPulls`), call
+  `analyzePullMitigation`, and print each target's `parts`. Keep such
+  scripts in your scratch space, not `scripts/`.
 - Design and tuning choices: [mitigation-redesign.md](archive/mitigation-redesign.md).
 
 ## Verifying UI in a real browser

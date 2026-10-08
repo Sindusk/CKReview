@@ -430,20 +430,34 @@ before anyone relies on them.
 
 ### Mitigation (FFXIV)
 
-- **Thresholds to tune with the user**, all chosen by the builder:
-  - raidwide: 4+ targets and 75%+ of the living party
-  - verdict: under below 5%, tight 5–20%, over 20%+, judged on the
-    sequence margin
-  - follow-up damage: enemy damage chained within 5s of the hit, up to 15s
-  - droppable: party-wide mitigations with a 30s+ cooldown only, keeping
-    the lowest player at 5%+ after a 5% damage-roll buffer
-  - free: a full cooldown since the last cast and before the next; in
-    all-pulls mode, free in at least half the pulls
-  - the cross-pull verdict uses the median margin
+Reviewed with the user on 2026-10-08 against their own week-1 Vamp Fatale
+log (`jN3XDrf2z8PmLgRJ`). Settled by the user: verdict bands (fail on a
+death, under below 15%, good 15–30%, over 30%+), droppable only on over
+hits down to good, hits within 3s joined and judged as landing at once,
+DoTs and auto-attacks never hits, rare hits hidden in all-pulls, pulls
+grouped by exact roster. The module headers hold the rules.
+
+- **Chosen by the builder, not yet confirmed:**
+  - a tank-only hit counts only when buster-sized (raw at least 40% of
+    max HP); 4+ targets otherwise
+  - a joined hit stops growing after a 10s span
+  - rare = taken in under 25% of the pulls that got that far, once 3+
+    did. Red Hot and Deep Blue's Vertical Plunge (7/39) and Re-Entry
+    Plunge #2 (7/34) get hidden and may be variants, not mistakes.
+  - invulnerable tanks are left out of HP% like vulnerable players
+  - on tank-only hits, tank cooldowns count for droppable and notes
+- **Known rough edges:**
+  - A joined hit's cross-pull key is its first ability, so when a join
+    starts with a different ability in different pulls, the rows don't
+    line up (Red Hot and Deep Blue's Plunging Snap / Re-Entry rows).
+  - No minimum size for 4+-target hits: a 25k-raw Bloody Bondage gets
+    a row.
+  - Notes list unused mitigations without estimating whether they'd
+    have lifted the hit into good.
 - **Unverified catalog entries:** Warrior, Machinist (Dismantle), Red Mage,
   Ninja, Monk, Summoner.
-- **Deferred:** what-if sandbox (reuse `marginWithout`), tank busters, an
-  optional published plan to compare against, a WoW port.
+- **Deferred:** what-if sandbox (reuse `marginWithout`), an optional
+  published plan to compare against, a WoW port.
 
 ### Damage (both games)
 
