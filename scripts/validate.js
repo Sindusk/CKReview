@@ -477,8 +477,8 @@ const MECHANICS = {
 };
 
 // The fallback model (lib/mechanics/fallback.ts) for bosses without an
-// encounter module. Cross-pull: one ability profile per boss from every pull
-// in the folder, then each pull is checked against it, as page.tsx does.
+// encounter module. Cross-pull: each pull is checked against a profile of
+// itself and the boss's earlier pulls in the folder, as page.tsx does.
 // Runs through the real pipeline (it reads statusIds, maxHealth and
 // unmitigatedAmount), and skips folders whose fights all have a module.
 MECHANICS.fallback = {
@@ -494,7 +494,7 @@ MECHANICS.fallback = {
     const pulls = (await loadThroughRealPipeline(mod, dir) ?? []).filter(mod.fallbackApplies);
     const profiles = mod.buildFallbackProfiles(pulls);
     for (const pull of pulls) {
-      const errors = mod.detectFallbackErrors(pull, profiles.get(pull.name));
+      const errors = mod.detectFallbackErrors(pull, profiles.get(pull.id));
       console.log('='.repeat(70));
       console.log(`${pull.name} Pull ${pull.pullNumber} (${pull.result}) ->`, errors.length, 'errors');
       for (const e of errors) {

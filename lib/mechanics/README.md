@@ -7,8 +7,9 @@ organized per game and per raid:
 lib/mechanics/
   MODEL-RESEARCH-GUIDE.md     — how to write a boss's encounter model (research stage)
   fallback.ts                 — the fallback model for bosses with no module: learns
-                                each ability's normal targets from the report's
-                                own pulls, then flags doubled-up, wrong-target,
+                                each ability's normal targets from the pull and
+                                the boss's earlier pulls (never later ones, as in
+                                week-1 progression), then flags doubled-up, wrong-target,
                                 avoidable and unsurvivable hits, penalties and
                                 the pull's cutoff. Boss-agnostic; FFXIV only so far
   player-position.ts          — THE shared "where was player X at time T" lookup

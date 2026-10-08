@@ -15,7 +15,12 @@
 // analysed blind: no boss knowledge, only the log.
 //
 // ── The ability profile (cross-pull) ───────────────────────────────────
-// For every enemy ability ID, over all pulls of the boss in the report:
+// Each pull gets its own profile, built from that pull and the boss's
+// earlier pulls only: what the raid had seen so far. Later pulls are never
+// used, because week-1 progression doesn't have them (user, 2026-10-08).
+// Pull 1 of a new boss therefore knows little, and the profile-based
+// signals switch on as clean resolutions accumulate.
+// For every enemy ability ID, over those pulls:
 //   - casts: completed enemy casts of that ID
 //   - hits: non-DoT damage events of that ID on players
 //   - resolutions: hits clustered by RESOLUTION_GAP_MS. A resolution is
@@ -40,7 +45,7 @@
 //   - "how many it hits": clean resolution sizes per ID, and whether they
 //     hit every living player. See underSoak.
 // And per ability name and episode (the nth time it went off in the pull),
-// the enemy stack counters at the start of clean episodes (stackRanges).
+// the enemy stack counters at the start of clean episodes (stackSamples).
 //
 // ── Per-pull signals ───────────────────────────────────────────────────
 // Shared hits too few players took (underSoak): fewer players than any
@@ -181,16 +186,15 @@ type AbilityStats = {
   cleanRaw: number[];
 };
 
-type StackRange = { min: number; max: number; n: number };
-
 export type FallbackProfile = {
   byId: Map<number, AbilityStats>;
   byName: Map<string, AbilityStats>;
   /**
-   * Enemy stack counts at the start of clean episodes, keyed by
-   * "<ability name>#<episode>" and then "<enemy>|<status>".
+   * Enemy stack counts at the start of each clean episode, keyed by
+   * "<ability name>#<episode>"; one sample per clean episode, each keyed by
+   * "<enemy>|<status>". A counter missing from a sample was at 0.
    */
-  stackRanges: Map<string, Map<string, StackRange>>;
+  stackSamples: Map<string, Map<string, number>[]>;
 };
 
 type Hit = { player: PlayerInfo; event: PlayerEvent };
@@ -255,69 +259,89 @@ function episodes(pull: Pull): Map<string, Hit[][]> {
 
 const stackKey = (s: EnemyStackEvent) => `${s.actorName}|${s.statusName}`;
 
-/** Every enemy stack counter's count at `t` (0 before it first appears). */
-function stacksAt(pull: Pull, keys: Iterable<string>, t: number): Map<string, number> {
+/** Every enemy stack counter's count at `t`; counters at 0 are left out. */
+function stacksAt(pull: Pull, t: number): Map<string, number> {
   const out = new Map<string, number>();
-  for (const key of keys) out.set(key, 0);
   for (const s of pull.enemyStacks ?? []) {
     if (s.timestamp > t) break;
-    out.set(stackKey(s), s.stack);
+    if (s.stack > 0) out.set(stackKey(s), s.stack); else out.delete(stackKey(s));
   }
   return out;
 }
 
-/** One profile per boss name, from every pull of that boss given. */
-export function buildFallbackProfiles(pulls: Pull[]): Map<string, FallbackProfile> {
-  const out = new Map<string, FallbackProfile>();
-  const keysOf = new Map<string, Set<string>>();
-  for (const pull of pulls) {
-    if (!fallbackApplies(pull)) continue;
-    const keys = keysOf.get(pull.name) ?? new Set<string>();
-    for (const s of pull.enemyStacks ?? []) keys.add(stackKey(s));
-    keysOf.set(pull.name, keys);
+const emptyProfile = (): FallbackProfile => ({ byId: new Map(), byName: new Map(), stackSamples: new Map() });
+
+/** What one pull adds to its boss's profile. */
+function contribution(pull: Pull): FallbackProfile {
+  const profile = emptyProfile();
+  for (const [name, list] of episodes(pull)) {
+    list.forEach((episode, i) => {
+      if (!isClean(episode)) return;
+      profile.stackSamples.set(`${name}#${i}`, [stacksAt(pull, episode[0].event.timestamp)]);
+    });
   }
-  for (const pull of pulls) {
-    if (!fallbackApplies(pull)) continue;
-    let profile = out.get(pull.name);
-    if (!profile) {
-      out.set(pull.name, profile = { byId: new Map(), byName: new Map(), stackRanges: new Map() });
-    }
-    for (const [name, list] of episodes(pull)) {
-      list.forEach((episode, i) => {
-        if (!isClean(episode)) return;
-        const id = `${name}#${i}`;
-        const ranges = profile!.stackRanges.get(id) ?? new Map<string, StackRange>();
-        for (const [key, stack] of stacksAt(pull, keysOf.get(pull.name)!, episode[0].event.timestamp)) {
-          const r = ranges.get(key);
-          ranges.set(key, r ? { min: Math.min(r.min, stack), max: Math.max(r.max, stack), n: r.n + 1 } : { min: stack, max: stack, n: 1 });
-        }
-        profile!.stackRanges.set(id, ranges);
-      });
-    }
-    const statsFor = (id: number, name: string) => {
-      if (!profile!.byId.has(id)) profile!.byId.set(id, emptyStats());
-      if (!profile!.byName.has(name)) profile!.byName.set(name, emptyStats());
-      return [profile!.byId.get(id)!, profile!.byName.get(name)!];
-    };
-    for (const c of pull.enemyCasts ?? []) for (const s of statsFor(c.abilityId, c.abilityName)) s.casts++;
-    for (const res of resolutions(pull)) {
-      const first = res[0].event;
-      const clean = isClean(res);
-      const size = playersIn(res).size;
-      const everyone = clean && size >= aliveCount(pull, first.timestamp);
-      for (const s of statsFor(first.abilityId, first.abilityName)) {
-        s.hits += res.length;
-        if (!clean) continue;
-        s.cleanResolutions++;
-        s.cleanHits += res.length;
-        s.cleanSizes.push(size);
-        if (everyone) s.cleanEveryone++;
-        for (const h of res) {
-          s.cleanRoles[h.player.role] = (s.cleanRoles[h.player.role] ?? 0) + 1;
-          if (h.event.maxHealth) s.cleanRaw.push(ratioOf(h.event));
-        }
+  const statsFor = (id: number, name: string) => {
+    if (!profile.byId.has(id)) profile.byId.set(id, emptyStats());
+    if (!profile.byName.has(name)) profile.byName.set(name, emptyStats());
+    return [profile.byId.get(id)!, profile.byName.get(name)!];
+  };
+  for (const c of pull.enemyCasts ?? []) for (const s of statsFor(c.abilityId, c.abilityName)) s.casts++;
+  for (const res of resolutions(pull)) {
+    const first = res[0].event;
+    const clean = isClean(res);
+    const size = playersIn(res).size;
+    const everyone = clean && size >= aliveCount(pull, first.timestamp);
+    for (const s of statsFor(first.abilityId, first.abilityName)) {
+      s.hits += res.length;
+      if (!clean) continue;
+      s.cleanResolutions++;
+      s.cleanHits += res.length;
+      s.cleanSizes.push(size);
+      if (everyone) s.cleanEveryone++;
+      for (const h of res) {
+        s.cleanRoles[h.player.role] = (s.cleanRoles[h.player.role] ?? 0) + 1;
+        if (h.event.maxHealth) s.cleanRaw.push(ratioOf(h.event));
       }
     }
+  }
+  return profile;
+}
+
+function addStats(a: AbilityStats | undefined, b: AbilityStats): AbilityStats {
+  if (!a) return { ...b, cleanRoles: { ...b.cleanRoles }, cleanSizes: [...b.cleanSizes], cleanRaw: [...b.cleanRaw] };
+  const roles = { ...a.cleanRoles };
+  for (const [r, n] of Object.entries(b.cleanRoles) as [PlayerRole, number][]) roles[r] = (roles[r] ?? 0) + n;
+  return {
+    casts: a.casts + b.casts, hits: a.hits + b.hits,
+    cleanResolutions: a.cleanResolutions + b.cleanResolutions, cleanHits: a.cleanHits + b.cleanHits,
+    cleanRoles: roles, cleanSizes: [...a.cleanSizes, ...b.cleanSizes],
+    cleanEveryone: a.cleanEveryone + b.cleanEveryone, cleanRaw: [...a.cleanRaw, ...b.cleanRaw],
+  };
+}
+
+/** A new profile: `a` plus `b`. Neither is changed. */
+function merged(a: FallbackProfile, b: FallbackProfile): FallbackProfile {
+  const out: FallbackProfile = { byId: new Map(a.byId), byName: new Map(a.byName), stackSamples: new Map(a.stackSamples) };
+  for (const [id, s] of b.byId) out.byId.set(id, addStats(out.byId.get(id), s));
+  for (const [name, s] of b.byName) out.byName.set(name, addStats(out.byName.get(name), s));
+  for (const [key, samples] of b.stackSamples) out.stackSamples.set(key, [...(out.stackSamples.get(key) ?? []), ...samples]);
+  return out;
+}
+
+/**
+ * One profile per pull, keyed by Pull.id, built only from that pull and the
+ * earlier pulls of the same boss: what a raid would have had in hand at the
+ * time. Week-1 progression has no future pulls to learn from, so the
+ * fallback must not use them either (user, 2026-10-08).
+ */
+export function buildFallbackProfiles(pulls: Pull[]): Map<number, FallbackProfile> {
+  const out = new Map<number, FallbackProfile>();
+  const sofar = new Map<string, FallbackProfile>();
+  const ordered = pulls.filter(fallbackApplies).sort((a, b) => a.startTime - b.startTime || a.pullNumber - b.pullNumber);
+  for (const pull of ordered) {
+    const profile = merged(sofar.get(pull.name) ?? emptyProfile(), contribution(pull));
+    sofar.set(pull.name, profile);
+    out.set(pull.id, profile);
   }
   return out;
 }
@@ -358,6 +382,9 @@ function wrongTarget(profile: FallbackProfile, h: Hit) {
 function underSoak(profile: FallbackProfile, pull: Pull, res: Hit[]) {
   const s = profile.byId.get(res[0].event.abilityId);
   if (!s || s.cleanResolutions < ROLE_MIN_CLEAN_RESOLUTIONS || rarelyHits(profile, res[0].event)) return undefined;
+  // A vulnerable target means a double-up, not a share (Vamp's opening
+  // bombs: one went off on a player still vulnerable from a neighbour's).
+  if (res.some((h) => isVulnerable(h.event))) return undefined;
   const t = res[0].event.timestamp;
   const alive = aliveCount(pull, t);
   const everyone = s.cleanEveryone >= s.cleanResolutions * EVERYONE_FRACTION;
@@ -374,16 +401,19 @@ function underSoak(profile: FallbackProfile, pull: Pull, res: Hit[]) {
 function stackNote(profile: FallbackProfile, pull: Pull, abilityName: string, t: number): string {
   const list = episodes(pull).get(abilityName) ?? [];
   const i = list.findIndex((ep) => ep[0].event.timestamp <= t && t <= ep[ep.length - 1].event.timestamp + EPISODE_GAP_MS);
-  const ranges = i < 0 ? undefined : profile.stackRanges.get(`${abilityName}#${i}`);
-  if (!ranges) return "";
+  const samples = i < 0 ? undefined : profile.stackSamples.get(`${abilityName}#${i}`);
+  if (!samples || samples.length < MIN_CLEAN_STACK_EPISODES) return "";
+  const now = stacksAt(pull, t);
   const notes: string[] = [];
-  for (const [key, stack] of stacksAt(pull, ranges.keys(), t)) {
-    const r = ranges.get(key)!;
-    if (r.n < MIN_CLEAN_STACK_EPISODES || (stack === 0 && r.max === 0)) continue;
+  for (const key of new Set([...now.keys(), ...samples.flatMap((s) => [...s.keys()])])) {
+    const stack = now.get(key) ?? 0;
+    const seen = samples.map((s) => s.get(key) ?? 0);
+    const min = Math.min(...seen), max = Math.max(...seen);
+    if (stack === 0 && max === 0) continue;
     const [actor, status] = key.split("|");
-    const range = r.min === r.max ? `${r.min}` : `${r.min}-${r.max}`;
+    const range = min === max ? `${min}` : `${min}-${max}`;
     notes.push(`${actor} had ${stack} ${stack === 1 ? "stack" : "stacks"} of ${status} ` +
-      `(the ${r.n} clean resolutions of this ${abilityName}: ${range}${stack > r.max ? ", so more than any of them" : ""})`);
+      `(the ${samples.length} clean resolutions of this ${abilityName} so far: ${range}${stack > max ? ", so more than any of them" : ""})`);
   }
   return notes.length ? ` ${notes.join("; ")}.` : "";
 }
@@ -673,8 +703,8 @@ export function detectFallbackErrors(pull: Pull, profile: FallbackProfile): Pull
  * The pull with the fallback's errors in place of the generic Damage Down
  * rule, or the pull unchanged when the boss has a module.
  */
-export function applyFallback(pull: Pull, profiles: Map<string, FallbackProfile>): Pull {
-  const profile = profiles.get(pull.name);
+export function applyFallback(pull: Pull, profiles: Map<number, FallbackProfile>): Pull {
+  const profile = profiles.get(pull.id);
   if (!profile || !fallbackApplies(pull)) return pull;
   return {
     ...pull,

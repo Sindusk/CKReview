@@ -164,8 +164,8 @@ export default function Home() {
   // generalize across raid teams.
   const waveCannonLayout = useMemo(() => learnWaveCannonLayout(pulls), [pulls]);
   // Bosses without an encounter module get the fallback model, which learns
-  // each ability's normal targets from all of the report's pulls of that
-  // boss (lib/mechanics/fallback.ts).
+  // each ability's normal targets from the pull itself and the report's
+  // earlier pulls of that boss, never later ones (lib/mechanics/fallback.ts).
   const fallbackProfiles = useMemo(() => buildFallbackProfiles(pulls), [pulls]);
 
   // Pulls with the cross-pull errors merged in: Black Hole "Missed Assigned
