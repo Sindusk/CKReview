@@ -187,7 +187,12 @@ every mechanic, in every game. When in doubt, come back here.
    lists the causes first.
 5. **Put distances/specifics in descriptions.** "~5.6 yalms off their spot"
    is the desired style — the number goes in the error *description*, even
-   when the attribution decision itself didn't need geometry.
+   when the attribution decision itself didn't need geometry. Descriptions
+   also explain what went wrong and why: name the penalty (FFXIV: say when
+   it handed out Damage Down) and, for a mechanic failure, the correct play
+   ("their bat chain exploded … stay close to your own bat"). A plain
+   ground hit needs only "hit by X, got Damage Down" (user, 2026-10-08:
+   "Hit by Coffinfiller" alone was too terse).
 6. **The user's review is ground truth.** The first version of a rule will
    not be perfect. The user reviews pulls on VOD and reports precise
    corrections, e.g. "only X should flag" or "overload is always Major".
