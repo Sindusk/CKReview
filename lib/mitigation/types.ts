@@ -56,6 +56,10 @@ export type MitigationGame = {
   catalog:     CatalogEntry[];
   statusIndex: Map<number, { entry: CatalogEntry; status: CatalogStatus }>;
   actionIndex: Map<number, CatalogEntry>;
+  // Damage that is never a hit: DoT ticks the log doesn't flag as ticks,
+  // and enemy auto-attacks.
+  isTick(abilityId: number): boolean;
+  isAutoAttack(abilityName: string): boolean;
   // "none" = % mitigation does not apply (FFXIV unaspected); undefined =
   // unknown (pull fetched before damage types were kept).
   damageColumn(damageType: number | undefined): "physical" | "magical" | "none" | undefined;
@@ -63,22 +67,39 @@ export type MitigationGame = {
 
 // ── Analysis output ────────────────────────────────────────────────────
 
-export type HitVerdict = "under" | "tight" | "over";
+// fail: a non-vulnerable player died. Otherwise by the lowest player's
+// health after the hit: under < 15%, good 15-30%, over 30%+.
+export type HitVerdict = "fail" | "under" | "good" | "over";
+
+// One damage event of a hit on one player. A multi-hit attack (Brutal Rain
+// hits four times about a second apart) gives each target several parts.
+export type HitPart = {
+  timestampMs:   number;
+  damage:        number;          // to health, overkill included
+  absorbed:      number;          // by shields
+  healthAfter:   number;          // negative = overkill
+  statusIds:     number[];        // catalog statuses on the target for this part
+  shieldAbsorbs: { statusId: number; caster?: string; amount: number }[];
+};
 
 export type HitTarget = {
   player:        string;
   job:           string;
+  tank:          boolean;
   maxHealth:     number;
-  healthBefore:  number;
-  healthAfter:   number;
-  damage:        number;          // to health
-  absorbed:      number;          // by shields
-  unmitigated?:  number;          // FFLogs' unmitigatedAmount
-  multiplier?:   number;          // FFLogs' % product (vuln included)
-  catalogProduct: number;         // product of the catalog % statuses present
+  healthBefore:  number;          // before the first part
+  healthAfter:   number;          // lowest after any part
+  damage:        number;          // to health, all parts, overkill included
+  absorbed:      number;          // by shields, all parts
+  // Damage before any mitigation, all parts: FFLogs' unmitigatedAmount, or
+  // rebuilt from the multiplier when the log leaves it out.
+  unmitigated?:  number;
+  multiplier?:   number;          // FFLogs' % product (vuln included), first part
+  catalogProduct: number;         // product of the catalog % statuses present, first part
   // |catalogProduct - multiplier| within rounding. False usually means a
   // status in `buffs` that didn't apply (snapshot lag) or an unknown one.
   consistent:    boolean;
+  parts:         HitPart[];
   margin:        number;          // healthAfter / maxHealth; negative = overkill
   // Health fraction lost to later damage in the same sequence (see
   // analyze.ts), so a drop here can't spend headroom a later hit needs.
@@ -88,8 +109,11 @@ export type HitTarget = {
   // one from low health is a healing / timing problem.
   deathCause?:   "mitigation" | "healing";
   vulnerable:    boolean;         // carrying a vulnerability-up
-  statusIds:     number[];        // catalog statuses on this target at the hit
-  // What each shield took from this hit (0-amount shields left out).
+  // Under a tank invulnerability (Living Dead and Superbolide leave the
+  // tank at 0-1 HP on purpose): left out of the margin like a vulnerable one.
+  invulnerable:  boolean;
+  statusIds:     number[];        // catalog statuses on this target, any part
+  // What each shield took from this hit, all parts (0-amount shields left out).
   shieldAbsorbs: { statusId: number; caster?: string; amount: number }[];
 };
 
@@ -126,6 +150,10 @@ export type DroppableResult = {
   keys:        string[];
   names:       string[];
   worstMargin: number;  // lowest player's margin with those removed (after the roll buffer)
+  // Each mitigation that could be dropped on its own (the hit stays Good
+  // without it), so a single drop can be offered as "X, Y or Z".
+  alternatives: string[];
+  candidates:  number;  // planned mitigations on the hit that were considered
 };
 
 export type MitigationHit = {
@@ -139,11 +167,23 @@ export type MitigationHit = {
   phase?:        string;
   damageColumn?: "physical" | "magical" | "none";
   sequenceId:    number;  // hits a few seconds apart share one
+  waves:         number;  // most parts any target took (multi-hit attacks)
+  // Only tanks were hit (a tank buster): the damage averages are the tanks',
+  // and personal mitigation counts for droppable and suggestions.
+  tankOnly:      boolean;
   targets:       HitTarget[];
   active:        ActiveMitigation[];
   players:       PlayerMitigation[];
   totalDamage:   number;  // to health, all targets
-  // Lowest player's margin, vulnerable players left out.
+  // Averages per target, all parts summed, over the non-tank targets (the
+  // tanks on a tank-only hit), vulnerable players left out.
+  rawDamage?:    number;  // before mitigation; undefined when the log has none
+  takenDamage:   number;  // to health, after mitigation and shields
+  absorbedDamage: number; // by shields
+  // Lowest player's health before the hit, vulnerable players left out.
+  lowestBefore:  number;
+  // Lowest player's health after the hit (at its low point across parts),
+  // vulnerable players left out.
   margin:        number;
   // The same, after subtracting each player's laterDrop.
   sequenceMargin: number;
@@ -152,5 +192,6 @@ export type MitigationHit = {
   // counts. A vulnerable player's death is a mechanic failure.
   cleanDeaths:   number;
   verdict:       HitVerdict;
-  droppable:     DroppableResult;
+  droppable:     DroppableResult;  // empty unless the verdict is over
+  note:          string;           // what could change (lib/mitigation/notes.ts)
 };

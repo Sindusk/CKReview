@@ -5,13 +5,21 @@
 // PullError; the result only feeds the Mitigation dialog.
 //
 // ── What a hit is ──────────────────────────────────────────────────────
-// One enemy ability's damage landing on RAIDWIDE_MIN_TARGETS+ players,
-// consecutive events no more than HIT_CLUSTER_GAP_MS apart (the game
-// staggers a raidwide's events ~45ms per target). DoT ticks are left out of
-// hit detection but count toward a sequence's later damage. Dead players'
-// bodies still log hits (immune, at 0 HP); those are left out. A hit whose
-// targets were mostly killed by damage no mitigation saves (beyondMitigation)
-// isn't a raidwide: a mechanic hit the wrong players, or an enrage.
+// One enemy ability's damage, consecutive events no more than
+// HIT_CLUSTER_GAP_MS apart (the game staggers a hit's events ~45ms per
+// target), landing on HIT_MIN_TARGETS+ players or on tanks only (a tank
+// buster, TANK_HIT_MIN_RAW). A multi-hit attack's waves fall inside the gap, so they make one
+// hit whose targets each have several parts (HitPart). DoT ticks and
+// auto-attacks are never hits (MitigationGame.isTick / isAutoAttack) but
+// count toward a sequence's later damage. Dead players' bodies still log
+// hits (immune, at 0 HP); those are left out. A hit whose targets were
+// mostly killed by damage no mitigation saves (beyondMitigation) isn't
+// graded: a mechanic hit the wrong players, or an enrage.
+//
+// Raw and taken damage are averages per target over the non-tanks (the
+// tanks on a tank-only hit); health before and after are the lowest of
+// everyone hit. Vulnerable players and invulnerable tanks are left out of
+// both.
 //
 // ── Where the numbers come from ────────────────────────────────────────
 // Everything about the hit itself is read from FFLogs, not estimated:
@@ -33,32 +41,37 @@
 // simulation says had no charge is dropped as log noise (a doubled pet
 // command was seen: two Fey Illuminations 12.8s apart).
 //
-// ── Margin, sequences and droppable ────────────────────────────────────
-// margin = healthAfter / maxHealth, per target; the hit's margin is the
-// lowest, leaving out vulnerable players (they inflate the worst case).
+// ── Margin, verdict, sequences and droppable ───────────────────────────
+// margin = lowest health after any part / maxHealth, per target; the hit's
+// margin is the lowest, leaving out vulnerable players (they inflate the
+// worst case). Verdict (user, 2026-10-08): fail when a non-vulnerable
+// player died, under below MARGIN_UNDER (someone else should add a safety
+// net), good up to MARGIN_OVER, over above it.
 // Hits starting within SEQUENCE_GAP_MS of the previous hit's end form a
 // sequence. Each target's laterDrop is how far their health fell after this
 // hit until the sequence ended (any enemy damage, DoTs included), so the
 // headroom a later hit needs is not offered up as droppable.
-// Droppable is greedy: repeatedly remove the active mitigation whose
-// removal leaves the lowest player highest, while that player stays at or
-// above DROP_FLOOR after the DAMAGE_ROLL_BUFFER. Shields are assumed to
-// absorb what they absorbed (their capacity isn't logged), so removing a %
-// mitigation in front of a shield is slightly optimistic.
+// Droppable, only on an over hit, is greedy: repeatedly remove the active
+// mitigation whose removal leaves the lowest player highest, while that
+// player stays good (MARGIN_UNDER+) after the DAMAGE_ROLL_BUFFER and above
+// SEQUENCE_FLOOR after follow-up damage. Shields are assumed to absorb what
+// they absorbed (their capacity isn't logged), so removing a % mitigation
+// in front of a shield is slightly optimistic.
 
 import type { Pull } from "@/types/Pull";
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import type { DeathEvent } from "@/types/DeathEvent";
 import type {
-  ActiveMitigation, CatalogEntry, DroppableResult, HitTarget, HitVerdict,
+  ActiveMitigation, CatalogEntry, DroppableResult, HitPart, HitTarget, HitVerdict,
   MitigationGame, MitigationHit, MitigationState, PlayerMitigation,
 } from "./types";
+import { hitNote } from "./notes";
 
 export const HIT_CLUSTER_GAP_MS    = 1_000;
-// A raidwide hits at least this many players AND this share of the living
-// party. 4-of-8 spreads and towers (Wave Cannon, The Path of Light) stay out.
-export const RAIDWIDE_MIN_TARGETS  = 4;
-export const RAIDWIDE_MIN_FRACTION = 0.75;
+// A hit on non-tanks reaches at least this many players (light-party
+// stacks and 4-player spreads count; a mechanic clipping one or two players
+// is a mistake, not something to mitigate).
+export const HIT_MIN_TARGETS       = 4;
 export const SEQUENCE_GAP_MS       = 5_000;
 // A hit's statuses snapshot before its damage lands: Dark Missionary was
 // still listed 16.9s after a 15s cast. So a cast covers a hit for its
@@ -68,9 +81,9 @@ export const SNAPSHOT_SLACK_MS     = 3_000;
 // personals (The Blackest Night, Tengentsu) are treated as always used.
 export const DROP_MIN_COOLDOWN_MS  = 30_000;
 export const CAST_ANCHOR_WINDOW_MS = 12_000;
-export const MARGIN_UNDER          = 0.05;
-export const MARGIN_OVER           = 0.20;
-export const DROP_FLOOR            = 0.05;
+export const MARGIN_UNDER          = 0.15;
+export const MARGIN_OVER           = 0.30;
+export const SEQUENCE_FLOOR        = 0.05;
 export const DAMAGE_ROLL_BUFFER    = 1.05;
 export const HEALTH_FULL_FRACTION  = 0.95;
 const RESURRECTION_GRACE_MS        = 2_000;
@@ -82,7 +95,7 @@ type TargetEvent = { player: PlayerInfo; event: PlayerEvent };
 
 export function analyzePullMitigation(pull: Pull, game: MitigationGame): MitigationHit[] {
   const playerNames = new Set(pull.players.map((p) => p.name));
-  const clusters = findRaidwideClusters(pull, playerNames);
+  const clusters = findHitClusters(pull, playerNames, game);
   const casts = buildCastTimelines(pull.players, game);
 
   // Numbered by name within the phase: one mechanic can use several ability
@@ -131,11 +144,35 @@ function beyondMitigation({ player, event }: TargetEvent): boolean {
   return event.unmitigatedAmount >= limit * event.maxHealth;
 }
 
-function findRaidwideClusters(pull: Pull, playerNames: Set<string>): TargetEvent[][] {
+// A tank-only hit is graded only when it is a tank buster: raw damage on
+// some tank of at least this share of their max HP. Vamp Fatale's busters
+// (Hardcore, Plummet, Ultrasonic Spread on a tank) are 0.49-1.5x; a spread
+// or cleave that happened to land on a tank alone (Blood Lash, Explosion,
+// Coffinfiller) is 0.18-0.31x.
+const TANK_HIT_MIN_RAW = 0.4;
+
+function rawOf(event: PlayerEvent): number | undefined {
+  return event.unmitigatedAmount
+    ?? (event.multiplier ? ((event.amount ?? 0) + (event.absorbed ?? 0) + (event.overkill ?? 0)) / event.multiplier : undefined);
+}
+
+function busterSized(hit: TargetEvent[]): boolean {
+  const byPlayer = new Map<string, { raw: number; max: number }>();
+  for (const { player, event } of hit) {
+    const raw = rawOf(event);
+    if (raw === undefined || !event.maxHealth) continue;
+    const b = byPlayer.get(player.name) ?? { raw: 0, max: event.maxHealth };
+    b.raw += raw;
+    byPlayer.set(player.name, b);
+  }
+  return [...byPlayer.values()].some((b) => b.raw >= TANK_HIT_MIN_RAW * b.max);
+}
+
+function findHitClusters(pull: Pull, playerNames: Set<string>, game: MitigationGame): TargetEvent[][] {
   const byAbility = new Map<number, TargetEvent[]>();
   for (const player of pull.players) {
     for (const event of player.damageTaken) {
-      if (event.isDoT) continue;
+      if (event.isDoT || game.isTick(event.abilityId) || game.isAutoAttack(event.abilityName)) continue;
       if (!event.source || playerNames.has(event.source)) continue;
       // A dead player's body still logs the hit, as an immune 0 at 0 HP
       // (Vamp Fatale pull 8, Brutal Rain on a player dead 10s earlier).
@@ -151,25 +188,26 @@ function findRaidwideClusters(pull: Pull, playerNames: Set<string>): TargetEvent
     list.sort((a, b) => a.event.timestamp - b.event.timestamp);
     let current: TargetEvent[] = [];
     const flush = () => {
-      // One event per player: a second hit on the same player in the same
-      // cluster is a different resolution (or a stack splash), keep the first.
-      const seen = new Set<string>();
-      const unique = current.filter((t) => !seen.has(t.player.name) && seen.add(t.player.name));
-      const beyond = new Set(current.filter(beyondMitigation).map((t) => t.player.name));
+      // Every event is kept: a second hit on the same player is the next
+      // wave of a multi-hit attack (or a stack splash), and it is damage
+      // the mitigation had to cover.
+      const hit = current;
       current = [];
-      if (unique.length === 0) return;
-      const at = unique[0].event.timestamp;
-      const living = pull.players.filter((p) => !isDeadOrFreshlyRevived(p, pull.deathEvents, at)).length;
-      const needed = Math.max(RAIDWIDE_MIN_TARGETS, Math.ceil(RAIDWIDE_MIN_FRACTION * living));
+      if (hit.length === 0) return;
+      const names = [...new Set(hit.map((t) => t.player.name))];
+      const beyond = new Set(hit.filter(beyondMitigation).map((t) => t.player.name));
+      const tankOnly = hit.every((t) => t.player.role === "Tank");
       // A hit nobody took damage from (a gaze that was looked away from) is
       // not a damaging mechanic.
-      const dealt = unique.some((t) => (t.event.amount ?? 0) + (t.event.absorbed ?? 0) > 0);
-      // A hit is no raidwide when most of its targets were killed by damage
+      const dealt = hit.some((t) => (t.event.amount ?? 0) + (t.event.absorbed ?? 0) > 0);
+      // A hit isn't graded when most of its targets were killed by damage
       // no mitigation could have saved: they were hit by something not meant
       // for them (Vamp Fatale pull 1 +221.4, a tank buster's 3.4-3.8x max HP
       // killing four non-tanks), or by an enrage.
-      const mitigable = unique.filter((t) => !beyond.has(t.player.name));
-      if (unique.length >= needed && mitigable.length >= RAIDWIDE_MIN_TARGETS && dealt) clusters.push(unique);
+      const mitigable = names.filter((n) => !beyond.has(n)).length;
+      const needed = tankOnly ? 1 : HIT_MIN_TARGETS;
+      if (tankOnly && !busterSized(hit)) return;
+      if (names.length >= needed && mitigable >= needed && dealt) clusters.push(hit);
     };
     for (const t of list) {
       const prev = current[current.length - 1];
@@ -253,13 +291,24 @@ function buildHit(
   const first = cluster[0].event;
   const column = game.damageColumn(first.damageType);
 
-  const targets: HitTarget[] = [];
+  const byPlayer = new Map<string, { player: PlayerInfo; events: PlayerEvent[] }>();
   for (const { player, event } of cluster) {
-    const target = buildTarget(pull, game, player, event, column);
+    const g = byPlayer.get(player.name) ?? { player, events: [] };
+    g.events.push(event);
+    byPlayer.set(player.name, g);
+  }
+  const targets: HitTarget[] = [];
+  for (const { player, events } of byPlayer.values()) {
+    const target = buildTarget(pull, game, player, events, column);
     if (target) targets.push(target);
   }
+  const pool = judged(targets);
+  const tankOnly = targets.length > 0 && targets.every((t) => t.tank);
+  const scope = tankOnly ? pool : pool.filter((t) => !t.tank);
+  const avg = (xs: number[]) => (xs.length ? xs.reduce((s, x) => s + x, 0) / xs.length : 0);
+  const raws = scope.map((t) => t.unmitigated).filter((x): x is number => x !== undefined);
 
-  const active = findActive(cluster, game, casts, at.timestampMs, at.endMs);
+  const active = findActive(byPlayer, game, casts, at.timestampMs, at.endMs);
   const players = buildAvailability(pull, casts, active, cluster, at.timestampMs, at.endMs);
   const castMs = pull.enemyCasts
     ?.filter((c) => c.abilityName === first.abilityName && c.timestamp <= at.timestampMs && at.timestampMs - c.timestamp <= CAST_ANCHOR_WINDOW_MS)
@@ -276,16 +325,23 @@ function buildHit(
     phase:        phaseName(pull, at.timestampMs),
     damageColumn: column,
     sequenceId:   at.sequenceId,
+    waves:        Math.max(1, ...targets.map((t) => t.parts.length)),
+    tankOnly,
     targets,
     active,
     players,
     totalDamage:  targets.reduce((s, t) => s + t.damage, 0),
+    rawDamage:    raws.length ? avg(raws) : undefined,
+    takenDamage:  avg(scope.map((t) => t.damage)),
+    absorbedDamage: avg(scope.map((t) => t.absorbed)),
+    lowestBefore: pool.length ? Math.min(...pool.map((t) => t.healthBefore / t.maxHealth)) : 1,
     margin:       0,
     sequenceMargin: 0,
     deaths:       targets.filter((t) => t.died).length,
     cleanDeaths:  targets.filter((t) => t.died && !t.vulnerable).length,
     verdict:      "over",
-    droppable:    { keys: [], names: [], worstMargin: 0 },
+    droppable:    { keys: [], names: [], worstMargin: 0, alternatives: [], candidates: 0 },
+    note:         "",
   };
 }
 
@@ -293,40 +349,67 @@ function buildTarget(
   pull: Pull,
   game: MitigationGame,
   player: PlayerInfo,
-  event: PlayerEvent,
+  events: PlayerEvent[],
   column: "physical" | "magical" | "none" | undefined,
 ): HitTarget | null {
-  if (event.healthAfter === undefined || event.healthBefore === undefined || !event.maxHealth) return null;
-  const statusIds = (event.statusIds ?? []).filter((id) => game.statusIndex.has(id));
-  const catalogProduct = percentProduct(statusIds, game, column);
-  const multiplier = event.multiplier;
-  const died = (event.overkill ?? 0) > 0 || pull.deathEvents.some((d) =>
-    d.player === player.name && Math.abs(d.timestamp - event.timestamp) <= SAME_HIT_MS && d.killingAbilityGameId === event.abilityId);
-  const healthAfter = died && event.overkill ? -event.overkill : event.healthAfter;
-  const vulnerable = (multiplier !== undefined && multiplier > 1)
-    || (event.activeBuffNames ?? []).some((n) => /vulnerability up/i.test(n));
+  const usable = events.filter((e) => e.healthAfter !== undefined && e.healthBefore !== undefined && e.maxHealth);
+  if (usable.length === 0) return null;
+  const first = usable[0];
+  const maxHealth = first.maxHealth!;
+
+  // Health before the part that killed, for telling a mitigation death
+  // (from full) from a healing one.
+  let fatalBefore: number | undefined;
+  let unmitigated: number | undefined = 0;
+  const parts: HitPart[] = [];
+  for (const event of usable) {
+    const fatal = (event.overkill ?? 0) > 0 || pull.deathEvents.some((d) =>
+      d.player === player.name && Math.abs(d.timestamp - event.timestamp) <= SAME_HIT_MS && d.killingAbilityGameId === event.abilityId);
+    if (fatal && fatalBefore === undefined) fatalBefore = event.healthBefore!;
+    const overkill = event.overkill ?? 0;
+    const raw = rawOf(event);
+    unmitigated = unmitigated === undefined || raw === undefined ? undefined : unmitigated + raw;
+    parts.push({
+      timestampMs: event.timestamp,
+      damage:      (event.amount ?? 0) + overkill,
+      absorbed:    event.absorbed ?? 0,
+      healthAfter: fatal && overkill ? -overkill : event.healthAfter!,
+      statusIds:   (event.statusIds ?? []).filter((id) => game.statusIndex.has(id)),
+      shieldAbsorbs: (player.shieldAbsorbs ?? [])
+        .filter((a) => a.amount > 0 && Math.abs(a.timestamp - event.timestamp) <= SAME_HIT_MS)
+        .map((a) => ({ statusId: a.statusId, caster: a.caster, amount: a.amount })),
+    });
+  }
+  const healthAfter = Math.min(...parts.map((p) => p.healthAfter));
+  const died = fatalBefore !== undefined;
+  const catalogProduct = percentProduct(parts[0].statusIds, game, column);
+  const multiplier = first.multiplier;
+  const vulnerable = usable.some((e) => (e.multiplier !== undefined && e.multiplier > 1)
+    || (e.activeBuffNames ?? []).some((n) => /vulnerability up/i.test(n)));
 
   return {
     player:       player.name,
     job:          player.className,
-    maxHealth:    event.maxHealth,
-    healthBefore: event.healthBefore,
+    tank:         player.role === "Tank",
+    maxHealth,
+    healthBefore: first.healthBefore!,
     healthAfter,
-    damage:       event.amount ?? 0,
-    absorbed:     event.absorbed ?? 0,
-    unmitigated:  event.unmitigatedAmount,
+    damage:       parts.reduce((s, p) => s + p.damage, 0),
+    absorbed:     parts.reduce((s, p) => s + p.absorbed, 0),
+    unmitigated,
     multiplier,
     catalogProduct,
     consistent:   multiplier === undefined || Math.abs(catalogProduct - multiplier) <= 0.011,
-    margin:       healthAfter / event.maxHealth,
+    parts,
+    margin:       healthAfter / maxHealth,
     laterDrop:    0,
     died,
-    deathCause:   died ? (event.healthBefore / event.maxHealth >= HEALTH_FULL_FRACTION ? "mitigation" : "healing") : undefined,
+    deathCause:   fatalBefore === undefined ? undefined
+      : fatalBefore / maxHealth >= HEALTH_FULL_FRACTION ? "mitigation" : "healing",
     vulnerable,
-    statusIds,
-    shieldAbsorbs: (player.shieldAbsorbs ?? [])
-      .filter((a) => a.amount > 0 && Math.abs(a.timestamp - event.timestamp) <= SAME_HIT_MS)
-      .map((a) => ({ statusId: a.statusId, caster: a.caster, amount: a.amount })),
+    invulnerable: parts.some((p) => p.statusIds.some((id) => game.statusIndex.get(id)?.entry.kind === "invuln")),
+    statusIds:    [...new Set(parts.flatMap((p) => p.statusIds))],
+    shieldAbsorbs: parts.flatMap((p) => p.shieldAbsorbs),
   };
 }
 
@@ -344,15 +427,18 @@ function percentProduct(statusIds: number[], game: MitigationGame, column: "phys
 }
 
 function findActive(
-  cluster: TargetEvent[], game: MitigationGame, casts: CastTimeline[], startMs: number, endMs: number,
+  byPlayer: Map<string, { player: PlayerInfo; events: PlayerEvent[] }>,
+  game: MitigationGame, casts: CastTimeline[], startMs: number, endMs: number,
 ): ActiveMitigation[] {
   const byKey = new Map<string, ActiveMitigation>();
-  for (const { player, event } of cluster) {
+  for (const { player, events } of byPlayer.values()) {
     const keysHere = new Set<string>();
-    for (const id of event.statusIds ?? []) {
-      const s = game.statusIndex.get(id);
-      if (s && !s.status.shield && s.status.physical === 0 && s.status.magical === 0) continue; // marker status
-      if (s) keysHere.add(s.entry.key);
+    for (const event of events) {
+      for (const id of event.statusIds ?? []) {
+        const s = game.statusIndex.get(id);
+        if (s && !s.status.shield && s.status.physical === 0 && s.status.magical === 0) continue; // marker status
+        if (s) keysHere.add(s.entry.key);
+      }
     }
     for (const key of keysHere) {
       const entry = game.catalog.find((e) => e.key === key)!;
@@ -360,7 +446,7 @@ function findActive(
       a.targets++;
       // Shields name their caster on the absorb event.
       for (const abs of player.shieldAbsorbs ?? []) {
-        if (Math.abs(abs.timestamp - event.timestamp) <= SAME_HIT_MS && entry.statuses.some((s) => s.id === abs.statusId)
+        if (events.some((e) => Math.abs(abs.timestamp - e.timestamp) <= SAME_HIT_MS) && entry.statuses.some((s) => s.id === abs.statusId)
           && abs.caster && !a.casters.includes(abs.caster)) a.casters.push(abs.caster);
       }
       byKey.set(key, a);
@@ -464,29 +550,52 @@ function applySequenceDrops(hits: MitigationHit[], pull: Pull, playerNames: Set<
   }
 }
 
+// The targets a hit is graded on: never an invulnerable tank, and
+// vulnerable players only when everyone hit was vulnerable.
 function judged(targets: HitTarget[]): HitTarget[] {
-  const clean = targets.filter((t) => !t.vulnerable);
-  return clean.length > 0 ? clean : targets;
+  const mortal = targets.filter((t) => !t.invulnerable);
+  const clean = mortal.filter((t) => !t.vulnerable);
+  return clean.length > 0 ? clean : mortal;
 }
 
 function finishHit(hit: MitigationHit, game: MitigationGame) {
   const pool = judged(hit.targets);
-  hit.margin = pool.length ? Math.min(...pool.map((t) => t.margin)) : 0;
-  hit.sequenceMargin = pool.length ? Math.min(...pool.map((t) => t.margin - t.laterDrop)) : 0;
-  hit.verdict = verdictFor(Math.min(hit.margin, hit.sequenceMargin), hit.cleanDeaths);
-  hit.droppable = findDroppable([hit], game);
+  if (pool.length === 0) {
+    // Everyone hit was invulnerable: nothing to grade.
+    hit.margin = hit.sequenceMargin = 1;
+    hit.verdict = "good";
+    hit.note = "Taken with an invulnerability.";
+    return;
+  }
+  hit.margin = Math.min(...pool.map((t) => t.margin));
+  hit.sequenceMargin = Math.min(...pool.map((t) => t.margin - t.laterDrop));
+  hit.verdict = verdictFor(hit.margin, hit.cleanDeaths);
+  if (hit.verdict === "over") hit.droppable = findDroppable([hit], game);
+  hit.note = hitNote(hit, game);
 }
 
 export function verdictFor(margin: number, deaths: number): HitVerdict {
-  if (deaths > 0 || margin < MARGIN_UNDER) return "under";
-  if (margin < MARGIN_OVER) return "tight";
+  if (deaths > 0) return "fail";
+  if (margin < MARGIN_UNDER) return "under";
+  if (margin < MARGIN_OVER) return "good";
   return "over";
+}
+
+type Column = "physical" | "magical" | "none" | undefined;
+
+/** The % reduction a status gives against this damage column (0 for shields and unaspected hits). */
+export function statusReduction(statusId: number, game: MitigationGame, column: Column): number {
+  const s = game.statusIndex.get(statusId);
+  if (!s || s.status.shield || column === "none") return 0;
+  return column ? s.status[column] : Math.min(s.status.physical, s.status.magical);
 }
 
 /**
  * A target's margin with the given mitigations removed. Pure, so the later
  * what-if sandbox can reuse it. `rollBuffer` scales the rebuilt damage
  * (DAMAGE_ROLL_BUFFER for planning, 1 for "what would have happened").
+ * Each part's extra damage is added on from that part on, and the margin is
+ * the lowest point; healing between parts is kept as it was.
  * `sequenceMargin` also scales the target's laterDrop by the removed %
  * mitigations, assuming they covered the follow-up damage too (they
  * usually outlast it; when they didn't, this is conservative).
@@ -495,33 +604,50 @@ export function marginWithout(
   target: HitTarget,
   removeKeys: Set<string>,
   game: MitigationGame,
-  column: "physical" | "magical" | "none" | undefined,
+  column: Column,
   rollBuffer = 1,
 ): { margin: number; sequenceMargin: number } {
+  let extra = 0;
+  let low = Infinity;
   let factor = 1;
-  let shieldBack = 0;
-  for (const a of target.shieldAbsorbs) {
-    const s = game.statusIndex.get(a.statusId);
-    if (s && removeKeys.has(s.entry.key)) shieldBack += a.amount;
+  for (const part of target.parts) {
+    let shieldBack = 0;
+    for (const a of part.shieldAbsorbs) {
+      const s = game.statusIndex.get(a.statusId);
+      if (s && removeKeys.has(s.entry.key)) shieldBack += a.amount;
+    }
+    factor = 1;
+    for (const id of new Set(part.statusIds)) {
+      const s = game.statusIndex.get(id);
+      if (!s || !removeKeys.has(s.entry.key)) continue;
+      const r = statusReduction(id, game, column);
+      if (r < 1) factor *= 1 - r;
+    }
+    const beforeShields = (part.damage + part.absorbed) / factor * rollBuffer;
+    const toHealth = Math.max(0, beforeShields - (part.absorbed - shieldBack));
+    extra += toHealth - part.damage;
+    low = Math.min(low, part.healthAfter - extra);
   }
-  for (const id of new Set(target.statusIds)) {
-    const s = game.statusIndex.get(id);
-    if (!s || !removeKeys.has(s.entry.key) || s.status.shield) continue;
-    if (column === "none") continue;
-    const r = column ? s.status[column] : Math.min(s.status.physical, s.status.magical);
-    if (r < 1) factor *= 1 - r;
-  }
-  const beforeShields = (target.damage + target.absorbed) / factor * rollBuffer;
-  const toHealth = Math.max(0, beforeShields - (target.absorbed - shieldBack));
-  const margin = (target.healthBefore - toHealth) / target.maxHealth;
+  const margin = low / target.maxHealth;
   return { margin, sequenceMargin: margin - target.laterDrop / factor * rollBuffer };
+}
+
+/** Whether removing this catalog entry is ever offered as droppable on this hit. */
+export function droppableEntry(entry: CatalogEntry | undefined, tankOnly: boolean): boolean {
+  if (!entry || entry.inSheet === false) return false;
+  // Party-wide mitigation only (user, 2026-10-06), except on a tank-only
+  // hit, where the tanks' own cooldowns are what gets planned.
+  if (entry.reach !== "party" && !tankOnly) return false;
+  if (entry.kind === "invuln" || entry.kind === "limitBreak") return false;
+  return entry.cooldownMs >= DROP_MIN_COOLDOWN_MS;
 }
 
 /**
  * Greedy droppable set over one hit, or over the same hit in several pulls
- * (the aggregate budgets against the worst of them). Pulls where a
- * non-vulnerable player died to the hit are left out: nothing there can be
- * dropped, and the death is reported on its own.
+ * (the aggregate budgets against the worst of them): what an over hit can
+ * do without and still land good. Pulls where a non-vulnerable player died
+ * to the hit are left out: nothing there can be dropped, and the death is
+ * reported on its own.
  */
 export function findDroppable(hits: MitigationHit[], game: MitigationGame): DroppableResult {
   const usable = hits
@@ -529,43 +655,54 @@ export function findDroppable(hits: MitigationHit[], game: MitigationGame): Drop
     .map((h) => ({ hit: h, pool: judged(h.targets).filter((t) => !t.died) }))
     .filter((x) => x.pool.length > 0);
   if (usable.length === 0) {
-    return { keys: [], names: [], worstMargin: Math.min(...hits.map((h) => h.sequenceMargin)) };
+    return { keys: [], names: [], worstMargin: Math.min(...hits.map((h) => h.margin)), alternatives: [], candidates: 0 };
   }
 
-  const worstWith = (keys: Set<string>) => Math.min(...usable.flatMap(({ hit, pool }) => pool.map((t) =>
-    marginWithout(t, keys, game, hit.damageColumn, DAMAGE_ROLL_BUFFER).sequenceMargin)));
+  const worstWith = (keys: Set<string>) => {
+    let margin = Infinity;
+    let sequence = Infinity;
+    for (const { hit, pool } of usable) {
+      for (const t of pool) {
+        const m = marginWithout(t, keys, game, hit.damageColumn, DAMAGE_ROLL_BUFFER);
+        margin = Math.min(margin, m.margin);
+        sequence = Math.min(sequence, m.sequenceMargin);
+      }
+    }
+    return { margin, ok: margin >= MARGIN_UNDER && sequence >= SEQUENCE_FLOOR };
+  };
 
   const names = new Map<string, string>();
   for (const { hit } of usable) for (const a of hit.active) names.set(a.key, a.name);
 
+  const tankOnly = usable.every(({ hit }) => hit.tankOnly);
   const removed = new Set<string>();
   const candidates = [...names.keys()].filter((key) => {
-    const entry = game.catalog.find((e) => e.key === key);
-    // Only party-wide mitigation is offered (user, 2026-10-06): the result
-    // is shown as a count of party mitigations the hit could do without.
-    if (!entry || entry.reach !== "party" || entry.inSheet === false) return false;
-    if (entry.kind === "invuln" || entry.kind === "limitBreak") return false;
-    if (entry.cooldownMs < DROP_MIN_COOLDOWN_MS) return false;
+    if (!droppableEntry(game.catalog.find((e) => e.key === key), tankOnly)) return false;
     // Skip what had no effect (a % mitigation on an unaspected hit, a
     // shield that absorbed nothing).
     const without = new Set([key]);
     return usable.some(({ hit, pool }) =>
       pool.some((t) => marginWithout(t, without, game, hit.damageColumn).margin < t.margin - 1e-9));
   });
-  let worst = worstWith(removed);
+  const alternatives = candidates.filter((key) => worstWith(new Set([key])).ok);
+  let worst = worstWith(removed).margin;
   for (;;) {
     let best: { key: string; worst: number } | null = null;
     for (const key of candidates) {
       if (removed.has(key)) continue;
       const w = worstWith(new Set([...removed, key]));
-      if (w >= DROP_FLOOR && (!best || w > best.worst)) best = { key, worst: w };
+      if (w.ok && (!best || w.margin > best.worst)) best = { key, worst: w.margin };
     }
     if (!best) break;
     removed.add(best.key);
     worst = best.worst;
   }
   const keys = [...removed];
-  return { keys, names: keys.map((k) => names.get(k)!), worstMargin: worst };
+  return {
+    keys, names: keys.map((k) => names.get(k)!), worstMargin: worst,
+    alternatives: alternatives.map((k) => names.get(k)!),
+    candidates: candidates.length,
+  };
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────

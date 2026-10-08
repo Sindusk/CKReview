@@ -506,8 +506,8 @@ MECHANICS.fallback = {
 };
 
 // Print-only (no PullErrors, nothing snapshotted): the new mitigation
-// analysis (lib/mitigation/analyze.ts) for every pull, one line per raidwide
-// hit plus its active mitigations, free ones and droppable set.
+// analysis (lib/mitigation/analyze.ts) for every pull, one line per hit
+// plus its active mitigations, free ones, droppable set and note.
 // docs/archive/mitigation-redesign.md describes the columns.
 MECHANICS['mitigation-analysis'] = {
   game: 'ff',
@@ -529,20 +529,24 @@ MECHANICS['mitigation-analysis'] = {
       const targets = hits.flatMap((h) => h.targets);
       const withMult = targets.filter((t) => t.multiplier !== undefined);
       console.log('='.repeat(70));
-      console.log(`${pull.name} Pull ${pull.pullNumber}: ${hits.length} raidwide hits, catalog matches multiplier on ` +
+      console.log(`${pull.name} Pull ${pull.pullNumber}: ${hits.length} hits, catalog matches multiplier on ` +
         `${withMult.filter((t) => t.consistent).length}/${withMult.length} targets`);
+      const k = (n) => (n === undefined ? '?' : `${Math.round(n / 1000)}k`);
       for (const h of hits) {
         const active = h.active.map((a) => `${a.name}${a.casters.length ? `(${a.casters.map((c) => c.split(' ')[0]).join('/')})` : ''}`).join(', ');
         const free = h.players.filter((p) => p.state === 'free').map((p) => `${p.name}(${p.player.split(' ')[0]})`).join(', ');
         const ineff = h.players.filter((p) => p.state === 'ineffective').map((p) => `${p.name}(${p.player.split(' ')[0]})`).join(', ');
         const deathInfo = h.targets.filter((t) => t.died).map((t) => `${t.player.split(' ')[0]}:${t.deathCause}`).join(' ');
-        console.log(`  [${(h.timestampMs / 1000).toFixed(1)}s] seq${h.sequenceId} ${h.abilityName} #${h.occurrence} (${h.phase ?? '-'}, ${h.damageColumn ?? '?'}) ` +
-          `n=${h.targets.length} margin=${pctOf(h.margin)} seq=${pctOf(h.sequenceMargin)} ${h.verdict.toUpperCase()}` +
+        console.log(`  [${(h.timestampMs / 1000).toFixed(1)}s] seq${h.sequenceId} ${h.abilityName} #${h.occurrence}${h.waves > 1 ? ` x${h.waves}` : ''}` +
+          `${h.tankOnly ? ' TANK' : ''} (${h.phase ?? '-'}, ${h.damageColumn ?? '?'}) ` +
+          `n=${h.targets.length} raw=${k(h.rawDamage)} taken=${k(h.takenDamage)} before=${pctOf(h.lowestBefore)} ` +
+          `after=${pctOf(h.margin)} seq=${pctOf(h.sequenceMargin)} ${h.verdict.toUpperCase()}` +
           `${h.deaths ? ` deaths=${h.deaths} [${deathInfo}]` : ''}`);
         console.log(`      active: ${active || '-'}`);
         if (free) console.log(`      free: ${free}`);
         if (ineff) console.log(`      ineffective: ${ineff}`);
         if (h.droppable.keys.length) console.log(`      droppable: ${h.droppable.names.join(', ')} -> lowest ${pctOf(h.droppable.worstMargin)}`);
+        if (h.note) console.log(`      note: ${h.note}`);
       }
     }
     console.log('='.repeat(70));
@@ -557,6 +561,7 @@ MECHANICS['mitigation-analysis'] = {
       console.log(`      usual: ${usual || '-'}`);
       if (free) console.log(`      usually free: ${free}`);
       if (a.droppable.keys.length) console.log(`      droppable (worst pull): ${a.droppable.names.join(', ')} -> lowest ${pctOf(a.droppable.worstMargin)}`);
+      if (a.note) console.log(`      note: ${a.note}`);
     }
   },
 };

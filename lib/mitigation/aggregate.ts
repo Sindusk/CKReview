@@ -7,14 +7,15 @@
 // margin, deaths, how often each mitigation was on it, how often each was
 // free, and a droppable set budgeted against the worst pull.
 //
-// The verdict uses the MEDIAN sequence margin, so one pull lost to a
-// healing gap doesn't relabel a hit; deaths and the worst margin are shown
-// next to it.
+// The verdict uses the MEDIAN margin, so one pull lost to a healing gap
+// doesn't relabel a hit; it is fail only when most pulls had a death.
+// Deaths and the worst margin are shown next to it.
 
 import type {
   DroppableResult, HitVerdict, MitigationGame, MitigationHit, MitigationKind,
 } from "./types";
 import { findDroppable, verdictFor } from "./analyze";
+import { aggregateNote } from "./notes";
 
 export type AggregatedMitigation = {
   key:     string;
@@ -41,14 +42,19 @@ export type AggregatedHit = {
   damageColumn?:  "physical" | "magical" | "none";
   pulls:          number;   // pulls that reached it
   medianMs:       number;   // median time into the pull
-  medianMargin:   number;   // sequence-aware
-  worstMargin:    number;   // sequence-aware
+  // Medians over pulls of the per-pull values (MitigationHit).
+  rawDamage?:     number;
+  takenDamage:    number;
+  lowestBefore:   number;
+  medianMargin:   number;   // lowest health after
+  worstMargin:    number;
   deaths:         number;   // non-vulnerable deaths, summed over pulls
   deathPulls:     number;   // pulls with at least one such death
   verdict:        HitVerdict;
   active:         AggregatedMitigation[];
   free:           AggregatedFree[];
-  droppable:      DroppableResult;
+  droppable:      DroppableResult;  // empty unless the verdict is over
+  note:           string;
   byPull:         PullHit[];
 };
 
@@ -75,7 +81,8 @@ export function aggregateMitigation(
   for (const [id, byPull] of groups) {
     const hits = byPull.map((b) => b.hit);
     const first = hits[0];
-    const seqMargins = hits.map((h) => Math.min(h.margin, h.sequenceMargin));
+    const margins = hits.map((h) => h.margin);
+    const raws = hits.map((h) => h.rawDamage).filter((x): x is number => x !== undefined);
 
     const active = new Map<string, AggregatedMitigation>();
     for (const h of hits) {
@@ -99,8 +106,12 @@ export function aggregateMitigation(
     }
 
     const deaths = hits.reduce((s, h) => s + h.cleanDeaths, 0);
-    const medianMargin = median(seqMargins);
-    out.push({
+    const deathPulls = hits.filter((h) => h.cleanDeaths > 0).length;
+    const medianMargin = median(margins);
+    // Fail only when deaths are the usual outcome; one lost pull is shown
+    // as a death count beside the verdict.
+    const verdict = verdictFor(medianMargin, deathPulls * 2 > hits.length ? 1 : 0);
+    const row: AggregatedHit = {
       id,
       abilityName:  first.abilityName,
       occurrence:   first.occurrence,
@@ -108,16 +119,22 @@ export function aggregateMitigation(
       damageColumn: first.damageColumn,
       pulls:        hits.length,
       medianMs:     median(hits.map((h) => h.timestampMs)),
+      rawDamage:    raws.length ? median(raws) : undefined,
+      takenDamage:  median(hits.map((h) => h.takenDamage)),
+      lowestBefore: median(hits.map((h) => h.lowestBefore)),
       medianMargin,
-      worstMargin:  Math.min(...seqMargins),
+      worstMargin:  Math.min(...margins),
       deaths,
-      deathPulls:   hits.filter((h) => h.cleanDeaths > 0).length,
-      verdict:      verdictFor(medianMargin, 0),
+      deathPulls,
+      verdict,
       active:       [...active.values()].sort((a, b) => b.pulls - a.pulls || a.name.localeCompare(b.name)),
       free:         [...free.values()].sort((a, b) => b.pulls - a.pulls || a.name.localeCompare(b.name)),
-      droppable:    findDroppable(hits, game),
+      droppable:    verdict === "over" ? findDroppable(hits, game) : { keys: [], names: [], worstMargin: medianMargin, alternatives: [], candidates: 0 },
+      note:         "",
       byPull,
-    });
+    };
+    row.note = aggregateNote(row, game);
+    out.push(row);
   }
   return out.sort((a, b) => a.medianMs - b.medianMs);
 }

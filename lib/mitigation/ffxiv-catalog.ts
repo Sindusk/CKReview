@@ -277,6 +277,11 @@ export const FFXIV_MITIGATION: MitigationGame = {
   catalog:     FFXIV_MITIGATION_CATALOG,
   statusIndex: FFXIV_STATUS_INDEX,
   actionIndex: FFXIV_ACTION_INDEX,
+  // FFLogs logs DoT damage without the `tick` flag, under the status's ID
+  // (1,000,000+, "Sustained Damage", "Flesh Wound") or the 500000
+  // "Combined DoTs" pseudo-ability.
+  isTick: (abilityId) => abilityId >= 1_000_000 || abilityId === 500_000,
+  isAutoAttack: (abilityName) => abilityName === "Attack",
   damageColumn(type) {
     if (type === FFXIV_DAMAGE_TYPE.physical) return "physical";
     if (type === FFXIV_DAMAGE_TYPE.magical) return "magical";
