@@ -582,12 +582,12 @@ export function detectFallbackErrors(pull: Pull, profile: FallbackProfile): Pull
       errors.push(playerError(player, {
         ...base, ruleId: "fallback-death-wrong-target", severity: "Major", name: "Hit by Someone Else's Mechanic",
         description: `Died to ${e.abilityName}${fromSource(e)} (${times(ratioOf(e))} max HP), which hit only ${roleList(wrong.roles)} ` +
-          `in this report's ${wrong.stats.cleanResolutions} clean resolutions of it.`,
+          `in its ${wrong.stats.cleanResolutions} clean resolutions so far.`,
       }));
     } else if (rare) {
       errors.push(playerError(player, {
         ...base, ruleId: "fallback-death-avoidable", severity: "Major", name: "Died to Avoidable Damage",
-        description: `Died to ${e.abilityName}${fromSource(e)}, which hit a player on only ${rare.hits} of its ${rare.casts} casts in this report: avoidable.`,
+        description: `Died to ${e.abilityName}${fromSource(e)}, which hit a player on only ${rare.hits} of its ${rare.casts} casts so far: avoidable.`,
       }));
     } else if (unsurvivable(h)) {
       const s = profile.byId.get(e.abilityId);
@@ -634,9 +634,9 @@ export function detectFallbackErrors(pull: Pull, profile: FallbackProfile): Pull
       const rare = rarelyHits(profile, event);
       let flag: Flag | undefined;
       if (wrong) flag = { rule: "fallback-wrong-target-hit", name: "Hit by Someone Else's Mechanic",
-        text: `which hit only ${roleList(wrong.roles)} in this report's ${wrong.stats.cleanResolutions} clean resolutions of it` };
+        text: `which hit only ${roleList(wrong.roles)} in its ${wrong.stats.cleanResolutions} clean resolutions so far` };
       else if (rare) flag = { rule: "fallback-avoidable-hit", name: "Avoidable Damage",
-        text: `which hit a player on only ${rare.hits} of its ${rare.casts} casts in this report` };
+        text: `which hit a player on only ${rare.hits} of its ${rare.casts} casts so far` };
       else if (isVulnerable(event)) flag = { rule: "fallback-vulnerable-hit", name: "Hit While Vulnerable",
         text: `while carrying ${vulnCause(player, event)}` };
       if (!flag) continue;
