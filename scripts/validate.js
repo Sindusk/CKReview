@@ -530,10 +530,13 @@ MECHANICS['mitigation-analysis'] = {
     const pulls = await loadThroughRealPipeline(mod, dir);
     if (!pulls) return;
     const pctOf = (x) => `${Math.round(x * 100)}%`;
-    const perPull = [];
+    // Aggregated like the dialog: per boss and exact roster.
+    const groups = new Map();
     for (const pull of pulls) {
       const hits = mod.analyzePullMitigation(pull, mod.FFXIV_MITIGATION);
-      perPull.push({ pullId: pull.id, pullNumber: pull.pullNumber, hits });
+      const key = `${pull.name} | ${pull.players.map((p) => p.name.split(' ')[0]).sort().join(', ')}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push({ pullId: pull.id, pullNumber: pull.pullNumber, durationMs: pull.fightDuration, hits });
       const targets = hits.flatMap((h) => h.targets);
       const withMult = targets.filter((t) => t.multiplier !== undefined);
       console.log('='.repeat(70));
@@ -557,19 +560,20 @@ MECHANICS['mitigation-analysis'] = {
         if (h.note) console.log(`      note: ${h.note}`);
       }
     }
+    for (const [group, perPull] of groups) {
     console.log('='.repeat(70));
-    console.log(`ALL PULLS (${perPull.length}): hits seen in 2+ pulls`);
+    console.log(`ALL PULLS: ${group} (${perPull.length} pulls)`);
     for (const a of mod.aggregateMitigation(perPull, mod.FFXIV_MITIGATION)) {
-      if (a.pulls < 2) continue;
       const usual = a.active.filter((m) => m.pulls * 2 >= a.pulls).map((m) => m.name).join(', ');
       const free = a.free.filter((f) => f.pulls * 2 >= a.pulls).map((f) => `${f.name}(${f.player.split(' ')[0]})`).join(', ');
-      console.log(`  ${(a.medianMs / 1000).toFixed(0).padStart(4)}s ${a.phase ?? '-'} | ${a.abilityName} #${a.occurrence} pulls=${a.pulls} ` +
+      console.log(`  ${(a.medianMs / 1000).toFixed(0).padStart(4)}s ${a.phase ?? '-'} | ${a.abilityName} #${a.occurrence} pulls=${a.pulls}/${a.reached}${a.rare ? ' RARE' : ''} ` +
         `median=${pctOf(a.medianMargin)} worst=${pctOf(a.worstMargin)} ${a.verdict.toUpperCase()}` +
         `${a.deaths ? ` deaths=${a.deaths} in ${a.deathPulls} pull(s)` : ''}`);
       console.log(`      usual: ${usual || '-'}`);
       if (free) console.log(`      usually free: ${free}`);
       if (a.droppable.keys.length) console.log(`      droppable (worst pull): ${a.droppable.names.join(', ')} -> lowest ${pctOf(a.droppable.worstMargin)}`);
       if (a.note) console.log(`      note: ${a.note}`);
+    }
     }
   },
 };

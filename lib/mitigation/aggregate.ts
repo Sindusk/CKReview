@@ -55,8 +55,20 @@ export type AggregatedHit = {
   free:           AggregatedFree[];
   droppable:      DroppableResult;  // empty unless the verdict is over
   note:           string;
+  // Pulls still going when this hit first landed in any pull (those that
+  // had it included), and whether it is rare among them: seen in under
+  // RARE_SHARE of them, with at least RARE_MIN_REACHED reaching it. A hit
+  // the group usually doesn't take is a mistake, not a planned mitigation
+  // (Vamp Fatale's Aetherletting: 1 of 8 pulls), whatever the boss. Not
+  // half: a randomized mechanic's variants each land in about half the
+  // pulls (Red Hot and Deep Blue's Awesome Slab: 20 of 41).
+  reached:        number;
+  rare:           boolean;
   byPull:         PullHit[];
 };
+
+export const RARE_SHARE = 0.25;
+export const RARE_MIN_REACHED = 3;
 
 const median = (xs: number[]) => {
   const s = [...xs].sort((a, b) => a - b);
@@ -65,7 +77,9 @@ const median = (xs: number[]) => {
 };
 
 export function aggregateMitigation(
-  perPull: { pullId: number; pullNumber: number; hits: MitigationHit[] }[],
+  // durationMs: how long the pull lasted, for `reached`; without it only the
+  // pulls that had the hit count as reaching it.
+  perPull: { pullId: number; pullNumber: number; durationMs?: number; hits: MitigationHit[] }[],
   game: MitigationGame,
 ): AggregatedHit[] {
   const groups = new Map<string, PullHit[]>();
@@ -111,6 +125,9 @@ export function aggregateMitigation(
     // Fail only when deaths are the usual outcome; one lost pull is shown
     // as a death count beside the verdict.
     const verdict = verdictFor(medianMargin, deathPulls * 2 > hits.length ? 1 : 0);
+    const firstMs = Math.min(...hits.map((h) => h.timestampMs));
+    const had = new Set(byPull.map((b) => b.pullId));
+    const reached = perPull.filter((p) => had.has(p.pullId) || (p.durationMs ?? 0) > firstMs).length;
     const row: AggregatedHit = {
       id,
       abilityName:  first.abilityName,
@@ -131,6 +148,8 @@ export function aggregateMitigation(
       free:         [...free.values()].sort((a, b) => b.pulls - a.pulls || a.name.localeCompare(b.name)),
       droppable:    verdict === "over" ? findDroppable(hits, game) : { keys: [], names: [], worstMargin: medianMargin, alternatives: [], candidates: 0 },
       note:         "",
+      reached,
+      rare:         reached >= RARE_MIN_REACHED && hits.length < RARE_SHARE * reached,
       byPull,
     };
     row.note = aggregateNote(row, game);

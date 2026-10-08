@@ -77,10 +77,16 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId }
   const perPull = useMemo(() => {
     if (!open) return [];
     return analyzable.map((p) => ({
-      pullId: p.id, pullNumber: p.pullNumber, hits: analyzePullMitigation(p, FFXIV_MITIGATION),
+      pullId: p.id, pullNumber: p.pullNumber, durationMs: p.fightDuration,
+      hits: analyzePullMitigation(p, FFXIV_MITIGATION),
     }));
   }, [open, analyzable]);
   const aggregate = useMemo(() => (allPulls ? aggregateMitigation(perPull, FFXIV_MITIGATION) : []), [allPulls, perPull]);
+  // Hits the group rarely takes are likely mistakes, not mitigation to
+  // plan (AggregatedHit.rare): hidden unless asked for.
+  const [showRare, setShowRare] = useState(false);
+  const rareCount = aggregate.filter((r) => r.rare).length;
+  const shownRows = showRare ? aggregate : aggregate.filter((r) => !r.rare);
   const groups = useMemo(() => buildPlayerGroups(allPulls ? analyzable : selectedPull ? [selectedPull] : []),
     [allPulls, analyzable, selectedPull]);
 
@@ -134,6 +140,16 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId }
 
           <TimelineLegend aggregate={allPulls} />
 
+          {allPulls && rareCount > 0 && (
+            <div className="ck-help" style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
+              <span>
+                {showRare ? "Showing" : "Hiding"} {rareCount} hit{rareCount > 1 ? "s" : ""} taken in under a quarter of the pulls
+                that got that far: likely mistakes, not mitigation to plan.
+              </span>
+              <button className="ck-btn ck-btn--sm" onClick={() => setShowRare((s) => !s)}>{showRare ? "Hide" : "Show"}</button>
+            </div>
+          )}
+
           <div style={{ flex: "1 1 auto", minHeight: 0, overflow: "auto", border: "1px solid var(--ck-line-2)", borderRadius: 3 }}>
             {selectedStale ? (
               <p className="ck-dialog-text" style={{ padding: 12 }}>
@@ -142,7 +158,7 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId }
             ) : allPulls ? (
               analyzable.length === 0
                 ? <p className="ck-dialog-text" style={{ padding: 12 }}>No loaded pull has mitigation data yet. Re-fetch the report to analyze it.</p>
-                : <AggregateTimeline rows={aggregate} groups={groups} expanded={expanded} onToggle={toggleExpanded} />
+                : <AggregateTimeline rows={shownRows} groups={groups} expanded={expanded} onToggle={toggleExpanded} />
             ) : selectedHits && selectedHits.length > 0 ? (
               <PullTimeline hits={selectedHits} groups={groups} expanded={expanded} onToggle={toggleExpanded} />
             ) : (
