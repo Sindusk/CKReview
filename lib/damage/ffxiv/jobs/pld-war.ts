@@ -1,9 +1,15 @@
 // lib/damage/ffxiv/jobs/pld-war.ts
 //
-// Paladin and Warrior checks (tank batch). UNVERIFIED: no sample pull has
-// either job, so these follow xivanalysis and the 7.x tooltips only.
+// Paladin and Warrior checks (tank batch). Warrior is UNVERIFIED (no
+// sample has it) and follows xivanalysis and the 7.x tooltips only.
 //
-// Paladin, Fight or Flight (+25% from the tooltip), ported from
+// Paladin, checked against xivanalysis on jN3XDrf2z8PmLgRJ Vamp pull 8
+// (2026-10-08): the window counts match its 7 missed actions and 1
+// missed GCD. Fight or Flight is +25%, the FFLogs multiplier on a hit
+// with only it up. Not checked here: Oath gauge overcap (xivanalysis
+// reports it; it costs Holy Sheltrons, which is mitigation, not damage).
+//
+// Fight or Flight, ported from
 // xivanalysis src/parser/jobs/pld/modules/FightOrFlight.tsx: 8 GCDs;
 // Goring Blade, Confiteor and the three Blades once each; Blade of Honor,
 // Expiacion, Circle of Scorn and Intervene once each; three of Royal
@@ -26,7 +32,7 @@ const fightOrFlight: JobCheck = (ctx) => burstWindowFindings(ctx, {
   statusId: S.FIGHT_OR_FLIGHT.id,
   name: "Fight or Flight",
   bonus: 0.25,
-  bonusBasis: "Fight or Flight is +25% (tooltip; not yet checked against a log)",
+  bonusBasis: "Fight or Flight is +25% (FFLogs multiplier with it alone: 1.25)",
   expectedGcds: () => 8,
   expected: () => [
     { ids: [id("GORING_BLADE")], count: 1, name: "Goring Blade" },

@@ -134,7 +134,9 @@ export function checkGcdGaps(ctx: PlayerCheckContext): DamageFinding[] {
         cause,
         basis: `${s(unforced)} idle ÷ ${s(ctx.baseGcdMs)} GCD × ${k(value)} average GCD${inWindows(mid, ctx.buffWindows) ? " in raid buffs" : ""}`,
         detail: `No GCD for ${s(unforced)} after ${after}${forced.ms > 0 ? ` (plus ${s(forced.ms)} forced: ${forced.cause})` : ""}` +
-          (weaves.length >= CLIP_WEAVES ? `; ${weaves.length} weaves: ${weaves.map((w) => w.abilityName).join(", ")}` : ""),
+          // A double weave that ran long is xivanalysis's "incorrect
+          // weaving", so name the weaves from two up.
+          (weaves.length >= 2 ? `; ${weaves.length} weaves: ${weaves.map((w) => w.abilityName).join(", ")}` : ""),
       }));
     } else if (unforced > 0) {
       // Three or more oGCDs between two GCDs: the delay is the weaving.

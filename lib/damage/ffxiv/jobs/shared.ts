@@ -11,7 +11,8 @@
 // status on the player (apply → remove, from the player-buff stream).
 // GCDs count when they start inside it; actions when cast inside it, the
 // removal's own timestamp included (xivanalysis's 'SAME-TIMESTAMP' mode:
-// Delirium's last stack goes at the same instant as the GCD using it). A
+// Delirium's last stack goes at the same instant as the GCD using it), but
+// nothing after it. A
 // window still open at the end of the analysis is skipped (xivanalysis's
 // "rushed end of pull"). One that overlaps forced time by 1.5s+ is shown
 // as forced.
@@ -31,7 +32,13 @@ import type { DamageFinding } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";
 import { forcedPart, inWindows, mergeWindows, overlapMs, type Window } from "../../timeline";
 
-const SAME_TIMESTAMP_MS = 100;
+// The removal's own timestamp, no later. A 100ms allowance counted a
+// Paladin's Sepulchre cast 40ms after Fight or Flight fell off
+// (jN3XDrf2z8PmLgRJ Vamp pull 8, 5:38), whose hit logged ×1.00. Every
+// cast 40-90ms after a Fight or Flight, Divination or Lance Charge
+// removal on jN3XDrf2z8PmLgRJ and dQ8wmb1VhKt6yBXk (about 30) hit
+// without the status in its snapshot.
+const SAME_TIMESTAMP_MS = 0;
 
 export const s = (ms: number) => `${(ms / 1000).toFixed(1)}s`;
 export const k = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(2)}M` : `${Math.round(n / 1000)}k`);

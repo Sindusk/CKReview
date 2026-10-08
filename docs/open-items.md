@@ -458,6 +458,11 @@ grouped by exact roster. The module headers hold the rules.
   Ninja, Monk, Summoner.
 - **Deferred:** what-if sandbox (reuse `marginWithout`), an optional
   published plan to compare against, a WoW port.
+- **Not built: tank gauge overcap.** The PLD on the Vamp kill overcapped
+  Oath gauge: xivanalysis says 260, and a simulation (+5 per auto-attack,
+  −50 per Holy Sheltron) gives about 170. That's 3–5 Holy Sheltrons
+  never pressed. It costs mitigation, not damage, so it belongs here if
+  anywhere.
 
 ### Damage (both games)
 
@@ -481,6 +486,12 @@ grouped by exact roster. The module headers hold the rules.
   Rejected: the late Devilment (no loss) and feather overcap (not in the
   log). Its one "weaving" delay was 0.3s, which already counts toward
   the pull's small GCD delays (under one GCD in total, so not shown).
+- **Paladin, same kill.** The Fight or Flight check matched xivanalysis
+  (7 missed actions, 1 missed GCD) once the window end stopped counting
+  casts after the buff's removal. The "incorrect weaving" lines are
+  already GCD gaps or small delays; a gap now names its weaves from two
+  up. One is a 1.3s gap holding Passage of Arms, counted as a loss;
+  confirm with the player whether it was planned.
 - **Per-player busy windows** (tower soaks, debuff carriers, baits) aren't
   in the Dancing Mad context. Gaps during a mechanic are labelled but
   still counted. Candidate: the DRK's 4.6–4.9s idle after LB3 during Limit
