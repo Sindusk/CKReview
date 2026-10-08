@@ -72,7 +72,7 @@ export function hitNote(hit: MitigationHit, game: MitigationGame): string {
   }
 
   const entryOf = (key: string) => game.catalog.find((e) => e.key === key);
-  const unused = hit.players.filter((p) => wouldHelp(entryOf(p.key), hit.tankOnly, hit.damageColumn));
+  const unused = hit.players.filter((p) => !p.dead && wouldHelp(entryOf(p.key), hit.tankOnly, hit.damageColumn));
   const add = addText(unused.filter((p) => p.state === "free"), unused.filter((p) => p.state === "available"));
 
   if (hit.verdict === "fail") {

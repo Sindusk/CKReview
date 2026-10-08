@@ -528,7 +528,6 @@ function buildAvailability(
     let readyMs: number | undefined;
     if (usedByThem && withinDuration) state = "used";
     else if (usedByThem && entry.kind === "shield") state = "used";
-    else if (isDeadOrFreshlyRevived(player, pull.deathEvents, atMs)) state = "dead";
     else if (withinDuration && (entry.kind === "bossDebuff" || entry.kind === "partyBuff") && !entry.variableDuration) state = "ineffective";
     else {
       const charges = chargesAt(tl.casts, entry, atMs);
@@ -543,7 +542,8 @@ function buildAvailability(
     }
     out.push({
       player: player.name, job: player.className, key: entry.key, name: entry.name, kind: entry.kind,
-      state, lastCastMs, readyMs, nextCastMs, approximate: !!entry.gated,
+      state, dead: isDeadOrFreshlyRevived(player, pull.deathEvents, atMs),
+      lastCastMs, readyMs, nextCastMs, approximate: !!entry.gated,
     });
   }
   return out;

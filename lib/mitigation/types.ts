@@ -137,8 +137,7 @@ export type MitigationState =
   | "free"        // off cooldown, and casting it here would not delay this player's next real use
   | "available"   // off cooldown but not free (a later real use would be delayed)
   | "cooldown"    // spent elsewhere
-  | "ineffective" // cast and still within its duration, yet not on this hit (wrong target, out of range)
-  | "dead";       // player dead or just raised
+  | "ineffective"; // cast and still within its duration, yet not on this hit (wrong target, out of range)
 
 export type PlayerMitigation = {
   player:     string;
@@ -147,6 +146,9 @@ export type PlayerMitigation = {
   name:       string;
   kind:       MitigationKind;
   state:      MitigationState;
+  // Dead or just raised at the hit. Kept apart from `state` so the
+  // cooldown still shows (on a red cell); a dead player is never suggested.
+  dead:       boolean;
   lastCastMs?: number;  // this player's latest cast at or before the hit
   readyMs?:    number;  // when it is next off cooldown, if on cooldown
   nextCastMs?: number;  // this player's next real cast after the hit

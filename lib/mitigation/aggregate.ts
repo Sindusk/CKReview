@@ -97,7 +97,7 @@ export function aggregateMitigation(
     const free = new Map<string, AggregatedFree>();
     for (const h of hits) {
       for (const p of h.players) {
-        if (p.state !== "free") continue;
+        if (p.state !== "free" || p.dead) continue;
         const k = `${p.player}|${p.key}`;
         const agg = free.get(k) ?? { player: p.player, key: p.key, name: p.name, pulls: 0 };
         agg.pulls++;

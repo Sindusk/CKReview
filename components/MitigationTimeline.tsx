@@ -50,12 +50,11 @@ const STATE_STYLE: Record<MitigationState, { mark: string; color: string; label:
   available:   { mark: "○", color: "#94a3b8", label: "Available, but using it here would delay their next use" },
   cooldown:    { mark: "·", color: "#475569", label: "On cooldown" },
   ineffective: { mark: "✕", color: "#f87171", label: "Cast and still running, but not on this hit (wrong target or out of range)" },
-  dead:        { mark: "☠", color: "#ef4444", label: "Dead or just raised" },
 };
 
-// A dead player's cells are tinted too, so their stretch of the fight reads
-// as one band across the row rather than a mark among cooldown dots.
-const DEAD_CELL_BG = "rgba(239, 68, 68, 0.12)";
+// A dead (or just raised) player's cells keep their cooldown mark on a red
+// background, so their stretch of the fight reads as one band.
+const DEAD_CELL_BG = "rgba(239, 68, 68, 0.28)";
 
 const VERDICT_STYLE: Record<HitVerdict, { color: string; label: string }> = {
   fail:  { color: "#ef4444", label: "Fail" },
@@ -227,7 +226,10 @@ function outcomeTip(hit: MitigationHit): string {
 function beforeTip(hit: MitigationHit): string {
   const graded = hit.targets.filter((t) => !t.vulnerable && !t.invulnerable);
   const low = [...graded].sort((a, b) => a.healthBefore / a.maxHealth - b.healthBefore / b.maxHealth)[0];
-  return low ? `Lowest before: ${low.player} at ${pctHp(low.healthBefore / low.maxHealth)}` : "";
+  if (!low) return "";
+  // Matches the 100% the cell shows: nobody to single out.
+  if (pctHp(low.healthBefore / low.maxHealth) === "100%") return "Party at full health";
+  return `Lowest before: ${low.player} at ${pctHp(low.healthBefore / low.maxHealth)}`;
 }
 
 /** A per-hit tip for each pull that reached the hit. */
@@ -312,7 +314,7 @@ function PhaseRow({ phase, span }: { phase: string; span: number }) {
 }
 
 function stateTooltip(col: MitigationColumn, s: PlayerMitigation, hitMs: number): string {
-  const lines = [`${col.player} — ${col.name}`, STATE_STYLE[s.state].label];
+  const lines = [`${col.player} — ${col.name}`, ...(s.dead ? ["Dead or just raised"] : []), STATE_STYLE[s.state].label];
   if (s.lastCastMs !== undefined) lines.push(`Last cast ${fmtTime(s.lastCastMs)} (${Math.round((hitMs - s.lastCastMs) / 1000)}s before)`);
   if (s.readyMs !== undefined && Number.isFinite(s.readyMs)) lines.push(`Back at ${fmtTime(s.readyMs)}`);
   if (s.nextCastMs !== undefined) lines.push(`Next cast ${fmtTime(s.nextCastMs)}`);
@@ -382,8 +384,8 @@ export function PullTimeline({ hits, groups, expanded, onToggle }: TimelineProps
                 const st = STATE_STYLE[s.state];
                 return (
                   <td key={colKey(c)} title={stateTooltip(c, s, hit.timestampMs)} style={{
-                    ...cellTd, ...ruled(i === 0), color: st.color, cursor: "help", fontSize: s.state === "dead" ? 11 : cellTd.fontSize,
-                    ...(s.state === "dead" ? { background: DEAD_CELL_BG } : {}),
+                    ...cellTd, ...ruled(i === 0), color: st.color, cursor: "help",
+                    ...(s.dead ? { background: DEAD_CELL_BG } : {}),
                   }}>
                     {st.mark}
                   </td>
@@ -409,12 +411,13 @@ export function AggregateTimeline({ rows, groups, expanded, onToggle }: Timeline
       <TimelineHead groups={visible} expanded={expanded} onToggle={onToggle} aggregate />
       <tbody>
         {rows.map((row) => {
-          const counts = new Map<string, Record<MitigationState, number>>();
+          const counts = new Map<string, Record<MitigationState | "dead", number>>();
           for (const { hit } of row.byPull) {
             for (const p of hit.players) {
               const k = `${p.player}|${p.key}`;
               const c = counts.get(k) ?? { used: 0, free: 0, available: 0, cooldown: 0, ineffective: 0, dead: 0 };
               c[p.state]++;
+              if (p.dead) c.dead++;
               counts.set(k, c);
             }
           }
@@ -477,7 +480,10 @@ export function TimelineLegend({ aggregate }: { aggregate: boolean }) {
   const marks = aggregate
     ? [swatch("var(--ck-text)", "12", "pulls it was used on this hit (greener = more often)"),
        swatch(STATE_STYLE.free.color, "◆", "never used, free in half the pulls or more")]
-    : (Object.keys(STATE_STYLE) as MitigationState[]).map((s) => swatch(STATE_STYLE[s].color, STATE_STYLE[s].mark, s));
+    : [...(Object.keys(STATE_STYLE) as MitigationState[]).map((s) => swatch(STATE_STYLE[s].color, STATE_STYLE[s].mark, s)),
+       <span key="dead" style={{ marginRight: 12, whiteSpace: "nowrap" }}>
+         <span style={{ background: DEAD_CELL_BG, padding: "0 5px", borderRadius: 2 }}>&nbsp;</span> dead or just raised
+       </span>];
   return (
     <div className="ck-help" style={{ display: "flex", gap: 32, flexWrap: "wrap", marginBottom: 8 }}>
       <div>
