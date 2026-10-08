@@ -10,8 +10,9 @@
 //
 // One view, the timeline (components/MitigationTimeline.tsx), for one boss
 // at a time (a Boss dropdown, defaulting to the current pull's boss), and
-// for either a single pull or all of that boss's pulls at once (the
-// default: one pull is too noisy to plan from). Pulls fetched before the mitigation fields were kept
+// for either a single pull or all of one group's pulls on that boss at once
+// (the default: one pull is too noisy to plan from). A group is an exact
+// roster; a report can hold several groups' pulls of the same boss. Pulls fetched before the mitigation fields were kept
 // are listed as needing a re-fetch; re-fetching stays an explicit action
 // elsewhere in the app, never triggered from here.
 
@@ -35,6 +36,10 @@ type MitigationDialogProps = {
   currentPullId: number | null;
 };
 
+const rosterKey = (pull: Pull) => pull.players.map((p) => p.name).sort().join("|");
+// First names in party-list order, for the group's dropdown heading.
+const rosterLabel = (pull: Pull) => pull.players.map((p) => p.name.split(" ")[0]).join(", ");
+
 export default function MitigationDialog({ open, onClose, pulls, currentPullId }: MitigationDialogProps) {
   const { ffPulls, selectedPullId, setSelectedPullId, selectedPull } =
     useFFPullSelector(pulls, open, currentPullId);
@@ -56,8 +61,18 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId }
     if (pulls.length) setSelectedPullId(pulls[pulls.length - 1].id);
   };
 
-  const analyzable = useMemo(() => bossPulls.filter(hasMitigationData), [bossPulls]);
-  const stale = bossPulls.length - analyzable.length;
+  // Within the boss, pulls are grouped by roster (every player the same), so
+  // "all pulls" never mixes two groups' mitigation plans.
+  const rosters = useMemo(() => {
+    const byKey = new Map<string, Pull[]>();
+    for (const p of bossPulls) byKey.set(rosterKey(p), [...(byKey.get(rosterKey(p)) ?? []), p]);
+    return [...byKey].map(([key, pulls]) => ({ key, pulls }));
+  }, [bossPulls]);
+  const roster = selectedPull ? rosterKey(selectedPull) : rosters[0]?.key;
+  const rosterPulls = useMemo(() => rosters.find((r) => r.key === roster)?.pulls ?? [], [rosters, roster]);
+
+  const analyzable = useMemo(() => rosterPulls.filter(hasMitigationData), [rosterPulls]);
+  const stale = rosterPulls.length - analyzable.length;
 
   // Only computed while open; the analysis reads every damage event.
   const perPull = useMemo(() => {
@@ -97,24 +112,36 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId }
             <span className="ck-label" style={{ margin: 0 }}>Pull</span>
             <select
               className="ck-field"
-              value={allPulls ? "all" : String(selectedPullId ?? "")}
+              value={allPulls ? `all:${roster}` : String(selectedPullId ?? "")}
               onChange={(e) => {
-                if (e.target.value === "all") { setAllPulls(true); return; }
+                const v = e.target.value;
+                if (v.startsWith("all:")) {
+                  const pulls = rosters.find((r) => r.key === v.slice(4))?.pulls ?? [];
+                  if (pulls.length) setSelectedPullId(pulls[pulls.length - 1].id);
+                  setAllPulls(true);
+                  return;
+                }
                 setAllPulls(false);
-                setSelectedPullId(Number(e.target.value));
+                setSelectedPullId(Number(v));
               }}
               style={{ padding: "3px 8px" }}
             >
-              <option value="all">All pulls ({analyzable.length})</option>
-              {bossPulls.map((p) => (
-                <option key={p.id} value={p.id}>
-                  #{p.pullNumber} ({p.result}){hasMitigationData(p) ? "" : " — needs re-fetch"}
-                </option>
+              {rosters.map((r, i) => (
+                <optgroup key={r.key} label={rosters.length > 1 ? `Group ${i + 1}: ${rosterLabel(r.pulls[0])}` : rosterLabel(r.pulls[0])}>
+                  <option value={`all:${r.key}`}>
+                    All pulls{rosters.length > 1 ? `, group ${i + 1}` : ""} ({r.pulls.filter(hasMitigationData).length})
+                  </option>
+                  {r.pulls.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      #{p.pullNumber} ({p.result}){hasMitigationData(p) ? "" : " — needs re-fetch"}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
             {stale > 0 && (
               <span className="ck-help" style={{ margin: 0 }}>
-                {stale} of {bossPulls.length} pulls were fetched before mitigation data was kept and are left out.
+                {stale} of {rosterPulls.length} pulls were fetched before mitigation data was kept and are left out.
                 Re-fetch the report to include them.
               </span>
             )}
