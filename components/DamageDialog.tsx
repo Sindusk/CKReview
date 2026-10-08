@@ -119,6 +119,8 @@ export default function DamageDialog({ open, onClose, pulls, currentPullId }: Da
     <Dialog
       title="Damage"
       width={gamePulls.length > 0 ? "min(1400px, 97vw)" : "480px"}
+      // Fixed, so picking a player with few findings doesn't shrink it.
+      height={gamePulls.length > 0 ? "88vh" : undefined}
       maxHeight="88vh"
       zIndex={1100}
       onBackdropClick={onClose}

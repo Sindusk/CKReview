@@ -15,6 +15,7 @@ export function Dialog({
   title,
   subtitle,
   width,
+  height,
   maxHeight = "90vh",
   zIndex = 1000,
   onBackdropClick,
@@ -28,6 +29,8 @@ export function Dialog({
   subtitle?:        ReactNode;
   /** Any CSS width; it is capped to the viewport. */
   width:            string;
+  /** A fixed height, so the dialog doesn't resize as its content changes. */
+  height?:          string;
   maxHeight?:       string;
   zIndex?:          number;
   onBackdropClick?: () => void;
@@ -44,7 +47,7 @@ export function Dialog({
         role="dialog"
         aria-modal="true"
         onClick={(e) => e.stopPropagation()}
-        style={{ width, maxWidth: "100%", maxHeight, display: "flex", flexDirection: "column", minHeight: 0 }}
+        style={{ width, maxWidth: "100%", height, maxHeight, display: "flex", flexDirection: "column", minHeight: 0 }}
       >
         <Panel style={{ flex: "1 1 auto", minHeight: 0 }}>
           <PanelHeader title={title} subtitle={subtitle} shrinkTitle>
