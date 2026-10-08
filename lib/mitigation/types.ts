@@ -48,6 +48,9 @@ export type CatalogEntry = {
   inSheet?:   false;
   // True once the action and status IDs were seen in a real log.
   verified:   boolean;
+  // The log site's icon filename for the action (FFLogs "000000-000806.png"),
+  // so a column has its icon even when nobody cast it in the loaded pulls.
+  icon?:      string;
 };
 
 // What the analysis needs from a game: its catalog and how to read a

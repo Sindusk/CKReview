@@ -25,6 +25,7 @@ import { MARGIN_OVER, MARGIN_UNDER, verdictFor } from "@/lib/mitigation/analyze"
 import { FFXIV_MITIGATION } from "@/lib/mitigation/ffxiv-catalog";
 import { detectFFRoles, FF_ROLE_SLOTS } from "@/lib/mechanics/ffxiv/roles";
 import { getClassColor } from "@/lib/player-display";
+import { getFFAbilityIconUrl } from "@/lib/ability-icons";
 
 export type MitigationColumn = {
   player: string;
@@ -91,7 +92,10 @@ export function buildPlayerGroups(pulls: Pull[]): PlayerGroup[] {
         if (entry.cooldownMs === 0 || entry.kind === "invuln" || entry.kind === "limitBreak") continue;
         const list = entry.reach === "party" ? g.party : g.personal;
         if (list.some((c) => c.key === entry.key)) continue;
-        const icon = player.casts.find((c) => entry.actionIds.includes(c.abilityId) && c.abilityIcon)?.abilityIcon;
+        // From the catalog, so a column has its icon even when nobody cast
+        // it in these pulls; a cast's own icon is the fallback.
+        const icon = getFFAbilityIconUrl(entry.icon)
+          ?? player.casts.find((c) => entry.actionIds.includes(c.abilityId) && c.abilityIcon)?.abilityIcon;
         list.push({ player: player.name, job: player.className, key: entry.key, name: entry.name, kind: entry.kind, icon });
       }
       groups.set(player.name, g);

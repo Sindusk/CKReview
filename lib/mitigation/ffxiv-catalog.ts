@@ -253,6 +253,37 @@ export const FFXIV_MITIGATION_CATALOG: CatalogEntry[] = [
     kind: "personal", reach: "self", durationMs: 10_000, cooldownMs: 120_000, verified: false },
 ];
 
+// FFLogs icon filename per entry (lib/ability-icons.ts resolves it), from
+// the masterData ability lists of the sample reports, 2026-10-08. A new
+// entry's filename is the `icon` of its action ID in any report's
+// masterData.abilities.
+const FFXIV_MITIGATION_ICONS: Record<string, string> = {
+  "reprisal": "000000-000806.png", "feint": "000000-000828.png", "addle": "000000-000861.png",
+  "rampart": "000000-000801.png", "divine-veil": "002000-002508.png", "passage-of-arms": "002000-002515.png",
+  "guardian": "002000-002524.png", "bulwark": "000000-000167.png", "holy-sheltron": "002000-002950.png",
+  "intervention": "002000-002512.png", "hallowed-ground": "002000-002502.png", "shake-it-off": "002000-002563.png",
+  "damnation": "002000-002573.png", "bloodwhetting": "002000-002569.png", "nascent-flash": "002000-002567.png",
+  "holmgang": "000000-000266.png", "dark-missionary": "003000-003087.png", "dark-mind": "003000-003076.png",
+  "shadowed-vigil": "003000-003094.png", "the-blackest-night": "003000-003081.png", "oblation": "003000-003089.png",
+  "living-dead": "003000-003077.png", "heart-of-light": "003000-003424.png", "camouflage": "003000-003404.png",
+  "great-nebula": "003000-003435.png", "heart-of-corundum": "003000-003430.png", "brutal-shell": "003000-003403.png",
+  "superbolide": "003000-003416.png", "tank-lb1": "000000-000103.png", "tank-lb2": "000000-000103.png",
+  "tank-lb3": "000000-000103.png", "temperance": "002000-002645.png", "divine-caress": "002000-002128.png",
+  "aquaveil": "002000-002648.png", "divine-benison": "002000-002638.png", "sacred-soil": "002000-002804.png",
+  "expedient": "002000-002878.png", "fey-illumination": "002000-002853.png", "consolation": "002000-002851.png",
+  "galvanize": "002000-002801.png", "collective-unconscious": "003000-003140.png", "neutral-sect": "003000-003552.png",
+  "sun-sign": "003000-003109.png", "exaltation": "003000-003561.png", "celestial-intersection": "003000-003556.png",
+  "the-bole": "003000-003111.png", "the-spire": "003000-003115.png", "kerachole": "003000-003666.png",
+  "taurochole": "003000-003671.png", "holos": "003000-003678.png", "panhaima": "003000-003679.png",
+  "haima": "003000-003673.png", "eukrasian-prognosis": "003000-003660.png", "eukrasian-diagnosis": "003000-003659.png",
+  "troubadour": "002000-002612.png", "tactician": "003000-003040.png", "dismantle": "003000-003011.png",
+  "shield-samba": "003000-003469.png", "improvisation": "003000-003477.png", "magick-barrier": "003000-003237.png",
+  "manaward": "000000-000463.png", "tempera-coat": "003000-003835.png", "tempera-grassa": "003000-003836.png",
+  "radiant-aegis": "002000-002750.png", "tengentsu": "003000-003190.png", "arcane-crest": "003000-003632.png",
+  "shade-shift": "000000-000607.png", "riddle-of-earth": "002000-002537.png",
+};
+for (const entry of FFXIV_MITIGATION_CATALOG) entry.icon = FFXIV_MITIGATION_ICONS[entry.key];
+
 // Status ID -> (entry, status). One status belongs to exactly one entry.
 export const FFXIV_STATUS_INDEX: Map<number, { entry: CatalogEntry; status: CatalogStatus }> = (() => {
   const m = new Map<number, { entry: CatalogEntry; status: CatalogStatus }>();
