@@ -59,6 +59,12 @@
 //     ability applied. A double-up. Vamp: every opening-bomb death; those
 //     hits ran 6-22x max HP. Major on the victim; the description names
 //     what gave the vulnerability.
+//   - doubled: the player took two or more copies of one ability in one
+//     resolution (distinct source instances; each copy is meant for one
+//     target), unless half or more of its clean resolutions so far did.
+//     Vamp pull 2 +21.7: the tanks stood 5.6y apart and each took both
+//     Hardcores (user: both tanks at fault). A whole-raid double with no
+//     death is how that raid plays it and isn't flagged.
 //   - wrong target: hit by an ability whose clean resolutions never hit
 //     the victim's role. Major. Vamp pull 1 +221.9: four non-tanks killed
 //     by a tank-only Hardcore at 3.4-3.8x max HP.
@@ -69,6 +75,11 @@
 //     for, or took more than their share. Major. Vamp: clean tank busters
 //     reach 1.36x on a tank; non-tank deaths of this kind ran 1.6-6x. When
 //     the hit reached more players than any clean resolution, it says so.
+//   - after a mistake: a small finishing blow (an auto-attack, a tick)
+//     within DEATH_LOOKBACK_MS of a doubled, wrong-target or avoidable hit
+//     that left the player at LOW_HP_AFTER or less. The death is that
+//     hit's. Vamp pull 2: Alice at 5% from the doubled Hardcore, killed
+//     2.4s later by an auto-attack.
 //   - survivable: everything else (a hit under max HP that landed on a low
 //     player, DoT ticks, auto-attacks). Nobody to blame from the log, so
 //     one player-less Minor per cluster of such deaths, with each victim's
@@ -81,7 +92,7 @@
 // the enemy stack counters beside their clean range. Vamp's Satisfied
 // enlarges Hardcore (user, VOD of pull 1, which died at 10 stacks).
 // Non-fatal hits (one per player per ability per CLUSTER_GAP_MS): wrong
-// target, avoidable, then hit while vulnerable, in that priority. Major in
+// target, avoidable, doubled, then hit while vulnerable, in that priority. Major in
 // FFXIV, Minor in WoW (avoidableSeverity).
 // Penalties: a Damage Down is folded into the hit that caused it; on its
 // own it is a Major on each player who got it, raid-wide ones included
@@ -132,6 +143,11 @@ const MIN_CLEAN_STACK_EPISODES = 2;
 const EVERYONE_FRACTION = 0.8;
 const SHARE_RAW_RISE = 1.5;
 const MAX_NAMED_MISSING = 2;
+const NORMAL_DOUBLE_FRACTION = 0.5;
+// A flagged hit that left a player at or under this much HP owns a death
+// that follows within DEATH_LOOKBACK_MS (Vamp pull 2: Alice left at 5% by
+// a doubled tank buster, killed 2.4s later by an auto-attack).
+const LOW_HP_AFTER = 0.3;
 const STACK_NOTE_RULES = new Set([
   "fallback-death-wrong-target", "fallback-wrong-target-hit", "fallback-death-unsurvivable",
   "fallback-death-full-hp", "fallback-under-soak", "fallback-missed-share",
@@ -184,6 +200,8 @@ type AbilityStats = {
   cleanEveryone: number;
   /** Damage before mitigation / max HP, per clean hit. */
   cleanRaw: number[];
+  /** Clean resolutions where a player took two or more of its instances. */
+  cleanDoubled: number;
 };
 
 export type FallbackProfile = {
@@ -229,8 +247,23 @@ function penaltyGroups(pull: Pull): { player: PlayerInfo; d: PlayerEvent }[][] {
 }
 
 const emptyStats = (): AbilityStats => ({
-  casts: 0, hits: 0, cleanResolutions: 0, cleanHits: 0, cleanRoles: {}, cleanSizes: [], cleanEveryone: 0, cleanRaw: [],
+  casts: 0, hits: 0, cleanResolutions: 0, cleanHits: 0, cleanRoles: {}, cleanSizes: [], cleanEveryone: 0, cleanRaw: [], cleanDoubled: 0,
 });
+
+/**
+ * The players a resolution hit with two or more different copies of the
+ * ability (distinct source instances), with how many. Each copy is meant
+ * for one target, so a player taking two stood in someone else's.
+ */
+function doubledIn(res: Hit[]): Map<string, number> {
+  const copies = new Map<string, Set<string>>();
+  for (const h of res) {
+    const set = copies.get(h.player.name) ?? new Set<string>();
+    set.add(`${h.event.source ?? ""}#${h.event.sourceInstance ?? 0}`);
+    copies.set(h.player.name, set);
+  }
+  return new Map([...copies].filter(([, s]) => s.size >= 2).map(([name, s]) => [name, s.size]));
+}
 
 const playersIn = (res: Hit[]) => new Set(res.map((h) => h.player.name));
 const isClean = (hits: Hit[]) => !hits.some((h) => isFatal(h.event) || isVulnerable(h.event));
@@ -298,6 +331,7 @@ function contribution(pull: Pull): FallbackProfile {
       s.cleanHits += res.length;
       s.cleanSizes.push(size);
       if (everyone) s.cleanEveryone++;
+      if (doubledIn(res).size > 0) s.cleanDoubled++;
       for (const h of res) {
         s.cleanRoles[h.player.role] = (s.cleanRoles[h.player.role] ?? 0) + 1;
         if (h.event.maxHealth) s.cleanRaw.push(ratioOf(h.event));
@@ -316,6 +350,7 @@ function addStats(a: AbilityStats | undefined, b: AbilityStats): AbilityStats {
     cleanResolutions: a.cleanResolutions + b.cleanResolutions, cleanHits: a.cleanHits + b.cleanHits,
     cleanRoles: roles, cleanSizes: [...a.cleanSizes, ...b.cleanSizes],
     cleanEveryone: a.cleanEveryone + b.cleanEveryone, cleanRaw: [...a.cleanRaw, ...b.cleanRaw],
+    cleanDoubled: a.cleanDoubled + b.cleanDoubled,
   };
 }
 
@@ -363,6 +398,18 @@ function rolesHit(profile: FallbackProfile, e: PlayerEvent): { roles: PlayerRole
   const stats = enough(byId) ? byId : profile.byName.get(e.abilityName);
   if (!stats || !enough(stats)) return undefined;
   return { roles: (Object.keys(stats.cleanRoles) as PlayerRole[]), stats };
+}
+
+/**
+ * Taking two copies is how this ability normally lands (a designed
+ * multi-hit), going by its clean resolutions so far. Without that history
+ * a double is an error. Vamp: Hardcore doubled once in 20 resolutions (pull
+ * 2's tanks standing 5.6y apart, user-confirmed), Blast Beat 3 in 58, all
+ * fatal; Brutal Rain 3 in 27, the second group's merged stacks.
+ */
+function doublesAreNormal(profile: FallbackProfile, e: PlayerEvent): boolean {
+  const s = profile.byId.get(e.abilityId);
+  return !!s && s.cleanResolutions >= ROLE_MIN_CLEAN_RESOLUTIONS && s.cleanDoubled >= s.cleanResolutions * NORMAL_DOUBLE_FRACTION;
 }
 
 function wrongTarget(profile: FallbackProfile, h: Hit) {
@@ -546,6 +593,27 @@ export function detectFallbackErrors(pull: Pull, profile: FallbackProfile): Pull
     }
   }
 
+  // ── Doubled hits: two copies of one ability on one player ──
+  const doubled = new Map<PlayerEvent, number>();
+  for (const res of allResolutions) {
+    if (doublesAreNormal(profile, res[0].event)) continue;
+    const players = doubledIn(res);
+    // Half the raid or more taking two, with nobody dying: how this raid
+    // plays it (Vamp's second group stacked all 8 for two Brutal Rains in
+    // every pull that reached it), not each player's mistake.
+    if (players.size >= aliveCount(pull, res[0].event.timestamp) / 2 && !res.some((h) => isFatal(h.event))) continue;
+    for (const h of res) if (players.has(h.player.name)) doubled.set(h.event, players.get(h.player.name)!);
+  }
+
+  // A flagged hit that left the player low, before a death to something
+  // small: the death is that hit's, not the finishing blow's.
+  const flaggedHitBefore = (player: PlayerInfo, e: PlayerEvent) => player.damageTaken
+    .filter((x) => x !== e && !x.isDoT && x.timestamp < e.timestamp && e.timestamp - x.timestamp <= DEATH_LOOKBACK_MS)
+    .filter((x) => x.maxHealth && x.healthAfter !== undefined && x.healthAfter / x.maxHealth <= LOW_HP_AFTER)
+    .filter((x) => doubled.has(x) || rarelyHits(profile, x) || wrongTarget(profile, { player, event: x }))
+    .pop();
+  const doubledText = (x: PlayerEvent) => `took ${doubled.get(x)} copies of ${x.abilityName} at once, each meant for a different target`;
+
   // ── Deaths ──
   const handled = new Set<PlayerEvent>();
   const survivable: { d: DeathEvent; hit: PlayerEvent }[] = [];
@@ -584,6 +652,11 @@ export function detectFallbackErrors(pull: Pull, profile: FallbackProfile): Pull
         description: `Died to ${e.abilityName}${fromSource(e)} (${times(ratioOf(e))} max HP), which hit only ${roleList(wrong.roles)} ` +
           `in its ${wrong.stats.cleanResolutions} clean resolutions so far.`,
       }));
+    } else if (doubled.has(e)) {
+      errors.push(playerError(player, {
+        ...base, ruleId: "fallback-death-doubled", severity: "Major", name: "Took Two Copies",
+        description: `Died after they ${doubledText(e)} (${times(ratioOf(e))} max HP for the last one).`,
+      }));
     } else if (rare) {
       errors.push(playerError(player, {
         ...base, ruleId: "fallback-death-avoidable", severity: "Major", name: "Died to Avoidable Damage",
@@ -606,7 +679,23 @@ export function detectFallbackErrors(pull: Pull, profile: FallbackProfile): Pull
           `(${times(ratioOf(e))} max HP before mitigation): not enough mitigation for it, or they took it when they weren't meant to.`,
       }));
     } else {
-      survivable.push({ d, hit: e });
+      const x = flaggedHitBefore(player, e);
+      if (!x) {
+        survivable.push({ d, hit: e });
+        continue;
+      }
+      for (const y of player.damageTaken) {
+        if (y.abilityId === x.abilityId && Math.abs(y.timestamp - x.timestamp) <= CLUSTER_GAP_MS) handled.add(y);
+      }
+      const what = doubled.has(x) ? `they ${doubledText(x)}`
+        : wrongTarget(profile, { player, event: x }) ? `${x.abilityName} hit them, a role it isn't meant for`
+        : `they were hit by ${x.abilityName}, which rarely hits anyone`;
+      errors.push(playerError(player, {
+        timestamp: x.timestamp, abilityId: x.abilityId, abilityName: x.abilityName, amount: x.amount,
+        ruleId: "fallback-death-after-hit", severity: "Major", name: "Died After a Mistake",
+        description: `At +${sec(x.timestamp)}s ${what}, which left them at ${pct((x.healthAfter ?? 0) / (x.maxHealth ?? 1))} HP; ` +
+          `${e.abilityName}${e.isDoT ? " (a tick)" : ""} finished them ${sec(e.timestamp - x.timestamp)}s later.`,
+      }));
     }
   }
   for (const group of clusterByGap(survivable, (x) => x.hit.timestamp, CLUSTER_GAP_MS)) {
@@ -637,6 +726,8 @@ export function detectFallbackErrors(pull: Pull, profile: FallbackProfile): Pull
         text: `which hit only ${roleList(wrong.roles)} in its ${wrong.stats.cleanResolutions} clean resolutions so far` };
       else if (rare) flag = { rule: "fallback-avoidable-hit", name: "Avoidable Damage",
         text: `which hit a player on only ${rare.hits} of its ${rare.casts} casts so far` };
+      else if (doubled.has(event)) flag = { rule: "fallback-doubled-hit", name: "Took Two Copies",
+        text: `taking ${doubled.get(event)} copies at once, each meant for a different target` };
       else if (isVulnerable(event)) flag = { rule: "fallback-vulnerable-hit", name: "Hit While Vulnerable",
         text: `while carrying ${vulnCause(player, event)}` };
       if (!flag) continue;
