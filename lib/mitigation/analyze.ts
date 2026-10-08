@@ -8,7 +8,8 @@
 // One enemy ability's damage landing on RAIDWIDE_MIN_TARGETS+ players,
 // consecutive events no more than HIT_CLUSTER_GAP_MS apart (the game
 // staggers a raidwide's events ~45ms per target). DoT ticks are left out of
-// hit detection but count toward a sequence's later damage. A hit whose
+// hit detection but count toward a sequence's later damage. Dead players'
+// bodies still log hits (immune, at 0 HP); those are left out. A hit whose
 // targets were mostly killed by damage no mitigation saves (beyondMitigation)
 // isn't a raidwide: a mechanic hit the wrong players, or an enrage.
 //
@@ -136,6 +137,9 @@ function findRaidwideClusters(pull: Pull, playerNames: Set<string>): TargetEvent
     for (const event of player.damageTaken) {
       if (event.isDoT) continue;
       if (!event.source || playerNames.has(event.source)) continue;
+      // A dead player's body still logs the hit, as an immune 0 at 0 HP
+      // (Vamp Fatale pull 8, Brutal Rain on a player dead 10s earlier).
+      if (event.healthBefore === 0) continue;
       const list = byAbility.get(event.abilityId) ?? [];
       list.push({ player, event });
       byAbility.set(event.abilityId, list);
