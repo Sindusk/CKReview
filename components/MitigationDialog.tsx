@@ -26,6 +26,7 @@ import {
   AggregateTimeline, PullTimeline, TimelineLegend, buildPlayerGroups, hasMitigationData,
 } from "./MitigationTimeline";
 import { Dialog } from "./ui/Dialog";
+import RosterPullPicker from "./RosterPullPicker";
 
 type MitigationDialogProps = {
   open:     boolean;
@@ -37,8 +38,6 @@ type MitigationDialogProps = {
 };
 
 const rosterKey = (pull: Pull) => pull.players.map((p) => p.name).sort().join("|");
-// First names in party-list order, for the group's dropdown heading.
-const rosterLabel = (pull: Pull) => pull.players.map((p) => p.name.split(" ")[0]).join(", ");
 
 export default function MitigationDialog({ open, onClose, pulls, currentPullId }: MitigationDialogProps) {
   const { ffPulls, selectedPullId, setSelectedPullId, selectedPull } =
@@ -110,35 +109,21 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId }
               {bosses.map((b) => <option key={b} value={b}>{b}</option>)}
             </select>
             <span className="ck-label" style={{ margin: 0 }}>Pull</span>
-            <select
-              className="ck-field"
-              value={allPulls ? `all:${roster}` : String(selectedPullId ?? "")}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (v.startsWith("all:")) {
-                  const pulls = rosters.find((r) => r.key === v.slice(4))?.pulls ?? [];
+            <RosterPullPicker
+              rosters={rosters}
+              usable={hasMitigationData}
+              value={allPulls ? { kind: "all", roster: roster ?? "" } : { kind: "pull", pullId: selectedPullId ?? -1 }}
+              onChange={(pick) => {
+                if (pick.kind === "all") {
+                  const pulls = rosters.find((r) => r.key === pick.roster)?.pulls ?? [];
                   if (pulls.length) setSelectedPullId(pulls[pulls.length - 1].id);
                   setAllPulls(true);
                   return;
                 }
                 setAllPulls(false);
-                setSelectedPullId(Number(v));
+                setSelectedPullId(pick.pullId);
               }}
-              style={{ padding: "3px 8px" }}
-            >
-              {rosters.map((r, i) => (
-                <optgroup key={r.key} label={rosters.length > 1 ? `Group ${i + 1}: ${rosterLabel(r.pulls[0])}` : rosterLabel(r.pulls[0])}>
-                  <option value={`all:${r.key}`}>
-                    All pulls{rosters.length > 1 ? `, group ${i + 1}` : ""} ({r.pulls.filter(hasMitigationData).length})
-                  </option>
-                  {r.pulls.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      #{p.pullNumber} ({p.result}){hasMitigationData(p) ? "" : " — needs re-fetch"}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
+            />
             {stale > 0 && (
               <span className="ck-help" style={{ margin: 0 }}>
                 {stale} of {rosterPulls.length} pulls were fetched before mitigation data was kept and are left out.
