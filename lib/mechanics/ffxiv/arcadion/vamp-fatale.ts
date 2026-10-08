@@ -476,17 +476,31 @@ const RAID_KILLS          = [45965, 45966]; // Barbed Burst, Doornail Explosion
 
 // Hits that are the hit player's own fault (each also hands out Damage Down,
 // which is why ffxiv-damage-down excludes their causes; see error-rules.ts).
-const AVOIDABLE: Record<number, string> = {
-  45928: "Coffinfiller", 45929: "Coffinfiller", 45930: "Coffinfiller",
-  45943: "Half Moon", 45944: "Half Moon", 45945: "Half Moon", 45946: "Half Moon",
-  45947: "Half Moon", 45948: "Half Moon", 45949: "Half Moon", 45950: "Half Moon",
-  45939: "Pulping Pulse",
-  45969: "Aetherletting (rotating cone)",
-  45976: "Naughty Knot",
-  45987: "Explosion (bat chain)",
-  45989: "Sanguine Scratch", 45991: "Sanguine Scratch",
-  45992: "Breakdown Drop", 45994: "Breakdown Drop",
-  45993: "Breakwing Beat", 45995: "Breakwing Beat",
+// `hit` says what happened; `why`, when set, is the one-line correct play.
+type Avoidable = { name: string; hit: string; why?: string };
+const COFFINFILLER: Avoidable = { name: "Coffinfiller", hit: "Hit by the Coffinmaker's Coffinfiller blades",
+  why: "Its glowing blades fire a pair at a time as it advances down the lane; stand clear of the lit pair." };
+const HALF_MOON: Avoidable = { name: "Half Moon", hit: "Caught in Half Moon, the boss's half-arena cleave",
+  why: "It cleaves one half and then the other; move to the safe half before each one lands." };
+const SCRATCH: Avoidable = { name: "Sanguine Scratch", hit: "Caught by Sanguine Scratch, the boss's cones during Undead Deathmatch",
+  why: "Move into the gap between the cones while staying with your bat." };
+const BREAKDOWN: Avoidable = { name: "Breakdown Drop", hit: "Hit by a bat's Breakdown Drop, a circle around the bat",
+  why: "For the circle, stand away from your bat, toward the boss." };
+const BREAKWING: Avoidable = { name: "Breakwing Beat", hit: "Hit by a bat's Breakwing Beat, a donut around the bat",
+  why: "For the donut, stand right next to your bat." };
+const AVOIDABLE: Record<number, Avoidable> = {
+  45928: COFFINFILLER, 45929: COFFINFILLER, 45930: COFFINFILLER,
+  45943: HALF_MOON, 45944: HALF_MOON, 45945: HALF_MOON, 45946: HALF_MOON,
+  45947: HALF_MOON, 45948: HALF_MOON, 45949: HALF_MOON, 45950: HALF_MOON,
+  45939: { name: "Pulping Pulse", hit: "Stood in a Pulping Pulse ground circle" },
+  45969: { name: "Aetherletting Cone", hit: "Caught by one of Aetherletting's rotating cones",
+    why: "The cones fire in sequence around the arena; dodge locally into the gap that has already fired." },
+  45976: { name: "Naughty Knot", hit: "Hit by Naughty Knot while bound inside a Charnel Cell" },
+  45987: { name: "Bat Chain Explosion", hit: "Their bat chain exploded on them",
+    why: "The chain breaks when it's stretched too far from its bat (or taken from the wrong side's tower); stay close to your own bat as it circles." },
+  45989: SCRATCH, 45991: SCRATCH,
+  45992: BREAKDOWN, 45994: BREAKDOWN,
+  45993: BREAKWING, 45995: BREAKWING,
 };
 
 // FFLogs logs the death event ~2.0s after the fatal hit (same as Dancing
@@ -674,10 +688,13 @@ function detectStomp(players: PlayerInfo[], life: Life, explosions: Explosion[],
       if (!life.hitAlive(p, e.timestamp) || ((e.amount ?? 0) === 0 && !gotDamageDown(p, e.timestamp))) continue;
       if (errors.some((x) => x.player === p.name && x.ruleId === VF_STOMP_BAT_RULE_ID && e.timestamp - x.timestamp < 5000)) continue;
       const death = life.diedFrom(p, e.timestamp);
-      const how = death && death.timestamp - e.timestamp > 1000 ? ", and died to the Blast Beat that followed under the bat's Magic Vulnerability Up" : diedText(death);
+      const how = !death ? ""
+        : death.timestamp - e.timestamp > 1000
+          ? " With that vulnerability still on, their own Bombpyre explosion a moment later killed them."
+          : " The bat's hit killed them.";
       errors.push(playerError(p, {
         ruleId: VF_STOMP_BAT_RULE_ID, severity: "Major", name: "Hit by a Bat (Vamp Stomp)",
-        description: `Touched an orbiting bat's Blast Beat (${kFmt(e.amount ?? 0)})${how}.`,
+        description: `Stood where an orbiting Vamp Stomp bat exploded (Blast Beat, ${kFmt(e.amount ?? 0)})${gotDamageDown(p, e.timestamp) ? " and got Damage Down" : ""} plus Magic Vulnerability Up. The bats burst when the expanding ring reaches them; keep your spot clear of their path.${how}`,
         timestamp: e.timestamp, abilityId: BLAST_BEAT_BAT, abilityName: "Blast Beat",
       }));
     }
@@ -697,7 +714,7 @@ function detectStomp(players: PlayerInfo[], life: Life, explosions: Explosion[],
       for (const p of blame) {
         errors.push(playerError(p, {
           ruleId: VF_STOMP_OVERLAP_RULE_ID, severity: "Major", name: "Bombpyre Explosions Overlapped",
-          description: `${p === x.owner ? `Their Bombpyre explosion hit ${v.p.name}` : `Stood in ${x.owner.name}'s Bombpyre explosion`} (${kFmt(v.e.amount ?? 0)}${death ? `, ${v.p.name} died` : ""}). ${where}.${blame.length > 1 ? " Neither was clearly off their spot, so both are flagged." : ""}`,
+          description: `${p === x.owner ? `Their Bombpyre explosion hit ${v.p.name}` : `Stood in ${x.owner.name}'s Bombpyre explosion`} (${kFmt(v.e.amount ?? 0)}${death ? `, ${v.p.name} died` : ""}). Each carrier explodes when the ring reaches them and must be alone at their own clock spot. ${where}.${blame.length > 1 ? " Neither was clearly off their spot, so both are flagged." : ""}`,
           timestamp: v.e.timestamp, abilityId: BLAST_BEAT_PLAYER, abilityName: "Blast Beat",
         }));
       }
@@ -720,12 +737,17 @@ function detectAvoidable(players: PlayerInfo[], life: Life): PullError[] {
     const chain = hits.filter((e) => e.abilityId === CHAIN_EXPLOSION);
     for (const g of [...clusterByGap(hits.filter((e) => e.abilityId !== CHAIN_EXPLOSION), (e) => e.timestamp, 3000),
                      ...clusterByGap(chain, (e) => e.timestamp, 8000)]) {
-      const names = uniq(g.map((e) => AVOIDABLE[e.abilityId]));
+      const kinds = uniq(g.map((e) => AVOIDABLE[e.abilityId]));
       const total = g.reduce((s, e) => s + (e.amount ?? 0), 0);
       const death = life.diedFrom(p, g[g.length - 1].timestamp);
+      const dd = g.some((e) => gotDamageDown(p, e.timestamp));
+      const hit = kinds.map((k, i) => (i === 0 ? k.hit : k.hit.charAt(0).toLowerCase() + k.hit.slice(1))).join(", and ");
+      const times = g.length > 1 ? `${g.length} hits, ` : "";
+      const outcome = [dd ? "got Damage Down" : "", death ? "died" : ""].filter(Boolean).join(" and ");
+      const why = kinds.map((k) => k.why).filter(Boolean).join(" ");
       errors.push(playerError(p, {
-        ruleId: VF_AVOIDABLE_RULE_ID, severity: "Major", name: `Hit by ${names.join(" / ")}`,
-        description: `Hit by ${joinNames(names)} (${g.length > 1 ? `${g.length} hits, ` : ""}${kFmt(total)})${diedText(death)}.`,
+        ruleId: VF_AVOIDABLE_RULE_ID, severity: "Major", name: `Hit by ${kinds.map((k) => k.name).join(" / ")}`,
+        description: `${hit} (${times}${kFmt(total)}).${outcome ? ` They ${outcome}.` : ""}${why ? ` ${why}` : ""}`,
         timestamp: g[0].timestamp, abilityId: g[0].abilityId, abilityName: g[0].abilityName,
       }));
     }
@@ -770,7 +792,7 @@ function detectSaws(players: PlayerInfo[], life: Life, deaths: DeathEvent[]): Pu
       const total = ticks.reduce((s, e) => s + (e.amount ?? 0), 0);
       errors.push(playerError(p, {
         ruleId: VF_SAW_RULE_ID, severity: death ? "Major" : "Minor", name: "Saw / Puddle Contact",
-        description: `Touched ${what} (${kFmt(total)} over ${ticks.length} hit${ticks.length === 1 ? "" : "s"})${death ? ", and died while it was still ticking" : ""}.`,
+        description: `Touched ${what} (${kFmt(total)} over ${ticks.length} hit${ticks.length === 1 ? "" : "s"}). The saws run along their lanes and the Doornail's puddle keeps growing; step around them. ${death ? "They died while the damage-over-time was still ticking." : "No Damage Down, and the healers can heal through it, so it's minor."}`,
         timestamp: ep.start, abilityId: ep.kinds[0] === "saw" ? FLESH_WOUND : ELECTROCUTION[0], abilityName: ep.kinds[0] === "saw" ? "Flesh Wound" : "Electrocution",
       }));
     }
@@ -791,7 +813,7 @@ function detectHardcore(players: PlayerInfo[], life: Life): PullError[] {
     const enlarged = g.some((h) => h.e.abilityId === HARDCORE[1]);
     if (others.length >= 3) {
       errors.push(raidMarker(VF_HARDCORE_PARTY_RULE_ID, "Hardcore Hit the Party",
-        `${enlarged ? "Enlarged (Satisfied 8+) " : ""}Hardcore hit ${others.length} non-tanks (${namesOf(others)})${killed.length ? `, killing ${killed.length}` : ""}. The tanks and the party weren't separated. Unresolvable from here.`,
+        `${enlarged ? "Enlarged " : ""}Hardcore hit ${others.length} non-tanks (${namesOf(others)})${killed.length ? `, killing ${killed.length}` : ""}. The tanks and the party weren't separated.${enlarged ? " Once Satisfied reaches 8 stacks (earlier deaths and mistakes add to it), Hardcore's circles grow much larger, so the tanks have to take it far from the party." : ""} Unresolvable from here.`,
         t, g[0].e.abilityId, "Hardcore"));
       continue;
     }
@@ -804,7 +826,7 @@ function detectHardcore(players: PlayerInfo[], life: Life): PullError[] {
       const e = g.find((h) => h.p === p)!.e;
       errors.push(playerError(p, {
         ruleId: VF_HARDCORE_RULE_ID, severity: "Major", name: "Hit by Hardcore",
-        description: `Took a ${enlarged ? "enlarged " : ""}Hardcore tankbuster (${kFmt(e.amount ?? 0)}) with both tanks alive${diedText(life.diedFrom(p, e.timestamp))}.`,
+        description: `Took ${enlarged ? "an enlarged" : "a"} Hardcore tankbuster (${kFmt(e.amount ?? 0)}) with both tanks alive${diedText(life.diedFrom(p, e.timestamp))}. Hardcore drops a circle on each of the top two enmity targets (the tanks); everyone else has to stay out of both${enlarged ? ", and the enlarged circles reach much further" : ""}.`,
         timestamp: e.timestamp, abilityId: e.abilityId, abilityName: "Hardcore",
       }));
     }
@@ -823,14 +845,14 @@ function detectRain(players: PlayerInfo[], life: Life, deaths: DeathEvent[]): Pu
       if (hit.has(p) || !life.hitAlive(p, from) || !life.hitAlive(p, to)) continue;
       errors.push(playerError(p, {
         ruleId: VF_RAIN_MISSED_RULE_ID, severity: "Major", name: "Missed the Brutal Rain Stack",
-        description: `Alive but took none of Brutal Rain's ${uniq(seq.map((h) => Math.round(h.e.timestamp / 900))).length} stack hits, leaving the rest to share them.`,
+        description: `Alive but took none of Brutal Rain's ${uniq(seq.map((h) => Math.round(h.e.timestamp / 900))).length} stack hits. Brutal Rain is a repeated party stack on a healer that splits its damage among everyone in it; missing it leaves the rest to take more.`,
         timestamp: from, abilityId: BRUTAL_RAIN_HIT, abilityName: "Brutal Rain",
       }));
     }
     const killed = deaths.filter((d) => d.killingAbilityGameId === BRUTAL_RAIN_HIT && d.timestamp >= from && d.timestamp <= to + DIED_FROM_HIT_MS);
     if (killed.length >= 3) {
       errors.push(raidMarker(VF_RAIN_WIPE_RULE_ID, "Brutal Rain Killed the Party",
-        `Brutal Rain killed ${killed.length} (${joinNames(killed.map((d) => d.player))}) with ${hit.size} sharing it. Unresolvable from here.`,
+        `Brutal Rain killed ${killed.length} (${joinNames(killed.map((d) => d.player))}) with ${hit.size} sharing it: the party wasn't healed and mitigated enough between its hits. Unresolvable from here.`,
         killed[0].timestamp - DEATH_EVENT_LAG_MS, BRUTAL_RAIN_HIT, "Brutal Rain"));
     }
   }
@@ -862,7 +884,7 @@ function detectAetherletting(players: PlayerInfo[], life: Life, casts: EnemyEven
     if (culprit && life.hitAlive(culprit.owner, t)) {
       errors.push(playerError(culprit.owner, {
         ruleId: VF_AETH_OVERLAP_RULE_ID, severity: "Major", name: "Aetherletting Puddles Overlapped",
-        description: `Their Aetherletting drop touched another puddle, setting off the raid-wide overlap explosions. ${dropText(culprit)}.`,
+        description: `Their Aetherletting drop touched another puddle, setting off the raid-wide overlap explosions. Each marked player drops against the wall at their own assigned spot so the puddles stay apart. ${dropText(culprit)}.`,
         timestamp: t, abilityId: AETH_OVERLAP, abilityName: "Aetherletting",
       }));
     }
@@ -883,7 +905,7 @@ function detectAetherletting(players: PlayerInfo[], life: Life, casts: EnemyEven
       const blame = dropOff(d) >= vOff ? d.owner : v.p;
       errors.push(playerError(blame, {
         ruleId: VF_AETH_CLIP_RULE_ID, severity: "Major", name: "Aetherletting Drop Clipped Someone",
-        description: `${blame === d.owner ? `Their drop hit ${v.p.name}` : `Stood in ${d.owner.name}'s drop`} (${kFmt(v.e.amount ?? 0)}${life.diedFrom(v.p, v.e.timestamp) ? `, ${v.p.name} died` : ""}). ${dropText(d)}; ${v.p.name} was ${yd(vOff)}y from their own spot.`,
+        description: `${blame === d.owner ? `Their Aetherletting drop hit ${v.p.name}` : `Stood in ${d.owner.name}'s Aetherletting drop`} (${kFmt(v.e.amount ?? 0)}${life.diedFrom(v.p, v.e.timestamp) ? `, ${v.p.name} died` : ""}). Each drop is a spread that must land on its owner alone at their spot. ${dropText(d)}; ${v.p.name} was ${yd(vOff)}y from their own spot.`,
         timestamp: v.e.timestamp, abilityId: AETH_DROP, abilityName: "Aetherletting",
       }));
     }
@@ -907,7 +929,7 @@ function detectAetherletting(players: PlayerInfo[], life: Life, casts: EnemyEven
     for (const v of victims.filter((h) => !centered.includes(h))) {
       errors.push(playerError(v.p, {
         ruleId: VF_AETH_CROSS_RULE_ID, severity: "Major", name: "Hit by an Aetherletting Line",
-        description: `Hit by ${!owner ? "a" : owner.owner === v.p ? "their own" : `${owner.owner.name}'s`} puddle's delayed line (${kFmt(v.e.amount ?? 0)}) standing ${yd(fromBoss(v))}y from the boss instead of under it${diedText(life.diedFrom(v.p, v.e.timestamp))}.`,
+        description: `Hit by ${!owner ? "a" : owner.owner === v.p ? "their own" : `${owner.owner.name}'s`} puddle's delayed line (${kFmt(v.e.amount ?? 0)})${gotDamageDown(v.p, v.e.timestamp) ? " and got Damage Down" : ""}${diedText(life.diedFrom(v.p, v.e.timestamp))}. They stood ${yd(fromBoss(v))}y from the boss; the only safe spot for the puddles' lines is right under the boss.`,
         timestamp: v.e.timestamp, abilityId: AETH_CROSS, abilityName: "Aetherletting",
       }));
     }
@@ -915,7 +937,7 @@ function detectAetherletting(players: PlayerInfo[], life: Life, casts: EnemyEven
       const killed = centered.filter((h) => life.diedFrom(h.p, h.e.timestamp)).map((h) => h.p);
       errors.push(playerError(owner.owner, {
         ruleId: VF_AETH_CROSS_RULE_ID, severity: "Major", name: "Aetherletting Line Through the Center",
-        description: `Their puddle's delayed line crossed the stack under the boss, hitting ${namesOf(centered.map((h) => h.p))}${killed.length ? ` (${namesOf(killed)} died)` : ""}. ${dropText(owner)}.`,
+        description: `Their puddle's delayed line crossed the stack under the boss, hitting ${namesOf(centered.map((h) => h.p))}${killed.length ? ` (${namesOf(killed)} died)` : ""}. A puddle dropped at its assigned spot sends its lines past the boss; a drop at the wrong angle runs a line through it. ${dropText(owner)}.`,
         timestamp: centered[0].e.timestamp, abilityId: AETH_CROSS, abilityName: "Aetherletting",
       }));
     } else if (centered.length) {
@@ -946,7 +968,7 @@ function detectAdds(players: PlayerInfo[], life: Life, casts: EnemyEvent[], deat
       for (const p of absent) {
         errors.push(playerError(p, {
           ruleId: VF_FLAIL_TOWER_RULE_ID, severity: "Major", name: "Missed a Plummet Tower",
-          description: `Alive but didn't soak their Plummet tower${soakers.length ? ` (${namesOf(soakers)} took the other)` : ""}${impact ? "; Massive Impact hit the party and left Sustained Damage on everyone" : ""}.`,
+          description: `Alive but didn't soak their Plummet tower${soakers.length ? ` (${namesOf(soakers)} took the other)` : ""}. Each tank soaks one tower (MT north, OT south)${impact ? "; the empty one went off as Massive Impact on the party and left Sustained Damage on everyone" : ""}.`,
           timestamp: t, abilityId: PLUMMET, abilityName: "Plummet",
         }));
       }
@@ -960,7 +982,7 @@ function detectAdds(players: PlayerInfo[], life: Life, casts: EnemyEvent[], deat
   // Down on everyone. Happened in the kill too, so it's Minor unless lethal.
   for (const c of castsOf(casts, BARBED_BURST)) {
     const killed = deaths.filter((d) => d.killingAbilityGameId === BARBED_BURST && d.timestamp >= c.timestamp && d.timestamp <= c.timestamp + 4000);
-    const text = `A Fatal Flail wasn't killed in time and finished Barbed Burst: raid-wide damage and Damage Down on everyone${killed.length ? `, killing ${joinNames(killed.map((d) => d.player))}` : ""}.`;
+    const text = `A Fatal Flail wasn't killed in time and finished Barbed Burst: raid-wide damage and Damage Down on everyone${killed.length ? `, killing ${joinNames(killed.map((d) => d.player))}` : ""}. Each soaked Plummet tower spawns a Flail that has to die within ~16s.`;
     errors.push(killed.length >= 3
       ? raidMarker(VF_BARBED_BURST_RULE_ID, "Barbed Burst", `${text} Unresolvable from here.`, c.timestamp, BARBED_BURST, "Barbed Burst")
       : playerlessMinor(VF_BARBED_BURST_RULE_ID, "Barbed Burst", text, c.timestamp, BARBED_BURST, "Barbed Burst"));
@@ -968,7 +990,7 @@ function detectAdds(players: PlayerInfo[], life: Life, casts: EnemyEvent[], deat
   for (const c of castsOf(casts, DOORNAIL_EXPLOSION)) {
     const killed = deaths.filter((d) => d.killingAbilityGameId === DOORNAIL_EXPLOSION && d.timestamp <= c.timestamp + 4000 && d.timestamp >= c.timestamp);
     errors.push(raidMarker(VF_DOORNAIL_RULE_ID, "Deadly Doornail Exploded",
-      `The Deadly Doornail wasn't killed and exploded${killed.length ? `, killing ${killed.length} (${joinNames(killed.map((d) => d.player))})` : ""}. Unresolvable from here.`,
+      `The Deadly Doornail wasn't killed before the next Screech and exploded${killed.length ? `, killing ${killed.length} (${joinNames(killed.map((d) => d.player))})` : ""}. The party has to burn the nail down during the add waves. Unresolvable from here.`,
       c.timestamp, DOORNAIL_EXPLOSION, "Explosion"));
   }
   return errors;
@@ -999,7 +1021,7 @@ function detectCells(players: PlayerInfo[], life: Life, casts: EnemyEvent[], slo
       for (const p of absent) {
         errors.push(playerError(p, {
           ruleId: VF_CELL_TOWER_RULE_ID, severity: "Major", name: "Missed a Cell Tower",
-          description: `Alive but didn't soak their ${i === 0 ? "first" : "second"}-set Hell in a Cell tower (${slots.get(p)}, group ${i === 0 ? 1 : 2}); Unmitigated Explosion hit the party and left Sustained Damage on everyone.`,
+          description: `Alive but didn't soak their Hell in a Cell tower. As ${slots.get(p)} they're in group ${i === 0 ? "1 (MT/H1/M1/R1), which soaks the first set" : "2 (OT/H2/M2/R2), which soaks the second set"}. The empty tower went off as Unmitigated Explosion on the party and left Sustained Damage on everyone.`,
           timestamp: t + 1200, abilityId: UNMITIGATED_EXPL, abilityName: "Unmitigated Explosion",
         }));
       }
@@ -1024,7 +1046,7 @@ function detectCells(players: PlayerInfo[], life: Life, casts: EnemyEvent[], slo
         if (h.e.abilityId === SPREAD_TANK && aimer) {
           errors.push(playerError(aimer, {
             ruleId: VF_CELL_CONE_RULE_ID, severity: "Major", name: "Ultrasonic Cone Hit an Inmate",
-            description: `Their tank Ultrasonic Spread cone hit ${h.p.name} inside a Charnel Cell (${kFmt(h.e.amount ?? 0)})${died ? `, and ${h.p.name} died` : ""}.`,
+            description: `Their tank Ultrasonic Spread cone hit ${h.p.name} inside a Charnel Cell (${kFmt(h.e.amount ?? 0)})${died ? `, and ${h.p.name} died` : ""}. The outside tank aims the cone by standing in the gap between the two far-apart towers, away from the cells.`,
             timestamp: h.e.timestamp, abilityId: SPREAD_TANK, abilityName: "Ultrasonic Spread",
           }));
         } else {
@@ -1042,7 +1064,7 @@ function detectCells(players: PlayerInfo[], life: Life, casts: EnemyEvent[], slo
         const killed = strays.filter((h) => life.diedFrom(h.p, h.e.timestamp)).map((h) => h.p);
         errors.push(playerError(aimer, {
           ruleId: VF_CELL_CONE_RULE_ID, severity: "Major", name: "Ultrasonic Cone Hit the Party",
-          description: `Out of position between the far-apart towers: their tank Ultrasonic Spread cone hit ${namesOf(strays.map((h) => h.p))}${killed.length ? ` (${namesOf(killed)} died)` : ""}.`,
+          description: `Their tank Ultrasonic Spread cone hit ${namesOf(strays.map((h) => h.p))}${killed.length ? ` (${namesOf(killed)} died)` : ""}. The outside tank aims the cone by standing in the gap between the two far-apart towers; they weren't there.`,
           timestamp: strays[0].e.timestamp, abilityId: SPREAD_TANK, abilityName: "Ultrasonic Spread",
         }));
       } else if (strays.length) {
@@ -1055,7 +1077,7 @@ function detectCells(players: PlayerInfo[], life: Life, casts: EnemyEvent[], slo
   for (const { p, e } of hitsOf(players, LAST_LASH)) {
     errors.push(playerError(p, {
       ruleId: VF_LAST_LASH_RULE_ID, severity: "Major", name: "Didn't Break Out of the Cell",
-      description: `Their Charnel Cell wasn't destroyed in time and finished Last Lash on them (${kFmt(e.amount ?? 0)})${diedText(life.diedFrom(p, e.timestamp))}.`,
+      description: `Their Charnel Cell wasn't destroyed in time and finished Last Lash on them (${kFmt(e.amount ?? 0)})${diedText(life.diedFrom(p, e.timestamp))}. Only the player inside can damage their own cell, so each inmate has to break out on their own before it casts.`,
       timestamp: e.timestamp, abilityId: LAST_LASH, abilityName: "Last Lash",
     }));
   }
@@ -1075,7 +1097,7 @@ function detectDeathmatch(players: PlayerInfo[], life: Life, casts: EnemyEvent[]
     for (const p of players.filter((x) => !soakers.includes(x) && life.hitAlive(x, t))) {
       errors.push(playerError(p, {
         ruleId: VF_DEATHMATCH_TOWER_RULE_ID, severity: "Major", name: "Missed an Undead Deathmatch Tower",
-        description: `Alive but soaked neither Undead Deathmatch tower (${soakers.length} soaked${killed.length ? `; ${namesOf(killed)} died in an under-soaked tower` : ""}).`,
+        description: `Alive but soaked neither Undead Deathmatch tower (${soakers.length} soaked${killed.length ? `; ${namesOf(killed)} died in an under-soaked tower` : ""}). Both towers need four players each: group 1 north/west, group 2 south/east.`,
         timestamp: t, abilityId: DEATHMATCH_TOWER, abilityName: "Bloody Bondage",
       }));
     }
