@@ -8,9 +8,10 @@
 // dying, and what could be dropped. No plan input and no PullErrors; this
 // replaced the Ikuya-sheet Heatmap and Review tabs on 2026-10-06.
 //
-// One view, the timeline (components/MitigationTimeline.tsx), for either a
-// single pull or every loaded pull at once (the default: one pull is too
-// noisy to plan from). Pulls fetched before the mitigation fields were kept
+// One view, the timeline (components/MitigationTimeline.tsx), for one boss
+// at a time (a Boss dropdown, defaulting to the current pull's boss), and
+// for either a single pull or all of that boss's pulls at once (the
+// default: one pull is too noisy to plan from). Pulls fetched before the mitigation fields were kept
 // are listed as needing a re-fetch; re-fetching stays an explicit action
 // elsewhere in the app, never triggered from here.
 
@@ -46,8 +47,17 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId }
     return next;
   });
 
-  const analyzable = useMemo(() => ffPulls.filter(hasMitigationData), [ffPulls]);
-  const stale = ffPulls.length - analyzable.length;
+  // One boss at a time: the selected pull's boss, all pulls or one of them.
+  const bosses = useMemo(() => [...new Set(ffPulls.map((p) => p.name))], [ffPulls]);
+  const boss = selectedPull?.name ?? bosses[0];
+  const bossPulls = useMemo(() => ffPulls.filter((p) => p.name === boss), [ffPulls, boss]);
+  const pickBoss = (name: string) => {
+    const pulls = ffPulls.filter((p) => p.name === name);
+    if (pulls.length) setSelectedPullId(pulls[pulls.length - 1].id);
+  };
+
+  const analyzable = useMemo(() => bossPulls.filter(hasMitigationData), [bossPulls]);
+  const stale = bossPulls.length - analyzable.length;
 
   // Only computed while open; the analysis reads every damage event.
   const perPull = useMemo(() => {
@@ -80,7 +90,11 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId }
       ) : (
         <>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
-            <span className="ck-label" style={{ margin: 0 }}>Pulls</span>
+            <span className="ck-label" style={{ margin: 0 }}>Boss</span>
+            <select className="ck-field" value={boss} onChange={(e) => pickBoss(e.target.value)} style={{ padding: "3px 8px" }}>
+              {bosses.map((b) => <option key={b} value={b}>{b}</option>)}
+            </select>
+            <span className="ck-label" style={{ margin: 0 }}>Pull</span>
             <select
               className="ck-field"
               value={allPulls ? "all" : String(selectedPullId ?? "")}
@@ -91,16 +105,16 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId }
               }}
               style={{ padding: "3px 8px" }}
             >
-              <option value="all">All loaded pulls ({analyzable.length})</option>
-              {ffPulls.map((p) => (
+              <option value="all">All pulls ({analyzable.length})</option>
+              {bossPulls.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.name} #{p.pullNumber} ({p.result}){hasMitigationData(p) ? "" : " — needs re-fetch"}
+                  #{p.pullNumber} ({p.result}){hasMitigationData(p) ? "" : " — needs re-fetch"}
                 </option>
               ))}
             </select>
             {stale > 0 && (
               <span className="ck-help" style={{ margin: 0 }}>
-                {stale} of {ffPulls.length} pulls were fetched before mitigation data was kept and are left out.
+                {stale} of {bossPulls.length} pulls were fetched before mitigation data was kept and are left out.
                 Re-fetch the report to include them.
               </span>
             )}
