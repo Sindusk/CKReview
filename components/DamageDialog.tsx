@@ -343,10 +343,54 @@ function PlayerDetail({ summary, analysis, colorFor }: { summary: PlayerDamageSu
       {shown.length === 0 ? (
         <p className="ck-dialog-text" style={{ marginTop: 12 }}>Nothing found for this player.</p>
       ) : (
-        <div style={{ marginTop: 10 }}>
-          {shown.map((f, i) => <FindingRow key={i} f={f} />)}
-        </div>
+        <FindingGroups findings={shown} />
       )}
+    </div>
+  );
+}
+
+// Findings grouped by kind: the groups by their counted loss (biggest
+// first), each one's entries in time order, collapsed until clicked.
+function FindingGroups({ findings }: { findings: DamageFinding[] }) {
+  const [open, setOpen] = useState<Set<DamageFinding["kind"]>>(new Set());
+  const groups = new Map<DamageFinding["kind"], DamageFinding[]>();
+  for (const f of findings) groups.set(f.kind, [...(groups.get(f.kind) ?? []), f]);
+  const counted = (list: DamageFinding[]) => list.filter((f) => !f.forced).reduce((a, f) => a + f.lostDamage, 0);
+  const sorted = [...groups].sort((a, b) => counted(b[1]) - counted(a[1]));
+  return (
+    <div style={{ marginTop: 10 }}>
+      {sorted.map(([kind, list]) => {
+        const total = counted(list);
+        const isOpen = open.has(kind);
+        const forcedOnly = list.every((f) => f.forced);
+        return (
+          <div key={kind} style={{ borderTop: "1px solid var(--ck-line)" }}>
+            <div
+              onClick={() => setOpen((prev) => {
+                const next = new Set(prev);
+                if (next.has(kind)) next.delete(kind); else next.add(kind);
+                return next;
+              })}
+              style={{ display: "flex", gap: 10, alignItems: "center", padding: "7px 0", cursor: "pointer", opacity: forcedOnly ? 0.55 : 1 }}
+            >
+              <span style={{ color: "var(--ck-text-3)", fontSize: 11, width: 12, flex: "0 0 auto" }}>{isOpen ? "▾" : "▸"}</span>
+              <span className="ck-badge ck-badge--plain" style={{ flex: "0 0 auto" }}>{KIND_LABEL[kind]}</span>
+              <span style={{ color: "var(--ck-text-3)", fontSize: 12, flex: "1 1 auto" }}>
+                {list.length} {list.length === 1 ? "entry" : "entries"}
+                {list.some((f) => f.forced) && !forcedOnly ? ` (${list.filter((f) => f.forced).length} forced)` : ""}
+              </span>
+              <span className="ck-num" style={{ color: total >= 1 ? LOSS_COLOR : "var(--ck-text-3)", fontSize: 14, fontWeight: 700, flex: "0 0 auto" }}>
+                {total >= 1 ? fmtDamage(total) : "—"}
+              </span>
+            </div>
+            {isOpen && (
+              <div style={{ paddingLeft: 22, paddingBottom: 4 }}>
+                {[...list].sort((a, b) => a.startMs - b.startMs).map((f, i) => <FindingRow key={i} f={f} />)}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -356,12 +400,11 @@ function FindingRow({ f }: { f: DamageFinding }) {
     <div style={{ padding: "6px 0", borderTop: "1px solid var(--ck-line)", opacity: f.forced ? 0.55 : 1 }}>
       <div style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
         <span className="ck-num" style={{ color: "var(--ck-text-3)", fontSize: 12, width: 42, flex: "0 0 auto" }}>{fmtTime(f.startMs)}</span>
-        <span className="ck-badge ck-badge--plain" style={{ flex: "0 0 auto" }}>{KIND_LABEL[f.kind]}</span>
         <span style={{ color: "var(--ck-text)", fontSize: 13, flex: "1 1 auto" }}>
           {f.detail}
           {f.cause && <span style={{ color: "var(--ck-text-3)" }}> — {f.forced ? `forced: ${f.cause}` : f.cause}</span>}
         </span>
-        <span className="ck-num" style={{ color: f.forced ? "var(--ck-text-3)" : LOSS_COLOR, fontSize: 13, flex: "0 0 auto" }}>
+        <span className="ck-num" style={{ color: f.forced ? "var(--ck-text-3)" : LOSS_COLOR, fontSize: 12, fontWeight: 400, flex: "0 0 auto" }}>
           {f.lostDamage >= 1 ? fmtDamage(f.lostDamage) : "—"}
         </span>
       </div>
