@@ -142,6 +142,7 @@ const TRACKED = new Map<string, TrackedCooldown[]>(
       charges:          actions[0].charges ?? 1,
       firstUseOffsetMs: spec.firstUseOffsetMs ?? 0,
       holdMs:           spec.holdMs,
+      prePullEvidenceIds: spec.prePullEvidence?.map((key) => XIVA_ACTIONS[key]?.id).filter((id): id is number => id !== undefined),
     }];
   })]),
 );

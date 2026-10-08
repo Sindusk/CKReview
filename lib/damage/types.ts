@@ -112,6 +112,9 @@ export type TrackedCooldown = {
   charges:          number;
   firstUseOffsetMs: number;
   holdMs?:          number;     // allowed hold per ready stretch; default COOLDOWN_HOLD_MS
+  // Actions that only follow this cooldown: one cast before its first use
+  // in the pull means it was used before the pull.
+  prePullEvidenceIds?: number[];
 };
 
 // ── Fight context (per boss) ───────────────────────────────────────────

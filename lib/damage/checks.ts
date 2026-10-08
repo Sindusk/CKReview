@@ -336,7 +336,11 @@ export function checkCooldownDrift(ctx: PlayerCheckContext): DamageFinding[] {
       .filter((c) => ids.has(c.abilityId) && c.timestamp < ctx.endMs)
       .map((c) => c.timestamp)
       .sort((a, b) => a - b);
-    const capped = cappedStretches(casts, cd.cooldownMs, cd.charges, ctx.endMs);
+    // Used before the pull (Dancer's Standard Step, shown by a Standard
+    // Finish before the first Step): still recharging until the first use.
+    const evidence = new Set(cd.prePullEvidenceIds ?? []);
+    const prePull = evidence.size > 0 && ctx.player.casts.some((c) => evidence.has(c.abilityId) && c.timestamp < (casts[0] ?? Infinity));
+    const capped = cappedStretches(casts, cd.cooldownMs, cd.charges, ctx.endMs).filter((w) => !(prePull && w.startMs === 0));
     let unforced = 0, heldForDeciding = 0, longest: Window | undefined;
     for (const w of capped) {
       const len = w.endMs - w.startMs;
@@ -373,19 +377,24 @@ export function checkCooldownDrift(ctx: PlayerCheckContext): DamageFinding[] {
   return out;
 }
 
+// A press logged up to this long before the simulated recast ends is on
+// time: Vamp's Dancer pressed Standard Step a few ms short of every 30s,
+// and dropping those as "no charge" turned each into 30s of drift.
+const RECAST_SLACK_MS = 1_000;
+
 /** Stretches where every charge was ready, from pull start to endMs. */
 export function cappedStretches(casts: number[], cooldownMs: number, maxCharges: number, endMs: number): Window[] {
   const out: Window[] = [];
   let charges = maxCharges, rechargeStart: number | null = null, cappedSince = 0;
-  const advance = (t: number) => {
-    while (charges < maxCharges && rechargeStart !== null && t >= rechargeStart + cooldownMs) {
+  const advance = (t: number, slack = 0) => {
+    while (charges < maxCharges && rechargeStart !== null && t + slack >= rechargeStart + cooldownMs) {
       charges++;
       rechargeStart += cooldownMs;
       if (charges === maxCharges) { cappedSince = rechargeStart; rechargeStart = null; }
     }
   };
   for (const t of casts) {
-    advance(t);
+    advance(t, RECAST_SLACK_MS);
     if (charges === maxCharges) out.push({ startMs: cappedSince, endMs: t });
     if (charges === 0) continue; // the simulation says no charge: log noise
     charges--;

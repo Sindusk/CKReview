@@ -20,6 +20,9 @@ export type TrackedCooldownSpec = {
   actions:           string[];  // xivanalysis action keys; several = one shared recast
   firstUseOffsetMs?: number;    // how late the opener normally uses it
   holdMs?:           number;    // allowed hold per ready stretch (xivanalysis allowedAverageDowntime)
+  // Action keys that only follow this cooldown: cast before its first use
+  // in the pull, they show it was used before the pull.
+  prePullEvidence?:  string[];
 };
 
 export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
@@ -82,10 +85,13 @@ export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
   // ── Physical ranged (from xivanalysis dnc/OGCDDowntime, brd/OGCDDowntime,
   //    mch/GeneralCDDowntime) ─────────────────────────────────────────
   // Their negative first-use offsets (Standard Step, Reassemble: used
-  // before the pull) become 0 here.
+  // before the pull) become 0 here; Standard Step's pre-pull use is read
+  // from a Standard Finish before the first Step (Vamp kill: Finish at
+  // 0:00.8, first Finishing Move at 0:21.8).
   "Dancer": [
     { actions: ["TECHNICAL_STEP"], holdMs: 250 },
-    { actions: ["STANDARD_STEP", "FINISHING_MOVE"], holdMs: 250 },
+    { actions: ["STANDARD_STEP", "FINISHING_MOVE"], holdMs: 250,
+      prePullEvidence: ["STANDARD_FINISH", "SINGLE_STANDARD_FINISH", "DOUBLE_STANDARD_FINISH"] },
     { actions: ["DEVILMENT"] },
     { actions: ["FLOURISH"] },
   ],
