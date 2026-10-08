@@ -192,7 +192,11 @@ export function checkBuffCoverage(ctx: PlayerCheckContext): DamageFinding[] {
   for (const c of ledger.casts) {
     if (c.source !== ctx.player.name || c.startMs >= ctx.endMs) continue;
     const end = Math.min(c.startMs + c.durationMs, ctx.endMs);
+    // Never the caster: some buffs put a separate self status on them (Red
+    // Mage's Embolden is 1001239 on the RDM, 1001297 on the party), so the
+    // party status is missing from them by design.
     const missed = ctx.pull.players.filter((p) =>
+      p.name !== c.source &&
       !c.recipients.has(p.name) && !inWindows(c.startMs, ledger.dead.get(p.name) ?? []) &&
       p.damageDone.some((e) => e.timestamp >= c.startMs && e.timestamp < end));
     if (missed.length === 0) continue;
