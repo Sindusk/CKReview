@@ -83,11 +83,26 @@ export type Pull = {
   enemyBuffs?:        EnemyEvent[];
   enemyBuffRemovals?: EnemyEvent[];
 
+  // FFXIV only: every stack change of a status on an enemy that reaches 2+
+  // stacks (a counter like Vamp Fatale's Satisfied, which enlarges her
+  // tank buster). The fallback model (lib/mechanics/fallback.ts) compares a
+  // failure's stacks with the clean resolutions'. Undefined on pulls saved
+  // before 2026-10-08.
+  enemyStacks?: EnemyStackEvent[];
+
   // Statuses players put on enemies (FFXIV: Chain Stratagem, DoTs,
   // Reprisal, ...; WoW: DoTs and the debuffs their spells apply, pets'
   // credited to the owner), for the damage analysis. Undefined for pulls
   // fetched without the enemyDebuffs stream.
   bossDebuffs?: BossDebuffEvent[];
+};
+
+export type EnemyStackEvent = {
+  timestamp:  number;   // ms into the pull
+  actorName:  string;
+  statusId:   number;
+  statusName: string;
+  stack:      number;   // the new count; 0 when the status is removed
 };
 
 export type BossDebuffEvent = {

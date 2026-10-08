@@ -37,8 +37,17 @@
 //     tank-only, Blood Lash and Ultrasonic Spread come in per-role IDs.
 //     The minimums keep a random 2-target spread from looking role-bound
 //     by chance (it misses both tanks in 4 resolutions ~8% of the time).
+//   - "how many it hits": clean resolution sizes per ID, and whether they
+//     hit every living player. See underSoak.
+// And per ability name and episode (the nth time it went off in the pull),
+// the enemy stack counters at the start of clean episodes (stackRanges).
 //
 // ── Per-pull signals ───────────────────────────────────────────────────
+// Shared hits too few players took (underSoak): fewer players than any
+// clean resolution, and it hurt more for it. Nobody who took it is blamed.
+// When clean resolutions hit everyone and 1-2 living players were missing,
+// they get the error (Major if someone died); otherwise it's a player-less
+// Minor naming who took it.
 // Deaths (one error per death, timed at the fatal hit; death events lag
 // the hit by up to ~2s):
 //   - vulnerable: the fatal hit landed on a Vulnerability Up an enemy
@@ -53,15 +62,19 @@
 //     for tanks) of max HP, with none of the above. Nothing heals through
 //     that, so the player was most likely somewhere the hit wasn't meant
 //     for, or took more than their share. Major. Vamp: clean tank busters
-//     reach 1.36x on a tank; non-tank deaths of this kind ran 1.6-6x.
+//     reach 1.36x on a tank; non-tank deaths of this kind ran 1.6-6x. When
+//     the hit reached more players than any clean resolution, it says so.
 //   - survivable: everything else (a hit under max HP that landed on a low
 //     player, DoT ticks, auto-attacks). Nobody to blame from the log, so
 //     one player-less Minor per cluster of such deaths, with each victim's
 //     HP before the hit. Vamp pulls 2/10/13: 5-7 players dead to
 //     Aetherletting from 6-80% HP.
-//   - no killing blow before the cutoff: Major on the player (likely fell
-//     or was knocked off). After the cutoff, or 2+ within 10s, it's a reset
-//     (the called-wipe marker).
+//   - no killing blow before the cutoff: Major on the player, who went off
+//     the arena. After the cutoff, or 2+ within 10s, it's players jumping
+//     off once a wipe is called (user, 2026-10-08): the called-wipe marker.
+// Wrong-target, unsurvivable, full-HP and too-few-players errors also give
+// the enemy stack counters beside their clean range. Vamp's Satisfied
+// enlarges Hardcore (user, VOD of pull 1, which died at 10 stacks).
 // Non-fatal hits (Minor, one per player per ability per CLUSTER_GAP_MS):
 // wrong target, avoidable, then hit while vulnerable, in that priority.
 // Penalties: a Damage Down is folded into the hit that caused it; on its
@@ -82,13 +95,12 @@
 // Errors after the cutoff are dropped: they are fallout.
 //
 // ── Known gaps ─────────────────────────────────────────────────────────
-//   - Stack/share mechanics: too few players in a stack makes the hit
-//     unsurvivable for those who were there, and the fault is whoever was
-//     missing. That reads as "unsurvivable" on the victims today.
 //   - A bomb or spread hitting a neighbour: the victim is named, not the
 //     bomb carrier.
+//   - A shared hit split into groups (Ultrasonic Amp: 4 and 4) can't name
+//     who was missing from which group.
 
-import type { Pull } from "@/types/Pull";
+import type { EnemyStackEvent, Pull } from "@/types/Pull";
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import type { DeathEvent } from "@/types/DeathEvent";
 import type { PlayerRole, PullError } from "@/types/PullError";
@@ -108,6 +120,15 @@ const COVERED_ENCOUNTERS: Record<Pull["game"], Set<string>> = {
 };
 
 const RESOLUTION_GAP_MS = 1_000;
+const EPISODE_GAP_MS = 10_000;
+const MIN_CLEAN_STACK_EPISODES = 2;
+const EVERYONE_FRACTION = 0.8;
+const SHARE_RAW_RISE = 1.5;
+const MAX_NAMED_MISSING = 2;
+const STACK_NOTE_RULES = new Set([
+  "fallback-death-wrong-target", "fallback-wrong-target-hit", "fallback-death-unsurvivable",
+  "fallback-death-full-hp", "fallback-under-soak", "fallback-missed-share",
+]);
 const RARE_MIN_CASTS = 8;
 const RARE_MAX_HIT_RATE = 0.25;
 const ROLE_MIN_CLEAN_RESOLUTIONS = 4;
@@ -143,13 +164,26 @@ type AbilityStats = {
   cleanResolutions: number;
   cleanHits: number;
   cleanRoles: Partial<Record<PlayerRole, number>>;
+  /** Players hit per clean resolution. */
+  cleanSizes: number[];
+  /** Clean resolutions that hit every living player. */
+  cleanEveryone: number;
+  /** Damage before mitigation / max HP, per clean hit. */
+  cleanRaw: number[];
 };
+
+type StackRange = { min: number; max: number; n: number };
 
 export type FallbackProfile = {
   byId: Map<number, AbilityStats>;
   byName: Map<string, AbilityStats>;
   /** Abilities that gave PENALTY_RAIDWIDE_MIN+ players a penalty at once in a kill. */
   raidwidePenaltiesInKills: Set<number>;
+  /**
+   * Enemy stack counts at the start of clean episodes, keyed by
+   * "<ability name>#<episode>" and then "<enemy>|<status>".
+   */
+  stackRanges: Map<string, Map<string, StackRange>>;
 };
 
 type Hit = { player: PlayerInfo; event: PlayerEvent };
@@ -183,15 +217,76 @@ function penaltyGroups(pull: Pull): { player: PlayerInfo; d: PlayerEvent }[][] {
     [...new Set(group.map((p) => p.d.causeAbilityId ?? 0))].map((cause) => group.filter((p) => (p.d.causeAbilityId ?? 0) === cause)));
 }
 
-const emptyStats = (): AbilityStats => ({ casts: 0, hits: 0, cleanResolutions: 0, cleanHits: 0, cleanRoles: {} });
+const emptyStats = (): AbilityStats => ({
+  casts: 0, hits: 0, cleanResolutions: 0, cleanHits: 0, cleanRoles: {}, cleanSizes: [], cleanEveryone: 0, cleanRaw: [],
+});
+
+const playersIn = (res: Hit[]) => new Set(res.map((h) => h.player.name));
+const isClean = (hits: Hit[]) => !hits.some((h) => isFatal(h.event) || isVulnerable(h.event));
+const median = (xs: number[]) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)] ?? 0;
+
+/**
+ * Each ability name's episodes: its hits grouped by EPISODE_GAP_MS, so one
+ * set of staggered bombs or puddles is one episode. The episode index is
+ * what lines up "the second Hardcore" across pulls.
+ */
+const episodeCache = new WeakMap<Pull, Map<string, Hit[][]>>();
+function episodes(pull: Pull): Map<string, Hit[][]> {
+  const cached = episodeCache.get(pull);
+  if (cached) return cached;
+  const byName = new Map<string, Hit[]>();
+  for (const player of pull.players) {
+    for (const event of player.damageTaken) {
+      if (event.isDoT || !landed(event)) continue;
+      byName.set(event.abilityName, [...(byName.get(event.abilityName) ?? []), { player, event }]);
+    }
+  }
+  const out = new Map([...byName].map(([name, hits]) => [name, clusterByGap(hits, (h) => h.event.timestamp, EPISODE_GAP_MS)]));
+  episodeCache.set(pull, out);
+  return out;
+}
+
+const stackKey = (s: EnemyStackEvent) => `${s.actorName}|${s.statusName}`;
+
+/** Every enemy stack counter's count at `t` (0 before it first appears). */
+function stacksAt(pull: Pull, keys: Iterable<string>, t: number): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const key of keys) out.set(key, 0);
+  for (const s of pull.enemyStacks ?? []) {
+    if (s.timestamp > t) break;
+    out.set(stackKey(s), s.stack);
+  }
+  return out;
+}
 
 /** One profile per boss name, from every pull of that boss given. */
 export function buildFallbackProfiles(pulls: Pull[]): Map<string, FallbackProfile> {
   const out = new Map<string, FallbackProfile>();
+  const keysOf = new Map<string, Set<string>>();
+  for (const pull of pulls) {
+    if (!fallbackApplies(pull)) continue;
+    const keys = keysOf.get(pull.name) ?? new Set<string>();
+    for (const s of pull.enemyStacks ?? []) keys.add(stackKey(s));
+    keysOf.set(pull.name, keys);
+  }
   for (const pull of pulls) {
     if (!fallbackApplies(pull)) continue;
     let profile = out.get(pull.name);
-    if (!profile) out.set(pull.name, profile = { byId: new Map(), byName: new Map(), raidwidePenaltiesInKills: new Set() });
+    if (!profile) {
+      out.set(pull.name, profile = { byId: new Map(), byName: new Map(), raidwidePenaltiesInKills: new Set(), stackRanges: new Map() });
+    }
+    for (const [name, list] of episodes(pull)) {
+      list.forEach((episode, i) => {
+        if (!isClean(episode)) return;
+        const id = `${name}#${i}`;
+        const ranges = profile!.stackRanges.get(id) ?? new Map<string, StackRange>();
+        for (const [key, stack] of stacksAt(pull, keysOf.get(pull.name)!, episode[0].event.timestamp)) {
+          const r = ranges.get(key);
+          ranges.set(key, r ? { min: Math.min(r.min, stack), max: Math.max(r.max, stack), n: r.n + 1 } : { min: stack, max: stack, n: 1 });
+        }
+        profile!.stackRanges.set(id, ranges);
+      });
+    }
     if (pull.result === "Kill") {
       for (const same of penaltyGroups(pull)) {
         if (same.length >= PENALTY_RAIDWIDE_MIN) profile.raidwidePenaltiesInKills.add(same[0].d.causeAbilityId ?? 0);
@@ -205,13 +300,20 @@ export function buildFallbackProfiles(pulls: Pull[]): Map<string, FallbackProfil
     for (const c of pull.enemyCasts ?? []) for (const s of statsFor(c.abilityId, c.abilityName)) s.casts++;
     for (const res of resolutions(pull)) {
       const first = res[0].event;
-      const clean = !res.some((h) => isFatal(h.event) || isVulnerable(h.event));
+      const clean = isClean(res);
+      const size = playersIn(res).size;
+      const everyone = clean && size >= aliveCount(pull, first.timestamp);
       for (const s of statsFor(first.abilityId, first.abilityName)) {
         s.hits += res.length;
         if (!clean) continue;
         s.cleanResolutions++;
         s.cleanHits += res.length;
-        for (const h of res) s.cleanRoles[h.player.role] = (s.cleanRoles[h.player.role] ?? 0) + 1;
+        s.cleanSizes.push(size);
+        if (everyone) s.cleanEveryone++;
+        for (const h of res) {
+          s.cleanRoles[h.player.role] = (s.cleanRoles[h.player.role] ?? 0) + 1;
+          if (h.event.maxHealth) s.cleanRaw.push(ratioOf(h.event));
+        }
       }
     }
   }
@@ -240,6 +342,48 @@ function rolesHit(profile: FallbackProfile, e: PlayerEvent): { roles: PlayerRole
 function wrongTarget(profile: FallbackProfile, h: Hit) {
   const r = rolesHit(profile, h.event);
   return r && !r.roles.includes(h.player.role) ? r : undefined;
+}
+
+/**
+ * A resolution that hit fewer players than this ability ever hits cleanly,
+ * and hurt more for it (a death, or each hit SHARE_RAW_RISE+ times the clean
+ * median): a shared hit that too few players took. `everyone` when clean
+ * resolutions hit every living player, so the missing players are known.
+ * Vamp: Ultrasonic Amp, cleanly 4 players at 0.8x max HP, killed a player
+ * who took it alone at 3.2x; Brutal Rain, cleanly everyone at 0.5x, killed
+ * the 1-2 players who took it at 2-4x.
+ */
+function underSoak(profile: FallbackProfile, pull: Pull, res: Hit[]) {
+  const s = profile.byId.get(res[0].event.abilityId);
+  if (!s || s.cleanResolutions < ROLE_MIN_CLEAN_RESOLUTIONS || rarelyHits(profile, res[0].event)) return undefined;
+  const t = res[0].event.timestamp;
+  const alive = aliveCount(pull, t);
+  const everyone = s.cleanEveryone >= s.cleanResolutions * EVERYONE_FRACTION;
+  const normal = everyone ? alive : Math.min(...s.cleanSizes);
+  const hit = playersIn(res);
+  if (hit.size >= normal) return undefined;
+  const hurt = res.some((h) => isFatal(h.event)) || median(res.map((h) => ratioOf(h.event))) >= SHARE_RAW_RISE * median(s.cleanRaw);
+  if (!hurt) return undefined;
+  const missing = everyone ? pull.players.filter((p) => !hit.has(p.name) && isAlive(pull, p, t)) : [];
+  return { normal, everyone, hit, missing };
+}
+
+/** The enemy stack counts at `t` that no clean episode of this ability saw, as a sentence. */
+function stackNote(profile: FallbackProfile, pull: Pull, abilityName: string, t: number): string {
+  const list = episodes(pull).get(abilityName) ?? [];
+  const i = list.findIndex((ep) => ep[0].event.timestamp <= t && t <= ep[ep.length - 1].event.timestamp + EPISODE_GAP_MS);
+  const ranges = i < 0 ? undefined : profile.stackRanges.get(`${abilityName}#${i}`);
+  if (!ranges) return "";
+  const notes: string[] = [];
+  for (const [key, stack] of stacksAt(pull, ranges.keys(), t)) {
+    const r = ranges.get(key)!;
+    if (r.n < MIN_CLEAN_STACK_EPISODES || (stack === 0 && r.max === 0)) continue;
+    const [actor, status] = key.split("|");
+    const range = r.min === r.max ? `${r.min}` : `${r.min}-${r.max}`;
+    notes.push(`${actor} had ${stack} ${stack === 1 ? "stack" : "stacks"} of ${status} ` +
+      `(the ${r.n} clean resolutions of this ${abilityName}: ${range}${stack > r.max ? ", so more than any of them" : ""})`);
+  }
+  return notes.length ? ` ${notes.join("; ")}.` : "";
 }
 
 // ── Per-pull detection ──────────────────────────────────────────────────
@@ -280,12 +424,15 @@ function fatalHit(player: PlayerInfo | undefined, d: DeathEvent): PlayerEvent | 
   return [...window].reverse().find(isFatal) ?? window[window.length - 1];
 }
 
+/** Alive at `t`: never died, or active again (raised) since their last death. */
+function isAlive(pull: Pull, p: PlayerInfo, t: number): boolean {
+  const mine = pull.deathEvents.filter((d) => d.player === p.name && d.timestamp < t).pop();
+  if (!mine) return true;
+  return [...p.casts, ...p.damageTaken].some((e) => e.timestamp > mine.timestamp + 2_000 && e.timestamp < t);
+}
+
 function aliveCount(pull: Pull, t: number): number {
-  return pull.players.filter((p) => {
-    const mine = pull.deathEvents.filter((d) => d.player === p.name && d.timestamp < t).pop();
-    if (!mine) return true;
-    return [...p.casts, ...p.damageTaken].some((e) => e.timestamp > mine.timestamp + 2_000 && e.timestamp < t);
-  }).length;
+  return pull.players.filter((p) => isAlive(pull, p, t)).length;
 }
 
 /**
@@ -333,6 +480,39 @@ export function detectFallbackErrors(pull: Pull, profile: FallbackProfile): Pull
   });
   const cutoff = marker[0]?.timestamp ?? Infinity;
   const lethalHits = lethal.find((l) => l.marker === marker[0])?.hits ?? new Set<PlayerEvent>();
+  const resOf = new Map<PlayerEvent, Hit[]>();
+  const allResolutions = resolutions(pull);
+  for (const res of allResolutions) for (const h of res) resOf.set(h.event, res);
+
+  // ── Shared hits too few players took ──
+  // The fault is whoever was missing, so the players who took it (and any
+  // who died to it) aren't blamed.
+  const soakHits = new Set<PlayerEvent>();
+  for (const res of allResolutions) {
+    const e = res[0].event;
+    if (e.timestamp >= cutoff || res.some((h) => lethalHits.has(h.event))) continue;
+    const under = underSoak(profile, pull, res);
+    if (!under) continue;
+    for (const h of res) soakHits.add(h.event);
+    const died = res.filter((h) => isFatal(h.event)).map((h) => h.player.name);
+    const took = `${under.hit.size} player${under.hit.size === 1 ? "" : "s"} (${joinNames([...under.hit])})`;
+    const deathText = died.length ? ` ${joinNames(died)} died to it.` : "";
+    const base = { timestamp: e.timestamp, abilityId: e.abilityId, abilityName: e.abilityName };
+    if (under.everyone && under.missing.length > 0 && under.missing.length <= MAX_NAMED_MISSING) {
+      for (const p of under.missing) {
+        errors.push(playerError(p, {
+          ...base, ruleId: "fallback-missed-share", severity: died.length ? "Major" : "Minor", name: "Missed a Shared Hit",
+          description: `Wasn't in ${e.abilityName}: only ${took} of ${under.normal} living took it, where clean resolutions hit everyone.${deathText}`,
+        }));
+      }
+    } else {
+      errors.push({
+        ...base, ruleId: "fallback-under-soak", severity: "Minor", name: "Too Few Took a Shared Hit",
+        description: `Only ${took} took ${e.abilityName}, where clean resolutions hit ${under.everyone ? "every living player" : `at least ${under.normal}`}: ` +
+          `the damage is shared, so the rest of the group was missing.${deathText}`,
+      });
+    }
+  }
 
   // ── Deaths ──
   const handled = new Set<PlayerEvent>();
@@ -345,7 +525,7 @@ export function detectFallbackErrors(pull: Pull, profile: FallbackProfile): Pull
       if (d.timestamp < cutoff && (!called || d.timestamp < called.at)) {
         errors.push(playerError(player, {
           ruleId: "fallback-death-no-blow", severity: "Major", name: "Died Without a Hit",
-          description: "Died with no killing blow while the pull was still going: most likely fell or was knocked off the arena.",
+          description: "Died with no killing blow while the pull was still going: went off the arena.",
           timestamp: d.timestamp, abilityId: 0, abilityName: d.cause,
         }));
       }
@@ -355,7 +535,7 @@ export function detectFallbackErrors(pull: Pull, profile: FallbackProfile): Pull
     for (const x of player.damageTaken) {
       if (x.abilityId === e.abilityId && x.timestamp <= e.timestamp && e.timestamp - x.timestamp <= CLUSTER_GAP_MS) handled.add(x);
     }
-    if (e.timestamp >= cutoff || lethalHits.has(e)) continue;
+    if (e.timestamp >= cutoff || lethalHits.has(e) || soakHits.has(e)) continue;
     const h = { player, event: e };
     const base = { timestamp: e.timestamp, abilityId: e.abilityId, abilityName: e.abilityName, amount: e.amount };
     const wrong = wrongTarget(profile, h);
@@ -378,10 +558,14 @@ export function detectFallbackErrors(pull: Pull, profile: FallbackProfile): Pull
         description: `Died to ${e.abilityName}${fromSource(e)}, which hit a player on only ${rare.hits} of its ${rare.casts} casts in this report: avoidable.`,
       }));
     } else if (unsurvivable(h)) {
+      const s = profile.byId.get(e.abilityId);
+      const size = playersIn(resOf.get(e) ?? [h]).size;
+      const most = s && s.cleanSizes.length >= ROLE_MIN_CLEAN_RESOLUTIONS ? Math.max(...s.cleanSizes) : Infinity;
+      const crowd = size > most ? ` It hit ${size} players, where clean resolutions hit at most ${most}.` : "";
       errors.push(playerError(player, {
         ...base, ruleId: "fallback-death-unsurvivable", severity: "Major", name: "Unsurvivable Hit",
         description: `Took ${times(ratioOf(e))} their max HP from ${e.abilityName}${fromSource(e)}. No healing or mitigation survives that: ` +
-          "most likely they stood where it wasn't meant to hit, or took more than their share.",
+          `most likely they stood where it wasn't meant to hit, or took more than their share.${crowd}`,
       }));
     } else if (fromFull(e)) {
       errors.push(playerError(player, {
@@ -412,7 +596,7 @@ export function detectFallbackErrors(pull: Pull, profile: FallbackProfile): Pull
   const flagOf = new Map<Hit, Flag>();
   for (const player of pull.players) {
     for (const event of player.damageTaken) {
-      if (event.isDoT || !landed(event) || handled.has(event) || event.timestamp >= cutoff) continue;
+      if (event.isDoT || !landed(event) || handled.has(event) || soakHits.has(event) || event.timestamp >= cutoff) continue;
       const h = { player, event };
       const wrong = wrongTarget(profile, h);
       const rare = rarelyHits(profile, event);
@@ -479,7 +663,17 @@ export function detectFallbackErrors(pull: Pull, profile: FallbackProfile): Pull
     }
   }
 
-  return [...errors, ...hitErrors.map((x) => x.error), ...marker].sort((a, b) => a.timestamp - b.timestamp);
+  // Enemy stack counters, beside the clean range, on the errors where a hit
+  // landed bigger than usual. Vamp's Satisfied enlarges Hardcore (user, VOD
+  // of pull 1): pull 1 died at 10 stacks and pull 11 at 8, while pull 7
+  // survived 9, so the count is context for the reviewer, not a verdict.
+  // Counters grow over the fight at each group's pace, so on other errors
+  // they say nothing.
+  const out = [...errors, ...hitErrors.map((x) => x.error)];
+  for (const e of out) {
+    if (STACK_NOTE_RULES.has(e.ruleId)) e.description += stackNote(profile, pull, e.abilityName, e.timestamp);
+  }
+  return [...out, ...marker].sort((a, b) => a.timestamp - b.timestamp);
 }
 
 /**

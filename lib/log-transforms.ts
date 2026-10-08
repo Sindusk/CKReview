@@ -22,7 +22,7 @@
 // preferred over the masterData lookup when present — mirrors how
 // fflAbilityName already prefers `ability.name` over the masterData lookup.
 
-import type { Pull, BlackHoleGeometry, BossDebuffEvent } from "@/types/Pull";
+import type { Pull, BlackHoleGeometry, BossDebuffEvent, EnemyStackEvent } from "@/types/Pull";
 import type { DeathEvent } from "@/types/DeathEvent";
 import type { PlayerInfo, PlayerEvent, ShieldAbsorb } from "@/types/PlayerInfo";
 import type { EnemyEvent } from "@/types/PullError";
@@ -1252,6 +1252,34 @@ function fflBuildEnemyBuffEvents(
     }));
 }
 
+// Stack counters on enemies (Pull.enemyStacks): every stack change of a
+// status that reaches 2+ stacks on some enemy in this pull. FFLogs logs
+// the new count on applybuffstack/removebuffstack; an applybuff starts at 1
+// and a removebuff ends at 0.
+function fflBuildEnemyStacks(
+  enemyBuffEvents: FFLBuffEvent[],
+  actorMap:        Map<number, FFLActor>,
+  abilityMap:      Map<number, AbilityInfo>,
+  fightStart:      number
+): EnemyStackEvent[] {
+  const onEnemy = enemyBuffEvents.filter((e) => actorMap.get(e.targetID)?.type !== "Player");
+  const stacking = new Set(onEnemy.filter((e) => (e.stack ?? 0) >= 2).map((e) => e.abilityGameID));
+  const out: EnemyStackEvent[] = [];
+  for (const e of onEnemy) {
+    if (!stacking.has(e.abilityGameID)) continue;
+    const stack = e.type === "applybuff" ? 1 : e.type === "removebuff" ? 0 : e.stack;
+    if (stack === undefined) continue;
+    out.push({
+      timestamp:  Math.max(0, e.timestamp - fightStart),
+      actorName:  actorMap.get(e.targetID)?.name ?? `Unknown (${e.targetID})`,
+      statusId:   e.abilityGameID ?? 0,
+      statusName: fflAbilityName(e, abilityMap),
+      stack,
+    });
+  }
+  return out.sort((a, b) => a.timestamp - b.timestamp);
+}
+
 // Dancing Mad Phase 4's hidden real/fake bit. FFLogs stamps status 1002056
 // on a boss actor with an `extraInfo` payload that is even for a REAL
 // mechanic and odd for a FAKE one — the only machine-readable signal for it
@@ -1555,6 +1583,7 @@ export function transformFFightToPull(
     castEvents,
     blackHoleGeometry,
     enemyCasts:    enemyCastEvents,
+    enemyStacks:   fflBuildEnemyStacks(data.enemyBuffEvents ?? [], actorMap, abilityMap, fightStart),
     bossDebuffs:   data.enemyDebuffEvents
       ? fflBuildBossDebuffs(data.enemyDebuffEvents, actorMap, abilityMap, fightStart)
       : undefined,
