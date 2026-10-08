@@ -68,8 +68,9 @@
 //   killed the M2.
 // - Aetherletting overlap ended P2 (OT dropped 11y off SSE, onto M2's
 //   puddle), P10 (MT dropped N, 8y off NNW) and P13 (whole group dropped
-//   near the center). Lines: a line hit the center when it passed 4.9y from
-//   it (P3) and missed at 6.4-6.6y (P1, P11, P12), so LINE_HIT = 5.5y.
+//   near the center). Lines: the stack under the boss was hit in P3/P11/
+//   P12 (victims 0.1-0.6y from the boss); everyone else hit stood 1.4-16y
+//   out.
 // - Hardcore: P1/P11's second Hardcore was already ENLARGED (earlier deaths
 //   pushed Satisfied to 8) and caught 4-5 of the party: both wipes. The
 //   kill's third Hardcore is enlarged by schedule and clean. P5/P6's third
@@ -104,20 +105,22 @@
 //   carrier/victim is further (45+ degrees) off their clock spot; both if
 //   neither is).
 // ffxiv-vf-hardcore (Major, non-tank hit with both tanks alive and not
-//   dead in the last 30s); ffxiv-vf-hardcore-party (Raid, 3+ non-tanks).
+//   dead in the last 30s); ffxiv-vf-hardcore-party (Raid, 3+ non-tanks;
+//   names nobody, per the user).
 // ffxiv-vf-rain-missed (Major); ffxiv-vf-rain-wipe (Raid, 3+ Rain deaths).
 // ffxiv-vf-aetherletting-overlap (Major on the latest drop furthest from
-//   its spot + Raid); -cross (Major on the puddle owner when the center was
-//   exposed, else on the victim); -clip (Major on whichever of dropper/
-//   victim is further from their spot).
-// ffxiv-vf-saw (Minor; Major when the player died with the DoT on).
+//   its spot + Raid); -cross (Major on the puddle owner when a victim was
+//   within 1y of the boss, else on the victim); -clip (Major on whichever
+//   of dropper/victim is further from their spot).
+// ffxiv-vf-saw (Minor: avoidable but no Damage Down, healable; Major when
+//   the player died with the DoT on).
 // ffxiv-vf-flail-tower (Major on the living tank who soaked no Plummet);
 //   ffxiv-vf-barbed-burst (player-less Minor; Raid if 3+ died);
 //   ffxiv-vf-doornail (Raid).
 // ffxiv-vf-cell-tower (Major on living set-group members who didn't soak);
-//   ffxiv-vf-cell-cone (Major on the outside tank whose cone hit an inmate,
-//   or on an outside non-tank in the tank cone; Amp/45982 on an inmate is
-//   player-less Minor); ffxiv-vf-last-lash (Major on the inmate).
+//   ffxiv-vf-cell-cone (Major on the outside tank whose cone hit an inmate
+//   or another outside player: the tank's spot aims it; Amp/45982 on an
+//   inmate is player-less Minor); ffxiv-vf-last-lash (Major on the inmate).
 // ffxiv-vf-deathmatch-tower (Major on living non-soakers).
 // ffxiv-vf-enrage, ffxiv-vf-collapse (Raid, only before any other Raid).
 // Their Damage Down causes are excluded from ffxiv-damage-down
@@ -442,6 +445,7 @@ const BLAST_BEAT_PLAYER   = 45942; // a Bombpyre carrier's own explosion
 const BLAST_BEAT_BAT      = 45941;
 const HARDCORE            = [45951, 45952]; // normal, enlarged (Satisfied >= 8)
 const BRUTAL_RAIN_HIT     = 45955;
+const AETH_CONE           = 45969; // rotating cones, cast from the boss
 const AETH_DROP           = 45970; // each marked player's own drop
 const AETH_CROSS          = 45971; // the dropped puddle's delayed plus/X
 const AETH_OVERLAP        = 45972; // two puddles touching: raid-wide repeats
@@ -502,11 +506,9 @@ const STOMP_SPOT: Record<FFRoleSlot, number> = { MT: 0, OT: 180, M1: 270, M2: 90
 const DROP_SPOT: Record<FFRoleSlot, number>  = { MT: 337.5, OT: 157.5, M1: 202.5, M2: 112.5, H1: 247.5, H2: 67.5, R1: 292.5, R2: 22.5 };
 // Aetherletting drops sit against the wall: clean drops were 18.3-19.6y out.
 const DROP_RADIUS = 1890;
-// A puddle's delayed lines: plus (N-S, E-W) or X (the diagonals), as unit
-// directions in log axes (y grows south). A line hit the center when it
-// passed 4.9y from it (P3), and missed at 6.4-6.6y (P1, P11, P12).
-const LINES = [[0, 1], [1, 0], [Math.SQRT1_2, Math.SQRT1_2], [Math.SQRT1_2, -Math.SQRT1_2]];
-const LINE_HIT = 550;
+// Under the boss for Aetherletting's delayed lines (user, 2026-10-08):
+// within 1y, a line hit is the dropper's fault; further out, the player's.
+const UNDER_BOSS = 100;
 const G1: FFRoleSlot[] = ["MT", "H1", "M1", "R1"];
 const G2: FFRoleSlot[] = ["OT", "H2", "M2", "R2"];
 
@@ -885,28 +887,25 @@ function detectAetherletting(players: PlayerInfo[], life: Life, casts: EnemyEven
     }
   }
 
-  // The puddles' delayed plus/X lines. The center is safe only when every
-  // puddle sits at its 22.5-degree offset, ~7y off any line through the
-  // center. For each victim, take the line through the puddle nearest them:
-  // if the center itself was within LINE_HIT of that line, the drop's angle
-  // was the problem (its owner's fault); otherwise the victim stood out of
-  // the center stack.
+  // The puddles' delayed plus/X lines. The safe spot is under the boss: a
+  // victim within 1y of the boss means the drop's angle put a line through
+  // the stack (its owner's fault); a victim anywhere else should have been
+  // under the boss (user ruling, 2026-10-08).
   for (const c of castsOf(casts, AETH_CROSS)) {
     const victims = hitsOf(players, AETH_CROSS, c.timestamp, c.timestamp + 1500)
       .filter((h) => h.e.sourceInstance === c.sourceInstance && life.hitAlive(h.p, h.e.timestamp) && h.e.x !== undefined && h.e.y !== undefined);
     if (victims.length === 0 || c.x === undefined || c.y === undefined) continue;
     const px = c.x, py = c.y;
-    const lineDist = (x: number, y: number, [ux, uy]: number[]) => Math.abs((x - px) * uy - (y - py) * ux);
-    const centerExposed = (h: Hit) => {
-      const line = LINES.reduce((a, b) => (lineDist(h.e.x!, h.e.y!, a) <= lineDist(h.e.x!, h.e.y!, b) ? a : b));
-      return lineDist(10000, 10000, line) < LINE_HIT;
-    };
+    // The boss's own position: the rotating cones are cast from it.
+    const boss = castsOf(casts, AETH_CONE).filter((b) => b.timestamp < c.timestamp && b.x !== undefined).pop();
+    const bx = boss?.x ?? 10000, by = boss?.y ?? 10000;
+    const fromBoss = (h: Hit) => Math.hypot(h.e.x! - bx, h.e.y! - by);
     const owner = drops.filter((d) => d.t < c.timestamp && Math.hypot(d.at.x - px, d.at.y - py) <= 300)[0];
-    const centered = victims.filter(centerExposed);
+    const centered = victims.filter((h) => fromBoss(h) <= UNDER_BOSS);
     for (const v of victims.filter((h) => !centered.includes(h))) {
       errors.push(playerError(v.p, {
         ruleId: VF_AETH_CROSS_RULE_ID, severity: "Major", name: "Hit by an Aetherletting Line",
-        description: `Hit by ${!owner ? "a" : owner.owner === v.p ? "their own" : `${owner.owner.name}'s`} puddle's delayed line (${kFmt(v.e.amount ?? 0)}) standing ${yd(distanceFromCenter(v.e.x!, v.e.y!))}y from the center, where it was safe${diedText(life.diedFrom(v.p, v.e.timestamp))}.`,
+        description: `Hit by ${!owner ? "a" : owner.owner === v.p ? "their own" : `${owner.owner.name}'s`} puddle's delayed line (${kFmt(v.e.amount ?? 0)}) standing ${yd(fromBoss(v))}y from the boss instead of under it${diedText(life.diedFrom(v.p, v.e.timestamp))}.`,
         timestamp: v.e.timestamp, abilityId: AETH_CROSS, abilityName: "Aetherletting",
       }));
     }
@@ -914,12 +913,12 @@ function detectAetherletting(players: PlayerInfo[], life: Life, casts: EnemyEven
       const killed = centered.filter((h) => life.diedFrom(h.p, h.e.timestamp)).map((h) => h.p);
       errors.push(playerError(owner.owner, {
         ruleId: VF_AETH_CROSS_RULE_ID, severity: "Major", name: "Aetherletting Line Through the Center",
-        description: `Their puddle's delayed line crossed the center stack, hitting ${namesOf(centered.map((h) => h.p))}${killed.length ? ` (${namesOf(killed)} died)` : ""}. ${dropText(owner)}.`,
+        description: `Their puddle's delayed line crossed the stack under the boss, hitting ${namesOf(centered.map((h) => h.p))}${killed.length ? ` (${namesOf(killed)} died)` : ""}. ${dropText(owner)}.`,
         timestamp: centered[0].e.timestamp, abilityId: AETH_CROSS, abilityName: "Aetherletting",
       }));
     } else if (centered.length) {
       errors.push(playerlessMinor(VF_AETH_CROSS_RULE_ID, "Aetherletting Line Through the Center",
-        `A puddle's delayed line crossed the center stack, hitting ${namesOf(centered.map((h) => h.p))}; its drop couldn't be matched to a player.`,
+        `A puddle's delayed line crossed the stack under the boss, hitting ${namesOf(centered.map((h) => h.p))}; its drop couldn't be matched to a player.`,
         centered[0].e.timestamp, AETH_CROSS, "Aetherletting"));
     }
   }
@@ -1030,14 +1029,22 @@ function detectCells(players: PlayerInfo[], life: Life, casts: EnemyEvent[], slo
             h.e.timestamp, h.e.abilityId, h.e.abilityName));
         }
       }
-      // An outside non-tank standing in the tank's cone. One who skipped
-      // their tower was only outside because of that (already flagged).
-      for (const h of tankCone.filter((x) => x.p.role !== "Tank" && !isInmate(x.p, x.e.timestamp) && !absent.includes(x.p))) {
-        errors.push(playerError(h.p, {
-          ruleId: VF_CELL_CONE_RULE_ID, severity: "Major", name: "Stood in the Tank's Ultrasonic Cone",
-          description: `Stood in the tank's Ultrasonic Spread cone${aimer ? ` (aimed by ${aimer.name})` : ""} (${kFmt(h.e.amount ?? 0)})${diedText(life.diedFrom(h.p, h.e.timestamp))}.`,
-          timestamp: h.e.timestamp, abilityId: SPREAD_TANK, abilityName: "Ultrasonic Spread",
+      // The tank cone on an outside non-tank: the tank aims it by standing in
+      // the gap between the two far-apart towers, so it's the tank's
+      // position (user ruling, P3 +6:57). One who skipped their tower was
+      // only outside because of that (already flagged).
+      const strays = tankCone.filter((x) => x.p.role !== "Tank" && !isInmate(x.p, x.e.timestamp) && !absent.includes(x.p));
+      if (strays.length && aimer) {
+        const killed = strays.filter((h) => life.diedFrom(h.p, h.e.timestamp)).map((h) => h.p);
+        errors.push(playerError(aimer, {
+          ruleId: VF_CELL_CONE_RULE_ID, severity: "Major", name: "Ultrasonic Cone Hit the Party",
+          description: `Out of position between the far-apart towers: their tank Ultrasonic Spread cone hit ${namesOf(strays.map((h) => h.p))}${killed.length ? ` (${namesOf(killed)} died)` : ""}.`,
+          timestamp: strays[0].e.timestamp, abilityId: SPREAD_TANK, abilityName: "Ultrasonic Spread",
         }));
+      } else if (strays.length) {
+        errors.push(playerlessMinor(VF_CELL_CONE_RULE_ID, "Ultrasonic Cone Hit the Party",
+          `The tank Ultrasonic Spread cone hit ${namesOf(strays.map((h) => h.p))}; no living outside tank to name.`,
+          strays[0].e.timestamp, SPREAD_TANK, "Ultrasonic Spread"));
       }
     }
   });

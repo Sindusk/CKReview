@@ -301,25 +301,17 @@ module. Open:
 
 ### Vamp Fatale (FFXIV)
 
-Report jN3XDrf2z8PmLgRJ; the user has the VOD for pull 1, none reviewed
-yet. Header of `lib/mechanics/ffxiv/arcadion/vamp-fatale.ts` has the
-evidence.
-- **Pull 1 +39.5, MT bat hit:** his own explosion went off at +38.6, then
-  a bat killed him. Did he walk into it after cleansing, or was he hit
-  where he stood? Flagged Major on him.
-- **Saw / Doornail puddle contact** is Minor (no Damage Down; 4x in the
-  kill) unless the player died with the DoT on. Right severity?
+Report jN3XDrf2z8PmLgRJ; pulls 1 and 3 partly reviewed (rulings in
+expectations/). Header of `lib/mechanics/ffxiv/arcadion/vamp-fatale.ts`
+has the evidence.
+- **Missed cell tower as a cutoff.** The user called pull 3 over the
+  moment a cell tower was missed (6:42). Pull 5 (7:04) and pull 9 (6:41)
+  also missed one; pull 5 lived another 80s. Should every missed cell
+  tower be a Raid cutoff, or only some (first set? two towers?)
 - **Stomp overlap blame** goes to whoever stood further from their clock
-  spot (45+ degrees), both when neither did. Confirm on P1/P3/P13.
-- **Aetherletting lines:** the owner is blamed when the center was within
-  5.5y of the line (P3/P11/P12), otherwise the victim (P1's M2 at 2.6y
-  from center, P9, P11's MT at 2.2y). Confirm.
-- **Hardcore party wipes (P1, P11)** are player-less Raids. Should the
-  tanks (not running out for the enlarged version) be named?
-- **Tank cone in cells:** an outside non-tank in the tank's cone is blamed,
-  not the aiming tank (P3 +417). Right call?
-- **Third Brutal Rain deaths (P5, P7)** are a player-less Raid (healing
-  check). Should anyone be named?
+  spot (45+ degrees), both when neither did. Confirm on pulls 1/3/13.
+- **Third Brutal Rain deaths (pulls 5, 7)** are a player-less Raid
+  (healing check). Should anyone be named?
 
 ### Dancing Mad (FFXIV)
 

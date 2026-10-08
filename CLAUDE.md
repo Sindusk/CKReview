@@ -87,6 +87,9 @@ These are standing preferences, each learned from a real correction:
   labeled diagnostic logging (plain strings, not objects) at the decision
   points, or measure in a headless browser (docs/dev-tooling.md). Then get
   one real trace. Remove the logging once the bug is fixed.
+- **Give pull times as MM:SS** (e.g. 6:57), not +SSS seconds, when talking
+  to the user: they match them against VOD timestamps (user, 2026-10-08).
+  Code comments and headers may keep +seconds.
 - **Small UI tweaks: don't run a visual verification loop.** The user is
   usually driving the running app and checks visually themselves. Make the
   edit, typecheck, and stop. Measure only when a symptom survives repeated
