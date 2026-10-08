@@ -57,10 +57,13 @@ These are standing preferences, each learned from a real correction:
   validate.js and tsc pass, or, for UI work, the change has been reviewed.
   This is standing authorization. The local remote is named **`CKReview`**,
   not `origin` (`git push CKReview main`).
-- **Credit Claude as co-author.** Since 2026-10-06, every commit an agent
-  makes ends with a blank line and this trailer, so GitHub shows Claude as a
-  co-author:
-  `Co-Authored-By: Claude <noreply@anthropic.com>`
+- **Credit the authoring AI model as co-author.** Since 2026-10-08, every
+  commit an agent makes ends with a blank line and a `Co-Authored-By`
+  trailer naming the AI model that authored the work. For GPT-6.1 Sol:
+  `Co-Authored-By: GPT-6.1 Sol <noreply@openai.com>`
+  That trailer alone is sufficient for GPT-6.1 Sol commits; Claude credit
+  is only appropriate when Claude also authored the work. Other models
+  should use their own model name and the appropriate provider address.
 - **Never deploy.** Don't SSH into the production server or run
   `./deploy.sh`. The user deploys themselves for oversight after pulling
   your commits. When done, say the change is ready to deploy.
