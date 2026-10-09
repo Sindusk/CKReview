@@ -524,6 +524,15 @@ grouped by exact roster. The module headers hold the rules.
 
   Not built: Life of the Dragon and Battle Litany window checks, which
   overlap Lance Charge (the same actions would count twice).
+- **Reaper, Vamp kill.** Positionals, cancelled Harpes, broken combos
+  and weaving already matched. Gluttony drift is found (1 use; xivanalysis
+  says 8 of 10). New: the Arcane Circle window (2 Communios, 1 Plentiful
+  Harvest; 1 Communio in the opener) finds the 8:22 window's second
+  Communio 2s late; xivanalysis says 2 missed, and the other isn't
+  visible. Not built:
+  - Soul gauge, because casts don't account for all gains
+  - AoE on too few targets, which needs per-job AoE → single-target pairs
+    (Whorl of Death at 5:00 hit 2)
 - **Healer DoT applications are valued against the filler** (user,
   2026-10-08), two ways:
   - an early refresh on an enemy that stays costs (seconds left ÷ 30s)

@@ -162,9 +162,31 @@ const enshroud: JobCheck = (ctx) => burstWindowFindings(ctx, {
   ],
 });
 
+// Reaper, checked against xivanalysis on jN3XDrf2z8PmLgRJ Vamp pull 8
+// (positionals, cancelled Harpes and broken combos already matched):
+// - Arcane Circle (xivanalysis ArcaneCircle.ts): two Communios and one
+//   Plentiful Harvest, one Communio in the opener (the first window).
+//   +3% from the tooltip. A missing one was used outside the window.
+// - Not built: Soul gauge overcap (xivanalysis: 20 lost). Simulated from
+//   casts (+10 per combo step, +50 per Soul Slice, −50 per spender) the
+//   kill gains 1800 and spends 1850, going below zero 4 times: some gains
+//   aren't casts (likely +10 when an enemy dies under Death's Design), so
+//   a cast simulation runs short and would hide overcaps.
+// - Not built: AoE on too few targets (Whorl of Death at 5:00 hit 2; it
+//   needs about 3 to beat Shadow of Death). Needs per-job AoE → single-
+//   target pairs.
+const arcaneCircle: JobCheck = (ctx) => burstWindowFindings(ctx, {
+  statusId: S.ARCANE_CIRCLE.id, name: "Arcane Circle", bonus: 0.03,
+  bonusBasis: "Arcane Circle is +3% (tooltip)",
+  expected: (c, casts): ExpectedAction[] => [
+    { ids: ids("COMMUNIO"), count: casts.length && casts[0].timestamp < 30_000 ? 1 : 2, name: "Communio" },
+    { ids: ids("PLENTIFUL_HARVEST"), count: 1, name: "Plentiful Harvest" },
+  ],
+});
+
 export const SAM_CHECKS: JobCheck[] = [uptime("FUGETSU", 0.13, "Fugetsu is +13%, FFLogs multiplier"), meikyo];
 export const VPR_CHECKS: JobCheck[] = [uptime("HUNTERS_INSTINCT", 0.1, "Hunter's Instinct is +10%, FFLogs multiplier"), reawaken];
 export const MNK_CHECKS: JobCheck[] = [riddleOfFire];
 export const DRG_CHECKS: JobCheck[] = [uptime("POWER_SURGE", 0.1, "Power Surge is +10% (tooltip)"), lanceCharge, lifeSurge, chaoticSpring];
 export const NIN_CHECKS: JobCheck[] = [kunaisBane];
-export const RPR_CHECKS: JobCheck[] = [enshroud];
+export const RPR_CHECKS: JobCheck[] = [enshroud, arcaneCircle];
