@@ -189,8 +189,13 @@ const GENERIC_DAMAGE_DOWN_RULE = "ffxiv-damage-down";
  */
 const avoidableSeverity = (pull: Pull): ErrorSeverity => (pull.game === "ffxiv" ? "Major" : "Minor");
 
+/** True when a dedicated encounter module covers this pull's boss. */
+export function hasEncounterModule(pull: Pull): boolean {
+  return COVERED_ENCOUNTERS[pull.game].has(pull.name);
+}
+
 export function fallbackApplies(pull: Pull): boolean {
-  return pull.game === "ffxiv" && !COVERED_ENCOUNTERS[pull.game].has(pull.name);
+  return pull.game === "ffxiv" && !hasEncounterModule(pull);
 }
 
 // ── Profile ─────────────────────────────────────────────────────────────

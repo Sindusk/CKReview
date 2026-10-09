@@ -11,6 +11,8 @@ import ConfirmDialog from "./ConfirmDialog";
 import AddErrorDialog from "./AddErrorDialog";
 import { SeverityIcon, SEVERITY_COLOR, type SeverityKind } from "./SeverityIcon";
 import { PanelHeader } from "./ui/Panel";
+import { InfoTip } from "./ui/InfoTip";
+import { hasEncounterModule } from "@/lib/mechanics/fallback";
 
 type AnalysisPanelProps = {
   pull: Pull | null;
@@ -504,29 +506,17 @@ export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime, onCa
             )
           )}
 
-          {/* Accuracy reminder — hover only. */}
-          <span
-            title="Findings here can be inaccurate."
-            aria-label="Findings here can be inaccurate."
-            style={{
-              display:        "inline-flex",
-              alignItems:     "center",
-              justifyContent: "center",
-              width:          "18px",
-              height:         "18px",
-              borderRadius:   "50%",
-              border:         "1px solid var(--ck-text-3)",
-              color:          "var(--ck-text-2)",
-              fontSize:       "11px",
-              fontWeight:     700,
-              fontStyle:      "italic",
-              fontFamily:     "Georgia, serif",
-              cursor:         "help",
-              flexShrink:     0,
-            }}
-          >
-            i
-          </span>
+          {/* Accuracy reminder; a red "!" when no encounter module covers
+              this boss (only generic or fallback detection ran). */}
+          {hasEncounterModule(pull) ? (
+            <InfoTip label="Findings here can be inaccurate." content="Findings here can be inaccurate." />
+          ) : (
+            <InfoTip
+              tone="alert"
+              label="Findings here will be inaccurate. There is no module detected for this encounter."
+              content={<>Findings here <b>will</b> be inaccurate.<br />There is no module detected for this encounter.</>}
+            />
+          )}
         </div>
       </PanelHeader>
 
