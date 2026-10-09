@@ -25,7 +25,7 @@ import { analyzePullDamage } from "@/lib/damage/analyze";
 import { aggregateDamage, type PlayerDamageAggregate } from "@/lib/damage/aggregate";
 import { getDamageContext } from "@/lib/damage/contexts";
 import { FFXIV_DAMAGE, GUARANTEED_HIT_STATUS_IDS } from "@/lib/damage/ffxiv/game";
-import { estimateHitRates } from "@/lib/damage/crit-rates";
+import { MIN_ESTIMATE_HITS, playerHitRates, reliableRates } from "@/lib/damage/crit-rates";
 import { critLuck } from "@/lib/damage/crit-luck";
 import { WOW_DAMAGE } from "@/lib/damage/wow/game";
 import type { DamageFinding, PhaseDamageSummary, PlayerDamageSummary, PullDamageAnalysis } from "@/lib/damage/types";
@@ -330,10 +330,17 @@ function PlayerDetail({ summary, analysis, colorFor, pull, pulls }: {
     if (!pull || pull.game !== "ffxiv") return undefined;
     const player = pull.players.find((p) => p.name === summary.player);
     const same = pulls.filter((p) => p.game === "ffxiv").flatMap((p) => p.players.filter((x) => x.name === summary.player));
-    const rates = player ? estimateHitRates(same, FFXIV_DAMAGE, GUARANTEED_HIT_STATUS_IDS) : undefined;
-    const result = player && rates ? critLuck(player, analysis.endMs, rates, FFXIV_DAMAGE, GUARANTEED_HIT_STATUS_IDS) : undefined;
-    return result && rates ? { ...result, rates, pulls: same.length } : undefined;
+    const rates = player ? playerHitRates(same, FFXIV_DAMAGE, GUARANTEED_HIT_STATUS_IDS) : undefined;
+    if (!player || !rates) return undefined;
+    if (!reliableRates(rates)) return { thin: true as const, rates, pulls: same.length };
+    const result = critLuck(player, analysis.endMs, rates, FFXIV_DAMAGE, GUARANTEED_HIT_STATUS_IDS);
+    return result ? { thin: false as const, ...result, rates, pulls: same.length } : undefined;
   }, [pull, pulls, summary.player, analysis.endMs]);
+  const rolled = luck && "percentile" in luck ? luck : undefined;
+  const ratesNote = luck?.rates.source === "stats"
+    ? `Rates from this player's gear in the log (they recorded it): crit ${(luck.rates.crit * 100).toFixed(1)}% ×${luck.rates.critMult.toFixed(3)}, direct hit ${(luck.rates.directHit * 100).toFixed(1)}%.`
+    : luck ? `Rates estimated from ${luck.rates.hits} unbuffed hits in ${luck.pulls} loaded pulls: crit ${(luck.rates.crit * 100).toFixed(1)}% ` +
+      `×${luck.rates.critMult.toFixed(2)}, direct hit ${(luck.rates.directHit * 100).toFixed(1)}%.` : "";
   return (
     <div>
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 8 }}>
@@ -357,14 +364,19 @@ function PlayerDetail({ summary, analysis, colorFor, pull, pulls }: {
           title: "What this player's party buffs added to everyone else's damage" },
         { label: "Received", value: approx(summary, fmtDamage(summary.buffs.received)),
           title: "What others' buffs added to this player's damage" },
-        ...(luck ? [{
+        ...(luck?.thin ? [{
           label: "Crit luck",
-          value: `${ordinal(Math.round(luck.percentile * 100))} pct (${luck.actual >= luck.mean ? "+" : "−"}${fmtDamage(Math.abs(luck.actual - luck.mean))})`,
+          value: "needs more pulls",
+          title: `This player's crit and direct-hit rates aren't in the log (only the player who recorded it has gear stats), ` +
+            `and ${luck.rates.hits} unbuffed hits in ${luck.pulls} loaded pull${luck.pulls === 1 ? "" : "s"} are too few to estimate them ` +
+            `(${MIN_ESTIMATE_HITS} needed, about 8-10 pulls). With fewer, the estimate absorbs the luck it's meant to measure.`,
+        }] : rolled ? [{
+          label: "Crit luck",
+          value: `${ordinal(Math.round(rolled.percentile * 100))} pct (${rolled.actual >= rolled.mean ? "+" : "−"}${fmtDamage(Math.abs(rolled.actual - rolled.mean))})`,
           title: `Where this pull's damage sat among every outcome the same rotation could roll (crit, direct hit, ±5%), ` +
-            `and how far from the average: ${luck.crits} crits vs ${luck.expectedCrits.toFixed(0)} expected, ` +
-            `${luck.directHits} direct hits vs ${luck.expectedDirectHits.toFixed(0)} expected, over ${luck.hits} hits. ` +
-            `Rates estimated from ${luck.rates.hits} hits in ${luck.pulls} loaded pulls: crit ${(luck.rates.crit * 100).toFixed(1)}% ` +
-            `×${luck.rates.critMult.toFixed(2)}, direct hit ${(luck.rates.directHit * 100).toFixed(1)}%. DoT ticks don't count (FFLogs logs them at their average).`,
+            `and how far from the average: ${rolled.crits} crits vs ${rolled.expectedCrits.toFixed(0)} expected, ` +
+            `${rolled.directHits} direct hits vs ${rolled.expectedDirectHits.toFixed(0)} expected, over ${rolled.hits} hits. ` +
+            `${ratesNote} DoT ticks don't count (FFLogs logs them at their average).`,
         }] : []),
       ]} />
       <TimelineStrip summary={summary} analysis={analysis} />

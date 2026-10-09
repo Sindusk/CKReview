@@ -233,6 +233,13 @@ export type FFLCombatantInfoEvent = {
   sourceID:  number;
   // FFLogs may expose specID or a job field; we rely on the actor.subType
   // from masterData which is more reliably populated.
+  // Gear stats: present only for the player who recorded the log (ACT's
+  // PlayerStats line). Everyone else gets simulatedCrit / simulatedDirectHit,
+  // FFLogs' estimate from that fight's hits, not gear (checked on
+  // jN3XDrf2z8PmLgRJ, 2026-10-08).
+  criticalHit?:   number;
+  directHit?:     number;
+  determination?: number;
 };
 
 export type FFLCastEvent = {

@@ -51,6 +51,7 @@ import type {
   FFLHealEvent,
   FFLDebuffEvent,
   FFLBuffEvent,
+  FFLCombatantInfoEvent,
 } from "./ffl-client";
 import { getSpellName }                          from "./spell-data";
 import { getSpecInfo, getRosterSortOrder }        from "./spec-data";
@@ -1418,9 +1419,14 @@ function buildFFPlayers(
   debuffEvents:      FFLDebuffEvent[],
   fightStart:        number,
   beginCastEvents:   FFLCastEvent[],
-  playerBuffEvents:  FFLBuffEvent[] | undefined
+  playerBuffEvents:  FFLBuffEvent[] | undefined,
+  combatantInfos:    FFLCombatantInfoEvent[] = []
 ): PlayerInfo[] {
   const uniqueIds = [...new Set(friendlyPlayerIds)];
+  const statsOf = (actorId: number): PlayerInfo["stats"] => {
+    const ci = combatantInfos.find((c) => c.sourceID === actorId && c.criticalHit !== undefined && c.directHit !== undefined);
+    return ci ? { criticalHit: ci.criticalHit!, directHit: ci.directHit!, determination: ci.determination } : undefined;
+  };
 
   return uniqueIds
     .map((actorId): PlayerInfo | null => {
@@ -1493,6 +1499,8 @@ function buildFFPlayers(
         buffs: playerBuffEvents
           ?.filter((e) => e.targetID === actorId)
           .map((e) => fflBuffToPlayerEvent(e, actorMap, abilityMap, fightStart)),
+
+        stats: statsOf(actorId),
       };
     })
     .filter((p): p is PlayerInfo => p !== null)
@@ -1535,7 +1543,8 @@ export function transformFFightToPull(
     data.debuffEvents,
     fightStart,
     data.castEvents.filter((e) => e.type === "begincast"),
-    data.playerBuffEvents
+    data.playerBuffEvents,
+    data.combatantInfos
   );
 
   // NOTE: sourced from data.enemyCastEvents / data.enemyBuffEvents — the

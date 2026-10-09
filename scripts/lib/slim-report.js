@@ -97,11 +97,10 @@ const FF_RESOURCE_SUBKEYS = ['x', 'y', 'hitPoints', 'maxHitPoints'];
 
 const FFL_PROJECTORS = {
   deaths:        (e) => omit(e, ['fight', 'packetID']),
-  // Only .sourceID is ever read (as a player-id roster source in the
-  // validate-*.js harnesses — the app itself doesn't use combatantInfo
-  // for FF at all, roster comes from fight.friendlyPlayers instead) —
-  // the gear/auras/stat block this stream otherwise carries is pure bloat.
-  combatantInfo: (e) => pick(e, ['timestamp', 'type', 'sourceID']),
+  // .sourceID is a player-id roster source in the validate-*.js harnesses;
+  // the crit / direct hit / determination stats (only the log recorder has
+  // them) feed crit luck (lib/damage/crit-luck.ts). Gear and auras are bloat.
+  combatantInfo: (e) => pick(e, ['timestamp', 'type', 'sourceID', 'criticalHit', 'directHit', 'determination']),
   // `duration` is a begincast's cast time (damage analysis).
   casts: (e) => ({
     ...pick(e, ['timestamp', 'type', 'sourceID', 'targetID', 'sourceInstance', 'targetInstance', 'abilityGameID', 'duration']),

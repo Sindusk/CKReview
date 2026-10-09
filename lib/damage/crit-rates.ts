@@ -42,6 +42,21 @@ export function ratesFromStats(criticalHit: number, directHit: number): Omit<Hit
   };
 }
 
+// An estimate from fewer hits is too loose for crit luck: one pull's
+// ~150-300 unbuffed hits put the crit rate ±3% out, which moved the kill's
+// percentiles 30-60 points (Kade 76th pooled, 18th from the kill alone).
+// About 8-10 pulls.
+export const MIN_ESTIMATE_HITS = 2_000;
+
+export const reliableRates = (r: HitRates) => r.source === "stats" || r.hits >= MIN_ESTIMATE_HITS;
+
+/** The log recorder's real stats when the log has them, else the estimate. */
+export function playerHitRates(players: PlayerInfo[], game: DamageGame, guaranteedStatusIds: Set<number>): HitRates | undefined {
+  const stats = players.find((p) => p.stats)?.stats;
+  if (stats) return { ...ratesFromStats(stats.criticalHit, stats.directHit), hits: 0, source: "stats" };
+  return estimateHitRates(players, game, guaranteedStatusIds);
+}
+
 const ALWAYS_SHARE = 0.95;
 const ALWAYS_MIN_HITS = 5;
 const MULT_MIN_EACH = 3;

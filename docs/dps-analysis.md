@@ -139,11 +139,16 @@ howbadwasmycritinxiv.com and the `ffxiv_stats` package
   - Everyone else gets `simulatedCrit` / `simulatedDirectHit`. These are
     estimates from that fight's own hits, not gear, so they're useless
     for luck.
-  - We don't keep the logger's stats yet: the sample saver drops them.
-- **So rates are estimated from each player's hits across the loaded
+  - The logger's stats reach `PlayerInfo.stats`, and crit luck uses them
+    as exact rates. Samples fetched before 2026-10-08 lack them;
+    re-fetch with `--refetch`.
+- **Everyone else's rates are estimated from their hits across the loaded
   pulls.** Only unbuffed hits count, with no guaranteed crits and no
   always-crit abilities. On `jN3XDrf2z8PmLgRJ` this recovered the
   logger's real gear within sampling error.
+- **Under 2,000 unbuffed hits (about 8–10 pulls) the dialog says "needs
+  more pulls".** One pull's estimate is ±3% on crit and absorbs the luck
+  it's meant to measure: the kill's percentiles moved 30–60 points.
 - **FFXIV DoT ticks never crit in FFLogs.** They're logged at their
   expected value, so they carry no measurable luck and are left out.
 - **A dance partner's hits list Devilment twice.** Count each buff once.

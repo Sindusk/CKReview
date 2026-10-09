@@ -638,9 +638,11 @@ MECHANICS['crit-rates'] = {
       if (!pull) { console.log(`  no pull ${boss} ${num}`); continue; }
       console.log(`  luck: ${boss} pull ${num}`);
       for (const p of pull.players) {
-        const r = mod.estimateHitRates(byName.get(p.name), mod.FFXIV_DAMAGE, mod.GUARANTEED_HIT_STATUS_IDS);
+        const r = mod.playerHitRates(byName.get(p.name), mod.FFXIV_DAMAGE, mod.GUARANTEED_HIT_STATUS_IDS);
+        if (r && !mod.reliableRates(r)) { console.log(`    ${p.name.padEnd(22)} needs more pulls (${r.hits} unbuffed hits)`); continue; }
         const l = r && mod.critLuck(p, Infinity, r, mod.FFXIV_DAMAGE, mod.GUARANTEED_HIT_STATUS_IDS);
         if (!l) continue;
+        process.stdout.write(r.source === 'stats' ? '  [gear]' : '');
         const k = (x) => `${Math.round(x / 1000)}k`;
         console.log(`    ${p.name.padEnd(22)} ${String(Math.round(l.percentile * 100)).padStart(3)}th percentile, ` +
           `${l.actual >= l.mean ? '+' : ''}${k(l.actual - l.mean)} vs mean (sd ${k(l.sd)}, ${l.hits} hits), ` +

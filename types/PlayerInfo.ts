@@ -192,6 +192,11 @@ export type PlayerInfo = {
   //   with `source` = who applied it; FFXIV also has `durationMs`.
   beginCasts?: PlayerEvent[];
   buffs?:      PlayerEvent[];
+
+  // FFXIV only: gear stats from the log, present only for the player who
+  // recorded it (FFLCombatantInfoEvent). Crit luck uses them instead of
+  // estimated rates (lib/damage/crit-rates.ts).
+  stats?: { criticalHit: number; directHit: number; determination?: number };
 };
 
 export type ShieldAbsorb = {
