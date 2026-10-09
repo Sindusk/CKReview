@@ -532,6 +532,63 @@ export function gaugeFindings(ctx: PlayerCheckContext, spec: GaugeSpec): DamageF
   }));
 }
 
+// ── AoE GCDs on one target ─────────────────────────────────────────────
+
+const AOE_HIT_MS = 1_500;
+
+/**
+ * An AoE GCD that hit one enemy and dealt less than the single-target GCD
+ * it stood in for (`against`: the healer's filler, a tank's combo step).
+ * One pressed in forced time is shown, not counted: past a phase's HP
+ * check a tank builds gauge with the AoE combo before downtime
+ * (2T1HzdPKgbhM43am fight 10, Dark Knight at 6:20 and 14:22).
+ */
+export function aoeOnOneTargetFindings(
+  ctx: PlayerCheckContext,
+  aoeIds: number[],
+  against: (aoeId: number) => { name: string; value: number } | undefined,
+): DamageFinding[] {
+  const out: DamageFinding[] = [];
+  const aoe = new Set(aoeIds);
+  const uses = ctx.uses.filter((u) => u.startMs < ctx.endMs);
+  uses.forEach((u, i) => {
+    if (!aoe.has(u.action.id)) return;
+    const alt = against(u.action.id);
+    if (!alt || alt.value <= 0) return;
+    const landed = u.startMs + u.castMs;
+    const until = Math.min(uses[i + 1]?.startMs ?? Infinity, landed + AOE_HIT_MS);
+    const hits = ctx.player.damageDone.filter((e) => e.abilityId === u.action.id && e.timestamp >= u.startMs && e.timestamp < until);
+    const targets = new Set(hits.map((e) => `${e.targetActorId ?? e.target}.${e.targetInstance ?? 1}`));
+    if (targets.size !== 1) return;
+    const dealt = hits.reduce((a, e) => a + (e.amount ?? 0), 0);
+    if (dealt >= alt.value) return;
+    const during = forcedPart(u.startMs - 1, u.startMs + 1, ctx.forced);
+    out.push(finding(ctx, {
+      kind: "aoe-single", startMs: u.startMs, endMs: landed,
+      forced: during.ms > 0, cause: during.ms > 0 ? during.cause : undefined,
+      label: `${u.abilityName} on one target`,
+      lostDamage: alt.value - dealt,
+      basis: `${k(alt.value)} average ${alt.name} − ${k(dealt)} this ${u.abilityName} dealt`,
+      detail: `${u.abilityName} hit only ${hits[0].target ?? "one enemy"}`,
+    }));
+  });
+  return out;
+}
+
+/**
+ * A tank's AoE combo on one target, each step against the single-target
+ * step it replaces ([AoE id, single-target id] pairs), at the player's own
+ * average for it. From xivanalysis's AoE-usage check (Unleash and Stalwart
+ * Soul on one target).
+ */
+export const aoeComboOnOneTarget = (pairs: [number, number][]): JobCheck => (ctx) => {
+  const st = new Map(pairs);
+  return aoeOnOneTargetFindings(ctx, pairs.map(([a]) => a), (aoeId) => {
+    const id = st.get(aoeId)!;
+    return { name: ctx.game.action(id)?.name ?? "single-target GCD", value: ctx.values.perUse(id) };
+  });
+};
+
 // ── Casts that did no damage ───────────────────────────────────────────
 
 const NO_DAMAGE_HIT_MS = 3_000;

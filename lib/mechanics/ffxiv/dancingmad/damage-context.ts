@@ -8,7 +8,8 @@
 // those pools are fixed. Only P5's DPS decides the enrage, so a cooldown
 // held from an earlier phase into P5 is not drift.
 //
-// P1 and P4 are threshold checks: Kefka must be under 15% HP when he goes
+// P2's pool is a kill to 0% (HP_CHECKS below). P1 and P4 are threshold
+// checks: Kefka must be under 15% HP when he goes
 // untargetable at the end of P1 (phase1.ts "ENRAGE CHECK"), and under 25%
 // by his final Ultima Upsurge in P4 (kefka-says.ts header, "PHASE END").
 // Neither phase's damage carries over (the next pool is fixed), so once
@@ -45,8 +46,11 @@ const RULE_KEY_LABELS: Record<string, string> = {
   "ffxiv-uk-apocalypse":                     "Stray Apocalypse",
 };
 
-// The HP share Kefka must be under, by phase.
-const HP_CHECKS: Record<number, number> = { 1: 0.15, 4: 0.25 };
+// The HP share Kefka must reach, by phase. P2's pool is a kill: he sits
+// at 0% until Ultimate Embrace (forsaken.ts), so the rest is wasted too
+// (2T1HzdPKgbhM43am fight 10: 0% at +378.4, a Dark Knight then built Blood
+// with the AoE combo before the downtime).
+const HP_CHECKS: Record<number, number> = { 1: 0.15, 2: 0, 4: 0.25 };
 
 const EARTHQUAKE = 47866;          // Stompies' start marker when Kefka casts it
 const STOMPIES_BAIT = 47887;       // Exdeath's Blizzard III bait, Stompies wave 1
@@ -71,9 +75,10 @@ export const DANCING_MAD_DAMAGE_CONTEXT: DamageContext = {
           .flatMap((p) => p.damageDone)
           .filter((e) => e.timestamp >= span.startMs && e.timestamp <= span.endMs
             && e.target === "Kefka" && e.healthAfter !== undefined && e.maxHealth
-            && e.healthAfter / e.maxHealth < line)
+            && e.healthAfter / e.maxHealth <= line)
           .reduce<number | undefined>((min, e) => (min === undefined || e.timestamp < min ? e.timestamp : min), undefined);
-        if (crossed !== undefined) out.push({ startMs: crossed, endMs: span.endMs, cause: `P${phase} check passed: Kefka under ${line * 100}%` });
+        const reached = line === 0 ? "at 0%" : `under ${line * 100}%`;
+        if (crossed !== undefined) out.push({ startMs: crossed, endMs: span.endMs, cause: `P${phase} check passed: Kefka ${reached}` });
       }
     }
     // The end-of-P3 hold, from Stompies' start to the end of the phase.

@@ -19,13 +19,23 @@
 // consumes (read from the stack removals), −50 per Bloodspiller / Quietus
 // outside Delirium. 50 Blood is worth one average Bloodspiller.
 //
+// AoE combo on one target (shared.ts aoeComboOnOneTarget, every tank).
+//
+// Checked against xivanalysis on 2T1HzdPKgbhM43am Dancing Mad fight 10
+// (2026-10-08): its 60 Blood overcapped matches; its AoE-on-one-target
+// uses (6:20, 14:22) were past a phase's HP check, building Blood before
+// downtime, so they're forced. Not built: its Tincture windows (a pot is a
+// few % for 30s, so a missed action in one costs little), MP overcap (one
+// Edge of Shadow), and Living Shadow cut by downtime (the one here was
+// pressed into the end-of-P3 hold).
+//
 //   Copyright (c) 2018 Saxon Landers & contributors
 //   MIT License; full text in THIRD_PARTY_NOTICES.md.
 
 import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import type { JobCheck } from "../../types";
 import { inWindows, type Window } from "../../timeline";
-import { burstWindowFindings, castHits, gaugeFindings, k, statusWindows, uptimeFindings, type GaugeEvent } from "./shared";
+import { aoeComboOnOneTarget, burstWindowFindings, castHits, gaugeFindings, k, statusWindows, uptimeFindings, type GaugeEvent } from "./shared";
 import { comboLanded } from "./gnb";
 
 const id = (key: string) => A[key].id;
@@ -105,4 +115,6 @@ const blood: JobCheck = (ctx) => {
   });
 };
 
-export const DRK_CHECKS: JobCheck[] = [delirium, darkside, blood];
+const aoeCombo = aoeComboOnOneTarget([[id("UNLEASH"), id("HARD_SLASH")], [id("STALWART_SOUL"), id("SYPHON_STRIKE")]]);
+
+export const DRK_CHECKS: JobCheck[] = [delirium, darkside, blood, aoeCombo];

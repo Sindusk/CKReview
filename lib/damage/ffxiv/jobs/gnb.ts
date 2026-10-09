@@ -24,7 +24,7 @@
 import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import type { DamageFinding, JobCheck } from "../../types";
 import type { PlayerCheckContext } from "../../checks";
-import { burstWindowFindings, castHits, gaugeFindings, k, statusWindows, type GaugeEvent } from "./shared";
+import { aoeComboOnOneTarget, burstWindowFindings, castHits, gaugeFindings, k, statusWindows, type GaugeEvent } from "./shared";
 
 const id = (key: string) => A[key].id;
 const GCD_SLOW_MS = 2470;
@@ -83,4 +83,6 @@ const cartridges: JobCheck = (ctx): DamageFinding[] => {
   });
 };
 
-export const GNB_CHECKS: JobCheck[] = [noMercy, cartridges];
+const aoeCombo = aoeComboOnOneTarget([[A.DEMON_SLICE.id, A.KEEN_EDGE.id], [A.DEMON_SLAUGHTER.id, A.BRUTAL_SHELL.id]]);
+
+export const GNB_CHECKS: JobCheck[] = [noMercy, cartridges, aoeCombo];

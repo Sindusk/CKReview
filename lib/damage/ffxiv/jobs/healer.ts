@@ -49,7 +49,7 @@ import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import type { DamageFinding, JobCheck } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";
 import { gcdKinds, inWindows, mergeWindows } from "../../timeline";
-import { burstWindowFindings, dotFindings, k } from "./shared";
+import { aoeOnOneTargetFindings, burstWindowFindings, dotFindings, k } from "./shared";
 
 export const HEAL_WASTE_SHARE = 0.2;
 const HEAL_LAND_MS = 1_500;
@@ -139,31 +139,9 @@ const healGcds: JobCheck = (ctx): DamageFinding[] => {
 // left out: they're what a healer presses while moving, when the filler
 // isn't an option, so the filler overstates the loss.
 const AOE_GCD_KEYS = ["GRAVITY", "GRAVITY_II", "HOLY", "HOLY_III"];
-const AOE_HIT_MS = 1_500;
-
-const aoeOnOneTarget: JobCheck = (ctx): DamageFinding[] => {
-  const out: DamageFinding[] = [];
-  const aoe = new Set(AOE_GCD_KEYS.filter((key) => A[key]).map((key) => A[key].id));
+const aoeOnOneTarget: JobCheck = (ctx) => {
   const fill = filler(ctx);
-  const uses = ctx.uses.filter((u) => u.startMs < ctx.endMs);
-  uses.forEach((u, i) => {
-    if (!aoe.has(u.action.id)) return;
-    const landed = u.startMs + u.castMs;
-    const until = Math.min(uses[i + 1]?.startMs ?? Infinity, landed + AOE_HIT_MS);
-    const hits = ctx.player.damageDone.filter((e) => e.abilityId === u.action.id && e.timestamp >= u.startMs && e.timestamp < until);
-    const targets = new Set(hits.map((e) => `${e.targetActorId ?? e.target}.${e.targetInstance ?? 1}`));
-    if (targets.size !== 1) return;
-    const dealt = hits.reduce((a, e) => a + (e.amount ?? 0), 0);
-    if (dealt >= fill.value) return;
-    out.push(finding(ctx, {
-      kind: "aoe-single", startMs: u.startMs, endMs: landed, forced: false,
-      label: `${u.abilityName} on one target`,
-      lostDamage: fill.value - dealt,
-      basis: `${k(fill.value)} average ${fill.name} − ${k(dealt)} this ${u.abilityName} dealt`,
-      detail: `${u.abilityName} hit only ${hits[0].target ?? "one enemy"}`,
-    }));
-  });
-  return out;
+  return aoeOnOneTargetFindings(ctx, AOE_GCD_KEYS.filter((key) => A[key]).map((key) => A[key].id), () => fill);
 };
 
 const dot = (key: string, ...more: string[]): JobCheck => (ctx) => dotFindings(ctx, {

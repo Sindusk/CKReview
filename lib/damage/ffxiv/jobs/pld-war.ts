@@ -30,7 +30,7 @@
 
 import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import type { JobCheck } from "../../types";
-import { burstWindowFindings, statusWindows, uptimeFindings } from "./shared";
+import { aoeComboOnOneTarget, burstWindowFindings, statusWindows, uptimeFindings } from "./shared";
 
 const id = (key: string) => A[key].id;
 
@@ -66,5 +66,8 @@ const surgingTempest: JobCheck = (ctx) => {
   });
 };
 
-export const PLD_CHECKS: JobCheck[] = [fightOrFlight];
-export const WAR_CHECKS: JobCheck[] = [surgingTempest];
+const pldAoeCombo = aoeComboOnOneTarget([[id("TOTAL_ECLIPSE"), id("FAST_BLADE")], [id("PROMINENCE"), id("RIOT_BLADE")]]);
+const warAoeCombo = aoeComboOnOneTarget([[id("OVERPOWER"), id("HEAVY_SWING")], [id("MYTHRIL_TEMPEST"), id("MAIM")]]);
+
+export const PLD_CHECKS: JobCheck[] = [fightOrFlight, pldAoeCombo];
+export const WAR_CHECKS: JobCheck[] = [surgingTempest, warAoeCombo];
