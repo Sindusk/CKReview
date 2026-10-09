@@ -46,7 +46,7 @@
 
 import type { Pull } from "@/types/Pull";
 import type { PlayerEvent, PlayerInfo } from "@/types/PlayerInfo";
-import type { DamageContext, DamageFinding, DamageGame, ForcedWindow } from "./types";
+import type { DamageContext, DamageFinding, DamageGame, ForcedWindow, Moment } from "./types";
 import type { BuffLedger } from "./buffs";
 import {
   forcedPart, gcdLockMs, inWindows, latestBegin, overlapMs, mergeWindows,
@@ -103,7 +103,7 @@ export function checkGcdGaps(ctx: PlayerCheckContext): DamageFinding[] {
   const out: DamageFinding[] = [];
   const uses = ctx.uses.filter((u) => u.startMs < ctx.endMs);
   if (uses.length === 0) return out;
-  type Bucket = { ms: number; lost: number; start: number; end: number; n: number; defensives: Map<string, number>; moments: Window[] };
+  type Bucket = { ms: number; lost: number; start: number; end: number; n: number; defensives: Map<string, number>; moments: Moment[] };
   const small = new Map<number | undefined, Bucket>();
   const clipped = new Map<number | undefined, Bucket>();
   // One press per name per instant: FFLogs can log an action's damage id
@@ -147,7 +147,11 @@ export function checkGcdGaps(ctx: PlayerCheckContext): DamageFinding[] {
       const bucketMap = weaves.length >= CLIP_WEAVES ? clipped : small;
       const acc = bucketMap.get(phaseId) ?? { ms: 0, lost: 0, start, end, n: 0, defensives: new Map<string, number>(), moments: [] };
       acc.ms += unforced; acc.lost += unforced * perMs; acc.end = end; acc.n++;
-      acc.moments.push({ startMs: start, endMs: end });
+      acc.moments.push({
+        startMs: start, endMs: end, lostDamage: unforced * perMs,
+        detail: `next GCD ${s(unforced)} late after ${after}` +
+          (weaves.length >= 2 ? `; ${weaves.length} weaves: ${weaves.map((w) => w.abilityName).join(", ")}` : ""),
+      });
       if (bucketMap === clipped) {
         for (const w of weaves) {
           if (ctx.game.isDefensive(w.abilityId)) acc.defensives.set(w.abilityName, (acc.defensives.get(w.abilityName) ?? 0) + 1);
@@ -254,7 +258,7 @@ export function checkDisengages(ctx: PlayerCheckContext): DamageFinding[] {
 // One finding per action per phase.
 
 export function checkPositionals(ctx: PlayerCheckContext): DamageFinding[] {
-  const groups = new Map<string, { name: string; phaseId?: number; misses: number; casts: number; lost: number; start: number; end: number; cost: number; moments: Window[] }>();
+  const groups = new Map<string, { name: string; phaseId?: number; misses: number; casts: number; lost: number; start: number; end: number; cost: number; moments: Moment[] }>();
   let last: { id: number; t: number } | undefined;
   for (const e of ctx.player.damageDone) {
     if (e.timestamp >= ctx.endMs || e.isDoT) continue;
@@ -272,7 +276,10 @@ export function checkPositionals(ctx: PlayerCheckContext): DamageFinding[] {
     g.misses++;
     g.lost += (e.amount ?? 0) * a.positional.missCost;
     g.end = e.timestamp;
-    g.moments.push({ startMs: e.timestamp, endMs: e.timestamp });
+    g.moments.push({
+      startMs: e.timestamp, endMs: e.timestamp, lostDamage: (e.amount ?? 0) * a.positional.missCost,
+      detail: `${e.abilityName} positional missed`,
+    });
   }
   const out: DamageFinding[] = [];
   for (const g of groups.values()) {

@@ -303,22 +303,25 @@ function PlayerCard({ name, job, color, icon, lost, forced, uptime, dealt, dealt
   name: string; job: string; color: string; icon: string; lost: number; forced: number; uptime: number;
   dealt: number; dealtLabel: string; selected: boolean; onClick: () => void;
 }) {
-  const small: React.CSSProperties = { color: "var(--ck-text-3)", fontSize: 11 };
+  // Two lines always: long text is cut with an ellipsis, never wrapped.
+  const small: React.CSSProperties = { color: "var(--ck-text-3)", fontSize: 11, whiteSpace: "nowrap" };
   return (
     <div
       className={`ck-card ck-card--interactive${selected ? " ck-card--selected" : ""}`}
       onClick={onClick}
       style={{
         padding: "7px 10px", marginBottom: 6, cursor: "pointer",
-        display: "grid", gridTemplateColumns: "26px minmax(0, 1fr) 62px 62px", columnGap: 10, alignItems: "center",
+        display: "grid", gridTemplateColumns: "26px minmax(0, 1fr) 56px 70px", columnGap: 8, alignItems: "center",
       }}
     >
       <img src={icon} alt={job} width={26} height={26} style={{ display: "block" }}
         onError={(e) => { e.currentTarget.style.visibility = "hidden"; }} />
       <div style={{ minWidth: 0 }}>
         <div style={{ color, fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</div>
-        <div style={small} title="GCD uptime while alive and the boss was targetable">
-          {job} · <span className="ck-num">{fmtUptime(uptime)}</span> uptime
+        {/* The job shrinks first; the uptime always shows whole. */}
+        <div style={{ ...small, display: "flex", minWidth: 0 }} title={`${job} · GCD uptime while alive and the boss was targetable`}>
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{job}</span>
+          <span style={{ flexShrink: 0 }}>&nbsp;· <span className="ck-num">{fmtUptime(uptime)}</span> uptime</span>
         </div>
       </div>
       <div style={{ textAlign: "center" }}>
@@ -387,7 +390,6 @@ function PlayerDetail({ summary, analysis, colorFor, iconFor, pull, pulls }: {
           }] : rolled ? [{
             label: "Crit luck", value: `${ordinal(Math.round(rolled.percentile * 100))} pct`,
             sub: `${rolled.actual >= rolled.mean ? "+" : "−"}${fmtDamage(Math.abs(rolled.actual - rolled.mean))} vs average`,
-            tone: rolled.percentile >= 0.5 ? "good" as const : rolled.percentile <= LUCK_POOR ? "bad" as const : undefined,
             title: `Where this pull's damage sat among every outcome the same rotation could roll (crit, direct hit, ±5%), ` +
               `and how far from the average: ${rolled.crits} crits vs ${rolled.expectedCrits.toFixed(0)} expected, ` +
               `${rolled.directHits} direct hits vs ${rolled.expectedDirectHits.toFixed(0)} expected, over ${rolled.hits} hits. ` +
@@ -420,9 +422,9 @@ type Stat = {
   tone?:  "good" | "bad";               // arcane blue / Death red; else plain
   title?: string;
 };
-// Uptime 95%+ reads good, under 90% poor; crit luck at or below the 25th
-// percentile reads poor (bad luck, not a mistake, but worth seeing).
-const UPTIME_GOOD = 0.95, UPTIME_POOR = 0.9, LUCK_POOR = 0.25;
+// Uptime 95%+ reads good, under 90% poor. Crit luck stays uncoloured: it's
+// luck, not something to fix.
+const UPTIME_GOOD = 0.95, UPTIME_POOR = 0.9;
 const TONE: Record<NonNullable<Stat["tone"]>, string> = { good: "var(--ck-arcane-text)", bad: LOSS_COLOR };
 // Stats as one row of equal panels.
 function StatStrip({ stats }: { stats: Stat[] }) {
@@ -520,6 +522,10 @@ function TimelineStrip({ summary, analysis }: { summary: PlayerDamageSummary; an
   const total = Math.max(1, analysis.endMs);
   const pct = (ms: number) => `${(Math.max(0, Math.min(ms, total)) / total) * 100}%`;
   const width = (s: number, e: number) => `${(Math.max(0, Math.min(e, total) - Math.max(0, s)) / total) * 100}%`;
+  // A tick and label every minute; the last is left out when it would
+  // crowd the end label.
+  const minutes: number[] = [];
+  for (let t = 60_000; t < total - 15_000; t += 60_000) minutes.push(t);
   return (
     <div>
       <div style={{ position: "relative", height: 34, background: "var(--ck-bg-deep)", border: "1px solid var(--ck-line-2)", borderRadius: 2, overflow: "hidden" }}>
@@ -530,6 +536,9 @@ function TimelineStrip({ summary, analysis }: { summary: PlayerDamageSummary; an
         {summary.timeline.buffWindows.map((w, i) => (
           <div key={`b${i}`} title={`Raid buffs ${fmtTime(w.startMs)}–${fmtTime(w.endMs)}`}
             style={{ position: "absolute", top: 0, height: 5, left: pct(w.startMs), width: width(w.startMs, w.endMs), background: "var(--ck-gold-2)" }} />
+        ))}
+        {minutes.map((t) => (
+          <div key={`m${t}`} style={{ position: "absolute", top: 0, bottom: 0, left: pct(t), width: 1, background: "var(--ck-line-2)" }} />
         ))}
         {summary.timeline.gcdStarts.map((t, i) => (
           <div key={`g${i}`} style={{ position: "absolute", top: 9, bottom: 9, left: pct(t), width: 1, background: "var(--ck-text-3)", opacity: 0.6 }} />
@@ -542,14 +551,20 @@ function TimelineStrip({ summary, analysis }: { summary: PlayerDamageSummary; an
             positionals) marks each of its moments, not its first-to-last span. */}
         {summary.findings.filter((f) => !f.forced && f.lostDamage >= 1).flatMap((f, i) =>
           (f.moments ?? [{ startMs: f.startMs, endMs: f.endMs }]).map((m, j) => (
-            <div key={`x${i}-${j}`} title={`${fmtTime(m.startMs)} ${f.detail} (${fmtDamage(f.lostDamage)})`}
+            <div key={`x${i}-${j}`}
+              title={`${fmtTime(m.startMs)} ${m.detail ?? f.detail} (${fmtDamage(m.lostDamage ?? f.lostDamage)})`}
               style={{ position: "absolute", bottom: 0, height: 6, left: pct(m.startMs), width: `max(3px, ${width(m.startMs, m.endMs)})`, background: LOSS_COLOR }} />
           )))}
       </div>
-      <div style={{ display: "flex", justifyContent: "space-between", color: "var(--ck-text-3)", fontSize: 10, marginTop: 2 }}>
-        <span className="ck-num">0:00</span>
-        <span>gold: raid buffs · shaded: forced · ticks: GCDs · red: counted losses</span>
-        <span className="ck-num">{fmtTime(total)}</span>
+      <div style={{ position: "relative", height: 13, color: "var(--ck-text-3)", fontSize: 10, marginTop: 2 }}>
+        <span className="ck-num" style={{ position: "absolute", left: 0 }}>0:00</span>
+        {minutes.map((t) => (
+          <span key={t} className="ck-num" style={{ position: "absolute", left: pct(t), transform: "translateX(-50%)" }}>{fmtTime(t)}</span>
+        ))}
+        <span className="ck-num" style={{ position: "absolute", right: 0 }}>{fmtTime(total)}</span>
+      </div>
+      <div style={{ color: "var(--ck-text-3)", fontSize: 10, textAlign: "center" }}>
+        gold: raid buffs · shaded: forced · ticks: GCDs · red: counted losses
       </div>
     </div>
   );

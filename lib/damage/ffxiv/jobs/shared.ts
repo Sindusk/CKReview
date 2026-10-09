@@ -45,7 +45,7 @@
 //   MIT License; full text in THIRD_PARTY_NOTICES.md.
 
 import type { PlayerEvent } from "@/types/PlayerInfo";
-import type { DamageFinding, JobCheck } from "../../types";
+import type { DamageFinding, JobCheck, Moment } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";
 import { forcedPart, inWindows, mergeWindows, overlapMs, type Window } from "../../timeline";
 
@@ -328,7 +328,7 @@ function dotApplicationFindings(ctx: PlayerCheckContext, spec: DotSpec, filler: 
   };
   const dotCasts = ctx.player.casts.filter((c) => ctx.game.action(c.abilityId)?.appliesStatusIds.some((id) => ids.has(id)));
   const lastApply = new Map<string, number>();
-  const steady = new Map<number | undefined, { ms: number; lost: number; n: number; start: number; end: number; moments: Window[] }>();
+  const steady = new Map<number | undefined, { ms: number; lost: number; n: number; start: number; end: number; moments: Moment[] }>();
   for (let i = 0; i < events.length; i++) {
     const e = events[i];
     const key = keyOf(e);
@@ -363,9 +363,11 @@ function dotApplicationFindings(ctx: PlayerCheckContext, spec: DotSpec, filler: 
       const hit = direct.reduce((a, h) => a + (h.amount ?? 0), 0);
       const phaseId = ctx.phaseOf(castAt);
       const b = steady.get(phaseId) ?? { ms: 0, lost: 0, n: 0, start: castAt, end: castAt, moments: [] };
+      const cost = (left / spec.durationMs) * Math.max(0, fill - hit);
       b.ms += left; b.n++; b.end = castAt;
-      b.lost += (left / spec.durationMs) * Math.max(0, fill - hit);
-      b.moments.push({ startMs: castAt, endMs: castAt });
+      b.lost += cost;
+      b.moments.push({ startMs: castAt, endMs: castAt, lostDamage: cost,
+        detail: `${spec.name} refreshed with ${s(left)} left on ${e.targetName}` });
       steady.set(phaseId, b);
       continue;
     }
@@ -420,7 +422,7 @@ export function dotFindings(ctx: PlayerCheckContext, spec: DotSpec): DamageFindi
 
   const windows: Window[] = [];
   const open = new Map<string, { start: number; lastApply: number }>();
-  const clips = new Map<number | undefined, { ms: number; n: number; start: number; end: number; moments: Window[] }>();
+  const clips = new Map<number | undefined, { ms: number; n: number; start: number; end: number; moments: Moment[] }>();
   for (const e of events) {
     const key = `${e.targetActorId}.${e.targetInstance ?? 1}`;
     const o = open.get(key);
@@ -434,7 +436,8 @@ export function dotFindings(ctx: PlayerCheckContext, spec: DotSpec): DamageFindi
         const phaseId = ctx.phaseOf(e.timestamp);
         const c = clips.get(phaseId) ?? { ms: 0, n: 0, start: e.timestamp, end: e.timestamp, moments: [] };
         c.ms += left; c.n++; c.end = e.timestamp;
-        c.moments.push({ startMs: e.timestamp, endMs: e.timestamp });
+        c.moments.push({ startMs: e.timestamp, endMs: e.timestamp, lostDamage: (left / DOT_TICK_MS) * avgTick,
+          detail: `${spec.name} refreshed with ${s(left)} left on ${e.targetName}` });
         clips.set(phaseId, c);
       }
       o.lastApply = e.timestamp;

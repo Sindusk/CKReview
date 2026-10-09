@@ -193,10 +193,13 @@ export type DamageFinding = {
   label:      string;
   inference?: boolean;   // rests on inference rather than a measured value
   // A summary over separate moments (small GCD delays, early DoT refreshes,
-  // missed positionals): when each happened. The dialog's strip marks these
-  // instead of the whole startMs–endMs span, which can cover the pull.
-  moments?:   Window[];
+  // missed positionals): when each happened, and what that one was and
+  // cost. The dialog's strip marks these instead of the whole startMs–endMs
+  // span, which can cover the pull, and its tooltip describes just the one.
+  moments?:   Moment[];
 };
+
+export type Moment = Window & { detail?: string; lostDamage?: number };
 
 type Window = { startMs: number; endMs: number };
 
