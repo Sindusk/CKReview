@@ -125,18 +125,25 @@
 // ffxiv-rhdb-buster (Major): a non-tank in Hot Impact or in someone else's
 //   Vertical buster; a non-tank who drew Vertical as the nearest (tanks
 //   alive and not dead in the last 30s); snaking Hot Impact on a non-tank
-//   names the tank with Firesnaking (player-less Minor when none had it).
+//   names that non-tank (user, 2026-10-09: telegraphed, the non-tank's
+//   fault; A14 +4:30 the H1 and R2).
 // ffxiv-rhdb-deep-impact (Major): the target is the farthest player it hit
 //   (user, 2026-10-09). A non-tank target baited it (A8 +2:18 the H2); a
 //   tank target that also hit non-tanks blames the tank under 6y from Deep
 //   Blue, else the victims (off the hitbox); Raid at 3+ deaths.
 // ffxiv-rhdb-stack: Pyrotation that killed someone names living non-tanks
 //   outside it (Major); Re-Entry under four with a death (player-less Minor).
-// ffxiv-rhdb-xtreme-wave (Major): both colors in one wave; a single dash
-//   killing its holder. ffxiv-rhdb-prison (Raid): Impact Zone at the
-//   deadline; player-less Minor for an unsoaked tower.
+// ffxiv-rhdb-xtreme-wave: per dash, the holder is the free player hit
+//   farthest from the boss's start; anyone else it hit stood in the lane
+//   (Minor, Major if the dash killed them; user, 2026-10-09, B3 +6:23). A
+//   holder killed by their own dash alone: tether too short (Major).
+//   ffxiv-rhdb-prison (Raid): Impact Zone at the deadline; player-less
+//   Minor for an unsoaked tower.
 // ffxiv-rhdb-xtreme-cleanse (Major on every same-color cleanser of a
-//   volley with 2+; Raid when 3+ died in the next 4s).
+//   volley with 2+; Raid when 3+ died in the next 4s). Raid at the first
+//   death between Xtreme snaking and the fourth Air 2 volley (user,
+//   2026-10-09: any death there is unrecoverable; B11/B17/B24 lost two to
+//   the opening Xtreme hit itself).
 // ffxiv-rhdb-enrage, -called-wipe (3+ no-killing-blow deaths at the end),
 //   -collapse (Raid): only before any other Raid.
 // The Damage Down causes are excluded from ffxiv-damage-down (error-rules.ts).
@@ -523,6 +530,8 @@ const FIRE_SNAKING        = 1004974;
 const WATER_SNAKING       = 1004975;
 const XTREME_FIRE         = 1004827;
 const XTREME_WATER        = 1004828;
+const XTREME_SNAKING_CAST = 46510; // Red Hot's Xtreme Firesnaking (both colors land together)
+const AIR_2_VOLLEYS       = [46566, 46568]; // Insane Air 2: first volley, then the next three
 const WATERY_GRAVE        = 1004829;
 const FLOATER_DASH        = [46523, 46524, 46525, 46526];        // dashes 1-4
 const IN_LINE             = [1003004, 1003005, 1003006, 1003451]; // First..Fourth in Line
@@ -546,6 +555,11 @@ const CUTBACK_HITBOX          = 300;
 const RE_ENTRY            = [46581, 46582]; // four-person cone stacks
 const XTREME_WAVE_RED     = 46545;
 const XTREME_WAVE_BLUE    = 46546;
+// Each boss's own wave cast (first wave, then waves 2-6): its position is
+// where that dash starts.
+const XTREME_WAVE_START: Record<number, number[]> = { [XTREME_WAVE_RED]: [46533, 46535], [XTREME_WAVE_BLUE]: [46534, 46536] };
+// A lane victim within this of the holder's distance was stacked on them.
+const WAVE_STACKED_YD     = 300;
 const IMPACT_ZONE_EXPIRY  = 46572; // the Watery Grave's deadline detonation
 const UNMITIGATED_EXPL    = 46565; // Deep Aerial tower left unsoaked
 const OVER_THE_FALLS      = [46588, 46589];
@@ -1115,18 +1129,15 @@ function detectBusters(players: PlayerInfo[], life: Life, casts: EnemyEvent[]): 
         }));
         continue;
       }
-      const fireTank = tanks.find((x) => life.hitAlive(x, t) && hasAura(x, FIRE_SNAKING, t - 500));
-      const text = `Hot Impact went to ${p.name} (${kFmt(e.amount ?? 0)}${died ? ", died" : ""}): Red Hot's top enmity among the Firesnaking players wasn't a tank.`;
-      if (fireTank && !tankOutRecently(life, fireTank, t)) {
-        errors.push(playerError(fireTank, {
-          ruleId: RHDB_BUSTER_RULE_ID, severity: "Major", name: "Hot Impact Hit a Non-Tank",
-          description: `${text} ${fireTank.name} had Firesnaking, so it was theirs: the fire tank holds (or provokes) Red Hot during snaking.`,
-          timestamp: e.timestamp, abilityId: HOT_IMPACT_SNAKING, abilityName: "Hot Impact",
-        }));
-      } else {
-        errors.push(playerlessMinor(RHDB_BUSTER_RULE_ID, "Hot Impact Hit a Non-Tank",
-          `${text} No living tank had Firesnaking to take it.`, e.timestamp, HOT_IMPACT_SNAKING, "Hot Impact"));
-      }
+      // A non-tank under the buster is theirs: it's well telegraphed (user,
+      // 2026-10-09, A14 +4:30: the H1 and R2 at fault, the OT fine). Only
+      // with no living tank is it fallout.
+      if (!tanks.some((x) => life.hitAlive(x, t))) continue;
+      errors.push(playerError(p, {
+        ruleId: RHDB_BUSTER_RULE_ID, severity: "Major", name: "Hit by Hot Impact",
+        description: `Took Hot Impact, Red Hot's tankbuster (${kFmt(e.amount ?? 0)})${diedText(died)}. It's telegraphed on Red Hot's top-enmity Firesnaking player; non-tanks stay away from it and out of the top spot, and the fire tank holds Red Hot.`,
+        timestamp: e.timestamp, abilityId: HOT_IMPACT_SNAKING, abilityName: "Hot Impact",
+      }));
     }
   }
 
@@ -1258,32 +1269,66 @@ function detectStacks(players: PlayerInfo[], life: Life): PullError[] {
 // ── Watery Grave prison and Xtreme Wave tethers ─────────────────────────────
 
 /**
- * Six tether waves: each holder takes their boss's dash. A free player hit
- * by both bosses' dashes in one wave stood in the other lane; a holder
- * killed by a single dash had too short a tether. Inmates are skipped.
+ * Six tether waves: each boss dashes from where it stands to its tether
+ * holder. The holder is the free player the dash hit farthest from its
+ * start (clean holders 28-39y out); anyone else it hit stood in the lane
+ * without a tether (user, 2026-10-09, B3 +6:23: the Blue tether went from
+ * south to the R1 in the northwest, through the OT and R2 at 15y). A
+ * holder killed by their own dash alone had too short a tether. Inmates
+ * are skipped.
  */
 function detectXtremeWave(players: PlayerInfo[], life: Life, casts: EnemyEvent[]): PullError[] {
   const errors: PullError[] = [];
+  const colorName = (id: number) => (id === XTREME_WAVE_RED ? "Red Hot" : "Deep Blue");
   for (const res of resolutions(players, [XTREME_WAVE_RED, XTREME_WAVE_BLUE], 1200)) {
-    const free = res.filter((h) => !hasAura(h.p, WATERY_GRAVE, h.e.timestamp) && life.hitAlive(h.p, h.e.timestamp));
-    const byPlayer = new Map<PlayerInfo, Hit[]>();
-    for (const h of free) byPlayer.set(h.p, [...(byPlayer.get(h.p) ?? []), h]);
-    for (const [p, hs] of byPlayer) {
-      const colors = uniq(hs.map((h) => h.e.abilityId));
-      const last = hs[hs.length - 1].e;
-      const death = life.diedFrom(p, last.timestamp);
-      if (colors.length >= 2) {
-        errors.push(playerError(p, {
-          ruleId: RHDB_XTREME_WAVE_RULE_ID, severity: "Major", name: "Hit by Both Xtreme Waves",
-          description: `Took both bosses' Xtreme Wave dashes in one wave (${hs.map((h) => kFmt(h.e.amount ?? 0)).join(" + ")})${diedText(death)}. Each tether holder takes only their own boss's dash; the two lanes must not cross, and everyone else stays out of both.`,
-          timestamp: hs[0].e.timestamp, abilityId: last.abilityId, abilityName: "Xtreme Wave",
-        }));
-      } else if (death && hs.length === 1) {
-        errors.push(playerError(p, {
-          ruleId: RHDB_XTREME_WAVE_RULE_ID, severity: "Major", name: "Xtreme Wave Tether Too Short",
-          description: `Died to a single Xtreme Wave dash (${kFmt(last.amount ?? 0)}). The dash hurts less the farther it travels: stretch the tether from the boss's current spot before it dashes.`,
-          timestamp: last.timestamp, abilityId: last.abilityId, abilityName: "Xtreme Wave",
-        }));
+    const free = res.filter((h) => !hasAura(h.p, WATERY_GRAVE, h.e.timestamp) && life.hitAlive(h.p, h.e.timestamp) &&
+      h.e.x !== undefined && h.e.y !== undefined);
+    // Per color: where the dash started (the boss's own wave cast) and how
+    // far along it each hit player stood.
+    const lanes = [XTREME_WAVE_RED, XTREME_WAVE_BLUE].map((id) => {
+      const hs = free.filter((h) => h.e.abilityId === id);
+      const t = hs[0]?.e.timestamp ?? 0;
+      const start = castsOf(casts, XTREME_WAVE_START[id]).filter((c) => c.timestamp <= t && c.timestamp >= t - 3000 && c.x !== undefined && c.y !== undefined).pop();
+      const along = (h: Hit) => (start ? Math.hypot(h.e.x! - start.x!, h.e.y! - start.y!) : 0);
+      return { id, hs: [...hs].sort((a, b) => along(b) - along(a)), along, ok: !!start };
+    }).filter((l) => l.hs.length && l.ok);
+    // Holders: the farthest per color, but one player can't hold both. When
+    // the same player is farthest for both, keep the pairing that puts the
+    // holders farther out in total.
+    const holders = new Map<number, PlayerInfo>();
+    if (lanes.length === 2 && lanes[0].hs[0].p === lanes[1].hs[0].p && lanes[0].hs.length > 1 && lanes[1].hs.length > 1) {
+      const [a, b] = lanes;
+      const keepA = a.along(a.hs[0]) + b.along(b.hs[1]), keepB = a.along(a.hs[1]) + b.along(b.hs[0]);
+      holders.set(a.id, keepA >= keepB ? a.hs[0].p : a.hs[1].p);
+      holders.set(b.id, keepA >= keepB ? b.hs[1].p : b.hs[0].p);
+    } else {
+      for (const l of lanes) holders.set(l.id, l.hs[0].p);
+    }
+    for (const l of lanes) {
+      const holder = holders.get(l.id)!;
+      const own = l.hs.find((h) => h.p === holder)!;
+      for (const h of l.hs) {
+        // Only a death the dash itself caused counts (A35 +6:22: a 4k dash
+        // hit, then a death to something else).
+        const death = [XTREME_WAVE_RED, XTREME_WAVE_BLUE].includes(life.diedFrom(h.p, h.e.timestamp)?.killingAbilityGameId ?? 0)
+          ? life.diedFrom(h.p, h.e.timestamp) : undefined;
+        if (h.p !== holder) {
+          if ((h.e.amount ?? 0) + (h.e.absorbed ?? 0) === 0 && !death) continue;
+          const where = l.along(h) >= l.along(own) - WAVE_STACKED_YD
+            ? `They stood with ${holder.name} at the end of the dash (${yd(l.along(h))}y out, ${holder.name} ${yd(l.along(own))}y).`
+            : `They were ${yd(l.along(h))}y along the dash; ${holder.name} was at its end, ${yd(l.along(own))}y out.`;
+          errors.push(playerError(h.p, {
+            ruleId: RHDB_XTREME_WAVE_RULE_ID, severity: death ? "Major" : "Minor", name: "Stood in an Xtreme Wave Lane",
+            description: `Stood in the path of ${colorName(l.id)}'s Xtreme Wave dash to ${holder.name}, its tether holder (${kFmt(h.e.amount ?? 0)})${diedText(death)}. ${where} Players without a tether stay out of the line between the boss and its tether holder.`,
+            timestamp: h.e.timestamp, abilityId: l.id, abilityName: "Xtreme Wave",
+          }));
+        } else if (death && !free.some((x) => x.p === holder && x.e.abilityId !== l.id)) {
+          errors.push(playerError(h.p, {
+            ruleId: RHDB_XTREME_WAVE_RULE_ID, severity: "Major", name: "Xtreme Wave Tether Too Short",
+            description: `Died to ${colorName(l.id)}'s Xtreme Wave dash on their own tether (${kFmt(h.e.amount ?? 0)}, ${yd(l.along(h))}y from where the boss started). The dash hurts less the farther it travels: stretch the tether from the boss's current spot before it dashes (surviving holders stood 28-39y away).`,
+            timestamp: h.e.timestamp, abilityId: l.id, abilityName: "Xtreme Wave",
+          }));
+        }
       }
     }
   }
@@ -1310,7 +1355,7 @@ function detectXtremeWave(players: PlayerInfo[], life: Life, casts: EnemyEvent[]
  * Bailout that leaves Magic Vulnerability Up around them. Several of one
  * color on the same volley stack their Bailouts and the next attacks kill.
  */
-function detectCleanses(players: PlayerInfo[], life: Life, deaths: DeathEvent[]): PullError[] {
+function detectCleanses(players: PlayerInfo[], life: Life, deaths: DeathEvent[], casts: EnemyEvent[]): PullError[] {
   const errors: PullError[] = [];
   const removals: { p: PlayerInfo; t: number; color: "Fire" | "Water" }[] = [];
   for (const p of players) {
@@ -1323,6 +1368,28 @@ function detectCleanses(players: PlayerInfo[], life: Life, deaths: DeathEvent[])
       // The application itself can strip it at once (both colors); skip.
       if (!applied || e.timestamp - applied.timestamp < 1000) continue;
       removals.push({ p, t: e.timestamp, color: e.abilityId === XTREME_FIRE ? "Fire" : "Water" });
+    }
+  }
+  // Any death before the fourth Insane Air volley ends the pull: every
+  // player carries a color and has a cleanse turn, so the rotation can't
+  // complete (user, 2026-10-09: B11/B17/B24 had two dead going into their
+  // overlapped cleanses). A death on the fourth volley is survivable.
+  const snaking = castsOf(casts, XTREME_SNAKING_CAST)[0];
+  if (snaking) {
+    const fourth = castsOf(casts, AIR_2_VOLLEYS).filter((c) => c.timestamp > snaking.timestamp)[3]?.timestamp ?? Infinity;
+    const first = deaths.filter((d) => d.timestamp - DEATH_EVENT_LAG_MS >= snaking.timestamp && d.timestamp - DEATH_EVENT_LAG_MS < fourth)
+      .sort((a, b) => a.timestamp - b.timestamp)[0];
+    if (first) {
+      const fatal = players.find((p) => p.name === first.player)?.damageTaken
+        .filter((e) => e.abilityId === first.killingAbilityGameId && e.timestamp <= first.timestamp).pop();
+      const how = fatal ? `to ${fatal.abilityName}` : "with no killing blow";
+      // The opening Xtreme hit itself killed two players in B11/B17/B24 (111-
+      // 207k; the kill took 75-178k): raid healing/mitigation, not a spot.
+      const raidwide = fatal && (fatal.abilityId === XTREME_SNAKING_CAST || fatal.abilityId === XTREME_SNAKING_CAST + 1)
+        ? " The Xtreme snaking hit itself lands on everyone; top the party up and mitigate before it." : "";
+      errors.push(raidMarker(RHDB_CLEANSE_RULE_ID, "Died During Xtreme Snaking",
+        `${first.player} died during Xtreme snaking (${how}) before the last Insane Air volley.${raidwide} Every player carries Xtreme Fire or Water and has a cleanse turn, so with one gone the rotation can't complete. Unresolvable from here.`,
+        first.timestamp - DEATH_EVENT_LAG_MS, first.killingAbilityGameId, fatal?.abilityName ?? "Death"));
     }
   }
   for (const volley of clusterByGap(removals, (r) => r.t, 1000)) {
@@ -1374,7 +1441,7 @@ export function detectRedHotDeepBlueErrors(players: PlayerInfo[], deathEvents: D
     ...detectDeepImpact(players, life, enemyCasts),
     ...detectStacks(players, life),
     ...detectXtremeWave(players, life, enemyCasts),
-    ...detectCleanses(players, life, deathEvents),
+    ...detectCleanses(players, life, deathEvents, enemyCasts),
   ];
 
   const firstRaid = () => Math.min(...errors.filter((e) => e.severity === "Raid").map((e) => e.timestamp));

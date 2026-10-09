@@ -313,20 +313,23 @@ has the evidence.
 
 Reports jN3XDrf2z8PmLgRJ (A), xFAfGP3qX4yJhDrV (B), d3vRbwfpNBLzJ2Xh (C,
 kill = C4); VOD answers 2026-10-09 cover overlaps (boss-relative clock
-spots), Cutback (aim described, nobody named) and Deep Impact (farthest
-player). Header of `lib/mechanics/ffxiv/arcadion/red-hot-deep-blue.ts` has
-the evidence.
+spots), Cutback (aim described, nobody named), Deep Impact (farthest
+player), busters on non-tanks, Xtreme Wave lanes and deaths during Xtreme
+snaking. Header of `lib/mechanics/ffxiv/arcadion/red-hot-deep-blue.ts` has
+the evidence. Rulings still to write once the batch settles.
 - **Other overlap layouts.** Only the all-party Double-Dip / Reverse
   volleys have known spots. Snaps, Inferno, Splash and the snaking /
   split-arena cones still name every player hit twice. Their layouts?
 - **Deep Impact during snaking:** the H1 was the farthest player in 9
   pulls (+5:15, +9:17). Real mistakes, or a strategy that put them there?
-- **Snaking Hot Impact on a non-tank** names the tank holding
-  Firesnaking; when neither tank had it, nobody. Right?
-- **Xtreme Wave deaths** at full HP to one dash are called a short
-  tether. Could they be a vulnerability from an earlier wave instead?
+- **Cutback target.** Name the farthest player when the safe slice they
+  set landed on earlier fire, or keep it player-less?
+- **Xtreme Wave holders dying at 23-29y** (surviving holders 28-39y) are
+  called a short tether. Right?
 - **Same-color Xtreme cleanses** flag every cleanser on the volley; with
-  the user's cleanse order known, only the out-of-turn ones could be.
+  the static's cleanse order, only the out-of-turn ones could be.
+- **Walked into the wall** with nothing before it (A6 +0:28 OT, A2 +1:16
+  R1, A17 +4:18 OT): real, or resets?
 - **Not built:** Blue dash through the bubble (Vulnerability Down on the
   Watery Grave is an enemy buff the module isn't given), Awesome Slab
   membership, lethal Xtreme aura expiry (never seen).
