@@ -249,19 +249,23 @@ export function uptimeFindings(ctx: PlayerCheckContext, spec: UptimeSpec): Damag
 // 1s (time to reapply). Clipping: a refresh with time left overwrites it.
 // Lost damage is in the player's own average tick (ticks every 3s).
 //
-// With a filler (healers), each application is valued instead of the
-// seconds it overwrote: what it added = its direct hit + its ticks on that
-// enemy after the previous application would have run out, until it ran
-// out itself or the status came off (the enemy left or died). Below the
-// filler's average at the same buff state (in or out of raid buffs), it
-// loses the difference: a cast of the filler would have done more. That
-// covers both early refreshes and a DoT left on an enemy about to leave:
-// on jN3XDrf2z8PmLgRJ Vamp pull 8 the AST's Combust III at 0:57 added 3
-// ticks (25k) before the boss left for 20s, against a 30k Fall Malefic
-// (xivanalysis listed its 20s "invulnerable"). An application whose run
-// reaches the end of a wipe's analysis is skipped (unknowable); on a kill
-// it counts. The DoTs are instants: when moving, no filler was possible,
-// which the basis says.
+// With a filler (healers), each application is valued against the filler
+// at the same buff state (in or out of raid buffs), two ways:
+// - The DoT ran its course on a live enemy: an early refresh didn't lose
+//   ticks (the new one ticks at the same rate), it made the next refresh
+//   come sooner. L seconds early = L ÷ duration of an extra DoT cast in
+//   place of a filler. Summed per phase ("refreshed early").
+// - It was cut short (the status came off, the enemy took no ticks for
+//   4.5s+, or a kill ended): no later refresh was coming, so the choice was
+//   this DoT or a filler. What it added = its direct hit + its ticks after
+//   the previous application would have run out; below the filler, it
+//   loses the difference. On jN3XDrf2z8PmLgRJ Vamp pull 8 the AST's
+//   Combust III at 0:57 added 3 ticks (25k) before the boss left for 20s,
+//   against a 30k Fall Malefic (xivanalysis's 20s "invulnerable").
+// Ticks for 0 (an invulnerable enemy) don't count. An application whose
+// run reaches the end of a wipe's analysis is skipped (unknowable); on a
+// kill it counts. The DoTs are instants: when moving, no filler was
+// possible, which the basis says.
 
 export type DotSpec = {
   statusIds:   number[];
@@ -293,6 +297,7 @@ function dotApplicationFindings(ctx: PlayerCheckContext, spec: DotSpec, filler: 
   };
   const dotCasts = ctx.player.casts.filter((c) => ctx.game.action(c.abilityId)?.appliesStatusIds.some((id) => ids.has(id)));
   const lastApply = new Map<string, number>();
+  const steady = new Map<number | undefined, { ms: number; lost: number; n: number; start: number; end: number; moments: Window[] }>();
   for (let i = 0; i < events.length; i++) {
     const e = events[i];
     const key = keyOf(e);
@@ -313,15 +318,31 @@ function dotApplicationFindings(ctx: PlayerCheckContext, spec: DotSpec, filler: 
     const castAt = cast?.timestamp ?? e.timestamp;
     const buffed = inWindows(castAt, ctx.buffWindows);
     const fill = fillerAvg(buffed);
-    if (fill <= 0 || fill - gained < fill * DOT_MIN_SHORTFALL) continue;
+    if (fill <= 0) continue;
     const forced = forcedPart(castAt - 1, castAt + 1, ctx.forced);
-    // Why it fell short: an early refresh, or the enemy stopped taking
-    // ticks (it left, went invulnerable or died) before the DoT ran out.
-    const n = `${added.length} new tick${added.length === 1 ? "" : "s"}`;
     const lastTick = ticks.filter((t) => keyOf(t) === key && t.timestamp > e.timestamp && t.timestamp <= until + 500).pop()?.timestamp ?? e.timestamp;
     const silent = until - lastTick;
     const left = prev !== undefined ? prev + spec.durationMs - e.timestamp : 0;
     const cut = runsOut - until;
+
+    // The DoT ran its course: an early refresh only brought the next one
+    // closer. Summed per phase below.
+    if (cut < DOT_TICK_MS && silent < DOT_SILENT_MS) {
+      if (left <= 0 || forced.ms > 0) continue;
+      const hit = direct.reduce((a, h) => a + (h.amount ?? 0), 0);
+      const phaseId = ctx.phaseOf(castAt);
+      const b = steady.get(phaseId) ?? { ms: 0, lost: 0, n: 0, start: castAt, end: castAt, moments: [] };
+      b.ms += left; b.n++; b.end = castAt;
+      b.lost += (left / spec.durationMs) * Math.max(0, fill - hit);
+      b.moments.push({ startMs: castAt, endMs: castAt });
+      steady.set(phaseId, b);
+      continue;
+    }
+
+    // Cut short: no later refresh was coming, so the choice was this DoT or
+    // a filler.
+    if (fill - gained < fill * DOT_MIN_SHORTFALL) continue;
+    const n = `${added.length} new tick${added.length === 1 ? "" : "s"}`;
     const why = [
       left > 0 ? `refreshed with ${s(left)} left` : undefined,
       silent >= DOT_SILENT_MS && cut < 1_000 ? `${e.targetName} took no ticks for the last ${s(silent)} (out of reach or invulnerable)` : undefined,
@@ -337,6 +358,18 @@ function dotApplicationFindings(ctx: PlayerCheckContext, spec: DotSpec, filler: 
         `(its ticks after the previous one would have run out${direct.length ? ", plus its hit" : ""}); ` +
         `${spec.name} is instant, so if you were moving no ${filler.name} was possible`,
       detail: `${spec.name} added ${k(gained)} (${n}), less than a ${filler.name}: ${why}`,
+    }));
+  }
+  for (const [phaseId, b] of steady) {
+    if (b.ms < DOT_CLIP_FINDING_MS) continue;
+    out.push(finding(ctx, {
+      kind: "dot-clip", startMs: b.start, endMs: b.end, forced: false, moments: b.moments,
+      label: `${spec.name} refreshed early`,
+      lostDamage: b.lost,
+      basis: `each refresh made the next one come that much sooner: ${s(b.ms)} ÷ ${s(spec.durationMs)} = ` +
+        `${(b.ms / spec.durationMs).toFixed(1)} extra ${spec.name} casts, each in place of a ${filler.name} ` +
+        `(${k(fillerAvg(false))} average${b.n ? ", less the DoT's own hit" : ""})`,
+      detail: `${spec.name} refreshed early ${b.n} time${b.n > 1 ? "s" : ""} in ${ctx.phaseName(phaseId) ?? "the pull"}, ${s(b.ms)} clipped`,
     }));
   }
   return out;

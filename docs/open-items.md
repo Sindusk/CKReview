@@ -512,10 +512,19 @@ grouped by exact roster. The module headers hold the rules.
   Our Combust III clipping is lower than xivanalysis's because it's per
   target.
 - **Healer DoT applications are valued against the filler** (user,
-  2026-10-08): ticks added past the previous application's expiry, plus
-  the hit, against an average filler cast. This replaces "seconds
-  clipped" for healers. It also catches a DoT left on an enemy that
-  leaves, goes invulnerable (0-damage ticks) or dies. Open questions:
+  2026-10-08), two ways:
+  - an early refresh on an enemy that stays costs (seconds left ÷ 30s)
+    of a filler cast, because the next refresh comes sooner; the ticks
+    themselves aren't lost
+  - a DoT cut short (the enemy leaves, goes invulnerable with 0-damage
+    ticks, or dies, or the kill ends) is its added ticks plus hit,
+    against a whole filler cast
+
+  Bard (Stormbite, Caustic Bite) and Black Mage still value clipping as
+  ticks overwritten, which overstates it about 3×; switch them over once
+  someone checks them against a log. On the Vamp kill the SGE clipped
+  64.3s (6 refreshes, read from the log), but xivanalysis says 17.5s a
+  minute (about 171s). That gap isn't explained. Open questions:
   - movement: the DoT is instant, so a refresh while moving cost little.
     The finding says so but still counts it (Dia refreshes with 25s left
     are common on dQ8wmb1VhKt6yBXk). Needs VOD checks.
