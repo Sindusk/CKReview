@@ -106,14 +106,16 @@ const lanceCharge: JobCheck = (ctx) => burstWindowFindings(ctx, {
 
 // Life Surge (xivanalysis LifeSurge.ts): its guaranteed crit belongs on
 // Drakesbane or Heavens' Thrust (Coerthan Torment in AoE). The GCD that
-// consumed it is the cast at the status's removal. A weaker one loses
-// (the best GCD's average − its average) × the crit's share, estimated
-// as for crit buffs (lib/damage/buffs.ts: ×1.55 at a 25% base rate, so a
-// forced crit adds 36% over an average hit). xivanalysis counted 4 on
-// jN3XDrf2z8PmLgRJ Vamp pull 8; the log has 8 on other GCDs (Fang and
-// Claw ×3, Raiden Thrust ×2, Lance Barrage, Spiral Blow, Chaotic Spring),
-// so its rule allows some of them. Marked inference.
-const LIFE_SURGE_GOOD = ["DRAKESBANE", "HEAVENS_THRUST", "COERTHAN_TORMENT"];
+// consumed it is the cast at the status's removal. xivanalysis also
+// accepts the other strong steps, Fang and Claw, Wheeling Thrust and
+// Chaotic Spring: its consumer table for jN3XDrf2z8PmLgRJ Vamp pull 8
+// (Drakesbane 6, Heavens' Thrust 1, Fang and Claw 3, Chaotic Spring 1,
+// Other 4) matches the log, and only the 4 "Other" (Raiden Thrust ×2,
+// Lance Barrage, Spiral Blow) were called non-optimal. Those lose (the
+// best GCD's average − its average) × the crit's share, estimated as for
+// crit buffs (lib/damage/buffs.ts: ×1.55 at a 25% base rate, so a forced
+// crit adds 36% over an average hit). Marked inference.
+const LIFE_SURGE_GOOD = ["DRAKESBANE", "HEAVENS_THRUST", "COERTHAN_TORMENT", "FANG_AND_CLAW", "WHEELING_THRUST", "CHAOTIC_SPRING"];
 const FORCED_CRIT_SHARE = (1.55 - (1 + 0.25 * 0.55)) / (1 + 0.25 * 0.55);
 
 const lifeSurge: JobCheck = (ctx): DamageFinding[] => {
@@ -132,7 +134,7 @@ const lifeSurge: JobCheck = (ctx): DamageFinding[] => {
       lostDamage: lost,
       basis: `(${k(best)} best of Drakesbane / Heavens' Thrust − ${k(ctx.values.perUse(used.action.id))} average ${used.abilityName}) × ` +
         `${Math.round(FORCED_CRIT_SHARE * 100)}% (a forced crit over an average hit, estimated)`,
-      detail: `Life Surge spent on ${used.abilityName}, not Drakesbane or Heavens' Thrust`,
+      detail: `Life Surge spent on ${used.abilityName}, a weak combo step`,
     }));
   }
   return out;

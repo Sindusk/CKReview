@@ -517,9 +517,9 @@ grouped by exact roster. The module headers hold the rules.
   cooldown than the window's cycle (Dragonfire Dive in a 60s window)
   when it was on cooldown throughout, unless it was pressed within 10s
   before. New:
-  - Life Surge spent on a weaker GCD. The log shows 8 against
-    xivanalysis's 4, so its rule allows some (perhaps Fang and Claw);
-    ask the player.
+  - Life Surge spent on a weak combo step. Like xivanalysis, Fang and
+    Claw, Wheeling Thrust and Chaotic Spring are accepted; both find
+    the same 4 (Raiden Thrust ×2, Lance Barrage, Spiral Blow).
   - Chaotic Spring DoT uptime
 
   Not built: Life of the Dragon and Battle Litany window checks, which
