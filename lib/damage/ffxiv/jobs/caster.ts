@@ -25,7 +25,12 @@
 //     line; confirm with the player before treating it as a loss.
 // Red Mage: see its section below.
 // Black Mage, Summoner (unverified, no sample has them):
-//   - BLM High Thunder / High Thunder II uptime and clipping (DoTs.tsx).
+//   - BLM High Thunder / High Thunder II uptime and clipping (DoTs.tsx),
+//     AoE on too few targets. Checked against xivanalysis on
+//     2T1HzdPKgbhM43am Dancing Mad fight 10 (2026-10-09): its 3
+//     interrupted casts and 2 AoE (both Freezes) match. Not built:
+//     Paradox overwrites, missing Despair and a weakened Fire III (gauge
+//     and MP, which the log doesn't carry).
 //   - SMN Searing Light with one Searing Flash (SearingLight.tsx).
 //   - Cooldowns for all three in tracked-cooldowns.ts.
 //
@@ -35,7 +40,7 @@
 import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import type { DamageFinding, JobCheck } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";
-import { burstWindowFindings, dotFindings, k, statusWindows, type ExpectedAction } from "./shared";
+import { aoeComboOnOneTarget, burstWindowFindings, dotFindings, k, statusWindows, type ExpectedAction } from "./shared";
 
 const ids = (...keys: string[]) => keys.filter((key) => A[key]).map((key) => A[key].id);
 const best = (ctx: PlayerCheckContext, list: number[]) => Math.max(0, ...list.map((x) => ctx.values.perUse(x)));
@@ -77,9 +82,24 @@ const starryFillers: JobCheck = (ctx): DamageFinding[] => {
   return out;
 };
 
+// High Thunder costs a GCD (a Thunderhead proc makes it instant), so an
+// early refresh loses ticks to nothing; it brings the next High Thunder
+// closer, in place of a Fire IV. Valued like the healer DoTs
+// (shared.ts dotApplicationFindings). Seconds of ticks overwritten, the
+// old basis, read 0.66M on 2T1HzdPKgbhM43am fight 10. It's instant: one
+// pressed to move loses less than the basis says, which it states.
 const highThunder: JobCheck = (ctx) => dotFindings(ctx, {
   statusIds: [S.HIGH_THUNDER.id, S.HIGH_THUNDER_II.id], name: S.HIGH_THUNDER.name, durationMs: S.HIGH_THUNDER.duration ?? 30_000,
+  fillerId: () => ({ id: A.FIRE_IV.id, name: A.FIRE_IV.name }),
 });
+
+// AoE spells on too few targets, each against the single-target spell
+// sharing its resource. Freeze needs 3 to beat Blizzard IV; the fight 10
+// Black Mage's two Freezes on the two P3 bosses (7:55, 8:15) are
+// xivanalysis's 2.
+const blmAoe = aoeComboOnOneTarget([
+  [A.FOUL.id, A.XENOGLOSSY.id], [A.FLARE.id, A.FIRE_IV.id], [A.FREEZE.id, A.BLIZZARD_IV.id, 3],
+]);
 
 const searingLight: JobCheck = (ctx) => burstWindowFindings(ctx, {
   statusId: S.SEARING_LIGHT.id, name: "Searing Light", bonus: "observed",
@@ -166,6 +186,6 @@ const verprocOverwrites: JobCheck = (ctx): DamageFinding[] => {
 };
 
 export const PCT_CHECKS: JobCheck[] = [starryMuse, starryFillers];
-export const BLM_CHECKS: JobCheck[] = [highThunder];
+export const BLM_CHECKS: JobCheck[] = [highThunder, blmAoe];
 export const SMN_CHECKS: JobCheck[] = [searingLight];
 export const RDM_CHECKS: JobCheck[] = [manaStacks, dualcastWasted, verprocOverwrites];

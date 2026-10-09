@@ -343,6 +343,14 @@ function dotApplicationFindings(ctx: PlayerCheckContext, spec: DotSpec, filler: 
     ctx.game.action(c.abilityId)?.appliesStatusIds.some((id) => ids.has(id)));
   const lastApply = new Map<string, number>();
   const steady = new Map<number | undefined, { ms: number; lost: number; n: number; start: number; end: number; moments: Moment[] }>();
+  // One record per target the application landed on. An AoE DoT (High
+  // Thunder II on both P3 bosses, 2T1HzdPKgbhM43am fight 10) is one cast
+  // and one GCD: its records are judged together below, not once each.
+  type Rec = {
+    castAt: number; targetName?: string; until: number; removal: number; left: number; cut: number; silent: number;
+    gained: number; hit: number; newTicks: number; hasHit: boolean; isSteady: boolean;
+  };
+  const byCast = new Map<number, Rec[]>();
   for (let i = 0; i < events.length; i++) {
     const e = events[i];
     const key = keyOf(e);
@@ -359,50 +367,67 @@ function dotApplicationFindings(ctx: PlayerCheckContext, spec: DotSpec, filler: 
     const cast = [...dotCasts].reverse().find((c) => c.timestamp <= e.timestamp && e.timestamp - c.timestamp <= DOT_CAST_MS);
     const direct = cast ? ctx.player.damageDone.filter((h) => h.abilityId === cast.abilityId && !h.isDoT &&
       !ctx.game.isTickAbility(h.abilityId) && keyOf(h) === key && h.timestamp >= cast.timestamp && h.timestamp <= cast.timestamp + DOT_HIT_MS) : [];
-    const gained = [...added, ...direct].reduce((a, h) => a + (h.amount ?? 0), 0);
     const castAt = cast?.timestamp ?? e.timestamp;
+    const lastTick = ticks.filter((t) => keyOf(t) === key && t.timestamp > e.timestamp && t.timestamp <= until + 500).pop()?.timestamp ?? e.timestamp;
+    const silent = until - lastTick;
+    const cut = runsOut - until;
+    const hit = direct.reduce((a, h) => a + (h.amount ?? 0), 0);
+    const recs = byCast.get(castAt) ?? [];
+    recs.push({
+      castAt, targetName: e.targetName, until, removal, cut, silent, hit,
+      left: prev !== undefined ? prev + spec.durationMs - e.timestamp : 0,
+      gained: hit + added.reduce((a, h) => a + (h.amount ?? 0), 0),
+      newTicks: added.length, hasHit: direct.length > 0,
+      isSteady: cut < DOT_TICK_MS && silent < DOT_SILENT_MS,
+    });
+    byCast.set(castAt, recs);
+  }
+
+  for (const [castAt, recs] of byCast) {
     const buffed = inWindows(castAt, ctx.buffWindows);
     const fill = fillerAvg(buffed);
     if (fill <= 0) continue;
     const forced = forcedPart(castAt - 1, castAt + 1, ctx.forced);
-    const lastTick = ticks.filter((t) => keyOf(t) === key && t.timestamp > e.timestamp && t.timestamp <= until + 500).pop()?.timestamp ?? e.timestamp;
-    const silent = until - lastTick;
-    const left = prev !== undefined ? prev + spec.durationMs - e.timestamp : 0;
-    const cut = runsOut - until;
 
-    // The DoT ran its course: an early refresh only brought the next one
-    // closer. Summed per phase below.
-    if (cut < DOT_TICK_MS && silent < DOT_SILENT_MS) {
-      if (left <= 0 || forced.ms > 0 || (spec.snapshotInBuffs && buffed)) continue;
-      const hit = direct.reduce((a, h) => a + (h.amount ?? 0), 0);
+    // The DoT ran its course on some target: an early refresh only brought
+    // the next one closer. One cost per cast, at its longest overwrite.
+    // Summed per phase below.
+    const ran = recs.filter((r) => r.isSteady);
+    if (ran.length > 0) {
+      const r = ran.reduce((a, b) => (b.left > a.left ? b : a));
+      if (r.left <= 0 || forced.ms > 0 || (spec.snapshotInBuffs && buffed)) continue;
+      const hit = Math.max(...recs.map((x) => x.hit));
       const phaseId = ctx.phaseOf(castAt);
       const b = steady.get(phaseId) ?? { ms: 0, lost: 0, n: 0, start: castAt, end: castAt, moments: [] };
-      const cost = (left / spec.durationMs) * Math.max(0, fill - hit);
-      b.ms += left; b.n++; b.end = castAt;
+      const cost = (r.left / spec.durationMs) * Math.max(0, fill - hit);
+      b.ms += r.left; b.n++; b.end = castAt;
       b.lost += cost;
       b.moments.push({ startMs: castAt, endMs: castAt, lostDamage: cost,
-        detail: `${spec.name} refreshed with ${s(left)} left on ${e.targetName}` });
+        detail: `${spec.name} refreshed with ${s(r.left)} left on ${r.targetName}` });
       steady.set(phaseId, b);
       continue;
     }
 
-    // Cut short: no later refresh was coming, so the choice was this DoT or
-    // a filler.
+    // Cut short everywhere: no later refresh was coming, so the choice was
+    // this DoT or a filler. Its value is what it added on every target.
+    const gained = recs.reduce((a, r) => a + r.gained, 0);
     if (fill - gained < fill * DOT_MIN_SHORTFALL) continue;
-    const n = `${added.length} new tick${added.length === 1 ? "" : "s"}`;
+    const r = recs[0];
+    const newTicks = recs.reduce((a, x) => a + x.newTicks, 0);
+    const n = `${newTicks} new tick${newTicks === 1 ? "" : "s"}${recs.length > 1 ? ` on ${recs.length} enemies` : ""}`;
     const why = [
-      left > 0 ? `refreshed with ${s(left)} left` : undefined,
-      silent >= DOT_SILENT_MS && cut < 1_000 ? `${e.targetName} took no ticks for the last ${s(silent)} (out of reach or invulnerable)` : undefined,
-      cut >= 1_000 ? (until === ctx.endMs || removal >= ctx.endMs - 1_000 ? `the pull ended ${s(cut)} before it ran out`
-        : `it came off ${e.targetName} ${s(cut)} before it ran out (the enemy died or left)`) : undefined,
+      r.left > 0 ? `refreshed with ${s(r.left)} left` : undefined,
+      r.silent >= DOT_SILENT_MS && r.cut < 1_000 ? `${r.targetName} took no ticks for the last ${s(r.silent)} (out of reach or invulnerable)` : undefined,
+      r.cut >= 1_000 ? (r.until === ctx.endMs || r.removal >= ctx.endMs - 1_000 ? `the pull ended ${s(r.cut)} before it ran out`
+        : `it came off ${recs.length > 1 ? "them" : r.targetName} ${s(r.cut)} before it ran out (the enemy died or left)`) : undefined,
     ].filter(Boolean).join("; ") || "few ticks";
     out.push(finding(ctx, {
-      kind: "dot-clip", startMs: castAt, endMs: until, forced: forced.ms > 0,
+      kind: "dot-clip", startMs: castAt, endMs: Math.max(...recs.map((x) => x.until)), forced: forced.ms > 0,
       cause: forced.ms > 0 ? forced.cause : undefined,
       label: `${spec.name} worth less than ${filler.name}`,
       lostDamage: fill - gained,
       basis: `${k(fill)} average ${filler.name}${buffed ? " in raid buffs" : ""} − ${k(gained)} the ${spec.name} added ` +
-        `(its ticks after the previous one would have run out${direct.length ? ", plus its hit" : ""}); ` +
+        `(its ticks after the previous one would have run out${recs.some((x) => x.hasHit) ? ", plus its hit" : ""}); ` +
         `${spec.name} is instant, so if you were moving no ${filler.name} was possible`,
       detail: `${spec.name} added ${k(gained)} (${n}), less than a ${filler.name}: ${why}`,
     }));
@@ -571,6 +596,7 @@ export function aoeOnOneTargetFindings(
   ctx: PlayerCheckContext,
   aoeIds: number[],
   against: (aoeId: number) => { name: string; value: number } | undefined,
+  minTargets: (aoeId: number) => number | undefined = () => undefined,
 ): DamageFinding[] {
   const out: DamageFinding[] = [];
   const aoe = new Set(aoeIds);
@@ -583,21 +609,29 @@ export function aoeOnOneTargetFindings(
     // Up to the next cast of the same AoE, not the next GCD: a Bard's
     // Shadowbite lands 1.4s after its cast and the second target's hit
     // 0.15s after that, past the next GCD's start.
-    const nextSame = uses.slice(i + 1).find((x) => x.action.id === u.action.id)?.startMs ?? Infinity;
+    // (When it lands, not starts: a Black Mage's next Flare begins casting
+    // before this one's second hit.)
+    const next = uses.slice(i + 1).find((x) => x.action.id === u.action.id);
+    const nextSame = next ? next.startMs + next.castMs : Infinity;
     const until = Math.min(nextSame, landed + AOE_HIT_MS);
     const hits = ctx.player.damageDone.filter((e) => e.abilityId === u.action.id && e.timestamp >= u.startMs && e.timestamp < until);
     const targets = new Set(hits.map((e) => `${e.targetActorId ?? e.target}.${e.targetInstance ?? 1}`));
-    if (targets.size !== 1) return;
+    // Some AoEs lose on two targets too (Freeze, 120 a target against
+    // Blizzard IV's 300): minTargets. Judging every two-target AoE by its
+    // damage against the single-target average flagged Gravity IIs worth
+    // 1-6k less, which is buff and crit noise.
+    if (targets.size === 0 || targets.size >= (minTargets(u.action.id) ?? 2)) return;
     const dealt = hits.reduce((a, e) => a + (e.amount ?? 0), 0);
     if (dealt >= alt.value) return;
     const during = forcedPart(u.startMs - 1, u.startMs + 1, ctx.forced);
     out.push(finding(ctx, {
       kind: "aoe-single", startMs: u.startMs, endMs: landed,
       forced: during.ms > 0, cause: during.ms > 0 ? during.cause : undefined,
-      label: `${u.abilityName} on one target`,
+      label: `${u.abilityName} on ${targets.size === 1 ? "one target" : "too few targets"}`,
       lostDamage: alt.value - dealt,
       basis: `${k(alt.value)} average ${alt.name} − ${k(dealt)} this ${u.abilityName} dealt`,
-      detail: `${u.abilityName} hit only ${hits[0].target ?? "one enemy"}`,
+      detail: targets.size === 1 ? `${u.abilityName} hit only ${hits[0].target ?? "one enemy"}`
+        : `${u.abilityName} hit ${targets.size} enemies for less than a ${alt.name}`,
     }));
   });
   return out;
@@ -609,12 +643,13 @@ export function aoeOnOneTargetFindings(
  * average for it. From xivanalysis's AoE-usage check (Unleash and Stalwart
  * Soul on one target).
  */
-export const aoeComboOnOneTarget = (pairs: [number, number][]): JobCheck => (ctx) => {
-  const st = new Map(pairs);
+export const aoeComboOnOneTarget = (pairs: [aoe: number, single: number, minTargets?: number][]): JobCheck => (ctx) => {
+  const st = new Map(pairs.map(([a, b]) => [a, b]));
+  const min = new Map(pairs.map(([a, , m]) => [a, m]));
   return aoeOnOneTargetFindings(ctx, pairs.map(([a]) => a), (aoeId) => {
     const id = st.get(aoeId)!;
     return { name: ctx.game.action(id)?.name ?? "single-target GCD", value: ctx.values.perUse(id) };
-  });
+  }, (aoeId) => min.get(aoeId));
 };
 
 // ── Casts that did no damage ───────────────────────────────────────────
