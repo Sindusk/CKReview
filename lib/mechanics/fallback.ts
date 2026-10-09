@@ -42,6 +42,9 @@
 //     tank-only, Blood Lash and Ultrasonic Spread come in per-role IDs.
 //     The minimums keep a random 2-target spread from looking role-bound
 //     by chance (it misses both tanks in 4 resolutions ~8% of the time).
+//     The role must also have been alive in ROLE_MIN_CLEAN_RESOLUTIONS of
+//     them: TEA pull 4's J Wave, a raidwide, hit only the tanks because
+//     everyone else was dead (user, pull 10).
 //   - "how many it hits": clean resolution sizes per ID, and whether they
 //     hit every living player. See underSoak.
 // And per ability name and episode (the nth time it went off in the pull),
@@ -198,6 +201,8 @@ type AbilityStats = {
   cleanResolutions: number;
   cleanHits: number;
   cleanRoles: Partial<Record<PlayerRole, number>>;
+  /** Clean resolutions in which each role had a living player. */
+  cleanRolesAlive: Partial<Record<PlayerRole, number>>;
   /** Players hit per clean resolution. */
   cleanSizes: number[];
   /** Clean resolutions that hit every living player. */
@@ -251,7 +256,7 @@ function penaltyGroups(pull: Pull): { player: PlayerInfo; d: PlayerEvent }[][] {
 }
 
 const emptyStats = (): AbilityStats => ({
-  casts: 0, hits: 0, cleanResolutions: 0, cleanHits: 0, cleanRoles: {}, cleanSizes: [], cleanEveryone: 0, cleanRaw: [], cleanDoubled: 0,
+  casts: 0, hits: 0, cleanResolutions: 0, cleanHits: 0, cleanRoles: {}, cleanRolesAlive: {}, cleanSizes: [], cleanEveryone: 0, cleanRaw: [], cleanDoubled: 0,
 });
 
 /**
@@ -328,6 +333,7 @@ function contribution(pull: Pull): FallbackProfile {
     const clean = isClean(res);
     const size = playersIn(res).size;
     const everyone = clean && size >= aliveCount(pull, first.timestamp);
+    const rolesAlive = new Set(pull.players.filter((p) => isAlive(pull, p, first.timestamp)).map((p) => p.role));
     for (const s of statsFor(first.abilityId, first.abilityName)) {
       s.hits += res.length;
       if (!clean) continue;
@@ -336,6 +342,7 @@ function contribution(pull: Pull): FallbackProfile {
       s.cleanSizes.push(size);
       if (everyone) s.cleanEveryone++;
       if (doubledIn(res).size > 0) s.cleanDoubled++;
+      for (const r of rolesAlive) s.cleanRolesAlive[r] = (s.cleanRolesAlive[r] ?? 0) + 1;
       for (const h of res) {
         s.cleanRoles[h.player.role] = (s.cleanRoles[h.player.role] ?? 0) + 1;
         if (h.event.maxHealth) s.cleanRaw.push(ratioOf(h.event));
@@ -345,14 +352,23 @@ function contribution(pull: Pull): FallbackProfile {
   return profile;
 }
 
+function addRoleCounts(a: Partial<Record<PlayerRole, number>>, b: Partial<Record<PlayerRole, number>>) {
+  const out = { ...a };
+  for (const [r, n] of Object.entries(b) as [PlayerRole, number][]) out[r] = (out[r] ?? 0) + n;
+  return out;
+}
+
 function addStats(a: AbilityStats | undefined, b: AbilityStats): AbilityStats {
-  if (!a) return { ...b, cleanRoles: { ...b.cleanRoles }, cleanSizes: [...b.cleanSizes], cleanRaw: [...b.cleanRaw] };
-  const roles = { ...a.cleanRoles };
-  for (const [r, n] of Object.entries(b.cleanRoles) as [PlayerRole, number][]) roles[r] = (roles[r] ?? 0) + n;
+  if (!a) return {
+    ...b, cleanRoles: { ...b.cleanRoles }, cleanRolesAlive: { ...b.cleanRolesAlive },
+    cleanSizes: [...b.cleanSizes], cleanRaw: [...b.cleanRaw],
+  };
   return {
     casts: a.casts + b.casts, hits: a.hits + b.hits,
     cleanResolutions: a.cleanResolutions + b.cleanResolutions, cleanHits: a.cleanHits + b.cleanHits,
-    cleanRoles: roles, cleanSizes: [...a.cleanSizes, ...b.cleanSizes],
+    cleanRoles: addRoleCounts(a.cleanRoles, b.cleanRoles),
+    cleanRolesAlive: addRoleCounts(a.cleanRolesAlive, b.cleanRolesAlive),
+    cleanSizes: [...a.cleanSizes, ...b.cleanSizes],
     cleanEveryone: a.cleanEveryone + b.cleanEveryone, cleanRaw: [...a.cleanRaw, ...b.cleanRaw],
     cleanDoubled: a.cleanDoubled + b.cleanDoubled,
   };
@@ -416,9 +432,16 @@ function doublesAreNormal(profile: FallbackProfile, e: PlayerEvent): boolean {
   return !!s && s.cleanResolutions >= ROLE_MIN_CLEAN_RESOLUTIONS && s.cleanDoubled >= s.cleanResolutions * NORMAL_DOUBLE_FRACTION;
 }
 
+/**
+ * Hit by an ability whose clean resolutions never hit this role, while
+ * the role was there to be hit: alive in ROLE_MIN_CLEAN_RESOLUTIONS of
+ * them. A role that was dead proves nothing (TEA pull 4: J Wave, a
+ * raidwide, hit only the tanks because only the tanks were left).
+ */
 function wrongTarget(profile: FallbackProfile, h: Hit) {
   const r = rolesHit(profile, h.event);
-  return r && !r.roles.includes(h.player.role) ? r : undefined;
+  const role = h.player.role;
+  return r && !r.roles.includes(role) && (r.stats.cleanRolesAlive[role] ?? 0) >= ROLE_MIN_CLEAN_RESOLUTIONS ? r : undefined;
 }
 
 /**
