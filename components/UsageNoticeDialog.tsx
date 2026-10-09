@@ -52,7 +52,11 @@ export default function UsageNoticeDialog({ open, onAccept }: Props) {
       }
     >
       <p style={{ margin: "0 0 10px", fontSize: "14px", lineHeight: 1.55 }}>
-        Raid Review is meant for constructive feedback. Errors are log-inferred and can be incorrect.
+        Raid Review is built for raid leads and statics reviewing pulls together: finding where the
+        group can improve, and bringing that back to the team.
+      </p>
+      <p style={{ margin: "0 0 10px", fontSize: "14px", lineHeight: 1.55 }}>
+        Findings are log-inferred and can be incorrect. Check the VOD before acting on them.
       </p>
       <p style={{ margin: 0, fontSize: "14px", lineHeight: 1.55 }}>
         Please do not use the information provided to harass or insult other players.
