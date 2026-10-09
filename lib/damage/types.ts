@@ -61,6 +61,9 @@ export type DamageGame = {
   disengageActionIds: Set<number>;
   // Job-specific checks (Layer 3), by job display name.
   jobChecks(job: string): JobCheck[];
+  // Procs a job check handles itself (Viper's venoms, which only boost a
+  // finisher): the generic proc check skips them.
+  jobProcStatusIds?: Set<number>;
 
   // ── Optional, for games unlike FFXIV (WoW, lib/damage/wow/game.ts) ──
   // Unset, each behaves as FFXIV always has.

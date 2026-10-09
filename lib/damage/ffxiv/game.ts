@@ -25,6 +25,7 @@ import { XIVA_ACTIONS, XIVA_STATUSES, type XivaAction } from "./xiva-data";
 import { TRACKED_COOLDOWNS } from "./tracked-cooldowns";
 import { JOB_CHECKS } from "./jobs";
 import { noDamageCasts } from "./jobs/shared";
+import { VPR_PROC_STATUS_IDS } from "./jobs/melee";
 import { FFXIV_ACTION_INDEX } from "../../mitigation/ffxiv-catalog";
 import type { DamageGame, GameAction, PartyBuff, TrackedCooldown } from "../types";
 
@@ -103,6 +104,14 @@ function toGameAction(a: XivaAction): GameAction {
 // bonusPercent is one a non-positional potency pair produces, 0 included.
 // Checked on dQ8wmb1VhKt6yBXk: the SAM's Gekko shows 61 = 1 − 160/420
 // (combo + positional).
+// Observed miss values the potency tables don't produce. Viper's venomed
+// finishers log 48 with the positional and 40 without; the 40s match
+// xivanalysis's misses one for one on 2T1HzdPKgbhM43am fight 10 (8 of 8),
+// and dQ8wmb1VhKt6yBXk's Viper shows the same 48 / 40 split.
+const POSITIONAL_MISSED_EXTRA: Record<string, number[]> = {
+  "Hindsting Strike": [40], "Hindsbane Fang": [40], "Flanksting Strike": [40], "Flanksbane Fang": [40],
+};
+
 function positionalInfo(a: XivaAction): GameAction["positional"] {
   const pots = a.potencies ?? [];
   if (!pots.some((p) => p.bonusModifiers.includes("POSITIONAL"))) return undefined;
@@ -120,6 +129,7 @@ function positionalInfo(a: XivaAction): GameAction["positional"] {
       missed.add(Math.trunc(100 * (1 - base.value / bonus.value)));
     }
   }
+  for (const b of POSITIONAL_MISSED_EXTRA[a.name] ?? []) missed.add(b);
   const hit = pots.filter((p) => p.bonusModifiers.includes("POSITIONAL")).sort((x, y) => y.value - x.value)[0];
   const sameState = (p: (typeof pots)[number]) =>
     p.bonusModifiers.includes("COMBO") === hit.bonusModifiers.includes("COMBO") &&
@@ -177,4 +187,5 @@ export const FFXIV_DAMAGE: DamageGame = {
   tankSwapActionIds: TANK_SWAP_IDS,
   disengageActionIds: DISENGAGE_IDS,
   jobChecks: (job) => [...(JOB_CHECKS[job] ?? []), noDamageCasts],
+  jobProcStatusIds: VPR_PROC_STATUS_IDS,
 };

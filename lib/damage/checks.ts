@@ -603,7 +603,9 @@ export function checkProcs(ctx: PlayerCheckContext): DamageFinding[] {
   const out: DamageFinding[] = [];
   const { player } = ctx;
   if (!player.buffs) return out;
-  const own = player.buffs.filter((e) => e.source === player.name).sort((a, b) => a.timestamp - b.timestamp);
+  const own = player.buffs
+    .filter((e) => e.source === player.name && !ctx.game.jobProcStatusIds?.has(e.abilityId))
+    .sort((a, b) => a.timestamp - b.timestamp);
   const casts = player.casts;
   const castNear = (t: number) => casts.find((c) => Math.abs(c.timestamp - t) <= PROC_CONSUME_MS);
 

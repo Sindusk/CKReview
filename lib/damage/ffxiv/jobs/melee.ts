@@ -16,6 +16,12 @@
 //   - Reawaken (Reawaken.tsx): four Generations, four Legacies, one
 //     Ouroboros. A missing Legacy is lost outright (its average); a missing
 //     Generation or Ouroboros is its average minus the GCD used instead.
+//   - Venoms and Honed buffs, Rattling Coil (below), and positionals (the
+//     finishers' miss value, game.ts POSITIONAL_MISSED_EXTRA). Checked
+//     against xivanalysis on 2T1HzdPKgbhM43am Dancing Mad fight 10
+//     (2026-10-09): venoms 7, Honed 3 + 1 overwrite, coils 3 + 3 left,
+//     positionals and the Reawaken at 6:05 all match. Not built: Serpent's
+//     Ire pooling (9 actions) and Death Rattle (1).
 // Unverified (no sample has the job):
 //   - Monk: Riddle of Fire, 11 GCDs (RiddleOfFire.tsx), +15% (tooltip).
 //   - Dragoon (checked against xivanalysis on jN3XDrf2z8PmLgRJ Vamp pull 8:
@@ -39,7 +45,8 @@
 
 import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import type { DamageFinding, JobCheck } from "../../types";
-import { finding, type PlayerCheckContext } from "../../checks";
+import { finding, PROC_CONSUME_MS, PROC_EXPIRY_EARLY_MS, type PlayerCheckContext } from "../../checks";
+import { forcedPart, inWindows, mergeWindows } from "../../timeline";
 import { burstWindowFindings, dotFindings, gaugeFindings, k, offCooldownIn, statusWindows, uptimeFindings, type ExpectedAction, type GaugeEvent } from "./shared";
 
 const id = (key: string) => A[key].id;
@@ -85,6 +92,67 @@ const reawaken: JobCheck = (ctx) => burstWindowFindings(ctx, {
     { ids: ids("OUROBOROS"), count: 1, name: "Ouroboros", value: replacedGcd("OUROBOROS") },
   ],
 });
+
+// Venoms and Honed buffs (xivanalysis Venoms / Honed procs): each boosts
+// one action by 100 potency and falls off when another combo step goes
+// first. The generic proc check missed those drops (the removal sits on a
+// cast, so it read as consumed) and valued an expiry at the whole finisher,
+// though the finisher is still pressed. On 2T1HzdPKgbhM43am fight 10 the
+// Hindstung drops are Hindsbane Fangs pressed instead (2:02, 4:45, 11:35,
+// 12:04) plus one expiry (13:17): xivanalysis's 5.
+const VENOM_PROCS: [status: string, consumer: string, share: number][] = [
+  // 500 vs 400 potency (combo, positional) from the finishers' potency tables.
+  ["HINDSTUNG_VENOM", "HINDSTING_STRIKE", 0.2],
+  ["HINDSBANE_VENOM", "HINDSBANE_FANG", 0.2],
+  ["FLANKSTUNG_VENOM", "FLANKSTING_STRIKE", 0.2],
+  ["FLANKSBANE_VENOM", "FLANKSBANE_FANG", 0.2],
+  // Steel Fangs / Reaving Fangs: 300 vs 200 (tooltip).
+  ["HONED_STEEL", "STEEL_FANGS", 1 / 3],
+  ["HONED_REAVERS", "REAVING_FANGS", 1 / 3],
+];
+
+/** Statuses the venom check owns; the generic proc check skips them (game.ts). */
+export const VPR_PROC_STATUS_IDS = new Set(VENOM_PROCS.map(([st]) => S[st]?.id).filter((x): x is number => x !== undefined));
+
+const venoms: JobCheck = (ctx) => {
+  const out: DamageFinding[] = [];
+  const forced = mergeWindows(ctx.forced);
+  const gcdCasts = ctx.player.casts.filter((c) => ctx.game.action(c.abilityId)?.onGcd);
+  for (const [statusKey, consumerKey, share] of VENOM_PROCS) {
+    const status = S[statusKey], consumer = A[consumerKey];
+    if (!status || !consumer) continue;
+    const value = ctx.values.perUse(consumer.id) * share;
+    if (value <= 0) continue;
+    const lose = (t: number, how: string) => {
+      const isForced = inWindows(t, forced);
+      out.push(finding(ctx, {
+        kind: "proc-lost", startMs: t, endMs: t, forced: isForced,
+        cause: isForced ? forcedPart(t - 1, t + 1, ctx.forced).cause : undefined,
+        label: `${status.name} ${how.startsWith("dropped") ? "dropped" : how}`,
+        lostDamage: value,
+        basis: `${k(ctx.values.perUse(consumer.id))} average ${consumer.name} × ${Math.round(share * 100)}% (its 100 potency bonus)`,
+        detail: `${status.name} ${how}`,
+      }));
+    };
+    let expiresAt: number | undefined;
+    for (const e of [...(ctx.player.buffs ?? [])].sort((a, b) => a.timestamp - b.timestamp)) {
+      if (e.abilityId !== status.id || e.source !== ctx.player.name || e.timestamp >= ctx.endMs) continue;
+      if (e.buffStatus === "applied" || e.buffStatus === "refreshed") {
+        if (expiresAt !== undefined && e.timestamp < expiresAt - PROC_EXPIRY_EARLY_MS) lose(e.timestamp, "overwritten before use");
+        expiresAt = e.durationMs ? e.timestamp + e.durationMs : undefined;
+      } else if (e.buffStatus === "removed") {
+        const at = gcdCasts.find((c) => Math.abs(c.timestamp - e.timestamp) <= PROC_CONSUME_MS);
+        if (at && at.abilityId !== consumer.id && !inWindows(e.timestamp, ctx.dead)) lose(e.timestamp, `dropped: ${at.abilityName} went first`);
+        // No upper bound: the 13:17 removal logged 1.6s after its 60s ran
+        // out, past the generic check's 1.5s.
+        else if (!at && expiresAt !== undefined && e.timestamp >= expiresAt - PROC_EXPIRY_EARLY_MS &&
+          !inWindows(e.timestamp, ctx.dead)) lose(e.timestamp, "expired unused");
+        expiresAt = undefined;
+      }
+    }
+  }
+  return out;
+};
 
 // ── Monk, Dragoon, Ninja, Reaper (unverified) ──────────────────────────
 
@@ -189,7 +257,31 @@ const arcaneCircle: JobCheck = (ctx) => burstWindowFindings(ctx, {
 });
 
 export const SAM_CHECKS: JobCheck[] = [uptime("FUGETSU", 0.13, "Fugetsu is +13%, FFLogs multiplier"), meikyo];
-export const VPR_CHECKS: JobCheck[] = [uptime("HUNTERS_INSTINCT", 0.1, "Hunter's Instinct is +10%, FFLogs multiplier"), reawaken];
+// Rattling Coil (xivanalysis UncoiledFury): +1 per Vicewinder / Vicepit /
+// Serpent's Ire, cap 3, Uncoiled Fury spends 1. Coils left when a kill
+// ends are lost too. On 2T1HzdPKgbhM43am fight 10 the cast simulation finds
+// xivanalysis's 3 overcapped (12:07, 14:08, 15:23) and 3 left at the end,
+// never going below zero.
+const rattlingCoils: JobCheck = (ctx) => {
+  const gain = new Set(ids("VICEWINDER", "VICEPIT", "SERPENTS_IRE"));
+  const spend = new Set(ids("UNCOILED_FURY"));
+  const events: GaugeEvent[] = [];
+  for (const c of ctx.player.casts) {
+    if (gain.has(c.abilityId)) events.push({ t: c.timestamp, type: "gain", amount: 1, label: `${c.abilityName} at 3 coils` });
+    else if (spend.has(c.abilityId)) events.push({ t: c.timestamp, type: "spend", amount: 1, label: "Uncoiled Fury" });
+  }
+  for (const d of ctx.dead) events.push({ t: d.startMs, type: "reset", label: "death" });
+  if (ctx.pull.result === "Kill") events.push({ t: ctx.endMs - 1, type: "cap", cap: 0, label: "left when the boss died" });
+  // Uncoiled Fury is a GCD: it replaces one, so only its excess counts.
+  const perCoil = replacedGcd("UNCOILED_FURY")(ctx) + ctx.values.perUse(id("UNCOILED_TWINFANG")) + ctx.values.perUse(id("UNCOILED_TWINBLOOD"));
+  return gaugeFindings(ctx, {
+    name: "Rattling Coil", unit: "Rattling Coil", cap: 3, unitValue: perCoil,
+    valueBasis: `${k(perCoil)} per coil: Uncoiled Fury less the GCD it replaces, plus its Twinfang and Twinblood`,
+    events,
+  });
+};
+
+export const VPR_CHECKS: JobCheck[] = [uptime("HUNTERS_INSTINCT", 0.1, "Hunter's Instinct is +10%, FFLogs multiplier"), reawaken, venoms, rattlingCoils];
 export const MNK_CHECKS: JobCheck[] = [riddleOfFire];
 // Firstminds' Focus (xivanalysis FirstmindsFocus): +1 per Raiden Thrust /
 // Draconian Fury, cap 2, Wyrmwind Thrust spends 2. A stack gained at 2 is
