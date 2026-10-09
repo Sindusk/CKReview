@@ -370,7 +370,9 @@ Departures from the plan, found while building:
   stretch.
 - **P4 is marked `damageCounts: false`.** Its damage doesn't carry over,
   so losses there are shown as forced. Revisit this if P4 turns out to
-  have its own check.
+  have its own check. (Superseded 2026-10-08: P4 has a 25% HP check, so
+  only the stretch after Kefka crosses 25% is forced; see
+  damage-context.ts.)
 
 **Tank batch** (step 6, first role, 2026-10-06), awaiting the user's review:
 - **Engine, every job:**

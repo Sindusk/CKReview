@@ -46,6 +46,10 @@ differ from the FFLogs fight id. In one report, "pull 11" was fight 12.
      damage in that phase is lost (it doesn't carry over).
    - Dancing Mad: P2 (44.1M), P3 (75.1M) and P5 (56.9M) are fixed. P4
      varies and doesn't carry over, so only P5 DPS decided the enrage.
+   - A varying total doesn't mean the phase's damage is free. P4 is a
+     threshold check: Kefka must be under 25% by the final Ultima Upsurge.
+     The study missed this; only the damage past 25% is wasted, and the
+     damage context marks that stretch forced.
    - So resources pooled for the final phase are free, as long as earlier
      damage checks still pass.
 2. **Compare equal windows (`window`).** Measure every log over the same
