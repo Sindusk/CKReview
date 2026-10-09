@@ -80,7 +80,9 @@ export function InfoTip({
           }}
         >
           <Panel diamond={false} bodyStyle={{ padding: "8px 12px", fontSize: "12px", lineHeight: 1.5, color: "var(--ck-text)" }}>
-            {content}
+            {/* Panel bodies are flex columns; one block keeps mixed inline
+                content (text + <b>) flowing on a line. */}
+            <div>{content}</div>
           </Panel>
         </div>,
         document.body,
