@@ -42,6 +42,11 @@ export type CatalogEntry = {
   // Can end before durationMs (a channel, or a ground effect players leave),
   // so being within its duration doesn't mean it should be on a hit.
   variableDuration?: boolean;
+  // An invulnerability that outlasts its status by this long without the
+  // log listing it: Living Dead's Walking Dead (the tank can't die for 10s
+  // after Living Dead triggers) never shows in a damage event's `buffs`,
+  // so a hit taking the tank to 0 HP then looked like a failed buster.
+  trailingInvulnMs?: number;
   // false: recognized on hits (so the math stays right) but never shown as
   // a column, graded for availability or offered as droppable. For things
   // the group doesn't plan as mitigation (Astrologian cards, per the user).

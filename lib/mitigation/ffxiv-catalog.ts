@@ -109,7 +109,7 @@ export const FFXIV_MITIGATION_CATALOG: CatalogEntry[] = [
     kind: "personal", reach: "target", durationMs: 10_000, cooldownMs: 60_000, charges: 2, verified: true },
   { key: "living-dead", name: "Living Dead", jobs: ["Dark Knight"], actionIds: [3638],
     statuses: [pct(1000810, "Living Dead", 1), pct(1000811, "Walking Dead", 1), marker(1003255, "Undead Rebirth")],
-    kind: "invuln", reach: "self", durationMs: 10_000, cooldownMs: 300_000, verified: true },
+    kind: "invuln", reach: "self", durationMs: 10_000, cooldownMs: 300_000, trailingInvulnMs: 10_000, verified: true },
 
   // ── Gunbreaker ──────────────────────────────────────────────────────
   { key: "heart-of-light", name: "Heart of Light", jobs: ["Gunbreaker"], actionIds: [16160],

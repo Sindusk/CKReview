@@ -487,6 +487,18 @@ grouped by exact roster. The module headers hold the rules.
     a row.
   - Notes list unused mitigations without estimating whether they'd
     have lifted the hit into good.
+- **Plan view (built 2026-10-09, waiting on the user's review):**
+  `lib/mitigation/plan.ts` header has the rules. Chosen by the builder:
+  - at most 3 changes; a hit needs 3+ pulls; a change must fit the
+    cooldowns in at least half the hit's pulls
+  - tight = good median but the worst pull under 15%, given a change
+    only when it fixes the worst pull
+  - a short hit whose median lowest HP is below -50% is labelled a
+    mechanic failure, not planned (Red Hot and Deep Blue's Plunging
+    Snap #3 at -674%)
+  - one change per hit, even when it leaves the hit still short
+  - the role filter dims the plan and hides timeline columns by party
+    slot (MT/OT, H1/H2, M1/M2, R1/R2)
 - **Unverified catalog entries:** Warrior, Machinist (Dismantle), Red Mage,
   Ninja, Monk, Summoner.
 - **Deferred:** what-if sandbox (reuse `marginWithout`), an optional

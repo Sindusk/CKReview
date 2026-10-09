@@ -176,7 +176,10 @@ It loads pulls lazily and keeps three in memory, so narrowing with
   `node scripts/validate.js mitigation-analysis sampledata/ff/<code>`
   prints every hit per pull (raw/taken damage, HP before/after, verdict,
   note), then the all-pulls aggregate per boss and roster, the way the
-  dialog groups it; `pulls=1/8 RARE` marks a hidden rare hit.
+  dialog groups it; `pulls=1/8 RARE` marks a hidden rare hit. A group
+  with enough pulls also gets its `PLAN` (`lib/mitigation/plan.ts`):
+  each listed hit with its change or the reason it has none, then the
+  spare hits.
   Print-only; it needs a full capture fetched after 2026-10-06.
 - **Inspecting one hit:** load pulls the way the runner does
   (`lib/sample-report-store.ts` `loadSampleReport` →

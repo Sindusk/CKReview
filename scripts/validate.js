@@ -532,6 +532,7 @@ MECHANICS['mitigation-analysis'] = {
     lt: requireTsFromRoot('lib/log-transforms.ts', { './log-auth': {} }),
     ...requireTsFromRoot('lib/mitigation/analyze.ts'),
     ...requireTsFromRoot('lib/mitigation/aggregate.ts'),
+    ...requireTsFromRoot('lib/mitigation/plan.ts'),
     ...requireTsFromRoot('lib/mitigation/ffxiv-catalog.ts'),
   }),
   async run({ mod, dir }) {
@@ -544,7 +545,7 @@ MECHANICS['mitigation-analysis'] = {
       const hits = mod.analyzePullMitigation(pull, mod.FFXIV_MITIGATION);
       const key = `${pull.name} | ${pull.players.map((p) => p.name.split(' ')[0]).sort().join(', ')}`;
       if (!groups.has(key)) groups.set(key, []);
-      groups.get(key).push({ pullId: pull.id, pullNumber: pull.pullNumber, durationMs: pull.fightDuration, hits });
+      groups.get(key).push({ pullId: pull.id, pullNumber: pull.pullNumber, durationMs: pull.fightDuration, hits, pull });
       const targets = hits.flatMap((h) => h.targets);
       const withMult = targets.filter((t) => t.multiplier !== undefined);
       console.log('='.repeat(70));
@@ -581,6 +582,23 @@ MECHANICS['mitigation-analysis'] = {
       if (free) console.log(`      usually free: ${free}`);
       if (a.droppable.keys.length) console.log(`      droppable (worst pull): ${a.droppable.names.join(', ')} -> lowest ${pctOf(a.droppable.worstMargin)}`);
       if (a.note) console.log(`      note: ${a.note}`);
+    }
+    // The Plan view (lib/mitigation/plan.ts).
+    if (perPull.length >= mod.PLAN_MIN_PULLS) {
+      const rows = mod.aggregateMitigation(perPull, mod.FFXIV_MITIGATION);
+      const plan = mod.buildMitigationPlan(rows, perPull, mod.FFXIV_MITIGATION);
+      const mmss = (ms) => `${Math.floor(ms / 60000)}:${String(Math.round(ms / 1000) % 60).padStart(2, '0')}`;
+      const ref = (h) => `${h.name} #${h.occurrence} (${h.phase ?? '-'}, ${mmss(h.medianMs)})`;
+      console.log(`  PLAN (${plan.pulls} pulls):`);
+      for (const i of plan.issues) {
+        console.log(`    ${i.status.toUpperCase()} ${ref(i.hit)} median=${pctOf(i.hit.medianMargin)} worst=${pctOf(i.hit.worstMargin)}`);
+        const c = i.change;
+        if (c) {
+          const est = c.estMargin === undefined ? 'no estimate' : `est median ${pctOf(c.estMargin)} worst ${pctOf(c.estWorst)}`;
+          console.log(`      ${c.kind} ${c.name} (${c.player.split(' ')[0]})${c.from ? ` from ${ref(c.from)} -> ${pctOf(c.from.estMargin)}` : ''}; ${est}; fits ${c.fits}/${c.pulls}`);
+        } else console.log(`      ${i.reason}`);
+      }
+      for (const s of plan.spare) console.log(`    SPARE ${ref(s.hit)}: ${s.items.map((x) => (x.player ? `${x.name} (${x.player.split(' ')[0]})` : x.name)).join(', ')} -> ${pctOf(s.worstMargin)}`);
     }
     }
   },

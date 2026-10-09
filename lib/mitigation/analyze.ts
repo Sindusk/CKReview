@@ -262,15 +262,19 @@ function buildCastTimelines(players: PlayerInfo[], game: MitigationGame): CastTi
   const out: CastTimeline[] = [];
   for (const player of players) {
     for (const entry of entriesForJob(game, player.className)) {
-      const raw = player.casts
-        .filter((c) => entry.actionIds.includes(c.abilityId))
-        .map((c) => c.timestamp)
-        .sort((a, b) => a - b);
-      const casts = entry.cooldownMs > 0 ? simulateCharges(raw, entry).accepted : raw;
-      out.push({ player, entry, casts });
+      out.push({ player, entry, casts: playerCasts(player, entry) });
     }
   }
   return out;
+}
+
+/** A player's casts of an entry, in order, with casts the cooldown rules out dropped as log noise. */
+export function playerCasts(player: PlayerInfo, entry: CatalogEntry): number[] {
+  const raw = player.casts
+    .filter((c) => entry.actionIds.includes(c.abilityId))
+    .map((c) => c.timestamp)
+    .sort((a, b) => a - b);
+  return entry.cooldownMs > 0 ? simulateCharges(raw, entry).accepted : raw;
 }
 
 type ChargeState = { charges: number; nextReadyMs: number };
@@ -441,10 +445,18 @@ function buildTarget(
     deathCause:   fatalBefore === undefined ? undefined
       : fatalBefore / maxHealth >= HEALTH_FULL_FRACTION ? "mitigation" : "healing",
     vulnerable,
-    invulnerable: parts.some((p) => p.statusIds.some((id) => game.statusIndex.get(id)?.entry.kind === "invuln")),
+    invulnerable: parts.some((p) => p.statusIds.some((id) => game.statusIndex.get(id)?.entry.kind === "invuln"))
+      || (!died && underTrailingInvuln(player, game, first.timestamp)),
     statusIds:    [...new Set(parts.flatMap((p) => p.statusIds))],
     shieldAbsorbs: parts.flatMap((p) => p.shieldAbsorbs),
   };
+}
+
+/** Within an unlisted invulnerability (CatalogEntry.trailingInvulnMs) from this player's own cast. */
+function underTrailingInvuln(player: PlayerInfo, game: MitigationGame, atMs: number): boolean {
+  return game.catalog.some((e) => e.trailingInvulnMs && e.jobs.includes(player.className)
+    && player.casts.some((c) => e.actionIds.includes(c.abilityId) && c.timestamp <= atMs
+      && atMs - c.timestamp <= e.durationMs + e.trailingInvulnMs!));
 }
 
 function percentProduct(statusIds: number[], game: MitigationGame, column: "physical" | "magical" | "none" | undefined): number {
@@ -589,7 +601,7 @@ function applySequenceDrops(hits: MitigationHit[], pull: Pull, playerNames: Set<
 
 // The targets a hit is graded on: never an invulnerable tank, and
 // vulnerable players only when everyone hit was vulnerable.
-function judged(targets: HitTarget[]): HitTarget[] {
+export function judged(targets: HitTarget[]): HitTarget[] {
   const mortal = targets.filter((t) => !t.invulnerable);
   const clean = mortal.filter((t) => !t.vulnerable);
   return clean.length > 0 ? clean : mortal;

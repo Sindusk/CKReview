@@ -56,7 +56,7 @@ const STATE_STYLE: Record<MitigationState, { mark: string; color: string; label:
 // background, so their stretch of the fight reads as one band.
 const DEAD_CELL_BG = "rgba(239, 68, 68, 0.28)";
 
-const VERDICT_STYLE: Record<HitVerdict, { color: string; label: string }> = {
+export const VERDICT_STYLE: Record<HitVerdict, { color: string; label: string }> = {
   fail:  { color: "#ef4444", label: "Fail" },
   under: { color: "#f59e0b", label: "Under" },
   good:  { color: "#22c55e", label: "Good" },
