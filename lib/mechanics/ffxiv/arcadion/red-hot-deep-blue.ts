@@ -102,11 +102,12 @@
 //   Damage Down causes plus Sickest Take-Off. Steam on a prison inmate is
 //   skipped (they can't move).
 // ffxiv-rhdb-fire (Minor; Major if they died burning): Burns episodes.
-//   4+ players lighting up with Cutback's fire is one player-less Minor
-//   naming the Cutback target (farthest player from Red Hot) and whether
-//   the safe slice opposite them landed on earlier Inferno/Pyrotation fire
-//   (user, 2026-10-09: a geometry puzzle; A5 the R1 put it on the dropped
-//   puddles), plus a Raid when it killed 3+. Burns
+//   4+ players lighting up with Cutback's fire: when the safe slice
+//   opposite its target (the farthest player from Red Hot; during snaking
+//   the farthest Firesnaking player) landed on earlier Inferno/Pyrotation
+//   fire, a Major on the target for pointing it there (user, 2026-10-09:
+//   A5 the R1, B7 the R2); otherwise one player-less Minor. Plus a Raid
+//   when it killed 3+. Burns
 //   that end in a called-wipe death are skipped.
 // ffxiv-rhdb-wall (Major): a no-killing-blow death outside a called wipe:
 //   "knocked" when a knockback (Deep Impact, Sick Swell, Take-Off, Floater)
@@ -808,7 +809,11 @@ function cutbackAim(players: PlayerInfo[], casts: EnemyEvent[], hitT: number) {
   const boss = castsOf(casts, CUTBACK_CAST).filter((c) => c.timestamp <= hitT && c.timestamp >= hitT - 3000 && c.x !== undefined && c.y !== undefined).pop();
   if (!boss) return undefined;
   const at = { x: boss.x!, y: boss.y! };
-  const spots = hitsOf(players, CUTBACK_BLAZE, hitT - 200, hitT + 1000).filter((h) => h.e.x !== undefined && h.e.y !== undefined)
+  // During snaking only Firesnaking players are eligible (user, 2026-10-09;
+  // the farthest player overall had Watersnaking at every snaking Cutback).
+  const snaking = players.some((p) => hasAura(p, FIRE_SNAKING, hitT - 500));
+  const spots = hitsOf(players, CUTBACK_BLAZE, hitT - 200, hitT + 1000)
+    .filter((h) => h.e.x !== undefined && h.e.y !== undefined && (!snaking || hasAura(h.p, FIRE_SNAKING, hitT - 500)))
     .map((h) => ({ p: h.p, d: Math.hypot(h.e.x! - at.x, h.e.y! - at.y), pos: h.e as { x: number; y: number } }));
   const far = spots.sort((a, b) => b.d - a.d)[0];
   if (!far) return undefined;
@@ -852,11 +857,23 @@ function detectFire(players: PlayerInfo[], life: Life, deaths: DeathEvent[], cal
     const killed = uniq(caught.filter(({ p, ep }) => deaths.some((d) => d.player === p.name && !called.has(d) && d.timestamp - DEATH_EVENT_LAG_MS >= ep.start - 500 && d.timestamp - DEATH_EVENT_LAG_MS <= ep.end + 1000)).map((c) => c.p));
     const aim = cutbackAim(players, casts, t);
     const aimText = aim
-      ? ` It was aimed at ${aim.target.name}, the farthest player from Red Hot (${yd(aim.targetDist)}y), which put the safe slice ${aim.safeWhere}${aim.fireInSlice ? `, where ${aim.fireInSlice} earlier fire puddle${aim.fireInSlice > 1 ? "s" : ""} (Inferno/Pyrotation) already burned` : " on floor with no earlier fire"}.`
+      ? ` It was aimed at ${aim.target.name}, the farthest eligible player from Red Hot (${yd(aim.targetDist)}y), which put the safe slice ${aim.safeWhere}${aim.fireInSlice ? `, where ${aim.fireInSlice} earlier fire puddle${aim.fireInSlice > 1 ? "s" : ""} (Inferno/Pyrotation) already burned` : " on floor with no earlier fire"}.`
       : "";
-    errors.push(playerlessMinor(RHDB_FIRE_RULE_ID, "Party Caught in Cutback Fire",
-      `${uniq(caught.map((c) => c.p)).length} players (${namesOf(caught.map((c) => c.p))}) were standing in Cutback Blaze's fire when it lit, ${sec(Math.min(...caught.map((c) => c.ep.start)) - t)}s after the hit${killed.length ? `; ${namesOf(killed)} died burning` : ""}.${aimText} Cutback targets the farthest player from Red Hot and sets ~300 degrees around the boss alight, leaving a safe slice on the opposite side; whoever is farthest has to point it so that slice lands on clear floor. Whether a clear slice was still possible depends on everything placed earlier, so nobody is named.`,
-      t + 3000, CUTBACK_BLAZE, "Cutback Blaze"));
+    const caughtText = `${uniq(caught.map((c) => c.p)).length} players (${namesOf(caught.map((c) => c.p))}) were standing in Cutback Blaze's fire when it lit, ${sec(Math.min(...caught.map((c) => c.ep.start)) - t)}s after the hit${killed.length ? `; ${namesOf(killed)} died burning` : ""}.${aimText}`;
+    const how = "Cutback targets the farthest player from Red Hot (only Firesnaking players during snaking) and sets ~300 degrees around the boss alight, leaving a safe slice on the opposite side; whoever is farthest has to point it so that slice lands on clear floor.";
+    // Pointed into earlier fire: the target's aim (user, 2026-10-09, B7
+    // +5:12). With the slice on clear floor, the party just didn't get there.
+    if (aim && aim.fireInSlice && life.hitAlive(aim.target, t)) {
+      errors.push(playerError(aim.target, {
+        ruleId: RHDB_FIRE_RULE_ID, severity: "Major", name: "Pointed Cutback Blaze Into Fire",
+        description: `${caughtText} ${how}`,
+        timestamp: t + 3000, abilityId: CUTBACK_BLAZE, abilityName: "Cutback Blaze",
+      }));
+    } else {
+      errors.push(playerlessMinor(RHDB_FIRE_RULE_ID, "Party Caught in Cutback Fire",
+        `${caughtText} ${how} The slice was on clear floor, so nobody is named for the aim.`,
+        t + 3000, CUTBACK_BLAZE, "Cutback Blaze"));
+    }
     if (killed.length >= MASS_DEATHS) {
       errors.push(raidMarker(RHDB_FIRE_RULE_ID, "Party Caught in Cutback Fire",
         `Cutback Blaze's fire killed ${killed.length} (${namesOf(killed)}). Unresolvable from here.`, t + 3000, CUTBACK_BLAZE, "Cutback Blaze"));
@@ -1085,9 +1102,13 @@ function detectSplitDrops(players: PlayerInfo[], life: Life, casts: EnemyEvent[]
   for (const d of split.drops.filter((x) => !x.ok && life.hitAlive(x.p, x.e.timestamp))) {
     const east = d.e.x! > ARENA_CENTER;
     const side = (h: Hit) => h.e.x !== undefined && (h.e.x > ARENA_CENTER) === east;
-    // Players on this side hit by 2+ cones.
-    const doubled = cones ? uniq(cones.filter(side).map((h) => h.p)).filter((p) =>
+    // Players hit by 2+ cones. Once this side's players were pushed off
+    // their spots, their cones also crossed the far side (user, 2026-10-09,
+    // B1 +7:13: the east players' cones overlapped the west), so every
+    // overlap in the volley is the drop's, as long as one is on its side.
+    const doubledAll = cones ? uniq(cones.map((h) => h.p)).filter((p) =>
       uniq(cones.filter((h) => h.p === p).map((h) => instanceKey(h.e))).length >= 2) : [];
+    const doubled = doubledAll.some((p) => cones!.some((h) => h.p === p && side(h))) ? doubledAll : [];
     const where = `${yd(Math.abs(d.e.y! - ARENA_CENTER))}y ${d.e.y! < ARENA_CENTER ? "north" : "south"} of the midline on the ${east ? "east" : "west"} side`;
     const rule = "In the split arena each player drops their circle against their side's wall: tanks and ranged in the north half, healers and melee in the south, well clear of the middle, so the side keeps room for the cones that follow.";
     if (doubled.length) {
@@ -1095,7 +1116,7 @@ function detectSplitDrops(players: PlayerInfo[], life: Life, casts: EnemyEvent[]
       const killed = doubled.filter((p) => life.diedFrom(p, cones![cones!.length - 1].e.timestamp));
       errors.push(playerError(d.p, {
         ruleId: RHDB_SPLIT_DROP_RULE_ID, severity: "Major", name: "Split Arena Fire Dropped Out of Place",
-        description: `Dropped their Alley-Oop Inferno fire ${where} instead of the ${d.want}, cutting their side off from its spots: in the next cones ${namesOf(doubled)} took two or more at once${killed.length ? ` (${namesOf(killed)} died)` : ""}. ${rule}`,
+        description: `Dropped their Alley-Oop Inferno fire ${where} instead of the ${d.want}, cutting their side off from its spots: in the next cones ${namesOf(doubled)} took two or more at once, the displaced players' cones crossing everyone near them${killed.length ? ` (${namesOf(killed)} died)` : ""}. ${rule}`,
         timestamp: d.e.timestamp, abilityId: INFERNO, abilityName: "Alley-Oop Inferno",
       }));
     } else {
