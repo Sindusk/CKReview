@@ -94,8 +94,10 @@
 // the enemy stack counters beside their clean range. Vamp's Satisfied
 // enlarges Hardcore (user, VOD of pull 1, which died at 10 stacks).
 // Non-fatal hits (one per player per ability per CLUSTER_GAP_MS): wrong
-// target, avoidable, doubled, then hit while vulnerable, in that priority. Major in
-// FFXIV, Minor in WoW (avoidableSeverity).
+// target, avoidable, then doubled, in that priority. Major in FFXIV, Minor
+// in WoW (avoidableSeverity). A hit taken while vulnerable is only an error
+// if it kills (see "vulnerable" above): tanks often eat a second hit on a
+// vulnerability and live (user, TEA pull 2, 2026-10-08).
 // Penalties: a Damage Down is folded into the hit that caused it; on its
 // own it is a Major on each player who got it, raid-wide ones included
 // (the description says how many got it at once). Never suppressed: the
@@ -734,8 +736,6 @@ export function detectFallbackErrors(pull: Pull, profile: FallbackProfile): Pull
         text: `which hit a player on only ${rare.hits} of its ${rare.casts} casts so far` };
       else if (doubled.has(event)) flag = { rule: "fallback-doubled-hit", name: "Took Two Copies",
         text: `taking ${doubled.get(event)} copies at once, each meant for a different target` };
-      else if (isVulnerable(event)) flag = { rule: "fallback-vulnerable-hit", name: "Hit While Vulnerable",
-        text: `while carrying ${vulnCause(player, event)}` };
       if (!flag) continue;
       const key = `${player.name}|${event.abilityId}|${flag.rule}`;
       flagged.set(key, [...(flagged.get(key) ?? []), h]);
