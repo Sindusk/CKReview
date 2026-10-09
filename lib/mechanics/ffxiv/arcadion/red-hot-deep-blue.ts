@@ -880,7 +880,11 @@ function detectOverlaps(players: PlayerInfo[], life: Life, casts: EnemyEvent[]):
         flagged.set(p, f);
       };
       const byPlayer = new Map<PlayerInfo, Hit[]>();
-      for (const h of res) if (life.hitAlive(h.p, h.e.timestamp)) byPlayer.set(h.p, [...(byPlayer.get(h.p) ?? []), h]);
+      // A hit that did nothing, not even to a shield, was an invulnerability
+      // (A16 +213.0, the OT): it doesn't count.
+      for (const h of res) {
+        if (life.hitAlive(h.p, h.e.timestamp) && (h.e.amount ?? 0) + (h.e.absorbed ?? 0) > 0) byPlayer.set(h.p, [...(byPlayer.get(h.p) ?? []), h]);
+      }
       for (const [v, hs] of byPlayer) {
         const instances = uniq(hs.map((h) => instanceKey(h.e)));
         const died = !!life.diedFrom(v, hs[hs.length - 1].e.timestamp);
