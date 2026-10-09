@@ -23,7 +23,11 @@
 //     (tooltip); Chaotic Spring DoT uptime; Life Surge (below); Lance Charge
 //     (LanceCharge.tsx): 8 GCDs plus High Jump, Mirage Dive, Dragonfire
 //     Dive, Rise of the Dragon, Geirskogul, Nastrond, Stardiver and
-//     Starcross, +10% (tooltip).
+//     Starcross, +10% (tooltip); Firstminds' Focus overcap (below).
+//     Rechecked on 2T1HzdPKgbhM43am Dancing Mad fight 10 (2026-10-09):
+//     its 9 missed Lance Charge GCDs and 13 missed positionals match; most
+//     of the GCDs were in forced windows. Life of the Dragon and Battle
+//     Litany windows aren't separate checks: they fall with Lance Charge.
 //   - Ninja: Kunai's Bane on the enemy (KunaisBaneWindow.tsx): 7 GCDs
 //     plus Dream Within a Dream, +10% damage taken (tooltip).
 //   - Reaper: Enshroud (Enshroud.tsx): four Reapings, two Lemure's, one
@@ -36,7 +40,7 @@
 import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import type { DamageFinding, JobCheck } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";
-import { burstWindowFindings, dotFindings, k, offCooldownIn, statusWindows, uptimeFindings, type ExpectedAction } from "./shared";
+import { burstWindowFindings, dotFindings, gaugeFindings, k, offCooldownIn, statusWindows, uptimeFindings, type ExpectedAction, type GaugeEvent } from "./shared";
 
 const id = (key: string) => A[key].id;
 const ids = (...keys: string[]) => keys.filter((key) => A[key]).map(id);
@@ -187,6 +191,27 @@ const arcaneCircle: JobCheck = (ctx) => burstWindowFindings(ctx, {
 export const SAM_CHECKS: JobCheck[] = [uptime("FUGETSU", 0.13, "Fugetsu is +13%, FFLogs multiplier"), meikyo];
 export const VPR_CHECKS: JobCheck[] = [uptime("HUNTERS_INSTINCT", 0.1, "Hunter's Instinct is +10%, FFLogs multiplier"), reawaken];
 export const MNK_CHECKS: JobCheck[] = [riddleOfFire];
-export const DRG_CHECKS: JobCheck[] = [uptime("POWER_SURGE", 0.1, "Power Surge is +10% (tooltip)"), lanceCharge, lifeSurge, chaoticSpring];
+// Firstminds' Focus (xivanalysis FirstmindsFocus): +1 per Raiden Thrust /
+// Draconian Fury, cap 2, Wyrmwind Thrust spends 2. A stack gained at 2 is
+// half a Wyrmwind. On 2T1HzdPKgbhM43am fight 10 the cast simulation finds
+// xivanalysis's 2 lost stacks (3:17, 6:18) and never goes below zero.
+const firstmindsFocus: JobCheck = (ctx) => {
+  const gain = new Set(ids("RAIDEN_THRUST", "DRACONIAN_FURY"));
+  const spend = new Set(ids("WYRMWIND_THRUST"));
+  const events: GaugeEvent[] = [];
+  for (const c of ctx.player.casts) {
+    if (gain.has(c.abilityId)) events.push({ t: c.timestamp, type: "gain", amount: 1, label: `${c.abilityName} at 2 stacks` });
+    else if (spend.has(c.abilityId)) events.push({ t: c.timestamp, type: "spend", amount: 2, label: c.abilityName ?? "Wyrmwind Thrust" });
+  }
+  for (const d of ctx.dead) events.push({ t: d.startMs, type: "reset", label: "death" });
+  const perStack = ctx.values.perUse(id("WYRMWIND_THRUST")) / 2;
+  return gaugeFindings(ctx, {
+    name: "Firstminds' Focus", unit: "Firstminds' Focus", cap: 2, unitValue: perStack,
+    valueBasis: `${k(perStack * 2)} average Wyrmwind Thrust per 2`,
+    events,
+  });
+};
+
+export const DRG_CHECKS: JobCheck[] = [uptime("POWER_SURGE", 0.1, "Power Surge is +10% (tooltip)"), lanceCharge, lifeSurge, chaoticSpring, firstmindsFocus];
 export const NIN_CHECKS: JobCheck[] = [kunaisBane];
 export const RPR_CHECKS: JobCheck[] = [enshroud, arcaneCircle];

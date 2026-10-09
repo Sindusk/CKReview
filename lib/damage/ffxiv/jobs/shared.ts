@@ -259,7 +259,12 @@ export function uptimeFindings(ctx: PlayerCheckContext, spec: UptimeSpec): Damag
     const len = g.endMs - g.startMs;
     const forcedMs = overlapMs(g.startMs, g.endMs, forced);
     if (len - forcedMs < spec.graceMs) continue;
-    const dealt = ctx.values.damageIn(g.startMs, g.endMs);
+    // Only what was dealt outside forced time: past a phase's HP check the
+    // damage was wasted anyway (2T1HzdPKgbhM43am fight 10, Power Surge
+    // down from 6:11 into P2's 0% stretch).
+    const dealt = ctx.values.damageIn(g.startMs, g.endMs) - forced
+      .filter((f) => f.endMs > g.startMs && f.startMs < g.endMs)
+      .reduce((a, f) => a + ctx.values.damageIn(Math.max(f.startMs, g.startMs), Math.min(f.endMs, g.endMs)), 0);
     out.push(finding(ctx, {
       kind: "buff-uptime", startMs: g.startMs, endMs: g.endMs, forced: false,
       label: `${spec.name} down`,
