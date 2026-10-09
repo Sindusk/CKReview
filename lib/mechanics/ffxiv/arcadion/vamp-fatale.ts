@@ -6,7 +6,7 @@
 // -- VERIFIED AGAINST LOGS (2026-10-08) --
 // Report jN3XDrf2z8PmLgRJ: 13 pulls, kill = P8 (586.9s). P1-P8 are one
 // roster, P9-P13 a second one (alts) running the same Toxic/Hector plan.
-// Cited as P<n> +<seconds from pull start>. No VOD review yet.
+// Cited as P<n> +<seconds from pull start>. VOD-reviewed: P1-P4, P6.
 //
 // Clock (identical every pull, +/-0.3s; the model's [TL] times held within
 // ~2s): Killer Voice +11, Hardcore +21.7, Stomp #1 +30.5 (cleanses
@@ -97,22 +97,33 @@
 // +200.2, P11 Hardcore party +221.1, P12 Doornail +357.4, P13 overlap
 // +200.1. No wipe is unexplained.
 //
+// VOD review 2026-10-09 (P2-P4, P6): P2 +0:21 both Hardcores hit both tanks
+// (40ms apart) and the OT died to the next auto; P3 +3:16 the OT dropped
+// 15.1y out (too close to the boss; no penalty, but the party had to
+// adjust); P4 +3:34 the R1 dropped 12.8y out and the line victims were
+// adjusting around it (not their fault). FFLogs logs a Damage Down refresh
+// as remove + apply at the hit's millisecond.
+//
 // -- RULES IMPLEMENTED --
 // ffxiv-vf-avoidable (Major): Coffinfiller, Half Moon, Pulping Pulse,
 //   Aetherletting cone, Naughty Knot, chain Explosion, Sanguine Scratch,
 //   Breakdown Drop, Breakwing Beat. One error per resolution (3s; chain
-//   Explosions 8s).
+//   Explosions 8s). A chain Explosion on a player who already had Damage
+//   Down is Minor unless it killed (it only refreshes the debuff).
 // ffxiv-vf-stomp-bat (Major); ffxiv-vf-stomp-overlap (Major: whoever of
 //   carrier/victim is further (45+ degrees) off their clock spot; both if
-//   neither is).
+//   neither is; one owner error per explosion listing every victim).
 // ffxiv-vf-hardcore (Major, non-tank hit with both tanks alive and not
-//   dead in the last 30s); ffxiv-vf-hardcore-party (Raid, 3+ non-tanks;
+//   dead in the last 30s; also Major on BOTH tanks when each took both
+//   circles within 150ms); ffxiv-vf-hardcore-party (Raid, 3+ non-tanks;
 //   names nobody, per the user).
 // ffxiv-vf-rain-missed (Major); ffxiv-vf-rain-wipe (Raid, 3+ Rain deaths).
 // ffxiv-vf-aetherletting-overlap (Major on the latest drop furthest from
 //   its spot + Raid); -cross (Major on the puddle owner when a victim was
-//   within 1y of the boss, else on the victim); -clip (Major on whichever
-//   of dropper/victim is further from their spot).
+//   within 1y of the boss or the drop was under 16y out, else on the
+//   victim); -clip (Major on whichever of dropper/victim is further from
+//   their spot); -misplaced (Minor: a drop under 16y out that no other
+//   Aetherletting rule blamed).
 // ffxiv-vf-saw (Minor: avoidable but no Damage Down, healable; Major when
 //   the player died with the DoT on).
 // ffxiv-vf-flail-tower (Major on the living tank who soaked no Plummet);
@@ -124,7 +135,9 @@
 //   or another outside player: the tank's spot aims it; Amp/45982 on an
 //   inmate is player-less Minor); ffxiv-vf-last-lash (Major on the inmate).
 // ffxiv-vf-deathmatch-tower (Major on living non-soakers).
-// ffxiv-vf-enrage, ffxiv-vf-collapse (Raid, only before any other Raid).
+// ffxiv-vf-enrage (Raid, with the boss's HP % and damage still needed from
+//   the Finale Fatale cast's own HP), ffxiv-vf-collapse (Raid); both only
+//   before any other Raid.
 // Their Damage Down causes are excluded from ffxiv-damage-down
 // (error-rules.ts), so a hit is one error.
 //
@@ -427,6 +440,7 @@ export const VF_RAIN_WIPE_RULE_ID         = "ffxiv-vf-rain-wipe";
 export const VF_AETH_OVERLAP_RULE_ID      = "ffxiv-vf-aetherletting-overlap";
 export const VF_AETH_CROSS_RULE_ID        = "ffxiv-vf-aetherletting-cross";
 export const VF_AETH_CLIP_RULE_ID         = "ffxiv-vf-aetherletting-clip";
+export const VF_AETH_MISPLACED_RULE_ID    = "ffxiv-vf-aetherletting-misplaced";
 export const VF_SAW_RULE_ID               = "ffxiv-vf-saw";
 export const VF_FLAIL_TOWER_RULE_ID       = "ffxiv-vf-flail-tower";
 export const VF_BARBED_BURST_RULE_ID      = "ffxiv-vf-barbed-burst";
@@ -495,7 +509,8 @@ const AVOIDABLE: Record<number, Avoidable> = {
   45939: { name: "Pulping Pulse", hit: "Stood in a Pulping Pulse ground circle" },
   45969: { name: "Aetherletting Cone", hit: "Caught by one of Aetherletting's rotating cones",
     why: "The cones fire in sequence around the arena; dodge locally into the gap that has already fired." },
-  45976: { name: "Naughty Knot", hit: "Hit by Naughty Knot while bound inside a Charnel Cell" },
+  45976: { name: "Naughty Knot", hit: "Tried to walk out of the Charnel Cell they were bound in and was hit by Naughty Knot",
+    why: "An inmate is bound to their cell's circle; stay inside and break out by destroying the cell." },
   45987: { name: "Bat Chain Explosion", hit: "Their bat chain exploded on them",
     why: "The chain breaks when it's stretched too far from its bat (or taken from the wrong side's tower); stay close to your own bat as it circles." },
   45989: SCRATCH, 45991: SCRATCH,
@@ -513,6 +528,9 @@ const COLLAPSE_DEAD_COUNT = 5;
 const COLLAPSE_END_MS     = 45_000;
 // A tank dead at any point in this window before a Hardcore has lost enmity.
 const TANK_ENMITY_LOST_MS = 30_000;
+// Two Hardcore hits on one tank this close together = both circles on them.
+// Overlap P2: 40ms apart; enlarged follow-up hits: 450-500ms (P1/P5/P11).
+const HARDCORE_DOUBLE_MS = 150;
 
 // ── party slots (Toxic/Hector) ──────────────────────────────────────────────
 
@@ -522,6 +540,9 @@ const STOMP_SPOT: Record<FFRoleSlot, number> = { MT: 0, OT: 180, M1: 270, M2: 90
 const DROP_SPOT: Record<FFRoleSlot, number>  = { MT: 337.5, OT: 157.5, M1: 202.5, M2: 112.5, H1: 247.5, H2: 67.5, R1: 292.5, R2: 22.5 };
 // Aetherletting drops sit against the wall: clean drops were 18.3-19.6y out.
 const DROP_RADIUS = 1890;
+// A drop closer in than this is misplaced. First roster's clean drops: 17.4y
+// worst (P7 OT); misplaced per VOD: 15.1y (P3 OT), 12.8y (P4 R1).
+const DROP_MIN_RADIUS = 1600;
 // Under the boss for Aetherletting's delayed lines (user, 2026-10-08):
 // within 1y, a line hit is the dropper's fault; further out, the player's.
 const UNDER_BOSS = 100;
@@ -585,6 +606,15 @@ const castsOf = (casts: EnemyEvent[], ids: number | number[]) => {
 
 function gotDamageDown(p: PlayerInfo, t: number): boolean {
   return p.debuffs.some((e) => e.abilityId === DAMAGE_DOWN && e.debuffStatus === "applied" && Math.abs(e.timestamp - t) <= 1500);
+}
+
+/**
+ * Damage Down already active just before `t` (a new hit only refreshes it).
+ * FFLogs logs the refresh as a removal and a fresh application at the hit's
+ * own millisecond, so a window ending at `t` counts.
+ */
+function hadDamageDown(p: PlayerInfo, t: number): boolean {
+  return debuffIntervals(p, DAMAGE_DOWN).some((w) => w.start < t - 100 && w.end >= t - 150);
 }
 
 const uniq = <T,>(xs: T[]) => [...new Set(xs)];
@@ -701,24 +731,37 @@ function detectStomp(players: PlayerInfo[], life: Life, explosions: Explosion[],
   }
   // Another carrier's explosion. Blame whoever of the two stood further
   // from their clock spot; when neither is clearly off (45 degrees), name
-  // both.
+  // both. An owner blamed for several victims of one explosion gets one
+  // error listing them all (user, 2026-10-09, P3 +0:37).
   for (const x of explosions) {
+    const os = slots.get(x.owner);
+    if (!os) continue;
+    const od = angularDistance(bearing(x.at), STOMP_SPOT[os]);
+    const ownerText = `${x.owner.name} (${os}) exploded ${dirName(bearing(x.at))} at ${yd(distanceFromCenter(x.at.x, x.at.y))}y, ${Math.round(od)}° off their ${dirName(STOMP_SPOT[os])} spot`;
+    const rule = "Each carrier explodes when the ring reaches them and must be alone at their own clock spot.";
+    const onOwner: { v: Hit; where: string; both: boolean }[] = [];
     for (const v of x.victims) {
-      const os = slots.get(x.owner), vs = slots.get(v.p);
-      if (!os || !vs || v.e.x === undefined || v.e.y === undefined) continue;
-      const od = angularDistance(bearing(x.at), STOMP_SPOT[os]);
+      const vs = slots.get(v.p);
+      if (!vs || v.e.x === undefined || v.e.y === undefined) continue;
       const vd = angularDistance(bearing(v.e as { x: number; y: number }), STOMP_SPOT[vs]);
-      const death = life.diedFrom(v.p, v.e.timestamp);
-      const where = `${x.owner.name} (${os}) exploded ${dirName(bearing(x.at))} at ${yd(distanceFromCenter(x.at.x, x.at.y))}y, ${Math.round(od)}° off their ${dirName(STOMP_SPOT[os])} spot; ${v.p.name} (${vs}) stood ${dirName(bearing(v.e as { x: number; y: number }))}, ${Math.round(vd)}° off ${dirName(STOMP_SPOT[vs])}`;
+      const where = `${v.p.name} (${vs}) stood ${dirName(bearing(v.e as { x: number; y: number }))}, ${Math.round(vd)}° off ${dirName(STOMP_SPOT[vs])}`;
       const blame = od >= 45 && od >= vd ? [x.owner] : vd >= 45 ? [v.p] : [x.owner, v.p];
-      for (const p of blame) {
-        errors.push(playerError(p, {
-          ruleId: VF_STOMP_OVERLAP_RULE_ID, severity: "Major", name: "Bombpyre Explosions Overlapped",
-          description: `${p === x.owner ? `Their Bombpyre explosion hit ${v.p.name}` : `Stood in ${x.owner.name}'s Bombpyre explosion`} (${kFmt(v.e.amount ?? 0)}${death ? `, ${v.p.name} died` : ""}). Each carrier explodes when the ring reaches them and must be alone at their own clock spot. ${where}.${blame.length > 1 ? " Neither was clearly off their spot, so both are flagged." : ""}`,
-          timestamp: v.e.timestamp, abilityId: BLAST_BEAT_PLAYER, abilityName: "Blast Beat",
-        }));
-      }
+      if (blame.includes(x.owner)) onOwner.push({ v, where, both: blame.length > 1 });
+      if (!blame.includes(v.p)) continue;
+      const death = life.diedFrom(v.p, v.e.timestamp);
+      errors.push(playerError(v.p, {
+        ruleId: VF_STOMP_OVERLAP_RULE_ID, severity: "Major", name: "Bombpyre Explosions Overlapped",
+        description: `Stood in ${x.owner.name}'s Bombpyre explosion (${kFmt(v.e.amount ?? 0)}${death ? `, ${v.p.name} died` : ""}). ${rule} ${ownerText}; ${where}.${blame.length > 1 ? " Neither was clearly off their spot, so both are flagged." : ""}`,
+        timestamp: v.e.timestamp, abilityId: BLAST_BEAT_PLAYER, abilityName: "Blast Beat",
+      }));
     }
+    if (onOwner.length === 0) continue;
+    const hitText = joinNames(onOwner.map(({ v }) => `${v.p.name} (${kFmt(v.e.amount ?? 0)}${life.diedFrom(v.p, v.e.timestamp) ? ", died" : ""})`));
+    errors.push(playerError(x.owner, {
+      ruleId: VF_STOMP_OVERLAP_RULE_ID, severity: "Major", name: "Bombpyre Explosions Overlapped",
+      description: `Their Bombpyre explosion hit ${hitText}. ${rule} ${ownerText}; ${onOwner.map((o) => o.where).join("; ")}.${onOwner.some((o) => o.both) ? " Neither was clearly off their spot, so both are flagged." : ""}`,
+      timestamp: onOwner[0].v.e.timestamp, abilityId: BLAST_BEAT_PLAYER, abilityName: "Blast Beat",
+    }));
   }
   return errors;
 }
@@ -741,12 +784,17 @@ function detectAvoidable(players: PlayerInfo[], life: Life): PullError[] {
       const total = g.reduce((s, e) => s + (e.amount ?? 0), 0);
       const death = life.diedFrom(p, g[g.length - 1].timestamp);
       const dd = g.some((e) => gotDamageDown(p, e.timestamp));
+      // A chain Explosion on a player who already had Damage Down only
+      // refreshes it: Minor unless it killed (user, 2026-10-09: chains were
+      // flooding the review tab with Majors).
+      const refreshOnly = g[0].abilityId === CHAIN_EXPLOSION && !death && hadDamageDown(p, g[0].timestamp);
       const hit = kinds.map((k, i) => (i === 0 ? k.hit : k.hit.charAt(0).toLowerCase() + k.hit.slice(1))).join(", and ");
       const times = g.length > 1 ? `${g.length} hits, ` : "";
-      const outcome = [dd ? "got Damage Down" : "", death ? "died" : ""].filter(Boolean).join(" and ");
+      const outcome = refreshOnly ? "already had Damage Down, so this only refreshed it"
+        : [dd ? "got Damage Down" : "", death ? "died" : ""].filter(Boolean).join(" and ");
       const why = kinds.map((k) => k.why).filter(Boolean).join(" ");
       errors.push(playerError(p, {
-        ruleId: VF_AVOIDABLE_RULE_ID, severity: "Major", name: `Hit by ${kinds.map((k) => k.name).join(" / ")}`,
+        ruleId: VF_AVOIDABLE_RULE_ID, severity: refreshOnly ? "Minor" : "Major", name: `Hit by ${kinds.map((k) => k.name).join(" / ")}`,
         description: `${hit} (${times}${kFmt(total)}).${outcome ? ` They ${outcome}.` : ""}${why ? ` ${why}` : ""}`,
         timestamp: g[0].timestamp, abilityId: g[0].abilityId, abilityName: g[0].abilityName,
       }));
@@ -802,11 +850,38 @@ function detectSaws(players: PlayerInfo[], life: Life, deaths: DeathEvent[]): Pu
 
 // ── Hardcore ────────────────────────────────────────────────────────────────
 
-function detectHardcore(players: PlayerInfo[], life: Life): PullError[] {
+function detectHardcore(players: PlayerInfo[], life: Life, deaths: DeathEvent[]): PullError[] {
   const errors: PullError[] = [];
   const tanks = players.filter((p) => p.role === "Tank");
+  // An overlapped tank is usually left too low to survive the next auto.
+  const deathsSoonAfter = (p: PlayerInfo, hitT: number) =>
+    deaths.some((d) => d.player === p.name && d.timestamp >= hitT && d.timestamp <= hitT + DEATH_EVENT_LAG_MS + 5000);
   for (const g of clusterByGap(hitsOf(players, HARDCORE), (h) => h.e.timestamp, 1500)) {
     const t = g[0].e.timestamp;
+    // Both circles on both tanks: each tank hit twice within a few dozen ms
+    // (P2 +0:21, 40ms apart; the OT died to the next auto-attack). Clean
+    // Hardcores hit each tank once; the enlarged version's follow-up hit
+    // lands ~0.5s later (P1/P5/P11), outside this window.
+    const doubled = tanks.filter((p) => {
+      const mine = g.filter((h) => h.p === p).map((h) => h.e.timestamp);
+      return mine.some((a, i) => mine.slice(i + 1).some((b) => Math.abs(b - a) <= HARDCORE_DOUBLE_MS));
+    });
+    if (doubled.length === 2 && tanks.every((p) => life.hitAlive(p, t))) {
+      const taken = (p: PlayerInfo) => g.filter((h) => h.p === p && h.e.timestamp - t <= HARDCORE_DOUBLE_MS);
+      const summary = doubled.map((p) => {
+        const hs = taken(p);
+        const last = hs[hs.length - 1].e;
+        const died = deathsSoonAfter(p, last.timestamp);
+        return `${p.name} took ${hs.map((h) => kFmt(h.e.amount ?? 0)).join(" + ")}${last.healthAfter !== undefined ? `, left at ${kFmt(last.healthAfter)} HP` : ""}${died ? ", and died moments later" : ""}`;
+      }).join("; ");
+      for (const p of doubled) {
+        errors.push(playerError(p, {
+          ruleId: VF_HARDCORE_RULE_ID, severity: "Major", name: "Hardcore Tankbusters Overlapped",
+          description: `Both Hardcore tankbusters landed on both tanks: they stood too close together. Hardcore drops a circle on each of the two tanks, so they have to split apart and each take only their own. ${summary}.`,
+          timestamp: taken(p)[0].e.timestamp, abilityId: HARDCORE[0], abilityName: "Hardcore",
+        }));
+      }
+    }
     const others = uniq(g.filter((h) => h.p.role !== "Tank" && life.hitAlive(h.p, h.e.timestamp)).map((h) => h.p));
     if (others.length === 0) continue;
     const killed = others.filter((p) => life.diedFrom(p, g[g.length - 1].e.timestamp));
@@ -872,6 +947,8 @@ function detectAetherletting(players: PlayerInfo[], life: Life, casts: EnemyEven
     return `${d.owner.name}${slot ? ` (${slot})` : ""} dropped ${dirName(bearing(d.at))} at ${yd(distanceFromCenter(d.at.x, d.at.y))}y${slot ? `, ${yd(dropSpotDistance(d.at, slot))}y from their ${dirName(DROP_SPOT[slot])} spot` : ""}`;
   };
 
+  const tooClose = (d: Explosion) => distanceFromCenter(d.at.x, d.at.y) < DROP_MIN_RADIUS;
+
   // Two puddles touching: the raid-wide overlap penalty, repeated. Every
   // occurrence ended its pull (P2/P10/P13). Blame the drop of the pair that
   // just landed which is furthest from its spot; one Raid marker per
@@ -925,7 +1002,11 @@ function detectAetherletting(players: PlayerInfo[], life: Life, casts: EnemyEven
     const bx = boss?.x ?? 10000, by = boss?.y ?? 10000;
     const fromBoss = (h: Hit) => Math.hypot(h.e.x! - bx, h.e.y! - by);
     const owner = drops.filter((d) => d.t < c.timestamp && Math.hypot(d.at.x - px, d.at.y - py) <= 300)[0];
-    const centered = victims.filter((h) => fromBoss(h) <= UNDER_BOSS);
+    // A puddle dropped too far in leaves no clean safe spot: everyone its
+    // line catches was adjusting around it, so all of them are the owner's
+    // (user, 2026-10-09, P4 +3:34).
+    const misplaced = !!owner && tooClose(owner);
+    const centered = victims.filter((h) => fromBoss(h) <= UNDER_BOSS || (misplaced && h.p !== owner.owner));
     for (const v of victims.filter((h) => !centered.includes(h))) {
       errors.push(playerError(v.p, {
         ruleId: VF_AETH_CROSS_RULE_ID, severity: "Major", name: "Hit by an Aetherletting Line",
@@ -936,8 +1017,10 @@ function detectAetherletting(players: PlayerInfo[], life: Life, casts: EnemyEven
     if (centered.length && owner) {
       const killed = centered.filter((h) => life.diedFrom(h.p, h.e.timestamp)).map((h) => h.p);
       errors.push(playerError(owner.owner, {
-        ruleId: VF_AETH_CROSS_RULE_ID, severity: "Major", name: "Aetherletting Line Through the Center",
-        description: `Their puddle's delayed line crossed the stack under the boss, hitting ${namesOf(centered.map((h) => h.p))}${killed.length ? ` (${namesOf(killed)} died)` : ""}. A puddle dropped at its assigned spot sends its lines past the boss; a drop at the wrong angle runs a line through it. ${dropText(owner)}.`,
+        ruleId: VF_AETH_CROSS_RULE_ID, severity: "Major", name: misplaced ? "Misplaced Aetherletting Puddle's Line" : "Aetherletting Line Through the Center",
+        description: misplaced
+          ? `Their puddle, dropped too far from the wall, sent its delayed line through the party, hitting ${namesOf(centered.map((h) => h.p))}${killed.length ? ` (${namesOf(killed)} died)` : ""}. They were adjusting around the misplaced puddle, so it's on the dropper. Drops go against the wall (${yd(DROP_RADIUS)}y out) so the lines pass the stack under the boss. ${dropText(owner)}.`
+          : `Their puddle's delayed line crossed the stack under the boss, hitting ${namesOf(centered.map((h) => h.p))}${killed.length ? ` (${namesOf(killed)} died)` : ""}. A puddle dropped at its assigned spot sends its lines past the boss; a drop at the wrong angle runs a line through it. ${dropText(owner)}.`,
         timestamp: centered[0].e.timestamp, abilityId: AETH_CROSS, abilityName: "Aetherletting",
       }));
     } else if (centered.length) {
@@ -945,6 +1028,20 @@ function detectAetherletting(players: PlayerInfo[], life: Life, casts: EnemyEven
         `A puddle's delayed line crossed the stack under the boss, hitting ${namesOf(centered.map((h) => h.p))}; its drop couldn't be matched to a player.`,
         centered[0].e.timestamp, AETH_CROSS, "Aetherletting"));
     }
+  }
+
+  // A drop well in from the wall that no other rule already blamed: no
+  // Damage Down, but the party has to rearrange around it (user,
+  // 2026-10-09, P3 +3:16), so Minor.
+  const aethRules = [VF_AETH_OVERLAP_RULE_ID, VF_AETH_CROSS_RULE_ID, VF_AETH_CLIP_RULE_ID];
+  for (const d of drops.filter(tooClose)) {
+    if (!life.hitAlive(d.owner, d.t)) continue;
+    if (errors.some((x) => x.player === d.owner.name && aethRules.includes(x.ruleId) && x.timestamp >= d.t - 100 && x.timestamp <= d.t + 20_000)) continue;
+    errors.push(playerError(d.owner, {
+      ruleId: VF_AETH_MISPLACED_RULE_ID, severity: "Minor", name: "Aetherletting Dropped Too Far In",
+      description: `Dropped their Aetherletting puddle too close to the boss instead of against the wall, so the party had to move to adjust around it. Each marked player drops at the wall (${yd(DROP_RADIUS)}y out) at their own spot. ${dropText(d)}.`,
+      timestamp: d.t, abilityId: AETH_DROP, abilityName: "Aetherletting",
+    }));
   }
   return errors;
 }
@@ -1122,7 +1219,7 @@ export function detectVampFataleErrors(players: PlayerInfo[], deathEvents: Death
     ...detectStomp(players, life, explosions, slots),
     ...detectAvoidable(players, life),
     ...detectSaws(players, life, deathEvents),
-    ...detectHardcore(players, life),
+    ...detectHardcore(players, life, deathEvents),
     ...detectRain(players, life, deathEvents),
     ...detectAetherletting(players, life, enemyCasts, drops, slots),
     ...detectAdds(players, life, enemyCasts, deathEvents),
@@ -1133,8 +1230,11 @@ export function detectVampFataleErrors(players: PlayerInfo[], deathEvents: Death
   const firstRaid = () => Math.min(...errors.filter((e) => e.severity === "Raid").map((e) => e.timestamp));
   const enrage = castsOf(enemyCasts, FINALE_ENRAGE)[0];
   if (enrage && enrage.timestamp < firstRaid()) {
+    // The boss's own cast carries its HP (the 45937 hits come from a helper).
+    const boss = castsOf(enemyCasts, FINALE_ENRAGE[0]).find((c) => c.hitPoints !== undefined && c.maxHitPoints);
+    const left = boss ? ` Vamp Fatale still had ${(100 * boss.hitPoints! / boss.maxHitPoints!).toFixed(1)}% HP left: ${(boss.hitPoints! / 1e6).toFixed(2)}M more damage (of ${(boss.maxHitPoints! / 1e6).toFixed(1)}M total) was needed to kill it.` : "";
     errors.push(raidMarker(VF_ENRAGE_RULE_ID, "Finale Fatale (Enrage)",
-      "The final Crowd Kill left Vamp Fatale More Than Satisfied and Finale Fatale killed everyone — the hard enrage. The DPS check wasn't met.",
+      `The final Crowd Kill left Vamp Fatale More Than Satisfied and Finale Fatale killed everyone — the hard enrage. The DPS check wasn't met.${left}`,
       enrage.timestamp, enrage.abilityId, "Finale Fatale"));
   }
   // Pull-over marker: the first moment 5 are dead at once, when the pull
