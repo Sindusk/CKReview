@@ -28,8 +28,12 @@
 //   Not checked: feather overcap. Feathers are gauge, never logged, and
 //   come from 50% procs, so a lost one can't be told from the log
 //   (xivanalysis says "may have been lost").
-// Bard (unverified): Caustic Bite / Stormbite uptime and clipping
-//   (DoTs.tsx), cooldowns (OGCDDowntime.ts).
+// Bard: Caustic Bite / Stormbite (below), Hawk's Eye overwrites, AoE on
+//   one target, Raging Strikes window, cooldowns (OGCDDowntime.ts).
+//   Checked against xivanalysis on 2T1HzdPKgbhM43am Dancing Mad fight 10
+//   (2026-10-09): 4 overwrites, 2 AoE and the window's missing actions
+//   match (all its window misses were in forced time). Its DoT clipping
+//   (1:06 a minute) is standard Iron Jaws play, not a loss.
 // Machinist (unverified): Wildfire on the enemy, 6 GCDs (Wildfire.tsx);
 //   Hypercharge (Overheated), 5 Heat Blasts / Blazing Shots / Auto
 //   Crossbows (Hypercharge.tsx), each missing one its average; cooldowns
@@ -42,7 +46,8 @@
 import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import type { DamageFinding, JobCheck } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";
-import { burstWindowFindings, dotFindings, k, statusWindows, type ExpectedAction } from "./shared";
+import { aoeComboOnOneTarget, burstWindowFindings, dotFindings, k, statusWindows, type ExpectedAction } from "./shared";
+import { forcedPart, inWindows, mergeWindows } from "../../timeline";
 
 const ids = (...keys: string[]) => keys.filter((key) => A[key]).map((key) => A[key].id);
 const replacedGcd = (...keys: string[]) => (ctx: PlayerCheckContext) =>
@@ -97,9 +102,13 @@ const DNC_PROCS: [string, string[], boolean][] = [
   ["FOURFOLD_FAN_DANCE", ["FAN_DANCE_IV"], true],
 ];
 
-const dancerOverwrites: JobCheck = (ctx): DamageFinding[] => {
+/** A proc granted again while still held (FFLogs "refreshed" beside a cast): one use lost. */
+// The optional fourth entry is the GCD the proc upgrades (Hawk's Eye turns
+// a Burst Shot into a Refulgent Arrow): a lost one is the difference.
+const procOverwrites = (list: [string, string[], boolean, string?][]): JobCheck => (ctx): DamageFinding[] => {
   const out: DamageFinding[] = [];
-  const procs = new Map(DNC_PROCS.filter(([s]) => S[s]).map(([s, consumers, ogcd]) => [S[s].id, { consumers, ogcd }]));
+  const forced = mergeWindows(ctx.forced);
+  const procs = new Map(list.filter(([s]) => S[s]).map(([s, consumers, ogcd, instead]) => [S[s].id, { consumers, ogcd, instead }]));
   for (const e of ctx.player.buffs ?? []) {
     if (e.buffStatus !== "refreshed" || e.source !== ctx.player.name || e.timestamp >= ctx.endMs) continue;
     const proc = procs.get(e.abilityId);
@@ -110,13 +119,17 @@ const dancerOverwrites: JobCheck = (ctx): DamageFinding[] => {
     const best = consumerIds.sort((a, b) => ctx.values.perUse(b) - ctx.values.perUse(a))[0];
     const avg = best === undefined ? 0 : ctx.values.perUse(best);
     const consumerName = ctx.player.casts.find((c) => c.abilityId === best)?.abilityName ?? proc.consumers[0];
-    const lost = proc.ogcd ? avg : replacedGcd(...proc.consumers)(ctx);
+    const instead = proc.instead && A[proc.instead] ? ctx.values.perUse(A[proc.instead].id) : undefined;
+    const lost = proc.ogcd ? avg : instead !== undefined ? Math.max(0, avg - instead) : replacedGcd(...proc.consumers)(ctx);
+    const isForced = inWindows(e.timestamp, forced);
     out.push(finding(ctx, {
-      kind: "proc-lost", startMs: e.timestamp, endMs: e.timestamp, forced: false, inference: !proc.ogcd,
+      kind: "proc-lost", startMs: e.timestamp, endMs: e.timestamp, forced: isForced, inference: !proc.ogcd,
+      cause: isForced ? forcedPart(e.timestamp - 1, e.timestamp + 1, ctx.forced).cause : undefined,
       label: `${e.abilityName} overwritten`,
       lostDamage: lost,
       basis: proc.ogcd
         ? `one ${consumerName} lost (${k(avg)} average)`
+        : instead !== undefined ? `${k(avg)} average ${consumerName} − ${k(instead)} average ${A[proc.instead!].name}`
         : `${k(avg)} average ${consumerName} minus the GCD used instead`,
       detail: `${cast.abilityName} gave ${e.abilityName} while one was still held`,
     }));
@@ -124,12 +137,33 @@ const dancerOverwrites: JobCheck = (ctx): DamageFinding[] => {
   return out;
 };
 
+const dancerOverwrites = procOverwrites(DNC_PROCS);
+
 // ── Bard, Machinist (unverified) ───────────────────────────────────────
 
+// Bard's DoTs. Iron Jaws refreshes both at once, about every 40s and again
+// in each burst to snapshot the buffs, so "seconds of ticks overwritten"
+// (the old basis) read standard play as 0.5M lost on 2T1HzdPKgbhM43am
+// fight 10, counted twice (once per DoT). A refresh loses no ticks; it
+// brings the next Iron Jaws closer. So Stormbite is valued like the healer
+// DoTs (shared.ts dotApplicationFindings, against Burst Shot, less the
+// Iron Jaws hit), a refresh in raid buffs is a snapshot and costs nothing,
+// and Caustic Bite, refreshed by the same casts, counts only its uptime.
 const bardDots: JobCheck = (ctx) => [
-  ...dotFindings(ctx, { statusIds: [S.CAUSTIC_BITE.id], name: S.CAUSTIC_BITE.name, durationMs: S.CAUSTIC_BITE.duration ?? 45_000 }),
-  ...dotFindings(ctx, { statusIds: [S.STORMBITE.id], name: S.STORMBITE.name, durationMs: S.STORMBITE.duration ?? 45_000 }),
+  ...dotFindings(ctx, { statusIds: [S.CAUSTIC_BITE.id], name: S.CAUSTIC_BITE.name, durationMs: S.CAUSTIC_BITE.duration ?? 45_000, uptimeOnly: true }),
+  ...dotFindings(ctx, {
+    statusIds: [S.STORMBITE.id], name: S.STORMBITE.name, durationMs: S.STORMBITE.duration ?? 45_000,
+    fillerId: () => ({ id: A.BURST_SHOT.id, name: A.BURST_SHOT.name }),
+    castIds: [A.IRON_JAWS.id], snapshotInBuffs: true,
+  }),
 ];
+
+// Hawk's Eye granted again while held: a Refulgent Arrow lost
+// (xivanalysis: 4 overwritten on 2T1HzdPKgbhM43am fight 10, the same 4).
+const bardOverwrites = procOverwrites([["HAWKS_EYE", ["REFULGENT_ARROW"], false, "BURST_SHOT"]]);
+
+// Ladonsbite / Shadowbite on one target, against Burst Shot / Refulgent.
+const bardAoe = aoeComboOnOneTarget([[A.LADONSBITE.id, A.BURST_SHOT.id], [A.SHADOWBITE.id, A.REFULGENT_ARROW.id]]);
 
 const wildfire: JobCheck = (ctx) => burstWindowFindings(ctx, {
   statusId: S.WILDFIRE.id, name: "Wildfire", bonus: 0, onEnemy: true,
@@ -148,5 +182,22 @@ const hypercharge: JobCheck = (ctx) => burstWindowFindings(ctx, {
 });
 
 export const DNC_CHECKS: JobCheck[] = [technical, technicalFillers, dancerOverwrites];
-export const BRD_CHECKS: JobCheck[] = [bardDots];
+// Raging Strikes, the burst window (xivanalysis RagingStrikes.tsx): 7 GCDs
+// (8 under Army's Muse, not modelled, so a shortfall can read one low);
+// Radiant Encore, Resonant Arrow, Barrage and Iron Jaws once each; three
+// Heartbreak Shots / Rain of Deaths. +15% (status amount).
+const ragingStrikes: JobCheck = (ctx) => burstWindowFindings(ctx, {
+  statusId: S.RAGING_STRIKES.id, name: "Raging Strikes", bonus: 0.15,
+  bonusBasis: "Raging Strikes is +15%",
+  expectedGcds: () => 7,
+  expected: (): ExpectedAction[] => [
+    { ids: ids("RADIANT_ENCORE"), count: 1, name: "Radiant Encore" },
+    { ids: ids("RESONANT_ARROW"), count: 1, name: "Resonant Arrow" },
+    { ids: ids("BARRAGE"), count: 1, name: "Barrage" },
+    { ids: ids("IRON_JAWS"), count: 1, name: "Iron Jaws" },
+    { ids: ids("HEARTBREAK_SHOT", "RAIN_OF_DEATH"), count: 3, name: "Heartbreak Shot" },
+  ],
+});
+
+export const BRD_CHECKS: JobCheck[] = [bardDots, bardOverwrites, bardAoe, ragingStrikes];
 export const MCH_CHECKS: JobCheck[] = [wildfire, hypercharge];

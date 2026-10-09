@@ -308,6 +308,14 @@ export type DotSpec = {
   name:        string;
   durationMs:  number;
   fillerId?:   (ctx: PlayerCheckContext) => { id: number; name: string } | undefined;
+  // Only the uptime: another DoT's spec values the refreshes they share
+  // (Bard's Caustic Bite, refreshed with Stormbite by Iron Jaws).
+  uptimeOnly?: boolean;
+  // Other casts that apply or refresh it (Iron Jaws).
+  castIds?:    number[];
+  // An early refresh in raid buffs is a snapshot, not a cost: the new DoT
+  // ticks under the buffs for its whole duration (Bard's burst Iron Jaws).
+  snapshotInBuffs?: boolean;
 };
 
 const DOT_CAST_MS = 1_500;   // cast → status applied
@@ -331,7 +339,8 @@ function dotApplicationFindings(ctx: PlayerCheckContext, spec: DotSpec, filler: 
     const pool = own.length >= 3 ? own : fillerHits;
     return pool.length ? pool.reduce((a, e) => a + (e.amount ?? 0), 0) / pool.length : 0;
   };
-  const dotCasts = ctx.player.casts.filter((c) => ctx.game.action(c.abilityId)?.appliesStatusIds.some((id) => ids.has(id)));
+  const dotCasts = ctx.player.casts.filter((c) => spec.castIds?.includes(c.abilityId) ||
+    ctx.game.action(c.abilityId)?.appliesStatusIds.some((id) => ids.has(id)));
   const lastApply = new Map<string, number>();
   const steady = new Map<number | undefined, { ms: number; lost: number; n: number; start: number; end: number; moments: Moment[] }>();
   for (let i = 0; i < events.length; i++) {
@@ -364,7 +373,7 @@ function dotApplicationFindings(ctx: PlayerCheckContext, spec: DotSpec, filler: 
     // The DoT ran its course: an early refresh only brought the next one
     // closer. Summed per phase below.
     if (cut < DOT_TICK_MS && silent < DOT_SILENT_MS) {
-      if (left <= 0 || forced.ms > 0) continue;
+      if (left <= 0 || forced.ms > 0 || (spec.snapshotInBuffs && buffed)) continue;
       const hit = direct.reduce((a, h) => a + (h.amount ?? 0), 0);
       const phaseId = ctx.phaseOf(castAt);
       const b = steady.get(phaseId) ?? { ms: 0, lost: 0, n: 0, start: castAt, end: castAt, moments: [] };
@@ -480,6 +489,7 @@ export function dotFindings(ctx: PlayerCheckContext, spec: DotSpec): DamageFindi
     }
     cursor = Math.max(cursor, w.endMs);
   }
+  if (spec.uptimeOnly) return out;
   const filler = spec.fillerId?.(ctx);
   if (filler) return [...out, ...dotApplicationFindings(ctx, spec, filler)];
   for (const [phaseId, c] of clips) {
@@ -548,7 +558,7 @@ export function gaugeFindings(ctx: PlayerCheckContext, spec: GaugeSpec): DamageF
 
 // ── AoE GCDs on one target ─────────────────────────────────────────────
 
-const AOE_HIT_MS = 1_500;
+const AOE_HIT_MS = 2_000;
 
 /**
  * An AoE GCD that hit one enemy and dealt less than the single-target GCD
@@ -570,7 +580,11 @@ export function aoeOnOneTargetFindings(
     const alt = against(u.action.id);
     if (!alt || alt.value <= 0) return;
     const landed = u.startMs + u.castMs;
-    const until = Math.min(uses[i + 1]?.startMs ?? Infinity, landed + AOE_HIT_MS);
+    // Up to the next cast of the same AoE, not the next GCD: a Bard's
+    // Shadowbite lands 1.4s after its cast and the second target's hit
+    // 0.15s after that, past the next GCD's start.
+    const nextSame = uses.slice(i + 1).find((x) => x.action.id === u.action.id)?.startMs ?? Infinity;
+    const until = Math.min(nextSame, landed + AOE_HIT_MS);
     const hits = ctx.player.damageDone.filter((e) => e.abilityId === u.action.id && e.timestamp >= u.startMs && e.timestamp < until);
     const targets = new Set(hits.map((e) => `${e.targetActorId ?? e.target}.${e.targetInstance ?? 1}`));
     if (targets.size !== 1) return;
