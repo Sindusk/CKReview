@@ -64,7 +64,9 @@
 //     target), unless half or more of its clean resolutions so far did.
 //     Vamp pull 2 +21.7: the tanks stood 5.6y apart and each took both
 //     Hardcores (user: both tanks at fault). A whole-raid double with no
-//     death is how that raid plays it and isn't flagged.
+//     death is how that raid plays it and isn't flagged, and neither is
+//     one player taking every copy with nobody else hit, if they live: a
+//     lone soaker (TEA pull 2 +204, a tank soaking both Hidden Mines).
 //   - wrong target: hit by an ability whose clean resolutions never hit
 //     the victim's role. Major. Vamp pull 1 +221.9: four non-tanks killed
 //     by a tank-only Hardcore at 3.4-3.8x max HP.
@@ -602,6 +604,10 @@ export function detectFallbackErrors(pull: Pull, profile: FallbackProfile): Pull
     // plays it (Vamp's second group stacked all 8 for two Brutal Rains in
     // every pull that reached it), not each player's mistake.
     if (players.size >= aliveCount(pull, res[0].event.timestamp) / 2 && !res.some((h) => isFatal(h.event))) continue;
+    // One player took every copy and nobody else was hit: no copy was
+    // anyone else's, so that's a lone soaker who lived, not a mistake (TEA
+    // pull 2 +204: a tank soaked both Hidden Mines, user-confirmed).
+    if (playersIn(res).size === 1 && !res.some((h) => isFatal(h.event))) continue;
     for (const h of res) if (players.has(h.player.name)) doubled.set(h.event, players.get(h.player.name)!);
   }
 
