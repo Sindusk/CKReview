@@ -187,6 +187,11 @@ export const ERROR_RULES: PullErrorRule[] = [
       45987,   // Explosion (bat chain)
       45989, 45991,                                          // Sanguine Scratch
       45992, 45993, 45994, 45995,                            // Breakdown Drop / Breakwing Beat
+      // Red Hot and Deep Blue: red-hot-deep-blue.ts owns these.
+      46559,   // Alley-Oop Double-Dip aftershock
+      46562,   // Reverse Alley-Oop aftershock
+      46547,   // Deep Varial
+      46587,   // Steam Burst
     ],
   },
 

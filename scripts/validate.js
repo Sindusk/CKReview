@@ -286,6 +286,14 @@ const MECHANICS = {
     },
   },
 
+  'red-hot-deep-blue': {
+    game: 'ff',
+    load: () => requireTsFromRoot('lib/mechanics/ffxiv/arcadion/red-hot-deep-blue.ts'),
+    run({ mod, ctxs }) {
+      for (const c of ctxs) printPullErrors(c, mod.detectRedHotDeepBlueErrors(c.relPlayers(), c.relDeaths(), c.relEnemyCasts()));
+    },
+  },
+
   stompies: {
     game: 'ff',
     load: () => requireTsFromRoot('lib/mechanics/ffxiv/dancingmad/stompies.ts'),

@@ -213,6 +213,7 @@ function buildFFEnemyCastEvents(rep, actorMap, abilityMap) {
       sourceInstance: e.sourceInstance,
       x: e.sourceResources?.x,
       y: e.sourceResources?.y,
+      target: actorMap.get(e.targetID)?.type === 'Player' ? actorMap.get(e.targetID)?.name : undefined,
     }));
 }
 

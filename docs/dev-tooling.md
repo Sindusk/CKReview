@@ -84,6 +84,10 @@ regex (`"Caustic Waves"`), and times are seconds from the pull start.
 | `soakers <casts> <debuffs>` | How many players got a debuff at each cast (soak counts via lockout debuffs) |
 | `collapse` | Seconds from the Nth concurrent death to the pull end (the "N dead" threshold) |
 | `players [pull]` | Roster with spec and role |
+| `profile <abilities>` | Per ability: how many players each resolution hit, how often one player took 2+ copies (an overlap), how often it killed, and the kill's resolutions as the clean baseline |
+| `resolutions <abilities> [--auras debuffs]` | Each resolution in full: who each copy targeted (from the casts), who it hit, HP after, auras they held, deaths |
+| `nokb` | Deaths with no killing blow and what preceded them: called wipe, wall knockback, or a walk-off |
+| `after <casts> <debuffs> [--from s --to s]` | Who gained a debuff in a window after each cast (ground fire left by a cast, delayed penalties) |
 
 It loads pulls lazily and keeps three in memory, so narrowing with
 `--pulls` keeps big WoW reports (50MB+ per pull) quick.

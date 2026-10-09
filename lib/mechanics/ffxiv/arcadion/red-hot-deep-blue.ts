@@ -1,10 +1,148 @@
 // lib/mechanics/ffxiv/arcadion/red-hot-deep-blue.ts
 //
+// Red Hot and Deep Blue (M10S) per-pull rules. Entry point:
+// detectRedHotDeepBlueErrors. Self-gates on Hot Impact / Flame Floater /
+// Divers' Dare, so it is safe on every pull.
+//
+// -- VERIFIED AGAINST LOGS (2026-10-09) --
+// One static, week-1 progression, 96 pulls over three reports. Cited as
+// A12 +213.3 (report letter, pull, seconds from pull start):
+//   A = jN3XDrf2z8PmLgRJ (53 wipes, reached the prison at best),
+//   B = xFAfGP3qX4yJhDrV (39 wipes, prison through enrage; B35 enraged),
+//   C = d3vRbwfpNBLzJ2Xh (3 wipes + the kill, C4, 579.8s).
+// Roster slots (user): MT PLD, OT DRK, H1 AST, H2 SGE, M1 RPR, M2 DRG,
+// R1 DNC, R2 RDM. The strategy was mixed week-1 improvisation, NOT Hector
+// (user): no rule depends on a clock spot or group assignment.
+//
+// Clock (kill; every pull within ~1s): Hot Impact +15, Floater dashes
+// +31/+34/+38/+41, Inferno +54, Cutback +64, Pyrotation +70/+72/+74, Dare
+// +84; Sick Swell/Take-Off +116, Slab or Splash +119, Double-Dip/Reverse
+// +127 (aftershock +129), Deep Impact +137, Dare +145; Spectacular +170;
+// Air 1 volleys +199/+206/+213/+221; Dare +230; snaking +246, Inferno +259,
+// Double-Dip/Reverse +259, Hot Impact +270, Varial +277, Inferno +281,
+// Aerial +291..+298, Take-Off +303, Cutback +309, Deep Impact +315, Dare
+// +322; Deep Aerial tower +337; Xtreme Waves +348..+392 (6, every 8.6s);
+// prison deadline +396 (Impact Zone); Dare +401; split Floater +417,
+// Inferno +426, Reverse +432, Freaky Pyrotation +440, Slab +451, Dare +455;
+// Xtreme snaking +471; Air 2 volleys +489/+499/+510/+520; Dare +529;
+// Reverse +545, Pyrotation +557, Deep Impact +557; Dares +570/+579; Over
+// the Falls (enrage) +600 (B35, Red Hot at 5.9%). The prison phase is fixed
+// length: breaking the bubble early doesn't move later mechanics.
+//
+// Log IDs (model candidates corrected where brackets say so):
+// - Burns 1003065/1003066: the fire-contact status (no Damage Down). Cutback
+//   Blaze's own fire lights 3.0-3.3s after its hit [model: "short grace"].
+// - Damage Down causes (only these four): Double-Dip aftershock 46559,
+//   Reverse aftershock 46562, Deep Varial 46547, Steam Burst 46587 (an
+//   Xtreme Aether cast with the victim as its target). The initial cones
+//   (46558/46561) give Magic Vulnerability Up, not Damage Down.
+// - Sickest Take-Off 46542 (the lane) kills without Damage Down.
+// - Flame Floater dashes 46523-46526 in order; carriers hold First..Fourth
+//   in Line 1003004/1003005/1003006/1003451, removed at their dash. Clean
+//   carrier hits 17-136k; a carrier dying alone took 186-296k [short tether].
+// - Hot Impact 46518 = opening shared buster (2 tanks; 28 of 96 had one
+//   tank, nobody died). 46464 = snaking version on Red Hot's top-enmity
+//   Firesnaking player; the fire tank often eats it alone under an invuln.
+// - Deep Impact cast 46519, hit 44486 (target named on the cast when only
+//   one player is hit; ground-targeted otherwise). Knockback: a tank with
+//   no immunity hits the deathwall and dies with NO killing blow ~2.6s
+//   later (C4 +557, A10, A34, A41, A46, B3, B22).
+// - Snaps: Blasting 46577 / Plunging 46578, eight cones per volley, one per
+//   target, targets named on the casts. Instance numbers collide between
+//   Red Hot and Deep Blue (A12 +213: Red Hot #5 and Deep Blue #5 in one
+//   volley), so a cone's owner is caster + instance.
+// - Vertical Blast/Plunge 46585/46586: nearest-player buster (1 hit clean).
+// - Re-Entry Blast/Plunge 46581/46582: four-person cone stacks.
+// - Pyrotation 46531: three stacks; the MT routinely sits out hits 2-3
+//   (C3/C4/B5/B9 all 7 of 8), so a missing player is only counted when the
+//   stack killed someone.
+// - Xtreme Wave 46545 (Red) / 46546 (Blue); inmates hold Watery Grave
+//   1004829. Clean holder hits 0-60k; deaths are single 188-296k hits (full
+//   HP, a short tether) or a holder taking both colors in one wave.
+// - Impact Zone 46572 at +396 = the prison's deadline: kills all 8.
+//   Unmitigated Explosion 46565 = Deep Aerial tower unsoaked (once, A).
+// - Xtreme Firesnaking/Watersnaking auras 1004827/1004828. Each cleanse
+//   (aura removed by an opposite attack) casts Bailout 46512/46513 on the
+//   cleanser, shared by players near them (~15k each in the kill). No
+//   lethal aura expiry was seen; the failures were several same-color
+//   cleanses on one volley (B11 +488.6 four Fire, six dead; B17, B24, B32).
+// - Over the Falls 46588/46589: the enrage.
+// - Walking Dead 1000811 (OT's Living Dead) running its full 10s ends in a
+//   no-killing-blow death 2s later (A23 +280.5).
+// - The huge (1-13M) amounts on some hits are FFLogs' unpaired previews of
+//   lethal hits; they are counted as hits but never as evidence.
+//
+// Failure findings (all pulls):
+// - Floater: 34 errors before the cutoffs (collateral hits and carriers
+//   killed by their own dash); the 4th carrier knocked into the wall (A2
+//   +40.5, A12 +34.0).
+// - Cutback fire caught 4-8 players at once 14 times (A5/A6/A45/B7: all
+//   8); 0 burns after 102 of 139 Cutbacks.
+// - Insane Air 1 Snap overlaps ended many day-1 pulls (A9-A16 +199..+221):
+//   players took 2-5 cones each.
+// - Deep Impact hit 3-7 players during snaking (+315) in 9 pulls, each a
+//   cutoff; a lone non-tank took it as the farthest twice (A42 +138,
+//   A36 +315).
+// - Snaking Hot Impact killed a non-tank when no tank had Firesnaking
+//   (A13-A20 +270).
+// - Prison deadline missed: A44, B3, B4, B9, B19, B20, B25, B31, B37.
+// - Collapse: 5 dead was survived 63-125s three times (A2, A35, A42); the
+//   other pulls reaching 5 dead ended within 45s, so the marker is 5 dead
+//   with the pull ending within 45s.
+// - Called wipes: players walk into the deathwall (no killing blow), often
+//   through fire, in the last seconds.
+//
+// Cutoffs (first Raid error): collapse 39, called wipe 26, Deep Impact 9,
+// prison 9, Cutback fire 7, Xtreme cleanses 4, enrage 1 (B35); the kill
+// has none. Its only errors: Reverse aftershock x2 and Steam Burst (Damage
+// Down) and the MT knocked into the wall by the last Deep Impact (C4 +557).
+//
+// -- RULES IMPLEMENTED --
+// ffxiv-rhdb-avoidable (Major; Take-Off Minor unless it killed): the four
+//   Damage Down causes plus Sickest Take-Off. Steam on a prison inmate is
+//   skipped (they can't move).
+// ffxiv-rhdb-fire (Minor; Major if they died burning): Burns episodes.
+//   4+ players lighting up with Cutback's fire is one player-less Minor
+//   (aim or movement, unknowable), plus a Raid when it killed 3+. Burns
+//   that end in a called-wipe death are skipped.
+// ffxiv-rhdb-wall (Major): a no-killing-blow death outside a called wipe:
+//   "knocked" when a knockback (Deep Impact, Sick Swell, Take-Off, Floater)
+//   hit them in the 4.5s before, else "walked". Walking Dead running out is
+//   a player-less Minor instead.
+// ffxiv-rhdb-floater (Major): a non-carrier hit by a dash; a carrier killed
+//   by their own dash (not after being clipped earlier).
+// ffxiv-rhdb-overlap (Major): one player hit by another player's bait
+//   (Inferno circles, Double-Dip/Reverse cones, Snaps, Splash, Hot Aerial)
+//   names both, or by 2+ unowned instances names the victim; Freaky
+//   Pyrotation: standing in two pair stacks.
+// ffxiv-rhdb-buster (Major): a non-tank in Hot Impact or in someone else's
+//   Vertical buster; a non-tank who drew Vertical as the nearest (tanks
+//   alive and not dead in the last 30s); snaking Hot Impact on a non-tank
+//   names the tank with Firesnaking (player-less Minor when none had it).
+// ffxiv-rhdb-deep-impact (Major): one non-tank hit alone (the farthest);
+//   several players hit names Deep Blue's tank (latest autos, else the
+//   Watersnaking tank); Raid at 3+ deaths.
+// ffxiv-rhdb-stack: Pyrotation that killed someone names living non-tanks
+//   outside it (Major); Re-Entry under four with a death (player-less Minor).
+// ffxiv-rhdb-xtreme-wave (Major): both colors in one wave; a single dash
+//   killing its holder. ffxiv-rhdb-prison (Raid): Impact Zone at the
+//   deadline; player-less Minor for an unsoaked tower.
+// ffxiv-rhdb-xtreme-cleanse (Major on every same-color cleanser of a
+//   volley with 2+; Raid when 3+ died in the next 4s).
+// ffxiv-rhdb-enrage, -called-wipe (3+ no-killing-blow deaths at the end),
+//   -collapse (Raid): only before any other Raid.
+// The Damage Down causes are excluded from ffxiv-damage-down (error-rules.ts).
+//
+// Not built (no clean signal, or needs data the module doesn't get):
+// Vulnerability Down on the Watery Grave (Blue dash through the bubble: an
+// enemy buff, not passed to this module); Awesome Slab membership (stack
+// count varies by color and phase); lethal Xtreme aura expiry (never seen).
+//
 // -- GUIDE-DERIVED MODEL: RED HOT / DEEP BLUE (M10S) --
 // The Xtremes, AAC Heavyweight M2 (Savage), Arcadion, patch 7.4; Savage only.
-// Research stage, checked 2026-10-08. Comments only; no detector registered.
-// No report supplied or analyzed. ALL failure signals below are hypotheses,
-// not observed-log findings. The user selected Hector on WTFDIG.
+// Research stage, checked 2026-10-08. Written before any report was
+// analyzed; VERIFIED AGAINST LOGS above wins every disagreement. The user
+// selected Hector on WTFDIG.
 //
 // -- SOURCES AND CONFIDENCE --
 // [H] WTFDIG Hector preset, all eight role selectors read; Parallel Aerial
@@ -345,3 +483,749 @@
 //    helpers have distinct stack/tower penalty spells or only larger hits?
 // 8. Which Hector slots are actual roster players? Which failures were
 //    observed versus guide-only, and which deaths represent called resets?
+
+import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
+import type { DeathEvent } from "@/types/DeathEvent";
+import type { PullError, EnemyEvent } from "@/types/PullError";
+import { yd, kFmt, sec, joinNames, playerError, playerlessMinor, raidMarker, rezzedAt, clusterByGap, debuffIntervals } from "@/lib/mechanics/wow/common";
+
+export const RHDB_AVOIDABLE_RULE_ID     = "ffxiv-rhdb-avoidable";
+export const RHDB_FIRE_RULE_ID          = "ffxiv-rhdb-fire";
+export const RHDB_WALL_RULE_ID          = "ffxiv-rhdb-wall";
+export const RHDB_FLOATER_RULE_ID       = "ffxiv-rhdb-floater";
+export const RHDB_OVERLAP_RULE_ID       = "ffxiv-rhdb-overlap";
+export const RHDB_BUSTER_RULE_ID        = "ffxiv-rhdb-buster";
+export const RHDB_DEEP_IMPACT_RULE_ID   = "ffxiv-rhdb-deep-impact";
+export const RHDB_STACK_RULE_ID         = "ffxiv-rhdb-stack";
+export const RHDB_XTREME_WAVE_RULE_ID   = "ffxiv-rhdb-xtreme-wave";
+export const RHDB_PRISON_RULE_ID        = "ffxiv-rhdb-prison";
+export const RHDB_CLEANSE_RULE_ID       = "ffxiv-rhdb-xtreme-cleanse";
+export const RHDB_ENRAGE_RULE_ID        = "ffxiv-rhdb-enrage";
+export const RHDB_COLLAPSE_RULE_ID      = "ffxiv-rhdb-collapse";
+export const RHDB_CALLED_WIPE_RULE_ID   = "ffxiv-rhdb-called-wipe";
+
+// ── IDs (see VERIFIED AGAINST LOGS) ─────────────────────────────────────────
+
+const SIGNATURE           = [46518, 46522, 46520, 46521]; // Hot Impact, Flame Floater, Divers' Dare x2
+const DAMAGE_DOWN         = 1002911;
+const BURNS               = [1003065, 1003066];
+const FIRE_SNAKING        = 1004974;
+const WATER_SNAKING       = 1004975;
+const XTREME_FIRE         = 1004827;
+const XTREME_WATER        = 1004828;
+const WATERY_GRAVE        = 1004829;
+const FLOATER_DASH        = [46523, 46524, 46525, 46526];        // dashes 1-4
+const IN_LINE             = [1003004, 1003005, 1003006, 1003451]; // First..Fourth in Line
+const HOT_IMPACT_SHARED   = 46518; // opening shared buster on Red Hot's top two
+const HOT_IMPACT_SNAKING  = 46464; // snaking: Red Hot's top-enmity Firesnaking player
+const DEEP_IMPACT         = 44486;
+const VERTICAL            = [46585, 46586]; // Vertical Blast / Plunge (nearest-player buster)
+const PYROTATION          = 46531;
+const CUTBACK_BLAZE       = 46538;
+const RE_ENTRY            = [46581, 46582]; // four-person cone stacks
+const XTREME_WAVE_RED     = 46545;
+const XTREME_WAVE_BLUE    = 46546;
+const IMPACT_ZONE_EXPIRY  = 46572; // the Watery Grave's deadline detonation
+const UNMITIGATED_EXPL    = 46565; // Deep Aerial tower left unsoaked
+const OVER_THE_FALLS      = [46588, 46589];
+const SICK_SWELL          = 46540;
+const WALKING_DEAD        = 1000811; // Dark Knight's Living Dead follow-up
+const WALKING_DEAD_FULL_MS = 9500;
+const SICKEST_TAKE_OFF    = 46542;
+
+// Knockbacks: a player dying with no killing blow shortly after one of
+// these hit them was thrown into the deathwall.
+const KNOCKBACKS: Record<number, string> = {
+  [DEEP_IMPACT]: "Deep Impact", [SICK_SWELL]: "Sick Swell", [SICKEST_TAKE_OFF]: "Sickest Take-Off",
+  46523: "Flame Floater", 46524: "Flame Floater", 46525: "Flame Floater", 46526: "Flame Floater",
+};
+
+type Avoidable = { name: string; hit: string; why?: string; noDamageDown?: boolean };
+const AVOIDABLE: Record<number, Avoidable> = {
+  46559: { name: "Double-Dip Aftershock", hit: "Hit by an Alley-Oop Double-Dip aftershock",
+    why: "Double-Dip repeats every water cone a moment later; step out of where the cones fired into a gap." },
+  46562: { name: "Reverse Alley-Oop Aftershock", hit: "Hit by a Reverse Alley-Oop aftershock",
+    why: "Reverse Alley-Oop's second hit fires into the gaps between the first cones; stay where the first cone hit." },
+  46547: { name: "Deep Varial", hit: "Caught in Deep Varial, Deep Blue's wide cone",
+    why: "Deep Varial cleaves a wide cone across the arena from the side Deep Blue jumps to; move out of it." },
+  46587: { name: "Steam Burst", hit: "Hit by a Steam Burst",
+    why: "Water passing through fire leaves steam that bursts a moment later; keep clear of steaming fire." },
+  [SICKEST_TAKE_OFF]: { name: "Sickest Take-Off", hit: "Hit by Sickest Take-Off, Deep Blue's surfboard line", noDamageDown: true,
+    why: "Deep Blue surfs down one lane during the wave; stand outside its lane." },
+};
+
+// Baits with one target per instance: a player hit by another player's
+// instance (or by two at once) is an overlap. `stack` families share
+// damage by design, so only standing in two of them at once counts.
+type Family = { name: string; ids: number[]; what: string; why: string; stack?: boolean };
+const FAMILIES: Family[] = [
+  { name: "Alley-Oop Inferno", ids: [46529], what: "fire circle",
+    why: "Each marked player drops their own circle; spread so no one stands in someone else's." },
+  { name: "Alley-Oop Double-Dip", ids: [46558], what: "water cone",
+    why: "Each marked player baits their own cone from Deep Blue; keep the angles apart so no cone crosses someone else." },
+  { name: "Reverse Alley-Oop", ids: [46561], what: "water cone",
+    why: "Each marked player baits their own cone from Deep Blue; keep the angles apart so no cone crosses someone else." },
+  { name: "Insane Air Snaps", ids: [46577, 46578], what: "Snap cone",
+    why: "The surfboard's Snap fires a separate cone at each of the four nearest players per boss; aim them outward, apart from each other." },
+  { name: "Awesome Splash", ids: [46543, 46551], what: "water spread",
+    why: "Awesome Splash is a spread on each marked player; stand apart." },
+  { name: "Hot Aerial", ids: [47390, 47391, 47392, 47393], what: "Hot Aerial jump",
+    why: "Red Hot jumps at the farthest fire player each time; only that player may be under it." },
+  { name: "Freaky Pyrotation", ids: [46487], what: "pair stack", stack: true,
+    why: "Freaky Pyrotation is four two-person stacks; each player stands in exactly one." },
+];
+
+// FFLogs logs the death event ~2.0s after the fatal hit (README).
+const DEATH_EVENT_LAG_MS = 2000;
+const DIED_FROM_HIT_MS   = 3000;
+// A no-killing-blow death within this of a knockback hit was thrown into
+// the wall (clean examples land 2.1-3.2s after the hit; see header).
+const WALL_KNOCKBACK_MS  = 4500;
+// No-killing-blow deaths this close to the pull's end are the wipe being
+// called (players walking into the deathwall to reset).
+const CALLED_WIPE_END_MS = 6000;
+const CALLED_WIPE_COUNT  = 3;
+const CALLED_WIPE_WINDOW = 10_000;
+// 5 dead was survived 63-125s three times (A2/A35/A42); every other pull that
+// reached 5 dead ended within 45s.
+const COLLAPSE_DEAD_COUNT = 5;
+const COLLAPSE_END_MS     = 45_000;
+// A tank dead in this window before a buster has lost enmity.
+const TANK_ENMITY_LOST_MS = 30_000;
+// Cutback Blaze's fire lights 3.0-3.3s after its hit; 4+ players starting
+// Burns in this window is the party in the wrong place (clean: 0 in 102 of
+// 139 Cutbacks; group failures caught 4-8 at once).
+const CUTBACK_FIRE_FROM_MS = 2500;
+const CUTBACK_FIRE_TO_MS   = 4000;
+const CUTBACK_GROUP_BURNS  = 4;
+// Deep Impact or Xtreme cleanse deaths that end the pull.
+const MASS_DEATHS         = 3;
+
+// ── shared helpers ──────────────────────────────────────────────────────────
+
+type Hit = { p: PlayerInfo; e: PlayerEvent };
+
+type Life = {
+  alive: (p: PlayerInfo, t: number) => boolean;
+  hitAlive: (p: PlayerInfo, hitT: number) => boolean;
+  diedFrom: (p: PlayerInfo, hitT: number) => DeathEvent | undefined;
+  outIntervals: { p: PlayerInfo; start: number; end: number }[];
+};
+
+function buildLife(players: PlayerInfo[], deaths: DeathEvent[]): Life {
+  const outIntervals: Life["outIntervals"] = [];
+  for (const p of players) {
+    const own = deaths.filter((d) => d.player === p.name).sort((a, b) => a.timestamp - b.timestamp);
+    own.forEach((d, i) => {
+      const next = own[i + 1]?.timestamp ?? Infinity;
+      const end = rezzedAt(p, d.timestamp, next) ?? next - DEATH_EVENT_LAG_MS - 100;
+      outIntervals.push({ p, start: d.timestamp - DEATH_EVENT_LAG_MS - 100, end });
+    });
+  }
+  const alive = (p: PlayerInfo, t: number) => !outIntervals.some((w) => w.p === p && t >= w.start && t < w.end);
+  return {
+    outIntervals,
+    alive,
+    hitAlive: (p, hitT) => alive(p, hitT - 500),
+    diedFrom: (p, hitT) => deaths.find((d) => d.player === p.name && d.timestamp >= hitT && d.timestamp <= hitT + DIED_FROM_HIT_MS),
+  };
+}
+
+function hitsOf(players: PlayerInfo[], ids: number | number[], from = -Infinity, to = Infinity): Hit[] {
+  const set = new Set(Array.isArray(ids) ? ids : [ids]);
+  const out: Hit[] = [];
+  for (const p of players) {
+    for (const e of p.damageTaken) if (set.has(e.abilityId) && e.timestamp >= from && e.timestamp <= to) out.push({ p, e });
+  }
+  return out.sort((a, b) => a.e.timestamp - b.e.timestamp);
+}
+
+const castsOf = (casts: EnemyEvent[], ids: number | number[]) => {
+  const set = new Set(Array.isArray(ids) ? ids : [ids]);
+  return casts.filter((c) => set.has(c.abilityId)).sort((a, b) => a.timestamp - b.timestamp);
+};
+
+function gotDamageDown(p: PlayerInfo, t: number): boolean {
+  return p.debuffs.some((e) => e.abilityId === DAMAGE_DOWN && e.debuffStatus === "applied" && Math.abs(e.timestamp - t) <= 1500);
+}
+
+/** The aura was on the player at `t` (applied before, not yet removed). */
+function hasAura(p: PlayerInfo, id: number, t: number): boolean {
+  return debuffIntervals(p, id).some((w) => w.start <= t && w.end > t) ||
+    p.debuffs.some((e) => e.abilityId === id && e.debuffStatus === "applied" && e.timestamp <= t &&
+      !p.debuffs.some((r) => r.abilityId === id && r.debuffStatus === "removed" && r.timestamp > e.timestamp));
+}
+
+const uniq = <T,>(xs: T[]) => [...new Set(xs)];
+const namesOf = (ps: PlayerInfo[]) => joinNames(uniq(ps).map((p) => p.name));
+const diedText = (d: DeathEvent | undefined) => (d ? ", and died" : "");
+const dist = (a: PlayerEvent, b: PlayerEvent) =>
+  a.x !== undefined && a.y !== undefined && b.x !== undefined && b.y !== undefined ? Math.hypot(a.x - b.x, a.y - b.y) : undefined;
+const isTank = (p: PlayerInfo) => p.role === "Tank";
+
+/** Hits clustered into resolutions (one volley of a mechanic). */
+function resolutions(players: PlayerInfo[], ids: number[], gapMs = 1500): Hit[][] {
+  return clusterByGap(hitsOf(players, ids), (h) => h.e.timestamp, gapMs);
+}
+
+/**
+ * Owner (cast target) of each instance in a resolution, from the casts just
+ * before its hits. Keyed by caster + instance: Red Hot and Deep Blue number
+ * their instances separately, and one volley can use both.
+ */
+type Owners = { get: (e: PlayerEvent) => PlayerInfo | undefined };
+function instanceOwners(casts: EnemyEvent[], ids: number[], res: Hit[], players: PlayerInfo[]): Owners {
+  const t0 = res[0].e.timestamp, t1 = res[res.length - 1].e.timestamp;
+  const out = new Map<string, PlayerInfo>();
+  for (const c of casts) {
+    if (!ids.includes(c.abilityId) || c.timestamp < t0 - 2000 || c.timestamp > t1 || c.sourceInstance === undefined || !c.target) continue;
+    const p = players.find((x) => x.name === c.target);
+    if (p) out.set(`${c.actorName}#${c.sourceInstance}`, p);
+  }
+  return { get: (e) => (e.sourceInstance === undefined ? undefined : out.get(`${e.source}#${e.sourceInstance}`)) };
+}
+const instanceKey = (e: PlayerEvent) => `${e.source}#${e.sourceInstance}`;
+
+/** A tank whose recent death (or raise) cost them enmity before `t`. */
+function tankOutRecently(life: Life, p: PlayerInfo, t: number): boolean {
+  return !life.hitAlive(p, t) || life.outIntervals.some((w) => w.p === p && w.start <= t && w.end >= t - TANK_ENMITY_LOST_MS);
+}
+
+// ── plain avoidable hits ────────────────────────────────────────────────────
+
+function detectAvoidable(players: PlayerInfo[], life: Life): PullError[] {
+  const errors: PullError[] = [];
+  const ids = Object.keys(AVOIDABLE).map(Number);
+  for (const p of players) {
+    // An inmate of the Watery Grave can't move: steam on them isn't theirs.
+    const hits = p.damageTaken.filter((e) => ids.includes(e.abilityId) && life.hitAlive(p, e.timestamp) &&
+      ((e.amount ?? 0) > 0 || gotDamageDown(p, e.timestamp)) && !hasAura(p, WATERY_GRAVE, e.timestamp));
+    for (const g of clusterByGap(hits, (e) => e.timestamp, 3000)) {
+      const kinds = uniq(g.map((e) => AVOIDABLE[e.abilityId]));
+      const total = g.reduce((s, e) => s + (e.amount ?? 0), 0);
+      const death = life.diedFrom(p, g[g.length - 1].timestamp);
+      const dd = g.some((e) => gotDamageDown(p, e.timestamp));
+      // No Damage Down and survived: healable, so Minor (README FFXIV exception).
+      const minor = !dd && !death && kinds.every((k) => k.noDamageDown);
+      const hit = kinds.map((k, i) => (i === 0 ? k.hit : k.hit.charAt(0).toLowerCase() + k.hit.slice(1))).join(", and ");
+      const outcome = [dd ? "got Damage Down" : "", death ? "died" : ""].filter(Boolean).join(" and ");
+      const why = kinds.map((k) => k.why).filter(Boolean).join(" ");
+      errors.push(playerError(p, {
+        ruleId: RHDB_AVOIDABLE_RULE_ID, severity: minor ? "Minor" : "Major", name: `Hit by ${kinds.map((k) => k.name).join(" / ")}`,
+        description: `${hit} (${g.length > 1 ? `${g.length} hits, ` : ""}${kFmt(total)}).${outcome ? ` They ${outcome}.` : ""}${why ? ` ${why}` : ""}`,
+        timestamp: g[0].timestamp, abilityId: g[0].abilityId, abilityName: g[0].abilityName,
+      }));
+    }
+  }
+  return errors;
+}
+
+// ── fire on the floor (Burns) ───────────────────────────────────────────────
+
+/**
+ * Standing in Red Hot's fire puddles: the Burns status. No Damage Down and
+ * healable, so Minor unless the player died while it was on them.
+ */
+function detectFire(players: PlayerInfo[], life: Life, deaths: DeathEvent[], called: Set<DeathEvent>): PullError[] {
+  const errors: PullError[] = [];
+  const episodesOf = (p: PlayerInfo) => {
+    const spans = BURNS.flatMap((id) => debuffIntervals(p, id)).filter((w) => life.hitAlive(p, w.start)).sort((a, b) => a.start - b.start);
+    const eps: { start: number; end: number }[] = [];
+    for (const w of spans) {
+      const last = eps[eps.length - 1];
+      if (last && w.start <= last.end + 1500) last.end = Math.max(last.end, w.end);
+      else eps.push({ ...w });
+    }
+    return eps;
+  };
+  const all = players.map((p) => ({ p, eps: episodesOf(p) }));
+  // Cutback Blaze's fire activates ~3s after its hit (every burn that
+  // followed one started 0.7-7.8s later, most at 3.0-3.3s). When most of the
+  // party burns at once, the safe slice wasn't where they stood: a group
+  // failure (bad aim or no movement), not each player's (model: Cutback).
+  const groupBurns = new Set<{ start: number; end: number }>();
+  for (const t of clusterByGap(hitsOf(players, CUTBACK_BLAZE), (h) => h.e.timestamp, 3000).map((g) => g[0].e.timestamp)) {
+    const caught = all.flatMap(({ p, eps }) => eps.filter((ep) => ep.start >= t + CUTBACK_FIRE_FROM_MS && ep.start <= t + CUTBACK_FIRE_TO_MS).map((ep) => ({ p, ep })));
+    if (uniq(caught.map((c) => c.p)).length < CUTBACK_GROUP_BURNS) continue;
+    caught.forEach((c) => groupBurns.add(c.ep));
+    const killed = uniq(caught.filter(({ p, ep }) => deaths.some((d) => d.player === p.name && !called.has(d) && d.timestamp - DEATH_EVENT_LAG_MS >= ep.start - 500 && d.timestamp - DEATH_EVENT_LAG_MS <= ep.end + 1000)).map((c) => c.p));
+    errors.push(playerlessMinor(RHDB_FIRE_RULE_ID, "Party Caught in Cutback Fire",
+      `${uniq(caught.map((c) => c.p)).length} players (${namesOf(caught.map((c) => c.p))}) were standing in Cutback Blaze's fire when it lit, ${sec(Math.min(...caught.map((c) => c.ep.start)) - t)}s after the hit${killed.length ? `; ${namesOf(killed)} died burning` : ""}. Cutback sets most of the arena alight around its farthest target and leaves one narrow slice; the party bait it so that slice points at clear floor and moves into it together. The log can't tell whether the aim or the movement failed, so nobody is named.`,
+      t + 3000, CUTBACK_BLAZE, "Cutback Blaze"));
+    if (killed.length >= MASS_DEATHS) {
+      errors.push(raidMarker(RHDB_FIRE_RULE_ID, "Party Caught in Cutback Fire",
+        `Cutback Blaze's fire killed ${killed.length} (${namesOf(killed)}). Unresolvable from here.`, t + 3000, CUTBACK_BLAZE, "Cutback Blaze"));
+    }
+  }
+  for (const { p, eps } of all) {
+    for (const ep of eps) {
+      if (groupBurns.has(ep)) continue;
+      const ticks = p.damageTaken.filter((e) => BURNS.includes(e.abilityId) && e.timestamp >= ep.start - 100 && e.timestamp <= ep.end + 100);
+      const death = deaths.find((d) => d.player === p.name && d.timestamp - DEATH_EVENT_LAG_MS >= ep.start - 500 && d.timestamp - DEATH_EVENT_LAG_MS <= ep.end + 1000);
+      // Walking through fire to reset after a called wipe isn't a mistake.
+      if (death && called.has(death)) continue;
+      const others = all.filter((o) => o.p !== p && o.eps.some((x) => Math.abs(x.start - ep.start) <= 3000)).map((o) => o.p);
+      const total = ticks.reduce((s, e) => s + (e.amount ?? 0), 0);
+      const dmg = ticks.length ? `${kFmt(total)} over ${ticks.length} tick${ticks.length === 1 ? "" : "s"}, ` : "";
+      errors.push(playerError(p, {
+        ruleId: RHDB_FIRE_RULE_ID, severity: death ? "Major" : "Minor", name: "Stood in Fire",
+        description: `Walked into Red Hot's fire on the floor and took Burns (${dmg}${sec(ep.end - ep.start)}s).${others.length ? ` ${namesOf(others)} also entered fire within 3s.` : ""} Fire stays on the floor until Divers' Dare clears it; route around it. ${death ? "They died while burning." : "No Damage Down and the healers can heal through it, so it's minor."}`,
+        timestamp: ep.start, abilityId: BURNS[0], abilityName: "Burns",
+      }));
+    }
+  }
+  return errors;
+}
+
+// ── deaths with no killing blow: the deathwall ──────────────────────────────
+
+/** No-killing-blow deaths that are the wipe being called, not mistakes. */
+function calledWipeDeaths(deaths: DeathEvent[], pullEnd: number): Set<DeathEvent> {
+  const silent = deaths.filter((d) => !d.killingAbilityGameId);
+  const out = new Set<DeathEvent>();
+  for (const d of silent) {
+    if (pullEnd - d.timestamp <= CALLED_WIPE_END_MS) out.add(d);
+    const near = silent.filter((x) => Math.abs(x.timestamp - d.timestamp) <= CALLED_WIPE_WINDOW);
+    if (near.length >= CALLED_WIPE_COUNT) near.forEach((x) => out.add(x));
+  }
+  return out;
+}
+
+function detectWall(players: PlayerInfo[], deaths: DeathEvent[], called: Set<DeathEvent>): PullError[] {
+  const errors: PullError[] = [];
+  for (const d of deaths) {
+    if (d.killingAbilityGameId || called.has(d)) continue;
+    const p = players.find((x) => x.name === d.player);
+    if (!p) continue;
+    const hitT = d.timestamp - DEATH_EVENT_LAG_MS;
+    // Living Dead's Walking Dead ran its full 10s without the tank being
+    // healed back up (A23 +4:42): the healing, not a wall.
+    const wd = debuffIntervals(p, WALKING_DEAD).find((w) => Math.abs(w.end - hitT) <= 500 && w.end - w.start >= WALKING_DEAD_FULL_MS);
+    if (wd) {
+      errors.push(playerlessMinor(RHDB_WALL_RULE_ID, "Walking Dead Ran Out",
+        `${p.name}'s Walking Dead (from Living Dead) expired before they were healed back to full, and they died. The healers have to heal the Walking Dead tank to full within its 10s.`,
+        wd.end, WALKING_DEAD, "Walking Dead"));
+      continue;
+    }
+    const kb = p.damageTaken.filter((e) => KNOCKBACKS[e.abilityId] && e.timestamp <= d.timestamp && e.timestamp >= d.timestamp - WALL_KNOCKBACK_MS).pop();
+    const how = kb
+      ? `Knocked into the deathwall by ${KNOCKBACKS[kb.abilityId]} (${sec(d.timestamp - kb.timestamp)}s before the death). ${kb.abilityId === DEEP_IMPACT ? "Deep Impact knocks its target back hard; the tank taking it uses knockback immunity or stands with room behind them." : kb.abilityId === SICK_SWELL || kb.abilityId === SICKEST_TAKE_OFF ? "The wave knocks everyone across the arena; start from the side it comes from or use knockback immunity." : "Each Floater dash knocks its carrier back; leave room behind you."}`
+      : "Died with no killing blow: walked into the deathwall.";
+    errors.push(playerError(p, {
+      ruleId: RHDB_WALL_RULE_ID, severity: "Major", name: kb ? "Knocked Into the Wall" : "Walked Into the Wall",
+      description: how,
+      timestamp: kb ? kb.timestamp : hitT, abilityId: kb?.abilityId ?? 0, abilityName: kb ? KNOCKBACKS[kb.abilityId] : "Deathwall",
+    }));
+  }
+  return errors;
+}
+
+// ── Flame Floater ───────────────────────────────────────────────────────────
+
+/**
+ * Four dashes at the First..Fourth in Line carriers. Anyone else hit was in
+ * the dash's path; a carrier killed by their own dash with nothing else
+ * wrong had too short a tether.
+ */
+function detectFloater(players: PlayerInfo[], life: Life): PullError[] {
+  const errors: PullError[] = [];
+  const clipped = new Map<PlayerInfo, number>(); // player -> time they took someone else's dash
+  FLOATER_DASH.forEach((id, k) => {
+    for (const res of resolutions(players, [id], 1000)) {
+      const t = res[0].e.timestamp;
+      // The carrier's In Line status ends at their dash.
+      const carrier = players.find((p) => p.debuffs.some((e) => e.abilityId === IN_LINE[k] && e.debuffStatus === "removed" && Math.abs(e.timestamp - t) <= 1500));
+      for (const { p, e } of res) {
+        if (!life.hitAlive(p, e.timestamp)) continue;
+        const death = life.diedFrom(p, e.timestamp);
+        if (carrier && p !== carrier) {
+          clipped.set(p, e.timestamp);
+          errors.push(playerError(p, {
+            ruleId: RHDB_FLOATER_RULE_ID, severity: "Major", name: "Hit by Someone Else's Floater Dash",
+            description: `Stood in the path of Flame Floater dash #${k + 1} to ${carrier.name} (${kFmt(e.amount ?? 0)})${diedText(death)}. Red Hot dashes to each numbered carrier in turn; everyone else stays out of the line between the boss and the carrier. The hit leaves Fire Resistance Down, so a later dash of their own becomes deadly.`,
+            timestamp: e.timestamp, abilityId: id, abilityName: "Flame Floater",
+          }));
+        } else if (p === carrier && death?.killingAbilityGameId === id && !(clipped.has(p) && clipped.get(p)! < e.timestamp)) {
+          errors.push(playerError(p, {
+            ruleId: RHDB_FLOATER_RULE_ID, severity: "Major", name: "Floater Tether Too Short",
+            description: `Died to their own Flame Floater dash #${k + 1} (${kFmt(e.amount ?? 0)}). The dash hurts less the farther it travels: stretch the tether away from where Red Hot stands before it dashes.`,
+            timestamp: e.timestamp, abilityId: id, abilityName: "Flame Floater",
+          }));
+        }
+      }
+    }
+  });
+  return errors;
+}
+
+// ── bait overlaps (spreads, cones, jumps, pair stacks) ──────────────────────
+
+/**
+ * A player hit by an instance whose target was someone else (or by two
+ * instances at once, for a pair stack). Both the player who was hit and the
+ * player the bait belonged to are named: the log can't tell which of them
+ * was out of place, and spacing is on both (README principle 3).
+ */
+function detectOverlaps(players: PlayerInfo[], life: Life, casts: EnemyEvent[]): PullError[] {
+  const errors: PullError[] = [];
+  for (const fam of FAMILIES) {
+    for (const res of resolutions(players, fam.ids)) {
+      const owners = instanceOwners(casts, fam.ids, res, players);
+      // involved player -> description pieces and their hit
+      const flagged = new Map<PlayerInfo, { parts: string[]; t: number; died: boolean; id: number; paired: boolean }>();
+      const flag = (p: PlayerInfo, part: string, t: number, died: boolean, id: number, paired = true) => {
+        const f = flagged.get(p) ?? { parts: [], t, died: false, id, paired: false };
+        if (!f.parts.includes(part)) f.parts.push(part);
+        f.t = Math.min(f.t, t); f.died ||= died; f.paired ||= paired;
+        flagged.set(p, f);
+      };
+      const byPlayer = new Map<PlayerInfo, Hit[]>();
+      for (const h of res) if (life.hitAlive(h.p, h.e.timestamp)) byPlayer.set(h.p, [...(byPlayer.get(h.p) ?? []), h]);
+      for (const [v, hs] of byPlayer) {
+        const instances = uniq(hs.map((h) => instanceKey(h.e)));
+        const died = !!life.diedFrom(v, hs[hs.length - 1].e.timestamp);
+        if (fam.stack) {
+          if (instances.length < 2) continue;
+          flag(v, `Stood in ${instances.length} of them at once (${hs.map((h) => kFmt(h.e.amount ?? 0)).join(" + ")})`, hs[0].e.timestamp, died, hs[0].e.abilityId, false);
+          continue;
+        }
+        for (const h of hs.filter((x) => owners.get(x.e) !== v)) {
+          const owner = owners.get(h.e);
+          // Unknown owner: only a second hit on the same player says anything.
+          if (!owner) {
+            if (instances.length >= 2) flag(v, `Took ${instances.length} ${fam.what}s at once`, h.e.timestamp, died, h.e.abilityId, false);
+            continue;
+          }
+          const own = owner.damageTaken.find((e) => fam.ids.includes(e.abilityId) && instanceKey(e) === instanceKey(h.e) && Math.abs(e.timestamp - h.e.timestamp) <= 1500);
+          const d = own ? dist(own, h.e) : undefined;
+          const gap = d !== undefined ? `, ${yd(d)}y apart` : "";
+          flag(v, `Was hit by ${owner.name}'s ${fam.what} (${kFmt(h.e.amount ?? 0)}${gap})`, h.e.timestamp, died, h.e.abilityId);
+          if (life.hitAlive(owner, h.e.timestamp)) flag(owner, `Their ${fam.what} hit ${v.name} (${kFmt(h.e.amount ?? 0)}${gap}${died ? `; ${v.name} died` : ""})`, h.e.timestamp, false, h.e.abilityId);
+        }
+      }
+      for (const [p, f] of flagged) {
+        errors.push(playerError(p, {
+          ruleId: RHDB_OVERLAP_RULE_ID, severity: "Major", name: `${fam.name} Overlap`,
+          description: `${fam.name}: ${f.parts.join(". ")}${f.died ? ", and died" : ""}. ${fam.why}${f.paired ? " The log can't tell which of the two was out of place, so both are flagged." : ""}`,
+          timestamp: f.t, abilityId: f.id, abilityName: fam.name,
+        }));
+      }
+    }
+  }
+  return errors;
+}
+
+// ── tank busters ────────────────────────────────────────────────────────────
+
+function detectBusters(players: PlayerInfo[], life: Life, casts: EnemyEvent[]): PullError[] {
+  const errors: PullError[] = [];
+  const tanks = players.filter(isTank);
+  const tanksReady = (t: number) => tanks.length === 2 && tanks.every((p) => !tankOutRecently(life, p, t));
+
+  // Opening Hot Impact: shared by the two tanks; anyone else stood in it.
+  for (const res of resolutions(players, [HOT_IMPACT_SHARED])) {
+    const t = res[0].e.timestamp;
+    if (!tanksReady(t)) continue;
+    for (const { p, e } of res.filter((h) => !isTank(h.p) && life.hitAlive(h.p, h.e.timestamp))) {
+      errors.push(playerError(p, {
+        ruleId: RHDB_BUSTER_RULE_ID, severity: "Major", name: "Hit by Hot Impact",
+        description: `Took Hot Impact, the tanks' shared buster (${kFmt(e.amount ?? 0)})${diedText(life.diedFrom(p, e.timestamp))}. Only the two tanks share it; everyone else stays away from them.`,
+        timestamp: e.timestamp, abilityId: HOT_IMPACT_SHARED, abilityName: "Hot Impact",
+      }));
+    }
+  }
+
+  // Snaking Hot Impact: Red Hot's top-enmity Firesnaking player. A non-tank
+  // target means the tank with Firesnaking didn't hold Red Hot.
+  for (const res of resolutions(players, [HOT_IMPACT_SNAKING])) {
+    const t = res[0].e.timestamp;
+    const target = castsOf(casts, HOT_IMPACT_SNAKING).filter((c) => c.timestamp <= t && c.timestamp >= t - 2000 && c.target).pop()?.target;
+    for (const { p, e } of res.filter((h) => !isTank(h.p) && life.hitAlive(h.p, h.e.timestamp))) {
+      const died = life.diedFrom(p, e.timestamp);
+      if (target && p.name !== target) {
+        errors.push(playerError(p, {
+          ruleId: RHDB_BUSTER_RULE_ID, severity: "Major", name: "Hit by Hot Impact",
+          description: `Stood in Hot Impact aimed at ${target} (${kFmt(e.amount ?? 0)})${diedText(died)}. It's a tankbuster; stay away from its target.`,
+          timestamp: e.timestamp, abilityId: HOT_IMPACT_SNAKING, abilityName: "Hot Impact",
+        }));
+        continue;
+      }
+      const fireTank = tanks.find((x) => life.hitAlive(x, t) && hasAura(x, FIRE_SNAKING, t - 500));
+      const text = `Hot Impact went to ${p.name} (${kFmt(e.amount ?? 0)}${died ? ", died" : ""}): Red Hot's top enmity among the Firesnaking players wasn't a tank.`;
+      if (fireTank && !tankOutRecently(life, fireTank, t)) {
+        errors.push(playerError(fireTank, {
+          ruleId: RHDB_BUSTER_RULE_ID, severity: "Major", name: "Hot Impact Hit a Non-Tank",
+          description: `${text} ${fireTank.name} had Firesnaking, so it was theirs: the fire tank holds (or provokes) Red Hot during snaking.`,
+          timestamp: e.timestamp, abilityId: HOT_IMPACT_SNAKING, abilityName: "Hot Impact",
+        }));
+      } else {
+        errors.push(playerlessMinor(RHDB_BUSTER_RULE_ID, "Hot Impact Hit a Non-Tank",
+          `${text} No living tank had Firesnaking to take it.`, e.timestamp, HOT_IMPACT_SNAKING, "Hot Impact"));
+      }
+    }
+  }
+
+  // Vertical Blast/Plunge: a buster on the nearest player. A non-tank target
+  // stood closer to the boss than the tanks.
+  for (const res of resolutions(players, VERTICAL, 500)) {
+    const t = res[0].e.timestamp;
+    const owners = instanceOwners(casts, VERTICAL, res, players);
+    for (const { p, e } of res.filter((h) => !isTank(h.p) && life.hitAlive(h.p, h.e.timestamp))) {
+      const owner = owners.get(e);
+      if ((owner && owner !== p) || !tanksReady(t)) continue; // someone else's buster: below
+      errors.push(playerError(p, {
+        ruleId: RHDB_BUSTER_RULE_ID, severity: "Major", name: `Took ${e.abilityName}`,
+        description: `Took ${e.abilityName}, the surfboard's tankbuster on the nearest player (${kFmt(e.amount ?? 0)})${diedText(life.diedFrom(p, e.timestamp))}. They were closer to the boss than either tank; the tank closest to that boss takes it, everyone else stays farther out.`,
+        timestamp: e.timestamp, abilityId: e.abilityId, abilityName: e.abilityName,
+      }));
+    }
+    for (const { p, e } of res.filter((h) => life.hitAlive(h.p, h.e.timestamp))) {
+      const owner = owners.get(e);
+      if (!owner || owner === p) continue;
+      errors.push(playerError(p, {
+        ruleId: RHDB_BUSTER_RULE_ID, severity: "Major", name: `Hit by ${e.abilityName}`,
+        description: `Stood in ${e.abilityName} aimed at ${owner.name} (${kFmt(e.amount ?? 0)})${diedText(life.diedFrom(p, e.timestamp))}. It's a tankbuster; stay away from its target.`,
+        timestamp: e.timestamp, abilityId: e.abilityId, abilityName: e.abilityName,
+      }));
+    }
+  }
+  return errors;
+}
+
+/**
+ * Deep Impact: an AoE buster with knockback on Deep Blue's farthest player.
+ * One non-tank alone = they went farther than the tank. Anyone else caught =
+ * the tank holding Deep Blue (its auto-attack target) didn't take it away
+ * from the party. 3+ deaths end the pull.
+ */
+function detectDeepImpact(players: PlayerInfo[], life: Life, casts: EnemyEvent[]): PullError[] {
+  const errors: PullError[] = [];
+  for (const res of resolutions(players, [DEEP_IMPACT])) {
+    const t = res[0].e.timestamp;
+    const hit = res.filter((h) => life.hitAlive(h.p, h.e.timestamp));
+    const nonTanks = uniq(hit.filter((h) => !isTank(h.p)).map((h) => h.p));
+    if (nonTanks.length === 0) continue;
+    const killed = uniq(hit.filter((h) => life.diedFrom(h.p, h.e.timestamp)).map((h) => h.p));
+    const target = castsOf(casts, DEEP_IMPACT).filter((c) => c.timestamp <= t && c.timestamp >= t - 2000 && c.target).pop()?.target;
+    const hitText = joinNames(hit.map((h) => `${h.p.name} (${kFmt(h.e.amount ?? 0)}${life.diedFrom(h.p, h.e.timestamp) ? ", died" : ""})`));
+    if (hit.length === 1) {
+      const { p, e } = hit[0];
+      errors.push(playerError(p, {
+        ruleId: RHDB_DEEP_IMPACT_RULE_ID, severity: "Major", name: "Took Deep Impact",
+        description: `Was the farthest player from Deep Blue and took Deep Impact (${kFmt(e.amount ?? 0)})${diedText(life.diedFrom(p, e.timestamp))}. The tank holding Deep Blue goes farthest to bait it; everyone else stays closer to the boss.`,
+        timestamp: e.timestamp, abilityId: DEEP_IMPACT, abilityName: "Deep Impact",
+      }));
+    } else {
+      // Deep Blue's tank: the target of its latest auto-attack before the
+      // cast; during snaking (when Deep Blue barely auto-attacks) the tank
+      // with Watersnaking, who holds Deep Blue in every clean pull.
+      const blueTank = players.filter(isTank)
+        .map((p) => ({ p, at: Math.max(-Infinity, ...p.damageTaken.filter((e) => e.source === "Deep Blue" && e.abilityName === "Attack" && e.timestamp < t - 1000).map((e) => e.timestamp)) }))
+        .filter((x) => x.at > t - 20_000 && life.hitAlive(x.p, t)).sort((a, b) => b.at - a.at)[0]?.p
+        ?? players.find((p) => isTank(p) && life.hitAlive(p, t) && hasAura(p, WATER_SNAKING, t - 500));
+      const text = `Deep Impact${target ? ` (aimed at ${target})` : ""} hit ${hitText}. It's an AoE tankbuster on the farthest player from Deep Blue: the tank holding Deep Blue takes it far away from everyone.`;
+      if (blueTank) {
+        errors.push(playerError(blueTank, {
+          ruleId: RHDB_DEEP_IMPACT_RULE_ID, severity: "Major", name: "Deep Impact Hit the Party",
+          description: `${text} ${blueTank.name} was holding Deep Blue and didn't take it away from the party.`,
+          timestamp: t, abilityId: DEEP_IMPACT, abilityName: "Deep Impact",
+        }));
+      } else {
+        errors.push(playerlessMinor(RHDB_DEEP_IMPACT_RULE_ID, "Deep Impact Hit the Party", `${text} No living tank was holding Deep Blue.`, t, DEEP_IMPACT, "Deep Impact"));
+      }
+    }
+    if (killed.length >= MASS_DEATHS) {
+      errors.push(raidMarker(RHDB_DEEP_IMPACT_RULE_ID, "Deep Impact Hit the Party",
+        `Deep Impact killed ${killed.length} (${namesOf(killed)}). Unresolvable from here.`, t, DEEP_IMPACT, "Deep Impact"));
+    }
+  }
+  return errors;
+}
+
+// ── stacks ──────────────────────────────────────────────────────────────────
+
+/**
+ * Pyrotation is three party stacks in a row; the main tank routinely sits
+ * hits two and three out (every clean pull), so a missing player is only an
+ * error when the stack killed someone. Re-Entry is a four-person cone
+ * stack: fewer than four with a death is player-less (any four may go).
+ */
+function detectStacks(players: PlayerInfo[], life: Life): PullError[] {
+  const errors: PullError[] = [];
+  for (const res of resolutions(players, [PYROTATION], 900)) {
+    const t = res[0].e.timestamp;
+    const inIt = uniq(res.map((h) => h.p));
+    const killed = inIt.filter((p) => life.diedFrom(p, t));
+    if (killed.length === 0) continue;
+    const absent = players.filter((p) => !inIt.includes(p) && !isTank(p) && life.hitAlive(p, t) && life.alive(p, t + 1000));
+    for (const p of absent) {
+      errors.push(playerError(p, {
+        ruleId: RHDB_STACK_RULE_ID, severity: "Major", name: "Missed the Pyrotation Stack",
+        description: `Alive but not in a Pyrotation stack that killed ${namesOf(killed)} (${inIt.length} shared it). Pyrotation is three party stacks in a row; everyone moves with the stack between hits.`,
+        timestamp: t, abilityId: PYROTATION, abilityName: "Pyrotation",
+      }));
+    }
+  }
+  for (const id of RE_ENTRY) {
+    for (const g of resolutions(players, [id], 900)) {
+      const t = g[0].e.timestamp;
+      const inIt = uniq(g.map((h) => h.p));
+      const killed = inIt.filter((p) => life.diedFrom(p, t));
+      if (inIt.length >= 4 || killed.length === 0) continue;
+      errors.push(playerlessMinor(RHDB_STACK_RULE_ID, `${g[0].e.abilityName} Under-Soaked`,
+        `Only ${inIt.length} (${namesOf(inIt)}) shared ${g[0].e.abilityName}, a four-person cone stack, and ${namesOf(killed)} died. Which player should have joined can't be told from the log.`,
+        t, g[0].e.abilityId, g[0].e.abilityName));
+    }
+  }
+  return errors;
+}
+
+// ── Watery Grave prison and Xtreme Wave tethers ─────────────────────────────
+
+/**
+ * Six tether waves: each holder takes their boss's dash. A free player hit
+ * by both bosses' dashes in one wave stood in the other lane; a holder
+ * killed by a single dash had too short a tether. Inmates are skipped.
+ */
+function detectXtremeWave(players: PlayerInfo[], life: Life, casts: EnemyEvent[]): PullError[] {
+  const errors: PullError[] = [];
+  for (const res of resolutions(players, [XTREME_WAVE_RED, XTREME_WAVE_BLUE], 1200)) {
+    const free = res.filter((h) => !hasAura(h.p, WATERY_GRAVE, h.e.timestamp) && life.hitAlive(h.p, h.e.timestamp));
+    const byPlayer = new Map<PlayerInfo, Hit[]>();
+    for (const h of free) byPlayer.set(h.p, [...(byPlayer.get(h.p) ?? []), h]);
+    for (const [p, hs] of byPlayer) {
+      const colors = uniq(hs.map((h) => h.e.abilityId));
+      const last = hs[hs.length - 1].e;
+      const death = life.diedFrom(p, last.timestamp);
+      if (colors.length >= 2) {
+        errors.push(playerError(p, {
+          ruleId: RHDB_XTREME_WAVE_RULE_ID, severity: "Major", name: "Hit by Both Xtreme Waves",
+          description: `Took both bosses' Xtreme Wave dashes in one wave (${hs.map((h) => kFmt(h.e.amount ?? 0)).join(" + ")})${diedText(death)}. Each tether holder takes only their own boss's dash; the two lanes must not cross, and everyone else stays out of both.`,
+          timestamp: hs[0].e.timestamp, abilityId: last.abilityId, abilityName: "Xtreme Wave",
+        }));
+      } else if (death && hs.length === 1) {
+        errors.push(playerError(p, {
+          ruleId: RHDB_XTREME_WAVE_RULE_ID, severity: "Major", name: "Xtreme Wave Tether Too Short",
+          description: `Died to a single Xtreme Wave dash (${kFmt(last.amount ?? 0)}). The dash hurts less the farther it travels: stretch the tether from the boss's current spot before it dashes.`,
+          timestamp: last.timestamp, abilityId: last.abilityId, abilityName: "Xtreme Wave",
+        }));
+      }
+    }
+  }
+  // The prison wasn't destroyed before its deadline: Impact Zone on everyone.
+  const expiry = castsOf(casts, IMPACT_ZONE_EXPIRY)[0];
+  if (expiry) {
+    errors.push(raidMarker(RHDB_PRISON_RULE_ID, "Watery Grave Not Broken",
+      "The Watery Grave wasn't destroyed in time and detonated (Impact Zone), killing everyone. Six Red Hot dashes through the bubble take most of its HP and the raid has to burst the rest; every missed or wrong-color dash makes the deadline harder. Unresolvable from here.",
+      expiry.timestamp, IMPACT_ZONE_EXPIRY, "Impact Zone"));
+  }
+  for (const c of castsOf(casts, UNMITIGATED_EXPL)) {
+    errors.push(playerlessMinor(RHDB_PRISON_RULE_ID, "Deep Aerial Tower Unsoaked",
+      "The Deep Aerial tower went off without enough soakers (Unmitigated Explosion). Two players soak it and become the Watery Grave's inmates.",
+      c.timestamp, UNMITIGATED_EXPL, "Unmitigated Explosion"));
+  }
+  return errors;
+}
+
+// ── Xtreme snaking cleanses ─────────────────────────────────────────────────
+
+/**
+ * Each Insane Air volley, one Xtreme Firesnaking and one Xtreme Watersnaking
+ * player cleanses (by taking the opposite boss's attack), each dropping a
+ * Bailout that leaves Magic Vulnerability Up around them. Several of one
+ * color on the same volley stack their Bailouts and the next attacks kill.
+ */
+function detectCleanses(players: PlayerInfo[], life: Life, deaths: DeathEvent[]): PullError[] {
+  const errors: PullError[] = [];
+  const removals: { p: PlayerInfo; t: number; color: "Fire" | "Water" }[] = [];
+  for (const p of players) {
+    for (const e of p.debuffs) {
+      if (e.debuffStatus !== "removed" || (e.abilityId !== XTREME_FIRE && e.abilityId !== XTREME_WATER)) continue;
+      // The cleansing hit itself can be the fatal one (B11 +488.6: four Fire
+      // cleanses, all four dead), so a removal at a death still counts.
+      if (!life.hitAlive(p, e.timestamp)) continue;
+      const applied = p.debuffs.find((a) => a.abilityId === e.abilityId && a.debuffStatus === "applied" && a.timestamp <= e.timestamp);
+      // The application itself can strip it at once (both colors); skip.
+      if (!applied || e.timestamp - applied.timestamp < 1000) continue;
+      removals.push({ p, t: e.timestamp, color: e.abilityId === XTREME_FIRE ? "Fire" : "Water" });
+    }
+  }
+  for (const volley of clusterByGap(removals, (r) => r.t, 1000)) {
+    const t = volley[0].t;
+    const killed = uniq(deaths.filter((d) => d.timestamp - DEATH_EVENT_LAG_MS >= t && d.timestamp - DEATH_EVENT_LAG_MS <= t + 4000).map((d) => d.player));
+    let extra = false;
+    for (const color of ["Fire", "Water"] as const) {
+      const same = volley.filter((r) => r.color === color);
+      if (same.length < 2) continue;
+      extra = true;
+      for (const r of same) {
+        errors.push(playerError(r.p, {
+          ruleId: RHDB_CLEANSE_RULE_ID, severity: "Major", name: "Cleansed Xtreme Snaking Out of Turn",
+          description: `${same.length} players (${namesOf(same.map((x) => x.p))}) cleansed Xtreme ${color}snaking on the same volley${killed.length ? `; ${joinNames(killed)} died in the next 4s` : ""}. Only one player per color cleanses each volley (healers, then melee, then ranged; tanks on the tankbuster); the others stay on their own boss's attacks. Each cleanse drops a Bailout, and overlapping Bailouts make the next attacks lethal. The log can't tell whose turn it was, so all of them are flagged.`,
+          timestamp: r.t, abilityId: color === "Fire" ? XTREME_FIRE : XTREME_WATER, abilityName: `Xtreme ${color}snaking`,
+        }));
+      }
+    }
+    if (extra && killed.length >= MASS_DEATHS) {
+      errors.push(raidMarker(RHDB_CLEANSE_RULE_ID, "Xtreme Cleanses Overlapped",
+        `Too many players cleansed Xtreme snaking on one volley and ${killed.length} died right after (${joinNames(killed)}). Unresolvable from here.`,
+        Math.max(...volley.map((r) => r.t)), XTREME_FIRE, "Xtreme Firesnaking"));
+    }
+  }
+  return errors;
+}
+
+// ── entry point ─────────────────────────────────────────────────────────────
+
+/**
+ * Red Hot and Deep Blue (M10S) errors. Self-gates on Hot Impact / Flame
+ * Floater / Divers' Dare, which no other fight in the sample set casts.
+ */
+export function detectRedHotDeepBlueErrors(players: PlayerInfo[], deathEvents: DeathEvent[], enemyCasts: EnemyEvent[]): PullError[] {
+  if (!enemyCasts.some((c) => SIGNATURE.includes(c.abilityId))) return [];
+  const life = buildLife(players, deathEvents);
+  const pullEnd = Math.max(0, ...players.flatMap((p) => [...p.damageTaken, ...p.casts].map((e) => e.timestamp)), ...deathEvents.map((d) => d.timestamp));
+  const called = calledWipeDeaths(deathEvents, pullEnd);
+
+  const errors = [
+    ...detectAvoidable(players, life),
+    ...detectFire(players, life, deathEvents, called),
+    ...detectWall(players, deathEvents, called),
+    ...detectFloater(players, life),
+    ...detectOverlaps(players, life, enemyCasts),
+    ...detectBusters(players, life, enemyCasts),
+    ...detectDeepImpact(players, life, enemyCasts),
+    ...detectStacks(players, life),
+    ...detectXtremeWave(players, life, enemyCasts),
+    ...detectCleanses(players, life, deathEvents),
+  ];
+
+  const firstRaid = () => Math.min(...errors.filter((e) => e.severity === "Raid").map((e) => e.timestamp));
+  const enrage = castsOf(enemyCasts, OVER_THE_FALLS)[0];
+  if (enrage && enrage.timestamp < firstRaid()) {
+    const left = enrage.hitPoints !== undefined && enrage.maxHitPoints
+      ? ` ${enrage.actorName} still had ${(100 * enrage.hitPoints / enrage.maxHitPoints).toFixed(1)}% HP left.` : "";
+    errors.push(raidMarker(RHDB_ENRAGE_RULE_ID, "Over the Falls (Enrage)",
+      `Over the Falls killed everyone — the hard enrage. The DPS check wasn't met.${left}`,
+      enrage.timestamp, enrage.abilityId, "Over the Falls"));
+  }
+  // A called wipe: several no-killing-blow deaths together, before any
+  // mechanic cutoff.
+  const calledList = deathEvents.filter((d) => called.has(d)).sort((a, b) => a.timestamp - b.timestamp);
+  if (calledList.length >= CALLED_WIPE_COUNT && calledList[0].timestamp - DEATH_EVENT_LAG_MS < firstRaid()) {
+    errors.push(raidMarker(RHDB_CALLED_WIPE_RULE_ID, "Wipe Called",
+      `${calledList.length} players died with no killing blow at the end of the pull (${joinNames(uniq(calledList.map((d) => d.player)))}): the wipe was called and the raid reset into the deathwall.`,
+      calledList[0].timestamp - DEATH_EVENT_LAG_MS, 0, "Deaths"));
+  }
+  // Pull-over marker: 5 dead at once with the pull ending soon after.
+  const outAt = (t: number) => players.filter((p) => !life.alive(p, t));
+  const collapseT = life.outIntervals.map((w) => w.start).sort((a, b) => a - b)
+    .find((t) => outAt(t).length >= COLLAPSE_DEAD_COUNT && pullEnd - t <= COLLAPSE_END_MS);
+  if (collapseT !== undefined && collapseT < firstRaid()) {
+    const who = outAt(collapseT).map((p) => p.name);
+    errors.push(raidMarker(RHDB_COLLAPSE_RULE_ID, "Party Collapse",
+      `${who.length} players were dead at once (${joinNames(who)}). Treated as the cutoff point.`,
+      collapseT + DEATH_EVENT_LAG_MS, 0, "Deaths"));
+  }
+  return errors.sort((a, b) => a.timestamp - b.timestamp);
+}

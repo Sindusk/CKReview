@@ -37,6 +37,10 @@ lib/mechanics/
                                 Bombpyre overlaps, Aetherletting drops/lines/overlap,
                                 Hardcore, Rain, saws/towers/Flails/Doornail, cells,
                                 Deathmatch, enrage)
+      red-hot-deep-blue.ts    — Red Hot and Deep Blue (M10S) per-pull rules
+                                (Damage Down hits, fire, deathwall, Floater, bait
+                                overlaps, busters, Deep Impact, stacks, prison
+                                tethers/deadline, Xtreme cleanses, enrage)
   wow/
     registry.ts               — THE list of per-pull WoW modules; the app and
                                 validate.js both run it (a new boss = one line)
@@ -537,6 +541,30 @@ The same principles apply when refining any module:
 - **Journal counts can be off by one.** Toxic Incubation logged 5 hits per
   interceptor, not the journal's four shots; Stage 2 had four Doomscale
   Eggs and four Weakened Doomscales, not one per side.
+
+### Lessons from Red Hot and Deep Blue (96 pulls over three reports, one kill)
+
+- **Week-1 strategy is improvised; build on outcomes, not spots.** The
+  static mixed strategies (user), so no rule uses a clock spot or group.
+  Ownership comes from the log instead: who a cast targeted (`EnemyEvent.target`,
+  added for this boss) and which copy hit whom.
+- **Instance numbers are per caster.** Red Hot #5 and Deep Blue #5 fire in
+  the same volley, so a copy's identity is caster + instance. Keying on the
+  instance alone tripled the overlap errors with false pairs.
+- **A ground hazard's activation delay separates groups from stragglers.**
+  Cutback Blaze's fire lit 3.0-3.3s after its hit. Four or more players
+  burning at that moment is the party standing on the wrong side (one
+  player-less error); one or two late is individual. `analyze-report.js
+  after` measures this.
+- **No killing blow has four meanings here:** a called wipe (end of pull,
+  in bulk), a knockback into the deathwall (~2.6s after the knockback hit),
+  a Dark Knight's Walking Dead running out unhealed, and an unexplained
+  walk-off. `analyze-report.js nokb` lists them with their context.
+- **A cleanse can be the fatal hit.** Xtreme snaking auras removed at a
+  death were still cleanses (the opposite attack both cleansed and killed);
+  excluding death-time removals hid every overlapped-cleanse wipe.
+- **New tooling from this boss:** `profile`, `resolutions`, `nokb` and
+  `after` in `scripts/analyze-report.js` (docs/dev-tooling.md).
 
 ### Lessons from Ultimate Kefka (a late phase, 29 pulls, no kill)
 

@@ -68,6 +68,7 @@ import { detectKefkaSaysErrors } from "./mechanics/ffxiv/dancingmad/kefka-says";
 import type { KefkaSaysStateSignal } from "./mechanics/ffxiv/dancingmad/kefka-says";
 import { detectUltimateKefkaErrors } from "./mechanics/ffxiv/dancingmad/ultimate-kefka";
 import { detectVampFataleErrors } from "./mechanics/ffxiv/arcadion/vamp-fatale";
+import { detectRedHotDeepBlueErrors } from "./mechanics/ffxiv/arcadion/red-hot-deep-blue";
 import { detectWowEncounterErrors } from "./mechanics/wow/registry";
 import { buildPullPhaseSegments } from "./pull-phases";
 import { computeMechanicOccurrences } from "./mechanics/occurrences";
@@ -1232,6 +1233,7 @@ function fflBuildEnemyCastEvents(
       sourceInstance: e.sourceInstance,
       x:            e.sourceResources?.x,
       y:            e.sourceResources?.y,
+      target:       actorMap.get(e.targetID)?.type === "Player" ? actorMap.get(e.targetID)?.name : undefined,
     }));
 }
 
@@ -1567,6 +1569,7 @@ export function transformFFightToPull(
     ...detectKefkaSaysErrors(players, deathEvents, enemyCastEvents, kefkaSaysSignals),
     ...detectUltimateKefkaErrors(players, deathEvents, enemyCastEvents),
     ...detectVampFataleErrors(players, deathEvents, enemyCastEvents),
+    ...detectRedHotDeepBlueErrors(players, deathEvents, enemyCastEvents),
   ].sort((a, b) => a.timestamp - b.timestamp);
 
   const fightDurationMs = data.fight.endTime - data.fight.startTime;

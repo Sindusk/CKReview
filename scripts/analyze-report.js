@@ -43,6 +43,27 @@
 //                                  death (net of battle-rezzes) to the pull end,
 //                                  for N = 4..8 — sets the "N dead" marker
 //   players [pull]                 roster with spec/role (WoW) or job (FFXIV)
+//   profile <abilities>            per ability ID over all selected pulls:
+//                                  resolutions, how many players each hit
+//                                  (histogram), resolutions where one player
+//                                  took 2+ distinct instances (caster+instance:
+//                                  an overlap), resolutions with a death to it,
+//                                  and the kill's resolutions as the clean
+//                                  baseline (--gap ms, default 1500)
+//   resolutions <abilities>        one line per resolution: cast targets by
+//                                  caster#instance, each hit (player#instance,
+//                                  amount, HP% after), auras the player held
+//                                  (--auras <debuffs>), deaths within 4s
+//                                  (--gap ms, default 1500)
+//   nokb                           deaths with no killing blow: last 3 hits
+//                                  before (with HP%), how many no-killing-blow
+//                                  deaths within 10s, seconds to the pull end —
+//                                  separates called wipes from walls/knockbacks
+//   after <castAbilities> <debuffs>
+//                                  per cast cluster: players gaining the debuff
+//                                  --from..--to seconds after it (default 0..8),
+//                                  with each one's delay — e.g. who stood in
+//                                  ground fire a cast left behind
 //
 // Options (all commands):
 //   --pulls 1,3,5-8   only these pull numbers      --kill   only kills
@@ -198,6 +219,12 @@ const cluster = (items, at, gap) => {
 };
 const k = (n) => `${Math.round(n / 1000)}k`;
 const amountOf = (e) => (e.amount ?? 0) + (e.absorbed ?? 0);
+// Player hits that landed: FFLogs' "calculateddamage" previews only count
+// when unpaired (the hit killed before its "damage" record), as in the app.
+const landedHits = (P) => P.damageTaken.filter((e) => isPlayer(e.targetID) &&
+  (e.type === undefined || e.type === 'damage' || (e.type === 'calculateddamage' && e.unpaired === true)));
+// One copy of an ability: two bosses can reuse the same instance number.
+const instKey = (e) => `${e.sourceID}#${e.sourceInstance ?? 0}`;
 
 // ── commands ─────────────────────────────────────────────────────────────────
 
@@ -405,6 +432,93 @@ const commands = {
       const r = roleOf(P, ci.sourceID);
       console.log(`${nm(ci.sourceID).padEnd(20)} ${(r.role || '').padEnd(7)} ${r.label}`);
     }
+  },
+
+  profile(arg) {
+    const ids = abilityIds(arg);
+    const gap = Number(opts.gap ?? 1500);
+    const stat = new Map();
+    for (const p of selectedPulls()) {
+      const P = load(p);
+      for (const id of ids) {
+        for (const r of cluster(landedHits(P).filter((e) => e.abilityGameID === id), (e) => e.timestamp, gap)) {
+          const per = new Map();
+          for (const e of r) { if (!per.has(e.targetID)) per.set(e.targetID, new Set()); per.get(e.targetID).add(instKey(e)); }
+          const multi = [...per].filter(([, v]) => v.size > 1);
+          const died = P.deaths.some((d) => d.killingAbilityGameID === id && per.has(d.targetID) && d.timestamp >= r[0].timestamp && d.timestamp <= r[r.length - 1].timestamp + 3000);
+          let st = stat.get(id);
+          if (!st) stat.set(id, st = { res: 0, sizes: {}, multi: 0, deaths: 0, kill: [] });
+          st.res++; st.sizes[per.size] = (st.sizes[per.size] ?? 0) + 1;
+          if (multi.length) st.multi++;
+          if (died) st.deaths++;
+          if (P.kill) st.kill.push(`+${P.t(r[0].timestamp)} n=${per.size}${multi.length ? ' multi' : ''}`);
+        }
+      }
+    }
+    for (const [id, s] of stat) {
+      console.log(`${String(id).padEnd(8)} ${an(id).slice(0, 28).padEnd(28)} res=${s.res} sizes=${JSON.stringify(s.sizes)} ` +
+        `multiInstance=${s.multi} withDeaths=${s.deaths} | kill: ${s.kill.join('; ') || '-'}`);
+    }
+  },
+
+  resolutions(arg) {
+    const ids = abilityIds(arg);
+    const auras = opts.auras ? abilityIds(opts.auras) : new Set();
+    const gap = Number(opts.gap ?? 1500);
+    for (const p of selectedPulls()) {
+      const P = load(p);
+      const held = (pid, ts) => [...auras].filter((a) => {
+        const ev = P.debuffs.filter((e) => e.targetID === pid && e.abilityGameID === a && e.timestamp <= ts - 20);
+        return ev.length && ev[ev.length - 1].type !== 'removedebuff';
+      }).map(an);
+      for (const r of cluster(landedHits(P).filter((e) => ids.has(e.abilityGameID)), (e) => e.timestamp, gap)) {
+        const t0 = r[0].timestamp, t1 = r[r.length - 1].timestamp;
+        const targets = P.enemyCasts.filter((c) => c.type === 'cast' && ids.has(c.abilityGameID) && c.timestamp >= t0 - 2000 && c.timestamp <= t1 && isPlayer(c.targetID))
+          .map((c) => `${nm(c.sourceID)}#${c.sourceInstance ?? 0}>${nm(c.targetID)}`);
+        const hits = r.map((e) => {
+          const hp = e.targetResources?.maxHitPoints ? ` ${Math.round(100 * e.targetResources.hitPoints / e.targetResources.maxHitPoints)}%` : '';
+          const a = held(e.targetID, e.timestamp);
+          return `${nm(e.targetID)}#${e.sourceInstance ?? 0}:${k(amountOf(e))}${hp}${a.length ? '[' + a.join('/') + ']' : ''}`;
+        });
+        const died = P.deaths.filter((d) => isPlayer(d.targetID) && d.timestamp >= t0 && d.timestamp <= t1 + 4000).map((d) => `${nm(d.targetID)}(${an(d.killingAbilityGameID)})`);
+        console.log(`${p.boss} P${p.pullNumber}${P.kill ? 'K' : ''} +${P.t(t0)} ${an(r[0].abilityGameID)}${targets.length ? ' targets ' + targets.join(',') : ''} | ${hits.join(' ')}${died.length ? ' | DIED ' + died.join(', ') : ''}`);
+      }
+    }
+  },
+
+  nokb() {
+    for (const p of selectedPulls()) {
+      const P = load(p);
+      const silent = P.deaths.filter((d) => isPlayer(d.targetID) && !d.killingAbilityGameID);
+      for (const d of silent) {
+        const near = silent.filter((x) => Math.abs(x.timestamp - d.timestamp) <= 10000).length;
+        const last = landedHits(P).filter((e) => e.targetID === d.targetID && e.timestamp <= d.timestamp && e.timestamp >= d.timestamp - 8000).slice(-3)
+          .map((e) => `${an(e.abilityGameID)}@-${((d.timestamp - e.timestamp) / 1000).toFixed(1)}s${e.targetResources?.maxHitPoints ? ' ' + Math.round(100 * e.targetResources.hitPoints / e.targetResources.maxHitPoints) + '%' : ''}`);
+        console.log(`${p.boss} P${p.pullNumber}${P.kill ? 'K' : ''} +${P.t(d.timestamp)} ${nm(d.targetID)} within10s=${near} toEnd=${((P.end - d.timestamp) / 1000).toFixed(1)}s | ${last.join(' ; ') || '-'}`);
+      }
+    }
+  },
+
+  after(castArg, debuffArg) {
+    const casts = abilityIds(castArg), debuffs = abilityIds(debuffArg);
+    const from = Number(opts.from ?? 0) * 1000, to = Number(opts.to ?? 8) * 1000;
+    const hist = {};
+    for (const p of selectedPulls()) {
+      const P = load(p);
+      for (const g of cluster(P.enemyCasts.filter((e) => e.type === 'cast' && casts.has(e.abilityGameID)), (e) => e.timestamp, 3000)) {
+        const t = g[0].timestamp;
+        const first = new Map();
+        for (const e of P.debuffs) {
+          if (!debuffs.has(e.abilityGameID) || e.type !== 'applydebuff' || !isPlayer(e.targetID)) continue;
+          if (e.timestamp < t + from || e.timestamp > t + to || first.has(e.targetID)) continue;
+          first.set(e.targetID, e.timestamp);
+        }
+        hist[first.size] = (hist[first.size] ?? 0) + 1;
+        if (first.size) console.log(`${p.boss} P${p.pullNumber}${P.kill ? 'K' : ''} ${an(g[0].abilityGameID)} +${P.t(t)}: ${first.size} — ` +
+          [...first].map(([id, ts]) => `${nm(id)} +${((ts - t) / 1000).toFixed(1)}s`).join(', '));
+      }
+    }
+    console.log('players per cast:', JSON.stringify(hist));
   },
 };
 

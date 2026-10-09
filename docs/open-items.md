@@ -309,6 +309,28 @@ has the evidence.
 - **Third Brutal Rain deaths (pulls 5, 7)** are a player-less Raid
   (healing check). Should anyone be named?
 
+### Red Hot and Deep Blue (FFXIV)
+
+Reports jN3XDrf2z8PmLgRJ (A), xFAfGP3qX4yJhDrV (B), d3vRbwfpNBLzJ2Xh (C,
+kill = C4); no VOD review yet. Header of
+`lib/mechanics/ffxiv/arcadion/red-hot-deep-blue.ts` has the evidence.
+- **Overlap blame.** A bait (cone, circle, jump) hitting someone else
+  names both the owner and the victim. Pick one side once the VOD shows
+  who moved?
+- **Cutback group burns** (4+ players lighting up together) are one
+  player-less Minor. Should the Cutback target be named?
+- **Deep Impact on the party** names Deep Blue's tank (its auto-attack
+  target, else the Watersnaking tank). Right during snaking?
+- **Snaking Hot Impact on a non-tank** names the tank holding
+  Firesnaking; when neither tank had it, nobody. Right?
+- **Xtreme Wave deaths** at full HP to one dash are called a short
+  tether. Could they be a vulnerability from an earlier wave instead?
+- **Same-color Xtreme cleanses** flag every cleanser on the volley; with
+  the user's cleanse order known, only the out-of-turn ones could be.
+- **Not built:** Blue dash through the bubble (Vulnerability Down on the
+  Watery Grave is an enemy buff the module isn't given), Awesome Slab
+  membership, lethal Xtreme aura expiry (never seen).
+
 ### Dancing Mad (FFXIV)
 
 - **Phase 1 (graven-image / phase1.ts):**

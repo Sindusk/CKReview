@@ -200,4 +200,7 @@ export type EnemyEvent = {
   sourceInstance?: number;
   x?:              number;
   y?:              number;
+  // FFXIV casts: the player the cast targeted, when FFLogs names one (a
+  // bait's owner: Red Hot and Deep Blue's cones, circles and busters).
+  target?:         string;
 };
