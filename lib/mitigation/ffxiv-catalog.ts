@@ -170,6 +170,8 @@ export const FFXIV_MITIGATION_CATALOG: CatalogEntry[] = [
 
   // ── Astrologian ─────────────────────────────────────────────────────
   // A channel of up to 18s; the 10% lingers briefly after it ends.
+  // Astrologians cancel the channel almost at once and rely on the linger
+  // (user, 2026-10-09), so it is a generic mitigation, not situational.
   { key: "collective-unconscious", name: "Collective Unconscious", jobs: ["Astrologian"], actionIds: [3613],
     statuses: [pct(1000849, "Collective Unconscious", 0.10), pct(1000848, "Collective Unconscious", 0.10)],
     kind: "partyBuff", reach: "party", durationMs: 18_000, cooldownMs: 60_000, variableDuration: true, verified: true },
