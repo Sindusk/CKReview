@@ -15,13 +15,15 @@
 //     Listed, never given a mitigation change.
 //   - mechanic: short by more than MECHANIC_MARGIN. Listed, never given a
 //     mitigation change.
-//   - spare: over, with a droppable set left after the plan's moves.
-//     Information only, never an instruction.
+//   - spare: over, with a droppable set left after the plan's moves
+//     (situational entries left out). Information only, never an
+//     instruction.
 //
 // ── One change per hit ─────────────────────────────────────────────────
 // For a short or tight hit, every party mitigation in the roster that would
 // reach it (tank cooldowns too on a tank buster; shields only on
-// unaspected damage) is tried two ways:
+// unaspected damage; never a gated or situational one, such as Passage of
+// Arms) is tried two ways:
 //   - add: cast it at the hit. Fits a pull when it isn't already on the
 //     hit, the player is alive, and the cast breaks no later cast's
 //     cooldown (the same test as "free" in analyze.ts).
@@ -129,7 +131,7 @@ function refOf(row: AggregatedHit): PlanHitRef {
 
 /** Whether casting this entry could help this hit (see header). */
 function reaches(entry: CatalogEntry, row: AggregatedHit, player: string, tankOnly: boolean): boolean {
-  if (entry.inSheet === false || entry.gated) return false;
+  if (entry.inSheet === false || entry.gated || entry.situational) return false;
   if (entry.kind === "invuln" || entry.kind === "limitBreak" || entry.cooldownMs < DROP_MIN_COOLDOWN_MS) return false;
   if (row.damageColumn === "none" && entry.kind !== "shield") return false;
   if (entry.reach === "party") return true;
@@ -350,7 +352,8 @@ export function buildMitigationPlan(rows: AggregatedHit[], perPull: PerPull[], g
   for (const row of planned) {
     if (row.verdict !== "over") continue;
     const taken = removedFrom(row.id);
-    const items = row.droppable.keys.filter((k) => !taken.has(k)).map((k) => {
+    const items = row.droppable.keys
+      .filter((k) => !taken.has(k) && !game.catalog.find((e) => e.key === k)?.situational).map((k) => {
       const a = row.active.find((x) => x.key === k);
       const top = a && Object.entries(a.casters).sort((x, y) => y[1] - x[1])[0]?.[0];
       return { name: a?.name ?? k, player: top };

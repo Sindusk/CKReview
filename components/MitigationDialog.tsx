@@ -8,9 +8,10 @@
 // dying, and what could be dropped. No plan input and no PullErrors; this
 // replaced the Ikuya-sheet Heatmap and Review tabs on 2026-10-06.
 //
-// Two views: the Plan (components/MitigationPlan.tsx, lib/mitigation/plan.ts),
-// a short list of coordinated changes for the raid lead, read from all of
-// a group's pulls; and the full timeline (components/MitigationTimeline.tsx).
+// Two views: the full timeline (components/MitigationTimeline.tsx), the
+// default; and the opt-in Plan (components/MitigationPlan.tsx,
+// lib/mitigation/plan.ts), a short list of coordinated changes for the raid
+// lead, read from all of a group's pulls (user, 2026-10-09).
 // A role filter hides other roles' columns in the timeline and dims items
 // that don't involve that role in the plan. Both are for one boss
 // at a time (a Boss dropdown, defaulting to the current pull's boss), and
@@ -88,7 +89,7 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId }
     }));
   }, [open, analyzable]);
   const aggregate = useMemo(() => (allPulls ? aggregateMitigation(perPull, FFXIV_MITIGATION) : []), [allPulls, perPull]);
-  const [view, setView] = useState<"plan" | "timeline">("plan");
+  const [view, setView] = useState<"plan" | "timeline">("timeline");
   const [role, setRole] = useState<RoleFilter>("all");
   const plan = useMemo(() => {
     if (!allPulls || view !== "plan" || perPull.length < PLAN_MIN_PULLS) return null;
@@ -131,8 +132,8 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId }
         <>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
             <div style={{ display: "flex", gap: 4 }}>
-              <button className={`ck-tab ck-tab--sm${view === "plan" ? " ck-tab--active" : ""}`} onClick={() => setView("plan")}>Plan</button>
               <button className={`ck-tab ck-tab--sm${view === "timeline" ? " ck-tab--active" : ""}`} onClick={() => setView("timeline")}>Timeline</button>
+              <button className={`ck-tab ck-tab--sm${view === "plan" ? " ck-tab--active" : ""}`} onClick={() => setView("plan")}>Plan</button>
             </div>
             <span className="ck-label" style={{ margin: 0 }}>Boss</span>
             <select className="ck-field" value={boss} onChange={(e) => pickBoss(e.target.value)} style={{ padding: "3px 8px" }}>
