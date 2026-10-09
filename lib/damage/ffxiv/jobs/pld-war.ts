@@ -8,6 +8,12 @@
 // missed GCD. Fight or Flight is +25%, the FFLogs multiplier on a hit
 // with only it up. Not checked here: Oath gauge overcap (xivanalysis
 // reports it; it costs Holy Sheltrons, which is mitigation, not damage).
+// Rechecked on 2T1HzdPKgbhM43am Dancing Mad fight 10 (2026-10-08): its 6
+// missed GCDs and 10 missed fillers match these windows (the last window,
+// cut by the kill, is skipped here). Its one missed Requiescat window was
+// the Confiteor chain held past the P1 HP check into P2, which is right;
+// its lost Expiacion / Circle of Scorn / Intervene uses were held across
+// downtime into the next Fight or Flight.
 //
 // Fight or Flight, ported from
 // xivanalysis src/parser/jobs/pld/modules/FightOrFlight.tsx: 8 GCDs;
