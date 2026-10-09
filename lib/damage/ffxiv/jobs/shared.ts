@@ -248,8 +248,99 @@ export function uptimeFindings(ctx: PlayerCheckContext, spec: UptimeSpec): Damag
 // its first application, less forced time, ignoring gaps under one GCD +
 // 1s (time to reapply). Clipping: a refresh with time left overwrites it.
 // Lost damage is in the player's own average tick (ticks every 3s).
+//
+// With a filler (healers), each application is valued instead of the
+// seconds it overwrote: what it added = its direct hit + its ticks on that
+// enemy after the previous application would have run out, until it ran
+// out itself or the status came off (the enemy left or died). Below the
+// filler's average at the same buff state (in or out of raid buffs), it
+// loses the difference: a cast of the filler would have done more. That
+// covers both early refreshes and a DoT left on an enemy about to leave:
+// on jN3XDrf2z8PmLgRJ Vamp pull 8 the AST's Combust III at 0:57 added 3
+// ticks (25k) before the boss left for 20s, against a 30k Fall Malefic
+// (xivanalysis listed its 20s "invulnerable"). An application whose run
+// reaches the end of a wipe's analysis is skipped (unknowable); on a kill
+// it counts. The DoTs are instants: when moving, no filler was possible,
+// which the basis says.
 
-export type DotSpec = { statusIds: number[]; name: string; durationMs: number };
+export type DotSpec = {
+  statusIds:   number[];
+  name:        string;
+  durationMs:  number;
+  fillerId?:   (ctx: PlayerCheckContext) => { id: number; name: string } | undefined;
+};
+
+const DOT_CAST_MS = 1_500;   // cast → status applied
+const DOT_HIT_MS = 2_000;    // cast → its direct hit
+const DOT_SILENT_MS = 4_500; // no tick for longer than a tick and a half
+const DOT_MIN_SHORTFALL = 0.05; // under 5% of a filler is noise (crit variance)
+
+function dotApplicationFindings(ctx: PlayerCheckContext, spec: DotSpec, filler: { id: number; name: string }): DamageFinding[] {
+  const out: DamageFinding[] = [];
+  const ids = new Set(spec.statusIds);
+  const events = (ctx.pull.bossDebuffs ?? [])
+    .filter((e) => ids.has(e.statusId) && e.sourceName === ctx.player.name)
+    .sort((a, b) => a.timestamp - b.timestamp);
+  const keyOf = (e: { targetActorId?: number; targetInstance?: number }) => `${e.targetActorId}.${e.targetInstance ?? 1}`;
+  // An invulnerable enemy still logs ticks, for 0 (Chaos on dQ8wmb1VhKt6yBXk
+  // P3): those aren't ticks the DoT got.
+  const ticks = ctx.player.damageDone.filter((e) => ids.has(e.abilityId) && (e.amount ?? 0) > 0);
+  const fillerHits = ctx.player.damageDone.filter((e) => e.abilityId === filler.id && !e.isDoT);
+  const fillerAvg = (buffed: boolean) => {
+    const own = fillerHits.filter((e) => inWindows(e.timestamp, ctx.buffWindows) === buffed);
+    const pool = own.length >= 3 ? own : fillerHits;
+    return pool.length ? pool.reduce((a, e) => a + (e.amount ?? 0), 0) / pool.length : 0;
+  };
+  const dotCasts = ctx.player.casts.filter((c) => ctx.game.action(c.abilityId)?.appliesStatusIds.some((id) => ids.has(id)));
+  const lastApply = new Map<string, number>();
+  for (let i = 0; i < events.length; i++) {
+    const e = events[i];
+    const key = keyOf(e);
+    if (e.status === "removed") { lastApply.delete(key); continue; }
+    const prev = lastApply.get(key);
+    lastApply.set(key, e.timestamp);
+    if (e.timestamp >= ctx.endMs) continue;
+    const from = prev === undefined ? e.timestamp : Math.max(e.timestamp, prev + spec.durationMs);
+    const removal = events.slice(i + 1).find((x) => x.status === "removed" && keyOf(x) === key)?.timestamp ?? Infinity;
+    const runsOut = e.timestamp + spec.durationMs;
+    const until = Math.min(runsOut, removal, ctx.endMs);
+    if (until === ctx.endMs && ctx.pull.result !== "Kill") continue;
+    const added = ticks.filter((t) => keyOf(t) === key && t.timestamp > from && t.timestamp <= until + 500);
+    const cast = [...dotCasts].reverse().find((c) => c.timestamp <= e.timestamp && e.timestamp - c.timestamp <= DOT_CAST_MS);
+    const direct = cast ? ctx.player.damageDone.filter((h) => h.abilityId === cast.abilityId && !h.isDoT &&
+      !ctx.game.isTickAbility(h.abilityId) && keyOf(h) === key && h.timestamp >= cast.timestamp && h.timestamp <= cast.timestamp + DOT_HIT_MS) : [];
+    const gained = [...added, ...direct].reduce((a, h) => a + (h.amount ?? 0), 0);
+    const castAt = cast?.timestamp ?? e.timestamp;
+    const buffed = inWindows(castAt, ctx.buffWindows);
+    const fill = fillerAvg(buffed);
+    if (fill <= 0 || fill - gained < fill * DOT_MIN_SHORTFALL) continue;
+    const forced = forcedPart(castAt - 1, castAt + 1, ctx.forced);
+    // Why it fell short: an early refresh, or the enemy stopped taking
+    // ticks (it left, went invulnerable or died) before the DoT ran out.
+    const n = `${added.length} new tick${added.length === 1 ? "" : "s"}`;
+    const lastTick = ticks.filter((t) => keyOf(t) === key && t.timestamp > e.timestamp && t.timestamp <= until + 500).pop()?.timestamp ?? e.timestamp;
+    const silent = until - lastTick;
+    const left = prev !== undefined ? prev + spec.durationMs - e.timestamp : 0;
+    const cut = runsOut - until;
+    const why = [
+      left > 0 ? `refreshed with ${s(left)} left` : undefined,
+      silent >= DOT_SILENT_MS && cut < 1_000 ? `${e.targetName} took no ticks for the last ${s(silent)} (out of reach or invulnerable)` : undefined,
+      cut >= 1_000 ? (until === ctx.endMs || removal >= ctx.endMs - 1_000 ? `the pull ended ${s(cut)} before it ran out`
+        : `it came off ${e.targetName} ${s(cut)} before it ran out (the enemy died or left)`) : undefined,
+    ].filter(Boolean).join("; ") || "few ticks";
+    out.push(finding(ctx, {
+      kind: "dot-clip", startMs: castAt, endMs: until, forced: forced.ms > 0,
+      cause: forced.ms > 0 ? forced.cause : undefined,
+      label: `${spec.name} worth less than ${filler.name}`,
+      lostDamage: fill - gained,
+      basis: `${k(fill)} average ${filler.name}${buffed ? " in raid buffs" : ""} − ${k(gained)} the ${spec.name} added ` +
+        `(its ticks after the previous one would have run out${direct.length ? ", plus its hit" : ""}); ` +
+        `${spec.name} is instant, so if you were moving no ${filler.name} was possible`,
+      detail: `${spec.name} added ${k(gained)} (${n}), less than a ${filler.name}: ${why}`,
+    }));
+  }
+  return out;
+}
 
 const DOT_TICK_MS = 3_000;
 
@@ -308,6 +399,8 @@ export function dotFindings(ctx: PlayerCheckContext, spec: DotSpec): DamageFindi
     }
     cursor = Math.max(cursor, w.endMs);
   }
+  const filler = spec.fillerId?.(ctx);
+  if (filler) return [...out, ...dotApplicationFindings(ctx, spec, filler)];
   for (const [phaseId, c] of clips) {
     if (c.ms < DOT_CLIP_FINDING_MS) continue;
     out.push(finding(ctx, {

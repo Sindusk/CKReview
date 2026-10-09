@@ -511,6 +511,15 @@ grouped by exact roster. The module headers hold the rules.
 
   Our Combust III clipping is lower than xivanalysis's because it's per
   target.
+- **Healer DoT applications are valued against the filler** (user,
+  2026-10-08): ticks added past the previous application's expiry, plus
+  the hit, against an average filler cast. This replaces "seconds
+  clipped" for healers. It also catches a DoT left on an enemy that
+  leaves, goes invulnerable (0-damage ticks) or dies. Open questions:
+  - movement: the DoT is instant, so a refresh while moving cost little.
+    The finding says so but still counts it (Dia refreshes with 25s left
+    are common on dQ8wmb1VhKt6yBXk). Needs VOD checks.
+  - a kill's last refresh counts, valued only to the kill.
 - **Per-player busy windows** (tower soaks, debuff carriers, baits) aren't
   in the Dancing Mad context. Gaps during a mechanic are labelled but
   still counted. Candidate: the DRK's 4.6–4.9s idle after LB3 during Limit

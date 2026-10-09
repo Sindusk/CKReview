@@ -36,8 +36,10 @@
 //   8: its missed Lightspeed (Divination at 4:08) isn't a finding of its
 //   own; what it cost (a cancelled cast, the gap weaving the burst) is
 //   already in the GCD gaps. Its Combust III clipping (9.8s a minute) is
-//   higher than ours because ours is per target: a refresh on another
-//   enemy isn't a clip.
+//   higher than our seconds were because ours is per target: a DoT on a
+//   second enemy isn't a clip.
+// - Healer DoTs are valued per application against the filler
+//   (shared.ts dotFindings with fillerId), not by seconds overwritten.
 // White Mage and Sage are unverified: no sample pull has either.
 //
 //   Copyright (c) 2018 Saxon Landers & contributors
@@ -58,7 +60,7 @@ const clock = (ms: number) => {
 };
 
 /** The healer's damage filler: most-cast damage GCD with no cooldown of its own. */
-function filler(ctx: PlayerCheckContext): { name: string; value: number } {
+function filler(ctx: PlayerCheckContext): { id?: number; name: string; value: number } {
   const kinds = gcdKinds(ctx.player, ctx.pull, ctx.uses);
   const counts = new Map<number, { name: string; n: number }>();
   for (const u of ctx.uses) {
@@ -68,7 +70,7 @@ function filler(ctx: PlayerCheckContext): { name: string; value: number } {
     counts.set(u.action.id, c);
   }
   const top = [...counts.entries()].sort((a, b) => b[1].n - a[1].n)[0];
-  return top ? { name: top[1].name, value: ctx.values.perUse(top[0]) } : { name: "damage GCD", value: 0 };
+  return top ? { id: top[0], name: top[1].name, value: ctx.values.perUse(top[0]) } : { name: "damage GCD", value: 0 };
 }
 
 const healGcds: JobCheck = (ctx): DamageFinding[] => {
@@ -168,6 +170,10 @@ const dot = (key: string, ...more: string[]): JobCheck => (ctx) => dotFindings(c
   statusIds: [key, ...more].map((x) => S[x].id),
   name: S[key].name,
   durationMs: S[key].duration ?? 30_000,
+  fillerId: (c) => {
+    const f = filler(c);
+    return f.id === undefined ? undefined : { id: f.id, name: f.name };
+  },
 });
 
 const divination: JobCheck = (ctx) => burstWindowFindings(ctx, {
