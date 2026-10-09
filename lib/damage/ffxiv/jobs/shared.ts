@@ -430,6 +430,12 @@ export function dotFindings(ctx: PlayerCheckContext, spec: DotSpec): DamageFindi
       if (o) { windows.push({ startMs: o.start, endMs: e.timestamp }); open.delete(key); }
       continue;
     }
+    // Ran out with no removal logged: close it at its expiry.
+    if (o && e.timestamp > o.lastApply + spec.durationMs) {
+      windows.push({ startMs: o.start, endMs: o.lastApply + spec.durationMs });
+      open.set(key, { start: e.timestamp, lastApply: e.timestamp });
+      continue;
+    }
     if (o) {
       const left = spec.durationMs - (e.timestamp - o.lastApply);
       if (left > 0) {
@@ -445,7 +451,10 @@ export function dotFindings(ctx: PlayerCheckContext, spec: DotSpec): DamageFindi
       open.set(key, { start: e.timestamp, lastApply: e.timestamp });
     }
   }
-  for (const o of open.values()) windows.push({ startMs: o.start, endMs: ctx.endMs });
+  // No removal logged (the enemy left at a phase change, 2T1HzdPKgbhM43am
+  // fight 10's Exdeath at 11:55): it ran at most its duration, not to the
+  // end of the pull, which hid every later gap.
+  for (const o of open.values()) windows.push({ startMs: o.start, endMs: Math.min(ctx.endMs, o.lastApply + spec.durationMs) });
 
   const active = mergeWindows(windows);
   const forced = mergeWindows(ctx.forced);

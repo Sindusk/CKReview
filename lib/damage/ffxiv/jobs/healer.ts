@@ -37,7 +37,12 @@
 //   own; what it cost (a cancelled cast, the gap weaving the burst) is
 //   already in the GCD gaps. Its Combust III clipping (9.8s a minute) is
 //   higher than our seconds were because ours is per target: a DoT on a
-//   second enemy isn't a clip.
+//   second enemy isn't a clip. Rechecked on 2T1HzdPKgbhM43am Dancing Mad
+//   fight 10 (2026-10-09): its 82.7% Combust uptime exposed a bug (a DoT
+//   with no logged removal ran to the end of the pull, hiding the 12s
+//   gaps at 13:54 and 16:59); its 10 interrupted casts and 1 Gravity II
+//   match. Its Earthly Star hold (1 use) isn't built: the star is placed
+//   for the heal plan, and its damage logs under the Stellar ids.
 // - Healer DoTs are valued per application against the filler
 //   (shared.ts dotFindings with fillerId), not by seconds overwritten.
 // White Mage and Sage are unverified: no sample pull has either.
