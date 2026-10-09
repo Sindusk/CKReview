@@ -670,7 +670,7 @@ function printDamageAnalysis(mod, pulls, game) {
       }
       for (const p of a.players) {
         console.log(`  ${p.job.padEnd(12)} ${p.player.padEnd(18)} dealt ${M(p.damage).padStart(7)} lost ${M(p.lostDamage).padStart(6)}` +
-          ` (forced ${M(p.forcedDamage)}) uptime ${(p.gcdUptime.pct * 100).toFixed(1)}% of ${t(p.gcdUptime.eligibleMs)}, GCD ${t(p.baseGcdMs)} x${p.gcds}, in buffs ${p.buffWindowGcds.used}/${p.buffWindowGcds.fit}` +
+          ` (forced ${M(p.forcedDamage)}) uptime ${(p.gcdUptime.pct * 100).toFixed(1)}% of ${t(p.gcdUptime.eligibleMs)}, GCD ${t(p.baseGcdMs)} x${p.gcds}` +
           `, buffs given ${p.buffs.approximate ? '~' : ''}${M(p.buffs.given)} received ${M(p.buffs.received)}` +
           `${p.gcdSplit.heal ? `, heal GCDs ${p.gcdSplit.heal}/${p.gcdSplit.heal + p.gcdSplit.damage}` : ''}`);
         const shown = all ? p.findings : p.findings.filter((f) => !f.forced).slice(0, 4);

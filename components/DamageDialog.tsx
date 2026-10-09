@@ -320,33 +320,52 @@ function PlayerDetail({ summary, analysis, colorFor }: { summary: PlayerDamageSu
   const shown = summary.findings.filter((f) => f.lostDamage >= 1 || f.kind === "interrupted-cast");
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 8 }}>
         <span style={{ color: colorFor(summary.player, summary.job), fontSize: 15, fontWeight: 600 }}>{summary.player}</span>
         <span style={{ color: "var(--ck-text-3)", fontSize: 12 }}>{summary.job}</span>
-        <span className="ck-help" style={{ margin: 0 }}
-          title="GCD locks over the time this player was alive and the boss was targetable (deaths, untargetable time and limit breaks excluded)">
-          GCD uptime <span className="ck-num" style={{ color: "var(--ck-text)", fontWeight: 600 }}>{fmtUptime(summary.gcdUptime.pct)}</span>
-          {" "}of <span className="ck-num">{fmtTime(summary.gcdUptime.eligibleMs)}</span> alive and targetable ·
-          GCD <span className="ck-num">{(summary.baseGcdMs / 1000).toFixed(2)}s</span> · {summary.gcds} GCDs ·
-          in raid buffs <span className="ck-num">{summary.buffWindowGcds.used}/{summary.buffWindowGcds.fit}</span> that fit
-          {summary.gcdSplit.heal > 0 && <>
-            {" "}· heal GCDs <span className="ck-num">{summary.gcdSplit.heal}</span> vs damage{" "}
-            <span className="ck-num">{summary.gcdSplit.damage}</span>
-          </>}
-        </span>
       </div>
-      <div className="ck-help" style={{ margin: "-4px 0 8px" }}
-        title="The rDPS split: own damage excludes what others' buffs added; buffs given is what this player's buffs added to the party">
-        Own damage <span className="ck-num">{fmtDamage(summary.damage - summary.buffs.received)}</span>
-        {" "}· buffs given to the party <span className="ck-num">{summary.buffs.approximate ? "≈" : ""}{fmtDamage(summary.buffs.given)}</span>
-        {" "}· received <span className="ck-num">{summary.buffs.approximate ? "≈" : ""}{fmtDamage(summary.buffs.received)}</span>
-      </div>
+      <StatRow stats={[
+        { label: "Uptime", value: fmtUptime(summary.gcdUptime.pct),
+          title: `GCD locks over ${fmtTime(summary.gcdUptime.eligibleMs)} alive and targetable (deaths, untargetable time and limit breaks excluded)` },
+        { label: "GCDs", value: String(summary.gcds) },
+        { label: "GCD speed", value: `${(summary.baseGcdMs / 1000).toFixed(2)}s` },
+        ...(summary.gcdSplit.heal > 0 ? [{
+          label: "Heal GCDs", value: `${summary.gcdSplit.heal} of ${summary.gcdSplit.heal + summary.gcdSplit.damage}`,
+          title: "GCDs that healed or shielded, of all heal and damage GCDs",
+        }] : []),
+      ]} />
+      <StatRow stats={[
+        { label: "Own damage", value: fmtDamage(summary.damage - summary.buffs.received),
+          title: "The rDPS split: this player's damage without what others' buffs added" },
+        { label: "Buffs given", value: summary.buffs.given > 0 ? approx(summary, fmtDamage(summary.buffs.given)) : "—",
+          title: "What this player's party buffs added to everyone else's damage" },
+        { label: "Received", value: approx(summary, fmtDamage(summary.buffs.received)),
+          title: "What others' buffs added to this player's damage" },
+      ]} />
       <TimelineStrip summary={summary} analysis={analysis} />
       {shown.length === 0 ? (
         <p className="ck-dialog-text" style={{ marginTop: 12 }}>Nothing found for this player.</p>
       ) : (
         <FindingGroups findings={shown} />
       )}
+    </div>
+  );
+}
+
+// ≈ only on values that include estimated crit / direct-hit buff shares.
+const approx = (s: PlayerDamageSummary, v: string) => (s.buffs.approximate ? `≈${v}` : v);
+const APPROX_NOTE = "; ≈ includes crit and direct-hit buffs, estimated";
+
+// A row of small stats, label above value; wraps on narrow widths.
+function StatRow({ stats }: { stats: { label: string; value: string; title?: string }[] }) {
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 22px", marginBottom: 8 }}>
+      {stats.map((s) => (
+        <div key={s.label} title={s.title && s.value.startsWith("≈") ? s.title + APPROX_NOTE : s.title} style={{ cursor: s.title ? "help" : undefined }}>
+          <div style={{ color: "var(--ck-text-3)", fontSize: 11 }}>{s.label}</div>
+          <div className="ck-num" style={{ color: "var(--ck-text)", fontSize: 13, fontWeight: 600 }}>{s.value}</div>
+        </div>
+      ))}
     </div>
   );
 }

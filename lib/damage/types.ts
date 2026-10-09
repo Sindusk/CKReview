@@ -214,8 +214,6 @@ export type PlayerDamageSummary = {
   // GCD locks over the time the player was alive, the boss targetable and
   // no limit break running (timeline.ts gcdUptime). pct is 0-1.
   gcdUptime:     { pct: number; activeMs: number; eligibleMs: number };
-  // GCD starts inside raid-buff windows vs how many fit.
-  buffWindowGcds: { used: number; fit: number };
   // GCDs by what they did: heal (landed heals or shields), damage, other
   // (raises, Esuna). The healer headline: heal GCDs against damage taken.
   gcdSplit:      { heal: number; damage: number; other: number };

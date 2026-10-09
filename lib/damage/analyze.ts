@@ -24,7 +24,7 @@ import {
   type PlayerCheckContext,
 } from "./checks";
 import {
-  deadWindows, gcdKinds, gcdUptime, gcdUses, inWindows, limitBreakWindows, playerValues, raidBuffWindows, raidDowntime,
+  deadWindows, gcdKinds, gcdUptime, gcdUses, limitBreakWindows, playerValues, raidBuffWindows, raidDowntime,
   speedProfile, statusWindows, wipeCollapseMs, type Window,
 } from "./timeline";
 import { buildBuffLedger, checkBuffCoverage } from "./buffs";
@@ -110,10 +110,6 @@ export function analyzePullDamage(pull: Pull, game: DamageGame, context?: Damage
     const kinds = gcdKinds(player, pull, uses);
     const gcdSplit = { heal: 0, damage: 0, other: 0 };
     for (const u of uses) if (u.startMs < endMs) gcdSplit[kinds.get(u.action.id) ?? "other"]++;
-    const used = uses.filter((u) => u.startMs < endMs && inWindows(u.startMs, buffWindows)).length;
-    // At the speed the player had in the window (haste windows are faster).
-    const fit = buffWindows.reduce((n, w) =>
-      n + Math.floor((Math.min(w.endMs, endMs) - w.startMs) / (speed.baseRecastMs * speed.at(w.startMs))), 0);
     players.push({
       player: player.name, job, role: player.role,
       damage: values.total,
@@ -122,7 +118,6 @@ export function analyzePullDamage(pull: Pull, game: DamageGame, context?: Damage
       gcds: uses.filter((u) => u.startMs < endMs).length,
       baseGcdMs: ctx.baseGcdMs,
       gcdUptime: gcdUptime(uses, speed.at, [...downtime, ...dead, ...limitBreakWindows(uses)], endMs),
-      buffWindowGcds: { used, fit },
       gcdSplit,
       buffs: ledger.contributions.get(player.name) ?? { given: 0, received: 0, approximate: false },
       findings,
