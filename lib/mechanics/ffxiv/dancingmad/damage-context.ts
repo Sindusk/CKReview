@@ -19,6 +19,14 @@
 // held the Confiteor chain for P2); P4 under 25% at +859.5, 17.35% at the
 // final Upsurge (+868.4).
 //
+// The end of P3 is a hold: groups stop attacking at Stompies, with both
+// bosses low, to time the transition so cooldowns are back for P4 (user,
+// 2026-10-08: "This is common"). The P3 pool is fixed, so the hold costs
+// nothing. Forced from Stompies' start marker (Kefka's Earthquake just
+// before Exdeath's Blizzard III bait, stompies.ts) to the end of P3. On
+// 2T1HzdPKgbhM43am fight 10 the marker is +694.3 and players' last hits
+// fall +691-703, with Chaos at 0.4% and Exdeath at 2%.
+//
 // Forced downtime: the transitions and untargetable stretches come from
 // the engine's log-inferred raid downtime. Per-player busy windows (tower
 // soakers, debuff carriers, baits) are the next step; until then a gap
@@ -39,6 +47,10 @@ const RULE_KEY_LABELS: Record<string, string> = {
 
 // The HP share Kefka must be under, by phase.
 const HP_CHECKS: Record<number, number> = { 1: 0.15, 4: 0.25 };
+
+const EARTHQUAKE = 47866;          // Stompies' start marker when Kefka casts it
+const STOMPIES_BAIT = 47887;       // Exdeath's Blizzard III bait, Stompies wave 1
+const MARKER_LOOKBACK_MS = 15_000;
 
 export const DANCING_MAD_DAMAGE_CONTEXT: DamageContext = {
   encounter: "Dancing Mad",
@@ -63,6 +75,15 @@ export const DANCING_MAD_DAMAGE_CONTEXT: DamageContext = {
           .reduce<number | undefined>((min, e) => (min === undefined || e.timestamp < min ? e.timestamp : min), undefined);
         if (crossed !== undefined) out.push({ startMs: crossed, endMs: span.endMs, cause: `P${phase} check passed: Kefka under ${line * 100}%` });
       }
+    }
+    // The end-of-P3 hold, from Stompies' start to the end of the phase.
+    const casts = pull.enemyCasts ?? [];
+    for (const span of phaseSpans(pull, 3)) {
+      const bait = casts.find((e) => e.abilityId === STOMPIES_BAIT && e.timestamp >= span.startMs && e.timestamp <= span.endMs);
+      if (!bait) continue;
+      const marker = casts.filter((e) => e.abilityId === EARTHQUAKE && e.actorName === "Kefka"
+        && e.timestamp <= bait.timestamp && e.timestamp >= bait.timestamp - MARKER_LOOKBACK_MS).pop();
+      out.push({ startMs: marker?.timestamp ?? bait.timestamp, endMs: span.endMs, cause: "end-of-P3 hold for P4 timing (Stompies)" });
     }
     return out;
   },

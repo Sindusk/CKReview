@@ -52,6 +52,9 @@ differ from the FFLogs fight id. In one report, "pull 11" was fight 12.
      damage past the line is wasted, and the damage context marks that
      stretch forced. Holding burst past the line for the next phase is
      correct play (a Paladin's Confiteor chain at the end of P1).
+   - Groups also hold DPS at the end of P3 (Stompies) to time the
+     transition so cooldowns are back for P4. P3's pool is fixed, so that
+     stretch is forced too.
    - So resources pooled for the final phase are free, as long as earlier
      damage checks still pass.
 2. **Compare equal windows (`window`).** Measure every log over the same
