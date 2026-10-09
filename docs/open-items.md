@@ -533,6 +533,17 @@ grouped by exact roster. The module headers hold the rules.
   - Soul gauge, because casts don't account for all gains
   - AoE on too few targets, which needs per-job AoE → single-target pairs
     (Whorl of Death at 5:00 hit 2)
+- **Red Mage, Vamp kill.** Already matched: deaths, the 17 cancelled
+  casts, the out-of-order combo and the expired Verfire. New, all
+  matching xivanalysis:
+  - Mana Stacks dropped: Grand Impact after Redoublement at 5:04 lost the
+    whole finisher chain, about 156k
+  - Dualcast spent on an instant (Enchanted Riposte at 4:59)
+  - Verfire / Verstone procs overwritten (4 + 5)
+
+  Not built: White Mana overcap (3 mana). Our cooldown drift counts
+  fewer lost Fleche / Contre Sixte / Corps-a-corps uses than its x/y
+  (whole lost uses, dead time forced).
 - **Healer DoT applications are valued against the filler** (user,
   2026-10-08), two ways:
   - an early refresh on an enemy that stays costs (seconds left ÷ 30s)

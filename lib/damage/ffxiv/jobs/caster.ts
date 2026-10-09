@@ -23,7 +23,8 @@
 //     (the PCT starts Hammer Time at the window's end, after a second
 //     Subtractive round). Consistent across pulls, so likely a chosen
 //     line; confirm with the player before treating it as a loss.
-// Black Mage, Summoner, Red Mage (unverified, no sample has them):
+// Red Mage: see its section below.
+// Black Mage, Summoner (unverified, no sample has them):
 //   - BLM High Thunder / High Thunder II uptime and clipping (DoTs.tsx).
 //   - SMN Searing Light with one Searing Flash (SearingLight.tsx).
 //   - Cooldowns for all three in tracked-cooldowns.ts.
@@ -86,7 +87,85 @@ const searingLight: JobCheck = (ctx) => burstWindowFindings(ctx, {
   expected: () => [{ ids: ids("SEARING_FLASH"), count: 1, name: "Searing Flash" }],
 });
 
+// ── Red Mage ───────────────────────────────────────────────────────────
+// Checked against xivanalysis on jN3XDrf2z8PmLgRJ Vamp pull 8 (its
+// deaths, 17 cancelled casts, out-of-order combo and expired Verfire were
+// already found). Each value is an estimate, so marked inference:
+// - Mana Stacks: the enchanted combo's last hit (Redoublement, Moulinet
+//   Trois) leaves 3 stacks for Verflare / Verholy → Scorch → Resolution. Any
+//   other GCD next drops them and the whole finisher chain: the three's
+//   averages minus three average GCDs. (Grand Impact at 5:04 on the kill.)
+// - Dualcast spent on an instant GCD (enchanted melee, Grand Impact): the
+//   free hardcast is gone, worth a Verthunder / Veraero III over a Jolt III.
+// - Verfire / Verstone Ready refreshed by a cast while held: one proc lost,
+//   a Verfire over the Jolt III cast instead (its 5 mana not valued).
+//   Matches xivanalysis's 4 + 5; the opener's two (Verthunder III under
+//   Swiftcast and Acceleration) and finisher refreshes count too.
+const FINISHERS = ids("VERFLARE", "VERHOLY");
+const BASE_CAST_MS = new Map(Object.values(A).map((a) => [a.id, a.castTime ?? 0]));
+const COMBO_ENDS = ids("ENCHANTED_REDOUBLEMENT", "ENCHANTED_MOULINET_TROIS");
+
+const manaStacks: JobCheck = (ctx): DamageFinding[] => {
+  const out: DamageFinding[] = [];
+  const ends = new Set(COMBO_ENDS), fin = new Set(FINISHERS);
+  const chain = best(ctx, FINISHERS) + ctx.values.perUse(A.SCORCH.id) + ctx.values.perUse(A.RESOLUTION.id);
+  ctx.uses.forEach((u, i) => {
+    const next = ctx.uses[i + 1];
+    if (!ends.has(u.action.id) || !next || next.startMs >= ctx.endMs || fin.has(next.action.id)) return;
+    if (ctx.dead.some((d) => d.startMs >= u.startMs && d.startMs <= next.startMs)) return;
+    const plain = 3 * ctx.values.gcdValue(ctx.phaseOf(next.startMs), false);
+    out.push(finding(ctx, {
+      kind: "combo-broken", startMs: next.startMs, endMs: next.startMs, forced: false, inference: true,
+      label: "Mana Stacks dropped",
+      lostDamage: Math.max(0, chain - plain),
+      basis: `${k(chain)} for Verflare / Verholy + Scorch + Resolution (averages) − ${k(plain)} for three average GCDs`,
+      detail: `${next.abilityName} after ${u.abilityName} dropped the Mana Stacks and the finisher chain`,
+    }));
+  });
+  return out;
+};
+
+const dualcastWasted: JobCheck = (ctx): DamageFinding[] => {
+  const out: DamageFinding[] = [];
+  const value = Math.max(0, best(ctx, ids("VERTHUNDER_III", "VERAERO_III")) - ctx.values.perUse(A.JOLT_III.id));
+  for (const e of ctx.player.buffs ?? []) {
+    if (e.abilityId !== S.DUALCAST.id || e.buffStatus !== "removed" || e.timestamp >= ctx.endMs) continue;
+    const used = ctx.uses.find((u) => Math.abs(u.startMs - e.timestamp) <= 100);
+    // A spell with a base cast time is what Dualcast is for.
+    if (!used || (BASE_CAST_MS.get(used.action.id) ?? 0) > 0) continue;
+    out.push(finding(ctx, {
+      kind: "proc-lost", startMs: e.timestamp, endMs: e.timestamp, forced: false, inference: true,
+      label: `Dualcast spent on ${used.abilityName}`,
+      lostDamage: value,
+      basis: `a free Verthunder / Veraero III (${k(best(ctx, ids("VERTHUNDER_III", "VERAERO_III")))}) over a Jolt III (${k(ctx.values.perUse(A.JOLT_III.id))})`,
+      detail: `${used.abilityName} used up Dualcast; it's instant anyway`,
+    }));
+  }
+  return out;
+};
+
+const verprocOverwrites: JobCheck = (ctx): DamageFinding[] => {
+  const out: DamageFinding[] = [];
+  const procs = new Map([[S.VERFIRE_READY.id, A.VERFIRE.id], [S.VERSTONE_READY.id, A.VERSTONE.id]]);
+  for (const e of ctx.player.buffs ?? []) {
+    const spell = procs.get(e.abilityId);
+    if (spell === undefined || e.buffStatus !== "refreshed" || e.source !== ctx.player.name || e.timestamp >= ctx.endMs) continue;
+    const cast = ctx.player.casts.find((c) => Math.abs(c.timestamp - e.timestamp) <= 100);
+    if (!cast) continue;
+    const value = Math.max(0, ctx.values.perUse(spell) - ctx.values.perUse(A.JOLT_III.id));
+    out.push(finding(ctx, {
+      kind: "proc-lost", startMs: e.timestamp, endMs: e.timestamp, forced: false, inference: true,
+      label: `${e.abilityName} overwritten`,
+      lostDamage: value,
+      basis: `a ${A[spell === A.VERFIRE.id ? "VERFIRE" : "VERSTONE"].name} (${k(ctx.values.perUse(spell))}) over the Jolt III cast instead ` +
+        `(${k(ctx.values.perUse(A.JOLT_III.id))}); its 5 mana isn't valued`,
+      detail: `${cast.abilityName} gave ${e.abilityName} while one was still held`,
+    }));
+  }
+  return out;
+};
+
 export const PCT_CHECKS: JobCheck[] = [starryMuse, starryFillers];
 export const BLM_CHECKS: JobCheck[] = [highThunder];
 export const SMN_CHECKS: JobCheck[] = [searingLight];
-export const RDM_CHECKS: JobCheck[] = [];
+export const RDM_CHECKS: JobCheck[] = [manaStacks, dualcastWasted, verprocOverwrites];
