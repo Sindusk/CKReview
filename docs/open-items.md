@@ -499,6 +499,18 @@ grouped by exact roster. The module headers hold the rules.
   actions it expected, and its potion module isn't vendored. The second
   potion lacks Salted Earth, which came up at 6:47 and went in at 6:55,
   3s after the potion ended.
+- **Astrologian, same kill.** Cancelled casts now match xivanalysis (7):
+  a cast cancelled and restarted was credited to the first attempt. The
+  GCD timeline had the same pairing, so gaps after a restarted cast
+  moved. New: hardcast AoE spells (Gravity II, Holy III) on one target.
+  Not built:
+  - the missed Lightspeed for Divination, whose cost is already in the
+    GCD gaps
+  - the Horoscope/Neutral Sect planning note, a healing plan
+  - overheal %, which the heal-GCD check covers per cast
+
+  Our Combust III clipping is lower than xivanalysis's because it's per
+  target.
 - **Per-player busy windows** (tower soaks, debuff carriers, baits) aren't
   in the Dancing Mad context. Gaps during a mechanic are labelled but
   still counted. Candidate: the DRK's 4.6–4.9s idle after LB3 during Limit

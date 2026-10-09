@@ -67,6 +67,7 @@ const KIND_LABEL: Record<DamageFinding["kind"], string> = {
   "buff-uptime":      "Buff uptime",
   "gauge-overcap":    "Overcap",
   "heal-gcd":         "Heal GCD",
+  "aoe-single":       "AoE on one",
   "dot-uptime":       "DoT uptime",
   "dot-clip":         "DoT clipping",
 };

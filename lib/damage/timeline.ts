@@ -153,6 +153,23 @@ export type GcdUse = {
   target?:     string;      // the cast's target name, when it has one
 };
 
+/**
+ * The begin-cast a completed cast belongs to: the latest one of the same
+ * ability before it, within its cast time + slackMs. Not the earliest: a
+ * cast cancelled and restarted 0.6s later (AST Fall Malefic,
+ * jN3XDrf2z8PmLgRJ Vamp pull 8, 3:15) would otherwise take the cancelled
+ * begin and hide the cancel.
+ */
+export function latestBegin(begins: PlayerEvent[], cast: PlayerEvent, slackMs: number, used?: Set<PlayerEvent>): PlayerEvent | undefined {
+  let found: PlayerEvent | undefined;
+  for (const x of begins) {
+    if (x.timestamp > cast.timestamp) break;
+    if (used?.has(x) || x.abilityId !== cast.abilityId) continue;
+    if (cast.timestamp <= x.timestamp + (x.durationMs ?? 0) + slackMs) found = x;
+  }
+  return found;
+}
+
 export function gcdUses(player: PlayerInfo, game: DamageGame): GcdUse[] {
   const begins = [...(player.beginCasts ?? [])].sort((a, b) => a.timestamp - b.timestamp);
   const used = new Set<PlayerEvent>();
@@ -161,8 +178,7 @@ export function gcdUses(player: PlayerInfo, game: DamageGame): GcdUse[] {
     if (c.fake) continue; // made by the log (WoW), not pressed
     const action = game.action(c.abilityId);
     if (!action?.onGcd) continue;
-    const b = begins.find((x) => !used.has(x) && x.abilityId === c.abilityId &&
-      c.timestamp >= x.timestamp && c.timestamp <= x.timestamp + (x.durationMs ?? 0) + 300);
+    const b = latestBegin(begins, c, 300, used);
     if (b) used.add(b);
     out.push({ startMs: b?.timestamp ?? c.timestamp, castMs: b?.durationMs ?? 0, action, abilityName: c.abilityName, target: c.target });
   }

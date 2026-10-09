@@ -31,6 +31,13 @@
 //   Oracle and Combust III once each. Divination is +6% (FFLogs
 //   multiplier: Technical Finish + Divination = 1.11).
 // - Cooldown drift: tracked-cooldowns.ts.
+// - Hardcast AoE spells on one target (aoeOnOneTarget, below).
+// - Astrologian, checked against xivanalysis on jN3XDrf2z8PmLgRJ Vamp pull
+//   8: its missed Lightspeed (Divination at 4:08) isn't a finding of its
+//   own; what it cost (a cancelled cast, the gap weaving the burst) is
+//   already in the GCD gaps. Its Combust III clipping (9.8s a minute) is
+//   higher than ours because ours is per target: a refresh on another
+//   enemy isn't a clip.
 // White Mage and Sage are unverified: no sample pull has either.
 //
 //   Copyright (c) 2018 Saxon Landers & contributors
@@ -122,6 +129,41 @@ const healGcds: JobCheck = (ctx): DamageFinding[] => {
   return out;
 };
 
+// Hardcast AoE damage GCDs: on one target they do less than the filler,
+// which takes the same cast (Gravity II 130 potency vs Fall Malefic 270;
+// xivanalysis flagged 3 on jN3XDrf2z8PmLgRJ Vamp pull 8, all found).
+// Each cast whose hits reached a single enemy loses the filler's average
+// minus what it dealt. The instant ones (Dyskrasia II, Art of War II) are
+// left out: they're what a healer presses while moving, when the filler
+// isn't an option, so the filler overstates the loss.
+const AOE_GCD_KEYS = ["GRAVITY", "GRAVITY_II", "HOLY", "HOLY_III"];
+const AOE_HIT_MS = 1_500;
+
+const aoeOnOneTarget: JobCheck = (ctx): DamageFinding[] => {
+  const out: DamageFinding[] = [];
+  const aoe = new Set(AOE_GCD_KEYS.filter((key) => A[key]).map((key) => A[key].id));
+  const fill = filler(ctx);
+  const uses = ctx.uses.filter((u) => u.startMs < ctx.endMs);
+  uses.forEach((u, i) => {
+    if (!aoe.has(u.action.id)) return;
+    const landed = u.startMs + u.castMs;
+    const until = Math.min(uses[i + 1]?.startMs ?? Infinity, landed + AOE_HIT_MS);
+    const hits = ctx.player.damageDone.filter((e) => e.abilityId === u.action.id && e.timestamp >= u.startMs && e.timestamp < until);
+    const targets = new Set(hits.map((e) => `${e.targetActorId ?? e.target}.${e.targetInstance ?? 1}`));
+    if (targets.size !== 1) return;
+    const dealt = hits.reduce((a, e) => a + (e.amount ?? 0), 0);
+    if (dealt >= fill.value) return;
+    out.push(finding(ctx, {
+      kind: "aoe-single", startMs: u.startMs, endMs: landed, forced: false,
+      label: `${u.abilityName} on one target`,
+      lostDamage: fill.value - dealt,
+      basis: `${k(fill.value)} average ${fill.name} − ${k(dealt)} this ${u.abilityName} dealt`,
+      detail: `${u.abilityName} hit only ${hits[0].target ?? "one enemy"}`,
+    }));
+  });
+  return out;
+};
+
 const dot = (key: string, ...more: string[]): JobCheck => (ctx) => dotFindings(ctx, {
   statusIds: [key, ...more].map((x) => S[x].id),
   name: S[key].name,
@@ -148,7 +190,7 @@ function avgTick(ctx: PlayerCheckContext, statusId: number): number {
   return ticks.length ? ticks.reduce((a, e) => a + (e.amount ?? 0), 0) / ticks.length : 0;
 }
 
-export const SCH_CHECKS: JobCheck[] = [healGcds, dot("BIOLYSIS")];
-export const AST_CHECKS: JobCheck[] = [healGcds, dot("COMBUST_III"), divination];
-export const WHM_CHECKS: JobCheck[] = [healGcds, dot("DIA")];
-export const SGE_CHECKS: JobCheck[] = [healGcds, dot("EUKRASIAN_DOSIS_III", "EUKRASIAN_DYSKRASIA")];
+export const SCH_CHECKS: JobCheck[] = [healGcds, aoeOnOneTarget, dot("BIOLYSIS")];
+export const AST_CHECKS: JobCheck[] = [healGcds, aoeOnOneTarget, dot("COMBUST_III"), divination];
+export const WHM_CHECKS: JobCheck[] = [healGcds, aoeOnOneTarget, dot("DIA")];
+export const SGE_CHECKS: JobCheck[] = [healGcds, aoeOnOneTarget, dot("EUKRASIAN_DOSIS_III", "EUKRASIAN_DYSKRASIA")];

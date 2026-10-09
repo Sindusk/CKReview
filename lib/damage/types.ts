@@ -168,6 +168,7 @@ export type FindingKind =
   | "buff-uptime"       // a job damage buff (Darkside, Surging Tempest) down
   | "gauge-overcap"     // job gauge wasted at its cap
   | "heal-gcd"          // a heal GCD that mostly overhealed
+  | "aoe-single"        // an AoE damage GCD that hit one enemy (worse than the filler)
   | "dot-uptime"        // the player's DoT off the boss
   | "dot-clip";         // the player's DoT refreshed early
 

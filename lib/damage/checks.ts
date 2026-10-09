@@ -49,7 +49,7 @@ import type { PlayerEvent, PlayerInfo } from "@/types/PlayerInfo";
 import type { DamageContext, DamageFinding, DamageGame, ForcedWindow } from "./types";
 import type { BuffLedger } from "./buffs";
 import {
-  forcedPart, gcdLockMs, inWindows, overlapMs, mergeWindows,
+  forcedPart, gcdLockMs, inWindows, latestBegin, overlapMs, mergeWindows,
   type GcdUse, type PlayerValues, type Window,
 } from "./timeline";
 
@@ -674,11 +674,13 @@ export function checkProcs(ctx: PlayerCheckContext): DamageFinding[] {
 
 export function checkInterrupts(ctx: PlayerCheckContext): DamageFinding[] {
   const cancelled: PlayerEvent[] = [];
-  for (const b of ctx.player.beginCasts ?? []) {
+  const begins = [...(ctx.player.beginCasts ?? [])].sort((a, b) => a.timestamp - b.timestamp);
+  // Each completed cast completes only its latest begin-cast, so a cast
+  // cancelled and restarted counts as cancelled.
+  const completed = new Set(ctx.player.casts.map((c) => latestBegin(begins, c, 500)).filter((b) => b !== undefined));
+  for (const b of begins) {
     if (b.timestamp >= ctx.endMs || !b.durationMs) continue;
-    const done = ctx.player.casts.some((c) => c.abilityId === b.abilityId &&
-      c.timestamp >= b.timestamp && c.timestamp <= b.timestamp + b.durationMs + 500);
-    if (done) continue;
+    if (completed.has(b)) continue;
     const end = b.timestamp + b.durationMs;
     if (inWindows(end, ctx.dead) || overlapMs(b.timestamp, end + 500, ctx.dead) > 0) continue;
     cancelled.push(b);
