@@ -156,6 +156,13 @@ const TANK_SWAP_IDS = ids(["PROVOKE", "SHIRK"]);
 const DISENGAGE_IDS = ids(["LIGHTNING_SHOT", "TOMAHAWK", "UNMEND", "SHIELD_LOB",
   "ENPI", "PIERCING_TALON", "THROWING_DAGGER", "HARPE", "WRITHING_SNAP"]);
 
+// Statuses that force the hit carrying them to crit (Life Surge, Inner
+// Release, Reassembled also direct-hit): left out of crit-rate estimates
+// (lib/damage/crit-rates.ts). Life Surge shows in the hit's snapshot.
+export const GUARANTEED_HIT_STATUS_IDS = new Set(
+  ["LIFE_SURGE", "INNER_RELEASE", "REASSEMBLED"].map((k) => XIVA_STATUSES[k]?.id).filter((id): id is number => id !== undefined),
+);
+
 export const FFXIV_DAMAGE: DamageGame = {
   action: (id) => ACTIONS.get(id),
   penaltyFactor: (statusId) => PENALTIES.get(statusId),

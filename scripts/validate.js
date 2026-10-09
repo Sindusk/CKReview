@@ -582,6 +582,42 @@ MECHANICS['mitigation-analysis'] = {
 // (lib/damage/analyze.ts) for every pull: phase summary, then each player's
 // estimated loss and top findings. `--all-findings` prints every finding.
 // docs/archive/damage-analysis-plan.md describes the model.
+// Print-only: each player's crit rate, direct-hit rate and crit multiplier
+// estimated from their hits across every pull in the folder
+// (lib/damage/crit-rates.ts), grouped by player name. `--stats=Name:crit:dh`
+// (repeatable) prints the gear-derived rates beside the estimate, to check
+// it against the logger's real stats.
+MECHANICS['crit-rates'] = {
+  game: 'ff',
+  namedOnly: true,
+  load: () => ({
+    store: requireTsFromRoot('lib/sample-report-store.ts'),
+    lt: requireTsFromRoot('lib/log-transforms.ts', { './log-auth': {} }),
+    ...requireTsFromRoot('lib/damage/crit-rates.ts'),
+    ...requireTsFromRoot('lib/damage/ffxiv/game.ts'),
+  }),
+  async run({ mod, dir }) {
+    const pulls = await loadThroughRealPipeline(mod, dir);
+    if (!pulls) return;
+    const known = new Map(rawArgs.filter((a) => a.startsWith('--stats=')).map((a) => {
+      const [name, crit, dh] = a.slice('--stats='.length).split(':');
+      return [name, mod.ratesFromStats(Number(crit), Number(dh))];
+    }));
+    const byName = new Map();
+    for (const pull of pulls) for (const p of pull.players) byName.set(p.name, [...(byName.get(p.name) ?? []), p]);
+    const pct = (x) => `${(x * 100).toFixed(1)}%`;
+    for (const [name, players] of byName) {
+      const r = mod.estimateHitRates(players, mod.FFXIV_DAMAGE, mod.GUARANTEED_HIT_STATUS_IDS);
+      if (!r) continue;
+      const truth = known.get(name);
+      console.log(`  ${name.padEnd(22)} ${players.length} pulls, ${String(r.hits).padStart(6)} hits: ` +
+        `crit ${pct(r.crit)} (±${pct(Math.sqrt(r.crit * (1 - r.crit) / r.hits))}) ×${r.critMult.toFixed(3)}, ` +
+        `DH ${pct(r.directHit)} (±${pct(Math.sqrt(r.directHit * (1 - r.directHit) / r.hits))})` +
+        (truth ? `  | gear: crit ${pct(truth.crit)} ×${truth.critMult.toFixed(3)}, DH ${pct(truth.directHit)}` : ''));
+    }
+  },
+};
+
 MECHANICS['damage-analysis'] = {
   game: 'ff',
   load: () => ({
