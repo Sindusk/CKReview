@@ -1,7 +1,17 @@
 // lib/log-auth.ts
 //
 // OAuth 2.0 + PKCE for both WarcraftLogs and FFLogs (public clients — no
-// client secret). Both APIs are Laravel Passport instances with an
+// client secret).
+//
+// Bring-your-own client: API points are charged to the API client's OWNER,
+// not to the user who authorized it (measured 2026-10-09: other users'
+// imports burned the site owner's allowance). So there is no built-in
+// client ID. Each user registers their own public client on the log site
+// and pastes its ID into the setup dialog (components/LogApiSetupDialog.tsx).
+// The ID and tokens live only in this browser's localStorage; the server
+// never sees either.
+//
+// Both APIs are Laravel Passport instances with an
 // identical PKCE flow, so the mechanics (code verifier/challenge, token
 // storage, refresh-on-expiry) are implemented once via createLogAuth()
 // and configured twice below, instead of maintaining two near-identical
@@ -12,11 +22,13 @@
 //   exchangeCodeForTokens(code) — called from /ckreview/callback
 //   getAccessToken()            — use before every API call; auto-refreshes if needed
 //   isAuthenticated()           — quick boolean for UI gating
-//   logout()                    — clears all stored tokens
+//   logout()                    — clears all stored tokens (keeps the client ID)
+//   getWCLClientId() / setWCLClientId(id) — the user's own client ID;
+//                                 changing it drops tokens from the old client
 //
 // Usage (FFLogs) — same shape, FFLogs-flavored names:
 //   loginWithFFLogs(), exchangeFFCodeForTokens(code), getFFAccessToken(),
-//   isFFAuthenticated(), ffLogout()
+//   isFFAuthenticated(), ffLogout(), getFFClientId(), setFFClientId(id)
 
 // ─── PKCE primitives (shared) ───────────────────────────────────────────────
 
@@ -67,7 +79,7 @@ type ProviderStorageKeys = {
 
 type ProviderConfig = {
   providerLabel:  string;              // used in error messages, e.g. "FFLogs"
-  clientId:       string;
+  clientIdKey:    string;              // localStorage key for the user's own client ID
   authUrl:        string;
   tokenUrl:       string;
   scope:          string;
@@ -82,7 +94,32 @@ type ProviderConfig = {
 };
 
 function createLogAuth(config: ProviderConfig) {
-  const { providerLabel, clientId, authUrl, tokenUrl, scope, getRedirectUri, storageKeys, includeScopeInExchange } = config;
+  const { providerLabel, clientIdKey, authUrl, tokenUrl, scope, getRedirectUri, storageKeys, includeScopeInExchange } = config;
+
+  function getClientId(): string | null {
+    return localStorage.getItem(clientIdKey);
+  }
+
+  function clientId(): string {
+    const id = getClientId();
+    if (!id) {
+      throw new Error(
+        `No ${providerLabel} API client set up — open the menu and use "Connect ${providerLabel}" to add your client ID.`
+      );
+    }
+    return id;
+  }
+
+  /**
+   * Stores the user's own client ID (null removes it). Tokens are bound to
+   * the client that issued them, so changing the ID drops the session.
+   */
+  function setClientId(id: string | null): void {
+    if (id === getClientId()) return;
+    logout();
+    if (id) localStorage.setItem(clientIdKey, id);
+    else    localStorage.removeItem(clientIdKey);
+  }
 
   function storeTokens(data: TokenResponse): void {
     localStorage.setItem(storageKeys.accessToken, data.access_token);
@@ -102,7 +139,7 @@ function createLogAuth(config: ProviderConfig) {
     localStorage.setItem(storageKeys.codeVerifier, verifier);
 
     const params = new URLSearchParams({
-      client_id:             clientId,
+      client_id:             clientId(),
       redirect_uri:          getRedirectUri(),
       response_type:         "code",
       code_challenge:        challenge,
@@ -126,7 +163,7 @@ function createLogAuth(config: ProviderConfig) {
 
     const body = new URLSearchParams({
       grant_type:    "authorization_code",
-      client_id:     clientId,
+      client_id:     clientId(),
       redirect_uri:  getRedirectUri(),
       code,
       code_verifier: verifier,
@@ -155,7 +192,7 @@ function createLogAuth(config: ProviderConfig) {
 
     const body = new URLSearchParams({
       grant_type:    "refresh_token",
-      client_id:     clientId,
+      client_id:     clientId(),
       refresh_token: refreshToken,
     });
 
@@ -202,8 +239,9 @@ function createLogAuth(config: ProviderConfig) {
    * leaving dead tokens around that keep the UI looking "Connected".
    */
   async function getAccessToken(): Promise<string> {
+    dropOrphanedSession();
     const token = localStorage.getItem(storageKeys.accessToken);
-    if (!token) throw new Error(`Not authenticated with ${providerLabel} — call login first`);
+    if (!token) throw new Error(`Not authenticated with ${providerLabel} — open the menu and use "Connect ${providerLabel}".`);
 
     const expiresAt  = Number(localStorage.getItem(storageKeys.expiresAt) ?? 0);
     const nearExpiry = Date.now() > expiresAt - 60_000;
@@ -215,7 +253,17 @@ function createLogAuth(config: ProviderConfig) {
     return token;
   }
 
+  /**
+   * Tokens with no client ID beside them were issued to the old built-in
+   * client (before bring-your-own, 2026-10-09). They'd keep spending the
+   * site owner's points until expiry, so they're discarded.
+   */
+  function dropOrphanedSession(): void {
+    if (!getClientId() && localStorage.getItem(storageKeys.accessToken)) logout();
+  }
+
   function isAuthenticated(): boolean {
+    dropOrphanedSession();
     return !!localStorage.getItem(storageKeys.accessToken);
   }
 
@@ -223,21 +271,32 @@ function createLogAuth(config: ProviderConfig) {
     Object.values(storageKeys).forEach((k) => localStorage.removeItem(k));
   }
 
-  return { login, exchangeCodeForTokens, getAccessToken, forceRefreshAccessToken, isAuthenticated, logout };
+  return {
+    login, exchangeCodeForTokens, getAccessToken, forceRefreshAccessToken, isAuthenticated, logout,
+    getClientId, setClientId,
+  };
 }
 
-// ─── WarcraftLogs instance ──────────────────────────────────────────────────
+// ─── Redirect URIs ──────────────────────────────────────────────────────────
 
-function getWCLRedirectUri(): string {
+// Origin-relative, so it works on any deployment (and localhost) as long as
+// the user registered this exact URL on their client — the setup dialog
+// shows it with a copy button.
+function originRedirectUri(path: string): string {
   if (typeof window === "undefined") {
     throw new Error("Redirect URI can only be resolved in the browser.");
   }
-  return `${window.location.origin}/ckreview/callback`;
+  return `${window.location.origin}${path}`;
 }
+
+export const getWCLRedirectUri = () => originRedirectUri("/ckreview/callback");
+export const getFFRedirectUri  = () => originRedirectUri("/ckreview/ffcallback");
+
+// ─── WarcraftLogs instance ──────────────────────────────────────────────────
 
 const wclAuth = createLogAuth({
   providerLabel:  "WarcraftLogs",
-  clientId:       "a22351f8-ab0e-4861-88c3-f27023c99156",
+  clientIdKey:    "wcl_client_id",
   authUrl:        "https://www.warcraftlogs.com/oauth/authorize",
   tokenUrl:       "https://www.warcraftlogs.com/oauth/token",
   scope:          "view-user-profile view-private-reports",
@@ -256,18 +315,18 @@ export const getAccessToken         = wclAuth.getAccessToken;
 export const refreshWCLAccessToken  = wclAuth.forceRefreshAccessToken;
 export const isAuthenticated        = wclAuth.isAuthenticated;
 export const logout                 = wclAuth.logout;
+export const getWCLClientId         = wclAuth.getClientId;
+export const setWCLClientId         = wclAuth.setClientId;
 
 // ─── FFLogs instance ────────────────────────────────────────────────────────
 
-const FFL_REDIRECT_URI = "https://review.consistencykings.com/ckreview/ffcallback";
-
 const fflAuth = createLogAuth({
   providerLabel:  "FFLogs",
-  clientId:       "a225e605-1025-4b97-ad2f-b71347ca2e64",
+  clientIdKey:    "ffl_client_id",
   authUrl:        "https://www.fflogs.com/oauth/authorize",
   tokenUrl:       "https://www.fflogs.com/oauth/token",
   scope:          "view-user-profile view-private-reports",
-  getRedirectUri: () => FFL_REDIRECT_URI,
+  getRedirectUri: getFFRedirectUri,
   includeScopeInExchange: true,
   storageKeys: {
     accessToken:  "ffl_access_token",
@@ -283,3 +342,5 @@ export const getFFAccessToken        = fflAuth.getAccessToken;
 export const refreshFFAccessToken    = fflAuth.forceRefreshAccessToken;
 export const isFFAuthenticated       = fflAuth.isAuthenticated;
 export const ffLogout                = fflAuth.logout;
+export const getFFClientId           = fflAuth.getClientId;
+export const setFFClientId           = fflAuth.setClientId;

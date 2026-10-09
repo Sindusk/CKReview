@@ -7,6 +7,7 @@ import ReportDialog from "../components/ReportDialog";
 import SessionFoundDialog from "@/components/SessionFoundDialog";
 import SampleDataFoundDialog from "@/components/SampleDataFoundDialog";
 import LoginDialog from "@/components/LoginDialog";
+import LogApiSetupDialog, { type LogProvider } from "@/components/LogApiSetupDialog";
 import AddReviewToStaticDialog from "@/components/AddReviewToStaticDialog";
 import ManageStaticsDialog from "@/components/ManageStaticsDialog";
 import { parseYouTubeUrl, parseLogUrl } from "@/lib/url-parsers";
@@ -38,7 +39,6 @@ import type { Pull } from "../types/Pull";
 import { createCallWipeError, CALL_WIPE_RULE_ID, createManualError, type ManualErrorInput } from "@/types/PullError";
 import type { SavedSession } from "@/types/Session";
 import useTimelineController from "@/hooks/useTimelineController";
-import { loginWithWarcraftLogs, loginWithFFLogs } from "@/lib/log-auth";
 import { fetchReport, fetchFightData, buildFightLogLabels, getWCLRateLimitStatus, isWCLQuotaExhausted, type WCLReport } from "@/lib/wcl-client";
 import {
   transformReportToPulls,
@@ -273,6 +273,7 @@ export default function Home() {
   // ── Statics (see components/BurgerMenu.tsx "Statics"/"Account" sections) ──
   const [currentUser, setCurrentUser] = useState<{ username: string; role: string } | null>(null);
   const [showLoginDialog, setShowLoginDialog] = useState(false);
+  const [logApiSetup, setLogApiSetup] = useState<LogProvider | null>(null);
   const [showAddReviewToStaticDialog, setShowAddReviewToStaticDialog] = useState(false);
   const [showManageStaticsDialog, setShowManageStaticsDialog] = useState(false);
 
@@ -1118,8 +1119,8 @@ export default function Home() {
     >
       <Header
         onAddVod={() => setShowDialog(true)}
-        onConnectWCL={loginWithWarcraftLogs}
-        onConnectFFL={loginWithFFLogs}
+        onConnectWCL={() => setLogApiSetup("wcl")}
+        onConnectFFL={() => setLogApiSetup("ffl")}
         onOpenReport={() => setShowReport(true)}
         onAddReviewToStatic={() => setShowAddReviewToStaticDialog(true)}
         onManageStatics={() => setShowManageStaticsDialog(true)}
@@ -1302,6 +1303,11 @@ export default function Home() {
         open={showLoginDialog}
         onClose={() => setShowLoginDialog(false)}
         onLoggedIn={setCurrentUser}
+      />
+
+      <LogApiSetupDialog
+        provider={logApiSetup}
+        onClose={() => setLogApiSetup(null)}
       />
 
       <AddReviewToStaticDialog

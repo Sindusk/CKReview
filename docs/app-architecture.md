@@ -162,6 +162,12 @@ file's header comment. Mechanic detection has its own guide:
   (`LIVE_POLL_INTERVAL_MS`) and appends new fights by `fightId`.
   - Pull numbers are recomputed with `renumberPullsByBoss`.
   - Polling pauses when the API's hourly quota is exhausted.
+- **Bring-your-own API client** (`lib/log-auth.ts`,
+  `components/LogApiSetupDialog.tsx`). There is no built-in client ID: API
+  points are charged to the client's owner, so each user registers a public
+  (PKCE) client on WarcraftLogs/FFLogs and pastes its ID in. The ID and
+  tokens stay in the browser's localStorage. Redirect URIs are
+  origin-relative (`/ckreview/callback`, `/ckreview/ffcallback`).
 - **Auth token refresh.** Both GraphQL runners retry once on a 401 after
   refreshing the access token. If that fails, they clear the session so the
   menu offers "Connect" again.

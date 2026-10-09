@@ -254,18 +254,20 @@ export default function BurgerMenu({
           {/* ── Integrations ── */}
           <SectionLabel label="Integrations" />
 
+          {/* Both states open the API client setup dialog, so a connected
+              user can still change or remove their client ID there. */}
           {fflReady ? (
             <MenuItem
               icon="✅"
               label="FFLogs Connected"
-              sublabel="Ready to import FFXIV reports"
-              disabled
+              sublabel="Manage your FFLogs API client"
+              onClick={handleConnectFFL}
             />
           ) : (
             <MenuItem
               icon="🎮"
               label="Connect FFLogs"
-              sublabel="Authorize to import FFXIV reports"
+              sublabel="Add your API client to import FFXIV reports"
               onClick={handleConnectFFL}
             />
           )}
@@ -274,14 +276,14 @@ export default function BurgerMenu({
             <MenuItem
               icon="✅"
               label="WarcraftLogs Connected"
-              sublabel="Ready to import WoW reports"
-              disabled
+              sublabel="Manage your WarcraftLogs API client"
+              onClick={handleConnectWCL}
             />
           ) : (
             <MenuItem
               icon="📊"
               label="Connect WarcraftLogs"
-              sublabel="Authorize to import WoW reports"
+              sublabel="Add your API client to import WoW reports"
               onClick={handleConnectWCL}
             />
           )}
