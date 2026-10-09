@@ -360,22 +360,19 @@ function PlayerDetail({ summary, analysis, colorFor, iconFor, pull, pulls }: {
         <img src={iconFor(summary.player, summary.job)} alt={summary.job} width={28} height={28} style={{ display: "block" }}
           onError={(e) => { e.currentTarget.style.visibility = "hidden"; }} />
         <span style={{ color: colorFor(summary.player, summary.job), fontSize: 16, fontWeight: 600 }}>{summary.player}</span>
-        <span style={{ color: "var(--ck-text-3)", fontSize: 12 }}>{summary.job}</span>
+        <span style={{ color: "var(--ck-text-3)", fontSize: 12 }}>
+          {summary.job} · <span className="ck-num">{(summary.baseGcdMs / 1000).toFixed(2)}s</span> GCD
+        </span>
       </div>
-      <StatGrid sections={[
-        { name: "Rotation", stats: [
+      <StatStrip stats={[
           { label: "GCD uptime", value: fmtUptime(summary.gcdUptime.pct),
             sub: `of ${fmtTime(summary.gcdUptime.eligibleMs)} active`,
             tone: summary.gcdUptime.pct >= UPTIME_GOOD ? "good" : summary.gcdUptime.pct < UPTIME_POOR ? "bad" : undefined,
-            title: `GCD locks over ${fmtTime(summary.gcdUptime.eligibleMs)} alive and targetable (deaths, untargetable time and limit breaks excluded)` },
-          { label: "GCDs", value: String(summary.gcds) },
-          { label: "GCD speed", value: `${(summary.baseGcdMs / 1000).toFixed(2)}s` },
+            title: `GCD locks over ${fmtTime(summary.gcdUptime.eligibleMs)} alive and targetable (deaths, untargetable time and limit breaks excluded); ${summary.gcds} GCDs` },
           ...(summary.gcdSplit.heal > 0 ? [{
             label: "Heal GCDs", value: String(summary.gcdSplit.heal), sub: `of ${summary.gcdSplit.heal + summary.gcdSplit.damage}`,
             title: "GCDs that healed or shielded, of all heal and damage GCDs",
           }] : []),
-        ] },
-        { name: "Damage", stats: [
           { label: "Own damage", value: fmtDamage(summary.damage - summary.buffs.received), sub: `${fmtDamage(summary.damage)} dealt`,
             title: "The rDPS split: this player's damage without what others' buffs added" },
           { label: "Buffs given", value: summary.buffs.given > 0 ? approx(summary, fmtDamage(summary.buffs.given)) : "—",
@@ -396,7 +393,6 @@ function PlayerDetail({ summary, analysis, colorFor, iconFor, pull, pulls }: {
               `${rolled.directHits} direct hits vs ${rolled.expectedDirectHits.toFixed(0)} expected, over ${rolled.hits} hits. ` +
               `${ratesNote} DoT ticks don't count (FFLogs logs them at their average).`,
           }] : []),
-        ] },
       ]} />
       <TimelineStrip summary={summary} analysis={analysis} />
       {shown.length === 0 ? (
@@ -428,39 +424,25 @@ type Stat = {
 // percentile reads poor (bad luck, not a mistake, but worth seeing).
 const UPTIME_GOOD = 0.95, UPTIME_POOR = 0.9, LUCK_POOR = 0.25;
 const TONE: Record<NonNullable<Stat["tone"]>, string> = { good: "var(--ck-arcane-text)", bad: LOSS_COLOR };
-const STAT_COLUMNS = 4;
-
-// Stats as a fixed grid: one labelled row per section, STAT_COLUMNS equal
-// tiles each (short rows keep empty cells so the columns line up).
-function StatGrid({ sections }: { sections: { name: string; stats: Stat[] }[] }) {
+// Stats as one row of equal panels.
+function StatStrip({ stats }: { stats: Stat[] }) {
   return (
     <div style={{
-      display: "grid", gridTemplateColumns: `64px repeat(${STAT_COLUMNS}, minmax(0, 1fr))`, gap: 6,
-      marginBottom: 10, alignItems: "stretch",
+      display: "grid", gridTemplateColumns: `repeat(${stats.length}, minmax(0, 1fr))`, gap: 6, marginBottom: 10,
     }}>
-      {sections.flatMap((sec) => [
-        <div key={`${sec.name}-label`} style={{
-          alignSelf: "center", color: "var(--ck-text-gold)", fontSize: 10, fontWeight: 600,
-          letterSpacing: "0.08em", textTransform: "uppercase",
-        }}>{sec.name}</div>,
-        ...Array.from({ length: STAT_COLUMNS }, (_, i) => {
-          const s = sec.stats[i];
-          if (!s) return <div key={`${sec.name}-${i}`} />;
-          return (
-            <div key={`${sec.name}-${s.label}`}
-              title={s.title && s.value.startsWith("≈") ? s.title + APPROX_NOTE : s.title}
-              style={{
-                background: "var(--ck-bg-card-hi)", border: "1px solid var(--ck-line-2)", borderRadius: 3,
-                borderTop: `2px solid ${s.tone ? TONE[s.tone] : "var(--ck-line-2)"}`,
-                padding: "6px 10px", minHeight: 56, minWidth: 0, cursor: s.title ? "help" : undefined,
-              }}>
-              <div style={{ color: "var(--ck-text-3)", fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.label}</div>
-              <div className="ck-num" style={{ color: s.tone ? TONE[s.tone] : "var(--ck-text)", fontSize: 16, fontWeight: 600, lineHeight: 1.3 }}>{s.value}</div>
-              {s.sub && <div className="ck-num" style={{ color: "var(--ck-text-3)", fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.sub}</div>}
-            </div>
-          );
-        }),
-      ])}
+      {stats.map((s) => (
+        <div key={s.label}
+          title={s.title && s.value.startsWith("≈") ? s.title + APPROX_NOTE : s.title}
+          style={{
+            background: "var(--ck-bg-card-hi)", border: "1px solid var(--ck-line-2)", borderRadius: 3,
+            borderTop: `2px solid ${s.tone ? TONE[s.tone] : "var(--ck-line-2)"}`,
+            padding: "5px 9px", minWidth: 0, cursor: s.title ? "help" : undefined,
+          }}>
+          <div style={{ color: "var(--ck-text-3)", fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.label}</div>
+          <div className="ck-num" style={{ color: s.tone ? TONE[s.tone] : "var(--ck-text)", fontSize: 15, fontWeight: 600, lineHeight: 1.3 }}>{s.value}</div>
+          {s.sub && <div className="ck-num" style={{ color: "var(--ck-text-3)", fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.sub}</div>}
+        </div>
+      ))}
     </div>
   );
 }
@@ -586,7 +568,7 @@ function AggregateDetail({ agg, totalPulls, colorFor, iconFor }: {
         <span style={{ color: colorFor(agg.player, agg.job), fontSize: 16, fontWeight: 600 }}>{agg.player}</span>
         <span style={{ color: "var(--ck-text-3)", fontSize: 12 }}>{agg.job}</span>
       </div>
-      <StatGrid sections={[{ name: "All pulls", stats: [
+      <StatStrip stats={[
         { label: "Pulls", value: String(agg.pulls), sub: `of ${totalPulls} loaded` },
         { label: "GCD uptime", value: fmtUptime(agg.gcdUptime),
           tone: agg.gcdUptime >= UPTIME_GOOD ? "good" : agg.gcdUptime < UPTIME_POOR ? "bad" : undefined,
@@ -594,7 +576,7 @@ function AggregateDetail({ agg, totalPulls, colorFor, iconFor }: {
         { label: "Dealt per pull", value: fmtDamage(agg.damagePerPull) },
         { label: "Lost per pull", value: fmtDamage(agg.lostPerPull), sub: `forced ${fmtDamage(agg.forcedPerPull)}`,
           tone: agg.lostPerPull > 0 ? "bad" : undefined },
-      ] }]} />
+      ]} />
       <div className="ck-table-wrap">
         <table className="ck-table" style={{ fontSize: 12 }}>
           <thead>
