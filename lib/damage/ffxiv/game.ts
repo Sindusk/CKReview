@@ -24,6 +24,7 @@
 import { XIVA_ACTIONS, XIVA_STATUSES, type XivaAction } from "./xiva-data";
 import { TRACKED_COOLDOWNS } from "./tracked-cooldowns";
 import { JOB_CHECKS } from "./jobs";
+import { noDamageCasts } from "./jobs/shared";
 import { FFXIV_ACTION_INDEX } from "../../mitigation/ffxiv-catalog";
 import type { DamageGame, GameAction, PartyBuff, TrackedCooldown } from "../types";
 
@@ -168,5 +169,5 @@ export const FFXIV_DAMAGE: DamageGame = {
   isDefensive: (actionId) => FFXIV_ACTION_INDEX.has(actionId),
   tankSwapActionIds: TANK_SWAP_IDS,
   disengageActionIds: DISENGAGE_IDS,
-  jobChecks: (job) => JOB_CHECKS[job] ?? [],
+  jobChecks: (job) => [...(JOB_CHECKS[job] ?? []), noDamageCasts],
 };

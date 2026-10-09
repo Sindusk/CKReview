@@ -159,6 +159,7 @@ export type FindingKind =
   | "penalty"           // damage dealt under Damage Down / Weakness
   | "proc-lost"         // a proc that expired unused or was overwritten
   | "interrupted-cast"  // a cast that never went off
+  | "no-damage"         // a damage action that hit nothing (invulnerable, out of range)
   | "combo-broken"      // a combo step that landed without its combo bonus, or a combo dropped
   | "disengage"         // a ranged filler GCD (Lightning Shot) instead of a real one
   | "positional"        // positionals missed

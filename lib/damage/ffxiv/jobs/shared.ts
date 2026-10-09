@@ -24,11 +24,28 @@
 // before the log, an unlogged combo). Then every overcap finding from that
 // gauge is marked inference and says how many times it happened.
 //
+// ── Casts that did no damage ───────────────────────────────────────────
+// Every job gets this (game.ts jobChecks). An action is a damage action
+// when at least NO_DAMAGE_MIN_CASTS casts were followed by a direct hit
+// of the same name or id within NO_DAMAGE_HIT_MS, for NO_DAMAGE_SHARE of
+// its casts. (Name, because the cast and the damage can log under
+// different ids: Salt and Darkness 25755 casts, 25756 hits.) A cast of
+// it with no hit (target invulnerable, out of the area, already dead) is
+// lost, at the action's average per cast. Same-name casts within 50ms
+// are one press: FFLogs also logs the damage id as a "cast" when it hits
+// nothing. From xivanalysis's Salt and Darkness check, on jN3XDrf2z8PmLgRJ
+// Vamp pull 8 (8:39, no hit while Salted Earth stopped ticking). Marked
+// inference: the cooldown may have come back in time to use anyway. A
+// cast in forced time is forced: Standard Finish is pressed in downtime
+// for its buff. Seen across the samples: spells finishing on a target
+// that went invulnerable (Fall Malefic on Charnel Cell hit for 0), Circle
+// of Scorn out of range, single-target GCDs on a dead add.
+//
 //   Copyright (c) 2018 Saxon Landers & contributors (the window model)
 //   MIT License; full text in THIRD_PARTY_NOTICES.md.
 
 import type { PlayerEvent } from "@/types/PlayerInfo";
-import type { DamageFinding } from "../../types";
+import type { DamageFinding, JobCheck } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";
 import { forcedPart, inWindows, mergeWindows, overlapMs, type Window } from "../../timeline";
 
@@ -354,3 +371,53 @@ export function gaugeFindings(ctx: PlayerCheckContext, spec: GaugeSpec): DamageF
     detail: `${w.amount} ${spec.unit} lost: ${w.label}`,
   }));
 }
+
+// ── Casts that did no damage ───────────────────────────────────────────
+
+const NO_DAMAGE_HIT_MS = 3_000;
+const NO_DAMAGE_MIN_CASTS = 3;
+const NO_DAMAGE_SHARE = 0.8;
+const SAME_PRESS_MS = 50;
+// Technical Finish logs 16196 and then 33218 about 0.7s later.
+const SAME_NAME_OTHER_ID_MS = 1_000;
+
+export const noDamageCasts: JobCheck = (ctx) => {
+  const out: DamageFinding[] = [];
+  // Ticks share the action's name (Eukrasian Dosis III) and older samples
+  // don't mark them isDoT, so tick ids are left out too.
+  const hits = ctx.player.damageDone.filter((e) => !e.isDoT && !ctx.game.isTickAbility(e.abilityId) && (e.amount ?? 0) > 0);
+  const presses = new Map<string, PlayerEvent[]>();
+  for (const c of ctx.player.casts) {
+    const list = presses.get(c.abilityName) ?? [];
+    const last = list[list.length - 1];
+    if (last && (c.timestamp - last.timestamp <= SAME_PRESS_MS ||
+      (c.abilityId !== last.abilityId && c.timestamp - last.timestamp <= SAME_NAME_OTHER_ID_MS))) continue;
+    list.push(c);
+    presses.set(c.abilityName, list);
+  }
+  for (const [name, casts] of presses) {
+    const ids = new Set(casts.map((c) => c.abilityId));
+    const dealt = casts.map((c) => hits
+      .filter((e) => (e.abilityName === name || ids.has(e.abilityId)) &&
+        e.timestamp >= c.timestamp && e.timestamp <= c.timestamp + NO_DAMAGE_HIT_MS)
+      .reduce((a, e) => a + (e.amount ?? 0), 0));
+    const landed = dealt.filter((d) => d > 0);
+    if (landed.length < NO_DAMAGE_MIN_CASTS || landed.length < casts.length * NO_DAMAGE_SHARE) continue;
+    const average = landed.reduce((a, d) => a + d, 0) / landed.length;
+    casts.forEach((c, i) => {
+      if (dealt[i] > 0 || c.timestamp >= ctx.endMs || inWindows(c.timestamp, ctx.dead)) return;
+      // Pressed during forced time (boss untargetable): shown, not
+      // counted. Dancers refresh Standard Finish there for its buff.
+      const during = forcedPart(c.timestamp - 1, c.timestamp + 1, ctx.forced);
+      out.push(finding(ctx, {
+        kind: "no-damage", startMs: c.timestamp, endMs: c.timestamp, forced: during.ms > 0, inference: true,
+        cause: during.ms > 0 ? during.cause : undefined,
+        label: `${name} did no damage`,
+        lostDamage: average,
+        basis: `${k(average)} average ${name} (${landed.length} of ${casts.length} casts hit something)`,
+        detail: `${name} hit nothing`,
+      }));
+    });
+  }
+  return out;
+};

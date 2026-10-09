@@ -492,6 +492,13 @@ grouped by exact roster. The module headers hold the rules.
   already GCD gaps or small delays; a gap now names its weaves from two
   up. One is a 1.3s gap holding Passage of Arms, counted as a loss;
   confirm with the player whether it was planned.
+- **Dark Knight, same kill.** The death, the 4 broken combos and the
+  missed Delirium GCD were already found. New from xivanalysis: a check
+  for damage casts that hit nothing, for every job (Salt and Darkness at
+  8:39). Not checked: Tincture windows. xivanalysis didn't name the 2
+  actions it expected, and its potion module isn't vendored. The second
+  potion lacks Salted Earth, which came up at 6:47 and went in at 6:55,
+  3s after the potion ended.
 - **Per-player busy windows** (tower soaks, debuff carriers, baits) aren't
   in the Dancing Mad context. Gaps during a mechanic are labelled but
   still counted. Candidate: the DRK's 4.6–4.9s idle after LB3 during Limit

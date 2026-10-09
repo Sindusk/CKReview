@@ -57,6 +57,7 @@ const KIND_LABEL: Record<DamageFinding["kind"], string> = {
   "penalty":          "Penalty",
   "proc-lost":        "Lost proc",
   "interrupted-cast": "Cancelled cast",
+  "no-damage":        "No damage",
   "gcd-clipping":     "Clipping",
   "combo-broken":     "Broken combo",
   "disengage":        "Disengage",

@@ -106,9 +106,13 @@ export function checkGcdGaps(ctx: PlayerCheckContext): DamageFinding[] {
   type Bucket = { ms: number; lost: number; start: number; end: number; n: number; defensives: Map<string, number>; moments: Window[] };
   const small = new Map<number | undefined, Bucket>();
   const clipped = new Map<number | undefined, Bucket>();
-  const ogcds = ctx.player.casts.filter((c) => {
+  // One press per name per instant: FFLogs can log an action's damage id
+  // as a second "cast" (Salt and Darkness 25755 + 25756 when it hit
+  // nothing), which read as a double weave.
+  const ogcds = ctx.player.casts.filter((c, i, all) => {
     const a = ctx.game.action(c.abilityId);
-    return a !== undefined && !a.onGcd && !a.autoAttack;
+    const dup = all.slice(0, i).some((p) => p.abilityName === c.abilityName && c.timestamp - p.timestamp <= 50);
+    return a !== undefined && !a.onGcd && !a.autoAttack && !dup;
   });
 
   const consider = (gcdStart: number, from: number, to: number, after: string) => {
