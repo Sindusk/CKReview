@@ -8,7 +8,6 @@ import { isAuthenticated, isFFAuthenticated } from "@/lib/log-auth";
 export type BurgerMenuProps = {
   onConnectWCL: () => void;
   onConnectFFL: () => void;
-  onOpenReport: () => void;
   onAddReviewToStatic: () => void;
   onManageStatics:     () => void;
   onLogin:              () => void;
@@ -97,7 +96,6 @@ function MenuLinkItem({
 export default function BurgerMenu({
   onConnectWCL,
   onConnectFFL,
-  onOpenReport,
   onAddReviewToStatic,
   onManageStatics,
   onLogin,
@@ -147,11 +145,6 @@ export default function BurgerMenu({
   function handleConnectFFL() {
     setOpen(false);
     onConnectFFL();
-  }
-
-  function handleOpenReport() {
-    setOpen(false);
-    onOpenReport();
   }
 
   function handleAddReviewToStatic() {
@@ -239,13 +232,6 @@ export default function BurgerMenu({
             href="https://review.consistencykings.com/"
             newTab={false}
             onNavigate={() => setOpen(false)}
-          />
-
-          <MenuItem
-            icon="📋"
-            label="View Report"
-            sublabel="First errors, MVPs, and raid uptime"
-            onClick={handleOpenReport}
           />
 
           {/* Thin rule between sections */}

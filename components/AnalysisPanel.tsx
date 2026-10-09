@@ -503,6 +503,30 @@ export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime, onCa
               </button>
             )
           )}
+
+          {/* Accuracy reminder — hover only. */}
+          <span
+            title="Findings here can be inaccurate."
+            aria-label="Findings here can be inaccurate."
+            style={{
+              display:        "inline-flex",
+              alignItems:     "center",
+              justifyContent: "center",
+              width:          "18px",
+              height:         "18px",
+              borderRadius:   "50%",
+              border:         "1px solid var(--ck-text-3)",
+              color:          "var(--ck-text-2)",
+              fontSize:       "11px",
+              fontWeight:     700,
+              fontStyle:      "italic",
+              fontFamily:     "Georgia, serif",
+              cursor:         "help",
+              flexShrink:     0,
+            }}
+          >
+            i
+          </span>
         </div>
       </PanelHeader>
 

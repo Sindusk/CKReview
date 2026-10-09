@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import Header from "../components/Header";
 import AddVodDialog, { type AddVodSource } from "../components/AddVodDialog";
-import ReportDialog from "../components/ReportDialog";
+import UsageNoticeDialog, { hasAcceptedUsageNotice } from "@/components/UsageNoticeDialog";
 import SessionFoundDialog from "@/components/SessionFoundDialog";
 import SampleDataFoundDialog from "@/components/SampleDataFoundDialog";
 import LoginDialog from "@/components/LoginDialog";
@@ -122,7 +122,9 @@ export default function Home() {
   const [vods, setVods] = useState<Vod[]>([]);
   const [selectedVodId, setSelectedVodId] = useState<number | null>(null);
   const [showDialog, setShowDialog] = useState(false);
-  const [showReport, setShowReport] = useState(false);
+  // Import input held while the one-time usage notice is up; the import
+  // runs once the user clicks "Got It" (see handleImportClick).
+  const [noticePendingInput, setNoticePendingInput] = useState<string | null>(null);
   const [transcriptVodId, setTranscriptVodId] = useState<number | null>(null);
 
   const [pulls, setPulls] = useState<Pull[]>([]);
@@ -954,6 +956,16 @@ export default function Home() {
     }
   }
 
+  // The Import button's entry point: the first import in a browser shows the
+  // usage notice before anything else runs (session check included).
+  function handleImportClick(rawInput: string) {
+    if (hasAcceptedUsageNotice()) {
+      handleImportReport(rawInput);
+    } else {
+      setNoticePendingInput(rawInput);
+    }
+  }
+
   // ── "A session was found for this log" dialog ───────────────────────────────
 
   async function handleLoadFoundSession() {
@@ -1121,7 +1133,6 @@ export default function Home() {
         onAddVod={() => setShowDialog(true)}
         onConnectWCL={() => setLogApiSetup("wcl")}
         onConnectFFL={() => setLogApiSetup("ffl")}
-        onOpenReport={() => setShowReport(true)}
         onAddReviewToStatic={() => setShowAddReviewToStaticDialog(true)}
         onManageStatics={() => setShowManageStaticsDialog(true)}
         onLogin={() => setShowLoginDialog(true)}
@@ -1150,7 +1161,7 @@ export default function Home() {
           importStatus={importStatus}
           loadedReportCode={loadedReportCode}
           error={importError}
-          onImport={handleImportReport}
+          onImport={handleImportClick}
           importPointsUsed={importPointsUsed}
           rateLimit={liveRateLimit}
           liveLogEnabled={liveLogEnabled}
@@ -1293,10 +1304,13 @@ export default function Home() {
         onAdd={handleAddVod}
       />
 
-      <ReportDialog
-        open={showReport}
-        onClose={() => setShowReport(false)}
-        pulls={displayPulls}
+      <UsageNoticeDialog
+        open={noticePendingInput !== null}
+        onAccept={() => {
+          const input = noticePendingInput;
+          setNoticePendingInput(null);
+          if (input) handleImportReport(input);
+        }}
       />
 
       <LoginDialog

@@ -88,6 +88,10 @@ file's header comment. Mechanic detection has its own guide:
     end the pull, and counting that would be unfair.
   - When a count looks wrong, check the cutoff and the denominator before
     hunting for an arithmetic bug.
+- **The Report dialog is unreachable** since 2026-10-09: "View Report" was
+  removed from the menu so player comparison lives only in Statics (user's
+  constructive-use decision). `components/ReportDialog.tsx` is kept but
+  not rendered; the notes below describe it.
 - **Report dialog rates** (`computePlayerReportStats`) divide by the pulls
   that player actually played, not by every pull in the report. This keeps
   substitutes comparable with full-attendance raiders.

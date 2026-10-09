@@ -11,7 +11,6 @@ type HeaderProps = {
   onAddVod:             () => void;
   onConnectWCL:         () => void;
   onConnectFFL:         () => void;
-  onOpenReport:         () => void;
   onAddReviewToStatic:  () => void;
   onManageStatics:      () => void;
   onLogin:              () => void;
@@ -24,7 +23,6 @@ export default function Header({
   onAddVod,
   onConnectWCL,
   onConnectFFL,
-  onOpenReport,
   onAddReviewToStatic,
   onManageStatics,
   onLogin,
@@ -58,7 +56,6 @@ export default function Header({
         <BurgerMenu
           onConnectWCL={onConnectWCL}
           onConnectFFL={onConnectFFL}
-          onOpenReport={onOpenReport}
           onAddReviewToStatic={onAddReviewToStatic}
           onManageStatics={onManageStatics}
           onLogin={onLogin}
