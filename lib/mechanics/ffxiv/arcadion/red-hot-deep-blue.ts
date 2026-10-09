@@ -103,7 +103,10 @@
 //   skipped (they can't move).
 // ffxiv-rhdb-fire (Minor; Major if they died burning): Burns episodes.
 //   4+ players lighting up with Cutback's fire is one player-less Minor
-//   (aim or movement, unknowable), plus a Raid when it killed 3+. Burns
+//   naming the Cutback target (farthest player from Red Hot) and whether
+//   the safe slice opposite them landed on earlier Inferno/Pyrotation fire
+//   (user, 2026-10-09: a geometry puzzle; A5 the R1 put it on the dropped
+//   puddles), plus a Raid when it killed 3+. Burns
 //   that end in a called-wipe death are skipped.
 // ffxiv-rhdb-wall (Major): a no-killing-blow death outside a called wipe:
 //   "knocked" when a knockback (Deep Impact, Sick Swell, Take-Off, Floater)
@@ -114,14 +117,19 @@
 // ffxiv-rhdb-overlap (Major): one player hit by another player's bait
 //   (Inferno circles, Double-Dip/Reverse cones, Snaps, Splash, Hot Aerial)
 //   names both, or by 2+ unowned instances names the victim; Freaky
-//   Pyrotation: standing in two pair stacks.
+//   Pyrotation: standing in two pair stacks. The all-party Double-Dip /
+//   Reverse volleys (+126, +545) use boss-relative clock spots (CLOCK_SPOT;
+//   user, 2026-10-09): there only players 30+ degrees off their spot near
+//   the overlap are named (A10 +2:07 H2, not the OT). Stray Snap cones carry
+//   no cast target, so Snap overlaps name only the players hit twice.
 // ffxiv-rhdb-buster (Major): a non-tank in Hot Impact or in someone else's
 //   Vertical buster; a non-tank who drew Vertical as the nearest (tanks
 //   alive and not dead in the last 30s); snaking Hot Impact on a non-tank
 //   names the tank with Firesnaking (player-less Minor when none had it).
-// ffxiv-rhdb-deep-impact (Major): one non-tank hit alone (the farthest);
-//   several players hit names Deep Blue's tank (latest autos, else the
-//   Watersnaking tank); Raid at 3+ deaths.
+// ffxiv-rhdb-deep-impact (Major): the target is the farthest player it hit
+//   (user, 2026-10-09). A non-tank target baited it (A8 +2:18 the H2); a
+//   tank target that also hit non-tanks blames the tank under 6y from Deep
+//   Blue, else the victims (off the hitbox); Raid at 3+ deaths.
 // ffxiv-rhdb-stack: Pyrotation that killed someone names living non-tanks
 //   outside it (Major); Re-Entry under four with a death (player-less Minor).
 // ffxiv-rhdb-xtreme-wave (Major): both colors in one wave; a single dash
@@ -488,6 +496,8 @@ import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import type { DeathEvent } from "@/types/DeathEvent";
 import type { PullError, EnemyEvent } from "@/types/PullError";
 import { yd, kFmt, sec, joinNames, playerError, playerlessMinor, raidMarker, rezzedAt, clusterByGap, debuffIntervals } from "@/lib/mechanics/wow/common";
+import { ARENA_CENTER, angularDistance, compassBearingOf, facingToCompassBearing } from "@/lib/mechanics/geometry";
+import { detectFFRoles, type FFRoleSlot } from "@/lib/mechanics/ffxiv/roles";
 
 export const RHDB_AVOIDABLE_RULE_ID     = "ffxiv-rhdb-avoidable";
 export const RHDB_FIRE_RULE_ID          = "ffxiv-rhdb-fire";
@@ -519,9 +529,20 @@ const IN_LINE             = [1003004, 1003005, 1003006, 1003451]; // First..Four
 const HOT_IMPACT_SHARED   = 46518; // opening shared buster on Red Hot's top two
 const HOT_IMPACT_SNAKING  = 46464; // snaking: Red Hot's top-enmity Firesnaking player
 const DEEP_IMPACT         = 44486;
+const DEEP_IMPACT_CAST    = 46519; // Deep Blue's own cast: its position
+// A Deep Impact tank this close to Deep Blue brought it onto the party.
+// Clean opening casts: tank 8.0-16y out, party 0-7y (A/B/C +138).
+const TANK_MIN_YD         = 6;
 const VERTICAL            = [46585, 46586]; // Vertical Blast / Plunge (nearest-player buster)
 const PYROTATION          = 46531;
 const CUTBACK_BLAZE       = 46538;
+const CUTBACK_CAST        = 46537; // Red Hot's own cast: its position
+const INFERNO             = 46529;
+const DIVERS_DARE         = [46520, 46521];
+// Cutback leaves ~60 degrees safe (user: a ~300 degree attack). Puddles
+// under the boss's hitbox don't count against the slice.
+const CUTBACK_SAFE_HALF_ANGLE = 30;
+const CUTBACK_HITBOX          = 300;
 const RE_ENTRY            = [46581, 46582]; // four-person cone stacks
 const XTREME_WAVE_RED     = 46545;
 const XTREME_WAVE_BLUE    = 46546;
@@ -557,13 +578,15 @@ const AVOIDABLE: Record<number, Avoidable> = {
 // Baits with one target per instance: a player hit by another player's
 // instance (or by two at once) is an overlap. `stack` families share
 // damage by design, so only standing in two of them at once counts.
-type Family = { name: string; ids: number[]; what: string; why: string; stack?: boolean };
+// `clock`: an all-party cone volley baited from boss-relative clock spots
+// (see CLOCK_SPOT); only players off their spot are blamed when it overlaps.
+type Family = { name: string; ids: number[]; what: string; why: string; stack?: boolean; clock?: boolean };
 const FAMILIES: Family[] = [
   { name: "Alley-Oop Inferno", ids: [46529], what: "fire circle",
     why: "Each marked player drops their own circle; spread so no one stands in someone else's." },
-  { name: "Alley-Oop Double-Dip", ids: [46558], what: "water cone",
+  { name: "Alley-Oop Double-Dip", ids: [46558], what: "water cone", clock: true,
     why: "Each marked player baits their own cone from Deep Blue; keep the angles apart so no cone crosses someone else." },
-  { name: "Reverse Alley-Oop", ids: [46561], what: "water cone",
+  { name: "Reverse Alley-Oop", ids: [46561], what: "water cone", clock: true,
     why: "Each marked player baits their own cone from Deep Blue; keep the angles apart so no cone crosses someone else." },
   { name: "Insane Air Snaps", ids: [46577, 46578], what: "Snap cone",
     why: "The surfboard's Snap fires a separate cone at each of the four nearest players per boss; aim them outward, apart from each other." },
@@ -574,6 +597,25 @@ const FAMILIES: Family[] = [
   { name: "Freaky Pyrotation", ids: [46487], what: "pair stack", stack: true,
     why: "Freaky Pyrotation is four two-person stacks; each player stands in exactly one." },
 ];
+
+// Boss-relative clock spots for the all-party Double-Dip / Reverse volleys
+// (+126 and +545), degrees clockwise from Deep Blue's front (user,
+// 2026-10-09: the OT is behind the boss, H2 to its right). Deep Blue's
+// logged facing points at the OT's spot, so "front" is facing + 180.
+const CLOCK_SPOT: Record<FFRoleSlot, number> = { MT: 0, OT: 180, H1: 270, H2: 90, M1: 225, M2: 135, R1: 315, R2: 45 };
+const CLOCK_SPOT_NAME: Record<FFRoleSlot, string> = {
+  MT: "in front", OT: "behind", H1: "on the left", H2: "on the right",
+  M1: "back-left", M2: "back-right", R1: "front-left", R2: "front-right",
+};
+const CLOCK_CASTS: Record<number, number> = { 46557: 46558, 46560: 46561 }; // boss cast -> initial cones
+// Clean volleys put every player 0-24 degrees from their spot (630 player-
+// volleys); misplaced players were 35-135 off (A9, A10 H2 104, B11 R2 60).
+const CLOCK_TOLERANCE  = 30;
+// The layout is in use when this many stood on their spots (the snaking
+// and split-arena volleys use other layouts and fail this).
+const CLOCK_LAYOUT_MIN = 5;
+// An off-spot player is the cause of an overlap within this angle of it.
+const CLOCK_CONE_REACH = 45;
 
 // FFLogs logs the death event ~2.0s after the fatal hit (README).
 const DEATH_EVENT_LAG_MS = 2000;
@@ -726,7 +768,36 @@ function detectAvoidable(players: PlayerInfo[], life: Life): PullError[] {
  * Standing in Red Hot's fire puddles: the Burns status. No Damage Down and
  * healable, so Minor unless the player died while it was on them.
  */
-function detectFire(players: PlayerInfo[], life: Life, deaths: DeathEvent[], called: Set<DeathEvent>): PullError[] {
+/**
+ * Where a Cutback Blaze pointed (user, 2026-10-09): it targets the farthest
+ * player from Red Hot and leaves its safe slice on the opposite side of the
+ * boss. Counts the phase's earlier fire puddles (Inferno circles and
+ * Pyrotation stacks since the last Divers' Dare) inside that slice.
+ */
+function cutbackAim(players: PlayerInfo[], casts: EnemyEvent[], hitT: number) {
+  const boss = castsOf(casts, CUTBACK_CAST).filter((c) => c.timestamp <= hitT && c.timestamp >= hitT - 3000 && c.x !== undefined && c.y !== undefined).pop();
+  if (!boss) return undefined;
+  const at = { x: boss.x!, y: boss.y! };
+  const spots = hitsOf(players, CUTBACK_BLAZE, hitT - 200, hitT + 1000).filter((h) => h.e.x !== undefined && h.e.y !== undefined)
+    .map((h) => ({ p: h.p, d: Math.hypot(h.e.x! - at.x, h.e.y! - at.y), pos: h.e as { x: number; y: number } }));
+  const far = spots.sort((a, b) => b.d - a.d)[0];
+  if (!far) return undefined;
+  const safe = (bearingFrom(at, far.pos) + 180) % 360;
+  const lastDare = Math.max(-Infinity, ...castsOf(casts, DIVERS_DARE).filter((c) => c.timestamp < hitT).map((c) => c.timestamp));
+  const puddles = [
+    ...hitsOf(players, INFERNO, lastDare, hitT).map((h) => h.e),
+    // One fire per Pyrotation hit, under the stack: the hits' middle.
+    ...clusterByGap(hitsOf(players, PYROTATION, lastDare, hitT), (h) => h.e.timestamp, 500).map((g) => {
+      const xs = g.filter((h) => h.e.x !== undefined && h.e.y !== undefined);
+      return xs.length ? { x: xs.reduce((s, h) => s + h.e.x!, 0) / xs.length, y: xs.reduce((s, h) => s + h.e.y!, 0) / xs.length } : {};
+    }),
+  ].filter((e): e is { x: number; y: number } => e.x !== undefined && e.y !== undefined);
+  const fireInSlice = puddles.filter((e) => Math.hypot(e.x - at.x, e.y - at.y) > CUTBACK_HITBOX && angularDistance(bearingFrom(at, e), safe) <= CUTBACK_SAFE_HALF_ANGLE).length;
+  const compass = ["north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest"][Math.round(safe / 45) % 8];
+  return { target: far.p, targetDist: far.d, safeWhere: `to the ${compass} of the boss`, fireInSlice };
+}
+
+function detectFire(players: PlayerInfo[], life: Life, deaths: DeathEvent[], called: Set<DeathEvent>, casts: EnemyEvent[]): PullError[] {
   const errors: PullError[] = [];
   const episodesOf = (p: PlayerInfo) => {
     const spans = BURNS.flatMap((id) => debuffIntervals(p, id)).filter((w) => life.hitAlive(p, w.start)).sort((a, b) => a.start - b.start);
@@ -749,8 +820,12 @@ function detectFire(players: PlayerInfo[], life: Life, deaths: DeathEvent[], cal
     if (uniq(caught.map((c) => c.p)).length < CUTBACK_GROUP_BURNS) continue;
     caught.forEach((c) => groupBurns.add(c.ep));
     const killed = uniq(caught.filter(({ p, ep }) => deaths.some((d) => d.player === p.name && !called.has(d) && d.timestamp - DEATH_EVENT_LAG_MS >= ep.start - 500 && d.timestamp - DEATH_EVENT_LAG_MS <= ep.end + 1000)).map((c) => c.p));
+    const aim = cutbackAim(players, casts, t);
+    const aimText = aim
+      ? ` It was aimed at ${aim.target.name}, the farthest player from Red Hot (${yd(aim.targetDist)}y), which put the safe slice ${aim.safeWhere}${aim.fireInSlice ? `, where ${aim.fireInSlice} earlier fire puddle${aim.fireInSlice > 1 ? "s" : ""} (Inferno/Pyrotation) already burned` : " on floor with no earlier fire"}.`
+      : "";
     errors.push(playerlessMinor(RHDB_FIRE_RULE_ID, "Party Caught in Cutback Fire",
-      `${uniq(caught.map((c) => c.p)).length} players (${namesOf(caught.map((c) => c.p))}) were standing in Cutback Blaze's fire when it lit, ${sec(Math.min(...caught.map((c) => c.ep.start)) - t)}s after the hit${killed.length ? `; ${namesOf(killed)} died burning` : ""}. Cutback sets most of the arena alight around its farthest target and leaves one narrow slice; the party bait it so that slice points at clear floor and moves into it together. The log can't tell whether the aim or the movement failed, so nobody is named.`,
+      `${uniq(caught.map((c) => c.p)).length} players (${namesOf(caught.map((c) => c.p))}) were standing in Cutback Blaze's fire when it lit, ${sec(Math.min(...caught.map((c) => c.ep.start)) - t)}s after the hit${killed.length ? `; ${namesOf(killed)} died burning` : ""}.${aimText} Cutback targets the farthest player from Red Hot and sets ~300 degrees around the boss alight, leaving a safe slice on the opposite side; whoever is farthest has to point it so that slice lands on clear floor. Whether a clear slice was still possible depends on everything placed earlier, so nobody is named.`,
       t + 3000, CUTBACK_BLAZE, "Cutback Blaze"));
     if (killed.length >= MASS_DEATHS) {
       errors.push(raidMarker(RHDB_FIRE_RULE_ID, "Party Caught in Cutback Fire",
@@ -858,6 +933,69 @@ function detectFloater(players: PlayerInfo[], life: Life): PullError[] {
   return errors;
 }
 
+// ── boss-relative clock spots ───────────────────────────────────────────────
+
+type Slots = Map<PlayerInfo, FFRoleSlot>;
+/** One Double-Dip / Reverse volley: each hit player's angle clockwise from Deep Blue's front. */
+type ClockVolley = { t: number; hitId: number; angles: Map<PlayerInfo, number> };
+
+/** Compass bearing of `p` as seen from `from`. */
+const bearingFrom = (from: { x: number; y: number }, p: { x: number; y: number }) =>
+  compassBearingOf(p.x - from.x + ARENA_CENTER, p.y - from.y + ARENA_CENTER);
+
+function clockVolleys(players: PlayerInfo[], casts: EnemyEvent[]): ClockVolley[] {
+  const out: ClockVolley[] = [];
+  for (const c of castsOf(casts, Object.keys(CLOCK_CASTS).map(Number))) {
+    if (c.facing === undefined || c.x === undefined || c.y === undefined) continue;
+    const front = facingToCompassBearing(c.facing) + 180;
+    const hitId = CLOCK_CASTS[c.abilityId];
+    const angles = new Map<PlayerInfo, number>();
+    for (const p of players) {
+      const h = p.damageTaken.find((e) => e.abilityId === hitId && e.timestamp >= c.timestamp && e.timestamp <= c.timestamp + 2000 && e.x !== undefined && e.y !== undefined);
+      if (h) angles.set(p, ((bearingFrom(c as { x: number; y: number }, h as { x: number; y: number }) - front) % 360 + 360) % 360);
+    }
+    out.push({ t: c.timestamp, hitId, angles });
+  }
+  return out;
+}
+
+/**
+ * Party slots for this pull. Healers and ranged come from their jobs
+ * (roles.ts); tanks and melee are paired by where they stood in the clock
+ * volleys (roles.ts's job default swaps this roster's melee, and its
+ * first-auto-attack MT was the OT in A1).
+ */
+function resolveSlots(players: PlayerInfo[], volleys: ClockVolley[]): Slots {
+  const roles = detectFFRoles(players);
+  const slots: Slots = new Map();
+  for (const r of roles) if (r.player) slots.set(r.player, r.slot);
+  const deviation = (p: PlayerInfo, slot: FFRoleSlot) =>
+    volleys.reduce((s, v) => s + (v.angles.has(p) ? angularDistance(v.angles.get(p)!, CLOCK_SPOT[slot]) : 0), 0);
+  for (const [a, b] of [["MT", "OT"], ["M1", "M2"]] as [FFRoleSlot, FFRoleSlot][]) {
+    const pa = roles.find((r) => r.slot === a)?.player, pb = roles.find((r) => r.slot === b)?.player;
+    if (!pa || !pb) continue;
+    if (deviation(pa, b) + deviation(pb, a) < deviation(pa, a) + deviation(pb, b)) { slots.set(pa, b); slots.set(pb, a); }
+  }
+  return slots;
+}
+
+/** Each player's angle and distance from their clock spot, when the volley used the layout. */
+function clockLayout(v: ClockVolley | undefined, slots: Slots): Map<PlayerInfo, { angle: number; dev: number; slot: FFRoleSlot }> | undefined {
+  if (!v) return undefined;
+  const out = new Map<PlayerInfo, { angle: number; dev: number; slot: FFRoleSlot }>();
+  for (const [p, angle] of v.angles) {
+    const slot = slots.get(p);
+    if (slot) out.set(p, { angle, dev: angularDistance(angle, CLOCK_SPOT[slot]), slot });
+  }
+  return [...out.values()].filter((x) => x.dev <= CLOCK_TOLERANCE).length >= CLOCK_LAYOUT_MIN ? out : undefined;
+}
+
+/** Which clock spot an angle is closest to, in words. */
+function clockWhere(angle: number): string {
+  const best = (Object.keys(CLOCK_SPOT) as FFRoleSlot[]).sort((a, b) => angularDistance(angle, CLOCK_SPOT[a]) - angularDistance(angle, CLOCK_SPOT[b]))[0];
+  return CLOCK_SPOT_NAME[best];
+}
+
 // ── bait overlaps (spreads, cones, jumps, pair stacks) ──────────────────────
 
 /**
@@ -866,7 +1004,7 @@ function detectFloater(players: PlayerInfo[], life: Life): PullError[] {
  * player the bait belonged to are named: the log can't tell which of them
  * was out of place, and spacing is on both (README principle 3).
  */
-function detectOverlaps(players: PlayerInfo[], life: Life, casts: EnemyEvent[]): PullError[] {
+function detectOverlaps(players: PlayerInfo[], life: Life, casts: EnemyEvent[], volleys: ClockVolley[], slots: Slots): PullError[] {
   const errors: PullError[] = [];
   for (const fam of FAMILIES) {
     for (const res of resolutions(players, fam.ids)) {
@@ -905,6 +1043,29 @@ function detectOverlaps(players: PlayerInfo[], life: Life, casts: EnemyEvent[]):
           const gap = d !== undefined ? `, ${yd(d)}y apart` : "";
           flag(v, `Was hit by ${owner.name}'s ${fam.what} (${kFmt(h.e.amount ?? 0)}${gap})`, h.e.timestamp, died, h.e.abilityId);
           if (life.hitAlive(owner, h.e.timestamp)) flag(owner, `Their ${fam.what} hit ${v.name} (${kFmt(h.e.amount ?? 0)}${gap}${died ? `; ${v.name} died` : ""})`, h.e.timestamp, false, h.e.abilityId);
+        }
+      }
+      // Boss-relative clock volleys: blame only players off their spot near
+      // the overlap (user, 2026-10-09, A10 +2:07: the H2 stood behind the
+      // boss with the OT; only the H2 was wrong).
+      const layout = fam.clock && flagged.size
+        ? clockLayout(volleys.find((v) => fam.ids.includes(v.hitId) && Math.abs(v.t - res[0].e.timestamp) <= 2500), slots)
+        : undefined;
+      if (layout) {
+        const victims = [...flagged.keys()].filter((p) => layout.has(p));
+        const culprits = [...layout].filter(([, x]) => x.dev > CLOCK_TOLERANCE &&
+          victims.some((v) => angularDistance(layout.get(v)!.angle, x.angle) <= CLOCK_CONE_REACH)).map(([p]) => p);
+        if (culprits.length) {
+          const hitText = joinNames(victims.map((v) => `${v.name} (${byPlayer.get(v)?.length ?? 0} cones${flagged.get(v)!.died ? ", died" : ""})`));
+          for (const p of culprits) {
+            const x = layout.get(p)!;
+            errors.push(playerError(p, {
+              ruleId: RHDB_OVERLAP_RULE_ID, severity: "Major", name: `${fam.name}: Out of Position`,
+              description: `${fam.name}: as ${x.slot} they belong ${CLOCK_SPOT_NAME[x.slot]} relative to Deep Blue's facing, but stood ${clockWhere(x.angle)} (${Math.round(x.dev)}° off), so the cones overlapped: ${hitText}. Every player takes a fixed spot around the boss, measured from the way it faces, so the eight cones fan out apart.`,
+              timestamp: Math.min(...victims.map((v) => flagged.get(v)!.t)), abilityId: fam.ids[0], abilityName: fam.name,
+            }));
+          }
+          continue;
         }
       }
       for (const [p, f] of flagged) {
@@ -997,10 +1158,17 @@ function detectBusters(players: PlayerInfo[], life: Life, casts: EnemyEvent[]): 
 }
 
 /**
- * Deep Impact: an AoE buster with knockback on Deep Blue's farthest player.
- * One non-tank alone = they went farther than the tank. Anyone else caught =
- * the tank holding Deep Blue (its auto-attack target) didn't take it away
- * from the party. 3+ deaths end the pull.
+ * Deep Impact: an AoE buster with knockback on the farthest player from
+ * Deep Blue (user, 2026-10-09). The party stands on the hitbox and the tank
+ * a little farther out (max melee) so it takes it. The AoE centers on its
+ * target, the farthest player it hit:
+ * - a non-tank target was too far from the boss and baited it (A8 +2:18:
+ *   the H2 at 5.5y while the MT, unhit, was correctly placed);
+ * - a tank target that also hit non-tanks: the tank was too close if under
+ *   TANK_MIN_YD, otherwise the victims weren't on the hitbox.
+ * 3+ deaths end the pull. Absolute distances only hold for the opening cast;
+ * the snaking/final ones were taken away from the boss, so blame compares
+ * players with each other.
  */
 function detectDeepImpact(players: PlayerInfo[], life: Life, casts: EnemyEvent[]): PullError[] {
   const errors: PullError[] = [];
@@ -1010,37 +1178,40 @@ function detectDeepImpact(players: PlayerInfo[], life: Life, casts: EnemyEvent[]
     const nonTanks = uniq(hit.filter((h) => !isTank(h.p)).map((h) => h.p));
     if (nonTanks.length === 0) continue;
     const killed = uniq(hit.filter((h) => life.diedFrom(h.p, h.e.timestamp)).map((h) => h.p));
-    const target = castsOf(casts, DEEP_IMPACT).filter((c) => c.timestamp <= t && c.timestamp >= t - 2000 && c.target).pop()?.target;
-    const hitText = joinNames(hit.map((h) => `${h.p.name} (${kFmt(h.e.amount ?? 0)}${life.diedFrom(h.p, h.e.timestamp) ? ", died" : ""})`));
-    if (hit.length === 1) {
-      const { p, e } = hit[0];
-      errors.push(playerError(p, {
-        ruleId: RHDB_DEEP_IMPACT_RULE_ID, severity: "Major", name: "Took Deep Impact",
-        description: `Was the farthest player from Deep Blue and took Deep Impact (${kFmt(e.amount ?? 0)})${diedText(life.diedFrom(p, e.timestamp))}. The tank holding Deep Blue goes farthest to bait it; everyone else stays closer to the boss.`,
-        timestamp: e.timestamp, abilityId: DEEP_IMPACT, abilityName: "Deep Impact",
+    const boss = castsOf(casts, DEEP_IMPACT_CAST).filter((c) => c.timestamp <= t && c.timestamp >= t - 3000 && c.x !== undefined && c.y !== undefined).pop();
+    const fromBoss = (e: PlayerEvent) => (boss && e.x !== undefined && e.y !== undefined ? Math.hypot(e.x - boss.x!, e.y - boss.y!) : undefined);
+    const ranked = [...hit].sort((a, b) => (fromBoss(b.e) ?? -1) - (fromBoss(a.e) ?? -1));
+    const named = castsOf(casts, DEEP_IMPACT).filter((c) => c.timestamp <= t && c.timestamp >= t - 2000 && c.target).pop()?.target;
+    const target = (named ? hit.find((h) => h.p.name === named) : undefined) ?? (fromBoss(ranked[0].e) !== undefined ? ranked[0] : undefined);
+    const at = (h: Hit) => (fromBoss(h.e) !== undefined ? `${yd(fromBoss(h.e)!)}y` : "?y");
+    const hitText = joinNames(ranked.map((h) => `${h.p.name} (${at(h)} out, ${kFmt(h.e.amount ?? 0)}${life.diedFrom(h.p, h.e.timestamp) ? ", died" : ""})`));
+    const rule = "Deep Impact is an AoE tankbuster on the farthest player from Deep Blue: the party stands on the boss's hitbox and the tank a little farther out, at max melee, so it targets the tank.";
+    if (!target) {
+      errors.push(playerlessMinor(RHDB_DEEP_IMPACT_RULE_ID, "Deep Impact Hit the Party", `Deep Impact hit ${hitText}; positions are missing, so its target can't be told. ${rule}`, t, DEEP_IMPACT, "Deep Impact"));
+    } else if (!isTank(target.p)) {
+      const others = ranked.filter((h) => h !== target);
+      errors.push(playerError(target.p, {
+        ruleId: RHDB_DEEP_IMPACT_RULE_ID, severity: "Major", name: "Baited Deep Impact",
+        description: `Was the farthest player from Deep Blue (${at(target)}) and baited Deep Impact (${kFmt(target.e.amount ?? 0)})${diedText(life.diedFrom(target.p, target.e.timestamp))}${others.length ? `; it also hit ${joinNames(others.map((h) => `${h.p.name} (${at(h)}${life.diedFrom(h.p, h.e.timestamp) ? ", died" : ""})`))}` : ""}. ${rule}`,
+        timestamp: target.e.timestamp, abilityId: DEEP_IMPACT, abilityName: "Deep Impact",
       }));
     } else {
-      // Deep Blue's tank: the target of its latest auto-attack before the
-      // cast; during snaking (when Deep Blue barely auto-attacks) the tank
-      // with Watersnaking, who holds Deep Blue in every clean pull.
-      const blueTank = players.filter(isTank)
-        .map((p) => ({ p, at: Math.max(-Infinity, ...p.damageTaken.filter((e) => e.source === "Deep Blue" && e.abilityName === "Attack" && e.timestamp < t - 1000).map((e) => e.timestamp)) }))
-        .filter((x) => x.at > t - 20_000 && life.hitAlive(x.p, t)).sort((a, b) => b.at - a.at)[0]?.p
-        ?? players.find((p) => isTank(p) && life.hitAlive(p, t) && hasAura(p, WATER_SNAKING, t - 500));
-      const text = `Deep Impact${target ? ` (aimed at ${target})` : ""} hit ${hitText}. It's an AoE tankbuster on the farthest player from Deep Blue: the tank holding Deep Blue takes it far away from everyone.`;
-      if (blueTank) {
-        errors.push(playerError(blueTank, {
+      const tankYd = fromBoss(target.e)!;
+      const victims = ranked.filter((h) => !isTank(h.p));
+      const blame = tankYd < TANK_MIN_YD * 100 ? [target] : victims;
+      for (const h of blame) {
+        errors.push(playerError(h.p, {
           ruleId: RHDB_DEEP_IMPACT_RULE_ID, severity: "Major", name: "Deep Impact Hit the Party",
-          description: `${text} ${blueTank.name} was holding Deep Blue and didn't take it away from the party.`,
-          timestamp: t, abilityId: DEEP_IMPACT, abilityName: "Deep Impact",
+          description: h === target
+            ? `Took Deep Impact only ${at(target)} from Deep Blue, close enough that it also hit ${joinNames(victims.map((v) => `${v.p.name} (${at(v)}${life.diedFrom(v.p, v.e.timestamp) ? ", died" : ""})`))}. ${rule}`
+            : `Stood ${at(h)} from Deep Blue, close enough to ${target.p.name} (the target, ${at(target)} out) to be caught by Deep Impact (${kFmt(h.e.amount ?? 0)})${diedText(life.diedFrom(h.p, h.e.timestamp))}. ${rule}`,
+          timestamp: h.e.timestamp, abilityId: DEEP_IMPACT, abilityName: "Deep Impact",
         }));
-      } else {
-        errors.push(playerlessMinor(RHDB_DEEP_IMPACT_RULE_ID, "Deep Impact Hit the Party", `${text} No living tank was holding Deep Blue.`, t, DEEP_IMPACT, "Deep Impact"));
       }
     }
     if (killed.length >= MASS_DEATHS) {
       errors.push(raidMarker(RHDB_DEEP_IMPACT_RULE_ID, "Deep Impact Hit the Party",
-        `Deep Impact killed ${killed.length} (${namesOf(killed)}). Unresolvable from here.`, t, DEEP_IMPACT, "Deep Impact"));
+        `Deep Impact killed ${killed.length} (${namesOf(killed)}). Unresolvable from here.`, Math.max(...hit.map((h) => h.e.timestamp)), DEEP_IMPACT, "Deep Impact"));
     }
   }
   return errors;
@@ -1190,13 +1361,15 @@ export function detectRedHotDeepBlueErrors(players: PlayerInfo[], deathEvents: D
   const life = buildLife(players, deathEvents);
   const pullEnd = Math.max(0, ...players.flatMap((p) => [...p.damageTaken, ...p.casts].map((e) => e.timestamp)), ...deathEvents.map((d) => d.timestamp));
   const called = calledWipeDeaths(deathEvents, pullEnd);
+  const volleys = clockVolleys(players, enemyCasts);
+  const slots = resolveSlots(players, volleys);
 
   const errors = [
     ...detectAvoidable(players, life),
-    ...detectFire(players, life, deathEvents, called),
+    ...detectFire(players, life, deathEvents, called, enemyCasts),
     ...detectWall(players, deathEvents, called),
     ...detectFloater(players, life),
-    ...detectOverlaps(players, life, enemyCasts),
+    ...detectOverlaps(players, life, enemyCasts, volleys, slots),
     ...detectBusters(players, life, enemyCasts),
     ...detectDeepImpact(players, life, enemyCasts),
     ...detectStacks(players, life),
@@ -1225,7 +1398,7 @@ export function detectRedHotDeepBlueErrors(players: PlayerInfo[], deathEvents: D
   const outAt = (t: number) => players.filter((p) => !life.alive(p, t));
   const collapseT = life.outIntervals.map((w) => w.start).sort((a, b) => a - b)
     .find((t) => outAt(t).length >= COLLAPSE_DEAD_COUNT && pullEnd - t <= COLLAPSE_END_MS);
-  if (collapseT !== undefined && collapseT < firstRaid()) {
+  if (collapseT !== undefined && collapseT + DEATH_EVENT_LAG_MS < firstRaid()) {
     const who = outAt(collapseT).map((p) => p.name);
     errors.push(raidMarker(RHDB_COLLAPSE_RULE_ID, "Party Collapse",
       `${who.length} players were dead at once (${joinNames(who)}). Treated as the cutoff point.`,

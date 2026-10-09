@@ -312,15 +312,15 @@ has the evidence.
 ### Red Hot and Deep Blue (FFXIV)
 
 Reports jN3XDrf2z8PmLgRJ (A), xFAfGP3qX4yJhDrV (B), d3vRbwfpNBLzJ2Xh (C,
-kill = C4); no VOD review yet. Header of
-`lib/mechanics/ffxiv/arcadion/red-hot-deep-blue.ts` has the evidence.
-- **Overlap blame.** A bait (cone, circle, jump) hitting someone else
-  names both the owner and the victim. Pick one side once the VOD shows
-  who moved?
-- **Cutback group burns** (4+ players lighting up together) are one
-  player-less Minor. Should the Cutback target be named?
-- **Deep Impact on the party** names Deep Blue's tank (its auto-attack
-  target, else the Watersnaking tank). Right during snaking?
+kill = C4); VOD answers 2026-10-09 cover overlaps (boss-relative clock
+spots), Cutback (aim described, nobody named) and Deep Impact (farthest
+player). Header of `lib/mechanics/ffxiv/arcadion/red-hot-deep-blue.ts` has
+the evidence.
+- **Other overlap layouts.** Only the all-party Double-Dip / Reverse
+  volleys have known spots. Snaps, Inferno, Splash and the snaking /
+  split-arena cones still name every player hit twice. Their layouts?
+- **Deep Impact during snaking:** the H1 was the farthest player in 9
+  pulls (+5:15, +9:17). Real mistakes, or a strategy that put them there?
 - **Snaking Hot Impact on a non-tank** names the tank holding
   Firesnaking; when neither tank had it, nobody. Right?
 - **Xtreme Wave deaths** at full HP to one dash are called a short

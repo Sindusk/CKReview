@@ -1234,6 +1234,7 @@ function fflBuildEnemyCastEvents(
       x:            e.sourceResources?.x,
       y:            e.sourceResources?.y,
       target:       actorMap.get(e.targetID)?.type === "Player" ? actorMap.get(e.targetID)?.name : undefined,
+      facing:       e.sourceResources?.facing,
     }));
 }
 

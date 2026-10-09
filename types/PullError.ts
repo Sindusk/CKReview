@@ -203,4 +203,7 @@ export type EnemyEvent = {
   // FFXIV casts: the player the cast targeted, when FFLogs names one (a
   // bait's owner: Red Hot and Deep Blue's cones, circles and busters).
   target?:         string;
+  // FFXIV casts: the caster's facing in FFLogs centi-radians (convert with
+  // geometry.ts's facingToCompassBearing). Boss-relative bait spots.
+  facing?:         number;
 };
