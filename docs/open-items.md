@@ -511,6 +511,19 @@ grouped by exact roster. The module headers hold the rules.
 
   Our Combust III clipping is lower than xivanalysis's because it's per
   target.
+- **Dragoon, Vamp kill.** Positionals (3 missed of 21, 21 and 22) and the
+  broken combo matched. Lance Charge now matches (5 missed actions, 1
+  missed GCD): burst windows no longer expect an action on a longer
+  cooldown than the window's cycle (Dragonfire Dive in a 60s window)
+  when it was on cooldown throughout, unless it was pressed within 10s
+  before. New:
+  - Life Surge spent on a weaker GCD. The log shows 8 against
+    xivanalysis's 4, so its rule allows some (perhaps Fang and Claw);
+    ask the player.
+  - Chaotic Spring DoT uptime
+
+  Not built: Life of the Dragon and Battle Litany window checks, which
+  overlap Lance Charge (the same actions would count twice).
 - **Healer DoT applications are valued against the filler** (user,
   2026-10-08), two ways:
   - an early refresh on an enemy that stays costs (seconds left ÷ 30s)

@@ -106,7 +106,33 @@ export type ExpectedAction = {
   // How a missing one is valued; default = its average × the window bonus
   // (it was used outside the window instead).
   value?: (ctx: PlayerCheckContext) => number;
+  // Whether it could have been used in this window. Default: an action on
+  // a longer cooldown than the window's own cycle (one charge) is expected
+  // only if it came off cooldown by the window's end. A 60s Lance Charge
+  // can't hold a 120s Dragonfire Dive every time (jN3XDrf2z8PmLgRJ Vamp
+  // pull 8: every odd-minute window "missed" it; xivanalysis expects it
+  // every other window). Actions on the window's cycle or shorter (a 60s
+  // Double Down in a 60s No Mercy) are always expected: pressed early,
+  // they're misaligned, not unavailable.
+  availableIf?: (ctx: PlayerCheckContext, w: Window, cycleMs: number) => boolean;
 };
+
+// Pressed this soon before the window, it could have been held for it.
+const HOLDABLE_MS = 10_000;
+
+/**
+ * Whether any of these actions was off cooldown at some point in the window
+ * (or pressed just before it, when it could have been held). Only actions
+ * on a cooldown longer than cycleMs are ever unavailable.
+ */
+export function offCooldownIn(ctx: PlayerCheckContext, ids: number[], w: Window, cycleMs: number): boolean {
+  return ids.some((id) => {
+    const a = ctx.game.action(id);
+    if (!a || a.charges > 1 || a.cooldownMs <= cycleMs * 1.1) return true;
+    const last = ctx.player.casts.filter((c) => c.abilityId === id && c.timestamp < w.startMs).pop();
+    return !last || last.timestamp + a.cooldownMs <= w.endMs || w.startMs - last.timestamp <= HOLDABLE_MS;
+  });
+}
 
 export type BurstWindowSpec = {
   statusId:      number;
@@ -155,6 +181,10 @@ export function observedBonus(ctx: PlayerCheckContext, w: Window): number {
 export function burstWindowFindings(ctx: PlayerCheckContext, specIn: BurstWindowSpec): DamageFinding[] {
   const out: DamageFinding[] = [];
   const windows = specIn.onEnemy ? enemyStatusWindows(ctx, specIn.statusId) : statusWindows(ctx, specIn.statusId);
+  // The window's own cycle: the shortest gap between window starts (its
+  // recast, give or take drift). With one window, nothing is unavailable.
+  const starts = windows.map((w) => w.startMs);
+  const cycleMs = starts.length > 1 ? Math.min(...starts.slice(1).map((t, i) => t - starts[i])) : Infinity;
   for (const w of windows) {
     if (w.endMs > ctx.endMs) continue;
     const spec = { ...specIn, bonus: specIn.bonus === "observed" ? observedBonus(ctx, w) : specIn.bonus };
@@ -167,6 +197,7 @@ export function burstWindowFindings(ctx: PlayerCheckContext, specIn: BurstWindow
     const missingGcds = expectedGcds !== undefined ? Math.max(0, expectedGcds - gcds.length) : 0;
     const missing: { name: string; n: number; value: number }[] = [];
     for (const e of spec.expected(ctx, casts)) {
+      if (!(e.availableIf ? e.availableIf(ctx, w, cycleMs) : offCooldownIn(ctx, e.ids, w, cycleMs))) continue;
       const got = casts.filter((c) => e.ids.includes(c.abilityId)).length;
       const n = Math.max(0, e.count - got);
       if (n === 0) continue;

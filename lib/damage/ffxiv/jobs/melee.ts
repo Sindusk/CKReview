@@ -18,7 +18,9 @@
 //     Generation or Ouroboros is its average minus the GCD used instead.
 // Unverified (no sample has the job):
 //   - Monk: Riddle of Fire, 11 GCDs (RiddleOfFire.tsx), +15% (tooltip).
-//   - Dragoon: Power Surge uptime, +10% (tooltip); Lance Charge
+//   - Dragoon (checked against xivanalysis on jN3XDrf2z8PmLgRJ Vamp pull 8:
+//     Lance Charge and positionals match): Power Surge uptime, +10%
+//     (tooltip); Chaotic Spring DoT uptime; Life Surge (below); Lance Charge
 //     (LanceCharge.tsx): 8 GCDs plus High Jump, Mirage Dive, Dragonfire
 //     Dive, Rise of the Dragon, Geirskogul, Nastrond, Stardiver and
 //     Starcross, +10% (tooltip).
@@ -32,9 +34,9 @@
 //   MIT License; full text in THIRD_PARTY_NOTICES.md.
 
 import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
-import type { JobCheck } from "../../types";
-import type { PlayerCheckContext } from "../../checks";
-import { burstWindowFindings, statusWindows, uptimeFindings, type ExpectedAction } from "./shared";
+import type { DamageFinding, JobCheck } from "../../types";
+import { finding, type PlayerCheckContext } from "../../checks";
+import { burstWindowFindings, dotFindings, k, offCooldownIn, statusWindows, uptimeFindings, type ExpectedAction } from "./shared";
 
 const id = (key: string) => A[key].id;
 const ids = (...keys: string[]) => keys.filter((key) => A[key]).map(id);
@@ -93,7 +95,51 @@ const lanceCharge: JobCheck = (ctx) => burstWindowFindings(ctx, {
   bonusBasis: "Lance Charge is +10% (tooltip; not yet checked against a log)",
   expectedGcds: () => 8,
   expected: () => ["HIGH_JUMP", "MIRAGE_DIVE", "DRAGONFIRE_DIVE", "RISE_OF_THE_DRAGON", "GEIRSKOGUL", "NASTROND", "STARDIVER", "STARCROSS"]
-    .filter((key) => A[key]).map((key) => ({ ids: [id(key)], count: 1, name: A[key].name })),
+    .filter((key) => A[key]).map((key): ExpectedAction => ({
+      ids: [id(key)], count: 1, name: A[key].name,
+      // Follow-ups are available when what grants them was.
+      availableIf: key === "RISE_OF_THE_DRAGON" ? (c, w, cycle) => offCooldownIn(c, ids("DRAGONFIRE_DIVE"), w, cycle)
+        : key === "MIRAGE_DIVE" ? (c, w, cycle) => offCooldownIn(c, ids("HIGH_JUMP"), w, cycle)
+        : undefined,
+    })),
+});
+
+// Life Surge (xivanalysis LifeSurge.ts): its guaranteed crit belongs on
+// Drakesbane or Heavens' Thrust (Coerthan Torment in AoE). The GCD that
+// consumed it is the cast at the status's removal. A weaker one loses
+// (the best GCD's average − its average) × the crit's share, estimated
+// as for crit buffs (lib/damage/buffs.ts: ×1.55 at a 25% base rate, so a
+// forced crit adds 36% over an average hit). xivanalysis counted 4 on
+// jN3XDrf2z8PmLgRJ Vamp pull 8; the log has 8 on other GCDs (Fang and
+// Claw ×3, Raiden Thrust ×2, Lance Barrage, Spiral Blow, Chaotic Spring),
+// so its rule allows some of them. Marked inference.
+const LIFE_SURGE_GOOD = ["DRAKESBANE", "HEAVENS_THRUST", "COERTHAN_TORMENT"];
+const FORCED_CRIT_SHARE = (1.55 - (1 + 0.25 * 0.55)) / (1 + 0.25 * 0.55);
+
+const lifeSurge: JobCheck = (ctx): DamageFinding[] => {
+  const out: DamageFinding[] = [];
+  const good = new Set(ids(...LIFE_SURGE_GOOD));
+  const best = Math.max(...ids("DRAKESBANE", "HEAVENS_THRUST").map((x) => ctx.values.perUse(x)));
+  for (const e of ctx.player.buffs ?? []) {
+    if (e.abilityId !== S.LIFE_SURGE.id || e.buffStatus !== "removed" || e.source !== ctx.player.name || e.timestamp >= ctx.endMs) continue;
+    const used = ctx.uses.find((u) => Math.abs(u.startMs - e.timestamp) <= 100);
+    if (!used || good.has(used.action.id)) continue;
+    const lost = Math.max(0, best - ctx.values.perUse(used.action.id)) * FORCED_CRIT_SHARE;
+    if (lost <= 0) continue;
+    out.push(finding(ctx, {
+      kind: "burst-window", startMs: e.timestamp, endMs: e.timestamp, forced: false, inference: true,
+      label: `Life Surge on ${used.abilityName}`,
+      lostDamage: lost,
+      basis: `(${k(best)} best of Drakesbane / Heavens' Thrust − ${k(ctx.values.perUse(used.action.id))} average ${used.abilityName}) × ` +
+        `${Math.round(FORCED_CRIT_SHARE * 100)}% (a forced crit over an average hit, estimated)`,
+      detail: `Life Surge spent on ${used.abilityName}, not Drakesbane or Heavens' Thrust`,
+    }));
+  }
+  return out;
+};
+
+const chaoticSpring: JobCheck = (ctx) => dotFindings(ctx, {
+  statusIds: [S.CHAOTIC_SPRING.id], name: S.CHAOTIC_SPRING.name, durationMs: S.CHAOTIC_SPRING.duration ?? 24_000,
 });
 
 const kunaisBane: JobCheck = (ctx) => burstWindowFindings(ctx, {
@@ -117,6 +163,6 @@ const enshroud: JobCheck = (ctx) => burstWindowFindings(ctx, {
 export const SAM_CHECKS: JobCheck[] = [uptime("FUGETSU", 0.13, "Fugetsu is +13%, FFLogs multiplier"), meikyo];
 export const VPR_CHECKS: JobCheck[] = [uptime("HUNTERS_INSTINCT", 0.1, "Hunter's Instinct is +10%, FFLogs multiplier"), reawaken];
 export const MNK_CHECKS: JobCheck[] = [riddleOfFire];
-export const DRG_CHECKS: JobCheck[] = [uptime("POWER_SURGE", 0.1, "Power Surge is +10% (tooltip)"), lanceCharge];
+export const DRG_CHECKS: JobCheck[] = [uptime("POWER_SURGE", 0.1, "Power Surge is +10% (tooltip)"), lanceCharge, lifeSurge, chaoticSpring];
 export const NIN_CHECKS: JobCheck[] = [kunaisBane];
 export const RPR_CHECKS: JobCheck[] = [enshroud];
