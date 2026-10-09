@@ -127,6 +127,32 @@ differ from the FFLogs fight id. In one report, "pull 11" was fight 12.
 - When a finding rests on inference rather than measurement, say so. The
   player will check it against what they actually press.
 
+## Crit luck
+
+The Damage dialog shows where each player's pull sat among the outcomes
+the same rotation could have rolled. That's the method of
+howbadwasmycritinxiv.com and the `ffxiv_stats` package
+(`lib/damage/crit-rates.ts`, `lib/damage/crit-luck.ts`).
+- **FFLogs has gear stats only for the player who recorded the log.**
+  The `combatantinfo` events carry real crit / direct hit / determination
+  only for them (ACT's PlayerStats line).
+  - Everyone else gets `simulatedCrit` / `simulatedDirectHit`. These are
+    estimates from that fight's own hits, not gear, so they're useless
+    for luck.
+  - We don't keep the logger's stats yet: the sample saver drops them.
+- **So rates are estimated from each player's hits across the loaded
+  pulls.** Only unbuffed hits count, with no guaranteed crits and no
+  always-crit abilities. On `jN3XDrf2z8PmLgRJ` this recovered the
+  logger's real gear within sampling error.
+- **FFXIV DoT ticks never crit in FFLogs.** They're logged at their
+  expected value, so they carry no measurable luck and are left out.
+- **A dance partner's hits list Devilment twice.** Count each buff once.
+- **Check:** `node scripts/validate.js crit-rates <folder> --calibrate`.
+  The percentiles over all players and pulls should fall about 10% in
+  each tenth; they do on both FF samples. `--luck=<boss>:<pull>` prints
+  one pull, and `--stats=Name:crit:dh` compares an estimate with real
+  gear.
+
 ## Ideas for app tooling
 
 All of these are built in the Damage dialog (`lib/damage/`). The build

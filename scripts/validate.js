@@ -594,6 +594,7 @@ MECHANICS['crit-rates'] = {
     store: requireTsFromRoot('lib/sample-report-store.ts'),
     lt: requireTsFromRoot('lib/log-transforms.ts', { './log-auth': {} }),
     ...requireTsFromRoot('lib/damage/crit-rates.ts'),
+    ...requireTsFromRoot('lib/damage/crit-luck.ts'),
     ...requireTsFromRoot('lib/damage/ffxiv/game.ts'),
   }),
   async run({ mod, dir }) {
@@ -614,6 +615,37 @@ MECHANICS['crit-rates'] = {
         `crit ${pct(r.crit)} (±${pct(Math.sqrt(r.crit * (1 - r.crit) / r.hits))}) ×${r.critMult.toFixed(3)}, ` +
         `DH ${pct(r.directHit)} (±${pct(Math.sqrt(r.directHit * (1 - r.directHit) / r.hits))})` +
         (truth ? `  | gear: crit ${pct(truth.crit)} ×${truth.critMult.toFixed(3)}, DH ${pct(truth.directHit)}` : ''));
+    }
+    // Calibration: across every pull and player the percentiles should be
+    // spread evenly, about 10% in each tenth.
+    if (rawArgs.includes('--calibrate')) {
+      const rates = new Map([...byName].map(([n, ps]) => [n, mod.estimateHitRates(ps, mod.FFXIV_DAMAGE, mod.GUARANTEED_HIT_STATUS_IDS)]));
+      const bins = new Array(10).fill(0);
+      let n = 0;
+      for (const pull of pulls) for (const p of pull.players) {
+        const r = rates.get(p.name);
+        const l = r && mod.critLuck(p, Infinity, r, mod.FFXIV_DAMAGE, mod.GUARANTEED_HIT_STATUS_IDS);
+        if (!l || l.hits < 50) continue;
+        bins[Math.min(9, Math.floor(l.percentile * 10))]++; n++;
+      }
+      console.log(`  calibration over ${n} player-pulls (50+ rolling hits), share per tenth: ` +
+        bins.map((b) => `${Math.round((b / n) * 100)}%`).join(' '));
+    }
+    // Crit luck per pull with --luck=<boss>:<pull> (lib/damage/crit-luck.ts).
+    for (const a of rawArgs.filter((x) => x.startsWith('--luck='))) {
+      const [boss, num] = a.slice('--luck='.length).split(':');
+      const pull = pulls.find((p) => p.name === boss && p.pullNumber === Number(num));
+      if (!pull) { console.log(`  no pull ${boss} ${num}`); continue; }
+      console.log(`  luck: ${boss} pull ${num}`);
+      for (const p of pull.players) {
+        const r = mod.estimateHitRates(byName.get(p.name), mod.FFXIV_DAMAGE, mod.GUARANTEED_HIT_STATUS_IDS);
+        const l = r && mod.critLuck(p, Infinity, r, mod.FFXIV_DAMAGE, mod.GUARANTEED_HIT_STATUS_IDS);
+        if (!l) continue;
+        const k = (x) => `${Math.round(x / 1000)}k`;
+        console.log(`    ${p.name.padEnd(22)} ${String(Math.round(l.percentile * 100)).padStart(3)}th percentile, ` +
+          `${l.actual >= l.mean ? '+' : ''}${k(l.actual - l.mean)} vs mean (sd ${k(l.sd)}, ${l.hits} hits), ` +
+          `crits ${l.crits}/${l.expectedCrits.toFixed(0)} expected, DH ${l.directHits}/${l.expectedDirectHits.toFixed(0)}`);
+      }
     }
   },
 };

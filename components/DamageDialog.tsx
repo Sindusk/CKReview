@@ -24,7 +24,9 @@ import type { Pull } from "@/types/Pull";
 import { analyzePullDamage } from "@/lib/damage/analyze";
 import { aggregateDamage, type PlayerDamageAggregate } from "@/lib/damage/aggregate";
 import { getDamageContext } from "@/lib/damage/contexts";
-import { FFXIV_DAMAGE } from "@/lib/damage/ffxiv/game";
+import { FFXIV_DAMAGE, GUARANTEED_HIT_STATUS_IDS } from "@/lib/damage/ffxiv/game";
+import { estimateHitRates } from "@/lib/damage/crit-rates";
+import { critLuck } from "@/lib/damage/crit-luck";
 import { WOW_DAMAGE } from "@/lib/damage/wow/game";
 import type { DamageFinding, PhaseDamageSummary, PlayerDamageSummary, PullDamageAnalysis } from "@/lib/damage/types";
 import { getClassColor } from "@/lib/player-display";
@@ -208,6 +210,8 @@ export default function DamageDialog({ open, onClose, pulls, currentPullId }: Da
                   summary={analysis.players.find((p) => p.player === activePlayer)!}
                   analysis={analysis}
                   colorFor={colorFor}
+                  pull={selectedPull}
+                  pulls={gamePulls}
                 />
               ) : (
                 <p className="ck-dialog-text">No players in this pull.</p>
@@ -316,8 +320,20 @@ function PlayerCard({ name, job, color, lost, forced, uptime, sub, selected, onC
   );
 }
 
-function PlayerDetail({ summary, analysis, colorFor }: { summary: PlayerDamageSummary; analysis: PullDamageAnalysis; colorFor: ColorFor }) {
+function PlayerDetail({ summary, analysis, colorFor, pull, pulls }: {
+  summary: PlayerDamageSummary; analysis: PullDamageAnalysis; colorFor: ColorFor; pull?: Pull; pulls: Pull[];
+}) {
   const shown = summary.findings.filter((f) => f.lostDamage >= 1 || f.kind === "interrupted-cast");
+  // Crit luck (FFXIV): the player's rates from their hits in every loaded
+  // pull, then this pull against what its rotation averages.
+  const luck = useMemo(() => {
+    if (!pull || pull.game !== "ffxiv") return undefined;
+    const player = pull.players.find((p) => p.name === summary.player);
+    const same = pulls.filter((p) => p.game === "ffxiv").flatMap((p) => p.players.filter((x) => x.name === summary.player));
+    const rates = player ? estimateHitRates(same, FFXIV_DAMAGE, GUARANTEED_HIT_STATUS_IDS) : undefined;
+    const result = player && rates ? critLuck(player, analysis.endMs, rates, FFXIV_DAMAGE, GUARANTEED_HIT_STATUS_IDS) : undefined;
+    return result && rates ? { ...result, rates, pulls: same.length } : undefined;
+  }, [pull, pulls, summary.player, analysis.endMs]);
   return (
     <div>
       <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 8 }}>
@@ -341,6 +357,15 @@ function PlayerDetail({ summary, analysis, colorFor }: { summary: PlayerDamageSu
           title: "What this player's party buffs added to everyone else's damage" },
         { label: "Received", value: approx(summary, fmtDamage(summary.buffs.received)),
           title: "What others' buffs added to this player's damage" },
+        ...(luck ? [{
+          label: "Crit luck",
+          value: `${ordinal(Math.round(luck.percentile * 100))} pct (${luck.actual >= luck.mean ? "+" : "−"}${fmtDamage(Math.abs(luck.actual - luck.mean))})`,
+          title: `Where this pull's damage sat among every outcome the same rotation could roll (crit, direct hit, ±5%), ` +
+            `and how far from the average: ${luck.crits} crits vs ${luck.expectedCrits.toFixed(0)} expected, ` +
+            `${luck.directHits} direct hits vs ${luck.expectedDirectHits.toFixed(0)} expected, over ${luck.hits} hits. ` +
+            `Rates estimated from ${luck.rates.hits} hits in ${luck.pulls} loaded pulls: crit ${(luck.rates.crit * 100).toFixed(1)}% ` +
+            `×${luck.rates.critMult.toFixed(2)}, direct hit ${(luck.rates.directHit * 100).toFixed(1)}%. DoT ticks don't count (FFLogs logs them at their average).`,
+        }] : []),
       ]} />
       <TimelineStrip summary={summary} analysis={analysis} />
       {shown.length === 0 ? (
@@ -351,6 +376,11 @@ function PlayerDetail({ summary, analysis, colorFor }: { summary: PlayerDamageSu
     </div>
   );
 }
+
+const ordinal = (n: number) => {
+  const s = n % 100 >= 11 && n % 100 <= 13 ? "th" : ["th", "st", "nd", "rd"][n % 10] ?? "th";
+  return `${n}${s}`;
+};
 
 // ≈ only on values that include estimated crit / direct-hit buff shares.
 const approx = (s: PlayerDamageSummary, v: string) => (s.buffs.approximate ? `≈${v}` : v);
