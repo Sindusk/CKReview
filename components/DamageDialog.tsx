@@ -348,9 +348,11 @@ function PlayerDetail({ summary, analysis, colorFor, iconFor, pull, pulls }: {
     const same = pulls.filter((p) => p.game === "ffxiv").flatMap((p) => p.players.filter((x) => x.name === summary.player));
     const rates = player ? playerHitRates(same, FFXIV_DAMAGE, GUARANTEED_HIT_STATUS_IDS) : undefined;
     if (!player || !rates) return undefined;
-    if (!reliableRates(rates)) return { thin: true as const, rates, pulls: same.length };
+    // One pull: hidden (its own hits would set the rates it's judged
+    // against). Two or more but under the hit threshold: shown as rough.
+    if (rates.source === "estimate" && same.length < 2) return { thin: true as const, rates, pulls: same.length };
     const result = critLuck(player, analysis.endMs, rates, FFXIV_DAMAGE, GUARANTEED_HIT_STATUS_IDS);
-    return result ? { thin: false as const, ...result, rates, pulls: same.length } : undefined;
+    return result ? { thin: false as const, rough: !reliableRates(rates), ...result, rates, pulls: same.length } : undefined;
   }, [pull, pulls, summary.player, analysis.endMs]);
   const rolled = luck && "percentile" in luck ? luck : undefined;
   const ratesNote = luck?.rates.source === "stats"
@@ -385,12 +387,15 @@ function PlayerDetail({ summary, analysis, colorFor, iconFor, pull, pulls }: {
           ...(luck?.thin ? [{
             label: "Crit luck", value: "—", sub: "needs more pulls",
             title: `This player's crit and direct-hit rates aren't in the log (only the player who recorded it has gear stats), ` +
-              `and ${luck.rates.hits} unbuffed hits in ${luck.pulls} loaded pull${luck.pulls === 1 ? "" : "s"} are too few to estimate them ` +
-              `(${MIN_ESTIMATE_HITS} needed, about 8-10 pulls). With fewer, the estimate absorbs the luck it's meant to measure.`,
+              `and one pull can't estimate them: its own hits would set the rates it's judged against. Load another pull.`,
           }] : rolled ? [{
-            label: "Crit luck", value: `${ordinal(Math.round(rolled.percentile * 100))} pct`,
+            label: "Crit luck", value: `${ordinal(Math.round(rolled.percentile * 100))} pct${rolled.rough ? "?" : ""}`,
             sub: `${rolled.actual >= rolled.mean ? "+" : "−"}${fmtDamage(Math.abs(rolled.actual - rolled.mean))} vs average`,
-            title: `Where this pull's damage sat among every outcome the same rotation could roll (crit, direct hit, ±5%), ` +
+            caution: rolled.rough,
+            title: (rolled.rough
+              ? `ROUGH: the rates come from ${rolled.rates.hits} unbuffed hits, under the ${MIN_ESTIMATE_HITS} (about 8-10 pulls) that make ` +
+                `them reliable, so this can be tens of points off. Take it as a general idea. ` : "") +
+              `Where this pull's damage sat among every outcome the same rotation could roll (crit, direct hit, ±5%), ` +
               `and how far from the average: ${rolled.crits} crits vs ${rolled.expectedCrits.toFixed(0)} expected, ` +
               `${rolled.directHits} direct hits vs ${rolled.expectedDirectHits.toFixed(0)} expected, over ${rolled.hits} hits. ` +
               `${ratesNote} DoT ticks don't count (FFLogs logs them at their average).`,
@@ -420,11 +425,14 @@ type Stat = {
   value:  string;
   sub?:   string;                       // small line under the value
   tone?:  "good" | "bad";               // arcane blue / Death red; else plain
+  caution?: boolean;                    // a rough value: amber-tinted panel
   title?: string;
 };
 // Uptime 95%+ reads good, under 90% poor. Crit luck stays uncoloured: it's
 // luck, not something to fix.
 const UPTIME_GOOD = 0.95, UPTIME_POOR = 0.9;
+// A rough value (crit luck from too few hits): the Minor amber, faint.
+const CAUTION_BG = "rgba(227, 195, 74, 0.10)", CAUTION_EDGE = "rgba(227, 195, 74, 0.45)";
 const TONE: Record<NonNullable<Stat["tone"]>, string> = { good: "var(--ck-arcane-text)", bad: LOSS_COLOR };
 // Stats as one row of equal panels.
 function StatStrip({ stats }: { stats: Stat[] }) {
@@ -436,8 +444,9 @@ function StatStrip({ stats }: { stats: Stat[] }) {
         <div key={s.label}
           title={s.title && s.value.startsWith("≈") ? s.title + APPROX_NOTE : s.title}
           style={{
-            background: "var(--ck-bg-card-hi)", border: "1px solid var(--ck-line-2)", borderRadius: 3,
-            borderTop: `2px solid ${s.tone ? TONE[s.tone] : "var(--ck-line-2)"}`,
+            background: s.caution ? CAUTION_BG : "var(--ck-bg-card-hi)",
+            border: `1px solid ${s.caution ? CAUTION_EDGE : "var(--ck-line-2)"}`, borderRadius: 3,
+            borderTop: `2px solid ${s.tone ? TONE[s.tone] : s.caution ? CAUTION_EDGE : "var(--ck-line-2)"}`,
             padding: "5px 9px", minWidth: 0, cursor: s.title ? "help" : undefined,
           }}>
           <div style={{ color: "var(--ck-text-3)", fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.label}</div>

@@ -146,9 +146,13 @@ howbadwasmycritinxiv.com and the `ffxiv_stats` package
   pulls.** Only unbuffed hits count, with no guaranteed crits and no
   always-crit abilities. On `jN3XDrf2z8PmLgRJ` this recovered the
   logger's real gear within sampling error.
-- **Under 2,000 unbuffed hits (about 8–10 pulls) the dialog says "needs
-  more pulls".** One pull's estimate is ±3% on crit and absorbs the luck
-  it's meant to measure: the kill's percentiles moved 30–60 points.
+- **How much data each case needs (user, 2026-10-08):**
+  - **One loaded pull:** the dialog says "needs more pulls", because the
+    estimate would absorb the luck it's meant to measure.
+  - **Two or more pulls but under 2,000 unbuffed hits (about 8–10
+    pulls):** the percentile shows with a "?" on an amber panel as a rough
+    idea. One pull's estimate is ±3% on crit, which moved the kill's
+    percentiles 30–60 points.
 - **FFXIV DoT ticks never crit in FFLogs.** They're logged at their
   expected value, so they carry no measurable luck and are left out.
 - **A dance partner's hits list Devilment twice.** Count each buff once.
