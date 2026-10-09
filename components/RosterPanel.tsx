@@ -566,13 +566,18 @@ export default function RosterPanel({ players, playbackTimeMs }: RosterPanelProp
   return (
     <div style={{ height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <PanelHeader title="Roster">
-        <div className="ck-num" style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ck-text-3)", flexWrap: "wrap", justifyContent: "flex-end" }}>
-          <span>{filteredPlayers.length} players</span>
-          {tankCount > 0 && <span style={{ color: getRoleColor("Tank") }}>Tanks {tankCount}</span>}
-          {healerCount > 0 && <span style={{ color: getRoleColor("Healer") }}>Healers {healerCount}</span>}
-          {meleeCount > 0 && <span style={{ color: getRoleColor("DPS") }}>Melee {meleeCount}</span>}
-          {rangedCount > 0 && <span style={{ color: getRoleColor("DPS") }}>Ranged {rangedCount}</span>}
-          {casterCount > 0 && <span style={{ color: getRoleColor("DPS") }}>Casters {casterCount}</span>}
+        {/* Two fixed rows: totals + tanks/healers, then the DPS breakdown. */}
+        <div className="ck-num" style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "2px", fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "var(--ck-text-3)" }}>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <span>{filteredPlayers.length} players</span>
+            {tankCount > 0 && <span style={{ color: getRoleColor("Tank") }}>Tanks {tankCount}</span>}
+            {healerCount > 0 && <span style={{ color: getRoleColor("Healer") }}>Healers {healerCount}</span>}
+          </div>
+          <div style={{ display: "flex", gap: "8px" }}>
+            {meleeCount > 0 && <span style={{ color: getRoleColor("DPS") }}>Melee {meleeCount}</span>}
+            {rangedCount > 0 && <span style={{ color: getRoleColor("DPS") }}>Ranged {rangedCount}</span>}
+            {casterCount > 0 && <span style={{ color: getRoleColor("DPS") }}>Casters {casterCount}</span>}
+          </div>
         </div>
       </PanelHeader>
 
