@@ -29,7 +29,7 @@ import { MIN_ESTIMATE_HITS, playerHitRates, reliableRates } from "@/lib/damage/c
 import { critLuck } from "@/lib/damage/crit-luck";
 import { WOW_DAMAGE } from "@/lib/damage/wow/game";
 import type { DamageFinding, PhaseDamageSummary, PlayerDamageSummary, PullDamageAnalysis } from "@/lib/damage/types";
-import { getClassColor } from "@/lib/player-display";
+import { getClassColor, getPlayerClassIcon } from "@/lib/player-display";
 import { useFFPullSelector } from "@/hooks/useFFPullSelector";
 import { SEVERITY_COLOR } from "./SeverityIcon";
 import { fmtTime } from "./MitigationTimeline";
@@ -110,6 +110,7 @@ export default function DamageDialog({ open, onClose, pulls, currentPullId }: Da
   const classOf = new Map<string, string>();
   for (const p of (allPulls ? gamePulls : selectedPull ? [selectedPull] : [])) for (const pl of p.players) classOf.set(pl.name, pl.className);
   const colorFor = (player: string, job: string) => getClassColor(colorGame, isWow ? classOf.get(player) ?? job : job);
+  const iconFor = (player: string, job: string) => getPlayerClassIcon(colorGame, isWow ? classOf.get(player) ?? job : job);
 
   const analysis = selectedPull ? analyses.get(selectedPull.id) : undefined;
   const needRefetch = [...analyses.values()].filter((a) => a.missingData.length > 0).length;
@@ -191,25 +192,28 @@ export default function DamageDialog({ open, onClose, pulls, currentPullId }: Da
               </div>
               {allPulls
                 ? aggregate.map((a) => (
-                  <PlayerCard key={a.player} name={a.player} job={a.job} color={colorFor(a.player, a.job)} lost={a.lostPerPull} forced={a.forcedPerPull}
-                    uptime={a.gcdUptime} sub={`${a.pulls} pull${a.pulls === 1 ? "" : "s"}`}
+                  <PlayerCard key={a.player} name={a.player} job={a.job} color={colorFor(a.player, a.job)} icon={iconFor(a.player, a.job)}
+                    lost={a.lostPerPull} forced={a.forcedPerPull} uptime={a.gcdUptime}
+                    dealt={a.damagePerPull} dealtLabel={`dealt / ${a.pulls} pull${a.pulls === 1 ? "" : "s"}`}
                     selected={a.player === activePlayer} onClick={() => setSelectedPlayer(a.player)} />
                 ))
                 : analysis?.players.map((p) => (
-                  <PlayerCard key={p.player} name={p.player} job={p.job} color={colorFor(p.player, p.job)} lost={p.lostDamage} forced={p.forcedDamage}
-                    uptime={p.gcdUptime.pct} sub={`dealt ${fmtDamage(p.damage)}`}
+                  <PlayerCard key={p.player} name={p.player} job={p.job} color={colorFor(p.player, p.job)} icon={iconFor(p.player, p.job)}
+                    lost={p.lostDamage} forced={p.forcedDamage} uptime={p.gcdUptime.pct}
+                    dealt={p.damage} dealtLabel="dealt"
                     selected={p.player === activePlayer} onClick={() => setSelectedPlayer(p.player)} />
                 ))}
             </div>
 
             <div style={{ minHeight: 0, overflowY: "auto", border: "1px solid var(--ck-line-2)", borderRadius: 3, padding: 12 }}>
               {allPulls ? (
-                <AggregateDetail agg={aggregate.find((a) => a.player === activePlayer)} totalPulls={gamePulls.length} colorFor={colorFor} />
+                <AggregateDetail agg={aggregate.find((a) => a.player === activePlayer)} totalPulls={gamePulls.length} colorFor={colorFor} iconFor={iconFor} />
               ) : analysis && activePlayer ? (
                 <PlayerDetail
                   summary={analysis.players.find((p) => p.player === activePlayer)!}
                   analysis={analysis}
                   colorFor={colorFor}
+                  iconFor={iconFor}
                   pull={selectedPull}
                   pulls={gamePulls}
                 />
@@ -294,34 +298,43 @@ type ColorFor = (player: string, job: string) => string;
 
 const fmtUptime = (pct: number) => `${(pct * 100).toFixed(1)}%`;
 
-function PlayerCard({ name, job, color, lost, forced, uptime, sub, selected, onClick }: {
-  name: string; job: string; color: string; lost: number; forced: number; uptime: number; sub: string; selected: boolean; onClick: () => void;
+// Icon | name (job colour) over job · uptime | damage dealt | loss over forced.
+function PlayerCard({ name, job, color, icon, lost, forced, uptime, dealt, dealtLabel, selected, onClick }: {
+  name: string; job: string; color: string; icon: string; lost: number; forced: number; uptime: number;
+  dealt: number; dealtLabel: string; selected: boolean; onClick: () => void;
 }) {
+  const small: React.CSSProperties = { color: "var(--ck-text-3)", fontSize: 11 };
   return (
     <div
       className={`ck-card ck-card--interactive${selected ? " ck-card--selected" : ""}`}
       onClick={onClick}
-      style={{ padding: "7px 10px", marginBottom: 6, display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}
+      style={{
+        padding: "7px 10px", marginBottom: 6, cursor: "pointer",
+        display: "grid", gridTemplateColumns: "26px minmax(0, 1fr) 62px 62px", columnGap: 10, alignItems: "center",
+      }}
     >
-      <span style={{ width: 4, alignSelf: "stretch", borderRadius: 2, background: color }} />
-      <div style={{ flex: "1 1 auto", minWidth: 0 }}>
-        <div style={{ color: "var(--ck-text)", fontSize: 13, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</div>
-        <div style={{ color: "var(--ck-text-3)", fontSize: 11 }}>{job} · {sub}</div>
+      <img src={icon} alt={job} width={26} height={26} style={{ display: "block" }}
+        onError={(e) => { e.currentTarget.style.visibility = "hidden"; }} />
+      <div style={{ minWidth: 0 }}>
+        <div style={{ color, fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</div>
+        <div style={small} title="GCD uptime while alive and the boss was targetable">
+          {job} · <span className="ck-num">{fmtUptime(uptime)}</span> uptime
+        </div>
       </div>
-      <div style={{ textAlign: "right" }} title="GCD uptime while alive and the boss was targetable">
-        <div className="ck-num" style={{ color: "var(--ck-text)", fontSize: 14, fontWeight: 600 }}>{fmtUptime(uptime)}</div>
-        <div style={{ color: "var(--ck-text-3)", fontSize: 11 }}>uptime</div>
+      <div style={{ textAlign: "center" }}>
+        <div className="ck-num" style={{ color: "var(--ck-text)", fontSize: 14, fontWeight: 600 }}>{fmtDamage(dealt)}</div>
+        <div style={small}>{dealtLabel}</div>
       </div>
-      <div style={{ textAlign: "right", minWidth: 56 }}>
+      <div style={{ textAlign: "right" }}>
         <div className="ck-num" style={{ color: lost > 0 ? LOSS_COLOR : "var(--ck-text-2)", fontSize: 14, fontWeight: 600 }}>{fmtDamage(lost)}</div>
-        <div className="ck-num" style={{ color: "var(--ck-text-3)", fontSize: 11 }}>forced {fmtDamage(forced)}</div>
+        <div className="ck-num" style={small}>forced {fmtDamage(forced)}</div>
       </div>
     </div>
   );
 }
 
-function PlayerDetail({ summary, analysis, colorFor, pull, pulls }: {
-  summary: PlayerDamageSummary; analysis: PullDamageAnalysis; colorFor: ColorFor; pull?: Pull; pulls: Pull[];
+function PlayerDetail({ summary, analysis, colorFor, iconFor, pull, pulls }: {
+  summary: PlayerDamageSummary; analysis: PullDamageAnalysis; colorFor: ColorFor; iconFor: ColorFor; pull?: Pull; pulls: Pull[];
 }) {
   const shown = summary.findings.filter((f) => f.lostDamage >= 1 || f.kind === "interrupted-cast");
   // Crit luck (FFXIV): the player's rates from their hits in every loaded
@@ -343,41 +356,47 @@ function PlayerDetail({ summary, analysis, colorFor, pull, pulls }: {
       `×${luck.rates.critMult.toFixed(2)}, direct hit ${(luck.rates.directHit * 100).toFixed(1)}%.` : "";
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 8 }}>
-        <span style={{ color: colorFor(summary.player, summary.job), fontSize: 15, fontWeight: 600 }}>{summary.player}</span>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+        <img src={iconFor(summary.player, summary.job)} alt={summary.job} width={28} height={28} style={{ display: "block" }}
+          onError={(e) => { e.currentTarget.style.visibility = "hidden"; }} />
+        <span style={{ color: colorFor(summary.player, summary.job), fontSize: 16, fontWeight: 600 }}>{summary.player}</span>
         <span style={{ color: "var(--ck-text-3)", fontSize: 12 }}>{summary.job}</span>
       </div>
-      <StatRow stats={[
-        { label: "Uptime", value: fmtUptime(summary.gcdUptime.pct),
-          title: `GCD locks over ${fmtTime(summary.gcdUptime.eligibleMs)} alive and targetable (deaths, untargetable time and limit breaks excluded)` },
-        { label: "GCDs", value: String(summary.gcds) },
-        { label: "GCD speed", value: `${(summary.baseGcdMs / 1000).toFixed(2)}s` },
-        ...(summary.gcdSplit.heal > 0 ? [{
-          label: "Heal GCDs", value: `${summary.gcdSplit.heal} of ${summary.gcdSplit.heal + summary.gcdSplit.damage}`,
-          title: "GCDs that healed or shielded, of all heal and damage GCDs",
-        }] : []),
-      ]} />
-      <StatRow stats={[
-        { label: "Own damage", value: fmtDamage(summary.damage - summary.buffs.received),
-          title: "The rDPS split: this player's damage without what others' buffs added" },
-        { label: "Buffs given", value: summary.buffs.given > 0 ? approx(summary, fmtDamage(summary.buffs.given)) : "—",
-          title: "What this player's party buffs added to everyone else's damage" },
-        { label: "Received", value: approx(summary, fmtDamage(summary.buffs.received)),
-          title: "What others' buffs added to this player's damage" },
-        ...(luck?.thin ? [{
-          label: "Crit luck",
-          value: "needs more pulls",
-          title: `This player's crit and direct-hit rates aren't in the log (only the player who recorded it has gear stats), ` +
-            `and ${luck.rates.hits} unbuffed hits in ${luck.pulls} loaded pull${luck.pulls === 1 ? "" : "s"} are too few to estimate them ` +
-            `(${MIN_ESTIMATE_HITS} needed, about 8-10 pulls). With fewer, the estimate absorbs the luck it's meant to measure.`,
-        }] : rolled ? [{
-          label: "Crit luck",
-          value: `${ordinal(Math.round(rolled.percentile * 100))} pct (${rolled.actual >= rolled.mean ? "+" : "−"}${fmtDamage(Math.abs(rolled.actual - rolled.mean))})`,
-          title: `Where this pull's damage sat among every outcome the same rotation could roll (crit, direct hit, ±5%), ` +
-            `and how far from the average: ${rolled.crits} crits vs ${rolled.expectedCrits.toFixed(0)} expected, ` +
-            `${rolled.directHits} direct hits vs ${rolled.expectedDirectHits.toFixed(0)} expected, over ${rolled.hits} hits. ` +
-            `${ratesNote} DoT ticks don't count (FFLogs logs them at their average).`,
-        }] : []),
+      <StatGrid sections={[
+        { name: "Rotation", stats: [
+          { label: "GCD uptime", value: fmtUptime(summary.gcdUptime.pct),
+            sub: `of ${fmtTime(summary.gcdUptime.eligibleMs)} active`,
+            tone: summary.gcdUptime.pct >= UPTIME_GOOD ? "good" : summary.gcdUptime.pct < UPTIME_POOR ? "bad" : undefined,
+            title: `GCD locks over ${fmtTime(summary.gcdUptime.eligibleMs)} alive and targetable (deaths, untargetable time and limit breaks excluded)` },
+          { label: "GCDs", value: String(summary.gcds) },
+          { label: "GCD speed", value: `${(summary.baseGcdMs / 1000).toFixed(2)}s` },
+          ...(summary.gcdSplit.heal > 0 ? [{
+            label: "Heal GCDs", value: String(summary.gcdSplit.heal), sub: `of ${summary.gcdSplit.heal + summary.gcdSplit.damage}`,
+            title: "GCDs that healed or shielded, of all heal and damage GCDs",
+          }] : []),
+        ] },
+        { name: "Damage", stats: [
+          { label: "Own damage", value: fmtDamage(summary.damage - summary.buffs.received), sub: `${fmtDamage(summary.damage)} dealt`,
+            title: "The rDPS split: this player's damage without what others' buffs added" },
+          { label: "Buffs given", value: summary.buffs.given > 0 ? approx(summary, fmtDamage(summary.buffs.given)) : "—",
+            title: "What this player's party buffs added to everyone else's damage" },
+          { label: "Buffs received", value: approx(summary, fmtDamage(summary.buffs.received)),
+            title: "What others' buffs added to this player's damage" },
+          ...(luck?.thin ? [{
+            label: "Crit luck", value: "—", sub: "needs more pulls",
+            title: `This player's crit and direct-hit rates aren't in the log (only the player who recorded it has gear stats), ` +
+              `and ${luck.rates.hits} unbuffed hits in ${luck.pulls} loaded pull${luck.pulls === 1 ? "" : "s"} are too few to estimate them ` +
+              `(${MIN_ESTIMATE_HITS} needed, about 8-10 pulls). With fewer, the estimate absorbs the luck it's meant to measure.`,
+          }] : rolled ? [{
+            label: "Crit luck", value: `${ordinal(Math.round(rolled.percentile * 100))} pct`,
+            sub: `${rolled.actual >= rolled.mean ? "+" : "−"}${fmtDamage(Math.abs(rolled.actual - rolled.mean))} vs average`,
+            tone: rolled.percentile >= 0.5 ? "good" as const : rolled.percentile <= LUCK_POOR ? "bad" as const : undefined,
+            title: `Where this pull's damage sat among every outcome the same rotation could roll (crit, direct hit, ±5%), ` +
+              `and how far from the average: ${rolled.crits} crits vs ${rolled.expectedCrits.toFixed(0)} expected, ` +
+              `${rolled.directHits} direct hits vs ${rolled.expectedDirectHits.toFixed(0)} expected, over ${rolled.hits} hits. ` +
+              `${ratesNote} DoT ticks don't count (FFLogs logs them at their average).`,
+          }] : []),
+        ] },
       ]} />
       <TimelineStrip summary={summary} analysis={analysis} />
       {shown.length === 0 ? (
@@ -398,16 +417,50 @@ const ordinal = (n: number) => {
 const approx = (s: PlayerDamageSummary, v: string) => (s.buffs.approximate ? `≈${v}` : v);
 const APPROX_NOTE = "; ≈ includes crit and direct-hit buffs, estimated";
 
-// A row of small stats, label above value; wraps on narrow widths.
-function StatRow({ stats }: { stats: { label: string; value: string; title?: string }[] }) {
+type Stat = {
+  label:  string;
+  value:  string;
+  sub?:   string;                       // small line under the value
+  tone?:  "good" | "bad";               // arcane blue / Death red; else plain
+  title?: string;
+};
+// Uptime 95%+ reads good, under 90% poor; crit luck at or below the 25th
+// percentile reads poor (bad luck, not a mistake, but worth seeing).
+const UPTIME_GOOD = 0.95, UPTIME_POOR = 0.9, LUCK_POOR = 0.25;
+const TONE: Record<NonNullable<Stat["tone"]>, string> = { good: "var(--ck-arcane-text)", bad: LOSS_COLOR };
+const STAT_COLUMNS = 4;
+
+// Stats as a fixed grid: one labelled row per section, STAT_COLUMNS equal
+// tiles each (short rows keep empty cells so the columns line up).
+function StatGrid({ sections }: { sections: { name: string; stats: Stat[] }[] }) {
   return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 22px", marginBottom: 8 }}>
-      {stats.map((s) => (
-        <div key={s.label} title={s.title && s.value.startsWith("≈") ? s.title + APPROX_NOTE : s.title} style={{ cursor: s.title ? "help" : undefined }}>
-          <div style={{ color: "var(--ck-text-3)", fontSize: 11 }}>{s.label}</div>
-          <div className="ck-num" style={{ color: "var(--ck-text)", fontSize: 13, fontWeight: 600 }}>{s.value}</div>
-        </div>
-      ))}
+    <div style={{
+      display: "grid", gridTemplateColumns: `64px repeat(${STAT_COLUMNS}, minmax(0, 1fr))`, gap: 6,
+      marginBottom: 10, alignItems: "stretch",
+    }}>
+      {sections.flatMap((sec) => [
+        <div key={`${sec.name}-label`} style={{
+          alignSelf: "center", color: "var(--ck-text-gold)", fontSize: 10, fontWeight: 600,
+          letterSpacing: "0.08em", textTransform: "uppercase",
+        }}>{sec.name}</div>,
+        ...Array.from({ length: STAT_COLUMNS }, (_, i) => {
+          const s = sec.stats[i];
+          if (!s) return <div key={`${sec.name}-${i}`} />;
+          return (
+            <div key={`${sec.name}-${s.label}`}
+              title={s.title && s.value.startsWith("≈") ? s.title + APPROX_NOTE : s.title}
+              style={{
+                background: "var(--ck-bg-card-hi)", border: "1px solid var(--ck-line-2)", borderRadius: 3,
+                borderTop: `2px solid ${s.tone ? TONE[s.tone] : "var(--ck-line-2)"}`,
+                padding: "6px 10px", minHeight: 56, minWidth: 0, cursor: s.title ? "help" : undefined,
+              }}>
+              <div style={{ color: "var(--ck-text-3)", fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.label}</div>
+              <div className="ck-num" style={{ color: s.tone ? TONE[s.tone] : "var(--ck-text)", fontSize: 16, fontWeight: 600, lineHeight: 1.3 }}>{s.value}</div>
+              {s.sub && <div className="ck-num" style={{ color: "var(--ck-text-3)", fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.sub}</div>}
+            </div>
+          );
+        }),
+      ])}
     </div>
   );
 }
@@ -520,18 +573,28 @@ function TimelineStrip({ summary, analysis }: { summary: PlayerDamageSummary; an
   );
 }
 
-function AggregateDetail({ agg, totalPulls, colorFor }: { agg: PlayerDamageAggregate | undefined; totalPulls: number; colorFor: ColorFor }) {
+function AggregateDetail({ agg, totalPulls, colorFor, iconFor }: {
+  agg: PlayerDamageAggregate | undefined; totalPulls: number; colorFor: ColorFor; iconFor: ColorFor;
+}) {
   if (!agg) return <p className="ck-dialog-text">No players.</p>;
   const rows = agg.recurring.filter((r) => r.lostDamage >= 1 || r.kind === "interrupted-cast");
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 8 }}>
-        <span style={{ color: colorFor(agg.player, agg.job), fontSize: 15, fontWeight: 600 }}>{agg.player}</span>
-        <span style={{ color: "var(--ck-text-3)", fontSize: 12 }}>{agg.job} · in {agg.pulls} of {totalPulls} pulls</span>
-        <span className="ck-help" style={{ margin: 0 }} title="GCD locks over the time this player was alive and the boss was targetable, all pulls together">
-          GCD uptime <span className="ck-num" style={{ color: "var(--ck-text)", fontWeight: 600 }}>{fmtUptime(agg.gcdUptime)}</span>
-        </span>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+        <img src={iconFor(agg.player, agg.job)} alt={agg.job} width={28} height={28} style={{ display: "block" }}
+          onError={(e) => { e.currentTarget.style.visibility = "hidden"; }} />
+        <span style={{ color: colorFor(agg.player, agg.job), fontSize: 16, fontWeight: 600 }}>{agg.player}</span>
+        <span style={{ color: "var(--ck-text-3)", fontSize: 12 }}>{agg.job}</span>
       </div>
+      <StatGrid sections={[{ name: "All pulls", stats: [
+        { label: "Pulls", value: String(agg.pulls), sub: `of ${totalPulls} loaded` },
+        { label: "GCD uptime", value: fmtUptime(agg.gcdUptime),
+          tone: agg.gcdUptime >= UPTIME_GOOD ? "good" : agg.gcdUptime < UPTIME_POOR ? "bad" : undefined,
+          title: "GCD locks over the time this player was alive and the boss was targetable, all pulls together" },
+        { label: "Dealt per pull", value: fmtDamage(agg.damagePerPull) },
+        { label: "Lost per pull", value: fmtDamage(agg.lostPerPull), sub: `forced ${fmtDamage(agg.forcedPerPull)}`,
+          tone: agg.lostPerPull > 0 ? "bad" : undefined },
+      ] }]} />
       <div className="ck-table-wrap">
         <table className="ck-table" style={{ fontSize: 12 }}>
           <thead>
