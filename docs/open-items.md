@@ -315,8 +315,9 @@ Reports jN3XDrf2z8PmLgRJ (A), xFAfGP3qX4yJhDrV (B), d3vRbwfpNBLzJ2Xh (C,
 kill = C4); VOD answers 2026-10-09 cover overlaps (boss-relative clock
 spots), Cutback (aim described, nobody named), Deep Impact (farthest
 player), busters on non-tanks, Xtreme Wave lanes and deaths during Xtreme
-snaking. Header of `lib/mechanics/ffxiv/arcadion/red-hot-deep-blue.ts` has
-the evidence. Rulings still to write once the batch settles.
+snaking, split-arena puddles and stacked tether holders. Header of
+`lib/mechanics/ffxiv/arcadion/red-hot-deep-blue.ts` has the evidence;
+rulings so far cover A8/A10/A14 and B1/B2/B3.
 - **Other overlap layouts.** Only the all-party Double-Dip / Reverse
   volleys have known spots. Snaps, Inferno, Splash and the snaking /
   split-arena cones still name every player hit twice. Their layouts?

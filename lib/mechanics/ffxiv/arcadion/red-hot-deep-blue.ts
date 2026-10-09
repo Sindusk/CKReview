@@ -130,13 +130,21 @@
 // ffxiv-rhdb-deep-impact (Major): the target is the farthest player it hit
 //   (user, 2026-10-09). A non-tank target baited it (A8 +2:18 the H2); a
 //   tank target that also hit non-tanks blames the tank under 6y from Deep
-//   Blue, else the victims (off the hitbox); Raid at 3+ deaths.
+//   Blue, else the victims (off the hitbox); Raid at 3+ deaths. During
+//   snaking it targets the farthest Watersnaking player (the water tank in
+//   every clean pull); with that tank dead, the Raid is the tank's death
+//   and the bait is fallout (user, 2026-10-09, B2 +5:16).
 // ffxiv-rhdb-stack: Pyrotation that killed someone names living non-tanks
 //   outside it (Major); Re-Entry under four with a death (player-less Minor).
 // ffxiv-rhdb-xtreme-wave: per dash, the holder is the free player hit
 //   farthest from the boss's start; anyone else it hit stood in the lane
 //   (Minor, Major if the dash killed them; user, 2026-10-09, B3 +6:23). A
-//   holder killed by their own dash alone: tether too short (Major).
+//   holder killed by their own dash alone: tether too short (Major). Both
+//   holders hit by both dashes: only the Red Hot holder (B3 +5:48).
+// ffxiv-rhdb-split-drop: split-arena Inferno drops off their side/half
+//   (Major when that side's next cones overlapped, which excuses those
+//   overlap victims; B1 +7:07 the OT's puddle), Minor otherwise. A pair
+//   trading sides is a role swap, not an error.
 //   ffxiv-rhdb-prison (Raid): Impact Zone at the deadline; player-less
 //   Minor for an unsoaked tower.
 // ffxiv-rhdb-xtreme-cleanse (Major on every same-color cleanser of a
@@ -511,6 +519,7 @@ export const RHDB_FIRE_RULE_ID          = "ffxiv-rhdb-fire";
 export const RHDB_WALL_RULE_ID          = "ffxiv-rhdb-wall";
 export const RHDB_FLOATER_RULE_ID       = "ffxiv-rhdb-floater";
 export const RHDB_OVERLAP_RULE_ID       = "ffxiv-rhdb-overlap";
+export const RHDB_SPLIT_DROP_RULE_ID    = "ffxiv-rhdb-split-drop";
 export const RHDB_BUSTER_RULE_ID        = "ffxiv-rhdb-buster";
 export const RHDB_DEEP_IMPACT_RULE_ID   = "ffxiv-rhdb-deep-impact";
 export const RHDB_STACK_RULE_ID         = "ffxiv-rhdb-stack";
@@ -542,11 +551,18 @@ const DEEP_IMPACT_CAST    = 46519; // Deep Blue's own cast: its position
 // A Deep Impact tank this close to Deep Blue brought it onto the party.
 // Clean opening casts: tank 8.0-16y out, party 0-7y (A/B/C +138).
 const TANK_MIN_YD         = 6;
+// Normal snaking (+246) to its Deep Impact (+315).
+const SNAKING_SPAN_MS     = 70_000;
 const VERTICAL            = [46585, 46586]; // Vertical Blast / Plunge (nearest-player buster)
 const PYROTATION          = 46531;
 const CUTBACK_BLAZE       = 46538;
 const CUTBACK_CAST        = 46537; // Red Hot's own cast: its position
 const INFERNO             = 46529;
+const INFERNO_CAST        = 46528;
+const SPLIT_FLOATER       = [46548, 46527]; // the split arena's fixed center Floater
+const SPLIT_CONES         = [46558, 46561]; // the split arena's Double-Dip / Reverse
+// A split drop this close to the north/south midline (clean: 9-19y off).
+const SPLIT_MIDLINE       = 500;
 const DIVERS_DARE         = [46520, 46521];
 // Cutback leaves ~60 degrees safe (user: a ~300 degree attack). Puddles
 // under the boss's hitbox don't count against the slice.
@@ -1010,6 +1026,89 @@ function clockWhere(angle: number): string {
   return CLOCK_SPOT_NAME[best];
 }
 
+// ── split arena: personal fire drops ────────────────────────────────────────
+
+type SplitDrop = { p: PlayerInfo; e: PlayerEvent; want: string; ok: boolean };
+
+/**
+ * The split-arena Inferno (+426): each player drops their circle at their
+ * side's wall, group 1 (MT/H1/M1/R1) west and group 2 east, tanks and
+ * ranged in the north half, healers and melee in the south (model [KS];
+ * every drop in the kill and B12 fit, 9-19y off the midline). A drop on the
+ * wrong half or within SPLIT_MIDLINE of the midline takes the space the
+ * side needs for the cones that follow.
+ */
+function splitDrops(players: PlayerInfo[], casts: EnemyEvent[], slots: Slots): { drops: SplitDrop[]; t: number } | undefined {
+  const floater = castsOf(casts, SPLIT_FLOATER)[0];
+  const inferno = floater && castsOf(casts, INFERNO_CAST).find((c) => c.timestamp > floater.timestamp && c.timestamp < floater.timestamp + 20_000);
+  if (!inferno) return undefined;
+  const fits = (slot: FFRoleSlot, e: PlayerEvent) => {
+    const west = ["MT", "H1", "M1", "R1"].includes(slot);
+    const north = ["MT", "OT", "R1", "R2"].includes(slot);
+    return {
+      want: `${north ? "north" : "south"}${west ? "west" : "east"}`,
+      ok: (west ? e.x! < ARENA_CENTER : e.x! > ARENA_CENTER) &&
+        (north ? e.y! < ARENA_CENTER - SPLIT_MIDLINE : e.y! > ARENA_CENTER + SPLIT_MIDLINE),
+    };
+  };
+  const placed = new Map<PlayerInfo, PlayerEvent>();
+  for (const { p, e } of hitsOf(players, INFERNO, inferno.timestamp, inferno.timestamp + 2500)) {
+    if (slots.get(p) && e.x !== undefined && e.y !== undefined && !placed.has(p)) placed.set(p, e);
+  }
+  const partner: Record<FFRoleSlot, FFRoleSlot> = { MT: "OT", OT: "MT", H1: "H2", H2: "H1", M1: "M2", M2: "M1", R1: "R2", R2: "R1" };
+  const drops: SplitDrop[] = [];
+  for (const [p, e] of placed) {
+    const slot = slots.get(p)!;
+    const f = fits(slot, e);
+    // A pair that traded sides but is otherwise in place is a role swap,
+    // not a mistake (B11-B34: the melee dropped on each other's side every
+    // pull).
+    const mate = [...placed].find(([q]) => slots.get(q) === partner[slot]);
+    const swapped = !f.ok && !!mate && fits(partner[slot], e).ok && fits(slot, mate[1]).ok;
+    drops.push({ p, e, want: f.want, ok: f.ok || swapped });
+  }
+  return { drops, t: inferno.timestamp };
+}
+
+/**
+ * A misplaced split drop is Major when the next cone volley overlapped on
+ * its side (user, 2026-10-09, B1 +7:12: the OT's puddle at the east wall's
+ * middle cut the OT and M2 off from their spots; the overlap was the
+ * puddle's fault), else Minor. Returns the players whose overlap it explains.
+ */
+function detectSplitDrops(players: PlayerInfo[], life: Life, casts: EnemyEvent[], slots: Slots): { errors: PullError[]; excused: { p: PlayerInfo; t: number }[] } {
+  const errors: PullError[] = [];
+  const excused: { p: PlayerInfo; t: number }[] = [];
+  const split = splitDrops(players, casts, slots);
+  if (!split) return { errors, excused };
+  const cones = resolutions(players, SPLIT_CONES).find((r) => r[0].e.timestamp > split.t && r[0].e.timestamp < split.t + 12_000);
+  for (const d of split.drops.filter((x) => !x.ok && life.hitAlive(x.p, x.e.timestamp))) {
+    const east = d.e.x! > ARENA_CENTER;
+    const side = (h: Hit) => h.e.x !== undefined && (h.e.x > ARENA_CENTER) === east;
+    // Players on this side hit by 2+ cones.
+    const doubled = cones ? uniq(cones.filter(side).map((h) => h.p)).filter((p) =>
+      uniq(cones.filter((h) => h.p === p).map((h) => instanceKey(h.e))).length >= 2) : [];
+    const where = `${yd(Math.abs(d.e.y! - ARENA_CENTER))}y ${d.e.y! < ARENA_CENTER ? "north" : "south"} of the midline on the ${east ? "east" : "west"} side`;
+    const rule = "In the split arena each player drops their circle against their side's wall: tanks and ranged in the north half, healers and melee in the south, well clear of the middle, so the side keeps room for the cones that follow.";
+    if (doubled.length) {
+      doubled.forEach((p) => excused.push({ p, t: cones![0].e.timestamp }));
+      const killed = doubled.filter((p) => life.diedFrom(p, cones![cones!.length - 1].e.timestamp));
+      errors.push(playerError(d.p, {
+        ruleId: RHDB_SPLIT_DROP_RULE_ID, severity: "Major", name: "Split Arena Fire Dropped Out of Place",
+        description: `Dropped their Alley-Oop Inferno fire ${where} instead of the ${d.want}, cutting their side off from its spots: in the next cones ${namesOf(doubled)} took two or more at once${killed.length ? ` (${namesOf(killed)} died)` : ""}. ${rule}`,
+        timestamp: d.e.timestamp, abilityId: INFERNO, abilityName: "Alley-Oop Inferno",
+      }));
+    } else {
+      errors.push(playerError(d.p, {
+        ruleId: RHDB_SPLIT_DROP_RULE_ID, severity: "Minor", name: "Split Arena Fire Dropped Out of Place",
+        description: `Dropped their Alley-Oop Inferno fire ${where} instead of the ${d.want}. ${rule}`,
+        timestamp: d.e.timestamp, abilityId: INFERNO, abilityName: "Alley-Oop Inferno",
+      }));
+    }
+  }
+  return { errors, excused };
+}
+
 // ── bait overlaps (spreads, cones, jumps, pair stacks) ──────────────────────
 
 /**
@@ -1018,7 +1117,7 @@ function clockWhere(angle: number): string {
  * player the bait belonged to are named: the log can't tell which of them
  * was out of place, and spacing is on both (README principle 3).
  */
-function detectOverlaps(players: PlayerInfo[], life: Life, casts: EnemyEvent[], volleys: ClockVolley[], slots: Slots): PullError[] {
+function detectOverlaps(players: PlayerInfo[], life: Life, casts: EnemyEvent[], volleys: ClockVolley[], slots: Slots, excused: { p: PlayerInfo; t: number }[]): PullError[] {
   const errors: PullError[] = [];
   for (const fam of FAMILIES) {
     for (const res of resolutions(players, fam.ids)) {
@@ -1083,6 +1182,8 @@ function detectOverlaps(players: PlayerInfo[], life: Life, casts: EnemyEvent[], 
         }
       }
       for (const [p, f] of flagged) {
+        // Cut off by someone's misplaced split-arena fire: theirs, not this player's.
+        if (excused.some((x) => x.p === p && Math.abs(x.t - f.t) <= 2000)) continue;
         errors.push(playerError(p, {
           ruleId: RHDB_OVERLAP_RULE_ID, severity: "Major", name: `${fam.name} Overlap`,
           description: `${fam.name}: ${f.parts.join(". ")}${f.died ? ", and died" : ""}. ${fam.why}${f.paired ? " The log can't tell which of the two was out of place, so both are flagged." : ""}`,
@@ -1181,7 +1282,7 @@ function detectBusters(players: PlayerInfo[], life: Life, casts: EnemyEvent[]): 
  * the snaking/final ones were taken away from the boss, so blame compares
  * players with each other.
  */
-function detectDeepImpact(players: PlayerInfo[], life: Life, casts: EnemyEvent[]): PullError[] {
+function detectDeepImpact(players: PlayerInfo[], life: Life, casts: EnemyEvent[], deaths: DeathEvent[]): PullError[] {
   const errors: PullError[] = [];
   for (const res of resolutions(players, [DEEP_IMPACT])) {
     const t = res[0].e.timestamp;
@@ -1189,6 +1290,24 @@ function detectDeepImpact(players: PlayerInfo[], life: Life, casts: EnemyEvent[]
     const nonTanks = uniq(hit.filter((h) => !isTank(h.p)).map((h) => h.p));
     if (nonTanks.length === 0) continue;
     const killed = uniq(hit.filter((h) => life.diedFrom(h.p, h.e.timestamp)).map((h) => h.p));
+    // During snaking it targets the farthest Watersnaking player: the water
+    // tank in every clean pull. With that tank dead, nobody can bait it
+    // safely: the death is the cutoff and the bait is fallout (user,
+    // 2026-10-09, B2 +5:16: the OT died first, the H1 then took it).
+    const snakingNow = players.some((p) => hasAura(p, WATER_SNAKING, t - 500));
+    if (snakingNow && !players.some((p) => isTank(p) && life.hitAlive(p, t) && hasAura(p, WATER_SNAKING, t - 500))) {
+      const lost = deaths.filter((d) => {
+        const p = players.find((x) => x.name === d.player);
+        const hitT = d.timestamp - DEATH_EVENT_LAG_MS;
+        return !!p && isTank(p) && hitT < t && hitT >= t - SNAKING_SPAN_MS && hasAura(p, WATER_SNAKING, hitT - 100);
+      }).pop();
+      if (lost) {
+        errors.push(raidMarker(RHDB_DEEP_IMPACT_RULE_ID, "Water Tank Died Before Deep Impact",
+          `${lost.player}, the Watersnaking tank, died before Deep Impact. During snaking it targets the farthest Watersnaking player, which is meant to be that tank; with them gone it lands on someone in the party${hit.length ? ` (it hit ${namesOf(hit.map((h) => h.p))}${killed.length ? `, killing ${killed.length}` : ""})` : ""}. Unresolvable from here.`,
+          lost.timestamp - DEATH_EVENT_LAG_MS, DEEP_IMPACT, "Deep Impact"));
+      }
+      continue;
+    }
     const boss = castsOf(casts, DEEP_IMPACT_CAST).filter((c) => c.timestamp <= t && c.timestamp >= t - 3000 && c.x !== undefined && c.y !== undefined).pop();
     const fromBoss = (e: PlayerEvent) => (boss && e.x !== undefined && e.y !== undefined ? Math.hypot(e.x - boss.x!, e.y - boss.y!) : undefined);
     const ranked = [...hit].sort((a, b) => (fromBoss(b.e) ?? -1) - (fromBoss(a.e) ?? -1));
@@ -1304,6 +1423,26 @@ function detectXtremeWave(players: PlayerInfo[], life: Life, casts: EnemyEvent[]
     } else {
       for (const l of lanes) holders.set(l.id, l.hs[0].p);
     }
+    // Both holders standing together: both dashes hit both. The Deep Blue
+    // holder's lane is the fixed one (kept clear of the bubble), so the
+    // Red Hot holder, who should have crossed through the center to the
+    // other side, is at fault (user, 2026-10-09, B3 +5:48: the OT stacked
+    // on the MT and killed both).
+    const redH = holders.get(XTREME_WAVE_RED), blueH = holders.get(XTREME_WAVE_BLUE);
+    const redHit = free.find((h) => h.p === redH && h.e.abilityId === XTREME_WAVE_RED);
+    const blueHit = free.find((h) => h.p === blueH && h.e.abilityId === XTREME_WAVE_BLUE);
+    // "Together" = each holder was also hit by the other boss's dash (B3
+    // +5:48: 5.5y apart, both hit by both).
+    const crossHit = (p: PlayerInfo, id: number) => free.some((h) => h.p === p && h.e.abilityId === id);
+    if (redH && blueH && redH !== blueH && redHit && blueHit && crossHit(redH, XTREME_WAVE_BLUE) && crossHit(blueH, XTREME_WAVE_RED)) {
+      const dead = [redH, blueH].filter((p) => [XTREME_WAVE_RED, XTREME_WAVE_BLUE].includes(life.diedFrom(p, blueHit.e.timestamp)?.killingAbilityGameId ?? 0));
+      errors.push(playerError(redH, {
+        ruleId: RHDB_XTREME_WAVE_RULE_ID, severity: "Major", name: "Stacked on the Other Tether",
+        description: `Held Red Hot's Xtreme Wave tether but stood on ${blueH.name}, who held Deep Blue's (${yd(Math.hypot(redHit.e.x! - blueHit.e.x!, redHit.e.y! - blueHit.e.y!))}y apart), so both dashes hit both of them${dead.length ? `; ${namesOf(dead)} died` : ""}. Deep Blue's tether runs along its fixed outer lane, clear of the bubble; Red Hot's holder takes the dash through the center to the far side.`,
+        timestamp: Math.min(redHit.e.timestamp, blueHit.e.timestamp), abilityId: XTREME_WAVE_RED, abilityName: "Xtreme Wave",
+      }));
+    }
+    const stacked = (p: PlayerInfo) => errors.some((e) => e.name === "Stacked on the Other Tether" && Math.abs(e.timestamp - res[0].e.timestamp) <= 1500) && (p === redH || p === blueH);
     for (const l of lanes) {
       const holder = holders.get(l.id)!;
       const own = l.hs.find((h) => h.p === holder)!;
@@ -1312,11 +1451,14 @@ function detectXtremeWave(players: PlayerInfo[], life: Life, casts: EnemyEvent[]
         // hit, then a death to something else).
         const death = [XTREME_WAVE_RED, XTREME_WAVE_BLUE].includes(life.diedFrom(h.p, h.e.timestamp)?.killingAbilityGameId ?? 0)
           ? life.diedFrom(h.p, h.e.timestamp) : undefined;
+        if (stacked(h.p)) continue;
         if (h.p !== holder) {
           if ((h.e.amount ?? 0) + (h.e.absorbed ?? 0) === 0 && !death) continue;
           const where = l.along(h) >= l.along(own) - WAVE_STACKED_YD
             ? `They stood with ${holder.name} at the end of the dash (${yd(l.along(h))}y out, ${holder.name} ${yd(l.along(own))}y).`
-            : `They were ${yd(l.along(h))}y along the dash; ${holder.name} was at its end, ${yd(l.along(own))}y out.`;
+            : l.along(h) <= WAVE_STACKED_YD
+              ? `They stood right next to ${colorName(l.id)} (${yd(l.along(h))}y), where the dash starts.`
+              : `They were ${yd(l.along(h))}y along the dash; ${holder.name} was at its end, ${yd(l.along(own))}y out.`;
           errors.push(playerError(h.p, {
             ruleId: RHDB_XTREME_WAVE_RULE_ID, severity: death ? "Major" : "Minor", name: "Stood in an Xtreme Wave Lane",
             description: `Stood in the path of ${colorName(l.id)}'s Xtreme Wave dash to ${holder.name}, its tether holder (${kFmt(h.e.amount ?? 0)})${diedText(death)}. ${where} Players without a tether stay out of the line between the boss and its tether holder.`,
@@ -1430,15 +1572,17 @@ export function detectRedHotDeepBlueErrors(players: PlayerInfo[], deathEvents: D
   const called = calledWipeDeaths(deathEvents, pullEnd);
   const volleys = clockVolleys(players, enemyCasts);
   const slots = resolveSlots(players, volleys);
+  const split = detectSplitDrops(players, life, enemyCasts, slots);
 
   const errors = [
     ...detectAvoidable(players, life),
     ...detectFire(players, life, deathEvents, called, enemyCasts),
     ...detectWall(players, deathEvents, called),
     ...detectFloater(players, life),
-    ...detectOverlaps(players, life, enemyCasts, volleys, slots),
+    ...split.errors,
+    ...detectOverlaps(players, life, enemyCasts, volleys, slots, split.excused),
     ...detectBusters(players, life, enemyCasts),
-    ...detectDeepImpact(players, life, enemyCasts),
+    ...detectDeepImpact(players, life, enemyCasts, deathEvents),
     ...detectStacks(players, life),
     ...detectXtremeWave(players, life, enemyCasts),
     ...detectCleanses(players, life, deathEvents, enemyCasts),
