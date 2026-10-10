@@ -136,7 +136,7 @@ export const FALLBACK_RULE_PREFIX = "fallback-";
 // Bosses with an encounter module, by fight name. The fallback never runs
 // on these.
 const COVERED_ENCOUNTERS: Record<Pull["game"], Set<string>> = {
-  ffxiv: new Set(["Dancing Mad", "Vamp Fatale", "Red Hot and Deep Blue"]),
+  ffxiv: new Set(["Dancing Mad", "Vamp Fatale", "Red Hot and Deep Blue", "The Tyrant"]),
   wow: new Set([
     "Midnight Falls", "Entombed Sentinels", "Vashnik the Malignant", "Sszorak",
     "Nek'zali the Soulcoiler", "The Lost Explorers", "The Twin Fangs",

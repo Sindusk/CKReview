@@ -1,10 +1,142 @@
 // lib/mechanics/ffxiv/arcadion/tyrant.ts
 //
+// The Tyrant (M11S) per-pull rules. Entry point: detectTyrantErrors.
+// Self-gates on the boss's signature casts, so it is safe on every pull.
+//
+// -- VERIFIED AGAINST LOGS (2026-10-09) --
+// One static, week-1 progression, 88 pulls over three reports. Cited as
+// B23 +9:36 (report letter, pull, mm:ss from pull start):
+//   A = d3vRbwfpNBLzJ2Xh (33 wipes, never past One and Only ~4:05),
+//   B = L3YxvqnNVdzBcj7t (35 wipes, roster change; enraged 4 times),
+//   C = gmX1Ac9PqWdfDR7B (19 wipes + the kill, C20, 11:01).
+// Roster slots (user): MT PLD, OT DRK, H1 AST, H2 SGE, M1 RPR, M2 DRG,
+// R1 DNC, R2 caster; the OT and R2 players changed between reports. Mostly
+// Hector (user, "can't recall for sure"). No rule depends on a clock spot
+// or M1/M2; the only role-order rule is the comet drops (melee -> healers
+// -> ranged, every clean drop).
+//
+// Clock (kill; every pull within ~1s): Crown +0:11, Raw Steel +0:25,
+// weapons +0:51/+0:56/+1:01, Stardust +1:21 (Comet/Crushing Comet +1:30 or
+// +1:57), weapons +1:36/+1:41/+1:46, Crown +2:03, Dance +2:22, Eye pairs
+// +2:32, Raw Steel +2:45, Charybdistopia +3:01, Ultimate weapons
+// +3:16..+3:42, Gust +3:48, One and Only +4:02, Wall +4:16/+4:19, Fire and
+// Fury +4:38, Meteorain +4:54 (fireballs +5:02/+5:12/+5:22/+5:32, comet
+// drops +5:03/+5:13/+5:23, tethers +5:11/+5:21/+5:31), Flatliner +6:04,
+// towers +6:32/+7:04/+7:42, breaths/tethers +6:47/+7:19, Massive Meteor
+// +7:29..+7:35, Avalanche +7:52, Crown +8:03, Wall +8:15, Fire and Fury
+// +8:37, Crown +8:46, Stampede +8:58 (Mammoth +9:06, towers +9:21,
+// tethers +9:31, Two/Four-Way +9:35), Crown +9:43, kicks +9:57/+10:16/
+// +10:37, Heartbreaker +10:54 cast, lands +11:05 (enrage).
+//
+// Log IDs (the model's [ID] candidates were right for every cast checked):
+// - Damage Down causes: Cometite 46099, axe 46104 / sword 46106 hazards,
+//   Dance Explosion 46112, Charybdis 46118 (tornado contact), Fire and Fury
+//   46128/46129 (front/back, not tank-targeted: the kill's OT got Damage Down
+//   from it), Orbital Omen 46131, spent-comet Explosion 46136 (Comet actor),
+//   Majestic Meteor 46145 (split) / 46165 (Stampede), Meteorain lane 46146.
+//   The scythe's donut 46105 never gave Damage Down: 33 of 35 hits killed,
+//   the 2 survivors were invulnerable. Arcadion Avalanche 46155/46159 always
+//   killed (6 deaths).
+// - Raw Steel: axe 46091 shared buster + Impact 46092 on the other six;
+//   scythe 46095 tank cones (cast targets = top two enmity) + Heavy Hitter
+//   46096 shared by the six. Axe or scythe comes first at random.
+// - Weapons: Heavy Weight 46107 (one party stack), Sweeping Victory 46108
+//   (a cone per player, cast-targeted), Sharp Taste 46109 (two line stacks
+//   aimed at the healers; cast facing = line direction).
+// - Comet 46100 (spreads), Crushing Comet 46101 (stack), Eye of the Hurricane
+//   46116 (four pairs, Magic Vulnerability Up), Powerful Gust 46119 (eight
+//   cast-targeted cones).
+// - Great Wall 46124: Wall 1 the OT solo under Living Dead (~900k twice),
+//   Wall 2 shared by both tanks; Fire Resistance Down II 1002937.
+// - Meteorain: comet drop Cosmic Kiss 46133 (Comet actor, two hits clean),
+//   Fearsome Fireball 46138 (clean soak counts 6/4/4/6: tanks join the first,
+//   the next drop's two baiters sit each out), Foregone Fatality 46134 on the
+//   tanks every time. Shockwave 46141 logged no player damage in any pull.
+// - Flatliner: towers 46148 (4 x 2), short tower Unmitigated Explosion 46149
+//   + Sustained Damage 1004149 (raid DoT; B4 +6:32 killed 5), breaths 46151 +
+//   tethers 46147 (one line each), Massive Meteor 46153 (2 x 4, five hits).
+// - Stampede: Mammoth Meteor 46163 (proximity, kill max ~75k), Atomic Impact
+//   46164 cast-targeted at the two carriers six times each, lava = Burns
+//   1003065/1003066, towers Cosmic Kiss 46166 (tank) / Weighty Impact 46167
+//   (pair), short tower 46168, tethers 46169 (Fire Resistance Down II),
+//   Two-Way 47038 (2 x 4) / Four-Way 46171 (4 x 2).
+// - Kicks: tank-only in every pull (kick 1 OT under Living Dead, kick 2 MT
+//   invulnerable after the OT's first hit, kick 3 both tanks). Tough Break
+//   46177 = an empty tower: killed the raid (B16, B23). Heartbreaker
+//   46178/46179 = hard enrage (B13, B19, B20, B26, C3, C7, C10).
+// - Huge (1-5M) amounts are FFLogs' unpaired previews of lethal hits;
+//   counted as hits, never compared as amounts.
+//
+// Failure findings:
+// - Weapon hazards were the top killer (93 deaths, 28 first deaths).
+// - Proximity baits retarget once anyone is dead: two survivors took seven
+//   tornado cones (A9 +3:47), so Gust and Fire Breath overlaps need all 8 up.
+// - Doubled Sharp Taste: 7 of 9 followed a healer's death (the line went to
+//   someone in the group); A18 +1:35 and C5 +3:21 had both lines within 4
+//   degrees (healers on one side).
+// - Comet drops on the party: B1 +5:13 (healers), B4 +5:23 (ranged); four
+//   non-baiters hit each time, the melee's comet vulnerability killed them.
+// - Raw Steel: A8 +0:26 a tank cone with no tank in it killed five (the OT
+//   held no cone: enmity); A3 +0:26 and A26 +2:45 both tanks in both cones.
+// - Atomic Impact went through everyone once both carriers died to Mammoth
+//   Meteor (C13 +9:06): fallout.
+// - No-killing-blow deaths: almost all are the raid walking off to reset;
+//   the earliest came 10.6s before the pull's end (A15). Mid-pull falls:
+//   tower knockbacks off an island (B7 +7:03, B26 +7:41, 4.4s each).
+// - The kill's only death: the M2 took Two-Way's front with Fire Resistance
+//   Down II (C20 +9:35) while the H2 joined no line.
+//
+// Cutoffs (first Raid error): collapse 41, called wipe 37, enrage 7,
+// Flatliner tower 1 (B4), Tough Break 1 (B16); the kill has none.
+//
+// -- RULES IMPLEMENTED --
+// ffxiv-tyrant-avoidable (Major on Damage Down or death; Minor otherwise):
+//   AVOIDABLE. Fully mitigated 0-damage hits without Damage Down skipped.
+// ffxiv-tyrant-overlap (Major if anyone involved died to it, else Minor):
+//   one-bait-per-player families (PERSONAL). A player hit by another
+//   player's instance or by two at once names the victim; a known owner
+//   (cast target, or the only player the instance hit, or the one player it
+//   hit who took nothing else) is named too. Gust / Fire Breath only with
+//   all 8 alive.
+// ffxiv-tyrant-stack (Major on deaths): standing in two instances of a
+//   stack (STACKS); a stack that killed someone names living eligible players
+//   in none (not those who just took an avoidable hit); one or two players
+//   taking it while 3+ were elsewhere names the takers instead. Sharp Taste:
+//   skipped with a healer down; 3+ in both lines names both healers. A
+//   Two/Four-Way death with Fire Resistance Down II on the line's largest
+//   hit took the front.
+// ffxiv-tyrant-buster: a non-tank in the axe's Raw Steel, Great Wall or
+//   Foregone Fatality with both tanks up; scythe cones: both tanks in both
+//   (both named), a cone through 3+ non-tanks (its tank, or the tank holding
+//   no cone when no tank was in it), 1-2 non-tanks in a cone (them).
+// ffxiv-tyrant-meteorain: comet drop k (melee, healers, ranged) hitting 3+
+//   others names its two baiters, 1-2 others name those; skipped once a
+//   baiter is dead. A lethal Fearsome Fireball names living non-tanks out of
+//   it, except the next drop's baiters.
+// ffxiv-tyrant-tower: a short Flatliner / Stampede tower names eligible
+//   living players in no tower (Stampede: not the carriers); player-less
+//   Minor when all were in; Raid when its explosion and DoT killed 3+. Tough
+//   Break is a Raid. A non-tank killed in a kick tower with both tanks up.
+// ffxiv-tyrant-stampede: Atomic Impact on a non-carrier (both carriers up),
+//   lava (Minor; Major only when Burns killed), a lethal Mammoth Meteor.
+// ffxiv-tyrant-fall (Major): a no-killing-blow death outside a called wipe,
+//   "knocked" after a tower / Flatliner / tornado knockback in the 5s
+//   before. Walking Dead running out is a player-less Minor.
+// ffxiv-tyrant-enrage, -called-wipe (3+ no-killing-blow deaths within 10s,
+//   or any within 12s of the end), -collapse (5 dead, pull over within 45s):
+//   Raid, only before any other Raid.
+// The Damage Down causes are excluded from ffxiv-damage-down (error-rules.ts).
+//
+// Not built: Shockwave line-of-sight (no damage logged), rock collisions,
+// clock-spot attribution of scythe cone / Gust overlaps (both players named),
+// Wall front swaps (the static invulns Wall 1), kick cooldown timing, tank
+// deaths to their own busters (mitigation).
+//
 // -- GUIDE-DERIVED MODEL: THE TYRANT (M11S) --
 // AAC Heavyweight M3 (Savage), Arcadion, patch 7.4; Savage only.
-// Research stage, checked 2026-10-08. Comments only; no detector registered.
-// No report supplied or analyzed. ALL log signals below are hypotheses,
-// including lethal failures; none are observed-log findings.
+// Research stage, checked 2026-10-08, before any report was analyzed: the
+// log signals below are the researcher's hypotheses. VERIFIED AGAINST LOGS
+// above wins every disagreement.
 // User-selected strategy: WTFDIG Hector (Toxic / Hector No Buddies).
 //
 // -- SOURCES AND CONFIDENCE --
@@ -360,3 +492,841 @@
 //    Which opposite corners can Mammoth Meteor choose, fixed or variable?
 // 8. What roster matches H slots, actual kick plan and mitigation handoffs?
 //    Which failures are observed, and which no-ability deaths are resets?
+
+import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
+import type { DeathEvent } from "@/types/DeathEvent";
+import type { PullError, EnemyEvent } from "@/types/PullError";
+import { kFmt, sec, joinNames, playerError, playerlessMinor, raidMarker, rezzedAt, clusterByGap, debuffIntervals } from "@/lib/mechanics/wow/common";
+
+export const TYRANT_AVOIDABLE_RULE_ID   = "ffxiv-tyrant-avoidable";
+export const TYRANT_OVERLAP_RULE_ID     = "ffxiv-tyrant-overlap";
+export const TYRANT_STACK_RULE_ID       = "ffxiv-tyrant-stack";
+export const TYRANT_BUSTER_RULE_ID      = "ffxiv-tyrant-buster";
+export const TYRANT_METEORAIN_RULE_ID   = "ffxiv-tyrant-meteorain";
+export const TYRANT_TOWER_RULE_ID       = "ffxiv-tyrant-tower";
+export const TYRANT_STAMPEDE_RULE_ID    = "ffxiv-tyrant-stampede";
+export const TYRANT_FALL_RULE_ID        = "ffxiv-tyrant-fall";
+export const TYRANT_ENRAGE_RULE_ID      = "ffxiv-tyrant-enrage";
+export const TYRANT_COLLAPSE_RULE_ID    = "ffxiv-tyrant-collapse";
+export const TYRANT_CALLED_WIPE_RULE_ID = "ffxiv-tyrant-called-wipe";
+
+// ── log IDs (see VERIFIED AGAINST LOGS) ─────────────────────────────────────
+
+// Crown of Arcadia, Raw Steel Trophy (axe/scythe), Trophy Weapons, Meteorain,
+// Flatliner, Ecliptic Stampede: no other fight in the sample set casts these.
+const SIGNATURE           = [46086, 46114, 46115, 46102, 46132, 46143, 46162];
+const DAMAGE_DOWN         = 1002911;
+const FIRE_RES_DOWN       = 1002937; // Great Wall front hit, Meteowrath tethers
+const WALKING_DEAD        = 1000811; // Dark Knight's Living Dead follow-up
+const WALKING_DEAD_FULL_MS = 9500;
+const BURNS               = [1003065, 1003066]; // Stampede lava
+const RAW_STEEL_AXE       = 46091; // shared buster on the top two enmity
+const RAW_STEEL_SCYTHE    = 46095; // one cone per top-two enmity player
+const HEAVY_HITTER        = 46096; // the scythe version's shared cone on the other six
+const GREAT_WALL          = 46124;
+const COSMIC_KISS_DROP    = 46133; // Meteorain comet landing on its two baiters
+const FEARSOME_FIREBALL   = 46138;
+const FOREGONE_FATALITY   = 46134;
+const FLATLINER_TOWER     = 46148;
+const FLATLINER_UNSOAKED  = 46149; // Unmitigated Explosion: a Flatliner tower short
+const STAMPEDE_TOWERS     = [46166, 46167]; // Cosmic Kiss (tank) / Weighty Impact (pair)
+const STAMPEDE_UNSOAKED   = 46168;
+const SUSTAINED_DAMAGE    = 1004149; // the unsoaked tower's raid DoT
+const ATOMIC_IMPACT       = 46164;
+const MAMMOTH_METEOR      = 46163;
+const TWO_WAY             = 47038;
+const FOUR_WAY            = 46171;
+const HEARTBREAK_KICK     = 46174;
+const TOUGH_BREAK         = 46177; // a Heartbreak Kick tower left empty
+const HEARTBREAKER        = [46178, 46179]; // hard enrage
+
+// Knockbacks that can throw a player off an island or the arena edge.
+const KNOCKBACKS: Record<number, string> = {
+  [FLATLINER_TOWER]: "a Flatliner tower's knockback", 47760: "Flatliner", 46118: "the tornado (Charybdis)",
+};
+
+// Avoidable hits. Every one hands out Damage Down when survived except the
+// Avalanche (always lethal in the sample) and the scythe's donut (lethal 33 of
+// 35 hits; the two survivors were invulnerable).
+type Avoidable = { name: string; hit: string; why: string };
+const AVOIDABLE: Record<number, Avoidable> = {
+  46104: { name: "Axe (Assault Evolved)", hit: "Hit by the axe's point-blank circle (Assault Evolved)",
+    why: "The axe smashes everything close to where it lands; share Heavy Weight outside its circle." },
+  46105: { name: "Scythe (Assault Evolved)", hit: "Hit by the scythe's donut (Assault Evolved)",
+    why: "The scythe hits everything outside its small safe circle; stand inside it for the cones." },
+  46106: { name: "Sword (Assault Evolved)", hit: "Hit by the sword's cross (Assault Evolved)",
+    why: "The sword cleaves a plus shape through where it lands; take the healer lines off the cross." },
+  46099: { name: "Cometite", hit: "Hit by a Cometite bait",
+    why: "Each Cometite lands where it was baited a moment earlier; keep moving away from the old drops." },
+  46112: { name: "Explosion (Dance of Domination)", hit: "Hit by a Dance of Domination line explosion",
+    why: "The ground lines explode after the pulses; stand in the gaps for the pair stacks." },
+  46118: { name: "Charybdis", hit: "Touched a tornado (Charybdis)",
+    why: "The tornadoes left by Ultimate Trophy Weapons knock back and hand out Damage Down; bait the Gusts without walking into one." },
+  46131: { name: "Orbital Omen", hit: "Hit by an Orbital Omen line",
+    why: "The portal lines fire in pairs; dodge into an intersection that has already gone off." },
+  46128: { name: "Fire and Fury", hit: "Hit by Fire and Fury (the boss's front/back cones)",
+    why: "Fire and Fury cleaves the boss's front and back; stand on its flanks." },
+  46129: { name: "Fire and Fury", hit: "Hit by Fire and Fury (the boss's front/back cones)",
+    why: "Fire and Fury cleaves the boss's front and back; stand on its flanks." },
+  46136: { name: "Explosion (spent comet)", hit: "Caught in a spent Meteorain comet's explosion",
+    why: "A comet that absorbed a Fearsome Fireball explodes a moment later; step away from it." },
+  46145: { name: "Majestic Meteor", hit: "Hit by a Majestic Meteor puddle",
+    why: "The Fire Breath markers bait three puddles each; keep clear of where they land." },
+  46146: { name: "Majestic Meteorain", hit: "Hit by a Majestic Meteorain lane",
+    why: "The meteor lanes fire with the breaths and tethers; stay out of the lanes." },
+  46165: { name: "Majestic Meteor", hit: "Hit by a Stampede Majestic Meteor puddle",
+    why: "The six unmarked players bait these puddles in a line; keep moving with the group, off the old drops." },
+  46155: { name: "Arcadion Avalanche", hit: "Caught by Arcadion Avalanche",
+    why: "The boss throws the island it faces; be on the island behind it, in the corner opposite the throw." },
+  46159: { name: "Arcadion Avalanche", hit: "Caught by Arcadion Avalanche",
+    why: "The boss throws the island it faces; be on the island behind it, in the corner opposite the throw." },
+};
+
+// One bait per player per instance: a player hit by another player's
+// instance, or by two at once, is an overlap.
+// `proximity`: aimed at the nearest players, so with anyone dead the baits
+// pile onto the survivors (A9 +3:47: two players left took 7 tornado cones).
+type Family = { name: string; ids: number[]; what: string; why: string; gap?: number; proximity?: boolean };
+const PERSONAL: Family[] = [
+  { name: "Impact", ids: [46092], what: "Impact circle",
+    why: "The axe's Raw Steel drops a circle on each of the six non-tanks; spread to your own spot." },
+  { name: "Sweeping Victory", ids: [46108], what: "scythe cone",
+    why: "The scythe fires a cone at every player; spread around it on your clock spot so no cone crosses another player." },
+  { name: "Comet", ids: [46100], what: "Comet",
+    why: "Void Stardust's Comets are spreads on every player; stand apart." },
+  { name: "Powerful Gust", ids: [46119], what: "tornado cone", proximity: true,
+    why: "Each tornado fires a cone at its two nearest players; aim them outward and apart." },
+  { name: "Fire Breath / Meteowrath", ids: [46151, 46147], what: "Fire Breath or tether line", proximity: true,
+    why: "Each player takes exactly one line: the tethered players stretch theirs, the others bait one breath each; keep the lines apart." },
+  { name: "Majestic Meteowrath", ids: [46169], what: "tether line",
+    why: "Each tower soaker stretches their own tether across the arena; keep the lines apart." },
+];
+
+// Shared stacks: standing in two instances is an overlap; a stack that killed
+// someone while a living eligible player stood in none names that player.
+// `healerLines`: one line per healer, aimed from the sword at them. With a
+// healer down the line retargets onto the group (fallout); with both lines
+// through the same players the healers stood on the same side.
+type Stack = Family & { eligible?: "all" | "nonTank" | "pairTower"; healerLines?: boolean };
+const STACKS: Stack[] = [
+  { name: "Heavy Weight", ids: [46107], what: "axe stack",
+    why: "The axe's Heavy Weight is one party stack; everyone shares it." },
+  { name: "Heavy Hitter", ids: [HEAVY_HITTER], what: "shared cone", eligible: "nonTank",
+    why: "The scythe's Heavy Hitter is shared by all six non-tanks while the tanks take their own cones." },
+  { name: "Sharp Taste", ids: [46109], what: "healer line stack", healerLines: true,
+    why: "The sword's Sharp Taste is two line stacks, four players on each healer." },
+  { name: "Crushing Comet", ids: [46101], what: "party stack",
+    why: "Crushing Comet is one party stack; everyone shares it." },
+  { name: "Eye of the Hurricane", ids: [46116], what: "pair stack",
+    why: "Eye of the Hurricane is four two-person stacks; each player stands in exactly one, with their partner." },
+  { name: "Massive Meteor", ids: [46153], what: "light-party stack", gap: 700,
+    why: "Massive Meteor is two five-hit light-party stacks; each stack needs its four players." },
+  { name: "Two-Way Fireball", ids: [TWO_WAY], what: "charge line",
+    why: "Two-Way Fireball is two four-player charge lines; everyone joins one." },
+  { name: "Four-Way Fireball", ids: [FOUR_WAY], what: "charge line",
+    why: "Four-Way Fireball is four two-player charge lines; everyone joins one." },
+  { name: "Weighty Impact", ids: [46167], what: "pair tower", eligible: "pairTower",
+    why: "Each Weighty Impact tower needs two players; the four players without fire or a tank tower take them." },
+];
+
+// FFLogs logs the death event ~2.0s after the fatal hit (README).
+const DEATH_EVENT_LAG_MS = 2000;
+const DIED_FROM_HIT_MS   = 3000;
+// A no-killing-blow death this soon after a knockback hit was thrown off
+// (tower knockbacks off an island: 4.4s, B7 +427.7 and B26 +465.7).
+const FALL_KNOCKBACK_MS  = 5000;
+// No-killing-blow deaths this close to the pull's end are the wipe being
+// called (the raid walks off the edge to reset; the earliest such death came
+// 10.6s before the end, A15). The mid-pull falls ended 18.8s+ before it.
+const CALLED_WIPE_END_MS = 12_000;
+const CALLED_WIPE_COUNT  = 3;
+const CALLED_WIPE_WINDOW = 10_000;
+const COLLAPSE_DEAD_COUNT = 5;
+const COLLAPSE_END_MS     = 45_000;
+// A tank dead in this window before a buster has lost enmity.
+const TANK_ENMITY_LOST_MS = 30_000;
+// Deaths to one unsoaked tower that end the pull.
+const MASS_DEATHS         = 3;
+// Hits this large are FFLogs' unpaired previews of lethal hits (README):
+// counted as hits, never compared as amounts.
+const PREVIEW_AMOUNT      = 1_500_000;
+// A Cosmic Kiss drop hitting this many players besides its two baiters was
+// dropped on the group (B1 +313.8 and B4 +323.9 hit 4; clean drops hit only
+// their two baiters, with a third player clipped 3 times in 17 pulls).
+const KISS_ON_GROUP       = 3;
+// This many players in both Sharp Taste lines means the lines lay on top of
+// each other (A18 4, C5 5; a single player straddling: A11, 2).
+const HEALER_LINES_MERGED = 3;
+// A stack taken by one or two players while this many eligible players stood
+// elsewhere went to the wrong place itself.
+const STACK_LEFT_GROUP = 3;
+// Hits closer together than this are one avoidable episode for a player.
+const EPISODE_MS          = 3000;
+
+// ── shared helpers ──────────────────────────────────────────────────────────
+
+type Hit = { p: PlayerInfo; e: PlayerEvent };
+
+type Life = {
+  alive: (p: PlayerInfo, t: number) => boolean;
+  hitAlive: (p: PlayerInfo, hitT: number) => boolean;
+  diedFrom: (p: PlayerInfo, hitT: number) => DeathEvent | undefined;
+  outIntervals: { p: PlayerInfo; start: number; end: number }[];
+};
+
+function buildLife(players: PlayerInfo[], deaths: DeathEvent[]): Life {
+  const outIntervals: Life["outIntervals"] = [];
+  for (const p of players) {
+    const own = deaths.filter((d) => d.player === p.name).sort((a, b) => a.timestamp - b.timestamp);
+    own.forEach((d, i) => {
+      const next = own[i + 1]?.timestamp ?? Infinity;
+      const end = rezzedAt(p, d.timestamp, next) ?? next - DEATH_EVENT_LAG_MS - 100;
+      outIntervals.push({ p, start: d.timestamp - DEATH_EVENT_LAG_MS - 100, end });
+    });
+  }
+  const alive = (p: PlayerInfo, t: number) => !outIntervals.some((w) => w.p === p && t >= w.start && t < w.end);
+  return {
+    outIntervals,
+    alive,
+    hitAlive: (p, hitT) => alive(p, hitT - 500),
+    diedFrom: (p, hitT) => deaths.find((d) => d.player === p.name && d.timestamp >= hitT && d.timestamp <= hitT + DIED_FROM_HIT_MS),
+  };
+}
+
+/** Hits on living players (a dead body still logs 0-damage hits). */
+function hitsOf(players: PlayerInfo[], life: Life, ids: number | number[], from = -Infinity, to = Infinity): Hit[] {
+  const set = new Set(Array.isArray(ids) ? ids : [ids]);
+  const out: Hit[] = [];
+  for (const p of players) {
+    for (const e of p.damageTaken) {
+      if (!set.has(e.abilityId) || e.timestamp < from || e.timestamp > to || e.healthBefore === 0) continue;
+      if (life.hitAlive(p, e.timestamp)) out.push({ p, e });
+    }
+  }
+  return out.sort((a, b) => a.e.timestamp - b.e.timestamp);
+}
+
+const castsOf = (casts: EnemyEvent[], ids: number | number[]) => {
+  const set = new Set(Array.isArray(ids) ? ids : [ids]);
+  return casts.filter((c) => set.has(c.abilityId)).sort((a, b) => a.timestamp - b.timestamp);
+};
+
+function gotDamageDown(p: PlayerInfo, t: number): boolean {
+  return p.debuffs.some((e) => e.abilityId === DAMAGE_DOWN && e.debuffStatus === "applied" && Math.abs(e.timestamp - t) <= 1500);
+}
+
+/** The aura was on the player at `t`. */
+function hasAura(p: PlayerInfo, id: number, t: number): boolean {
+  return debuffIntervals(p, id).some((w) => w.start <= t && w.end > t);
+}
+
+const uniq = <T,>(xs: T[]) => [...new Set(xs)];
+const namesOf = (ps: PlayerInfo[]) => joinNames(uniq(ps).map((p) => p.name));
+const isTank = (p: PlayerInfo) => p.role === "Tank";
+const realAmount = (e: PlayerEvent) => ((e.amount ?? 0) >= PREVIEW_AMOUNT ? 0 : e.amount ?? 0);
+const instanceKey = (e: PlayerEvent) => `${e.source}#${e.sourceInstance}`;
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+/** A tank whose recent death (or raise) cost them enmity before `t`. */
+function tankOutRecently(life: Life, p: PlayerInfo, t: number): boolean {
+  return !life.hitAlive(p, t) || life.outIntervals.some((w) => w.p === p && w.start <= t && w.end >= t - TANK_ENMITY_LOST_MS);
+}
+
+/** Both tanks alive and holding enmity at `t` (otherwise busters retarget as fallout). */
+function tanksHealthy(players: PlayerInfo[], life: Life, t: number): boolean {
+  const tanks = players.filter(isTank);
+  return tanks.length >= 2 && tanks.every((p) => !tankOutRecently(life, p, t));
+}
+
+/** Players who took a listed avoidable hit within 2s of `t`: already flagged for it. */
+function inAvoidable(p: PlayerInfo, t: number): boolean {
+  return p.damageTaken.some((e) => AVOIDABLE[e.abilityId] && Math.abs(e.timestamp - t) <= 2000 && realAmount(e) > 0);
+}
+
+/** Cast target of each instance among the casts just before a resolution's hits. */
+function castOwners(casts: EnemyEvent[], ids: number[], res: Hit[], players: PlayerInfo[]): Map<string, PlayerInfo> {
+  const t0 = res[0].e.timestamp, t1 = res[res.length - 1].e.timestamp;
+  const out = new Map<string, PlayerInfo>();
+  for (const c of casts) {
+    if (!ids.includes(c.abilityId) || c.timestamp < t0 - 2000 || c.timestamp > t1 || c.sourceInstance === undefined || !c.target) continue;
+    const p = players.find((x) => x.name === c.target);
+    if (p) out.set(`${c.actorName}#${c.sourceInstance}`, p);
+  }
+  return out;
+}
+
+// ── plain avoidable hits ────────────────────────────────────────────────────
+
+function detectAvoidable(players: PlayerInfo[], life: Life): PullError[] {
+  const errors: PullError[] = [];
+  const ids = Object.keys(AVOIDABLE).map(Number);
+  for (const p of players) {
+    // A fully mitigated hit (invulnerable, 0 damage, no Damage Down) is no loss.
+    const hits = p.damageTaken.filter((e) => ids.includes(e.abilityId) && e.healthBefore !== 0 && life.hitAlive(p, e.timestamp) &&
+      (realAmount(e) > 0 || (e.amount ?? 0) >= PREVIEW_AMOUNT || gotDamageDown(p, e.timestamp)));
+    for (const g of clusterByGap(hits, (e) => e.timestamp, EPISODE_MS)) {
+      const kinds = uniq(g.map((e) => AVOIDABLE[e.abilityId]));
+      const total = g.reduce((s, e) => s + realAmount(e), 0);
+      const death = life.diedFrom(p, g[g.length - 1].timestamp);
+      const dd = g.some((e) => gotDamageDown(p, e.timestamp));
+      const hit = kinds.map((k, i) => (i === 0 ? k.hit : k.hit.charAt(0).toLowerCase() + k.hit.slice(1))).join(", and ");
+      const outcome = [dd ? "got Damage Down" : "", death ? "died" : ""].filter(Boolean).join(" and ");
+      errors.push(playerError(p, {
+        ruleId: TYRANT_AVOIDABLE_RULE_ID, severity: dd || death ? "Major" : "Minor", name: `Hit by ${uniq(kinds.map((k) => k.name)).join(" / ")}`,
+        description: `${hit} (${g.length > 1 ? `${g.length} hits, ` : ""}${kFmt(total)}).${outcome ? ` They ${outcome}.` : ""} ${uniq(kinds.map((k) => k.why)).join(" ")}`,
+        timestamp: g[0].timestamp, abilityId: g[0].abilityId, abilityName: g[0].abilityName,
+      }));
+    }
+  }
+  return errors;
+}
+
+// ── overlapping personal baits ──────────────────────────────────────────────
+
+/**
+ * Per resolution of a one-bait-per-player family: who owns each instance (the
+ * cast target; failing that, the only player it hit, or the one player it hit
+ * who took nothing else), and who was hit by an instance that isn't theirs or
+ * by two at once. Names the victim and, when known, the owner (README
+ * philosophy 3: both are candidates).
+ */
+function detectPersonalOverlaps(players: PlayerInfo[], life: Life, casts: EnemyEvent[]): PullError[] {
+  const errors: PullError[] = [];
+  for (const fam of PERSONAL) {
+    for (const res of clusterByGap(hitsOf(players, life, fam.ids), (h) => h.e.timestamp, fam.gap ?? 1500)) {
+      if (fam.proximity && players.some((p) => !life.hitAlive(p, res[0].e.timestamp))) continue;
+      const byInst = new Map<string, Hit[]>();
+      const byPlayer = new Map<PlayerInfo, Set<string>>();
+      for (const h of res) {
+        const k = instanceKey(h.e);
+        byInst.set(k, [...(byInst.get(k) ?? []), h]);
+        byPlayer.set(h.p, (byPlayer.get(h.p) ?? new Set()).add(k));
+      }
+      const owners = castOwners(casts, fam.ids, res, players);
+      for (const [k, hs] of byInst) {
+        if (owners.has(k)) continue;
+        const only = uniq(hs.map((h) => h.p)).filter((p) => byPlayer.get(p)!.size === 1);
+        if (hs.length === 1) owners.set(k, hs[0].p);
+        else if (only.length === 1 && uniq(hs.map((h) => h.p)).length > 1) owners.set(k, only[0]);
+      }
+      const t = res[0].e.timestamp;
+      const victims = new Map<PlayerInfo, PlayerInfo[]>(); // victim -> others involved
+      for (const [p, ks] of byPlayer) {
+        const foreign = [...ks].filter((k) => owners.get(k) !== p);
+        if (ks.size < 2 && foreign.length === 0) continue;
+        const others = uniq([...ks].flatMap((k) => {
+          const o = owners.get(k);
+          return o ? (o === p ? [] : [o]) : byInst.get(k)!.map((h) => h.p).filter((x) => x !== p);
+        }));
+        victims.set(p, others);
+      }
+      if (!victims.size) continue;
+      const involved = uniq([...victims.keys(), ...[...victims.values()].flat()]);
+      const killed = involved.filter((p) => {
+        const last = res.filter((h) => h.p === p).pop()?.e.timestamp ?? t;
+        const d = life.diedFrom(p, last);
+        return d && fam.ids.includes(d.killingAbilityGameId);
+      });
+      const severity = killed.length ? "Major" : "Minor";
+      const deathText = killed.length ? ` ${namesOf(killed)} died.` : "";
+      const named = new Set<PlayerInfo>();
+      for (const [p, others] of victims) {
+        const n = byPlayer.get(p)!.size;
+        named.add(p);
+        errors.push(playerError(p, {
+          ruleId: TYRANT_OVERLAP_RULE_ID, severity, name: `${fam.name} Overlap`,
+          description: `Hit by ${n > 1 ? `${n} ${fam.what}s at once` : `another player's ${fam.what}`}${others.length ? ` (with ${namesOf(others)})` : ""}.${deathText} ${fam.why}`,
+          timestamp: t, abilityId: fam.ids[0], abilityName: fam.name,
+        }));
+      }
+      // Owners whose bait hit someone else (and who weren't hit twice themselves).
+      for (const [k, o] of owners) {
+        if (named.has(o) || !life.hitAlive(o, t)) continue;
+        const hitOthers = uniq(byInst.get(k)!.map((h) => h.p).filter((p) => p !== o));
+        if (!hitOthers.length) continue;
+        named.add(o);
+        errors.push(playerError(o, {
+          ruleId: TYRANT_OVERLAP_RULE_ID, severity, name: `${fam.name} Overlap`,
+          description: `Their ${fam.what} also hit ${namesOf(hitOthers)}.${deathText} ${fam.why}`,
+          timestamp: t, abilityId: fam.ids[0], abilityName: fam.name,
+        }));
+      }
+    }
+  }
+  return errors;
+}
+
+// ── shared stacks ───────────────────────────────────────────────────────────
+
+/**
+ * Stampede fire carriers: the players Atomic Impact's casts target (six
+ * each). Counting hits instead fails when the puddles chain through the
+ * group (C13: six players took 3+).
+ */
+function atomicCarriers(players: PlayerInfo[], casts: EnemyEvent[]): Set<PlayerInfo> {
+  const counts = new Map<string, number>();
+  for (const c of castsOf(casts, ATOMIC_IMPACT)) if (c.target) counts.set(c.target, (counts.get(c.target) ?? 0) + 1);
+  return new Set(players.filter((p) => (counts.get(p.name) ?? 0) >= 3));
+}
+
+function detectStacks(players: PlayerInfo[], life: Life, deaths: DeathEvent[], carriers: Set<PlayerInfo>): PullError[] {
+  const errors: PullError[] = [];
+  for (const fam of STACKS) {
+    for (const res of clusterByGap(hitsOf(players, life, fam.ids), (h) => h.e.timestamp, fam.gap ?? 1500)) {
+      const t = res[0].e.timestamp;
+      const byPlayer = new Map<PlayerInfo, Set<string>>();
+      for (const h of res) byPlayer.set(h.p, (byPlayer.get(h.p) ?? new Set()).add(instanceKey(h.e)));
+      const killed = uniq(res.map((h) => h.p)).filter((p) => {
+        const d = life.diedFrom(p, res.filter((h) => h.p === p).pop()!.e.timestamp);
+        return d && fam.ids.includes(d.killingAbilityGameId);
+      });
+      const deathText = killed.length ? ` ${namesOf(killed)} died.` : "";
+      const doubled = [...byPlayer].filter(([, ks]) => ks.size >= 2).map(([p]) => p);
+      if (fam.healerLines) {
+        // 7 of 9 doubled Sharp Tastes followed a healer's death (A12, A16,
+        // A19, A24, A28, B2); the other two had both lines within 4 degrees
+        // of each other (A18 +1:35, C5 +3:21: the healers on one side).
+        const healers = players.filter((p) => p.role === "Healer");
+        if (healers.some((p) => !life.hitAlive(p, t))) continue;
+        if (doubled.length >= HEALER_LINES_MERGED) {
+          for (const p of healers) {
+            errors.push(playerError(p, {
+              ruleId: TYRANT_STACK_RULE_ID, severity: killed.length ? "Major" : "Minor", name: "Sharp Taste Lines Merged",
+              description: `Both Sharp Taste lines fired through the same players (${namesOf(doubled)} took both).${deathText} Each line aims at a healer; the two healers stand on opposite sides of the sword so the lines split the party four and four.`,
+              timestamp: t, abilityId: fam.ids[0], abilityName: fam.name,
+            }));
+          }
+          continue;
+        }
+      }
+      for (const [p, ks] of byPlayer) {
+        if (ks.size < 2) continue;
+        errors.push(playerError(p, {
+          ruleId: TYRANT_STACK_RULE_ID, severity: killed.length ? "Major" : "Minor", name: `${fam.name}: Two Stacks`,
+          description: `Stood in ${ks.size} ${fam.what}s at once.${deathText} ${fam.why}`,
+          timestamp: t, abilityId: fam.ids[0], abilityName: fam.name,
+        }));
+      }
+      if (!killed.length) continue;
+      const eligible = (p: PlayerInfo) =>
+        fam.eligible === "nonTank" ? !isTank(p)
+        : fam.eligible === "pairTower" ? !isTank(p) && !carriers.has(p)
+        : true;
+      const absent = players.filter((p) => eligible(p) && !byPlayer.has(p) && life.hitAlive(p, t) && !inAvoidable(p, t));
+      // One or two players took it while most of the party was elsewhere:
+      // the stack left the group, not the other way round (B17 +1:41, C18
+      // +3:31: one player under Heavy Weight, the rest absent).
+      if (absent.length >= STACK_LEFT_GROUP && byPlayer.size <= 2) {
+        for (const p of byPlayer.keys()) {
+          errors.push(playerError(p, {
+            ruleId: TYRANT_STACK_RULE_ID, severity: "Major", name: `${fam.name} Away From the Group`,
+            description: `Took the ${fam.what} ${byPlayer.size === 1 ? "alone" : `with only ${namesOf([...byPlayer.keys()].filter((x) => x !== p))}`} while ${plural(absent.length, "player")} (${namesOf(absent)}) were elsewhere.${deathText} ${fam.why}`,
+            timestamp: t, abilityId: fam.ids[0], abilityName: fam.name,
+          }));
+        }
+        continue;
+      }
+      for (const p of absent) {
+        errors.push(playerError(p, {
+          ruleId: TYRANT_STACK_RULE_ID, severity: "Major", name: `Missed ${fam.name}`,
+          description: `Wasn't in any ${fam.what}; ${plural(byPlayer.size, "player")} shared it and ${namesOf(killed)} died to the extra damage. ${fam.why}`,
+          timestamp: t, abilityId: fam.ids[0], abilityName: fam.name,
+        }));
+      }
+    }
+  }
+  return errors;
+}
+
+/**
+ * Two-Way / Four-Way Fireball: a player with Fire Resistance Down II (their
+ * Meteowrath tether) who died taking the biggest hit of their line stood in
+ * front of it (the kill's only death, C20 +9:37).
+ */
+function detectFireballFronts(players: PlayerInfo[], life: Life): PullError[] {
+  const errors: PullError[] = [];
+  for (const res of clusterByGap(hitsOf(players, life, [TWO_WAY, FOUR_WAY]), (h) => h.e.timestamp, 1500)) {
+    const named = new Set<PlayerInfo>();
+    for (const h of res) {
+      if (named.has(h.p)) continue;
+      const d = life.diedFrom(h.p, h.e.timestamp);
+      if (!d || ![TWO_WAY, FOUR_WAY].includes(d.killingAbilityGameId) || !hasAura(h.p, FIRE_RES_DOWN, h.e.timestamp - 200)) continue;
+      const line = res.filter((x) => instanceKey(x.e) === instanceKey(h.e));
+      if (line.some((x) => realAmount(x.e) > realAmount(h.e))) continue;
+      named.add(h.p);
+      errors.push(playerError(h.p, {
+        ruleId: TYRANT_STACK_RULE_ID, severity: "Major", name: "Fireball Front With Fire Vulnerability",
+        description: `Took the front of ${h.e.abilityName} (${kFmt(realAmount(h.e))}, the largest hit of their line) while carrying Fire Resistance Down II from their tether, and died. The front of each charge takes far more damage; the tether players stand behind a player without the vulnerability.`,
+        timestamp: h.e.timestamp, abilityId: h.e.abilityId, abilityName: h.e.abilityName,
+      }));
+    }
+  }
+  return errors;
+}
+
+// ── tank busters ────────────────────────────────────────────────────────────
+
+function detectBusters(players: PlayerInfo[], life: Life, casts: EnemyEvent[]): PullError[] {
+  const errors: PullError[] = [];
+  const diedText = (p: PlayerInfo, t: number) => (life.diedFrom(p, t) ? ", and died" : "");
+  // Axe Raw Steel: one shared buster on the tanks. A non-tank in it stood
+  // with the tanks (with a tank down it retargets: fallout).
+  for (const res of clusterByGap(hitsOf(players, life, RAW_STEEL_AXE), (h) => h.e.timestamp, 1500)) {
+    const t = res[0].e.timestamp;
+    if (!tanksHealthy(players, life, t)) continue;
+    for (const h of res.filter((x) => !isTank(x.p))) {
+      errors.push(playerError(h.p, {
+        ruleId: TYRANT_BUSTER_RULE_ID, severity: life.diedFrom(h.p, t) ? "Major" : "Minor", name: "In the Tank Buster",
+        description: `Stood in the axe's Raw Steel, the tanks' shared buster (${kFmt(realAmount(h.e))})${diedText(h.p, t)}. Only the two tanks share it; everyone else spreads for their Impact circle.`,
+        timestamp: t, abilityId: RAW_STEEL_AXE, abilityName: "Raw Steel",
+      }));
+    }
+  }
+  // Scythe Raw Steel: a cone on each of the top two enmity players.
+  for (const res of clusterByGap(hitsOf(players, life, RAW_STEEL_SCYTHE), (h) => h.e.timestamp, 1500)) {
+    const t = res[0].e.timestamp;
+    if (!tanksHealthy(players, life, t)) continue;
+    const owners = castOwners(casts, [RAW_STEEL_SCYTHE], res, players);
+    const byInst = new Map<string, Hit[]>();
+    for (const h of res) byInst.set(instanceKey(h.e), [...(byInst.get(instanceKey(h.e)) ?? []), h]);
+    const tanks = players.filter(isTank);
+    // Both tanks in both cones: they stood together (A3 +0:26, both died).
+    const doubled = tanks.filter((p) => uniq(res.filter((h) => h.p === p).map((h) => instanceKey(h.e))).length >= 2);
+    for (const p of doubled) {
+      errors.push(playerError(p, {
+        ruleId: TYRANT_BUSTER_RULE_ID, severity: life.diedFrom(p, t) ? "Major" : "Minor", name: "Tank Cones Overlapped",
+        description: `Took both tanks' Raw Steel cones${diedText(p, t)}. Each tank takes their own cone away from the other (Hector: MT northwest, OT northeast).`,
+        timestamp: t, abilityId: RAW_STEEL_SCYTHE, abilityName: "Raw Steel",
+      }));
+    }
+    for (const [k, hs] of byInst) {
+      const party = uniq(hs.map((h) => h.p).filter((p) => !isTank(p)));
+      if (!party.length) continue;
+      const owner = owners.get(k);
+      const killed = party.filter((p) => life.diedFrom(p, t));
+      const severity = killed.length ? "Major" : "Minor";
+      const deathText = killed.length ? ` ${namesOf(killed)} died.` : "";
+      if (owner && !isTank(owner)) {
+        // The cone went to a non-tank: a tank didn't hold second enmity.
+        const lost = tanks.filter((p) => !res.some((h) => h.p === p));
+        for (const p of lost.length ? lost : []) {
+          errors.push(playerError(p, {
+            ruleId: TYRANT_BUSTER_RULE_ID, severity, name: "Lost Enmity for Raw Steel",
+            description: `A Raw Steel tank cone targeted ${owner.name} instead of a tank, hitting ${namesOf(party)}.${deathText} The cones go to the top two on enmity; both tanks need to hold it.`,
+            timestamp: t, abilityId: RAW_STEEL_SCYTHE, abilityName: "Raw Steel",
+          }));
+        }
+        continue;
+      }
+      if (party.length >= 3) {
+        // A cone through most of the party: its tank pointed it at the group.
+        const tank = owner ?? tanks.find((p) => hs.some((h) => h.p === p));
+        // No tank in it at all: it went to a non-tank, so the tank who took
+        // no cone didn't hold enmity (A8 +0:26, five dead).
+        const noCone = tanks.filter((p) => !res.some((h) => h.p === p));
+        if (!tank && noCone.length) {
+          for (const p of noCone) {
+            errors.push(playerError(p, {
+              ruleId: TYRANT_BUSTER_RULE_ID, severity, name: "Lost Enmity for Raw Steel",
+              description: `Took no Raw Steel cone while one went through ${plural(party.length, "party member")} (${namesOf(party)}).${deathText} The cones go to the top two on enmity; both tanks need to hold it and face their cone away from the party.`,
+              timestamp: t, abilityId: RAW_STEEL_SCYTHE, abilityName: "Raw Steel",
+            }));
+          }
+          continue;
+        }
+        if (tank) {
+          errors.push(playerError(tank, {
+            ruleId: TYRANT_BUSTER_RULE_ID, severity, name: "Raw Steel Cone Into the Party",
+            description: `Their Raw Steel cone hit ${plural(party.length, "party member")} (${namesOf(party)}).${deathText} Each tank faces their cone away from the party stack (Hector: MT northwest, OT northeast, party south).`,
+            timestamp: t, abilityId: RAW_STEEL_SCYTHE, abilityName: "Raw Steel",
+          }));
+          continue;
+        }
+      }
+      for (const p of party) {
+        errors.push(playerError(p, {
+          ruleId: TYRANT_BUSTER_RULE_ID, severity: life.diedFrom(p, t) ? "Major" : "Minor", name: "In a Tank Cone",
+          description: `Stood in a tank's Raw Steel cone${owner ? ` (aimed at ${owner.name})` : ""}${diedText(p, t)}. The non-tanks stack for Heavy Hitter away from both tank cones.`,
+          timestamp: t, abilityId: RAW_STEEL_SCYTHE, abilityName: "Raw Steel",
+        }));
+      }
+    }
+  }
+  // Great Wall of Fire, Foregone Fatality: tank-only.
+  for (const [id, name, why] of [
+    [GREAT_WALL, "Great Wall of Fire", "Great Wall of Fire is a line buster on the main tank; everyone else stays off the line."],
+    [FOREGONE_FATALITY, "Foregone Fatality", "The tanks intercept every Foregone Fatality tether; nobody else takes one."],
+  ] as const) {
+    for (const h of hitsOf(players, life, id)) {
+      if (isTank(h.p) || !tanksHealthy(players, life, h.e.timestamp)) continue;
+      errors.push(playerError(h.p, {
+        ruleId: TYRANT_BUSTER_RULE_ID, severity: life.diedFrom(h.p, h.e.timestamp) ? "Major" : "Minor", name: `Took ${name}`,
+        description: `Took ${name} (${kFmt(realAmount(h.e))}) while both tanks were up${diedText(h.p, h.e.timestamp)}. ${why}`,
+        timestamp: h.e.timestamp, abilityId: id, abilityName: name,
+      }));
+    }
+  }
+  return errors;
+}
+
+// ── Meteorain ───────────────────────────────────────────────────────────────
+
+/**
+ * The three comet drops go melee -> healers -> ranged (Hector; every clean
+ * drop in the sample). A drop that hit the group means its baiters didn't
+ * leave the party; one or two extra players clipped stood too close. Fearsome
+ * Fireball charges are shared by every non-tank except the next drop's
+ * baiters (clean: 6 / 4 / 4 / 6, tanks on the first).
+ */
+function detectMeteorain(players: PlayerInfo[], life: Life): PullError[] {
+  const errors: PullError[] = [];
+  const isBaiter = (p: PlayerInfo, k: number) =>
+    p.role === (k === 1 ? "Healer" : "DPS") && (k === 1 || (k === 0 ? p.rangeType === "Melee" : p.rangeType !== "Melee"));
+  const drops = clusterByGap(hitsOf(players, life, COSMIC_KISS_DROP), (h) => h.e.timestamp, 3000);
+  drops.forEach((res, k) => {
+    if (k > 2) return;
+    const t = res[0].e.timestamp;
+    const baiters = players.filter((p) => isBaiter(p, k));
+    if (baiters.length !== 2 || !baiters.every((p) => life.hitAlive(p, t))) return; // retargeted: fallout
+    const extra = uniq(res.map((h) => h.p)).filter((p) => !baiters.includes(p));
+    if (!extra.length) return;
+    const killed = uniq(res.map((h) => h.p)).filter((p) => life.diedFrom(p, t)?.killingAbilityGameId === COSMIC_KISS_DROP);
+    const severity = killed.length ? "Major" : "Minor";
+    const deathText = killed.length ? ` ${namesOf(killed)} died (the earlier comets' Physical Vulnerability Up makes a second hit deadly).` : "";
+    const role = ["melee", "healer", "ranged"][k];
+    if (extra.length >= KISS_ON_GROUP) {
+      for (const p of baiters) {
+        errors.push(playerError(p, {
+          ruleId: TYRANT_METEORAIN_RULE_ID, severity, name: "Dropped Comet on the Party",
+          description: `Comet drop ${k + 1} (the ${role} pair: ${namesOf(baiters)}) also hit ${namesOf(extra)}.${deathText} The baiters carry their comets out to their own corners before they land.`,
+          timestamp: t, abilityId: COSMIC_KISS_DROP, abilityName: "Cosmic Kiss",
+        }));
+      }
+      return;
+    }
+    for (const p of extra) {
+      errors.push(playerError(p, {
+        ruleId: TYRANT_METEORAIN_RULE_ID, severity: life.diedFrom(p, t) ? "Major" : "Minor", name: "Clipped by a Comet",
+        description: `Stood under comet drop ${k + 1}, the ${role} pair's (${namesOf(baiters)}).${deathText} Only the two baiters may be under each comet.`,
+        timestamp: t, abilityId: COSMIC_KISS_DROP, abilityName: "Cosmic Kiss",
+      }));
+    }
+  });
+  for (const res of clusterByGap(hitsOf(players, life, FEARSOME_FIREBALL), (h) => h.e.timestamp, 1500)) {
+    const t = res[0].e.timestamp;
+    const killed = uniq(res.map((h) => h.p)).filter((p) => life.diedFrom(p, t)?.killingAbilityGameId === FEARSOME_FIREBALL);
+    if (!killed.length) continue;
+    const nextBaiters = new Set(hitsOf(players, life, COSMIC_KISS_DROP, t, t + 2500).map((h) => h.p));
+    const absent = players.filter((p) => !isTank(p) && !nextBaiters.has(p) && !res.some((h) => h.p === p) && life.hitAlive(p, t) && !inAvoidable(p, t));
+    for (const p of absent) {
+      errors.push(playerError(p, {
+        ruleId: TYRANT_METEORAIN_RULE_ID, severity: "Major", name: "Missed Fearsome Fireball",
+        description: `Wasn't in the Fearsome Fireball charge; ${plural(res.length, "player")} shared it and ${namesOf(killed)} died. Every non-tank except the next comet's two baiters shares each charge behind the rock.`,
+        timestamp: t, abilityId: FEARSOME_FIREBALL, abilityName: "Fearsome Fireball",
+      }));
+    }
+  }
+  return errors;
+}
+
+// ── towers ──────────────────────────────────────────────────────────────────
+
+function detectTowers(players: PlayerInfo[], life: Life, casts: EnemyEvent[], deaths: DeathEvent[], carriers: Set<PlayerInfo>): PullError[] {
+  const errors: PullError[] = [];
+  const waves: { penalty: number; soak: number[]; window: number; eligible: (p: PlayerInfo) => boolean; label: string; why: string }[] = [
+    { penalty: FLATLINER_UNSOAKED, soak: [FLATLINER_TOWER], window: 2500, eligible: () => true, label: "Flatliner tower",
+      why: "Every player soaks a two-person tower in each of the three waves; a short tower explodes and hands the raid a heavy damage-over-time." },
+    { penalty: STAMPEDE_UNSOAKED, soak: STAMPEDE_TOWERS, window: 3000, eligible: (p) => !carriers.has(p), label: "Stampede tower",
+      why: "The two tanks take the solo towers and the four players without fire take the pair towers." },
+  ];
+  for (const w of waves) {
+    for (const g of clusterByGap(castsOf(casts, w.penalty), (c) => c.timestamp, 3000)) {
+      const t = g[0].timestamp;
+      const soakers = new Set(hitsOf(players, life, w.soak, t - w.window, t).map((h) => h.p));
+      const absent = players.filter((p) => w.eligible(p) && !soakers.has(p) && life.hitAlive(p, t - 1000) && !inAvoidable(p, t - 1000));
+      const killed = uniq(deaths.filter((d) => [w.penalty, SUSTAINED_DAMAGE].includes(d.killingAbilityGameId) && d.timestamp >= t && d.timestamp <= t + 10_000).map((d) => d.player));
+      const deathText = killed.length ? ` ${joinNames(killed)} died to the explosion and its damage-over-time.` : "";
+      for (const p of absent) {
+        errors.push(playerError(p, {
+          ruleId: TYRANT_TOWER_RULE_ID, severity: "Major", name: `Missed ${w.label}`,
+          description: `Soaked no tower in a wave where ${plural(g.length, "tower")} went off short (Unmitigated Explosion).${deathText} ${w.why}`,
+          timestamp: t, abilityId: w.penalty, abilityName: "Unmitigated Explosion",
+        }));
+      }
+      if (!absent.length) {
+        errors.push(playerlessMinor(TYRANT_TOWER_RULE_ID, `${w.label} Short`,
+          `${plural(g.length, w.label)} went off short (Unmitigated Explosion) with every living player already in a tower: earlier deaths left too few soakers.${deathText}`,
+          t, w.penalty, "Unmitigated Explosion"));
+      }
+      if (killed.length >= MASS_DEATHS) {
+        errors.push(raidMarker(TYRANT_TOWER_RULE_ID, `${w.label} Short`,
+          `The unsoaked ${w.label} killed ${killed.length} (${joinNames(killed)}). Unresolvable from here.`, t, w.penalty, "Unmitigated Explosion"));
+      }
+    }
+  }
+  // Heartbreak Kick: the static's towers are tank-only (both tanks in every
+  // pull that reached them). An empty tower is Tough Break.
+  const tough = castsOf(casts, TOUGH_BREAK)[0];
+  if (tough) {
+    errors.push(raidMarker(TYRANT_TOWER_RULE_ID, "Heartbreak Kick Tower Failed",
+      "A Heartbreak Kick tower was left empty and Tough Break hit the raid. Unresolvable from here.", tough.timestamp, TOUGH_BREAK, "Tough Break"));
+  }
+  for (const h of hitsOf(players, life, HEARTBREAK_KICK)) {
+    const d = life.diedFrom(h.p, h.e.timestamp);
+    if (isTank(h.p) || d?.killingAbilityGameId !== HEARTBREAK_KICK || !tanksHealthy(players, life, h.e.timestamp)) continue;
+    errors.push(playerError(h.p, {
+      ruleId: TYRANT_TOWER_RULE_ID, severity: "Major", name: "Entered a Tank Kick Tower",
+      description: `Stepped into a Heartbreak Kick tower (${kFmt(realAmount(h.e))}) and died. The tanks cover the kick towers with their cooldowns and invulnerabilities; everyone else stays out.`,
+      timestamp: h.e.timestamp, abilityId: HEARTBREAK_KICK, abilityName: "Heartbreak Kick",
+    }));
+  }
+  return errors;
+}
+
+// ── Ecliptic Stampede ───────────────────────────────────────────────────────
+
+function detectStampede(players: PlayerInfo[], life: Life, deaths: DeathEvent[], called: Set<DeathEvent>, carriers: Set<PlayerInfo>): PullError[] {
+  const errors: PullError[] = [];
+  // Atomic Impact on anyone but its two carriers: too close to a carrier.
+  // With a carrier dead the puddles land on whoever is left (C13 +9:06: both
+  // carriers died to Mammoth Meteor and Atomic Impact went through everyone).
+  const carriersUp = (t: number) => carriers.size === 2 && [...carriers].every((c) => life.hitAlive(c, t));
+  for (const p of players) {
+    if (carriers.has(p)) continue;
+    const hits = hitsOf([p], life, ATOMIC_IMPACT).filter((h) => realAmount(h.e) > 0 && carriersUp(h.e.timestamp));
+    for (const g of clusterByGap(hits, (h) => h.e.timestamp, EPISODE_MS)) {
+      const t = g[0].e.timestamp;
+      const death = life.diedFrom(p, g[g.length - 1].e.timestamp);
+      const dd = g.some((h) => gotDamageDown(p, h.e.timestamp));
+      errors.push(playerError(p, {
+        ruleId: TYRANT_STAMPEDE_RULE_ID, severity: death || dd ? "Major" : "Minor", name: "Hit by Atomic Impact",
+        description: `Hit by a fire carrier's Atomic Impact (${g.length > 1 ? `${g.length} hits, ` : ""}${kFmt(g.reduce((s, h) => s + realAmount(h.e), 0))})${carriers.size ? `; the carriers were ${namesOf([...carriers])}` : ""}.${death ? " They died." : dd ? " They got Damage Down." : ""} The two marked players run their own routes along the walls; everyone else keeps away from them.`,
+        timestamp: t, abilityId: ATOMIC_IMPACT, abilityName: "Atomic Impact",
+      }));
+    }
+  }
+  // Lava left by Atomic Impact (Burns): healable, Minor unless it killed.
+  for (const p of players) {
+    const spans = BURNS.flatMap((id) => debuffIntervals(p, id)).filter((w) => life.hitAlive(p, w.start)).sort((a, b) => a.start - b.start);
+    for (const ep of clusterByGap(spans, (w) => w.start, 1500)) {
+      const start = ep[0].start, end = Math.max(...ep.map((w) => w.end));
+      const death = deaths.find((d) => d.player === p.name && d.timestamp - DEATH_EVENT_LAG_MS >= start - 500 && d.timestamp - DEATH_EVENT_LAG_MS <= end + 1000);
+      if (death && called.has(death)) continue;
+      // Only a death to the Burns ticks themselves is the lava's doing.
+      const burned = death && BURNS.includes(death.killingAbilityGameId);
+      errors.push(playerError(p, {
+        ruleId: TYRANT_STAMPEDE_RULE_ID, severity: burned ? "Major" : "Minor", name: "Stood in Lava",
+        description: `${carriers.has(p) ? "Stood in their own Atomic Impact lava" : "Walked into the lava Atomic Impact leaves behind"} and took Burns (${sec(Math.min(end, start + 60_000) - start)}s). The lava stays through the towers and tethers; ${carriers.has(p) ? "keep moving along your route so the puddles land behind you" : "route around it"}.${burned ? " They died to the burn." : death ? " They died while burning." : ""}`,
+        timestamp: start, abilityId: BURNS[0], abilityName: "Burns",
+      }));
+    }
+  }
+  // Mammoth Meteor hits everyone by distance; only a lethal hit is an error
+  // (clean max ~75k in the kill; the two deaths took 133k+, C13 +9:06).
+  for (const h of hitsOf(players, life, MAMMOTH_METEOR)) {
+    if (life.diedFrom(h.p, h.e.timestamp)?.killingAbilityGameId !== MAMMOTH_METEOR) continue;
+    errors.push(playerError(h.p, {
+      ruleId: TYRANT_STAMPEDE_RULE_ID, severity: "Major", name: "Too Close to Mammoth Meteor",
+      description: `Killed by Mammoth Meteor (${kFmt(realAmount(h.e))}). It hits harder the closer you are to where it lands in its corner; start the Stampede far from both meteors.`,
+      timestamp: h.e.timestamp, abilityId: MAMMOTH_METEOR, abilityName: "Mammoth Meteor",
+    }));
+  }
+  return errors;
+}
+
+// ── deaths with no killing blow: falls ──────────────────────────────────────
+
+/** No-killing-blow deaths that are the wipe being called, not mistakes. */
+function calledWipeDeaths(deaths: DeathEvent[], pullEnd: number): Set<DeathEvent> {
+  const silent = deaths.filter((d) => !d.killingAbilityGameId);
+  const out = new Set<DeathEvent>();
+  for (const d of silent) {
+    if (pullEnd - d.timestamp <= CALLED_WIPE_END_MS) out.add(d);
+    const near = silent.filter((x) => Math.abs(x.timestamp - d.timestamp) <= CALLED_WIPE_WINDOW);
+    if (near.length >= CALLED_WIPE_COUNT) near.forEach((x) => out.add(x));
+  }
+  return out;
+}
+
+function detectFalls(players: PlayerInfo[], deaths: DeathEvent[], called: Set<DeathEvent>): PullError[] {
+  const errors: PullError[] = [];
+  for (const d of deaths) {
+    if (d.killingAbilityGameId || called.has(d)) continue;
+    const p = players.find((x) => x.name === d.player);
+    if (!p) continue;
+    const hitT = d.timestamp - DEATH_EVENT_LAG_MS;
+    // Living Dead's Walking Dead ran its full 10s without the tank being
+    // healed back up: the healing, not a fall.
+    const wd = debuffIntervals(p, WALKING_DEAD).find((w) => Math.abs(w.end - hitT) <= 500 && w.end - w.start >= WALKING_DEAD_FULL_MS);
+    if (wd) {
+      errors.push(playerlessMinor(TYRANT_FALL_RULE_ID, "Walking Dead Ran Out",
+        `${p.name}'s Walking Dead (from Living Dead) expired before they were healed back to full, and they died. The healers have to heal the Walking Dead tank to full within its 10s.`,
+        wd.end, WALKING_DEAD, "Walking Dead"));
+      continue;
+    }
+    const kb = p.damageTaken.filter((e) => KNOCKBACKS[e.abilityId] && e.timestamp <= d.timestamp && e.timestamp >= d.timestamp - FALL_KNOCKBACK_MS).pop();
+    errors.push(playerError(p, {
+      ruleId: TYRANT_FALL_RULE_ID, severity: "Major", name: kb ? "Knocked Off the Edge" : "Fell Off the Edge",
+      description: kb
+        ? `Knocked off the edge by ${KNOCKBACKS[kb.abilityId]} (${sec(d.timestamp - kb.timestamp)}s before the death). Stand so the knockback carries you onto your island, not past its edge.`
+        : "Died with no killing blow mid-pull: fell off the edge of the arena or an island.",
+      timestamp: kb ? kb.timestamp : hitT, abilityId: kb?.abilityId ?? 0, abilityName: kb ? KNOCKBACKS[kb.abilityId] : "Fall",
+    }));
+  }
+  return errors;
+}
+
+// ── entry point ─────────────────────────────────────────────────────────────
+
+/**
+ * The Tyrant (M11S) errors. Self-gates on the boss's signature casts, which
+ * no other fight in the sample set uses.
+ */
+export function detectTyrantErrors(players: PlayerInfo[], deathEvents: DeathEvent[], enemyCasts: EnemyEvent[]): PullError[] {
+  if (!enemyCasts.some((c) => SIGNATURE.includes(c.abilityId))) return [];
+  const life = buildLife(players, deathEvents);
+  const pullEnd = Math.max(0, ...players.flatMap((p) => [...p.damageTaken, ...p.casts].map((e) => e.timestamp)), ...deathEvents.map((d) => d.timestamp));
+  const called = calledWipeDeaths(deathEvents, pullEnd);
+  const carriers = atomicCarriers(players, enemyCasts);
+
+  const errors = [
+    ...detectAvoidable(players, life),
+    ...detectPersonalOverlaps(players, life, enemyCasts),
+    ...detectStacks(players, life, deathEvents, carriers),
+    ...detectFireballFronts(players, life),
+    ...detectBusters(players, life, enemyCasts),
+    ...detectMeteorain(players, life),
+    ...detectTowers(players, life, enemyCasts, deathEvents, carriers),
+    ...detectStampede(players, life, deathEvents, called, carriers),
+    ...detectFalls(players, deathEvents, called),
+  ];
+
+  const firstRaid = () => Math.min(...errors.filter((e) => e.severity === "Raid").map((e) => e.timestamp));
+  const enrage = castsOf(enemyCasts, HEARTBREAKER)[0];
+  if (enrage && enrage.timestamp < firstRaid()) {
+    const left = enrage.hitPoints !== undefined && enrage.maxHitPoints
+      ? ` ${enrage.actorName} still had ${(100 * enrage.hitPoints / enrage.maxHitPoints).toFixed(1)}% HP left.` : "";
+    errors.push(raidMarker(TYRANT_ENRAGE_RULE_ID, "Heartbreaker (Enrage)",
+      `Heartbreaker, the hard enrage, went off. The DPS check wasn't met.${left}`,
+      enrage.timestamp, enrage.abilityId, "Heartbreaker"));
+  }
+  // A called wipe: several no-killing-blow deaths together, before any
+  // mechanic cutoff.
+  const calledList = deathEvents.filter((d) => called.has(d)).sort((a, b) => a.timestamp - b.timestamp);
+  if (calledList.length >= CALLED_WIPE_COUNT && calledList[0].timestamp - DEATH_EVENT_LAG_MS < firstRaid()) {
+    errors.push(raidMarker(TYRANT_CALLED_WIPE_RULE_ID, "Wipe Called",
+      `${calledList.length} players died with no killing blow at the end of the pull (${joinNames(uniq(calledList.map((d) => d.player)))}): the wipe was called and the raid reset off the edge.`,
+      calledList[0].timestamp - DEATH_EVENT_LAG_MS, 0, "Deaths"));
+  }
+  // Pull-over marker: 5 dead at once with the pull ending soon after.
+  const outAt = (t: number) => players.filter((p) => !life.alive(p, t));
+  const collapseT = life.outIntervals.map((w) => w.start).sort((a, b) => a - b)
+    .find((t) => outAt(t).length >= COLLAPSE_DEAD_COUNT && pullEnd - t <= COLLAPSE_END_MS);
+  if (collapseT !== undefined && collapseT + DEATH_EVENT_LAG_MS < firstRaid()) {
+    const who = outAt(collapseT).map((p) => p.name);
+    errors.push(raidMarker(TYRANT_COLLAPSE_RULE_ID, "Party Collapse",
+      `${who.length} players were dead at once (${joinNames(who)}). Treated as the cutoff point.`,
+      collapseT + DEATH_EVENT_LAG_MS, 0, "Deaths"));
+  }
+  return errors.sort((a, b) => a.timestamp - b.timestamp);
+}

@@ -41,6 +41,10 @@ lib/mechanics/
                                 (Damage Down hits, fire, deathwall, Floater, bait
                                 overlaps, busters, Deep Impact, stacks, prison
                                 tethers/deadline, Xtreme cleanses, enrage)
+      tyrant.ts               — The Tyrant (M11S) per-pull rules (Damage Down hits,
+                                overlapping personal baits, short stacks, Raw
+                                Steel busters, Meteorain comets/fireballs,
+                                towers, Stampede fire/lava, falls, kicks, enrage)
   wow/
     registry.ts               — THE list of per-pull WoW modules; the app and
                                 validate.js both run it (a new boss = one line)
@@ -565,6 +569,26 @@ The same principles apply when refining any module:
   excluding death-time removals hid every overlapped-cleanse wipe.
 - **New tooling from this boss:** `profile`, `resolutions`, `nokb` and
   `after` in `scripts/analyze-report.js` (docs/dev-tooling.md).
+
+### Lessons from The Tyrant (88 pulls over three reports, one kill)
+
+- **Generic families beat one rule per mechanic.** Most of the fight is
+  "one bait per player" (cones, spreads, lines) or "shared stack". Two
+  table-driven detectors (tyrant.ts's PERSONAL and STACKS) cover 15
+  mechanics; owners come from the cast target, else the only player an
+  instance hit, else the one player it hit who took nothing else.
+- **Proximity baits retarget onto survivors.** Tornado cones and breaths go
+  to the nearest players, so after a death two survivors took seven cones.
+  Gate those families on everyone being alive.
+- **A doubled line stack usually means a dead target.** Sharp Taste aims at
+  the healers; 7 of 9 doubled resolutions followed a healer's death. Check
+  who the instances target before blaming the people standing in them.
+- **Name the takers when a stack goes elsewhere.** One player alone under a
+  party stack while most of the party stood elsewhere is the stack leaving
+  the group, not five players missing it.
+- **Carrier identity from cast targets, not hit counts.** Atomic Impact's
+  puddles chained through the group (six players with 3+ hits); the casts
+  name exactly the two carriers.
 
 ### Lessons from Ultimate Kefka (a late phase, 29 pulls, no kill)
 

@@ -342,6 +342,30 @@ rulings so far cover A8/A10/A14 and B1/B2/B3.
   Watery Grave is an enemy buff the module isn't given), Awesome Slab
   membership, lethal Xtreme aura expiry (never seen).
 
+### The Tyrant (FFXIV)
+
+Reports d3vRbwfpNBLzJ2Xh (A), L3YxvqnNVdzBcj7t (B), gmX1Ac9PqWdfDR7B (C,
+kill = C20); built 2026-10-09, no VOD review yet. Evidence is in the
+header of `lib/mechanics/ffxiv/arcadion/tyrant.ts`.
+- **Kill, Two-Way Fireball (C20 +9:35):** the M2 died taking the front
+  with Fire Resistance Down II, and the H2 joined no line, leaving it one
+  short. Both flag. Right?
+- **Scythe cone / tornado overlaps** name both players hit twice (no
+  clock-spot attribution yet). With the Hector spots (MT N, OT S, H1 W,
+  H2 E, M1 SW, M2 SE, R1 NW, R2 NE) the off-spot player could be named
+  instead, as for Red Hot and Deep Blue. Wanted?
+- **Merged Sharp Taste lines** (A18 +1:35, C5 +3:21) blame both healers.
+  Or the one on the wrong side?
+- **Comet drop on the party** (B1 +5:13 healers, B4 +5:23 ranged) blames
+  the drop's two baiters. Or the players who stood under it?
+- **Heartbreak Kick:** a non-tank killed in a kick tower is a Major
+  (tank-only plan). Tank deaths in the towers aren't flagged. Right?
+- **Lone mid-pull falls with nothing before them** (A29 +1:34 R2, B8 +1:50
+  R1): real, or resets?
+- **Not built:** Shockwave line of sight (no damage logged), rock
+  collisions, Wall front swaps, kick cooldown timing, tank deaths to their
+  own busters.
+
 ### Dancing Mad (FFXIV)
 
 - **Phase 1 (graven-image / phase1.ts):**

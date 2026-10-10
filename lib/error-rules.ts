@@ -192,6 +192,16 @@ export const ERROR_RULES: PullErrorRule[] = [
       46562,   // Reverse Alley-Oop aftershock
       46547,   // Deep Varial
       46587,   // Steam Burst
+      // The Tyrant: tyrant.ts owns these.
+      46099,   // Cometite
+      46104, 46105, 46106,                                   // Assault Evolved axe / scythe / sword
+      46112,   // Explosion (Dance of Domination lines)
+      46118,   // Charybdis (tornado)
+      46128, 46129,                                          // Fire and Fury
+      46131,   // Orbital Omen
+      46136,   // Explosion (spent comet)
+      46145, 46146, 46165,                                   // Majestic Meteor / Meteorain / Stampede Meteor
+      46164,   // Atomic Impact
     ],
   },
 

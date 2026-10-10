@@ -69,6 +69,7 @@ import type { KefkaSaysStateSignal } from "./mechanics/ffxiv/dancingmad/kefka-sa
 import { detectUltimateKefkaErrors } from "./mechanics/ffxiv/dancingmad/ultimate-kefka";
 import { detectVampFataleErrors } from "./mechanics/ffxiv/arcadion/vamp-fatale";
 import { detectRedHotDeepBlueErrors } from "./mechanics/ffxiv/arcadion/red-hot-deep-blue";
+import { detectTyrantErrors } from "./mechanics/ffxiv/arcadion/tyrant";
 import { detectWowEncounterErrors } from "./mechanics/wow/registry";
 import { buildPullPhaseSegments } from "./pull-phases";
 import { computeMechanicOccurrences } from "./mechanics/occurrences";
@@ -1571,6 +1572,7 @@ export function transformFFightToPull(
     ...detectUltimateKefkaErrors(players, deathEvents, enemyCastEvents),
     ...detectVampFataleErrors(players, deathEvents, enemyCastEvents),
     ...detectRedHotDeepBlueErrors(players, deathEvents, enemyCastEvents),
+    ...detectTyrantErrors(players, deathEvents, enemyCastEvents),
   ].sort((a, b) => a.timestamp - b.timestamp);
 
   const fightDurationMs = data.fight.endTime - data.fight.startTime;

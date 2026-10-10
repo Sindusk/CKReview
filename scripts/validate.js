@@ -294,6 +294,14 @@ const MECHANICS = {
     },
   },
 
+  tyrant: {
+    game: 'ff',
+    load: () => requireTsFromRoot('lib/mechanics/ffxiv/arcadion/tyrant.ts'),
+    run({ mod, ctxs }) {
+      for (const c of ctxs) printPullErrors(c, mod.detectTyrantErrors(c.relPlayers(), c.relDeaths(), c.relEnemyCasts()));
+    },
+  },
+
   stompies: {
     game: 'ff',
     load: () => requireTsFromRoot('lib/mechanics/ffxiv/dancingmad/stompies.ts'),
