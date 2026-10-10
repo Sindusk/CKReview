@@ -12,9 +12,15 @@
 // Collapsed by default — it's a management tool, not something glanced at
 // every visit, and a full roster (soon including substitutes) takes up
 // real space once opened.
+//
+// Each row's "…" menu holds Delete, for a player who isn't in the static
+// at all (a log that also has dungeon or other-group pulls): it removes
+// every pull they appear in, see the players/[identityId] DELETE route.
+// The parent's onPlayersDeleted refreshes everything else on the page.
 
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { getClassColor, getPlayerSpecIcon } from "@/lib/player-display";
+import { Dialog } from "./ui/Dialog";
 
 type PlayerJob = { game: string; className: string; specId: number | null } | null;
 
@@ -45,7 +51,13 @@ const NUMERIC_COLUMNS: { key: SortKey; label: string }[] = [
   { key: "errorRatePct", label: "% Error Rate" },
 ];
 
-export default function StaticPlayersPanel({ staticId }: { staticId: number }) {
+export default function StaticPlayersPanel({
+  staticId,
+  onPlayersDeleted,
+}: {
+  staticId:          number;
+  onPlayersDeleted?: () => void;
+}) {
   const [open, setOpen] = useState(false);
   const [players, setPlayers] = useState<PlayerIdentity[] | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("majorErrors");
@@ -56,6 +68,8 @@ export default function StaticPlayersPanel({ staticId }: { staticId: number }) {
   const [renamingId, setRenamingId] = useState<number | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  const [menu, setMenu] = useState<{ id: number; top: number; right: number } | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<PlayerIdentity | null>(null);
 
   function reload() {
     fetch(`/api/statics/${staticId}/players`)
@@ -239,9 +253,25 @@ export default function StaticPlayersPanel({ staticId }: { staticId: number }) {
                         <td style={tdStyle("right")} title="Major errors per pull">{p.errorRatePct.toFixed(0)}%</td>
                         <td style={{ padding: "6px 8px", textAlign: "right" }}>
                           {renamingId !== p.id && (
-                            <button className="ck-btn ck-btn--xs" onClick={() => { setRenamingId(p.id); setRenameDraft(p.name); }}>
-                              Rename
-                            </button>
+                            <div style={{ display: "inline-flex", gap: "4px" }}>
+                              <button className="ck-btn ck-btn--xs" onClick={() => { setRenamingId(p.id); setRenameDraft(p.name); }}>
+                                Rename
+                              </button>
+                              <button
+                                className="ck-btn ck-btn--xs"
+                                data-row-menu-trigger
+                                aria-label={`More actions for ${p.name}`}
+                                aria-expanded={menu?.id === p.id}
+                                title="More actions"
+                                onClick={(e) => {
+                                  if (menu?.id === p.id) { setMenu(null); return; }
+                                  const r = e.currentTarget.getBoundingClientRect();
+                                  setMenu({ id: p.id, top: r.bottom + 4, right: window.innerWidth - r.right });
+                                }}
+                              >
+                                …
+                              </button>
+                            </div>
                           )}
                         </td>
                       </tr>
@@ -275,7 +305,161 @@ export default function StaticPlayersPanel({ staticId }: { staticId: number }) {
           )}
         </div>
       )}
+
+      {menu && (
+        <RowMenu top={menu.top} right={menu.right} onClose={() => setMenu(null)}>
+          <button
+            className="ck-menu-item"
+            style={{ color: "#ff8a8a" }}
+            onClick={() => {
+              setPendingDelete(players?.find((p) => p.id === menu.id) ?? null);
+              setMenu(null);
+            }}
+          >
+            Delete
+          </button>
+        </RowMenu>
+      )}
+
+      {pendingDelete && (
+        <DeletePlayerDialog
+          staticId={staticId}
+          player={pendingDelete}
+          onCancel={() => setPendingDelete(null)}
+          onDeleted={() => {
+            setPendingDelete(null);
+            reload();
+            onPlayersDeleted?.();
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+// Fixed-positioned so the table wrapper's horizontal scroll can't clip it.
+// Closes on an outside click, Escape, or any scroll (it would drift off its
+// button otherwise).
+function RowMenu({
+  top,
+  right,
+  onClose,
+  children,
+}: {
+  top:      number;
+  right:    number;
+  onClose:  () => void;
+  children: ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onMouseDown(e: MouseEvent) {
+      // The "…" button toggles the menu itself; closing here too would let
+      // its click reopen it.
+      if ((e.target as Element).closest?.("[data-row-menu-trigger]")) return;
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("mousedown", onMouseDown);
+    document.addEventListener("keydown", onKeyDown);
+    window.addEventListener("scroll", onClose, true);
+    window.addEventListener("resize", onClose);
+    return () => {
+      document.removeEventListener("mousedown", onMouseDown);
+      document.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("scroll", onClose, true);
+      window.removeEventListener("resize", onClose);
+    };
+  }, [onClose]);
+
+  return (
+    <div
+      ref={ref}
+      className="ck-menu"
+      role="menu"
+      style={{ position: "fixed", top, right, minWidth: "140px", padding: "4px", zIndex: 300 }}
+    >
+      {children}
+    </div>
+  );
+}
+
+// Counts come from the database only (GET on the player route), fetched
+// when the dialog opens so the warning states exactly what will go.
+function DeletePlayerDialog({
+  staticId,
+  player,
+  onCancel,
+  onDeleted,
+}: {
+  staticId:  number;
+  player:    PlayerIdentity;
+  onCancel:  () => void;
+  onDeleted: () => void;
+}) {
+  const [impact, setImpact] = useState<{ pulls: number; sessions: number } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    fetch(`/api/statics/${staticId}/players/${player.id}`)
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok) { setError(data.error || "Failed to load what would be removed"); return; }
+        setImpact(data);
+      })
+      .catch(() => setError("Failed to load what would be removed"));
+  }, [staticId, player.id]);
+
+  async function confirm() {
+    setDeleting(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/statics/${staticId}/players/${player.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || "Failed to delete player");
+        return;
+      }
+      onDeleted();
+    } catch {
+      setError("Failed to delete player — check your connection and try again");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+  return (
+    <Dialog
+      title="Delete Player?"
+      width="420px"
+      zIndex={1100}
+      onBackdropClick={deleting ? undefined : onCancel}
+      footer={
+        <>
+          <button className="ck-btn ck-btn--md" onClick={onCancel} disabled={deleting}>Cancel</button>
+          <button className="ck-btn ck-btn--md ck-btn--danger" onClick={confirm} disabled={deleting || impact == null}>
+            {deleting ? "Deleting…" : "OK"}
+          </button>
+        </>
+      }
+    >
+      <p className="ck-dialog-text">
+        This removes every pull that <strong>{player.name}</strong> appears in from this static&apos;s sessions,
+        with all of those pulls&apos; data — including pulls that static members were also in.
+      </p>
+      <p className="ck-dialog-text" style={{ marginTop: "10px" }}>
+        {impact == null
+          ? (error ? null : "Counting pulls…")
+          : <>This will remove <strong>{plural(impact.pulls, "pull")}</strong> from <strong>{plural(impact.sessions, "session")}</strong>. Sessions left with no pulls are removed from the static. Resyncing those sessions won&apos;t bring the pulls back.</>}
+      </p>
+      {error && <p className="ck-error-text" style={{ marginTop: "10px", marginBottom: 0 }}>{error}</p>}
+    </Dialog>
   );
 }
 

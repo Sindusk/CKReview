@@ -175,8 +175,7 @@ export async function POST(
     typeof body?.reportStartedAt === "number" && Number.isFinite(body.reportStartedAt)
       ? new Date(body.reportStartedAt)
       : null;
-  const pulls: StaticReviewPullData[] = Array.isArray(body?.pulls) ? body.pulls : [];
-  const allPlayerNames = pulls.flatMap((p) => p.players.map((pl) => pl.player));
+  let pulls: StaticReviewPullData[] = Array.isArray(body?.pulls) ? body.pulls : [];
   // Detail rows (docs/archive/static-player-analysis-plan.md) come only from
   // clients that send a detailVersion; an older client's payload imports
   // counts only and leaves the session undetailed.
@@ -192,6 +191,16 @@ export async function POST(
   if (!sessionId || !reportUrl) {
     return NextResponse.json({ error: "sessionId and reportUrl are required" }, { status: 400 });
   }
+
+  // Players deleted from this session in the Players panel (see
+  // players/[identityId] DELETE): their pulls stay out on every resync.
+  // Filtered before identities resolve, so the deleted names don't return.
+  const excluded = new Set((await prisma.staticExcludedPlayer.findMany({
+    where:  { staticId, sessionId },
+    select: { name: true },
+  })).map((e) => e.name));
+  if (excluded.size > 0) pulls = pulls.filter((p) => !p.players.some((pl) => excluded.has(pl.player)));
+  const allPlayerNames = pulls.flatMap((p) => p.players.map((pl) => pl.player));
 
   try {
     const review = await prisma.$transaction(async (tx) => {

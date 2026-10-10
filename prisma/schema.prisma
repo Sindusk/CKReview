@@ -26,6 +26,7 @@ model Static {
   aliases    StaticPlayerAlias[]
   rules      StaticRule[]
   phases     StaticPhase[]
+  excludedPlayers StaticExcludedPlayer[]
 }
 
 model StaticMember {
@@ -322,4 +323,22 @@ model StaticPlayerAlias {
 
   @@unique([staticId, name])
   @@index([identityId])
+}
+
+/// A log name deleted from one session of a static (Players panel ->
+/// Delete), so a resync of that session keeps dropping every pull the name
+/// appears in instead of re-adding them. Keyed by sessionId rather than
+/// StaticReview, because a review left with no pulls is deleted outright
+/// and re-adding the session must still honor it. Scoped to the sessions
+/// the name was in when deleted: new sessions import it normally.
+model StaticExcludedPlayer {
+  id        Int      @id @default(autoincrement())
+  staticId  Int
+  sessionId String
+  name      String
+  createdAt DateTime @default(now())
+
+  static Static @relation(fields: [staticId], references: [id], onDelete: Cascade)
+
+  @@unique([staticId, sessionId, name])
 }

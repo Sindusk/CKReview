@@ -38,7 +38,7 @@ const KIND_LABEL: Record<keyof WipeCause["kinds"], string> = {
   called:     "called",
 };
 
-export default function StaticMechanicsPanel({ staticId }: { staticId: number }) {
+export default function StaticMechanicsPanel({ staticId, dataVersion = 0 }: { staticId: number; dataVersion?: number }) {
   const [filter, setFilter] = useState<AnalysisFilterState>(DEFAULT_ANALYSIS_FILTER);
   const [mechanics, setMechanics] = useState<MechanicsResponse | null>(null);
   const [wipes, setWipes] = useState<WipeCausesResponse | null>(null);
@@ -65,7 +65,7 @@ export default function StaticMechanicsPanel({ staticId }: { staticId: number })
       .catch(() => { if (!cancelled) setError("Failed to load analysis"); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [staticId, filter]);
+  }, [staticId, filter, dataVersion]);
 
   const context = mechanics;
   const noDetail = context !== null && context.boss === null;

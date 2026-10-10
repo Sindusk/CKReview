@@ -40,7 +40,7 @@ type PlayerAnalysisResponse = AnalysisContextResponse & {
 /** Sessions compared at each end for "first vs last". */
 const COMPARE_SESSIONS = 3;
 
-export default function StaticPlayerAnalysisPanel({ staticId }: { staticId: number }) {
+export default function StaticPlayerAnalysisPanel({ staticId, dataVersion = 0 }: { staticId: number; dataVersion?: number }) {
   const [players, setPlayers] = useState<PlayerOption[] | null>(null);
   const [identityId, setIdentityId] = useState<number | null>(null);
   const [filter, setFilter] = useState<AnalysisFilterState>(DEFAULT_ANALYSIS_FILTER);
@@ -54,10 +54,13 @@ export default function StaticPlayerAnalysisPanel({ staticId }: { staticId: numb
       .then(async (res) => {
         const d = await res.json();
         if (!res.ok) { setError(d.error || "Failed to load players"); return; }
-        setPlayers([...d.players].sort((a: PlayerOption, b: PlayerOption) => a.name.localeCompare(b.name)));
+        const next: PlayerOption[] = [...d.players].sort((a: PlayerOption, b: PlayerOption) => a.name.localeCompare(b.name));
+        setPlayers(next);
+        // The selected player may just have been deleted.
+        setIdentityId((id) => (id !== null && !next.some((p) => p.id === id) ? null : id));
       })
       .catch(() => setError("Failed to load players"));
-  }, [staticId]);
+  }, [staticId, dataVersion]);
 
   // Reads only this app's database (no WCL/FFLogs call).
   useEffect(() => {
@@ -75,7 +78,7 @@ export default function StaticPlayerAnalysisPanel({ staticId }: { staticId: numb
       .catch(() => { if (!cancelled) setError("Failed to load player analysis"); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [staticId, identityId, filter]);
+  }, [staticId, identityId, filter, dataVersion]);
 
   // A selection that the new filter no longer contains would leave the strip empty.
   useEffect(() => {

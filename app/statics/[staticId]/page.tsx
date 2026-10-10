@@ -90,6 +90,9 @@ export default function StaticDashboardPage() {
   const [labelDraft, setLabelDraft] = useState("");
   const [pendingRemove, setPendingRemove] = useState<{ review: ReviewSummary; number: number } | null>(null);
   const [removeError, setRemoveError] = useState<string | null>(null);
+  // Bumped when a player delete removes pulls, so the analysis panels
+  // (which fetch for themselves) reload. Database reads only.
+  const [dataVersion, setDataVersion] = useState(0);
 
   useEffect(() => {
     if (!Number.isInteger(staticId)) return;
@@ -101,6 +104,10 @@ export default function StaticDashboardPage() {
         setStaticInfo(data.static);
       })
       .catch(() => setError("Failed to load static"));
+  }, [staticId]);
+
+  useEffect(() => {
+    if (!Number.isInteger(staticId)) return;
 
     fetch(`/api/statics/${staticId}/reviews`)
       .then(async (res) => {
@@ -115,7 +122,7 @@ export default function StaticDashboardPage() {
         if (res.ok) setPulls(data.pulls);
       })
       .catch(() => {});
-  }, [staticId]);
+  }, [staticId, dataVersion]);
 
   const sessions = useMemo(
     () => (pulls && reviews ? groupIntoSessions(pulls, reviews) : null),
@@ -236,15 +243,17 @@ export default function StaticDashboardPage() {
         </Panel>
 
         <Panel style={{ marginBottom: sectionGap }}>
-          {Number.isInteger(staticId) && <StaticMechanicsPanel staticId={staticId} />}
+          {Number.isInteger(staticId) && <StaticMechanicsPanel staticId={staticId} dataVersion={dataVersion} />}
         </Panel>
 
         <Panel style={{ marginBottom: sectionGap }}>
-          {Number.isInteger(staticId) && <StaticPlayerAnalysisPanel staticId={staticId} />}
+          {Number.isInteger(staticId) && <StaticPlayerAnalysisPanel staticId={staticId} dataVersion={dataVersion} />}
         </Panel>
 
         <Panel style={{ marginBottom: sectionGap }}>
-          {Number.isInteger(staticId) && <StaticPlayersPanel staticId={staticId} />}
+          {Number.isInteger(staticId) && (
+            <StaticPlayersPanel staticId={staticId} onPlayersDeleted={() => setDataVersion((v) => v + 1)} />
+          )}
         </Panel>
 
         <Panel>
