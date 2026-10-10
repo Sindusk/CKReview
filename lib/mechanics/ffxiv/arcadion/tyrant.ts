@@ -11,9 +11,13 @@
 //   C = gmX1Ac9PqWdfDR7B (19 wipes + the kill, C20, 11:01).
 // Roster slots (user): MT PLD, OT DRK, H1 AST, H2 SGE, M1 RPR, M2 DRG,
 // R1 DNC, R2 caster; the OT and R2 players changed between reports. Mostly
-// Hector (user, "can't recall for sure"). No rule depends on a clock spot
-// or M1/M2; the only role-order rule is the comet drops (melee -> healers
-// -> ranged, every clean drop).
+// Hector (user, "can't recall for sure"). Slots come from roles.ts with
+// MT/OT and M1/M2 re-read from the pull's own spreads (resolveSlots); the
+// boss's first auto-attack picked the OT in some pulls.
+// VOD review 2026-10-09 (user): report A pulls 1-29, rulings in
+// expectations/rulings.json. It set the spread-spot attribution, raise
+// grace, Eye partners, Sharp Taste side, tank sides and the doomed-stack
+// gate below.
 //
 // Clock (kill; every pull within ~1s): Crown +0:11, Raw Steel +0:25,
 // weapons +0:51/+0:56/+1:01, Stardust +1:21 (Comet/Crushing Comet +1:30 or
@@ -96,19 +100,26 @@
 //   one-bait-per-player families (PERSONAL). A player hit by another
 //   player's instance or by two at once names the victim; a known owner
 //   (cast target, or the only player the instance hit, or the one player it
-//   hit who took nothing else) is named too. Gust / Fire Breath only with
-//   all 8 alive.
+//   hit who took nothing else) is named too. Impact and scythe cones have
+//   assigned spots (IMPACT_SPOTS absolute, SCYTHE_CLOCK around the scythe):
+//   when one player of the incident was clearly the farthest off, only they
+//   are named. Instances that hit a player in raise grace are dropped. Gust /
+//   Fire Breath only with all 8 alive; Impact only with both tanks holding
+//   enmity.
 // ffxiv-tyrant-stack (Major on deaths): standing in two instances of a
 //   stack (STACKS); a stack that killed someone names living eligible players
-//   in none (not those who just took an avoidable hit); one or two players
-//   taking it while 3+ were elsewhere names the takers instead. Sharp Taste:
-//   skipped with a healer down; 3+ in both lines names both healers. A
+//   in none (not those who just took an avoidable hit, and nobody with 3+
+//   dead); one or two players taking it while 3+ were elsewhere names the
+//   takers instead. Sharp Taste: skipped with a healer down; a healer in both
+//   lines (wrong side) is named alone. Eye of the Hurricane: a marked player
+//   whose stack missed their Hector partner (MT/M1, OT/M2, H1/R1, H2/R2). A
 //   Two/Four-Way death with Fire Resistance Down II on the line's largest
 //   hit took the front.
 // ffxiv-tyrant-buster: a non-tank in the axe's Raw Steel, Great Wall or
 //   Foregone Fatality with both tanks up; scythe cones: both tanks in both
-//   (both named), a cone through 3+ non-tanks (its tank, or the tank holding
-//   no cone when no tank was in it), 1-2 non-tanks in a cone (them).
+//   (the one on the other's side, MT west / OT east, else both), a cone
+//   through 3+ non-tanks (its tank, or the tank holding no cone when no tank
+//   was in it), 1-2 non-tanks in a cone (them).
 // ffxiv-tyrant-meteorain: comet drop k (melee, healers, ranged) hitting 3+
 //   others names its two baiters, 1-2 others name those; skipped once a
 //   baiter is dead. A lethal Fearsome Fireball names living non-tanks out of
@@ -496,7 +507,9 @@
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import type { DeathEvent } from "@/types/DeathEvent";
 import type { PullError, EnemyEvent } from "@/types/PullError";
-import { kFmt, sec, joinNames, playerError, playerlessMinor, raidMarker, rezzedAt, clusterByGap, debuffIntervals } from "@/lib/mechanics/wow/common";
+import { yd, kFmt, sec, joinNames, playerError, playerlessMinor, raidMarker, rezzedAt, clusterByGap, debuffIntervals } from "@/lib/mechanics/wow/common";
+import { angularDistance, facingToCompassBearing } from "@/lib/mechanics/geometry";
+import { detectFFRoles, type FFRoleSlot } from "@/lib/mechanics/ffxiv/roles";
 
 export const TYRANT_AVOIDABLE_RULE_ID   = "ffxiv-tyrant-avoidable";
 export const TYRANT_OVERLAP_RULE_ID     = "ffxiv-tyrant-overlap";
@@ -586,11 +599,15 @@ const AVOIDABLE: Record<number, Avoidable> = {
 // instance, or by two at once, is an overlap.
 // `proximity`: aimed at the nearest players, so with anyone dead the baits
 // pile onto the survivors (A9 +3:47: two players left took 7 tornado cones).
-type Family = { name: string; ids: number[]; what: string; why: string; gap?: number; proximity?: boolean };
+// `tankEnmity`: aimed at everyone but the top two on enmity, so a tank who
+// just died or was raised takes one (A29 +2:45: user, nobody at fault).
+// `spot`: assigned spread spots; an overlap names only the player clearly
+// farthest from theirs (see spreadDeviation).
+type Family = { name: string; ids: number[]; what: string; why: string; gap?: number; proximity?: boolean; tankEnmity?: boolean; spot?: "impact" | "scytheClock" };
 const PERSONAL: Family[] = [
-  { name: "Impact", ids: [46092], what: "Impact circle",
+  { name: "Impact", ids: [46092], what: "Impact circle", tankEnmity: true, spot: "impact",
     why: "The axe's Raw Steel drops a circle on each of the six non-tanks; spread to your own spot." },
-  { name: "Sweeping Victory", ids: [46108], what: "scythe cone",
+  { name: "Sweeping Victory", ids: [46108], what: "scythe cone", spot: "scytheClock",
     why: "The scythe fires a cone at every player; spread around it on your clock spot so no cone crosses another player." },
   { name: "Comet", ids: [46100], what: "Comet",
     why: "Void Stardust's Comets are spreads on every player; stand apart." },
@@ -605,9 +622,10 @@ const PERSONAL: Family[] = [
 // Shared stacks: standing in two instances is an overlap; a stack that killed
 // someone while a living eligible player stood in none names that player.
 // `healerLines`: one line per healer, aimed from the sword at them. With a
-// healer down the line retargets onto the group (fallout); with both lines
-// through the same players the healers stood on the same side.
-type Stack = Family & { eligible?: "all" | "nonTank" | "pairTower"; healerLines?: boolean };
+// healer down the line retargets onto the group (fallout); a healer standing
+// in both lines was on the wrong side (user, 2026-10-09, A11 +1:35).
+// `pairs`: Eye of the Hurricane, judged by assigned partners (eyePartnerErrors).
+type Stack = Family & { eligible?: "all" | "nonTank" | "pairTower"; healerLines?: boolean; pairs?: boolean };
 const STACKS: Stack[] = [
   { name: "Heavy Weight", ids: [46107], what: "axe stack",
     why: "The axe's Heavy Weight is one party stack; everyone shares it." },
@@ -617,7 +635,7 @@ const STACKS: Stack[] = [
     why: "The sword's Sharp Taste is two line stacks, four players on each healer." },
   { name: "Crushing Comet", ids: [46101], what: "party stack",
     why: "Crushing Comet is one party stack; everyone shares it." },
-  { name: "Eye of the Hurricane", ids: [46116], what: "pair stack",
+  { name: "Eye of the Hurricane", ids: [46116], what: "pair stack", pairs: true,
     why: "Eye of the Hurricane is four two-person stacks; each player stands in exactly one, with their partner." },
   { name: "Massive Meteor", ids: [46153], what: "light-party stack", gap: 700,
     why: "Massive Meteor is two five-hit light-party stacks; each stack needs its four players." },
@@ -654,12 +672,36 @@ const PREVIEW_AMOUNT      = 1_500_000;
 // dropped on the group (B1 +313.8 and B4 +323.9 hit 4; clean drops hit only
 // their two baiters, with a third player clipped 3 times in 17 pulls).
 const KISS_ON_GROUP       = 3;
-// This many players in both Sharp Taste lines means the lines lay on top of
-// each other (A18 4, C5 5; a single player straddling: A11, 2).
-const HEALER_LINES_MERGED = 3;
 // A stack taken by one or two players while this many eligible players stood
 // elsewhere went to the wrong place itself.
 const STACK_LEFT_GROUP = 3;
+// With this many dead a stack is doomed anyway: nobody is named for missing it
+// (user, 2026-10-09, A14 +1:40 with three dead).
+const STACK_DOOMED_DEAD = 3;
+// A player raised this recently may still be in their raise grace (immune):
+// baits they draw from where they were raised are bad luck, not an overlap
+// (user, 2026-10-09, A20 +1:46).
+const RAISE_GRACE_MS = 10_000;
+// Hector spread spots for the axe Raw Steel's Impact circles, absolute arena
+// units (the boss is always centered facing north for both Raw Steels).
+// Medians of the clean resolutions over all three reports, 22-35 per slot.
+const IMPACT_SPOTS: Partial<Record<FFRoleSlot, { x: number; y: number }>> = {
+  M1: { x: 9530, y: 10440 }, M2: { x: 10550, y: 10290 }, H1: { x: 9560, y: 11250 },
+  H2: { x: 10340, y: 11320 }, R1: { x: 8370, y: 9860 }, R2: { x: 11200, y: 11050 },
+};
+// Hector scythe clock: degrees clockwise from the scythe's logged facing
+// (which points at the OT). Clean medians over all reports: OT 4, M2 -38,
+// H2 -85, R2 -128, MT 180, R1 136, H1 83, M1 46 (p10-p90 within ~15).
+const SCYTHE_CLOCK: Record<FFRoleSlot, number> = { OT: 0, M2: -45, H2: -90, R2: -135, MT: 180, R1: 135, H1: 90, M1: 45 };
+const SCYTHE_CAST = 46105;
+// An overlap names only its worst-placed player when they were at least this
+// far off and clearly worse than the next (Impact A1 the R2 1500 units off,
+// next 170; A5 330 vs 120; A15 1250 vs 650. Scythe A7 the R2 20 deg vs 5,
+// A17 77 vs 8, A32 52 vs 6; ambiguous A21 20 vs 17).
+const SPOT_MIN = { impact: 250, scytheClock: 15 };
+const SPOT_CLEAR = { impact: (w: number, s: number) => w >= 1.8 * s, scytheClock: (w: number, s: number) => w - s >= 10 };
+// Eye of the Hurricane partners (Hector): MT/M1, OT/M2, H1/R1, H2/R2.
+const EYE_PARTNER: Record<FFRoleSlot, FFRoleSlot> = { MT: "M1", M1: "MT", OT: "M2", M2: "OT", H1: "R1", R1: "H1", H2: "R2", R2: "H2" };
 // Hits closer together than this are one avoidable episode for a player.
 const EPISODE_MS          = 3000;
 
@@ -738,6 +780,79 @@ function tanksHealthy(players: PlayerInfo[], life: Life, t: number): boolean {
   return tanks.length >= 2 && tanks.every((p) => !tankOutRecently(life, p, t));
 }
 
+/** Raised within RAISE_GRACE_MS before `t` (or still out at `t`). */
+function inRaiseGrace(life: Life, p: PlayerInfo, t: number): boolean {
+  return !life.hitAlive(p, t) || life.outIntervals.some((w) => w.p === p && w.end <= t && t - w.end < RAISE_GRACE_MS);
+}
+
+type Slots = Map<PlayerInfo, FFRoleSlot>;
+
+/**
+ * Party slots: roles.ts (H1 the pure healer, R1 physical ranged, R2
+ * caster), with MT/OT and M1/M2 read from this pull's own spreads, which
+ * agree in every clean resolution (user, 2026-10-09: PLD MT, DRK OT, RPR M1,
+ * DRG M2). The boss's first auto-attack, roles.ts's MT signal, picked the OT
+ * in some pulls (A13, A26).
+ * - MT stands in front of the scythe (180 from its facing), OT behind (0);
+ *   MT takes the west Raw Steel cone.
+ * - M1 sits west of M2 for Impact and on the scythe's +45 side.
+ */
+function resolveSlots(players: PlayerInfo[], life: Life, casts: EnemyEvent[]): Slots {
+  const slots: Slots = new Map();
+  for (const a of detectFFRoles(players)) if (a.player) slots.set(a.player, a.slot);
+  const pair = (first: FFRoleSlot, second: FFRoleSlot, vote: (p: PlayerInfo) => number) => {
+    const two = players.filter((p) => slots.get(p) === first || slots.get(p) === second);
+    if (two.length !== 2) return;
+    const d = vote(two[0]) - vote(two[1]);
+    if (d === 0) return;
+    slots.set(d > 0 ? two[0] : two[1], first);
+    slots.set(d > 0 ? two[1] : two[0], second);
+  };
+  // Votes for the first slot of each pair.
+  pair("MT", "OT", (p) => {
+    let v = 0;
+    for (const h of hitsOf([p], life, 46108)) {
+      const rel = scytheAngle(casts, h.e);
+      if (rel !== undefined) v += Math.abs(rel) > 120 ? 1 : Math.abs(rel) < 60 ? -1 : 0;
+    }
+    for (const h of hitsOf([p], life, RAW_STEEL_SCYTHE)) if (h.e.x !== undefined) v += h.e.x < 10000 ? 1 : -1;
+    return v;
+  });
+  pair("M1", "M2", (p) => {
+    let v = 0;
+    for (const h of hitsOf([p], life, 46092)) if (h.e.x !== undefined) v += h.e.x < 10000 ? 1 : -1;
+    for (const h of hitsOf([p], life, 46108)) {
+      const rel = scytheAngle(casts, h.e);
+      if (rel !== undefined && Math.abs(rel) < 90) v += rel > 0 ? 1 : -1;
+    }
+    return v;
+  });
+  return slots;
+}
+
+/** A hit's angle around the scythe, degrees clockwise from its facing (-180..180). */
+function scytheAngle(casts: EnemyEvent[], e: PlayerEvent): number | undefined {
+  const sc = casts.filter((c) => c.abilityId === SCYTHE_CAST && c.timestamp <= e.timestamp + 200 && c.timestamp > e.timestamp - 4000 && c.x !== undefined && c.facing !== undefined).pop();
+  if (!sc || e.x === undefined || e.y === undefined) return undefined;
+  const bearing = (Math.atan2(e.x - sc.x!, -(e.y - sc.y!)) * 180 / Math.PI + 360) % 360;
+  const rel = bearing - facingToCompassBearing(sc.facing!);
+  return ((rel % 360) + 540) % 360 - 180;
+}
+
+/** How far a player was from their assigned spread spot (units or degrees). */
+function spreadDeviation(kind: "impact" | "scytheClock", slots: Slots, casts: EnemyEvent[], h: Hit): number | undefined {
+  const slot = slots.get(h.p);
+  if (!slot || h.e.x === undefined || h.e.y === undefined) return undefined;
+  if (kind === "impact") {
+    const s = IMPACT_SPOTS[slot];
+    return s ? Math.hypot(h.e.x - s.x, h.e.y - s.y) : undefined;
+  }
+  const rel = scytheAngle(casts, h.e);
+  return rel === undefined ? undefined : angularDistance(rel, SCYTHE_CLOCK[slot]);
+}
+
+const spotText = (kind: "impact" | "scytheClock", dev: number) => (kind === "impact" ? `~${yd(dev)} yalms` : `${Math.round(dev)} degrees`);
+
 /** Players who took a listed avoidable hit within 2s of `t`: already flagged for it. */
 function inAvoidable(p: PlayerInfo, t: number): boolean {
   return p.damageTaken.some((e) => AVOIDABLE[e.abilityId] && Math.abs(e.timestamp - t) <= 2000 && realAmount(e) > 0);
@@ -788,20 +903,36 @@ function detectAvoidable(players: PlayerInfo[], life: Life): PullError[] {
  * cast target; failing that, the only player it hit, or the one player it hit
  * who took nothing else), and who was hit by an instance that isn't theirs or
  * by two at once. Names the victim and, when known, the owner (README
- * philosophy 3: both are candidates).
+ * philosophy 3: both are candidates) — unless the family has assigned spots
+ * and one player of the incident was clearly the farthest off theirs, who is
+ * then named alone (user, 2026-10-09: A1, A5, A7 the R2).
  */
-function detectPersonalOverlaps(players: PlayerInfo[], life: Life, casts: EnemyEvent[]): PullError[] {
+function detectPersonalOverlaps(players: PlayerInfo[], life: Life, casts: EnemyEvent[], slots: Slots): PullError[] {
   const errors: PullError[] = [];
   for (const fam of PERSONAL) {
     for (const res of clusterByGap(hitsOf(players, life, fam.ids), (h) => h.e.timestamp, fam.gap ?? 1500)) {
-      if (fam.proximity && players.some((p) => !life.hitAlive(p, res[0].e.timestamp))) continue;
+      const t0 = res[0].e.timestamp, t1 = res[res.length - 1].e.timestamp;
+      if (fam.proximity && players.some((p) => !life.hitAlive(p, t0))) continue;
+      // A tank dying to this same Raw Steel still held enmity at the cast.
+      if (fam.tankEnmity && !tanksHealthy(players, life, t0 - DIED_FROM_HIT_MS)) continue;
+      // Instances that also hit someone dead or in raise grace are that
+      // player's bait drawn from where they were raised: drop them.
+      const tainted = new Set<string>();
+      for (const p of players) {
+        for (const e of p.damageTaken) {
+          // A grace-immune player's 0-damage hits log early (A20: 0.7s before).
+          if (fam.ids.includes(e.abilityId) && e.timestamp >= t0 - 1500 && e.timestamp <= t1 + 500 && inRaiseGrace(life, p, e.timestamp)) tainted.add(instanceKey(e));
+        }
+      }
       const byInst = new Map<string, Hit[]>();
       const byPlayer = new Map<PlayerInfo, Set<string>>();
       for (const h of res) {
         const k = instanceKey(h.e);
+        if (tainted.has(k)) continue;
         byInst.set(k, [...(byInst.get(k) ?? []), h]);
         byPlayer.set(h.p, (byPlayer.get(h.p) ?? new Set()).add(k));
       }
+      if (!byInst.size) continue;
       const owners = castOwners(casts, fam.ids, res, players);
       for (const [k, hs] of byInst) {
         if (owners.has(k)) continue;
@@ -809,47 +940,78 @@ function detectPersonalOverlaps(players: PlayerInfo[], life: Life, casts: EnemyE
         if (hs.length === 1) owners.set(k, hs[0].p);
         else if (only.length === 1 && uniq(hs.map((h) => h.p)).length > 1) owners.set(k, only[0]);
       }
-      const t = res[0].e.timestamp;
-      const victims = new Map<PlayerInfo, PlayerInfo[]>(); // victim -> others involved
+      const t = t0;
+      // Who is involved with whom: victims with the owners / co-victims of
+      // the instances that hit them, and owners whose bait hit someone else.
+      const links = new Map<PlayerInfo, Set<PlayerInfo>>();
+      const link = (a: PlayerInfo, b: PlayerInfo) => {
+        links.set(a, (links.get(a) ?? new Set()).add(b));
+        links.set(b, (links.get(b) ?? new Set()).add(a));
+      };
+      const hitTwice = new Set<PlayerInfo>();
       for (const [p, ks] of byPlayer) {
         const foreign = [...ks].filter((k) => owners.get(k) !== p);
         if (ks.size < 2 && foreign.length === 0) continue;
-        const others = uniq([...ks].flatMap((k) => {
+        if (ks.size >= 2) hitTwice.add(p);
+        if (!links.has(p)) links.set(p, new Set());
+        for (const k of ks) {
           const o = owners.get(k);
-          return o ? (o === p ? [] : [o]) : byInst.get(k)!.map((h) => h.p).filter((x) => x !== p);
-        }));
-        victims.set(p, others);
+          if (o) { if (o !== p) link(p, o); }
+          else for (const h of byInst.get(k)!) if (h.p !== p) link(p, h.p);
+        }
       }
-      if (!victims.size) continue;
-      const involved = uniq([...victims.keys(), ...[...victims.values()].flat()]);
-      const killed = involved.filter((p) => {
-        const last = res.filter((h) => h.p === p).pop()?.e.timestamp ?? t;
-        const d = life.diedFrom(p, last);
-        return d && fam.ids.includes(d.killingAbilityGameId);
-      });
-      const severity = killed.length ? "Major" : "Minor";
-      const deathText = killed.length ? ` ${namesOf(killed)} died.` : "";
-      const named = new Set<PlayerInfo>();
-      for (const [p, others] of victims) {
-        const n = byPlayer.get(p)!.size;
-        named.add(p);
-        errors.push(playerError(p, {
-          ruleId: TYRANT_OVERLAP_RULE_ID, severity, name: `${fam.name} Overlap`,
-          description: `Hit by ${n > 1 ? `${n} ${fam.what}s at once` : `another player's ${fam.what}`}${others.length ? ` (with ${namesOf(others)})` : ""}.${deathText} ${fam.why}`,
-          timestamp: t, abilityId: fam.ids[0], abilityName: fam.name,
-        }));
-      }
-      // Owners whose bait hit someone else (and who weren't hit twice themselves).
-      for (const [k, o] of owners) {
-        if (named.has(o) || !life.hitAlive(o, t)) continue;
-        const hitOthers = uniq(byInst.get(k)!.map((h) => h.p).filter((p) => p !== o));
-        if (!hitOthers.length) continue;
-        named.add(o);
-        errors.push(playerError(o, {
-          ruleId: TYRANT_OVERLAP_RULE_ID, severity, name: `${fam.name} Overlap`,
-          description: `Their ${fam.what} also hit ${namesOf(hitOthers)}.${deathText} ${fam.why}`,
-          timestamp: t, abilityId: fam.ids[0], abilityName: fam.name,
-        }));
+      if (!links.size) continue;
+      // Split into incidents (connected groups).
+      const seen = new Set<PlayerInfo>();
+      for (const start of links.keys()) {
+        if (seen.has(start)) continue;
+        const group: PlayerInfo[] = [];
+        const stack = [start];
+        while (stack.length) {
+          const p = stack.pop()!;
+          if (seen.has(p)) continue;
+          seen.add(p);
+          group.push(p);
+          for (const q of links.get(p) ?? []) stack.push(q);
+        }
+        const killed = group.filter((p) => {
+          const last = res.filter((h) => h.p === p).pop()?.e.timestamp ?? t;
+          const d = life.diedFrom(p, last);
+          return d && fam.ids.includes(d.killingAbilityGameId);
+        });
+        const severity = killed.length ? "Major" : "Minor";
+        const deathText = killed.length ? ` ${namesOf(killed)} died.` : "";
+        // The worst-placed player, when the family has spots and it's clear.
+        let culprit: { p: PlayerInfo; dev: number; next?: number } | undefined;
+        if (fam.spot) {
+          const devs = group.map((p) => ({ p, dev: spreadDeviation(fam.spot!, slots, casts, res.find((h) => h.p === p)!) }));
+          if (devs.every((d) => d.dev !== undefined)) {
+            const sorted = (devs as { p: PlayerInfo; dev: number }[]).sort((a, b) => b.dev - a.dev);
+            const [w, s] = sorted;
+            if (w.dev >= SPOT_MIN[fam.spot] && (!s || SPOT_CLEAR[fam.spot](w.dev, s.dev))) culprit = { ...w, next: s?.dev };
+          }
+        }
+        if (culprit) {
+          const others = group.filter((p) => p !== culprit!.p);
+          errors.push(playerError(culprit.p, {
+            ruleId: TYRANT_OVERLAP_RULE_ID, severity, name: `${fam.name} Overlap`,
+            description: `Was ${spotText(fam.spot!, culprit.dev)} off their ${fam.what} spot${culprit.next !== undefined ? ` (the others involved: ${spotText(fam.spot!, culprit.next)} at most)` : ""}, so their ${fam.what} and ${namesOf(others)}'s overlapped.${deathText} ${fam.why}`,
+            timestamp: t, abilityId: fam.ids[0], abilityName: fam.name,
+          }));
+          continue;
+        }
+        for (const p of group) {
+          const others = [...(links.get(p) ?? [])];
+          const n = byPlayer.get(p)?.size ?? 0;
+          const description = hitTwice.has(p) || [...(byPlayer.get(p) ?? [])].some((k) => owners.get(k) !== p)
+            ? `Hit by ${n > 1 ? `${n} ${fam.what}s at once` : `another player's ${fam.what}`}${others.length ? ` (with ${namesOf(others)})` : ""}.`
+            : `Their ${fam.what} also hit ${namesOf(others)}.`;
+          errors.push(playerError(p, {
+            ruleId: TYRANT_OVERLAP_RULE_ID, severity, name: `${fam.name} Overlap`,
+            description: `${description}${deathText} ${fam.why}`,
+            timestamp: t, abilityId: fam.ids[0], abilityName: fam.name,
+          }));
+        }
       }
     }
   }
@@ -869,7 +1031,40 @@ function atomicCarriers(players: PlayerInfo[], casts: EnemyEvent[]): Set<PlayerI
   return new Set(players.filter((p) => (counts.get(p.name) ?? 0) >= 3));
 }
 
-function detectStacks(players: PlayerInfo[], life: Life, deaths: DeathEvent[], carriers: Set<PlayerInfo>): PullError[] {
+/**
+ * Eye of the Hurricane by partner: the four marked players (all supports or
+ * all DPS, read from the casts' targets) each bring their stack to their
+ * Hector partner. A marked player whose stack missed their partner is the
+ * one out of place (user, 2026-10-09, A13 +2:31: the R1 alone and the M1 on
+ * the M2's stack; the unmarked partners and the M2 were where they belonged).
+ * Undefined when the markers can't be read: the generic rules apply.
+ */
+function eyePartnerErrors(fam: Stack, res: Hit[], players: PlayerInfo[], life: Life, casts: EnemyEvent[], slots: Slots, killed: PlayerInfo[]): PullError[] | undefined {
+  const t = res[0].e.timestamp;
+  const targets = castsOf(casts, fam.ids).filter((c) => c.timestamp >= t - 2000 && c.timestamp <= t && c.target)
+    .map((c) => players.find((p) => p.name === c.target)).filter((p): p is PlayerInfo => !!p);
+  if (!targets.length || slots.size < 8) return undefined;
+  const dpsMarked = targets[0].role === "DPS";
+  const marked = players.filter((p) => (p.role === "DPS") === dpsMarked);
+  const instancesOf = (p: PlayerInfo) => new Set(res.filter((h) => h.p === p).map((h) => instanceKey(h.e)));
+  const deathText = killed.length ? ` ${namesOf(killed)} died.` : "";
+  const errors: PullError[] = [];
+  for (const m of marked) {
+    const partner = players.find((p) => slots.get(p) === EYE_PARTNER[slots.get(m)!]);
+    if (!partner || !life.hitAlive(m, t) || !life.hitAlive(partner, t) || inAvoidable(m, t)) continue;
+    const mine = instancesOf(m);
+    if ([...instancesOf(partner)].some((k) => mine.has(k))) continue;
+    const with_ = uniq(res.filter((h) => mine.has(instanceKey(h.e)) && h.p !== m).map((h) => h.p));
+    errors.push(playerError(m, {
+      ruleId: TYRANT_STACK_RULE_ID, severity: killed.length ? "Major" : "Minor", name: "Eye of the Hurricane Away From Partner",
+      description: `Took their Eye of the Hurricane stack ${with_.length ? `to ${namesOf(with_)}` : "alone"} instead of to their partner ${partner.name} (${slots.get(m)} with ${slots.get(partner)}).${deathText} ${fam.why}`,
+      timestamp: t, abilityId: fam.ids[0], abilityName: fam.name,
+    }));
+  }
+  return errors;
+}
+
+function detectStacks(players: PlayerInfo[], life: Life, casts: EnemyEvent[], carriers: Set<PlayerInfo>, slots: Slots): PullError[] {
   const errors: PullError[] = [];
   for (const fam of STACKS) {
     for (const res of clusterByGap(hitsOf(players, life, fam.ids), (h) => h.e.timestamp, fam.gap ?? 1500)) {
@@ -882,17 +1077,26 @@ function detectStacks(players: PlayerInfo[], life: Life, deaths: DeathEvent[], c
       });
       const deathText = killed.length ? ` ${namesOf(killed)} died.` : "";
       const doubled = [...byPlayer].filter(([, ks]) => ks.size >= 2).map(([p]) => p);
+      if (fam.pairs) {
+        const pairErrors = eyePartnerErrors(fam, res, players, life, casts, slots, killed);
+        if (pairErrors) {
+          errors.push(...pairErrors);
+          continue;
+        }
+      }
       if (fam.healerLines) {
         // 7 of 9 doubled Sharp Tastes followed a healer's death (A12, A16,
-        // A19, A24, A28, B2); the other two had both lines within 4 degrees
-        // of each other (A18 +1:35, C5 +3:21: the healers on one side).
+        // A19, A24, A28, B2): the line retargeted onto the group.
         const healers = players.filter((p) => p.role === "Healer");
         if (healers.some((p) => !life.hitAlive(p, t))) continue;
-        if (doubled.length >= HEALER_LINES_MERGED) {
-          for (const p of healers) {
+        // A healer in both lines stood on the other healer's side, which put
+        // both lines through the same players (A11 +1:35, A18, C5).
+        const wrongSide = doubled.filter((p) => p.role === "Healer");
+        if (wrongSide.length) {
+          for (const p of wrongSide) {
             errors.push(playerError(p, {
-              ruleId: TYRANT_STACK_RULE_ID, severity: killed.length ? "Major" : "Minor", name: "Sharp Taste Lines Merged",
-              description: `Both Sharp Taste lines fired through the same players (${namesOf(doubled)} took both).${deathText} Each line aims at a healer; the two healers stand on opposite sides of the sword so the lines split the party four and four.`,
+              ruleId: TYRANT_STACK_RULE_ID, severity: killed.length ? "Major" : "Minor", name: "Sharp Taste Wrong Side",
+              description: `Stood in both Sharp Taste lines, on the other healer's side, so both lines fired through the same players (${namesOf(doubled)} took both).${deathText} Each line aims at a healer; the two healers stand on opposite sides of the sword so the lines split the party four and four.`,
               timestamp: t, abilityId: fam.ids[0], abilityName: fam.name,
             }));
           }
@@ -908,6 +1112,7 @@ function detectStacks(players: PlayerInfo[], life: Life, deaths: DeathEvent[], c
         }));
       }
       if (!killed.length) continue;
+      if (players.filter((p) => !life.alive(p, t)).length >= STACK_DOOMED_DEAD) continue;
       const eligible = (p: PlayerInfo) =>
         fam.eligible === "nonTank" ? !isTank(p)
         : fam.eligible === "pairTower" ? !isTank(p) && !carriers.has(p)
@@ -966,7 +1171,7 @@ function detectFireballFronts(players: PlayerInfo[], life: Life): PullError[] {
 
 // ── tank busters ────────────────────────────────────────────────────────────
 
-function detectBusters(players: PlayerInfo[], life: Life, casts: EnemyEvent[]): PullError[] {
+function detectBusters(players: PlayerInfo[], life: Life, casts: EnemyEvent[], slots: Slots): PullError[] {
   const errors: PullError[] = [];
   const diedText = (p: PlayerInfo, t: number) => (life.diedFrom(p, t) ? ", and died" : "");
   // Axe Raw Steel: one shared buster on the tanks. A non-tank in it stood
@@ -991,7 +1196,17 @@ function detectBusters(players: PlayerInfo[], life: Life, casts: EnemyEvent[]): 
     for (const h of res) byInst.set(instanceKey(h.e), [...(byInst.get(instanceKey(h.e)) ?? []), h]);
     const tanks = players.filter(isTank);
     // Both tanks in both cones: they stood together (A3 +0:26, both died).
-    const doubled = tanks.filter((p) => uniq(res.filter((h) => h.p === p).map((h) => instanceKey(h.e))).length >= 2);
+    // MT takes the west (northwest) cone, OT the east; a tank on the other's
+    // side is the one out of place (user, 2026-10-09, A26 +2:45: the OT).
+    let doubled = tanks.filter((p) => uniq(res.filter((h) => h.p === p).map((h) => instanceKey(h.e))).length >= 2);
+    const boss = castsOf(casts, [46093, 46094]).filter((c) => c.timestamp <= t && c.timestamp > t - 4000 && c.x !== undefined).pop();
+    if (doubled.length === 2 && boss) {
+      const wrong = doubled.filter((p) => {
+        const x = res.find((h) => h.p === p)?.e.x;
+        return x !== undefined && (slots.get(p) === "MT" ? x > boss.x! : x < boss.x!);
+      });
+      if (wrong.length === 1) doubled = wrong;
+    }
     for (const p of doubled) {
       errors.push(playerError(p, {
         ruleId: TYRANT_BUSTER_RULE_ID, severity: life.diedFrom(p, t) ? "Major" : "Minor", name: "Tank Cones Overlapped",
@@ -1288,13 +1503,14 @@ export function detectTyrantErrors(players: PlayerInfo[], deathEvents: DeathEven
   const pullEnd = Math.max(0, ...players.flatMap((p) => [...p.damageTaken, ...p.casts].map((e) => e.timestamp)), ...deathEvents.map((d) => d.timestamp));
   const called = calledWipeDeaths(deathEvents, pullEnd);
   const carriers = atomicCarriers(players, enemyCasts);
+  const slots = resolveSlots(players, life, enemyCasts);
 
   const errors = [
     ...detectAvoidable(players, life),
-    ...detectPersonalOverlaps(players, life, enemyCasts),
-    ...detectStacks(players, life, deathEvents, carriers),
+    ...detectPersonalOverlaps(players, life, enemyCasts, slots),
+    ...detectStacks(players, life, enemyCasts, carriers, slots),
     ...detectFireballFronts(players, life),
-    ...detectBusters(players, life, enemyCasts),
+    ...detectBusters(players, life, enemyCasts, slots),
     ...detectMeteorain(players, life),
     ...detectTowers(players, life, enemyCasts, deathEvents, carriers),
     ...detectStampede(players, life, deathEvents, called, carriers),
