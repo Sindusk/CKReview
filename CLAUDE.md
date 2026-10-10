@@ -81,6 +81,16 @@ These are standing preferences, each learned from a real correction:
   - Write rulings at the end, once detection has settled.
   - When the user's account and the log disagree, pin only the confirmed
     part and ask about the rest.
+- **Asking for VOD checks: one numbered list per loaded VOD** (user,
+  2026-10-09). When the user has a VOD loaded, ask only about the pulls in
+  that VOD. Number every question sequentially (1, 2, 3 …, no sub-letters)
+  so the user can answer by number. Each item gives:
+  - the pull and its MM:SS time
+  - what detection currently says, with the players it names
+  - the exact thing to look at
+
+  Group the items under mechanic headings, but keep the numbering
+  continuous across the headings.
 - **Narrow overrides, not wholesale replacement.** When a working mechanism
   fails for one specific case, add a scoped override for that case. Don't
   swap the whole mechanism.
