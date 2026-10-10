@@ -6,7 +6,7 @@
 // role filter): a 4 × 2 grid of job icon, job-colored name and gray slot,
 // light party 1 (MT H1 M1 R1) across the top and light party 2 (OT H2 M2
 // R2) across the bottom. Picking a player narrows the timeline to their
-// columns, personal ones open, and dims Analysis items that don't involve
+// columns, personal ones open, and removes Analysis items that don't involve
 // them. Picking them again, or All, clears it. Players without a detected
 // slot fill the empty cells in order.
 

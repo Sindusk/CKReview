@@ -17,7 +17,7 @@
 // uneventful hits (raid hits nobody died to, taken at full health) and,
 // across pulls, rare ones, each behind a checkbox.
 // A player selector (components/MitigationPlayerPicker.tsx) narrows the
-// timeline to one player's columns and dims Analysis items that don't
+// timeline to one player's columns and removes Analysis items that don't
 // involve them. Both views are for one boss
 // at a time (a Boss dropdown, defaulting to the current pull's boss), and
 // for either a single pull or all of one group's pulls on that boss at once

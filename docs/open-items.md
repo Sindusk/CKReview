@@ -528,7 +528,8 @@ grouped by exact roster. The module headers hold the rules.
     mechanic failure, not planned (Red Hot and Deep Blue's Plunging
     Snap #3 at -674%)
   - one change per hit, even when it leaves the hit still short
-  - the player selector dims items that don't involve that player
+  - a picked player sees only their changes, hits without a change that
+    they died to, and their own spare mitigation
 - **Unverified catalog entries:** Warrior, Machinist (Dismantle), Red Mage,
   Ninja, Monk, Summoner.
 - **Deferred:** what-if sandbox (reuse `marginWithout`), an optional

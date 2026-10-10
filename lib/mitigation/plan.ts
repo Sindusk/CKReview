@@ -80,6 +80,8 @@ export type PlanHitRef = {
   worstMargin:  number;
   pulls:        number;
   deathPulls:   number;
+  // Players who died to it without a vulnerability-up, in any pull.
+  died:         string[];
   tankOnly:     boolean;
 };
 
@@ -125,7 +127,9 @@ function refOf(row: AggregatedHit): PlanHitRef {
   return {
     id: row.id, name: row.abilityName, occurrence: row.occurrence, phase: row.phase, medianMs: row.medianMs,
     verdict: row.verdict, medianMargin: row.medianMargin, worstMargin: row.worstMargin, pulls: row.pulls,
-    deathPulls: row.deathPulls, tankOnly: row.byPull.every((b) => b.hit.tankOnly),
+    deathPulls: row.deathPulls,
+    died: [...new Set(row.byPull.flatMap((b) => b.hit.targets.filter((t) => t.died && !t.vulnerable).map((t) => t.player)))],
+    tankOnly: row.byPull.every((b) => b.hit.tankOnly),
   };
 }
 
