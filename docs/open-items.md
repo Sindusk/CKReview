@@ -509,9 +509,16 @@ grouped by exact roster. The module headers hold the rules.
     line up (Red Hot and Deep Blue's Plunging Snap / Re-Entry rows).
   - No minimum size for 4+-target hits: a 25k-raw Bloody Bondage gets
     a row.
-  - Notes list unused mitigations without estimating whether they'd
-    have lifted the hit into good.
-- **Plan view (built 2026-10-09, waiting on the user's review):**
+  - Notes and the hit details estimate added shields as nothing (their
+    size isn't logged per hit), so a shield is never "enough alone".
+- **UX pass (2026-10-09, from the user's direction):** Plan renamed
+  Analysis and opened first with 3+ pulls; a player selector replaced
+  the role filter; the timeline hides uneventful raid hits (no death,
+  full HP going in) behind a checkbox, folds its number columns into one
+  Outcome cell, marks only used / free-on-a-short-hit / ineffective, and
+  opens a details panel on click. Notes list only adds that lift the hit
+  to good alone. Waiting on the user's review.
+- **Analysis view (built 2026-10-09 as "Plan", waiting on the user's review):**
   `lib/mitigation/plan.ts` header has the rules. Chosen by the builder:
   - at most 3 changes; a hit needs 3+ pulls; a change must fit the
     cooldowns in at least half the hit's pulls
@@ -521,8 +528,7 @@ grouped by exact roster. The module headers hold the rules.
     mechanic failure, not planned (Red Hot and Deep Blue's Plunging
     Snap #3 at -674%)
   - one change per hit, even when it leaves the hit still short
-  - the role filter dims the plan and hides timeline columns by party
-    slot (MT/OT, H1/H2, M1/M2, R1/R2)
+  - the player selector dims items that don't involve that player
 - **Unverified catalog entries:** Warrior, Machinist (Dismantle), Red Mage,
   Ninja, Monk, Summoner.
 - **Deferred:** what-if sandbox (reuse `marginWithout`), an optional

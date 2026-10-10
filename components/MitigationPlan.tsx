@@ -2,37 +2,23 @@
 
 // components/MitigationPlan.tsx
 //
-// The Mitigation dialog's Plan view: lib/mitigation/plan.ts laid out for a
-// raid lead. A few coordinated changes first (one per short or tight hit,
-// at most PLAN_MAX_CHANGES), then the hits that need a look without a
-// mitigation change, then where mitigation is spare. Framed as what the
-// group could change, never as who failed, and marked as inferred from the
-// log (user-approved design, 2026-10-09).
+// The Mitigation dialog's Analysis view (named Plan until 2026-10-09):
+// lib/mitigation/plan.ts laid out for a raid lead. A few coordinated
+// changes first (one per short or tight hit, at most PLAN_MAX_CHANGES),
+// then the hits that need a look without a mitigation change, then where
+// mitigation is spare. Framed as what the group could change, never as who
+// failed, and marked as inferred from the log (user-approved design,
+// 2026-10-09).
 //
-// The role filter only dims what doesn't involve that role. Every item
-// stays visible and worded the same, so it never reads as personal orders.
+// The player selector only dims what doesn't involve that player. Every
+// item stays visible and worded the same, so it never reads as personal
+// orders.
 
 import { useState, type CSSProperties, type ReactNode } from "react";
 import type { MitigationPlan, PlanHitRef, PlanIssue, PlanSpare } from "@/lib/mitigation/plan";
 import { PLAN_MAX_CHANGES } from "@/lib/mitigation/plan";
 import { MARGIN_UNDER, verdictFor } from "@/lib/mitigation/analyze";
 import { VERDICT_STYLE, fmtTime } from "./MitigationTimeline";
-
-export type RoleFilter = "all" | "tank" | "healer" | "melee" | "ranged";
-
-export const ROLE_FILTERS: { value: RoleFilter; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "tank", label: "Tanks" },
-  { value: "healer", label: "Healers" },
-  { value: "melee", label: "Melee" },
-  { value: "ranged", label: "Ranged" },
-];
-
-/** The role filter a party slot (MT, H1, ...) belongs to. */
-export function roleOfSlot(slot: string | undefined): RoleFilter | undefined {
-  if (slot === "MT" || slot === "OT") return "tank";
-  return ({ H: "healer", M: "melee", R: "ranged" } as Record<string, RoleFilter>)[slot?.[0] ?? ""];
-}
 
 const SPARE_SHOWN = 5;
 const DIMMED = 0.4;
@@ -147,15 +133,13 @@ function Toggle({ open, onClick, children }: { open: boolean; onClick: () => voi
   );
 }
 
-export function PlanView({ plan, roleOf, role }: {
-  plan: MitigationPlan;
-  // The role filter each player belongs to (undefined: unknown slot, never dimmed).
-  roleOf: (player: string) => RoleFilter | undefined;
-  role: RoleFilter;
+export function PlanView({ plan, focus }: {
+  plan:  MitigationPlan;
+  focus: string | null;  // the selected player; null: nothing dimmed
 }) {
   const [showDeferred, setShowDeferred] = useState(false);
   const [showAllSpare, setShowAllSpare] = useState(false);
-  const active = (player: string) => role === "all" || (roleOf(player) ?? role) === role;
+  const active = (player: string) => focus === null || player === focus;
 
   const changes = plan.issues.filter((i) => i.change);
   const deferred = plan.issues.filter((i) => !i.change && i.reason?.startsWith("Not planned"));

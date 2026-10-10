@@ -678,6 +678,40 @@ export function marginWithout(
   return { margin, sequenceMargin: margin - target.laterDrop / factor * rollBuffer };
 }
 
+/**
+ * A target's margin with an entry added: an added % mitigation scales each
+ * part's logged damage before shields; an added shield subtracts
+ * `shieldAmount` (its capacity isn't logged, so the caller estimates it).
+ */
+export function marginWithAdded(t: HitTarget, entry: CatalogEntry, shieldAmount: number, column: Column): number {
+  let toHealth = 0;
+  for (const part of t.parts) {
+    const col = part.column ?? column;
+    let factor = 1;
+    if (col !== "none") {
+      for (const s of entry.statuses) {
+        if (s.shield) continue;
+        factor *= 1 - (col ? s[col] : Math.min(s.physical, s.magical));
+      }
+    }
+    toHealth += Math.max(0, (part.damage + part.absorbed) * factor - part.absorbed);
+  }
+  toHealth = Math.max(0, toHealth - shieldAmount);
+  return (t.healthBefore - toHealth) / t.maxHealth;
+}
+
+/**
+ * The hit's lowest HP with `player` casting `entry` on it: a party entry
+ * reaches everyone, a self one only its caster, a target one the lowest
+ * player. Infinity when nobody hit is graded.
+ */
+export function lowestWithAdded(hit: MitigationHit, entry: CatalogEntry, player: string, shieldAmount: number): number {
+  const pool = judged(hit.targets);
+  const lowest = [...pool].sort((a, b) => a.margin - b.margin)[0];
+  const gets = (t: HitTarget) => entry.reach === "party" || (entry.reach === "self" ? t.player === player : t === lowest);
+  return Math.min(...pool.map((t) => (gets(t) ? marginWithAdded(t, entry, shieldAmount, hit.damageColumn) : t.margin)));
+}
+
 /** Whether removing this catalog entry is ever offered as droppable on this hit. */
 export function droppableEntry(entry: CatalogEntry | undefined, tankOnly: boolean): boolean {
   if (!entry || entry.inSheet === false) return false;

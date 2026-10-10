@@ -45,6 +45,7 @@ export type AggregatedHit = {
   // Medians over pulls of the per-pull values (MitigationHit).
   rawDamage?:     number;
   takenDamage:    number;
+  absorbedDamage: number;
   lowestBefore:   number;
   medianMargin:   number;   // lowest health after
   worstMargin:    number;
@@ -138,6 +139,7 @@ export function aggregateMitigation(
       medianMs:     median(hits.map((h) => h.timestampMs)),
       rawDamage:    raws.length ? median(raws) : undefined,
       takenDamage:  median(hits.map((h) => h.takenDamage)),
+      absorbedDamage: median(hits.map((h) => h.absorbedDamage)),
       lowestBefore: median(hits.map((h) => h.lowestBefore)),
       medianMargin,
       worstMargin:  Math.min(...margins),

@@ -8,14 +8,21 @@
 // per player in party-slot order (MT, OT, H1, H2, M1, M2, R1, R2), with a
 // rule between players. Each group shows that player's party-wide
 // mitigation; personal mitigation is collapsed and expands per player.
-// Side columns carry raw and taken damage, the lowest health before and
-// after, the verdict and how many mitigations an over hit could do
-// without; a Notes column on the far right says what could change. In "all pulls"
-// mode each row is a hit matched across pulls (lib/mitigation/aggregate.ts)
-// and each cell counts pulls.
+// Beside the time and mechanic, one Outcome column shows the lowest
+// player's HP after the hit and the verdict; a Notes column on the far
+// right says what could change. Clicking a row opens its details
+// (components/MitigationHitDetails.tsx): health before and after with who
+// was lowest, raw, mitigated and taken damage, and the options with their
+// estimates (user, 2026-10-09). In "all pulls" mode each row is a hit
+// matched across pulls (lib/mitigation/aggregate.ts) and each cell counts
+// pulls.
+//
+// Cells mark only what can be acted on (user, 2026-10-09): used, cast but
+// not on the hit, and free only on a hit that went short (under or fail).
+// Cooldown and plain availability stay in the cell's tooltip.
 //
 // All numbers come from lib/mitigation/analyze.ts; this file only lays
-// them out. Tooltips use the native `title` attribute.
+// them out. Cell tooltips use the native `title` attribute.
 
 import type { CSSProperties, ReactNode } from "react";
 import type { Pull } from "@/types/Pull";
@@ -26,6 +33,7 @@ import { FFXIV_MITIGATION } from "@/lib/mitigation/ffxiv-catalog";
 import { detectFFRoles, FF_ROLE_SLOTS } from "@/lib/mechanics/ffxiv/roles";
 import { getClassColor } from "@/lib/player-display";
 import { getFFAbilityIconUrl } from "@/lib/ability-icons";
+import { InfoTip } from "./ui/InfoTip";
 
 export type MitigationColumn = {
   player: string;
@@ -44,7 +52,7 @@ export type PlayerGroup = {
   personal: MitigationColumn[];
 };
 
-const STATE_STYLE: Record<MitigationState, { mark: string; color: string; label: string }> = {
+export const STATE_STYLE: Record<MitigationState, { mark: string; color: string; label: string }> = {
   used:        { mark: "●", color: "#4ade80", label: "Used on this hit" },
   free:        { mark: "◆", color: "#fbbf24", label: "Free: a full cooldown since their last cast, and a full cooldown before their next one" },
   available:   { mark: "○", color: "#94a3b8", label: "Available, but using it here would delay their next use" },
@@ -52,9 +60,10 @@ const STATE_STYLE: Record<MitigationState, { mark: string; color: string; label:
   ineffective: { mark: "✕", color: "#f87171", label: "Cast and still running, but not on this hit (wrong target or out of range)" },
 };
 
-// A dead (or just raised) player's cells keep their cooldown mark on a red
-// background, so their stretch of the fight reads as one band.
+// A dead (or just raised) player's cells keep their red background, so
+// their stretch of the fight reads as one band.
 const DEAD_CELL_BG = "rgba(239, 68, 68, 0.28)";
+const SELECTED_BG = "#1c2833";
 
 export const VERDICT_STYLE: Record<HitVerdict, { color: string; label: string }> = {
   fail:  { color: "#ef4444", label: "Fail" },
@@ -63,11 +72,11 @@ export const VERDICT_STYLE: Record<HitVerdict, { color: string; label: string }>
   over:  { color: "#53a9ff", label: "Over" },
 };
 
-// Health after a hit, colored like the verdict it lands in.
-const afterColor = (margin: number) => VERDICT_STYLE[verdictFor(margin, 0)].color;
-// Health going into a hit: full, nearly full, or already dented.
-const beforeColor = (health: number) =>
-  health >= 0.995 ? VERDICT_STYLE.good.color : health >= 0.8 ? VERDICT_STYLE.over.color : VERDICT_STYLE.under.color;
+/** HP after a hit, colored like the verdict it lands in. */
+export const afterColor = (margin: number) => VERDICT_STYLE[verdictFor(margin, 0)].color;
+
+// Health at or above this counts as full going into a hit.
+export const FULL_HEALTH = 0.995;
 
 const KIND_ORDER: MitigationKind[] = ["bossDebuff", "partyBuff", "shield", "personal", "limitBreak", "invuln"];
 
@@ -76,9 +85,16 @@ export function fmtTime(ms: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
-const pct = (x: number) => `${Math.round(x * 100)}%`;
-const fmtDamage = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(2)}M` : `${Math.round(n / 1000)}k`);
+export const pctHp = (x: number) => `${Math.round(Math.max(0, x) * 100)}%`;
 const colKey = (c: MitigationColumn) => `${c.player}|${c.key}`;
+const short = (v: HitVerdict) => v === "under" || v === "fail";
+
+/**
+ * A raid hit nobody died to, taken at full health: nothing to look at
+ * (user, 2026-10-09). Tank busters always stay.
+ */
+export const uneventful = (hit: MitigationHit) => !hit.tankOnly && hit.deaths === 0 && hit.lowestBefore >= FULL_HEALTH;
+export const rowUneventful = (row: AggregatedHit) => row.byPull.every((b) => uneventful(b.hit));
 
 /**
  * One group per player, in party-slot order (taken from the latest pull;
@@ -146,17 +162,14 @@ const td: CSSProperties = {
 const stickyLeft = (left: number): CSSProperties => ({ position: "sticky", left, zIndex: 1 });
 const cellTd: CSSProperties = { ...td, textAlign: "center", padding: "3px 2px", minWidth: 26 };
 const ruled = (first: boolean): CSSProperties => (first ? { borderLeft: GROUP_RULE } : {});
+const selectedBg = (selected: boolean): CSSProperties => (selected ? { background: SELECTED_BG } : {});
 
-const SIDE_HEADERS = ["Time", "Mechanic", "Raw", "Taken", "HP% Before", "HP% After", "Verdict", "Droppable"];
+const TIME_WIDTH = 44;
+const SIDE_HEADERS = ["Time", "Mechanic", "Outcome"];
 
 const HEADER_TIPS: Record<string, string> = {
-  "Raw":        "Damage before any mitigation, per player (average over the non-tanks; the tanks on a tank buster). A multi-hit attack's hits are summed.",
-  "Taken":      "Damage to health after mitigation and shields, per player, averaged the same way.",
-  "HP% Before": "Lowest health before the hit among the players it hit.",
-  "HP% After":  "Lowest health after the hit among the players it hit (vulnerable players and invulnerable tanks left out).",
-  "Verdict":    `Fail: someone died. Under: someone ended below ${Math.round(MARGIN_UNDER * 100)}%. Good: ${Math.round(MARGIN_UNDER * 100)}-${Math.round(MARGIN_OVER * 100)}%. Over: everyone ${Math.round(MARGIN_OVER * 100)}%+.`,
-  "Droppable":  `How many planned mitigations an over hit could do without and still land Good (lowest player ${Math.round(MARGIN_UNDER * 100)}%+ with a 5% damage roll). Party-wide only, plus tank cooldowns on a tank buster.`,
-  "Notes":      "What could change on this hit.",
+  "Outcome": `Lowest player's HP after the hit (vulnerable players and invulnerable tanks left out), and the verdict. Fail: someone died. Under: below ${Math.round(MARGIN_UNDER * 100)}%. Good: ${Math.round(MARGIN_UNDER * 100)}-${Math.round(MARGIN_OVER * 100)}%. Over: ${Math.round(MARGIN_OVER * 100)}%+.`,
+  "Notes":   "What could change on this hit.",
 };
 
 function TimelineHead({ groups, expanded, onToggle, aggregate }: {
@@ -166,8 +179,8 @@ function TimelineHead({ groups, expanded, onToggle, aggregate }: {
     <thead>
       <tr style={{ height: HEAD_ROW_1 }}>
         {SIDE_HEADERS.map((h, i) => (
-          <th key={h} rowSpan={2} style={{ ...th, ...(i < 2 ? stickyLeft(i === 0 ? 0 : 44) : {}), zIndex: i < 2 ? 4 : 3, verticalAlign: "bottom" }}
-            title={`${HEADER_TIPS[h] ?? ""}${aggregate && i >= 2 && i <= 5 ? " Median over pulls; After also shows the worst pull." : ""}` || undefined}>
+          <th key={h} rowSpan={2} style={{ ...th, ...(i < 2 ? stickyLeft(i === 0 ? 0 : TIME_WIDTH) : {}), zIndex: i < 2 ? 4 : 3, verticalAlign: "bottom" }}
+            title={h === "Outcome" ? `${HEADER_TIPS.Outcome}${aggregate ? " Median over pulls, then the worst pull." : ""}` : undefined}>
             {h}
           </th>
         ))}
@@ -209,47 +222,23 @@ function TimelineHead({ groups, expanded, onToggle, aggregate }: {
   );
 }
 
-const pctHp = (x: number) => pct(Math.max(0, x));
+const BAR_WIDTH = 36;
 
-/** Who died to the hit, or, when nobody did, who ended lowest. */
-function outcomeTip(hit: MitigationHit): string {
-  const dead = hit.targets.filter((t) => t.died);
-  if (dead.length) {
-    return `Died: ${dead.map((t) => `${t.player}${t.vulnerable ? " (vulnerable)" : ""}`).join(", ")}`;
-  }
-  const graded = hit.targets.filter((t) => !t.vulnerable && !t.invulnerable);
-  const low = [...graded].sort((a, b) => a.margin - b.margin)[0];
-  return low ? `Lowest after: ${low.player} at ${pctHp(low.margin)}` : "";
-}
-
-/** Who went into the hit lowest. */
-function beforeTip(hit: MitigationHit): string {
-  const graded = hit.targets.filter((t) => !t.vulnerable && !t.invulnerable);
-  const low = [...graded].sort((a, b) => a.healthBefore / a.maxHealth - b.healthBefore / b.maxHealth)[0];
-  if (!low) return "";
-  // Matches the 100% the cell shows: nobody to single out.
-  if (pctHp(low.healthBefore / low.maxHealth) === "100%") return "Party at full health";
-  return `Lowest before: ${low.player} at ${pctHp(low.healthBefore / low.maxHealth)}`;
-}
-
-/** A per-hit tip for each pull that reached the hit. */
-function perPullTip(row: AggregatedHit, tip: (hit: MitigationHit) => string): string {
-  return row.byPull.map(({ pullNumber, hit }) => `Pull ${pullNumber}: ${tip(hit)}`).join("\n");
-}
-
-// Raw, Taken, HP% Before and HP% After.
-function NumberCells({ raw, taken, absorbed, before, after, worst, beforeTip, afterTip }: {
-  raw?: number; taken: number; absorbed?: number; before: number; after: number; worst?: number; beforeTip: string; afterTip: string;
-}) {
-  return [
-    <td key="raw" style={td} className="ck-num">{raw === undefined ? <span style={{ color: "var(--ck-text-3)" }}>—</span> : fmtDamage(raw)}</td>,
-    <td key="taken" style={td} className="ck-num" title={absorbed ? `${fmtDamage(absorbed)} more absorbed by shields` : undefined}>{fmtDamage(taken)}</td>,
-    <td key="before" style={{ ...td, color: beforeColor(before), cursor: "help" }} className="ck-num" title={beforeTip}>{pctHp(before)}</td>,
-    <td key="after" style={{ ...td, cursor: "help" }} className="ck-num" title={afterTip}>
-      <span style={{ color: afterColor(after) }}>{pctHp(after)}</span>
-      {worst !== undefined && <span style={{ color: afterColor(worst) }}> / {pctHp(worst)}</span>}
-    </td>,
-  ];
+/** A small HP bar, its percentage, an optional worst-pull percentage, and the verdict word. */
+function OutcomeCell({ after, worst, verdict, selected }: { after: number; worst?: number; verdict: HitVerdict; selected: boolean }) {
+  const v = VERDICT_STYLE[verdict];
+  return (
+    <td style={{ ...td, ...selectedBg(selected) }}>
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+        <span style={{ width: BAR_WIDTH, height: 6, borderRadius: 2, background: "var(--ck-line-2)", overflow: "hidden", flex: "0 0 auto" }}>
+          <span style={{ display: "block", height: "100%", width: `${Math.min(1, Math.max(0, after)) * 100}%`, background: afterColor(after) }} />
+        </span>
+        <span className="ck-num" style={{ color: afterColor(after), minWidth: 30 }}>{pctHp(after)}</span>
+        {worst !== undefined && <span className="ck-num" style={{ color: afterColor(worst), fontSize: 11 }}>/ {pctHp(worst)}</span>}
+        <span style={{ color: v.color, fontWeight: 600, fontSize: 11 }}>{v.label}</span>
+      </span>
+    </td>
+  );
 }
 
 // One line, cut with an ellipsis; the full note is in the tooltip. The
@@ -261,17 +250,18 @@ const NOTES_MIN_WIDTH = 140;
 const notesWidth: CSSProperties = { width: "100%", maxWidth: 0, minWidth: NOTES_MIN_WIDTH };
 const tableStyle: CSSProperties = { borderCollapse: "separate", borderSpacing: 0, width: "100%" };
 
-function NoteCell({ note }: { note: string }) {
+function NoteCell({ note, selected }: { note: string; selected: boolean }) {
   return (
     <td title={note || undefined} style={{
       ...td, ...notesWidth, overflow: "hidden", textOverflow: "ellipsis", borderLeft: GROUP_RULE, color: "var(--ck-text)",
+      ...selectedBg(selected),
     }}>
       {note || <span style={{ color: "var(--ck-text-3)" }}>—</span>}
     </td>
   );
 }
 
-function MechanicLabel({ name, occurrence, waves, tankOnly, pulls }: {
+export function MechanicLabel({ name, occurrence, waves, tankOnly, pulls }: {
   name: string; occurrence: number; waves: number; tankOnly: boolean; pulls?: number;
 }) {
   const dim = { color: "var(--ck-text-3)" };
@@ -282,20 +272,6 @@ function MechanicLabel({ name, occurrence, waves, tankOnly, pulls }: {
       {tankOnly && <span style={{ ...dim, fontSize: 10 }}> tanks</span>}
       {pulls !== undefined && <span style={{ ...dim, fontSize: 10 }}> ×{pulls}</span>}
     </>
-  );
-}
-
-function VerdictPill({ verdict }: { verdict: HitVerdict }) {
-  const v = VERDICT_STYLE[verdict];
-  return <span style={{ color: v.color, fontWeight: 600, fontSize: 11 }}>{v.label}</span>;
-}
-
-function DroppableCell({ count, worstMargin }: { count: number; worstMargin: number }) {
-  return (
-    <td style={{ ...td, textAlign: "center" }} className="ck-num"
-      title={count ? `${count} party-wide mitigation${count > 1 ? "s" : ""} could be dropped; the lowest player would still end at ${pct(worstMargin)}` : "None"}>
-      {count || <span style={{ color: "var(--ck-text-3)" }}>—</span>}
-    </td>
   );
 }
 
@@ -322,39 +298,31 @@ function stateTooltip(col: MitigationColumn, s: PlayerMitigation, hitMs: number)
   return lines.join("\n");
 }
 
-function hitTooltip(hit: MitigationHit): string {
-  const lines = [`${hit.abilityNames.join(" + ")} #${hit.occurrence}: ${hit.targets.length} players hit${hit.waves > 1 ? ` up to ${hit.waves} times` : ""}, ${hit.damageColumn ?? "unknown"} damage`];
-  lines.push("Active:");
-  for (const a of hit.active) lines.push(`  ${a.name} (${a.casters.join(", ") || "caster not found"}) on ${a.targets}`);
-  const graded = hit.targets.filter((t) => !t.vulnerable && !t.invulnerable);
-  const before = [...graded].sort((a, b) => a.healthBefore / a.maxHealth - b.healthBefore / b.maxHealth)[0];
-  const after = [...graded].sort((a, b) => a.margin - b.margin)[0];
-  if (before) lines.push(`Lowest before: ${before.player} at ${pctHp(before.healthBefore / before.maxHealth)}`);
-  if (after) lines.push(`Lowest after: ${after.player} at ${pctHp(after.margin)}${after.laterDrop > 0 ? `, ${pctHp(after.margin - after.laterDrop)} after follow-up damage` : ""}`);
-  for (const t of hit.targets.filter((x) => x.died)) {
-    lines.push(`Died: ${t.player}${t.vulnerable ? " (vulnerable)" : ""} — ${t.deathCause === "mitigation" ? "full health before the hit: a mitigation problem" : "low health before the hit: a healing / timing problem"}`);
-  }
-  for (const t of hit.targets.filter((x) => x.vulnerable && !x.died)) lines.push(`Vulnerable (left out): ${t.player}`);
-  for (const t of hit.targets.filter((x) => x.invulnerable)) lines.push(`Invulnerable (left out): ${t.player}`);
-  return lines.join("\n");
-}
-
 function spanOf(groups: VisibleGroup[]): number {
   return SIDE_HEADERS.length + groups.reduce((s, g) => s + g.columns.length, 0) + 1;
 }
 
-function sideCells(time: string, mechanic: ReactNode, mechanicTip: string): ReactNode[] {
+function sideCells(time: string, mechanic: ReactNode, selected: boolean): ReactNode[] {
   return [
-    <td key="t" style={{ ...td, ...stickyLeft(0), width: 44 }} className="ck-num">{time}</td>,
-    <td key="m" style={{ ...td, ...stickyLeft(44), color: "var(--ck-text)", cursor: "help" }} title={mechanicTip}>{mechanic}</td>,
+    <td key="t" style={{ ...td, ...stickyLeft(0), width: TIME_WIDTH, ...selectedBg(selected) }} className="ck-num">{time}</td>,
+    <td key="m" style={{ ...td, ...stickyLeft(TIME_WIDTH), color: "var(--ck-text)", ...selectedBg(selected) }}>{mechanic}</td>,
   ];
 }
 
-type TimelineProps = { groups: PlayerGroup[]; expanded: Set<string>; onToggle: (player: string) => void };
+type TimelineProps = {
+  groups:     PlayerGroup[];
+  expanded:   Set<string>;
+  onToggle:   (player: string) => void;
+  selectedId: string | null;
+  // Clicking the selected row again closes its details.
+  onSelect:   (id: string | null) => void;
+};
+
+const rowStyle: CSSProperties = { cursor: "pointer" };
 
 // ── Single pull ─────────────────────────────────────────────────────────
 
-export function PullTimeline({ hits, groups, expanded, onToggle }: TimelineProps & { hits: MitigationHit[] }) {
+export function PullTimeline({ hits, groups, expanded, onToggle, selectedId, onSelect }: TimelineProps & { hits: MitigationHit[] }) {
   const visible = visibleGroups(groups, expanded);
   const span = spanOf(visible);
   let lastPhase: string | undefined;
@@ -366,32 +334,29 @@ export function PullTimeline({ hits, groups, expanded, onToggle }: TimelineProps
           const byCol = new Map(hit.players.map((p) => [`${p.player}|${p.key}`, p]));
           const phaseRow = hit.phase !== lastPhase ? <PhaseRow key={`ph-${hit.id}`} phase={hit.phase ?? "—"} span={span} /> : null;
           lastPhase = hit.phase;
+          const selected = hit.id === selectedId;
           return [
             phaseRow,
-            <tr key={hit.id}>
+            <tr key={hit.id} style={rowStyle} onClick={() => onSelect(selected ? null : hit.id)}>
               {sideCells(fmtTime(hit.timestampMs),
-                <MechanicLabel name={hit.abilityNames.join(" + ")} occurrence={hit.occurrence} waves={hit.waves} tankOnly={hit.tankOnly} />, hitTooltip(hit))}
-              <NumberCells raw={hit.rawDamage} taken={hit.takenDamage} absorbed={hit.absorbedDamage} before={hit.lowestBefore} after={hit.margin}
-                beforeTip={beforeTip(hit)} afterTip={outcomeTip(hit)} />
-              <td style={{ ...td, cursor: "help" }} title={outcomeTip(hit)}>
-                <VerdictPill verdict={hit.verdict} />
-              </td>
-              <DroppableCell count={hit.droppable.keys.length} worstMargin={hit.droppable.worstMargin} />
+                <MechanicLabel name={hit.abilityNames.join(" + ")} occurrence={hit.occurrence} waves={hit.waves} tankOnly={hit.tankOnly} />, selected)}
+              <OutcomeCell after={hit.margin} verdict={hit.verdict} selected={selected} />
               {visible.flatMap(({ group, columns }) => columns.map((c, i) => {
-                if (!c) return <td key={`${group.player}|empty`} style={{ ...cellTd, ...ruled(i === 0) }} />;
+                const base = { ...cellTd, ...ruled(i === 0), ...selectedBg(selected) };
+                if (!c) return <td key={`${group.player}|empty`} style={base} />;
                 const s = byCol.get(colKey(c));
-                if (!s) return <td key={colKey(c)} style={{ ...cellTd, ...ruled(i === 0) }} />;
+                if (!s) return <td key={colKey(c)} style={base} />;
                 const st = STATE_STYLE[s.state];
+                const shown = s.state === "used" || s.state === "ineffective" || (s.state === "free" && short(hit.verdict));
                 return (
                   <td key={colKey(c)} title={stateTooltip(c, s, hit.timestampMs)} style={{
-                    ...cellTd, ...ruled(i === 0), color: st.color, cursor: "help",
-                    ...(s.dead ? { background: DEAD_CELL_BG } : {}),
+                    ...base, color: st.color, ...(s.dead ? { background: DEAD_CELL_BG } : {}),
                   }}>
-                    {st.mark}
+                    {shown ? st.mark : ""}
                   </td>
                 );
               }))}
-              <NoteCell note={hit.note} />
+              <NoteCell note={hit.note} selected={selected} />
             </tr>,
           ];
         })}
@@ -402,7 +367,7 @@ export function PullTimeline({ hits, groups, expanded, onToggle }: TimelineProps
 
 // ── All loaded pulls ────────────────────────────────────────────────────
 
-export function AggregateTimeline({ rows, groups, expanded, onToggle }: TimelineProps & { rows: AggregatedHit[] }) {
+export function AggregateTimeline({ rows, groups, expanded, onToggle, selectedId, onSelect }: TimelineProps & { rows: AggregatedHit[] }) {
   const visible = visibleGroups(groups, expanded);
   const span = spanOf(visible);
   let lastPhase: string | undefined;
@@ -423,42 +388,38 @@ export function AggregateTimeline({ rows, groups, expanded, onToggle }: Timeline
           }
           const phaseRow = row.phase !== lastPhase ? <PhaseRow key={`ph-${row.id}`} phase={row.phase ?? "—"} span={span} /> : null;
           lastPhase = row.phase;
-          const usual = row.active.map((a) => `${a.name}: ${a.pulls}/${row.pulls} pulls`).join("\n");
+          const selected = row.id === selectedId;
           return [
             phaseRow,
-            <tr key={row.id}>
+            <tr key={row.id} style={rowStyle} onClick={() => onSelect(selected ? null : row.id)}>
               {sideCells(fmtTime(row.medianMs),
                 <MechanicLabel name={row.byPull[0].hit.abilityNames.join(" + ")} occurrence={row.occurrence} pulls={row.pulls}
-                  waves={Math.max(...row.byPull.map((b) => b.hit.waves))} tankOnly={row.byPull.every((b) => b.hit.tankOnly)} />,
-                `${row.abilityName} #${row.occurrence}, reached in ${row.pulls} pull(s)\nActive:\n${usual}`)}
-              <NumberCells raw={row.rawDamage} taken={row.takenDamage} before={row.lowestBefore} after={row.medianMargin} worst={row.worstMargin}
-                beforeTip={perPullTip(row, beforeTip)} afterTip={perPullTip(row, outcomeTip)} />
-              <td style={{ ...td, cursor: "help" }} title={perPullTip(row, outcomeTip)}>
-                <VerdictPill verdict={row.verdict} />
-              </td>
-              <DroppableCell count={row.droppable.keys.length} worstMargin={row.droppable.worstMargin} />
+                  waves={Math.max(...row.byPull.map((b) => b.hit.waves))} tankOnly={row.byPull.every((b) => b.hit.tankOnly)} />, selected)}
+              <OutcomeCell after={row.medianMargin} worst={row.worstMargin} verdict={row.verdict} selected={selected} />
               {visible.flatMap(({ group, columns }) => columns.map((c, i) => {
-                if (!c) return <td key={`${group.player}|empty`} style={{ ...cellTd, ...ruled(i === 0) }} />;
+                const base = { ...cellTd, ...ruled(i === 0), ...selectedBg(selected) };
+                if (!c) return <td key={`${group.player}|empty`} style={base} />;
                 const k = colKey(c);
                 const n = counts.get(k);
-                if (!n) return <td key={k} style={{ ...cellTd, ...ruled(i === 0) }} />;
+                if (!n) return <td key={k} style={base} />;
                 const total = row.pulls;
                 const used = n.used;
-                const shade = used === 0 ? "var(--ck-bg-deep)" : `rgba(74, 222, 128, ${0.12 + 0.5 * (used / total)})`;
-                // A diamond only when it was free in at least half the pulls
-                // that reached this hit; once in a while isn't a pattern.
-                const usuallyFree = used === 0 && n.free * 2 >= total;
+                const shade = used === 0 ? undefined : `rgba(74, 222, 128, ${0.12 + 0.5 * (used / total)})`;
+                // A diamond only on a short hit, and only when it was free
+                // in at least half the pulls that reached it; once in a
+                // while isn't a pattern.
+                const usuallyFree = used === 0 && n.free * 2 >= total && short(row.verdict);
                 const tip = [`${c.player} — ${c.name}`, `Used ${used}/${total}`, `Free ${n.free}/${total}`, `Available ${n.available}`,
                   `On cooldown ${n.cooldown}`, n.ineffective ? `Ineffective ${n.ineffective}` : "", n.dead ? `Dead ${n.dead}` : ""].filter(Boolean).join("\n");
                 return (
-                  <td key={k} style={{ ...cellTd, ...ruled(i === 0), background: shade, cursor: "help" }} title={tip}>
+                  <td key={k} style={{ ...base, ...(shade ? { background: shade } : {}) }} title={tip}>
                     {used > 0 ? <span className="ck-num" style={{ color: "var(--ck-text)", fontSize: 11 }}>{used}</span>
                       : usuallyFree ? <span style={{ color: STATE_STYLE.free.color }}>◆</span>
-                      : <span style={{ color: "var(--ck-text-3)" }}>·</span>}
+                      : ""}
                   </td>
                 );
               }))}
-              <NoteCell note={row.note} />
+              <NoteCell note={row.note} selected={selected} />
             </tr>,
           ];
         })}
@@ -467,46 +428,37 @@ export function AggregateTimeline({ rows, groups, expanded, onToggle }: Timeline
   );
 }
 
-// Two blocks, in the same order as the table's sections below: the hit
-// columns (HP colors, verdicts) on the left, the mitigation marks on the right.
+/** One line of marks; the verdict bands sit behind the info icon. */
 export function TimelineLegend({ aggregate }: { aggregate: boolean }) {
   const under = Math.round(MARGIN_UNDER * 100);
   const over = Math.round(MARGIN_OVER * 100);
-  const swatch = (color: string, label: string, text: string) => (
-    <span key={label} style={{ marginRight: 12, whiteSpace: "nowrap" }}><span style={{ color }}>{label}</span> {text}</span>
+  const item = (mark: ReactNode, text: string) => (
+    <span key={text} style={{ whiteSpace: "nowrap" }}>{mark} {text}</span>
   );
-  const heading: CSSProperties = { color: "var(--ck-text-gold)", fontWeight: 600, marginBottom: 2 };
-  const line: CSSProperties = { marginBottom: 2 };
   const marks = aggregate
-    ? [swatch("var(--ck-text)", "12", "pulls it was used on this hit (greener = more often)"),
-       swatch(STATE_STYLE.free.color, "◆", "never used, free in half the pulls or more")]
-    : [...(Object.keys(STATE_STYLE) as MitigationState[]).map((s) => swatch(STATE_STYLE[s].color, STATE_STYLE[s].mark, s)),
-       <span key="dead" style={{ marginRight: 12, whiteSpace: "nowrap" }}>
-         <span style={{ background: DEAD_CELL_BG, padding: "0 5px", borderRadius: 2 }}>&nbsp;</span> dead or just raised
-       </span>];
+    ? [item(<span style={{ color: "var(--ck-text)" }}>3</span>, "pulls it was used (greener = more often)"),
+       item(<span style={{ color: STATE_STYLE.free.color }}>◆</span>, "usually free on a short hit")]
+    : [item(<span style={{ color: STATE_STYLE.used.color }}>●</span>, "used"),
+       item(<span style={{ color: STATE_STYLE.free.color }}>◆</span>, "free on a short hit"),
+       item(<span style={{ color: STATE_STYLE.ineffective.color }}>✕</span>, "cast, but not on the hit"),
+       item(<span style={{ background: DEAD_CELL_BG, padding: "0 5px", borderRadius: 2 }}>&nbsp;</span>, "dead or just raised")];
   return (
-    <div className="ck-help" style={{ display: "flex", gap: 32, flexWrap: "wrap", marginBottom: 8 }}>
-      <div>
-        <div style={heading}>Hit</div>
-        <div style={line}>
-          Verdict on the lowest player after the hit:{" "}
-          {swatch(VERDICT_STYLE.fail.color, "Fail", "someone died")}
-          {swatch(VERDICT_STYLE.under.color, "Under", `<${under}%`)}
-          {swatch(VERDICT_STYLE.good.color, "Good", `${under}–${over}%`)}
-          {swatch(VERDICT_STYLE.over.color, "Over", `${over}%+`)}
-        </div>
-        <div style={line}>
-          HP% Before:{" "}
-          {swatch(VERDICT_STYLE.good.color, "100%", "full")}
-          {swatch(VERDICT_STYLE.over.color, "80%+", "")}
-          {swatch(VERDICT_STYLE.under.color, "<80%", "")}
-        </div>
-      </div>
-      <div>
-        <div style={heading}>Mitigation</div>
-        <div style={line}>{marks}</div>
-        <div style={line}>Party-wide mitigation shown; +N on a player opens their personal ones.</div>
-      </div>
+    <div className="ck-help" style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", marginBottom: 8 }}>
+      {marks}
+      <span style={{ color: "var(--ck-text-3)" }}>Click a hit for details · +N on a player shows personal mitigation</span>
+      <InfoTip
+        label={`Outcome is the lowest player's HP after the hit. Fail: someone died. Under: below ${under}%. Good: ${under} to ${over}%. Over: ${over}% or more.`}
+        content={
+          <>
+            <b>Outcome</b> is the lowest player&apos;s HP after the hit.
+            <div><span style={{ color: VERDICT_STYLE.fail.color }}>Fail</span>: someone died</div>
+            <div><span style={{ color: VERDICT_STYLE.under.color }}>Under</span>: below {under}%</div>
+            <div><span style={{ color: VERDICT_STYLE.good.color }}>Good</span>: {under}–{over}%</div>
+            <div><span style={{ color: VERDICT_STYLE.over.color }}>Over</span>: {over}% or more</div>
+            <div style={{ marginTop: 4 }}>Hover a cell for its cooldown: when it was last cast and when it was back.</div>
+          </>
+        }
+      />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 // lib/mitigation/plan.ts
 //
-// The Mitigation dialog's Plan view: a short list of changes for the raid
+// The Mitigation dialog's Analysis view (named Plan until 2026-10-09): a short list of changes for the raid
 // lead, read from the cross-pull aggregate (aggregate.ts). The timeline
 // shows every hit; this picks the few that need something and pairs each
 // with one fix (user-approved design, 2026-10-09).
@@ -54,11 +54,11 @@
 
 import type { Pull } from "@/types/Pull";
 import type { PlayerInfo } from "@/types/PlayerInfo";
-import type { CatalogEntry, HitTarget, HitVerdict, MitigationGame, MitigationHit } from "./types";
+import type { CatalogEntry, HitVerdict, MitigationGame, MitigationHit } from "./types";
 import type { AggregatedHit } from "./aggregate";
 import {
   DAMAGE_ROLL_BUFFER, DROP_MIN_COOLDOWN_MS, MARGIN_UNDER, SNAPSHOT_SLACK_MS,
-  isDeadOrFreshlyRevived, judged, marginWithout, playerCasts, simulateCharges,
+  isDeadOrFreshlyRevived, judged, lowestWithAdded, marginWithout, playerCasts, simulateCharges,
 } from "./analyze";
 
 export const PLAN_MIN_PULLS = 3;
@@ -140,24 +140,6 @@ function reaches(entry: CatalogEntry, row: AggregatedHit, player: string, tankOn
   return row.byPull.some((b) => b.hit.targets.some((t) => t.player === player));
 }
 
-/** A target's margin with an entry added (see Estimates in the header). */
-function marginWith(t: HitTarget, entry: CatalogEntry, shieldAmount: number, column: MitigationHit["damageColumn"]): number {
-  let toHealth = 0;
-  for (const part of t.parts) {
-    const col = part.column ?? column;
-    let factor = 1;
-    if (col !== "none") {
-      for (const s of entry.statuses) {
-        if (s.shield) continue;
-        factor *= 1 - (col ? s[col] : Math.min(s.physical, s.magical));
-      }
-    }
-    toHealth += Math.max(0, (part.damage + part.absorbed) * factor - part.absorbed);
-  }
-  toHealth = Math.max(0, toHealth - shieldAmount);
-  return (t.healthBefore - toHealth) / t.maxHealth;
-}
-
 export function buildMitigationPlan(rows: AggregatedHit[], perPull: PerPull[], game: MitigationGame): MitigationPlan {
   const byPullId = new Map(perPull.map((p) => [p.pull.id, p]));
   const planned = rows.filter((r) => !r.rare && r.pulls >= PLAN_MIN_PULLS);
@@ -207,12 +189,7 @@ export function buildMitigationPlan(rows: AggregatedHit[], perPull: PerPull[], g
     const shield = entry.statuses.some((s) => s.shield);
     const size = shield ? shieldSize.get(entry.key) : 0;
     if (size === undefined) return undefined;
-    const margins = row.byPull.map(({ hit }) => {
-      const pool = judged(hit.targets);
-      const lowest = [...pool].sort((a, b) => a.margin - b.margin)[0];
-      const gets = (t: HitTarget) => entry.reach === "party" || (entry.reach === "self" ? t.player === player : t === lowest);
-      return Math.min(...pool.map((t) => (gets(t) ? marginWith(t, entry, size, hit.damageColumn) : t.margin)));
-    }).filter(Number.isFinite);
+    const margins = row.byPull.map(({ hit }) => lowestWithAdded(hit, entry, player, size)).filter(Number.isFinite);
     if (!margins.length) return undefined;
     return { median: median(margins), worst: Math.min(...margins) };
   };

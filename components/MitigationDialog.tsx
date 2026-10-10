@@ -8,12 +8,17 @@
 // dying, and what could be dropped. No plan input and no PullErrors; this
 // replaced the Ikuya-sheet Heatmap and Review tabs on 2026-10-06.
 //
-// Two views: the full timeline (components/MitigationTimeline.tsx), the
-// default; and the opt-in Plan (components/MitigationPlan.tsx,
+// Two views (user, 2026-10-09): Analysis (components/MitigationPlan.tsx,
 // lib/mitigation/plan.ts), a short list of coordinated changes for the raid
-// lead, read from all of a group's pulls (user, 2026-10-09).
-// A role filter hides other roles' columns in the timeline and dims items
-// that don't involve that role in the plan. Both are for one boss
+// lead read from all of a group's pulls, opened first whenever the group
+// has PLAN_MIN_PULLS+ analyzable pulls; and the full Timeline
+// (components/MitigationTimeline.tsx), with a details panel for the
+// clicked hit (components/MitigationHitDetails.tsx). The timeline hides
+// uneventful hits (raid hits nobody died to, taken at full health) and,
+// across pulls, rare ones, each behind a checkbox.
+// A player selector (components/MitigationPlayerPicker.tsx) narrows the
+// timeline to one player's columns and dims Analysis items that don't
+// involve them. Both views are for one boss
 // at a time (a Boss dropdown, defaulting to the current pull's boss), and
 // for either a single pull or all of one group's pulls on that boss at once
 // (the default: one pull is too noisy to plan from). A group is an exact
@@ -21,16 +26,18 @@
 // are listed as needing a re-fetch; re-fetching stays an explicit action
 // elsewhere in the app, never triggered from here.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Pull } from "@/types/Pull";
 import { analyzePullMitigation } from "@/lib/mitigation/analyze";
 import { aggregateMitigation } from "@/lib/mitigation/aggregate";
 import { PLAN_MIN_PULLS, buildMitigationPlan } from "@/lib/mitigation/plan";
-import { PlanView, ROLE_FILTERS, roleOfSlot, type RoleFilter } from "./MitigationPlan";
+import { PlanView } from "./MitigationPlan";
+import { PlayerPicker } from "./MitigationPlayerPicker";
+import { AggregateDetails, HitDetails } from "./MitigationHitDetails";
 import { FFXIV_MITIGATION } from "@/lib/mitigation/ffxiv-catalog";
 import { useFFPullSelector } from "@/hooks/useFFPullSelector";
 import {
-  AggregateTimeline, PullTimeline, TimelineLegend, buildPlayerGroups, hasMitigationData,
+  AggregateTimeline, PullTimeline, TimelineLegend, buildPlayerGroups, hasMitigationData, rowUneventful, uneventful,
 } from "./MitigationTimeline";
 import { Dialog } from "./ui/Dialog";
 import RosterPullPicker from "./RosterPullPicker";
@@ -44,7 +51,18 @@ type MitigationDialogProps = {
   currentPullId: number | null;
 };
 
+type View = "analysis" | "timeline";
+
 const rosterKey = (pull: Pull) => pull.players.map((p) => p.name).sort().join("|");
+
+function Checkbox({ checked, onChange, children }: { checked: boolean; onChange: (v: boolean) => void; children: ReactNode }) {
+  return (
+    <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--ck-text-2)", cursor: "pointer" }}>
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      {children}
+    </label>
+  );
+}
 
 export default function MitigationDialog({ open, onClose, pulls, currentPullId }: MitigationDialogProps) {
   const { ffPulls, selectedPullId, setSelectedPullId, selectedPull } =
@@ -57,6 +75,20 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId }
     if (next.has(player)) next.delete(player); else next.add(player);
     return next;
   });
+  // The view the user picked; null until they do, so each open defaults by
+  // how many pulls there are.
+  const [viewPick, setViewPick] = useState<View | null>(null);
+  const [focus, setFocus] = useState<string | null>(null);
+  const [selectedHitId, setSelectedHitId] = useState<string | null>(null);
+  const [showUneventful, setShowUneventful] = useState(false);
+  // Hits the group rarely takes are likely mistakes, not mitigation to
+  // plan (AggregatedHit.rare): hidden unless asked for.
+  const [showRare, setShowRare] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    setViewPick(null);
+    setSelectedHitId(null);
+  }, [open]);
 
   // One boss at a time: the selected pull's boss, all pulls or one of them.
   const bosses = useMemo(() => [...new Set(ffPulls.map((p) => p.name))], [ffPulls]);
@@ -65,6 +97,7 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId }
   const pickBoss = (name: string) => {
     const pulls = ffPulls.filter((p) => p.name === name);
     if (pulls.length) setSelectedPullId(pulls[pulls.length - 1].id);
+    setViewPick(null);
   };
 
   // Within the boss, pulls are grouped by roster (every player the same), so
@@ -89,32 +122,37 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId }
     }));
   }, [open, analyzable]);
   const aggregate = useMemo(() => (allPulls ? aggregateMitigation(perPull, FFXIV_MITIGATION) : []), [allPulls, perPull]);
-  const [view, setView] = useState<"plan" | "timeline">("timeline");
-  const [role, setRole] = useState<RoleFilter>("all");
+  const view: View = viewPick ?? (allPulls && perPull.length >= PLAN_MIN_PULLS ? "analysis" : "timeline");
   const plan = useMemo(() => {
-    if (!allPulls || view !== "plan" || perPull.length < PLAN_MIN_PULLS) return null;
+    if (!allPulls || view !== "analysis" || perPull.length < PLAN_MIN_PULLS) return null;
     const byId = new Map(analyzable.map((p) => [p.id, p]));
     return buildMitigationPlan(aggregate, perPull.map((p) => ({ pull: byId.get(p.pullId)!, hits: p.hits })), FFXIV_MITIGATION);
   }, [allPulls, view, perPull, aggregate, analyzable]);
-  // Hits the group rarely takes are likely mistakes, not mitigation to
-  // plan (AggregatedHit.rare): hidden unless asked for.
-  const [showRare, setShowRare] = useState(false);
-  const rareCount = aggregate.filter((r) => r.rare).length;
-  const shownRows = showRare ? aggregate : aggregate.filter((r) => !r.rare);
+
   const groups = useMemo(() => buildPlayerGroups(allPulls ? analyzable : selectedPull ? [selectedPull] : []),
     [allPulls, analyzable, selectedPull]);
-  const roleOf = useMemo(() => {
-    const map = new Map(groups.map((g) => [g.player, roleOfSlot(g.slot)]));
-    return (player: string) => map.get(player);
-  }, [groups]);
-  // Players with no known slot stay visible under every filter.
-  const shownGroups = useMemo(() => (role === "all" ? groups : groups.filter((g) => (roleOfSlot(g.slot) ?? role) === role)),
-    [groups, role]);
+  const focusGroup = groups.find((g) => g.player === focus);
+  const shownFocus = focusGroup ? focus : null;
+  // A picked player shows only their columns, personal ones open.
+  const shownGroups = focusGroup ? [focusGroup] : groups;
+  const shownExpanded = focusGroup ? new Set([...expanded, focusGroup.player]) : expanded;
+
+  const notRare = aggregate.filter((r) => !r.rare);
+  const rareCount = aggregate.length - notRare.length;
+  const rowsAfterRare = showRare ? aggregate : notRare;
+  const quietRows = rowsAfterRare.filter(rowUneventful).length;
+  const shownRows = showUneventful ? rowsAfterRare : rowsAfterRare.filter((r) => !rowUneventful(r));
 
   if (!open) return null;
 
   const selectedHits = selectedPull ? perPull.find((p) => p.pullId === selectedPull.id)?.hits : undefined;
+  const quietHits = selectedHits?.filter(uneventful).length ?? 0;
+  const shownHits = selectedHits && !showUneventful ? selectedHits.filter((h) => !uneventful(h)) : selectedHits;
   const selectedStale = !allPulls && selectedPull !== null && !hasMitigationData(selectedPull);
+  const closeDetails = () => setSelectedHitId(null);
+  const detailRow = allPulls ? shownRows.find((r) => r.id === selectedHitId) : undefined;
+  const detailHit = !allPulls ? shownHits?.find((h) => h.id === selectedHitId) : undefined;
+  const quiet = allPulls ? quietRows : quietHits;
 
   return (
     <Dialog
@@ -132,8 +170,8 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId }
         <>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
             <div style={{ display: "flex", gap: 4 }}>
-              <button className={`ck-tab ck-tab--sm${view === "timeline" ? " ck-tab--active" : ""}`} onClick={() => setView("timeline")}>Timeline</button>
-              <button className={`ck-tab ck-tab--sm${view === "plan" ? " ck-tab--active" : ""}`} onClick={() => setView("plan")}>Plan</button>
+              <button className={`ck-tab ck-tab--sm${view === "analysis" ? " ck-tab--active" : ""}`} onClick={() => setViewPick("analysis")}>Analysis</button>
+              <button className={`ck-tab ck-tab--sm${view === "timeline" ? " ck-tab--active" : ""}`} onClick={() => setViewPick("timeline")}>Timeline</button>
             </div>
             <span className="ck-label" style={{ margin: 0 }}>Boss</span>
             <select className="ck-field" value={boss} onChange={(e) => pickBoss(e.target.value)} style={{ padding: "3px 8px" }}>
@@ -155,14 +193,7 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId }
                 setSelectedPullId(pick.pullId);
               }}
             />
-            <span className="ck-label" style={{ margin: 0 }}>Role</span>
-            <div style={{ display: "flex", gap: 4 }}>
-              {ROLE_FILTERS.map((r) => (
-                <button key={r.value} className={`ck-tab ck-tab--sm${role === r.value ? " ck-tab--active" : ""}`} onClick={() => setRole(r.value)}>
-                  {r.label}
-                </button>
-              ))}
-            </div>
+            {groups.length > 0 && <PlayerPicker groups={groups} focus={shownFocus} onPick={setFocus} />}
             {stale > 0 && (
               <span className="ck-help" style={{ margin: 0 }}>
                 {stale} of {rosterPulls.length} pulls were fetched before mitigation data was kept and are left out.
@@ -173,42 +204,55 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId }
 
           {view === "timeline" && <TimelineLegend aggregate={allPulls} />}
 
-          {view === "timeline" && allPulls && rareCount > 0 && (
-            <div className="ck-help" style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 8 }}>
-              <span>
-                {showRare ? "Showing" : "Hiding"} {rareCount} hit{rareCount > 1 ? "s" : ""} taken in under a quarter of the pulls
-                that got that far: likely mistakes, not mitigation to plan.
-              </span>
-              <button className="ck-btn ck-btn--sm" onClick={() => setShowRare((s) => !s)}>{showRare ? "Hide" : "Show"}</button>
+          {view === "timeline" && (quiet > 0 || (allPulls && rareCount > 0)) && (
+            <div style={{ marginBottom: 8, display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+              {quiet > 0 && (
+                <Checkbox checked={showUneventful} onChange={setShowUneventful}>
+                  Show {quiet} uneventful hit{quiet > 1 ? "s" : ""} (nobody died, everyone at full HP going in)
+                </Checkbox>
+              )}
+              {allPulls && rareCount > 0 && (
+                <Checkbox checked={showRare} onChange={setShowRare}>
+                  Show {rareCount} rare hit{rareCount > 1 ? "s" : ""} (taken in under a quarter of the pulls that got that far)
+                </Checkbox>
+              )}
             </div>
           )}
 
-          <div style={{ flex: "1 1 auto", minHeight: 0, overflow: "auto", border: "1px solid var(--ck-line-2)", borderRadius: 3 }}>
-            {view === "plan" ? (
-              !allPulls ? (
+          <div style={{ flex: "1 1 auto", minHeight: 0, display: "flex", border: "1px solid var(--ck-line-2)", borderRadius: 3, overflow: "hidden" }}>
+            <div style={{ flex: "1 1 auto", minWidth: 0, overflow: "auto" }}>
+              {view === "analysis" ? (
+                !allPulls ? (
+                  <p className="ck-dialog-text" style={{ padding: 12 }}>
+                    The analysis reads all of a group&apos;s pulls: one pull is too noisy to plan from.{" "}
+                    <button className="ck-btn ck-btn--sm" onClick={() => setAllPulls(true)}>Use all pulls</button>
+                  </p>
+                ) : !plan ? (
+                  <p className="ck-dialog-text" style={{ padding: 12 }}>
+                    The analysis needs at least {PLAN_MIN_PULLS} pulls with mitigation data from this group ({perPull.length} loaded).
+                    The Timeline still shows them.
+                  </p>
+                ) : <PlanView plan={plan} focus={shownFocus} />
+              ) : selectedStale ? (
                 <p className="ck-dialog-text" style={{ padding: 12 }}>
-                  The plan reads all of a group&apos;s pulls: one pull is too noisy to plan from.{" "}
-                  <button className="ck-btn ck-btn--sm" onClick={() => setAllPulls(true)}>Use all pulls</button>
+                  This pull was fetched before mitigation data was kept. Re-fetch the report to analyze it.
                 </p>
-              ) : !plan ? (
+              ) : allPulls ? (
+                analyzable.length === 0
+                  ? <p className="ck-dialog-text" style={{ padding: 12 }}>No loaded pull has mitigation data yet. Re-fetch the report to analyze it.</p>
+                  : <AggregateTimeline rows={shownRows} groups={shownGroups} expanded={shownExpanded} onToggle={toggleExpanded}
+                      selectedId={selectedHitId} onSelect={setSelectedHitId} />
+              ) : shownHits && shownHits.length > 0 ? (
+                <PullTimeline hits={shownHits} groups={shownGroups} expanded={shownExpanded} onToggle={toggleExpanded}
+                  selectedId={selectedHitId} onSelect={setSelectedHitId} />
+              ) : (
                 <p className="ck-dialog-text" style={{ padding: 12 }}>
-                  The plan needs at least {PLAN_MIN_PULLS} pulls with mitigation data from this group ({perPull.length} loaded).
-                  The Timeline still shows them.
+                  {selectedHits?.length ? "Every hit in this pull was uneventful." : "No raidwide hits in this pull."}
                 </p>
-              ) : <PlanView plan={plan} roleOf={roleOf} role={role} />
-            ) : selectedStale ? (
-              <p className="ck-dialog-text" style={{ padding: 12 }}>
-                This pull was fetched before mitigation data was kept. Re-fetch the report to analyze it.
-              </p>
-            ) : allPulls ? (
-              analyzable.length === 0
-                ? <p className="ck-dialog-text" style={{ padding: 12 }}>No loaded pull has mitigation data yet. Re-fetch the report to analyze it.</p>
-                : <AggregateTimeline rows={shownRows} groups={shownGroups} expanded={expanded} onToggle={toggleExpanded} />
-            ) : selectedHits && selectedHits.length > 0 ? (
-              <PullTimeline hits={selectedHits} groups={shownGroups} expanded={expanded} onToggle={toggleExpanded} />
-            ) : (
-              <p className="ck-dialog-text" style={{ padding: 12 }}>No raidwide hits in this pull.</p>
-            )}
+              )}
+            </div>
+            {view === "timeline" && detailRow && <AggregateDetails row={detailRow} onClose={closeDetails} />}
+            {view === "timeline" && detailHit && <HitDetails hit={detailHit} onClose={closeDetails} />}
           </div>
         </>
       )}
