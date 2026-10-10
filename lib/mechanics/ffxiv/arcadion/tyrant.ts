@@ -132,13 +132,16 @@
 //   healers, ranged) hitting 3+ others names its two baiters, 1-2 others
 //   name those; skipped once a baiter is dead. A lethal Fearsome Fireball
 //   names living non-tanks out of it, except the next drop's baiters. A rock
-//   exploding early: a tether to the rock names the living tank who took no
-//   tether that round; two comets at once name the newer comet's baiter;
+//   exploding early: a tether to the rock names the rock's baiter when it
+//   lay 5y+ off every Hector rock spot (ROCK_SPOTS) with both tanks up, else
+//   the living tank who took no tether that round; two comets at once name
+//   the newer comet's baiter;
 //   otherwise player-less; Raid at 3+ deaths. Shockwave: each player hit
 //   (Major), or a Raid when 4+ were hit at once.
 // ffxiv-tyrant-tower: a short Flatliner / Stampede tower names eligible
 //   living players in no tower (Stampede: not the carriers); player-less
-//   Minor when all were in; Raid when its explosion and DoT killed 3+. Tough
+//   Minor when all were in; Raid when its explosion and DoT killed 3+, or
+//   always for Flatliner's first two waves (user: ends the pull). Tough
 //   Break is a Raid. A non-tank killed in a kick tower with both tanks up.
 // ffxiv-tyrant-stampede: Atomic Impact on a non-carrier (both carriers up),
 //   lava (Minor; Major only when Burns killed), a lethal Mammoth Meteor.
@@ -552,6 +555,7 @@ const GREAT_WALL          = 46124;
 const COSMIC_KISS_DROP    = 46133; // Meteorain comet landing on its two baiters
 const FEARSOME_FIREBALL   = 46138;
 const FOREGONE_FATALITY   = 46134;
+const FLATLINER_CAST      = 46143;
 const FLATLINER_TOWER     = 46148;
 const FLATLINER_UNSOAKED  = 46149; // Unmitigated Explosion: a Flatliner tower short
 const STAMPEDE_TOWERS     = [46166, 46167]; // Cosmic Kiss (tank) / Weighty Impact (pair)
@@ -688,6 +692,19 @@ const PREVIEW_AMOUNT      = 1_500_000;
 // dropped on the group (B1 +313.8 and B4 +323.9 hit 4; clean drops hit only
 // their two baiters, with a third player clipped 3 times in 17 pulls).
 const KISS_ON_GROUP       = 3;
+// Hector comet rock spots (the kill's landings): the melee pair northeast and
+// southwest, healers northwest and southwest, ranged northeast and the far
+// southwest. 230 rocks: median 62 units from the nearest spot, p90 184; the
+// off-spot ones were drops retargeted after deaths, and D15's corner rock
+// (2015). A rock farther than this from every spot was misplaced.
+const ROCK_SPOTS = [[10450, 9620], [9480, 10505], [9550, 9560], [9000, 11000], [10530, 9500], [8450, 11560]];
+const ROCK_OFF_SPOT = 500;
+/** Distance from a comet's landing (its Cosmic Kiss cast) to the nearest rock spot. */
+function rockOffSpot(c: EnemyEvent): number | undefined {
+  // (10000, 10000) is FFLogs' placeholder for a cast with no position.
+  if (c.x === undefined || c.y === undefined || (c.x === 10000 && c.y === 10000)) return undefined;
+  return Math.min(...ROCK_SPOTS.map(([x, y]) => Math.hypot(c.x! - x, c.y! - y)));
+}
 // Shockwave hitting this many players at once: no rock left (D28 six; the
 // one individual miss, D75, hit one).
 const SHOCKWAVE_NO_ROCK   = 4;
@@ -1066,6 +1083,9 @@ function eyePartnerErrors(fam: Stack, res: Hit[], players: PlayerInfo[], life: L
   const targets = castsOf(casts, fam.ids).filter((c) => c.timestamp >= t - 2000 && c.timestamp <= t && c.target)
     .map((c) => players.find((p) => p.name === c.target)).filter((p): p is PlayerInfo => !!p);
   if (!targets.length || slots.size < 8) return undefined;
+  // Mixed markers (a support and a DPS) mean the assignment broke, e.g. a
+  // disconnected player (user, 2026-10-09, D19 +2:31): nobody is judged.
+  if (new Set(targets.map((p) => p.role === "DPS")).size > 1) return [];
   const dpsMarked = targets[0].role === "DPS";
   const marked = players.filter((p) => (p.role === "DPS") === dpsMarked);
   const instancesOf = (p: PlayerInfo) => new Set(res.filter((h) => h.p === p).map((h) => instanceKey(h.e)));
@@ -1299,7 +1319,9 @@ function detectBusters(players: PlayerInfo[], life: Life, casts: EnemyEvent[], s
     [FOREGONE_FATALITY, "Foregone Fatality", "The tanks intercept every Foregone Fatality tether; nobody else takes one."],
   ] as const) {
     for (const h of hitsOf(players, life, id)) {
+      // With 3+ dead the tethers land wherever (user, 2026-10-09, D14 +5:21).
       if (isTank(h.p) || !tanksHealthy(players, life, h.e.timestamp)) continue;
+      if (players.filter((p) => !life.alive(p, h.e.timestamp)).length >= STACK_DOOMED_DEAD) continue;
       errors.push(playerError(h.p, {
         ruleId: TYRANT_BUSTER_RULE_ID, severity: life.diedFrom(h.p, h.e.timestamp) ? "Major" : "Minor", name: `Took ${name}`,
         description: `Took ${name} (${kFmt(realAmount(h.e))}) while both tanks were up${diedText(h.p, h.e.timestamp)}. ${why}`,
@@ -1374,7 +1396,17 @@ function detectMeteorain(players: PlayerInfo[], life: Life, casts: EnemyEvent[],
     // at once (D15 +5:21, both tanks dead by then).
     const round = castsOf(casts, FOREGONE_FATALITY).filter((c) => c.timestamp >= t - 1500 && c.timestamp <= t);
     const toRock = round.some((c) => !c.target || !players.some((p) => p.name === c.target));
-    if (toRock) {
+    // The rock that blew: where its comet landed, and whose it was.
+    const rockKiss = castsOf(casts, COSMIC_KISS_DROP).filter((c) => c.actorName === g[0].actorName && comets.includes(c.sourceInstance) && c.timestamp < t);
+    const offSpot = rockKiss.map((c) => ({ c, d: rockOffSpot(c) })).filter((r) => r.d !== undefined && r.d > ROCK_OFF_SPOT);
+    // With a tank dead the tethers can't all be taken anyway: fallout.
+    if (toRock && offSpot.length && tanksHealthy(players, life, t)) {
+      // A rock far off its spot can't be shielded from its tether (user,
+      // 2026-10-09, D15 +5:11: the H2 dropped it in the corner, 20y off).
+      named = offSpot.map((r) => players.find((p) => p.name === r.c.target)).filter((p): p is PlayerInfo => !!p);
+      const worst = Math.max(...offSpot.map((r) => r.d!));
+      why = `Dropped their comet rock ~${yd(worst)} yalms off its spot, where the tanks couldn't get between it and its Foregone Fatality tether; the tether hit the rock and it exploded on the raid.${deathText} Each pair drops its comet at its own spot (Hector: northeast, northwest, and the southwest line).`;
+    } else if (toRock) {
       const tookOne = new Set(hitsOf(players, life, FOREGONE_FATALITY, t - 1500, t + 500).map((h) => h.p));
       named = players.filter((p) => isTank(p) && !tookOne.has(p) && !tankOutRecently(life, p, t));
       why = `Didn't intercept their Foregone Fatality tether, so it hit a comet rock, which exploded on the raid.${deathText} The tanks take every tether (Hector: MT the northeast and northwest ones, OT the southwest).`;
@@ -1389,7 +1421,7 @@ function detectMeteorain(players: PlayerInfo[], life: Life, casts: EnemyEvent[],
     }
     for (const p of named) {
       errors.push(playerError(p, {
-        ruleId: TYRANT_METEORAIN_RULE_ID, severity: "Major", name: toRock ? "Missed Foregone Fatality Tether" : "Comet Dropped on a Rock",
+        ruleId: TYRANT_METEORAIN_RULE_ID, severity: "Major", name: toRock ? (offSpot.length ? "Comet Rock Off Its Spot" : "Missed Foregone Fatality Tether") : "Comet Dropped on a Rock",
         description: why, timestamp: t, abilityId: ROCK_EXPLOSION, abilityName: "Unmitigated Explosion",
       }));
     }
@@ -1467,9 +1499,18 @@ function detectTowers(players: PlayerInfo[], life: Life, casts: EnemyEvent[], de
           `${plural(g.length, w.label)} went off short (Unmitigated Explosion) with every living player already in a tower: earlier deaths left too few soakers.${deathText}`,
           t, w.penalty, "Unmitigated Explosion"));
       }
-      if (killed.length >= MASS_DEATHS) {
+      // A short tower in Flatliner's first or second wave ends the pull on the
+      // spot (user, 2026-10-09, D35 +6:32): its DoT runs into the next wave.
+      // The third was survived (B11, B15, C12 +7:41), so it needs 3 deaths.
+      // Waves land +30s / +62s / +100s after the Flatliner cast (kill).
+      const flat = castsOf(casts, FLATLINER_CAST).filter((c) => c.timestamp < t).pop();
+      const wave = w.penalty === FLATLINER_UNSOAKED && flat ? (t - flat.timestamp < 45_000 ? 1 : t - flat.timestamp < 80_000 ? 2 : 3) : 0;
+      if (killed.length >= MASS_DEATHS || (wave >= 1 && wave <= 2)) {
         errors.push(raidMarker(TYRANT_TOWER_RULE_ID, `${w.label} Short`,
-          `The unsoaked ${w.label} killed ${killed.length} (${joinNames(killed)}). Unresolvable from here.`, t, w.penalty, "Unmitigated Explosion"));
+          killed.length >= MASS_DEATHS
+            ? `The unsoaked ${w.label} killed ${killed.length} (${joinNames(killed)}). Unresolvable from here.`
+            : `A tower in Flatliner's ${wave === 1 ? "first" : "second"} wave went off short; its damage-over-time runs into the next wave. Treated as the cutoff point.`,
+          t, w.penalty, "Unmitigated Explosion"));
       }
     }
   }
