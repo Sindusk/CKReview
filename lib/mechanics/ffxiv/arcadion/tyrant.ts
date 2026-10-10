@@ -8,7 +8,15 @@
 // B23 +9:36 (report letter, pull, mm:ss from pull start):
 //   A = d3vRbwfpNBLzJ2Xh (33 wipes, never past One and Only ~4:05),
 //   B = L3YxvqnNVdzBcj7t (35 wipes, roster change; enraged 4 times),
-//   C = gmX1Ac9PqWdfDR7B (19 wipes + the kill, C20, 11:01).
+//   C = gmX1Ac9PqWdfDR7B (19 wipes + the kill, C20, 11:01),
+//   D = G6PDJfcX98CpTkBy (76 wipes, report A's roster; mostly Meteorain and
+//       the Flatliner split, never past Avalanche).
+// Report D added: a Foregone Fatality tether nobody intercepts targets a
+// comet rock ("Comet" as the cast target) and the rock blows up the raid
+// (Unmitigated Explosion 46135; D15, D61 +5:11); a comet dropped onto an
+// earlier rock does the same, two comets exploding at once (D48 +5:23, D69
+// +5:14); Shockwave 46141 does hit when nobody hides (D28 +5:47 five, no rock
+// left; D75 +5:49 one); Great Wall's trail Explosion 46126 gives Damage Down.
 // Roster slots (user): MT PLD, OT DRK, H1 AST, H2 SGE, M1 RPR, M2 DRG,
 // R1 DNC, R2 caster; the OT and R2 players changed between reports. Mostly
 // Hector (user, "can't recall for sure"). Slots come from roles.ts with
@@ -120,10 +128,14 @@
 //   (the one on the other's side, MT west / OT east, else both), a cone
 //   through 3+ non-tanks (its tank, or the tank holding no cone when no tank
 //   was in it), 1-2 non-tanks in a cone (them).
-// ffxiv-tyrant-meteorain: comet drop k (melee, healers, ranged) hitting 3+
-//   others names its two baiters, 1-2 others name those; skipped once a
-//   baiter is dead. A lethal Fearsome Fireball names living non-tanks out of
-//   it, except the next drop's baiters.
+// ffxiv-tyrant-meteorain: comet drop k (its two cast targets, else melee,
+//   healers, ranged) hitting 3+ others names its two baiters, 1-2 others
+//   name those; skipped once a baiter is dead. A lethal Fearsome Fireball
+//   names living non-tanks out of it, except the next drop's baiters. A rock
+//   exploding early: a tether to the rock names the living tank who took no
+//   tether that round; two comets at once name the newer comet's baiter;
+//   otherwise player-less; Raid at 3+ deaths. Shockwave: each player hit
+//   (Major), or a Raid when 4+ were hit at once.
 // ffxiv-tyrant-tower: a short Flatliner / Stampede tower names eligible
 //   living players in no tower (Stampede: not the carriers); player-less
 //   Minor when all were in; Raid when its explosion and DoT killed 3+. Tough
@@ -545,6 +557,8 @@ const FLATLINER_UNSOAKED  = 46149; // Unmitigated Explosion: a Flatliner tower s
 const STAMPEDE_TOWERS     = [46166, 46167]; // Cosmic Kiss (tank) / Weighty Impact (pair)
 const STAMPEDE_UNSOAKED   = 46168;
 const SUSTAINED_DAMAGE    = 1004149; // the unsoaked tower's raid DoT
+const ROCK_EXPLOSION      = 46135; // Unmitigated Explosion: a comet rock destroyed early
+const SHOCKWAVE           = 46141; // Triple Tyrannhilation, blocked by a rock
 const ATOMIC_IMPACT       = 46164;
 const MAMMOTH_METEOR      = 46163;
 const TWO_WAY             = 47038;
@@ -581,6 +595,8 @@ const AVOIDABLE: Record<number, Avoidable> = {
     why: "Fire and Fury cleaves the boss's front and back; stand on its flanks." },
   46129: { name: "Fire and Fury", hit: "Hit by Fire and Fury (the boss's front/back cones)",
     why: "Fire and Fury cleaves the boss's front and back; stand on its flanks." },
+  46126: { name: "Explosion (Great Wall trail)", hit: "Caught in Great Wall of Fire's trailing explosion",
+    why: "Each Great Wall line leaves a delayed explosion along its path; step off the line after the buster." },
   46136: { name: "Explosion (spent comet)", hit: "Caught in a spent Meteorain comet's explosion",
     why: "A comet that absorbed a Fearsome Fireball explodes a moment later; step away from it." },
   46145: { name: "Majestic Meteor", hit: "Hit by a Majestic Meteor puddle",
@@ -672,6 +688,9 @@ const PREVIEW_AMOUNT      = 1_500_000;
 // dropped on the group (B1 +313.8 and B4 +323.9 hit 4; clean drops hit only
 // their two baiters, with a third player clipped 3 times in 17 pulls).
 const KISS_ON_GROUP       = 3;
+// Shockwave hitting this many players at once: no rock left (D28 six; the
+// one individual miss, D75, hit one).
+const SHOCKWAVE_NO_ROCK   = 4;
 // A stack taken by one or two players while this many eligible players stood
 // elsewhere went to the wrong place itself.
 const STACK_LEFT_GROUP = 3;
@@ -700,6 +719,9 @@ const SCYTHE_CAST = 46105;
 // A17 77 vs 8, A32 52 vs 6; ambiguous A21 20 vs 17).
 const SPOT_MIN = { impact: 250, scytheClock: 15 };
 const SPOT_CLEAR = { impact: (w: number, s: number) => w >= 1.8 * s, scytheClock: (w: number, s: number) => w - s >= 10 };
+// A tank this far onto their own side of the boss for the scythe Raw Steel
+// (MT west, OT east) is on it.
+const TANK_SIDE_MARGIN = 150;
 // Eye of the Hurricane partners (Hector): MT/M1, OT/M2, H1/R1, H2/R2.
 const EYE_PARTNER: Record<FFRoleSlot, FFRoleSlot> = { MT: "M1", M1: "MT", OT: "M2", M2: "OT", H1: "R1", R1: "H1", H2: "R2", R2: "H2" };
 // Hits closer together than this are one avoidable episode for a player.
@@ -1178,7 +1200,8 @@ function detectBusters(players: PlayerInfo[], life: Life, casts: EnemyEvent[], s
   // with the tanks (with a tank down it retargets: fallout).
   for (const res of clusterByGap(hitsOf(players, life, RAW_STEEL_AXE), (h) => h.e.timestamp, 1500)) {
     const t = res[0].e.timestamp;
-    if (!tanksHealthy(players, life, t)) continue;
+    // A tank dying to this same Raw Steel still held enmity at the cast (A3).
+    if (!tanksHealthy(players, life, t - DIED_FROM_HIT_MS)) continue;
     for (const h of res.filter((x) => !isTank(x.p))) {
       errors.push(playerError(h.p, {
         ruleId: TYRANT_BUSTER_RULE_ID, severity: life.diedFrom(h.p, t) ? "Major" : "Minor", name: "In the Tank Buster",
@@ -1190,7 +1213,8 @@ function detectBusters(players: PlayerInfo[], life: Life, casts: EnemyEvent[], s
   // Scythe Raw Steel: a cone on each of the top two enmity players.
   for (const res of clusterByGap(hitsOf(players, life, RAW_STEEL_SCYTHE), (h) => h.e.timestamp, 1500)) {
     const t = res[0].e.timestamp;
-    if (!tanksHealthy(players, life, t)) continue;
+    // A tank dying to this same Raw Steel still held enmity at the cast (A3).
+    if (!tanksHealthy(players, life, t - DIED_FROM_HIT_MS)) continue;
     const owners = castOwners(casts, [RAW_STEEL_SCYTHE], res, players);
     const byInst = new Map<string, Hit[]>();
     for (const h of res) byInst.set(instanceKey(h.e), [...(byInst.get(instanceKey(h.e)) ?? []), h]);
@@ -1203,7 +1227,9 @@ function detectBusters(players: PlayerInfo[], life: Life, casts: EnemyEvent[], s
     if (doubled.length === 2 && boss) {
       const wrong = doubled.filter((p) => {
         const x = res.find((h) => h.p === p)?.e.x;
-        return x !== undefined && (slots.get(p) === "MT" ? x > boss.x! : x < boss.x!);
+        // Centered counts as wrong (user: A3 +0:26 the OT moved to the MT's
+        // side, 0.1y east of the boss; the MT was 5.1y west).
+        return x !== undefined && (slots.get(p) === "MT" ? x > boss.x! - TANK_SIDE_MARGIN : x < boss.x! + TANK_SIDE_MARGIN);
       });
       if (wrong.length === 1) doubled = wrong;
     }
@@ -1293,7 +1319,7 @@ function detectBusters(players: PlayerInfo[], life: Life, casts: EnemyEvent[], s
  * Fireball charges are shared by every non-tank except the next drop's
  * baiters (clean: 6 / 4 / 4 / 6, tanks on the first).
  */
-function detectMeteorain(players: PlayerInfo[], life: Life): PullError[] {
+function detectMeteorain(players: PlayerInfo[], life: Life, casts: EnemyEvent[], deaths: DeathEvent[]): PullError[] {
   const errors: PullError[] = [];
   const isBaiter = (p: PlayerInfo, k: number) =>
     p.role === (k === 1 ? "Healer" : "DPS") && (k === 1 || (k === 0 ? p.rangeType === "Melee" : p.rangeType !== "Melee"));
@@ -1301,19 +1327,22 @@ function detectMeteorain(players: PlayerInfo[], life: Life): PullError[] {
   drops.forEach((res, k) => {
     if (k > 2) return;
     const t = res[0].e.timestamp;
-    const baiters = players.filter((p) => isBaiter(p, k));
+    // The comets' casts name their baiters (report D's early pulls used
+    // other pairs, e.g. D15 a healer and a melee first); else the role order.
+    const targeted = uniq(castsOf(casts, COSMIC_KISS_DROP).filter((c) => c.timestamp >= t - 1500 && c.timestamp <= t && c.target)
+      .map((c) => players.find((p) => p.name === c.target)).filter((p): p is PlayerInfo => !!p));
+    const baiters = targeted.length === 2 ? targeted : players.filter((p) => isBaiter(p, k));
     if (baiters.length !== 2 || !baiters.every((p) => life.hitAlive(p, t))) return; // retargeted: fallout
     const extra = uniq(res.map((h) => h.p)).filter((p) => !baiters.includes(p));
     if (!extra.length) return;
     const killed = uniq(res.map((h) => h.p)).filter((p) => life.diedFrom(p, t)?.killingAbilityGameId === COSMIC_KISS_DROP);
     const severity = killed.length ? "Major" : "Minor";
     const deathText = killed.length ? ` ${namesOf(killed)} died (the earlier comets' Physical Vulnerability Up makes a second hit deadly).` : "";
-    const role = ["melee", "healer", "ranged"][k];
     if (extra.length >= KISS_ON_GROUP) {
       for (const p of baiters) {
         errors.push(playerError(p, {
           ruleId: TYRANT_METEORAIN_RULE_ID, severity, name: "Dropped Comet on the Party",
-          description: `Comet drop ${k + 1} (the ${role} pair: ${namesOf(baiters)}) also hit ${namesOf(extra)}.${deathText} The baiters carry their comets out to their own corners before they land.`,
+          description: `Comet drop ${k + 1} (${namesOf(baiters)}) also hit ${namesOf(extra)}.${deathText} The baiters carry their comets out to their own corners before they land.`,
           timestamp: t, abilityId: COSMIC_KISS_DROP, abilityName: "Cosmic Kiss",
         }));
       }
@@ -1322,11 +1351,76 @@ function detectMeteorain(players: PlayerInfo[], life: Life): PullError[] {
     for (const p of extra) {
       errors.push(playerError(p, {
         ruleId: TYRANT_METEORAIN_RULE_ID, severity: life.diedFrom(p, t) ? "Major" : "Minor", name: "Clipped by a Comet",
-        description: `Stood under comet drop ${k + 1}, the ${role} pair's (${namesOf(baiters)}).${deathText} Only the two baiters may be under each comet.`,
+        description: `Stood under comet drop ${k + 1}, ${namesOf(baiters)}'s.${deathText} Only the two baiters may be under each comet.`,
         timestamp: t, abilityId: COSMIC_KISS_DROP, abilityName: "Cosmic Kiss",
       }));
     }
   });
+  // A rock destroyed early (Unmitigated Explosion 46135) blasts the raid
+  // (D15, D61 +5:11 killed 6-7). Two causes in report D:
+  // - a Foregone Fatality tether nobody intercepted: its cast targets the
+  //   rock instead of a player (D15, D19, D57, D61, D67); the tank who took no
+  //   tether that round missed it.
+  // - a new comet landing on an earlier rock: two comets explode together
+  //   (D48 +5:23, D69 +5:14); the new comet's baiter dropped it there.
+  for (const g of clusterByGap(castsOf(casts, ROCK_EXPLOSION), (c) => c.timestamp, 1000)) {
+    const t = g[0].timestamp;
+    const killed = uniq(deaths.filter((d) => d.killingAbilityGameId === ROCK_EXPLOSION && d.timestamp >= t && d.timestamp <= t + 4000).map((d) => d.player));
+    const deathText = killed.length ? ` The explosion killed ${joinNames(killed)}.` : "";
+    const comets = uniq(g.map((c) => c.sourceInstance));
+    let named: PlayerInfo[] = [];
+    let why = "";
+    // A tether to a rock explains it first: two tethers can blow two rocks
+    // at once (D15 +5:21, both tanks dead by then).
+    const round = castsOf(casts, FOREGONE_FATALITY).filter((c) => c.timestamp >= t - 1500 && c.timestamp <= t);
+    const toRock = round.some((c) => !c.target || !players.some((p) => p.name === c.target));
+    if (toRock) {
+      const tookOne = new Set(hitsOf(players, life, FOREGONE_FATALITY, t - 1500, t + 500).map((h) => h.p));
+      named = players.filter((p) => isTank(p) && !tookOne.has(p) && !tankOutRecently(life, p, t));
+      why = `Didn't intercept their Foregone Fatality tether, so it hit a comet rock, which exploded on the raid.${deathText} The tanks take every tether (Hector: MT the northeast and northwest ones, OT the southwest).`;
+    } else if (comets.length >= 2) {
+      const kisses = castsOf(casts, COSMIC_KISS_DROP).filter((c) => c.actorName === g[0].actorName && comets.includes(c.sourceInstance) && c.target && c.timestamp < t);
+      const newest = kisses[kisses.length - 1];
+      const owner = newest && players.find((p) => p.name === newest.target);
+      if (owner) {
+        named = [owner];
+        why = `Dropped their comet onto an earlier rock; both exploded.${deathText} Each pair carries its comet to its own spot, clear of the rocks already down.`;
+      }
+    }
+    for (const p of named) {
+      errors.push(playerError(p, {
+        ruleId: TYRANT_METEORAIN_RULE_ID, severity: "Major", name: toRock ? "Missed Foregone Fatality Tether" : "Comet Dropped on a Rock",
+        description: why, timestamp: t, abilityId: ROCK_EXPLOSION, abilityName: "Unmitigated Explosion",
+      }));
+    }
+    if (!named.length) {
+      errors.push(playerlessMinor(TYRANT_METEORAIN_RULE_ID, "Comet Rock Exploded",
+        `A comet rock exploded early (Unmitigated Explosion) and the log doesn't show whose it was.${deathText}`, t, ROCK_EXPLOSION, "Unmitigated Explosion"));
+    }
+    if (killed.length >= MASS_DEATHS) {
+      errors.push(raidMarker(TYRANT_METEORAIN_RULE_ID, "Comet Rock Exploded",
+        `A comet rock's explosion killed ${killed.length} (${joinNames(killed)}). Unresolvable from here.`, t, ROCK_EXPLOSION, "Unmitigated Explosion"));
+    }
+  }
+  // Triple Tyrannhilation's Shockwaves hit whoever isn't behind a rock (none
+  // in reports A-C; D75 +5:49 one player). Four or more at once means no
+  // rock was left to hide behind (D28 +5:47, six hit).
+  for (const res of clusterByGap(hitsOf(players, life, SHOCKWAVE), (h) => h.e.timestamp, 2500)) {
+    const t = res[0].e.timestamp;
+    const hit = uniq(res.map((h) => h.p));
+    if (hit.length >= SHOCKWAVE_NO_ROCK) {
+      errors.push(raidMarker(TYRANT_METEORAIN_RULE_ID, "No Rock Left for the Shockwaves",
+        `Triple Tyrannhilation's Shockwave hit ${hit.length} players (${namesOf(hit)}): no comet rock was left to hide behind. Unresolvable from here.`, t, SHOCKWAVE, "Shockwave"));
+      continue;
+    }
+    for (const p of hit) {
+      errors.push(playerError(p, {
+        ruleId: TYRANT_METEORAIN_RULE_ID, severity: "Major", name: "Not Behind a Rock",
+        description: `Hit by Triple Tyrannhilation's Shockwave (${kFmt(res.filter((h) => h.p === p).reduce((s, h) => s + realAmount(h.e), 0))})${life.diedFrom(p, t) ? ", and died" : ""}. Each Shockwave is blocked by a comet rock; hide behind the rearmost southwest rock for all three.`,
+        timestamp: t, abilityId: SHOCKWAVE, abilityName: "Shockwave",
+      }));
+    }
+  }
   for (const res of clusterByGap(hitsOf(players, life, FEARSOME_FIREBALL), (h) => h.e.timestamp, 1500)) {
     const t = res[0].e.timestamp;
     const killed = uniq(res.map((h) => h.p)).filter((p) => life.diedFrom(p, t)?.killingAbilityGameId === FEARSOME_FIREBALL);
@@ -1511,7 +1605,7 @@ export function detectTyrantErrors(players: PlayerInfo[], deathEvents: DeathEven
     ...detectStacks(players, life, enemyCasts, carriers, slots),
     ...detectFireballFronts(players, life),
     ...detectBusters(players, life, enemyCasts, slots),
-    ...detectMeteorain(players, life),
+    ...detectMeteorain(players, life, enemyCasts, deathEvents),
     ...detectTowers(players, life, enemyCasts, deathEvents, carriers),
     ...detectStampede(players, life, deathEvents, called, carriers),
     ...detectFalls(players, deathEvents, called),

@@ -196,6 +196,8 @@ export const ERROR_RULES: PullErrorRule[] = [
       46099,   // Cometite
       46104, 46105, 46106,                                   // Assault Evolved axe / scythe / sword
       46112,   // Explosion (Dance of Domination lines)
+      46126,   // Explosion (Great Wall trail)
+      46135,   // Unmitigated Explosion (comet rock destroyed early)
       46118,   // Charybdis (tornado)
       46128, 46129,                                          // Fire and Fury
       46131,   // Orbital Omen
