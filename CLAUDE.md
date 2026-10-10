@@ -89,8 +89,9 @@ These are standing preferences, each learned from a real correction:
   - what detection currently says, with the players it names
   - the exact thing to look at
 
-  Group the items under mechanic headings, but keep the numbering
-  continuous across the headings.
+  Order the items by pull, not by mechanic. When the same question
+  applies to several pulls, ask it once, at the first pull. If the user's
+  answer doesn't settle the later pulls, raise those in the next turn.
 - **Narrow overrides, not wholesale replacement.** When a working mechanism
   fails for one specific case, add a scoped override for that case. Don't
   swap the whole mechanism.
