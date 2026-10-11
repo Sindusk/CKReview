@@ -1,9 +1,22 @@
 # VOD coverage and re-sync points (build plan)
 
-Status: **planned 2026-10-11, not started.**
+Status: **built 2026-10-11.** Archived as the design record; the live
+description is [app-architecture.md](../app-architecture.md), "VOD
+playback", and the header of `lib/vod-sync.ts`.
+
+Decided during the build (user, 2026-10-11), beyond the plan below:
+- **An unsynced VOD on screen is never swapped away from.** Picking a pull
+  is how the user starts syncing it.
+- **No coverage pauses and holds.** The player pauses and ignores seeks,
+  and the timeline skips its auto-seek and pull detection, so the paused
+  video can't select its own pull again and hide the card. Picking
+  another pull or VOD lifts the hold.
+- **A VOD picked by hand that doesn't cover the pull gets the same card**,
+  naming the synced VODs that do, with buttons to switch. Nothing swaps,
+  since the user chose that VOD.
 
 Read first:
-- [docs/app-architecture.md](app-architecture.md), "VOD playback"
+- [docs/app-architecture.md](../app-architecture.md), "VOD playback"
 - the comments in `hooks/useTimelineController.ts` (the seek target is
   computed during render, and there's seek ping-pong protection)
 - `components/VideoPanel.tsx` (the `seekOnceReady` YouTube quirk)

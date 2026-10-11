@@ -26,7 +26,6 @@ sampling it.
 | Mitigation Analysis auto-optimizer (build plan) | [docs/mitigation-optimizer-plan.md](docs/mitigation-optimizer-plan.md) |
 | Tanking panel (build plan; after the optimizer) | [docs/tanking-panel-plan.md](docs/tanking-panel-plan.md) |
 | Per-player exposure: targeted / assigned mechanics in Statics (build plan) | [docs/exposure-plan.md](docs/exposure-plan.md) |
-| VOD coverage, auto-swap between VODs, re-sync points (build plan) | [docs/vod-coverage-plan.md](docs/vod-coverage-plan.md) |
 | Local video files as VOD sources (build plan) | [docs/local-vod-plan.md](docs/local-vod-plan.md) |
 | What's unfinished or waiting on a user decision | [docs/open-items.md](docs/open-items.md) |
 | Which ports are taken locally and in production | [PORTS.md](PORTS.md) |

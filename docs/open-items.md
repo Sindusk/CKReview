@@ -714,10 +714,17 @@ grouped by exact roster. The module headers hold the rules.
 
 ## App
 
-- **VOD coverage planned (user, 2026-10-11):**
-  [vod-coverage-plan.md](vod-coverage-plan.md). It covers auto-swap to a
-  synced VOD that covers the selected pull, a clear error when none does,
-  and "re-sync from this pull" for stream dropouts.
+- **VOD coverage built 2026-10-11, awaiting the user's check in the app**
+  ([archive/vod-coverage-plan.md](archive/vod-coverage-plan.md)). It adds
+  auto-swap to a synced VOD that covers the picked pull, the no-coverage
+  card, sidebar ranges, and "Re-sync from this pull" for stream dropouts.
+  Open points:
+  - Not exercised against real split VODs or a real dropout yet.
+  - A VOD's length is recorded from the playback loop the first time
+    `getDuration() > 0`. If YouTube briefly reports the previous video's
+    length right after a `loadVideoById` swap, the wrong length would
+    stick. The readiness poll relies on the same signal and works, so
+    this is unlikely. If a sidebar range looks wrong, check this first.
 - **Statics:**
   - Importing a different log keeps the previous report's VOD list on
     screen, and it gets saved into the new session.

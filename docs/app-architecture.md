@@ -200,6 +200,37 @@ file's header comment. Mechanic detection has its own guide:
   position; changing pull resets it.
 - **Auto pull-detection.** It ignores readings until the player lands
   within 2s of a manual seek (or 4s pass), which prevents seek ping-pong.
+- **Sync points, not one offset** (`lib/vod-sync.ts`; design record in
+  [archive/vod-coverage-plan.md](archive/vod-coverage-plan.md)). A VOD
+  holds `{ fromTime, offset }` points, with `fromTime` in report seconds,
+  because live polling renumbers pulls.
+  - A pull uses the last point at or before its start, or the first point
+    when none qualifies.
+  - "Re-sync from this pull" (beside Unsync) adds a point. It exists for
+    stream dropouts that skip ~20s of video. The pull the skip happens in
+    may stay off.
+  - Every report↔video conversion must go through the helpers there.
+    `Vod.offset` and `isCalibrated` are derived (first point / any point)
+    and kept in step by `withSyncPoints()`.
+  - Persistence: sessions save `syncPoints` and `durationSec`, and still
+    write `offset` for older clients. Local files keep the same as JSON in
+    their localStorage entry, which still reads the old plain-number
+    format.
+- **Coverage.** A synced VOD covers a pull when the pull's start maps into
+  `0..durationSec`. The length is recorded from VideoPanel's playback loop
+  the first time the player reports it; until then only the start is
+  checked.
+  - **Picking a pull from the list** (`handleSelectPullFromList`, never
+    auto-detection) swaps to a covering synced VOD: the same player
+    first, then sidebar order. A brief note on the video says why. An
+    unsynced VOD on screen is never swapped away from.
+  - **No coverage, or a hand-picked VOD that doesn't cover the pull,**
+    shows a card instead of the video. The timeline gets `hold`: no
+    auto-seek and no detection. VideoPanel pauses, ignores seeks, and
+    never starts playback in its async ready paths. Without the hold, the
+    paused video's own pull would be auto-detected and hide the card.
+  - Natural playback past a VOD's end just stops.
+  - The sidebar's VOD cards show each synced VOD's covered pulls.
 - **VOD card titles.** They come from YouTube's keyless `oembed` endpoint
   and are cached in memory. Local VODs show the file name and have no
   transcript button.
