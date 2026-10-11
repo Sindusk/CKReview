@@ -38,6 +38,10 @@
 //      when nothing is failing or tight in the window (user, 2026-10-11):
 //      otherwise its moves only spend headroom
 //   4. fewer changes, at most PLAN_MAX_CHANGES
+//   5. less headroom taken off other hits (median and worst-pull drops,
+//      summed), so a free extra use always beats moving a cast away from
+//      where it is used (user, 2026-10-11: Reprisal was moved from 1:04 to
+//      5:09 when it was free again three times over)
 // Healing and mechanic hits are left out of tiers 1-2.
 //
 // ── Hard constraint ────────────────────────────────────────────────────
@@ -157,6 +161,18 @@ export function partySetup(window: WindowPull[], allHits: MitigationHit[][], gam
   const shieldSizes = medianShieldSizes(allHits, game);
   const cap = (x: number) => Math.min(x, MARGIN_UNDER);
   let freeMode = false;
+  let baseEv: PlanEvaluation | undefined;
+  // Headroom a plan takes off hits (median and worst pull, summed), so a
+  // free extra use beats moving a cast that is needed where it is.
+  const spent = (ev: PlanEvaluation) => {
+    let s = 0;
+    if (!baseEv) return s;
+    for (const [id, b] of baseEv.hits) {
+      const e = ev.hits.get(id)!;
+      s += Math.max(0, b.median - e.median) + Math.max(0, b.worst - e.worst);
+    }
+    return s;
+  };
   const problem: OptimizerProblem = {
     game, reach, window, anchors, shieldSizes, maxChanges: PLAN_MAX_CHANGES, freeShifts: false,
     eligible: (entry, player) => partyEligible(entry) && (!only || only(entry, player)),
@@ -170,7 +186,7 @@ export function partySetup(window: WindowPull[], allHits: MitigationHit[][], gam
         failSum += cap(e.median);
         tightSum += cap(e.worst);
       }
-      return [-fail, failSum, -tight, tightSum, freeMode ? ev.freedom : 0, -ev.changes.length];
+      return [-fail, failSum, -tight, tightSum, freeMode ? ev.freedom : 0, -ev.changes.length, -spent(ev)];
     },
     constraint: (base, ev) => {
       for (const [id, b] of base.hits) {
@@ -190,6 +206,7 @@ export function partySetup(window: WindowPull[], allHits: MitigationHit[][], gam
   };
   const { ctxs, baseline } = prepareProblem(problem);
   const base = evaluatePlan(problem, ctxs, []);
+  baseEv = base;
   freeMode = !anchors.some((r) => problem.needsHelp(base, r.id));
   problem.freeShifts = freeMode;
   return { problem, classes, ctxs, baseline, base };
