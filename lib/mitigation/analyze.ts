@@ -683,24 +683,78 @@ export function marginWithout(
   column: Column,
   rollBuffer = 1,
 ): { margin: number; sequenceMargin: number } {
+  return marginWith(target, removeKeys, [], game, column, rollBuffer);
+}
+
+/** A mitigation added to a target in marginWith. */
+export type AddedMitigation = {
+  entry:   CatalogEntry;
+  // What an added shield absorbs (its capacity isn't logged, so the caller
+  // estimates it); ignored for an entry with no shield status.
+  shield:  number;
+  // Limits the % to some parts (a boss debuff reaches only the attacks its
+  // evidence allows: debuff-reach.ts). Default: every part.
+  applies?: (part: HitPart) => boolean;
+};
+
+/**
+ * A target's margin with some mitigations removed and others added, in one
+ * pass (the optimizer's evaluation; marginWithout and marginWithAdded are
+ * the one-sided cases). Per part, every part taken to land at once:
+ *   - a removed % status divides out of the logged damage before shields;
+ *     a removed shield gives back what it absorbed.
+ *   - an added % status scales that damage by the part's own column
+ *     (`column` is the fallback); unaspected ("none") damage takes shields
+ *     only.
+ *   - `rollBuffer` scales the rebuilt damage (DAMAGE_ROLL_BUFFER for
+ *     planning, 1 for "what would have happened").
+ * Added shields then subtract their size from the target's total.
+ * `sequenceMargin` also scales the target's laterDrop by the removed %
+ * mitigations (assumed to cover the follow-up too; conservative when they
+ * didn't). Added ones don't scale it.
+ * `game` is needed only when something is removed.
+ */
+export function marginWith(
+  target: HitTarget,
+  removeKeys: Set<string>,
+  add: AddedMitigation[],
+  game: MitigationGame | undefined,
+  column: Column,
+  rollBuffer = 1,
+): { margin: number; sequenceMargin: number } {
   let toHealthTotal = 0;
   let factor = 1;
   for (const part of target.parts) {
     let shieldBack = 0;
-    for (const a of part.shieldAbsorbs) {
-      const s = game.statusIndex.get(a.statusId);
-      if (s && removeKeys.has(s.entry.key)) shieldBack += a.amount;
-    }
     factor = 1;
-    for (const id of new Set(part.statusIds)) {
-      const s = game.statusIndex.get(id);
-      if (!s || !removeKeys.has(s.entry.key)) continue;
-      const r = statusReduction(id, game, part.column ?? column);
-      if (r < 1) factor *= 1 - r;
+    if (removeKeys.size > 0) {
+      for (const a of part.shieldAbsorbs) {
+        const s = game!.statusIndex.get(a.statusId);
+        if (s && removeKeys.has(s.entry.key)) shieldBack += a.amount;
+      }
+      for (const id of new Set(part.statusIds)) {
+        const s = game!.statusIndex.get(id);
+        if (!s || !removeKeys.has(s.entry.key)) continue;
+        const r = statusReduction(id, game!, part.column ?? column);
+        if (r < 1) factor *= 1 - r;
+      }
     }
-    const beforeShields = (part.damage + part.absorbed) / factor * rollBuffer;
+    const col = part.column ?? column;
+    let added = 1;
+    if (col !== "none") {
+      for (const a of add) {
+        if (a.applies && !a.applies(part)) continue;
+        for (const s of a.entry.statuses) {
+          if (s.shield) continue;
+          added *= 1 - (col ? s[col] : Math.min(s.physical, s.magical));
+        }
+      }
+    }
+    const beforeShields = (part.damage + part.absorbed) / factor * rollBuffer * added;
     toHealthTotal += Math.max(0, beforeShields - (part.absorbed - shieldBack));
   }
+  const shields = add.reduce((s, a) => s + (a.entry.statuses.some((x) => x.shield) ? a.shield : 0), 0);
+  toHealthTotal = Math.max(0, toHealthTotal - shields);
   const margin = (target.healthBefore - toHealthTotal) / target.maxHealth;
   return { margin, sequenceMargin: margin - target.laterDrop / factor * rollBuffer };
 }
@@ -713,21 +767,8 @@ export function marginWithout(
  * attacks its evidence allows: debuff-reach.ts).
  */
 export function marginWithAdded(t: HitTarget, entry: CatalogEntry, shieldAmount: number, column: Column,
-  applies: (part: HitPart) => boolean = () => true): number {
-  let toHealth = 0;
-  for (const part of t.parts) {
-    const col = part.column ?? column;
-    let factor = 1;
-    if (col !== "none" && applies(part)) {
-      for (const s of entry.statuses) {
-        if (s.shield) continue;
-        factor *= 1 - (col ? s[col] : Math.min(s.physical, s.magical));
-      }
-    }
-    toHealth += Math.max(0, (part.damage + part.absorbed) * factor - part.absorbed);
-  }
-  toHealth = Math.max(0, toHealth - shieldAmount);
-  return (t.healthBefore - toHealth) / t.maxHealth;
+  applies?: (part: HitPart) => boolean): number {
+  return marginWith(t, new Set(), [{ entry, shield: shieldAmount, applies }], undefined, column).margin;
 }
 
 /**
