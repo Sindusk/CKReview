@@ -313,7 +313,8 @@ export function simulateCharges(casts: number[], entry: CatalogEntry): { accepte
   return { accepted, rejected };
 }
 
-function chargesAt(casts: number[], entry: CatalogEntry, atMs: number): ChargeState {
+/** Charges left at `atMs` and when the next one comes back (Infinity when full). */
+export function chargesAt(casts: number[], entry: CatalogEntry, atMs: number): ChargeState {
   const state: ChargeState = { charges: entry.charges ?? 1, nextReadyMs: Infinity };
   for (const t of casts) {
     if (t > atMs) break;

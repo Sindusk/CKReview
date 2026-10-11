@@ -649,6 +649,26 @@ MECHANICS['mitigation-analysis'] = {
           ` | ${assigned || '-'}`);
       }
       console.log(`    baseline vs aggregate mismatches: ${mismatches}`);
+      const t0 = Date.now();
+      const opt = mod.partyPlan(window, wRows, perPull.map((p) => p.hits), mod.FFXIV_MITIGATION, reach);
+      const ms = Date.now() - t0;
+      const href = (h) => `${h.name} #${h.occurrence} (${mmss(h.medianMs)})`;
+      const nChanges = opt.groups.reduce((s, g) => s + g.changes.length, 0);
+      console.log(`  OPTIMIZER (${opt.evaluated} plans, ${ms}ms): failing ${opt.summary.before.failing} -> ${opt.summary.after.failing}, ` +
+        `tight ${opt.summary.before.tight} -> ${opt.summary.after.tight}, ${nChanges} change(s)`);
+      opt.groups.forEach((g, i) => {
+        console.log(`    group ${i + 1} (${g.purpose}):`);
+        for (const c of g.changes) {
+          console.log(`      ${c.kind} ${c.name} (${c.player.split(' ')[0]})${c.from ? ` ${href(c.from)} ->` : ' on'} ${href(c.to)}` +
+            ` fits ${c.legal}/${c.pulls}${c.gated ? ` [needs ${c.gated}]` : ''}`);
+        }
+        for (const h of g.hits) {
+          console.log(`      ${href(h.hit)}: ${pctOf(h.before.median)}/${pctOf(h.before.worst)} ${h.before.verdict}${h.before.tight ? ' tight' : ''}` +
+            ` -> ${pctOf(h.after.median)}/${pctOf(h.after.worst)} ${h.after.verdict}${h.after.tight ? ' tight' : ''}`);
+        }
+      });
+      if (opt.notMitigation.length) console.log(`    not mitigation: ${opt.notMitigation.map(href).join(', ')}`);
+      if (opt.unfixed.length) console.log(`    unfixed: ${opt.unfixed.map(href).join(', ')}`);
     }
     }
   },
