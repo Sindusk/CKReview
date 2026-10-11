@@ -16,6 +16,7 @@ type YTPlayer = {
   destroy(): void;
   seekTo(seconds: number, allowSeekAhead: boolean): void;
   playVideo(): void;
+  pauseVideo(): void;
   getCurrentTime(): number;
   getDuration(): number;
   loadVideoById(options: { videoId: string; startSeconds?: number }): void;
@@ -35,6 +36,7 @@ type YTPlayerEvent = {
 type PlayerAdapter = {
   seekTo(seconds: number): void;
   play(): void;
+  pause(): void;
   getCurrentTime(): number;
   getDuration(): number;
 };
@@ -43,6 +45,7 @@ function youTubeAdapter(player: YTPlayer): PlayerAdapter {
   return {
     seekTo:         (t) => player.seekTo(t, true),
     play:           () => player.playVideo(),
+    pause:          () => player.pauseVideo(),
     getCurrentTime: () => player.getCurrentTime(),
     getDuration:    () => player.getDuration(),
   };
@@ -61,10 +64,22 @@ function videoElementAdapter(video: HTMLVideoElement): PlayerAdapter {
         video.play().catch(() => {});
       });
     },
+    pause: () => video.pause(),
     getCurrentTime: () => video.currentTime,
     getDuration:    () => (Number.isFinite(video.duration) ? video.duration : 0),
   };
 }
+
+// What the no-coverage card shows (built in app/page.tsx from
+// lib/vod-sync.ts). Labels are "Alice" or "Alice part 2".
+export type CoverageGap = {
+  pullNumber:   number;
+  logTime:      string;                             // "2:41:10"
+  currentLabel: string;                             // the VOD on screen
+  covering:     { vodId: number; label: string }[]; // other synced VODs that cover it
+  ranges:       { label: string; range: string }[]; // every synced VOD's covered pulls
+  unsynced:     string[];                           // VODs that might, once synced
+};
 
 type VideoPanelProps = {
   vod: Vod | null;
@@ -95,6 +110,13 @@ type VideoPanelProps = {
   // A brief note shown over the top of the video, e.g. after an auto-swap
   // to another VOD. The page clears it after a few seconds.
   note?: { text: string; token: number } | null;
+
+  // Set while this synced VOD doesn't cover the selected pull. The player
+  // pauses, ignores seeks and never starts playing, and a card replaces
+  // the video saying what does cover the pull. Cleared by picking another
+  // pull or VOD.
+  coverageGap?: CoverageGap | null;
+  onSelectVod?: (vodId: number) => void;
 
   // The active video's length in seconds, reported from the playback loop
   // once the player knows it (getDuration() > 0) and the VOD hasn't
@@ -132,8 +154,15 @@ export default function VideoPanel({
   canResync,
   syncPointLabels,
   note,
+  coverageGap,
+  onSelectVod,
   onDurationKnown,
 }: VideoPanelProps) {
+  const hold = !!coverageGap;
+  // Read by the async player callbacks below (readiness poll, onReady,
+  // local metadata), which must not start playback behind the card.
+  const holdRef = useRef(hold);
+  holdRef.current = hold;
   const containerRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   // The raw YouTube player, kept for loadVideoById/destroy. Non-null only
@@ -186,6 +215,11 @@ export default function VideoPanel({
     if (!player || swapGenerationRef.current !== generation) return;
 
     if (player.getDuration() > 0) {
+      // loadVideoById autoplays; behind the no-coverage card it must not.
+      if (holdRef.current) {
+        player.pauseVideo();
+        return;
+      }
       const target = latestSeekRef.current?.time;
       if (target !== undefined) {
         player.seekTo(target, true);
@@ -275,6 +309,11 @@ export default function VideoPanel({
             playerReadyRef.current = true;
             setPlayerReady(true);
 
+            if (holdRef.current) {
+              event.target.pauseVideo();
+              return;
+            }
+
             // `start` only has integer-second precision — nudge to the
             // exact target once, then let the video play uninterrupted.
             const target = latestSeekRef.current?.time;
@@ -312,6 +351,7 @@ export default function VideoPanel({
     playerRef.current = player;
     playerReadyRef.current = true;
     setPlayerReady(true);
+    if (holdRef.current) return;
 
     const target = latestSeekRef.current?.time;
     if (target !== undefined) player.seekTo(target);
@@ -340,10 +380,17 @@ export default function VideoPanel({
   useEffect(() => {
     if (seekRequest === null) return;
     if (!playerRef.current || !playerReadyRef.current) return;
+    if (holdRef.current) return;
 
     playerRef.current.seekTo(seekRequest.time);
     playerRef.current.play();
   }, [seekRequest]);
+
+  // Pause when the no-coverage card goes up. The seek that lifts it (a
+  // new pull or VOD) starts playback again through the effect above.
+  useEffect(() => {
+    if (hold && playerReady) playerRef.current?.pause();
+  }, [hold, playerReady]);
 
   /**
    * =========================
@@ -417,7 +464,8 @@ export default function VideoPanel({
         )}
       </PanelHeader>
 
-      {/* Inset well around the player — nothing is drawn over the iframe. */}
+      {/* Inset well around the player. Only two things are drawn over the
+          iframe: the brief swap note and the no-coverage card. */}
       <div style={{ flex: 1, minHeight: 0, display: "flex", padding: "8px 8px 0" }}>
         <div
           style={{
@@ -450,8 +498,12 @@ export default function VideoPanel({
             />
           )}
 
-          {/* Swap note: the one thing drawn over the player, briefly, and
-              click-through so it never blocks the video's controls. */}
+          {coverageGap && (
+            <CoverageGapCard gap={coverageGap} onSelectVod={onSelectVod} />
+          )}
+
+          {/* Swap note: drawn over the player briefly, and click-through so
+              it never blocks the video's controls. */}
           {note && (
             <div
               key={note.token}
@@ -503,6 +555,76 @@ export default function VideoPanel({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// Replaces the video while the synced VOD on screen doesn't cover the
+// selected pull: what does cover it (with a button to switch), each synced
+// VOD's range, and unsynced VODs that might once synced. The timeline,
+// errors and analysis keep working without video.
+function CoverageGapCard({
+  gap,
+  onSelectVod,
+}: {
+  gap: CoverageGap;
+  onSelectVod?: (vodId: number) => void;
+}) {
+  const where = `pull ${gap.pullNumber} (${gap.logTime} into the log)`;
+  const unsyncedCount = gap.unsynced.length;
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        inset: 0,
+        zIndex: 1,
+        background: "#0b0d12",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        gap: "10px",
+        padding: "24px",
+        fontSize: "13px",
+        lineHeight: 1.55,
+        color: "var(--ck-text-2)",
+        textAlign: "center",
+      }}
+    >
+      <div style={{ color: "#ff8a8a", fontWeight: 600 }}>
+        {gap.covering.length === 0
+          ? `No synced VOD covers ${where}.`
+          : `${gap.currentLabel}'s VOD doesn't reach ${where}.`}
+      </div>
+
+      {gap.covering.length > 0 && (
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+          <span>Covered by</span>
+          {gap.covering.map(c => (
+            <button
+              key={c.vodId}
+              className="ck-btn ck-btn--arcane ck-btn--sm"
+              onClick={() => onSelectVod?.(c.vodId)}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {gap.ranges.length > 0 && (
+        <div style={{ color: "var(--ck-text-3)" }}>
+          {gap.ranges.map(r => `${r.label}: ${r.range.toLowerCase()}`).join(" · ")}
+        </div>
+      )}
+
+      {unsyncedCount > 0 && (
+        <div style={{ color: "var(--ck-text-3)" }}>
+          {unsyncedCount === 1
+            ? `${gap.unsynced[0]}'s VOD isn't synced yet. Sync it to use it here.`
+            : `${gap.unsynced.join(", ")}'s VODs aren't synced yet. Sync them to use them here.`}
+        </div>
+      )}
     </div>
   );
 }

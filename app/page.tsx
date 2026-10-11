@@ -14,10 +14,10 @@ import { parseYouTubeUrl, parseLogUrl } from "@/lib/url-parsers";
 import { isLocalVod, type Vod } from "../types/Vod";
 import { loadLocalVodSync, saveLocalVodSync, clearLocalVodSync } from "@/lib/local-vod-sync";
 import {
-  addSyncPoint, coversPull, isSynced, pickCoveringVod, savedSyncPoints, syncPointPulls, syncPointsOf,
-  vodLabel, withSyncPoints,
+  addSyncPoint, coveredRangeLabel, coversPull, formatLogTime, isSynced, pickCoveringVod, savedSyncPoints,
+  syncPointPulls, syncPointsOf, vodLabel, withSyncPoints,
 } from "@/lib/vod-sync";
-import VideoPanel from "../components/VideoPanel";
+import VideoPanel, { type CoverageGap } from "../components/VideoPanel";
 import VODSidebar from "../components/VODSidebar";
 import { Panel } from "../components/ui/Panel";
 import TranscriptDialog from "../components/TranscriptDialog";
@@ -399,11 +399,30 @@ export default function Home() {
     });
   }
 
+  // The synced VOD on screen doesn't cover the selected pull (no VOD did
+  // for a list pick, or the user chose this VOD). The video panel shows a
+  // card instead, and the timeline holds: no seek, no auto-detection.
+  const coverageGap = useMemo((): CoverageGap | null => {
+    if (!selectedVod || !activePull || !isSynced(selectedVod) || coversPull(selectedVod, activePull)) return null;
+    const synced = vods.filter(isSynced);
+    return {
+      pullNumber:   activePull.pullNumber,
+      logTime:      formatLogTime(activePull.startTime),
+      currentLabel: vodLabel(selectedVod, vods),
+      covering:     synced
+        .filter(v => coversPull(v, activePull))
+        .map(v => ({ vodId: v.id, label: vodLabel(v, vods) })),
+      ranges:       synced.map(v => ({ label: vodLabel(v, vods), range: coveredRangeLabel(v, displayPulls) })),
+      unsynced:     vods.filter(v => !isSynced(v)).map(v => vodLabel(v, vods)),
+    };
+  }, [selectedVod, activePull, vods, displayPulls]);
+
   const timeline = useTimelineController({
     vod:            selectedVod,
     pull:           activePull,
     pulls:          displayPulls,
     onPullDetected: handlePullDetected,
+    hold:           coverageGap !== null,
   });
 
   const handleVideoTimeUpdate = useCallback((rawTime: number) => {
@@ -1148,6 +1167,9 @@ export default function Home() {
   }
 
   const isCalibrated = selectedVod?.isCalibrated ?? false;
+  // Synced and showing footage of the selected pull (not the no-coverage
+  // card), so playback time means something for that pull.
+  const videoUsable = isCalibrated && coverageGap === null;
 
   const syncPointLabels = selectedVod
     ? syncPointPulls(selectedVod, displayPulls).map(p => (p ? String(p.pullNumber) : "?"))
@@ -1318,11 +1340,11 @@ export default function Home() {
             <AnalysisPanel
               pull={activePull}
               playbackTimeMs={timeline.playbackTimeMs}
-              onSeekToTime={isCalibrated ? handleSeekToMs : undefined}
+              onSeekToTime={videoUsable ? handleSeekToMs : undefined}
               onCallWipe={handleCallWipe}
               onAddError={handleAddError}
               onRemoveError={handleRemoveError}
-              vodTimeAvailable={isCalibrated}
+              vodTimeAvailable={videoUsable}
             />
           </Panel>
         </div>
@@ -1335,9 +1357,11 @@ export default function Home() {
               onCurrentTimeChange={handleVideoTimeUpdate}
               onUnsync={handleUnsyncVod}
               onResync={resyncFromPull}
-              canResync={!!activePull && timeline.rawVideoTime !== null}
+              canResync={!!activePull && timeline.rawVideoTime !== null && coverageGap === null}
               syncPointLabels={syncPointLabels}
               note={swapNote}
+              coverageGap={coverageGap}
+              onSelectVod={setSelectedVodId}
               onDurationKnown={handleVodDuration}
             />
           </div>

@@ -135,6 +135,24 @@ export function vodLabel(vod: Vod, vods: Vod[]): string {
   return own.length > 1 ? `${vod.player} part ${own.indexOf(vod) + 1}` : vod.player;
 }
 
+// "Pulls 1–40", "Pull 5" or "No pulls", for the sidebar and the
+// no-coverage card. Pull numbers are the list's per-boss "#N".
+export function coveredRangeLabel(vod: Vod, pulls: Pull[]): string {
+  const range = coveredPullRange(vod, pulls);
+  if (!range) return "No pulls";
+  if (range.first === range.last) return `Pull ${range.first.pullNumber}`;
+  return `Pulls ${range.first.pullNumber}–${range.last.pullNumber}`;
+}
+
+// Report seconds as H:MM:SS ("2:41:10 into the log").
+export function formatLogTime(seconds: number): string {
+  const s = Math.max(0, Math.floor(seconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  return `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
+}
+
 // First and last covered pull in list order, or null when none is covered.
 export function coveredPullRange(vod: Vod, pulls: Pull[]): { first: Pull; last: Pull } | null {
   let first: Pull | null = null;

@@ -5,6 +5,7 @@ import { isLocalVod, type Vod } from "../types/Vod";
 import PullList from "../components/PullList";
 import { Panel, PanelHeader } from "./ui/Panel";
 import type { Pull } from "../types/Pull";
+import { coveredRangeLabel, isSynced } from "../lib/vod-sync";
 
 // Module-level cache (not component state) so switching pulls/remounting
 // this sidebar doesn't re-fetch a title we already have this session.
@@ -107,6 +108,7 @@ export default function VODSidebar({
             <VodCard
               key={vod.id}
               vod={vod}
+              rangeLabel={isSynced(vod) ? coveredRangeLabel(vod, pulls) : null}
               isSelected={vod.id === selectedVodId}
               onSelectVod={onSelectVod}
               onOpenTranscript={onOpenTranscript}
@@ -128,11 +130,15 @@ export default function VODSidebar({
 
 function VodCard({
   vod,
+  rangeLabel,
   isSelected,
   onSelectVod,
   onOpenTranscript,
 }: {
   vod: Vod;
+  // Pulls this synced VOD covers ("Pulls 1–40", lib/vod-sync.ts), shown
+  // beside the source icon so an auto-swap is predictable. Null if unsynced.
+  rangeLabel: string | null;
   isSelected: boolean;
   onSelectVod: (id: number) => void;
   onOpenTranscript: (id: number) => void;
@@ -187,7 +193,7 @@ function VodCard({
         )}
       </div>
 
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: "4px 0" }}>
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "6px", padding: "4px 0" }}>
         {local ? (
           <span
             className="ck-badge"
@@ -202,6 +208,16 @@ function VodCard({
             <rect x="0" y="0" width="28" height="20" rx="5" fill="#f87171" opacity="0.85" />
             <path d="M11 6 L19 10 L11 14 Z" fill="#1a1a1a" />
           </svg>
+        )}
+        {rangeLabel && (
+          <span
+            title={vod.durationSec === undefined
+              ? "Covered pulls. The video's length isn't known until it plays once, so this may run past its end."
+              : "Pulls whose start is in this VOD"}
+            style={{ fontSize: "10px", color: "var(--ck-text-3)", whiteSpace: "nowrap" }}
+          >
+            {rangeLabel}
+          </span>
         )}
       </div>
 

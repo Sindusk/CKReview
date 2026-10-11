@@ -8,6 +8,11 @@ type TimelineControllerProps = {
   pull:            Pull | null;
   pulls:           Pull[];                        // full list for auto-detection
   onPullDetected:  (pullId: number) => void;      // called when video crosses into a different pull
+  // True while the synced VOD doesn't cover the selected pull (the
+  // no-coverage card is up). No auto-seek and no auto-detection: the
+  // paused video sits at some other pull, and detecting it would yank the
+  // selection back. Lifts when another pull or VOD is picked.
+  hold?:           boolean;
 };
 
 // One-shot seek command. `token` is bumped on every request so that
@@ -24,6 +29,7 @@ export default function useTimelineController({
   pull,
   pulls,
   onPullDetected,
+  hold = false,
 }: TimelineControllerProps) {
 
   // ─── Core state ──────────────────────────────────────────────────────────────
@@ -93,7 +99,12 @@ export default function useTimelineController({
   const autoSeekKeyRef = useRef<string | null>(null);
   const autoSeekKey = vod && pull ? `${vod.id}:${pull.id}` : null;
 
-  if (vod && pull && isSynced(vod) && autoSeekKey !== autoSeekKeyRef.current) {
+  // Skipped while on hold. The key is forgotten so the seek fires as soon
+  // as the hold lifts, even back on the same VOD and pull (the held VOD
+  // may have loaded at another VOD's position). prevPullIdRef is left
+  // alone, so it still knows whether the pull changed meanwhile.
+  if (hold) autoSeekKeyRef.current = null;
+  if (vod && pull && isSynced(vod) && !hold && autoSeekKey !== autoSeekKeyRef.current) {
     autoSeekKeyRef.current = autoSeekKey;
 
     const pullChanged = prevPullIdRef.current !== pull.id;
@@ -138,7 +149,7 @@ export default function useTimelineController({
    * 2. Detects whether we've crossed into a different pull and notifies page.tsx.
    */
   const updateFromVideo = useCallback((rawVideoTime: number) => {
-    if (!vod) return;
+    if (!vod || hold) return;
 
     // 1. Update playback time relative to selected pull
     if (pull) {
@@ -177,7 +188,7 @@ export default function useTimelineController({
         onPullDetected(detected.id);
       }
     }
-  }, [vod, pull, pulls, pullDuration, onPullDetected]);
+  }, [vod, pull, pulls, pullDuration, onPullDetected, hold]);
 
   // ─── Scrub bar input ─────────────────────────────────────────────────────────
 
