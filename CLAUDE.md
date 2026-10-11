@@ -24,6 +24,7 @@ sampling it.
 | Damage output / rotation analysis, or tooling for it | [docs/dps-analysis.md](docs/dps-analysis.md) (method and pitfalls) |
 | Changing the Damage, Mitigation or Statics analysis | The module headers (`lib/damage/`, `lib/mitigation/`, `lib/static-analysis.ts`). Design records and log-semantics findings are in [docs/archive/](docs/archive/) |
 | Mitigation Analysis auto-optimizer (build plan) | [docs/mitigation-optimizer-plan.md](docs/mitigation-optimizer-plan.md) |
+| Tanking panel (build plan; after the optimizer) | [docs/tanking-panel-plan.md](docs/tanking-panel-plan.md) |
 | Local video files as VOD sources (build plan) | [docs/local-vod-plan.md](docs/local-vod-plan.md) |
 | What's unfinished or waiting on a user decision | [docs/open-items.md](docs/open-items.md) |
 | Which ports are taken locally and in production | [PORTS.md](PORTS.md) |

@@ -535,9 +535,12 @@ grouped by exact roster. The module headers hold the rules.
   the Analysis view's change finding and Spare section with a
   schedule optimizer over the last 5 pulls, takes tank busters out of
   Analysis, and adds boss-debuff reach evidence.
-- **Tanking panel (future, user 2026-10-11):** tank busters and tank
-  personal cooldowns (Rampart, Damnation, ...) get their own panel,
-  outside the Mitigation Analysis. Not designed yet.
+- **Tanking panel planned (user, 2026-10-11):**
+  [tanking-panel-plan.md](tanking-panel-plan.md). It covers busters
+  checked with 10s of follow-up damage, invuln planning for shared and
+  dual busters, both tanks' cooldowns on each other, and tank damage in
+  % of max HP. It reuses the optimizer engine. The tank gauge overcap
+  item below is folded into it.
 - **Unverified catalog entries:** Warrior, Machinist (Dismantle), Red Mage,
   Ninja, Monk, Summoner.
 - **Deferred:** what-if sandbox (reuse `marginWithout`), an optional
