@@ -714,6 +714,10 @@ grouped by exact roster. The module headers hold the rules.
 
 ## App
 
+- **VOD coverage planned (user, 2026-10-11):**
+  [vod-coverage-plan.md](vod-coverage-plan.md). It covers auto-swap to a
+  synced VOD that covers the selected pull, a clear error when none does,
+  and "re-sync from this pull" for stream dropouts.
 - **Statics:**
   - Importing a different log keeps the previous report's VOD list on
     screen, and it gets saved into the new session.
