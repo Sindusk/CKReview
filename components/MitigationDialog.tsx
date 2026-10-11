@@ -26,12 +26,13 @@
 // are listed as needing a re-fetch; re-fetching stays an explicit action
 // elsewhere in the app, never triggered from here.
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Pull } from "@/types/Pull";
 import { analyzePullMitigation } from "@/lib/mitigation/analyze";
 import { aggregateMitigation } from "@/lib/mitigation/aggregate";
 import { buildDebuffReach } from "@/lib/mitigation/debuff-reach";
-import { PLAN_MIN_PULLS, buildMitigationPlan } from "@/lib/mitigation/plan";
+import { PLAN_MIN_PULLS, buildMitigationPlan, planWindow, type OptimizedPlan } from "@/lib/mitigation/plan";
+import type { PlanReply, PlanRequest } from "@/lib/mitigation/plan.worker";
 import { PlanView } from "./MitigationPlan";
 import { PlayerPicker } from "./MitigationPlayerPicker";
 import { AggregateDetails, HitDetails } from "./MitigationHitDetails";
@@ -128,11 +129,43 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId }
   }, [open, analyzable, reach]);
   const aggregate = useMemo(() => (allPulls ? aggregateMitigation(perPull, FFXIV_MITIGATION, reach) : []), [allPulls, perPull, reach]);
   const view: View = viewPick ?? (allPulls && perPull.length >= PLAN_MIN_PULLS ? "analysis" : "timeline");
-  const plan = useMemo(() => {
-    if (!allPulls || view !== "analysis" || perPull.length < PLAN_MIN_PULLS) return null;
+
+  // The Analysis searches the group's last N pulls (lib/mitigation/plan.ts)
+  // in a web worker; blank input = the default window.
+  const [windowInput, setWindowInput] = useState("");
+  const windowSize = /^\d+$/.test(windowInput.trim()) ? Number(windowInput) : undefined;
+  const [planResult, setPlanResult] = useState<{ plan: OptimizedPlan | null; pending: boolean; error?: string }>({ plan: null, pending: false });
+  const worker = useRef<Worker | null>(null);
+  const requestId = useRef(0);
+  const planWanted = open && allPulls && view === "analysis" && perPull.length >= PLAN_MIN_PULLS;
+  useEffect(() => {
+    if (!planWanted) return;
     const byId = new Map(analyzable.map((p) => [p.id, p]));
-    return buildMitigationPlan(aggregate, perPull.map((p) => ({ pull: byId.get(p.pullId)!, hits: p.hits })), FFXIV_MITIGATION, reach);
-  }, [allPulls, view, perPull, aggregate, analyzable, reach]);
+    const window = planWindow(perPull, windowSize).map((p) => ({ ...p, pull: byId.get(p.pullId)! }));
+    const allHits = perPull.map((p) => p.hits);
+    const id = ++requestId.current;
+    setPlanResult((r) => ({ ...r, pending: true }));
+    if (typeof Worker === "undefined") {
+      setPlanResult({ plan: buildMitigationPlan(window, allHits, FFXIV_MITIGATION, reach), pending: false });
+      return;
+    }
+    if (!worker.current) {
+      worker.current = new Worker(new URL("../lib/mitigation/plan.worker.ts", import.meta.url));
+      worker.current.onmessage = (e: MessageEvent<PlanReply>) => {
+        if (e.data.id !== requestId.current) return;
+        setPlanResult({ plan: e.data.plan ?? null, pending: false, error: e.data.error });
+      };
+    }
+    const request: PlanRequest = { id, window, allHits, reach };
+    worker.current.postMessage(request);
+  }, [planWanted, perPull, analyzable, reach, windowSize]);
+  // The worker goes with the dialog.
+  useEffect(() => {
+    if (open) return;
+    worker.current?.terminate();
+    worker.current = null;
+    setPlanResult({ plan: null, pending: false });
+  }, [open]);
 
   const groups = useMemo(() => buildPlayerGroups(allPulls ? analyzable : selectedPull ? [selectedPull] : []),
     [allPulls, analyzable, selectedPull]);
@@ -232,12 +265,19 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId }
                     The analysis reads all of a group&apos;s pulls: one pull is too noisy to plan from.{" "}
                     <button className="ck-btn ck-btn--sm" onClick={() => setAllPulls(true)}>Use all pulls</button>
                   </p>
-                ) : !plan ? (
+                ) : perPull.length < PLAN_MIN_PULLS ? (
                   <p className="ck-dialog-text" style={{ padding: 12 }}>
                     The analysis needs at least {PLAN_MIN_PULLS} pulls with mitigation data from this group ({perPull.length} loaded).
                     The Timeline still shows them.
                   </p>
-                ) : <PlanView plan={plan} focus={shownFocus} />
+                ) : <PlanView plan={planResult.plan} pending={planResult.pending} error={planResult.error} focus={shownFocus}
+                      windowInput={windowInput} onWindowInput={setWindowInput} groupPulls={perPull.length}
+                      onOpenHit={(id) => {
+                        const row = aggregate.find((r) => r.id === id);
+                        if (row && rowUneventful(row)) setShowUneventful(true);
+                        setViewPick("timeline");
+                        setSelectedHitId(id);
+                      }} />
               ) : selectedStale ? (
                 <p className="ck-dialog-text" style={{ padding: 12 }}>
                   This pull was fetched before mitigation data was kept. Re-fetch the report to analyze it.

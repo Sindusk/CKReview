@@ -64,45 +64,45 @@
 // cooldown dropped to be used elsewhere is a shift. Change count: a shift
 // or an add is 1, a swap 2 (two players each move one cooldown); shifting
 // an already moved or added cast edits that change instead of adding one.
-// Shift and swap targets are anchors that are failing or tight, or that
-// hold a movable cast; adds go only to failing or tight anchors (an add
-// helps nothing else). Beam search from the baseline, BEAM_WIDTH wide, up
-// to PLAN_MAX_CHANGES changes; candidates breaking a change's legality
-// share or the hard constraint are dropped; the best plan at any depth wins
-// by the objective (a tuple, compared first difference first).
+// The edit set is pruned to what can matter (needsHelp marks the anchors
+// worth fixing): shifts and adds go to those anchors; a swap only when it
+// helps one directly or brings the cast that moves earlier back in time
+// for one after its old spot; and, with problem.freeShifts, one more shift
+// per cast: to the latest earlier anchor that gets it back by the
+// progression edge (the last anchor). Beam search from the baseline,
+// beamWidth wide, up to maxChanges changes; candidates breaking a change's
+// legality share or the hard constraint are dropped; the best plan at any
+// depth wins by the objective (a tuple, compared first difference first).
+// Every plan also carries `freedom`: per changed (player, entry), whether
+// it is off cooldown at the progression edge (its length in seconds)
+// minus how long until it is back, weighted by length over
+// FREEDOM_REFERENCE_MS, against the real casts, averaged over the window
+// pulls reaching the edge. An objective may read it.
 //
 // ── Groups ─────────────────────────────────────────────────────────────
 // The winning changes are split into dependent groups, each shown as one
-// "do together" card: a swap's two halves always go together; otherwise two
-// changes are dependent when, with one taken out, the other becomes illegal
-// or stops helping (the objective without both equals the objective
-// without the first).
+// "do together" card: a swap's two halves; changes lifting the same anchor
+// that needs help (a raid lead fixes one hit at a time); and two changes
+// where, with one taken out, the other becomes illegal or stops helping
+// (the objective without both equals the objective without the first).
 
 import type { Pull } from "@/types/Pull";
 import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { CatalogEntry, HitTarget, HitVerdict, MitigationGame, MitigationHit } from "./types";
 import type { AggregatedHit } from "./aggregate";
 import {
-  DAMAGE_ROLL_BUFFER, DROP_MIN_COOLDOWN_MS, MARGIN_UNDER, SEQUENCE_FLOOR, SNAPSHOT_SLACK_MS,
+  DAMAGE_ROLL_BUFFER, MARGIN_UNDER, SNAPSHOT_SLACK_MS,
   chargesAt, isDeadOrFreshlyRevived, judged, marginWith, playerCasts, simulateCharges, verdictFor, type AddedMitigation,
 } from "./analyze";
 import { reachesPart, type DebuffReach } from "./debuff-reach";
 
-// Tunables: chosen by the builder, not yet confirmed (docs/open-items.md),
-// except the window and the change budget (user, 2026-10-11).
-export const PLAN_WINDOW_DEFAULT = 5;
-export const PLAN_MAX_CHANGES = 3;
-export const PLAN_MIN_PULLS = 3;
+// Tunables: chosen by the builder, not yet confirmed (docs/open-items.md).
 // A placed cast's lead before its anchor hit's first damage.
 export const CAST_LEAD_MS = 2_000;
 export const BEAM_WIDTH = 50;
-// Tier 3: a cooldown's weight is its length over this, so a 120s one counts
-// twice a 60s one.
+// `freedom`: a cooldown's weight is its length over this, so a 120s one
+// counts twice a 60s one.
 const FREEDOM_REFERENCE_MS = 120_000;
-// A short hit whose median lowest player ends below this (overkill of half
-// a health bar) is a mechanic failure, not something one more mitigation
-// covers: Red Hot and Deep Blue's Plunging Snap #3 at -674%.
-export const MECHANIC_MARGIN = -0.5;
 const SAME_HIT_MS = 100;
 
 const median = (xs: number[]) => {
@@ -152,12 +152,13 @@ export type OptimizerProblem = {
   objective:  (ev: PlanEvaluation) => number[];
   // The hard constraint, against the baseline.
   constraint: (base: PlanEvaluation, ev: PlanEvaluation) => boolean;
-  // Anchors worth fixing (adds go only here; shifts and swaps go here or
-  // to anchors holding a movable cast).
+  // Anchors worth fixing (see "The search").
   needsHelp:  (ev: PlanEvaluation, hitId: string) => boolean;
+  // Offer the shifts that free a cooldown by the progression edge.
+  freeShifts: boolean;
   // More edits beyond shift, swap and add (the Tanking panel's invulns).
   extraEdits?: (state: SearchState) => Change[][];
-  maxChanges?: number;
+  maxChanges:  number;
   beamWidth?:  number;
 };
 
@@ -483,7 +484,7 @@ function valid(problem: OptimizerProblem, base: PlanEvaluation, ev: PlanEvaluati
 export type SearchResult = { baseline: Assignment[]; base: PlanEvaluation; best: PlanEvaluation; evaluated: number };
 
 export function searchPlan(problem: OptimizerProblem, ctxs: PullCtx[], baseline: Assignment[]): SearchResult {
-  const maxChanges = problem.maxChanges ?? PLAN_MAX_CHANGES;
+  const maxChanges = problem.maxChanges;
   const width = problem.beamWidth ?? BEAM_WIDTH;
   const base = evaluatePlan(problem, ctxs, []);
   const lanesByPlayer = new Map<string, PlayerInfo>();
@@ -518,7 +519,7 @@ export function searchPlan(problem: OptimizerProblem, ctxs: PullCtx[], baseline:
         }
         // ...or, to free a cooldown for later mechanics (tier 3), to the
         // latest earlier hit that gets it back by the progression edge.
-        if (backBy(a.key, a.anchor) > edgeMs) {
+        if (problem.freeShifts && backBy(a.key, a.anchor) > edgeMs) {
           const to = [...anchorIds].reverse().find((id) => timeOf.get(id)! < timeOf.get(a.anchor)! && backBy(a.key, id) <= edgeMs);
           if (to && !occupied.has(`${a.player}|${a.key}|${to}`)) {
             const p = shifted(changes, a, to);
@@ -617,198 +618,9 @@ export function groupChanges(problem: OptimizerProblem, ctxs: PullCtx[], changes
   return [...groups.values()];
 }
 
-// ── The party Analysis ─────────────────────────────────────────────────
-
-export type HitClass = "plan" | "healing" | "mechanic";
-
-/** Hits the objective leaves out: healing deaths and mechanic failures. */
-export function classifyHit(row: AggregatedHit): HitClass {
-  if ((row.verdict === "fail" || row.verdict === "under") && row.medianMargin < MECHANIC_MARGIN) return "mechanic";
-  if (row.verdict === "fail") {
-    const dead = row.byPull.flatMap((b) => b.hit.targets.filter((t) => t.died && !t.vulnerable));
-    if (dead.every((t) => t.deathCause === "healing")) return "healing";
-  }
-  return "plan";
-}
-
-/** Party-wide planned cooldowns: the entries the Analysis may move or add. Tank personals never move. */
-export function partyEligible(entry: CatalogEntry): boolean {
-  return entry.reach === "party" && entry.inSheet !== false && !entry.situational
-    && entry.kind !== "invuln" && entry.kind !== "limitBreak" && entry.cooldownMs >= DROP_MIN_COOLDOWN_MS;
-}
-
-const failing = (e: HitEstimate) => e.verdict === "fail" || e.verdict === "under";
-
-export type PartySetup = {
-  problem:  OptimizerProblem;
-  ctxs:     PullCtx[];
-  baseline: Assignment[];
-  classes:  Map<string, HitClass>;
-};
-
-/**
- * The party Analysis problem over a group's last pulls. `rows` is
- * aggregateMitigation over exactly the window pulls; `allHits` every loaded
- * pull's hits (shield size estimates). Anchors are party hits (no tank
- * busters) reached in PLAN_MIN_PULLS+ window pulls and not rare.
- *
- * Objective, first difference wins (user, 2026-10-11):
- *   1. fewer failing hits (median fail or under); ties: higher sum of
- *      median margins capped at MARGIN_UNDER
- *   2. fewer tight hits; ties: higher sum of worst-pull margins, capped
- *   3. cooldowns free at the progression edge (the last anchor): per
- *      changed (player, entry), off cooldown there (its length in seconds)
- *      minus how long until it is back, weighted by length over
- *      FREEDOM_REFERENCE_MS, against the real casts, averaged over the
- *      window pulls reaching the edge. The least certain tier.
- *   4. fewer changes
- * Healing and mechanic hits are left out of tiers 1-2.
- * Hard constraint: a healing or mechanic hit gets no worse (median or worst
- * pull), and a hit good or over in the baseline stays at least
- * MARGIN_UNDER on the median, its worst pull stays at least MARGIN_UNDER
- * (or no lower than it was, if it was already below), and its worst
- * sequence margin stays at least SEQUENCE_FLOOR (or no lower than it was).
- */
-export function partySetup(window: WindowPull[], rows: AggregatedHit[], allHits: MitigationHit[][],
-  game: MitigationGame, reach?: DebuffReach,
-  // Narrows the entries considered (scripts/check-optimizer-example.js).
-  only?: (entry: CatalogEntry, player: PlayerInfo) => boolean): PartySetup {
-  const anchors = rows.filter((r) => !r.rare && r.pulls >= PLAN_MIN_PULLS && !r.byPull.every((b) => b.hit.tankOnly))
-    .sort((a, b) => a.medianMs - b.medianMs);
-  const classes = new Map(anchors.map((r) => [r.id, classifyHit(r)]));
-  const planned = (id: string) => classes.get(id) === "plan";
-  const shieldSizes = medianShieldSizes(allHits, game);
-  const cap = (x: number) => Math.min(x, MARGIN_UNDER);
-  const problem: OptimizerProblem = {
-    game, reach, window, anchors, shieldSizes,
-    eligible: (entry, player) => partyEligible(entry) && (!only || only(entry, player)),
-    canAdd:   (entry) => !entry.statuses.some((s) => s.shield) || shieldSizes.has(entry.key),
-    objective: (ev) => {
-      let fail = 0, failSum = 0, tight = 0, tightSum = 0;
-      for (const [id, e] of ev.hits) {
-        if (!planned(id)) continue;
-        if (failing(e)) fail++;
-        else if (e.tight) tight++;
-        failSum += cap(e.median);
-        tightSum += cap(e.worst);
-      }
-      return [-fail, failSum, -tight, tightSum, ev.freedom, -ev.changes.length];
-    },
-    constraint: (base, ev) => {
-      for (const [id, b] of base.hits) {
-        const e = ev.hits.get(id)!;
-        // Healing and mechanic hits are never changed, so never made worse.
-        if (!planned(id) && (e.median < b.median - 1e-9 || e.worst < b.worst - 1e-9)) return false;
-        if (b.verdict !== "good" && b.verdict !== "over") continue;
-        if (e.verdict === "fail" || e.median < MARGIN_UNDER - 1e-9) return false;
-        if (e.worst < Math.min(MARGIN_UNDER, b.worst) - 1e-9) return false;
-        if (e.worstSequence < Math.min(SEQUENCE_FLOOR, b.worstSequence) - 1e-9) return false;
-      }
-      return true;
-    },
-    needsHelp: (ev, id) => {
-      const e = ev.hits.get(id);
-      return !!e && planned(id) && (failing(e) || e.tight);
-    },
-  };
-  const edgeId = anchors[anchors.length - 1]?.id;
-  const ctxs = window.map((wp) => buildPullCtx(problem, wp, edgeId));
-  return { problem, ctxs, baseline: baselineAssignments(problem, ctxs), classes };
-}
-
-/** Failing (fail or under on the median) and tight counts over the planned hits. */
-export function countIssues(setup: PartySetup, ev: PlanEvaluation): { failing: number; tight: number } {
-  let f = 0;
-  let t = 0;
-  for (const [id, e] of ev.hits) {
-    if (setup.classes.get(id) !== "plan") continue;
-    if (failing(e)) f++;
-    else if (e.tight) t++;
-  }
-  return { failing: f, tight: t };
-}
-
-// ── Output ─────────────────────────────────────────────────────────────
-
-export type HitRef = { id: string; name: string; occurrence: number; phase?: string; medianMs: number };
-
-export type OptimizedChange = {
-  kind:   "move" | "add";  // a swap is two moves
-  player: string;
-  job:    string;
-  key:    string;
-  name:   string;          // catalog entry
-  from?:  HitRef;          // move only
-  to:     HitRef;
-  legal:  number;          // window pulls where it fits
-  pulls:  number;
-  gated?: string;          // an add of a gated entry: what the player must check (Addersgall)
-};
-
-type Side = { median: number; worst: number; verdict: HitVerdict; tight: boolean };
-export type HitOutcome = { hit: HitRef; before: Side; after: Side };
-
-export type Counts = { failing: number; tight: number };
-
-export type OptimizedPlan = {
-  windowPulls:   number[];  // pull ids used
-  summary:       { before: Counts; after: Counts };
-  // purpose: "fix" lifts a failing or tight hit; "free" only frees
-  // cooldowns for later mechanics (tier 3).
-  groups:        { purpose: "fix" | "free"; changes: OptimizedChange[]; hits: HitOutcome[] }[];
-  notMitigation: HitRef[];  // healing or mechanic failures: listed, never changed
-  unfixed:       HitRef[];  // failing or tight hits no plan within budget fixes
-  evaluated:     number;    // candidate plans scored
-};
-
-function refOf(row: AggregatedHit): HitRef {
-  return { id: row.id, name: row.abilityName, occurrence: row.occurrence, phase: row.phase, medianMs: row.medianMs };
-}
-
-/** The party Analysis: the best plan within the change budget, grouped for display. */
-export function partyPlan(window: WindowPull[], rows: AggregatedHit[], allHits: MitigationHit[][],
-  game: MitigationGame, reach?: DebuffReach, only?: (entry: CatalogEntry, player: PlayerInfo) => boolean): OptimizedPlan {
-  const setup = partySetup(window, rows, allHits, game, reach, only);
-  const { problem, ctxs } = setup;
-  const result = searchPlan(problem, ctxs, setup.baseline);
-  const { base, best } = result;
-  const rowOf = new Map(problem.anchors.map((r) => [r.id, r]));
-  const jobOf = new Map(window.flatMap((w) => w.pull.players.map((p) => [p.name, p.className] as const)));
-  const entryOf = new Map(game.catalog.map((e) => [e.key, e]));
-  const side = (e: HitEstimate): Side => ({ median: e.median, worst: e.worst, verdict: e.verdict, tight: e.tight });
-
-  const groups = groupChanges(problem, ctxs, best.changes, base).map((group) => {
-    const changes: OptimizedChange[] = group.map((c) => {
-      const i = best.changes.indexOf(c);
-      const entry = entryOf.get(c.key)!;
-      return {
-        kind: c.kind, player: c.player, job: jobOf.get(c.player) ?? "", key: c.key, name: entry.name,
-        from: c.kind === "move" ? refOf(rowOf.get(c.from)!) : undefined,
-        to: refOf(rowOf.get(c.to)!),
-        legal: best.legal[i].legal, pulls: best.legal[i].pulls,
-        gated: c.kind === "add" ? entry.gated : undefined,
-      };
-    });
-    const alone = evaluatePlan(problem, ctxs, group);
-    const hits: HitOutcome[] = problem.anchors
-      .filter((r) => {
-        const a = alone.hits.get(r.id);
-        const b = base.hits.get(r.id);
-        return a && b && (Math.abs(a.median - b.median) > 1e-9 || Math.abs(a.worst - b.worst) > 1e-9);
-      })
-      .map((r) => ({ hit: refOf(r), before: side(base.hits.get(r.id)!), after: side(best.hits.get(r.id)!) }));
-    const fixes = hits.some((h) => problem.needsHelp(base, h.hit.id)
-      && (h.after.median > h.before.median + 1e-9 || h.after.worst > h.before.worst + 1e-9));
-    return { purpose: fixes ? "fix" as const : "free" as const, changes, hits };
-  });
-
-  const notMitigation = problem.anchors.filter((r) => setup.classes.get(r.id) !== "plan" && failing(base.hits.get(r.id)!)).map(refOf);
-  const unfixed = problem.anchors
-    .filter((r) => setup.classes.get(r.id) === "plan" && (failing(best.hits.get(r.id)!) || best.hits.get(r.id)!.tight))
-    .map(refOf);
-  return {
-    windowPulls: window.map((w) => w.pull.id),
-    summary: { before: countIssues(setup, base), after: countIssues(setup, best) },
-    groups, notMitigation, unfixed, evaluated: result.evaluated,
-  };
+/** A problem's per-pull contexts and baseline, for searchPlan and evaluatePlan. */
+export function prepareProblem(problem: OptimizerProblem): { ctxs: PullCtx[]; baseline: Assignment[] } {
+  const edgeId = problem.anchors.reduce<AggregatedHit | undefined>((e, r) => (!e || r.medianMs > e.medianMs ? r : e), undefined)?.id;
+  const ctxs = problem.window.map((wp) => buildPullCtx(problem, wp, edgeId));
+  return { ctxs, baseline: baselineAssignments(problem, ctxs) };
 }

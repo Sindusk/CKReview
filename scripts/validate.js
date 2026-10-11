@@ -610,51 +610,19 @@ MECHANICS['mitigation-analysis'] = {
       if (a.droppable.keys.length) console.log(`      droppable (worst pull): ${a.droppable.names.join(', ')} -> lowest ${pctOf(a.droppable.worstMargin)}`);
       if (a.note) console.log(`      note: ${a.note}`);
     }
-    // The Plan view (lib/mitigation/plan.ts).
+    // The Analysis view (lib/mitigation/plan.ts, searched by optimize.ts)
+    // over the default window: before/after counts, each "do together"
+    // group's changes and hit outcomes, and what it leaves alone.
     if (perPull.length >= mod.PLAN_MIN_PULLS) {
-      const rows = mod.aggregateMitigation(perPull, mod.FFXIV_MITIGATION, reach);
-      const plan = mod.buildMitigationPlan(rows, perPull, mod.FFXIV_MITIGATION, reach);
       const mmss = (ms) => `${Math.floor(ms / 60000)}:${String(Math.round(ms / 1000) % 60).padStart(2, '0')}`;
-      const ref = (h) => `${h.name} #${h.occurrence} (${h.phase ?? '-'}, ${mmss(h.medianMs)})`;
-      console.log(`  PLAN (${plan.pulls} pulls):`);
-      for (const i of plan.issues) {
-        console.log(`    ${i.status.toUpperCase()} ${ref(i.hit)} median=${pctOf(i.hit.medianMargin)} worst=${pctOf(i.hit.worstMargin)}`);
-        const c = i.change;
-        if (c) {
-          const est = c.estMargin === undefined ? 'no estimate' : `est median ${pctOf(c.estMargin)} worst ${pctOf(c.estWorst)}`;
-          console.log(`      ${c.kind} ${c.name} (${c.player.split(' ')[0]})${c.from ? ` from ${ref(c.from)} -> ${pctOf(c.from.estMargin)}` : ''}; ${est}; fits ${c.fits}/${c.pulls}`);
-        } else console.log(`      ${i.reason}`);
-      }
-      for (const s of plan.spare) console.log(`    SPARE ${ref(s.hit)}: ${s.items.map((x) => (x.player ? `${x.name} (${x.player.split(' ')[0]})` : x.name)).join(', ')} -> ${pctOf(s.worstMargin)}`);
-
-      // The optimizer's baseline (lib/mitigation/optimize.ts) over the last
-      // PLAN_WINDOW_DEFAULT pulls: the current plan per hit, and a check
-      // that evaluating it with no changes reproduces the window aggregate.
-      const window = perPull.slice(-mod.PLAN_WINDOW_DEFAULT);
-      const wRows = mod.aggregateMitigation(window, mod.FFXIV_MITIGATION, reach);
-      const setup = mod.partySetup(window, wRows, perPull.map((p) => p.hits), mod.FFXIV_MITIGATION, reach);
-      const ev = mod.evaluatePlan(setup.problem, setup.ctxs, []);
-      const counts = mod.countIssues(setup, ev);
-      const names = new Map(mod.FFXIV_MITIGATION.catalog.map((e) => [e.key, e.name]));
-      console.log(`  OPTIMIZER BASELINE (pulls ${window.map((p) => p.pullNumber).join(', ')}): failing ${counts.failing}, tight ${counts.tight}`);
-      let mismatches = 0;
-      for (const row of setup.problem.anchors) {
-        const e = ev.hits.get(row.id);
-        const cls = setup.classes.get(row.id);
-        const same = e && Math.abs(e.median - row.medianMargin) < 1e-9 && Math.abs(e.worst - row.worstMargin) < 1e-9 && e.verdict === row.verdict;
-        if (!same) mismatches++;
-        const assigned = setup.baseline.filter((a) => a.anchor === row.id).map((a) => `${names.get(a.key)}(${a.player.split(' ')[0]})`).join(', ');
-        console.log(`    ${mmss(row.medianMs).padStart(5)} ${row.abilityName} #${row.occurrence}${cls !== 'plan' ? ` [${cls}]` : ''}` +
-          ` est ${pctOf(e.median)}/${pctOf(e.worst)} ${e.verdict.toUpperCase()}${e.tight ? ' TIGHT' : ''}${same ? '' : ` (aggregate ${pctOf(row.medianMargin)}/${pctOf(row.worstMargin)} ${row.verdict})`}` +
-          ` | ${assigned || '-'}`);
-      }
-      console.log(`    baseline vs aggregate mismatches: ${mismatches}`);
+      const window = mod.planWindow(perPull);
       const t0 = Date.now();
-      const opt = mod.partyPlan(window, wRows, perPull.map((p) => p.hits), mod.FFXIV_MITIGATION, reach);
+      const opt = mod.buildMitigationPlan(window, perPull.map((p) => p.hits), mod.FFXIV_MITIGATION, reach);
       const ms = Date.now() - t0;
       const href = (h) => `${h.name} #${h.occurrence} (${mmss(h.medianMs)})`;
       const nChanges = opt.groups.reduce((s, g) => s + g.changes.length, 0);
-      console.log(`  OPTIMIZER (${opt.evaluated} plans, ${ms}ms): failing ${opt.summary.before.failing} -> ${opt.summary.after.failing}, ` +
+      console.log(`  PLAN (pulls ${window.map((p) => p.pullNumber).join(', ')}; ${opt.evaluated} plans, ${ms}ms): ` +
+        `failing ${opt.summary.before.failing} -> ${opt.summary.after.failing}, ` +
         `tight ${opt.summary.before.tight} -> ${opt.summary.after.tight}, ${nChanges} change(s)`);
       opt.groups.forEach((g, i) => {
         console.log(`    group ${i + 1} (${g.purpose}):`);

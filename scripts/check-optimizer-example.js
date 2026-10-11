@@ -1,5 +1,6 @@
 // scripts/check-optimizer-example.js — the mitigation optimizer's synthetic
-// test (lib/mitigation/optimize.ts): the user's three-hit example
+// test (lib/mitigation/optimize.ts, through plan.ts buildMitigationPlan):
+// the user's three-hit example
 // (2026-10-11). Three magical raidwides 20s apart; the party uses Feint (90s)
 // on hit 1 and Kerachole (30s) on hit 2 and has nothing for hit 3, which
 // lands under. Kerachole on hit 1 and Feint on hit 2 bring Kerachole back in
@@ -9,16 +10,16 @@
 // Built from a real pull (Red Hot and Deep Blue, report d3vRbwfpNBLzJ2Xh,
 // needs its sampledata): its players, with their Feint and Kerachole casts
 // rewritten, and three Divers' Dare hits (Red Hot's copy, which Red Hot
-// Feint reaches) with hand-set damage. The search is narrowed to Feint and
-// Kerachole. Exits 1 when the expected plan isn't found.
+// Feint reaches) with hand-set damage. The search is narrowed to those two
+// players' Feint and Kerachole (another melee's free Feint on hit 3 is a
+// one-change fix). Exits 1 when the expected plan isn't found.
 //
 // Usage: node scripts/check-optimizer-example.js
 
 const { requireTsFromRoot } = require('./lib/require-ts');
 const store = requireTsFromRoot('lib/sample-report-store.ts');
 const lt = requireTsFromRoot('lib/log-transforms.ts', { './log-auth': {} });
-const ag = requireTsFromRoot('lib/mitigation/aggregate.ts');
-const op = requireTsFromRoot('lib/mitigation/optimize.ts');
+const pl = requireTsFromRoot('lib/mitigation/plan.ts');
 const dr = requireTsFromRoot('lib/mitigation/debuff-reach.ts');
 const { FFXIV_MITIGATION: G } = requireTsFromRoot('lib/mitigation/ffxiv-catalog.ts');
 
@@ -78,9 +79,10 @@ function makeHit(n, atMs, statusId, caster, key, name, factor) {
     const pull = { ...src, id: 9000 + i, pullNumber: i, players, deathEvents: [] };
     return { pull, pullId: pull.id, pullNumber: i, durationMs: 400_000, hits: builders.map((b) => b(players)) };
   });
-  const rows = ag.aggregateMitigation(window, G, reach);
-  const only = (entry) => entry.key === 'feint' || entry.key === 'kerachole';
-  const plan = op.partyPlan(window, rows, window.map((w) => w.hits), G, reach, only);
+  // Nothing else is available for hit 3: only these two players' cooldowns.
+  const only = (entry, player) => (entry.key === 'feint' && player.name === FEINT.player)
+    || (entry.key === 'kerachole' && player.name === KERACHOLE.player);
+  const plan = pl.buildMitigationPlan(window, window.map((w) => w.hits), G, reach, only);
 
   const pct = (x) => `${Math.round(x * 100)}%`;
   console.log(`failing ${plan.summary.before.failing} -> ${plan.summary.after.failing}; ${plan.evaluated} plans`);
