@@ -530,6 +530,14 @@ grouped by exact roster. The module headers hold the rules.
   - one change per hit, even when it leaves the hit still short
   - a picked player sees only their changes, hits without a change that
     they died to, and their own spare mitigation
+- **Analysis view rework planned (user, 2026-10-11):**
+  [mitigation-optimizer-plan.md](mitigation-optimizer-plan.md). It replaces
+  the Analysis view's change finding and Spare section with a
+  schedule optimizer over the last 5 pulls, takes tank busters out of
+  Analysis, and adds boss-debuff reach evidence.
+- **Tanking panel (future, user 2026-10-11):** tank busters and tank
+  personal cooldowns (Rampart, Damnation, ...) get their own panel,
+  outside the Mitigation Analysis. Not designed yet.
 - **Unverified catalog entries:** Warrior, Machinist (Dismantle), Red Mage,
   Ninja, Monk, Summoner.
 - **Deferred:** what-if sandbox (reuse `marginWithout`), an optional

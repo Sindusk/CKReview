@@ -749,6 +749,29 @@ event's TARGET — never the source:
 - **`unmitigatedAmount` is missing on fully absorbed hits.** Rebuild it as
   (amount + absorbed + overkill) / multiplier.
 
+### FFXIV boss debuffs don't reach every attack (recurring; user, 2026-10-11)
+
+Reprisal, Feint, Addle and Dismantle sit on one enemy and reduce only that
+enemy's attacks. Whether a given attack counts as "that enemy's" is the
+hard part, and experienced players get it wrong too:
+- Many raidwides come from helper actors that the game still treats as
+  the boss: the debuff applies even though the helper never carries it
+  (107 of 209 debuffed hits in the mitigation data check).
+- Some attacks aren't reduced at all, whatever the debuff is on.
+- With several bosses (Red Hot and Deep Blue), a debuff on one boss
+  doesn't touch the other boss's attacks.
+
+The attack's source actor can't settle it. Only an attempt can: the
+debuff was up on boss X when the attack hit, and the hit's `buffs`
+snapshot (checked against its `multiplier`) either lists it or doesn't.
+Key what you learn by (ability, boss, debuff). An attack nobody has
+tried it on is **unknown**, not reached. Never suggest or credit a boss
+debuff on an attack without evidence that it reaches it. User
+corrections from VOD win over the log. Red Hot and Deep Blue is the
+reference fight for this. The build plan is
+[docs/mitigation-optimizer-plan.md](../../docs/mitigation-optimizer-plan.md)
+("Boss-debuff reach").
+
 ### Fields that exist but aren't in the TypeScript types
 
 FFLogs events routinely carry more fields than the declared types — check the
