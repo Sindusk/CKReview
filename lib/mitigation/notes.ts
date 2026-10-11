@@ -13,7 +13,10 @@
 //     Free ones first; ones that would delay a later use only when nothing
 //     was free. When none is enough alone, "Not enough alone: A / B", best
 //     first. Shields have no estimate here (their capacity isn't logged), so
-//     they never count as enough alone.
+//     they never count as enough alone. A boss debuff (Reprisal, Feint,
+//     Addle, Dismantle) is offered only where its reach evidence says it
+//     reduces the hit's attacks, and counts only on those (debuff-reach.ts);
+//     without evidence it is never offered.
 //   - good: nothing.
 // The timeline's hit details list the same options with their estimates
 // (addOptions, aggregateAddOptions).
@@ -21,6 +24,7 @@
 import type { CatalogEntry, DroppableResult, MitigationGame, MitigationHit } from "./types";
 import type { AggregatedHit } from "./aggregate";
 import { MARGIN_UNDER, lowestWithAdded } from "./analyze";
+import { reachesHit, type DebuffReach } from "./debuff-reach";
 
 const MAX_LISTED = 3;
 
@@ -79,29 +83,31 @@ const byEstimate = (a: AddOption, b: AddOption) =>
   Number(b.free) - Number(a.free) || (b.est ?? -Infinity) - (a.est ?? -Infinity) || a.name.localeCompare(b.name);
 
 /** Unused mitigations that would have reached the hit, free first, best estimate first. */
-export function addOptions(hit: MitigationHit, game: MitigationGame): AddOption[] {
+export function addOptions(hit: MitigationHit, game: MitigationGame, reach?: DebuffReach): AddOption[] {
   const entryOf = (key: string) => game.catalog.find((e) => e.key === key);
   return hit.players
-    .filter((p) => !p.dead && (p.state === "free" || p.state === "available") && wouldHelp(entryOf(p.key), hit.tankOnly, hit.damageColumn))
+    .filter((p) => !p.dead && (p.state === "free" || p.state === "available") && wouldHelp(entryOf(p.key), hit.tankOnly, hit.damageColumn)
+      && reachesHit(reach, entryOf(p.key)!, p.player, hit))
     .map((p) => {
       const entry = entryOf(p.key)!;
-      const est = isShield(entry) ? undefined : lowestWithAdded(hit, entry, p.player, 0);
+      const est = isShield(entry) ? undefined : lowestWithAdded(hit, entry, p.player, 0, reach);
       return { key: p.key, name: p.name, player: p.player, free: p.state === "free", est: Number.isFinite(est) ? est : undefined };
     })
     .sort(byEstimate);
 }
 
 /** Mitigations free in at least half the pulls that reached the hit, with the median estimate over those pulls. */
-export function aggregateAddOptions(row: AggregatedHit, game: MitigationGame): AddOption[] {
+export function aggregateAddOptions(row: AggregatedHit, game: MitigationGame, reach?: DebuffReach): AddOption[] {
   const entryOf = (key: string) => game.catalog.find((e) => e.key === key);
   const tankOnly = row.byPull.every((b) => b.hit.tankOnly);
   return row.free
-    .filter((f) => f.pulls * 2 >= row.pulls && wouldHelp(entryOf(f.key), tankOnly, row.damageColumn))
+    .filter((f) => f.pulls * 2 >= row.pulls && wouldHelp(entryOf(f.key), tankOnly, row.damageColumn)
+      && row.byPull.some(({ hit }) => reachesHit(reach, entryOf(f.key)!, f.player, hit)))
     .map((f) => {
       const entry = entryOf(f.key)!;
       const ests = isShield(entry) ? [] : row.byPull
         .filter(({ hit }) => hit.players.some((p) => p.player === f.player && p.key === f.key && p.state === "free"))
-        .map(({ hit }) => lowestWithAdded(hit, entry, f.player, 0))
+        .map(({ hit }) => lowestWithAdded(hit, entry, f.player, 0, reach))
         .filter(Number.isFinite);
       return { key: f.key, name: f.name, player: f.player, free: true, est: ests.length ? median(ests) : undefined, pulls: f.pulls };
     })
@@ -129,14 +135,14 @@ function dropText(drop: DroppableResult, casters: Map<string, string[]>): string
   return `Drop ${joinList(names.map(label), " + ")}`;
 }
 
-export function hitNote(hit: MitigationHit, game: MitigationGame): string {
+export function hitNote(hit: MitigationHit, game: MitigationGame, reach?: DebuffReach): string {
   if (hit.verdict === "good") return "";
   if (hit.verdict === "over") {
     const casters = new Map(hit.active.map((a) => [a.name, a.casters]));
     return dropText(hit.droppable, casters);
   }
 
-  const add = addText(addOptions(hit, game), "Nothing else available");
+  const add = addText(addOptions(hit, game, reach), "Nothing else available");
 
   if (hit.verdict === "fail") {
     const dead = hit.targets.filter((t) => t.died && !t.vulnerable);
@@ -146,7 +152,7 @@ export function hitNote(hit: MitigationHit, game: MitigationGame): string {
   return add;
 }
 
-export function aggregateNote(row: AggregatedHit, game: MitigationGame): string {
+export function aggregateNote(row: AggregatedHit, game: MitigationGame, reach?: DebuffReach): string {
   const deaths = row.deathPulls > 0 ? `Deaths ${row.deathPulls}/${row.pulls}. ` : "";
   if (row.verdict === "good") return deaths.trim();
   if (row.verdict === "over") {
@@ -155,5 +161,5 @@ export function aggregateNote(row: AggregatedHit, game: MitigationGame): string 
     ]));
     return (deaths + dropText(row.droppable, casters)).trim();
   }
-  return deaths + addText(aggregateAddOptions(row, game), "Nothing else usually free");
+  return deaths + addText(aggregateAddOptions(row, game, reach), "Nothing else usually free");
 }

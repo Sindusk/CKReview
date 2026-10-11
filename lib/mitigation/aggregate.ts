@@ -15,6 +15,7 @@ import type {
   DroppableResult, HitVerdict, MitigationGame, MitigationHit, MitigationKind,
 } from "./types";
 import { findDroppable, verdictFor } from "./analyze";
+import type { DebuffReach } from "./debuff-reach";
 import { aggregateNote } from "./notes";
 
 export type AggregatedMitigation = {
@@ -82,6 +83,7 @@ export function aggregateMitigation(
   // pulls that had the hit count as reaching it.
   perPull: { pullId: number; pullNumber: number; durationMs?: number; hits: MitigationHit[] }[],
   game: MitigationGame,
+  reach?: DebuffReach,  // boss-debuff reach, for the notes (debuff-reach.ts)
 ): AggregatedHit[] {
   const groups = new Map<string, PullHit[]>();
   for (const p of perPull) {
@@ -154,7 +156,7 @@ export function aggregateMitigation(
       rare:         reached >= RARE_MIN_REACHED && hits.length < RARE_SHARE * reached,
       byPull,
     };
-    row.note = aggregateNote(row, game);
+    row.note = aggregateNote(row, game, reach);
     out.push(row);
   }
   return out.sort((a, b) => a.medianMs - b.medianMs);

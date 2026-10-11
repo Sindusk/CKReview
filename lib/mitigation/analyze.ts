@@ -70,6 +70,7 @@ import type {
   MitigationGame, MitigationHit, MitigationState, PlayerMitigation,
 } from "./types";
 import { hitNote } from "./notes";
+import { ineffectiveMisses, reachesPart, type DebuffReach } from "./debuff-reach";
 
 export const HIT_CLUSTER_GAP_MS    = 1_000;
 // A hit on non-tanks reaches at least this many players (light-party
@@ -97,38 +98,48 @@ type TargetEvent = { player: PlayerInfo; event: PlayerEvent };
 
 // ── Entry point ─────────────────────────────────────────────────────────
 
-export function analyzePullMitigation(pull: Pull, game: MitigationGame): MitigationHit[] {
+export function analyzePullMitigation(pull: Pull, game: MitigationGame, reach?: DebuffReach): MitigationHit[] {
   const playerNames = new Set(pull.players.map((p) => p.name));
-  const clusters = joinClusters(findHitClusters(pull, playerNames, game));
   const casts = buildCastTimelines(pull.players, game);
+  const hits: MitigationHit[] = [];
+  let sequenceId = 0;
+  let lastEnd = -Infinity;
 
+  for (const span of spans(pull, playerNames, game)) {
+    if (span.timestampMs - lastEnd > SEQUENCE_GAP_MS) sequenceId++;
+    lastEnd = Math.max(lastEnd, span.endMs);
+    hits.push(buildHit(pull, game, span.cluster, casts, { ...span, sequenceId }, reach));
+  }
+
+  applySequenceDrops(hits, pull, playerNames);
+  for (const hit of hits) finishHit(hit, game, reach);
+  return hits;
+}
+
+type Span = { cluster: TargetEvent[]; id: string; occurrence: number; timestampMs: number; endMs: number };
+
+function spans(pull: Pull, playerNames: Set<string>, game: MitigationGame): Span[] {
   // Numbered by name within the phase: one mechanic can use several ability
   // IDs (Kefka's Flagrant Fire III variants), and counting per phase keeps
   // the cross-pull match key stable when an earlier phase plays out
   // differently (a skip, or a pull that started from a checkpoint).
   const occurrence = new Map<string, number>();
-  const hits: MitigationHit[] = [];
-  let sequenceId = 0;
-  let lastEnd = -Infinity;
-
-  for (const cluster of clusters) {
+  return joinClusters(findHitClusters(pull, playerNames, game)).map((cluster) => {
     const first = cluster[0].event;
     const counter = `${phaseName(pull, first.timestamp) ?? ""}|${first.abilityName}`;
     const n = (occurrence.get(counter) ?? 0) + 1;
     occurrence.set(counter, n);
-    const timestampMs = first.timestamp;
-    const endMs = Math.max(...cluster.map((t) => t.event.timestamp));
-    if (timestampMs - lastEnd > SEQUENCE_GAP_MS) sequenceId++;
-    lastEnd = Math.max(lastEnd, endMs);
+    return {
+      cluster, id: `${counter}#${n}`, occurrence: n,
+      timestampMs: first.timestamp, endMs: Math.max(...cluster.map((t) => t.event.timestamp)),
+    };
+  });
+}
 
-    hits.push(buildHit(pull, game, cluster, casts, {
-      occurrence: n, timestampMs, endMs, sequenceId,
-    }));
-  }
-
-  applySequenceDrops(hits, pull, playerNames);
-  for (const hit of hits) finishHit(hit, game);
-  return hits;
+/** Each hit's cross-pull id and time span, without the analysis (debuff-reach.ts ties debuff casts to hits with it). */
+export function hitSpans(pull: Pull, game: MitigationGame): { id: string; timestampMs: number; endMs: number }[] {
+  return spans(pull, new Set(pull.players.map((p) => p.name)), game)
+    .map(({ id, timestampMs, endMs }) => ({ id, timestampMs, endMs }));
 }
 
 // ── Hit detection ───────────────────────────────────────────────────────
@@ -321,7 +332,8 @@ function buildHit(
   game: MitigationGame,
   cluster: TargetEvent[],
   casts: CastTimeline[],
-  at: { occurrence: number; timestampMs: number; endMs: number; sequenceId: number },
+  at: { id: string; occurrence: number; timestampMs: number; endMs: number; sequenceId: number },
+  reach: DebuffReach | undefined,
 ): MitigationHit {
   const first = cluster[0].event;
   const column = game.damageColumn(first.damageType);
@@ -345,12 +357,13 @@ function buildHit(
 
   const active = findActive(byPlayer, game, casts, at.timestampMs, at.endMs);
   const players = buildAvailability(pull, casts, active, cluster, at.timestampMs, at.endMs);
+  if (reach) markReachMisses(players, cluster, reach, game, pull.id, at.timestampMs);
   const castMs = pull.enemyCasts
     ?.filter((c) => c.abilityName === first.abilityName && c.timestamp <= at.timestampMs && at.timestampMs - c.timestamp <= CAST_ANCHOR_WINDOW_MS)
     .reduce<number | undefined>((best, c) => (best === undefined || c.timestamp > best ? c.timestamp : best), undefined);
 
   return {
-    id:           `${phaseName(pull, at.timestampMs) ?? ""}|${first.abilityName}#${at.occurrence}`,
+    id:           at.id,
     abilityId:    first.abilityId,
     abilityName:  first.abilityName,
     abilityNames: [...new Set(cluster.map((t) => t.event.abilityName))],
@@ -406,6 +419,8 @@ function buildTarget(
     const raw = rawOf(event);
     unmitigated = unmitigated === undefined || raw === undefined ? undefined : unmitigated + raw;
     parts.push({
+      abilityName: event.abilityName,
+      source:      event.source,
       timestampMs: event.timestamp,
       damage:      (event.amount ?? 0) + overkill,
       absorbed:    event.absorbed ?? 0,
@@ -561,6 +576,18 @@ function buildAvailability(
   return out;
 }
 
+/** Tags ineffective boss debuffs the reach evidence says can't reduce this hit's attacks (the timeline tooltip). */
+function markReachMisses(players: PlayerMitigation[], cluster: TargetEvent[], reach: DebuffReach, game: MitigationGame,
+  pullId: number, atMs: number) {
+  const attacks = [...new Map(cluster.map((t) => [`${t.event.abilityName}|${t.event.source}`,
+    { abilityName: t.event.abilityName, source: t.event.source }])).values()];
+  for (const p of players) {
+    if (p.state !== "ineffective" || p.kind !== "bossDebuff") continue;
+    const entry = game.catalog.find((e) => e.key === p.key);
+    if (entry) p.reachMisses = ineffectiveMisses(reach, entry, pullId, p.player, attacks, atMs);
+  }
+}
+
 // ── Sequences, margin, verdict, droppable ──────────────────────────────
 
 // laterDrop is measured per player on ALL enemy damage after the hit, not
@@ -607,7 +634,7 @@ export function judged(targets: HitTarget[]): HitTarget[] {
   return clean.length > 0 ? clean : mortal;
 }
 
-function finishHit(hit: MitigationHit, game: MitigationGame) {
+function finishHit(hit: MitigationHit, game: MitigationGame, reach: DebuffReach | undefined) {
   const pool = judged(hit.targets);
   if (pool.length === 0) {
     // Everyone hit was invulnerable: nothing to grade.
@@ -620,7 +647,7 @@ function finishHit(hit: MitigationHit, game: MitigationGame) {
   hit.sequenceMargin = Math.min(...pool.map((t) => t.margin - t.laterDrop));
   hit.verdict = verdictFor(hit.margin, hit.cleanDeaths);
   if (hit.verdict === "over") hit.droppable = findDroppable([hit], game);
-  hit.note = hitNote(hit, game);
+  hit.note = hitNote(hit, game, reach);
 }
 
 export function verdictFor(margin: number, deaths: number): HitVerdict {
@@ -682,13 +709,16 @@ export function marginWithout(
  * A target's margin with an entry added: an added % mitigation scales each
  * part's logged damage before shields; an added shield subtracts
  * `shieldAmount` (its capacity isn't logged, so the caller estimates it).
+ * `applies` limits the % to some parts (a boss debuff reaches only the
+ * attacks its evidence allows: debuff-reach.ts).
  */
-export function marginWithAdded(t: HitTarget, entry: CatalogEntry, shieldAmount: number, column: Column): number {
+export function marginWithAdded(t: HitTarget, entry: CatalogEntry, shieldAmount: number, column: Column,
+  applies: (part: HitPart) => boolean = () => true): number {
   let toHealth = 0;
   for (const part of t.parts) {
     const col = part.column ?? column;
     let factor = 1;
-    if (col !== "none") {
+    if (col !== "none" && applies(part)) {
       for (const s of entry.statuses) {
         if (s.shield) continue;
         factor *= 1 - (col ? s[col] : Math.min(s.physical, s.magical));
@@ -703,13 +733,17 @@ export function marginWithAdded(t: HitTarget, entry: CatalogEntry, shieldAmount:
 /**
  * The hit's lowest HP with `player` casting `entry` on it: a party entry
  * reaches everyone, a self one only its caster, a target one the lowest
- * player. Infinity when nobody hit is graded.
+ * player. A boss debuff counts only on the attacks its reach evidence
+ * says it reduces (none without evidence). Infinity when nobody hit is
+ * graded.
  */
-export function lowestWithAdded(hit: MitigationHit, entry: CatalogEntry, player: string, shieldAmount: number): number {
+export function lowestWithAdded(hit: MitigationHit, entry: CatalogEntry, player: string, shieldAmount: number,
+  reach?: DebuffReach): number {
   const pool = judged(hit.targets);
   const lowest = [...pool].sort((a, b) => a.margin - b.margin)[0];
   const gets = (t: HitTarget) => entry.reach === "party" || (entry.reach === "self" ? t.player === player : t === lowest);
-  return Math.min(...pool.map((t) => (gets(t) ? marginWithAdded(t, entry, shieldAmount, hit.damageColumn) : t.margin)));
+  const applies = (part: HitPart) => reachesPart(reach, entry, player, part, hit);
+  return Math.min(...pool.map((t) => (gets(t) ? marginWithAdded(t, entry, shieldAmount, hit.damageColumn, applies) : t.margin)));
 }
 
 /** Whether removing this catalog entry is ever offered as droppable on this hit. */

@@ -40,11 +40,16 @@
 // review) win over the log.
 //
 // ── Which boss a player debuffs ────────────────────────────────────────
-// Per phase: every boss that player's casts of it landed on in at least
-// half their casts there (one cast's applies within CAST_GROUP_MS are one
-// landing; Reprisal lands on every boss in range). With no cast of theirs
-// in that phase, the bosses anyone's casts landed on most there; with
-// nothing in the phase either, the same over the whole pull set.
+// One cast's applies within CAST_GROUP_MS are one landing (Reprisal lands
+// on every boss in range); a landing is for the first hit it covered
+// (analyze.ts hitSpans, within its duration + SNAPSHOT_SLACK_MS). For a
+// planned cast on a hit (user, 2026-10-11: per hit), every boss that
+// player's landings for that same hit, in any loaded pull, were on in at
+// least half of them. Never cast for that hit: the same over their
+// landings in the hit's phase; none there either, the bosses anyone's
+// landings in the phase were on most; then the same over the whole pull
+// set. An ineffective cast on the timeline uses the bosses that cast
+// really landed on.
 //
 // ── Consumers ──────────────────────────────────────────────────────────
 // An added or moved boss debuff reduces a damage part only when
@@ -56,8 +61,8 @@
 // optimizer.
 
 import type { Pull } from "@/types/Pull";
-import type { CatalogEntry, MitigationGame } from "./types";
-import { HIT_CLUSTER_GAP_MS, SNAPSHOT_SLACK_MS, phaseName } from "./analyze";
+import type { CatalogEntry, HitPart, MitigationGame, MitigationHit } from "./types";
+import { HIT_CLUSTER_GAP_MS, SNAPSHOT_SLACK_MS, hitSpans, judged, phaseName } from "./analyze";
 import { DEBUFF_REACH_OVERRIDES } from "./debuff-reach-overrides";
 
 // Applies of one cast on several enemies land within this of each other.
@@ -82,7 +87,10 @@ export type ReachEvidence = {
   override?: boolean;
 };
 
-type Landing = { player: string; phase?: string; statusId: number; bosses: string[] };
+type Landing = {
+  pullId: number; atMs: number; player: string; phase?: string; statusId: number; bosses: string[];
+  hitId?: string;  // the first hit it covered
+};
 
 export type DebuffReach = {
   evidence: Map<string, ReachEvidence>;  // reachKey(ability, source, boss, statusId)
@@ -137,8 +145,9 @@ function buildWindows(pull: Pull, statuses: Map<number, CatalogEntry>): Window[]
   return out;
 }
 
-function buildLandings(pull: Pull, statuses: Map<number, CatalogEntry>): Landing[] {
+function buildLandings(pull: Pull, statuses: Map<number, CatalogEntry>, game: MitigationGame): Landing[] {
   const out: Landing[] = [];
+  const hits = hitSpans(pull, game);
   const applies = (pull.bossDebuffs ?? [])
     .filter((e) => statuses.has(e.statusId) && e.status !== "removed")
     .sort((a, b) => a.timestamp - b.timestamp);
@@ -150,7 +159,12 @@ function buildLandings(pull: Pull, statuses: Map<number, CatalogEntry>): Landing
       if (!prev.landing.bosses.includes(e.targetName)) prev.landing.bosses.push(e.targetName);
       continue;
     }
-    const landing = { player: e.sourceName, phase: phaseName(pull, e.timestamp), statusId: e.statusId, bosses: [e.targetName] };
+    const reachMs = statuses.get(e.statusId)!.durationMs + SNAPSHOT_SLACK_MS;
+    const landing: Landing = {
+      pullId: pull.id, atMs: e.timestamp, player: e.sourceName, phase: phaseName(pull, e.timestamp),
+      statusId: e.statusId, bosses: [e.targetName],
+      hitId: hits.find((h) => h.endMs >= e.timestamp && h.timestampMs - e.timestamp <= reachMs)?.id,
+    };
     out.push(landing);
     last.set(k, { t: e.timestamp, landing });
   }
@@ -228,7 +242,7 @@ export function buildDebuffReach(pulls: Pull[], game: MitigationGame, onAttempt?
 
   for (const pull of pulls) {
     const windows = buildWindows(pull, statuses);
-    landings.push(...buildLandings(pull, statuses));
+    landings.push(...buildLandings(pull, statuses, game));
     if (windows.length === 0) continue;
     for (const wave of buildWaves(pull, game)) {
       const t = wave.startMs;
@@ -289,23 +303,34 @@ export function buildDebuffReach(pulls: Pull[], game: MitigationGame, onAttempt?
   return { evidence, landings };
 }
 
-/** The bosses `player`'s casts of this status land on in this phase (see header). */
-export function bossesFor(reach: DebuffReach, player: string, statusId: number, phase: string | undefined): string[] {
+/** The bosses `player` would put this status on for this hit (see header). */
+export function bossesFor(reach: DebuffReach, player: string, statusId: number, phase: string | undefined, hitId?: string): string[] {
   const counts = (list: Landing[]) => {
     const m = new Map<string, number>();
     for (const l of list) for (const b of l.bosses) m.set(b, (m.get(b) ?? 0) + 1);
     return m;
   };
-  const same = reach.landings.filter((l) => l.statusId === statusId);
-  const mine = same.filter((l) => l.player === player && l.phase === phase);
-  if (mine.length) return [...counts(mine)].filter(([, n]) => n * 2 >= mine.length).map(([b]) => b);
+  const majority = (list: Landing[]) => [...counts(list)].filter(([, n]) => n * 2 >= list.length).map(([b]) => b);
   const top = (list: Landing[]) => {
     const m = counts(list);
     const best = Math.max(0, ...m.values());
     return [...m].filter(([, n]) => n === best && n > 0).map(([b]) => b);
   };
+  const same = reach.landings.filter((l) => l.statusId === statusId);
+  const mine = same.filter((l) => l.player === player);
+  const forHit = hitId === undefined ? [] : mine.filter((l) => l.hitId === hitId);
+  if (forHit.length) return majority(forHit);
+  const minePhase = mine.filter((l) => l.phase === phase);
+  if (minePhase.length) return majority(minePhase);
   const inPhase = same.filter((l) => l.phase === phase);
   return inPhase.length ? top(inPhase) : top(same);
+}
+
+/** The bosses a real cast landed on: this player's landing in this pull that was up at `atMs`. */
+function castBosses(reach: DebuffReach, entry: CatalogEntry, pullId: number, player: string, statusId: number, atMs: number): string[] | undefined {
+  const reachMs = entry.durationMs + SNAPSHOT_SLACK_MS;
+  return [...reach.landings].reverse().find((l) => l.pullId === pullId && l.player === player && l.statusId === statusId
+    && l.atMs <= atMs && atMs - l.atMs <= reachMs)?.bosses;
 }
 
 /** One (attack, boss, status) key's state, overrides first. */
@@ -334,15 +359,45 @@ export function reachState(reach: DebuffReach, entry: CatalogEntry, statusId: nu
   return { state: "unknown", seen: 0 };
 }
 
+/** Where a planned cast goes: the hit it is for. */
+export type ReachHit = { id: string; phase?: string };
+
 /**
- * Whether `player` casting this boss debuff would reduce a damage part of
- * this attack: "reaches" only with evidence for it. Other entries always
+ * Whether `player` casting this boss debuff for `hit` would reduce this
+ * damage part: "reaches" only with evidence for it. Other entries always
  * reach.
  */
 export function reachesPart(reach: DebuffReach | undefined, entry: CatalogEntry, player: string,
-  ability: string | undefined, source: string | undefined, phase: string | undefined): boolean {
+  part: Pick<HitPart, "abilityName" | "source">, hit: ReachHit): boolean {
   if (entry.kind !== "bossDebuff") return true;
-  if (!reach || !ability || !source) return false;
-  return entry.statuses.some((s) =>
-    reachState(reach, entry, s.id, ability, source, bossesFor(reach, player, s.id, phase)).state === "reaches");
+  if (!reach || !part.source) return false;
+  return entry.statuses.some((s) => reachState(reach, entry, s.id, part.abilityName, part.source!,
+    bossesFor(reach, player, s.id, hit.phase, hit.id)).state === "reaches");
+}
+
+/** Whether the debuff would reduce any judged target's damage on this hit. */
+export function reachesHit(reach: DebuffReach | undefined, entry: CatalogEntry, player: string, hit: MitigationHit): boolean {
+  if (entry.kind !== "bossDebuff") return true;
+  return judged(hit.targets).some((t) => t.parts.some((p) => reachesPart(reach, entry, player, p, hit)));
+}
+
+/**
+ * For an ineffective boss debuff (cast and up, not on the hit): the
+ * attempts showing it never reduces any of the hit's attacks from the boss
+ * it was on, or undefined when the evidence doesn't say so.
+ */
+export function ineffectiveMisses(reach: DebuffReach, entry: CatalogEntry, pullId: number, player: string,
+  attacks: { abilityName: string; source?: string }[], atMs: number): number | undefined {
+  let seen = Infinity;
+  for (const s of entry.statuses) {
+    const bosses = castBosses(reach, entry, pullId, player, s.id, atMs);
+    if (!bosses) return undefined;
+    for (const a of attacks) {
+      if (!a.source) return undefined;
+      const r = reachState(reach, entry, s.id, a.abilityName, a.source, bosses);
+      if (r.state !== "misses") return undefined;
+      seen = Math.min(seen, r.seen);
+    }
+  }
+  return Number.isFinite(seen) ? seen : undefined;
 }

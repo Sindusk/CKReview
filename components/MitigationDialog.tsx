@@ -30,6 +30,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { Pull } from "@/types/Pull";
 import { analyzePullMitigation } from "@/lib/mitigation/analyze";
 import { aggregateMitigation } from "@/lib/mitigation/aggregate";
+import { buildDebuffReach } from "@/lib/mitigation/debuff-reach";
 import { PLAN_MIN_PULLS, buildMitigationPlan } from "@/lib/mitigation/plan";
 import { PlanView } from "./MitigationPlan";
 import { PlayerPicker } from "./MitigationPlayerPicker";
@@ -113,21 +114,25 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId }
   const analyzable = useMemo(() => rosterPulls.filter(hasMitigationData), [rosterPulls]);
   const stale = rosterPulls.length - analyzable.length;
 
+  // Boss-debuff reach is learned from every loaded pull of the boss, any
+  // group (lib/mitigation/debuff-reach.ts): more attempts, fewer unknowns.
+  const reach = useMemo(() => (open ? buildDebuffReach(bossPulls.filter(hasMitigationData), FFXIV_MITIGATION) : undefined),
+    [open, bossPulls]);
   // Only computed while open; the analysis reads every damage event.
   const perPull = useMemo(() => {
     if (!open) return [];
     return analyzable.map((p) => ({
       pullId: p.id, pullNumber: p.pullNumber, durationMs: p.fightDuration,
-      hits: analyzePullMitigation(p, FFXIV_MITIGATION),
+      hits: analyzePullMitigation(p, FFXIV_MITIGATION, reach),
     }));
-  }, [open, analyzable]);
-  const aggregate = useMemo(() => (allPulls ? aggregateMitigation(perPull, FFXIV_MITIGATION) : []), [allPulls, perPull]);
+  }, [open, analyzable, reach]);
+  const aggregate = useMemo(() => (allPulls ? aggregateMitigation(perPull, FFXIV_MITIGATION, reach) : []), [allPulls, perPull, reach]);
   const view: View = viewPick ?? (allPulls && perPull.length >= PLAN_MIN_PULLS ? "analysis" : "timeline");
   const plan = useMemo(() => {
     if (!allPulls || view !== "analysis" || perPull.length < PLAN_MIN_PULLS) return null;
     const byId = new Map(analyzable.map((p) => [p.id, p]));
-    return buildMitigationPlan(aggregate, perPull.map((p) => ({ pull: byId.get(p.pullId)!, hits: p.hits })), FFXIV_MITIGATION);
-  }, [allPulls, view, perPull, aggregate, analyzable]);
+    return buildMitigationPlan(aggregate, perPull.map((p) => ({ pull: byId.get(p.pullId)!, hits: p.hits })), FFXIV_MITIGATION, reach);
+  }, [allPulls, view, perPull, aggregate, analyzable, reach]);
 
   const groups = useMemo(() => buildPlayerGroups(allPulls ? analyzable : selectedPull ? [selectedPull] : []),
     [allPulls, analyzable, selectedPull]);
@@ -251,8 +256,8 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId }
                 </p>
               )}
             </div>
-            {view === "timeline" && detailRow && <AggregateDetails row={detailRow} onClose={closeDetails} />}
-            {view === "timeline" && detailHit && <HitDetails hit={detailHit} onClose={closeDetails} />}
+            {view === "timeline" && detailRow && <AggregateDetails row={detailRow} reach={reach} onClose={closeDetails} />}
+            {view === "timeline" && detailHit && <HitDetails hit={detailHit} reach={reach} onClose={closeDetails} />}
           </div>
         </>
       )}

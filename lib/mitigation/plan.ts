@@ -56,6 +56,7 @@ import type { Pull } from "@/types/Pull";
 import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { CatalogEntry, HitVerdict, MitigationGame, MitigationHit } from "./types";
 import type { AggregatedHit } from "./aggregate";
+import { reachesHit, type DebuffReach } from "./debuff-reach";
 import {
   DAMAGE_ROLL_BUFFER, DROP_MIN_COOLDOWN_MS, MARGIN_UNDER, SNAPSHOT_SLACK_MS,
   isDeadOrFreshlyRevived, judged, lowestWithAdded, marginWithout, playerCasts, simulateCharges,
@@ -144,7 +145,7 @@ function reaches(entry: CatalogEntry, row: AggregatedHit, player: string, tankOn
   return row.byPull.some((b) => b.hit.targets.some((t) => t.player === player));
 }
 
-export function buildMitigationPlan(rows: AggregatedHit[], perPull: PerPull[], game: MitigationGame): MitigationPlan {
+export function buildMitigationPlan(rows: AggregatedHit[], perPull: PerPull[], game: MitigationGame, reach?: DebuffReach): MitigationPlan {
   const byPullId = new Map(perPull.map((p) => [p.pull.id, p]));
   const planned = rows.filter((r) => !r.rare && r.pulls >= PLAN_MIN_PULLS);
 
@@ -193,7 +194,7 @@ export function buildMitigationPlan(rows: AggregatedHit[], perPull: PerPull[], g
     const shield = entry.statuses.some((s) => s.shield);
     const size = shield ? shieldSize.get(entry.key) : 0;
     if (size === undefined) return undefined;
-    const margins = row.byPull.map(({ hit }) => lowestWithAdded(hit, entry, player, size)).filter(Number.isFinite);
+    const margins = row.byPull.map(({ hit }) => lowestWithAdded(hit, entry, player, size, reach)).filter(Number.isFinite);
     if (!margins.length) return undefined;
     return { median: median(margins), worst: Math.min(...margins) };
   };
@@ -209,6 +210,7 @@ export function buildMitigationPlan(rows: AggregatedHit[], perPull: PerPull[], g
     for (const player of roster) {
       for (const entry of game.catalog) {
         if (!entry.jobs.includes(player.className) || !reaches(entry, row, player.name, tankOnly)) continue;
+        if (!row.byPull.some(({ hit }) => reachesHit(reach, entry, player.name, hit))) continue;
         const est = estimate(row, entry, player.name);
         const goodEnough = (e: typeof est) => !!e && (status === "short" ? e.median : e.worst) >= MARGIN_UNDER;
 

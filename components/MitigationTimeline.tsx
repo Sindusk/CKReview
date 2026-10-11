@@ -291,6 +291,9 @@ function PhaseRow({ phase, span }: { phase: string; span: number }) {
 
 function stateTooltip(col: MitigationColumn, s: PlayerMitigation, hitMs: number): string {
   const lines = [`${col.player} — ${col.name}`, ...(s.dead ? ["Dead or just raised"] : []), STATE_STYLE[s.state].label];
+  if (s.reachMisses !== undefined) {
+    lines.push(s.reachMisses > 0 ? `Doesn't reach this attack (seen ${s.reachMisses} time${s.reachMisses === 1 ? "" : "s"})` : "Doesn't reach this attack (from review)");
+  }
   if (s.lastCastMs !== undefined) lines.push(`Last cast ${fmtTime(s.lastCastMs)} (${Math.round((hitMs - s.lastCastMs) / 1000)}s before)`);
   if (s.readyMs !== undefined && Number.isFinite(s.readyMs)) lines.push(`Back at ${fmtTime(s.readyMs)}`);
   if (s.nextCastMs !== undefined) lines.push(`Next cast ${fmtTime(s.nextCastMs)}`);

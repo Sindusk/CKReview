@@ -549,9 +549,11 @@ MECHANICS['mitigation-analysis'] = {
     if (!pulls) return;
     const pctOf = (x) => `${Math.round(x * 100)}%`;
     // Boss-debuff reach evidence (lib/mitigation/debuff-reach.ts), per boss
-    // over every pull of it in this report.
+    // over every pull of it in this report, as the dialog does.
+    const reachByBoss = new Map();
     for (const boss of new Set(pulls.map((p) => p.name))) {
       const reach = mod.buildDebuffReach(pulls.filter((p) => p.name === boss), mod.FFXIV_MITIGATION);
+      reachByBoss.set(boss, reach);
       if (reach.evidence.size === 0) continue;
       console.log('='.repeat(70));
       console.log(`DEBUFF REACH: ${boss} (ability [source] | boss | debuff: reached/missed/shared/inconclusive -> state)`);
@@ -564,7 +566,7 @@ MECHANICS['mitigation-analysis'] = {
     // Aggregated like the dialog: per boss and exact roster.
     const groups = new Map();
     for (const pull of pulls) {
-      const hits = mod.analyzePullMitigation(pull, mod.FFXIV_MITIGATION);
+      const hits = mod.analyzePullMitigation(pull, mod.FFXIV_MITIGATION, reachByBoss.get(pull.name));
       const key = `${pull.name} | ${pull.players.map((p) => p.name.split(' ')[0]).sort().join(', ')}`;
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key).push({ pullId: pull.id, pullNumber: pull.pullNumber, durationMs: pull.fightDuration, hits, pull });
@@ -577,7 +579,8 @@ MECHANICS['mitigation-analysis'] = {
       for (const h of hits) {
         const active = h.active.map((a) => `${a.name}${a.casters.length ? `(${a.casters.map((c) => c.split(' ')[0]).join('/')})` : ''}`).join(', ');
         const free = h.players.filter((p) => p.state === 'free').map((p) => `${p.name}(${p.player.split(' ')[0]})`).join(', ');
-        const ineff = h.players.filter((p) => p.state === 'ineffective').map((p) => `${p.name}(${p.player.split(' ')[0]})`).join(', ');
+        const ineff = h.players.filter((p) => p.state === 'ineffective')
+          .map((p) => `${p.name}(${p.player.split(' ')[0]})${p.reachMisses !== undefined ? ` [never reaches, seen ${p.reachMisses}]` : ''}`).join(', ');
         const deathInfo = h.targets.filter((t) => t.died).map((t) => `${t.player.split(' ')[0]}:${t.deathCause}`).join(' ');
         console.log(`  [${(h.timestampMs / 1000).toFixed(1)}s] seq${h.sequenceId} ${h.abilityNames.join(' + ')} #${h.occurrence}${h.waves > 1 ? ` x${h.waves}` : ''}` +
           `${h.tankOnly ? ' TANK' : ''} (${h.phase ?? '-'}, ${h.damageColumn ?? '?'}) ` +
@@ -594,7 +597,8 @@ MECHANICS['mitigation-analysis'] = {
     for (const [group, perPull] of groups) {
     console.log('='.repeat(70));
     console.log(`ALL PULLS: ${group} (${perPull.length} pulls)`);
-    for (const a of mod.aggregateMitigation(perPull, mod.FFXIV_MITIGATION)) {
+    const reach = reachByBoss.get(perPull[0].pull.name);
+    for (const a of mod.aggregateMitigation(perPull, mod.FFXIV_MITIGATION, reach)) {
       const usual = a.active.filter((m) => m.pulls * 2 >= a.pulls).map((m) => m.name).join(', ');
       const free = a.free.filter((f) => f.pulls * 2 >= a.pulls).map((f) => `${f.name}(${f.player.split(' ')[0]})`).join(', ');
       console.log(`  ${(a.medianMs / 1000).toFixed(0).padStart(4)}s ${a.phase ?? '-'} | ${a.abilityName} #${a.occurrence} pulls=${a.pulls}/${a.reached}${a.rare ? ' RARE' : ''} ` +
@@ -607,8 +611,8 @@ MECHANICS['mitigation-analysis'] = {
     }
     // The Plan view (lib/mitigation/plan.ts).
     if (perPull.length >= mod.PLAN_MIN_PULLS) {
-      const rows = mod.aggregateMitigation(perPull, mod.FFXIV_MITIGATION);
-      const plan = mod.buildMitigationPlan(rows, perPull, mod.FFXIV_MITIGATION);
+      const rows = mod.aggregateMitigation(perPull, mod.FFXIV_MITIGATION, reach);
+      const plan = mod.buildMitigationPlan(rows, perPull, mod.FFXIV_MITIGATION, reach);
       const mmss = (ms) => `${Math.floor(ms / 60000)}:${String(Math.round(ms / 1000) % 60).padStart(2, '0')}`;
       const ref = (h) => `${h.name} #${h.occurrence} (${h.phase ?? '-'}, ${mmss(h.medianMs)})`;
       console.log(`  PLAN (${plan.pulls} pulls):`);

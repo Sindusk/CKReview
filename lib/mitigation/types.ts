@@ -87,6 +87,10 @@ export type HitVerdict = "fail" | "under" | "good" | "over";
 // hits four times about a second apart), or hits joined because they land
 // within seconds of each other, give each target several parts.
 export type HitPart = {
+  // The attack this part belongs to (a joined hit holds several), for
+  // boss-debuff reach (debuff-reach.ts).
+  abilityName:   string;
+  source?:       string;
   timestampMs:   number;
   damage:        number;          // to health, overkill included
   absorbed:      number;          // by shields
@@ -162,6 +166,9 @@ export type PlayerMitigation = {
   readyMs?:    number;  // when it is next off cooldown, if on cooldown
   nextCastMs?: number;  // this player's next real cast after the hit
   approximate: boolean; // gated entry: availability is a guess
+  // An ineffective boss debuff the reach evidence says never reduces this
+  // hit's attacks from the boss it was on: how many attempts showed that.
+  reachMisses?: number;
 };
 
 export type DroppableResult = {
