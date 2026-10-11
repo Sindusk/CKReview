@@ -698,6 +698,12 @@ grouped by exact roster. The module headers hold the rules.
 
 ### Statics analysis
 
+- **Per-player exposure planned (user, 2026-10-11):**
+  [exposure-plan.md](exposure-plan.md). Targeted and assigned mechanics
+  count chances per responsible player. Assigned duties move to the
+  Strategy dialog with auto-detection and a saved override. Every module
+  gets classified in a sweep. Venomous Abyss modules will report their
+  own instances, which covers the missing anchors below.
 - **Mechanic anchors missing** for the Kefka Says instructions, the
   generic Damage Down splits and every Venomous Abyss boss. Those fall back
   to phase exposure, or pull exposure on bosses without log phases.
