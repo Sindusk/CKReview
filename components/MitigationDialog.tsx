@@ -9,9 +9,10 @@
 // replaced the Ikuya-sheet Heatmap and Review tabs on 2026-10-06.
 //
 // Two views (user, 2026-10-09): Analysis (components/MitigationPlan.tsx,
-// lib/mitigation/plan.ts), a short list of coordinated changes for the raid
-// lead read from all of a group's pulls, opened first whenever the group
-// has PLAN_MIN_PULLS+ analyzable pulls; and the full Timeline
+// lib/mitigation/plan.ts), a few coordinated cooldown changes for the raid
+// lead, searched over the group's last N pulls (a "Last N pulls" input,
+// blank = 5) in a web worker (lib/mitigation/plan.worker.ts), opened first
+// whenever the group has PLAN_MIN_PULLS+ analyzable pulls; and the full Timeline
 // (components/MitigationTimeline.tsx), with a details panel for the
 // clicked hit (components/MitigationHitDetails.tsx). The timeline hides
 // uneventful hits (raid hits nobody died to, taken at full health) and,
@@ -22,7 +23,9 @@
 // at a time (a Boss dropdown, defaulting to the current pull's boss), and
 // for either a single pull or all of one group's pulls on that boss at once
 // (the default: one pull is too noisy to plan from). A group is an exact
-// roster; a report can hold several groups' pulls of the same boss. Pulls fetched before the mitigation fields were kept
+// roster; a report can hold several groups' pulls of the same boss. Boss-
+// debuff reach (lib/mitigation/debuff-reach.ts) is learned from every
+// loaded pull of the boss, any group. Pulls fetched before the mitigation fields were kept
 // are listed as needing a re-fetch; re-fetching stays an explicit action
 // elsewhere in the app, never triggered from here.
 

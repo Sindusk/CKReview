@@ -1,9 +1,11 @@
 # Tanking panel (build plan)
 
 Status: **planned 2026-10-11, not started.** It depends on the shared
-optimizer engine from
-[mitigation-optimizer-plan.md](mitigation-optimizer-plan.md), so build
-that first (at least through its step 5).
+optimizer engine, built 2026-10-11: `lib/mitigation/optimize.ts`
+(OptimizerProblem: eligible, canAdd, anchors, objective, constraint,
+needsHelp, freeShifts, extraEdits), with the party Analysis in
+`lib/mitigation/plan.ts` as the worked example. Design record:
+[archive/mitigation-optimizer-plan.md](archive/mitigation-optimizer-plan.md).
 
 Read first:
 - the headers of `lib/mitigation/analyze.ts` and `ffxiv-catalog.ts`

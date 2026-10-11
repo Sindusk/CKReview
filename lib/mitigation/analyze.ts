@@ -61,6 +61,16 @@
 // SEQUENCE_FLOOR after follow-up damage. Shields are assumed to absorb what
 // they absorbed (their capacity isn't logged), so removing a % mitigation
 // in front of a shield is slightly optimistic.
+//
+// ── What-ifs and boss-debuff reach ─────────────────────────────────────
+// marginWith is the one what-if: mitigations removed and added on a target
+// in one pass (the optimizer, optimize.ts); marginWithout and
+// marginWithAdded are its one-sided wrappers. Given the boss's reach
+// evidence (debuff-reach.ts), an added boss debuff reduces only the parts
+// of attacks it is known to reach, and an ineffective boss debuff on the
+// timeline carries how many attempts showed it never reaches this hit's
+// attacks (PlayerMitigation.reachMisses). Each HitPart names its attack
+// (ability and dealing actor) for this.
 
 import type { Pull } from "@/types/Pull";
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";

@@ -23,7 +23,7 @@ sampling it.
 | Sample data, auth tokens, scripts, browser checks, deploy pipeline | [docs/dev-tooling.md](docs/dev-tooling.md) |
 | Damage output / rotation analysis, or tooling for it | [docs/dps-analysis.md](docs/dps-analysis.md) (method and pitfalls) |
 | Changing the Damage, Mitigation or Statics analysis | The module headers (`lib/damage/`, `lib/mitigation/`, `lib/static-analysis.ts`). Design records and log-semantics findings are in [docs/archive/](docs/archive/) |
-| Mitigation Analysis auto-optimizer (build plan) | [docs/mitigation-optimizer-plan.md](docs/mitigation-optimizer-plan.md) |
+| Mitigation Analysis optimizer and boss-debuff reach | Headers of `lib/mitigation/plan.ts` (party rules), `optimize.ts` (generic engine), `debuff-reach.ts`; test: `node scripts/check-optimizer-example.js`. Design record: [docs/archive/mitigation-optimizer-plan.md](docs/archive/mitigation-optimizer-plan.md) |
 | Tanking panel (build plan; after the optimizer) | [docs/tanking-panel-plan.md](docs/tanking-panel-plan.md) |
 | Per-player exposure: targeted / assigned mechanics in Statics (build plan) | [docs/exposure-plan.md](docs/exposure-plan.md) |
 | Local video files as VOD sources (build plan) | [docs/local-vod-plan.md](docs/local-vod-plan.md) |

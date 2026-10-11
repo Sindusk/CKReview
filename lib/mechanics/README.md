@@ -768,8 +768,11 @@ Key what you learn by (ability, boss, debuff). An attack nobody has
 tried it on is **unknown**, not reached. Never suggest or credit a boss
 debuff on an attack without evidence that it reaches it. User
 corrections from VOD win over the log. Red Hot and Deep Blue is the
-reference fight for this. The build plan is
-[docs/mitigation-optimizer-plan.md](../../docs/mitigation-optimizer-plan.md)
+reference fight for this. Built in `lib/mitigation/debuff-reach.ts`
+(evidence) and `debuff-reach-overrides.ts` (VOD corrections). One ability
+name can be two attacks: key by the dealing actor too (both M10S bosses
+cast their own Divers' Dare at once). Design record:
+[docs/archive/mitigation-optimizer-plan.md](../../docs/archive/mitigation-optimizer-plan.md)
 ("Boss-debuff reach").
 
 ### Fields that exist but aren't in the TypeScript types

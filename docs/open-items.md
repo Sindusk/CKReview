@@ -518,23 +518,44 @@ grouped by exact roster. The module headers hold the rules.
   Outcome cell, marks only used / free-on-a-short-hit / ineffective, and
   opens a details panel on click. Notes list only adds that lift the hit
   to good alone. Waiting on the user's review.
-- **Analysis view (built 2026-10-09 as "Plan", waiting on the user's review):**
-  `lib/mitigation/plan.ts` header has the rules. Chosen by the builder:
-  - at most 3 changes; a hit needs 3+ pulls; a change must fit the
-    cooldowns in at least half the hit's pulls
-  - tight = good median but the worst pull under 15%, given a change
-    only when it fixes the worst pull
-  - a short hit whose median lowest HP is below -50% is labelled a
-    mechanic failure, not planned (Red Hot and Deep Blue's Plunging
-    Snap #3 at -674%)
-  - one change per hit, even when it leaves the hit still short
-  - a picked player sees only their changes, hits without a change that
-    they died to, and their own spare mitigation
-- **Analysis view rework planned (user, 2026-10-11):**
-  [mitigation-optimizer-plan.md](mitigation-optimizer-plan.md). It replaces
-  the Analysis view's change finding and Spare section with a
-  schedule optimizer over the last 5 pulls, takes tank busters out of
-  Analysis, and adds boss-debuff reach evidence.
+- **Mitigation optimizer (built 2026-10-11, waiting on the user's review
+  in the running app):** the Analysis view is now a schedule optimizer
+  over the group's last 5 pulls (`lib/mitigation/plan.ts` for the party
+  rules, `optimize.ts` for the generic engine, `debuff-reach.ts` for
+  boss-debuff reach). Design record:
+  [archive/mitigation-optimizer-plan.md](archive/mitigation-optimizer-plan.md).
+  Settled by the user: window 5 (input overrides), about 3 changes, the
+  objective order, tank busters out, boss debuffs only where reach is
+  known, gated entries addable and marked, reach per hit, tier 3 only when
+  nothing fails, the roll buffer applied to changes only.
+  - **Chosen by the builder, not yet confirmed:**
+    - `PLAN_MIN_PULLS` 3: window pulls a hit needs to be planned
+    - `CAST_LEAD_MS` 2s: a placed cast's lead before its hit (not yet
+      checked against how early real casts land)
+    - `BEAM_WIDTH` 50; legality share ½ (a change must fit the cooldowns
+      in at least half the window pulls reaching its hit)
+    - `MECHANIC_MARGIN` -50%: a failing hit below it is a mechanic
+      failure, never planned
+    - tier 3 (`freedom`): off cooldown at the last planned hit, in
+      seconds, minus time until back, weighted by cooldown length / 120s
+    - hard constraint: good hits stay 15%+ (median and worst pull) and
+      5%+ after follow-up damage; healing and mechanic hits get no worse
+    - edit pruning: shifts and adds only to failing or tight hits; a swap
+      only when it helps one; one tier-3 shift per cast, to the latest
+      hit that gets it back by the edge
+    - groups: changes lifting the same failing or tight hit share a card
+    - reach: one cast's applies within 1s are one landing; a landing is
+      "for" the first hit it covered; shared attempts (status open on
+      several bosses) count for a player whose debuff lands on all of them
+  - **Open questions:**
+    - Short windows lose late hits: hits only the best pull reached get
+      no plan. Ask once it shows on real data.
+    - A reach fallback: a planned debuff on a hit the player never
+      debuffed goes on their usual boss. On Divers' Dare #2 (Deep Blue's
+      only) that boss is Red Hot, so Sonder's Feint gets no credit there.
+    - Freaky Pyrotation (Red Hot and Deep Blue) is tight and unfixable
+      partly because no boss debuff was ever tried on it (reach unknown,
+      so no credit; user kept that rule 2026-10-11).
 - **Tanking panel planned (user, 2026-10-11):**
   [tanking-panel-plan.md](tanking-panel-plan.md). It covers busters
   checked with 10s of follow-up damage, invuln planning for shared and
@@ -543,7 +564,7 @@ grouped by exact roster. The module headers hold the rules.
   item below is folded into it.
 - **Unverified catalog entries:** Warrior, Machinist (Dismantle), Red Mage,
   Ninja, Monk, Summoner.
-- **Deferred:** what-if sandbox (reuse `marginWithout`), an optional
+- **Deferred:** what-if sandbox (reuse `marginWith`), an optional
   published plan to compare against, a WoW port.
 - **Not built: tank gauge overcap.** The PLD on the Vamp kill overcapped
   Oath gauge: xivanalysis says 260, and a simulation (+5 per auto-attack,

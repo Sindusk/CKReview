@@ -1,10 +1,33 @@
 # Mitigation Analysis: auto-optimizer (build plan)
 
-Status: **planned 2026-10-11, not started.** Written for the agent that
-builds it. Read first:
+Status: **built 2026-10-11.** Archived as the design record; the live
+rules are the headers of `lib/mitigation/plan.ts` (party Analysis),
+`optimize.ts` (generic engine), `debuff-reach.ts` and
+`debuff-reach-overrides.ts`. Builder tunables and open questions are in
+[open-items.md](../open-items.md), "Mitigation optimizer".
+
+Decided during the build (user, 2026-10-11), beyond the plan below:
+- **An attack is its ability name plus the actor that dealt it.** Red Hot
+  and Deep Blue each cast their own Divers' Dare at once, and a boss's
+  debuff reduces only its own copy. M10S corrections are in the overrides
+  file.
+- **Which boss a player debuffs is decided per hit:** the boss their
+  debuff was on when they used it for that hit in other pulls, else their
+  usual boss.
+- **Gated entries may be added**, marked with their gate (the three-hit
+  example needs it). Only moves were planned.
+- **The roll buffer applies to a change's delta only**, so untouched hits
+  keep their logged margins and the Analysis agrees with the Timeline.
+- **Tier 3 only when nothing is failing or tight.** Otherwise its moves
+  only spend headroom.
+- **No separate drop edit:** a drop used elsewhere is a shift.
+- **Party rules live in plan.ts**, the generic engine in optimize.ts, and
+  the search runs in a web worker (0.2-2s on a 5-pull window).
+
+Read first (when it was planned):
 - the headers of `lib/mitigation/analyze.ts`, `aggregate.ts`, `plan.ts`
   and `notes.ts`, which hold the current rules this plan builds on
-- [lib/mechanics/README.md](../lib/mechanics/README.md), "FFXIV boss
+- [lib/mechanics/README.md](../../lib/mechanics/README.md), "FFXIV boss
   debuffs don't reach every attack": the hardest part of this work
 
 ## Why
@@ -53,7 +76,7 @@ schedule**, and shows them with as little text as possible.
    `red-hot-deep-blue.ts` header.
 
 **Build the engine generic.** The planned Tanking panel
-([tanking-panel-plan.md](tanking-panel-plan.md)) reuses this optimizer
+([tanking-panel-plan.md](../tanking-panel-plan.md)) reuses this optimizer
 with its own eligible entries, anchors (busters plus heavy auto
 windows), objective and extra edits (invulns). So `optimize.ts` should
 take these as parameters: an eligibility predicate, the anchor hits, an
