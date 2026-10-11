@@ -9,16 +9,23 @@
 // never reduced, and with two bosses (Red Hot and Deep Blue) a debuff on one
 // doesn't touch the other's attacks.
 //
+// ── What an attack is ──────────────────────────────────────────────────
+// An ability name AND the actor that dealt it. One name can be two attacks
+// landing together: Red Hot and Deep Blue each cast their own Divers' Dare
+// at the same moment, and a debuff on one boss reduces only that boss's
+// copy (user, 2026-10-11). The source only tells attacks apart; whether a
+// debuff on a boss reaches the attack is still decided by attempts.
+//
 // ── Evidence ───────────────────────────────────────────────────────────
 // Built from every loaded pull of the boss (more attempts, fewer unknowns).
 // Windows come from Pull.bossDebuffs: per enemy actor and status, open from
 // the first apply until the last source's remove (or the catalog duration
-// when the log has no remove). An attempt is one wave of one ability: its
-// enemy damage events on players, no more than HIT_CLUSTER_GAP_MS apart
-// (DoT ticks, auto-attacks, dead bodies and unaspected damage left out),
-// with a window of the debuff open on some boss at the wave's first event
-// and not within SNAPSHOT_SLACK_MS of that window's apply or remove (the
-// `buffs` snapshot lags). For each such (boss, debuff):
+// when the log has no remove). An attempt is one wave of one attack: its
+// damage events on players, no more than HIT_CLUSTER_GAP_MS apart (DoT
+// ticks, auto-attacks, dead bodies and unaspected damage left out), with a
+// window of the debuff open on some boss at the wave's first event and not
+// within SNAPSHOT_SLACK_MS of that window's apply or remove (the `buffs`
+// snapshot lags). For each such (boss, debuff):
 //   - reached: some target's `buffs` lists the status and the target's
 //     FFLogs multiplier agrees (the catalog product matches it, or the
 //     multiplier divided by the other statuses leaves this one's %).
@@ -41,7 +48,7 @@
 //
 // ── Consumers ──────────────────────────────────────────────────────────
 // An added or moved boss debuff reduces a damage part only when
-// reachesPart() says "reaches" for the part's ability and the bosses the
+// reachesPart() says "reaches" for the part's attack and the bosses the
 // player debuffs: any boss whose key reaches, or, for a player whose debuff
 // lands on several bosses, shared attempts outnumbering every one of those
 // bosses' misses. Unknown counts as no reduction (conservative). Used by
@@ -59,9 +66,11 @@ const CAST_GROUP_MS = 1_000;
 const MULTIPLIER_TOLERANCE = 0.011;
 
 export type ReachState = "reaches" | "misses" | "unknown";
+type Outcome = "reached" | "missed" | "shared" | "inconclusive";
 
 export type ReachEvidence = {
   ability:  string;
+  source:   string;  // the actor that dealt it ("*" on an override for every source)
   boss:     string;
   debuff:   string;  // catalog key
   statusId: number;
@@ -69,19 +78,19 @@ export type ReachEvidence = {
   missed:   number;
   shared:   number;
   inconclusive: number;
-  state:    ReachState;
-  // Set when an override decided the state.
+  state:    ReachState;  // overrides applied
   override?: boolean;
 };
 
 type Landing = { player: string; phase?: string; statusId: number; bosses: string[] };
 
 export type DebuffReach = {
-  evidence: Map<string, ReachEvidence>;  // reachKey(ability, boss, statusId)
+  evidence: Map<string, ReachEvidence>;  // reachKey(ability, source, boss, statusId)
   landings: Landing[];
 };
 
-export const reachKey = (ability: string, boss: string, statusId: number) => `${ability}|${boss}|${statusId}`;
+export const reachKey = (ability: string, source: string, boss: string, statusId: number) =>
+  `${ability}|${source}|${boss}|${statusId}`;
 
 /** Catalog boss debuffs by status id. */
 function debuffStatuses(game: MitigationGame): Map<number, CatalogEntry> {
@@ -90,11 +99,18 @@ function debuffStatuses(game: MitigationGame): Map<number, CatalogEntry> {
   return m;
 }
 
-type Window = { boss: string; statusId: number; startMs: number; endMs: number };
+/** The override for this key, if any: one naming the source wins over one for every source. */
+function overrideFor(ability: string, source: string, boss: string, debuff: string) {
+  const matches = DEBUFF_REACH_OVERRIDES.filter((o) => o.ability === ability && o.boss === boss && o.debuff === debuff
+    && (o.source === undefined || o.source === source));
+  return matches.find((o) => o.source !== undefined) ?? matches[0];
+}
+
+type Window = { boss: string; statusId: number; startMs: number; endMs: number; casters: string[] };
 
 function buildWindows(pull: Pull, statuses: Map<number, CatalogEntry>): Window[] {
   const out: Window[] = [];
-  const open = new Map<string, { boss: string; statusId: number; startMs: number; sources: Set<string>; lastApply: number }>();
+  const open = new Map<string, { boss: string; statusId: number; startMs: number; sources: Set<string>; casters: string[]; lastApply: number }>();
   const events = (pull.bossDebuffs ?? []).filter((e) => statuses.has(e.statusId)).sort((a, b) => a.timestamp - b.timestamp);
   for (const e of events) {
     const k = `${e.targetActorId}|${e.targetInstance ?? 0}|${e.statusId}`;
@@ -103,18 +119,20 @@ function buildWindows(pull: Pull, statuses: Map<number, CatalogEntry>): Window[]
       if (!w) continue;
       w.sources.delete(e.sourceName);
       if (w.sources.size === 0) {
-        out.push({ boss: w.boss, statusId: w.statusId, startMs: w.startMs, endMs: e.timestamp });
+        out.push({ boss: w.boss, statusId: w.statusId, startMs: w.startMs, endMs: e.timestamp, casters: w.casters });
         open.delete(k);
       }
     } else if (w) {
       w.sources.add(e.sourceName);
+      if (!w.casters.includes(e.sourceName)) w.casters.push(e.sourceName);
       w.lastApply = e.timestamp;
     } else {
-      open.set(k, { boss: e.targetName, statusId: e.statusId, startMs: e.timestamp, sources: new Set([e.sourceName]), lastApply: e.timestamp });
+      open.set(k, { boss: e.targetName, statusId: e.statusId, startMs: e.timestamp, sources: new Set([e.sourceName]),
+        casters: [e.sourceName], lastApply: e.timestamp });
     }
   }
   for (const w of open.values()) {
-    out.push({ boss: w.boss, statusId: w.statusId, startMs: w.startMs, endMs: w.lastApply + statuses.get(w.statusId)!.durationMs });
+    out.push({ boss: w.boss, statusId: w.statusId, startMs: w.startMs, endMs: w.lastApply + statuses.get(w.statusId)!.durationMs, casters: w.casters });
   }
   return out;
 }
@@ -159,30 +177,32 @@ function multiplierAgrees(statusIds: number[], multiplier: number | undefined, s
     || Math.abs(multiplier - own) <= MULTIPLIER_TOLERANCE;
 }
 
-type Wave = { ability: string; startMs: number; events: { statusIds: number[]; multiplier?: number; column: "physical" | "magical" }[] };
+type WaveEvent = { t: number; statusIds: number[]; multiplier?: number; column: "physical" | "magical" };
+type Wave = { ability: string; source: string; startMs: number; events: WaveEvent[] };
 
 function buildWaves(pull: Pull, game: MitigationGame): Wave[] {
   const players = new Set(pull.players.map((p) => p.name));
-  const byAbility = new Map<string, { t: number; statusIds: number[]; multiplier?: number; column: "physical" | "magical" }[]>();
+  const byAttack = new Map<string, { ability: string; source: string; list: WaveEvent[] }>();
   for (const player of pull.players) {
     for (const e of player.damageTaken) {
       if (e.isDoT || game.isTick(e.abilityId) || game.isAutoAttack(e.abilityName)) continue;
       if (!e.source || players.has(e.source) || e.healthBefore === 0) continue;
       const column = game.damageColumn(e.damageType);
       if (column !== "physical" && column !== "magical") continue;
-      const list = byAbility.get(e.abilityName) ?? [];
-      list.push({ t: e.timestamp, statusIds: e.statusIds ?? [], multiplier: e.multiplier, column });
-      byAbility.set(e.abilityName, list);
+      const k = `${e.abilityName}|${e.source}`;
+      const g = byAttack.get(k) ?? { ability: e.abilityName, source: e.source, list: [] };
+      g.list.push({ t: e.timestamp, statusIds: e.statusIds ?? [], multiplier: e.multiplier, column });
+      byAttack.set(k, g);
     }
   }
   const out: Wave[] = [];
-  for (const [ability, list] of byAbility) {
+  for (const { ability, source, list } of byAttack.values()) {
     list.sort((a, b) => a.t - b.t);
     let wave: Wave | null = null;
     let lastT = -Infinity;
     for (const ev of list) {
       if (!wave || ev.t - lastT > HIT_CLUSTER_GAP_MS) {
-        wave = { ability, startMs: ev.t, events: [] };
+        wave = { ability, source, startMs: ev.t, events: [] };
         out.push(wave);
       }
       wave.events.push(ev);
@@ -192,19 +212,19 @@ function buildWaves(pull: Pull, game: MitigationGame): Wave[] {
   return out;
 }
 
+/** One counted attempt, for debug prints (the `onAttempt` hook). */
+export type ReachAttempt = {
+  pull: Pull; atMs: number; ability: string; source: string; boss: string; statusId: number;
+  outcome: Outcome; casters: string[];
+};
+
 /** Reach evidence from every loaded pull of one boss. */
-export function buildDebuffReach(pulls: Pull[], game: MitigationGame): DebuffReach {
+export function buildDebuffReach(pulls: Pull[], game: MitigationGame, onAttempt?: (a: ReachAttempt) => void): DebuffReach {
   const statuses = debuffStatuses(game);
   const evidence = new Map<string, ReachEvidence>();
   const landings: Landing[] = [];
-  const fresh = (ability: string, boss: string, debuff: string, statusId: number): ReachEvidence =>
-    ({ ability, boss, debuff, statusId, reached: 0, missed: 0, shared: 0, inconclusive: 0, state: "unknown" });
-  const tally = (ability: string, boss: string, statusId: number, field: "reached" | "missed" | "shared" | "inconclusive") => {
-    const k = reachKey(ability, boss, statusId);
-    const ev = evidence.get(k) ?? fresh(ability, boss, statuses.get(statusId)!.key, statusId);
-    ev[field]++;
-    evidence.set(k, ev);
-  };
+  const fresh = (ability: string, source: string, boss: string, debuff: string, statusId: number): ReachEvidence =>
+    ({ ability, source, boss, debuff, statusId, reached: 0, missed: 0, shared: 0, inconclusive: 0, state: "unknown" });
 
   for (const pull of pulls) {
     const windows = buildWindows(pull, statuses);
@@ -217,36 +237,53 @@ export function buildDebuffReach(pulls: Pull[], game: MitigationGame): DebuffRea
         const all = openAt.filter((w) => w.statusId === statusId);
         const clean = all.filter((w) => t - w.startMs > SNAPSHOT_SLACK_MS && w.endMs - t > SNAPSHOT_SLACK_MS);
         if (clean.length === 0) continue;
+        const count = (ws: Window[], outcome: Outcome) => {
+          for (const w of ws) {
+            const k = reachKey(wave.ability, wave.source, w.boss, statusId);
+            const ev = evidence.get(k) ?? fresh(wave.ability, wave.source, w.boss, statuses.get(statusId)!.key, statusId);
+            ev[outcome]++;
+            evidence.set(k, ev);
+            onAttempt?.({ pull, atMs: t, ability: wave.ability, source: wave.source, boss: w.boss, statusId, outcome, casters: w.casters });
+          }
+        };
         const listed = wave.events.filter((e) => e.statusIds.includes(statusId));
         if (listed.length === 0) {
-          for (const w of clean) tally(wave.ability, w.boss, statusId, "missed");
+          count(clean, "missed");
           continue;
         }
         // Another boss's copy near its own edge could also be the one that
         // applied: only a reach with a single open copy names the boss.
-        const bosses = [...new Set(all.map((w) => w.boss))];
+        const bosses = [...new Map(all.map((w) => [w.boss, w])).values()];
         if (!listed.some((e) => multiplierAgrees(e.statusIds, e.multiplier, statusId, game, e.column))) {
-          for (const b of bosses) tally(wave.ability, b, statusId, "inconclusive");
+          count(bosses, "inconclusive");
           continue;
         }
-        if (bosses.length > 1) for (const b of bosses) tally(wave.ability, b, statusId, "shared");
-        else tally(wave.ability, bosses[0], statusId, "reached");
+        count(bosses, bosses.length > 1 ? "shared" : "reached");
       }
     }
   }
 
   for (const ev of evidence.values()) {
-    ev.state = ev.reached > ev.missed ? "reaches" : ev.missed > ev.reached ? "misses" : "unknown";
+    const o = overrideFor(ev.ability, ev.source, ev.boss, ev.debuff);
+    if (o) {
+      ev.state = o.reaches ? "reaches" : "misses";
+      ev.override = true;
+    } else {
+      ev.state = ev.reached > ev.missed ? "reaches" : ev.missed > ev.reached ? "misses" : "unknown";
+    }
   }
+  // Overrides for keys the log never tried, so a print lists them too.
   for (const o of DEBUFF_REACH_OVERRIDES) {
     const entry = game.catalog.find((e) => e.key === o.debuff);
     if (!entry) continue;
     for (const s of entry.statuses) {
-      const k = reachKey(o.ability, o.boss, s.id);
-      const ev = evidence.get(k) ?? fresh(o.ability, o.boss, o.debuff, s.id);
+      const source = o.source ?? "*";
+      if ([...evidence.values()].some((e) => e.ability === o.ability && e.boss === o.boss && e.statusId === s.id
+        && (o.source === undefined || e.source === o.source))) continue;
+      const ev = fresh(o.ability, source, o.boss, o.debuff, s.id);
       ev.state = o.reaches ? "reaches" : "misses";
       ev.override = true;
-      evidence.set(k, ev);
+      evidence.set(reachKey(o.ability, source, o.boss, s.id), ev);
     }
   }
   return { evidence, landings };
@@ -254,50 +291,58 @@ export function buildDebuffReach(pulls: Pull[], game: MitigationGame): DebuffRea
 
 /** The bosses `player`'s casts of this status land on in this phase (see header). */
 export function bossesFor(reach: DebuffReach, player: string, statusId: number, phase: string | undefined): string[] {
-  const majority = (list: Landing[]) => {
-    const counts = new Map<string, number>();
-    for (const l of list) for (const b of l.bosses) counts.set(b, (counts.get(b) ?? 0) + 1);
-    return [...counts].filter(([, n]) => n * 2 >= list.length).map(([b]) => b);
+  const counts = (list: Landing[]) => {
+    const m = new Map<string, number>();
+    for (const l of list) for (const b of l.bosses) m.set(b, (m.get(b) ?? 0) + 1);
+    return m;
   };
   const same = reach.landings.filter((l) => l.statusId === statusId);
   const mine = same.filter((l) => l.player === player && l.phase === phase);
-  if (mine.length) return majority(mine);
-  const inPhase = same.filter((l) => l.phase === phase);
+  if (mine.length) return [...counts(mine)].filter(([, n]) => n * 2 >= mine.length).map(([b]) => b);
   const top = (list: Landing[]) => {
-    const counts = new Map<string, number>();
-    for (const l of list) for (const b of l.bosses) counts.set(b, (counts.get(b) ?? 0) + 1);
-    const best = Math.max(0, ...counts.values());
-    return [...counts].filter(([, n]) => n === best && n > 0).map(([b]) => b);
+    const m = counts(list);
+    const best = Math.max(0, ...m.values());
+    return [...m].filter(([, n]) => n === best && n > 0).map(([b]) => b);
   };
+  const inPhase = same.filter((l) => l.phase === phase);
   return inPhase.length ? top(inPhase) : top(same);
 }
 
-/** Whether a debuff on these bosses reduces this ability (see header). */
-export function reachState(reach: DebuffReach, ability: string, bosses: string[], statusId: number): { state: ReachState; seen: number } {
-  const evs = bosses.map((b) => reach.evidence.get(reachKey(ability, b, statusId)));
-  const hit = evs.find((e) => e?.state === "reaches");
-  if (hit) return { state: "reaches", seen: hit.reached + hit.shared };
-  const overridden = evs.filter((e) => e?.override);
-  if (overridden.length && overridden.length === evs.length) return { state: "misses", seen: 0 };
-  if (bosses.length > 1) {
-    const shared = Math.min(...evs.map((e) => e?.shared ?? 0));
-    const missed = Math.max(...evs.map((e) => e?.missed ?? 0));
-    if (shared > missed && !evs.some((e) => e?.override)) return { state: "reaches", seen: shared };
+/** One (attack, boss, status) key's state, overrides first. */
+function stateOf(reach: DebuffReach, ability: string, source: string, boss: string, statusId: number, debuff: string):
+  { state: ReachState; ev?: ReachEvidence; override: boolean } {
+  const ev = reach.evidence.get(reachKey(ability, source, boss, statusId));
+  const o = overrideFor(ability, source, boss, debuff);
+  if (o) return { state: o.reaches ? "reaches" : "misses", ev, override: true };
+  return { state: ev?.state ?? "unknown", ev, override: false };
+}
+
+/** Whether a debuff on these bosses reduces this attack (see header); `seen` is the attempts behind it. */
+export function reachState(reach: DebuffReach, entry: CatalogEntry, statusId: number,
+  ability: string, source: string, bosses: string[]): { state: ReachState; seen: number } {
+  const states = bosses.map((b) => stateOf(reach, ability, source, b, statusId, entry.key));
+  const hit = states.find((s) => s.state === "reaches");
+  if (hit) return { state: "reaches", seen: (hit.ev?.reached ?? 0) + (hit.ev?.shared ?? 0) };
+  if (bosses.length > 1 && !states.some((s) => s.override)) {
+    const shared = Math.min(...states.map((s) => s.ev?.shared ?? 0));
+    const missed = Math.max(...states.map((s) => s.ev?.missed ?? 0));
+    if (shared > missed) return { state: "reaches", seen: shared };
   }
-  if (evs.length && evs.every((e) => e?.state === "misses")) {
-    return { state: "misses", seen: Math.min(...evs.map((e) => e!.missed)) };
+  if (states.length && states.every((s) => s.state === "misses")) {
+    return { state: "misses", seen: Math.min(...states.map((s) => s.ev?.missed ?? 0)) };
   }
   return { state: "unknown", seen: 0 };
 }
 
 /**
- * Whether `player` casting this boss debuff would reduce a part of this
- * ability: "reaches" only with evidence for it. Non-debuff entries always
+ * Whether `player` casting this boss debuff would reduce a damage part of
+ * this attack: "reaches" only with evidence for it. Other entries always
  * reach.
  */
 export function reachesPart(reach: DebuffReach | undefined, entry: CatalogEntry, player: string,
-  ability: string | undefined, phase: string | undefined): boolean {
+  ability: string | undefined, source: string | undefined, phase: string | undefined): boolean {
   if (entry.kind !== "bossDebuff") return true;
-  if (!reach || !ability) return false;
-  return entry.statuses.some((s) => reachState(reach, ability, bossesFor(reach, player, s.id, phase), s.id).state === "reaches");
+  if (!reach || !ability || !source) return false;
+  return entry.statuses.some((s) =>
+    reachState(reach, entry, s.id, ability, source, bossesFor(reach, player, s.id, phase)).state === "reaches");
 }

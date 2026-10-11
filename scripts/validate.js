@@ -554,11 +554,11 @@ MECHANICS['mitigation-analysis'] = {
       const reach = mod.buildDebuffReach(pulls.filter((p) => p.name === boss), mod.FFXIV_MITIGATION);
       if (reach.evidence.size === 0) continue;
       console.log('='.repeat(70));
-      console.log(`DEBUFF REACH: ${boss} (ability | boss | debuff: reached/missed/shared/inconclusive -> state)`);
-      const rows = [...reach.evidence.values()].sort((a, b) =>
-        a.ability.localeCompare(b.ability) || a.boss.localeCompare(b.boss) || a.debuff.localeCompare(b.debuff));
+      console.log(`DEBUFF REACH: ${boss} (ability [source] | boss | debuff: reached/missed/shared/inconclusive -> state)`);
+      const rows = [...reach.evidence.values()].sort((a, b) => a.ability.localeCompare(b.ability)
+        || a.source.localeCompare(b.source) || a.boss.localeCompare(b.boss) || a.debuff.localeCompare(b.debuff));
       for (const r of rows) {
-        console.log(`  ${r.ability} | ${r.boss} | ${r.debuff}: ${r.reached}/${r.missed}/${r.shared}/${r.inconclusive} -> ${r.state}${r.override ? ' (override)' : ''}`);
+        console.log(`  ${r.ability} [${r.source}] | ${r.boss} | ${r.debuff}: ${r.reached}/${r.missed}/${r.shared}/${r.inconclusive} -> ${r.state}${r.override ? ' (override)' : ''}`);
       }
     }
     // Aggregated like the dialog: per boss and exact roster.
