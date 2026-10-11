@@ -787,7 +787,7 @@ export function findDroppable(hits: MitigationHit[], game: MitigationGame): Drop
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 
-function phaseName(pull: Pull, atMs: number): string | undefined {
+export function phaseName(pull: Pull, atMs: number): string | undefined {
   const seg = pull.phaseSegments?.find((s) => atMs >= s.startMs && atMs < s.endMs);
   if (!seg) return undefined;
   return pull.encounterPhases?.find((p) => p.id === seg.phase)?.name ?? `Phase ${seg.phase}`;
