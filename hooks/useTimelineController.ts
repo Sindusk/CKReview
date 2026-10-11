@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Pull } from "@/types/Pull";
 import type { Vod } from "@/types/Vod";
+import { isSynced, offsetForPull, videoToReportTime } from "@/lib/vod-sync";
 
 type TimelineControllerProps = {
   vod:             Vod | null;
@@ -63,10 +64,13 @@ export default function useTimelineController({
     return Math.min(playbackTime / pullDuration, 1);
   }, [playbackTime, pullDuration]);
 
-  // Absolute video time in seconds (for VideoPanel and calibration)
+  // Absolute video time in seconds (for VideoPanel and calibration).
+  // Every report->video conversion uses the pull's own sync point
+  // (lib/vod-sync.ts), so a re-sync after a stream dropout only moves
+  // pulls from that point on.
   const currentVideoTime = useMemo(() => {
     if (!vod || !pull) return null;
-    return (vod.offset ?? 0) + pull.startTime + playbackTime;
+    return (offsetForPull(vod, pull) ?? 0) + pull.startTime + playbackTime;
   }, [vod, pull, playbackTime]);
 
   // Playback time in MS for AnalysisPanel event comparisons
@@ -89,7 +93,7 @@ export default function useTimelineController({
   const autoSeekKeyRef = useRef<string | null>(null);
   const autoSeekKey = vod && pull ? `${vod.id}:${pull.id}` : null;
 
-  if (vod && pull && vod.isCalibrated && autoSeekKey !== autoSeekKeyRef.current) {
+  if (vod && pull && isSynced(vod) && autoSeekKey !== autoSeekKeyRef.current) {
     autoSeekKeyRef.current = autoSeekKey;
 
     const pullChanged = prevPullIdRef.current !== pull.id;
@@ -99,7 +103,7 @@ export default function useTimelineController({
     if (pullChanged) setPlaybackTime(0);
 
     seekTokenRef.current += 1;
-    const target = (vod.offset ?? 0) + pull.startTime + withinPull;
+    const target = (offsetForPull(vod, pull) ?? 0) + pull.startTime + withinPull;
     pendingSeekRef.current = { time: target, issuedAt: Date.now() };
     setSeekRequest({ time: target, token: seekTokenRef.current });
   }
@@ -136,11 +140,9 @@ export default function useTimelineController({
   const updateFromVideo = useCallback((rawVideoTime: number) => {
     if (!vod) return;
 
-    const offset = vod.offset ?? 0;
-
     // 1. Update playback time relative to selected pull
     if (pull) {
-      const t = rawVideoTime - offset - pull.startTime;
+      const t = rawVideoTime - (offsetForPull(vod, pull) ?? 0) - pull.startTime;
       setPlaybackTime(Math.max(0, Math.min(t, pullDuration)));
     }
 
@@ -160,8 +162,12 @@ export default function useTimelineController({
     }
 
     // 2. Auto-detect which pull we're in (only when calibrated)
-    if (vod.isCalibrated && pulls.length > 0) {
-      const reportTime = rawVideoTime - offset; // seconds from report start
+    // The video time maps back through whichever sync point's stretch of
+    // video it falls in. Detection only ever names a pull this VOD is
+    // playing, so it can't select a pull past the VOD's end (and it never
+    // swaps VODs; only a pick from the list does).
+    const reportTime = videoToReportTime(vod, rawVideoTime); // seconds from report start
+    if (reportTime !== undefined && pulls.length > 0) {
 
       const detected = pulls.find(
         (p) => reportTime >= p.startTime && reportTime <= p.endTime
@@ -182,14 +188,14 @@ export default function useTimelineController({
     const newPlayback = clamped * pullDuration;
 
     setPlaybackTime(newPlayback);
-    emitSeek((vod.offset ?? 0) + pull.startTime + newPlayback);
+    emitSeek((offsetForPull(vod, pull) ?? 0) + pull.startTime + newPlayback);
   }
 
   // ─── Jump to pull start ───────────────────────────────────────────────────────
 
   function seekToPullStart(offsetOverride = 0) {
     if (!pull || !vod) return;
-    emitSeek((vod.offset ?? 0) + pull.startTime + offsetOverride);
+    emitSeek((offsetForPull(vod, pull) ?? 0) + pull.startTime + offsetOverride);
   }
 
   // ─── Raw video time (for the Sync button label) ───────────────────────────────

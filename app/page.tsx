@@ -13,6 +13,7 @@ import ManageStaticsDialog from "@/components/ManageStaticsDialog";
 import { parseYouTubeUrl, parseLogUrl } from "@/lib/url-parsers";
 import { isLocalVod, type Vod } from "../types/Vod";
 import { loadLocalVodOffset, saveLocalVodOffset, clearLocalVodOffset } from "@/lib/local-vod-sync";
+import { withSyncPoints } from "@/lib/vod-sync";
 import VideoPanel from "../components/VideoPanel";
 import VODSidebar from "../components/VODSidebar";
 import { Panel } from "../components/ui/Panel";
@@ -601,10 +602,12 @@ export default function Home() {
     if (selectedVod.localFile) {
       saveLocalVodOffset(selectedVod.localFile, currentReportKey(), offset);
     }
+    // The first sync: a single point from this pull (lib/vod-sync.ts).
+    const point = { fromTime: activePull.startTime, offset };
     setVods(prev =>
       prev.map(v =>
         v.id === selectedVod.id
-          ? { ...v, offset, isCalibrated: true }
+          ? withSyncPoints(v, [point])
           : v
       )
     );
@@ -620,7 +623,7 @@ export default function Home() {
     setVods(prev =>
       prev.map(v =>
         v.id === vodId
-          ? { ...v, isCalibrated: false, offset: undefined }
+          ? withSyncPoints(v, [])
           : v
       )
     );
