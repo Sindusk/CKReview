@@ -95,6 +95,16 @@ These are standing preferences, each learned from a real correction:
   Order the items by pull, not by mechanic. When the same question
   applies to several pulls, ask it once, at the first pull. If the user's
   answer doesn't settle the later pulls, raise those in the next turn.
+- **Show, don't describe** (user, 2026-10-11). Text descriptions of a
+  layout, or tables of numbers with no reference point, don't land:
+  - for a UI or layout choice, render a visual mockup built from real
+    data and let the user pick
+  - for a data checkpoint, tie each question to a pull and MM:SS the
+    user can open in the app, and say what the log shows there
+- **Sanity-check generated advice before showing it.** Read each proposed
+  change the way a raid lead would (would a player actually do this?).
+  The optimizer once moved a 60s Reprisal four minutes later when it was
+  free three times over in between (user, 2026-10-11).
 - **Narrow overrides, not wholesale replacement.** When a working mechanism
   fails for one specific case, add a scoped override for that case. Don't
   swap the whole mechanism.
