@@ -13,7 +13,10 @@ import ManageStaticsDialog from "@/components/ManageStaticsDialog";
 import { parseYouTubeUrl, parseLogUrl } from "@/lib/url-parsers";
 import { isLocalVod, type Vod } from "../types/Vod";
 import { loadLocalVodSync, saveLocalVodSync, clearLocalVodSync } from "@/lib/local-vod-sync";
-import { addSyncPoint, savedSyncPoints, syncPointsOf, syncPointPulls, isSynced, withSyncPoints } from "@/lib/vod-sync";
+import {
+  addSyncPoint, coversPull, isSynced, pickCoveringVod, savedSyncPoints, syncPointPulls, syncPointsOf,
+  vodLabel, withSyncPoints,
+} from "@/lib/vod-sync";
 import VideoPanel from "../components/VideoPanel";
 import VODSidebar from "../components/VODSidebar";
 import { Panel } from "../components/ui/Panel";
@@ -365,6 +368,36 @@ export default function Home() {
   const handlePullDetected = useCallback((pullId: number) => {
     setSelectedPullId(pullId);
   }, []);
+
+  // Brief note on the video panel after an auto-swap, so it isn't silent.
+  // `token` restarts the fade when two swaps happen back to back.
+  const [swapNote, setSwapNote] = useState<{ text: string; token: number } | null>(null);
+  useEffect(() => {
+    if (!swapNote) return;
+    const t = setTimeout(() => setSwapNote(null), 6000);
+    return () => clearTimeout(t);
+  }, [swapNote]);
+
+  // A pull picked from the list (never auto-detection, which follows the
+  // VOD already playing). If the synced VOD on screen doesn't cover it,
+  // swap to one that does (lib/vod-sync.ts pickCoveringVod). Both updates
+  // land in one render, so the timeline's during-render auto-seek computes
+  // the target with the new VOD's offset and resets to the pull start. An
+  // unsynced VOD on screen is never swapped away from: picking a pull is
+  // how the user starts syncing it (user, 2026-10-11).
+  function handleSelectPullFromList(pullId: number) {
+    setSelectedPullId(pullId);
+    const pull = displayPulls.find(p => p.id === pullId);
+    if (!pull || !selectedVod || !isSynced(selectedVod) || coversPull(selectedVod, pull)) return;
+
+    const target = pickCoveringVod(vods, selectedVod, pull);
+    if (!target) return;   // the no-coverage card takes over
+    setSelectedVodId(target.id);
+    setSwapNote({
+      text:  `Switched to ${vodLabel(target, vods)}: ${vodLabel(selectedVod, vods)} doesn't reach pull ${pull.pullNumber}`,
+      token: Date.now(),
+    });
+  }
 
   const timeline = useTimelineController({
     vod:            selectedVod,
@@ -1304,6 +1337,7 @@ export default function Home() {
               onResync={resyncFromPull}
               canResync={!!activePull && timeline.rawVideoTime !== null}
               syncPointLabels={syncPointLabels}
+              note={swapNote}
               onDurationKnown={handleVodDuration}
             />
           </div>
@@ -1315,7 +1349,7 @@ export default function Home() {
         <VODSidebar
           pulls={displayPulls}
           selectedPullId={selectedPullId}
-          onSelectPull={setSelectedPullId}
+          onSelectPull={handleSelectPullFromList}
           vods={vods}
           selectedVodId={selectedVodId}
           onSelectVod={setSelectedVodId}

@@ -12,6 +12,11 @@
 // - The pull the skip happens in may be off; that's accepted. Nothing here
 //   works within a pull.
 //
+// Coverage: a VOD covers a pull when it's synced and the pull's start maps
+// inside the video (0 <= start <= durationSec). Picking an uncovered pull
+// from the list swaps to a covering synced VOD (page.tsx); natural playback
+// never swaps.
+//
 // `Vod.offset` / `isCalibrated` stay as derived fields (first point's offset
 // / any point exists) so callers that only ask "is it synced" keep working.
 // Anything that turns report time into video time, or back, goes through
@@ -113,6 +118,21 @@ export function coversPull(vod: Vod, pull: Pull): boolean {
   const start = pullStartVideoTime(vod, pull);
   if (start === undefined || start < 0) return false;
   return vod.durationSec === undefined || start <= vod.durationSec;
+}
+
+// Auto-swap target for a pull picked from the list that `current` doesn't
+// cover: a synced VOD that does, the same player's first (their next
+// part), then in sidebar order. Unsynced VODs are never candidates.
+export function pickCoveringVod(vods: Vod[], current: Vod, pull: Pull): Vod | null {
+  const candidates = vods.filter(v => v.id !== current.id && coversPull(v, pull));
+  return candidates.find(v => v.player === current.player) ?? candidates[0] ?? null;
+}
+
+// "Alice", or "Alice part 2" when the player has several VODs (numbered in
+// sidebar order).
+export function vodLabel(vod: Vod, vods: Vod[]): string {
+  const own = vods.filter(v => v.player === vod.player);
+  return own.length > 1 ? `${vod.player} part ${own.indexOf(vod) + 1}` : vod.player;
 }
 
 // First and last covered pull in list order, or null when none is covered.

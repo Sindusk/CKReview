@@ -92,6 +92,10 @@ type VideoPanelProps = {
   // bar lists them once there's more than one.
   syncPointLabels?: string[];
 
+  // A brief note shown over the top of the video, e.g. after an auto-swap
+  // to another VOD. The page clears it after a few seconds.
+  note?: { text: string; token: number } | null;
+
   // The active video's length in seconds, reported from the playback loop
   // once the player knows it (getDuration() > 0) and the VOD hasn't
   // recorded one yet. Coverage (lib/vod-sync.ts) depends on it.
@@ -127,6 +131,7 @@ export default function VideoPanel({
   onResync,
   canResync,
   syncPointLabels,
+  note,
   onDurationKnown,
 }: VideoPanelProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -443,6 +448,31 @@ export default function VideoPanel({
               onError={handleLocalError}
               style={{ position: "absolute", inset: 0, width: "100%", height: "100%", background: "#000" }}
             />
+          )}
+
+          {/* Swap note: the one thing drawn over the player, briefly, and
+              click-through so it never blocks the video's controls. */}
+          {note && (
+            <div
+              key={note.token}
+              style={{
+                position: "absolute",
+                top: "8px",
+                left: "50%",
+                transform: "translateX(-50%)",
+                maxWidth: "calc(100% - 16px)",
+                padding: "5px 10px",
+                borderRadius: "4px",
+                background: "rgba(10, 12, 18, 0.85)",
+                boxShadow: "0 0 0 1px rgba(255,255,255,0.08)",
+                color: "var(--ck-text-2)",
+                fontSize: "12px",
+                pointerEvents: "none",
+                zIndex: 2,
+              }}
+            >
+              {note.text}
+            </div>
           )}
 
           {isLocal && localError && (
