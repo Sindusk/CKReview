@@ -59,6 +59,16 @@ export function addSyncPoint(vod: Vod, point: SyncPoint): Vod {
   return withSyncPoints(vod, [...kept, point]);
 }
 
+// The pull each sync point was made at: the pull starting at its fromTime,
+// else the first pull after it (a point restored from a legacy offset has
+// fromTime 0). Undefined when no pull is that late.
+export function syncPointPulls(vod: Vod, pulls: Pull[]): (Pull | undefined)[] {
+  return syncPointsOf(vod).map(point =>
+    pulls.find(p => Math.abs(p.startTime - point.fromTime) < 0.001) ??
+    pulls.find(p => p.startTime >= point.fromTime)
+  );
+}
+
 // Offset (video - report seconds) in effect at a report time, or undefined
 // when the VOD isn't synced.
 export function offsetAtReportTime(vod: Vod, reportTime: number): number | undefined {

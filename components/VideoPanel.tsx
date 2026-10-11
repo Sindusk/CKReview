@@ -81,6 +81,17 @@ type VideoPanelProps = {
   // calibrated — nothing to unsync otherwise.
   onUnsync?: (vodId: number) => void;
 
+  // "Re-sync from this pull" (lib/vod-sync.ts): adds a sync point at the
+  // selected pull, from the current video position, for a stream dropout.
+  // Shown beside Unsync; `canResync` is false until a pull is selected and
+  // the player has reported a time.
+  onResync?: () => void;
+  canResync?: boolean;
+
+  // Pull labels of the VOD's sync points, e.g. ["#1", "#23"]. The title
+  // bar lists them once there's more than one.
+  syncPointLabels?: string[];
+
   // The active video's length in seconds, reported from the playback loop
   // once the player knows it (getDuration() > 0) and the VOD hasn't
   // recorded one yet. Coverage (lib/vod-sync.ts) depends on it.
@@ -113,6 +124,9 @@ export default function VideoPanel({
   seekRequest,
   onCurrentTimeChange,
   onUnsync,
+  onResync,
+  canResync,
+  syncPointLabels,
   onDurationKnown,
 }: VideoPanelProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -369,6 +383,24 @@ export default function VideoPanel({
       }}
     >
       <PanelHeader title={vod ? vod.player : "No VOD Selected"} shrinkTitle>
+        {vod?.isCalibrated && syncPointLabels && syncPointLabels.length > 1 && (
+          <span
+            title="This VOD was re-synced after a skip. Each pull uses the latest sync at or before it."
+            style={{ fontSize: "11px", color: "var(--ck-text-3)", whiteSpace: "nowrap" }}
+          >
+            synced at pulls {syncPointLabels.join(", ")}
+          </span>
+        )}
+        {vod?.isCalibrated && onResync && (
+          <button
+            className="ck-btn ck-btn--arcane ck-btn--sm"
+            onClick={onResync}
+            disabled={!canResync}
+            title="Fixes a skip in the video: this pull and later ones use the new sync; earlier pulls keep theirs. Seek the video to this pull's start first."
+          >
+            Re-sync from this pull
+          </button>
+        )}
         {vod?.isCalibrated && onUnsync && (
           <button
             className="ck-btn ck-btn--arcane ck-btn--sm"

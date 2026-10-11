@@ -13,7 +13,7 @@ import ManageStaticsDialog from "@/components/ManageStaticsDialog";
 import { parseYouTubeUrl, parseLogUrl } from "@/lib/url-parsers";
 import { isLocalVod, type Vod } from "../types/Vod";
 import { loadLocalVodSync, saveLocalVodSync, clearLocalVodSync } from "@/lib/local-vod-sync";
-import { savedSyncPoints, syncPointsOf, isSynced, withSyncPoints } from "@/lib/vod-sync";
+import { addSyncPoint, savedSyncPoints, syncPointsOf, syncPointPulls, isSynced, withSyncPoints } from "@/lib/vod-sync";
 import VideoPanel from "../components/VideoPanel";
 import VODSidebar from "../components/VODSidebar";
 import { Panel } from "../components/ui/Panel";
@@ -632,6 +632,18 @@ export default function Home() {
     updateVodSync(selectedVod.id, v => withSyncPoints(v, [point]));
   }
 
+  // "Re-sync from this pull": for a stream dropout that skipped part of the
+  // video. Adds a sync point at the selected pull (replacing one already
+  // there), so this pull and later ones use the new offset while earlier
+  // pulls keep theirs. The user seeks the video to the pull's real start
+  // first, exactly as for the first sync.
+  function resyncFromPull() {
+    if (!selectedVod || !activePull || timeline.rawVideoTime === null) return;
+    const offset = timeline.calibrate(timeline.rawVideoTime, activePull);
+    const point = { fromTime: activePull.startTime, offset };
+    updateVodSync(selectedVod.id, v => addSyncPoint(v, point));
+  }
+
   // Clears a VOD's calibration so it can be re-synced from scratch — the
   // counterpart to syncToPull() above. Triggered from the "Unsync" button
   // in VideoPanel's title bar (only shown while the VOD is calibrated).
@@ -1104,6 +1116,10 @@ export default function Home() {
 
   const isCalibrated = selectedVod?.isCalibrated ?? false;
 
+  const syncPointLabels = selectedVod
+    ? syncPointPulls(selectedVod, displayPulls).map(p => (p ? String(p.pullNumber) : "?"))
+    : undefined;
+
   const videoBottom = isCalibrated ? (
     <TimelinePanel
       currentTime={timeline.currentTime}
@@ -1285,6 +1301,9 @@ export default function Home() {
               seekRequest={timeline.seekRequest}
               onCurrentTimeChange={handleVideoTimeUpdate}
               onUnsync={handleUnsyncVod}
+              onResync={resyncFromPull}
+              canResync={!!activePull && timeline.rawVideoTime !== null}
+              syncPointLabels={syncPointLabels}
               onDurationKnown={handleVodDuration}
             />
           </div>
