@@ -541,6 +541,7 @@ MECHANICS['mitigation-analysis'] = {
     ...requireTsFromRoot('lib/mitigation/analyze.ts'),
     ...requireTsFromRoot('lib/mitigation/aggregate.ts'),
     ...requireTsFromRoot('lib/mitigation/plan.ts'),
+    ...requireTsFromRoot('lib/mitigation/optimize.ts'),
     ...requireTsFromRoot('lib/mitigation/debuff-reach.ts'),
     ...requireTsFromRoot('lib/mitigation/ffxiv-catalog.ts'),
   }),
@@ -625,6 +626,29 @@ MECHANICS['mitigation-analysis'] = {
         } else console.log(`      ${i.reason}`);
       }
       for (const s of plan.spare) console.log(`    SPARE ${ref(s.hit)}: ${s.items.map((x) => (x.player ? `${x.name} (${x.player.split(' ')[0]})` : x.name)).join(', ')} -> ${pctOf(s.worstMargin)}`);
+
+      // The optimizer's baseline (lib/mitigation/optimize.ts) over the last
+      // PLAN_WINDOW_DEFAULT pulls: the current plan per hit, and a check
+      // that evaluating it with no changes reproduces the window aggregate.
+      const window = perPull.slice(-mod.PLAN_WINDOW_DEFAULT);
+      const wRows = mod.aggregateMitigation(window, mod.FFXIV_MITIGATION, reach);
+      const setup = mod.partySetup(window, wRows, perPull.map((p) => p.hits), mod.FFXIV_MITIGATION, reach);
+      const ev = mod.evaluatePlan(setup.problem, setup.ctxs, []);
+      const counts = mod.countIssues(setup, ev);
+      const names = new Map(mod.FFXIV_MITIGATION.catalog.map((e) => [e.key, e.name]));
+      console.log(`  OPTIMIZER BASELINE (pulls ${window.map((p) => p.pullNumber).join(', ')}): failing ${counts.failing}, tight ${counts.tight}`);
+      let mismatches = 0;
+      for (const row of setup.problem.anchors) {
+        const e = ev.hits.get(row.id);
+        const cls = setup.classes.get(row.id);
+        const same = e && Math.abs(e.median - row.medianMargin) < 1e-9 && Math.abs(e.worst - row.worstMargin) < 1e-9 && e.verdict === row.verdict;
+        if (!same) mismatches++;
+        const assigned = setup.baseline.filter((a) => a.anchor === row.id).map((a) => `${names.get(a.key)}(${a.player.split(' ')[0]})`).join(', ');
+        console.log(`    ${mmss(row.medianMs).padStart(5)} ${row.abilityName} #${row.occurrence}${cls !== 'plan' ? ` [${cls}]` : ''}` +
+          ` est ${pctOf(e.median)}/${pctOf(e.worst)} ${e.verdict.toUpperCase()}${e.tight ? ' TIGHT' : ''}${same ? '' : ` (aggregate ${pctOf(row.medianMargin)}/${pctOf(row.worstMargin)} ${row.verdict})`}` +
+          ` | ${assigned || '-'}`);
+      }
+      console.log(`    baseline vs aggregate mismatches: ${mismatches}`);
     }
     }
   },
