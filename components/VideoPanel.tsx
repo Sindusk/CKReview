@@ -80,6 +80,11 @@ type VideoPanelProps = {
   // re-synced. Only rendered in the title bar when the VOD is currently
   // calibrated — nothing to unsync otherwise.
   onUnsync?: (vodId: number) => void;
+
+  // The active video's length in seconds, reported from the playback loop
+  // once the player knows it (getDuration() > 0) and the VOD hasn't
+  // recorded one yet. Coverage (lib/vod-sync.ts) depends on it.
+  onDurationKnown?: (vodId: number, durationSec: number) => void;
 };
 
 function loadYouTubeAPI(): Promise<void> {
@@ -108,6 +113,7 @@ export default function VideoPanel({
   seekRequest,
   onCurrentTimeChange,
   onUnsync,
+  onDurationKnown,
 }: VideoPanelProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -125,6 +131,11 @@ export default function VideoPanel({
   latestSeekRef.current = seekRequest;
   const latestVodIdRef = useRef<number | null>(vod?.id ?? null);
   latestVodIdRef.current = vod?.id ?? null;
+  // Read by the playback loop, which only restarts on a VOD switch.
+  const latestDurationRef = useRef<number | undefined>(vod?.durationSec);
+  latestDurationRef.current = vod?.durationSec;
+  const onDurationKnownRef = useRef(onDurationKnown);
+  onDurationKnownRef.current = onDurationKnown;
 
   // Bumped on every reuse-swap so an in-flight readiness poll (below) from
   // an earlier swap can tell it's been superseded and stop.
@@ -325,11 +336,23 @@ export default function VideoPanel({
     if (!onCurrentTimeChange) return;
     if (!playerReady || !playerRef.current) return;
 
+    const loopVodId = vod?.id;
     const interval = setInterval(() => {
       const time = playerRef.current?.getCurrentTime();
 
       if (typeof time === "number") {
         onCurrentTimeChange(time);
+      }
+
+      // Record the length the first time the player knows it. The page
+      // decides whether a later, longer reading is worth re-saving.
+      const duration = playerRef.current?.getDuration();
+      if (
+        loopVodId !== undefined &&
+        typeof duration === "number" && duration > 0 &&
+        (latestDurationRef.current === undefined || duration > latestDurationRef.current + 30)
+      ) {
+        onDurationKnownRef.current?.(loopVodId, duration);
       }
     }, 200);
 

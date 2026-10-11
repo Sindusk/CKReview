@@ -30,6 +30,13 @@ export function syncPointsOf(vod: Vod): SyncPoint[] {
   return [];
 }
 
+// Sync points from a saved session VOD: `syncPoints` when present, else
+// one point from the legacy `offset`.
+export function savedSyncPoints(saved: { offset?: number; syncPoints?: SyncPoint[] }): SyncPoint[] {
+  if (saved.syncPoints && saved.syncPoints.length > 0) return saved.syncPoints;
+  return saved.offset !== undefined ? [{ fromTime: 0, offset: saved.offset }] : [];
+}
+
 export function isSynced(vod: Vod): boolean {
   return syncPointsOf(vod).length > 0;
 }

@@ -12,8 +12,8 @@ import AddReviewToStaticDialog from "@/components/AddReviewToStaticDialog";
 import ManageStaticsDialog from "@/components/ManageStaticsDialog";
 import { parseYouTubeUrl, parseLogUrl } from "@/lib/url-parsers";
 import { isLocalVod, type Vod } from "../types/Vod";
-import { loadLocalVodOffset, saveLocalVodOffset, clearLocalVodOffset } from "@/lib/local-vod-sync";
-import { withSyncPoints } from "@/lib/vod-sync";
+import { loadLocalVodSync, saveLocalVodSync, clearLocalVodSync } from "@/lib/local-vod-sync";
+import { savedSyncPoints, syncPointsOf, isSynced, withSyncPoints } from "@/lib/vod-sync";
 import VideoPanel from "../components/VideoPanel";
 import VODSidebar from "../components/VODSidebar";
 import { Panel } from "../components/ui/Panel";
@@ -38,7 +38,7 @@ import { learnWaveCannonLayout, detectWaveCannonPositionErrors } from "@/lib/mec
 import { applyFallback, buildFallbackProfiles } from "@/lib/mechanics/fallback";
 import type { Pull } from "../types/Pull";
 import { createCallWipeError, CALL_WIPE_RULE_ID, createManualError, type ManualErrorInput } from "@/types/PullError";
-import type { SavedSession } from "@/types/Session";
+import type { SavedSession, SavedSessionVod } from "@/types/Session";
 import useTimelineController from "@/hooks/useTimelineController";
 import { fetchReport, fetchFightData, buildFightLogLabels, getWCLRateLimitStatus, isWCLQuotaExhausted, type WCLReport } from "@/lib/wcl-client";
 import {
@@ -115,6 +115,26 @@ async function mapWithConcurrency<T, R>(
 // must go through this too.
 function serverSavableVods(vods: Vod[]): Vod[] {
   return vods.filter(v => !isLocalVod(v));
+}
+
+// A saved session's VOD back as a Vod, with its sync points (or one point
+// from the legacy offset) and recorded length.
+function restoreSessionVod(v: SavedSessionVod, index: number): Vod {
+  const parsedYt = parseYouTubeUrl(v.url);
+  return withSyncPoints({
+    id:          Date.now() + index,
+    player:      v.player,
+    url:         v.url,
+    videoId:     parsedYt?.videoId ?? "",
+    embedUrl:    parsedYt?.embedUrl ?? "",
+    class:       "Unknown",
+    role:        "DPS",
+    raid:        "Unknown Raid",
+    boss:        "Unknown Boss",
+    difficulty:  "Unknown",
+    uploadedBy:  "local-user",
+    durationSec: v.durationSec,
+  }, savedSyncPoints(v));
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -374,11 +394,16 @@ export default function Home() {
     saveTimeoutRef.current = setTimeout(async () => {
       const payload: Omit<SavedSession, "createdAt"> = {
         reportUrl: sessionReportUrlRef.current ?? "",
-        vods: serverSavableVods(vodsRef.current).map(v => ({
-          player: v.player,
-          url:    v.url,
-          offset: v.isCalibrated ? v.offset : undefined,
-        })),
+        vods: serverSavableVods(vodsRef.current).map(v => {
+          const points = syncPointsOf(v);
+          return {
+            player:      v.player,
+            url:         v.url,
+            offset:      points[0]?.offset,
+            syncPoints:  points.length > 0 ? points : undefined,
+            durationSec: v.durationSec,
+          };
+        }),
         wipeCalls:    buildWipeCallsMap(pullsRef.current),
         manualErrors: buildManualErrorsMap(pullsRef.current),
       };
@@ -453,24 +478,7 @@ export default function Home() {
       pendingWipeCallsRef.current = session.wipeCalls ?? {};
       pendingManualErrorsRef.current = session.manualErrors ?? {};
 
-      const restoredVods: Vod[] = session.vods.map((v, i) => {
-        const parsedYt = parseYouTubeUrl(v.url);
-        return {
-          id:           Date.now() + i,
-          player:       v.player,
-          url:          v.url,
-          videoId:      parsedYt?.videoId ?? "",
-          embedUrl:     parsedYt?.embedUrl ?? "",
-          class:        "Unknown",
-          role:         "DPS",
-          raid:         "Unknown Raid",
-          boss:         "Unknown Boss",
-          difficulty:   "Unknown",
-          uploadedBy:   "local-user",
-          offset:       v.offset,
-          isCalibrated: v.offset !== undefined,
-        };
-      });
+      const restoredVods: Vod[] = session.vods.map((v, i) => restoreSessionVod(v, i));
 
       if (restoredVods.length > 0) {
         setVods(restoredVods);
@@ -541,13 +549,12 @@ export default function Home() {
         lastModified: file.lastModified,
       };
       // Re-picking a file calibrated earlier on this log restores its sync.
-      const rememberedOffset = loadLocalVodOffset(localFile, currentReportKey());
-      const newVod: Vod = {
+      const remembered = loadLocalVodSync(localFile, currentReportKey());
+      const newVod: Vod = withSyncPoints({
         id:         Date.now(),
         source:     "local",
         localFile,
-        offset:       rememberedOffset,
-        isCalibrated: rememberedOffset !== undefined,
+        durationSec: remembered?.durationSec,
         player,
         url:        "",
         videoId:    "",
@@ -558,7 +565,7 @@ export default function Home() {
         boss:       "Unknown Boss",
         difficulty: "Unknown",
         uploadedBy: "local-user",
-      };
+      }, remembered?.syncPoints ?? []);
 
       setVods(prev => [...prev, newVod]);
       setSelectedVodId(newVod.id);
@@ -596,38 +603,50 @@ export default function Home() {
     persistSession();
   }
 
+  // Applies a change to one VOD's sync or length and saves it: the server
+  // session for YouTube VODs, localStorage for local files (where it's
+  // cleared once the VOD is unsynced).
+  function updateVodSync(vodId: number, update: (v: Vod) => Vod) {
+    const current = vodsRef.current.find(v => v.id === vodId);
+    if (!current) return;
+    const next = update(current);
+    if (next.localFile) {
+      if (isSynced(next)) {
+        saveLocalVodSync(next.localFile, currentReportKey(), {
+          syncPoints:  syncPointsOf(next),
+          durationSec: next.durationSec,
+        });
+      } else {
+        clearLocalVodSync(next.localFile, currentReportKey());
+      }
+    }
+    setVods(prev => prev.map(v => (v.id === vodId ? update(v) : v)));
+    persistSession();
+  }
+
   function syncToPull() {
     if (!selectedVod || !activePull || timeline.rawVideoTime === null) return;
     const offset = timeline.calibrate(timeline.rawVideoTime, activePull);
-    if (selectedVod.localFile) {
-      saveLocalVodOffset(selectedVod.localFile, currentReportKey(), offset);
-    }
     // The first sync: a single point from this pull (lib/vod-sync.ts).
     const point = { fromTime: activePull.startTime, offset };
-    setVods(prev =>
-      prev.map(v =>
-        v.id === selectedVod.id
-          ? withSyncPoints(v, [point])
-          : v
-      )
-    );
-    persistSession();
+    updateVodSync(selectedVod.id, v => withSyncPoints(v, [point]));
   }
 
   // Clears a VOD's calibration so it can be re-synced from scratch — the
   // counterpart to syncToPull() above. Triggered from the "Unsync" button
   // in VideoPanel's title bar (only shown while the VOD is calibrated).
   function handleUnsyncVod(vodId: number) {
-    const localFile = vods.find(v => v.id === vodId)?.localFile;
-    if (localFile) clearLocalVodOffset(localFile, currentReportKey());
-    setVods(prev =>
-      prev.map(v =>
-        v.id === vodId
-          ? withSyncPoints(v, [])
-          : v
-      )
-    );
-    persistSession();
+    updateVodSync(vodId, v => withSyncPoints(v, []));
+  }
+
+  // The player reported the video's length (VideoPanel). Recorded once,
+  // and again only if it grows a lot (a VOD of a stream still live), so
+  // a steady video never re-saves.
+  function handleVodDuration(vodId: number, durationSec: number) {
+    const current = vodsRef.current.find(v => v.id === vodId);
+    if (!current) return;
+    if (current.durationSec !== undefined && durationSec <= current.durationSec + 30) return;
+    updateVodSync(vodId, v => ({ ...v, durationSec }));
   }
 
   // ── WarcraftLogs import ────────────────────────────────────────────────────
@@ -997,24 +1016,7 @@ export default function Home() {
     pendingWipeCallsRef.current = session.wipeCalls ?? {};
     pendingManualErrorsRef.current = session.manualErrors ?? {};
 
-    const restoredVods: Vod[] = session.vods.map((v, i) => {
-      const parsedYt = parseYouTubeUrl(v.url);
-      return {
-        id:           Date.now() + i,
-        player:       v.player,
-        url:          v.url,
-        videoId:      parsedYt?.videoId ?? "",
-        embedUrl:     parsedYt?.embedUrl ?? "",
-        class:        "Unknown",
-        role:         "DPS",
-        raid:         "Unknown Raid",
-        boss:         "Unknown Boss",
-        difficulty:   "Unknown",
-        uploadedBy:   "local-user",
-        offset:       v.offset,
-        isCalibrated: v.offset !== undefined,
-      };
-    });
+    const restoredVods: Vod[] = session.vods.map((v, i) => restoreSessionVod(v, i));
 
     if (restoredVods.length > 0) {
       setVods(restoredVods);
@@ -1283,6 +1285,7 @@ export default function Home() {
               seekRequest={timeline.seekRequest}
               onCurrentTimeChange={handleVideoTimeUpdate}
               onUnsync={handleUnsyncVod}
+              onDurationKnown={handleVodDuration}
             />
           </div>
           <div style={{ flexShrink: 0 }}>

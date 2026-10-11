@@ -8,7 +8,13 @@
 export type SavedSessionVod = {
   player:  string;
   url:     string;
-  offset?: number;   // present only if this VOD was calibrated
+  // Present only if this VOD was calibrated: the first sync point's
+  // offset, still written so an older client can read the session.
+  offset?: number;
+  // Every sync point (lib/vod-sync.ts). Absent in sessions saved before
+  // re-sync existed; restore then builds one point from `offset`.
+  syncPoints?:  { fromTime: number; offset: number }[];
+  durationSec?: number;   // video length, once the player has reported it
 };
 
 // A manually-added error, serialized for storage. `player` is stored as a
