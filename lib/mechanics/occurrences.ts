@@ -27,6 +27,18 @@
 // start, so their early mechanics show no instances; that is the capture,
 // not the anchors.
 
+// Responsible players (docs/exposure-plan.md): a targeted or assigned
+// mechanic (rule-meta.ts exposure) tests only some players at each
+// instance. Its boss module reports each instance with the players the log
+// names (ReportedOccurrence), since it already works out who was involved
+// to detect the failure. mergeReportedOccurrences folds those into the
+// anchored instances, or makes them the instances for a mechanic without
+// anchors (every WoW boss). `players` stays undefined for everyone
+// mechanics; an empty list means nobody was responsible (an assigned job
+// nobody performed). A module that reports a mechanic must report every
+// instance it can see: an anchored instance it names nobody for counts as
+// nobody's.
+
 import type { EnemyEvent } from "@/types/PullError";
 
 export type MechanicOccurrence = {
@@ -35,6 +47,21 @@ export type MechanicOccurrence = {
   occurrence:  number;
   /** ms into the pull. */
   timestamp:   number;
+  /** Responsible players' log names; undefined = everyone in the pull. */
+  players?:    string[];
+};
+
+/**
+ * One instance of a targeted or assigned mechanic as a boss module sees it.
+ * Report every instance the pull reached, failed or not, timestamped no
+ * later than its errors (the debuff, mark or cast that starts it), and one
+ * entry per instance: entries sharing a key and timestamp are merged.
+ */
+export type ReportedOccurrence = {
+  mechanicKey: string;
+  /** ms into the pull. */
+  timestamp:   number;
+  players:     string[];
 };
 
 type Anchor = {
@@ -121,6 +148,46 @@ export function computeMechanicOccurrences(bossName: string, enemyCasts: EnemyEv
       }
     });
   }
+  return out.sort((a, b) => a.timestamp - b.timestamp);
+}
+
+/**
+ * Folds module-reported instances into the anchored ones. A mechanic with
+ * anchors keeps its instances, and each report adds its players to the
+ * instance its timestamp belongs to (as an error would, else the first
+ * one). A mechanic without anchors takes the reports as its instances, in
+ * time order. Undefined when there is nothing at all.
+ */
+export function mergeReportedOccurrences(
+  anchored: MechanicOccurrence[] | undefined,
+  reported: ReportedOccurrence[],
+): MechanicOccurrence[] | undefined {
+  if (reported.length === 0) return anchored;
+  const out = (anchored ?? []).map((o) => ({ ...o, players: o.players ? [...o.players] : undefined }));
+  const anchoredKeys = new Set(out.map((o) => o.mechanicKey));
+  const addPlayers = (o: MechanicOccurrence, players: string[]) => {
+    o.players = [...new Set([...(o.players ?? []), ...players])];
+  };
+
+  const sorted = [...reported].sort((a, b) => a.timestamp - b.timestamp);
+  const counters = new Map<string, number>();
+  for (const r of sorted) {
+    if (anchoredKeys.has(r.mechanicKey)) {
+      const n = occurrenceForError(out, r.mechanicKey, r.timestamp) ?? 1;
+      const target = out.find((o) => o.mechanicKey === r.mechanicKey && o.occurrence === n);
+      if (target) addPlayers(target, r.players);
+      continue;
+    }
+    const same = out.find((o) => o.mechanicKey === r.mechanicKey && o.timestamp === r.timestamp);
+    if (same) { addPlayers(same, r.players); continue; }
+    const n = (counters.get(r.mechanicKey) ?? 0) + 1;
+    counters.set(r.mechanicKey, n);
+    out.push({ mechanicKey: r.mechanicKey, occurrence: n, timestamp: r.timestamp, players: [...new Set(r.players)] });
+  }
+  // A module that reports a mechanic speaks for all of its instances: an
+  // anchored instance it named nobody for had nobody responsible.
+  const reportedKeys = new Set(reported.map((r) => r.mechanicKey));
+  for (const o of out) if (reportedKeys.has(o.mechanicKey) && !o.players) o.players = [];
   return out.sort((a, b) => a.timestamp - b.timestamp);
 }
 

@@ -24,11 +24,28 @@
 // "Viper Hatched") are grouped with mechanic() instead. A rule that is
 // neither keeps one mechanic per rule id, so renaming it doesn't break its
 // trend.
+//
+// Exposure (docs/exposure-plan.md) says who a mechanic tests, which sets a
+// player's chances in the Statics analysis:
+// - "everyone" (the default): every player in the pull, at every instance.
+// - "targeted": only the player(s) the log names at each instance (a
+//   debuff target, a bait, a cast's target), chosen by the game.
+// - "assigned": a job the raid lead could give to anyone (the fish
+//   carrier, a kick rotation, soakers). Shown in the Strategy dialog, not
+//   in the player ranking.
+// One scope per mechanic: a mechanic whose rules mix scopes is split into
+// two keys ("<X> bait" targeted, "<X> hit" everyone). A targeted or
+// assigned mechanic only takes effect where its module reports instances
+// with their responsible players (lib/mechanics/occurrences.ts
+// ReportedOccurrence); anywhere else it counts as everyone.
+
+export type Exposure = "everyone" | "targeted" | "assigned";
 
 export type RuleMeta = {
   mechanicKey:   string;
   mechanicLabel: string;
   phaseHint?:    number;
+  exposure?:     Exposure;
 };
 
 /** A registry entry; omitted key/label fall back to the rule's own. */
@@ -59,6 +76,15 @@ function mechanic(mechanicKey: string, mechanicLabel: string, phaseHint: number 
 /** Rules that stay their own mechanic but belong to a known phase. */
 function phase(phaseHint: number, ruleIds: string[]): void {
   for (const id of ruleIds) RULE_META[id] = { ...RULE_META[id], phaseHint };
+}
+
+/**
+ * Who these rules' mechanic tests (see header). Call after the rules'
+ * mechanic()/phase() entries; every rule of one mechanic must get the same
+ * scope.
+ */
+function exposure(scope: Exposure, ruleIds: string[]): void {
+  for (const id of ruleIds) RULE_META[id] = { ...RULE_META[id], exposure: scope };
 }
 
 // ── Dancing Mad (FFXIV) ─────────────────────────────────────────────────────
@@ -291,6 +317,14 @@ export function mechanicLabelForKey(mechanicKey: string): string | undefined {
   return undefined;
 }
 
+/** A mechanic's exposure by its key; "everyone" when unclassified. */
+export function mechanicExposure(mechanicKey: string): Exposure {
+  for (const [ruleId, entry] of Object.entries(RULE_META)) {
+    if ((entry.mechanicKey ?? ruleId) === mechanicKey && entry.exposure) return entry.exposure;
+  }
+  return "everyone";
+}
+
 /** The error's mechanic, falling back to the rule itself (see header). */
 export function getRuleMeta(ruleId: string, ruleName: string): RuleMeta {
   const entry = RULE_META[ruleId];
@@ -299,5 +333,6 @@ export function getRuleMeta(ruleId: string, ruleName: string): RuleMeta {
     mechanicKey:   entry?.mechanicKey ?? (split ? staticRuleKey(ruleId, ruleName) : ruleId),
     mechanicLabel: entry?.mechanicLabel ?? ruleName,
     phaseHint:     entry?.phaseHint,
+    exposure:      entry?.exposure ?? "everyone",
   };
 }

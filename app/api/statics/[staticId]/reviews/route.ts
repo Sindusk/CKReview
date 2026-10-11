@@ -104,13 +104,25 @@ function buildPullsCreateData(
         })),
       },
     },
+    // Everyone instances go in one batch; targeted/assigned ones are created
+    // one by one with their responsible players (docs/exposure-plan.md).
     mechanics: {
       createMany: {
-        data: (p.mechanics ?? []).map((m) => ({
+        data: (p.mechanics ?? []).filter((m) => !m.exposure).map((m) => ({
           mechanicKey: m.mechanicKey, occurrence: m.occurrence,
           timestampMs: Math.round(m.timestampMs), phase: m.phase ?? null,
         })),
       },
+      create: (p.mechanics ?? []).filter((m) => m.exposure).map((m) => ({
+        mechanicKey: m.mechanicKey, occurrence: m.occurrence,
+        timestampMs: Math.round(m.timestampMs), phase: m.phase ?? null,
+        exposure:    m.exposure === "assigned" ? "assigned" : "targeted",
+        players: {
+          createMany: {
+            data: (m.players ?? []).map((name) => ({ player: String(name), identityId: identities.get(name) ?? null })),
+          },
+        },
+      })),
     },
     playerErrors: {
       create: p.players.map((pl) => ({

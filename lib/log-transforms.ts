@@ -72,7 +72,7 @@ import { detectRedHotDeepBlueErrors } from "./mechanics/ffxiv/arcadion/red-hot-d
 import { detectTyrantErrors } from "./mechanics/ffxiv/arcadion/tyrant";
 import { detectWowEncounterErrors } from "./mechanics/wow/registry";
 import { buildPullPhaseSegments } from "./pull-phases";
-import { computeMechanicOccurrences } from "./mechanics/occurrences";
+import { computeMechanicOccurrences, mergeReportedOccurrences, type ReportedOccurrence } from "./mechanics/occurrences";
 
 // Shared shape for both games' ability maps: gameID -> name + raw icon
 // filename (not yet resolved to a URL — that happens per-game via
@@ -683,6 +683,7 @@ export function transformFightToPull(
   const friendlyNpcDamageEvents = wclBuildFriendlyNpcDamageEvents(data.damageTakenEvents ?? [], actorMap, abilityMap, fightStart);
 
   // Per-boss encounter modules: see lib/mechanics/wow/registry.ts.
+  const reportedOccurrences: ReportedOccurrence[] = [];
   const errors = [
     ...detectPullErrors(players, deathEvents, enemyCastEvents, enemyBuffEvents),
     ...detectWowEncounterErrors({
@@ -693,6 +694,7 @@ export function transformFightToPull(
       enemyBuffRemovals: enemyBuffRemovalEvents,
       friendlyNpcDamage: friendlyNpcDamageEvents,
       pullDurationMs:    data.fight.endTime - data.fight.startTime,
+      occurrences:       reportedOccurrences,
     }),
   ].sort((a, b) => a.timestamp - b.timestamp);
 
@@ -718,6 +720,7 @@ export function transformFightToPull(
     difficulty:    data.fight.difficulty ?? undefined,
     phaseSegments:   buildPullPhaseSegments(data.fight),
     encounterPhases: data.fight.encounterPhases,
+    mechanicOccurrences: mergeReportedOccurrences(undefined, reportedOccurrences),
     // The sample loader turns a missing stream into []; a capture without
     // the damage stream's aura snapshot predates this stream.
     bossDebuffs:     data.enemyDebuffEvents && data.damageDoneEvents.some((e) => e.buffs !== undefined)

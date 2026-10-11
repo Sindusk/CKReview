@@ -241,10 +241,33 @@ model StaticReviewPullMechanic {
   occurrence  Int
   timestampMs Int
   phase       Int?
+  /// "targeted" | "assigned" when the boss module named this instance's
+  /// responsible players (StaticReviewPullMechanicPlayer; none = nobody was
+  /// responsible). Null = everyone in the pull was exposed. See
+  /// lib/mechanics/rule-meta.ts and docs/exposure-plan.md.
+  exposure    String?
 
-  pull StaticReviewPull @relation(fields: [pullId], references: [id], onDelete: Cascade)
+  pull    StaticReviewPull                 @relation(fields: [pullId], references: [id], onDelete: Cascade)
+  players StaticReviewPullMechanicPlayer[]
 
   @@index([pullId])
+}
+
+/// A responsible player of one targeted or assigned mechanic instance: the
+/// only player(s) that instance gave a chance to fail.
+model StaticReviewPullMechanicPlayer {
+  id          Int     @id @default(autoincrement())
+  mechanicId  Int
+  /// Null for names outside the pull's roster.
+  identityId  Int?
+  /// Raw log name in this pull (provenance).
+  player      String
+
+  mechanic StaticReviewPullMechanic @relation(fields: [mechanicId], references: [id], onDelete: Cascade)
+  identity StaticPlayerIdentity?    @relation(fields: [identityId], references: [id], onDelete: SetNull)
+
+  @@index([mechanicId])
+  @@index([identityId])
 }
 
 /// Per-player error counts for one pull, computed at import time using the
@@ -305,6 +328,7 @@ model StaticPlayerIdentity {
   aliases StaticPlayerAlias[]
   errors  StaticReviewPullPlayerError[]
   detailErrors StaticReviewPullError[]
+  mechanicDuties StaticReviewPullMechanicPlayer[]
 
   @@index([staticId])
 }

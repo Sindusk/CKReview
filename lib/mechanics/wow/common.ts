@@ -13,6 +13,7 @@
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import type { DeathEvent } from "@/types/DeathEvent";
 import type { PullError, EnemyEvent } from "@/types/PullError";
+import type { ReportedOccurrence } from "@/lib/mechanics/occurrences";
 
 /**
  * Everything a per-pull WoW encounter module receives (see registry.ts).
@@ -29,6 +30,12 @@ export type WowPullContext = {
   friendlyNpcDamage: EnemyEvent[];
   /** fight.endTime - fight.startTime (the harness approximates it from events). */
   pullDurationMs:    number;
+  /**
+   * Sink for the instances of this boss's targeted and assigned mechanics,
+   * with their responsible players (lib/mechanics/occurrences.ts
+   * ReportedOccurrence). Absent when the caller doesn't collect them.
+   */
+  occurrences?:      ReportedOccurrence[];
 };
 
 // A Raid marker usually shares its millisecond with the Major errors that

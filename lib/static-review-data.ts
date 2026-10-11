@@ -16,14 +16,17 @@ import { CALL_WIPE_RULE_ID, type PullError } from "@/types/PullError";
 import { getPullRaidCutoff } from "@/lib/report-data";
 import { WCL_MYTHIC_DIFFICULTY } from "@/lib/wcl-client";
 import { phaseAt, type EncounterPhase } from "@/lib/pull-phases";
-import { getRuleMeta, staticRuleKey } from "@/lib/mechanics/rule-meta";
+import { getRuleMeta, mechanicExposure, staticRuleKey } from "@/lib/mechanics/rule-meta";
 import { occurrenceForError } from "@/lib/mechanics/occurrences";
 
 /**
  * Shape version of the detail rows (StaticReview.detailVersion). Bump when
  * the stored detail changes meaning, so the views can tell sessions apart.
  */
-export const STATIC_DETAIL_VERSION = 1;
+// 2: mechanic instances carry their exposure and responsible players
+// (docs/exposure-plan.md). Sessions below this count every player at every
+// instance, as before.
+export const STATIC_DETAIL_VERSION = 2;
 
 /**
  * The pulls that count toward a static's stats. WoW: Mythic raid pulls
@@ -89,6 +92,10 @@ export type StaticReviewMechanicData = {
   occurrence:  number;
   timestampMs: number;
   phase:       number | null;
+  // A targeted or assigned instance (rule-meta.ts exposure) whose module
+  // named its responsible players; empty = nobody. Absent for everyone.
+  exposure?:   "targeted" | "assigned";
+  players?:    string[];
 };
 
 /** What ended a wiped pull (see computeWipeCause). */
@@ -286,12 +293,16 @@ export function computeStaticReviewPullData(pulls: Pull[]): StaticReviewPullData
       lastPhase:     pull.phaseSegments?.length ? Math.max(...pull.phaseSegments.map((s) => s.phase)) : null,
       phases:        (pull.phaseSegments ?? []).map((s) => ({ phase: s.phase, startMs: s.startMs, endMs: s.endMs })),
       errors:        computePullErrorDetail(pull, cutoff),
-      mechanics:     (pull.mechanicOccurrences ?? []).map((o) => ({
-        mechanicKey: o.mechanicKey,
-        occurrence:  o.occurrence,
-        timestampMs: Math.round(o.timestamp),
-        phase:       phaseAt(pull.phaseSegments, o.timestamp),
-      })),
+      mechanics:     (pull.mechanicOccurrences ?? []).map((o) => {
+        const exposure = o.players ? mechanicExposure(o.mechanicKey) : "everyone";
+        return {
+          mechanicKey: o.mechanicKey,
+          occurrence:  o.occurrence,
+          timestampMs: Math.round(o.timestamp),
+          phase:       phaseAt(pull.phaseSegments, o.timestamp),
+          ...(exposure !== "everyone" ? { exposure, players: o.players } : {}),
+        };
+      }),
       endCause:      computeWipeCause(pull),
     };
   });
