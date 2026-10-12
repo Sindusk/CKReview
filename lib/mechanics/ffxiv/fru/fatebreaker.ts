@@ -74,8 +74,23 @@
 //   Damage Down are voluntary resets (A40, A42, A53, A57, A66 ...); a few
 //   with a big hit just before are FFLogs dropping the killing blow (A19).
 // - Pulls end fast: 4 dead ended every pull within 14s (C47 the worst).
-// Cutoffs (first Raid error): collapse 76, called wipe 51, Fated Burn Mark
-// 27, tower 13, enrage 12; the 18 P1 clears have none.
+// - Initial-cone clock spots: each player stands at the same bearing in
+//   both Cyclonic Breaks in A and B (within ~5 degrees); C swaps two players
+//   (226 <-> 270) every pull. A's spots: MT 0, OT 90, H1 268, H2 180, the
+//   M1 225, the SE melee 135, NE 45, NW 315 (standard modified clocks).
+// - Group A's tank swap: the MT Provokes at the pull (+0:00-1.6), the OT
+//   Provokes ~1.5s before the first buster lands; B/C have no opener
+//   Provoke (their MT Shirks ~2s before the buster).
+// - Fall of Faith fire: Sinblaze points at the helper nearest the carrier.
+//   Every fire cone into the other group had a helper 17-68 units from the
+//   carrier (A40, A42, A53, A61); clean resolutions' nearest helper 90+.
+// VOD review 2026-10-12 (user): report A pulls 3, 4, 17, 19, 26, 46, 53,
+// 61, 64; rulings in expectations/rulings.json. It set the Provoke blame,
+// the opener-MT aggro check, cone spots, "dead going into", Sinblaze's
+// nearest helper and the 20s Damage Down reset window below.
+// Cutoffs (first Raid error): player dead going into a mechanic 62, called
+// wipe 41, collapse 40, Fated Burn Mark 22, enrage 11, tower 3; the 18 P1
+// clears have none.
 //
 // -- RULES IMPLEMENTED --
 // ffxiv-fb-avoidable (Major on Damage Down or death, else Minor): Cyclonic
@@ -83,27 +98,39 @@
 // ffxiv-fb-overlap (Major if someone involved died, else Minor): with all
 //   eight alive, a player hit by two or more initial cones, Sinsmite or
 //   Sinbound Thunder III spreads; everyone sharing those instances named.
+//   Cones: when some of them stood 20+ degrees off their spot in the pull's
+//   other Cyclonic Break, only those are named; with someone dead, only a
+//   player who moved onto a living player's spot.
 // ffxiv-fb-stack: with all eight alive, a player in two Sinsmoke / Sinbound
 //   Fire III stacks, or in none (not if just hit by an avoidable).
-// ffxiv-fb-powder-swap (Major, both tanks): Powder Mark holder killed by an
-//   auto-attack. ffxiv-fb-powder-death (Major): a tank killed by the Powder
-//   Mark buster or a single expiry Burn Mark.
+// ffxiv-fb-powder-swap (Major): the first Powder Mark on the tank who
+//   wasn't the opener-Provoke MT (that tank named); the holder killed by an
+//   auto-attack: the other tank if they didn't Provoke, both tanks if they
+//   did. ffxiv-fb-powder-death (Major): a tank killed by the Powder Mark
+//   buster or by a single expiry Burn Mark (their mitigation).
 // ffxiv-fb-burn-mark: both expiry explosions on one tank (both tanks named),
-//   or one on a non-tank (that player and the other tank).
+//   or one on a non-tank with all eight alive (that player and the other
+//   tank).
 // ffxiv-fb-fated-burn-mark (Raid): a Fated Burn Mark explosion hitting 3+
 //   others; the holder's death is flagged by what killed them.
 // ffxiv-fb-tether-stack (all eight alive): both stacks overlapping (the two
 //   tethered players), a player in both, a player in neither when a stack
 //   was short, else a player-less Minor for an uneven split.
 // ffxiv-fb-fall-of-faith: each resolution's group is read from the other
-//   resolution on its side when that was clean; with the group alive: a
-//   double hit, other-group players in it (3+: the carrier, by Floating
-//   Fetters), a short Sinblaze's missing members (player-less if unknown).
+//   resolution on its side when that was clean, else as everyone outside a
+//   clean resolution of the other side; with the group alive: a double hit,
+//   fire reaching the other group (the helper nearest the carrier alone),
+//   lightning reaching it (3+: the carrier, by Floating Fetters, else those
+//   players), a short Sinblaze's missing members (player-less if unknown).
 // ffxiv-fb-tower (Raid + Major): a short tower; with the six non-tanks
 //   alive, a non-tank in no tower, else the extras in an overfilled one.
 //   Skipped with 3+ non-tanks dead.
 // ffxiv-fb-knockback (Major): knocked into the wall by Blastburn, or walked
-//   into it mid-pull (not a Damage Down reset, not a dropped killing blow).
+//   into it mid-pull (not within 20s of their own Damage Down: a reset; not
+//   a dropped killing blow).
+// ffxiv-fb-dead-going-in (Raid): someone still dead when Cyclonic Break,
+//   Utopian Sky, the tether stacks or Fall of Faith begins (all eight
+//   needed), or a non-tank at the towers (C27 cleared with the OT dead).
 // ffxiv-fb-enrage / -called-wipe (3+ no-killing-blow deaths within 10s or
 //   within 12s of the end, knocks excluded) / -collapse (4 dead, pull over
 //   within 20s): Raid, only the earliest, only before any mechanic Raid.
@@ -111,10 +138,11 @@
 // Powder Mark); everything else counts everyone.
 // The Damage Down causes are excluded from ffxiv-damage-down (error-rules.ts).
 //
-// Not built (questions for VOD review): who left their spot in an overlap
-// (clock spots from positions), which tank missed the swap, the tether
-// stacks' and towers' assigned members (groups differ per report), Bleeding
-// / Burnished Glory deaths (healing), tank mitigation beyond deaths.
+// Not built: who left their spot in a spread overlap, who belongs on the
+// sides vs behind in a misread lightning tether (user: unknown, A46), the
+// tether stacks' and towers' assigned members (groups differ per report),
+// Bleeding / Burnished Glory deaths (healing), tank mitigation beyond
+// deaths.
 //
 // -- GUIDE-DERIVED MODEL: FATEBREAKER (FRU PHASE 1) --
 // Futures Rewritten (Ultimate), released patch 7.11; checked 2026-10-09.
@@ -337,7 +365,7 @@ import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import type { DeathEvent } from "@/types/DeathEvent";
 import type { PullError, EnemyEvent } from "@/types/PullError";
 import type { ReportedOccurrence } from "@/lib/mechanics/occurrences";
-import { kFmt, sec, joinNames, playerError, playerlessMinor, raidMarker, rezzedAt, clusterByGap } from "@/lib/mechanics/wow/common";
+import { kFmt, sec, yd, joinNames, playerError, playerlessMinor, raidMarker, clusterByGap } from "@/lib/mechanics/wow/common";
 
 export const FB_AVOIDABLE_RULE_ID    = "ffxiv-fb-avoidable";
 export const FB_OVERLAP_RULE_ID      = "ffxiv-fb-overlap";
@@ -353,6 +381,7 @@ export const FB_KNOCKBACK_RULE_ID    = "ffxiv-fb-knockback";
 export const FB_ENRAGE_RULE_ID       = "ffxiv-fb-enrage";
 export const FB_CALLED_WIPE_RULE_ID  = "ffxiv-fb-called-wipe";
 export const FB_COLLAPSE_RULE_ID     = "ffxiv-fb-collapse";
+export const FB_DEAD_GOING_IN_RULE_ID = "ffxiv-fb-dead-going-in";
 
 // ── log IDs (VERIFIED above) ────────────────────────────────────────────────
 
@@ -418,9 +447,10 @@ const EPISODE_MS         = 3000;
 const KNOCKBACK_MIN_MS   = 2000;
 const KNOCKBACK_MAX_MS   = 4500;
 // A no-killing-blow death this soon after the player's own Damage Down is a
-// voluntary reset into the wall (4.1-8.5s in every case, A40 ... C25): the
-// Damage Down's cause is the error, not the death.
-const DD_RESET_MS        = 15_000;
+// voluntary reset into the wall (4.1-8.5s mostly, A40 ... C25; A64 +1:22.8
+// 15.3s, user-confirmed): the Damage Down's cause is the error, not the
+// death.
+const DD_RESET_MS        = 20_000;
 const CALLED_WIPE_END_MS = 12_000;
 const CALLED_WIPE_COUNT  = 3;
 const CALLED_WIPE_WINDOW = 10_000;
@@ -443,6 +473,19 @@ const TOWER_OVER_DEAD    = 3;
 // A no-killing-blow death with a damage hit this soon before its event died
 // to that hit (FFLogs dropped the killing blow: A19 +1:49.5 after Sinblaze).
 const SILENT_HIT_MS      = 3500;
+const ARENA_CENTER       = 10000;
+// A player's initial-cone clock spot is the same in both Cyclonic Breaks
+// (A and B: within ~5 degrees; C swaps two players every pull). Further than
+// this from it is off their spot (A4 the M1 226 -> 137).
+const CONE_SPOT_MOVED    = 20;
+// The main tank Provokes at the pull (group A: +0:00.0-1.6 every pull).
+const OPENER_PROVOKE_MS  = 3000;
+// The swap Provoke counts from this long before the buster lands (group A
+// Provokes ~1.5s before it, B/C 0.7-2.7s before).
+const SWAP_PROVOKE_BEFORE_MS = 6000;
+// "Dead going in" is read this long before a mechanic's first hit, so its
+// own victims (death modeled ~2.1s before the event) don't count.
+const DEAD_GOING_IN_MS   = 500;
 
 // ── shared helpers ──────────────────────────────────────────────────────────
 
@@ -455,13 +498,32 @@ type Life = {
   outIntervals: { p: PlayerInfo; start: number; end: number }[];
 };
 
+/**
+ * A dead body still logs hits: 0 damage at 0 HP. The live pipeline marks
+ * them healthBefore 0; the validate harness has only healthAfter.
+ */
+const bodyHit = (e: PlayerEvent) => e.healthBefore === 0 || (e.healthAfter === 0 && !((e.amount ?? 0) > 0));
+
+/**
+ * When a dead player was raised: their next cast or real hit. Not common.ts's
+ * rezzedAt, which counts body hits as a sign of life (A4: the OT's body took
+ * the second Cyclonic Break's cones and read as raised).
+ */
+function raisedAt(p: PlayerInfo, deathT: number, nextDeathT: number): number | undefined {
+  const t = [...p.damageTaken.filter((e) => !bodyHit(e)), ...p.casts]
+    .map((e) => e.timestamp)
+    .filter((x) => x > deathT + 2000 && x < nextDeathT)
+    .sort((a, b) => a - b)[0];
+  return t;
+}
+
 function buildLife(players: PlayerInfo[], deaths: DeathEvent[]): Life {
   const outIntervals: Life["outIntervals"] = [];
   for (const p of players) {
     const own = deaths.filter((d) => d.player === p.name).sort((a, b) => a.timestamp - b.timestamp);
     own.forEach((d, i) => {
       const next = own[i + 1]?.timestamp ?? Infinity;
-      const end = rezzedAt(p, d.timestamp, next) ?? next - DEATH_EVENT_LAG_MS - 100;
+      const end = raisedAt(p, d.timestamp, next) ?? next - DEATH_EVENT_LAG_MS - 100;
       outIntervals.push({ p, start: d.timestamp - DEATH_EVENT_LAG_MS - 100, end });
     });
   }
@@ -480,7 +542,7 @@ function hitsOf(players: PlayerInfo[], life: Life, ids: number | number[], until
   const out: Hit[] = [];
   for (const p of players) {
     for (const e of p.damageTaken) {
-      if (!set.has(e.abilityId) || e.timestamp > until || e.healthBefore === 0) continue;
+      if (!set.has(e.abilityId) || e.timestamp > until || bodyHit(e)) continue;
       if (life.hitAlive(p, e.timestamp)) out.push({ p, e });
     }
   }
@@ -496,6 +558,8 @@ function gotAura(p: PlayerInfo, id: number, t: number, ms = 1500): boolean {
   return p.debuffs.some((e) => e.abilityId === id && e.debuffStatus === "applied" && Math.abs(e.timestamp - t) <= ms);
 }
 
+/** ms into the pull as m:ss.s, the way reviewers read VOD timestamps. */
+const clock = (ms: number) => `${Math.floor(ms / 60_000)}:${((ms % 60_000) / 1000).toFixed(1).padStart(4, "0")}`;
 const uniq = <T,>(xs: T[]) => [...new Set(xs)];
 const namesOf = (ps: PlayerInfo[]) => joinNames(uniq(ps).map((p) => p.name));
 const isTank = (p: PlayerInfo) => p.role === "Tank";
@@ -509,7 +573,7 @@ const byPlayer = (hits: Hit[]) => {
 
 /** Took a listed avoidable hit within 2s of `t`: already flagged for it. */
 function inAvoidable(p: PlayerInfo, t: number): boolean {
-  return p.damageTaken.some((e) => AVOIDABLE[e.abilityId] && Math.abs(e.timestamp - t) <= 2000 && e.healthBefore !== 0);
+  return p.damageTaken.some((e) => AVOIDABLE[e.abilityId] && Math.abs(e.timestamp - t) <= 2000 && !bodyHit(e));
 }
 
 /** When Phase 1 ends: the first cast by a Phase 2 actor (Infinity on a P1 wipe). */
@@ -523,7 +587,7 @@ function detectAvoidable(players: PlayerInfo[], life: Life, end: number): PullEr
   const errors: PullError[] = [];
   const ids = Object.keys(AVOIDABLE).map(Number);
   for (const p of players) {
-    const hits = p.damageTaken.filter((e) => ids.includes(e.abilityId) && e.timestamp <= end && e.healthBefore !== 0 && life.hitAlive(p, e.timestamp) &&
+    const hits = p.damageTaken.filter((e) => ids.includes(e.abilityId) && e.timestamp <= end && !bodyHit(e) && life.hitAlive(p, e.timestamp) &&
       (realAmount(e) > 0 || (e.amount ?? 0) >= PREVIEW_AMOUNT || gotAura(p, DAMAGE_DOWN, e.timestamp)));
     for (const g of clusterByGap(hits, (e) => e.timestamp, EPISODE_MS)) {
       const kinds = uniq(g.map((e) => AVOIDABLE[e.abilityId]));
@@ -554,31 +618,69 @@ const PERSONAL: Personal[] = [
     why: "Lightning Utopian Sky gives everyone a Sinbound Thunder III spread: spread out inside the safe wedge." },
 ];
 
+/** Clock bearing of a hit around the arena center, degrees clockwise from north. */
+function bearingOf(e: PlayerEvent): number | undefined {
+  if (e.x === undefined || e.y === undefined) return undefined;
+  return (Math.atan2(e.x - ARENA_CENTER, -(e.y - ARENA_CENTER)) * 180 / Math.PI + 360) % 360;
+}
+const angleApart = (a: number, b: number) => Math.abs(((a - b) % 360 + 540) % 360 - 180);
+
 /**
  * With all eight alive, a player hit by two or more instances of a personal
  * bait stood on someone else's. Every player involved is named (README
- * philosophy 3): the log can't tell who left their spot. With anyone dead
- * the baits retarget onto the living (eight cones on one survivor, C21), so
- * those resolutions are fallout and skipped.
+ * philosophy 3) unless, for the initial Cyclonic Break cones, some of them
+ * stood somewhere else in the pull's other Cyclonic Break: then only those
+ * who left their clock spot are named (user, 2026-10-12, A4 +0:58: the M1
+ * stood on the M2's spot). With anyone dead the baits retarget onto the
+ * living (eight cones on one survivor, C21), so only a cone player who left
+ * their spot is named; the rest is fallout.
  */
 function detectPersonalOverlaps(players: PlayerInfo[], life: Life, end: number): PullError[] {
   const errors: PullError[] = [];
+  const coneSets = clusterByGap(hitsOf(players, life, CYCLONIC_CONE, end), (h) => h.e.timestamp, 1500);
   for (const fam of PERSONAL) {
+    const isCone = fam.ids.includes(CYCLONIC_CONE);
     for (const res of clusterByGap(hitsOf(players, life, fam.ids, end), (h) => h.e.timestamp, 1500)) {
       const t0 = res[0].e.timestamp;
-      if (!allAlive(players, life, t0 - 500)) continue;
-      const doubled = [...byPlayer(res)].filter(([, es]) => es.length > 1);
+      const everyone = allAlive(players, life, t0 - 500);
+      if (!everyone && !isCone) continue;
+      let doubled = [...byPlayer(res)].filter(([, es]) => es.length > 1);
+      // Each doubled player's spot in the other Cyclonic Break, and how far
+      // they stood from it now.
+      const moved = new Map<PlayerInfo, { now: number; before: number }>();
+      if (isCone) {
+        const other = coneSets.find((s) => s !== res && Math.abs(s[0].e.timestamp - t0) > 10_000);
+        for (const [p, es] of doubled) {
+          const now = bearingOf(es[0]);
+          const ref = other?.find((h) => h.p === p && byPlayer(other).get(p)!.length === 1);
+          const before = ref ? bearingOf(ref.e) : undefined;
+          if (now !== undefined && before !== undefined && angleApart(now, before) > CONE_SPOT_MOVED) moved.set(p, { now, before });
+        }
+        // With someone dead, only a player who moved onto another living
+        // player's spot (shared a cone with someone who didn't move); a lone
+        // survivor eating the extra cones is fallout (B5: 8 cones on one).
+        const instKey = (e: PlayerEvent) => `${e.source}#${e.sourceInstance}`;
+        const sharesWithUnmoved = (p: PlayerInfo, es: PlayerEvent[]) => {
+          const mine = new Set(es.map(instKey));
+          return res.some((h) => h.p !== p && !moved.has(h.p) && mine.has(instKey(h.e)));
+        };
+        const off = doubled.filter(([p, es]) => moved.has(p) && (everyone || sharesWithUnmoved(p, es)));
+        if (!everyone || (off.length && off.length < doubled.length)) doubled = off;
+      }
       if (!doubled.length) continue;
       const killed = doubled.filter(([p, es]) => life.diedFrom(p, es[es.length - 1].timestamp)).map(([p]) => p);
       const instKey = (e: PlayerEvent) => `${e.source}#${e.sourceInstance}`;
       for (const [p, es] of doubled) {
+        const m = moved.get(p);
+        const spot = m ? ` They stood at ${Math.round(m.now)} degrees around the boss, where their spot in the other Cyclonic Break was ${Math.round(m.before)}.` : "";
+        const dead = everyone ? "" : " Someone was already dead, so the extra cones went to the living anyway.";
         // Who shared an instance with them.
         const mine = new Set(es.map(instKey));
         const others = uniq(res.filter((h) => h.p !== p && mine.has(instKey(h.e))).map((h) => h.p));
         const death = killed.includes(p);
         errors.push(playerError(p, {
           ruleId: FB_OVERLAP_RULE_ID, severity: killed.length ? "Major" : "Minor", name: `${fam.name} Overlap`,
-          description: `Took ${es.length} ${fam.name} ${fam.what}s (${kFmt(es.reduce((s, e) => s + realAmount(e), 0))})${others.length ? ` together with ${namesOf(others)}` : ""}${death ? " and died" : killed.length ? `; ${namesOf(killed)} died` : ""}. ${fam.why}`,
+          description: `Took ${es.length} ${fam.name} ${fam.what}s (${kFmt(es.reduce((s, e) => s + realAmount(e), 0))})${others.length ? ` together with ${namesOf(others)}` : ""}${death ? " and died" : killed.length ? `; ${namesOf(killed)} died` : ""}.${spot}${dead} ${fam.why}`,
           timestamp: t0, abilityId: es[0].abilityId, abilityName: es[0].abilityName,
         }));
       }
@@ -639,35 +741,59 @@ function detectStacks(players: PlayerInfo[], life: Life, end: number): PullError
  * Powder Mark Trail: a buster on the top-enmity tank, then ~16s of Powder
  * Mark; at expiry (or the holder's death) Burn Mark hits the holder and the
  * player nearest them, who should be the other tank.
+ * - The first buster on the tank who wasn't the MT: they held aggro they
+ *   shouldn't have (user, 2026-10-12, A26: the OT Shirked after the opener
+ *   and still took it). The MT is the tank who Provoked at the pull
+ *   (group A, every pull); without one this isn't checked.
  * - The holder killed by an auto-attack under the buster's Physical
- *   Vulnerability Up: the swap failed. Both tanks are named (the log can't
- *   say who missed the Provoke/Shirk).
+ *   Vulnerability Up: the swap failed. The other tank is named when they
+ *   didn't Provoke (A3; a Shirk alone doesn't move aggro). Group A's clean
+ *   swap is a Provoke ~1.5s before the buster lands. When they did Provoke,
+ *   both tanks are named (B/C: Provoked and still lost the holder).
  * - The holder killed by the buster itself: their mitigation.
- * - An expiry Burn Mark hitting a non-tank with both tanks up: that player
+ * - An expiry Burn Mark hitting a non-tank with all eight up: that player
  *   and the other tank (who should have been nearest) are named.
- * - A tank killed by an expiry Burn Mark (mitigation).
+ * - A tank killed by a single expiry Burn Mark: their mitigation (user,
+ *   A4: not a mechanic failure).
  * A death-triggered Burn Mark's victims are fallout of the holder's death.
  */
 function detectPowderMark(players: PlayerInfo[], life: Life, casts: EnemyEvent[], deaths: DeathEvent[], end: number, occurrences?: ReportedOccurrence[]): PullError[] {
   const errors: PullError[] = [];
   const tanks = players.filter(isTank);
-  for (const c of castsOf(casts, POWDER, end)) {
+  const provokes = (p: PlayerInfo) => p.casts.filter((e) => e.abilityName === "Provoke");
+  // Only an opener Provoke says who the MT is: the first auto-attack named
+  // the wrong tank in group C (its MT is the one who takes every buster).
+  const mt = tanks.find((p) => provokes(p).some((e) => e.timestamp <= OPENER_PROVOKE_MS));
+  castsOf(casts, POWDER, end).forEach((c, n) => {
     const holder = players.find((p) => p.name === c.target);
     // With a tank dead the buster goes to someone else: fallout.
-    if (!holder || !isTank(holder)) continue;
+    if (!holder || !isTank(holder)) return;
     const t = c.timestamp;
     for (const key of [FB_POWDER_SWAP_RULE_ID, FB_POWDER_DEATH_RULE_ID]) occurrences?.push({ mechanicKey: key, timestamp: t, players: tanks.map((p) => p.name) });
     const other = tanks.find((p) => p !== holder);
     const death = deaths.find((d) => d.player === holder.name && d.timestamp > t && d.timestamp <= t + 18_000);
-    if (death?.killingAbilityGameId === AUTO) {
-      for (const p of tanks) {
+    const wrongTank = n === 0 && mt && holder !== mt && life.alive(mt, t);
+    if (wrongTank) {
+      const shirk = holder.casts.find((e) => e.abilityName === "Shirk" && e.timestamp < t);
+      errors.push(playerError(holder, {
+        ruleId: FB_POWDER_SWAP_RULE_ID, severity: "Major", name: "Had Aggro for the First Powder Mark",
+        description: `Held aggro when the first Powder Mark Trail went out, so it landed on them instead of ${mt!.name}, the main tank${shirk ? ` (they had Shirked at ${clock(shirk.timestamp)})` : ""}.${death?.killingAbilityGameId === POWDER ? " They died to it, setting off Burn Mark early." : ""} The main tank holds aggro for the first buster; the off-tank stays below them on enmity.`,
+        timestamp: t, abilityId: POWDER, abilityName: "Powder Mark Trail",
+      }));
+    }
+    if (death?.killingAbilityGameId === AUTO && other) {
+      const provoke = provokes(other).find((e) => e.timestamp >= t - SWAP_PROVOKE_BEFORE_MS && e.timestamp <= death.timestamp);
+      const lethal = `${holder.name} took an auto-attack under Powder Mark Trail's Physical Vulnerability Up and died (${sec(death.timestamp - t)}s after the buster), setting off Burn Mark early.`;
+      for (const p of provoke ? tanks : [other]) {
         errors.push(playerError(p, {
           ruleId: FB_POWDER_SWAP_RULE_ID, severity: "Major", name: "Powder Mark Swap Missed",
-          description: `${holder.name} took an auto-attack under Powder Mark Trail's Physical Vulnerability Up and died (${sec(death.timestamp - t)}s after the buster). The other tank must Provoke right after the buster lands; ${holder.name}'s death then set off Burn Mark early.`,
+          description: provoke
+            ? `${lethal} ${other.name} did Provoke (${sec(Math.abs(provoke.timestamp - t))}s ${provoke.timestamp < t ? "before" : "after"} the buster), but ${holder.name} still had aggro. The log can't tell which tank's enmity was off.`
+            : `${lethal} ${other.name} didn't Provoke: the other tank must Provoke as the buster goes out. A Shirk from the marked tank only helps; it doesn't move aggro on its own.`,
           timestamp: death.timestamp - DEATH_EVENT_LAG_MS, abilityId: AUTO, abilityName: "Attack",
         }));
       }
-    } else if (death?.killingAbilityGameId === POWDER) {
+    } else if (death?.killingAbilityGameId === POWDER && !wrongTank) {
       errors.push(playerError(holder, {
         ruleId: FB_POWDER_DEATH_RULE_ID, severity: "Major", name: "Died to Powder Mark Trail",
         description: "Died to the Powder Mark Trail tank buster itself. It needs a mitigation cooldown; the death also set off Burn Mark early on the players nearest.",
@@ -676,7 +802,7 @@ function detectPowderMark(players: PlayerInfo[], life: Life, casts: EnemyEvent[]
     }
     // The expiry Burn Mark (the holder still alive when the mark ran out).
     const expiry = holder.debuffs.find((e) => e.abilityId === POWDER_MARK && e.debuffStatus === "removed" && e.timestamp > t);
-    if (!isTank(holder) || !expiry || !life.alive(holder, expiry.timestamp)) continue;
+    if (!expiry || !life.alive(holder, expiry.timestamp)) return;
     const hits = hitsOf(players, life, BURN_MARK, end).filter((h) => h.e.timestamp >= expiry.timestamp - 500 && h.e.timestamp <= expiry.timestamp + 2500);
     const nonTanks = uniq(hits.filter((h) => !isTank(h.p)).map((h) => h.p));
     // Both explosions on one tank: the tanks stood together.
@@ -690,9 +816,10 @@ function detectPowderMark(players: PlayerInfo[], life: Life, casts: EnemyEvent[]
           timestamp: hits[0].e.timestamp, abilityId: BURN_MARK, abilityName: "Burn Mark",
         }));
       }
-      continue;
+      return;
     }
-    if (nonTanks.length && other && life.alive(other, expiry.timestamp)) {
+    // With anyone dead the pull was already over (user, A17 +2:27).
+    if (nonTanks.length && other && allAlive(players, life, expiry.timestamp - 500)) {
       const killed = nonTanks.filter((p) => hits.some((h) => h.p === p && life.diedFrom(p, h.e.timestamp)));
       for (const p of [...nonTanks, other]) {
         errors.push(playerError(p, {
@@ -706,11 +833,11 @@ function detectPowderMark(players: PlayerInfo[], life: Life, casts: EnemyEvent[]
       if (life.diedFrom(h.p, h.e.timestamp)?.killingAbilityGameId !== BURN_MARK) continue;
       errors.push(playerError(h.p, {
         ruleId: FB_POWDER_DEATH_RULE_ID, severity: "Major", name: "Died to Burn Mark",
-        description: `Died to Burn Mark at the end of Powder Mark Trail (${kFmt(realAmount(h.e))}). Both tanks take it; it needs mitigation and the tanks topped up.`,
+        description: `Died to their own Burn Mark at the end of Powder Mark Trail (${kFmt(realAmount(h.e))}) without enough mitigation. The mechanic resolved correctly (one explosion each); the tank needs a cooldown for it.`,
         timestamp: h.e.timestamp, abilityId: BURN_MARK, abilityName: "Burn Mark",
       }));
     }
-  }
+  });
   return errors;
 }
 
@@ -811,10 +938,16 @@ function detectTetherStacks(players: PlayerInfo[], life: Life, end: number): Pul
  * (carrier + three; fewer gives Mark of Mortality), lightning Sinsmite on
  * the carrier + three Bow Shock cones. A group is read from the other
  * resolution on its side when that one was clean (four players, one hit
- * each). With all eight alive:
+ * each), else as everyone outside a clean resolution of the other side
+ * (user, 2026-10-12, A19 +1:47: the MT was the missing fourth). With the
+ * group alive:
  * - a player hit twice in one resolution (two cones, or cone + carrier);
- * - players from the other group in it (FALL_WRONG_SIDE+ of them: the
- *   carrier brought the tether over, so the carrier is named);
+ * - fire reaching the other group: Sinblaze's cone points at the helper
+ *   nearest the carrier, so that helper is named alone (user, A53 +1:55
+ *   and A61 +1:55: they stood 17-33 units from the carrier, the cone went
+ *   across the arena; also A40 68, A42 38. Clean nearest helpers 90+);
+ * - lightning with players of the other group in it (FALL_WRONG_SIDE+ of
+ *   them: the carrier is named, else those players);
  * - a short Sinblaze: the missing members of that group.
  */
 function detectFallOfFaith(players: PlayerInfo[], life: Life, end: number): PullError[] {
@@ -824,7 +957,9 @@ function detectFallOfFaith(players: PlayerInfo[], life: Life, end: number): Pull
   res.forEach((r, k) => {
     const t = r[0].e.timestamp;
     const partner = [res[k - 2], res[k + 2]].find((x) => x && clean(x));
-    const group = partner ? new Set(partner.map((h) => h.p)) : undefined;
+    const across = [res[k - 1], res[k + 1]].find((x) => x && clean(x));
+    const group = partner ? new Set(partner.map((h) => h.p))
+      : across && players.length === 8 ? new Set(players.filter((p) => !across.some((h) => h.p === p))) : undefined;
     // A dead group member's share retargets onto whoever is near: fallout.
     // Without a known group, everyone must be alive.
     if (!(group ? [...group] : players).every((p) => life.alive(p, t - 500))) return;
@@ -837,12 +972,26 @@ function detectFallOfFaith(players: PlayerInfo[], life: Life, end: number): Pull
     const killed = uniq(r.filter((h) => life.diedFrom(h.p, h.e.timestamp)).map((h) => h.p));
     const outcome = `${mom.length ? ` ${namesOf(mom)} got Mark of Mortality.` : ""}${killed.length ? ` ${namesOf(killed)} died.` : ""}`;
     const sev = mom.length || killed.length ? "Major" : "Minor";
-    const nth = `tether ${k + 1}`;
+    const nth = `tether ${k + 1} (${fire ? "fire" : "lightning"})`;
     const base = { ruleId: FB_FALL_RULE_ID, severity: sev, timestamp: t, abilityId: r[0].e.abilityId, abilityName: r[0].e.abilityName } as const;
     for (const [p, es] of per) {
       if (es.length < 2) continue;
       errors.push(playerError(p, { ...base, name: "Fall of Faith Double Hit",
-        description: `Took ${es.length} hits from Fall of Faith ${nth} (${kFmt(es.reduce((s, e) => s + realAmount(e), 0))}).${outcome} Each helper takes one: lightning helpers spread into their own Bow Shock cone, fire helpers stack behind the carrier.` }));
+        description: `Took ${es.length} hits from Fall of Faith ${nth} (${kFmt(es.reduce((s, e) => s + realAmount(e), 0))}).${outcome} ${fire
+          ? "Sinblaze is one fire cone shared by the carrier's group of four."
+          : "This tether was lightning: the three helpers spread for their own Bow Shock cones (two to the sides, one behind). Stacking as if it were fire puts several cones on each player."}` }));
+    }
+    // Fire into the other group: the helper nearest the carrier aimed it.
+    const carrierHit = carrier && per.get(carrier)?.[0];
+    if (fire && group && carrierHit?.x !== undefined && [...per.keys()].some((p) => !group.has(p))) {
+      const dist = (e: PlayerEvent) => (e.x === undefined || e.y === undefined ? Infinity : Math.hypot(e.x - carrierHit.x!, e.y - carrierHit.y!));
+      const near = [...per].filter(([p]) => p !== carrier).map(([p, es]) => ({ p, d: dist(es[0]) })).sort((a, b) => a.d - b.d)[0];
+      const extras = [...per.keys()].filter((p) => !group.has(p));
+      if (near && near.d < Infinity) {
+        errors.push(playerError(near.p, { ...base, severity: "Major", name: "Pointed Sinblaze at the Other Group",
+          description: `Stood ~${yd(near.d)} yalms from ${carrier!.name}, the fire carrier of ${nth}, the closest helper, so Sinblaze's cone pointed through them across the arena into the other group (${namesOf(extras)}).${outcome} Sinblaze aims at the helper nearest the carrier: stand a few yalms out on your group's side so the cone points away from the other group.` }));
+        return;
+      }
     }
     if (group) {
       const extras = [...per.keys()].filter((p) => !group.has(p));
@@ -889,7 +1038,7 @@ function detectTowers(players: PlayerInfo[], life: Life, casts: EnemyEvent[], en
   const towers = uniq(towerCasts.filter((c) => c.timestamp - t < 2000).map((c) => `${c.x},${c.y}`)).map((key) => {
     const c = towerCasts.find((x) => `${x.x},${x.y}` === key)!;
     const soak = players.filter((p) => p.damageTaken.some((e) => TOWER_NEED[e.abilityId] && e.sourceInstance === c.sourceInstance &&
-      Math.abs(e.timestamp - c.timestamp) <= 1500 && e.healthBefore !== 0));
+      Math.abs(e.timestamp - c.timestamp) <= 1500 && !bodyHit(e)));
     const blew = castsOf(casts, UNMITIGATED, end).some((u) => u.x === c.x && u.y === c.y && Math.abs(u.timestamp - c.timestamp) < 4000);
     const where = c.y === undefined ? "?" : c.y < 9500 ? "north" : c.y > 10500 ? "south" : "middle";
     return { c, need: TOWER_NEED[c.abilityId], soak, failed: blew || soak.length < TOWER_NEED[c.abilityId], where };
@@ -917,6 +1066,41 @@ function detectTowers(players: PlayerInfo[], life: Life, casts: EnemyEvent[], en
     `${short.charAt(0).toUpperCase() + short.slice(1)} didn't get enough soakers (${counts})${dead.length ? `; ${namesOf(dead)} ${dead.length === 1 ? "was" : "were"} already dead` : ""}. Unmitigated Explosion gives the raid Damage Down; treated as the cutoff point.`,
     t, bad[0].c.abilityId, "Explosion"));
   return errors;
+}
+
+// ── a mechanic started with someone dead ────────────────────────────────────
+
+/**
+ * Nearly all of P1 needs all eight alive: eight Cyclonic Break cones, two
+ * four-player groups for Utopian Sky, the tether stacks and Fall of Faith,
+ * six tower soakers plus two tanks. Deaths are only survivable in the short
+ * windows between (the Damage Down resets). So someone still dead when one
+ * of these starts makes it unresolvable: a Raid marker just before it
+ * (user, 2026-10-12, A4 +0:57: the OT dead going into the second Cyclonic
+ * Break; A17: three dead going into the towers). The death's own cause is
+ * flagged where it happened.
+ */
+function detectDeadGoingIn(players: PlayerInfo[], life: Life, casts: EnemyEvent[], end: number): PullError[] {
+  // `need`: who must be alive (the towers only need the six non-tanks: C27
+  // cleared P1 with the OT dead at them).
+  const starts: { t: number; what: string; id: number; need?: (p: PlayerInfo) => boolean }[] = [];
+  const first = (ids: number[], gap: number) => clusterByGap(hitsOf(players, life, ids, end), (h) => h.e.timestamp, gap).map((g) => g[0].e);
+  for (const e of first([CYCLONIC_CONE], 1500)) starts.push({ t: e.timestamp, what: "Cyclonic Break", id: CYCLONIC_CONE });
+  for (const e of first([40157, FIRE_STACK, THUNDER_SPREAD], 3000)) starts.push({ t: e.timestamp, what: "Utopian Sky", id: e.abilityId });
+  for (const e of first([TETHER_STACK], 1000)) starts.push({ t: e.timestamp, what: "the tether stacks", id: TETHER_STACK });
+  const fall = first([SINBLAZE, FALL_CARRIER, BOW_SHOCK], 10_000)[0];
+  if (fall) starts.push({ t: fall.timestamp, what: "Fall of Faith", id: fall.abilityId });
+  const tower = castsOf(casts, Object.keys(TOWER_NEED).map(Number), end)[0];
+  if (tower) starts.push({ t: tower.timestamp, what: "the towers", id: tower.abilityId, need: (p) => !isTank(p) });
+  for (const s of starts.sort((a, b) => a.t - b.t)) {
+    const t = s.t - DEAD_GOING_IN_MS;
+    const dead = players.filter((p) => (s.need ?? (() => true))(p) && !life.alive(p, t));
+    if (!dead.length) continue;
+    return [raidMarker(FB_DEAD_GOING_IN_RULE_ID, "Player Dead Going Into a Mechanic",
+      `${namesOf(dead)} ${dead.length === 1 ? "was" : "were"} still dead when ${s.what} began. It needs ${s.need ? "all six non-tanks" : "all eight"} alive, so it's unresolvable from here; treated as the cutoff point. Raise before it, or don't die outside the short safe windows.`,
+      t, s.id, s.what)];
+  }
+  return [];
 }
 
 // ── deaths with no killing blow ─────────────────────────────────────────────
@@ -996,6 +1180,7 @@ export function detectFatebreakerErrors(
     ...detectTetherStacks(players, life, end),
     ...detectFallOfFaith(players, life, end),
     ...detectTowers(players, life, enemyCasts, end),
+    ...detectDeadGoingIn(players, life, enemyCasts, end),
     ...detectWallDeaths(players, enemyCasts, deaths, called, end),
   ];
 
