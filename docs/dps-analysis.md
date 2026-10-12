@@ -171,6 +171,32 @@ howbadwasmycritinxiv.com and the `ffxiv_stats` package
   one pull, and `--stats=Name:crit:dh` compares an estimate with real
   gear.
 
+## Patch-specific analysis (case study in progress)
+
+The FRU kill dDar482XvFKBPJYh fight 3 (2025-02-21, patch 7.1) is being
+compared player by player with xivanalysis's feedback on it. The app
+applies the vendored 7.4 data to every log; xivanalysis switches by the
+log's patch (`parser.patch.before('7.2')`, data layers in
+`src/data/*/layers`). What the study has shown so far:
+- Checks valued from the log's own damage carry across patches: GCD
+  gaps, AoE on one target, tincture placement, Esteem slots (read from
+  the pet's hits).
+- Checks that encode a rule are the patch-sensitive ones: expected GCDs
+  and actions in a burst window, cooldown lengths, proc durations, gauge
+  rules, AoE target counts. For this comp, xivanalysis's own rules
+  changed for RPR (7.2 AoE breakpoints, 7.3 Enshroud cooldown), PCT (7.2
+  only: Starry Muse could drop Hammers), BRD (7.3/7.4 potencies), NIN
+  (7.3 frog thresholds) and AST (7.2 Gravity targets).
+- The on-disk sample is a partial (P2-P3) capture with baselines. The
+  full kill is refetched separately and swapped in only for print-only
+  runs (`damage-analysis`), then the partial file is restored.
+
+Built from it so far: pet damage credited to owners (FFLogs `petOwner`;
+the FF transform had dropped Esteem, Bunshin, Earthly Star, Queen and
+demis), the tincture check (`lib/damage/ffxiv/jobs/tincture.ts`), Living
+Shadow cut short, Passage of Arms channel as forced time, heal GCDs not
+filling burst windows, and small GCD delays counted from 0.5s per phase.
+
 ## Ideas for app tooling
 
 All of these are built in the Damage dialog (`lib/damage/`). The build

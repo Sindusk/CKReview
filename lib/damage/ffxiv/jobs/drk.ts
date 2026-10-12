@@ -21,20 +21,28 @@
 //
 // AoE combo on one target (shared.ts aoeComboOnOneTarget, every tank).
 //
+// Living Shadow (xivanalysis's Esteem evaluator): Esteem runs a set
+// sequence at fixed offsets from the summon (Abyssal Drain, Shadowbringer,
+// Edge of Shadow, Bloodspiller, Disesteem: +8, +12, +14, +16.5, +19.5s in
+// 7.1). The full sequence is the player's most complete summons, read from
+// the pet's hits so it follows the patch; slots are matched by time, not
+// name, since in AoE Esteem swaps actions. Each slot a summon missed costs
+// that slot's average. Forced when the slot fell in forced time. dDar482XvFKBPJYh FRU kill: the 6:11 summon lost its
+// Bloodspiller while Esteem was on the P2 crystals, xivanalysis's one.
+//
 // Checked against xivanalysis on 2T1HzdPKgbhM43am Dancing Mad fight 10
 // (2026-10-08): its 60 Blood overcapped matches; its AoE-on-one-target
 // uses (6:20, 14:22) were past a phase's HP check, building Blood before
-// downtime, so they're forced. Not built: its Tincture windows (a pot is a
-// few % for 30s, so a missed action in one costs little), MP overcap (one
-// Edge of Shadow), and Living Shadow cut by downtime (the one here was
-// pressed into the end-of-P3 hold).
+// downtime, so they're forced. Not built: MP overcap (one Edge of Shadow).
+// Tinctures are every job's (tincture.ts).
 //
 //   Copyright (c) 2018 Saxon Landers & contributors
 //   MIT License; full text in THIRD_PARTY_NOTICES.md.
 
 import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
-import type { JobCheck } from "../../types";
-import { inWindows, type Window } from "../../timeline";
+import type { DamageFinding, JobCheck } from "../../types";
+import { finding } from "../../checks";
+import { inWindows, mergeWindows, type Window } from "../../timeline";
 import { aoeComboOnOneTarget, burstWindowFindings, castHits, gaugeFindings, k, statusWindows, uptimeFindings, type GaugeEvent } from "./shared";
 import { comboLanded } from "./gnb";
 
@@ -117,4 +125,76 @@ const blood: JobCheck = (ctx) => {
 
 const aoeCombo = aoeComboOnOneTarget([[id("UNLEASH"), id("HARD_SLASH")], [id("STALWART_SOUL"), id("SYPHON_STRIKE")]]);
 
-export const DRK_CHECKS: JobCheck[] = [delirium, darkside, blood, aoeCombo];
+const ESTEEM_IDS = new Set(Object.entries(A).filter(([key]) => key.startsWith("ESTEEM_")).map(([, a]) => a.id));
+const SUMMON_SPAN_MS = 30_000;
+const ACTION_HIT_MS = 300;
+const SLOT_SLACK_MS = 1_200;
+
+const livingShadow: JobCheck = (ctx) => {
+  const summons = ctx.player.casts.filter((c) => c.abilityId === id("LIVING_SHADOW")).map((c) => c.timestamp);
+  const hits = ctx.player.damageDone.filter((e) => e.pet && ESTEEM_IDS.has(e.abilityId) && (e.amount ?? 0) > 0)
+    .sort((a, b) => a.timestamp - b.timestamp);
+  if (summons.length === 0 || hits.length === 0) return [];
+  // Per summon, Esteem's actions: hits of one id within ACTION_HIT_MS are
+  // one action (several targets).
+  const runs = summons.map((t, i) => {
+    const until = Math.min(summons[i + 1] ?? Infinity, t + SUMMON_SPAN_MS);
+    const actions: { offset: number; dealt: number; name: string; id: number }[] = [];
+    for (const e of hits) {
+      if (e.timestamp < t || e.timestamp >= until) continue;
+      const same = actions.find((a) => a.id === e.abilityId && Math.abs(t + a.offset - e.timestamp) <= ACTION_HIT_MS);
+      if (same) same.dealt += e.amount ?? 0;
+      else actions.push({ offset: e.timestamp - t, dealt: e.amount ?? 0, name: e.abilityName, id: e.abilityId });
+    }
+    return { t, actions };
+  });
+  const most = Math.max(...runs.map((r) => r.actions.length));
+  const full = runs.filter((r) => r.actions.length === most);
+  // Slot k of a full sequence: its usual offset, name and value.
+  const median = (xs: number[]) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)];
+  const slots = Array.from({ length: most }, (_, slot) => {
+    const names = new Map<string, number>();
+    for (const r of full) names.set(r.actions[slot].name, (names.get(r.actions[slot].name) ?? 0) + 1);
+    return {
+      offset: median(full.map((r) => r.actions[slot].offset)),
+      value: full.reduce((a, r) => a + r.actions[slot].dealt, 0) / full.length,
+      name: [...names].sort((a, b) => b[1] - a[1])[0][0],
+    };
+  });
+  const forcedAll = mergeWindows(ctx.forced);
+  const out: DamageFinding[] = [];
+  for (const r of runs) {
+    if (r.actions.length === most) continue;
+    // A slot is missing when nothing landed near its usual moment. (In AoE
+    // Esteem swaps actions: Abyssal Drain lands in Edge of Shadow's or
+    // Disesteem's slot on jN3XDrf2z8PmLgRJ Red Hot pulls 1, 5 and 9.)
+    const missing = slots
+      .filter((sl) => !r.actions.some((a) => Math.abs(a.offset - sl.offset) <= SLOT_SLACK_MS))
+      .map((sl) => ({ ...sl, at: r.t + sl.offset }))
+      // Cut by the end of the analysis (a kill, a wipe) or a death: not this check's.
+      .filter((m) => m.at < ctx.endMs && !inWindows(m.at, ctx.dead));
+    for (const forced of [false, true]) {
+      const part = missing.filter((m) => inWindows(m.at, forcedAll) === forced);
+      if (part.length === 0) continue;
+      const cause = forced ? ctx.forced.find((f) => part.some((m) => m.at >= f.startMs && m.at < f.endMs))?.cause : undefined;
+      const during = ctx.mechanicAround(r.t, part[part.length - 1].at);
+      out.push(finding(ctx, {
+        kind: "pet-cut", startMs: r.t, endMs: part[part.length - 1].at, forced,
+        cause: cause ?? (during ? `during ${during}` : undefined),
+        label: "Living Shadow cut short",
+        lostDamage: part.reduce((a, m) => a + m.value, 0),
+        basis: `each missing Esteem action × that slot's average in the full summons (${part.map((m) => `${m.name} ${k(m.value)}`).join(", ")}); ` +
+          `a full summon lands ${most} actions (${full.length} of ${runs.length} did)`,
+        detail: `Living Shadow at ${clock(r.t)}: Esteem's ${part.map((m) => m.name).join(", ")} didn't land`,
+      }));
+    }
+  }
+  return out;
+};
+
+const clock = (ms: number) => {
+  const t = Math.max(0, Math.round(ms / 1000));
+  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
+};
+
+export const DRK_CHECKS: JobCheck[] = [delirium, darkside, blood, aoeCombo, livingShadow];

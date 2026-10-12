@@ -1460,6 +1460,34 @@ function fflBuildNpcHits(
     }));
 }
 
+// Pets whose hits count as their owner's damage. FFLogs' petOwner says
+// whose (requested since 2026-10-12); for reports stored before that, a
+// pet is credited by its name's job when exactly one player has that job.
+// Without this, Esteem, Bunshin, Earthly Star, Automaton Queen and the
+// Summoner's demis were missing from their owners' damage (dDar482XvFKBPJYh
+// FRU kill: Esteem's 47 hits weren't the Dark Knight's).
+const FF_PET_JOB: Record<string, string> = {
+  "esteem": "DarkKnight", "bunshin": "Ninja", "earthly star": "Astrologian",
+  "automaton queen": "Machinist", "rook autoturret": "Machinist",
+  "eos": "Scholar", "selene": "Scholar", "seraph": "Scholar",
+  "carbuncle": "Summoner", "demi-bahamut": "Summoner", "demi-phoenix": "Summoner", "solar bahamut": "Summoner",
+  "ruby carbuncle": "Summoner", "topaz carbuncle": "Summoner", "emerald carbuncle": "Summoner",
+  "ifrit-egi": "Summoner", "titan-egi": "Summoner", "garuda-egi": "Summoner",
+};
+
+function fflPetOwners(friendlyPlayerIds: number[], actorMap: Map<number, FFLActor>): Map<number, number> {
+  const players = [...new Set(friendlyPlayerIds)].map((id) => actorMap.get(id)).filter((a): a is FFLActor => a !== undefined);
+  const out = new Map<number, number>();
+  for (const a of actorMap.values()) {
+    if (a.type !== "Pet") continue;
+    if (a.petOwner) { out.set(a.id, a.petOwner); continue; }
+    const job = FF_PET_JOB[a.name.toLowerCase()];
+    const owners = job ? players.filter((p) => p.subType === job) : [];
+    if (owners.length === 1) out.set(a.id, owners[0].id);
+  }
+  return out;
+}
+
 function buildFFPlayers(
   friendlyPlayerIds: number[],
   actorMap:          Map<number, FFLActor>,
@@ -1475,6 +1503,7 @@ function buildFFPlayers(
   combatantInfos:    FFLCombatantInfoEvent[] = []
 ): PlayerInfo[] {
   const uniqueIds = [...new Set(friendlyPlayerIds)];
+  const petOwners = fflPetOwners(friendlyPlayerIds, actorMap);
   const statsOf = (actorId: number): PlayerInfo["stats"] => {
     const ci = combatantInfos.find((c) => c.sourceID === actorId && c.criticalHit !== undefined && c.directHit !== undefined);
     return ci ? { criticalHit: ci.criticalHit!, directHit: ci.directHit!, determination: ci.determination } : undefined;
@@ -1506,8 +1535,11 @@ function buildFFPlayers(
         game:      "ffxiv",
 
         damageDone: damageDoneEvents
-          .filter((e) => e.sourceID === actorId)
-          .map((e) => fflDamageDoneToPlayerEvent(e, actorMap, abilityMap, fightStart)),
+          .filter((e) => e.sourceID === actorId || petOwners.get(e.sourceID) === actorId)
+          .map((e) => {
+            const ev = fflDamageDoneToPlayerEvent(e, actorMap, abilityMap, fightStart);
+            return e.sourceID === actorId ? ev : { ...ev, pet: actorMap.get(e.sourceID)?.name };
+          }),
 
         damageTaken: damageTakenEvents
           .filter((e) => e.targetID === actorId)

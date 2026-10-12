@@ -371,7 +371,7 @@ function unusedShortCooldowns(pull: Pull, player: PlayerInfo, streams: TankStrea
     } else if (key === "holy-sheltron") {
       // Uses lost = gauge wasted at the cap, over the cost.
       basis = "gauge";
-      const autos = player.damageDone.filter((e) => game.isAutoAttack(e.abilityName)).map((e) => e.timestamp);
+      const autos = player.damageDone.filter((e) => !e.pet && game.isAutoAttack(e.abilityName)).map((e) => e.timestamp);
       const spends = casts.map((c) => c.timestamp);
       const events = [...autos.map((t) => ({ t, d: OATH_PER_AUTO })), ...spends.map((t) => ({ t, d: -OATH_COST }))]
         .sort((a, b) => a.t - b.t || a.d - b.d);

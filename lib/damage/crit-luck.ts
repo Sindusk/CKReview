@@ -51,7 +51,7 @@ function phi(z: number): number {
 export function critLuck(
   player: PlayerInfo, endMs: number, rates: HitRates, game: DamageGame, guaranteedStatusIds: Set<number>,
 ): CritLuck | undefined {
-  const hits = player.damageDone.filter((e) => e.timestamp < endMs && (e.amount ?? 0) > 0 &&
+  const hits = player.damageDone.filter((e) => !e.pet && e.timestamp < endMs && (e.amount ?? 0) > 0 &&
     (e.hitType === 1 || e.hitType === 2) && !e.isDoT && !game.isTickAbility(e.abilityId) &&
     !(e.statusIds ?? []).some((id) => guaranteedStatusIds.has(id)));
 

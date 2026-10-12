@@ -33,6 +33,19 @@ import { buildBuffLedger, checkBuffCoverage } from "./buffs";
 // gap, or inside it.
 const MECHANIC_LOOKBACK_MS = 8_000;
 
+/** Channelled mitigation: from the cast to the player's next action, capped. */
+function channelWindows(player: Pull["players"][number], game: DamageGame): ForcedWindow[] {
+  const channels = game.mitigationChannels;
+  if (!channels?.size) return [];
+  const casts = [...player.casts].sort((a, b) => a.timestamp - b.timestamp);
+  return casts.flatMap((c, i) => {
+    const ch = channels.get(c.abilityId);
+    if (!ch) return [];
+    const next = casts.slice(i + 1).find((x) => x.timestamp > c.timestamp + 50)?.timestamp ?? Infinity;
+    return [{ startMs: c.timestamp, endMs: Math.min(next, c.timestamp + ch.maxMs), cause: `${ch.name} channel (raid mitigation)` }];
+  });
+}
+
 export function analyzePullDamage(pull: Pull, game: DamageGame, context?: DamageContext): PullDamageAnalysis {
   const collapseMs = wipeCollapseMs(pull);
   const endMs = Math.min(pull.fightDuration, collapseMs ?? Infinity);
@@ -80,6 +93,7 @@ export function analyzePullDamage(pull: Pull, game: DamageGame, context?: Damage
       ...downtime,
       ...dead.map((w) => ({ ...w, cause: "dead" })),
       ...limitBreakWindows(uses),
+      ...channelWindows(player, game),
       ...contextForced.filter((w) => !w.players || w.players.includes(player.name)),
       ...phaseForced,
     ];

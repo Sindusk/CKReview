@@ -178,7 +178,10 @@ export function checkGcdGaps(ctx: PlayerCheckContext): DamageFinding[] {
   consider(last.startMs, last.startMs + gcdLockMs(last, ctx.factorAt(last.startMs)), ctx.endMs + GCD_TOLERANCE_MS, `${last.abilityName} (to the end)`);
 
   for (const [phaseId, acc] of small) {
-    if (acc.ms < ctx.baseGcdMs) continue;
+    // A phase's delays are lost damage even under one GCD in total
+    // (xivanalysis lists each; the dDar482XvFKBPJYh FRU kill's DRK had
+    // 0.2-0.9s ones in five phases, all dropped at a one-GCD floor).
+    if (acc.ms < CLIP_FINDING_MS) continue;
     out.push({
       player: ctx.player.name, job: ctx.job, phaseId, phase: ctx.phaseName(phaseId),
       kind: "gcd-delays", startMs: acc.start, endMs: acc.end, forced: false, lostDamage: acc.lost, moments: acc.moments,

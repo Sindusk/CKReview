@@ -64,6 +64,10 @@ export type DamageGame = {
   // Procs a job check handles itself (Viper's venoms, which only boost a
   // finisher): the generic proc check skips them.
   jobProcStatusIds?: Set<number>;
+  // Channelled mitigation (Passage of Arms), by action id: from the cast
+  // to the player's next action, at most maxMs, is forced (the raid plan,
+  // not play).
+  mitigationChannels?: Map<number, { name: string; maxMs: number }>;
 
   // ── Optional, for games unlike FFXIV (WoW, lib/damage/wow/game.ts) ──
   // Unset, each behaves as FFXIV always has.
@@ -173,7 +177,9 @@ export type FindingKind =
   | "heal-gcd"          // a heal GCD that mostly overhealed
   | "aoe-single"        // an AoE damage GCD that hit one enemy (worse than the filler)
   | "dot-uptime"        // the player's DoT off the boss
-  | "dot-clip";         // the player's DoT refreshed early
+  | "dot-clip"          // the player's DoT refreshed early
+  | "tincture"          // tinctures placed where they covered less than they could, or one not used
+  | "pet-cut";          // a pet's set sequence cut short (Living Shadow)
 
 export type DamageFinding = {
   player:     string;

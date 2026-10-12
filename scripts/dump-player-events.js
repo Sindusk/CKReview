@@ -53,7 +53,8 @@ const clock = (t) => { const s = t / 1000; return `${Math.floor(s / 60)}:${(s % 
     for (const e of player.damageDone.filter(inRange)) {
       if (names.length && !names.some((n) => e.abilityName.includes(n))) continue;
       console.log(clock(e.timestamp), e.abilityName, e.abilityId, e.amount,
-        `bonus=${e.bonusPercent ?? '-'}`, `mult=${e.multiplier ?? '-'}`, e.isDoT ? 'DoT' : '', e.target ?? '');
+        `bonus=${e.bonusPercent ?? '-'}`, `mult=${e.multiplier ?? '-'}`, e.isDoT ? 'DoT' : '', e.target ?? '',
+        e.pet ? `pet=${e.pet}` : '');
     }
     return;
   }

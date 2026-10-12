@@ -183,6 +183,11 @@ export type FFLActor = {
                       // "Player"` as a valid enemy source (bosses can come
                       // back typed "NPC" or "Boss" depending on the fight) —
                       // see log-transforms.ts fflBuildEnemyCastEvents/fflBuildEnemyBuffEvents.
+  // The owning player's actor id, on type "Pet" actors (Esteem, Bunshin,
+  // Earthly Star, Automaton Queen, fairies, Summoner's demis). Absent on
+  // reports fetched before 2026-10-12; log-transforms.ts falls back to the
+  // pet's job then.
+  petOwner?: number | null;
 };
 
 // A single ability/action used anywhere in the report. Fetched once per
@@ -515,6 +520,7 @@ const REPORT_QUERY = /* graphql */`
             name
             type
             subType
+            petOwner
           }
           abilities {
             gameID

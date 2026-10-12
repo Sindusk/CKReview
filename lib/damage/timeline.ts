@@ -411,7 +411,7 @@ export function playerValues(
     perAbility.set(e.abilityId, (perAbility.get(e.abilityId) ?? 0) + amt);
     const gcdDamage = game.isGcdDamage
       ? game.isGcdDamage(e)
-      : game.isTickAbility(e.abilityId) || e.isDoT || game.action(e.abilityId)?.onGcd;
+      : !e.pet && (game.isTickAbility(e.abilityId) || e.isDoT || game.action(e.abilityId)?.onGcd);
     if (gcdDamage) {
       for (const k of [key(ph, inWindows(e.timestamp, buffWindows)), key(ph, false) + "all", "all"]) {
         gcdDmg.set(k, (gcdDmg.get(k) ?? 0) + amt);

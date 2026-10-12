@@ -47,7 +47,7 @@
 import type { PlayerEvent } from "@/types/PlayerInfo";
 import type { DamageFinding, JobCheck, Moment } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";
-import { forcedPart, inWindows, mergeWindows, overlapMs, type Window } from "../../timeline";
+import { forcedPart, gcdKinds, inWindows, mergeWindows, overlapMs, type Window } from "../../timeline";
 
 // The removal's own timestamp, no later. A 100ms allowance counted a
 // Paladin's Sepulchre cast 40ms after Fight or Flight fell off
@@ -170,7 +170,7 @@ export function enemyStatusWindows(ctx: PlayerCheckContext, statusId: number): W
 
 /** The player's average hit multiplier in a window over their median outside raid buffs, minus 1. */
 export function observedBonus(ctx: PlayerCheckContext, w: Window): number {
-  const hits = ctx.player.damageDone.filter((e) => !e.isDoT && e.multiplier !== undefined && (e.amount ?? 0) > 0);
+  const hits = ctx.player.damageDone.filter((e) => !e.pet && !e.isDoT && e.multiplier !== undefined && (e.amount ?? 0) > 0);
   const inside = hits.filter((e) => e.timestamp >= w.startMs && e.timestamp <= w.endMs).map((e) => e.multiplier!);
   const outside = hits.filter((e) => !inWindows(e.timestamp, ctx.buffWindows)).map((e) => e.multiplier!).sort((a, b) => a - b);
   if (inside.length === 0 || outside.length === 0) return 0;
@@ -185,13 +185,17 @@ export function burstWindowFindings(ctx: PlayerCheckContext, specIn: BurstWindow
   // recast, give or take drift). With one window, nothing is unavailable.
   const starts = windows.map((w) => w.startMs);
   const cycleMs = starts.length > 1 ? Math.min(...starts.slice(1).map((t, i) => t - starts[i])) : Infinity;
+  // Heal GCDs don't fill a burst window (xivanalysis's Fight or Flight
+  // ignores Clemency: two at 5:14 on the dDar482XvFKBPJYh FRU kill made
+  // its 4/8 our 6/8).
+  const kinds = gcdKinds(ctx.player, ctx.pull, ctx.uses);
   for (const w of windows) {
     if (w.endMs > ctx.endMs) continue;
     const spec = { ...specIn, bonus: specIn.bonus === "observed" ? observedBonus(ctx, w) : specIn.bonus };
     // Inclusive end: a stack-consumed buff (Delirium) loses its last stack
     // at the same timestamp as the cast that used it.
     const end = w.endMs + SAME_TIMESTAMP_MS;
-    const gcds = ctx.uses.filter((u) => u.startMs >= w.startMs && u.startMs <= end);
+    const gcds = ctx.uses.filter((u) => u.startMs >= w.startMs && u.startMs <= end && kinds.get(u.action.id) !== "heal");
     const casts = ctx.player.casts.filter((c) => c.timestamp >= w.startMs && c.timestamp <= end);
     const expectedGcds = spec.expectedGcds?.(ctx);
     const missingGcds = expectedGcds !== undefined ? Math.max(0, expectedGcds - gcds.length) : 0;
@@ -664,8 +668,9 @@ const SAME_NAME_OTHER_ID_MS = 1_000;
 export const noDamageCasts: JobCheck = (ctx) => {
   const out: DamageFinding[] = [];
   // Ticks share the action's name (Eukrasian Dosis III) and older samples
-  // don't mark them isDoT, so tick ids are left out too.
-  const hits = ctx.player.damageDone.filter((e) => !e.isDoT && !ctx.game.isTickAbility(e.abilityId) && (e.amount ?? 0) > 0);
+  // don't mark them isDoT, so tick ids are left out too. Pet hits share
+  // names with the owner's actions (Esteem's Edge of Shadow).
+  const hits = ctx.player.damageDone.filter((e) => !e.pet && !e.isDoT && !ctx.game.isTickAbility(e.abilityId) && (e.amount ?? 0) > 0);
   const presses = new Map<string, PlayerEvent[]>();
   for (const c of ctx.player.casts) {
     const list = presses.get(c.abilityName) ?? [];

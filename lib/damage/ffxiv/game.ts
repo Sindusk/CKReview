@@ -25,6 +25,7 @@ import { XIVA_ACTIONS, XIVA_STATUSES, type XivaAction } from "./xiva-data";
 import { TRACKED_COOLDOWNS } from "./tracked-cooldowns";
 import { JOB_CHECKS } from "./jobs";
 import { noDamageCasts } from "./jobs/shared";
+import { tincture } from "./jobs/tincture";
 import { VPR_PROC_STATUS_IDS } from "./jobs/melee";
 import { FFXIV_ACTION_INDEX } from "../../mitigation/ffxiv-catalog";
 import type { DamageGame, GameAction, PartyBuff, TrackedCooldown } from "../types";
@@ -173,6 +174,18 @@ export const GUARANTEED_HIT_STATUS_IDS = new Set(
   ["LIFE_SURGE", "INNER_RELEASE", "REASSEMBLED"].map((k) => XIVA_STATUSES[k]?.id).filter((id): id is number => id !== undefined),
 );
 
+// Channelled raid mitigation: no GCDs while it's held, by design. On the
+// dDar482XvFKBPJYh FRU kill the Paladin held Passage of Arms from 9:54
+// into the end of P3 (7.9s with no GCD); xivanalysis leaves it out of
+// GCD downtime. Read from the cast: its status is mitigation, which the
+// buff stream doesn't fetch (buff-stream.ts).
+const MITIGATION_CHANNELS = new Map(
+  ["PASSAGE_OF_ARMS"].map((key) => [XIVA_ACTIONS[key]?.id, {
+    name: XIVA_ACTIONS[key]?.name ?? key,
+    maxMs: XIVA_STATUSES[key]?.duration ?? 18_000,
+  }] as const).filter((e): e is readonly [number, { name: string; maxMs: number }] => e[0] !== undefined),
+);
+
 export const FFXIV_DAMAGE: DamageGame = {
   action: (id) => ACTIONS.get(id),
   penaltyFactor: (statusId) => PENALTIES.get(statusId),
@@ -186,6 +199,7 @@ export const FFXIV_DAMAGE: DamageGame = {
   isDefensive: (actionId) => FFXIV_ACTION_INDEX.has(actionId),
   tankSwapActionIds: TANK_SWAP_IDS,
   disengageActionIds: DISENGAGE_IDS,
-  jobChecks: (job) => [...(JOB_CHECKS[job] ?? []), noDamageCasts],
+  jobChecks: (job) => [...(JOB_CHECKS[job] ?? []), noDamageCasts, tincture],
   jobProcStatusIds: VPR_PROC_STATUS_IDS,
+  mitigationChannels: MITIGATION_CHANNELS,
 };

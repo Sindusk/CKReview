@@ -73,7 +73,7 @@ export function estimateHitRates(players: PlayerInfo[], game: DamageGame, guaran
     return b !== undefined && ((b.crit ?? 0) > 0 || (b.directHit ?? 0) > 0);
   };
   const hits = players.flatMap((p) => p.damageDone).filter((e) =>
-    (e.amount ?? 0) > 0 && (e.hitType === 1 || e.hitType === 2) &&
+    !e.pet && (e.amount ?? 0) > 0 && (e.hitType === 1 || e.hitType === 2) &&
     !e.isDoT && !game.isTickAbility(e.abilityId) &&
     !(e.statusIds ?? []).some((id) => rateBuff(id) || guaranteedStatusIds.has(id)));
 
