@@ -8,8 +8,7 @@
 // and constraint differ. Every amount is a fraction of the tank's max HP.
 //
 // ── Anchors (each a synthetic MitigationHit per window pull) ───────────
-//   - busters (tanking.ts aggregateBusters), not rare, reached in
-//     PLAN_MIN_PULLS+ window pulls. Each tank hit is one target judged
+//   - busters (tanking.ts aggregateBusters), not rare. Each tank hit is one target judged
 //     from FULL HP: its parts are the buster's own plus all of that tank's
 //     enemy damage in the next FOLLOW_UP_MS, so a margin is exactly the
 //     tanking.ts margin and a change's effect follows the plan's buster
@@ -24,7 +23,11 @@
 // Buster classes: "mechanic" when the median margin is below
 // TANK_MECHANIC_MARGIN (a bait or overlap failure: Deep Impact hitting a
 // non-tank's spot, Plummet towers left empty): listed, never changed and
-// never made worse. Otherwise "plan".
+// never made worse. "protect" when reached in fewer than PLAN_MIN_PULLS
+// window pulls: not planned, but never made worse, so a cooldown isn't
+// spent just before a buster the group is only starting to reach (Vamp
+// A9-A13: a Rampart on autos ending 5s before Hardcore #2; builder's
+// choice, user, 2026-10-11). Otherwise "plan".
 //
 // ── Eligible entries ────────────────────────────────────────────────────
 // Tank jobs' own cooldowns of 30s+ (DROP_MIN_COOLDOWN_MS): Rampart, the
@@ -105,6 +108,8 @@ const median = (xs: number[]) => {
 };
 
 // ── Types ──────────────────────────────────────────────────────────────
+
+export type BusterClass = "plan" | "mechanic" | "protect";
 
 export type TankWindowPull = {
   pull: Pull; pullId: number; pullNumber: number; durationMs: number;
@@ -351,7 +356,7 @@ function heavyHit(wp: TankWindowPull, game: MitigationGame, w: HeavyWindow): Mit
 export type TankSetup = {
   problem:  OptimizerProblem;
   refs:     Map<string, AnchorRef>;
-  classes:  Map<string, "plan" | "mechanic">;
+  classes:  Map<string, BusterClass>;
   ctxs:     ReturnType<typeof prepareProblem>["ctxs"];
   baseline: ReturnType<typeof prepareProblem>["baseline"];
   base:     PlanEvaluation;
@@ -363,7 +368,7 @@ const mmss = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor(ms /
 export function tankSetup(window: TankWindowPull[], game: MitigationGame,
   only?: (entry: CatalogEntry, player: PlayerInfo) => boolean): TankSetup {
   const rows = aggregateBusters(window.map((w) => ({ pullId: w.pullId, pullNumber: w.pullNumber, durationMs: w.durationMs, tanking: w.tanking })));
-  const busters = rows.filter((r) => !r.rare && r.pulls >= PLAN_MIN_PULLS);
+  const busters = rows.filter((r) => !r.rare);
   const heavy = heavyWindows(window, rows, game);
 
   const refs = new Map<string, AnchorRef>();
@@ -388,8 +393,11 @@ export function tankSetup(window: TankWindowPull[], game: MitigationGame,
     hitTanks.set(h.id, set);
   }
 
-  const classes = new Map<string, "plan" | "mechanic">();
-  for (const r of busters) classes.set(r.id, r.medianMargin !== undefined && r.medianMargin < TANK_MECHANIC_MARGIN ? "mechanic" : "plan");
+  const classes = new Map<string, BusterClass>();
+  for (const r of busters) {
+    classes.set(r.id, r.medianMargin !== undefined && r.medianMargin < TANK_MECHANIC_MARGIN ? "mechanic"
+      : r.pulls < PLAN_MIN_PULLS ? "protect" : "plan");
+  }
   const isBuster = (id: string) => refs.get(id)?.kind === "buster";
   const planned = (id: string) => classes.get(id) === "plan";
   const failing = (e: HitEstimate) => e.median < TANK_MARGIN_UNDER || e.verdict === "fail";
