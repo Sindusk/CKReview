@@ -1,9 +1,142 @@
 // lib/mechanics/ffxiv/arcadion/lindwurm-2.ts
 //
+// Lindwurm II (M12S P2) per-pull rules. Entry point: detectLindwurm2Errors.
+// FFLogs logs P2 as its own fight ("Lindwurm II"); the module self-gates on
+// P2's signature casts, so lindwurm-1.ts's door boss is skipped.
+//
+// -- VERIFIED AGAINST LOGS (2026-10-12) --
+// Progression of the user's static, plan varying pull to pull (user: "ours,
+// plan varies"), so rules judge outcomes, never the BC/SS/DN spots below.
+// 95 pulls, cited as E13 7:47 (report letter, pull, mm:ss from P2 engage):
+//   A = AYQm9Kd8Ct4FxcGp (19 wipes, all in Replication 1, furthest 1:29),
+//   B = H9fnVZgPA3krpCzY (29 wipes, furthest 3:44),
+//   C = 13wYrRKFLjWZzqJk (15 wipes, furthest 6:20),
+//   D = vFY7kHVWK19ZQ24A (19 wipes, furthest 7:01),
+//   E = zWVayP4BM9dk8tA1 (12 wipes, kill E13, 9:07).
+// B's "Lindwurm" pull 4 (a P1 checkpoint stub) waits into P2 (Arcadia Aflame
+// at +1:37) after the party jumped: only the called wipe fires there. E1 is a
+// 0:25 reset (jumps at 0:02-0:10).
+// Slots: roles.ts as-is (user, lindwurm-1.ts); no rule here needs them.
+//
+// Clock (the kill; every pull within ~1s): Arcadia Aflame 0:16, Replication
+// 0:28, Rep1 sets 0:40 and 1:02, Snaking Kick 0:46, Double Sobat 1:10 (turn
+// cleave 1:15), Esoteric Finisher 1:18, Staging 1:32, Replication 1:46,
+// Firefall Splash + proteans 2:09, Mana Burst 2:10, Heavy Slam 2:16, cones
+// 2:18, Snaking Kick 2:22, Reenactment 2:32, replays 2:40-2:54 (Near/Far,
+// Timeless Spite 2:41), Mutating Cells 3:04, Blood Mana 3:11, first check
+// 3:23, Blood Wakening 3:38 (shapes 3:40 / 3:45), Wailing Wave 3:51, second
+// check 3:53, Arcadia Aflame 3:57, Double Sobat 4:07, Finisher 4:14, Idyllic
+// Dream 4:30, Rep3 replays 5:11 / 5:40, Meteor 5:45, Arcanum 5:58, live sets
+// 6:12 / 6:17 / 6:22 / 6:28, towers 6:40, Stone III 6:45, portents 6:51,
+// Temporal Curtain 6:59, replays 7:20-7:47, Idyllic Dream 7:53, Double Sobat
+// 8:01, Replication 8:22, Arcadian Hell 8:35 / 8:52, enrage 9:05 (48833 /
+// 46391, unfinished in the kill).
+//
+// Log IDs:
+// - Damage Down causes (every one, all reports): Snaking Kick 46375 / 48789
+//   (Rep3 replay), Winged Scourge 46300, Double Sobat 46373 (the turn; the
+//   first hit is 46369-46372), Firefall Splash 46317 (replayed jump),
+//   Hemorrhagic Projection 46315 (live) / 47394 (replay), Blood Wakening's
+//   Water III 46337 / Aero III 46338 / Straightforward Thunder II 46339 /
+//   Sideways Fire II 46340, Unmitigated Explosion 46344 (failed mutation),
+//   Power Gusher 46358, Lindwurm's Stone III 46327. Pyretic Wurm 46329 (moved
+//   under Hot-Blooded 1004768) only ever killed.
+// - Rep1: fire Top-Tier Slam 46302 (two-player stack per clone), dark Mighty
+//   Magic 46304 (first set: two untargeted instances on pairs; second set:
+//   four cast-targeted), Fire / Dark Resistance Down II 1002937 / 1003323.
+//   Kill: 2 fire + 4 dark in set 1, 4 fire (2 clones) + 4 dark in set 2.
+// - Rep2 live: Firefall Splash 46308 (jump, one player), Scalding Waves 46309
+//   (four proteans, cast-targeted), Mana Burst 46311 (three defams, NO cast
+//   target; the cast sits on the clone, not the owner), Heavy Slam 46312
+//   (two stacks, 4 + 4 in every clean pull), Grotesquerie 46314 cast-targeted
+//   at the two cone holders, Hemorrhagic Projection 46315 (cones: hit nobody
+//   in every clean pull; the cast sits on its holder, 0.0-0.1y in E13, and
+//   its cast target is the VICTIM). Unmitigated Impact 46320: a clone stack
+//   nobody took (B16 2:20, both stacks empty).
+// - Replays: Netherwrath Near / Far 46382 / 46383 -> Timeless Spite 46384
+//   (two targets; tanks solo it in the kill), Mana Burst 48099, Heavy Slam
+//   48733 (three-player stacks in Rep2, all eight at Idyllic's end),
+//   Scalding Waves 47329.
+// - Blood Mana: Mutating Cells hands Mutation alpha 1004769 / beta 1004771 to
+//   four each. At each check (3:23, 3:53) every beta must have taken a hit
+//   (Bloody Burst 46334 at the contact, then Wailing Wave 46381) and every
+//   alpha none: ANY hit counts (C12 3:53 an alpha in Wailing Wave, E11 3:54
+//   an alpha in Sideways Fire II). The statuses swap on a timer, not on the
+//   hit. Pass = Dramatic Lysis 46343 for 0; fail = Unmitigated Explosion
+//   46344 with Damage Down on that player (17 in the sample).
+// - Idyllic: Lindwurm's Meteor 46322 and Idyllic Dream 46345 are raidwides.
+//   Arcadian Arcanum 47577 (four cast-targeted light spreads). Cosmic Kiss
+//   46324 towers are cast-targeted at the soaker; an empty one explodes as
+//   Unmitigated Explosion 46325 (one per empty tower) plus Sustained Damage
+//   1004149. Lindwurm's Dark II 46326 hits 1-3 players (2 in the kill) and
+//   gives Doom 1003364 (8s; Esuna clears it). Portents: Thunder II 46330 /
+//   Glare 46328, cast-targeted, one player each in the kill. Live sets:
+//   Heavy Slam 46361 (4 + 4) and Mana Burst 46360 (two cast-targeted defams).
+// - Esoteric Finisher 46374: cast-targeted at the two tanks, 2 hits clean.
+//
+// Failure findings:
+// - Rep1 (all of A, most of B's early pulls): a fire or dark hit while
+//   already holding that element's Resistance Down killed 69 of 71 times.
+// - Rep2 live defams: an unowned Mana Burst on 3+ players is the defam
+//   landing in the group (C6, C7 2:11 hit 6); whose it was isn't in the log.
+// - Mana Burst knocks back: no-killing-blow deaths 2.2-2.8s after a 46360
+//   hit are players knocked off the platforms (D16 6:25, D18 6:21, E4 6:15).
+// - Doom ran out uncleansed into a no-killing-blow death 2s later (E7 6:49,
+//   E8 6:48).
+// - Bloody Burst deaths (15) were betas taking their contact: survival.
+// - The kill has two deaths to the last Power Gusher replay (E13 7:47).
+// - Unexplained wipe: C15 (nobody died after 2:48; the pull reset at 4:48).
+//
+// Cutoffs (first Raid error): mass death 37, collapse 29, called wipe 23,
+// towers 4, none 1 (C15); the kill has none. Collapse: 5 dead with the pull
+// over within 45s (C8 went on 77s after 5 died to Idyllic Dream at 4:34).
+//
+// -- RULES IMPLEMENTED --
+// ffxiv-lw2-avoidable (Major on Damage Down or death, else Minor): AVOIDABLE.
+// ffxiv-lw2-element (Major if it killed): a Rep1 hit of the element whose
+//   Resistance Down the player already held names them (and, in the
+//   description, whose targeted dark it was).
+// ffxiv-lw2-cone: a live Hemorrhagic Projection that hit someone names the
+//   Grotesquerie holder standing on its cast (CONE_OWNER_MAX), never a
+//   victim; Major on Damage Down/death. No holder placed = player-less
+//   (7 of 8 in the sample: the holders' positions are often stale).
+// ffxiv-lw2-overlap / -defam (Major if anyone in it died): one-bait-per-
+//   player families (PERSONAL): Mighty Magic (pairs allowed on untargeted
+//   instances), Scalding Waves, Firefall Splash, Mana Burst (-defam; knock-
+//   off deaths count; an unowned one on 3+ is player-less), Arcanum, portent
+//   cones, and tanks overlapping their Esoteric Finishers.
+// ffxiv-lw2-finisher: a non-tank in a tank's Esoteric Finisher with both
+//   tanks holding enmity, named alone.
+// ffxiv-lw2-stack: a player in both Heavy Slam stacks; a stack that killed
+//   someone names living players in neither (not resolving their own bait,
+//   more than 6y out); skipped with 3+ dead. Unmitigated Impact = player-
+//   less Minor. Rep2's three-player replay stacks are not judged.
+// ffxiv-lw2-mutation (Major: always Damage Down): Unmitigated Explosion 46344
+//   names its player, saying whether they were a beta never hit or an alpha
+//   hit (and by what).
+// ffxiv-lw2-tower: empty Cosmic Kiss towers name the living non-soakers when
+//   they match the empty count (1-2), else player-less; Raid at 3+ deaths.
+// ffxiv-lw2-doom (player-less Minor): Doom ran out; the cleanser isn't known.
+// ffxiv-lw2-fall (player-less Minor): Walking Dead ran out, or an otherwise
+//   unexplained no-killing-blow death.
+// ffxiv-lw2-mass-death (Raid): 4+ deaths to one non-raidwide mechanic within
+//   3s with the pull over within 60s. -enrage (Arcadian Hell's final volley
+//   killed), -called-wipe (as lindwurm-1.ts), -collapse: Raid, each only
+//   before any other Raid.
+// Exposure (rule-meta.ts): -finisher targets the non-tanks; the rest
+// everyone. The Damage Down causes are excluded from ffxiv-damage-down
+// (error-rules.ts).
+//
+// Not built: assignment checks for any strategy (the plan varied); Timeless
+// Spite (Near/Far) baits; Top-Tier Slam stack sizes (the repeat rule covers
+// its deaths); Bloody Burst / Wailing Wave survival; Dark II tower lines;
+// which shape was contacted; tank deaths to their own busters (mitigation).
+//
 // -- GUIDE-DERIVED MODEL: LINDWURM II (M12S P2) --
 // AAC Heavyweight M4 (Savage), Arcadion, patch 7.4; final boss only.
-// Research checked 2026-10-08. Comments only; no detector registered.
-// No report analyzed: ALL proposed log signals are guide-inferred.
+// Research checked 2026-10-08, before any report was analyzed: the log
+// signals below are the researcher's hypotheses. VERIFIED AGAINST LOGS
+// above wins every disagreement.
 // lindwurm-1.ts owns the door boss and successful transition into this
 // checkpoint. A P2 wipe restarts P2; its clock below starts at P2 engage.
 // Selected: Modified 3VJ0, DN Rep1, BC Rep2, DN Uptime Idyllic. The user's
@@ -394,3 +527,784 @@
 // 10. What evidence distinguishes cleanse omission from an unavailable
 //     target/cleanser, and does a player dying leave their recorded clone
 //     active? Confirm final enrage time and simultaneous-caster grouping.
+
+import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
+import type { DeathEvent } from "@/types/DeathEvent";
+import type { PullError, EnemyEvent } from "@/types/PullError";
+import type { ReportedOccurrence } from "@/lib/mechanics/occurrences";
+import { yd, kFmt, sec, joinNames, playerError, playerlessMinor, raidMarker, rezzedAt, clusterByGap, debuffIntervals } from "@/lib/mechanics/wow/common";
+import { findPlayerPosition, interpolatePlayerPosition } from "@/lib/mechanics/player-position";
+
+export const LW2_AVOIDABLE_RULE_ID   = "ffxiv-lw2-avoidable";
+export const LW2_ELEMENT_RULE_ID     = "ffxiv-lw2-element";
+export const LW2_CONE_RULE_ID        = "ffxiv-lw2-cone";
+export const LW2_OVERLAP_RULE_ID     = "ffxiv-lw2-overlap";
+export const LW2_DEFAM_RULE_ID       = "ffxiv-lw2-defam";
+export const LW2_FINISHER_RULE_ID    = "ffxiv-lw2-finisher";
+export const LW2_STACK_RULE_ID       = "ffxiv-lw2-stack";
+export const LW2_MUTATION_RULE_ID    = "ffxiv-lw2-mutation";
+export const LW2_TOWER_RULE_ID       = "ffxiv-lw2-tower";
+export const LW2_DOOM_RULE_ID        = "ffxiv-lw2-doom";
+export const LW2_FALL_RULE_ID        = "ffxiv-lw2-fall";
+export const LW2_MASS_DEATH_RULE_ID  = "ffxiv-lw2-mass-death";
+export const LW2_ENRAGE_RULE_ID      = "ffxiv-lw2-enrage";
+export const LW2_COLLAPSE_RULE_ID    = "ffxiv-lw2-collapse";
+export const LW2_CALLED_WIPE_RULE_ID = "ffxiv-lw2-called-wipe";
+
+// ── log IDs (see VERIFIED AGAINST LOGS) ─────────────────────────────────────
+
+// Arcadia Aflame, Replication, Staging, Mutating Cells, Idyllic Dream: P2 only.
+const SIGNATURE        = [46376, 46296, 46305, 46341, 46345];
+const DAMAGE_DOWN      = 1002911;
+const WALKING_DEAD     = 1000811; // Dark Knight's Living Dead follow-up
+const WALKING_DEAD_FULL_MS = 9500;
+const FIRE_RES_DOWN    = 1002937;
+const DARK_RES_DOWN    = 1003323;
+const TOP_TIER_SLAM    = 46302;   // Rep1 fire: a two-player stack from a clone
+const MIGHTY_MAGIC     = 46304;   // Rep1 dark: the first set hits pairs, the second is cast-targeted
+const GROTESQUERIE     = 46314;   // Rep2 live cones: cast-targeted at the cone holders
+const HEMORRHAGIC      = 46315;   // Rep2 live cone (its cast target, when present, is the VICTIM)
+const ESOTERIC_FINISHER = 46374;
+const UNMITIGATED_IMPACT = 46320; // a clone stack nobody took
+const MUTATION_A       = 1004769;
+const MUTATION_B       = 1004771;
+const BLOODY_BURST     = 46334;
+const WAILING_WAVE     = 46381;
+const MUTATION_FAILED  = 46344;   // Unmitigated Explosion on a player whose mutation failed
+const COSMIC_KISS      = 46324;   // Idyllic towers: cast-targeted at the soaker
+const TOWER_EMPTY      = 46325;   // Unmitigated Explosion: an Idyllic tower left empty
+const SUSTAINED_DAMAGE = 1004149;
+const DOOM             = 1003364; // from Lindwurm's Dark II (dark tower); Esuna clears it
+const IDYLLIC_DREAM    = 46345;
+const HEAVY_SLAM_LIVE  = 46312;   // Rep2 live stacks (two, shared by all eight)
+const HEAVY_SLAM_IDYLLIC = 46361; // Idyllic live sets (two, shared by all eight)
+const HEAVY_SLAM_REPLAY = 48733;  // replayed clone stacks
+const MANA_BURST_KNOCK = [46311, 48099, 46360]; // defams that knock the people they hit back
+const ARCADIAN_HELL_ENRAGE = [48833, 46391];
+
+// Avoidable hits, every one a Damage Down cause in the sample (Pyretic Wurm
+// only ever killed).
+type Avoidable = { name: string; hit: string; why: string };
+const AVOIDABLE: Record<number, Avoidable> = {
+  46375: { name: "Snaking Kick", hit: "Hit by Snaking Kick",
+    why: "Snaking Kick hits half the room behind the boss; get to the safe side before it lands." },
+  48789: { name: "Snaking Kick", hit: "Hit by a replayed Snaking Kick",
+    why: "Replication 3 stores a Snaking Kick that replays when its reality returns; remember its safe side." },
+  46300: { name: "Winged Scourge", hit: "Hit by Winged Scourge",
+    why: "The cone clones of Replication 1 cover lanes from their cardinals; stay out of the lanes." },
+  46373: { name: "Double Sobat", hit: "Hit by Double Sobat's turning cleave",
+    why: "After the first hit Double Sobat turns and cleaves half the room; move to the side it leaves." },
+  46317: { name: "Firefall Splash", hit: "Hit by a replayed Firefall Splash",
+    why: "The replayed boss jump lands where it was recorded; stay off its landing point." },
+  47394: { name: "Hemorrhagic Projection", hit: "Hit by a replayed Hemorrhagic Projection cone",
+    why: "Replayed clone cones point at the arena center from their clone; stay out of the line." },
+  46337: { name: "Blood Wakening", hit: "Hit by Lindwurm's Water III",
+    why: "Blood Wakening sets off the Blood Mana shapes in two waves; stand in the safe spots for each wave." },
+  46338: { name: "Blood Wakening", hit: "Hit by Lindwurm's Aero III",
+    why: "Blood Wakening sets off the Blood Mana shapes in two waves; stand in the safe spots for each wave." },
+  46339: { name: "Blood Wakening", hit: "Hit by Straightforward Thunder II",
+    why: "Blood Wakening sets off the Blood Mana shapes in two waves; stand in the safe spots for each wave." },
+  46340: { name: "Blood Wakening", hit: "Hit by Sideways Fire II",
+    why: "Blood Wakening sets off the Blood Mana shapes in two waves; stand in the safe spots for each wave." },
+  46358: { name: "Power Gusher", hit: "Hit by a replayed Power Gusher",
+    why: "Replication 3's stored cones and chariot replay when blue returns; dodge them from memory." },
+  46327: { name: "Lindwurm's Stone III", hit: "Hit by Lindwurm's Stone III",
+    why: "The earth tower leaves a delayed circle; leave it before Stone III lands." },
+  46329: { name: "Pyretic Wurm", hit: "Moved under Hot-Blooded and took Pyretic Wurm",
+    why: "The fire tower gives Hot-Blooded; stand still until it ends." },
+};
+
+// One bait per player per instance: a player hit by another player's
+// instance, or by two at once, is an overlap. The owner of an instance is its
+// cast target, else the only player it hit, or the one player it hit who took
+// nothing else.
+// `proximity`: aimed at the nearest players; with anyone dead they retarget.
+// `knockback`: knocks the players it hits back, so a no-killing-blow death
+//   right after it is that overlap's death (off an island).
+// `crowd`: an instance this many players took with no owner known is the
+//   group under it, not a pair: player-less.
+// `tanks`: only with both tanks alive and holding enmity.
+// `shared`: an instance with no cast target is meant for several players (the
+//   first Mighty Magic set hits a pair, every pull): only a player hit by two
+//   instances, or by a cast-targeted one that isn't theirs, overlapped.
+// `tanks` also means a tankbuster: a non-tank in it is named alone (they
+//   stood in the tank's hit), the tanks only when they hit each other.
+type Family = { name: string; ids: number[]; what: string; why: string; ruleId: string; gap?: number; proximity?: boolean; knockback?: boolean; crowd?: number; tanks?: boolean; shared?: boolean };
+const PERSONAL: Family[] = [
+  { name: "Mighty Magic", ids: [MIGHTY_MAGIC], what: "dark AoE", ruleId: LW2_OVERLAP_RULE_ID, proximity: true, shared: true,
+    why: "Replication 1's dark Mighty Magic hits the players near each dark clone; the second set's four dark baits stand apart." },
+  { name: "Scalding Waves", ids: [46309, 47329], what: "protean", ruleId: LW2_OVERLAP_RULE_ID, proximity: true,
+    why: "Firefall Splash sends four Scalding Waves proteans at the nearest players; bait one each, apart from the rest." },
+  { name: "Firefall Splash", ids: [46308], what: "jump", ruleId: LW2_OVERLAP_RULE_ID,
+    why: "Firefall Splash jumps onto its bait; only the jump bait stands there." },
+  { name: "Mana Burst", ids: [46311, 48099, 46360], what: "defamation", ruleId: LW2_DEFAM_RULE_ID, knockback: true, crowd: 3,
+    why: "Mana Burst is a large defamation that knocks back everyone it hits; take it far from the party." },
+  { name: "Esoteric Finisher", ids: [ESOTERIC_FINISHER], what: "Esoteric Finisher", ruleId: LW2_OVERLAP_RULE_ID, tanks: true,
+    why: "Esoteric Finisher hits the top two on enmity; the tanks take one each, apart from each other and the party." },
+  { name: "Arcadian Arcanum", ids: [47577], what: "light spread", ruleId: LW2_OVERLAP_RULE_ID,
+    why: "Arcadian Arcanum puts a light spread on four players; spread them apart." },
+  { name: "Portent cones", ids: [46330, 46328], what: "portent cone", ruleId: LW2_OVERLAP_RULE_ID, proximity: true,
+    why: "The portents send Thunder II and Glare at the nearest and farthest players; each bait stands alone on their spot." },
+];
+
+// Stacks the whole party shares, two at a time.
+type Stack = { name: string; ids: number[]; why: string; afterIdyllic?: boolean };
+const STACKS: Stack[] = [
+  { name: "Heavy Slam", ids: [HEAVY_SLAM_LIVE],
+    why: "Replication 2's two Heavy Slam stacks are shared by everyone, four in each." },
+  { name: "Heavy Slam", ids: [HEAVY_SLAM_IDYLLIC],
+    why: "Idyllic Dream's live Heavy Slam stacks are shared by everyone, four in each." },
+  { name: "Heavy Slam", ids: [HEAVY_SLAM_REPLAY], afterIdyllic: true,
+    why: "The replayed Heavy Slams at the end of Idyllic Dream are shared by everyone, split between the two stacks." },
+];
+// Players resolving their own bait during a stack aren't missing from it.
+const BUSY_IDS = [46311, 48099, 46360, 46308, 46384, 46309, 47329];
+
+// FFLogs logs the death event ~2.0s after the fatal hit (README).
+const DEATH_EVENT_LAG_MS = 2000;
+const DIED_FROM_HIT_MS   = 3000;
+// Mana Burst knockbacks off an island: no-killing-blow deaths 2.2-2.8s after
+// the hit (D16 +6:25, D18 +6:21, E4 +6:15).
+const KNOCKED_OFF_MS     = 4000;
+const CALLED_WIPE_END_MS = 12_000;
+const CALLED_WIPE_COUNT  = 3;
+const CALLED_WIPE_WINDOW = 10_000;
+const CALLED_WIPE_PAIR_MS = 5_000;
+// 5 dead with the pull over within 45s; C8 lived 77s past 5 dead (raises
+// after Idyllic Dream at +4:34), E7 65s past 4 dead.
+const COLLAPSE_DEAD_COUNT = 5;
+const COLLAPSE_END_MS     = 45_000;
+// One mechanic killing this many within MASS_DEATH_MS ends the pull: Rep1's
+// second set (A7, A13: 6), defams in the party (C6, C7: 5), Blood Wakening
+// (B29, D19: 7-8). The pull ended within 60s every time.
+const MASS_DEATHS        = 4;
+const MASS_DEATH_MS      = 3000;
+const MASS_DEATH_END_MS  = 60_000;
+// Raidwides and autos never count toward a mass death.
+const NOT_A_MECHANIC     = [0, 46367, 46376, IDYLLIC_DREAM, 46322, 46387, 46388, 46389, ...ARCADIAN_HELL_ENRAGE];
+const TANK_ENMITY_LOST_MS = 30_000;
+const UNSOAKED_DEATHS_MS = 12_000;
+const TOWER_DEATHS       = 3;
+// Hits this large are FFLogs' unpaired previews of lethal hits (README).
+const PREVIEW_AMOUNT     = 1_500_000;
+const STACK_DOOMED_DEAD  = 3;
+// An absent player this close to a stack's center nearly made it.
+const STACK_NEAR_MISS    = 600;
+const RAISE_GRACE_MS     = 10_000;
+// A live Hemorrhagic Projection cast sits on its holder: 0.0-0.1y in the
+// kill (E13 +2:18), 2.0y in B27.
+const CONE_OWNER_MAX     = 300;
+const EPISODE_MS         = 3000;
+// The resistance a Rep1 hit repeats must predate the hit by this much (the
+// hit's own debuff lands with it).
+const ELEMENT_HELD_MS    = 1500;
+const DOOM_EXPIRED_MS    = 300;
+
+// ── shared helpers ──────────────────────────────────────────────────────────
+
+type Hit = { p: PlayerInfo; e: PlayerEvent };
+
+type Life = {
+  alive: (p: PlayerInfo, t: number) => boolean;
+  hitAlive: (p: PlayerInfo, hitT: number) => boolean;
+  diedFrom: (p: PlayerInfo, hitT: number) => DeathEvent | undefined;
+  outIntervals: { p: PlayerInfo; start: number; end: number }[];
+};
+
+function buildLife(players: PlayerInfo[], deaths: DeathEvent[]): Life {
+  const outIntervals: Life["outIntervals"] = [];
+  for (const p of players) {
+    const own = deaths.filter((d) => d.player === p.name).sort((a, b) => a.timestamp - b.timestamp);
+    own.forEach((d, i) => {
+      const next = own[i + 1]?.timestamp ?? Infinity;
+      const end = rezzedAt(p, d.timestamp, next) ?? next - DEATH_EVENT_LAG_MS - 100;
+      outIntervals.push({ p, start: d.timestamp - DEATH_EVENT_LAG_MS - 100, end });
+    });
+  }
+  const alive = (p: PlayerInfo, t: number) => !outIntervals.some((w) => w.p === p && t >= w.start && t < w.end);
+  return {
+    outIntervals,
+    alive,
+    hitAlive: (p, hitT) => alive(p, hitT - 500),
+    diedFrom: (p, hitT) => deaths.find((d) => d.player === p.name && d.timestamp >= hitT && d.timestamp <= hitT + DIED_FROM_HIT_MS),
+  };
+}
+
+/** Hits on living players (a dead body still logs 0-damage hits). */
+function hitsOf(players: PlayerInfo[], life: Life, ids: number | number[], from = -Infinity, to = Infinity): Hit[] {
+  const set = new Set(Array.isArray(ids) ? ids : [ids]);
+  const out: Hit[] = [];
+  for (const p of players) {
+    for (const e of p.damageTaken) {
+      if (!set.has(e.abilityId) || e.timestamp < from || e.timestamp > to || e.healthBefore === 0) continue;
+      if (life.hitAlive(p, e.timestamp)) out.push({ p, e });
+    }
+  }
+  return out.sort((a, b) => a.e.timestamp - b.e.timestamp);
+}
+
+const castsOf = (casts: EnemyEvent[], ids: number | number[]) => {
+  const set = new Set(Array.isArray(ids) ? ids : [ids]);
+  return casts.filter((c) => set.has(c.abilityId)).sort((a, b) => a.timestamp - b.timestamp);
+};
+
+function gotDamageDown(p: PlayerInfo, t: number): boolean {
+  return p.debuffs.some((e) => e.abilityId === DAMAGE_DOWN && e.debuffStatus === "applied" && Math.abs(e.timestamp - t) <= 1500);
+}
+
+/** The aura was on the player from at least `heldMs` before `t` until `t`. */
+function heldBefore(p: PlayerInfo, id: number, t: number, heldMs: number): boolean {
+  return debuffIntervals(p, id).some((w) => w.start <= t - heldMs && w.end >= t - 300);
+}
+
+/** One of the auras ended on the player within [t - before, t + after]. */
+function auraEndedNear(p: PlayerInfo, ids: number[], t: number, before = 1500, after = 300): boolean {
+  return p.debuffs.some((e) => ids.includes(e.abilityId) && e.debuffStatus === "removed" && e.timestamp >= t - before && e.timestamp <= t + after);
+}
+
+const uniq = <T,>(xs: T[]) => [...new Set(xs)];
+const namesOf = (ps: PlayerInfo[]) => joinNames(uniq(ps).map((p) => p.name));
+const isTank = (p: PlayerInfo) => p.role === "Tank";
+const realAmount = (e: PlayerEvent) => ((e.amount ?? 0) >= PREVIEW_AMOUNT ? 0 : e.amount ?? 0);
+const instanceKey = (e: PlayerEvent) => `${e.abilityId}|${e.source}#${e.sourceInstance}`;
+const castKey = (c: EnemyEvent) => `${c.abilityId}|${c.actorName}#${c.sourceInstance}`;
+
+function tankOutRecently(life: Life, p: PlayerInfo, t: number): boolean {
+  return !life.hitAlive(p, t) || life.outIntervals.some((w) => w.p === p && w.start <= t && w.end >= t - TANK_ENMITY_LOST_MS);
+}
+
+/** Both tanks alive and holding enmity at `t` (otherwise busters retarget as fallout). */
+function tanksHealthy(players: PlayerInfo[], life: Life, t: number): boolean {
+  const tanks = players.filter(isTank);
+  return tanks.length >= 2 && tanks.every((p) => !tankOutRecently(life, p, t));
+}
+
+/** Raised within RAISE_GRACE_MS before `t` (or still out at `t`). */
+function inRaiseGrace(life: Life, p: PlayerInfo, t: number): boolean {
+  return !life.hitAlive(p, t) || life.outIntervals.some((w) => w.p === p && w.end <= t && t - w.end < RAISE_GRACE_MS);
+}
+
+/** Players who took a listed avoidable hit within 2s of `t`: already flagged for it. */
+function inAvoidable(p: PlayerInfo, t: number): boolean {
+  return p.damageTaken.some((e) => AVOIDABLE[e.abilityId] && Math.abs(e.timestamp - t) <= 2000 && realAmount(e) > 0);
+}
+
+function positionAt(p: PlayerInfo, t: number) {
+  return interpolatePlayerPosition(p, t, { windowMs: 2000, maxSpanMs: 3000 }) ?? findPlayerPosition(p, t, { windowMs: 2000 });
+}
+
+/** A no-killing-blow death right after a knockback defam hit the player. */
+function knockedOffBy(p: PlayerInfo, d: DeathEvent): PlayerEvent | undefined {
+  return p.damageTaken.filter((e) => MANA_BURST_KNOCK.includes(e.abilityId) && e.healthBefore !== 0 &&
+    e.timestamp <= d.timestamp && e.timestamp >= d.timestamp - KNOCKED_OFF_MS).pop();
+}
+
+/** The Doom on the player ran out (not cleansed) just before this death. */
+function doomExpiredBefore(p: PlayerInfo, d: DeathEvent): { start: number; end: number } | undefined {
+  return debuffIntervals(p, DOOM).find((w) => w.end <= d.timestamp && w.end >= d.timestamp - DEATH_EVENT_LAG_MS - 1500 &&
+    p.debuffs.some((e) => e.abilityId === DOOM && e.debuffStatus === "applied" && e.timestamp === w.start &&
+      e.durationMs !== undefined && w.end - w.start >= e.durationMs - DOOM_EXPIRED_MS));
+}
+
+// ── plain avoidable hits ────────────────────────────────────────────────────
+
+function detectAvoidable(players: PlayerInfo[], life: Life): PullError[] {
+  const errors: PullError[] = [];
+  const ids = Object.keys(AVOIDABLE).map(Number);
+  for (const p of players) {
+    const hits = p.damageTaken.filter((e) => ids.includes(e.abilityId) && e.healthBefore !== 0 && life.hitAlive(p, e.timestamp) &&
+      (realAmount(e) > 0 || (e.amount ?? 0) >= PREVIEW_AMOUNT || gotDamageDown(p, e.timestamp)));
+    for (const g of clusterByGap(hits, (e) => e.timestamp, EPISODE_MS)) {
+      const kinds = uniq(g.map((e) => AVOIDABLE[e.abilityId]));
+      const total = g.reduce((s, e) => s + realAmount(e), 0);
+      const death = life.diedFrom(p, g[g.length - 1].timestamp);
+      const dd = g.some((e) => gotDamageDown(p, e.timestamp));
+      const hit = kinds.map((k, i) => (i === 0 ? k.hit : k.hit.charAt(0).toLowerCase() + k.hit.slice(1))).join(", and ");
+      const outcome = [dd ? "got Damage Down" : "", death ? "died" : ""].filter(Boolean).join(" and ");
+      errors.push(playerError(p, {
+        ruleId: LW2_AVOIDABLE_RULE_ID, severity: dd || death ? "Major" : "Minor", name: `Hit by ${uniq(kinds.map((k) => k.name)).join(" / ")}`,
+        description: `${hit} (${g.length > 1 ? `${g.length} hits, ` : ""}${kFmt(total)}).${outcome ? ` They ${outcome}.` : ""} ${uniq(kinds.map((k) => k.why)).join(" ")}`,
+        timestamp: g[0].timestamp, abilityId: g[0].abilityId, abilityName: g[0].abilityName,
+      }));
+    }
+  }
+  return errors;
+}
+
+// ── Replication 1: repeating an element ─────────────────────────────────────
+
+/**
+ * Replication 1's fire (Top-Tier Slam) and dark (Mighty Magic) hits leave
+ * Fire / Dark Resistance Down II; the second set must take the other element.
+ * A hit of the element whose resistance the player already held is the wrong
+ * spot (69 of 71 such hits killed, reports A and B). Returns the errors and
+ * the repeat hits, which the dark overlap family then leaves alone.
+ */
+function detectElements(players: PlayerInfo[], life: Life, casts: EnemyEvent[]): { errors: PullError[]; repeats: Set<PlayerEvent> } {
+  const errors: PullError[] = [];
+  const repeats = new Set<PlayerEvent>();
+  const darkTargets = castsOf(casts, MIGHTY_MAGIC).filter((c) => c.target);
+  for (const p of players) {
+    const hits = p.damageTaken.filter((e) => (e.abilityId === TOP_TIER_SLAM || e.abilityId === MIGHTY_MAGIC) && e.healthBefore !== 0 &&
+      life.hitAlive(p, e.timestamp) && heldBefore(p, e.abilityId === TOP_TIER_SLAM ? FIRE_RES_DOWN : DARK_RES_DOWN, e.timestamp, ELEMENT_HELD_MS));
+    for (const g of clusterByGap(hits, (e) => e.timestamp, EPISODE_MS)) {
+      g.forEach((e) => repeats.add(e));
+      const t = g[0].timestamp;
+      const fire = g.some((e) => e.abilityId === TOP_TIER_SLAM);
+      const death = life.diedFrom(p, g[g.length - 1].timestamp);
+      const killed = death && (death.killingAbilityGameId === TOP_TIER_SLAM || death.killingAbilityGameId === MIGHTY_MAGIC || !death.killingAbilityGameId);
+      // A second-set dark is cast-targeted: name whose it was.
+      const owners = uniq(g.filter((e) => e.abilityId === MIGHTY_MAGIC).map((e) =>
+        darkTargets.find((c) => c.sourceInstance === e.sourceInstance && Math.abs(c.timestamp - e.timestamp) <= 2000)?.target)
+        .filter((n): n is string => !!n && n !== p.name));
+      const element = fire ? "fire (Top-Tier Slam)" : "dark (Mighty Magic)";
+      errors.push(playerError(p, {
+        ruleId: LW2_ELEMENT_RULE_ID, severity: killed ? "Major" : "Minor", name: "Took the Same Element Twice",
+        description: `Took ${element} again while still holding ${fire ? "Fire" : "Dark"} Resistance Down II from the first set${owners.length ? ` (${joinNames(owners)}'s dark bait)` : ""}, ${kFmt(g.reduce((s, e) => s + realAmount(e), 0))}.${killed ? " They died." : ""} In Replication 1 each player alternates: the dark-hit players take the fire stacks next, the fire-hit and unhit players take the dark.`,
+        timestamp: t, abilityId: g[0].abilityId, abilityName: g[0].abilityName,
+      }));
+    }
+  }
+  return { errors, repeats };
+}
+
+// ── Replication 2: live cones ───────────────────────────────────────────────
+
+/**
+ * Hemorrhagic Projection: Grotesquerie (46314) marks the two cone holders and
+ * each cone's cast sits on its holder (0.0-0.1y in the kill). A clean
+ * resolution hits nobody (every clean pull). A cone that hit someone names
+ * the holder standing on its cast, never one of its victims; none placed
+ * leaves a player-less error.
+ */
+function detectCones(players: PlayerInfo[], life: Life, casts: EnemyEvent[]): PullError[] {
+  const errors: PullError[] = [];
+  const coneCasts = castsOf(casts, HEMORRHAGIC);
+  const holderCasts = castsOf(casts, GROTESQUERIE).filter((c) => c.target);
+  for (const res of clusterByGap(hitsOf(players, life, HEMORRHAGIC), (h) => h.e.timestamp, 1500)) {
+    const t = res[0].e.timestamp;
+    const holders = uniq(holderCasts.filter((c) => c.timestamp <= t && c.timestamp >= t - 4000)
+      .map((c) => players.find((p) => p.name === c.target)).filter((p): p is PlayerInfo => !!p));
+    const byInst = new Map<number, Hit[]>();
+    for (const h of res) if (h.e.sourceInstance !== undefined) byInst.set(h.e.sourceInstance, [...(byInst.get(h.e.sourceInstance) ?? []), h]);
+    for (const [inst, hs] of byInst) {
+      const victims = uniq(hs.map((h) => h.p));
+      const c = coneCasts.filter((x) => x.sourceInstance === inst && x.timestamp <= t + 200 && x.timestamp >= t - 3000).pop();
+      let owners: PlayerInfo[] = [];
+      let dist: number | undefined;
+      if (c?.x !== undefined && c.y !== undefined) {
+        const near = holders.filter((p) => !victims.includes(p) && life.hitAlive(p, c.timestamp))
+          .map((p) => { const q = positionAt(p, c.timestamp); return { p, d: q ? Math.hypot(q.x - c.x!, q.y - c.y!) : Infinity }; })
+          .filter((x) => x.d <= CONE_OWNER_MAX);
+        owners = near.map((x) => x.p);
+        dist = near[0]?.d;
+      }
+      const killed = victims.filter((p) => life.diedFrom(p, t)?.killingAbilityGameId === HEMORRHAGIC);
+      const dd = victims.filter((p) => gotDamageDown(p, t));
+      const outcome = `${dd.length ? ` ${namesOf(dd)} got Damage Down.` : ""}${killed.length ? ` ${namesOf(killed)} died.` : ""}`;
+      const why = "Each Grotesquerie cone fires the way its holder faces; face it away from everyone before it fires.";
+      if (!owners.length) {
+        errors.push(playerlessMinor(LW2_CONE_RULE_ID, "Hemorrhagic Projection Hit Someone",
+          `A Hemorrhagic Projection cone hit ${namesOf(victims)}; its holder couldn't be placed from the log.${outcome} ${why}`,
+          t, HEMORRHAGIC, "Hemorrhagic Projection"));
+        continue;
+      }
+      for (const o of owners) {
+        errors.push(playerError(o, {
+          ruleId: LW2_CONE_RULE_ID, severity: killed.length || dd.length ? "Major" : "Minor", name: "Cone Hit Someone",
+          description: `${owners.length > 1 ? `Their cone or ${namesOf(owners.filter((x) => x !== o))}'s` : "Their"} Hemorrhagic Projection cone hit ${namesOf(victims)}${dist !== undefined && owners.length === 1 ? ` (the cone fired from ~${yd(dist)} yalms of them)` : ""}.${outcome} ${why}`,
+          timestamp: t, abilityId: HEMORRHAGIC, abilityName: "Hemorrhagic Projection",
+        }));
+      }
+    }
+  }
+  return errors;
+}
+
+// ── overlapping personal baits ──────────────────────────────────────────────
+
+function detectPersonalOverlaps(players: PlayerInfo[], life: Life, casts: EnemyEvent[], deaths: DeathEvent[], skip: Set<PlayerEvent>): PullError[] {
+  const errors: PullError[] = [];
+  for (const fam of PERSONAL) {
+    for (const res0 of clusterByGap(hitsOf(players, life, fam.ids), (h) => h.e.timestamp, fam.gap ?? 1500)) {
+      const res = res0.filter((h) => !skip.has(h.e));
+      if (!res.length) continue;
+      const t0 = res[0].e.timestamp, t1 = res[res.length - 1].e.timestamp;
+      if (fam.proximity && players.some((p) => !life.hitAlive(p, t0))) continue;
+      if (fam.tanks && !tanksHealthy(players, life, t0 - DIED_FROM_HIT_MS)) continue;
+      // Instances that also hit someone in raise grace: drop them.
+      const tainted = new Set<string>();
+      for (const p of players) {
+        for (const e of p.damageTaken) {
+          if (fam.ids.includes(e.abilityId) && e.timestamp >= t0 - 1500 && e.timestamp <= t1 + 500 && inRaiseGrace(life, p, e.timestamp)) tainted.add(instanceKey(e));
+        }
+      }
+      const byInst = new Map<string, Hit[]>();
+      const byPlayer = new Map<PlayerInfo, Set<string>>();
+      for (const h of res) {
+        const k = instanceKey(h.e);
+        if (tainted.has(k)) continue;
+        byInst.set(k, [...(byInst.get(k) ?? []), h]);
+        byPlayer.set(h.p, (byPlayer.get(h.p) ?? new Set()).add(k));
+      }
+      if (!byInst.size) continue;
+      const owners = new Map<string, PlayerInfo>();
+      for (const c of casts) {
+        if (!fam.ids.includes(c.abilityId) || c.timestamp < t0 - 2000 || c.timestamp > t1 || c.sourceInstance === undefined || !c.target) continue;
+        const p = players.find((x) => x.name === c.target);
+        if (p) owners.set(castKey(c), p);
+      }
+      for (const [k, hs] of byInst) {
+        if (owners.has(k) || fam.shared) continue;
+        const hit = uniq(hs.map((h) => h.p));
+        const only = hit.filter((p) => byPlayer.get(p)!.size === 1);
+        if (hs.length === 1) owners.set(k, hs[0].p);
+        else if (only.length === 1 && hit.length > 1) owners.set(k, only[0]);
+      }
+      const diedTo = (p: PlayerInfo) => {
+        const last = res.filter((h) => h.p === p).pop()?.e.timestamp ?? t0;
+        const d = life.diedFrom(p, last);
+        if (d && fam.ids.includes(d.killingAbilityGameId)) return true;
+        return !!fam.knockback && deaths.some((x) => x.player === p.name && !x.killingAbilityGameId && x.timestamp >= last && x.timestamp <= last + KNOCKED_OFF_MS);
+      };
+      // An unowned instance on a crowd is the group under it: player-less.
+      for (const [k, hs] of [...byInst]) {
+        const hit = uniq(hs.map((h) => h.p));
+        if (!fam.crowd || owners.has(k) || hit.length < fam.crowd) continue;
+        const killed = hit.filter(diedTo);
+        errors.push(playerlessMinor(fam.ruleId, `${fam.name} Hit the Group`,
+          `One ${fam.what} hit ${hit.length} players at once (${namesOf(hit)}); its owner can't be told apart from the log.${killed.length ? ` ${namesOf(killed)} died.` : ""} ${fam.why}`,
+          hs[0].e.timestamp, hs[0].e.abilityId, fam.name));
+        byInst.delete(k);
+        for (const p of hit) byPlayer.get(p)?.delete(k);
+      }
+      const links = new Map<PlayerInfo, Set<PlayerInfo>>();
+      const link = (a: PlayerInfo, b: PlayerInfo) => {
+        links.set(a, (links.get(a) ?? new Set()).add(b));
+        links.set(b, (links.get(b) ?? new Set()).add(a));
+      };
+      const hitTwice = new Set<PlayerInfo>();
+      for (const [p, ks] of byPlayer) {
+        const foreign = [...ks].filter((k) => owners.get(k) !== p && (owners.has(k) || !fam.shared));
+        if (ks.size < 2 && foreign.length === 0) continue;
+        if (ks.size >= 2) hitTwice.add(p);
+        if (!links.has(p)) links.set(p, new Set());
+        for (const k of ks) {
+          const o = owners.get(k);
+          if (o) { if (o !== p) link(p, o); }
+          else if (!fam.shared || ks.size >= 2) for (const h of byInst.get(k)!) if (h.p !== p && (!fam.shared || byPlayer.get(h.p)!.size >= 2)) link(p, h.p);
+        }
+      }
+      if (!links.size) continue;
+      const seen = new Set<PlayerInfo>();
+      for (const start of links.keys()) {
+        if (seen.has(start)) continue;
+        const group: PlayerInfo[] = [];
+        const stack = [start];
+        while (stack.length) {
+          const p = stack.pop()!;
+          if (seen.has(p)) continue;
+          seen.add(p);
+          group.push(p);
+          for (const q of links.get(p) ?? []) stack.push(q);
+        }
+        if (group.length < 2 && !hitTwice.has(group[0])) continue;
+        const killed = group.filter(diedTo);
+        const severity = killed.length ? "Major" : "Minor";
+        const deathText = killed.length ? ` ${namesOf(killed)} died.` : "";
+        if (fam.tanks && group.some(isTank) && group.some((p) => !isTank(p))) {
+          for (const p of group.filter((x) => !isTank(x))) {
+            const tanks = [...(links.get(p) ?? [])].filter(isTank);
+            errors.push(playerError(p, {
+              ruleId: LW2_FINISHER_RULE_ID, severity, name: `In ${fam.name}`,
+              description: `Stood in ${tanks.length ? `${namesOf(tanks)}'s` : "a tank's"} ${fam.what}.${deathText} ${fam.why}`,
+              timestamp: t0, abilityId: fam.ids[0], abilityName: fam.name,
+            }));
+          }
+          continue;
+        }
+        for (const p of group) {
+          const others = [...(links.get(p) ?? [])];
+          const n = byPlayer.get(p)?.size ?? 0;
+          const description = hitTwice.has(p) || [...(byPlayer.get(p) ?? [])].some((k) => owners.get(k) !== p)
+            ? `Hit by ${n > 1 ? `${n} ${fam.what}s at once` : `another player's ${fam.what}`}${others.length ? ` (with ${namesOf(others)})` : ""}.`
+            : `Their ${fam.what} also hit ${namesOf(others)}.`;
+          errors.push(playerError(p, {
+            ruleId: fam.ruleId, severity, name: `${fam.name} Overlap`,
+            description: `${description}${deathText} ${fam.why}`,
+            timestamp: t0, abilityId: fam.ids[0], abilityName: fam.name,
+          }));
+        }
+      }
+    }
+  }
+  return errors;
+}
+
+// ── shared stacks ───────────────────────────────────────────────────────────
+
+/**
+ * Two Heavy Slam stacks shared by everyone. A player hit by both stacked them
+ * together; a stack that killed someone while a living player took neither
+ * names that player (unless they were resolving their own bait).
+ */
+function detectStacks(players: PlayerInfo[], life: Life, casts: EnemyEvent[]): PullError[] {
+  const errors: PullError[] = [];
+  const idyllic = castsOf(casts, IDYLLIC_DREAM)[0]?.timestamp ?? Infinity;
+  for (const fam of STACKS) {
+    for (const res of clusterByGap(hitsOf(players, life, fam.ids), (h) => h.e.timestamp, 1500)) {
+      const t = res[0].e.timestamp;
+      if (fam.afterIdyllic && t < idyllic) continue;
+      if (players.filter((p) => !life.alive(p, t)).length >= STACK_DOOMED_DEAD) continue;
+      const byPlayer = new Map<PlayerInfo, Set<string>>();
+      for (const h of res) byPlayer.set(h.p, (byPlayer.get(h.p) ?? new Set()).add(instanceKey(h.e)));
+      const killed = [...byPlayer.keys()].filter((p) => {
+        const d = life.diedFrom(p, res.filter((h) => h.p === p).pop()!.e.timestamp);
+        return d && fam.ids.includes(d.killingAbilityGameId);
+      });
+      const deathText = killed.length ? ` ${namesOf(killed)} died.` : "";
+      const doubled = [...byPlayer].filter(([, ks]) => ks.size >= 2).map(([p]) => p);
+      if (doubled.length) {
+        errors.push(...doubled.map((p) => playerError(p, {
+          ruleId: LW2_STACK_RULE_ID, severity: killed.length ? "Major" : "Minor", name: `Took Both ${fam.name} Stacks`,
+          description: `Was in both ${fam.name} stacks at once (with ${namesOf(doubled.filter((x) => x !== p))}), so the two stacks landed on top of each other.${deathText} ${fam.why}`,
+          timestamp: t, abilityId: fam.ids[0], abilityName: fam.name,
+        })));
+      }
+      if (!killed.length) continue;
+      const centers = uniq(res.map((h) => instanceKey(h.e))).map((k) => {
+        const at = res.filter((h) => instanceKey(h.e) === k && h.e.x !== undefined && h.e.y !== undefined);
+        return at.length ? { x: at.reduce((s, h) => s + h.e.x!, 0) / at.length, y: at.reduce((s, h) => s + h.e.y!, 0) / at.length } : undefined;
+      }).filter((c): c is { x: number; y: number } => !!c);
+      const busy = (p: PlayerInfo) => p.damageTaken.some((e) => BUSY_IDS.includes(e.abilityId) && Math.abs(e.timestamp - t) <= 2500);
+      const absent = players.filter((p) => !byPlayer.has(p) && life.hitAlive(p, t) && !inRaiseGrace(life, p, t) && !inAvoidable(p, t) && !busy(p)).map((p) => {
+        const q = positionAt(p, t);
+        return { p, d: q && centers.length ? Math.min(...centers.map((c) => Math.hypot(q.x - c.x, q.y - c.y))) : undefined };
+      }).filter((a) => a.d === undefined || a.d > STACK_NEAR_MISS);
+      for (const a of absent) {
+        errors.push(playerError(a.p, {
+          ruleId: LW2_STACK_RULE_ID, severity: "Major", name: `Missed ${fam.name}`,
+          description: `Took neither ${fam.name} stack${a.d !== undefined ? ` (~${yd(a.d)} yalms from the nearer one)` : ""}; ${byPlayer.size} took them and ${namesOf(killed)} died. ${fam.why}`,
+          timestamp: t, abilityId: fam.ids[0], abilityName: fam.name,
+        }));
+      }
+    }
+  }
+  // A clone stack nobody took hits the raid as Unmitigated Impact: who was
+  // meant to take it isn't in the log.
+  for (const c of clusterByGap(castsOf(casts, UNMITIGATED_IMPACT), (x) => x.timestamp, 1500)) {
+    const hit = uniq(players.filter((p) => p.damageTaken.some((e) => e.abilityId === UNMITIGATED_IMPACT && e.healthBefore !== 0 && e.timestamp >= c[0].timestamp && e.timestamp <= c[0].timestamp + 2000)));
+    errors.push(playerlessMinor(LW2_STACK_RULE_ID, "Clone Stack Unsoaked",
+      `${c.length === 1 ? "A clone Heavy Slam stack" : `${c.length} clone Heavy Slam stacks`} went untaken, so Unmitigated Impact hit ${hit.length ? namesOf(hit) : "the raid"}. Every clone stack needs its assigned players under it.`,
+      c[0].timestamp, UNMITIGATED_IMPACT, "Unmitigated Impact"));
+  }
+  return errors;
+}
+
+// ── Blood Mana: mutations ───────────────────────────────────────────────────
+
+/**
+ * Mutating Cells gives four players Mutation α and four Mutation β; at each
+ * check (Blood Mana's contacts, then Netherworld) every β must have been hit
+ * (Bloody Burst / Wailing Wave) and every α must not. A player who failed
+ * takes Unmitigated Explosion (46344) with Damage Down; the others take a
+ * 0-damage Dramatic Lysis. Both statuses swap after each check.
+ */
+function detectMutation(players: PlayerInfo[], life: Life): PullError[] {
+  const errors: PullError[] = [];
+  for (const { p, e } of hitsOf(players, life, MUTATION_FAILED)) {
+    const t = e.timestamp;
+    const alpha = auraEndedNear(p, [MUTATION_A], t, 1500, 500);
+    const beta = auraEndedNear(p, [MUTATION_B], t, 1500, 500);
+    // Any hit since the status was handed out counts (C12 +3:53 an α in
+    // Wailing Wave, E11 +3:54 an α in Sideways Fire II); DoTs and autos aside.
+    const since = Math.max(...debuffIntervals(p, alpha ? MUTATION_A : MUTATION_B).filter((w) => w.start < t).map((w) => w.start), t - 30_000);
+    const took = p.damageTaken.filter((x) => x.healthBefore !== 0 && (x.amount ?? 0) > 0 && x.timestamp >= since && x.timestamp < t - 200 &&
+      x.abilityId < 1_000_000 && x.abilityId !== 500000 && x.abilityName !== "Attack");
+    const dd = gotDamageDown(p, t);
+    const d = life.diedFrom(p, t);
+    const what = beta && !took.length
+      ? "Held Mutation β and took no hit (Bloody Burst or Wailing Wave) before the check"
+      : alpha && took.length
+        ? `Held Mutation α and was hit by ${uniq(took.map((x) => x.abilityName)).join(" and ")} before the check`
+        : "Their mutation failed at the check";
+    errors.push(playerError(p, {
+      ruleId: LW2_MUTATION_RULE_ID, severity: dd || d ? "Major" : "Minor", name: "Mutation Failed",
+      description: `${what}, so it exploded as Unmitigated Explosion (${kFmt(realAmount(e))}).${dd ? " They got Damage Down." : ""}${d ? " They died." : ""} Mutation β players must take a hit (the contacted shape's Bloody Burst, then Wailing Wave) and Mutation α players must take none.`,
+      timestamp: t, abilityId: MUTATION_FAILED, abilityName: "Unmitigated Explosion",
+    }));
+  }
+  return errors;
+}
+
+// ── Idyllic Dream: Cosmic Kiss towers ───────────────────────────────────────
+
+/**
+ * Eight Cosmic Kiss towers, each cast-targeted at its soaker. An empty tower
+ * explodes as Unmitigated Explosion (46325, one per empty tower) on the raid.
+ * The living players who soaked nothing are named when they match the empty
+ * count; otherwise player-less. 3+ deaths to it and its DoT end the pull.
+ */
+function detectTowers(players: PlayerInfo[], life: Life, casts: EnemyEvent[], deaths: DeathEvent[]): PullError[] {
+  const errors: PullError[] = [];
+  for (const empties of clusterByGap(castsOf(casts, TOWER_EMPTY), (c) => c.timestamp, 3000)) {
+    const t = empties[0].timestamp;
+    const emptyCount = uniq(empties.map((c) => c.sourceInstance)).length;
+    const soakers = new Set(castsOf(casts, COSMIC_KISS).filter((c) => Math.abs(c.timestamp - t) <= 3000).map((c) => c.target).filter(Boolean));
+    const free = players.filter((p) => !soakers.has(p.name) && life.hitAlive(p, t) && !inRaiseGrace(life, p, t));
+    const lost = uniq(deaths.filter((d) => (d.killingAbilityGameId === TOWER_EMPTY || d.killingAbilityGameId === SUSTAINED_DAMAGE) &&
+      d.timestamp >= t && d.timestamp <= t + UNSOAKED_DEATHS_MS).map((d) => d.player));
+    const deathText = lost.length ? ` ${joinNames(lost)} died to the explosion and its damage over time.` : "";
+    const why = "Each of the eight Downfall towers takes one player; soak the one your group and Arcanum swap assign you.";
+    if (free.length && free.length === emptyCount && emptyCount <= 2) {
+      for (const p of free) {
+        errors.push(playerError(p, {
+          ruleId: LW2_TOWER_RULE_ID, severity: "Major", name: "Missed a Tower",
+          description: `Soaked no tower while ${emptyCount === 1 ? "one Cosmic Kiss tower" : `${emptyCount} Cosmic Kiss towers`} went empty, so Unmitigated Explosion hit the raid.${deathText} ${why}`,
+          timestamp: t, abilityId: TOWER_EMPTY, abilityName: "Unmitigated Explosion",
+        }));
+      }
+    } else {
+      errors.push(playerlessMinor(LW2_TOWER_RULE_ID, "Towers Unsoaked",
+        `${emptyCount} Cosmic Kiss tower${emptyCount === 1 ? "" : "s"} went empty${free.length ? ` (soaking none: ${namesOf(free)})` : ""}, so Unmitigated Explosion hit the raid.${deathText} ${why}`,
+        t, TOWER_EMPTY, "Unmitigated Explosion"));
+    }
+    if (lost.length >= TOWER_DEATHS) {
+      errors.push(raidMarker(LW2_TOWER_RULE_ID, "Unsoaked Towers Killed the Raid",
+        `${emptyCount} Cosmic Kiss tower${emptyCount === 1 ? "" : "s"} went empty and the explosions killed ${lost.length} (${joinNames(lost)}). Treated as the cutoff point.`,
+        t, TOWER_EMPTY, "Unmitigated Explosion"));
+    }
+  }
+  return errors;
+}
+
+// ── deaths with no killing blow ─────────────────────────────────────────────
+
+/** No-killing-blow deaths that are the wipe being called, not mistakes. */
+function calledWipeDeaths(players: PlayerInfo[], deaths: DeathEvent[], pullEnd: number): Set<DeathEvent> {
+  const explained = (d: DeathEvent) => {
+    const p = players.find((x) => x.name === d.player);
+    return !!p && (!!knockedOffBy(p, d) || !!doomExpiredBefore(p, d) ||
+      p.damageTaken.some((e) => AVOIDABLE[e.abilityId] && e.timestamp <= d.timestamp && e.timestamp >= d.timestamp - DIED_FROM_HIT_MS));
+  };
+  const silent = deaths.filter((d) => !d.killingAbilityGameId && !explained(d));
+  const out = new Set<DeathEvent>();
+  for (const d of silent) {
+    if (pullEnd - d.timestamp <= CALLED_WIPE_END_MS) out.add(d);
+    const near = silent.filter((x) => Math.abs(x.timestamp - d.timestamp) <= CALLED_WIPE_WINDOW);
+    if (near.length >= CALLED_WIPE_COUNT) near.forEach((x) => out.add(x));
+    const pair = silent.filter((x) => Math.abs(x.timestamp - d.timestamp) <= CALLED_WIPE_PAIR_MS);
+    if (pair.length >= 2) pair.forEach((x) => out.add(x));
+  }
+  return out;
+}
+
+/**
+ * The other no-killing-blow deaths: an uncleansed Doom (player-less: the
+ * cleanser isn't in the log), Walking Dead running out (player-less), a
+ * Mana Burst knockback (that overlap's error) or unexplained (player-less).
+ */
+function detectSilentDeaths(players: PlayerInfo[], deaths: DeathEvent[], called: Set<DeathEvent>): PullError[] {
+  const errors: PullError[] = [];
+  for (const d of deaths) {
+    if (d.killingAbilityGameId || called.has(d)) continue;
+    const p = players.find((x) => x.name === d.player);
+    if (!p) continue;
+    const hitT = d.timestamp - DEATH_EVENT_LAG_MS;
+    const doom = doomExpiredBefore(p, d);
+    if (doom) {
+      errors.push(playerlessMinor(LW2_DOOM_RULE_ID, "Doom Not Cleansed",
+        `${p.name}'s Doom (from the dark tower's Lindwurm's Dark II) ran out after ${sec(doom.end - doom.start)}s without a cleanse, and they died. Esuna or The Warden's Paean the Doom before it runs out.`,
+        doom.end, DOOM, "Doom"));
+      continue;
+    }
+    const wd = debuffIntervals(p, WALKING_DEAD).find((w) => Math.abs(w.end - hitT) <= 500 && w.end - w.start >= WALKING_DEAD_FULL_MS);
+    if (wd) {
+      errors.push(playerlessMinor(LW2_FALL_RULE_ID, "Walking Dead Ran Out",
+        `${p.name}'s Walking Dead (from Living Dead) expired before they were healed back to full, and they died. The healers have to heal the Walking Dead tank to full within its 10s.`,
+        wd.end, WALKING_DEAD, "Walking Dead"));
+      continue;
+    }
+    if (knockedOffBy(p, d)) continue;
+    if (p.damageTaken.some((e) => AVOIDABLE[e.abilityId] && e.timestamp <= d.timestamp && e.timestamp >= d.timestamp - DIED_FROM_HIT_MS)) continue;
+    errors.push(playerlessMinor(LW2_FALL_RULE_ID, "Died With No Killing Blow",
+      `${p.name} died with no killing blow mid-pull: likely fell off the arena or an island. The log can't say what moved them.`,
+      hitT, 0, "Fall"));
+  }
+  return errors;
+}
+
+// ── entry point ─────────────────────────────────────────────────────────────
+
+/**
+ * Lindwurm II (M12S P2) errors. Self-gates on P2's signature casts, so the
+ * door boss and other fights are skipped.
+ */
+export function detectLindwurm2Errors(
+  players: PlayerInfo[], deathEvents: DeathEvent[], enemyCasts: EnemyEvent[], occurrences?: ReportedOccurrence[],
+): PullError[] {
+  if (!enemyCasts.some((c) => SIGNATURE.includes(c.abilityId))) return [];
+  const life = buildLife(players, deathEvents);
+  // Esoteric Finisher tests the non-tanks (staying out of it) whenever both
+  // tanks hold enmity.
+  for (const res of clusterByGap(hitsOf(players, life, ESOTERIC_FINISHER), (h) => h.e.timestamp, 1500)) {
+    const t = res[0].e.timestamp;
+    if (tanksHealthy(players, life, t - DIED_FROM_HIT_MS)) {
+      occurrences?.push({ mechanicKey: LW2_FINISHER_RULE_ID, timestamp: t, players: players.filter((p) => !isTank(p) && life.hitAlive(p, t)).map((p) => p.name) });
+    }
+  }
+  const pullEnd = Math.max(0, ...players.flatMap((p) => [...p.damageTaken, ...p.casts].map((e) => e.timestamp)), ...deathEvents.map((d) => d.timestamp));
+  const called = calledWipeDeaths(players, deathEvents, pullEnd);
+  const elements = detectElements(players, life, enemyCasts);
+
+  const errors = [
+    ...detectAvoidable(players, life),
+    ...elements.errors,
+    ...detectCones(players, life, enemyCasts),
+    ...detectPersonalOverlaps(players, life, enemyCasts, deathEvents, elements.repeats),
+    ...detectStacks(players, life, enemyCasts),
+    ...detectMutation(players, life),
+    ...detectTowers(players, life, enemyCasts, deathEvents),
+    ...detectSilentDeaths(players, deathEvents, called),
+  ];
+
+  const firstRaid = () => Math.min(...errors.filter((e) => e.severity === "Raid").map((e) => e.timestamp));
+  // One mechanic killing MASS_DEATHS at once with the pull over soon after.
+  const mechDeaths = deathEvents.filter((d) => !NOT_A_MECHANIC.includes(d.killingAbilityGameId));
+  for (const g of clusterByGap(mechDeaths, (d) => d.timestamp, MASS_DEATH_MS)) {
+    const who = uniq(g.map((d) => d.player));
+    if (who.length < MASS_DEATHS || pullEnd - g[0].timestamp > MASS_DEATH_END_MS) continue;
+    const t = g[0].timestamp - DEATH_EVENT_LAG_MS;
+    if (t >= firstRaid()) break;
+    const nameOf = (id: number) => players.flatMap((p) => p.damageTaken).find((e) => e.abilityId === id)?.abilityName ?? `${id}`;
+    const kinds = uniq(g.map((d) => nameOf(d.killingAbilityGameId)));
+    errors.push(raidMarker(LW2_MASS_DEATH_RULE_ID, "Mechanic Killed the Party",
+      `${who.length} players died to ${joinNames(kinds)} within ${sec(g[g.length - 1].timestamp - g[0].timestamp)}s (${joinNames(who)}). Treated as the cutoff point.`,
+      t, g[0].killingAbilityGameId, kinds[0]));
+    break;
+  }
+  const enrage = players.flatMap((p) => p.damageTaken.filter((e) => ARCADIAN_HELL_ENRAGE.includes(e.abilityId) && life.diedFrom(p, e.timestamp)))
+    .sort((a, b) => a.timestamp - b.timestamp)[0];
+  if (enrage && enrage.timestamp < firstRaid()) {
+    errors.push(raidMarker(LW2_ENRAGE_RULE_ID, "Arcadian Hell (Enrage)",
+      "The final Arcadian Hell volley killed the raid: the boss wasn't dead before the hard enrage.",
+      enrage.timestamp, enrage.abilityId, "Arcadian Hell"));
+  }
+  const calledList = deathEvents.filter((d) => called.has(d)).sort((a, b) => a.timestamp - b.timestamp);
+  const calledPair = calledList.some((d, i) => i > 0 && d.timestamp - calledList[i - 1].timestamp <= CALLED_WIPE_PAIR_MS);
+  if ((calledList.length >= CALLED_WIPE_COUNT || calledPair) && calledList[0].timestamp - DEATH_EVENT_LAG_MS < firstRaid()) {
+    errors.push(raidMarker(LW2_CALLED_WIPE_RULE_ID, "Wipe Called",
+      `${calledList.length} players died with no killing blow together (${joinNames(uniq(calledList.map((d) => d.player)))}): the wipe was called and the raid reset.`,
+      calledList[0].timestamp - DEATH_EVENT_LAG_MS, 0, "Deaths"));
+  }
+  const outAt = (t: number) => players.filter((p) => !life.alive(p, t));
+  const collapseT = life.outIntervals.map((w) => w.start).sort((a, b) => a - b)
+    .find((t) => outAt(t).length >= COLLAPSE_DEAD_COUNT && pullEnd - t <= COLLAPSE_END_MS);
+  if (collapseT !== undefined && collapseT + DEATH_EVENT_LAG_MS < firstRaid()) {
+    const who = outAt(collapseT).map((p) => p.name);
+    errors.push(raidMarker(LW2_COLLAPSE_RULE_ID, "Party Collapse",
+      `${who.length} players were dead at once (${joinNames(who)}). Treated as the cutoff point.`,
+      collapseT + DEATH_EVENT_LAG_MS, 0, "Deaths"));
+  }
+  return errors.sort((a, b) => a.timestamp - b.timestamp);
+}

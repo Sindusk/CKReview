@@ -84,7 +84,11 @@ lib/mechanics/
                                 Fusion stacks, Visceral Burst, Act 2 Unbreakable
                                 chains and In Line towers, Metamitosis towers,
                                 falls, Refreshing Overkill enrage)
-      lindwurm-2.ts           — Lindwurm II research model only (no detector)
+      lindwurm-2.ts           — Lindwurm II (M12S P2) per-pull rules (Damage Down
+                                hits, Rep1 element repeats, Rep2 cones/defams/
+                                proteans/stacks, Esoteric Finisher, Blood Mana
+                                mutations, Idyllic towers/Doom/portents, mass
+                                deaths, Arcadian Hell enrage)
   wow/
     registry.ts               — THE list of per-pull WoW modules; the app and
                                 validate.js both run it (a new boss = one line)

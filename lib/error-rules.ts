@@ -214,6 +214,16 @@ export const ERROR_RULES: PullErrorRule[] = [
       46237,   // Ravenous Reach
       46253,   // Cell Death
       47548,   // Serpentine Scourge
+      // Lindwurm II (M12S P2): lindwurm-2.ts owns these.
+      46375, 48789,                                          // Snaking Kick
+      46300,   // Winged Scourge
+      46373,   // Double Sobat (turning cleave)
+      46317,   // Firefall Splash (replayed jump)
+      46315, 47394,                                          // Hemorrhagic Projection
+      46337, 46338, 46339, 46340,                            // Blood Wakening shapes
+      46344,   // Unmitigated Explosion (failed mutation)
+      46358,   // Power Gusher
+      46327,   // Lindwurm's Stone III
       // Futures Rewritten P1: fatebreaker.ts owns these.
       40146,   // Cyclonic Break follow-up cones
       40157,   // Blasting Zone

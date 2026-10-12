@@ -346,6 +346,10 @@ mechanic("ffxiv-lw1-buster", "Visceral Burst (non-tanks)", undefined, ["ffxiv-lw
 mechanic("ffxiv-lw1-chain", "Act 2 chains (Unbreakable pair)", undefined, ["ffxiv-lw1-chain"]);
 mechanic("ffxiv-lw1-tower", "Act 2 towers (In Line soaker)", undefined, ["ffxiv-lw1-tower"]);
 exposure("targeted", ["ffxiv-lw1-buster", "ffxiv-lw1-chain", "ffxiv-lw1-tower"]);
+// Lindwurm II (M12S P2): the non-tanks' side of Esoteric Finisher
+// (lindwurm-2.ts reports every instance).
+mechanic("ffxiv-lw2-finisher", "Esoteric Finisher (non-tanks)", undefined, ["ffxiv-lw2-finisher"]);
+exposure("targeted", ["ffxiv-lw2-finisher"]);
 // Futures Rewritten P1: the tanks' Powder Mark Trail swap and survival
 // (fatebreaker.ts reports both tanks at every Powder Mark).
 mechanic("ffxiv-fb-powder-swap", "Powder Mark swap", 1, ["ffxiv-fb-powder-swap"]);

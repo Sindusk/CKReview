@@ -103,6 +103,14 @@ philosophy and the data semantics this list assumes.
   Mortal Slayer's and the Scourges' targets are the baits. A Hemorrhagic
   Projection cone's target was its *victim*; its owner stood on the cast's
   position (Lindwurm).
+- **A cast's position can be its clone's, not its owner's.** Lindwurm II's
+  Mana Burst defams cast from the clone that recorded them, with no target,
+  so an owner-less defam on 3+ players stays player-less. Its live cones'
+  casts did sit on the holder.
+- **A status can swap on a timer while the hit decides pass/fail.** Blood
+  Mana's alpha/beta flip at fixed times; the failure is a penalty hit on
+  the failing player (Unmitigated Explosion), and any damage counts as "hit"
+  (Lindwurm II).
 - **A cast that hit several players can lose its target.** Find the owner
   among the hit players who held that timer's status (Oracle of Darkness).
 - **Head markers name bait owners** (`HeadMarker[]`, marked player as
@@ -217,8 +225,11 @@ Classify every one before counting a called wipe. Known meanings:
   - Fatebreaker: 2.8-3.5s
   - Lindwurm: 2.4-2.9s
   - The Tyrant: 4.4s
+  - Lindwurm II: 2.2-2.8s after a Mana Burst defam (off a platform)
 
   Keep these out of the called-wipe count.
+- **An uncleansed Doom:** no killing blow ~2s after it runs out at full
+  duration (Lindwurm II).
 - **Falling with collapsing floor** (Lindwurm, 2.1s after the collapse
   hit).
 - **Walking Dead running out unhealed** (Dark Knight): player-less.
@@ -242,7 +253,10 @@ Related:
   collapse` prints the time from N dead to the pull's end. Results so far:
   - The Lost Explorers: 7.
   - Ula'tek: 7, plus the pull ending within 45s.
-  - The Tyrant and Lindwurm: 5 within 45s.
+  - The Tyrant, Lindwurm and Lindwurm II: 5 within 45s.
+- **One mechanic killing 4+ at once is its own cutoff** when the pull ends
+  within a minute. It lands seconds before the collapse or the jumps
+  (Lindwurm II's Rep1, defams and Blood Wakening; raidwides excluded).
   - Oracle of Darkness: 4, with no window.
 - **Tune the tank-death marker per boss.** Some fights carry on with one
   tank (Nek'zali).
