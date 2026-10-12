@@ -1,6 +1,6 @@
 // lib/mitigation/tanking-plan.ts
 //
-// The Tanking view's optimizer (docs/tanking-panel-plan.md, "The
+// The Tanking view's optimizer (docs/archive/tanking-panel-plan.md, "The
 // optimizer"): the tank problem handed to the generic engine (optimize.ts),
 // and the TankingPlan the view shows. Same plan model, window
 // (plan.ts planWindow), legality, beam search and change budget as the

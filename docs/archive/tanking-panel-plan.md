@@ -1,16 +1,31 @@
 # Tanking panel (build plan)
 
-Status: **planned 2026-10-11, not started.** It depends on the shared
-optimizer engine, built 2026-10-11: `lib/mitigation/optimize.ts`
-(OptimizerProblem: eligible, canAdd, anchors, objective, constraint,
-needsHelp, freeShifts, extraEdits), with the party Analysis in
-`lib/mitigation/plan.ts` as the worked example. Design record:
-[archive/mitigation-optimizer-plan.md](archive/mitigation-optimizer-plan.md).
+Status: **built 2026-10-11/12; archived as the design record.** The
+rules live in the module headers: `lib/mitigation/tanking.ts` (stream,
+busters, short cooldowns), `tanking-plan.ts` (the optimizer problem),
+`buster-kinds.ts`, `components/MitigationTanking.tsx` (the view, layout
+C). What's unconfirmed is in [../open-items.md](../open-items.md),
+"Tanking panel". Where the build departed from this plan:
+- Busters taken as an overlap of a dual buster (one tank took both hits)
+  are mechanic failures, left out (user).
+- "One tank takes both hits" and invuln re-planning on shared busters
+  were not built: the only dual busters so far (Vamp's Hardcore, Plummet)
+  make soloing a failure or impossible.
+- The Blackest Night is MP-gated and MP isn't logged, so its "unused"
+  count is usage only.
+- The window keeps only pulls with the latest pull's tank jobs.
+- Busters reached in 1-2 window pulls are protected (never made worse),
+  not planned.
+- The user picked a mirrored one-clock layout (C) over this file's sketch.
+
+Built on the shared optimizer engine (`lib/mitigation/optimize.ts`), with
+the party Analysis in `lib/mitigation/plan.ts` as the worked example.
+Design record: [mitigation-optimizer-plan.md](mitigation-optimizer-plan.md).
 
 Read first:
 - the headers of `lib/mitigation/analyze.ts` and `ffxiv-catalog.ts`
 - the optimizer plan's "The model" and "The search"
-- [lib/mechanics/README.md](../lib/mechanics/README.md), "FFXIV boss
+- [lib/mechanics/README.md](../../lib/mechanics/README.md), "FFXIV boss
   debuffs don't reach every attack"
 
 ## Why

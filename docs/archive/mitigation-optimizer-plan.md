@@ -75,8 +75,8 @@ schedule**, and shows them with as little text as possible.
    `d3vRbwfpNBLzJ2Xh` (C, has the kill). The roster is in the
    `red-hot-deep-blue.ts` header.
 
-**Build the engine generic.** The planned Tanking panel
-([tanking-panel-plan.md](../tanking-panel-plan.md)) reuses this optimizer
+**Build the engine generic.** The Tanking panel
+([tanking-panel-plan.md](tanking-panel-plan.md)) reuses this optimizer
 with its own eligible entries, anchors (busters plus heavy auto
 windows), objective and extra edits (invulns). So `optimize.ts` should
 take these as parameters: an eligibility predicate, the anchor hits, an

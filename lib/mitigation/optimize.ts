@@ -3,10 +3,11 @@
 // The Analysis view's optimizer (docs/archive/mitigation-optimizer-plan.md):
 // a small set of coordinated changes to a group's current cooldown plan,
 // found by searching over the whole schedule. The engine is generic: the
-// party Analysis (partyPlan, below) and the planned Tanking panel
-// (docs/tanking-panel-plan.md) differ only in the OptimizerProblem they hand
-// it: eligible entries, anchor hits, objective, hard constraint and extra
-// edits.
+// party Analysis (plan.ts) and the Tanking panel (tanking-plan.ts) differ
+// only in the OptimizerProblem they hand it: eligible entries, anchor hits,
+// objective, hard constraint, extra edits and change filter. The Tanking
+// panel also turns on coverParts (a placed cast covers only the parts
+// inside its duration) and reads each anchor's damage (HitEstimate.damage).
 //
 // ── The plan is "cooldown on hit" ──────────────────────────────────────
 // A plan is a list of assignments (player, catalog entry, anchor hit id),

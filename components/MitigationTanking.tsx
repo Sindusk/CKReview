@@ -2,7 +2,7 @@
 
 // components/MitigationTanking.tsx
 //
-// The Mitigation dialog's Tanking view (docs/tanking-panel-plan.md, "UI";
+// The Mitigation dialog's Tanking view (docs/archive/tanking-panel-plan.md, "UI";
 // layout C picked by the user over a lanes-first and an advice-first
 // mockup, 2026-10-11). Every amount is a % of the tank's max HP.
 //   - Header: the "Last N pulls" input (blank = 5), one ⓘ, and the summary:

@@ -2,7 +2,7 @@
 //
 // The Mitigation dialog's Tanking view, per pull: each tank's damage stream,
 // who held the boss at each moment, and the busters with their follow-up
-// margins (docs/tanking-panel-plan.md, Model 1-2). Pure: (pull, hits) ->
+// margins (docs/archive/tanking-panel-plan.md, Model 1-2 and 4). Pure: (pull, hits) ->
 // PullTanking. Every amount is a fraction of the tank's max HP, never raw HP
 // (user, 2026-10-11: level-synced content makes raw numbers meaningless).
 //
@@ -52,6 +52,26 @@
 // verdict and margin are its worst non-invulnerable tank's. A margin below
 // 0 is a fail even when healers kept the tank alive (user, 2026-10-11:
 // the plan must survive the follow-up without healing).
+//
+// A dual buster where both tanks were hit and one took both hits is an
+// overlap (Buster.overlap): a mechanic failure (user, 2026-10-11; Vamp A2
+// +21.7), left out of the margins across pulls and of the optimizer.
+//
+// ── Short cooldowns (Model 4) ──────────────────────────────────────────
+// SHORT_COOLDOWNS are pressed on cooldown and never placed by the
+// optimizer. Per tank and pull, uses (counting entries that share the
+// recast or gauge: Nascent Flash with Bloodwhetting, Intervention with
+// Holy Sheltron) against possible uses:
+//   - Holy Sheltron: the Oath Gauge simulated from the Paladin's own
+//     landed autos (+5, cap 100, 50 per Sheltron or Intervention, from 0);
+//     possible = uses + gauge wasted at the cap / 50. The Vamp kill: 18
+//     of 21.
+//   - Heart of Corundum, Bloodwhetting: charges + time alive (deaths to
+//     the next sign of life left out) / cooldown.
+//   - The Blackest Night: usage only (MP isn't logged and is shared with
+//     Edge of Shadow).
+// savedPerUse is the median a real use saved its target: the % statuses
+// divided back out of each covered event, plus what the shield absorbed.
 //
 // ── Across pulls (aggregateBusters) ────────────────────────────────────
 // Matched by MitigationHit.id: median and worst margin over the pulls not

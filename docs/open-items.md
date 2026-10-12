@@ -557,21 +557,62 @@ grouped by exact roster. The module headers hold the rules.
     - Freaky Pyrotation (Red Hot and Deep Blue) is tight and unfixable
       partly because no boss debuff was ever tried on it (reach unknown,
       so no credit; user kept that rule 2026-10-11).
-- **Tanking panel planned (user, 2026-10-11):**
-  [tanking-panel-plan.md](tanking-panel-plan.md). It covers busters
-  checked with 10s of follow-up damage, invuln planning for shared and
-  dual busters, both tanks' cooldowns on each other, and tank damage in
-  % of max HP. It reuses the optimizer engine. The tank gauge overcap
-  item below is folded into it.
+- **Tanking panel (built 2026-10-11/12, waiting on the user's review in
+  the running app):** the dialog's Tanking view. Rules in the headers of
+  `lib/mitigation/tanking.ts`, `tanking-plan.ts`, `buster-kinds.ts` and
+  `components/MitigationTanking.tsx`; test:
+  `node scripts/check-tanking-example.js`. Design record:
+  [archive/tanking-panel-plan.md](archive/tanking-panel-plan.md).
+  Settled by the user: 10s follow-up with no healing, margins from full
+  HP, invulns part of the plan, amounts in % of max HP, a margin below 0
+  is a fail, rare busters left out, layout C, the tanks-only picker,
+  buster labels (Vamp Hardcore and Plummet dual, RHDB Hot Impact shared),
+  a dual buster's overlap is a mechanic failure.
+  - **Chosen by the builder, not yet confirmed:**
+    - `TANK_MARGIN_UNDER` / `TANK_MARGIN_OVER` 15% / 30% (same as the
+      Analysis, kept separate)
+    - `BUSTER_MIN_PULLS` 3 with the 25% share: rare busters
+    - heavy auto windows: `HEAVY_WINDOWS_PER_DURATION` 3 per cooldown
+      length, at least `HEAVY_MIN` 30% of max HP (median over the window),
+      not overlapping a buster's check window
+    - `TANK_CHANGE_COST` 10% of max HP: what a change must save to beat
+      making no change
+    - `INVULN_COST`: Hallowed Ground 0.5, Holmgang / Living Dead /
+      Superbolide 1 (tie-break only)
+    - `TANK_MECHANIC_MARGIN` -50%: a buster below it is a mechanic
+      failure, never planned
+    - invulns only added (never moved or dropped), only onto a failing or
+      tight non-shared buster, only by a tank who is low on it; a
+      Superbolide on a ~50% Plummet tower is allowed (user deferred,
+      2026-10-11)
+    - busters reached in 1-2 window pulls are protected, not planned
+      (user deferred, 2026-10-11)
+    - busters start from full HP even right after another heavy hit
+      (user deferred, 2026-10-11: Vamp A4 +333.9, Kade enters Plummet #3
+      at 74%)
+    - the window keeps only pulls with the latest pull's tank jobs, so
+      Vamp's Kade/Alice (Paladin in only A7-A8) get no plan yet
+    - Bulwark is never moved (its block is outside FFLogs' multiplier)
+    - The Blackest Night: usage only, no "unused" count (MP isn't logged
+      and is shared with Edge of Shadow)
+    - Oath Gauge simulated from 0 at pull start, +5 per auto-attack the
+      Paladin lands
+  - **Not built (plan items):** "one tank takes both hits" for dual
+    busters (no labelled dual buster allows it yet), re-planning shared
+    busters around an invuln, crediting self-healing cooldowns
+    (Bloodwhetting, Clarity of Corundum).
+  - **Known rough edges:**
+    - A target-reach cooldown (Oblation) placed on an anchor goes to the
+      lowest tank there, and can be credited on two overlapping anchors
+      of different tanks.
+    - A placed cast's value counts only the damage inside anchors, so a
+      long cooldown's tail past its anchor isn't credited.
+    - Living Dead, Holmgang and Superbolide count their covered damage
+      as saved, though the healers still have to heal the tank from 1 HP.
 - **Unverified catalog entries:** Warrior, Machinist (Dismantle), Red Mage,
   Ninja, Monk, Summoner.
 - **Deferred:** what-if sandbox (reuse `marginWith`), an optional
   published plan to compare against, a WoW port.
-- **Not built: tank gauge overcap.** The PLD on the Vamp kill overcapped
-  Oath gauge: xivanalysis says 260, and a simulation (+5 per auto-attack,
-  −50 per Holy Sheltron) gives about 170. That's 3–5 Holy Sheltrons
-  never pressed. It costs mitigation, not damage, so it belongs here if
-  anywhere.
 
 ### Damage (both games)
 
