@@ -327,6 +327,10 @@
 // can detonate per K2 (exact damage name unconfirmed). No revival described.
 // Correct play: TF MT north/OT south; tanks hit Flails, others focus nail,
 // melee switch when puddle blocks access. Help Flails before their deadline.
+// Tanks (user, 2026-10-11): one tower per tank, both required. The MT soaks
+// while still taking the boss's autos (17-24% of max HP each, ~3s apart),
+// so it is a mitigation-planning spot: A4 +333.9, the tower took 34% and
+// three autos 52% in the next 10s.
 // Failure: empty tower -> LOG SIGNAL: Massive Impact/Sustained Damage;
 // FAULT: assigned living tank only if tower identity/position is known;
 // CONSEQUENCE: Major if attributable, Raid only if unresolvable.
@@ -362,6 +366,12 @@
 // cones, tank/healer/DPS. DPS pair belongs together, not individual spreads.
 // Correct play: wide gap for tank/Amp, healer CW gap, both DPS CCW gap;
 // keep every cone off inmates. Swap outside/inside groups for second set.
+// User, 2026-10-11: Spread splits the outside group by role; its tank cone
+// is a hard-hitting single-tank buster (116-154% raw in the log) the
+// outside tank is expected to mitigate. Amp is a party stack split four
+// ways by the outside group. Each group takes one Spread and one Amp over
+// the mechanic, so each tank takes one Spread buster (A8 +410 the OT,
+// +440 the MT).
 // Failure: cone clips inmate/other role -> LOG SIGNAL: wrong-role/inmate
 // ultrasonic damage; FAULT: mis-aimed target or misplaced outside player,
 // never inmate merely for being hit; CONSEQUENCE: Major, possibly Raid.

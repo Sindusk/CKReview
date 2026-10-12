@@ -43,6 +43,13 @@
 // - Hot Impact 46518 = opening shared buster (2 tanks; 28 of 96 had one
 //   tank, nobody died). 46464 = snaking version on Red Hot's top-enmity
 //   Firesnaking player; the fire tank often eats it alone under an invuln.
+//   Shared means one hit split between the tanks (user, 2026-10-11): each
+//   takes ~135% of max HP raw. A tank taking either Hot Impact alone takes
+//   the whole hit, ~250% raw, and the other tank nothing (opening: A6-A8
+//   +15 Kade alone, 211-252%; snaking: A28 +270 Kade alone without an
+//   invuln, 248%, survived; A29 +270 both, 131%/130%). The snaking one was
+//   soloed under an invuln in 50 of 52 pulls (OT Living Dead 26, MT
+//   Hallowed Ground 24).
 // - Deep Impact cast 46519, hit 44486 (target named on the cast when only
 //   one player is hit; ground-targeted otherwise). Knockback: a tank with
 //   no immunity hits the deathwall and dies with NO killing blow ~2.6s

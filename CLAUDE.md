@@ -95,6 +95,12 @@ These are standing preferences, each learned from a real correction:
   Order the items by pull, not by mechanic. When the same question
   applies to several pulls, ask it once, at the first pull. If the user's
   answer doesn't settle the later pulls, raise those in the next turn.
+- **Read the boss's full module header before asking about the fight**
+  (user, 2026-10-11). Any question about a mechanic (who takes a buster,
+  shared or not, why an invuln is used, MT/OT) is usually answered by the
+  research model and VERIFIED section at the top of the boss's detection
+  module, even for mitigation work. Grepping it isn't reading it. Ask
+  only what it doesn't answer, and write the answer back into it.
 - **Show, don't describe** (user, 2026-10-11). Text descriptions of a
   layout, or tables of numbers with no reference point, don't land:
   - for a UI or layout choice, render a visual mockup built from real
