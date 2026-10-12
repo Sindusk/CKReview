@@ -376,6 +376,10 @@ import type { DeathEvent } from "@/types/DeathEvent";
 import type { PullError, EnemyEvent } from "@/types/PullError";
 import type { ReportedOccurrence } from "@/lib/mechanics/occurrences";
 import { kFmt, sec, yd, joinNames, playerError, playerlessMinor, raidMarker, clusterByGap } from "@/lib/mechanics/wow/common";
+import {
+  DAMAGE_DOWN, MARK_OF_MORTALITY, DEATH_EVENT_LAG_MS, PREVIEW_AMOUNT, type Hit, type Life,
+  bodyHit, buildLife, hitsOf, castsOf, gotAura, clock, uniq, namesOf, isTank, realAmount, allAlive, byPlayer,
+} from "./common";
 
 export const FB_AVOIDABLE_RULE_ID    = "ffxiv-fb-avoidable";
 export const FB_OVERLAP_RULE_ID      = "ffxiv-fb-overlap";
@@ -396,8 +400,6 @@ export const FB_DEAD_GOING_IN_RULE_ID = "ffxiv-fb-dead-going-in";
 // ── log IDs (VERIFIED above) ────────────────────────────────────────────────
 
 const SIGNATURE = [40144, 40148, 40168];      // opening Cyclonic Break (fire / lightning), Powder Mark Trail
-const DAMAGE_DOWN = 1002911;
-const MARK_OF_MORTALITY = 1004372;
 const FATED_BURN_MARK = 1004165;
 const POWDER_MARK = 1004166;
 const FLOATING_FETTERS = 1002304;
@@ -449,12 +451,6 @@ const AVOIDABLE: Record<number, Avoidable> = {
   40134: { name: "Burnout", hit: "Hit by Burnout", why: BURNOUT_WHY },
 };
 
-// FFLogs logs the death event ~2.0s after the fatal hit (README).
-const DEATH_EVENT_LAG_MS = 2000;
-const DIED_FROM_HIT_MS   = 3000;
-// Hits this large are FFLogs' unpaired previews of lethal hits: counted as
-// hits, never compared as amounts.
-const PREVIEW_AMOUNT     = 1_500_000;
 const EPISODE_MS         = 3000;
 // A no-killing-blow death this long after a Blastburn cast was knocked into
 // the deathwall: 2.8-3.5s in all 32 such deaths (A12 +1:16.4 ... C20 +2:27.5).
@@ -501,89 +497,7 @@ const SWAP_PROVOKE_BEFORE_MS = 6000;
 // own victims (death modeled ~2.1s before the event) don't count.
 const DEAD_GOING_IN_MS   = 500;
 
-// ── shared helpers ──────────────────────────────────────────────────────────
-
-type Hit = { p: PlayerInfo; e: PlayerEvent };
-
-type Life = {
-  alive: (p: PlayerInfo, t: number) => boolean;
-  hitAlive: (p: PlayerInfo, hitT: number) => boolean;
-  diedFrom: (p: PlayerInfo, hitT: number) => DeathEvent | undefined;
-  outIntervals: { p: PlayerInfo; start: number; end: number }[];
-};
-
-/**
- * A dead body still logs hits: 0 damage at 0 HP. The live pipeline marks
- * them healthBefore 0; the validate harness has only healthAfter.
- */
-const bodyHit = (e: PlayerEvent) => e.healthBefore === 0 || (e.healthAfter === 0 && !((e.amount ?? 0) > 0));
-
-/**
- * When a dead player was raised: their next cast or real hit. Not common.ts's
- * rezzedAt, which counts body hits as a sign of life (A4: the OT's body took
- * the second Cyclonic Break's cones and read as raised).
- */
-function raisedAt(p: PlayerInfo, deathT: number, nextDeathT: number): number | undefined {
-  const t = [...p.damageTaken.filter((e) => !bodyHit(e)), ...p.casts]
-    .map((e) => e.timestamp)
-    .filter((x) => x > deathT + 2000 && x < nextDeathT)
-    .sort((a, b) => a - b)[0];
-  return t;
-}
-
-function buildLife(players: PlayerInfo[], deaths: DeathEvent[]): Life {
-  const outIntervals: Life["outIntervals"] = [];
-  for (const p of players) {
-    const own = deaths.filter((d) => d.player === p.name).sort((a, b) => a.timestamp - b.timestamp);
-    own.forEach((d, i) => {
-      const next = own[i + 1]?.timestamp ?? Infinity;
-      const end = raisedAt(p, d.timestamp, next) ?? next - DEATH_EVENT_LAG_MS - 100;
-      outIntervals.push({ p, start: d.timestamp - DEATH_EVENT_LAG_MS - 100, end });
-    });
-  }
-  const alive = (p: PlayerInfo, t: number) => !outIntervals.some((w) => w.p === p && t >= w.start && t < w.end);
-  return {
-    outIntervals,
-    alive,
-    hitAlive: (p, hitT) => alive(p, hitT - 500),
-    diedFrom: (p, hitT) => deaths.find((d) => d.player === p.name && d.timestamp >= hitT && d.timestamp <= hitT + DIED_FROM_HIT_MS),
-  };
-}
-
-/** Hits on living players (a dead body still logs 0-damage hits). */
-function hitsOf(players: PlayerInfo[], life: Life, ids: number | number[], until: number): Hit[] {
-  const set = new Set(Array.isArray(ids) ? ids : [ids]);
-  const out: Hit[] = [];
-  for (const p of players) {
-    for (const e of p.damageTaken) {
-      if (!set.has(e.abilityId) || e.timestamp > until || bodyHit(e)) continue;
-      if (life.hitAlive(p, e.timestamp)) out.push({ p, e });
-    }
-  }
-  return out.sort((a, b) => a.e.timestamp - b.e.timestamp);
-}
-
-const castsOf = (casts: EnemyEvent[], ids: number | number[], until: number) => {
-  const set = new Set(Array.isArray(ids) ? ids : [ids]);
-  return casts.filter((c) => set.has(c.abilityId) && c.timestamp <= until).sort((a, b) => a.timestamp - b.timestamp);
-};
-
-function gotAura(p: PlayerInfo, id: number, t: number, ms = 1500): boolean {
-  return p.debuffs.some((e) => e.abilityId === id && e.debuffStatus === "applied" && Math.abs(e.timestamp - t) <= ms);
-}
-
-/** ms into the pull as m:ss.s, the way reviewers read VOD timestamps. */
-const clock = (ms: number) => `${Math.floor(ms / 60_000)}:${((ms % 60_000) / 1000).toFixed(1).padStart(4, "0")}`;
-const uniq = <T,>(xs: T[]) => [...new Set(xs)];
-const namesOf = (ps: PlayerInfo[]) => joinNames(uniq(ps).map((p) => p.name));
-const isTank = (p: PlayerInfo) => p.role === "Tank";
-const realAmount = (e: PlayerEvent) => ((e.amount ?? 0) >= PREVIEW_AMOUNT ? 0 : e.amount ?? 0);
-const allAlive = (players: PlayerInfo[], life: Life, t: number) => players.every((p) => life.alive(p, t));
-const byPlayer = (hits: Hit[]) => {
-  const m = new Map<PlayerInfo, PlayerEvent[]>();
-  for (const h of hits) m.set(h.p, [...(m.get(h.p) ?? []), h.e]);
-  return m;
-};
+// ── shared helpers (the rest are in ./common) ───────────────────────────────
 
 /** Took a listed avoidable hit within 2s of `t`: already flagged for it. */
 function inAvoidable(p: PlayerInfo, t: number): boolean {
@@ -1195,7 +1109,7 @@ export function detectFatebreakerErrors(
   const life = buildLife(players, deaths);
   const lastEvent = Math.max(0, ...players.flatMap((p) => [...p.damageTaken, ...p.casts].map((e) => e.timestamp)), ...deathEvents.map((d) => d.timestamp));
   const end = Math.min(p2, lastEvent);
-  const called = calledWipeDeaths(deaths, enemyCasts, p2 === Infinity ? lastEvent : -Infinity, end);
+  const called = calledWipeDeaths(deaths, enemyCasts, p2 === Infinity ? lastEvent : Infinity, end);
 
   const errors = [
     ...detectAvoidable(players, life, end),

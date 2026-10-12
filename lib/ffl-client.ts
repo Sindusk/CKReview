@@ -396,6 +396,8 @@ export type FFLDebuffEvent = {
   // lib/mechanics/ffxiv/dancingmad/kefka-says.ts). Only ever populated on
   // the ENEMY-hostility debuff stream — see enemyDebuffEvents below.
   extraInfo?: number;
+  // The new stack count on "applydebuffstack" (FRU's Lightsteeped).
+  stack?: number;
   ability?: {
     name:        string;
     abilityIcon?: string;
@@ -812,11 +814,15 @@ export async function fetchFFightData(
   logLabel?:  string,      // e.g. from buildFFFightLogLabels — tags console dumps
   skipConsoleDump = false, // true for callers (e.g. scripts/fetch-ff-report.js) that
                             // persist the result themselves
-  eventsFrom?: number       // sample scripts only: absolute report-ms where the bulky
+  eventsFrom?: number,      // sample scripts only: absolute report-ms where the bulky
                             // streams start. deaths/combatantInfo still start at
                             // fight.startTime, so fight-relative offsets still hold.
+  eventsTo?: number         // sample scripts only: absolute report-ms where the bulky
+                            // streams stop. deaths/combatantInfo still run to the end.
 ): Promise<FFLFightData> {
   const endTime = fight.endTime;
+  const bulkyEnd = Math.min(endTime, eventsTo ?? endTime);
+  const stopAt = (key: StreamKey) => (key === "deaths" || key === "combatantInfo" ? endTime : bulkyEnd);
   const label   = logLabel ?? `${fight.name ?? "Unknown Fight"} (fight ${fight.id})`;
   const from    = Math.max(fight.startTime, eventsFrom ?? fight.startTime);
 
@@ -870,9 +876,12 @@ export async function fetchFFightData(
       if (done[key]) continue; // already finished — ignore the (cheap, empty) page we still requested for it
 
       const stream = report[key];
-      (collected[key] as unknown[]).push(...stream.data);
+      const stop = stopAt(key);
+      (collected[key] as unknown[]).push(...(stop < endTime
+        ? (stream.data as { timestamp: number }[]).filter((e) => e.timestamp <= stop)
+        : stream.data));
 
-      if (!stream.nextPageTimestamp || stream.nextPageTimestamp >= endTime) {
+      if (!stream.nextPageTimestamp || stream.nextPageTimestamp >= stop) {
         done[key] = true;
         cursors[key] = endTime;
       } else {

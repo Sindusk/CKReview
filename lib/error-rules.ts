@@ -212,6 +212,16 @@ export const ERROR_RULES: PullErrorRule[] = [
       40164, 40134,                                          // Burnout
       40331,   // Fated Burn Mark explosion
       40132, 40136,                                          // Unmitigated Explosion (tower)
+      // Futures Rewritten P2: usurper-of-frost.ts owns these.
+      40198,   // Icicle Impact
+      40202, 40203, 40204, 40205,                            // Axe / Scythe / Reflected Scythe Kick
+      40200, 40201,                                          // Frigid Needle
+      40185,   // Shining Armor (gaze)
+      40219,   // Burst (holy light)
+      40215,   // Refulgent Fate (broken Light Rampant tether)
+      40214,   // Inescapable Illumination (short center tower)
+      40256,   // Hiemal Storm
+      40262,   // Sinbound Blizzard III (dark crystal cone)
     ],
   },
 

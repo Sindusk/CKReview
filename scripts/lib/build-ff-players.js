@@ -131,6 +131,7 @@ function buildFFPlayers(rep, actorMap, getFFJobByName, abilityMap) {
         abilityId: e.abilityGameID ?? 0,
         abilityName: resolveAbilityName(e.abilityGameID),
         debuffStatus: statusMap[e.type] ?? 'applied',
+        stack: e.stack,
         causeAbilityId: e.extraAbilityGameID,
         causeAbilityName: e.extraAbilityGameID !== undefined
           ? (abilityMap?.get(e.extraAbilityGameID) ?? ('Ability ' + e.extraAbilityGameID))
@@ -263,4 +264,13 @@ function buildFFPlayerPositionSamples(rep, actorMap) {
     }));
 }
 
-module.exports = { buildFFPlayers, buildFFDeaths, buildFFBlackHoleGeometry, buildFFEnemyCastEvents, buildFFKefkaSaysStateSignals, buildFFStompiesPuddleSamples, buildFFPlayerPositionSamples };
+// Mirrors lib/log-transforms.ts's fflBuildHeadMarkers: head markers on
+// players (usurper-of-frost.ts's Frigid Stone marker). The marked actor is
+// the event's sourceID.
+function buildFFHeadMarkers(rep, actorMap) {
+  return (rep.headMarkers?.data ?? [])
+    .filter((e) => actorMap.get(e.sourceID)?.type === 'Player')
+    .map((e) => ({ timestamp: e.timestamp, player: actorMap.get(e.sourceID).name, markerId: e.markerID }));
+}
+
+module.exports = { buildFFPlayers, buildFFDeaths, buildFFBlackHoleGeometry, buildFFEnemyCastEvents, buildFFKefkaSaysStateSignals, buildFFStompiesPuddleSamples, buildFFPlayerPositionSamples, buildFFHeadMarkers };

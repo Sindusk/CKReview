@@ -22,6 +22,9 @@
 //   --from-minutes <n> Start the bulky event streams n minutes into each fight.
 //                      deaths/combatantInfo stay whole, so offsets still hold.
 //                      Saves API points when only a late phase matters.
+//   --to-minutes <n>   Stop the bulky streams n minutes into each fight (deaths
+//                      still run to the end). With --from-minutes it fetches one
+//                      middle phase (FRU P2: --from-minutes 2.4 --to-minutes 7.75).
 //   --refetch        Download again the pulls whose file already exists. Pulls
 //                    not on disk are skipped; name them with --fight to add them.
 //
@@ -39,7 +42,7 @@ const { slimFflReport } = require('./lib/slim-report');
 const { killsFirst, withRateLimitWait, writeAtomic } = require('./lib/fetch-plan');
 
 function parseArgs(argv) {
-  const args = { fights: [], out: null, boss: null, creds: null, minMinutes: 0, fromMinutes: 0, refetch: false };
+  const args = { fights: [], out: null, boss: null, creds: null, minMinutes: 0, fromMinutes: 0, toMinutes: 0, refetch: false };
   let reportCode = null;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -49,6 +52,7 @@ function parseArgs(argv) {
     else if (a === '--creds') args.creds = argv[++i];
     else if (a === '--min-minutes') args.minMinutes = Number(argv[++i]);
     else if (a === '--from-minutes') args.fromMinutes = Number(argv[++i]);
+    else if (a === '--to-minutes') args.toMinutes = Number(argv[++i]);
     else if (a === '--refetch') args.refetch = true;
     else if (!reportCode) reportCode = a;
     else throw new Error(`Unrecognized argument: ${a}`);
@@ -56,7 +60,7 @@ function parseArgs(argv) {
   if (!reportCode) {
     throw new Error(
       'Usage: node scripts/fetch-ff-report.js <reportCode> [--out dir] [--fight id]... [--boss name] [--creds path] ' +
-      '[--min-minutes n] [--from-minutes n] [--refetch]'
+      '[--min-minutes n] [--from-minutes n] [--to-minutes n] [--refetch]'
     );
   }
   return { reportCode: extractReportCode(reportCode), ...args };
@@ -72,7 +76,7 @@ function extractReportCode(input) {
 }
 
 async function main() {
-  const { reportCode, out, fights, boss, creds, minMinutes, fromMinutes, refetch } = parseArgs(process.argv.slice(2));
+  const { reportCode, out, fights, boss, creds, minMinutes, fromMinutes, toMinutes, refetch } = parseArgs(process.argv.slice(2));
   const outDir    = out   ? path.resolve(out)   : path.join(ROOT, 'sampledata', 'ff', reportCode);
   const credsPath = creds ? path.resolve(creds) : path.join(ROOT, '.credentials', 'ffl-token.json');
 
@@ -129,11 +133,12 @@ async function main() {
 
     const { data, interrupts } = await withRateLimitWait(async () => {
       const d = await fflClient.fetchFFightData(reportCode, fight, report.masterData.actors, label, true /* skipConsoleDump */,
-        fromMinutes > 0 ? fight.startTime + fromMinutes * 60000 : undefined);
+        fromMinutes > 0 ? fight.startTime + fromMinutes * 60000 : undefined,
+        toMinutes > 0 ? fight.startTime + toMinutes * 60000 : undefined);
       // FFLogs "Interrupts" tab — see lib/ffl-client.ts's fetchFFInterruptsTable
       // header comment (pure aggregate, not per-kick detail). Not run through
       // slimFflReport (unknown key, already small/aggregate).
-      return { data: d, interrupts: fromMinutes > 0 ? null : await fflClient.fetchFFInterruptsTable(reportCode, fight) };
+      return { data: d, interrupts: fromMinutes > 0 || toMinutes > 0 ? null : await fflClient.fetchFFInterruptsTable(reportCode, fight) };
     }, label);
 
     const slim = slimFflReport({

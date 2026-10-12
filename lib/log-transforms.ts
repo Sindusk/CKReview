@@ -52,6 +52,7 @@ import type {
   FFLDebuffEvent,
   FFLBuffEvent,
   FFLCombatantInfoEvent,
+  FFLHeadMarkerEvent,
 } from "./ffl-client";
 import { getSpellName }                          from "./spell-data";
 import { getSpecInfo, getRosterSortOrder }        from "./spec-data";
@@ -71,6 +72,7 @@ import { detectVampFataleErrors } from "./mechanics/ffxiv/arcadion/vamp-fatale";
 import { detectRedHotDeepBlueErrors } from "./mechanics/ffxiv/arcadion/red-hot-deep-blue";
 import { detectTyrantErrors } from "./mechanics/ffxiv/arcadion/tyrant";
 import { detectFatebreakerErrors } from "./mechanics/ffxiv/fru/fatebreaker";
+import { detectUsurperOfFrostErrors, type HeadMarker } from "./mechanics/ffxiv/fru/usurper-of-frost";
 import { detectWowEncounterErrors } from "./mechanics/wow/registry";
 import { buildPullPhaseSegments } from "./pull-phases";
 import { computeMechanicOccurrences, mergeReportedOccurrences, type ReportedOccurrence } from "./mechanics/occurrences";
@@ -1170,6 +1172,7 @@ function fflDebuffToPlayerEvent(
     abilityIcon: fflAbilityIcon(event, abilityMap),
     extra:       source?.name,
     debuffStatus,
+    stack:       event.stack,
     causeAbilityId:   event.extraAbilityGameID,
     causeAbilityName: event.extraAbilityGameID !== undefined
       ? fflAbilityName({ abilityGameID: event.extraAbilityGameID }, abilityMap)
@@ -1313,6 +1316,22 @@ function fflBuildKefkaSaysStateSignals(
 }
 
 const KEFKA_SAYS_STATE_ABILITY_ID = 1002056;
+
+// Head markers on players (usurper-of-frost.ts reads the Frigid Stone
+// marker). The marked actor is the event's sourceID.
+function fflBuildHeadMarkers(
+  headMarkerEvents: FFLHeadMarkerEvent[],
+  actorMap:         Map<number, FFLActor>,
+  fightStart:       number
+): HeadMarker[] {
+  return headMarkerEvents
+    .filter((e) => actorMap.get(e.sourceID)?.type === "Player")
+    .map((e) => ({
+      timestamp: Math.max(0, e.timestamp - fightStart),
+      player:    actorMap.get(e.sourceID)!.name,
+      markerId:  e.markerID,
+    }));
+}
 
 // Raw geometry data for the Black Hole mechanic's direction/priority
 // detection (see types/Pull.ts's BlackHoleGeometry + blackhole-strategy.ts's
@@ -1560,6 +1579,7 @@ export function transformFFightToPull(
   const enemyCastEvents = fflBuildEnemyCastEvents(data.enemyCastEvents ?? [], actorMap, abilityMap, fightStart);
   const enemyBuffEvents = fflBuildEnemyBuffEvents(data.enemyBuffEvents ?? [], actorMap, abilityMap, fightStart);
   const kefkaSaysSignals = fflBuildKefkaSaysStateSignals(data.enemyDebuffEvents ?? [], actorMap, fightStart);
+  const headMarkers = fflBuildHeadMarkers(data.headMarkerEvents ?? [], actorMap, fightStart);
   const blackHoleGeometry = fflBuildBlackHoleGeometry(data.enemyCastEvents ?? [], actorMap, abilityMap, fightStart);
   const stompiesPuddleSamples = fflBuildStompiesPuddleSamples(data.enemyCastEvents ?? [], abilityMap, fightStart);
   const playerPositionSamples = fflBuildPlayerPositionSamples(data.enemyDamageTakenEvents ?? [], actorMap, fightStart);
@@ -1581,6 +1601,7 @@ export function transformFFightToPull(
     ...detectRedHotDeepBlueErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
     ...detectTyrantErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
     ...detectFatebreakerErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
+    ...detectUsurperOfFrostErrors(players, deathEvents, enemyCastEvents, headMarkers, reportedOccurrences),
   ].sort((a, b) => a.timestamp - b.timestamp);
 
   const fightDurationMs = data.fight.endTime - data.fight.startTime;

@@ -143,6 +143,7 @@ function makeFFPullCtx(pull, actorMap, abilityMap, getFFJobByName) {
     relDeaths:       () => memo('relDeaths', () => ffb.buildFFDeaths(rel(), actorMap, getFFJobByName)),
     relEnemyCasts:   () => memo('relEnemyCasts', () => ffb.buildFFEnemyCastEvents(rel(), actorMap, abilityMap)),
     relStateSignals: () => memo('relStateSignals', () => ffb.buildFFKefkaSaysStateSignals(rel(), actorMap)),
+    relHeadMarkers:  () => memo('relHeadMarkers', () => ffb.buildFFHeadMarkers(rel(), actorMap)),
   };
 }
 
@@ -307,6 +308,15 @@ const MECHANICS = {
     load: () => requireTsFromRoot('lib/mechanics/ffxiv/fru/fatebreaker.ts'),
     run({ mod, ctxs }) {
       for (const c of ctxs) printPullErrors(c, mod.detectFatebreakerErrors(c.relPlayers(), c.relDeaths(), c.relEnemyCasts()));
+    },
+  },
+
+  'usurper-of-frost': {
+    game: 'ff',
+    lateCapture: true, // Phase 2 only — safe on --from-minutes captures (see isLateCapture)
+    load: () => requireTsFromRoot('lib/mechanics/ffxiv/fru/usurper-of-frost.ts'),
+    run({ mod, ctxs }) {
+      for (const c of ctxs) printPullErrors(c, mod.detectUsurperOfFrostErrors(c.relPlayers(), c.relDeaths(), c.relEnemyCasts(), c.relHeadMarkers()));
     },
   },
 
@@ -1116,12 +1126,12 @@ function readSnapshot(game, code) {
 // --update: replace the snapshot's entries for the mechanics that ran,
 // keeping entries of mechanics that didn't (so narrowed runs don't wipe the
 // rest of the file).
-// True when every pull's damage stream starts 5+ minutes after its
+// True when every pull's damage stream starts 2+ minutes after its
 // combatantinfo events (the pull start) — a `fetch-ff-report.js
-// --from-minutes` capture. Detected from the data so captures never need
-// hand-editing.
+// --from-minutes` capture (FRU Phase 2 captures start at 2.4 minutes).
+// Detected from the data so captures never need hand-editing.
 function isLateCapture(pulls) {
-  const LATE_MS = 5 * 60000;
+  const LATE_MS = 2 * 60000;
   return pulls.length > 0 && pulls.every((p) => {
     const start = Math.min(...(p.rep.combatantInfo?.data ?? []).map((e) => e.timestamp));
     const firstHit = (p.rep.damageTaken?.data ?? [])[0]?.timestamp;

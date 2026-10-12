@@ -30,8 +30,11 @@ validation harness (`scripts/validate.js`, `expectations/`), see
   lasting at least n minutes; `--from-minutes <n>` starts every stream
   except deaths and combatantInfo n minutes into each fight. Ultimate
   Kefka used `--min-minutes 15 --from-minutes 14` (~1MB per pull instead
-  of 5-7MB). `validate.js` detects these captures and runs only
-  `lateCapture` mechanics on them.
+  of 5-7MB). `--to-minutes <n>` also stops those streams n minutes in
+  (deaths still run to the end), so a middle phase costs only its own
+  span: FRU Phase 2 used `--from-minutes 2.4 --to-minutes 7.75`.
+  `validate.js` detects captures whose damage starts 2+ minutes in and runs
+  only `lateCapture` mechanics on them.
   - **Re-running a fetch on such a folder must repeat its flags.** A
     plain re-run downloads every pull the capture skipped, at full size.
     The folder then mixes full and late captures, so validate stops

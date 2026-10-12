@@ -367,6 +367,37 @@ header of `lib/mechanics/ffxiv/arcadion/tyrant.ts`.
   collisions, Wall front swaps, kick cooldown timing, tank deaths to their
   own busters.
 
+### Futures Rewritten P2: Usurper of Frost (FFXIV)
+
+Built 2026-10-12 from 19 logs of one static (245 P2 pulls, 91 P2 clears)
+with no VODs. Evidence is in the header of
+`lib/mechanics/ffxiv/fru/usurper-of-frost.ts`. These questions apply to any
+P2 pull; check them on the first VODs that reach P2:
+- **Tank dies with no killing blow in Mirror, Mirror** (about 4:35 into
+  the pull, just before the red-mirror cones). Flagged "Walked Into the Wall", and
+  the cones then wipe the raid. Is it the wall while moving the boss, or
+  something else?
+- **Deaths into the wall within 8s of another death** (the Heavenly
+  Strike knockback, or sliding on Thin Ice) are treated as the raid
+  resetting and not flagged. Right, or were some real mistakes?
+- **Sinbound Holy:** one player out of a stack is a Minor ("Missed
+  Sinbound Holy", the most common stack error, usually nobody dies). When a stack holds only its
+  target and the other three are missing, all four are named. Keep both?
+- **Two Frigid Stone players in one stone** with nobody dying isn't
+  flagged. Should it be?
+- **Center tower short with nobody named** (the raid marker only): who
+  should have been in it?
+- **Luminous Hammer players dying to Powerful Light** (the hammers' magic
+  vulnerability, 3 pulls): healing, or should they wait to join the stack?
+- **Refulgent Fate with nobody dead** reads "a tether was too short". Which
+  pair, and is that the right reading?
+- **Bleeding without a death** is a Minor ("Stood in a Puddle"). Keep it?
+- **Endless Ice Age** is a player-less Raid: the log has no crystal deaths
+  or crystal buffs, only the Ice Veil's. What went wrong in those pulls
+  (light crystal shielded by a dark cone, dark crystal killed, too slow)?
+- **Not built:** Hammer/tower overlaps, who aimed a Mirror, Mirror cone,
+  crystal kill order, Light Rampant tower assignments.
+
 ### Dancing Mad (FFXIV)
 
 - **Phase 1 (graven-image / phase1.ts):**

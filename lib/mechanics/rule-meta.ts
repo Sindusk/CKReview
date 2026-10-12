@@ -344,6 +344,13 @@ exposure("targeted", [
 mechanic("ffxiv-fb-powder-swap", "Powder Mark swap", 1, ["ffxiv-fb-powder-swap"]);
 mechanic("ffxiv-fb-powder-death", "Powder Mark / Burn Mark survival", 1, ["ffxiv-fb-powder-death"]);
 exposure("targeted", ["ffxiv-fb-powder-swap", "ffxiv-fb-powder-death"]);
+// Futures Rewritten P2: Quadruple Slap tests the tanks; the Diamond Dust
+// cone and stone rules test the four Frigid Stone players
+// (usurper-of-frost.ts reports both at every instance).
+mechanic("ffxiv-uof-slap", "Quadruple Slap", 2, ["ffxiv-uof-slap"]);
+mechanic("ffxiv-uof-marked-cone", "Diamond Dust: marked players' cones", 2, ["ffxiv-uof-marked-cone"]);
+mechanic("ffxiv-uof-stone", "Diamond Dust: Frigid Stone drops", 2, ["ffxiv-uof-stone"]);
+exposure("targeted", ["ffxiv-uof-slap", "ffxiv-uof-marked-cone", "ffxiv-uof-stone"]);
 // Vamp Fatale (vamp-fatale.ts reports every instance): each rule scoped to
 // the role or group that can fail it.
 mechanic("ffxiv-vf-hardcore", "Hardcore (non-tanks)", undefined, ["ffxiv-vf-hardcore"]);

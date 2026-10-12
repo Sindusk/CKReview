@@ -38,10 +38,16 @@ lib/mechanics/
                                 Apocalypse, Forsaken ground, Null enrage, collapse)
       blackhole-strategy.ts   — cross-pull strategy auto-detect (DSA/SDA/Double Tether)
     fru/                      — Futures Rewritten (Ultimate); one pull, five phases
+      common.ts               — shared helpers (alive/raised, hits on the living)
       fatebreaker.ts          — Phase 1 per-pull rules (Cyclonic Break, Powder Mark /
                                 Burn Mark, Utopian Sky, Fated Burn Mark tethers,
-                                Fall of Faith, towers, deathwall knocks, enrage).
-                                The other four files are research models only
+                                Fall of Faith, towers, deathwall knocks, enrage)
+      usurper-of-frost.ts     — Phase 2 + intermission per-pull rules (Diamond
+                                Dust cones/stones, gaze, twins, Holy stacks,
+                                Mirror cones, Light Rampant tethers/stacks/
+                                towers, puddles, walls, Absolute Zero, Endless
+                                Ice Age). The other three files are research
+                                models only
     arcadion/                 — AAC Heavyweight (Savage)
       vamp-fatale.ts          — Vamp Fatale (M9S) per-pull rules (Stomp bats and
                                 Bombpyre overlaps, Aetherletting drops/lines/overlap,
@@ -652,6 +658,29 @@ The same principles apply when refining any module:
 - **Deaths with no killing blow after a Damage Down are resets.** Players
   walked into the wall 4-8s after their own Damage Down to clear it; the
   Damage Down's cause is the error.
+
+### Lessons from Usurper of Frost (FRU P2: 245 pulls over 19 reports, no VODs)
+
+- **Fetch a middle phase only.** `fetch-ff-report.js --from-minutes 2.4
+  --to-minutes 7.75 --fight <id>...` (fights picked by `lastPhase` in
+  meta.json) took ~1.7MB per pull. validate.js treats a capture starting
+  2+ minutes in as late and runs only `lateCapture` mechanics on it.
+- **Head markers name the bait owners.** FFLogs logs them with the marked
+  player as `sourceID`; the Frigid Stone players (marker 345) can't be
+  told apart from the log otherwise. Modules get them as `HeadMarker[]`.
+- **Stack counters need the `stack` field.** A new stack is logged as
+  remove + apply + applydebuffstack in one millisecond; FFXIV debuff
+  PlayerEvents now carry `stack` (live and harness).
+- **"Near the pull end" must not use -Infinity.** Passing `-Infinity` as
+  the pull end for pulls that reached the next phase made every silent
+  death a called wipe (`-Infinity - t <= 12s`). Use Infinity, and require
+  most of the raid dead for a lone end-of-pull death.
+- **A death right after another death is usually the raid resetting.**
+  Six players took the knockback into the wall 5s after one died (B12);
+  slides on Thin Ice did the same. Lone ones stay flagged.
+- **Phase clears are the baseline.** With no kill, the 91 P2 clears were
+  checked for zero Raid errors and the few Majors left in them read one by
+  one.
 
 ### Lessons from Ultimate Kefka (a late phase, 29 pulls, no kill)
 
