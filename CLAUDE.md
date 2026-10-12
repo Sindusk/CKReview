@@ -18,7 +18,9 @@ sampling it.
 | Task | Read |
 |---|---|
 | Researching a boss/mechanic model | [lib/mechanics/MODEL-RESEARCH-GUIDE.md](lib/mechanics/MODEL-RESEARCH-GUIDE.md) |
-| Building or changing mechanic detection | [lib/mechanics/README.md](lib/mechanics/README.md) (includes the working method and "Lessons from building new bosses"), then the module's own header comment |
+| Building or changing mechanic detection | [lib/mechanics/README.md](lib/mechanics/README.md) (the working method) and [lib/mechanics/PITFALLS.md](lib/mechanics/PITFALLS.md) (per-boss lessons as a checklist), then the module's own header comment |
+| Building a boss module from its research model and logs | the `/build-module` skill ([.claude/skills/build-module/](.claude/skills/build-module/SKILL.md)) |
+| Refining a module with a reviewed log / VOD answers | the `/refine-module` skill ([.claude/skills/refine-module/](.claude/skills/refine-module/SKILL.md)) |
 | App features, UI, data flow | [docs/app-architecture.md](docs/app-architecture.md) |
 | Sample data, auth tokens, scripts, browser checks, deploy pipeline | [docs/dev-tooling.md](docs/dev-tooling.md) |
 | Damage output / rotation analysis, or tooling for it | [docs/dps-analysis.md](docs/dps-analysis.md) (method and pitfalls) |
