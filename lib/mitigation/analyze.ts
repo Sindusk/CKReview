@@ -891,7 +891,7 @@ export function phaseName(pull: Pull, atMs: number): string | undefined {
 }
 
 /** Earliest timestamp after `afterMs` that this player shows any sign of being alive. */
-function firstActivityAfter(player: PlayerInfo, afterMs: number): number | undefined {
+export function firstActivityAfter(player: PlayerInfo, afterMs: number): number | undefined {
   let min: number | undefined;
   for (const stream of [player.casts, player.damageTaken, player.healing]) {
     for (const e of stream) {

@@ -61,7 +61,7 @@
 import type { Pull } from "@/types/Pull";
 import type { PlayerEvent, PlayerInfo } from "@/types/PlayerInfo";
 import type { HitVerdict, MitigationGame, MitigationHit } from "./types";
-import { rawOf, trailingInvulnAt } from "./analyze";
+import { firstActivityAfter, rawOf, trailingInvulnAt } from "./analyze";
 import { busterLabel } from "./buster-kinds";
 import { RARE_SHARE } from "./aggregate";
 
@@ -141,6 +141,24 @@ export type PullTanking = {
   tanks:   TankStream[];
   tanking: TankingSpan[];
   busters: Buster[];
+  unused:  UnusedCooldown[];
+};
+
+// A short tank cooldown meant to be pressed on cooldown, per tank and pull.
+export type UnusedCooldown = {
+  player:   string;
+  key:      string;
+  name:     string;
+  used:     number;   // casts, including entries sharing its recast or gauge
+  possible?: number;  // undefined for MP-gated ones (see basis)
+  unused:   number;
+  // cooldown: every cooldownMs while alive; gauge: Oath wasted at the cap;
+  // mp: no possible count (MP isn't logged and is shared with damage).
+  basis:    "cooldown" | "gauge" | "mp";
+  everyMs?: number;   // alive time per use
+  // What one of this tank's real uses saved, median, fraction of the
+  // target's max HP (undefined when it was never used).
+  savedPerUse?: number;
 };
 
 // ── Entry point ────────────────────────────────────────────────────────
@@ -154,6 +172,7 @@ export function analyzePullTanking(pull: Pull, hits: MitigationHit[], game: Miti
     tanks: streams,
     tanking: tankingSpans(tanks, playerNames, game),
     busters: busterHits.map((h) => buildBuster(pull, h, streams)),
+    unused: tanks.flatMap((p) => unusedShortCooldowns(pull, p, streams, game)),
   };
 }
 
@@ -282,6 +301,100 @@ export function tankVerdict(margin: number, died: boolean): HitVerdict {
   if (margin < TANK_MARGIN_UNDER) return "under";
   if (margin < TANK_MARGIN_OVER) return "good";
   return "over";
+}
+
+// ── Short cooldowns ────────────────────────────────────────────────────
+
+// Pressed on cooldown, never placed by the optimizer (plan, Model 4).
+export const SHORT_COOLDOWNS = ["holy-sheltron", "bloodwhetting", "heart-of-corundum", "the-blackest-night"];
+// Entries sharing one recast or gauge with a short cooldown: their casts
+// count as uses of it.
+const SHARES_WITH: Record<string, string[]> = {
+  "bloodwhetting": ["nascent-flash"],
+  "holy-sheltron": ["intervention"],
+};
+// Oath Gauge: +5 per auto-attack the Paladin lands, cap 100, 50 per Holy
+// Sheltron or Intervention.
+const OATH_PER_AUTO = 5;
+const OATH_MAX = 100;
+const OATH_COST = 50;
+
+function unusedShortCooldowns(pull: Pull, player: PlayerInfo, streams: TankStream[], game: MitigationGame): UnusedCooldown[] {
+  const out: UnusedCooldown[] = [];
+  const firstDamage = streams.find((s) => s.player === player.name)?.events[0]?.timestampMs;
+  if (firstDamage === undefined) return out;
+  // Time alive from their first enemy damage: each death until the first
+  // sign of life after it is left out.
+  let alive = pull.fightDuration - firstDamage;
+  for (const d of pull.deathEvents.filter((x) => x.player === player.name && x.timestamp >= firstDamage)) {
+    alive -= Math.min(firstActivityAfter(player, d.timestamp) ?? pull.fightDuration, pull.fightDuration) - d.timestamp;
+  }
+  for (const key of SHORT_COOLDOWNS) {
+    const entry = game.catalog.find((e) => e.key === key);
+    if (!entry || !entry.jobs.includes(player.className)) continue;
+    const keys = [key, ...(SHARES_WITH[key] ?? [])];
+    const casts = player.casts.filter((c) => keys.some((k) => game.actionIndex.get(c.abilityId)?.key === k));
+    const own = player.casts.filter((c) => entry.actionIds.includes(c.abilityId));
+    const saved = own.map((c) => savedBy(pull, entry, player.name, c, game)).filter((x): x is number => x !== undefined);
+    const savedPerUse = saved.length ? median(saved) : undefined;
+    let possible: number | undefined;
+    let basis: UnusedCooldown["basis"] = "cooldown";
+    if (entry.gated === "MP") {
+      // MP isn't in the log and is shared with damage (a Dark Knight's
+      // Edge of Shadow), so there is no fair "possible": usage only.
+      basis = "mp";
+    } else if (key === "holy-sheltron") {
+      // Uses lost = gauge wasted at the cap, over the cost.
+      basis = "gauge";
+      const autos = player.damageDone.filter((e) => game.isAutoAttack(e.abilityName)).map((e) => e.timestamp);
+      const spends = casts.map((c) => c.timestamp);
+      const events = [...autos.map((t) => ({ t, d: OATH_PER_AUTO })), ...spends.map((t) => ({ t, d: -OATH_COST }))]
+        .sort((a, b) => a.t - b.t || a.d - b.d);
+      let gauge = 0;
+      let wasted = 0;
+      for (const e of events) {
+        const next = gauge + e.d;
+        if (next > OATH_MAX) wasted += next - OATH_MAX;
+        gauge = Math.max(0, Math.min(OATH_MAX, next));
+      }
+      possible = casts.length + Math.floor(wasted / OATH_COST);
+    } else {
+      possible = (entry.charges ?? 1) + Math.floor(Math.max(0, alive) / entry.cooldownMs);
+    }
+    out.push({
+      player: player.name, key, name: entry.name, used: casts.length, possible,
+      unused: possible === undefined ? 0 : Math.max(0, possible - casts.length), basis, savedPerUse,
+      everyMs: casts.length ? alive / casts.length : undefined,
+    });
+  }
+  return out;
+}
+
+/** What one cast saved its target over its duration, fraction of the target's max HP. */
+function savedBy(pull: Pull, entry: { durationMs: number; statuses: { id: number; shield?: boolean }[] }, caster: string,
+  cast: PlayerEvent, game: MitigationGame): number | undefined {
+  const target = pull.players.find((p) => p.name === (cast.target || caster)) ?? pull.players.find((p) => p.name === caster);
+  const max = target?.damageTaken.find((e) => e.maxHealth)?.maxHealth;
+  if (!target || !max) return undefined;
+  const ids = new Set(entry.statuses.map((s) => s.id));
+  const inWindow = (t: number) => t >= cast.timestamp && t <= cast.timestamp + entry.durationMs;
+  let saved = 0;
+  for (const e of target.damageTaken) {
+    if (!inWindow(e.timestamp) || !e.source || pull.players.some((p) => p.name === e.source)) continue;
+    const col = game.damageColumn(e.damageType);
+    if (col === "none") continue;
+    let factor = 1;
+    for (const id of new Set(e.statusIds ?? [])) {
+      if (!ids.has(id)) continue;
+      const s = game.statusIndex.get(id)!.status;
+      if (!s.shield) factor *= 1 - (col ? s[col] : Math.min(s.physical, s.magical));
+    }
+    if (factor < 1) saved += ((e.amount ?? 0) + (e.absorbed ?? 0)) * (1 / factor - 1);
+  }
+  for (const a of target.shieldAbsorbs ?? []) {
+    if (ids.has(a.statusId) && a.caster === caster && inWindow(a.timestamp)) saved += a.amount;
+  }
+  return saved / max;
 }
 
 // ── Across pulls ───────────────────────────────────────────────────────

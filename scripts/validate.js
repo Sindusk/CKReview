@@ -668,6 +668,11 @@ MECHANICS['mitigation-analysis'] = {
       const totals = tanking.tanks.map((s) => `${s.player.split(' ')[0]} ${pctOf(s.events.reduce((x, e) => x + e.taken, 0))}` +
         ` (autos ${pctOf(s.events.filter((e) => e.kind === 'auto').reduce((x, e) => x + e.taken, 0))})`).join(', ');
       console.log(`    pull ${pullNumber}: taken ${totals}; holding: ${holders || '-'}`);
+      const unused = tanking.unused.map((u) => `${u.player.split(' ')[0]} ${u.name} ${u.used}/${u.possible ?? '?'}` +
+        `${u.everyMs ? ` every ${Math.round(u.everyMs / 1000)}s` : ''}` +
+        `${u.unused ? ` (${u.unused} unused${u.savedPerUse !== undefined ? ` ~${pctOf(u.unused * u.savedPerUse)}` : ''})` : ''}` +
+        ` [${u.basis}${u.savedPerUse !== undefined ? `, ${pctOf(u.savedPerUse)}/use` : ''}]`).join(', ');
+      if (unused) console.log(`      short cds: ${unused}`);
       for (const b of tanking.busters) {
         const tanks = b.tanks.map((t) => `${t.player.split(' ')[0]} ${t.invuln ? `INVULN(${t.invuln})` : pctOf(t.margin)}` +
           ` [raw ${t.raw === undefined ? '?' : pctOf(t.raw)} x${t.parts}, hit ${pctOf(t.taken)} +${pctOf(t.followUp)}, before ${pctOf(t.before)}]` +
