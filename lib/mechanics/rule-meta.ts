@@ -259,10 +259,11 @@ mechanic("mf-radiance", "Radiance", undefined, [
 
 // ── The Venomous Abyss (lib/mechanics/wow/va/) ──────────────────────────────
 
-mechanic("es-blighted-blood", "Blighted Blood", undefined, [
-  "wow-es-blighted-blood",
-  "wow-es-blighted-blood-pool",
-]);
+// The pool tests only its carrier, the undispelled death the healers, so
+// they are two mechanics (one exposure each).
+mechanic("es-blighted-blood", "Blighted Blood", undefined, ["wow-es-blighted-blood"]);
+mechanic("wow-es-blighted-blood-pool", "Blighted Blood pool", undefined, ["wow-es-blighted-blood-pool"]);
+exposure("targeted", ["wow-es-blighted-blood-pool"]);
 mechanic("es-helical", "Helical Toxins", undefined, [
   "wow-es-helical-collapse",
   "wow-es-helical-overload",

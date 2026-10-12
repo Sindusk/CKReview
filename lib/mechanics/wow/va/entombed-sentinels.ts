@@ -131,6 +131,11 @@
 //                               not separated, Berserk) when no mechanic Raid
 //                               error came first — see "When was the pull over?"
 //
+// Exposure (docs/archive/exposure-plan.md): the Blighted Blood pool
+// (wow-es-blighted-blood-pool, its own mechanic) is targeted — one
+// instance per undispelled expiry, its carrier responsible. The
+// undispelled death (the healers' dispel) stays everyone.
+//
 // Deliberately NOT flagged (see above): Mark deaths, Contaminate ticks,
 // Helical Toxins ticks on a pairing player, tank-buster hits/deaths, the
 // unavoidable first Blood Venom tick from a player's own Murk/Injection
@@ -213,6 +218,7 @@ import {
   raidMarker, pullOverMarker,
 } from "../common";
 import type { WowPullContext } from "../common";
+import type { ReportedOccurrence } from "../../occurrences";
 
 // ─── Ability IDs (all verified in Mvz3r1AnVKYpdFTH) ──────────────────────────
 
@@ -1041,11 +1047,14 @@ function detectBlightedBlood(players: PlayerInfo[], deaths: DeathEvent[]): PullE
 
 export const ES_BLIGHTED_BLOOD_POOL_RULE_ID = "wow-es-blighted-blood-pool";
 
-function detectBlightedPools(players: PlayerInfo[], deaths: DeathEvent[]): PullError[] {
+function detectBlightedPools(players: PlayerInfo[], deaths: DeathEvent[], occurrences?: ReportedOccurrence[]): PullError[] {
   const errors: PullError[] = [];
   const drops = poolDrops(players, deaths);
   for (const drop of drops) {
     if (drop.source !== "blighted") continue;
+    // Each undispelled expiry is the carrier's chance to drop it in the
+    // puddle area (rule-meta exposure); a dispelled one tests nobody.
+    occurrences?.push({ mechanicKey: ES_BLIGHTED_BLOOD_POOL_RULE_ID, timestamp: drop.t, players: [drop.p.name] });
     // Another carrier whose own pool spawned at the same moment can't be
     // told apart from "caught by this one" (pull 2 +61: Sylmigron and
     // Neximage expired together) — leave them out of each other's list.
@@ -1230,7 +1239,7 @@ export function detectEntombedSentinelsErrors(ctx: WowPullContext): PullError[] 
     ...detectBloodVenom(players, deaths),
     ...detectDeadlyVenom(players, deaths),
     ...detectBlightedBlood(players, deaths),
-    ...detectBlightedPools(players, deaths),
+    ...detectBlightedPools(players, deaths, ctx.occurrences),
     ...detectContaminateKills(players, deaths, enemyCasts),
   ];
 
