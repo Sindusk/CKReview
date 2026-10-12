@@ -118,7 +118,9 @@
 //   was short, else a player-less Minor for an uneven split.
 // ffxiv-fb-fall-of-faith: each resolution's group is read from the other
 //   resolution on its side when that was clean, else as everyone outside a
-//   clean resolution of the other side; with the group alive: a double hit,
+//   clean resolution of the other side; with the group alive: a double hit
+//   (in lightning, not the next same-side carrier by Prey order when others
+//   doubled too: they stand behind the carrier),
 //   fire reaching the other group (the helper nearest the carrier alone),
 //   lightning reaching it (3+: the carrier, by Floating Fetters, else those
 //   players), a short Sinblaze's missing members (player-less if unknown).
@@ -138,9 +140,17 @@
 // Powder Mark); everything else counts everyone.
 // The Damage Down causes are excluded from ffxiv-damage-down (error-rules.ts).
 //
-// Not built: who left their spot in a spread overlap, who belongs on the
-// sides vs behind in a misread lightning tether (user: unknown, A46), the
-// tether stacks' and towers' assigned members (groups differ per report),
+// - Utopian tether stacks, group A: supports north, DPS south. Two DPS
+//   tethered: one DPS flexes north and the MT south; two supports: the M1
+//   north. Which DPS flexes changed through the night (A12/A42 the BLM/PCT
+//   caster, A23/A54/A62/A70 the NIN); the model says the long tether goes
+//   north, but tether length isn't logged (the charge casts 40165/40166
+//   appear in only 7 of 197 pulls). So when the stacks overlap both
+//   tethered players stay named; per the user's notes A49's caster failed
+//   to flex (ruling).
+// Not built: who left their spot in a spread overlap, which tethered player
+// should flex for the tether stacks, the towers' assigned members (groups
+// differ per report),
 // Bleeding / Burnished Glory deaths (healing), tank mitigation beyond
 // deaths.
 //
@@ -391,6 +401,10 @@ const MARK_OF_MORTALITY = 1004372;
 const FATED_BURN_MARK = 1004165;
 const POWDER_MARK = 1004166;
 const FLOATING_FETTERS = 1002304;
+const PREY = 1001051;
+// Fall of Faith's Prey marks land 5.6-13.9s before the first tether hits
+// (C31: +1:33.3 .. +1:41.6, hit +1:47.2); the Utopian Prey is 40s earlier.
+const PREY_BEFORE_FALL_MS = 16_000;
 const CYCLONIC_CONE = 40145;
 const SINSMITE_SPREAD = 40149;
 const SINSMOKE_PAIR = 40147;
@@ -954,6 +968,11 @@ function detectFallOfFaith(players: PlayerInfo[], life: Life, end: number): Pull
   const errors: PullError[] = [];
   const res = clusterByGap(hitsOf(players, life, [SINBLAZE, FALL_CARRIER, BOW_SHOCK], end), (h) => h.e.timestamp, FALL_GAP_MS);
   const clean = (r: Hit[]) => byPlayer(r).size === 4 && [...byPlayer(r).values()].every((es) => es.length === 1);
+  // Tether order = Prey order (applied ~1:33-1:41, before the first hit).
+  const first = res[0]?.[0].e.timestamp ?? 0;
+  const preyOrder = players.flatMap((p) => p.debuffs.filter((e) => e.abilityId === PREY && e.debuffStatus === "applied" &&
+    e.timestamp <= first && first - e.timestamp <= PREY_BEFORE_FALL_MS).map((e) => ({ p, t: e.timestamp })))
+    .sort((a, b) => a.t - b.t).map((x) => x.p);
   res.forEach((r, k) => {
     const t = r[0].e.timestamp;
     const partner = [res[k - 2], res[k + 2]].find((x) => x && clean(x));
@@ -974,12 +993,19 @@ function detectFallOfFaith(players: PlayerInfo[], life: Life, end: number): Pull
     const sev = mom.length || killed.length ? "Major" : "Minor";
     const nth = `tether ${k + 1} (${fire ? "fire" : "lightning"})`;
     const base = { ruleId: FB_FALL_RULE_ID, severity: sev, timestamp: t, abilityId: r[0].e.abilityId, abilityName: r[0].e.abilityName } as const;
+    // The carrier of the next tether on this side stands behind the current
+    // carrier, so in a misread lightning tether (stacked as for fire) they
+    // were in their spot; the others weren't (user, 2026-10-12, A46 +1:47:
+    // the H1, tether 3's carrier, correct).
+    const nextCarrier = preyOrder[k + 2];
+    const doubledHere = [...per].filter(([, es]) => es.length > 1).map(([p]) => p);
+    const behind = !fire && nextCarrier && doubledHere.includes(nextCarrier) && doubledHere.length > 1 ? nextCarrier : undefined;
     for (const [p, es] of per) {
-      if (es.length < 2) continue;
+      if (es.length < 2 || p === behind) continue;
       errors.push(playerError(p, { ...base, name: "Fall of Faith Double Hit",
         description: `Took ${es.length} hits from Fall of Faith ${nth} (${kFmt(es.reduce((s, e) => s + realAmount(e), 0))}).${outcome} ${fire
           ? "Sinblaze is one fire cone shared by the carrier's group of four."
-          : "This tether was lightning: the three helpers spread for their own Bow Shock cones (two to the sides, one behind). Stacking as if it were fire puts several cones on each player."}` }));
+          : `This tether was lightning: the three helpers spread for their own Bow Shock cones (two to the sides, one behind${behind ? `: ${behind.name}, the next carrier, was correctly behind` : ""}). Stacking as if it were fire puts several cones on each player.`}` }));
     }
     // Fire into the other group: the helper nearest the carrier aimed it.
     const carrierHit = carrier && per.get(carrier)?.[0];
