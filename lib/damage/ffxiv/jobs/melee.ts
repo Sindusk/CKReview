@@ -44,8 +44,14 @@
 //     Bane with stacks isn't built (the stack goes to a later Aeolian
 //     Edge: ~10% of 100 potency each).
 //   - Reaper: Enshroud (Enshroud.tsx): four Reapings, two Lemure's, one
-//     Sacrificium, one Communio. Arcane Circle's window isn't ported:
-//     xivanalysis adjusts its expectations in ways that don't carry over.
+//     Sacrificium, one Communio. Arcane Circle, Death's Design, Harvest
+//     Moon, Shroud and Whorl of Death below. Checked against xivanalysis
+//     on dDar482XvFKBPJYh FRU kill (7.1, 2026-10-12): its 27 missing
+//     Arcane Circle actions, 10 Shroud lost, 8 positionals, 4 expired
+//     combos and Whorl of Death match; its Soul Slice 36/38 recharged
+//     through P4's downtime with nothing banked (not counted); its Arcane
+//     Circle 9/10 was ready 18s before that downtime and held for the
+//     14:18 burst.
 //
 //   Copyright (c) 2018 Saxon Landers & contributors
 //   MIT License; full text in THIRD_PARTY_NOTICES.md.
@@ -54,7 +60,7 @@ import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import type { DamageFinding, JobCheck } from "../../types";
 import { finding, PROC_CONSUME_MS, PROC_EXPIRY_EARLY_MS, type PlayerCheckContext } from "../../checks";
 import { forcedPart, inWindows, mergeWindows } from "../../timeline";
-import { burstWindowFindings, castHits, dotFindings, gaugeFindings, k, offCooldownIn, statusWindows, uptimeFindings, type ExpectedAction, type GaugeEvent } from "./shared";
+import { aoeOnOneTargetFindings, burstWindowFindings, castHits, dotFindings, gaugeFindings, k, offCooldownIn, s, statusWindows, uptimeFindings, type ExpectedAction, type GaugeEvent } from "./shared";
 import { comboLanded } from "./gnb";
 
 const id = (key: string) => A[key].id;
@@ -368,14 +374,147 @@ const enshroud: JobCheck = (ctx) => burstWindowFindings(ctx, {
 // - Not built: AoE on too few targets (Whorl of Death at 5:00 hit 2; it
 //   needs about 3 to beat Shadow of Death). Needs per-job AoE → single-
 //   target pairs.
+// Arcane Circle, from xivanalysis ArcaneCircle.tsx: the two-minute burst
+// is a double Enshroud inside the window: 7 Reapings, 4 Lemure's, 2
+// Sacrificium, 1 Plentiful Harvest, 2 Communio; the opener half of that
+// (Plentiful Harvest still 1). Valued at the window's observed bonus (it
+// lines up with the party's buffs): a Reaping done just after it lost the
+// whole raid-buff stack, not Arcane Circle's 3%. dDar482XvFKBPJYh FRU kill:
+// xivanalysis's 27 missing match (8:30, 10:37, 14:18, 16:18, 18:18 single
+// Enshrouds in the window).
+const AC_OPENER_MS = 30_000;
 const arcaneCircle: JobCheck = (ctx) => burstWindowFindings(ctx, {
-  statusId: S.ARCANE_CIRCLE.id, name: "Arcane Circle", bonus: 0.03,
-  bonusBasis: "Arcane Circle is +3% (tooltip)",
-  expected: (c, casts): ExpectedAction[] => [
-    { ids: ids("COMMUNIO"), count: casts.length && casts[0].timestamp < 30_000 ? 1 : 2, name: "Communio" },
-    { ids: ids("PLENTIFUL_HARVEST"), count: 1, name: "Plentiful Harvest" },
-  ],
+  statusId: S.ARCANE_CIRCLE.id, name: "Arcane Circle", bonus: "observed",
+  bonusBasis: "the window's observed bonus (the player's multiplier in it over their median outside raid buffs)",
+  expected: (c, casts): ExpectedAction[] => {
+    const half = casts.length > 0 && casts[0].timestamp < AC_OPENER_MS ? 0.5 : 1;
+    return [
+      { ids: ids("CROSS_REAPING", "VOID_REAPING", "GRIM_REAPING"), count: Math.ceil(7 * half), name: "Reaping" },
+      { ids: ids("LEMURES_SLICE", "LEMURES_SCYTHE"), count: 4 * half, name: "Lemure's Slice" },
+      { ids: ids("SACRIFICIUM"), count: 2 * half, name: "Sacrificium" },
+      { ids: ids("PLENTIFUL_HARVEST"), count: 1, name: "Plentiful Harvest" },
+      { ids: ids("COMMUNIO"), count: 2 * half, name: "Communio" },
+    ];
+  },
 });
+
+// Death's Design (+10% on the Reaper's own damage to the target, xivanalysis
+// DeathsDesign.tsx: uptime). Measured from the Reaper's own hits: each hit
+// whose snapshot lacks it, from the first one that has it, outside forced
+// time, lost 10% of itself. Per target, so P3/P4's second boss counts.
+// Summed per phase, with each stretch as a moment.
+const DD_STRETCH_GAP_MS = 5_000;
+const deathsDesign: JobCheck = (ctx) => {
+  const dd = S.DEATHS_DESIGN?.id;
+  if (dd === undefined) return [];
+  const hits = ctx.player.damageDone.filter((e) => !e.pet && (e.amount ?? 0) > 0 && e.timestamp < ctx.endMs && e.statusIds);
+  const first = hits.find((e) => e.statusIds!.includes(dd))?.timestamp;
+  if (first === undefined) return [];
+  const forced = mergeWindows(ctx.forced);
+  const bare = hits.filter((e) => e.timestamp > first && !e.statusIds!.includes(dd) && !inWindows(e.timestamp, forced));
+  const byPhase = new Map<number | undefined, typeof bare>();
+  for (const e of bare) {
+    const ph = ctx.phaseOf(e.timestamp);
+    byPhase.set(ph, [...(byPhase.get(ph) ?? []), e]);
+  }
+  const out: DamageFinding[] = [];
+  for (const [, list] of byPhase) {
+    const stretches: { startMs: number; endMs: number; dealt: number; n: number }[] = [];
+    for (const e of list) {
+      const last = stretches[stretches.length - 1];
+      if (last && e.timestamp - last.endMs <= DD_STRETCH_GAP_MS) { last.endMs = e.timestamp; last.dealt += e.amount ?? 0; last.n++; }
+      else stretches.push({ startMs: e.timestamp, endMs: e.timestamp, dealt: e.amount ?? 0, n: 1 });
+    }
+    const dealt = stretches.reduce((a, x) => a + x.dealt, 0);
+    out.push(finding(ctx, {
+      kind: "buff-uptime", startMs: stretches[0].startMs, endMs: stretches[stretches.length - 1].endMs, forced: false,
+      label: "Death's Design down",
+      lostDamage: dealt * 0.1,
+      basis: `${k(dealt)} dealt in ${list.length} hits without Death's Design on the target × 10% (tooltip)`,
+      detail: `${list.length} hits without Death's Design in ${ctx.phaseName(ctx.phaseOf(list[0].timestamp)) ?? "the pull"}`,
+      moments: stretches.map((x) => ({
+        startMs: x.startMs, endMs: x.endMs, lostDamage: x.dealt * 0.1,
+        detail: `${x.n} hit${x.n === 1 ? "" : "s"} without Death's Design`,
+      })),
+    }));
+  }
+  return out;
+};
+
+// Harvest Moon (xivanalysis HarvestMoon.tsx: one per downtime long enough
+// to cast Soulsow, plus the pre-pull one). Each boss-untargetable stretch
+// of SOULSOW_WINDOW_MS+ with targetable time after it is a chance: Soulsow
+// cast in it, and Harvest Moon fired before the next. One with no Soulsow
+// cast in it was wasted, whether Soulsow wasn't up (never recast) or was
+// (the last Harvest Moon was held through it). Each costs the average
+// Harvest Moon minus the GCD it would have replaced. dDar482XvFKBPJYh FRU
+// kill: 3:20 (not recast), 5:50 and 12:55 (held; the 12:25 Soulsow's
+// Harvest Moon went at 18:28). xivanalysis counts 7 chances, from its
+// invulnerability windows; the boss-untargetable windows give 9.
+const SOULSOW_WINDOW_MS = 6_000;
+const harvestMoon: JobCheck = (ctx) => {
+  const soulsow = id("SOULSOW"), moon = id("HARVEST_MOON");
+  if (!ctx.player.casts.some((c) => c.abilityId === moon || c.abilityId === soulsow)) return [];
+  const downtime = mergeWindows(ctx.forced.filter((f) => f.cause === "boss untargetable"))
+    .filter((w) => w.endMs - w.startMs >= SOULSOW_WINDOW_MS && w.endMs + ctx.baseGcdMs < ctx.endMs);
+  const value = Math.max(0, ctx.values.perUse(moon) - ctx.values.gcdValue(undefined, false));
+  if (value <= 0) return [];
+  const out: DamageFinding[] = [];
+  for (const w of downtime) {
+    if (ctx.player.casts.some((c) => c.abilityId === soulsow && c.timestamp >= w.startMs - 1_000 && c.timestamp <= w.endMs)) continue;
+    if (inWindows(w.startMs, ctx.dead)) continue;
+    const up = statusWindows(ctx, S.SOULSOW.id).some((s) => s.startMs <= w.startMs && s.endMs >= w.endMs);
+    out.push(finding(ctx, {
+      kind: "proc-lost", startMs: w.startMs, endMs: w.endMs, forced: false, inference: true,
+      label: "Harvest Moon chance missed",
+      lostDamage: value,
+      basis: `${k(ctx.values.perUse(moon))} average Harvest Moon − ${k(ctx.values.gcdValue(undefined, false))} average GCD it replaces`,
+      detail: up
+        ? `Soulsow was still up through ${s(w.endMs - w.startMs)} of downtime: Harvest Moon before it, then Soulsow in it, is one more`
+        : `No Soulsow cast in ${s(w.endMs - w.startMs)} of downtime`,
+    }));
+  }
+  return out;
+};
+
+// Shroud (cap 100), from xivanalysis OtherGauges.tsx: +10 per Gibbet,
+// Gallows, Guillotine (Executioner's too); Enshroud spends 50 unless Ideal
+// Host is up (Plentiful Harvest's free Enshroud). 50 Shroud is one
+// Enshroud: worth the player's average Enshroud window (Reapings, Lemure's,
+// Sacrificium, Communio dealt in it) minus the same time's average GCDs.
+const SHROUD_GAIN = new Set(ids("GIBBET", "GALLOWS", "GUILLOTINE", "EXECUTIONERS_GIBBET", "EXECUTIONERS_GALLOWS", "EXECUTIONERS_GUILLOTINE"));
+const ENSHROUD_CONTENT = new Set(ids("CROSS_REAPING", "VOID_REAPING", "GRIM_REAPING", "LEMURES_SLICE", "LEMURES_SCYTHE", "SACRIFICIUM", "COMMUNIO"));
+const shroud: JobCheck = (ctx) => {
+  const enshroud = id("ENSHROUD");
+  const idealHost = statusWindows(ctx, S.IDEAL_HOST.id);
+  const events: GaugeEvent[] = [];
+  for (const c of ctx.player.casts) {
+    if (SHROUD_GAIN.has(c.abilityId)) events.push({ t: c.timestamp, type: "gain", amount: 10, label: `${c.abilityName} at full Shroud` });
+    if (c.abilityId === enshroud && !idealHost.some((w) => c.timestamp >= w.startMs && c.timestamp <= w.endMs + 200)) {
+      events.push({ t: c.timestamp, type: "spend", amount: 50, label: "Enshroud" });
+    }
+  }
+  for (const d of ctx.dead) events.push({ t: d.startMs, type: "reset", label: "death" });
+  const windows = statusWindows(ctx, S.ENSHROUDED.id).filter((w) => w.endMs <= ctx.endMs);
+  if (windows.length === 0) return [];
+  const content = windows.reduce((a, w) => a + ctx.player.damageDone
+    .filter((e) => ENSHROUD_CONTENT.has(e.abilityId) && e.timestamp >= w.startMs && e.timestamp <= w.endMs + 1_000)
+    .reduce((x, e) => x + (e.amount ?? 0), 0), 0) / windows.length;
+  const span = windows.reduce((a, w) => a + w.endMs - w.startMs, 0) / windows.length;
+  const plain = (span / ctx.baseGcdMs) * ctx.values.gcdValue(undefined, false);
+  const perEnshroud = Math.max(0, content - plain);
+  return gaugeFindings(ctx, {
+    name: "Shroud", unit: "Shroud", cap: 100, unitValue: perEnshroud / 50,
+    valueBasis: `(${k(content)} average Enshroud window − ${k(plain)} of average GCDs in its ${s(span)}) per 50`,
+    events,
+  });
+};
+
+// Whorl of Death on too few targets: Shadow of Death does more under 3
+// (xivanalysis AoE.ts). Judged by what it dealt against the average
+// Shadow of Death, so a patch's potency change moves the verdict with it.
+const whorl: JobCheck = (ctx) => aoeOnOneTargetFindings(ctx, ids("WHORL_OF_DEATH"),
+  () => ({ name: "Shadow of Death", value: ctx.values.perUse(id("SHADOW_OF_DEATH")) }), () => 3);
 
 export const SAM_CHECKS: JobCheck[] = [uptime("FUGETSU", 0.13, "Fugetsu is +13%, FFLogs multiplier"), meikyo];
 // Rattling Coil (xivanalysis UncoiledFury): +1 per Vicewinder / Vicepit /
@@ -427,4 +566,4 @@ const firstmindsFocus: JobCheck = (ctx) => {
 
 export const DRG_CHECKS: JobCheck[] = [uptime("POWER_SURGE", 0.1, "Power Surge is +10% (tooltip)"), lanceCharge, lifeSurge, chaoticSpring, firstmindsFocus];
 export const NIN_CHECKS: JobCheck[] = [kunaisBane, ninki, kazematoi];
-export const RPR_CHECKS: JobCheck[] = [enshroud, arcaneCircle];
+export const RPR_CHECKS: JobCheck[] = [enshroud, arcaneCircle, deathsDesign, harvestMoon, shroud, whorl];
