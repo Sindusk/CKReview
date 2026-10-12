@@ -436,10 +436,21 @@ export function checkCooldownDrift(ctx: PlayerCheckContext): DamageFinding[] {
     let unforced = 0, heldForDeciding = 0, longest: Window | undefined;
     for (const w of capped) {
       const len = w.endMs - w.startMs;
-      const plain = overlapMs(w.startMs, w.endMs, forcedMerged);
+      // Capping inside downtime is a lost recharge when a charge was
+      // already banked as the downtime began: spent before it (or drifted
+      // less earlier), the recharge would have kept running
+      // (dDar482XvFKBPJYh FRU kill: the Sage's Phlegma III came back at
+      // 12:54, a second before P4's downtime, after 9s of opener drift and
+      // small delays, and capped 13:34-14:13; xivanalysis's 28/29).
+      const avoidable = cd.charges > 1
+        ? forcedMerged.filter((f) => f.startMs < w.startMs && f.endMs > w.startMs &&
+            chargesAt(casts, cd.cooldownMs, cd.charges, f.startMs) >= 1)
+          .reduce((a, f) => a + Math.min(f.endMs, w.endMs) - w.startMs, 0)
+        : 0;
+      const plain = overlapMs(w.startMs, w.endMs, forcedMerged) - avoidable;
       // Holding into the deciding phase only counts when the use lands in it.
       const forced = ctx.decidingPhaseStart !== undefined && w.endMs >= ctx.decidingPhaseStart
-        ? overlapMs(w.startMs, w.endMs, withDeciding) : plain;
+        ? overlapMs(w.startMs, w.endMs, withDeciding) - avoidable : plain;
       heldForDeciding += forced - plain;
       const allowance = (cd.holdMs ?? COOLDOWN_HOLD_MS) + (w.startMs === 0 ? cd.firstUseOffsetMs : 0);
       const held = Math.max(0, len - forced - allowance);
@@ -460,12 +471,19 @@ export function checkCooldownDrift(ctx: PlayerCheckContext): DamageFinding[] {
     // A cooldown that deals no damage itself (Devilment) has no estimate,
     // and a 0 line says nothing.
     if (perUse === 0) continue;
+    // A lost GCD cooldown (Phlegma III, Gnashing Fang) still had its GCD:
+    // the filler went there instead, so it costs the difference.
+    const onGcd = cd.actionIds.some((id) => ctx.game.action(id)?.onGcd);
+    const filler = onGcd ? ctx.values.gcdValue(undefined, false) : 0;
+    const each = Math.max(0, perUse - filler);
+    if (each === 0) continue;
     const uses = (n: number) => `${n} use${n === 1 ? "" : "s"}`;
     out.push(finding(ctx, {
       kind: "cooldown-drift", startMs: longest.startMs, endMs: longest.endMs, forced: false,
       label: `${cd.name} drift`,
-      lostDamage: lostUses * perUse,
-      basis: `${uses(lostUses)} × ${k(perUse)} average per ${cd.name}; room for ${room} in the pull`,
+      lostDamage: lostUses * each,
+      basis: `${uses(lostUses)} × ${onGcd ? `(${k(perUse)} average ${cd.name} − ${k(filler)} average GCD in its place)` : `${k(perUse)} average per ${cd.name}`}` +
+        `; room for ${room} in the pull`,
       detail: `${cd.name} sat ready for ${s(unforced)} in total (${uses(casts.length)}): about ${uses(lostUses)} lost` +
         (heldForDeciding > 0 ? `; ${s(heldForDeciding)} more held for the deciding phase is fine` : ""),
     }));
@@ -484,26 +502,59 @@ export function checkCooldownDrift(ctx: PlayerCheckContext): DamageFinding[] {
  */
 export function roomForUses(cd: TrackedCooldown, endMs: number, forced: Window[], prePull: boolean): number {
   const land = cd.landDelayMs ?? 0;
-  let t = prePull ? cd.cooldownMs : cd.firstUseOffsetMs;
-  let n = prePull ? 1 : 0;
-  while (t + land < endMs) {
-    let place = t;
-    for (let guard = 0; guard < forced.length + 1; guard++) {
-      const f = forced.find((w) => place + land >= w.startMs && place + land < w.endMs);
-      if (!f) break;
-      place = f.endMs - land;
-    }
-    if (place + land >= endMs) break;
+  // Charges recharge one at a time, through downtime too; a charge is
+  // spent as soon as there is one and its effect wouldn't land in forced
+  // time, one per GCD.
+  let charges = cd.charges, rechargeStart: number | null = null, n = 0;
+  const spend = (t: number) => {
     n++;
-    t = place + cd.cooldownMs;
+    charges--;
+    if (rechargeStart === null) rechargeStart = t;
+  };
+  const advance = (to: number) => {
+    while (charges < cd.charges && rechargeStart !== null && to >= rechargeStart + cd.cooldownMs) {
+      charges++;
+      rechargeStart = charges === cd.charges ? null : rechargeStart + cd.cooldownMs;
+    }
+  };
+  if (prePull) spend(0);
+  let t = prePull ? 0 : cd.firstUseOffsetMs;
+  for (let guard = 0; guard < 10_000 && t + land < endMs; guard++) {
+    advance(t);
+    const f = forced.find((w) => t + land >= w.startMs && t + land < w.endMs);
+    if (f) { t = f.endMs - land; continue; }
+    if (charges > 0) { spend(t); t += ROOM_SPEND_GAP_MS; continue; }
+    t = rechargeStart! + cd.cooldownMs;
   }
-  return n + cd.charges - 1;
+  return n;
 }
+
+const ROOM_SPEND_GAP_MS = 2_500;
 
 // A press logged up to this long before the simulated recast ends is on
 // time: Vamp's Dancer pressed Standard Step a few ms short of every 30s,
 // and dropping those as "no charge" turned each into 30s of drift.
 const RECAST_SLACK_MS = 1_000;
+
+/** Charges ready at t, from the same simulation as cappedStretches. */
+export function chargesAt(casts: number[], cooldownMs: number, maxCharges: number, t: number): number {
+  let charges = maxCharges, rechargeStart: number | null = null;
+  const advance = (to: number, slack = 0) => {
+    while (charges < maxCharges && rechargeStart !== null && to + slack >= rechargeStart + cooldownMs) {
+      charges++;
+      rechargeStart = charges === maxCharges ? null : rechargeStart + cooldownMs;
+    }
+  };
+  for (const c of casts) {
+    if (c > t) break;
+    advance(c, RECAST_SLACK_MS);
+    if (charges === 0) continue;
+    charges--;
+    if (rechargeStart === null) rechargeStart = c;
+  }
+  advance(t);
+  return charges;
+}
 
 /** Stretches where every charge was ready, from pull start to endMs. */
 export function cappedStretches(casts: number[], cooldownMs: number, maxCharges: number, endMs: number): Window[] {

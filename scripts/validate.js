@@ -994,6 +994,7 @@ function printDamageAnalysis(mod, pulls, game) {
           ` (forced ${M(p.forcedDamage)}) uptime ${(p.gcdUptime.pct * 100).toFixed(1)}% of ${t(p.gcdUptime.eligibleMs)}, GCD ${t(p.baseGcdMs)} x${p.gcds}` +
           `, buffs given ${p.buffs.approximate ? '~' : ''}${M(p.buffs.given)} received ${M(p.buffs.received)}` +
           `${p.gcdSplit.heal ? `, heal GCDs ${p.gcdSplit.heal}/${p.gcdSplit.heal + p.gcdSplit.damage}` : ''}`);
+        for (const g of p.timeline.gauges ?? []) console.log(`      gauge ${g.name}: ${g.note}`);
         const shown = all ? p.findings : p.findings.filter((f) => !f.forced).slice(0, 4);
         for (const f of shown) {
           console.log(`      ${f.forced ? '(forced) ' : ''}${f.kind} ${t(f.startMs)} ${f.phase ?? ''}: ${M(f.lostDamage)} — ${f.detail}` +

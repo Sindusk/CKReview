@@ -28,7 +28,7 @@ import { FFXIV_DAMAGE, GUARANTEED_HIT_STATUS_IDS } from "@/lib/damage/ffxiv/game
 import { MIN_ESTIMATE_HITS, playerHitRates, reliableRates } from "@/lib/damage/crit-rates";
 import { critLuck } from "@/lib/damage/crit-luck";
 import { WOW_DAMAGE } from "@/lib/damage/wow/game";
-import type { DamageFinding, PhaseDamageSummary, PlayerDamageSummary, PullDamageAnalysis } from "@/lib/damage/types";
+import type { DamageFinding, GaugeTrack, PhaseDamageSummary, PlayerDamageSummary, PullDamageAnalysis } from "@/lib/damage/types";
 import { getClassColor, getPlayerClassIcon } from "@/lib/player-display";
 import { useFFPullSelector } from "@/hooks/useFFPullSelector";
 import { SEVERITY_COLOR } from "./SeverityIcon";
@@ -567,6 +567,9 @@ function TimelineStrip({ summary, analysis }: { summary: PlayerDamageSummary; an
               style={{ position: "absolute", bottom: 0, height: 6, left: pct(m.startMs), width: `max(3px, ${width(m.startMs, m.endMs)})`, background: LOSS_COLOR }} />
           )))}
       </div>
+      {(summary.timeline.gauges ?? []).map((g) => (
+        <GaugeRow key={g.name} gauge={g} pct={pct} width={width} total={total} />
+      ))}
       <div style={{ position: "relative", height: 13, color: "var(--ck-text-3)", fontSize: 10, marginTop: 2 }}>
         <span className="ck-num" style={{ position: "absolute", left: 0 }}>0:00</span>
         {minutes.map((t) => (
@@ -577,6 +580,34 @@ function TimelineStrip({ summary, analysis }: { summary: PlayerDamageSummary; an
       <div style={{ color: "var(--ck-text-3)", fontSize: 10, textAlign: "center" }}>
         gold: raid buffs · shaded: forced · ticks: GCDs · red: counted losses
       </div>
+    </div>
+  );
+}
+
+// A job gauge under the strip: a bar per step, height by value, and the
+// stretches at the cap with the timer stopped (generation lost) in amber.
+function GaugeRow({ gauge, pct, width, total }: {
+  gauge: GaugeTrack; pct: (ms: number) => string; width: (s: number, e: number) => string; total: number;
+}) {
+  return (
+    <div style={{ marginTop: 3 }}>
+      <div style={{ position: "relative", height: 16, background: "var(--ck-bg-deep)", border: "1px solid var(--ck-line-2)", borderRadius: 2, overflow: "hidden" }}
+        title={`${gauge.name}: ${gauge.note}`}>
+        {gauge.capped.map((w, i) => (
+          <div key={`c${i}`} title={`${gauge.name} capped ${fmtTime(w.startMs)}–${fmtTime(w.endMs)}`}
+            style={{ position: "absolute", top: 0, bottom: 0, left: pct(w.startMs), width: width(w.startMs, w.endMs), background: "rgba(232,168,56,0.28)" }} />
+        ))}
+        {gauge.steps.map((s, i) => {
+          const end = gauge.steps[i + 1]?.t ?? total;
+          return (
+            <div key={`s${i}`} title={`${gauge.name} ${s.value} at ${fmtTime(s.t)}–${fmtTime(end)}`}
+              style={{ position: "absolute", bottom: 0, left: pct(s.t), width: width(s.t, end),
+                height: `${(s.value / gauge.max) * 100}%`, background: "var(--ck-text-3)", opacity: 0.45 }} />
+          );
+        })}
+        <span style={{ position: "absolute", left: 4, top: 1, fontSize: 10, color: "var(--ck-text-2)", pointerEvents: "none" }}>{gauge.name}</span>
+      </div>
+      <div style={{ color: "var(--ck-text-3)", fontSize: 10 }}>{gauge.note}</div>
     </div>
   );
 }

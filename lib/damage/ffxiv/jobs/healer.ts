@@ -52,7 +52,17 @@
 //   5 interrupted casts were the boss going untargetable (6:54, 12:55).
 // - Healer DoTs are valued per application against the filler
 //   (shared.ts dotFindings with fillerId), not by seconds overwritten.
-// White Mage and Sage are unverified: no sample pull has either.
+// - Sage, checked against xivanalysis on dDar482XvFKBPJYh FRU kill (7.1,
+//   2026-10-12): its Psyche 16/17 holds (ready 5:10, unused through 41s
+//   of targetable boss before P2's downtime); Phlegma III 28/29 holds
+//   only as perfect play (the 0:09 opener Phlegma, aligned to burst, put
+//   a recharge 1s past the start of P4's downtime), so it isn't counted;
+//   its Eukrasian Dosis clipping (24.4s a minute) counts the double casts
+//   on P4's two bosses (10:42/10:45, 11:10/11:13, 12:38/12:41) as clips;
+//   Addersgall / Addersting are healing resources (Addersgall is drawn on
+//   the timeline, gauges.ts). 1 of its 4 interrupted casts (12:55) was
+//   the boss going untargetable.
+// White Mage is unverified: no sample pull has one.
 //
 //   Copyright (c) 2018 Saxon Landers & contributors
 //   MIT License; full text in THIRD_PARTY_NOTICES.md.

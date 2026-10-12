@@ -143,6 +143,7 @@ export function analyzePullDamage(pull: Pull, game: DamageGame, context?: Damage
         healGcdStarts: uses.filter((u) => u.startMs < endMs && kinds.get(u.action.id) === "heal").map((u) => u.startMs),
         buffWindows,
         forced: forced.filter((w) => w.startMs < endMs),
+        gauges: (game.jobGauges?.(job) ?? []).flatMap((g) => g(ctx)),
       },
     });
   }

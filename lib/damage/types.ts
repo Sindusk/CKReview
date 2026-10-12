@@ -61,6 +61,8 @@ export type DamageGame = {
   disengageActionIds: Set<number>;
   // Job-specific checks (Layer 3), by job display name.
   jobChecks(job: string): JobCheck[];
+  // Job gauges for the dialog's timeline (display only).
+  jobGauges?(job: string): ((ctx: PlayerCheckContext) => GaugeTrack[])[];
   // Procs a job check handles itself (Viper's venoms, which only boost a
   // finisher): the generic proc check skips them.
   jobProcStatusIds?: Set<number>;
@@ -247,7 +249,19 @@ export type PlayerDamageSummary = {
     healGcdStarts: number[];
     buffWindows: { startMs: number; endMs: number }[];
     forced:      ForcedWindow[];
+    // Job gauges simulated from casts (Sage's Addersgall), for display.
+    gauges?:     GaugeTrack[];
   };
+};
+
+export type GaugeTrack = {
+  name:   string;
+  max:    number;
+  // The value from each t until the next step.
+  steps:  { t: number; value: number }[];
+  // Stretches at the cap with the generation timer stopped.
+  capped: { startMs: number; endMs: number }[];
+  note:   string;     // one line: what was lost, how it's simulated
 };
 
 export type PhaseDamageSummary = {

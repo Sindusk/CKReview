@@ -26,6 +26,7 @@ import { TRACKED_COOLDOWNS } from "./tracked-cooldowns";
 import { JOB_CHECKS } from "./jobs";
 import { noDamageCasts } from "./jobs/shared";
 import { tincture } from "./jobs/tincture";
+import { JOB_GAUGES } from "./jobs/gauges";
 import { VPR_PROC_STATUS_IDS } from "./jobs/melee";
 import { FFXIV_ACTION_INDEX } from "../../mitigation/ffxiv-catalog";
 import type { DamageGame, GameAction, PartyBuff, TrackedCooldown } from "../types";
@@ -202,6 +203,7 @@ export const FFXIV_DAMAGE: DamageGame = {
   tankSwapActionIds: TANK_SWAP_IDS,
   disengageActionIds: DISENGAGE_IDS,
   jobChecks: (job) => [...(JOB_CHECKS[job] ?? []), noDamageCasts, tincture],
+  jobGauges: (job) => JOB_GAUGES[job] ?? [],
   jobProcStatusIds: VPR_PROC_STATUS_IDS,
   mitigationChannels: MITIGATION_CHANNELS,
 };
