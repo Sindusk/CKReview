@@ -142,6 +142,7 @@ function makeFFPullCtx(pull, actorMap, abilityMap, getFFJobByName) {
     relPlayers:      () => memo('relPlayers', () => ffb.buildFFPlayers(rel(), actorMap, getFFJobByName, abilityMap)),
     relDeaths:       () => memo('relDeaths', () => ffb.buildFFDeaths(rel(), actorMap, getFFJobByName)),
     relEnemyCasts:   () => memo('relEnemyCasts', () => ffb.buildFFEnemyCastEvents(rel(), actorMap, abilityMap)),
+    relNpcHits:      () => memo('relNpcHits', () => ffb.buildFFNpcHits(rel(), actorMap, abilityMap)),
     relStateSignals: () => memo('relStateSignals', () => ffb.buildFFKefkaSaysStateSignals(rel(), actorMap)),
     relHeadMarkers:  () => memo('relHeadMarkers', () => ffb.buildFFHeadMarkers(rel(), actorMap)),
   };
@@ -326,6 +327,15 @@ const MECHANICS = {
     load: () => requireTsFromRoot('lib/mechanics/ffxiv/fru/oracle-of-darkness.ts'),
     run({ mod, ctxs }) {
       for (const c of ctxs) printPullErrors(c, mod.detectOracleOfDarknessErrors(c.relPlayers(), c.relDeaths(), c.relEnemyCasts()));
+    },
+  },
+
+  'enter-the-dragon': {
+    game: 'ff',
+    lateCapture: true, // Phase 4 only — safe on --from-minutes captures (see isLateCapture)
+    load: () => requireTsFromRoot('lib/mechanics/ffxiv/fru/enter-the-dragon.ts'),
+    run({ mod, ctxs }) {
+      for (const c of ctxs) printPullErrors(c, mod.detectEnterTheDragonErrors(c.relPlayers(), c.relDeaths(), c.relEnemyCasts(), c.relNpcHits()));
     },
   },
 

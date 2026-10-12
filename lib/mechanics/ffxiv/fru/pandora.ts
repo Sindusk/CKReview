@@ -4,7 +4,7 @@
 // Futures Rewritten (Ultimate), patch 7.11 origin; checked 2026-10-09.
 // Comment-only research. No real report verified; ALL proposed log signals
 // and attribution below are hypotheses. Shared contract: fatebreaker.ts.
-// roomates.ts owns duo/crystal failure and bad-ending cause; P5 has no
+// enter-the-dragon.ts owns duo/crystal failure and bad-ending cause; P5 has no
 // checkpoint. Death/penalty here threatens tight damage check but is not
 // automatically an inevitable wipe if a specific recovery remains possible.
 // Damage Down is Major for a proven root player; Raid marks terminal loss.

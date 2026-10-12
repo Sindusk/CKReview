@@ -355,6 +355,13 @@ exposure("targeted", ["ffxiv-uof-slap", "ffxiv-uof-marked-cone", "ffxiv-uof-ston
 // (oracle-of-darkness.ts reports them at every cast).
 mechanic("ffxiv-ood-tank-buster", "Black Halo / Darkest Dance (non-tanks)", 3, ["ffxiv-ood-tank-buster"]);
 exposure("targeted", ["ffxiv-ood-tank-buster"]);
+// Futures Rewritten P4: Somber Dance tests the non-tanks; Shiva's dual
+// autos and Akh Morn's one-boss-per-tank test the tanks
+// (enter-the-dragon.ts reports them at every instance).
+mechanic("ffxiv-etd-tank-buster", "Somber Dance (non-tanks)", 4, ["ffxiv-etd-tank-buster"]);
+mechanic("ffxiv-etd-autos", "Shiva's second auto-attack (tanks)", 4, ["ffxiv-etd-autos"]);
+mechanic("ffxiv-etd-akh-morn", "Akh Morn: one boss per tank", 4, ["ffxiv-etd-akh-morn"]);
+exposure("targeted", ["ffxiv-etd-tank-buster", "ffxiv-etd-autos", "ffxiv-etd-akh-morn"]);
 // Vamp Fatale (vamp-fatale.ts reports every instance): each rule scoped to
 // the role or group that can fail it.
 mechanic("ffxiv-vf-hardcore", "Hardcore (non-tanks)", undefined, ["ffxiv-vf-hardcore"]);

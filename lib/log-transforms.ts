@@ -25,7 +25,7 @@
 import type { Pull, BlackHoleGeometry, BossDebuffEvent, EnemyStackEvent } from "@/types/Pull";
 import type { DeathEvent } from "@/types/DeathEvent";
 import type { PlayerInfo, PlayerEvent, ShieldAbsorb } from "@/types/PlayerInfo";
-import type { EnemyEvent } from "@/types/PullError";
+import type { EnemyEvent, NpcHit } from "@/types/PullError";
 import type {
   WCLFightData,
   WCLActor,
@@ -74,6 +74,7 @@ import { detectTyrantErrors } from "./mechanics/ffxiv/arcadion/tyrant";
 import { detectFatebreakerErrors } from "./mechanics/ffxiv/fru/fatebreaker";
 import { detectUsurperOfFrostErrors, type HeadMarker } from "./mechanics/ffxiv/fru/usurper-of-frost";
 import { detectOracleOfDarknessErrors } from "./mechanics/ffxiv/fru/oracle-of-darkness";
+import { detectEnterTheDragonErrors } from "./mechanics/ffxiv/fru/enter-the-dragon";
 import { detectWowEncounterErrors } from "./mechanics/wow/registry";
 import { buildPullPhaseSegments } from "./pull-phases";
 import { computeMechanicOccurrences, mergeReportedOccurrences, type ReportedOccurrence } from "./mechanics/occurrences";
@@ -1437,6 +1438,27 @@ function fflBuildPlayerPositionSamples(
     }));
 }
 
+// Enemy abilities landing on other enemy actors (not players): the
+// enemyDamageTaken stream's non-player sources. FRU P4 reads its memory
+// crystal's hits from it (lib/mechanics/ffxiv/fru/enter-the-dragon.ts).
+function fflBuildNpcHits(
+  enemyDamageTakenEvents: FFLDamageEvent[],
+  actorMap:               Map<number, FFLActor>,
+  abilityMap:             Map<number, AbilityInfo>,
+  fightStart:             number
+): NpcHit[] {
+  return enemyDamageTakenEvents
+    .filter((e) => e.type === "damage" && actorMap.get(e.sourceID)?.type !== "Player" && actorMap.get(e.targetID)?.type !== "Player")
+    .map((e) => ({
+      timestamp:   Math.max(0, e.timestamp - fightStart),
+      abilityId:   e.abilityGameID ?? 0,
+      abilityName: fflAbilityName(e, abilityMap),
+      sourceName:  actorMap.get(e.sourceID)?.name ?? `Unknown (${e.sourceID})`,
+      targetName:  actorMap.get(e.targetID)?.name ?? `Unknown (${e.targetID})`,
+      sourceInstance: e.sourceInstance,
+    }));
+}
+
 function buildFFPlayers(
   friendlyPlayerIds: number[],
   actorMap:          Map<number, FFLActor>,
@@ -1585,6 +1607,7 @@ export function transformFFightToPull(
   const blackHoleGeometry = fflBuildBlackHoleGeometry(data.enemyCastEvents ?? [], actorMap, abilityMap, fightStart);
   const stompiesPuddleSamples = fflBuildStompiesPuddleSamples(data.enemyCastEvents ?? [], abilityMap, fightStart);
   const playerPositionSamples = fflBuildPlayerPositionSamples(data.enemyDamageTakenEvents ?? [], actorMap, fightStart);
+  const npcHits = fflBuildNpcHits(data.enemyDamageTakenEvents ?? [], actorMap, abilityMap, fightStart);
   // Targeted/assigned instances the modules report (lib/mechanics/
   // occurrences.ts ReportedOccurrence), merged into the anchors below.
   const reportedOccurrences: ReportedOccurrence[] = [];
@@ -1605,6 +1628,7 @@ export function transformFFightToPull(
     ...detectFatebreakerErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
     ...detectUsurperOfFrostErrors(players, deathEvents, enemyCastEvents, headMarkers, reportedOccurrences),
     ...detectOracleOfDarknessErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
+    ...detectEnterTheDragonErrors(players, deathEvents, enemyCastEvents, npcHits, reportedOccurrences),
   ].sort((a, b) => a.timestamp - b.timestamp);
 
   const fightDurationMs = data.fight.endTime - data.fight.startTime;

@@ -207,3 +207,16 @@ export type EnemyEvent = {
   // geometry.ts's facingToCompassBearing). Boss-relative bait spots.
   facing?:         number;
 };
+
+// FFXIV: an enemy ability landing on another non-player actor, from the
+// enemyDamageTaken stream (sources that aren't players). Futures Rewritten
+// P4's memory crystal (an actor named "fragment of fate") shows its hits
+// this way: which attack struck it, and when (enter-the-dragon.ts).
+export type NpcHit = {
+  timestamp:   number;  // ms into the pull
+  abilityId:   number;
+  abilityName: string;
+  sourceName:  string;
+  targetName:  string;
+  sourceInstance?: number;
+};

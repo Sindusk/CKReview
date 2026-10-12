@@ -220,6 +220,22 @@ function buildFFEnemyCastEvents(rep, actorMap, abilityMap) {
     }));
 }
 
+// Mirrors lib/log-transforms.ts's fflBuildNpcHits — enemy abilities landing
+// on other enemy actors (FRU P4's memory crystal). The live stream keeps only
+// landed hits; the raw capture also has calculateddamage previews.
+function buildFFNpcHits(rep, actorMap, abilityMap) {
+  return (rep.enemyDamageTaken?.data ?? [])
+    .filter((e) => e.type === 'damage' && actorMap.get(e.sourceID)?.type !== 'Player' && actorMap.get(e.targetID)?.type !== 'Player')
+    .map((e) => ({
+      timestamp: e.timestamp,
+      abilityId: e.abilityGameID ?? 0,
+      abilityName: (abilityMap?.get(e.abilityGameID)) ?? ('Ability ' + e.abilityGameID),
+      sourceName: actorMap.get(e.sourceID)?.name || `Unknown (${e.sourceID})`,
+      targetName: actorMap.get(e.targetID)?.name || `Unknown (${e.targetID})`,
+      sourceInstance: e.sourceInstance,
+    }));
+}
+
 // Mirrors lib/log-transforms.ts's fflBuildKefkaSaysStateSignals — the hidden
 // real/fake bit Dancing Mad Phase 4 stamps on a boss actor (status 1002056,
 // extraInfo even = real / odd = fake). Lives on the enemyDebuffs stream,
@@ -274,4 +290,4 @@ function buildFFHeadMarkers(rep, actorMap) {
     .map((e) => ({ timestamp: e.timestamp, player: actorMap.get(e.sourceID).name, markerId: e.markerID }));
 }
 
-module.exports = { buildFFPlayers, buildFFDeaths, buildFFBlackHoleGeometry, buildFFEnemyCastEvents, buildFFKefkaSaysStateSignals, buildFFStompiesPuddleSamples, buildFFPlayerPositionSamples, buildFFHeadMarkers };
+module.exports = { buildFFPlayers, buildFFDeaths, buildFFBlackHoleGeometry, buildFFEnemyCastEvents, buildFFNpcHits, buildFFKefkaSaysStateSignals, buildFFStompiesPuddleSamples, buildFFPlayerPositionSamples, buildFFHeadMarkers };

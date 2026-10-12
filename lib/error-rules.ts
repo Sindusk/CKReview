@@ -225,6 +225,12 @@ export const ERROR_RULES: PullErrorRule[] = [
       // Futures Rewritten P3: oracle-of-darkness.ts owns these.
       40279,   // Dark Blizzard III (Relativity donut)
       40297,   // Apocalypse
+      // Futures Rewritten P4: enter-the-dragon.ts owns these (and 40215,
+      // 40279 above).
+      40238,   // Akh Rhai
+      40216,   // Lightsteep (fifth Lightsteeped)
+      40299,   // Maelstrom
+      40252, 40253,                                          // Tidal Light
     ],
   },
 

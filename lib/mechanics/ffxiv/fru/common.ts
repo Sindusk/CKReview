@@ -1,7 +1,7 @@
 // lib/mechanics/ffxiv/fru/common.ts
 //
 // Helpers shared by the Futures Rewritten phase modules (fatebreaker.ts,
-// usurper-of-frost.ts, oracle-of-darkness.ts): who was alive when, hits on the living, cast and
+// usurper-of-frost.ts, oracle-of-darkness.ts, enter-the-dragon.ts): who was alive when, hits on the living, cast and
 // aura lookups, and name formatting. Moved out of fatebreaker.ts unchanged.
 
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";

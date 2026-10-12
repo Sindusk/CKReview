@@ -106,7 +106,7 @@
 // Futures Rewritten (Ultimate), patch 7.11 origin; checked 2026-10-09.
 // Comments only. No real reports checked; ALL proposed log signals and
 // attribution are guide-derived hypotheses. Shared contract: fatebreaker.ts.
-// Previous module owns Ice Veil. roomates.ts owns subsequent duo phase.
+// Previous module owns Ice Veil. enter-the-dragon.ts owns subsequent duo phase.
 // Baseline WTFDIG NAUR; LPDU/MUR mechanics choices documented separately.
 // Damage Down/Mark of Mortality -> Major when root player proven; Raid is
 // first inevitable wipe. Unknown assignment or clipped victim is not fault.

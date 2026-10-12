@@ -437,6 +437,51 @@ the pull). Check them on the first VODs that reach P3:
   in it), light ownership / relative north, Return snapshot positions,
   NAUR/LPDU/MUR presets.
 
+### Futures Rewritten P4: Enter the Dragon (FFXIV)
+
+Built 2026-10-12 from 46 P4 pulls (six P4 clears, mostly one static) with
+no VODs and no raid plan. Evidence is in the header of
+`lib/mechanics/ffxiv/fru/enter-the-dragon.ts`. These questions apply to
+any P4 pull; times are from Materialization (~10:15 into the pull). Check
+them on the first VODs that reach P4:
+- **Shiva's second auto on a DPS** (~0:15-0:21): the tank who took neither
+  swing is named (not holding second place on her enmity). Right, or was
+  it a DPS pulling threat?
+- **Fifth Lightsteeped** (~0:37): every player who reached five is named.
+  When a chained player stood in a cone, was it them, or the cone baiter
+  whose cone went through them? With two cones on one player, should both
+  baiters be named (today: both players who took two)?
+- **Refulgent Chain break** (~0:33): only the player whose end broke first
+  is named. Should their chain partner be named too?
+- **Darklit Waters on one side** (~0:45): both Water holders are named. With
+  the static's swap rule, only the unchained player who should have moved
+  could be. Who moves?
+- **Akh Morn on one target** (~1:02): when the tank both bosses targeted
+  had Provoked the other tank's boss, only they are named; otherwise both
+  tanks. A solo tank who died to Akh Morn is named. Mitigation, healing,
+  or neither?
+- **Morn Afah taken alone** (~1:13 / ~2:34): with the bosses within 5% the
+  tank who took it alone and died is named; over 5% it is a player-less
+  note. Was the tank calling a sacrifice (even under 5%), or late back?
+- **Crystallize Time stacks** (~1:40 / ~1:45): a blue player missing the
+  Water or Unholy is named; with no Ice (Unholy) or Aero (Water) red in
+  it, both reds of that kind are. Which red is meant to join?
+- **Longing of the Lost on others**: anyone but the popping red is named.
+  Should the red who popped the head near them be named too?
+- **The memory crystal**: an Unholy Darkness or a dragon head striking it
+  shattered it (no further Quietus hits), and a Dark Eruption that hit it
+  didn't. Is the stack's holder (Unholy) or the group at fault? Is an
+  Eruption hit that the crystal survives worth flagging at all (Minor
+  today)?
+- **Rewind wings, non-tank in both front fours**: named only with all
+  eight alive. Is the Return snapshot spot the player's own?
+- **Knocked out of the arena** by the rewind wings, Dark Aero III or a
+  red's own Longing: the knocked player is named. Should the Aero holder
+  be named when the party was pushed out?
+- **Not built:** tower under/over-soak by itself, cone aim, bowtie/Mami
+  preset detection, deaths to raidwides (Darklit, Crystallize Time, Edge
+  of Oblivion), CT positions and Tidal/rewind corners, beacon ownership.
+
 ### Dancing Mad (FFXIV)
 
 - **Phase 1 (graven-image / phase1.ts):**

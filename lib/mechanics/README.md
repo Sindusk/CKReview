@@ -51,8 +51,14 @@ lib/mechanics/
                                 Unholy, Blizzard, Meltdown baits/beams,
                                 rewind Water/Eruption/Shadoweye, Refrain
                                 Waters, Apocalypse, Spirit Taker, busters,
-                                Darkest Dance walls, Memory's End). The other
-                                two files are research models only
+                                Darkest Dance walls, Memory's End)
+      enter-the-dragon.ts     — Phase 4 per-pull rules (Shiva's dual autos,
+                                Akh Rhai, Darklit Lightsteep / chains / Waters,
+                                Somber Dance, Akh Morn enmity, Morn Afah HP gap,
+                                Crystallize Time stacks / Aero / dragon heads /
+                                claw and fang expiry, rewind wings, the memory
+                                crystal, enrage). pandora.ts (P5) is a
+                                research model only
     arcadion/                 — AAC Heavyweight (Savage)
       vamp-fatale.ts          — Vamp Fatale (M9S) per-pull rules (Stomp bats and
                                 Bombpyre overlaps, Aetherletting drops/lines/overlap,
@@ -706,6 +712,32 @@ The same principles apply when refining any module:
 - **Collapse threshold from the clears.** No P3 clear had more than one
   player down before Memory's End, and no pull came back from four; three
   did. The marker uses four with no end-of-pull window.
+
+### Lessons from Enter the Dragon (FRU P4: 46 pulls over 11 reports, 6 P4 clears)
+
+- **Hits on an NPC live in enemyDamageTaken.** The memory crystal never
+  carries a buff or HP; the only trace of it being struck is an enemy
+  ability landing on the "fragment of fate" actor. Modules now get those
+  as `NpcHit[]` (log-transforms.ts `fflBuildNpcHits`, harness
+  `relNpcHits`).
+- **A scripted hit that stops arriving proves destruction.** Every clean
+  crystal took three Quietus hits; after an Unholy or dragon-head strike
+  it took none, so the last strike before the missing Quietus is the one
+  that shattered it (an earlier Eruption hit it survived).
+- **A stack counter's cause tells which source overflowed.** Lightsteeped
+  stack applies carry `causeAbilityId` (tower or cone), which names what
+  gave a player the fifth stack without positions.
+- **Status hand-offs look like removals.** Refulgent Chain is removed the
+  millisecond Refulgent Fate is applied; only a removal without the
+  successor (or Fate's own early end) is a break.
+- **Boss HP at a cast decides a DPS gate.** Morn Afah's two casts carry
+  each boss's HP; the gap at the cast separated survived (4.8) from
+  lethal (6.0) stacks.
+- **Captures cut with --to-minutes still have every death.** Bound the
+  module's window by the last damage or cast event, not the last death,
+  or late deaths read as walk-offs.
+- **Provoke history names an enmity steal.** The tank both bosses
+  targeted had Provoked the boss the other tank last Provoked (C5).
 
 ### Lessons from Ultimate Kefka (a late phase, 29 pulls, no kill)
 
