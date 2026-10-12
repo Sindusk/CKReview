@@ -495,6 +495,45 @@ const MECHANICS = {
     },
   },
 
+  // Assigned duties (lib/mechanics/assignments.ts): every registry module's
+  // reported instances, the duties detected across the report, and the
+  // errors the assignee takes over where nobody performed the duty. Only
+  // those changed errors are recorded; the modules' own output is already
+  // covered by their generated entries.
+  'duty-assignments': {
+    game: 'wow',
+    load: () => ({
+      ...requireTsFromRoot('lib/mechanics/wow/registry.ts'),
+      ...requireTsFromRoot('lib/mechanics/occurrences.ts'),
+      ...requireTsFromRoot('lib/mechanics/assignments.ts'),
+      ...requireTsFromRoot('lib/spec-data.ts'),
+    }),
+    run({ mod, pulls, actorMap, abilityMap }) {
+      const built = pulls.map((pull, i) => {
+        const ctx = { ...wowPullContext(pull, actorMap, abilityMap, mod.getSpecInfo), occurrences: [] };
+        const errors = mod.detectWowEncounterErrors(ctx);
+        return {
+          id: i, name: pull.bossName, pullNumber: pull.pullNumber, players: ctx.players, errors,
+          mechanicOccurrences: mod.mergeReportedOccurrences(undefined, ctx.occurrences),
+        };
+      });
+      const duties = mod.detectDutyAssignments(built);
+      console.log('='.repeat(70));
+      if (duties.length === 0) console.log('No assigned duties detected');
+      for (const d of duties) {
+        console.log(`${d.label} (${d.mechanicKey}): ${d.kind}, ${d.assignees.map((a) => `${a.player} ${a.performed}`).join(' / ')} of ${d.performed} performed, ${d.instances} instances over ${d.pulls} pulls`);
+      }
+      for (const pull of built) {
+        const applied = mod.applyDutyAssignments(pull, duties);
+        const changed = applied.errors.filter((e) => !pull.errors.includes(e));
+        if (changed.length === 0) continue;
+        console.log(`${pull.name} Pull ${pull.pullNumber}:`);
+        for (const e of changed) console.log(`  [${e.severity}] [${e.ruleId}] t=+${(e.timestamp / 1000).toFixed(1)}s ${e.player}: ${e.description}`);
+        recordErrors(pull.name, pull.pullNumber, changed);
+      }
+    },
+  },
+
   // The other per-pull WoW modules get generated entries from
   // lib/mechanics/wow/registry.ts (see addWowRegistryEntries below).
 

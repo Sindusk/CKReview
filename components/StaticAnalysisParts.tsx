@@ -26,6 +26,7 @@ export type AnalysisContextResponse = {
   undetailedSessions: number;
   pulls:              number;
   pullsWithoutPhases: number;
+  sessionsWithoutExposure: number;
 };
 
 export type AnalysisFilterState = {
@@ -131,6 +132,9 @@ export function AnalysisCoverageNote({ context, extra }: { context: AnalysisCont
   if (extra) parts.push(extra);
   if (context.undetailedSessions > 0) {
     parts.push(`${context.undetailedSessions} earlier session${context.undetailedSessions === 1 ? "" : "s"} predate detailed tracking (resync to include)`);
+  }
+  if (context.sessionsWithoutExposure > 0) {
+    parts.push(`${context.sessionsWithoutExposure} session${context.sessionsWithoutExposure === 1 ? "" : "s"} predate per-player chances and count everyone at every instance (resync to include)`);
   }
   if (context.pullsWithoutPhases > 0) {
     parts.push(`${context.pullsWithoutPhases} pull${context.pullsWithoutPhases === 1 ? " has" : "s have"} no phase data and sit out phase-based rates`);

@@ -65,9 +65,17 @@ export type AnalysisSession = {
   /** When the log was recorded, else when it was added. ISO string. */
   date:    string;
   pulls:   number;
+  /** StaticReview.detailVersion. */
+  detailVersion: number;
 };
 
-export type AnalysisPhase = { id: number; name: string; isIntermission: boolean };
+/**
+ * The detailVersion that started storing responsible players
+ * (lib/static-review-data.ts STATIC_DETAIL_VERSION 2).
+ */
+const EXPOSURE_DETAIL_VERSION = 2;
+
+export type AnalysisPhase ={ id: number; name: string; isIntermission: boolean };
 
 type LoadedError = {
   identityId:  number | null;
@@ -139,7 +147,7 @@ export async function loadAnalysisContext(staticId: number, filter: AnalysisFilt
     prisma.staticReview.findMany({
       where:   { staticId, detailVersion: { not: null }, pulls: { some: { bossName: boss } } },
       orderBy: { addedAt: "asc" },
-      select:  { id: true, label: true, addedAt: true, reportStartedAt: true },
+      select:  { id: true, label: true, addedAt: true, reportStartedAt: true, detailVersion: true },
     }),
     prisma.staticReview.count({
       where: { staticId, detailVersion: null, pulls: { some: { bossName: boss } } },
@@ -195,6 +203,7 @@ export async function loadAnalysisContext(staticId: number, filter: AnalysisFilt
       label: r.label,
       date:  (r.reportStartedAt ?? r.addedAt).toISOString(),
       pulls: pullCounts.get(r.id) ?? 0,
+      detailVersion: r.detailVersion ?? 0,
     })),
     undetailedSessions,
     pulls: rawPulls.map((p) => ({
@@ -568,5 +577,11 @@ export function contextSummary(ctx: AnalysisContext) {
     pulls:              ctx.pulls.length,
     // Pulls stored without phase data; phase-based rates leave them out.
     pullsWithoutPhases: ctx.phases.length > 0 ? ctx.pulls.filter((p) => p.phases.length === 0).length : 0,
+    // Sessions imported before responsible players were stored, counted
+    // only when this boss has targeted/assigned mechanics at all: there
+    // every player counts at every instance until resynced.
+    sessionsWithoutExposure: ctx.pulls.some((p) => p.mechanics.some((m) => m.exposure !== null))
+      ? ctx.sessions.filter((s) => s.detailVersion < EXPOSURE_DETAIL_VERSION).length
+      : 0,
   };
 }

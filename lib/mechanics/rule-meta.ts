@@ -49,7 +49,10 @@ export type RuleMeta = {
 };
 
 /** A registry entry; omitted key/label fall back to the rule's own. */
-type RuleMetaEntry = Partial<RuleMeta>;
+type RuleMetaEntry = Partial<RuleMeta> & {
+  /** An assigned mechanic's job, as the Strategy dialog names it ("Fish carrier"). */
+  dutyLabel?: string;
+};
 
 const RULE_META: Record<string, RuleMetaEntry> = {};
 
@@ -83,8 +86,8 @@ function phase(phaseHint: number, ruleIds: string[]): void {
  * mechanic()/phase() entries; every rule of one mechanic must get the same
  * scope.
  */
-function exposure(scope: Exposure, ruleIds: string[]): void {
-  for (const id of ruleIds) RULE_META[id] = { ...RULE_META[id], exposure: scope };
+function exposure(scope: Exposure, ruleIds: string[], dutyLabel?: string): void {
+  for (const id of ruleIds) RULE_META[id] = { ...RULE_META[id], exposure: scope, ...(dutyLabel ? { dutyLabel } : {}) };
 }
 
 // ── Dancing Mad (FFXIV) ─────────────────────────────────────────────────────
@@ -298,6 +301,10 @@ mechanic("ula-eggs", "Eggs", undefined, ["wow-ula-egg-hatch"]);
 mechanic("ula-spectral-coils", "Spectral Coils", undefined, ["wow-ula-spectral-coils"]);
 mechanic("ula-blight-vein", "Blight Vein", undefined, ["wow-ula-blight-vein"]);
 mechanic("le-final-ascension", "Final Ascension", undefined, ["wow-le-final-ascension"]);
+// The fish carrier is a raid-lead job; element and shard targets are the
+// game's pick (lost-explorers.ts reportOccurrences).
+exposure("assigned", ["wow-le-final-ascension"], "Fish carrier");
+exposure("targeted", ["wow-le-elemental-explosion", "wow-le-shards-no-swap"]);
 mechanic("vash-plague-froth", "Plague Froth", undefined, ["wow-vash-plague-froth"]);
 mechanic("ca-venom-eruption", "Venom Eruption", undefined, ["wow-ca-venom-eruption"]);
 
@@ -315,6 +322,14 @@ export function mechanicLabelForKey(mechanicKey: string): string | undefined {
     if (entry.mechanicKey === mechanicKey && entry.mechanicLabel) return entry.mechanicLabel;
   }
   return undefined;
+}
+
+/** An assigned mechanic's duty name, falling back to its mechanic label. */
+export function mechanicDutyLabel(mechanicKey: string): string {
+  for (const [ruleId, entry] of Object.entries(RULE_META)) {
+    if ((entry.mechanicKey ?? ruleId) === mechanicKey && entry.dutyLabel) return entry.dutyLabel;
+  }
+  return mechanicLabelForKey(mechanicKey) ?? mechanicKey;
 }
 
 /** A mechanic's exposure by its key; "everyone" when unclassified. */

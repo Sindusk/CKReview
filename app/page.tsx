@@ -29,6 +29,7 @@ import MitigationDialog from "@/components/MitigationDialog";
 import DamageDialog from "@/components/DamageDialog";
 import { detectTerminateKickOrder } from "@/lib/mechanics/wow/vs-dr-mqd/terminate-kicks";
 import { detectCrystalAssignments } from "@/lib/mechanics/wow/vs-dr-mqd/crystal-assignments";
+import { applyDutyAssignments, detectDutyAssignments } from "@/lib/mechanics/assignments";
 import {
   detectBlackHoleStrategy,
   detectMissedAssignedTetherErrors,
@@ -193,8 +194,12 @@ export default function Home() {
   // each ability's normal targets from the pull itself and the report's
   // earlier pulls of that boss, never later ones (lib/mechanics/fallback.ts).
   const fallbackProfiles = useMemo(() => buildFallbackProfiles(pulls), [pulls]);
+  // Assigned duties (the Lost Explorers fish carrier, ...): who each job
+  // was given to, detected across the report (lib/mechanics/assignments.ts).
+  const dutyAssignments = useMemo(() => detectDutyAssignments(pulls), [pulls]);
 
-  // Pulls with the cross-pull errors merged in: Black Hole "Missed Assigned
+  // Pulls with the cross-pull errors merged in: assigned duties filled in
+  // where nobody performed them (assignments.ts), Black Hole "Missed Assigned
   // Tether" (blackhole-strategy.ts), Graven Image, Wave Cannon, and the
   // fallback model on bosses without a module (which also drops the
   // generic Damage Down rule there, since it owns penalties). Unlike
@@ -211,7 +216,7 @@ export default function Home() {
   // calls / manual errors) and re-derived on strategy swap.
   const displayPulls = useMemo(() => {
     return pulls.map((pull) => {
-      const p = applyFallback(pull, fallbackProfiles);
+      const p = applyDutyAssignments(applyFallback(pull, fallbackProfiles), dutyAssignments);
       const blackHoleErrors = [
         ...detectMissedAssignedTetherErrors(p, blackHoleStrategy),
         ...detectClippedByNeighborTetherErrors(p, blackHoleStrategy),
@@ -225,7 +230,7 @@ export default function Home() {
       const extra = [...blackHoleErrors, ...gravenImageErrors, ...waveCannonErrors];
       return extra.length === 0 ? p : { ...p, errors: [...p.errors, ...extra] };
     });
-  }, [pulls, blackHoleStrategy, gravenImageLayout, waveCannonLayout, fallbackProfiles]);
+  }, [pulls, blackHoleStrategy, gravenImageLayout, waveCannonLayout, fallbackProfiles, dutyAssignments]);
   const [selectedPullId, setSelectedPullId] = useState<number | null>(null);
 
   const [importError, setImportError] = useState<string | null>(null);

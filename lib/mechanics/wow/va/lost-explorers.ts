@@ -398,6 +398,7 @@ const FUNGAL_BURST       = 1305618;
 // Iku's Command
 const BURNING_FLAMES     = 1295928; // debuff from a Fire missile
 const PIERCING_FROST     = 1295954; // debuff from a Frost missile
+const FROSTFIRE_VOLLEY   = 1295891; // Iku cast, Command +15 and +42
 const FIRE_MISSILE_HIT   = 1295893;
 const FROST_MISSILE_HIT  = 1295985;
 const ELEMENTAL_EXPLOSION = 1295952;
@@ -858,6 +859,55 @@ function detectPullOver(players: PlayerInfo[], deaths: DeathEvent[], pullEnd: nu
   });
 }
 
+// ─── Responsible players (docs/exposure-plan.md) ─────────────────────────────
+//
+// Mechanics that test only some players, reported per instance through
+// ctx.occurrences (rule-meta.ts sets their exposure):
+// - The fish (assigned): one instance per fish cycle that needed a feed —
+//   a cycle with a fish thrown, or one whose Final Ascension completed
+//   unfed. The thrower is responsible; an unfed cycle names nobody (the
+//   detected carrier is filled in across pulls). A cycle the pull ended in
+//   before the cast, and the enrage cycle after all three were fed, are no
+//   chance at all. Report B: one thrower in all 20 pulls.
+// - Elemental Explosion (targeted): one instance per Frostfire Volley; the
+//   players its missiles gave Burning Flames or Piercing Frost.
+// - Shredding Shards (targeted): one instance per shard set (6-7
+//   applications within ~3.5s, sets ~66s apart); the tank(s) it landed on.
+
+const SHARD_SET_GAP_MS = 5000;
+const VOLLEY_DEBUFF_MS = 5000;
+
+function reportOccurrences(ctx: WowPullContext): void {
+  const sink = ctx.occurrences;
+  if (!sink) return;
+  const { players, enemyCasts, enemyBuffs } = ctx;
+
+  const charges = clusterByGap(enemyBuffs.filter((e) => e.abilityId === FA_CHARGE), (e) => e.timestamp, 1000).map((g) => g[0].timestamp);
+  const channels = enemyBuffs.filter((e) => e.abilityId === FA_CHANNEL).map((e) => e.timestamp);
+  const commands = enemyBuffs.filter((e) => COMMAND_IDS.has(e.abilityId)).map((e) => e.timestamp);
+  const fishes = players.flatMap((p) => p.casts.filter((c) => c.abilityId === DISGUSTING_FISH).map((c) => ({ p, t: c.timestamp })));
+  charges.forEach((start, i) => {
+    const end = charges[i + 1] ?? Infinity;
+    if (commands.filter((t) => t < start).length >= 3) return; // the enrage cycle
+    const thrown = fishes.filter((f) => f.t >= start && f.t < end);
+    const completed = channels.some((t) => t >= start && t < end);
+    if (thrown.length === 0 && !completed) return;
+    sink.push({ mechanicKey: "le-final-ascension", timestamp: start, players: thrown.map((f) => f.p.name) });
+  });
+
+  for (const volley of enemyCasts.filter((e) => e.abilityId === FROSTFIRE_VOLLEY)) {
+    const t = volley.timestamp;
+    const targets = players.filter((p) => p.debuffs.some((e) => (e.abilityId === BURNING_FLAMES || e.abilityId === PIERCING_FROST) &&
+      e.debuffStatus === "applied" && e.timestamp >= t && e.timestamp <= t + VOLLEY_DEBUFF_MS));
+    sink.push({ mechanicKey: LE_EXPLOSION_RULE_ID, timestamp: t, players: targets.map((p) => p.name) });
+  }
+
+  const shards = players.flatMap((p) => p.debuffs.filter((e) => e.abilityId === SHREDDING_SHARDS && e.debuffStatus === "applied").map((e) => ({ p, t: e.timestamp })));
+  for (const set of clusterByGap(shards, (s) => s.t, SHARD_SET_GAP_MS)) {
+    sink.push({ mechanicKey: LE_SHARDS_RULE_ID, timestamp: set[0].t, players: [...new Set(set.map((s) => s.p.name))] });
+  }
+}
+
 // ─── Entry point ─────────────────────────────────────────────────────────────
 
 export function detectLostExplorersErrors(ctx: WowPullContext): PullError[] {
@@ -865,6 +915,7 @@ export function detectLostExplorersErrors(ctx: WowPullContext): PullError[] {
   // Self-gate: tank deaths and generic damage exist in every fight.
   const isLostExplorers = players.some((p) => p.debuffs.some((e: PlayerEvent) => LOST_EXPLORERS_SIGNATURE.has(e.abilityId)));
   if (!isLostExplorers) return [];
+  reportOccurrences(ctx);
 
   const finalAscension = detectFinalAscension(players, deaths, enemyBuffs);
   // After the enrage everything dies to it; per-player errors are fallout.
