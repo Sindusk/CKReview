@@ -49,6 +49,12 @@ export type MechanicOccurrence = {
   timestamp:   number;
   /** Responsible players' log names; undefined = everyone in the pull. */
   players?:    string[];
+  /**
+   * A module-reported instance (not an anchor): stamped no later than its
+   * errors, so an error matches it without OCCURRENCE_LEAD_MS (instances can
+   * be closer together than the lead: Spectral Coils impacts ~2.5s apart).
+   */
+  reported?:   true;
 };
 
 /**
@@ -182,7 +188,7 @@ export function mergeReportedOccurrences(
     if (same) { addPlayers(same, r.players); continue; }
     const n = (counters.get(r.mechanicKey) ?? 0) + 1;
     counters.set(r.mechanicKey, n);
-    out.push({ mechanicKey: r.mechanicKey, occurrence: n, timestamp: r.timestamp, players: [...new Set(r.players)] });
+    out.push({ mechanicKey: r.mechanicKey, occurrence: n, timestamp: r.timestamp, players: [...new Set(r.players)], reported: true });
   }
   // A module that reports a mechanic speaks for all of its instances: an
   // anchored instance it named nobody for had nobody responsible.
@@ -208,7 +214,7 @@ export function occurrenceForError(
   let mine: number | null = null;
   for (const o of occurrences) {
     if (o.mechanicKey !== mechanicKey) continue;
-    if (o.timestamp > timestampMs + OCCURRENCE_LEAD_MS) continue;
+    if (o.timestamp > timestampMs + (o.reported ? 0 : OCCURRENCE_LEAD_MS)) continue;
     found = o.occurrence;
     if (player && o.players?.includes(player)) mine = o.occurrence;
   }

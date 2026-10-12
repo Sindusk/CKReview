@@ -145,7 +145,9 @@
 //   wow-ca-pull-over           Raid         6 dead / tank death / called wipe
 //
 // Exposure: Gravebound, ghost-caught and Malevolent Resonance are targeted
-// (see "Responsible players" above the entry point).
+// (see "Responsible players" above the entry point). Guillotine
+// (ca-guillotine) is an assigned soak-group duty: each mark an instance,
+// its impact's soakers the performers.
 //
 // ── GUIDE-DERIVED MODEL (pre-log) ────────────────────────────────────────────
 //
@@ -584,10 +586,20 @@ function detectEruptions(players: PlayerInfo[], deaths: DeathEvent[], enemyCasts
 
 export const CA_EXECUTION_RULE_ID = "wow-ca-guillotine-execution";
 export const CA_RESOAK_RULE_ID = "wow-ca-guillotine-resoak";
+// The impact lands ~5s after the mark (header: mark +43, impact +48).
+const GUILLOTINE_IMPACT_MS = 8000;
 
-function detectGuillotine(players: PlayerInfo[], deaths: DeathEvent[]): PullError[] {
+function detectGuillotine(players: PlayerInfo[], deaths: DeathEvent[], occurrences?: ReportedOccurrence[]): PullError[] {
   const errors: PullError[] = [];
   for (const G of [GUILLOTINE, GRIM_GUILLOTINE]) {
+    // A soak-group duty (rule-meta exposure "assigned"): each mark is an
+    // instance, the players its impact hit (~5s later) the performers; the
+    // groups are detected across the report (lib/mechanics/assignments.ts).
+    const marks = clusterByGap(players.flatMap((p) => applied(p, G.mark)), (e) => e.timestamp, 3000).map((g) => g[0].timestamp);
+    for (const t of marks) {
+      const soakers = players.filter((p) => p.damageTaken.some((e) => e.abilityId === G.hit && e.timestamp > t && e.timestamp <= t + GUILLOTINE_IMPACT_MS));
+      occurrences?.push({ mechanicKey: "ca-guillotine", timestamp: t, players: soakers.map((p) => p.name) });
+    }
     // Under-soaked: the penalty hits the raid.
     for (const g of raidHits(players, G.penalty, 1000)) {
       const t = g[0].e.timestamp;
@@ -948,7 +960,7 @@ export function detectCoiledAltarErrors(ctx: WowPullContext): PullError[] {
 
   const errors = [
     ...detectEruptions(players, deaths, enemyCasts),
-    ...detectGuillotine(players, deaths),
+    ...detectGuillotine(players, deaths, ctx.occurrences),
     ...detectFrontals(players, deaths),
     ...detectGravebound(players, deaths),
     ...detectDreadmarch(players, deaths, enemyCasts),

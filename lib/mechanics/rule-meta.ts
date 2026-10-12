@@ -76,7 +76,8 @@ function isSplitByName(ruleId: string): boolean {
 
 /** Several rules forming one mechanic. */
 function mechanic(mechanicKey: string, mechanicLabel: string, phaseHint: number | undefined, ruleIds: string[]): void {
-  for (const id of ruleIds) RULE_META[id] = { mechanicKey, mechanicLabel, phaseHint };
+  // Keeps an exposure() set before it (call order doesn't matter).
+  for (const id of ruleIds) RULE_META[id] = { ...RULE_META[id], mechanicKey, mechanicLabel, phaseHint };
 }
 
 /** Rules that stay their own mechanic but belong to a known phase. */
@@ -352,6 +353,11 @@ exposure("targeted", [
 exposure("targeted", ["wow-ca-gravebound-expired", "wow-ca-ghost-caught", "wow-ca-malevolent-resonance"]);
 // Stone Breaker: the tank whose set it is (twin-fangs.ts).
 exposure("targeted", ["wow-tf-stone-breaker-unsoaked"]);
+// Sszorak's Mutilate soak groups: an assigned group duty (sszorak.ts
+// reports the soakers; lib/mechanics/assignments.ts finds the groups).
+exposure("assigned", ["wow-ssz-mutilate-missed", "wow-ssz-mutilate-repeat"], "Mutilate soak group");
+exposure("assigned", ["wow-ca-guillotine-execution", "wow-ca-guillotine-resoak"], "Guillotine soak group");
+exposure("assigned", ["wow-nek-pyre-undersoaked"], "Hungering Pyre soak group");
 // Possession Barrage: the debuffed tank kites it (nekzali.ts).
 exposure("targeted", ["wow-nek-barrage-short"]);
 mechanic("ssz-cysts", "Cysts", undefined, [
@@ -377,6 +383,9 @@ mechanic("tf-globules", "Globules", undefined, [
 // One rule id, several names for the same mechanic.
 mechanic("ula-eggs", "Eggs", undefined, ["wow-ula-egg-hatch"]);
 mechanic("ula-spectral-coils", "Spectral Coils", undefined, ["wow-ula-spectral-coils"]);
+// Coils: an assigned mitigation group; Purge: its holders (ulatek.ts).
+exposure("assigned", ["wow-ula-spectral-coils"], "Spectral Coils group");
+exposure("targeted", ["wow-ula-volatile-purge"]);
 mechanic("ula-blight-vein", "Blight Vein", undefined, ["wow-ula-blight-vein"]);
 // Grasping Fangs tethers its own players (ulatek.ts detectBlightVein).
 exposure("targeted", ["wow-ula-blight-vein"]);

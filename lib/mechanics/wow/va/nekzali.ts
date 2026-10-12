@@ -120,7 +120,9 @@
 //
 // Exposure (docs/archive/exposure-plan.md): Possession Barrage
 // (wow-nek-barrage-short) is targeted — one instance per Barrage cast, the
-// debuffed tank responsible.
+// debuffed tank responsible. Hungering Pyre (wow-nek-pyre-undersoaked) is
+// an assigned soak-group duty: each Pyre an instance, its soakers the
+// performers.
 //
 // ── GUIDE-DERIVED MODEL (pre-log) ────────────────────────────────────────────
 //
@@ -504,11 +506,15 @@ function detectUncoiledRage(enemyBuffs: EnemyEvent[]): PullError[] {
 
 export const NEK_PYRE_RULE_ID = "wow-nek-pyre-undersoaked";
 
-function detectPyreSoak(players: PlayerInfo[], deaths: DeathEvent[], enemyCasts: EnemyEvent[]): PullError[] {
+function detectPyreSoak(players: PlayerInfo[], deaths: DeathEvent[], enemyCasts: EnemyEvent[], occurrences?: ReportedOccurrence[]): PullError[] {
   const errors: PullError[] = [];
   for (const c of enemyCasts.filter((e) => e.abilityId === HUNGERING_PYRE)) {
     const soakers = players.filter((p) => p.damageTaken.some((e) =>
       e.abilityId === HUNGERING_PYRE && !e.isDoT && Math.abs(e.timestamp - c.timestamp) <= PYRE_HIT_WINDOW_MS));
+    // A soak-group duty (rule-meta exposure "assigned"): each Pyre an
+    // instance, its soakers the performers; groups detected across the
+    // report (lib/mechanics/assignments.ts).
+    occurrences?.push({ mechanicKey: NEK_PYRE_RULE_ID, timestamp: c.timestamp, players: soakers.map((p) => p.name) });
     if (soakers.length === 0 || soakers.length > PYRE_MAX_UNDERSOAK) continue;
     const killed = deaths.filter((d) => d.killingAbilityGameId === HUNGERING_PYRE &&
       d.timestamp >= c.timestamp - 100 && d.timestamp <= c.timestamp + PYRE_DEATH_WINDOW_MS);
@@ -770,7 +776,7 @@ export function detectNekzaliErrors(ctx: WowPullContext): PullError[] {
     ...detectVesselRevival(deaths, enemyCasts, enemyBuffs),
     ...detectUncoiledRage(enemyBuffs),
     ...[
-      ...detectPyreSoak(players, deaths, enemyCasts),
+      ...detectPyreSoak(players, deaths, enemyCasts, ctx.occurrences),
       ...detectBarrage(players, deaths, enemyCasts, ctx.occurrences),
       ...detectAvoidable(players, deaths),
       ...detectCurse(players, deaths, enemyCasts),

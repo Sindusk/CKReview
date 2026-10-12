@@ -84,7 +84,9 @@ function DutyRow({
     ? "Set by you"
     : duty.kind === "single" ? `Detected: did it ${duty.assignees[0].performed} of ${duty.performed} times`
     : duty.kind === "shared" ? `Shared: ${top}`
+    : duty.kind === "group" ? `${duty.groups!.length} group${duty.groups!.length === 1 ? "" : "s"} detected over ${duty.performed} times`
     : duty.performed > 0 ? `No clear assignee (${top})` : "Nobody did it in this report";
+  const isGroup = duty.kind === "group" && !!duty.groups;
   const value = override === undefined ? "" : override === null ? NOBODY : override;
 
   return (
@@ -105,7 +107,23 @@ function DutyRow({
         </select>
         <span style={{ fontSize: "11px", color: "var(--ck-text-3)" }}>{detected} · {duty.boss}</span>
       </div>
-      {records.map((r) => (
+      {isGroup && duty.groups!.map((g, i) => (
+        <div key={i} style={{ fontSize: "12px", display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "baseline" }}>
+          <span style={{ color: "var(--ck-text-3)", fontSize: "11px", flexShrink: 0 }}>Group {i + 1} · {g.instances}×</span>
+          <span style={{ display: "inline-flex", flexWrap: "wrap", columnGap: "8px" }}>
+            {g.members.map((m) => {
+              const r = records.find((x) => x.player === m);
+              return (
+                <span key={m} style={{ color: getClassColor(game, classOf(m) ?? ""), fontWeight: 600 }}
+                  title={r ? `${r.chances - r.failures.length} of ${r.chances} clean${r.failures.length ? `\nFailed: ${r.failures.map((f) => `P${f.pullNumber} ${mmss(f.timestamp)}`).join(", ")}` : ""}` : undefined}>
+                  {m}{r && r.failures.length ? <span style={{ color: "var(--ck-text-3)", fontWeight: 400 }}> ({r.failures.length} missed)</span> : null}
+                </span>
+              );
+            })}
+          </span>
+        </div>
+      ))}
+      {!isGroup && records.map((r) => (
         <div key={r.player} style={{ display: "flex", alignItems: "baseline", gap: "8px", fontSize: "12px", flexWrap: "wrap" }}>
           <span style={{ color: getClassColor(game, classOf(r.player) ?? ""), fontWeight: 600 }}>{r.player}</span>
           <span className="ck-num" style={{ color: "var(--ck-text-1)" }}>

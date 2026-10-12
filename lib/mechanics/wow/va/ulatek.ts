@@ -149,6 +149,9 @@
 //
 // Exposure (docs/archive/exposure-plan.md): Blight Vein is targeted — one
 // instance per Grasping Fangs wave, the tethered players responsible.
+// Volatile Purge is targeted at each Bite resolution's purge holders.
+// Spectral Coils is an assigned mitigation-group duty: each impact an
+// instance, its Soul Constrictor recipients the performers.
 //
 // ── GUIDE-DERIVED MODEL (pre-log) ────────────────────────────────────────────
 //
@@ -616,12 +619,16 @@ function detectWaves(players: PlayerInfo[], deaths: DeathEvent[], blamed: HatchB
 
 export const ULA_COILS_RULE_ID = "wow-ula-spectral-coils";
 
-function detectCoils(players: PlayerInfo[], deaths: DeathEvent[], enemyCasts: EnemyEvent[]): PullError[] {
+function detectCoils(players: PlayerInfo[], deaths: DeathEvent[], enemyCasts: EnemyEvent[], occurrences?: ReportedOccurrence[]): PullError[] {
   const impacts = clusterByGap(enemyCasts.filter((c) => c.abilityId === COIL_IMPACT), (c) => c.timestamp, 500).map((g) => g[0].timestamp);
   const errors: PullError[] = [];
   let raided = false;
   for (const t of impacts) {
     const soakers = players.filter((p) => applied(p, SOUL_CONSTRICTOR).some(near(t, 500)));
+    // A mitigation-group duty (rule-meta exposure "assigned"): each impact
+    // an instance, its Soul Constrictor recipients the performers; groups
+    // detected across the report (lib/mechanics/assignments.ts).
+    occurrences?.push({ mechanicKey: "ula-spectral-coils", timestamp: t, players: soakers.map((p) => p.name) });
     const alive = players.length - deadAt(players, deaths, t - 100).length;
     const killed = deathsBy(deaths, [COIL_DAMAGE], t, t + 1000);
     const who = soakers.length ? `: ${joinNames(soakers.map((p) => p.name))}` : "";
@@ -672,9 +679,16 @@ function detectCorpse(players: PlayerInfo[], deaths: DeathEvent[]): PullError[] 
 // ─── Volatile Purge ──────────────────────────────────────────────────────────
 
 export const ULA_PURGE_RULE_ID = "wow-ula-volatile-purge";
+// One Bite resolution's helpers gain Volatile Purge together.
+const PURGE_SET_GAP_MS = 2000;
 
-function detectPurge(players: PlayerInfo[], deaths: DeathEvent[]): PullError[] {
+function detectPurge(players: PlayerInfo[], deaths: DeathEvent[], occurrences?: ReportedOccurrence[]): PullError[] {
   const errors: PullError[] = [];
+  // Each Bite resolution's purges test their holders (rule-meta exposure).
+  const purges = players.flatMap((p) => applied(p, VOLATILE_PURGE).map((e) => ({ p, t: e.timestamp })));
+  for (const g of clusterByGap(purges, (x) => x.t, PURGE_SET_GAP_MS)) {
+    occurrences?.push({ mechanicKey: ULA_PURGE_RULE_ID, timestamp: g[0].t, players: [...new Set(g.map((x) => x.p.name))] });
+  }
   for (const p of players) {
     for (const g of clusterByGap(p.damageTaken.filter((e) => e.abilityId === PURGE_HIT), (e) => e.timestamp, 300)) {
       const t = g[0].timestamp;
@@ -866,9 +880,9 @@ export function detectUlatekErrors(ctx: WowPullContext): PullError[] {
 
   const errors = [
     ...detectHatches(players, deaths, enemyBuffRemovals, pullEnd, blamed),
-    ...detectCoils(players, deaths, enemyCasts),
+    ...detectCoils(players, deaths, enemyCasts, ctx.occurrences),
     ...detectCorpse(players, deaths),
-    ...detectPurge(players, deaths),
+    ...detectPurge(players, deaths, ctx.occurrences),
     ...detectWrath(players, deaths, enemyCasts),
     ...detectBlightVein(players, deaths, ctx.occurrences),
     ...detectAddCasts(deaths, enemyCasts),

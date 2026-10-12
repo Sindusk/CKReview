@@ -119,7 +119,9 @@
 // Exposure (docs/archive/exposure-plan.md): the Crosswinds knockback
 // (wow-ssz-crosswinds-fall, its own mechanic) is targeted — one instance
 // per Crosswinds set, the direction-aura holders responsible. The blast
-// stays with everyone.
+// stays with everyone. Mutilate (ssz-mutilate) is an assigned group duty:
+// each tanked soak is an instance, its non-tank soakers the performers,
+// the soak groups detected across the report.
 //
 // ── GUIDE-DERIVED MODEL (pre-log) ────────────────────────────────────────────
 //
@@ -590,12 +592,19 @@ function detectVirulence(players: PlayerInfo[], deaths: DeathEvent[]): PullError
 export const SSZ_MUTILATE_MISSED_RULE_ID = "wow-ssz-mutilate-missed";
 export const SSZ_MUTILATE_REPEAT_RULE_ID = "wow-ssz-mutilate-repeat";
 
-function detectMutilate(players: PlayerInfo[], deaths: DeathEvent[]): PullError[] {
+function detectMutilate(players: PlayerInfo[], deaths: DeathEvent[], occurrences?: ReportedOccurrence[]): PullError[] {
   const hits = players.flatMap((p) => p.damageTaken.filter((e) => e.abilityId === MUTILATE_HIT).map((e) => ({ p, e })));
   const soaks = clusterByGap(hits, (h) => h.e.timestamp, MUTILATE_CLUSTER_MS).map((g) => {
     const soakers = [...new Set(g.map((h) => h.p))];
     return { t: g[0].e.timestamp, soakers, tank: soakers.find((p) => p.role === "Tank"), hits: g };
   });
+  // A soak-group duty (rule-meta exposure "assigned"): each soak with its
+  // tank is an instance, its non-tank soakers the performers; the groups
+  // are detected across the report (lib/mechanics/assignments.ts).
+  for (const s of soaks) {
+    if (!s.tank) continue;
+    occurrences?.push({ mechanicKey: "ssz-mutilate", timestamp: s.t, players: s.soakers.filter((p) => p !== s.tank).map((p) => p.name) });
+  }
 
   // Soak groups are fixed per tank: learn them from this pull's clean soaks.
   const tally = new Map<string, Map<string, number>>();
@@ -1004,7 +1013,7 @@ export function detectSszorakErrors(ctx: WowPullContext): PullError[] {
   const errors = [
     ...detectUnbound(players, deaths, enemyBuffs),
     ...detectVirulence(players, deaths),
-    ...detectMutilate(players, deaths),
+    ...detectMutilate(players, deaths, ctx.occurrences),
     ...detectRavageSwap(players, deaths),
     ...detectTempest(players, deaths),
     ...detectCrosswinds(players, deaths, ctx.occurrences),

@@ -513,7 +513,7 @@ const MECHANICS = {
         const ctx = { ...wowPullContext(pull, actorMap, abilityMap, mod.getSpecInfo), occurrences: [] };
         const errors = mod.detectWowEncounterErrors(ctx);
         return {
-          id: i, name: pull.bossName, pullNumber: pull.pullNumber, players: ctx.players, errors,
+          id: i, name: pull.bossName, pullNumber: pull.pullNumber, players: ctx.players, deathEvents: ctx.deaths, errors,
           mechanicOccurrences: mod.mergeReportedOccurrences(undefined, ctx.occurrences),
         };
       });
@@ -521,7 +521,9 @@ const MECHANICS = {
       console.log('='.repeat(70));
       if (duties.length === 0) console.log('No assigned duties detected');
       for (const d of duties) {
-        console.log(`${d.label} (${d.mechanicKey}): ${d.kind}, ${d.assignees.map((a) => `${a.player} ${a.performed}`).join(' / ')} of ${d.performed} performed, ${d.instances} instances over ${d.pulls} pulls`);
+        console.log(`${d.label} (${d.mechanicKey}): ${d.kind}, ${d.groups
+          ? d.groups.map((g, i) => `group ${i + 1} [${g.members.join(', ')}] ${g.instances}x`).join('; ')
+          : d.assignees.map((a) => `${a.player} ${a.performed}`).join(' / ')} of ${d.performed} performed, ${d.instances} instances over ${d.pulls} pulls`);
       }
       for (const pull of built) {
         const applied = mod.applyDutyAssignments(pull, duties);
