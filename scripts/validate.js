@@ -796,6 +796,9 @@ function recordScopedInstances(pulls) {
 
 MECHANICS['exposure-ffxiv'] = {
   game: 'ff',
+  // Runs on late captures too, for Phase 5's instances; their early-phase
+  // instances are partial but just as deterministic.
+  lateCapture: true,
   load: () => ({
     store: requireTsFromRoot('lib/sample-report-store.ts'),
     lt: requireTsFromRoot('lib/log-transforms.ts', { './log-auth': {} }),

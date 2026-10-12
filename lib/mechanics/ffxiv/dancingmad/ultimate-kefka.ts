@@ -4,6 +4,12 @@
 // detectUltimateKefkaErrors. Self-gates on Phase 5 IDs (none of them occur
 // in any earlier phase), so it is safe to run on every pull.
 //
+// Exposure (docs/archive/exposure-plan.md), role-only targeted: per Fell
+// Forces volley the role stacks test the living non-tanks and the tank
+// stack the living tanks; per Maddening Orchestra (both tanks alive) the
+// tank duties and Chaotic Flare test the tanks, Holy and Flare Diffusion
+// the living non-tanks. Overlaps stay everyone.
+//
 // -- VERIFIED AGAINST LOGS (2026-09-27) --
 // 29 pulls reach Phase 5, no kills. Pulls are cited as <code prefix>#<pull>
 // with an offset from Ultima Repeater #1's begincast ("P5 +0"; the
@@ -385,6 +391,7 @@
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import type { DeathEvent } from "@/types/DeathEvent";
 import type { PullError, EnemyEvent, ErrorSeverity } from "@/types/PullError";
+import type { ReportedOccurrence } from "@/lib/mechanics/occurrences";
 import { compassBearingOf, distanceBetween, distanceFromCenter } from "@/lib/mechanics/geometry";
 import {
   RAID_MARKER_SORT_OFFSET_MS, yd, kFmt, joinNames, playerError, rezzedAt, debuffIntervals,
@@ -560,7 +567,7 @@ function detectFlood(players: PlayerInfo[], life: Life): PullError[] {
 
 // ── Fell Forces ─────────────────────────────────────────────────────────────
 
-function detectFellForces(players: PlayerInfo[], life: Life, enemyCasts: EnemyEvent[]): PullError[] {
+function detectFellForces(players: PlayerInfo[], life: Life, enemyCasts: EnemyEvent[], occurrences?: ReportedOccurrence[]): PullError[] {
   const errors: PullError[] = [];
   const casts = enemyCasts.filter((c) => FELL_FORCES_IDS.has(c.abilityId));
   for (const volley of clusterByTime(casts, (c) => c.timestamp, 500)) {
@@ -568,6 +575,12 @@ function detectFellForces(players: PlayerInfo[], life: Life, enemyCasts: EnemyEv
     const hits = [...FELL_FORCES_IDS].flatMap((id) => hitsIn(players, id, t - 300, t + 1500));
     const idsOf = (p: PlayerInfo) => new Set(hits.filter((h) => h.p === p).map((h) => h.e.abilityId));
     const aliveNow = players.filter((p) => life.alive(p, t - 200));
+    // Role-only (rule-meta exposure): the role stacks test the living
+    // non-tanks, the tank stack the living tanks.
+    occurrences?.push(
+      { mechanicKey: UK_FELL_MISSED_RULE_ID, timestamp: t, players: aliveNow.filter((p) => p.role !== "Tank").map((p) => p.name) },
+      { mechanicKey: UK_FELL_UNSHARED_RULE_ID, timestamp: t, players: aliveNow.filter((p) => p.role === "Tank").map((p) => p.name) },
+    );
     const roleName = (id: number) => (Object.keys(FELL_FORCES) as PlayerInfo["role"][]).find((r) => FELL_FORCES[r] === id)!.toLowerCase();
 
     // One player inside two role circles. When a role group is entirely dead
@@ -639,7 +652,7 @@ function lastPositionBefore(p: PlayerInfo, t: number): { x: number; y: number } 
   return ev ? { x: ev.x!, y: ev.y! } : undefined;
 }
 
-function detectOrchestra(players: PlayerInfo[], deaths: DeathEvent[], life: Life, enemyCasts: EnemyEvent[]): PullError[] {
+function detectOrchestra(players: PlayerInfo[], deaths: DeathEvent[], life: Life, enemyCasts: EnemyEvent[], occurrences?: ReportedOccurrence[]): PullError[] {
   const errors: PullError[] = [];
   for (const orch of enemyCasts.filter((c) => c.abilityId === ORCHESTRA_CAST)) {
     const T = orch.timestamp;
@@ -650,6 +663,18 @@ function detectOrchestra(players: PlayerInfo[], deaths: DeathEvent[], life: Life
     const carriers = [flareCarrier, holyCarrier].filter(Boolean) as PlayerInfo[];
     const tanks = players.filter((p) => p.role === "Tank");
     const bothTanksAlive = tanks.length >= 2 && tanks.filter((p) => life.alive(p, T)).length >= 2;
+    // Role-only (rule-meta exposure): enmity, the Flare carrier's survival
+    // and Chaotic Flare test the tanks; Holy and Flare Diffusion the
+    // non-tanks. Judged only with both tanks alive (else it's fallout).
+    if (bothTanksAlive) {
+      const tankNames = tanks.map((p) => p.name);
+      const partyNames = players.filter((p) => p.role !== "Tank" && life.alive(p, T)).map((p) => p.name);
+      occurrences?.push(
+        { mechanicKey: "dm-uk-orchestra-tank", timestamp: T, players: tankNames },
+        { mechanicKey: UK_CHAOTIC_FLARE_RULE_ID, timestamp: T, players: tankNames },
+        { mechanicKey: "dm-uk-orchestra-party", timestamp: T, players: partyNames },
+      );
+    }
     const nonTankCarriers = carriers.filter((p) => p.role !== "Tank");
     const clean = bothTanksAlive && carriers.length === 2 && nonTankCarriers.length === 0;
 
@@ -972,7 +997,9 @@ function detectForsakenGround(players: PlayerInfo[], life: Life, nullT: number):
  * Phase 5 (Ultimate Kefka) errors. Returns [] for pulls that never reach
  * Phase 5 (no completed Ultima Repeater cast).
  */
-export function detectUltimateKefkaErrors(players: PlayerInfo[], deathEvents: DeathEvent[], enemyCasts: EnemyEvent[]): PullError[] {
+export function detectUltimateKefkaErrors(
+  players: PlayerInfo[], deathEvents: DeathEvent[], enemyCasts: EnemyEvent[], occurrences?: ReportedOccurrence[],
+): PullError[] {
   const anchor = enemyCasts.find((c) => c.abilityId === ULTIMA_REPEATER_CAST);
   if (!anchor) return [];
   const life = buildLife(players, deathEvents);
@@ -981,8 +1008,8 @@ export function detectUltimateKefkaErrors(players: PlayerInfo[], deathEvents: De
 
   const errors = [
     ...detectFlood(players, life),
-    ...detectFellForces(players, life, enemyCasts),
-    ...detectOrchestra(players, deathEvents, life, enemyCasts),
+    ...detectFellForces(players, life, enemyCasts, occurrences),
+    ...detectOrchestra(players, deathEvents, life, enemyCasts, occurrences),
     ...detectCelestriad(players, life, enemyCasts),
     ...detectStray(players, deathEvents, life),
     ...detectForsakenGround(players, life, nullT),

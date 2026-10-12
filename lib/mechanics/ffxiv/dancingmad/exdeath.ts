@@ -5,6 +5,9 @@
 // tankbuster mis-targeting a bystander tank, and Shockwave's occasional
 // instant-kill bypass of its own Damage Down debuff.
 //
+// Exposure (docs/archive/exposure-plan.md): Thunder III is role-only
+// targeted — each mark cluster is a chance for the two tanks alone.
+//
 // ── THUNDER III (confirmed 2026-07-22, report VtdBqhLQkWJXMvDg) ────────────
 //
 // Thunder III (damage ability 47884) is a personal tankbuster. ~200-300ms
@@ -67,6 +70,7 @@
 import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { PullError } from "@/types/PullError";
 import type { DeathEvent } from "@/types/DeathEvent";
+import type { ReportedOccurrence } from "@/lib/mechanics/occurrences";
 
 export const THUNDER_III_WRONG_TANK_RULE_ID   = "ffxiv-exdeath-thunder3-wrong-tank";
 export const SHOCKWAVE_SILENT_KILL_RULE_ID    = "ffxiv-exdeath-shockwave-silent-kill";
@@ -107,7 +111,7 @@ const TANK_PERSONAL_MITIGATION_NAMES: Readonly<Record<string, readonly string[]>
   Gunbreaker: [],
 };
 
-function detectThunderIIIErrors(players: PlayerInfo[]): PullError[] {
+function detectThunderIIIErrors(players: PlayerInfo[], occurrences?: ReportedOccurrence[]): PullError[] {
   type Mark = { player: PlayerInfo; timestamp: number };
   const marks: Mark[] = [];
   for (const player of players) {
@@ -135,8 +139,12 @@ function detectThunderIIIErrors(players: PlayerInfo[]): PullError[] {
   }
 
   const errors: PullError[] = [];
+  // Role-only (user, 2026-10-11): only the tanks can fail a Thunder III,
+  // so each one is a chance for the two tanks alone.
+  const tankNames = players.filter((p) => p.role === "Tank").map((p) => p.name);
 
   for (const cluster of clusters) {
+    occurrences?.push({ mechanicKey: THUNDER_III_WRONG_TANK_RULE_ID, timestamp: cluster[0].timestamp, players: tankNames });
     const byPlayer = new Map<number, Mark>();
     for (const m of cluster) byPlayer.set(m.player.actorId, m);
     if (byPlayer.size < 2) continue; // the normal, single-target case
@@ -239,8 +247,8 @@ function detectShockwaveSilentKillErrors(players: PlayerInfo[], deathEvents: Dea
  * self-gating on the Thunder III marker debuff / a Shockwave killing blow
  * rather than an encounter-name check, so it's safe to always call.
  */
-export function detectExdeathErrors(players: PlayerInfo[], deathEvents: DeathEvent[]): PullError[] {
-  return [...detectThunderIIIErrors(players), ...detectShockwaveSilentKillErrors(players, deathEvents)].sort(
+export function detectExdeathErrors(players: PlayerInfo[], deathEvents: DeathEvent[], occurrences?: ReportedOccurrence[]): PullError[] {
+  return [...detectThunderIIIErrors(players, occurrences),...detectShockwaveSilentKillErrors(players, deathEvents)].sort(
     (a, b) => a.timestamp - b.timestamp
   );
 }

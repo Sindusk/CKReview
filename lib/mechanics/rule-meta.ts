@@ -29,7 +29,10 @@
 // player's chances in the Statics analysis:
 // - "everyone" (the default): every player in the pull, at every instance.
 // - "targeted": only the player(s) the log names at each instance (a
-//   debuff target, a bait, a cast's target), chosen by the game.
+//   debuff target, a bait, a cast's target), chosen by the game. Also a
+//   role-only mechanic, one only that role can fail (a tank swap, the
+//   non-tanks' side of a tankbuster): its instances name that role's
+//   players (user, 2026-10-11).
 // - "assigned": a job the raid lead could give to anyone (the fish
 //   carrier, a kick rotation, soakers). Shown in the Strategy dialog, not
 //   in the player ranking.
@@ -212,6 +215,8 @@ phase(3, [
   "ffxiv-exdeath-shockwave-silent-kill",
   "ffxiv-exdeath-thunder3-wrong-tank",
 ]);
+// Role-only: only the tanks can fail Thunder III (exdeath.ts).
+exposure("targeted", ["ffxiv-exdeath-thunder3-wrong-tank"]);
 
 // P4: Kefka Says (kefka-says.ts) — each instruction is its own mechanic.
 phase(4, [
@@ -233,11 +238,13 @@ mechanic("dm-uk-choice", "Choice", 5, [
   "ffxiv-uk-choice",
   "ffxiv-uk-choice-group",
 ]);
-mechanic("dm-uk-fell-forces", "Fell Forces", 5, [
-  "ffxiv-uk-fell-forces-missed",
-  "ffxiv-uk-fell-forces-overlap",
-  "ffxiv-uk-fell-forces-unshared",
-]);
+// Role-only splits (ultimate-kefka.ts reports the instances): the role
+// stacks test the non-tanks, the tank stack the tanks; an overlap can be
+// anyone's.
+mechanic("dm-uk-fell-forces", "Fell Forces", 5, ["ffxiv-uk-fell-forces-overlap"]);
+mechanic("ffxiv-uk-fell-forces-missed", "Fell Forces: role stack", 5, ["ffxiv-uk-fell-forces-missed"]);
+mechanic("ffxiv-uk-fell-forces-unshared", "Fell Forces: tank stack", 5, ["ffxiv-uk-fell-forces-unshared"]);
+exposure("targeted", ["ffxiv-uk-fell-forces-missed", "ffxiv-uk-fell-forces-unshared"]);
 mechanic("dm-uk-flood", "Flood", 5, [
   "ffxiv-uk-flood-group",
   "ffxiv-uk-flood-line",
@@ -246,12 +253,21 @@ mechanic("dm-uk-forsaken", "Forsaken (P5)", 5, [
   "ffxiv-uk-forsaken-ground",
   "ffxiv-uk-forsaken-null",
 ]);
-mechanic("dm-uk-orchestra", "Orchestra", 5, [
-  "ffxiv-uk-orchestra-diffusion",
+// Role-only splits as for Fell Forces: tank duties, the non-tanks' Holy
+// and Diffusion, and the Flare overlap anyone can walk into.
+mechanic("dm-uk-orchestra", "Orchestra", 5, ["ffxiv-uk-orchestra-flare-overlap"]);
+mechanic("dm-uk-orchestra-tank", "Orchestra: tanks", 5, [
   "ffxiv-uk-orchestra-early-flare",
   "ffxiv-uk-orchestra-enmity",
-  "ffxiv-uk-orchestra-flare-overlap",
+]);
+mechanic("dm-uk-orchestra-party", "Orchestra: Holy and Diffusion", 5, [
+  "ffxiv-uk-orchestra-diffusion",
   "ffxiv-uk-orchestra-holy",
+]);
+exposure("targeted", [
+  "ffxiv-uk-orchestra-early-flare", "ffxiv-uk-orchestra-enmity",
+  "ffxiv-uk-orchestra-diffusion", "ffxiv-uk-orchestra-holy",
+  "ffxiv-uk-chaotic-flare",
 ]);
 mechanic("dm-uk-towers", "Towers (P5)", 5, [
   "ffxiv-uk-tower-missed",
