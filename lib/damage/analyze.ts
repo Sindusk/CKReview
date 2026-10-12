@@ -60,12 +60,12 @@ export function analyzePullDamage(pull: Pull, game: DamageGame, context?: Damage
     }));
   const decidingSegment = segments.find((sgm) => context?.phases[sgm.phase]?.decidesEnrage);
 
-  // Only mechanics the boss's damage context names: WoW pulls also carry
-  // the instances of targeted/assigned mechanics (lib/mechanics/
-  // occurrences.ts), which aren't damage context.
+  // Only the boss's own anchored mechanics, which its damage context names:
+  // pulls also carry the per-player instances of targeted/assigned
+  // mechanics (lib/mechanics/occurrences.ts), which aren't damage context.
   const mechanicAround = (startMs: number, end: number): string | undefined => {
     const occ = (pull.mechanicOccurrences ?? [])
-      .filter((o) => o.timestamp >= startMs - MECHANIC_LOOKBACK_MS && o.timestamp <= end && context?.mechanicLabel?.(o.mechanicKey))
+      .filter((o) => o.timestamp >= startMs - MECHANIC_LOOKBACK_MS && o.timestamp <= end && !o.players && context?.mechanicLabel?.(o.mechanicKey))
       .sort((a, b) => b.timestamp - a.timestamp)[0];
     if (!occ) return undefined;
     return context?.mechanicLabel?.(occ.mechanicKey);

@@ -1217,6 +1217,7 @@
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import type { PullError, EnemyEvent } from "@/types/PullError";
 import type { DeathEvent } from "@/types/DeathEvent";
+import type { ReportedOccurrence } from "@/lib/mechanics/occurrences";
 import { distanceBetween, distanceFromCenter, ARENA_CENTER, compassBearingOf, angularDistance } from "@/lib/mechanics/geometry";
 import { interpolatePlayerPosition, findPlayerPosition } from "@/lib/mechanics/player-position";
 import { detectFFRoles, type FFRoleSlot } from "@/lib/mechanics/ffxiv/roles";
@@ -2696,7 +2697,7 @@ const GRAVEN_2_SPREAD_RESOLUTION_GAP_MS = 5000;
  * far enough apart. Pure outcome/overlap check — see module header for why
  * this doesn't need the still-unconfirmed exact spread positions.
  */
-function detectGraven2SpreadMisplacedErrors(players: PlayerInfo[]): PullError[] {
+function detectGraven2SpreadMisplacedErrors(players: PlayerInfo[], occurrences?: ReportedOccurrence[]): PullError[] {
   type Hit = { player: PlayerInfo; timestamp: number; sourceInstance: number | undefined };
   const hits: Hit[] = [];
   for (const player of players) {
@@ -2728,6 +2729,12 @@ function detectGraven2SpreadMisplacedErrors(players: PlayerInfo[]): PullError[] 
     const isLegitimateSpreader = supportCount >= dpsCount
       ? (p: PlayerInfo) => p.role !== "DPS"
       : (p: PlayerInfo) => p.role === "DPS";
+    // Each resolution tests only the spreading role category's players
+    // (rule-meta exposure; the puddle-proximity rule shares this key).
+    occurrences?.push({
+      mechanicKey: "dm-graven-2-spread", timestamp: start,
+      players: [...new Set(resolutionHits.filter((h) => isLegitimateSpreader(h.player)).map((h) => h.player.name))],
+    });
 
     const byInstance = new Map<number, Hit[]>();
     for (const h of resolutionHits) {
@@ -3793,7 +3800,7 @@ function detectConfettiKnockbackVictimErrors(players: PlayerInfo[]): PullError[]
  * Runs once per resolution instance (see collectConfettiResolutions — a
  * long pull can have more than one).
  */
-function detectConfettiHolderMisplacedErrors(players: PlayerInfo[]): PullError[] {
+function detectConfettiHolderMisplacedErrors(players: PlayerInfo[], occurrences?: ReportedOccurrence[]): PullError[] {
   const errors: PullError[] = [];
 
   // Only the FIRST resolution's due-west/due-east axis is confirmed (see
@@ -3810,6 +3817,11 @@ function detectConfettiHolderMisplacedErrors(players: PlayerInfo[]): PullError[]
 
     const snapshotTime = confettiSnapshotTime(players, holders[0].timestamp);
     if (snapshotTime === undefined) continue;
+    // A judged resolution tests only its two holders (rule-meta exposure).
+    occurrences?.push({
+      mechanicKey: "dm-confetti-holder", timestamp: holders[0].timestamp,
+      players: [...new Set(holders.map((h) => h.player.name))],
+    });
 
     for (const { player } of holders) {
       const pos = interpolatePlayerPosition(player, snapshotTime, {
@@ -4639,11 +4651,13 @@ function detectTeleTrouncingBaitPositionErrors(players: PlayerInfo[], enemyCasts
 export function detectPhase1Errors(
   players:     PlayerInfo[],
   deathEvents: DeathEvent[],
-  enemyCasts:  EnemyEvent[] = []
+  enemyCasts:  EnemyEvent[] = [],
+  /** Sink for the targeted instances (Confetti holders, Graven 2 spreaders). */
+  occurrences?: ReportedOccurrence[],
 ): PullError[] {
   const blizzardIIISilentKillErrors = detectBlizzardIIIBlowoutSilentKillErrors(players, deathEvents);
   const revoltingRuinThreatLossErrors = detectRevoltingRuinThreatLossErrors(players, deathEvents);
-  const graven2SpreadMisplacedErrors = detectGraven2SpreadMisplacedErrors(players);
+  const graven2SpreadMisplacedErrors = detectGraven2SpreadMisplacedErrors(players, occurrences);
   const graven2PuddleSoakMissedErrors = detectGraven2PuddleSoakMissedErrors(players, deathEvents);
   const waveCannonTowerOverlapErrors = detectWaveCannonTowerOverlapErrors(players, deathEvents);
 
@@ -4669,7 +4683,7 @@ export function detectPhase1Errors(
     ...detectGraven2DeathWipeError(players, deathEvents, enemyCasts, [...graven2SpreadMisplacedErrors, ...graven2PuddleSoakMissedErrors]),
     ...detectConfettiLostError(players, deathEvents),
     ...detectConfettiKnockbackVictimErrors(players),
-    ...detectConfettiHolderMisplacedErrors(players),
+    ...detectConfettiHolderMisplacedErrors(players, occurrences),
     ...detectConfettiGroupMisplacedErrors(players),
     ...detectConfettiFinalPositionMisplacedErrors(players),
     ...detectTeleTrouncingArrowErrors(players),

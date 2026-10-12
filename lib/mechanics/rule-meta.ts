@@ -103,10 +103,15 @@ mechanic("dm-graven-2", "Graven Image 2", 1, [
   "ffxiv-phase1-graven2-death-wipe",
   "ffxiv-phase1-graven2-puddle-linger",
   "ffxiv-phase1-graven2-puddle-placement",
-  "ffxiv-phase1-graven2-puddle-proximity",
   "ffxiv-phase1-graven2-puddle-soak-missed",
+]);
+// Only the spreading role category (random per pull) is tested by these
+// (phase1.ts detectGraven2SpreadMisplacedErrors reports the instances).
+mechanic("dm-graven-2-spread", "Graven Image 2: spread", 1, [
+  "ffxiv-phase1-graven2-puddle-proximity",
   "ffxiv-phase1-graven2-spread-misplaced",
 ]);
+exposure("targeted", ["ffxiv-phase1-graven2-puddle-proximity", "ffxiv-phase1-graven2-spread-misplaced"]);
 mechanic("dm-graven-3", "Graven Image 3", 1, [
   "ffxiv-phase1-graven3-stack-missed",
 ]);
@@ -118,10 +123,13 @@ mechanic("dm-tele-trouncing", "Tele-Trouncing", 1, [
 mechanic("dm-confetti", "Confetti", 1, [
   "ffxiv-phase1-confetti-final-position-misplaced",
   "ffxiv-phase1-confetti-group-misplaced",
-  "ffxiv-phase1-confetti-holder-misplaced",
   "ffxiv-phase1-confetti-knockback-victim-misplaced",
   "ffxiv-phase1-confetti-lost",
 ]);
+// The first resolution's two debuff holders (phase1.ts
+// detectConfettiHolderMisplacedErrors reports the instances).
+mechanic("dm-confetti-holder", "Confetti holder", 1, ["ffxiv-phase1-confetti-holder-misplaced"]);
+exposure("targeted", ["ffxiv-phase1-confetti-holder-misplaced"]);
 mechanic("dm-wave-cannon", "Wave Cannon", 1, [
   "ffxiv-phase1-wave-cannon-out-of-position",
   "ffxiv-phase1-wave-cannon-tower-missed",
