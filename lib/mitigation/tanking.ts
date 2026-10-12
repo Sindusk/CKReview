@@ -49,13 +49,21 @@
 // Superbolide need afterwards is the healers' implicit job); fail when the
 // tank died to it (not vulnerable) or the margin is below 0; under below
 // TANK_MARGIN_UNDER; good below TANK_MARGIN_OVER; over above. A buster's
-// verdict and margin are its worst non-invulnerable tank's.
+// verdict and margin are its worst non-invulnerable tank's. A margin below
+// 0 is a fail even when healers kept the tank alive (user, 2026-10-11:
+// the plan must survive the follow-up without healing).
+//
+// ── Across pulls (aggregateBusters) ────────────────────────────────────
+// Matched by MitigationHit.id: median and worst margin over the pulls not
+// taken under an invuln, the most common kind, and `rare` (BUSTER_MIN_PULLS)
+// for tank-only hits that landed on a tank by accident.
 
 import type { Pull } from "@/types/Pull";
 import type { PlayerEvent, PlayerInfo } from "@/types/PlayerInfo";
 import type { HitVerdict, MitigationGame, MitigationHit } from "./types";
 import { rawOf, trailingInvulnAt } from "./analyze";
 import { busterLabel } from "./buster-kinds";
+import { RARE_SHARE } from "./aggregate";
 
 export const FOLLOW_UP_MS = 10_000;  // user
 // Tunables: chosen by the builder, not yet confirmed (docs/open-items.md).
@@ -278,7 +286,15 @@ export function tankVerdict(margin: number, died: boolean): HitVerdict {
 
 // ── Across pulls ───────────────────────────────────────────────────────
 
-export type PullTankingRef = { pullId: number; pullNumber: number; tanking: PullTanking };
+export type PullTankingRef = { pullId: number | string; pullNumber: number; durationMs: number; tanking: PullTanking };
+
+// A tank-only hit seen in fewer than BUSTER_MIN_PULLS pulls, when at least
+// that many pulls lasted until it and it landed in under RARE_SHARE of
+// them (aggregate.ts), hit a tank by accident (Flame Floater, Steam Burst,
+// Xtreme Wave): not a buster to plan (user, 2026-10-11). A late buster
+// only the best pulls reach is kept (Vamp's third Hardcore: 1 of 3; the
+// other two lost it to a non-tank after the OT died).
+export const BUSTER_MIN_PULLS = 3;
 
 export type AggregatedBuster = {
   id:          string;
@@ -293,7 +309,9 @@ export type AggregatedBuster = {
   worstMargin?:  number;
   invulnPulls: number;
   verdict:     TankVerdict;         // by the median margin; invuln when most pulls were
-  byPull:      { pullId: number; pullNumber: number; buster: Buster }[];
+  reached:     number;              // pulls still going at its earliest time
+  rare:        boolean;             // see BUSTER_MIN_PULLS
+  byPull:      { pullId: number | string; pullNumber: number; buster: Buster }[];
 };
 
 /** Busters matched across pulls by id, with the solo upgrade for unlabelled abilities. */
@@ -315,7 +333,7 @@ export function aggregateBusters(perPull: PullTankingRef[]): AggregatedBuster[] 
     const buster = kind === b.kind ? b : { ...b, kind };
     const row = rows.get(b.id) ?? {
       id: b.id, abilityName: b.abilityName, occurrence: b.occurrence, phase: b.phase, medianMs: 0, pulls: 0,
-      kind, kinds: {}, invulnPulls: 0, verdict: "good" as TankVerdict, byPull: [],
+      kind, kinds: {}, invulnPulls: 0, verdict: "good" as TankVerdict, reached: 0, rare: false, byPull: [],
     };
     row.byPull.push({ pullId: p.pullId, pullNumber: p.pullNumber, buster });
     row.kinds[kind] = (row.kinds[kind] ?? 0) + 1;
@@ -324,6 +342,9 @@ export function aggregateBusters(perPull: PullTankingRef[]): AggregatedBuster[] 
   for (const row of rows.values()) {
     row.pulls = row.byPull.length;
     row.medianMs = median(row.byPull.map((x) => x.buster.timestampMs));
+    const earliest = Math.min(...row.byPull.map((x) => x.buster.timestampMs));
+    row.reached = perPull.filter((p) => p.durationMs >= earliest).length;
+    row.rare = row.pulls < BUSTER_MIN_PULLS && row.reached >= BUSTER_MIN_PULLS && row.pulls < RARE_SHARE * row.reached;
     row.kind = Object.entries(row.kinds).sort((a, b) => b[1] - a[1])[0][0] as BusterKind;
     const margins = row.byPull.map((x) => x.buster.margin).filter((m): m is number => m !== undefined);
     row.invulnPulls = row.byPull.length - margins.length;

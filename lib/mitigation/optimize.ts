@@ -162,6 +162,11 @@ export type OptimizerProblem = {
   beamWidth?:  number;
 };
 
+/** An added shield's size on a target: exact for one sized by max HP, else the median-absorb estimate (0 if none). */
+export function shieldSize(problem: OptimizerProblem, entry: CatalogEntry, targetMaxHealth: number): number {
+  return entry.shieldPctMaxHp !== undefined ? entry.shieldPctMaxHp * targetMaxHealth : problem.shieldSizes.get(entry.key) ?? 0;
+}
+
 /** Median per-target absorb of each shield entry over every hit given; none for a shield never seen absorbing. */
 export function medianShieldSizes(hitLists: MitigationHit[][], game: MitigationGame): Map<string, number> {
   const amounts = new Map<string, number[]>();
@@ -325,7 +330,7 @@ function estimateHit(problem: OptimizerProblem, ctx: PullCtx, hit: MitigationHit
     const adds: AddedMitigation[] = added
       .filter((a) => a.entry.reach === "party" || (a.entry.reach === "self" ? a.player === t.player : t === lowest))
       .map((a) => ({
-        entry: a.entry, shield: problem.shieldSizes.get(a.entry.key) ?? 0,
+        entry: a.entry, shield: shieldSize(problem, a.entry, t.maxHealth),
         applies: (part) => reachesPart(problem.reach, a.entry, a.player, part, hit),
       }));
     const d = targetDelta(problem, t, removed, adds, hit);

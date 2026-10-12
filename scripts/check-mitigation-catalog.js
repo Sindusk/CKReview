@@ -35,6 +35,8 @@ const castTimes = new Map();    // `${code}|${fight}|${source}|${actionId}` -> [
 const multGroups = new Map();   // statusKey -> { n, bad, examples }
 let multHits = 0, multBad = 0;
 const implied2 = new Map();     // `${status} ${col}` -> { expected, bins: factor(0.05 steps) -> n }
+const shieldOpen = new Map();   // `${code}|${fight}|${target}|${source}|${status}` -> current application
+const shieldApps = new Map();   // status id -> [{ total, max }]
 
 for (const dir of dirs) {
   const code = path.basename(dir);
@@ -54,6 +56,19 @@ for (const dir of dirs) {
     }
     for (const e of r.healing.data) {
       if (e.type === 'absorbed' && STATUS.has(e.abilityGameID)) seenStatus.set(e.abilityGameID, abil.get(e.abilityGameID)?.name);
+      // One application's absorbs: the same shield, caster and target
+      // within the entry's duration (+1s) of the first.
+      if (e.type !== 'absorbed' || !STATUS.get(e.abilityGameID)?.status.shield || !e.targetResources?.maxHitPoints) continue;
+      const s = STATUS.get(e.abilityGameID);
+      const k = `${code}|${fight}|${e.targetID}|${e.sourceID}|${e.abilityGameID}`;
+      const open = shieldOpen.get(k);
+      if (open && e.timestamp - open.start <= s.entry.durationMs + 1000) {
+        open.total += e.amount;
+        continue;
+      }
+      const app = { start: e.timestamp, total: e.amount, max: e.targetResources.maxHitPoints };
+      shieldOpen.set(k, app);
+      (shieldApps.get(e.abilityGameID) || shieldApps.set(e.abilityGameID, []).get(e.abilityGameID)).push(app);
     }
     for (const e of r.damageTaken.data) {
       const ids = (e.buffs || '').split('.').filter(Boolean).map(Number);
@@ -144,4 +159,23 @@ for (const entry of CATALOG) {
   const flag = entry.gated ? `  (gated: ${entry.gated})`
     : gap < entry.cooldownMs - 1000 ? '  <-- shorter than catalog cooldown' : '';
   console.log(`  ${entry.key}: catalog ${entry.cooldownMs / 1000}s, shortest seen ${(gap / 1000).toFixed(1)}s${flag}`);
+}
+
+// A shield scaling with the target's max HP (The Blackest Night: 25%)
+// tops out at the same % on every target; a potency-based one doesn't.
+console.log('\n== 4. Shield size per application, % of the target\'s max HP (catalog shieldPctMaxHp in brackets)');
+for (const [id, apps] of [...shieldApps].sort((a, b) => STATUS.get(a[0]).entry.key.localeCompare(STATUS.get(b[0]).entry.key))) {
+  const s = STATUS.get(id);
+  const pcts = apps.map((a) => a.total / a.max).sort((a, b) => a - b);
+  const top = pcts[pcts.length - 1];
+  const atTop = pcts.filter((p) => p >= top - 0.01).length;
+  const med = pcts[Math.floor(pcts.length / 2)];
+  // The most common size (0.5pt bins): a fully consumed HP-scaled shield.
+  const bins = new Map();
+  for (const p of pcts) { const b = Math.round(p * 200) / 200; bins.set(b, (bins.get(b) || 0) + 1); }
+  const [mode, modeN] = [...bins].sort((a, b) => b[1] - a[1])[0];
+  const cat = s.entry.shieldPctMaxHp;
+  const flag = cat === undefined ? '' : Math.abs(cat - mode) <= 0.005 ? '  ok' : '  <-- differs from catalog';
+  console.log(`  ${s.entry.key} / ${s.status.name}(${id}) [${cat === undefined ? '-' : `${Math.round(cat * 100)}%`}]: n=${pcts.length} ` +
+    `most common ${(mode * 100).toFixed(1)}% (${Math.round(100 * modeN / pcts.length)}%) max ${(top * 100).toFixed(1)}% (${atTop} within 1pt) median ${(med * 100).toFixed(1)}%${flag}`);
 }

@@ -51,6 +51,10 @@ export type CatalogEntry = {
   // after Living Dead triggers) never shows in a damage event's `buffs`,
   // so a hit taking the tank to 0 HP then looked like a failed buster.
   trailingInvulnMs?: number;
+  // A shield sized as a share of the TARGET's max HP (The Blackest Night:
+  // 0.25), so an added one has an exact size instead of the median-absorb
+  // estimate. Checked by scripts/check-mitigation-catalog.js section 4.
+  shieldPctMaxHp?: number;
   // false: recognized on hits (so the math stays right) but never shown as
   // a column, graded for availability or offered as droppable. For things
   // the group doesn't plan as mitigation (Astrologian cards, per the user).

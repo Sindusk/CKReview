@@ -30,6 +30,12 @@
 //     Plenary Indulgence (status "Confession") are heals, not mitigation,
 //     and are left out, as are Second Wind and Bloodbath.
 //
+// Shield sizes (check script section 4, 2026-10-11): only The Blackest
+// Night scales with the target's max HP, 25.0% on 92% of 1,430
+// applications (the rest partly consumed). Guardian's Will, Stem the Tide
+// and Brutal Shell are heal-potency barriers (Guardian's Will 20-24%,
+// varying with healing buffs), so they keep the median-absorb estimate.
+//
 // Damage type matters: `physical` and `magical` are kept separate (Feint
 // 10% physical / 5% magical, Addle the reverse). Unaspected hits (FFLogs
 // ability type 32) ignore % mitigation entirely; only shields apply.
@@ -105,7 +111,7 @@ export const FFXIV_MITIGATION_CATALOG: CatalogEntry[] = [
     kind: "personal", reach: "self", durationMs: 15_000, cooldownMs: 120_000, verified: true },
   { key: "the-blackest-night", name: "The Blackest Night", jobs: ["Dark Knight"], actionIds: [7393],
     statuses: [shield(1001178, "Blackest Night")],
-    kind: "shield", reach: "target", durationMs: 7_000, cooldownMs: 15_000, gated: "MP", verified: true },
+    kind: "shield", reach: "target", durationMs: 7_000, cooldownMs: 15_000, gated: "MP", shieldPctMaxHp: 0.25, verified: true },
   { key: "oblation", name: "Oblation", jobs: ["Dark Knight"], actionIds: [25754], statuses: [pct(1002682, "Oblation", 0.10)],
     kind: "personal", reach: "target", durationMs: 10_000, cooldownMs: 60_000, charges: 2, verified: true },
   { key: "living-dead", name: "Living Dead", jobs: ["Dark Knight"], actionIds: [3638],

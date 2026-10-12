@@ -659,7 +659,7 @@ MECHANICS['mitigation-analysis'] = {
     // The Tanking view (lib/mitigation/tanking.ts): who held the boss, and
     // each buster per pull (kind, per-tank margin from full HP after the
     // follow-up, logged HP before, invuln), then matched across pulls.
-    const tankingPulls = perPull.map((p) => ({ pullId: p.pullId, pullNumber: p.pullNumber,
+    const tankingPulls = perPull.map((p) => ({ pullId: p.pullId, pullNumber: p.pullNumber, durationMs: p.durationMs,
       tanking: mod.analyzePullTanking(p.pull, p.hits, mod.FFXIV_MITIGATION) }));
     console.log(`  TANKING (margin = from full HP, buster + ${mod.FOLLOW_UP_MS / 1000}s follow-up, no healing; [before] = logged HP before)`);
     for (const { pullNumber, tanking } of tankingPulls) {
@@ -679,7 +679,7 @@ MECHANICS['mitigation-analysis'] = {
       const kinds = Object.entries(a.kinds).map(([k, n]) => `${k} ${n}`).join(', ');
       console.log(`    ALL ${mmss(a.medianMs)} ${a.abilityName} #${a.occurrence} pulls=${a.pulls} kind=${a.kind} (${kinds}) ` +
         `median=${a.medianMargin === undefined ? '-' : pctOf(a.medianMargin)} worst=${a.worstMargin === undefined ? '-' : pctOf(a.worstMargin)} ` +
-        `invuln=${a.invulnPulls} ${a.verdict.toUpperCase()}`);
+        `invuln=${a.invulnPulls} ${a.verdict.toUpperCase()}${a.rare ? ` RARE (${a.pulls}/${a.reached})` : ''}`);
     }
     if (perPull.length >= mod.PLAN_MIN_PULLS) {
       const window = mod.planWindow(perPull);
