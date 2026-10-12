@@ -204,6 +204,16 @@ export const ERROR_RULES: PullErrorRule[] = [
       46136,   // Explosion (spent comet)
       46145, 46146, 46165,                                   // Majestic Meteor / Meteorain / Stampede Meteor
       46164,   // Atomic Impact
+      // Lindwurm (M12S P1): lindwurm-1.ts owns these.
+      46239,   // Burst
+      46238, 46262,                                          // Phagocyte Spotlight
+      46261,   // Dramatic Lysis (Unbreakable chain still short)
+      46398,   // Skinsplitter
+      46243, 46240,                                          // Grand Entrance
+      46244, 46245, 46246,                                   // Bring Down the House
+      46237,   // Ravenous Reach
+      46253,   // Cell Death
+      47548,   // Serpentine Scourge
       // Futures Rewritten P1: fatebreaker.ts owns these.
       40146,   // Cyclonic Break follow-up cones
       40157,   // Blasting Zone

@@ -304,6 +304,14 @@ const MECHANICS = {
     },
   },
 
+  lindwurm: {
+    game: 'ff',
+    load: () => requireTsFromRoot('lib/mechanics/ffxiv/arcadion/lindwurm-1.ts'),
+    run({ mod, ctxs }) {
+      for (const c of ctxs) printPullErrors(c, mod.detectLindwurmErrors(c.relPlayers(), c.relDeaths(), c.relEnemyCasts()));
+    },
+  },
+
   fatebreaker: {
     game: 'ff',
     load: () => requireTsFromRoot('lib/mechanics/ffxiv/fru/fatebreaker.ts'),

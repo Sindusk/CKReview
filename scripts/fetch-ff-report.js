@@ -17,6 +17,8 @@
 //   --out <dir>      Output directory (default: sampledata/ff/<reportCode>)
 //   --fight <id>     Restrict to this FFLogs fight id — repeatable
 //   --boss <name>    Restrict to fights whose name contains this (case-insensitive)
+//   --boss-exact <name> Only fights named exactly this (case-insensitive), e.g.
+//                    "Lindwurm" without "Lindwurm II"
 //   --creds <path>   Credentials file (default: .credentials/ffl-token.json)
 //   --min-minutes <n>  Only fights lasting at least n minutes (late-phase work)
 //   --from-minutes <n> Start the bulky event streams n minutes into each fight.
@@ -42,13 +44,14 @@ const { slimFflReport } = require('./lib/slim-report');
 const { killsFirst, withRateLimitWait, writeAtomic } = require('./lib/fetch-plan');
 
 function parseArgs(argv) {
-  const args = { fights: [], out: null, boss: null, creds: null, minMinutes: 0, fromMinutes: 0, toMinutes: 0, refetch: false };
+  const args = { fights: [], out: null, boss: null, bossExact: null, creds: null, minMinutes: 0, fromMinutes: 0, toMinutes: 0, refetch: false };
   let reportCode = null;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--out') args.out = argv[++i];
     else if (a === '--fight') args.fights.push(Number(argv[++i]));
     else if (a === '--boss') args.boss = argv[++i];
+    else if (a === '--boss-exact') args.bossExact = argv[++i];
     else if (a === '--creds') args.creds = argv[++i];
     else if (a === '--min-minutes') args.minMinutes = Number(argv[++i]);
     else if (a === '--from-minutes') args.fromMinutes = Number(argv[++i]);
@@ -59,7 +62,7 @@ function parseArgs(argv) {
   }
   if (!reportCode) {
     throw new Error(
-      'Usage: node scripts/fetch-ff-report.js <reportCode> [--out dir] [--fight id]... [--boss name] [--creds path] ' +
+      'Usage: node scripts/fetch-ff-report.js <reportCode> [--out dir] [--fight id]... [--boss name] [--boss-exact name] [--creds path] ' +
       '[--min-minutes n] [--from-minutes n] [--to-minutes n] [--refetch]'
     );
   }
@@ -76,7 +79,7 @@ function extractReportCode(input) {
 }
 
 async function main() {
-  const { reportCode, out, fights, boss, creds, minMinutes, fromMinutes, toMinutes, refetch } = parseArgs(process.argv.slice(2));
+  const { reportCode, out, fights, boss, bossExact, creds, minMinutes, fromMinutes, toMinutes, refetch } = parseArgs(process.argv.slice(2));
   const outDir    = out   ? path.resolve(out)   : path.join(ROOT, 'sampledata', 'ff', reportCode);
   const credsPath = creds ? path.resolve(creds) : path.join(ROOT, '.credentials', 'ffl-token.json');
 
@@ -109,6 +112,7 @@ async function main() {
   let targetFights = killsFirst(report.fights.filter((f) => f.endTime > f.startTime));
   if (fights.length > 0) targetFights = targetFights.filter((f) => fights.includes(f.id));
   if (boss) targetFights = targetFights.filter((f) => (f.name ?? '').toLowerCase().includes(boss.toLowerCase()));
+  if (bossExact) targetFights = targetFights.filter((f) => (f.name ?? '').toLowerCase() === bossExact.toLowerCase());
   if (minMinutes > 0) targetFights = targetFights.filter((f) => f.endTime - f.startTime >= minMinutes * 60000);
 
   if (targetFights.length === 0) {

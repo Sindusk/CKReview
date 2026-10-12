@@ -71,6 +71,7 @@ import { detectUltimateKefkaErrors } from "./mechanics/ffxiv/dancingmad/ultimate
 import { detectVampFataleErrors } from "./mechanics/ffxiv/arcadion/vamp-fatale";
 import { detectRedHotDeepBlueErrors } from "./mechanics/ffxiv/arcadion/red-hot-deep-blue";
 import { detectTyrantErrors } from "./mechanics/ffxiv/arcadion/tyrant";
+import { detectLindwurmErrors } from "./mechanics/ffxiv/arcadion/lindwurm-1";
 import { detectFatebreakerErrors } from "./mechanics/ffxiv/fru/fatebreaker";
 import { detectUsurperOfFrostErrors, type HeadMarker } from "./mechanics/ffxiv/fru/usurper-of-frost";
 import { detectOracleOfDarknessErrors } from "./mechanics/ffxiv/fru/oracle-of-darkness";
@@ -1658,6 +1659,7 @@ export function transformFFightToPull(
     ...detectVampFataleErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
     ...detectRedHotDeepBlueErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
     ...detectTyrantErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
+    ...detectLindwurmErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
     ...detectFatebreakerErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
     ...detectUsurperOfFrostErrors(players, deathEvents, enemyCastEvents, headMarkers, reportedOccurrences),
     ...detectOracleOfDarknessErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),

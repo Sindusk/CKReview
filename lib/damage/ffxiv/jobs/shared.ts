@@ -532,6 +532,9 @@ export function dotFindings(ctx: PlayerCheckContext, spec: DotSpec): DamageFindi
   for (const o of open.values()) windows.push({ startMs: o.start, endMs: Math.min(ctx.endMs, o.lastApply + spec.durationMs) });
 
   const active = mergeWindows(windows);
+  // Only removals in range (a checkpoint-resume pull that starts with the
+  // DoT already ticking, H9fnVZgPA3krpCzY fight 4): no window to judge.
+  if (!active.length) return out;
   const forced = mergeWindows(ctx.forced);
   const grace = ctx.baseGcdMs + 1_000;
   let cursor = active[0].startMs;

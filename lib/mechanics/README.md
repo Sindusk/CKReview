@@ -76,6 +76,12 @@ lib/mechanics/
                                 overlapping personal baits, short stacks, Raw
                                 Steel busters, Meteorain comets/fireballs,
                                 towers, Stampede fire/lava, falls, kicks, enrage)
+      lindwurm-1.ts           — Lindwurm (M12S door boss) per-pull rules (Damage
+                                Down hits, Act 1 cones, orb/spread/chain overlaps,
+                                Fusion stacks, Visceral Burst, Act 2 Unbreakable
+                                chains and In Line towers, Metamitosis towers,
+                                falls, Refreshing Overkill enrage)
+      lindwurm-2.ts           — Lindwurm II research model only (no detector)
   wow/
     registry.ts               — THE list of per-pull WoW modules; the app and
                                 validate.js both run it (a new boss = one line)
@@ -647,6 +653,25 @@ The same principles apply when refining any module:
 - **Carrier identity from cast targets, not hit counts.** Atomic Impact's
   puddles chained through the group (six players with 3+ hits); the casts
   name exactly the two carriers.
+
+### Lessons from Lindwurm (M12S P1: 108 pulls over three reports, two kills)
+
+- **Fetch one fight name exactly.** `--boss Lindwurm` also matched
+  "Lindwurm II"; `fetch-ff-report.js --boss-exact Lindwurm` takes only P1.
+- **A numbered debuff can be the assignment.** Act 2's In Line I-IV plus
+  the alpha/beta chain debuff fix which tower each player soaks, so an
+  empty tower names its owner with no positions or raid plan. Check the
+  tower kind matches its slot first: after a death the order shifts.
+- **A cast target isn't always the owner.** Mortal Slayer's and the
+  Scourges' targets are the baits, but a Hemorrhagic Projection cone that
+  hit someone names the victim; the cone's owner is the player standing on
+  the cast's position.
+- **Instance numbers can repeat within a second.** Curtain Call's four
+  chain breaks, 0.3s apart, reuse explosion instances; a 1.5s resolution
+  merged them into false overlaps. Cluster such families tightly.
+- **Checkpoint stubs share the fight name.** A Lindwurm II checkpoint
+  resume is logged as "Lindwurm" (Refreshing Overkill at +0:01). The
+  signature gate skips it.
 
 ### Lessons from Fatebreaker (FRU P1: 197 pulls over three reports, 18 P1 clears)
 

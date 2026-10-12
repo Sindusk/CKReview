@@ -1,9 +1,140 @@
 // lib/mechanics/ffxiv/arcadion/lindwurm-1.ts
 //
+// Lindwurm (M12S door boss) per-pull rules. Entry point: detectLindwurmErrors.
+// Self-gates on the boss's signature casts. FFLogs logs Lindwurm II as its
+// own fight ("Lindwurm II"), which stays on the fallback model.
+//
+// -- VERIFIED AGAINST LOGS (2026-10-12) --
+// Week-2 progression of several roster configurations testing different
+// strategies (user: "will likely not follow the strategy perfectly"), so
+// rules judge outcomes, not the selected plan's spots. 108 pulls, cited as
+// A23 +2:33 (report letter, pull, mm:ss from pull start):
+//   A = QwNrFkGZ4m1yKpXC (90 wipes, furthest 7:01),
+//   B = H9fnVZgPA3krpCzY (first kill B3, 7:17; 4 enrages),
+//   C = vFY7kHVWK19ZQ24A (kill C1, 7:13).
+// B4 and C2 are Lindwurm II checkpoint stubs logged under this fight's name
+// (Refreshing Overkill at +0:01, then a reset): no signature cast, no errors.
+// Slots (user): roles.ts as-is. The Act 2 alpha/beta split was NOT by role
+// in report A, so it is read from the Bonds debuffs, never from roles.
+//
+// Clock (both kills, every pull within ~1s): Fixer +0:16, Mortal Slayer
+// orbs +0:41/44/47/50, Act 1 +1:10 (spotlights +1:18..+1:26, cones/spreads/
+// stack +1:29, Burst +1:38, Visceral Burst + six-player Fusion +1:38),
+// Fixer +1:48, Act 2 +2:00 (Cruel Coil +2:15, chains break +2:27/+2:32/
+// +2:37/+2:42 pair I-IV, towers +2:33..+2:50, Constrictor +2:57), Splatter-
+// shed +3:09, Act 3 +3:26 (Grand Entrance +3:33, Bring Down the House
+// +3:37, spreads + Metamitosis towers +3:39), Split Scourge +3:49, Venomous
+// Scourge +3:52, Fixer +4:01, Curtain Call +4:13 (Reach +4:28, chains break
+// +4:36), Splattershed +4:50, Mortal Slayer +5:16..+5:25, Slaughtershed
+// +5:40/+6:09/+6:38 (Serpentine Scourge or Raptor Knuckles after each),
+// Refreshing Overkill +7:17: unfinished in the kills, lethal enrage in B1,
+// B9, B14, B15 (+7:24).
+//
+// Log IDs:
+// - Damage Down causes (every one, all reports): Burst 46239, Phagocyte
+//   Spotlight 46238, Dramatic Lysis 46261, Skinsplitter 46398, Bring Down
+//   the House 46244/46245/46246, Grand Entrance 46243, Ravenous Reach 46237,
+//   Serpentine Scourge 47548, Cell Death 46253. Grand Entrance 46240 and
+//   Phagocyte Spotlight 46262 only ever killed. Constrictor 46274 always
+//   killed (7 deaths).
+// - Mortal Slayer: green 46230, purple 46232, both cast-targeted at their
+//   bait, sharing a caster and instance numbers (keyed by ability too).
+//   The wave pairs are not in a fixed role order (B3 opens on the H2 and MT,
+//   B3's second set on both healers), so no assignment check.
+// - Act 1: Hemorrhagic Projection 46255 cones hit nobody in either kill.
+//   The cone's cast sits on its owner (within 0.1y when the position is
+//   fresh, B1/B2); its cast target, when present, is the VICTIM. Dramatic
+//   Lysis 46250 = Bursting spreads (4); Fourth-Wall Fusion 46254 (4) and
+//   47545 (the six non-tanks); Visceral Burst 46294 on both tanks.
+// - Act 2: In Line I-IV 1003004/1003005/1003006/1003451 name the four pairs;
+//   Bonds of Flesh alpha 1004752 / beta 1004754 turn into Unbreakable Flesh
+//   1004753/1004755, and ~3s later the break hits both partners with
+//   Dramatic Lysis 46260 (one instance each) plus Magic Vulnerability Up.
+//   An Unbreakable chain that isn't stretched pulses Dramatic Lysis 46261
+//   on the pair (~1.1s apart, each with Damage Down) until it breaks; never
+//   in a kill. Towers: Roiling Mass from Blood Vessel #1-#8, cast-targeted
+//   at the soaker: #1-2 In Line III, #3-4 IV, #5-6 I, #7-8 II, odd 46263 =
+//   alpha, even 46259 = beta (every clean tower in all three reports; only
+//   broke after deaths or early breaks, A8, A11, A50). An empty tower casts
+//   with no target and Unmitigated Explosion 46258 + Sustained Damage
+//   1004149 hit the raid ~1s later.
+// - Act 3: Mitotic Phase 1004764 on all eight; Dramatic Lysis 46256. A
+//   player's own spread hits them for 0-36k; another's for 170-300k, which
+//   killed in every case. Metamitosis 47395 towers are cast-targeted at
+//   their soaker; empty ones explode as 46258 too.
+// - Split Scourge 46251 (two tank lines), Venomous Scourge 46248 (six
+//   non-tank spreads), Cell Shedding 46252 and Slaughtershed's Dramatic
+//   Lysis 46292 / Fusion 46293 are all cast-targeted.
+// - Curtain Call: Rotting Flesh 1004763 holders take Ravenous Reach (the
+//   cleanse) and then Cell Shedding; Reach on anyone else gives Damage Down
+//   (A28 and A76 a Bursting holder). The eight chains break ~0.3s apart and
+//   reuse explosion instance numbers (B3 +4:36).
+// - Refreshing Overkill 46393/46394 = the timed check; it killed the raid
+//   at +7:24 in all four enrages.
+//
+// Failure findings:
+// - First deaths: Act 1's +1:29 resolution (cones, spreads and the stack
+//   at once) and Mortal Slayer's first set dominate report A; Act 2 towers
+//   ended 18 pulls and Act 3's towers 18 more.
+// - Mortal Slayer overlaps: two baits on top of each other (both took both
+//   orbs, A6, A25, B2 +5:16) or one blast catching a neighbour (B9 +0:41
+//   the DRK's purple killed the SGE). Orbs retarget once anyone is dead.
+// - Act 3: an empty Metamitosis tower nearly always came with spread
+//   overlaps and falls in the same second (the layout failed as a whole);
+//   only A69/A73 left exactly as many free players as empty towers.
+// - No killing blow: falls with the collapsing floor 2.1s after Bring Down
+//   the House (A15, A40), Raptor Knuckles knock-offs 2.4-2.9s after the
+//   knockback (B3 twice in the kill, six at once in A74), called wipes,
+//   and C1 +6:21 (the GNB at full HP, nothing near: unexplained).
+// - Not seen: Rotting Flesh left on except once (B12 +4:31 Cell Death).
+//
+// Cutoffs (first Raid error): collapse 42, called wipe 21, Act 2 tower 18,
+// Metamitosis 18, enrage 3, party knocked off 2; the kills have none.
+//
+// -- RULES IMPLEMENTED --
+// ffxiv-lw1-avoidable (Major on Damage Down or death, else Minor): AVOIDABLE.
+//   Ravenous Reach on a Rotting Flesh holder is the cleanse, not an error.
+// ffxiv-lw1-cone: a Hemorrhagic Projection cone that hit someone names the
+//   players standing on its cast (CONE_OWNER_MAX), never a victim; pairs
+//   standing together are both named; no position = player-less Minor.
+//   Major when a victim died.
+// ffxiv-lw1-orb / -overlap / -chain-clip (Major if anyone involved died to
+//   it): one-bait-per-player families (PERSONAL). A player hit by another
+//   player's instance or by two names the victim and the owner (cast target,
+//   else the hit player whose aura ended there, else the only player hit).
+//   Orbs only with all eight alive; the four waves count as one resolution.
+// ffxiv-lw1-stack (Major): a Fusion stack that killed someone names living
+//   eligible players more than 6y away; skipped with 3+ dead.
+// ffxiv-lw1-buster: a non-tank in Visceral Burst with both tanks up.
+// ffxiv-lw1-chain (Major on Damage Down/death): Dramatic Lysis 46261 pulses
+//   name both Unbreakable partners; nobody once the partner is dead.
+// ffxiv-lw1-tower: an empty Act 2 tower names its In Line soaker (Major)
+//   when alive and the order held, else player-less; a second player in a
+//   tower; Raid at the first empty tower whose explosion and DoT killed 3+.
+// ffxiv-lw1-metamitosis: empty Act 3 towers name the living non-soakers
+//   only when they match the empty count (1-2), else player-less; Raid at
+//   3+ deaths.
+// ffxiv-lw1-fall (Major): no-killing-blow deaths outside a called wipe:
+//   knocked off by Raptor Knuckles, fell with the floor, or unexplained;
+//   4+ off one knockback = one player-less Raid. Deaths right after an
+//   avoidable hit are that hit's error.
+// ffxiv-lw1-enrage, -called-wipe (3+ unexplained no-killing-blow deaths in
+//   10s, or any within 12s of the end), -collapse (5 dead, pull over within
+//   45s): Raid, only before any other Raid.
+// Exposure (rule-meta.ts): -buster targets the non-tanks, -chain each
+// Unbreakable pair, -tower each tower's In Line soaker; the rest everyone.
+// The Damage Down causes are excluded from ffxiv-damage-down (error-rules.ts).
+//
+// Not built: Mortal Slayer / Act 1 / Act 3 role-order assignments (the
+// groups varied their plan); tank deaths to their own purple orb or busters
+// (mitigation); The Fixer deaths (healing); Raptor Knuckles / Serpentine
+// first-arm reads.
+//
 // -- GUIDE-DERIVED MODEL: LINDWURM (M12S P1) --
 // AAC Heavyweight M4 (Savage), Arcadion, patch 7.4; door boss only.
-// Research checked 2026-10-08. Comments only; no detector registered.
-// No report analyzed: every proposed LOG SIGNAL is guide-inferred.
+// Research checked 2026-10-08, before any report was analyzed: the log
+// signals below are the researcher's hypotheses. VERIFIED AGAINST LOGS
+// above wins every disagreement.
 // After the transition, lindwurm-2.ts owns Lindwurm II and its checkpoint.
 // Selected plan: Modified 3VJ0 / Role Mortal Slayer. The strategy board
 // identifies its P1 as Toxic/Shabin with role-based Mortal assignments.
@@ -288,3 +419,802 @@
 //    which errors can name a player rather than remain player-less?
 // 7. Confirm exact P1 HP/time gates, failed Fixer vs successful Refreshing
 //    Overkill IDs, P1/P2 encounter splitting and checkpoint reset signatures.
+
+import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
+import type { DeathEvent } from "@/types/DeathEvent";
+import type { PullError, EnemyEvent } from "@/types/PullError";
+import type { ReportedOccurrence } from "@/lib/mechanics/occurrences";
+import { yd, kFmt, sec, joinNames, playerError, playerlessMinor, raidMarker, rezzedAt, clusterByGap, debuffIntervals } from "@/lib/mechanics/wow/common";
+import { findPlayerPosition, interpolatePlayerPosition } from "@/lib/mechanics/player-position";
+
+export const LW1_AVOIDABLE_RULE_ID   = "ffxiv-lw1-avoidable";
+export const LW1_CONE_RULE_ID        = "ffxiv-lw1-cone";
+export const LW1_OVERLAP_RULE_ID     = "ffxiv-lw1-overlap";
+export const LW1_ORB_RULE_ID         = "ffxiv-lw1-orb";
+export const LW1_CHAIN_CLIP_RULE_ID  = "ffxiv-lw1-chain-clip";
+export const LW1_STACK_RULE_ID       = "ffxiv-lw1-stack";
+export const LW1_BUSTER_RULE_ID      = "ffxiv-lw1-buster";      // the non-tanks' side of Visceral Burst
+export const LW1_CHAIN_RULE_ID       = "ffxiv-lw1-chain";       // the Unbreakable pair
+export const LW1_TOWER_RULE_ID       = "ffxiv-lw1-tower";       // each Act 2 tower's In Line soaker
+export const LW1_METAMITOSIS_RULE_ID = "ffxiv-lw1-metamitosis";
+export const LW1_FALL_RULE_ID        = "ffxiv-lw1-fall";
+export const LW1_ENRAGE_RULE_ID      = "ffxiv-lw1-enrage";
+export const LW1_COLLAPSE_RULE_ID    = "ffxiv-lw1-collapse";
+export const LW1_CALLED_WIPE_RULE_ID = "ffxiv-lw1-called-wipe";
+
+// ── log IDs (see VERIFIED AGAINST LOGS) ─────────────────────────────────────
+
+// Grotesquerie: Act 1/2/3/Curtain Call, Mortal Slayer, The Fixer.
+const SIGNATURE        = [48829, 48830, 48831, 48832, 46229, 46295];
+const DAMAGE_DOWN      = 1002911;
+const WALKING_DEAD     = 1000811; // Dark Knight's Living Dead follow-up
+const WALKING_DEAD_FULL_MS = 9500;
+const BURSTING         = 1004761; // Bursting Grotesquerie (Act 1 / Curtain Call spreads)
+const MITOTIC          = 1004764; // Mitotic Phase (Act 3 spreads)
+const ROTTING          = 1004763; // Rotting Flesh (Curtain Call; Ravenous Reach cleanses it)
+const BONDS_A          = 1004752;
+const BONDS_B          = 1004754;
+const UNBREAKABLE      = [1004753, 1004755]; // Unbreakable Flesh alpha / beta
+const IN_LINE: Record<number, number> = { 1003004: 1, 1003005: 2, 1003006: 3, 1003451: 4 };
+const ACT2_CAST        = 48830;
+const ACT3_CAST        = 48831;
+const HEMORRHAGIC      = 46255; // Act 1 body-relative cones
+const CHAIN_BREAK      = 46260; // a chain's explosion on each partner as it breaks
+const CHAIN_TICK       = 46261; // an Unbreakable chain still short: pulses on the pair, Damage Down
+const TOWER_ALPHA      = 46263; // Roiling Mass, the alpha player's Act 2 tower
+const TOWER_BETA       = 46259; // Roiling Mass, the beta player's
+const UNSOAKED         = 46258; // Unmitigated Explosion: an Act 2 or Act 3 tower left empty
+const SUSTAINED_DAMAGE = 1004149; // its raid DoT
+const METAMITOSIS      = 47395; // Act 3 towers (cast target = the soaker)
+const RAVENOUS_REACH   = 46237;
+const VISCERAL_BURST   = 46294;
+const RAPTOR_KNUCKLES  = 47559;
+const BRING_DOWN_CASTS = [48650, 46244, 46245, 46246];
+const REFRESHING_OVERKILL = [46393, 46394];
+// Act 2 towers in Blood Vessel instance order: 1-2 In Line III, 3-4 IV, 5-6 I,
+// 7-8 II; alpha takes 46263, beta 46259 (every clean tower in all reports).
+const TOWER_LINE = [3, 3, 4, 4, 1, 1, 2, 2];
+
+// Avoidable hits. All give Damage Down when survived except Constrictor
+// (always lethal in the sample).
+type Avoidable = { name: string; hit: string; why: string };
+const AVOIDABLE: Record<number, Avoidable> = {
+  46239: { name: "Burst", hit: "Caught by a flesh blob's Burst",
+    why: "The flesh blobs grow and then Burst; wait in the gap between them." },
+  46238: { name: "Phagocyte Spotlight", hit: "Hit by a Phagocyte Spotlight puddle",
+    why: "Each spotlight drops a puddle where the players stood a moment earlier; keep moving along the route and off the old drops." },
+  46262: { name: "Phagocyte Spotlight", hit: "Hit by a Phagocyte Spotlight puddle",
+    why: "Each spotlight drops a puddle where the players stood a moment earlier; step off it." },
+  46398: { name: "Skinsplitter", hit: "Hit by Skinsplitter (Cruel Coil)",
+    why: "Cruel Coil's opening turns 90 degrees before every Skinsplitter; follow the opening and stay off the coil." },
+  46274: { name: "Constrictor", hit: "Caught inside Constrictor",
+    why: "Leave Cruel Coil before Constrictor closes it." },
+  46244: { name: "Bring Down the House", hit: "Caught by Bring Down the House",
+    why: "The floor between the islands collapses; be on your island before it falls." },
+  46245: { name: "Bring Down the House", hit: "Caught by Bring Down the House",
+    why: "The floor between the islands collapses; be on your island before it falls." },
+  46246: { name: "Bring Down the House", hit: "Caught by Bring Down the House",
+    why: "The floor between the islands collapses; be on your island before it falls." },
+  46243: { name: "Grand Entrance", hit: "Hit by Grand Entrance",
+    why: "Feral Fission's islands land with Grand Entrance; don't stand where one lands." },
+  46240: { name: "Grand Entrance", hit: "Hit by Grand Entrance",
+    why: "Feral Fission's islands land with Grand Entrance; don't stand where one lands." },
+  [RAVENOUS_REACH]: { name: "Ravenous Reach", hit: "Hit by Ravenous Reach",
+    why: "Ravenous Reach cleaves one side of the arena; only the Rotting Flesh players (Curtain Call) belong in it." },
+  47548: { name: "Serpentine Scourge", hit: "Hit by Serpentine Scourge",
+    why: "The dragon arms sweep half the room twice; start on the second-grown arm's side, then cross." },
+  46253: { name: "Cell Death", hit: "Kept Rotting Flesh past Ravenous Reach and took Cell Death",
+    why: "Rotting Flesh players must stand in Ravenous Reach to cleanse it; left on, it bursts as Cell Death." },
+};
+
+// One bait per player per instance: a player hit by another player's
+// instance, or by two at once, is an overlap. The owner of an instance is its
+// cast target, else the hit player whose `ownerAura` ended at the hit, else
+// the only player it hit, or the one player it hit who took nothing else.
+// `proximity`: aimed at the nearest players; with anyone dead they retarget.
+type Family = { name: string; ids: number[]; what: string; why: string; ruleId: string; gap?: number; proximity?: boolean; ownerAura?: number[] };
+const PERSONAL: Family[] = [
+  { name: "Mortal Slayer", ids: [46230, 46232], what: "orb", ruleId: LW1_ORB_RULE_ID, gap: 4000, proximity: true,
+    why: "Each Mortal Slayer orb takes one player: one orb each, with the baits of a wave far enough apart that an orb's blast hits only its own player." },
+  { name: "Dramatic Lysis", ids: [46250], what: "spread", ruleId: LW1_OVERLAP_RULE_ID, ownerAura: [BURSTING],
+    why: "Bursting Grotesquerie is a spread; take it away from everyone else, the Fusion stack included." },
+  { name: "Dramatic Lysis (Act 3)", ids: [46256], what: "spread", ruleId: LW1_OVERLAP_RULE_ID, ownerAura: [MITOTIC],
+    why: "Every Mitotic Phase spread launches from its player's island corner; stand on your own corner, apart from the rest." },
+  { name: "Dramatic Lysis (Slaughtershed)", ids: [46292], what: "spread", ruleId: LW1_OVERLAP_RULE_ID,
+    why: "Slaughtershed's spreads go in the larger open region; keep them apart and away from the stack." },
+  { name: "Cell Shedding", ids: [46252], what: "spread", ruleId: LW1_OVERLAP_RULE_ID,
+    why: "Ravenous Reach turns each Rotting Flesh into a Cell Shedding spread; separate inside the Reach side." },
+  { name: "Venomous Scourge", ids: [46248], what: "spread", ruleId: LW1_OVERLAP_RULE_ID,
+    why: "Venomous Scourge marks the three eastmost and three westmost players; spread apart while the tanks stay central." },
+  { name: "Split Scourge", ids: [46251], what: "line", ruleId: LW1_OVERLAP_RULE_ID,
+    why: "Split Scourge's two lines go to the two closest players (the tanks); keep the party out of them." },
+  // Curtain Call's four pairs break ~0.3s apart and reuse instance numbers
+  // (B3 +4:36), so each break is its own resolution.
+  { name: "Chain explosion", ids: [CHAIN_BREAK], what: "chain explosion", ruleId: LW1_CHAIN_CLIP_RULE_ID, ownerAura: UNBREAKABLE, gap: 200,
+    why: "A chain explodes on both partners as it breaks; break it away from everyone else." },
+];
+
+// Shared stacks: a stack that killed someone while a living eligible player
+// stood elsewhere names that player.
+type Stack = { name: string; ids: number[]; what: string; why: string; eligible: "notBursting" | "nonTank" | "notSpread" };
+const STACKS: Stack[] = [
+  { name: "Fourth-Wall Fusion", ids: [46254], what: "stack", eligible: "notBursting",
+    why: "In Act 1, Fourth-Wall Fusion is one four-player stack for the role without Bursting Grotesquerie; all four share it." },
+  { name: "Fourth-Wall Fusion", ids: [47545], what: "stack", eligible: "nonTank",
+    why: "After the Act 1 Burst, Fourth-Wall Fusion is shared by the six non-tanks while the tanks take Visceral Burst." },
+  { name: "Fourth-Wall Fusion", ids: [46293], what: "stack", eligible: "notSpread",
+    why: "Slaughtershed's Fourth-Wall Fusion is one four-player stack for the role without spreads." },
+];
+
+// FFLogs logs the death event ~2.0s after the fatal hit (README).
+const DEATH_EVENT_LAG_MS = 2000;
+const DIED_FROM_HIT_MS   = 3000;
+const FALL_KNOCKBACK_MS  = 5000;
+// Players thrown off by one Raptor Knuckles that make it a group error.
+const MASS_KNOCKED       = 4;
+// A no-killing-blow death this soon after the floor collapse cast fell with it
+// (+2.1s after Bring Down the House's hit, A15).
+const FALL_COLLAPSE_MS   = 6000;
+const CALLED_WIPE_END_MS = 12_000;
+const CALLED_WIPE_COUNT  = 3;
+const CALLED_WIPE_WINDOW = 10_000;
+const COLLAPSE_DEAD_COUNT = 5;
+const COLLAPSE_END_MS     = 45_000;
+const TANK_ENMITY_LOST_MS = 30_000;
+// Deaths to an empty tower's explosion and DoT that end the pull.
+const MASS_DEATHS        = 3;
+const UNSOAKED_DEATHS_MS = 12_000;
+// Hits this large are FFLogs' unpaired previews of lethal hits (README).
+const PREVIEW_AMOUNT     = 1_500_000;
+// With this many dead a stack is doomed anyway.
+const STACK_DOOMED_DEAD  = 3;
+// An absent player this close to the stack's center nearly made it.
+const STACK_NEAR_MISS    = 600;
+const RAISE_GRACE_MS     = 10_000;
+// A Hemorrhagic Projection cast sits on its owner: the cast and the owner's
+// position agreed within 0.1y whenever the position was fresh (B1, B2). A
+// player this close to the cast is a candidate owner.
+const CONE_OWNER_MAX     = 200;
+const EPISODE_MS         = 3000;
+
+// ── shared helpers ──────────────────────────────────────────────────────────
+
+type Hit = { p: PlayerInfo; e: PlayerEvent };
+
+type Life = {
+  alive: (p: PlayerInfo, t: number) => boolean;
+  hitAlive: (p: PlayerInfo, hitT: number) => boolean;
+  diedFrom: (p: PlayerInfo, hitT: number) => DeathEvent | undefined;
+  outIntervals: { p: PlayerInfo; start: number; end: number }[];
+};
+
+function buildLife(players: PlayerInfo[], deaths: DeathEvent[]): Life {
+  const outIntervals: Life["outIntervals"] = [];
+  for (const p of players) {
+    const own = deaths.filter((d) => d.player === p.name).sort((a, b) => a.timestamp - b.timestamp);
+    own.forEach((d, i) => {
+      const next = own[i + 1]?.timestamp ?? Infinity;
+      const end = rezzedAt(p, d.timestamp, next) ?? next - DEATH_EVENT_LAG_MS - 100;
+      outIntervals.push({ p, start: d.timestamp - DEATH_EVENT_LAG_MS - 100, end });
+    });
+  }
+  const alive = (p: PlayerInfo, t: number) => !outIntervals.some((w) => w.p === p && t >= w.start && t < w.end);
+  return {
+    outIntervals,
+    alive,
+    hitAlive: (p, hitT) => alive(p, hitT - 500),
+    diedFrom: (p, hitT) => deaths.find((d) => d.player === p.name && d.timestamp >= hitT && d.timestamp <= hitT + DIED_FROM_HIT_MS),
+  };
+}
+
+/** Hits on living players (a dead body still logs 0-damage hits). */
+function hitsOf(players: PlayerInfo[], life: Life, ids: number | number[], from = -Infinity, to = Infinity): Hit[] {
+  const set = new Set(Array.isArray(ids) ? ids : [ids]);
+  const out: Hit[] = [];
+  for (const p of players) {
+    for (const e of p.damageTaken) {
+      if (!set.has(e.abilityId) || e.timestamp < from || e.timestamp > to || e.healthBefore === 0) continue;
+      if (life.hitAlive(p, e.timestamp)) out.push({ p, e });
+    }
+  }
+  return out.sort((a, b) => a.e.timestamp - b.e.timestamp);
+}
+
+const castsOf = (casts: EnemyEvent[], ids: number | number[]) => {
+  const set = new Set(Array.isArray(ids) ? ids : [ids]);
+  return casts.filter((c) => set.has(c.abilityId)).sort((a, b) => a.timestamp - b.timestamp);
+};
+
+function gotDamageDown(p: PlayerInfo, t: number): boolean {
+  return p.debuffs.some((e) => e.abilityId === DAMAGE_DOWN && e.debuffStatus === "applied" && Math.abs(e.timestamp - t) <= 1500);
+}
+
+/** The aura was on the player at `t`. */
+function hasAura(p: PlayerInfo, id: number, t: number): boolean {
+  return debuffIntervals(p, id).some((w) => w.start <= t && w.end > t);
+}
+
+/** One of the auras ended on the player within [t - before, t + after]. */
+function auraEndedNear(p: PlayerInfo, ids: number[], t: number, before = 1500, after = 300): boolean {
+  return p.debuffs.some((e) => ids.includes(e.abilityId) && e.debuffStatus === "removed" && e.timestamp >= t - before && e.timestamp <= t + after);
+}
+
+const uniq = <T,>(xs: T[]) => [...new Set(xs)];
+const namesOf = (ps: PlayerInfo[]) => joinNames(uniq(ps).map((p) => p.name));
+const isTank = (p: PlayerInfo) => p.role === "Tank";
+const realAmount = (e: PlayerEvent) => ((e.amount ?? 0) >= PREVIEW_AMOUNT ? 0 : e.amount ?? 0);
+// Green and purple Mortal Slayer orbs share a caster and instance numbers, so
+// an instance is keyed by its ability too.
+const instanceKey = (e: PlayerEvent) => `${e.abilityId}|${e.source}#${e.sourceInstance}`;
+const castKey = (c: EnemyEvent) => `${c.abilityId}|${c.actorName}#${c.sourceInstance}`;
+
+function tankOutRecently(life: Life, p: PlayerInfo, t: number): boolean {
+  return !life.hitAlive(p, t) || life.outIntervals.some((w) => w.p === p && w.start <= t && w.end >= t - TANK_ENMITY_LOST_MS);
+}
+
+/** Both tanks alive and holding enmity at `t` (otherwise busters retarget as fallout). */
+function tanksHealthy(players: PlayerInfo[], life: Life, t: number): boolean {
+  const tanks = players.filter(isTank);
+  return tanks.length >= 2 && tanks.every((p) => !tankOutRecently(life, p, t));
+}
+
+/** Raised within RAISE_GRACE_MS before `t` (or still out at `t`). */
+function inRaiseGrace(life: Life, p: PlayerInfo, t: number): boolean {
+  return !life.hitAlive(p, t) || life.outIntervals.some((w) => w.p === p && w.end <= t && t - w.end < RAISE_GRACE_MS);
+}
+
+/** Players who took a listed avoidable hit within 2s of `t`: already flagged for it. */
+function inAvoidable(p: PlayerInfo, t: number): boolean {
+  return p.damageTaken.some((e) => AVOIDABLE[e.abilityId] && Math.abs(e.timestamp - t) <= 2000 && realAmount(e) > 0);
+}
+
+function positionAt(p: PlayerInfo, t: number) {
+  return interpolatePlayerPosition(p, t, { windowMs: 2000, maxSpanMs: 3000 }) ?? findPlayerPosition(p, t, { windowMs: 2000 });
+}
+
+/** Deaths to an empty tower's explosion or its DoT within the window after `t`. */
+function unsoakedDeaths(players: PlayerInfo[], deaths: DeathEvent[], t: number): string[] {
+  return uniq(deaths.filter((d) => (d.killingAbilityGameId === UNSOAKED || d.killingAbilityGameId === SUSTAINED_DAMAGE) &&
+    d.timestamp >= t && d.timestamp <= t + UNSOAKED_DEATHS_MS).map((d) => d.player));
+}
+
+// ── plain avoidable hits ────────────────────────────────────────────────────
+
+/**
+ * Ravenous Reach on a Rotting Flesh holder is the cleanse (Curtain Call):
+ * their Rotting Flesh ends at the hit. Every other avoidable hit is an error.
+ */
+function detectAvoidable(players: PlayerInfo[], life: Life): PullError[] {
+  const errors: PullError[] = [];
+  const ids = Object.keys(AVOIDABLE).map(Number);
+  for (const p of players) {
+    const hits = p.damageTaken.filter((e) => ids.includes(e.abilityId) && e.healthBefore !== 0 && life.hitAlive(p, e.timestamp) &&
+      !(e.abilityId === RAVENOUS_REACH && (auraEndedNear(p, [ROTTING], e.timestamp, 1500, 1500) || hasAura(p, ROTTING, e.timestamp))) &&
+      (realAmount(e) > 0 || (e.amount ?? 0) >= PREVIEW_AMOUNT || gotDamageDown(p, e.timestamp)));
+    for (const g of clusterByGap(hits, (e) => e.timestamp, EPISODE_MS)) {
+      const kinds = uniq(g.map((e) => AVOIDABLE[e.abilityId]));
+      const total = g.reduce((s, e) => s + realAmount(e), 0);
+      const death = life.diedFrom(p, g[g.length - 1].timestamp);
+      const dd = g.some((e) => gotDamageDown(p, e.timestamp));
+      const hit = kinds.map((k, i) => (i === 0 ? k.hit : k.hit.charAt(0).toLowerCase() + k.hit.slice(1))).join(", and ");
+      const outcome = [dd ? "got Damage Down" : "", death ? "died" : ""].filter(Boolean).join(" and ");
+      errors.push(playerError(p, {
+        ruleId: LW1_AVOIDABLE_RULE_ID, severity: dd || death ? "Major" : "Minor", name: `Hit by ${uniq(kinds.map((k) => k.name)).join(" / ")}`,
+        description: `${hit} (${g.length > 1 ? `${g.length} hits, ` : ""}${kFmt(total)}).${outcome ? ` They ${outcome}.` : ""} ${uniq(kinds.map((k) => k.why)).join(" ")}`,
+        timestamp: g[0].timestamp, abilityId: g[0].abilityId, abilityName: g[0].abilityName,
+      }));
+    }
+  }
+  return errors;
+}
+
+// ── Act 1 cones ─────────────────────────────────────────────────────────────
+
+/**
+ * Hemorrhagic Projection: a cone from every Directed Grotesquerie player,
+ * turned by their facing. A clean resolution hits nobody (both kills). A
+ * cone that hit someone names its owner: the player standing on the cone's
+ * cast (CONE_OWNER_MAX), never one of its own victims. Several candidates are
+ * all named; none leaves a player-less error.
+ */
+function detectCones(players: PlayerInfo[], life: Life, casts: EnemyEvent[]): PullError[] {
+  const errors: PullError[] = [];
+  const coneCasts = castsOf(casts, HEMORRHAGIC);
+  for (const res of clusterByGap(hitsOf(players, life, HEMORRHAGIC), (h) => h.e.timestamp, 1500)) {
+    const t = res[0].e.timestamp;
+    const byInst = new Map<number, Hit[]>();
+    for (const h of res) if (h.e.sourceInstance !== undefined) byInst.set(h.e.sourceInstance, [...(byInst.get(h.e.sourceInstance) ?? []), h]);
+    // Victims grouped by the owner candidates of the cones that hit them.
+    const byOwner = new Map<string, { owners: PlayerInfo[]; victims: PlayerInfo[]; killed: PlayerInfo[] }>();
+    for (const [inst, hs] of byInst) {
+      const victims = uniq(hs.map((h) => h.p));
+      const c = coneCasts.filter((x) => x.sourceInstance === inst && x.timestamp <= t + 200 && x.timestamp >= t - 3000).pop();
+      let owners: PlayerInfo[] = [];
+      if (c?.x !== undefined && c.y !== undefined) {
+        owners = players.filter((p) => !victims.includes(p) && life.hitAlive(p, c.timestamp)).filter((p) => {
+          const q = positionAt(p, c.timestamp);
+          return q && Math.hypot(q.x - c.x!, q.y - c.y!) <= CONE_OWNER_MAX;
+        });
+      }
+      const killed = victims.filter((p) => life.diedFrom(p, t)?.killingAbilityGameId === HEMORRHAGIC);
+      const k = owners.map((p) => p.name).sort().join("+");
+      const cur = byOwner.get(k) ?? { owners, victims: [], killed: [] };
+      cur.victims.push(...victims);
+      cur.killed.push(...killed);
+      byOwner.set(k, cur);
+    }
+    for (const { owners, victims, killed } of byOwner.values()) {
+      const deathText = killed.length ? ` ${namesOf(killed)} died.` : "";
+      const why = "Each Directed Grotesquerie cone points the way its player faces; face it away from everyone before it fires.";
+      if (!owners.length) {
+        errors.push(playerlessMinor(LW1_CONE_RULE_ID, "Hemorrhagic Projection Hit Someone",
+          `A Hemorrhagic Projection cone hit ${namesOf(victims)}; its owner couldn't be placed from the log.${deathText} ${why}`,
+          t, HEMORRHAGIC, "Hemorrhagic Projection"));
+        continue;
+      }
+      for (const o of owners) {
+        errors.push(playerError(o, {
+          ruleId: LW1_CONE_RULE_ID, severity: killed.length ? "Major" : "Minor", name: "Cone Hit Someone",
+          description: `${owners.length > 1 ? `Their cone or ${namesOf(owners.filter((x) => x !== o))}'s` : "Their"} Hemorrhagic Projection cone hit ${namesOf(victims)}.${deathText} ${why}`,
+          timestamp: t, abilityId: HEMORRHAGIC, abilityName: "Hemorrhagic Projection",
+        }));
+      }
+    }
+  }
+  return errors;
+}
+
+// ── overlapping personal baits ──────────────────────────────────────────────
+
+/**
+ * Per resolution of a one-bait-per-player family: who owns each instance and
+ * who was hit by an instance that isn't theirs or by two at once. Names the
+ * victim and, when known, the owner (README philosophy 3: both are
+ * candidates).
+ */
+function detectPersonalOverlaps(players: PlayerInfo[], life: Life, casts: EnemyEvent[]): PullError[] {
+  const errors: PullError[] = [];
+  for (const fam of PERSONAL) {
+    for (const res of clusterByGap(hitsOf(players, life, fam.ids), (h) => h.e.timestamp, fam.gap ?? 1500)) {
+      const t0 = res[0].e.timestamp, t1 = res[res.length - 1].e.timestamp;
+      if (fam.proximity && players.some((p) => !life.hitAlive(p, t0))) continue;
+      // Instances that also hit someone in raise grace are that player's
+      // bait drawn from where they were raised: drop them.
+      const tainted = new Set<string>();
+      for (const p of players) {
+        for (const e of p.damageTaken) {
+          if (fam.ids.includes(e.abilityId) && e.timestamp >= t0 - 1500 && e.timestamp <= t1 + 500 && inRaiseGrace(life, p, e.timestamp)) tainted.add(instanceKey(e));
+        }
+      }
+      const byInst = new Map<string, Hit[]>();
+      const byPlayer = new Map<PlayerInfo, Set<string>>();
+      for (const h of res) {
+        const k = instanceKey(h.e);
+        if (tainted.has(k)) continue;
+        byInst.set(k, [...(byInst.get(k) ?? []), h]);
+        byPlayer.set(h.p, (byPlayer.get(h.p) ?? new Set()).add(k));
+      }
+      if (!byInst.size) continue;
+      const owners = new Map<string, PlayerInfo>();
+      for (const c of casts) {
+        if (!fam.ids.includes(c.abilityId) || c.timestamp < t0 - 2000 || c.timestamp > t1 || c.sourceInstance === undefined || !c.target) continue;
+        const p = players.find((x) => x.name === c.target);
+        if (p) owners.set(castKey(c), p);
+      }
+      for (const [k, hs] of byInst) {
+        if (owners.has(k)) continue;
+        const hit = uniq(hs.map((h) => h.p));
+        if (fam.ownerAura) {
+          const holders = hit.filter((p) => auraEndedNear(p, fam.ownerAura!, hs[0].e.timestamp));
+          if (holders.length === 1) { owners.set(k, holders[0]); continue; }
+        }
+        const only = hit.filter((p) => byPlayer.get(p)!.size === 1);
+        if (hs.length === 1) owners.set(k, hs[0].p);
+        else if (only.length === 1 && hit.length > 1) owners.set(k, only[0]);
+      }
+      const t = t0;
+      const links = new Map<PlayerInfo, Set<PlayerInfo>>();
+      const link = (a: PlayerInfo, b: PlayerInfo) => {
+        links.set(a, (links.get(a) ?? new Set()).add(b));
+        links.set(b, (links.get(b) ?? new Set()).add(a));
+      };
+      const hitTwice = new Set<PlayerInfo>();
+      for (const [p, ks] of byPlayer) {
+        const foreign = [...ks].filter((k) => owners.get(k) !== p);
+        if (ks.size < 2 && foreign.length === 0) continue;
+        if (ks.size >= 2) hitTwice.add(p);
+        if (!links.has(p)) links.set(p, new Set());
+        for (const k of ks) {
+          const o = owners.get(k);
+          if (o) { if (o !== p) link(p, o); }
+          else for (const h of byInst.get(k)!) if (h.p !== p) link(p, h.p);
+        }
+      }
+      if (!links.size) continue;
+      const seen = new Set<PlayerInfo>();
+      for (const start of links.keys()) {
+        if (seen.has(start)) continue;
+        const group: PlayerInfo[] = [];
+        const stack = [start];
+        while (stack.length) {
+          const p = stack.pop()!;
+          if (seen.has(p)) continue;
+          seen.add(p);
+          group.push(p);
+          for (const q of links.get(p) ?? []) stack.push(q);
+        }
+        const killed = group.filter((p) => {
+          const last = res.filter((h) => h.p === p).pop()?.e.timestamp ?? t;
+          const d = life.diedFrom(p, last);
+          return d && fam.ids.includes(d.killingAbilityGameId);
+        });
+        const severity = killed.length ? "Major" : "Minor";
+        const deathText = killed.length ? ` ${namesOf(killed)} died.` : "";
+        for (const p of group) {
+          const others = [...(links.get(p) ?? [])];
+          const n = byPlayer.get(p)?.size ?? 0;
+          const description = hitTwice.has(p) || [...(byPlayer.get(p) ?? [])].some((k) => owners.get(k) !== p)
+            ? `Hit by ${n > 1 ? `${n} ${fam.what}s${(fam.gap ?? 1500) > 1500 ? "" : " at once"}` : `another player's ${fam.what}`}${others.length ? ` (with ${namesOf(others)})` : ""}.`
+            : `Their ${fam.what} also hit ${namesOf(others)}.`;
+          errors.push(playerError(p, {
+            ruleId: fam.ruleId, severity, name: `${fam.name} Overlap`,
+            description: `${description}${deathText} ${fam.why}`,
+            timestamp: t, abilityId: fam.ids[0], abilityName: fam.name,
+          }));
+        }
+      }
+    }
+  }
+  return errors;
+}
+
+// ── shared stacks ───────────────────────────────────────────────────────────
+
+function detectStacks(players: PlayerInfo[], life: Life, casts: EnemyEvent[]): PullError[] {
+  const errors: PullError[] = [];
+  for (const fam of STACKS) {
+    for (const res of clusterByGap(hitsOf(players, life, fam.ids), (h) => h.e.timestamp, 1500)) {
+      const t = res[0].e.timestamp;
+      const inIt = new Set(res.map((h) => h.p));
+      const killed = [...inIt].filter((p) => {
+        const d = life.diedFrom(p, res.filter((h) => h.p === p).pop()!.e.timestamp);
+        return d && fam.ids.includes(d.killingAbilityGameId);
+      });
+      if (!killed.length) continue;
+      if (players.filter((p) => !life.alive(p, t)).length >= STACK_DOOMED_DEAD) continue;
+      const spreadTargets = new Set(castsOf(casts, 46292).filter((c) => Math.abs(c.timestamp - t) <= 2000).map((c) => c.target));
+      const eligible = (p: PlayerInfo) =>
+        fam.eligible === "nonTank" ? !isTank(p)
+        : fam.eligible === "notSpread" ? !spreadTargets.has(p.name)
+        : !hasAura(p, BURSTING, t - 1000);
+      const at = res.filter((h) => h.e.x !== undefined && h.e.y !== undefined);
+      const cx = at.length ? at.reduce((s, h) => s + h.e.x!, 0) / at.length : undefined;
+      const cy = at.length ? at.reduce((s, h) => s + h.e.y!, 0) / at.length : undefined;
+      const absent = players.filter((p) => eligible(p) && !inIt.has(p) && life.hitAlive(p, t) && !inAvoidable(p, t)).map((p) => {
+        const q = positionAt(p, t);
+        return { p, d: q && cx !== undefined && cy !== undefined ? Math.hypot(q.x - cx, q.y - cy!) : undefined };
+      }).filter((a) => a.d === undefined || a.d > STACK_NEAR_MISS);
+      for (const a of absent) {
+        errors.push(playerError(a.p, {
+          ruleId: LW1_STACK_RULE_ID, severity: "Major", name: `Missed ${fam.name}`,
+          description: `Wasn't in the ${fam.what}${a.d !== undefined ? ` (~${yd(a.d)} yalms from it)` : ""}; only ${inIt.size} took it and ${namesOf(killed)} died. ${fam.why}`,
+          timestamp: t, abilityId: fam.ids[0], abilityName: fam.name,
+        }));
+      }
+    }
+  }
+  return errors;
+}
+
+// ── Visceral Burst ──────────────────────────────────────────────────────────
+
+/** Visceral Burst hits the top two on enmity: a non-tank in it with both tanks up. */
+function detectBusters(players: PlayerInfo[], life: Life, occurrences?: ReportedOccurrence[]): PullError[] {
+  const errors: PullError[] = [];
+  for (const res of clusterByGap(hitsOf(players, life, VISCERAL_BURST), (h) => h.e.timestamp, 1500)) {
+    const t = res[0].e.timestamp;
+    if (!tanksHealthy(players, life, t - DIED_FROM_HIT_MS)) continue;
+    occurrences?.push({ mechanicKey: LW1_BUSTER_RULE_ID, timestamp: t, players: players.filter((p) => !isTank(p) && life.hitAlive(p, t)).map((p) => p.name) });
+    for (const p of uniq(res.filter((h) => !isTank(h.p)).map((h) => h.p))) {
+      const d = life.diedFrom(p, t);
+      errors.push(playerError(p, {
+        ruleId: LW1_BUSTER_RULE_ID, severity: d ? "Major" : "Minor", name: "In Visceral Burst",
+        description: `Stood in Visceral Burst, the tanks' buster.${d ? " They died." : ""} The tanks take Visceral Burst away from the party; the non-tanks stack for Fourth-Wall Fusion elsewhere.`,
+        timestamp: t, abilityId: VISCERAL_BURST, abilityName: "Visceral Burst",
+      }));
+    }
+  }
+  return errors;
+}
+
+// ── Act 2: chains and towers ────────────────────────────────────────────────
+
+type Act2 = { t0: number; line: Map<PlayerInfo, number>; alpha: Set<PlayerInfo> };
+
+/** In Line numbers and alpha/beta chains handed out at Act 2's start. */
+function act2Lines(players: PlayerInfo[], casts: EnemyEvent[]): Act2 | undefined {
+  const cast = castsOf(casts, ACT2_CAST)[0];
+  if (!cast) return undefined;
+  const t0 = cast.timestamp;
+  const line = new Map<PlayerInfo, number>();
+  const alpha = new Set<PlayerInfo>();
+  for (const p of players) {
+    const l = p.debuffs.find((e) => IN_LINE[e.abilityId] && e.debuffStatus === "applied" && e.timestamp >= t0 && e.timestamp <= t0 + 5000);
+    if (l) line.set(p, IN_LINE[l.abilityId]);
+    if (p.debuffs.some((e) => e.abilityId === BONDS_A && e.debuffStatus === "applied" && e.timestamp >= t0 && e.timestamp <= t0 + 5000)) alpha.add(p);
+  }
+  return { t0, line, alpha };
+}
+
+const ROMAN = ["", "I", "II", "III", "IV"];
+
+/**
+ * Unbreakable Flesh that isn't stretched apart pulses Dramatic Lysis 46261 on
+ * the pair, each pulse with Damage Down, until it breaks (never in a kill).
+ * Both partners are named: either could have been the one who didn't move.
+ * A pulse after the partner died is that death's fallout.
+ */
+function detectChains(players: PlayerInfo[], life: Life, a2: Act2 | undefined, occurrences?: ReportedOccurrence[]): PullError[] {
+  const errors: PullError[] = [];
+  const partnerOf = (p: PlayerInfo) => a2 && a2.line.has(p)
+    ? players.find((q) => q !== p && a2.line.get(q) === a2.line.get(p) && a2.alpha.has(q) !== a2.alpha.has(p)) : undefined;
+  // Each Act 2 pair's Unbreakable Flesh tests both partners.
+  if (a2) {
+    const done = new Set<PlayerInfo>();
+    for (const p of players) {
+      const q = partnerOf(p);
+      if (!q || done.has(p)) continue;
+      done.add(p).add(q);
+      const ub = p.debuffs.find((e) => UNBREAKABLE.includes(e.abilityId) && e.debuffStatus === "applied" && e.timestamp >= a2.t0);
+      if (ub && life.hitAlive(p, ub.timestamp) && life.hitAlive(q, ub.timestamp)) {
+        occurrences?.push({ mechanicKey: LW1_CHAIN_RULE_ID, timestamp: ub.timestamp, players: [p.name, q.name] });
+      }
+    }
+  }
+  for (const p of players) {
+    const ticks = p.damageTaken.filter((e) => e.abilityId === CHAIN_TICK && e.healthBefore !== 0 && life.hitAlive(p, e.timestamp));
+    for (const g of clusterByGap(ticks, (e) => e.timestamp, EPISODE_MS)) {
+      const t = g[0].timestamp;
+      const q = partnerOf(p);
+      if (q && !life.hitAlive(q, t)) continue;
+      const dd = g.some((e) => gotDamageDown(p, e.timestamp));
+      const d = life.diedFrom(p, g[g.length - 1].timestamp);
+      const lineNo = a2?.line.get(p);
+      const outcome = [dd ? "got Damage Down" : "", d ? "died" : ""].filter(Boolean).join(" and ");
+      errors.push(playerError(p, {
+        ruleId: LW1_CHAIN_RULE_ID, severity: dd || d ? "Major" : "Minor", name: "Chain Not Broken",
+        description: `Their ${lineNo ? `In Line ${ROMAN[lineNo]} ` : ""}chain${q ? ` with ${q.name}` : ""} stayed short after it turned Unbreakable, so it pulsed Dramatic Lysis on them (${g.length} hit${g.length === 1 ? "" : "s"}, ${kFmt(g.reduce((s, e) => s + realAmount(e), 0))}).${outcome ? ` They ${outcome}.` : ""} Stretch the chain apart as soon as it turns Unbreakable.`,
+        timestamp: t, abilityId: CHAIN_TICK, abilityName: "Dramatic Lysis",
+      }));
+    }
+  }
+  return errors;
+}
+
+/**
+ * Act 2 towers. Each tower's assigned soaker is fixed by its order and kind
+ * (TOWER_LINE; the cast target is who actually soaked it). An empty tower
+ * names its assigned soaker when they were alive; Unmitigated Explosion then
+ * hits the raid, and 3+ deaths to it and its DoT end the pull. A Roiling Mass
+ * hitting anyone but its cast target was a second soaker.
+ */
+function detectAct2Towers(players: PlayerInfo[], life: Life, casts: EnemyEvent[], deaths: DeathEvent[], a2: Act2 | undefined, occurrences?: ReportedOccurrence[]): PullError[] {
+  const errors: PullError[] = [];
+  if (!a2) return errors;
+  const towers = castsOf(casts, [TOWER_ALPHA, TOWER_BETA]).filter((c) => c.timestamp > a2.t0 && c.timestamp < a2.t0 + 80_000);
+  let raidDone = false;
+  for (const c of towers) {
+    const k = c.sourceInstance ?? 0;
+    const lineNo = TOWER_LINE[k - 1];
+    const wantAlpha = c.abilityId === TOWER_ALPHA;
+    // Odd towers are alpha, even beta. A tower of the other kind means the
+    // sequence already broke (a death or early break moved the towers: A8
+    // tower 2, A11 towers 3-4): nobody's slot is known.
+    const inOrder = !!lineNo && wantAlpha === (k % 2 === 1);
+    const assigned = inOrder ? players.find((p) => a2.line.get(p) === lineNo && a2.alpha.has(p) === wantAlpha) : undefined;
+    if (assigned) occurrences?.push({ mechanicKey: LW1_TOWER_RULE_ID, timestamp: c.timestamp, players: [assigned.name] });
+    const label = `Tower ${k}${inOrder ? ` (In Line ${ROMAN[lineNo]}, ${wantAlpha ? "alpha" : "beta"})` : ""}`;
+    if (c.target) {
+      const extra = players.filter((p) => p.name !== c.target && p.damageTaken.some((e) => e.abilityId === c.abilityId && e.sourceInstance === k &&
+        e.timestamp >= c.timestamp && e.timestamp <= c.timestamp + 1500 && e.healthBefore !== 0) && life.hitAlive(p, c.timestamp));
+      for (const p of extra) {
+        const d = life.diedFrom(p, c.timestamp);
+        errors.push(playerError(p, {
+          ruleId: LW1_TOWER_RULE_ID, severity: d ? "Major" : "Minor", name: "Soaked Another Player's Tower",
+          description: `Stood in ${label} with ${c.target}, who was soaking it.${d ? " They died." : ""} Each Act 2 tower takes exactly one player: In Line I-IV soak towers 3, 4, 1, 2 in that order.`,
+          timestamp: c.timestamp, abilityId: c.abilityId, abilityName: "Roiling Mass",
+        }));
+      }
+      continue;
+    }
+    const lost = unsoakedDeaths(players, deaths, c.timestamp);
+    const deathText = lost.length ? ` ${joinNames(lost)} died to the explosion and its damage over time.` : "";
+    if (assigned && life.hitAlive(assigned, c.timestamp) && !inRaiseGrace(life, assigned, c.timestamp)) {
+      errors.push(playerError(assigned, {
+        ruleId: LW1_TOWER_RULE_ID, severity: "Major", name: "Missed Their Tower",
+        description: `${label} was theirs and went unsoaked, so Unmitigated Explosion hit the raid.${deathText} In Line I-IV soak towers 3, 4, 1, 2 in that order.`,
+        timestamp: c.timestamp, abilityId: c.abilityId, abilityName: "Roiling Mass",
+      }));
+    } else {
+      errors.push(playerlessMinor(LW1_TOWER_RULE_ID, "Tower Unsoaked",
+        `${label} went unsoaked${assigned ? `; its soaker ${assigned.name} was dead` : inOrder ? "" : " after the tower order had already broken"}, so Unmitigated Explosion hit the raid.${deathText}`,
+        c.timestamp, c.abilityId, "Roiling Mass"));
+    }
+    if (lost.length >= MASS_DEATHS && !raidDone) {
+      raidDone = true;
+      errors.push(raidMarker(LW1_TOWER_RULE_ID, "Unsoaked Tower Killed the Raid",
+        `${label} went unsoaked and its explosion and damage over time killed ${lost.length} (${joinNames(lost)}). Treated as the cutoff point.`,
+        c.timestamp, UNSOAKED, "Unmitigated Explosion"));
+    }
+  }
+  return errors;
+}
+
+// ── Act 3: Metamitosis towers ───────────────────────────────────────────────
+
+/**
+ * Eight Metamitosis towers land with the Act 3 spreads; each cast's target is
+ * the player who soaked it. An empty tower names the living players who
+ * soaked none when they account for every empty tower (one or two);
+ * otherwise the layout failed as a whole and the error is player-less.
+ */
+function detectMetamitosis(players: PlayerInfo[], life: Life, casts: EnemyEvent[], deaths: DeathEvent[]): PullError[] {
+  const errors: PullError[] = [];
+  const act3 = castsOf(casts, ACT3_CAST)[0];
+  if (!act3) return errors;
+  const towers = castsOf(casts, METAMITOSIS).filter((c) => c.timestamp > act3.timestamp && c.timestamp < act3.timestamp + 25_000);
+  const empty = towers.filter((c) => !c.target);
+  if (!empty.length) return errors;
+  const t = empty[0].timestamp;
+  const soakers = new Set(towers.map((c) => c.target).filter(Boolean));
+  const free = players.filter((p) => !soakers.has(p.name) && life.hitAlive(p, t) && !inRaiseGrace(life, p, t));
+  const lost = unsoakedDeaths(players, deaths, t);
+  const deathText = lost.length ? ` ${joinNames(lost)} died to the explosion and its damage over time.` : "";
+  const why = "Each Metamitosis tower lands on the island opposite its spread; every player soaks the one their partner's spread sends to their corner.";
+  if (empty.length <= 2 && free.length === empty.length) {
+    for (const p of free) {
+      errors.push(playerError(p, {
+        ruleId: LW1_METAMITOSIS_RULE_ID, severity: "Major", name: "Missed a Metamitosis Tower",
+        description: `Soaked no tower while ${empty.length === 1 ? "one Metamitosis tower" : `${empty.length} Metamitosis towers`} went empty, so Unmitigated Explosion hit the raid.${deathText} ${why}`,
+        timestamp: t, abilityId: METAMITOSIS, abilityName: "Metamitosis",
+      }));
+    }
+  } else {
+    errors.push(playerlessMinor(LW1_METAMITOSIS_RULE_ID, "Metamitosis Towers Unsoaked",
+      `${empty.length} of ${towers.length} Metamitosis towers went empty${free.length ? ` (soaking none: ${namesOf(free)})` : ""}, so Unmitigated Explosion hit the raid.${deathText} ${why}`,
+      t, METAMITOSIS, "Metamitosis"));
+  }
+  if (lost.length >= MASS_DEATHS) {
+    errors.push(raidMarker(LW1_METAMITOSIS_RULE_ID, "Unsoaked Towers Killed the Raid",
+      `${empty.length} Metamitosis tower${empty.length === 1 ? "" : "s"} went empty and the explosions killed ${lost.length} (${joinNames(lost)}). Treated as the cutoff point.`,
+      t, UNSOAKED, "Unmitigated Explosion"));
+  }
+  return errors;
+}
+
+// ── deaths with no killing blow: falls ──────────────────────────────────────
+
+/**
+ * No-killing-blow deaths that are the wipe being called, not mistakes. Falls
+ * with the collapsing floor or after a Raptor Knuckles knockback are kept out
+ * even near the end (A15: three fell with the floor 5s before the end).
+ */
+function calledWipeDeaths(players: PlayerInfo[], deaths: DeathEvent[], casts: EnemyEvent[], pullEnd: number): Set<DeathEvent> {
+  const collapses = castsOf(casts, BRING_DOWN_CASTS);
+  const explained = (d: DeathEvent) => collapses.some((c) => c.timestamp <= d.timestamp && c.timestamp >= d.timestamp - FALL_COLLAPSE_MS) ||
+    !!players.find((p) => p.name === d.player)?.damageTaken.some((e) =>
+      (e.abilityId === RAPTOR_KNUCKLES || AVOIDABLE[e.abilityId]) && e.timestamp <= d.timestamp && e.timestamp >= d.timestamp - FALL_KNOCKBACK_MS);
+  const silent = deaths.filter((d) => !d.killingAbilityGameId && !explained(d));
+  const out = new Set<DeathEvent>();
+  for (const d of silent) {
+    if (pullEnd - d.timestamp <= CALLED_WIPE_END_MS) out.add(d);
+    const near = silent.filter((x) => Math.abs(x.timestamp - d.timestamp) <= CALLED_WIPE_WINDOW);
+    if (near.length >= CALLED_WIPE_COUNT) near.forEach((x) => out.add(x));
+  }
+  return out;
+}
+
+function detectFalls(players: PlayerInfo[], deaths: DeathEvent[], casts: EnemyEvent[], called: Set<DeathEvent>): PullError[] {
+  const errors: PullError[] = [];
+  const collapses = castsOf(casts, BRING_DOWN_CASTS);
+  const knockOf = (d: DeathEvent) => players.find((x) => x.name === d.player)?.damageTaken
+    .filter((e) => e.abilityId === RAPTOR_KNUCKLES && e.timestamp <= d.timestamp && e.timestamp >= d.timestamp - FALL_KNOCKBACK_MS).pop();
+  // Four or more thrown off by one knockback: the party stood on the wrong
+  // side (A74 +5:58, six at once). One player-less cutoff, not six errors.
+  const massKnocked = new Set<DeathEvent>();
+  const knocked = deaths.filter((d) => !d.killingAbilityGameId && !called.has(d) && knockOf(d));
+  for (const g of clusterByGap(knocked, (d) => knockOf(d)!.timestamp, 1500)) {
+    if (g.length < MASS_KNOCKED) continue;
+    g.forEach((d) => massKnocked.add(d));
+    const kb = knockOf(g[0])!;
+    errors.push(raidMarker(LW1_FALL_RULE_ID, "Party Knocked Off the Edge",
+      `${g.length} players were knocked off the edge by the same Raptor Knuckles (${joinNames(g.map((d) => d.player))}): the group stood on the wrong side of the hand. Treated as the cutoff point.`,
+      kb.timestamp, RAPTOR_KNUCKLES, "Raptor Knuckles"));
+  }
+  for (const d of deaths) {
+    if (massKnocked.has(d)) continue;
+    if (d.killingAbilityGameId || called.has(d)) continue;
+    const p = players.find((x) => x.name === d.player);
+    if (!p) continue;
+    const hitT = d.timestamp - DEATH_EVENT_LAG_MS;
+    const wd = debuffIntervals(p, WALKING_DEAD).find((w) => Math.abs(w.end - hitT) <= 500 && w.end - w.start >= WALKING_DEAD_FULL_MS);
+    if (wd) {
+      errors.push(playerlessMinor(LW1_FALL_RULE_ID, "Walking Dead Ran Out",
+        `${p.name}'s Walking Dead (from Living Dead) expired before they were healed back to full, and they died. The healers have to heal the Walking Dead tank to full within its 10s.`,
+        wd.end, WALKING_DEAD, "Walking Dead"));
+      continue;
+    }
+    // A death right after an avoidable hit is that hit's error.
+    if (p.damageTaken.some((e) => AVOIDABLE[e.abilityId] && e.timestamp <= d.timestamp && e.timestamp >= d.timestamp - DIED_FROM_HIT_MS)) continue;
+    const kb = p.damageTaken.filter((e) => e.abilityId === RAPTOR_KNUCKLES && e.timestamp <= d.timestamp && e.timestamp >= d.timestamp - FALL_KNOCKBACK_MS).pop();
+    const collapse = collapses.filter((c) => c.timestamp <= d.timestamp && c.timestamp >= d.timestamp - FALL_COLLAPSE_MS).pop();
+    errors.push(playerError(p, {
+      ruleId: LW1_FALL_RULE_ID, severity: "Major",
+      name: kb ? "Knocked Off the Edge" : collapse ? "Fell With the Floor" : "Fell Off the Edge",
+      description: kb
+        ? `Knocked off the edge by Raptor Knuckles (${sec(d.timestamp - kb.timestamp)}s before the death). Stand so the hand's knockback carries you across the arena, or use knockback immunity.`
+        : collapse
+          ? "Fell when Bring Down the House collapsed the floor between the islands. Be on your island before the floor falls."
+          : "Died with no killing blow mid-pull: fell off the edge of the arena or an island.",
+      timestamp: kb ? kb.timestamp : collapse ? collapse.timestamp : hitT,
+      abilityId: kb?.abilityId ?? collapse?.abilityId ?? 0,
+      abilityName: kb ? "Raptor Knuckles" : collapse ? "Bring Down the House" : "Fall",
+    }));
+  }
+  return errors;
+}
+
+// ── entry point ─────────────────────────────────────────────────────────────
+
+/**
+ * Lindwurm (M12S door boss) errors. Self-gates on the boss's signature casts.
+ * Lindwurm II is a separate fight in the log (and on the fallback).
+ */
+export function detectLindwurmErrors(
+  players: PlayerInfo[], deathEvents: DeathEvent[], enemyCasts: EnemyEvent[], occurrences?: ReportedOccurrence[],
+): PullError[] {
+  if (!enemyCasts.some((c) => SIGNATURE.includes(c.abilityId))) return [];
+  const life = buildLife(players, deathEvents);
+  const pullEnd = Math.max(0, ...players.flatMap((p) => [...p.damageTaken, ...p.casts].map((e) => e.timestamp)), ...deathEvents.map((d) => d.timestamp));
+  const called = calledWipeDeaths(players, deathEvents, enemyCasts, pullEnd);
+  const a2 = act2Lines(players, enemyCasts);
+
+  const errors = [
+    ...detectAvoidable(players, life),
+    ...detectCones(players, life, enemyCasts),
+    ...detectPersonalOverlaps(players, life, enemyCasts),
+    ...detectStacks(players, life, enemyCasts),
+    ...detectBusters(players, life, occurrences),
+    ...detectChains(players, life, a2, occurrences),
+    ...detectAct2Towers(players, life, enemyCasts, deathEvents, a2, occurrences),
+    ...detectMetamitosis(players, life, enemyCasts, deathEvents),
+    ...detectFalls(players, deathEvents, enemyCasts, called),
+  ];
+
+  const firstRaid = () => Math.min(...errors.filter((e) => e.severity === "Raid").map((e) => e.timestamp));
+  // Refreshing Overkill ends P1 either way: it kills the raid when the boss
+  // wasn't brought low enough (the kills never let it finish).
+  const enrage = players.flatMap((p) => p.damageTaken.filter((e) => REFRESHING_OVERKILL.includes(e.abilityId) && life.diedFrom(p, e.timestamp)))
+    .sort((a, b) => a.timestamp - b.timestamp)[0];
+  if (enrage && enrage.timestamp < firstRaid()) {
+    errors.push(raidMarker(LW1_ENRAGE_RULE_ID, "Refreshing Overkill (Enrage)",
+      "Refreshing Overkill killed the raid: the boss wasn't brought low enough before the timed transition to Lindwurm II.",
+      enrage.timestamp, enrage.abilityId, "Refreshing Overkill"));
+  }
+  const calledList = deathEvents.filter((d) => called.has(d)).sort((a, b) => a.timestamp - b.timestamp);
+  if (calledList.length >= CALLED_WIPE_COUNT && calledList[0].timestamp - DEATH_EVENT_LAG_MS < firstRaid()) {
+    errors.push(raidMarker(LW1_CALLED_WIPE_RULE_ID, "Wipe Called",
+      `${calledList.length} players died with no killing blow at the end of the pull (${joinNames(uniq(calledList.map((d) => d.player)))}): the wipe was called and the raid reset.`,
+      calledList[0].timestamp - DEATH_EVENT_LAG_MS, 0, "Deaths"));
+  }
+  const outAt = (t: number) => players.filter((p) => !life.alive(p, t));
+  const collapseT = life.outIntervals.map((w) => w.start).sort((a, b) => a - b)
+    .find((t) => outAt(t).length >= COLLAPSE_DEAD_COUNT && pullEnd - t <= COLLAPSE_END_MS);
+  if (collapseT !== undefined && collapseT + DEATH_EVENT_LAG_MS < firstRaid()) {
+    const who = outAt(collapseT).map((p) => p.name);
+    errors.push(raidMarker(LW1_COLLAPSE_RULE_ID, "Party Collapse",
+      `${who.length} players were dead at once (${joinNames(who)}). Treated as the cutoff point.`,
+      collapseT + DEATH_EVENT_LAG_MS, 0, "Deaths"));
+  }
+  return errors.sort((a, b) => a.timestamp - b.timestamp);
+}

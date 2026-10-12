@@ -339,6 +339,13 @@ exposure("targeted", [
   "ffxiv-tyrant-buster", "ffxiv-tyrant-tank-buster", "ffxiv-tyrant-comet-bait",
   "ffxiv-tyrant-fatality-tether", "ffxiv-tyrant-sharp-taste-side", "ffxiv-tyrant-fireball-front",
 ]);
+// Lindwurm (M12S P1): the non-tanks' side of Visceral Burst, each Act 2
+// Unbreakable pair, and each Act 2 tower's In Line soaker (lindwurm-1.ts
+// reports every instance).
+mechanic("ffxiv-lw1-buster", "Visceral Burst (non-tanks)", undefined, ["ffxiv-lw1-buster"]);
+mechanic("ffxiv-lw1-chain", "Act 2 chains (Unbreakable pair)", undefined, ["ffxiv-lw1-chain"]);
+mechanic("ffxiv-lw1-tower", "Act 2 towers (In Line soaker)", undefined, ["ffxiv-lw1-tower"]);
+exposure("targeted", ["ffxiv-lw1-buster", "ffxiv-lw1-chain", "ffxiv-lw1-tower"]);
 // Futures Rewritten P1: the tanks' Powder Mark Trail swap and survival
 // (fatebreaker.ts reports both tanks at every Powder Mark).
 mechanic("ffxiv-fb-powder-swap", "Powder Mark swap", 1, ["ffxiv-fb-powder-swap"]);

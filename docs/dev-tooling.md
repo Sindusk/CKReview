@@ -7,7 +7,9 @@ validation harness (`scripts/validate.js`, `expectations/`), see
 ## Fetching sample data
 
 - **Fetch command:** `node scripts/fetch-wow-report.js <code-or-URL> [--boss "<name>"] [--fight <id>]... [--refetch]`
-  (or `fetch-ff-report.js`).
+  (or `fetch-ff-report.js`). `--boss` matches any fight name containing the
+  text; `fetch-ff-report.js --boss-exact "<name>"` matches the whole name
+  (`Lindwurm` without `Lindwurm II`).
 - **Output:** writes `sampledata/{wow,ff}/<code>/meta.json` plus one
   `<Boss>_Pull<N>.json` per fight. Pull numbers match the app's per-boss
   numbering. A pasted full URL works.
