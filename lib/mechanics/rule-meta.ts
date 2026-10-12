@@ -314,6 +314,15 @@ mechanic("es-protovenom", "Protovenom", undefined, [
 mechanic("ssz-crosswinds", "Crosswinds", undefined, ["wow-ssz-crosswinds-blast"]);
 mechanic("wow-ssz-crosswinds-fall", "Crosswinds knockback", undefined, ["wow-ssz-crosswinds-fall"]);
 exposure("targeted", ["wow-ssz-crosswinds-fall"]);
+// Vamp Fatale (vamp-fatale.ts reports every instance): each rule scoped to
+// the role or group that can fail it.
+mechanic("ffxiv-vf-hardcore", "Hardcore (non-tanks)", undefined, ["ffxiv-vf-hardcore"]);
+mechanic("ffxiv-vf-hardcore-tanks", "Hardcore (tanks)", undefined, ["ffxiv-vf-hardcore-tanks"]);
+mechanic("ffxiv-vf-cell-cone-tank", "Ultrasonic tank cone", undefined, ["ffxiv-vf-cell-cone-tank"]);
+exposure("targeted", [
+  "ffxiv-vf-hardcore", "ffxiv-vf-hardcore-tanks", "ffxiv-vf-flail-tower",
+  "ffxiv-vf-cell-tower", "ffxiv-vf-cell-cone-tank",
+]);
 // Coiled Altar: your own Gravebound fragments and your own ghost
 // (coiled-altar.ts reportOccurrences).
 exposure("targeted", ["wow-ca-gravebound-expired", "wow-ca-ghost-caught", "wow-ca-malevolent-resonance"]);

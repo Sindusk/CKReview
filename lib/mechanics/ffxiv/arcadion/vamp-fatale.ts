@@ -114,9 +114,9 @@
 //   carrier/victim is further (45+ degrees) off their clock spot; both if
 //   neither is; one owner error per explosion listing every victim).
 // ffxiv-vf-hardcore (Major, non-tank hit with both tanks alive and not
-//   dead in the last 30s; also Major on BOTH tanks when each took both
-//   circles within 150ms); ffxiv-vf-hardcore-party (Raid, 3+ non-tanks;
-//   names nobody, per the user).
+//   dead in the last 30s); ffxiv-vf-hardcore-tanks (Major on BOTH tanks
+//   when each took both circles within 150ms); ffxiv-vf-hardcore-party
+//   (Raid, 3+ non-tanks; names nobody, per the user).
 // ffxiv-vf-rain-missed (Major); ffxiv-vf-rain-wipe (Raid, 3+ Rain deaths).
 // ffxiv-vf-aetherletting-overlap (Major on the latest drop furthest from
 //   its spot + Raid); -cross (Major on the puddle owner when a victim was
@@ -131,9 +131,15 @@
 //   ffxiv-vf-doornail (Raid).
 // ffxiv-vf-cell-tower (Major on living set-group members who didn't soak,
 //   then a Raid cutoff: a missed cell tower ends the pull, per the user);
-//   ffxiv-vf-cell-cone (Major on the outside tank whose cone hit an inmate
-//   or another outside player: the tank's spot aims it; Amp/45982 on an
-//   inmate is player-less Minor); ffxiv-vf-last-lash (Major on the inmate).
+//   ffxiv-vf-cell-cone-tank (Major on the outside tank whose cone hit an
+//   inmate or another outside player: the tank's spot aims it);
+//   ffxiv-vf-cell-cone (player-less Minor: Amp/45982 on an inmate, or a
+//   tank cone with no living outside tank); ffxiv-vf-last-lash (Major on
+//   the inmate).
+// Exposure (docs/archive/exposure-plan.md), each rule scoped to who can
+// fail it: Hardcore's tank side the tanks, its non-tank side the living
+// non-tanks; Plummet towers the living tanks; each cell set its role-slot
+// group; each tank cone its outside tank.
 // ffxiv-vf-deathmatch-tower (Major on living non-soakers).
 // ffxiv-vf-enrage (Raid, with the boss's HP % and damage still needed from
 //   the Finale Fatale cast's own HP), ffxiv-vf-collapse (Raid); both only
@@ -424,6 +430,7 @@
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import type { DeathEvent } from "@/types/DeathEvent";
 import type { PullError, EnemyEvent } from "@/types/PullError";
+import type { ReportedOccurrence } from "@/lib/mechanics/occurrences";
 import { angularDistance, compassBearingOf, distanceFromCenter } from "@/lib/mechanics/geometry";
 import { detectFFRoles, type FFRoleSlot } from "@/lib/mechanics/ffxiv/roles";
 import {
@@ -435,6 +442,10 @@ export const VF_STOMP_BAT_RULE_ID         = "ffxiv-vf-stomp-bat";
 export const VF_STOMP_OVERLAP_RULE_ID     = "ffxiv-vf-stomp-overlap";
 export const VF_HARDCORE_RULE_ID          = "ffxiv-vf-hardcore";
 export const VF_HARDCORE_PARTY_RULE_ID    = "ffxiv-vf-hardcore-party";
+// The tanks' side of Hardcore (both busters on both tanks). Split from
+// VF_HARDCORE_RULE_ID, which keeps the non-tanks' side ("Hit by
+// Hardcore"), so each is scoped to who can fail it (user, 2026-10-11).
+export const VF_HARDCORE_TANKS_RULE_ID    = "ffxiv-vf-hardcore-tanks";
 export const VF_RAIN_MISSED_RULE_ID       = "ffxiv-vf-rain-missed";
 export const VF_RAIN_WIPE_RULE_ID         = "ffxiv-vf-rain-wipe";
 export const VF_AETH_OVERLAP_RULE_ID      = "ffxiv-vf-aetherletting-overlap";
@@ -447,6 +458,9 @@ export const VF_BARBED_BURST_RULE_ID      = "ffxiv-vf-barbed-burst";
 export const VF_DOORNAIL_RULE_ID          = "ffxiv-vf-doornail";
 export const VF_CELL_TOWER_RULE_ID        = "ffxiv-vf-cell-tower";
 export const VF_CELL_CONE_RULE_ID         = "ffxiv-vf-cell-cone";
+// The outside tank's aim of the tank cone, split from VF_CELL_CONE_RULE_ID
+// (which keeps the player-less cones whose aimer the log can't tell).
+export const VF_CELL_CONE_TANK_RULE_ID    = "ffxiv-vf-cell-cone-tank";
 export const VF_LAST_LASH_RULE_ID         = "ffxiv-vf-last-lash";
 export const VF_DEATHMATCH_TOWER_RULE_ID  = "ffxiv-vf-deathmatch-tower";
 export const VF_ENRAGE_RULE_ID            = "ffxiv-vf-enrage";
@@ -850,7 +864,7 @@ function detectSaws(players: PlayerInfo[], life: Life, deaths: DeathEvent[]): Pu
 
 // ── Hardcore ────────────────────────────────────────────────────────────────
 
-function detectHardcore(players: PlayerInfo[], life: Life, deaths: DeathEvent[]): PullError[] {
+function detectHardcore(players: PlayerInfo[], life: Life, deaths: DeathEvent[], occurrences?: ReportedOccurrence[]): PullError[] {
   const errors: PullError[] = [];
   const tanks = players.filter((p) => p.role === "Tank");
   // An overlapped tank is usually left too low to survive the next auto.
@@ -858,6 +872,12 @@ function detectHardcore(players: PlayerInfo[], life: Life, deaths: DeathEvent[])
     deaths.some((d) => d.player === p.name && d.timestamp >= hitT && d.timestamp <= hitT + DEATH_EVENT_LAG_MS + 5000);
   for (const g of clusterByGap(hitsOf(players, HARDCORE), (h) => h.e.timestamp, 1500)) {
     const t = g[0].e.timestamp;
+    // Role-only: each Hardcore tests the tanks (split apart) and the living
+    // non-tanks (stay out) — rule-meta exposure.
+    occurrences?.push(
+      { mechanicKey: VF_HARDCORE_TANKS_RULE_ID, timestamp: t, players: tanks.map((p) => p.name) },
+      { mechanicKey: VF_HARDCORE_RULE_ID, timestamp: t, players: players.filter((p) => p.role !== "Tank" && life.hitAlive(p, t)).map((p) => p.name) },
+    );
     // Both circles on both tanks: each tank hit twice within a few dozen ms
     // (P2 +0:21, 40ms apart; the OT died to the next auto-attack). Clean
     // Hardcores hit each tank once; the enlarged version's follow-up hit
@@ -876,7 +896,7 @@ function detectHardcore(players: PlayerInfo[], life: Life, deaths: DeathEvent[])
       }).join("; ");
       for (const p of doubled) {
         errors.push(playerError(p, {
-          ruleId: VF_HARDCORE_RULE_ID, severity: "Major", name: "Hardcore Tankbusters Overlapped",
+          ruleId: VF_HARDCORE_TANKS_RULE_ID, severity: "Major", name: "Hardcore Tankbusters Overlapped",
           description: `Both Hardcore tankbusters landed on both tanks: they stood too close together. Hardcore drops a circle on each of the two tanks, so they have to split apart and each take only their own. ${summary}.`,
           timestamp: taken(p)[0].e.timestamp, abilityId: HARDCORE[0], abilityName: "Hardcore",
         }));
@@ -1048,7 +1068,7 @@ function detectAetherletting(players: PlayerInfo[], life: Life, casts: EnemyEven
 
 // ── Plummet towers, Fatal Flails, Deadly Doornail ───────────────────────────
 
-function detectAdds(players: PlayerInfo[], life: Life, casts: EnemyEvent[], deaths: DeathEvent[]): PullError[] {
+function detectAdds(players: PlayerInfo[], life: Life, casts: EnemyEvent[], deaths: DeathEvent[], occurrences?: ReportedOccurrence[]): PullError[] {
   const errors: PullError[] = [];
   const tanks = players.filter((p) => p.role === "Tank");
   // A Plummet tower nobody soaked: the cast lands with no player hit, then
@@ -1056,6 +1076,8 @@ function detectAdds(players: PlayerInfo[], life: Life, casts: EnemyEvent[], deat
   // so with one tower missed the living tank who took no Plummet is the one.
   for (const wave of clusterByGap(castsOf(casts, PLUMMET), (c) => c.timestamp, 1000)) {
     const t = wave[0].timestamp;
+    // Role-only: each wave tests the living tanks (rule-meta exposure).
+    occurrences?.push({ mechanicKey: VF_FLAIL_TOWER_RULE_ID, timestamp: t, players: tanks.filter((p) => life.hitAlive(p, t)).map((p) => p.name) });
     const soakers = uniq(hitsOf(players, PLUMMET, t - 200, t + 1000).map((h) => h.p));
     const missed = wave.length - soakers.length;
     if (missed <= 0) continue;
@@ -1103,7 +1125,7 @@ function isInmate(p: PlayerInfo, t: number): boolean {
   return !!last && (last.debuffStatus === "applied" || Math.abs(last.timestamp - t) <= 150);
 }
 
-function detectCells(players: PlayerInfo[], life: Life, casts: EnemyEvent[], slots: Slots): PullError[] {
+function detectCells(players: PlayerInfo[], life: Life, casts: EnemyEvent[], slots: Slots, occurrences?: ReportedOccurrence[]): PullError[] {
   const errors: PullError[] = [];
   const sets = castsOf(casts, HELL_IN_A_CELL);
   sets.forEach((c, i) => {
@@ -1111,6 +1133,8 @@ function detectCells(players: PlayerInfo[], life: Life, casts: EnemyEvent[], slo
     const soakers = uniq(hitsOf(players, CELL_SOAK, t, t + 3000).map((h) => h.p));
     const unsoaked = castsOf(casts, UNMITIGATED_EXPL).filter((u) => u.timestamp >= t && u.timestamp <= t + 5000).length;
     const group = i === 0 ? G1 : G2;
+    // Each set tests its role-slot group (rule-meta exposure).
+    occurrences?.push({ mechanicKey: VF_CELL_TOWER_RULE_ID, timestamp: t, players: players.filter((p) => group.includes(slots.get(p)!)).map((p) => p.name) });
     const absent = unsoaked > 0
       ? players.filter((p) => group.includes(slots.get(p)!) && !soakers.includes(p) && life.hitAlive(p, t + 1000))
       : [];
@@ -1138,11 +1162,16 @@ function detectCells(players: PlayerInfo[], life: Life, casts: EnemyEvent[], slo
       const inmates = g.filter((h) => isInmate(h.p, h.e.timestamp));
       const tankCone = g.filter((h) => h.e.abilityId === SPREAD_TANK);
       const aimer = tankCone.find((h) => h.p.role === "Tank" && !isInmate(h.p, h.e.timestamp))?.p;
+      // Each tank cone tests the outside tank who aims it (rule-meta exposure).
+      if (tankCone.length) {
+        const outsideTanks = players.filter((p) => p.role === "Tank" && !isInmate(p, tankCone[0].e.timestamp) && life.hitAlive(p, tankCone[0].e.timestamp));
+        occurrences?.push({ mechanicKey: VF_CELL_CONE_TANK_RULE_ID, timestamp: g[0].e.timestamp, players: (aimer ? [aimer] : outsideTanks).map((p) => p.name) });
+      }
       for (const h of inmates) {
         const died = life.diedFrom(h.p, h.e.timestamp);
         if (h.e.abilityId === SPREAD_TANK && aimer) {
           errors.push(playerError(aimer, {
-            ruleId: VF_CELL_CONE_RULE_ID, severity: "Major", name: "Ultrasonic Cone Hit an Inmate",
+            ruleId: VF_CELL_CONE_TANK_RULE_ID, severity: "Major", name: "Ultrasonic Cone Hit an Inmate",
             description: `Their tank Ultrasonic Spread cone hit ${h.p.name} inside a Charnel Cell (${kFmt(h.e.amount ?? 0)})${died ? `, and ${h.p.name} died` : ""}. The outside tank aims the cone by standing in the gap between the two far-apart towers, away from the cells.`,
             timestamp: h.e.timestamp, abilityId: SPREAD_TANK, abilityName: "Ultrasonic Spread",
           }));
@@ -1160,7 +1189,7 @@ function detectCells(players: PlayerInfo[], life: Life, casts: EnemyEvent[], slo
       if (strays.length && aimer) {
         const killed = strays.filter((h) => life.diedFrom(h.p, h.e.timestamp)).map((h) => h.p);
         errors.push(playerError(aimer, {
-          ruleId: VF_CELL_CONE_RULE_ID, severity: "Major", name: "Ultrasonic Cone Hit the Party",
+          ruleId: VF_CELL_CONE_TANK_RULE_ID, severity: "Major", name: "Ultrasonic Cone Hit the Party",
           description: `Their tank Ultrasonic Spread cone hit ${namesOf(strays.map((h) => h.p))}${killed.length ? ` (${namesOf(killed)} died)` : ""}. The outside tank aims the cone by standing in the gap between the two far-apart towers; they weren't there.`,
           timestamp: strays[0].e.timestamp, abilityId: SPREAD_TANK, abilityName: "Ultrasonic Spread",
         }));
@@ -1208,7 +1237,9 @@ function detectDeathmatch(players: PlayerInfo[], life: Life, casts: EnemyEvent[]
  * Vamp Fatale (M9S) errors. Self-gates on Killer Voice + Vamp Stomp, which
  * no other fight in the sample set casts.
  */
-export function detectVampFataleErrors(players: PlayerInfo[], deathEvents: DeathEvent[], enemyCasts: EnemyEvent[]): PullError[] {
+export function detectVampFataleErrors(
+  players: PlayerInfo[], deathEvents: DeathEvent[], enemyCasts: EnemyEvent[], occurrences?: ReportedOccurrence[],
+): PullError[] {
   if (!enemyCasts.some((c) => c.abilityId === KILLER_VOICE) && !enemyCasts.some((c) => c.abilityId === VAMP_STOMP)) return [];
   const life = buildLife(players, deathEvents);
   const explosions = stompExplosions(players, life);
@@ -1219,11 +1250,11 @@ export function detectVampFataleErrors(players: PlayerInfo[], deathEvents: Death
     ...detectStomp(players, life, explosions, slots),
     ...detectAvoidable(players, life),
     ...detectSaws(players, life, deathEvents),
-    ...detectHardcore(players, life, deathEvents),
+    ...detectHardcore(players, life, deathEvents, occurrences),
     ...detectRain(players, life, deathEvents),
     ...detectAetherletting(players, life, enemyCasts, drops, slots),
-    ...detectAdds(players, life, enemyCasts, deathEvents),
-    ...detectCells(players, life, enemyCasts, slots),
+    ...detectAdds(players, life, enemyCasts, deathEvents, occurrences),
+    ...detectCells(players, life, enemyCasts, slots, occurrences),
     ...detectDeathmatch(players, life, enemyCasts),
   ];
 

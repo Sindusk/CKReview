@@ -1576,7 +1576,7 @@ export function transformFFightToPull(
     ...detectPhase1Errors(players, deathEvents, enemyCastEvents, reportedOccurrences),
     ...detectKefkaSaysErrors(players, deathEvents, enemyCastEvents, kefkaSaysSignals, reportedOccurrences),
     ...detectUltimateKefkaErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
-    ...detectVampFataleErrors(players, deathEvents, enemyCastEvents),
+    ...detectVampFataleErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
     ...detectRedHotDeepBlueErrors(players, deathEvents, enemyCastEvents),
     ...detectTyrantErrors(players, deathEvents, enemyCastEvents),
   ].sort((a, b) => a.timestamp - b.timestamp);
