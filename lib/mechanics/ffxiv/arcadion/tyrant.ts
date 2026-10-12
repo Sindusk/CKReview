@@ -157,6 +157,14 @@
 //   or any within 12s of the end), -collapse (5 dead, pull over within 45s):
 //   Raid, only before any other Raid.
 // The Damage Down causes are excluded from ffxiv-damage-down (error-rules.ts).
+// Split 2026-10-11 so each rule is scoped to who can fail it (exposure,
+// docs/archive/exposure-plan.md): -tank-buster (Tank Cones Overlapped, Lost
+// Enmity, Cone Into the Party: the tanks) from -buster (the non-tanks'
+// side); -comet-bait (Dropped Comet on the Party, Comet Rock Off Its Spot,
+// Comet Dropped on a Rock: each drop's baiters) and -fatality-tether
+// (Missed Foregone Fatality Tether: the tanks) from -meteorain, which stays
+// everyone; -sharp-taste-side (the healers) and -fireball-front (Fire
+// Resistance Down holders) from -stack.
 //
 // Not built: Shockwave line-of-sight (no damage logged), rock collisions,
 // clock-spot attribution of scythe cone / Gust overlaps (both players named),
@@ -527,6 +535,7 @@
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import type { DeathEvent } from "@/types/DeathEvent";
 import type { PullError, EnemyEvent } from "@/types/PullError";
+import type { ReportedOccurrence } from "@/lib/mechanics/occurrences";
 import { yd, kFmt, sec, joinNames, playerError, playerlessMinor, raidMarker, rezzedAt, clusterByGap, debuffIntervals } from "@/lib/mechanics/wow/common";
 import { angularDistance, facingToCompassBearing } from "@/lib/mechanics/geometry";
 import { detectFFRoles, type FFRoleSlot } from "@/lib/mechanics/ffxiv/roles";
@@ -543,6 +552,13 @@ export const TYRANT_FALL_RULE_ID        = "ffxiv-tyrant-fall";
 export const TYRANT_ENRAGE_RULE_ID      = "ffxiv-tyrant-enrage";
 export const TYRANT_COLLAPSE_RULE_ID    = "ffxiv-tyrant-collapse";
 export const TYRANT_CALLED_WIPE_RULE_ID = "ffxiv-tyrant-called-wipe";
+// Errors split out of the rules above so each rule is scoped to who can
+// fail it (user, 2026-10-11; docs/archive/exposure-plan.md):
+export const TYRANT_TANK_BUSTER_RULE_ID    = "ffxiv-tyrant-tank-buster";     // the tanks' Raw Steel cones
+export const TYRANT_COMET_BAIT_RULE_ID     = "ffxiv-tyrant-comet-bait";      // each drop's two baiters
+export const TYRANT_FATALITY_TETHER_RULE_ID = "ffxiv-tyrant-fatality-tether"; // the tanks' interceptions
+export const TYRANT_SHARP_TASTE_RULE_ID    = "ffxiv-tyrant-sharp-taste-side"; // the healers' sides
+export const TYRANT_FIREBALL_FRONT_RULE_ID = "ffxiv-tyrant-fireball-front";  // Fire Resistance Down holders
 
 // ── log IDs (see VERIFIED AGAINST LOGS) ─────────────────────────────────────
 
@@ -1181,7 +1197,9 @@ function eyePartnerErrors(fam: Stack, res: Hit[], players: PlayerInfo[], life: L
   return errors;
 }
 
-function detectStacks(players: PlayerInfo[], life: Life, casts: EnemyEvent[], carriers: Set<PlayerInfo>, slots: Slots): PullError[] {
+function detectStacks(
+  players: PlayerInfo[], life: Life, casts: EnemyEvent[], carriers: Set<PlayerInfo>, slots: Slots, occurrences?: ReportedOccurrence[],
+): PullError[] {
   const errors: PullError[] = [];
   for (const fam of STACKS) {
     for (const res of clusterByGap(hitsOf(players, life, fam.ids), (h) => h.e.timestamp, fam.gap ?? 1500)) {
@@ -1206,13 +1224,15 @@ function detectStacks(players: PlayerInfo[], life: Life, casts: EnemyEvent[], ca
         // A19, A24, A28, B2): the line retargeted onto the group.
         const healers = players.filter((p) => p.role === "Healer");
         if (healers.some((p) => !life.hitAlive(p, t))) continue;
+        // Each Sharp Taste tests the two healers' sides (rule-meta exposure).
+        occurrences?.push({ mechanicKey: TYRANT_SHARP_TASTE_RULE_ID, timestamp: t, players: healers.map((p) => p.name) });
         // A healer in both lines stood on the other healer's side, which put
         // both lines through the same players (A11 +1:35, A18, C5).
         const wrongSide = doubled.filter((p) => p.role === "Healer");
         if (wrongSide.length) {
           for (const p of wrongSide) {
             errors.push(playerError(p, {
-              ruleId: TYRANT_STACK_RULE_ID, severity: killed.length ? "Major" : "Minor", name: "Sharp Taste Wrong Side",
+              ruleId: TYRANT_SHARP_TASTE_RULE_ID, severity: killed.length ? "Major" : "Minor", name: "Sharp Taste Wrong Side",
               description: `Stood in both Sharp Taste lines, on the other healer's side, so both lines fired through the same players (${namesOf(doubled)} took both).${deathText} Each line aims at a healer; the two healers stand on opposite sides of the sword so the lines split the party four and four.`,
               timestamp: t, abilityId: fam.ids[0], abilityName: fam.name,
             }));
@@ -1275,9 +1295,13 @@ function detectStacks(players: PlayerInfo[], life: Life, casts: EnemyEvent[], ca
  * Meteowrath tether) who died taking the biggest hit of their line stood in
  * front of it (the kill's only death, C20 +9:37).
  */
-function detectFireballFronts(players: PlayerInfo[], life: Life): PullError[] {
+function detectFireballFronts(players: PlayerInfo[], life: Life, occurrences?: ReportedOccurrence[]): PullError[] {
   const errors: PullError[] = [];
   for (const res of clusterByGap(hitsOf(players, life, [TWO_WAY, FOUR_WAY]), (h) => h.e.timestamp, 1500)) {
+    // Each charge tests the players carrying the tether's vulnerability.
+    const t0 = res[0].e.timestamp;
+    occurrences?.push({ mechanicKey: TYRANT_FIREBALL_FRONT_RULE_ID, timestamp: t0,
+      players: players.filter((p) => life.hitAlive(p, t0) && hasAura(p, FIRE_RES_DOWN, t0 - 200)).map((p) => p.name) });
     const named = new Set<PlayerInfo>();
     for (const h of res) {
       if (named.has(h.p)) continue;
@@ -1287,7 +1311,7 @@ function detectFireballFronts(players: PlayerInfo[], life: Life): PullError[] {
       if (line.some((x) => realAmount(x.e) > realAmount(h.e))) continue;
       named.add(h.p);
       errors.push(playerError(h.p, {
-        ruleId: TYRANT_STACK_RULE_ID, severity: "Major", name: "Fireball Front With Fire Vulnerability",
+        ruleId: TYRANT_FIREBALL_FRONT_RULE_ID, severity: "Major", name: "Fireball Front With Fire Vulnerability",
         description: `Took the front of ${h.e.abilityName} (${kFmt(realAmount(h.e))}, the largest hit of their line) while carrying Fire Resistance Down II from their tether, and died. The front of each charge takes far more damage; the tether players stand behind a player without the vulnerability.`,
         timestamp: h.e.timestamp, abilityId: h.e.abilityId, abilityName: h.e.abilityName,
       }));
@@ -1298,15 +1322,19 @@ function detectFireballFronts(players: PlayerInfo[], life: Life): PullError[] {
 
 // ── tank busters ────────────────────────────────────────────────────────────
 
-function detectBusters(players: PlayerInfo[], life: Life, casts: EnemyEvent[], slots: Slots): PullError[] {
+function detectBusters(players: PlayerInfo[], life: Life, casts: EnemyEvent[], slots: Slots, occurrences?: ReportedOccurrence[]): PullError[] {
   const errors: PullError[] = [];
   const diedText = (p: PlayerInfo, t: number) => (life.diedFrom(p, t) ? ", and died" : "");
+  // Role-only (rule-meta exposure): the tanks' side and the non-tanks' side
+  // of each buster are separate rules.
+  const nonTanksAt = (t: number) => players.filter((p) => !isTank(p) && life.hitAlive(p, t)).map((p) => p.name);
   // Axe Raw Steel: one shared buster on the tanks. A non-tank in it stood
   // with the tanks (with a tank down it retargets: fallout).
   for (const res of clusterByGap(hitsOf(players, life, RAW_STEEL_AXE), (h) => h.e.timestamp, 1500)) {
     const t = res[0].e.timestamp;
     // A tank dying to this same Raw Steel still held enmity at the cast (A3).
     if (!tanksHealthy(players, life, t - DIED_FROM_HIT_MS)) continue;
+    occurrences?.push({ mechanicKey: TYRANT_BUSTER_RULE_ID, timestamp: t, players: nonTanksAt(t) });
     for (const h of res.filter((x) => !isTank(x.p))) {
       errors.push(playerError(h.p, {
         ruleId: TYRANT_BUSTER_RULE_ID, severity: life.diedFrom(h.p, t) ? "Major" : "Minor", name: "In the Tank Buster",
@@ -1324,6 +1352,10 @@ function detectBusters(players: PlayerInfo[], life: Life, casts: EnemyEvent[], s
     const byInst = new Map<string, Hit[]>();
     for (const h of res) byInst.set(instanceKey(h.e), [...(byInst.get(instanceKey(h.e)) ?? []), h]);
     const tanks = players.filter(isTank);
+    occurrences?.push(
+      { mechanicKey: TYRANT_TANK_BUSTER_RULE_ID, timestamp: t, players: tanks.map((p) => p.name) },
+      { mechanicKey: TYRANT_BUSTER_RULE_ID, timestamp: t, players: nonTanksAt(t) },
+    );
     // Both tanks in both cones: they stood together (A3 +0:26, both died).
     // MT takes the west (northwest) cone, OT the east; a tank on the other's
     // side is the one out of place (user, 2026-10-09, A26 +2:45: the OT).
@@ -1340,7 +1372,7 @@ function detectBusters(players: PlayerInfo[], life: Life, casts: EnemyEvent[], s
     }
     for (const p of doubled) {
       errors.push(playerError(p, {
-        ruleId: TYRANT_BUSTER_RULE_ID, severity: life.diedFrom(p, t) ? "Major" : "Minor", name: "Tank Cones Overlapped",
+        ruleId: TYRANT_TANK_BUSTER_RULE_ID, severity: life.diedFrom(p, t) ? "Major" : "Minor", name: "Tank Cones Overlapped",
         description: `Took both tanks' Raw Steel cones${diedText(p, t)}. Each tank takes their own cone away from the other (Hector: MT northwest, OT northeast).`,
         timestamp: t, abilityId: RAW_STEEL_SCYTHE, abilityName: "Raw Steel",
       }));
@@ -1357,7 +1389,7 @@ function detectBusters(players: PlayerInfo[], life: Life, casts: EnemyEvent[], s
         const lost = tanks.filter((p) => !res.some((h) => h.p === p));
         for (const p of lost.length ? lost : []) {
           errors.push(playerError(p, {
-            ruleId: TYRANT_BUSTER_RULE_ID, severity, name: "Lost Enmity for Raw Steel",
+            ruleId: TYRANT_TANK_BUSTER_RULE_ID, severity, name: "Lost Enmity for Raw Steel",
             description: `A Raw Steel tank cone targeted ${owner.name} instead of a tank, hitting ${namesOf(party)}.${deathText} The cones go to the top two on enmity; both tanks need to hold it.`,
             timestamp: t, abilityId: RAW_STEEL_SCYTHE, abilityName: "Raw Steel",
           }));
@@ -1373,7 +1405,7 @@ function detectBusters(players: PlayerInfo[], life: Life, casts: EnemyEvent[], s
         if (!tank && noCone.length) {
           for (const p of noCone) {
             errors.push(playerError(p, {
-              ruleId: TYRANT_BUSTER_RULE_ID, severity, name: "Lost Enmity for Raw Steel",
+              ruleId: TYRANT_TANK_BUSTER_RULE_ID, severity, name: "Lost Enmity for Raw Steel",
               description: `Took no Raw Steel cone while one went through ${plural(party.length, "party member")} (${namesOf(party)}).${deathText} The cones go to the top two on enmity; both tanks need to hold it and face their cone away from the party.`,
               timestamp: t, abilityId: RAW_STEEL_SCYTHE, abilityName: "Raw Steel",
             }));
@@ -1382,7 +1414,7 @@ function detectBusters(players: PlayerInfo[], life: Life, casts: EnemyEvent[], s
         }
         if (tank) {
           errors.push(playerError(tank, {
-            ruleId: TYRANT_BUSTER_RULE_ID, severity, name: "Raw Steel Cone Into the Party",
+            ruleId: TYRANT_TANK_BUSTER_RULE_ID, severity, name: "Raw Steel Cone Into the Party",
             description: `Their Raw Steel cone hit ${plural(party.length, "party member")} (${namesOf(party)}).${deathText} Each tank faces their cone away from the party stack (Hector: MT northwest, OT northeast, party south).`,
             timestamp: t, abilityId: RAW_STEEL_SCYTHE, abilityName: "Raw Steel",
           }));
@@ -1403,6 +1435,11 @@ function detectBusters(players: PlayerInfo[], life: Life, casts: EnemyEvent[], s
     [GREAT_WALL, "Great Wall of Fire", "Great Wall of Fire is a line buster on the main tank; everyone else stays off the line."],
     [FOREGONE_FATALITY, "Foregone Fatality", "The tanks intercept every Foregone Fatality tether; nobody else takes one."],
   ] as const) {
+    for (const g of clusterByGap(hitsOf(players, life, id), (h) => h.e.timestamp, 1500)) {
+      if (tanksHealthy(players, life, g[0].e.timestamp)) {
+        occurrences?.push({ mechanicKey: TYRANT_BUSTER_RULE_ID, timestamp: g[0].e.timestamp, players: nonTanksAt(g[0].e.timestamp) });
+      }
+    }
     for (const h of hitsOf(players, life, id)) {
       // With 3+ dead the tethers land wherever (user, 2026-10-09, D14 +5:21).
       if (isTank(h.p) || !tanksHealthy(players, life, h.e.timestamp)) continue;
@@ -1426,8 +1463,15 @@ function detectBusters(players: PlayerInfo[], life: Life, casts: EnemyEvent[], s
  * Fireball charges are shared by every non-tank except the next drop's
  * baiters (clean: 6 / 4 / 4 / 6, tanks on the first).
  */
-function detectMeteorain(players: PlayerInfo[], life: Life, casts: EnemyEvent[], deaths: DeathEvent[]): PullError[] {
+function detectMeteorain(players: PlayerInfo[], life: Life, casts: EnemyEvent[], deaths: DeathEvent[], occurrences?: ReportedOccurrence[]): PullError[] {
   const errors: PullError[] = [];
+  // Each Foregone Fatality round tests the tanks' interceptions (rule-meta
+  // exposure); with a tank down the tethers can't all be taken.
+  for (const round of clusterByGap(castsOf(casts, FOREGONE_FATALITY), (c) => c.timestamp, 3000)) {
+    const t = round[0].timestamp;
+    if (!tanksHealthy(players, life, t)) continue;
+    occurrences?.push({ mechanicKey: TYRANT_FATALITY_TETHER_RULE_ID, timestamp: t, players: players.filter(isTank).map((p) => p.name) });
+  }
   const isBaiter = (p: PlayerInfo, k: number) =>
     p.role === (k === 1 ? "Healer" : "DPS") && (k === 1 || (k === 0 ? p.rangeType === "Melee" : p.rangeType !== "Melee"));
   const drops = clusterByGap(hitsOf(players, life, COSMIC_KISS_DROP), (h) => h.e.timestamp, 3000);
@@ -1440,6 +1484,8 @@ function detectMeteorain(players: PlayerInfo[], life: Life, casts: EnemyEvent[],
       .map((c) => players.find((p) => p.name === c.target)).filter((p): p is PlayerInfo => !!p));
     const baiters = targeted.length === 2 ? targeted : players.filter((p) => isBaiter(p, k));
     if (baiters.length !== 2 || !baiters.every((p) => life.hitAlive(p, t))) return; // retargeted: fallout
+    // Each drop tests its two baiters (rule-meta exposure).
+    occurrences?.push({ mechanicKey: TYRANT_COMET_BAIT_RULE_ID, timestamp: t, players: baiters.map((p) => p.name) });
     const extra = uniq(res.map((h) => h.p)).filter((p) => !baiters.includes(p));
     if (!extra.length) return;
     const killed = uniq(res.map((h) => h.p)).filter((p) => life.diedFrom(p, t)?.killingAbilityGameId === COSMIC_KISS_DROP);
@@ -1448,7 +1494,7 @@ function detectMeteorain(players: PlayerInfo[], life: Life, casts: EnemyEvent[],
     if (extra.length >= KISS_ON_GROUP) {
       for (const p of baiters) {
         errors.push(playerError(p, {
-          ruleId: TYRANT_METEORAIN_RULE_ID, severity, name: "Dropped Comet on the Party",
+          ruleId: TYRANT_COMET_BAIT_RULE_ID, severity, name: "Dropped Comet on the Party",
           description: `Comet drop ${k + 1} (${namesOf(baiters)}) also hit ${namesOf(extra)}.${deathText} The baiters carry their comets out to their own corners before they land.`,
           timestamp: t, abilityId: COSMIC_KISS_DROP, abilityName: "Cosmic Kiss",
         }));
@@ -1506,7 +1552,8 @@ function detectMeteorain(players: PlayerInfo[], life: Life, casts: EnemyEvent[],
     }
     for (const p of named) {
       errors.push(playerError(p, {
-        ruleId: TYRANT_METEORAIN_RULE_ID, severity: "Major", name: toRock ? (offSpot.length ? "Comet Rock Off Its Spot" : "Missed Foregone Fatality Tether") : "Comet Dropped on a Rock",
+        ruleId: toRock && !offSpot.length ? TYRANT_FATALITY_TETHER_RULE_ID : TYRANT_COMET_BAIT_RULE_ID,
+        severity: "Major", name: toRock ? (offSpot.length ? "Comet Rock Off Its Spot" : "Missed Foregone Fatality Tether") : "Comet Dropped on a Rock",
         description: why, timestamp: t, abilityId: ROCK_EXPLOSION, abilityName: "Unmitigated Explosion",
       }));
     }
@@ -1717,7 +1764,9 @@ function detectFalls(players: PlayerInfo[], deaths: DeathEvent[], called: Set<De
  * The Tyrant (M11S) errors. Self-gates on the boss's signature casts, which
  * no other fight in the sample set uses.
  */
-export function detectTyrantErrors(players: PlayerInfo[], deathEvents: DeathEvent[], enemyCasts: EnemyEvent[]): PullError[] {
+export function detectTyrantErrors(
+  players: PlayerInfo[], deathEvents: DeathEvent[], enemyCasts: EnemyEvent[], occurrences?: ReportedOccurrence[],
+): PullError[] {
   if (!enemyCasts.some((c) => SIGNATURE.includes(c.abilityId))) return [];
   const life = buildLife(players, deathEvents);
   const pullEnd = Math.max(0, ...players.flatMap((p) => [...p.damageTaken, ...p.casts].map((e) => e.timestamp)), ...deathEvents.map((d) => d.timestamp));
@@ -1728,10 +1777,10 @@ export function detectTyrantErrors(players: PlayerInfo[], deathEvents: DeathEven
   const errors = [
     ...detectAvoidable(players, life),
     ...detectPersonalOverlaps(players, life, enemyCasts, slots),
-    ...detectStacks(players, life, enemyCasts, carriers, slots),
-    ...detectFireballFronts(players, life),
-    ...detectBusters(players, life, enemyCasts, slots),
-    ...detectMeteorain(players, life, enemyCasts, deathEvents),
+    ...detectStacks(players, life, enemyCasts, carriers, slots, occurrences),
+    ...detectFireballFronts(players, life, occurrences),
+    ...detectBusters(players, life, enemyCasts, slots, occurrences),
+    ...detectMeteorain(players, life, enemyCasts, deathEvents, occurrences),
     ...detectTowers(players, life, enemyCasts, deathEvents, carriers),
     ...detectStampede(players, life, deathEvents, called, carriers),
     ...detectFalls(players, deathEvents, called),

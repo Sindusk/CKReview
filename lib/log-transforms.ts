@@ -1578,7 +1578,7 @@ export function transformFFightToPull(
     ...detectUltimateKefkaErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
     ...detectVampFataleErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
     ...detectRedHotDeepBlueErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
-    ...detectTyrantErrors(players, deathEvents, enemyCastEvents),
+    ...detectTyrantErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
   ].sort((a, b) => a.timestamp - b.timestamp);
 
   const fightDurationMs = data.fight.endTime - data.fight.startTime;

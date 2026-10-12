@@ -321,6 +321,19 @@ mechanic("ffxiv-rhdb-floater-tether", "Flame Floater: tether", undefined, ["ffxi
 mechanic("ffxiv-rhdb-xtreme-wave", "Xtreme Wave: lane", undefined, ["ffxiv-rhdb-xtreme-wave"]);
 mechanic("ffxiv-rhdb-xtreme-tether", "Xtreme Wave: tether", undefined, ["ffxiv-rhdb-xtreme-tether"]);
 exposure("targeted", ["ffxiv-rhdb-floater", "ffxiv-rhdb-floater-tether", "ffxiv-rhdb-xtreme-wave", "ffxiv-rhdb-xtreme-tether"]);
+// The Tyrant: tank and non-tank sides of the busters, the comet baiters,
+// the tanks' tether interceptions, the healers' Sharp Taste sides and the
+// Fire Resistance Down holders (tyrant.ts reports every instance).
+mechanic("ffxiv-tyrant-buster", "Tank busters (non-tanks)", undefined, ["ffxiv-tyrant-buster"]);
+mechanic("ffxiv-tyrant-tank-buster", "Raw Steel tank cones", undefined, ["ffxiv-tyrant-tank-buster"]);
+mechanic("ffxiv-tyrant-comet-bait", "Comet baiters", undefined, ["ffxiv-tyrant-comet-bait"]);
+mechanic("ffxiv-tyrant-fatality-tether", "Foregone Fatality tethers", undefined, ["ffxiv-tyrant-fatality-tether"]);
+mechanic("ffxiv-tyrant-sharp-taste-side", "Sharp Taste healer sides", undefined, ["ffxiv-tyrant-sharp-taste-side"]);
+mechanic("ffxiv-tyrant-fireball-front", "Fireball front (fire vulnerable)", undefined, ["ffxiv-tyrant-fireball-front"]);
+exposure("targeted", [
+  "ffxiv-tyrant-buster", "ffxiv-tyrant-tank-buster", "ffxiv-tyrant-comet-bait",
+  "ffxiv-tyrant-fatality-tether", "ffxiv-tyrant-sharp-taste-side", "ffxiv-tyrant-fireball-front",
+]);
 // Vamp Fatale (vamp-fatale.ts reports every instance): each rule scoped to
 // the role or group that can fail it.
 mechanic("ffxiv-vf-hardcore", "Hardcore (non-tanks)", undefined, ["ffxiv-vf-hardcore"]);
