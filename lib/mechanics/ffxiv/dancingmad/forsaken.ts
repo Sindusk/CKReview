@@ -82,6 +82,7 @@
 import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { PullError, EnemyEvent } from "@/types/PullError";
 import type { DeathEvent } from "@/types/DeathEvent";
+import type { ReportedOccurrence } from "@/lib/mechanics/occurrences";
 import { findPlayerPosition } from "@/lib/mechanics/player-position";
 import { ARENA_CENTER, distanceFromCenter } from "@/lib/mechanics/geometry";
 
@@ -693,7 +694,9 @@ function buildTowerLabelsByPlayer(
 export function detectForsakenTowerErrors(
   players:     PlayerInfo[],
   deathEvents: DeathEvent[] = [],
-  enemyCasts:  EnemyEvent[] = []
+  enemyCasts:  EnemyEvent[] = [],
+  /** Sink for the Forsaken stack's targeted instances. */
+  occurrences?: ReportedOccurrence[],
 ): PullError[] {
   // Every Path of Light hit on ANYONE — the reference for which stack-loss
   // instants correspond to a tower that actually resolved (see the
@@ -819,7 +822,7 @@ export function detectForsakenTowerErrors(
   // on. Its confirmedLegitKeys tells the team-based check which players are
   // already proven innocent, so it doesn't re-flag them under a
   // mis-inferred team (see the "stolen stack decrement" case below).
-  const { errors: wrongPositionErrors, confirmedLegitKeys, misattributedConeDeaths } = detectWrongTowerPositionErrors(players, expectedTimestamps, deathEvents, burstTeamByPlayer);
+  const { errors: wrongPositionErrors, confirmedLegitKeys, misattributedConeDeaths } = detectWrongTowerPositionErrors(players, expectedTimestamps, deathEvents, burstTeamByPlayer, occurrences);
   errors.push(...detectOvercrowdedTowerErrors(players, teamByPlayer, labelsByPlayer, expectedTimestamps, confirmedLegitKeys));
   errors.push(...wrongPositionErrors);
   errors.push(...detectLethalConeBaitErrors(players, deathEvents, expectedTimestamps, misattributedConeDeaths));
@@ -1425,7 +1428,8 @@ function detectWrongTowerPositionErrors(
   players:                    PlayerInfo[],
   expectedTimestamps:         Map<string, number>,
   deathEvents:                DeathEvent[] = [],
-  authoritativeTeamByPlayer?: Map<number, "first" | "second">
+  authoritativeTeamByPlayer?: Map<number, "first" | "second">,
+  occurrences?:               ReportedOccurrence[],
 ): { errors: PullError[]; confirmedLegitKeys: Set<string>; misattributedConeDeaths: Set<string> } {
   // Every PoL hit that carries the tower instance and a position snapshot.
   const soaks: TowerSoak[] = [];
@@ -2043,6 +2047,17 @@ function detectWrongTowerPositionErrors(
                   .map((h) => h.actorId)
               )
             : undefined;
+
+        // The stack tests only its holder and their tower partner
+        // (rule-meta exposure). Stamped at the holder's own stack hit, so
+        // it joins that volley's Spelldriver instance; a stack whose hit
+        // isn't in the log names nobody.
+        if (holderHit) {
+          occurrences?.push({
+            mechanicKey: "dm-forsaken-stack", timestamp: holderHit.timestamp,
+            players: [holderSoak.player.name, partnerSoak.player.name],
+          });
+        }
 
         const coneOverlapError = stackConeOverlapError(holderSoak, partnerSoak, pair.tower!, volleyVictims, holderHit);
         const overlappedConeBait = coneOverlapError !== null;

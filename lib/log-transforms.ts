@@ -1568,7 +1568,7 @@ export function transformFFightToPull(
 
   const errors = [
     ...detectPullErrors(players, deathEvents, enemyCastEvents, enemyBuffEvents),
-    ...detectForsakenTowerErrors(players, deathEvents, enemyCastEvents),
+    ...detectForsakenTowerErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
     ...detectBlackHoleErrors(players, deathEvents),
     ...detectLimitCutErrors(players, deathEvents),
     ...detectExdeathErrors(players, deathEvents),

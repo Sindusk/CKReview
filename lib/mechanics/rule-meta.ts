@@ -170,6 +170,12 @@ mechanic("dm-forsaken-stack", "Forsaken: stack", 2, [
   "ffxiv-forsaken-stack-clipped-too-close",
   "ffxiv-forsaken-stack-overlapped-cone-bait",
 ]);
+// The Stack holder and their tower partner (forsaken.ts reports them).
+exposure("targeted", [
+  "ffxiv-forsaken-stack-misplaced",
+  "ffxiv-forsaken-stack-clipped-too-close",
+  "ffxiv-forsaken-stack-overlapped-cone-bait",
+]);
 mechanic("dm-forsaken-enrage-check", "Enrage check (P2)", 2, [
   "ffxiv-forsaken-enrage-check-missed",
 ]);
