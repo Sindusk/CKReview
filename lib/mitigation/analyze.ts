@@ -8,7 +8,7 @@
 // One enemy ability's damage, consecutive events no more than
 // HIT_CLUSTER_GAP_MS apart (the game staggers a hit's events ~45ms per
 // target), landing on HIT_MIN_TARGETS+ players or on tanks only (a tank
-// buster, TANK_HIT_MIN_RAW). A multi-hit attack's waves fall inside the
+// buster: TANK_HIT_MIN_RAW, or taken under an invuln). A multi-hit attack's waves fall inside the
 // gap, and hits starting within JOIN_GAP_MS of the previous one's end are
 // joined to it whatever the ability, so either way one hit can give its
 // targets several parts (HitPart). Each target is judged as if every part
@@ -176,7 +176,7 @@ function beyondMitigation({ player, event }: TargetEvent): boolean {
 // Coffinfiller) is 0.18-0.31x.
 const TANK_HIT_MIN_RAW = 0.4;
 
-function rawOf(event: PlayerEvent): number | undefined {
+export function rawOf(event: PlayerEvent): number | undefined {
   return event.unmitigatedAmount
     ?? (event.multiplier ? ((event.amount ?? 0) + (event.absorbed ?? 0) + (event.overkill ?? 0)) / event.multiplier : undefined);
 }
@@ -231,8 +231,14 @@ function findHitClusters(pull: Pull, playerNames: Set<string>, game: MitigationG
       // killing four non-tanks), or by an enrage.
       const mitigable = names.filter((n) => !beyond.has(n)).length;
       const needed = tankOnly ? 1 : HIT_MIN_TARGETS;
-      if (tankOnly && !busterSized(hit)) return;
-      if (names.length >= needed && mitigable >= needed && dealt) clusters.push(hit);
+      // A tank-only hit taken under an invuln is a buster even when it logs
+      // no damage or raw size: Red Hot and Deep Blue pull A23's opening Hot
+      // Impact, taken alone under Hallowed Ground for 0 (the Tanking view
+      // needs it, and the next Hot Impact keeps its occurrence number).
+      const invulned = tankOnly && hit.some((t) => (t.event.statusIds ?? [])
+        .some((id) => game.statusIndex.get(id)?.entry.kind === "invuln"));
+      if (tankOnly && !busterSized(hit) && !invulned) return;
+      if (names.length >= needed && mitigable >= needed && (dealt || invulned)) clusters.push(hit);
     };
     for (const t of list) {
       const prev = current[current.length - 1];
@@ -479,8 +485,13 @@ function buildTarget(
 }
 
 /** Within an unlisted invulnerability (CatalogEntry.trailingInvulnMs) from this player's own cast. */
-function underTrailingInvuln(player: PlayerInfo, game: MitigationGame, atMs: number): boolean {
-  return game.catalog.some((e) => e.trailingInvulnMs && e.jobs.includes(player.className)
+export function underTrailingInvuln(player: PlayerInfo, game: MitigationGame, atMs: number): boolean {
+  return !!trailingInvulnAt(player, game, atMs);
+}
+
+/** The entry whose unlisted trailing invulnerability covers `atMs`, if any. */
+export function trailingInvulnAt(player: PlayerInfo, game: MitigationGame, atMs: number): CatalogEntry | undefined {
+  return game.catalog.find((e) => e.trailingInvulnMs && e.jobs.includes(player.className)
     && player.casts.some((c) => e.actionIds.includes(c.abilityId) && c.timestamp <= atMs
       && atMs - c.timestamp <= e.durationMs + e.trailingInvulnMs!));
 }

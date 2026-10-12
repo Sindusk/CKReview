@@ -585,11 +585,13 @@ MECHANICS['mitigation-analysis'] = {
     ...requireTsFromRoot('lib/mitigation/optimize.ts'),
     ...requireTsFromRoot('lib/mitigation/debuff-reach.ts'),
     ...requireTsFromRoot('lib/mitigation/ffxiv-catalog.ts'),
+    ...requireTsFromRoot('lib/mitigation/tanking.ts'),
   }),
   async run({ mod, dir }) {
     const pulls = await loadThroughRealPipeline(mod, dir);
     if (!pulls) return;
     const pctOf = (x) => `${Math.round(x * 100)}%`;
+    const mmss = (ms) => `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}`;
     // Boss-debuff reach evidence (lib/mitigation/debuff-reach.ts), per boss
     // over every pull of it in this report, as the dialog does.
     const reachByBoss = new Map();
@@ -654,8 +656,32 @@ MECHANICS['mitigation-analysis'] = {
     // The Analysis view (lib/mitigation/plan.ts, searched by optimize.ts)
     // over the default window: before/after counts, each "do together"
     // group's changes and hit outcomes, and what it leaves alone.
+    // The Tanking view (lib/mitigation/tanking.ts): who held the boss, and
+    // each buster per pull (kind, per-tank margin from full HP after the
+    // follow-up, logged HP before, invuln), then matched across pulls.
+    const tankingPulls = perPull.map((p) => ({ pullId: p.pullId, pullNumber: p.pullNumber,
+      tanking: mod.analyzePullTanking(p.pull, p.hits, mod.FFXIV_MITIGATION) }));
+    console.log(`  TANKING (margin = from full HP, buster + ${mod.FOLLOW_UP_MS / 1000}s follow-up, no healing; [before] = logged HP before)`);
+    for (const { pullNumber, tanking } of tankingPulls) {
+      const holders = tanking.tanking.filter((s) => s.autos >= 3)
+        .map((s) => `${s.player.split(' ')[0]}<-${s.source} ${mmss(s.startMs)}-${mmss(s.endMs)}`).join(', ');
+      const totals = tanking.tanks.map((s) => `${s.player.split(' ')[0]} ${pctOf(s.events.reduce((x, e) => x + e.taken, 0))}` +
+        ` (autos ${pctOf(s.events.filter((e) => e.kind === 'auto').reduce((x, e) => x + e.taken, 0))})`).join(', ');
+      console.log(`    pull ${pullNumber}: taken ${totals}; holding: ${holders || '-'}`);
+      for (const b of tanking.busters) {
+        const tanks = b.tanks.map((t) => `${t.player.split(' ')[0]} ${t.invuln ? `INVULN(${t.invuln})` : pctOf(t.margin)}` +
+          ` [raw ${t.raw === undefined ? '?' : pctOf(t.raw)} x${t.parts}, hit ${pctOf(t.taken)} +${pctOf(t.followUp)}, before ${pctOf(t.before)}]` +
+          `${t.died ? ' DIED' : ''}${t.vulnerable ? ' VULN' : ''}`).join(' | ');
+        console.log(`      ${mmss(b.timestampMs)} ${b.abilityName} #${b.occurrence} ${b.kind} ${b.verdict.toUpperCase()}: ${tanks}`);
+      }
+    }
+    for (const a of mod.aggregateBusters(tankingPulls)) {
+      const kinds = Object.entries(a.kinds).map(([k, n]) => `${k} ${n}`).join(', ');
+      console.log(`    ALL ${mmss(a.medianMs)} ${a.abilityName} #${a.occurrence} pulls=${a.pulls} kind=${a.kind} (${kinds}) ` +
+        `median=${a.medianMargin === undefined ? '-' : pctOf(a.medianMargin)} worst=${a.worstMargin === undefined ? '-' : pctOf(a.worstMargin)} ` +
+        `invuln=${a.invulnPulls} ${a.verdict.toUpperCase()}`);
+    }
     if (perPull.length >= mod.PLAN_MIN_PULLS) {
-      const mmss = (ms) => `${Math.floor(ms / 60000)}:${String(Math.round(ms / 1000) % 60).padStart(2, '0')}`;
       const window = mod.planWindow(perPull);
       const t0 = Date.now();
       const opt = mod.buildMitigationPlan(window, perPull.map((p) => p.hits), mod.FFXIV_MITIGATION, reach);
