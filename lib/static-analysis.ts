@@ -418,6 +418,61 @@ export function computeMechanicStats(ctx: AnalysisContext, filter: AnalysisFilte
   return stats.sort((a, b) => (b.rate ?? -1) - (a.rate ?? -1) || b.failed - a.failed || a.label.localeCompare(b.label));
 }
 
+// ─── Adjusted errors per pull (the Players panel headline) ──────────────────
+
+/**
+ * Each player's Major errors per pull had they faced the raid's typical set
+ * of mechanics (docs/exposure-plan.md, wording settled with the user
+ * 2026-10-11):
+ *
+ *   raid errors per player-pull × their errors ÷ Σ (raid rate per chance ×
+ *   their chances), per boss and mechanic
+ *
+ * over every detailed session, all bosses. Pulls that reach more mechanics
+ * (deeper progression) and targeted mechanics that pick a player more
+ * often both raise the denominator. Assigned duties are left out on both
+ * sides (they're in the Strategy dialog). Equal exposure gives back their
+ * raw rate. Players without detailed pulls are absent from the map.
+ */
+export async function computeAdjustedErrorRates(staticId: number): Promise<Map<number, number | null>> {
+  const base = await loadAnalysisContext(staticId, parseAnalysisFilter(new URLSearchParams()));
+  const actual = new Map<number, number>();
+  const predicted = new Map<number, number>();
+  let raidErrors = 0;
+  let raidPlayerPulls = 0;
+
+  for (const { name: boss } of base.bosses) {
+    const filter = parseAnalysisFilter(new URLSearchParams({ boss }));
+    const ctx = boss === base.boss ? base : await loadAnalysisContext(staticId, filter);
+    for (const p of ctx.pulls) {
+      raidPlayerPulls += p.roster.size;
+      for (const id of p.roster) {
+        if (!actual.has(id)) actual.set(id, 0);
+        if (!predicted.has(id)) predicted.set(id, 0);
+      }
+    }
+    for (const m of computeMechanicStats(ctx, filter)) {
+      if (m.exposure === "assigned" || !m.perPlayer) continue;
+      const chances = m.perPlayer.reduce((s, x) => s + x.chances, 0);
+      const errors = m.perPlayer.reduce((s, x) => s + x.errors, 0);
+      if (chances === 0) continue;
+      const rate = errors / chances;
+      raidErrors += errors;
+      for (const x of m.perPlayer) {
+        actual.set(x.identityId, (actual.get(x.identityId) ?? 0) + x.errors);
+        predicted.set(x.identityId, (predicted.get(x.identityId) ?? 0) + rate * x.chances);
+      }
+    }
+  }
+
+  const raidRate = raidPlayerPulls > 0 ? raidErrors / raidPlayerPulls : 0;
+  const out = new Map<number, number | null>();
+  // No predicted errors means every mechanic they faced went clean for the
+  // whole raid, so they had none either: 0.
+  for (const [id, pred] of predicted) out.set(id, pred > 0 ? raidRate * (actual.get(id) ?? 0) / pred : 0);
+  return out;
+}
+
 /** One counted error of a player, for the fight-timeline strip. */
 export type TimelineError = {
   timestampMs: number;

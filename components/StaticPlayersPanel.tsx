@@ -34,21 +34,30 @@ type PlayerIdentity = {
   totalErrors:  number;
   pullsCount:   number;
   // Majors per pull as a 0–100+ percentage — Minors deliberately excluded,
-  // see the /players route's header comment.
+  // see the /players route's header comment. Shown as errors per pull.
   errorRatePct: number;
+  // The headline: Majors per pull adjusted for which mechanics they were
+  // tested on (detailed sessions only; null without any).
+  adjustedPerPull: number | null;
 };
 
 // Every column the table can be ordered by. `name` sorts ascending by
 // default (A→Z reads naturally); the numeric columns start descending,
-// since "who has the most" is the question being asked of them.
-type SortKey = "name" | "minorErrors" | "majorErrors" | "totalErrors" | "pullsCount" | "errorRatePct";
+// since "who has the most" is the question being asked of them. The
+// default is the adjusted headline (user, 2026-10-11).
+type SortKey = "name" | "minorErrors" | "majorErrors" | "totalErrors" | "pullsCount" | "errorRatePct" | "adjustedPerPull";
 
-const NUMERIC_COLUMNS: { key: SortKey; label: string }[] = [
-  { key: "minorErrors",  label: "Minor Errors" },
-  { key: "majorErrors",  label: "Major Errors" },
-  { key: "totalErrors",  label: "Total Errors" },
-  { key: "pullsCount",   label: "Pulls" },
-  { key: "errorRatePct", label: "% Error Rate" },
+const ADJUSTED_TOOLTIP =
+  "Adjusted for which mechanics they were targeted by and how far their pulls got. Assigned duties are in Strategy. " +
+  "Counts sessions with detailed tracking only.";
+
+const NUMERIC_COLUMNS: { key: SortKey; label: string; title?: string }[] = [
+  { key: "minorErrors",     label: "Minor Errors" },
+  { key: "majorErrors",     label: "Major Errors" },
+  { key: "totalErrors",     label: "Total Errors" },
+  { key: "pullsCount",      label: "Pulls" },
+  { key: "errorRatePct",    label: "Errors / pull", title: "Major errors per pull, every session" },
+  { key: "adjustedPerPull", label: "Adjusted / pull", title: ADJUSTED_TOOLTIP },
 ];
 
 export default function StaticPlayersPanel({
@@ -60,7 +69,7 @@ export default function StaticPlayersPanel({
 }) {
   const [open, setOpen] = useState(false);
   const [players, setPlayers] = useState<PlayerIdentity[] | null>(null);
-  const [sortKey, setSortKey] = useState<SortKey>("majorErrors");
+  const [sortKey, setSortKey] = useState<SortKey>("adjustedPerPull");
   const [sortAsc, setSortAsc] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mergeFrom, setMergeFrom] = useState<number | null>(null);
@@ -93,7 +102,10 @@ export default function StaticPlayersPanel({
     const dir = sortAsc ? 1 : -1;
     return [...players].sort((a, b) => {
       if (sortKey === "name") return a.name.localeCompare(b.name) * dir;
-      const diff = (a[sortKey] - b[sortKey]) * dir;
+      // Players without a value (no detailed sessions) sort last either way.
+      const av = a[sortKey], bv = b[sortKey];
+      if (av === null || bv === null) return av === bv ? a.name.localeCompare(b.name) : av === null ? 1 : -1;
+      const diff = (av - bv) * dir;
       return diff !== 0 ? diff : a.name.localeCompare(b.name);
     });
   }, [players, sortKey, sortAsc]);
@@ -200,6 +212,7 @@ export default function StaticPlayersPanel({
                       <SortableTh
                         key={col.key}
                         label={col.label}
+                        title={col.title}
                         align="right"
                         column={col.key}
                         sortKey={sortKey}
@@ -250,7 +263,10 @@ export default function StaticPlayersPanel({
                         <td style={tdStyle("right")}>{p.majorErrors}</td>
                         <td style={tdStyle("right")}>{p.totalErrors}</td>
                         <td style={tdStyle("right")}>{p.pullsCount}</td>
-                        <td style={tdStyle("right")} title="Major errors per pull">{p.errorRatePct.toFixed(0)}%</td>
+                        <td style={tdStyle("right")} title="Major errors per pull, every session">{(p.errorRatePct / 100).toFixed(2)}</td>
+                        <td style={{ ...tdStyle("right"), fontWeight: 600 }} title={ADJUSTED_TOOLTIP}>
+                          {p.adjustedPerPull === null ? "—" : p.adjustedPerPull.toFixed(2)}
+                        </td>
                         <td style={{ padding: "6px 8px", textAlign: "right" }}>
                           {renamingId !== p.id && (
                             <div style={{ display: "inline-flex", gap: "4px" }}>
@@ -465,6 +481,7 @@ function DeletePlayerDialog({
 
 function SortableTh({
   label,
+  title,
   align,
   column,
   sortKey,
@@ -472,6 +489,7 @@ function SortableTh({
   onSort,
 }: {
   label:   string;
+  title?:  string;
   align:   "left" | "right";
   column:  SortKey;
   sortKey: SortKey;
@@ -490,7 +508,7 @@ function SortableTh({
           gap:            "4px",
           justifyContent: align === "right" ? "flex-end" : "flex-start",
         }}
-        title={`Sort by ${label}`}
+        title={title ? `${title}\nClick to sort by ${label}` : `Sort by ${label}`}
       >
         {label}
         {/* Reserved-width caret so the header doesn't jump as sorting moves. */}

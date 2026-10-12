@@ -14,9 +14,15 @@
 // as their sum) because the Players panel sorts and rates on Majors alone —
 // Minors are noise-level mistakes that shouldn't drag a player's rate
 // around. `errorRatePct` is therefore MAJORS per pull, not all errors.
+//
+// `adjustedPerPull` is the panel's headline: Majors per pull adjusted for
+// which mechanics the player was actually tested on, over detailed
+// sessions only (computeAdjustedErrorRates in lib/static-analysis.ts).
+// Null for a player without detailed sessions.
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { computeAdjustedErrorRates } from "@/lib/static-analysis";
 import { getCurrentUser } from "@/lib/auth";
 
 export async function GET(
@@ -52,6 +58,8 @@ export async function GET(
       },
     },
   });
+
+  const adjusted = await computeAdjustedErrorRates(staticId);
 
   // Identities with no pulls left (every review they appeared in was removed
   // from the static) are hidden rather than deleted: resolvePlayerIdentities
@@ -90,6 +98,7 @@ export async function GET(
       totalErrors:  majorErrors + minorErrors,
       pullsCount,
       errorRatePct: pullsCount > 0 ? (majorErrors / pullsCount) * 100 : 0,
+      adjustedPerPull: adjusted.get(identity.id) ?? null,
     };
   });
 
