@@ -307,6 +307,8 @@ mechanic("tf-globules", "Globules", undefined, [
 mechanic("ula-eggs", "Eggs", undefined, ["wow-ula-egg-hatch"]);
 mechanic("ula-spectral-coils", "Spectral Coils", undefined, ["wow-ula-spectral-coils"]);
 mechanic("ula-blight-vein", "Blight Vein", undefined, ["wow-ula-blight-vein"]);
+// Grasping Fangs tethers its own players (ulatek.ts detectBlightVein).
+exposure("targeted", ["wow-ula-blight-vein"]);
 mechanic("le-final-ascension", "Final Ascension", undefined, ["wow-le-final-ascension"]);
 // The fish carrier is a raid-lead job; element and shard targets are the
 // game's pick (lost-explorers.ts reportOccurrences).

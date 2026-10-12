@@ -147,6 +147,9 @@
 //   wow-ula-enrage           Raid         Fury Unleashed
 //   wow-ula-pull-over        Raid         7 dead / tank death / called wipe
 //
+// Exposure (docs/archive/exposure-plan.md): Blight Vein is targeted — one
+// instance per Grasping Fangs wave, the tethered players responsible.
+//
 // ── GUIDE-DERIVED MODEL (pre-log) ────────────────────────────────────────────
 //
 // Guide- and journal-derived encounter model. Linked spell IDs are
@@ -439,6 +442,7 @@ import {
   pullOverMarker, calledWipe,
 } from "../common";
 import type { WowPullContext } from "../common";
+import type { ReportedOccurrence } from "../../occurrences";
 
 // ─── Ability IDs (log-verified, report JZp82Rm7TzycM94a) ────────────────────
 
@@ -710,9 +714,16 @@ function detectWrath(players: PlayerInfo[], deaths: DeathEvent[], enemyCasts: En
 // ─── Grasping Fangs / Blight Vein ────────────────────────────────────────────
 
 export const ULA_BLIGHT_RULE_ID = "wow-ula-blight-vein";
+// Grasping Fangs lands on its 6 players together; waves are far apart.
+const FANGS_WAVE_GAP_MS = 3000;
 
-function detectBlightVein(players: PlayerInfo[], deaths: DeathEvent[]): PullError[] {
+function detectBlightVein(players: PlayerInfo[], deaths: DeathEvent[], occurrences?: ReportedOccurrence[]): PullError[] {
   const errors: PullError[] = [];
+  // Each tether wave tests its tethered players (rule-meta exposure).
+  const tethers = players.flatMap((p) => applied(p, GRASPING_FANGS).map((e) => ({ p, t: e.timestamp })));
+  for (const wave of clusterByGap(tethers, (x) => x.t, FANGS_WAVE_GAP_MS)) {
+    occurrences?.push({ mechanicKey: "ula-blight-vein", timestamp: wave[0].t, players: [...new Set(wave.map((x) => x.p.name))] });
+  }
   // A tethered player dying before they broke free.
   for (const d of deaths.filter((x) => x.killingAbilityGameId === FANGS_DAMAGE)) {
     const p = players.find((x) => x.name === d.player);
@@ -859,7 +870,7 @@ export function detectUlatekErrors(ctx: WowPullContext): PullError[] {
     ...detectCorpse(players, deaths),
     ...detectPurge(players, deaths),
     ...detectWrath(players, deaths, enemyCasts),
-    ...detectBlightVein(players, deaths),
+    ...detectBlightVein(players, deaths, ctx.occurrences),
     ...detectAddCasts(deaths, enemyCasts),
     ...detectAvoidable(players, deaths),
     ...detectEnrage(players),
