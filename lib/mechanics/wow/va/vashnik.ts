@@ -78,11 +78,16 @@
 //   wow-vash-exploding-infection Minor/Raid  carrier(s) died still infected
 //   wow-vash-dispel-overlap      Major    stacked dispel explosions that killed
 //   wow-vash-plague-wave         Minor/Major victim of a wave
-//   wow-vash-plague-froth        Minor/Major stayed near / overlapped a carrier
+//   wow-vash-plague-froth        Minor/Major non-carrier stayed near a carrier
+//   wow-vash-froth-carrier-overlap Minor/Major carrier overlapped another carrier
 //   wow-vash-stygian-burst       Minor/Major non-holder hit by Stygian Burst
 //   wow-vash-umbral-ejection     Minor/Major hit by a Shrouded Venom's death impact
 //   wow-vash-fangs-swap          Minor/Major other tank didn't taunt Dripping Fangs
 //   wow-vash-pull-over           Raid     5+ dead / unrecovered tank death / Berserk
+//
+// Exposure (docs/archive/exposure-plan.md): targeted per Froth set — the
+// carriers for the carrier overlap, the living non-carriers for standing
+// near; role-only per Dripping Fangs hit — the tanks for the swap.
 //
 // ── GUIDE-DERIVED MODEL (pre-log) ────────────────────────────────────────────
 //
@@ -316,6 +321,7 @@ import {
   aliveAt, raidMarker, pullOverMarker,
 } from "../common";
 import type { WowPullContext } from "../common";
+import type { ReportedOccurrence } from "../../occurrences";
 
 // ─── Ability IDs (log-verified, report kGVX7tafBT2pM1N3) ─────────────────────
 
@@ -641,8 +647,11 @@ function detectPlagueWave(players: PlayerInfo[], deaths: DeathEvent[]): PullErro
 }
 
 export const VASH_PLAGUE_FROTH_RULE_ID = "wow-vash-plague-froth";
+// A carrier overlapping another carrier (split from the non-carrier rule
+// above, 2026-10-11: each is scoped to who can fail it).
+export const VASH_FROTH_CARRIER_RULE_ID = "wow-vash-froth-carrier-overlap";
 
-function detectPlagueFroth(players: PlayerInfo[], deaths: DeathEvent[]): PullError[] {
+function detectPlagueFroth(players: PlayerInfo[], deaths: DeathEvent[], occurrences?: ReportedOccurrence[]): PullError[] {
   type Carry = { p: PlayerInfo; start: number; end: number };
   const carries: Carry[] = players.flatMap((p) => debuffIntervals(p, PLAGUE_FROTH).map((iv) => ({ p, start: iv.start, end: iv.end })));
   const errors: PullError[] = [];
@@ -650,6 +659,13 @@ function detectPlagueFroth(players: PlayerInfo[], deaths: DeathEvent[]): PullErr
     const start = set[0].start;
     const end = Math.max(...set.map((c) => (Number.isFinite(c.end) ? c.end : c.start + 6000)));
     const carriers = new Map(set.map((c) => [c.p, c]));
+    // Each set tests its carriers (spread apart) and the living others
+    // (stay clear) — rule-meta exposure.
+    occurrences?.push(
+      { mechanicKey: VASH_FROTH_CARRIER_RULE_ID, timestamp: start, players: set.map((c) => c.p.name) },
+      { mechanicKey: "vash-plague-froth", timestamp: start,
+        players: players.filter((p) => !carriers.has(p) && aliveAt(p, deaths, start)).map((p) => p.name) },
+    );
     for (const p of players) {
       const carry = carriers.get(p);
       const ticks = hitsOf(p, PLAGUE_FROTH_TICK).filter((e) => e.timestamp > start + FROTH_SPREAD_GRACE_MS && e.timestamp <= end + 300);
@@ -671,7 +687,7 @@ function detectPlagueFroth(players: PlayerInfo[], deaths: DeathEvent[]): PullErr
         .map((o) => ({ name: o.c.p.name, d: Math.hypot(o.pos!.x - at.x!, o.pos!.y - at.y!) }))
         .sort((a, b) => a.d - b.d)[0]?.name;
       errors.push(playerError(p, {
-        ruleId:      VASH_PLAGUE_FROTH_RULE_ID,
+        ruleId:      carry ? VASH_FROTH_CARRIER_RULE_ID : VASH_PLAGUE_FROTH_RULE_ID,
         severity:    died ? "Major" : "Minor",
         name:        carry ? "Froth Carriers Overlapped" : "Stood Near Plague Froth",
         description: carry
@@ -754,9 +770,16 @@ function detectUmbralEjection(players: PlayerInfo[], deaths: DeathEvent[]): Pull
 
 export const VASH_FANGS_SWAP_RULE_ID = "wow-vash-fangs-swap";
 
-function detectFangsSwap(players: PlayerInfo[], deaths: DeathEvent[]): PullError[] {
+function detectFangsSwap(players: PlayerInfo[], deaths: DeathEvent[], occurrences?: ReportedOccurrence[]): PullError[] {
   const tanks = players.filter((p) => p.role === "Tank");
   const errors: PullError[] = [];
+  // Role-only (rule-meta exposure): every Fangs hit is a swap chance for
+  // the tanks alone.
+  const fangHits = tanks.flatMap((t) => t.debuffs.filter((e) =>
+    e.abilityId === DRIPPING_FANGS_DEBUFF && (e.debuffStatus === "applied" || e.debuffStatus === "stack")).map((e) => e.timestamp));
+  for (const g of groupByTime(fangHits, (t) => t, 1000)) {
+    occurrences?.push({ mechanicKey: VASH_FANGS_SWAP_RULE_ID, timestamp: g[0], players: tanks.map((t) => t.name) });
+  }
   for (const tank of tanks) {
     for (const e of tank.debuffs) {
       if (e.abilityId !== DRIPPING_FANGS_DEBUFF || e.debuffStatus !== "stack" || (e.stack ?? 0) < 2) continue;
@@ -826,10 +849,10 @@ export function detectVashnikErrors(ctx: WowPullContext): PullError[] {
     ...detectInfectionDeaths(removals, deaths),
     ...detectDispelOverlap(removals, deaths),
     ...detectPlagueWave(players, deaths),
-    ...detectPlagueFroth(players, deaths),
+    ...detectPlagueFroth(players, deaths, ctx.occurrences),
     ...detectStygianBurst(players, deaths),
     ...detectUmbralEjection(players, deaths),
-    ...detectFangsSwap(players, deaths),
+    ...detectFangsSwap(players, deaths, ctx.occurrences),
   ];
 
   const pullEnd = pullDurationMs ?? lastPlayerEventMs(players);

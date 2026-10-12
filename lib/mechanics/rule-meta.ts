@@ -351,6 +351,10 @@ mechanic("le-final-ascension", "Final Ascension", undefined, ["wow-le-final-asce
 exposure("assigned", ["wow-le-final-ascension"], "Fish carrier");
 exposure("targeted", ["wow-le-elemental-explosion", "wow-le-shards-no-swap"]);
 mechanic("vash-plague-froth", "Plague Froth", undefined, ["wow-vash-plague-froth"]);
+// Froth: carriers overlapping each other vs non-carriers standing near;
+// Dripping Fangs: the tanks' swap (vashnik.ts reports all three).
+mechanic("wow-vash-froth-carrier-overlap", "Plague Froth: carriers", undefined, ["wow-vash-froth-carrier-overlap"]);
+exposure("targeted", ["wow-vash-plague-froth", "wow-vash-froth-carrier-overlap", "wow-vash-fangs-swap"]);
 mechanic("ca-venom-eruption", "Venom Eruption", undefined, ["wow-ca-venom-eruption"]);
 
 /**
