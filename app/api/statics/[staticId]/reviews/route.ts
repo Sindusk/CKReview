@@ -105,7 +105,7 @@ function buildPullsCreateData(
       },
     },
     // Everyone instances go in one batch; targeted/assigned ones are created
-    // one by one with their responsible players (docs/exposure-plan.md).
+    // one by one with their responsible players (docs/archive/exposure-plan.md).
     mechanics: {
       createMany: {
         data: (p.mechanics ?? []).filter((m) => !m.exposure).map((m) => ({

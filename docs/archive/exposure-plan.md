@@ -1,13 +1,37 @@
 # Per-player exposure (build plan)
 
-Status: **planned 2026-10-11, not started.** This is a system-wide change
-to how the Statics analysis counts a player's chances, for both games.
+> **Archived 2026-10-11.** Built. Kept as the design record; the module
+> headers (`lib/mechanics/rule-meta.ts`, `occurrences.ts`,
+> `assignments.ts`, `lib/static-analysis.ts`) are authoritative for
+> current behaviour. Builder tunables, doubtful classifications and
+> unchecked items are in [open-items.md](../open-items.md) ("Statics
+> analysis"). Decisions made while building (user, 2026-10-11):
+> - **Headline:** "Errors / pull" (raw, every session) and "Adjusted /
+>   pull" (the formula below, detailed sessions only, Majors only), sorted
+>   by Adjusted. Tooltip: "Adjusted for which mechanics they were targeted
+>   by and how far their pulls got. Assigned duties are in Strategy."
+> - **Strategy dialog:** layout "sections by kind": assigned duties, then
+>   strategy choices, then party roles. Overrides are saved per report
+>   in the review session.
+> - **Shared duties** (two carriers, no fixed order): a time nobody did it
+>   stays player-less. **Rotations** didn't turn up as such.
+> - **Role-only mechanics** (only one role can fail them) are targeted at
+>   that role. **Mixed rules** get one rule id per target (the tank who
+>   stood wrong vs the DPS who stood in the tank's spot).
+> - **Group duties** (soak groups) are detected from who soaks together;
+>   absent members take a player-less failure.
+> - A late fish thrown after Final Ascension completed is stamped at the
+>   completion so it counts.
+
+Status: **built 2026-10-11** (originally planned the same day). This is a
+system-wide change to how the Statics analysis counts a player's chances,
+for both games.
 
 Read first:
 - the `lib/static-analysis.ts` header (the current counting rules)
 - `lib/mechanics/occurrences.ts` and `lib/mechanics/rule-meta.ts`
 - `components/StrategyDialog.tsx`
-- [docs/archive/static-player-analysis-plan.md](archive/static-player-analysis-plan.md)
+- [docs/archive/static-player-analysis-plan.md](static-player-analysis-plan.md)
 
 ## Why
 
@@ -195,7 +219,7 @@ Commit after each step once `validate.js --check` and `tsc` pass.
 5. **The sweep** over the remaining modules.
 6. **Docs:**
    - `static-analysis.ts` and `rule-meta.ts` headers
-   - [lib/mechanics/README.md](../lib/mechanics/README.md): a new boss
+   - [lib/mechanics/README.md](../../lib/mechanics/README.md): a new boss
      module must classify its mechanics' exposure and report responsible
      players. Add it to the working method.
    - open-items, then archive this file

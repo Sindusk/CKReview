@@ -442,7 +442,7 @@ export function computeMechanicStats(ctx: AnalysisContext, filter: AnalysisFilte
 
 /**
  * Each player's Major errors per pull had they faced the raid's typical set
- * of mechanics (docs/exposure-plan.md, wording settled with the user
+ * of mechanics (docs/archive/exposure-plan.md, wording settled with the user
  * 2026-10-11):
  *
  *   raid errors per player-pull × their errors ÷ Σ (raid rate per chance ×

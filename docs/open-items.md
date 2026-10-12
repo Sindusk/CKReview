@@ -13,7 +13,8 @@ it's resolved. Module headers carry the full context for mechanic items.
   - **Living Venom blame.** Should it fall on the victim (current), the
     orb collector, or both?
   - **Protovenom eruption.** It flags both the marked and the unmarked
-    player. Keep that?
+    player (since 2026-10-11 under two rules: the eruption on the marked,
+    wow-es-protovenom-unmarked on the unmarked). Keep that?
   - **Undispelled Blighted Blood** with no one else hit is a player-less
     Minor. Keep it?
   - **Not built yet:**
@@ -719,15 +720,53 @@ grouped by exact roster. The module headers hold the rules.
 
 ### Statics analysis
 
-- **Per-player exposure planned (user, 2026-10-11):**
-  [exposure-plan.md](exposure-plan.md). Targeted and assigned mechanics
-  count chances per responsible player. Assigned duties move to the
-  Strategy dialog with auto-detection and a saved override. Every module
-  gets classified in a sweep. Venomous Abyss modules will report their
-  own instances, which covers the missing anchors below.
-- **Mechanic anchors missing** for the Kefka Says instructions, the
-  generic Damage Down splits and every Venomous Abyss boss. Those fall back
-  to phase exposure, or pull exposure on bosses without log phases.
+- **Per-player exposure built (2026-10-11):**
+  [archive/exposure-plan.md](archive/exposure-plan.md). Sessions imported
+  before it count every player at every instance until resynced (the
+  analysis says how many).
+  - **Chosen by the builder, not yet confirmed:**
+    - Duty detection (`lib/mechanics/assignments.ts`): single assignee
+      at 75%+ of performed instances; shared at 25%+ each and 75%+
+      together; at least 3 performed instances; a group duty at 2.5+
+      performers per instance on average, groups by co-occurrence
+      (Jaccard 0.4) among players in 25%+ of the instances.
+    - Instance clustering: Coiled Altar fixate/Gravebound refreshes 3s,
+      Ula'tek Grasping Fangs waves 3s and Volatile Purge sets 2s,
+      Entombed Sentinels Protovenom casts 3s, Lost Explorers shard sets
+      5s and element debuffs within 5s of a Frostfire Volley, Guillotine
+      impact within 8s of its mark.
+    - Low chance counts (under 5) are dimmed, not hidden.
+    - Adjusted / pull covers detailed sessions only, Majors only.
+  - **Group duties that look loose:** Hungering Pyre's detected "group"
+    is 11 players (nearly the raid), and Guillotine's main group is 7 for
+    a 5-player soak, so a missed soak names 2-4 absent members. Check
+    against a real raid plan before trusting those names.
+  - **Not checked on VOD (no WoW VODs):** Lost Explorers report B
+    (8PQFgdDh3R9BW71t): pull 1 3:07 late fish, pull 2 1:05 unfed cycle
+    now on the carrier, pulls 4 2:33 / 9 2:37 shard sets on non-tanks,
+    pulls 11 7:17 / 15 7:12 enrage cycles treated as no fish chance.
+  - **Left as everyone after the sweep (doubtful):**
+    - Dancing Mad: Forsaken towers (team inference falls back to timing
+      when the burst inference fails), Forsaken cone baits (a failure
+      flags every candidate), Revolting Ruin OT threat (arguably an
+      assigned OT job).
+    - Red Hot and Deep Blue: Cutback Blaze aim (the target is only
+      computed on a failure), Deep Aerial tower (one failure in 96
+      pulls).
+    - The Tyrant: the rest of Meteorain (Clipped by a Comet, Not Behind
+      a Rock, Missed Fearsome Fireball) mixes scopes; Missed Stampede
+      tower would be "everyone but the two marked".
+    - Vamp Fatale: Last Lash (no clean-instance signal).
+    - Vashnik: dispel overlap (healers, no visible assignment).
+    - Nek'zali: the Soulcoil Well team (needs the Grasping Depths buff).
+    - Ula'tek egg carriers (no stable assignment seen).
+    - Interrupts everywhere (Twin Fangs Visceral Burst, Coiled Altar
+      Wail/Nightfall, Ula'tek add casts, Lost Explorers Icebound
+      Flames): the log shows no kicker, only casts that went through.
+- **Mechanic anchors missing** for the generic Damage Down splits. They
+  fall back to phase exposure, or pull exposure on bosses without log
+  phases. Every Venomous Abyss mechanic without reported instances does
+  the same.
 - **Values never tuned with the user:** death-chain gap 10s and end window
   15s (`lib/static-review-data.ts`), a trend needs 5+ chances
   (`MIN_CHANCES`), "first vs last" compares 3 sessions

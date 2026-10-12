@@ -1,6 +1,6 @@
 // lib/mechanics/assignments.ts
 //
-// Assigned duties (docs/exposure-plan.md): a job the raid lead gives to a
+// Assigned duties (docs/archive/exposure-plan.md): a job the raid lead gives to a
 // player or a group, such as The Lost Explorers' fish carrier or Sszorak's
 // Mutilate soak groups. The boss module reports every instance of an
 // assigned mechanic with the player(s) who performed it

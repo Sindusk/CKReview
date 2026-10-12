@@ -13,6 +13,11 @@ lib/mechanics/
                                 avoidable and unsurvivable hits, penalties and
                                 the pull's cutoff. Boss-agnostic; FFXIV only so far
   player-position.ts          — THE shared "where was player X at time T" lookup
+  rule-meta.ts                — mechanic grouping and each rule's exposure (who it tests)
+  occurrences.ts              — mechanic instances: Dancing Mad anchors plus the
+                                instances modules report with their responsible players
+  assignments.ts              — assigned duties detected across a report (carrier,
+                                shared, soak groups) and applied to the pulls
   geometry.ts                 — distances/angles (two angle conventions — read its header)
   ffxiv/
     roles.ts                  — MT/OT/H1/H2/M1/M2/R1/R2 party-role detector (MT = the
@@ -288,6 +293,30 @@ through four stages, plus a fifth for the damage analysis:
    what each wipe's cutoff was, and list the attribution calls you were
    unsure of as explicit questions. Their VOD review answers them (principle
    6 above).
+
+   **Classify every rule's exposure as part of this stage**
+   ([docs/archive/exposure-plan.md](../../docs/archive/exposure-plan.md)).
+   The Statics count a player's chances by it, so a mechanic left at the
+   default reads bad luck or a job as playing worse:
+   - **everyone** (default): every player is tested at every instance.
+   - **targeted**: only the players the log names at each instance (a
+     debuff, bait or cast target), or only one role when only that role
+     can fail it (a tank swap, the non-tanks' side of a tankbuster).
+   - **assigned**: a job the raid lead gives out (a carrier, a soak
+     group). It goes to the Strategy dialog, not the player ranking.
+
+   One scope per rule id: when a rule blames different targets (the tank
+   who stood wrong vs the DPS who stood in the tank's spot), give each its
+   own rule id (user, 2026-10-11). Then add `exposure()` in
+   `rule-meta.ts` and report **every** instance, clean ones included, with
+   its responsible players: WoW through `ctx.occurrences`, FFXIV through
+   the entry point's `occurrences` sink (lib/mechanics/occurrences.ts
+   ReportedOccurrence). Stamp each instance no later than its errors. For
+   an assigned duty report the performers; `lib/mechanics/assignments.ts`
+   detects the assignee, shared carriers or soak groups across the report.
+   Write the classification in the module header. `validate.js`'s
+   `exposure-ffxiv` / `exposure-wow` and `duty-assignments` entries
+   snapshot the instances and the reassigned failures.
 
 5. **Damage context, after detection settles.** Write the boss's
    `DamageContext` (`lib/damage/types.ts`) in a sibling `damage-context.ts`

@@ -24,7 +24,7 @@ import { occurrenceForError } from "@/lib/mechanics/occurrences";
  * the stored detail changes meaning, so the views can tell sessions apart.
  */
 // 2: mechanic instances carry their exposure and responsible players
-// (docs/exposure-plan.md). Sessions below this count every player at every
+// (docs/archive/exposure-plan.md). Sessions below this count every player at every
 // instance, as before.
 export const STATIC_DETAIL_VERSION = 2;
 

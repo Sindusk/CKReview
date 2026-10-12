@@ -27,7 +27,7 @@
 // start, so their early mechanics show no instances; that is the capture,
 // not the anchors.
 
-// Responsible players (docs/exposure-plan.md): a targeted or assigned
+// Responsible players (docs/archive/exposure-plan.md): a targeted or assigned
 // mechanic (rule-meta.ts exposure) tests only some players at each
 // instance. Its boss module reports each instance with the players the log
 // names (ReportedOccurrence), since it already works out who was involved

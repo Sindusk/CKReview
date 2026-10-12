@@ -244,7 +244,7 @@ model StaticReviewPullMechanic {
   /// "targeted" | "assigned" when the boss module named this instance's
   /// responsible players (StaticReviewPullMechanicPlayer; none = nobody was
   /// responsible). Null = everyone in the pull was exposed. See
-  /// lib/mechanics/rule-meta.ts and docs/exposure-plan.md.
+  /// lib/mechanics/rule-meta.ts and docs/archive/exposure-plan.md.
   exposure    String?
 
   pull    StaticReviewPull                 @relation(fields: [pullId], references: [id], onDelete: Cascade)

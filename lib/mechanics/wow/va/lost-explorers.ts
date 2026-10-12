@@ -862,7 +862,7 @@ function detectPullOver(players: PlayerInfo[], deaths: DeathEvent[], pullEnd: nu
   });
 }
 
-// ─── Responsible players (docs/exposure-plan.md) ─────────────────────────────
+// ─── Responsible players (docs/archive/exposure-plan.md) ─────────────────────
 //
 // Mechanics that test only some players, reported per instance through
 // ctx.occurrences (rule-meta.ts sets their exposure):

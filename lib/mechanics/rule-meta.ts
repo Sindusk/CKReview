@@ -25,7 +25,7 @@
 // neither keeps one mechanic per rule id, so renaming it doesn't break its
 // trend.
 //
-// Exposure (docs/exposure-plan.md) says who a mechanic tests, which sets a
+// Exposure (docs/archive/exposure-plan.md) says who a mechanic tests, which sets a
 // player's chances in the Statics analysis:
 // - "everyone" (the default): every player in the pull, at every instance.
 // - "targeted": only the player(s) the log names at each instance (a

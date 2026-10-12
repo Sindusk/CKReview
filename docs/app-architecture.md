@@ -145,7 +145,21 @@ file's header comment. Mechanic detection has its own guide:
     `sessionReportUrlRef.current` eagerly.
 - **Data semantics:**
   - `errorRatePct` from `/api/statics/[staticId]/players` is **Majors per
-    pull**.
+    pull** (shown as "Errors / pull"). The panel's headline and default
+    sort is `adjustedPerPull` ("Adjusted / pull",
+    `computeAdjustedErrorRates` in `lib/static-analysis.ts`): Majors per
+    pull adjusted for which mechanics the player was tested on, over
+    detailed sessions only.
+  - **Per-player exposure** (`lib/mechanics/rule-meta.ts` exposure,
+    [archive/exposure-plan.md](archive/exposure-plan.md)): targeted and
+    assigned mechanic instances store their responsible players
+    (`StaticReviewPullMechanicPlayer`, detailVersion 2), so a player's
+    chances are their own.
+- **Assigned duties** (`lib/mechanics/assignments.ts`): detected across
+  the loaded report and applied in `displayPulls` (a duty nobody did
+  lands on its assignee or the absent group members). The Strategy
+  dialog shows them first, with a picker whose override is saved in the
+  session (`SavedSession.dutyOverrides`, per report).
   - `reportStartedAt` (the date the log was recorded) can only be captured
     client-side, so older reviews show "—" until they are resynced.
   - Sessions are ordered by `addedAt`.
