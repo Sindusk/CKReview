@@ -30,6 +30,12 @@ philosophy and the data semantics this list assumes.
 - **Two reports from different raids beat one big one.** Label them A/B
   at the top of the header and cite pulls as `A6 +188.9` (The Lost
   Explorers).
+- **Every module must gate its entry point on its own fight** (user,
+  2026-10-12). A rule keyed on nothing boss-specific, such as "any
+  environmental death", otherwise fires on every fight. Dancing Mad's
+  jump-off cutoff put 234 Raid markers on five other fights before
+  phase1.ts gated on Kefka's casts. `refine-module`'s `pull-errors.js
+  --summary` shows rule ids from other modules when one leaks.
 - **A checkpoint stub can share the fight's name.** A Lindwurm II
   checkpoint resume was logged as "Lindwurm" (Refreshing Overkill at
   +0:01, then a reset). Self-gate on signature casts so the module skips

@@ -1003,18 +1003,13 @@ grouped by exact roster. The module headers hold the rules.
    `lib/mechanics/PITFALLS.md`. Try them on the next boss and fix whatever
    step the session stumbles on. Still open: a `/research-boss` skill for
    the model-writing stage.
-2. **Dancing Mad's `ffxiv-phase1-jumped-off-arena` runs on every FFXIV
-   fight** (user decision). `detectJumpedOffArenaError` (phase1.ts) has no
-   boss gate. Any environmental death in the first phase window becomes a
-   Raid cutoff:
-   - on Lindwurm (H9fnVZgPA3krpCzY pull 4), alongside the module's own
-     cutoffs;
-   - on Futures Rewritten (39 pulls in FbxL2QZhG7df3Ry4) and The Epic of
-     Alexander.
-
-   Gating it on Kefka casts removes those markers. Decide whether those
-   fights should lose it (their own modules or the fallback mark
-   cutoffs), then gate it.
+2. **A shared FFXIV "jumped off to call the wipe" helper** (user idea,
+   2026-10-12). Jumping off the arena is a common way to call a wipe, but
+   whether it is one depends on the fight. A general helper could live in
+   an FFXIV common module, for modules to opt into per fight. Background:
+   until 2026-10-12, Dancing Mad's phase1.ts applied its jump rule to every
+   FFXIV fight. It is now gated to Dancing Mad (user: a fight's module must
+   not affect other fights).
 3. **Fixture curation.** Keep the smallest set of reports that exercises
    every rule's known failure modes.
 4. **Baselines for cross-pull strategy output** (Black Hole lanes, kick

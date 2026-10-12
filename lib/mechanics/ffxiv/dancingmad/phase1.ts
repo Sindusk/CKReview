@@ -1253,6 +1253,8 @@ export const GRAVEN_3_STACK_RULE_ID = "ffxiv-phase1-graven3-stack-missed";
 
 const BLIZZARD_III_BLOWOUT_ABILITY_IDS = new Set([47765, 47768, 47771, 47774]);
 const DAMAGE_DOWN_ABILITY_ID = 1002911;
+// Phase 1's boss actor: casts from Kefka gate the module to Dancing Mad.
+const DANCING_MAD_BOSS = "Kefka";
 
 // Hyperdrive (49739): an untelegraphed tankbuster, no castbar of its own —
 // per the raid's strategy sheet, it fires immediately after Light of
@@ -4644,9 +4646,12 @@ function detectTeleTrouncingBaitPositionErrors(players: PlayerInfo[], enemyCasts
 }
 
 /**
- * Returns [] immediately for any pull that never touches Phase 1's tracked
- * abilities — self-gating the same way exdeath.ts does, so it's safe to
- * always call.
+ * Returns [] for any pull that isn't Dancing Mad (no cast by Kefka), so it's
+ * safe to always call. Several rules here key on nothing boss-specific: the
+ * jumped-off-arena cutoff fires on any environmental death, and it put
+ * Raid cutoffs on Futures Rewritten, The Epic of Alexander, Red Hot and Deep
+ * Blue, The Tyrant and Lindwurm pulls until this gate (user, 2026-10-12:
+ * a Dancing Mad module must not affect other fights).
  */
 export function detectPhase1Errors(
   players:     PlayerInfo[],
@@ -4655,6 +4660,7 @@ export function detectPhase1Errors(
   /** Sink for the targeted instances (Confetti holders, Graven 2 spreaders). */
   occurrences?: ReportedOccurrence[],
 ): PullError[] {
+  if (!enemyCasts.some((c) => c.actorName === DANCING_MAD_BOSS)) return [];
   const blizzardIIISilentKillErrors = detectBlizzardIIIBlowoutSilentKillErrors(players, deathEvents);
   const revoltingRuinThreatLossErrors = detectRevoltingRuinThreatLossErrors(players, deathEvents);
   const graven2SpreadMisplacedErrors = detectGraven2SpreadMisplacedErrors(players, occurrences);
