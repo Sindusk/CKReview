@@ -37,6 +37,11 @@ lib/mechanics/
                                 Maddening Orchestra, Celestriad towers, Stray
                                 Apocalypse, Forsaken ground, Null enrage, collapse)
       blackhole-strategy.ts   — cross-pull strategy auto-detect (DSA/SDA/Double Tether)
+    fru/                      — Futures Rewritten (Ultimate); one pull, five phases
+      fatebreaker.ts          — Phase 1 per-pull rules (Cyclonic Break, Powder Mark /
+                                Burn Mark, Utopian Sky, Fated Burn Mark tethers,
+                                Fall of Faith, towers, deathwall knocks, enrage).
+                                The other four files are research models only
     arcadion/                 — AAC Heavyweight (Savage)
       vamp-fatale.ts          — Vamp Fatale (M9S) per-pull rules (Stomp bats and
                                 Bombpyre overlaps, Aetherletting drops/lines/overlap,
@@ -148,7 +153,10 @@ report-wide context or user-selectable configuration.
 **The fallback model** (`fallback.ts`) is cross-pull detection for every
 boss without an encounter module. It is listed by fight name in its
 `COVERED_ENCOUNTERS`, so **a new boss module must add its fight name
-there**, or the fallback keeps running beside it. On fallback pulls it
+there**, or the fallback keeps running beside it. A module covering only
+some phases of a multi-phase fight goes in `MODULE_PHASES` instead (by the
+log's phase ids): the fallback keeps running on those pulls but drops its
+errors inside the covered phases (Futures Rewritten P1). On fallback pulls it
 replaces the generic `ffxiv-damage-down` rule. Keep it boss-agnostic: a fix
 for one boss belongs in that boss's module, not here.
 
@@ -618,6 +626,32 @@ The same principles apply when refining any module:
 - **Carrier identity from cast targets, not hit counts.** Atomic Impact's
   puddles chained through the group (six players with 3+ hits); the casts
   name exactly the two carriers.
+
+### Lessons from Fatebreaker (FRU P1: 197 pulls over three reports, 18 P1 clears)
+
+- **One pull, several modules: stop at the next phase.** The module ends
+  at the first cast by a Phase 2 actor and ignores deaths after it; the
+  fallback drops its own errors inside P1 (`MODULE_PHASES`). Use the next
+  phase's first cast, not a fixed offset: P1 clears handed over between
+  +2:49 and +2:58.
+- **Phase clears are the clean baseline when there is no kill.** A cast
+  that looks like the enrage (the third Burnished Glory) went off in every
+  P1 clear too, with the boss under 1%; only pulls that never reached P2
+  died to it.
+- **The partner resolution names a group.** Fall of Faith's tethers 1/3
+  and 2/4 resolve on the same four players. A clean resolution on one side
+  tells who belonged in a failed one on that side, so a short soak names
+  its missing members with no positions or assignments.
+- **Process of elimination for towers.** The Explosion ID says how many a
+  tower needs; with every soaker alive, a short tower blames a non-tank in
+  no tower, else the extras in an overfilled one. The groups' fill orders
+  differed, so a fixed assignment table would have misnamed players.
+- **A knockback into the deathwall leaves a fixed delay.** No-killing-blow
+  deaths 2.8-3.5s after Blastburn are knocks, even four at once; keep them
+  out of the called-wipe count, which otherwise swallowed them.
+- **Deaths with no killing blow after a Damage Down are resets.** Players
+  walked into the wall 4-8s after their own Damage Down to clear it; the
+  Damage Down's cause is the error.
 
 ### Lessons from Ultimate Kefka (a late phase, 29 pulls, no kill)
 

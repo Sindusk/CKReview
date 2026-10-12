@@ -302,6 +302,14 @@ const MECHANICS = {
     },
   },
 
+  fatebreaker: {
+    game: 'ff',
+    load: () => requireTsFromRoot('lib/mechanics/ffxiv/fru/fatebreaker.ts'),
+    run({ mod, ctxs }) {
+      for (const c of ctxs) printPullErrors(c, mod.detectFatebreakerErrors(c.relPlayers(), c.relDeaths(), c.relEnemyCasts()));
+    },
+  },
+
   stompies: {
     game: 'ff',
     load: () => requireTsFromRoot('lib/mechanics/ffxiv/dancingmad/stompies.ts'),

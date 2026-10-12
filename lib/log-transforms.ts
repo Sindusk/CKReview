@@ -70,6 +70,7 @@ import { detectUltimateKefkaErrors } from "./mechanics/ffxiv/dancingmad/ultimate
 import { detectVampFataleErrors } from "./mechanics/ffxiv/arcadion/vamp-fatale";
 import { detectRedHotDeepBlueErrors } from "./mechanics/ffxiv/arcadion/red-hot-deep-blue";
 import { detectTyrantErrors } from "./mechanics/ffxiv/arcadion/tyrant";
+import { detectFatebreakerErrors } from "./mechanics/ffxiv/fru/fatebreaker";
 import { detectWowEncounterErrors } from "./mechanics/wow/registry";
 import { buildPullPhaseSegments } from "./pull-phases";
 import { computeMechanicOccurrences, mergeReportedOccurrences, type ReportedOccurrence } from "./mechanics/occurrences";
@@ -1579,6 +1580,7 @@ export function transformFFightToPull(
     ...detectVampFataleErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
     ...detectRedHotDeepBlueErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
     ...detectTyrantErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
+    ...detectFatebreakerErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
   ].sort((a, b) => a.timestamp - b.timestamp);
 
   const fightDurationMs = data.fight.endTime - data.fight.startTime;

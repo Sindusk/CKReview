@@ -144,6 +144,20 @@ const COVERED_ENCOUNTERS: Record<Pull["game"], Set<string>> = {
   ]),
 };
 
+// Encounters whose early phases have a module, by fight name and the log's
+// phase ids: the fallback still runs on these pulls but reports nothing
+// inside those phases (Futures Rewritten: fatebreaker.ts owns P1). A pull
+// without phase data keeps every fallback error.
+const MODULE_PHASES: Record<string, number[]> = {
+  "Futures Rewritten": [1],
+};
+
+/** `t` (ms into the pull) falls in a phase an encounter module covers. */
+function inModulePhase(pull: Pull, t: number): boolean {
+  const ids = MODULE_PHASES[pull.name];
+  return !!ids && !!pull.phaseSegments?.some((s) => ids.includes(s.phase) && t >= s.startMs && t < s.endMs);
+}
+
 const RESOLUTION_GAP_MS = 1_000;
 const EPISODE_GAP_MS = 10_000;
 const MIN_CLEAN_STACK_EPISODES = 2;
@@ -821,7 +835,7 @@ export function detectFallbackErrors(pull: Pull, profile: FallbackProfile): Pull
   for (const e of out) {
     if (STACK_NOTE_RULES.has(e.ruleId)) e.description += stackNote(profile, pull, e.abilityName, e.timestamp);
   }
-  return [...out, ...marker].sort((a, b) => a.timestamp - b.timestamp);
+  return [...out, ...marker].filter((e) => !inModulePhase(pull, e.timestamp)).sort((a, b) => a.timestamp - b.timestamp);
 }
 
 /**

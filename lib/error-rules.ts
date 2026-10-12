@@ -204,6 +204,14 @@ export const ERROR_RULES: PullErrorRule[] = [
       46136,   // Explosion (spent comet)
       46145, 46146, 46165,                                   // Majestic Meteor / Meteorain / Stampede Meteor
       46164,   // Atomic Impact
+      // Futures Rewritten P1: fatebreaker.ts owns these.
+      40146,   // Cyclonic Break follow-up cones
+      40157,   // Blasting Zone
+      40152, 40153,                                          // Brightfire
+      40161, 40163, 40129, 40133,                            // Burnt Strike
+      40164, 40134,                                          // Burnout
+      40331,   // Fated Burn Mark explosion
+      40132, 40136,                                          // Unmitigated Explosion (tower)
     ],
   },
 

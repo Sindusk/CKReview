@@ -339,6 +339,11 @@ exposure("targeted", [
   "ffxiv-tyrant-buster", "ffxiv-tyrant-tank-buster", "ffxiv-tyrant-comet-bait",
   "ffxiv-tyrant-fatality-tether", "ffxiv-tyrant-sharp-taste-side", "ffxiv-tyrant-fireball-front",
 ]);
+// Futures Rewritten P1: the tanks' Powder Mark Trail swap and survival
+// (fatebreaker.ts reports both tanks at every Powder Mark).
+mechanic("ffxiv-fb-powder-swap", "Powder Mark swap", 1, ["ffxiv-fb-powder-swap"]);
+mechanic("ffxiv-fb-powder-death", "Powder Mark / Burn Mark survival", 1, ["ffxiv-fb-powder-death"]);
+exposure("targeted", ["ffxiv-fb-powder-swap", "ffxiv-fb-powder-death"]);
 // Vamp Fatale (vamp-fatale.ts reports every instance): each rule scoped to
 // the role or group that can fail it.
 mechanic("ffxiv-vf-hardcore", "Hardcore (non-tanks)", undefined, ["ffxiv-vf-hardcore"]);
