@@ -191,7 +191,7 @@ export function dutyRecords(pulls: Pull[], duty: DutyAssignment): DutyRecord[] {
         if (e.player !== player || (e.severity !== "Major" && e.severity !== "Minor")) continue;
         if (cutoff !== null && e.timestamp > cutoff) continue;
         if (getRuleMeta(e.ruleId, e.name).mechanicKey !== duty.mechanicKey) continue;
-        const n = occurrenceForError(pull.mechanicOccurrences, duty.mechanicKey, e.timestamp);
+        const n = occurrenceForError(pull.mechanicOccurrences, duty.mechanicKey, e.timestamp, player);
         if (n === null || failed.has(n)) continue;
         failed.add(n);
         failures.push({ pullNumber: pull.pullNumber, timestamp: e.timestamp, name: e.name });

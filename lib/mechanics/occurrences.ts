@@ -193,19 +193,26 @@ export function mergeReportedOccurrences(
 
 /**
  * The instance an error at `timestampMs` belongs to: the latest one starting
- * no later than OCCURRENCE_LEAD_MS after it. Null when the mechanic has no
+ * no later than OCCURRENCE_LEAD_MS after it — the latest such one naming
+ * `player` when there is one. Null when the mechanic has no
  * instance that early (or no anchors at all).
  */
 export function occurrenceForError(
   occurrences: MechanicOccurrence[] | undefined,
   mechanicKey: string,
   timestampMs: number,
+  player?: string | null,
 ): number | null {
   if (!occurrences) return null;
   let found: number | null = null;
+  let mine: number | null = null;
   for (const o of occurrences) {
     if (o.mechanicKey !== mechanicKey) continue;
-    if (o.timestamp <= timestampMs + OCCURRENCE_LEAD_MS) found = o.occurrence;
+    if (o.timestamp > timestampMs + OCCURRENCE_LEAD_MS) continue;
+    found = o.occurrence;
+    if (player && o.players?.includes(player)) mine = o.occurrence;
   }
-  return found;
+  // Per-player instances overlap in time (each fixate or debuff is its own
+  // instance), so a player's error belongs to the latest one naming them.
+  return mine ?? found;
 }

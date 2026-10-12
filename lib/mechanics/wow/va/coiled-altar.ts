@@ -144,6 +144,9 @@
 //                                          Noxious Ground
 //   wow-ca-pull-over           Raid         6 dead / tank death / called wipe
 //
+// Exposure: Gravebound, ghost-caught and Malevolent Resonance are targeted
+// (see "Responsible players" above the entry point).
+//
 // ── GUIDE-DERIVED MODEL (pre-log) ────────────────────────────────────────────
 //
 // Guide- and journal-derived encounter model. Linked spell IDs are
@@ -431,6 +434,7 @@ import {
   landed, total, died, deathsBy, applied, removed, raidMarker, pullOverMarker, calledWipe,
 } from "../common";
 import type { WowPullContext } from "../common";
+import type { ReportedOccurrence } from "../../occurrences";
 
 // ─── Ability IDs (log-verified, report wThYvpJkbK6Pjrdc) ────────────────────
 
@@ -906,11 +910,39 @@ function detectPullOver(players: PlayerInfo[], deaths: DeathEvent[], pullEnd: nu
 
 // ─── Entry point ─────────────────────────────────────────────────────────────
 
+// ─── Responsible players (docs/archive/exposure-plan.md) ─────────────────────
+//
+// Targeted mechanics, one instance per player per debuff they were given
+// (each its own instance; an error matches the latest one naming its
+// player): Gravebound (wow-ca-gravebound-expired: collect your own
+// fragments) and Unnerving Fixation (wow-ca-ghost-caught and
+// wow-ca-malevolent-resonance: steer your own ghost). Refreshes within
+// REPEAT_MS of the last application are the same instance.
+
+const REPEAT_MS = 3000;
+
+function reportOccurrences(players: PlayerInfo[], occurrences: ReportedOccurrence[]): void {
+  const each = (id: number, keys: string[]) => {
+    for (const p of players) {
+      let last = -Infinity;
+      for (const e of applied(p, id)) {
+        if (e.timestamp - last > REPEAT_MS) {
+          for (const mechanicKey of keys) occurrences.push({ mechanicKey, timestamp: e.timestamp, players: [p.name] });
+        }
+        last = e.timestamp;
+      }
+    }
+  };
+  each(GRAVEBOUND, [CA_GRAVEBOUND_RULE_ID]);
+  each(UNNERVING_FIXATION, [CA_GHOST_CAUGHT_RULE_ID, CA_RESONANCE_RULE_ID]);
+}
+
 export function detectCoiledAltarErrors(ctx: WowPullContext): PullError[] {
   const { players, deaths, enemyCasts, enemyBuffs, enemyBuffRemovals, pullDurationMs } = ctx;
   // Self-gate: tank deaths and generic damage exist in every fight.
   const isCoiledAltar = players.some((p) => p.debuffs.some((e) => COILED_ALTAR_SIGNATURE.has(e.abilityId)));
   if (!isCoiledAltar) return [];
+  if (ctx.occurrences) reportOccurrences(players, ctx.occurrences);
 
   const pullEnd = pullDurationMs ?? lastPlayerEventMs(players);
 

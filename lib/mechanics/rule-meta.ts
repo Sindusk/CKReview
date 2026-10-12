@@ -278,6 +278,9 @@ mechanic("es-protovenom", "Protovenom", undefined, [
 mechanic("ssz-crosswinds", "Crosswinds", undefined, ["wow-ssz-crosswinds-blast"]);
 mechanic("wow-ssz-crosswinds-fall", "Crosswinds knockback", undefined, ["wow-ssz-crosswinds-fall"]);
 exposure("targeted", ["wow-ssz-crosswinds-fall"]);
+// Coiled Altar: your own Gravebound fragments and your own ghost
+// (coiled-altar.ts reportOccurrences).
+exposure("targeted", ["wow-ca-gravebound-expired", "wow-ca-ghost-caught", "wow-ca-malevolent-resonance"]);
 // Possession Barrage: the debuffed tank kites it (nekzali.ts).
 exposure("targeted", ["wow-nek-barrage-short"]);
 mechanic("ssz-cysts", "Cysts", undefined, [

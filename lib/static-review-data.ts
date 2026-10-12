@@ -196,7 +196,7 @@ function computePullErrorDetail(pull: Pull, cutoff: number | null): StaticReview
     severity:    e.severity,
     timestampMs: Math.round(e.timestamp),
     phase:       phaseAt(pull.phaseSegments, e.timestamp),
-    occurrence:  occurrenceForError(pull.mechanicOccurrences, getRuleMeta(e.ruleId, e.name).mechanicKey, e.timestamp),
+    occurrence:  occurrenceForError(pull.mechanicOccurrences, getRuleMeta(e.ruleId, e.name).mechanicKey, e.timestamp, e.player),
     afterCutoff: cutoff !== null && e.timestamp > cutoff,
   }));
 }
