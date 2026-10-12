@@ -309,6 +309,10 @@ mechanic("es-protovenom", "Protovenom", undefined, [
   "wow-es-protovenom-eruption",
   "wow-es-protovenom-ticks",
 ]);
+// Protovenom: the marked players (above) vs the unmarked making space
+// (entombed-sentinels.ts reports both).
+mechanic("wow-es-protovenom-unmarked", "Protovenom: unmarked", undefined, ["wow-es-protovenom-unmarked"]);
+exposure("targeted", ["wow-es-protovenom-eruption", "wow-es-protovenom-ticks", "wow-es-protovenom-unmarked"]);
 // The knockback tests only the aura holders, the blast everyone else, so
 // they are two mechanics (one exposure each).
 mechanic("ssz-crosswinds", "Crosswinds", undefined, ["wow-ssz-crosswinds-blast"]);

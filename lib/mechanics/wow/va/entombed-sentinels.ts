@@ -114,7 +114,8 @@
 //   wow-es-helical-unresolved   still holding toxins at expiry
 //   wow-es-helical-collapse     Raid at the first overload of a Stasis (or
 //                               >=3 toxin deaths without one)
-//   wow-es-protovenom-eruption  marked<->unmarked collision (both flagged)
+//   wow-es-protovenom-eruption  marked<->unmarked collision: the marked collider
+//   wow-es-protovenom-unmarked  the same collision: the unmarked player
 //   wow-es-protovenom-ticks     died to Protovenom ticks before pairing
 //   wow-es-miasma-missed-soak   thin Miasma soak: flags the Blood-team
 //                               members who were out of it
@@ -131,7 +132,9 @@
 //                               not separated, Berserk) when no mechanic Raid
 //                               error came first — see "When was the pull over?"
 //
-// Exposure (docs/archive/exposure-plan.md): the Blighted Blood pool
+// Exposure (docs/archive/exposure-plan.md): Protovenom is targeted per
+// cast — the marked players for the eruption and the ticks, the living
+// unmarked ones for wow-es-protovenom-unmarked. The Blighted Blood pool
 // (wow-es-blighted-blood-pool, its own mechanic) is targeted — one
 // instance per undispelled expiry, its carrier responsible. The
 // undispelled death (the healers' dispel) stays everyone.
@@ -214,7 +217,7 @@ import { suppressDuplicateRaidErrors } from "../../../error-detection";
 import { findPlayerPosition, type Position } from "../../player-position";
 import { distanceBetween, distanceToSegment } from "../../geometry";
 import {
-  RAID_MARKER_SORT_OFFSET_MS, yd, kFmt, sec, debuffIntervals, hitsOf, deathOf, joinNames, playerError, lastPlayerEventMs,
+  RAID_MARKER_SORT_OFFSET_MS, yd, kFmt, sec, debuffIntervals, hitsOf, deathOf, joinNames, playerError, lastPlayerEventMs, clusterByGap,
   raidMarker, pullOverMarker,
 } from "../common";
 import type { WowPullContext } from "../common";
@@ -697,10 +700,33 @@ function detectHelicalToxins(
 
 export const ES_PROTOVENOM_ERUPTION_RULE_ID = "wow-es-protovenom-eruption";
 export const ES_PROTOVENOM_TICKS_RULE_ID    = "wow-es-protovenom-ticks";
+// The unmarked side of a collision, split from the eruption rule (which
+// keeps the marked collider) so each is scoped to who can fail it (user,
+// 2026-10-11).
+export const ES_PROTOVENOM_UNMARKED_RULE_ID = "wow-es-protovenom-unmarked";
+// Both waves of one Protovenom cast's marks land within ~0.6s.
+const PROTOVENOM_CAST_GAP_MS = 3000;
 
-function detectProtovenom(players: PlayerInfo[], deaths: DeathEvent[]): PullError[] {
+function detectProtovenom(players: PlayerInfo[], deaths: DeathEvent[], occurrences?: ReportedOccurrence[]): PullError[] {
   const errors: PullError[] = [];
   const intervals = new Map(players.map((p) => [p.name, debuffIntervals(p, PROTOVENOM_DEBUFF)]));
+  // Each Protovenom cast (two waves of marks ~0.6s apart) tests the marked
+  // players (pair up, survive the ticks) and the living unmarked ones (make
+  // space) — rule-meta exposure.
+  const marks = players.flatMap((p) => (intervals.get(p.name) ?? []).map((iv) => ({ p, t: iv.start })));
+  for (const cast of clusterByGap(marks, (m) => m.t, PROTOVENOM_CAST_GAP_MS)) {
+    const t = cast[0].t;
+    const marked = new Set(cast.map((m) => m.p));
+    occurrences?.push(
+      { mechanicKey: "es-protovenom", timestamp: t, players: [...marked].map((p) => p.name) },
+      { mechanicKey: ES_PROTOVENOM_UNMARKED_RULE_ID, timestamp: t,
+        players: players.filter((p) => {
+          if (marked.has(p)) return false;
+          const d = deathOf(deaths, p.name);
+          return !d || d.timestamp > t;
+        }).map((p) => p.name) },
+    );
+  }
   // Marked at t — including a pair clearing at the very same instant.
   const markedAt = (p: PlayerInfo, t: number) =>
     (intervals.get(p.name) ?? []).some((iv) => iv.start <= t + 150 && iv.end >= t - 50);
@@ -781,7 +807,7 @@ function detectProtovenom(players: PlayerInfo[], deaths: DeathEvent[]): PullErro
       }));
       for (const r of partners) {
         flag(r.u.p, b.t, playerError(r.u.p, {
-          ruleId:      ES_PROTOVENOM_ERUPTION_RULE_ID,
+          ruleId:      ES_PROTOVENOM_UNMARKED_RULE_ID,
           severity,
           name:        "Protovenom Eruption",
           description: `Collided with ${m.p.name}'s Shifting Protovenom while unmarked` +
@@ -1234,7 +1260,7 @@ export function detectEntombedSentinelsErrors(ctx: WowPullContext): PullError[] 
     ...detectPickupDeaths(players, deaths),
     ...detectLivingVenom(players, deaths, stasis),
     ...detectHelicalToxins(players, deaths, stasis),
-    ...detectProtovenom(players, deaths),
+    ...detectProtovenom(players, deaths, ctx.occurrences),
     ...detectMiasmaSoaks(players, deaths),
     ...detectBloodVenom(players, deaths),
     ...detectDeadlyVenom(players, deaths),
