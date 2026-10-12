@@ -207,6 +207,12 @@ phase(4, [
   "ffxiv-kefka-says-failed-to-stack",
   "ffxiv-kefka-says-flood-wrong-side",
 ]);
+// Only the elemental and bomb holders are tested (kefka-says.ts).
+exposure("targeted", [
+  "ffxiv-kefka-says-failed-to-spread",
+  "ffxiv-kefka-says-failed-to-stack",
+  "ffxiv-kefka-says-acceleration-bomb",
+]);
 
 // P5: Ultima Kefka (ultimate-kefka.ts)
 mechanic("dm-uk-choice", "Choice", 5, [

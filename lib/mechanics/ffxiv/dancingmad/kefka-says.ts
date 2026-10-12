@@ -13,6 +13,12 @@
 // plus a shared first-death cutoff that emits one Raid marker and stops all
 // three, since the phase cannot be resolved with anyone dead.
 //
+// Exposure (docs/archive/exposure-plan.md): the spread, stack and
+// Acceleration Bomb rules are targeted. Each judged resolution block is one
+// spread instance (its spreading holders) and one stack instance (its
+// stacking holders); each set of bombs expiring together is one bomb
+// instance (its holders). Only debuff holders are ever tested.
+//
 // NOT written yet, and still only modelled in these notes: Kefka's three
 // Mystery Magic ice/lightning dodges, Cursed Shriek gaze direction, the
 // Chaos Entropy / Dynamic Fluid move-vs-stay, Mana Charge / Mana Release,
@@ -497,6 +503,7 @@
 import type { PlayerEvent, PlayerInfo } from "@/types/PlayerInfo";
 import type { EnemyEvent, PullError } from "@/types/PullError";
 import type { DeathEvent } from "@/types/DeathEvent";
+import type { ReportedOccurrence } from "../../occurrences";
 
 export const FLOOD_WRONG_SIDE_RULE_ID = "ffxiv-kefka-says-flood-wrong-side";
 
@@ -910,7 +917,8 @@ function firstPhaseDeath(
 function detectResolutionBlockErrors(
   players: PlayerInfo[],
   crosses: GrandCross[],
-  cutoff:  number
+  cutoff:  number,
+  occurrences?: ReportedOccurrence[],
 ): PullError[] {
   // Every elemental application, tagged with the Grand Cross that applied it
   // and the removal (= expiry) that resolves it.
@@ -999,11 +1007,18 @@ function detectResolutionBlockErrors(
 
     const blockErrors: PullError[] = [];
 
+    // The block's judged holders are its spread and stack instances: the
+    // other four players are never tested (rule-meta exposure).
+    const mustSpreadOf = (el: Elemental) =>
+      el.grandCrossState === "REAL" ? el.kind === "Forked Lightning" : el.kind === "Compressed Water";
+    const judged = block.filter((el) => neighbourhood(el.player.actorId) !== null);
+    occurrences?.push(
+      { mechanicKey: FAILED_TO_SPREAD_RULE_ID, timestamp: blockTime, players: judged.filter(mustSpreadOf).map((el) => el.player.name) },
+      { mechanicKey: FAILED_TO_STACK_RULE_ID, timestamp: blockTime, players: judged.filter((el) => !mustSpreadOf(el)).map((el) => el.player.name) },
+    );
+
     for (const el of block) {
-      const mustSpread =
-        el.grandCrossState === "REAL"
-          ? el.kind === "Forked Lightning"
-          : el.kind === "Compressed Water";
+      const mustSpread = mustSpreadOf(el);
 
       const around = neighbourhood(el.player.actorId);
       if (around === null) continue;
@@ -1090,9 +1105,38 @@ const BREAKING_ACTION_WINDOW_MS = 500;
 function detectAccelerationBombErrors(
   players: PlayerInfo[],
   crosses: GrandCross[],
-  cutoff:  number
+  cutoff:  number,
+  occurrences?: ReportedOccurrence[],
 ): PullError[] {
   const errors: PullError[] = [];
+
+  // Every resolved bomb of a known Grand Cross is its holder's instance,
+  // clean or not; holders whose bombs expire together share one.
+  if (occurrences) {
+    const expiries: { name: string; t: number }[] = [];
+    for (const player of players) {
+      for (const app of player.debuffs) {
+        if (app.abilityId !== ACCELERATION_BOMB_ABILITY_ID || app.debuffStatus !== "applied") continue;
+        const cross = crosses.find((c) => Math.abs(app.timestamp - c.timestamp) <= GRAND_CROSS_MATCH_WINDOW_MS);
+        if (!cross || cross.state === null) continue;
+        const removal = player.debuffs.find((d) =>
+          d.abilityId === ACCELERATION_BOMB_ABILITY_ID && d.debuffStatus === "removed" && d.timestamp > app.timestamp);
+        if (!removal || removal.timestamp > cutoff) continue;
+        expiries.push({ name: player.name, t: removal.timestamp });
+      }
+    }
+    expiries.sort((a, b) => a.t - b.t);
+    let set: { name: string; t: number }[] = [];
+    const flush = () => {
+      if (set.length) occurrences.push({ mechanicKey: ACCELERATION_BOMB_RULE_ID, timestamp: set[0].t, players: set.map((x) => x.name) });
+      set = [];
+    };
+    for (const x of expiries) {
+      if (set.length && x.t - set[set.length - 1].t > BOMB_RESOLUTION_WINDOW_MS) flush();
+      set.push(x);
+    }
+    flush();
+  }
 
   for (const player of players) {
     for (const bomb of player.damageTaken) {
@@ -1187,7 +1231,9 @@ export function detectKefkaSaysErrors(
   players:         PlayerInfo[],
   deathEvents:     DeathEvent[] = [],
   enemyCastEvents: EnemyEvent[] = [],
-  stateSignals:    KefkaSaysStateSignal[] = []
+  stateSignals:    KefkaSaysStateSignal[] = [],
+  /** Sink for the targeted instances (see "Responsible players"). */
+  occurrences?:    ReportedOccurrence[],
 ): PullError[] {
   const crosses = grandCrossStates(enemyCastEvents, stateSignals);
 
@@ -1211,8 +1257,8 @@ export function detectKefkaSaysErrors(
   // even though the module treats everything past that point as fallout.
   const errors = [
     ...detectFloodOfNaughtErrors(players).filter((e) => e.timestamp <= cutoff),
-    ...detectResolutionBlockErrors(players, crosses, cutoff),
-    ...detectAccelerationBombErrors(players, crosses, cutoff),
+    ...detectResolutionBlockErrors(players, crosses, cutoff, occurrences),
+    ...detectAccelerationBombErrors(players, crosses, cutoff, occurrences),
   ].sort((a, b) => a.timestamp - b.timestamp);
 
   // The death only ends the phase "because of an error" if one of these

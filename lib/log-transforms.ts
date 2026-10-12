@@ -1574,7 +1574,7 @@ export function transformFFightToPull(
     ...detectExdeathErrors(players, deathEvents),
     ...detectStompiesErrors(players, deathEvents, enemyCastEvents, blackHoleGeometry, stompiesPuddleSamples, playerPositionSamples),
     ...detectPhase1Errors(players, deathEvents, enemyCastEvents),
-    ...detectKefkaSaysErrors(players, deathEvents, enemyCastEvents, kefkaSaysSignals),
+    ...detectKefkaSaysErrors(players, deathEvents, enemyCastEvents, kefkaSaysSignals, reportedOccurrences),
     ...detectUltimateKefkaErrors(players, deathEvents, enemyCastEvents),
     ...detectVampFataleErrors(players, deathEvents, enemyCastEvents),
     ...detectRedHotDeepBlueErrors(players, deathEvents, enemyCastEvents),
