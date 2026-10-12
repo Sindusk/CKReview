@@ -1,5 +1,8 @@
 .next/
-.claude/
+# Local Claude Code settings stay out; project skills are committed
+# (docs/open-items.md, "Plan: a /build-boss-detection skill").
+.claude/*
+!.claude/skills/
 .env
 .env*.local
 asset-builder/node_modules/

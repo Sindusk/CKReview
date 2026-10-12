@@ -1009,6 +1009,12 @@ grouped by exact roster. The module headers hold the rules.
 
 ### Plan: a `/build-boss-detection` skill
 
+**Groundwork done (2026-10-12):** `.gitignore` now ignores `.claude/*`
+except `.claude/skills/`, so project skills commit. Two skills exist as
+models for this one: `/damage-analysis` and `/build-fight-context`
+(`.claude/skills/<name>/SKILL.md`, with read-only helper scripts in
+`tools/` run from the repo root).
+
 **What a skill is.** A skill is a folder in the repo, `.claude/skills/<name>/`,
 holding a `SKILL.md` file: a short description at the top plus
 instructions in plain Markdown. Claude Code lists every skill's
