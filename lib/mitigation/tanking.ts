@@ -135,6 +135,10 @@ export type Buster = {
   tanks:       BusterTank[];
   margin?:     number;   // worst non-invulnerable tank; undefined when all were invulnerable
   verdict:     TankVerdict;
+  // A dual buster where both tanks were hit and one took both hits: a
+  // mechanic failure (Vamp A2 +21.7, both Hardcores on both tanks), not a
+  // mitigation problem (user, 2026-10-11). Left out across pulls.
+  overlap:     boolean;
 };
 
 export type PullTanking = {
@@ -293,6 +297,7 @@ function buildBuster(pull: Pull, hit: MitigationHit, streams: TankStream[]): Bus
     id: hit.id, abilityName: hit.abilityName, occurrence: hit.occurrence, phase: hit.phase,
     timestampMs: hit.timestampMs, endMs: hit.endMs, kind, tanks,
     margin: worst?.margin, verdict: worst ? worst.verdict : "invuln",
+    overlap: kind === "dual" && tanks.some((t) => t.parts >= 2),
   };
 }
 
@@ -421,6 +426,7 @@ export type AggregatedBuster = {
   medianMargin?: number;            // over pulls not taken under an invuln
   worstMargin?:  number;
   invulnPulls: number;
+  overlapPulls: number;             // left out of the margins (Buster.overlap)
   verdict:     TankVerdict;         // by the median margin; invuln when most pulls were
   reached:     number;              // pulls still going at its earliest time
   rare:        boolean;             // see BUSTER_MIN_PULLS
@@ -446,7 +452,7 @@ export function aggregateBusters(perPull: PullTankingRef[]): AggregatedBuster[] 
     const buster = kind === b.kind ? b : { ...b, kind };
     const row = rows.get(b.id) ?? {
       id: b.id, abilityName: b.abilityName, occurrence: b.occurrence, phase: b.phase, medianMs: 0, pulls: 0,
-      kind, kinds: {}, invulnPulls: 0, verdict: "good" as TankVerdict, reached: 0, rare: false, byPull: [],
+      kind, kinds: {}, invulnPulls: 0, overlapPulls: 0, verdict: "good" as TankVerdict, reached: 0, rare: false, byPull: [],
     };
     row.byPull.push({ pullId: p.pullId, pullNumber: p.pullNumber, buster });
     row.kinds[kind] = (row.kinds[kind] ?? 0) + 1;
@@ -459,12 +465,14 @@ export function aggregateBusters(perPull: PullTankingRef[]): AggregatedBuster[] 
     row.reached = perPull.filter((p) => p.durationMs >= earliest).length;
     row.rare = row.pulls < BUSTER_MIN_PULLS && row.reached >= BUSTER_MIN_PULLS && row.pulls < RARE_SHARE * row.reached;
     row.kind = Object.entries(row.kinds).sort((a, b) => b[1] - a[1])[0][0] as BusterKind;
-    const margins = row.byPull.map((x) => x.buster.margin).filter((m): m is number => m !== undefined);
-    row.invulnPulls = row.byPull.length - margins.length;
+    const counted = row.byPull.filter((x) => !x.buster.overlap);
+    row.overlapPulls = row.byPull.length - counted.length;
+    const margins = counted.map((x) => x.buster.margin).filter((m): m is number => m !== undefined);
+    row.invulnPulls = counted.length - margins.length;
     row.medianMargin = margins.length ? median(margins) : undefined;
     row.worstMargin = margins.length ? Math.min(...margins) : undefined;
-    const deaths = row.byPull.filter((x) => x.buster.tanks.some((t) => t.died)).length;
-    row.verdict = row.invulnPulls * 2 > row.pulls || row.medianMargin === undefined ? "invuln"
+    const deaths = counted.filter((x) => x.buster.tanks.some((t) => t.died)).length;
+    row.verdict = row.invulnPulls * 2 > counted.length || row.medianMargin === undefined ? "invuln"
       : tankVerdict(row.medianMargin, deaths * 2 > margins.length);
   }
   return [...rows.values()].sort((a, b) => a.medianMs - b.medianMs);

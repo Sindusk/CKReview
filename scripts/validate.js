@@ -586,6 +586,7 @@ MECHANICS['mitigation-analysis'] = {
     ...requireTsFromRoot('lib/mitigation/debuff-reach.ts'),
     ...requireTsFromRoot('lib/mitigation/ffxiv-catalog.ts'),
     ...requireTsFromRoot('lib/mitigation/tanking.ts'),
+    ...requireTsFromRoot('lib/mitigation/tanking-plan.ts'),
   }),
   async run({ mod, dir }) {
     const pulls = await loadThroughRealPipeline(mod, dir);
@@ -685,6 +686,33 @@ MECHANICS['mitigation-analysis'] = {
       console.log(`    ALL ${mmss(a.medianMs)} ${a.abilityName} #${a.occurrence} pulls=${a.pulls} kind=${a.kind} (${kinds}) ` +
         `median=${a.medianMargin === undefined ? '-' : pctOf(a.medianMargin)} worst=${a.worstMargin === undefined ? '-' : pctOf(a.worstMargin)} ` +
         `invuln=${a.invulnPulls} ${a.verdict.toUpperCase()}${a.rare ? ` RARE (${a.pulls}/${a.reached})` : ''}`);
+    }
+    // The Tanking view's optimizer (lib/mitigation/tanking-plan.ts) over
+    // the default window: buster counts and tank damage before -> after,
+    // each card's changes with buster margins (median) before -> after.
+    const tw = mod.tankWindow(perPull.map((p, i) => ({ ...p, tanking: tankingPulls[i].tanking })));
+    if (!tw.length) console.log(`  TANK PLAN: fewer than ${mod.PLAN_MIN_PULLS} pulls with the latest pull's tank jobs`);
+    if (tw.length) {
+      const t0 = Date.now();
+      const tplan = mod.buildTankingPlan(tw, mod.FFXIV_MITIGATION);
+      const s = tplan.summary;
+      console.log(`  TANK PLAN (pulls ${tw.map((p) => p.pullNumber).join(', ')}; ${tplan.evaluated} plans, ${Date.now() - t0}ms): ` +
+        `failing ${s.before.failing} -> ${s.after.failing}, tight ${s.before.tight} -> ${s.after.tight}, ` +
+        `tank damage on anchors ${pctOf(s.before.damage)} -> ${pctOf(s.after.damage)}`);
+      console.log(`    anchors: ${tplan.anchors.map((a) => a.kind === 'autos' ? `${a.tank.split(' ')[0]} ${a.name}` : `${a.name} (${mmss(a.medianMs)})`).join(', ')}`);
+      tplan.groups.forEach((g, i) => {
+        console.log(`    card ${i + 1}${g.together ? ' (together)' : ''}: tank damage ${pctOf(g.damage.before)} -> ${pctOf(g.damage.after)}`);
+        for (const c of g.changes) {
+          const where = (r) => r.kind === 'autos' ? `${r.name}` : `${r.name} (${mmss(r.medianMs)})`;
+          console.log(`      ${c.kind} ${c.name} (${c.player.split(' ')[0]}${c.receiver ? ` -> ${c.receiver.split(' ')[0]}` : ''})` +
+            `${c.from ? ` ${where(c.from)} ->` : ' on'} ${where(c.to)} fits ${c.legal}/${c.pulls}`);
+        }
+        for (const b of g.busters) {
+          console.log(`      ${b.buster.name}: ${pctOf(b.before.median)}/${pctOf(b.before.worst)} -> ${pctOf(b.after.median)}/${pctOf(b.after.worst)}`);
+        }
+      });
+      if (tplan.mechanic.length) console.log(`    mechanic: ${tplan.mechanic.map((r) => r.name).join(', ')}`);
+      if (tplan.unfixed.length) console.log(`    unfixed: ${tplan.unfixed.map((r) => `${r.name} (${mmss(r.medianMs)})`).join(', ')}`);
     }
     if (perPull.length >= mod.PLAN_MIN_PULLS) {
       const window = mod.planWindow(perPull);

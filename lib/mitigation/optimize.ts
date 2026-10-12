@@ -89,7 +89,6 @@
 import type { Pull } from "@/types/Pull";
 import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { CatalogEntry, HitTarget, HitVerdict, MitigationGame, MitigationHit } from "./types";
-import type { AggregatedHit } from "./aggregate";
 import {
   DAMAGE_ROLL_BUFFER, MARGIN_UNDER, SNAPSHOT_SLACK_MS,
   chargesAt, isDeadOrFreshlyRevived, judged, marginWith, playerCasts, simulateCharges, verdictFor, type AddedMitigation,
@@ -125,7 +124,13 @@ export type Change =
 
 export type HitEstimate = {
   median: number; worst: number; worstSequence: number; verdict: HitVerdict; tight: boolean; pulls: number;
+  // Mean over pulls of the damage the judged targets take, summed, as a
+  // fraction of each one's max HP (health before minus estimated after).
+  damage: number;
 };
+
+/** What the engine reads of an anchor row (AggregatedHit, or the Tanking panel's own rows). */
+export type AnchorRow = { id: string; pulls: number; medianMs: number };
 
 export type PlanEvaluation = {
   changes: Change[];
@@ -142,7 +147,7 @@ export type OptimizerProblem = {
   window:   WindowPull[];
   // The hits matched across the window (aggregateMitigation over the window
   // pulls) that casts may be moved from or to and the objective reads.
-  anchors:  AggregatedHit[];
+  anchors:  AnchorRow[];
   eligible: (entry: CatalogEntry, player: PlayerInfo) => boolean;
   // Whether a new cast may be added (not just moved).
   canAdd:   (entry: CatalogEntry, player: PlayerInfo) => boolean;
@@ -158,6 +163,11 @@ export type OptimizerProblem = {
   freeShifts: boolean;
   // More edits beyond shift, swap and add (the Tanking panel's invulns).
   extraEdits?: (state: SearchState) => Change[][];
+  // Drops proposed changes the problem never wants (an invuln on autos).
+  allowChange?: (change: Change) => boolean;
+  // A placed cast reduces only the parts inside its duration (the Tanking
+  // panel's anchors span 10-20s); off: every part of a hit it covers.
+  coverParts?: boolean;
   maxChanges:  number;
   beamWidth?:  number;
 };
@@ -202,7 +212,7 @@ export type PullCtx = {
   cache:   Map<string, HitResult>;    // `${hitId}|${signature}`
 };
 
-type HitResult = { margin: number; sequence: number; died: boolean };
+type HitResult = { margin: number; sequence: number; died: boolean; damage: number };
 
 type PullEval = {
   lanes:   Map<string, Cast[]>;  // changed lanes only
@@ -292,7 +302,7 @@ function applyChanges(ctx: PullCtx, changes: Change[]): { lanes: Map<string, Cas
 /** One hit's estimate in one pull, with the changed lanes applied. */
 function estimateHit(problem: OptimizerProblem, ctx: PullCtx, hit: MitigationHit, changed: Map<string, Cast[]>): HitResult {
   const removed = new Set<string>();
-  const added: { entry: CatalogEntry; player: string }[] = [];
+  const added: { entry: CatalogEntry; player: string; t: number }[] = [];
   for (const [k, casts] of changed) {
     const lane = ctx.lanes.get(k)!;
     const { player, entry } = lane;
@@ -309,16 +319,17 @@ function estimateHit(problem: OptimizerProblem, ctx: PullCtx, hit: MitigationHit
       if (!covers) continue;
       if (hit.active.some((a) => a.key === entry.key) && !removed.has(entry.key)) continue;  // doesn't stack
       if (added.some((a) => a.entry.key === entry.key)) continue;
-      added.push({ entry, player: player.name });
+      added.push({ entry, player: player.name, t: c.t });
     }
   }
   const pool = judged(hit.targets);
+  const loggedDamage = pool.reduce((s, t) => s + (t.healthBefore / t.maxHealth - t.margin), 0);
   const logged = (): HitResult => ({
-    margin: hit.margin, sequence: hit.sequenceMargin, died: hit.cleanDeaths > 0,
+    margin: hit.margin, sequence: hit.sequenceMargin, died: hit.cleanDeaths > 0, damage: loggedDamage,
   });
   if (pool.length === 0 || (removed.size === 0 && added.length === 0)) return logged();
 
-  const signature = `${hit.id}|${[...removed].sort().join(",")}|${added.map((a) => `${a.entry.key}:${a.player}`).sort().join(",")}`;
+  const signature = `${hit.id}|${[...removed].sort().join(",")}|${added.map((a) => `${a.entry.key}:${a.player}${problem.coverParts ? `@${a.t}` : ""}`).sort().join(",")}`;
   const hitCache = ctx.cache.get(signature);
   if (hitCache) return hitCache;
 
@@ -326,21 +337,24 @@ function estimateHit(problem: OptimizerProblem, ctx: PullCtx, hit: MitigationHit
   let margin = Infinity;
   let sequence = Infinity;
   let died = false;
+  let damage = 0;
   for (const t of pool) {
     const adds: AddedMitigation[] = added
       .filter((a) => a.entry.reach === "party" || (a.entry.reach === "self" ? a.player === t.player : t === lowest))
       .map((a) => ({
         entry: a.entry, shield: shieldSize(problem, a.entry, t.maxHealth),
-        applies: (part) => reachesPart(problem.reach, a.entry, a.player, part, hit),
+        applies: (part) => reachesPart(problem.reach, a.entry, a.player, part, hit)
+          && (!problem.coverParts || (part.timestampMs >= a.t && part.timestampMs - a.t <= a.entry.durationMs)),
       }));
     const d = targetDelta(problem, t, removed, adds, hit);
     const m = t.margin + d.margin;
     margin = Math.min(margin, m);
     sequence = Math.min(sequence, t.margin - t.laterDrop + d.sequence);
+    damage += t.healthBefore / t.maxHealth - m;
     const changedHere = d.margin !== 0;
     if (!t.vulnerable && (changedHere ? m < 0 : t.died)) died = true;
   }
-  const result = { margin, sequence, died };
+  const result = { margin, sequence, died, damage };
   ctx.cache.set(signature, result);
   return result;
 }
@@ -433,6 +447,7 @@ export function evaluatePlan(problem: OptimizerProblem, ctxs: PullCtx[], changes
     hits.set(row.id, {
       median: med, worst, worstSequence: Math.min(...rs.map((r) => r.sequence)), verdict,
       tight: verdict === "good" && worst < MARGIN_UNDER, pulls: rs.length,
+      damage: rs.reduce((s, r) => s + r.damage, 0) / rs.length,
     });
   }
   return { changes, hits, legal, freedom: edgePulls ? freedom / edgePulls : 0, perPull };
@@ -565,6 +580,7 @@ export function searchPlan(problem: OptimizerProblem, ctxs: PullCtx[], baseline:
 
       for (const p of proposals) {
         if (p.length > maxChanges) continue;
+        if (problem.allowChange && !p.every(problem.allowChange)) continue;
         const key = planKey(p);
         if (seen.has(key)) continue;
         seen.add(key);
@@ -625,7 +641,7 @@ export function groupChanges(problem: OptimizerProblem, ctxs: PullCtx[], changes
 
 /** A problem's per-pull contexts and baseline, for searchPlan and evaluatePlan. */
 export function prepareProblem(problem: OptimizerProblem): { ctxs: PullCtx[]; baseline: Assignment[] } {
-  const edgeId = problem.anchors.reduce<AggregatedHit | undefined>((e, r) => (!e || r.medianMs > e.medianMs ? r : e), undefined)?.id;
+  const edgeId = problem.anchors.reduce<AnchorRow | undefined>((e, r) => (!e || r.medianMs > e.medianMs ? r : e), undefined)?.id;
   const ctxs = problem.window.map((wp) => buildPullCtx(problem, wp, edgeId));
   return { ctxs, baseline: baselineAssignments(problem, ctxs) };
 }

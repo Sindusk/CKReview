@@ -134,6 +134,7 @@ export type WindowPull = { pull: Pull; pullId: number; pullNumber: number; durat
 
 export type PartySetup = {
   problem: OptimizerProblem;
+  anchors: AggregatedHit[];  // problem.anchors, typed
   classes: Map<string, HitClass>;
   ctxs:    ReturnType<typeof prepareProblem>["ctxs"];
   baseline: ReturnType<typeof prepareProblem>["baseline"];
@@ -209,7 +210,7 @@ export function partySetup(window: WindowPull[], allHits: MitigationHit[][], gam
   baseEv = base;
   freeMode = !anchors.some((r) => problem.needsHelp(base, r.id));
   problem.freeShifts = freeMode;
-  return { problem, classes, ctxs, baseline, base };
+  return { problem, anchors, classes, ctxs, baseline, base };
 }
 
 /** Failing (fail or under on the median) and tight counts over the planned hits. */
@@ -236,10 +237,10 @@ function refOf(row: AggregatedHit): HitRef {
 export function buildMitigationPlan(window: WindowPull[], allHits: MitigationHit[][], game: MitigationGame, reach?: DebuffReach,
   only?: (entry: CatalogEntry, player: PlayerInfo) => boolean): OptimizedPlan {
   const setup = partySetup(window, allHits, game, reach, only);
-  const { problem, ctxs, classes, base } = setup;
+  const { problem, anchors, ctxs, classes, base } = setup;
   const result = searchPlan(problem, ctxs, setup.baseline);
   const best = result.best;
-  const rowOf = new Map(problem.anchors.map((r) => [r.id, r]));
+  const rowOf = new Map(anchors.map((r) => [r.id, r]));
   const jobOf = new Map(window.flatMap((w) => w.pull.players.map((p) => [p.name, p.className] as const)));
   const entryOf = new Map(game.catalog.map((e) => [e.key, e]));
   const side = (e: HitEstimate): HitSide => ({ median: e.median, worst: e.worst, verdict: e.verdict, tight: e.tight });
@@ -257,7 +258,7 @@ export function buildMitigationPlan(window: WindowPull[], allHits: MitigationHit
       };
     });
     const alone = evaluatePlan(problem, ctxs, group);
-    const hits: HitOutcome[] = problem.anchors
+    const hits: HitOutcome[] = anchors
       .filter((r) => {
         const a = alone.hits.get(r.id);
         const b = base.hits.get(r.id);
@@ -269,8 +270,8 @@ export function buildMitigationPlan(window: WindowPull[], allHits: MitigationHit
     return { purpose: fixes ? "fix" : "free", changes, hits };
   });
 
-  const notMitigation = problem.anchors.filter((r) => classes.get(r.id) !== "plan" && failing(base.hits.get(r.id)!)).map(refOf);
-  const unfixed = problem.anchors
+  const notMitigation = anchors.filter((r) => classes.get(r.id) !== "plan" && failing(base.hits.get(r.id)!)).map(refOf);
+  const unfixed = anchors
     .filter((r) => classes.get(r.id) === "plan" && (failing(best.hits.get(r.id)!) || best.hits.get(r.id)!.tight))
     .map(refOf);
   return {
