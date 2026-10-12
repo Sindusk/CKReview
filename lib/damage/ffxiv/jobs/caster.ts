@@ -19,6 +19,14 @@
 //     rotation repaints in uptime, so only motifs that could have waited
 //     for known downtime would be a real loss, which needs the fight
 //     context.
+//   - Palette gauge and Monochrome Tones overwrites (below).
+//   - Checked against xivanalysis on dDar482XvFKBPJYh FRU kill (7.1,
+//     2026-10-12): its 11 missing Starry Muse actions, 1 Additive in
+//     Starry Muse, 1 Subtractive Palette lost to overcap and 1 Monochrome
+//     Tones overwrite all match. Its Living Muse 30/31 fits only with
+//     perfect play (under one recast of unforced hold, and muses wait on
+//     motifs); Starry Muse 9/10 was ready just before P4's downtime and
+//     held for the 14:13 burst; its Swiftcast "9/24" is utility, not damage.
 //   - On dQ8wmb1VhKt6yBXk every Starry Muse window holds only one Hammer
 //     (the PCT starts Hammer Time at the window's end, after a second
 //     Subtractive round). Consistent across pulls, so likely a chosen
@@ -40,7 +48,8 @@
 import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import type { DamageFinding, JobCheck } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";
-import { aoeComboOnOneTarget, burstWindowFindings, dotFindings, k, statusWindows, type ExpectedAction } from "./shared";
+import { inWindows } from "../../timeline";
+import { aoeComboOnOneTarget, burstWindowFindings, castHits, dotFindings, gaugeFindings, k, statusWindows, type ExpectedAction, type GaugeEvent } from "./shared";
 
 const ids = (...keys: string[]) => keys.filter((key) => A[key]).map((key) => A[key].id);
 const best = (ctx: PlayerCheckContext, list: number[]) => Math.max(0, ...list.map((x) => ctx.values.perUse(x)));
@@ -49,27 +58,62 @@ const HAMMERS = ids("HAMMER_STAMP", "HAMMER_BRUSH", "POLISHING_HAMMER");
 const SUBTRACTIVE = ids("BLIZZARD_IN_CYAN", "STONE_IN_YELLOW", "THUNDER_IN_MAGENTA");
 const ADDITIVE = ids("FIRE_IN_RED", "AERO_IN_GREEN", "WATER_IN_BLUE", "FIRE_II_IN_RED", "AERO_II_IN_GREEN", "WATER_II_IN_BLUE", "HOLY_IN_WHITE");
 
+// Patch-specific (lib/damage/ffxiv/patches.ts), from xivanalysis
+// StarryMuse.tsx: in 7.2 only, a window could trade Hammers for extra
+// Subtractive spells and Comets ("6Sub"), so skipped Hammers are allowed
+// as long as the earlier ones are the ones skipped, a fourth Subtractive
+// is expected when the Comets didn't make up for them, and an Additive
+// spell isn't an error. 7.1 and 7.3+ expect all three Hammers. In every
+// patch: a creature motif painted in the window pushes two Subtractive
+// spells and Rainbow Drip out of it, and a Comet carried in (two in the
+// window) pushes one Subtractive out.
+const CREATURE_MOTIFS = ids("POM_MOTIF", "WING_MOTIF", "CLAW_MOTIF", "MAW_MOTIF");
 const starryMuse: JobCheck = (ctx) => burstWindowFindings(ctx, {
   statusId: S.STARRY_MUSE.id, name: "Starry Muse", bonus: "observed",
-  bonusBasis: "each missing action × its average × the window's measured bonus (multiplier inside vs outside raid buffs)",
-  expected: (): ExpectedAction[] => [
-    { ids: HAMMERS, count: 3, name: "Hammer GCD" },
-    { ids: ids("STAR_PRISM"), count: 1, name: "Star Prism" },
-    { ids: ids("RAINBOW_DRIP"), count: 1, name: "Rainbow Drip" },
-    { ids: ids("COMET_IN_BLACK"), count: 1, name: "Comet in Black" },
-    { ids: SUBTRACTIVE, count: 3, name: "Subtractive spell" },
-    { ids: ids("POM_MUSE", "WINGED_MUSE", "CLAWED_MUSE", "FANGED_MUSE"), count: 1, name: "Living Muse" },
-    { ids: ids("MOG_OF_THE_AGES", "RETRIBUTION_OF_THE_MADEEN"), count: 1, name: "Mog of the Ages / Madeen" },
-  ],
+  bonusBasis: "each missing action × its average × the window's measured bonus (multiplier inside vs outside raid buffs)" +
+    (ctx.patch ? `; patch ${ctx.patch} rules` : ""),
+  expected: (_c, casts): ExpectedAction[] => {
+    const used = (list: number[]) => casts.filter((c) => list.includes(c.abilityId)).length;
+    const motifs = used(CREATURE_MOTIFS);
+    const comets = used(ids("COMET_IN_BLACK"));
+    const hammersUsed = used(HAMMERS);
+    let hammers = 3, subtractive = 3;
+    if (ctx.patch === "7.2") {
+      if (used(ids("HAMMER_STAMP")) === 0) {
+        hammers--;
+        if (used(ids("HAMMER_BRUSH")) === 0) { hammers--; if (used(ids("POLISHING_HAMMER")) === 0) hammers--; }
+      }
+      if ((hammersUsed === 2 && comets < 2) || (hammersUsed < 2 && comets < 3)) subtractive++;
+    }
+    if (ctx.patch !== "7.2" || hammersUsed > 2) {
+      if (motifs > 0) subtractive -= 2;
+      if (comets > 1) subtractive--;
+    }
+    return [
+      { ids: HAMMERS, count: hammers, name: "Hammer GCD" },
+      { ids: ids("STAR_PRISM"), count: 1, name: "Star Prism" },
+      { ids: ids("RAINBOW_DRIP"), count: motifs > 0 ? 0 : 1, name: "Rainbow Drip" },
+      { ids: ids("COMET_IN_BLACK"), count: Math.max(1, comets), name: "Comet in Black" },
+      { ids: SUBTRACTIVE, count: Math.max(0, subtractive), name: "Subtractive spell" },
+      { ids: ids("POM_MUSE", "WINGED_MUSE", "CLAWED_MUSE", "FANGED_MUSE"), count: 1, name: "Living Muse" },
+      { ids: ids("MOG_OF_THE_AGES", "RETRIBUTION_OF_THE_MADEEN"), count: 1, name: "Mog of the Ages / Madeen" },
+    ];
+  },
 });
 
+// Additive spells landing inside Starry Muse (xivanalysis expects none,
+// except in 7.2). Judged by when the spell lands, which is when Starry
+// Muse's bonus applies: a Water in Blue started inside the 6:11 window on
+// dDar482XvFKBPJYh's FRU kill landed 0.5s after it ended (xivanalysis's 1
+// Additive was the 16:30 Holy in White alone).
 const starryFillers: JobCheck = (ctx): DamageFinding[] => {
+  if (ctx.patch === "7.2") return [];
   const additive = new Set(ADDITIVE);
   const sub = best(ctx, SUBTRACTIVE);
   const out: DamageFinding[] = [];
   for (const w of statusWindows(ctx, S.STARRY_MUSE.id)) {
     if (w.endMs > ctx.endMs) continue;
-    const used = ctx.uses.filter((u) => u.startMs >= w.startMs && u.startMs <= w.endMs + 100 && additive.has(u.action.id));
+    const used = ctx.uses.filter((u) => u.startMs + u.castMs >= w.startMs && u.startMs + u.castMs <= w.endMs + 100 && additive.has(u.action.id));
     if (used.length === 0) continue;
     out.push(finding(ctx, {
       kind: "burst-window", startMs: w.startMs, endMs: w.endMs, forced: false, inference: true,
@@ -185,7 +229,65 @@ const verprocOverwrites: JobCheck = (ctx): DamageFinding[] => {
   return out;
 };
 
-export const PCT_CHECKS: JobCheck[] = [starryMuse, starryFillers];
+// Palette gauge (cap 100), from xivanalysis pct/modules/Gauge.tsx: +25 per
+// Water in Blue / Water II in Blue that hits; Subtractive Palette spends 50
+// unless Subtractive Spectrum (Starry Muse's free one) is up. 50 gauge is
+// one Subtractive Palette: three Subtractive spells over three Additive
+// ones, plus the Comet in Black over the Holy in White its Monochrome Tones
+// turns into one (the player's averages).
+// Monochrome Tones overwritten (Gauge.tsx "overtones"): a Subtractive
+// Palette while it's still up loses a Comet in Black, worth a Comet over a
+// Holy in White.
+const ADDITIVE_ST = ids("FIRE_IN_RED", "AERO_IN_GREEN", "WATER_IN_BLUE");
+// Averages outside raid buffs: Subtractive spells and Comets mostly land
+// in Starry Muse, Additive ones and Holy outside it, so the plain averages
+// put the burst's bonus into the difference (182k for one Subtractive
+// Palette on dDar482XvFKBPJYh's FRU kill).
+const avgOf = (ctx: PlayerCheckContext, list: number[]) => {
+  const vals = list.map((x) => {
+    const hits = castHits(ctx, x).filter((h) => !inWindows(h.timestamp, ctx.buffWindows));
+    return hits.length ? hits.reduce((a, h) => a + (h.amount ?? 0), 0) / hits.length : 0;
+  }).filter((v) => v > 0);
+  return vals.length ? vals.reduce((a, v) => a + v, 0) / vals.length : 0;
+};
+const palette: JobCheck = (ctx): DamageFinding[] => {
+  const sp = A.SUBTRACTIVE_PALETTE.id;
+  const spCasts = ctx.player.casts.filter((c) => c.abilityId === sp);
+  if (spCasts.length === 0) return [];
+  const spectrum = statusWindows(ctx, S.SUBTRACTIVE_SPECTRUM.id);
+  const events: GaugeEvent[] = [];
+  for (const id of ids("WATER_IN_BLUE", "WATER_II_IN_BLUE")) {
+    for (const h of castHits(ctx, id)) events.push({ t: h.timestamp, type: "gain", amount: 25, label: `${h.abilityName} at full Palette` });
+  }
+  for (const c of spCasts) {
+    if (!spectrum.some((w) => c.timestamp >= w.startMs && c.timestamp <= w.endMs + 200)) {
+      events.push({ t: c.timestamp, type: "spend", amount: 50, label: "Subtractive Palette" });
+    }
+  }
+  for (const d of ctx.dead) events.push({ t: d.startMs, type: "reset", label: "death" });
+  const comet = avgOf(ctx, [A.COMET_IN_BLACK.id]), holy = avgOf(ctx, [A.HOLY_IN_WHITE.id]);
+  const cometGain = Math.max(0, comet - holy);
+  const perPalette = 3 * Math.max(0, avgOf(ctx, SUBTRACTIVE) - avgOf(ctx, ADDITIVE_ST)) + cometGain;
+  const out = gaugeFindings(ctx, {
+    name: "Palette", unit: "Palette gauge", cap: 100, unitValue: perPalette / 50,
+    valueBasis: `(3 × (Subtractive − Additive) + Comet − Holy, averages outside raid buffs = ${k(perPalette)}) per 50`,
+    events,
+  });
+  const tones = statusWindows(ctx, S.MONOCHROME_TONES.id);
+  for (const c of spCasts) {
+    if (c.timestamp >= ctx.endMs || !tones.some((w) => w.startMs < c.timestamp - 50 && w.endMs >= c.timestamp)) continue;
+    out.push(finding(ctx, {
+      kind: "proc-lost", startMs: c.timestamp, endMs: c.timestamp, forced: false, inference: true,
+      label: "Monochrome Tones overwritten",
+      lostDamage: cometGain,
+      basis: `${k(comet)} average Comet in Black − ${k(holy)} average Holy in White, outside raid buffs`,
+      detail: "Subtractive Palette while Monochrome Tones was still up: a Comet in Black lost",
+    }));
+  }
+  return out;
+};
+
+export const PCT_CHECKS: JobCheck[] = [starryMuse, starryFillers, palette];
 export const BLM_CHECKS: JobCheck[] = [highThunder, blmAoe];
 export const SMN_CHECKS: JobCheck[] = [searingLight];
 export const RDM_CHECKS: JobCheck[] = [manaStacks, dualcastWasted, verprocOverwrites];

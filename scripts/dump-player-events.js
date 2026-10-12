@@ -40,7 +40,7 @@ const clock = (t) => { const s = t / 1000; return `${Math.floor(s / 60)}:${(s % 
   const lt = requireTsFromRoot('lib/log-transforms.ts', { './log-auth': {} });
   const payload = await store.loadSampleReport('ffl', path.basename(code));
   const abilityMap = lt.buildFFLAbilityMap(payload.report.masterData.abilities);
-  const pulls = await lt.transformFFReportToPulls(payload.fightDataList, abilityMap, path.basename(code));
+  const pulls = await lt.transformFFReportToPulls(payload.fightDataList, abilityMap, path.basename(code), payload.report.startTime);
   const pull = pulls.find((p) => p.name === boss && p.pullNumber === Number(pullNumber));
   if (!pull) { console.log(`no pull "${boss}" ${pullNumber}; bosses: ${[...new Set(pulls.map((p) => p.name))].join(', ')}`); process.exit(1); }
   const player = pull.players.find((p) => p.name === who);

@@ -852,7 +852,7 @@ export default function Home() {
       }
     );
 
-    let newPulls = transformFFReportToPulls(fightDataList, abilityMap, report.code);
+    let newPulls = transformFFReportToPulls(fightDataList, abilityMap, report.code, report.startTime);
 
     newPulls = applyPendingWipeCalls(newPulls, pendingWipeCallsRef.current);
     pendingWipeCallsRef.current = {};
@@ -1141,7 +1141,8 @@ export default function Home() {
       : transformFFReportToPulls(
           payload.fightDataList,
           buildFFLAbilityMap(payload.report.masterData.abilities),
-          payload.report.code
+          payload.report.code,
+          payload.report.startTime
         );
 
     let newPulls = applyPendingWipeCalls(newPullsRaw, pendingWipeCallsRef.current);

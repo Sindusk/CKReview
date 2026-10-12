@@ -167,6 +167,7 @@ export default function DamageDialog({ open, onClose, pulls, currentPullId }: Da
               {hasContext
                 ? `Fight context: ${contextName}.`
                 : "No fight context for this boss: only untargetable time read from the log counts as forced."}
+              {!allPulls && analysis?.patch ? ` Judged by patch ${analysis.patch} job rules.` : ""}
               {!allPulls && analysis?.missingData.length
                 ? ` This pull was fetched without ${analysis.missingData.join(", ")}; re-fetch the report for the full analysis.`
                 : allPulls && needRefetch > 0

@@ -61,6 +61,9 @@ export type DamageGame = {
   disengageActionIds: Set<number>;
   // Job-specific checks (Layer 3), by job display name.
   jobChecks(job: string): JobCheck[];
+  // The patch a pull was played on ("7.1"), for checks whose rule changed
+  // between patches; undefined = unknown, checks use the current rules.
+  patchOf?(pull: Pull): string | undefined;
   // Job gauges for the dialog's timeline (display only).
   jobGauges?(job: string): ((ctx: PlayerCheckContext) => GaugeTrack[])[];
   // Procs a job check handles itself (Viper's venoms, which only boost a
@@ -291,6 +294,9 @@ export type PullDamageAnalysis = {
   endMs:         number;
   collapseMs?:   number;
   context?:      string;     // DamageContext.encounter, if one exists
+  // The game patch the pull was played on (DamageGame.patchOf), when known:
+  // the rules patch-specific checks applied.
+  patch?:        string;
   // Data the pull lacks (fetched before it existed). Re-fetching is the
   // user's call.
   missingData:   string[];

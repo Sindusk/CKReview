@@ -46,6 +46,10 @@ export type Pull = {
 
   game:          "wow" | "ffxiv";
   reportCode:    string;
+  // Epoch ms the log started recording (the report's startTime), for the
+  // patch the pull was played on (lib/damage/ffxiv/patches.ts). Absent on
+  // pulls saved before 2026-10-12 and on samples fetched before then.
+  reportStartedAt?: number;
   logSource:     "wcl" | "ffl";
   fightId:       number;    // raw fight ID from the log source, for report URLs (?fight=N)
 

@@ -1700,11 +1700,12 @@ export function transformFFightToPull(
 export function transformFFReportToPulls(
   fightDataList: FFLFightData[],
   abilityMap:    Map<number, AbilityInfo>,
-  reportCode:    string
+  reportCode:    string,
+  reportStartedAt?: number
 ): Array<Pull & { castEvents: FFLDisplayCastEvent[] }> {
   const pulls = [...fightDataList]
     .sort((a, b) => a.fight.startTime - b.fight.startTime)
-    .map((data, i) => transformFFightToPull(data, abilityMap, reportCode, i + 1));
+    .map((data, i) => ({ ...transformFFightToPull(data, abilityMap, reportCode, i + 1), reportStartedAt }));
 
   renumberPullsByBoss(pulls);
 

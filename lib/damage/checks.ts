@@ -87,6 +87,7 @@ export type PlayerCheckContext = {
   mechanicAround(startMs: number, endMs: number): string | undefined;
   decidingPhaseStart?: number;
   ledger?:     BuffLedger;      // party buffs across the pull (lib/damage/buffs.ts)
+  patch?:      string;          // the patch the pull was played on (DamageGame.patchOf), if known
 };
 
 export function finding(ctx: PlayerCheckContext, f: Omit<DamageFinding, "player" | "job" | "phaseId" | "phase">): DamageFinding {

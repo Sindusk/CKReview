@@ -118,6 +118,9 @@ export async function loadSampleReport(source: SampleSource, code: string): Prom
   const report = {
     code:       meta.code,
     title:      meta.title,
+    // Written by fetch-ff-report.js since 2026-10-12 (the patch the log
+    // was played on); absent on older samples.
+    startTime:  meta.startTime,
     fights:     meta.fights,
     masterData: meta.masterData,
   };

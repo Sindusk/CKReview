@@ -85,6 +85,7 @@ export function analyzePullDamage(pull: Pull, game: DamageGame, context?: Damage
   };
 
   const ledger = buildBuffLedger(pull, game, endMs);
+  const patch = game.patchOf?.(pull);
   const players: PlayerDamageSummary[] = [];
   for (const player of pull.players) {
     const dead = deadWindows(player, pull, endMs);
@@ -109,6 +110,7 @@ export function analyzePullDamage(pull: Pull, game: DamageGame, context?: Damage
       forced, dead, buffWindows, values, phaseOf, phaseName, mechanicAround,
       decidingPhaseStart: decidingSegment?.startMs,
       ledger,
+      patch,
     };
     const findings: DamageFinding[] = [
       ...checkGcdGaps(ctx),
@@ -172,6 +174,7 @@ export function analyzePullDamage(pull: Pull, game: DamageGame, context?: Damage
   return {
     pullId: pull.id, pullNumber: pull.pullNumber, endMs, collapseMs,
     context: context?.encounter,
+    patch,
     missingData: missingData(pull),
     raidDowntime: downtime,
     players, phases,

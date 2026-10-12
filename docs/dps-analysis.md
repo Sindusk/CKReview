@@ -198,11 +198,26 @@ log's patch (`parser.patch.before('7.2')`, data layers in
   full kill is refetched separately and swapped in only for print-only
   runs (`damage-analysis`), then the partial file is restored.
 
-Built from it so far: pet damage credited to owners (FFLogs `petOwner`;
-the FF transform had dropped Esteem, Bunshin, Earthly Star, Queen and
-demis), the tincture check (`lib/damage/ffxiv/jobs/tincture.ts`), Living
-Shadow cut short, Passage of Arms channel as forced time, heal GCDs not
-filling burst windows, and small GCD delays counted from 0.5s per phase.
+**Patch detection is built** (`lib/damage/ffxiv/patches.ts`): each pull
+carries the report's start time (`Pull.reportStartedAt`, from the FFLogs
+report query; sample `meta.json` files carry `startTime` since
+2026-10-12), `DamageGame.patchOf` maps it to a patch from xivanalysis's
+global release dates, checks read it as `ctx.patch`, and the Damage
+dialog says which patch's rules it judged by. Pulls without the date use
+the current rules. First rule switched on it: Pictomancer's Starry Muse
+(7.2 allowed trading Hammers for Subtractive spells). A new
+patch-specific rule goes in the check that encodes it, keyed on
+`ctx.patch`, with the patch and its source in the comment.
+
+Built from the eight-player comparison (each job module's header records
+what matched and what wasn't adopted): pet damage credited to owners,
+tinctures, Living Shadow, Passage of Arms channel as forced time, heal
+GCDs out of burst windows, small delays from 0.5s, AST cards and Earthly
+Star, cooldown drift that simulates charges and downtime, Addersgall on
+the timeline, NIN Kunai's Bane / Ninki / Kazematoi / Bunshin, RPR
+double-Enshroud Arcane Circle / Death's Design / Harvest Moon / Shroud,
+the BRD three-buff burst window and Army's Muse haste, PCT Palette gauge
+and Monochrome Tones.
 
 ## Ideas for app tooling
 

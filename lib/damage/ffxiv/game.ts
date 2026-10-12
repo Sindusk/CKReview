@@ -27,6 +27,7 @@ import { JOB_CHECKS } from "./jobs";
 import { noDamageCasts } from "./jobs/shared";
 import { tincture } from "./jobs/tincture";
 import { JOB_GAUGES } from "./jobs/gauges";
+import { patchOf } from "./patches";
 import { VPR_PROC_STATUS_IDS } from "./jobs/melee";
 import { FFXIV_ACTION_INDEX } from "../../mitigation/ffxiv-catalog";
 import type { DamageGame, GameAction, PartyBuff, TrackedCooldown } from "../types";
@@ -205,6 +206,7 @@ export const FFXIV_DAMAGE: DamageGame = {
   disengageActionIds: DISENGAGE_IDS,
   jobChecks: (job) => [...(JOB_CHECKS[job] ?? []), noDamageCasts, tincture],
   jobGauges: (job) => JOB_GAUGES[job] ?? [],
+  patchOf,
   jobProcStatusIds: VPR_PROC_STATUS_IDS,
   mitigationChannels: MITIGATION_CHANNELS,
   // Army's Muse speeds the Bard's GCDs for 10s by a fixed amount per window

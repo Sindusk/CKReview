@@ -982,7 +982,7 @@ function printDamageAnalysis(mod, pulls, game) {
       const a = mod.analyzePullDamage(pull, game, mod.getDamageContext(pull.name));
       console.log('='.repeat(70));
       console.log(`${pull.name} Pull ${pull.pullNumber} (${pull.result}): analysed to ${t(a.endMs)}` +
-        `${a.collapseMs !== undefined ? ' (wipe collapse)' : ''}, context ${a.context ?? 'MISSING'}` +
+        `${a.collapseMs !== undefined ? ' (wipe collapse)' : ''}, context ${a.context ?? 'MISSING'}, patch ${a.patch ?? 'unknown'}` +
         `${a.missingData.length ? `, missing: ${a.missingData.join('; ')}` : ''}`);
       for (const ph of a.phases) {
         console.log(`  ${ph.name.padEnd(24)} ${t(ph.startMs).padStart(7)}-${t(ph.endMs).padEnd(7)} raid ${M(ph.raidDamage).padStart(7)}` +
@@ -1134,7 +1134,7 @@ async function loadThroughRealPipeline(mod, dir) {
   const payload = await mod.store.loadSampleReport('ffl', code);
   if (payload.source !== 'ffl') return null;
   const abilityMap = mod.lt.buildFFLAbilityMap(payload.report.masterData.abilities);
-  return mod.lt.transformFFReportToPulls(payload.fightDataList, abilityMap, code);
+  return mod.lt.transformFFReportToPulls(payload.fightDataList, abilityMap, code, payload.report.startTime);
 }
 
 // ── expectations: snapshots + rulings ───────────────────────────────────────
