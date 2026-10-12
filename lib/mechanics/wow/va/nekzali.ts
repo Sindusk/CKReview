@@ -118,6 +118,10 @@
 //   wow-nek-unscheduled-rite   Minor       Rite outside Ignition/Invoke (unverified)
 //   wow-nek-pull-over          Raid        5+ dead / tank death the pull didn't survive
 //
+// Exposure (docs/archive/exposure-plan.md): Possession Barrage
+// (wow-nek-barrage-short) is targeted — one instance per Barrage cast, the
+// debuffed tank responsible.
+//
 // ── GUIDE-DERIVED MODEL (pre-log) ────────────────────────────────────────────
 //
 // The spell IDs below come from encounter-journal links; they are
@@ -336,6 +340,7 @@ import {
   clusterByGap, deadAt, died, hitEpisodes, pullOverMarker,
 } from "../common";
 import type { WowPullContext } from "../common";
+import type { ReportedOccurrence } from "../../occurrences";
 
 // ─── Ability IDs (log-verified, report nRGxQ1b8LdMvzC4D) ─────────────────────
 
@@ -529,15 +534,17 @@ function detectPyreSoak(players: PlayerInfo[], deaths: DeathEvent[], enemyCasts:
 
 export const NEK_BARRAGE_RULE_ID = "wow-nek-barrage-short";
 
-function detectBarrage(players: PlayerInfo[], deaths: DeathEvent[], enemyCasts: EnemyEvent[]): PullError[] {
+function detectBarrage(players: PlayerInfo[], deaths: DeathEvent[], enemyCasts: EnemyEvent[], occurrences?: ReportedOccurrence[]): PullError[] {
   const errors: PullError[] = [];
   for (const c of enemyCasts.filter((e) => e.abilityId === BARRAGE_TARGET)) {
+    const tank = players.find((p) => p.debuffs.some((e) => e.abilityId === BARRAGE_TARGET && e.debuffStatus === "applied" &&
+      Math.abs(e.timestamp - c.timestamp) <= BARRAGE_TARGET_MATCH_MS));
+    // Every cast is the debuffed tank's chance (rule-meta exposure).
+    occurrences?.push({ mechanicKey: NEK_BARRAGE_RULE_ID, timestamp: c.timestamp, players: tank ? [tank.name] : [] });
     const hits = players.flatMap((p) => p.damageTaken.filter((e) =>
       e.abilityId === BARRAGE_HIT && !e.isDoT && e.timestamp >= c.timestamp && e.timestamp <= c.timestamp + BARRAGE_WINDOW_MS));
     const med = median(hits.map((e) => e.amount ?? 0));
     if (med < BARRAGE_HEAVY_MEDIAN) continue;
-    const tank = players.find((p) => p.debuffs.some((e) => e.abilityId === BARRAGE_TARGET && e.debuffStatus === "applied" &&
-      Math.abs(e.timestamp - c.timestamp) <= BARRAGE_TARGET_MATCH_MS));
     if (!tank) continue;
     const killed = deaths.filter((d) => d.killingAbilityGameId === BARRAGE_HIT &&
       d.timestamp >= c.timestamp && d.timestamp <= c.timestamp + BARRAGE_DEATH_WINDOW_MS);
@@ -764,7 +771,7 @@ export function detectNekzaliErrors(ctx: WowPullContext): PullError[] {
     ...detectUncoiledRage(enemyBuffs),
     ...[
       ...detectPyreSoak(players, deaths, enemyCasts),
-      ...detectBarrage(players, deaths, enemyCasts),
+      ...detectBarrage(players, deaths, enemyCasts, ctx.occurrences),
       ...detectAvoidable(players, deaths),
       ...detectCurse(players, deaths, enemyCasts),
       ...detectExhaustedDeath(players, deaths),
