@@ -122,6 +122,10 @@ These are standing preferences, each learned from a real correction:
   labeled diagnostic logging (plain strings, not objects) at the decision
   points, or measure in a headless browser (docs/dev-tooling.md). Then get
   one real trace. Remove the logging once the bug is fixed.
+- **Name pulls as "Pull X" when talking to the user** (user, 2026-10-12).
+  You and the user discuss one report at a time, so report letters
+  ("D7", "B29") mean nothing to them. Module headers may still cite
+  multi-report evidence with letters.
 - **Give pull times as MM:SS** (e.g. 6:57), not +SSS seconds, when talking
   to the user: they match them against VOD timestamps (user, 2026-10-08).
   Code comments and headers may keep +seconds.

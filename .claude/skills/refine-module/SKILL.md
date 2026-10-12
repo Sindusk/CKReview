@@ -80,7 +80,8 @@ learn what the log shows at each one before asking.
   pulls in that VOD.
 - Write one numbered list, 1, 2, 3 …, with no sub-letters, ordered by
   pull. Each item gives:
-  - the pull and its MM:SS;
+  - the pull and its MM:SS, written "Pull X 6:12", never with a report
+    letter (CLAUDE.md);
   - what detection currently says, with the players it names;
   - the exact thing to look at.
 - Ask a question that applies to several pulls once, at the first pull.

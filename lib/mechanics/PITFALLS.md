@@ -111,6 +111,16 @@ philosophy and the data semantics this list assumes.
   Mana's alpha/beta flip at fixed times; the failure is a penalty hit on
   the failing player (Unmitigated Explosion), and any damage counts as "hit"
   (Lindwurm II).
+- **A boss object's composition can prove a wrong interaction.** Every
+  clean Blood Wakening wave is two Fire and two Thunder; a 4 + 0 wave means
+  the wrong shape was contacted, and the contact's cast target is the cause
+  (Lindwurm II).
+- **A same-millisecond remove + apply is a refresh.** Merge it before asking
+  "held since before"; Lindwurm II's repeated element re-applies its
+  resistance 0.5s before the damage.
+- **A healer LB3 locks its caster ~8-9s.** It's in the caster's own casts
+  (Techne Makre, Astral Stasis): excuse them from a positional duty in that
+  window (Lindwurm II towers, user ruling).
 - **A cast that hit several players can lose its target.** Find the owner
   among the hit players who held that timer's status (Oracle of Darkness).
 - **Head markers name bait owners** (`HeadMarker[]`, marked player as

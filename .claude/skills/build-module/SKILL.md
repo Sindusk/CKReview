@@ -63,8 +63,9 @@ questions, not a mid-run stop.
   PITFALLS "Fetching".
 - Probe the first report while the next downloads. If a filter caught
   unrelated fights, stop the fetch and delete those pull files.
-- Label the reports A, B, C… in the order you'll cite them, kill reports
-  included.
+- Label the reports A, B, C… in the order you'll cite them in the header,
+  kill reports included. When talking to the user, name the report and say
+  "Pull X", never the letter (CLAUDE.md).
 
 ## 3. Survey
 
