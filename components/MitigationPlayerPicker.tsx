@@ -24,20 +24,31 @@ const cell = (active: boolean): CSSProperties => ({
   background: active ? "rgba(212, 175, 55, 0.12)" : "transparent",
 });
 
-export function PlayerPicker({ groups, focus, onPick }: {
+const TANK_JOBS = ["Paladin", "Warrior", "Dark Knight", "Gunbreaker"];
+
+export function PlayerPicker({ groups, focus, onPick, tanksOnly }: {
   groups: PlayerGroup[];
   focus:  string | null;
   onPick: (player: string | null) => void;
+  // The Tanking view: just the two tanks side by side (MT first), "Both"
+  // instead of "All".
+  tanksOnly?: boolean;
 }) {
-  const cells: (PlayerGroup | null)[] = GRID_ORDER.map((slot) => groups.find((g) => g.slot === slot) ?? null);
-  for (const g of groups.filter((x) => !x.slot || !GRID_ORDER.includes(x.slot))) {
-    const free = cells.indexOf(null);
-    if (free >= 0) cells[free] = g; else cells.push(g);
+  let cells: (PlayerGroup | null)[];
+  if (tanksOnly) {
+    cells = groups.filter((g) => TANK_JOBS.includes(g.job))
+      .sort((a, b) => (a.slot === "MT" ? -1 : b.slot === "MT" ? 1 : 0));
+  } else {
+    cells = GRID_ORDER.map((slot) => groups.find((g) => g.slot === slot) ?? null);
+    for (const g of groups.filter((x) => !x.slot || !GRID_ORDER.includes(x.slot))) {
+      const free = cells.indexOf(null);
+      if (free >= 0) cells[free] = g; else cells.push(g);
+    }
   }
   return (
     <div style={{ display: "flex", alignItems: "stretch", gap: 4 }}>
-      <button style={{ ...cell(focus === null), width: "auto", justifyContent: "center" }} onClick={() => onPick(null)}>All</button>
-      <div style={{ display: "grid", gridTemplateColumns: `repeat(4, ${CELL_WIDTH}px)`, gap: 3 }}>
+      <button style={{ ...cell(focus === null), width: "auto", justifyContent: "center" }} onClick={() => onPick(null)}>{tanksOnly ? "Both" : "All"}</button>
+      <div style={{ display: "grid", gridTemplateColumns: `repeat(${tanksOnly ? Math.max(1, cells.length) : 4}, ${CELL_WIDTH}px)`, gap: 3 }}>
         {cells.map((g, i) => g === null ? <span key={`empty${i}`} /> : (
           <button key={g.player} style={cell(focus === g.player)} title={`${g.player} (${g.job})`}
             onClick={() => onPick(focus === g.player ? null : g.player)}>

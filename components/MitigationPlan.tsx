@@ -21,8 +21,9 @@
 //   - Footer: the hits that need healing or mechanics rather than
 //     mitigation, and the ones no plan within budget fixes, each collapsed
 //     to one line; expanded, each hit opens in the Timeline.
-// A picked player sees only a checklist of their own changes and the
-// summary line.
+// Given a player (`focus`), it shows only a checklist of their own changes
+// and the summary line; the dialog has no picker on this view since
+// 2026-10-11 (user) and passes none.
 
 import { useState, type CSSProperties, type ReactNode } from "react";
 import type { HitRef, OptimizedChange, OptimizedPlan, PlanGroup } from "@/lib/mitigation/plan";

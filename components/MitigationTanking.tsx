@@ -22,8 +22,9 @@
 //     current use in grey.
 // In all-pulls mode the clock shows the window's median pull (by total tank
 // damage) and the chips and cards the whole window; in one-pull mode, that
-// pull, with no cards (the changes read a group's pulls). A picked tank
-// sees only their lane, chips and cards; a picked non-tank sees everything.
+// pull, with no cards (the changes read a group's pulls). The dialog's
+// picker here holds just the two tanks side by side (user, 2026-10-11): a
+// picked tank sees only their lane, chips and cards; "Both", everything.
 
 import { useState, type CSSProperties, type ReactNode } from "react";
 import type { Pull } from "@/types/Pull";

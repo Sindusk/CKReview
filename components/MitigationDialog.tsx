@@ -21,8 +21,9 @@
 // uneventful hits (raid hits nobody died to, taken at full health) and,
 // across pulls, rare ones, each behind a checkbox.
 // A player selector (components/MitigationPlayerPicker.tsx) narrows the
-// timeline to one player's columns and removes Analysis items that don't
-// involve them. Both views are for one boss
+// timeline to one player's columns. The Tanking view swaps it for the two
+// tanks side by side; the Analysis has none (user, 2026-10-11). All views
+// are for one boss
 // at a time (a Boss dropdown, defaulting to the current pull's boss), and
 // for either a single pull or all of one group's pulls on that boss at once
 // (the default: one pull is too noisy to plan from). A group is an exact
@@ -236,6 +237,8 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId }
   // A picked player shows only their columns, personal ones open.
   const shownGroups = focusGroup ? [focusGroup] : groups;
   const shownExpanded = focusGroup ? new Set([...expanded, focusGroup.player]) : expanded;
+  // The Tanking view's picker holds only the tanks: another pick shows both.
+  const tankFocus = focusGroup && ["Paladin", "Warrior", "Dark Knight", "Gunbreaker"].includes(focusGroup.job) ? focusGroup.player : null;
 
   const notRare = aggregate.filter((r) => !r.rare);
   const rareCount = aggregate.length - notRare.length;
@@ -294,7 +297,8 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId }
                 setSelectedPullId(pick.pullId);
               }}
             />
-            {groups.length > 0 && <PlayerPicker groups={groups} focus={shownFocus} onPick={setFocus} />}
+            {groups.length > 0 && view === "timeline" && <PlayerPicker groups={groups} focus={shownFocus} onPick={setFocus} />}
+            {groups.length > 0 && view === "tanking" && <PlayerPicker groups={groups} focus={tankFocus} onPick={setFocus} tanksOnly />}
             {stale > 0 && (
               <span className="ck-help" style={{ margin: 0 }}>
                 {stale} of {rosterPulls.length} pulls were fetched before mitigation data was kept and are left out.
@@ -326,7 +330,7 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId }
                 analyzable.length === 0 || (!allPulls && selectedStale)
                   ? <p className="ck-dialog-text" style={{ padding: 12 }}>No loaded pull has mitigation data yet. Re-fetch the report to analyze it.</p>
                   : <TankingView plan={tankResult.plan} pending={tankResult.pending} error={tankResult.error}
-                      shown={tankShown} chips={tankChips} unused={tankUnused} focus={shownFocus} allPulls={allPulls}
+                      shown={tankShown} chips={tankChips} unused={tankUnused} focus={tankFocus} allPulls={allPulls}
                       shownLabel={tankShown ? `Clock: pull ${tankShown.pullNumber}${allPulls ? " (median of the window)" : ""}` : ""}
                       windowInput={windowInput} onWindowInput={setWindowInput} groupPulls={perPull.length} windowPulls={tankWin.length}
                       onOpenBuster={(id) => {
@@ -348,7 +352,7 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId }
                     The analysis needs at least {PLAN_MIN_PULLS} pulls with mitigation data from this group ({perPull.length} loaded).
                     The Timeline still shows them.
                   </p>
-                ) : <PlanView plan={planResult.plan} pending={planResult.pending} error={planResult.error} focus={shownFocus}
+                ) : <PlanView plan={planResult.plan} pending={planResult.pending} error={planResult.error} focus={null}
                       windowInput={windowInput} onWindowInput={setWindowInput} groupPulls={perPull.length}
                       onOpenHit={(id) => {
                         const row = aggregate.find((r) => r.id === id);
