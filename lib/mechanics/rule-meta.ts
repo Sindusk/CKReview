@@ -317,6 +317,8 @@ exposure("targeted", ["wow-ssz-crosswinds-fall"]);
 // Coiled Altar: your own Gravebound fragments and your own ghost
 // (coiled-altar.ts reportOccurrences).
 exposure("targeted", ["wow-ca-gravebound-expired", "wow-ca-ghost-caught", "wow-ca-malevolent-resonance"]);
+// Stone Breaker: the tank whose set it is (twin-fangs.ts).
+exposure("targeted", ["wow-tf-stone-breaker-unsoaked"]);
 // Possession Barrage: the debuffed tank kites it (nekzali.ts).
 exposure("targeted", ["wow-nek-barrage-short"]);
 mechanic("ssz-cysts", "Cysts", undefined, [

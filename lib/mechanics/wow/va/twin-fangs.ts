@@ -385,6 +385,7 @@ import {
   clusterByGap, deadAt, landed, total, died, deathsBy, pullOverMarker, hitEpisodes, annotateGroups as annotateGroupsBy,
 } from "../common";
 import type { WowPullContext } from "../common";
+import type { ReportedOccurrence } from "../../occurrences";
 
 // ─── Ability IDs (log-verified, reports 6Jnq8ycwgkYZpHND + xKP1M6gwC8WpnrBc) ─
 
@@ -793,11 +794,12 @@ function detectVisceralBurst(deaths: DeathEvent[], enemyCasts: EnemyEvent[]): Pu
 // every clean set one tank soaked all three, and the tanks alternated sets.
 // An empty impact hits the raid instead (1289153). The owner is the tank
 // soaking this set, or, when nobody soaked any of it, the tank whose turn it
-// was (the one who didn't soak the previous set).
+// was (the one who didn't soak the previous set). Exposure: role-only — each
+// impact tests that tank, or both tanks when the turn is unknown.
 
 export const TF_STONE_BREAKER_RULE_ID = "wow-tf-stone-breaker-unsoaked";
 
-function detectStoneBreaker(players: PlayerInfo[], deaths: DeathEvent[], enemyCasts: EnemyEvent[]): PullError[] {
+function detectStoneBreaker(players: PlayerInfo[], deaths: DeathEvent[], enemyCasts: EnemyEvent[], occurrences?: ReportedOccurrence[]): PullError[] {
   const errors: PullError[] = [];
   const tanks = players.filter((p) => p.role === "Tank");
   const soakersAt = (t: number) => players.filter((p) => p.damageTaken.some((e) => e.abilityId === STONE_SOAK && e.timestamp >= t - 100 && e.timestamp <= t + STONE_HIT_MS));
@@ -808,6 +810,9 @@ function detectStoneBreaker(players: PlayerInfo[], deaths: DeathEvent[], enemyCa
     const duty = setTanks.length === 1 ? setTanks[0]
       : setTanks.length === 0 && lastSetTank ? tanks.find((p) => p !== lastSetTank) : undefined;
     for (const [i, t] of set.entries()) {
+      // Each impact tests the tank whose set it is, else both tanks
+      // (role-only, rule-meta exposure).
+      occurrences?.push({ mechanicKey: TF_STONE_BREAKER_RULE_ID, timestamp: t, players: (duty ? [duty] : tanks).map((p) => p.name) });
       const hit = players.flatMap((p) => p.damageTaken.filter((e) => e.abilityId === STONE_UNSOAKED && e.timestamp >= t - 100 && e.timestamp <= t + STONE_HIT_MS));
       if (hit.length === 0) continue;
       const killed = deathsBy(deaths, [STONE_UNSOAKED], t, t + HIT_DEATH_WINDOW_MS);
@@ -1002,7 +1007,7 @@ export function detectTwinFangsErrors(ctx: WowPullContext): PullError[] {
     ...detectFeast(players, deaths, castTimes(RAVENOUS_FEAST)),
     ...detectTaintedBurst(players, deaths),
     ...detectVisceralBurst(deaths, enemyCasts),
-    ...detectStoneBreaker(players, deaths, enemyCasts),
+    ...detectStoneBreaker(players, deaths, enemyCasts, ctx.occurrences),
     ...detectAvoidable(players, deaths),
     ...detectOutOfRange(players, deaths, enemyCasts),
     ...detectUncoiledWrath(enemyBuffs, pullEnd),
