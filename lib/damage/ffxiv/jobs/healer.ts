@@ -41,8 +41,15 @@
 //   fight 10 (2026-10-09): its 82.7% Combust uptime exposed a bug (a DoT
 //   with no logged removal ran to the end of the pull, hiding the 12s
 //   gaps at 13:54 and 16:59); its 10 interrupted casts and 1 Gravity II
-//   match. Its Earthly Star hold (1 use) isn't built: the star is placed
-//   for the heal plan, and its damage logs under the Stellar ids.
+//   match. Its Earthly Star hold is the drift check now
+//   (tracked-cooldowns.ts, valued from the Stellar hits): the star is
+//   placed for the heal plan, but a held one still loses its damage.
+// - Astrologian, checked against xivanalysis on dDar482XvFKBPJYh FRU kill
+//   (7.1, 2026-10-12): its 18/20 cards and "2 Draws missed" are draws
+//   held across P4's downtime and to align Divination (no damage); its
+//   one Draw over an unplayed card holds (`cards` below); 3 Divinations
+//   without Lightspeed cost what the weaving gaps already count; 2 of its
+//   5 interrupted casts were the boss going untargetable (6:54, 12:55).
 // - Healer DoTs are valued per application against the filler
 //   (shared.ts dotFindings with fillerId), not by seconds overwritten.
 // White Mage and Sage are unverified: no sample pull has either.
@@ -180,6 +187,74 @@ function avgTick(ctx: PlayerCheckContext, statusId: number): number {
 }
 
 export const SCH_CHECKS: JobCheck[] = [healGcds, aoeOnOneTarget, dot("BIOLYSIS")];
-export const AST_CHECKS: JobCheck[] = [healGcds, aoeOnOneTarget, dot("COMBUST_III"), divination];
+// Astrologian cards. Astral Draw gives The Balance (Play I) and Lord of
+// Crowns, Umbral Draw The Spear; the next Draw replaces what's unplayed
+// (xivanalysis's Draw "used when there was an available Play I or Lord of
+// Crowns"). A card is lost when no play of it came between its draw and
+// the next one. The Balance / The Spear are worth what one play of them
+// added to the party in this pull (the buff ledger's share of each hit
+// under them ÷ plays); Lord of Crowns its own average. The first card can
+// come from a pre-pull draw: plays before the first Draw are its. A draw
+// with no later one is left alone (the pull ended). Forced when the draw
+// and the next one were all forced time (nothing to play it on).
+// dDar482XvFKBPJYh FRU kill: The Balance from the 17:19 Astral Draw
+// was never played; the 18:19 Umbral Draw replaced it before the 18:27
+// Divination.
+const CARD_FORCED_SLACK_MS = 2_500;
+const cards: JobCheck = (ctx): DamageFinding[] => {
+  const astral = A.ASTRAL_DRAW?.id, umbral = A.UMBRAL_DRAW?.id;
+  if (astral === undefined || umbral === undefined) return [];
+  const draws = ctx.player.casts.filter((c) => c.abilityId === astral || c.abilityId === umbral)
+    .sort((a, b) => a.timestamp - b.timestamp);
+  if (draws.length < 2) return [];
+  const playsOf = (actionId: number) => ctx.player.casts.filter((c) => c.abilityId === actionId).map((c) => c.timestamp);
+  // What one play of a party card added: its share of every hit under it.
+  const cardValue = (statusId: number, actionId: number) => {
+    const plays = playsOf(actionId).filter((t) => t < ctx.endMs).length;
+    if (!ctx.ledger || plays === 0) return 0;
+    let added = 0;
+    for (const p of ctx.pull.players) {
+      for (const e of p.damageDone) {
+        if (e.timestamp >= ctx.endMs || !e.statusIds?.includes(statusId)) continue;
+        added += (e.amount ?? 0) * ctx.ledger.share(statusId, p);
+      }
+    }
+    return added / plays;
+  };
+  const kinds = [
+    { draw: astral, action: A.THE_BALANCE.id, status: S.THE_BALANCE.id, name: "The Balance" },
+    { draw: umbral, action: A.THE_SPEAR.id, status: S.THE_SPEAR.id, name: "The Spear" },
+    { draw: astral, action: A.LORD_OF_CROWNS.id, status: undefined, name: "Lord of Crowns" },
+  ];
+  const forced = mergeWindows(ctx.forced);
+  const out: DamageFinding[] = [];
+  for (const kind of kinds) {
+    const plays = playsOf(kind.action);
+    const value = kind.status !== undefined ? cardValue(kind.status, kind.action) : ctx.values.perUse(kind.action);
+    if (value <= 0) continue;
+    for (let i = 0; i < draws.length - 1; i++) {
+      const d = draws[i], next = draws[i + 1];
+      if (d.abilityId !== kind.draw || d.timestamp >= ctx.endMs) continue;
+      if (plays.some((t) => t >= d.timestamp && t < next.timestamp)) continue;
+      const span = next.timestamp - d.timestamp;
+      let covered = 0;
+      for (const f of forced) covered += Math.max(0, Math.min(f.endMs, next.timestamp) - Math.max(f.startMs, d.timestamp));
+      const isForced = span - covered < CARD_FORCED_SLACK_MS;
+      out.push(finding(ctx, {
+        kind: "proc-lost", startMs: d.timestamp, endMs: next.timestamp, forced: isForced,
+        cause: isForced ? "nothing to play it on between the draws" : undefined,
+        label: `${kind.name} not played`,
+        lostDamage: value, inference: true,
+        basis: kind.status !== undefined
+          ? `${k(value)}: what one ${kind.name} added to the party in this pull (its share of every hit under it ÷ plays)`
+          : `${k(value)} average ${kind.name}`,
+        detail: `${kind.name} from the ${d.abilityName} at ${clock(d.timestamp)} wasn't played before the ${next.abilityName} at ${clock(next.timestamp)} replaced it`,
+      }));
+    }
+  }
+  return out;
+};
+
+export const AST_CHECKS: JobCheck[] = [healGcds, aoeOnOneTarget, dot("COMBUST_III"), divination, cards];
 export const WHM_CHECKS: JobCheck[] = [healGcds, aoeOnOneTarget, dot("DIA")];
 export const SGE_CHECKS: JobCheck[] = [healGcds, aoeOnOneTarget, dot("EUKRASIAN_DOSIS_III", "EUKRASIAN_DYSKRASIA")];

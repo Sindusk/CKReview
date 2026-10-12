@@ -28,6 +28,13 @@ check each claim in the log before building anything:
 - Some can't be seen in the log at all: feathers are gauge, so xivanalysis
   only says one "may have been lost".
 
+**Rule for adopting them (user, 2026-10-12):** verify every xivanalysis
+claim against the log first. A claim that holds and costs damage the app
+doesn't count gets built into the app. A claim that is false or
+inaccurate is reported to the user as such and not adopted. Don't adopt
+claims that hold but cost no damage (healing efficiency, mitigation); say
+so instead.
+
 **Fetch options worth knowing:**
 - `--phase` / `--window` / `--bin` set the comparison window: which phase,
   how many seconds from its start, and the bin size.

@@ -46,7 +46,7 @@
 
 import type { Pull } from "@/types/Pull";
 import type { PlayerEvent, PlayerInfo } from "@/types/PlayerInfo";
-import type { DamageContext, DamageFinding, DamageGame, ForcedWindow, Moment } from "./types";
+import type { DamageContext, DamageFinding, DamageGame, ForcedWindow, Moment, TrackedCooldown } from "./types";
 import type { BuffLedger } from "./buffs";
 import {
   forcedPart, gcdLockMs, inWindows, latestBegin, overlapMs, mergeWindows,
@@ -430,7 +430,8 @@ export function checkCooldownDrift(ctx: PlayerCheckContext): DamageFinding[] {
     // Used before the pull (Dancer's Standard Step, shown by a Standard
     // Finish before the first Step): still recharging until the first use.
     const evidence = new Set(cd.prePullEvidenceIds ?? []);
-    const prePull = evidence.size > 0 && ctx.player.casts.some((c) => evidence.has(c.abilityId) && c.timestamp < (casts[0] ?? Infinity));
+    const prePull = evidence.size > 0 && [...ctx.player.casts, ...ctx.player.damageDone]
+      .some((c) => evidence.has(c.abilityId) && c.timestamp < (casts[0] ?? Infinity));
     const capped = cappedStretches(casts, cd.cooldownMs, cd.charges, ctx.endMs).filter((w) => !(prePull && w.startMs === 0));
     let unforced = 0, heldForDeciding = 0, longest: Window | undefined;
     for (const w of capped) {
@@ -448,10 +449,14 @@ export function checkCooldownDrift(ctx: PlayerCheckContext): DamageFinding[] {
     // Never more lost uses than the pull had room for: Vamp's Dancer used
     // Standard Step 19 times in 587s (room for 20), yet its ready time
     // summed to 163s, "5 lost", because each use came a few seconds late.
-    const room = cd.charges + Math.floor(Math.max(0, ctx.endMs - cd.firstUseOffsetMs - overlapMs(0, ctx.endMs, forcedMerged)) / cd.cooldownMs);
-    const lostUses = Math.min(Math.floor(unforced / cd.cooldownMs), Math.max(0, room - casts.length));
+    const room = roomForUses(cd, ctx.endMs, forcedMerged, prePull);
+    const lostUses = Math.min(Math.floor(unforced / cd.cooldownMs), Math.max(0, room - casts.length - (prePull ? 1 : 0)));
     if (lostUses < 1 || !longest) continue;
-    const perUse = cd.actionIds.reduce((a, id) => Math.max(a, ctx.values.perUse(id)), 0);
+    const damageIds = new Set(cd.damageIds ?? []);
+    const perUse = damageIds.size > 0
+      ? ctx.player.damageDone.filter((e) => damageIds.has(e.abilityId) && e.timestamp < ctx.endMs)
+        .reduce((a, e) => a + (e.amount ?? 0), 0) / Math.max(1, casts.length + (prePull ? 1 : 0))
+      : cd.actionIds.reduce((a, id) => Math.max(a, ctx.values.perUse(id)), 0);
     // A cooldown that deals no damage itself (Devilment) has no estimate,
     // and a 0 line says nothing.
     if (perUse === 0) continue;
@@ -466,6 +471,33 @@ export function checkCooldownDrift(ctx: PlayerCheckContext): DamageFinding[] {
     }));
   }
   return out;
+}
+
+/**
+ * How many uses the pull had room for: each use as soon as it's ready,
+ * held only while its effect (landDelayMs after the press) would land in
+ * forced time. The recast keeps running through downtime. Counting room as
+ * (pull − forced time) ÷ recast didn't: on dDar482XvFKBPJYh's FRU kill it
+ * gave Earthly Star room for 15 (the 14 casts plus the pre-pull one), when
+ * 17 could have exploded on a target (xivanalysis: 4 lost, counting its
+ * holds through downtime; the log: 2).
+ */
+export function roomForUses(cd: TrackedCooldown, endMs: number, forced: Window[], prePull: boolean): number {
+  const land = cd.landDelayMs ?? 0;
+  let t = prePull ? cd.cooldownMs : cd.firstUseOffsetMs;
+  let n = prePull ? 1 : 0;
+  while (t + land < endMs) {
+    let place = t;
+    for (let guard = 0; guard < forced.length + 1; guard++) {
+      const f = forced.find((w) => place + land >= w.startMs && place + land < w.endMs);
+      if (!f) break;
+      place = f.endMs - land;
+    }
+    if (place + land >= endMs) break;
+    n++;
+    t = place + cd.cooldownMs;
+  }
+  return n + cd.charges - 1;
 }
 
 // A press logged up to this long before the simulated recast ends is on

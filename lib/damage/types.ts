@@ -119,9 +119,15 @@ export type TrackedCooldown = {
   charges:          number;
   firstUseOffsetMs: number;
   holdMs?:          number;     // allowed hold per ready stretch; default COOLDOWN_HOLD_MS
-  // Actions that only follow this cooldown: one cast before its first use
-  // in the pull means it was used before the pull.
+  // Actions that only follow this cooldown: one cast (or hit) before its
+  // first use in the pull means it was used before the pull.
   prePullEvidenceIds?: number[];
+  // Where its damage logs, when not under its own id (Earthly Star's pet
+  // explodes as Stellar Explosion): the value of a lost use.
+  damageIds?: number[];
+  // Its effect lands this long after the press (Earthly Star matures in
+  // 10s): it can be pressed in downtime if that's over by then.
+  landDelayMs?: number;
 };
 
 // ── Fight context (per boss) ───────────────────────────────────────────

@@ -20,9 +20,13 @@ export type TrackedCooldownSpec = {
   actions:           string[];  // xivanalysis action keys; several = one shared recast
   firstUseOffsetMs?: number;    // how late the opener normally uses it
   holdMs?:           number;    // allowed hold per ready stretch (xivanalysis allowedAverageDowntime)
-  // Action keys that only follow this cooldown: cast before its first use
-  // in the pull, they show it was used before the pull.
+  // Action keys that only follow this cooldown: cast (or hitting) before
+  // its first use in the pull, they show it was used before the pull.
   prePullEvidence?:  string[];
+  // Action keys its damage logs under, when not its own (a pet's hits).
+  damage?:           string[];
+  // Its effect lands this long after the press (checks.ts roomForUses).
+  landDelayMs?:      number;
 };
 
 export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
@@ -171,7 +175,15 @@ export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
   ],
 
   // ── Jobs xivanalysis doesn't track: party buff only ─────────────────
-  "Astrologian": [{ actions: ["DIVINATION"] }],
+  // Earthly Star (xivanalysis's EarthlyStar module: drift past its 60s):
+  // its damage is the pet's Stellar Explosion, or Stellar Burst when
+  // detonated early. One placed before the pull shows as an explosion
+  // before the first cast (dDar482XvFKBPJYh FRU kill: 0:18, first cast
+  // 1:21). Worth ~22-46k a use there, one target.
+  "Astrologian": [
+    { actions: ["DIVINATION"] },
+    { actions: ["EARTHLY_STAR"], prePullEvidence: ["STELLAR_EXPLOSION", "STELLAR_BURST"], damage: ["STELLAR_EXPLOSION", "STELLAR_BURST"], landDelayMs: 10_000 },
+  ],
   // Unverified (no White Mage in any sample).
   "White Mage":  [{ actions: ["PRESENCE_OF_MIND"] }],
 };

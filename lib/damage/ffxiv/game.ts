@@ -155,6 +155,8 @@ const TRACKED = new Map<string, TrackedCooldown[]>(
       firstUseOffsetMs: spec.firstUseOffsetMs ?? 0,
       holdMs:           spec.holdMs,
       prePullEvidenceIds: spec.prePullEvidence?.map((key) => XIVA_ACTIONS[key]?.id).filter((id): id is number => id !== undefined),
+      damageIds:        spec.damage?.map((key) => XIVA_ACTIONS[key]?.id).filter((id): id is number => id !== undefined),
+      landDelayMs:      spec.landDelayMs,
     }];
   })]),
 );
