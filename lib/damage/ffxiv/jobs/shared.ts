@@ -115,6 +115,11 @@ export type ExpectedAction = {
   // Double Down in a 60s No Mercy) are always expected: pressed early,
   // they're misaligned, not unavailable.
   availableIf?: (ctx: PlayerCheckContext, w: Window, cycleMs: number) => boolean;
+  // How many it got in the window, when not a count of its casts (Bard's
+  // Barrage counts when consumed inside it).
+  got?:   (ctx: PlayerCheckContext, w: Window, casts: PlayerEvent[]) => number;
+  // `value` is the action's worth before the window's bonus: multiply it in.
+  scaled?: boolean;
 };
 
 // Pressed this soon before the window, it could have been held for it.
@@ -152,6 +157,10 @@ export type BurstWindowSpec = {
   // The status is a debuff the player puts on the enemy (Kunai's Bane),
   // read from Pull.bossDebuffs instead of the player-buff stream.
   onEnemy?:      boolean;
+  // The window is where every one of these statuses (the player's own) is
+  // up at once, instead of statusId's (Bard: Raging Strikes, Battle Voice
+  // and Radiant Finale together).
+  allOf?:        number[];
   inference?:    boolean;
 };
 
@@ -182,9 +191,27 @@ export function observedBonus(ctx: PlayerCheckContext, w: Window): number {
   return Math.max(0, inside.reduce((a, m) => a + m, 0) / inside.length / base - 1);
 }
 
+/** Where every list has a window at once. */
+function overlapWindows(lists: Window[][]): Window[] {
+  if (lists.length === 0) return [];
+  let out = lists[0];
+  for (const next of lists.slice(1)) {
+    const both: Window[] = [];
+    for (const a of out) {
+      for (const b of next) {
+        const s = Math.max(a.startMs, b.startMs), e = Math.min(a.endMs, b.endMs);
+        if (e > s) both.push({ startMs: s, endMs: e });
+      }
+    }
+    out = both;
+  }
+  return out.sort((a, b) => a.startMs - b.startMs);
+}
+
 export function burstWindowFindings(ctx: PlayerCheckContext, specIn: BurstWindowSpec): DamageFinding[] {
   const out: DamageFinding[] = [];
-  const windows = specIn.onEnemy ? enemyStatusWindows(ctx, specIn.statusId) : statusWindows(ctx, specIn.statusId);
+  const windows = specIn.allOf ? overlapWindows(specIn.allOf.map((id) => statusWindows(ctx, id)))
+    : specIn.onEnemy ? enemyStatusWindows(ctx, specIn.statusId) : statusWindows(ctx, specIn.statusId);
   // The window's own cycle: the shortest gap between window starts (its
   // recast, give or take drift). With one window, nothing is unavailable.
   const starts = windows.map((w) => w.startMs);
@@ -207,10 +234,10 @@ export function burstWindowFindings(ctx: PlayerCheckContext, specIn: BurstWindow
     const missing: { name: string; n: number; value: number }[] = [];
     for (const e of spec.expected(ctx, casts)) {
       if (!(e.availableIf ? e.availableIf(ctx, w, cycleMs) : offCooldownIn(ctx, e.ids, w, cycleMs))) continue;
-      const got = casts.filter((c) => e.ids.includes(c.abilityId)).length;
+      const got = e.got ? e.got(ctx, w, casts) : casts.filter((c) => e.ids.includes(c.abilityId)).length;
       const n = Math.max(0, e.count - got);
       if (n === 0) continue;
-      const each = e.value ? e.value(ctx) : Math.max(...e.ids.map((id) => ctx.values.perUse(id))) * spec.bonus;
+      const each = e.value ? e.value(ctx) * (e.scaled ? spec.bonus : 1) : Math.max(...e.ids.map((id) => ctx.values.perUse(id))) * spec.bonus;
       missing.push({ name: e.name, n, value: n * each });
     }
     if (missingGcds === 0 && missing.length === 0) continue;

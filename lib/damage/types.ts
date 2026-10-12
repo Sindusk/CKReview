@@ -84,6 +84,9 @@ export type DamageGame = {
   // Statuses that speed up GCDs for their duration (Bloodlust, Power
   // Infusion): GCDs under them get their own speed factor.
   hasteStatusIds?: Set<number>;
+  // The speed-up assumed in a haste window with too few GCDs to measure
+  // (default 1.3, Bloodlust). FFXIV: 1, assume none.
+  hasteFallback?: number;
   // Channelled GCDs: they log no end, so their lock runs to their last
   // tick before the next GCD (timeline.ts gcdUses).
   isChannel?(actionId: number): boolean;

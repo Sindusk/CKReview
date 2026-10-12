@@ -29,7 +29,14 @@
 //   come from 50% procs, so a lost one can't be told from the log
 //   (xivanalysis says "may have been lost").
 // Bard: Caustic Bite / Stormbite (below), Hawk's Eye overwrites, AoE on
-//   one target, Raging Strikes window, cooldowns (OGCDDowntime.ts).
+//   one target, the burst window, cooldowns (OGCDDowntime.ts).
+//   Rechecked on dDar482XvFKBPJYh FRU kill (7.1, 2026-10-12): its 17
+//   Hawk's Eye overwrites match by time; Empyreal Arrow 55/59 is 3 by
+//   drift; Battle Voice / Radiant Finale / Raging Strikes / Barrage 9/10
+//   were ready just before P4's downtime and held for the 14:17 burst;
+//   its DoT clipping (1:05 a minute) is Iron Jaws snapshots again; its
+//   Army's Muse "4/5 GCDs" is a fifth GCD at the window's edge, the real
+//   cost being the weave delays in it (Army's Muse is a haste window now).
 //   Checked against xivanalysis on 2T1HzdPKgbhM43am Dancing Mad fight 10
 //   (2026-10-09): 4 overwrites, 2 AoE and the window's missing actions
 //   match (all its window misses were in forced time). Its DoT clipping
@@ -182,22 +189,59 @@ const hypercharge: JobCheck = (ctx) => burstWindowFindings(ctx, {
 });
 
 export const DNC_CHECKS: JobCheck[] = [technical, technicalFillers, dancerOverwrites];
-// Raging Strikes, the burst window (xivanalysis RagingStrikes.tsx): 7 GCDs
-// (8 under Army's Muse, not modelled, so a shortfall can read one low);
-// Radiant Encore, Resonant Arrow, Barrage and Iron Jaws once each; three
-// Heartbreak Shots / Rain of Deaths. +15% (status amount).
-const ragingStrikes: JobCheck = (ctx) => burstWindowFindings(ctx, {
-  statusId: S.RAGING_STRIKES.id, name: "Raging Strikes", bonus: 0.15,
-  bonusBasis: "Raging Strikes is +15%",
-  expectedGcds: () => 7,
-  expected: (): ExpectedAction[] => [
-    { ids: ids("RADIANT_ENCORE"), count: 1, name: "Radiant Encore" },
-    { ids: ids("RESONANT_ARROW"), count: 1, name: "Resonant Arrow" },
-    { ids: ids("BARRAGE"), count: 1, name: "Barrage" },
-    { ids: ids("IRON_JAWS"), count: 1, name: "Iron Jaws" },
-    { ids: ids("HEARTBREAK_SHOT", "RAIN_OF_DEATH"), count: 3, name: "Heartbreak Shot" },
-  ],
-});
+// The burst window (xivanalysis BuffWindows/BurstWindow.tsx): where
+// Raging Strikes, Battle Voice and Radiant Finale are all up. 7 GCDs, 8
+// when Army's Muse covers 2+ of them; Barrage consumed in it (a Refulgent
+// Arrow / Shadowbite, then Barrage's removal, inside it); Iron Jaws once
+// per enemy hit in it; Apex Arrow and Blast Arrow after the first minute;
+// Radiant Encore, Resonant Arrow, Empyreal Arrow and Sidewinder once;
+// three Heartbreak Shots / Rains of Death. Valued at the window's observed
+// bonus (the player's multiplier in it over outside raid buffs; Battle
+// Voice's direct hit isn't in it, so a floor). A Barrage spent outside it
+// loses its two extra Refulgent hits' bonus. Replaces the Raging-Strikes-
+// only window. dDar482XvFKBPJYh FRU kill (7.1): checked against its 6
+// GCDs, 7 Barrage / Iron Jaws, 3 Sidewinder / Empyreal, 6 Heartbreak, 2
+// Apex / Blast and 1 Radiant Encore / Resonant missed.
+const BRD_OPENER_MS = 60_000;
+const BRD_MUSE_GCDS = 2;
+const bardBurst: JobCheck = (ctx) => {
+  const muse = statusWindows(ctx, S.ARMYS_MUSE.id);
+  const barrageGone = (ctx.player.buffs ?? []).filter((e) => e.abilityId === S.BARRAGE.id && e.buffStatus === "removed").map((e) => e.timestamp);
+  const consumers = new Set(ids("REFULGENT_ARROW", "SHADOWBITE"));
+  return burstWindowFindings(ctx, {
+    statusId: S.RAGING_STRIKES.id, allOf: [S.RAGING_STRIKES.id, S.BATTLE_VOICE.id, S.RADIANT_FINALE.id],
+    name: "Burst window", bonus: "observed",
+    bonusBasis: "the window's observed bonus (multiplier in it over outside raid buffs; direct-hit buffs aren't in it, so a floor)",
+    expectedGcds: (c, casts) => {
+      const gcds = casts.filter((x) => c.game.action(x.abilityId)?.onGcd);
+      return 7 + (muse.some((m) => gcds.filter((x) => x.timestamp > m.startMs && x.timestamp < m.endMs).length >= BRD_MUSE_GCDS) ? 1 : 0);
+    },
+    expected: (c, casts): ExpectedAction[] => {
+      const opener = casts.length > 0 && casts[0].timestamp <= BRD_OPENER_MS;
+      const enemies = new Set(casts.filter((x) => x.target && x.target !== c.player.name).map((x) => x.target)).size;
+      return [
+        {
+          ids: ids("BARRAGE"), count: 1, name: "Barrage", scaled: true,
+          value: (cc) => cc.values.perUse(A.REFULGENT_ARROW.id),
+          got: (_cc, w, cs) => {
+            const first = cs.find((x) => consumers.has(x.abilityId))?.timestamp;
+            return first !== undefined && barrageGone.some((t) => t >= first && t <= w.endMs + 200) ? 1 : 0;
+          },
+        },
+        { ids: ids("IRON_JAWS"), count: Math.max(1, enemies), name: "Iron Jaws" },
+        ...(opener ? [] : [
+          { ids: ids("APEX_ARROW"), count: 1, name: "Apex Arrow" },
+          { ids: ids("BLAST_ARROW"), count: 1, name: "Blast Arrow" },
+        ]),
+        { ids: ids("RADIANT_ENCORE"), count: 1, name: "Radiant Encore" },
+        { ids: ids("RESONANT_ARROW"), count: 1, name: "Resonant Arrow" },
+        { ids: ids("EMPYREAL_ARROW"), count: 1, name: "Empyreal Arrow" },
+        { ids: ids("SIDEWINDER"), count: 1, name: "Sidewinder" },
+        { ids: ids("HEARTBREAK_SHOT", "RAIN_OF_DEATH"), count: 3, name: "Heartbreak Shot" },
+      ];
+    },
+  });
+};
 
-export const BRD_CHECKS: JobCheck[] = [bardDots, bardOverwrites, bardAoe, ragingStrikes];
+export const BRD_CHECKS: JobCheck[] = [bardDots, bardOverwrites, bardAoe, bardBurst];
 export const MCH_CHECKS: JobCheck[] = [wildfire, hypercharge];

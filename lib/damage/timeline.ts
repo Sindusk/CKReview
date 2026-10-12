@@ -291,7 +291,7 @@ export function speedProfile(uses: GcdUse[], game: DamageGame | undefined, haste
   const factor = clamp((mode(counts[0], 1) ?? base) / base);
   if (hasteWindows.length === 0) return { baseRecastMs: base, factor, at: () => factor };
   const inside = mode(counts[1], 5);
-  const hasteFactor = inside !== undefined ? clamp(inside / base) : clamp(factor / FALLBACK_HASTE);
+  const hasteFactor = inside !== undefined ? clamp(inside / base) : clamp(factor / (game?.hasteFallback ?? FALLBACK_HASTE));
   return { baseRecastMs: base, factor, hasteFactor, at: (t) => (inWindows(t, hasteWindows) ? hasteFactor : factor) };
 }
 

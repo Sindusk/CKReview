@@ -207,4 +207,12 @@ export const FFXIV_DAMAGE: DamageGame = {
   jobGauges: (job) => JOB_GAUGES[job] ?? [],
   jobProcStatusIds: VPR_PROC_STATUS_IDS,
   mitigationChannels: MITIGATION_CHANNELS,
+  // Army's Muse speeds the Bard's GCDs for 10s by a fixed amount per window
+  // (from the Repertoire held when Army's Paeon ended): measured from the
+  // GCDs under it. Judged at 2.5s, a 2.95s gap from a triple weave in it
+  // read as 0.3s late instead of 0.77s (dDar482XvFKBPJYh FRU kill, 2:10;
+  // xivanalysis's "4/5 GCDs" in every Muse). Army's Paeon is left out: its
+  // speed-up grows stack by stack, which one measured factor can't follow.
+  hasteStatusIds: new Set(["ARMYS_MUSE"].map((k) => XIVA_STATUSES[k]?.id).filter((id): id is number => id !== undefined)),
+  hasteFallback: 1,
 };
