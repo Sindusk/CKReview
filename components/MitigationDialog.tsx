@@ -8,7 +8,10 @@
 // dying, and what could be dropped. No plan input and no PullErrors; this
 // replaced the Ikuya-sheet Heatmap and Review tabs on 2026-10-06.
 //
-// Two views (user, 2026-10-09): Analysis (components/MitigationPlan.tsx,
+// Three views. Tanking (components/MitigationTanking.tsx, user, 2026-10-11):
+// both tanks on one fight clock, buster margins and the tank optimizer's
+// changes (lib/mitigation/tanking-plan.ts, in lib/mitigation/tanking.worker.ts),
+// computed only while it is open. Analysis (components/MitigationPlan.tsx,
 // lib/mitigation/plan.ts), a few coordinated cooldown changes for the raid
 // lead, searched over the group's last N pulls (a "Last N pulls" input,
 // blank = 5) in a web worker (lib/mitigation/plan.worker.ts), opened first
@@ -36,7 +39,11 @@ import { aggregateMitigation } from "@/lib/mitigation/aggregate";
 import { buildDebuffReach } from "@/lib/mitigation/debuff-reach";
 import { PLAN_MIN_PULLS, buildMitigationPlan, planWindow, type OptimizedPlan } from "@/lib/mitigation/plan";
 import type { PlanReply, PlanRequest } from "@/lib/mitigation/plan.worker";
+import { aggregateBusters, analyzePullTanking, summarizeUnused } from "@/lib/mitigation/tanking";
+import { buildTankingPlan, medianTankPull, tankWindow, type TankingPlan } from "@/lib/mitigation/tanking-plan";
+import type { TankingReply, TankingRequest } from "@/lib/mitigation/tanking.worker";
 import { PlanView } from "./MitigationPlan";
+import { TankingView, chipsFromAggregate, chipsFromPull } from "./MitigationTanking";
 import { PlayerPicker } from "./MitigationPlayerPicker";
 import { AggregateDetails, HitDetails } from "./MitigationHitDetails";
 import { FFXIV_MITIGATION } from "@/lib/mitigation/ffxiv-catalog";
@@ -56,7 +63,7 @@ type MitigationDialogProps = {
   currentPullId: number | null;
 };
 
-type View = "analysis" | "timeline";
+type View = "analysis" | "timeline" | "tanking";
 
 const rosterKey = (pull: Pull) => pull.players.map((p) => p.name).sort().join("|");
 
@@ -162,12 +169,64 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId }
     const request: PlanRequest = { id, window, allHits, reach };
     worker.current.postMessage(request);
   }, [planWanted, perPull, analyzable, reach, windowSize]);
-  // The worker goes with the dialog.
+  // The Tanking view (components/MitigationTanking.tsx): each pull's tank
+  // streams and busters, only while that view is open; its changes are
+  // searched over the window of pulls with the latest tank jobs, in a
+  // worker like the Analysis.
+  const tankingWanted = open && view === "tanking";
+  const tankingPerPull = useMemo(() => {
+    if (!tankingWanted) return [];
+    const byId = new Map(analyzable.map((p) => [p.id, p]));
+    return perPull.map((p) => {
+      const pull = byId.get(p.pullId)!;
+      return { ...p, pull, tanking: analyzePullTanking(pull, p.hits, FFXIV_MITIGATION) };
+    });
+  }, [tankingWanted, perPull, analyzable]);
+  const tankWin = useMemo(() => tankWindow(tankingPerPull, windowSize), [tankingPerPull, windowSize]);
+  const [tankResult, setTankResult] = useState<{ plan: TankingPlan | null; pending: boolean; error?: string }>({ plan: null, pending: false });
+  const tankWorker = useRef<Worker | null>(null);
+  const tankRequestId = useRef(0);
+  useEffect(() => {
+    if (!tankingWanted || !allPulls || !tankWin.length) {
+      setTankResult({ plan: null, pending: false });
+      return;
+    }
+    const id = ++tankRequestId.current;
+    setTankResult((r) => ({ ...r, pending: true }));
+    if (typeof Worker === "undefined") {
+      setTankResult({ plan: buildTankingPlan(tankWin, FFXIV_MITIGATION), pending: false });
+      return;
+    }
+    if (!tankWorker.current) {
+      tankWorker.current = new Worker(new URL("../lib/mitigation/tanking.worker.ts", import.meta.url));
+      tankWorker.current.onmessage = (e: MessageEvent<TankingReply>) => {
+        if (e.data.id !== tankRequestId.current) return;
+        setTankResult({ plan: e.data.plan ?? null, pending: false, error: e.data.error });
+      };
+    }
+    const request: TankingRequest = { id, window: tankWin };
+    tankWorker.current.postMessage(request);
+  }, [tankingWanted, allPulls, tankWin]);
+  const tankShown = useMemo(() => {
+    if (!tankingWanted) return undefined;
+    if (!allPulls) return tankingPerPull.find((p) => p.pullId === selectedPull?.id);
+    return medianTankPull(tankWin.length ? tankWin : tankingPerPull);
+  }, [tankingWanted, allPulls, tankingPerPull, tankWin, selectedPull]);
+  const tankPulls = useMemo(() => (allPulls ? (tankWin.length ? tankWin : tankingPerPull) : tankShown ? [tankShown] : []),
+    [allPulls, tankWin, tankingPerPull, tankShown]);
+  const tankChips = useMemo(() => (allPulls
+    ? chipsFromAggregate(aggregateBusters(tankPulls))
+    : chipsFromPull(tankShown?.tanking.busters ?? [])), [allPulls, tankPulls, tankShown]);
+  const tankUnused = useMemo(() => summarizeUnused(tankPulls.map((p) => p.tanking)), [tankPulls]);
+
+  // The workers go with the dialog.
   useEffect(() => {
     if (open) return;
     worker.current?.terminate();
     worker.current = null;
     setPlanResult({ plan: null, pending: false });
+    tankWorker.current?.terminate();
+    tankWorker.current = null;
   }, [open]);
 
   const groups = useMemo(() => buildPlayerGroups(allPulls ? analyzable : selectedPull ? [selectedPull] : []),
@@ -213,6 +272,7 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId }
             <div style={{ display: "flex", gap: 4 }}>
               <button className={`ck-tab ck-tab--sm${view === "analysis" ? " ck-tab--active" : ""}`} onClick={() => setViewPick("analysis")}>Analysis</button>
               <button className={`ck-tab ck-tab--sm${view === "timeline" ? " ck-tab--active" : ""}`} onClick={() => setViewPick("timeline")}>Timeline</button>
+              <button className={`ck-tab ck-tab--sm${view === "tanking" ? " ck-tab--active" : ""}`} onClick={() => setViewPick("tanking")}>Tanking</button>
             </div>
             <span className="ck-label" style={{ margin: 0 }}>Boss</span>
             <select className="ck-field" value={boss} onChange={(e) => pickBoss(e.target.value)} style={{ padding: "3px 8px" }}>
@@ -262,7 +322,22 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId }
 
           <div style={{ flex: "1 1 auto", minHeight: 0, display: "flex", border: "1px solid var(--ck-line-2)", borderRadius: 3, overflow: "hidden" }}>
             <div style={{ flex: "1 1 auto", minWidth: 0, overflow: "auto" }}>
-              {view === "analysis" ? (
+              {view === "tanking" ? (
+                analyzable.length === 0 || (!allPulls && selectedStale)
+                  ? <p className="ck-dialog-text" style={{ padding: 12 }}>No loaded pull has mitigation data yet. Re-fetch the report to analyze it.</p>
+                  : <TankingView plan={tankResult.plan} pending={tankResult.pending} error={tankResult.error}
+                      shown={tankShown} chips={tankChips} unused={tankUnused} focus={shownFocus} allPulls={allPulls}
+                      shownLabel={tankShown ? `Clock: pull ${tankShown.pullNumber}${allPulls ? " (median of the window)" : ""}` : ""}
+                      windowInput={windowInput} onWindowInput={setWindowInput} groupPulls={perPull.length} windowPulls={tankWin.length}
+                      onOpenBuster={(id) => {
+                        const row = aggregate.find((r) => r.id === id);
+                        if (row && rowUneventful(row)) setShowUneventful(true);
+                        if (row?.rare) setShowRare(true);
+                        if (!allPulls && selectedHits?.some((h) => h.id === id && uneventful(h))) setShowUneventful(true);
+                        setViewPick("timeline");
+                        setSelectedHitId(id);
+                      }} />
+              ) : view === "analysis" ? (
                 !allPulls ? (
                   <p className="ck-dialog-text" style={{ padding: 12 }}>
                     The analysis reads all of a group&apos;s pulls: one pull is too noisy to plan from.{" "}

@@ -402,6 +402,58 @@ function savedBy(pull: Pull, entry: { durationMs: number; statuses: { id: number
   return saved / max;
 }
 
+// ── For the view ───────────────────────────────────────────────────────
+
+/** A tank-job cooldown cast that lands on `tank`: their own, or the co-tank's on them. */
+export type TankCast = {
+  key: string; name: string; by: string; atMs: number; durationMs: number;
+  kind: "invuln" | "short" | "cooldown";
+};
+
+const TANK_JOB_NAMES = ["Paladin", "Warrior", "Dark Knight", "Gunbreaker"];
+
+/** Every tank cooldown cast on `tank` in the pull (party mitigation left out), by time. */
+export function tankCasts(pull: Pull, game: MitigationGame, tank: string): TankCast[] {
+  const out: TankCast[] = [];
+  for (const p of pull.players.filter((x) => x.role === "Tank")) {
+    for (const c of p.casts) {
+      const entry = game.actionIndex.get(c.abilityId);
+      if (!entry || entry.reach === "party" || entry.kind === "limitBreak") continue;
+      if (!entry.jobs.some((j) => TANK_JOB_NAMES.includes(j))) continue;
+      const target = entry.reach === "self" ? p.name : (c.target || p.name);
+      if (target !== tank) continue;
+      out.push({
+        key: entry.key, name: entry.name, by: p.name, atMs: c.timestamp, durationMs: entry.durationMs,
+        kind: entry.kind === "invuln" ? "invuln" : SHORT_COOLDOWNS.includes(entry.key) || entry.cooldownMs < 30_000 ? "short" : "cooldown",
+      });
+    }
+  }
+  return out.sort((a, b) => a.atMs - b.atMs);
+}
+
+export type UnusedSummary = {
+  player: string; key: string; name: string; basis: UnusedCooldown["basis"];
+  used: number; unused: number;  // per pull, averaged
+  everyMs?: number; savedPerUse?: number;
+};
+
+/** Each tank's short cooldowns averaged over pulls. */
+export function summarizeUnused(pulls: PullTanking[]): UnusedSummary[] {
+  const by = new Map<string, UnusedCooldown[]>();
+  for (const p of pulls) for (const u of p.unused) by.set(`${u.player}|${u.key}`, [...(by.get(`${u.player}|${u.key}`) ?? []), u]);
+  return [...by.values()].map((xs) => {
+    const every = xs.map((u) => u.everyMs).filter((x): x is number => x !== undefined);
+    const saved = xs.map((u) => u.savedPerUse).filter((x): x is number => x !== undefined);
+    return {
+      player: xs[0].player, key: xs[0].key, name: xs[0].name, basis: xs[0].basis,
+      used: xs.reduce((s, u) => s + u.used, 0) / xs.length,
+      unused: xs.reduce((s, u) => s + u.unused, 0) / xs.length,
+      everyMs: every.length ? median(every) : undefined,
+      savedPerUse: saved.length ? median(saved) : undefined,
+    };
+  });
+}
+
 // ── Across pulls ───────────────────────────────────────────────────────
 
 export type PullTankingRef = { pullId: number | string; pullNumber: number; durationMs: number; tanking: PullTanking };

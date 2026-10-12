@@ -178,6 +178,13 @@ export function tankWindow<T extends { pull: Pull }>(perPull: T[], size?: number
   return same.length < PLAN_MIN_PULLS ? [] : planWindow(same, size);
 }
 
+/** The window's median pull by total tank damage: the one the lanes show in all-pulls mode. */
+export function medianTankPull<T extends { tanking: PullTanking }>(window: T[]): T | undefined {
+  const total = (w: T) => w.tanking.tanks.reduce((s, t) => s + t.events.reduce((a, e) => a + e.taken, 0), 0);
+  const sorted = [...window].sort((a, b) => total(a) - total(b));
+  return sorted[Math.floor(sorted.length / 2)];
+}
+
 // ── Eligibility ────────────────────────────────────────────────────────
 
 const TANK_JOBS = new Set(["Paladin", "Warrior", "Dark Knight", "Gunbreaker"]);
