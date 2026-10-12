@@ -320,6 +320,15 @@ const MECHANICS = {
     },
   },
 
+  'oracle-of-darkness': {
+    game: 'ff',
+    lateCapture: true, // Phase 3 only — safe on --from-minutes captures (see isLateCapture)
+    load: () => requireTsFromRoot('lib/mechanics/ffxiv/fru/oracle-of-darkness.ts'),
+    run({ mod, ctxs }) {
+      for (const c of ctxs) printPullErrors(c, mod.detectOracleOfDarknessErrors(c.relPlayers(), c.relDeaths(), c.relEnemyCasts()));
+    },
+  },
+
   stompies: {
     game: 'ff',
     load: () => requireTsFromRoot('lib/mechanics/ffxiv/dancingmad/stompies.ts'),

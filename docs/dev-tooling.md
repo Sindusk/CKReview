@@ -32,7 +32,11 @@ validation harness (`scripts/validate.js`, `expectations/`), see
   Kefka used `--min-minutes 15 --from-minutes 14` (~1MB per pull instead
   of 5-7MB). `--to-minutes <n>` also stops those streams n minutes in
   (deaths still run to the end), so a middle phase costs only its own
-  span: FRU Phase 2 used `--from-minutes 2.4 --to-minutes 7.75`.
+  span: FRU Phase 2 used `--from-minutes 2.4 --to-minutes 7.75`, Phase 3
+  `--min-minutes 7.3 --from-minutes 6.9 --to-minutes 10.75` (P3 starts
+  7:20-7:27 and ends by 10:35). The P2 folders' P3 pulls were refetched
+  with `--refetch --fight <id>... --from-minutes 2.4 --to-minutes 10.75`,
+  which keeps their P2 data (and baselines) unchanged.
   `validate.js` detects captures whose damage starts 2+ minutes in and runs
   only `lateCapture` mechanics on them.
   - **Re-running a fetch on such a folder must repeat its flags.** A

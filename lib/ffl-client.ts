@@ -398,6 +398,9 @@ export type FFLDebuffEvent = {
   extraInfo?: number;
   // The new stack count on "applydebuffstack" (FRU's Lightsteeped).
   stack?: number;
+  // The status's full length in ms on an apply (FRU P3's Spell-in-Waiting
+  // timers: 10000 / 20000 / 30000 fires, 10000 / 29000 / 38000 Waters).
+  duration?: number;
   ability?: {
     name:        string;
     abilityIcon?: string;

@@ -222,6 +222,9 @@ export const ERROR_RULES: PullErrorRule[] = [
       40214,   // Inescapable Illumination (short center tower)
       40256,   // Hiemal Storm
       40262,   // Sinbound Blizzard III (dark crystal cone)
+      // Futures Rewritten P3: oracle-of-darkness.ts owns these.
+      40279,   // Dark Blizzard III (Relativity donut)
+      40297,   // Apocalypse
     ],
   },
 

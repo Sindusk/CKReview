@@ -147,10 +147,10 @@ const COVERED_ENCOUNTERS: Record<Pull["game"], Set<string>> = {
 // Encounters whose early phases have a module, by fight name and the log's
 // phase ids: the fallback still runs on these pulls but reports nothing
 // inside those phases (Futures Rewritten: fatebreaker.ts owns P1,
-// usurper-of-frost.ts P2 with its intermission). A pull
-// without phase data keeps every fallback error.
+// usurper-of-frost.ts P2 with its intermission, oracle-of-darkness.ts P3).
+// A pull without phase data keeps every fallback error.
 const MODULE_PHASES: Record<string, number[]> = {
-  "Futures Rewritten": [1, 2],
+  "Futures Rewritten": [1, 2, 3],
 };
 
 /** `t` (ms into the pull) falls in a phase an encounter module covers. */

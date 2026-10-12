@@ -73,6 +73,7 @@ import { detectRedHotDeepBlueErrors } from "./mechanics/ffxiv/arcadion/red-hot-d
 import { detectTyrantErrors } from "./mechanics/ffxiv/arcadion/tyrant";
 import { detectFatebreakerErrors } from "./mechanics/ffxiv/fru/fatebreaker";
 import { detectUsurperOfFrostErrors, type HeadMarker } from "./mechanics/ffxiv/fru/usurper-of-frost";
+import { detectOracleOfDarknessErrors } from "./mechanics/ffxiv/fru/oracle-of-darkness";
 import { detectWowEncounterErrors } from "./mechanics/wow/registry";
 import { buildPullPhaseSegments } from "./pull-phases";
 import { computeMechanicOccurrences, mergeReportedOccurrences, type ReportedOccurrence } from "./mechanics/occurrences";
@@ -1173,6 +1174,7 @@ function fflDebuffToPlayerEvent(
     extra:       source?.name,
     debuffStatus,
     stack:       event.stack,
+    durationMs:  event.duration,
     causeAbilityId:   event.extraAbilityGameID,
     causeAbilityName: event.extraAbilityGameID !== undefined
       ? fflAbilityName({ abilityGameID: event.extraAbilityGameID }, abilityMap)
@@ -1602,6 +1604,7 @@ export function transformFFightToPull(
     ...detectTyrantErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
     ...detectFatebreakerErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
     ...detectUsurperOfFrostErrors(players, deathEvents, enemyCastEvents, headMarkers, reportedOccurrences),
+    ...detectOracleOfDarknessErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
   ].sort((a, b) => a.timestamp - b.timestamp);
 
   const fightDurationMs = data.fight.endTime - data.fight.startTime;

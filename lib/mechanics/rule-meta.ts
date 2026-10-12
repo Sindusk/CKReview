@@ -351,6 +351,10 @@ mechanic("ffxiv-uof-slap", "Quadruple Slap", 2, ["ffxiv-uof-slap"]);
 mechanic("ffxiv-uof-marked-cone", "Diamond Dust: marked players' cones", 2, ["ffxiv-uof-marked-cone"]);
 mechanic("ffxiv-uof-stone", "Diamond Dust: Frigid Stone drops", 2, ["ffxiv-uof-stone"]);
 exposure("targeted", ["ffxiv-uof-slap", "ffxiv-uof-marked-cone", "ffxiv-uof-stone"]);
+// Futures Rewritten P3: Black Halo and Darkest Dance test the non-tanks
+// (oracle-of-darkness.ts reports them at every cast).
+mechanic("ffxiv-ood-tank-buster", "Black Halo / Darkest Dance (non-tanks)", 3, ["ffxiv-ood-tank-buster"]);
+exposure("targeted", ["ffxiv-ood-tank-buster"]);
 // Vamp Fatale (vamp-fatale.ts reports every instance): each rule scoped to
 // the role or group that can fail it.
 mechanic("ffxiv-vf-hardcore", "Hardcore (non-tanks)", undefined, ["ffxiv-vf-hardcore"]);

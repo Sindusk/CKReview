@@ -132,6 +132,7 @@ function buildFFPlayers(rep, actorMap, getFFJobByName, abilityMap) {
         abilityName: resolveAbilityName(e.abilityGameID),
         debuffStatus: statusMap[e.type] ?? 'applied',
         stack: e.stack,
+        durationMs: e.duration,
         causeAbilityId: e.extraAbilityGameID,
         causeAbilityName: e.extraAbilityGameID !== undefined
           ? (abilityMap?.get(e.extraAbilityGameID) ?? ('Ability ' + e.extraAbilityGameID))

@@ -46,8 +46,13 @@ lib/mechanics/
                                 Dust cones/stones, gaze, twins, Holy stacks,
                                 Mirror cones, Light Rampant tethers/stacks/
                                 towers, puddles, walls, Absolute Zero, Endless
-                                Ice Age). The other three files are research
-                                models only
+                                Ice Age)
+      oracle-of-darkness.ts   — Phase 3 per-pull rules (Relativity fires,
+                                Unholy, Blizzard, Meltdown baits/beams,
+                                rewind Water/Eruption/Shadoweye, Refrain
+                                Waters, Apocalypse, Spirit Taker, busters,
+                                Darkest Dance walls, Memory's End). The other
+                                two files are research models only
     arcadion/                 — AAC Heavyweight (Savage)
       vamp-fatale.ts          — Vamp Fatale (M9S) per-pull rules (Stomp bats and
                                 Bombpyre overlaps, Aetherletting drops/lines/overlap,
@@ -681,6 +686,26 @@ The same principles apply when refining any module:
 - **Phase clears are the baseline.** With no kill, the 91 P2 clears were
   checked for zero Raid errors and the few Majors left in them read one by
   one.
+
+### Lessons from Oracle of Darkness (FRU P3: 133 pulls over 24 reports, 6 P3 clears)
+
+- **Timed statuses carry their timer.** FFLogs' debuff applies have a
+  `duration` (now `PlayerEvent.durationMs`); Relativity's and Refrain's
+  10/20/30s and 10/29/38s assignments read straight from it, with no
+  waiting for the removal (which a death or the pull end cuts short).
+- **A cast that hit several players loses its target.** 89 of 95 fires
+  that caught others had no cast target. Find the owner among the hit
+  players who held that timer's status instead.
+- **Some debuffs go off at the holder's death.** A Dark Fire holder's
+  death fires it at once on the body (untargeted, ~0.1s after the fatal
+  hit), which kills the stack and chains. Report the chain once,
+  player-less, and flag the first death's own cause.
+- **Mark of Mortality is a delayed death.** The next stack hit kills its
+  holder with no killing blow; so does Doom ~5s on. Classify both before
+  calling a silent death a wall or a reset.
+- **Collapse threshold from the clears.** No P3 clear had more than one
+  player down before Memory's End, and no pull came back from four; three
+  did. The marker uses four with no end-of-pull window.
 
 ### Lessons from Ultimate Kefka (a late phase, 29 pulls, no kill)
 

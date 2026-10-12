@@ -96,8 +96,8 @@ export type PlayerEvent = {
   // Begin-casts and player buffs. Cast time after speed for a begin-cast
   // (WoW: begin → cast of the same ability, 0 for an instant proc; for a
   // cast that never went off, how long it ran before the player's next
-  // cast); full status length for an FFXIV buff apply/refresh (WoW buffs
-  // carry none).
+  // cast); full status length for an FFXIV buff or debuff apply/refresh
+  // (WoW buffs carry none).
   durationMs?:   number;
   buffStatus?:   "applied" | "refreshed" | "removed" | "stack" | "stackRemoved";
 
