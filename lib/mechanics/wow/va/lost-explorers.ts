@@ -560,7 +560,10 @@ function detectFinalAscension(players: PlayerInfo[], deaths: DeathEvent[], enemy
       ? `threw the Disgusting Fish at ${fish.c.target ?? "an explorer"} only ${sec(lead)}s before Final Ascension completed`
       : `threw the Disgusting Fish at ${fish.c.target ?? "an explorer"} ${sec(-lead)}s after Final Ascension had already completed`;
     errors.push(playerError(fish.p, {
-      ...base, severity: killed.length ? "Major" : "Minor", name: "Fish Fed Late", timestamp: fish.c.timestamp,
+      // A fish thrown after the completion is stamped at the completion,
+      // so it sits before the Raid marker and counts (B7 +311.5; user,
+      // 2026-10-11).
+      ...base, severity: killed.length ? "Major" : "Minor", name: "Fish Fed Late", timestamp: Math.min(fish.c.timestamp, t),
       description: `${fish.p.name} ${timing} (${FISH_LAG_NOTE}); the channel hit the raid ${ticks.length} times` +
         (command ? ` for ${sec(command.timestamp - t)}s` : "") + `. ${outcome}`,
     }));
