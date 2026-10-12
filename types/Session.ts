@@ -37,4 +37,9 @@ export type SavedSession = {
   vods:      SavedSessionVod[];
   wipeCalls: Record<number, number>;  // fightId -> timestampMs
   manualErrors: Record<number, SavedManualError[]>;  // fightId -> manual errors
+  // Strategy dialog overrides of assigned duties (lib/mechanics/
+  // assignments.ts): mechanicKey -> player name, or null for "nobody
+  // assigned". A duty without an entry uses detection. Absent in sessions
+  // saved before 2026-10-11.
+  dutyOverrides?: Record<string, string | null>;
 };

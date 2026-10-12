@@ -29,7 +29,7 @@ import MitigationDialog from "@/components/MitigationDialog";
 import DamageDialog from "@/components/DamageDialog";
 import { detectTerminateKickOrder } from "@/lib/mechanics/wow/vs-dr-mqd/terminate-kicks";
 import { detectCrystalAssignments } from "@/lib/mechanics/wow/vs-dr-mqd/crystal-assignments";
-import { applyDutyAssignments, detectDutyAssignments } from "@/lib/mechanics/assignments";
+import { applyDutyAssignments, detectDutyAssignments, resolveDutyAssignments, type DutyOverrides } from "@/lib/mechanics/assignments";
 import {
   detectBlackHoleStrategy,
   detectMissedAssignedTetherErrors,
@@ -196,7 +196,12 @@ export default function Home() {
   const fallbackProfiles = useMemo(() => buildFallbackProfiles(pulls), [pulls]);
   // Assigned duties (the Lost Explorers fish carrier, ...): who each job
   // was given to, detected across the report (lib/mechanics/assignments.ts).
-  const dutyAssignments = useMemo(() => detectDutyAssignments(pulls), [pulls]);
+  // The Strategy dialog's overrides, saved in this report's session.
+  const [dutyOverrides, setDutyOverrides] = useState<DutyOverrides>({});
+  const dutyOverridesRef = useRef<DutyOverrides>({});
+  useEffect(() => { dutyOverridesRef.current = dutyOverrides; }, [dutyOverrides]);
+  const detectedDuties = useMemo(() => detectDutyAssignments(pulls), [pulls]);
+  const dutyAssignments = useMemo(() => resolveDutyAssignments(detectedDuties, dutyOverrides), [detectedDuties, dutyOverrides]);
 
   // Pulls with the cross-pull errors merged in: assigned duties filled in
   // where nobody performed them (assignments.ts), Black Hole "Missed Assigned
@@ -463,6 +468,7 @@ export default function Home() {
         }),
         wipeCalls:    buildWipeCallsMap(pullsRef.current),
         manualErrors: buildManualErrorsMap(pullsRef.current),
+        dutyOverrides: Object.keys(dutyOverridesRef.current).length > 0 ? dutyOverridesRef.current : undefined,
       };
 
       // Nothing worth saving yet — don't create an empty session.
@@ -494,6 +500,17 @@ export default function Home() {
   // (staticId, sessionId): adding a second night's log to a static then hit
   // the "resync" path and wiped the first night's pulls (seen 2026-08-03
   // with J4TnhjdNBtDK6LMx + mhLjAT4vDyJgZcBk).
+  // Strategy dialog: a player name, null for "nobody assigned", undefined
+  // to go back to detection. Saved with the session (one per report).
+  const handleDutyOverrideChange = useCallback((mechanicKey: string, value: string | null | undefined) => {
+    const next = { ...dutyOverridesRef.current };
+    if (value === undefined) delete next[mechanicKey];
+    else next[mechanicKey] = value;
+    dutyOverridesRef.current = next;
+    setDutyOverrides(next);
+    persistSession();
+  }, [persistSession]);
+
   const startNewSessionIfDifferentLog = useCallback((rawInput: string) => {
     if (!sessionIdRef.current) return;
 
@@ -506,6 +523,8 @@ export default function Home() {
     setSessionId(null);
     pendingWipeCallsRef.current    = {};
     pendingManualErrorsRef.current = {};
+    dutyOverridesRef.current = {};
+    setDutyOverrides({});
 
     // Drop ?session=<id> so a reload doesn't restore the old report on top of
     // the one being imported; persistSession() stamps the new id shortly.
@@ -534,6 +553,8 @@ export default function Home() {
       setImportInput(session.reportUrl);
       pendingWipeCallsRef.current = session.wipeCalls ?? {};
       pendingManualErrorsRef.current = session.manualErrors ?? {};
+      dutyOverridesRef.current = session.dutyOverrides ?? {};
+      setDutyOverrides(session.dutyOverrides ?? {});
 
       const restoredVods: Vod[] = session.vods.map((v, i) => restoreSessionVod(v, i));
 
@@ -1084,6 +1105,8 @@ export default function Home() {
     sessionReportUrlRef.current = session.reportUrl;
     pendingWipeCallsRef.current = session.wipeCalls ?? {};
     pendingManualErrorsRef.current = session.manualErrors ?? {};
+    dutyOverridesRef.current = session.dutyOverrides ?? {};
+    setDutyOverrides(session.dutyOverrides ?? {});
 
     const restoredVods: Vod[] = session.vods.map((v, i) => restoreSessionVod(v, i));
 
@@ -1283,6 +1306,10 @@ export default function Home() {
         onBlackHoleOverrideChange={handleBlackHoleOverrideChange}
         pulls={pulls}
         currentPullId={selectedPullId}
+        duties={dutyAssignments}
+        displayPulls={displayPulls}
+        dutyOverrides={dutyOverrides}
+        onDutyOverrideChange={handleDutyOverrideChange}
       />
 
       <DamageDialog

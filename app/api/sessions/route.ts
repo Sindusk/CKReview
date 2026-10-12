@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { writeSession, generateSessionId } from "@/lib/session-store";
 import type { SavedSession } from "@/types/Session";
+import { sanitizeDutyOverrides } from "@/lib/session";
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
@@ -13,6 +14,7 @@ export async function POST(req: NextRequest) {
     vods:         Array.isArray(body.vods) ? body.vods : [],
     wipeCalls:    body.wipeCalls && typeof body.wipeCalls === "object" ? body.wipeCalls : {},
     manualErrors: body.manualErrors && typeof body.manualErrors === "object" ? body.manualErrors : {},
+    dutyOverrides: sanitizeDutyOverrides(body.dutyOverrides),
   };
 
   const id = generateSessionId();

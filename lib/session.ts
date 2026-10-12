@@ -3,9 +3,10 @@
 // Everything the client needs to save/restore/reattach a session: fetch
 // wrappers around the /api/sessions routes (formerly session-client.ts),
 // plus pure helpers for turning Pull[] wipe-call state into/from the
-// SavedSession.wipeCalls map (formerly session-helpers.ts). Both are
-// small, client-safe, and operate on the same SavedSession shape, so they
-// belong together. lib/session-store.ts stays separate — it's server-only
+// SavedSession.wipeCalls map (formerly session-helpers.ts), and the
+// dutyOverrides sanitizer the session routes share. All are small,
+// client-safe, and operate on the same SavedSession shape, so they belong
+// together. lib/session-store.ts stays separate — it's server-only
 // (uses `fs`) and must never be imported from a "use client" file.
 
 import type { SavedSession, SavedManualError } from "@/types/Session";
@@ -16,6 +17,17 @@ import {
   MANUAL_ERROR_RULE_ID,
   type PullError,
 } from "@/types/PullError";
+
+/** SavedSession.dutyOverrides from an untrusted request body: string keys to a name or null. */
+export function sanitizeDutyOverrides(raw: unknown): Record<string, string | null> | undefined {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const out: Record<string, string | null> = {};
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (value === null) out[key] = null;
+    else if (typeof value === "string") out[key] = value;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
 
 // ─── Fetch wrappers around /api/sessions ────────────────────────────────────
 

@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readSession, writeSession } from "@/lib/session-store";
 import type { SavedSession } from "@/types/Session";
+import { sanitizeDutyOverrides } from "@/lib/session";
 
 export async function GET(
   _req: NextRequest,
@@ -36,6 +37,7 @@ export async function PUT(
     vods:         Array.isArray(body.vods) ? body.vods : [],
     wipeCalls:    body.wipeCalls && typeof body.wipeCalls === "object" ? body.wipeCalls : {},
     manualErrors: body.manualErrors && typeof body.manualErrors === "object" ? body.manualErrors : {},
+    dutyOverrides: sanitizeDutyOverrides(body.dutyOverrides),
   };
 
   await writeSession(id, session);

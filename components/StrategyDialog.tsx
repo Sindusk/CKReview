@@ -3,12 +3,18 @@
 // components/StrategyDialog.tsx
 //
 // "Strategy" modal opened from the header bar next to the import/log
-// controls. Shows raid strategy detected automatically from the loaded
-// report's pulls — currently the Midnight Falls Terminate interrupt
-// rotation (lib/mechanics/wow/vs-dr-mqd/terminate-kicks.ts) and Dawn
-// Crystal carry assignments for WoW, plus the Dancing Mad Black Hole tether
-// strategy (DSA / SDA / Double Tether) and a per-pull party-role roster
-// (MT/OT/H1/H2/M1/M2/R1/R2 — lib/mechanics/ffxiv/roles.ts) for FFXIV.
+// controls: the group's plan for the loaded report, detected from its
+// pulls. Layout chosen by the user 2026-10-11 ("sections by kind",
+// docs/archive/exposure-plan.md), top to bottom:
+// 1. Assigned duties (lib/mechanics/assignments.ts): each job with its
+//    detected assignee, a picker to override it (saved in the report's
+//    session), and the assignee's record in this report.
+// 2. Strategy: the Dancing Mad Black Hole shape (DSA / SDA / Double
+//    Tether) and the Graven 2 variant.
+// 3. Party roles (MT/OT/H1/H2/M1/M2/R1/R2 — lib/mechanics/ffxiv/roles.ts)
+//    per pull, FFXIV only.
+// Midnight Falls (deprecated) keeps its Terminate kick order and Dawn
+// Crystal sections at the bottom, unchanged.
 //
 
 import { useMemo } from "react";
@@ -23,6 +29,7 @@ import {
 import { detectFFRoles, type FFRoleSlot } from "@/lib/mechanics/ffxiv/roles";
 import { detectGraven2Strategy } from "@/lib/mechanics/ffxiv/dancingmad/graven2-strategy";
 import { getClassColor } from "@/lib/player-display";
+import { dutyRecords, type DutyAssignment, type DutyOverrides } from "@/lib/mechanics/assignments";
 import type { Pull } from "@/types/Pull";
 import { Dialog } from "./ui/Dialog";
 
@@ -41,7 +48,84 @@ type StrategyDialogProps = {
   // The app's globally-selected pull — the role roster's dropdown resets to
   // this every time the dialog opens (see hooks/useFFPullSelector.ts).
   currentPullId: number | null;
+  // Assigned duties with overrides applied, the pulls they were applied to
+  // (for the records), and the saved overrides.
+  duties:        DutyAssignment[];
+  displayPulls:  Pull[];
+  dutyOverrides: DutyOverrides;
+  /** A player name, null = nobody assigned, undefined = back to detection. */
+  onDutyOverrideChange: (mechanicKey: string, value: string | null | undefined) => void;
 };
+
+const mmss = (ms: number) => `${Math.floor(ms / 60000)}:${String(Math.floor((ms % 60000) / 1000)).padStart(2, "0")}`;
+
+// Picker values: "" = auto, NOBODY = nobody assigned, else a player name.
+const NOBODY = "\u0000nobody";
+
+// One assigned duty: picker, what detection saw, the assignee's record.
+function DutyRow({
+  duty, pulls, override, onChange,
+}: {
+  duty:     DutyAssignment;
+  pulls:    Pull[];
+  override: string | null | undefined;
+  onChange: (value: string | null | undefined) => void;
+}) {
+  const records = useMemo(() => dutyRecords(pulls, duty), [pulls, duty]);
+  const roster = useMemo(() => {
+    const names = new Set<string>();
+    for (const p of pulls) if (p.name === duty.boss) for (const pl of p.players) names.add(pl.name);
+    return [...names].sort((a, b) => a.localeCompare(b));
+  }, [pulls, duty.boss]);
+  const game = pulls.find((p) => p.name === duty.boss)?.game ?? "wow";
+  const classOf = (name: string) => pulls.find((p) => p.name === duty.boss)?.players.find((pl) => pl.name === name)?.className;
+  const top = duty.performers.slice(0, 3).map((p) => `${p.player} ${p.performed}`).join(", ");
+  const detected = duty.source === "override"
+    ? "Set by you"
+    : duty.kind === "single" ? `Detected: did it ${duty.assignees[0].performed} of ${duty.performed} times`
+    : duty.kind === "shared" ? `Shared: ${top}`
+    : duty.performed > 0 ? `No clear assignee (${top})` : "Nobody did it in this report";
+  const value = override === undefined ? "" : override === null ? NOBODY : override;
+
+  return (
+    <div className="ck-card" style={{ padding: "8px 12px", display: "flex", flexDirection: "column", gap: "4px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+        <span style={{ ...strategyRowLabelStyle, width: "110px" }}>{duty.label}</span>
+        <select
+          className="ck-field"
+          value={value}
+          onChange={(e) => onChange(e.target.value === "" ? undefined : e.target.value === NOBODY ? null : e.target.value)}
+          style={{ padding: "3px 8px", fontSize: "12px" }}
+        >
+          <option value="">
+            Auto{duty.source === "detected" && duty.assignees.length > 0 ? ` (${duty.assignees.map((a) => a.player).join(" / ")})` : ""}
+          </option>
+          <option value={NOBODY}>Nobody assigned</option>
+          {roster.map((name) => <option key={name} value={name}>{name}</option>)}
+        </select>
+        <span style={{ fontSize: "11px", color: "var(--ck-text-3)" }}>{detected} · {duty.boss}</span>
+      </div>
+      {records.map((r) => (
+        <div key={r.player} style={{ display: "flex", alignItems: "baseline", gap: "8px", fontSize: "12px", flexWrap: "wrap" }}>
+          <span style={{ color: getClassColor(game, classOf(r.player) ?? ""), fontWeight: 600 }}>{r.player}</span>
+          <span className="ck-num" style={{ color: "var(--ck-text-1)" }}>
+            {r.chances === 0 ? "no chances yet" : `${r.chances - r.failures.length} of ${r.chances} clean`}
+          </span>
+          {r.failures.length > 0 && (
+            <span style={{ color: "var(--ck-text-3)", fontSize: "11px" }}>
+              Failed: {r.failures.map((f) => `P${f.pullNumber} ${mmss(f.timestamp)} ${f.name.toLowerCase()}`).join(" · ")}
+            </span>
+          )}
+        </div>
+      ))}
+      {duty.kind === "shared" && duty.source === "detected" && (
+        <div style={{ fontSize: "11px", color: "var(--ck-text-3)" }}>
+          Shared, so a time nobody did it stays unassigned. Pick one player to make them responsible for every time.
+        </div>
+      )}
+    </div>
+  );
+}
 
 // Column layout for the compact roster table — Tank/Healer/Melee/Ranged
 // across, MT-row then OT-row down (2026-07-23, replaced the earlier
@@ -201,6 +285,10 @@ export default function StrategyDialog({
   onBlackHoleOverrideChange,
   pulls,
   currentPullId,
+  duties,
+  displayPulls,
+  dutyOverrides,
+  onDutyOverrideChange,
 }: StrategyDialogProps) {
   // Pull selector for the role roster — only FF pulls with a resolved
   // roster are selectable. Resets to the app's current pull every time the
@@ -213,58 +301,43 @@ export default function StrategyDialog({
 
   const showBlackHole = blackHole !== null;
   const showRoster = ffPulls.length > 0;
+  const showDuties = duties.length > 0;
 
   return (
     <Dialog
       title="Strategy"
-      width={showBlackHole || showRoster ? "min(680px, 94vw)" : "480px"}
+      width={showBlackHole || showRoster || showDuties ? "min(680px, 94vw)" : "480px"}
       maxHeight="80vh"
       zIndex={1100}
       onBackdropClick={onClose}
       onClose={onClose}
     >
-        {showRoster && selectedPull && (
+        {showDuties && (
           <div style={{ marginBottom: "20px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px" }}>
-              <div className="ck-subheading">Party Roles</div>
-              <select
-                className="ck-field"
-                value={selectedPullId ?? ""}
-                onChange={(e) => setSelectedPullId(Number(e.target.value))}
-                style={{ padding: "3px 8px" }}
-              >
-                {ffPulls.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} #{p.pullNumber} ({p.result})
-                  </option>
-                ))}
-              </select>
-            </div>
+            <div className="ck-subheading" style={{ marginBottom: "4px" }}>Assigned Duties</div>
             <div className="ck-help">
-              Auto-detected party role for each player in this pull. MT is
-              whoever took the boss&apos;s first auto-attack; M1/M2 come from
-              the Wave Cannon line-up. A slot that couldn&apos;t be told apart
-              is marked with &quot;?&quot;.
+              Who each job was given to, detected from who did it across this
+              report. Change it if detection is wrong: the choice is saved with
+              this report and used when it&apos;s added to a static. A time
+              nobody did the job counts against the assignee. Records count
+              this report, before each pull&apos;s raid cutoff.
             </div>
-            <RoleRoster pull={selectedPull} />
-          </div>
-        )}
-
-        {showRoster && selectedPull && (
-          <div style={{ marginBottom: "20px" }}>
-            <div className="ck-subheading" style={{ marginBottom: "4px" }}>Graven 2 Strategy</div>
-            <div className="ck-help">
-              Auto-detected per pull from this pull&apos;s own Gravitas hits —
-              Light Party (two 4-player stacks, opposite sides of the arena) vs
-              the newer 8-Player Stack. Identification only for now; no
-              per-player error detection for the stack/spread step itself yet.
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+              {duties.map((d) => (
+                <DutyRow
+                  key={d.mechanicKey}
+                  duty={d}
+                  pulls={displayPulls}
+                  override={d.mechanicKey in dutyOverrides ? dutyOverrides[d.mechanicKey] : undefined}
+                  onChange={(v) => onDutyOverrideChange(d.mechanicKey, v)}
+                />
+              ))}
             </div>
-            <Graven2StrategyView pull={selectedPull} />
           </div>
         )}
 
         {showBlackHole && blackHole && (
-          <div style={{ marginBottom: strategy || crystals ? "20px" : 0 }}>
+          <div style={{ marginBottom: "20px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px", flexWrap: "wrap" }}>
               <div className="ck-subheading">Black Hole Strategy</div>
               <select
@@ -313,12 +386,53 @@ export default function StrategyDialog({
           </div>
         )}
 
+        {showRoster && selectedPull && (
+          <div style={{ marginBottom: "20px" }}>
+            <div className="ck-subheading" style={{ marginBottom: "4px" }}>Graven 2 Strategy (pull #{selectedPull.pullNumber})</div>
+            <div className="ck-help">
+              Auto-detected per pull from this pull&apos;s own Gravitas hits —
+              Light Party (two 4-player stacks, opposite sides of the arena) vs
+              the newer 8-Player Stack. Pick the pull under Party Roles.
+              Identification only for now; no per-player error detection for
+              the stack/spread step itself yet.
+            </div>
+            <Graven2StrategyView pull={selectedPull} />
+          </div>
+        )}
+
+        {showRoster && selectedPull && (
+          <div style={{ marginBottom: strategy || crystals ? "20px" : 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px" }}>
+              <div className="ck-subheading">Party Roles</div>
+              <select
+                className="ck-field"
+                value={selectedPullId ?? ""}
+                onChange={(e) => setSelectedPullId(Number(e.target.value))}
+                style={{ padding: "3px 8px" }}
+              >
+                {ffPulls.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} #{p.pullNumber} ({p.result})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="ck-help">
+              Auto-detected party role for each player in this pull. MT is
+              whoever took the boss&apos;s first auto-attack; M1/M2 come from
+              the Wave Cannon line-up. A slot that couldn&apos;t be told apart
+              is marked with &quot;?&quot;.
+            </div>
+            <RoleRoster pull={selectedPull} />
+          </div>
+        )}
+
         {!strategy && !crystals ? (
-          showBlackHole || showRoster ? null : (
+          showBlackHole || showRoster || showDuties ? null : (
           <p className="ck-dialog-text">
-            No strategy detected yet. Import a report with Midnight Falls pulls —
-            the Terminate interrupt rotation and Dawn Crystal assignments are
-            derived automatically from the raid&apos;s casts and debuffs.
+            No strategy detected yet. Assigned duties, strategy choices and
+            party roles are derived automatically from the loaded report&apos;s
+            pulls, for the bosses that have them.
           </p>
           )
         ) : (
