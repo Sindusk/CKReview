@@ -178,11 +178,15 @@ export function tankWindow<T extends { pull: Pull }>(perPull: T[], size?: number
   return same.length < PLAN_MIN_PULLS ? [] : planWindow(same, size);
 }
 
-/** The window's median pull by total tank damage: the one the lanes show in all-pulls mode. */
-export function medianTankPull<T extends { tanking: PullTanking }>(window: T[]): T | undefined {
-  const total = (w: T) => w.tanking.tanks.reduce((s, t) => s + t.events.reduce((a, e) => a + e.taken, 0), 0);
-  const sorted = [...window].sort((a, b) => total(a) - total(b));
-  return sorted[Math.floor(sorted.length / 2)];
+/**
+ * The pull the clock shows in all-pulls mode: the window pull that got
+ * furthest (the latest one on a tie), so every buster and change in the
+ * window lands on it. Not the median pull: Dancing Mad's last 5 pulls in
+ * 2T1HzdPKgbhM43am ran 1:00-18:37, and the median was a 5:04 wipe that hid
+ * the kill (user, 2026-10-12).
+ */
+export function clockPull<T extends { durationMs: number }>(window: T[]): T | undefined {
+  return window.reduce<T | undefined>((best, w) => (!best || w.durationMs >= best.durationMs ? w : best), undefined);
 }
 
 // ── Eligibility ────────────────────────────────────────────────────────

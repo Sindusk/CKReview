@@ -17,6 +17,9 @@ C). What's unconfirmed is in [../open-items.md](../open-items.md),
 - Busters reached in 1-2 window pulls are protected (never made worse),
   not planned.
 - The user picked a mirrored one-clock layout (C) over this file's sketch.
+- All-pulls mode shows the window pull that got furthest, not the median
+  pull: on Dancing Mad the median was a 5:04 wipe that hid the 18:37 kill
+  (user, 2026-10-12).
 
 Built on the shared optimizer engine (`lib/mitigation/optimize.ts`), with
 the party Analysis in `lib/mitigation/plan.ts` as the worked example.

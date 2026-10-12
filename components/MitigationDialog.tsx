@@ -41,7 +41,7 @@ import { buildDebuffReach } from "@/lib/mitigation/debuff-reach";
 import { PLAN_MIN_PULLS, buildMitigationPlan, planWindow, type OptimizedPlan } from "@/lib/mitigation/plan";
 import type { PlanReply, PlanRequest } from "@/lib/mitigation/plan.worker";
 import { aggregateBusters, analyzePullTanking, summarizeUnused } from "@/lib/mitigation/tanking";
-import { buildTankingPlan, medianTankPull, tankWindow, type TankingPlan } from "@/lib/mitigation/tanking-plan";
+import { buildTankingPlan, clockPull, tankWindow, type TankingPlan } from "@/lib/mitigation/tanking-plan";
 import type { TankingReply, TankingRequest } from "@/lib/mitigation/tanking.worker";
 import { PlanView } from "./MitigationPlan";
 import { TankingView, chipsFromAggregate, chipsFromPull } from "./MitigationTanking";
@@ -50,7 +50,7 @@ import { AggregateDetails, HitDetails } from "./MitigationHitDetails";
 import { FFXIV_MITIGATION } from "@/lib/mitigation/ffxiv-catalog";
 import { useFFPullSelector } from "@/hooks/useFFPullSelector";
 import {
-  AggregateTimeline, PullTimeline, TimelineLegend, buildPlayerGroups, hasMitigationData, rowUneventful, uneventful,
+  AggregateTimeline, PullTimeline, TimelineLegend, buildPlayerGroups, fmtTime, hasMitigationData, rowUneventful, uneventful,
 } from "./MitigationTimeline";
 import { Dialog } from "./ui/Dialog";
 import RosterPullPicker from "./RosterPullPicker";
@@ -211,7 +211,7 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId }
   const tankShown = useMemo(() => {
     if (!tankingWanted) return undefined;
     if (!allPulls) return tankingPerPull.find((p) => p.pullId === selectedPull?.id);
-    return medianTankPull(tankWin.length ? tankWin : tankingPerPull);
+    return clockPull(tankWin.length ? tankWin : tankingPerPull);
   }, [tankingWanted, allPulls, tankingPerPull, tankWin, selectedPull]);
   const tankPulls = useMemo(() => (allPulls ? (tankWin.length ? tankWin : tankingPerPull) : tankShown ? [tankShown] : []),
     [allPulls, tankWin, tankingPerPull, tankShown]);
@@ -331,7 +331,7 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId }
                   ? <p className="ck-dialog-text" style={{ padding: 12 }}>No loaded pull has mitigation data yet. Re-fetch the report to analyze it.</p>
                   : <TankingView plan={tankResult.plan} pending={tankResult.pending} error={tankResult.error}
                       shown={tankShown} chips={tankChips} unused={tankUnused} focus={tankFocus} allPulls={allPulls}
-                      shownLabel={tankShown ? `Clock: pull ${tankShown.pullNumber}${allPulls ? " (median of the window)" : ""}` : ""}
+                      shownLabel={tankShown ? `Clock: pull ${tankShown.pullNumber}${allPulls ? ` (${fmtTime(tankShown.durationMs)}, the window's furthest)` : ""}` : ""}
                       windowInput={windowInput} onWindowInput={setWindowInput} groupPulls={perPull.length} windowPulls={tankWin.length}
                       onOpenBuster={(id) => {
                         const row = aggregate.find((r) => r.id === id);

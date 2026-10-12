@@ -20,8 +20,9 @@
 //     who casts what on whom, buster margins and tank damage before →
 //     after. Hovering a card outlines its changes on the clock, with the
 //     current use in grey.
-// In all-pulls mode the clock shows the window's median pull (by total tank
-// damage) and the chips and cards the whole window; in one-pull mode, that
+// In all-pulls mode the clock shows the window pull that got furthest
+// (tanking-plan.ts clockPull; the median pull hid most of a long fight,
+// user, 2026-10-12) and the chips and cards the whole window; in one-pull mode, that
 // pull, with no cards (the changes read a group's pulls). The dialog's
 // picker here holds just the two tanks side by side (user, 2026-10-11): a
 // picked tank sees only their lane, chips and cards; "Both", everything.
@@ -54,7 +55,7 @@ const BUSTER_LABEL: Record<BusterKind, string> = { single: "single", shared: "sh
 const INFO = [
   "Estimated from the log: margins, damage rolls and snapshot timing can be off. Confirm on VOD before relying on a change.",
   "A buster's margin is the tank's HP left, starting from full, after the buster and everything they take in the next 10s, with no healing. Under 15%: under; 15-30%: good; over 30%: over.",
-  "All pulls: the clock shows the window's median pull by total tank damage; the chips and the changes cover the whole window, at each anchor's typical time.",
+  "All pulls: the clock shows the window pull that got furthest; the chips and the changes cover the whole window, at each anchor's typical time.",
   `Make a card's changes together, at most ${PLAN_MAX_CHANGES} at a time. Short cooldowns (Holy Sheltron, Heart of Corundum, The Blackest Night, Bloodwhetting) are expected on cooldown and never moved.`,
 ].join("\n\n");
 
