@@ -18,6 +18,17 @@
 //   `failed` is the number of chances with at least one counted error, so
 //   "6/14" reads "failed 6 of the 14 times it happened". `errors` is the raw
 //   error count (several players can fail one chance).
+// - Per-player exposure (docs/archive/exposure-plan.md): a player's
+//   chances at a mechanic are their own. An everyone mechanic tests them at
+//   every instance of the pulls they played; a targeted or assigned one
+//   (lib/mechanics/rule-meta.ts) only at the instances that name them
+//   (StaticReviewPullMechanic.exposure + its players), plus any instance
+//   they failed outside those. Sessions imported before detailVersion 2
+//   have no players and count as everyone. 0 chances shows "—".
+// - The Players panel headline, computeAdjustedErrorRates: Majors per pull
+//   had the player faced the raid's typical set of mechanics, over detailed
+//   sessions; assigned duties are left out (they're in the Strategy
+//   dialog). Wording and formula settled with the user 2026-10-11.
 // - Sessions are ordered by addedAt, like the rest of the statics views.
 
 import { prisma } from "@/lib/prisma";

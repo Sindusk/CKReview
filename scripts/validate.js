@@ -776,6 +776,44 @@ MECHANICS['damage-analysis'] = {
 //   node scripts/validate.js damage-analysis-wow sampledata/wow/<code> [--pulls=1,3] [--boss=Vashnik]
 // Needs a capture fetched after 2026-10-06 (docs/archive/damage-analysis-plan.md,
 // "Build status (WoW)").
+// Targeted/assigned mechanic instances (docs/archive/exposure-plan.md),
+// through the live transform: every scoped instance a boss module reports,
+// with its responsible players, recorded as a snapshot entry (ruleId = the
+// mechanic key, player = the responsible players or "(nobody)"), so a
+// change to who a mechanic tests shows up in --check. Duty assignments
+// (cross-pull) are in 'duty-assignments'.
+function recordScopedInstances(pulls) {
+  for (const pull of pulls) {
+    const scoped = (pull.mechanicOccurrences ?? []).filter((o) => o.players);
+    if (scoped.length === 0) continue;
+    console.log(`${pull.name} Pull ${pull.pullNumber}: ${scoped.length} scoped instance(s)`);
+    recordErrors(pull.name, pull.pullNumber, scoped.map((o) => ({
+      ruleId: o.mechanicKey, severity: null, player: o.players.length ? o.players.join(', ') : '(nobody)',
+      timestamp: Math.round(o.timestamp), name: `instance ${o.occurrence}`, description: null,
+    })));
+  }
+}
+
+MECHANICS['exposure-ffxiv'] = {
+  game: 'ff',
+  load: () => ({
+    store: requireTsFromRoot('lib/sample-report-store.ts'),
+    lt: requireTsFromRoot('lib/log-transforms.ts', { './log-auth': {} }),
+  }),
+  async run({ mod, dir }) {
+    const pulls = await loadThroughRealPipeline(mod, dir);
+    if (pulls) recordScopedInstances(pulls);
+  },
+};
+
+MECHANICS['exposure-wow'] = {
+  game: 'wow',
+  load: () => ({ lt: requireTsFromRoot('lib/log-transforms.ts', { './log-auth': {} }) }),
+  async run({ mod, dir, meta }) {
+    recordScopedInstances(loadWowThroughRealPipeline(mod, dir, meta, false));
+  },
+};
+
 MECHANICS['damage-analysis-wow'] = {
   game: 'wow',
   namedOnly: true,

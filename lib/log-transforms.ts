@@ -1562,6 +1562,9 @@ export function transformFFightToPull(
   const blackHoleGeometry = fflBuildBlackHoleGeometry(data.enemyCastEvents ?? [], actorMap, abilityMap, fightStart);
   const stompiesPuddleSamples = fflBuildStompiesPuddleSamples(data.enemyCastEvents ?? [], abilityMap, fightStart);
   const playerPositionSamples = fflBuildPlayerPositionSamples(data.enemyDamageTakenEvents ?? [], actorMap, fightStart);
+  // Targeted/assigned instances the modules report (lib/mechanics/
+  // occurrences.ts ReportedOccurrence), merged into the anchors below.
+  const reportedOccurrences: ReportedOccurrence[] = [];
 
   const errors = [
     ...detectPullErrors(players, deathEvents, enemyCastEvents, enemyBuffEvents),
@@ -1599,7 +1602,7 @@ export function transformFFightToPull(
     fightId:       data.fight.id,
     phaseSegments:   buildPullPhaseSegments(data.fight),
     encounterPhases: data.fight.encounterPhases,
-    mechanicOccurrences: computeMechanicOccurrences(data.fight.name ?? "", enemyCastEvents),
+    mechanicOccurrences: mergeReportedOccurrences(computeMechanicOccurrences(data.fight.name ?? "", enemyCastEvents), reportedOccurrences),
     castEvents,
     blackHoleGeometry,
     enemyCasts:    enemyCastEvents,
