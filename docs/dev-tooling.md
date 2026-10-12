@@ -40,7 +40,9 @@ validation harness (`scripts/validate.js`, `expectations/`), see
   `--min-minutes 10.15 --from-minutes 6.9 --to-minutes 14` (P4 starts
   ~10:08 and its transition or enrage comes by ~13:00), ~2.8MB per pull;
   the P3 folders' P4 pulls were refetched the same way with `--refetch
-  --fight <id>...`.
+  --fight <id>...`. Phase 5 used `--min-minutes 14.1 --from-minutes 13.5`
+  (P5 starts 14:07-14:20; 0.5-2.3MB per pull); the P4 folder's P5 pulls
+  were refetched with its P4 flags minus `--to-minutes`.
   `validate.js` detects captures whose damage starts 2+ minutes in and runs
   only `lateCapture` mechanics on them.
   - **Re-running a fetch on such a folder must repeat its flags.** A

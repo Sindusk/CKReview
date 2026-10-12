@@ -339,6 +339,15 @@ const MECHANICS = {
     },
   },
 
+  pandora: {
+    game: 'ff',
+    lateCapture: true, // Phase 5 only — safe on --from-minutes captures (see isLateCapture)
+    load: () => requireTsFromRoot('lib/mechanics/ffxiv/fru/pandora.ts'),
+    run({ mod, ctxs }) {
+      for (const c of ctxs) printPullErrors(c, mod.detectPandoraErrors(c.relPlayers(), c.relDeaths(), c.relEnemyCasts()));
+    },
+  },
+
   stompies: {
     game: 'ff',
     load: () => requireTsFromRoot('lib/mechanics/ffxiv/dancingmad/stompies.ts'),

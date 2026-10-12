@@ -57,8 +57,12 @@ lib/mechanics/
                                 Somber Dance, Akh Morn enmity, Morn Afah HP gap,
                                 Crystallize Time stacks / Aero / dragon heads /
                                 claw and fang expiry, rewind wings, the memory
-                                crystal, enrage). pandora.ts (P5) is a
-                                research model only
+                                crystal, enrage)
+      pandora.ts              — Phase 5 per-pull rules (Fulgent Blade
+                                exalines, Akh Morn stacks, dual autos,
+                                Paradise Regained wings / tethers / towers,
+                                Cruel Path lines and lanes, Pandora's Box,
+                                Paradise Lost enrage)
     arcadion/                 — AAC Heavyweight (Savage)
       vamp-fatale.ts          — Vamp Fatale (M9S) per-pull rules (Stomp bats and
                                 Bombpyre overlaps, Aetherletting drops/lines/overlap,
@@ -738,6 +742,22 @@ The same principles apply when refining any module:
   or late deaths read as walk-offs.
 - **Provoke history names an enmity steal.** The tank both bosses
   targeted had Provoked the boss the other tank last Provoked (C5).
+
+### Lessons from Pandora (FRU P5: 37 pulls over 10 reports, 3 clears)
+
+- **A debuff's cause tells whose error a later death is.** Resistance
+  Down II comes from an avoidable exaline or lane, or from a correct
+  Cruel Path front. Reading `causeAbilityId` keeps a death to the next
+  stack on the avoidable hit's error instead of adding a second one.
+- **An enrage cast can complete in a clear.** Paradise Lost 40328
+  finished as Pandora died (B3) and its hits were 9,999,999 previews with
+  no HP change. Gate the enrage on hits that actually killed.
+- **Check where a lone victim stood before blaming aim.** Every non-tank
+  in a single wing was 1-2.7 yalms from a tower that resolved after it:
+  they went in early. Positions settled what the model left open.
+- **Gate group mechanics on everyone being alive.** After one death the
+  stacks, lines and front order retarget; naming players then reads
+  fallout as mistakes.
 
 ### Lessons from Ultimate Kefka (a late phase, 29 pulls, no kill)
 

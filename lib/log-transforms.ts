@@ -75,6 +75,7 @@ import { detectFatebreakerErrors } from "./mechanics/ffxiv/fru/fatebreaker";
 import { detectUsurperOfFrostErrors, type HeadMarker } from "./mechanics/ffxiv/fru/usurper-of-frost";
 import { detectOracleOfDarknessErrors } from "./mechanics/ffxiv/fru/oracle-of-darkness";
 import { detectEnterTheDragonErrors } from "./mechanics/ffxiv/fru/enter-the-dragon";
+import { detectPandoraErrors } from "./mechanics/ffxiv/fru/pandora";
 import { detectWowEncounterErrors } from "./mechanics/wow/registry";
 import { buildPullPhaseSegments } from "./pull-phases";
 import { computeMechanicOccurrences, mergeReportedOccurrences, type ReportedOccurrence } from "./mechanics/occurrences";
@@ -1629,6 +1630,7 @@ export function transformFFightToPull(
     ...detectUsurperOfFrostErrors(players, deathEvents, enemyCastEvents, headMarkers, reportedOccurrences),
     ...detectOracleOfDarknessErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
     ...detectEnterTheDragonErrors(players, deathEvents, enemyCastEvents, npcHits, reportedOccurrences),
+    ...detectPandoraErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
   ].sort((a, b) => a.timestamp - b.timestamp);
 
   const fightDurationMs = data.fight.endTime - data.fight.startTime;

@@ -482,6 +482,49 @@ them on the first VODs that reach P4:
   preset detection, deaths to raidwides (Darklit, Crystallize Time, Edge
   of Oblivion), CT positions and Tidal/rewind corners, beacon ownership.
 
+### Futures Rewritten P5: Pandora (FFXIV)
+
+Built 2026-10-12 from 37 P5 pulls (three clears, mostly one static) with
+no VODs and no raid plan. Evidence is in the header of
+`lib/mechanics/ffxiv/fru/pandora.ts`. These questions apply to any P5
+pull; times are from the first Fulgent Blade (~14:20 into the pull).
+Check them on the first VODs that reach P5:
+- **Exaline then Akh Morn** (~0:14-0:24, then ~0:27): the exaline hit is
+  the one error, and its description says when the resistance then made
+  the same element's Akh Morn lethal. Should the holder also be named for
+  staying in their own stack (some players swapped to the other stack and
+  lived), or is that the static's call?
+- **Akh Morn missed** (~0:27): a living player in neither stack is named,
+  Major when the short stack killed someone. When both stacks land on one
+  group, the one or two living players in neither are named (they left a
+  side empty); with three or more it is player-less. Right?
+- **Wings Dark and Light on non-tanks** (~0:45 / ~0:49): one to three
+  non-tanks are named (they were usually already standing on the third
+  tower). Four or more is a player-less "cleaved the party" note. Was it
+  the party's position or the tank's aim? Should the wing's tank be named?
+- **Both tanks in one wing** (~0:45): both tanks are named, since the log
+  can't tell a tank standing in the cleave from top enmity on the wrong
+  tank. Which was it?
+- **Tether on a non-tank** (~0:46 / ~0:50): named with both tanks alive.
+  Is that the non-tank's position, or the tether tank not being far/near
+  enough?
+- **Missed tower** (~0:45-0:53): a living non-tank who soaked no tower
+  when one went off short is named. Every short tower in the sample came
+  after a soaker died, so this has never fired. Do towers get reassigned
+  when a soaker dies?
+- **Cruel Paths** (~1:07-1:21): with everyone alive, players in both
+  lines are named (three or more is player-less); a player back in the
+  line of the element they hold is named. Who is at fault when both lines
+  land on one group?
+- **Cruel Path lanes** (~1:09-1:23): each player in an exploding lane is
+  named (Damage Down); four or more at once is player-less.
+- **Pandora's autos on a DPS**: the tank who took neither swing is named,
+  except before the first Fulgent Blade and for a tank raised in the last
+  60s. Right?
+- **Not built:** wing aim and the tether tank's distance, duty swaps other
+  than both tanks in one wing, raidwide deaths (Fulgent after Box), boss
+  facing, the limit break gauge, the order of Polarizing fronts.
+
 ### Dancing Mad (FFXIV)
 
 - **Phase 1 (graven-image / phase1.ts):**

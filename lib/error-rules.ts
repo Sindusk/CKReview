@@ -231,6 +231,10 @@ export const ERROR_RULES: PullErrorRule[] = [
       40216,   // Lightsteep (fifth Lightsteeped)
       40299,   // Maelstrom
       40252, 40253,                                          // Tidal Light
+      // Futures Rewritten P5: pandora.ts owns these.
+      40308, 40309,                                          // The Path of Light / Darkness (exalines)
+      40119, 40120,                                          // Cruel Path lanes exploding
+      40321,   // Unmitigated Explosion (short tower)
     ],
   },
 

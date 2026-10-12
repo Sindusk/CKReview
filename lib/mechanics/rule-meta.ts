@@ -362,6 +362,13 @@ mechanic("ffxiv-etd-tank-buster", "Somber Dance (non-tanks)", 4, ["ffxiv-etd-tan
 mechanic("ffxiv-etd-autos", "Shiva's second auto-attack (tanks)", 4, ["ffxiv-etd-autos"]);
 mechanic("ffxiv-etd-akh-morn", "Akh Morn: one boss per tank", 4, ["ffxiv-etd-akh-morn"]);
 exposure("targeted", ["ffxiv-etd-tank-buster", "ffxiv-etd-autos", "ffxiv-etd-akh-morn"]);
+// Futures Rewritten P5: Pandora's dual autos test the tanks; the wing cleave
+// and its distance tether test the non-tanks (pandora.ts reports them at
+// every instance).
+mechanic("ffxiv-pan-autos", "Pandora's dual auto-attacks (tanks)", 5, ["ffxiv-pan-autos"]);
+mechanic("ffxiv-pan-wings", "Wings Dark and Light cleave (non-tanks)", 5, ["ffxiv-pan-wings"]);
+mechanic("ffxiv-pan-tether", "Wings Dark and Light tether (non-tanks)", 5, ["ffxiv-pan-tether"]);
+exposure("targeted", ["ffxiv-pan-autos", "ffxiv-pan-wings", "ffxiv-pan-tether"]);
 // Vamp Fatale (vamp-fatale.ts reports every instance): each rule scoped to
 // the role or group that can fail it.
 mechanic("ffxiv-vf-hardcore", "Hardcore (non-tanks)", undefined, ["ffxiv-vf-hardcore"]);
