@@ -113,8 +113,9 @@
 //   "knocked" when a knockback (Deep Impact, Sick Swell, Take-Off, Floater)
 //   hit them in the 4.5s before, else "walked". Walking Dead running out is
 //   a player-less Minor instead.
-// ffxiv-rhdb-floater (Major): a non-carrier hit by a dash; a carrier killed
-//   by their own dash (not after being clipped earlier).
+// ffxiv-rhdb-floater (Major): a non-carrier hit by a dash.
+// ffxiv-rhdb-floater-tether (Major): a carrier killed by their own dash
+//   (not after being clipped earlier).
 // ffxiv-rhdb-overlap (Major): one player hit by another player's bait
 //   (Inferno circles, Double-Dip/Reverse cones, Snaps, Splash, Hot Aerial)
 //   names both, or by 2+ unowned instances names the victim; Freaky
@@ -139,9 +140,14 @@
 //   outside it (Major); Re-Entry under four with a death (player-less Minor).
 // ffxiv-rhdb-xtreme-wave: per dash, the holder is the free player hit
 //   farthest from the boss's start; anyone else it hit stood in the lane
-//   (Minor, Major if the dash killed them; user, 2026-10-09, B3 +6:23). A
-//   holder killed by their own dash alone: tether too short (Major). Both
-//   holders hit by both dashes: only the Red Hot holder (B3 +5:48).
+//   (Minor, Major if the dash killed them; user, 2026-10-09, B3 +6:23).
+// ffxiv-rhdb-xtreme-tether: a holder killed by their own dash alone: tether
+//   too short (Major). Both holders hit by both dashes: only the Red Hot
+//   holder (B3 +5:48).
+// Exposure (docs/archive/exposure-plan.md), each rule scoped to who can
+// fail it: per Floater dash the carrier (tether) and the living others
+// (path); per Xtreme Wave the two holders (tether) and the free others
+// (lane).
 // ffxiv-rhdb-split-drop: split-arena Inferno drops off their side/half
 //   (Major when that side's next cones overlapped, which excuses those
 //   overlap victims; B1 +7:07 the OT's puddle), Minor otherwise. A pair
@@ -511,6 +517,7 @@
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import type { DeathEvent } from "@/types/DeathEvent";
 import type { PullError, EnemyEvent } from "@/types/PullError";
+import type { ReportedOccurrence } from "@/lib/mechanics/occurrences";
 import { yd, kFmt, sec, joinNames, playerError, playerlessMinor, raidMarker, rezzedAt, clusterByGap, debuffIntervals } from "@/lib/mechanics/wow/common";
 import { ARENA_CENTER, angularDistance, compassBearingOf, facingToCompassBearing } from "@/lib/mechanics/geometry";
 import { detectFFRoles, type FFRoleSlot } from "@/lib/mechanics/ffxiv/roles";
@@ -525,6 +532,10 @@ export const RHDB_BUSTER_RULE_ID        = "ffxiv-rhdb-buster";
 export const RHDB_DEEP_IMPACT_RULE_ID   = "ffxiv-rhdb-deep-impact";
 export const RHDB_STACK_RULE_ID         = "ffxiv-rhdb-stack";
 export const RHDB_XTREME_WAVE_RULE_ID   = "ffxiv-rhdb-xtreme-wave";
+// The tether holders' own errors, split from the bystander rules above so
+// each is scoped to who can fail it (user, 2026-10-11).
+export const RHDB_FLOATER_TETHER_RULE_ID = "ffxiv-rhdb-floater-tether";
+export const RHDB_XTREME_TETHER_RULE_ID  = "ffxiv-rhdb-xtreme-tether";
 export const RHDB_PRISON_RULE_ID        = "ffxiv-rhdb-prison";
 export const RHDB_CLEANSE_RULE_ID       = "ffxiv-rhdb-xtreme-cleanse";
 export const RHDB_ENRAGE_RULE_ID        = "ffxiv-rhdb-enrage";
@@ -949,7 +960,7 @@ function detectWall(players: PlayerInfo[], deaths: DeathEvent[], called: Set<Dea
  * the dash's path; a carrier killed by their own dash with nothing else
  * wrong had too short a tether.
  */
-function detectFloater(players: PlayerInfo[], life: Life): PullError[] {
+function detectFloater(players: PlayerInfo[], life: Life, occurrences?: ReportedOccurrence[]): PullError[] {
   const errors: PullError[] = [];
   const clipped = new Map<PlayerInfo, number>(); // player -> time they took someone else's dash
   FLOATER_DASH.forEach((id, k) => {
@@ -957,6 +968,13 @@ function detectFloater(players: PlayerInfo[], life: Life): PullError[] {
       const t = res[0].e.timestamp;
       // The carrier's In Line status ends at their dash.
       const carrier = players.find((p) => p.debuffs.some((e) => e.abilityId === IN_LINE[k] && e.debuffStatus === "removed" && Math.abs(e.timestamp - t) <= 1500));
+      // Each dash tests its carrier (tether) and the living others (path).
+      if (carrier) {
+        occurrences?.push(
+          { mechanicKey: RHDB_FLOATER_TETHER_RULE_ID, timestamp: t, players: [carrier.name] },
+          { mechanicKey: RHDB_FLOATER_RULE_ID, timestamp: t, players: players.filter((p) => p !== carrier && life.hitAlive(p, t)).map((p) => p.name) },
+        );
+      }
       for (const { p, e } of res) {
         if (!life.hitAlive(p, e.timestamp)) continue;
         const death = life.diedFrom(p, e.timestamp);
@@ -969,7 +987,7 @@ function detectFloater(players: PlayerInfo[], life: Life): PullError[] {
           }));
         } else if (p === carrier && death?.killingAbilityGameId === id && !(clipped.has(p) && clipped.get(p)! < e.timestamp)) {
           errors.push(playerError(p, {
-            ruleId: RHDB_FLOATER_RULE_ID, severity: "Major", name: "Floater Tether Too Short",
+            ruleId: RHDB_FLOATER_TETHER_RULE_ID, severity: "Major", name: "Floater Tether Too Short",
             description: `Died to their own Flame Floater dash #${k + 1} (${kFmt(e.amount ?? 0)}). The dash hurts less the farther it travels: stretch the tether away from where Red Hot stands before it dashes.`,
             timestamp: e.timestamp, abilityId: id, abilityName: "Flame Floater",
           }));
@@ -1417,7 +1435,7 @@ function detectStacks(players: PlayerInfo[], life: Life): PullError[] {
  * holder killed by their own dash alone had too short a tether. Inmates
  * are skipped.
  */
-function detectXtremeWave(players: PlayerInfo[], life: Life, casts: EnemyEvent[]): PullError[] {
+function detectXtremeWave(players: PlayerInfo[], life: Life, casts: EnemyEvent[], occurrences?: ReportedOccurrence[]): PullError[] {
   const errors: PullError[] = [];
   const colorName = (id: number) => (id === XTREME_WAVE_RED ? "Red Hot" : "Deep Blue");
   for (const res of resolutions(players, [XTREME_WAVE_RED, XTREME_WAVE_BLUE], 1200)) {
@@ -1450,6 +1468,16 @@ function detectXtremeWave(players: PlayerInfo[], life: Life, casts: EnemyEvent[]
     // other side, is at fault (user, 2026-10-09, B3 +5:48: the OT stacked
     // on the MT and killed both).
     const redH = holders.get(XTREME_WAVE_RED), blueH = holders.get(XTREME_WAVE_BLUE);
+    // Each wave tests its holders (tether) and the free others (lane).
+    if (holders.size) {
+      const t0 = res[0].e.timestamp;
+      const held = new Set(holders.values());
+      occurrences?.push(
+        { mechanicKey: RHDB_XTREME_TETHER_RULE_ID, timestamp: t0, players: [...held].map((p) => p.name) },
+        { mechanicKey: RHDB_XTREME_WAVE_RULE_ID, timestamp: t0, players: players.filter((p) =>
+          !held.has(p) && life.hitAlive(p, t0) && !hasAura(p, WATERY_GRAVE, t0)).map((p) => p.name) },
+      );
+    }
     const redHit = free.find((h) => h.p === redH && h.e.abilityId === XTREME_WAVE_RED);
     const blueHit = free.find((h) => h.p === blueH && h.e.abilityId === XTREME_WAVE_BLUE);
     // "Together" = each holder was also hit by the other boss's dash (B3
@@ -1458,7 +1486,7 @@ function detectXtremeWave(players: PlayerInfo[], life: Life, casts: EnemyEvent[]
     if (redH && blueH && redH !== blueH && redHit && blueHit && crossHit(redH, XTREME_WAVE_BLUE) && crossHit(blueH, XTREME_WAVE_RED)) {
       const dead = [redH, blueH].filter((p) => [XTREME_WAVE_RED, XTREME_WAVE_BLUE].includes(life.diedFrom(p, blueHit.e.timestamp)?.killingAbilityGameId ?? 0));
       errors.push(playerError(redH, {
-        ruleId: RHDB_XTREME_WAVE_RULE_ID, severity: "Major", name: "Stacked on the Other Tether",
+        ruleId: RHDB_XTREME_TETHER_RULE_ID, severity: "Major", name: "Stacked on the Other Tether",
         description: `Held Red Hot's Xtreme Wave tether but stood on ${blueH.name}, who held Deep Blue's (${yd(Math.hypot(redHit.e.x! - blueHit.e.x!, redHit.e.y! - blueHit.e.y!))}y apart), so both dashes hit both of them${dead.length ? `; ${namesOf(dead)} died` : ""}. Deep Blue's tether runs along its fixed outer lane, clear of the bubble; Red Hot's holder takes the dash through the center to the far side.`,
         timestamp: Math.min(redHit.e.timestamp, blueHit.e.timestamp), abilityId: XTREME_WAVE_RED, abilityName: "Xtreme Wave",
       }));
@@ -1487,7 +1515,7 @@ function detectXtremeWave(players: PlayerInfo[], life: Life, casts: EnemyEvent[]
           }));
         } else if (death && !free.some((x) => x.p === holder && x.e.abilityId !== l.id)) {
           errors.push(playerError(h.p, {
-            ruleId: RHDB_XTREME_WAVE_RULE_ID, severity: "Major", name: "Xtreme Wave Tether Too Short",
+            ruleId: RHDB_XTREME_TETHER_RULE_ID, severity: "Major", name: "Xtreme Wave Tether Too Short",
             description: `Died to ${colorName(l.id)}'s Xtreme Wave dash on their own tether (${kFmt(h.e.amount ?? 0)}, ${yd(l.along(h))}y from where the boss started). The dash hurts less the farther it travels: stretch the tether from the boss's current spot before it dashes (surviving holders stood 28-39y away).`,
             timestamp: h.e.timestamp, abilityId: l.id, abilityName: "Xtreme Wave",
           }));
@@ -1586,7 +1614,9 @@ function detectCleanses(players: PlayerInfo[], life: Life, deaths: DeathEvent[],
  * Red Hot and Deep Blue (M10S) errors. Self-gates on Hot Impact / Flame
  * Floater / Divers' Dare, which no other fight in the sample set casts.
  */
-export function detectRedHotDeepBlueErrors(players: PlayerInfo[], deathEvents: DeathEvent[], enemyCasts: EnemyEvent[]): PullError[] {
+export function detectRedHotDeepBlueErrors(
+  players: PlayerInfo[], deathEvents: DeathEvent[], enemyCasts: EnemyEvent[], occurrences?: ReportedOccurrence[],
+): PullError[] {
   if (!enemyCasts.some((c) => SIGNATURE.includes(c.abilityId))) return [];
   const life = buildLife(players, deathEvents);
   const pullEnd = Math.max(0, ...players.flatMap((p) => [...p.damageTaken, ...p.casts].map((e) => e.timestamp)), ...deathEvents.map((d) => d.timestamp));
@@ -1599,13 +1629,13 @@ export function detectRedHotDeepBlueErrors(players: PlayerInfo[], deathEvents: D
     ...detectAvoidable(players, life),
     ...detectFire(players, life, deathEvents, called, enemyCasts),
     ...detectWall(players, deathEvents, called),
-    ...detectFloater(players, life),
+    ...detectFloater(players, life, occurrences),
     ...split.errors,
     ...detectOverlaps(players, life, enemyCasts, volleys, slots, split.excused),
     ...detectBusters(players, life, enemyCasts),
     ...detectDeepImpact(players, life, enemyCasts, deathEvents),
     ...detectStacks(players, life),
-    ...detectXtremeWave(players, life, enemyCasts),
+    ...detectXtremeWave(players, life, enemyCasts, occurrences),
     ...detectCleanses(players, life, deathEvents, enemyCasts),
   ];
 

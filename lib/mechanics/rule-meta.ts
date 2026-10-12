@@ -314,6 +314,13 @@ mechanic("es-protovenom", "Protovenom", undefined, [
 mechanic("ssz-crosswinds", "Crosswinds", undefined, ["wow-ssz-crosswinds-blast"]);
 mechanic("wow-ssz-crosswinds-fall", "Crosswinds knockback", undefined, ["wow-ssz-crosswinds-fall"]);
 exposure("targeted", ["wow-ssz-crosswinds-fall"]);
+// Red Hot and Deep Blue: tether holders vs everyone else in the dash's path
+// (red-hot-deep-blue.ts reports every instance).
+mechanic("ffxiv-rhdb-floater", "Flame Floater: path", undefined, ["ffxiv-rhdb-floater"]);
+mechanic("ffxiv-rhdb-floater-tether", "Flame Floater: tether", undefined, ["ffxiv-rhdb-floater-tether"]);
+mechanic("ffxiv-rhdb-xtreme-wave", "Xtreme Wave: lane", undefined, ["ffxiv-rhdb-xtreme-wave"]);
+mechanic("ffxiv-rhdb-xtreme-tether", "Xtreme Wave: tether", undefined, ["ffxiv-rhdb-xtreme-tether"]);
+exposure("targeted", ["ffxiv-rhdb-floater", "ffxiv-rhdb-floater-tether", "ffxiv-rhdb-xtreme-wave", "ffxiv-rhdb-xtreme-tether"]);
 // Vamp Fatale (vamp-fatale.ts reports every instance): each rule scoped to
 // the role or group that can fail it.
 mechanic("ffxiv-vf-hardcore", "Hardcore (non-tanks)", undefined, ["ffxiv-vf-hardcore"]);
