@@ -404,7 +404,7 @@ export default function StrategyDialog({
           </div>
         )}
 
-        {showRoster && selectedPull && (
+        {showRoster && selectedPull?.name === "Dancing Mad" && (
           <div style={{ marginBottom: "20px" }}>
             <div className="ck-subheading" style={{ marginBottom: "4px" }}>Graven 2 Strategy (pull #{selectedPull.pullNumber})</div>
             <div className="ck-help">
