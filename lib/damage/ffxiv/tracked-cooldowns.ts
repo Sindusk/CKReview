@@ -27,6 +27,8 @@ export type TrackedCooldownSpec = {
   damage?:           string[];
   // Its effect lands this long after the press (checks.ts roomForUses).
   landDelayMs?:      number;
+  // Its damage is the player's pet hits (Bunshin's shadow).
+  petDamage?:        boolean;
 };
 
 export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
@@ -79,7 +81,8 @@ export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
   "Ninja": [
     { actions: ["KASSATSU"], firstUseOffsetMs: 1000 },
     { actions: ["DOKUMORI"], firstUseOffsetMs: 6000 },
-    { actions: ["BUNSHIN"], firstUseOffsetMs: 7000 },
+    // Bunshin's damage is its shadow's (pet hits, Phantom Kamaitachi included).
+    { actions: ["BUNSHIN"], firstUseOffsetMs: 7000, petDamage: true },
     { actions: ["KUNAIS_BANE"], firstUseOffsetMs: 10000 },
     { actions: ["DREAM_WITHIN_A_DREAM"], firstUseOffsetMs: 12250 },
     { actions: ["TEN_CHI_JIN"], firstUseOffsetMs: 17250 },

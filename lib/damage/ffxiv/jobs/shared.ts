@@ -143,7 +143,11 @@ export type BurstWindowSpec = {
   // party's buffs (Starry Muse). Crit/DH buffs aren't in it, so it's a floor.
   bonus:         number | "observed";
   bonusBasis:    string;      // where the bonus value comes from
-  expectedGcds?: (ctx: PlayerCheckContext) => number;
+  // `casts`: the player's casts in the window (Ten Chi Jin in a Kunai's
+  // Bane window adds a GCD).
+  expectedGcds?: (ctx: PlayerCheckContext, casts: PlayerEvent[]) => number;
+  // GCDs that don't count toward expectedGcds (Ninja's mudras).
+  ignoreGcdIds?: Set<number>;
   expected:      (ctx: PlayerCheckContext, casts: PlayerEvent[]) => ExpectedAction[];
   // The status is a debuff the player puts on the enemy (Kunai's Bane),
   // read from Pull.bossDebuffs instead of the player-buff stream.
@@ -195,9 +199,10 @@ export function burstWindowFindings(ctx: PlayerCheckContext, specIn: BurstWindow
     // Inclusive end: a stack-consumed buff (Delirium) loses its last stack
     // at the same timestamp as the cast that used it.
     const end = w.endMs + SAME_TIMESTAMP_MS;
-    const gcds = ctx.uses.filter((u) => u.startMs >= w.startMs && u.startMs <= end && kinds.get(u.action.id) !== "heal");
+    const gcds = ctx.uses.filter((u) => u.startMs >= w.startMs && u.startMs <= end && kinds.get(u.action.id) !== "heal" &&
+      !spec.ignoreGcdIds?.has(u.action.id));
     const casts = ctx.player.casts.filter((c) => c.timestamp >= w.startMs && c.timestamp <= end);
-    const expectedGcds = spec.expectedGcds?.(ctx);
+    const expectedGcds = spec.expectedGcds?.(ctx, casts);
     const missingGcds = expectedGcds !== undefined ? Math.max(0, expectedGcds - gcds.length) : 0;
     const missing: { name: string; n: number; value: number }[] = [];
     for (const e of spec.expected(ctx, casts)) {

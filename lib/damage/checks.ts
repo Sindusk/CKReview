@@ -433,7 +433,7 @@ export function checkCooldownDrift(ctx: PlayerCheckContext): DamageFinding[] {
     const prePull = evidence.size > 0 && [...ctx.player.casts, ...ctx.player.damageDone]
       .some((c) => evidence.has(c.abilityId) && c.timestamp < (casts[0] ?? Infinity));
     const capped = cappedStretches(casts, cd.cooldownMs, cd.charges, ctx.endMs).filter((w) => !(prePull && w.startMs === 0));
-    let unforced = 0, heldForDeciding = 0, longest: Window | undefined;
+    let unforced = 0, heldForDeciding = 0, stretchLost = 0, longest: Window | undefined;
     for (const w of capped) {
       const len = w.endMs - w.startMs;
       // Capping inside downtime is a lost recharge when a charge was
@@ -455,17 +455,28 @@ export function checkCooldownDrift(ctx: PlayerCheckContext): DamageFinding[] {
       const allowance = (cd.holdMs ?? COOLDOWN_HOLD_MS) + (w.startMs === 0 ? cd.firstUseOffsetMs : 0);
       const held = Math.max(0, len - forced - allowance);
       unforced += held;
-      if (held > 0 && (!longest || len > longest.endMs - longest.startMs)) longest = w;
+      // Per stretch: from the first moment it could have been pressed to
+      // when it was. A recast's worth or more lost a use, even when
+      // downtime filled part of it (dDar482XvFKBPJYh FRU kill: Dream Within
+      // a Dream ready 5:15 with 36s of targetable boss before P2's
+      // downtime, used 6:20; ready 12:45 with 10s before P4's, used 14:22;
+      // xivanalysis's 15/17).
+      const blockers = ctx.decidingPhaseStart !== undefined && w.endMs >= ctx.decidingPhaseStart ? withDeciding : forcedMerged;
+      const first = avoidable > 0 ? w.startMs : firstPressable(w.startMs, w.endMs, cd.landDelayMs ?? 0, blockers);
+      const lost = first === undefined ? 0 : Math.floor(Math.max(0, w.endMs - first - allowance) / cd.cooldownMs);
+      stretchLost += lost;
+      if ((held > 0 || lost > 0) && (!longest || len > longest.endMs - longest.startMs)) longest = w;
     }
     // Never more lost uses than the pull had room for: Vamp's Dancer used
     // Standard Step 19 times in 587s (room for 20), yet its ready time
     // summed to 163s, "5 lost", because each use came a few seconds late.
     const room = roomForUses(cd, ctx.endMs, forcedMerged, prePull);
-    const lostUses = Math.min(Math.floor(unforced / cd.cooldownMs), Math.max(0, room - casts.length - (prePull ? 1 : 0)));
+    const lostUses = Math.min(Math.max(stretchLost, Math.floor(unforced / cd.cooldownMs)),
+      Math.max(0, room - casts.length - (prePull ? 1 : 0)));
     if (lostUses < 1 || !longest) continue;
     const damageIds = new Set(cd.damageIds ?? []);
-    const perUse = damageIds.size > 0
-      ? ctx.player.damageDone.filter((e) => damageIds.has(e.abilityId) && e.timestamp < ctx.endMs)
+    const perUse = damageIds.size > 0 || cd.petDamage
+      ? ctx.player.damageDone.filter((e) => (cd.petDamage ? !!e.pet : damageIds.has(e.abilityId)) && e.timestamp < ctx.endMs)
         .reduce((a, e) => a + (e.amount ?? 0), 0) / Math.max(1, casts.length + (prePull ? 1 : 0))
       : cd.actionIds.reduce((a, id) => Math.max(a, ctx.values.perUse(id)), 0);
     // A cooldown that deals no damage itself (Devilment) has no estimate,
@@ -530,6 +541,17 @@ export function roomForUses(cd: TrackedCooldown, endMs: number, forced: Window[]
 }
 
 const ROOM_SPEND_GAP_MS = 2_500;
+
+/** The first moment in [startMs, endMs) whose press would land (+landMs) outside forced time. */
+function firstPressable(startMs: number, endMs: number, landMs: number, forced: Window[]): number | undefined {
+  let t = startMs;
+  for (let guard = 0; guard <= forced.length && t < endMs; guard++) {
+    const f = forced.find((w) => t + landMs >= w.startMs && t + landMs < w.endMs);
+    if (!f) return t;
+    t = f.endMs - landMs;
+  }
+  return t < endMs ? t : undefined;
+}
 
 // A press logged up to this long before the simulated recast ends is on
 // time: Vamp's Dancer pressed Standard Step a few ms short of every 30s,

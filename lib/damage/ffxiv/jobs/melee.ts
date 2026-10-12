@@ -34,8 +34,15 @@
 //     its 9 missed Lance Charge GCDs and 13 missed positionals match; most
 //     of the GCDs were in forced windows. Life of the Dragon and Battle
 //     Litany windows aren't separate checks: they fall with Lance Charge.
-//   - Ninja: Kunai's Bane on the enemy (KunaisBaneWindow.tsx): 7 GCDs
-//     plus Dream Within a Dream, +10% damage taken (tooltip).
+//   - Ninja: Kunai's Bane window, Ninki and Kazematoi (below). Checked
+//     against xivanalysis on dDar482XvFKBPJYh FRU kill (7.1, 2026-10-12):
+//     its 9 Kazematoi lost and 1 unbuffed Aeolian Edge match; Ninki ~300
+//     simulated vs its 250; Bunshin 2 lost (its 3 counts burst
+//     alignment); Dokumori, Ten Chi Jin and Meisui's missing uses were
+//     ready a few seconds before P4's downtime and held for the 14:17
+//     burst (no extra use fit before the kill); Armor Crush under Kunai's
+//     Bane with stacks isn't built (the stack goes to a later Aeolian
+//     Edge: ~10% of 100 potency each).
 //   - Reaper: Enshroud (Enshroud.tsx): four Reapings, two Lemure's, one
 //     Sacrificium, one Communio. Arcane Circle's window isn't ported:
 //     xivanalysis adjusts its expectations in ways that don't carry over.
@@ -47,7 +54,8 @@ import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import type { DamageFinding, JobCheck } from "../../types";
 import { finding, PROC_CONSUME_MS, PROC_EXPIRY_EARLY_MS, type PlayerCheckContext } from "../../checks";
 import { forcedPart, inWindows, mergeWindows } from "../../timeline";
-import { burstWindowFindings, dotFindings, gaugeFindings, k, offCooldownIn, statusWindows, uptimeFindings, type ExpectedAction, type GaugeEvent } from "./shared";
+import { burstWindowFindings, castHits, dotFindings, gaugeFindings, k, offCooldownIn, statusWindows, uptimeFindings, type ExpectedAction, type GaugeEvent } from "./shared";
+import { comboLanded } from "./gnb";
 
 const id = (key: string) => A[key].id;
 const ids = (...keys: string[]) => keys.filter((key) => A[key]).map(id);
@@ -216,12 +224,125 @@ const chaoticSpring: JobCheck = (ctx) => dotFindings(ctx, {
   statusIds: [S.CHAOTIC_SPRING.id], name: S.CHAOTIC_SPRING.name, durationMs: S.CHAOTIC_SPRING.duration ?? 24_000,
 });
 
+// Kunai's Bane, from xivanalysis KunaisBaneWindow.tsx: 7 GCDs, mudras not
+// counted (with them, a 6/7 window read 7+), 8 with Ten Chi Jin in it;
+// Hyosho Ranryu or Goka Mekkyaku once; Raiton twice (once in the opener,
+// where one goes before the window for an extra Bhavacakra); Dream Within
+// a Dream once; Tenri Jindo when Ten Chi Jin is in it.
+const MUDRA_IDS = new Set(ids("TEN", "CHI", "JIN", "TEN_KASSATSU", "CHI_KASSATSU", "JIN_KASSATSU"));
+const KB_OPENER_MS = 12_000;
 const kunaisBane: JobCheck = (ctx) => burstWindowFindings(ctx, {
   statusId: S.KUNAIS_BANE.id, name: "Kunai's Bane", bonus: 0.1, onEnemy: true,
   bonusBasis: "Kunai's Bane is +10% damage taken (tooltip; not yet checked against a log)",
-  expectedGcds: () => 7,
-  expected: () => [{ ids: ids("DREAM_WITHIN_A_DREAM"), count: 1, name: "Dream Within a Dream" }],
+  ignoreGcdIds: MUDRA_IDS,
+  expectedGcds: (_c, casts) => (casts.some((c) => c.abilityId === id("TEN_CHI_JIN")) ? 8 : 7),
+  expected: (_c, casts) => {
+    const opener = casts.length > 0 && casts[0].timestamp <= KB_OPENER_MS;
+    const tcj = casts.some((c) => c.abilityId === id("TEN_CHI_JIN"));
+    return [
+      { ids: ids("DREAM_WITHIN_A_DREAM"), count: 1, name: "Dream Within a Dream" },
+      { ids: ids("HYOSHO_RANRYU", "GOKA_MEKKYAKU"), count: 1, name: "Hyosho Ranryu" },
+      { ids: ids("RAITON"), count: opener ? 1 : 2, name: "Raiton" },
+      ...(tcj ? [{ ids: ids("TENRI_JINDO"), count: 1, name: "Tenri Jindo" }] : []),
+    ];
+  },
 });
+
+// Ninki (cap 100), from xivanalysis Ninki.tsx: +5 Spinning Edge, Gust
+// Slash, Death Blossom, Hakke Mujinsatsu; +15 Aeolian Edge, Armor Crush
+// (combo'd steps only, read from bonusPercent); +5 per Raiju and Throwing
+// Dagger hit; +40 Mug / Dokumori; +50 Meisui; +5 per Bunshin shadow hit
+// (+10 its Phantom Kamaitachi); −50 Bhavacakra, Zesho Meppo, Hellfrog,
+// Deathfrog, Bunshin. Starts at 0; a death empties it. 50 Ninki is one
+// average Bhavacakra.
+const NINKI_COMBO = new Map([
+  ...ids("SPINNING_EDGE", "GUST_SLASH", "DEATH_BLOSSOM", "HAKKE_MUJINSATSU").map((x) => [x, 5] as const),
+  ...ids("AEOLIAN_EDGE", "ARMOR_CRUSH").map((x) => [x, 15] as const),
+]);
+const NINKI_HIT = new Map([
+  ...ids("FORKED_RAIJU", "FLEETING_RAIJU", "THROWING_DAGGER").map((x) => [x, 5] as const),
+  ...ids("MUG", "DOKUMORI").map((x) => [x, 40] as const),
+]);
+const NINKI_SPEND = new Set(ids("BHAVACAKRA", "ZESHO_MEPPO", "HELLFROG_MEDIUM", "DEATHFROG_MEDIUM", "BUNSHIN"));
+const ninki: JobCheck = (ctx) => {
+  const events: GaugeEvent[] = [];
+  for (const c of ctx.player.casts) {
+    const combo = NINKI_COMBO.get(c.abilityId);
+    if (combo !== undefined && (c.abilityId === id("SPINNING_EDGE") || c.abilityId === id("DEATH_BLOSSOM") ||
+      comboLanded(ctx, c.abilityId, c.timestamp))) {
+      events.push({ t: c.timestamp, type: "gain", amount: combo, label: `${c.abilityName} at high Ninki` });
+    }
+    if (c.abilityId === id("MEISUI")) events.push({ t: c.timestamp, type: "gain", amount: 50, label: "Meisui at high Ninki" });
+    if (NINKI_SPEND.has(c.abilityId)) events.push({ t: c.timestamp, type: "spend", amount: 50, label: c.abilityName });
+  }
+  // One gain per hit cast (several targets = one), from the player's hits.
+  for (const [aid, amount] of NINKI_HIT) {
+    for (const h of castHits(ctx, aid)) events.push({ t: h.timestamp, type: "gain", amount, label: `${h.abilityName} at high Ninki` });
+  }
+  for (const e of ctx.player.damageDone) {
+    if (!e.pet || !(e.amount && e.amount > 0)) continue;
+    events.push({ t: e.timestamp, type: "gain", amount: e.abilityId === id("PHANTOM_KAMAITACHI_BUNSHIN") ? 10 : 5, label: "Bunshin hit at high Ninki" });
+  }
+  for (const d of ctx.dead) events.push({ t: d.startMs, type: "reset", label: "death" });
+  const perPoint = ctx.values.perUse(id("BHAVACAKRA")) / 50;
+  return gaugeFindings(ctx, {
+    name: "Ninki", unit: "Ninki", cap: 100, unitValue: perPoint,
+    valueBasis: `${k(perPoint * 50)} average Bhavacakra per 50`,
+    events,
+  });
+};
+
+// Kazematoi (cap 5), from xivanalysis Kazematoi.tsx: a combo'd Armor
+// Crush adds 2, Aeolian Edge spends 1. Stacks over the cap are lost, each
+// worth one buffed Aeolian Edge over the Armor Crush that replaced it
+// (the player's averages). An Aeolian Edge at 0 stacks loses the average
+// Armor Crush minus that Aeolian Edge.
+const kazematoi: JobCheck = (ctx) => {
+  const ac = id("ARMOR_CRUSH"), ae = id("AEOLIAN_EDGE");
+  const casts = ctx.player.casts.filter((c) => (c.abilityId === ac && comboLanded(ctx, ac, c.timestamp)) || c.abilityId === ae)
+    .sort((a, b) => a.timestamp - b.timestamp);
+  if (!casts.some((c) => c.abilityId === ae)) return [];
+  const aeHits = castHits(ctx, ae), acAvg = ctx.values.perUse(ac);
+  const hitOf = (t: number) => aeHits.find((h) => h.timestamp >= t && h.timestamp <= t + 1_500)?.amount ?? 0;
+  let stacks = 0;
+  const buffed: number[] = [];
+  const unbuffed: { t: number; dealt: number }[] = [];
+  const events: GaugeEvent[] = [];
+  for (const c of casts) {
+    if (inWindows(c.timestamp, ctx.dead)) continue;
+    if (c.abilityId === ac) {
+      events.push({ t: c.timestamp, type: "gain", amount: 2, label: "Armor Crush at 4+ Kazematoi" });
+      stacks = Math.min(5, stacks + 2);
+    } else if (stacks > 0) {
+      events.push({ t: c.timestamp, type: "spend", amount: 1, label: "Aeolian Edge" });
+      stacks--;
+      buffed.push(hitOf(c.timestamp));
+    } else {
+      unbuffed.push({ t: c.timestamp, dealt: hitOf(c.timestamp) });
+    }
+  }
+  for (const d of ctx.dead) events.push({ t: d.startMs, type: "reset", label: "death" });
+  const buffedAvg = buffed.length ? buffed.reduce((a, x) => a + x, 0) / buffed.length : 0;
+  const perStack = Math.max(0, buffedAvg - acAvg);
+  const out = gaugeFindings(ctx, {
+    name: "Kazematoi", unit: "Kazematoi", cap: 5, unitValue: perStack,
+    valueBasis: `(${k(buffedAvg)} average buffed Aeolian Edge − ${k(acAvg)} average Armor Crush)`,
+    events,
+  });
+  const forced = mergeWindows(ctx.forced);
+  for (const u of unbuffed) {
+    if (u.t >= ctx.endMs) continue;
+    const lost = Math.max(0, acAvg - u.dealt);
+    out.push(finding(ctx, {
+      kind: "gauge-overcap", startMs: u.t, endMs: u.t, forced: inWindows(u.t, forced),
+      label: "Aeolian Edge without Kazematoi",
+      lostDamage: lost, inference: true,
+      basis: `${k(acAvg)} average Armor Crush − ${k(u.dealt)} this Aeolian Edge (Kazematoi simulated from casts)`,
+      detail: "Aeolian Edge at 0 Kazematoi (Armor Crush does more unbuffed)",
+    }));
+  }
+  return out;
+};
 
 const enshroud: JobCheck = (ctx) => burstWindowFindings(ctx, {
   statusId: S.ENSHROUDED.id, name: "Enshroud", bonus: 0,
@@ -305,5 +426,5 @@ const firstmindsFocus: JobCheck = (ctx) => {
 };
 
 export const DRG_CHECKS: JobCheck[] = [uptime("POWER_SURGE", 0.1, "Power Surge is +10% (tooltip)"), lanceCharge, lifeSurge, chaoticSpring, firstmindsFocus];
-export const NIN_CHECKS: JobCheck[] = [kunaisBane];
+export const NIN_CHECKS: JobCheck[] = [kunaisBane, ninki, kazematoi];
 export const RPR_CHECKS: JobCheck[] = [enshroud, arcaneCircle];

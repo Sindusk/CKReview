@@ -130,6 +130,8 @@ export type TrackedCooldown = {
   // Its effect lands this long after the press (Earthly Star matures in
   // 10s): it can be pressed in downtime if that's over by then.
   landDelayMs?: number;
+  // Its damage is the player's pet hits (Bunshin's shadow).
+  petDamage?: boolean;
 };
 
 // ── Fight context (per boss) ───────────────────────────────────────────
