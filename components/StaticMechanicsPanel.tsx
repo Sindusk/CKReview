@@ -24,7 +24,7 @@ type WipeCause = {
   perSession: { sessionId: number; count: number }[];
 };
 
-type MechanicsResponse = AnalysisContextResponse & { mechanics: MechanicStats[] };
+type MechanicsResponse = AnalysisContextResponse & { mechanics: MechanicStats[]; players: { id: number; name: string }[] };
 type WipeCausesResponse = AnalysisContextResponse & {
   wipes:      number;
   unknown:    number;
@@ -44,6 +44,8 @@ export default function StaticMechanicsPanel({ staticId, dataVersion = 0 }: { st
   const [wipes, setWipes] = useState<WipeCausesResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Mechanic whose per-player chances are listed under the table.
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
   // Reads only this app's database (no WCL/FFLogs call), so refetching on
   // every filter change is free.
@@ -69,6 +71,7 @@ export default function StaticMechanicsPanel({ staticId, dataVersion = 0 }: { st
 
   const context = mechanics;
   const noDetail = context !== null && context.boss === null;
+  const selected = context?.mechanics.find((m) => m.mechanicKey === selectedKey) ?? null;
 
   return (
     <div>
@@ -93,7 +96,14 @@ export default function StaticMechanicsPanel({ staticId, dataVersion = 0 }: { st
                 <h3 className="ck-section-label" style={{ margin: "0 0 8px" }}>
                   {filter.includeMinors ? "Major + Minor errors" : "Major errors"} by mechanic
                 </h3>
-                <MechanicTable mechanics={rankMechanics(context.mechanics)} phases={context.phases} sessions={context.sessions} />
+                <MechanicTable
+                  mechanics={rankMechanics(context.mechanics)}
+                  phases={context.phases}
+                  sessions={context.sessions}
+                  selectedKey={selected?.mechanicKey ?? null}
+                  onSelect={(key) => setSelectedKey(selectedKey === key ? null : key)}
+                />
+                {selected && <PlayerChancesList mechanic={selected} names={context.players} />}
               </section>
               <section style={{ minWidth: 0 }}>
                 <h3 className="ck-section-label" style={{ margin: "0 0 8px" }}>
@@ -104,6 +114,46 @@ export default function StaticMechanicsPanel({ staticId, dataVersion = 0 }: { st
             </div>
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+const EXPOSURE_NOTE: Record<MechanicStats["exposure"], string> = {
+  everyone: "Everyone in the pull is tested at every instance.",
+  targeted: "Only the players the log names at each instance (debuff, bait or cast target) are tested.",
+  assigned: "An assigned job: only the assignee is tested at each instance.",
+};
+
+/** Each player's own failures out of their chances at one mechanic. */
+function PlayerChancesList({ mechanic, names }: { mechanic: MechanicStats; names: { id: number; name: string }[] }) {
+  const nameOf = new Map(names.map((n) => [n.id, n.name]));
+  const rows = [...(mechanic.perPlayer ?? [])].sort((a, b) =>
+    (b.chances > 0 ? 1 : 0) - (a.chances > 0 ? 1 : 0)
+    || (b.chances > 0 ? b.failed / b.chances : 0) - (a.chances > 0 ? a.failed / a.chances : 0)
+    || b.chances - a.chances
+    || (nameOf.get(a.identityId) ?? "").localeCompare(nameOf.get(b.identityId) ?? ""));
+  return (
+    <div style={{ marginTop: "10px" }}>
+      <div style={{ fontSize: "11px", color: "var(--ck-text-3)", marginBottom: "6px" }}>
+        <strong style={{ color: "var(--ck-text-2)" }}>{mechanic.label}</strong> per player. {EXPOSURE_NOTE[mechanic.exposure]}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: "4px 14px", fontSize: "12px" }}>
+        {rows.map((r) => {
+          const thin = r.chances < MIN_CHANCES;
+          return (
+            <div
+              key={r.identityId}
+              style={{ display: "flex", justifyContent: "space-between", gap: "8px", opacity: thin ? 0.6 : 1 }}
+              title={r.chances === 0 ? "Never tested by this mechanic" : `Failed ${r.failed} of their ${r.chances} chances (${r.errors} error${r.errors === 1 ? "" : "s"})`}
+            >
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{nameOf.get(r.identityId) ?? `#${r.identityId}`}</span>
+              <span className="ck-num" style={{ color: "var(--ck-text-2)", flexShrink: 0 }}>
+                {r.chances === 0 ? "—" : `${r.failed}/${r.chances} · ${Math.round((r.failed / r.chances) * 100)}%`}
+              </span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

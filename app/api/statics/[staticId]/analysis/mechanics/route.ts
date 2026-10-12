@@ -2,7 +2,8 @@
 //
 // Raid-wide mechanic ranking for the static's detailed sessions: per
 // mechanic, failures out of chances, raw error count, players involved and
-// a per-session trend. Query: boss, sessions (last N) or from/to, phase,
+// a per-session trend, plus each player's own chances (perPlayer, named by
+// `players`). Query: boss, sessions (last N) or from/to, phase,
 // includeMinors. Counting rules live in lib/static-analysis.ts.
 
 import { NextRequest, NextResponse } from "next/server";
@@ -29,10 +30,19 @@ export async function GET(
 
   const filter = parseAnalysisFilter(req.nextUrl.searchParams);
   const ctx = await loadAnalysisContext(staticId, filter);
+  const mechanics = computeMechanicStats(ctx, filter);
+
+  // Names for the per-player chances.
+  const ids = [...new Set(mechanics.flatMap((m) => (m.perPlayer ?? []).map((p) => p.identityId)))];
+  const players = await prisma.staticPlayerIdentity.findMany({
+    where:  { id: { in: ids }, staticId },
+    select: { id: true, name: true },
+  });
 
   return NextResponse.json({
     ...contextSummary(ctx),
     filter: { phase: filter.phase, includeMinors: filter.includeMinors },
-    mechanics: computeMechanicStats(ctx, filter),
+    mechanics,
+    players,
   });
 }

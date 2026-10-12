@@ -21,6 +21,7 @@
 // - Sessions are ordered by addedAt, like the rest of the statics views.
 
 import { prisma } from "@/lib/prisma";
+import type { Exposure } from "@/lib/mechanics/rule-meta";
 
 export type AnalysisFilter = {
   boss:          string | null;
@@ -78,6 +79,17 @@ type LoadedError = {
   rule:        { mechanicKey: string; mechanicLabel: string; phaseHint: number | null; name: string };
 };
 
+/** One mechanic instance; a scoped one tests only its `players`. */
+type LoadedMechanic = {
+  mechanicKey: string;
+  occurrence:  number;
+  phase:       number | null;
+  /** "targeted" | "assigned", null = everyone in the pull. */
+  exposure:    Exposure | null;
+  /** Responsible players' identity ids (scoped instances only). */
+  players:     number[];
+};
+
 type LoadedPull = {
   id:               number;
   sessionId:        number;
@@ -90,7 +102,7 @@ type LoadedPull = {
   endCausePhase:    number | null;
   endCauseRule:     { mechanicKey: string; mechanicLabel: string } | null;
   phases:           { phase: number }[];
-  mechanics:        { mechanicKey: string; occurrence: number; phase: number | null }[];
+  mechanics:        LoadedMechanic[];
   errors:           LoadedError[];
   /** Identity ids in the pull's roster (from the count rows). */
   roster:           Set<number>;
@@ -154,7 +166,12 @@ export async function loadAnalysisContext(staticId: number, filter: AnalysisFilt
       endCauseKind: true, endCauseAbility: true, endCausePhase: true,
       endCauseRule: { select: { mechanicKey: true, mechanicLabel: true } },
       phases:       { select: { phase: true }, orderBy: { seq: "asc" } },
-      mechanics:    { select: { mechanicKey: true, occurrence: true, phase: true } },
+      mechanics:    {
+        select: {
+          mechanicKey: true, occurrence: true, phase: true, exposure: true,
+          players: { select: { identityId: true } },
+        },
+      },
       errors: {
         where:  { afterCutoff: false, severity: { in: severities } },
         select: {
@@ -192,7 +209,13 @@ export async function loadAnalysisContext(staticId: number, filter: AnalysisFilt
       endCausePhase:   p.endCausePhase,
       endCauseRule:    p.endCauseRule,
       phases:          p.phases,
-      mechanics:       p.mechanics,
+      mechanics:       p.mechanics.map((m) => ({
+        mechanicKey: m.mechanicKey,
+        occurrence:  m.occurrence,
+        phase:       m.phase,
+        exposure:    m.exposure === "targeted" || m.exposure === "assigned" ? m.exposure : null,
+        players:     m.players.map((pl) => pl.identityId).filter((id): id is number => id !== null),
+      })),
       errors:          p.errors,
       roster:          new Set(p.playerErrors.map((pe) => pe.identityId).filter((id): id is number => id !== null)),
     })),
@@ -219,7 +242,21 @@ export type MechanicStats = {
   players:     number;
   rules:       { name: string; errors: number }[];
   perSession:  SessionTally[];
+  /**
+   * Who the mechanic tests: "targeted" / "assigned" once a boss module
+   * reports its responsible players (rule-meta.ts), else "everyone".
+   */
+  exposure:    Exposure;
+  /** Raid view only: every rostered player's own chances (see PlayerChances). */
+  perPlayer?:  PlayerChances[];
 };
+
+/**
+ * One player's chances at a mechanic: the instances that tested them (all
+ * of an everyone mechanic's, only those naming them for a targeted one)
+ * plus any they failed outside those. chances 0 = never tested, shown "—".
+ */
+export type PlayerChances = { identityId: number; failed: number; chances: number; errors: number };
 
 /**
  * The one phase a mechanic belongs to, or null when its errors span several
@@ -238,9 +275,81 @@ function errorInPhase(e: LoadedError, phase: number): boolean {
   return e.phase === phase || (e.phase === null && e.rule.phaseHint === phase);
 }
 
+/** A mechanic's exposure as stored on its instances; "everyone" without scoped ones. */
+function mechanicExposureIn(pulls: LoadedPull[], mechanicKey: string): Exposure {
+  for (const p of pulls) {
+    const scoped = p.mechanics.find((m) => m.mechanicKey === mechanicKey && m.exposure !== null);
+    if (scoped?.exposure) return scoped.exposure;
+  }
+  return "everyone";
+}
+
+/**
+ * Chances and failures over `pulls`, overall and per session. `items` are
+ * the counted errors. With `identityId`, a scoped (targeted/assigned)
+ * instance is a chance only when it names that player; everyone instances
+ * always are.
+ */
+function tallyChances(
+  pulls:       LoadedPull[],
+  items:       { pull: LoadedPull; e: LoadedError }[],
+  mechanicKey: string,
+  chanceKind:  ChanceKind,
+  phase:       number | null,
+  filter:      AnalysisFilter,
+  identityId:  number | undefined,
+): { chances: number; failed: number; errors: number; perSession: Map<number, SessionTally> } {
+  const failedIn = new Map<number, Set<string>>(); // pullId -> failed chance ids
+  for (const { pull, e } of items) {
+    const set = failedIn.get(pull.id) ?? new Set<string>();
+    set.add(chanceKind === "occurrence" ? String(e.occurrence ?? "?") : "pull");
+    failedIn.set(pull.id, set);
+  }
+
+  const perSession = new Map<number, SessionTally>();
+  let chances = 0;
+  let failed = 0;
+  for (const p of pulls) {
+    const failedIds = failedIn.get(p.id) ?? new Set<string>();
+    const f = failedIds.size;
+    let pc: number;
+    if (chanceKind === "occurrence") {
+      const instances = p.mechanics.filter((m) => m.mechanicKey === mechanicKey && (filter.phase === null || m.phase === filter.phase));
+      if (instances.some((m) => m.exposure !== null)) {
+        // Scoped: the instances that tested this player, plus any failure
+        // outside them (an error is always a chance).
+        const ids = new Set(instances
+          .filter((m) => identityId === undefined || m.exposure === null || m.players.includes(identityId))
+          .map((m) => String(m.occurrence)));
+        for (const id of failedIds) ids.add(id);
+        pc = ids.size;
+      } else {
+        // A failure always implies the mechanic happened, even where the
+        // exposure data missed it (unreported occurrence).
+        pc = Math.max(instances.length, f);
+      }
+    } else {
+      const c = chanceKind === "phase" ? (p.phases.some((s) => s.phase === phase) ? 1 : 0) : 1;
+      pc = Math.max(c, f);
+    }
+    const tally = perSession.get(p.sessionId) ?? { sessionId: p.sessionId, failed: 0, chances: 0, errors: 0 };
+    tally.chances += pc;
+    tally.failed += f;
+    perSession.set(p.sessionId, tally);
+    chances += pc;
+    failed += f;
+  }
+  for (const { pull } of items) {
+    const tally = perSession.get(pull.sessionId);
+    if (tally) tally.errors += 1;
+  }
+  return { chances, failed, errors: items.length, perSession };
+}
+
 /**
  * Per-mechanic stats over `ctx.pulls`. With `identityId`, only that player's
- * errors count and chances are limited to pulls they played.
+ * errors count and chances are limited to pulls they played and, for a
+ * targeted or assigned mechanic, to the instances that named them.
  */
 export function computeMechanicStats(ctx: AnalysisContext, filter: AnalysisFilter, identityId?: number): MechanicStats[] {
   const pulls = identityId === undefined ? ctx.pulls : ctx.pulls.filter((p) => p.roster.has(identityId));
@@ -271,41 +380,23 @@ export function computeMechanicStats(ctx: AnalysisContext, filter: AnalysisFilte
     const items = allItems.filter((i) => countedIds.has(i.pull.id));
     if (items.length === 0) continue;
 
-    // Chances and failures per pull, then summed per session and overall.
-    const chancesIn = (p: LoadedPull): number => {
-      if (chanceKind === "occurrence") {
-        return p.mechanics.filter((m) => m.mechanicKey === mechanicKey && (filter.phase === null || m.phase === filter.phase)).length;
-      }
-      if (chanceKind === "phase") return p.phases.some((s) => s.phase === phase) ? 1 : 0;
-      return 1;
-    };
-    const failedIn = new Map<number, Set<string>>(); // pullId -> failed chance ids
-    for (const { pull, e } of items) {
-      const set = failedIn.get(pull.id) ?? new Set<string>();
-      set.add(chanceKind === "occurrence" ? String(e.occurrence ?? "?") : "pull");
-      failedIn.set(pull.id, set);
-    }
-
-    const perSession = new Map<number, SessionTally>();
-    let chances = 0;
-    let failed = 0;
-    for (const p of counted) {
-      const c = chancesIn(p);
-      // A failure always implies the mechanic happened, even where the
-      // exposure data missed it (no phase segment, unreported occurrence).
-      const f = failedIn.get(p.id)?.size ?? 0;
-      const pc = Math.max(c, f);
-      const tally = perSession.get(p.sessionId) ?? { sessionId: p.sessionId, failed: 0, chances: 0, errors: 0 };
-      tally.chances += pc;
-      tally.failed += f;
-      perSession.set(p.sessionId, tally);
-      chances += pc;
-      failed += f;
-    }
-    for (const { pull } of items) perSession.get(pull.sessionId)!.errors += 1;
+    const tally = tallyChances(counted, items, mechanicKey, chanceKind, phase, filter, identityId);
 
     const rules = new Map<string, number>();
     for (const { e } of items) rules.set(e.rule.name, (rules.get(e.rule.name) ?? 0) + 1);
+
+    // Raid view: each rostered player's own chances.
+    let perPlayer: PlayerChances[] | undefined;
+    if (identityId === undefined) {
+      const ids = [...new Set(counted.flatMap((p) => [...p.roster]))];
+      perPlayer = ids.map((id) => {
+        const t = tallyChances(
+          counted.filter((p) => p.roster.has(id)), items.filter((i) => i.e.identityId === id),
+          mechanicKey, chanceKind, phase, filter, id,
+        );
+        return { identityId: id, failed: t.failed, chances: t.chances, errors: t.errors };
+      });
+    }
 
     stats.push({
       mechanicKey,
@@ -313,12 +404,14 @@ export function computeMechanicStats(ctx: AnalysisContext, filter: AnalysisFilte
       phase: chanceKind === "pull" ? null : phase,
       chanceKind,
       errors:   items.length,
-      failed,
-      chances,
-      rate:     chances > 0 ? failed / chances : null,
+      failed:   tally.failed,
+      chances:  tally.chances,
+      rate:     tally.chances > 0 ? tally.failed / tally.chances : null,
       players:  new Set(items.map((i) => i.e.identityId).filter((id) => id !== null)).size,
       rules:    [...rules].map(([name, errors]) => ({ name, errors })).sort((a, b) => b.errors - a.errors),
-      perSession: ctx.sessions.map((s) => perSession.get(s.id) ?? { sessionId: s.id, failed: 0, chances: 0, errors: 0 }),
+      perSession: ctx.sessions.map((s) => tally.perSession.get(s.id) ?? { sessionId: s.id, failed: 0, chances: 0, errors: 0 }),
+      exposure: mechanicExposureIn(ctx.pulls, mechanicKey),
+      perPlayer,
     });
   }
 
