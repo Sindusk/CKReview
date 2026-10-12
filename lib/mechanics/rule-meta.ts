@@ -272,10 +272,11 @@ mechanic("es-protovenom", "Protovenom", undefined, [
   "wow-es-protovenom-eruption",
   "wow-es-protovenom-ticks",
 ]);
-mechanic("ssz-crosswinds", "Crosswinds", undefined, [
-  "wow-ssz-crosswinds-blast",
-  "wow-ssz-crosswinds-fall",
-]);
+// The knockback tests only the aura holders, the blast everyone else, so
+// they are two mechanics (one exposure each).
+mechanic("ssz-crosswinds", "Crosswinds", undefined, ["wow-ssz-crosswinds-blast"]);
+mechanic("wow-ssz-crosswinds-fall", "Crosswinds knockback", undefined, ["wow-ssz-crosswinds-fall"]);
+exposure("targeted", ["wow-ssz-crosswinds-fall"]);
 mechanic("ssz-cysts", "Cysts", undefined, [
   "wow-ssz-cyst-double",
   "wow-ssz-cyst-early",

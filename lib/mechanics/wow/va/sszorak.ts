@@ -116,6 +116,11 @@
 //   wow-ssz-maelstrom-fall     Major/Raid  blown off during Maelstrom
 //   wow-ssz-pull-over          Raid        5+ dead / unrecovered tank death / Berserk
 //
+// Exposure (docs/archive/exposure-plan.md): the Crosswinds knockback
+// (wow-ssz-crosswinds-fall, its own mechanic) is targeted — one instance
+// per Crosswinds set, the direction-aura holders responsible. The blast
+// stays with everyone.
+//
 // ── GUIDE-DERIVED MODEL (pre-log) ────────────────────────────────────────────
 //
 // The spell IDs below come from encounter-journal links; they are
@@ -339,6 +344,7 @@ import {
   aliveAt, raidMarker, pullOverMarker,
 } from "../common";
 import type { WowPullContext } from "../common";
+import type { ReportedOccurrence } from "../../occurrences";
 
 // ─── Ability IDs (log-verified, report rNL38zFGMbyADRTh) ─────────────────────
 
@@ -712,13 +718,15 @@ function detectTempest(players: PlayerInfo[], deaths: DeathEvent[]): PullError[]
 export const SSZ_CROSSWINDS_BLAST_RULE_ID = "wow-ssz-crosswinds-blast";
 export const SSZ_CROSSWINDS_FALL_RULE_ID = "wow-ssz-crosswinds-fall";
 
-function detectCrosswinds(players: PlayerInfo[], deaths: DeathEvent[]): PullError[] {
+function detectCrosswinds(players: PlayerInfo[], deaths: DeathEvent[], occurrences?: ReportedOccurrence[]): PullError[] {
   const removals = players.flatMap((p) =>
     p.debuffs.filter((e) => CROSSWINDS_PARTNER.has(e.abilityId) && e.debuffStatus === "removed").map((e) => ({ p, e })));
   const errors: PullError[] = [];
   for (const set of clusterByGap(removals, (r) => r.e.timestamp, CROSSWINDS_SET_MS)) {
     const t = set[0].e.timestamp;
     const holders = new Set(set.map((r) => r.p));
+    // Every set is a knockback chance for its holders (rule-meta exposure).
+    occurrences?.push({ mechanicKey: SSZ_CROSSWINDS_FALL_RULE_ID, timestamp: t, players: [...holders].map((p) => p.name) });
 
     for (const p of players) {
       if (holders.has(p)) continue;
@@ -999,7 +1007,7 @@ export function detectSszorakErrors(ctx: WowPullContext): PullError[] {
     ...detectMutilate(players, deaths),
     ...detectRavageSwap(players, deaths),
     ...detectTempest(players, deaths),
-    ...detectCrosswinds(players, deaths),
+    ...detectCrosswinds(players, deaths, ctx.occurrences),
     ...detectCysts(players, deaths, enemyBuffs),
   ];
 
