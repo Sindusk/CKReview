@@ -48,6 +48,13 @@
 //     Paradox overwrites, missing Despair and a weakened Fire III (gauge
 //     and MP, which the log doesn't carry).
 //   - SMN Searing Light with one Searing Flash (SearingLight.tsx).
+//     Checked against xivanalysis on qjCMx4bRfgNKwX9T fight 16 (7.5,
+//     2026-10-13, the first Summoner sample): Searing Flash 10/10, every
+//     cooldown 100%, nothing to build. Its Summons table's short
+//     attunements are all forced: 2:44 (the fourth Emerald Rite cut by
+//     the 2:56 downtime), 3:01 (past P1's HP check), 6:03 (P2's downtime),
+//     14:11 (past P4's HP check), 18:19 (the kill). Its one triple weave
+//     (16:11, 0.36s) is under the phase's 0.5s floor.
 //   - Cooldowns for all three in tracked-cooldowns.ts.
 //
 //   Copyright (c) 2018 Saxon Landers & contributors
