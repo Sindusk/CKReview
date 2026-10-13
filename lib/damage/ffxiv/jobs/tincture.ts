@@ -50,7 +50,13 @@ const MEDICATED = S.MEDICATED.id;
 const DURATION_MS = 30_000;
 const RECAST_MS = 270_000;
 const EARLIEST_MS = -3_000;
-const STEP_MS = 1_000;
+// 0.1s, not 1s: a bin counts damage from its start, so on a 1s grid a pot
+// drunk after Standard Finish (vVPtwaTQ62Jg391q The Tyrant kill, cast
+// 0:00.66, Medicated ~0:01.9) was credited from 0:01.0 and took the
+// Standard Finish hit at 0:01.33 it would have missed.
+const STEP_MS = 100;
+// Moves shorter than this aren't listed as moments.
+const MOVE_MIN_MS = 3_000;
 const BONUS_MIN_ABILITIES = 5;
 const BONUS_DEFAULT = 0.05;
 const DH_MULT = 1.25;
@@ -72,8 +78,8 @@ const GUARANTEED = new Set(
 );
 
 const clock = (ms: number) => {
-  const neg = ms < 0;
   const t = Math.round(Math.abs(ms) / 1000);
+  const neg = ms < 0 && t > 0;
   return `${neg ? "-" : ""}${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
 };
 
@@ -175,6 +181,28 @@ export function potSlots(ctx: PlayerCheckContext, medicatedAt: number[]): Window
     const woven = ogcds.filter((c) => c.timestamp > a.startMs && c.timestamp < next.startMs).length;
     if (woven < Math.floor(room / WEAVE_LOCK_MS)) out.push({ startMs: lockEnd, endMs: next.startMs - WEAVE_LOCK_MS });
   }
+  // No pot mid-dance (user, 2026-10-13): Technical / Standard Step's own
+  // 1.5s GCD leaves room on paper, but a pot there pushes the steps
+  // (vVPtwaTQ62Jg391q Vamp Fatale kill: a pot after the 6:04 Technical
+  // Step was suggested). Pre-pull is exempt: the dancer finished the steps
+  // and waits for the pull (The Tyrant kill drank at −0:00 in Standard Step).
+  const dances = danceWindows(ctx);
+  return out.filter((s, i) => i === 0 || !dances.some((d) => s.startMs < d.endMs && s.endMs > d.startMs));
+}
+
+const DANCE_STATUSES = ["STANDARD_STEP", "TECHNICAL_STEP"].map((x) => S[x]?.id).filter((id): id is number => id !== undefined);
+
+function danceWindows(ctx: PlayerCheckContext): Window[] {
+  const out: Window[] = [];
+  const open = new Map<number, number>();
+  for (const e of [...(ctx.player.buffs ?? [])].sort((a, b) => a.timestamp - b.timestamp)) {
+    if (!DANCE_STATUSES.includes(e.abilityId)) continue;
+    if (e.buffStatus === "applied") open.set(e.abilityId, e.timestamp);
+    else if (e.buffStatus === "removed") {
+      out.push({ startMs: open.get(e.abilityId) ?? -Infinity, endMs: e.timestamp });
+      open.delete(e.abilityId);
+    }
+  }
   return out;
 }
 
@@ -260,7 +288,7 @@ export const tincture: JobCheck = (ctx: PlayerCheckContext): DamageFinding[] => 
       const to = best.starts[i];
       const gain = cover(to) - cover(b);
       return { from: b, to, gain };
-    }).filter((m) => Math.abs(m.to - m.from) >= 3 && m.gain > Math.max(1, cover(m.from)) * MOVE_MIN_SHARE);
+    }).filter((m) => Math.abs(m.to - m.from) * STEP_MS >= MOVE_MIN_MS &&m.gain > Math.max(1, cover(m.from)) * MOVE_MIN_SHARE);
     if (moments.length > 0) {
       const lost = (best.total - actual) * bonus;
       out.push(finding(ctx, {
