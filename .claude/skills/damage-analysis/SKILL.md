@@ -200,8 +200,21 @@ file (step 0) with what's done and the next step.
 
 ## WoW (Warcraft Logs)
 
-First run: qpZx3mWaG7gcDdYB fight 5 (Entombed Sentinels, 2026-10-13).
-Background and pitfalls: docs/dps-analysis.md, "WoW case study".
+First run: qpZx3mWaG7gcDdYB fight 5 (Entombed Sentinels, 2026-10-13),
+all 16 non-healers against top references. Background and pitfalls:
+docs/dps-analysis.md, "WoW case study" and "Analyzing a WoW kill: method
+and lessons" (the per-spec table, what WoWAnalyzer overstates, what the
+log can't show, the user's leniency rules). Read that section first.
+
+**References.** For each player, ask the user for a 99th/100th-percentile
+log of the spec on the same boss and its WoWAnalyzer page; fetch only
+that fight (`fetch-wow-report.js <code> --fight <id>`), then
+`validate.js --update <folder>` and `--check` it. Record every top parse
+the user names in the case study (one kill often covers several specs).
+Compare against all loaded references at once:
+`damage-compare-wow <own folder> --refs=<code>,<code>,...`. Before trusting
+a new check, run it on the reference kills: a finding on the top player
+must match WoWAnalyzer there too, or the check is wrong.
 
 **Data.**
 - `node scripts/fetch-wow-report.js <code> --fight <id>` (one kill; ~28MB).

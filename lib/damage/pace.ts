@@ -13,8 +13,7 @@
 // reference clear's analysis passed in), the base this player could have
 // had = the peer's base × (1 + peer's rating haste) ÷ (1 + own rating
 // haste), rating haste = rating ÷ each pull's own calibration (haste.ts).
-// The fastest of those, if 5%+ under the player's own base, is the
-// expectation. Every instant GCD outside forced time then had a lock
+// Their median, if 5%+ under the player's own base, is the expectation. Every instant GCD outside forced time then had a lock
 // (recast × the player's GCD factor at t) longer than the expectation's
 // (recast × expected ÷ 1.5s × the haste buffs up at t); the difference is
 // valued like the gap check's idle (average GCD ÷ base GCD). Hard casts are
@@ -48,12 +47,18 @@ export function checkSameSpecPace(
   ctx: PlayerCheckContext, own: PacePeer | undefined, peers: PacePeer[], hasteAt: ((t: number) => number) | undefined,
 ): DamageFinding[] {
   if (!own || own.ratingHaste === undefined || !hasteAt) return [];
-  let best: { peer: PacePeer; expectedMs: number } | undefined;
+  // The median of the same-spec players' scaled bases (the slower middle
+  // one when even), not the fastest: with eight reference kills loaded the
+  // fastest of many noisy fits drifted low (Sylmigron's benchmark became a
+  // non-top Balance's 0.98s) and the 99th-percentile Kaströ was flagged
+  // against one raid member (JZjf9x3mK76NzabP, 2026-10-13).
+  const scaled: { peer: PacePeer; expectedMs: number }[] = [];
   for (const q of peers) {
     if (q.job !== own.job || (q.player === own.player && q.source === undefined) || q.ratingHaste === undefined) continue;
-    const expectedMs = q.baseMs * (1 + q.ratingHaste) / (1 + own.ratingHaste);
-    if (!best || expectedMs < best.expectedMs) best = { peer: q, expectedMs };
+    scaled.push({ peer: q, expectedMs: q.baseMs * (1 + q.ratingHaste) / (1 + own.ratingHaste) });
   }
+  scaled.sort((a, b) => a.expectedMs - b.expectedMs);
+  const best = scaled[Math.floor(scaled.length / 2)];
   if (!best || best.expectedMs > own.baseMs * MARGIN) return [];
 
   let savedMs = 0, lost = 0, n = 0, first = Infinity, last = 0;
@@ -71,7 +76,8 @@ export function checkSameSpecPace(
   }
   if (n === 0) return [];
   const peer = best.peer;
-  const who = `${peer.player}${peer.source ? ` (${peer.source})` : ""}`;
+  const who = `${peer.player}${peer.source ? ` (${peer.source})` : ""}` +
+    (scaled.length > 1 ? `, the median of ${scaled.length} same-spec players` : "");
   const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
   return [finding(ctx, {
     kind: "gcd-pace", startMs: first, endMs: last, forced: false, inference: true,

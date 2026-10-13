@@ -310,7 +310,11 @@ docs/damage-case-studies/qpZx3mWaG7gcDdYB.md. What generalizes:
   the pull or a loaded clear, scaled by rating haste, and counts the
   longer lock on instant GCDs: 2.18M for Hervous, not the ~6–7M a raw
   1.2s-vs-0.98s count gives (the gap check already counts idle past his
-  own base). Healers are left out.
+  own base). Healers are left out. The expectation is the **median** of the
+  same-spec players loaded (pull + references), not the fastest: with
+  eight reference kills the fastest drifted onto non-top players and
+  flagged a 99th-percentile Havoc. Its result depends on which references
+  are loaded; say which when quoting it.
 - **Movement stays lenient (user, 2026-10-13).** Shadowmeld idled 29–52%
   inside his Murk, Miasma and slime-switch windows; the 100th-percentile
   Marksmanship Hunter (3Vz6Qt2RyTPXwpJn's Imnotanorc) 0–1% in the same
@@ -345,6 +349,94 @@ docs/damage-case-studies/qpZx3mWaG7gcDdYB.md. What generalizes:
   buff's duration (Deep Breath's flight) read as idle; and burst windows
   counted channel time as missing GCDs. A spec with channels, empowers or
   flights needs its first log checked for each.
+
+## Analyzing a WoW kill: method and lessons (qpZx3mWaG7gcDdYB, 2026-10-13)
+
+Sixteen players checked, each against a 99th/100th-percentile player of
+the spec on another kill of the same boss (eight reference kills). What
+worked, in order:
+
+1. **One reference per spec, from the user.** Ask for a top parse of the
+   spec on the same boss; fetch only that fight (`--fight <id>`, ~30–45MB)
+   and baseline it (`validate.js --update <folder>`). A reference kill
+   usually carries other top parses too: note them in the case study's
+   table. The user saves each reference player's WoWAnalyzer page as well;
+   the two pages side by side say which of its complaints are habits the
+   best players share (WoWAnalyzer flags 99th-percentile players for
+   potions, Focus waste, Implosion, Eternal Hunt, Vanish).
+2. **Extract both pages**, list the claims where they differ, and verify
+   each in the log; claims both players share are floors, not findings.
+3. **Compare numbers, not grades:** `damage-compare-wow` (est. loss per
+   second, GCDs a minute), casts per unforced minute per spell, damage
+   share per spell, damage per cast inside vs outside a buff. Cast rates
+   that match mean the rotation is fine and the gap is elsewhere (gear,
+   talents, target count).
+4. **Run every new check on the reference kills before trusting it.** A
+   check that fires on the top player either matches WoWAnalyzer there
+   too (a real, common loss) or is wrong (Barbed Shot at full Focus fired
+   only on the weaker hunter because his gain happened to measure).
+5. **Record per spec** in the spec module's header: matched, overstated,
+   not adopted, and why.
+
+WoWAnalyzer, read against the log:
+- **Cooldown efficiency counts Stasis as ready time** (Dragonrage,
+  Trueshot, Metamorphosis, Touch of the Magi, Implosion, Wake of Ashes):
+  most "missed" uses were held through the 99% damage reduction or past it
+  to sync with another cooldown. Check with `cooldown.js` (forced time and
+  room) before believing a lost use.
+- **Its "active time" includes Stasis**, so it reads 5–15 points under the
+  app's uptime; compare players, not to 100%.
+- **It's right about procs and resource spending** (Holy Power waste,
+  spenders outside Eclipse, Eternal Hunt, Vanish): the app's rebuilds
+  matched its counts within ~20%.
+- **Some sections grade idle twice**: Elemental's Call of the Ancestors is
+  active time inside each Ancestor window, the same idle the gap check
+  counts.
+
+What the log can't show (stop looking):
+- **Cooldown reductions**: server-side, never logged (Windwalker's Fists
+  of Fury resets: no buff, no cast pattern explains them).
+- **Regen waste** for Energy / Focus / Runic Power passive gains while
+  capped; only casts made at the cap are visible.
+- **Crit chance**: talents and per-spell crit dwarf gear (section below).
+
+Floors and leniency (user's choices):
+- **Movement** idle is shown, never counted against a same-spec reference.
+- **Idle during Stasis** is forced: casting through it showed no payoff
+  after it (Arcane: Màzz cast through, hit no harder after).
+- **Energy specs** (Assassination) read GCD gaps as loss that is really
+  pooling: the 99th-percentile Rogues show more than ours.
+- **Utility and defensives** (Touch of Karma, Astral Shift, Aspect of the
+  Turtle gaps) are survival calls, not judged.
+
+Per spec, what decided it (headers in `lib/damage/wow/specs/` hold the
+detail):
+
+| Spec | What separated our player from the top one |
+|---|---|
+| Destruction | Havoc on the main target; pace; Soul Fire is ~45s, not WoWAnalyzer's ~41s |
+| Arms | Avatar / Colossus Smash recharge with Rage spent; pace |
+| Devastation | engine fixes (empowers, Animosity, Deep Breath, channels); Strafing Run expiry; Essence income |
+| Marksmanship | movement idle (lenient); potion |
+| Havoc | Eternal Hunt (Eye Beam pressed before The Hunt); Fury cap and small delays are a floor |
+| Arcane | small delays; Touch of the Magi holds are Stasis / Surge sync |
+| Retribution | Holy Power at the cap (rebuilt from spender snapshots); pace; potion |
+| Blood | idle; Runic Power waste is worth little (Death Strike is a heal) |
+| Assassination | the opener Vanish (valued by the empowered Garrote); Energy floor |
+| Windwalker | Fists of Fury cadence (resets not logged; open) |
+| Demonology | nothing: rates match; the DPS gap is talents |
+| Beast Mastery | Barbed Shot at full Focus is not waste; pace |
+| Elemental | idle; Call of the Ancestors grades the same idle |
+| Balance | spenders outside Eclipse; pace; cancelled Starfires |
+| Protection Paladin | idle; potion |
+
+Engine lessons that apply to any spec: GCD value must match hits by name
+(many WoW hits log under another id than their cast); a dead player's
+DoTs and pets keep logging (dead time ends at the next cast); burst
+windows must take channel time out of the GCDs that fit; a buff removed
+and re-applied in the same instant is one window; empower casts log at
+the start. Data: the fetch keeps every self-applied buff and each
+player's whole CombatantInfo, since spec buffs postdate the survey list.
 
 ## WoW secondary stats (researched 2026-10-13)
 

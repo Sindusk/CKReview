@@ -170,6 +170,31 @@ pick) or ACmXHMFtaPLR9k8w (99th, user's pick).
   Conduit); 39.6 vs 47.9 GCDs a minute (counted as gaps, 15.1k vs 8.5k/s
   est. loss). Main gap Fists of Fury (Open 1); Rising Sun Kick 5.9 vs 7.9
   a minute, Blackout Kick filler 10.3 vs 8.1.
+- **Re-check against all eight reference kills (2026-10-13, last task).**
+  Estimated loss per second, ours vs the spec's reference median (n =
+  same-spec reference players): Wyrmtongues 49.4k vs 24.3k (6), Hervous
+  32.2k vs 10.1k (7), Cocomber 14.1k vs 10.1k (7), Polpo 33.2k vs 6.9k
+  (3), Sylmigron 38.6k vs 15.3k (10), Mythnarra 29.8k vs 21.9k (8),
+  Shadowmeld 18.8k vs 8.9k (9), Blkphnx 15.3k vs 7.6k (6), Neximage 10.7k
+  vs 2.1k (9), Cocroach 11.3k vs 6.2k (7), Deathstriker 7.7k vs 0.6k (2),
+  Veinglas 6.9k vs 4.5k (10), Thatapaddlin 6.2k vs 1.8k (4), Fwîî 2.7k vs
+  1.5k (3), Bragontix 21.5k vs 26.1k (2), Nearby 15.7k vs 20.6k (6: the
+  Assassination Energy floor). Every conclusion above held. The new
+  references changed two checks:
+  - **Pace check:** the fastest of many references drifted low
+    (Sylmigron's benchmark became a non-top Balance at 0.98s, 4.03M) and
+    flagged the 99th-percentile Kaströ. It now takes the median of the
+    same-spec players: Sylmigron 1.43M, Wyrmtongues 2.16M, Deathstriker
+    1.37M with all references; Polpo and Hervous drop out against the full
+    set (still flagged on the pull alone, against Yenvenger / Cocomber).
+  - **Potions:** WoWAnalyzer calls one potion right on a 5:20 kill
+    (Holyvi, 18s left) and flags a 5:29 one (Imnotanorc, 26s): room left
+    now must be 20s, not 10s.
+  - Top players confirm the other new checks: Eternal Hunt misses on
+    Vairuh (3 of 5), Kaströ (2 of 6), Dcn (1 of 6), each also flagged by
+    WoWAnalyzer; Vanish on Catsneaks (WoWAnalyzer 55%); Balance spenders
+    outside Eclipse 4–9 on top Balance players; Holy Power 6% on
+    Yenvenger.
 - **Thatapaddlin vs Holyvi (VWMbYPRyxCAmhZFj):** no new check; cooldowns,
   defensives and Holy Power close; idle 6.7k/s vs 3.1k/s; potion 0.90M.
   Every non-healer on the kill is now done.

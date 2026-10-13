@@ -45,7 +45,10 @@ const POTIONS = new Set([LIGHTS_POTENTIAL, RECKLESSNESS, DRAUGHT]);
 const COOLDOWN_MS = 300_000;
 const DURATION_MS = 30_000;
 const PRE_PULL_MS = 1_500;
-const MIN_ROOM_MS = 10_000;
+// WoWAnalyzer's line, measured (2026-10-13): it calls one potion right on
+// a 5:20 kill (Holyvi, 18s left after the cooldown) and flags a 5:29 one
+// (Imnotanorc, 26s left).
+const MIN_ROOM_MS = 20_000;
 const NEAR_MS = 60_000;
 const BONUS_CAP = 0.3;
 const RECKLESSNESS_BONUS = 1 / 0.864 - 1;
