@@ -35,8 +35,22 @@
 //     6:02 is the cut Reawaken; 14:03's second one would land past P4's
 //     HP check at 14:09); Vicewinder 28/29 (its banked charge capped in
 //     P2's downtime, 35s held in all, under one 40s recharge).
-// Unverified (no sample has the job):
-//   - Monk: Riddle of Fire, 11 GCDs (RiddleOfFire.tsx), +15% (tooltip).
+// Monk (checked against xivanalysis on qjCMx4bRfgNKwX9T fight 16, 7.5,
+// 2026-10-13, the first Monk sample):
+//   - Riddle of Fire (RiddleOfFire.tsx): 11 GCDs; +15% (FFLogs multiplier
+//     1.16 beside 1.01 from a Bard song outside it); Masterful Blitzes,
+//     one per Perfect Balance it had time for (blitzesExpected, below).
+//   - Matches: its 3 short windows (3:02, 6:02, 7:03; past HP checks or
+//     downtime, forced), 7 positionals, the 13:02 delay. Built: Blitzes in
+//     Riddle of Fire. The opener's second Perfect Balance came at 0:17 and
+//     its Elixir Burst at 0:24, 1.2s after Riddle of Fire (27k); 12:04's at
+//     12:28 (forced: 5s of that window was the P3-P4 transition).
+//   - Not adopted: 18:17 Blitz and "1 Perfect Balance GCD" (cut by the
+//     kill; Six-sided Star to finish is right); Riddle of Wind 12/13 (66s
+//     held in all, under one 90s recharge; room is 12); 11:49 and the 12:02
+//     triple weave (end-of-P3 hold). Not built: "Perfect Balance after
+//     Opo-opo 22/29" (form order; its cost depends on the Blitz planned
+//     and isn't measurable from one press).
 //   - Dragoon (checked against xivanalysis on jN3XDrf2z8PmLgRJ Vamp pull 8:
 //     Lance Charge and positionals match): Power Surge uptime, +10%
 //     (tooltip); Chaotic Spring DoT uptime; Life Surge (below); Lance Charge
@@ -79,7 +93,7 @@
 
 import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import type { DamageFinding, JobCheck } from "../../types";
-import { finding, PROC_CONSUME_MS, PROC_EXPIRY_EARLY_MS, type PlayerCheckContext } from "../../checks";
+import { chargesAt, finding, PROC_CONSUME_MS, PROC_EXPIRY_EARLY_MS, type PlayerCheckContext } from "../../checks";
 import { forcedPart, inWindows, mergeWindows } from "../../timeline";
 import { aoeOnOneTargetFindings, burstWindowFindings, castHits, dotFindings, gaugeFindings, k, offCooldownIn, s, statusWindows, uptimeFindings, type ExpectedAction, type GaugeEvent } from "./shared";
 import { comboLanded } from "./gnb";
@@ -195,10 +209,40 @@ const venoms: JobCheck = (ctx) => {
 
 // ── Monk, Dragoon, Ninja, Reaper (unverified) ──────────────────────────
 
+// Blitzes in Riddle of Fire, from xivanalysis BlitzEvaluator.tsx: one per
+// Perfect Balance it had time for, at most two: the charges held when the
+// window opened, one already running, and one regained 8s or more before
+// it ended (room for 3 Balance GCDs and the Blitz). A late one was pressed
+// after the window, so it costs the window's bonus on it.
+const BLITZ_KEYS = ["TORNADO_KICK", "ELIXIR_FIELD", "CELESTIAL_REVOLUTION", "FLINT_STRIKE", "RISING_PHOENIX", "PHANTOM_RUSH", "ELIXIR_BURST"];
+const BLITZ_END_TOLERANCE_MS = 8_000;
+
+function blitzesExpected(ctx: PlayerCheckContext, w: { startMs: number; endMs: number }): number {
+  const pb = A.PERFECT_BALANCE;
+  const cd = pb.cooldown ?? 40_000, max = pb.charges ?? 2;
+  const casts = ctx.player.casts.filter((c) => c.abilityId === pb.id).map((c) => c.timestamp);
+  const held = chargesAt(casts.filter((t) => t < w.startMs), cd, max, w.startMs);
+  const running = statusWindows(ctx, S.PERFECT_BALANCE.id).some((b) => b.startMs < w.startMs && b.endMs > w.startMs);
+  const regained = chargesAt(casts, cd, max, w.endMs - BLITZ_END_TOLERANCE_MS) >
+    chargesAt(casts.filter((t) => t < w.startMs), cd, max, w.startMs) - casts.filter((t) => t >= w.startMs && t < w.endMs - BLITZ_END_TOLERANCE_MS).length;
+  return Math.min(2, held + (running ? 1 : 0) + (regained ? 1 : 0));
+}
+
 const riddleOfFire: JobCheck = (ctx) => burstWindowFindings(ctx, {
   statusId: S.RIDDLE_OF_FIRE.id, name: "Riddle of Fire", bonus: 0.15,
-  bonusBasis: "Riddle of Fire is +15% (tooltip; not yet checked against a log)",
-  expectedGcds: () => 11, expected: () => [],
+  bonusBasis: "Riddle of Fire is +15% (FFLogs multiplier 1.16 against 1.01 outside it)",
+  expectedGcds: () => 11,
+  expected: () => [{
+    ids: ids(...BLITZ_KEYS.filter((key) => A[key])), count: 0, countIn: blitzesExpected, name: "Masterful Blitz",
+    // The player's average Blitz (a late one still landed, so the window's
+    // bonus on it is the loss).
+    value: (c) => {
+      const used = ids(...BLITZ_KEYS.filter((key) => A[key])).map((i) => ({ v: c.values.perUse(i), n: c.player.casts.filter((x) => x.abilityId === i).length }));
+      const n = used.reduce((a, u) => a + u.n, 0);
+      return n > 0 ? used.reduce((a, u) => a + u.v * u.n, 0) / n : 0;
+    },
+    scaled: true,
+  }],
 });
 
 const lanceCharge: JobCheck = (ctx) => burstWindowFindings(ctx, {

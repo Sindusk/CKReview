@@ -130,6 +130,9 @@ export type ExpectedAction = {
   got?:   (ctx: PlayerCheckContext, w: Window, casts: PlayerEvent[]) => number;
   // `value` is the action's worth before the window's bonus: multiply it in.
   scaled?: boolean;
+  // How many this window expects, when it depends on the window (Monk's
+  // Blitzes: one per Perfect Balance charge it had time for). Overrides count.
+  countIn?: (ctx: PlayerCheckContext, w: Window) => number;
 };
 
 // Pressed this soon before the window, it could have been held for it.
@@ -250,7 +253,7 @@ export function burstWindowFindings(ctx: PlayerCheckContext, specIn: BurstWindow
     for (const e of spec.expected(ctx, casts)) {
       if (!(e.availableIf ? e.availableIf(ctx, w, cycleMs) : offCooldownIn(ctx, e.ids, w, cycleMs))) continue;
       const got = e.got ? e.got(ctx, w, casts) : casts.filter((c) => e.ids.includes(c.abilityId)).length;
-      const n = Math.max(0, e.count - got);
+      const n = Math.max(0, (e.countIn ? e.countIn(ctx, w) : e.count) - got);
       if (n === 0) continue;
       const each = e.value ? e.value(ctx) * (e.scaled ? spec.bonus : 1) : Math.max(...e.ids.map((id) => ctx.values.perUse(id))) * spec.bonus;
       missing.push({ name: e.name, n, value: n * each });
