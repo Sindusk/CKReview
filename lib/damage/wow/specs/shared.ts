@@ -432,6 +432,9 @@ export type ResourceCapSpec = {
   // Abilities that spend it (value per unit comes from these); "auto": every
   // cast that logged a cost of it.
   spenderIds:  number[] | "auto";
+  // Generators whose cast at the cap isn't waste (their gain arrives later,
+  // or they run on charges that must be spent): Beast Mastery's Barbed Shot.
+  ignoreIds?:  number[];
 };
 
 // WCL classResources types logged on every cast (builders included) in the
@@ -453,12 +456,12 @@ export const PRIMARY_RESOURCES: Record<number, { name: string; scale: number }> 
 };
 
 /** The player's most-logged resource among PRIMARY_RESOURCES, capped (resourceCapFindings). */
-export function primaryResourceCapFindings(ctx: PlayerCheckContext): DamageFinding[] {
+export function primaryResourceCapFindings(ctx: PlayerCheckContext, ignoreIds?: number[]): DamageFinding[] {
   const counts = new Map<number, number>();
   for (const c of ctx.player.casts) for (const r of c.resources ?? []) if (PRIMARY_RESOURCES[r.type]) counts.set(r.type, (counts.get(r.type) ?? 0) + 1);
   const type = [...counts].sort((a, b) => b[1] - a[1])[0]?.[0];
   if (type === undefined) return [];
-  return resourceCapFindings(ctx, { type, ...PRIMARY_RESOURCES[type], spenderIds: "auto" });
+  return resourceCapFindings(ctx, { type, ...PRIMARY_RESOURCES[type], spenderIds: "auto", ignoreIds });
 }
 
 const GAIN_PAIR_MS = 3_000;
@@ -511,7 +514,7 @@ export function resourceCapFindings(ctx: PlayerCheckContext, spec: ResourceCapSp
   const forced = mergeWindows(ctx.forced);
   const byPhase = new Map<number | undefined, { units: number; n: number; start: number; end: number; names: Map<string, number> }>();
   for (const x of casts) {
-    if (spenderIds.has(x.c.abilityId) || x.r.amount < max) continue;
+    if (spenderIds.has(x.c.abilityId) || x.r.amount < max || spec.ignoreIds?.includes(x.c.abilityId)) continue;
     const gain = gainOf(x.c.abilityId);
     if (!gain || inWindows(x.c.timestamp, forced)) continue;
     const ph = ctx.phaseOf(x.c.timestamp);

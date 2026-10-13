@@ -21,6 +21,9 @@ for this kill, so top players' logs stand in for it.
   Pull 2, 5:03), the user's pick (2026-10-13): 99th-percentile parses for
   Pisslizard, Styphi, Auxeus, Yenvenger (Retribution), Vairuh, Nagafenw,
   Frostydn; WoWAnalyzer pages for all saved. Baselined.
+- `sampledata/wow/jmprxRc62fHCZy7g/` — reference kill (fight 25, app
+  Pull 4, 6:15), the user's pick (2026-10-13): 99th-percentile Matcheh
+  (Beast Mastery); nobody else there is a 99th. Page saved. Baselined.
 - `sampledata/wow/MAkCVqHfwx1vnDW8/` — reference kill (fight 9, app
   Pull 1, 5:00), the user's pick (2026-10-13): 99th-percentile Killulock
   (Demonology), Weeblock (Destruction), Catsneaks (Assassination), Vildk
@@ -46,7 +49,7 @@ pick) or ACmXHMFtaPLR9k8w (99th, user's pick).
 | Mythnarra | Havoc Demon Hunter | 47 | 176.4k | Hawkerton (3V), Vairuh (AC) | **Done** (against Hawkerton) |
 | Neximage | Arcane Mage | 33 | 175.9k | Màzz (3V) | **Done** |
 | Bragontix | Devastation Evoker | 51 | 172.3k | Gilgvoker (3V) | **Done** |
-| Deathstriker | Beast Mastery Hunter | 29 | 166.2k | none | not started |
+| Deathstriker | Beast Mastery Hunter | 29 | 166.2k | Matcheh (jm) | **Done** |
 | Hervous | Arms Warrior | 17 | 163.6k | Eroka (NK), Nagafenw (AC) | **Done** |
 | Cocroach | Elemental Shaman | 30 | 163.1k | Soccerkid (AC, not a named top parse) | not started |
 | Sylmigron | Balance Druid | 6 | 152.4k | Arzenal (NK), Skress (AC, not named) | not started |
@@ -155,6 +158,10 @@ pick) or ACmXHMFtaPLR9k8w (99th, user's pick).
   Conduit); 39.6 vs 47.9 GCDs a minute (counted as gaps, 15.1k vs 8.5k/s
   est. loss). Main gap Fists of Fury (Open 1); Rising Sun Kick 5.9 vs 7.9
   a minute, Blackout Kick filler 10.3 vs 8.1.
+- **Deathstriker vs Matcheh (jmprxRc62fHCZy7g):** rates match; the
+  Focus-cap finding (888k, Barbed Shot at full Focus) was wrong: Matcheh
+  did it more. Barbed Shot now excluded for BM (1.73M → 0.90M). Left: pace
+  (1.63M against the log's other BM, Nadlerbs), Stasis idle (forced).
 - **Fwîî vs Killulock (MAkCVqHfwx1vnDW8):** no new check; rates match,
   the gap is talents (Shadow Nova). Implosion 48% is mostly Stasis.
 - **Matches in ACmXHMFtaPLR9k8w:** Frostydn ↔ Veinglas, Auxeus

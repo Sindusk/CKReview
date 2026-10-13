@@ -24,6 +24,16 @@
 //   yet: WCL credits it its own way and our streams don't carry it.
 // Tracked cooldowns are in tracked-cooldowns.ts.
 //
+// Beast Mastery, checked against WoWAnalyzer on qpZx3mWaG7gcDdYB pull 3
+// (Deathstriker; reference jmprxRc62fHCZy7g fight 25's Matcheh, 99th
+// percentile; checked 2026-10-13). Its page has only Focus waste (19.2% vs
+// 17.9%, both "bad") and potions (2/2 both). Cast rates match (Kill
+// Command 17.0 vs 15.8 a minute, Barbed Shot 9.2 vs 9.9, Cobra Shot 13.7
+// vs 15.4, Bestial Wrath 1.9 vs 2.0). Fixed: Barbed Shot at full Focus
+// isn't waste (BARBED_SHOT below). Left: pace 1.22s vs 1.11s from the
+// reference kill's other BM (1.63M); 39.9 vs 43.2 GCDs a minute; a 3.9s
+// gap in Aspect of the Turtle at 5:02 (a survival call, counted).
+//
 // Demonology, checked against WoWAnalyzer on qpZx3mWaG7gcDdYB pull 3
 // (Fwîî; reference MAkCVqHfwx1vnDW8 fight 9's Killulock, 99th percentile;
 // checked 2026-10-13): no new check. Casts per unforced minute match
@@ -193,6 +203,13 @@ const strafingRun: JobCheck = (ctx) => {
   return out;
 };
 
+// Beast Mastery's Barbed Shot (217200) gives its Focus over the next
+// seconds and runs on charges: pressing it at full Focus isn't waste. The
+// 99th-percentile Matcheh (jmprxRc62fHCZy7g) did it 38 times, Deathstriker
+// (qpZx3mWaG7gcDdYB) 28, and only Deathstriker's read as 888k lost (his
+// Barbed Shot gain happened to measure, Matcheh's didn't).
+const BARBED_SHOT = 217200;
+
 const window = (statusId: number, name: string): JobCheck => (ctx) => burstGcdFindings(ctx, {
   statusId, name,
   bonus: observedWindowBonus,
@@ -206,7 +223,7 @@ export const RANGED_CHECKS: Record<string, JobCheck[]> = {
   "Fire Mage":            [window(190319, "Combustion")],
   "Frost Mage":           [],
   "Balance Druid":        [window(102560, "Incarnation"), primaryResourceCapFindings, dot("Moonfire", 164812), dot("Sunfire", 164815)],
-  "Beast Mastery Hunter": [window(19574, "Bestial Wrath"), primaryResourceCapFindings],
+  "Beast Mastery Hunter": [window(19574, "Bestial Wrath"), (ctx) => primaryResourceCapFindings(ctx, [BARBED_SHOT])],
   "Marksmanship Hunter":  [window(288613, "Trueshot"), primaryResourceCapFindings],
   "Shadow Priest":        [window(194249, "Voidform"), primaryResourceCapFindings, dot("Shadow Word: Pain", 589), dot("Vampiric Touch", 34914)],
   "Elemental Shaman":     [window(1219480, "Ascendance"), primaryResourceCapFindings, dot("Flame Shock", 188389)],
