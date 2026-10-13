@@ -1006,8 +1006,9 @@ grouped by exact roster. The module headers hold the rules.
     per 1% with diminishing returns (docs/dps-analysis.md, "WoW secondary
     stats"); the gap to the fit is talent haste.
   - Blood DK Veinglas fits a 0.90s base with no haste buff (rating says
-    ~1.1s): an unlisted haste source, or abilities with shorter GCDs that
-    the 0.85× median rule doesn't catch.
+    ~1.1s). The 99th-percentile Blood DK Frostydn (ACmXHMFtaPLR9k8w)
+    fits 0.91s at the same rating haste, so it's Blood's GCD (an unlisted
+    passive or shorter GCDs), not a play gap; harmless to the checks.
 
 ### Statics analysis
 

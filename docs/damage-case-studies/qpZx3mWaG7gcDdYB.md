@@ -38,7 +38,7 @@ for this kill, so top players' logs stand in for it.
 | Mythnarra | Havoc Demon Hunter | **Done** (against Hawkerton) |
 | Neximage | Arcane Mage | **Done** (against Màzz) |
 | Deathstriker | Beast Mastery Hunter | not started |
-| Veinglas | Blood Death Knight | not started (haste fit: 0.90s base, unexplained) |
+| Veinglas | Blood Death Knight | **Done** (against Frostydn) |
 | Polpo | Retribution Paladin | **Done** (against Yenvenger) |
 | Blkphnx | Windwalker Monk | not started |
 | Thatapaddlin | Protection Paladin | not started |
@@ -127,6 +127,19 @@ for this kill, so top players' logs stand in for it.
   snapshots (33% vs 6%; WoWAnalyzer 41.9% vs 12.9%): 5.62M. Pace 1.15s vs
   1.02s (3.06M); second potion missed (1.77M). Cooldowns fine (Divine
   Toll at most one cast at the end).
+- **Veinglas vs Frostydn (ACmXHMFtaPLR9k8w):** no new check. Idle is
+  the gap (uptime 74% vs 86%; 7.7k/s vs 3.5k/s est. loss); Runic Power
+  waste 354 vs 48 per WoWAnalyzer, 115 vs 40 in the app, worth under 1M
+  either way (Death Strike is mostly a heal). Same pace: his 0.90s base is
+  the 99th-percentile Blood DK's too, so it's Blood's GCD, not a gap in
+  the haste list. Missed second potion 0.83M.
+- **Matches in ACmXHMFtaPLR9k8w:** Frostydn ↔ Veinglas, Auxeus
+  (Assassination) ↔ Nearby, Styphi (Windwalker) ↔ Blkphnx, Nagafenw (Arms)
+  ↔ Hervous / Cocomber, Pisslizard (Marksmanship) ↔ Shadowmeld, Vairuh
+  (Havoc) ↔ Mythnarra. User's WCL parses (2026-10-13): Wyrmtongues 57,
+  Fwîî 77, Cocomber 72, Nearby 75, Polpo 71, Shadowmeld 47, Mythnarra 47,
+  Neximage 33, Bragontix 51, Deathstriker 29, Hervous 17, Cocroach 30,
+  Sylmigron 6, Blkphnx 14, Thatapaddlin 66, Veinglas 46.
 - Potion buffs added to the stream; all three kills refetched
   (2026-10-13) and baselines checked.
 

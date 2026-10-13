@@ -20,6 +20,16 @@
 //   Runic Power (Blood Boil, Infliction of Sorrow, Death Grip). Valued at
 //   Death Strike's damage per Runic Power: small, since Death Strike is
 //   mostly a heal.
+// - Checked against WoWAnalyzer on qpZx3mWaG7gcDdYB pull 3 (Veinglas;
+//   reference ACmXHMFtaPLR9k8w's Frostydn, 99th percentile; 2026-10-13):
+//   Runic Power wasted 354 vs 48 there; this check finds 115 vs 40 (only
+//   casts made at the cap; passive gains while capped, Runic Attenuation
+//   and Anti-Magic Shell absorbs, aren't seen). A per-cast rebuild
+//   (gain per ability + passive per second, fitted on uncapped pairs) read
+//   148 vs 13: no closer, not adopted. Even 354 is ~0.9M at his ~2.5k per
+//   Runic Power. Runes wasted (21 vs 9) show up as idle: uptime 74% vs
+//   86%, small delays 18.2s vs 6.8s. Same pace (0.90s vs 0.91s). Death
+//   Strike timing and Marrowrend use (15 vs 12 flagged) aren't damage.
 //
 // ── Protection Paladin ─────────────────────────────────────────────────
 // - Sentinel (389539, the Protection Avenging Wrath): GCDs in the window.
