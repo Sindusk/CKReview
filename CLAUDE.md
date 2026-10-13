@@ -180,9 +180,18 @@ These are standing preferences, each learned from a real correction:
 
   Find the folders by the boss name in each folder's `meta.json`.
   Widen to every report that boss's sibling modules cover when you touch a
-  shared helper (e.g. `ffxiv/fru/common.ts` means all FRU reports). Run
-  unscoped only after editing cross-boss code: `error-rules.ts`, the
-  transform layer, `player-position.ts`, `wow/common.ts`, rule-meta.
+  shared helper (e.g. `ffxiv/fru/common.ts` means all FRU reports). Widen
+  to the whole game (`--game ff` or `--game wow`) after editing cross-boss
+  code within it: `error-rules.ts`, `player-position.ts`, `wow/common.ts`,
+  rule-meta.
+
+  **One game at a time** (user, 2026-10-13). Baseline recaptures,
+  validation, sample fetches and any other checking run only for the game
+  being worked on (`--game ff` / `--game wow`), never both. The two games
+  barely overlap. Run both games only after a change to code they share:
+  the data streams, log fetching and transforms (`lib/log-transforms.ts`,
+  `lib/log-auth.ts`, `scripts/lib/`), the damage engine's shared layer (`lib/damage/*.ts`
+  outside `ffxiv/` and `wow/`), or `validate.js` itself.
 
   For an intended behavior change, verify the `--check` diff is exactly the
   intended delta, then run `--update`. `expectations/rulings.json` is

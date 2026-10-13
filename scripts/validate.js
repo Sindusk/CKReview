@@ -11,6 +11,7 @@
 //   node scripts/validate.js --check                  # diff output vs expectations/
 //   node scripts/validate.js --update                 # regenerate expectations/
 //   node scripts/validate.js --prune                  # drop snapshots whose sampledata is gone
+//   node scripts/validate.js --check --game ff        # one game only (the default scope)
 //   node scripts/validate.js --list                   # print mechanic names
 //
 // Args that match a mechanic name select mechanics; anything else is treated
@@ -1344,6 +1345,7 @@ if (rawArgs.includes('--list') || rawArgs.includes('--help') || rawArgs.includes
   console.log('--check  diff detection output against expectations/ (snapshots + rulings); nonzero exit on any difference');
   console.log('--update regenerate expectations/ snapshots from current output (rulings are never touched)');
   console.log('--prune  delete snapshots whose sampledata report folder no longer exists');
+  console.log('--game ff|wow  only that game (the default for work on one game; both only after shared-code changes)');
   process.exit(0);
 }
 
@@ -1358,10 +1360,20 @@ if (rawArgs.includes('--check') && rawArgs.includes('--update')) {
   process.exit(1);
 }
 
+// --game ff|wow: only that game's mechanics and reports (user, 2026-10-13:
+// work on one game validates that game; run both only after a change to
+// shared code).
+const gameIdx = rawArgs.indexOf('--game');
+const onlyGame = gameIdx >= 0 ? rawArgs[gameIdx + 1] : undefined;
+if (gameIdx >= 0 && onlyGame !== 'ff' && onlyGame !== 'wow') {
+  console.error('--game takes ff or wow');
+  process.exit(1);
+}
+
 const selectedNames = [];
 const explicitDirs = [];
-for (const a of rawArgs) {
-  if (a.startsWith('--')) continue;
+for (const [i, a] of rawArgs.entries()) {
+  if (a.startsWith('--') || (gameIdx >= 0 && i === gameIdx + 1)) continue;
   if (MECHANICS[a]) selectedNames.push(a);
   else explicitDirs.push(path.resolve(a));
 }
@@ -1390,6 +1402,7 @@ function gamesOfDir(dir) {
   const failures = []; // check mode: one line per report with differences
 
   for (const game of ['ff', 'wow']) {
+    if (onlyGame && game !== onlyGame) continue;
     const mechs = selected.filter((n) => MECHANICS[n].game === game);
     if (mechs.length === 0) continue;
 
