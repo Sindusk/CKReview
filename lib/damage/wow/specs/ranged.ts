@@ -24,6 +24,17 @@
 //   yet: WCL credits it its own way and our streams don't carry it.
 // Tracked cooldowns are in tracked-cooldowns.ts.
 //
+// Demonology, checked against WoWAnalyzer on qpZx3mWaG7gcDdYB pull 3
+// (Fwîî; reference MAkCVqHfwx1vnDW8 fight 9's Killulock, 99th percentile;
+// checked 2026-10-13): no new check. Casts per unforced minute match
+// (Demonbolt 9.8 vs 9.8, Hand of Gul'dan 13.8 vs 14.6, Infernal Bolt,
+// Ruination); est. loss 2.7k/s vs 1.5k/s. Tyrant 92% (its holds were in
+// Stasis), Dreadstalkers 85% vs 80%, Grimoire 91% vs 95%, potions 2/2.
+// Implosion 48% vs 79%: WoWAnalyzer counts Stasis as ready time; outside
+// it ~42s of holds (1:52–2:13, 5:21–5:42), and Implosion needs Wild Imps,
+// so not judged. The rest of the DPS gap is talents: Killulock's Shadow
+// Nova (2.8M) and bigger demon Mind Sear / Greater Felbolt shares.
+//
 // Arcane, checked against WoWAnalyzer on qpZx3mWaG7gcDdYB pull 3
 // (Neximage; reference 3Vz6Qt2RyTPXwpJn's Màzz, 100th percentile, page
 // saved; checked 2026-10-13):

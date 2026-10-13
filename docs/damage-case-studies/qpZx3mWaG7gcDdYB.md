@@ -21,6 +21,10 @@ for this kill, so top players' logs stand in for it.
   Pull 2, 5:03), the user's pick (2026-10-13): 99th-percentile parses for
   Pisslizard, Styphi, Auxeus, Yenvenger (Retribution), Vairuh, Nagafenw,
   Frostydn; WoWAnalyzer pages for all saved. Baselined.
+- `sampledata/wow/MAkCVqHfwx1vnDW8/` — reference kill (fight 9, app
+  Pull 1, 5:00), the user's pick (2026-10-13): 99th-percentile Killulock
+  (Demonology), Weeblock (Destruction), Catsneaks (Assassination), Vildk
+  (Frost DK); pages saved. Baselined.
 - `sampledata/damage-wow/` — WoWAnalyzer Overview pages for every
   non-healer on the kill (16 pages).
 
@@ -34,7 +38,7 @@ pick) or ACmXHMFtaPLR9k8w (99th, user's pick).
 | Player | Spec | Parse | DPS | Reference | Status |
 |---|---|---|---|---|---|
 | Wyrmtongues | Destruction Warlock | 57 | 227.9k | Shn, Bryon (NK) | **Done** |
-| Fwîî | Demonology Warlock | 77 | 204.6k | Petonpassive (AC, not a named top parse) | not started |
+| Fwîî | Demonology Warlock | 77 | 204.6k | Killulock (MA) | **Done** |
 | Cocomber | Arms Warrior | 72 | 197.9k | Eroka (NK), Nagafenw (AC) | **Done** |
 | Nearby | Assassination Rogue | 75 | 195.0k | Auxeus (AC) | **Done** |
 | Polpo | Retribution Paladin | 71 | 194.8k | Yenvenger (AC) | **Done** |
@@ -151,6 +155,8 @@ pick) or ACmXHMFtaPLR9k8w (99th, user's pick).
   Conduit); 39.6 vs 47.9 GCDs a minute (counted as gaps, 15.1k vs 8.5k/s
   est. loss). Main gap Fists of Fury (Open 1); Rising Sun Kick 5.9 vs 7.9
   a minute, Blackout Kick filler 10.3 vs 8.1.
+- **Fwîî vs Killulock (MAkCVqHfwx1vnDW8):** no new check; rates match,
+  the gap is talents (Shadow Nova). Implosion 48% is mostly Stasis.
 - **Matches in ACmXHMFtaPLR9k8w:** Frostydn ↔ Veinglas, Auxeus
   (Assassination) ↔ Nearby, Styphi (Windwalker) ↔ Blkphnx, Nagafenw (Arms)
   ↔ Hervous / Cocomber, Pisslizard (Marksmanship) ↔ Shadowmeld, Vairuh
