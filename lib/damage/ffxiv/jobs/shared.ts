@@ -46,8 +46,9 @@
 
 import type { PlayerEvent } from "@/types/PlayerInfo";
 import type { DamageFinding, JobCheck, Moment } from "../../types";
-import { finding, type PlayerCheckContext } from "../../checks";
+import { finding, measuredPenaltyFactor, type PlayerCheckContext } from "../../checks";
 import { forcedPart, gcdKinds, inWindows, mergeWindows, overlapMs, type Window } from "../../timeline";
+import { estimateHitRates } from "../../crit-rates";
 
 // The removal's own timestamp, no later. A 100ms allowance counted a
 // Paladin's Sepulchre cast 40ms after Fight or Flight fell off
@@ -353,7 +354,10 @@ export function uptimeFindings(ctx: PlayerCheckContext, spec: UptimeSpec): Damag
 //   come sooner. L seconds early = L ÷ duration of an extra DoT cast in
 //   place of a filler. Summed per phase ("refreshed early"). Only what
 //   pressing it one or more GCDs later would have gained counts, less the
-//   ticks that delay drops (expected: lapse ÷ 3s × average tick). Inside
+//   ticks that delay drops (expected: lapse ÷ 3s × average tick), plus
+//   what the delay changes in buffs: the snapshot the new DoT takes and
+//   the GCDs it pushes one slot earlier (buffFactors; penalties already
+//   counted by the penalty finding are left out). Inside
 //   one GCD of expiry a refresh is on time unless the lapse a delay causes
 //   is short (AST: under ~0.8s still favours waiting). User, 2026-10-13;
 //   vVPtwaTQ62Jg391q The Tyrant kill, the Sage's 11 refreshes, 14.0s
@@ -389,6 +393,82 @@ const DOT_CAST_MS = 1_500;   // cast → status applied
 const DOT_HIT_MS = 2_000;    // cast → its direct hit
 const DOT_SILENT_MS = 4_500; // no tick for longer than a tick and a half
 const DOT_MIN_SHORTFALL = 0.05; // under 5% of a filler is noise (crit variance)
+const SLOT_HIT_MS = 1_500;      // a GCD's land → its hit
+const NEAR_HIT_MS = 3_000;      // fallback: any hit this close reads the buffs
+const DH_MULT = 1.25;
+const MAX_DELAY_GCDS = 20;
+
+/**
+ * What a hit at a moment is worth relative to an unbuffed one: FFLogs'
+ * multiplier (damage buffs, the DoT's snapshot on its ticks) times the
+ * expected gain from the crit / direct-hit buffs it carried, at the
+ * player's estimated rates. A DoT tick carries its snapshot (vVPtwaTQ62Jg391q
+ * The Tyrant kill: the Sage's 0:25 Eukrasian Dosis ticked at 1.23 with
+ * Battle Litany through 0:53, long after the buffs fell off).
+ */
+// A snapshot: the hit's factor and the penalty debuffs (Weakness, Damage
+// Down) in it.
+type Snap = { f: number; pens: number[] };
+
+function buffFactors(ctx: PlayerCheckContext) {
+  const rates = estimateHitRates([ctx.player], ctx.game, new Set());
+  const c0 = rates?.crit ?? 0.25, d0 = rates?.directHit ?? 0.3, m = rates?.critMult ?? 1.55;
+  const expect = (c: number, d: number) => (1 + Math.min(1, c) * (m - 1)) * (1 + Math.min(1, d) * (DH_MULT - 1));
+  const base = expect(c0, d0);
+  const factor = (e: PlayerEvent) => {
+    let c = c0, d = d0;
+    for (const id of e.statusIds ?? []) { const b = ctx.game.partyBuff(id); c += b?.crit ?? 0; d += b?.directHit ?? 0; }
+    return (e.multiplier ?? 1) * expect(c, d) / base;
+  };
+  // The penalty finding (checks.ts checkPenalties) already counts every hit
+  // carrying a penalty up to 1s past its end, DoT ticks included: those
+  // hits are valued here as if unpenalized, so only a snapshot that
+  // outlives the debuff counts again.
+  const penEnd = new Map<number, Window[]>();
+  const opened = new Map<number, number>();
+  for (const e of [...ctx.player.debuffs].sort((a, b) => a.timestamp - b.timestamp)) {
+    if (ctx.game.penaltyFactor(e.abilityId) === undefined) continue;
+    if (e.debuffStatus === "removed") {
+      const st = opened.get(e.abilityId);
+      if (st !== undefined) { penEnd.set(e.abilityId, [...(penEnd.get(e.abilityId) ?? []), { startMs: st, endMs: e.timestamp + 1_000 }]); opened.delete(e.abilityId); }
+    } else if (!opened.has(e.abilityId)) opened.set(e.abilityId, e.timestamp);
+  }
+  for (const [id, st] of opened) penEnd.set(id, [...(penEnd.get(id) ?? []), { startMs: st, endMs: Infinity }]);
+  const penFactor = (id: number) => measuredPenaltyFactor(ctx.pull, id)?.factor ?? ctx.game.penaltyFactor(id) ?? 1;
+  const snap = (e: PlayerEvent): Snap => ({ f: factor(e), pens: (e.statusIds ?? []).filter((id) => penEnd.has(id)) });
+  /** A snapshot's worth on a hit landing at t: penalties the penalty finding counts there are taken out. */
+  const worth = (s: Snap, t: number) =>
+    s.pens.reduce((f, id) => (inWindows(t, penEnd.get(id)!) ? f / penFactor(id) : f), s.f);
+  const direct = ctx.player.damageDone
+    .filter((e) => !e.pet && !e.isDoT && !ctx.game.isTickAbility(e.abilityId) && (e.amount ?? 0) > 0)
+    .sort((a, b) => a.timestamp - b.timestamp);
+  /** The buffs a hit landing at t would have had, read from the player's own hits then. */
+  const at = (t: number): Snap => {
+    const after = direct.find((e) => e.timestamp >= t && e.timestamp <= t + SLOT_HIT_MS);
+    if (after) return snap(after);
+    let best: PlayerEvent | undefined;
+    for (const e of direct) if (Math.abs(e.timestamp - t) <= NEAR_HIT_MS && (!best || Math.abs(e.timestamp - t) < Math.abs(best.timestamp - t))) best = e;
+    return best ? snap(best) : { f: 1, pens: [] };
+  };
+  // An action's average damage per cast with buffs taken out (crit luck
+  // averages out over its casts); multi-target hits within 500ms are one cast.
+  const norm = new Map<number, number>();
+  const unbuffedPerCast = (id: number) => {
+    if (norm.has(id)) return norm.get(id)!;
+    const casts: number[] = [];
+    let last = -Infinity;
+    for (const e of direct) {
+      if (e.abilityId !== id) continue;
+      if (e.timestamp - last >= 500) casts.push(0);
+      casts[casts.length - 1] += (e.amount ?? 0) / factor(e);
+      last = e.timestamp;
+    }
+    const v = casts.length ? casts.reduce((a, x) => a + x, 0) / casts.length : 0;
+    norm.set(id, v);
+    return v;
+  };
+  return { factor, snap, worth, at, direct, unbuffedPerCast };
+}
 
 function dotApplicationFindings(ctx: PlayerCheckContext, spec: DotSpec, filler: { id: number; name: string }): DamageFinding[] {
   const out: DamageFinding[] = [];
@@ -401,6 +481,8 @@ function dotApplicationFindings(ctx: PlayerCheckContext, spec: DotSpec, filler: 
   // P3): those aren't ticks the DoT got.
   const ticks = ctx.player.damageDone.filter((e) => ids.has(e.abilityId) && (e.amount ?? 0) > 0);
   const tickAvg = ticks.length ? ticks.reduce((a, e) => a + (e.amount ?? 0), 0) / ticks.length : 0;
+  const bf = buffFactors(ctx);
+  const gcdSlots = [...ctx.uses].sort((a, b) => a.startMs - b.startMs);
   const fillerHits = ctx.player.damageDone.filter((e) => e.abilityId === filler.id && !e.isDoT);
   const fillerAvg = (buffed: boolean) => {
     const own = fillerHits.filter((e) => inWindows(e.timestamp, ctx.buffWindows) === buffed);
@@ -415,7 +497,7 @@ function dotApplicationFindings(ctx: PlayerCheckContext, spec: DotSpec, filler: 
   // Thunder II on both P3 bosses, 2T1HzdPKgbhM43am fight 10) is one cast
   // and one GCD: its records are judged together below, not once each.
   type Rec = {
-    castAt: number; targetName?: string; until: number; removal: number; left: number; cut: number; silent: number;
+    castAt: number; appliedAt: number; key: string; targetName?: string; until: number; removal: number; left: number; cut: number; silent: number;
     gained: number; hit: number; newTicks: number; hasHit: boolean; isSteady: boolean;
   };
   const byCast = new Map<number, Rec[]>();
@@ -442,7 +524,7 @@ function dotApplicationFindings(ctx: PlayerCheckContext, spec: DotSpec, filler: 
     const hit = direct.reduce((a, h) => a + (h.amount ?? 0), 0);
     const recs = byCast.get(castAt) ?? [];
     recs.push({
-      castAt, targetName: e.targetName, until, removal, cut, silent, hit,
+      castAt, appliedAt: e.timestamp, key, targetName: e.targetName, until, removal, cut, silent, hit,
       left: prev !== undefined ? prev + spec.durationMs - e.timestamp : 0,
       gained: hit + added.reduce((a, h) => a + (h.amount ?? 0), 0),
       newTicks: added.length, hasHit: direct.length > 0,
@@ -470,22 +552,75 @@ function dotApplicationFindings(ctx: PlayerCheckContext, spec: DotSpec, filler: 
       // alternative to a refresh is the same press k GCDs later: it saves
       // k GCDs of clipping, and past the time left it drops ticks. Only
       // the best such delay counts; none better means it was on time.
-      const per = Math.max(0, fill - hit) / spec.durationMs;
-      let best = { gain: 0, delays: 0 };
-      for (let d = 1; d <= Math.floor(r.left / ctx.baseGcdMs) + 1; d++) {
-        const later = d * ctx.baseGcdMs;
-        const gain = later * per - (Math.max(0, later - r.left) / DOT_TICK_MS) * tickAvg;
-        if (gain > best.gain) best = { gain, delays: d };
+      //
+      // Delaying also changes what the buffs touch (user, 2026-10-13): the
+      // new DoT snapshots the buffs of the later moment for all its ticks,
+      // and each GCD in between moves one slot earlier, into the buffs of
+      // the slot before it. Both are read from the log: the DoT's snapshot
+      // from its ticks, each slot's from that GCD's own hit (bf.at as a
+      // fallback), values with buffs taken out (bf.unbuffedPerCast). The
+      // Sage's 0:25 re-dot in buffs on The Tyrant kill came out about even
+      // against three GCDs later (+20k snapshot, −9k Dosis III out of the
+      // buffs, −12k clip).
+      const per = Math.max(0, fillerAvg(false) - hit) / spec.durationMs;
+      const at = gcdSlots.findIndex((u) => Math.abs(u.startMs - castAt) <= 100);
+      // Ticks after the application are the new DoT's (its snapshot).
+      const newTicks = ticks.filter((t) => keyOf(t) === r.key && t.timestamp > r.appliedAt && t.timestamp <= r.appliedAt + spec.durationMs + 500);
+      const prevTick = [...ticks].reverse().find((t) => keyOf(t) === r.key && t.timestamp <= r.appliedAt);
+      const tickNorm = ticks.length ? ticks.reduce((a, e) => a + (e.amount ?? 0) / bf.factor(e), 0) / ticks.length : 0;
+      // Each slot: when it lands and what it snapshots. Slot 0 is the
+      // refresh itself (its own ticks); slot i the i-th GCD after it.
+      const slotAt = (i: number) => (i === 0 ? castAt : gcdSlots[at + i].startMs);
+      const slotSnap = (i: number): Snap => {
+        if (i === 0) return newTicks[0] ? bf.snap(newTicks[0]) : bf.at(castAt);
+        const u = gcdSlots[at + i];
+        const own = bf.direct.find((e) => e.abilityId === u.action.id && e.timestamp >= u.startMs && e.timestamp <= u.startMs + u.castMs + SLOT_HIT_MS);
+        return own ? bf.snap(own) : bf.at(u.startMs + u.castMs);
+      };
+      // The new DoT's ticks as played, and the same ticks delayMs later.
+      const offsets = newTicks.length ? newTicks.map((t) => t.timestamp - castAt)
+        : Array.from({ length: spec.durationMs / DOT_TICK_MS }, (_, i) => (i + 1) * DOT_TICK_MS);
+      const ticksWorth = (s: Snap, shiftMs: number) => offsets.reduce((a, o) => a + tickNorm * bf.worth(s, castAt + shiftMs + o), 0);
+      let best = { gain: 0, delays: 0, delayMs: 0, clip: 0, lapse: 0, snap: 0, shift: 0 };
+      if (at >= 0) {
+        const sn = [slotSnap(0)];
+        const played = ticksWorth(sn[0], 0);
+        let shift = 0;
+        for (let d = 1; d <= MAX_DELAY_GCDS && at + d < gcdSlots.length; d++) {
+          const delayMs = slotAt(d) - castAt;
+          if (delayMs > r.left + DOT_TICK_MS) break;
+          sn.push(slotSnap(d));
+          // GCD d moves into slot d − 1.
+          shift += bf.unbuffedPerCast(gcdSlots[at + d].action.id) *
+            (bf.worth(sn[d - 1], slotAt(d - 1)) - bf.worth(sn[d], slotAt(d)));
+          const clip = delayMs * per;
+          const lapse = (Math.max(0, delayMs - r.left) / DOT_TICK_MS) * tickNorm *
+            (prevTick ? bf.worth(bf.snap(prevTick), castAt + r.left) : 1);
+          const snap = (ticksWorth(sn[d], delayMs) - played) * ran.length;
+          const gain = clip - lapse + snap + shift;
+          if (gain > best.gain) best = { gain, delays: d, delayMs, clip, lapse, snap, shift };
+        }
+      } else {
+        for (let d = 1; d <= Math.floor(r.left / ctx.baseGcdMs) + 1; d++) {
+          const delayMs = d * ctx.baseGcdMs, clip = delayMs * per;
+          const lapse = (Math.max(0, delayMs - r.left) / DOT_TICK_MS) * tickAvg;
+          if (clip - lapse > best.gain) best = { gain: clip - lapse, delays: d, delayMs, clip, lapse, snap: 0, shift: 0 };
+        }
       }
       if (best.gain <= 0) continue;
       const phaseId = ctx.phaseOf(castAt);
       const b = steady.get(phaseId) ?? { ms: 0, lost: 0, n: 0, start: castAt, end: castAt, moments: [] };
-      const avoidable = Math.min(r.left, best.delays * ctx.baseGcdMs);
+      const avoidable = Math.min(r.left, best.delayMs);
       b.ms += avoidable; b.n++; b.end = castAt;
       b.lost += best.gain;
+      const sign = (v: number) => `${v >= 0 ? "+" : "−"}${k(Math.abs(v))}`;
       b.moments.push({ startMs: castAt, endMs: castAt, lostDamage: best.gain,
         detail: `${spec.name} refreshed with ${s(r.left)} left on ${r.targetName}; ` +
-          `${best.delays} GCD${best.delays > 1 ? "s" : ""} later would have done more` });
+          `${best.delays} GCD${best.delays > 1 ? "s" : ""} later would have done ${k(best.gain)} more ` +
+          `(clip ${sign(best.clip)}` +
+          (best.snap ? `, snapshot ${sign(best.snap)}` : "") +
+          (best.shift ? `, GCDs moved into other buffs ${sign(best.shift)}` : "") +
+          (best.lapse ? `, ticks dropped ${sign(-best.lapse)}` : "") + ")" });
       steady.set(phaseId, b);
       continue;
     }
@@ -515,7 +650,9 @@ function dotApplicationFindings(ctx: PlayerCheckContext, spec: DotSpec, filler: 
     }));
   }
   for (const [phaseId, b] of steady) {
-    if (b.ms < DOT_CLIP_FINDING_MS) continue;
+    // xivanalysis's 6s gate is about clipped seconds; a refresh that missed
+    // raid buffs by a GCD or two clips little but can cost a GCD or more.
+    if (b.ms < DOT_CLIP_FINDING_MS && b.lost < fillerAvg(false)) continue;
     out.push(finding(ctx, {
       kind: "dot-clip", startMs: b.start, endMs: b.end, forced: false, moments: b.moments,
       label: `${spec.name} refreshed early`,
