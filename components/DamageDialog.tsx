@@ -29,11 +29,12 @@ import { MIN_ESTIMATE_HITS, playerHitRates, reliableRates } from "@/lib/damage/c
 import { critLuck } from "@/lib/damage/crit-luck";
 import { WOW_DAMAGE } from "@/lib/damage/wow/game";
 import type { DamageFinding, GaugeTrack, PhaseDamageSummary, PlayerDamageSummary, PullDamageAnalysis } from "@/lib/damage/types";
-import { getClassColor, getPlayerClassIcon } from "@/lib/player-display";
+import { getClassColor, getPlayerClassIcon, getPlayerSpecIcon } from "@/lib/player-display";
 import { useFFPullSelector } from "@/hooks/useFFPullSelector";
 import { SEVERITY_COLOR } from "./SeverityIcon";
 import { fmtTime } from "./MitigationTimeline";
 import { Dialog } from "./ui/Dialog";
+import { InfoTip } from "./ui/InfoTip";
 import DamageCompare, { type ReferenceClear } from "./DamageCompare";
 
 type DamageDialogProps = {
@@ -122,9 +123,18 @@ export default function DamageDialog({ open, onClose, pulls, currentPullId }: Da
   const colorGame = isWow ? "wow" : "ffxiv";
   // WoW findings name the spec ("Fire Mage"); class colours key on the class.
   const classOf = new Map<string, string>();
-  for (const p of (allPulls ? gamePulls : selectedPull ? [selectedPull] : [])) for (const pl of p.players) classOf.set(pl.name, pl.className);
+  const specOf = new Map<string, number>();
+  for (const p of (allPulls ? gamePulls : selectedPull ? [selectedPull] : [])) {
+    for (const pl of p.players) { classOf.set(pl.name, pl.className); specOf.set(pl.name, pl.specId); }
+  }
   const colorFor = (player: string, job: string) => getClassColor(colorGame, isWow ? classOf.get(player) ?? job : job);
-  const iconFor = (player: string, job: string) => getPlayerClassIcon(colorGame, isWow ? classOf.get(player) ?? job : job);
+  // WoW: the spec's icon, so two Warlocks on different specs don't look alike.
+  const iconFor = (player: string, job: string) => {
+    const spec = specOf.get(player);
+    return isWow && spec !== undefined
+      ? getPlayerSpecIcon(colorGame, spec, classOf.get(player) ?? job)
+      : getPlayerClassIcon(colorGame, isWow ? classOf.get(player) ?? job : job);
+  };
 
   const analysis = selectedPull ? analyses.get(selectedPull.id) : undefined;
   const needRefetch = [...analyses.values()].filter((a) => a.missingData.length > 0).length;
@@ -186,6 +196,13 @@ export default function DamageDialog({ open, onClose, pulls, currentPullId }: Da
                   ? ` ${needRefetch} of ${gamePulls.length} pulls were fetched before the damage data existed; re-fetch the report for the full analysis.`
                   : ""}
             </span>
+            {view === "findings" && !allPulls && analysis && analysis.phases.length > 0 && (
+              <span style={{ marginLeft: "auto" }}>
+                <InfoTip label="Phases: raid damage, damage taken and estimated loss per phase" maxWidth={480}
+                  trigger={<span className="ck-badge">Phases</span>}
+                  content={<PhaseTable phases={analysis.phases} />} />
+              </span>
+            )}
           </div>
 
           {view === "compare" ? (
@@ -201,8 +218,7 @@ export default function DamageDialog({ open, onClose, pulls, currentPullId }: Da
           ) : (
           <div style={{ flex: "1 1 auto", minHeight: 0, display: "grid", gridTemplateColumns: "340px minmax(0, 1fr)", gap: 12 }}>
             <div style={{ minHeight: 0, overflowY: "auto", paddingRight: 4 }}>
-              {!allPulls && analysis && <PhaseTable phases={analysis.phases} />}
-              <div className="ck-section-label" style={{ margin: "10px 0 6px" }}>
+              <div className="ck-section-label" style={{ margin: "0 0 6px" }}>
                 {allPulls ? "Estimated loss per pull" : "Estimated loss"}
               </div>
               {allPulls
@@ -284,10 +300,11 @@ function PhaseTable({ phases }: { phases: PhaseDamageSummary[] }) {
           <tbody>
             {phases.map((p) => (
               <tr key={`${p.phaseId}-${p.startMs}`}>
-                <td title={p.context?.note}>
-                  {p.name}
+                <td>
+                  {p.name} <span className="ck-num" style={{ color: "var(--ck-text-3)" }}>{fmtTime(p.startMs)}–{fmtTime(p.endMs)}</span>
                   {p.context?.decidesEnrage && <span className="ck-badge" style={{ marginLeft: 6 }}>Decides enrage</span>}
                   {p.context?.damageCounts === false && <span className="ck-badge ck-badge--plain" style={{ marginLeft: 6 }}>Doesn&apos;t count</span>}
+                  {p.context?.note && <div style={{ color: "var(--ck-text-3)", fontSize: 11 }}>{p.context.note}</div>}
                 </td>
                 <td className="ck-num" style={{ textAlign: "right" }}>{fmtDamage(p.raidDamage)}</td>
                 <td className="ck-num" style={{ textAlign: "right" }}>{fmtDamage(p.raidDamageTaken)}</td>
@@ -337,7 +354,7 @@ function PlayerCard({ name, job, color, icon, lost, forced, movement, uptime, de
         {/* The job shrinks first; the uptime always shows whole. */}
         <div style={{ ...small, display: "flex", minWidth: 0 }} title={`${job} · GCD uptime while alive and the boss was targetable`}>
           <span style={{ overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 }}>{job}</span>
-          <span style={{ flexShrink: 0 }}>&nbsp;· <span className="ck-num">{fmtUptime(uptime)}</span> uptime</span>
+          <span style={{ flexShrink: 0 }}>&nbsp;· <span className="ck-num">{fmtUptime(uptime)}</span></span>
         </div>
       </div>
       <div style={{ textAlign: "center" }}>
@@ -347,7 +364,7 @@ function PlayerCard({ name, job, color, icon, lost, forced, movement, uptime, de
       <div style={{ textAlign: "right" }}>
         <div className="ck-num" style={{ color: lost > 0 ? LOSS_COLOR : "var(--ck-text-2)", fontSize: 14, fontWeight: 600 }}>{fmtDamage(lost)}</div>
         <div className="ck-num" style={small} title={`Forced ${fmtDamage(forced)}; movement a mechanic required ${fmtDamage(movement)} (neither is counted)`}>
-          {movement >= 1 ? <>forced {fmtDamage(forced)} · <span style={{ color: MOVEMENT_COLOR }}>move {fmtDamage(movement)}</span></> : <>forced {fmtDamage(forced)}</>}
+          {fmtDamage(forced)}{movement >= 1 && <> · <span style={{ color: MOVEMENT_COLOR }}>{fmtDamage(movement)}</span></>}
         </div>
       </div>
     </div>

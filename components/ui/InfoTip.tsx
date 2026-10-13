@@ -17,11 +17,16 @@ export function InfoTip({
   content,
   label,
   tone = "default",
+  trigger,
+  maxWidth = 280,
 }: {
   content: ReactNode;
   /** Plain-text version of `content` for screen readers. */
   label:   string;
   tone?:   "default" | "alert";
+  /** Shown instead of the circled icon (a badge, say). */
+  trigger?: ReactNode;
+  maxWidth?: number;
 }) {
   const iconRef = useRef<HTMLSpanElement>(null);
   const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
@@ -45,7 +50,7 @@ export function InfoTip({
         onMouseLeave={hide}
         onFocus={show}
         onBlur={hide}
-        style={{
+        style={trigger !== undefined ? { display: "inline-flex", cursor: "help", outline: "none", flexShrink: 0 } : {
           display:        "inline-flex",
           alignItems:     "center",
           justifyContent: "center",
@@ -64,7 +69,7 @@ export function InfoTip({
           outline:        "none",
         }}
       >
-        {tone === "alert" ? "!" : "i"}
+        {trigger ?? (tone === "alert" ? "!" : "i")}
       </span>
 
       {pos && createPortal(
@@ -75,7 +80,7 @@ export function InfoTip({
             top:           pos.top,
             right:         pos.right,
             zIndex:        2000,
-            maxWidth:      "280px",
+            maxWidth:      `${maxWidth}px`,
             pointerEvents: "none",
           }}
         >
