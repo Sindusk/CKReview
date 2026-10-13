@@ -1,7 +1,7 @@
 // One tracked cooldown's held time, through the app's own analysis: each
 // ready stretch split into forced / unforced time, charges banked at each
 // downtime, the room-for-uses simulation and the drift finding. For checking
-// a xivanalysis "N / M uses" claim.
+// a xivanalysis "N / M uses" or WoWAnalyzer "NN% effic" claim.
 //
 //   node .claude/skills/damage-analysis/tools/cooldown.js <code> "<boss>" <pull> "<player>" "<cooldown name>"
 //
@@ -10,28 +10,18 @@
 // Run from the repo root. Read-only.
 
 const path = require('path');
-const { requireTsFromRoot } = require(path.join(process.cwd(), 'scripts/lib/require-ts'));
+const { loadPull } = require(path.join(process.cwd(), 'scripts/lib/load-sample-pull')); // FFXIV or WoW
 const clock = (t) => { const s = Math.round(t / 100) / 10; return `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, '0')}`; };
 
 (async () => {
   const [code, boss, pullNumber, who, name] = process.argv.slice(2);
   if (!name) { console.log('usage: cooldown.js <code> "<boss>" <pull> "<player>" "<cooldown name>"'); process.exit(1); }
-  const store = requireTsFromRoot('lib/sample-report-store.ts');
-  const lt = requireTsFromRoot('lib/log-transforms.ts', { './log-auth': {} });
-  const mod = {
-    ...requireTsFromRoot('lib/damage/analyze.ts'), ...requireTsFromRoot('lib/damage/ffxiv/game.ts'),
-    ...requireTsFromRoot('lib/damage/timeline.ts'), ...requireTsFromRoot('lib/damage/checks.ts'),
-    ...requireTsFromRoot('lib/damage/contexts.ts'),
-  };
-  const payload = await store.loadSampleReport('ffl', code);
-  const abilityMap = lt.buildFFLAbilityMap(payload.report.masterData.abilities);
-  const pulls = await lt.transformFFReportToPulls(payload.fightDataList, abilityMap, code, payload.report.startTime);
-  const pull = pulls.find((p) => p.name === boss && p.pullNumber === Number(pullNumber));
-  if (!pull) { console.log(`no pull "${boss}" ${pullNumber}`); process.exit(1); }
-  const a = mod.analyzePullDamage(pull, mod.FFXIV_DAMAGE, mod.getDamageContext(pull.name));
+  const { pull, game, mod } = await loadPull(code, boss, pullNumber);
+  const a = mod.analyzePullDamage(pull, game, mod.getDamageContext(pull.name));
   const ps = a.players.find((p) => p.player === who);
-  const cd = mod.FFXIV_DAMAGE.trackedCooldowns(ps.job).find((c) => c.name === name);
-  if (!cd) { console.log(`no tracked cooldown "${name}" for ${ps.job}: ${mod.FFXIV_DAMAGE.trackedCooldowns(ps.job).map((c) => c.name).join(', ')}`); process.exit(1); }
+  if (!ps) { console.log(`no player "${who}"`); process.exit(1); }
+  const cd = game.trackedCooldowns(ps.job).find((c) => c.name === name);
+  if (!cd) { console.log(`no tracked cooldown "${name}" for ${ps.job}: ${game.trackedCooldowns(ps.job).map((c) => c.name).join(', ')}`); process.exit(1); }
   const forced = mod.mergeWindows(ps.timeline.forced);
   const player = pull.players.find((p) => p.name === who);
   const casts = player.casts.filter((c) => cd.actionIds.includes(c.abilityId)).map((c) => c.timestamp);

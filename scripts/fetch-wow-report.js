@@ -115,7 +115,8 @@ async function main() {
 
   fs.writeFileSync(
     path.join(outDir, 'meta.json'),
-    JSON.stringify({ code: report.code, title: report.title, fights: report.fights, masterData: report.masterData }, null, 2)
+    // startTime (epoch ms) dates the log: the damage analysis reads the patch from it.
+    JSON.stringify({ code: report.code, title: report.title, startTime: report.startTime, fights: report.fights, masterData: report.masterData }, null, 2)
   );
   console.log(`  wrote meta.json (${report.fights.length} fights, ${report.masterData.actors.length} actors)`);
 

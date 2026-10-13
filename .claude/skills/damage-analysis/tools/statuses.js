@@ -7,19 +7,14 @@
 //
 //   node .claude/skills/damage-analysis/tools/statuses.js <code> "<boss>" <pull> <statusId>...
 //
-// Status ids carry FFLogs' +1000000 offset. Run from the repo root. Read-only.
+// FFXIV status ids carry FFLogs' +1000000 offset; WoW ids are spell ids. Run from the repo root. Read-only.
 
 const path = require('path');
-const { requireTsFromRoot } = require(path.join(process.cwd(), 'scripts/lib/require-ts'));
+const { loadPull } = require(path.join(process.cwd(), 'scripts/lib/load-sample-pull')); // FFXIV or WoW
 
 (async () => {
   const [code, boss, pullNumber, ...ids] = process.argv.slice(2);
-  const store = requireTsFromRoot('lib/sample-report-store.ts');
-  const lt = requireTsFromRoot('lib/log-transforms.ts', { './log-auth': {} });
-  const payload = await store.loadSampleReport('ffl', code);
-  const abilityMap = lt.buildFFLAbilityMap(payload.report.masterData.abilities);
-  const pulls = await lt.transformFFReportToPulls(payload.fightDataList, abilityMap, code, payload.report.startTime);
-  const pull = pulls.find((p) => p.name === boss && p.pullNumber === Number(pullNumber));
+  const { pull } = await loadPull(code, boss, pullNumber);
   for (const id of ids.map(Number)) {
     const hits = pull.players.reduce((a, p) => a + p.damageDone.filter((e) => e.statusIds?.includes(id)).length, 0);
     const buffs = pull.players.reduce((a, p) => a + (p.buffs ?? []).filter((e) => e.abilityId === id).length, 0);

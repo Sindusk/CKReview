@@ -1,9 +1,9 @@
 // scripts/dump-player-events.js
 //
-// Prints one FFXIV player's raw event stream for one pull, through the
-// app's real transform (the same Pull the damage analysis sees). For
-// checking a damage finding, or an outside claim (xivanalysis), against
-// the log itself. Times are M:SS.ss into the pull.
+// Prints one player's raw event stream for one pull (FFXIV or WoW),
+// through the app's real transform (the same Pull the damage analysis
+// sees). For checking a damage finding, or an outside claim (xivanalysis,
+// WoWAnalyzer), against the log itself. Times are M:SS.ss into the pull.
 //
 //   node scripts/dump-player-events.js <code> "<boss>" <pull> "<player>" [--from M:SS] [--to M:SS] [mode]
 //
@@ -16,11 +16,11 @@
 // Example (the DNC checks in lib/damage/ffxiv/jobs/ranged.ts):
 //   node scripts/dump-player-events.js jN3XDrf2z8PmLgRJ "Vamp Fatale" 8 "Chauzey Solstice" --from 8:10 --to 8:45
 //
-// Reads sampledata/ff/<code>/ (fetch it first, docs/dev-tooling.md).
+// Reads sampledata/ff/<code>/ or sampledata/wow/<code>/ (fetch it first,
+// docs/dev-tooling.md; scripts/lib/load-sample-pull.js picks the game).
 // Writes nothing.
 
-const path = require('path');
-const { requireTsFromRoot } = require('./lib/require-ts');
+const { loadPull } = require('./lib/load-sample-pull');
 
 const args = process.argv.slice(2);
 const flag = (name) => args.includes(name);
@@ -36,13 +36,7 @@ const clock = (t) => { const s = t / 1000; return `${Math.floor(s / 60)}:${(s % 
   }
   const from = toMs(value('--from')) ?? 0;
   const to = toMs(value('--to')) ?? Infinity;
-  const store = requireTsFromRoot('lib/sample-report-store.ts');
-  const lt = requireTsFromRoot('lib/log-transforms.ts', { './log-auth': {} });
-  const payload = await store.loadSampleReport('ffl', path.basename(code));
-  const abilityMap = lt.buildFFLAbilityMap(payload.report.masterData.abilities);
-  const pulls = await lt.transformFFReportToPulls(payload.fightDataList, abilityMap, path.basename(code), payload.report.startTime);
-  const pull = pulls.find((p) => p.name === boss && p.pullNumber === Number(pullNumber));
-  if (!pull) { console.log(`no pull "${boss}" ${pullNumber}; bosses: ${[...new Set(pulls.map((p) => p.name))].join(', ')}`); process.exit(1); }
+  const { pull } = await loadPull(code, boss, pullNumber);
   const player = pull.players.find((p) => p.name === who);
   if (!player) { console.log(`no player "${who}"; players: ${pull.players.map((p) => p.name).join(', ')}`); process.exit(1); }
   const inRange = (e) => e.timestamp >= from && e.timestamp <= to;

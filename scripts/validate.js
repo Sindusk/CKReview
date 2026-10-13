@@ -78,6 +78,7 @@ const { ROOT, requireTsFromRoot } = require('./lib/require-ts');
 const { discoverReportFolders, loadReportFolder, buildActorMap, buildAbilityMap, STREAM_KEYS } = require('./lib/load-report-folder');
 const ffb = require('./lib/build-ff-players');
 const { buildWowPull } = require('./lib/build-wow-players');
+const { transformWowPullFile } = require('./lib/load-sample-pull');
 
 // ── shared helpers ──────────────────────────────────────────────────────────
 
@@ -964,27 +965,14 @@ function loadWowThroughRealPipeline(mod, dir, meta, narrow = true) {
   const wanted = pullsArg ? new Set(pullsArg.split(',').map(Number)) : null;
   const boss = narrow ? process.argv.find((a) => a.startsWith('--boss='))?.slice('--boss='.length)?.toLowerCase() : undefined;
   const abilityMap = mod.lt.buildWCLAbilityMap(meta.masterData.abilities);
-  const fightById = new Map(meta.fights.map((f) => [f.id, f]));
   const out = [];
   for (const file of fs.readdirSync(dir).sort()) {
     const m = file.match(/^(.*)_Pull(\d+)\.json$/);
     if (!m) continue;
     if (wanted && !wanted.has(Number(m[2]))) continue;
     if (boss && !m[1].toLowerCase().includes(boss)) continue;
-    const raw = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'));
-    const fight = fightById.get(raw?.variables?.fightIDs?.[0]);
-    if (!fight) continue;
-    const s = raw.json.data.reportData.report;
-    const d = (k) => s[k]?.data ?? [];
-    const pull = mod.lt.transformFightToPull({
-      fight, actors: meta.masterData.actors,
-      deathEvents: d('deaths'), combatantInfos: d('combatantInfo'), castEvents: d('casts'),
-      damageDoneEvents: d('damageDone'), damageTakenEvents: d('damageTaken'), healingEvents: d('healing'),
-      debuffEvents: d('debuffs'), enemyCastEvents: d('enemyCasts'), enemyBuffEvents: d('enemyBuffs'),
-      playerBuffEvents: d('playerBuffs'), enemyDebuffEvents: d('enemyDebuffs'),
-    }, abilityMap, meta.code);
-    pull.pullNumber = Number(m[2]);
-    out.push(pull);
+    const pull = transformWowPullFile(mod.lt, meta, abilityMap, path.join(dir, file), Number(m[2]));
+    if (pull) out.push(pull);
   }
   return out.sort((a, b) => a.name.localeCompare(b.name) || a.pullNumber - b.pullNumber);
 }
