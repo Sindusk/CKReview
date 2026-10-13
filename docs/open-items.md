@@ -644,6 +644,31 @@ WoWAnalyzer rules, but never run against a real log. When a static or a
 reference clear includes one, fetch it as a sample and check its findings
 before anyone relies on them.
 
+**FFXIV GCD identification (open, raised by the user 2026-10-13).** The
+app needs to know a player's real GCD (their skill-speed tier), not a
+statistic of logged gaps. The user: no tank plays at 2.47s; tanks run
+2.45 or 2.50, and Frail Tailed (qjCMx4bRfgNKwX9T fight 16, GNB) looks
+like 2.45 with something adding delays. Where things stand:
+- Two measures in use: `timeline.ts speedProfile` takes the most common
+  10ms gap (2.45 for Frail; values gap findings for every job) and
+  `gnb.ts ruleGcdMs` the mean near it (2.47; decides No Mercy's 8 vs 9,
+  matching xivanalysis's "Estimated GCD 2.47s"). They disagree, and which
+  is right changes GNB's No Mercy expectation (2.45 → 9 GCDs, so the
+  8/9 windows at 10:12, 15:14, 16:15 would count again).
+- Frail's logged gaps between 2.43 and 2.52s: 2.44 ×34, 2.45 ×144,
+  2.46 ×27, 2.49 ×87, 2.50 ×59. Weaving doesn't explain the long ones:
+  with no oGCD between, 49 of 157 gaps are still 2.49-2.50 (double
+  weaves shift it somewhat: 35 of 57).
+- Neither "2.47 with timestamp jitter" nor "2.45 plus delays" fits
+  cleanly: a long gap is followed by a short one 69% of the time (partial
+  payback), but short-short pairs (sums 4.89-4.91) are as common as
+  short-long, and a 30-GCD unbroken chain averages 2.4687s.
+- To settle it: the logger's own gear stats (combatantinfo skill speed)
+  give an exact GCD for one player per report; compare a logger whose
+  tier is known with their logged gaps to learn what the delay pattern
+  looks like (server tick, latency, animation lock), then pick the rule.
+  Until then the No Mercy rule follows xivanalysis.
+
 ### Mitigation (FFXIV)
 
 Reviewed with the user on 2026-10-08 against their own week-1 Vamp Fatale
