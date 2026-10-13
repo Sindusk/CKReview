@@ -36,11 +36,16 @@ Chauzey Solstice, across every fight.
   Sage, The Tyrant kill: 11 refreshes / 14.0s → 1 (the 0:25 re-dot in
   buffs with 8s left, 15k). AST Combust drops ~10-35% per pull.
 
+- DoT refresh snapshots (user, 2026-10-13): the delay comparison also
+  values the buffs each moment snapshots, read from the log (ticks carry
+  their snapshot multiplier and buff ids). The Sage's 0:25 re-dot is on
+  time (every delay loses 2-9k); the AST's Combusts under Damage Down
+  (The Tyrant kill 5:02, +29k) and Weakness (9:00, +16k) are found, and
+  so are Sage refreshes 2-3 GCDs before the 2-minute buffs on other
+  reports (+27k snapshot, −12k Dosis III moved out of buffs).
+
 ## Next
 
-- Open: the Sage's 0:25 re-dot on The Tyrant kill is inside raid buffs;
-  whether a snapshot refresh is worth its clip isn't modelled for
-  healers (Bard has `snapshotInBuffs`).
 
 - Tincture check, offered and not yet answered: drop moves whose only
   gain is filler in the same off-burst stretch (The Tyrant kill's 5:10 →
