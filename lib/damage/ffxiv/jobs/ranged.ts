@@ -105,8 +105,14 @@ const sabersExpected = (casts: PlayerEvent[]) => {
   return got < SABERS_EXPECTED && !casts.some((c) => fillers.has(c.abilityId)) ? SABERS_EXPECTED - 1 : SABERS_EXPECTED;
 };
 
+// A window whose 20s runs past the end of the pull was cut by the kill (or
+// a wipe) and is skipped. vVPtwaTQ62Jg391q Vamp Fatale kill: the 8:11
+// Technical Finish, ended by the kill at 8:23, read as 5/8 with Starfall
+// Dance and Tillana missing (242k).
+const TECH_SPAN_MS = S.TECHNICAL_FINISH.duration ?? 20_000;
+
 const technical: JobCheck = (ctx) => burstWindowFindings(ctx, {
-  statusId: S.TECHNICAL_FINISH.id, name: "Technical Finish", bonus: 0.05,
+  statusId: S.TECHNICAL_FINISH.id, name: "Technical Finish", bonus: 0.05, spanMs: () => TECH_SPAN_MS,
   bonusBasis: "a missing GCD = its average minus the GCD used instead; Fan Dance IV × 5% (Technical Finish, FFLogs multiplier 1.05)",
   expectedGcds: () => 8,
   expected: (_ctx, casts): ExpectedAction[] => [
@@ -124,7 +130,7 @@ const technicalFillers: JobCheck = (ctx): DamageFinding[] => {
   const saber = ctx.values.perUse(A.SABER_DANCE.id);
   const out: DamageFinding[] = [];
   for (const w of statusWindows(ctx, S.TECHNICAL_FINISH.id)) {
-    if (w.endMs > ctx.endMs) continue;
+    if (w.endMs > ctx.endMs || w.startMs + TECH_SPAN_MS > ctx.endMs) continue;
     const casts = ctx.player.casts.filter((c) => c.timestamp >= w.startMs && c.timestamp <= w.endMs);
     const shortfall = Math.max(0, sabersExpected(casts) - casts.filter((c) => sabers.has(c.abilityId)).length);
     const used = ctx.uses.filter((u) => u.startMs >= w.startMs && u.startMs <= w.endMs + 100 && fillers.has(u.action.id))
