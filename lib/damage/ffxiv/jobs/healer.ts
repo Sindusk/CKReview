@@ -62,6 +62,17 @@
 //   GCDs, these windows count damage GCDs and heal-gcd values the heals.
 //   No damage: the 12:05 Divination without Lightspeed (all 8 GCDs and
 //   every oGCD fit), overheal, Synastry, Horoscope / Neutral Sect.
+// - Scholar, checked against xivanalysis on qjCMx4bRfgNKwX9T Dancing Mad
+//   kill (7.5, 2026-10-13): GCD uptime, Chain Stratagem and Aetherflow
+//   (no use lost), 6 interrupted casts and its weaving gaps (17:24 6.2s,
+//   17:19, 18:16, 17:55; 11:49 is the end-of-P3 hold) all match here.
+//   Overstated: Biolysis clipping 15.8s a minute (per target it's ~48s
+//   over the pull; P3's two bosses again); Dissipation drift 3:11 (it
+//   counts 6:05-7:40, when Seraph, summoned 5:58, locks Dissipation out
+//   until P2's downtime: from 7:09 on, room is 6 and it used 6); Biolysis
+//   at 6:06 before the downtime (3 ticks, 46k, a Broil IV's worth; the
+//   14:03 one is a dot-clip finding). No damage: overheal, Faerie Gauge
+//   overcap, Swiftcast 7/23.
 // - Healer DoTs are valued per application against the filler
 //   (shared.ts dotFindings with fillerId), not by seconds overwritten.
 // - Sage, checked against xivanalysis on dDar482XvFKBPJYh FRU kill (7.1,
