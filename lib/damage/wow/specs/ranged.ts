@@ -24,6 +24,20 @@
 //   yet: WCL credits it its own way and our streams don't carry it.
 // Tracked cooldowns are in tracked-cooldowns.ts.
 //
+// Marksmanship, checked against WoWAnalyzer on qpZx3mWaG7gcDdYB pull 3
+// (Shadowmeld; reference: 3Vz6Qt2RyTPXwpJn's Imnotanorc, 100th
+// percentile, page saved too; checked 2026-10-13):
+// - Matched: uptime 79.6% vs the reference's 94.9%; 6 cancelled Steady /
+//   Aimed Shots at 3:25, 3:48, 3:52, 4:01, 4:14, 6:27, the ~2s gaps it
+//   flags. One combat potion of two (combatPotion, potion.ts); the
+//   reference missed its second too.
+// - Overstated: Trueshot 88% (0:03, 2:13, 4:47): ready at 4:13, Stasis
+//   from 4:14.7, pressed 15.7s after it; prompt use adds only a ~4s
+//   Trueshot before the kill. No lost use.
+// - Not counted (user's choice): most of his idle fell inside movement
+//   windows he carried (Murk 52%, Miasma 40%, slime switch 29% idle;
+//   the reference 0–1%). Shown as movement, 3.15M.
+//
 // Devastation, checked against WoWAnalyzer on qpZx3mWaG7gcDdYB pull 3
 // (Bragontix, Scalecommander; log 2026-10-02, checked 2026-10-13):
 // - Matched: Dragonrage 3 casts; the 2:03 → 2:46 hold ran into Stasis

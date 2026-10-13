@@ -24,11 +24,17 @@
 import { WOW_SPELL_DATA } from "./spell-data";
 import { WOW_HASTE_STATUS_IDS } from "./haste-statuses";
 
+// Midnight combat potions (30s, 5-minute cooldown not shared with health
+// potions), for the potion check: Light's Potential (primary stat) and
+// Potion of Recklessness (secondary stats; also a measured haste status).
+export const WOW_COMBAT_POTION_IDS: number[] = [1236616, 1236994, 1236998];   // + Draught of Rampant Abandon
+
 // Plus the measured haste statuses (haste.ts), gear procs included: the
-// GCD model needs their windows.
+// GCD model needs their windows. And the combat potions.
 export const WOW_PLAYER_BUFF_IDS: number[] = [...new Set([
   ...Object.values(WOW_SPELL_DATA).flatMap((s) => s.statuses.filter((st) => st.kind !== "gear").map((st) => st.id)),
   ...WOW_HASTE_STATUS_IDS,
+  ...WOW_COMBAT_POTION_IDS,
 ])].sort((a, b) => a - b);
 
 export const WOW_ENEMY_DEBUFF_IDS: number[] = [...new Set(

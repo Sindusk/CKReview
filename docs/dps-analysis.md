@@ -311,6 +311,21 @@ docs/damage-case-studies/qpZx3mWaG7gcDdYB.md. What generalizes:
   longer lock on instant GCDs: 2.18M for Hervous, not the ~6–7M a raw
   1.2s-vs-0.98s count gives (the gap check already counts idle past his
   own base). Healers are left out.
+- **Movement stays lenient (user, 2026-10-13).** Shadowmeld idled 29–52%
+  inside his Murk, Miasma and slime-switch windows; the 100th-percentile
+  Marksmanship Hunter (3Vz6Qt2RyTPXwpJn's Imnotanorc) 0–1% in the same
+  kinds of window. The user chose not to count that against the player:
+  showing it (blue) is enough, and demanding reference-level movement
+  would push players to dodge mechanics to parse. Don't propose judging
+  movement against a same-spec reference again.
+- **Dead time ends at the next cast,** not the next logged event: a dead
+  player's DoTs and pets keep logging (3Vz6Qt2RyTPXwpJn's three unraised
+  deaths read as 40M+ of idle). Reference medians leave out players who
+  died in the window.
+- **Combat potions** (lib/damage/wow/specs/potion.ts): one per 5 minutes,
+  not shared with health potions. Light's Potential measured +20–40% on
+  hits (same ability, target and other buffs, within 60s); Potion of
+  Recklessness valued by its measured haste. Some top players drink none.
 - **Evoker exposed four engine assumptions** (Bragontix): empowers log
   their cast at the start beside the empowerstart (read as cancelled);
   a buff extended by removal + re-application in the same instant

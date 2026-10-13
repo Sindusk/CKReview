@@ -56,6 +56,7 @@ import { SPEC_DATA } from "../../spec-data";
 import { WOW_SPELL_DATA } from "./spell-data";
 import { WOW_TRACKED_COOLDOWNS } from "./tracked-cooldowns";
 import { WOW_SPEC_CHECKS } from "./specs";
+import { combatPotion } from "./specs/potion";
 import { WOW_HASTE_STATUS_IDS, wowSpeedModels } from "./haste";
 import type { DamageGame, GameAction, PartyBuff } from "../types";
 
@@ -175,7 +176,7 @@ export const WOW_DAMAGE: DamageGame = {
   isDefensive: () => false,
   tankSwapActionIds: TAUNT_IDS,
   disengageActionIds: new Set(),
-  jobChecks: (job) => WOW_SPEC_CHECKS[job] ?? [],
+  jobChecks: (job) => [...(WOW_SPEC_CHECKS[job] ?? []), combatPotion],
   jobOf: wowJobOf,
   speed: { minIntervalShare: 0.45, minFactor: 0.5 },
   hasteStatusIds: new Set([...LUST_IDS, POWER_INFUSION]),

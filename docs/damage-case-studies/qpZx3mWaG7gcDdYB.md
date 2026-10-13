@@ -26,7 +26,7 @@ for this kill, so top players' logs stand in for it.
 |---|---|---|
 | Wyrmtongues | Destruction Warlock (57th pct) | **Done** |
 | Hervous, Cocomber | Arms Warrior | **Done** |
-| Shadowmeld | Marksmanship Hunter | not started |
+| Shadowmeld | Marksmanship Hunter | **Done** (against Imnotanorc) |
 | Nearby | Assassination Rogue | not started |
 | Bragontix | Devastation Evoker | **Done** (against Gilgvoker) |
 | Sylmigron | Balance Druid | not started |
@@ -95,15 +95,24 @@ for this kill, so top players' logs stand in for it.
   from 0.2s to 6.6s dead (battle res, 1.15M). The comparison also leaves
   reference players who died out of their spec's median.
 
+- **Shadowmeld vs Imnotanorc:** same pace (1.43s vs 1.44s) but 30.9 vs
+  37.5 GCDs a minute: idle in his own mechanic windows (Murk 52%, Miasma
+  40%, slime switch 29% vs 0–1%). Left as movement by the user's choice
+  (lenient; docs/dps-analysis.md). Trueshot: no lost use (WoWAnalyzer's
+  88% overstated). New combat potion check: his second potion from 5:04,
+  0.89M; it also flags several players on all three kills.
+- Potion buffs added to the stream; all three kills refetched
+  (2026-10-13) and baselines checked.
+
 ## Open
 
 1. **Patch table for WoW** (docs/open-items.md): none yet.
 
 ## Next
 
-The next player the user names. Shadowmeld (Marksmanship), Mythnarra
-(Havoc) and Neximage (Arcane) now have 100th-percentile references in
-3Vz6Qt2RyTPXwpJn (Imnotanorc, Hawkerton, Màzz):
+The next player the user names. Mythnarra (Havoc) and Neximage (Arcane)
+have 100th-percentile references in 3Vz6Qt2RyTPXwpJn (Hawkerton, Màzz;
+the user is saving their WoWAnalyzer pages):
 `damage-compare-wow sampledata/wow/qpZx3mWaG7gcDdYB --refs=NK1hBtW9rckdjq36,3Vz6Qt2RyTPXwpJn`. For each: extract the page
 (`wowa-html.js --brief`), the app's findings (`--all-findings`), verify
 each claim, and compare against a top player of the spec (ask the user for
