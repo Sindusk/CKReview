@@ -6,8 +6,8 @@
 
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import type { DeathEvent } from "@/types/DeathEvent";
-import type { EnemyEvent } from "@/types/PullError";
-import { joinNames } from "@/lib/mechanics/wow/common";
+import type { EnemyEvent, PullError } from "@/types/PullError";
+import { joinNames, playerlessMinor } from "@/lib/mechanics/wow/common";
 
 export const DAMAGE_DOWN = 1002911;
 export const MARK_OF_MORTALITY = 1004372;
@@ -113,6 +113,38 @@ export const byPlayer = (hits: Hit[]) => {
  * nor does a death right behind others (C41 +1:21, 4.7s after Blastburn
  * with two already knocked out).
  */
+/**
+ * Mark of Mortality (a short stack) always means something went wrong
+ * (user, 2026-10-12). A Mark in [start, end] with no error of the module's
+ * within 6s before to 1.5s after it is reported player-less: most were the
+ * third Refrain Water or an Unholy left short by earlier deaths (20 of 151
+ * on disk). Major when a marked player died within 30s.
+ */
+export function unexplainedMarks(players: PlayerInfo[], deaths: DeathEvent[], errors: PullError[], start: number, end: number, ruleId: string): PullError[] {
+  const marks = players.flatMap((p) => p.debuffs.filter((e) => e.abilityId === MARK_OF_MORTALITY && e.debuffStatus === "applied" && e.timestamp >= start && e.timestamp <= end).map((e) => ({ p, e })))
+    .sort((a, b) => a.e.timestamp - b.e.timestamp);
+  const out: PullError[] = [];
+  const groups: (typeof marks)[] = [];
+  for (const m of marks) {
+    const g = groups[groups.length - 1];
+    if (g && m.e.timestamp - g[0].e.timestamp <= 1500) g.push(m); else groups.push([m]);
+  }
+  for (const g of groups) {
+    const t = g[0].e.timestamp;
+    if (errors.some((x) => x.timestamp >= t - 6000 && x.timestamp <= t + 1500)) continue;
+    const who = uniq(g.map((m) => m.p));
+    const died = who.filter((p) => deaths.some((d) => d.player === p.name && d.timestamp > t && d.timestamp - t <= 30_000));
+    const cause = g[0].e.causeAbilityName ?? g[0].e.abilityName;
+    out.push({
+      ...playerlessMinor(ruleId, "Mark of Mortality",
+        `${namesOf(who)} got Mark of Mortality${cause && cause !== "Mark of Mortality" ? ` from ${cause}` : ""}: a stack came up short.${died.length ? ` ${namesOf(died)} died.` : ""} Mark of Mortality always means something went wrong; look at who was missing (often a player dead from an earlier mistake).`,
+        t, MARK_OF_MORTALITY, "Mark of Mortality"),
+      severity: died.length ? "Major" : "Minor",
+    });
+  }
+  return out;
+}
+
 export function resetCluster(near: DeathEvent[], deaths: DeathEvent[]): DeathEvent[] {
   const sorted = [...near].sort((a, b) => a.timestamp - b.timestamp);
   const [first, next] = sorted;

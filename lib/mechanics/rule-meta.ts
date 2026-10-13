@@ -366,7 +366,8 @@ exposure("targeted", ["ffxiv-uof-slap", "ffxiv-uof-marked-cone", "ffxiv-uof-ston
 // Futures Rewritten P3: Black Halo and Darkest Dance test the non-tanks
 // (oracle-of-darkness.ts reports them at every cast).
 mechanic("ffxiv-ood-tank-buster", "Black Halo / Darkest Dance (non-tanks)", 3, ["ffxiv-ood-tank-buster"]);
-exposure("targeted", ["ffxiv-ood-tank-buster"]);
+mechanic("ffxiv-ood-tank", "Black Halo aggro / Darkest Dance bait (tanks)", 3, ["ffxiv-ood-tank"]);
+exposure("targeted", ["ffxiv-ood-tank-buster", "ffxiv-ood-tank"]);
 // Futures Rewritten P4: Somber Dance tests the non-tanks; Shiva's dual
 // autos and Akh Morn's one-boss-per-tank test the tanks
 // (enter-the-dragon.ts reports them at every instance).

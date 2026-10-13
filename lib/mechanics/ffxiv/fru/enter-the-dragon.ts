@@ -92,6 +92,16 @@
 // Fate 1 (C10), enrage 1 (E5). Wipes with nobody named before the cutoff:
 // W8 (the raidwide) and C6 (an Aero red died at the CT Water with no
 // killing blow, then the Aero went off on their body).
+// VOD review 2026-10-12 (user): report j6Zhc8kNYKrFWAGT (the user's
+// static, 2025-01-28; Materialization 10:14-10:17), pulls 6 and 14;
+// rulings in expectations/rulings.json. It set:
+// - the lone Darklit Water holder late to the stack (6 +44.7: the PCT;
+//   the three missing stood together);
+// - a chain broken by a shared Spirit Taker's knock being that jump's
+//   fallout (14 +43.4).
+// - Spirit Taker 14 +43.0: the NIN should have spread to the D marker,
+//   the SGE was fine. Not readable (positions too sparse; see
+//   oracle-of-darkness.ts), so both stay named.
 //
 // -- RULES IMPLEMENTED --
 // ffxiv-etd-autos: Shiva's second auto on a non-tank names the tank who
@@ -100,9 +110,12 @@
 // ffxiv-etd-lightsteep (Major): with all alive, everyone reaching five
 //   Lightsteeped (and what gave it); Raid when Lightsteep killed 4+.
 // ffxiv-etd-chain (Major): a Refulgent Chain broken by its own end, not a
-//   death; Raid when it killed 4+.
+//   death or a shared Spirit Taker's knock within 1.5s; Raid when it killed
+//   4+.
 // ffxiv-etd-water: Darklit Waters with all alive: both holders on one side
-//   (both named), missing or doubled players.
+//   (both named), missing or doubled players; a Water that hit only its
+//   holder while the missing stood together 4y+ away names the holder.
+// ffxiv-etd-mark: a Mark of Mortality no error accounts for.
 // ffxiv-etd-spirit-taker: a shared jump. ffxiv-etd-wings: the half-room
 //   wing. ffxiv-etd-tank-buster: non-tanks hit by Somber Dance (exposure:
 //   the non-tanks).
@@ -399,9 +412,10 @@ import type { DeathEvent } from "@/types/DeathEvent";
 import type { PullError, EnemyEvent, NpcHit } from "@/types/PullError";
 import type { ReportedOccurrence } from "@/lib/mechanics/occurrences";
 import { kFmt, joinNames, playerError, playerlessMinor, raidMarker, clusterByGap } from "@/lib/mechanics/wow/common";
+import { interpolatePlayerPosition } from "@/lib/mechanics/player-position";
 import {
   DAMAGE_DOWN, MARK_OF_MORTALITY, DEATH_EVENT_LAG_MS, type Hit, type Life,
-  buildLife, hitsOf, castsOf, uniq, namesOf, isTank, realAmount, allAlive, byPlayer,
+  buildLife, hitsOf, castsOf, uniq, namesOf, isTank, realAmount, allAlive, byPlayer, unexplainedMarks,
 } from "./common";
 
 export const ETD_AUTOS_RULE_ID       = "ffxiv-etd-autos";
@@ -427,6 +441,7 @@ export const ETD_WALL_RULE_ID        = "ffxiv-etd-wall";
 export const ETD_ENRAGE_RULE_ID      = "ffxiv-etd-enrage";
 export const ETD_CALLED_WIPE_RULE_ID = "ffxiv-etd-called-wipe";
 export const ETD_COLLAPSE_RULE_ID    = "ffxiv-etd-collapse";
+export const ETD_MARK_RULE_ID        = "ffxiv-etd-mark";
 
 // ── log IDs (VERIFIED above) ────────────────────────────────────────────────
 
@@ -494,6 +509,13 @@ const AFAH_GAP_PCT = 5;
 // Darklit Water and the Crystallize Time Water need four, the Unholy five:
 // fewer gave Mark of Mortality (Water 3: B10/E5/G1/G8; Unholy 4: C9/E6/E11/E12).
 const WATER_MIN  = 4;
+// Darklit Water hitting only its holder: the missing players within this of
+// their centroid, the holder this far from it (j6Zhc8 6: 1.6y and 5.4y).
+const LONE_WATER_GROUP_YD = 3;
+const LONE_WATER_AWAY_YD  = 4;
+// A chain end that broke this soon after its holder was knocked by a shared
+// Spirit Taker (j6Zhc8 14 +43.4: 0.4s) is the knockback's fallout.
+const KNOCKED_CHAIN_MS = 1500;
 const UNHOLY_MIN = 5;
 // No-killing-blow deaths 2.0-5.6s after a knockback hit: Hallowed Wings after
 // the rewind (A1 3.7-5.3s, G9 2.1s), Dark Aero III (C3/F2 2.5-3.2s), a red's
@@ -686,7 +708,13 @@ function detectChains(players: PlayerInfo[], life: Life, casts: EnemyEvent[], dl
     if (broke.some((p) => fatalBy(p, first))) continue;
     const hit = playersOf(hitsIn(players, life, REFULGENT_FATE, t - 200, t + 2000));
     const killed = uniq(hitsIn(players, life, REFULGENT_FATE, t - 200, t + 2000).filter((h) => life.diedFrom(h.p, h.e.timestamp)).map((h) => h.p));
+    // Knocked by a shared Spirit Taker just before: the Spirit Taker error
+    // is the cause (user, 2026-10-12, j6Zhc8 14 +43.4: the NIN didn't go to
+    // their spread spot; the SGE's chain broke from the knock).
+    const knocked = (p: PlayerInfo) => p.damageTaken.some((e) => e.abilityId === SPIRIT_TAKER && e.timestamp <= first && first - e.timestamp <= KNOCKED_CHAIN_MS &&
+      players.filter((q) => q !== p && q.damageTaken.some((x) => x.abilityId === SPIRIT_TAKER && Math.abs(x.timestamp - e.timestamp) <= 500)).length > 0);
     for (const p of broke) {
+      if (knocked(p)) continue;
       errors.push(playerError(p, {
         ruleId: ETD_CHAIN_RULE_ID, severity: "Major", name: "Refulgent Chain Broke",
         description: `Their end of the Refulgent Chain broke ${Math.round((first - dl.t) / 100) / 10}s into Darklit, and Refulgent Fate exploded on ${hit.length} players with Damage Down${killed.length ? `; ${namesOf(killed)} died` : ""}. Unlike Phase 2, the chain breaks when its two ends are too close as well as too far: hold the bowtie spots with your partner.`,
@@ -732,7 +760,28 @@ function detectDarklitWater(players: PlayerInfo[], life: Life, dl: Darklit, end:
   }
   const soaked = uniq(stacks.flat());
   const short = stacks.filter((s) => s.length < WATER_MIN);
-  for (const p of players.filter((x) => !soaked.includes(x))) {
+  const missing = players.filter((x) => !soaked.includes(x));
+  // A Water that hit only its holder while the missing players stood
+  // together away from them: the holder didn't reach their stack spot
+  // (user, 2026-10-12, j6Zhc8 6 +44.7: the PCT didn't make it across; the
+  // three missing stood within 1.6y of each other, 5.4y from the PCT). The
+  // only lone-holder Water on disk.
+  const lone = stacks.filter((s) => s.length === 1 && holders.includes(s[0])).map((s) => s[0]);
+  if (lone.length === 1 && missing.length >= 2) {
+    const at = (p: PlayerInfo) => interpolatePlayerPosition(p, t - 300, { windowMs: 1500 });
+    const ms = missing.map(at);
+    if (ms.every(Boolean)) {
+      const cx = ms.reduce((s, q) => s + q!.x, 0) / ms.length, cy = ms.reduce((s, q) => s + q!.y, 0) / ms.length;
+      const spread = Math.max(...ms.map((q) => Math.hypot(q!.x - cx, q!.y - cy))) / 100;
+      const h = at(lone[0]);
+      const away = h ? Math.hypot(h.x - cx, h.y - cy) / 100 : 0;
+      if (spread <= LONE_WATER_GROUP_YD && away >= LONE_WATER_AWAY_YD) {
+        err(lone[0], "Late to the Water Stack", `Held a Dark Water III but stood ~${away.toFixed(1)} yalms from ${namesOf(missing)}, who were waiting together for it, so it hit only them.`);
+        return errors;
+      }
+    }
+  }
+  for (const p of missing) {
     err(p, "Missed Dark Water", `Wasn't in either Dark Water III stack${short.length ? `, so ${namesOf(short.flat())} took one short` : ""}.`);
   }
   for (const p of both) err(p, "Doubled Dark Water", "Stood in both Dark Water III stacks at once.");
@@ -1366,6 +1415,7 @@ export function detectEnterTheDragonErrors(
     ...detectCrystal(players, enemyCasts, ct, npcHits, start, end),
     ...detectWallDeaths(players, p4Deaths, called, ct, life, start, end),
   ];
+  errors.push(...unexplainedMarks(players, deaths, errors, start, end, ETD_MARK_RULE_ID));
 
   if (enrage) {
     const shiva = enemyCasts.find((c) => c.abilityId === ABSOLUTE_ZERO && c.timestamp > mat.timestamp);

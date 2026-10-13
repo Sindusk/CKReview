@@ -5,11 +5,12 @@
 // ~2s after the fatal hit). Runs the real pipeline (log-transforms.ts), so
 // it matches the app, not just one mechanic's harness output.
 //
-//   node .claude/skills/refine-module/tools/pull-errors.js <ff|wow> <code> "<boss>" [--pulls 1,3-5] [--rule <ruleId prefix>] [--all] [--summary]
+//   node .claude/skills/refine-module/tools/pull-errors.js <ff|wow> <code> "<boss>" [--pulls 1,3-5] [--rule <ruleId prefix>] [--all] [--full] [--summary]
 //
 // --pulls    only these pull numbers (the app's per-boss numbering)
 // --rule     only errors whose ruleId starts with this (e.g. ffxiv-lw1-chain)
 // --all      also list errors after the cutoff (default: count them only)
+// --full     print whole descriptions (default: cut at 220 characters)
 // --summary  instead of per-pull lists: counts per rule/name/severity with
 //            example pulls, the cutoff each pull got (wipes without one are
 //            listed), and every error in a kill
@@ -40,6 +41,7 @@ function parsePulls(s) {
   const want = parsePulls(opt('--pulls'));
   const rule = opt('--rule');
   const all = args.includes('--all');
+  const full = args.includes('--full');
 
   const store = requireTsFromRoot('lib/sample-report-store.ts');
   const lt = requireTsFromRoot('lib/log-transforms.ts', { './log-auth': {} });
@@ -84,7 +86,7 @@ function parsePulls(s) {
       if (rule && !e.ruleId.startsWith(rule)) continue;
       const late = cut && e.timestamp > cut.timestamp;
       if (late && !all) { after++; continue; }
-      const desc = e.description.length > 220 ? `${e.description.slice(0, 217)}...` : e.description;
+      const desc = full || e.description.length <= 220 ? e.description : `${e.description.slice(0, 217)}...`;
       console.log(`  ${clock(e.timestamp).padStart(6)} ${late ? '(after cutoff) ' : ''}[${e.severity}] ${e.player ?? '(raid)'} — ${e.name} [${e.ruleId}]: ${desc}`);
     }
     if (after) console.log(`  … ${after} more after the cutoff (--all to list)`);

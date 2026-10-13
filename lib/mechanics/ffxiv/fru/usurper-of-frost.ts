@@ -156,6 +156,7 @@
 //   death (except a lone knockback death), not with a dropped killing
 //   blow, not a called wipe.
 // ffxiv-uof-dead-going-in (Raid): someone dead when Light Rampant begins.
+// ffxiv-uof-mark: a Mark of Mortality no error accounts for (common.ts).
 // ffxiv-uof-enrage / -endless-ice-age (Raid): the timer checks.
 // ffxiv-uof-called-wipe (3+ no-killing-blow deaths within 10s, or one in
 //   the last 12s with 4+ dead; a first one followed by a mechanic death
@@ -431,6 +432,7 @@ import { kFmt, sec, yd, joinNames, playerError, playerlessMinor, raidMarker, clu
 import {
   DAMAGE_DOWN, MARK_OF_MORTALITY, DEATH_EVENT_LAG_MS, PREVIEW_AMOUNT, type Hit, type Life,
   bodyHit, buildLife, hitsOf, castsOf, gotAura, clock, uniq, namesOf, isTank, realAmount, allAlive, byPlayer, resetCluster,
+  unexplainedMarks,
 } from "./common";
 
 export const UOF_AVOIDABLE_RULE_ID   = "ffxiv-uof-avoidable";
@@ -452,6 +454,7 @@ export const UOF_ENRAGE_RULE_ID      = "ffxiv-uof-enrage";
 export const UOF_ICE_AGE_RULE_ID     = "ffxiv-uof-endless-ice-age";
 export const UOF_CALLED_WIPE_RULE_ID = "ffxiv-uof-called-wipe";
 export const UOF_COLLAPSE_RULE_ID    = "ffxiv-uof-collapse";
+export const UOF_MARK_RULE_ID        = "ffxiv-uof-mark";
 
 /** A head marker on a player (FFLogs headmarker events), ms into the pull. */
 export type HeadMarker = { timestamp: number; player: string; markerId: number };
@@ -1256,6 +1259,7 @@ export function detectUsurperOfFrostErrors(
     ...detectDeadGoingIn(players, life, enemyCasts, from, end),
     ...detectWallDeaths(players, enemyCasts, deaths, called, start, end),
   ];
+  errors.push(...unexplainedMarks(players, deaths, errors, from, end, UOF_MARK_RULE_ID));
 
   // Timer checks: Absolute Zero with Shiva at 20%+, the Ice Veil surviving
   // Endless Ice Age.

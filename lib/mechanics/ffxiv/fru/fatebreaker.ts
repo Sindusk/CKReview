@@ -118,6 +118,13 @@
 // - the Fall of Faith group read from a same-side four-player resolution
 //   (T34: the ninja on the wrong side for tether 1, their cone hit all
 //   five of the other group).
+// VOD review 2026-10-12 round 5 (user): report j6Zhc8kNYKrFWAGT (group A's
+// static on 2025-01-28), pulls 1, 4, 16; rulings in expectations/rulings.json.
+// It set both tanks dead as P1's cutoff (16 +1:47: the raid walked to the
+// wall at once, the RPR's Sinblaze after it was the reset). Pull 4 +1:52
+// (tether 3, lightning): the AST went to the wrong side and the BRD was
+// right. Not readable: no player keeps one side across clean lightning
+// tethers (the AST was left in 11, right in 10), so both stay named.
 // Cutoffs (first Raid error): player dead going into a mechanic 62, called
 // wipe 41, collapse 40, Fated Burn Mark 22, enrage 11, tower 3; the 18 P1
 // clears have none.
@@ -176,6 +183,9 @@
 //   within 12s of the end, knocks excluded, and not a lone first death
 //   followed by a mechanic death: common.ts resetCluster) / -collapse (4 dead, pull over
 //   within 20s): Raid, only the earliest, only before any mechanic Raid.
+// ffxiv-fb-tanks-dead (Raid): both tanks dead in a pull that never reached
+//   P2; per-player errors after it are dropped (the reset).
+// ffxiv-fb-mark: a Mark of Mortality no error accounts for.
 // Exposure: -powder-swap and -powder-death are targeted (both tanks at each
 // Powder Mark); everything else counts everyone.
 // The Damage Down causes are excluded from ffxiv-damage-down (error-rules.ts).
@@ -419,6 +429,7 @@ import { kFmt, sec, yd, joinNames, playerError, playerlessMinor, raidMarker, clu
 import {
   DAMAGE_DOWN, MARK_OF_MORTALITY, DEATH_EVENT_LAG_MS, PREVIEW_AMOUNT, type Hit, type Life,
   bodyHit, buildLife, hitsOf, castsOf, gotAura, clock, uniq, namesOf, isTank, realAmount, allAlive, byPlayer, resetCluster,
+  unexplainedMarks,
 } from "./common";
 
 export const FB_AVOIDABLE_RULE_ID    = "ffxiv-fb-avoidable";
@@ -436,6 +447,8 @@ export const FB_ENRAGE_RULE_ID       = "ffxiv-fb-enrage";
 export const FB_CALLED_WIPE_RULE_ID  = "ffxiv-fb-called-wipe";
 export const FB_COLLAPSE_RULE_ID     = "ffxiv-fb-collapse";
 export const FB_DEAD_GOING_IN_RULE_ID = "ffxiv-fb-dead-going-in";
+export const FB_TANKS_DEAD_RULE_ID   = "ffxiv-fb-tanks-dead";
+export const FB_MARK_RULE_ID         = "ffxiv-fb-mark";
 
 // ── log IDs (VERIFIED above) ────────────────────────────────────────────────
 
@@ -1261,9 +1274,27 @@ export function detectFatebreakerErrors(
     ...detectDeadGoingIn(players, life, enemyCasts, end),
     ...detectWallDeaths(players, enemyCasts, deaths, called, end),
   ];
+  errors.push(...unexplainedMarks(players, deaths, errors, 0, end, FB_MARK_RULE_ID));
 
   // Generic cutoffs, only the earliest and only before any mechanic Raid.
   const generic: PullError[] = [];
+  // Both tanks dead in Phase 1 is the wipe: the raid resets at once (user,
+  // 2026-10-12, j6Zhc8 16 +1:47: both tanks died to tether 1's Bow Shock and
+  // everyone walked to the wall, so the RPR's Sinblaze at +1:50 was the
+  // reset). 1 of 259 such moments on disk reached P2 (zxkbv8 5, after the
+  // towers with the boss under 1%), so only pulls that never reached it.
+  // Per-player errors after it are the reset and are dropped.
+  let tanksDeadAt = Infinity;
+  const tanks = players.filter(isTank);
+  if (p2 === Infinity && tanks.length === 2) {
+    tanksDeadAt = life.outIntervals.filter((w) => tanks.includes(w.p)).map((w) => w.start).sort((a, b) => a - b)
+      .find((t) => tanks.every((p) => !life.alive(p, t))) ?? Infinity;
+    if (tanksDeadAt < Infinity) {
+      generic.push(raidMarker(FB_TANKS_DEAD_RULE_ID, "Both Tanks Dead",
+        `${namesOf(tanks)} were both dead: Phase 1 can't continue without a tank, so the raid resets from here.`,
+        tanksDeadAt, 0, "Deaths"));
+    }
+  }
   // The third Burnished Glory is cast in clears too (boss at <1% HP, A20
   // +2:41.5): only a pull that never reached P2 enraged.
   const enrage = p2 === Infinity ? castsOf(enemyCasts, ENRAGE, end)[0] : undefined;
@@ -1296,5 +1327,5 @@ export function detectFatebreakerErrors(
   const firstRaid = Math.min(...errors.filter((e) => e.severity === "Raid").map((e) => e.timestamp));
   const marker = generic.sort((a, b) => a.timestamp - b.timestamp)[0];
   if (marker && marker.timestamp < firstRaid) errors.push(marker);
-  return errors.sort((a, b) => a.timestamp - b.timestamp);
+  return errors.filter((e) => e.severity === "Raid" || e.timestamp <= tanksDeadAt + 500).sort((a, b) => a.timestamp - b.timestamp);
 }

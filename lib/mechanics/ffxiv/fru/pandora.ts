@@ -105,6 +105,7 @@
 // ffxiv-pan-wall (Major): a no-killing-blow death that isn't a reset.
 // ffxiv-pan-enrage (Raid, Pandora's HP at Paradise Lost's first cast),
 // ffxiv-pan-called-wipe / -collapse (Raid; four dead).
+// ffxiv-pan-mark: a Mark of Mortality no error accounts for (common.ts).
 // The Damage Down causes are excluded from ffxiv-damage-down (error-rules.ts).
 // Not built: who aims a wing (party cleaves are player-less), the tether
 // tank's distance, duty swaps beyond both-tanks-in-one-wing, raidwide
@@ -307,7 +308,7 @@ import type { ReportedOccurrence } from "@/lib/mechanics/occurrences";
 import { kFmt, joinNames, playerError, playerlessMinor, raidMarker, clusterByGap } from "@/lib/mechanics/wow/common";
 import {
   DAMAGE_DOWN, DEATH_EVENT_LAG_MS, type Hit, type Life,
-  buildLife, hitsOf, castsOf, uniq, namesOf, isTank, realAmount, allAlive, byPlayer,
+  buildLife, hitsOf, castsOf, uniq, namesOf, isTank, realAmount, allAlive, byPlayer, unexplainedMarks,
 } from "./common";
 
 export const PAN_EXALINE_RULE_ID     = "ffxiv-pan-exaline";
@@ -324,6 +325,7 @@ export const PAN_WALL_RULE_ID        = "ffxiv-pan-wall";
 export const PAN_ENRAGE_RULE_ID      = "ffxiv-pan-enrage";
 export const PAN_CALLED_WIPE_RULE_ID = "ffxiv-pan-called-wipe";
 export const PAN_COLLAPSE_RULE_ID    = "ffxiv-pan-collapse";
+export const PAN_MARK_RULE_ID        = "ffxiv-pan-mark";
 
 // ── log IDs (VERIFIED above) ────────────────────────────────────────────────
 
@@ -891,6 +893,7 @@ export function detectPandoraErrors(
     // Damage Down resets carried over the cutscene (G8 -8.1).
     ...detectWallDeaths(players, p5Deaths, called, fulgent[0].timestamp, enrageHit ? enrageHit.timestamp - PRE_ENRAGE_MS - DEATH_EVENT_LAG_MS : end),
   ];
+  errors.push(...unexplainedMarks(players, deaths, errors, start, end, PAN_MARK_RULE_ID));
 
   if (enrageHit) {
     const gift = enemyCasts.filter((c) => c.abilityId === LB_GIFT && c.timestamp > start).pop();

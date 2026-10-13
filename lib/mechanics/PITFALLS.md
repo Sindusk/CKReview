@@ -172,6 +172,20 @@ philosophy and the data semantics this list assumes.
 - **Process of elimination beats geometry.** With N interchangeable
   candidates and N-1 accounted for, the last one is decisive (Fatebreaker
   towers; Lindwurm's Metamitosis free players).
+- **A published flex priority can name who went wrong.** Check it against
+  the static's clean resolutions first: the user's static followed NAUR's
+  Refrain Water swap (MT > OT > H1 > H2, melee > R1 > R2) every time, and
+  it named both reviewed failures (Oracle of Darkness `naurGroups`).
+- **A stack that splits names the member who stood off its spot,** not
+  the players waiting in the middle (Oracle of Darkness's Shell Crusher:
+  the BRD 6y out, the four missers within 1y of center).
+- **An unplanned aggro swap shows in the boss's autos.** A buster on the
+  wrong tank, with the autos moving over and no Provoke or Shirk, is the
+  tank who took aggro (Oracle of Darkness's Black Halo; the DRK hadn't
+  dropped tank stance).
+- **Measure positions the same way the thresholds were calibrated.** A
+  hit event's own x/y for a jump can differ from the interpolated track
+  (Darkest Dance: 14.9y vs 12.4y, either side of the 15y line).
 - **Mirrored misses need a reference layout.** Two players who each miss
   the other's tower are 5.0y off each other symmetrically. The tie-break
   is the clean pulls' launch spots (`LAUNCH_SPOTS`, Lindwurm).
@@ -285,7 +299,12 @@ Related:
   (Lindwurm II's Rep1, defams and Blood Wakening; raidwides excluded).
   - Oracle of Darkness: 4, with no window.
 - **Tune the tank-death marker per boss.** Some fights carry on with one
-  tank (Nek'zali).
+  tank (Nek'zali). Fatebreaker never did with both tanks dead (1 of 259,
+  after its last mechanic): the raid resets at once, so errors after it
+  are the reset (user ruling).
+- **A failure status no error explains is a gap.** Report it player-less
+  so the review sees it: every Mark of Mortality means something went
+  wrong (user, FRU), and 20 of 151 had no error near them.
 - **Scope a failure's escalation to its own aftermath.** Count deaths only
   up to the next mechanic's Raid error (The Coiled Altar).
 - **One failure, one Raid marker.** Successive empty towers must not

@@ -77,6 +77,21 @@
 // Relativity's raidwide right after Hell's Judgment), V12 (one beam swept
 // all seven): their released fires are player-less errors.
 //
+// VOD review 2026-10-12 (user): report j6Zhc8kNYKrFWAGT (the user's static,
+// T-X's group, 2025-01-28, 20 pulls; P3 starts 7:23-7:27), pulls 2, 3, 7,
+// 8, 9, 20; rulings in expectations/rulings.json. It set:
+// - Refrain Water flex as NAUR priority (2 +106.8 the BRD, 3 +106.8 the
+//   PLD): the static's flexes followed it in every clean Refrain on disk;
+// - Shell Crusher pulled off the middle by its off-center member (7 +62.4);
+// - the DRK keeping Grit and taking the PLD's Black Halo (3 +79.2; in
+//   every other pull the DRK casts Release Grit at ~+9);
+// - the Dance baiter short of the wall (20 +128.3: 12.4y) and clipping
+//   Apocalypse on the run out (2 +129.9, the wrong direction);
+// - a no-killing-blow death holding Damage Down is a reset (8 +149).
+// - Spirit Taker 9 +111.5: the NIN didn't move far enough, the DRK was
+//   fine. Not readable: positions are too sparse to say who moved into
+//   whom (18 shared jumps on disk), so both stay named.
+//
 // -- RULES IMPLEMENTED --
 // ffxiv-ood-fire: a Relativity fire that caught others (Major on a death):
 //   the owner, plus the caught when one or two; two holders in one fire
@@ -91,12 +106,22 @@
 // ffxiv-ood-eruption: rewind Eruption overlaps (as the fires), Apocalypse
 //   Eruption players hit twice. ffxiv-ood-gaze (Major): Doom from Shadoweye.
 // ffxiv-ood-water: rewind Water missed by its Water / Shadoweye holder;
-//   Refrain Waters (all alive): both of a timer together, missing players,
-//   the duplicated-timer members of an oversized group, doubled players.
-// ffxiv-ood-shell-crusher: missed (all alive). ffxiv-ood-spirit-taker: a
-//   shared jump (target known: the others; else all). ffxiv-ood-tank-buster:
-//   non-tanks hit by Black Halo / Darkest Dance (exposure: the non-tanks).
-// ffxiv-ood-apocalypse (Major, Damage Down); a wave on 4+ is player-less.
+//   Refrain Waters (all alive): with the NAUR groups readable (naurGroups),
+//   the one or two players in the other group's stack; else both of a
+//   timer together, missing players, the duplicated-timer members of an
+//   oversized group, doubled players.
+// ffxiv-ood-shell-crusher: missed (all alive); a member 5.5y+ off the
+//   middle while the missers stood in it is named instead of them.
+// ffxiv-ood-spirit-taker: a shared jump (target known: the others; else
+//   all). ffxiv-ood-tank-buster: non-tanks hit by Black Halo / Darkest Dance
+//   (exposure: the non-tanks). ffxiv-ood-tank (exposure: the tanks): a tank
+//   killed by Black Halo after taking Gaia's autos with no Provoke/Shirk,
+//   the other tank alive; a Dance that hit non-tanks baited under 15y from
+//   the middle (the baiter instead of them).
+// ffxiv-ood-apocalypse (Major, Damage Down); a wave on 4+ is player-less;
+//   the Dance baiter hit just before the jump ran out the wrong way.
+// ffxiv-ood-mark: a Mark of Mortality no error accounts for (common.ts
+//   unexplainedMarks; the same in every FRU phase as -fb/-uof/-etd/-pan-mark).
 // ffxiv-ood-wall (Major): Darkest Dance knockbacks, Return into the wall,
 //   walk-offs. ffxiv-ood-enrage / -called-wipe / -collapse (Raid).
 // The Damage Down causes are excluded from ffxiv-damage-down (error-rules.ts).
@@ -300,9 +325,11 @@ import type { DeathEvent } from "@/types/DeathEvent";
 import type { PullError, EnemyEvent } from "@/types/PullError";
 import type { ReportedOccurrence } from "@/lib/mechanics/occurrences";
 import { kFmt, yd, joinNames, playerError, playerlessMinor, raidMarker, clusterByGap } from "@/lib/mechanics/wow/common";
+import { interpolatePlayerPosition } from "@/lib/mechanics/player-position";
+import { detectFFRoles, type FFRoleSlot } from "@/lib/mechanics/ffxiv/roles";
 import {
   DAMAGE_DOWN, MARK_OF_MORTALITY, DEATH_EVENT_LAG_MS, type Hit, type Life,
-  buildLife, hitsOf, castsOf, uniq, namesOf, isTank, realAmount, allAlive, byPlayer,
+  buildLife, hitsOf, castsOf, uniq, namesOf, isTank, realAmount, allAlive, byPlayer, unexplainedMarks,
 } from "./common";
 
 export const OOD_AVOIDABLE_RULE_ID   = "ffxiv-ood-avoidable";
@@ -321,6 +348,8 @@ export const OOD_WALL_RULE_ID        = "ffxiv-ood-wall";
 export const OOD_ENRAGE_RULE_ID      = "ffxiv-ood-enrage";
 export const OOD_CALLED_WIPE_RULE_ID = "ffxiv-ood-called-wipe";
 export const OOD_COLLAPSE_RULE_ID    = "ffxiv-ood-collapse";
+export const OOD_TANK_RULE_ID        = "ffxiv-ood-tank";
+export const OOD_MARK_RULE_ID        = "ffxiv-ood-mark";
 
 // ── log IDs (VERIFIED above) ────────────────────────────────────────────────
 
@@ -397,6 +426,25 @@ const CALLED_WIPE_RAID_DEAD = 4;
 // than one down before Memory's End, and every pull that reached four
 // failed (Q14: one dead from Refrain on, enraged).
 const COLLAPSE_DEAD_COUNT  = 4;
+// Shell Crusher pulled off the middle: a stack member this far from the
+// center (yalms) while the missers stood in the middle. Clean stacks reach
+// 5.3y (cwW2F4 13); the pulled-away ones were 6.0-18.6y (j6Zhc8 7 the BRD at
+// 6.1, user ruling 2026-10-12; H8QryY 9, cQL739 15), the missers within 3y.
+const SHELL_OFF_CENTER_YD = 5.5;
+const SHELL_MIDDLE_YD     = 3;
+// Darkest Dance's tank baits from the edge: clean solo baits 15.4-18.7y from
+// the center; the three that also hit others came from 11.5-13.6y (j6Zhc8 20
+// 12.4y, user ruling 2026-10-12: the DRK didn't go far enough).
+const DANCE_BAIT_MIN_YD   = 15;
+// ...but only a tank who went out and stopped short (the closest clean
+// solo bait, rtahLj 21, was 8.4y). A "baiter" in the middle (GQT7Nh 4
+// 3.7y, yWrQA4 7 3.4y) means nobody went out: the old per-player read.
+const DANCE_BAIT_OUT_YD   = 8;
+// Black Halo aggro: the autos this long before the cast show who held Gaia.
+const HALO_AGGRO_MS       = 16_000;
+const HALO_SWAP_MS        = 20_000;
+// An Apocalypse hit this soon before the Dance baiter's jump is the run out.
+const DANCE_RUN_MS        = 4000;
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 
@@ -411,6 +459,13 @@ const playersOf = (hits: Hit[]) => uniq(hits.map((h) => h.p));
 const diedIn = (life: Life, hits: Hit[]) => uniq(hits.filter((h) => life.diedFrom(h.p, h.e.timestamp)).map((h) => h.p));
 const momIn = (players: PlayerInfo[], cause: number, t: number) =>
   players.filter((p) => p.debuffs.some((e) => e.abilityId === MARK_OF_MORTALITY && e.debuffStatus === "applied" && e.causeAbilityId === cause && Math.abs(e.timestamp - t) <= 2000));
+
+/** Yalms from the arena center at `t` (interpolated), or undefined without a position. */
+const ARENA_CENTER = 10000;
+function fromCenter(p: PlayerInfo, t: number): number | undefined {
+  const q = interpolatePlayerPosition(p, t, { windowMs: 1500 });
+  return q ? Math.hypot(q.x - ARENA_CENTER, q.y - ARENA_CENTER) / 100 : undefined;
+}
 
 /** A Spell-in-Waiting status: who holds it and when it resolves. */
 type Waiting = { p: PlayerInfo; due: number; dur: number };
@@ -752,9 +807,16 @@ function detectApocalypse(players: PlayerInfo[], life: Life, start: number, end:
   for (const [p, es] of byPlayer(individual)) {
     for (const g of clusterByGap(es, (e) => e.timestamp, EPISODE_MS)) {
       const death = life.diedFrom(p, g[g.length - 1].timestamp);
+      // The Dance baiter clipping a wave on the run out went the wrong way
+      // (user, 2026-10-12, j6Zhc8 2 +129.9: the DRK should have gone north
+      // or south that pull). Still Major: Damage Down even when shielded.
+      const last = g[g.length - 1].timestamp;
+      const runOut = isTank(p) && p.damageTaken.some((e) => e.abilityId === DANCE_BUSTER && e.timestamp > last && e.timestamp - last <= DANCE_RUN_MS);
       errors.push(playerError(p, {
         ruleId: OOD_APOCALYPSE_RULE_ID, severity: "Major", name: "Hit by Apocalypse",
-        description: `Hit by Apocalypse (${g.length > 1 ? `${g.length} hits, ` : ""}${kFmt(g.reduce((s, e) => s + realAmount(e), 0))}): Damage Down${death ? ", and died" : ""}. ${why}`,
+        description: runOut
+          ? `Hit by Apocalypse on the way out to bait Darkest Dance (${kFmt(g.reduce((s, e) => s + realAmount(e), 0))}): Damage Down${death ? ", and died" : ""}. The Dance bait goes to the next safe wall sector, away from the lights' rotation: run out through the side that has already exploded.`
+          : `Hit by Apocalypse (${g.length > 1 ? `${g.length} hits, ` : ""}${kFmt(g.reduce((s, e) => s + realAmount(e), 0))}): Damage Down${death ? ", and died" : ""}. ${why}`,
         timestamp: g[0].timestamp, abilityId: APOCALYPSE, abilityName: "Apocalypse",
       }));
     }
@@ -798,6 +860,42 @@ function detectApocEruptions(players: PlayerInfo[], life: Life, start: number, e
  * - a short stack with nobody missing: the extra player stood in the other
  *   group; its members whose timer another member shares are named.
  */
+/**
+ * NAUR's Refrain groups: supports (MT, OT, H1, H2) on one side, DPS (M1,
+ * M2, R1, R2) on the other; for a timer two supports share, the
+ * higher-priority one (MT > OT > H1 > H2) swaps with the higher-priority
+ * DPS of the timer two DPS share (M1 > M2 > R1 > R2). The user's static
+ * followed it in every clean Refrain on disk (j6Zhc8 6, 7, 8, 12, 13, 14,
+ * 20; balanced 9, 10, 17), and it names the user's calls (2026-10-12):
+ * j6Zhc8 2 +106.8 the BRD (should have stayed on the AST's side), 3 +106.8
+ * the PLD (belonged west with the supports). Undefined when a slot is
+ * unknown, a pair is both melee (M1/M2 aren't readable in FRU), or the
+ * result isn't one of each timer per group.
+ */
+function naurGroups(players: PlayerInfo[], timer: (p: PlayerInfo) => string): [Set<PlayerInfo>, Set<PlayerInfo>] | undefined {
+  const roles = detectFFRoles(players);
+  const slot = (s: FFRoleSlot) => roles.find((r) => r.slot === s)?.player ?? undefined;
+  const supports = (["MT", "OT", "H1", "H2"] as FFRoleSlot[]).map(slot);
+  const dps = (["M1", "M2", "R1", "R2"] as FFRoleSlot[]).map(slot);
+  if ([...supports, ...dps].some((p) => !p)) return undefined;
+  const movers = (side: PlayerInfo[], melee: boolean): PlayerInfo[] | undefined => {
+    const out: PlayerInfo[] = [];
+    for (const tm of uniq(side.map(timer))) {
+      const pair = side.filter((p) => timer(p) === tm);
+      if (pair.length !== 2) continue;
+      if (melee && side.indexOf(pair[0]) < 2 && side.indexOf(pair[1]) < 2) return undefined;
+      out.push(pair[0]);                       // listed in priority order
+    }
+    return out;
+  };
+  const ms = movers(supports as PlayerInfo[], false), md = movers(dps as PlayerInfo[], true);
+  if (!ms || !md || ms.length !== md.length) return undefined;
+  const a = new Set([...(supports as PlayerInfo[]).filter((p) => !ms.includes(p)), ...md]);
+  const b = new Set([...(dps as PlayerInfo[]).filter((p) => !md.includes(p)), ...ms]);
+  const balanced = (g: Set<PlayerInfo>) => g.size === 4 && new Set([...g].map(timer)).size === 4;
+  return balanced(a) && balanced(b) ? [a, b] : undefined;
+}
+
 function detectRefrainWater(players: PlayerInfo[], life: Life, casts: EnemyEvent[], start: number, end: number): PullError[] {
   const errors: PullError[] = [];
   const refrain = castsOf(casts, REFRAIN, end).find((c) => c.timestamp >= start);
@@ -805,6 +903,7 @@ function detectRefrainWater(players: PlayerInfo[], life: Life, casts: EnemyEvent
   const waters = waitingOf(players, W_WATER, refrain.timestamp, refrain.timestamp + 15_000);
   const timer = (p: PlayerInfo) => { const w = waters.find((x) => x.p === p); return w ? `${Math.round(w.dur / 1000)}s` : "none"; };
   const why = "Each Water stack of four needs one player of each Water timer (10s, 29s, 38s) and one without: when both of a timer are in one group, one flexes to the other.";
+  const naur = players.length === 8 ? naurGroups(players, timer) : undefined;
   for (const { t, holders } of byDue(waters)) {
     if (!allAlive(players, life, t - 500)) continue;
     const hits = resolutionHits(players, life, casts, DARK_WATER, t, end);
@@ -817,6 +916,22 @@ function detectRefrainWater(players: PlayerInfo[], life: Life, casts: EnemyEvent
     const err = (p: PlayerInfo, name: string, description: string) =>
       errors.push(playerError(p, { ruleId: OOD_WATER_RULE_ID, severity: sev, name, description: `${description}${outcome} ${why}`, timestamp: t, abilityId: DARK_WATER, abilityName: "Dark Water III" }));
     const together = holders.length === 2 && stacks.some((s) => holders.every((h) => s.includes(h)));
+    // With the NAUR groups known, the players standing in the other group's
+    // stack are the ones who went wrong (one or two; the two stacks must map
+    // to different groups, else the read is unreliable).
+    // Only with everyone in a stack: a player in neither is named below
+    // (WbMPXr 3 +106.8: three missed both).
+    if (naur && stacks.length === 2 && uniq(stacks.flat()).length === players.length && (together || stacks.some((s) => s.length !== WATER_MIN))) {
+      const home = stacks.map((s) => (s.filter((p) => naur[0].has(p)).length >= s.filter((p) => naur[1].has(p)).length ? naur[0] : naur[1]));
+      const wrong = stacks.flatMap((s, i) => s.filter((p) => !home[i].has(p) && !stacks[1 - i].includes(p)));
+      if (home[0] !== home[1] && wrong.length >= 1 && wrong.length <= 2) {
+        for (const p of wrong) {
+          const mates = [...naur.find((g) => g.has(p))!].filter((x) => x !== p);
+          err(p, "Wrong Water Group", `Stood in the other group's Water stack (${timer(p) === "none" ? "no Water" : `${timer(p)} Water`}): by the group's flex they belonged with ${namesOf(mates)}, so one stack took ${Math.max(...stacks.map((s) => s.length))} and the other ${Math.min(...stacks.map((s) => s.length))}.`);
+        }
+        continue;
+      }
+    }
     if (together) {
       const both = stacks.filter((s) => holders.every((h) => s.includes(h))).flat();
       for (const h of holders) err(h, "Water Holders Together", `Held a ${timer(h)} Dark Water and stood in the same group as ${namesOf(holders.filter((x) => x !== h))}, who had the other: both Waters hit ${namesOf(uniq(both))}.`);
@@ -840,7 +955,14 @@ function detectRefrainWater(players: PlayerInfo[], life: Life, casts: EnemyEvent
 
 // ── Shell Crusher, Spirit Taker, busters ────────────────────────────────────
 
-/** Shell Crusher is a whole-party stack: with all eight alive, a living player outside it is named. */
+/**
+ * Shell Crusher is a whole-party stack in the middle: with all eight alive,
+ * a living player outside it is named. When a stack member stood
+ * SHELL_OFF_CENTER_YD+ out while the missers were in the middle, the stack
+ * went off on them away from the group: they are named instead of the
+ * missers in the middle (user, 2026-10-12, j6Zhc8 7 +62.4: the BRD not in
+ * the middle, the stack split four and four).
+ */
 function detectShellCrusher(players: PlayerInfo[], life: Life, start: number, end: number): PullError[] {
   const errors: PullError[] = [];
   for (const res of clusterByGap(hitsOf(players, life, SHELL_CRUSHER, end).filter((h) => h.e.timestamp >= start), (h) => h.e.timestamp, 1500)) {
@@ -848,7 +970,18 @@ function detectShellCrusher(players: PlayerInfo[], life: Life, start: number, en
     if (!allAlive(players, life, t - 500)) continue;
     const soaked = playersOf(res);
     const killed = diedIn(life, res);
-    for (const p of players.filter((x) => !soaked.includes(x))) {
+    const missers = players.filter((x) => !soaked.includes(x));
+    const off = missers.length ? soaked.filter((p) => (fromCenter(p, t - 300) ?? 0) > SHELL_OFF_CENTER_YD) : [];
+    const inMiddle = (p: PlayerInfo) => { const r = fromCenter(p, t - 300); return r !== undefined && r <= SHELL_MIDDLE_YD; };
+    for (const p of off) {
+      errors.push(playerError(p, {
+        ruleId: OOD_SHELL_RULE_ID, severity: killed.length ? "Major" : "Minor", name: "Pulled Shell Crusher Away",
+        description: `Stood ~${(fromCenter(p, t - 300) ?? 0).toFixed(1)} yalms from the middle when Shell Crusher went off, so the stack landed away from the group: only ${soaked.length} took it (${namesOf(soaked)}) while ${namesOf(missers)} stood in the middle.${killed.length ? ` ${namesOf(killed)} died.` : ""} Shell Crusher is one stack for all eight: everyone stands in the middle.`,
+        timestamp: t, abilityId: SHELL_CRUSHER, abilityName: "Shell Crusher",
+      }));
+    }
+    for (const p of missers) {
+      if (off.length && inMiddle(p)) continue;
       errors.push(playerError(p, {
         ruleId: OOD_SHELL_RULE_ID, severity: killed.length ? "Major" : "Minor", name: "Missed Shell Crusher",
         description: `Wasn't in the Shell Crusher stack (${soaked.length} took it).${killed.length ? ` ${namesOf(killed)} died.` : ""} Shell Crusher is one stack for all eight.`,
@@ -901,8 +1034,24 @@ function detectBusters(players: PlayerInfo[], life: Life, casts: EnemyEvent[], s
     for (const res of clusterByGap(hitsOf(players, life, id, end).filter((h) => h.e.timestamp >= start), (h) => h.e.timestamp, 1500)) {
       const t = res[0].e.timestamp;
       occurrences?.push({ mechanicKey: OOD_BUSTER_RULE_ID, timestamp: t, players: players.filter((p) => !isTank(p)).map((p) => p.name) });
+      occurrences?.push({ mechanicKey: OOD_TANK_RULE_ID, timestamp: t, players: tanks.map((p) => p.name) });
       if (!tanks.some((p) => life.alive(p, t - 500))) continue;
       const tankHit = res.some((h) => isTank(h.p));
+      if (id === BLACK_HALO) errors.push(...haloAggro(players, life, res, t));
+      // A Dance that hit non-tanks with its tank baiter short of the edge:
+      // the baiter didn't go out far enough, the rest were in place.
+      if (id === DANCE_BUSTER && res.some((h) => !isTank(h.p))) {
+        const baiter = res.filter((h) => isTank(h.p)).map((h) => ({ h, r: fromCenter(h.p, t - 300) ?? Infinity })).sort((a, b) => b.r - a.r)[0];
+        if (baiter && baiter.r >= DANCE_BAIT_OUT_YD && baiter.r < DANCE_BAIT_MIN_YD) {
+          const killed = diedIn(life, res);
+          errors.push(playerError(baiter.h.p, {
+            ruleId: OOD_TANK_RULE_ID, severity: killed.length ? "Major" : "Minor", name: "Baited Darkest Dance Too Close",
+            description: `Baited Darkest Dance only ~${baiter.r.toFixed(1)} yalms from the middle (clean baits go 15+ out, to the wall), so the jump also hit ${namesOf(res.map((h) => h.p).filter((p) => p !== baiter.h.p))}.${killed.length ? ` ${namesOf(killed)} died.` : ""} The Darkest Dance tank runs all the way out to the wall so the jump lands away from the group.`,
+            timestamp: t, abilityId: DANCE_BUSTER, abilityName: "Darkest Dance",
+          }));
+          continue;
+        }
+      }
       for (const h of res.filter((x) => !isTank(x.p))) {
         const death = life.diedFrom(h.p, h.e.timestamp);
         errors.push(playerError(h.p, {
@@ -914,6 +1063,35 @@ function detectBusters(players: PlayerInfo[], life: Life, casts: EnemyEvent[], s
     }
   }
   return errors;
+}
+
+/**
+ * Black Halo goes on whoever holds Gaia. A tank killed by it alone, with the
+ * other tank alive, who took Gaia's autos only in the HALO_AGGRO_MS before
+ * it (the other tank had them first) and with no Provoke / Shirk in the
+ * HALO_SWAP_MS before: an unplanned aggro swap, theirs (user, 2026-10-12,
+ * j6Zhc8 3 +79.2: the DRK never released Grit, unlike every other pull, and
+ * took the PLD's buster). The only such death on disk; planned swaps
+ * (GQT7Nh 16, zqta7c 14) Provoke or Shirk, and a dead partner (j6Zhc8 20)
+ * leaves the other tank holding Gaia from the start of the window.
+ */
+function haloAggro(players: PlayerInfo[], life: Life, res: Hit[], t: number): PullError[] {
+  const tanks = players.filter(isTank);
+  const hitTanks = uniq(res.filter((h) => isTank(h.p)).map((h) => h.p));
+  if (tanks.length !== 2 || hitTanks.length !== 1) return [];
+  const [taker] = hitTanks;
+  const other = tanks.find((p) => p !== taker)!;
+  if (!diedIn(life, res).includes(taker) || !life.alive(other, t - 500)) return [];
+  const autos = tanks.flatMap((p) => p.damageTaken.filter((e) => e.abilityName === "Attack" && e.timestamp >= t - HALO_AGGRO_MS && e.timestamp < t).map((e) => ({ p, t: e.timestamp })))
+    .sort((a, b) => a.t - b.t);
+  if (!autos.length || autos[0].p !== other || autos[autos.length - 1].p !== taker) return [];
+  const swapped = tanks.some((p) => p.casts.some((c) => /^(Provoke|Shirk)$/.test(c.abilityName) && c.timestamp >= t - HALO_SWAP_MS && c.timestamp <= t));
+  if (swapped) return [];
+  return [playerError(taker, {
+    ruleId: OOD_TANK_RULE_ID, severity: "Major", name: "Took Aggro Before Black Halo",
+    description: `Took Gaia's aggro from ${other.name} in the seconds before Black Halo with no Provoke or Shirk (her autos moved over to them), so the buster went on them and killed them. The tank who isn't taking Black Halo keeps their enmity under the other tank's until it lands (drop tank stance if that is the plan).`,
+    timestamp: t, abilityId: BLACK_HALO, abilityName: "Black Halo",
+  })];
 }
 
 // ── deaths with no killing blow ─────────────────────────────────────────────
@@ -1027,6 +1205,8 @@ export function detectOracleOfDarknessErrors(
     ...detectSpiritTaker(players, life, enemyCasts, deaths, from, end),
     ...detectWallDeaths(players, p3Deaths, called, start, end),
   ];
+
+  errors.push(...unexplainedMarks(players, deaths, errors, start, end, OOD_MARK_RULE_ID));
 
   // Memory's End with Gaia at 20% or more is the enrage.
   const failCast = enemyCasts.find((c) => c.abilityId === MEMORYS_END_FAIL && c.timestamp >= start);
