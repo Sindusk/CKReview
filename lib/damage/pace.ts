@@ -13,7 +13,7 @@
 // reference clear's analysis passed in), the base this player could have
 // had = the peer's base × (1 + peer's rating haste) ÷ (1 + own rating
 // haste), rating haste = rating ÷ each pull's own calibration (haste.ts).
-// The fastest of those, if 3%+ under the player's own base, is the
+// The fastest of those, if 5%+ under the player's own base, is the
 // expectation. Every instant GCD outside forced time then had a lock
 // (recast × the player's GCD factor at t) longer than the expectation's
 // (recast × expected ÷ 1.5s × the haste buffs up at t); the difference is
@@ -26,7 +26,10 @@ import type { DamageFinding, PacePeer } from "./types";
 import { finding, type PlayerCheckContext } from "./checks";
 import { inWindows } from "./timeline";
 
-const MARGIN = 0.97;      // the peer's scaled base must be 3%+ faster
+// The peer's scaled base must be 5%+ faster. At 3% the 100th-percentile
+// Arcane Mage Màzz (3Vz6Qt2RyTPXwpJn) was flagged against a raid member's
+// base fitted on 3 minutes alive (1.07s vs 1.03s): fit noise, not play.
+const MARGIN = 0.95;
 const FLOOR_SHARE = 0.5;  // WoW's 0.75s GCD floor, as a share of the recast
 
 /** The player's own pace, from their speed model (undefined when it isn't comparable). */

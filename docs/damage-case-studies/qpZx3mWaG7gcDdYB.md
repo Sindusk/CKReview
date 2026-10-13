@@ -32,7 +32,7 @@ for this kill, so top players' logs stand in for it.
 | Sylmigron | Balance Druid | not started |
 | Cocroach | Elemental Shaman | not started |
 | Mythnarra | Havoc Demon Hunter | **Done** (against Hawkerton) |
-| Neximage | Arcane Mage | not started |
+| Neximage | Arcane Mage | **Done** (against Màzz) |
 | Deathstriker | Beast Mastery Hunter | not started |
 | Veinglas | Blood Death Knight | not started (haste fit: 0.90s base, unexplained) |
 | Polpo | Retribution Paladin | not started |
@@ -113,6 +113,11 @@ for this kill, so top players' logs stand in for it.
   Metamorphosis 79% overstated (Stasis; no fourth use possible). Fury cap
   and small delays are a Havoc floor (Hawkerton shows them too). Pace
   right for his haste; 47.8 vs 53.7 GCDs a minute.
+- **Neximage vs Màzz:** no new check. Excess is small GCD delays (9.5s
+  vs 1.9s) and gaps; Touch of the Magi 84% overstated (held through
+  Stasis to sync with Arcane Surge); Arcane Orb "bad" casts still beat his
+  average GCD; casting through Stasis showed no payoff after it. The pace
+  check's threshold went 3% → 5% (it flagged Màzz on fit noise).
 - Potion buffs added to the stream; all three kills refetched
   (2026-10-13) and baselines checked.
 
@@ -122,8 +127,10 @@ for this kill, so top players' logs stand in for it.
 
 ## Next
 
-The next player the user names. Neximage (Arcane) has a 100th-percentile
-reference in 3Vz6Qt2RyTPXwpJn (Màzz; page saved):
+The next player the user names. The remaining players (Nearby, Sylmigron,
+Cocroach, Deathstriker, Veinglas, Polpo, Blkphnx, Thatapaddlin, Fwîî)
+have references only where NK1hBtW9rckdjq36 or 3Vz6Qt2RyTPXwpJn has the
+spec; ask the user for a top log otherwise:
 `damage-compare-wow sampledata/wow/qpZx3mWaG7gcDdYB --refs=NK1hBtW9rckdjq36,3Vz6Qt2RyTPXwpJn`. For each: extract the page
 (`wowa-html.js --brief`), the app's findings (`--all-findings`), verify
 each claim, and compare against a top player of the spec (ask the user for

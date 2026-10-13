@@ -24,6 +24,21 @@
 //   yet: WCL credits it its own way and our streams don't carry it.
 // Tracked cooldowns are in tracked-cooldowns.ts.
 //
+// Arcane, checked against WoWAnalyzer on qpZx3mWaG7gcDdYB pull 3
+// (Neximage; reference 3Vz6Qt2RyTPXwpJn's Màzz, 100th percentile, page
+// saved; checked 2026-10-13):
+// - Matched: active time 82.1% vs 96.2%; small GCD delays 9.5s vs 1.9s
+//   (Arcane Missiles ended 0.31s vs 0.10s late on average). Arcane Surge
+//   100%, potions 2/2.
+// - Overstated: Touch of the Magi 84% (0:49–1:34 "missed"): ready inside
+//   Stasis, then held to line up with Arcane Surge at 1:34; Màzz spent his
+//   into Stasis's 99% reduction. No lost use.
+// - Not adopted: Arcane Orb 8 bad of 11 (cast at 4 charges): his Orbs
+//   averaged 294k, above his 241k average GCD; the charge waste isn't in
+//   the log. Prismatic Bolt munched 3 (Màzz 6). Idle during Stasis (16.2s,
+//   13.8s, 9.1s): Màzz cast through it but hit no harder after (0.52–0.81×
+//   his average in the 15s after vs Neximage's 0.67–0.91×).
+//
 // Marksmanship, checked against WoWAnalyzer on qpZx3mWaG7gcDdYB pull 3
 // (Shadowmeld; reference: 3Vz6Qt2RyTPXwpJn's Imnotanorc, 100th
 // percentile, page saved too; checked 2026-10-13):
