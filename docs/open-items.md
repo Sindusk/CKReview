@@ -955,14 +955,35 @@ grouped by exact roster. The module headers hold the rules.
   - Cooldown recasts are the shortest measured interval, an upper bound,
     so drift errs lenient.
   - Subtlety's Energy-cap gain estimate includes regen.
-- **Same-spec GCD expectation (proposed 2026-10-13, user to decide).**
-  The per-player GCD model judges each player against their own fastest
-  presses, so a player who is uniformly slow is excused. Arms Hervous vs
-  Cocomber (qpZx3mWaG7gcDdYB): fitted 1.13s vs 0.98s, ratings 947 vs 1063
-  (~3%), talents differ in one choice node, no haste buff differs: ~6–7M
-  likely unpressed. Proposal: with a same-spec peer (pull or reference),
-  expect the peer's fitted GCD × the rating ratio. Case file:
-  docs/damage-case-studies/qpZx3mWaG7gcDdYB.md.
+- **Same-spec GCD pace: gear-haste conversion (proposed 2026-10-13,
+  user to decide).** The pace check (lib/damage/pace.ts, built
+  2026-10-13) scales a peer's base GCD by rating haste from the pull's
+  own linear calibration (~33 rating per 1%), which also absorbs talent
+  haste. Same-spec players share their talent haste, so only gear haste
+  should separate them: Maxroll's 44 rating per 1% with the diminishing-
+  returns bands (docs/dps-analysis.md, "WoW secondary stats"). Hervous vs
+  Cocomber: 21.5% vs 24.2% gear haste (×1.022) against ×1.034 from the
+  calibration, so the current expectation is a little too fast and the
+  2.18M slightly high. Proposal: the published conversion in the pace
+  check; the calibration stays as the GCD fallback for players without
+  enough instants.
+- **WoW crit luck: talent library vs measured rates (open, user to
+  decide).** Crit rating is in every player's CombatantInfo (critSpell /
+  critMelee; the sample fetch drops it, scripts/lib/slim-report.js), but
+  gear crit (5% + rating ÷ 46 with the bands) undershoots what players
+  crit by +2.6 to +26.4 points on qpZx3mWaG7gcDdYB (talents, per-spell and
+  conditional crit, buffs; table in docs/dps-analysis.md). Two ways:
+  - **Library:** model every talent, per-spell and conditional crit
+    effect, tier set and proc per spec, kept current per patch. Talents
+    are in the log only as unnamed node ids. Large and never finished;
+    WoWAnalyzer maintains this per spec and still shows no crit luck.
+  - **Measured:** each player's crit rate per ability from their own hits
+    across the other loaded pulls (the FFXIV fallback,
+    lib/damage/crit-rates.ts, done per ability; leave-one-out so a pull
+    isn't judged against itself). Everything above is baked in; needs
+    several pulls of the player, else "needs more pulls".
+  Recommendation: measured. Nothing is built yet; the dialog shows no
+  crit luck for WoW players.
 - **WoW patch dates (open).** Pulls carry the log's start time
   (`reportStartedAt`, meta.json `startTime`) but there's no WoW
   patch/hotfix table (FFXIV's is lib/damage/ffxiv/patches.ts), so every
@@ -981,7 +1002,9 @@ grouped by exact roster. The module headers hold the rules.
     gear haste buffs: refetch with `--refetch` to get them.
   - Rating → haste varies across players (18–37 rating per 1% on that
     kill: passive talent haste), so the rating base is a rough fallback;
-    nobody on that kill needed it.
+    nobody on that kill needed it. The published gear conversion is 44
+    per 1% with diminishing returns (docs/dps-analysis.md, "WoW secondary
+    stats"); the gap to the fit is talent haste.
   - Blood DK Veinglas fits a 0.90s base with no haste buff (rating says
     ~1.1s): an unlisted haste source, or abilities with shorter GCDs that
     the 0.85× median rule doesn't catch.

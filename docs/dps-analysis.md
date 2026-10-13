@@ -319,6 +319,58 @@ docs/damage-case-studies/qpZx3mWaG7gcDdYB.md. What generalizes:
   counted channel time as missing GCDs. A spec with channels, empowers or
   flights needs its first log checked for each.
 
+## WoW secondary stats (researched 2026-10-13)
+
+Sources: Maxroll, "Stat Diminishing Returns for World of Warcraft
+12.0.1 - Midnight" (maxroll.gg/wow/resources/stat-diminishing-returns,
+updated 2026-03-13); Wowhead, "Diminishing Returns on Secondary Stats"
+(patch 12.1.5, 2026-03-04; brackets only, no level-90 conversion).
+
+- **Rating per 1% at level 90:** crit 46, haste 44, versatility 54
+  (1% damage done, 0.5% damage taken), mastery per spec. Tertiary:
+  avoidance 37, leech 69, speed 12.
+- **Diminishing returns** apply to % from rating only, progressively
+  like tax bands: 0–30% none, 30–39% −10%, 39–47% −20%, 47–54% −30%,
+  54–66% −40%, 66–126% −50%, nothing past 126%. In rating (Maxroll): haste
+  penalties start at 1320, crit and mastery at 1380, versatility at 1620.
+  Flat % effects (Bloodlust, talents that grant %) aren't penalised;
+  rating procs (trinkets) are.
+- **What the log has:** each player's CombatantInfo carries every stat
+  (critSpell/critMelee/critRanged, haste*, mastery, versatility*,
+  primary stats) and talents as unnamed node ids. The sample fetch keeps
+  only haste (scripts/lib/slim-report.js).
+- **Gear stats don't predict crit.** qpZx3mWaG7gcDdYB pull 3, own non-pet
+  hits that can crit (abilities that never crit, like Rune of Lingering
+  0/316 or Caustic Spatter 0/582, and always-crit ones left out),
+  against 5% + rating ÷ 46 with the bands:
+
+  | Player | Spec | Crit rating | Gear crit | Observed | Gap |
+  |---|---|---|---|---|---|
+  | Veinglas | Blood DK | 1171 | 30.5% | 33.0% | +2.6 |
+  | Fwîî | Demonology | 1556 | 38.4% | 45.1% | +6.6 |
+  | Bragontix | Devastation | 1251 | 32.2% | 39.4% | +7.2 |
+  | Thatapaddlin | Protection Paladin | 1241 | 32.0% | 40.5% | +8.5 |
+  | Neximage | Arcane | 660 | 19.3% | 29.9% | +10.5 |
+  | Cocomber | Arms | 1306 | 33.4% | 50.2% | +16.8 |
+  | Wyrmtongues | Destruction | 1146 | 29.9% | 47.1% | +17.2 |
+  | Polpo | Retribution | 1387 | 35.1% | 53.1% | +18.0 |
+  | Nearby | Assassination | 1522 | 37.8% | 57.1% | +19.3 |
+  | Blkphnx | Windwalker | 1058 | 28.0% | 48.1% | +20.1 |
+  | Mythnarra | Havoc | 1548 | 38.3% | 61.9% | +23.6 |
+  | Shadowmeld | Marksmanship | 1714 | 41.5% | 65.9% | +24.4 |
+  | Cocroach | Elemental | 999 | 26.7% | 53.1% | +26.4 |
+
+  The gap is talents, per-spell and conditional crit (execute ranges,
+  guaranteed-crit casts, stacking buffs), procs and sets, none of which
+  the log names. Predicting crit means a per-spec effect library kept
+  current per patch; measuring it per ability from the player's other
+  pulls needs no library. The choice is open (docs/open-items.md, "WoW
+  crit luck").
+- **Haste:** the GCD model's on-pull calibration reads ~33 rating per 1%
+  (18–37 per player) because it absorbs talent haste; the published gear
+  conversion is 44. Between two players of the same spec only gear haste
+  differs (open item on the pace check).
+
 ## Ideas for app tooling
 
 All of these are built in the Damage dialog (`lib/damage/`). The build
