@@ -236,6 +236,108 @@ export function castTimeProcFindings(ctx: PlayerCheckContext, spec: CastTimeProc
   })];
 }
 
+// ── Cooldowns recharged by spending a resource ─────────────────────────
+// Arms' Avatar and Colossus Smash come back faster the more Rage is spent
+// (measured on three Arms Warriors, qpZx3mWaG7gcDdYB / NK1hBtW9rckdjq36,
+// 2026-10-13: Avatar 90s − 1s per 20 Rage, Colossus Smash 45s − 1s per 20;
+// Eroka's Avatar after 650 Rage: 57.5s predicted, 57.5s actual). A fixed
+// recast can't judge them (tracked-cooldowns.ts leaves them out), so after
+// each cast the next ready time is simulated from the player's own spends:
+// the first moment elapsed time + spent ÷ perUnit seconds reaches baseMs.
+// Held = ready → next cast, less forced time and a short allowance; lost
+// uses = held ÷ the player's average actual recharge. A use is worth the
+// cooldown's window bonus read from the player's hits (observedWindowBonus,
+// per window, averaged) × their damage rate outside the windows × the
+// average window. Inference: the recharge rule and the window's value are
+// both measured, not known.
+
+export type SpentCooldownSpec = {
+  name:          string;
+  actionIds:     number[];
+  baseMs:        number;
+  resourceType:  number;     // WCL classResources type (1 Rage)
+  scale:         number;     // logged units per displayed unit (Rage ×10)
+  unitsPerSecond: number;    // displayed units spent per 1s of recharge
+  firstUseOffsetMs: number;
+  // The cooldown's effect window, for its value: the player's own buff,
+  // or a debuff the player puts on enemies.
+  window: { buffId: number } | { debuffId: number };
+};
+
+const SPENT_HOLD_MS = 3_000;
+
+export function spentCooldownDrift(ctx: PlayerCheckContext, spec: SpentCooldownSpec): DamageFinding[] {
+  const ids = new Set(spec.actionIds);
+  const casts = ctx.player.casts.filter((c) => ids.has(c.abilityId) && c.timestamp < ctx.endMs).map((c) => c.timestamp).sort((a, b) => a - b);
+  if (casts.length < 2) return [];
+  const spends = ctx.player.casts
+    .map((c) => ({ t: c.timestamp, units: (c.resources?.find((r) => r.type === spec.resourceType)?.cost ?? 0) / spec.scale }))
+    .filter((x) => x.units > 0)
+    .sort((a, b) => a.t - b.t);
+  const msPerUnit = 1000 / spec.unitsPerSecond;
+  const readyAfter = (t: number) => {
+    let reduced = 0;
+    for (const s of spends) {
+      if (s.t <= t) continue;
+      if (s.t - t + reduced >= spec.baseMs) break;
+      reduced += s.units * msPerUnit;
+    }
+    return Math.max(t, t + spec.baseMs - reduced);
+  };
+  const forced = mergeWindows(ctx.forced);
+  const stretches: Window[] = [{ startMs: spec.firstUseOffsetMs, endMs: casts[0] }];
+  const recharges: number[] = [];
+  for (let i = 0; i < casts.length; i++) {
+    const ready = readyAfter(casts[i]);
+    recharges.push(ready - casts[i]);
+    stretches.push({ startMs: ready, endMs: casts[i + 1] ?? ctx.endMs });
+  }
+  let held = 0;
+  let longest: Window | undefined, longestHeld = 0;
+  for (const w of stretches) {
+    if (w.endMs <= w.startMs) continue;
+    const h = Math.max(0, w.endMs - w.startMs - overlapMs(w.startMs, w.endMs, forced) - SPENT_HOLD_MS);
+    held += h;
+    if (h > longestHeld) { longestHeld = h; longest = w; }
+  }
+  const avgRecharge = recharges.reduce((a, x) => a + x, 0) / recharges.length;
+  const lost = Math.floor(held / avgRecharge);
+  if (lost < 1 || !longest) return [];
+
+  // What one use is worth.
+  const wins: Window[] = "buffId" in spec.window
+    ? statusWindows(ctx, spec.window.buffId)
+    : mergeWindows((() => {
+        const id = (spec.window as { debuffId: number }).debuffId;
+        const out: Window[] = []; const open = new Map<string, number>();
+        for (const e of (ctx.pull.bossDebuffs ?? []).filter((x) => x.statusId === id && x.sourceName === ctx.player.name).sort((a, b) => a.timestamp - b.timestamp)) {
+          const key = `${e.targetActorId}.${e.targetInstance ?? 1}`;
+          if (e.status === "removed") { const s0 = open.get(key); if (s0 !== undefined) { out.push({ startMs: s0, endMs: e.timestamp }); open.delete(key); } }
+          else if (!open.has(key)) open.set(key, e.timestamp);
+        }
+        return out;
+      })());
+  const inside = wins.filter((w) => w.endMs <= ctx.endMs && w.endMs > w.startMs);
+  if (inside.length === 0) return [];
+  const bonus = inside.reduce((a, w) => a + observedWindowBonus(ctx, w), 0) / inside.length;
+  const avgLen = inside.reduce((a, w) => a + w.endMs - w.startMs, 0) / inside.length;
+  const excluded = mergeWindows([...forced, ...inside]);
+  const outsideMs = ctx.endMs - overlapMs(0, ctx.endMs, excluded);
+  const outsideDmg = ctx.player.damageDone
+    .filter((e) => e.timestamp < ctx.endMs && !inWindows(e.timestamp, excluded))
+    .reduce((a, e) => a + (e.amount ?? 0), 0);
+  const perUse = bonus * avgLen * (outsideMs > 0 ? outsideDmg / outsideMs : 0);
+  if (perUse <= 0) return [];
+  return [finding(ctx, {
+    kind: "cooldown-drift", startMs: longest.startMs, endMs: longest.endMs, forced: false,
+    label: `${spec.name} drift`,
+    lostDamage: lost * perUse,
+    inference: true,
+    basis: `${lost} use${lost > 1 ? "s" : ""} × ${s(avgLen)} window × ${Math.round(bonus * 100)}% bonus (read from the player's hits) × ${k(outsideDmg / outsideMs * 1000)}/s outside it`,
+    detail: `${spec.name} sat ready for ${s(held)} in total (${casts.length} uses; recharge ${s(spec.baseMs)} − 1s per ${spec.unitsPerSecond} spent, ${s(avgRecharge)} on average here): about ${lost} use${lost > 1 ? "s" : ""} lost`,
+  })];
+}
+
 // ── Resource cap ───────────────────────────────────────────────────────
 
 export type ResourceCapSpec = {

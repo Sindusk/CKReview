@@ -20,7 +20,7 @@
 // Tracked cooldowns are in tracked-cooldowns.ts.
 
 import type { JobCheck } from "../../types";
-import { burstGcdFindings, observedWindowBonus, primaryResourceCapFindings } from "./shared";
+import { burstGcdFindings, observedWindowBonus, primaryResourceCapFindings, spentCooldownDrift } from "./shared";
 
 const window = (statusId: number, name: string): JobCheck => (ctx) => burstGcdFindings(ctx, {
   statusId, name,
@@ -45,6 +45,23 @@ const MELEE_WINDOWS: Record<string, [number, string]> = {
   "Survival Hunter":        [1250646, "Takedown"],
 };
 
+// Arms: Avatar and Colossus Smash recharge with Rage spent (shared.ts
+// spentCooldownDrift has the measurement). Colossus Smash's window is a
+// buff on the Warrior (208086, 13 on Cocomber's 13 casts), not an enemy
+// debuff; Bladestorm resets (15–20s comebacks) and stays unjudged.
+const ARMS_SPENT: JobCheck[] = [
+  (ctx) => spentCooldownDrift(ctx, {
+    name: "Avatar", actionIds: [107574], baseMs: 90_000, resourceType: 1, scale: 10, unitsPerSecond: 20,
+    firstUseOffsetMs: 3_000, window: { buffId: 107574 },
+  }),
+  (ctx) => spentCooldownDrift(ctx, {
+    name: "Colossus Smash", actionIds: [167105], baseMs: 45_000, resourceType: 1, scale: 10, unitsPerSecond: 20,
+    firstUseOffsetMs: 3_000, window: { buffId: 208086 },
+  }),
+];
+
 export const MELEE_CHECKS: Record<string, JobCheck[]> = Object.fromEntries(
-  Object.entries(MELEE_WINDOWS).map(([spec, [id, name]]) => [spec, [window(id, name), primaryResourceCapFindings]]),
+  Object.entries(MELEE_WINDOWS).map(([spec, [id, name]]) => [spec, [
+    window(id, name), primaryResourceCapFindings, ...(spec === "Arms Warrior" ? ARMS_SPENT : []),
+  ]]),
 );

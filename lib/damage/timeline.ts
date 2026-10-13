@@ -182,8 +182,10 @@ export function gcdUses(player: PlayerInfo, game: DamageGame): GcdUse[] {
   const begins = [...(player.beginCasts ?? [])].sort((a, b) => a.timestamp - b.timestamp);
   const used = new Set<PlayerEvent>();
   const out: GcdUse[] = [];
+  const auto = game.isAutoCast?.(player);
   for (const c of player.casts) {
     if (c.fake) continue; // made by the log (WoW), not pressed
+    if (auto?.(c)) continue; // fired by another ability (Bladestorm's Mortal Strikes)
     const action = game.action(c.abilityId);
     if (!action?.onGcd) continue;
     const b = latestBegin(begins, c, 300, used);

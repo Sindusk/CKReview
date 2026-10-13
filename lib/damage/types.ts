@@ -102,6 +102,9 @@ export type DamageGame = {
   // Channelled GCDs: they log no end, so their lock runs to their last
   // tick before the next GCD (timeline.ts gcdUses).
   isChannel?(actionId: number): boolean;
+  // Casts the game fires by itself, logged like presses (Arms' Bladestorm
+  // casts Mortal Strike during its channel): not GCD uses.
+  isAutoCast?(player: PlayerInfo): (cast: PlayerEvent) => boolean;
   // Which damage events make up the player's average GCD value (the price
   // of a GCD gap). Default: on-GCD actions' hits plus every DoT tick.
   // WoW: only the player's own on-GCD abilities (hits and their DoT ticks);

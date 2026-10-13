@@ -50,7 +50,7 @@
 //   rDPS split: WCL credits it in its own way, and our streams don't
 //   carry it.
 
-import type { PlayerInfo } from "@/types/PlayerInfo";
+import type { PlayerEvent, PlayerInfo } from "@/types/PlayerInfo";
 import { SPEC_DATA } from "../../spec-data";
 import { WOW_SPELL_DATA } from "./spell-data";
 import { WOW_TRACKED_COOLDOWNS } from "./tracked-cooldowns";
@@ -85,7 +85,16 @@ const CHANNEL_IDS = new Set([
   1261153, // Malefic Grasp
   740,     // Tranquility
   64843,   // Divine Hymn
+  446035,  // Bladestorm (ticks as 50622 "Bladestorm"; see BLADESTORM below)
 ]);
+
+// Arms' Bladestorm: a ~4.5s channel that casts Mortal Strike by itself,
+// logged as ordinary casts (39–46 of each Arms Warrior's ~75–100 Mortal
+// Strikes on qpZx3mWaG7gcDdYB / NK1hBtW9rckdjq36, none of anything else).
+// The survey read Bladestorm as off-GCD because those casts followed it at
+// once. It's an on-GCD channel, and its Mortal Strikes aren't presses.
+const BLADESTORM = 446035;
+const MORTAL_STRIKE = 12294;
 
 // Taunts (spell-data.ts): Dark Command, Hand of Reckoning, Provoke, Torment.
 // Warrior Taunt and Growl weren't cast often enough to appear; add them
@@ -124,6 +133,23 @@ const ACTIONS = new Map<number, GameAction>();
   }
 }
 
+{
+  const bs = ACTIONS.get(BLADESTORM);
+  if (bs) ACTIONS.set(BLADESTORM, { ...bs, onGcd: true, recastMs: HASTED_GCD_MS, cooldownMs: HASTED_GCD_MS, speedScaled: true });
+}
+
+/** Mortal Strikes inside the player's own Bladestorm buff. */
+function bladestormAutoCasts(player: PlayerInfo): (c: PlayerEvent) => boolean {
+  const wins: [number, number][] = [];
+  let open: number | undefined;
+  for (const e of [...(player.buffs ?? [])].filter((b) => b.abilityId === BLADESTORM).sort((a, b) => a.timestamp - b.timestamp)) {
+    if (e.buffStatus === "applied" && open === undefined) open = e.timestamp;
+    else if (e.buffStatus === "removed" && open !== undefined) { wins.push([open, e.timestamp]); open = undefined; }
+  }
+  if (wins.length === 0) return () => false;
+  return (c) => c.abilityId === MORTAL_STRIKE && wins.some(([s, e]) => c.timestamp > s && c.timestamp <= e);
+}
+
 export function wowJobOf(player: Pick<PlayerInfo, "specId" | "className">): string {
   const spec = SPEC_DATA[player.specId];
   return spec ? `${spec.name} ${spec.className}` : player.className;
@@ -147,6 +173,7 @@ export const WOW_DAMAGE: DamageGame = {
   // Haste procs and gear (haste.ts): the GCD follows them through the pull.
   speedModels: (pull, usesOf, endMs) => wowSpeedModels(pull, usesOf, endMs, [...LUST_IDS, POWER_INFUSION, ...WOW_HASTE_STATUS_IDS]),
   isChannel: (id) => CHANNEL_IDS.has(id),
+  isAutoCast: bladestormAutoCasts,
   // DoT ticks share their spell's id (Agony 980, Shadow Word: Pain 589), so
   // an on-GCD action's ticks count too.
   isGcdDamage: (e) => !e.pet && ACTIONS.get(e.abilityId)?.onGcd === true,
