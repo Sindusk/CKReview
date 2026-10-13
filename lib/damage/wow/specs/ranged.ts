@@ -24,6 +24,18 @@
 //   yet: WCL credits it its own way and our streams don't carry it.
 // Tracked cooldowns are in tracked-cooldowns.ts.
 //
+// Elemental, checked against WoWAnalyzer on qpZx3mWaG7gcDdYB pull 3
+// (Cocroach; reference JZjf9x3mK76NzabP fight 9's Nickshockz, 99th
+// percentile; checked 2026-10-13): no new check. Cooldowns (Ascendance,
+// Stormkeeper, Ancestral Swiftness), Elemental Blast spending, Flame
+// Shock (99.5%) and Maelstrom (2.7% vs 2.2%) match. Time on GCD 75.0% vs
+// 81.4%: the app's small delays (18.1s, 2.32M) and gaps; Call of the
+// Ancestors "bad" (24 of 41 vs 8 of 38) is WoWAnalyzer grading active
+// time inside each Ancestor window (under 75%), the same idle. Fewer
+// Spiritwalker's Grace (4 vs 6) fits his larger movement share (2.79M vs
+// 0.74M, not counted by the user's rule). Astral Shift / Earth Elemental:
+// utility.
+//
 // Beast Mastery, checked against WoWAnalyzer on qpZx3mWaG7gcDdYB pull 3
 // (Deathstriker; reference jmprxRc62fHCZy7g fight 25's Matcheh, 99th
 // percentile; checked 2026-10-13). Its page has only Focus waste (19.2% vs
