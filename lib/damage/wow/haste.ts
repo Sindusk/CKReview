@@ -38,6 +38,9 @@
 // that have both (rating ÷ C = haste %; Midnight's C isn't published, and
 // the old level-90 tables are from Mists of Pandaria).
 //
+// The base is the player's own pace, so a slow rhythm all pull sets a slow
+// base; lib/damage/pace.ts compares it with same-spec players' bases.
+//
 // The fit runs on the buffs in the player-buff stream; haste-statuses.ts
 // lists the measured haste buffs the stream keeps (gear procs included).
 
@@ -52,6 +55,12 @@ export type SpeedModel = {
   at(t: number): number;        // GCD ÷ 1.5s for a GCD starting at t
   terms: { id: number; factor: number }[];
   baseFrom: "instants" | "rating";
+  // The haste buffs' product at t (no clamp, no local floor): the GCD
+  // without the player's own pace is base × this.
+  hasteAt(t: number): number;
+  // Rating ÷ haste % on this pull (the calibration above), when 3+ players
+  // gave one. The same-spec pace check (lib/damage/pace.ts) scales by it.
+  ratingC?: number;
 };
 
 const BASE_MS = 1_500;
@@ -102,6 +111,8 @@ export function wowSpeedModels(
       at: (t) => clampMs(Math.max(floorAt(t), terms.reduce((g, x) => (inWindows(t, x.windows) ? g * x.factor : g), base))) / BASE_MS,
       terms: terms.map((x) => ({ id: x.id, factor: x.factor })),
       baseFrom,
+      hasteAt: (t) => terms.reduce((g, x) => (inWindows(t, x.windows) ? g * x.factor : g), 1),
+      ratingC: c,
     });
   }
   return out;

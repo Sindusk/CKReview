@@ -54,6 +54,7 @@ const fmtDamage = (n: number) =>
 const KIND_LABEL: Record<DamageFinding["kind"], string> = {
   "gcd-gap":          "GCD gap",
   "gcd-delays":       "GCD delays",
+  "gcd-pace":         "GCD pace",
   "cooldown-drift":   "Cooldown drift",
   "death":            "Death",
   "penalty":          "Penalty",
@@ -96,18 +97,23 @@ export default function DamageDialog({ open, onClose, pulls, currentPullId }: Da
 
   // Analyses are computed only for the pulls on show and cached per Pull
   // object; a re-import replaces the objects, so stale entries never match.
+  // Loaded clears' players feed the same-spec pace check (lib/damage/pace.ts),
+  // so adding or removing one starts a fresh cache.
   const cache = useRef(new WeakMap<Pull, PullDamageAnalysis>());
+  const cacheRefs = useRef(refs);
   const analyses = useMemo(() => {
     const out = new Map<number, PullDamageAnalysis>();
     if (!open) return out;
+    if (cacheRefs.current !== refs) { cache.current = new WeakMap(); cacheRefs.current = refs; }
+    const pacePeers = refs.flatMap((r) => r.analysis.players.flatMap((p) => (p.pace ? [{ ...p.pace, source: r.label }] : [])));
     const shown = allPulls ? gamePulls : selectedPull ? [selectedPull] : [];
     for (const p of shown) {
       let a = cache.current.get(p);
-      if (!a) { a = analyzePullDamage(p, gameOf(p), getDamageContext(p.name)); cache.current.set(p, a); }
+      if (!a) { a = analyzePullDamage(p, gameOf(p), getDamageContext(p.name), { pacePeers }); cache.current.set(p, a); }
       out.set(p.id, a);
     }
     return out;
-  }, [open, allPulls, gamePulls, selectedPull]);
+  }, [open, allPulls, gamePulls, selectedPull, refs]);
   const aggregate = useMemo(() => (allPulls ? aggregateDamage([...analyses.values()]) : []), [allPulls, analyses]);
 
   if (!open) return null;

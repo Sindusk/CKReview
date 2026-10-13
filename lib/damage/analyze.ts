@@ -16,9 +16,10 @@
 
 import type { Pull } from "@/types/Pull";
 import type {
-  DamageContext, DamageFinding, DamageGame, ForcedWindow, PhaseDamageSummary,
+  DamageContext, DamageFinding, DamageGame, ForcedWindow, PacePeer, PhaseDamageSummary,
   PlayerDamageSummary, PullDamageAnalysis,
 } from "./types";
+import { checkSameSpecPace, paceOf } from "./pace";
 import {
   checkCombos, checkCooldownDrift, checkDeaths, checkDisengages, checkPositionals, checkGcdGaps, checkInterrupts, checkPenalties, checkProcs,
   type PlayerCheckContext,
@@ -46,7 +47,13 @@ function channelWindows(player: Pull["players"][number], game: DamageGame): Forc
   });
 }
 
-export function analyzePullDamage(pull: Pull, game: DamageGame, context?: DamageContext): PullDamageAnalysis {
+/**
+ * `pacePeers`: other logs' players (reference clears' `pace`), compared
+ * with this pull's own same-spec players by the pace check (pace.ts).
+ */
+export function analyzePullDamage(
+  pull: Pull, game: DamageGame, context?: DamageContext, opts?: { pacePeers?: PacePeer[] },
+): PullDamageAnalysis {
   const collapseMs = wipeCollapseMs(pull);
   const endMs = Math.min(pull.fightDuration, collapseMs ?? Infinity);
 
@@ -90,6 +97,10 @@ export function analyzePullDamage(pull: Pull, game: DamageGame, context?: Damage
   const players: PlayerDamageSummary[] = [];
   const usesOf = new Map(pull.players.map((p) => [p.name, gcdUses(p, game)]));
   const speedModels = game.speedModels?.(pull, usesOf, endMs);
+  // Healers' pace follows the healing needed, not their hands: no pace.
+  const paces = new Map(pull.players.map((p) =>
+    [p.name, p.role === "Healer" ? undefined : paceOf(p.name, game.jobOf?.(p) ?? p.className, speedModels?.get(p.name), p.hasteRating)]));
+  const pacePeers = [...[...paces.values()].filter((x): x is PacePeer => !!x), ...(opts?.pacePeers ?? [])];
   for (const player of pull.players) {
     const dead = deadWindows(player, pull, endMs);
     const uses = usesOf.get(player.name)!;
@@ -129,6 +140,7 @@ export function analyzePullDamage(pull: Pull, game: DamageGame, context?: Damage
       ...checkDisengages(ctx),
       ...checkPositionals(ctx),
       ...checkBuffCoverage(ctx),
+      ...checkSameSpecPace(ctx, paces.get(player.name), pacePeers, model?.hasteAt),
       ...game.jobChecks(job).flatMap((check) => check(ctx)),
     ].sort((a, b) => Number(a.forced) - Number(b.forced) || b.lostDamage - a.lostDamage);
 
@@ -143,6 +155,7 @@ export function analyzePullDamage(pull: Pull, game: DamageGame, context?: Damage
       movementDamage: findings.filter((f) => f.movement).reduce((a, f) => a + f.lostDamage, 0),
       gcds: uses.filter((u) => u.startMs < endMs).length,
       baseGcdMs: ctx.baseGcdMs,
+      pace: paces.get(player.name),
       gcdUptime: gcdUptime(uses, speed.at, [...downtime, ...dead, ...limitBreakWindows(uses)], endMs),
       gcdSplit,
       buffs: ledger.contributions.get(player.name) ?? { given: 0, received: 0, approximate: false },

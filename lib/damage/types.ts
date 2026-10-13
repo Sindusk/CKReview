@@ -98,7 +98,12 @@ export type DamageGame = {
   // Per-player GCD speed over time, fitted on the pull (WoW: haste procs
   // and gear, lib/damage/wow/haste.ts). A player it returns replaces the
   // speedProfile's two levels; players it skips keep them.
-  speedModels?(pull: Pull, usesOf: Map<string, GcdUse[]>, endMs: number): Map<string, { factor: number; at(t: number): number }>;
+  // `baseFrom`, `hasteAt` and `ratingC` feed the same-spec pace check
+  // (lib/damage/pace.ts); a model without them is never compared.
+  speedModels?(pull: Pull, usesOf: Map<string, GcdUse[]>, endMs: number): Map<string, {
+    factor: number; at(t: number): number;
+    baseFrom?: "instants" | "rating"; hasteAt?(t: number): number; ratingC?: number;
+  }>;
   // Channelled GCDs: they log no end, so their lock runs to their last
   // tick before the next GCD (timeline.ts gcdUses).
   isChannel?(actionId: number): boolean;
@@ -193,6 +198,7 @@ export type DamageContext = {
 export type FindingKind =
   | "gcd-gap"           // one idle stretch of 1s+
   | "gcd-delays"        // the sum of a phase's small delays
+  | "gcd-pace"          // a slower base GCD than a same-spec player shows (lib/damage/pace.ts)
   | "gcd-clipping"      // small delays with three or more weaves between GCDs
   | "cooldown-drift"    // a cooldown held long enough to lose a use
   | "death"             // time dead
@@ -248,6 +254,18 @@ export type DamageFinding = {
 
 export type Moment = Window & { detail?: string; lostDamage?: number };
 
+// One player's fitted press pace (WoW, lib/damage/pace.ts): the base GCD
+// from back-to-back instants with no haste buff up, and the haste the rating
+// gives on that pull (rating ÷ the pull's calibration), so two players' bases
+// compare after the rating difference is taken out.
+export type PacePeer = {
+  player:       string;
+  job:          string;
+  baseMs:       number;
+  ratingHaste?: number;    // fraction (0.28 = 28%)
+  source?:      string;    // a reference clear's label; undefined = this pull
+};
+
 type Window = { startMs: number; endMs: number };
 
 // ── Analysis output ────────────────────────────────────────────────────
@@ -262,6 +280,9 @@ export type PlayerDamageSummary = {
   movementDamage: number;    // movement findings
   gcds:          number;
   baseGcdMs:     number;     // the player's observed GCD
+  // The fitted press pace, for comparing same-spec players across pulls
+  // (lib/damage/pace.ts); only for players whose base came from instants.
+  pace?:         PacePeer;
   // GCD locks over the time the player was alive, the boss targetable and
   // no limit break running (timeline.ts gcdUptime). pct is 0-1.
   gcdUptime:     { pct: number; activeMs: number; eligibleMs: number };

@@ -20,7 +20,7 @@ for this kill, so top players' logs stand in for it.
 | Player | Spec | Status |
 |---|---|---|
 | Wyrmtongues | Destruction Warlock (57th pct) | **Done** |
-| Hervous, Cocomber | Arms Warrior | **Done**, one open item (below) |
+| Hervous, Cocomber | Arms Warrior | **Done** |
 | Shadowmeld | Marksmanship Hunter | not started |
 | Nearby | Assassination Rogue | not started |
 | Bragontix | Devastation Evoker | not started |
@@ -60,23 +60,21 @@ for this kill, so top players' logs stand in for it.
   (43%/42%); 42% of casts at full Rage vs 36%/25%; Rage spent 3,500 vs
   4,552 / ~5,380 per 396s. The app now counts 1 Avatar + 1 Colossus Smash
   use lost for him.
+- **Same-spec GCD pace (built 2026-10-13, user's choice;
+  `lib/damage/pace.ts`, inference):** Hervous 2.18M against Cocomber
+  (1.13s vs 1.02s after ratings). With NK1hBtW9rckdjq36 loaded as a clear:
+  Wyrmtongues 1.93M (vs Shn), Sylmigron 1.04M (vs Arzenal), Veinglas 0.71M,
+  Thatapaddlin 0.47M. The old ~6–7M estimate double-counted idle the gap
+  check already counts.
 
 ## Open
 
-1. **Same-spec GCD check (user to decide; proposed 2026-10-13).** Hervous
-   presses on a ~1.2s rhythm; his fitted GCD is 1.13s against Cocomber's
-   0.98s. Their haste ratings (947 vs 1063) explain ~3%, their talents
-   differ in one choice node only (node 108676, entries 134216/134217,
-   unnamed), and no haste buff differs. So ~0.1–0.2s per press (~6–7M) is
-   likely play, which the per-player GCD model excuses. Proposal: when a
-   same-spec player (on the pull or a reference clear) has a faster fitted
-   GCD, expect that × the rating ratio; count the excess, as inference.
-2. **Patch table for WoW** (docs/open-items.md): none yet.
+1. **Patch table for WoW** (docs/open-items.md): none yet.
 
 ## Next
 
-Ask the user whether to build the same-spec GCD check (Open 1), then take
-the next player the user names. For each: extract the page
+Bragontix (Devastation Evoker; user's pick, 2026-10-13), then the next
+player the user names. For each: extract the page
 (`wowa-html.js --brief`), the app's findings (`--all-findings`), verify
 each claim, and compare against a top player of the spec (ask the user for
 a log if NK1hBtW9rckdjq36 has none).

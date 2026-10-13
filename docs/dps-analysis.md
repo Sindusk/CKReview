@@ -304,6 +304,13 @@ docs/damage-case-studies/qpZx3mWaG7gcDdYB.md. What generalizes:
 - **A same-spec comparison separates habit from setup**: the ~80ms press
   delay all three Arms Warriors (the 99th percentile too) showed isn't a
   finding; Havoc on the main target, which the top two never did, is.
+- **A per-player GCD fit excuses a slow rhythm.** Hervous's base fitted
+  1.13s against Cocomber's 0.98s (ratings explain ~3%). The pace check
+  (`lib/damage/pace.ts`, inference) expects the fastest same-spec base on
+  the pull or a loaded clear, scaled by rating haste, and counts the
+  longer lock on instant GCDs: 2.18M for Hervous, not the ~6–7M a raw
+  1.2s-vs-0.98s count gives (the gap check already counts idle past his
+  own base). Healers are left out.
 
 ## Ideas for app tooling
 

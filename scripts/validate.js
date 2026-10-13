@@ -997,7 +997,8 @@ function printDamageAnalysis(mod, pulls, game) {
         console.log(`  ${p.job.padEnd(12)} ${p.player.padEnd(18)} dealt ${M(p.damage).padStart(7)} lost ${M(p.lostDamage).padStart(6)}` +
           ` (forced ${M(p.forcedDamage)}${p.movementDamage ? `, movement ${M(p.movementDamage)}` : ''}) uptime ${(p.gcdUptime.pct * 100).toFixed(1)}% of ${t(p.gcdUptime.eligibleMs)}, GCD ${t(p.baseGcdMs)} x${p.gcds}` +
           `, buffs given ${p.buffs.approximate ? '~' : ''}${M(p.buffs.given)} received ${M(p.buffs.received)}` +
-          `${p.gcdSplit.heal ? `, heal GCDs ${p.gcdSplit.heal}/${p.gcdSplit.heal + p.gcdSplit.damage}` : ''}`);
+          `${p.gcdSplit.heal ? `, heal GCDs ${p.gcdSplit.heal}/${p.gcdSplit.heal + p.gcdSplit.damage}` : ''}` +
+          `${p.pace ? `, pace ${(p.pace.baseMs / 1000).toFixed(3)}s${p.pace.ratingHaste !== undefined ? ` @${(p.pace.ratingHaste * 100).toFixed(1)}% rating` : ''}` : ''}`);
         for (const g of p.timeline.gauges ?? []) console.log(`      gauge ${g.name}: ${g.note}`);
         const shown = all ? p.findings : p.findings.filter((f) => !f.forced).slice(0, 4);
         for (const f of shown) {
@@ -1057,18 +1058,28 @@ MECHANICS['damage-compare-wow'] = {
   async run({ mod, dir, meta }) {
     const refArg = process.argv.find((a) => a.startsWith('--refs='))?.slice('--refs='.length);
     if (!refArg) { console.log('  (needs --refs=<code>[,<code>...])'); return; }
-    const toLogs = (pulls, label) => pulls.map((pull) => ({
-      pull, analysis: mod.analyzePullDamage(pull, mod.WOW_DAMAGE, mod.getDamageContext(pull.name)),
+    const toLogs = (pulls, label, opts) => pulls.map((pull) => ({
+      pull, analysis: mod.analyzePullDamage(pull, mod.WOW_DAMAGE, mod.getDamageContext(pull.name), opts),
       label: `${label} #${pull.fightId}`,
     }));
-    const own = toLogs(loadWowThroughRealPipeline(mod, dir, meta), path.basename(dir));
-    const boss = own[0]?.pull.name;
+    const ownPulls = loadWowThroughRealPipeline(mod, dir, meta);
+    const boss = ownPulls[0]?.name;
     const refs = [];
     for (const code of refArg.split(',')) {
       const refDir = path.join(path.dirname(dir), code);
       const refMeta = JSON.parse(fs.readFileSync(path.join(refDir, 'meta.json'), 'utf8'));
       const kills = loadWowThroughRealPipeline(mod, refDir, refMeta, false).filter((p) => p.result === 'Kill' && (!boss || p.name === boss));
       refs.push(...toLogs(kills, code));
+    }
+    // The clears' players feed the same-spec pace check (lib/damage/pace.ts).
+    const pacePeers = refs.flatMap((r) => r.analysis.players.flatMap((p) => (p.pace ? [{ ...p.pace, source: r.label }] : [])));
+    const own = toLogs(ownPulls, path.basename(dir), { pacePeers });
+    for (const o of own) {
+      for (const p of o.analysis.players) {
+        for (const f of p.findings.filter((x) => x.kind === 'gcd-pace')) {
+          console.log(`  pace: ${p.player} (${p.job}) ${(f.lostDamage / 1e6).toFixed(2)}M — ${f.detail}`);
+        }
+      }
     }
     printComparison(mod, mod.WOW_DAMAGE, own, refs);
   },
