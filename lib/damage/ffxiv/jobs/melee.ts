@@ -371,9 +371,18 @@ const enshroud: JobCheck = (ctx) => burstWindowFindings(ctx, {
 //   kill gains 1800 and spends 1850, going below zero 4 times: some gains
 //   aren't casts (likely +10 when an enemy dies under Death's Design), so
 //   a cast simulation runs short and would hide overcaps.
-// - Not built: AoE on too few targets (Whorl of Death at 5:00 hit 2; it
-//   needs about 3 to beat Shadow of Death). Needs per-job AoE → single-
-//   target pairs.
+// - AoE on too few targets (Whorl of Death at 5:00 hit 2; it needs about
+//   3 to beat Shadow of Death): `whorl` below.
+// Rechecked on qjCMx4bRfgNKwX9T Dancing Mad kill (7.5, 2026-10-13):
+// GCD uptime, Harvest Moon 5/4, Death's Design, its 14 missed
+// positionals (same split by action), 2 Whorls on too few targets, the
+// cancelled Communio and its weaving gaps all match. Its 6 missed
+// Enshroud actions are the 6:12 Enshroud, cashed with Sacrificium and
+// Communio 9s before P2's downtime (counted: holding the Shroud through
+// the downtime would have kept the Reapings). Its "2 Communios missed in
+// tinctures" (1:58, 17:48) is the tincture placement finding. Not
+// adopted: Gluttony drift (31s and 25s at two-minute marks; 18/18, no
+// use lost); Soul gauge 20 (the cast simulation's reason above stands).
 // Arcane Circle, from xivanalysis ArcaneCircle.tsx: the two-minute burst
 // is a double Enshroud inside the window: 7 Reapings, 4 Lemure's, 2
 // Sacrificium, 1 Plentiful Harvest, 2 Communio; the opener half of that

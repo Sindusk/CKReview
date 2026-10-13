@@ -69,7 +69,8 @@
 //   Overstated: Biolysis clipping 15.8s a minute (per target it's ~48s
 //   over the pull; P3's two bosses again); Dissipation drift 3:11 (it
 //   counts 6:05-7:40, when Seraph, summoned 5:58, locks Dissipation out
-//   until P2's downtime: from 7:09 on, room is 6 and it used 6); Biolysis
+//   (no Dissipation while Seraph is out, confirmed by the user) until
+//   P2's downtime: from 7:09 on, room is 6 and it used 6); Biolysis
 //   at 6:06 before the downtime (3 ticks, 46k, a Broil IV's worth; the
 //   14:03 one is a dot-clip finding). No damage: overheal, Faerie Gauge
 //   overcap, Swiftcast 7/23.
