@@ -134,7 +134,11 @@ export function raidDowntime(pull: Pull, endMs: number, game: DamageGame): Force
 
 /** Death → first sign of activity after it (there is no raise event). */
 export function deadWindows(player: PlayerInfo, pull: Pull, endMs: number): Window[] {
-  const activity = [...player.casts, ...player.damageDone, ...player.healing]
+  // Back alive at the next cast only: a dead player's DoTs, pets and
+  // passive effects keep logging damage and healing (3Vz6Qt2RyTPXwpJn
+  // fight 22: three players died at 2:20–2:57 and their windows closed at
+  // the next DoT tick, so the rest of the pull read as 40M+ of idle).
+  const activity = player.casts.filter((e) => !e.fake)
     .map((e) => e.timestamp)
     .sort((a, b) => a - b);
   const out: Window[] = [];

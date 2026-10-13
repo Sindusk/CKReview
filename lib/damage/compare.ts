@@ -19,7 +19,8 @@
 // added to others (lib/damage/buffs.ts). rDPS ≈ own + given, FFLogs'
 // definition. Plus GCDs and heal GCDs per minute, deaths, and the
 // analysis's own estimated loss inside the window. Each is set against the
-// median of the reference players of the same job.
+// median of the reference players of the same job, leaving out those who
+// died inside the window unless all of them did.
 //
 // ── Per role ───────────────────────────────────────────────────────────
 // Tanks, healers and DPS are summed per log (every log has 2 / 2 / 4), so
@@ -159,7 +160,12 @@ export function compareWithReferences(
     for (const s of ownStats) {
       const e = perPlayer.get(s.player) ?? { stats: [], refs: [] };
       e.stats.push(s);
-      e.refs.push(refStats.flat().filter((r) => r.job === s.job));
+      // A reference player who died in the window isn't a benchmark for the
+      // job (3Vz6Qt2RyTPXwpJn fight 22: two of three Arcane Mages died at
+      // 2:25 and 2:57 and halved the median); kept only when all of them did.
+      const sameJob = refStats.flat().filter((r) => r.job === s.job);
+      const alive = sameJob.filter((r) => r.deaths === 0);
+      e.refs.push(alive.length ? alive : sameJob);
       perPlayer.set(s.player, e);
     }
     // FFXIV parties are always 2 / 2 / 4, so a role's sum compares like with

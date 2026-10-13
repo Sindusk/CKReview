@@ -12,6 +12,11 @@ for this kill, so top players' logs stand in for it.
 - `sampledata/wow/NK1hBtW9rckdjq36/` — reference kill (fight 3, app Pull 2,
   5:26, 2026-10-04): the top Destruction Warlock (Shn, also Bryon) and a
   99th-percentile Arms Warrior (Eroka). Baselined.
+- `sampledata/wow/3Vz6Qt2RyTPXwpJn/` — reference kill (fight 22, app
+  Pull 1, 5:29), the user's pick (2026-10-13): 100th-percentile parses for
+  Marksmanship (Imnotanorc), Devastation (Gilgvoker), Havoc (Hawkerton)
+  and Arcane (Màzz). Three players died there (Falkeron 2:20, Forgyy 2:25,
+  Unbearievabl 2:57, none raised). Baselined.
 - `sampledata/damage-wow/` — WoWAnalyzer Overview pages for every
   non-healer on the kill (16 pages).
 
@@ -23,7 +28,7 @@ for this kill, so top players' logs stand in for it.
 | Hervous, Cocomber | Arms Warrior | **Done** |
 | Shadowmeld | Marksmanship Hunter | not started |
 | Nearby | Assassination Rogue | not started |
-| Bragontix | Devastation Evoker | **In progress**: needs a reference log (Open 1) |
+| Bragontix | Devastation Evoker | **Done** (against Gilgvoker) |
 | Sylmigron | Balance Druid | not started |
 | Cocroach | Elemental Shaman | not started |
 | Mythnarra | Havoc Demon Hunter | not started |
@@ -75,25 +80,31 @@ for this kill, so top players' logs stand in for it.
   it). New: Strafing Run expired at 2:15 (one Deep Breath, ~0.25M). Record
   in the header of lib/damage/wow/specs/ranged.ts.
 
+- **Bragontix vs Gilgvoker (3Vz6Qt2RyTPXwpJn):** rDPS 190k vs 281k.
+  Est. loss 15.2k/s vs 11.0k/s, so ~4k/s is comparable play; the rest is
+  damage per GCD and haste (rating haste 16.6% vs 34.7%: 31.8 vs 34.8 GCDs
+  a minute). Empowers: release → next press + 0.5s per Disintegrate tick
+  is ~27–28s for Fire Breath in both; Eternity Surge ~27s vs ~24–26s.
+  Bragontix's clear holds outside Stasis (Fire Breath 3:57 ~6s, Eternity
+  Surge 3:54 ~10s and 5:04 ~4s) add up to under one use each: no empower
+  check built. Disintegrate: 4.66 vs 4.93 ticks per cast (~6%, ~2M) and
+  12.6 vs 16.6 casts a minute (Essence income, not built).
+- **Dead-time fix (found on the reference):** a dead window closed at the
+  player's next logged damage, and dead players' DoTs and pets keep
+  logging; it now closes at the next cast. Bragontix's 2:27 death went
+  from 0.2s to 6.6s dead (battle res, 1.15M). The comparison also leaves
+  reference players who died out of their spec's median.
+
 ## Open
 
-1. **Bragontix's empowers (needs a top Devastation log on Entombed
-   Sentinels).** WoWAnalyzer: Fire Breath 86% / Eternity Surge 82%,
-   "sat ready" 68.7s / 87.1s, much of it in Stasis. Measured: release →
-   next press + 0.5s per Disintegrate tick comes out ~26.6–28s when
-   prompt, 34–37s at Fire Breath 3:57 and Eternity Surge 3:54 / 5:04, but
-   in Dragonrage the intervals run shorter than 30s − 0.5s/tick predicts,
-   so the Causality rule isn't pinned. Also Disintegrate tick efficiency
-   340/385 (clips and early chains): no reference to judge it against.
-2. **Patch table for WoW** (docs/open-items.md): none yet.
+1. **Patch table for WoW** (docs/open-items.md): none yet.
 
 ## Next
 
-Get a top Devastation log from the user and fetch it
-(`fetch-wow-report.js <code> --fight <id>`); compare empower intervals
-(scratchpad script: interval vs Disintegrate ticks) and tick efficiency;
-then build empower drift if Bragontix's holds exceed the reference's.
-Then the next player the user names. For each: extract the page
+The next player the user names. Shadowmeld (Marksmanship), Mythnarra
+(Havoc) and Neximage (Arcane) now have 100th-percentile references in
+3Vz6Qt2RyTPXwpJn (Imnotanorc, Hawkerton, Màzz):
+`damage-compare-wow sampledata/wow/qpZx3mWaG7gcDdYB --refs=NK1hBtW9rckdjq36,3Vz6Qt2RyTPXwpJn`. For each: extract the page
 (`wowa-html.js --brief`), the app's findings (`--all-findings`), verify
 each claim, and compare against a top player of the spec (ask the user for
 a log if NK1hBtW9rckdjq36 has none).
