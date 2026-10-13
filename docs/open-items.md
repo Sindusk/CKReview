@@ -955,27 +955,23 @@ grouped by exact roster. The module headers hold the rules.
   - Cooldown recasts are the shortest measured interval, an upper bound,
     so drift errs lenient.
   - Subtlety's Energy-cap gain estimate includes regen.
-- **GCD under changing haste (open, raised by the user 2026-10-13).**
-  The engine has two GCD levels per player: inside Bloodlust-family /
-  Power Infusion windows and outside them, each the most common interval
-  (timeline.ts speedProfile). Haste procs (Destruction's Reverse Entropy
-  and Flashpoint; trinket procs, which the buff stream filters out as
-  "gear") shorten the GCD in between. Measured on qpZx3mWaG7gcDdYB pull 3:
-  - The outside value sits at the slow end. Back-to-back instants ran
-    faster than it near almost every instant (Wyrmtongues: 136 of 165;
-    Thatapaddlin 291 of 297) and slower in at most 11 per player. So the
-    engine misses delays during procs (lenient); it doesn't charge players
-    for haste wearing off.
-  - A local estimate (fastest back-to-back instant within ±15s) roughly
-    doubles small delays after instants (Wyrmtongues 10.1s → 20.5s,
-    Polpo 4.6s → 41.1s), but it's not safe as is: abilities with their
-    own shorter GCD (Sweeping Strikes 737ms, Execution Sentence 742ms)
-    drag the minimum down, and a ±15s window spreads a short proc onto
-    time it didn't cover.
-  - Better inputs: combatantinfo's haste rating (the fetch keeps only the
-    spec id today), haste procs kept in the buff stream (gear haste procs
-    are dropped), or casters' own hard-cast times (cast time ÷ base gives
-    haste at that moment).
+- **GCD under changing haste (built 2026-10-13, refine with more
+  samples).** lib/damage/wow/haste.ts fits each player's GCD through the
+  pull from hard-cast times, the faster back-to-back instants and the
+  haste buffs in haste-statuses.ts (header has the method and its
+  validation: Time Warp and Power Infusion fit their known +30% / +20%).
+  What's left:
+  - The haste list was measured on one kill (qpZx3mWaG7gcDdYB fight 5).
+    Specs and gear not in it only make the model lenient (the ±15s cap).
+    To extend it, run the same fit on unfiltered buffs of a new kill.
+  - WoW samples fetched before 2026-10-13 lack the haste rating and the
+    gear haste buffs: refetch with `--refetch` to get them.
+  - Rating → haste varies across players (18–37 rating per 1% on that
+    kill: passive talent haste), so the rating base is a rough fallback;
+    nobody on that kill needed it.
+  - Blood DK Veinglas fits a 0.90s base with no haste buff (rating says
+    ~1.1s): an unlisted haste source, or abilities with shorter GCDs that
+    the 0.85× median rule doesn't catch.
 
 ### Statics analysis
 

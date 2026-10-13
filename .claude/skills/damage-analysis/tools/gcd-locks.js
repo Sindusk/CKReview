@@ -30,9 +30,17 @@ const toMs = (x) => { const [m, s] = x.split(':'); return (+m * 60 + +s) * 1000;
   const p = pull.players.find((x) => x.name === who);
   if (!p) { console.log(`no player "${who}"`); process.exit(1); }
   const uses = mod.gcdUses(p, game);
-  const prof = mod.speedProfile(uses, game, []);
-  const lockOf = (u) => mod.gcdLockMs(u, prof.at(u.startMs));
-  console.log(`GCD ${(prof.baseRecastMs * prof.factor / 1000).toFixed(2)}s outside haste windows (base ${prof.baseRecastMs}ms × ${prof.factor.toFixed(3)})`);
+  // The analysis's own speed: WoW's fitted model (haste procs, gear, lust)
+  // when the player has one, else the two-level profile.
+  const usesOf = new Map(pull.players.map((x) => [x.name, mod.gcdUses(x, game)]));
+  const model = game.speedModels?.(pull, usesOf, pull.fightDuration ?? Infinity)?.get(who);
+  const prof = mod.speedProfile(uses, game, mod.statusWindows(p, game.hasteStatusIds, Infinity));
+  const at = model ? model.at : prof.at;
+  const lockOf = (u) => mod.gcdLockMs(u, at(u.startMs));
+  console.log(model
+    ? `GCD from the fitted model: base ${(prof.baseRecastMs * model.factor / 1000).toFixed(2)}s, ` +
+      `haste terms ${model.terms.map((t) => `${t.id} ×${t.factor.toFixed(3)}`).join(', ') || 'none'} (${model.baseFrom})`
+    : `GCD ${(prof.baseRecastMs * prof.factor / 1000).toFixed(2)}s outside haste windows (base ${prof.baseRecastMs}ms × ${prof.factor.toFixed(3)})`);
 
   if (summary) {
     const hardIds = new Set((p.beginCasts ?? []).filter((b) => (b.durationMs ?? 0) > 0).map((b) => b.abilityId));
@@ -62,7 +70,7 @@ const toMs = (x) => { const [m, s] = x.split(':'); return (+m * 60 + +s) * 1000;
     // not the previous cast of the spell landing as this one begins
     const landed = casts.find((c) => c.abilityName === u.abilityName && c.timestamp >= u.startMs + u.castMs - 20 && c.timestamp <= u.startMs + 6000);
     const next = uses[i + 1];
-    console.log(`${clock(u.startMs)} ${u.abilityName.padEnd(18)} cast ${(u.castMs / 1000).toFixed(2)}s  lock ${(lock / 1000).toFixed(2)}s to ${clock(u.startMs + lock)}  landed ${landed ? clock(landed.timestamp) : '?'}  ` +
+    console.log(`${clock(u.startMs)} ${u.abilityName.padEnd(18)} cast ${(u.castMs / 1000).toFixed(2)}s  gcd ${(prof.baseRecastMs * at(u.startMs) / 1000).toFixed(2)}s  lock ${(lock / 1000).toFixed(2)}s to ${clock(u.startMs + lock)}  landed ${landed ? clock(landed.timestamp) : '?'}  ` +
       (next ? `next ${clock(next.startMs)}  idle ${((next.startMs - u.startMs - lock) / 1000).toFixed(2)}s` : '(last)'));
   }
 })();
