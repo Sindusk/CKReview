@@ -31,7 +31,16 @@ Chauzey Solstice, across every fight.
   Across the FF samples, 11.3M → 10.4M of tincture findings; Dancer
   suggestions inside Technical Step 16 → 0.
 
+- Healer DoT refreshes (user, 2026-10-13): only what pressing it one or
+  more GCDs later would gain counts (shared.ts dotApplicationFindings).
+  Sage, The Tyrant kill: 11 refreshes / 14.0s → 1 (the 0:25 re-dot in
+  buffs with 8s left, 15k). AST Combust drops ~10-35% per pull.
+
 ## Next
+
+- Open: the Sage's 0:25 re-dot on The Tyrant kill is inside raid buffs;
+  whether a snapshot refresh is worth its clip isn't modelled for
+  healers (Bard has `snapshotInBuffs`).
 
 - Tincture check, offered and not yet answered: drop moves whose only
   gain is filler in the same off-burst stretch (The Tyrant kill's 5:10 →
