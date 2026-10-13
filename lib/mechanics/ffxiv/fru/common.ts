@@ -100,3 +100,23 @@ export const byPlayer = (hits: Hit[]) => {
   for (const h of hits) m.set(h.p, [...(m.get(h.p) ?? []), h.e]);
   return m;
 };
+
+/**
+ * A called wipe's no-killing-blow deaths, minus a first one followed by a
+ * death to a mechanic before the next no-killing-blow death: the reset
+ * follows the failure, so that first death was its own mistake (user,
+ * 2026-10-12: T25 P2 +87.6 the sage walked into the wall, the cones killed
+ * four, then the raid reset; T30 +0:49 in P1 the picto smudged into the
+ * wall, a spread doubled onto the healer, then the reset). Only the first,
+ * and only with nobody dead in the 10s before it: a mechanic death in the
+ * middle of a reset (B22 +0:32, a Burn Mark among seven) doesn't split it,
+ * nor does a death right behind others (C41 +1:21, 4.7s after Blastburn
+ * with two already knocked out).
+ */
+export function resetCluster(near: DeathEvent[], deaths: DeathEvent[]): DeathEvent[] {
+  const sorted = [...near].sort((a, b) => a.timestamp - b.timestamp);
+  const [first, next] = sorted;
+  if (!next || !deaths.some((k) => k.killingAbilityGameId && k.timestamp > first.timestamp && k.timestamp < next.timestamp)) return near;
+  if (deaths.some((k) => k !== first && k.timestamp <= first.timestamp && first.timestamp - k.timestamp <= 10_000)) return near;
+  return sorted.slice(1);
+}

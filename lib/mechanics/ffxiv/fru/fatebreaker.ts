@@ -108,6 +108,16 @@
 // - Sinsmite: each bearing holds an outer and an inner spread (A: Yoro/
 //   Galileo, Apollo/Sayacissa, Sin/Laura, Sarelie/Jamie). Clean outer
 //   11.5y+ from the center (B, C 12.1+), inner 10.6y- (B, C 8.7-).
+// VOD review 2026-10-12 round 4 (user): report T wdH8Az193bYxJTRf (group
+// A's static on 2025-01-11, 34 pulls, cited as T12 +0:50), pulls 12, 14,
+// 30, 34; rulings in expectations/rulings.json. It set:
+// - stacks retargeted by a death to something else being fallout (T12);
+// - still holding Damage Down at a wall death being a reset (T14);
+// - a wall death before a mechanic death not being part of the called
+//   wipe (T30);
+// - the Fall of Faith group read from a same-side four-player resolution
+//   (T34: the ninja on the wrong side for tether 1, their cone hit all
+//   five of the other group).
 // Cutoffs (first Raid error): player dead going into a mechanic 62, called
 // wipe 41, collapse 40, Fated Burn Mark 22, enrage 11, tower 3; the 18 P1
 // clears have none.
@@ -124,7 +134,8 @@
 //   one bearing: the one outside their band (outer under 11y, inner over
 //   11y), else both.
 // ffxiv-fb-stack: with all eight alive, a player in two Sinsmoke / Sinbound
-//   Fire III stacks, or in none (not if just hit by an avoidable).
+//   Fire III stacks, or in none (not if just hit by an avoidable). Skipped
+//   when a player outside the stacks died at that moment (retargeted).
 // ffxiv-fb-powder-swap (Major): the first Powder Mark on the tank who
 //   wasn't the opener-Provoke MT (that tank named); the holder killed by an
 //   auto-attack: the other tank if they didn't Provoke, both tanks if they
@@ -140,7 +151,8 @@
 //   tethered players), a player in both, a player in neither when a stack
 //   was short, else a player-less Minor for an uneven split.
 // ffxiv-fb-fall-of-faith: each resolution's group is read from the other
-//   resolution on its side when that was clean, else as everyone outside a
+//   resolution on its side when that was clean (failing that, one that hit
+//   exactly four including this carrier), else as everyone outside a
 //   clean resolution of the other side (failing that, one of exactly four
 //   players sharing nobody with this one); with the group alive: a double hit
 //   (in lightning, not this side's other carrier by Prey order, next in
@@ -155,13 +167,14 @@
 //   alive, a non-tank in no tower, else the extras in an overfilled one.
 //   Skipped with 3+ non-tanks dead.
 // ffxiv-fb-knockback (Major): knocked into the wall by Blastburn, or walked
-//   into it mid-pull (not within 20s of their own Damage Down: a reset; not
-//   a dropped killing blow).
+//   into it mid-pull (not within 20s of their own Damage Down or still
+//   holding it: a reset; not a dropped killing blow).
 // ffxiv-fb-dead-going-in (Raid): someone still dead when Cyclonic Break,
 //   Utopian Sky, the tether stacks or Fall of Faith begins (all eight
 //   needed), or a non-tank at the towers (C27 cleared with the OT dead).
 // ffxiv-fb-enrage / -called-wipe (3+ no-killing-blow deaths within 10s or
-//   within 12s of the end, knocks excluded) / -collapse (4 dead, pull over
+//   within 12s of the end, knocks excluded, and not a lone first death
+//   followed by a mechanic death: common.ts resetCluster) / -collapse (4 dead, pull over
 //   within 20s): Raid, only the earliest, only before any mechanic Raid.
 // Exposure: -powder-swap and -powder-death are targeted (both tanks at each
 // Powder Mark); everything else counts everyone.
@@ -405,7 +418,7 @@ import type { ReportedOccurrence } from "@/lib/mechanics/occurrences";
 import { kFmt, sec, yd, joinNames, playerError, playerlessMinor, raidMarker, clusterByGap } from "@/lib/mechanics/wow/common";
 import {
   DAMAGE_DOWN, MARK_OF_MORTALITY, DEATH_EVENT_LAG_MS, PREVIEW_AMOUNT, type Hit, type Life,
-  bodyHit, buildLife, hitsOf, castsOf, gotAura, clock, uniq, namesOf, isTank, realAmount, allAlive, byPlayer,
+  bodyHit, buildLife, hitsOf, castsOf, gotAura, clock, uniq, namesOf, isTank, realAmount, allAlive, byPlayer, resetCluster,
 } from "./common";
 
 export const FB_AVOIDABLE_RULE_ID    = "ffxiv-fb-avoidable";
@@ -534,6 +547,13 @@ const SWAP_PROVOKE_BEFORE_MS = 6000;
 const DEAD_GOING_IN_MS   = 500;
 
 // ── shared helpers (the rest are in ./common) ───────────────────────────────
+
+/** Holding the aura at `t` (applied before, not removed since). */
+function holdsAt(p: PlayerInfo, id: number, t: number): boolean {
+  let on = false;
+  for (const e of p.debuffs) if (e.abilityId === id && e.timestamp <= t) on = e.debuffStatus !== "removed";
+  return on;
+}
 
 /** Took a listed avoidable hit within 2s of `t`: already flagged for it. */
 function inAvoidable(p: PlayerInfo, t: number): boolean {
@@ -689,13 +709,18 @@ const STACKS: Stack[] = [
  * living player in none missed it (named; Major when the stack killed). The
  * Fall of Faith and tether stacks have their own rules below.
  */
-function detectStacks(players: PlayerInfo[], life: Life, end: number): PullError[] {
+function detectStacks(players: PlayerInfo[], life: Life, deaths: DeathEvent[], end: number): PullError[] {
   const errors: PullError[] = [];
   for (const st of STACKS) {
     for (const res of clusterByGap(hitsOf(players, life, st.id, end), (h) => h.e.timestamp, 1000)) {
       const t0 = res[0].e.timestamp;
       if (!allAlive(players, life, t0 - 500)) continue;
       const per = byPlayer(res);
+      // Someone killed at that moment by something else (Blasting Zone on a
+      // stack's healer target) retargets the stacks: fallout (user,
+      // 2026-10-12, T12 +0:50: both fire stacks on three after the healer
+      // died to Blasting Zone; the line victims are flagged for it).
+      if (players.some((p) => !per.has(p) && deaths.some((d) => d.player === p.name && d.timestamp >= t0 && d.timestamp <= t0 + DEATH_EVENT_LAG_MS + 1000))) continue;
       const killed = uniq(res.filter((h) => life.diedFrom(h.p, h.e.timestamp)).map((h) => h.p));
       const sev = killed.length ? "Major" : "Minor";
       const deathText = killed.length ? ` ${namesOf(killed)} died.` : "";
@@ -954,9 +979,17 @@ function detectFallOfFaith(players: PlayerInfo[], life: Life, end: number): Pull
   const preyOrder = players.flatMap((p) => p.debuffs.filter((e) => e.abilityId === PREY && e.debuffStatus === "applied" &&
     e.timestamp <= first && first - e.timestamp <= PREY_BEFORE_FALL_MS).map((e) => ({ p, t: e.timestamp })))
     .sort((a, b) => a.t - b.t).map((x) => x.p);
+  const carrierAt = (t: number) => players.find((p) => p.debuffs.some((e) => e.abilityId === FLOATING_FETTERS && e.debuffStatus === "applied" &&
+    t - e.timestamp >= FETTERS_BEFORE_MS[0] && t - e.timestamp <= FETTERS_BEFORE_MS[1]));
   res.forEach((r, k) => {
     const t = r[0].e.timestamp;
-    const partner = [res[k - 2], res[k + 2]].find((x) => x && clean(x));
+    // Failing a clean one, a same-side resolution that hit exactly four
+    // players including this tether's carrier (user, 2026-10-12, T34 +1:47:
+    // tether 3 hit the ninja with its group, so the ninja's tether-1 cone
+    // into the other group was theirs).
+    const own = carrierAt(t);
+    const partner = [res[k - 2], res[k + 2]].find((x) => x && clean(x)) ??
+      [res[k - 2], res[k + 2]].find((x) => x && byPlayer(x).size === 4 && !!own && byPlayer(x).has(own));
     // Any resolution of the other side; failing a clean one, one that hit
     // exactly four players (user, 2026-10-12: A60 +1:47 Laura, read from a
     // clean tether 4; A43 +1:47 Sayacissa, from tether 4's four, doubled).
@@ -1161,10 +1194,10 @@ function calledWipeDeaths(deaths: DeathEvent[], casts: EnemyEvent[], pullEnd: nu
   const out = new Set<DeathEvent>();
   for (const d of silent) {
     if (pullEnd - d.timestamp <= CALLED_WIPE_END_MS) out.add(d);
-    const near = silent.filter((x) => Math.abs(x.timestamp - d.timestamp) <= CALLED_WIPE_WINDOW);
+    const near = resetCluster(silent.filter((x) => Math.abs(x.timestamp - d.timestamp) <= CALLED_WIPE_WINDOW), deaths);
     if (near.length >= CALLED_WIPE_COUNT) near.forEach((x) => out.add(x));
   }
-  return out;
+  return new Set(resetCluster([...out], deaths));
 }
 
 /**
@@ -1181,6 +1214,10 @@ function detectWallDeaths(players: PlayerInfo[], casts: EnemyEvent[], deaths: De
     if (!p) continue;
     const kb = knockbackOf(casts, d, end);
     if (!kb && p.debuffs.some((e) => e.abilityId === DAMAGE_DOWN && e.debuffStatus === "applied" && e.timestamp < d.timestamp && d.timestamp - e.timestamp <= DD_RESET_MS)) continue;
+    // Still holding Damage Down at the death, however old: dying where
+    // nothing needs them to clear it is the right call (user, 2026-10-12,
+    // T14 +1:21: the GNB reset after the tether stacks, 61s after it).
+    if (!kb && holdsAt(p, DAMAGE_DOWN, d.timestamp - DEATH_EVENT_LAG_MS - 200)) continue;
     if (!kb && p.damageTaken.some((e) => (e.amount ?? 0) > 0 && e.timestamp <= d.timestamp && d.timestamp - e.timestamp <= SILENT_HIT_MS)) continue;
     errors.push(playerError(p, {
       ruleId: FB_KNOCKBACK_RULE_ID, severity: "Major", name: kb ? "Knocked Into the Wall" : "Walked Into the Wall",
@@ -1215,7 +1252,7 @@ export function detectFatebreakerErrors(
   const errors = [
     ...detectAvoidable(players, life, end),
     ...detectPersonalOverlaps(players, life, end),
-    ...detectStacks(players, life, end),
+    ...detectStacks(players, life, deaths, end),
     ...detectPowderMark(players, life, enemyCasts, deaths, end, occurrences),
     ...detectFatedBurnMark(players, life, deaths, end),
     ...detectTetherStacks(players, life, end),

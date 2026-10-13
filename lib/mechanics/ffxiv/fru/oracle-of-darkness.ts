@@ -10,8 +10,10 @@
 // - A-S: the 19 reports of usurper-of-frost.ts (same letters), 91 P3 pulls,
 //   refetched with `--from-minutes 2.4 --to-minutes 10.75`.
 // - T wdH8Az193bYxJTRf, U t8VfAkyq2YFzBjDP, V abPA9dLJVD4rn6Zq,
-//   W yWrQA4ac1VfMhgR7, X cQL739vDqXgxhAPy: a second static, 42 P3 pulls,
-//   fetched with `--min-minutes 7.3 --from-minutes 6.9 --to-minutes 10.75`.
+//   W yWrQA4ac1VfMhgR7, X cQL739vDqXgxhAPy: a second static (the user's
+//   own, fatebreaker.ts's group A), 42 P3 pulls, fetched with
+//   `--min-minutes 7.3 --from-minutes 6.9 --to-minutes 10.75`. T is now on
+//   disk whole (2026-10-12) for its P1/P2 VOD review.
 // Cited as V22 +34.0: pull number, seconds after Hell's Judgment (7:23-7:27
 // into the pull). Six Memory's End passes (S10, V22, W4, W8, X5, X8), 22
 // enrages, the rest wiped earlier.

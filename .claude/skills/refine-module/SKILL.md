@@ -116,10 +116,12 @@ other reports too, and read every new or removed error the change causes.
 
 ## 5. Validate and record
 
-1. Run `node scripts/validate.js --check` and read the whole diff. Each
-   added, removed or changed line must be an intended consequence, and
-   every report counts, not just this one. Fix anything unexpected
-   before going on.
+1. Run `node scripts/validate.js --check <mechanic> <the boss's report
+   folders>` and read the whole diff. Scope it the way CLAUDE.md's
+   Validation fact says: only the reports holding this boss, unscoped only
+   for cross-boss code. Each added, removed or changed line must be an
+   intended consequence, and every one of the boss's reports counts, not
+   just this one. Fix anything unexpected before going on.
 2. Write the rulings **by hand** into `expectations/rulings.json`, at the
    end, once detection has settled. Follow the file's `_doc` schema:
    `{ report, mechanic, boss, pull, mustFlag, mustNotFlag, note, date }`.

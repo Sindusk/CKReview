@@ -149,6 +149,12 @@ philosophy and the data semantics this list assumes.
 - **Name the takers when a stack goes elsewhere.** One player alone under
   it while most stood elsewhere is the stack leaving the group (The
   Tyrant).
+- **A shared cone is its baiter's.** A cone hits its own baiter, so in a
+  shared one the player hit by nothing else aimed it; the doubled players
+  were in their spots (Usurper of Frost's Mirror, Mirror, user ruling).
+- **A bait landing on everyone can be the boss's spot.** A boss-centered
+  donut hitting 3+ players names the tank holding the boss (Usurper of
+  Frost, user ruling).
 - **A nearest-player bait that went to the wrong player:** name whoever
   baited nothing (and anyone in a bait that isn't their role's), not the
   players who caught the leftovers (Lindwurm's Mortal Slayer, user
@@ -256,7 +262,9 @@ Classify every one before counting a called wipe. Known meanings:
 - **A delayed death:** Mark of Mortality, Doom (Oracle of Darkness).
 - **A Dreadmarch walk-off, or a feared player falling** (The Coiled Altar).
 - **A death right after another death:** usually the raid resetting
-  (Usurper of Frost).
+  (Usurper of Frost). But a lone wall death followed by deaths to a
+  mechanic, then the reset, was its own mistake: the reset follows the
+  failure (Futures Rewritten `resetCluster`, user ruling).
 
 Related:
 

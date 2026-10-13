@@ -170,7 +170,9 @@ Find, for each mechanic:
    - every wipe has a cutoff (no `NONE: wipe without a cutoff`);
    - each rule's sample reads right when you open a few per rule (per-pull
      mode, `--pulls`, `--rule`).
-3. `node scripts/validate.js --check`. Existing reports must not change,
+3. `node scripts/validate.js --check`, scoped as CLAUDE.md's Validation
+   fact says (the new module plus any shared file you touched; unscoped
+   only for cross-boss code). Existing reports must not change,
    unless a shared file was touched on purpose; read that diff line by
    line. The new reports show "no baseline". Then
    `node scripts/validate.js --update sampledata/<game>/<code>` for each

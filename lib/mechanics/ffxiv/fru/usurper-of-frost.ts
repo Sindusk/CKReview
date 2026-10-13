@@ -92,6 +92,28 @@
 // 21, Refulgent Fate 18, Endless Ice Age 18, Absolute Zero 11, center tower
 // 11, fifth stack 9, dead going into Light Rampant 3. The 91 clears have
 // none.
+// VOD review 2026-10-12 (user): report T wdH8Az193bYxJTRf (the user's
+// static, fatebreaker.ts's group A, 2025-01-11), pulls 1, 3, 4, 8, 13, 19,
+// 20, 21, 25; rulings in expectations/rulings.json. Report T is cited in
+// the same P2-relative seconds (its P2 starts 2:52-2:57). It set:
+// - the Diamond Dust cone bait: the unmarked player who took no cone is
+//   named, not the marked player it went to (T13 +30.8);
+// - a Mirror, Mirror cone's aimer named alone (T20 +103.2);
+// - the boss's spot as the tank's fault (T21 +92.7);
+// - a missed Sinbound Holy always Major (T3 +45.7);
+// - the fifth-stack mover (T4 +155.6);
+// - lone knockback walls after a death (T19 +40.1);
+// - a wall death before a mechanic death not being part of the called
+//   wipe (T25 +87.6).
+// - Refulgent Fate T8 (pull 5:03): per the user the summoner stood too close to
+//   the sage (tether assignments went wrong). Not readable: at the
+//   chains-to-curse change the closest chained pairs in failed pulls
+//   (13.7-15.9y: A3, H2, T8, T18) overlap the clean ones (14.3y+), and the
+//   tether partners aren't logged. It stays player-less.
+// - Diamond Dust deaths: per the user the pull was over once the GNB died
+//   in T19 Diamond Dust. On disk 11 of 46 pulls with a Diamond Dust death
+//   still reached Hallowed Ray (T29 among them), so there is no cutoff for
+//   it yet (asked).
 //
 // -- RULES IMPLEMENTED --
 // ffxiv-uof-avoidable (Major on Damage Down or death, else Minor): Icicle
@@ -100,15 +122,23 @@
 //   Blizzard III.
 // ffxiv-uof-gaze (Major): Stun / Damage Down from Shining Armor.
 // ffxiv-uof-marked-cone: a Frigid Stone player hit by a House of Light cone
-//   (Major when they died). ffxiv-uof-stone: a stone hitting unmarked
+//   (Major when they died). When the cone was aimed at them as one of the
+//   four nearest while a living unmarked player took no cone,
+//   ffxiv-uof-cone-bait names that unmarked player instead (too far out).
+//   ffxiv-uof-stone: a stone hitting unmarked
 //   players names the marked players it also hit (player-less without one).
 // ffxiv-uof-overlap (all eight alive): a player hit by 2+ instances of a
 //   Mirror, Mirror cone, Banish III Divided spread or final cone; everyone
-//   sharing them named. Major if one of them died.
+//   sharing them named. Major if one of them died. House of Light cones:
+//   when every shared cone has exactly one player hit by nothing else, that
+//   player aimed it and is named alone ("Aimed ... Into Others").
+// ffxiv-uof-boss-spot (Major): a boss Scythe Kick in Mirror, Mirror on 3+
+//   players names the tank holding the boss (last auto); that volley's kick
+//   and cone errors are dropped.
 // ffxiv-uof-stack (all eight alive): a player in none or in two of Sinbound
 //   Holy, Hallowed Ray, Banish III pairs, Powerful Light; a Holy taken alone
 //   with 2+ missing also names its target. Major on a death or Mark of
-//   Mortality, else Minor.
+//   Mortality, else Minor; a missed Sinbound Holy is always Major.
 // ffxiv-uof-puddle: Bleeding (Minor; Major when it killed).
 // ffxiv-uof-slap (Major): a tank killed by Quadruple Slap, or by an auto
 //   under its vulnerability (both tanks).
@@ -118,20 +148,27 @@
 //   the tower are named, except one a Burst pushed to three.
 // ffxiv-uof-fifth-stack (Major + Raid): the player who reached five stacks,
 //   with their stack history; not when the extra came from Inescapable
-//   Illumination. Raid when it hit 3+.
+//   Illumination. Two who reached five from the same final cones: the one
+//   on the side of the empty spot alone. Raid when it hit 3+.
 // ffxiv-uof-wall (Major): no-killing-blow deaths: knockback (Heavenly
 //   Strike, Swelling Frost), Thin Ice slide, else walked into the wall. Not
 //   within 36s of the player's own Damage Down, not within 8s of another
-//   death, not with a dropped killing blow, not a called wipe.
+//   death (except a lone knockback death), not with a dropped killing
+//   blow, not a called wipe.
 // ffxiv-uof-dead-going-in (Raid): someone dead when Light Rampant begins.
 // ffxiv-uof-enrage / -endless-ice-age (Raid): the timer checks.
 // ffxiv-uof-called-wipe (3+ no-killing-blow deaths within 10s, or one in
-//   the last 12s with 4+ dead) / -collapse (3 dead, pull over within 25s):
-//   Raid, only the earliest, only before any mechanic Raid.
+//   the last 12s with 4+ dead; a first one followed by a mechanic death
+//   before the next, with nobody dead in the 10s before it, is its own
+//   mistake: common.ts resetCluster) / -collapse (3 dead, pull over within
+//   25s): Raid, only the earliest, only before any mechanic Raid.
 // Exposure: -slap targets both tanks, -marked-cone and -stone the four
-// Frigid Stone players; everything else counts everyone.
+// Frigid Stone players; everything else (-cone-bait, -boss-spot included)
+// counts everyone.
 // The Damage Down causes are excluded from ffxiv-damage-down (error-rules.ts).
-// Not built: Hammer/tower overlaps, who aimed a Mirror, Mirror cone, the
+// Not built: Hammer/tower overlaps, who stood too close in a short Light
+// Rampant tether (Refulgent Fate stays player-less), a mirror cone's aimer
+// when its target can't be told apart, the
 // light/dark crystal kill order (no crystal buffs or deaths in the log),
 // LR tower assignments, tank mitigation beyond deaths.
 //
@@ -393,13 +430,15 @@ import type { ReportedOccurrence } from "@/lib/mechanics/occurrences";
 import { kFmt, sec, yd, joinNames, playerError, playerlessMinor, raidMarker, clusterByGap } from "@/lib/mechanics/wow/common";
 import {
   DAMAGE_DOWN, MARK_OF_MORTALITY, DEATH_EVENT_LAG_MS, PREVIEW_AMOUNT, type Hit, type Life,
-  bodyHit, buildLife, hitsOf, castsOf, gotAura, clock, uniq, namesOf, isTank, realAmount, allAlive, byPlayer,
+  bodyHit, buildLife, hitsOf, castsOf, gotAura, clock, uniq, namesOf, isTank, realAmount, allAlive, byPlayer, resetCluster,
 } from "./common";
 
 export const UOF_AVOIDABLE_RULE_ID   = "ffxiv-uof-avoidable";
 export const UOF_GAZE_RULE_ID        = "ffxiv-uof-gaze";
 export const UOF_CONE_RULE_ID        = "ffxiv-uof-marked-cone";
+export const UOF_CONE_BAIT_RULE_ID   = "ffxiv-uof-cone-bait";
 export const UOF_STONE_RULE_ID       = "ffxiv-uof-stone";
+export const UOF_BOSS_SPOT_RULE_ID   = "ffxiv-uof-boss-spot";
 export const UOF_OVERLAP_RULE_ID     = "ffxiv-uof-overlap";
 export const UOF_STACK_RULE_ID       = "ffxiv-uof-stack";
 export const UOF_PUDDLE_RULE_ID      = "ffxiv-uof-puddle";
@@ -681,13 +720,29 @@ function detectDiamondDust(players: PlayerInfo[], life: Life, casts: EnemyEvent[
         }));
       }
     }
-    // Cones on marked players.
+    // Cones on marked players. When the cone was aimed at the marked player
+    // as one of the four nearest while a living unmarked player took no cone,
+    // that unmarked player stood too far out and is named instead (user,
+    // 2026-10-12, T13 +30.8: the summoner wasn't close enough, the marked
+    // healer was fine; PITFALLS: name whoever baited nothing).
     const coneTargets = new Set(castsOf(casts, HOUSE_CONE, end).filter((c) => c.timestamp >= t0 && c.timestamp <= t1).map((c) => c.target));
+    const baitFlagged = new Set<PlayerInfo>();
     for (const [p, es] of byPlayer(cones)) {
       if (!marked.has(p.name) || stoneFlagged.has(p)) continue;
       const own = stones.find((h) => h.p === p);
       const died = life.diedFrom(p, (own ?? { e: es[0] }).e.timestamp);
       const skipped = players.filter((x) => !marked.has(x.name) && life.alive(x, es[0].timestamp) && !cones.some((c) => c.p === x));
+      if (coneTargets.has(p.name) && skipped.length) {
+        for (const s of skipped.filter((x) => !baitFlagged.has(x))) {
+          baitFlagged.add(s);
+          errors.push(playerError(s, {
+            ruleId: UOF_CONE_BAIT_RULE_ID, severity: died ? "Major" : "Minor", name: "Too Far for the Cones",
+            description: `Wasn't marked for Frigid Stone but took no House of Light cone: they stood farther from the boss than ${p.name}, who was marked, so a cone went to ${p.name} instead, with magic vulnerability right before their stone.${died ? ` ${p.name} died${own ? ` to ${own.e.abilityName}` : ""}.` : ""} The four unmarked players stand closest to the boss to take the cones.`,
+            timestamp: es[0].timestamp, abilityId: HOUSE_CONE, abilityName: "The House of Light",
+          }));
+        }
+        continue;
+      }
       errors.push(playerError(p, {
         ruleId: UOF_CONE_RULE_ID, severity: died ? "Major" : "Minor", name: "Took a Cone While Marked",
         description: `Had a Frigid Stone marker but was hit by ${es.length > 1 ? `${es.length} House of Light cones` : "a House of Light cone"}${coneTargets.has(p.name) ? `, aimed at them as one of the four nearest the boss${skipped.length ? ` instead of ${namesOf(skipped)}` : ""}` : ""}: magic vulnerability right before their own stone.${died ? ` They died${own ? ` to ${own.e.abilityName}` : ""}.` : ""} Marked players stand a little farther from the boss than the cone baiters, and out of their lines.`,
@@ -700,9 +755,9 @@ function detectDiamondDust(players: PlayerInfo[], life: Life, casts: EnemyEvent[
 
 // ── one bait per player: cones and spreads ──────────────────────────────────
 
-type Personal = { ids: number[]; name: string; what: string; why: string; skipMarked?: boolean };
+type Personal = { ids: number[]; name: string; what: string; why: string; skipMarked?: boolean; aimer?: boolean };
 const PERSONAL: Personal[] = [
-  { ids: [HOUSE_CONE], name: "The House of Light", what: "cone", skipMarked: true,
+  { ids: [HOUSE_CONE], name: "The House of Light", what: "cone", skipMarked: true, aimer: true,
     why: "Each player baits one House of Light cone; two players on one line take both (magic vulnerability). In Mirror, Mirror the tanks and melee bait at the boss, the healers and ranged at the blue mirror, then each group at its nearest red mirror." },
   { ids: [BANISH_SPREAD], name: "Banish III Divided", what: "spread",
     why: "Banish III with four orbs is eight spreads: everyone takes their own." },
@@ -732,6 +787,28 @@ function detectOverlaps(players: PlayerInfo[], life: Life, markers: HeadMarker[]
         for (const h of res) if (keys.has(instKey(h.e)) && !involved.has(h.p)) involved.set(h.p, per.get(h.p)!);
       }
       const killed = [...involved.keys()].filter((p) => life.diedFrom(p, involved.get(p)!.slice(-1)[0].timestamp));
+      // A cone hits its own baiter first, so a shared cone with exactly one
+      // player hit by nothing else was that player's, aimed through the
+      // others; the doubled players stood in their own spots (user,
+      // 2026-10-12, T20 +103.2: the ninja's cone crossed into the boss group,
+      // the three it doubled were correct). Only them, when every shared
+      // cone has such an owner.
+      if (fam.aimer) {
+        const shared = byInstance(res).filter((hs) => uniq(hs.map((h) => h.p)).length > 1);
+        const owners = shared.map((hs) => uniq(hs.map((h) => h.p)).filter((p) => per.get(p)!.length === 1));
+        if (shared.length && owners.every((o) => o.length === 1)) {
+          for (const [i, [owner]] of owners.entries()) {
+            const victims = uniq(shared[i].map((h) => h.p)).filter((p) => p !== owner);
+            const dead = victims.filter((p) => killed.includes(p));
+            errors.push(playerError(owner, {
+              ruleId: UOF_OVERLAP_RULE_ID, severity: killed.length ? "Major" : "Minor", name: `Aimed ${fam.name} Into Others`,
+              description: `Their ${fam.name} ${fam.what} also hit ${namesOf(victims)}, who took it on top of their own${dead.length ? `; ${namesOf(dead)} died` : ""}. ${fam.why}`,
+              timestamp: t0, abilityId: shared[i][0].e.abilityId, abilityName: shared[i][0].e.abilityName,
+            }));
+          }
+          continue;
+        }
+      }
       for (const [p, es] of involved) {
         const mine = new Set(es.map(instKey));
         const others = uniq(res.filter((h) => h.p !== p && mine.has(instKey(h.e))).map((h) => h.p));
@@ -766,7 +843,8 @@ const STACKS: Stack[] = [
  * (named), a player in two doubled up (named). A short Holy stack with only
  * its target and two or more missing names the target too: one player
  * leaving and three leaving look alike in the log (R7 +42.4). Major when
- * someone in the resolution died or got Mark of Mortality, else Minor.
+ * someone in the resolution died or got Mark of Mortality, else Minor; a
+ * missed Sinbound Holy is always Major.
  */
 function detectStacks(players: PlayerInfo[], life: Life, start: number, end: number): PullError[] {
   const errors: PullError[] = [];
@@ -790,9 +868,11 @@ function detectStacks(players: PlayerInfo[], life: Life, start: number, end: num
       }
       const missing = players.filter((p) => !per.has(p) && !inAvoidable(p, t0));
       const short = insts.filter((ps) => ps.length < st.size);
+      // Leaving a Sinbound Holy stack is Major even when its three survive
+      // (user, 2026-10-12, T3 +45.7: the picto out of the stacks).
       for (const p of missing) {
         errors.push(playerError(p, {
-          ruleId: UOF_STACK_RULE_ID, severity: sev, name: `Missed ${st.name}`,
+          ruleId: UOF_STACK_RULE_ID, severity: st.id === HOLY ? "Major" : sev, name: `Missed ${st.name}`,
           description: `Wasn't in ${st.size === 8 ? "the" : "any"} ${st.name} stack${short.length ? `, so ${namesOf(short.flat())} took it short` : ""}.${outcome} ${st.why}`,
           timestamp: t0, abilityId: st.id, abilityName: st.name,
         }));
@@ -957,7 +1037,9 @@ function detectFifthStack(players: PlayerInfo[], life: Life, start: number, end:
     const fromRaidStack = (p: PlayerInfo) => lightsteepedHistory(p).some((h) => h.cause === "Inescapable Illumination" && h.t < t);
     const hit = uniq(res.map((h) => h.p));
     const killed = hit.filter((p) => life.diedFrom(p, t));
-    for (const p of five.filter((x) => !fromRaidStack(x))) {
+    const owed = five.filter((x) => !fromRaidStack(x));
+    const mover = owed.length === 2 ? offSpotOfPair(players, owed as [PlayerInfo, PlayerInfo], t) : undefined;
+    for (const p of mover ? [mover] : owed) {
       const hist = lightsteepedHistory(p).filter((h) => h.t <= t + 200 && h.n > 0);
       const steps = hist.map((h) => `${h.n} from ${h.cause ?? "Light Rampant"} (${clock(h.t)})`).join(", ");
       errors.push(playerError(p, {
@@ -973,6 +1055,76 @@ function detectFifthStack(players: PlayerInfo[], life: Life, start: number, end:
     }
   }
   return errors;
+}
+
+/**
+ * Two players who reached five together from the same final cones stood in
+ * one spot of the eight-way layout around the boss. The one who left their
+ * spot is the one next to the empty one: of the gaps between consecutive
+ * players' bearings, the pair's widest outer gap is on the mover's side
+ * (user, 2026-10-12, T4 +155.6: the ninja went to the wrong spot and
+ * overlapped the sage, who was fine; bearings 25 degrees apart, the ninja's
+ * outer gap 62 degrees, the sage's 48). Undefined (both named) without all
+ * eight placed, or with the outer gaps within 10 degrees of each other.
+ */
+function offSpotOfPair(players: PlayerInfo[], pair: [PlayerInfo, PlayerInfo], t: number): PlayerInfo | undefined {
+  const fromCones = (p: PlayerInfo, id: number) => p.damageTaken.filter((e) => e.abilityId === id && e.timestamp >= t - 1000 && e.timestamp - t < 3000).length >= 2;
+  if (!pair.every((p) => fromCones(p, FINAL_CONES))) return undefined;
+  const bearing = new Map<PlayerInfo, number>();
+  for (const p of players) {
+    const e = p.damageTaken.find((x) => x.abilityId === FINAL_CONES && x.timestamp >= t - 1000 && x.timestamp - t < 3000 && x.x !== undefined && x.y !== undefined);
+    if (e) bearing.set(p, (Math.atan2(e.y! - CENTER, e.x! - CENTER) * 180 / Math.PI + 360) % 360);
+  }
+  if (bearing.size !== 8) return undefined;
+  const sorted = [...bearing].sort((a, b) => a[1] - b[1]);
+  const gapAfter = (i: number) => ((sorted[(i + 1) % 8][1] - sorted[i][1]) + 360) % 360;
+  const outer = pair.map((p) => {
+    const i = sorted.findIndex(([q]) => q === p);
+    const prev = sorted[(i + 7) % 8][0], next = sorted[(i + 1) % 8][0];
+    // The gap on the side away from the partner.
+    return next === pair.find((q) => q !== p) ? gapAfter((i + 7) % 8) : prev === pair.find((q) => q !== p) ? gapAfter(i) : NaN;
+  });
+  if (outer.some(Number.isNaN) || Math.abs(outer[0] - outer[1]) < 10) return undefined;
+  return outer[0] > outer[1] ? pair[0] : pair[1];
+}
+
+// ── Mirror, Mirror: the boss's spot ─────────────────────────────────────────
+
+/**
+ * In Mirror, Mirror the tank holds the boss opposite the blue mirror, and its
+ * Scythe Kick donut hits nobody who stands at their bait. One that hit
+ * BOSS_SPOT_HITS+ players means the boss was in the wrong spot: the tank
+ * holding it (the last auto-attack's target) is named, and that volley's
+ * kick and cone hits are fallout (user, 2026-10-12, T21 +92.7: five in the
+ * donut, the boss ~10y off center next to a mirror). No other Scythe Kick
+ * on disk (both statics) hit more than two players. Returns the
+ * errors and the window whose avoidable / overlap errors to drop.
+ */
+const BOSS_SPOT_HITS = 3;
+function detectBossSpot(players: PlayerInfo[], life: Life, casts: EnemyEvent[], end: number): { errors: PullError[]; windows: [number, number][] } {
+  const errors: PullError[] = [];
+  const windows: [number, number][] = [];
+  const reflected = castsOf(casts, [40204, 40205], end);
+  for (const res of clusterByGap(hitsOf(players, life, 40203, end), (h) => h.e.timestamp, 1500)) {
+    const t = res[0].e.timestamp;
+    const hit = uniq(res.map((h) => h.p));
+    if (hit.length < BOSS_SPOT_HITS || !reflected.some((c) => Math.abs(c.timestamp - t) < 3000)) continue;
+    const auto = players.filter(isTank).flatMap((p) => p.damageTaken.filter((e) => e.abilityId === AUTO && e.timestamp <= t + 1000).map((e) => ({ p, t: e.timestamp })))
+      .sort((a, b) => b.t - a.t)[0];
+    windows.push([t - 1500, t + 1500]);
+    const killed = hit.filter((p) => life.diedFrom(p, t));
+    const why = `Scythe Kick hit ${hit.length} players (${namesOf(hit)})${killed.length ? `; ${namesOf(killed)} died` : ""}: the boss wasn't where the groups bait their cones, so its donut and the mirrors' cones landed on them.`;
+    if (auto) {
+      errors.push(playerError(auto.p, {
+        ruleId: UOF_BOSS_SPOT_RULE_ID, severity: "Major", name: "Boss in the Wrong Spot",
+        description: `Held the boss in the wrong spot for Mirror, Mirror. ${why} The tank pulls the boss opposite the blue mirror before the kicks.`,
+        timestamp: t, abilityId: 40203, abilityName: "Scythe Kick",
+      }));
+    } else {
+      errors.push(playerlessMinor(UOF_BOSS_SPOT_RULE_ID, "Boss in the Wrong Spot", `${why} The tank pulls the boss opposite the blue mirror before the kicks.`, t, 40203, "Scythe Kick"));
+    }
+  }
+  return { errors, windows };
 }
 
 // ── a mechanic started with someone dead ────────────────────────────────────
@@ -1021,10 +1173,10 @@ function calledWipeDeaths(deaths: DeathEvent[], casts: EnemyEvent[], life: Life,
   const deadAt = (t: number) => players.filter((p) => !life.alive(p, t)).length;
   for (const d of silent) {
     if (pullEnd - d.timestamp <= CALLED_WIPE_END_MS && deadAt(d.timestamp - DEATH_EVENT_LAG_MS - 200) >= CALLED_WIPE_RAID_DEAD) out.add(d);
-    const near = silent.filter((x) => Math.abs(x.timestamp - d.timestamp) <= CALLED_WIPE_WINDOW);
+    const near = resetCluster(silent.filter((x) => Math.abs(x.timestamp - d.timestamp) <= CALLED_WIPE_WINDOW), deaths);
     if (near.length >= CALLED_WIPE_COUNT) near.forEach((x) => out.add(x));
   }
-  return out;
+  return new Set(resetCluster([...out], deaths));
 }
 
 /**
@@ -1043,8 +1195,11 @@ function detectWallDeaths(players: PlayerInfo[], casts: EnemyEvent[], deaths: De
     const at = d.timestamp - DEATH_EVENT_LAG_MS;
     // Right after another death, the raid resets through the knockback or
     // the ice (B12 +36.3: six into the wall 5s after a death; J18 +58-60).
-    if (deaths.some((x) => x !== d && x.player !== d.player && x.timestamp <= d.timestamp && d.timestamp - x.timestamp <= RESET_AFTER_DEATH_MS)) continue;
+    // A lone knockback death is still a bad knockback (user, 2026-10-12,
+    // T19 +40.1: the summoner knocked into the wall 7.8s after the GNB died).
     const kb = knockbackOf(casts, d, end);
+    const kbAlone = kb && !deaths.some((x) => x !== d && !x.killingAbilityGameId && knockbackOf(casts, x, end) === kb);
+    if (!kbAlone && deaths.some((x) => x !== d && x.player !== d.player && x.timestamp <= d.timestamp && d.timestamp - x.timestamp <= RESET_AFTER_DEATH_MS)) continue;
     if (!kb && ddReset(players, d)) continue;
     const ice = !kb && slidOnIce(players, d);
     if (!kb && !ice && p.damageTaken.some((e) => (e.amount ?? 0) > 0 && e.timestamp <= d.timestamp && d.timestamp - e.timestamp <= SILENT_HIT_MS)) continue;
@@ -1083,11 +1238,15 @@ export function detectUsurperOfFrostErrors(
   const called = calledWipeDeaths(deaths.filter((d) => d.timestamp >= start), enemyCasts, life, players, p3 === Infinity ? lastEvent : Infinity, end);
   const from = start - 1000;
 
+  const bossSpot = detectBossSpot(players, life, enemyCasts, end);
+  const volley = (e: PullError) => (e.ruleId === UOF_AVOIDABLE_RULE_ID || e.ruleId === UOF_OVERLAP_RULE_ID) &&
+    bossSpot.windows.some(([a, b]) => e.timestamp >= a && e.timestamp <= b);
   const errors = [
-    ...detectAvoidable(players, life, from, end),
+    ...detectAvoidable(players, life, from, end).filter((e) => !volley(e)),
     ...detectGaze(players, life, from, end),
     ...detectDiamondDust(players, life, enemyCasts, headMarkers, end, occurrences),
-    ...detectOverlaps(players, life, headMarkers, from, end),
+    ...detectOverlaps(players, life, headMarkers, from, end).filter((e) => !volley(e)),
+    ...bossSpot.errors,
     ...detectStacks(players, life, from, end),
     ...detectPuddles(players, life, deaths, from, end),
     ...detectSlap(players, life, deaths, from, end, occurrences),

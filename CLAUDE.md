@@ -172,6 +172,18 @@ These are standing preferences, each learned from a real correction:
     it by mechanic name and/or report folder.
   - `npx tsc --noEmit`
 
+  **Scope `--check` to the changed module's reports** (user, 2026-10-12).
+  A full run walks every report on disk and takes minutes. After changing
+  a boss module, pass:
+  - that module's mechanic name(s);
+  - the `sampledata/<game>/<code>` folders that hold that boss.
+
+  Find the folders by the boss name in each folder's `meta.json`.
+  Widen to every report that boss's sibling modules cover when you touch a
+  shared helper (e.g. `ffxiv/fru/common.ts` means all FRU reports). Run
+  unscoped only after editing cross-boss code: `error-rules.ts`, the
+  transform layer, `player-position.ts`, `wow/common.ts`, rule-meta.
+
   For an intended behavior change, verify the `--check` diff is exactly the
   intended delta, then run `--update`. `expectations/rulings.json` is
   hand-edited only and never regenerated. `--prune` drops snapshots for
