@@ -8,14 +8,25 @@
 // Dancer (verified on dQ8wmb1VhKt6yBXk), Technicalities.tsx: inside each
 // Technical Finish window
 //   - Dance of the Dawn, Finishing Move, Starfall Dance and Tillana once
-//     each, and four Last Dance / Saber Dance. A missing one is its average
-//     minus the GCD used instead.
+//     each, and four Last Dance / Saber Dance (three when the window has
+//     no filler: out of Esprit, one Fountainfall is allowed). A missing
+//     one is its average minus the GCD used instead.
 //   - one Fan Dance IV, valued at its average × 5% (used outside instead).
 //   - no combo or proc fillers (Cascade, Fountain, Reverse Cascade,
-//     Fountainfall, Windmill, Bladeshower, Rising Windmill, Bloodshower):
-//     each one is the player's average Saber Dance minus the filler's own
-//     average. xivanalysis allows Fountainfall when out of Esprit; this
-//     counts it, so treat the filler finding as an upper bound.
+//     Windmill, Bladeshower, Rising Windmill; Fountainfall and Bloodshower
+//     are allowed, as in xivanalysis): each one beyond the Saber shortfall
+//     is the player's average Saber Dance minus the filler's own average.
+//   Checked against xivanalysis on qjCMx4bRfgNKwX9T Dancing Mad kill
+//   (7.5, 2026-10-13). Until then Fountainfall counted as a filler and
+//   four Sabers were always expected, so 0:02, 4:03, 8:03 and 10:03 each
+//   read as a missing Saber plus a Fountainfall filler (78k each) where
+//   xivanalysis has 3/3; and a filler in a missing Saber's slot was
+//   charged twice (6:03). Now its 2/4 and 2/3 windows match. Its 9 broken
+//   combos match by time, as do the dropped (12:27) and overwritten
+//   (15:59) Symmetry. Not adopted: Standard Step 35/37 (the drift
+//   simulation has room for 34); the 0-step Standard Finish at 11:50 and
+//   the late Devilment at 14:07 (both in forced stretches, the end-of-P3
+//   hold and past P4's check); Esprit and feathers (gauge, not logged).
 //   Proc overwrites (xivanalysis Procs.tsx, checked on jN3XDrf2z8PmLgRJ
 //   Vamp pull 8): a Silken / Flourishing Symmetry or Flow, Threefold or
 //   Fourfold Fan Dance "refreshed" within 600ms of one of the Dancer's casts
@@ -51,6 +62,7 @@
 //   MIT License; full text in THIRD_PARTY_NOTICES.md.
 
 import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
+import type { PlayerEvent } from "@/types/PlayerInfo";
 import type { DamageFinding, JobCheck } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";
 import { aoeComboOnOneTarget, burstWindowFindings, dotFindings, k, statusWindows, type ExpectedAction } from "./shared";
@@ -65,33 +77,57 @@ const replacedGcd = (...keys: string[]) => (ctx: PlayerCheckContext) =>
 const TECH_EXPECTED: [string, number][] = [
   ["DANCE_OF_THE_DAWN", 1], ["FINISHING_MOVE", 1], ["STARFALL_DANCE", 1], ["TILLANA", 1],
 ];
-const TECH_FILLERS = ["CASCADE", "REVERSE_CASCADE", "FOUNTAIN", "FOUNTAINFALL", "WINDMILL", "RISING_WINDMILL", "BLADESHOWER", "BLOODSHOWER"];
+// xivanalysis's BAD_TECHNICAL_GCDS: Fountainfall and Bloodshower aren't
+// in it (fine when out of Esprit).
+const TECH_FILLERS = ["CASCADE", "REVERSE_CASCADE", "FOUNTAIN", "WINDMILL", "RISING_WINDMILL", "BLADESHOWER"];
+const SABERS = ["LAST_DANCE", "SABER_DANCE"];
+const SABERS_EXPECTED = 4;
+
+// xivanalysis adjustExpectedCounts: a window with no filler GCD in it
+// likely ran out of Esprit, so it is allowed one Fountainfall in place of
+// the fourth Saber Dance. qjCMx4bRfgNKwX9T kill: 0:02, 4:03, 8:03, 10:03
+// each had 3 Sabers and a Fountainfall (its 3/3).
+const sabersExpected = (casts: PlayerEvent[]) => {
+  const fillers = new Set(ids(...TECH_FILLERS)), sabers = new Set(ids(...SABERS));
+  const got = casts.filter((c) => sabers.has(c.abilityId)).length;
+  return got < SABERS_EXPECTED && !casts.some((c) => fillers.has(c.abilityId)) ? SABERS_EXPECTED - 1 : SABERS_EXPECTED;
+};
 
 const technical: JobCheck = (ctx) => burstWindowFindings(ctx, {
   statusId: S.TECHNICAL_FINISH.id, name: "Technical Finish", bonus: 0.05,
   bonusBasis: "a missing GCD = its average minus the GCD used instead; Fan Dance IV × 5% (Technical Finish, FFLogs multiplier 1.05)",
   expectedGcds: () => 8,
-  expected: (): ExpectedAction[] => [
+  expected: (_ctx, casts): ExpectedAction[] => [
     ...TECH_EXPECTED.map(([key, count]) => ({ ids: ids(key), count, name: A[key].name, value: replacedGcd(key) })),
-    { ids: ids("LAST_DANCE", "SABER_DANCE"), count: 4, name: "Last Dance / Saber Dance", value: replacedGcd("SABER_DANCE") },
+    { ids: ids(...SABERS), count: sabersExpected(casts), name: "Last Dance / Saber Dance", value: replacedGcd("SABER_DANCE") },
     { ids: ids("FAN_DANCE_IV"), count: 1, name: "Fan Dance IV" },
   ],
 });
 
+// A filler that took a missing Saber Dance's slot is already valued by
+// `technical` (the Saber's average minus the GCD used instead): only the
+// fillers beyond the Saber shortfall count here.
 const technicalFillers: JobCheck = (ctx): DamageFinding[] => {
-  const fillers = new Set(ids(...TECH_FILLERS));
+  const fillers = new Set(ids(...TECH_FILLERS)), sabers = new Set(ids(...SABERS));
   const saber = ctx.values.perUse(A.SABER_DANCE.id);
   const out: DamageFinding[] = [];
   for (const w of statusWindows(ctx, S.TECHNICAL_FINISH.id)) {
     if (w.endMs > ctx.endMs) continue;
-    const used = ctx.uses.filter((u) => u.startMs >= w.startMs && u.startMs <= w.endMs + 100 && fillers.has(u.action.id));
+    const casts = ctx.player.casts.filter((c) => c.timestamp >= w.startMs && c.timestamp <= w.endMs);
+    const shortfall = Math.max(0, sabersExpected(casts) - casts.filter((c) => sabers.has(c.abilityId)).length);
+    const used = ctx.uses.filter((u) => u.startMs >= w.startMs && u.startMs <= w.endMs + 100 && fillers.has(u.action.id))
+      .sort((a, b) => ctx.values.perUse(b.action.id) - ctx.values.perUse(a.action.id))
+      .slice(shortfall);
     if (used.length === 0) continue;
     const lost = used.reduce((a, u) => a + Math.max(0, saber - ctx.values.perUse(u.action.id)), 0);
+    const during = forcedPart(w.startMs, w.endMs, ctx.forced);
     out.push(finding(ctx, {
-      kind: "burst-window", startMs: w.startMs, endMs: w.endMs, forced: false, inference: true,
+      kind: "burst-window", startMs: w.startMs, endMs: w.endMs, inference: true,
+      forced: during.ms >= 1_500, cause: during.ms >= 1_500 ? during.cause : undefined,
       label: "Fillers in Technical Finish",
       lostDamage: lost,
-      basis: `each filler = ${k(saber)} average Saber Dance minus the filler's average (upper bound: Fountainfall is fine out of Esprit)`,
+      basis: `each filler = ${k(saber)} average Saber Dance minus the filler's average` +
+        (shortfall > 0 ? `; ${shortfall} more counted as missing Saber Dances` : ""),
       detail: `${used.length} filler GCD${used.length > 1 ? "s" : ""} in Technical Finish: ${used.map((u) => u.abilityName).join(", ")}`,
     }));
   }
@@ -99,12 +135,16 @@ const technicalFillers: JobCheck = (ctx): DamageFinding[] => {
 };
 
 const OVERWRITE_CAST_MS = 600;
-// Proc status → its consumers, and whether the consumer is an oGCD.
-const DNC_PROCS: [string, string[], boolean][] = [
-  ["SILKEN_SYMMETRY", ["REVERSE_CASCADE", "RISING_WINDMILL"], false],
-  ["FLOURISHING_SYMMETRY", ["REVERSE_CASCADE", "RISING_WINDMILL"], false],
-  ["SILKEN_FLOW", ["FOUNTAINFALL", "BLOODSHOWER"], false],
-  ["FLOURISHING_FLOW", ["FOUNTAINFALL", "BLOODSHOWER"], false],
+// Proc status → its consumers, whether the consumer is an oGCD, and the
+// combo GCD a Symmetry or Flow upgrades. Measured against "the GCD used
+// instead" (the player's average GCD, Saber Dances and Tillanas in it), a
+// Reverse Cascade came out worth nothing: qjCMx4bRfgNKwX9T kill, the
+// Silken Symmetry overwritten at 15:59 read 0k.
+const DNC_PROCS: [string, string[], boolean, string?][] = [
+  ["SILKEN_SYMMETRY", ["REVERSE_CASCADE", "RISING_WINDMILL"], false, "CASCADE"],
+  ["FLOURISHING_SYMMETRY", ["REVERSE_CASCADE", "RISING_WINDMILL"], false, "CASCADE"],
+  ["SILKEN_FLOW", ["FOUNTAINFALL", "BLOODSHOWER"], false, "FOUNTAIN"],
+  ["FLOURISHING_FLOW", ["FOUNTAINFALL", "BLOODSHOWER"], false, "FOUNTAIN"],
   ["THREEFOLD_FAN_DANCE", ["FAN_DANCE_III"], true],
   ["FOURFOLD_FAN_DANCE", ["FAN_DANCE_IV"], true],
 ];
@@ -145,6 +185,17 @@ const procOverwrites = (list: [string, string[], boolean, string?][]): JobCheck 
 };
 
 const dancerOverwrites = procOverwrites(DNC_PROCS);
+
+// For the generic expired-proc check (checks.ts, DamageGame.procReplaces):
+// a GCD proc that expired cost its consumer minus the GCD it would have
+// replaced. Last Dance takes a filler's slot, valued as a Cascade.
+// qjCMx4bRfgNKwX9T kill: Last Dance Ready, held into the 4:02 Technical
+// Finish and run out at 4:06, read as a whole 86k Last Dance.
+export const PROC_REPLACES = new Map(([
+  ["REVERSE_CASCADE", "CASCADE"], ["RISING_WINDMILL", "WINDMILL"],
+  ["FOUNTAINFALL", "FOUNTAIN"], ["BLOODSHOWER", "BLADESHOWER"],
+  ["LAST_DANCE", "CASCADE"], ["REFULGENT_ARROW", "BURST_SHOT"],
+] as const).filter(([a, b]) => A[a] && A[b]).map(([a, b]) => [A[a].id, A[b].id]));
 
 // ── Bard, Machinist (unverified) ───────────────────────────────────────
 

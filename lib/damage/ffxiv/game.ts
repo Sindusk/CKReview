@@ -29,6 +29,7 @@ import { tincture } from "./jobs/tincture";
 import { JOB_GAUGES } from "./jobs/gauges";
 import { patchOf } from "./patches";
 import { VPR_PROC_STATUS_IDS } from "./jobs/melee";
+import { PROC_REPLACES } from "./jobs/ranged";
 import { FFXIV_ACTION_INDEX } from "../../mitigation/ffxiv-catalog";
 import type { DamageGame, GameAction, PartyBuff, TrackedCooldown } from "../types";
 
@@ -208,6 +209,7 @@ export const FFXIV_DAMAGE: DamageGame = {
   jobGauges: (job) => JOB_GAUGES[job] ?? [],
   patchOf,
   jobProcStatusIds: VPR_PROC_STATUS_IDS,
+  procReplaces: PROC_REPLACES,
   mitigationChannels: MITIGATION_CHANNELS,
   // Army's Muse speeds the Bard's GCDs for 10s by a fixed amount per window
   // (from the Repertoire held when Army's Paeon ended): measured from the

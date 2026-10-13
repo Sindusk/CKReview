@@ -69,6 +69,10 @@ export type DamageGame = {
   // Procs a job check handles itself (Viper's venoms, which only boost a
   // finisher): the generic proc check skips them.
   jobProcStatusIds?: Set<number>;
+  // A GCD proc's consumer → the GCD it takes the place of (Reverse Cascade
+  // → Cascade). A lost proc costs the difference, not the consumer's whole
+  // average. Consumers not listed keep the upper bound.
+  procReplaces?: Map<number, number>;
   // Channelled mitigation (Passage of Arms), by action id: from the cast
   // to the player's next action, at most maxMs, is forced (the raid plan,
   // not play).

@@ -754,7 +754,11 @@ export function checkProcs(ctx: PlayerCheckContext): DamageFinding[] {
     const st = state.get(e.abilityId);
     const lose = (t: number, n: number, how: string) => {
       const consumerName = casts.find((c) => c.abilityId === consumerId)?.abilityName ?? "its consumer";
-      const value = ctx.values.perUse(consumerId) * n;
+      // The GCD it takes the place of, when the game names one.
+      const replacesId = ctx.game.procReplaces?.get(consumerId);
+      const replaced = replacesId !== undefined ? ctx.values.perUse(replacesId) : 0;
+      const replacedName = replacesId !== undefined ? ctx.game.action(replacesId)?.name ?? "the GCD it replaces" : undefined;
+      const value = Math.max(0, ctx.values.perUse(consumerId) - replaced) * n;
       // A consumer with no damage of its own (Horoscope detonates at
       // expiry by design) loses nothing.
       if (value <= 0) return;
@@ -764,7 +768,9 @@ export function checkProcs(ctx: PlayerCheckContext): DamageFinding[] {
         label: `${e.abilityName} ${how}`,
         cause: forced ? forcedPart(t - 1, t + 1, ctx.forced).cause : undefined,
         lostDamage: value, inference: true,
-        basis: `${n} × ${k(ctx.values.perUse(consumerId))} average ${consumerName} (upper bound: the GCD used instead did some damage)`,
+        basis: replacedName
+          ? `${n} × (${k(ctx.values.perUse(consumerId))} average ${consumerName} − ${k(replaced)} average ${replacedName}, the GCD it takes the place of)`
+          : `${n} × ${k(ctx.values.perUse(consumerId))} average ${consumerName} (upper bound: the GCD used instead did some damage)`,
         detail: `${e.abilityName} ${how}${n > 1 ? ` with ${n} stacks` : ""}`,
       }));
     };
