@@ -55,8 +55,12 @@ function project(streams, projectors) {
 
 const WCL_PROJECTORS = {
   deaths:        (e) => omit(e, ['fight']),
-  // Haste rating: the damage analysis's WoW speed model (lib/damage/wow/haste.ts).
-  combatantInfo: (e) => pick(e, ['timestamp', 'type', 'sourceID', 'specID', 'hasteSpell', 'hasteMelee', 'hasteRanged']),
+  // Kept whole (one event per player): haste rating feeds the speed model
+  // (lib/damage/wow/haste.ts); crit, mastery, versatility, primary stats,
+  // talents, gear and pre-pull auras were dropped until 2026-10-13 and
+  // came up in the damage studies (docs/dps-analysis.md, "WoW secondary
+  // stats").
+  combatantInfo: (e) => omit(e, ['fight']),
   // Damage analysis (docs/archive/damage-analysis-plan.md, "WoW port"): `fake`,
   // `empowermentLevel` and the caster's `classResources` on casts; on
   // damage done, the aura snapshot (cut to the tracked ids, see

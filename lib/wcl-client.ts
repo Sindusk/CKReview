@@ -230,6 +230,11 @@ export type WCLCombatantInfoEvent = {
   hasteSpell?:  number;
   hasteMelee?:  number;
   hasteRanged?: number;
+  // Also logged (samples keep the whole event since 2026-10-13; nothing
+  // reads them yet): critSpell / critMelee / critRanged, mastery,
+  // versatilityDamageDone, strength / agility / intellect, talentTree,
+  // gear, auras.
+  [field: string]: unknown;
 };
 
 export type WCLCastEvent = {

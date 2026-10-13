@@ -158,6 +158,12 @@ pick) or ACmXHMFtaPLR9k8w (99th, user's pick).
   Fwîî 77, Cocomber 72, Nearby 75, Polpo 71, Shadowmeld 47, Mythnarra 47,
   Neximage 33, Bragontix 51, Deathstriker 29, Hervous 17, Cocroach 30,
   Sylmigron 6, Blkphnx 14, Thatapaddlin 66, Veinglas 46.
+- **Wider streams (user, 2026-10-13: keep useful data):** the player-buff
+  stream now also keeps every self-applied buff (Blkphnx 1,320 → 3,364
+  events, Hit Combo, Combo Strikes, Tigereye Brew, Rushing Wind Kick) and
+  the fetch keeps each player's whole CombatantInfo (stats, talents, gear).
+  All four study kills refetched (+~2.5MB each); baselines and every
+  damage finding unchanged.
 - Potion buffs added to the stream; all three kills refetched
   (2026-10-13) and baselines checked.
 
@@ -168,9 +174,13 @@ pick) or ACmXHMFtaPLR9k8w (99th, user's pick).
    WoWAnalyzer's stretches ~3.6s vs ~1.2s of each cycle is ready-but-
    unpressed (the rest is a shorter cooldown for Styphi: haste, resets).
    Rough cost: ~2.4s × ~27 casts ≈ 5 Fists × (470k − 62k Blackout Kick)
-   ≈ 2M. Not built: the resets aren't in our log. Options: find the reset
-   source in the buff stream (a refetch with it), or a reference-rate
-   inference scaled by the cooldown difference.
+   ≈ 2M. Not built: the resets aren't in the log. Checked 2026-10-13
+   with Blkphnx's unfiltered buffs (4,031 events, 80 ids): no buff lines
+   up with early Fists, and interval + 1–3s per Blackout Kick (more in
+   Zenith) still leaves the fastest Fists 3–4.4s apart against 8–17s
+   typical, for Styphi too. WoW's cooldown reductions are server-side and
+   not logged. Left: a reference-rate inference scaled by the cooldown
+   difference (user to decide).
 2. **Patch table for WoW** (docs/open-items.md): none yet.
 
 ## Next
