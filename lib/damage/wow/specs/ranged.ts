@@ -24,6 +24,19 @@
 //   yet: WCL credits it its own way and our streams don't carry it.
 // Tracked cooldowns are in tracked-cooldowns.ts.
 //
+// Balance, checked against WoWAnalyzer on qpZx3mWaG7gcDdYB pull 3
+// (Sylmigron, 6th percentile; reference dBxtMyAc1zYHXQnK fight 18's Kadss,
+// 100th; checked 2026-10-13):
+// - Matched: spenders outside Eclipse not near the cap, 28 vs 4 there;
+//   spenderOutsideEclipse finds 26 vs 4 (1.69M vs 0.28M; other strong
+//   Balance players 5–9). Active time 80.4% vs 94.0%; cancelled casts
+//   22.7% vs 5.8% (22 Starfires, their time counted in the gaps). Pace
+//   1.21s vs 1.07s from the reference kill's other Balance (2.61M).
+// - Fine: Incarnation 100%, Moonfire / Sunfire uptime 99%, Astral Power
+//   waste 5.0% vs 4.4%. Fury of Elune 66% vs 73% (holds mostly Stasis).
+// - Not adopted: Eclipse uptime 53% vs 69% and Starlord at 3 stacks 52%
+//   vs 63%: the spenders above carry most of it.
+//
 // Elemental, checked against WoWAnalyzer on qpZx3mWaG7gcDdYB pull 3
 // (Cocroach; reference JZjf9x3mK76NzabP fight 9's Nickshockz, 99th
 // percentile; checked 2026-10-13): no new check. Cooldowns (Ascendance,
@@ -107,7 +120,7 @@
 
 import type { JobCheck } from "../../types";
 import { finding } from "../../checks";
-import { mergeWindows, overlapMs } from "../../timeline";
+import { inWindows, mergeWindows, overlapMs, statusWindows } from "../../timeline";
 import { burstGcdFindings, castTimeProcFindings, dotUptimeFindings, k, observedWindowBonus, primaryResourceCapFindings } from "./shared";
 
 // Backdraft (117828): Conflagrate (17962) adds a stack, max 2; Chaos Bolt
@@ -222,6 +235,60 @@ const strafingRun: JobCheck = (ctx) => {
 // Barbed Shot gain happened to measure, Matcheh's didn't).
 const BARBED_SHOT = 217200;
 
+// Balance spenders (Starsurge 78674, Starfall 191034) cast outside Eclipse
+// (Solar 48517, Lunar 48518) and Incarnation (102560), with Astral Power
+// (type 8, logged ×10) under NEAR_CAP of its max (spending to avoid
+// capping is right). Measured on qpZx3mWaG7gcDdYB pull 3 (2026-10-13):
+// Sylmigron cast 38 such spenders outside forced time, the 100th-
+// percentile Kadss (dBxtMyAc1zYHXQnK) 13; inside vs outside, Sylmigron's
+// Starsurge 151k vs 100k, Starfall (its hits over 8s) 145k vs 94k;
+// WoWAnalyzer counts 28 vs 4 "outside Eclipse not near AP cap". Lost per
+// spend: the player's own inside − outside average for that spell (both
+// measured; none when there's no inside one to compare). Inference.
+const BALANCE_SPENDERS: { id: number; name: string; spanMs: number }[] = [
+  { id: 78674, name: "Starsurge", spanMs: 2_000 },
+  { id: 191034, name: "Starfall", spanMs: 8_000 },
+];
+const ECLIPSE_IDS = new Set([48517, 48518, 102560]);
+const NEAR_CAP = 200;   // 20 Astral Power, logged ×10
+const spenderOutsideEclipse: JobCheck = (ctx) => {
+  const ecl = statusWindows(ctx.player, ECLIPSE_IDS, ctx.endMs);
+  const forced = mergeWindows(ctx.forced);
+  let lost = 0, n = 0, first = Infinity, last = 0;
+  const parts: string[] = [];
+  for (const sp of BALANCE_SPENDERS) {
+    const casts = ctx.player.casts.filter((c) => c.abilityId === sp.id && c.timestamp < ctx.endMs).sort((a, b) => a.timestamp - b.timestamp);
+    const hits = ctx.player.damageDone.filter((h) => !h.pet && h.abilityName === sp.name);
+    const rows = casts.map((c, i) => {
+      const r = c.resources?.find((x) => x.type === 8);
+      return {
+        t: c.timestamp,
+        inE: inWindows(c.timestamp, ecl),
+        nearCap: r !== undefined && r.amount >= r.max - NEAR_CAP,
+        dmg: hits.filter((h) => h.timestamp >= c.timestamp && h.timestamp < Math.min(c.timestamp + sp.spanMs, casts[i + 1]?.timestamp ?? Infinity))
+          .reduce((a, h) => a + (h.amount ?? 0), 0),
+      };
+    }).filter((r) => !inWindows(r.t, forced));
+    const avg = (xs: number[]) => xs.reduce((a, x) => a + x, 0) / xs.length;
+    const inside = rows.filter((r) => r.inE), outside = rows.filter((r) => !r.inE);
+    if (inside.length < 3 || outside.length === 0) continue;
+    const per = avg(inside.map((r) => r.dmg)) - avg(outside.map((r) => r.dmg));
+    const bad = outside.filter((r) => !r.nearCap);
+    if (per <= 0 || bad.length === 0) continue;
+    lost += bad.length * per; n += bad.length;
+    first = Math.min(first, bad[0].t); last = Math.max(last, bad[bad.length - 1].t);
+    parts.push(`${bad.length} ${sp.name} × ${k(per)} (${k(avg(inside.map((r) => r.dmg)))} inside − ${k(avg(outside.map((r) => r.dmg)))} outside)`);
+  }
+  if (n === 0) return [];
+  return [finding(ctx, {
+    kind: "burst-window", startMs: first, endMs: last, forced: false, inference: true,
+    label: "Spenders outside Eclipse",
+    lostDamage: lost,
+    basis: parts.join(" + "),
+    detail: `${n} Astral Power spenders cast outside Eclipse and Incarnation, not near the cap`,
+  })];
+};
+
 const window = (statusId: number, name: string): JobCheck => (ctx) => burstGcdFindings(ctx, {
   statusId, name,
   bonus: observedWindowBonus,
@@ -234,7 +301,7 @@ export const RANGED_CHECKS: Record<string, JobCheck[]> = {
   "Arcane Mage":          [window(365362, "Arcane Surge")],
   "Fire Mage":            [window(190319, "Combustion")],
   "Frost Mage":           [],
-  "Balance Druid":        [window(102560, "Incarnation"), primaryResourceCapFindings, dot("Moonfire", 164812), dot("Sunfire", 164815)],
+  "Balance Druid":        [window(102560, "Incarnation"), primaryResourceCapFindings, dot("Moonfire", 164812), dot("Sunfire", 164815), spenderOutsideEclipse],
   "Beast Mastery Hunter": [window(19574, "Bestial Wrath"), (ctx) => primaryResourceCapFindings(ctx, [BARBED_SHOT])],
   "Marksmanship Hunter":  [window(288613, "Trueshot"), primaryResourceCapFindings],
   "Shadow Priest":        [window(194249, "Voidform"), primaryResourceCapFindings, dot("Shadow Word: Pain", 589), dot("Vampiric Touch", 34914)],

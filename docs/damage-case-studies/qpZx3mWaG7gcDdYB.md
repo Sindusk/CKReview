@@ -21,6 +21,10 @@ for this kill, so top players' logs stand in for it.
   Pull 2, 5:03), the user's pick (2026-10-13): 99th-percentile parses for
   Pisslizard, Styphi, Auxeus, Yenvenger (Retribution), Vairuh, Nagafenw,
   Frostydn; WoWAnalyzer pages for all saved. Baselined.
+- `sampledata/wow/dBxtMyAc1zYHXQnK/` — reference kill (fight 18, app
+  Pull 1, 5:52), the user's pick (2026-10-13): 100th-percentile Kadss
+  (Balance), 99th Bowguytome (Marksmanship) and Dcn (Havoc); pages saved.
+  Baselined.
 - `sampledata/wow/JZjf9x3mK76NzabP/` — reference kill (fight 9, app
   Pull 1, 5:30), the user's pick (2026-10-13): 99th-percentile Nickshockz
   (Elemental) and Kaströ (Havoc). Nickshockz's page saved. Baselined.
@@ -55,7 +59,7 @@ pick) or ACmXHMFtaPLR9k8w (99th, user's pick).
 | Deathstriker | Beast Mastery Hunter | 29 | 166.2k | Matcheh (jm) | **Done** |
 | Hervous | Arms Warrior | 17 | 163.6k | Eroka (NK), Nagafenw (AC) | **Done** |
 | Cocroach | Elemental Shaman | 30 | 163.1k | Nickshockz (JZ) | **Done** |
-| Sylmigron | Balance Druid | 6 | 152.4k | Arzenal (NK), Skress (AC, not named) | not started |
+| Sylmigron | Balance Druid | 6 | 152.4k | Kadss (dB) | **Done** |
 | Blkphnx | Windwalker Monk | 14 | 150.4k | Styphi (AC) | **Done**, one open item |
 | Thatapaddlin | Protection Paladin | 66 | 100.1k | Holyvi (NK) | not started |
 | Veinglas | Blood Death Knight | 46 | 90.5k | Frostydn (AC) | **Done** |
@@ -161,6 +165,10 @@ pick) or ACmXHMFtaPLR9k8w (99th, user's pick).
   Conduit); 39.6 vs 47.9 GCDs a minute (counted as gaps, 15.1k vs 8.5k/s
   est. loss). Main gap Fists of Fury (Open 1); Rising Sun Kick 5.9 vs 7.9
   a minute, Blackout Kick filler 10.3 vs 8.1.
+- **Sylmigron vs Kadss (dBxtMyAc1zYHXQnK):** new check: Astral Power
+  spenders outside Eclipse / Incarnation, not near the cap (26 vs 4;
+  WoWAnalyzer 28 vs 4): 1.69M. Also pace (2.61M), 22 cancelled Starfires,
+  idle (25.0k/s vs 12.0k/s est. loss).
 - **Cocroach vs Nickshockz (JZjf9x3mK76NzabP):** no new check; same
   cooldowns and spending; idle 10.3k/s vs 4.6k/s est. loss (small delays
   18.1s); movement larger (lenient). Died at the very end (6:33).
