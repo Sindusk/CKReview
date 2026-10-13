@@ -34,6 +34,14 @@
 //     its 9 missed Lance Charge GCDs and 13 missed positionals match; most
 //     of the GCDs were in forced windows. Life of the Dragon and Battle
 //     Litany windows aren't separate checks: they fall with Lance Charge.
+//     Rechecked on qjCMx4bRfgNKwX9T Dancing Mad kill (7.5, 2026-10-13):
+//     its 17 missed positionals match by action (Chaotic Spring 7,
+//     Wheeling Thrust 5, Fang and Claw 5), as do Power Surge, the one
+//     poor Life Surge (Lance Barrage, 14:13) and the 2.8s gap at 13:44.
+//     Its missed window GCDs are all at 3:01-3:03, 6:03, 7:06 and 14:08,
+//     which run into downtime or past an HP check (forced here). Not
+//     adopted: "Chaotic Spring before invulnerability" (it's a combo
+//     step, not an optional DoT GCD).
 //   - Ninja: Kunai's Bane window, Ninki and Kazematoi (below). Checked
 //     against xivanalysis on dDar482XvFKBPJYh FRU kill (7.1, 2026-10-12):
 //     its 9 Kazematoi lost and 1 unbuffed Aeolian Edge match; Ninki ~300
