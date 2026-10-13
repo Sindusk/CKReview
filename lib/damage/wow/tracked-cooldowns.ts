@@ -140,8 +140,10 @@ export const WOW_TRACKED_COOLDOWNS: Record<string, TrackedCooldown[]> = {
   // Malevolence measures 60.0s too). Soul Fire is often hard-cast before the
   // pull: its own hit before the first cast is the evidence (0:01.5 there),
   // which WoWAnalyzer misses ("0:00-1:07 unused"). Its bars say ~41s, but
-  // the player never began one sooner than 45.9s after the last landed, so
-  // the measured 46s stays (lenient). Havoc (30s) isn't tracked: its value
+  // no player began one sooner than ~45s after the last landed (45.9s
+  // there; the two top Destruction Warlocks on NK1hBtW9rckdjq36 45.3s and
+  // 45.6s): the cooldown is ~45s from landing, so the measured 46s between
+  // landings stays. Havoc (30s) isn't tracked: its value
   // is the damage it copies, not hits of its own, and it was pressed before
   // the pull too (on the enemy at 0:00).
   "Destruction Warlock": [
