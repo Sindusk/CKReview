@@ -31,7 +31,7 @@
 
 import type { DamageFinding } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";
-import { forcedPart, inWindows, mergeWindows, overlapMs, type Window } from "../../timeline";
+import { forcedPart, gcdLockMs, inWindows, mergeWindows, overlapMs, type Window } from "../../timeline";
 import { k, s, statusWindows } from "../../ffxiv/jobs/shared";
 
 export { k, s, statusWindows };
@@ -56,8 +56,17 @@ export function burstGcdFindings(ctx: PlayerCheckContext, spec: BurstGcdSpec): D
   for (const w of statusWindows(ctx, spec.statusId)) {
     if (w.endMs > ctx.endMs) continue;
     const gcdMs = ctx.baseGcdMs / ctx.factor * ctx.factorAt(w.startMs);
-    const fit = Math.max(0, Math.floor((w.endMs - w.startMs) / gcdMs) - 1);
-    const got = ctx.uses.filter((u) => u.startMs >= w.startMs && u.startMs <= w.endMs).length;
+    // Time a channel, cast or flight held the player past one GCD isn't
+    // room for another GCD: Devastation's Disintegrates lock 1.3–1.8s
+    // against a 0.97s GCD, and Bragontix's 0:03 Dragonrage (qpZx3mWaG7gcDdYB
+    // pull 3), with almost no idle, read 26 of 34.
+    const inside = ctx.uses.filter((u) => u.startMs >= w.startMs && u.startMs <= w.endMs);
+    const heldMs = inside.reduce((a, u) => {
+      const g = ctx.baseGcdMs / ctx.factor * ctx.factorAt(u.startMs);
+      return a + Math.max(0, Math.min(u.startMs + gcdLockMs(u, ctx.factorAt(u.startMs)), w.endMs) - u.startMs - g);
+    }, 0);
+    const fit = Math.max(0, Math.floor((w.endMs - w.startMs - heldMs) / gcdMs) - 1);
+    const got = inside.length;
     const missing = fit - got;
     if (missing <= 0) continue;
     const bonus = spec.bonus(ctx, w);

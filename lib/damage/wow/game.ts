@@ -26,6 +26,7 @@
 //   pull; one speed factor per player read lust GCDs as normal and every
 //   later GCD as slow.
 // - isChannel: channels log no end; their lock runs to their last tick.
+// - lockStatus: Deep Breath's lock runs to its flight buff's removal.
 // - isGcdDamage: a gap is priced at the player's own on-GCD abilities only.
 //   Counting every DoT tick and pet hit (FFXIV's rule) valued one
 //   Assassination Rogue gap on JZp82Rm7TzycM94a pull 25 at 1.7M per GCD,
@@ -86,6 +87,14 @@ const CHANNEL_IDS = new Set([
   740,     // Tranquility
   64843,   // Divine Hymn
   446035,  // Bladestorm (ticks as 50622 "Bladestorm"; see BLADESTORM below)
+]);
+
+// GCDs that lock the player for as long as a buff of their own: Scalecommander
+// Deep Breath flies 1.3–2.4s (its 433874 buff; qpZx3mWaG7gcDdYB pull 3,
+// Bragontix's next GCD came 0.0–0.4s after each removal). Read as a plain
+// GCD, every flight was a ~1.1s gap.
+const LOCK_STATUSES = new Map<number, number>([
+  [433874, 433874],   // Deep Breath
 ]);
 
 // Arms' Bladestorm: a ~4.5s channel that casts Mortal Strike by itself,
@@ -173,6 +182,7 @@ export const WOW_DAMAGE: DamageGame = {
   // Haste procs and gear (haste.ts): the GCD follows them through the pull.
   speedModels: (pull, usesOf, endMs) => wowSpeedModels(pull, usesOf, endMs, [...LUST_IDS, POWER_INFUSION, ...WOW_HASTE_STATUS_IDS]),
   isChannel: (id) => CHANNEL_IDS.has(id),
+  lockStatus: (id) => LOCK_STATUSES.get(id),
   isAutoCast: bladestormAutoCasts,
   // DoT ticks share their spell's id (Agony 980, Shadow Word: Pain 589), so
   // an on-GCD action's ticks count too.

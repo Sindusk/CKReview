@@ -149,7 +149,7 @@ function fitPlayer(player: PlayerInfo, uses: GcdUse[], endMs: number, candidateI
 
   type Obs = { y: number; g: string; t: number };
   const obs: Obs[] = fast.map((x) => ({ y: Math.log(x.iv), g: "i", t: x.t }));
-  for (const u of uses) if (u.castMs > 300) obs.push({ y: Math.log(u.castMs), g: `c${u.action.id}`, t: u.startMs });
+  for (const u of uses) if (u.castMs > 300 && !u.statusLock) obs.push({ y: Math.log(u.castMs), g: `c${u.action.id}`, t: u.startMs });
   const counts = new Map<string, number>();
   for (const o of obs) counts.set(o.g, (counts.get(o.g) ?? 0) + 1);
   const groups = [...counts].filter(([g, n]) => n >= (g === "i" ? MIN_INSTANTS : 3)).map(([g]) => g);

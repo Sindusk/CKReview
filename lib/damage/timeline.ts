@@ -151,6 +151,7 @@ export type GcdUse = {
   action:      GameAction;
   abilityName: string;
   target?:     string;      // the cast's target name, when it has one
+  statusLock?: boolean;     // castMs is a DamageGame.lockStatus duration, not a cast time
 };
 
 /**
@@ -172,7 +173,14 @@ export function latestBegin(begins: PlayerEvent[], cast: PlayerEvent, slackMs: n
     // it: qpZx3mWaG7gcDdYB pull 3, Destruction's Chaos Bolt landed and the
     // next one began at 0:40.49). Taking it orphaned the 0:41.89 Chaos Bolt,
     // whose 1.4s cast then read as idle, and its own begin as cancelled.
-    if (cast.timestamp - x.timestamp <= SAME_INSTANT_MS && (x.durationMs ?? 0) > SAME_INSTANT_MS) continue;
+    // Only when an earlier begin of the spell ends at this cast (this cast
+    // is its landing): Evoker empowers log their cast at the start, beside
+    // the empowerstart, and nothing earlier ends there (same pull,
+    // Bragontix's Fire Breath at 0:04.80). Skipping those read 35 empowers
+    // as cancelled.
+    if (cast.timestamp - x.timestamp <= SAME_INSTANT_MS && (x.durationMs ?? 0) > SAME_INSTANT_MS &&
+        begins.some((y) => y !== x && y.abilityId === x.abilityId && y.timestamp < x.timestamp &&
+          Math.abs(y.timestamp + (y.durationMs ?? 0) - cast.timestamp) <= SAME_INSTANT_MS)) continue;
     if (cast.timestamp <= x.timestamp + (x.durationMs ?? 0) + slackMs) found = x;
   }
   return found;
@@ -194,7 +202,21 @@ export function gcdUses(player: PlayerInfo, game: DamageGame): GcdUse[] {
   }
   out.sort((a, b) => a.startMs - b.startMs);
   if (game.isChannel) channelLocks(player, game, out);
+  if (game.lockStatus) statusLocks(player, game, out);
   return out;
+}
+
+const STATUS_LOCK_MAX_MS = 6_000;
+
+/** DamageGame.lockStatus: the lock runs to the first removal of the status after the cast. */
+function statusLocks(player: PlayerInfo, game: DamageGame, uses: GcdUse[]): void {
+  for (const u of uses) {
+    const id = game.lockStatus!(u.action.id);
+    if (id === undefined) continue;
+    const end = (player.buffs ?? []).find((e) => e.abilityId === id && e.buffStatus === "removed" &&
+      e.timestamp > u.startMs && e.timestamp <= u.startMs + STATUS_LOCK_MAX_MS)?.timestamp;
+    if (end !== undefined) { u.castMs = Math.max(u.castMs, end - u.startMs); u.statusLock = true; }
+  }
 }
 
 /**

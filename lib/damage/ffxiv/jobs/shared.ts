@@ -66,6 +66,7 @@ const clock = (ms: number) => {
 
 /** Windows where a status is on the player, from the player-buff stream. */
 const PRE_PULL_SLACK_MS = 1_000;
+const SAME_INSTANT_MS = 20;
 
 export function statusWindows(ctx: PlayerCheckContext, statusId: number): Window[] {
   const out: Window[] = [];
@@ -83,7 +84,13 @@ export function statusWindows(ctx: PlayerCheckContext, statusId: number): Window
     if (e.buffStatus === "removed") {
       if (open !== undefined) { out.push({ startMs: open, endMs: e.timestamp }); open = undefined; }
     } else if (e.buffStatus === "applied" && open === undefined) {
-      open = e.timestamp;
+      // Removed and re-applied in the same instant is one window: WoW logs
+      // Devastation's Animosity extending Dragonrage that way
+      // (qpZx3mWaG7gcDdYB pull 3, 2:55–3:16), which cut the 2:46 window
+      // into five and kept only the 3:05 piece.
+      const last = out[out.length - 1];
+      if (last && e.timestamp - last.endMs <= SAME_INSTANT_MS) open = out.pop()!.startMs;
+      else open = e.timestamp;
     }
   }
   if (open !== undefined) out.push({ startMs: open, endMs: ctx.endMs + 1 });

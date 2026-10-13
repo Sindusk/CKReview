@@ -23,6 +23,25 @@
 // - Augmentation's support (Ebon Might, Prescience) isn't in the rDPS split
 //   yet: WCL credits it its own way and our streams don't carry it.
 // Tracked cooldowns are in tracked-cooldowns.ts.
+//
+// Devastation, checked against WoWAnalyzer on qpZx3mWaG7gcDdYB pull 3
+// (Bragontix, Scalecommander; log 2026-10-02, checked 2026-10-13):
+// - Matched: Dragonrage 3 casts; the 2:03 → 2:46 hold ran into Stasis
+//   (2:29–2:48), and 3 full windows beat 4 with two cut, so no lost use
+//   (WoWAnalyzer's 87% counts the hold). Cancelled casts: 4 Living Flames.
+//   Strafing Run 6 of 7 (strafingRun).
+// - Fixed in the engine from this page: empowers read as cancelled
+//   (timeline.ts latestBegin), Dragonrage windows cut by Animosity's
+//   re-applications (statusWindows), Deep Breath's flight read as idle
+//   (game.ts lockStatus), channels counted as missing GCDs in burst windows
+//   (burstGcdFindings).
+// - Not adopted: Essence waste (logged on spenders only; it graded 12.7%
+//   "good"); Burnout / Leaping Flames / Mass Disintegrate / Imminent
+//   Destruction expiries (3 / 1 / 1 / 1 outside his death, each worth well
+//   under a GCD).
+// - Open: Fire Breath / Eternity Surge "sat ready" (86% / 82%): their
+//   recharge is cut by Disintegrate ticks (Causality) and the rule isn't
+//   pinned from one player; Disintegrate tick efficiency (340/385).
 
 import type { JobCheck } from "../../types";
 import { finding } from "../../checks";
@@ -90,6 +109,50 @@ const havocTarget: JobCheck = (ctx) => {
   });
 };
 
+// Strafing Run (1266165, Scalecommander): each Deep Breath (433874) grants
+// one recast within 18s; the buff goes when it's used. On qpZx3mWaG7gcDdYB
+// pull 3 Bragontix used 6 of 7 (WoWAnalyzer: 6 good, 1 bad); the one from
+// 1:57 ran out at 2:15. A buff removed with no Deep Breath within 150ms is a
+// Deep Breath lost: the player's own damage per Deep Breath (its hits and
+// ticks, logged as "Deep Breath" under 353759, and the Melt Armor debuff it
+// applies for 12s, 2.56M of Bragontix's 69M) less the flight's lock at
+// their average GCD's rate. Melt Armor's damage-taken increase isn't
+// counted. Forced when under 3s of its 18s was unforced.
+const STRAFING_RUN = 1266165;
+const DEEP_BREATH = 433874;
+const strafingRun: JobCheck = (ctx) => {
+  const casts = ctx.player.casts.filter((c) => c.abilityId === DEEP_BREATH);
+  if (casts.length === 0) return [];
+  const dmg = ctx.player.damageDone.filter((h) => !h.pet && (h.abilityName === "Deep Breath" || h.abilityName === "Melt Armor"))
+    .reduce((a, h) => a + (h.amount ?? 0), 0);
+  const perCast = dmg / casts.length;
+  const locks = ctx.uses.filter((u) => u.action.id === DEEP_BREATH && u.statusLock).map((u) => u.castMs);
+  const lockMs = locks.length ? locks.reduce((a, x) => a + x, 0) / locks.length : ctx.baseGcdMs;
+  const forced = mergeWindows(ctx.forced);
+  const ev = (ctx.player.buffs ?? []).filter((e) => e.abilityId === STRAFING_RUN).sort((a, b) => a.timestamp - b.timestamp);
+  let grantedAt: number | undefined;
+  const out = [];
+  for (const e of ev) {
+    if (e.buffStatus === "applied") { grantedAt = e.timestamp; continue; }
+    if (e.buffStatus !== "removed" || grantedAt === undefined || e.timestamp >= ctx.endMs) continue;
+    const from = grantedAt;
+    grantedAt = undefined;
+    if (casts.some((c) => Math.abs(c.timestamp - e.timestamp) <= 150)) continue;
+    const unforcedMs = e.timestamp - from - overlapMs(from, e.timestamp, forced);
+    const value = ctx.values.gcdValue(ctx.phaseOf(e.timestamp), false);
+    const lost = Math.max(0, perCast - lockMs * value / ctx.baseGcdMs);
+    const t = Math.round(e.timestamp / 1000);
+    out.push(finding(ctx, {
+      kind: "proc-lost", startMs: from, endMs: e.timestamp, forced: unforcedMs < 3_000,
+      label: "Strafing Run expired",
+      lostDamage: lost,
+      basis: `${k(perCast)} per Deep Breath with its Melt Armor (${casts.length} casts) −${(lockMs / 1000).toFixed(1)}s flight ÷ ${(ctx.baseGcdMs / 1000).toFixed(2)}s GCD × ${k(value)} average GCD`,
+      detail: `Strafing Run ran out at ${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")} without the second Deep Breath`,
+    }));
+  }
+  return out;
+};
+
 const window = (statusId: number, name: string): JobCheck => (ctx) => burstGcdFindings(ctx, {
   statusId, name,
   bonus: observedWindowBonus,
@@ -110,7 +173,7 @@ export const RANGED_CHECKS: Record<string, JobCheck[]> = {
   "Affliction Warlock":   [window(442726, "Malevolence"), dot("Agony", 980), dot("Unstable Affliction", 1259790), dot("Wither / Corruption", 445474, 146739)],
   "Demonology Warlock":   [window(265187, "Demonic Tyrant")],
   "Destruction Warlock":  [window(442726, "Malevolence"), dot("Wither", 445474), backdraft, havocTarget],
-  "Devastation Evoker":   [window(375087, "Dragonrage")],
+  "Devastation Evoker":   [window(375087, "Dragonrage"), strafingRun],
   "Augmentation Evoker":  [],
   "Devourer Demon Hunter": [],
 };

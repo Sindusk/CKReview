@@ -311,6 +311,13 @@ docs/damage-case-studies/qpZx3mWaG7gcDdYB.md. What generalizes:
   longer lock on instant GCDs: 2.18M for Hervous, not the ~6–7M a raw
   1.2s-vs-0.98s count gives (the gap check already counts idle past his
   own base). Healers are left out.
+- **Evoker exposed four engine assumptions** (Bragontix): empowers log
+  their cast at the start beside the empowerstart (read as cancelled);
+  a buff extended by removal + re-application in the same instant
+  (Dragonrage under Animosity) split its window; a GCD that locks for a
+  buff's duration (Deep Breath's flight) read as idle; and burst windows
+  counted channel time as missing GCDs. A spec with channels, empowers or
+  flights needs its first log checked for each.
 
 ## Ideas for app tooling
 

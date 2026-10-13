@@ -23,7 +23,7 @@ for this kill, so top players' logs stand in for it.
 | Hervous, Cocomber | Arms Warrior | **Done** |
 | Shadowmeld | Marksmanship Hunter | not started |
 | Nearby | Assassination Rogue | not started |
-| Bragontix | Devastation Evoker | not started |
+| Bragontix | Devastation Evoker | **In progress**: needs a reference log (Open 1) |
 | Sylmigron | Balance Druid | not started |
 | Cocroach | Elemental Shaman | not started |
 | Mythnarra | Havoc Demon Hunter | not started |
@@ -67,14 +67,33 @@ for this kill, so top players' logs stand in for it.
   Thatapaddlin 0.47M. The old ~6–7M estimate double-counted idle the gap
   check already counts.
 
+- **Bragontix (Devastation, Scalecommander):** 5.42M → 4.64M after four
+  engine fixes (empowers read as cancelled, Dragonrage windows split by
+  Animosity, Deep Breath's flight read as idle, channels counted as
+  missing burst GCDs; they moved other casters' totals too). Dragonrage
+  held 2:03 → 2:46 across Stasis: no lost use (WoWAnalyzer's 87% counts
+  it). New: Strafing Run expired at 2:15 (one Deep Breath, ~0.25M). Record
+  in the header of lib/damage/wow/specs/ranged.ts.
+
 ## Open
 
-1. **Patch table for WoW** (docs/open-items.md): none yet.
+1. **Bragontix's empowers (needs a top Devastation log on Entombed
+   Sentinels).** WoWAnalyzer: Fire Breath 86% / Eternity Surge 82%,
+   "sat ready" 68.7s / 87.1s, much of it in Stasis. Measured: release →
+   next press + 0.5s per Disintegrate tick comes out ~26.6–28s when
+   prompt, 34–37s at Fire Breath 3:57 and Eternity Surge 3:54 / 5:04, but
+   in Dragonrage the intervals run shorter than 30s − 0.5s/tick predicts,
+   so the Causality rule isn't pinned. Also Disintegrate tick efficiency
+   340/385 (clips and early chains): no reference to judge it against.
+2. **Patch table for WoW** (docs/open-items.md): none yet.
 
 ## Next
 
-Bragontix (Devastation Evoker; user's pick, 2026-10-13), then the next
-player the user names. For each: extract the page
+Get a top Devastation log from the user and fetch it
+(`fetch-wow-report.js <code> --fight <id>`); compare empower intervals
+(scratchpad script: interval vs Disintegrate ticks) and tick efficiency;
+then build empower drift if Bragontix's holds exceed the reference's.
+Then the next player the user names. For each: extract the page
 (`wowa-html.js --brief`), the app's findings (`--all-findings`), verify
 each claim, and compare against a top player of the spec (ask the user for
 a log if NK1hBtW9rckdjq36 has none).

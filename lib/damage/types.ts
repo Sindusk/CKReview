@@ -107,6 +107,10 @@ export type DamageGame = {
   // Channelled GCDs: they log no end, so their lock runs to their last
   // tick before the next GCD (timeline.ts gcdUses).
   isChannel?(actionId: number): boolean;
+  // GCDs that lock the player while a status of their own is up (WoW
+  // Devastation's Deep Breath: the flight's buff): the lock runs to that
+  // status's removal (timeline.ts gcdUses).
+  lockStatus?(actionId: number): number | undefined;
   // Casts the game fires by itself, logged like presses (Arms' Bladestorm
   // casts Mortal Strike during its channel): not GCD uses.
   isAutoCast?(player: PlayerInfo): (cast: PlayerEvent) => boolean;
