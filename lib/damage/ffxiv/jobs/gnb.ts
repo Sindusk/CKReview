@@ -23,7 +23,7 @@
 // 2026-10-13; xivanalysis's GNB rules are 7.4's, no 7.5 changes):
 // - No Mercy: its 7 missed GCDs and 13 missed actions match these windows
 //   once the 8-or-9 rule reads the GCD as xivanalysis does (ruleGcdMs:
-//   2.47s, so 8). The 3:04, 6:06 and 14:13 windows are past HP checks or
+//   2.47s, so 8; its saved page shows "Estimated GCD 2.47s"). The 3:04, 6:06 and 14:13 windows are past HP checks or
 //   cut by downtime (forced); 5:06's Double Down was pressed 0.1s before
 //   No Mercy applied and hit without it (multiplier 1.01).
 // - 1 cartridge left at the kill: built (leftAtKill).
@@ -35,9 +35,13 @@
 //   in each. GF was pressed on cooldown, so a second one meant holding a
 //   charge ~20s into the tincture: worth the tincture's ~3% of one GF
 //   combo (~6k each), the same call as WAR's Onslaughts (pld-war.ts).
-// - Weaving: 9 of its 13 are 0.02-0.2s (jitter); 6:03 and 11:08 are the
-//   triple-weave findings, 14:10 is past P4's HP check, 13:10 (0.45s past
-//   tolerance) is under the phase's 0.5s floor.
+// - Weaving: 8 of its 13 are 0.02-0.2s (jitter); 9 of the 13 are a
+//   defensive or Sprint woven with Bloodfest + No Mercy before the burst.
+//   6:03, 8:07 and 11:08 are the triple-weave findings, 17:12 (0.4s) is in
+//   P5's small delays, 14:10 is past P4's HP check, 13:10 (0.45s past
+//   tolerance) is under the phase's 0.5s floor. Its "Lightning Shots 9"
+//   are the app's 9 disengages (6 unforced, 3 in the end-of-P3 hold).
+//   The 8:09 window's two Fated Circles hit both P3 bosses (right).
 // - Continuations 100%: none lost, so nothing to value.
 //
 //   Copyright (c) 2018 Saxon Landers & contributors
