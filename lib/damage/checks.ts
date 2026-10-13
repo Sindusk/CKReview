@@ -479,6 +479,9 @@ export function checkCooldownDrift(ctx: PlayerCheckContext): DamageFinding[] {
     // A press whose effect can't land before the end isn't a use: the
     // qjCMx4bRfgNKwX9T fight 16 Scholar's last Aetherflow came back 0.2s
     // before the kill after 26s of drift in P5, and its stacks went unspent.
+    // Room can come out below the casts (the fight-16 Bard: 67 Empyreal
+    // Arrows, room for 66, 5 of them in forced time), which caps a real
+    // drift to 0; see docs/open-items.md (cooldown room) before changing.
     const landed = casts.filter((t) => t + (cd.landDelayMs ?? 0) < ctx.endMs).length;
     const lostUses = Math.min(Math.max(stretchLost, Math.floor(unforced / cd.cooldownMs)),
       Math.max(0, room - landed - (prePull ? 1 : 0)));

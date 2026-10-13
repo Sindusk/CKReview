@@ -52,6 +52,18 @@
 //   (2026-10-09): 4 overwrites, 2 AoE and the window's missing actions
 //   match (all its window misses were in forced time). Its DoT clipping
 //   (1:06 a minute) is standard Iron Jaws play, not a loss.
+//   Rechecked on qjCMx4bRfgNKwX9T fight 16 (7.5, 2026-10-13): its 18
+//   burst GCDs and every missed window action (Iron Jaws ×4, Barrage,
+//   Resonant ×3, Blast Arrow, Sidewinder, Heartbreak ×2) match window by
+//   window; 6:07, 12:08 and 14:08 are forced. Its 15 Hawk's Eye overwrites
+//   match by time (3:28 forced). Built: Rain of Death on one target (8:55,
+//   hit only Exdeath; oGCD AoEs are now checked, hits matched by their
+//   measured delay). Open: Empyreal Arrow 67/69 (31.7s held; the drift
+//   cap hides it, docs/open-items.md "cooldown room"). Not adopted: DoT
+//   clipping 37s a minute (P3's two bosses plus Iron Jaws snapshots);
+//   DoTs before invulnerability (3:04 and 11:46 are dot-clip findings,
+//   5:40 ticked to 6:15); Army's Muse 3/5 and 4/5 (the burst windows'
+//   GCD counts already hold them).
 // Machinist (unverified): Wildfire on the enemy, 6 GCDs (Wildfire.tsx);
 //   Hypercharge (Overheated), 5 Heat Blasts / Blazing Shots / Auto
 //   Crossbows (Hypercharge.tsx), each missing one its average; cooldowns
@@ -221,7 +233,10 @@ const bardDots: JobCheck = (ctx) => [
 const bardOverwrites = procOverwrites([["HAWKS_EYE", ["REFULGENT_ARROW"], false, "BURST_SHOT"]]);
 
 // Ladonsbite / Shadowbite on one target, against Burst Shot / Refulgent.
-const bardAoe = aoeComboOnOneTarget([[A.LADONSBITE.id, A.BURST_SHOT.id], [A.SHADOWBITE.id, A.REFULGENT_ARROW.id]]);
+const bardAoe = aoeComboOnOneTarget([[A.LADONSBITE.id, A.BURST_SHOT.id], [A.SHADOWBITE.id, A.REFULGENT_ARROW.id],
+  // xivanalysis AoEUsages: Rain of Death needs 2 targets over Heartbreak
+  // Shot (qjCMx4bRfgNKwX9T fight 16: one at 8:57 hit only Exdeath).
+  [A.RAIN_OF_DEATH.id, A.HEARTBREAK_SHOT.id]]);
 
 const wildfire: JobCheck = (ctx) => burstWindowFindings(ctx, {
   statusId: S.WILDFIRE.id, name: "Wildfire", bonus: 0, onEnemy: true,

@@ -656,6 +656,17 @@ const AOE_HIT_MS = 2_000;
  * check a tank builds gauge with the AoE combo before downtime
  * (2T1HzdPKgbhM43am fight 10, Dark Knight at 6:20 and 14:22).
  */
+const HIT_DELAY_SLACK_MS = 500;
+
+/** An oGCD's typical delay from press to first hit: the median over its casts. */
+function hitDelayMs(ctx: PlayerCheckContext, abilityId: number): number {
+  const hits = ctx.player.damageDone.filter((e) => e.abilityId === abilityId).map((e) => e.timestamp);
+  const delays = ctx.player.casts.filter((c) => c.abilityId === abilityId)
+    .map((c) => (hits.find((t) => t >= c.timestamp && t <= c.timestamp + 3_000) ?? Infinity) - c.timestamp)
+    .filter((d) => Number.isFinite(d)).sort((a, b) => a - b);
+  return delays.length ? delays[Math.floor(delays.length / 2)] : 0;
+}
+
 export function aoeOnOneTargetFindings(
   ctx: PlayerCheckContext,
   aoeIds: number[],
@@ -664,11 +675,20 @@ export function aoeOnOneTargetFindings(
 ): DamageFinding[] {
   const out: DamageFinding[] = [];
   const aoe = new Set(aoeIds);
-  const uses = ctx.uses.filter((u) => u.startMs < ctx.endMs);
+  // GCDs, plus oGCD AoEs (Bard's Rain of Death against Heartbreak Shot).
+  const uses = [
+    ...ctx.uses.filter((u) => u.startMs < ctx.endMs)
+      .map((u) => ({ action: { id: u.action.id }, startMs: u.startMs, castMs: u.castMs, abilityName: u.abilityName, ogcd: false })),
+    ...ctx.player.casts.filter((c) => aoe.has(c.abilityId) && c.timestamp < ctx.endMs && ctx.game.action(c.abilityId)?.onGcd === false)
+      .map((c) => ({ action: { id: c.abilityId }, startMs: c.timestamp, castMs: hitDelayMs(ctx, c.abilityId), abilityName: c.abilityName, ogcd: true })),
+  ].sort((a, b) => a.startMs - b.startMs);
   uses.forEach((u, i) => {
     if (!aoe.has(u.action.id)) return;
     const alt = against(u.action.id);
     if (!alt || alt.value <= 0) return;
+    // For an oGCD, castMs is its measured hit delay: Rain of Death hits
+    // 1.65s after the press, after the next press when they're stacked
+    // (fight 16's Bard: 8:08.15, 8:09.84, hits 8:09.80 / 8:09.93).
     const landed = u.startMs + u.castMs;
     // Up to the next cast of the same AoE, not the next GCD: a Bard's
     // Shadowbite lands 1.4s after its cast and the second target's hit
@@ -678,7 +698,7 @@ export function aoeOnOneTargetFindings(
     const next = uses.slice(i + 1).find((x) => x.action.id === u.action.id);
     const nextSame = next ? next.startMs + next.castMs : Infinity;
     const until = Math.min(nextSame, landed + AOE_HIT_MS);
-    const hits = ctx.player.damageDone.filter((e) => e.abilityId === u.action.id && e.timestamp >= u.startMs && e.timestamp < until);
+    const hits = ctx.player.damageDone.filter((e) => e.abilityId === u.action.id && e.timestamp >= (u.ogcd ? landed - HIT_DELAY_SLACK_MS : u.startMs) && e.timestamp < until);
     const targets = new Set(hits.map((e) => `${e.targetActorId ?? e.target}.${e.targetInstance ?? 1}`));
     // Some AoEs lose on two targets too (Freeze, 120 a target against
     // Blizzard IV's 300): minTargets. Judging every two-target AoE by its

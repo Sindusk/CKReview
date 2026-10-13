@@ -669,6 +669,20 @@ like 2.45 with something adding delays. Where things stand:
   looks like (server tick, latency, animation lock), then pick the rule.
   Until then the No Mercy rule follows xivanalysis.
 
+**Cooldown drift: room for uses vs casts in forced time (open,
+2026-10-13).** `checks.ts checkCooldownDrift` caps lost uses at
+`roomForUses − casts`. Room skips forced time; casts include presses made
+in it, so room can come out below the casts and hide a real drift.
+qjCMx4bRfgNKwX9T fight 16's Bard: Empyreal Arrow 67 casts (5 in forced
+time), room 66, 31.7s held unforced; xivanalysis says 67/69, the app says
+nothing. Not counting forced-time casts fixes that but makes the same
+report's Paladin lose an Expiacion (xivanalysis 34/34, 30.5s held), and
+adds ~25 drift findings across the samples (several of them likely real:
+other Bards' Empyreal Arrows). Doing it only when casts exceed room still
+flips the Paladin. Needs a room simulation that models presses in forced
+time (they spend the recast like any other), then a recheck against the
+xivanalysis counts in the job headers.
+
 ### Mitigation (FFXIV)
 
 Reviewed with the user on 2026-10-08 against their own week-1 Vamp Fatale
