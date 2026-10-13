@@ -175,6 +175,11 @@ export type DamageContext = {
   phases:    Record<number, PhaseContext>;   // keyed by the log's phase id
   // Windows where uptime loss isn't the player's fault.
   forcedWindows?(pull: Pull): ForcedWindow[];
+  // Windows where a mechanic makes the player move (pairing up, dropping a
+  // pool, soaking). Idle inside one beyond the player's own usual idle rate
+  // is movement: tracked apart, not counted against them (checks.ts
+  // checkGcdGaps). Unlike forced time, the player's usual share still counts.
+  movementWindows?(pull: Pull): ForcedWindow[];
   // A name for a mechanic occurrence key, used to say what was happening
   // during a gap ("during Towers (P5)"). Labels only; never excuses a gap.
   mechanicLabel?(mechanicKey: string): string | undefined;
@@ -205,7 +210,8 @@ export type FindingKind =
   | "dot-clip"          // the player's DoT refreshed early
   | "tincture"          // tinctures placed where they covered less than they could, or one not used
   | "pet-cut"           // a pet's set sequence cut short (Living Shadow)
-  | "missed-followup";  // an action unlocked by another never pressed (Salt and Darkness)
+  | "missed-followup"   // an action unlocked by another never pressed (Salt and Darkness)
+  | "movement";         // idle a mechanic's movement explains (DamageContext.movementWindows)
 
 export type DamageFinding = {
   player:     string;
@@ -220,6 +226,9 @@ export type DamageFinding = {
   lostDamage: number;
   // Shown, but not counted against the player.
   forced:     boolean;
+  // Movement a mechanic required (always forced too, so every "counted"
+  // total leaves it out); summed apart as movementDamage.
+  movement?:  boolean;
   cause?:     string;
   basis:      string;    // how lostDamage was estimated
   detail:     string;    // one line for the dialog
@@ -246,7 +255,8 @@ export type PlayerDamageSummary = {
   role:          string;
   damage:        number;     // dealt in the analysed window
   lostDamage:    number;     // unforced findings
-  forcedDamage:  number;     // forced findings
+  forcedDamage:  number;     // forced findings, movement left out
+  movementDamage: number;    // movement findings
   gcds:          number;
   baseGcdMs:     number;     // the player's observed GCD
   // GCD locks over the time the player was alive, the boss targetable and
@@ -267,6 +277,7 @@ export type PlayerDamageSummary = {
     healGcdStarts: number[];
     buffWindows: { startMs: number; endMs: number }[];
     forced:      ForcedWindow[];
+    movement:    ForcedWindow[];   // DamageContext.movementWindows for this player
     // Job gauges simulated from casts (Sage's Addersgall), for display.
     gauges?:     GaugeTrack[];
   };

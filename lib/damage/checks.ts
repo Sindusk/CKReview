@@ -66,6 +66,21 @@ export const PROC_CONSUMER_ALT_SHARE = 0.1;
 // A double weave is normal; a third oGCD between two GCDs clips.
 export const CLIP_WEAVES = 3;
 export const CLIP_FINDING_MS = 500;
+// Movement under this much per cause and phase isn't listed (still not counted).
+export const MOVEMENT_FINDING_MS = 200;
+
+/** Movement windows merged where they overlap; the causes of merged ones joined. */
+function mergeMovement(ws: ForcedWindow[]): ForcedWindow[] {
+  const out: ForcedWindow[] = [];
+  for (const w of [...ws].sort((a, b) => a.startMs - b.startMs)) {
+    const prev = out[out.length - 1];
+    if (prev && w.startMs <= prev.endMs) {
+      prev.endMs = Math.max(prev.endMs, w.endMs);
+      if (!prev.cause.split(" + ").includes(w.cause)) prev.cause = `${prev.cause} + ${w.cause}`;
+    } else out.push({ ...w });
+  }
+  return out;
+}
 export const COMBO_TIMEOUT_MS = 30_000;
 
 export type PlayerCheckContext = {
@@ -80,6 +95,7 @@ export type PlayerCheckContext = {
   factorAt(t: number): number;  // the factor for a GCD starting at t
   baseGcdMs:   number;
   forced:      ForcedWindow[];  // every forced window for this player
+  movement?:   ForcedWindow[];  // DamageContext.movementWindows for this player
   dead:        Window[];
   buffWindows: Window[];
   values:      PlayerValues;
@@ -118,16 +134,70 @@ export function checkGcdGaps(ctx: PlayerCheckContext): DamageFinding[] {
     return a !== undefined && !a.onGcd && !a.autoAttack && !dup;
   });
 
+  // Every idle stretch the check considers: GCD lock end → next GCD start.
+  const stretches: { gcdStart: number; from: number; to: number; after: string }[] = [];
+  for (let i = 1; i < uses.length; i++) {
+    const prev = uses[i - 1];
+    stretches.push({ gcdStart: prev.startMs, from: prev.startMs + gcdLockMs(prev, ctx.factorAt(prev.startMs)), to: uses[i].startMs, after: prev.abilityName });
+  }
+  {
+    const last = uses[uses.length - 1];
+    stretches.push({ gcdStart: last.startMs, from: last.startMs + gcdLockMs(last, ctx.factorAt(last.startMs)), to: ctx.endMs + GCD_TOLERANCE_MS, after: `${last.abilityName} (to the end)` });
+  }
+
+  // Movement (DamageContext.movementWindows): idle inside a movement window
+  // is the player's own up to their usual idle rate outside movement and
+  // forced time, × the window's length; past that it's movement. Spent in
+  // time order, so a window's first idle counts against the player.
+  const forcedMerged = mergeWindows(ctx.forced);
+  const moveWins = mergeMovement(ctx.movement ?? []).map((w) => {
+    const len = w.endMs - w.startMs - overlapMs(w.startMs, w.endMs, forcedMerged);
+    return { ...w, len, budget: 0 };
+  }).filter((w) => w.len > 0);
+  if (moveWins.length) {
+    const excluded = mergeWindows([...ctx.forced, ...moveWins]);
+    let idleOut = 0;
+    for (const st of stretches) {
+      const end = st.to - GCD_TOLERANCE_MS;
+      if (end > st.from) idleOut += end - st.from - overlapMs(st.from, end, excluded);
+    }
+    const from = uses[0].startMs;
+    const eligible = ctx.endMs - from - overlapMs(from, ctx.endMs, excluded);
+    const rate = eligible > 0 ? Math.min(1, idleOut / eligible) : 0;
+    for (const w of moveWins) w.budget = rate * w.len;
+  }
+  const usualRate = moveWins.length ? (moveWins[0].budget / moveWins[0].len) : 0;
+  type MoveAcc = { ms: number; lost: number; start: number; end: number; moments: Moment[] };
+  const moved = new Map<string, MoveAcc>();   // cause|phase → accumulated movement
+
   const consider = (gcdStart: number, from: number, to: number, after: string) => {
     const idle = to - from - GCD_TOLERANCE_MS;
     if (idle <= 0) return;
     const start = from, end = to - GCD_TOLERANCE_MS;
     const forced = forcedPart(start, end, ctx.forced);
-    const unforced = idle - forced.ms;
+    let moveMs = 0, moveCause: string | undefined, moveBest = 0;
+    for (const w of moveWins) {
+      if (w.endMs <= start || w.startMs >= end) continue;
+      const s0 = Math.max(start, w.startMs), e0 = Math.min(end, w.endMs);
+      const o = e0 - s0 - overlapMs(s0, e0, forcedMerged);
+      if (o <= 0) continue;
+      const own = Math.min(o, w.budget);
+      w.budget -= own;
+      moveMs += o - own;
+      if (o - own > moveBest) { moveBest = o - own; moveCause = w.cause; }
+    }
+    const unforced = idle - forced.ms - moveMs;
     const mid = start + idle / 2;
     const phaseId = ctx.phaseOf(mid);
     const value = ctx.values.gcdValue(phaseId, inWindows(mid, ctx.buffWindows));
     const perMs = value / ctx.baseGcdMs;
+    if (moveMs > 0 && moveCause) {
+      const key = `${moveCause}|${phaseId}`;
+      const acc = moved.get(key) ?? { ms: 0, lost: 0, start, end, moments: [] };
+      acc.ms += moveMs; acc.lost += moveMs * perMs; acc.end = end;
+      acc.moments.push({ startMs: start, endMs: end, lostDamage: moveMs * perMs, detail: `${s(moveMs)} moving (${moveCause}) after ${after}` });
+      moved.set(key, acc);
+    }
     const weaves = ogcds.filter((c) => c.timestamp > gcdStart && c.timestamp < to);
     const swap = weaves.find((c) => ctx.game.tankSwapActionIds.has(c.abilityId)) ??
       ctx.player.casts.find((c) => ctx.game.tankSwapActionIds.has(c.abilityId) && c.timestamp >= start - 3_000 && c.timestamp <= end);
@@ -173,12 +243,21 @@ export function checkGcdGaps(ctx: PlayerCheckContext): DamageFinding[] {
     }
   };
 
-  for (let i = 1; i < uses.length; i++) {
-    const prev = uses[i - 1];
-    consider(prev.startMs, prev.startMs + gcdLockMs(prev, ctx.factorAt(prev.startMs)), uses[i].startMs, prev.abilityName);
+  for (const st of stretches) consider(st.gcdStart, st.from, st.to, st.after);
+
+  for (const [key, acc] of moved) {
+    if (acc.ms < MOVEMENT_FINDING_MS) continue;
+    const cause = key.slice(0, key.lastIndexOf("|"));
+    const phaseId = ctx.phaseOf(acc.start);
+    out.push({
+      player: ctx.player.name, job: ctx.job, phaseId, phase: ctx.phaseName(phaseId),
+      kind: "movement", startMs: acc.start, endMs: acc.end, forced: true, movement: true, cause,
+      lostDamage: acc.lost, moments: acc.moments,
+      label: `Movement: ${cause}`,
+      basis: `${s(acc.ms)} idle inside ${cause} beyond this player's usual ${Math.round(usualRate * 100)}% idle, valued at their average GCD`,
+      detail: `${s(acc.ms)} moving for ${cause} in ${ctx.phaseName(phaseId) ?? "the pull"} (${acc.moments.length} time${acc.moments.length === 1 ? "" : "s"})`,
+    });
   }
-  const last = uses[uses.length - 1];
-  consider(last.startMs, last.startMs + gcdLockMs(last, ctx.factorAt(last.startMs)), ctx.endMs + GCD_TOLERANCE_MS, `${last.abilityName} (to the end)`);
 
   for (const [phaseId, acc] of small) {
     // A phase's delays are lost damage even under one GCD in total

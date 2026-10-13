@@ -75,7 +75,12 @@ const KIND_LABEL: Record<DamageFinding["kind"], string> = {
   "tincture":         "Tincture",
   "pet-cut":          "Pet cut short",
   "missed-followup":  "Missed follow-up",
+  "movement":         "Movement",
 };
+
+// Movement a mechanic required (DamageContext.movementWindows): blue, apart
+// from forced (grey) and counted (red).
+const MOVEMENT_COLOR = "#5b8def";
 
 const gameOf = (p: Pull) => (p.game === "wow" ? WOW_DAMAGE : FFXIV_DAMAGE);
 
@@ -197,13 +202,13 @@ export default function DamageDialog({ open, onClose, pulls, currentPullId }: Da
               {allPulls
                 ? aggregate.map((a) => (
                   <PlayerCard key={a.player} name={a.player} job={a.job} color={colorFor(a.player, a.job)} icon={iconFor(a.player, a.job)}
-                    lost={a.lostPerPull} forced={a.forcedPerPull} uptime={a.gcdUptime}
+                    lost={a.lostPerPull} forced={a.forcedPerPull} movement={a.movementPerPull} uptime={a.gcdUptime}
                     dealt={a.damagePerPull} dealtLabel={`dealt / ${a.pulls} pull${a.pulls === 1 ? "" : "s"}`}
                     selected={a.player === activePlayer} onClick={() => setSelectedPlayer(a.player)} />
                 ))
                 : analysis?.players.map((p) => (
                   <PlayerCard key={p.player} name={p.player} job={p.job} color={colorFor(p.player, p.job)} icon={iconFor(p.player, p.job)}
-                    lost={p.lostDamage} forced={p.forcedDamage} uptime={p.gcdUptime.pct}
+                    lost={p.lostDamage} forced={p.forcedDamage} movement={p.movementDamage ?? 0} uptime={p.gcdUptime.pct}
                     dealt={p.damage} dealtLabel="dealt"
                     selected={p.player === activePlayer} onClick={() => setSelectedPlayer(p.player)} />
                 ))}
@@ -232,7 +237,8 @@ export default function DamageDialog({ open, onClose, pulls, currentPullId }: Da
             <p className="ck-help" style={{ margin: "10px 0 0" }}>
               Losses are estimates in each player&apos;s own damage from the pull; every line shows its basis.
               Greyed lines are forced (untargetable, dead, a boss mechanic that keeps the player off the boss, or a
-              phase whose damage doesn&apos;t count) and aren&apos;t counted. Spell timings are measured from logs;
+              phase whose damage doesn&apos;t count) and aren&apos;t counted. Blue is movement a mechanic required: idle
+              inside its window beyond the player&apos;s own usual rate, not counted either. Spell timings are measured from logs;
               rules informed by{" "}
               <a href="https://github.com/WoWAnalyzer/WoWAnalyzer" target="_blank" rel="noreferrer" style={{ color: "var(--ck-arcane-text)" }}>
                 WoWAnalyzer
@@ -303,8 +309,8 @@ type ColorFor = (player: string, job: string) => string;
 const fmtUptime = (pct: number) => `${(pct * 100).toFixed(1)}%`;
 
 // Icon | name (job colour) over job · uptime | damage dealt | loss over forced.
-function PlayerCard({ name, job, color, icon, lost, forced, uptime, dealt, dealtLabel, selected, onClick }: {
-  name: string; job: string; color: string; icon: string; lost: number; forced: number; uptime: number;
+function PlayerCard({ name, job, color, icon, lost, forced, movement, uptime, dealt, dealtLabel, selected, onClick }: {
+  name: string; job: string; color: string; icon: string; lost: number; forced: number; movement: number; uptime: number;
   dealt: number; dealtLabel: string; selected: boolean; onClick: () => void;
 }) {
   // Two lines always: long text is cut with an ellipsis, never wrapped.
@@ -315,7 +321,7 @@ function PlayerCard({ name, job, color, icon, lost, forced, uptime, dealt, dealt
       onClick={onClick}
       style={{
         padding: "7px 10px", marginBottom: 6, cursor: "pointer",
-        display: "grid", gridTemplateColumns: "26px minmax(0, 1fr) 56px 70px", columnGap: 8, alignItems: "center",
+        display: "grid", gridTemplateColumns: "26px minmax(0, 1fr) 56px auto", columnGap: 8, alignItems: "center",
       }}
     >
       <img src={icon} alt={job} width={26} height={26} style={{ display: "block" }}
@@ -334,7 +340,9 @@ function PlayerCard({ name, job, color, icon, lost, forced, uptime, dealt, dealt
       </div>
       <div style={{ textAlign: "right" }}>
         <div className="ck-num" style={{ color: lost > 0 ? LOSS_COLOR : "var(--ck-text-2)", fontSize: 14, fontWeight: 600 }}>{fmtDamage(lost)}</div>
-        <div className="ck-num" style={small}>forced {fmtDamage(forced)}</div>
+        <div className="ck-num" style={small} title={`Forced ${fmtDamage(forced)}; movement a mechanic required ${fmtDamage(movement)} (neither is counted)`}>
+          {movement >= 1 ? <>forced {fmtDamage(forced)} · <span style={{ color: MOVEMENT_COLOR }}>move {fmtDamage(movement)}</span></> : <>forced {fmtDamage(forced)}</>}
+        </div>
       </div>
     </div>
   );
@@ -475,7 +483,8 @@ function FindingGroups({ findings }: { findings: DamageFinding[] }) {
       {sorted.map(([kind, list]) => {
         const total = counted(list);
         const isOpen = open.has(kind);
-        const forcedOnly = list.every((f) => f.forced);
+        const forcedOnly = list.every((f) => f.forced) && kind !== "movement";
+        const moveTotal = list.filter((f) => f.movement).reduce((a, f) => a + f.lostDamage, 0);
         return (
           <div key={kind} style={{ borderTop: "1px solid var(--ck-line)" }}>
             <div
@@ -492,8 +501,8 @@ function FindingGroups({ findings }: { findings: DamageFinding[] }) {
                 {list.length} {list.length === 1 ? "entry" : "entries"}
                 {list.some((f) => f.forced) && !forcedOnly ? ` (${list.filter((f) => f.forced).length} forced)` : ""}
               </span>
-              <span className="ck-num" style={{ color: total >= 1 ? LOSS_COLOR : "var(--ck-text-3)", fontSize: 14, fontWeight: 700, flex: "0 0 auto" }}>
-                {total >= 1 ? fmtDamage(total) : "—"}
+              <span className="ck-num" style={{ color: total >= 1 ? LOSS_COLOR : moveTotal >= 1 ? MOVEMENT_COLOR : "var(--ck-text-3)", fontSize: 14, fontWeight: 700, flex: "0 0 auto" }}>
+                {total >= 1 ? fmtDamage(total) : moveTotal >= 1 ? fmtDamage(moveTotal) : "—"}
               </span>
             </div>
             {isOpen && (
@@ -510,14 +519,15 @@ function FindingGroups({ findings }: { findings: DamageFinding[] }) {
 
 function FindingRow({ f }: { f: DamageFinding }) {
   return (
-    <div style={{ padding: "6px 0", borderTop: "1px solid var(--ck-line)", opacity: f.forced ? 0.55 : 1 }}>
+    <div style={{ padding: "6px 0", borderTop: "1px solid var(--ck-line)", opacity: f.forced && !f.movement ? 0.55 : 1 }}>
       <div style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
         <span className="ck-num" style={{ color: "var(--ck-text-3)", fontSize: 12, width: 42, flex: "0 0 auto" }}>{fmtTime(f.startMs)}</span>
         <span style={{ color: "var(--ck-text)", fontSize: 13, flex: "1 1 auto" }}>
           {f.detail}
-          {f.cause && <span style={{ color: "var(--ck-text-3)" }}> — {f.forced ? `forced: ${f.cause}` : f.cause}</span>}
+          {f.cause && !f.movement && <span style={{ color: "var(--ck-text-3)" }}> — {f.forced ? `forced: ${f.cause}` : f.cause}</span>}
+          {f.movement && <span style={{ color: MOVEMENT_COLOR }}> — movement, not counted</span>}
         </span>
-        <span className="ck-num" style={{ color: f.forced ? "var(--ck-text-3)" : LOSS_COLOR, fontSize: 12, fontWeight: 400, flex: "0 0 auto" }}>
+        <span className="ck-num" style={{ color: f.movement ? MOVEMENT_COLOR : f.forced ? "var(--ck-text-3)" : LOSS_COLOR, fontSize: 12, fontWeight: 400, flex: "0 0 auto" }}>
           {f.lostDamage >= 1 ? fmtDamage(f.lostDamage) : "—"}
         </span>
       </div>
@@ -546,6 +556,17 @@ function TimelineStrip({ summary, analysis }: { summary: PlayerDamageSummary; an
           <div key={`f${i}`} title={`${fmtTime(w.startMs)}–${fmtTime(w.endMs)} forced: ${w.cause}`}
             style={{ position: "absolute", top: 0, bottom: 0, left: pct(w.startMs), width: width(w.startMs, w.endMs), background: "rgba(255,255,255,0.07)" }} />
         ))}
+        {(summary.timeline.movement ?? []).map((w, i) => (
+          <div key={`mv${i}`} title={`${fmtTime(w.startMs)}–${fmtTime(w.endMs)} movement: ${w.cause}`}
+            style={{ position: "absolute", top: 0, bottom: 0, left: pct(w.startMs), width: width(w.startMs, w.endMs), background: "rgba(91,141,239,0.22)" }} />
+        ))}
+        {/* Idle the movement explained, as markers like the counted losses. */}
+        {summary.findings.filter((f) => f.movement && f.lostDamage >= 1).flatMap((f, i) =>
+          (f.moments ?? [{ startMs: f.startMs, endMs: f.endMs }]).map((m, j) => (
+            <div key={`mm${i}-${j}`}
+              title={`${fmtTime(m.startMs)} ${m.detail ?? f.detail} (${fmtDamage(m.lostDamage ?? f.lostDamage)}, not counted)`}
+              style={{ position: "absolute", bottom: 0, height: 6, left: pct(m.startMs), width: `max(3px, ${width(m.startMs, m.endMs)})`, background: MOVEMENT_COLOR }} />
+          )))}
         {summary.timeline.buffWindows.map((w, i) => (
           <div key={`b${i}`} title={`Raid buffs ${fmtTime(w.startMs)}–${fmtTime(w.endMs)}`}
             style={{ position: "absolute", top: 0, height: 5, left: pct(w.startMs), width: width(w.startMs, w.endMs), background: "var(--ck-gold-2)" }} />
@@ -580,7 +601,7 @@ function TimelineStrip({ summary, analysis }: { summary: PlayerDamageSummary; an
         <span className="ck-num" style={{ position: "absolute", right: 0 }}>{fmtTime(total)}</span>
       </div>
       <div style={{ color: "var(--ck-text-3)", fontSize: 10, textAlign: "center" }}>
-        gold: raid buffs · shaded: forced · ticks: GCDs · red: counted losses
+        gold: raid buffs · shaded: forced · <span style={{ color: MOVEMENT_COLOR }}>blue: movement</span> · ticks: GCDs · red: counted losses
       </div>
     </div>
   );

@@ -65,6 +65,7 @@ export function analyzePullDamage(pull: Pull, game: DamageGame, context?: Damage
 
   const downtime = raidDowntime(pull, endMs, game);
   const contextForced = context?.forcedWindows?.(pull) ?? [];
+  const contextMovement = context?.movementWindows?.(pull) ?? [];
   const phaseForced: ForcedWindow[] = segments
     .filter((sgm) => context?.phases[sgm.phase]?.damageCounts === false)
     .map((sgm) => ({
@@ -100,6 +101,7 @@ export function analyzePullDamage(pull: Pull, game: DamageGame, context?: Damage
       ...contextForced.filter((w) => !w.players || w.players.includes(player.name)),
       ...phaseForced,
     ];
+    const movement = contextMovement.filter((w) => (!w.players || w.players.includes(player.name)) && w.startMs < endMs);
     const profile = speedProfile(uses, game, statusWindows(player, game.hasteStatusIds, endMs));
     const model = speedModels?.get(player.name);
     const speed = model ? { ...profile, factor: model.factor, at: model.at } : profile;
@@ -111,7 +113,7 @@ export function analyzePullDamage(pull: Pull, game: DamageGame, context?: Damage
     const ctx: PlayerCheckContext = {
       pull, player, game, context, endMs, uses, job, factor, factorAt: speed.at,
       baseGcdMs: speed.baseRecastMs * factor,
-      forced, dead, buffWindows, values, phaseOf, phaseName, mechanicAround,
+      forced, movement, dead, buffWindows, values, phaseOf, phaseName, mechanicAround,
       decidingPhaseStart: decidingSegment?.startMs,
       ledger,
       patch,
@@ -137,7 +139,8 @@ export function analyzePullDamage(pull: Pull, game: DamageGame, context?: Damage
       player: player.name, job, role: player.role,
       damage: values.total,
       lostDamage: findings.filter((f) => !f.forced).reduce((a, f) => a + f.lostDamage, 0),
-      forcedDamage: findings.filter((f) => f.forced).reduce((a, f) => a + f.lostDamage, 0),
+      forcedDamage: findings.filter((f) => f.forced && !f.movement).reduce((a, f) => a + f.lostDamage, 0),
+      movementDamage: findings.filter((f) => f.movement).reduce((a, f) => a + f.lostDamage, 0),
       gcds: uses.filter((u) => u.startMs < endMs).length,
       baseGcdMs: ctx.baseGcdMs,
       gcdUptime: gcdUptime(uses, speed.at, [...downtime, ...dead, ...limitBreakWindows(uses)], endMs),
@@ -149,6 +152,7 @@ export function analyzePullDamage(pull: Pull, game: DamageGame, context?: Damage
         healGcdStarts: uses.filter((u) => u.startMs < endMs && kinds.get(u.action.id) === "heal").map((u) => u.startMs),
         buffWindows,
         forced: forced.filter((w) => w.startMs < endMs),
+        movement,
         gauges: (game.jobGauges?.(job) ?? []).flatMap((g) => g(ctx)),
       },
     });

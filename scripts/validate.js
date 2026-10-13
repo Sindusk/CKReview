@@ -995,7 +995,7 @@ function printDamageAnalysis(mod, pulls, game) {
       }
       for (const p of a.players) {
         console.log(`  ${p.job.padEnd(12)} ${p.player.padEnd(18)} dealt ${M(p.damage).padStart(7)} lost ${M(p.lostDamage).padStart(6)}` +
-          ` (forced ${M(p.forcedDamage)}) uptime ${(p.gcdUptime.pct * 100).toFixed(1)}% of ${t(p.gcdUptime.eligibleMs)}, GCD ${t(p.baseGcdMs)} x${p.gcds}` +
+          ` (forced ${M(p.forcedDamage)}${p.movementDamage ? `, movement ${M(p.movementDamage)}` : ''}) uptime ${(p.gcdUptime.pct * 100).toFixed(1)}% of ${t(p.gcdUptime.eligibleMs)}, GCD ${t(p.baseGcdMs)} x${p.gcds}` +
           `, buffs given ${p.buffs.approximate ? '~' : ''}${M(p.buffs.given)} received ${M(p.buffs.received)}` +
           `${p.gcdSplit.heal ? `, heal GCDs ${p.gcdSplit.heal}/${p.gcdSplit.heal + p.gcdSplit.damage}` : ''}`);
         for (const g of p.timeline.gauges ?? []) console.log(`      gauge ${g.name}: ${g.note}`);
