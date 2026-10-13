@@ -26,23 +26,32 @@ for this kill, so top players' logs stand in for it.
 
 ## Players
 
-| Player | Spec | Status |
-|---|---|---|
-| Wyrmtongues | Destruction Warlock (57th pct) | **Done** |
-| Hervous, Cocomber | Arms Warrior | **Done** |
-| Shadowmeld | Marksmanship Hunter | **Done** (against Imnotanorc) |
-| Nearby | Assassination Rogue | not started |
-| Bragontix | Devastation Evoker | **Done** (against Gilgvoker) |
-| Sylmigron | Balance Druid | not started |
-| Cocroach | Elemental Shaman | not started |
-| Mythnarra | Havoc Demon Hunter | **Done** (against Hawkerton) |
-| Neximage | Arcane Mage | **Done** (against Màzz) |
-| Deathstriker | Beast Mastery Hunter | not started |
-| Veinglas | Blood Death Knight | **Done** (against Frostydn) |
-| Polpo | Retribution Paladin | **Done** (against Yenvenger) |
-| Blkphnx | Windwalker Monk | not started |
-| Thatapaddlin | Protection Paladin | not started |
-| Fwîî | Demonology Warlock | not started |
+Parse = Warcraft Logs DPS percentile on this kill, as the user pasted it
+from the report's damage table (2026-10-13). References: the top player of
+the spec in NK1hBtW9rckdjq36, 3Vz6Qt2RyTPXwpJn (100th percentile, user's
+pick) or ACmXHMFtaPLR9k8w (99th, user's pick).
+
+| Player | Spec | Parse | DPS | Reference | Status |
+|---|---|---|---|---|---|
+| Wyrmtongues | Destruction Warlock | 57 | 227.9k | Shn, Bryon (NK) | **Done** |
+| Fwîî | Demonology Warlock | 77 | 204.6k | Petonpassive (AC, not a named top parse) | not started |
+| Cocomber | Arms Warrior | 72 | 197.9k | Eroka (NK), Nagafenw (AC) | **Done** |
+| Nearby | Assassination Rogue | 75 | 195.0k | Auxeus (AC) | **Done** |
+| Polpo | Retribution Paladin | 71 | 194.8k | Yenvenger (AC) | **Done** |
+| Shadowmeld | Marksmanship Hunter | 47 | 188.9k | Imnotanorc (3V), Pisslizard (AC) | **Done** (against Imnotanorc) |
+| Mythnarra | Havoc Demon Hunter | 47 | 176.4k | Hawkerton (3V), Vairuh (AC) | **Done** (against Hawkerton) |
+| Neximage | Arcane Mage | 33 | 175.9k | Màzz (3V) | **Done** |
+| Bragontix | Devastation Evoker | 51 | 172.3k | Gilgvoker (3V) | **Done** |
+| Deathstriker | Beast Mastery Hunter | 29 | 166.2k | none | not started |
+| Hervous | Arms Warrior | 17 | 163.6k | Eroka (NK), Nagafenw (AC) | **Done** |
+| Cocroach | Elemental Shaman | 30 | 163.1k | Soccerkid (AC, not a named top parse) | not started |
+| Sylmigron | Balance Druid | 6 | 152.4k | Arzenal (NK), Skress (AC, not named) | not started |
+| Blkphnx | Windwalker Monk | 14 | 150.4k | Styphi (AC) | not started |
+| Thatapaddlin | Protection Paladin | 66 | 100.1k | Holyvi (NK) | not started |
+| Veinglas | Blood Death Knight | 46 | 90.5k | Frostydn (AC) | **Done** |
+| Saelska | Restoration Druid (healer) | 17 | 3.0k | — | not in scope |
+| Neptune | Restoration Shaman (healer) | 27 | 2.3k | — | not in scope |
+| Cocovid | Restoration Shaman (healer) | 5 | 0.0k | — | not in scope |
 
 ## What was built (all committed)
 
@@ -133,6 +142,11 @@ for this kill, so top players' logs stand in for it.
   either way (Death Strike is mostly a heal). Same pace: his 0.90s base is
   the 99th-percentile Blood DK's too, so it's Blood's GCD, not a gap in
   the haste list. Missed second potion 0.83M.
+- **Nearby vs Auxeus (ACmXHMFtaPLR9k8w):** new: Vanish tracked for
+  Assassination, valued by the Garrote it empowers (1.13M vs 0.35M), with
+  a skipped opener use counted (openerUse): 0.78M. Same GCD rate (45.9 vs
+  46.1/min); the app's gaps are an Energy floor for this spec (Auxeus reads
+  more). The rest of the DPS gap is damage per GCD.
 - **Matches in ACmXHMFtaPLR9k8w:** Frostydn ↔ Veinglas, Auxeus
   (Assassination) ↔ Nearby, Styphi (Windwalker) ↔ Blkphnx, Nagafenw (Arms)
   ↔ Hervous / Cocomber, Pisslizard (Marksmanship) ↔ Shadowmeld, Vairuh

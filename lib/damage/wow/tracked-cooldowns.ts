@@ -20,7 +20,32 @@
 // Defensives are left out: holding them is a choice. So are cooldowns gated
 // by a resource (Eye Beam, Breath of Sindragosa) or charges (Shadow Dance).
 
+import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { TrackedCooldown } from "../types";
+
+/**
+ * One Vanish's worth to an Assassination Rogue: the damage of a Garrote cast
+ * within 6s after a Vanish (to its next Garrote on that target, up to 24s)
+ * less the player's average ordinary Garrote (ones that ran 15s+). Both from
+ * this player's hits; undefined without one of each.
+ */
+function vanishGarroteValue(player: PlayerInfo, endMs: number): { value: number; basis: string } | undefined {
+  const vanish = player.casts.filter((c) => c.abilityName === "Vanish").map((c) => c.timestamp);
+  const gar = player.casts.filter((c) => c.abilityName === "Garrote" && c.timestamp < endMs).sort((a, b) => a.timestamp - b.timestamp);
+  const ticks = player.damageDone.filter((h) => !h.pet && h.abilityName === "Garrote");
+  const rows = gar.map((c, i) => {
+    const next = gar.slice(i + 1).find((x) => x.target === c.target);
+    const end = Math.min(next?.timestamp ?? Infinity, c.timestamp + 24_000, endMs);
+    const dmg = ticks.filter((h) => h.target === c.target && h.timestamp > c.timestamp && h.timestamp <= end + 500).reduce((a, h) => a + (h.amount ?? 0), 0);
+    return { dmg, len: end - c.timestamp, fromVanish: vanish.some((t) => c.timestamp - t >= 0 && c.timestamp - t < 6_000) };
+  });
+  const avg = (xs: number[]) => xs.reduce((a, x) => a + x, 0) / xs.length;
+  const v = rows.filter((r) => r.fromVanish && r.len >= 15_000).map((r) => r.dmg);
+  const o = rows.filter((r) => !r.fromVanish && r.len >= 15_000).map((r) => r.dmg);
+  if (v.length === 0 || o.length === 0) return undefined;
+  const k = (n: number) => `${Math.round(n / 1000)}k`;
+  return { value: avg(v) - avg(o), basis: `(${k(avg(v))} Garrote from Vanish − ${k(avg(o))} ordinary Garrote)` };
+}
 
 export const WOW_TRACKED_COOLDOWNS: Record<string, TrackedCooldown[]> = {
   // ── Tanks ───────────────────────────────────────────────────────────
@@ -80,6 +105,13 @@ export const WOW_TRACKED_COOLDOWNS: Record<string, TrackedCooldown[]> = {
   "Assassination Rogue": [
     { name: "Kingsbane", actionIds: [385627], cooldownMs: 60_000, charges: 1, firstUseOffsetMs: 11_000 },   // 60.0 / 64.8s, 10.9s
     { name: "Deathmark", actionIds: [360194], cooldownMs: 122_000, charges: 1, firstUseOffsetMs: 10_000 },  // 122.4 / 140.5s, 9.9s
+    // Vanish (1856) is a damage cooldown here: the Garrote after it gets
+    // Improved Garrote (392401, 6s), 1.09–1.60M over its duration against
+    // ~0.34M for an ordinary one. Measured 2026-10-13: the 99th-percentile
+    // Auxeus (ACmXHMFtaPLR9k8w) Vanished at 0:09, 2:10, 4:20 (121s, 130s);
+    // Nearby (qpZx3mWaG7gcDdYB) only at 2:04 and 4:30, skipping the opener
+    // one (WoWAnalyzer 61%). Value of a use: vanishGarroteValue.
+    { name: "Vanish", actionIds: [1856], cooldownMs: 120_000, charges: 1, firstUseOffsetMs: 10_000, valuePerUse: vanishGarroteValue, openerUse: true },
   ],
   "Subtlety Rogue": [
     { name: "Shadow Blades", actionIds: [121471], cooldownMs: 90_000, charges: 1, firstUseOffsetMs: 5_000 },  // 90.5 / 97.2s, 5.0s

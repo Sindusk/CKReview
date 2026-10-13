@@ -19,6 +19,19 @@
 //   invisible: the check sees only non-spending casts made at the cap.
 // Tracked cooldowns are in tracked-cooldowns.ts.
 //
+// Assassination, checked against WoWAnalyzer on qpZx3mWaG7gcDdYB pull 3
+// (Nearby; reference ACmXHMFtaPLR9k8w's Auxeus, 99th percentile; checked
+// 2026-10-13):
+// - Matched: Vanish 61%, opener use skipped (tracked-cooldowns.ts, Vanish
+//   with openerUse and the Garrote it empowers: 784k). Potions 2/2.
+// - Similar to the reference: Envenom (20 bad vs 25), Rupture, Garrote,
+//   Fan of Knives on one target (56% vs 51%), Deathmark, Kingsbane.
+// - Not adopted: Energy waste 4.0% vs 0.7% (both "perfect"; regen waste
+//   isn't in the log).
+// - A floor: GCD gaps. Assassination waits on Energy; Nearby presses 45.9
+//   GCDs a minute to Auxeus's 46.1 and reads 15.6k/s estimated loss to
+//   Auxeus's 23.4k/s.
+//
 // Retribution, checked against WoWAnalyzer on qpZx3mWaG7gcDdYB pull 3
 // (Polpo; reference ACmXHMFtaPLR9k8w fight 15's Yenvenger, 99th
 // percentile, page saved; checked 2026-10-13):

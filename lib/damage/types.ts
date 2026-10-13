@@ -161,6 +161,16 @@ export type TrackedCooldown = {
   landDelayMs?: number;
   // Its damage is the player's pet hits (Bunshin's shadow).
   petDamage?: boolean;
+  // A cooldown whose worth is what it does to another spell (Assassination's
+  // Vanish: the empowered Garrote it allows): the value of one use, with
+  // the basis to print. Overrides damageIds / petDamage / own damage.
+  valuePerUse?(player: PlayerInfo, endMs: number): { value: number; basis: string } | undefined;
+  // The opener should use it: a first cast later than firstUseOffsetMs +
+  // OPENER_LATE_MS is one use lost whenever the pull had room for one more
+  // than were cast, even if the wait was under a full cooldown (the later
+  // casts could slide). Nearby's Vanish (qpZx3mWaG7gcDdYB): first at 2:04,
+  // the next fitting after Stasis anyway.
+  openerUse?: boolean;
 };
 
 // ── Fight context (per boss) ───────────────────────────────────────────

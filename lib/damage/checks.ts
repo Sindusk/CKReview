@@ -56,6 +56,9 @@ import {
 export const GCD_TOLERANCE_MS = 150;
 export const GAP_FINDING_MS = 1_000;
 export const COOLDOWN_HOLD_MS = 1_250;
+// TrackedCooldown.openerUse: a first cast this much later than the opener's
+// offset is a skipped opener use.
+const OPENER_LATE_MS = 30_000;
 export const PROC_CONSUME_MS = 200;
 export const PROC_EXPIRY_EARLY_MS = 600;
 export const PROC_EXPIRY_LATE_MS = 1_500;
@@ -562,9 +565,23 @@ export function checkCooldownDrift(ctx: PlayerCheckContext): DamageFinding[] {
     // Arrows, room for 66, 5 of them in forced time), which caps a real
     // drift to 0; see docs/open-items.md (cooldown room) before changing.
     const landed = casts.filter((t) => t + (cd.landDelayMs ?? 0) < ctx.endMs).length;
-    const lostUses = Math.min(Math.max(stretchLost, Math.floor(unforced / cd.cooldownMs)),
+    const openerLost = cd.openerUse && !prePull && casts.length > 0 && casts[0] > cd.firstUseOffsetMs + OPENER_LATE_MS ? 1 : 0;
+    const lostUses = Math.min(Math.max(stretchLost, Math.floor(unforced / cd.cooldownMs), openerLost),
       Math.max(0, room - landed - (prePull ? 1 : 0)));
     if (lostUses < 1 || !longest) continue;
+    const custom = cd.valuePerUse?.(ctx.player, ctx.endMs);
+    if (cd.valuePerUse) {
+      if (!custom || custom.value <= 0) continue;
+      const uses = (n: number) => `${n} use${n === 1 ? "" : "s"}`;
+      out.push(finding(ctx, {
+        kind: "cooldown-drift", startMs: longest.startMs, endMs: longest.endMs, forced: false, inference: true,
+        label: `${cd.name} drift`,
+        lostDamage: lostUses * custom.value,
+        basis: `${uses(lostUses)} × ${custom.basis}; room for ${room} in the pull`,
+        detail: `${cd.name} sat ready for ${s(unforced)} in total (${uses(casts.length)}): about ${uses(lostUses)} lost`,
+      }));
+      continue;
+    }
     const damageIds = new Set(cd.damageIds ?? []);
     const perUse = damageIds.size > 0 || cd.petDamage
       ? ctx.player.damageDone.filter((e) => (cd.petDamage ? !!e.pet : damageIds.has(e.abilityId)) && e.timestamp < ctx.endMs)
