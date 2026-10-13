@@ -353,9 +353,11 @@ export function uptimeFindings(ctx: PlayerCheckContext, spec: UptimeSpec): Damag
 //   come sooner. L seconds early = L ÷ duration of an extra DoT cast in
 //   place of a filler. Summed per phase ("refreshed early"). Only what
 //   pressing it one or more GCDs later would have gained counts, less the
-//   ticks that delay drops: inside one GCD of expiry a refresh is on time
-//   (user, 2026-10-13; vVPtwaTQ62Jg391q The Tyrant kill, the Sage's 11
-//   refreshes, 14.0s clipped, are now one, the 0:25 re-dot with 8s left).
+//   ticks that delay drops (expected: lapse ÷ 3s × average tick). Inside
+//   one GCD of expiry a refresh is on time unless the lapse a delay causes
+//   is short (AST: under ~0.8s still favours waiting). User, 2026-10-13;
+//   vVPtwaTQ62Jg391q The Tyrant kill, the Sage's 11 refreshes, 14.0s
+//   clipped, are now one, the 0:25 re-dot with 8s left.
 // - It was cut short (the status came off, the enemy took no ticks for
 //   4.5s+, or a kill ended): no later refresh was coming, so the choice was
 //   this DoT or a filler. What it added = its direct hit + its ticks after
