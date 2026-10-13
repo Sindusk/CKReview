@@ -74,8 +74,24 @@ node .claude/skills/damage-analysis/tools/xiva-html.js "<page.html>" --module po
   are dropped. A page comes out ~30x smaller, so the whole extract is
   usually fine in one read; use `--module` when only a few sections matter.
 - Action icons print as `[Name]`, named from the page's own alt / link
-  text; one never named on the page prints `[icon 002875]` (the icon file
-  id). Expanded and collapsed accordion sections are both in the HTML.
+  text, then from xivanalysis's data when the step-2 checkout is given
+  (`--xiva <scratchpad>/xiva` or `XIVA_DIR=...`): without it a Summoner
+  page left 15 rotation icons as `[icon 002785]`. `[icon 001751]` is the
+  weaving-warning icon, not an action.
+- Marks: `✓` / `✗` / `⚠` are the page's pass/fail glyphs (checklist rows,
+  Swiftcast "Good Use?", Reawaken "in order"); `(red)` is a cell
+  xivanalysis colours as a shortfall.
+- Expanded and collapsed accordion sections are both in the HTML.
+- **Checking the extract:** `node .claude/skills/damage-analysis/tools/xiva-html-audit.js <page.html>...`
+  (with `XIVA_DIR` set) lists any visible text, icon name or tooltip on
+  the page that isn't in the extract, and unnamed icons. On the six
+  qjCMx4bRfgNKwX9T fight 16 pages it found three gaps, all fixed: icons
+  only shown in tables, `<thead>` rows with no `<tr>`, and a note inside
+  a table but outside its rows. Run it on a new job's first page; only
+  "Expand module" (a button label) should remain.
+- Not in the extract: the Timeline (resource graphs are SVG paths, not
+  numbers), hover tooltips (not in the saved page), and minor suggestions
+  if "Show minor" was off when the page was saved.
 - Window tables (`x/y` columns) don't name their columns per cell: the
   header row's icon order gives them.
 - Times are xivanalysis's clock: on qjCMx4bRfgNKwX9T they matched the
