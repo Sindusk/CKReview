@@ -256,6 +256,16 @@ were to the app's own engine, found where xivanalysis was right.
   `leftAtKill`); a cooldown pressed too late for its effect isn't a use
   (SCH's last Aetherflow, 0.2s before the kill); a window whose full span
   runs past the kill is skipped (VPR Reawaken ended early by Ouroboros).
+- **First Monk and Summoner samples.** Monk Blitzes in Riddle of Fire
+  are built (one per Perfect Balance charge with time, xivanalysis's
+  rule); Riddle of Fire's +15% is confirmed from the multiplier. The
+  Summoner had nothing to build: its short attunements were all forced.
+- **oGCD AoEs** are checked for too few targets now (Bard Rain of
+  Death); their hits are matched by the action's measured delay, since a
+  stacked second press comes before the first one's hits.
+- **Open:** drift's room-for-uses skips forced time while casts include
+  presses made in it, which can hide drift (Bard Empyreal Arrow 67/69);
+  the simple fixes flip verified counts elsewhere (docs/open-items.md).
 - **Input:** the user saves each player's xivanalysis page as HTML;
   `tools/xiva-html.js` cuts a ~500KB page to ~20KB of text with named
   action icons (see the skill).
