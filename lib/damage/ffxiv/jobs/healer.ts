@@ -62,6 +62,18 @@
 //   GCDs, these windows count damage GCDs and heal-gcd values the heals.
 //   No damage: the 12:05 Divination without Lightspeed (all 8 GCDs and
 //   every oGCD fit), overheal, Synastry, Horoscope / Neutral Sect.
+//   Rechecked on the same report's fight 16 (2026-10-13), nothing new:
+//   GCD uptime (93.7% both), the weaving gaps (15:32 4.6s, 16:19 and
+//   17:28 triple weaves, 17:57), Oracle missing from the 8:03 Divination,
+//   Combust missing from five, 7 interrupted casts and the tincture
+//   finding all match. Overstated: Combust uptime 85.6% (its gaps are
+//   P1/P2/P4 downtime; the only unforced one is Exdeath's 9s at 8:43, a
+//   dot-clip finding); clipping 17.2s a minute (per target ~52s over
+//   the pull, P3's two bosses again); 3 Combusts before invulnerability
+//   (8-9 ticks, 63-80k, each more than a 38k Fall Malefic); "1 Earthly
+//   Star missed" (it counts from 0:00 past a pre-pull star exploded at
+//   0:17; 55s held in all, under one recharge). No damage: overheal,
+//   Synastry, Horoscope, Swiftcast 0/28.
 // - Scholar, checked against xivanalysis on qjCMx4bRfgNKwX9T Dancing Mad
 //   kill (7.5, 2026-10-13): GCD uptime, Chain Stratagem and Aetherflow
 //   (no use lost), 6 interrupted casts and its weaving gaps (17:24 6.2s,
