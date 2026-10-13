@@ -46,7 +46,7 @@ pick) or ACmXHMFtaPLR9k8w (99th, user's pick).
 | Hervous | Arms Warrior | 17 | 163.6k | Eroka (NK), Nagafenw (AC) | **Done** |
 | Cocroach | Elemental Shaman | 30 | 163.1k | Soccerkid (AC, not a named top parse) | not started |
 | Sylmigron | Balance Druid | 6 | 152.4k | Arzenal (NK), Skress (AC, not named) | not started |
-| Blkphnx | Windwalker Monk | 14 | 150.4k | Styphi (AC) | not started |
+| Blkphnx | Windwalker Monk | 14 | 150.4k | Styphi (AC) | **Done**, one open item |
 | Thatapaddlin | Protection Paladin | 66 | 100.1k | Holyvi (NK) | not started |
 | Veinglas | Blood Death Knight | 46 | 90.5k | Frostydn (AC) | **Done** |
 | Saelska | Restoration Druid (healer) | 17 | 3.0k | — | not in scope |
@@ -147,6 +147,10 @@ pick) or ACmXHMFtaPLR9k8w (99th, user's pick).
   a skipped opener use counted (openerUse): 0.78M. Same GCD rate (45.9 vs
   46.1/min); the app's gaps are an Energy floor for this spec (Auxeus reads
   more). The rest of the DPS gap is damage per GCD.
+- **Blkphnx vs Styphi (ACmXHMFtaPLR9k8w):** cooldowns fine (Xuen, Zenith,
+  Conduit); 39.6 vs 47.9 GCDs a minute (counted as gaps, 15.1k vs 8.5k/s
+  est. loss). Main gap Fists of Fury (Open 1); Rising Sun Kick 5.9 vs 7.9
+  a minute, Blackout Kick filler 10.3 vs 8.1.
 - **Matches in ACmXHMFtaPLR9k8w:** Frostydn ↔ Veinglas, Auxeus
   (Assassination) ↔ Nearby, Styphi (Windwalker) ↔ Blkphnx, Nagafenw (Arms)
   ↔ Hervous / Cocomber, Pisslizard (Marksmanship) ↔ Shadowmeld, Vairuh
@@ -159,7 +163,15 @@ pick) or ACmXHMFtaPLR9k8w (99th, user's pick).
 
 ## Open
 
-1. **Patch table for WoW** (docs/open-items.md): none yet.
+1. **Blkphnx's Fists of Fury (user to decide).** 4.4 vs Styphi's 7.2
+   casts per unforced minute; unforced interval median 12.9s vs 7.7s. By
+   WoWAnalyzer's stretches ~3.6s vs ~1.2s of each cycle is ready-but-
+   unpressed (the rest is a shorter cooldown for Styphi: haste, resets).
+   Rough cost: ~2.4s × ~27 casts ≈ 5 Fists × (470k − 62k Blackout Kick)
+   ≈ 2M. Not built: the resets aren't in our log. Options: find the reset
+   source in the buff stream (a refetch with it), or a reference-rate
+   inference scaled by the cooldown difference.
+2. **Patch table for WoW** (docs/open-items.md): none yet.
 
 ## Next
 
