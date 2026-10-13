@@ -33,10 +33,17 @@ const clock = (t) => { const s = Math.round(t / 100) / 10; return `${Math.floor(
   const cd = mod.FFXIV_DAMAGE.trackedCooldowns(ps.job).find((c) => c.name === name);
   if (!cd) { console.log(`no tracked cooldown "${name}" for ${ps.job}: ${mod.FFXIV_DAMAGE.trackedCooldowns(ps.job).map((c) => c.name).join(', ')}`); process.exit(1); }
   const forced = mod.mergeWindows(ps.timeline.forced);
-  const casts = pull.players.find((p) => p.name === who).casts.filter((c) => cd.actionIds.includes(c.abilityId)).map((c) => c.timestamp);
-  console.log(`${cd.name}: ${cd.cooldownMs / 1000}s, ${cd.charges} charge(s), ${casts.length} casts; room for ${mod.roomForUses(cd, a.endMs, forced, false)} (no pre-pull use)`);
+  const player = pull.players.find((p) => p.name === who);
+  const casts = player.casts.filter((c) => cd.actionIds.includes(c.abilityId)).map((c) => c.timestamp);
+  // The engine's pre-pull evidence (checks.ts checkCooldownDrift): an
+  // action that only follows this cooldown, before its first cast.
+  const evidence = new Set(cd.prePullEvidenceIds ?? []);
+  const prePull = evidence.size > 0 && [...player.casts, ...player.damageDone]
+    .some((c) => evidence.has(c.abilityId) && c.timestamp < (casts[0] ?? Infinity));
+  console.log(`${cd.name}: ${cd.cooldownMs / 1000}s, ${cd.charges} charge(s), ${casts.length} casts; room for ${mod.roomForUses(cd, a.endMs, forced, prePull)}` +
+    (prePull ? ' (used before the pull too: the first stretch is its recharge)' : ' (no pre-pull use)'));
   let u = 0;
-  for (const w of mod.cappedStretches(casts, cd.cooldownMs, cd.charges, a.endMs)) {
+  for (const w of mod.cappedStretches(casts, cd.cooldownMs, cd.charges, a.endMs).filter((w) => !(prePull && w.startMs === 0))) {
     const f = mod.overlapMs(w.startMs, w.endMs, forced);
     u += w.endMs - w.startMs - f;
     console.log(`  full ${clock(w.startMs)}-${clock(w.endMs)}: ${((w.endMs - w.startMs) / 1000).toFixed(1)}s, forced ${(f / 1000).toFixed(1)}s`);

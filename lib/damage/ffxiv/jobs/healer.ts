@@ -50,6 +50,18 @@
 //   one Draw over an unplayed card holds (`cards` below); 3 Divinations
 //   without Lightspeed cost what the weaving gaps already count; 2 of its
 //   5 interrupted casts were the boss going untargetable (6:54, 12:55).
+// - Astrologian, checked against xivanalysis on qjCMx4bRfgNKwX9T Dancing
+//   Mad kill (7.5, 2026-10-13): GCD uptime, Combust uptime, 40
+//   interrupted casts, 1 Gravity II, the weaving gaps (16:59 12s, 13:41
+//   9s) and Combust missing from Divination all match findings here.
+//   Overstated: Combust clipping 11.8s a minute (per target it's 2.3s;
+//   P3's Exdeath and Chaos DoTs counted as one); "1 Earthly Star use
+//   missed" (it can't see the pre-pull star, exploded 0:18); 3 Combusts
+//   before invulnerability (each got 7-9 ticks, more than a Fall
+//   Malefic). Divination GCD counts differ by definition: it counts heal
+//   GCDs, these windows count damage GCDs and heal-gcd values the heals.
+//   No damage: the 12:05 Divination without Lightspeed (all 8 GCDs and
+//   every oGCD fit), overheal, Synastry, Horoscope / Neutral Sect.
 // - Healer DoTs are valued per application against the filler
 //   (shared.ts dotFindings with fillerId), not by seconds overwritten.
 // - Sage, checked against xivanalysis on dDar482XvFKBPJYh FRU kill (7.1,
