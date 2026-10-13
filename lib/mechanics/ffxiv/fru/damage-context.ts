@@ -95,6 +95,7 @@ const RULE_KEY_LABELS: Record<string, string> = {
   "ffxiv-pan-exaline":            "Exalines",
   "ffxiv-pan-tower":              "Paradise Regained",
   "ffxiv-pan-tank-wings":         "Paradise Regained",
+  "ffxiv-pan-tank-swap":          "Paradise Regained",
   "ffxiv-pan-polarizing":         "Polarizing Strikes",
   "ffxiv-pan-afterblast":         "Polarizing Strikes",
   "ffxiv-pan-box":                "Pandora's Box",

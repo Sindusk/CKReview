@@ -68,7 +68,18 @@
 //   F16, J6). Both tanks in one wing: D6 (the tether tank took it, the
 //   target was invulnerable) and E4 (the reverse).
 // - Fulgent Blade's raidwide after Box killed four in F15 and H5 (healing,
-//   not a mechanic).
+//   not a mechanic; the user confirmed F15 was mitigation).
+// - The tank swap (every clean Paradise Regained): the PLD tank takes wing 1
+//   under Hallowed Ground; the other tank Provokes 3.4-13.6s into the cast
+//   (with or without a Shirk before it) and takes wing 2. Wing 1's target
+//   locks early: a raised tank's Provoke at +3.2 (F5) didn't take it. Missed
+//   swaps: A9 and F10 (no Provoke), F16 (Provoke 2.4s after a raise; F15's
+//   identical one worked). The second wing then hits its tank and, ~0.9s
+//   later, the party, with the tank standing in the tether spot.
+// - Enmity is not in the log: FFLogs has no threat events for FFXIV and
+//   Pandora's autos pause during Paradise Regained. Damage done after the
+//   Provoke doesn't predict the swap either (clean pulls had the wing-1 tank
+//   out-damaging the Provoker 5-10x and the swap still held).
 // Cutoffs (first Raid error) of the 34 non-clears: enrage 8 (A10, A11,
 //   D6, H7, H9, I12, J1, J11), collapse 9, wings 5, Akh Morn 3 (A3, H1,
 //   J4), Cruel Path 3 (A5, B1, E14), Unmitigated Explosion 3 (E16, G9, H13).
@@ -76,6 +87,11 @@
 //   Wipes with nobody named before the cutoff: A9 and J4-style group
 //   misreads (a wing on the party, both Akh Morns on one group), B1 (both
 //   Cruel Paths on one group) and H5 (Fulgent's raidwide after Box).
+// VOD review 2026-10-13 (user): report F pulls 5/10/15/16, rulings in
+//   expectations/rulings.json. Exaline hits are the error, not the deaths
+//   that follow (Akh Morn under the resistance); a death from a teammate's
+//   early mistake (F5 after the wing-1 tank's) makes the rest of the pull fallout; a
+//   Damage Down reset death (F16) is intentional.
 //
 // -- RULES IMPLEMENTED --
 // ffxiv-pan-exaline (Major, Damage Down): every exaline hit, one per player
@@ -91,13 +107,18 @@
 //   a later tower they stood on); 4+ is player-less plus Raid when it
 //   killed 4+. Exposure: the non-tanks.
 // ffxiv-pan-tank-wings: both tanks in one wing, both named.
+// ffxiv-pan-tank-swap: the second wing on the first wing's tank again names
+//   the other tank (Major when its cleave killed someone; it then owns the
+//   wing's hits, the Raid marker stays). Not when that tank was raised in
+//   the last minute or a wing hit both tanks. Exposure: the tanks.
 // ffxiv-pan-tether: the tether's buster on a non-tank with both tanks alive
 //   (not one the wing just hit). Exposure: the non-tanks.
 // ffxiv-pan-tower (Major): a living non-tank in no tower when one went off
 //   short; Raid when Unmitigated Explosion killed 4+.
 // ffxiv-pan-polarizing: with all alive, players in both lines (3+ is
 //   player-less), a player in a line of the element they hold a resistance
-//   for (not from an avoidable hit); Raid when a volley killed 4+.
+//   for (not from an avoidable hit), a living player in neither line when
+//   nobody was in both (Minor); Raid when a volley killed 4+.
 // ffxiv-pan-afterblast (Major, Damage Down): an exploding lane; 4+ at once
 //   is player-less.
 // ffxiv-pan-box: Box with no tank LB on any hit (player-less); Raid when
@@ -316,6 +337,7 @@ export const PAN_AKH_MORN_RULE_ID    = "ffxiv-pan-akh-morn";
 export const PAN_AUTOS_RULE_ID       = "ffxiv-pan-autos";
 export const PAN_WINGS_RULE_ID       = "ffxiv-pan-wings";
 export const PAN_TANK_WINGS_RULE_ID  = "ffxiv-pan-tank-wings";
+export const PAN_TANK_SWAP_RULE_ID   = "ffxiv-pan-tank-swap";
 export const PAN_TETHER_RULE_ID      = "ffxiv-pan-tether";
 export const PAN_TOWER_RULE_ID       = "ffxiv-pan-tower";
 export const PAN_POLARIZING_RULE_ID  = "ffxiv-pan-polarizing";
@@ -585,6 +607,34 @@ function detectParadiseRegained(players: PlayerInfo[], life: Life, casts: EnemyE
       .sort((a, b) => a[0].e.timestamp - b[0].e.timestamp);
     let partyCleaved = false;
 
+    // The tank swap: the second wing goes to the first wing's tank again.
+    // Every clean resolution had the other tank Provoke 3.4-13.6s into the
+    // cast and take it. Named: the tank who should have taken it (user,
+    // 2026-10-13, F10 +49.3: a missed Provoke; also A9 +49.4). Not when that
+    // tank was raised in the last minute (F16 +49.3: Provoke 2.4s after the raise,
+    // indistinguishable from F15's that worked; the user calls it fallout
+    // of their death) or when a wing already hit both tanks (tank-wings).
+    occurrences?.push({ mechanicKey: PAN_TANK_SWAP_RULE_ID, timestamp: pr.timestamp, players: tanks.map((p) => p.name) });
+    const targetOf = (res: Hit[]) => res.find((h) => isTank(h.p))?.p;
+    let swapMissed: Hit[] | undefined;
+    if (wings.length >= 2 && tanks.length === 2) {
+      const [w1, w2] = wings;
+      const tank = targetOf(w1);
+      const other = tanks.find((p) => p !== tank);
+      const t2 = w2[0].e.timestamp;
+      const raised = other && life.outIntervals.some((w) => w.p === other && w.end <= t2 && t2 - w.end <= RAISED_MS);
+      if (tank && other && targetOf(w2) === tank && !w1.some((h) => h.p === other) && life.alive(other, t2 - 500) && !raised) {
+        swapMissed = w2;
+        const killed = diedIn(life, w2.filter((h) => h.p !== tank));
+        const provoked = other.casts.some((e) => e.abilityName === "Provoke" && e.timestamp >= pr.timestamp - 3000 && e.timestamp < t2);
+        errors.push(playerError(other, {
+          ruleId: PAN_TANK_SWAP_RULE_ID, severity: killed.length ? "Major" : "Minor", name: "Missed the Wing Tank Swap",
+          description: `The second Wings Dark and Light went to ${tank.name} again${provoked ? "" : `: ${other.name} didn't Provoke during Paradise Regained`}${killed.length ? `, and its cleave killed ${namesOf(killed)}` : ""}. After the first wing, the tank who took the tether Provokes during the cast to take the second wing while the first wing's tank takes the next tether.`,
+          timestamp: t2, abilityId: w2[0].e.abilityId, abilityName: "Wings Dark and Light",
+        }));
+      }
+    }
+
     // The wing's 225-degree cleave on anyone but its tank (no Damage Down,
     // only Physical Vulnerability Up; they nearly always died).
     for (const res of wings) {
@@ -594,6 +644,16 @@ function detectParadiseRegained(players: PlayerInfo[], life: Life, casts: EnemyE
       const tether = tethers.find((g) => g[0].e.timestamp > t && g[0].e.timestamp - t <= 1500);
       const killed = diedIn(life, [...res, ...(tether ?? [])]);
       const why = "Wings Dark and Light cleaves 225 degrees toward its tank (the front and one wing's side): the party stays behind the boss on the other side, in their towers";
+      // A missed swap aimed this wing: the tank's error owns the hits, only
+      // the cutoff stays.
+      if (res === swapMissed) {
+        if (off.length >= GROUP_HIT) partyCleaved = true;
+        if (killed.length >= COLLAPSE_DEAD_COUNT) {
+          errors.push(raidMarker(PAN_WINGS_RULE_ID, "Wings Dark and Light",
+            `The missed tank swap's wing cleaved the party and killed ${namesOf(killed)}: unrecoverable from here.`, t, res[0].e.abilityId, "Wings Dark and Light"));
+        }
+        continue;
+      }
       if (off.length >= GROUP_HIT) {
         partyCleaved = true;
         errors.push(playerlessMinor(PAN_WINGS_RULE_ID, "Wings Cleaved the Party",
@@ -737,6 +797,20 @@ function detectPolarizing(players: PlayerInfo[], life: Life, casts: EnemyEvent[]
           errors.push(playerError(p, {
             ruleId: PAN_POLARIZING_RULE_ID, severity: death ? "Major" : "Minor", name: "Took Both Cruel Paths",
             description: `Stood in both lines of the ${nth} Cruel Path volley${death ? " and died" : ""}. ${why}.`,
+            timestamp: t, abilityId: hits[0].e.abilityId, abilityName: "Cruel Path",
+          }));
+        }
+        // A living player in neither line: survivable for the line left
+        // short, but the swap order says where they go (user, 2026-10-13,
+        // F15 +77.2: the previous volley's front player didn't cross; also
+        // A4 +72.4, I3 +68.1). Only with nobody in both lines: G8 +67.2 put
+        // two in both and seven in light, the group misreading the volley.
+        for (const p of both.length ? [] : players.filter((x) => !light.includes(x) && !dark.includes(x) && life.alive(x, t))) {
+          const held = (["light", "dark"] as Element[]).find((el) => resistAt(p, el, t));
+          const to: Element | undefined = held === "light" ? "dark" : held === "dark" ? "light" : undefined;
+          errors.push(playerError(p, {
+            ruleId: PAN_POLARIZING_RULE_ID, severity: "Minor", name: "Missed a Cruel Path Line",
+            description: `Was in neither line of the ${nth} Cruel Path volley (light ${light.length}, dark ${dark.length})${held ? `, holding ${RESIST_NAME[held]}: after a front hit, cross to the ${to} line` : ""}. ${why}.`,
             timestamp: t, abilityId: hits[0].e.abilityId, abilityName: "Cruel Path",
           }));
         }

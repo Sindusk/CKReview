@@ -210,6 +210,11 @@ philosophy and the data semantics this list assumes.
   Dragon's crystal, `NpcHit[]`).
 - **Boss HP at a cast decides a DPS gate** (Enter the Dragon's Morn Afah).
   **Provoke history names an enmity steal** (Enter the Dragon).
+- **FFXIV logs carry no enmity.** A planned tank swap is judged by who the
+  enmity-targeted hit landed on twice, plus the Provoke casts. Damage done
+  after a Provoke doesn't predict it. A tank raised shortly before is
+  exempt, because the swap can fail by milliseconds with nothing wrong in
+  the log (Pandora's wings).
 - **Check where a lone victim stood before blaming aim.** Pandora's wing
   victims had gone into a tower early.
 - **Tabulate a failure's outcomes before choosing blame.** Blast Wave

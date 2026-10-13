@@ -381,7 +381,8 @@ exposure("targeted", ["ffxiv-etd-tank-buster", "ffxiv-etd-autos", "ffxiv-etd-akh
 mechanic("ffxiv-pan-autos", "Pandora's dual auto-attacks (tanks)", 5, ["ffxiv-pan-autos"]);
 mechanic("ffxiv-pan-wings", "Wings Dark and Light cleave (non-tanks)", 5, ["ffxiv-pan-wings"]);
 mechanic("ffxiv-pan-tether", "Wings Dark and Light tether (non-tanks)", 5, ["ffxiv-pan-tether"]);
-exposure("targeted", ["ffxiv-pan-autos", "ffxiv-pan-wings", "ffxiv-pan-tether"]);
+mechanic("ffxiv-pan-tank-swap", "Wings Dark and Light tank swap (tanks)", 5, ["ffxiv-pan-tank-swap"]);
+exposure("targeted", ["ffxiv-pan-autos", "ffxiv-pan-wings", "ffxiv-pan-tether", "ffxiv-pan-tank-swap"]);
 // Vamp Fatale (vamp-fatale.ts reports every instance): each rule scoped to
 // the role or group that can fail it.
 mechanic("ffxiv-vf-hardcore", "Hardcore (non-tanks)", undefined, ["ffxiv-vf-hardcore"]);
