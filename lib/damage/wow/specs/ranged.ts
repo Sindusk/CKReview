@@ -25,7 +25,16 @@
 // Tracked cooldowns are in tracked-cooldowns.ts.
 
 import type { JobCheck } from "../../types";
-import { burstGcdFindings, dotUptimeFindings, observedWindowBonus, primaryResourceCapFindings } from "./shared";
+import { burstGcdFindings, castTimeProcFindings, dotUptimeFindings, observedWindowBonus, primaryResourceCapFindings } from "./shared";
+
+// Backdraft (117828): Conflagrate (17962) adds a stack, max 2; Chaos Bolt
+// (116858), Incinerate (29722) and Soul Fire (6353) each take one. Ids and
+// the max from qpZx3mWaG7gcDdYB pull 3 (applybuffstack 2, then
+// refreshbuff on a Conflagrate at 2).
+const backdraft: JobCheck = (ctx) => castTimeProcFindings(ctx, {
+  statusId: 117828, name: "Backdraft", maxStacks: 2,
+  generatorIds: [17962], consumerIds: [116858, 29722, 6353],
+});
 
 const window = (statusId: number, name: string): JobCheck => (ctx) => burstGcdFindings(ctx, {
   statusId, name,
@@ -46,7 +55,7 @@ export const RANGED_CHECKS: Record<string, JobCheck[]> = {
   "Elemental Shaman":     [window(1219480, "Ascendance"), primaryResourceCapFindings, dot("Flame Shock", 188389)],
   "Affliction Warlock":   [window(442726, "Malevolence"), dot("Agony", 980), dot("Unstable Affliction", 1259790), dot("Wither / Corruption", 445474, 146739)],
   "Demonology Warlock":   [window(265187, "Demonic Tyrant")],
-  "Destruction Warlock":  [window(442726, "Malevolence"), dot("Wither", 445474)],
+  "Destruction Warlock":  [window(442726, "Malevolence"), dot("Wither", 445474), backdraft],
   "Devastation Evoker":   [window(375087, "Dragonrage")],
   "Augmentation Evoker":  [],
   "Devourer Demon Hunter": [],

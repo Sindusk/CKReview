@@ -148,6 +148,94 @@ export function dotUptimeFindings(ctx: PlayerCheckContext, spec: { statusIds: nu
   return out;
 }
 
+// ── Cast-time procs wasted ─────────────────────────────────────────────
+// A stacking buff that shortens the next casts (Destruction's Backdraft:
+// Conflagrate adds a stack, each Chaos Bolt / Incinerate / Soul Fire takes
+// one). A stack is wasted when the generator is pressed at max stacks, or
+// when the buff drops with no consumer landing beside it (outside forced
+// time). Each wasted stack is worth the cast time it would have saved,
+// measured from the player's own begin-casts (median with the buff − without,
+// per consumer), × their damage per GCD-second. Inference: the saved time
+// would have gone into more casts.
+// Buff stack counts come from the events: WCL buffs carry no count on the
+// PlayerEvent, so applied = 1, stack = +1, stackRemoved = −1.
+
+export type CastTimeProcSpec = {
+  statusId:     number;
+  name:         string;
+  maxStacks:    number;
+  generatorIds: number[];
+  consumerIds:  number[];
+};
+
+const PROC_PAIR_MS = 300;
+
+export function castTimeProcFindings(ctx: PlayerCheckContext, spec: CastTimeProcSpec): DamageFinding[] {
+  const buffs = (ctx.player.buffs ?? []).filter((e) => e.abilityId === spec.statusId && e.timestamp < ctx.endMs)
+    .sort((a, b) => a.timestamp - b.timestamp);
+  if (buffs.length === 0) return [];
+  const consumers = new Set(spec.consumerIds), generators = new Set(spec.generatorIds);
+  const consumeTimes = ctx.player.casts.filter((c) => consumers.has(c.abilityId)).map((c) => c.timestamp);
+  const stacksBefore = (t: number) => {
+    let st = 0;
+    for (const e of buffs) {
+      if (e.timestamp >= t) break;
+      if (e.buffStatus === "applied") st = 1;
+      else if (e.buffStatus === "stack") st = Math.min(spec.maxStacks, st + 1);
+      else if (e.buffStatus === "stackRemoved") st = Math.max(0, st - 1);
+      else if (e.buffStatus === "removed") st = 0;
+    }
+    return st;
+  };
+  const forced = mergeWindows(ctx.forced);
+
+  // What one stack saves, measured.
+  const begins = ctx.player.beginCasts ?? [];
+  const savings: { saved: number; n: number }[] = [];
+  for (const id of spec.consumerIds) {
+    const withBuff: number[] = [], without: number[] = [];
+    for (const b of begins) {
+      if (b.abilityId !== id || !b.durationMs) continue;
+      (stacksBefore(b.timestamp + 1) > 0 ? withBuff : without).push(b.durationMs);
+    }
+    if (withBuff.length < 3 || without.length < 3) continue;
+    const med = (xs: number[]) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)];
+    const saved = med(without) - med(withBuff);
+    if (saved > 0) savings.push({ saved, n: withBuff.length });
+  }
+  const totalN = savings.reduce((a, x) => a + x.n, 0);
+  if (totalN === 0) return [];
+  const savedMs = savings.reduce((a, x) => a + x.saved * x.n, 0) / totalN;
+
+  const wasted: { t: number; stacks: number; how: string }[] = [];
+  for (const c of ctx.player.casts) {
+    if (!generators.has(c.abilityId) || c.timestamp >= ctx.endMs || inWindows(c.timestamp, forced)) continue;
+    // A consumer landing at the same instant takes a stack first (Chaos Bolt
+    // and a queued Conflagrate share a timestamp).
+    const sameInstant = consumeTimes.filter((t) => Math.abs(t - c.timestamp) <= 50).length;
+    if (stacksBefore(c.timestamp) - sameInstant >= spec.maxStacks) wasted.push({ t: c.timestamp, stacks: 1, how: "overcap" });
+  }
+  for (const e of buffs) {
+    if (e.buffStatus !== "removed" || inWindows(e.timestamp, forced)) continue;
+    if (consumeTimes.some((t) => Math.abs(t - e.timestamp) <= PROC_PAIR_MS)) continue;
+    wasted.push({ t: e.timestamp, stacks: Math.max(1, stacksBefore(e.timestamp)), how: "expired" });
+  }
+  if (wasted.length === 0) return [];
+  wasted.sort((a, b) => a.t - b.t);
+  const stacks = wasted.reduce((a, w) => a + w.stacks, 0);
+  const perMs = ctx.values.gcdValue(undefined, false) / ctx.baseGcdMs;
+  const over = wasted.filter((w) => w.how === "overcap"), exp = wasted.filter((w) => w.how === "expired");
+  const list = (ws: typeof wasted) => ws.map((w) => clock(w.t)).join(", ");
+  return [finding(ctx, {
+    kind: "proc-lost", startMs: wasted[0].t, endMs: wasted[wasted.length - 1].t, forced: false,
+    label: `${spec.name} wasted`,
+    lostDamage: stacks * savedMs * perMs,
+    inference: true,
+    basis: `${stacks} stack${stacks > 1 ? "s" : ""} × ${(savedMs / 1000).toFixed(2)}s cast time each (median with ${spec.name} − without, from the player's casts) × ${k(perMs * 1000)} per second of GCD time`,
+    detail: [over.length ? `${over.length} overcapped (${list(over)})` : "", exp.length ? `${exp.length} expired (${list(exp)})` : ""].filter(Boolean).join(", "),
+  })];
+}
+
 // ── Resource cap ───────────────────────────────────────────────────────
 
 export type ResourceCapSpec = {

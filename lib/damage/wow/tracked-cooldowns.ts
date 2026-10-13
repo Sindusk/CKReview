@@ -134,10 +134,20 @@ export const WOW_TRACKED_COOLDOWNS: Record<string, TrackedCooldown[]> = {
   "Demonology Warlock": [
     { name: "Summon Demonic Tyrant", actionIds: [265187], cooldownMs: 60_000, charges: 1, firstUseOffsetMs: 5_000 },  // 60.8 / 63.0s, 5.0s
   ],
-  "Destruction Warlock": [   // unverified (1 player)
-    { name: "Summon Infernal", actionIds: [1122], cooldownMs: 95_000, charges: 1, firstUseOffsetMs: 2_000 },   // 95.2 / 100.6s, 1.8s
-    { name: "Malevolence", actionIds: [442726], cooldownMs: 95_000, charges: 1, firstUseOffsetMs: 3_000 },     // 95.5 / 100.5s, 2.8s
-    { name: "Soul Fire", actionIds: [6353], cooldownMs: 46_000, charges: 1, firstUseOffsetMs: 1_000 },         // 46.7 / 52.3s, 0.4s
+  // Checked against WoWAnalyzer on qpZx3mWaG7gcDdYB pull 3 (2026-10-13):
+  // its cooldown bars recharge Summon Infernal in 90.0s and Malevolence in
+  // 60.0s (the 1-player survey's 95s came from late casts; Affliction's
+  // Malevolence measures 60.0s too). Soul Fire is often hard-cast before the
+  // pull: its own hit before the first cast is the evidence (0:01.5 there),
+  // which WoWAnalyzer misses ("0:00-1:07 unused"). Its bars say ~41s, but
+  // the player never began one sooner than 45.9s after the last landed, so
+  // the measured 46s stays (lenient). Havoc (30s) isn't tracked: its value
+  // is the damage it copies, not hits of its own, and it was pressed before
+  // the pull too (on the enemy at 0:00).
+  "Destruction Warlock": [
+    { name: "Summon Infernal", actionIds: [1122], cooldownMs: 90_000, charges: 1, firstUseOffsetMs: 2_000 },   // 90.2s here, 1.8s
+    { name: "Malevolence", actionIds: [442726], cooldownMs: 60_000, charges: 1, firstUseOffsetMs: 3_000 },     // 60.0s (bars), 2.8s
+    { name: "Soul Fire", actionIds: [6353], cooldownMs: 46_000, charges: 1, firstUseOffsetMs: 1_000, prePullEvidenceIds: [6353] },  // 46.7 / 52.3s, 0.4s
   ],
   "Devastation Evoker": [
     { name: "Dragonrage", actionIds: [375087], cooldownMs: 120_000, charges: 1, firstUseOffsetMs: 3_000 },     // 120.0 / 122.5s, 2.8s

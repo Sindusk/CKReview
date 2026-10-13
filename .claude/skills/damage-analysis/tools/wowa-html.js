@@ -180,12 +180,14 @@ function cooldownBar(bar) {
   const casts = [];
   const ready = [];
   const missed = [];
+  const recharge = []; // unavailable segments: the cooldown as WoWAnalyzer models it (talents included)
   for (const c of win.children.filter((x) => x.tag)) {
     const left = num(style(c), /left:\s*([\d.]+)%/);
     const width = num(style(c), /width:\s*([\d.]+)%/);
     if (left === undefined) continue;
     if (has(c, 'cooldown-unavailable')) {
       if (find(c, (x) => has(x, 'cast-chip') || x.tag === 'img')) casts.push(left);
+      if (left + (width ?? 0) < 99.9) recharge.push(width ?? 0); // a segment cut by the kill isn't a full recharge
     } else if (has(c, 'cooldown-available-bad')) missed.push([left, width ?? 0]);
     else if (has(c, 'cooldown-available')) ready.push(width ?? 0);
     else if (find(c, (x) => x.tag === 'img' || has(x, 'cast-chip'))) casts.push(left); // charge spells: loose markers
@@ -199,6 +201,11 @@ function cooldownBar(bar) {
     out.push(`casts (${casts.length}): ${casts.map((p) => mmss(sec(p))).join(', ')}`);
     const readySec = ready.reduce((s, w) => s + sec(w), 0) + missed.reduce((s, [, w]) => s + sec(w), 0);
     out.push(`sat ready ${readySec.toFixed(1)}s`);
+    // Several charges merge segments, so print the shortest and the most common.
+    if (recharge.length) {
+      const secs = recharge.map((p) => sec(p)).sort((a, b) => a - b);
+      out.push(`unavailable stretches ${secs[0].toFixed(1)}s shortest, ${secs[Math.floor(secs.length / 2)].toFixed(1)}s median`);
+    }
     if (missed.length) out.push(`missed (red): ${missed.map(([l, w]) => `${mmss(sec(l))}-${mmss(sec(l + w))}`).join(', ')}`);
   }
   return `\n  ${out.join('; ')}\n`;
