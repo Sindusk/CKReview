@@ -436,7 +436,7 @@ export function checkCooldownDrift(ctx: PlayerCheckContext): DamageFinding[] {
     const prePull = evidence.size > 0 && [...ctx.player.casts, ...ctx.player.damageDone]
       .some((c) => evidence.has(c.abilityId) && c.timestamp < (casts[0] ?? Infinity));
     const capped = cappedStretches(casts, cd.cooldownMs, cd.charges, ctx.endMs).filter((w) => !(prePull && w.startMs === 0));
-    let unforced = 0, heldForDeciding = 0, stretchLost = 0, longest: Window | undefined;
+    let unforced = 0, heldForDeciding = 0, stretchLost = 0, longest: Window | undefined, longestHeld = 0;
     for (const w of capped) {
       const len = w.endMs - w.startMs;
       // Capping inside downtime is a lost recharge when a charge was
@@ -468,14 +468,20 @@ export function checkCooldownDrift(ctx: PlayerCheckContext): DamageFinding[] {
       const first = avoidable > 0 ? w.startMs : firstPressable(w.startMs, w.endMs, cd.landDelayMs ?? 0, blockers);
       const lost = first === undefined ? 0 : Math.floor(Math.max(0, w.endMs - first - allowance) / cd.cooldownMs);
       stretchLost += lost;
-      if ((held > 0 || lost > 0) && (!longest || len > longest.endMs - longest.startMs)) longest = w;
+      // Anchored on the longest hold, not the longest stretch: a stretch
+      // mostly in downtime (Aetherflow 6:40-7:18) isn't where it drifted.
+      if ((held > 0 || lost > 0) && (!longest || held > longestHeld)) { longest = w; longestHeld = held; }
     }
     // Never more lost uses than the pull had room for: Vamp's Dancer used
     // Standard Step 19 times in 587s (room for 20), yet its ready time
     // summed to 163s, "5 lost", because each use came a few seconds late.
     const room = roomForUses(cd, ctx.endMs, forcedMerged, prePull);
+    // A press whose effect can't land before the end isn't a use: the
+    // qjCMx4bRfgNKwX9T fight 16 Scholar's last Aetherflow came back 0.2s
+    // before the kill after 26s of drift in P5, and its stacks went unspent.
+    const landed = casts.filter((t) => t + (cd.landDelayMs ?? 0) < ctx.endMs).length;
     const lostUses = Math.min(Math.max(stretchLost, Math.floor(unforced / cd.cooldownMs)),
-      Math.max(0, room - casts.length - (prePull ? 1 : 0)));
+      Math.max(0, room - landed - (prePull ? 1 : 0)));
     if (lostUses < 1 || !longest) continue;
     const damageIds = new Set(cd.damageIds ?? []);
     const perUse = damageIds.size > 0 || cd.petDamage

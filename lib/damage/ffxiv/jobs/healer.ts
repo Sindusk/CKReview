@@ -86,6 +86,18 @@
 //   at 6:06 before the downtime (3 ticks, 46k, a Broil IV's worth; the
 //   14:03 one is a dot-clip finding). No damage: overheal, Faerie Gauge
 //   overcap, Swiftcast 7/23.
+//   Same report, fight 16's Scholar (2026-10-13): GCD uptime, 27
+//   interrupted casts and the weaving gaps (1:55 4.9s, 13:51-13:57,
+//   16:54, 12:57) match; 11:29 is the end-of-P3 hold. Built: Aetherflow
+//   17/18 and its "3 wasted stacks": 31s held at 9:18 and 26s in P5
+//   brought the last one back 0.2s before the kill, so it counts as no
+//   use (checks.ts: a press whose effect can't land isn't a use;
+//   Aetherflow valued from Energy Drain). Not adopted: Chain Stratagem
+//   9/10 (held 14:11-16:16 across P4's downtime to meet the 16:16 raid
+//   buffs; room is 9); Biolysis 82.3% (its gaps are downtime, plus the
+//   two P5 dot-uptime findings); Biolysis before invulnerability at 6:03
+//   (5 ticks, 48k against a 44k Broil IV, past P2's HP check anyway) and
+//   11:56 (a forced dot-clip finding).
 // - Healer DoTs are valued per application against the filler
 //   (shared.ts dotFindings with fillerId), not by seconds overwritten.
 // - Sage, checked against xivanalysis on dDar482XvFKBPJYh FRU kill (7.1,

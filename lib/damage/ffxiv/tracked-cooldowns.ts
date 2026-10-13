@@ -174,7 +174,11 @@ export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
   ],
   "Scholar": [
     { actions: ["CHAIN_STRATAGEM"], firstUseOffsetMs: 10000 },
-    { actions: ["AETHERFLOW"], firstUseOffsetMs: 7500 },
+    // Valued from Energy Drain (the damaging use of its stacks; the rest
+    // go to Sacred Soil and other heals, and Dissipation's stacks also
+    // feed it, so the average per press is slightly high). Its stacks need
+    // a weave to spend: a press in the last GCD of the pull is no use.
+    { actions: ["AETHERFLOW"], firstUseOffsetMs: 7500, damage: ["SCH_ENERGY_DRAIN"], landDelayMs: 2_500 },
   ],
 
   // ── Jobs xivanalysis doesn't track: party buff only ─────────────────
