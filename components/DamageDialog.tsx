@@ -564,6 +564,8 @@ function FindingRow({ f }: { f: DamageFinding }) {
 // One horizontal strip over the analysed window: forced time shaded, raid
 // buff windows as a gold band, a tick per GCD, phase starts as dividers and
 // each counted finding as a marker.
+const SPAN_MARK_MS = 10_000;
+
 function TimelineStrip({ summary, analysis }: { summary: PlayerDamageSummary; analysis: PullDamageAnalysis }) {
   const total = Math.max(1, analysis.endMs);
   const pct = (ms: number) => `${(Math.max(0, Math.min(ms, total)) / total) * 100}%`;
@@ -605,11 +607,16 @@ function TimelineStrip({ summary, analysis }: { summary: PlayerDamageSummary; an
             style={{ position: "absolute", top: 0, bottom: 0, left: pct(p.startMs), width: 1, background: "var(--ck-frame)" }} />
         ))}
         {/* A summary finding (small delays, early DoT refreshes, missed
-            positionals) marks each of its moments, not its first-to-last span. */}
-        {summary.findings.filter((f) => !f.forced && f.lostDamage >= 1).flatMap((f, i) =>
-          (f.moments ?? [{ startMs: f.startMs, endMs: f.endMs }]).map((m, j) => (
+            positionals) marks each of its moments, not its first-to-last span.
+            A pull-wide rate (GCD pace) has no moment and isn't drawn: its
+            span painted the whole strip red (user, 2026-10-13). Nor are
+            long spans: a finding without moments over SPAN_MARK_MS (a burst
+            window, a cooldown's ready stretch, a summary) is one mark where
+            it starts, its span in the tooltip. */}
+        {summary.findings.filter((f) => !f.forced && !f.pullWide && f.lostDamage >= 1).flatMap((f, i) =>
+          (f.moments ?? [{ startMs: f.startMs, endMs: f.endMs - f.startMs > SPAN_MARK_MS ? f.startMs : f.endMs }]).map((m, j) => (
             <div key={`x${i}-${j}`}
-              title={`${fmtTime(m.startMs)} ${m.detail ?? f.detail} (${fmtDamage(m.lostDamage ?? f.lostDamage)})`}
+              title={`${fmtTime(m.startMs)}${!f.moments && f.endMs - f.startMs > SPAN_MARK_MS ? `–${fmtTime(f.endMs)}` : ""} ${m.detail ?? f.detail} (${fmtDamage(m.lostDamage ?? f.lostDamage)})`}
               style={{ position: "absolute", bottom: 0, height: 6, left: pct(m.startMs), width: `max(3px, ${width(m.startMs, m.endMs)})`, background: LOSS_COLOR }} />
           )))}
       </div>

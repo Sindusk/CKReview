@@ -129,6 +129,8 @@ export const combatPotion: JobCheck = (ctx): DamageFinding[] => {
         ? `${s(coverMs)} × ${k(rate * 1000)}/s × ${(bonus * 100).toFixed(0)}% (${bonusBasis})`
         : "not valued: Light's Potential's bonus couldn't be measured on this pull",
       detail: `A combat potion was ready from ${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")} and never used (${uses.length} used)`,
+      // One mark where it came ready, not the 30s it would have covered.
+      moments: [{ startMs: at, endMs: at, lostDamage: lost }],
     });
   });
 };

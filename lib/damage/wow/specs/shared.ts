@@ -29,7 +29,7 @@
 // over casts that weren't near the cap. Lost = units wasted × the player's
 // damage per unit from the resource's spenders.
 
-import type { DamageFinding } from "../../types";
+import type { DamageFinding, Moment } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";
 import { forcedPart, gcdLockMs, inWindows, mergeWindows, overlapMs, type Window } from "../../timeline";
 import { k, s, statusWindows } from "../../ffxiv/jobs/shared";
@@ -398,6 +398,7 @@ export function spenderSnapshotWaste(ctx: PlayerCheckContext, spec: { type: numb
   }
   const forced = mergeWindows(ctx.forced);
   let generated = 0, lost = 0, n = 0, first = Infinity, last = 0;
+  const wasted: { t: number; w: number }[] = [];
   for (const r of rows) {
     const pred = r.x.reduce((acc, v, k) => acc + v * g[k], 0);
     generated += Math.max(pred, r.gain);
@@ -405,6 +406,7 @@ export function spenderSnapshotWaste(ctx: PlayerCheckContext, spec: { type: numb
     const w = pred - r.gain;
     if (w <= 0.5) continue;
     lost += w; n++; first = Math.min(first, r.t); last = Math.max(last, r.t);
+    wasted.push({ t: r.t, w });
   }
   if (lost < 1) return [];
   const spentUnits = spends.reduce((a, c) => a + res(c)!.cost!, 0);
@@ -420,6 +422,8 @@ export function spenderSnapshotWaste(ctx: PlayerCheckContext, spec: { type: numb
     basis: `~${Math.round(lost)} ${spec.name} lost at the cap of ~${Math.round(generated)} generated (rebuilt from spender snapshots; fitted gains: ` +
       `${top.map((b) => `${b.name} ${b.g.toFixed(1)}`).join(", ")}) × ${k(perUnit)} per ${spec.name} spent`,
     detail: `~${Math.round(lost)} of ~${Math.round(generated)} ${spec.name} (${Math.round(lost / generated * 100)}%) generated at the cap, over ${n} spends`,
+    moments: wasted.map((x) => ({ startMs: x.t, endMs: x.t, lostDamage: x.w * perUnit,
+      detail: `spent at the cap, ~${x.w.toFixed(1)} ${spec.name} lost before it` })),
   })];
 }
 
@@ -512,14 +516,16 @@ export function resourceCapFindings(ctx: PlayerCheckContext, spec: ResourceCapSp
   const perUnit = spentUnits > 0 ? spenderDamage / spentUnits : 0;
 
   const forced = mergeWindows(ctx.forced);
-  const byPhase = new Map<number | undefined, { units: number; n: number; start: number; end: number; names: Map<string, number> }>();
+  const byPhase = new Map<number | undefined, { units: number; n: number; start: number; end: number; names: Map<string, number>; moments: Moment[] }>();
   for (const x of casts) {
     if (spenderIds.has(x.c.abilityId) || x.r.amount < max || spec.ignoreIds?.includes(x.c.abilityId)) continue;
     const gain = gainOf(x.c.abilityId);
     if (!gain || inWindows(x.c.timestamp, forced)) continue;
     const ph = ctx.phaseOf(x.c.timestamp);
-    const g = byPhase.get(ph) ?? { units: 0, n: 0, start: x.c.timestamp, end: x.c.timestamp, names: new Map() };
+    const g = byPhase.get(ph) ?? { units: 0, n: 0, start: x.c.timestamp, end: x.c.timestamp, names: new Map(), moments: [] };
     g.units += gain; g.n++; g.end = x.c.timestamp;
+    g.moments.push({ startMs: x.c.timestamp, endMs: x.c.timestamp, lostDamage: gain * perUnit,
+      detail: `${x.c.abilityName} at full ${spec.name}, ~${Math.round(gain / spec.scale)} lost` });
     g.names.set(x.c.abilityName, (g.names.get(x.c.abilityName) ?? 0) + 1);
     byPhase.set(ph, g);
   }
@@ -533,6 +539,7 @@ export function resourceCapFindings(ctx: PlayerCheckContext, spec: ResourceCapSp
       lostDamage: g.units * perUnit,
       basis: `${Math.round(shown)} ${spec.name} generated at the cap (each ability's gain measured from the pull) × ${k(perUnit * spec.scale)} per ${spec.name} from its spenders`,
       detail: `${g.n} casts at full ${spec.name} in ${ctx.phaseName(ph) ?? "the pull"}, ~${Math.round(shown)} lost: ${names}`,
+      moments: g.moments,
     }));
   }
   return out;

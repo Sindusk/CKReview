@@ -261,6 +261,9 @@ export type DamageFinding = {
   // the same label in two pulls is the same recurring finding.
   label:      string;
   inference?: boolean;   // rests on inference rather than a measured value
+  // A rate over the whole pull (GCD pace): no moment to mark, so the
+  // dialog's timeline strip leaves it off (its span would paint the pull).
+  pullWide?:  boolean;
   // A summary over separate moments (small GCD delays, early DoT refreshes,
   // missed positionals): when each happened, and what that one was and
   // cost. The dialog's strip marks these instead of the whole startMs–endMs

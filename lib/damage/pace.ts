@@ -80,7 +80,7 @@ export function checkSameSpecPace(
     (scaled.length > 1 ? `, the median of ${scaled.length} same-spec players` : "");
   const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
   return [finding(ctx, {
-    kind: "gcd-pace", startMs: first, endMs: last, forced: false, inference: true,
+    kind: "gcd-pace", startMs: first, endMs: last, forced: false, inference: true, pullWide: true,
     label: "GCD pace vs same spec",
     lostDamage: lost,
     basis: `${who}'s base GCD ${(peer.baseMs / 1000).toFixed(2)}s at ${pct(peer.ratingHaste!)} rating haste → ` +

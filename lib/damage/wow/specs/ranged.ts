@@ -118,7 +118,7 @@
 //   recharge is cut by Disintegrate ticks (Causality) and the rule isn't
 //   pinned from one player; Disintegrate tick efficiency (340/385).
 
-import type { JobCheck } from "../../types";
+import type { JobCheck, Moment } from "../../types";
 import { finding } from "../../checks";
 import { inWindows, mergeWindows, overlapMs, statusWindows } from "../../timeline";
 import { burstGcdFindings, castTimeProcFindings, dotUptimeFindings, k, observedWindowBonus, primaryResourceCapFindings } from "./shared";
@@ -256,6 +256,7 @@ const spenderOutsideEclipse: JobCheck = (ctx) => {
   const forced = mergeWindows(ctx.forced);
   let lost = 0, n = 0, first = Infinity, last = 0;
   const parts: string[] = [];
+  const moments: Moment[] = [];
   for (const sp of BALANCE_SPENDERS) {
     const casts = ctx.player.casts.filter((c) => c.abilityId === sp.id && c.timestamp < ctx.endMs).sort((a, b) => a.timestamp - b.timestamp);
     const hits = ctx.player.damageDone.filter((h) => !h.pet && h.abilityName === sp.name);
@@ -277,6 +278,7 @@ const spenderOutsideEclipse: JobCheck = (ctx) => {
     if (per <= 0 || bad.length === 0) continue;
     lost += bad.length * per; n += bad.length;
     first = Math.min(first, bad[0].t); last = Math.max(last, bad[bad.length - 1].t);
+    for (const r of bad) moments.push({ startMs: r.t, endMs: r.t, lostDamage: per, detail: `${sp.name} outside Eclipse` });
     parts.push(`${bad.length} ${sp.name} × ${k(per)} (${k(avg(inside.map((r) => r.dmg)))} inside − ${k(avg(outside.map((r) => r.dmg)))} outside)`);
   }
   if (n === 0) return [];
@@ -286,6 +288,7 @@ const spenderOutsideEclipse: JobCheck = (ctx) => {
     lostDamage: lost,
     basis: parts.join(" + "),
     detail: `${n} Astral Power spenders cast outside Eclipse and Incarnation, not near the cap`,
+    moments: moments.sort((a, b) => a.startMs - b.startMs),
   })];
 };
 
