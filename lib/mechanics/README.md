@@ -216,6 +216,11 @@ every mechanic, in every game. When in doubt, come back here.
    flagged.** When a player dies, every downstream consequence of that death
    (re-targeted dashes, tethers, cones, redistributed soaks) stays UNFLAGGED.
    The death's own cause is flagged where it happened — once.
+   **A death to raw damage in a correctly executed mechanic is not a player
+   error** (user, 2026-10-12, Fatebreaker's Fall of Faith): low HP or missing
+   mitigation is the Mitigation Analysis's territory, not a mechanic flag.
+   Don't flag it here, in any module. (Existing tank-buster "died to the
+   buster" rules predate this and are pending the user's call.)
 3. **When attribution is ambiguous, flag all candidates rather than guess.**
    When fallout vs. genuine error can't be distinguished at all, stay silent.
    A false accusation is worse than a miss.

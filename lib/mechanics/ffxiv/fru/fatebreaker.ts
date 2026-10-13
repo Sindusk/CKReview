@@ -98,8 +98,16 @@
 //   3+-extras lightning resolution (A, B, C) no own-group helper was within
 //   60 degrees; clean ones go down to 44 (so the angle alone isn't an error).
 // - Single-hit deaths in clean Fall of Faith resolutions are low HP going in
-//   (A15, A34, A55: 30-80k HP left after the previous tether, no
-//   mitigation on the hits).
+//   (A15, A34, A52, A55: 30-80k HP left after the previous tether, no
+//   mitigation on the hits). Per the user these are never flagged: a death
+//   to raw damage in a correctly done mechanic isn't a player error.
+// VOD review 2026-10-12 round 3 (user): report A pulls 34, 43, 44, 45, 52,
+// 55, 58, 59, 60. It set the Sinsmite outer/inner bands, Burn Mark on a
+// non-tank naming only them, the four-player other-side group read, and
+// no mitigation-death flags.
+// - Sinsmite: each bearing holds an outer and an inner spread (A: Yoro/
+//   Galileo, Apollo/Sayacissa, Sin/Laura, Sarelie/Jamie). Clean outer
+//   11.5y+ from the center (B, C 12.1+), inner 10.6y- (B, C 8.7-).
 // Cutoffs (first Raid error): player dead going into a mechanic 62, called
 // wipe 41, collapse 40, Fated Burn Mark 22, enrage 11, tower 3; the 18 P1
 // clears have none.
@@ -112,17 +120,19 @@
 //   Sinbound Thunder III spreads; everyone sharing those instances named.
 //   Cones: when some of them stood 20+ degrees off their spot in the pull's
 //   other Cyclonic Break, only those are named; with someone dead, only a
-//   player who moved onto a living player's spot.
+//   player who moved onto a living player's spot. Sinsmite, two players on
+//   one bearing: the one outside their band (outer under 11y, inner over
+//   11y), else both.
 // ffxiv-fb-stack: with all eight alive, a player in two Sinsmoke / Sinbound
 //   Fire III stacks, or in none (not if just hit by an avoidable).
 // ffxiv-fb-powder-swap (Major): the first Powder Mark on the tank who
 //   wasn't the opener-Provoke MT (that tank named); the holder killed by an
 //   auto-attack: the other tank if they didn't Provoke, both tanks if they
 //   did. ffxiv-fb-powder-death (Major): a tank killed by the Powder Mark
-//   buster or by a single expiry Burn Mark (their mitigation).
+//   buster or by a single expiry Burn Mark with the other tank alive
+//   (their mitigation; with the other tank dead it's fallout, A45).
 // ffxiv-fb-burn-mark: both expiry explosions on one tank (both tanks named),
-//   or one on a non-tank with all eight alive (that player and the other
-//   tank).
+//   or one on a non-tank with all eight alive (that player alone: A58).
 // ffxiv-fb-fated-burn-mark (Raid): a Fated Burn Mark explosion hitting 3+
 //   others; the holder (the one who died before it) is flagged by what
 //   killed them.
@@ -131,15 +141,16 @@
 //   was short, else a player-less Minor for an uneven split.
 // ffxiv-fb-fall-of-faith: each resolution's group is read from the other
 //   resolution on its side when that was clean, else as everyone outside a
-//   clean resolution of the other side; with the group alive: a double hit
+//   clean resolution of the other side (failing that, one of exactly four
+//   players sharing nobody with this one); with the group alive: a double hit
 //   (in lightning, not this side's other carrier by Prey order, next in
 //   tethers 1/2 and previous in 3/4, when others doubled too: they stand
 //   behind the carrier),
 //   fire reaching the other group (the helper nearest the carrier alone),
 //   lightning reaching it (3+: the own-group helper within 60 degrees of the
 //   direction to them, else the carrier by Floating Fetters; fewer: those
-//   players), a short Sinblaze's missing members (player-less if unknown),
-//   and a death in a clean resolution (Major, their mitigation).
+//   players), a short Sinblaze's missing members (player-less if unknown).
+//   A death in a clean resolution is never flagged (mitigation).
 // ffxiv-fb-tower (Raid + Major): a short tower; with the six non-tanks
 //   alive, a non-tank in no tower, else the extras in an overfilled one.
 //   Skipped with 3+ non-tanks dead.
@@ -507,6 +518,12 @@ const ARENA_CENTER       = 10000;
 // (A and B: within ~5 degrees; C swaps two players every pull). Further than
 // this from it is off their spot (A4 the M1 226 -> 137).
 const CONE_SPOT_MOVED    = 20;
+// Sinsmite spreads: two players per bearing, one outer, one inner (yalms
+// from the center). Clean outer 11.5+ (A) / 12.1+ (B, C); clean inner
+// 10.6- (A) / 8.7- (B, C). A44 +0:17 outer at 10.6 (user: wrong).
+const SPREAD_PAIR_DEG    = 25;
+const SPREAD_OUTER_MIN   = 11;
+const SPREAD_INNER_MAX   = 11;
 // The main tank Provokes at the pull (group A: +0:00.0-1.6 every pull).
 const OPENER_PROVOKE_MS  = 3000;
 // The swap Provoke counts from this long before the buster lands (group A
@@ -570,6 +587,10 @@ function bearingOf(e: PlayerEvent): number | undefined {
   if (e.x === undefined || e.y === undefined) return undefined;
   return (Math.atan2(e.x - ARENA_CENTER, -(e.y - ARENA_CENTER)) * 180 / Math.PI + 360) % 360;
 }
+/** Distance of a hit from the arena center, in yalms. */
+function radiusOf(e: PlayerEvent): number | undefined {
+  return e.x === undefined || e.y === undefined ? undefined : Math.hypot(e.x - ARENA_CENTER, e.y - ARENA_CENTER) / 100;
+}
 const angleApart = (a: number, b: number) => Math.abs(((a - b) % 360 + 540) % 360 - 180);
 
 /**
@@ -595,6 +616,7 @@ function detectPersonalOverlaps(players: PlayerInfo[], life: Life, end: number):
       // Each doubled player's spot in the other Cyclonic Break, and how far
       // they stood from it now.
       const moved = new Map<PlayerInfo, { now: number; before: number }>();
+      const spreadNote = new Map<PlayerInfo, string>();
       if (isCone) {
         const other = coneSets.find((s) => s !== res && Math.abs(s[0].e.timestamp - t0) > 10_000);
         for (const [p, es] of doubled) {
@@ -614,6 +636,22 @@ function detectPersonalOverlaps(players: PlayerInfo[], life: Life, end: number):
         const off = doubled.filter(([p, es]) => moved.has(p) && (everyone || sharesWithUnmoved(p, es)));
         if (!everyone || (off.length && off.length < doubled.length)) doubled = off;
       }
+      // Two Sinsmite players on one bearing: each bearing holds an outer and
+      // an inner spread. The one outside their band moved (user, 2026-10-12,
+      // A44 +0:17: Sarelie, outer at 10.6y; A1 +0:17 both in band, both
+      // named). Clean outer 11.5y+ (A; B/C 12.1+), inner 10.6y- (B/C 8.7-).
+      if (fam.ids.includes(SINSMITE_SPREAD) && everyone && doubled.length === 2) {
+        const [a, b] = doubled.map(([p, es]) => ({ p, e: es[0], r: radiusOf(es[0]) }));
+        const ba = bearingOf(a.e), bb = bearingOf(b.e);
+        if (a.r !== undefined && b.r !== undefined && ba !== undefined && bb !== undefined && angleApart(ba, bb) <= SPREAD_PAIR_DEG) {
+          const [outer, inner] = a.r >= b.r ? [a, b] : [b, a];
+          const off = outer.r! < SPREAD_OUTER_MIN ? outer : inner.r! > SPREAD_INNER_MAX ? inner : undefined;
+          if (off) {
+            doubled = doubled.filter(([p]) => p === off.p);
+            spreadNote.set(off.p, ` They were the ${off === outer ? "outer" : "inner"} spread on their line, ${off.r!.toFixed(1)} yalms from the center (${off === outer ? `outer spots are ${SPREAD_OUTER_MIN}+` : `inner spots are within ${SPREAD_INNER_MAX}`}).`);
+          }
+        }
+      }
       if (!doubled.length) continue;
       const killed = doubled.filter(([p, es]) => life.diedFrom(p, es[es.length - 1].timestamp)).map(([p]) => p);
       const instKey = (e: PlayerEvent) => `${e.source}#${e.sourceInstance}`;
@@ -627,7 +665,7 @@ function detectPersonalOverlaps(players: PlayerInfo[], life: Life, end: number):
         const death = killed.includes(p);
         errors.push(playerError(p, {
           ruleId: FB_OVERLAP_RULE_ID, severity: killed.length ? "Major" : "Minor", name: `${fam.name} Overlap`,
-          description: `Took ${es.length} ${fam.name} ${fam.what}s (${kFmt(es.reduce((s, e) => s + realAmount(e), 0))})${others.length ? ` together with ${namesOf(others)}` : ""}${death ? " and died" : killed.length ? `; ${namesOf(killed)} died` : ""}.${spot}${dead} ${fam.why}`,
+          description: `Took ${es.length} ${fam.name} ${fam.what}s (${kFmt(es.reduce((s, e) => s + realAmount(e), 0))})${others.length ? ` together with ${namesOf(others)}` : ""}${death ? " and died" : killed.length ? `; ${namesOf(killed)} died` : ""}.${spot}${spreadNote.get(p) ?? ""}${dead} ${fam.why}`,
           timestamp: t0, abilityId: es[0].abilityId, abilityName: es[0].abilityName,
         }));
       }
@@ -699,7 +737,7 @@ function detectStacks(players: PlayerInfo[], life: Life, end: number): PullError
  *   both tanks are named (B/C: Provoked and still lost the holder).
  * - The holder killed by the buster itself: their mitigation.
  * - An expiry Burn Mark hitting a non-tank with all eight up: that player
- *   and the other tank (who should have been nearest) are named.
+ *   (they came closer than the other tank; user, A58).
  * - A tank killed by a single expiry Burn Mark: their mitigation (user,
  *   A4: not a mechanic failure).
  * A death-triggered Burn Mark's victims are fallout of the holder's death.
@@ -768,15 +806,20 @@ function detectPowderMark(players: PlayerInfo[], life: Life, casts: EnemyEvent[]
     // With anyone dead the pull was already over (user, A17 +2:27).
     if (nonTanks.length && other && allAlive(players, life, expiry.timestamp - 500)) {
       const killed = nonTanks.filter((p) => hits.some((h) => h.p === p && life.diedFrom(p, h.e.timestamp)));
-      for (const p of [...nonTanks, other]) {
+      // The non-tank came closer than the other tank: theirs alone (user,
+      // 2026-10-12, A58 +0:41: Sarelie should have been further from the
+      // holder; the other tank, ~13y away, was fine; clean 12-17y).
+      for (const p of nonTanks) {
         errors.push(playerError(p, {
           ruleId: FB_BURN_MARK_RULE_ID, severity: killed.length ? "Major" : "Minor", name: "Burn Mark on a Non-Tank",
-          description: `Burn Mark from ${holder.name}'s Powder Mark went to ${namesOf(nonTanks)} instead of ${other.name}: it hits the player nearest the marked tank.${killed.length ? ` ${namesOf(killed)} died.` : ""} The other tank stays closest to the marked tank; everyone else keeps away.`,
+          description: `Burn Mark from ${holder.name}'s Powder Mark went to ${namesOf(nonTanks)} instead of ${other.name}: it hits the player nearest the marked tank, and they were closer to ${holder.name} than ${other.name} was.${killed.length ? ` ${namesOf(killed)} died.` : ""} The other tank stays closest to the marked tank; everyone else stays a few yalms further away, off to the side.`,
           timestamp: hits[0].e.timestamp, abilityId: BURN_MARK, abilityName: "Burn Mark",
         }));
       }
     }
-    for (const h of hits.filter((x) => isTank(x.p))) {
+    // Only with the other tank alive: otherwise the second explosion had
+    // nowhere correct to go and the death is fallout (A45 +2:27.9).
+    for (const h of hits.filter((x) => isTank(x.p) && other && life.alive(other, expiry.timestamp))) {
       if (life.diedFrom(h.p, h.e.timestamp)?.killingAbilityGameId !== BURN_MARK) continue;
       errors.push(playerError(h.p, {
         ruleId: FB_POWDER_DEATH_RULE_ID, severity: "Major", name: "Died to Burn Mark",
@@ -899,8 +942,8 @@ function detectTetherStacks(players: PlayerInfo[], life: Life, end: number): Pul
  * - lightning with players of the other group in it (FALL_WRONG_SIDE+ of
  *   them: the helper whose cone pointed at them, else the carrier; fewer:
  *   those players);
- * - a short Sinblaze: the missing members of that group;
- * - a death in a clean resolution: their mitigation (user, A15).
+ * - a short Sinblaze: the missing members of that group.
+ * A death in a clean resolution is mitigation, never flagged (user, A15).
  */
 function detectFallOfFaith(players: PlayerInfo[], life: Life, end: number): PullError[] {
   const errors: PullError[] = [];
@@ -914,7 +957,14 @@ function detectFallOfFaith(players: PlayerInfo[], life: Life, end: number): Pull
   res.forEach((r, k) => {
     const t = r[0].e.timestamp;
     const partner = [res[k - 2], res[k + 2]].find((x) => x && clean(x));
-    const across = [res[k - 1], res[k + 1]].find((x) => x && clean(x));
+    // Any resolution of the other side; failing a clean one, one that hit
+    // exactly four players (user, 2026-10-12: A60 +1:47 Laura, read from a
+    // clean tether 4; A43 +1:47 Sayacissa, from tether 4's four, doubled).
+    // The four must share nobody with this resolution: a late tether after
+    // deaths can sweep up both sides (A40 tether 4).
+    const otherSide = [res[k - 1], res[k + 1], res[k - 3], res[k + 3]];
+    const across = otherSide.find((x) => x && clean(x)) ??
+      otherSide.find((x) => x && byPlayer(x).size === 4 && !x.some((h) => r.some((m) => m.p === h.p)));
     const group = partner ? new Set(partner.map((h) => h.p))
       : across && players.length === 8 ? new Set(players.filter((p) => !across.some((h) => h.p === p))) : undefined;
     // A dead group member's share retargets onto whoever is near: fallout.
@@ -948,21 +998,8 @@ function detectFallOfFaith(players: PlayerInfo[], life: Life, end: number): Pull
           ? "Sinblaze is one fire cone shared by the carrier's group of four."
           : `This tether was lightning: the three helpers spread for their own Bow Shock cones (two to the sides, one behind${behind ? `: ${behind.name}, this side's other carrier, was correctly behind` : ""}). Stacking as if it were fire puts several cones on each player.`}` }));
     }
-    // A clean resolution that still killed: their mitigation, not the
-    // mechanic (user, 2026-10-12, A15 +1:53: Sin carried tether 3 at low HP).
-    if (clean(r) && !mom.length && (!group || [...per.keys()].every((p) => group.has(p)))) {
-      // Still under an earlier tether's Mark of Mortality: fallout of that
-      // short Sinblaze (A17 +1:52.8).
-      const marked = (p: PlayerInfo) => {
-        const on = p.debuffs.filter((e) => e.abilityId === MARK_OF_MORTALITY && e.debuffStatus === "applied" && e.timestamp < t - 1500).pop();
-        return !!on && !p.debuffs.some((e) => e.abilityId === MARK_OF_MORTALITY && e.debuffStatus === "removed" && e.timestamp > on.timestamp && e.timestamp < t - 200);
-      };
-      for (const p of killed.filter((x) => !marked(x))) {
-        const e = per.get(p)![0];
-        errors.push(playerError(p, { ...base, severity: "Major", name: "Died to Fall of Faith",
-          description: `Died to ${e.abilityName} from Fall of Faith ${nth} (${kFmt(realAmount(e))}), though it resolved correctly (four players, one hit each). Not a mechanic failure: it needed mitigation or a heal first.` }));
-      }
-    }
+    // A death in a clean resolution is mitigation/healing, never flagged
+    // here (user, 2026-10-12, A15/A34/A52/A55).
     // Fire into the other group: the helper nearest the carrier aimed it.
     const carrierHit = carrier && per.get(carrier)?.[0];
     if (fire && group && carrierHit?.x !== undefined && [...per.keys()].some((p) => !group.has(p))) {
