@@ -61,6 +61,8 @@ export const PROC_EXPIRY_EARLY_MS = 600;
 export const PROC_EXPIRY_LATE_MS = 1_500;
 export const PROC_MIN_REMOVALS = 3;
 export const PROC_CONSUMED_SHARE = 0.6;
+// A second consumer (Holy Circle beside Holy Spirit) that took this share of the status's removals.
+export const PROC_CONSUMER_ALT_SHARE = 0.1;
 // A double weave is normal; a third oGCD between two GCDs clips.
 export const CLIP_WEAVES = 3;
 export const CLIP_FINDING_MS = 500;
@@ -779,7 +781,13 @@ export function checkProcs(ctx: PlayerCheckContext): DamageFinding[] {
     } else if (e.buffStatus === "stack" || e.buffStatus === "stackRemoved") {
       if (st) st.stacks = e.stack ?? st.stacks;
     } else if (e.buffStatus === "removed") {
-      if (st?.expiresAt !== undefined && !castNear(e.timestamp) &&
+      // Only a consumer pressed beside the expiry used it: qjCMx4bRfgNKwX9T
+      // fight 16's Paladin let Divine Might run out 0.17s before a Blade
+      // of Valor, which read as consumed.
+      const near = castNear(e.timestamp);
+      const usedIt = near !== undefined && (near.abilityId === consumerId ||
+        (consumedBy.get(e.abilityId)?.get(near.abilityId) ?? 0) >= (removals.get(e.abilityId) ?? 0) * PROC_CONSUMER_ALT_SHARE);
+      if (st?.expiresAt !== undefined && !usedIt &&
           e.timestamp >= st.expiresAt - PROC_EXPIRY_EARLY_MS && e.timestamp <= st.expiresAt + PROC_EXPIRY_LATE_MS) {
         lose(e.timestamp, Math.max(1, st.stacks), "expired unused");
       }

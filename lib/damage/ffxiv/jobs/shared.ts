@@ -65,11 +65,21 @@ const clock = (ms: number) => {
 };
 
 /** Windows where a status is on the player, from the player-buff stream. */
+const PRE_PULL_SLACK_MS = 1_000;
+
 export function statusWindows(ctx: PlayerCheckContext, statusId: number): Window[] {
   const out: Window[] = [];
   let open: number | undefined;
-  for (const e of [...(ctx.player.buffs ?? [])].sort((a, b) => a.timestamp - b.timestamp)) {
-    if (e.abilityId !== statusId) continue;
+  const events = [...(ctx.player.buffs ?? [])].filter((e) => e.abilityId === statusId).sort((a, b) => a.timestamp - b.timestamp);
+  // A status applied before the pull shows only its removal: start it
+  // one duration (from a later application) earlier, when that falls
+  // before the pull. qjCMx4bRfgNKwX9T fight 16's Paladin pressed Fight
+  // or Flight at −2.2s; the window was invisible (xivanalysis: 7/8 GCDs).
+  // A late-start capture's first removal lands mid-pull and stays out.
+  const durationMs = events.find((e) => e.buffStatus === "applied" && e.durationMs)?.durationMs;
+  const first = events[0];
+  if (first?.buffStatus === "removed" && durationMs && first.timestamp - durationMs <= PRE_PULL_SLACK_MS) open = first.timestamp - durationMs;
+  for (const e of events) {
     if (e.buffStatus === "removed") {
       if (open !== undefined) { out.push({ startMs: open, endMs: e.timestamp }); open = undefined; }
     } else if (e.buffStatus === "applied" && open === undefined) {

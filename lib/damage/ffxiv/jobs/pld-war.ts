@@ -29,6 +29,20 @@
 // the Confiteor chain held past the P1 HP check into P2, which is right;
 // its lost Expiacion / Circle of Scorn / Intervene uses were held across
 // downtime into the next Fight or Flight.
+// Rechecked on qjCMx4bRfgNKwX9T fight 16 (7.5, 2026-10-13): its 10 missed
+// GCDs, 12 missed combo GCDs and 14 missed oGCDs match once the pre-pull
+// Fight or Flight (pressed at −2.2s, 7/8) is seen (statusWindows now
+// opens a status whose first event is its removal). Divine Might 38/42:
+// 2 expired in downtime (forced), 12:21 ran out 0.17s before a Blade of
+// Valor, which read as consumed until checkProcs required a consumer
+// beside the removal; the fourth was granted at 18:25 and the kill came
+// after Atonement / Supplication / Sepulchre (worth a Holy Spirit over an
+// Atonement, a few k; not built). Supplication / Sepulchre 41/42 are one
+// chain expired in P2's downtime (forced). Intervene 35/38: 40s of its
+// full time is the 11:20-12:06 end-of-P3 hold and transition (forced);
+// the rest is the ~1 use the drift finding counts. Not adopted: Oath
+// gauge (mitigation); "6 tincture actions" (the tincture placement
+// finding: 0:04 and 7:43 would have covered more at 1:57 and 7:53).
 //
 // Fight or Flight, ported from
 // xivanalysis src/parser/jobs/pld/modules/FightOrFlight.tsx: 8 GCDs;
