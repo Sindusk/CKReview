@@ -19,6 +19,19 @@
 //   invisible: the check sees only non-spending casts made at the cap.
 // Tracked cooldowns are in tracked-cooldowns.ts.
 //
+// Retribution, checked against WoWAnalyzer on qpZx3mWaG7gcDdYB pull 3
+// (Polpo; reference ACmXHMFtaPLR9k8w fight 15's Yenvenger, 99th
+// percentile, page saved; checked 2026-10-13):
+// - Matched: Holy Power wasted 41.9% vs 12.9% (holyPowerWaste rebuilds
+//   33% vs 6% after forced time: 5.62M vs 1.14M); ability uptime 80.1% vs
+//   91.3%; one combat potion of two (potion.ts, 1.77M). The pace check
+//   finds his base GCD 1.15s against 1.02s from Yenvenger (3.06M).
+// - Cooldowns: Avenging Wrath, Execution Sentence 100%; Wake of Ashes 89%
+//   (its holds were in Stasis; no lost use). Divine Toll 90%: ~27s of holds
+//   outside Stasis cost at most a cast just before the kill; it isn't
+//   tracked (resets).
+// - Not adopted: Expurgation 88% vs 92% (small).
+//
 // Havoc, checked against WoWAnalyzer on qpZx3mWaG7gcDdYB pull 3
 // (Mythnarra; reference 3Vz6Qt2RyTPXwpJn's Hawkerton, 100th percentile,
 // page saved; checked 2026-10-13):
@@ -34,7 +47,7 @@
 import type { JobCheck } from "../../types";
 import { finding } from "../../checks";
 import { forcedPart } from "../../timeline";
-import { burstGcdFindings, k, observedWindowBonus, primaryResourceCapFindings, spentCooldownDrift } from "./shared";
+import { burstGcdFindings, k, observedWindowBonus, primaryResourceCapFindings, spenderSnapshotWaste, spentCooldownDrift } from "./shared";
 
 const window = (statusId: number, name: string): JobCheck => (ctx) => burstGcdFindings(ctx, {
   statusId, name,
@@ -118,9 +131,14 @@ const eternalHunt: JobCheck = (ctx) => {
   })];
 };
 
+// Retribution's Holy Power (type 9), logged on spenders only
+// (shared.ts spenderSnapshotWaste has the method and its check).
+const holyPowerWaste: JobCheck = (ctx) => spenderSnapshotWaste(ctx, { type: 9, name: "Holy Power" });
+
 export const MELEE_CHECKS: Record<string, JobCheck[]> = Object.fromEntries(
   Object.entries(MELEE_WINDOWS).map(([spec, [id, name]]) => [spec, [
     window(id, name), primaryResourceCapFindings, ...(spec === "Arms Warrior" ? ARMS_SPENT : []),
     ...(spec === "Havoc Demon Hunter" ? [eternalHunt] : []),
+    ...(spec === "Retribution Paladin" ? [holyPowerWaste] : []),
   ]]),
 );

@@ -17,6 +17,10 @@ for this kill, so top players' logs stand in for it.
   Marksmanship (Imnotanorc), Devastation (Gilgvoker), Havoc (Hawkerton)
   and Arcane (Màzz). Three players died there (Falkeron 2:20, Forgyy 2:25,
   Unbearievabl 2:57, none raised). Baselined.
+- `sampledata/wow/ACmXHMFtaPLR9k8w/` — reference kill (fight 15, app
+  Pull 2, 5:03), the user's pick (2026-10-13): 99th-percentile parses for
+  Pisslizard, Styphi, Auxeus, Yenvenger (Retribution), Vairuh, Nagafenw,
+  Frostydn; WoWAnalyzer pages for all saved. Baselined.
 - `sampledata/damage-wow/` — WoWAnalyzer Overview pages for every
   non-healer on the kill (16 pages).
 
@@ -35,7 +39,7 @@ for this kill, so top players' logs stand in for it.
 | Neximage | Arcane Mage | **Done** (against Màzz) |
 | Deathstriker | Beast Mastery Hunter | not started |
 | Veinglas | Blood Death Knight | not started (haste fit: 0.90s base, unexplained) |
-| Polpo | Retribution Paladin | not started |
+| Polpo | Retribution Paladin | **Done** (against Yenvenger) |
 | Blkphnx | Windwalker Monk | not started |
 | Thatapaddlin | Protection Paladin | not started |
 | Fwîî | Demonology Warlock | not started |
@@ -118,6 +122,11 @@ for this kill, so top players' logs stand in for it.
   Stasis to sync with Arcane Surge); Arcane Orb "bad" casts still beat his
   average GCD; casting through Stasis showed no payoff after it. The pace
   check's threshold went 3% → 5% (it flagged Màzz on fit noise).
+- **Polpo vs Yenvenger (ACmXHMFtaPLR9k8w):** est. loss 38.7k/s vs
+  12.2k/s. New check: Holy Power lost at the cap, rebuilt from spender
+  snapshots (33% vs 6%; WoWAnalyzer 41.9% vs 12.9%): 5.62M. Pace 1.15s vs
+  1.02s (3.06M); second potion missed (1.77M). Cooldowns fine (Divine
+  Toll at most one cast at the end).
 - Potion buffs added to the stream; all three kills refetched
   (2026-10-13) and baselines checked.
 

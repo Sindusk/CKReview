@@ -328,6 +328,12 @@ docs/damage-case-studies/qpZx3mWaG7gcDdYB.md. What generalizes:
   real ~219k and undervalued most players' gaps (Blkphnx 26k of 221k,
   Sylmigron 52k of 223k); every study number before 2026-10-13's fix was
   low. Check: a player's average GCD must sit below damage ÷ GCDs.
+- **A resource logged on spenders only can still show waste**
+  (spenderSnapshotWaste, wow/specs/shared.ts): each spender logs the amount
+  before it; fit gain per builder on intervals that ended under the cap,
+  and the shortfall where they ended at it is waste. Holy Power came out
+  at ~80% of WoWAnalyzer's figure for both a weak and a 99th-percentile
+  Paladin. Soul Shards, Essence and combo points could take the same.
 - **Combat potions** (lib/damage/wow/specs/potion.ts): one per 5 minutes,
   not shared with health potions. Light's Potential measured +20–40% on
   hits (same ability, target and other buffs, within 60s); Potion of

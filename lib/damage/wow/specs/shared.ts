@@ -347,6 +347,82 @@ export function spentCooldownDrift(ctx: PlayerCheckContext, spec: SpentCooldownS
   })];
 }
 
+// ── Resource logged on spenders only ───────────────────────────────────
+// Holy Power (type 9) is logged only on the casts that spend it: the
+// amount before the spend and the cost. Between two costed spends, the
+// gain is known (next amount − what the last spend left); the builders
+// pressed between say what it should have been. Gain per builder is fitted
+// on the intervals that ended under the cap (nothing can be lost there),
+// non-negative least squares, so untracked sources (Art of War procs,
+// Crusading Strikes' every-other-swing) land in the fitted gains. In an
+// interval that ended at the cap, predicted − observed was lost.
+// Checked against WoWAnalyzer (2026-10-13): Polpo (qpZx3mWaG7gcDdYB) 33.5%
+// vs its 41.9%, the 99th-percentile Yenvenger (ACmXHMFtaPLR9k8w) 10.4% vs
+// 12.9%: ~80% of its figure for both, same order. Value: the units lost ×
+// the player's damage per unit spent (spender damage × the costed share
+// of spender casts, so free procs don't inflate it ÷ units spent).
+// Inference. Needs MIN_FIT_INTERVALS uncapped intervals.
+
+const MIN_FIT_INTERVALS = 15;
+
+export function spenderSnapshotWaste(ctx: PlayerCheckContext, spec: { type: number; name: string }): DamageFinding[] {
+  const casts = ctx.player.casts.filter((c) => !c.fake && c.timestamp < ctx.endMs).sort((a, b) => a.timestamp - b.timestamp);
+  const res = (c: (typeof casts)[number]) => c.resources?.find((r) => r.type === spec.type);
+  const spends = casts.filter((c) => (res(c)?.cost ?? 0) > 0);
+  if (spends.length < 20) return [];
+  const max = res(spends[0])!.max;
+  const spenderNames = new Set(spends.map((c) => c.abilityName));
+  const builders = [...new Set(casts.filter((c) => !spenderNames.has(c.abilityName)).map((c) => c.abilityName))];
+  const rows = spends.slice(0, -1).map((a, i) => {
+    const b = spends[i + 1];
+    const between = casts.filter((c) => c.timestamp > a.timestamp && c.timestamp < b.timestamp);
+    return {
+      x: builders.map((n) => between.filter((c) => c.abilityName === n).length),
+      gain: res(b)!.amount - (res(a)!.amount - res(a)!.cost!),
+      capped: res(b)!.amount >= max, t: b.timestamp,
+    };
+  });
+  const fitRows = rows.filter((r) => !r.capped);
+  if (fitRows.length < MIN_FIT_INTERVALS) return [];
+  const g = builders.map(() => 0.5);
+  for (let it = 0; it < 300; it++) {
+    for (let j = 0; j < g.length; j++) {
+      let num = 0, den = 0;
+      for (const r of fitRows) {
+        if (!r.x[j]) continue;
+        const rest = r.x.reduce((acc, v, k) => acc + (k === j ? 0 : v * g[k]), 0);
+        num += r.x[j] * (r.gain - rest); den += r.x[j] * r.x[j];
+      }
+      g[j] = den > 0 ? Math.max(0, Math.min(max, num / den)) : 0;
+    }
+  }
+  const forced = mergeWindows(ctx.forced);
+  let generated = 0, lost = 0, n = 0, first = Infinity, last = 0;
+  for (const r of rows) {
+    const pred = r.x.reduce((acc, v, k) => acc + v * g[k], 0);
+    generated += Math.max(pred, r.gain);
+    if (!r.capped || inWindows(r.t, forced)) continue;
+    const w = pred - r.gain;
+    if (w <= 0.5) continue;
+    lost += w; n++; first = Math.min(first, r.t); last = Math.max(last, r.t);
+  }
+  if (lost < 1) return [];
+  const spentUnits = spends.reduce((a, c) => a + res(c)!.cost!, 0);
+  const spenderCasts = casts.filter((c) => spenderNames.has(c.abilityName)).length;
+  const spenderDamage = ctx.player.damageDone.filter((h) => !h.pet && spenderNames.has(h.abilityName) && h.timestamp < ctx.endMs)
+    .reduce((a, h) => a + (h.amount ?? 0), 0);
+  const perUnit = spentUnits > 0 && spenderCasts > 0 ? spenderDamage * (spends.length / spenderCasts) / spentUnits : 0;
+  const top = builders.map((name, j) => ({ name, g: g[j] })).filter((b) => b.g >= 0.3).sort((a, b) => b.g - a.g).slice(0, 4);
+  return [finding(ctx, {
+    kind: "gauge-overcap", startMs: first, endMs: last, forced: false, inference: true,
+    label: `${spec.name} capped`,
+    lostDamage: lost * perUnit,
+    basis: `~${Math.round(lost)} ${spec.name} lost at the cap of ~${Math.round(generated)} generated (rebuilt from spender snapshots; fitted gains: ` +
+      `${top.map((b) => `${b.name} ${b.g.toFixed(1)}`).join(", ")}) × ${k(perUnit)} per ${spec.name} spent`,
+    detail: `~${Math.round(lost)} of ~${Math.round(generated)} ${spec.name} (${Math.round(lost / generated * 100)}%) generated at the cap, over ${n} spends`,
+  })];
+}
+
 // ── Resource cap ───────────────────────────────────────────────────────
 
 export type ResourceCapSpec = {
@@ -363,7 +439,8 @@ export type ResourceCapSpec = {
 // Power ×10 (max 1000 / 1250 / 1000–1400), Insanity ×100 (max 10000).
 // Mana is left out (casters' only resource for Mages; not a damage
 // resource), and Soul Shards, Holy Power, combo points and Essence are
-// logged on their spenders only, so they can't show waste.
+// logged on their spenders only: spenderSnapshotWaste below rebuilds the
+// waste from those snapshots instead.
 export const PRIMARY_RESOURCES: Record<number, { name: string; scale: number }> = {
   1:  { name: "Rage", scale: 10 },
   2:  { name: "Focus", scale: 1 },
