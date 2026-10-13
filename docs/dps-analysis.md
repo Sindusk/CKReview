@@ -243,6 +243,23 @@ generalizes:
   confirmed by the user).
 - `cooldown.js` now applies the engine's pre-pull evidence.
 
+The same report's second kill (fight 16, the app's Pull 2; PLD, GNB,
+AST, SCH, VPR, BRD, MNK, SMN) turned the comparison around: most fixes
+were to the app's own engine, found where xivanalysis was right.
+- **The engine can miss what xivanalysis sees.** A status applied before
+  the pull shows only its removal (PLD Fight or Flight at −2.2s, now
+  opened one duration early); a proc expiry with any cast within 0.2s read
+  as consumed (about 60 real expiries across the samples, now only the
+  consumer counts); a GCD measured as the most common 10ms bucket split
+  2.47s into 2.45/2.49 (GNB's 8-or-9 rule now reads the mean).
+- **End of the pull:** gauge left at a kill is lost (GNB cartridges,
+  `leftAtKill`); a cooldown pressed too late for its effect isn't a use
+  (SCH's last Aetherflow, 0.2s before the kill); a window whose full span
+  runs past the kill is skipped (VPR Reawaken ended early by Ouroboros).
+- **Input:** the user saves each player's xivanalysis page as HTML;
+  `tools/xiva-html.js` cuts a ~500KB page to ~20KB of text with named
+  action icons (see the skill).
+
 ## Ideas for app tooling
 
 All of these are built in the Damage dialog (`lib/damage/`). The build

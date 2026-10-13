@@ -172,6 +172,10 @@ export type BurstWindowSpec = {
   // and Radiant Finale together).
   allOf?:        number[];
   inference?:    boolean;
+  // How long the full window takes from its start, for a window its own
+  // last action ends early (Reawaken, ended by Ouroboros). One whose full
+  // span runs past the end of the pull was cut by the kill and is skipped.
+  spanMs?:       (ctx: PlayerCheckContext) => number;
 };
 
 /** Windows where the player's own debuff is on any enemy. */
@@ -232,7 +236,8 @@ export function burstWindowFindings(ctx: PlayerCheckContext, specIn: BurstWindow
   const kinds = gcdKinds(ctx.player, ctx.pull, ctx.uses);
   for (const w of windows) {
     if (w.endMs > ctx.endMs) continue;
-    const spec = { ...specIn, bonus: specIn.bonus === "observed" ? observedBonus(ctx, w) : specIn.bonus };
+    if (specIn.spanMs && w.startMs + specIn.spanMs(ctx) > ctx.endMs) continue;
+    const spec ={ ...specIn, bonus: specIn.bonus === "observed" ? observedBonus(ctx, w) : specIn.bonus };
     // Inclusive end: a stack-consumed buff (Delirium) loses its last stack
     // at the same timestamp as the cast that used it.
     const end = w.endMs + SAME_TIMESTAMP_MS;

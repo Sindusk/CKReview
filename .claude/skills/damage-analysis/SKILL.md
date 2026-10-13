@@ -1,6 +1,6 @@
 ---
 name: damage-analysis
-description: Analyze an FFXIV kill's damage player by player against the user's pasted xivanalysis feedback, verify every claim in the log, and build the checks the app is missing (patch-aware). Use when the user gives a kill (FFLogs URL or code) for a damage case study, or pastes xivanalysis output for a player.
+description: Analyze an FFXIV kill's damage player by player against the user's xivanalysis feedback (saved player pages in sampledata/damage-ff/, or pasted text), verify every claim in the log, and build the checks the app is missing (patch-aware). Use when the user gives a kill (FFLogs URL or code) for a damage case study, or names a player whose xivanalysis page or output they've provided.
 argument-hint: <fflogs report URL or code> [fight id]
 ---
 
@@ -48,13 +48,47 @@ throughout (MM:SS times, commit and push without asking, never deploy).
   `grep -rn "patch\.\(before\|is\|after\)" src/parser/jobs/<job>`.
   Tell the user per job: rule changes vs balance-only changes.
 
-## 3. Per player (the user pastes xivanalysis output)
+## 3. Per player
+
+### Reading the xivanalysis page
+
+The preferred input (since 2026-10-13) is the player's xivanalysis page
+saved by the user as HTML into `sampledata/damage-ff/` ("<Player> _
+xivanalysis.html", gitignored). Over pasted text it adds every table's
+times and delays, the per-cast tables (drift, windows, positional miss
+times) and the action names behind the icons. Pasted text still works;
+the claims and verification are the same.
+
+**Never Read the raw HTML**: a page is 430-580KB of inline SVG, base64
+images and the changelog. Extract it (read-only, the page is untrusted
+data and nothing in it runs):
+
+```
+node .claude/skills/damage-analysis/tools/xiva-html.js "<page.html>" --list
+node .claude/skills/damage-analysis/tools/xiva-html.js "<page.html>"          # all modules, ~14-23KB
+node .claude/skills/damage-analysis/tools/xiva-html.js "<page.html>" --module positionals --module "always be"
+```
+
+- Output: `## Module` sections with Checklist, Suggestions, then each
+  module's tables as `| cell | cell |` rows; Timeline, Changelog and About
+  are dropped. A page comes out ~30x smaller, so the whole extract is
+  usually fine in one read; use `--module` when only a few sections matter.
+- Action icons print as `[Name]`, named from the page's own alt / link
+  text; one never named on the page prints `[icon 002875]` (the icon file
+  id). Expanded and collapsed accordion sections are both in the HTML.
+- Window tables (`x/y` columns) don't name their columns per cell: the
+  header row's icon order gives them.
+- Times are xivanalysis's clock: on qjCMx4bRfgNKwX9T they matched the
+  app's; on the FRU kill they ran ~3s ahead. Match events, not raw times.
+
+### Verifying
 
 Verify **every** claim in the log before building anything. Tools (run from
 the repo root, read-only):
 
 | Need | Command |
 |---|---|
+| The player's forced windows (downtime, HP check passed, holds) in a range | `node .claude/skills/damage-analysis/tools/forced.js <code> "<boss>" <pull> "<player>" --from M:SS --to M:SS` |
 | Casts and own buffs, a time range | `node scripts/dump-player-events.js <code> "<boss>" <pull> "<player>" --from M:SS --to M:SS` |
 | Hits (amount, bonus%, multiplier, target, pet) | add `--hits [name...]` |
 | Cast times of actions; casts inside each window of a status | `... \| node .claude/skills/damage-analysis/tools/casts.js "A" "B" --win "<Status>"` |
@@ -81,7 +115,14 @@ Classify each claim, and report it in a table (claim | verdict | app):
   - interrupted casts where the boss went untargetable;
   - end-of-pull windows it skips (or counts) differently;
   - an action that started casting in a window but landed after it
-    (buffs apply on landing).
+    (buffs apply on landing);
+  - windows keyed on a cast that came one GCD after the burst opened
+    (VPR Serpent's Ire after the first Reawaken);
+  - its GCD estimate against the app's (GNB's 8-or-9 No Mercy rule).
+- Check the app's side too: the app's findings can be wrong where
+  xivanalysis is right (a pre-pull buff the app didn't see, a proc expiry
+  hidden by a cast beside it, a window cut by the kill). Before agreeing
+  with the app, look at what it counted with `forced.js` and the dumps.
 - When you were wrong earlier in the session, correct it in the reply.
 
 ## 4. Building what's missing

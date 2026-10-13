@@ -22,6 +22,19 @@
 //     (2026-10-09): venoms 7, Honed 3 + 1 overwrite, coils 3 + 3 left,
 //     positionals and the Reawaken at 6:05 all match. Not built: Serpent's
 //     Ire pooling (9 actions) and Death Rattle (1).
+//     Rechecked on qjCMx4bRfgNKwX9T fight 16 (7.5, 2026-10-13): Honed
+//     Reavers 30/31 (7:17 expiry), Third Legacy 24/25 (0:55), the 6:06
+//     Reawaken cut to two Generations (Kefka hit 0% at 6:15, after the
+//     window's natural end), 1 coil left at the kill, 8 positionals and
+//     the 16:02 combo all match. Fixed: the 18:27 Reawaken, ended by an
+//     early Ouroboros 1.6s before the kill, read as 2 Generations + 2
+//     Legacies missing (158k); a window whose full span runs past the
+//     kill is skipped now (spanMs). Not adopted: "8 missed in Serpent's
+//     Ire windows" (at 2:01, 4:01, 8:02 and 18:16 the first Reawaken was
+//     pressed one GCD before Serpent's Ire; both are inside the buffs;
+//     6:02 is the cut Reawaken; 14:03's second one would land past P4's
+//     HP check at 14:09); Vicewinder 28/29 (its banked charge capped in
+//     P2's downtime, 35s held in all, under one 40s recharge).
 // Unverified (no sample has the job):
 //   - Monk: Riddle of Fire, 11 GCDs (RiddleOfFire.tsx), +15% (tooltip).
 //   - Dragoon (checked against xivanalysis on jN3XDrf2z8PmLgRJ Vamp pull 8:
@@ -105,6 +118,10 @@ const meikyo: JobCheck = (ctx) => burstWindowFindings(ctx, {
 
 const reawaken: JobCheck = (ctx) => burstWindowFindings(ctx, {
   statusId: S.REAWAKENED.id, name: "Reawaken", bonus: 0,
+  // Reawaken's own GCD (2.2s) and four Generations (2.0s), at the player's
+  // speed; Ouroboros ends it. On qjCMx4bRfgNKwX9T fight 16 the 18:27 one
+  // had 6.9s left and went First, Second, Ouroboros: right at a kill.
+  spanMs: (c) => ((A.REAWAKEN.gcdRecast ?? 2200) + 4 * (A.FIRST_GENERATION.gcdRecast ?? 2000)) * c.factor,
   bonusBasis: "a missing Generation or Ouroboros = its average minus the GCD used instead; a missing Legacy = its average",
   expected: (): ExpectedAction[] => [
     { ids: ids("FIRST_GENERATION", "SECOND_GENERATION", "THIRD_GENERATION", "FOURTH_GENERATION"), count: 4, name: "Generation",
