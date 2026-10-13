@@ -20,6 +20,12 @@
 // - Best placement: the same number of 30s windows on a 1s grid, starts at
 //   least 270s apart (the tincture recast), the first as early as 3s before
 //   the pull. Dynamic programming over the start times.
+// - Only where it could be drunk (potSlots): a tincture takes a weave slot,
+//   so a start needs a free one in the player's GCD sequence as played.
+//   A double-woven gap, a hard cast's tail or a dance step (1s GCD) has
+//   none: a pot there clips a GCD (user, 2026-10-13). Before this, 16
+//   Dancer suggestions across the samples fell inside Technical Step
+//   (vVPtwaTQ62Jg391q The Tyrant kill: 0:00 → 0:08).
 // - Bonus: measured from the player's own hits, the median over abilities
 //   of (median non-crit non-DH hit ÷ FFLogs multiplier with Medicated) ÷
 //   (the same without); FFLogs' multiplier doesn't include a main-stat
@@ -52,6 +58,15 @@ const ALWAYS_SHARE = 0.95;
 const ALWAYS_MIN_HITS = 5;
 // A moved tincture under this share of its window's damage is noise.
 const MOVE_MIN_SHARE = 0.02;
+// Weave slots (see potSlots). A GCD instant locks ~0.6s, a hard cast ~0.1s
+// past its cast; an oGCD (a tincture too) takes ~0.7s with ping, so a 2.5s
+// GCD holds two and a 1s dance step none. Medicated logs ~0.6s after the
+// drink (vVPtwaTQ62Jg391q The Tyrant kill: 5:09.82 → 5:10.44).
+const GCD_ANIM_LOCK_MS = 600;
+const CAST_LOCK_MS = 100;
+const WEAVE_LOCK_MS = 700;
+const APPLY_DELAY_MS = 600;
+const OWN_POT_MS = 1_500;
 const GUARANTEED = new Set(
   ["LIFE_SURGE", "INNER_RELEASE", "REASSEMBLED"].map((x) => S[x]?.id).filter((id): id is number => id !== undefined),
 );
@@ -135,12 +150,40 @@ function unluckyAmounts(player: PlayerInfo, game: DamageGame, hits: PlayerEvent[
   });
 }
 
+/**
+ * When a tincture could have been drunk without delaying a GCD: before the
+ * first GCD (pre-pull), after the last, and between two GCDs whose gap has
+ * a weave slot the player left free. A slot already double-woven, or a
+ * dance step's 1s GCD, has none: a pot there clips. The player's own pots
+ * don't count as weaves (moving the pot frees its slot).
+ */
+export function potSlots(ctx: PlayerCheckContext, medicatedAt: number[]): Window[] {
+  const gcds = [...ctx.uses].filter((u) => u.startMs < ctx.endMs).sort((a, b) => a.startMs - b.startMs);
+  if (gcds.length === 0) return [{ startMs: -Infinity, endMs: Infinity }];
+  const ogcds = ctx.player.casts.filter((c, i, all) => {
+    const a = ctx.game.action(c.abilityId);
+    const dup = all.slice(0, i).some((p) => p.abilityName === c.abilityName && c.timestamp - p.timestamp <= 50);
+    const pot = medicatedAt.some((t) => t - c.timestamp >= 0 && t - c.timestamp <= OWN_POT_MS);
+    return a !== undefined && !a.onGcd && !a.autoAttack && !dup && !pot;
+  });
+  const out: Window[] = [{ startMs: -Infinity, endMs: gcds[0].startMs - WEAVE_LOCK_MS }];
+  for (let i = 0; i < gcds.length; i++) {
+    const a = gcds[i], next = gcds[i + 1];
+    const lockEnd = a.startMs + (a.castMs > 0 && !a.statusLock ? a.castMs + CAST_LOCK_MS : GCD_ANIM_LOCK_MS);
+    if (!next) { out.push({ startMs: lockEnd, endMs: Infinity }); break; }
+    const room = next.startMs - lockEnd;
+    const woven = ogcds.filter((c) => c.timestamp > a.startMs && c.timestamp < next.startMs).length;
+    if (woven < Math.floor(room / WEAVE_LOCK_MS)) out.push({ startMs: lockEnd, endMs: next.startMs - WEAVE_LOCK_MS });
+  }
+  return out;
+}
+
 type Placement = { total: number; starts: number[] };
 
-/** The best n windows on the grid (bin i starts at EARLIEST_MS + i × STEP_MS). */
-function bestPlacement(prefix: Float64Array, bins: number, n: number): Placement | undefined {
+/** The best n windows on the grid (bin i starts at EARLIEST_MS + i × STEP_MS); `allowed` bins only. */
+function bestPlacement(prefix: Float64Array, bins: number, n: number, allowed: Uint8Array): Placement | undefined {
   const per = DURATION_MS / STEP_MS, gap = RECAST_MS / STEP_MS;
-  const W = (t: number) => prefix[Math.min(bins, t + per)] - prefix[t];
+  const W = (t: number) => allowed[t] ? prefix[Math.min(bins, t + per)] - prefix[t] : -Infinity;
   let prev = new Float64Array(bins).fill(0);
   const takes: Uint8Array[] = [];
   for (let j = 1; j <= n; j++) {
@@ -196,8 +239,17 @@ export const tincture: JobCheck = (ctx: PlayerCheckContext): DamageFinding[] => 
 
   const actualBins = windows.map((w) => binOf(w.startMs));
   const actual = actualBins.reduce((a, b) => a + cover(b), 0);
-  const best = bestPlacement(prefix, bins, windows.length);
-  const more = bestPlacement(prefix, bins, windows.length + 1);
+  // A window can start in a bin only if a drink ~0.6s before it fits a
+  // free weave slot; the player's own windows always can.
+  const slots = potSlots(ctx, windows.map((w) => w.startMs));
+  const allowed = new Uint8Array(bins);
+  for (let t = 0; t < bins; t++) {
+    const from = atMs(t) - APPLY_DELAY_MS, to = from + STEP_MS;
+    allowed[t] = slots.some((s) => s.startMs < to && s.endMs >= from) ? 1 : 0;
+  }
+  for (const b of actualBins) if (b < bins) allowed[b] = 1;
+  const best = bestPlacement(prefix, bins, windows.length, allowed);
+  const more = bestPlacement(prefix, bins, windows.length + 1, allowed);
   const out: DamageFinding[] = [];
 
   // What the player cast first in a window, to say where it would start.
