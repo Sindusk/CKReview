@@ -1,10 +1,20 @@
 ---
 name: damage-analysis
-description: Analyze an FFXIV kill's damage player by player against the user's xivanalysis feedback (saved player pages in sampledata/damage-ff/, or pasted text), verify every claim in the log, and build the checks the app is missing (patch-aware). Use when the user gives a kill (FFLogs URL or code) for a damage case study, or names a player whose xivanalysis page or output they've provided.
-argument-hint: <fflogs report URL or code> [fight id]
+description: Analyze a kill's damage player by player against the user's analyzer feedback — FFXIV (FFLogs + xivanalysis pages in sampledata/damage-ff/) or WoW (Warcraft Logs + WoWAnalyzer pages in sampledata/damage-wow/) — verify every claim in the log, compare against top players' logs, and build the checks the app is missing (patch-aware). Use when the user gives a kill (FFLogs or Warcraft Logs URL or code) for a damage case study, or names a player whose analyzer page or output they've provided. Resumes an unfinished case study from docs/damage-case-studies/.
+argument-hint: <fflogs or warcraftlogs report URL or code> [fight id]
 ---
 
 # Damage analysis of a kill
+
+**Step 0, always: resume.** Look for `docs/damage-case-studies/<code>.md`
+(the report code from the URL). If it exists, read it whole before anything
+else: it records which players are done, what was built, open questions
+and the next step. Continue from its "Next" section; don't redo finished
+players. Update it as you go (it is the hand-off to the next session).
+Start a new one for a new report.
+
+**WoW reports** (warcraftlogs.com): follow this procedure with the
+differences in "WoW" at the end; read that section before step 1.
 
 The procedure from the dDar482XvFKBPJYh FRU case study (2026-10-12): the
 user pastes xivanalysis feedback one player at a time; each claim is
@@ -185,4 +195,84 @@ Then:
 
 Update docs/dps-analysis.md's case-study section with anything that
 generalizes (a new pitfall, a new engine capability). Note in the reply
-whether the full capture is only in the scratchpad.
+whether the full capture is only in the scratchpad. Update the case-study
+file (step 0) with what's done and the next step.
+
+## WoW (Warcraft Logs)
+
+First run: qpZx3mWaG7gcDdYB fight 5 (Entombed Sentinels, 2026-10-13).
+Background and pitfalls: docs/dps-analysis.md, "WoW case study".
+
+**Data.**
+- `node scripts/fetch-wow-report.js <code> --fight <id>` (one kill; ~28MB).
+  Samples fetched before 2026-10-13 lack meta.json `startTime`, the haste
+  rating and gear haste buffs: `--refetch --fight <id>` (it rewrites
+  meta.json and only the named pulls).
+- Print: `node scripts/validate.js damage-analysis-wow sampledata/wow/<code> --all-findings`
+  (lost / forced / movement per player). Reference comparison:
+  `node scripts/validate.js damage-compare-wow sampledata/wow/<own> --refs=<code>,...`
+  (est. loss yours / the references').
+- Every tool in `tools/` and `scripts/dump-player-events.js` takes a WoW
+  code too (scripts/lib/load-sample-pull.js picks the game). Pull numbers
+  are the per-boss numbers in the file names (`Entombed Sentinels_Pull3.json`
+  = pull 3). `tools/gcd-locks.js` shows each GCD's cast time, the fitted
+  GCD, the lock and the idle (`--summary`: unpaired hard casts, gaps).
+
+**WoWAnalyzer pages.** The user saves each player's Overview tab as HTML in
+`sampledata/damage-wow/` ("Mythic <Boss> - Kill (m_ss) by <Player> in
+<Raid>.html"). Never Read the HTML; extract it:
+```
+node .claude/skills/damage-analysis/tools/wowa-html.js "<page.html>" --brief
+node .claude/skills/damage-analysis/tools/wowa-html.js "<page.html>" --list
+node .claude/skills/damage-analysis/tools/wowa-html-audit.js <page.html>...   # what the extract misses
+```
+- Grades are colours in the page: printed as {perfect|good|ok|bad};
+  per-cast strips as P/G/O/B letters. Spells print as [Name #id].
+- Cooldown bars give cast times, "sat ready", red missed stretches and
+  "unavailable stretches" (the recharge as WoWAnalyzer models it, talents
+  included). Only the first per-cast card and problem point are saved.
+- No patch or date on the page; maintainer notes ("mostly updated for
+  12.1.0") are the only hints.
+
+**Patch.** The report's `startTime` is in meta.json and on each pull
+(`reportStartedAt`). There's no WoW patch/hotfix date table yet
+(docs/open-items.md): say the log's date and treat rules as current.
+
+**Verifying, WoW-specific** (the step-3 classification applies):
+- **WoWAnalyzer misses pre-pull casts.** Soul Fire hard-cast before the
+  pull (its hit at 0:01.5 with no cast), Havoc on the boss at 0:00: its
+  "unused 0:00–0:33" was wrong. Check the first cast against the first
+  hit / debuff; tracked cooldowns take `prePullEvidenceIds`.
+- **Its cooldown model can be wrong both ways.** Soul Fire modelled ~41s;
+  no player ever began one under ~45s after the last landed. Measure the
+  shortest landed → next begin across players before believing it.
+- **Cooldowns recharged by a resource** (Arms Avatar 90s / Colossus Smash
+  45s − 1s per 20 Rage spent): fit interval vs spent between casts; judge
+  with `spentCooldownDrift`, not a fixed recast.
+- **Its single-target APL "accuracy" doesn't value anything** and misleads
+  on cleave fights (Cocomber 39% accuracy, more damage than 67% Hervous).
+- **When there's no VOD, the top players' logs are the check.** Fetch the
+  best parse of the same spec on the same boss (ask the user for a log),
+  compare with `damage-compare-wow` and side-by-side counts (GCDs/min,
+  cooldown casts and buff uptime, resource at cap, damage per GCD). A
+  habit the top players never show (Havoc on the main target at a swap:
+  0 of 9) is a mistake; one they show too (the ~80ms melee press delay)
+  isn't.
+- **The estimated loss has a floor**: the best Destruction Warlock read
+  8% of their damage. Judge the excess over the references, not the
+  absolute number.
+- **Logged casts that aren't presses**: Bladestorm's Mortal Strikes
+  (`DamageGame.isAutoCast`), a Havoc copy logged as a second cast 0.03s
+  later. Look for intervals far under a GCD (`tools/gcd-locks.js`).
+- **Haste changes within the pull** (procs, gear, lust): the GCD comes
+  from `lib/damage/wow/haste.ts`; a new haste buff goes in
+  `haste-statuses.ts` only from a measured fit.
+- **Movement** is its own category (blue): the boss's damage context
+  lists movement windows (`movementWindows`), measured as idle inside vs
+  the player's own baseline on two kills. Unexplained gaps stay counted.
+
+**Where WoW checks live:** `lib/damage/wow/specs/{ranged,melee,tank,healer}.ts`
+(spec checks; each records what it was checked against),
+`specs/shared.ts` (burst windows, DoT uptime, resource cap, cast-time
+procs, resource-recharged cooldowns), `tracked-cooldowns.ts` (fixed-recast
+drift), `game.ts` (channels, auto casts, actions), `haste.ts`.

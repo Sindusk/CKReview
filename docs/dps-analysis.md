@@ -270,6 +270,41 @@ were to the app's own engine, found where xivanalysis was right.
   `tools/xiva-html.js` cuts a ~500KB page to ~20KB of text with named
   action icons (see the skill).
 
+## WoW case study (qpZx3mWaG7gcDdYB, 2026-10-13)
+
+The first WoW study: Mythic Entombed Sentinels, against WoWAnalyzer pages
+and, with no VOD, the top players' logs of the same boss
+(NK1hBtW9rckdjq36). Progress and open items:
+docs/damage-case-studies/qpZx3mWaG7gcDdYB.md. What generalizes:
+- **The engine's estimated loss has a floor.** The best Destruction
+  Warlock read 8% of their damage lost, the 57th-percentile one 15%; the
+  comparable part is the excess (the reference comparison now prints both).
+  Most of a top player's idle (~13%) belongs to no mechanic.
+- **WoW queues casts into the same millisecond.** A hard cast lands and the
+  next begins at the same timestamp; pairing the cast with that begin
+  orphaned the next cast and read its cast time as idle (Wyrmtongues
+  16.4M → 13.5M after the fix). FFLogs never does this.
+- **The GCD changes with haste all pull** (procs, gear, lust; haste
+  multiplies). `lib/damage/wow/haste.ts` fits it per player from hard-cast
+  times (exact) and fast back-to-back instants; it reproduced Bloodlust's
+  ×0.77 and Power Infusion's ×0.83. Haste rating converts at ~33 per 1% on
+  that kill but varies with passive talent haste.
+- **Movement** is a separate category: idle inside a mechanic's window
+  beyond the player's own baseline. Measured excess was small (+4–8
+  points); the context lists only windows that showed it.
+- **Some logged casts aren't presses** (Bladestorm's Mortal Strikes, a
+  Havoc copy logged as a cast) and some channels look off-GCD in the
+  survey. Intervals far under a GCD give them away.
+- **Cooldowns recharged by spending** (Arms: Avatar 90s, Colossus Smash
+  45s, −1s per 20 Rage) can't take a fixed recast; fit interval against
+  resource spent between casts.
+- **WoWAnalyzer misses pre-pull casts and can model a cooldown wrong**
+  (Soul Fire ~41s against ≥45s in three players). Its APL accuracy doesn't
+  translate to damage, especially on cleave.
+- **A same-spec comparison separates habit from setup**: the ~80ms press
+  delay all three Arms Warriors (the 99th percentile too) showed isn't a
+  finding; Havoc on the main target, which the top two never did, is.
+
 ## Ideas for app tooling
 
 All of these are built in the Damage dialog (`lib/damage/`). The build

@@ -24,7 +24,7 @@ sampling it.
 | App features, UI, data flow | [docs/app-architecture.md](docs/app-architecture.md) |
 | Sample data, auth tokens, scripts, browser checks, deploy pipeline | [docs/dev-tooling.md](docs/dev-tooling.md) |
 | Damage output / rotation analysis, or tooling for it | [docs/dps-analysis.md](docs/dps-analysis.md) (method and pitfalls) |
-| A damage case study of a kill against xivanalysis feedback | the `/damage-analysis` skill ([.claude/skills/damage-analysis/](.claude/skills/damage-analysis/SKILL.md)) |
+| A damage case study of a kill against xivanalysis (FFXIV) or WoWAnalyzer (WoW) feedback | the `/damage-analysis` skill ([.claude/skills/damage-analysis/](.claude/skills/damage-analysis/SKILL.md)); unfinished studies resume from [docs/damage-case-studies/](docs/damage-case-studies/) |
 | A boss's damage context (pools, checks, holds) | the `/build-fight-context` skill ([.claude/skills/build-fight-context/](.claude/skills/build-fight-context/SKILL.md)) |
 | Changing the Damage, Mitigation or Statics analysis | The module headers (`lib/damage/`, `lib/mitigation/`, `lib/static-analysis.ts`). Design records and log-semantics findings are in [docs/archive/](docs/archive/) |
 | Mitigation Analysis optimizer and boss-debuff reach | Headers of `lib/mitigation/plan.ts` (party rules), `optimize.ts` (generic engine), `debuff-reach.ts`; test: `node scripts/check-optimizer-example.js`. Design record: [docs/archive/mitigation-optimizer-plan.md](docs/archive/mitigation-optimizer-plan.md) |

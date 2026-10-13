@@ -955,6 +955,19 @@ grouped by exact roster. The module headers hold the rules.
   - Cooldown recasts are the shortest measured interval, an upper bound,
     so drift errs lenient.
   - Subtlety's Energy-cap gain estimate includes regen.
+- **Same-spec GCD expectation (proposed 2026-10-13, user to decide).**
+  The per-player GCD model judges each player against their own fastest
+  presses, so a player who is uniformly slow is excused. Arms Hervous vs
+  Cocomber (qpZx3mWaG7gcDdYB): fitted 1.13s vs 0.98s, ratings 947 vs 1063
+  (~3%), talents differ in one choice node, no haste buff differs: ~6–7M
+  likely unpressed. Proposal: with a same-spec peer (pull or reference),
+  expect the peer's fitted GCD × the rating ratio. Case file:
+  docs/damage-case-studies/qpZx3mWaG7gcDdYB.md.
+- **WoW patch dates (open).** Pulls carry the log's start time
+  (`reportStartedAt`, meta.json `startTime`) but there's no WoW
+  patch/hotfix table (FFXIV's is lib/damage/ffxiv/patches.ts), so every
+  WoW check uses current rules. Balance hotfixes land every few weeks; the
+  source of dates is still to be agreed with the user.
 - **GCD under changing haste (built 2026-10-13, refine with more
   samples).** lib/damage/wow/haste.ts fits each player's GCD through the
   pull from hard-cast times, the faster back-to-back instants and the
