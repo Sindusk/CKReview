@@ -160,11 +160,19 @@ export type GcdUse = {
  * jN3XDrf2z8PmLgRJ Vamp pull 8, 3:15) would otherwise take the cancelled
  * begin and hide the cancel.
  */
+const SAME_INSTANT_MS = 20;
+
 export function latestBegin(begins: PlayerEvent[], cast: PlayerEvent, slackMs: number, used?: Set<PlayerEvent>): PlayerEvent | undefined {
   let found: PlayerEvent | undefined;
   for (const x of begins) {
     if (x.timestamp > cast.timestamp) break;
     if (used?.has(x) || x.abilityId !== cast.abilityId) continue;
+    // A begin in the same instant as this cast, with a cast time of its own,
+    // is the NEXT cast of the spell starting as this one lands (WoW queues
+    // it: qpZx3mWaG7gcDdYB pull 3, Destruction's Chaos Bolt landed and the
+    // next one began at 0:40.49). Taking it orphaned the 0:41.89 Chaos Bolt,
+    // whose 1.4s cast then read as idle, and its own begin as cancelled.
+    if (cast.timestamp - x.timestamp <= SAME_INSTANT_MS && (x.durationMs ?? 0) > SAME_INSTANT_MS) continue;
     if (cast.timestamp <= x.timestamp + (x.durationMs ?? 0) + slackMs) found = x;
   }
   return found;
