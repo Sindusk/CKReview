@@ -219,6 +219,30 @@ double-Enshroud Arcane Circle / Death's Design / Harvest Moon / Shroud,
 the BRD three-buff burst window and Army's Muse haste, PCT Palette gauge
 and Monochrome Tones.
 
+The second study, the Dancing Mad kill qjCMx4bRfgNKwX9T (patch 7.5,
+2026-10-13; DRK, WAR, AST, SCH, RPR, DRG, DNC, PCT), had no patch
+differences to account for: xivanalysis has no rule layers past 7.4.
+Built from it: DRK Salt and Darkness, WAR Beast Gauge (the first
+Warrior sample), the DNC Technical Finish rules (xivanalysis's
+Fountainfall allowance; a filler no longer charged twice) and proc
+values net of the GCD they replace (`DamageGame.procReplaces`). What
+generalizes:
+- **A second check on the same window must respect forced time and
+  not re-count.** The DNC filler and PCT Additive checks ran beside
+  `burstWindowFindings` but ignored forced time and charged the GCD
+  the main check had already valued as "the GCD used instead".
+- **A GCD proc lost is worth its consumer minus what it upgrades.**
+  Against the player's average GCD (burst GCDs in it), a Reverse
+  Cascade came out at 0k; against nothing, a Last Dance at its whole
+  86k.
+- **xivanalysis's DoT clipping is target-blind** (again): P3's two
+  bosses inflated AST Combust to 11.8s a minute and SCH Biolysis to
+  15.8s; per target, 2.3s and ~2.6s.
+- **It can't see pre-pull casts** (the AST's pre-pull Earthly Star read
+  as a held one) **or lockouts** (SCH Dissipation while Seraph is out,
+  confirmed by the user).
+- `cooldown.js` now applies the engine's pre-pull evidence.
+
 ## Ideas for app tooling
 
 All of these are built in the Damage dialog (`lib/damage/`). The build

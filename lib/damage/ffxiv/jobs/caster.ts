@@ -27,6 +27,14 @@
 //     perfect play (under one recast of unforced hold, and muses wait on
 //     motifs); Starry Muse 9/10 was ready just before P4's downtime and
 //     held for the 14:13 burst; its Swiftcast "9/24" is utility, not damage.
+//   - Checked against xivanalysis on qjCMx4bRfgNKwX9T Dancing Mad kill
+//     (7.5, 2026-10-13): its 15 missing Starry Muse actions are the
+//     Hammers of 6:03, 12:04, 14:04 and 16:07 plus 14:04's Comet; all but
+//     16:07 run into downtime or past an HP check (forced here). At 16:07
+//     the three Hammers went 16:00-16:05, with Hammer Time good to 16:20.
+//     Its 1 Additive (Holy in White, 6:03) was counted unforced until
+//     then. Cooldowns, 3 interrupted casts match; Swiftcast 12/23 is
+//     utility.
 //   - On dQ8wmb1VhKt6yBXk every Starry Muse window holds only one Hammer
 //     (the PCT starts Hammer Time at the window's end, after a second
 //     Subtractive round). Consistent across pulls, so likely a chosen
@@ -48,7 +56,7 @@
 import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import type { DamageFinding, JobCheck } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";
-import { inWindows } from "../../timeline";
+import { forcedPart, inWindows } from "../../timeline";
 import { aoeComboOnOneTarget, burstWindowFindings, castHits, dotFindings, gaugeFindings, k, statusWindows, type ExpectedAction, type GaugeEvent } from "./shared";
 
 const ids = (...keys: string[]) => keys.filter((key) => A[key]).map((key) => A[key].id);
@@ -115,8 +123,12 @@ const starryFillers: JobCheck = (ctx): DamageFinding[] => {
     if (w.endMs > ctx.endMs) continue;
     const used = ctx.uses.filter((u) => u.startMs + u.castMs >= w.startMs && u.startMs + u.castMs <= w.endMs + 100 && additive.has(u.action.id));
     if (used.length === 0) continue;
+    // As burstWindowFindings judges the window itself: the 6:03 window on
+    // qjCMx4bRfgNKwX9T's kill, past P2's check, counted its Holy in White.
+    const during = forcedPart(w.startMs, w.endMs, ctx.forced);
     out.push(finding(ctx, {
-      kind: "burst-window", startMs: w.startMs, endMs: w.endMs, forced: false, inference: true,
+      kind: "burst-window", startMs: w.startMs, endMs: w.endMs, inference: true,
+      forced: during.ms >= 1_500, cause: during.ms >= 1_500 ? during.cause : undefined,
       label: "Additive spells in Starry Muse",
       lostDamage: used.reduce((a, u) => a + Math.max(0, sub - ctx.values.perUse(u.action.id)), 0),
       basis: `each Additive = ${k(sub)} average Subtractive spell minus the Additive's average (upper bound)`,
