@@ -351,7 +351,11 @@ export function uptimeFindings(ctx: PlayerCheckContext, spec: UptimeSpec): Damag
 // - The DoT ran its course on a live enemy: an early refresh didn't lose
 //   ticks (the new one ticks at the same rate), it made the next refresh
 //   come sooner. L seconds early = L ÷ duration of an extra DoT cast in
-//   place of a filler. Summed per phase ("refreshed early").
+//   place of a filler. Summed per phase ("refreshed early"). Only what
+//   pressing it one or more GCDs later would have gained counts, less the
+//   ticks that delay drops: inside one GCD of expiry a refresh is on time
+//   (user, 2026-10-13; vVPtwaTQ62Jg391q The Tyrant kill, the Sage's 11
+//   refreshes, 14.0s clipped, are now one, the 0:25 re-dot with 8s left).
 // - It was cut short (the status came off, the enemy took no ticks for
 //   4.5s+, or a kill ended): no later refresh was coming, so the choice was
 //   this DoT or a filler. What it added = its direct hit + its ticks after
@@ -394,6 +398,7 @@ function dotApplicationFindings(ctx: PlayerCheckContext, spec: DotSpec, filler: 
   // An invulnerable enemy still logs ticks, for 0 (Chaos on dQ8wmb1VhKt6yBXk
   // P3): those aren't ticks the DoT got.
   const ticks = ctx.player.damageDone.filter((e) => ids.has(e.abilityId) && (e.amount ?? 0) > 0);
+  const tickAvg = ticks.length ? ticks.reduce((a, e) => a + (e.amount ?? 0), 0) / ticks.length : 0;
   const fillerHits = ctx.player.damageDone.filter((e) => e.abilityId === filler.id && !e.isDoT);
   const fillerAvg = (buffed: boolean) => {
     const own = fillerHits.filter((e) => inWindows(e.timestamp, ctx.buffWindows) === buffed);
@@ -458,13 +463,27 @@ function dotApplicationFindings(ctx: PlayerCheckContext, spec: DotSpec, filler: 
       const r = ran.reduce((a, b) => (b.left > a.left ? b : a));
       if (r.left <= 0 || forced.ms > 0 || (spec.snapshotInBuffs && buffed)) continue;
       const hit = Math.max(...recs.map((x) => x.hit));
+      // Refreshes come on the GCD grid, so a DoT rarely runs out exactly on
+      // a GCD (user, 2026-10-13: Sage at 2.45s against a 30s DoT). The
+      // alternative to a refresh is the same press k GCDs later: it saves
+      // k GCDs of clipping, and past the time left it drops ticks. Only
+      // the best such delay counts; none better means it was on time.
+      const per = Math.max(0, fill - hit) / spec.durationMs;
+      let best = { gain: 0, delays: 0 };
+      for (let d = 1; d <= Math.floor(r.left / ctx.baseGcdMs) + 1; d++) {
+        const later = d * ctx.baseGcdMs;
+        const gain = later * per - (Math.max(0, later - r.left) / DOT_TICK_MS) * tickAvg;
+        if (gain > best.gain) best = { gain, delays: d };
+      }
+      if (best.gain <= 0) continue;
       const phaseId = ctx.phaseOf(castAt);
       const b = steady.get(phaseId) ?? { ms: 0, lost: 0, n: 0, start: castAt, end: castAt, moments: [] };
-      const cost = (r.left / spec.durationMs) * Math.max(0, fill - hit);
-      b.ms += r.left; b.n++; b.end = castAt;
-      b.lost += cost;
-      b.moments.push({ startMs: castAt, endMs: castAt, lostDamage: cost,
-        detail: `${spec.name} refreshed with ${s(r.left)} left on ${r.targetName}` });
+      const avoidable = Math.min(r.left, best.delays * ctx.baseGcdMs);
+      b.ms += avoidable; b.n++; b.end = castAt;
+      b.lost += best.gain;
+      b.moments.push({ startMs: castAt, endMs: castAt, lostDamage: best.gain,
+        detail: `${spec.name} refreshed with ${s(r.left)} left on ${r.targetName}; ` +
+          `${best.delays} GCD${best.delays > 1 ? "s" : ""} later would have done more` });
       steady.set(phaseId, b);
       continue;
     }
@@ -501,8 +520,9 @@ function dotApplicationFindings(ctx: PlayerCheckContext, spec: DotSpec, filler: 
       lostDamage: b.lost,
       basis: `each refresh made the next one come that much sooner: ${s(b.ms)} ÷ ${s(spec.durationMs)} = ` +
         `${(b.ms / spec.durationMs).toFixed(1)} extra ${spec.name} casts, each in place of a ${filler.name} ` +
-        `(${k(fillerAvg(false))} average${b.n ? ", less the DoT's own hit" : ""})`,
-      detail: `${spec.name} refreshed early ${b.n} time${b.n > 1 ? "s" : ""} in ${ctx.phaseName(phaseId) ?? "the pull"}, ${s(b.ms)} clipped`,
+        `(${k(fillerAvg(false))} average${b.n ? ", less the DoT's own hit" : ""}); only refreshes where pressing it ` +
+        `one or more GCDs (${s(ctx.baseGcdMs)}) later would have done more, less any ticks that delay would have dropped`,
+      detail: `${spec.name} refreshed early ${b.n} time${b.n > 1 ? "s" : ""} in ${ctx.phaseName(phaseId) ?? "the pull"}, ${s(b.ms)} avoidable`,
     }));
   }
   return out;
