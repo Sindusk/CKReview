@@ -245,6 +245,9 @@ export type FFLCombatantInfoEvent = {
   criticalHit?:   number;
   directHit?:     number;
   determination?: number;
+  // The recorder's speed stats: their exact GCD tier.
+  skillSpeed?:    number;
+  spellSpeed?:    number;
 };
 
 export type FFLCastEvent = {

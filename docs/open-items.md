@@ -644,30 +644,22 @@ WoWAnalyzer rules, but never run against a real log. When a static or a
 reference clear includes one, fetch it as a sample and check its findings
 before anyone relies on them.
 
-**FFXIV GCD identification (open, raised by the user 2026-10-13).** The
-app needs to know a player's real GCD (their skill-speed tier), not a
-statistic of logged gaps. The user: no tank plays at 2.47s; tanks run
-2.45 or 2.50, and Frail Tailed (qjCMx4bRfgNKwX9T fight 16, GNB) looks
-like 2.45 with something adding delays. Where things stand:
-- Two measures in use: `timeline.ts speedProfile` takes the most common
-  10ms gap (2.45 for Frail; values gap findings for every job) and
-  `gnb.ts ruleGcdMs` the mean near it (2.47; decides No Mercy's 8 vs 9,
-  matching xivanalysis's "Estimated GCD 2.47s"). They disagree, and which
-  is right changes GNB's No Mercy expectation (2.45 → 9 GCDs, so the
-  8/9 windows at 10:12, 15:14, 16:15 would count again).
-- Frail's logged gaps between 2.43 and 2.52s: 2.44 ×34, 2.45 ×144,
-  2.46 ×27, 2.49 ×87, 2.50 ×59. Weaving doesn't explain the long ones:
-  with no oGCD between, 49 of 157 gaps are still 2.49-2.50 (double
-  weaves shift it somewhat: 35 of 57).
-- Neither "2.47 with timestamp jitter" nor "2.45 plus delays" fits
-  cleanly: a long gap is followed by a short one 69% of the time (partial
-  payback), but short-short pairs (sums 4.89-4.91) are as common as
-  short-long, and a 30-GCD unbroken chain averages 2.4687s.
-- To settle it: the logger's own gear stats (combatantinfo skill speed)
-  give an exact GCD for one player per report; compare a logger whose
-  tier is known with their logged gaps to learn what the delay pattern
-  looks like (server tick, latency, animation lock), then pick the rule.
-  Until then the No Mercy rule follows xivanalysis.
+**FFXIV GCD identification (settled 2026-10-13, one leftover).** Two
+recorders with skill speed 420 in their combatantinfo (exactly 2.50s:
+RmCphLTDaMXyAf2r's Gunbreaker, qjCMx4bRfgNKwX9T fight 1's Dark Knight)
+showed what logged intervals look like: clusters ~44ms apart (the GCD,
++44/+88 for a GCD logged late, −44 paying a late stamp back; boss
+auto-attacks show the same steps). A 2.50 recorder never logs two −44s
+in a row; Frail logs 2.45s back to back, so Frail is 2.45 with a third
+of GCDs one step late, and xivanalysis's 2.47 is that mix's mean.
+`timeline.ts gcdTierMs` now reads the tier for every FFXIV player (the
+GNB No Mercy rule uses it: Frail's 10:12, 15:14, 16:15 windows count
+again). The recorder's skill and spell speed are now kept by the fetch.
+Leftover: Viper. The skill-speed-420 Viper recorder (qjCMx4bRfgNKwX9T
+fight 16, so 2.12s with Swiftscaled) reads 2.10 (the old mode read
+2.14): its 2.5s-recast intervals cluster at 2.087 and 2.131, neither on
+2.12. Ninja (2.10) likely has the same issue. Needs a look at which VPR
+GCDs the intervals pair up.
 
 **Cooldown drift: room for uses vs casts in forced time (open,
 2026-10-13).** `checks.ts checkCooldownDrift` caps lost uses at

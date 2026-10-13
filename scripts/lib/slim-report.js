@@ -104,8 +104,9 @@ const FFL_PROJECTORS = {
   deaths:        (e) => omit(e, ['fight', 'packetID']),
   // .sourceID is a player-id roster source in the validate-*.js harnesses;
   // the crit / direct hit / determination stats (only the log recorder has
-  // them) feed crit luck (lib/damage/crit-luck.ts). Gear and auras are bloat.
-  combatantInfo: (e) => pick(e, ['timestamp', 'type', 'sourceID', 'criticalHit', 'directHit', 'determination']),
+  // them) feed crit luck (lib/damage/crit-luck.ts); skill / spell speed give
+  // the recorder's exact GCD tier. Gear and auras are bloat.
+  combatantInfo: (e) => pick(e, ['timestamp', 'type', 'sourceID', 'criticalHit', 'directHit', 'determination', 'skillSpeed', 'spellSpeed']),
   // `duration` is a begincast's cast time (damage analysis).
   casts: (e) => ({
     ...pick(e, ['timestamp', 'type', 'sourceID', 'targetID', 'sourceInstance', 'targetInstance', 'abilityGameID', 'duration']),

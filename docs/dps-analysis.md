@@ -130,6 +130,14 @@ differ from the FFLogs fight id. In one report, "pull 11" was fight 12.
   victims.
 - **Deaths with no damage.** A death entry with no damage recorded is
   probably a disconnect, not a mechanic.
+- **A GCD estimate from logged gaps (FFXIV).** Logged intervals sit in
+  ~44ms steps around the real GCD: some GCDs log one step late, the next
+  sometimes pays it back. The mean (xivanalysis's "Estimated GCD") and
+  the 10ms mode both misread the tier: a 2.45s Gunbreaker read 2.47,
+  a 2.50s one 2.49. The app reads the tier with `timeline.ts gcdTierMs`
+  (calibrated on recorders whose skill speed is in the log; the method
+  is in its comment). The recorder's skill / spell speed is the exact
+  check when a report has it (`combatantInfo` in the pull file).
 
 ## Estimating impact
 

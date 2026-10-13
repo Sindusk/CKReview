@@ -9,10 +9,9 @@
 // ~0.5s before the cast bar ends, docs/archive/damage-analysis-plan.md "Data check
 // findings"), else at the cast. It locks the next GCD for
 // max(recast × speed factor, cast time). The speed factor is the player's
-// most common interval between two plain 2.5s GCDs, ÷ 2.5s: their skill or
-// spell speed plus any always-on haste (Fuka, Swiftscaled). Checked on
-// dQ8wmb1VhKt6yBXk pull 11: the modes were 2.50 (tanks, PCT), 2.40
-// (healers), 2.15 (SAM) and 2.10 (VPR) and matched their gear.
+// GCD tier ÷ 2.5s: their skill or spell speed plus any always-on haste
+// (Fuka, Swiftscaled). The tier is read from the clusters of intervals
+// between two plain 2.5s GCDs (gcdTierMs), not their mode or mean.
 //
 // WoW (DamageGame's optional hooks, lib/damage/wow/game.ts): `fake` casts
 // are skipped; a channel's lock runs to its last tick (channelLocks); the
@@ -324,11 +323,85 @@ export function speedProfile(uses: GcdUse[], game: DamageGame | undefined, haste
     return bestN >= min ? best : undefined;
   };
   const clamp = (f: number) => Math.min(1, Math.max(minFactor, f));
-  const factor = clamp((mode(counts[0], 1) ?? base) / base);
+  const tier = game?.speed ? undefined : gcdTierMs(uses, base, minShare, hasteWindows);
+  const factor = clamp((tier ?? mode(counts[0], 1) ?? base) / base);
   if (hasteWindows.length === 0) return { baseRecastMs: base, factor, at: () => factor };
   const inside = mode(counts[1], 5);
   const hasteFactor = inside !== undefined ? clamp(inside / base) : clamp(factor / (game?.hasteFallback ?? FALLBACK_HASTE));
   return { baseRecastMs: base, factor, hasteFactor, at: (t) => (inWindows(t, hasteWindows) ? hasteFactor : factor) };
+}
+
+// FFXIV GCD tier from logged intervals (gcdTierMs). Calibrated 2026-10-13 on
+// recorders whose gear stats are in the log (combatantinfo skillSpeed 420,
+// so exactly 2.50s): RmCphLTDaMXyAf2r's Gunbreaker and qjCMx4bRfgNKwX9T
+// fight 1's Dark Knight.
+// - Logged intervals fall in clusters ~44ms apart: the GCD itself (±8ms,
+//   centred on it or up to 6ms under it), +44 and +88 (a GCD logged late),
+//   and −44 (the next one, paying a late stamp back). Boss auto-attacks
+//   show the same ±44ms steps, so it's the log, not the player.
+// - So the densest cluster isn't always the GCD: a 2.45s player delayed on
+//   most GCDs logs more at 2.49 than at 2.45 (RmCphLTDaMXyAf2r's
+//   Warrior, jN3XDrf2z8PmLgRJ's Reaper and Dancer). The cluster 44ms lower
+//   is the real GCD when it isn't only paybacks: two in a row (2.50
+//   recorders: 0 and 0.5% of pairs; those players 7-15%), or runs of 8
+//   that average under the upper cluster (2.50 recorders: 10th
+//   percentile 2-8ms over it; 2.45 players 7-11ms under).
+// - The 10ms-bucket mode split one cluster: the 2.50 Gunbreaker logged
+//   71 at 2.49 and 65 at 2.50, so the mode read 2.49.
+const TIER_STEP_MS = 44;
+const TIER_HALF_WIDTH_MS = 15;
+
+/**
+ * The player's GCD tier in ms (10ms steps), or undefined with under 20
+ * plain intervals. See the calibration note above.
+ */
+function gcdTierMs(uses: GcdUse[], base: number, minShare: number, hasteWindows: Window[]): number | undefined {
+  // Plain intervals; prev[i] is the interval before ivs[i] when consecutive.
+  const ivs: number[] = [], prev: (number | undefined)[] = [], instant: boolean[] = [];
+  let last: number | undefined;
+  for (let i = 1; i < uses.length; i++) {
+    const p = uses[i - 1];
+    const iv = uses[i].startMs - p.startMs;
+    if (p.action.recastMs !== base || !p.action.speedScaled || p.castMs > base ||
+        iv < base * minShare || iv > base * 1.04 || inWindows(p.startMs, hasteWindows)) { last = undefined; continue; }
+    ivs.push(iv); prev.push(last); instant.push(p.castMs === 0); last = iv;
+  }
+  if (ivs.length < 20) return undefined;
+  const near = (x: number, c: number) => Math.abs(x - c) <= TIER_HALF_WIDTH_MS;
+  let top = 0, bestN = 0;
+  const lo = Math.min(...ivs), hi = Math.max(...ivs);
+  for (let c = lo; c <= hi; c++) {
+    let n = 0;
+    for (const x of ivs) if (near(x, c)) n++;
+    if (n > bestN) { bestN = n; top = c; }
+  }
+  const lower = top - TIER_STEP_MS;
+  let pairs = 0, lowPairs = 0;
+  ivs.forEach((x, i) => {
+    const p = prev[i];
+    if (p === undefined || !instant[i] || !instant[i - 1]) return;
+    pairs++;
+    if (near(x, lower) && near(p, lower)) lowPairs++;
+  });
+  // Pairs and runs use instant GCDs only. Runs of 8 must also sit in the
+  // cluster family:
+  // a hard cast's begin-cast and a haste the game doesn't model here
+  // (Army's Paeon, Ley Lines, Presence of Mind) both read as a fast run.
+  const inFamily = (x: number) => x >= lower - TIER_HALF_WIDTH_MS && x <= top + TIER_STEP_MS + TIER_HALF_WIDTH_MS;
+  const runMeans: number[] = [];
+  for (let i = 0; i + 8 <= ivs.length; i++) {
+    let ok = true;
+    for (let j = i; j < i + 8; j++) {
+      if ((j > i && prev[j] === undefined) || !instant[j] || !inFamily(ivs[j])) { ok = false; break; }
+    }
+    if (ok) runMeans.push(ivs.slice(i, i + 8).reduce((a, b) => a + b, 0) / 8);
+  }
+  runMeans.sort((a, b) => a - b);
+  const runP10 = runMeans.length >= 10 ? runMeans[Math.floor(runMeans.length * 0.1)] : Infinity;
+  const centre = (pairs >= 30 && lowPairs >= pairs * 0.06) || runP10 <= top - 8 ? lower : top;  const cluster = ivs.filter((x) => near(x, centre)).sort((a, b) => a - b);
+  if (cluster.length < 10) return undefined;
+  const median = cluster[cluster.length >> 1];
+  return Math.ceil((median - 2) / 10) * 10;
 }
 
 /** Windows where any of `statusIds` is on the player (player-buff stream). */

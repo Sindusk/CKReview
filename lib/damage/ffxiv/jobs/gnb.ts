@@ -22,10 +22,18 @@
 // Checked against xivanalysis on qjCMx4bRfgNKwX9T fight 16 (7.5,
 // 2026-10-13; xivanalysis's GNB rules are 7.4's, no 7.5 changes):
 // - No Mercy: its 7 missed GCDs and 13 missed actions match these windows
-//   once the 8-or-9 rule reads the GCD as xivanalysis does (ruleGcdMs:
-//   2.47s, so 8; its saved page shows "Estimated GCD 2.47s"). The 3:04, 6:06 and 14:13 windows are past HP checks or
-//   cut by downtime (forced); 5:06's Double Down was pressed 0.1s before
-//   No Mercy applied and hit without it (multiplier 1.01).
+//   when the 8-or-9 rule reads the GCD as xivanalysis does (its saved
+//   page shows "Estimated GCD 2.47s", so 8). The 3:04, 6:06 and 14:13
+//   windows are past HP checks or cut by downtime (forced); 5:06's Double
+//   Down was pressed 0.1s before No Mercy applied and hit without it
+//   (multiplier 1.01).
+// - Not adopted: its 2.47s GCD. The player is a 2.45s tier (timeline.ts
+//   gcdTierMs: 208 intervals at 2.44-2.46, 123 one ~44ms log step later
+//   at 2.49-2.50; 2.50s recorders never log two 2.45s in a row). 2.47s is
+//   that mix's mean. At 2.45s the rule expects 9, and the player landed 9
+//   in 9 of the 18 windows (0:03, 1:03, 2:03, 4:05, 7:10, 9:10, 11:12,
+//   12:13, 13:13), so the 8-GCD windows at 10:11, 15:14 and 16:15 count.
+//   Settled 2026-10-13 with RmCphLTDaMXyAf2r (the recorder's 2.50s GCD).
 // - 1 cartridge left at the kill: built (leftAtKill).
 // Not adopted:
 // - Gnashing Fang 37/38: the lost charge sat full in the P2-P3 downtime
@@ -54,26 +62,15 @@ import { aoeComboOnOneTarget, burstWindowFindings, castHits, gaugeFindings, k, s
 
 const id = (key: string) => A[key].id;
 const GCD_SLOW_MS = 2470;
-const GCD_NEAR_MS = 60;
 
 /**
- * The GCD the 8-or-9 rule reads: the mean interval between plain GCDs
- * within 60ms of ctx.baseGcdMs, rounded to the game's 10ms step.
- * ctx.baseGcdMs is the most common 10ms bucket, and log jitter can split
- * one GCD into two: qjCMx4bRfgNKwX9T fight 16's Gunbreaker logged 144
- * intervals at 2.45s and 146 at 2.49-2.50s (mean 2.47s). The mode read
- * 2.45s, so the app expected 9 GCDs where xivanalysis expected 8.
+ * The GCD the 8-or-9 rule reads: the player's GCD tier (timeline.ts
+ * gcdTierMs), not the mean interval xivanalysis estimates from. Logged
+ * intervals add ~44ms steps to some GCDs; the mean of a 2.45s Gunbreaker
+ * delayed on a third of them reads 2.47s (see the header).
  */
 function ruleGcdMs(ctx: PlayerCheckContext): number {
-  const near: number[] = [];
-  for (let i = 1; i < ctx.uses.length; i++) {
-    const prev = ctx.uses[i - 1];
-    if (prev.action.recastMs !== 2500 || !prev.action.speedScaled || prev.castMs > 2500) continue;
-    const iv = ctx.uses[i].startMs - prev.startMs;
-    if (Math.abs(iv - ctx.baseGcdMs) <= GCD_NEAR_MS) near.push(iv);
-  }
-  if (near.length < 10) return ctx.baseGcdMs;
-  return Math.round(near.reduce((a, b) => a + b, 0) / near.length / 10) * 10;
+  return Math.round(ctx.baseGcdMs);
 }
 
 const noMercy: JobCheck = (ctx) => burstWindowFindings(ctx, {
