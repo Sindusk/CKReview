@@ -25,7 +25,18 @@ Chauzey Solstice, across every fight.
   hit nothing (124k) while others were hitting a boss from 4:54: an early
   press, the finding stands.
 
+- Tinctures (user, 2026-10-13): a pot takes a weave slot, so the
+  placement search now only starts windows at a free one (tincture.ts
+  `potSlots`). The Tyrant kill: 23k → 15k, suggestion 0:01, 4:53, 9:57.
+  Across the FF samples, 11.3M → 10.4M of tincture findings; Dancer
+  suggestions inside Technical Step 16 → 0.
+
 ## Next
+
+- Tincture check, offered and not yet answered: drop moves whose only
+  gain is filler in the same off-burst stretch (The Tyrant kill's 5:10 →
+  4:53), and say why a move helps (pot ran past the kill, covers the end
+  of Technical Finish).
 
 - The user saves Chauzey's xivanalysis page for each kill into
   `sampledata/damage-ff/`; verify each claim per the skill.
