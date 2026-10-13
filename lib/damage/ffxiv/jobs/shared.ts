@@ -587,12 +587,14 @@ export type GaugeSpec = {
   unitValue: number;       // damage per unit
   valueBasis: string;
   events:    GaugeEvent[];
+  /** Units still held when the boss died, valued as the spender minus the GCD it would have replaced. Kills only. */
+  leftAtKill?: { unitValue: number; valueBasis: string };
 };
 
 export function gaugeFindings(ctx: PlayerCheckContext, spec: GaugeSpec): DamageFinding[] {
   const events = [...spec.events].filter((e) => e.t < ctx.endMs).sort((a, b) => a.t - b.t);
   let value = 0, cap = spec.cap, negatives = 0;
-  const waste: { t: number; amount: number; label: string }[] = [];
+  const waste: { t: number; amount: number; label: string; unitValue?: number; valueBasis?: string }[] = [];
   for (const e of events) {
     if (e.type === "gain") {
       const over = Math.max(0, value + e.amount - cap);
@@ -607,14 +609,19 @@ export function gaugeFindings(ctx: PlayerCheckContext, spec: GaugeSpec): DamageF
       value = 0;
     }
   }
+  // xivanalysis's "ending the fight with cartridges loaded" (Ammo.tsx):
+  // what's held at the kill was never spent.
+  if (spec.leftAtKill && ctx.pull.result === "Kill" && value > 0) {
+    waste.push({ t: ctx.endMs, amount: value, label: "left at the kill", ...spec.leftAtKill });
+  }
   const forced = mergeWindows(ctx.forced);
   return waste.map((w) => finding(ctx, {
     kind: "gauge-overcap", startMs: w.t, endMs: w.t,
     forced: inWindows(w.t, forced), cause: inWindows(w.t, forced) ? forcedPart(w.t - 1, w.t + 1, ctx.forced).cause : undefined,
-    label: `${spec.name} overcap (${w.label})`,
-    lostDamage: w.amount * spec.unitValue,
+    label: w.label === "left at the kill" ? `${spec.name} left at the kill` : `${spec.name} overcap (${w.label})`,
+    lostDamage: w.amount * (w.unitValue ?? spec.unitValue),
     inference: negatives > 0 ? true : undefined,
-    basis: `${w.amount} ${spec.unit} × ${spec.valueBasis}` +
+    basis: `${w.amount} ${spec.unit} × ${w.valueBasis ?? spec.valueBasis}` +
       (negatives > 0 ? `; the gauge simulation went below zero ${negatives} time${negatives > 1 ? "s" : ""}, so treat this as inference` : ""),
     detail: `${w.amount} ${spec.unit} lost: ${w.label}`,
   }));

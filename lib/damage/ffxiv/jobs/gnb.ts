@@ -16,7 +16,29 @@
 //     the hit's bonusPercent when the action shows one in the pull (every
 //     Solid Barrel in dQ8wmb1VhKt6yBXk pull 11 had 47), not guessed.
 //   - −1 Burst Strike, Fated Circle, Gnashing Fang; −2 Double Down.
-//   A lost cartridge is worth one average Burst Strike.
+//   A lost cartridge is worth one average Burst Strike. Cartridges left at
+//   a kill are worth Burst Strike + Hypervelocity minus a Keen Edge.
+//
+// Checked against xivanalysis on qjCMx4bRfgNKwX9T fight 16 (7.5,
+// 2026-10-13; xivanalysis's GNB rules are 7.4's, no 7.5 changes):
+// - No Mercy: its 7 missed GCDs and 13 missed actions match these windows
+//   once the 8-or-9 rule reads the GCD as xivanalysis does (ruleGcdMs:
+//   2.47s, so 8). The 3:04, 6:06 and 14:13 windows are past HP checks or
+//   cut by downtime (forced); 5:06's Double Down was pressed 0.1s before
+//   No Mercy applied and hit without it (multiplier 1.01).
+// - 1 cartridge left at the kill: built (leftAtKill).
+// Not adopted:
+// - Gnashing Fang 37/38: the lost charge sat full in the P2-P3 downtime
+//   (6:36-7:12), forced. Sonic Break 18/19: the 14:13 Ready to Break
+//   expired in P4's downtime past the HP check (forced proc-lost).
+// - "4 recommended actions missed in tinctures": one Gnashing Fang of two
+//   in each. GF was pressed on cooldown, so a second one meant holding a
+//   charge ~20s into the tincture: worth the tincture's ~3% of one GF
+//   combo (~6k each), the same call as WAR's Onslaughts (pld-war.ts).
+// - Weaving: 9 of its 13 are 0.02-0.2s (jitter); 6:03 and 11:08 are the
+//   triple-weave findings, 14:10 is past P4's HP check, 13:10 (0.45s past
+//   tolerance) is under the phase's 0.5s floor.
+// - Continuations 100%: none lost, so nothing to value.
 //
 //   Copyright (c) 2018 Saxon Landers & contributors
 //   MIT License; full text in THIRD_PARTY_NOTICES.md.
@@ -28,13 +50,34 @@ import { aoeComboOnOneTarget, burstWindowFindings, castHits, gaugeFindings, k, s
 
 const id = (key: string) => A[key].id;
 const GCD_SLOW_MS = 2470;
+const GCD_NEAR_MS = 60;
+
+/**
+ * The GCD the 8-or-9 rule reads: the mean interval between plain GCDs
+ * within 60ms of ctx.baseGcdMs, rounded to the game's 10ms step.
+ * ctx.baseGcdMs is the most common 10ms bucket, and log jitter can split
+ * one GCD into two: qjCMx4bRfgNKwX9T fight 16's Gunbreaker logged 144
+ * intervals at 2.45s and 146 at 2.49-2.50s (mean 2.47s). The mode read
+ * 2.45s, so the app expected 9 GCDs where xivanalysis expected 8.
+ */
+function ruleGcdMs(ctx: PlayerCheckContext): number {
+  const near: number[] = [];
+  for (let i = 1; i < ctx.uses.length; i++) {
+    const prev = ctx.uses[i - 1];
+    if (prev.action.recastMs !== 2500 || !prev.action.speedScaled || prev.castMs > 2500) continue;
+    const iv = ctx.uses[i].startMs - prev.startMs;
+    if (Math.abs(iv - ctx.baseGcdMs) <= GCD_NEAR_MS) near.push(iv);
+  }
+  if (near.length < 10) return ctx.baseGcdMs;
+  return Math.round(near.reduce((a, b) => a + b, 0) / near.length / 10) * 10;
+}
 
 const noMercy: JobCheck = (ctx) => burstWindowFindings(ctx, {
   statusId: S.NO_MERCY.id,
   name: "No Mercy",
   bonus: 0.2,
   bonusBasis: "No Mercy is +20% (FFLogs multiplier 1.20)",
-  expectedGcds: (c) => (c.baseGcdMs >= GCD_SLOW_MS ? 8 : 9),
+  expectedGcds: (c) => (ruleGcdMs(c) >= GCD_SLOW_MS ? 8 : 9),
   expected: (c, casts) => [
     { ids: [id("SAVAGE_CLAW")], count: 1, name: "Savage Claw" },
     { ids: [id("WICKED_TALON")], count: 1, name: "Wicked Talon" },
@@ -45,7 +88,7 @@ const noMercy: JobCheck = (ctx) => burstWindowFindings(ctx, {
     { ids: [id("LION_HEART")], count: 1, name: "Lion Heart" },
     {
       ids: [id("GNASHING_FANG")], name: "Gnashing Fang",
-      count: c.baseGcdMs >= GCD_SLOW_MS || casts.some((x) => x.abilityId === id("GNASHING_FANG")) ? 1 : 0,
+      count: ruleGcdMs(c) >= GCD_SLOW_MS || casts.some((x) => x.abilityId === id("GNASHING_FANG")) ? 1 : 0,
     },
   ],
 });
@@ -76,10 +119,19 @@ const cartridges: JobCheck = (ctx): DamageFinding[] => {
   }
   for (const d of ctx.dead) events.push({ t: d.startMs, type: "reset", label: "death" });
   const perCart = ctx.values.perUse(id("BURST_STRIKE"));
+  // At the kill the cartridge's Burst Strike + Hypervelocity would have
+  // replaced a combo GCD (qjCMx4bRfgNKwX9T fight 16: Keen Edge at 18:15
+  // with one loaded, none spent after Bloodfest's three).
+  const blast = perCart + ctx.values.perUse(id("HYPERVELOCITY"));
+  const filler = ctx.values.perUse(id("KEEN_EDGE"));
   return gaugeFindings(ctx, {
     name: "Cartridge", unit: "cartridge", cap: 3, unitValue: perCart,
     valueBasis: `${k(perCart)} average Burst Strike`,
     events,
+    leftAtKill: {
+      unitValue: Math.max(0, blast - filler),
+      valueBasis: `(${k(blast)} average Burst Strike + Hypervelocity − ${k(filler)} average Keen Edge it would have replaced)`,
+    },
   });
 };
 
