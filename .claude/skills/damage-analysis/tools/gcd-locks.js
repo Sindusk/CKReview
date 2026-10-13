@@ -45,10 +45,14 @@ const toMs = (x) => { const [m, s] = x.split(':'); return (+m * 60 + +s) * 1000;
   if (summary) {
     const hardIds = new Set((p.beginCasts ?? []).filter((b) => (b.durationMs ?? 0) > 0).map((b) => b.abilityId));
     const hard = uses.filter((u) => hardIds.has(u.action.id));
-    const zeroBegin = new Set((p.beginCasts ?? []).filter((b) => b.durationMs === 0).map((b) => `${b.abilityId}@${b.timestamp}`));
-    const unpaired = hard.filter((u) => u.castMs === 0 && !zeroBegin.has(`${u.action.id}@${u.startMs}`));
-    const instants = hard.filter((u) => u.castMs === 0 && zeroBegin.has(`${u.action.id}@${u.startMs}`));
-    console.log(`hard-cast actions: ${hard.length} uses; ${instants.length} instant (zero-length begin); ${unpaired.length} unpaired${unpaired.length ? `: ${unpaired.slice(0, 12).map((u) => `${clock(u.startMs)} ${u.abilityName}`).join(', ')}` : ''}`);
+    // Unpaired: a begin-cast of the same spell whose cast time ends at this
+    // landing exists but wasn't taken. Instants show either a zero-length
+    // begin (qpZx3mWaG7gcDdYB) or none at all (NK1hBtW9rckdjq36).
+    const begins = p.beginCasts ?? [];
+    const unpaired = hard.filter((u) => u.castMs === 0 && begins.some((b) => b.abilityId === u.action.id && (b.durationMs ?? 0) > 0 &&
+      Math.abs(b.timestamp + b.durationMs - u.startMs) <= 300));
+    const instants = hard.filter((u) => u.castMs === 0 && !unpaired.includes(u));
+    console.log(`hard-cast actions: ${hard.length} uses; ${instants.length} instant (proc'd); ${unpaired.length} unpaired${unpaired.length ? `: ${unpaired.slice(0, 12).map((u) => `${clock(u.startMs)} ${u.abilityName}`).join(', ')}` : ''}`);
     const small = new Map(), big = [];
     for (let i = 0; i + 1 < uses.length; i++) {
       const u = uses[i], idle = uses[i + 1].startMs - u.startMs - lockOf(u);

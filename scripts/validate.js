@@ -1091,7 +1091,7 @@ function printComparison(mod, game, own, refs) {
           ` own ${k(p.ownDps)}/${k(p.ref?.ownDps)} given ${k(p.givenDps)}/${k(p.ref?.givenDps)}` +
           ` GCD/min ${p.gcdsPerMin.toFixed(1)}/${(p.ref?.gcdsPerMin ?? NaN).toFixed(1)}` +
           `${p.healGcdsPerMin || p.ref?.healGcdsPerMin ? ` heal/min ${p.healGcdsPerMin.toFixed(1)}/${(p.ref?.healGcdsPerMin ?? NaN).toFixed(1)}` : ''}` +
-          ` deaths ${p.deaths.toFixed(1)} est.loss ${k(p.lostDps)}/s`);
+          ` deaths ${p.deaths.toFixed(1)} est.loss ${k(p.lostDps)}/${k(p.ref?.lostDps)}/s`);
       }
     };
     for (const o of own) show(`${o.pull.name} Pull ${o.pull.pullNumber}`, [o]);

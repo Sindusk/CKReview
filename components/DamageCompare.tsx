@@ -140,7 +140,7 @@ export default function DamageCompare({ ownPulls, analyses, refs, onRefsChange, 
                   <th>Player</th><th style={{ textAlign: "right" }}>rDPS</th><th style={{ textAlign: "right" }}>Clears</th>
                   <th style={{ textAlign: "right" }}>Δ</th><th style={{ textAlign: "right" }}>Own</th><th style={{ textAlign: "right" }}>Given</th>
                   <th style={{ textAlign: "right" }}>GCD/min</th><th style={{ textAlign: "right" }}>Heal GCD/min</th>
-                  <th style={{ textAlign: "right" }} title="The analysis's estimated unforced loss inside the window">Est. loss/s</th>
+                  <th style={{ textAlign: "right" }} title="The analysis's estimated unforced loss inside the window, yours / the reference players'. Top players show some too: the gap between the two is what's comparable.">Est. loss/s</th>
                 </tr>
               </thead>
               <tbody>
@@ -180,7 +180,7 @@ export default function DamageCompare({ ownPulls, analyses, refs, onRefsChange, 
                     <td className="ck-num" style={{ textAlign: "right" }}>
                       {p.healGcdsPerMin || p.ref?.healGcdsPerMin ? `${rate(p.healGcdsPerMin)} / ${rate(p.ref?.healGcdsPerMin)}` : "—"}
                     </td>
-                    <td className="ck-num" style={{ textAlign: "right" }}>{k(p.lostDps)}</td>
+                    <td className="ck-num" style={{ textAlign: "right" }}>{k(p.lostDps)} / {k(p.ref?.lostDps)}</td>
                   </tr>
                 ))}
               </tbody>

@@ -55,7 +55,11 @@ export type PlayerWindowStats = {
 
 export type CompareRow = PlayerWindowStats & {
   refCount:  number;
-  ref?:      { rdps: number; ownDps: number; givenDps: number; gcdsPerMin: number; healGcdsPerMin: number };
+  // lostDps: the reference players' own estimated loss. Even a top player
+  // shows some (qpZx3mWaG7gcDdYB vs NK1hBtW9rckdjq36, Entombed Sentinels:
+  // the best Destruction Warlock read 8% of their damage, the 57th
+  // percentile one 15%), so the excess over it is what's comparable.
+  ref?:      { rdps: number; ownDps: number; givenDps: number; gcdsPerMin: number; healGcdsPerMin: number; lostDps: number };
 };
 
 export type RoleRow = { role: string; rdps: number; refRdps?: number; refCount: number };
@@ -187,6 +191,7 @@ export function compareWithReferences(
       ref: refCount > 0 ? {
         rdps: refMed((s) => s.rdps), ownDps: refMed((s) => s.ownDps), givenDps: refMed((s) => s.givenDps),
         gcdsPerMin: refMed((s) => s.gcdsPerMin), healGcdsPerMin: refMed((s) => s.healGcdsPerMin),
+        lostDps: refMed((s) => s.lostDps),
       } : undefined,
     };
   }).sort((a, b) => ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role) || b.rdps - a.rdps);
