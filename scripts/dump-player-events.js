@@ -26,7 +26,8 @@ const args = process.argv.slice(2);
 const flag = (name) => args.includes(name);
 const value = (name) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : undefined; };
 const toMs = (s) => { if (!s) return undefined; const [m, sec] = s.split(':'); return (Number(m) * 60 + Number(sec)) * 1000; };
-const clock = (t) => { const s = t / 1000; return `${Math.floor(s / 60)}:${(s % 60).toFixed(2).padStart(5, '0')}`; };
+// Rounded to the centisecond first: 299.995s printed as "4:60.00".
+const clock = (t) => { const s = Math.round(t / 10) / 100; return `${Math.floor(s / 60)}:${(s % 60).toFixed(2).padStart(5, '0')}`; };
 
 (async () => {
   const [code, boss, pullNumber, who] = args;

@@ -21,6 +21,11 @@ for this kill, so top players' logs stand in for it.
   Pull 2, 5:03), the user's pick (2026-10-13): 99th-percentile parses for
   Pisslizard, Styphi, Auxeus, Yenvenger (Retribution), Vairuh, Nagafenw,
   Frostydn; WoWAnalyzer pages for all saved. Baselined.
+- `sampledata/wow/VWMbYPRyxCAmhZFj/` — reference kill (fight 9, app
+  Pull 1, 5:20), the user's pick (2026-10-13): 99th-percentile Holyvi
+  (Protection Paladin), Eroka (Arms), Jordomonk (Windwalker), Esra
+  (Subtlety), Padflash (Arcane); Blueprint isn't on this fight. Holyvi's
+  page saved. Baselined.
 - `sampledata/wow/dBxtMyAc1zYHXQnK/` — reference kill (fight 18, app
   Pull 1, 5:52), the user's pick (2026-10-13): 100th-percentile Kadss
   (Balance), 99th Bowguytome (Marksmanship) and Dcn (Havoc); pages saved.
@@ -61,7 +66,7 @@ pick) or ACmXHMFtaPLR9k8w (99th, user's pick).
 | Cocroach | Elemental Shaman | 30 | 163.1k | Nickshockz (JZ) | **Done** |
 | Sylmigron | Balance Druid | 6 | 152.4k | Kadss (dB) | **Done** |
 | Blkphnx | Windwalker Monk | 14 | 150.4k | Styphi (AC) | **Done**, one open item |
-| Thatapaddlin | Protection Paladin | 66 | 100.1k | Holyvi (NK) | not started |
+| Thatapaddlin | Protection Paladin | 66 | 100.1k | Holyvi (NK, VW) | **Done** |
 | Veinglas | Blood Death Knight | 46 | 90.5k | Frostydn (AC) | **Done** |
 | Saelska | Restoration Druid (healer) | 17 | 3.0k | — | not in scope |
 | Neptune | Restoration Shaman (healer) | 27 | 2.3k | — | not in scope |
@@ -165,6 +170,9 @@ pick) or ACmXHMFtaPLR9k8w (99th, user's pick).
   Conduit); 39.6 vs 47.9 GCDs a minute (counted as gaps, 15.1k vs 8.5k/s
   est. loss). Main gap Fists of Fury (Open 1); Rising Sun Kick 5.9 vs 7.9
   a minute, Blackout Kick filler 10.3 vs 8.1.
+- **Thatapaddlin vs Holyvi (VWMbYPRyxCAmhZFj):** no new check; cooldowns,
+  defensives and Holy Power close; idle 6.7k/s vs 3.1k/s; potion 0.90M.
+  Every non-healer on the kill is now done.
 - **Sylmigron vs Kadss (dBxtMyAc1zYHXQnK):** new check: Astral Power
   spenders outside Eclipse / Incarnation, not near the cap (26 vs 4;
   WoWAnalyzer 28 vs 4): 1.69M. Also pace (2.61M), 22 cancelled Starfires,
@@ -212,11 +220,11 @@ pick) or ACmXHMFtaPLR9k8w (99th, user's pick).
 
 ## Next
 
-The next player the user names. The remaining players (Nearby, Sylmigron,
-Cocroach, Deathstriker, Veinglas, Polpo, Blkphnx, Thatapaddlin, Fwîî)
-have references only where NK1hBtW9rckdjq36 or 3Vz6Qt2RyTPXwpJn has the
-spec; ask the user for a top log otherwise:
-`damage-compare-wow sampledata/wow/qpZx3mWaG7gcDdYB --refs=NK1hBtW9rckdjq36,3Vz6Qt2RyTPXwpJn`. For each: extract the page
-(`wowa-html.js --brief`), the app's findings (`--all-findings`), verify
-each claim, and compare against a top player of the spec (ask the user for
-a log if NK1hBtW9rckdjq36 has none).
+Every non-healer on the kill is done against a 99th/100th-percentile
+reference (2026-10-13). Left, at the user's call: the open items above
+(Fists of Fury; the pace check's gear-haste conversion and WoW crit luck
+in docs/open-items.md), and optional re-checks of earlier players against
+the later reference kills (Hervous vs Nagafenw / Eroka, Shadowmeld vs
+Pisslizard / Bowguytome, Mythnarra vs Vairuh / Kaströ / Dcn, Wyrmtongues
+vs Weeblock, Nearby vs Catsneaks). All references at once:
+`damage-compare-wow sampledata/wow/qpZx3mWaG7gcDdYB --refs=NK1hBtW9rckdjq36,3Vz6Qt2RyTPXwpJn,ACmXHMFtaPLR9k8w,MAkCVqHfwx1vnDW8,jmprxRc62fHCZy7g,JZjf9x3mK76NzabP,dBxtMyAc1zYHXQnK,VWMbYPRyxCAmhZFj`.

@@ -36,7 +36,15 @@
 //   Its bonus is read from the hits (observedWindowBonus).
 // - Holy Power is logged on spenders only (Shield of the Righteous at 5 of
 //   5 on 43 of 90 casts, nRGxQ1b8LdMvzC4D pull 6), which can't tell waste
-//   from pooling. Not judged.
+//   from pooling. Not judged. (WoWAnalyzer rates Thatapaddlin 7.0% and the
+//   99th-percentile Holyvi 3.7% wasted, both "perfect".)
+// - Checked against WoWAnalyzer on qpZx3mWaG7gcDdYB pull 3 (Thatapaddlin;
+//   reference VWMbYPRyxCAmhZFj fight 9's Holyvi, 99th percentile;
+//   2026-10-13): no new check. Sentinel 98%, Divine Toll 91%, defensives
+//   and priority accuracy (81% vs 85%) close. Ability uptime 73.0% vs
+//   83.4%: the app's small delays (19.3s) and gaps, 6.7k/s vs 3.1k/s est.
+//   loss. Its 20.9s "gap" at 4:56–5:17 had a cast every second (melee
+//   range on the slime). One combat potion of two (0.90M).
 //
 // ── Brewmaster Monk, Vengeance Demon Hunter (unverified) ───────────────
 // Tracked cooldowns only (tracked-cooldowns.ts). Brewmaster's energy is at

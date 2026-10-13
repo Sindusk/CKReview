@@ -16,7 +16,8 @@
 
 const path = require('path');
 const { loadPull } = require(path.join(process.cwd(), 'scripts/lib/load-sample-pull'));
-const clock = (t) => { const s = t / 1000; return `${Math.floor(s / 60)}:${(s % 60).toFixed(2).padStart(5, '0')}`; };
+// Rounded to the centisecond first: 299.995s printed as "4:60.00".
+const clock = (t) => { const s = Math.round(t / 10) / 100; return `${Math.floor(s / 60)}:${(s % 60).toFixed(2).padStart(5, '0')}`; };
 const toMs = (x) => { const [m, s] = x.split(':'); return (+m * 60 + +s) * 1000; };
 
 (async () => {
