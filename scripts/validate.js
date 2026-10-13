@@ -1286,9 +1286,9 @@ function checkRulings(rulings, code, mechsRun, entries) {
 // Snapshots (and rulings) for reports whose sampledata folder has been
 // deleted are unverifiable — detection can't re-run against them, so they
 // can never fail again. --check/--update warn about them; --prune removes
-// orphaned snapshots (rulings are hand-curated, so orphaned ones are only
-// LISTED for hand-removal — their lesson may still need distilling into a
-// module comment first).
+// orphaned snapshots. Rulings are never removed: an orphaned one is kept
+// and skipped, and counted in one line (it applies again if the log is
+// fetched back).
 function findOrphanSnapshots() {
   if (!fs.existsSync(EXPECTATIONS_DIR)) return [];
   const orphans = [];
@@ -1324,9 +1324,13 @@ function reportOrphans({ prune }) {
       console.log(`ORPHANED SNAPSHOT expectations/${o.name} — sampledata/${o.game}/${o.code}/ is gone; run --prune to remove`);
     }
   }
-  for (const r of orphanRulings) {
-    console.log(`ORPHANED RULING for report ${r.report} (${r.note ?? 'no note'}) — sampledata deleted; ` +
-      'hand-remove it from expectations/rulings.json once its lesson is encoded in the module/README');
+  // Rulings for deleted reports stay in rulings.json on purpose (user,
+  // 2026-10-13): they apply again if the log is fetched back. One line,
+  // not one per ruling.
+  if (orphanRulings.length) {
+    const reports = new Set(orphanRulings.map((r) => r.report));
+    console.log(`${orphanRulings.length} ruling(s) for ${reports.size} report(s) not on disk are kept and skipped ` +
+      '(they apply again if the report is fetched back).');
   }
 }
 
