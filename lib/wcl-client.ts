@@ -226,6 +226,10 @@ export type WCLCombatantInfoEvent = {
   type:      "combatantinfo";
   sourceID:  number;
   specID:    number;
+  // Haste rating at the pull (all three are equal in every sample).
+  hasteSpell?:  number;
+  hasteMelee?:  number;
+  hasteRanged?: number;
 };
 
 export type WCLCastEvent = {

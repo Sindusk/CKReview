@@ -22,10 +22,14 @@
 //   all of them would be ~8.6MB per long pull).
 
 import { WOW_SPELL_DATA } from "./spell-data";
+import { WOW_HASTE_STATUS_IDS } from "./haste-statuses";
 
-export const WOW_PLAYER_BUFF_IDS: number[] = [...new Set(
-  Object.values(WOW_SPELL_DATA).flatMap((s) => s.statuses.filter((st) => st.kind !== "gear").map((st) => st.id)),
-)].sort((a, b) => a - b);
+// Plus the measured haste statuses (haste.ts), gear procs included: the
+// GCD model needs their windows.
+export const WOW_PLAYER_BUFF_IDS: number[] = [...new Set([
+  ...Object.values(WOW_SPELL_DATA).flatMap((s) => s.statuses.filter((st) => st.kind !== "gear").map((st) => st.id)),
+  ...WOW_HASTE_STATUS_IDS,
+])].sort((a, b) => a - b);
 
 export const WOW_ENEMY_DEBUFF_IDS: number[] = [...new Set(
   Object.values(WOW_SPELL_DATA).flatMap((s) => s.enemyDebuffs.map((d) => d.id)),

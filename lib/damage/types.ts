@@ -10,6 +10,7 @@
 import type { Pull } from "@/types/Pull";
 import type { PlayerEvent, PlayerInfo } from "@/types/PlayerInfo";
 import type { PlayerCheckContext } from "./checks";
+import type { GcdUse } from "./timeline";
 
 // ── Game layer ─────────────────────────────────────────────────────────
 
@@ -94,6 +95,10 @@ export type DamageGame = {
   // The speed-up assumed in a haste window with too few GCDs to measure
   // (default 1.3, Bloodlust). FFXIV: 1, assume none.
   hasteFallback?: number;
+  // Per-player GCD speed over time, fitted on the pull (WoW: haste procs
+  // and gear, lib/damage/wow/haste.ts). A player it returns replaces the
+  // speedProfile's two levels; players it skips keep them.
+  speedModels?(pull: Pull, usesOf: Map<string, GcdUse[]>, endMs: number): Map<string, { factor: number; at(t: number): number }>;
   // Channelled GCDs: they log no end, so their lock runs to their last
   // tick before the next GCD (timeline.ts gcdUses).
   isChannel?(actionId: number): boolean;

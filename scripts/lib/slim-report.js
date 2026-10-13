@@ -55,7 +55,8 @@ function project(streams, projectors) {
 
 const WCL_PROJECTORS = {
   deaths:        (e) => omit(e, ['fight']),
-  combatantInfo: (e) => pick(e, ['timestamp', 'type', 'sourceID', 'specID']),
+  // Haste rating: the damage analysis's WoW speed model (lib/damage/wow/haste.ts).
+  combatantInfo: (e) => pick(e, ['timestamp', 'type', 'sourceID', 'specID', 'hasteSpell', 'hasteMelee', 'hasteRanged']),
   // Damage analysis (docs/archive/damage-analysis-plan.md, "WoW port"): `fake`,
   // `empowermentLevel` and the caster's `classResources` on casts; on
   // damage done, the aura snapshot (cut to the tracked ids, see

@@ -12,8 +12,10 @@
 // - 1.0s, not hasted, for every Rogue, Feral, Brewmaster and Windwalker
 //   (FIXED_GCD_SPECS; the survey measured exactly 1000ms for all six)
 // - 1.5s, hasted, for everyone else (the survey's modes: 940–1380ms)
-// The engine measures each player's actual speed (timeline.ts
-// speedProfile), separately inside and outside haste windows.
+// The engine measures each player's actual speed: haste.ts fits the GCD
+// through the pull from casts and instants (lust, Power Infusion, haste
+// procs and gear); timeline.ts speedProfile (one GCD inside lust / Power
+// Infusion, one outside) is the fallback for players it can't fit.
 //
 // ── Engine hooks WoW needs (lib/damage/types.ts, optional fields) ──────
 // - jobOf: findings, spec checks and cooldowns key on "<spec> <class>"; the
@@ -53,6 +55,7 @@ import { SPEC_DATA } from "../../spec-data";
 import { WOW_SPELL_DATA } from "./spell-data";
 import { WOW_TRACKED_COOLDOWNS } from "./tracked-cooldowns";
 import { WOW_SPEC_CHECKS } from "./specs";
+import { WOW_HASTE_STATUS_IDS, wowSpeedModels } from "./haste";
 import type { DamageGame, GameAction, PartyBuff } from "../types";
 
 // Rogue (Assassination, Outlaw, Subtlety), Feral, Brewmaster, Windwalker.
@@ -141,6 +144,8 @@ export const WOW_DAMAGE: DamageGame = {
   jobOf: wowJobOf,
   speed: { minIntervalShare: 0.45, minFactor: 0.5 },
   hasteStatusIds: new Set([...LUST_IDS, POWER_INFUSION]),
+  // Haste procs and gear (haste.ts): the GCD follows them through the pull.
+  speedModels: (pull, usesOf, endMs) => wowSpeedModels(pull, usesOf, endMs, [...LUST_IDS, POWER_INFUSION, ...WOW_HASTE_STATUS_IDS]),
   isChannel: (id) => CHANNEL_IDS.has(id),
   // DoT ticks share their spell's id (Agony 980, Shadow Word: Pain 589), so
   // an on-GCD action's ticks count too.

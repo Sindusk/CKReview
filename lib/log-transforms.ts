@@ -592,6 +592,7 @@ function wclBuildPlayers(
         role:       spec.role,
         rangeType:  spec.rangeType,
         game:       "wow",
+        hasteRating: ci.hasteSpell ?? ci.hasteMelee ?? ci.hasteRanged,
 
         damageDone: damageDoneEvents
           .filter(e => e.sourceID === actorId || petName(e.sourceID) !== undefined)

@@ -87,9 +87,11 @@ export function analyzePullDamage(pull: Pull, game: DamageGame, context?: Damage
   const ledger = buildBuffLedger(pull, game, endMs);
   const patch = game.patchOf?.(pull);
   const players: PlayerDamageSummary[] = [];
+  const usesOf = new Map(pull.players.map((p) => [p.name, gcdUses(p, game)]));
+  const speedModels = game.speedModels?.(pull, usesOf, endMs);
   for (const player of pull.players) {
     const dead = deadWindows(player, pull, endMs);
-    const uses = gcdUses(player, game);
+    const uses = usesOf.get(player.name)!;
     const forced: ForcedWindow[] = [
       ...downtime,
       ...dead.map((w) => ({ ...w, cause: "dead" })),
@@ -98,7 +100,9 @@ export function analyzePullDamage(pull: Pull, game: DamageGame, context?: Damage
       ...contextForced.filter((w) => !w.players || w.players.includes(player.name)),
       ...phaseForced,
     ];
-    const speed = speedProfile(uses, game, statusWindows(player, game.hasteStatusIds, endMs));
+    const profile = speedProfile(uses, game, statusWindows(player, game.hasteStatusIds, endMs));
+    const model = speedModels?.get(player.name);
+    const speed = model ? { ...profile, factor: model.factor, at: model.at } : profile;
     const factor = speed.factor;
     const job = game.jobOf?.(player) ?? player.className;
     const buffWindows = raidBuffWindows(player, pull, game, endMs);

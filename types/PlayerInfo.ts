@@ -197,6 +197,12 @@ export type PlayerInfo = {
   // recorded it (FFLCombatantInfoEvent). Crit luck uses them instead of
   // estimated rates (lib/damage/crit-rates.ts).
   stats?: { criticalHit: number; directHit: number; determination?: number };
+
+  // WoW only: haste rating at the pull (WCL combatantinfo hasteSpell, the
+  // same as hasteMelee/hasteRanged on every sample). The damage analysis
+  // calibrates rating → haste on the pull itself (lib/damage/wow/haste.ts).
+  // Undefined on samples fetched before 2026-10-13.
+  hasteRating?: number;
 };
 
 export type ShieldAbsorb = {
