@@ -88,6 +88,18 @@
 // 61, 64; rulings in expectations/rulings.json. It set the Provoke blame,
 // the opener-MT aggro check, cone spots, "dead going into", Sinblaze's
 // nearest helper and the 20s Damage Down reset window below.
+// VOD review 2026-10-12 round 2 (user): report A pulls 1, 7, 15, 29, 41;
+// rulings in expectations/rulings.json. It set Bow Shock's pointing helper,
+// the behind bait in tethers 3/4, mitigation deaths in a clean Fall of Faith
+// and the Fated Burn Mark holder who died (A13: Laura, not Yoro).
+// - Lightning Fall of Faith: each helper's cone points from the carrier
+//   through them. A7 +1:47: Jamie 1.2y from the carrier, 43 degrees off the
+//   line to the other group, whose four took Bow Shock. In every other
+//   3+-extras lightning resolution (A, B, C) no own-group helper was within
+//   60 degrees; clean ones go down to 44 (so the angle alone isn't an error).
+// - Single-hit deaths in clean Fall of Faith resolutions are low HP going in
+//   (A15, A34, A55: 30-80k HP left after the previous tether, no
+//   mitigation on the hits).
 // Cutoffs (first Raid error): player dead going into a mechanic 62, called
 // wipe 41, collapse 40, Fated Burn Mark 22, enrage 11, tower 3; the 18 P1
 // clears have none.
@@ -112,18 +124,22 @@
 //   or one on a non-tank with all eight alive (that player and the other
 //   tank).
 // ffxiv-fb-fated-burn-mark (Raid): a Fated Burn Mark explosion hitting 3+
-//   others; the holder's death is flagged by what killed them.
+//   others; the holder (the one who died before it) is flagged by what
+//   killed them.
 // ffxiv-fb-tether-stack (all eight alive): both stacks overlapping (the two
 //   tethered players), a player in both, a player in neither when a stack
 //   was short, else a player-less Minor for an uneven split.
 // ffxiv-fb-fall-of-faith: each resolution's group is read from the other
 //   resolution on its side when that was clean, else as everyone outside a
 //   clean resolution of the other side; with the group alive: a double hit
-//   (in lightning, not the next same-side carrier by Prey order when others
-//   doubled too: they stand behind the carrier),
+//   (in lightning, not this side's other carrier by Prey order, next in
+//   tethers 1/2 and previous in 3/4, when others doubled too: they stand
+//   behind the carrier),
 //   fire reaching the other group (the helper nearest the carrier alone),
-//   lightning reaching it (3+: the carrier, by Floating Fetters, else those
-//   players), a short Sinblaze's missing members (player-less if unknown).
+//   lightning reaching it (3+: the own-group helper within 60 degrees of the
+//   direction to them, else the carrier by Floating Fetters; fewer: those
+//   players), a short Sinblaze's missing members (player-less if unknown),
+//   and a death in a clean resolution (Major, their mitigation).
 // ffxiv-fb-tower (Raid + Major): a short tower; with the six non-tanks
 //   alive, a non-tank in no tower, else the extras in an overfilled one.
 //   Skipped with 3+ non-tanks dead.
@@ -478,6 +494,9 @@ const FETTERS_BEFORE_MS  = [2500, 5500];
 // This many players from the other group in one Fall of Faith resolution:
 // the carrier brought the tether to the wrong group.
 const FALL_WRONG_SIDE    = 3;
+// Bow Shock is a 120-degree cone: a helper this close to the direction of
+// the other group aims it at them (boltPointer).
+const BOW_HALF_CONE      = 60;
 // This many non-tanks dead before the towers: no tower error (A10, A34).
 const TOWER_OVER_DEAD    = 3;
 // A no-killing-blow death with a damage hit this soon before its event died
@@ -782,7 +801,10 @@ function detectFatedBurnMark(players: PlayerInfo[], life: Life, deaths: DeathEve
   const errors: PullError[] = [];
   for (const res of clusterByGap(hitsOf(players, life, FATED_EXPLOSION, end), (h) => h.e.timestamp, 1000)) {
     const t = res[0].e.timestamp;
-    const holder = players.find((p) => p.debuffs.some((e) => e.abilityId === FATED_BURN_MARK && e.debuffStatus === "removed" && e.timestamp <= t + 200 && e.timestamp >= t - 1500));
+    // Both holders' marks end at the stacks; the one that exploded is the
+    // holder who died (A13 +1:20: Laura's ended at her death, Yoro survived).
+    const holders = players.filter((p) => p.debuffs.some((e) => e.abilityId === FATED_BURN_MARK && e.debuffStatus === "removed" && e.timestamp <= t + 200 && e.timestamp >= t - 1500));
+    const holder = holders.find((p) => deaths.some((x) => x.player === p.name && x.timestamp - DEATH_EVENT_LAG_MS <= t && t - (x.timestamp - DEATH_EVENT_LAG_MS) <= 2500)) ?? holders[0];
     const hit = uniq(res.map((h) => h.p)).filter((p) => p !== holder);
     if (hit.length < FATED_RAID_HITS) continue;
     const d = holder ? deaths.find((x) => x.player === holder.name && Math.abs(x.timestamp - DEATH_EVENT_LAG_MS - t) <= 2500) : undefined;
@@ -875,8 +897,10 @@ function detectTetherStacks(players: PlayerInfo[], life: Life, end: number): Pul
  *   and A61 +1:55: they stood 17-33 units from the carrier, the cone went
  *   across the arena; also A40 68, A42 38. Clean nearest helpers 90+);
  * - lightning with players of the other group in it (FALL_WRONG_SIDE+ of
- *   them: the carrier is named, else those players);
- * - a short Sinblaze: the missing members of that group.
+ *   them: the helper whose cone pointed at them, else the carrier; fewer:
+ *   those players);
+ * - a short Sinblaze: the missing members of that group;
+ * - a death in a clean resolution: their mitigation (user, A15).
  */
 function detectFallOfFaith(players: PlayerInfo[], life: Life, end: number): PullError[] {
   const errors: PullError[] = [];
@@ -911,15 +935,33 @@ function detectFallOfFaith(players: PlayerInfo[], life: Life, end: number): Pull
     // carrier, so in a misread lightning tether (stacked as for fire) they
     // were in their spot; the others weren't (user, 2026-10-12, A46 +1:47:
     // the H1, tether 3's carrier, correct).
-    const nextCarrier = preyOrder[k + 2];
+    // In tethers 3 and 4 it is the previous carrier of this side (user, A29
+    // +1:55: Apollo, tether 2's carrier, correctly behind; Laura moved behind
+    // instead of to the side).
+    const sideCarrier = preyOrder[k + 2] ?? preyOrder[k - 2];
     const doubledHere = [...per].filter(([, es]) => es.length > 1).map(([p]) => p);
-    const behind = !fire && nextCarrier && doubledHere.includes(nextCarrier) && doubledHere.length > 1 ? nextCarrier : undefined;
+    const behind = !fire && sideCarrier && doubledHere.includes(sideCarrier) && doubledHere.length > 1 ? sideCarrier : undefined;
     for (const [p, es] of per) {
       if (es.length < 2 || p === behind) continue;
       errors.push(playerError(p, { ...base, name: "Fall of Faith Double Hit",
         description: `Took ${es.length} hits from Fall of Faith ${nth} (${kFmt(es.reduce((s, e) => s + realAmount(e), 0))}).${outcome} ${fire
           ? "Sinblaze is one fire cone shared by the carrier's group of four."
-          : `This tether was lightning: the three helpers spread for their own Bow Shock cones (two to the sides, one behind${behind ? `: ${behind.name}, the next carrier, was correctly behind` : ""}). Stacking as if it were fire puts several cones on each player.`}` }));
+          : `This tether was lightning: the three helpers spread for their own Bow Shock cones (two to the sides, one behind${behind ? `: ${behind.name}, this side's other carrier, was correctly behind` : ""}). Stacking as if it were fire puts several cones on each player.`}` }));
+    }
+    // A clean resolution that still killed: their mitigation, not the
+    // mechanic (user, 2026-10-12, A15 +1:53: Sin carried tether 3 at low HP).
+    if (clean(r) && !mom.length && (!group || [...per.keys()].every((p) => group.has(p)))) {
+      // Still under an earlier tether's Mark of Mortality: fallout of that
+      // short Sinblaze (A17 +1:52.8).
+      const marked = (p: PlayerInfo) => {
+        const on = p.debuffs.filter((e) => e.abilityId === MARK_OF_MORTALITY && e.debuffStatus === "applied" && e.timestamp < t - 1500).pop();
+        return !!on && !p.debuffs.some((e) => e.abilityId === MARK_OF_MORTALITY && e.debuffStatus === "removed" && e.timestamp > on.timestamp && e.timestamp < t - 200);
+      };
+      for (const p of killed.filter((x) => !marked(x))) {
+        const e = per.get(p)![0];
+        errors.push(playerError(p, { ...base, severity: "Major", name: "Died to Fall of Faith",
+          description: `Died to ${e.abilityName} from Fall of Faith ${nth} (${kFmt(realAmount(e))}), though it resolved correctly (four players, one hit each). Not a mechanic failure: it needed mitigation or a heal first.` }));
+      }
     }
     // Fire into the other group: the helper nearest the carrier aimed it.
     const carrierHit = carrier && per.get(carrier)?.[0];
@@ -935,7 +977,11 @@ function detectFallOfFaith(players: PlayerInfo[], life: Life, end: number): Pull
     }
     if (group) {
       const extras = [...per.keys()].filter((p) => !group.has(p));
-      if (extras.length >= FALL_WRONG_SIDE && carrier) {
+      const pointer = !fire && extras.length >= FALL_WRONG_SIDE && carrierHit ? boltPointer(carrierHit, per, group, extras) : undefined;
+      if (pointer) {
+        errors.push(playerError(pointer.p, { ...base, severity: "Major", name: "Pointed Bow Shock at the Other Group",
+          description: `Stood ~${yd(pointer.dist)} yalms from ${carrier!.name}, the lightning carrier of ${nth}, on the other group's side (${Math.round(pointer.off)} degrees off the line to them), so their Bow Shock cone hit ${extras.length} players of the other group (${namesOf(extras)}).${outcome} Each helper's cone points from the carrier through them: bait to the sides and behind, away from the other group.` }));
+      } else if (extras.length >= FALL_WRONG_SIDE && carrier) {
         errors.push(playerError(carrier, { ...base, name: "Fall of Faith Tether to the Wrong Group",
           description: `${label} from ${nth}, ${carrier.name}'s, hit ${extras.length} players of the other group (${namesOf(extras)}).${outcome} Tethers 1 and 3 resolve in one group, 2 and 4 in the other; the carrier stands inside their own group so the hit points at their own helpers.` }));
       } else {
@@ -961,7 +1007,25 @@ function detectFallOfFaith(players: PlayerInfo[], life: Life, end: number): Pull
   return errors;
 }
 
-// ── Burnt Strike towers (~+2:26) ────────────────────────────────────────────
+/**
+ * The lightning helper whose Bow Shock cone (120 degrees, from the carrier
+ * through the helper) points at the other group: within BOW_HALF_CONE of
+ * the direction from the carrier to the hit players of the other group.
+ * A7 +1:47 (user: Jamie): 43 degrees; every other 3+-extras lightning
+ * resolution in A, B and C had no own-group helper within 60.
+ */
+function boltPointer(c: PlayerEvent, per: Map<PlayerInfo, PlayerEvent[]>, group: Set<PlayerInfo>, extras: PlayerInfo[]) {
+  const dir = (e: PlayerEvent) => Math.atan2(e.y! - c.y!, e.x! - c.x!) * 180 / Math.PI;
+  const placed = extras.map((p) => per.get(p)![0]).filter((e) => e.x !== undefined && e.y !== undefined);
+  if (!placed.length || c.y === undefined) return undefined;
+  const cx = placed.reduce((s, e) => s + e.x!, 0) / placed.length, cy = placed.reduce((s, e) => s + e.y!, 0) / placed.length;
+  const toward = Math.atan2(cy - c.y, cx - c.x!) * 180 / Math.PI;
+  return [...per].filter(([p, es]) => group.has(p) && es[0].x !== undefined && es[0].y !== undefined && (es[0].x !== c.x || es[0].y !== c.y))
+    .map(([p, es]) => ({ p, off: angleApart(dir(es[0]), toward), dist: Math.hypot(es[0].x! - c.x!, es[0].y! - c.y!) }))
+    .filter((h) => h.off <= BOW_HALF_CONE).sort((a, b) => a.off - b.off)[0];
+}
+
+// ── Burnt Strike towers (~+2:26)────────────────────────────────────────────
 
 /**
  * Three towers on one side (N, middle, S) needing 1-4 soakers each, six in

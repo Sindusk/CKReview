@@ -155,6 +155,14 @@ philosophy and the data semantics this list assumes.
   ruling).
 - **A partner resolution names a group.** A clean tether on one side
   tells who belonged in the failed one (Fatebreaker's Fall of Faith).
+- **A cone baited through a helper blames the helper it aimed through,**
+  not the carrier: compare each helper's direction from the source with
+  the direction to the wrongly hit players (Fatebreaker's Sinblaze and Bow
+  Shock, user rulings). The angle alone isn't an error; clean baits came
+  within 44 degrees.
+- **Two marked players both lose the mark at once:** the one whose death
+  came first set it off. A later death is the explosion's own victim
+  (Fatebreaker's Fated Burn Mark).
 - **Process of elimination beats geometry.** With N interchangeable
   candidates and N-1 accounted for, the last one is decisive (Fatebreaker
   towers; Lindwurm's Metamitosis free players).
