@@ -74,6 +74,7 @@ const KIND_LABEL: Record<DamageFinding["kind"], string> = {
   "dot-clip":         "DoT clipping",
   "tincture":         "Tincture",
   "pet-cut":          "Pet cut short",
+  "missed-followup":  "Missed follow-up",
 };
 
 const gameOf = (p: Pull) => (p.game === "wow" ? WOW_DAMAGE : FFXIV_DAMAGE);

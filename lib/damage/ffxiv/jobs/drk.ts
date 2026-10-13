@@ -36,13 +36,25 @@
 // downtime, so they're forced. Not built: MP overcap (one Edge of Shadow).
 // Tinctures are every job's (tincture.ts).
 //
+// Checked against xivanalysis on qjCMx4bRfgNKwX9T Dancing Mad kill (7.5,
+// 2026-10-13). Matched: GCD uptime, cooldowns, Darkside, Delirium, Esteem,
+// the death. Built: Salt and Darkness (one unused, 7:36). Not adopted:
+// - "7 recommended actions missed in tinctures": its 13:01 tincture is in
+//   the one-minute burst (no Living Shadow, so no Disesteem, one
+//   Shadowbringer). Four tinctures need the third one before 13:59, so
+//   that was the price of a fourth; tincture.ts finds no better placement.
+//   Its 18:01 window is short a Bloodspiller and two Edges because the
+//   17:20 death emptied Blood and MP (the death and Weakness are counted).
+// - "4 incorrect weaves": triple weaves at 6:01, 6:14, 15:24, 18:07 that
+//   delayed the next GCD by 0.03-0.10s each, ~0.3s in all.
+//
 //   Copyright (c) 2018 Saxon Landers & contributors
 //   MIT License; full text in THIRD_PARTY_NOTICES.md.
 
 import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import type { DamageFinding, JobCheck } from "../../types";
 import { finding } from "../../checks";
-import { inWindows, mergeWindows, type Window } from "../../timeline";
+import { forcedPart, inWindows, mergeWindows, overlapMs, type Window } from "../../timeline";
 import { aoeComboOnOneTarget, burstWindowFindings, castHits, gaugeFindings, k, statusWindows, uptimeFindings, type GaugeEvent } from "./shared";
 import { comboLanded } from "./gnb";
 
@@ -192,9 +204,56 @@ const livingShadow: JobCheck = (ctx) => {
   return out;
 };
 
+// Salt and Darkness (xivanalysis SaltAndDarkness.tsx): one per Salted
+// Earth. Its 20s recast is always back within Salted Earth's 90s, so a
+// Salted Earth with no Salt and Darkness inside it lost one, valued at
+// the player's own average (its hits log under 25756, its casts under
+// 25755; a damage id logged as a cast within 50ms is the same press).
+// Only a Salted Earth that ran its full 15s counts: players press Salt
+// and Darkness 6-8s in (qjCMx4bRfgNKwX9T kill), and on FRU wipes
+// (FbxL2QZhG7df3Ry4) the status dropped after 0.2-4s at P1's boss jumps,
+// which the context doesn't mark forced. A pull that ended inside it isn't
+// this check's either. Forced when the whole patch was forced time or
+// death. Uses that hit nothing are noDamageCasts' (shared.ts).
+// Checked against xivanalysis on qjCMx4bRfgNKwX9T (7.5): its one unused
+// Salt and Darkness is the 7:36 Salted Earth, both bosses targetable.
+const SALT_PRESS_MS = 50;
+const SALT_MIN_FREE_MS = 1_000;
+const SALTED_EARTH_FULL_MS = 14_000;
+
+const saltAndDarkness: JobCheck = (ctx) => {
+  const castIds = new Set([id("SALT_AND_DARKNESS"), id("SALT_AND_DARKNESS_DAMAGE")]);
+  const presses = ctx.player.casts.filter((c) => castIds.has(c.abilityId)).map((c) => c.timestamp).sort((a, b) => a - b)
+    .filter((t, i, all) => i === 0 || t - all[i - 1] > SALT_PRESS_MS);
+  const dealt = ctx.player.damageDone.filter((e) => e.abilityId === id("SALT_AND_DARKNESS_DAMAGE") && e.timestamp < ctx.endMs)
+    .reduce((a, e) => a + (e.amount ?? 0), 0);
+  const used = presses.filter((t) => t < ctx.endMs).length;
+  if (used === 0 || dealt === 0) return [];
+  const avg = dealt / used;
+  const out: DamageFinding[] = [];
+  for (const w of statusWindows(ctx, S.SALTED_EARTH.id)) {
+    const end = w.endMs;
+    const span = end - w.startMs;
+    if (end > ctx.endMs || span < SALTED_EARTH_FULL_MS) continue;
+    if (presses.some((t) => t >= w.startMs - 1_000 && t < w.endMs + 100)) continue;
+    const blocked = forcedPart(w.startMs, end, ctx.forced);
+    const dead = overlapMs(w.startMs, end, ctx.dead);
+    const forced = span - blocked.ms - dead < SALT_MIN_FREE_MS;
+    out.push(finding(ctx, {
+      kind: "missed-followup", startMs: w.startMs, endMs: end, forced,
+      cause: forced ? blocked.cause ?? "dead" : undefined,
+      label: "Salt and Darkness not used",
+      lostDamage: avg,
+      basis: `${k(avg)} average Salt and Darkness (${used} used); its 20s recast is always back inside Salted Earth`,
+      detail: `Salted Earth at ${clock(w.startMs)} ended without a Salt and Darkness`,
+    }));
+  }
+  return out;
+};
+
 const clock = (ms: number) => {
   const t = Math.max(0, Math.round(ms / 1000));
   return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
 };
 
-export const DRK_CHECKS: JobCheck[] = [delirium, darkside, blood, aoeCombo, livingShadow];
+export const DRK_CHECKS: JobCheck[] = [delirium, darkside, blood, aoeCombo, livingShadow, saltAndDarkness];

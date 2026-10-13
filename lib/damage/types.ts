@@ -195,7 +195,8 @@ export type FindingKind =
   | "dot-uptime"        // the player's DoT off the boss
   | "dot-clip"          // the player's DoT refreshed early
   | "tincture"          // tinctures placed where they covered less than they could, or one not used
-  | "pet-cut";          // a pet's set sequence cut short (Living Shadow)
+  | "pet-cut"           // a pet's set sequence cut short (Living Shadow)
+  | "missed-followup";  // an action unlocked by another never pressed (Salt and Darkness)
 
 export type DamageFinding = {
   player:     string;
