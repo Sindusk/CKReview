@@ -31,7 +31,7 @@ for this kill, so top players' logs stand in for it.
 | Bragontix | Devastation Evoker | **Done** (against Gilgvoker) |
 | Sylmigron | Balance Druid | not started |
 | Cocroach | Elemental Shaman | not started |
-| Mythnarra | Havoc Demon Hunter | not started |
+| Mythnarra | Havoc Demon Hunter | **Done** (against Hawkerton) |
 | Neximage | Arcane Mage | not started |
 | Deathstriker | Beast Mastery Hunter | not started |
 | Veinglas | Blood Death Knight | not started (haste fit: 0.90s base, unexplained) |
@@ -101,6 +101,18 @@ for this kill, so top players' logs stand in for it.
   (lenient; docs/dps-analysis.md). Trueshot: no lost use (WoWAnalyzer's
   88% overstated). New combat potion check: his second potion from 5:04,
   0.89M; it also flags several players on all three kills.
+- **GCD value fix (2026-10-13, found on Mythnarra):** hits logged under
+  another id than their cast didn't count toward a GCD's value, so most
+  players' gaps were underpriced; the numbers above predate it. Estimated
+  loss per second now, own vs references: Wyrmtongues 46.2k vs 21.2k,
+  Hervous 30.8k vs 15.7k (Cocomber 13.0k), Bragontix 20.6k vs 16.5k,
+  Shadowmeld 21.3k vs 8.2k, Mythnarra 28.2k vs 24.6k, Neximage 13.2k vs
+  7.7k. Pace findings: Hervous 3.46M, Wyrmtongues 3.23M, Sylmigron 2.99M.
+- **Mythnarra vs Hawkerton:** Eternal Hunt wasted 4 of 6 (Eye Beam pressed
+  just before The Hunt; the empowered one hits ~2×): new check, 0.58M.
+  Metamorphosis 79% overstated (Stasis; no fourth use possible). Fury cap
+  and small delays are a Havoc floor (Hawkerton shows them too). Pace
+  right for his haste; 47.8 vs 53.7 GCDs a minute.
 - Potion buffs added to the stream; all three kills refetched
   (2026-10-13) and baselines checked.
 
@@ -110,9 +122,8 @@ for this kill, so top players' logs stand in for it.
 
 ## Next
 
-The next player the user names. Mythnarra (Havoc) and Neximage (Arcane)
-have 100th-percentile references in 3Vz6Qt2RyTPXwpJn (Hawkerton, Màzz;
-the user is saving their WoWAnalyzer pages):
+The next player the user names. Neximage (Arcane) has a 100th-percentile
+reference in 3Vz6Qt2RyTPXwpJn (Màzz; page saved):
 `damage-compare-wow sampledata/wow/qpZx3mWaG7gcDdYB --refs=NK1hBtW9rckdjq36,3Vz6Qt2RyTPXwpJn`. For each: extract the page
 (`wowa-html.js --brief`), the app's findings (`--all-findings`), verify
 each claim, and compare against a top player of the spec (ask the user for

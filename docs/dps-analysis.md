@@ -322,6 +322,12 @@ docs/damage-case-studies/qpZx3mWaG7gcDdYB.md. What generalizes:
   player's DoTs and pets keep logging (3Vz6Qt2RyTPXwpJn's three unraised
   deaths read as 40M+ of idle). Reference medians leave out players who
   died in the window.
+- **A GCD's value must match hits by name too.** WoW logs many hits under
+  another id than their cast (Havoc's Chaos Strike, Annihilation, Eye
+  Beam). Matching by id alone priced Mythnarra's average GCD at 7k of a
+  real ~219k and undervalued most players' gaps (Blkphnx 26k of 221k,
+  Sylmigron 52k of 223k); every study number before 2026-10-13's fix was
+  low. Check: a player's average GCD must sit below damage ÷ GCDs.
 - **Combat potions** (lib/damage/wow/specs/potion.ts): one per 5 minutes,
   not shared with health potions. Light's Potential measured +20–40% on
   hits (same ability, target and other buffs, within 60s); Potion of

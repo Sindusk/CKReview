@@ -187,7 +187,11 @@ export const WOW_DAMAGE: DamageGame = {
   isAutoCast: bladestormAutoCasts,
   // DoT ticks share their spell's id (Agony 980, Shadow Word: Pain 589), so
   // an on-GCD action's ticks count too.
-  isGcdDamage: (e) => !e.pet && ACTIONS.get(e.abilityId)?.onGcd === true,
+  // Or a hit named like an on-GCD action the player cast: Havoc's Chaos
+  // Strike, Annihilation and Eye Beam hit under other ids than their casts,
+  // and by id alone Mythnarra's average GCD read 7k of a real ~219k
+  // (qpZx3mWaG7gcDdYB pull 3), pricing every gap at a thirtieth.
+  isGcdDamage: (e, gcdNames) => !e.pet && (ACTIONS.get(e.abilityId)?.onGcd === true || gcdNames.has(e.abilityName)),
   compareFromPullStart: true,
   compareRolesPerPlayer: true,
 };

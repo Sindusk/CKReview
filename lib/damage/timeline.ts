@@ -439,6 +439,7 @@ export function playerValues(
   const phaseDmg = new Map<number | undefined, number>();
   const perAbility = new Map<number, number>();
   let total = 0;
+  const gcdNames = new Set(player.casts.filter((c) => game.action(c.abilityId)?.onGcd).map((c) => c.abilityName));
   for (const e of hits) {
     const amt = e.amount ?? 0;
     total += amt;
@@ -446,7 +447,7 @@ export function playerValues(
     phaseDmg.set(ph, (phaseDmg.get(ph) ?? 0) + amt);
     perAbility.set(e.abilityId, (perAbility.get(e.abilityId) ?? 0) + amt);
     const gcdDamage = game.isGcdDamage
-      ? game.isGcdDamage(e)
+      ? game.isGcdDamage(e, gcdNames)
       : !e.pet && (game.isTickAbility(e.abilityId) || e.isDoT || game.action(e.abilityId)?.onGcd);
     if (gcdDamage) {
       for (const k of [key(ph, inWindows(e.timestamp, buffWindows)), key(ph, false) + "all", "all"]) {

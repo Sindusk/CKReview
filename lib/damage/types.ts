@@ -118,7 +118,9 @@ export type DamageGame = {
   // of a GCD gap). Default: on-GCD actions' hits plus every DoT tick.
   // WoW: only the player's own on-GCD abilities (hits and their DoT ticks);
   // procs, trinkets and pets keep going during a gap.
-  isGcdDamage?(e: PlayerEvent): boolean;
+  // `gcdNames`: names of the on-GCD actions this player cast, for hits
+  // logged under another id than their cast.
+  isGcdDamage?(e: PlayerEvent, gcdNames: Set<string>): boolean;
   // Reference-clear comparison (lib/damage/compare.ts): compare from the
   // pull start when the context names no deciding phase, and show role
   // rows as per-player averages (WoW raid comps vary; FFXIV's are 2/2/4).
