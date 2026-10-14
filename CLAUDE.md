@@ -88,6 +88,10 @@ These are standing preferences, each learned from a real correction:
   - Write rulings at the end, once detection has settled.
   - When the user's account and the log disagree, pin only the confirmed
     part and ask about the rest.
+  - **Never edit an existing ruling** (user, 2026-10-14), even when a
+    later call seems to contradict it. A ruling for a report not on disk
+    stays as written. Only when it's on disk and a change makes it fail,
+    report the failure and let the user decide whether to update it.
 - **Asking for VOD checks: one numbered list per loaded VOD** (user,
   2026-10-09). When the user has a VOD loaded, ask only about the pulls in
   that VOD. Number every question sequentially (1, 2, 3 …, no sub-letters)

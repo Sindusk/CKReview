@@ -130,6 +130,9 @@ other reports too, and read every new or removed error the change causes.
    - Leave unruled whatever the user couldn't settle.
    - Pin only the confirmed part of a disputed account, and ask about the
      rest.
+   - Add new rulings only; never edit an existing one (CLAUDE.md). An
+     on-disk ruling your change breaks is reported to the user, not
+     rewritten.
 3. Run `--check` again (rulings must pass), then
    `--update sampledata/<game>/<code>` for the reports whose diff you
    reviewed, then `npx tsc --noEmit`.
