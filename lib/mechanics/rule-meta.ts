@@ -362,6 +362,10 @@ exposure("targeted", ["ffxiv-dt-buster", "ffxiv-dt-cone", "ffxiv-dt-orb-stack"])
 // (necron.ts reports both tanks at every pair of cones).
 mechanic("ffxiv-necron-blue-swap", "Blue Shockwave swap", undefined, ["ffxiv-necron-blue-swap"]);
 exposure("targeted", ["ffxiv-necron-blue-swap"]);
+// Zelenia (Recollection Extreme): the tanks taking Specter of the Lost's
+// tethers (zelenia.ts reports both tanks at every pair of cones).
+mechanic("ffxiv-zelenia-specter", "Specter of the Lost tethers", undefined, ["ffxiv-zelenia-specter"]);
+exposure("targeted", ["ffxiv-zelenia-specter"]);
 // Futures Rewritten P1: the tanks' Powder Mark Trail swap and survival
 // (fatebreaker.ts reports both tanks at every Powder Mark).
 mechanic("ffxiv-fb-powder-swap", "Powder Mark swap", 1, ["ffxiv-fb-powder-swap"]);

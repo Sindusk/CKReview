@@ -72,6 +72,11 @@ lib/mechanics/
                                 cones/stacks/spreads and deadline, Arcane
                                 stacks, Plummet, Lightning Burst, Derail
                                 strandings, falls, mass deaths, enrage)
+      zelenia.ts              — Zelenia (Recollection EX) per-pull rules
+                                (avoidables, center Bleeding, Specter tethers,
+                                Spearpoint Push, Escelons' Fall repeats,
+                                Thunder III drops on roses, Magic Break, Bloom
+                                towers, stacks, mass deaths, enrage)
       necron.ts               — Necron (Necron's Embrace EX) per-pull rules
                                 (avoidables, Mori center, Fear of Death hands,
                                 Smite/Embrace/Grand Cross overlaps, empty

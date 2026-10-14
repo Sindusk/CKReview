@@ -1,9 +1,106 @@
 // lib/mechanics/ffxiv/trials/zelenia.ts
 //
+// -- VERIFIED AGAINST LOGS (2026-10-14) --
+// A = Y9Fh2BHyj3xAqZ6V: 8 pulls, kills A3 (9:42), A5 (8:22), A7 (8:55),
+//     A8 (8:37); wipes A1 A2 A4 A6.
+// B = wNHvD38WTbFtGJKr: 13 pulls, kills B6 (9:47), B10 (9:50), B11 (8:53),
+//     B13 (8:43); wipes B1-B5 B7-B9 B12.
+// Both the user's static's (same roster, a few job swaps); B is the
+// progression night. No VOD, nobody remembers the plan.
+//
+// Clock (A5; every pull within ~1s, the add phase included): Catharsis 0:11,
+// Shock 0:31/towers 0:33, Specter 0:46, EF1 1:06-1:16, Stock 1:26,
+// Barricade 1:35, add towers + Spearpoint 1:47/1:59/2:11/2:23, Quietus
+// 2:31 (hit 2:37); Bloom1 2:52, Thunder III drops 3:21, Catharsis 3:28;
+// Bloom2 3:38, Slash/Thunder IV 3:49-3:54, Specter 4:04; Bloom3 4:13,
+// Emblazon 4:36, towers 4:41, Catharsis 4:48; Banish II 5:17, EF2
+// 5:23-5:33, Stock 5:43; Bloom4 5:53, Emblazon + drops 6:08, Thorns 6:12,
+// Banish III 6:22; Catharsis 6:32, Power Break 6:57, EF3 7:01-7:11, Power
+// Break 7:12, Stock 7:21; Bloom5 7:33, Valorous 7:40, Slash/IV 7:51-7:56,
+// Specter 8:06; Bloom6 8:18, Emblazon 8:39, Holy 8:42-8:46, towers 8:46.
+// Kills end 8:22-9:50 (Bloom6 or the Bloom1 repeat); Rose Red, failed
+// Quietus (43192/43214) and Magic Break's outer variant 43197 never seen.
+//
+// IDs (the model's BM candidates held):
+// - NO DAMAGE DOWN. Avoidables give Vulnerability Up 1001789. Its causes:
+//   Thunder II 43064/43199, Unmitigated Explosion 43069/43202, Shock 43178,
+//   Power Break 43184/43185, Spearpoint Push 43187/43188, Queen's Crusade
+//   43194, Valorous lines 43210, Thunder Slash 43216, Holy Hazard 43234,
+//   Thunder III ground 43238, Thunder IV 43450/43451.
+// - Shock: circles 43171 (each pulse its own instance, cast-targeted at
+//   whoever it hits), puddle pulses 43172 (circle holders take 0-2 in every
+//   kill: not an error), donut holders soak the 43226 towers. 43173-43176,
+//   43178, 43179 are taken by nobody clean (B1 +0:33, B13 +0:31 died).
+// - Light Resistance Down 1004164 <- Shock 43171 / Explosion 43201; Slashing
+//   Resistance Down 1003130 <- Escelons' Fall 43183; Lightning Resistance
+//   Down 1002998 <- Thunder III 43236; Magic Vulnerability Up 1003414 <-
+//   Emblazon 43040 (the four rose-marked players).
+// - Specter 43168 cast-targeted at each cone's taker. Explosion 43226/43201
+//   cast-targeted at each tower's soaker; add towers 43068 (3 soakers each).
+// - Center Bleeding: 1004137 on contact, 1004138 DoT (15s) after ~0.3s.
+// - Encircling Thorns 43204 hits the unbroken vine pair (Thorny Vine 445).
+//
+// Findings:
+// - Escelons' Fall: every clean volley hit four, alternating sets. Failures
+//   are a player in two volleys in a row or two cones at once, nearly
+//   always lethal: A2 +5:26 (three supports), A4, A6, B3 +5:23 (four DPS
+//   doubled), B4, B6 (a kill), B9, A7/B10/B11 EF3 (kills).
+// - Bloom4 Thunder III: a drop touching the roses spreads to all four marked
+//   players (A3 +6:09 in a kill, A4 +6:08, B4 +6:13: four died each). The
+//   drop's owner is the one unmarked player it hit. B12 +6:08 began with a
+//   rose on a rose (Magic Break), then two drops on the roses.
+// - Bloom1 drops: overlaps of two unmarked players (B4 +3:26, B5 +3:21 both
+//   tanks). B3 and B6 deaths there were a dead player's moved drop and raw
+//   damage at low HP.
+// - Bloom3 / Bloom6 towers: one empty tower kills the marked four (B3, B9
+//   +4:41: the unmarked player with no tower is the only one left; B8
+//   +8:50). B7 +4:41: a silent death left a tower to a doubled soaker. B5
+//   +8:45: a marked player in a tower, then everything.
+// - Add phase: Spearpoint Push through the party ended A1, B1, B2 (1:47 /
+//   2:11); the add towers' Unmitigated Explosion followed as fallout.
+// - Specter: A3 +0:46 (kill) and B4 +0:46, a tank took no cone and a
+//   non-tank died to it.
+// - Power Break killed someone in A3, A5, A7, A8, B10, B11 (all kills).
+// - Holy Hazard: the static takes one Holy cleave each, and the tower group
+//   a second, in every kill (the BM/G8 mitigation plan). Not flagged.
+// - Stock Break deaths (A3 +7:25 four DPS, A6) are raw damage after earlier
+//   deaths: mitigation, not flagged.
+//
+// Cutoffs: A 2 mass deaths (A1 Spearpoint, A4 Thunder III), 1 called wipe
+// (A2), 1 collapse (A6); B 9 mass deaths (Spearpoint B1/B2, Bloom3 towers
+// B3/B7/B9, Thunder III B4/B12, Bloom6 towers B5/B8). No unexplained wipe.
+//
+// -- RULES IMPLEMENTED --
+// - ffxiv-zelenia-avoidable: the Vulnerability Up causes above except
+//   Holy Hazard, the Unmitigated Explosions and Spearpoint Push (own rules),
+//   plus the rare Shock pulses and Encircling Thorns. Minor; Major on death.
+// - ffxiv-zelenia-center: the center Bleeding; Major when it killed. The
+//   boss's tank takes it at Bloom1/Bloom3 in most pulls.
+// - ffxiv-zelenia-specter (targeted: tanks): a non-tank in a cone names the
+//   tank who took none; with both tanks in, the non-tank stood in it.
+// - ffxiv-zelenia-spearpoint: 3+ hit is player-less (tethers aren't in the
+//   log); 1-2 hit are named.
+// - ffxiv-zelenia-escelons: back-to-back or doubled cones, each player.
+// - ffxiv-zelenia-thunder-drop: a drop on the roses names its dropper; an
+//   overlap names both. ffxiv-zelenia-magic-break: the rose's dropper.
+// - ffxiv-zelenia-tower: a marked player in a Bloom3/6 tower, or two towers.
+//   ffxiv-zelenia-empty-tower: the unmarked player with no tower when 1-2
+//   are left, else player-less; add towers always player-less.
+// - ffxiv-zelenia-share: a living player missing Banish II/III or Stock Break.
+// - ffxiv-zelenia-fall: lone silent deaths, player-less.
+// - Raid: ffxiv-zelenia-quietus, -mass-deaths (4+ within 2.5s, over within
+//   75s), -enrage (Rose Red), -called-wipe, -collapse (5 dead, over in 45s).
+// Drops, towers and EF skip resolutions with a player dead (marks and sets
+// move). Exposure is everyone except specter.
+// Not built: Shock circle placement (the pulses' targets are their victims,
+// not owners), add-phase tower ownership and shade aim (no tethers in the
+// log), Banish III network splits (player-less geometry), Bloom6 Holy
+// (planned), rose placement beyond Magic Break, Withering/Rose Red.
+//
 // -- GUIDE-DERIVED MODEL: ZELENIA --
 // Recollection (Extreme), level 100, Dawntrail patch 7.2; Extreme only.
-// Research checked 2026-10-14. Comment-only; no Zelenia report analyzed,
-// no failures observed, no detector registered. LOG SIGNALS are predicted.
+// Research checked 2026-10-14, written before any report was analyzed;
+// its LOG SIGNALS are predictions. VERIFIED above wins disagreements.
 //
 // -- SOURCES AND PATCH SENSITIVITY --
 // [BM] awgil/BossMod's firsthand Ex4Zelenia data: Enums, States, Tiles,
@@ -307,3 +404,655 @@
 // 6. Establish actual clocks, pairs, Kurapon/quadrant drop map, EF2 full-
 //    uptime positions and Bloom6 mitigation plan before naming displaced
 //    players or treating intentional rose/cleave damage as mistakes.
+
+import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
+import type { DeathEvent } from "@/types/DeathEvent";
+import type { PullError, EnemyEvent } from "@/types/PullError";
+import type { ReportedOccurrence } from "@/lib/mechanics/occurrences";
+import { kFmt, joinNames, playerError, playerlessMinor, raidMarker, rezzedAt, clusterByGap, debuffIntervals, RAID_MARKER_SORT_OFFSET_MS } from "@/lib/mechanics/wow/common";
+
+export const ZL_AVOIDABLE_RULE_ID   = "ffxiv-zelenia-avoidable";
+export const ZL_CENTER_RULE_ID      = "ffxiv-zelenia-center";       // Queen's Crusade's center Bleeding
+export const ZL_SPECTER_RULE_ID     = "ffxiv-zelenia-specter";      // Specter of the Lost tank tethers
+export const ZL_PUSH_RULE_ID        = "ffxiv-zelenia-spearpoint";   // the shades' Spearpoint Push lines
+export const ZL_EF_RULE_ID          = "ffxiv-zelenia-escelons";     // Escelons' Fall back-to-back / doubled cones
+export const ZL_DROP_RULE_ID        = "ffxiv-zelenia-thunder-drop"; // Alexandrian Thunder III circles
+export const ZL_MAGIC_BREAK_RULE_ID = "ffxiv-zelenia-magic-break";  // Emblazon rose on an existing rose
+export const ZL_TOWER_RULE_ID       = "ffxiv-zelenia-tower";        // Bloom3/Bloom6 towers: marked soak, double soak
+export const ZL_EMPTY_TOWER_RULE_ID = "ffxiv-zelenia-empty-tower";  // Unmitigated Explosion
+export const ZL_SHARE_RULE_ID       = "ffxiv-zelenia-share";        // Banish II/III and Stock Break stacks
+export const ZL_FALL_RULE_ID        = "ffxiv-zelenia-fall";
+export const ZL_QUIETUS_RULE_ID     = "ffxiv-zelenia-quietus";      // adds alive at Perfumed Quietus
+export const ZL_MASS_DEATHS_RULE_ID = "ffxiv-zelenia-mass-deaths";
+export const ZL_ENRAGE_RULE_ID      = "ffxiv-zelenia-enrage";
+export const ZL_CALLED_WIPE_RULE_ID = "ffxiv-zelenia-called-wipe";
+export const ZL_COLLAPSE_RULE_ID    = "ffxiv-zelenia-collapse";
+
+// Thorned Catharsis, Shock, Specter of the Lost: every pull opens with them.
+const SIGNATURE        = [43166, 43169, 43167];
+const SPECTER          = 43168;
+const ESCELONS_FALL    = 43183;
+const THUNDER_DROP     = 43236;
+const MAGIC_BREAK      = [43196, 43197];
+const TOWER            = 43201;   // Bloom3 / Bloom6 Explosion, cast-targeted at each soaker
+const TOWER_EMPTY      = 43202;   // their Unmitigated Explosion
+const ADD_TOWER_EMPTY  = 43069;   // the add phase's Unmitigated Explosion
+const SPEARPOINT       = [43187, 43188];
+const BANISH_II        = 43218;
+const BANISH_III       = 43241;
+const STOCK_BREAK      = [43222, 43223, 43224, 43225];
+const QUIETUS_FAIL     = 43214;
+const ROSE_RED         = 43205;   // hard enrage
+const MAGIC_VULN       = 1003414; // Emblazon's mark
+const CENTER_BLEED     = 1004137;
+const CENTER_BLEED_DOT = 1004138;
+// Raid-wide damage: deaths to it are mitigation, never part of a mass-death cutoff.
+const RAIDWIDE = [43166, 43213, ...STOCK_BREAK, 43207, 43208, 43209];
+
+// Avoidable hits: every cause of Vulnerability Up 1001789 except Holy Hazard
+// (the static takes it on purpose, see RULES), plus the Shock pulses nobody
+// takes cleanly and Encircling Thorns. No Damage Down exists in this fight,
+// so a survived hit is Minor and a lethal one Major.
+type Avoidable = { name: string; why: string };
+const SHOCK_WHY = "Shock's circles leave pulsing puddles and its donuts pulse around their holders; drop your circle clear of the others, then stay out of every puddle and donut until the pulses end.";
+const THUNDER_II_WHY = "Alexandrian Thunder II's three cones rotate; follow the rotation behind them on safe floor.";
+const AVOIDABLE: Record<number, Avoidable> = {
+  43064: { name: "Alexandrian Thunder II", why: THUNDER_II_WHY },
+  43199: { name: "Alexandrian Thunder II", why: THUNDER_II_WHY },
+  43173: { name: "Shock", why: SHOCK_WHY },
+  43174: { name: "Shock", why: SHOCK_WHY },
+  43175: { name: "Shock", why: SHOCK_WHY },
+  43176: { name: "Shock", why: SHOCK_WHY },
+  43178: { name: "Shock", why: SHOCK_WHY },
+  43179: { name: "Shock", why: SHOCK_WHY },
+  43184: { name: "Power Break", why: "The shade's Power Break cleaves half the room; stand on the side its sword isn't raised over." },
+  43185: { name: "Power Break", why: "The shade's Power Break cleaves half the room; stand on the side its sword isn't raised over." },
+  43194: { name: "Queen's Crusade", why: "Queen's Crusade hits around Zelenia as each Bloom starts; stay off the center." },
+  43216: { name: "Thunder Slash", why: "Thunder Slash fires six cones in turn; read the first in/out and move behind each cone." },
+  43450: { name: "Alexandrian Thunder IV", why: "Alexandrian Thunder IV is a circle then a donut (or the reverse); change ring between them." },
+  43451: { name: "Alexandrian Thunder IV", why: "Alexandrian Thunder IV is a circle then a donut (or the reverse); change ring between them." },
+  43238: { name: "Alexandrian Thunder III", why: "Bloom4's ground Thunder III circles land where the rose players stood; move off them." },
+  43210: { name: "Valorous Ascension", why: "The Briar Thorns fire lines across the arena during Valorous Ascension; move around to the opposite safe side." },
+  43204: { name: "Encircling Thorns", why: "Encircling Thorns tethers a support and a DPS; run apart (~20y) right away to break the vine." },
+};
+
+// FFLogs logs the death event ~2.0s after the fatal hit (README).
+const DEATH_EVENT_LAG_MS = 2000;
+const DIED_FROM_HIT_MS   = 3000;
+const EPISODE_MS         = 3000;
+const RAISE_GRACE_MS     = 10_000;
+const TANK_ENMITY_LOST_MS = 30_000;
+// Escelons' Fall volleys run ~3.1s apart; a longer gap is the next sequence.
+const EF_VOLLEY_GAP_MS   = 4500;
+// Deaths to one moment's mechanics that end the pull: 4+ within 2.5s and the
+// pull over within 75s. B9's Bloom3 tower (4:44) ended 63s later; the kills
+// A3 (Thunder III, 6:11) and B11 (Power Break, 7:15) carried on 98-211s.
+const MASS_DEATHS        = 4;
+const MASS_WINDOW_MS     = 2500;
+const MASS_END_MS        = 75_000;
+const CALLED_WIPE_END_MS = 12_000;
+const CALLED_WIPE_COUNT  = 3;
+const CALLED_WIPE_WINDOW = 10_000;
+const CALLED_WIPE_PAIR_MS = 5_000;
+// 5 dead with the pull over within 45s. A3 (a kill) and B8 carried on
+// 156-198s with 5 dead; every wipe's 5-dead moment ended within 26s.
+const COLLAPSE_DEAD_COUNT = 5;
+const COLLAPSE_END_MS     = 45_000;
+
+// ── shared helpers ──────────────────────────────────────────────────────────
+
+type Hit = { p: PlayerInfo; e: PlayerEvent };
+
+type Life = {
+  alive: (p: PlayerInfo, t: number) => boolean;
+  hitAlive: (p: PlayerInfo, hitT: number) => boolean;
+  diedFrom: (p: PlayerInfo, hitT: number) => DeathEvent | undefined;
+  outIntervals: { p: PlayerInfo; start: number; end: number }[];
+};
+
+function buildLife(players: PlayerInfo[], deaths: DeathEvent[]): Life {
+  const outIntervals: Life["outIntervals"] = [];
+  for (const p of players) {
+    const own = deaths.filter((d) => d.player === p.name).sort((a, b) => a.timestamp - b.timestamp);
+    own.forEach((d, i) => {
+      const next = own[i + 1]?.timestamp ?? Infinity;
+      const end = rezzedAt(p, d.timestamp, next) ?? next - DEATH_EVENT_LAG_MS - 100;
+      outIntervals.push({ p, start: d.timestamp - DEATH_EVENT_LAG_MS - 100, end });
+    });
+  }
+  const alive = (p: PlayerInfo, t: number) => !outIntervals.some((w) => w.p === p && t >= w.start && t < w.end);
+  return {
+    outIntervals,
+    alive,
+    hitAlive: (p, hitT) => alive(p, hitT - 500),
+    diedFrom: (p, hitT) => deaths.find((d) => d.player === p.name && d.timestamp >= hitT && d.timestamp <= hitT + DIED_FROM_HIT_MS),
+  };
+}
+
+/** Hits on living players (a dead body still logs 0-damage hits). */
+function hitsOf(players: PlayerInfo[], life: Life, ids: number | number[]): Hit[] {
+  const set = new Set(Array.isArray(ids) ? ids : [ids]);
+  const out: Hit[] = [];
+  for (const p of players) {
+    for (const e of p.damageTaken) {
+      if (!set.has(e.abilityId) || e.healthBefore === 0) continue;
+      if (life.hitAlive(p, e.timestamp)) out.push({ p, e });
+    }
+  }
+  return out.sort((a, b) => a.e.timestamp - b.e.timestamp);
+}
+
+const castsOf = (casts: EnemyEvent[], ids: number | number[]) => {
+  const set = new Set(Array.isArray(ids) ? ids : [ids]);
+  return casts.filter((c) => set.has(c.abilityId)).sort((a, b) => a.timestamp - b.timestamp);
+};
+
+// Hits this large are FFLogs' unpaired previews of lethal hits (README).
+const PREVIEW_AMOUNT = 1_500_000;
+/** "~120k", or "lethal" when a hit in the set is a lethal preview. */
+const amountText = (es: PlayerEvent[]) => es.some((e) => (e.amount ?? 0) >= PREVIEW_AMOUNT)
+  ? "lethal" : kFmt(es.reduce((s, e) => s + Math.min(e.amount ?? 0, PREVIEW_AMOUNT), 0));
+
+const uniq = <T,>(xs: T[]) => [...new Set(xs)];
+const namesOf = (ps: PlayerInfo[]) => joinNames(uniq(ps).map((p) => p.name));
+const isTank = (p: PlayerInfo) => p.role === "Tank";
+const instanceKey = (e: PlayerEvent) => `${e.abilityId}|${e.source}#${e.sourceInstance}`;
+const castKey = (c: EnemyEvent) => `${c.abilityId}|${c.actorName}#${c.sourceInstance}`;
+const byName = (players: PlayerInfo[], name?: string) => (name ? players.find((p) => p.name === name) : undefined);
+const landed = (e: PlayerEvent) => (e.amount ?? 0) > 0;
+const allAlive = (players: PlayerInfo[], life: Life, t: number) => players.every((p) => life.hitAlive(p, t));
+
+/** Exactly two tanks, both alive and holding enmity at `t` (otherwise targets move as fallout). */
+function tanksHealthy(players: PlayerInfo[], life: Life, t: number): boolean {
+  const tanks = players.filter(isTank);
+  return tanks.length === 2 && tanks.every((p) => life.hitAlive(p, t) && !life.outIntervals.some((w) => w.p === p && w.start <= t && w.end >= t - TANK_ENMITY_LOST_MS));
+}
+
+/** Raised within RAISE_GRACE_MS before `t` (or still out at `t`). */
+function inRaiseGrace(life: Life, p: PlayerInfo, t: number): boolean {
+  return !life.hitAlive(p, t) || life.outIntervals.some((w) => w.p === p && w.end <= t && t - w.end < RAISE_GRACE_MS);
+}
+
+/** Holding Emblazon's Magic Vulnerability Up at `t`: a rose-marked player. The hit that spreads onto the roses removes it in its own millisecond. */
+const marked = (p: PlayerInfo, t: number) => debuffIntervals(p, MAGIC_VULN).some((w) => w.start <= t + 100 && w.end >= t);
+
+// ── plain avoidable hits ────────────────────────────────────────────────────
+
+function detectAvoidable(players: PlayerInfo[], life: Life): PullError[] {
+  const errors: PullError[] = [];
+  const ids = Object.keys(AVOIDABLE).map(Number);
+  for (const p of players) {
+    const hits = p.damageTaken.filter((e) => ids.includes(e.abilityId) && e.healthBefore !== 0 && life.hitAlive(p, e.timestamp) && landed(e));
+    for (const g of clusterByGap(hits, (e) => e.timestamp, EPISODE_MS)) {
+      const kinds = uniq(g.map((e) => AVOIDABLE[e.abilityId]));
+      const death = life.diedFrom(p, g[g.length - 1].timestamp);
+      const names = uniq(kinds.map((k) => k.name));
+      errors.push(playerError(p, {
+        ruleId: ZL_AVOIDABLE_RULE_ID, severity: death ? "Major" : "Minor", name: `Hit by ${names.join(" / ")}`,
+        description: `Hit by ${joinNames(names)} (${g.length > 1 ? `${g.length} hits, ` : ""}${amountText(g)}), with Vulnerability Up.${death ? " They died." : ""} ${uniq(kinds.map((k) => k.why)).join(" ")}`,
+        timestamp: g[0].timestamp, abilityId: g[0].abilityId, abilityName: g[0].abilityName,
+      }));
+    }
+  }
+  return errors;
+}
+
+/**
+ * Queen's Crusade leaves a small Bleeding zone at the center: contact gives
+ * 1004137, which becomes the 1004138 DoT ~0.3s later (15s). The boss's tank
+ * gets it most (A4, B8, B10, B11, kills included); B8 +8:00 died to it.
+ */
+function detectCenter(players: PlayerInfo[], life: Life, deaths: DeathEvent[]): PullError[] {
+  const errors: PullError[] = [];
+  for (const p of players) {
+    const applies = p.debuffs.filter((e) => e.abilityId === CENTER_BLEED && e.debuffStatus === "applied" && life.hitAlive(p, e.timestamp));
+    for (const g of clusterByGap(applies, (e) => e.timestamp, 20_000)) {
+      const t = g[0].timestamp;
+      const d = deaths.find((x) => x.player === p.name && x.timestamp >= t && x.timestamp <= t + 20_000 &&
+        [CENTER_BLEED, CENTER_BLEED_DOT].includes(x.killingAbilityGameId));
+      errors.push(playerError(p, {
+        ruleId: ZL_CENTER_RULE_ID, severity: d ? "Major" : "Minor", name: "Stood in the Center",
+        description: `Stepped into the Bleeding zone Queen's Crusade leaves at the arena's center${d ? ", and died to its Bleeding" : " and took its Bleeding DoT"}. The center 2y stays dangerous for the whole Bloom; hold the boss just off it.`,
+        timestamp: t, abilityId: CENTER_BLEED, abilityName: "Bleeding",
+      }));
+    }
+  }
+  return errors;
+}
+
+// ── Specter of the Lost ─────────────────────────────────────────────────────
+
+/**
+ * Two tethers land on random players; the tanks take them and aim the cones
+ * outward. Every kill resolution had exactly the two tanks hit. A non-tank
+ * hit with both tanks healthy names the tank who took no cone (A3 +0:46,
+ * B4 +0:46: two non-tanks died). With both tanks in cones, a non-tank hit
+ * stood in a tank's cone. Skipped unless both tanks are healthy.
+ */
+function detectSpecter(players: PlayerInfo[], life: Life, occurrences?: ReportedOccurrence[]): PullError[] {
+  const errors: PullError[] = [];
+  for (const res of clusterByGap(hitsOf(players, life, SPECTER), (h) => h.e.timestamp, 1500)) {
+    const t = res[0].e.timestamp;
+    if (!tanksHealthy(players, life, t - DIED_FROM_HIT_MS)) continue;
+    const tanks = players.filter(isTank);
+    occurrences?.push({ mechanicKey: ZL_SPECTER_RULE_ID, timestamp: t, players: tanks.map((p) => p.name) });
+    const victims = uniq(res.filter((h) => !isTank(h.p) && landed(h.e) && !inRaiseGrace(life, h.p, t)).map((h) => h.p));
+    if (!victims.length) continue;
+    const died = victims.filter((p) => life.diedFrom(p, t)?.killingAbilityGameId === SPECTER);
+    const deathText = died.length ? ` ${namesOf(died)} died.` : "";
+    const missing = tanks.filter((p) => !res.some((h) => h.p === p));
+    const dmg = amountText(res.filter((h) => victims.includes(h.p)).map((h) => h.e));
+    if (missing.length) {
+      for (const p of missing) {
+        errors.push(playerError(p, {
+          ruleId: ZL_SPECTER_RULE_ID, severity: died.length ? "Major" : "Minor", name: "Specter Tether Not Taken",
+          description: `Took no Specter of the Lost cone, so ${namesOf(victims)} took it instead (${dmg}).${deathText} Each tank takes one of the two tethers from the party and aims the cone outward.`,
+          timestamp: t, abilityId: SPECTER, abilityName: "Specter of the Lost",
+        }));
+      }
+      continue;
+    }
+    for (const p of victims) {
+      const d = life.diedFrom(p, t);
+      errors.push(playerError(p, {
+        ruleId: ZL_SPECTER_RULE_ID, severity: d ? "Major" : "Minor", name: "In a Specter Cone",
+        description: `Stood in a tank's Specter of the Lost cone (${amountText(res.filter((h) => h.p === p).map((h) => h.e))}).${d ? " They died." : ""} The cones are wide; stay behind the boss while the tanks aim them outward.`,
+        timestamp: t, abilityId: SPECTER, abilityName: "Specter of the Lost",
+      }));
+    }
+  }
+  return errors;
+}
+
+// ── Spearpoint Push (party adds) ────────────────────────────────────────────
+
+/**
+ * The shades' Spearpoint Push lines go where their tethered player turns
+ * them; no kill took one. The tether isn't in the log, so a line through 3+
+ * players (the shade aimed into the party: A1 +1:47, B1, B2) is player-less;
+ * one or two hit stood in the line.
+ */
+function detectSpearpoint(players: PlayerInfo[], life: Life): PullError[] {
+  const errors: PullError[] = [];
+  const why = "Each tethered player turns their shade's raised sword away from the party, and everyone else stays clear of the shades' lines.";
+  for (const res of clusterByGap(hitsOf(players, life, SPEARPOINT), (h) => h.e.timestamp, 1500)) {
+    const t = res[0].e.timestamp;
+    const victims = uniq(res.filter((h) => landed(h.e) && !inRaiseGrace(life, h.p, t)).map((h) => h.p));
+    if (!victims.length) continue;
+    const died = victims.filter((p) => life.diedFrom(p, res.filter((h) => h.p === p).pop()!.e.timestamp));
+    if (victims.length >= 3) {
+      errors.push(playerlessMinor(ZL_PUSH_RULE_ID, "Spearpoint Push Into the Party",
+        `A shade's Spearpoint Push hit ${victims.length} players (${namesOf(victims)})${died.length ? `; ${namesOf(died)} died` : ""}. The log doesn't record whose tether aimed it. ${why}`,
+        t, res[0].e.abilityId, "Spearpoint Push"));
+      continue;
+    }
+    for (const p of victims) {
+      const d = died.includes(p);
+      errors.push(playerError(p, {
+        ruleId: ZL_PUSH_RULE_ID, severity: d ? "Major" : "Minor", name: "Hit by Spearpoint Push",
+        description: `Hit by a shade's Spearpoint Push (${amountText(res.filter((h) => h.p === p).map((h) => h.e))}), with Vulnerability Up.${d ? " They died." : ""} ${why}`,
+        timestamp: t, abilityId: res[0].e.abilityId, abilityName: "Spearpoint Push",
+      }));
+    }
+  }
+  return errors;
+}
+
+// ── Escelons' Fall ──────────────────────────────────────────────────────────
+
+/**
+ * Four volleys of four cones ~3.1s apart; each cone gives Slashing
+ * Resistance Down, so a player hit in two volleys in a row (or by two cones
+ * in one) takes 2-3x and usually dies (A2 +5:26: three supports; B3 +5:23:
+ * four DPS doubled). Every clean volley hit four players, alternating sets.
+ * Each repeated player could have moved, so each is named. A sequence that
+ * starts with a player dead is skipped (the sets shift).
+ */
+function detectEscelons(players: PlayerInfo[], life: Life): PullError[] {
+  const errors: PullError[] = [];
+  const volleys = clusterByGap(hitsOf(players, life, ESCELONS_FALL), (h) => h.e.timestamp, 1000);
+  const why = "Escelons' Fall alternates between the nearest and farthest four; after your hit, move to the other distance so the next volley takes the other set.";
+  for (const seq of clusterByGap(volleys, (v) => v[0].e.timestamp, EF_VOLLEY_GAP_MS)) {
+    if (!allAlive(players, life, seq[0][0].e.timestamp)) continue;
+    seq.forEach((v, i) => {
+      const t = v[0].e.timestamp;
+      const prev = i > 0 ? new Set(seq[i - 1].filter((h) => landed(h.e)).map((h) => h.p)) : new Set<PlayerInfo>();
+      const counts = new Map<PlayerInfo, Hit[]>();
+      for (const h of v) counts.set(h.p, [...(counts.get(h.p) ?? []), h]);
+      for (const [p, hs] of counts) {
+        if (inRaiseGrace(life, p, t) || !hs.some((h) => landed(h.e))) continue;
+        const doubled = hs.length >= 2, again = prev.has(p);
+        if (!doubled && !again) continue;
+        const d = life.diedFrom(p, hs[hs.length - 1].e.timestamp);
+        errors.push(playerError(p, {
+          ruleId: ZL_EF_RULE_ID, severity: d ? "Major" : "Minor", name: doubled ? "Two Escelons' Fall Cones" : "Escelons' Fall Twice in a Row",
+          description: `${doubled ? `Took ${hs.length} Escelons' Fall cones in one volley` : "Was hit by Escelons' Fall in two volleys in a row"}, under Slashing Resistance Down (${amountText(hs.map((h) => h.e))}).${d ? " They died." : ""} ${why}`,
+          timestamp: t, abilityId: ESCELONS_FALL, abilityName: "Escelons' Fall",
+        }));
+      }
+    });
+  }
+  return errors;
+}
+
+// ── Alexandrian Thunder III drops ───────────────────────────────────────────
+
+/**
+ * Eight drops at Bloom1 and its repeat, four at Bloom4; each is cast-targeted
+ * at its dropper and every kill resolution hit only the droppers. A drop that
+ * also hits an Emblazon-marked player (Magic Vulnerability Up) touched the
+ * rose network and spreads to all four: A3 +6:09 and A4 (four DPS died), B4
+ * and B12 (four supports). Its dropper is the error. A drop on another
+ * unmarked player is an overlap, both named. The owner of a drop without a
+ * logged target is the only unmarked player it hit. Skipped with a player
+ * dead (the marks move: B6 +6:08).
+ */
+function detectDrops(players: PlayerInfo[], life: Life, casts: EnemyEvent[]): PullError[] {
+  const errors: PullError[] = [];
+  for (const res of clusterByGap(hitsOf(players, life, THUNDER_DROP), (h) => h.e.timestamp, 1500)) {
+    const t0 = res[0].e.timestamp, t1 = res[res.length - 1].e.timestamp;
+    if (!allAlive(players, life, t0 - DIED_FROM_HIT_MS)) continue;
+    const owners = new Map<string, PlayerInfo>();
+    for (const c of casts) {
+      if (c.abilityId !== THUNDER_DROP || c.timestamp < t0 - 2000 || c.timestamp > t1 + 200 || !c.target) continue;
+      const p = byName(players, c.target);
+      if (p) owners.set(castKey(c), p);
+    }
+    const byInst = new Map<string, Hit[]>();
+    for (const h of res) byInst.set(instanceKey(h.e), [...(byInst.get(instanceKey(h.e)) ?? []), h]);
+    for (const [k, hs] of byInst) {
+      if (owners.has(k)) continue;
+      const unmarked = uniq(hs.filter((h) => !marked(h.p, h.e.timestamp)).map((h) => h.p));
+      const hit = uniq(hs.map((h) => h.p));
+      if (unmarked.length === 1) owners.set(k, unmarked[0]);
+      else if (hit.length === 1) owners.set(k, hit[0]);
+    }
+    const killedIn = (ps: PlayerInfo[]) => ps.filter((p) => {
+      const last = res.filter((h) => h.p === p).pop();
+      return last && life.diedFrom(p, last.e.timestamp)?.killingAbilityGameId === THUNDER_DROP;
+    });
+    const why = "Drop your Thunder III circle on your own blank tile: its whole circle must miss the roses and the other players, or it spreads through every connected rose.";
+    const sharedNamed = new Set<PlayerInfo>();
+    for (const [k, hs] of byInst) {
+      const owner = owners.get(k);
+      const roses = uniq(hs.filter((h) => h.p !== owner && marked(h.p, h.e.timestamp) && landed(h.e) && !inRaiseGrace(life, h.p, t0)).map((h) => h.p));
+      const others = uniq(hs.filter((h) => h.p !== owner && !marked(h.p, h.e.timestamp) && landed(h.e) && !inRaiseGrace(life, h.p, t0)).map((h) => h.p));
+      if (roses.length) {
+        const died = killedIn(roses);
+        const text = `hit the rose network, spreading Thunder III to the marked players (${namesOf(roses)}, under Magic Vulnerability Up)${died.length ? `; ${namesOf(died)} died` : ""}.`;
+        if (owner) {
+          errors.push(playerError(owner, {
+            ruleId: ZL_DROP_RULE_ID, severity: died.length ? "Major" : "Minor", name: "Thunder III on the Roses",
+            description: `Their Alexandrian Thunder III circle ${text} ${why}`,
+            timestamp: t0, abilityId: THUNDER_DROP, abilityName: "Alexandrian Thunder III",
+          }));
+        } else {
+          errors.push(playerlessMinor(ZL_DROP_RULE_ID, "Thunder III on the Roses",
+            `An Alexandrian Thunder III circle (its dropper isn't in the log) ${text} ${why}`, t0, THUNDER_DROP, "Alexandrian Thunder III"));
+        }
+      }
+      // No logged target and two unmarked players in it: they stood together
+      // (B5 +6:09, both tanks in each other's circles; both died).
+      if (!owner && others.length >= 2) {
+        const died = killedIn(others);
+        for (const p of others) {
+          if (sharedNamed.has(p)) continue;
+          sharedNamed.add(p);
+          errors.push(playerError(p, {
+            ruleId: ZL_DROP_RULE_ID, severity: died.length ? "Major" : "Minor", name: "Thunder III Overlap",
+            description: `Shared an Alexandrian Thunder III circle with ${namesOf(others.filter((x) => x !== p))}, under Lightning Resistance Down.${died.length ? ` ${namesOf(died)} died.` : ""} ${why}`,
+            timestamp: t0, abilityId: THUNDER_DROP, abilityName: "Alexandrian Thunder III",
+          }));
+        }
+      }
+      if (others.length && owner) {
+        const died = killedIn([owner, ...others]);
+        const sev = died.length ? "Major" : "Minor";
+        const deathText = died.length ? ` ${namesOf(died)} died.` : "";
+        errors.push(playerError(owner, {
+          ruleId: ZL_DROP_RULE_ID, severity: sev, name: "Thunder III Overlap",
+          description: `Their Alexandrian Thunder III circle also hit ${namesOf(others)}, under Lightning Resistance Down.${deathText} ${why}`,
+          timestamp: t0, abilityId: THUNDER_DROP, abilityName: "Alexandrian Thunder III",
+        }));
+        for (const p of others) {
+          errors.push(playerError(p, {
+            ruleId: ZL_DROP_RULE_ID, severity: sev, name: "Thunder III Overlap",
+            description: `Hit by ${owner.name}'s Alexandrian Thunder III circle as well as their own, under Lightning Resistance Down.${deathText} ${why}`,
+            timestamp: t0, abilityId: THUNDER_DROP, abilityName: "Alexandrian Thunder III",
+          }));
+        }
+      }
+    }
+  }
+  return errors;
+}
+
+/** Magic Break: an Emblazon rose dropped on an existing rose (B12 +6:10, lethal). */
+function detectMagicBreak(players: PlayerInfo[], life: Life): PullError[] {
+  return hitsOf(players, life, MAGIC_BREAK).filter((h) => !inRaiseGrace(life, h.p, h.e.timestamp)).map((h) => {
+    const d = life.diedFrom(h.p, h.e.timestamp);
+    return playerError(h.p, {
+      ruleId: ZL_MAGIC_BREAK_RULE_ID, severity: d ? "Major" : "Minor", name: "Rose on a Rose",
+      description: `Their Emblazon rose landed on a tile that was already a rose, and Magic Break hit them (${amountText([h.e])}).${d ? " They died." : ""} Drop your rose on a blank tile, never on an existing rose.`,
+      timestamp: h.e.timestamp, abilityId: h.e.abilityId, abilityName: "Magic Break",
+    });
+  });
+}
+
+// ── Bloom3 / Bloom6 towers ──────────────────────────────────────────────────
+
+/**
+ * Four towers, each cast-targeted at its soaker; the soakers are the four
+ * players Emblazon didn't mark. Every kill had four soakers, one tower each.
+ * Unmitigated Explosion = a tower left empty: hits everyone and kills the
+ * marked four (B3, B9 +4:44; B5, B8 Bloom6). The unmarked living player with
+ * no tower is named (B3, B9: one each). A marked player hit by a tower, or
+ * an unmarked one taking two, is that player's error. Skipped with a player
+ * dead (B7 +4:41: a death left a tower to a doubled soaker).
+ */
+function detectTowers(players: PlayerInfo[], life: Life, casts: EnemyEvent[]): PullError[] {
+  const errors: PullError[] = [];
+  const events = [...hitsOf(players, life, [TOWER, TOWER_EMPTY]).map((h) => h.e.timestamp), ...castsOf(casts, TOWER).map((c) => c.timestamp)];
+  for (const g of clusterByGap(events, (t) => t, 4000)) {
+    const t0 = g[0], t1 = g[g.length - 1];
+    const res = hitsOf(players, life, TOWER).filter((h) => h.e.timestamp >= t0 - 500 && h.e.timestamp <= t1 + 500);
+    const empty = hitsOf(players, life, TOWER_EMPTY).filter((h) => h.e.timestamp >= t0 - 500 && h.e.timestamp <= t1 + 500);
+    const soakers = new Set(castsOf(casts, TOWER).filter((c) => c.timestamp >= t0 - 500 && c.timestamp <= t1 + 500).map((c) => c.target));
+    const whole = allAlive(players, life, t0 - DIED_FROM_HIT_MS);
+    if (empty.length) {
+      const t = empty[0].e.timestamp;
+      const died = uniq(empty.filter((h) => life.diedFrom(h.p, h.e.timestamp)?.killingAbilityGameId === TOWER_EMPTY).map((h) => h.p));
+      const deathText = died.length ? ` ${namesOf(died)} died.` : "";
+      const missing = players.filter((p) => !marked(p, t0) && !soakers.has(p.name) && life.hitAlive(p, t0) && !inRaiseGrace(life, p, t0));
+      const why = "The four players Emblazon didn't mark each take one tower network; an empty tower's Unmitigated Explosion hits the whole party.";
+      if (missing.length && missing.length <= 2) {
+        for (const p of missing) {
+          errors.push(playerError(p, {
+            ruleId: ZL_EMPTY_TOWER_RULE_ID, severity: died.length ? "Major" : "Minor", name: "Missed a Tower",
+            description: `Wasn't marked by Emblazon and took no tower, so a tower stayed empty and Unmitigated Explosion hit the party (${uniq(empty.map((h) => h.p)).length} hit).${deathText} ${why}`,
+            timestamp: t, abilityId: TOWER_EMPTY, abilityName: "Unmitigated Explosion",
+          }));
+        }
+      } else {
+        errors.push(playerlessMinor(ZL_EMPTY_TOWER_RULE_ID, "Tower Left Empty",
+          `A tower stayed empty and Unmitigated Explosion hit the party (${uniq(empty.map((h) => h.p)).length} hit).${deathText} ${why}`, t, TOWER_EMPTY, "Unmitigated Explosion"));
+      }
+    }
+    if (!whole) continue;
+    const byPlayer = new Map<PlayerInfo, Hit[]>();
+    for (const h of res) if (landed(h.e)) byPlayer.set(h.p, [...(byPlayer.get(h.p) ?? []), h]);
+    for (const [p, hs] of byPlayer) {
+      if (inRaiseGrace(life, p, t0)) continue;
+      const isMarked = marked(p, hs[0].e.timestamp);
+      const n = uniq(hs.map((h) => instanceKey(h.e))).length;
+      if (!isMarked && n < 2) continue;
+      const d = life.diedFrom(p, hs[hs.length - 1].e.timestamp);
+      errors.push(playerError(p, {
+        ruleId: ZL_TOWER_RULE_ID, severity: d ? "Major" : "Minor", name: isMarked ? "Marked Player in a Tower" : "Took Two Towers",
+        description: isMarked
+          ? `Was marked by Emblazon (Magic Vulnerability Up) but was hit by ${n > 1 ? `${n} towers` : "a tower"} (${amountText(hs.map((h) => h.e))}).${d ? " They died." : ""} Marked players drop their roses and then leave the rose tiles before the towers go off.`
+          : `Was hit by ${n} towers at once, under Light Resistance Down (${amountText(hs.map((h) => h.e))}).${d ? " They died." : ""} Each tower network takes one soaker; don't connect two towers' rose tiles or stand where they meet.`,
+        timestamp: hs[0].e.timestamp, abilityId: TOWER, abilityName: "Explosion",
+      }));
+    }
+  }
+  return errors;
+}
+
+/** The add phase's towers: three soakers each. The log can't say whose tower it was. */
+function detectAddTowers(players: PlayerInfo[], life: Life): PullError[] {
+  const errors: PullError[] = [];
+  for (const res of clusterByGap(hitsOf(players, life, ADD_TOWER_EMPTY), (h) => h.e.timestamp, 2000)) {
+    const t = res[0].e.timestamp;
+    const died = uniq(res.filter((h) => life.diedFrom(h.p, h.e.timestamp)?.killingAbilityGameId === ADD_TOWER_EMPTY).map((h) => h.p));
+    errors.push(playerlessMinor(ZL_EMPTY_TOWER_RULE_ID, "Add Tower Left Empty",
+      `An add-phase tower went off without its three soakers, and Unmitigated Explosion hit the party (${uniq(res.map((h) => h.p)).length} hit)${died.length ? `; ${namesOf(died)} died` : ""}. The three untethered players on each side soak their side's tower.`,
+      t, ADD_TOWER_EMPTY, "Unmitigated Explosion"));
+  }
+  return errors;
+}
+
+// ── shared stacks ───────────────────────────────────────────────────────────
+
+type Share = { name: string; ids: number[]; why: string };
+const SHARES: Share[] = [
+  { name: "Alexandrian Banish II", ids: [BANISH_II], why: "Banish II stacks on one support and one DPS; each role gathers tightly in its own stack." },
+  { name: "Alexandrian Banish III", ids: [BANISH_III], why: "Banish III is shared by all eight through the southern roses; stand on the shared rose network after breaking your vine." },
+  { name: "Stock Break", ids: STOCK_BREAK, why: "Stock Break hits its target's stack several times; the whole party stays in it until the last hit." },
+];
+
+/** A living player in none of a stack's hits left the others to share it short. */
+function detectShares(players: PlayerInfo[], life: Life): PullError[] {
+  const errors: PullError[] = [];
+  for (const fam of SHARES) {
+    for (const res of clusterByGap(hitsOf(players, life, fam.ids), (h) => h.e.timestamp, 1500)) {
+      const t = res[0].e.timestamp;
+      const hit = new Set(res.map((h) => h.p));
+      const absent = players.filter((p) => !hit.has(p) && life.hitAlive(p, t) && !inRaiseGrace(life, p, t));
+      if (!absent.length) continue;
+      const killed = uniq(res.filter((h) => fam.ids.includes(life.diedFrom(h.p, h.e.timestamp)?.killingAbilityGameId ?? -1)).map((h) => h.p));
+      const deathText = killed.length ? ` ${namesOf(killed)} died.` : "";
+      for (const p of absent) {
+        errors.push(playerError(p, {
+          ruleId: ZL_SHARE_RULE_ID, severity: killed.length ? "Major" : "Minor", name: `Missed ${fam.name}`,
+          description: `Took no part of ${fam.name}, so ${hit.size} players shared it.${deathText} ${fam.why}`,
+          timestamp: t, abilityId: fam.ids[0], abilityName: fam.name,
+        }));
+      }
+    }
+  }
+  return errors;
+}
+
+// ── deaths with no killing blow ─────────────────────────────────────────────
+
+/** No-killing-blow deaths that are the wipe being called, not mistakes. */
+function calledWipeDeaths(deaths: DeathEvent[], pullEnd: number): Set<DeathEvent> {
+  const out = new Set<DeathEvent>();
+  const silent = deaths.filter((d) => !d.killingAbilityGameId);
+  for (const d of silent) {
+    // Near the end, unless mechanic deaths follow it: B7 +4:41's lone silent
+    // death left a Bloom3 tower short, and the party died to it after.
+    const followed = deaths.some((x) => x.killingAbilityGameId && x.player !== d.player && x.timestamp > d.timestamp);
+    if (pullEnd - d.timestamp <= CALLED_WIPE_END_MS && !followed) out.add(d);
+    const near = silent.filter((x) => Math.abs(x.timestamp - d.timestamp) <= CALLED_WIPE_WINDOW);
+    if (near.length >= CALLED_WIPE_COUNT) near.forEach((x) => out.add(x));
+    const pair = silent.filter((x) => Math.abs(x.timestamp - d.timestamp) <= CALLED_WIPE_PAIR_MS);
+    if (pair.length >= 2) pair.forEach((x) => out.add(x));
+  }
+  return out;
+}
+
+/**
+ * Lone silent deaths, player-less so the review sees them: a wall or edge
+ * death, or a lethal hit FFLogs dropped (B7 +4:41, before the Bloom3 towers).
+ * A death right after an avoidable or mechanic hit is that hit's error.
+ */
+function detectSilentDeaths(players: PlayerInfo[], deaths: DeathEvent[], skip: Set<DeathEvent>): PullError[] {
+  const errors: PullError[] = [];
+  const explained = new Set([...Object.keys(AVOIDABLE).map(Number), ESCELONS_FALL, THUNDER_DROP, BANISH_III, ...SPEARPOINT, TOWER, TOWER_EMPTY, SPECTER]);
+  for (const d of deaths) {
+    if (d.killingAbilityGameId || skip.has(d)) continue;
+    const p = byName(players, d.player);
+    if (!p) continue;
+    if (p.damageTaken.some((e) => explained.has(e.abilityId) && e.timestamp <= d.timestamp && e.timestamp >= d.timestamp - DIED_FROM_HIT_MS - 1000)) continue;
+    errors.push(playerlessMinor(ZL_FALL_RULE_ID, "Died With No Killing Blow",
+      `${p.name} died mid-pull with no killing blow: a wall death, or a lethal hit the log didn't record.`,
+      d.timestamp - DEATH_EVENT_LAG_MS, 0, "Fall"));
+  }
+  return errors;
+}
+
+// ── cutoffs ─────────────────────────────────────────────────────────────────
+
+/** 4+ deaths to one moment's mechanics (raidwides excluded), with the pull over soon after. */
+function detectMassDeaths(deaths: DeathEvent[], pullEnd: number): PullError[] {
+  const fatal = deaths.filter((d) => d.killingAbilityGameId && !RAIDWIDE.includes(d.killingAbilityGameId));
+  for (const g of clusterByGap(fatal, (d) => d.timestamp, MASS_WINDOW_MS)) {
+    if (uniq(g.map((d) => d.player)).length < MASS_DEATHS || pullEnd - g[0].timestamp > MASS_END_MS) continue;
+    const kinds = uniq(g.map((d) => d.cause));
+    return [raidMarker(ZL_MASS_DEATHS_RULE_ID, "Mass Deaths",
+      `${g.length} players died together to ${joinNames(kinds)} (${joinNames(uniq(g.map((d) => d.player)))}), and the pull ended soon after. Treated as the cutoff point.`,
+      g[0].timestamp - DEATH_EVENT_LAG_MS + RAID_MARKER_SORT_OFFSET_MS, g[0].killingAbilityGameId, kinds[0])];
+  }
+  return [];
+}
+
+// ── entry point ─────────────────────────────────────────────────────────────
+
+/** Zelenia (Recollection, Extreme) errors. Self-gates on the boss's opening casts. */
+export function detectZeleniaErrors(
+  players: PlayerInfo[], deathEvents: DeathEvent[], enemyCasts: EnemyEvent[], occurrences?: ReportedOccurrence[],
+): PullError[] {
+  if (!enemyCasts.some((c) => SIGNATURE.includes(c.abilityId) && c.actorName?.startsWith("Zelenia"))) return [];
+  const life = buildLife(players, deathEvents);
+  const pullEnd = Math.max(0, ...players.flatMap((p) => [...p.damageTaken, ...p.casts].map((e) => e.timestamp)), ...deathEvents.map((d) => d.timestamp));
+  const called = calledWipeDeaths(deathEvents, pullEnd);
+
+  const errors = [
+    ...detectAvoidable(players, life),
+    ...detectCenter(players, life, deathEvents),
+    ...detectSpecter(players, life, occurrences),
+    ...detectSpearpoint(players, life),
+    ...detectEscelons(players, life),
+    ...detectDrops(players, life, enemyCasts),
+    ...detectMagicBreak(players, life),
+    ...detectTowers(players, life, enemyCasts),
+    ...detectAddTowers(players, life),
+    ...detectShares(players, life),
+    ...detectSilentDeaths(players, deathEvents, called),
+  ];
+  const firstRaid = () => Math.min(...errors.filter((e) => e.severity === "Raid").map((e) => e.timestamp));
+
+  const quietus = hitsOf(players, life, QUIETUS_FAIL)[0];
+  if (quietus) {
+    errors.push(raidMarker(ZL_QUIETUS_RULE_ID, "Roseblood Drops Not Killed",
+      "Perfumed Quietus went off with Roseblood Drops still alive (their gauge filled), hitting the party for lethal damage. All four drops have to die before the gauge fills. Treated as the cutoff point.",
+      quietus.e.timestamp, QUIETUS_FAIL, "Perfumed Quietus"));
+  }
+  for (const m of detectMassDeaths(deathEvents, pullEnd)) if (m.timestamp < firstRaid()) errors.push(m);
+
+  const enrage = castsOf(enemyCasts, ROSE_RED)[0];
+  if (enrage && enrage.timestamp < firstRaid()) {
+    errors.push(raidMarker(ZL_ENRAGE_RULE_ID, "Rose Red (Enrage)",
+      "Rose Red went off: Zelenia wasn't brought down before the hard enrage.",
+      enrage.timestamp, ROSE_RED, "Rose Red"));
+  }
+  const calledList = deathEvents.filter((d) => called.has(d)).sort((a, b) => a.timestamp - b.timestamp);
+  const calledPair = calledList.some((d, i) => i > 0 && d.timestamp - calledList[i - 1].timestamp <= CALLED_WIPE_PAIR_MS);
+  if ((calledList.length >= CALLED_WIPE_COUNT || calledPair) && calledList[0].timestamp - DEATH_EVENT_LAG_MS < firstRaid()) {
+    errors.push(raidMarker(ZL_CALLED_WIPE_RULE_ID, "Wipe Called",
+      `${calledList.length} players died with no killing blow together (${joinNames(uniq(calledList.map((d) => d.player)))}): the wipe was called and the raid reset.`,
+      calledList[0].timestamp - DEATH_EVENT_LAG_MS, 0, "Deaths"));
+  }
+  const outAt = (t: number) => players.filter((p) => !life.alive(p, t));
+  const collapseT = life.outIntervals.map((w) => w.start).sort((a, b) => a - b)
+    .find((t) => outAt(t).length >= COLLAPSE_DEAD_COUNT && pullEnd - t <= COLLAPSE_END_MS);
+  if (collapseT !== undefined && collapseT + DEATH_EVENT_LAG_MS < firstRaid()) {
+    const who = outAt(collapseT).map((p) => p.name);
+    errors.push(raidMarker(ZL_COLLAPSE_RULE_ID, "Party Collapse",
+      `${who.length} players were dead at once (${joinNames(who)}). Treated as the cutoff point.`,
+      collapseT + DEATH_EVENT_LAG_MS, 0, "Deaths"));
+  }
+  return errors.sort((a, b) => a.timestamp - b.timestamp);
+}

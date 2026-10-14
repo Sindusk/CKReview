@@ -128,6 +128,10 @@ philosophy and the data semantics this list assumes.
   clean Blood Wakening wave is two Fire and two Thunder; a 4 + 0 wave means
   the wrong shape was contacted, and the contact's cast target is the cause
   (Lindwurm II).
+- **A hit can strip the aura that marks its victim in the same
+  millisecond.** Zelenia's Thunder III spreading onto the rose players
+  removed their Magic Vulnerability Up at the hit itself, so "held at the
+  hit" has to include an interval ending at that instant.
 - **A same-millisecond remove + apply is a refresh.** Merge it before asking
   "held since before"; Lindwurm II's repeated element re-applies its
   resistance 0.5s before the damage.
@@ -278,6 +282,8 @@ Classify every one before counting a called wipe. Known meanings:
   - several together;
   - any within ~12s of the end;
   - two jumping together mid-pull while the rest practise on (Lindwurm).
+  A lone one near the end is not a called wipe when mechanic deaths follow
+  it: Zelenia B7's left a Bloom3 tower short and the party died to it.
   Detect it first, or the first tank among them becomes a false "Tank
   Died" cutoff (The Lost Explorers).
 - **A knockback off an edge or island, at a fixed delay after the hit:**
