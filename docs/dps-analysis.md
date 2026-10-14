@@ -286,9 +286,15 @@ were to the app's own engine, found where xivanalysis was right.
   (K6qfMamL7rN8yz2Q Vamp Fatale, Sage, 2026-10-14): it measures from a
   hard cast's end and needs a full GCD + 150ms in every window, so ~1.6s
   after a Dosis and ~1s after a Eukrasian GCD go unseen. A count gap
-  against it isn't by itself a sign the app is wrong. What was noise:
-  delays under 0.35s past tolerance (a late weave's animation lock and
-  latency), now dropped for FFXIV (`DamageGame.smallDelayMinMs`).
+  against it isn't by itself a sign the app is wrong.
+- **Small GCD delays (0.15-0.5s) are real, not log timing.** Test: a GCD
+  can't come early, so a late timestamp that is only logging shows as an
+  early next GCD. Across six Vamp Fatale kills of one static (13 players),
+  7 of 412 were paid back and 360 kept the shift; the log's jitter
+  reaches about −50ms. They rise with weaves (2.8% of GCDs with none,
+  5.7% one, 8.5% two, 23% three) and are most common after hard casts
+  (AST Fall Malefic, SGE Dosis III). A floor that hid them was reverted
+  the same day.
 - **Input:** the user saves each player's xivanalysis page as HTML;
   `tools/xiva-html.js` cuts a ~500KB page to ~20KB of text with named
   action icons (see the skill).

@@ -13,20 +13,26 @@ all eight players on that kill are in `sampledata/damage-ff/`.
   (9-13 wipes, 14 kill). Baseline `expectations/ff-K6qfMamL7rN8yz2Q.json`
   created 2026-10-14 (173 entries, no rulings).
 - Every boss has a damage context.
+- Same static's later Vamp Fatale kills, fight 1 only, for the drift
+  test: `sampledata/ff/{grK2z6ptfZWGmVdj,nPLtv4FBZxKNXGYH,n6zTGPJh8wkLFRZ9,ZJ6WqpvNCDYA8X2G}`
+  (fetched 2026-10-14) and `vVPtwaTQ62Jg391q` (already on disk).
 
 ## Done
 
 - **GCD drift noise (user: "18 GCD drifts for Sin, xivanalysis finds 5").**
   Sin Dusk (Sage, GCD 2.41s). Of the app's 18 `gcd-drift` entries, nine
   were 0.0-0.3s delays (0.17-0.44s past the GCD before the 0.15s
-  tolerance): five were one oGCD woven late in the GCD (Kerachole,
+  tolerance): five after one oGCD woven late in the GCD (Kerachole,
   Ixochole, Zoe after Dosis III; Holos after Phlegma), four single late
-  presses. Not adopted as findings: FFXIV small delays now need 0.35s
-  unforced (`DamageGame.smallDelayMinMs`, lib/damage/ffxiv/game.ts);
-  triple-weave clips keep no floor; WoW unchanged. Sin: 18 → 9 entries,
-  lost 650k → 629k. Party on this kill: 122 → 39 drift/clip entries.
-  - The other nine stand, and xivanalysis's method is why it lists fewer
-    (header of lib/damage/checks.ts):
+  presses. A 0.35s floor hid them (a5d1ec8); the user asked instead
+  whether they're real, with five more Vamp Fatale kills of the same
+  static (grK2z6ptfZWGmVdj, vVPtwaTQ62Jg391q, nPLtv4FBZxKNXGYH,
+  n6zTGPJh8wkLFRZ9, ZJ6WqpvNCDYA8X2G; fight 1 each, weeks 6-10). They
+  are: 7 of 412 delays of 0.15-0.5s across 13 players were paid back by
+  an early next GCD, 360 kept the shift (docs/dps-analysis.md). Floor
+  reverted; all 18 stand.
+  - xivanalysis's method is why it lists fewer (header of
+    lib/damage/checks.ts):
     - Its 5 match ours: gap 7:13 (ours 7:14, 2.0s; it says 0.75s because
       it measures from the Dosis's cast end, not its start) and
       interrupts 1:30, 1:59, 4:03, 7:58 (ours 1:29 1.5s, 1:58 2.2s,
@@ -38,6 +44,13 @@ all eight players on that kill are in `sampledata/damage-ff/`.
       Its GCD Downtime needs a window over the full GCD + 150ms measured
       from a hard cast's end, which hides ~1.6s after every Dosis and ~1s
       after Eukrasian GCDs.
+
+## Open
+
+- Lock-model gaps seen in the drift test (they can hide delay, never
+  create it): pre-pull hard casts logged at 0:00, Pictomancer GCDs under
+  Starry Muse's haste, Viper's Vicewinder (~0.41s under the modelled
+  lock), Sage's Eukrasian Dyskrasia (locked 2.41s, its recast is 1.5s).
 
 ## Next
 

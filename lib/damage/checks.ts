@@ -12,11 +12,17 @@
 // (xivanalysis's AlwaysBeCasting allowance for latency). The part of the
 // idle time inside a forced window (dead, raid downtime, a context window,
 // a phase whose damage doesn't count) is forced. Unforced idle of 1s+ is
-// its own finding; shorter delays are listed one by one when they reach
-// DamageGame.smallDelayMinMs (FFXIV 0.35s) and the phase's add up to
-// CLIP_FINDING_MS. Triple-weave clips take no floor. Lost damage =
+// its own finding; shorter delays are listed one by one when the phase's
+// add up to CLIP_FINDING_MS. Lost damage =
 // idle ÷ the player's GCD × their average GCD value in that phase (the
 // buffed value when the gap sits in a raid-buff window).
+//
+// Small delays are real, not log timing (six Vamp Fatale kills of one
+// static, K6qfMamL7rN8yz2Q and five later weeks, 2026-10-14): of 412
+// GCDs 0.15-0.5s late, 7 were paid back by an early next GCD and 360
+// kept the shift; the log's own jitter reaches about -50ms (5th
+// percentile, every player). They rise with weaves: 2.8% of GCDs with
+// none, 5.7% with one, 8.5% with two, 23% with three.
 //
 // xivanalysis's AlwaysBeCasting (checked on K6qfMamL7rN8yz2Q, Vamp Fatale
 // kill, Sage) lists far fewer, by method rather than by finding them unreal:
@@ -231,7 +237,7 @@ export function checkGcdGaps(ctx: PlayerCheckContext): DamageFinding[] {
           // weaving", so name the weaves from two up.
           (weaves.length >= 2 ? `; ${weaves.length} weaves: ${weaves.map((w) => w.abilityName).join(", ")}` : ""),
       }));
-    } else if (unforced > 0 && (weaves.length >= CLIP_WEAVES || unforced >= (ctx.game.smallDelayMinMs ?? 0))) {
+    } else if (unforced > 0) {
       // Three or more oGCDs between two GCDs: the delay is the weaving.
       const clip = weaves.length >= CLIP_WEAVES;
       const bucket = (clip ? clipped : small).get(phaseId) ?? { ms: 0, findings: [] };

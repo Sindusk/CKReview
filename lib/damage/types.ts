@@ -80,10 +80,6 @@ export type DamageGame = {
   // to the player's next action, at most maxMs, is forced (the raid plan,
   // not play).
   mitigationChannels?: Map<number, { name: string; maxMs: number }>;
-  // A sub-second GCD delay (checks.ts checkGcdGaps) counts only from this
-  // much unforced lateness; shorter ones are neither listed nor counted.
-  // Default 0 (every delay past GCD_TOLERANCE_MS).
-  smallDelayMinMs?: number;
 
   // ── Optional, for games unlike FFXIV (WoW, lib/damage/wow/game.ts) ──
   // Unset, each behaves as FFXIV always has.
