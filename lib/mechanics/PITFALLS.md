@@ -67,6 +67,14 @@ philosophy and the data semantics this list assumes.
   (Nek'zali, +183.4s).
 - **Huge amounts (1M+) are FFLogs' unpaired previews of lethal hits.**
   Count them as hits; never compare them as amounts (The Tyrant).
+- **Not every fight hands out Damage Down.** Doomtrain gives only
+  Vulnerability Up stacks, so its avoidables are Minor unless they kill.
+  Check the debuff sweep before applying the FFXIV Major exception.
+- **A "marked circle" can be a split stack.** Doomtrain's Plummet marks
+  2-5 players but all 8 share them in every kill; the failure is a player
+  under two, not anyone under one.
+- **Stance toggles aren't in the log** (set before the pull), so a buster
+  on a non-tank can't be pinned on a tank (Doomtrain).
 - **Test a guide's "stack" or "fixed damage" claim against the damage.**
   Fell Forces split across the group: a lone DPS took 4x the normal hit
   (Ultimate Kefka).
@@ -275,6 +283,12 @@ Classify every one before counting a called wipe. Known meanings:
   duration (Lindwurm II).
 - **Falling with collapsing floor** (Lindwurm, 2.1s after the collapse
   hit).
+- **Left behind on a destroyed floor section:** 4.5s after the cast that
+  destroys it, at the spot the player was standing (Doomtrain's Derail).
+  Check Walking Dead first: a solo-tower DRK's ran out 2.6s after the same
+  cast.
+- **Stepping off a raised platform over the edge:** death 2.0-2.4s after
+  the platform aura (1004721) ends (Doomtrain).
 - **Walking Dead running out unhealed** (Dark Knight): player-less.
 - **A reset after the player's own Damage Down** (Fatebreaker): the Damage
   Down's cause is the error.

@@ -66,6 +66,12 @@ lib/mechanics/
                                 Paradise Regained wings / tethers / towers,
                                 Cruel Path lines and lanes, Pandora's Box,
                                 Paradise Lost enrage)
+    trials/                   — Extreme trials
+      doomtrain.ts            — Doomtrain (Hell on Rails EX) per-pull rules
+                                (avoidables, stored plasma spreads/pairs, orb
+                                cones/stacks/spreads and deadline, Arcane
+                                stacks, Plummet, Lightning Burst, Derail
+                                strandings, falls, mass deaths, enrage)
     arcadion/                 — AAC Heavyweight (Savage)
       vamp-fatale.ts          — Vamp Fatale (M9S) per-pull rules (Stomp bats and
                                 Bombpyre overlaps, Aetherletting drops/lines/overlap,

@@ -357,6 +357,14 @@ const MECHANICS = {
     },
   },
 
+  doomtrain: {
+    game: 'ff',
+    load: () => requireTsFromRoot('lib/mechanics/ffxiv/trials/doomtrain.ts'),
+    run({ mod, ctxs }) {
+      for (const c of ctxs) printPullErrors(c, mod.detectDoomtrainErrors(c.relPlayers(), c.relDeaths(), c.relEnemyCasts()));
+    },
+  },
+
   pandora: {
     game: 'ff',
     lateCapture: true, // Phase 5 only — safe on --from-minutes captures (see isLateCapture)

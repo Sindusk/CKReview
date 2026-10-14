@@ -351,6 +351,13 @@ exposure("targeted", ["ffxiv-lw1-buster", "ffxiv-lw1-chain", "ffxiv-lw1-tower"])
 mechanic("ffxiv-lw2-finisher", "Esoteric Finisher (non-tanks)", undefined, ["ffxiv-lw2-finisher"]);
 mechanic("ffxiv-lw2-contact", "Blood Mana contact (solo tank)", undefined, ["ffxiv-lw2-contact"]);
 exposure("targeted", ["ffxiv-lw2-finisher", "ffxiv-lw2-contact"]);
+// Doomtrain (Hell on Rails Extreme): the non-tanks' side of Lightning
+// Burst and of the Ghost Train cones, and the non-tanks' Aetherosote
+// stacks (doomtrain.ts reports every instance).
+mechanic("ffxiv-dt-buster", "Lightning Burst (non-tanks)", undefined, ["ffxiv-dt-buster"]);
+mechanic("ffxiv-dt-cone", "Aetherial Ray cones (non-tanks)", undefined, ["ffxiv-dt-cone"]);
+mechanic("ffxiv-dt-orb-stack", "Aetherosote stacks", undefined, ["ffxiv-dt-orb-stack"]);
+exposure("targeted", ["ffxiv-dt-buster", "ffxiv-dt-cone", "ffxiv-dt-orb-stack"]);
 // Futures Rewritten P1: the tanks' Powder Mark Trail swap and survival
 // (fatebreaker.ts reports both tanks at every Powder Mark).
 mechanic("ffxiv-fb-powder-swap", "Powder Mark swap", 1, ["ffxiv-fb-powder-swap"]);
