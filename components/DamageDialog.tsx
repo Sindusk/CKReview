@@ -55,6 +55,9 @@ type DamageDialogProps = {
 // Red, not the Major orange: beside the raid-buff gold the orange read as
 // the same colour. Totals use it; a single finding's cost the softer red.
 const LOSS_COLOR = SEVERITY_COLOR.Death;
+// The header's context / patch badges, coloured as AnalysisPanel's KILL / WIPE.
+const BADGE_GOOD = "#4ade80";
+const BADGE_BAD = "#f87171";
 const LOSS_SOFT = "#f0928d";
 
 // The dialog's secondary text, lifted for its small sizes (the app-wide
@@ -156,8 +159,11 @@ export default function DamageDialog({ open, onClose, pulls, currentPullId }: Da
 
   const analysis = selectedPull ? analyses.get(selectedPull.id) : undefined;
   const needRefetch = [...analyses.values()].filter((a) => a.missingData.length > 0).length;
-  const contextName = (allPulls ? gamePulls[gamePulls.length - 1] : selectedPull)?.name;
+  const contextPull = allPulls ? gamePulls[gamePulls.length - 1] : selectedPull;
+  const contextName = contextPull?.name;
   const hasContext = contextName ? getDamageContext(contextName) !== undefined : false;
+  // The patch badge reads the pull the context badge names.
+  const patchAnalysis = contextPull ? analyses.get(contextPull.id) : undefined;
 
   const playerNames = allPulls ? aggregate.map((a) => a.player) : analysis?.players.map((p) => p.player) ?? [];
   const activePlayer = selectedPlayer && playerNames.includes(selectedPlayer) ? selectedPlayer : playerNames[0] ?? null;
@@ -203,24 +209,39 @@ export default function DamageDialog({ open, onClose, pulls, currentPullId }: Da
                 </option>
               ))}
             </select>
-            <span className="ck-help" style={{ margin: 0 }}>
-              {hasContext
-                ? `Fight context: ${contextName}.`
-                : "No fight context for this boss: only untargetable time read from the log counts as forced."}
-              {!allPulls && analysis?.patch ? ` Judged by patch ${analysis.patch} job rules.` : ""}
-              {!allPulls && analysis?.missingData.length
-                ? ` This pull was fetched without ${analysis.missingData.join(", ")}; re-fetch the report for the full analysis.`
-                : allPulls && needRefetch > 0
-                  ? ` ${needRefetch} of ${gamePulls.length} pulls were fetched before the damage data existed; re-fetch the report for the full analysis.`
-                  : ""}
-            </span>
-            {view === "findings" && !allPulls && analysis && analysis.phases.length > 0 && (
-              <span style={{ marginLeft: "auto" }}>
+            {(!allPulls && analysis?.missingData.length) || (allPulls && needRefetch > 0) ? (
+              <span className="ck-help" style={{ margin: 0 }}>
+                {!allPulls && analysis?.missingData.length
+                  ? `This pull was fetched without ${analysis.missingData.join(", ")}; re-fetch the report for the full analysis.`
+                  : `${needRefetch} of ${gamePulls.length} pulls were fetched before the damage data existed; re-fetch the report for the full analysis.`}
+              </span>
+            ) : null}
+            {/* Right: Phases, the fight context and patch badges, the accuracy
+                note (user, 2026-10-14). Green = loaded, red = missing. */}
+            <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
+              {view === "findings" && !allPulls && analysis && analysis.phases.length > 0 && (
                 <InfoTip label="Phases: raid damage, damage taken and estimated loss per phase" maxWidth={480}
                   trigger={<span className="ck-badge">Phases</span>}
                   content={<PhaseTable phases={analysis.phases} />} />
-              </span>
-            )}
+              )}
+              {contextName && (hasContext ? (
+                <InfoTip label="Fight context loaded for this encounter." content="Fight context loaded for this encounter."
+                  trigger={<span className="ck-badge" style={{ color: BADGE_GOOD, fontSize: 11 }}>{contextName}</span>} />
+              ) : (
+                <InfoTip label="No fight context found for this encounter. Only untargetable time read from the log counts as forced, and nothing counts as movement."
+                  content={<>No fight context found for this encounter.<br />Only untargetable time read from the log counts as forced, and nothing counts as movement.</>}
+                  trigger={<span className="ck-badge" style={{ color: BADGE_BAD, fontSize: 11 }}>None</span>} />
+              ))}
+              {/* FFXIV only: WoW has no patch table yet and judges by current rules. */}
+              {!isWow && patchAnalysis && (patchAnalysis.patch ? (
+                <InfoTip label="Patch rules loaded." content="Patch rules loaded."
+                  trigger={<span className="ck-badge" style={{ color: BADGE_GOOD, fontSize: 11 }}>Patch {patchAnalysis.patch}</span>} />
+              ) : (
+                <InfoTip label="No rules found for this patch." content="No rules found for this patch."
+                  trigger={<span className="ck-badge" style={{ color: BADGE_BAD, fontSize: 11 }}>Patch ?</span>} />
+              ))}
+              <InfoTip label="Analysis here can be inaccurate." content="Analysis here can be inaccurate." />
+            </span>
           </div>
 
           {view === "compare" ? (
@@ -434,8 +455,10 @@ const WIN_SLOTS = 3;
 // card 14px taller than an empty slot, so "No counted loss" moved the
 // timeline up.
 const WIN_CARD_H = 56;
-function BiggestWins({ items, perPull, icons, onPick }: {
-  items: CoachingItem[]; perPull?: number; icons: AbilityIcons; onPick?: (f: DamageFinding) => void;
+// The % is the theme's loss over what the player dealt (user, 2026-10-14),
+// one decimal; the bar along the bottom stays its share of the counted loss.
+function BiggestWins({ items, perPull, dealt, icons, onPick }: {
+  items: CoachingItem[]; perPull?: number; dealt: number; icons: AbilityIcons; onPick?: (f: DamageFinding) => void;
 }) {
   const wins = biggestWins(items, WIN_SLOTS);
   const div = perPull ?? 1;
@@ -467,7 +490,7 @@ function BiggestWins({ items, perPull, icons, onPick }: {
                 <ThemeGlyph theme={w.theme} size={18} />
                 <span style={{ ...line, fontWeight: 600, fontSize: 12.5, flex: "1 1 auto", color: "var(--ck-text)" }}>{THEME_NAME[w.theme]}</span>
                 <span className="ck-num" style={{ color: LOSS_COLOR, fontSize: 14, fontWeight: 700, flex: "0 0 auto" }}>{fmtDamage(w.lostDamage / div)}</span>
-                <span className="ck-num" style={{ color: "var(--ck-text-3)", fontSize: 11, flex: "0 0 auto" }}>{Math.round(w.share * 100)}%</span>
+                <span className="ck-num" style={{ color: "var(--ck-text-3)", fontSize: 11, flex: "0 0 auto" }}>{dealt > 0 ? `${((w.lostDamage / div / dealt) * 100).toFixed(1)}%` : ""}</span>
               </div>
               <div style={{ ...line, color: "var(--ck-text-2)", fontSize: 11.5 }}>
                 <span className="ck-num" style={{ color: "var(--ck-text-3)" }}>{fmtTime(w.worst.startMs)}</span>{" "}
@@ -569,11 +592,8 @@ function PlayerDetail({ summary, analysis, colorFor, iconFor, pull, pulls }: {
               `${ratesNote} DoT ticks don't count (FFLogs logs them at their average).`,
           }] : []),
       ]} />
-      <BiggestWins items={items} icons={icons} onPick={pick} />
+      <BiggestWins items={items} dealt={summary.damage} icons={icons} onPick={pick} />
       <DamageTimeline summary={summary} analysis={analysis} highlight={hovered ?? picked} onPick={pick} />
-      {(summary.timeline.gauges ?? []).map((g) => (
-        <div key={g.name} style={{ color: "var(--ck-text-3)", fontSize: 11, marginLeft: 96 }}>{g.name}: {g.note}</div>
-      ))}
       {shown.length === 0 ? (
         <p className="ck-dialog-text" style={{ marginTop: 12 }}>Nothing found for this player.</p>
       ) : (
@@ -671,7 +691,7 @@ function FindingGroups({ findings, icons, open, onOpenChange: setOpen, picked, o
               <span style={{ flex: "0 0 auto", fontWeight: 600, fontSize: 13, color: "var(--ck-text)" }}>{KIND_LABEL[kind]}</span>
               {DELAY_TIME_KINDS.has(kind) && (
                 <span className="ck-num" style={{ flex: "0 0 auto", fontWeight: 600, fontSize: 13, color: "var(--ck-text-2)" }}>
-                  {(list.filter((f) => !f.forced).reduce((a, f) => a + (f.delayMs ?? 0), 0) / 1000).toFixed(1)}s
+                  ({(list.filter((f) => !f.forced).reduce((a, f) => a + (f.delayMs ?? 0), 0) / 1000).toFixed(1)}s)
                 </span>
               )}
               <span style={{ color: "var(--ck-text-3)", fontSize: 12, flex: "1 1 auto" }}>
@@ -778,7 +798,7 @@ function AggregateDetail({ agg, totalPulls, colorFor, iconFor, pulls }: {
         { label: "Lost per pull", value: fmtDamage(agg.lostPerPull), sub: `forced ${fmtDamage(agg.forcedPerPull)}`,
           tone: agg.lostPerPull > 0 ? "bad" : undefined },
       ]} />
-      <BiggestWins items={recurringItems(agg.recurring)} perPull={agg.pulls} icons={icons} />
+      <BiggestWins items={recurringItems(agg.recurring)} perPull={agg.pulls} dealt={agg.damagePerPull} icons={icons} />
       <div className="ck-table-wrap">
         <table className="ck-table" style={{ fontSize: 12 }}>
           <thead>

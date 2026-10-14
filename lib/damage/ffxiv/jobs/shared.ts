@@ -973,12 +973,16 @@ function runGauge(ctx: PlayerCheckContext, spec: GaugeSpec): GaugeRun {
   return { value, negatives, waste, steps, capped };
 }
 
-/** The same gauge as a timeline lane (display only). */
-export function gaugeTrack(ctx: PlayerCheckContext, spec: GaugeSpec, max = spec.cap): GaugeTrack {
+/**
+ * The same gauge as a timeline lane (display only). `name` is the lane's
+ * label, short enough for the timeline's 96px gutter ("Focus", not
+ * "Firstminds' Focus", which it cut to "stminds' Focus").
+ */
+export function gaugeTrack(ctx: PlayerCheckContext, spec: GaugeSpec, name = spec.name): GaugeTrack {
   const run = runGauge(ctx, spec);
   const lost = run.waste.reduce((a, w) => a + w.amount, 0);
   return {
-    name: spec.name, max, steps: run.steps, capped: run.capped,
+    name, max: spec.cap, steps: run.steps, capped: run.capped,
     note: `${lost} ${spec.unit} lost at the cap (the overcap findings value it)` +
       (run.negatives > 0 ? `; ${run.negatives} spend${run.negatives === 1 ? "" : "s"} the simulation had no gauge for (model or log off)` : ""),
   };

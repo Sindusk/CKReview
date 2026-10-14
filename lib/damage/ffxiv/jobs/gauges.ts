@@ -297,7 +297,7 @@ export function featherGauge(ctx: PlayerCheckContext): SimulatedGauge {
   const gen = idSet(FEATHER_GENERATORS), spend = idSet(FEATHER_SPENDERS);
   const events = ctx.player.casts.filter((c) => gen.has(c.abilityId) || spend.has(c.abilityId))
     .map((c) => ({ t: c.timestamp, delta: gen.has(c.abilityId) ? 0.5 : -1 }));
-  return simulate("Feathers (est.)", FEATHER_MAX, events, ctx, (over, short) =>
+  return simulate("Feathers", FEATHER_MAX, events, ctx, (over, short) =>
     `Estimated: ${Math.floor(over)} feather${Math.floor(over) === 1 ? "" : "s"} may have been lost at the cap (each proc counted as half a feather)` + shortNote(short, "feather"));
 }
 
@@ -335,7 +335,7 @@ export function espritGauge(ctx: PlayerCheckContext): SimulatedGauge {
       if (has(h.timestamp) && !deadAt(h.timestamp)) events.push({ t: h.timestamp, delta: ESPRIT_PARTY_AMOUNT * rate });
     }
   }
-  return simulate("Esprit (est.)", ESPRIT_MAX, events, ctx, (over, short) =>
+  return simulate("Esprit", ESPRIT_MAX, events, ctx, (over, short) =>
     `Estimated: ${Math.floor(over / ESPRIT_COST)} Saber Dance${Math.floor(over / ESPRIT_COST) === 1 ? "" : "s"} may have been lost at the cap (${Math.round(over)} Esprit over; the party's share is an average rate)` +
     shortNote(short, "Saber Dance's worth"));
 }
@@ -525,14 +525,14 @@ export function serpentOfferings(ctx: PlayerCheckContext): GaugeTrack[] {
   }
   if (cappedSince !== null && ctx.endMs > cappedSince) capped.push({ startMs: cappedSince, endMs: ctx.endMs });
   return [{
-    name: "Serpent Offerings", max: OFFERINGS_MAX, steps, capped, marks,
+    name: "Offerings", max: OFFERINGS_MAX, steps, capped, marks,
     note: `${lost} Serpent Offerings lost at the cap (${Math.floor(lost / OFFERINGS_COST)} Reawaken${Math.floor(lost / OFFERINGS_COST) === 1 ? "" : "s"}' worth); ${value} held at the end` +
       (short > 0 ? `; ${short} Reawaken${short === 1 ? "" : "s"} the simulation had no Offerings for (model or log off)` : "") +
       "; display only",
   }];
 }
 
-const viperGauges = (ctx: PlayerCheckContext): GaugeTrack[] => [gaugeTrack(ctx, rattlingCoilSpec(ctx)), ...serpentOfferings(ctx)];
+const viperGauges = (ctx: PlayerCheckContext): GaugeTrack[] => [gaugeTrack(ctx, rattlingCoilSpec(ctx), "Coils"), ...serpentOfferings(ctx)];
 
 const pictomancerGauges = (ctx: PlayerCheckContext): GaugeTrack[] => {
   const spec = paletteSpec(ctx);
@@ -543,11 +543,11 @@ export const JOB_GAUGES: Record<string, ((ctx: PlayerCheckContext) => GaugeTrack
   "Pictomancer": [pictomancerGauges],
   "Sage": [addersgall, addersting],
   // Firstminds' Focus: the overcap check's own simulation (melee.ts).
-  "Dragoon": [(ctx) => [gaugeTrack(ctx, firstmindsFocusSpec(ctx))]],
+  "Dragoon": [(ctx) => [gaugeTrack(ctx, firstmindsFocusSpec(ctx), "Focus")]],
   "Viper": [viperGauges],
   "Paladin": [oathGauge],
   "Dancer": [dancerGauges],
   "Astrologian": [arcana],
   // Beast Gauge: the overcap check's own simulation (pld-war.ts beastGaugeSpec).
-  "Warrior": [(ctx) => [gaugeTrack(ctx, beastGaugeSpec(ctx))]],
+  "Warrior": [(ctx) => [gaugeTrack(ctx, beastGaugeSpec(ctx), "Beast")]],
 };
