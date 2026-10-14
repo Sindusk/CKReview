@@ -103,6 +103,10 @@
 // adjust); P4 +3:34 the R1 dropped 12.8y out and the line victims were
 // adjusting around it (not their fault). FFLogs logs a Damage Down refresh
 // as remove + apply at the hit's millisecond.
+// VOD review 2026-10-14 (user): report bVDR2mTL7YGvMxK1 pull 1 (a week-2
+// kill), rulings in expectations/rulings.json. All three Stomp bat hits on
+// the OT confirmed. A Rain death to low HP, and a carrier dying to their own
+// explosion while a healer was dead, are mitigation: no error, as built.
 //
 // -- RULES IMPLEMENTED --
 // ffxiv-vf-avoidable (Major): Coffinfiller, Half Moon, Pulping Pulse,

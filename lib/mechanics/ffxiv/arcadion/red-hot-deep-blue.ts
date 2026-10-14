@@ -9,7 +9,17 @@
 // A12 +213.3 (report letter, pull, seconds from pull start):
 //   A = jN3XDrf2z8PmLgRJ (53 wipes, reached the prison at best),
 //   B = xFAfGP3qX4yJhDrV (39 wipes, prison through enrage; B35 enraged),
-//   C = d3vRbwfpNBLzJ2Xh (3 wipes + the kill, C4, 579.8s).
+//   C = d3vRbwfpNBLzJ2Xh (3 wipes + the kill, C4, 579.8s),
+//   N = bVDR2mTL7YGvMxK1 (week-2 reclears: 5 wipes + the kill, N6).
+// VOD review 2026-10-14 (user): report N pulls 1-5, rulings in
+// expectations/rulings.json. It set the split-arena column and Vertical
+// tank calls below. Open (no log signal yet, so unruled):
+// - N2 +4:53 Hot Aerial jumped OT > H2 > M2 > H2 (clean: OT > H2 > M2 > R2)
+//   and killed the H2; the user puts it on the OT. Repeats happen in 12 of
+//   22 week-1 pulls with different first jumpers, and the jumps' positions
+//   aren't logged reliably.
+// - N5 +3:33 Snaps: the OT moved badly and the H2 was in place, but both
+//   stood at their usual angles around Red Hot at the hit.
 // Roster slots (user): MT PLD, OT DRK, H1 AST, H2 SGE, M1 RPR, M2 DRG,
 // R1 DNC, R2 RDM. The strategy was mixed week-1 improvisation, NOT Hector
 // (user): no rule depends on a clock spot or group assignment.
@@ -131,9 +141,15 @@
 //   user, 2026-10-09): there only players 30+ degrees off their spot near
 //   the overlap are named (A10 +2:07 H2, not the OT). Stray Snap cones carry
 //   no cast target, so Snap overlaps name only the players hit twice.
+//   Split-arena cones: each side lines up in one north-south column (clean
+//   0-4y from its median x); a victim 6y+ off it, when the other victims
+//   were on theirs, is named alone (user, 2026-10-14, N1 +7:11 the OT).
 // ffxiv-rhdb-buster (Major): a non-tank in Hot Impact or in someone else's
-//   Vertical buster; a non-tank who drew Vertical as the nearest (tanks
-//   alive and not dead in the last 30s); snaking Hot Impact on a non-tank
+//   Vertical buster; a non-tank drawing Vertical as the nearest (tanks alive
+//   and not dead in the last 30s) names that boss's tank instead, who
+//   stands under it (OT Red Hot's Blast, MT Deep Blue's Plunge in every
+//   clean pull; user, 2026-10-14, N3 +3:18), one error per buster, and the
+//   non-tank only when the slot can't be read; snaking Hot Impact on a non-tank
 //   names that non-tank (user, 2026-10-09: telegraphed, the non-tank's
 //   fault; A14 +4:30 the H1 and R2).
 // ffxiv-rhdb-deep-impact (Major): the target is the farthest player it hit
@@ -573,6 +589,9 @@ const TANK_MIN_YD         = 6;
 // Normal snaking (+246) to its Deep Impact (+315).
 const SNAKING_SPAN_MS     = 70_000;
 const VERTICAL            = [46585, 46586]; // Vertical Blast / Plunge (nearest-player buster)
+// Who takes each Vertical in every clean resolution (A, C, B1, V1, N): the
+// OT Red Hot's Blast, the MT Deep Blue's Plunge.
+const VERTICAL_TANK: Record<number, FFRoleSlot> = { 46585: "OT", 46586: "MT" };
 const PYROTATION          = 46531;
 const CUTBACK_BLAZE       = 46538;
 const CUTBACK_CAST        = 46537; // Red Hot's own cast: its position
@@ -582,6 +601,11 @@ const SPLIT_FLOATER       = [46548, 46527]; // the split arena's fixed center Fl
 const SPLIT_CONES         = [46558, 46561]; // the split arena's Double-Dip / Reverse
 // A split drop this close to the north/south midline (clean: 9-19y off).
 const SPLIT_MIDLINE       = 500;
+// The split cones follow the split Floater within this window.
+const SPLIT_CONES_WINDOW_MS = 30_000;
+// A player this far (x) from their side's median column at the split cones
+// was out of line. Clean volleys (C4, B1, V1, N4, N6): 0-4y; N1's OT 10.3y.
+const SPLIT_COLUMN_OFF    = 600;
 const DIVERS_DARE         = [46520, 46521];
 // Cutback leaves ~60 degrees safe (user: a ~300 degree attack). Puddles
 // under the boss's hitbox don't count against the slice.
@@ -1227,6 +1251,36 @@ function detectOverlaps(players: PlayerInfo[], life: Life, casts: EnemyEvent[], 
           continue;
         }
       }
+      // Split-arena cones: each side lines up in one north-south column. A
+      // victim standing well off their side's column (in toward the boss)
+      // was in the far side's cone paths; the others hit were in place
+      // (user, 2026-10-14, N1 +7:11: the OT 10.3y in from the east column
+      // took three cones, the MT and M1 on the west column two each).
+      const splitT = castsOf(casts, SPLIT_FLOATER)[0]?.timestamp;
+      if (splitT !== undefined && fam.ids.some((id) => SPLIT_CONES.includes(id)) &&
+          res[0].e.timestamp > splitT && res[0].e.timestamp < splitT + SPLIT_CONES_WINDOW_MS) {
+        const at = new Map<PlayerInfo, PlayerEvent>();
+        for (const h of res) if (h.e.x !== undefined && !at.has(h.p)) at.set(h.p, h.e);
+        const columnOff = (p: PlayerInfo) => {
+          const e = at.get(p);
+          if (!e) return undefined;
+          const side = [...at].filter(([q, x]) => q !== p && (x.x! > ARENA_CENTER) === (e.x! > ARENA_CENTER)).map(([, x]) => x.x!).sort((a, b) => a - b);
+          return side.length >= 2 ? Math.abs(e.x! - side[Math.floor(side.length / 2)]) : undefined;
+        };
+        const victims = [...flagged.keys()].filter((p) => !excused.some((x) => x.p === p && Math.abs(x.t - flagged.get(p)!.t) <= 2000));
+        const off = victims.filter((p) => (columnOff(p) ?? 0) >= SPLIT_COLUMN_OFF);
+        if (off.length && off.length < victims.length) {
+          const hitText = joinNames(victims.map((v) => `${v.name} (${uniq((byPlayer.get(v) ?? []).map((h) => instanceKey(h.e))).length} cones${flagged.get(v)!.died ? ", died" : ""})`));
+          for (const p of off) {
+            errors.push(playerError(p, {
+              ruleId: RHDB_OVERLAP_RULE_ID, severity: "Major", name: `${fam.name}: Out of Position`,
+              description: `${fam.name} in the split arena: stood ${yd(columnOff(p)!)}y in from their side's line, in the path of the far side's cones, so the cones overlapped: ${hitText}. Each side lines up along its own wall so the cones from the middle fan out past everyone.`,
+              timestamp: Math.min(...victims.map((v) => flagged.get(v)!.t)), abilityId: fam.ids[0], abilityName: fam.name,
+            }));
+          }
+          continue;
+        }
+      }
       for (const [p, f] of flagged) {
         // Cut off by someone's misplaced split-arena fire: theirs, not this player's.
         if (excused.some((x) => x.p === p && Math.abs(x.t - f.t) <= 2000)) continue;
@@ -1243,7 +1297,7 @@ function detectOverlaps(players: PlayerInfo[], life: Life, casts: EnemyEvent[], 
 
 // ── tank busters ────────────────────────────────────────────────────────────
 
-function detectBusters(players: PlayerInfo[], life: Life, casts: EnemyEvent[]): PullError[] {
+function detectBusters(players: PlayerInfo[], life: Life, casts: EnemyEvent[], slots: Slots): PullError[] {
   const errors: PullError[] = [];
   const tanks = players.filter(isTank);
   const tanksReady = (t: number) => tanks.length === 2 && tanks.every((p) => !tankOutRecently(life, p, t));
@@ -1293,12 +1347,32 @@ function detectBusters(players: PlayerInfo[], life: Life, casts: EnemyEvent[]): 
   for (const res of resolutions(players, VERTICAL, 500)) {
     const t = res[0].e.timestamp;
     const owners = instanceOwners(casts, VERTICAL, res, players);
+    // The boss's tank stands under it to take the buster; a non-tank drawing
+    // it means that tank was too far out (user, 2026-10-14, N3 +3:18: the OT
+    // far outside Red Hot's hitbox, so the M2 was closest). One error per
+    // buster, listing everyone it went to.
+    const drawn = new Map<number, Hit[]>();
     for (const { p, e } of res.filter((h) => !isTank(h.p) && life.hitAlive(h.p, h.e.timestamp))) {
       const owner = owners.get(e);
       if ((owner && owner !== p) || !tanksReady(t)) continue; // someone else's buster: below
+      const tank = players.find((x) => slots.get(x) === VERTICAL_TANK[e.abilityId] && isTank(x));
+      if (tank) {
+        drawn.set(e.abilityId, [...(drawn.get(e.abilityId) ?? []), { p, e }]);
+        continue;
+      }
       errors.push(playerError(p, {
         ruleId: RHDB_BUSTER_RULE_ID, severity: "Major", name: `Took ${e.abilityName}`,
         description: `Took ${e.abilityName}, the surfboard's tankbuster on the nearest player (${kFmt(e.amount ?? 0)})${diedText(life.diedFrom(p, e.timestamp))}. They were closer to the boss than either tank; the tank closest to that boss takes it, everyone else stays farther out.`,
+        timestamp: e.timestamp, abilityId: e.abilityId, abilityName: e.abilityName,
+      }));
+    }
+    for (const [id, hs] of drawn) {
+      const tank = players.find((x) => slots.get(x) === VERTICAL_TANK[id] && isTank(x))!;
+      const e = hs[0].e;
+      const who = joinNames(hs.map((h) => `${h.p.name} (${kFmt(h.e.amount ?? 0)}${life.diedFrom(h.p, h.e.timestamp) ? ", died" : ""})`));
+      errors.push(playerError(tank, {
+        ruleId: RHDB_BUSTER_RULE_ID, severity: "Major", name: `Not Under the Boss for ${e.abilityName}`,
+        description: `${e.abilityName}, the surfboard's tankbuster on the nearest player, went to ${who}: as ${VERTICAL_TANK[id]}, ${tank.name} takes it by standing essentially under ${id === VERTICAL[0] ? "Red Hot" : "Deep Blue"}, and was too far out to be the closest.`,
         timestamp: e.timestamp, abilityId: e.abilityId, abilityName: e.abilityName,
       }));
     }
@@ -1639,7 +1713,7 @@ export function detectRedHotDeepBlueErrors(
     ...detectFloater(players, life, occurrences),
     ...split.errors,
     ...detectOverlaps(players, life, enemyCasts, volleys, slots, split.excused),
-    ...detectBusters(players, life, enemyCasts),
+    ...detectBusters(players, life, enemyCasts, slots),
     ...detectDeepImpact(players, life, enemyCasts, deathEvents),
     ...detectStacks(players, life),
     ...detectXtremeWave(players, life, enemyCasts, occurrences),

@@ -10,7 +10,15 @@
 //   B = L3YxvqnNVdzBcj7t (35 wipes, roster change; enraged 4 times),
 //   C = gmX1Ac9PqWdfDR7B (19 wipes + the kill, C20, 11:01),
 //   D = G6PDJfcX98CpTkBy (76 wipes, report A's roster; mostly Meteorain and
-//       the Flatliner split, never past Avalanche).
+//       the Flatliner split, never past Avalanche),
+//   N = bVDR2mTL7YGvMxK1 (week-2 reclears, 10 wipes + the kill, N11).
+// VOD review 2026-10-14 (user): report N pulls 1-9, rulings in
+// expectations/rulings.json. It set the Fire Breath line owners, the
+// Massive Meteor all-alive gate, near-miss Comets and knocked falls below.
+// Flatliner's second line wave swaps the roles: the first wave's breath
+// baiters take the tethers (9 of 9 two-wave pulls). Open: N1 +1:35 scythe,
+// the H1 late to her spot and the M1 in place, but both were on their clock
+// spots at the hit (2 and 4 degrees off), so both stay named.
 // Report D added: a Foregone Fatality tether nobody intercepts targets a
 // comet rock ("Comet" as the cast target) and the rock blows up the raid
 // (Unmitigated Explosion 46135; D15, D61 +5:11); a comet dropped onto an
@@ -111,7 +119,12 @@
 //   hit who took nothing else) is named too. Impact and scythe cones have
 //   assigned spots (IMPACT_SPOTS absolute, SCYTHE_CLOCK around the scythe):
 //   when one player of the incident was clearly the farthest off, only they
-//   are named. Gust: a known owner whose cone hit someone is named alone.
+//   are named. Gust and Fire Breath / Meteowrath: a known owner whose bait
+//   hit someone is named alone (a line that lost its cast target gets its
+//   owner from the previous wave's swap); a breath baiter and a tether
+//   holder in each other's lines names the baiter (user, 2026-10-14, N3,
+//   N4). Comets whose players all stood 5y+ apart (clean 6.1y+) are one
+//   player-less Minor: a near miss, not a misplacement (user, N8 +1:30).
 //   Instances that hit a player in raise grace are dropped. Gust /
 //   Fire Breath only with all 8 alive; Impact only with both tanks holding
 //   enmity.
@@ -125,7 +138,9 @@
 //   partners (MT/M1, OT/M2, H1/R1, H2/R2) who didn't share a stack; the
 //   layout's rotation is fitted to everyone's position (EYE_SPOTS) and the
 //   partner clearly farther from their spot is named, marked or not;
-//   nobody when the markers were mixed (a disconnect). A
+//   nobody when the markers were mixed (a disconnect). Massive Meteor only
+//   with all 8 alive: with deaths it retargets onto one side (fallout;
+//   user, 2026-10-14, N4 +7:28). A
 //   Two/Four-Way death with Fire Resistance Down II on the line's largest
 //   hit took the front.
 // ffxiv-tyrant-buster: a non-tank in the axe's Raw Steel, Great Wall or
@@ -152,7 +167,9 @@
 //   lava (Minor; Major only when Burns killed), a lethal Mammoth Meteor.
 // ffxiv-tyrant-fall (Major): a no-killing-blow death outside a called wipe,
 //   "knocked" after a tower / Flatliner / tornado knockback in the 5s
-//   before. Walking Dead running out is a player-less Minor.
+//   before. Walking Dead running out is a player-less Minor. A knocked fall
+//   more than 12s before the end never joins a called wipe, even when the
+//   reset follows it (user, 2026-10-14, N9 +6:31 the OT).
 // ffxiv-tyrant-enrage, -called-wipe (3+ no-killing-blow deaths within 10s,
 //   or any within 12s of the end), -collapse (5 dead, pull over within 45s):
 //   Raid, only before any other Raid.
@@ -647,18 +664,29 @@ const AVOIDABLE: Record<number, Avoidable> = {
 // farthest from theirs (see spreadDeviation).
 // `ownerAtFault`: when a known owner's bait hit someone, only the owner is
 // named (user, 2026-10-09, D46 +3:47: the M2 didn't go far enough back and
-// her tornado cone hit the H2, who was fine).
-type Family = { name: string; ids: number[]; what: string; why: string; gap?: number; proximity?: boolean; tankEnmity?: boolean; spot?: "impact" | "scytheClock"; ownerAtFault?: boolean };
+// her tornado cone hit the H2, who was fine; 2026-10-14, N3 +6:45 and N4
+// +7:17: the line's owner stood wrong, its victims were placed).
+// `nearMiss`: an overlap whose players all stood at least this far apart
+// (units) is two players a little too close, not a misplacement: one
+// player-less Minor (user, 2026-10-14, N8 +1:30).
+// `lineSwap`: Flatliner's lines, whose owners the next wave swaps (see
+// inferSwappedLineOwners).
+type Family = { name: string; ids: number[]; what: string; why: string; gap?: number; proximity?: boolean; tankEnmity?: boolean; spot?: "impact" | "scytheClock"; ownerAtFault?: boolean; nearMiss?: number; lineSwap?: boolean };
+const FIRE_BREATH_HIT  = 46151;
+const FLATLINER_TETHER = 46147;
 const PERSONAL: Family[] = [
   { name: "Impact", ids: [46092], what: "Impact circle", tankEnmity: true, spot: "impact",
     why: "The axe's Raw Steel drops a circle on each of the six non-tanks; spread to your own spot." },
   { name: "Sweeping Victory", ids: [46108], what: "scythe cone", spot: "scytheClock",
     why: "The scythe fires a cone at every player; spread around it on your clock spot so no cone crosses another player." },
-  { name: "Comet", ids: [46100], what: "Comet",
+  // Clean volleys keep every pair 6.1y+ apart (40 volleys); the near-miss
+  // overlaps stood 5.8-6.2y apart (A14, A22, A33, N8), the misplaced ones
+  // 2.8-4.2y (A16, A32, B2).
+  { name: "Comet", ids: [46100], what: "Comet", nearMiss: 500,
     why: "Void Stardust's Comets are spreads on every player; stand apart." },
   { name: "Powerful Gust", ids: [46119], what: "tornado cone", proximity: true, ownerAtFault: true,
     why: "Each tornado fires a cone at its two nearest players; aim them outward and apart." },
-  { name: "Fire Breath / Meteowrath", ids: [46151, 46147], what: "Fire Breath or tether line", proximity: true,
+  { name: "Fire Breath / Meteowrath", ids: [FIRE_BREATH_HIT, FLATLINER_TETHER], what: "Fire Breath or tether line", proximity: true, ownerAtFault: true, lineSwap: true,
     why: "Each player takes exactly one line: the tethered players stretch theirs, the others bait one breath each; keep the lines apart." },
   { name: "Majestic Meteowrath", ids: [46169], what: "tether line",
     why: "Each tower soaker stretches their own tether across the arena; keep the lines apart." },
@@ -672,7 +700,11 @@ const PERSONAL: Family[] = [
 // `pairs`: Eye of the Hurricane, judged by assigned partners (eyePartnerErrors).
 // `party`: one party-wide circle stack; an absent player within
 // STACK_NEAR_MISS of it isn't named.
-type Stack = Family & { eligible?: "all" | "nonTank" | "pairTower"; healerLines?: boolean; pairs?: boolean; party?: boolean };
+// `allAlive`: judged only with all eight alive. With anyone dead the stacks
+// retarget onto whoever is left and land on one side (user, 2026-10-14, N4
+// +7:28: the R1 target died for lack of mitigation and the stack jumped onto
+// the other group; fallout, not a stack mistake).
+type Stack = Family & { eligible?: "all" | "nonTank" | "pairTower"; healerLines?: boolean; pairs?: boolean; party?: boolean; allAlive?: boolean };
 const STACKS: Stack[] = [
   { name: "Heavy Weight", ids: [46107], what: "axe stack", party: true,
     why: "The axe's Heavy Weight is one party stack; everyone shares it." },
@@ -684,7 +716,7 @@ const STACKS: Stack[] = [
     why: "Crushing Comet is one party stack; everyone shares it." },
   { name: "Eye of the Hurricane", ids: [46116], what: "pair stack", pairs: true,
     why: "Eye of the Hurricane is four two-person stacks; each player stands in exactly one, with their partner." },
-  { name: "Massive Meteor", ids: [46153], what: "light-party stack", gap: 700,
+  { name: "Massive Meteor", ids: [46153], what: "light-party stack", gap: 700, allAlive: true,
     why: "Massive Meteor is two five-hit light-party stacks; each stack needs its four players." },
   { name: "Two-Way Fireball", ids: [TWO_WAY], what: "charge line",
     why: "Two-Way Fireball is two four-player charge lines; everyone joins one." },
@@ -953,6 +985,30 @@ function castOwners(casts: EnemyEvent[], ids: number[], res: Hit[], players: Pla
   return out;
 }
 
+/**
+ * Flatliner's second line wave swaps the roles: the first wave's Fire Breath
+ * baiters take the tethers and the tethered players bait the breaths (every
+ * two-wave pull on disk, 9 of 9). A line whose cast lost its target (its
+ * holder died to it) belongs to the one player of the swapped role not
+ * among the wave's targeted casts of that kind.
+ */
+function inferSwappedLineOwners(casts: EnemyEvent[], res: Hit[], players: PlayerInfo[], owners: Map<string, PlayerInfo>): void {
+  const t0 = res[0].e.timestamp;
+  const wave = casts.filter((c) => (c.abilityId === FIRE_BREATH_HIT || c.abilityId === FLATLINER_TETHER) && c.timestamp >= t0 - 2000 && c.timestamp <= t0 + 500);
+  const prev = casts.filter((c) => (c.abilityId === FIRE_BREATH_HIT || c.abilityId === FLATLINER_TETHER) && c.timestamp < t0 - 15_000 && c.timestamp > t0 - 45_000);
+  if (!wave.length || !prev.length) return;
+  for (const [kind, from] of [[FLATLINER_TETHER, FIRE_BREATH_HIT], [FIRE_BREATH_HIT, FLATLINER_TETHER]] as const) {
+    const now = wave.filter((c) => c.abilityId === kind && c.sourceInstance !== undefined);
+    const untargeted = now.filter((c) => !c.target);
+    const left = uniq(prev.filter((c) => c.abilityId === from && c.target).map((c) => c.target!))
+      .filter((n) => !now.some((c) => c.target === n));
+    if (untargeted.length !== 1 || left.length !== 1) continue;
+    const p = players.find((x) => x.name === left[0]);
+    const k = `${untargeted[0].actorName}#${untargeted[0].sourceInstance}`;
+    if (p && !owners.has(k)) owners.set(k, p);
+  }
+}
+
 // ── plain avoidable hits ────────────────────────────────────────────────────
 
 function detectAvoidable(players: PlayerInfo[], life: Life): PullError[] {
@@ -1017,6 +1073,7 @@ function detectPersonalOverlaps(players: PlayerInfo[], life: Life, casts: EnemyE
       }
       if (!byInst.size) continue;
       const owners = castOwners(casts, fam.ids, res, players);
+      if (fam.lineSwap) inferSwappedLineOwners(casts, res, players, owners);
       for (const [k, hs] of byInst) {
         if (owners.has(k)) continue;
         const only = uniq(hs.map((h) => h.p)).filter((p) => byPlayer.get(p)!.size === 1);
@@ -1075,7 +1132,15 @@ function detectPersonalOverlaps(players: PlayerInfo[], life: Life, casts: EnemyE
           }
         }
         if (!culprit && fam.ownerAtFault) {
-          const atFault = uniq([...owners].filter(([k, o]) => group.includes(o) && life.hitAlive(o, t) && byInst.get(k)!.some((h) => h.p !== o)).map(([, o]) => o));
+          let atFault = uniq([...owners].filter(([k, o]) => byInst.has(k) && group.includes(o) && life.hitAlive(o, t) && byInst.get(k)!.some((h) => h.p !== o)).map(([, o]) => o));
+          // A Fire Breath baiter and a tether holder caught in each other's
+          // lines: the baiter belonged inside, the tether is stretched to its
+          // fixed edge (user, 2026-10-14, N4 +7:17: the M2 had a breath marker,
+          // thought she had a tether and stood in the H2's line).
+          if (fam.lineSwap && atFault.length === 2 && group.length === 2) {
+            const breath = atFault.filter((o) => [...owners].some(([k, x]) => x === o && byInst.get(k)?.[0].e.abilityId === FIRE_BREATH_HIT));
+            if (breath.length === 1) atFault = breath;
+          }
           if (atFault.length && atFault.length < group.length) {
             for (const o of atFault) {
               const hitOthers = uniq([...owners].filter(([, x]) => x === o).flatMap(([k]) => byInst.get(k)!.map((h) => h.p)).filter((p) => p !== o));
@@ -1085,6 +1150,16 @@ function detectPersonalOverlaps(players: PlayerInfo[], life: Life, casts: EnemyE
                 timestamp: t, abilityId: fam.ids[0], abilityName: fam.name,
               }));
             }
+            continue;
+          }
+        }
+        if (fam.nearMiss && group.length >= 2) {
+          const at = group.map((p) => res.find((h) => h.p === p && h.e.x !== undefined && h.e.y !== undefined)?.e);
+          const apart = at.every((a) => a) && at.every((a, i) => at.slice(i + 1).every((b) => Math.hypot(a!.x! - b!.x!, a!.y! - b!.y!) >= fam.nearMiss!));
+          if (apart) {
+            errors.push(playerlessMinor(TYRANT_OVERLAP_RULE_ID, `${fam.name} Overlap`,
+              `${namesOf(group)} were each hit by more than one ${fam.what}, but stood ${yd(Math.min(...at.flatMap((a, i) => at.slice(i + 1).map((b) => Math.hypot(a!.x! - b!.x!, a!.y! - b!.y!)))))}y apart: both roughly in place, just slightly too close.${deathText} ${fam.why}`,
+              t, fam.ids[0], fam.name));
             continue;
           }
         }
@@ -1204,6 +1279,7 @@ function detectStacks(
   for (const fam of STACKS) {
     for (const res of clusterByGap(hitsOf(players, life, fam.ids), (h) => h.e.timestamp, fam.gap ?? 1500)) {
       const t = res[0].e.timestamp;
+      if (fam.allAlive && players.some((p) => !life.hitAlive(p, t))) continue;
       const byPlayer = new Map<PlayerInfo, Set<string>>();
       for (const h of res) byPlayer.set(h.p, (byPlayer.get(h.p) ?? new Set()).add(instanceKey(h.e)));
       const killed = uniq(res.map((h) => h.p)).filter((p) => {
@@ -1718,9 +1794,17 @@ function detectStampede(players: PlayerInfo[], life: Life, deaths: DeathEvent[],
 
 // ── deaths with no killing blow: falls ──────────────────────────────────────
 
-/** No-killing-blow deaths that are the wipe being called, not mistakes. */
-function calledWipeDeaths(deaths: DeathEvent[], pullEnd: number): Set<DeathEvent> {
-  const silent = deaths.filter((d) => !d.killingAbilityGameId);
+/**
+ * No-killing-blow deaths that are the wipe being called, not mistakes. A
+ * fall right after a tower or Flatliner knockback, short of the pull's last
+ * seconds, is the fall itself, even when the reset follows it (user,
+ * 2026-10-14, N9 +6:31: the OT launched himself off with the tower's
+ * knockback; the MT jumping off 8s later was the call).
+ */
+function calledWipeDeaths(players: PlayerInfo[], deaths: DeathEvent[], pullEnd: number): Set<DeathEvent> {
+  const knocked = (d: DeathEvent) => pullEnd - d.timestamp > CALLED_WIPE_END_MS &&
+    !!players.find((p) => p.name === d.player)?.damageTaken.some((e) => KNOCKBACKS[e.abilityId] && e.timestamp <= d.timestamp && e.timestamp >= d.timestamp - FALL_KNOCKBACK_MS);
+  const silent = deaths.filter((d) => !d.killingAbilityGameId && !knocked(d));
   const out = new Set<DeathEvent>();
   for (const d of silent) {
     if (pullEnd - d.timestamp <= CALLED_WIPE_END_MS) out.add(d);
@@ -1770,7 +1854,7 @@ export function detectTyrantErrors(
   if (!enemyCasts.some((c) => SIGNATURE.includes(c.abilityId))) return [];
   const life = buildLife(players, deathEvents);
   const pullEnd = Math.max(0, ...players.flatMap((p) => [...p.damageTaken, ...p.casts].map((e) => e.timestamp)), ...deathEvents.map((d) => d.timestamp));
-  const called = calledWipeDeaths(deathEvents, pullEnd);
+  const called = calledWipeDeaths(players, deathEvents, pullEnd);
   const carriers = atomicCarriers(players, enemyCasts);
   const slots = resolveSlots(players, life, enemyCasts);
 

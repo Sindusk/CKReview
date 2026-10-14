@@ -198,6 +198,17 @@ philosophy and the data semantics this list assumes.
   Return to Nothing gives its first player(s) several times the rest;
   compare each non-tank's unmitigated hit with the other non-tanks'
   median (clean max 1.4x, failures 3.4x+), not raw damage.
+- **A cast that lost its target can get its owner from a role swap.** A
+  holder killed by their own line drops off the cast. When the next wave
+  swaps roles (Flatliner's breath baiters take the tethers), the one player
+  of the swapped role missing from the wave's targets owns it (The Tyrant).
+- **Spread overlaps between two players who stood almost far enough apart
+  are bad luck.** Measure the pair's distance against the clean volleys'
+  minimum: The Tyrant's Comets cleanly kept 6.1y+, the near misses 5.8-6.2y
+  (one player-less Minor, user ruling), the misplacements 2.8-4.2y.
+- **A late arrival doesn't show at the hit.** Positions are logged at the
+  damage, after the player got there; "late to the spot" at the snapshot
+  is a VOD call (The Tyrant's scythe, both players on their spots).
 - **Process of elimination beats geometry.** With N interchangeable
   candidates and N-1 accounted for, the last one is decisive (Fatebreaker
   towers; Lindwurm's Metamitosis free players).
