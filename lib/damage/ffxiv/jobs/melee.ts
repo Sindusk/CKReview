@@ -109,13 +109,14 @@ const lostOgcd = (...keys: string[]) => (ctx: PlayerCheckContext) =>
   Math.max(...ids(...keys).map((x) => ctx.values.perUse(x)));
 
 const uptime = (statusKey: string, bonus: number, bonusBasis: string,
-  refresh?: { cost: (ctx: PlayerCheckContext, fromMs: number, toMs: number) => number; reapplyGcds: number }): JobCheck => (ctx) => {
+  refresh?: { cost: (ctx: PlayerCheckContext, fromMs: number, toMs: number) => number; reapplyGcds: number; restartIds?: number[] }): JobCheck => (ctx) => {
   const windows = statusWindows(ctx, S[statusKey].id);
   if (windows.length === 0) return [];
   return uptimeFindings(ctx, {
     name: S[statusKey].name, bonus, bonusBasis,
     active: windows, fromMs: windows[0].startMs, graceMs: 2_500,
     refreshCost: refresh?.cost, reapplyMs: refresh ? refresh.reapplyGcds * ctx.baseGcdMs : undefined,
+    restartIds: refresh?.restartIds,
   });
 };
 
@@ -377,6 +378,7 @@ const chaoticSpring: JobCheck = (ctx) => dotFindings(ctx, {
   // fight 5 at 3:01: ~33k for 2 ticks).
   applyCost: (ctx) => drgSpiralRouteCost(ctx),
   reapplyGcds: 2,   // Raiden Thrust, Spiral Blow
+  restartIds: ids("RAIDEN_THRUST", "TRUE_THRUST"),
 });
 
 // Kunai's Bane, from xivanalysis KunaisBaneWindow.tsx: 7 GCDs, mudras not
@@ -722,6 +724,6 @@ const firstmindsFocus: JobCheck = (ctx) => {
   });
 };
 
-export const DRG_CHECKS: JobCheck[] = [uptime("POWER_SURGE", 0.1, "Power Surge is +10% (tooltip)", { cost: drgPowerSurgeRefreshCost, reapplyGcds: 1 }), lanceCharge, lifeSurge, chaoticSpring, firstmindsFocus];
+export const DRG_CHECKS: JobCheck[] = [uptime("POWER_SURGE", 0.1, "Power Surge is +10% (tooltip)", { cost: drgPowerSurgeRefreshCost, reapplyGcds: 1, restartIds: ids("RAIDEN_THRUST", "TRUE_THRUST") }), lanceCharge, lifeSurge, chaoticSpring, firstmindsFocus];
 export const NIN_CHECKS: JobCheck[] = [kunaisBane, ninki, kazematoi];
 export const RPR_CHECKS: JobCheck[] = [enshroud, arcaneCircle, deathsDesign, harvestMoon, shroud, whorl];

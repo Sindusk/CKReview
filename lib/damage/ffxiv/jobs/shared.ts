@@ -312,12 +312,22 @@ export type UptimeSpec = {
   // Extra time to bring it back after a long forced stretch, past graceMs
   // (a combo step that grants it).
   reapplyMs?: number;
+  // The combo's starters: after a long forced stretch the ramp counts from
+  // the first one (a combo held through the stretch is finished first).
+  restartIds?: number[];
 };
 
 // A forced stretch shorter than this doesn't cut a buff or DoT gap off:
 // the player can still re-apply after it (vVPtwaTQ62Jg391q 8:21.9, a 0.3s
 // blip inside a Power Surge gap).
 const CUT_MIN_MS = 5_000;
+
+// The first combo starter (restartIds) pressed in [fromMs, toMs), else fromMs.
+function restartAt(ctx: PlayerCheckContext, restartIds: number[] | undefined, fromMs: number, toMs: number): number {
+  if (!restartIds?.length) return fromMs;
+  const u = ctx.uses.find((x) => x.startMs >= fromMs && x.startMs < toMs && restartIds.includes(x.action.id));
+  return u ? u.startMs : fromMs;
+}
 
 export function uptimeFindings(ctx: PlayerCheckContext, spec: UptimeSpec): DamageFinding[] {
   const out: DamageFinding[] = [];
@@ -357,8 +367,12 @@ export function uptimeFindings(ctx: PlayerCheckContext, spec: UptimeSpec): Damag
     // After a long forced stretch the buff comes back through its rotation
     // (Power Surge on the 2nd GCD after Raiden Thrust): the ramp isn't a
     // loss (yBKPqGwHparm7Tk4 fight 5, P3 opening 7:09.9 → 7:12.3).
-    const tailFree = at > g.startMs && at < g.endMs ? g.endMs - at - overlapMs(at, g.endMs, forced) : -1;
-    if (tailFree >= 0 && tailFree < spec.graceMs + (spec.reapplyMs ?? 0)) cutOff += dealtIn(at, g.endMs) * spec.bonus;
+    // Counted from the combo's restart when it held through (end of P3).
+    if (at > g.startMs && at < g.endMs) {
+      const restart = restartAt(ctx, spec.restartIds, at, g.endMs);
+      const tailFree = g.endMs - restart - overlapMs(restart, g.endMs, forced);
+      cutOff += dealtIn(at, tailFree < spec.graceMs + (spec.reapplyMs ?? 0) ? g.endMs : restart) * spec.bonus;
+    }
     const lost = dealt * spec.bonus - cutOff;
     if (lost < 1) continue;
     out.push(finding(ctx, {
@@ -433,6 +447,7 @@ export type DotSpec = {
   // GCDs its combo needs before it can go back on after a long forced
   // stretch (Dragoon: Raiden Thrust, Spiral Blow), added to the grace.
   reapplyGcds?: number;
+  restartIds?:  number[];   // as UptimeSpec.restartIds
 };
 
 const DOT_CAST_MS = 1_500;   // cast → status applied
@@ -807,7 +822,12 @@ export function dotFindings(ctx: PlayerCheckContext, spec: DotSpec): DamageFindi
       }
       // Short forced blips don't cut the gap; their time still isn't counted.
       const freeMs = (a: number, b: number) => b - a - overlapMs(a, b, forced);
-      const tail = at < w.startMs ? freeMs(at, w.startMs) : 0;
+      // After a long forced stretch, counted from the combo's restart: a
+      // combo held through it is finished first (yBKPqGwHparm7Tk4 fight 5,
+      // P3 → P4: Lance Barrage 11:53 held, Heavens' Thrust / Fang and Claw
+      // / Drakesbane, Raiden Thrust 12:24.8, Chaotic Spring 12:30.2).
+      const tailFrom = at > cursor && at < w.startMs ? restartAt(ctx, spec.restartIds, at, w.startMs) : at;
+      const tail = tailFrom < w.startMs ? freeMs(tailFrom, w.startMs) : 0;
       const cut = free.reduce((a, x) => a + cutValue(freeMs(x.startMs, x.endMs), x.startMs), 0);
       const cutMs = free.reduce((a, x) => a + (cutValue(freeMs(x.startMs, x.endMs), x.startMs) > 0 ? freeMs(x.startMs, x.endMs) : 0), 0);
       // 6XaWqwMbkZG9pLmx Vamp Fatale 1:58: both of the Bard's DoTs came off
