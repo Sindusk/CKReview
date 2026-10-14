@@ -67,6 +67,17 @@ const FAR_SPOT_MIN = 900;             // past the r=800 tower ring
 const FORSAKEN_BEFORE_MS = 2_500;
 const FORSAKEN_AFTER_MS = 1_500;
 
+// P1's statue gaze (user, 2026-10-13): Graven Image's Ave Maria (look at
+// the statue; Indolent Will is the look-away form, not yet seen in a log)
+// resolves on all eight with a 0-damage hit. Attacking Kefka turns the
+// player to face him, which can fail the gaze, so GCD gaps around it are
+// movement. yBKPqGwHparm7Tk4 fight 5: resolves 3:07.66; the Sage (3:05.7,
+// 5.0s), Black Mage and Viper (3:06.6, ~2.5s) held GCDs. The cast's start
+// isn't logged: 6s before the resolution to 1.5s after (turning back).
+const GAZE_NAMES = new Set(["Ave Maria", "Indolent Will"]);
+const GAZE_BEFORE_MS = 6_000;
+const GAZE_AFTER_MS = 1_500;
+
 const EARTHQUAKE = 47866;          // Stompies' start marker when Kefka casts it
 const STOMPIES_BAIT = 47887;       // Exdeath's Blizzard III bait, Stompies wave 1
 const MARKER_LOOKBACK_MS = 15_000;
@@ -107,14 +118,19 @@ export const DANCING_MAD_DAMAGE_CONTEXT: DamageContext = {
     }
     return out;
   },
-  movementWindows: (pull) => pull.players
-    .filter((p) => p.rangeType === "Melee")
-    .flatMap((p) => p.damageTaken
-      .filter((e) => e.abilityId === PATH_OF_LIGHT && e.x !== undefined && e.y !== undefined
-        && Math.hypot(e.x - ARENA.x, e.y - ARENA.y) >= FAR_SPOT_MIN)
-      .map((e) => ({
-        startMs: e.timestamp - FORSAKEN_BEFORE_MS, endMs: e.timestamp + FORSAKEN_AFTER_MS,
-        cause: "Forsaken: outer tower spot", players: [p.name],
-      }))),
+  movementWindows: (pull) => [
+    ...pull.players
+      .filter((p) => p.rangeType === "Melee")
+      .flatMap((p) => p.damageTaken
+        .filter((e) => e.abilityId === PATH_OF_LIGHT && e.x !== undefined && e.y !== undefined
+          && Math.hypot(e.x - ARENA.x, e.y - ARENA.y) >= FAR_SPOT_MIN)
+        .map((e) => ({
+          startMs: e.timestamp - FORSAKEN_BEFORE_MS, endMs: e.timestamp + FORSAKEN_AFTER_MS,
+          cause: "Forsaken: outer tower spot", players: [p.name],
+        }))),
+    ...(pull.enemyCasts ?? [])
+      .filter((e) => GAZE_NAMES.has(e.abilityName))
+      .map((e) => ({ startMs: e.timestamp - GAZE_BEFORE_MS, endMs: e.timestamp + GAZE_AFTER_MS, cause: `${e.abilityName} (statue gaze)` })),
+  ],
   mechanicLabel: (key) => mechanicLabelForKey(key) ?? RULE_KEY_LABELS[key],
 };
