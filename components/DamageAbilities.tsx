@@ -14,8 +14,8 @@
 // Hovering a name or icon shows what the app knows about it without a
 // fetch: GCD or off-GCD, recast / cooldown and charges (the game layer's
 // DamageGame.action), the player's median cast time and how often they
-// used it. Clicking opens its full tooltip on Garland Tools (FFXIV) or
-// Wowhead (WoW) in a new tab.
+// used it. For WoW, clicking opens its Wowhead page in a new tab; FFXIV
+// names don't link out.
 
 import { useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -137,12 +137,10 @@ export function AbilityName({ name, icons }: { name: string; icons: AbilityIcons
 }
 
 const gameOf = (g: AbilityIcons["game"]): DamageGame => (g === "wow" ? WOW_DAMAGE : FFXIV_DAMAGE);
-// FFLogs status ids carry a +1000000 offset.
-const STATUS_OFFSET = 1_000_000;
+// WoW only: FFXIV names don't link out (user, 2026-10-14: no Garland Tools).
 function externalUrl(a: AbilityInfo, game: AbilityIcons["game"]): string | undefined {
-  if (a.id === undefined || a.aliasOf) return undefined;
-  if (game === "wow") return `https://www.wowhead.com/spell=${a.id}`;
-  return a.id >= STATUS_OFFSET ? `https://garlandtools.org/db/#status/${a.id - STATUS_OFFSET}` : `https://garlandtools.org/db/#action/${a.id}`;
+  if (a.id === undefined || a.aliasOf || game !== "wow") return undefined;
+  return `https://www.wowhead.com/spell=${a.id}`;
 }
 const secs = (ms: number) => `${(ms / 1000).toFixed(ms % 1000 === 0 ? 0 : 1)}s`;
 
@@ -195,7 +193,7 @@ export function AbilityTip({ name, icons, children, style }: {
           {lines.map((l, i) => <div key={i} style={{ color: i === 0 ? "var(--ck-text)" : "var(--ck-text-2)" }}>{l}</div>)}
           {url && (
             <div style={{ color: "var(--ck-text-3)", fontSize: 11, marginTop: 4 }}>
-              Click for the full tooltip on {icons.game === "wow" ? "Wowhead" : "Garland Tools"}
+              Click for the full tooltip on Wowhead
             </div>
           )}
         </div>,
