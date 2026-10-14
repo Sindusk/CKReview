@@ -170,6 +170,12 @@ const VENOM_PROCS: [status: string, consumer: string, share: number][] = [
 /** Statuses the venom check owns; the generic proc check skips them (game.ts). */
 export const VPR_PROC_STATUS_IDS = new Set(VENOM_PROCS.map(([st]) => S[st]?.id).filter((x): x is number => x !== undefined));
 
+/** Melee statuses the generic proc check skips (game.ts): the venoms (their
+ *  own check) and Dragoon's Enhanced Piercing Talon, a ranged insurance the
+ *  Dragoon banks for a bad outcome, never a loss when it expires (user,
+ *  2026-10-13; yBKPqGwHparm7Tk4 fight 5 flagged one at 1:50). */
+export const MELEE_PROC_SKIP_IDS = new Set([...VPR_PROC_STATUS_IDS, S.ENHANCED_PIERCING_TALON.id]);
+
 const venoms: JobCheck = (ctx) => {
   const out: DamageFinding[] = [];
   const forced = mergeWindows(ctx.forced);
