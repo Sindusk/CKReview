@@ -105,6 +105,7 @@ const LOCK_STATUSES = new Map<number, number>([
 // once. It's an on-GCD channel, and its Mortal Strikes aren't presses.
 const BLADESTORM = 446035;
 const MORTAL_STRIKE = 12294;
+const CRUSADING_STRIKES = 408385;
 
 // Taunts (spell-data.ts): Dark Command, Hand of Reckoning, Provoke, Torment.
 // Warrior Taunt and Growl weren't cast often enough to appear; add them
@@ -146,6 +147,12 @@ const ACTIONS = new Map<number, GameAction>();
 {
   const bs = ACTIONS.get(BLADESTORM);
   if (bs) ACTIONS.set(BLADESTORM, { ...bs, onGcd: true, recastMs: HASTED_GCD_MS, cooldownMs: HASTED_GCD_MS, speedScaled: true });
+  // Retribution's Crusading Strikes replaces the auto-attack and logs a
+  // cast per swing (Polpo, 172 of them on gVDPhzp61Zm29HMw Kith'ix pull 2):
+  // read as presses, every swing was a weave in gap labels and the
+  // dialog's GCD hover.
+  const cs = ACTIONS.get(CRUSADING_STRIKES);
+  if (cs) ACTIONS.set(CRUSADING_STRIKES, { ...cs, autoAttack: true });
 }
 
 /** Mortal Strikes inside the player's own Bladestorm buff. */

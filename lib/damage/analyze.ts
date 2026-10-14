@@ -214,9 +214,12 @@ function timelineGcds(
 ): TimelineGcd[] {
   const icons = new Map<number, string>();
   for (const c of player.casts) if (c.abilityIcon && !icons.has(c.abilityId)) icons.set(c.abilityId, c.abilityIcon);
+  // One press per name per instant, as the gap check counts weaves
+  // (checks.ts): FFLogs can log an action's damage id as a second cast.
   const offGcd = player.casts
     .filter((c) => !c.fake && !game.action(c.abilityId)?.onGcd && !game.action(c.abilityId)?.autoAttack && !AUTO_ATTACK_NAME.test(c.abilityName))
-    .sort((a, b) => a.timestamp - b.timestamp);
+    .sort((a, b) => a.timestamp - b.timestamp)
+    .filter((c, i, all) => !all.slice(Math.max(0, i - 4), i).some((p) => p.abilityName === c.abilityName && c.timestamp - p.timestamp <= 50));
   const shown = uses.filter((u) => u.startMs < endMs);
   let w = 0;
   return shown.map((u, i) => {
