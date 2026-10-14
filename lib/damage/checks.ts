@@ -398,8 +398,10 @@ export function checkPositionals(ctx: PlayerCheckContext): DamageFinding[] {
 // carried the bonus is never pressed. So the chain is followed in the
 // casts too. A combo action whose next action in the same chain (actions
 // linked by comboFrom) isn't one of its follow-ups within COMBO_TIMEOUT_MS
-// lost that follow-up's combo part, valued like a break (the best
-// follow-up's average × its bonus share). A wrong step that lands is left
+// lost a follow-up: over the pull, one follow-up becomes one more restart, so
+// the loss is the best follow-up's average minus the chain starter's
+// (7tb1fYPkjy4RQ2L9 Vamp: Fountain 35.0k − Cascade 28.4k = 7k; valued as
+// Fountain's combo part it read 20k). A wrong step that lands is left
 // to the bonusPercent check above, so only a restart (a chain starter),
 // nothing, or a step after the timer counts here. The combo running into
 // the end of the analysis is skipped; one whose timer ran through 1s+ of
@@ -464,6 +466,18 @@ function droppedCombos(ctx: PlayerCheckContext, minBonus: Map<number, number>, b
     }
   }
   const names = new Map(uses.map((u) => [u.action.id, u.abilityName]));
+  // The chain's most-used starter (an action in it with no comboFrom).
+  const starterCounts = new Map<number, Map<number, number>>();
+  for (const u of uses) {
+    if (u.action.comboFrom || !parent.has(u.action.id)) continue;
+    const counts = starterCounts.get(root(u.action.id)) ?? new Map<number, number>();
+    starterCounts.set(root(u.action.id), counts.set(u.action.id, (counts.get(u.action.id) ?? 0) + 1));
+  }
+  const starterOf = (chain: number) => [...(starterCounts.get(chain) ?? [])].sort((a, b) => b[1] - a[1])[0]?.[0];
+  const starterValue = (chain: number) => {
+    const id = starterOf(chain);
+    return id === undefined ? 0 : ctx.values.perUse(id);
+  };
   for (let i = 0; i < uses.length; i++) {
     const u = uses[i];
     const follow = next.get(u.action.id);
@@ -475,20 +489,23 @@ function droppedCombos(ctx: PlayerCheckContext, minBonus: Map<number, number>, b
     const inTime = after !== undefined && after.startMs <= expiry;
     if (inTime && (follow.has(after.action.id) || after.action.comboFrom)) continue;
     const best = [...follow]
-      .map((id) => ({ id, value: ctx.values.perUse(id) * (minBonus.get(id) ?? 0) / 100 }))
+      .filter((id) => (minBonus.get(id) ?? 0) > 0)
+      .map((id) => ({ id, value: ctx.values.perUse(id) - starterValue(chain) }))
       .sort((a, b) => b.value - a.value)[0];
     if (!best || best.value <= 0) continue;
     const until = inTime ? after.startMs : expiry;
     const forcedBefore = forcedPart(u.startMs, until, ctx.forced);
     const forced = forcedBefore.ms >= GAP_FINDING_MS;
-    const bonus = minBonus.get(best.id) ?? 0;
     const bestName = names.get(best.id) ?? "its follow-up";
+    const starter = starterOf(chain);
     out.push(finding(ctx, {
       kind: "combo-broken", startMs: u.startMs, endMs: until, forced,
       cause: forced ? forcedBefore.cause : undefined,
       label: `${u.abilityName} combo dropped`,
       lostDamage: best.value,
-      basis: `${k(ctx.values.perUse(best.id))} average ${bestName} × ${bonus}% combo share (its bonusPercent when combo'd)`,
+      basis: starter === undefined
+        ? `${k(ctx.values.perUse(best.id))} average ${bestName} (no restart in the pull)`
+        : `${k(ctx.values.perUse(best.id))} average ${bestName} − ${k(starterValue(chain))} average ${names.get(starter)} (the restart that took its place)`,
       detail: inTime
         ? `${u.abilityName} wasn't followed up: the chain restarted with ${after.abilityName}`
         : `${u.abilityName}'s combo ran out before ${[...new Set([...follow].map((id) => names.get(id) ?? "?"))].join(" or ")}`,

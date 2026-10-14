@@ -33,7 +33,11 @@ the Dancer, Chauzey Solstice.
   turns one Fountain into a restart Cascade: 35.0k − 28.4k, plus the proc
   difference (50% × Fountainfall 40.2k − Reverse Cascade 34.7k) ≈ 9k.
 
+- **Fixed (user, 2026-10-13):** dropped combos are now valued as best
+  follow-up average − the chain's most-used starter average (checks.ts
+  `droppedCombos`). This kill's three drops: 20k → 7k each. The proc
+  difference isn't added (job-specific).
+
 ## Next
 
-- Offered, not answered: value dropped combos as best follow-up average −
-  chain starter average (checks.ts, shared with melee and WoW).
+- Nothing open for this question.
