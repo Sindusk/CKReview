@@ -28,7 +28,7 @@ import { noDamageCasts } from "./jobs/shared";
 import { tincture, tinctureWindows } from "./jobs/tincture";
 import { JOB_GAUGES } from "./jobs/gauges";
 import { patchOf } from "./patches";
-import { MELEE_PROC_SKIP_IDS } from "./jobs/melee";
+import { MELEE_PROC_SKIP_IDS, vprDisengageAlternative } from "./jobs/melee";
 import { PROC_REPLACES } from "./jobs/ranged";
 import { FFXIV_ACTION_INDEX } from "../../mitigation/ffxiv-catalog";
 import type { DamageGame, GameAction, PartyBuff, TrackedCooldown } from "../types";
@@ -206,6 +206,7 @@ export const FFXIV_DAMAGE: DamageGame = {
   isDefensive: (actionId) => FFXIV_ACTION_INDEX.has(actionId),
   tankSwapActionIds: TANK_SWAP_IDS,
   disengageActionIds: DISENGAGE_IDS,
+  disengageAlternative: vprDisengageAlternative,
   jobChecks: (job) => [...(JOB_CHECKS[job] ?? []), noDamageCasts, tincture],
   jobGauges: (job) => JOB_GAUGES[job] ?? [],
   potWindows: tinctureWindows,

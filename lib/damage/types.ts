@@ -60,6 +60,10 @@ export type DamageGame = {
   tankSwapActionIds: Set<number>;
   // Ranged filler GCDs used when out of melee range (Lightning Shot).
   disengageActionIds: Set<number>;
+  // A better ranged GCD the player held when they pressed a ranged filler
+  // at t (Viper's Uncoiled Fury with a Rattling Coil): the filler isn't
+  // forced then. Returns the reason, or undefined.
+  disengageAlternative?(ctx: PlayerCheckContext, t: number): string | undefined;
   // Job-specific checks (Layer 3), by job display name.
   jobChecks(job: string): JobCheck[];
   // The patch a pull was played on ("7.1"), for checks whose rule changed

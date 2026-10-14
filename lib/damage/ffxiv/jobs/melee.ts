@@ -23,6 +23,22 @@
 // (coils lost at the death, plus the one at the kill). Built: the Rattling
 // Coil and Serpent Offerings lanes (jobs/gauges.ts; 20 Offerings over
 // the cap, under its 25 threshold). Feint, Bloodbath, Second Wind: mitigation.
+// Rechecked on K6qfMamL7rN8yz2Q Red Hot and Deep Blue (Pull 2, 7.4,
+// 2026-10-14). Matched: 3 positionals, the 3 coils left at the kill, its
+// 4 weaving issues, the 6:39 combo expiry, its GCD downtimes by time (the
+// 3:13 and 8:03-8:32 ones are Insane Air movement here). Built: Steel /
+// Reaving Maw consume the Honed buffs (3:00.1 read as Honed Reavers
+// dropped) and are judged on under 3 targets (that Maw hit one: 16k);
+// Poised for Twinfang / Twinblood drops (7:06.9, a second Uncoiled
+// Twinfang: 4k); a Writhing Snap with an unpooled Rattling Coil held is a
+// choice (8:15.7 with 2, left at the kill: 34k; vprDisengageAlternative).
+// Kept: Hunter's Instinct down 34.6s (2:24, 4:36, 7:15) though it shows
+// 97.5%: its uptime divides by fight time less invulnerability (Swiftscaled
+// 104.5%). Not adopted: the 6:37 Serpent's Ire / 6:39 tincture's missing
+// Ouroboros (the split-arena Inferno at 7:05 pushed Fourth Generation and
+// Ouroboros to 7:10-7:12, past the tincture; Uncoiled Fury mid-Reawaken was
+// the ranged GCD it needed); 8:39 Ire (cut by the kill); Vicewinder 13/15
+// (18.8s at full charges in all, under one 40s recharge).
 // Viper (verified on dQ8wmb1VhKt6yBXk):
 //   - Hunter's Instinct uptime (Buffs.tsx), +10% (multiplier 1.10).
 //   - Reawaken (Reawaken.tsx): four Generations, four Legacies, one
@@ -116,7 +132,7 @@ import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import type { DamageFinding, JobCheck } from "../../types";
 import { chargesAt, finding, PROC_CONSUME_MS, PROC_EXPIRY_EARLY_MS, type PlayerCheckContext } from "../../checks";
 import { forcedPart, inWindows, mergeWindows } from "../../timeline";
-import { aoeOnOneTargetFindings, burstWindowFindings, castHits, dotFindings, gaugeFindings, k, offCooldownIn, s, statusWindows, uptimeFindings, type ExpectedAction, type GaugeEvent, type GaugeSpec } from "./shared";
+import { aoeComboOnOneTarget, aoeOnOneTargetFindings, burstWindowFindings, castHits, clock, dotFindings, gaugeFindings, gaugeTrack, k, offCooldownIn, s, statusWindows, uptimeFindings, type ExpectedAction, type GaugeEvent, type GaugeSpec } from "./shared";
 import { comboLanded } from "./gnb";
 
 const id = (key: string) => A[key].id;
@@ -177,15 +193,26 @@ const reawaken: JobCheck = (ctx) => burstWindowFindings(ctx, {
 // though the finisher is still pressed. On 2T1HzdPKgbhM43am fight 10 the
 // Hindstung drops are Hindsbane Fangs pressed instead (2:02, 4:45, 11:35,
 // 12:04) plus one expiry (13:17): xivanalysis's 5.
-const VENOM_PROCS: [status: string, consumer: string, share: number][] = [
+// Consumers are the actions that use the buff (the first one is valued);
+// Steel Maw / Reaving Maw consume the Honed buffs too (xivanalysis
+// HonedProcs.tsx): K6qfMamL7rN8yz2Q Red Hot and Deep Blue (Pull 2) 3:00.1,
+// a one-target Reaving Maw read as Honed Reavers dropped (its loss is the
+// AoE-on-one-target finding instead).
+const VENOM_PROCS: [status: string, consumers: string[], share: number, bonus: string][] = [
   // 500 vs 400 potency (combo, positional) from the finishers' potency tables.
-  ["HINDSTUNG_VENOM", "HINDSTING_STRIKE", 0.2],
-  ["HINDSBANE_VENOM", "HINDSBANE_FANG", 0.2],
-  ["FLANKSTUNG_VENOM", "FLANKSTING_STRIKE", 0.2],
-  ["FLANKSBANE_VENOM", "FLANKSBANE_FANG", 0.2],
+  ["HINDSTUNG_VENOM", ["HINDSTING_STRIKE"], 0.2, "its 100 potency bonus"],
+  ["HINDSBANE_VENOM", ["HINDSBANE_FANG"], 0.2, "its 100 potency bonus"],
+  ["FLANKSTUNG_VENOM", ["FLANKSTING_STRIKE"], 0.2, "its 100 potency bonus"],
+  ["FLANKSBANE_VENOM", ["FLANKSBANE_FANG"], 0.2, "its 100 potency bonus"],
   // Steel Fangs / Reaving Fangs: 300 vs 200 (tooltip).
-  ["HONED_STEEL", "STEEL_FANGS", 1 / 3],
-  ["HONED_REAVERS", "REAVING_FANGS", 1 / 3],
+  ["HONED_STEEL", ["STEEL_FANGS", "STEEL_MAW"], 1 / 3, "its 100 potency bonus"],
+  ["HONED_REAVERS", ["REAVING_FANGS", "REAVING_MAW"], 1 / 3, "its 100 potency bonus"],
+  // Uncoiled Twinfang / Twinblood: 120 with Poised, 100 without (tooltip,
+  // not measurable: every one but the drop had it). oGCDs, so a drop is
+  // the other one pressed (xivanalysis Venoms.tsx; K6qfMamL7rN8yz2Q Red
+  // Hot and Deep Blue 7:06.9, a second Uncoiled Twinfang).
+  ["POISED_FOR_TWINFANG", ["UNCOILED_TWINFANG"], 1 / 6, "its 20 potency bonus (tooltip)"],
+  ["POISED_FOR_TWINBLOOD", ["UNCOILED_TWINBLOOD"], 1 / 6, "its 20 potency bonus (tooltip)"],
 ];
 
 /** Statuses the venom check owns; the generic proc check skips them (game.ts). */
@@ -200,12 +227,15 @@ export const MELEE_PROC_SKIP_IDS = new Set([...VPR_PROC_STATUS_IDS, S.ENHANCED_P
 const venoms: JobCheck = (ctx) => {
   const out: DamageFinding[] = [];
   const forced = mergeWindows(ctx.forced);
-  const gcdCasts = ctx.player.casts.filter((c) => ctx.game.action(c.abilityId)?.onGcd);
-  for (const [statusKey, consumerKey, share] of VENOM_PROCS) {
-    const status = S[statusKey], consumer = A[consumerKey];
+  for (const [statusKey, consumerKeys, share, bonus] of VENOM_PROCS) {
+    const status = S[statusKey], consumer = A[consumerKeys[0]];
     if (!status || !consumer) continue;
+    const consumerIds = new Set(ids(...consumerKeys));
     const value = ctx.values.perUse(consumer.id) * share;
     if (value <= 0) continue;
+    // The press that removed it: a GCD for the combo buffs, an oGCD for Poised.
+    const onGcd = !!consumer.onGcd;
+    const presses = ctx.player.casts.filter((c) => !!ctx.game.action(c.abilityId)?.onGcd === onGcd);
     const lose = (t: number, how: string) => {
       const isForced = inWindows(t, forced);
       out.push(finding(ctx, {
@@ -213,7 +243,7 @@ const venoms: JobCheck = (ctx) => {
         cause: isForced ? forcedPart(t - 1, t + 1, ctx.forced).cause : undefined,
         label: `${status.name} ${how.startsWith("dropped") ? "dropped" : how}`,
         lostDamage: value,
-        basis: `${k(ctx.values.perUse(consumer.id))} average ${consumer.name} × ${Math.round(share * 100)}% (its 100 potency bonus)`,
+        basis: `${k(ctx.values.perUse(consumer.id))} average ${consumer.name} × ${Math.round(share * 100)}% (${bonus})`,
         detail: `${status.name} ${how}`,
       }));
     };
@@ -224,8 +254,8 @@ const venoms: JobCheck = (ctx) => {
         if (expiresAt !== undefined && e.timestamp < expiresAt - PROC_EXPIRY_EARLY_MS) lose(e.timestamp, "overwritten before use");
         expiresAt = e.durationMs ? e.timestamp + e.durationMs : undefined;
       } else if (e.buffStatus === "removed") {
-        const at = gcdCasts.find((c) => Math.abs(c.timestamp - e.timestamp) <= PROC_CONSUME_MS);
-        if (at && at.abilityId !== consumer.id && !inWindows(e.timestamp, ctx.dead)) lose(e.timestamp, `dropped: ${at.abilityName} went first`);
+        const at = presses.find((c) => Math.abs(c.timestamp - e.timestamp) <= PROC_CONSUME_MS);
+        if (at && !consumerIds.has(at.abilityId) && !inWindows(e.timestamp, ctx.dead)) lose(e.timestamp, `dropped: ${at.abilityName} went first`);
         // No upper bound: the 13:17 removal logged 1.6s after its 60s ran
         // out, past the generic check's 1.5s.
         else if (!at && expiresAt !== undefined && e.timestamp >= expiresAt - PROC_EXPIRY_EARLY_MS &&
@@ -750,7 +780,46 @@ export function rattlingCoilSpec(ctx: PlayerCheckContext): GaugeSpec {
 }
 const rattlingCoils: JobCheck = (ctx) => gaugeFindings(ctx, rattlingCoilSpec(ctx));
 
-export const VPR_CHECKS: JobCheck[] = [uptime("HUNTERS_INSTINCT", 0.1, "Hunter's Instinct is +10%, FFLogs multiplier"), reawaken, venoms, rattlingCoils];
+// Writhing Snap with a Rattling Coil held: Uncoiled Fury is Viper's ranged
+// GCD (xivanalysis Snaps.tsx: "save Uncoiled Fury for when you cannot stay
+// in melee range"). Spending the coil there frees a melee GCD later, so the
+// Snap costs the same as an unforced one (checks.ts checkDisengages).
+// Only when the coil wasn't pooled: the next Uncoiled Fury came outside
+// raid buffs and outside movement / forced time (spent in melee range), or
+// never (held to the end). Coils pooled for the burst are right: Fury and
+// its follow-ups under ~25% of buffs are worth about what the Snap costs.
+// On K6qfMamL7rN8yz2Q Red Hot and Deep Blue (Pull 2): 8:15.7 with 2 coils
+// (both left at the kill). 5:56.8 held 1, spent at 6:13.1 on an Xtreme
+// Wave tether stretch (another ranged need): not counted. The other 11
+// Snaps had none.
+export function vprDisengageAlternative(ctx: PlayerCheckContext, t: number): string | undefined {
+  if (ctx.job !== "Viper") return undefined;
+  const steps = gaugeTrack(ctx, rattlingCoilSpec(ctx)).steps;
+  const heldAt = (x: number) => [...steps].reverse().find((st) => st.t < x)?.value ?? 0;
+  const held = heldAt(t);
+  if (held <= 0) return undefined;
+  // One coil covers one Snap: earlier Snaps since the last Fury holding a
+  // coil claim it first (CABrk9zXLfJG8h6R The Tyrant, 0:50 and 1:39 with
+  // the same coil, spent 1:46).
+  const fury = id("UNCOILED_FURY"), snap = id("WRITHING_SNAP");
+  const lastFury = [...ctx.player.casts].reverse().find((c) => c.abilityId === fury && c.timestamp < t)?.timestamp ?? -Infinity;
+  const earlier = ctx.player.casts.filter((c) => c.abilityId === snap && c.timestamp > lastFury && c.timestamp < t && heldAt(c.timestamp) > 0).length;
+  if (earlier >= held) return undefined;
+  const coils = `${held} Rattling Coil${held === 1 ? "" : "s"} held (Uncoiled Fury is the ranged GCD)`;
+  const next = ctx.player.casts.find((c) => c.abilityId === fury && c.timestamp > t && c.timestamp < ctx.endMs);
+  if (!next) return `${coils}, never spent`;
+  const at = next.timestamp;
+  if (inWindows(at, ctx.buffWindows) || inWindows(at, ctx.forced) || inWindows(at, ctx.movement ?? [])) return undefined;
+  return `${coils}, next spent at ${clock(at)} outside raid buffs`;
+}
+
+// Steel Maw / Reaving Maw under three targets (xivanalysis AoEChecker.tsx,
+// minTargets 3): judged against the player's average Steel / Reaving Fangs.
+// K6qfMamL7rN8yz2Q Red Hot and Deep Blue 3:00.1: a Reaving Maw on Deep
+// Blue alone as the bosses came back (15.6k against 31k).
+const vprAoe = aoeComboOnOneTarget([[id("STEEL_MAW"), id("STEEL_FANGS"), 3], [id("REAVING_MAW"), id("REAVING_FANGS"), 3]]);
+
+export const VPR_CHECKS: JobCheck[] = [uptime("HUNTERS_INSTINCT", 0.1, "Hunter's Instinct is +10%, FFLogs multiplier"), reawaken, venoms, rattlingCoils, vprAoe];
 export const MNK_CHECKS: JobCheck[] = [riddleOfFire];
 // Firstminds' Focus (xivanalysis FirstmindsFocus): +1 per Raiden Thrust /
 // Draconian Fury, cap 2, Wyrmwind Thrust spends 2. A stack gained at 2 is

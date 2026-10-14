@@ -338,6 +338,18 @@ export function checkDisengages(ctx: PlayerCheckContext): DamageFinding[] {
         : shared.length > 0 ? { ms: 1, cause: `${[...new Set(shared.map((d) => d.player))].join(", ")} out of reach too` }
         : window;
       const during = ctx.mechanicAround(u.startMs, u.startMs);
+      // Out of reach, but holding a better ranged GCD (a Viper's Writhing
+      // Snap with a Rattling Coil held): the filler was a choice. Not in
+      // forced time (downtime, past a check), where neither does anything.
+      const better = window.ms > 0 ? undefined : ctx.game.disengageAlternative?.(ctx, u.startMs);
+      if (better) return finding(ctx, {
+        kind: "disengage", startMs: u.startMs, endMs: u.startMs, forced: false,
+        cause: during ? `during ${during}` : undefined,
+        label: `${u.abilityName} with ${better}`,
+        lostDamage: Math.max(0, value - own),
+        basis: `${k(value)} average GCD − ${k(own)} average ${u.abilityName}: the better ranged GCD used here frees a melee GCD later`,
+        detail: `${u.abilityName} instead of a melee GCD, with ${better}`,
+      });
       // A mechanic's movement window took the player out of reach
       // (Dancing Mad's outer Forsaken spots): movement, not a loss.
       const moving = window.ms > 0 ? undefined

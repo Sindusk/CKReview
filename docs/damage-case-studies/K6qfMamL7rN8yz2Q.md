@@ -107,6 +107,24 @@ all eight players on that kill are in `sampledata/damage-ff/`.
   can now take their windows directly); Life Surge drift valued as a
   forced crit (TrackedCooldownSpec.valuePerUse). Lost 748k → 762k + 25k.
 
+### Red Hot and Deep Blue (fight 3, the app's Pull 2, kill)
+
+xivanalysis pages for all eight players saved 2026-10-14 in
+`sampledata/damage-ff/`.
+
+- **Mocha Dreams (Viper).** Per-claim record in the Viper header of
+  lib/damage/ffxiv/jobs/melee.ts. Built:
+  - Steel / Reaving Maw consume the Honed buffs.
+  - Maw on under 3 targets is judged against Fangs (3:00, 16k).
+  - Poised for Twinfang / Twinblood drops are caught (7:06.9, 4k).
+  - A Writhing Snap with an unpooled Rattling Coil held counts as a
+    choice (DamageGame.disengageAlternative): 8:15.7 with 2 coils, which
+    were left at the kill (34k).
+  Lost 839k → 883k. Open (asked the user): 8:33-8:39, no GCD for 4.1s
+  inside the last Insane Air volley with 2 coils held, counted as
+  movement. The two tanks kept their GCDs rolling; the Dragoon was 1.3s
+  late.
+
 ## Open
 
 - Lock-model gaps seen in the drift test (they can hide delay, never
@@ -125,6 +143,9 @@ all eight players on that kill are in `sampledata/damage-ff/`.
 - Vamp Fatale is done for all eight players. Waiting on the user: the
   charges-at-kill proposal (open-items.md), the lenient saws/towers/adds
   window (Kade 4:54 / 5:47, Kevin 8:05), the PCT lanes' review.
-- The report's other kills are on disk (Red Hot and Deep Blue, The
-  Tyrant, Lindwurm, Lindwurm II) if the user wants them; xivanalysis
-  pages would go in sampledata/damage-ff/.
+- Red Hot and Deep Blue kill (session 2026-10-14): Mocha done. Next, in
+  order of the app's loss: Yoro (766k), Kade (655k), Sayacissa (554k), Sin
+  (524k), Kevin (475k), Siegward (305k), Chauzey (133k). Their pages are
+  already in sampledata/damage-ff/. Patch review: same report and comp as
+  Vamp Fatale (7.4), nothing new.
+- The Tyrant, Lindwurm and Lindwurm II kills are on disk too.
