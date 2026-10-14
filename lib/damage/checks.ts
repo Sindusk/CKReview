@@ -12,9 +12,20 @@
 // (xivanalysis's AlwaysBeCasting allowance for latency). The part of the
 // idle time inside a forced window (dead, raid downtime, a context window,
 // a phase whose damage doesn't count) is forced. Unforced idle of 1s+ is
-// its own finding; shorter delays are summed per phase. Lost damage =
+// its own finding; shorter delays are listed one by one when they reach
+// DamageGame.smallDelayMinMs (FFXIV 0.35s) and the phase's add up to
+// CLIP_FINDING_MS. Triple-weave clips take no floor. Lost damage =
 // idle ÷ the player's GCD × their average GCD value in that phase (the
 // buffed value when the gap sits in a raid-buff window).
+//
+// xivanalysis's AlwaysBeCasting (checked on K6qfMamL7rN8yz2Q, Vamp Fatale
+// kill, Sage) lists far fewer, by method rather than by finding them unreal:
+// after a hard cast it measures from the cast's end (the logged cast +
+// 0.5s slidecast), so ~1.6s of idle after a Dosis III goes unseen (its
+// 7:13 gap read 0.75s; the GCD sat ready 2.0s past tolerance), and every
+// window must exceed the full GCD + 150ms, so a 1.0s Eukrasia or a 1.5s
+// Eukrasian spell gets ~1s free. Its Interrupted Casts list the cancelled
+// cast's cast time (1.44s), not the idle; here they're GCD gaps.
 //
 // ── Cooldown drift ─────────────────────────────────────────────────────
 // Only the job's tracked cooldowns (lib/damage/ffxiv/tracked-cooldowns.ts):
@@ -220,7 +231,7 @@ export function checkGcdGaps(ctx: PlayerCheckContext): DamageFinding[] {
           // weaving", so name the weaves from two up.
           (weaves.length >= 2 ? `; ${weaves.length} weaves: ${weaves.map((w) => w.abilityName).join(", ")}` : ""),
       }));
-    } else if (unforced > 0) {
+    } else if (unforced > 0 && (weaves.length >= CLIP_WEAVES || unforced >= (ctx.game.smallDelayMinMs ?? 0))) {
       // Three or more oGCDs between two GCDs: the delay is the weaving.
       const clip = weaves.length >= CLIP_WEAVES;
       const bucket = (clip ? clipped : small).get(phaseId) ?? { ms: 0, findings: [] };

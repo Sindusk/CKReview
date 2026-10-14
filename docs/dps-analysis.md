@@ -282,6 +282,13 @@ were to the app's own engine, found where xivanalysis was right.
 - **Open:** drift's room-for-uses skips forced time while casts include
   presses made in it, which can hide drift (Bard Empyreal Arrow 67/69);
   the simple fixes flip verified counts elsewhere (docs/open-items.md).
+- **xivanalysis's GCD Downtime undercounts hard casters by method**
+  (K6qfMamL7rN8yz2Q Vamp Fatale, Sage, 2026-10-14): it measures from a
+  hard cast's end and needs a full GCD + 150ms in every window, so ~1.6s
+  after a Dosis and ~1s after a Eukrasian GCD go unseen. A count gap
+  against it isn't by itself a sign the app is wrong. What was noise:
+  delays under 0.35s past tolerance (a late weave's animation lock and
+  latency), now dropped for FFXIV (`DamageGame.smallDelayMinMs`).
 - **Input:** the user saves each player's xivanalysis page as HTML;
   `tools/xiva-html.js` cuts a ~500KB page to ~20KB of text with named
   action icons (see the skill).

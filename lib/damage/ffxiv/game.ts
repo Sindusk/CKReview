@@ -212,6 +212,14 @@ export const FFXIV_DAMAGE: DamageGame = {
   jobProcStatusIds: MELEE_PROC_SKIP_IDS,
   procReplaces: PROC_REPLACES,
   mitigationChannels: MITIGATION_CHANNELS,
+  // GCD delays under 0.35s past the tolerance (0.5s past the GCD) aren't
+  // findings (user, 2026-10-14). On K6qfMamL7rN8yz2Q's Vamp Fatale kill the
+  // Sage had nine at 0.0-0.3s: five were one oGCD woven late in the GCD
+  // (Kerachole, Ixochole, Zoe after a 1.44s Dosis III; Holos 1.9s after
+  // Phlegma), where the weave's animation lock plus latency, which the log
+  // can't show, explains 0.2-0.4s; the other four were single late presses
+  // (0.17-0.44s past the GCD). xivanalysis lists none of them (checks.ts).
+  smallDelayMinMs: 350,
   // Army's Muse speeds the Bard's GCDs for 10s by a fixed amount per window
   // (from the Repertoire held when Army's Paeon ended): measured from the
   // GCDs under it. Judged at 2.5s, a 2.95s gap from a triple weave in it
