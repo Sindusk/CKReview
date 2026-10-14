@@ -1537,7 +1537,21 @@ function buildFFPlayers(
         rangeType: job.rangeType,
         game:      "ffxiv",
 
+        // Players' own hits: "damage" only. An unpaired preview here is a
+        // hit that never landed (the boss went invulnerable or untargetable,
+        // or Dancing Mad P3's Hero debuff made it immune), and FFLogs'
+        // damage-done table leaves it out: yBKPqGwHparm7Tk4 fight 5 matched
+        // FFLogs for all nine players only without them (~0.2-1.1% of damage
+        // in every sample). Damage taken keeps them (fully absorbed hits).
         damageDone: damageDoneEvents
+          .filter((e) => e.type !== "calculateddamage")
+          .filter((e) => e.sourceID === actorId || petOwners.get(e.sourceID) === actorId)
+          .map((e) => {
+            const ev = fflDamageDoneToPlayerEvent(e, actorMap, abilityMap, fightStart);
+            return e.sourceID === actorId ? ev : { ...ev, pet: actorMap.get(e.sourceID)?.name };
+          }),
+        unlandedHits: damageDoneEvents
+          .filter((e) => e.type === "calculateddamage" && e.unpaired === true)
           .filter((e) => e.sourceID === actorId || petOwners.get(e.sourceID) === actorId)
           .map((e) => {
             const ev = fflDamageDoneToPlayerEvent(e, actorMap, abilityMap, fightStart);

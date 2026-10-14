@@ -957,12 +957,21 @@ export const noDamageCasts: JobCheck = (ctx) => {
     const average = landed.reduce((a, d) => a + d, 0) / landed.length;
     casts.forEach((c, i) => {
       if (dealt[i] > 0 || c.timestamp >= ctx.endMs || inWindows(c.timestamp, ctx.dead)) return;
+      // Would have landed after a kill: the boss was already dead.
+      if (ctx.pull.result === "Kill" && c.timestamp + NO_DAMAGE_HIT_MS >= ctx.endMs) return;
       // Pressed during forced time (boss untargetable): shown, not
       // counted. Dancers refresh Standard Finish there for its buff.
       const during = forcedPart(c.timestamp - 1, c.timestamp + 1, ctx.forced);
+      // FFLogs previewed the hit but it never landed: the target went
+      // invulnerable or untargetable before it applied (yBKPqGwHparm7Tk4
+      // fight 5: presses 6:15.3-6:16.9 as Kefka hit 0%, the Hero debuffs
+      // in P3). Not the player's doing, so shown, not counted.
+      const previewed = (ctx.player.unlandedHits ?? []).some((e) => !e.pet &&
+        (e.abilityName === name || ids.has(e.abilityId)) && e.timestamp >= c.timestamp && e.timestamp <= c.timestamp + NO_DAMAGE_HIT_MS);
+      const forced = during.ms > 0 || previewed;
       out.push(finding(ctx, {
-        kind: "no-damage", startMs: c.timestamp, endMs: c.timestamp, forced: during.ms > 0, inference: true,
-        cause: during.ms > 0 ? during.cause : undefined,
+        kind: "no-damage", startMs: c.timestamp, endMs: c.timestamp, forced, inference: true,
+        cause: during.ms > 0 ? during.cause : previewed ? "the target turned immune before it landed" : undefined,
         label: `${name} did no damage`,
         lostDamage: average,
         basis: `${k(average)} average ${name} (${landed.length} of ${casts.length} casts hit something)`,

@@ -45,6 +45,21 @@ Dragoon's POV (Sayacissa Morsaelth). No xivanalysis page.
     were absorbed) count. Across every FF sample the only change is a new
     BLM finding: Foul at 7:43.7, 99k (Xenoglossy 181k − Foul 82k), its
     Chaos hit 0 under Fated Hero.
+  - **BLM Foul at 9:06.2 (user):** the Chaos "hit" at 9:06.17 was an
+    unpaired `calculateddamage` preview (79k); Fated Hero went on at
+    9:06.6 and only Exdeath took the real hit (9:07.3). Now flagged:
+    "Foul hit only Exdeath", 76k. Same for the AST's Gravity II at 9:04.8
+    (20k).
+  - **Fixed, all FF:** unpaired previews were counted as player damage.
+    FFLogs' damage-done table leaves them out: this kill's nine players
+    match FFLogs exactly only without them (Dragoon 41.90M, the app had
+    42.63M). They are 0.2-1.1% of player damage in every sample, all at
+    moments the target turned immune (Kefka at 0% 6:15-6:23, untargetable
+    3:18 / 14:28, the Hero debuffs, the kill). log-transforms now keeps
+    them out of `damageDone` and in `unlandedHits`; `noDamageCasts`
+    marks a press with such a preview forced ("the target turned immune
+    before it landed") and skips presses whose hit would land after a
+    kill. Damage taken still keeps them (fully absorbed hits).
   - Not handled: a DoT on the boss you can't damage still counts as
     uptime in `dotFindings`. Not seen here (one 0 tick each for four
     DoTs at a window's start).

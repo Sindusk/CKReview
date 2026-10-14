@@ -13,7 +13,9 @@ function buildFFPlayers(rep, actorMap, getFFJobByName, abilityMap) {
   const playerIds = [...new Set(rep.combatantInfo?.data?.map((e) => e.sourceID) ?? [])];
   const onlyLanded = (evs) => evs.filter((e) => e.type === 'damage' || (e.type === 'calculateddamage' && e.unpaired === true));
   const dt = onlyLanded(rep.damageTaken?.data ?? []);
-  const dd = onlyLanded(rep.damageDone?.data ?? []);
+  // Players' own hits: "damage" only; an unpaired preview never landed
+  // (see lib/log-transforms.ts, the players' damageDone).
+  const dd = (rep.damageDone?.data ?? []).filter((e) => e.type === 'damage');
   const statusMap = { removedebuff: 'removed', applydebuffstack: 'stack', removedebuffstack: 'stackRemoved' };
   // Mirrors lib/log-transforms.ts's fflAbilityName — was a hardcoded
   // 'Ability <id>' placeholder here for every player-sourced stream (never

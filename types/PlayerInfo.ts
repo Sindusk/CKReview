@@ -155,6 +155,12 @@ export type PlayerInfo = {
 
   // Pre-fetched event tabs (populated at import, read from memory thereafter)
   damageDone:   PlayerEvent[];
+  // FFXIV: hits FFLogs previewed ("calculateddamage") that never landed:
+  // the target went invulnerable, untargetable or immune (Dancing Mad P3's
+  // Hero debuffs) first. Not damage (FFLogs' table leaves them out); kept
+  // so checks can tell "pressed into a target that turned immune" from
+  // "hit nothing".
+  unlandedHits?: PlayerEvent[];
   damageTaken:  PlayerEvent[];
   healing:      PlayerEvent[];
   debuffs:      PlayerEvent[];

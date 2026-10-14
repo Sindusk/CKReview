@@ -123,6 +123,14 @@ differ from the FFLogs fight id. In one report, "pull 11" was fight 12.
     1–2s.
   - That 35s offset explains every later song-timing difference, so it
     isn't a separate finding.
+- **FFLogs previews that never landed (FFXIV).** An unpaired
+  `calculateddamage` on a player's outgoing hit is a hit the target turned
+  immune to before it applied (invulnerable, untargetable, Dancing Mad
+  P3's Epic / Fated Hero). It isn't damage: FFLogs' table leaves it out,
+  and counting it hid AoEs on one target and casts that hit nothing
+  (yBKPqGwHparm7Tk4, 2026-10-13). The app keeps them apart as
+  `unlandedHits`. Players' damage taken still keeps them (a fully
+  absorbed hit leaves only the preview).
 - **Truncated ability lists.** The DamageDone table returns only each
   player's top 5 abilities. Per-ability totals need events (`--hits`).
 - **Pets in debuff events.** The unknown Damage Down target was an AST's

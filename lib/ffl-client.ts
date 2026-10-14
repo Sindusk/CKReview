@@ -934,7 +934,7 @@ export async function fetchFFightData(
     deathEvents:       collected.deaths,
     combatantInfos:    collected.combatantInfo,
     castEvents:        collected.casts,
-    damageDoneEvents:  onlyLanded(collected.damageDone),
+    damageDoneEvents:  onlyLanded(collected.damageDone),   // previews dropped again in log-transforms' players
     damageTakenEvents: onlyLanded(collected.damageTaken),
     healingEvents:     collected.healing,
     debuffEvents:      collected.debuffs,
