@@ -227,10 +227,15 @@ const dancerOverwrites = procOverwrites(DNC_PROCS);
 // replaced. Last Dance takes a filler's slot, valued as a Cascade.
 // qjCMx4bRfgNKwX9T kill: Last Dance Ready, held into the 4:02 Technical
 // Finish and run out at 4:06, read as a whole 86k Last Dance.
+// Warrior's Inner Release stack: a free Fell Cleave lost is a combo GCD in
+// its slot (K6qfMamL7rN8yz2Q Vamp Fatale, 1:26: Primal Ruination at 1:22
+// and Maim at 1:27 where Fell Cleave and Ruination fit; was a whole 81k
+// Fell Cleave).
 export const PROC_REPLACES = new Map(([
   ["REVERSE_CASCADE", "CASCADE"], ["RISING_WINDMILL", "WINDMILL"],
   ["FOUNTAINFALL", "FOUNTAIN"], ["BLOODSHOWER", "BLADESHOWER"],
   ["LAST_DANCE", "CASCADE"], ["REFULGENT_ARROW", "BURST_SHOT"],
+  ["FELL_CLEAVE", "MAIM"],
 ] as const).filter(([a, b]) => A[a] && A[b]).map(([a, b]) => [A[a].id, A[b].id]));
 
 // ── Bard, Machinist (unverified) ───────────────────────────────────────

@@ -17,6 +17,17 @@
 //   (the third charge went to movement before), worth the tincture's ~5%
 //   of one Onslaught; the 18:03 one had one Inner Chaos because the
 //   second Infuriate charge wasn't back before the kill.
+// Warrior rechecked on K6qfMamL7rN8yz2Q Vamp Fatale (7.4, 2026-10-14).
+// Matched: the expired Inner Release stack (1:26: Primal Ruination at
+// 1:22 and Maim at 1:27 where Fell Cleave and Ruination fit around two
+// forced Tomahawks), now Fell Cleave minus the Maim in its slot
+// (procReplaces; was a whole 81k, now 50k); the 3:25 gap (2.0s); its other
+// downtimes by time (1:42, 3:52 have Coffinmaker / Bombpyre movement in
+// them). Its Beast Gauge shows no suggestion (its tiers start at 20); ours
+// finds 10. The Beast Gauge is on the timeline (jobs/gauges.ts, the same
+// simulation). Not adopted: the 8:07 tincture's Onslaught 2/3 (the third
+// at 8:38.0, 0.3s after it ended) and Inner Chaos 1/2 (~5% of each, a few
+// k); weaving at 0:09 (0.14s, inside the tolerance); defensives.
 //
 // Paladin, checked against xivanalysis on jN3XDrf2z8PmLgRJ Vamp pull 8
 // (2026-10-08): the window counts match its 7 missed actions and 1
@@ -73,9 +84,9 @@
 
 import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import type { JobCheck } from "../../types";
-import { finding } from "../../checks";
+import { finding, type PlayerCheckContext } from "../../checks";
 import { forcedPart, inWindows } from "../../timeline";
-import { aoeComboOnOneTarget, burstWindowFindings, castHits, clock, gaugeFindings, k, statusWindows, uptimeFindings, type GaugeEvent } from "./shared";
+import { aoeComboOnOneTarget, burstWindowFindings, castHits, clock, gaugeFindings, k, statusWindows, uptimeFindings, type GaugeEvent, type GaugeSpec } from "./shared";
 import { comboLanded } from "./gnb";
 
 const id = (key: string) => A[key].id;
@@ -117,7 +128,8 @@ const surgingTempest: JobCheck = (ctx) => {
 // Infuriate; −50 Fell Cleave / Decimate (free under Inner Release),
 // Inner Chaos / Chaotic Cyclone. Combo read from bonusPercent, as for GNB.
 // 50 gauge is worth one average Fell Cleave.
-const beastGauge: JobCheck = (ctx) => {
+// The timeline draws the same simulation (jobs/gauges.ts, gaugeTrack).
+export function beastGaugeSpec(ctx: PlayerCheckContext): GaugeSpec {
   const events: GaugeEvent[] = [];
   const gains = new Map([["MAIM", 10], ["STORMS_EYE", 10], ["STORMS_PATH", 20], ["MYTHRIL_TEMPEST", 20]].map(([k, n]) => [id(k as string), n as number]));
   const freeUnderIr = new Set([id("FELL_CLEAVE"), id("DECIMATE")]);
@@ -139,12 +151,13 @@ const beastGauge: JobCheck = (ctx) => {
   const plain = castHits(ctx, id("FELL_CLEAVE")).filter((h) => !inWindows(h.timestamp, ir));
   const avg = plain.length > 0 ? plain.reduce((a, h) => a + (h.amount ?? 0), 0) / plain.length : ctx.values.perUse(id("FELL_CLEAVE"));
   const perPoint = avg / 50;
-  return gaugeFindings(ctx, {
+  return {
     name: "Beast Gauge", unit: "gauge", cap: 100, unitValue: perPoint,
     valueBasis: `${k(avg)} average Fell Cleave outside Inner Release per 50`,
     events,
-  });
-};
+  };
+}
+const beastGauge: JobCheck = (ctx) => gaugeFindings(ctx, beastGaugeSpec(ctx));
 
 // The Atonement chain still up at the kill while combo fillers went out
 // (K6qfMamL7rN8yz2Q Vamp Fatale, 8:19: Atonement Ready from the last

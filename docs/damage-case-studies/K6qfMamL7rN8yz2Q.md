@@ -70,6 +70,12 @@ all eight players on that kill are in `sampledata/damage-ff/`.
   Dances on the 5:44 add wave. App-only finding that holds: the 2:00 gap
   (Technical Step at 2:02.7, everyone else back by 2:01).
 
+- **Siegward Damvir (Warrior), Vamp Fatale.** Per-claim record in
+  lib/damage/ffxiv/jobs/pld-war.ts. Built: the Beast Gauge on the
+  timeline (gaugeTrack draws any GaugeSpec the overcap check simulates);
+  an expired Inner Release stack now costs Fell Cleave minus Maim (50k,
+  was 81k).
+
 ## Open
 
 - Lock-model gaps seen in the drift test (they can hide delay, never

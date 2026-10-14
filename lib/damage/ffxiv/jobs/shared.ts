@@ -45,7 +45,7 @@
 //   MIT License; full text in THIRD_PARTY_NOTICES.md.
 
 import type { PlayerEvent } from "@/types/PlayerInfo";
-import type { DamageFinding, JobCheck, Moment } from "../../types";
+import type { DamageFinding, GaugeTrack, JobCheck, Moment } from "../../types";
 import { finding, measuredPenaltyFactor, type PlayerCheckContext } from "../../checks";
 import { forcedPart, gcdKinds, inWindows, mergeWindows, overlapMs, type Window } from "../../timeline";
 import { estimateHitRates } from "../../crit-rates";
@@ -912,10 +912,26 @@ export type GaugeSpec = {
   leftAtKill?: { unitValue: number; valueBasis: string };
 };
 
-export function gaugeFindings(ctx: PlayerCheckContext, spec: GaugeSpec): DamageFinding[] {
+type GaugeRun = {
+  value: number; negatives: number;
+  waste: { t: number; amount: number; label: string; unitValue?: number; valueBasis?: string }[];
+  steps: GaugeTrack["steps"]; capped: GaugeTrack["capped"];
+};
+
+/** The gauge simulation gaugeFindings and gaugeTrack share. */
+function runGauge(ctx: PlayerCheckContext, spec: GaugeSpec): GaugeRun {
   const events = [...spec.events].filter((e) => e.t < ctx.endMs).sort((a, b) => a.t - b.t);
   let value = 0, cap = spec.cap, negatives = 0;
-  const waste: { t: number; amount: number; label: string; unitValue?: number; valueBasis?: string }[] = [];
+  let cappedSince: number | null = null;
+  const waste: GaugeRun["waste"] = [];
+  const steps: GaugeTrack["steps"] = [{ t: 0, value: 0 }];
+  const capped: GaugeTrack["capped"] = [];
+  const step = (t: number) => {
+    if (cappedSince !== null && value < cap) { if (t > cappedSince) capped.push({ startMs: cappedSince, endMs: t }); cappedSince = null; }
+    else if (cappedSince === null && value >= cap && cap > 0) cappedSince = t;
+    if (steps[steps.length - 1].t === t) steps[steps.length - 1].value = value;
+    else steps.push({ t, value });
+  };
   for (const e of events) {
     if (e.type === "gain") {
       const over = Math.max(0, value + e.amount - cap);
@@ -929,7 +945,25 @@ export function gaugeFindings(ctx: PlayerCheckContext, spec: GaugeSpec): DamageF
     } else {
       value = 0;
     }
+    step(e.t);
   }
+  if (cappedSince !== null && ctx.endMs > cappedSince) capped.push({ startMs: cappedSince, endMs: ctx.endMs });
+  return { value, negatives, waste, steps, capped };
+}
+
+/** The same gauge as a timeline lane (display only). */
+export function gaugeTrack(ctx: PlayerCheckContext, spec: GaugeSpec, max = spec.cap): GaugeTrack {
+  const run = runGauge(ctx, spec);
+  const lost = run.waste.reduce((a, w) => a + w.amount, 0);
+  return {
+    name: spec.name, max, steps: run.steps, capped: run.capped,
+    note: `${lost} ${spec.unit} lost at the cap (the overcap findings value it)` +
+      (run.negatives > 0 ? `; ${run.negatives} spend${run.negatives === 1 ? "" : "s"} the simulation had no gauge for (model or log off)` : ""),
+  };
+}
+
+export function gaugeFindings(ctx: PlayerCheckContext, spec: GaugeSpec): DamageFinding[] {
+  const { value, negatives, waste } = runGauge(ctx, spec);
   // xivanalysis's "ending the fight with cartridges loaded" (Ammo.tsx):
   // what's held at the kill was never spent.
   if (spec.leftAtKill && ctx.pull.result === "Kill" && value > 0) {

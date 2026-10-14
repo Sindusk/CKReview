@@ -24,6 +24,8 @@
 import type { GaugeTrack } from "../../types";
 import type { PlayerCheckContext } from "../../checks";
 import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
+import { beastGaugeSpec } from "./pld-war";
+import { gaugeTrack } from "./shared";
 
 const ADDERSGALL_MAX = 3;
 const ADDERSGALL_TIMER_MS = 20_000;
@@ -278,4 +280,6 @@ export const JOB_GAUGES: Record<string, ((ctx: PlayerCheckContext) => GaugeTrack
   "Sage": [addersgall],
   "Paladin": [oathGauge],
   "Dancer": [dancerGauges],
+  // Beast Gauge: the overcap check's own simulation (pld-war.ts beastGaugeSpec).
+  "Warrior": [(ctx) => [gaugeTrack(ctx, beastGaugeSpec(ctx))]],
 };
