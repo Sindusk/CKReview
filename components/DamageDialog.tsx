@@ -35,6 +35,7 @@ import type { DamageFinding, PhaseDamageSummary, PlayerDamageSummary, PullDamage
 import { biggestWins, findingItems, KIND_THEME, THEME_NAME, type CoachingItem, type CoachingTheme } from "@/lib/damage/coaching";
 import { readableText, THEME_COLOR, ThemeGlyph } from "./ui/DamageGlyphs";
 import DamageTimeline, { MOVEMENT_COLOR } from "./DamageTimeline";
+import { abilityIconsOf, AbilityTip, firstAbility, RichDetail, type AbilityIcons } from "./DamageAbilities";
 import { getClassColor, getPlayerClassIcon, getPlayerSpecIcon } from "@/lib/player-display";
 import { useFFPullSelector } from "@/hooks/useFFPullSelector";
 import { SEVERITY_COLOR } from "./SeverityIcon";
@@ -457,78 +458,29 @@ function BiggestWins({ items, perPull, icons, onPick }: {
   );
 }
 
-// ── Ability icons in finding text ────────────────────────────────────────
-// Findings name abilities in their text ("No GCD for 1.3s after Kasha"), so
-// the names are matched against the abilities this player logged in the
-// pull(s) (casts, buffs, hits, heals), longest first, and drawn with their
-// icon. Only the player's own abilities can match, so a boss's attack named
-// in a cause isn't decorated. Names under 3 characters are left out (Dia
-// and Bio are 3); the match is case-sensitive, so a name doesn't hit a word.
-type AbilityIcons = { icons: Map<string, string>; re: RegExp | null };
-// Names findings use that the log never records, shown with the icon of
-// the ability that keeps them up: Darkside is a gauge timer, not a status.
-const ICON_ALIASES: [string, string[]][] = [
-  ["Darkside", ["Edge of Shadow", "Flood of Shadow"]],
-];
-const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-function abilityIconsOf(pulls: Pull[], player: string): AbilityIcons {
-  const icons = new Map<string, string>();
-  for (const p of pulls) {
-    const pl = p.players.find((x) => x.name === player);
-    if (!pl) continue;
-    for (const e of [...pl.casts, ...(pl.buffs ?? []), ...pl.damageDone, ...pl.healing]) {
-      if (e.abilityIcon && e.abilityName && !icons.has(e.abilityName)) icons.set(e.abilityName, e.abilityIcon);
-    }
-  }
-  for (const [name, from] of ICON_ALIASES) {
-    const src = from.find((n) => icons.has(n));
-    if (!icons.has(name) && src) icons.set(name, icons.get(src)!);
-  }
-  const names = [...icons.keys()].filter((n) => n.length >= 3 && !/^(attack|melee|auto shot|shoot)$/i.test(n)).sort((a, b) => b.length - a.length);
-  return { icons, re: names.length ? new RegExp(`(?<![A-Za-z])(${names.map(escapeRe).join("|")})(?![A-Za-z])`, "g") : null };
-}
-const firstAbility = (text: string, a: AbilityIcons): string | undefined => {
-  if (!a.re) return undefined;
-  a.re.lastIndex = 0;
-  return a.re.exec(text)?.[1];
-};
-
-function RichDetail({ text, icons }: { text: string; icons: AbilityIcons }) {
-  if (!icons.re) return <>{text}</>;
-  const parts = text.split(icons.re);
-  // split with one capture group: odd indexes are the matched names.
-  return (
-    <>
-      {parts.map((part, i) => i % 2 === 0 ? part : (
-        <span key={i} style={{ whiteSpace: "nowrap", fontWeight: 600, color: "var(--ck-text)" }}>
-          <img src={icons.icons.get(part)} alt="" width={15} height={15}
-            style={{ verticalAlign: -3, marginRight: 3, borderRadius: 2 }}
-            onError={(e) => { e.currentTarget.style.display = "none"; }} />
-          {part}
-        </span>
-      ))}
-    </>
-  );
-}
-
 function PlayerDetail({ summary, analysis, colorFor, iconFor, pull, pulls }: {
   summary: PlayerDamageSummary; analysis: PullDamageAnalysis; colorFor: ColorFor; iconFor: ColorFor; pull?: Pull; pulls: Pull[];
 }) {
   const shown = summary.findings.filter((f) => f.lostDamage >= 1 || f.kind === "interrupted-cast");
   const icons = useMemo(() => abilityIconsOf(pull ? [pull] : [], summary.player), [pull, summary.player]);
   // Shared by the summary, the timeline and the finding list: the open
-  // groups (the biggest one to start) and the finding picked on either.
+  // groups (all collapsed for a new player; user, 2026-10-14) and the
+  // finding picked on either, whose highlight fades after PICK_FADE_MS.
   const items = useMemo(() => findingItems(summary.findings), [summary.findings]);
-  const [openKinds, setOpenKinds] = useState<Set<DamageFinding["kind"]>>(() => {
-    const top = biggestWins(items, 1)[0];
-    return new Set(top ? [top.topKind] : []);
-  });
-  const [picked, setPicked] = useState<DamageFinding | null>(null);
+  const [openKinds, setOpenKinds] = useState<Set<DamageFinding["kind"]>>(() => new Set());
+  // `n` counts picks, so picking the same finding again re-highlights it.
+  const [pickState, setPickState] = useState<{ f: DamageFinding | null; n: number }>({ f: null, n: 0 });
+  const picked = pickState.f;
   const [hovered, setHovered] = useState<DamageFinding | null>(null);
   const pick = (f: DamageFinding) => {
     setOpenKinds((prev) => new Set(prev).add(f.kind));
-    setPicked(f);
+    setPickState((prev) => ({ f, n: prev.n + 1 }));
   };
+  useEffect(() => {
+    if (!pickState.f) return;
+    const t = setTimeout(() => setPickState((prev) => ({ ...prev, f: null })), PICK_FADE_MS);
+    return () => clearTimeout(t);
+  }, [pickState]);
   // Crit luck (FFXIV): the player's rates from their hits in every loaded
   // pull, then this pull against what its rotation averages.
   const luck = useMemo(() => {
@@ -711,10 +663,15 @@ function FindingGroups({ findings, icons, open, onOpenChange: setOpen, picked, o
 // Time | lead icon (the first ability named, else the theme glyph) | the
 // line, ability names with their icons, over its basis | cost with a bar
 // against the player's biggest single finding.
+// A picked row's highlight holds this long, then fades over PICK_FADE_CSS.
+const PICK_FADE_MS = 2_500;
+const PICK_FADE_CSS = "background-color 1.2s ease, box-shadow 1.2s ease";
+
 function FindingRow({ f, icons, maxLost, picked, onHover }: {
   f: DamageFinding; icons: AbilityIcons; maxLost: number; picked: boolean; onHover: (f: DamageFinding | null) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  // Scroll once the row exists: a group opened by the same click mounts it.
   useEffect(() => {
     if (picked) ref.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [picked]);
@@ -725,12 +682,16 @@ function FindingRow({ f, icons, maxLost, picked, onHover }: {
       style={{
         display: "grid", gridTemplateColumns: "42px 22px minmax(0, 1fr) 64px", columnGap: 10, alignItems: "start",
         padding: "6px 4px", borderTop: "1px solid var(--ck-line)", opacity: f.forced && !f.movement ? 0.55 : 1,
-        background: picked ? "rgba(83,169,255,0.10)" : undefined, boxShadow: picked ? "inset 2px 0 0 var(--ck-arcane)" : undefined,
+        backgroundColor: picked ? "rgba(83,169,255,0.14)" : "rgba(83,169,255,0)",
+        boxShadow: picked ? "inset 2px 0 0 rgba(83,169,255,1)" : "inset 2px 0 0 rgba(83,169,255,0)",
+        transition: picked ? "none" : PICK_FADE_CSS,
       }}>
       <span className="ck-num" style={{ color: "var(--ck-text-2)", fontSize: 12, paddingTop: 2 }}>{fmtTime(f.startMs)}</span>
       {lead ? (
-        <img src={icons.icons.get(lead)} alt={lead} width={22} height={22} style={{ display: "block", borderRadius: 3 }}
-          onError={(e) => { e.currentTarget.style.visibility = "hidden"; }} />
+        <AbilityTip name={lead} icons={icons} style={{ display: "block", width: 22, height: 22 }}>
+          <img src={icons.icons.get(lead)} alt={lead} width={22} height={22} style={{ display: "block", borderRadius: 3 }}
+            onError={(e) => { e.currentTarget.style.visibility = "hidden"; }} />
+        </AbilityTip>
       ) : <ThemeGlyph theme={KIND_THEME[f.kind]} size={22} />}
       <div style={{ minWidth: 0 }}>
         <div style={{ color: "var(--ck-text)", fontSize: 13, lineHeight: 1.5 }}>
