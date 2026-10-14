@@ -1,5 +1,104 @@
 // lib/mechanics/ffxiv/trials/queen-eternal.ts
 //
+// -- VERIFIED AGAINST LOGS (2026-10-14) --
+// A = r83YhVvDwpzBkLyF: 16 pulls, kill A16 (9:43).
+// B = rFQT8XZckzvH1LNx: 13 pulls, kills B3 (9:24) and B13 (9:49).
+// Both the user's static's (some players on other jobs or swapped out). Nobody
+// remembers the plan and there's no VOD; roles.ts slots are correct.
+//
+// Clock (A16; every pull within ~1s): Aethertithe 0:16 (cones 0:26/0:35/
+// 0:44, Retribute 0:29/0:38/0:47), Wind 1:00 (Aeroquell 1:14, Force 1:27,
+// gusts 1:33), World Shatter 1:41, Prosecution 1:54, Divide and Conquer
+// 2:07 (recast 2:18), Royal Domain 2:26, Earth 2:40 (towers 3:08, Empire
+// 3:20 with towers 3:22, meteors 3:34/3:41, Weighty Blow 3:48-3:58), World
+// Shatter 4:03, Prosecution 4:15, Coronation 4:24 (Atomic Ray 4:37),
+// Absolute Authority 4:54 (push 5:15), Ice 5:32 (Freezing Up 5:42, Rush
+// 5:59, Force 6:07, second freeze 6:20, Drear Rising 6:26-6:49), World
+// Shatter 6:56, Authority Eternal 7:10 (pushed). P2: Radical Shift 7:50/
+// 8:09, World Shatter 8:22, Distortion 8:33, Grasp 8:44, Dying Memory 8:50,
+// Banishment 9:06, Radical Shift 9:38. No pull saw the enrages (failed
+// Authority Eternal 41036, Preservation 41053).
+//
+// IDs (the model's candidates held, with these log facts):
+// - NO DAMAGE DOWN in the fight. Avoidables give Vulnerability Up 1001789
+//   (Legitimate Force 40990/40992/40993/40994, Divide and Conquer's recast
+//   30505, Absolute Authority puddles 41027, lonely Heel 41033, Distortion
+//   41043/41044, both Big Bursts, Shatter 41021); Rush gives Physical
+//   Vulnerability Up 1002940, Ice Dart Ice Resistance Down II 1002465, the
+//   shares and spreads Magic Vulnerability Up 1002941.
+// - Cast-targeted (the owner): Divide and Conquer lines 40984 (caster
+//   instances repeat within the set), Earth towers Burst 41001 (the soaker),
+//   Gravity Pillar 41004 / Ray 41005, Meteor Impact 41007/41008, Atomic Ray
+//   40982, Rush 41017/41018 (penalty 41019/41020), Ice Dart 41023, Radical
+//   Shift 41040. Some casts lose their target in the log.
+// - Meteor Impact: 41007 = landed on a platform (a boulder), 41008 = fell
+//   into the void. Each lands only on its own player. Weighty Blow 41012 is
+//   the line hitting a player; 41010 a boulder blocking it.
+// - Tyranny's Grasp 41048 is the tank tower's miss penalty (A15: the tower's
+//   tank was dead). Biting Chains 40998 and Aero IV 40999 never hit.
+//
+// Findings:
+// - Meteors: eight boulders, four a side, in every kill (B's Black Mage drops
+//   in the second wave instead of the first). Big Burst 41009 killed the
+//   party in 10 wipes: two players dropping together, one landing hitting
+//   both (A9, A10, B11); a fallen player's meteor still landing (A5, A8, A14:
+//   retargeted onto a player already dropping, B7); a boulder left over
+//   because Weighty Blow hit a player instead (B5, B6); mass falls (A3, B9).
+//   Clean drops kept 4.1y+ apart (A8).
+// - Falls (no killing blow) are the most common error: Aethertithe cones
+//   (A12, A15, B4 ~0:28), Wind gusts (A16 kill 1:34), Earth platforms
+//   (3:17-3:42), the Ice bridges (5:49-5:56, in pairs: A11, A12, B8, B10),
+//   Absolute Authority's push (A7), Radical Shift (A15, A16 kill, B13 kill).
+// - Earth towers: a player not landed leaves a tower empty (A2, A5, A12, B7:
+//   survivable once); two sharing one killed (A4, B1, B4).
+// - Rush: short tethers and crossing lines killed 3-4 at once (A2, A6, A11).
+// - Ice Dart: a dart on the stack group killed 5 (A13 +6:49, B8 +6:34; B13
+//   kill: 6 hit, one died). The dart's cast loses its target every time.
+// - Retribute: B12 lost three to a line short of players, then a group in
+//   both lines. Prosecution: B1 +1:55 a tank took both hits and died; A2 +1:55
+//   a double hit under an invulnerability (fine).
+//
+// Cutoffs (every wipe has one): A 5 boulder Big Burst, 3 mass deaths (Rush
+// x2, Ice Dart), 3 both healers dead, 3 collapse, 1 tower Big Burst; B 4
+// boulder Big Burst, 4 both healers dead, 2 mass deaths (Ice Dart,
+// Retribute), 1 tower Big Burst. Kills carry no Raid error; their errors
+// are Legitimate Force hits, falls (A16 x4, B13 x1), Deep Freeze, a missed
+// Retribute/Aeroquell and B13's Ice Dart on the group.
+//
+// -- RULES IMPLEMENTED --
+// - ffxiv-queen-eternal-avoidable: the avoidables above, per player
+//   episode. Minor; Major when it killed (no Damage Down in this fight).
+// - ffxiv-queen-eternal-freeze: Deep Freeze. Minor, Major when they died.
+// - ffxiv-queen-eternal-share: Retribute lines, Aeroquell stacks: a player in
+//   two, or a living player in none.
+// - Spread families (one instance per player; owner and victim named; an
+//   owned instance hitting 3+ others names its owner alone, an ownerless
+//   one hitting 4+ is player-less): ffxiv-queen-eternal-spread (Atomic Ray,
+//   Radical Shift, Divide and Conquer), -earth (towers, Pillar, Ray), -rush
+//   (plus "tether too short" on 41019/41020's target), -ice-dart.
+// - ffxiv-queen-eternal-empty-tower: tower Big Burst names the player with no
+//   tower, else the two sharing one (Major); Raid tower-wipe when it killed
+//   2+ and the pull ended within 40s.
+// - ffxiv-queen-eternal-meteor: one landing hitting 2+ players names every
+//   one of them (skipped for a player handed a dead player's meteor).
+//   -weighty-blow: a Weighty Blow line on a player. -boulder-wipe: the Raid
+//   marker at the boulder Big Burst, its cause in the description.
+// - ffxiv-queen-eternal-prosecution (targeted: tanks): a tank died taking
+//   both hits; names the other tank.
+// - ffxiv-queen-eternal-fall: a death with no killing blow, phase named in
+//   the description. Bridge and Radical Shift falls are never a called wipe.
+// - Raid: boulder-wipe, tower-wipe, mass-deaths (4+ within 2.5s, Big Burst
+//   and raidwides excluded, over within 40s), enrage (41036 / 41053),
+//   called-wipe (3+ silent deaths within 5s, or near the end with nothing
+//   killing anyone after), collapse (6 dead, or 5 with the pull over within
+//   45s). Both healers dead comes from ffxiv/common.ts.
+// Not built: Coronation tether endpoints and Absolute Authority's flares
+// (both plans overlap the flares on purpose: the static stacks), Raised
+// Tribute membership (B's tanks solo the late stacks with invulns), wind
+// direction, Gravitational Anomaly flight, Royal Banishment/Dying Memory
+// (all eight every time), Tyranny's Grasp tower misses (only after a tank
+// death), Shatter (only after a tether holder fell), raidwide deaths.
+//
 // -- GUIDE-DERIVED MODEL: QUEEN ETERNAL (SPHENE) --
 // The Minstrel's Ballad: Sphene's Burden, level100, patch7.1; Extreme only.
 // Checked 2026-10-14. Comments only; no report analyzed, no failures
@@ -369,3 +468,746 @@
 // 8. P2: fixed-marker tolerances, spread snapshots, exaflare line counts,
 //    tower lockout/miss penalty, Memory/Banishment split and final-hit size;
 //    distinguish falls from deliberate resets and causal death fallout.
+
+import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
+import type { DeathEvent } from "@/types/DeathEvent";
+import type { PullError, EnemyEvent } from "@/types/PullError";
+import type { ReportedOccurrence } from "@/lib/mechanics/occurrences";
+import { kFmt, joinNames, playerError, playerlessMinor, raidMarker, rezzedAt, clusterByGap, debuffIntervals, RAID_MARKER_SORT_OFFSET_MS } from "@/lib/mechanics/wow/common";
+
+export const QE_AVOIDABLE_RULE_ID   = "ffxiv-queen-eternal-avoidable";
+export const QE_FREEZE_RULE_ID      = "ffxiv-queen-eternal-freeze";       // stopped under Freezing Up
+export const QE_SHARE_RULE_ID       = "ffxiv-queen-eternal-share";        // Retribute lines, Aeroquell stacks
+export const QE_SPREAD_RULE_ID      = "ffxiv-queen-eternal-spread";       // Atomic Ray, Radical Shift, Divide and Conquer baits
+export const QE_EARTH_RULE_ID       = "ffxiv-queen-eternal-earth";        // Earth towers, Gravity Pillar / Ray
+export const QE_EMPTY_TOWER_RULE_ID = "ffxiv-queen-eternal-empty-tower";  // Big Burst (tower)
+export const QE_RUSH_RULE_ID        = "ffxiv-queen-eternal-rush";         // Laws of Ice tethers
+export const QE_ICE_DART_RULE_ID    = "ffxiv-queen-eternal-ice-dart";     // Drear Rising tethers
+export const QE_METEOR_RULE_ID      = "ffxiv-queen-eternal-meteor";       // boulders dropped together
+export const QE_WEIGHTY_RULE_ID     = "ffxiv-queen-eternal-weighty-blow"; // not behind a boulder
+export const QE_SWAP_RULE_ID        = "ffxiv-queen-eternal-prosecution";  // Prosecution of War swap
+export const QE_FALL_RULE_ID        = "ffxiv-queen-eternal-fall";
+export const QE_BOULDER_WIPE_RULE_ID = "ffxiv-queen-eternal-boulder-wipe";
+export const QE_TOWER_WIPE_RULE_ID  = "ffxiv-queen-eternal-tower-wipe";
+export const QE_MASS_DEATHS_RULE_ID = "ffxiv-queen-eternal-mass-deaths";
+export const QE_ENRAGE_RULE_ID      = "ffxiv-queen-eternal-enrage";
+export const QE_CALLED_WIPE_RULE_ID = "ffxiv-queen-eternal-called-wipe";
+export const QE_COLLAPSE_RULE_ID    = "ffxiv-queen-eternal-collapse";
+
+// Aethertithe, Virtual Shift (Wind), Divide and Conquer: every pull opens with them.
+const SIGNATURE      = [40972, 40985, 40983];
+const WALKING_DEAD   = 1000811;
+const WALKING_DEAD_FULL_MS = 9500;
+const DEEP_FREEZE    = 1003519;
+const AETHERTITHE_CONES = [40974, 40975, 40976];
+const WIND_PUSH      = 40996;   // Wind of Change gust (cast on every player)
+const SHIFT_WIND     = 40985;
+const SHIFT_EARTH    = 40986;
+const SHIFT_ICE      = 40987;
+const WORLD_SHATTER  = [40988, 30354];
+const LAWS_OF_ICE    = 41013;
+const RADICAL_SHIFT  = 41039;
+const AUTHORITY_PUSH = 41029;
+const RETRIBUTE      = 40978;
+const AEROQUELL      = 40997;
+const DIVIDE         = 40984;   // Divide and Conquer: one line per baiter, cast-targeted
+const ATOMIC_RAY     = 40982;
+const RADICAL_SPREAD = 41040;
+const TOWER          = 41001;   // Burst: an Earth tower, cast-targeted at its soaker
+const PILLAR         = 41004;   // Gravity Pillar defamation, cast-targeted
+const RAY            = 41005;   // Gravity Ray cone, cast-targeted
+const TOWER_FAIL     = 41002;   // Big Burst: an Earth tower left empty
+const RUSH           = [41017, 41018];
+const RUSH_SHORT     = [41019, 41020]; // a Rush tether left short
+const ICE_DART       = 41023;
+const METEOR_DROP    = 41007;   // a meteor landing on a platform (a boulder)
+const METEOR_VOID    = 41008;   // a meteor falling into the void (no boulder)
+const BOULDER_BURST  = 41009;   // Big Burst: boulders touching, or one left over
+const WEIGHTY_CAST   = 41011;
+const WEIGHTY_BLOW   = 41012;
+const PROSECUTION    = [40970, 40971];
+const ENRAGE         = [41036, 41053]; // failed Authority Eternal, Preservation
+// Raid-wide damage: deaths to these are mitigation, never a mass-death cutoff.
+const RAIDWIDE = [40973, 40985, 40986, 40987, 40988, 30354, 41038, 41028, 41029, 41030, 41035, 41039, 41049, 20042, 41051, 41052, 41036, 41053];
+
+// Avoidable hits. The fight hands out no Damage Down; these give
+// Vulnerability Up 1001789 (Coronation's laser Magic Vulnerability Up), so
+// a survived hit is Minor.
+type Avoidable = { name: string; why: string };
+const FORCE_WHY = "Legitimate Force cleaves one half of the arena, then the other; start in the half the glowing arm hits second and cross as soon as the first cleave goes off.";
+const DISTORTION_WHY = "Dimensional Distortion's exaflares advance in staggered columns; step in behind a line that has already exploded.";
+const AVOIDABLE: Record<number, Avoidable> = {
+  40990: { name: "Legitimate Force", why: FORCE_WHY },
+  40992: { name: "Legitimate Force", why: FORCE_WHY },
+  40993: { name: "Legitimate Force", why: FORCE_WHY },
+  40994: { name: "Legitimate Force", why: FORCE_WHY },
+  30505: { name: "Divide and Conquer", why: "Divide and Conquer fires every baited line again together; after your own bait, step into a gap between the lines." },
+  41027: { name: "Absolute Authority", why: "Absolute Authority drops circles on the party four times; bait them together and move out of the old circles along the north wall." },
+  41033: { name: "Authority's Heel", why: "Authority's Heel needs at least one neighbour; stay next to another player when it goes off." },
+  40980: { name: "Ruthless Regalia", why: "Coronation's tethered pairs fire Ruthless Regalia lasers; hold your end of the tether at your spot without crossing another pair's beam." },
+  41043: { name: "Dimensional Distortion", why: DISTORTION_WHY },
+  41044: { name: "Dimensional Distortion", why: DISTORTION_WHY },
+};
+
+// FFLogs logs the death event ~2.0s after the fatal hit (README).
+const DEATH_EVENT_LAG_MS = 2000;
+const DIED_FROM_HIT_MS   = 3000;
+const EPISODE_MS         = 3000;
+const RAISE_GRACE_MS     = 10_000;
+// With this many dead, a share's, spread's or tower's layout is fallout.
+const DOOMED_DEAD        = 3;
+// An instance that hit this many players besides its owner was carried into
+// the group: its owner is named alone (README pitfalls: a stack taken away
+// from a waiting group names its holder).
+const CROWD              = 3;
+// Deaths to one moment's mechanics that end the pull: 4+ within
+// MASS_WINDOW_MS and the pull over within 40s (A6 Rush 37s, B8 Ice Dart 35s,
+// B12 Retribute 7s).
+const MASS_DEATHS        = 4;
+const MASS_WINDOW_MS     = 2500;
+const MASS_END_MS        = 40_000;
+const CALLED_WIPE_END_MS = 12_000;
+const CALLED_WIPE_COUNT  = 3;
+// Resets came 1-3s apart (A3 4.8s span, B9 5.5s); A3's first fall was
+// 8.9s before the reset and B9's 5.8s.
+const CALLED_WIPE_WINDOW = 5_000;
+// No kill ever had 4 down at once. 6 dead never recovered (A7 carried on
+// 89s with two alive); 5 dead with the pull over within 45s.
+const COLLAPSE_DEAD_COUNT = 5;
+const COLLAPSE_END_MS     = 45_000;
+const COLLAPSE_ANY_COUNT  = 6;
+
+// ── shared helpers ──────────────────────────────────────────────────────────
+
+type Hit = { p: PlayerInfo; e: PlayerEvent };
+
+type Life = {
+  alive: (p: PlayerInfo, t: number) => boolean;
+  hitAlive: (p: PlayerInfo, hitT: number) => boolean;
+  diedFrom: (p: PlayerInfo, hitT: number) => DeathEvent | undefined;
+  outIntervals: { p: PlayerInfo; start: number; end: number }[];
+};
+
+function buildLife(players: PlayerInfo[], deaths: DeathEvent[]): Life {
+  const outIntervals: Life["outIntervals"] = [];
+  for (const p of players) {
+    const own = deaths.filter((d) => d.player === p.name).sort((a, b) => a.timestamp - b.timestamp);
+    own.forEach((d, i) => {
+      const next = own[i + 1]?.timestamp ?? Infinity;
+      const end = rezzedAt(p, d.timestamp, next) ?? next - DEATH_EVENT_LAG_MS - 100;
+      outIntervals.push({ p, start: d.timestamp - DEATH_EVENT_LAG_MS - 100, end });
+    });
+  }
+  const alive = (p: PlayerInfo, t: number) => !outIntervals.some((w) => w.p === p && t >= w.start && t < w.end);
+  return {
+    outIntervals,
+    alive,
+    hitAlive: (p, hitT) => alive(p, hitT - 500),
+    diedFrom: (p, hitT) => deaths.find((d) => d.player === p.name && d.timestamp >= hitT && d.timestamp <= hitT + DIED_FROM_HIT_MS),
+  };
+}
+
+/** Hits on living players (a dead body still logs 0-damage hits). */
+function hitsOf(players: PlayerInfo[], life: Life, ids: number | number[]): Hit[] {
+  const set = new Set(Array.isArray(ids) ? ids : [ids]);
+  const out: Hit[] = [];
+  for (const p of players) {
+    for (const e of p.damageTaken) {
+      if (!set.has(e.abilityId) || e.healthBefore === 0) continue;
+      if (life.hitAlive(p, e.timestamp)) out.push({ p, e });
+    }
+  }
+  return out.sort((a, b) => a.e.timestamp - b.e.timestamp);
+}
+
+const castsOf = (casts: EnemyEvent[], ids: number | number[]) => {
+  const set = new Set(Array.isArray(ids) ? ids : [ids]);
+  return casts.filter((c) => set.has(c.abilityId)).sort((a, b) => a.timestamp - b.timestamp);
+};
+
+// Hits this large are FFLogs' unpaired previews of lethal hits (README).
+const PREVIEW_AMOUNT = 1_500_000;
+/** "~120k", or "lethal" when a hit in the set is a lethal preview. */
+const amountText = (es: PlayerEvent[]) => es.some((e) => (e.amount ?? 0) >= PREVIEW_AMOUNT)
+  ? "lethal" : kFmt(es.reduce((s, e) => s + (e.amount ?? 0), 0));
+
+const uniq = <T,>(xs: T[]) => [...new Set(xs)];
+const namesOf = (ps: PlayerInfo[]) => joinNames(uniq(ps).map((p) => p.name));
+const isTank = (p: PlayerInfo) => p.role === "Tank";
+const instanceKey = (e: PlayerEvent) => `${e.abilityId}|${e.source}#${e.sourceInstance}`;
+const castKey = (c: EnemyEvent) => `${c.abilityId}|${c.actorName}#${c.sourceInstance}`;
+const deadCount = (players: PlayerInfo[], life: Life, t: number) => players.filter((p) => !life.hitAlive(p, t)).length;
+const byName = (players: PlayerInfo[], name?: string) => (name ? players.find((p) => p.name === name) : undefined);
+const mmss = (ms: number) => { const s = Math.round(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
+
+/** Raised within RAISE_GRACE_MS before `t` (or still out at `t`). */
+function inRaiseGrace(life: Life, p: PlayerInfo, t: number): boolean {
+  return !life.hitAlive(p, t) || life.outIntervals.some((w) => w.p === p && w.end <= t && t - w.end < RAISE_GRACE_MS);
+}
+
+/** Took a listed avoidable hit within 2s of `t`: already flagged for it. */
+function inAvoidable(p: PlayerInfo, t: number): boolean {
+  return p.damageTaken.some((e) => AVOIDABLE[e.abilityId] && Math.abs(e.timestamp - t) <= 2000 && (e.amount ?? 0) > 0);
+}
+
+const killedBy = (life: Life, res: Hit[], p: PlayerInfo, ids: number[]) => {
+  const last = res.filter((h) => h.p === p).pop()?.e.timestamp;
+  const d = last !== undefined ? life.diedFrom(p, last) : undefined;
+  return !!d && ids.includes(d.killingAbilityGameId);
+};
+
+// ── plain avoidable hits ────────────────────────────────────────────────────
+
+function detectAvoidable(players: PlayerInfo[], life: Life): PullError[] {
+  const errors: PullError[] = [];
+  const ids = Object.keys(AVOIDABLE).map(Number);
+  for (const p of players) {
+    const hits = p.damageTaken.filter((e) => ids.includes(e.abilityId) && e.healthBefore !== 0 && life.hitAlive(p, e.timestamp) && (e.amount ?? 0) > 0);
+    for (const g of clusterByGap(hits, (e) => e.timestamp, EPISODE_MS)) {
+      const kinds = uniq(g.map((e) => AVOIDABLE[e.abilityId]));
+      const death = life.diedFrom(p, g[g.length - 1].timestamp);
+      const names = uniq(kinds.map((k) => k.name));
+      errors.push(playerError(p, {
+        ruleId: QE_AVOIDABLE_RULE_ID, severity: death ? "Major" : "Minor", name: `Hit by ${names.join(" / ")}`,
+        description: `Hit by ${joinNames(names)} (${g.length > 1 ? `${g.length} hits, ` : ""}${amountText(g)}), with a vulnerability debuff.${death ? " They died." : ""} ${uniq(kinds.map((k) => k.why)).join(" ")}`,
+        timestamp: g[0].timestamp, abilityId: g[0].abilityId, abilityName: g[0].abilityName,
+      }));
+    }
+  }
+  return errors;
+}
+
+/** Deep Freeze: stood still while Freezing Up held. */
+function detectFreeze(players: PlayerInfo[], life: Life): PullError[] {
+  const errors: PullError[] = [];
+  for (const p of players) {
+    for (const w of debuffIntervals(p, DEEP_FREEZE)) {
+      if (!life.hitAlive(p, w.start)) continue;
+      const end = Number.isFinite(w.end) ? w.end : w.start + 10_000;
+      const death = life.diedFrom(p, end - DIED_FROM_HIT_MS + 2000);
+      errors.push(playerError(p, {
+        ruleId: QE_FREEZE_RULE_ID, severity: death ? "Major" : "Minor", name: "Frozen by Deep Freeze",
+        description: `Stopped moving while Laws of Ice's Freezing Up held, and Deep Freeze froze them for ${((end - w.start) / 1000).toFixed(1)}s.${death ? " They died while it held." : ""} Keep walking until Freezing Up falls off (slidecast, or move between GCDs).`,
+        timestamp: w.start, abilityId: DEEP_FREEZE, abilityName: "Deep Freeze",
+      }));
+    }
+  }
+  return errors;
+}
+
+// ── one instance per player: spreads, baits, towers, tethers ───────────────
+
+type Spread = { name: string; ids: number[]; what: (abilityId: number) => string; why: string; ruleId: string; gapMs?: number; perCast?: boolean };
+const SPREADS: Spread[] = [
+  { name: "Atomic Ray", ids: [ATOMIC_RAY], what: () => "Atomic Ray spread", ruleId: QE_SPREAD_RULE_ID,
+    why: "Atomic Ray puts a large spread on all eight right after Coronation's lasers; each player takes their own wall or corner slot." },
+  { name: "Radical Shift", ids: [RADICAL_SPREAD], what: () => "Radical Shift spread", ruleId: QE_SPREAD_RULE_ID,
+    why: "Radical Shift's spreads go off on the new floor; stand on your own marker, apart from everyone." },
+  // The eight lines go off 1s apart and reuse caster instances within the
+  // set: each hit is keyed to its own cast.
+  { name: "Divide and Conquer", ids: [DIVIDE], what: () => "Divide and Conquer line", ruleId: QE_SPREAD_RULE_ID, perCast: true,
+    why: "Divide and Conquer fires one line at each player in turn; spread in a fan so no line passes through anyone else." },
+  { name: "Earth towers", ids: [TOWER, PILLAR, RAY], ruleId: QE_EARTH_RULE_ID,
+    what: (id) => (id === PILLAR ? "Gravity Pillar" : id === RAY ? "Gravity Ray cone" : "Earth tower"),
+    why: "Each Earth tower takes exactly one grounded player; at Gravitational Empire the Gravity Pillar and Gravity Ray players take their marks out of the towers' way." },
+  { name: "Rush", ids: [...RUSH, ...RUSH_SHORT], what: () => "Rush line", ruleId: QE_RUSH_RULE_ID,
+    why: "Each Ice Pillar rushes at its tethered player; stretch your tether across to the opposite platform and keep out of the other tethers' lines." },
+  { name: "Ice Dart", ids: [ICE_DART], what: () => "Ice Dart", ruleId: QE_ICE_DART_RULE_ID,
+    why: "Drear Rising's two tethered players take Ice Dart away from the group (each player only once: it leaves Ice Resistance Down II); everyone else stacks for Raised Tribute." },
+];
+
+/**
+ * One instance per player. The owner of an instance is its cast target, else
+ * the only player it hit, or the one player it hit who took nothing else. A
+ * player hit by an instance that isn't theirs, or by two, overlapped; the
+ * owner and the victim are both named. An owned instance that hit CROWD or
+ * more other players was carried into the group: its owner alone is named.
+ */
+function detectSpreadFamily(players: PlayerInfo[], life: Life, casts: EnemyEvent[], fam: Spread): PullError[] {
+  const errors: PullError[] = [];
+  for (const res of clusterByGap(hitsOf(players, life, fam.ids), (h) => h.e.timestamp, fam.gapMs ?? 1500)) {
+    const t0 = res[0].e.timestamp, t1 = res[res.length - 1].e.timestamp;
+    if (deadCount(players, life, t0) >= DOOMED_DEAD) continue;
+    // perCast: caster instances repeat within one set, so a hit belongs to
+    // the latest matching cast before it.
+    const famCasts = casts.filter((c) => fam.ids.includes(c.abilityId) && c.timestamp >= t0 - 2000 && c.timestamp <= t1 + 200 && c.sourceInstance !== undefined);
+    const keyOfCast = (c: EnemyEvent) => (fam.perCast ? `${castKey(c)}@${c.timestamp}` : castKey(c));
+    const keyOf = (e: PlayerEvent) => {
+      if (!fam.perCast) return instanceKey(e);
+      const c = famCasts.filter((x) => x.abilityId === e.abilityId && x.actorName === e.source && x.sourceInstance === e.sourceInstance &&
+        x.timestamp <= e.timestamp + 200 && x.timestamp >= e.timestamp - 1500).pop();
+      return c ? keyOfCast(c) : `${instanceKey(e)}@${e.timestamp}`;
+    };
+    const byInst = new Map<string, Hit[]>();
+    const byPlayer = new Map<PlayerInfo, Set<string>>();
+    for (const h of res) {
+      if (inRaiseGrace(life, h.p, h.e.timestamp)) continue;
+      const k = keyOf(h.e);
+      byInst.set(k, [...(byInst.get(k) ?? []), h]);
+      byPlayer.set(h.p, (byPlayer.get(h.p) ?? new Set()).add(k));
+    }
+    const owners = new Map<string, PlayerInfo>();
+    for (const c of famCasts) {
+      const p = byName(players, c.target);
+      if (p) owners.set(keyOfCast(c), p);
+    }
+    for (const [k, hs] of byInst) {
+      if (owners.has(k)) continue;
+      const hit = uniq(hs.map((h) => h.p));
+      const only = hit.filter((p) => byPlayer.get(p)!.size === 1 && ![...owners.values()].includes(p));
+      if (hit.length === 1 && ![...owners.values()].includes(hit[0])) owners.set(k, hit[0]);
+      else if (only.length === 1) owners.set(k, only[0]);
+    }
+    // Carried into the group: the owner alone answers for it. With no owner
+    // in the log (Ice Dart's cast loses its target exactly then: A13 +6:49,
+    // B8 +6:34, B13 +6:34) it stays player-less.
+    const carried = new Map<string, PlayerInfo[]>();
+    for (const [k, hs] of byInst) {
+      const o = owners.get(k);
+      const others = uniq(hs.map((h) => h.p)).filter((p) => p !== o);
+      if (others.length >= (o ? CROWD : CROWD + 1)) carried.set(k, others);
+    }
+    const what = (k: string) => fam.what(Number(k.split("|")[0]));
+    const killed = (ps: PlayerInfo[]) => ps.filter((p) => killedBy(life, res, p, fam.ids));
+    for (const [k, victims] of carried) {
+      const o = owners.get(k);
+      const dead = killed(o ? [o, ...victims] : victims);
+      const deathText = dead.length ? ` ${namesOf(dead)} died.` : "";
+      if (!o) {
+        errors.push(playerlessMinor(fam.ruleId, `${fam.name} on the Group`,
+          `${/^[AEIOU]/.test(what(k)) ? "An" : "A"} ${what(k)} hit ${victims.length} players (${namesOf(victims)}); the log doesn't name whose it was.${deathText} ${fam.why}`,
+          t0, Number(k.split("|")[0]), fam.name));
+        continue;
+      }
+      errors.push(playerError(o, {
+        ruleId: fam.ruleId, severity: dead.length ? "Major" : "Minor", name: `${fam.name} on the Group`,
+        description: `Their ${what(k)} hit ${victims.length} other players (${namesOf(victims)}).${deathText} ${fam.why}`,
+        timestamp: t0, abilityId: Number(k.split("|")[0]), abilityName: fam.name,
+      }));
+    }
+    const links = new Map<PlayerInfo, Set<PlayerInfo>>();
+    const link = (a: PlayerInfo, b: PlayerInfo) => {
+      links.set(a, (links.get(a) ?? new Set()).add(b));
+      links.set(b, (links.get(b) ?? new Set()).add(a));
+    };
+    for (const [p, ks0] of byPlayer) {
+      const ks = [...ks0].filter((k) => !carried.has(k));
+      const foreign = ks.filter((k) => owners.get(k) !== p);
+      if (ks.length < 2 && foreign.length === 0) continue;
+      if (!links.has(p)) links.set(p, new Set());
+      for (const k of ks) {
+        const o = owners.get(k);
+        if (o) { if (o !== p) link(p, o); }
+        else for (const h of byInst.get(k)!) if (h.p !== p) link(p, h.p);
+      }
+    }
+    const seen = new Set<PlayerInfo>();
+    for (const start of links.keys()) {
+      if (seen.has(start)) continue;
+      const group: PlayerInfo[] = [];
+      const stack = [start];
+      while (stack.length) {
+        const p = stack.pop()!;
+        if (seen.has(p)) continue;
+        seen.add(p);
+        group.push(p);
+        for (const q of links.get(p) ?? []) stack.push(q);
+      }
+      const dead = killed(group);
+      const deathText = dead.length ? ` ${namesOf(dead)} died.` : "";
+      for (const p of group) {
+        const others = [...(links.get(p) ?? [])];
+        const ks = [...(byPlayer.get(p) ?? [])].filter((k) => !carried.has(k));
+        const victim = ks.length > 1 || ks.some((k) => owners.get(k) !== p);
+        const kinds = ks.map((k) => `${owners.get(k) === p ? "their own" : owners.get(k) ? `${owners.get(k)!.name}'s` : /^[AEIOU]/.test(what(k)) ? "an" : "a"} ${what(k)}`);
+        const description = victim
+          ? `Hit by ${joinNames(kinds)}${others.length ? ` (with ${namesOf(others)})` : ""}.`
+          : `Their ${what(ks[0] ?? "")} also hit ${namesOf(others)}.`;
+        errors.push(playerError(p, {
+          ruleId: fam.ruleId, severity: dead.length ? "Major" : "Minor", name: `${fam.name} Overlap`,
+          description: `${description}${deathText} ${fam.why}`,
+          timestamp: t0, abilityId: fam.ids[0], abilityName: fam.name,
+        }));
+      }
+    }
+  }
+  return errors;
+}
+
+/** A Rush tether left short: the pillar's penalty Rush goes to its tethered player. */
+function detectShortRush(players: PlayerInfo[], life: Life, casts: EnemyEvent[]): PullError[] {
+  const errors: PullError[] = [];
+  for (const c of castsOf(casts, RUSH_SHORT)) {
+    const p = byName(players, c.target);
+    if (!p || !life.hitAlive(p, c.timestamp) || inRaiseGrace(life, p, c.timestamp)) continue;
+    const hit = p.damageTaken.find((e) => RUSH_SHORT.includes(e.abilityId) && Math.abs(e.timestamp - c.timestamp) <= 1500);
+    const death = life.diedFrom(p, hit?.timestamp ?? c.timestamp);
+    errors.push(playerError(p, {
+      ruleId: QE_RUSH_RULE_ID, severity: death ? "Major" : "Minor", name: "Rush Tether Too Short",
+      description: `Their Ice Pillar's tether wasn't stretched far enough, so its Rush hit as the short-tether penalty${hit ? ` (${amountText([hit])})` : ""}, with a knockback.${death ? " They died." : ""} Stretch the tether across to the opposite platform before the Rush.`,
+      timestamp: c.timestamp, abilityId: c.abilityId, abilityName: "Rush",
+    }));
+  }
+  return errors;
+}
+
+// ── shared lines and stacks ─────────────────────────────────────────────────
+
+type Share = { name: string; ids: number[]; what: string; why: string };
+const SHARES: Share[] = [
+  { name: "Retribute", ids: [RETRIBUTE], what: "line",
+    why: "Retribute fires two line stacks at the healers after each Aethertithe cone; each light party takes its own healer's line." },
+  { name: "Aeroquell", ids: [AEROQUELL], what: "stack",
+    why: "Aeroquell stacks on both healers; each light party takes its own healer's stack." },
+];
+
+/**
+ * Each living player takes exactly one instance. A player in two took the
+ * second under Magic Vulnerability Up (B12 +0:48: four died); a living
+ * player in none left the others to take it short (B12 +0:38: a healer
+ * died in a line of two).
+ */
+function detectShares(players: PlayerInfo[], life: Life): PullError[] {
+  const errors: PullError[] = [];
+  for (const fam of SHARES) {
+    for (const res of clusterByGap(hitsOf(players, life, fam.ids), (h) => h.e.timestamp, 1500)) {
+      const t = res[0].e.timestamp;
+      if (deadCount(players, life, t) >= DOOMED_DEAD) continue;
+      const byPlayer = new Map<PlayerInfo, Set<string>>();
+      for (const h of res) byPlayer.set(h.p, (byPlayer.get(h.p) ?? new Set()).add(instanceKey(h.e)));
+      const killed = uniq(res.map((h) => h.p)).filter((p) => killedBy(life, res, p, fam.ids));
+      const deathText = killed.length ? ` ${namesOf(killed)} died.` : "";
+      const doubled = [...byPlayer].filter(([p, ks]) => ks.size >= 2 && !inRaiseGrace(life, p, t)).map(([p]) => p);
+      for (const p of doubled) {
+        errors.push(playerError(p, {
+          ruleId: QE_SHARE_RULE_ID, severity: killed.length ? "Major" : "Minor", name: `Took Two ${fam.name} ${fam.what}s`,
+          description: `Stood in ${byPlayer.get(p)!.size} ${fam.name} ${fam.what}s at once${doubled.length > 1 ? ` (with ${namesOf(doubled.filter((x) => x !== p))})` : ""}.${deathText} ${fam.why}`,
+          timestamp: t, abilityId: fam.ids[0], abilityName: fam.name,
+        }));
+      }
+      const absent = players.filter((p) => !byPlayer.has(p) && life.hitAlive(p, t) && !inRaiseGrace(life, p, t) && !inAvoidable(p, t));
+      const sizes = uniq(res.map((h) => instanceKey(h.e))).map((k) => res.filter((h) => instanceKey(h.e) === k).length);
+      for (const p of absent) {
+        errors.push(playerError(p, {
+          ruleId: QE_SHARE_RULE_ID, severity: killed.length ? "Major" : "Minor", name: `Missed ${fam.name}`,
+          description: `Took no ${fam.name} ${fam.what}, so the others shared ${sizes.length === 1 ? "it" : "them"} short (${sizes.join(" + ")} players).${deathText} ${fam.why}`,
+          timestamp: t, abilityId: fam.ids[0], abilityName: fam.name,
+        }));
+      }
+    }
+  }
+  return errors;
+}
+
+// ── Earth: empty towers ─────────────────────────────────────────────────────
+
+/**
+ * Big Burst: an Earth tower nobody stood in hits everyone (A4 +3:08: the
+ * healers shared a tower). The first set takes all eight; the second set's
+ * four towers go to everyone but the Gravity Pillar and Gravity Ray players.
+ * The tower player who took no tower is named, else the two sharing one.
+ * It ends the pull when it kills two or more and the pull is over soon after
+ * (B1, B4); A2 survived one.
+ */
+function detectEmptyTowers(players: PlayerInfo[], life: Life, casts: EnemyEvent[], pullEnd: number): PullError[] {
+  const errors: PullError[] = [];
+  for (const res of clusterByGap(hitsOf(players, life, TOWER_FAIL), (h) => h.e.timestamp, 1500)) {
+    const t = res[0].e.timestamp;
+    const towers = hitsOf(players, life, TOWER).filter((h) => h.e.timestamp >= t - 3000 && h.e.timestamp <= t + 500);
+    const marked = castsOf(casts, [PILLAR, RAY]).filter((c) => Math.abs(c.timestamp - t) <= 3000).map((c) => byName(players, c.target));
+    const group = players.filter((p) => !marked.includes(p));
+    const missing = group.filter((p) => !towers.some((h) => h.p === p) && life.hitAlive(p, t - 1000) && !inRaiseGrace(life, p, t - 1000));
+    const byTower = new Map<string, PlayerInfo[]>();
+    for (const h of towers) byTower.set(instanceKey(h.e), [...(byTower.get(instanceKey(h.e)) ?? []), h.p]);
+    const doubled = uniq([...byTower.values()].filter((ps) => ps.length >= 2).flat());
+    const died = uniq(res.filter((h) => life.diedFrom(h.p, h.e.timestamp)).map((h) => h.p));
+    const deathText = died.length ? ` ${namesOf(died)} died.` : "";
+    const why = "Every Earth tower needs one grounded player (land at a well before the towers go off); an empty tower's Big Burst hits the whole party.";
+    const named = missing.length && missing.length <= 2 ? missing : doubled;
+    for (const p of named) {
+      const what = missing.includes(p)
+        ? "Took no Earth tower"
+        : `Shared an Earth tower with ${namesOf(doubled.filter((x) => x !== p))}`;
+      errors.push(playerError(p, {
+        ruleId: QE_EMPTY_TOWER_RULE_ID, severity: "Major", name: "Tower Left Empty",
+        description: `${what}, so a tower stayed empty and Big Burst hit the party (${res.length} hit).${deathText} ${why}`,
+        timestamp: t, abilityId: TOWER_FAIL, abilityName: "Big Burst",
+      }));
+    }
+    if (!named.length) {
+      errors.push(playerlessMinor(QE_EMPTY_TOWER_RULE_ID, "Tower Left Empty",
+        `An Earth tower stayed empty and Big Burst hit the party (${res.length} hit).${deathText} ${why}`, t, TOWER_FAIL, "Big Burst"));
+    }
+    if (died.length >= 2 && pullEnd - t <= MASS_END_MS) {
+      errors.push(raidMarker(QE_TOWER_WIPE_RULE_ID, "Tower Left Empty",
+        `An empty Earth tower's Big Burst killed ${namesOf(died)}. Treated as the cutoff point.`,
+        t, TOWER_FAIL, "Big Burst"));
+    }
+  }
+  return errors;
+}
+
+// ── Earth: meteors, boulders and Weighty Blow ───────────────────────────────
+
+/**
+ * Meteor Impact drops a meteor on every player twice: the first wave lands on
+ * the platforms as eight boulders (four a side), the second falls into the
+ * void (B's Black Mage drops in the second wave instead; legal). Boulders
+ * that touch go off as Big Burst and kill the party:
+ * - two players dropping together: one landing hits both (A9 +3:34, A10
+ *   +3:34, B11 +3:34). Both droppers are named;
+ * - a dead or fallen player's meteor still lands (A5, A8: on the body after
+ *   a fall; A14: retargeted onto a player already dropping one). The death
+ *   is the error; the Big Burst is player-less;
+ * - a boulder left over after Weighty Blow, because a line hit a player
+ *   instead of a boulder (B5, B6).
+ * Clean drops kept 4.1y+ apart (A8 4.1y); a landing hits players within ~4y.
+ */
+function detectMeteors(players: PlayerInfo[], life: Life, casts: EnemyEvent[], pullEnd: number): PullError[] {
+  const errors: PullError[] = [];
+  const why = "Each player drops their meteor on their own spot, apart from the others; boulders that touch go off as Big Burst and kill the party.";
+  for (const wave of clusterByGap(hitsOf(players, life, [METEOR_DROP, METEOR_VOID]), (h) => h.e.timestamp, 3000)) {
+    const t = wave[0].e.timestamp;
+    const targets = castsOf(casts, [METEOR_DROP, METEOR_VOID]).filter((c) => c.timestamp >= t - 2000 && c.timestamp <= t + 1000);
+    // A player targeted twice was handed a dead player's meteor: fallout.
+    const twice = new Set(targets.map((c) => c.target).filter((n, i, a) => n && a.indexOf(n) !== i));
+    const byInst = new Map<string, Hit[]>();
+    for (const h of wave) if (h.e.abilityId === METEOR_DROP) byInst.set(instanceKey(h.e), [...(byInst.get(instanceKey(h.e)) ?? []), h]);
+    const burst = hitsOf(players, life, BOULDER_BURST).some((h) => h.e.timestamp >= t && h.e.timestamp <= t + 6000);
+    const flagged = new Set<PlayerInfo>();
+    for (const hs of byInst.values()) {
+      const hit = uniq(hs.map((h) => h.p)).filter((p) => !inRaiseGrace(life, p, t));
+      if (hit.length < 2 || hit.some((p) => twice.has(p.name)) || deadCount(players, life, t) >= DOOMED_DEAD) continue;
+      const dead = hit.filter((p) => life.diedFrom(p, t));
+      for (const p of hit) {
+        if (flagged.has(p)) continue;
+        flagged.add(p);
+        errors.push(playerError(p, {
+          ruleId: QE_METEOR_RULE_ID, severity: burst || dead.length ? "Major" : "Minor", name: "Dropped Meteors Together",
+          description: `Dropped their meteor on top of ${namesOf(hit.filter((x) => x !== p))}'s: one landing hit ${hit.length} players${burst ? " and the boulders went off as Big Burst" : ""}.${dead.length ? ` ${namesOf(dead)} died.` : ""} ${why}`,
+          timestamp: t, abilityId: METEOR_DROP, abilityName: "Meteor Impact",
+        }));
+      }
+    }
+  }
+  // Weighty Blow: four volleys of two lines, each blocked by a boulder.
+  for (const h of hitsOf(players, life, WEIGHTY_BLOW)) {
+    if (inRaiseGrace(life, h.p, h.e.timestamp)) continue;
+    const d = life.diedFrom(h.p, h.e.timestamp);
+    errors.push(playerError(h.p, {
+      ruleId: QE_WEIGHTY_RULE_ID, severity: d ? "Major" : "Minor", name: "Not Behind a Boulder",
+      description: `Hit by a Weighty Blow line (${amountText([h.e])}) instead of a boulder taking it, so that boulder was left over.${d ? " They died." : ""} Line up behind your side's boulder for each Weighty Blow volley.`,
+      timestamp: h.e.timestamp, abilityId: WEIGHTY_BLOW, abilityName: "Weighty Blow",
+    }));
+  }
+  const first = hitsOf(players, life, BOULDER_BURST)[0];
+  if (first) {
+    const t = first.e.timestamp;
+    const weighty = castsOf(casts, WEIGHTY_CAST).find((c) => c.timestamp < t);
+    const overlap = errors.some((e) => e.ruleId === QE_METEOR_RULE_ID && e.severity === "Major" && t - e.timestamp <= 6000);
+    const fell = players.filter((p) => !life.hitAlive(p, t - 500) || inRaiseGrace(life, p, t - 2000));
+    const cause = weighty
+      ? "a boulder was left over after Weighty Blow"
+      : overlap ? "meteors were dropped on top of each other"
+        : fell.length ? `boulders touched after ${namesOf(fell)} died (a dead player's meteor still lands)` : "boulders touched";
+    errors.push(raidMarker(QE_BOULDER_WIPE_RULE_ID, "Boulders Went Off",
+      `Big Burst went off on the party because ${cause}. Treated as the cutoff point.`,
+      t, BOULDER_BURST, "Big Burst"));
+    void pullEnd;
+  }
+  return errors;
+}
+
+// ── Prosecution of War ──────────────────────────────────────────────────────
+
+/**
+ * Prosecution of War's two hits go to the top of enmity: the tanks swap
+ * between them. One tank taking both is deliberate with an invulnerability
+ * (A2 +1:55); when they die to it (B1 +1:55) the other tank didn't take the
+ * second hit. Every instance is reported for the tanks (targeted).
+ */
+function detectProsecution(players: PlayerInfo[], life: Life, casts: EnemyEvent[], occurrences?: ReportedOccurrence[]): PullError[] {
+  const errors: PullError[] = [];
+  for (const set of clusterByGap(castsOf(casts, PROSECUTION), (c) => c.timestamp, 5000)) {
+    const t = set[0].timestamp;
+    const tanks = players.filter(isTank).filter((p) => life.hitAlive(p, t) && !inRaiseGrace(life, p, t));
+    occurrences?.push({ mechanicKey: QE_SWAP_RULE_ID, timestamp: t, players: tanks.map((p) => p.name) });
+    const hits = hitsOf(players, life, PROSECUTION).filter((h) => h.e.timestamp >= t - 500 && h.e.timestamp <= t + 5000);
+    const takers = uniq(hits.map((h) => h.p));
+    if (takers.length !== 1 || hits.length < 2 || tanks.length !== 2) continue;
+    const victim = takers[0];
+    const d = life.diedFrom(victim, hits[hits.length - 1].e.timestamp);
+    if (!d) continue;
+    const other = tanks.find((p) => p !== victim);
+    if (!other) continue;
+    errors.push(playerError(other, {
+      ruleId: QE_SWAP_RULE_ID, severity: "Major", name: "Missed Prosecution Swap",
+      description: `${victim.name} took both Prosecution of War hits and died. The second hit goes to the other tank: Provoke (or Shirk) between the hits, unless the first tank is using an invulnerability.`,
+      timestamp: hits[1].e.timestamp, abilityId: hits[1].e.abilityId, abilityName: "Prosecution of War",
+    }));
+  }
+  return errors;
+}
+
+// ── deaths with no killing blow ─────────────────────────────────────────────
+
+function walkingDeadRanOut(p: PlayerInfo, d: DeathEvent): boolean {
+  const hitT = d.timestamp - DEATH_EVENT_LAG_MS;
+  return debuffIntervals(p, WALKING_DEAD).some((w) => Math.abs(w.end - hitT) <= 1500 && w.end - w.start >= WALKING_DEAD_FULL_MS);
+}
+
+/** A death right after a listed hit is that hit's error (or its fallout). */
+const OWNED_DEATH_IDS = new Set([TOWER_FAIL, BOULDER_BURST, METEOR_DROP, METEOR_VOID, WEIGHTY_BLOW, ...RUSH, ...RUSH_SHORT, ICE_DART, 41021, 41024, 41048, TOWER, PILLAR, RAY]);
+function ownedDeath(p: PlayerInfo, d: DeathEvent): boolean {
+  return p.damageTaken.some((e) => (AVOIDABLE[e.abilityId] || OWNED_DEATH_IDS.has(e.abilityId)) && (e.amount ?? 0) > 0 &&
+    e.timestamp <= d.timestamp && e.timestamp >= d.timestamp - DIED_FROM_HIT_MS - 1000);
+}
+
+/** Where the arena was when a player fell (the floor shapes change all fight). */
+function fallContext(casts: EnemyEvent[], t: number): { what: string; why: string; protectedFall: boolean } {
+  const last = (ids: number[]) => castsOf(casts, ids).filter((c) => c.timestamp <= t).pop();
+  const cone = last(AETHERTITHE_CONES);
+  if (cone && t - cone.timestamp <= 6000) {
+    return { what: "pulled off the edge by an Aethertithe cone", why: "Aethertithe's cones pull players toward the boss; stand outside each cone (or far enough from the edge).", protectedFall: false };
+  }
+  const push = last([WIND_PUSH]);
+  if (push && t - push.timestamp <= 4000) {
+    return { what: "pushed off the edge by their Wind of Change gust", why: "Wind of Change pushes 20y away from the side it blows from; stand on a bar at the edge facing the wind (east edge for East Wind, west for West Wind).", protectedFall: false };
+  }
+  const auth = last([AUTHORITY_PUSH]);
+  if (auth && t - auth.timestamp <= 8000) {
+    return { what: "knocked off the south edge by Absolute Authority", why: "Absolute Authority's final knockback pushes 30y south; stand at the north wall, or use knockback immunity.", protectedFall: false };
+  }
+  const radical = last([RADICAL_SHIFT]);
+  if (radical && t - radical.timestamp <= 12_000) {
+    return { what: "fell when Radical Shift changed the floor", why: "Radical Shift swaps in the previewed floor; stand inside its outline before the change.", protectedFall: true };
+  }
+  const shift = last([SHIFT_WIND, SHIFT_EARTH, SHIFT_ICE]);
+  const shatter = last(WORLD_SHATTER);
+  if (shift && (!shatter || shatter.timestamp < shift.timestamp)) {
+    if (shift.abilityId === SHIFT_WIND) return { what: "fell off the Wind floor", why: "Laws of Wind leaves narrow bars and diagonal paths; stay on the floor.", protectedFall: false };
+    if (shift.abilityId === SHIFT_EARTH) return { what: "fell off an Earth platform", why: "On Laws of Earth, only Gravitational Anomaly (from a well) lets a player cross the void; land on a platform before it runs out.", protectedFall: false };
+    const ice = last([LAWS_OF_ICE]);
+    const rush = castsOf(casts, RUSH).find((c) => ice && c.timestamp > ice.timestamp);
+    const bridges = !!ice && (!rush || t <= rush.timestamp + 3000);
+    return bridges
+      ? { what: "fell off the Ice floor while crossing", why: "An ice bridge breaks under two players crossing at once; take turns, one per bridge.", protectedFall: true }
+      : { what: "fell off the Ice floor", why: "On Laws of Ice, stay on the platforms and bridges.", protectedFall: false };
+  }
+  return { what: "fell off the arena", why: "Stay on the floor.", protectedFall: false };
+}
+
+type Silent = { d: DeathEvent; p?: PlayerInfo; ctx: ReturnType<typeof fallContext> };
+
+/** Classify deaths with no killing blow: falls (errors) versus the wipe being called. */
+function classifySilentDeaths(players: PlayerInfo[], deaths: DeathEvent[], casts: EnemyEvent[], pullEnd: number) {
+  const silent: Silent[] = [];
+  for (const d of deaths) {
+    if (d.killingAbilityGameId) continue;
+    const p = byName(players, d.player);
+    if (p && (walkingDeadRanOut(p, d) || ownedDeath(p, d))) continue;
+    silent.push({ d, p, ctx: fallContext(casts, d.timestamp - DEATH_EVENT_LAG_MS) });
+  }
+  const called = new Set<DeathEvent>();
+  // Bridge and Radical Shift falls come in pairs mid-mechanic (A11, A16 kill):
+  // never a called wipe.
+  const open = silent.filter((s) => !s.ctx.protectedFall);
+  // Near the end, with nothing killing anyone after it (A11's bridge falls
+  // were 12s before the last Legitimate Force deaths).
+  const lastKill = Math.max(-Infinity, ...deaths.filter((d) => d.killingAbilityGameId).map((d) => d.timestamp));
+  for (const s of open) if (pullEnd - s.d.timestamp <= CALLED_WIPE_END_MS && lastKill < s.d.timestamp) called.add(s.d);
+  for (const s of open) {
+    const near = open.filter((x) => Math.abs(x.d.timestamp - s.d.timestamp) <= CALLED_WIPE_WINDOW);
+    if (near.length >= CALLED_WIPE_COUNT) near.forEach((x) => called.add(x.d));
+  }
+  return { silent, called };
+}
+
+/** Falls: a death with no killing blow where the floor isn't whole, or after a push. */
+function detectFalls(silent: Silent[], called: Set<DeathEvent>, life: Life): PullError[] {
+  const errors: PullError[] = [];
+  for (const s of silent) {
+    if (called.has(s.d)) continue;
+    const hitT = s.d.timestamp - DEATH_EVENT_LAG_MS;
+    if (!s.p) continue;
+    const together = silent.filter((x) => x !== s && !called.has(x.d) && Math.abs(x.d.timestamp - s.d.timestamp) <= 1500 && x.p).map((x) => x.p!);
+    const pairText = together.length ? ` (${namesOf(together)} fell at the same moment)` : "";
+    errors.push(playerError(s.p, {
+      ruleId: QE_FALL_RULE_ID, severity: "Major", name: "Fell Off",
+      description: `Died with no killing blow at ${mmss(hitT)}: ${s.ctx.what}${pairText}. ${s.ctx.why}`,
+      timestamp: hitT, abilityId: 0, abilityName: "Fall",
+    }));
+    void life;
+  }
+  return errors;
+}
+
+// ── cutoffs ─────────────────────────────────────────────────────────────────
+
+/** 4+ deaths to one moment's mechanics (raidwides excluded), with the pull over soon after. */
+function detectMassDeaths(deaths: DeathEvent[], pullEnd: number): PullError[] {
+  // Big Burst deaths carry their own mechanic cutoffs.
+  const fatal = deaths.filter((d) => d.killingAbilityGameId && !RAIDWIDE.includes(d.killingAbilityGameId) && d.killingAbilityGameId !== BOULDER_BURST && d.killingAbilityGameId !== TOWER_FAIL);
+  for (const g of clusterByGap(fatal, (d) => d.timestamp, MASS_WINDOW_MS)) {
+    if (uniq(g.map((d) => d.player)).length < MASS_DEATHS || pullEnd - g[0].timestamp > MASS_END_MS) continue;
+    const kinds = uniq(g.map((d) => d.cause));
+    return [raidMarker(QE_MASS_DEATHS_RULE_ID, "Mass Deaths",
+      `${g.length} players died together to ${joinNames(kinds)} (${joinNames(uniq(g.map((d) => d.player)))}), and the pull ended soon after. Treated as the cutoff point.`,
+      g[0].timestamp - DEATH_EVENT_LAG_MS + RAID_MARKER_SORT_OFFSET_MS, g[0].killingAbilityGameId, kinds[0])];
+  }
+  return [];
+}
+
+// ── entry point ─────────────────────────────────────────────────────────────
+
+/** Queen Eternal (The Minstrel's Ballad: Sphene's Burden) errors. Self-gates on the boss's signature casts. */
+export function detectQueenEternalErrors(
+  players: PlayerInfo[], deathEvents: DeathEvent[], enemyCasts: EnemyEvent[], occurrences?: ReportedOccurrence[],
+): PullError[] {
+  if (!enemyCasts.some((c) => SIGNATURE.includes(c.abilityId))) return [];
+  const life = buildLife(players, deathEvents);
+  const pullEnd = Math.max(0, ...players.flatMap((p) => [...p.damageTaken, ...p.casts].map((e) => e.timestamp)), ...deathEvents.map((d) => d.timestamp));
+  const { silent, called } = classifySilentDeaths(players, deathEvents, enemyCasts, pullEnd);
+
+  const errors = [
+    ...detectAvoidable(players, life),
+    ...detectFreeze(players, life),
+    ...detectShares(players, life),
+    ...SPREADS.flatMap((fam) => detectSpreadFamily(players, life, enemyCasts, fam)),
+    ...detectShortRush(players, life, enemyCasts),
+    ...detectEmptyTowers(players, life, enemyCasts, pullEnd),
+    ...detectMeteors(players, life, enemyCasts, pullEnd),
+    ...detectProsecution(players, life, enemyCasts, occurrences),
+    ...detectFalls(silent, called, life),
+  ];
+  // One Raid error per pull: keep only the earliest mechanic Raid.
+  const raids = errors.filter((e) => e.severity === "Raid").sort((a, b) => a.timestamp - b.timestamp);
+  for (const r of raids.slice(1)) errors.splice(errors.indexOf(r), 1);
+  const firstRaid = () => Math.min(...errors.filter((e) => e.severity === "Raid").map((e) => e.timestamp));
+  for (const m of detectMassDeaths(deathEvents, pullEnd)) if (m.timestamp < firstRaid()) errors.push(m);
+  const enrage = castsOf(enemyCasts, ENRAGE)[0];
+  if (enrage && enrage.timestamp < firstRaid()) {
+    const failedPush = enrage.abilityId === 41036;
+    errors.push(raidMarker(QE_ENRAGE_RULE_ID, failedPush ? "Authority Eternal (Damage Check)" : "Preservation (Enrage)",
+      failedPush
+        ? "Authority Eternal went off as the enrage: the Queen wasn't brought to 0.1% before the cast finished."
+        : "Preservation went off: the Queen wasn't brought down before the hard enrage.",
+      enrage.timestamp, enrage.abilityId, failedPush ? "Authority Eternal" : "Preservation"));
+  }
+  const calledList = deathEvents.filter((d) => called.has(d)).sort((a, b) => a.timestamp - b.timestamp);
+  if (calledList.length >= 2 && calledList[0].timestamp - DEATH_EVENT_LAG_MS < firstRaid()) {
+    errors.push(raidMarker(QE_CALLED_WIPE_RULE_ID, "Wipe Called",
+      `${calledList.length} players died with no killing blow together (${joinNames(uniq(calledList.map((d) => d.player)))}): the wipe was called and the raid reset.`,
+      calledList[0].timestamp - DEATH_EVENT_LAG_MS, 0, "Deaths"));
+  }
+  const outAt = (t: number) => players.filter((p) => !life.alive(p, t));
+  const collapseT = life.outIntervals.map((w) => w.start).sort((a, b) => a - b)
+    .find((t) => outAt(t).length >= COLLAPSE_ANY_COUNT || (outAt(t).length >= COLLAPSE_DEAD_COUNT && pullEnd - t <= COLLAPSE_END_MS));
+  if (collapseT !== undefined && collapseT + DEATH_EVENT_LAG_MS < firstRaid()) {
+    const who = outAt(collapseT).map((p) => p.name);
+    errors.push(raidMarker(QE_COLLAPSE_RULE_ID, "Party Collapse",
+      `${who.length} players were dead at once (${joinNames(who)}). Treated as the cutoff point.`,
+      collapseT + DEATH_EVENT_LAG_MS, 0, "Deaths"));
+  }
+  return errors.sort((a, b) => a.timestamp - b.timestamp);
+}

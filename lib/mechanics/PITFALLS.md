@@ -146,6 +146,12 @@ philosophy and the data semantics this list assumes.
   alpha/beta chain fixed which tower each player soaks. Check that the
   tower kind still matches its slot: after a death the order shifts
   (Lindwurm).
+- **A sequence of baits can reuse caster instances within one set.**
+  Queen Eternal's eight Divide and Conquer lines, 1s apart, reuse
+  caster instances; key each hit to the latest matching cast, not caster#instance.
+- **A shared spread with no logged owner on the whole group stays
+  player-less.** Queen Eternal's Ice Dart lost its cast target in every
+  failure that hit the stack group (A13, B8, B13 kill).
 - **Instance numbers are per caster, and they get reused.** Key a copy by
   caster + instance (Red Hot and Deep Blue). Add the ability when two
   kinds share a caster (Mortal Slayer's green and purple orbs). Instances
@@ -347,6 +353,14 @@ Classify every one before counting a called wipe. Known meanings:
   destroys it, at the spot the player was standing (Doomtrain's Derail).
   Check Walking Dead first: a solo-tower DRK's ran out 2.6s after the same
   cast.
+- **Falls that come in pairs mid-mechanic aren't a called wipe.** Queen
+  Eternal's ice bridges break under two crossers, and Radical Shift drops
+  pairs off the wrong floor (even in a kill). Keep those windows out of the
+  called-wipe count, and only call a lone near-end death a reset when
+  nothing killed anyone after it.
+- **A dead player's mechanic can still resolve on the body.** A fallen
+  player's meteor still landed and touched a boulder (Queen Eternal): the
+  fall is the error, the Big Burst is player-less.
 - **Stepping off a raised platform over the edge:** death 2.0-2.4s after
   the platform aura (1004721) ends (Doomtrain).
 - **Walking Dead running out unhealed** (Dark Knight): player-less.

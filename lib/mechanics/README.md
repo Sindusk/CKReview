@@ -91,6 +91,12 @@ lib/mechanics/
                                 lines, tanks' line fronts, Meltdown spreads,
                                 Voidal Turbulence cones and towers, orb
                                 pairs, flares, mass deaths, enrage)
+      queen-eternal.ts        — Queen Eternal (Sphene's Burden EX) per-pull
+                                rules (avoidables, Deep Freeze, Retribute /
+                                Aeroquell shares, spreads and baits, Earth
+                                towers, meteors and boulder Big Burst, Weighty
+                                Blow, Rush tethers, Ice Darts, Prosecution
+                                swap, falls, mass deaths)
     arcadion/                 — AAC Heavyweight (Savage)
       vamp-fatale.ts          — Vamp Fatale (M9S) per-pull rules (Stomp bats and
                                 Bombpyre overlaps, Aetherletting drops/lines/overlap,

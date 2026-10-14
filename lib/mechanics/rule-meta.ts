@@ -370,6 +370,10 @@ exposure("targeted", ["ffxiv-zelenia-specter"]);
 // (enuo.ts reports every flare pair).
 mechanic("ffxiv-enuo-flare", "Deep Freeze flares (non-tanks)", undefined, ["ffxiv-enuo-flare"]);
 exposure("targeted", ["ffxiv-enuo-flare"]);
+// Queen Eternal (Sphene's Burden Extreme): the Prosecution of War tank swap
+// (queen-eternal.ts reports both tanks at every Prosecution).
+mechanic("ffxiv-queen-eternal-prosecution", "Prosecution of War swap", undefined, ["ffxiv-queen-eternal-prosecution"]);
+exposure("targeted", ["ffxiv-queen-eternal-prosecution"]);
 // Futures Rewritten P1: the tanks' Powder Mark Trail swap and survival
 // (fatebreaker.ts reports both tanks at every Powder Mark).
 mechanic("ffxiv-fb-powder-swap", "Powder Mark swap", 1, ["ffxiv-fb-powder-swap"]);
