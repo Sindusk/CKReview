@@ -36,9 +36,22 @@
 //   consumer's average minus the GCD used instead (inference). Last Dance
 //   Ready also logs a "refreshed" 2s after every Finishing Move with no
 //   cast near it: a log artifact, not an overwrite, so it isn't tracked.
-//   Not checked: feather overcap. Feathers are gauge, never logged, and
-//   come from 50% procs, so a lost one can't be told from the log
-//   (xivanalysis says "may have been lost").
+//   Feathers and Esprit (user, 2026-10-14): simulated as xivanalysis does
+//   (jobs/gauges.ts), drawn on the timeline, and their overcap named as
+//   "gauge-estimate" findings with no loss: the log shows neither gauge
+//   and generation is random. Same for feathers not pooled for Technical
+//   Finish (unpooledFeathers).
+//   Rechecked on K6qfMamL7rN8yz2Q Vamp Fatale (7.4, 2026-10-14). Matched:
+//   every Technical window full; dropped Silken Flow (4:29) and Silken
+//   Symmetry (8:30); the Cascade combo run out at 8:29; 1 feather and 1
+//   Saber Dance "may have been lost" (the estimates give 1 and 1); the
+//   6:08 window not pooled. Its GCD downtime matches ours by time (3:58
+//   1.44s our 1.3s; 2:14, 5:20, 6:40 small delays; 5:46, 7:56, 7:59 have
+//   movement for the saws and Undead Deathmatch in them). Ours adds 2:00
+//   (2.1s after Fountain): Coffinmaker died at 1:58.7, the boss was hit
+//   from 2:00.3 and everyone else attacked by 2:01, the Dancer's next GCD
+//   was Technical Step at 2:02.7; xivanalysis counts that stretch as
+//   downtime. Not adopted: Curing Waltz uses (healing).
 // Bard: Caustic Bite / Stormbite (below), Hawk's Eye overwrites, AoE on
 //   one target, the burst window, cooldowns (OGCDDowntime.ts).
 //   Rechecked on dDar482XvFKBPJYh FRU kill (7.1, 2026-10-12): its 17
@@ -83,6 +96,7 @@ import type { DamageFinding, JobCheck } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";
 import { aoeComboOnOneTarget, burstWindowFindings, dotFindings, k, statusWindows, type ExpectedAction } from "./shared";
 import { forcedPart, inWindows, mergeWindows } from "../../timeline";
+import { espritGauge, featherGauge } from "./gauges";
 
 const ids = (...keys: string[]) => keys.filter((key) => A[key]).map((key) => A[key].id);
 const replacedGcd = (...keys: string[]) => (ctx: PlayerCheckContext) =>
@@ -267,7 +281,75 @@ const hypercharge: JobCheck = (ctx) => burstWindowFindings(ctx, {
   }],
 });
 
-export const DNC_CHECKS: JobCheck[] = [technical, technicalFillers, dancerOverwrites];
+// Feathers and Esprit at the cap, from the estimated gauges (jobs/gauges.ts,
+// after xivanalysis's Gauge.tsx): named, never valued (user, 2026-10-14),
+// since the log shows neither gauge and their generation is random. One
+// finding per gauge once the estimate loses a whole feather or a whole
+// Saber Dance's 50 Esprit; each overcap is a moment.
+const dancerGaugeEstimates: JobCheck = (ctx) => {
+  const out: DamageFinding[] = [];
+  const gauges: [string, ReturnType<typeof featherGauge>, number, string][] = [
+    ["Feathers", featherGauge(ctx), 1, "feather"],
+    ["Esprit", espritGauge(ctx), 50, "Saber Dance"],
+  ];
+  for (const [name, g, per, unit] of gauges) {
+    const n = Math.floor(g.overcap / per);
+    if (n < 1 || g.overcaps.length === 0) continue;
+    // One moment per stretch at the cap (the party's Esprit comes in
+    // fractions, dozens of tiny overcaps a stretch).
+    const moments = g.track.capped.map((w) => ({
+      startMs: w.startMs, endMs: w.endMs,
+      amount: g.overcaps.filter((o) => o.t >= w.startMs && o.t <= w.endMs).reduce((a, o) => a + o.amount, 0),
+    })).filter((m) => m.amount > 0);
+    if (moments.length === 0) continue;
+    out.push(finding(ctx, {
+      kind: "gauge-estimate", startMs: moments[0].startMs, endMs: moments[moments.length - 1].endMs, forced: false, inference: true,
+      label: `${name} at the cap (estimated)`, lostDamage: 0,
+      moments: moments.map((m) => ({ startMs: m.startMs, endMs: m.endMs, lostDamage: 0, detail: `${name} at the cap, ${Math.round(m.amount * 10) / 10} over (estimated)` })),
+      basis: `${g.track.note}. Not counted: the log doesn't show this gauge`,
+      detail: `${n} ${unit}${n === 1 ? "" : "s"} may have been lost to ${name} at the cap (${moments.length} time${moments.length === 1 ? "" : "s"}, estimated)`,
+    }));
+  }
+  out.push(...unpooledFeathers(ctx));
+  return out;
+};
+
+// Feathers not pooled for Technical Finish (xivanalysis
+// evaluators/PooledFeathersEvaluator.tsx): a window with under 3 Fan Dance
+// / Fan Dance II in it, after any were spent between the previous window's
+// end (+0.5s) and its start. The opener isn't judged; a window the kill
+// cut short passes with a Fan Dance per GCD it had room for, less one.
+// Whether holding them would have overcapped rests on the estimated
+// feathers, so it's named, not valued (user, 2026-10-14). K6qfMamL7rN8yz2Q
+// Vamp Fatale, 6:09: 2 in it, 3 spent at 5:18-5:47 (its one ✗).
+const POOL_FEATHERS = 3;
+const POOL_GRACE_MS = 500;
+function unpooledFeathers(ctx: PlayerCheckContext): DamageFinding[] {
+  const spenders = new Set(ids("FAN_DANCE", "FAN_DANCE_II"));
+  const spends = ctx.player.casts.filter((c) => spenders.has(c.abilityId));
+  const windows = statusWindows(ctx, S.TECHNICAL_FINISH.id);
+  const out: DamageFinding[] = [];
+  windows.forEach((w, i) => {
+    if (i === 0) return;
+    const end = Math.min(w.endMs, ctx.endMs);
+    const inside = spends.filter((c) => c.timestamp >= w.startMs && c.timestamp <= end).length;
+    if (inside >= POOL_FEATHERS) return;
+    if (w.endMs > ctx.endMs && inside >= Math.floor((end - w.startMs) / ctx.baseGcdMs) - 1) return;
+    const before = spends.filter((c) => c.timestamp > windows[i - 1].endMs + POOL_GRACE_MS && c.timestamp < w.startMs);
+    if (before.length === 0) return;
+    const at = (t: number) => `${Math.floor(t / 60000)}:${String(Math.floor(t / 1000) % 60).padStart(2, "0")}`;
+    out.push(finding(ctx, {
+      kind: "gauge-estimate", startMs: w.startMs, endMs: w.startMs, forced: false, inference: true,
+      label: "Feathers not pooled for Technical Finish (estimated)", lostDamage: 0,
+      basis: `${inside} Fan Dance${inside === 1 ? "" : "s"} in the window (xivanalysis wants ${POOL_FEATHERS}), ${before.length} spent since the last one at ${before.map((c) => at(c.timestamp)).join(", ")}. ` +
+        "Not counted: whether holding them would have overcapped rests on the estimated feathers",
+      detail: `Technical Finish at ${at(w.startMs)}: ${inside} Fan Dance${inside === 1 ? "" : "s"} in it after ${before.length} spent between windows (estimated)`,
+    }));
+  });
+  return out;
+}
+
+export const DNC_CHECKS: JobCheck[] = [technical, technicalFillers, dancerOverwrites, dancerGaugeEstimates];
 // The burst window (xivanalysis BuffWindows/BurstWindow.tsx): where
 // Raging Strikes, Battle Voice and Radiant Finale are all up. 7 GCDs, 8
 // when Army's Muse covers 2+ of them; Barrage consumed in it (a Refulgent

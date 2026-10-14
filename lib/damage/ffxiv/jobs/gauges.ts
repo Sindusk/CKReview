@@ -23,7 +23,7 @@
 
 import type { GaugeTrack } from "../../types";
 import type { PlayerCheckContext } from "../../checks";
-import { XIVA_ACTIONS as A } from "../xiva-data";
+import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 
 const ADDERSGALL_MAX = 3;
 const ADDERSGALL_TIMER_MS = 20_000;
@@ -148,7 +148,134 @@ export function oathGauge(ctx: PlayerCheckContext): GaugeTrack[] {
   }];
 }
 
+// Dancer's Feathers and Esprit, after xivanalysis src/parser/jobs/dnc/modules/Gauge.tsx
+// (its simulation for logs without gauge events, which FFLogs never has).
+// Both are estimates: the log doesn't show the gauge, and generation is
+// random, so findings from them name the overcap but carry no loss (user,
+// 2026-10-14).
+//   Feathers (max 4, start 0): +0.5 per Reverse Cascade, Fountainfall,
+//   Rising Windmill or Bloodshower (a 50% proc, as its expected value);
+//   −1 per Fan Dance / Fan Dance II.
+//   Esprit (max 100, start 0), generated only while the generating player
+//   has Esprit (Standard Finish's on the Dancer and partner, Technical
+//   Finish's on everyone): the Dancer's Cascade / Fountain / Windmill /
+//   Bladeshower +5, Reverse Cascade / Fountainfall / Rising Windmill /
+//   Bloodshower +10, Tillana +50; each other player's GCD that hits
+//   (one per cast, not per target; Ninjutsu and Tsubame left out) +10 ×
+//   their job's rate (0.2, or its tested Monk 0.17, Dragoon 0.18, Ninja
+//   0.16, Samurai 0.19, Black Mage 0.25, Red Mage 0.21). −50 per Saber
+//   Dance / Dance of the Dawn. None while the Dancer is dead.
+// A death empties both (xivanalysis resets gauges on death). A spend with
+// too little clamps at 0, as xivanalysis's running value does (it also
+// redraws its graph backwards; the overcap is the same).
+const FEATHER_MAX = 4;
+const FEATHER_GENERATORS = ["REVERSE_CASCADE", "FOUNTAINFALL", "RISING_WINDMILL", "BLOODSHOWER"];
+const FEATHER_SPENDERS = ["FAN_DANCE", "FAN_DANCE_II"];
+const ESPRIT_MAX = 100;
+const ESPRIT_COST = 50;
+const ESPRIT_SELF: [string, number][] = [
+  ["CASCADE", 5], ["FOUNTAIN", 5], ["WINDMILL", 5], ["BLADESHOWER", 5],
+  ["REVERSE_CASCADE", 10], ["FOUNTAINFALL", 10], ["RISING_WINDMILL", 10], ["BLOODSHOWER", 10],
+  ["TILLANA", 50],
+];
+const ESPRIT_SPENDERS = ["SABER_DANCE", "DANCE_OF_THE_DAWN"];
+const ESPRIT_PARTY_AMOUNT = 10;
+const ESPRIT_PARTY_RATE = 0.2;
+const ESPRIT_PARTY_RATES = new Map([
+  ["Monk", 0.17], ["Dragoon", 0.18], ["Ninja", 0.16], ["Samurai", 0.19], ["BlackMage", 0.25], ["Black Mage", 0.25], ["RedMage", 0.21], ["Red Mage", 0.21],
+]);
+const ESPRIT_PARTY_EXCEPTIONS = [
+  "FUMA_SHURIKEN", "FUMA_SHURIKEN_TCJ_TEN", "FUMA_SHURIKEN_TCJ_CHI", "FUMA_SHURIKEN_TCJ_JIN", "KATON", "KATON_TCJ",
+  "RAITON_TCJ", "HYOTON_TCJ", "GOKA_MEKKYAKU", "HYOSHO_RANRYU", "SUITON", "SUITON_TCJ",
+  "KAESHI_GOKEN", "KAESHI_SETSUGEKKA", "KAESHI_NAMIKIRI",
+];
+const ESPRIT_STATUS_KEYS = ["ESPRIT", "ESPRIT_TECHNICAL"];
+const idSet = (keys: string[]) => new Set(keys.map((k) => A[k]?.id).filter((id): id is number => id !== undefined));
+
+export type GaugeOvercap = { t: number; amount: number };
+export type SimulatedGauge = { track: GaugeTrack; overcap: number; overcaps: GaugeOvercap[] };
+
+function simulate(name: string, max: number, events: { t: number; delta: number }[], ctx: PlayerCheckContext,
+  note: (over: number, short: number) => string): SimulatedGauge {
+  const all = [...events, ...ctx.dead.map((w) => ({ t: w.startMs, delta: Number.NEGATIVE_INFINITY }))]
+    .filter((e) => e.t < ctx.endMs).sort((a, b) => a.t - b.t);
+  let value = 0, over = 0, short = 0;
+  let cappedSince: number | null = null;
+  const steps: GaugeTrack["steps"] = [{ t: 0, value }];
+  const capped: GaugeTrack["capped"] = [];
+  const overcaps: GaugeOvercap[] = [];
+  const set = (t: number, v: number) => {
+    if (cappedSince !== null && v < max) { if (t > cappedSince) capped.push({ startMs: cappedSince, endMs: t }); cappedSince = null; }
+    if (cappedSince === null && v >= max && value < max) cappedSince = t;
+    value = v;
+    if (steps[steps.length - 1].t === t) steps[steps.length - 1].value = v;
+    else steps.push({ t, value: v });
+  };
+  for (const e of all) {
+    if (e.delta === Number.NEGATIVE_INFINITY) { set(e.t, 0); continue; }
+    const next = value + e.delta;
+    if (next > max) { over += next - max; overcaps.push({ t: e.t, amount: next - max }); set(e.t, max); }
+    else if (next < 0) { short++; set(e.t, 0); }
+    else set(e.t, next);
+  }
+  if (cappedSince !== null && ctx.endMs > cappedSince) capped.push({ startMs: cappedSince, endMs: ctx.endMs });
+  return { track: { name, max, steps, capped, note: note(over, short) }, overcap: over, overcaps };
+}
+
+const shortNote = (short: number, unit: string) =>
+  short > 0 ? `; ${short} spend${short === 1 ? "" : "s"} with under a ${unit} in the estimate` : "";
+
+export function featherGauge(ctx: PlayerCheckContext): SimulatedGauge {
+  const gen = idSet(FEATHER_GENERATORS), spend = idSet(FEATHER_SPENDERS);
+  const events = ctx.player.casts.filter((c) => gen.has(c.abilityId) || spend.has(c.abilityId))
+    .map((c) => ({ t: c.timestamp, delta: gen.has(c.abilityId) ? 0.5 : -1 }));
+  return simulate("Feathers (est.)", FEATHER_MAX, events, ctx, (over, short) =>
+    `Estimated: ${Math.floor(over)} feather${Math.floor(over) === 1 ? "" : "s"} may have been lost at the cap (each proc counted as half a feather)` + shortNote(short, "feather"));
+}
+
+export function espritGauge(ctx: PlayerCheckContext): SimulatedGauge {
+  const statusIds = new Set(ESPRIT_STATUS_KEYS.map((k) => S[k]?.id).filter((id): id is number => id !== undefined));
+  const hasEsprit = (p: { buffs?: typeof ctx.player.buffs }) => {
+    const out: { s: number; e: number }[] = [];
+    let open: number | undefined;
+    for (const b of [...(p.buffs ?? [])].filter((x) => statusIds.has(x.abilityId)).sort((a, b) => a.timestamp - b.timestamp)) {
+      if (b.buffStatus === "removed") { if (open !== undefined) out.push({ s: open, e: b.timestamp }); open = undefined; }
+      else if (b.buffStatus === "applied" && open === undefined) open = b.timestamp;
+    }
+    if (open !== undefined) out.push({ s: open, e: Infinity });
+    return (t: number) => out.some((w) => t >= w.s && t <= w.e);
+  };
+  const self = new Map([...ESPRIT_SELF].filter(([k]) => A[k]).map(([k, n]) => [A[k].id, n]));
+  const spend = idSet(ESPRIT_SPENDERS), skip = idSet(ESPRIT_PARTY_EXCEPTIONS);
+  const deadAt = (t: number) => ctx.dead.some((w) => t >= w.startMs && t < w.endMs);
+  const events: { t: number; delta: number }[] = [];
+  const mine = hasEsprit(ctx.player);
+  for (const c of ctx.player.casts) {
+    const n = self.get(c.abilityId);
+    if (n !== undefined && mine(c.timestamp) && !deadAt(c.timestamp)) events.push({ t: c.timestamp, delta: n });
+    if (spend.has(c.abilityId)) events.push({ t: c.timestamp, delta: -ESPRIT_COST });
+  }
+  for (const p of ctx.pull.players) {
+    if (p.name === ctx.player.name) continue;
+    const has = hasEsprit(p);
+    const rate = ESPRIT_PARTY_RATES.get(p.className) ?? ESPRIT_PARTY_RATE;
+    let last: { id: number; t: number } | undefined;
+    for (const h of [...p.damageDone].sort((a, b) => a.timestamp - b.timestamp)) {
+      if (h.pet || h.isDoT || skip.has(h.abilityId) || !ctx.game.action(h.abilityId)?.onGcd) continue;
+      if (last && last.id === h.abilityId && h.timestamp - last.t <= 100) continue; // one per cast, not per target
+      last = { id: h.abilityId, t: h.timestamp };
+      if (has(h.timestamp) && !deadAt(h.timestamp)) events.push({ t: h.timestamp, delta: ESPRIT_PARTY_AMOUNT * rate });
+    }
+  }
+  return simulate("Esprit (est.)", ESPRIT_MAX, events, ctx, (over, short) =>
+    `Estimated: ${Math.floor(over / ESPRIT_COST)} Saber Dance${Math.floor(over / ESPRIT_COST) === 1 ? "" : "s"} may have been lost at the cap (${Math.round(over)} Esprit over; the party's share is an average rate)` +
+    shortNote(short, "Saber Dance's worth"));
+}
+
+const dancerGauges = (ctx: PlayerCheckContext): GaugeTrack[] => [featherGauge(ctx).track, espritGauge(ctx).track];
+
 export const JOB_GAUGES: Record<string, ((ctx: PlayerCheckContext) => GaugeTrack[])[]> = {
   "Sage": [addersgall],
   "Paladin": [oathGauge],
+  "Dancer": [dancerGauges],
 };

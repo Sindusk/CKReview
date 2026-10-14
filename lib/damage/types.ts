@@ -231,6 +231,7 @@ export type FindingKind =
   | "burst-window"      // the job's own burst buff missing GCDs or actions
   | "buff-uptime"       // a job damage buff (Darkside, Surging Tempest) down
   | "gauge-overcap"     // job gauge wasted at its cap
+  | "gauge-estimate"    // an estimated gauge's overcap (DNC Feathers, Esprit): named, never valued
   | "heal-gcd"          // a heal GCD that mostly overhealed
   | "aoe-single"        // an AoE damage GCD that hit one enemy (worse than the filler)
   | "dot-uptime"        // the player's DoT off the boss

@@ -68,6 +68,10 @@ const READABLE_TEXT = {
 const fmtDamage = (n: number) =>
   n >= 1e6 ? `${(n / 1e6).toFixed(2)}M` : n >= 1000 ? `${Math.round(n / 1000)}k` : `${Math.round(n)}`;
 
+// Listed even with no loss: an interrupted cast's time is in the GCD gap
+// after it, and an estimated gauge's overcap is named but never valued.
+const NO_VALUE_KINDS = new Set<DamageFinding["kind"]>(["interrupted-cast", "gauge-estimate"]);
+
 const KIND_LABEL: Record<DamageFinding["kind"], string> = {
   "gcd-delay":        "GCD delay",
   "gcd-drift":        "GCD drift",
@@ -86,6 +90,7 @@ const KIND_LABEL: Record<DamageFinding["kind"], string> = {
   "burst-window":     "Burst window",
   "buff-uptime":      "Buff uptime",
   "gauge-overcap":    "Overcap",
+  "gauge-estimate":   "Overcap (estimated)",
   "heal-gcd":         "Heal GCD",
   "aoe-single":       "AoE on one",
   "dot-uptime":       "DoT uptime",
@@ -483,7 +488,7 @@ function BiggestWins({ items, perPull, icons, onPick }: {
 function PlayerDetail({ summary, analysis, colorFor, iconFor, pull, pulls }: {
   summary: PlayerDamageSummary; analysis: PullDamageAnalysis; colorFor: ColorFor; iconFor: ColorFor; pull?: Pull; pulls: Pull[];
 }) {
-  const shown = summary.findings.filter((f) => f.lostDamage >= 1 || f.kind === "interrupted-cast");
+  const shown = summary.findings.filter((f) => f.lostDamage >= 1 || NO_VALUE_KINDS.has(f.kind));
   const icons = useMemo(() => abilityIconsOf(pull ? [pull] : [], summary.player), [pull, summary.player]);
   // Shared by the summary, the timeline and the finding list: the open
   // groups (all collapsed for a new player; user, 2026-10-14) and the
@@ -755,7 +760,7 @@ function AggregateDetail({ agg, totalPulls, colorFor, iconFor, pulls }: {
   const player = agg?.player;
   const icons = useMemo(() => abilityIconsOf(player ? pulls : [], player ?? ""), [pulls, player]);
   if (!agg) return <p className="ck-dialog-text">No players.</p>;
-  const rows = agg.recurring.filter((r) => r.lostDamage >= 1 || r.kind === "interrupted-cast");
+  const rows = agg.recurring.filter((r) => r.lostDamage >= 1 || NO_VALUE_KINDS.has(r.kind));
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>

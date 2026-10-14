@@ -59,6 +59,17 @@ all eight players on that kill are in `sampledata/damage-ff/`.
   count as movement in the saws/towers/adds window, but no other melee
   idled at 4:54.
 
+- **Paladin Oath Gauge** on the timeline (jobs/gauges.ts; 570 lost, as
+  xivanalysis says). Display only.
+- **Chauzey Solstice (Dancer), Vamp Fatale.** Per-claim record in the
+  Dancer header of lib/damage/ffxiv/jobs/ranged.ts. Built (user: estimates
+  named, never valued): Feathers and Esprit gauges on the timeline after
+  xivanalysis's simulation, and a "gauge-estimate" finding kind the dialog
+  lists with "—" (1 feather, 1 Saber Dance, the 6:09 window not pooled:
+  all three match). The 6:09 window is short on week 6 too, after Fan
+  Dances on the 5:44 add wave. App-only finding that holds: the 2:00 gap
+  (Technical Step at 2:02.7, everyone else back by 2:01).
+
 ## Open
 
 - Lock-model gaps seen in the drift test (they can hide delay, never
