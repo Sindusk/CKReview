@@ -7,7 +7,8 @@ the Dancer, Chauzey Solstice.
 ## Data on disk
 
 - `sampledata/ff/7tb1fYPkjy4RQ2L9/` — the kill only, full capture. No
-  mechanic baselines; Vamp Fatale has no damage context.
+  mechanic baselines. Vamp Fatale's damage context was added 2026-10-13
+  (6XaWqwMbkZG9pLmx study).
 
 ## Done
 
