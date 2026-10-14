@@ -44,7 +44,7 @@ import type { Pull } from "../types/Pull";
 import { createCallWipeError, CALL_WIPE_RULE_ID, createManualError, type ManualErrorInput } from "@/types/PullError";
 import type { SavedSession, SavedSessionVod } from "@/types/Session";
 import useTimelineController from "@/hooks/useTimelineController";
-import { fetchReport, fetchFightData, buildFightLogLabels, getWCLRateLimitStatus, isWCLQuotaExhausted, type WCLReport } from "@/lib/wcl-client";
+import { fetchReport, fetchFightData, buildFightLogLabels, getWCLRateLimitStatus, isWCLQuotaExhausted, beginWCLImportMeasure, endWCLImportMeasure, type WCLReport } from "@/lib/wcl-client";
 import {
   transformReportToPulls,
   transformFFReportToPulls,
@@ -54,7 +54,7 @@ import {
   buildFFLAbilityMap,
   renumberPullsByBoss,
 } from "@/lib/log-transforms";
-import { fetchFFReport, fetchFFightData, buildFFFightLogLabels, getFFLRateLimitStatus, isFFLQuotaExhausted, type FFLReport } from "@/lib/ffl-client";
+import { fetchFFReport, fetchFFightData, buildFFFightLogLabels, getFFLRateLimitStatus, isFFLQuotaExhausted, beginFFLImportMeasure, endFFLImportMeasure, type FFLReport } from "@/lib/ffl-client";
 import { formatWaitTime, type RateLimitStatus } from "@/lib/rate-limit";
 import { tryFetchSampleReportMeta, fetchSampleReport, type SampleReportMeta, type SampleReportPayload } from "@/lib/sample-report-client";
 import {
@@ -742,12 +742,9 @@ export default function Home() {
   // ── WarcraftLogs import ────────────────────────────────────────────────────
 
   async function handleImportWCL(reportCode: string) {
-    // Baseline "points spent this hour" BEFORE this import does anything —
-    // used to compute how many points THIS import specifically cost (see
-    // the diff against endStatus below). Read before fetchReport so a
-    // fresh session (never seen a response yet) baselines at 0 rather than
-    // missing data entirely.
-    const startStatus = getWCLRateLimitStatus();
+    // Measure THIS import's points: baselined on the total seen before it,
+    // or on its first response after a page refresh (lib/rate-limit.ts).
+    beginWCLImportMeasure();
     setLoadedFromSampleData(false);
 
     const report = await fetchReport(reportCode);
@@ -801,15 +798,10 @@ export default function Home() {
     setImportStatus(`Log Loaded: ${report.code}`);
     setImportProgress(100);
 
-    const endStatus = getWCLRateLimitStatus();
+    const spent = endWCLImportMeasure();
     // TEMP DIAGNOSTIC — remove once the missing-display issue is confirmed fixed.
-    console.log("[rate-limit debug] WCL import finished — startStatus:", startStatus, "endStatus:", endStatus);
-    if (endStatus) {
-      const spent = startStatus
-        ? Math.max(0, endStatus.pointsSpentThisHour - startStatus.pointsSpentThisHour)
-        : endStatus.pointsSpentThisHour;
-      setImportPointsUsed(spent);
-    }
+    console.log("[rate-limit debug] WCL import finished — points this import:", spent, "status:", getWCLRateLimitStatus());
+    setImportPointsUsed(spent);
 
     persistSession();
   }
@@ -817,10 +809,8 @@ export default function Home() {
   // ── FFLogs import ──────────────────────────────────────────────────────────
 
   async function handleImportFFL(reportCode: string) {
-    // Baseline "points spent this hour" BEFORE this import does anything —
-    // used to compute how many points THIS import specifically cost (see
-    // the diff against endStatus below).
-    const startStatus = getFFLRateLimitStatus();
+    // Measure THIS import's points (see handleImportWCL).
+    beginFFLImportMeasure();
     setLoadedFromSampleData(false);
 
     const report = await fetchFFReport(reportCode);
@@ -868,15 +858,10 @@ export default function Home() {
     setImportStatus(`Log Loaded: ${report.code}`);
     setImportProgress(100);
 
-    const endStatus = getFFLRateLimitStatus();
+    const spent = endFFLImportMeasure();
     // TEMP DIAGNOSTIC — remove once the missing-display issue is confirmed fixed.
-    console.log("[rate-limit debug] FFL import finished — startStatus:", startStatus, "endStatus:", endStatus);
-    if (endStatus) {
-      const spent = startStatus
-        ? Math.max(0, endStatus.pointsSpentThisHour - startStatus.pointsSpentThisHour)
-        : endStatus.pointsSpentThisHour;
-      setImportPointsUsed(spent);
-    }
+    console.log("[rate-limit debug] FFL import finished — points this import:", spent, "status:", getFFLRateLimitStatus());
+    setImportPointsUsed(spent);
 
     persistSession();
   }

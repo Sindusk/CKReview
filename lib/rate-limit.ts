@@ -43,11 +43,20 @@ export type RateLimitStatus = {
   secondsUntilReset:   number;   // live-adjusted for time elapsed since capture
 };
 
+// Two snapshots whose reset times are this close are the same hourly window.
+const SAME_WINDOW_MS = 60_000;
+const resetAt = (s: RateLimitSnapshot) => s.capturedAt + s.pointsResetIn * 1000;
+
 /**
- * Tracks the most recently observed rateLimitData for one provider.
+ * Tracks the highest rateLimitData observed in the current hourly window
+ * for one provider. Responses to concurrent requests (an import fetches
+ * several fights at once) arrive out of order, so the latest one isn't
+ * always the latest total: within a window the snapshot only moves up. A
+ * reset time a minute or more later than the snapshot's is a new window.
  */
 export class RateLimitTracker {
   private snapshot: RateLimitSnapshot | null = null;
+  private measure: { prior: RateLimitSnapshot | null; first: number | null } | null = null;
 
   /** Call with the raw `data` object of any successful GraphQL response. */
   capture(data: unknown): void {
@@ -58,13 +67,37 @@ export class RateLimitTracker {
       typeof r.pointsSpentThisHour === "number" &&
       typeof r.pointsResetIn === "number"
     ) {
-      this.snapshot = {
+      const next: RateLimitSnapshot = {
         limitPerHour:        r.limitPerHour,
         pointsSpentThisHour: r.pointsSpentThisHour,
         pointsResetIn:       r.pointsResetIn,
         capturedAt:          Date.now(),
       };
+      if (this.measure && this.measure.first === null) this.measure.first = next.pointsSpentThisHour;
+      const s = this.snapshot;
+      const newWindow = !s || resetAt(next) - resetAt(s) >= SAME_WINDOW_MS;
+      if (newWindow || next.pointsSpentThisHour >= s.pointsSpentThisHour) this.snapshot = next;
     }
+  }
+
+  /**
+   * Start measuring one import's cost. Its baseline is the total seen
+   * before it, when that's from the same hourly window; otherwise (a page
+   * refresh, a reset since) the first response during the import.
+   */
+  beginMeasure(): void {
+    this.measure = { prior: this.snapshot, first: null };
+  }
+
+  /** Points the import cost since beginMeasure, or null with no response seen. */
+  endMeasure(): number | null {
+    const m = this.measure;
+    this.measure = null;
+    const s = this.snapshot;
+    if (!m || !s) return null;
+    const samePrior = m.prior && Math.abs(resetAt(s) - resetAt(m.prior)) < SAME_WINDOW_MS ? m.prior.pointsSpentThisHour : null;
+    const base = samePrior ?? m.first;
+    return base === null ? null : Math.max(0, s.pointsSpentThisHour - base);
   }
 
   /** Last-known status, with secondsUntilReset adjusted for time elapsed since capture. */

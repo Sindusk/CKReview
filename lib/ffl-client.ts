@@ -39,6 +39,10 @@ export function getFFLRateLimitStatus(): RateLimitStatus | null {
   return rateLimitTracker.status();
 }
 
+/** Measure one import's points (lib/rate-limit.ts beginMeasure / endMeasure). */
+export function beginFFLImportMeasure(): void { rateLimitTracker.beginMeasure(); }
+export function endFFLImportMeasure(): number | null { return rateLimitTracker.endMeasure(); }
+
 /** True if the last-observed hourly points quota is exhausted. */
 export function isFFLQuotaExhausted(): boolean {
   return rateLimitTracker.isQuotaExhausted();
