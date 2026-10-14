@@ -13,6 +13,7 @@ import { VAMP_FATALE_DAMAGE_CONTEXT } from "../mechanics/ffxiv/arcadion/vamp-fat
 import { RED_HOT_DEEP_BLUE_DAMAGE_CONTEXT } from "../mechanics/ffxiv/arcadion/red-hot-deep-blue-damage-context";
 import { DOOMTRAIN_DAMAGE_CONTEXT } from "../mechanics/ffxiv/trials/doomtrain-damage-context";
 import { NECRON_DAMAGE_CONTEXT } from "../mechanics/ffxiv/trials/necron-damage-context";
+import { ZELENIA_DAMAGE_CONTEXT } from "../mechanics/ffxiv/trials/zelenia-damage-context";
 import { ENTOMBED_SENTINELS_DAMAGE_CONTEXT } from "../mechanics/wow/va/entombed-sentinels-damage-context";
 import { VASHNIK_DAMAGE_CONTEXT } from "../mechanics/wow/va/vashnik-damage-context";
 import { SSZORAK_DAMAGE_CONTEXT } from "../mechanics/wow/va/sszorak-damage-context";
@@ -33,6 +34,7 @@ const CONTEXTS: Record<string, DamageContext> = {
   "Red Hot and Deep Blue": RED_HOT_DEEP_BLUE_DAMAGE_CONTEXT,
   "Doomtrain": DOOMTRAIN_DAMAGE_CONTEXT,
   "Necron": NECRON_DAMAGE_CONTEXT,
+  "Zelenia": ZELENIA_DAMAGE_CONTEXT,
   // The Venomous Abyss (WoW)
   "Entombed Sentinels":      ENTOMBED_SENTINELS_DAMAGE_CONTEXT,
   "Vashnik the Malignant":   VASHNIK_DAMAGE_CONTEXT,
