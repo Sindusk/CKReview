@@ -6,10 +6,12 @@
 // analysed window:
 //   - Burst: raid buff windows (gold) over the player's tinctures (violet;
 //     a suggested move dashed, with a line from the one played)
-//   - GCDs: one block per GCD, its lock long, so a rolling GCD reads solid
-//     and idle time shows as a red break (grey inside forced time)
-//   - Losses: each counted finding as a dot in its coaching theme's colour,
-//     sized by cost; summary findings mark each moment instead
+//   - GCDs: one block per GCD, its lock long, so a rolling GCD reads solid.
+//     GCD drift findings sit here: a gap (1s+) as a red overlay on the
+//     blocks (grey when forced), a small delay as a thin red line under
+//     them, a triple-weave clip as an amber one (user, 2026-10-14)
+//   - Losses: every other counted finding as a dot in its coaching theme's
+//     colour, sized by cost; summary findings mark each moment instead
 //   - job gauges, one lane each, when the job has any
 // Forced time is hatched over every lane, movement a mechanic required is a
 // blue tint, phase starts are gold dividers. Hovering anywhere shows the
@@ -34,6 +36,9 @@ export const POT_COLOR = "#b993f5";
 export const MOVEMENT_COLOR = "#6f9df2";
 const GCD_COLOR = "#6e7f91";
 const GAP_COLOR = "#ff6b66";
+// A delay from triple weaving, apart from a plain late press.
+const CLIP_COLOR = "#f2a65a";
+const DRIFT_NEAR_MS = 600;
 // Idle after a GCD's lock shorter than this isn't drawn as a break.
 const GAP_MIN_MS = 500;
 // Findings this close to the cursor are listed in the tooltip.
@@ -50,7 +55,8 @@ const fmtPrecise = (ms: number) => {
 };
 
 type ActiveBuff = { name: string; icon?: string; leftMs: number; sources: string[]; pot: boolean };
-type Marker = { f: DamageFinding; startMs: number; endMs: number; lost: number; detail: string; moment: boolean };
+type Marker = { f: DamageFinding; startMs: number; endMs: number; lost: number; detail: string; moment: boolean; drift: boolean };
+const DRIFT_KINDS = new Set<DamageFinding["kind"]>(["gcd-drift", "gcd-clipping"]);
 
 export default function DamageTimeline({ summary, analysis, highlight, onPick }: {
   summary: PlayerDamageSummary; analysis: PullDamageAnalysis;
@@ -87,22 +93,24 @@ export default function DamageTimeline({ summary, analysis, highlight, onPick }:
   const height = gaugeY0 + gauges.length * (gaugeH + LANE_GAP);
   const lanesTop = burstY, lanesBottom = height - (gauges.length ? LANE_GAP : 0);
 
-  const inForced = (t: number) => tl.forced.some((f) => t >= f.startMs && t <= f.endMs);
 
+  // GCD drift and clipping live in the GCD lane (forced gaps too, in grey);
+  // every other counted finding, and movement, in the loss lane.
   const markers = useMemo(() => {
     const out: Marker[] = [];
     for (const f of summary.findings) {
+      const drift = DRIFT_KINDS.has(f.kind);
       const counted = !f.forced && f.lostDamage >= 1;
-      if (f.pullWide || f.kind === "tincture" || !(counted || (f.movement && f.lostDamage >= 1))) continue;
+      if (f.pullWide || f.kind === "tincture" || !(counted || (f.movement && f.lostDamage >= 1) || (drift && f.forced))) continue;
       if (f.moments?.length) {
-        for (const m of f.moments) out.push({ f, startMs: m.startMs, endMs: m.endMs, lost: m.lostDamage ?? f.lostDamage, detail: m.detail ?? f.detail, moment: true });
+        for (const m of f.moments) out.push({ f, startMs: m.startMs, endMs: m.endMs, lost: m.lostDamage ?? f.lostDamage, detail: m.detail ?? f.detail, moment: true, drift });
       } else {
-        out.push({ f, startMs: f.startMs, endMs: f.endMs - f.startMs > SPAN_MARK_MS ? f.startMs : f.endMs, lost: f.lostDamage, detail: f.detail, moment: false });
+        out.push({ f, startMs: f.startMs, endMs: !drift && f.endMs - f.startMs > SPAN_MARK_MS ? f.startMs : f.endMs, lost: f.lostDamage, detail: f.detail, moment: false, drift });
       }
     }
     return out;
   }, [summary.findings]);
-  const maxLost = Math.max(1, ...markers.filter((m) => !m.moment).map((m) => m.lost));
+  const maxLost = Math.max(1, ...markers.filter((m) => !m.moment && !m.drift).map((m) => m.lost));
 
   const minutes: number[] = [];
   for (let t = 30_000; t < total; t += 30_000) minutes.push(t);
@@ -120,7 +128,10 @@ export default function DamageTimeline({ summary, analysis, highlight, onPick }:
       if (hoverT < reach) hoverGcd = { g, next };
     }
   }
-  const near = hoverT === null ? [] : markers.filter((m) => Math.abs(m.startMs - hoverT) <= NEAR_MS || (hoverT >= m.startMs && hoverT <= m.endMs));
+  // Drift sits between two GCDs, so only the one under the cursor is listed.
+  const near = hoverT === null ? [] : markers.filter((m) => m.drift
+    ? hoverT >= m.startMs - DRIFT_NEAR_MS && hoverT <= m.endMs + DRIFT_NEAR_MS
+    : Math.abs(m.startMs - hoverT) <= NEAR_MS || (hoverT >= m.startMs && hoverT <= m.endMs));
   const nearFindings = [...new Map(near.map((m) => [m.f, m])).values()];
   const hoverForced = hoverT === null ? undefined : tl.forced.find((f) => hoverT >= f.startMs && hoverT <= f.endMs);
   // Raid buffs and tinctures up at the cursor: one line per buff name (two
@@ -165,7 +176,7 @@ export default function DamageTimeline({ summary, analysis, highlight, onPick }:
         </defs>
 
         {lane(burstY, burstH, "Burst", "buffs · pots")}
-        {lane(gcdY, gcdH, "GCDs", "idle in red")}
+        {lane(gcdY, gcdH, "GCDs", "drift in red")}
         {lane(lossY, lossH, "Losses", "size = cost")}
         {gauges.map((g, i) => lane(gaugeY0 + i * (gaugeH + LANE_GAP), gaugeH, g.name))}
 
@@ -216,28 +227,38 @@ export default function DamageTimeline({ summary, analysis, highlight, onPick }:
           </g>
         )))}
 
-        {/* GCD lane: a block per GCD, its lock long; idle after it red, or grey in forced time. */}
+        {/* GCD lane: a block per GCD, its lock long. */}
         {gcds.map((g, i) => {
           const next = gcds[i + 1];
           const lockEnd = g.startMs + g.lockMs;
           const blockEnd = next ? Math.min(next.startMs, lockEnd) : Math.min(lockEnd, total);
-          const idle = next ? next.startMs - lockEnd : 0;
           const hovered = hoverGcd?.g === g;
           return (
-            <g key={`gc${i}`}>
-              <rect x={x(g.startMs)} y={gcdY + 5} width={Math.max(0.8, w(g.startMs, blockEnd) - 0.6)} height={gcdH - 10}
-                fill={g.heal ? THEME_COLOR.healing : GCD_COLOR} opacity={g.heal ? 0.7 : 1}
-                stroke={hovered ? "#fff" : "none"} strokeWidth={hovered ? 1 : 0} />
-              {idle >= GAP_MIN_MS && (
-                <rect x={x(lockEnd)} y={gcdY + 2} width={Math.max(1.5, w(lockEnd, next!.startMs))} height={gcdH - 4}
-                  fill={inForced(lockEnd + idle / 2) ? "rgba(255,255,255,0.18)" : GAP_COLOR} opacity={0.85} />
-              )}
-            </g>
+            <rect key={`gc${i}`} x={x(g.startMs)} y={gcdY + 4} width={Math.max(0.8, w(g.startMs, blockEnd) - 0.6)} height={gcdH - 11}
+              fill={g.heal ? THEME_COLOR.healing : GCD_COLOR} opacity={g.heal ? 0.7 : 1}
+              stroke={hovered ? "#fff" : "none"} strokeWidth={hovered ? 1 : 0} />
+          );
+        })}
+        {/* GCD drift: a gap as a red overlay on the blocks (grey when forced),
+            a small delay or clip as a thin line under them. */}
+        {markers.filter((m) => m.drift).map((m, i) => {
+          const hl = highlight === m.f;
+          const props = { style: { cursor: onPick ? "pointer" : undefined }, onClick: () => onPick?.(m.f) };
+          if (m.f.minor) {
+            return (
+              <rect key={`d${i}`} x={x(m.startMs)} y={gcdY + gcdH - 5} width={Math.max(2.5, w(m.startMs, m.endMs))} height={hl ? 5 : 3}
+                fill={hl ? "#fff" : m.f.kind === "gcd-clipping" ? CLIP_COLOR : GAP_COLOR} opacity={hl ? 1 : 0.9} {...props} />
+            );
+          }
+          return (
+            <rect key={`d${i}`} x={x(m.startMs)} y={gcdY + 2} width={Math.max(1.5, w(m.startMs, m.endMs))} height={gcdH - 4}
+              fill={m.f.forced ? "rgba(255,255,255,0.18)" : GAP_COLOR} opacity={0.85}
+              stroke={hl ? "#fff" : "none"} strokeWidth={hl ? 1.5 : 0} {...props} />
           );
         })}
 
         {/* Losses lane: moments as short bars at the top, single findings as dots. */}
-        {markers.map((m, i) => {
+        {markers.filter((m) => !m.drift).map((m, i) => {
           const color = m.f.movement ? MOVEMENT_COLOR : THEME_COLOR[KIND_THEME[m.f.kind]];
           const hl = highlight === m.f;
           if (m.moment) {

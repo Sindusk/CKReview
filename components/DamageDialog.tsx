@@ -68,8 +68,7 @@ const fmtDamage = (n: number) =>
   n >= 1e6 ? `${(n / 1e6).toFixed(2)}M` : n >= 1000 ? `${Math.round(n / 1000)}k` : `${Math.round(n)}`;
 
 const KIND_LABEL: Record<DamageFinding["kind"], string> = {
-  "gcd-gap":          "GCD gap",
-  "gcd-delays":       "GCD delays",
+  "gcd-drift":        "GCD drift",
   "gcd-pace":         "GCD pace",
   "cooldown-drift":   "Cooldown drift",
   "death":            "Death",
@@ -463,8 +462,14 @@ function BiggestWins({ items, perPull, icons, onPick }: {
 // the names are matched against the abilities this player logged in the
 // pull(s) (casts, buffs, hits, heals), longest first, and drawn with their
 // icon. Only the player's own abilities can match, so a boss's attack named
-// in a cause isn't decorated. Names under 4 characters are left out.
+// in a cause isn't decorated. Names under 3 characters are left out (Dia
+// and Bio are 3); the match is case-sensitive, so a name doesn't hit a word.
 type AbilityIcons = { icons: Map<string, string>; re: RegExp | null };
+// Names findings use that the log never records, shown with the icon of
+// the ability that keeps them up: Darkside is a gauge timer, not a status.
+const ICON_ALIASES: [string, string[]][] = [
+  ["Darkside", ["Edge of Shadow", "Flood of Shadow"]],
+];
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 function abilityIconsOf(pulls: Pull[], player: string): AbilityIcons {
   const icons = new Map<string, string>();
@@ -475,7 +480,11 @@ function abilityIconsOf(pulls: Pull[], player: string): AbilityIcons {
       if (e.abilityIcon && e.abilityName && !icons.has(e.abilityName)) icons.set(e.abilityName, e.abilityIcon);
     }
   }
-  const names = [...icons.keys()].filter((n) => n.length >= 4 && !/^(attack|melee|auto shot|shoot)$/i.test(n)).sort((a, b) => b.length - a.length);
+  for (const [name, from] of ICON_ALIASES) {
+    const src = from.find((n) => icons.has(n));
+    if (!icons.has(name) && src) icons.set(name, icons.get(src)!);
+  }
+  const names = [...icons.keys()].filter((n) => n.length >= 3 && !/^(attack|melee|auto shot|shoot)$/i.test(n)).sort((a, b) => b.length - a.length);
   return { icons, re: names.length ? new RegExp(`(?<![A-Za-z])(${names.map(escapeRe).join("|")})(?![A-Za-z])`, "g") : null };
 }
 const firstAbility = (text: string, a: AbilityIcons): string | undefined => {

@@ -125,9 +125,11 @@ export function checkGcdGaps(ctx: PlayerCheckContext): DamageFinding[] {
   const out: DamageFinding[] = [];
   const uses = ctx.uses.filter((u) => u.startMs < ctx.endMs);
   if (uses.length === 0) return out;
-  type Bucket = { ms: number; lost: number; start: number; end: number; n: number; defensives: Map<string, number>; moments: Moment[] };
-  const small = new Map<number | undefined, Bucket>();
-  const clipped = new Map<number | undefined, Bucket>();
+  // Sub-second delays, each its own finding (user, 2026-10-14: no summary
+  // lines), kept per phase so a phase whose delays add up to under
+  // CLIP_FINDING_MS still drops them all, as the summaries did.
+  const small = new Map<number | undefined, { ms: number; findings: DamageFinding[] }>();
+  const clipped = new Map<number | undefined, { ms: number; findings: DamageFinding[] }>();
   // One press per name per instant: FFLogs can log an action's damage id
   // as a second "cast" (Salt and Darkness 25755 + 25756 when it hit
   // nothing), which read as a double weave.
@@ -208,7 +210,7 @@ export function checkGcdGaps(ctx: PlayerCheckContext): DamageFinding[] {
       const during = ctx.mechanicAround(start, end);
       const cause = swap ? `tank swap (${swap.abilityName})` : during ? `during ${during}` : undefined;
       out.push(finding(ctx, {
-        kind: "gcd-gap", startMs: start, endMs: end, forced: false,
+        kind: "gcd-drift", startMs: start, endMs: end, forced: false,
         label: swap ? "GCD gap at a tank swap" : during ? `GCD gap during ${during}` : "GCD gap",
         lostDamage: unforced * perMs,
         cause,
@@ -220,24 +222,24 @@ export function checkGcdGaps(ctx: PlayerCheckContext): DamageFinding[] {
       }));
     } else if (unforced > 0) {
       // Three or more oGCDs between two GCDs: the delay is the weaving.
-      const bucketMap = weaves.length >= CLIP_WEAVES ? clipped : small;
-      const acc = bucketMap.get(phaseId) ?? { ms: 0, lost: 0, start, end, n: 0, defensives: new Map<string, number>(), moments: [] };
-      acc.ms += unforced; acc.lost += unforced * perMs; acc.end = end; acc.n++;
-      acc.moments.push({
-        startMs: start, endMs: end, lostDamage: unforced * perMs,
-        detail: `next GCD ${s(unforced)} late after ${after}` +
+      const clip = weaves.length >= CLIP_WEAVES;
+      const bucket = (clip ? clipped : small).get(phaseId) ?? { ms: 0, findings: [] };
+      bucket.ms += unforced;
+      const defs = clip ? weaves.filter((w) => ctx.game.isDefensive(w.abilityId)).map((w) => w.abilityName) : [];
+      bucket.findings.push(finding(ctx, {
+        kind: clip ? "gcd-clipping" : "gcd-drift", startMs: start, endMs: end, forced: false, minor: true,
+        label: clip ? "GCD clipped by triple weaves" : "Small GCD delay",
+        lostDamage: unforced * perMs,
+        cause: defs.length ? `defensive woven: ${defs.join(", ")}` : undefined,
+        basis: `${s(unforced)} late ÷ ${s(ctx.baseGcdMs)} GCD × ${k(value)} average GCD${inWindows(mid, ctx.buffWindows) ? " in raid buffs" : ""}`,
+        detail: `Next GCD ${s(unforced)} late after ${after}` +
           (weaves.length >= 2 ? `; ${weaves.length} weaves: ${weaves.map((w) => w.abilityName).join(", ")}` : ""),
-      });
-      if (bucketMap === clipped) {
-        for (const w of weaves) {
-          if (ctx.game.isDefensive(w.abilityId)) acc.defensives.set(w.abilityName, (acc.defensives.get(w.abilityName) ?? 0) + 1);
-        }
-      }
-      bucketMap.set(phaseId, acc);
+      }));
+      (clip ? clipped : small).set(phaseId, bucket);
     }
     if (forced.ms >= 2 * ctx.baseGcdMs && unforced < GAP_FINDING_MS) {
       out.push(finding(ctx, {
-        kind: "gcd-gap", startMs: start, endMs: end, forced: true,
+        kind: "gcd-drift", startMs: start, endMs: end, forced: true,
         label: `GCD gap (${forced.cause})`,
         lostDamage: forced.ms * perMs, cause: forced.cause,
         basis: `${s(forced.ms)} forced idle × ${k(value)} average GCD`,
@@ -262,30 +264,11 @@ export function checkGcdGaps(ctx: PlayerCheckContext): DamageFinding[] {
     });
   }
 
-  for (const [phaseId, acc] of small) {
-    // A phase's delays are lost damage even under one GCD in total
-    // (xivanalysis lists each; the dDar482XvFKBPJYh FRU kill's DRK had
-    // 0.2-0.9s ones in five phases, all dropped at a one-GCD floor).
-    if (acc.ms < CLIP_FINDING_MS) continue;
-    out.push({
-      player: ctx.player.name, job: ctx.job, phaseId, phase: ctx.phaseName(phaseId),
-      kind: "gcd-delays", startMs: acc.start, endMs: acc.end, forced: false, lostDamage: acc.lost, moments: acc.moments,
-      label: "Small GCD delays",
-      basis: `${acc.n} delays under 1s, ${s(acc.ms)} in total, valued at the phase's average GCD`,
-      detail: `${s(acc.ms)} of small GCD delays (${acc.n}) in ${ctx.phaseName(phaseId) ?? "the pull"}`,
-    });
-  }
-  for (const [phaseId, acc] of clipped) {
-    if (acc.ms < CLIP_FINDING_MS) continue;
-    const defs = [...acc.defensives.entries()].sort((a, b) => b[1] - a[1]).map(([n, c]) => `${n} ×${c}`).join(", ");
-    out.push({
-      player: ctx.player.name, job: ctx.job, phaseId, phase: ctx.phaseName(phaseId),
-      kind: "gcd-clipping", startMs: acc.start, endMs: acc.end, forced: false, lostDamage: acc.lost, moments: acc.moments,
-      label: "GCD clipped by triple weaves",
-      basis: `${acc.n} delays with ${CLIP_WEAVES}+ oGCDs between GCDs, ${s(acc.ms)} in total, valued at the phase's average GCD`,
-      detail: `${s(acc.ms)} of GCD delay from triple weaves (${acc.n}) in ${ctx.phaseName(phaseId) ?? "the pull"}` +
-        (defs ? `; defensives woven: ${defs}` : ""),
-    });
+  // A phase's delays are lost damage even under one GCD in total
+  // (xivanalysis lists each; the dDar482XvFKBPJYh FRU kill's DRK had
+  // 0.2-0.9s ones in five phases, all dropped at a one-GCD floor).
+  for (const bucket of [...small.values(), ...clipped.values()]) {
+    if (bucket.ms >= CLIP_FINDING_MS) out.push(...bucket.findings);
   }
   return out;
 }
