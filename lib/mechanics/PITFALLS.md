@@ -73,6 +73,11 @@ philosophy and the data semantics this list assumes.
 - **A "marked circle" can be a split stack.** Doomtrain's Plummet marks
   2-5 players but all 8 share them in every kill; the failure is a player
   under two, not anyone under one.
+- **Solo instances show only the logger's.** Necron's individual abyss
+  logs the logger's own island; everyone else's hands, hits and deaths
+  there have no events (killing blow 0). Read the island from the Doom
+  status window instead, and a later re-application of it as being pulled
+  back in (Invitation).
 - **Stance toggles aren't in the log** (set before the pull), so a buster
   on a non-tank can't be pinned on a tank (Doomtrain).
 - **Test a guide's "stack" or "fixed damage" claim against the damage.**
@@ -154,6 +159,10 @@ philosophy and the data semantics this list assumes.
   Kefka).
 - **A doubled stack usually means a dead target.** 7 of 9 doubled Sharp
   Tastes followed a healer's death (The Tyrant).
+- **An aimed share follows its aimer into the wrong zone.** When the
+  player a shared cone is aimed at took an avoidable hit, their partners
+  "missing" the cone is fallout; the aimer's avoidable is the error
+  (Necron's Shockwave behind Aetherblight).
 - **Name the takers when a stack goes elsewhere.** One player alone under
   it while most stood elsewhere is the stack leaving the group (The
   Tyrant).

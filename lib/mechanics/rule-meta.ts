@@ -358,6 +358,10 @@ mechanic("ffxiv-dt-buster", "Lightning Burst (non-tanks)", undefined, ["ffxiv-dt
 mechanic("ffxiv-dt-cone", "Aetherial Ray cones (non-tanks)", undefined, ["ffxiv-dt-cone"]);
 mechanic("ffxiv-dt-orb-stack", "Aetherosote stacks", undefined, ["ffxiv-dt-orb-stack"]);
 exposure("targeted", ["ffxiv-dt-buster", "ffxiv-dt-cone", "ffxiv-dt-orb-stack"]);
+// Necron (Necron's Embrace Extreme): the Blue Shockwave tank swap
+// (necron.ts reports both tanks at every pair of cones).
+mechanic("ffxiv-necron-blue-swap", "Blue Shockwave swap", undefined, ["ffxiv-necron-blue-swap"]);
+exposure("targeted", ["ffxiv-necron-blue-swap"]);
 // Futures Rewritten P1: the tanks' Powder Mark Trail swap and survival
 // (fatebreaker.ts reports both tanks at every Powder Mark).
 mechanic("ffxiv-fb-powder-swap", "Powder Mark swap", 1, ["ffxiv-fb-powder-swap"]);
