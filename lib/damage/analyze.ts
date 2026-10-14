@@ -17,7 +17,7 @@
 import type { Pull } from "@/types/Pull";
 import type {
   DamageContext, DamageFinding, DamageGame, ForcedWindow, PacePeer, PhaseDamageSummary,
-  PlayerDamageSummary, PullDamageAnalysis,
+  PlayerDamageSummary, PullDamageAnalysis, TimelineGcd,
 } from "./types";
 import { checkSameSpecPace, paceOf } from "./pace";
 import {
@@ -25,8 +25,8 @@ import {
   type PlayerCheckContext,
 } from "./checks";
 import {
-  deadWindows, gcdKinds, gcdUptime, gcdUses, limitBreakWindows, playerValues, raidBuffWindows, raidDowntime,
-  speedProfile, statusWindows, wipeCollapseMs, type Window,
+  deadWindows, gcdKinds, gcdLockMs, gcdUptime, gcdUses, limitBreakWindows, playerValues, raidBuffWindows, raidDowntime,
+  speedProfile, statusWindows, wipeCollapseMs, type GcdKind, type GcdUse, type Window,
 } from "./timeline";
 import { buildBuffLedger, checkBuffCoverage } from "./buffs";
 
@@ -164,6 +164,7 @@ export function analyzePullDamage(
       timeline: {
         gcdStarts: uses.filter((u) => u.startMs < endMs).map((u) => u.startMs),
         healGcdStarts: uses.filter((u) => u.startMs < endMs && kinds.get(u.action.id) === "heal").map((u) => u.startMs),
+        gcds: timelineGcds(player, game, uses, kinds, speed.at, endMs),
         buffWindows,
         forced: forced.filter((w) => w.startMs < endMs),
         movement,
@@ -202,6 +203,34 @@ export function analyzePullDamage(
     raidDowntime: downtime,
     players, phases,
   };
+}
+
+// Each GCD and the off-GCD presses after it, up to the next GCD's start.
+// Weaves leave out auto-attacks and casts the log made itself (WoW fake).
+const AUTO_ATTACK_NAME = /^(attack|melee|auto shot|shoot)$/i;
+function timelineGcds(
+  player: Pull["players"][number], game: DamageGame, uses: GcdUse[], kinds: Map<number, GcdKind>,
+  factorAt: (t: number) => number, endMs: number,
+): TimelineGcd[] {
+  const icons = new Map<number, string>();
+  for (const c of player.casts) if (c.abilityIcon && !icons.has(c.abilityId)) icons.set(c.abilityId, c.abilityIcon);
+  const offGcd = player.casts
+    .filter((c) => !c.fake && !game.action(c.abilityId)?.onGcd && !game.action(c.abilityId)?.autoAttack && !AUTO_ATTACK_NAME.test(c.abilityName))
+    .sort((a, b) => a.timestamp - b.timestamp);
+  const shown = uses.filter((u) => u.startMs < endMs);
+  let w = 0;
+  return shown.map((u, i) => {
+    const next = shown[i + 1]?.startMs ?? endMs;
+    while (w < offGcd.length && offGcd[w].timestamp < u.startMs) w++;
+    const weaves: TimelineGcd["weaves"] = [];
+    for (let j = w; j < offGcd.length && offGcd[j].timestamp < next; j++) {
+      weaves.push({ atMs: offGcd[j].timestamp, name: offGcd[j].abilityName, icon: offGcd[j].abilityIcon });
+    }
+    return {
+      startMs: u.startMs, castMs: u.castMs, lockMs: gcdLockMs(u, factorAt(u.startMs)),
+      name: u.abilityName, icon: icons.get(u.action.id), heal: kinds.get(u.action.id) === "heal", weaves,
+    };
+  });
 }
 
 /** HP of the enemy the raid was hitting hardest in the last 5s before `atMs`. */

@@ -5,9 +5,12 @@
 // "Damage" modal opened from the header bar (docs/archive/damage-analysis-plan.md,
 // UI). Shows where each player lost damage, scored in their own observed
 // damage, with fight context from the boss's DamageContext:
-//   - one pull: the phase summary, players ranked by estimated loss, and
-//     the selected player's timeline strip and findings, each with its
-//     basis; forced findings are greyed with their cause
+//   - one pull: the phase summary, players ranked by estimated loss (a bar
+//     of it by coaching theme, lib/damage/coaching.ts), and the selected
+//     player's Biggest wins (top three themes), lane timeline
+//     (DamageTimeline.tsx, hover for each GCD and its weaves) and findings,
+//     each with its basis, ability names drawn with their icons; forced
+//     findings are greyed with their cause
 //   - all loaded pulls: average loss per pull and the findings that recur
 // Pure view over lib/damage/; nothing is fetched here. Pulls fetched before
 // the damage fields existed say so; re-fetching stays an explicit action
@@ -19,7 +22,7 @@
 // pull for the "all loaded pulls" view) and cached for the open dialog.
 // Reference clears work for both (WarcraftLogs clears for WoW pulls).
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Pull } from "@/types/Pull";
 import { analyzePullDamage } from "@/lib/damage/analyze";
 import { aggregateDamage, type PlayerDamageAggregate } from "@/lib/damage/aggregate";
@@ -28,7 +31,10 @@ import { FFXIV_DAMAGE, GUARANTEED_HIT_STATUS_IDS } from "@/lib/damage/ffxiv/game
 import { MIN_ESTIMATE_HITS, playerHitRates, reliableRates } from "@/lib/damage/crit-rates";
 import { critLuck } from "@/lib/damage/crit-luck";
 import { WOW_DAMAGE } from "@/lib/damage/wow/game";
-import type { DamageFinding, GaugeTrack, PhaseDamageSummary, PlayerDamageSummary, PullDamageAnalysis } from "@/lib/damage/types";
+import type { DamageFinding, PhaseDamageSummary, PlayerDamageSummary, PullDamageAnalysis } from "@/lib/damage/types";
+import { biggestWins, findingItems, KIND_THEME, THEME_NAME, type CoachingItem, type CoachingTheme } from "@/lib/damage/coaching";
+import { readableText, THEME_COLOR, ThemeGlyph } from "./ui/DamageGlyphs";
+import DamageTimeline, { MOVEMENT_COLOR } from "./DamageTimeline";
 import { getClassColor, getPlayerClassIcon, getPlayerSpecIcon } from "@/lib/player-display";
 import { useFFPullSelector } from "@/hooks/useFFPullSelector";
 import { SEVERITY_COLOR } from "./SeverityIcon";
@@ -46,8 +52,17 @@ type DamageDialogProps = {
 };
 
 // Red, not the Major orange: beside the raid-buff gold the orange read as
-// the same colour.
+// the same colour. Totals use it; a single finding's cost the softer red.
 const LOSS_COLOR = SEVERITY_COLOR.Death;
+const LOSS_SOFT = "#f0928d";
+
+// The dialog's secondary text, lifted for its small sizes (the app-wide
+// tokens are #b3afa6 / #80848a), set on the dialog body so only it changes.
+const READABLE_TEXT = {
+  "--ck-text-2": "#c9c5bc",
+  "--ck-text-3": "#9da1a8",
+  "--ck-loss-soft": LOSS_SOFT,
+} as React.CSSProperties;
 
 const fmtDamage = (n: number) =>
   n >= 1e6 ? `${(n / 1e6).toFixed(2)}M` : n >= 1000 ? `${Math.round(n / 1000)}k` : `${Math.round(n)}`;
@@ -79,12 +94,6 @@ const KIND_LABEL: Record<DamageFinding["kind"], string> = {
   "missed-followup":  "Missed follow-up",
   "movement":         "Movement",
 };
-
-// Movement a mechanic required (DamageContext.movementWindows): blue, apart
-// from forced (grey) and counted (red).
-const MOVEMENT_COLOR = "#5b8def";
-// Tinctures on the timeline: played solid, a suggested move dashed.
-const POT_COLOR = "#b48cf2";
 
 const gameOf = (p: Pull) => (p.game === "wow" ? WOW_DAMAGE : FFXIV_DAMAGE);
 
@@ -129,7 +138,8 @@ export default function DamageDialog({ open, onClose, pulls, currentPullId }: Da
   for (const p of (allPulls ? gamePulls : selectedPull ? [selectedPull] : [])) {
     for (const pl of p.players) { classOf.set(pl.name, pl.className); specOf.set(pl.name, pl.specId); }
   }
-  const colorFor = (player: string, job: string) => getClassColor(colorGame, isWow ? classOf.get(player) ?? job : job);
+  // Used as text throughout, so lifted to read on the dark cards.
+  const colorFor = (player: string, job: string) => readableText(getClassColor(colorGame, isWow ? classOf.get(player) ?? job : job));
   // WoW: the spec's icon, so two Warlocks on different specs don't look alike.
   const iconFor = (player: string, job: string) => {
     const spec = specOf.get(player);
@@ -156,7 +166,7 @@ export default function DamageDialog({ open, onClose, pulls, currentPullId }: Da
       zIndex={1100}
       onBackdropClick={onClose}
       onClose={onClose}
-      bodyStyle={{ display: "flex", flexDirection: "column", overflow: "hidden" }}
+      bodyStyle={{ display: "flex", flexDirection: "column", overflow: "hidden", ...READABLE_TEXT }}
     >
       {gamePulls.length === 0 ? (
         <p className="ck-dialog-text">No report loaded. Import a report to see where each player lost damage.</p>
@@ -229,6 +239,7 @@ export default function DamageDialog({ open, onClose, pulls, currentPullId }: Da
                     lost={a.lostPerPull} forced={a.forcedPerPull} movement={a.movementPerPull} uptime={a.gcdUptime}
                     showMovement={aggregate.some((x) => x.movementPerPull >= 1)}
                     dealt={a.damagePerPull} dealtLabel={`dealt / ${a.pulls} pull${a.pulls === 1 ? "" : "s"}`}
+                    themeLoss={themeLoss(recurringItems(a.recurring), a.pulls)} maxLost={aggregate[0]?.lostPerPull ?? 0}
                     selected={a.player === activePlayer} onClick={() => setSelectedPlayer(a.player)} />
                 ))
                 : analysis?.players.map((p) => (
@@ -236,15 +247,18 @@ export default function DamageDialog({ open, onClose, pulls, currentPullId }: Da
                     lost={p.lostDamage} forced={p.forcedDamage} movement={p.movementDamage ?? 0} uptime={p.gcdUptime.pct}
                     showMovement={analysis.players.some((x) => (x.movementDamage ?? 0) >= 1)}
                     dealt={p.damage} dealtLabel="dealt"
+                    themeLoss={themeLoss(findingItems(p.findings), 1)} maxLost={Math.max(0, ...analysis.players.map((x) => x.lostDamage))}
                     selected={p.player === activePlayer} onClick={() => setSelectedPlayer(p.player)} />
                 ))}
             </div>
 
             <div style={{ minHeight: 0, overflowY: "auto", border: "1px solid var(--ck-line-2)", borderRadius: 3, padding: 12 }}>
               {allPulls ? (
-                <AggregateDetail agg={aggregate.find((a) => a.player === activePlayer)} totalPulls={gamePulls.length} colorFor={colorFor} iconFor={iconFor} />
+                <AggregateDetail agg={aggregate.find((a) => a.player === activePlayer)} totalPulls={gamePulls.length} colorFor={colorFor} iconFor={iconFor}
+                  pulls={gamePulls} />
               ) : analysis && activePlayer ? (
                 <PlayerDetail
+                  key={`${selectedPull?.id}-${activePlayer}`}
                   summary={analysis.players.find((p) => p.player === activePlayer)!}
                   analysis={analysis}
                   colorFor={colorFor}
@@ -262,9 +276,10 @@ export default function DamageDialog({ open, onClose, pulls, currentPullId }: Da
           {isWow ? (
             <p className="ck-help" style={{ margin: "10px 0 0" }}>
               Losses are estimates in each player&apos;s own damage from the pull; every line shows its basis.
-              Greyed lines are forced (untargetable, dead, a boss mechanic that keeps the player off the boss, or a
+              Greyed lines and hatched time are forced (untargetable, dead, a boss mechanic that keeps the player off the boss, or a
               phase whose damage doesn&apos;t count) and aren&apos;t counted. Blue is movement a mechanic required: idle
-              inside its window beyond the player&apos;s own usual rate, not counted either. Spell timings are measured from logs;
+              inside its window beyond the player&apos;s own usual rate, not counted either. Hover the timeline for each GCD
+              and what was woven after it. Spell timings are measured from logs;
               rules informed by{" "}
               <a href="https://github.com/WoWAnalyzer/WoWAnalyzer" target="_blank" rel="noreferrer" style={{ color: "var(--ck-arcane-text)" }}>
                 WoWAnalyzer
@@ -273,8 +288,8 @@ export default function DamageDialog({ open, onClose, pulls, currentPullId }: Da
           ) : (
             <p className="ck-help" style={{ margin: "10px 0 0" }}>
               Losses are estimates in each player&apos;s own damage from the pull; every line shows its basis.
-              Greyed lines are forced (untargetable, dead, a limit break, or a phase whose damage doesn&apos;t count)
-              and aren&apos;t counted. Action and status data and parts of the method are adapted from{" "}
+              Greyed lines and hatched time are forced (untargetable, dead, a limit break, or a phase whose damage
+              doesn&apos;t count) and aren&apos;t counted. Hover the timeline for each GCD and what was woven after it. Action and status data and parts of the method are adapted from{" "}
               <a href="https://github.com/xivanalysis/xivanalysis" target="_blank" rel="noreferrer" style={{ color: "var(--ck-arcane-text)" }}>
                 xivanalysis
               </a>{" "}(MIT).
@@ -335,13 +350,29 @@ type ColorFor = (player: string, job: string) => string;
 
 const fmtUptime = (pct: number) => `${(pct * 100).toFixed(1)}%`;
 
-// Icon | name (job colour) over job · uptime | damage dealt | loss over forced.
-function PlayerCard({ name, job, color, icon, lost, forced, movement, showMovement, uptime, dealt, dealtLabel, selected, onClick }: {
+// Counted loss per coaching theme, for a player card's bar.
+type ThemeLoss = Partial<Record<CoachingTheme, number>>;
+function themeLoss(items: CoachingItem[], pulls: number): ThemeLoss {
+  const out: ThemeLoss = {};
+  for (const i of items) {
+    if (i.forced || i.lostDamage < 1) continue;
+    const t = KIND_THEME[i.kind];
+    out[t] = (out[t] ?? 0) + i.lostDamage / pulls;
+  }
+  return out;
+}
+const recurringItems = (rows: PlayerDamageAggregate["recurring"]): CoachingItem[] =>
+  rows.map((r) => ({ kind: r.kind, lostDamage: r.lostDamage, forced: r.forced, example: r.example }));
+const THEME_ORDER = Object.keys(THEME_NAME) as CoachingTheme[];
+
+// Icon | name (job colour) over job · uptime | damage dealt | loss over forced,
+// then a bar of the loss by theme, against the biggest loss in the list.
+function PlayerCard({ name, job, color, icon, lost, forced, movement, showMovement, uptime, dealt, dealtLabel, themeLoss, maxLost, selected, onClick }: {
   name: string; job: string; color: string; icon: string; lost: number; forced: number; movement: number;
   // Any card in the list has movement: every card shows its (possibly 0k)
   // movement number so the columns line up.
   showMovement: boolean; uptime: number;
-  dealt: number; dealtLabel: string; selected: boolean; onClick: () => void;
+  dealt: number; dealtLabel: string; themeLoss: ThemeLoss; maxLost: number; selected: boolean; onClick: () => void;
 }) {
   // Two lines always: long text is cut with an ellipsis, never wrapped.
   const small: React.CSSProperties = { color: "var(--ck-text-3)", fontSize: 11, whiteSpace: "nowrap" };
@@ -374,7 +405,100 @@ function PlayerCard({ name, job, color, icon, lost, forced, movement, showMoveme
           {fmtDamage(forced)}{(showMovement || movement >= 1) && <> · <span style={{ color: MOVEMENT_COLOR }}>{movement >= 1 ? fmtDamage(movement) : "0k"}</span></>}
         </div>
       </div>
+      {maxLost > 0 && (
+        <div style={{ gridColumn: "2 / 5", height: 4, marginTop: 5, borderRadius: 2, background: "var(--ck-line)", display: "flex", overflow: "hidden" }}>
+          {THEME_ORDER.filter((t) => (themeLoss[t] ?? 0) > 0).map((t) => (
+            <span key={t} title={`${THEME_NAME[t]}: ${fmtDamage(themeLoss[t]!)}`}
+              style={{ width: `${(themeLoss[t]! / maxLost) * 100}%`, background: THEME_COLOR[t], height: "100%" }} />
+          ))}
+        </div>
+      )}
     </div>
+  );
+}
+
+// The top three themes by counted loss, each with its tip and worst instance.
+// Clicking one opens that kind's findings (single pull only).
+function BiggestWins({ items, perPull, icons, onPick }: {
+  items: CoachingItem[]; perPull?: number; icons: AbilityIcons; onPick?: (f: DamageFinding) => void;
+}) {
+  const wins = biggestWins(items);
+  if (wins.length === 0) return null;
+  const div = perPull ?? 1;
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div className="ck-section-label" style={{ margin: "0 0 6px" }}>Biggest wins{perPull ? " (per pull)" : ""}</div>
+      <div style={{ display: "grid", gridTemplateColumns: `repeat(${wins.length}, minmax(0, 1fr))`, gap: 6 }}>
+        {wins.map((w, i) => (
+          <div key={w.theme} className={onPick ? "ck-card ck-card--interactive" : "ck-card"} onClick={() => onPick?.(w.worst)}
+            style={{ padding: "9px 11px 10px", display: "grid", gap: 6, alignContent: "start", cursor: onPick ? "pointer" : undefined, minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <ThemeGlyph theme={w.theme} size={24} />
+              <span style={{ fontWeight: 600, fontSize: 13, flex: "1 1 auto", color: "var(--ck-text)" }}>{THEME_NAME[w.theme]}</span>
+              <span className="ck-num" style={{ color: "var(--ck-text-3)", fontSize: 11 }}>#{i + 1}</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+              <span className="ck-num" style={{ color: LOSS_COLOR, fontSize: 16, fontWeight: 700 }}>{fmtDamage(w.lostDamage / div)}</span>
+              <span style={{ color: "var(--ck-text-3)", fontSize: 11 }}>
+                {Math.round(w.share * 100)}% of the counted loss · {w.count} {w.count === 1 ? "finding" : "findings"}
+              </span>
+            </div>
+            <div style={{ height: 4, borderRadius: 2, background: "var(--ck-line)", overflow: "hidden" }}>
+              <div style={{ width: `${w.share * 100}%`, height: "100%", background: THEME_COLOR[w.theme] }} />
+            </div>
+            <div style={{ color: "var(--ck-text)", fontSize: 12.5, lineHeight: 1.45 }}>{w.tip}</div>
+            <div style={{ color: "var(--ck-text-2)", fontSize: 12, lineHeight: 1.5 }}>
+              Worst: <span className="ck-num">{fmtTime(w.worst.startMs)}</span> <RichDetail text={w.worst.detail} icons={icons} />{" "}
+              <span className="ck-num" style={{ color: LOSS_SOFT }}>{fmtDamage(w.worst.lostDamage)}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Ability icons in finding text ────────────────────────────────────────
+// Findings name abilities in their text ("No GCD for 1.3s after Kasha"), so
+// the names are matched against the abilities this player logged in the
+// pull(s) (casts, buffs, hits, heals), longest first, and drawn with their
+// icon. Only the player's own abilities can match, so a boss's attack named
+// in a cause isn't decorated. Names under 4 characters are left out.
+type AbilityIcons = { icons: Map<string, string>; re: RegExp | null };
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function abilityIconsOf(pulls: Pull[], player: string): AbilityIcons {
+  const icons = new Map<string, string>();
+  for (const p of pulls) {
+    const pl = p.players.find((x) => x.name === player);
+    if (!pl) continue;
+    for (const e of [...pl.casts, ...(pl.buffs ?? []), ...pl.damageDone, ...pl.healing]) {
+      if (e.abilityIcon && e.abilityName && !icons.has(e.abilityName)) icons.set(e.abilityName, e.abilityIcon);
+    }
+  }
+  const names = [...icons.keys()].filter((n) => n.length >= 4 && !/^(attack|melee|auto shot|shoot)$/i.test(n)).sort((a, b) => b.length - a.length);
+  return { icons, re: names.length ? new RegExp(`(?<![A-Za-z])(${names.map(escapeRe).join("|")})(?![A-Za-z])`, "g") : null };
+}
+const firstAbility = (text: string, a: AbilityIcons): string | undefined => {
+  if (!a.re) return undefined;
+  a.re.lastIndex = 0;
+  return a.re.exec(text)?.[1];
+};
+
+function RichDetail({ text, icons }: { text: string; icons: AbilityIcons }) {
+  if (!icons.re) return <>{text}</>;
+  const parts = text.split(icons.re);
+  // split with one capture group: odd indexes are the matched names.
+  return (
+    <>
+      {parts.map((part, i) => i % 2 === 0 ? part : (
+        <span key={i} style={{ whiteSpace: "nowrap", fontWeight: 600, color: "var(--ck-text)" }}>
+          <img src={icons.icons.get(part)} alt="" width={15} height={15}
+            style={{ verticalAlign: -3, marginRight: 3, borderRadius: 2 }}
+            onError={(e) => { e.currentTarget.style.display = "none"; }} />
+          {part}
+        </span>
+      ))}
+    </>
   );
 }
 
@@ -382,6 +506,20 @@ function PlayerDetail({ summary, analysis, colorFor, iconFor, pull, pulls }: {
   summary: PlayerDamageSummary; analysis: PullDamageAnalysis; colorFor: ColorFor; iconFor: ColorFor; pull?: Pull; pulls: Pull[];
 }) {
   const shown = summary.findings.filter((f) => f.lostDamage >= 1 || f.kind === "interrupted-cast");
+  const icons = useMemo(() => abilityIconsOf(pull ? [pull] : [], summary.player), [pull, summary.player]);
+  // Shared by the summary, the timeline and the finding list: the open
+  // groups (the biggest one to start) and the finding picked on either.
+  const items = useMemo(() => findingItems(summary.findings), [summary.findings]);
+  const [openKinds, setOpenKinds] = useState<Set<DamageFinding["kind"]>>(() => {
+    const top = biggestWins(items, 1)[0];
+    return new Set(top ? [top.topKind] : []);
+  });
+  const [picked, setPicked] = useState<DamageFinding | null>(null);
+  const [hovered, setHovered] = useState<DamageFinding | null>(null);
+  const pick = (f: DamageFinding) => {
+    setOpenKinds((prev) => new Set(prev).add(f.kind));
+    setPicked(f);
+  };
   // Crit luck (FFXIV): the player's rates from their hits in every loaded
   // pull, then this pull against what its rotation averages.
   const luck = useMemo(() => {
@@ -443,11 +581,16 @@ function PlayerDetail({ summary, analysis, colorFor, iconFor, pull, pulls }: {
               `${ratesNote} DoT ticks don't count (FFLogs logs them at their average).`,
           }] : []),
       ]} />
-      <TimelineStrip summary={summary} analysis={analysis} />
+      <BiggestWins items={items} icons={icons} onPick={pick} />
+      <DamageTimeline summary={summary} analysis={analysis} highlight={hovered ?? picked} onPick={pick} />
+      {(summary.timeline.gauges ?? []).map((g) => (
+        <div key={g.name} style={{ color: "var(--ck-text-3)", fontSize: 11, marginLeft: 96 }}>{g.name}: {g.note}</div>
+      ))}
       {shown.length === 0 ? (
         <p className="ck-dialog-text" style={{ marginTop: 12 }}>Nothing found for this player.</p>
       ) : (
-        <FindingGroups findings={shown} />
+        <FindingGroups findings={shown} icons={icons} open={openKinds} onOpenChange={setOpenKinds}
+          picked={picked} onHover={setHovered} />
       )}
     </div>
   );
@@ -501,13 +644,19 @@ function StatStrip({ stats }: { stats: Stat[] }) {
 }
 
 // Findings grouped by kind: the groups by their counted loss (biggest
-// first), each one's entries in time order, collapsed until clicked.
-function FindingGroups({ findings }: { findings: DamageFinding[] }) {
-  const [open, setOpen] = useState<Set<DamageFinding["kind"]>>(new Set());
+// first), each one's entries in time order, collapsed until clicked. The
+// picked finding (a timeline dot or a summary card) is highlighted and
+// scrolled to; hovering a row highlights its dot.
+function FindingGroups({ findings, icons, open, onOpenChange: setOpen, picked, onHover }: {
+  findings: DamageFinding[]; icons: AbilityIcons;
+  open: Set<DamageFinding["kind"]>; onOpenChange: React.Dispatch<React.SetStateAction<Set<DamageFinding["kind"]>>>;
+  picked: DamageFinding | null; onHover: (f: DamageFinding | null) => void;
+}) {
   const groups = new Map<DamageFinding["kind"], DamageFinding[]>();
   for (const f of findings) groups.set(f.kind, [...(groups.get(f.kind) ?? []), f]);
   const counted = (list: DamageFinding[]) => list.filter((f) => !f.forced).reduce((a, f) => a + f.lostDamage, 0);
   const sorted = [...groups].sort((a, b) => counted(b[1]) - counted(a[1]));
+  const maxRow = Math.max(1, ...findings.filter((f) => !f.forced).map((f) => f.lostDamage));
   return (
     <div style={{ marginTop: 10 }}>
       {sorted.map(([kind, list]) => {
@@ -526,7 +675,8 @@ function FindingGroups({ findings }: { findings: DamageFinding[] }) {
               style={{ display: "flex", gap: 10, alignItems: "center", padding: "7px 0", cursor: "pointer", opacity: forcedOnly ? 0.55 : 1 }}
             >
               <span style={{ color: "var(--ck-text-3)", fontSize: 11, width: 12, flex: "0 0 auto" }}>{isOpen ? "▾" : "▸"}</span>
-              <span className="ck-badge ck-badge--plain" style={{ flex: "0 0 auto" }}>{KIND_LABEL[kind]}</span>
+              <ThemeGlyph theme={KIND_THEME[kind]} size={22} />
+              <span style={{ flex: "0 0 auto", fontWeight: 600, fontSize: 13, color: "var(--ck-text)" }}>{KIND_LABEL[kind]}</span>
               <span style={{ color: "var(--ck-text-3)", fontSize: 12, flex: "1 1 auto" }}>
                 {list.length} {list.length === 1 ? "entry" : "entries"}
                 {list.some((f) => f.forced) && !forcedOnly ? ` (${list.filter((f) => f.forced).length} forced)` : ""}
@@ -537,7 +687,9 @@ function FindingGroups({ findings }: { findings: DamageFinding[] }) {
             </div>
             {isOpen && (
               <div style={{ paddingLeft: 22, paddingBottom: 4 }}>
-                {[...list].sort((a, b) => a.startMs - b.startMs).map((f, i) => <FindingRow key={i} f={f} />)}
+                {[...list].sort((a, b) => a.startMs - b.startMs).map((f, i) => (
+                  <FindingRow key={i} f={f} icons={icons} maxLost={maxRow} picked={f === picked} onHover={onHover} />
+                ))}
               </div>
             )}
           </div>
@@ -547,150 +699,60 @@ function FindingGroups({ findings }: { findings: DamageFinding[] }) {
   );
 }
 
-function FindingRow({ f }: { f: DamageFinding }) {
+// Time | lead icon (the first ability named, else the theme glyph) | the
+// line, ability names with their icons, over its basis | cost with a bar
+// against the player's biggest single finding.
+function FindingRow({ f, icons, maxLost, picked, onHover }: {
+  f: DamageFinding; icons: AbilityIcons; maxLost: number; picked: boolean; onHover: (f: DamageFinding | null) => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (picked) ref.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [picked]);
+  const lead = firstAbility(f.detail, icons);
+  const counted = !f.forced && f.lostDamage >= 1;
   return (
-    <div style={{ padding: "6px 0", borderTop: "1px solid var(--ck-line)", opacity: f.forced && !f.movement ? 0.55 : 1 }}>
-      <div style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
-        <span className="ck-num" style={{ color: "var(--ck-text-3)", fontSize: 12, width: 42, flex: "0 0 auto" }}>{fmtTime(f.startMs)}</span>
-        <span style={{ color: "var(--ck-text)", fontSize: 13, flex: "1 1 auto" }}>
-          {f.detail}
+    <div ref={ref} onMouseEnter={() => onHover(f)} onMouseLeave={() => onHover(null)}
+      style={{
+        display: "grid", gridTemplateColumns: "42px 22px minmax(0, 1fr) 64px", columnGap: 10, alignItems: "start",
+        padding: "6px 4px", borderTop: "1px solid var(--ck-line)", opacity: f.forced && !f.movement ? 0.55 : 1,
+        background: picked ? "rgba(83,169,255,0.10)" : undefined, boxShadow: picked ? "inset 2px 0 0 var(--ck-arcane)" : undefined,
+      }}>
+      <span className="ck-num" style={{ color: "var(--ck-text-2)", fontSize: 12, paddingTop: 2 }}>{fmtTime(f.startMs)}</span>
+      {lead ? (
+        <img src={icons.icons.get(lead)} alt={lead} width={22} height={22} style={{ display: "block", borderRadius: 3 }}
+          onError={(e) => { e.currentTarget.style.visibility = "hidden"; }} />
+      ) : <ThemeGlyph theme={KIND_THEME[f.kind]} size={22} />}
+      <div style={{ minWidth: 0 }}>
+        <div style={{ color: "var(--ck-text)", fontSize: 13, lineHeight: 1.5 }}>
+          <RichDetail text={f.detail} icons={icons} />
           {f.target && <span style={{ color: "var(--ck-text-2)" }}> · on {f.target}</span>}
           {f.cause && !f.movement && <span style={{ color: "var(--ck-text-3)" }}> — {f.forced ? `forced: ${f.cause}` : f.cause}</span>}
           {f.movement && <span style={{ color: MOVEMENT_COLOR }}> — movement, not counted</span>}
-        </span>
-        <span className="ck-num" style={{ color: f.movement ? MOVEMENT_COLOR : f.forced ? "var(--ck-text-3)" : LOSS_COLOR, fontSize: 12, fontWeight: 400, flex: "0 0 auto" }}>
+        </div>
+        <div style={{ color: "var(--ck-text-3)", fontSize: 11.5 }}>
+          {f.phase ? `${f.phase} · ` : ""}{f.inference ? "Inference: " : ""}{f.basis}
+        </div>
+      </div>
+      <div style={{ textAlign: "right" }}>
+        <span className="ck-num" style={{ color: f.movement ? MOVEMENT_COLOR : f.forced ? "var(--ck-text-3)" : LOSS_SOFT, fontSize: 12.5, fontWeight: 600 }}>
           {f.lostDamage >= 1 ? fmtDamage(f.lostDamage) : "—"}
         </span>
-      </div>
-      <div style={{ color: "var(--ck-text-3)", fontSize: 11, marginLeft: 52 }}>
-        {f.phase ? `${f.phase} · ` : ""}{f.inference ? "Inference: " : ""}{f.basis}
-      </div>
-    </div>
-  );
-}
-
-// One horizontal strip over the analysed window: forced time shaded, raid
-// buff windows as a gold band, tinctures under it (suggested moves dashed),
-// a tick per GCD, phase starts as dividers and
-// each counted finding as a marker.
-const SPAN_MARK_MS = 10_000;
-
-function TimelineStrip({ summary, analysis }: { summary: PlayerDamageSummary; analysis: PullDamageAnalysis }) {
-  const total = Math.max(1, analysis.endMs);
-  const pct = (ms: number) => `${(Math.max(0, Math.min(ms, total)) / total) * 100}%`;
-  const width = (s: number, e: number) => `${(Math.max(0, Math.min(e, total) - Math.max(0, s)) / total) * 100}%`;
-  // A tick and label every minute; the last is left out when it would
-  // crowd the end label.
-  const minutes: number[] = [];
-  for (let t = 60_000; t < total - 15_000; t += 60_000) minutes.push(t);
-  return (
-    <div>
-      <div style={{ position: "relative", height: 34, background: "var(--ck-bg-deep)", border: "1px solid var(--ck-line-2)", borderRadius: 2, overflow: "hidden" }}>
-        {summary.timeline.forced.map((w, i) => (
-          <div key={`f${i}`} title={`${fmtTime(w.startMs)}–${fmtTime(w.endMs)} forced: ${w.cause}`}
-            style={{ position: "absolute", top: 0, bottom: 0, left: pct(w.startMs), width: width(w.startMs, w.endMs), background: "rgba(255,255,255,0.07)" }} />
-        ))}
-        {(summary.timeline.movement ?? []).map((w, i) => (
-          <div key={`mv${i}`} title={`${fmtTime(w.startMs)}–${fmtTime(w.endMs)} movement: ${w.cause}`}
-            style={{ position: "absolute", top: 0, bottom: 0, left: pct(w.startMs), width: width(w.startMs, w.endMs), background: "rgba(91,141,239,0.22)" }} />
-        ))}
-        {/* Idle the movement explained, as markers like the counted losses. */}
-        {summary.findings.filter((f) => f.movement && f.lostDamage >= 1).flatMap((f, i) =>
-          (f.moments ?? [{ startMs: f.startMs, endMs: f.endMs }]).map((m, j) => (
-            <div key={`mm${i}-${j}`}
-              title={`${fmtTime(m.startMs)} ${m.detail ?? f.detail} (${fmtDamage(m.lostDamage ?? f.lostDamage)}, not counted)`}
-              style={{ position: "absolute", bottom: 0, height: 6, left: pct(m.startMs), width: `max(3px, ${width(m.startMs, m.endMs)})`, background: MOVEMENT_COLOR }} />
-          )))}
-        {summary.timeline.buffWindows.map((w, i) => (
-          <div key={`b${i}`} title={`Raid buffs ${fmtTime(w.startMs)}–${fmtTime(w.endMs)}`}
-            style={{ position: "absolute", top: 0, height: 5, left: pct(w.startMs), width: width(w.startMs, w.endMs), background: "var(--ck-gold-2)" }} />
-        ))}
-        {/* Tinctures under the raid buffs: as played, and where the tincture
-            finding would move them (dashed, like the Tanking tab's proposals). */}
-        {(summary.timeline.potWindows ?? []).map((w, i) => (
-          <div key={`pot${i}`} title={`Tincture ${fmtTime(w.startMs)}–${fmtTime(w.endMs)}`}
-            style={{ position: "absolute", top: 6, height: 6, left: pct(w.startMs), width: width(w.startMs, w.endMs), background: POT_COLOR, opacity: 0.7 }} />
-        ))}
-        {summary.findings.filter((f) => f.kind === "tincture").flatMap((f, i) => (f.proposals ?? []).map((p, j) => (
-          <div key={`potp${i}-${j}`}
-            title={`Suggested tincture ${fmtTime(p.atMs)}–${fmtTime(p.atMs + p.durationMs)}${p.fromMs !== undefined ? ` (played ${fmtTime(p.fromMs)})` : ""}: ${f.detail}`}
-            style={{ position: "absolute", top: 6, height: 6, left: pct(p.atMs), width: width(p.atMs, p.atMs + p.durationMs),
-              border: `1px dashed ${POT_COLOR}`, boxSizing: "border-box" }} />
-        )))}
-        {minutes.map((t) => (
-          <div key={`m${t}`} style={{ position: "absolute", top: 0, bottom: 0, left: pct(t), width: 1, background: "var(--ck-line-2)" }} />
-        ))}
-        {summary.timeline.gcdStarts.map((t, i) => (
-          <div key={`g${i}`} style={{ position: "absolute", top: 14, bottom: 8, left: pct(t), width: 1, background: "var(--ck-text-3)", opacity: 0.6 }} />
-        ))}
-        {analysis.phases.slice(1).map((p) => (
-          <div key={`p${p.phaseId}-${p.startMs}`} title={p.name}
-            style={{ position: "absolute", top: 0, bottom: 0, left: pct(p.startMs), width: 1, background: "var(--ck-frame)" }} />
-        ))}
-        {/* A summary finding (small delays, early DoT refreshes, missed
-            positionals) marks each of its moments, not its first-to-last span.
-            A pull-wide rate (GCD pace) has no moment and isn't drawn: its
-            span painted the whole strip red (user, 2026-10-13). Nor are
-            long spans: a finding without moments over SPAN_MARK_MS (a burst
-            window, a cooldown's ready stretch, a summary) is one mark where
-            it starts, its span in the tooltip. Tinctures aren't marked: a
-            gain not taken, shown in the tincture lane instead (user,
-            2026-10-13). */}
-        {summary.findings.filter((f) => !f.forced && !f.pullWide && f.lostDamage >= 1 && f.kind !== "tincture").flatMap((f, i) =>
-          (f.moments ?? [{ startMs: f.startMs, endMs: f.endMs - f.startMs > SPAN_MARK_MS ? f.startMs : f.endMs }]).map((m, j) => (
-            <div key={`x${i}-${j}`}
-              title={`${fmtTime(m.startMs)}${!f.moments && f.endMs - f.startMs > SPAN_MARK_MS ? `–${fmtTime(f.endMs)}` : ""} ${m.detail ?? f.detail} (${fmtDamage(m.lostDamage ?? f.lostDamage)})`}
-              style={{ position: "absolute", bottom: 0, height: 6, left: pct(m.startMs), width: `max(3px, ${width(m.startMs, m.endMs)})`, background: LOSS_COLOR }} />
-          )))}
-      </div>
-      {(summary.timeline.gauges ?? []).map((g) => (
-        <GaugeRow key={g.name} gauge={g} pct={pct} width={width} total={total} />
-      ))}
-      <div style={{ position: "relative", height: 13, color: "var(--ck-text-3)", fontSize: 10, marginTop: 2 }}>
-        <span className="ck-num" style={{ position: "absolute", left: 0 }}>0:00</span>
-        {minutes.map((t) => (
-          <span key={t} className="ck-num" style={{ position: "absolute", left: pct(t), transform: "translateX(-50%)" }}>{fmtTime(t)}</span>
-        ))}
-        <span className="ck-num" style={{ position: "absolute", right: 0 }}>{fmtTime(total)}</span>
-      </div>
-      <div style={{ color: "var(--ck-text-3)", fontSize: 10, textAlign: "center" }}>
-        gold: raid buffs · <span style={{ color: POT_COLOR }}>violet: tinctures (dashed: suggested)</span> · shaded: forced · <span style={{ color: MOVEMENT_COLOR }}>blue: movement</span> · ticks: GCDs · red: counted losses
+        {counted && (
+          <div style={{ height: 3, marginTop: 4, borderRadius: 2, background: "var(--ck-line)", overflow: "hidden", display: "flex", justifyContent: "flex-end" }}>
+            <span style={{ width: `${Math.min(1, f.lostDamage / maxLost) * 100}%`, background: LOSS_SOFT }} />
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-// A job gauge under the strip: a bar per step, height by value, and the
-// stretches at the cap with the timer stopped (generation lost) in amber.
-function GaugeRow({ gauge, pct, width, total }: {
-  gauge: GaugeTrack; pct: (ms: number) => string; width: (s: number, e: number) => string; total: number;
+function AggregateDetail({ agg, totalPulls, colorFor, iconFor, pulls }: {
+  agg: PlayerDamageAggregate | undefined; totalPulls: number; colorFor: ColorFor; iconFor: ColorFor; pulls: Pull[];
 }) {
-  return (
-    <div style={{ marginTop: 3 }}>
-      <div style={{ position: "relative", height: 16, background: "var(--ck-bg-deep)", border: "1px solid var(--ck-line-2)", borderRadius: 2, overflow: "hidden" }}
-        title={`${gauge.name}: ${gauge.note}`}>
-        {gauge.capped.map((w, i) => (
-          <div key={`c${i}`} title={`${gauge.name} capped ${fmtTime(w.startMs)}–${fmtTime(w.endMs)}`}
-            style={{ position: "absolute", top: 0, bottom: 0, left: pct(w.startMs), width: width(w.startMs, w.endMs), background: "rgba(232,168,56,0.28)" }} />
-        ))}
-        {gauge.steps.map((s, i) => {
-          const end = gauge.steps[i + 1]?.t ?? total;
-          return (
-            <div key={`s${i}`} title={`${gauge.name} ${s.value} at ${fmtTime(s.t)}–${fmtTime(end)}`}
-              style={{ position: "absolute", bottom: 0, left: pct(s.t), width: width(s.t, end),
-                height: `${(s.value / gauge.max) * 100}%`, background: "var(--ck-text-3)", opacity: 0.45 }} />
-          );
-        })}
-        <span style={{ position: "absolute", left: 4, top: 1, fontSize: 10, color: "var(--ck-text-2)", pointerEvents: "none" }}>{gauge.name}</span>
-      </div>
-      <div style={{ color: "var(--ck-text-3)", fontSize: 10 }}>{gauge.note}</div>
-    </div>
-  );
-}
-
-function AggregateDetail({ agg, totalPulls, colorFor, iconFor }: {
-  agg: PlayerDamageAggregate | undefined; totalPulls: number; colorFor: ColorFor; iconFor: ColorFor;
-}) {
+  const player = agg?.player;
+  const icons = useMemo(() => abilityIconsOf(player ? pulls : [], player ?? ""), [pulls, player]);
   if (!agg) return <p className="ck-dialog-text">No players.</p>;
   const rows = agg.recurring.filter((r) => r.lostDamage >= 1 || r.kind === "interrupted-cast");
   return (
@@ -710,6 +772,7 @@ function AggregateDetail({ agg, totalPulls, colorFor, iconFor }: {
         { label: "Lost per pull", value: fmtDamage(agg.lostPerPull), sub: `forced ${fmtDamage(agg.forcedPerPull)}`,
           tone: agg.lostPerPull > 0 ? "bad" : undefined },
       ]} />
+      <BiggestWins items={recurringItems(agg.recurring)} perPull={agg.pulls} icons={icons} />
       <div className="ck-table-wrap">
         <table className="ck-table" style={{ fontSize: 12 }}>
           <thead>
@@ -721,7 +784,12 @@ function AggregateDetail({ agg, totalPulls, colorFor, iconFor }: {
           <tbody>
             {rows.map((r, i) => (
               <tr key={i} style={{ opacity: r.forced ? 0.55 : 1 }}>
-                <td style={{ color: "var(--ck-text)" }}>{r.label}{r.forced ? " (forced)" : ""}</td>
+                <td style={{ color: "var(--ck-text)" }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                    <ThemeGlyph theme={KIND_THEME[r.kind]} size={18} />
+                    <span><RichDetail text={r.label} icons={icons} />{r.forced ? " (forced)" : ""}</span>
+                  </span>
+                </td>
                 <td>{r.phase ?? "—"}</td>
                 <td className="ck-num" style={{ textAlign: "right" }}>{r.pulls}/{agg.pulls}</td>
                 <td className="ck-num" style={{ textAlign: "right", color: r.forced ? undefined : LOSS_COLOR }}>

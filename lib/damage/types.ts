@@ -281,6 +281,19 @@ export type DamageFinding = {
 
 export type Moment = Window & { detail?: string; lostDamage?: number };
 
+// One GCD on the dialog's timeline: when it started (the begin-cast for a
+// hardcast), its lock at the player's speed then, and the off-GCD casts
+// between it and the next GCD. Icons are the log's resolved URLs.
+export type TimelineGcd = {
+  startMs: number;
+  castMs:  number;
+  lockMs:  number;
+  name:    string;
+  icon?:   string;
+  heal:    boolean;
+  weaves:  { atMs: number; name: string; icon?: string }[];
+};
+
 // One player's fitted press pace (WoW, lib/damage/pace.ts): the base GCD
 // from back-to-back instants with no haste buff up, and the haste the rating
 // gives on that pull (rating ÷ the pull's calibration), so two players' bases
@@ -326,6 +339,8 @@ export type PlayerDamageSummary = {
   timeline: {
     gcdStarts:   number[];
     healGcdStarts: number[];
+    // Each GCD with what was woven after it, for the timeline's hover.
+    gcds:        TimelineGcd[];
     buffWindows: { startMs: number; endMs: number }[];
     forced:      ForcedWindow[];
     movement:    ForcedWindow[];   // DamageContext.movementWindows for this player
