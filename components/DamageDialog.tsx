@@ -424,7 +424,10 @@ function PlayerCard({ name, job, color, icon, lost, forced, movement, showMoveme
 // the card's hover. Three slots always, empty ones dashed. Clicking a card
 // opens that kind's findings (single pull only).
 const WIN_SLOTS = 3;
-const WIN_CARD_H = 52;
+// Border-box on cards and empty slots alike: content-box made a padded
+// card 14px taller than an empty slot, so "No counted loss" moved the
+// timeline up.
+const WIN_CARD_H = 56;
 function BiggestWins({ items, perPull, icons, onPick }: {
   items: CoachingItem[]; perPull?: number; icons: AbilityIcons; onPick?: (f: DamageFinding) => void;
 }) {
@@ -440,7 +443,7 @@ function BiggestWins({ items, perPull, icons, onPick }: {
           if (!w) {
             return (
               <div key={`empty${i}`} style={{
-                height: WIN_CARD_H, border: "1px dashed var(--ck-line-2)", borderRadius: 3, display: "flex", alignItems: "center",
+                boxSizing: "border-box", height: WIN_CARD_H, border: "1px dashed var(--ck-line-2)", borderRadius: 3, display: "flex", alignItems: "center",
                 justifyContent: "center", color: "var(--ck-text-3)", fontSize: 11.5,
               }}>
                 {i === 0 ? "No counted loss" : ""}
@@ -451,7 +454,7 @@ function BiggestWins({ items, perPull, icons, onPick }: {
             <div key={w.theme} className={onPick ? "ck-card ck-card--interactive" : "ck-card"} onClick={() => onPick?.(w.worst)}
               title={`${w.tip}\nWorst: ${fmtTime(w.worst.startMs)} ${w.worst.detail} (${fmtDamage(w.worst.lostDamage)}) · ${w.count} ${w.count === 1 ? "finding" : "findings"}`}
               style={{
-                position: "relative", height: WIN_CARD_H, padding: "6px 10px 8px", display: "grid", gridTemplateRows: "auto auto",
+                position: "relative", boxSizing: "border-box", height: WIN_CARD_H, padding: "6px 10px 8px", display: "grid", gridTemplateRows: "auto auto",
                 alignContent: "center", gap: 3, cursor: onPick ? "pointer" : undefined, minWidth: 0, overflow: "hidden",
               }}>
               <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
