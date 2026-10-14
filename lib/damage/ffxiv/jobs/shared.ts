@@ -308,7 +308,10 @@ export type UptimeSpec = {
   // (a downtime, an HP check passed): there it's only worth the bonus on
   // what was dealt before the cut, less this (Dragoon's Power Surge: the
   // Spiral Blow route in place of Lance Barrage → Heavens' Thrust).
-  refreshCost?: (ctx: PlayerCheckContext) => number;
+  refreshCost?: (ctx: PlayerCheckContext, fromMs: number, toMs: number) => number;
+  // Extra time to bring it back after a long forced stretch, past graceMs
+  // (a combo step that grants it).
+  reapplyMs?: number;
 };
 
 // A forced stretch shorter than this doesn't cut a buff or DoT gap off:
@@ -334,29 +337,37 @@ export function uptimeFindings(ctx: PlayerCheckContext, spec: UptimeSpec): Damag
     // Only what was dealt outside forced time: past a phase's HP check the
     // damage was wasted anyway (2T1HzdPKgbhM43am fight 10, Power Surge
     // down from 6:11 into P2's 0% stretch).
-    const dealt = ctx.values.damageIn(g.startMs, g.endMs) - forced
-      .filter((f) => f.endMs > g.startMs && f.startMs < g.endMs)
-      .reduce((a, f) => a + ctx.values.damageIn(Math.max(f.startMs, g.startMs), Math.min(f.endMs, g.endMs)), 0);
+    const dealtIn = (a: number, b: number) => ctx.values.damageIn(a, b) - forced
+      .filter((f) => f.endMs > a && f.startMs < b)
+      .reduce((x, f) => x + ctx.values.damageIn(Math.max(f.startMs, a), Math.min(f.endMs, b)), 0);
+    const dealt = dealtIn(g.startMs, g.endMs);
     // Stretches forced time cuts off are worth their bonus less the
     // refresh's cost. yBKPqGwHparm7Tk4 fight 5, Dragoon's Power Surge
     // 3:05.2-3:10.7 (P1 check passed): 23k of bonus against ~33k for the
     // Spiral Blow route (user, 2026-10-13).
-    const cost = spec.refreshCost ? Math.max(0, spec.refreshCost(ctx)) : 0;
     let cutOff = 0, at = g.startMs;
     for (const f of forced) {
       if (f.endMs <= at || f.startMs >= g.endMs || f.endMs - f.startMs < CUT_MIN_MS) continue;
-      if (f.startMs > at) cutOff += Math.min(cost, ctx.values.damageIn(at, f.startMs) * spec.bonus);
+      if (f.startMs > at) {
+        const cost = spec.refreshCost ? Math.max(0, spec.refreshCost(ctx, at, f.startMs)) : 0;
+        cutOff += Math.min(cost, dealtIn(at, f.startMs) * spec.bonus);
+      }
       at = Math.max(at, f.endMs);
     }
+    // After a long forced stretch the buff comes back through its rotation
+    // (Power Surge on the 2nd GCD after Raiden Thrust): the ramp isn't a
+    // loss (yBKPqGwHparm7Tk4 fight 5, P3 opening 7:09.9 → 7:12.3).
+    const tailFree = at > g.startMs && at < g.endMs ? g.endMs - at - overlapMs(at, g.endMs, forced) : -1;
+    if (tailFree >= 0 && tailFree < spec.graceMs + (spec.reapplyMs ?? 0)) cutOff += dealtIn(at, g.endMs) * spec.bonus;
     const lost = dealt * spec.bonus - cutOff;
-    if (lost <= 0) continue;
+    if (lost < 1) continue;
     out.push(finding(ctx, {
       kind: "buff-uptime", startMs: g.startMs, endMs: g.endMs, forced: false,
       label: `${spec.name} down`,
       lostDamage: lost,
       inference: spec.inference,
       basis: `${k(dealt)} dealt while it was down × ${Math.round(spec.bonus * 100)}% (${spec.bonusBasis})` +
-        (cutOff ? `, less ${k(cutOff)} for stretches cut off by forced time where re-applying it cost more` : ""),
+        (cutOff ? `, less ${k(cutOff)}: stretches cut off by forced time are worth only what re-applying it gained over its cost, and its return after one is on time` : ""),
       detail: `${spec.name} down for ${s(len - forcedMs)}${forcedMs > 0 ? ` (plus ${s(forcedMs)} forced)` : ""}`,
     }));
   }
@@ -419,6 +430,9 @@ export type DotSpec = {
   // time cuts short. Default: its own hit against an average GCD; a DoT
   // on a combo route costs the route it displaces (Dragoon).
   applyCost?:  (ctx: PlayerCheckContext) => number;
+  // GCDs its combo needs before it can go back on after a long forced
+  // stretch (Dragoon: Raiden Thrust, Spiral Blow), added to the grace.
+  reapplyGcds?: number;
 };
 
 const DOT_CAST_MS = 1_500;   // cast → status applied
@@ -810,7 +824,11 @@ export function dotFindings(ctx: PlayerCheckContext, spec: DotSpec): DamageFindi
         && u.startMs >= cursor - spec.durationMs && u.startMs < w.startMs);
       const moveWin = moveGcds.map((u) => (ctx.movement ?? []).find((m) => u.startMs >= m.startMs && u.startMs <= m.endMs)).filter(Boolean)[0];
       const moveCount = moveGcds.filter((u) => (ctx.movement ?? []).some((m) => u.startMs >= m.startMs && u.startMs <= m.endMs)).length;
-      const needed = grace + firsts * ctx.baseGcdMs;
+      // After a long forced stretch the DoT returns through its combo
+      // (Chaotic Spring is the 3rd GCD after Raiden Thrust): yBKPqGwHparm7Tk4
+      // fight 5, P3 opening 7:09.9 → 7:14.8 is on time.
+      const afterCut = at > cursor ? (spec.reapplyGcds ?? 0) * ctx.baseGcdMs : 0;
+      const needed = grace + firsts * ctx.baseGcdMs + afterCut;
       if (moveWin && tail >= needed && tail < needed + moveCount * ctx.baseGcdMs) {
         out.push(finding(ctx, {
           kind: "dot-uptime", startMs: cursor, endMs: w.startMs, forced: true, movement: true, cause: moveWin.cause,
@@ -825,7 +843,7 @@ export function dotFindings(ctx: PlayerCheckContext, spec: DotSpec): DamageFindi
       const lost = (tailMs / DOT_TICK_MS) * avgTick + cut;
       if (lost > 0) {
         out.push(finding(ctx, {
-          kind: "dot-uptime", startMs: cursor, endMs: w.startMs, forced: false,
+          kind: "dot-uptime", startMs: cutMs ? cursor : at, endMs: w.startMs, forced: false,
           label: `${spec.name} off the boss`,
           lostDamage: lost,
           basis: `${s(len)} ÷ 3s ticks × ${k(avgTick)} average tick` +

@@ -106,6 +106,23 @@ Dragoon's POV (Sayacissa Morsaelth). No xivanalysis page.
   checks; a 0.3s blip on vVPtwaTQ62Jg391q had). This kill: 3:05 gone,
   6:10 45k → 12k.
 
+- **Dragoon Chaotic Spring 6:06 / Power Surge 6:11 (user: the check
+  passes shortly after).** One decision: Lance Barrage at 6:04.5 right
+  after the 5:52 Lance Barrage route (alternation broken). Spiral Blow
+  there: route −37k (Lance Charge), Power Surge kept 6:10.9-6:16.9 on
+  Stardiver / Fang and Claw / Nastrond / High Jump (~390k × 10% = 39k), 3
+  Chaotic Spring ticks to 6:16.9 (~21k): **≈ +23k for Spiral**, a real
+  but small loss. The app had 12k + 10k, mostly the P3 opening ramp
+  (7:09.9 → DoT 7:14.8, Power Surge ~7:12). **Fixed:** after a long
+  forced stretch the DoT / buff gets its combo's ramp as grace
+  (`reapplyGcds`: Chaotic Spring 2, Power Surge 1); Dragoon Power Surge's
+  `refreshCost(ctx, from, to)` is the explicit counterfactual: the first
+  alternation-breaking Lance Barrage (after a Lance Barrage route) whose
+  Power Surge reaches the stretch, Spiral there, Power Surge from its hit,
+  Chaotic Spring a GCD later (ticks where the DoT was off, taken off the
+  cost). No such slot: nothing to do. Now: 6:06 DoT gone, 6:11 Power
+  Surge 24k, 3:05 stays gone (2:49.5's Lance Barrage was the rotation).
+
 ## Next
 
 - Ask the user what the 8:47-8:54 mechanic is and whether it forces

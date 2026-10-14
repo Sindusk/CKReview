@@ -108,12 +108,14 @@ const replacedGcd = (...keys: string[]) => (ctx: PlayerCheckContext) =>
 const lostOgcd = (...keys: string[]) => (ctx: PlayerCheckContext) =>
   Math.max(...ids(...keys).map((x) => ctx.values.perUse(x)));
 
-const uptime = (statusKey: string, bonus: number, bonusBasis: string, refreshCost?: (ctx: PlayerCheckContext) => number): JobCheck => (ctx) => {
+const uptime = (statusKey: string, bonus: number, bonusBasis: string,
+  refresh?: { cost: (ctx: PlayerCheckContext, fromMs: number, toMs: number) => number; reapplyGcds: number }): JobCheck => (ctx) => {
   const windows = statusWindows(ctx, S[statusKey].id);
   if (windows.length === 0) return [];
   return uptimeFindings(ctx, {
     name: S[statusKey].name, bonus, bonusBasis,
-    active: windows, fromMs: windows[0].startMs, graceMs: 2_500, refreshCost,
+    active: windows, fromMs: windows[0].startMs, graceMs: 2_500,
+    refreshCost: refresh?.cost, reapplyMs: refresh ? refresh.reapplyGcds * ctx.baseGcdMs : undefined,
   });
 };
 
@@ -302,12 +304,79 @@ function drgSpiralRouteCost(ctx: PlayerCheckContext): number {
   return v("LANCE_BARRAGE", "HEAVENS_THRUST") - v("SPIRAL_BLOW", "CHAOTIC_SPRING");
 }
 
+// Power Surge down in a stretch forced time cuts off (from → to): the
+// choice was the Lance Barrage pressed after a Raiden Thrust, which Spiral
+// Blow could have replaced. The first such slot whose Power Surge would
+// reach into the stretch is the counterfactual: Spiral there (the route
+// cost), Power Surge from its hit (the bonus before that couldn't be had:
+// added to the cost), Chaotic Spring a GCD later (its ticks to the cut,
+// where the DoT was off: taken off the cost). So Power Surge + DoT − route
+// is counted once: the DoT check values its own cut stretch at ticks −
+// route, ≤ 0 unless long. No such slot: nothing could be done (cost ∞).
+// yBKPqGwHparm7Tk4 fight 5 (user, 2026-10-13):
+// - 6:04.5 Lance Barrage again instead of Spiral Blow: Power Surge off
+//   6:10.9-6:16.9 (~39k) + 3 ticks (~21k) − route (~37k) ≈ 23k.
+// - 3:06.4: Spiral there restores it only from ~3:07.1 and the DoT lands
+//   ~3:09.6, no tick before the check at 3:10.7: worth less than the route.
+const DOT_TICK_MS = 3_000;
+const SPIRAL_HIT_MS = 700;
+const POWER_SURGE_MS = 30_000;
+function drgPowerSurgeRefreshCost(ctx: PlayerCheckContext, fromMs: number, toMs: number): number {
+  const raiden = new Set(ids("RAIDEN_THRUST", "TRUE_THRUST"));
+  const barrage = new Set(ids("LANCE_BARRAGE", "VORPAL_THRUST"));
+  const uses = ctx.uses;
+  // Only a slot that broke the alternation (Lance Barrage after a Lance
+  // Barrage route) is a choice: Spiral Blow twice in a row to stretch
+  // Power Surge isn't something a Dragoon would be asked to do (3:05 here:
+  // Spiral 2:33.9, Lance Barrage 2:49.5 was the rotation; the second Lance
+  // Barrage at 3:06.4 was the choice). The first such slot that could have
+  // had it up in the stretch: before it, nothing could; after it, later
+  // slots keep it going.
+  const spiral = new Set(ids("SPIRAL_BLOW", "DISEMBOWEL"));
+  let prevRoute: "spiral" | "barrage" | undefined;
+  let slot: (typeof uses)[number] | undefined;
+  for (let i = 1; i < uses.length && !slot; i++) {
+    const u = uses[i];
+    if (!raiden.has(uses[i - 1].action.id)) continue;
+    const route = barrage.has(u.action.id) ? "barrage" : spiral.has(u.action.id) ? "spiral" : undefined;
+    if (!route) continue;
+    if (route === "barrage" && prevRoute === "barrage" && u.startMs < toMs && u.startMs + POWER_SURGE_MS >= fromMs) slot = u;
+    prevRoute = route;
+  }
+  if (!slot) return Infinity;
+  const psFrom = slot.startMs + SPIRAL_HIT_MS;
+  const early = psFrom > fromMs ? ctx.values.damageIn(fromMs, Math.min(psFrom, toMs)) * 0.1 : 0;
+  const route = drgSpiralRouteCost(ctx) + early;
+  const from = slot.startMs + ctx.baseGcdMs + SPIRAL_HIT_MS;
+  const evs = (ctx.pull.bossDebuffs ?? [])
+    .filter((e) => e.statusId === S.CHAOTIC_SPRING.id && e.sourceName === ctx.player.name)
+    .sort((a, b) => a.timestamp - b.timestamp);
+  const duration = S.CHAOTIC_SPRING.duration ?? 24_000;
+  const up: { startMs: number; endMs: number }[] = [];
+  let lastApply: number | undefined, open: number | undefined;
+  for (const e of evs) {
+    if (e.status === "removed") { if (open !== undefined) up.push({ startMs: open, endMs: e.timestamp }); open = lastApply = undefined; continue; }
+    if (open === undefined || (lastApply !== undefined && e.timestamp > lastApply + duration)) {
+      if (open !== undefined && lastApply !== undefined) up.push({ startMs: open, endMs: lastApply + duration });
+      open = e.timestamp;
+    }
+    lastApply = e.timestamp;
+  }
+  if (open !== undefined && lastApply !== undefined) up.push({ startMs: open, endMs: lastApply + duration });
+  const merged = mergeWindows(up);
+  const downMs = Math.max(0, toMs - Math.max(from, 0)) - merged.reduce((a, w) => a + Math.max(0, Math.min(w.endMs, toMs) - Math.max(w.startMs, from)), 0);
+  const ticks = ctx.player.damageDone.filter((e) => e.abilityId === S.CHAOTIC_SPRING.id && e.isDoT);
+  const avgTick = ticks.length ? ticks.reduce((a, e) => a + (e.amount ?? 0), 0) / ticks.length : 0;
+  return route - Math.floor(downMs / DOT_TICK_MS) * avgTick;
+}
+
 const chaoticSpring: JobCheck = (ctx) => dotFindings(ctx, {
   statusIds: [S.CHAOTIC_SPRING.id], name: S.CHAOTIC_SPRING.name, durationMs: S.CHAOTIC_SPRING.duration ?? 24_000,
   // Before a downtime or a passed check, Chaotic Spring means the Spiral
   // Blow route instead of Lance Barrage → Heavens' Thrust (yBKPqGwHparm7Tk4
   // fight 5 at 3:01: ~33k for 2 ticks).
   applyCost: (ctx) => drgSpiralRouteCost(ctx),
+  reapplyGcds: 2,   // Raiden Thrust, Spiral Blow
 });
 
 // Kunai's Bane, from xivanalysis KunaisBaneWindow.tsx: 7 GCDs, mudras not
@@ -653,6 +722,6 @@ const firstmindsFocus: JobCheck = (ctx) => {
   });
 };
 
-export const DRG_CHECKS: JobCheck[] = [uptime("POWER_SURGE", 0.1, "Power Surge is +10% (tooltip)", (ctx) => drgSpiralRouteCost(ctx)), lanceCharge, lifeSurge, chaoticSpring, firstmindsFocus];
+export const DRG_CHECKS: JobCheck[] = [uptime("POWER_SURGE", 0.1, "Power Surge is +10% (tooltip)", { cost: drgPowerSurgeRefreshCost, reapplyGcds: 1 }), lanceCharge, lifeSurge, chaoticSpring, firstmindsFocus];
 export const NIN_CHECKS: JobCheck[] = [kunaisBane, ninki, kazematoi];
 export const RPR_CHECKS: JobCheck[] = [enshroud, arcaneCircle, deathsDesign, harvestMoon, shroud, whorl];
