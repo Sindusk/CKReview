@@ -67,6 +67,8 @@ export type DamageGame = {
   patchOf?(pull: Pull): string | undefined;
   // Job gauges for the dialog's timeline (display only).
   jobGauges?(job: string): ((ctx: PlayerCheckContext) => GaugeTrack[])[];
+  // The player's tincture / potion windows, for the timeline (display only).
+  potWindows?(player: PlayerInfo, endMs: number): Window[];
   // Procs a job check handles itself (Viper's venoms, which only boost a
   // finisher): the generic proc check skips them.
   jobProcStatusIds?: Set<number>;
@@ -269,6 +271,9 @@ export type DamageFinding = {
   // cost. The dialog's strip marks these instead of the whole startMs–endMs
   // span, which can cover the pull, and its tooltip describes just the one.
   moments?:   Moment[];
+  // Where a timed use would go instead (a tincture moved to cover the raid
+  // buffs): drawn as a dashed box on the timeline, the played one at fromMs.
+  proposals?: { fromMs?: number; atMs: number; durationMs: number }[];
 };
 
 export type Moment = Window & { detail?: string; lostDamage?: number };
@@ -323,6 +328,8 @@ export type PlayerDamageSummary = {
     movement:    ForcedWindow[];   // DamageContext.movementWindows for this player
     // Job gauges simulated from casts (Sage's Addersgall), for display.
     gauges?:     GaugeTrack[];
+    // Tincture / potion windows as played (DamageGame.potWindows).
+    potWindows?: { startMs: number; endMs: number }[];
   };
 };
 

@@ -83,6 +83,8 @@ const KIND_LABEL: Record<DamageFinding["kind"], string> = {
 // Movement a mechanic required (DamageContext.movementWindows): blue, apart
 // from forced (grey) and counted (red).
 const MOVEMENT_COLOR = "#5b8def";
+// Tinctures on the timeline: played solid, a suggested move dashed.
+const POT_COLOR = "#b48cf2";
 
 const gameOf = (p: Pull) => (p.game === "wow" ? WOW_DAMAGE : FFXIV_DAMAGE);
 
@@ -562,7 +564,8 @@ function FindingRow({ f }: { f: DamageFinding }) {
 }
 
 // One horizontal strip over the analysed window: forced time shaded, raid
-// buff windows as a gold band, a tick per GCD, phase starts as dividers and
+// buff windows as a gold band, tinctures under it (suggested moves dashed),
+// a tick per GCD, phase starts as dividers and
 // each counted finding as a marker.
 const SPAN_MARK_MS = 10_000;
 
@@ -596,11 +599,23 @@ function TimelineStrip({ summary, analysis }: { summary: PlayerDamageSummary; an
           <div key={`b${i}`} title={`Raid buffs ${fmtTime(w.startMs)}–${fmtTime(w.endMs)}`}
             style={{ position: "absolute", top: 0, height: 5, left: pct(w.startMs), width: width(w.startMs, w.endMs), background: "var(--ck-gold-2)" }} />
         ))}
+        {/* Tinctures under the raid buffs: as played, and where the tincture
+            finding would move them (dashed, like the Tanking tab's proposals). */}
+        {(summary.timeline.potWindows ?? []).map((w, i) => (
+          <div key={`pot${i}`} title={`Tincture ${fmtTime(w.startMs)}–${fmtTime(w.endMs)}`}
+            style={{ position: "absolute", top: 6, height: 6, left: pct(w.startMs), width: width(w.startMs, w.endMs), background: POT_COLOR, opacity: 0.7 }} />
+        ))}
+        {summary.findings.filter((f) => f.kind === "tincture").flatMap((f, i) => (f.proposals ?? []).map((p, j) => (
+          <div key={`potp${i}-${j}`}
+            title={`Suggested tincture ${fmtTime(p.atMs)}–${fmtTime(p.atMs + p.durationMs)}${p.fromMs !== undefined ? ` (played ${fmtTime(p.fromMs)})` : ""}: ${f.detail}`}
+            style={{ position: "absolute", top: 6, height: 6, left: pct(p.atMs), width: width(p.atMs, p.atMs + p.durationMs),
+              border: `1px dashed ${POT_COLOR}`, boxSizing: "border-box" }} />
+        )))}
         {minutes.map((t) => (
           <div key={`m${t}`} style={{ position: "absolute", top: 0, bottom: 0, left: pct(t), width: 1, background: "var(--ck-line-2)" }} />
         ))}
         {summary.timeline.gcdStarts.map((t, i) => (
-          <div key={`g${i}`} style={{ position: "absolute", top: 9, bottom: 9, left: pct(t), width: 1, background: "var(--ck-text-3)", opacity: 0.6 }} />
+          <div key={`g${i}`} style={{ position: "absolute", top: 14, bottom: 8, left: pct(t), width: 1, background: "var(--ck-text-3)", opacity: 0.6 }} />
         ))}
         {analysis.phases.slice(1).map((p) => (
           <div key={`p${p.phaseId}-${p.startMs}`} title={p.name}
@@ -612,8 +627,10 @@ function TimelineStrip({ summary, analysis }: { summary: PlayerDamageSummary; an
             span painted the whole strip red (user, 2026-10-13). Nor are
             long spans: a finding without moments over SPAN_MARK_MS (a burst
             window, a cooldown's ready stretch, a summary) is one mark where
-            it starts, its span in the tooltip. */}
-        {summary.findings.filter((f) => !f.forced && !f.pullWide && f.lostDamage >= 1).flatMap((f, i) =>
+            it starts, its span in the tooltip. Tinctures aren't marked: a
+            gain not taken, shown in the tincture lane instead (user,
+            2026-10-13). */}
+        {summary.findings.filter((f) => !f.forced && !f.pullWide && f.lostDamage >= 1 && f.kind !== "tincture").flatMap((f, i) =>
           (f.moments ?? [{ startMs: f.startMs, endMs: f.endMs - f.startMs > SPAN_MARK_MS ? f.startMs : f.endMs }]).map((m, j) => (
             <div key={`x${i}-${j}`}
               title={`${fmtTime(m.startMs)}${!f.moments && f.endMs - f.startMs > SPAN_MARK_MS ? `–${fmtTime(f.endMs)}` : ""} ${m.detail ?? f.detail} (${fmtDamage(m.lostDamage ?? f.lostDamage)})`}
@@ -631,7 +648,7 @@ function TimelineStrip({ summary, analysis }: { summary: PlayerDamageSummary; an
         <span className="ck-num" style={{ position: "absolute", right: 0 }}>{fmtTime(total)}</span>
       </div>
       <div style={{ color: "var(--ck-text-3)", fontSize: 10, textAlign: "center" }}>
-        gold: raid buffs · shaded: forced · <span style={{ color: MOVEMENT_COLOR }}>blue: movement</span> · ticks: GCDs · red: counted losses
+        gold: raid buffs · <span style={{ color: POT_COLOR }}>violet: tinctures (dashed: suggested)</span> · shaded: forced · <span style={{ color: MOVEMENT_COLOR }}>blue: movement</span> · ticks: GCDs · red: counted losses
       </div>
     </div>
   );

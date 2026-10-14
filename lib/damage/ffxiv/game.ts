@@ -25,7 +25,7 @@ import { XIVA_ACTIONS, XIVA_STATUSES, type XivaAction } from "./xiva-data";
 import { TRACKED_COOLDOWNS } from "./tracked-cooldowns";
 import { JOB_CHECKS } from "./jobs";
 import { noDamageCasts } from "./jobs/shared";
-import { tincture } from "./jobs/tincture";
+import { tincture, tinctureWindows } from "./jobs/tincture";
 import { JOB_GAUGES } from "./jobs/gauges";
 import { patchOf } from "./patches";
 import { VPR_PROC_STATUS_IDS } from "./jobs/melee";
@@ -207,6 +207,7 @@ export const FFXIV_DAMAGE: DamageGame = {
   disengageActionIds: DISENGAGE_IDS,
   jobChecks: (job) => [...(JOB_CHECKS[job] ?? []), noDamageCasts, tincture],
   jobGauges: (job) => JOB_GAUGES[job] ?? [],
+  potWindows: tinctureWindows,
   patchOf,
   jobProcStatusIds: VPR_PROC_STATUS_IDS,
   procReplaces: PROC_REPLACES,

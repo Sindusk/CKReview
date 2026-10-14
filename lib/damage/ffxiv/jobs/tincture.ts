@@ -32,8 +32,12 @@
 //   buff. With fewer than BONUS_MIN_ABILITIES abilities, the party's median
 //   measured bonus, else BONUS_DEFAULT. dDar482XvFKBPJYh FRU kill (7.1,
 //   Grade 2 Gemdraughts): 4.8-6.4% for the six players with 7+ abilities.
-// - Lost = (best − actual) × bonus, and (best with one more − best) ×
-//   bonus for the extra tincture. Pulls with no tincture are skipped: in
+// - Lost = each kept move's gain × bonus, and (best with one more − best)
+//   × bonus for the extra tincture. A move is kept only when it covers
+//   MOVE_MIN_MS more raid buffs or less downtime; an extra tincture only
+//   when it adds EXTRA_MIN_BUFF_MS of raid buffs (user, 2026-10-13: moves
+//   that only won filler, or only gained because the pull ended, asked the
+//   player to predict the kill). Pulls with no tincture are skipped: in
 //   prog, not drinking is a choice about cost, not play.
 // Marked inference: it assumes the rotation would have been the same.
 
@@ -42,7 +46,7 @@ import type { Pull } from "@/types/Pull";
 import type { DamageFinding, DamageGame, JobCheck } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";
 import { estimateHitRates } from "../../crit-rates";
-import { inWindows, mergeWindows, type Window } from "../../timeline";
+import { inWindows, mergeWindows, overlapMs, type Window } from "../../timeline";
 import { XIVA_STATUSES as S } from "../xiva-data";
 import { k } from "./shared";
 
@@ -55,8 +59,11 @@ const EARLIEST_MS = -3_000;
 // 0:00.66, Medicated ~0:01.9) was credited from 0:01.0 and took the
 // Standard Finish hit at 0:01.33 it would have missed.
 const STEP_MS = 100;
-// Moves shorter than this aren't listed as moments.
-const MOVE_MIN_MS = 3_000;
+// A move must be at least this long and win at least this much raid-buff
+// coverage (or this much less downtime).
+const MOVE_MIN_MS = 2_000;
+const MOVE_MIN_SHIFT_MS = 3_000;
+const EXTRA_MIN_BUFF_MS = 10_000;
 const BONUS_MIN_ABILITIES = 5;
 const BONUS_DEFAULT = 0.05;
 const DH_MULT = 1.25;
@@ -283,32 +290,57 @@ export const tincture: JobCheck = (ctx: PlayerCheckContext): DamageFinding[] => 
   // What the player cast first in a window, to say where it would start.
   const firstCast = (ms: number) => ctx.player.casts.find((c) => c.timestamp >= ms && ctx.game.action(c.abilityId)?.onGcd)?.abilityName;
 
+  // A move is only suggested for a reason the player could plan for
+  // (user, 2026-10-13): the pot covers MOVE_MIN_MS more raid buffs, or
+  // MOVE_MIN_MS less downtime. Damage under a pot that ran past the kill
+  // isn't a reason (that asks the player to predict the kill: The Tyrant
+  // kill's 10:04 → 9:57), nor is filler that happened to land in a nearby
+  // off-burst stretch (5:10 → 5:08, ~3k).
+  const downtime = mergeWindows(ctx.forced.filter((w) => w.cause !== "dead"));
+  const spanOf = (bin: number) => [atMs(bin), Math.min(atMs(bin) + DURATION_MS, ctx.endMs)] as const;
+  const buffMs = (bin: number) => overlapMs(...spanOf(bin), ctx.buffWindows);
+  const downMs = (bin: number) => overlapMs(...spanOf(bin), downtime);
   if (best && best.total > actual) {
-    const moments = actualBins.map((b, i) => {
+    let moves = actualBins.map((b, i) => {
       const to = best.starts[i];
-      const gain = cover(to) - cover(b);
-      return { from: b, to, gain };
-    }).filter((m) => Math.abs(m.to - m.from) * STEP_MS >= MOVE_MIN_MS &&m.gain > Math.max(1, cover(m.from)) * MOVE_MIN_SHARE);
-    if (moments.length > 0) {
-      const lost = (best.total - actual) * bonus;
+      return { from: b, to, gain: cover(to) - cover(b), buffs: buffMs(to) - buffMs(b), down: downMs(b) - downMs(to) };
+    }).filter((m) => Math.abs(m.to - m.from) * STEP_MS >= MOVE_MIN_SHIFT_MS &&m.gain > Math.max(1, cover(m.from)) * MOVE_MIN_SHARE &&
+      (m.buffs >= MOVE_MIN_MS || m.down >= MOVE_MIN_MS));
+    // The kept moves must still respect the recast against the pots that
+    // stay where they were.
+    const startsIf = () => actualBins.map((b) => moves.find((m) => m.from === b)?.to ?? b).sort((a, b) => a - b);
+    while (moves.length && startsIf().some((s, i, all) => i > 0 && (s - all[i - 1]) * STEP_MS < RECAST_MS)) {
+      moves = moves.sort((a, b) => a.gain - b.gain).slice(1);
+    }
+    if (moves.length > 0) {
+      const lost = moves.reduce((a, m) => a + m.gain, 0) * bonus;
+      const why = (m: (typeof moves)[number]) => [
+        m.buffs >= MOVE_MIN_MS ? `${(m.buffs / 1000).toFixed(0)}s more raid buffs` : undefined,
+        m.down >= MOVE_MIN_MS ? `${(m.down / 1000).toFixed(0)}s less downtime` : undefined,
+      ].filter(Boolean).join(", ");
       out.push(finding(ctx, {
-        kind: "tincture", startMs: Math.max(0, windows[0].startMs), endMs: windows[windows.length - 1].endMs,
+        kind: "tincture", startMs: Math.max(0, atMs(moves[0].from)), endMs: atMs(moves[moves.length - 1].from) + DURATION_MS,
         forced: false, inference: true,
         label: "Tincture timing",
         lostDamage: lost,
-        basis: `${k(best.total)} vs ${k(actual)} damage under the tinctures (crit/DH luck removed, as played), × ${bonusBasis}`,
-        detail: `${windows.length === 1 ? "The tincture" : `${windows.length} tinctures`} at ${actualBins.map((b) => clock(atMs(b))).join(", ")}` +
-          ` covered ${k(actual)}; at ${best.starts.map((b) => clock(atMs(b))).join(", ")} they'd have covered ${k(best.total)}`,
-        moments: moments.map((m) => ({
+        basis: `the damage the moved tinctures would have covered over what they did (crit/DH luck removed, as played), × ${bonusBasis}; ` +
+          "only moves that cover more raid buffs or less downtime",
+        detail: moves.map((m) => `tincture at ${clock(atMs(m.from))} → ${clock(atMs(m.to))} (${why(m)})`).join("; "),
+        moments: moves.map((m) => ({
           startMs: Math.max(0, atMs(m.from)), endMs: Math.max(0, atMs(m.from)) + DURATION_MS,
           lostDamage: m.gain * bonus,
           detail: `tincture at ${clock(atMs(m.from))} (${k(cover(m.from))} under it) → ${clock(atMs(m.to))}` +
-            `${firstCast(atMs(m.to)) ? `, before ${firstCast(atMs(m.to))}` : ""} (${k(cover(m.to))})`,
+            `${firstCast(atMs(m.to)) ? `, before ${firstCast(atMs(m.to))}` : ""} (${k(cover(m.to))}): ${why(m)}`,
         })),
+        proposals: moves.map((m) => ({ fromMs: atMs(m.from), atMs: atMs(m.to), durationMs: DURATION_MS })),
       }));
     }
   }
-  if (best && more && more.total > best.total) {
+  // Another tincture only when it would have covered half a burst more of
+  // raid buffs: room "for a second pot at 4:29" in a pull that wiped at
+  // 4:40 asks the player to foresee the wipe.
+  const buffsOf = (p: Placement) => p.starts.reduce((a, b) => a + buffMs(b), 0);
+  if (best && more && more.total > best.total && buffsOf(more) - buffsOf(best) >= EXTRA_MIN_BUFF_MS) {
     const gain = more.total - best.total;
     out.push(finding(ctx, {
       kind: "tincture", startMs: Math.max(0, atMs(more.starts[0])), endMs: Math.max(0, atMs(more.starts[0])) + DURATION_MS,

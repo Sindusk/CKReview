@@ -167,6 +167,7 @@ export function analyzePullDamage(
         forced: forced.filter((w) => w.startMs < endMs),
         movement,
         gauges: (game.jobGauges?.(job) ?? []).flatMap((g) => g(ctx)),
+        potWindows: game.potWindows?.(player, endMs).filter((w) => w.startMs < endMs),
       },
     });
   }
