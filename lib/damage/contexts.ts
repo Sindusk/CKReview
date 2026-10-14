@@ -6,6 +6,7 @@
 import type { DamageContext } from "./types";
 import { DANCING_MAD_DAMAGE_CONTEXT } from "../mechanics/ffxiv/dancingmad/damage-context";
 import { FRU_DAMAGE_CONTEXT } from "../mechanics/ffxiv/fru/damage-context";
+import { TYRANT_DAMAGE_CONTEXT } from "../mechanics/ffxiv/arcadion/tyrant-damage-context";
 import { LINDWURM_DAMAGE_CONTEXT } from "../mechanics/ffxiv/arcadion/lindwurm-damage-context";
 import { ENTOMBED_SENTINELS_DAMAGE_CONTEXT } from "../mechanics/wow/va/entombed-sentinels-damage-context";
 import { VASHNIK_DAMAGE_CONTEXT } from "../mechanics/wow/va/vashnik-damage-context";
@@ -20,6 +21,7 @@ import { ULATEK_DAMAGE_CONTEXT } from "../mechanics/wow/va/ulatek-damage-context
 const CONTEXTS: Record<string, DamageContext> = {
   "Dancing Mad": DANCING_MAD_DAMAGE_CONTEXT,
   "Futures Rewritten": FRU_DAMAGE_CONTEXT,
+  "The Tyrant": TYRANT_DAMAGE_CONTEXT,
   "Lindwurm": LINDWURM_DAMAGE_CONTEXT,
   // The Venomous Abyss (WoW)
   "Entombed Sentinels":      ENTOMBED_SENTINELS_DAMAGE_CONTEXT,
