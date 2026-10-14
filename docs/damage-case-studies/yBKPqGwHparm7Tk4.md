@@ -81,6 +81,19 @@ Dragoon's POV (Sayacissa Morsaelth). No xivanalysis page.
     10k. Across the FF samples 937 → 865 DoT findings, mostly healer DoTs
     just before downtime dropping or shrinking.
 
+- **Dragoon Piercing Talons 4:19.4 / 4:32.0 and Chaotic Spring 4:21
+  (user: back of a Forsaken tower, out of melee).** Holds. Its soaks:
+  4:10.5 Stack inner 5.5y (kept melee), 4:19.9 Spread outer 10.9y, 4:31.0
+  Cone flare 10.4y; a Talon at each outer soak. The Paladin's three
+  outer soaks (10.3-10.7y) line up with its ranged GCDs. The Talon at
+  4:19.4 pushed Raiden → Spiral → Chaotic a GCD: Chaotic 4:24.5 instead
+  of ~4:21.9. **Built (user: Movement, not forced):** Dancing Mad
+  `movementWindows`, a melee player's Path of Light soak at r ≥ 9y, from
+  2.5s before to 1.5s after. `checkDisengages` reads a ranged GCD inside a
+  movement window as movement; `dotFindings` reads a DoT gap that is
+  within grace but for such GCDs as movement. Dragoon: both Talons, 4:21
+  and 4:48 Chaotic Spring gaps → movement (56k).
+
 ## Next
 
 - Ask the user what the 8:47-8:54 mechanic is and whether it forces

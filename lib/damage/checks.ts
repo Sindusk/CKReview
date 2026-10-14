@@ -326,6 +326,17 @@ export function checkDisengages(ctx: PlayerCheckContext): DamageFinding[] {
         : shared.length > 0 ? { ms: 1, cause: `${[...new Set(shared.map((d) => d.player))].join(", ")} out of reach too` }
         : window;
       const during = ctx.mechanicAround(u.startMs, u.startMs);
+      // A mechanic's movement window took the player out of reach
+      // (Dancing Mad's outer Forsaken spots): movement, not a loss.
+      const moving = window.ms > 0 ? undefined
+        : (ctx.movement ?? []).find((w) => u.startMs >= w.startMs && u.startMs <= w.endMs);
+      if (moving) return finding(ctx, {
+        kind: "disengage", startMs: u.startMs, endMs: u.startMs, forced: true, movement: true, cause: moving.cause,
+        label: `${u.abilityName} during ${moving.cause}`,
+        lostDamage: Math.max(0, value - own),
+        basis: `${k(value)} average GCD − ${k(own)} average ${u.abilityName}`,
+        detail: `${u.abilityName} instead of a melee GCD`,
+      });
       return finding(ctx, {
         kind: "disengage", startMs: u.startMs, endMs: u.startMs,
         forced: forced.ms > 0, cause: forced.ms > 0 ? forced.cause : during ? `during ${during}` : undefined,

@@ -52,6 +52,21 @@ const RULE_KEY_LABELS: Record<string, string> = {
 // with the AoE combo before the downtime).
 const HP_CHECKS: Record<number, number> = { 1: 0.15, 2: 0, 4: 0.25 };
 
+// Forsaken (P2) movement: a soak at an outer tower spot (Spread "outer",
+// Cone "flare": r ~10-11y, forsaken.ts "Phase 2: positioning") is out of
+// melee reach of Kefka at the arena center; inner and on-tower spots
+// (r ~5-7y) are not. yBKPqGwHparm7Tk4 fight 5: the Dragoon's Piercing
+// Talons at 4:19.4 and 4:32.0 were its two outer soaks (10.9y, 10.4y; its
+// 5.5y Stack soak at 4:10.5 kept melee), the Paladin's ranged GCDs at
+// 10.3-10.8y were its three. The user (2026-10-13) files this under
+// Movement, not forced. Melee only; from a GCD before the resolution (the
+// walk out) to 1.5s after it (the plant fires, then the walk back).
+const PATH_OF_LIGHT = 47806;          // the tower soak tick on the soaker
+const ARENA = { x: 10000, y: 10000 };
+const FAR_SPOT_MIN = 900;             // past the r=800 tower ring
+const FORSAKEN_BEFORE_MS = 2_500;
+const FORSAKEN_AFTER_MS = 1_500;
+
 const EARTHQUAKE = 47866;          // Stompies' start marker when Kefka casts it
 const STOMPIES_BAIT = 47887;       // Exdeath's Blizzard III bait, Stompies wave 1
 const MARKER_LOOKBACK_MS = 15_000;
@@ -92,5 +107,14 @@ export const DANCING_MAD_DAMAGE_CONTEXT: DamageContext = {
     }
     return out;
   },
+  movementWindows: (pull) => pull.players
+    .filter((p) => p.rangeType === "Melee")
+    .flatMap((p) => p.damageTaken
+      .filter((e) => e.abilityId === PATH_OF_LIGHT && e.x !== undefined && e.y !== undefined
+        && Math.hypot(e.x - ARENA.x, e.y - ARENA.y) >= FAR_SPOT_MIN)
+      .map((e) => ({
+        startMs: e.timestamp - FORSAKEN_BEFORE_MS, endMs: e.timestamp + FORSAKEN_AFTER_MS,
+        cause: "Forsaken: outer tower spot", players: [p.name],
+      }))),
   mechanicLabel: (key) => mechanicLabelForKey(key) ?? RULE_KEY_LABELS[key],
 };

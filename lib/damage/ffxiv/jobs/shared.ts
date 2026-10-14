@@ -775,7 +775,26 @@ export function dotFindings(ctx: PlayerCheckContext, spec: DotSpec): DamageFindi
       // after it (5.0s), which the plain grace read as lost (user, 2026-10-13).
       // One GCD per paired DoT, however many enemies it went on.
       const firsts = new Set(pairedApplies.filter((e) => e.timestamp >= cursor && e.timestamp < w.startMs).map((e) => e.statusId)).size;
-      const tailMs = tail >= grace + firsts * ctx.baseGcdMs ? tail : 0;
+      // A ranged GCD forced by a mechanic's movement (Dancing Mad's outer
+      // Forsaken spots) pushed the combo that re-applies the DoT back a GCD:
+      // yBKPqGwHparm7Tk4 fight 5, Dragoon's Piercing Talon 4:19.4 → Chaotic
+      // Spring 4:24.5 instead of 4:21.9 (user, 2026-10-13). That lateness
+      // is movement, not a loss.
+      const moveGcds = (ctx.uses ?? []).filter((u) => ctx.game.disengageActionIds.has(u.action.id)
+        && u.startMs >= cursor - spec.durationMs && u.startMs < w.startMs);
+      const moveWin = moveGcds.map((u) => (ctx.movement ?? []).find((m) => u.startMs >= m.startMs && u.startMs <= m.endMs)).filter(Boolean)[0];
+      const moveCount = moveGcds.filter((u) => (ctx.movement ?? []).some((m) => u.startMs >= m.startMs && u.startMs <= m.endMs)).length;
+      const needed = grace + firsts * ctx.baseGcdMs;
+      if (moveWin && tail >= needed && tail < needed + moveCount * ctx.baseGcdMs) {
+        out.push(finding(ctx, {
+          kind: "dot-uptime", startMs: cursor, endMs: w.startMs, forced: true, movement: true, cause: moveWin.cause,
+          label: `${spec.name} off the boss`,
+          lostDamage: (tail / DOT_TICK_MS) * avgTick,
+          basis: `${s(tail)} ÷ 3s ticks × ${k(avgTick)} average tick; within a GCD of on time but for ${moveCount} ranged GCD${moveCount > 1 ? "s" : ""} in ${moveWin.cause}`,
+          detail: `${spec.name} wasn't on the boss for ${s(tail)}`,
+        }));
+      }
+      const tailMs = tail >= needed + (moveWin ? moveCount * ctx.baseGcdMs : 0) ? tail : 0;
       const len = tailMs + cutMs;
       const lost = (tailMs / DOT_TICK_MS) * avgTick + cut;
       if (lost > 0) {
