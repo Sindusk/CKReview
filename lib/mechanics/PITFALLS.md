@@ -170,6 +170,32 @@ philosophy and the data semantics this list assumes.
 - **Name the takers when a stack goes elsewhere.** One player alone under
   it while most stood elsewhere is the stack leaving the group (The
   Tyrant).
+- **One bait per player pairs casts with players one-to-one.** Lindwurm's
+  Act 1 cones each cast from their owner's spot. Players stacked together
+  are all "on" several casts. A least-total-distance pairing, where no cast
+  can own a player it hit, still splits them; interpolated positions were
+  0.2-0.5y loose (user ruling). The casts also carry the owner's facing
+  (`sourceResources.facing`). Players' own facing isn't logged near the
+  cast.
+- **Waiting in the center is a duty too.** A player away from the center
+  when it isn't their turn confuses the pair that is resolving (Minor). A
+  chain that explodes on the players waiting there is the breaker's alone
+  (Lindwurm Act 2, user ruling).
+- **A wrong-island launch owns its spread overlaps.** Once the off-spot
+  launcher is named, the players on that island who caught the spread
+  aren't (Lindwurm Act 3, user ruling).
+- **A stack taken away from a waiting group names its holder.** When the
+  "absent" players stood together on their spot, the stack-marked player was
+  the one who left (Lindwurm Act 1, Lindwurm II Idyllic, user rulings).
+- **A bait nobody took names the player who owed it.** The bait retargets
+  onto whoever is nearest, so don't name the player it landed on (Lindwurm
+  II's Rep1 second-set darks, Mortal Slayer).
+- **Checkpoint resets aren't pulls.** After a phase kill, groups pull the
+  next phase and die on purpose to reset cooldowns. A death before the
+  phase's opening raidwide marks it (Lindwurm II).
+- **Both healers dead with no Red Mage or Summoner ends any FFXIV pull**
+  (user, 2026-10-14). The rule is in `ffxiv/common.ts`, so boss modules
+  don't repeat it.
 - **A shared cone is its baiter's.** A cone hits its own baiter, so in a
   shared one the player hit by nothing else aimed it; the doubled players
   were in their spots (Usurper of Frost's Mirror, Mirror, user ruling).

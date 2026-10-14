@@ -109,7 +109,10 @@
 //   Resistance Down the player already held names them (and, in the
 //   description, whose targeted dark it was). In the second set, a fire
 //   taken alone that killed names the living players who took no element
-//   (Major), not the lone taker.
+//   (Major), not the lone taker. A second-set dark on a dark-hit player who
+//   also took their fire had no bait: the fire-hit or unhit player who took
+//   no dark is named ("Missed Their Dark Bait"), not the fire pair it fell
+//   on (unless already named for that set).
 // ffxiv-lw2-contact (Major): a broken Blood Wakening wave names the
 //   cast-targeted Bloody Burst contact; that wave's shape hits on the others
 //   aren't errors.
@@ -146,6 +149,15 @@
 // expectations/rulings.json. Left unruled (the user couldn't tell): D4 6:05
 // no-killing-blow, D6 6:18 and D8 6:17 defams, D12 2:09 proteans and jump,
 // D13 2:19 (pull already over), D14 2:16 Rep2 stacks (tethers taken wrong).
+// VOD review 2026-10-14 (user): report A pulls 12 and 16, plus the post-kill
+// reset logged as "Lindwurm" Pull 33, rulings in expectations/rulings.json.
+// Left unruled: A12's fire pair (correct or not is unknown), A14 1:02 (the
+// ranged were wrong somehow; the camera didn't show how).
+// ffxiv-lw2-reset (Raid, player-less): any death before the first Arcadia
+//   Aflame is the tactical reset after a Lindwurm kill (pull Lindwurm II,
+//   walk into the wall to get resources back); the pull gets nothing else.
+//   B4, C2, A33 and the first Lindwurm II pull of two later reports.
+// Both healers dead is a cutoff for every FFXIV fight (ffxiv/common.ts).
 // Exposure (rule-meta.ts): -finisher targets the non-tanks, -contact the
 // solo contact; the rest everyone. The Damage Down causes are excluded from ffxiv-damage-down
 // (error-rules.ts).
@@ -574,6 +586,8 @@ export const LW2_MASS_DEATH_RULE_ID  = "ffxiv-lw2-mass-death";
 export const LW2_ENRAGE_RULE_ID      = "ffxiv-lw2-enrage";
 export const LW2_COLLAPSE_RULE_ID    = "ffxiv-lw2-collapse";
 export const LW2_CALLED_WIPE_RULE_ID = "ffxiv-lw2-called-wipe";
+export const LW2_RESET_RULE_ID       = "ffxiv-lw2-reset";
+const ARCADIA_AFLAME = 46376; // P2's opening raidwide, ~0:16 after engage
 
 // ── log IDs (see VERIFIED AGAINST LOGS) ─────────────────────────────────────
 
@@ -960,12 +974,42 @@ function detectElements(players: PlayerInfo[], life: Life, casts: EnemyEvent[]):
     // Only when the lone taker died: a tank soloing a fire under mitigation
     // survived it 13 times in report B.
     const died = lone.filter((p) => { const d = life.diedFrom(p, t); return d && d.killingAbilityGameId === TOP_TIER_SLAM; });
+    const named = new Set<PlayerInfo>();
     if (died.length && idle.length) {
       for (const p of idle) {
+        named.add(p);
         errors.push(playerError(p, {
           ruleId: LW2_ELEMENT_RULE_ID, severity: "Major", name: "Missed Their Element",
           description: `Took neither fire nor dark in Replication 1's second set while ${namesOf(died)} took a Top-Tier Slam alone and died. Every player takes one element in the second set: the dark-hit players pair up for the two fires.`,
           timestamp: t, abilityId: TOP_TIER_SLAM, abilityName: "Top-Tier Slam",
+        }));
+      }
+    }
+    // A second-set dark is a bait the fire-hit and unhit players owe. When a
+    // dark-hit player who took their fire was also hit by a dark, that dark
+    // had no bait: the player who owed one and took none is named, not the
+    // fire pair it fell on (user, 2026-10-14, A12 1:02: the PCT wasn't north on
+    // A to bait it, so it retargeted the PLD and RPR).
+    const took = (s: Hit[], p: PlayerInfo, id: number) => s.some((h) => h.p === p && h.e.abilityId === id);
+    const caught = players.filter((p) => took(sets[0], p, MIGHTY_MAGIC) && took(set2, p, TOP_TIER_SLAM) && took(set2, p, MIGHTY_MAGIC));
+    const repeated = new Set(errors.filter((e) => e.timestamp >= t - 500).map((e) => e.player));
+    const skipped = players.filter((p) => !took(sets[0], p, MIGHTY_MAGIC) && !took(set2, p, MIGHTY_MAGIC) &&
+      life.hitAlive(p, t) && !inRaiseGrace(life, p, t) && !inAvoidable(p, t));
+    if (caught.length && skipped.length) {
+      const caughtNames = new Set(caught.map((p) => p.name));
+      for (let i = errors.length - 1; i >= 0; i--) {
+        const e = errors[i];
+        if (caughtNames.has(e.player!) && e.abilityId === MIGHTY_MAGIC && e.timestamp >= t - 500) errors.splice(i, 1);
+      }
+      const dead = caught.filter((p) => !!life.diedFrom(p, set2[set2.length - 1].e.timestamp));
+      for (const p of skipped) {
+        // Already named for this set (a lone fire, a repeat): that error covers it.
+        if (named.has(p) || repeated.has(p.name)) continue;
+        const first = took(sets[0], p, TOP_TIER_SLAM) ? "a fire" : "no element";
+        errors.push(playerError(p, {
+          ruleId: LW2_ELEMENT_RULE_ID, severity: dead.length ? "Major" : "Minor", name: "Missed Their Dark Bait",
+          description: `Took ${first} in Replication 1's first set, so they owed a dark bait in the second, but took ${took(set2, p, TOP_TIER_SLAM) ? "a fire" : "nothing"} instead. The unbaited dark retargeted onto ${namesOf(caught)}, who already held Dark Resistance Down II.${dead.length ? ` ${namesOf(dead)} died.` : ""} The fire-hit and unhit players each stand on their dark clone's spot in the second set.`,
+          timestamp: t, abilityId: MIGHTY_MAGIC, abilityName: "Mighty Magic",
         }));
       }
     }
@@ -1409,6 +1453,19 @@ export function detectLindwurm2Errors(
 ): PullError[] {
   if (!enemyCasts.some((c) => SIGNATURE.includes(c.abilityId))) return [];
   const life = buildLife(players, deathEvents);
+  // The pull right after a Lindwurm kill is a tactical reset: the group
+  // pulls Lindwurm II and walks into the wall to get resources and cooldowns
+  // back for the checkpoint. Not an error for anyone (user, 2026-10-14, A33:
+  // deaths from 0:14, P2's Arcadia Aflame only at 1:37). Any death before
+  // the first Arcadia Aflame marks it; a real pull has none (every pull of
+  // reports A-E).
+  const aflame = castsOf(enemyCasts, ARCADIA_AFLAME)[0]?.timestamp ?? Infinity;
+  const early = deathEvents.filter((d) => d.timestamp - DEATH_EVENT_LAG_MS < aflame).sort((a, b) => a.timestamp - b.timestamp);
+  if (early.length) {
+    return [raidMarker(LW2_RESET_RULE_ID, "Checkpoint Reset",
+      `${early[0].player} died before Lindwurm II's opening Arcadia Aflame: the group reset the checkpoint to get resources and cooldowns back. Not an error.`,
+      early[0].timestamp - DEATH_EVENT_LAG_MS, 0, "Deaths")];
+  }
   // Esoteric Finisher tests the non-tanks (staying out of it) whenever both
   // tanks hold enmity.
   for (const res of clusterByGap(hitsOf(players, life, ESOTERIC_FINISHER), (h) => h.e.timestamp, 1500)) {

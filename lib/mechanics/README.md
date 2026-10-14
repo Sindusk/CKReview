@@ -25,6 +25,8 @@ lib/mechanics/
   ffxiv/
     roles.ts                  — MT/OT/H1/H2/M1/M2/R1/R2 party-role detector (MT = the
                                 boss's first auto-attack target)
+    common.ts                 — general rules for every FFXIV fight, run once per pull
+                                after the boss modules (both healers dead with no raiser)
     dancingmad/               — Dancing Mad (Kefka's Return) ultimate
       phase1.ts               — Phase 1 rules (Blizzard III, Tele-Trouncing, Confetti, ...)
       wave-cannon.ts          — Phase 1 Wave Cannon beams + towers

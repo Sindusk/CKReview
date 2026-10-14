@@ -314,6 +314,22 @@ const MECHANICS = {
     },
   },
 
+  // General rules for every FFXIV fight (lib/mechanics/ffxiv/common.ts). The
+  // kill flag comes from meta.json's fights, in per-boss order. Deaths are
+  // whole in a late capture, so it runs there too.
+  'ff-common': {
+    game: 'ff',
+    lateCapture: true,
+    load: () => requireTsFromRoot('lib/mechanics/ffxiv/common.ts'),
+    run({ mod, ctxs, meta }) {
+      const fights = meta.fights ?? meta.report?.fights ?? [];
+      for (const c of ctxs) {
+        const kill = !!fights.filter((f) => f.name === c.bossName)[c.pullNumber - 1]?.kill;
+        printPullErrors(c, mod.detectFFCommonErrors(c.relPlayers(), c.relDeaths(), kill));
+      }
+    },
+  },
+
   'lindwurm-2': {
     game: 'ff',
     load: () => requireTsFromRoot('lib/mechanics/ffxiv/arcadion/lindwurm-2.ts'),

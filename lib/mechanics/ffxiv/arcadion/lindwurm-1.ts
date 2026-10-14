@@ -11,7 +11,12 @@
 // A23 +2:33 (report letter, pull, mm:ss from pull start):
 //   A = QwNrFkGZ4m1yKpXC (90 wipes, furthest 7:01),
 //   B = H9fnVZgPA3krpCzY (first kill B3, 7:17; 4 enrages),
-//   C = vFY7kHVWK19ZQ24A (kill C1, 7:13).
+//   C = vFY7kHVWK19ZQ24A (kill C1, 7:13),
+//   D = AYQm9Kd8Ct4FxcGp (32 wipes, kill D32; D33 is the Lindwurm II reset
+//       logged under this name, which lindwurm-2.ts owns).
+// Hemorrhagic Projection casts carry the owner's facing
+// (sourceResources.facing), but players' own facing isn't logged near the
+// cast, so ownership comes from the cast positions (D, 2026-10-14).
 // B4 and C2 are Lindwurm II checkpoint stubs logged under this fight's name
 // (Refreshing Overkill at +0:01, then a reset): no signature cast, no errors.
 // Slots (user): roles.ts as-is. The Act 2 alpha/beta split was NOT by role
@@ -95,9 +100,12 @@
 // ffxiv-lw1-avoidable (Major on Damage Down or death, else Minor): AVOIDABLE.
 //   Ravenous Reach on a Rotting Flesh holder is the cleanse, not an error.
 // ffxiv-lw1-cone: a Hemorrhagic Projection cone that hit someone names the
-//   players standing on its cast (CONE_OWNER_MAX), never a victim; pairs
-//   standing together are both named; no position = player-less Minor.
-//   Major when a victim died.
+//   players standing on its cast (CONE_OWNER_MAX), never a victim. Players
+//   standing together are split by pairing every cast one-to-one with the
+//   players on them (least total distance; D18: the PLD's cast 0.3y from him,
+//   the stacked healers' 0.2-0.5y); still tied = all named; no position =
+//   player-less Minor. Major when a victim died within 3s (to the cone or
+//   their own spread on top of it).
 // ffxiv-lw1-orb / -overlap / -chain-clip (Major if anyone involved died to
 //   it): one-bait-per-player families (PERSONAL). A player hit by another
 //   player's instance or by two names the victim and the owner (cast target,
@@ -105,9 +113,19 @@
 //   Orbs only with all eight alive; the four waves count as one resolution;
 //   players who baited no orb and tanks hit by a green are named instead of
 //   whoever caught the leftovers (mortalSlayerBlame). Split Scourge: a tank
-//   whose line hit non-tanks is named alone.
+//   whose line hit non-tanks is named alone. Act 2 chain clips: the breaker
+//   whose explosion hit players of other lines is named alone (Major: the
+//   Magic Vulnerability Up makes their next tower lethal); victims within
+//   ACT2_CENTER of the center aren't named, those elsewhere stay candidates.
+//   Spread overlaps another rule already blames (Act 1 stack taken away,
+//   Act 3 launch off its spot) aren't repeated.
+// ffxiv-lw1-chain-clip "Left the Center Out of Turn" (Minor): at the first
+//   chain break an In Line II or IV player more than ACT2_CENTER out.
 // ffxiv-lw1-stack (Major): a Fusion stack that killed someone names living
-//   eligible players more than 6y away; skipped with 3+ dead.
+//   eligible players more than 6y away; skipped with 3+ dead. Act 1: when
+//   those absent players stood together (STACK_GROUP_MAX) and the Shared
+//   Grotesquerie holder was more than 6y from them, the holder took it away
+//   and is named instead.
 // ffxiv-lw1-buster: a non-tank in Visceral Burst with both tanks up.
 // ffxiv-lw1-chain (Major on Damage Down/death): Dramatic Lysis 46261 pulses
 //   on an Act 2 pair name the partner who connected far from the center
@@ -128,6 +146,11 @@
 //   over within 45s): Raid, only before any other Raid.
 // VOD review 2026-10-12 (user): report A pulls 8, 25, 35, 50, 69, 74, 76,
 // 85, 90, rulings in expectations/rulings.json.
+// VOD review 2026-10-14 (user): report D = AYQm9Kd8Ct4FxcGp (33 pulls, kill
+// D32 7:17) pulls 1, 7, 8, 11, 13, 18, 32, 33, rulings in
+// expectations/rulings.json. Left unruled (the user couldn't tell): D18's
+// cone on the SGE (named on the AST by the pairing), D8's other mistakes.
+// Both healers dead is a cutoff for every FFXIV fight (ffxiv/common.ts).
 // Exposure (rule-meta.ts): -buster targets the non-tanks, -chain each
 // Unbreakable pair, -tower each tower's In Line soaker; the rest everyone.
 // The Damage Down causes are excluded from ffxiv-damage-down (error-rules.ts).
@@ -448,7 +471,6 @@ export const LW1_FALL_RULE_ID        = "ffxiv-lw1-fall";
 export const LW1_ENRAGE_RULE_ID      = "ffxiv-lw1-enrage";
 export const LW1_COLLAPSE_RULE_ID    = "ffxiv-lw1-collapse";
 export const LW1_CALLED_WIPE_RULE_ID = "ffxiv-lw1-called-wipe";
-
 // ── log IDs (see VERIFIED AGAINST LOGS) ─────────────────────────────────────
 
 // Grotesquerie: Act 1/2/3/Curtain Call, Mortal Slayer, The Fixer.
@@ -607,6 +629,18 @@ const LAUNCH_SPOTS = [
   [11070, 11400], [8912, 10612], [11913, 10628], [8111, 9414], [11872, 8625], [8891, 8636], [11096, 9396], [8101, 11396],
 ];
 const LAUNCH_OFF_SPOT = 350;
+// Act 2: a player waiting for their turn stands dead center. At the first
+// chain break (In Line I) the In Line II and IV players stood 0-3.9y from the
+// center in every pull of report D but one, the kill included; In Line III
+// pre-positions on its towers. A waiting player this far out left early (user,
+// 2026-10-14, D1 +2:31: the DRK 8.8y out confused the breaking pair), and a
+// chain explosion on players inside it is the breaker's alone (the PCT and
+// SGE at 5.3y / 0.1y).
+const ACT2_CENTER        = 600;
+// Players waiting together on the Act 1 stack corner: within this of their
+// centroid (D8's three supports: 2.4y at most; a whole clean stack ~4y).
+const STACK_GROUP_MAX    = 600;
+const SHARED             = 1004762; // Shared Grotesquerie: the Act 1 stack's center
 
 // ── shared helpers ──────────────────────────────────────────────────────────
 
@@ -753,6 +787,38 @@ function detectCones(players: PlayerInfo[], life: Life, casts: EnemyEvent[]): Pu
   const coneCasts = castsOf(casts, HEMORRHAGIC);
   for (const res of clusterByGap(hitsOf(players, life, HEMORRHAGIC), (h) => h.e.timestamp, 1500)) {
     const t = res[0].e.timestamp;
+    // Every player has a cone, so the casts pair one-to-one with the players
+    // standing on them (least total distance; a cone never hits its own
+    // player). That splits candidates stacked together, whose interpolated
+    // positions are ~0.2-0.5y loose (user, 2026-10-14, D18 +1:29: the PLD faced
+    // the boss and his cone hit the DNC).
+    const wave = coneCasts.filter((x) => x.timestamp <= t + 200 && x.timestamp >= t - 3000 && x.x !== undefined && x.y !== undefined);
+    const victimsOf = (inst: number | undefined) => res.filter((h) => h.e.sourceInstance === inst).map((h) => h.p);
+    const options = wave.map((c) => players.flatMap((p) => {
+      if (!life.hitAlive(p, c.timestamp) || victimsOf(c.sourceInstance).includes(p)) return [];
+      const q = positionAt(p, c.timestamp);
+      const d = q ? Math.hypot(q.x - c.x!, q.y - c.y!) : Infinity;
+      return d <= CONE_OWNER_MAX ? [{ p, d }] : [];
+    }));
+    let best: { cost: number; pick: (PlayerInfo | undefined)[] } = { cost: Infinity, pick: [] };
+    const pick: (PlayerInfo | undefined)[] = [];
+    const used = new Set<PlayerInfo>();
+    const search = (i: number, cost: number) => {
+      if (cost >= best.cost) return;
+      if (i === wave.length) { best = { cost, pick: [...pick] }; return; }
+      for (const o of options[i]) {
+        if (used.has(o.p)) continue;
+        used.add(o.p); pick[i] = o.p;
+        search(i + 1, cost + o.d);
+        used.delete(o.p);
+      }
+      // A cast nobody fresh stood on (stale position) stays unmatched.
+      pick[i] = undefined;
+      search(i + 1, cost + CONE_OWNER_MAX);
+    };
+    search(0, 0);
+    const matched = new Map<number | undefined, PlayerInfo>();
+    wave.forEach((c, i) => { const p = best.pick[i]; if (p) matched.set(c.sourceInstance, p); });
     const byInst = new Map<number, Hit[]>();
     for (const h of res) if (h.e.sourceInstance !== undefined) byInst.set(h.e.sourceInstance, [...(byInst.get(h.e.sourceInstance) ?? []), h]);
     // Victims grouped by the owner candidates of the cones that hit them.
@@ -766,8 +832,12 @@ function detectCones(players: PlayerInfo[], life: Life, casts: EnemyEvent[]): Pu
           const q = positionAt(p, c.timestamp);
           return q && Math.hypot(q.x - c.x!, q.y - c.y!) <= CONE_OWNER_MAX;
         });
+        const m = matched.get(inst);
+        if (owners.length > 1 && m && owners.includes(m)) owners = [m];
       }
-      const killed = victims.filter((p) => life.diedFrom(p, t)?.killingAbilityGameId === HEMORRHAGIC);
+      // A victim who died right after it (to the cone or their own spread on
+      // top of it) died of the cone (D18: the DNC).
+      const killed = victims.filter((p) => !!life.diedFrom(p, t));
       const k = owners.map((p) => p.name).sort().join("+");
       const cur = byOwner.get(k) ?? { owners, victims: [], killed: [] };
       cur.victims.push(...victims);
@@ -803,11 +873,19 @@ function detectCones(players: PlayerInfo[], life: Life, casts: EnemyEvent[]): Pu
  * victim and, when known, the owner (README philosophy 3: both are
  * candidates).
  */
-function detectPersonalOverlaps(players: PlayerInfo[], life: Life, casts: EnemyEvent[]): PullError[] {
+/**
+ * A player another rule already named as the cause of a spread overlap (the
+ * stack taken away, a launch off the usual spot): the overlap group they're
+ * in is theirs, so its other members aren't named.
+ */
+type Culprit = { ids: number[]; t: number; p: PlayerInfo };
+
+function detectPersonalOverlaps(players: PlayerInfo[], life: Life, casts: EnemyEvent[], a2: Act2 | undefined, culprits: Culprit[]): PullError[] {
   const errors: PullError[] = [];
   for (const fam of PERSONAL) {
     for (const res of clusterByGap(hitsOf(players, life, fam.ids), (h) => h.e.timestamp, fam.gap ?? 1500)) {
       const t0 = res[0].e.timestamp, t1 = res[res.length - 1].e.timestamp;
+      const act2Clip = fam.ruleId === LW1_CHAIN_CLIP_RULE_ID && !!a2 && t0 > a2.t0 && t0 < a2.t0 + 60_000;
       if (fam.proximity && players.some((p) => !life.hitAlive(p, t0))) continue;
       // Instances that also hit someone in raise grace are that player's
       // bait drawn from where they were raised: drop them.
@@ -889,6 +967,37 @@ function detectPersonalOverlaps(players: PlayerInfo[], life: Life, casts: EnemyE
         });
         const severity = killed.length ? "Major" : "Minor";
         const deathText = killed.length ? ` ${namesOf(killed)} died.` : "";
+        if (culprits.some((c) => c.ids.some((id) => fam.ids.includes(id)) && Math.abs(c.t - t) <= 1500 && group.includes(c.p))) continue;
+        // Act 2: a chain explosion on players waiting in the center is the
+        // breaker's, and always Major: its Magic Vulnerability Up makes their
+        // next tower lethal (user, 2026-10-14, D1 +2:31: the PLD moved inward
+        // before the break; the PCT and SGE then died soaking their towers).
+        if (act2Clip) {
+          const atCenter = (p: PlayerInfo) => { const q = positionAt(p, t); return !!q && Math.hypot(q.x - 10000, q.y - 10000) < ACT2_CENTER; };
+          const breakers = uniq([...owners].filter(([k, o]) => group.includes(o) &&
+            byInst.get(k)!.some((h) => h.p !== o && a2!.line.get(h.p) !== a2!.line.get(o))).map(([, o]) => o));
+          if (breakers.length) {
+            for (const o of breakers) {
+              const hitOthers = uniq([...owners].filter(([, x]) => x === o).flatMap(([k]) => byInst.get(k)!.map((h) => h.p))
+                .filter((p) => p !== o && a2!.line.get(p) !== a2!.line.get(o)));
+              const dead = hitOthers.filter((p) => !life.alive(p, t + UNSOAKED_DEATHS_MS));
+              errors.push(playerError(o, {
+                ruleId: fam.ruleId, severity: "Major", name: "Chain Exploded on the Group",
+                description: `Their In Line ${ROMAN[a2!.line.get(o) ?? 0]} chain broke on top of ${namesOf(hitOthers)}, giving them Magic Vulnerability Up, which makes their next tower or hit lethal.${dead.length ? ` ${namesOf(dead)} died soon after.` : ""} Break the chain away from the players waiting in the center.`,
+                timestamp: t, abilityId: fam.ids[0], abilityName: fam.name,
+              }));
+            }
+            for (const p of group) {
+              if (breakers.includes(p) || atCenter(p) || [...owners.values()].includes(p)) continue;
+              errors.push(playerError(p, {
+                ruleId: fam.ruleId, severity, name: `${fam.name} Overlap`,
+                description: `Hit by another pair's chain explosion while away from the center.${deathText} ${fam.why}`,
+                timestamp: t, abilityId: fam.ids[0], abilityName: fam.name,
+              }));
+            }
+            continue;
+          }
+        }
         // A tank's line through non-tanks is the tank's aim (user, 2026-10-12,
         // A90 +3:50: the MT angled too far back and the line crossed the arena).
         if (fam.ownerAtFault) {
@@ -964,7 +1073,7 @@ function mortalSlayerBlame(players: PlayerInfo[], life: Life, res: Hit[], byPlay
 
 // ── shared stacks ───────────────────────────────────────────────────────────
 
-function detectStacks(players: PlayerInfo[], life: Life, casts: EnemyEvent[]): PullError[] {
+function detectStacks(players: PlayerInfo[], life: Life, casts: EnemyEvent[], culprits: Culprit[]): PullError[] {
   const errors: PullError[] = [];
   for (const fam of STACKS) {
     for (const res of clusterByGap(hitsOf(players, life, fam.ids), (h) => h.e.timestamp, 1500)) {
@@ -988,6 +1097,29 @@ function detectStacks(players: PlayerInfo[], life: Life, casts: EnemyEvent[]): P
         const q = positionAt(p, t);
         return { p, d: q && cx !== undefined && cy !== undefined ? Math.hypot(q.x - cx, q.y - cy!) : undefined };
       }).filter((a) => a.d === undefined || a.d > STACK_NEAR_MISS);
+      // Act 1: the stack lands on its Shared Grotesquerie holder. With the rest
+      // of their role waiting together on the corner, the holder took it away
+      // (user, 2026-10-14, D8 +1:29: the SGE ~11y from the three supports on the
+      // corner; the DRG's spread, on its usual spot, caught the SGE too).
+      if (fam.eligible === "notBursting" && absent.length >= 2) {
+        const holder = [...inIt].find((p) => auraEndedNear(p, [SHARED], t, 1500, 500));
+        const qs = absent.map((a) => positionAt(a.p, t)).filter((q): q is NonNullable<typeof q> => !!q);
+        const hq = holder && positionAt(holder, t);
+        if (holder && hq && qs.length === absent.length) {
+          const gx = qs.reduce((s, q) => s + q.x, 0) / qs.length, gy = qs.reduce((s, q) => s + q.y, 0) / qs.length;
+          const together = qs.every((q) => Math.hypot(q.x - gx, q.y - gy) <= STACK_GROUP_MAX);
+          const away = Math.hypot(hq.x - gx, hq.y - gy);
+          if (together && away > STACK_NEAR_MISS) {
+            culprits.push({ ids: [46250], t, p: holder });
+            errors.push(playerError(holder, {
+              ruleId: LW1_STACK_RULE_ID, severity: "Major", name: `Took ${fam.name} Away`,
+              description: `Held the stack (Shared Grotesquerie) ~${yd(away)} yalms from ${namesOf(absent.map((a) => a.p))}, who waited together on the corner, so only ${inIt.size} took it and ${namesOf(killed)} died. ${fam.why}`,
+              timestamp: t, abilityId: fam.ids[0], abilityName: fam.name,
+            }));
+            continue;
+          }
+        }
+      }
       for (const a of absent) {
         errors.push(playerError(a.p, {
           ruleId: LW1_STACK_RULE_ID, severity: "Major", name: `Missed ${fam.name}`,
@@ -1135,6 +1267,33 @@ function detectChains(players: PlayerInfo[], life: Life, a2: Act2 | undefined, o
 }
 
 /**
+ * At the first chain break (In Line I), the In Line II and IV players wait
+ * dead center (ACT2_CENTER); In Line III pre-positions on its towers. One
+ * already out has left before their turn (Minor: it confuses the breaking
+ * pair; user, 2026-10-14, D1 +2:31).
+ */
+function detectLeftCenterEarly(players: PlayerInfo[], life: Life, a2: Act2 | undefined): PullError[] {
+  if (!a2) return [];
+  const first = hitsOf(players, life, CHAIN_BREAK, a2.t0, a2.t0 + 60_000)[0];
+  if (!first) return [];
+  const t = first.e.timestamp;
+  const errors: PullError[] = [];
+  for (const p of players) {
+    const lineNo = a2.line.get(p);
+    if ((lineNo !== 2 && lineNo !== 4) || !life.hitAlive(p, t)) continue;
+    const q = positionAt(p, t);
+    const d = q ? Math.hypot(q.x - 10000, q.y - 10000) : 0;
+    if (d < ACT2_CENTER) continue;
+    errors.push(playerError(p, {
+      ruleId: LW1_CHAIN_CLIP_RULE_ID, severity: "Minor", name: "Left the Center Out of Turn",
+      description: `Was ~${yd(d)} yalms from the center when the In Line I chain broke, though their own chain (In Line ${ROMAN[lineNo]}) wasn't up yet. Wait dead center until it's your turn to break or soak; moving early confuses the pair that is breaking.`,
+      timestamp: t, abilityId: CHAIN_BREAK, abilityName: "Dramatic Lysis",
+    }));
+  }
+  return errors;
+}
+
+/**
  * Act 2 towers. Each tower's assigned soaker is fixed by its order and kind
  * (TOWER_LINE; the cast target is who actually soaked it). An empty tower
  * names its assigned soaker when they were alive; Unmitigated Explosion then
@@ -1201,7 +1360,7 @@ function detectAct2Towers(players: PlayerInfo[], life: Life, casts: EnemyEvent[]
  * soaked none when they account for every empty tower (one or two);
  * otherwise the layout failed as a whole and the error is player-less.
  */
-function detectMetamitosis(players: PlayerInfo[], life: Life, casts: EnemyEvent[], deaths: DeathEvent[]): PullError[] {
+function detectMetamitosis(players: PlayerInfo[], life: Life, casts: EnemyEvent[], deaths: DeathEvent[], culprits: Culprit[]): PullError[] {
   const errors: PullError[] = [];
   const act3 = castsOf(casts, ACT3_CAST)[0];
   if (!act3) return errors;
@@ -1228,9 +1387,18 @@ function detectMetamitosis(players: PlayerInfo[], life: Life, casts: EnemyEvent[
     const named = misplaced.length && misplaced.length < free.length ? misplaced : free;
     for (const p of named) {
       const off = offSpot.get(p);
+      // On the wrong island their spread also lands on that island's players:
+      // that overlap is theirs too (user, 2026-10-14, D11 +3:39: the DRG went
+      // bottom right instead of bottom left; everyone else was correct).
+      let clipped: PlayerInfo[] = [];
+      if (named === misplaced) {
+        culprits.push({ ids: [46256], t, p });
+        const mine = new Set(p.damageTaken.filter((e) => e.abilityId === 46256 && Math.abs(e.timestamp - t) <= 1500).map((e) => e.sourceInstance));
+        clipped = players.filter((x) => x !== p && x.damageTaken.some((e) => e.abilityId === 46256 && Math.abs(e.timestamp - t) <= 1500 && mine.has(e.sourceInstance)));
+      }
       errors.push(playerError(p, {
         ruleId: LW1_METAMITOSIS_RULE_ID, severity: "Major", name: "Missed a Metamitosis Tower",
-        description: `Soaked no tower while ${empty.length === 1 ? "one Metamitosis tower" : `${empty.length} Metamitosis towers`} went empty, so Unmitigated Explosion hit the raid.${named === misplaced && off !== undefined ? ` They launched their spread ~${yd(off)} yalms off the usual spot, which sent their tower away from their partner and left them off the one their partner sent.` : ""}${deathText} ${why}`,
+        description: `Soaked no tower while ${empty.length === 1 ? "one Metamitosis tower" : `${empty.length} Metamitosis towers`} went empty, so Unmitigated Explosion hit the raid.${named === misplaced && off !== undefined ? ` They launched their spread ~${yd(off)} yalms off the usual spot, which sent their tower away from their partner and left them off the one their partner sent.` : ""}${clipped.length ? ` Their spread overlapped with ${namesOf(clipped)} there.` : ""}${deathText} ${why}`,
         timestamp: t, abilityId: METAMITOSIS, abilityName: "Metamitosis",
       }));
     }
@@ -1335,16 +1503,21 @@ export function detectLindwurmErrors(
   const pullEnd = Math.max(0, ...players.flatMap((p) => [...p.damageTaken, ...p.casts].map((e) => e.timestamp)), ...deathEvents.map((d) => d.timestamp));
   const called = calledWipeDeaths(players, deathEvents, enemyCasts, pullEnd);
   const a2 = act2Lines(players, enemyCasts);
+  // Stacks and Metamitosis first: the overlaps they explain aren't repeated.
+  const culprits: Culprit[] = [];
+  const stacks = detectStacks(players, life, enemyCasts, culprits);
+  const metamitosis = detectMetamitosis(players, life, enemyCasts, deathEvents, culprits);
 
   const errors = [
     ...detectAvoidable(players, life),
     ...detectCones(players, life, enemyCasts),
-    ...detectPersonalOverlaps(players, life, enemyCasts),
-    ...detectStacks(players, life, enemyCasts),
+    ...detectPersonalOverlaps(players, life, enemyCasts, a2, culprits),
+    ...stacks,
     ...detectBusters(players, life, occurrences),
     ...detectChains(players, life, a2, occurrences),
+    ...detectLeftCenterEarly(players, life, a2),
     ...detectAct2Towers(players, life, enemyCasts, deathEvents, a2, occurrences),
-    ...detectMetamitosis(players, life, enemyCasts, deathEvents),
+    ...metamitosis,
     ...detectFalls(players, deathEvents, enemyCasts, called),
   ];
 
