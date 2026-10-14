@@ -81,6 +81,7 @@ import { detectPandoraErrors } from "./mechanics/ffxiv/fru/pandora";
 import { detectDoomtrainErrors } from "./mechanics/ffxiv/trials/doomtrain";
 import { detectNecronErrors } from "./mechanics/ffxiv/trials/necron";
 import { detectZeleniaErrors } from "./mechanics/ffxiv/trials/zelenia";
+import { detectEnuoErrors } from "./mechanics/ffxiv/trials/enuo";
 import { detectWowEncounterErrors } from "./mechanics/wow/registry";
 import { buildPullPhaseSegments } from "./pull-phases";
 import { computeMechanicOccurrences, mergeReportedOccurrences, type ReportedOccurrence } from "./mechanics/occurrences";
@@ -1688,6 +1689,7 @@ export function transformFFightToPull(
     ...detectDoomtrainErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
     ...detectNecronErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
     ...detectZeleniaErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
+    ...detectEnuoErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
   ].sort((a, b) => a.timestamp - b.timestamp);
 
   const fightDurationMs = data.fight.endTime - data.fight.startTime;

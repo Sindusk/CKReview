@@ -83,6 +83,12 @@ lib/mechanics/
                                 towers, Shockwave cones, Blue Shockwave swap and
                                 cleaves, Mass Macabre portals, abyss deaths,
                                 Invitation, add check, mass deaths)
+      enuo.ts                 — Enuo (The Unmaking EX) per-pull rules
+                                (avoidables, Chains / Deep Freeze /
+                                Petrification, Emptiness cones and Return
+                                lines, tanks' line fronts, Meltdown spreads,
+                                Voidal Turbulence cones and towers, orb
+                                pairs, flares, mass deaths, enrage)
     arcadion/                 — AAC Heavyweight (Savage)
       vamp-fatale.ts          — Vamp Fatale (M9S) per-pull rules (Stomp bats and
                                 Bombpyre overlaps, Aetherletting drops/lines/overlap,

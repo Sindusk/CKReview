@@ -190,6 +190,14 @@ philosophy and the data semantics this list assumes.
 - **Two marked players both lose the mark at once:** the one whose death
   came first set it off. A later death is the explosion's own victim
   (Fatebreaker's Fated Burn Mark).
+- **Pair soaks can follow the role pairs.** Enuo's orbs went to the same
+  two players (T/T, H/H, melee, ranged) in every kill, so a lone soaker
+  names their role partner (roles.ts slots) and a third soaker is whoever
+  is outside the orb's pair.
+- **A "front of the line" hit shows in the unmitigated amount.** Enuo's
+  Return to Nothing gives its first player(s) several times the rest;
+  compare each non-tank's unmitigated hit with the other non-tanks'
+  median (clean max 1.4x, failures 3.4x+), not raw damage.
 - **Process of elimination beats geometry.** With N interchangeable
   candidates and N-1 accounted for, the last one is decisive (Fatebreaker
   towers; Lindwurm's Metamitosis free players).

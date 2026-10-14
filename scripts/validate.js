@@ -381,6 +381,14 @@ const MECHANICS = {
     },
   },
 
+  enuo: {
+    game: 'ff',
+    load: () => requireTsFromRoot('lib/mechanics/ffxiv/trials/enuo.ts'),
+    run({ mod, ctxs }) {
+      for (const c of ctxs) printPullErrors(c, mod.detectEnuoErrors(c.relPlayers(), c.relDeaths(), c.relEnemyCasts()));
+    },
+  },
+
   pandora: {
     game: 'ff',
     lateCapture: true, // Phase 5 only — safe on --from-minutes captures (see isLateCapture)

@@ -255,6 +255,8 @@ export const ERROR_RULES: PullErrorRule[] = [
       40308, 40309,                                          // The Path of Light / Darkness (exalines)
       40119, 40120,                                          // Cruel Path lanes exploding
       40321,   // Unmitigated Explosion (short tower)
+      // Enuo (The Unmaking EX): enuo.ts owns this.
+      50014,   // Big Burst (empty Empty Shadow tower)
     ],
   },
 

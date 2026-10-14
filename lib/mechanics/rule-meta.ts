@@ -366,6 +366,10 @@ exposure("targeted", ["ffxiv-necron-blue-swap"]);
 // tethers (zelenia.ts reports both tanks at every pair of cones).
 mechanic("ffxiv-zelenia-specter", "Specter of the Lost tethers", undefined, ["ffxiv-zelenia-specter"]);
 exposure("targeted", ["ffxiv-zelenia-specter"]);
+// Enuo (The Unmaking Extreme): the non-tanks' side of Deep Freeze's flares
+// (enuo.ts reports every flare pair).
+mechanic("ffxiv-enuo-flare", "Deep Freeze flares (non-tanks)", undefined, ["ffxiv-enuo-flare"]);
+exposure("targeted", ["ffxiv-enuo-flare"]);
 // Futures Rewritten P1: the tanks' Powder Mark Trail swap and survival
 // (fatebreaker.ts reports both tanks at every Powder Mark).
 mechanic("ffxiv-fb-powder-swap", "Powder Mark swap", 1, ["ffxiv-fb-powder-swap"]);
