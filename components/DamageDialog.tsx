@@ -554,6 +554,7 @@ function FindingRow({ f }: { f: DamageFinding }) {
         <span className="ck-num" style={{ color: "var(--ck-text-3)", fontSize: 12, width: 42, flex: "0 0 auto" }}>{fmtTime(f.startMs)}</span>
         <span style={{ color: "var(--ck-text)", fontSize: 13, flex: "1 1 auto" }}>
           {f.detail}
+          {f.target && <span style={{ color: "var(--ck-text-2)" }}> · on {f.target}</span>}
           {f.cause && !f.movement && <span style={{ color: "var(--ck-text-3)" }}> — {f.forced ? `forced: ${f.cause}` : f.cause}</span>}
           {f.movement && <span style={{ color: MOVEMENT_COLOR }}> — movement, not counted</span>}
         </span>

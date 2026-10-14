@@ -257,6 +257,9 @@ export type DamageFinding = {
   // total leaves it out); summed apart as movementDamage.
   movement?:  boolean;
   cause?:     string;
+  // The enemy it applies to (analyze.ts targetAround, or the check's own
+  // hit): the dialog shows "on Chaos".
+  target?:    string;
   basis:      string;    // how lostDamage was estimated
   detail:     string;    // one line for the dialog
   // Short and pull-independent ("Technical Step", "gap during Limit Cut"):

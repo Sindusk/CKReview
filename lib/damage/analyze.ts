@@ -143,6 +143,7 @@ export function analyzePullDamage(
       ...checkSameSpecPace(ctx, paces.get(player.name), pacePeers, model?.hasteAt),
       ...game.jobChecks(job).flatMap((check) => check(ctx)),
     ].sort((a, b) => Number(a.forced) - Number(b.forced) || b.lostDamage - a.lostDamage);
+    for (const f of findings) f.target ??= targetAround(player, f);
 
     const kinds = gcdKinds(player, pull, uses);
     const gcdSplit = { heal: 0, damage: 0, other: 0 };
@@ -204,6 +205,26 @@ export function analyzePullDamage(
 }
 
 /** HP of the enemy the raid was hitting hardest in the last 5s before `atMs`. */
+// The enemy a finding applies to, for the dialog ("on Chaos"): the one the
+// player hit most around it (hits that dealt damage), else the last one
+// they hit before it. A multi-target phase (Dancing Mad P3's Exdeath and
+// Chaos) reads by boss; user, 2026-10-13.
+const TARGET_AROUND_MS = 3_000;
+const TARGET_LOOKBACK_MS = 15_000;
+function targetAround(player: Pull["players"][number], f: DamageFinding): string | undefined {
+  if (f.pullWide) return undefined;
+  const from = f.startMs - TARGET_AROUND_MS, to = Math.max(f.endMs, f.startMs) + TARGET_AROUND_MS;
+  const counts = new Map<string, number>();
+  let before: { t: number; name: string } | undefined;
+  for (const e of player.damageDone) {
+    if (!e.target || !((e.amount ?? 0) > 0)) continue;
+    if (e.timestamp >= from && e.timestamp <= to) counts.set(e.target, (counts.get(e.target) ?? 0) + 1);
+    else if (e.timestamp < from && e.timestamp >= from - TARGET_LOOKBACK_MS && (!before || e.timestamp > before.t)) before = { t: e.timestamp, name: e.target };
+  }
+  const best = [...counts].sort((a, b) => b[1] - a[1])[0];
+  return best?.[0] ?? before?.name;
+}
+
 function bossHpAt(pull: Pull, atMs: number): number | undefined {
   const recent = pull.players.flatMap((p) => p.damageDone)
     .filter((e) => e.timestamp <= atMs && e.timestamp > atMs - 5_000 && e.healthAfter !== undefined)

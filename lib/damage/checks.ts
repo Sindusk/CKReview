@@ -356,8 +356,12 @@ export function checkDisengages(ctx: PlayerCheckContext): DamageFinding[] {
 // missed hit's own amount × the potency the positional would have added.
 // One finding per action per phase.
 
+// One finding per miss (user, 2026-10-13: each entry its own row, even a
+// long list; a per-phase summary was stamped at the phase's first cast, a
+// P2 Fang and Claw at 3:48 that hit, yBKPqGwHparm7Tk4 fight 5).
 export function checkPositionals(ctx: PlayerCheckContext): DamageFinding[] {
-  const groups = new Map<string, { name: string; phaseId?: number; misses: number; casts: number; lost: number; start: number; end: number; cost: number; moments: Moment[] }>();
+  const casts = new Map<string, number>();   // ability|phase → casts, for the basis
+  const misses: { e: PlayerEvent; cost: number; key: string }[] = [];
   let last: { id: number; t: number } | undefined;
   for (const e of ctx.player.damageDone) {
     if (e.timestamp >= ctx.endMs || e.isDoT) continue;
@@ -365,37 +369,21 @@ export function checkPositionals(ctx: PlayerCheckContext): DamageFinding[] {
     if (!a?.positional) continue;
     if (last && last.id === e.abilityId && e.timestamp - last.t < 500) continue; // same cast, another target
     last = { id: e.abilityId, t: e.timestamp };
-    const phaseId = ctx.phaseOf(e.timestamp);
-    const key = `${e.abilityId}|${phaseId}`;
-    const g = groups.get(key) ?? { name: e.abilityName, phaseId, misses: 0, casts: 0, lost: 0, start: e.timestamp, end: e.timestamp, cost: a.positional.missCost, moments: [] };
-    g.casts++;
-    groups.set(key, g);
+    const key = `${e.abilityId}|${ctx.phaseOf(e.timestamp)}`;
+    casts.set(key, (casts.get(key) ?? 0) + 1);
     if (e.bonusPercent === undefined && a.comboFrom) continue;
     if (!a.positional.missedBonus.includes(e.bonusPercent ?? 0)) continue;
-    g.misses++;
-    // Anchored on the first miss, not the phase's first cast: a P2 Fang and
-    // Claw summary read "3:48", a hit that landed its positional
-    // (yBKPqGwHparm7Tk4 fight 5; the misses were 4:42.6 and 6:13.4).
-    if (g.misses === 1) g.start = e.timestamp;
-    g.lost += (e.amount ?? 0) * a.positional.missCost;
-    g.end = e.timestamp;
-    g.moments.push({
-      startMs: e.timestamp, endMs: e.timestamp, lostDamage: (e.amount ?? 0) * a.positional.missCost,
-      detail: `${e.abilityName} positional missed`,
-    });
+    misses.push({ e, cost: a.positional.missCost, key });
   }
-  const out: DamageFinding[] = [];
-  for (const g of groups.values()) {
-    if (g.misses === 0) continue;
-    out.push({
-      player: ctx.player.name, job: ctx.job, phaseId: g.phaseId, phase: ctx.phaseName(g.phaseId),
-      kind: "positional", startMs: g.start, endMs: g.end, forced: false, lostDamage: g.lost, moments: g.moments,
-      label: `${g.name} positional missed`,
-      basis: `each missed hit × ${Math.round(g.cost * 100)}% (the potency the positional adds)`,
-      detail: `${g.name}: ${g.misses} of ${g.casts} positionals missed in ${ctx.phaseName(g.phaseId) ?? "the pull"}`,
-    });
-  }
-  return out;
+  const missesIn = (key: string) => misses.filter((m) => m.key === key).length;
+  return misses.map(({ e, cost, key }) => finding(ctx, {
+    kind: "positional", startMs: e.timestamp, endMs: e.timestamp, forced: false,
+    lostDamage: (e.amount ?? 0) * cost, target: e.target,
+    label: `${e.abilityName} positional missed`,
+    basis: `the hit × ${Math.round(cost * 100)}% (the potency the positional adds); ` +
+      `${missesIn(key)} of ${casts.get(key)} ${e.abilityName} missed in ${ctx.phaseName(ctx.phaseOf(e.timestamp)) ?? "the pull"}`,
+    detail: `${e.abilityName} positional missed`,
+  }));
 }
 
 // ── Broken combos ──────────────────────────────────────────────────────
