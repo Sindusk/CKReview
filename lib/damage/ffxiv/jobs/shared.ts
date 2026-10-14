@@ -60,7 +60,7 @@ const SAME_TIMESTAMP_MS = 0;
 
 export const s = (ms: number) => `${(ms / 1000).toFixed(1)}s`;
 export const k = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(2)}M` : `${Math.round(n / 1000)}k`);
-const clock = (ms: number) => {
+export const clock = (ms: number) => {
   const t = Math.max(0, Math.round(ms / 1000));
   return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
 };

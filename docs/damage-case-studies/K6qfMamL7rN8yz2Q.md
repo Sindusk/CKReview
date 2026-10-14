@@ -50,6 +50,15 @@ all eight players on that kill are in `sampledata/damage-ff/`.
   drift"; both headers show their counted time. Sin, Pull 1: 10 delays
   (~11.2s), 8 drifts (~0.7s).
 
+- **Kade Kansado (Paladin), Vamp Fatale.** Verified against xivanalysis;
+  the per-claim record is in lib/damage/ffxiv/jobs/pld-war.ts's header.
+  Built: the Atonement chain left at the kill (Atonement Ready from 8:19,
+  Fast Blade 8:37 and Riot Blade 8:40 pressed instead; 26k, plus the 25k
+  Fight or Flight window finding). Kills only. Lost 221k → 248k.
+  Open question for the user: GCD gaps at 4:54 (0.97s) and 5:47 (1.2s)
+  count as movement in the saws/towers/adds window, but no other melee
+  idled at 4:54.
+
 ## Open
 
 - Lock-model gaps seen in the drift test (they can hide delay, never

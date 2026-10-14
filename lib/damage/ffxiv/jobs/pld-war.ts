@@ -43,6 +43,19 @@
 // the rest is the ~1 use the drift finding counts. Not adopted: Oath
 // gauge (mitigation); "6 tincture actions" (the tincture placement
 // finding: 0:04 and 7:43 would have covered more at 1:57 and 7:53).
+// Rechecked on K6qfMamL7rN8yz2Q Vamp Fatale (7.4, 2026-10-14). Matched:
+// Fight or Flight 1:11 (Intervene) and 8:20 (1/3 Royal Authority-type),
+// the 0:35 uncomboed Riot Blade, Intervene drift (its 11/19, our room for
+// 18, ~6 lost), its last two GCD downtimes (8:19, 8:31: under our 0.15s
+// tolerance once it's taken off, 0.0s drift). Built: the Atonement chain
+// left at the kill (its 21/22; atonementChainAtKill). Not adopted:
+// - GCD downtime 0:31, 1:40, 3:49: movement every melee shared (Bombpyre,
+//   Coffinmaker's blades), forced in the damage context; 4:54 (0.97s,
+//   Rampart + Holy Sheltron) and 5:47 (1.2s, the Flail died under the
+//   Atonement) sit in the lenient saws/towers/adds window, though no
+//   other melee idled at 4:54 (raised with the user).
+// - Weaving 2:14, 5:53 (0.08s each): inside the 0.15s tolerance.
+// - Oath gauge (570 lost) and defensives: mitigation.
 //
 // Fight or Flight, ported from
 // xivanalysis src/parser/jobs/pld/modules/FightOrFlight.tsx: 8 GCDs;
@@ -59,8 +72,9 @@
 
 import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import type { JobCheck } from "../../types";
-import { inWindows } from "../../timeline";
-import { aoeComboOnOneTarget, burstWindowFindings, castHits, gaugeFindings, k, statusWindows, uptimeFindings, type GaugeEvent } from "./shared";
+import { finding } from "../../checks";
+import { forcedPart, inWindows } from "../../timeline";
+import { aoeComboOnOneTarget, burstWindowFindings, castHits, clock, gaugeFindings, k, statusWindows, uptimeFindings, type GaugeEvent } from "./shared";
 import { comboLanded } from "./gnb";
 
 const id = (key: string) => A[key].id;
@@ -131,8 +145,54 @@ const beastGauge: JobCheck = (ctx) => {
   });
 };
 
+// The Atonement chain still up at the kill while combo fillers went out
+// (K6qfMamL7rN8yz2Q Vamp Fatale, 8:19: Atonement Ready from the last
+// Royal Authority, then Fast Blade 8:37 and Riot Blade 8:39 before the
+// kill at 8:41; xivanalysis's Atonement / Supplication / Sepulchre 21/22).
+// Each filler pressed while a step was left, from the last Royal
+// Authority to the kill, is one step lost: the step's
+// average minus the filler's, both outside Fight or Flight, whose window
+// finding already counts the 25% on those slots. Fillers in forced time
+// don't count. checkProcs sees no expiry here: the status is never removed.
+const CHAIN: [string, string[]][] = [
+  ["ATONEMENT_READY", ["ATONEMENT", "SUPPLICATION", "SEPULCHRE"]],
+  ["SUPPLICATION_READY", ["SUPPLICATION", "SEPULCHRE"]],
+  ["SEPULCHRE_READY", ["SEPULCHRE"]],
+];
+const COMBO_FILLERS = ["FAST_BLADE", "RIOT_BLADE", "TOTAL_ECLIPSE", "PROMINENCE"];
+const atonementChainAtKill: JobCheck = (ctx) => {
+  // Kills only: fillers with the chain up are normal play to line it up
+  // with Fight or Flight, and a wipe ends before it comes (jN3XDrf2z8PmLgRJ
+  // pulls at 3:35 and 5:05).
+  if (ctx.pull.result !== "Kill") return [];
+  const fof = statusWindows(ctx, S.FIGHT_OR_FLIGHT.id);
+  const avgOutside = (actionId: number) => {
+    const hits = castHits(ctx, actionId).filter((h) => !inWindows(h.timestamp, fof));
+    return hits.length ? hits.reduce((a, h) => a + (h.amount ?? 0), 0) / hits.length : ctx.values.perUse(actionId);
+  };
+  const fillerIds = new Set(COMBO_FILLERS.filter((x) => A[x]).map(id));
+  for (const [status, steps] of CHAIN) {
+    const w = statusWindows(ctx, S[status].id).find((x) => x.endMs > ctx.endMs);
+    if (!w) continue;
+    const fillers = ctx.uses.filter((u) => u.startMs > w.startMs && u.startMs < ctx.endMs &&
+      fillerIds.has(u.action.id) && forcedPart(u.startMs, u.startMs + 1, ctx.forced).ms === 0).slice(0, steps.length);
+    if (fillers.length === 0) return [];
+    const pairs = fillers.map((f, i) => ({ step: A[steps[i]], filler: f, lost: Math.max(0, avgOutside(id(steps[i])) - avgOutside(f.action.id)) }));
+    const lost = pairs.reduce((a, p) => a + p.lost, 0);
+    if (lost < 1) return [];
+    return [finding(ctx, {
+      kind: "proc-lost", startMs: w.startMs, endMs: fillers[fillers.length - 1].startMs,
+      forced: false, label: "Atonement chain left at the kill", lostDamage: lost,
+      basis: pairs.map((p) => `${k(avgOutside(p.step.id))} ${p.step.name} − ${k(avgOutside(p.filler.action.id))} ${p.filler.abilityName}`).join("; ") +
+        " (averages outside Fight or Flight; its window finding counts the 25%)",
+      detail: `${S[status].name} was up from ${clock(w.startMs)} to the kill; ${pairs.map((p) => `${p.filler.abilityName} at ${clock(p.filler.startMs)}`).join(" and ")} went out instead of ${pairs.map((p) => p.step.name).join(" and ")}`,
+    })];
+  }
+  return [];
+};
+
 const pldAoeCombo =aoeComboOnOneTarget([[id("TOTAL_ECLIPSE"), id("FAST_BLADE")], [id("PROMINENCE"), id("RIOT_BLADE")]]);
 const warAoeCombo = aoeComboOnOneTarget([[id("OVERPOWER"), id("HEAVY_SWING")], [id("MYTHRIL_TEMPEST"), id("MAIM")]]);
 
-export const PLD_CHECKS: JobCheck[] = [fightOrFlight, pldAoeCombo];
+export const PLD_CHECKS: JobCheck[] = [fightOrFlight, pldAoeCombo, atonementChainAtKill];
 export const WAR_CHECKS: JobCheck[] = [surgingTempest, warAoeCombo, beastGauge];
