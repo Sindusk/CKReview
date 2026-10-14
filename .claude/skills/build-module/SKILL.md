@@ -1,6 +1,6 @@
 ---
 name: build-module
-description: Build per-pull mechanic detection for a WoW or FFXIV boss from a comment-only research model the user points at (a module file whose header holds the GUIDE-DERIVED MODEL) and the report(s) they supply. Verifies the model against the logs, writes the rules, wires the module in, validates, commits, and ends with the wipe cutoffs and VOD questions. Use when the user asks to build, implement or "do detection for" a boss module from logs.
+description: Build per-pull mechanic detection for a WoW or FFXIV boss from a comment-only research model the user points at (a module file whose header holds the GUIDE-DERIVED MODEL) and the report(s) they supply. Verifies the model against the logs, writes the rules, wires the module in, validates, commits, builds the boss's damage context, and ends with the wipe cutoffs and VOD questions. Use when the user asks to build, implement or "do detection for" a boss module from logs.
 argument-hint: <module file with the model> <report URL or code> [more reports...]
 ---
 
@@ -191,8 +191,14 @@ Find, for each mechanic:
    new tooling flags to docs/dev-tooling.md.
 3. Check the diff for character names. Commit and push. Say it's ready to
    deploy.
-4. Reply with:
+4. **Build the damage context** (user, 2026-10-14): a boss's first module
+   build always continues straight into the `/build-fight-context` skill
+   on the same reports, so the Damage dialog has the boss's pools, checks
+   and holds. Skip it only when the boss already has a context registered
+   in `lib/damage/contexts.ts`. Commit and push it separately.
+5. Reply with:
    - each cutoff kind and its count, and the kill status;
+   - the damage context per phase (kind, pool, what's forced from when);
    - the attribution calls you were unsure of, as numbered questions in
      CLAUDE.md's VOD format (pull, MM:SS, what detection says with the
      players named, what to look at), ordered by pull. If the user has a
