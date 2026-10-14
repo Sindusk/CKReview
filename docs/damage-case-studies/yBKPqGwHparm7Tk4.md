@@ -94,6 +94,18 @@ Dragoon's POV (Sayacissa Morsaelth). No xivanalysis page.
   within grace but for such GCDs as movement. Dragoon: both Talons, 4:21
   and 4:48 Chaotic Spring gaps → movement (56k).
 
+- **Dragoon Power Surge 3:05 (23k, user: boss dead seconds later).**
+  Not a loss. It fell off at 3:05.2, the P1 check passed at 3:10.7.
+  Keeping it meant Spiral Blow at 3:06.4 (the route for Chaotic Spring),
+  in place of Lance Barrage → Heavens' Thrust (~33k): the bonus was 10% of
+  226k = 23k. Actual 3:06.4-3:10.7: Lance Barrage 71k + Heavens' Thrust
+  97k + High Jump 68k (237k) vs ~180k on the Spiral route with Power
+  Surge. **Fixed:** `uptimeFindings` takes `refreshCost` (Dragoon: the
+  same route cost); a stretch cut off by forced time counts only its
+  bonus beyond that cost. Forced stretches under 5s don't cut a gap (both
+  checks; a 0.3s blip on vVPtwaTQ62Jg391q had). This kill: 3:05 gone,
+  6:10 45k → 12k.
+
 ## Next
 
 - Ask the user what the 8:47-8:54 mechanic is and whether it forces

@@ -108,12 +108,12 @@ const replacedGcd = (...keys: string[]) => (ctx: PlayerCheckContext) =>
 const lostOgcd = (...keys: string[]) => (ctx: PlayerCheckContext) =>
   Math.max(...ids(...keys).map((x) => ctx.values.perUse(x)));
 
-const uptime = (statusKey: string, bonus: number, bonusBasis: string): JobCheck => (ctx) => {
+const uptime = (statusKey: string, bonus: number, bonusBasis: string, refreshCost?: (ctx: PlayerCheckContext) => number): JobCheck => (ctx) => {
   const windows = statusWindows(ctx, S[statusKey].id);
   if (windows.length === 0) return [];
   return uptimeFindings(ctx, {
     name: S[statusKey].name, bonus, bonusBasis,
-    active: windows, fromMs: windows[0].startMs, graceMs: 2_500,
+    active: windows, fromMs: windows[0].startMs, graceMs: 2_500, refreshCost,
   });
 };
 
@@ -295,15 +295,19 @@ const lifeSurge: JobCheck = (ctx): DamageFinding[] => {
   return out;
 };
 
+// Chaotic Spring and Power Surge both come from the Spiral Blow route; going
+// that way in place of Lance Barrage → Heavens' Thrust costs the difference.
+function drgSpiralRouteCost(ctx: PlayerCheckContext): number {
+  const v = (...keys: string[]) => ids(...keys).reduce((a, x) => a + ctx.values.perUse(x), 0);
+  return v("LANCE_BARRAGE", "HEAVENS_THRUST") - v("SPIRAL_BLOW", "CHAOTIC_SPRING");
+}
+
 const chaoticSpring: JobCheck = (ctx) => dotFindings(ctx, {
   statusIds: [S.CHAOTIC_SPRING.id], name: S.CHAOTIC_SPRING.name, durationMs: S.CHAOTIC_SPRING.duration ?? 24_000,
   // Before a downtime or a passed check, Chaotic Spring means the Spiral
   // Blow route instead of Lance Barrage → Heavens' Thrust (yBKPqGwHparm7Tk4
   // fight 5 at 3:01: ~33k for 2 ticks).
-  applyCost: (ctx) => {
-    const v = (...keys: string[]) => ids(...keys).reduce((a, x) => a + ctx.values.perUse(x), 0);
-    return v("LANCE_BARRAGE", "HEAVENS_THRUST") - v("SPIRAL_BLOW", "CHAOTIC_SPRING");
-  },
+  applyCost: (ctx) => drgSpiralRouteCost(ctx),
 });
 
 // Kunai's Bane, from xivanalysis KunaisBaneWindow.tsx: 7 GCDs, mudras not
@@ -649,6 +653,6 @@ const firstmindsFocus: JobCheck = (ctx) => {
   });
 };
 
-export const DRG_CHECKS: JobCheck[] = [uptime("POWER_SURGE", 0.1, "Power Surge is +10% (tooltip)"), lanceCharge, lifeSurge, chaoticSpring, firstmindsFocus];
+export const DRG_CHECKS: JobCheck[] = [uptime("POWER_SURGE", 0.1, "Power Surge is +10% (tooltip)", (ctx) => drgSpiralRouteCost(ctx)), lanceCharge, lifeSurge, chaoticSpring, firstmindsFocus];
 export const NIN_CHECKS: JobCheck[] = [kunaisBane, ninki, kazematoi];
 export const RPR_CHECKS: JobCheck[] = [enshroud, arcaneCircle, deathsDesign, harvestMoon, shroud, whorl];

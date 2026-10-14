@@ -304,7 +304,17 @@ export type UptimeSpec = {
   fromMs:     number;     // when the buff should first be up
   graceMs:    number;     // drops shorter than this are ignored
   inference?: boolean;    // the windows are simulated, not logged
+  // What re-applying it costs, for a stretch that forced time cuts off
+  // (a downtime, an HP check passed): there it's only worth the bonus on
+  // what was dealt before the cut, less this (Dragoon's Power Surge: the
+  // Spiral Blow route in place of Lance Barrage → Heavens' Thrust).
+  refreshCost?: (ctx: PlayerCheckContext) => number;
 };
+
+// A forced stretch shorter than this doesn't cut a buff or DoT gap off:
+// the player can still re-apply after it (vVPtwaTQ62Jg391q 8:21.9, a 0.3s
+// blip inside a Power Surge gap).
+const CUT_MIN_MS = 5_000;
 
 export function uptimeFindings(ctx: PlayerCheckContext, spec: UptimeSpec): DamageFinding[] {
   const out: DamageFinding[] = [];
@@ -327,12 +337,26 @@ export function uptimeFindings(ctx: PlayerCheckContext, spec: UptimeSpec): Damag
     const dealt = ctx.values.damageIn(g.startMs, g.endMs) - forced
       .filter((f) => f.endMs > g.startMs && f.startMs < g.endMs)
       .reduce((a, f) => a + ctx.values.damageIn(Math.max(f.startMs, g.startMs), Math.min(f.endMs, g.endMs)), 0);
+    // Stretches forced time cuts off are worth their bonus less the
+    // refresh's cost. yBKPqGwHparm7Tk4 fight 5, Dragoon's Power Surge
+    // 3:05.2-3:10.7 (P1 check passed): 23k of bonus against ~33k for the
+    // Spiral Blow route (user, 2026-10-13).
+    const cost = spec.refreshCost ? Math.max(0, spec.refreshCost(ctx)) : 0;
+    let cutOff = 0, at = g.startMs;
+    for (const f of forced) {
+      if (f.endMs <= at || f.startMs >= g.endMs || f.endMs - f.startMs < CUT_MIN_MS) continue;
+      if (f.startMs > at) cutOff += Math.min(cost, ctx.values.damageIn(at, f.startMs) * spec.bonus);
+      at = Math.max(at, f.endMs);
+    }
+    const lost = dealt * spec.bonus - cutOff;
+    if (lost <= 0) continue;
     out.push(finding(ctx, {
       kind: "buff-uptime", startMs: g.startMs, endMs: g.endMs, forced: false,
       label: `${spec.name} down`,
-      lostDamage: dealt * spec.bonus,
+      lostDamage: lost,
       inference: spec.inference,
-      basis: `${k(dealt)} dealt while it was down × ${Math.round(spec.bonus * 100)}% (${spec.bonusBasis})`,
+      basis: `${k(dealt)} dealt while it was down × ${Math.round(spec.bonus * 100)}% (${spec.bonusBasis})` +
+        (cutOff ? `, less ${k(cutOff)} for stretches cut off by forced time where re-applying it cost more` : ""),
       detail: `${spec.name} down for ${s(len - forcedMs)}${forcedMs > 0 ? ` (plus ${s(forcedMs)} forced)` : ""}`,
     }));
   }
@@ -763,13 +787,15 @@ export function dotFindings(ctx: PlayerCheckContext, spec: DotSpec): DamageFindi
       const free: Window[] = [];
       let at = cursor;
       for (const f of forced) {
-        if (f.endMs <= at || f.startMs >= w.startMs) continue;
+        if (f.endMs <= at || f.startMs >= w.startMs || f.endMs - f.startMs < CUT_MIN_MS) continue;
         if (f.startMs > at) free.push({ startMs: at, endMs: f.startMs });
         at = Math.max(at, f.endMs);
       }
-      const tail = at < w.startMs ? w.startMs - at : 0;
-      const cut = free.reduce((a, x) => a + cutValue(x.endMs - x.startMs, x.startMs), 0);
-      const cutMs = free.reduce((a, x) => a + (cutValue(x.endMs - x.startMs, x.startMs) > 0 ? x.endMs - x.startMs : 0), 0);
+      // Short forced blips don't cut the gap; their time still isn't counted.
+      const freeMs = (a: number, b: number) => b - a - overlapMs(a, b, forced);
+      const tail = at < w.startMs ? freeMs(at, w.startMs) : 0;
+      const cut = free.reduce((a, x) => a + cutValue(freeMs(x.startMs, x.endMs), x.startMs), 0);
+      const cutMs = free.reduce((a, x) => a + (cutValue(freeMs(x.startMs, x.endMs), x.startMs) > 0 ? freeMs(x.startMs, x.endMs) : 0), 0);
       // 6XaWqwMbkZG9pLmx Vamp Fatale 1:58: both of the Bard's DoTs came off
       // with Coffinmaker; Caustic Bite went on 2.9s later, Stormbite a GCD
       // after it (5.0s), which the plain grace read as lost (user, 2026-10-13).
