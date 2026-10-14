@@ -140,8 +140,10 @@ Classify each claim, and report it in a table (claim | verdict | app):
     Iron Jaws snapshot;
   - interrupted casts where the boss went untargetable;
   - end-of-pull windows it skips (or counts) differently;
-  - an action that started casting in a window but landed after it
-    (buffs apply on landing);
+  - an action that started casting in a window but went off after it
+    (buffs snapshot when the cast goes off, not when it began or when
+    the hit lands: a GCD cast the instant a timed buff ends still has
+    it, 4 of 4 on the samples; xivanalysis counts those out);
   - windows keyed on a cast that came one GCD after the burst opened
     (VPR Serpent's Ire after the first Reawaken);
   - its GCD estimate against the app's (GNB's 8-or-9 No Mercy rule).
@@ -168,7 +170,15 @@ Where things live (read the module header before editing it):
   `petDamage` when the damage isn't under the action's id, `landDelayMs`,
   `prePullEvidence`). The drift engine (checks.ts) simulates charges,
   recharge through downtime, banked charges and per-stretch holds.
-- Timeline gauges (display only): `jobs/gauges.ts`.
+- Timeline gauges: `jobs/gauges.ts` (the user asks for each job's
+  xivanalysis gauges as lanes). One the overcap check already simulates
+  is drawn from its `GaugeSpec` (`gaugeTrack`, a short lane name);
+  `marks` name ticks. Check every new gauge for spends it can't pay for
+  on all samples. Gauges the log can't show with random gains are
+  `gauge-estimate` findings with no loss (user rule). Method notes:
+  docs/dps-analysis.md, the K6qfMamL7rN8yz2Q study.
+- A buff only in hit snapshots (not the buff stream): measure it from
+  multipliers with and without it; burst windows take `windows`.
 - Patch rules: read `ctx.patch` (`lib/damage/ffxiv/patches.ts`) only where
   a rule changed; most checks are measured from the log and need none.
 

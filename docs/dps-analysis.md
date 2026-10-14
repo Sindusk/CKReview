@@ -294,7 +294,54 @@ were to the app's own engine, found where xivanalysis was right.
   reaches about −50ms. They rise with weaves (2.8% of GCDs with none,
   5.7% one, 8.5% two, 23% three) and are most common after hard casts
   (AST Fall Malefic, SGE Dosis III). A floor that hid them was reverted
-  the same day.
+  the same day. The dialog splits them by size: "GCD delay" from 0.3s
+  (as shown, so from 0.25s), "GCD drift" under it.
+
+The third study, K6qfMamL7rN8yz2Q Vamp Fatale (7.4, 2026-10-14; PLD,
+WAR, AST, SGE, DRG, VPR, DNC, PCT; case study in
+docs/damage-case-studies/), added each job's gauges to the timeline and
+showed:
+- **Job gauges as timeline lanes** (lib/damage/ffxiv/jobs/gauges.ts).
+  A gauge the app already simulates for overcap findings is drawn from
+  the same `GaugeSpec` (`shared.ts gaugeTrack`), so lane and findings
+  can't disagree; others get their own simulation there. `GaugeTrack.marks`
+  are named ticks (a card played, a Comet, a gauge lost at the cap).
+  Lane names must fit the 96px gutter ("Focus", not "Firstminds' Focus").
+  Gauges that buy mitigation or movement tools (Oath, Addersting, Paint)
+  are display only. Every new gauge is checked for spends the simulation
+  can't pay for across all samples before trusting it.
+- **Estimates are named, never valued (user, 2026-10-14).** A gauge the
+  log can't show and whose gain is random (DNC Feathers, Esprit, and
+  feathers not pooled for Technical) is a `gauge-estimate` finding,
+  listed with "—" and no loss.
+- **Gauge comes with the cast, not the hit** (~1s later): a Pictomancer
+  spent a Subtractive before the Water's hit that paid for it, and a
+  Water that never landed still paid for one. `shared.ts gaugeCastTimes`.
+- **A status can be in hit snapshots only**, never the buff stream
+  (Dragoon's Life of the Dragon, 1003177, absent from the vendored
+  xivanalysis data). Measure what it does from multipliers with and
+  without it (1.26 = 1.10 × 1.15: +15%); burst windows take explicit
+  `windows` for it.
+- **A GCD cast at a timed buff's removal instant snapshots it** (4 of 4
+  hits on the samples carry the status). xivanalysis counts it out (PCT
+  Hammer at 8:09); the inclusive window end stays.
+- **Three or more weaves are the delay, not movement**, even inside a
+  movement window (AST's instant Fall Malefic then three oGCDs, 1.87s).
+- **Gauge left at a kill is judged by how long it was held**, not the
+  kill's instant, which a "boss at 1 HP" forced window always covers.
+- **A cooldown with no damage of its own needs a value** to be judged at
+  all (Dragoon's Life Surge: a forced crit, `valuePerUse`); without one
+  the drift check drops it silently.
+- **Shield breaks are in the healing stream**: an `absorbed` and a
+  `removebuff` of the shield in the same instant (no remaining amount is
+  logged). The transform keeps both (`shieldAbsorbs`, `shieldRemovals`).
+- **xivanalysis's own gaps**: its GCD Downtime hides ~1.6s after every
+  hard cast and ~1s after short-recast GCDs (checks.ts header); it treats
+  short transitions as downtime (the 1.5s after Coffinmaker dies); it
+  doesn't see casts on a target that takes 0 (a Charnel Cell that isn't
+  the player's).
+- **Open (user's call):** charges held to a kill aren't lost uses to the
+  drift check (Living Muse, Phlegma III; docs/open-items.md).
 - **Input:** the user saves each player's xivanalysis page as HTML;
   `tools/xiva-html.js` cuts a ~500KB page to ~20KB of text with named
   action icons (see the skill).
