@@ -69,6 +69,7 @@ const fmtDamage = (n: number) =>
   n >= 1e6 ? `${(n / 1e6).toFixed(2)}M` : n >= 1000 ? `${Math.round(n / 1000)}k` : `${Math.round(n)}`;
 
 const KIND_LABEL: Record<DamageFinding["kind"], string> = {
+  "gcd-delay":        "GCD delay",
   "gcd-drift":        "GCD drift",
   "gcd-pace":         "GCD pace",
   "cooldown-drift":   "Cooldown drift",
@@ -625,6 +626,10 @@ function StatStrip({ stats }: { stats: Stat[] }) {
   );
 }
 
+// GCD delay and drift headers also show the time they counted (forced left
+// out, as in the loss total) (user, 2026-10-14).
+const DELAY_TIME_KINDS = new Set<DamageFinding["kind"]>(["gcd-delay", "gcd-drift"]);
+
 // Findings grouped by kind: the groups by their counted loss (biggest
 // first), each one's entries in time order, collapsed until clicked. The
 // picked finding (a timeline dot or a summary card) is highlighted and
@@ -659,6 +664,11 @@ function FindingGroups({ findings, icons, open, onOpenChange: setOpen, picked, o
               <span style={{ color: "var(--ck-text-3)", fontSize: 11, width: 12, flex: "0 0 auto" }}>{isOpen ? "▾" : "▸"}</span>
               <ThemeGlyph theme={KIND_THEME[kind]} size={22} />
               <span style={{ flex: "0 0 auto", fontWeight: 600, fontSize: 13, color: "var(--ck-text)" }}>{KIND_LABEL[kind]}</span>
+              {DELAY_TIME_KINDS.has(kind) && (
+                <span className="ck-num" style={{ flex: "0 0 auto", fontWeight: 600, fontSize: 13, color: "var(--ck-text-2)" }}>
+                  {(list.filter((f) => !f.forced).reduce((a, f) => a + (f.delayMs ?? 0), 0) / 1000).toFixed(1)}s
+                </span>
+              )}
               <span style={{ color: "var(--ck-text-3)", fontSize: 12, flex: "1 1 auto" }}>
                 {list.length} {list.length === 1 ? "entry" : "entries"}
                 {list.some((f) => f.forced) && !forcedOnly ? ` (${list.filter((f) => f.forced).length} forced)` : ""}

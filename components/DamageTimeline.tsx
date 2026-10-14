@@ -56,7 +56,7 @@ const fmtPrecise = (ms: number) => {
 
 type ActiveBuff = { name: string; icon?: string; leftMs: number; sources: string[]; pot: boolean };
 type Marker = { f: DamageFinding; startMs: number; endMs: number; lost: number; detail: string; moment: boolean; drift: boolean };
-const DRIFT_KINDS = new Set<DamageFinding["kind"]>(["gcd-drift", "gcd-clipping"]);
+const DRIFT_KINDS = new Set<DamageFinding["kind"]>(["gcd-delay", "gcd-drift", "gcd-clipping"]);
 
 export default function DamageTimeline({ summary, analysis, highlight, onPick }: {
   summary: PlayerDamageSummary; analysis: PullDamageAnalysis;

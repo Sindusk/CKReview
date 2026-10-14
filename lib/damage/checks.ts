@@ -13,7 +13,9 @@
 // idle time inside a forced window (dead, raid downtime, a context window,
 // a phase whose damage doesn't count) is forced. Unforced idle of 1s+ is
 // its own finding; shorter delays are listed one by one when the phase's
-// add up to CLIP_FINDING_MS. Lost damage =
+// add up to CLIP_FINDING_MS. Kinds: "gcd-delay" from DELAY_FINDING_MS
+// (reads 0.3s; gaps and forced gaps too), "gcd-drift" under it, "gcd-clipping"
+// with three or more weaves; each carries its idle as delayMs. Lost damage =
 // idle ÷ the player's GCD × their average GCD value in that phase (the
 // buffed value when the gap sits in a raid-buff window).
 //
@@ -86,6 +88,10 @@ export const PROC_CONSUMER_ALT_SHARE = 0.1;
 // A double weave is normal; a third oGCD between two GCDs clips.
 export const CLIP_WEAVES = 3;
 export const CLIP_FINDING_MS = 500;
+// A GCD that reads 0.3s late or more (unforced; the dialog rounds to 0.1s,
+// so from 0.25s) is a "GCD delay"; under it, "GCD drift" (user,
+// 2026-10-14). Only the kind differs: both count the same.
+export const DELAY_FINDING_MS = 250;
 // Movement under this much per cause and phase isn't listed (still not counted).
 export const MOVEMENT_FINDING_MS = 200;
 
@@ -227,7 +233,7 @@ export function checkGcdGaps(ctx: PlayerCheckContext): DamageFinding[] {
       const during = ctx.mechanicAround(start, end);
       const cause = swap ? `tank swap (${swap.abilityName})` : during ? `during ${during}` : undefined;
       out.push(finding(ctx, {
-        kind: "gcd-drift", startMs: start, endMs: end, forced: false,
+        kind: "gcd-delay", startMs: start, endMs: end, forced: false, delayMs: unforced,
         label: swap ? "GCD gap at a tank swap" : during ? `GCD gap during ${during}` : "GCD gap",
         lostDamage: unforced * perMs,
         cause,
@@ -244,8 +250,9 @@ export function checkGcdGaps(ctx: PlayerCheckContext): DamageFinding[] {
       bucket.ms += unforced;
       const defs = clip ? weaves.filter((w) => ctx.game.isDefensive(w.abilityId)).map((w) => w.abilityName) : [];
       bucket.findings.push(finding(ctx, {
-        kind: clip ? "gcd-clipping" : "gcd-drift", startMs: start, endMs: end, forced: false, minor: true,
-        label: clip ? "GCD clipped by triple weaves" : "Small GCD delay",
+        kind: clip ? "gcd-clipping" : unforced >= DELAY_FINDING_MS ? "gcd-delay" : "gcd-drift",
+        startMs: start, endMs: end, forced: false, minor: true, delayMs: unforced,
+        label: clip ? "GCD clipped by triple weaves" : unforced >= DELAY_FINDING_MS ? "Small GCD delay" : "GCD drift",
         lostDamage: unforced * perMs,
         cause: defs.length ? `defensive woven: ${defs.join(", ")}` : undefined,
         basis: `${s(unforced)} late ÷ ${s(ctx.baseGcdMs)} GCD × ${k(value)} average GCD${inWindows(mid, ctx.buffWindows) ? " in raid buffs" : ""}`,
@@ -256,7 +263,7 @@ export function checkGcdGaps(ctx: PlayerCheckContext): DamageFinding[] {
     }
     if (forced.ms >= 2 * ctx.baseGcdMs && unforced < GAP_FINDING_MS) {
       out.push(finding(ctx, {
-        kind: "gcd-drift", startMs: start, endMs: end, forced: true,
+        kind: "gcd-delay", startMs: start, endMs: end, forced: true, delayMs: forced.ms,
         label: `GCD gap (${forced.cause})`,
         lostDamage: forced.ms * perMs, cause: forced.cause,
         basis: `${s(forced.ms)} forced idle × ${k(value)} average GCD`,

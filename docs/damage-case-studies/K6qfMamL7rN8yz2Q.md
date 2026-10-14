@@ -45,6 +45,11 @@ all eight players on that kill are in `sampledata/damage-ff/`.
       from a hard cast's end, which hides ~1.6s after every Dosis and ~1s
       after Eukrasian GCDs.
 
+- **GCD delay / GCD drift split (user, 2026-10-14).** Entries reading
+  0.3s late or more (gaps included) are "GCD delay", shorter ones "GCD
+  drift"; both headers show their counted time. Sin, Pull 1: 10 delays
+  (~11.2s), 8 drifts (~0.7s).
+
 ## Open
 
 - Lock-model gaps seen in the drift test (they can hide delay, never

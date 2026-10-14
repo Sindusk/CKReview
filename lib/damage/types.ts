@@ -214,7 +214,8 @@ export type DamageContext = {
 // ── Findings ───────────────────────────────────────────────────────────
 
 export type FindingKind =
-  | "gcd-drift"         // one idle stretch between GCDs: a gap of 1s+, or a small delay (minor)
+  | "gcd-delay"         // one idle stretch between GCDs of 0.3s+: a gap of 1s+, or a small delay (minor)
+  | "gcd-drift"         // one GCD under 0.3s late (minor)
   | "gcd-pace"          // a slower base GCD than a same-spec player shows (lib/damage/pace.ts)
   | "gcd-clipping"      // one small delay with three or more weaves between GCDs (minor)
   | "cooldown-drift"    // a cooldown held long enough to lose a use
@@ -271,6 +272,9 @@ export type DamageFinding = {
   // A sub-second GCD delay (checks.ts checkGcdGaps): the timeline draws it
   // as a thin line under the GCD blocks, a gap as a red overlay on them.
   minor?:     boolean;
+  // GCD delay / drift / clipping: the idle it counts (forced: the forced
+  // idle), for the dialog's per-category time.
+  delayMs?:   number;
   // A summary over separate moments (small GCD delays, early DoT refreshes,
   // missed positionals): when each happened, and what that one was and
   // cost. The dialog's strip marks these instead of the whole startMs–endMs

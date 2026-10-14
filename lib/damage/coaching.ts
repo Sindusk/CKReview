@@ -21,8 +21,9 @@ export const THEME_NAME: Record<CoachingTheme, string> = {
 
 // A Record, so a new FindingKind fails to compile until it has a theme.
 export const KIND_THEME: Record<FindingKind, CoachingTheme> = {
+  "gcd-delay":        "gcd",
   "gcd-drift":        "gcd",
-  "gcd-pace":         "gcd",
+  "gcd-pace":        "gcd",
   "gcd-clipping":     "gcd",
   "interrupted-cast": "gcd",
   "burst-window":     "burst",
@@ -49,7 +50,8 @@ export const KIND_THEME: Record<FindingKind, CoachingTheme> = {
 
 // One line a player can act on, by the theme's costliest kind.
 const TIP: Record<FindingKind, string> = {
-  "gcd-drift":        "Keep the next GCD queued. When off-GCDs pile up, weave two and hold the rest.",
+  "gcd-delay":        "Keep the next GCD queued. When off-GCDs pile up, weave two and hold the rest.",
+  "gcd-drift":        "Many small delays add up: press the next GCD before the lock ends, not after it.",
   "gcd-pace":         "Same-spec players pressed faster. Look for a slower GCD setup or late presses.",
   "gcd-clipping":     "Three weaves push the GCD back. Move one off-GCD into the next window.",
   "interrupted-cast": "Cancelled casts are lost time. Start a cast only when you can finish it.",
