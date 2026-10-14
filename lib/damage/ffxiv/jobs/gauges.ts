@@ -276,10 +276,68 @@ export function espritGauge(ctx: PlayerCheckContext): SimulatedGauge {
 
 const dancerGauges = (ctx: PlayerCheckContext): GaugeTrack[] => [featherGauge(ctx).track, espritGauge(ctx).track];
 
+// Astrologian's Arcana (the card spread), after xivanalysis
+// src/parser/jobs/ast/modules/ArcanaTracking: Astral Draw deals The Balance,
+// The Arrow, The Spire and Lord of Crowns; Umbral Draw The Spear, The Bole,
+// The Ewer and Lady of Crowns. Each play takes its card out; the next Draw
+// replaces whatever is left. The lane's height is the cards held (0-4);
+// each play is a tick naming the card and its target, and each card a Draw
+// replaced unplayed is an amber tick. Display only: the damage cards'
+// losses are the `cards` check's (healer.ts). The first spread can come
+// from a pre-pull Draw: a card played before the first Draw starts the
+// pull with that card's whole spread (as xivanalysis approximates it).
+// Not modelled: a death (the spread is kept through it in game, as far as
+// we know; xivanalysis doesn't reset it either).
+const ARCANA_SPREADS: [string, string[]][] = [
+  ["ASTRAL_DRAW", ["THE_BALANCE", "THE_ARROW", "THE_SPIRE", "LORD_OF_CROWNS"]],
+  ["UMBRAL_DRAW", ["THE_SPEAR", "THE_BOLE", "THE_EWER", "LADY_OF_CROWNS"]],
+];
+
+export function arcana(ctx: PlayerCheckContext): GaugeTrack[] {
+  const spreads = ARCANA_SPREADS.filter(([d, cs]) => A[d] && cs.every((c) => A[c]))
+    .map(([d, cs]) => ({ draw: A[d].id, cards: cs.map((c) => A[c].id) }));
+  if (spreads.length < 2) return [];
+  const drawOf = new Map(spreads.map((s) => [s.draw, s.cards]));
+  const cardIds = new Set(spreads.flatMap((s) => s.cards));
+  const events = ctx.player.casts.filter((c) => (drawOf.has(c.abilityId) || cardIds.has(c.abilityId)) && c.timestamp < ctx.endMs)
+    .sort((a, b) => a.timestamp - b.timestamp);
+  if (events.length === 0) return [];
+  const name = (id: number) => ctx.game.action(id)?.name ?? String(id);
+  const party = new Set(ctx.pull.players.map((p) => p.name));
+  let held = new Set<number>();
+  const firstDraw = events.findIndex((e) => drawOf.has(e.abilityId));
+  const prePull = events.slice(0, firstDraw < 0 ? events.length : firstDraw).find((e) => cardIds.has(e.abilityId));
+  if (prePull) held = new Set(spreads.find((s) => s.cards.includes(prePull.abilityId))!.cards);
+  const steps: GaugeTrack["steps"] = [{ t: 0, value: held.size }];
+  const marks: NonNullable<GaugeTrack["marks"]> = [];
+  const set = (t: number) => {
+    if (steps[steps.length - 1].t === t) steps[steps.length - 1].value = held.size;
+    else steps.push({ t, value: held.size });
+  };
+  let plays = 0, lost = 0;
+  for (const e of events) {
+    const dealt = drawOf.get(e.abilityId);
+    if (dealt) {
+      for (const c of held) { marks.push({ t: e.timestamp, label: `${name(c)} replaced unplayed by ${e.abilityName}`, tone: "lost" }); lost++; }
+      held = new Set(dealt);
+    } else {
+      held.delete(e.abilityId);
+      plays++;
+      marks.push({ t: e.timestamp, label: `${e.abilityName}${e.target && party.has(e.target) ? ` on ${e.target === ctx.player.name ? "self" : e.target}` : ""}`, tone: "use" });
+    }
+    set(e.timestamp);
+  }
+  return [{
+    name: "Arcana", max: 4, steps, capped: [], marks,
+    note: `${plays} card${plays === 1 ? "" : "s"} played, ${lost} replaced unplayed by the next Draw (the damage cards' losses are their own findings)`,
+  }];
+}
+
 export const JOB_GAUGES: Record<string, ((ctx: PlayerCheckContext) => GaugeTrack[])[]> = {
   "Sage": [addersgall],
   "Paladin": [oathGauge],
   "Dancer": [dancerGauges],
+  "Astrologian": [arcana],
   // Beast Gauge: the overcap check's own simulation (pld-war.ts beastGaugeSpec).
   "Warrior": [(ctx) => [gaugeTrack(ctx, beastGaugeSpec(ctx))]],
 };

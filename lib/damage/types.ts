@@ -372,6 +372,9 @@ export type GaugeTrack = {
   // Stretches at the cap with the generation timer stopped.
   capped: { startMs: number; endMs: number }[];
   note:   string;     // one line: what was lost, how it's simulated
+  // Named moments drawn as ticks on the lane (AST: each card played, and
+  // each one a Draw replaced unplayed as "lost").
+  marks?: { t: number; label: string; tone: "use" | "lost" }[];
 };
 
 export type PhaseDamageSummary = {

@@ -76,6 +76,13 @@ all eight players on that kill are in `sampledata/damage-ff/`.
   an expired Inner Release stack now costs Fell Cleave minus Maim (50k,
   was 81k).
 
+- **Yoro Shiku (Astrologian), Vamp Fatale.** Per-claim record in
+  lib/damage/ffxiv/jobs/healer.ts. Built: the Arcana lane (cards held,
+  a tick per play naming its target, amber ticks for cards a Draw
+  replaced; GaugeTrack.marks). Fixed in the engine: a stretch with three
+  or more weaves spends no movement (8:10, 1.87s: was movement, now a
+  32k delay). Lost 477k → 509k.
+
 ## Open
 
 - Lock-model gaps seen in the drift test (they can hide delay, never

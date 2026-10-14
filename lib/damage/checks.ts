@@ -203,8 +203,14 @@ export function checkGcdGaps(ctx: PlayerCheckContext): DamageFinding[] {
     if (idle <= 0) return;
     const start = from, end = to - GCD_TOLERANCE_MS;
     const forced = forcedPart(start, end, ctx.forced);
+    const weaves = ogcds.filter((c) => c.timestamp > gcdStart && c.timestamp < to);
     let moveMs = 0, moveCause: string | undefined, moveBest = 0;
-    for (const w of moveWins) {
+    // Three or more weaves are the delay, not the mechanic's movement
+    // (K6qfMamL7rN8yz2Q Vamp Fatale, the Astrologian at 8:10: an instant
+    // Fall Malefic, then Earthly Star, Divination and The Balance, the next
+    // GCD 1.87s late inside Undead Deathmatch's window; xivanalysis's
+    // weaving issue). Such a stretch is a clip and spends no movement.
+    for (const w of weaves.length >= CLIP_WEAVES ? [] : moveWins) {
       if (w.endMs <= start || w.startMs >= end) continue;
       const s0 = Math.max(start, w.startMs), e0 = Math.min(end, w.endMs);
       const o = e0 - s0 - overlapMs(s0, e0, forcedMerged);
@@ -226,7 +232,6 @@ export function checkGcdGaps(ctx: PlayerCheckContext): DamageFinding[] {
       acc.moments.push({ startMs: start, endMs: end, lostDamage: moveMs * perMs, detail: `${s(moveMs)} moving (${moveCause}) after ${after}` });
       moved.set(key, acc);
     }
-    const weaves = ogcds.filter((c) => c.timestamp > gcdStart && c.timestamp < to);
     const swap = weaves.find((c) => ctx.game.tankSwapActionIds.has(c.abilityId)) ??
       ctx.player.casts.find((c) => ctx.game.tankSwapActionIds.has(c.abilityId) && c.timestamp >= start - 3_000 && c.timestamp <= end);
     if (unforced >= GAP_FINDING_MS) {

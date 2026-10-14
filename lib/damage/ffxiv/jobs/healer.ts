@@ -74,6 +74,20 @@
 //   Star missed" (it counts from 0:00 past a pre-pull star exploded at
 //   0:17; 55s held in all, under one recharge). No damage: overheal,
 //   Synastry, Horoscope, Swiftcast 0/28.
+// - Astrologian, checked against xivanalysis on K6qfMamL7rN8yz2Q Vamp
+//   Fatale (7.4, 2026-10-14). Matched: GCD uptime (94.7% / 95.1%), its 7
+//   GCD downtimes and 9 weaving issues by time, the 5:47 interrupted
+//   Gravity II, 2 Gravity IIs on one target, Combust missing from four
+//   Divinations and 8:12's 7/8 GCDs, the 0:58 Combust before Vamp's 20s
+//   out of reach (a dot-clip finding). Fixed: the 8:10 triple weave
+//   (Earthly Star, Divination, The Balance after an instant Fall Malefic,
+//   1.87s) read as Undead Deathmatch movement; three weaves are now the
+//   delay, not movement (checks.ts). Built: the Arcana lane on the timeline
+//   (jobs/gauges.ts arcana; its card log matches, 10/10 draws, 36 plays,
+//   4 cards replaced unplayed). Not adopted: the 1:38 Combust on
+//   Coffinmaker (20s of ticks before it died, more than a Fall Malefic);
+//   the Arrow / Spire dropped (mitigation cards); overheal, defensives,
+//   Swiftcast.
 // - Scholar, checked against xivanalysis on qjCMx4bRfgNKwX9T Dancing Mad
 //   kill (7.5, 2026-10-13): GCD uptime, Chain Stratagem and Aetherflow
 //   (no use lost), 6 interrupted casts and its weaving gaps (17:24 6.2s,

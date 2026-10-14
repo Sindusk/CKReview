@@ -374,7 +374,9 @@ function GcdTip({ g, next }: { g: TimelineGcd; next?: TimelineGcd }) {
 }
 
 // A job gauge lane: a bar per step, height by value; the stretches at the
-// cap with the timer stopped (generation lost) in amber.
+// cap with the timer stopped (generation lost) in amber. Marks (AST cards)
+// are ticks over it, each with its own tooltip: a use in the text colour, a
+// lost one in amber.
 function GaugeLane({ gauge, y, h, x, w, total }: {
   gauge: GaugeTrack; y: number; h: number; x: (t: number) => number; w: (s: number, e: number) => number; total: number;
 }) {
@@ -389,6 +391,12 @@ function GaugeLane({ gauge, y, h, x, w, total }: {
         const bh = (s.value / gauge.max) * (h - 2);
         return <rect key={`s${i}`} x={x(s.t)} y={y + h - 1 - bh} width={w(s.t, end)} height={bh} style={{ fill: "var(--ck-text-3)" }} opacity={0.5} />;
       })}
+      {gauge.marks?.map((m, i) => (
+        <rect key={`m${i}`} x={x(m.t) - 1} y={y} width={2} height={h}
+          style={{ fill: m.tone === "lost" ? "#e8a838" : "var(--ck-text-2)" }} opacity={0.9}>
+          <title>{`${fmtPrecise(m.t)} ${m.label}`}</title>
+        </rect>
+      ))}
     </g>
   );
 }
