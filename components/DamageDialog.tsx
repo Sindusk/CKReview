@@ -227,12 +227,14 @@ export default function DamageDialog({ open, onClose, pulls, currentPullId }: Da
                 ? aggregate.map((a) => (
                   <PlayerCard key={a.player} name={a.player} job={a.job} color={colorFor(a.player, a.job)} icon={iconFor(a.player, a.job)}
                     lost={a.lostPerPull} forced={a.forcedPerPull} movement={a.movementPerPull} uptime={a.gcdUptime}
+                    showMovement={aggregate.some((x) => x.movementPerPull >= 1)}
                     dealt={a.damagePerPull} dealtLabel={`dealt / ${a.pulls} pull${a.pulls === 1 ? "" : "s"}`}
                     selected={a.player === activePlayer} onClick={() => setSelectedPlayer(a.player)} />
                 ))
                 : analysis?.players.map((p) => (
                   <PlayerCard key={p.player} name={p.player} job={p.job} color={colorFor(p.player, p.job)} icon={iconFor(p.player, p.job)}
                     lost={p.lostDamage} forced={p.forcedDamage} movement={p.movementDamage ?? 0} uptime={p.gcdUptime.pct}
+                    showMovement={analysis.players.some((x) => (x.movementDamage ?? 0) >= 1)}
                     dealt={p.damage} dealtLabel="dealt"
                     selected={p.player === activePlayer} onClick={() => setSelectedPlayer(p.player)} />
                 ))}
@@ -334,8 +336,11 @@ type ColorFor = (player: string, job: string) => string;
 const fmtUptime = (pct: number) => `${(pct * 100).toFixed(1)}%`;
 
 // Icon | name (job colour) over job · uptime | damage dealt | loss over forced.
-function PlayerCard({ name, job, color, icon, lost, forced, movement, uptime, dealt, dealtLabel, selected, onClick }: {
-  name: string; job: string; color: string; icon: string; lost: number; forced: number; movement: number; uptime: number;
+function PlayerCard({ name, job, color, icon, lost, forced, movement, showMovement, uptime, dealt, dealtLabel, selected, onClick }: {
+  name: string; job: string; color: string; icon: string; lost: number; forced: number; movement: number;
+  // Any card in the list has movement: every card shows its (possibly 0k)
+  // movement number so the columns line up.
+  showMovement: boolean; uptime: number;
   dealt: number; dealtLabel: string; selected: boolean; onClick: () => void;
 }) {
   // Two lines always: long text is cut with an ellipsis, never wrapped.
@@ -366,7 +371,7 @@ function PlayerCard({ name, job, color, icon, lost, forced, movement, uptime, de
       <div style={{ textAlign: "right" }}>
         <div className="ck-num" style={{ color: lost > 0 ? LOSS_COLOR : "var(--ck-text-2)", fontSize: 14, fontWeight: 600 }}>{fmtDamage(lost)}</div>
         <div className="ck-num" style={small} title={`Forced ${fmtDamage(forced)}; movement a mechanic required ${fmtDamage(movement)} (neither is counted)`}>
-          {fmtDamage(forced)}{movement >= 1 && <> · <span style={{ color: MOVEMENT_COLOR }}>{fmtDamage(movement)}</span></>}
+          {fmtDamage(forced)}{(showMovement || movement >= 1) && <> · <span style={{ color: MOVEMENT_COLOR }}>{movement >= 1 ? fmtDamage(movement) : "0k"}</span></>}
         </div>
       </div>
     </div>
