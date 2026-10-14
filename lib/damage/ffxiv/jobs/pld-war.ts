@@ -55,7 +55,8 @@
 //   Atonement) sit in the lenient saws/towers/adds window, though no
 //   other melee idled at 4:54 (raised with the user).
 // - Weaving 2:14, 5:53 (0.08s each): inside the 0.15s tolerance.
-// - Oath gauge (570 lost) and defensives: mitigation.
+// - Oath gauge (570 lost) and defensives: mitigation. The Oath Gauge is
+//   on the timeline (jobs/gauges.ts oathGauge, 570 there too), not counted.
 //
 // Fight or Flight, ported from
 // xivanalysis src/parser/jobs/pld/modules/FightOrFlight.tsx: 8 GCDs;

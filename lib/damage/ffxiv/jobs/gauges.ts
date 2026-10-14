@@ -89,6 +89,66 @@ export function addersgall(ctx: PlayerCheckContext): GaugeTrack[] {
   }];
 }
 
+// Paladin's Oath Gauge, after xivanalysis src/parser/jobs/pld/modules/Gauge.tsx:
+//   - 100 at most; the pull starts full
+//   - +5 per auto-attack; the app keeps autos out of the cast stream, so
+//     each Attack hit counts, unlanded ones too (one per swing: they're
+//     1.7s+ apart on K6qfMamL7rN8yz2Q's Vamp Fatale kill)
+//   - Sheltron, Holy Sheltron, Intervention and Cover spend 50
+// Gauge past 100 is lost; it buys Holy Sheltron / Intervention, which is
+// mitigation, so it's shown, not counted. Checked on K6qfMamL7rN8yz2Q
+// Vamp Fatale: 570 over the cap, as xivanalysis says. Not modelled (nor by
+// xivanalysis): a death's effect on the gauge.
+const OATH_MAX = 100;
+const OATH_PER_AUTO = 5;
+const OATH_COST = 50;
+const OATH_SPENDERS = new Set(
+  ["SHELTRON", "HOLY_SHELTRON", "INTERVENTION", "COVER"].map((k) => A[k]?.id).filter((id): id is number => id !== undefined),
+);
+
+export function oathGauge(ctx: PlayerCheckContext): GaugeTrack[] {
+  const attack = A.ATTACK?.id;
+  const autos = [...ctx.player.damageDone, ...(ctx.player.unlandedHits ?? [])]
+    .filter((e) => e.abilityId === attack && !e.pet && e.timestamp < ctx.endMs);
+  if (autos.length === 0) return [];
+  const events = [
+    ...autos.map((e) => ({ t: e.timestamp, spend: false })),
+    ...ctx.player.casts.filter((c) => OATH_SPENDERS.has(c.abilityId) && c.timestamp < ctx.endMs).map((c) => ({ t: c.timestamp, spend: true })),
+  ].sort((a, b) => a.t - b.t);
+
+  let value = OATH_MAX, over = 0, short = 0;
+  let cappedSince: number | null = 0;
+  const steps: GaugeTrack["steps"] = [{ t: 0, value }];
+  const capped: GaugeTrack["capped"] = [];
+  const set = (t: number, v: number) => {
+    value = v;
+    if (steps[steps.length - 1].t === t) steps[steps.length - 1].value = v;
+    else steps.push({ t, value: v });
+  };
+  for (const e of events) {
+    if (e.spend) {
+      if (value < OATH_COST) { short++; continue; }
+      if (cappedSince !== null && e.t > cappedSince) capped.push({ startMs: cappedSince, endMs: e.t });
+      cappedSince = null;
+      set(e.t, value - OATH_COST);
+    } else if (value + OATH_PER_AUTO > OATH_MAX) {
+      over += value + OATH_PER_AUTO - OATH_MAX;
+      if (value < OATH_MAX) { set(e.t, OATH_MAX); cappedSince = e.t; }
+    } else {
+      set(e.t, value + OATH_PER_AUTO);
+      if (value >= OATH_MAX) cappedSince = e.t;
+    }
+  }
+  if (cappedSince !== null && ctx.endMs > cappedSince) capped.push({ startMs: cappedSince, endMs: ctx.endMs });
+
+  return [{
+    name: "Oath", max: OATH_MAX, steps, capped,
+    note: `${over} gauge lost at the cap (${Math.round(over / OATH_COST * 10) / 10} Holy Sheltrons; mitigation, not counted)` +
+      (short > 0 ? `; ${short} spend${short === 1 ? "" : "s"} the simulation had no gauge for (model or log off)` : ""),
+  }];
+}
+
 export const JOB_GAUGES: Record<string, ((ctx: PlayerCheckContext) => GaugeTrack[])[]> = {
   "Sage": [addersgall],
+  "Paladin": [oathGauge],
 };
