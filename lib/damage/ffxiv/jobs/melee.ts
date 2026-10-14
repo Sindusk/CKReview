@@ -69,6 +69,15 @@
 //     which run into downtime or past an HP check (forced here). Not
 //     adopted: "Chaotic Spring before invulnerability" (it's a combo
 //     step, not an optional DoT GCD).
+//     Rechecked on K6qfMamL7rN8yz2Q Vamp Fatale (7.4, 2026-10-14). Matched:
+//     its 5 missed positionals by time, Power Surge (93.7%), Chaotic
+//     Spring uptime, every Lance Charge / Battle Litany window full, its
+//     GCD downtimes by time (most are Bombpyre / saws movement, or Piercing
+//     Talons forced out of reach). Built: Life of the Dragon, +15% (below;
+//     its 5:11 and 7:12 at 7/8); Life Surge drift valued as a forced crit
+//     (tracked-cooldowns.ts; its 13/14, 1 use, 25k); the Firstminds' Focus
+//     lane (jobs/gauges.ts; 0 lost, as it says). Not adopted: Chaotic
+//     Spring before invulnerability (above); Feint, Bloodbath, Second Wind.
 //   - Ninja: Kunai's Bane window, Ninki and Kazematoi (below). Checked
 //     against xivanalysis on dDar482XvFKBPJYh FRU kill (7.1, 2026-10-12):
 //     its 9 Kazematoi lost and 1 unbuffed Aeolian Edge match; Ninki ~300
@@ -95,7 +104,7 @@ import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import type { DamageFinding, JobCheck } from "../../types";
 import { chargesAt, finding, PROC_CONSUME_MS, PROC_EXPIRY_EARLY_MS, type PlayerCheckContext } from "../../checks";
 import { forcedPart, inWindows, mergeWindows } from "../../timeline";
-import { aoeOnOneTargetFindings, burstWindowFindings, castHits, dotFindings, gaugeFindings, k, offCooldownIn, s, statusWindows, uptimeFindings, type ExpectedAction, type GaugeEvent } from "./shared";
+import { aoeOnOneTargetFindings, burstWindowFindings, castHits, dotFindings, gaugeFindings, k, offCooldownIn, s, statusWindows, uptimeFindings, type ExpectedAction, type GaugeEvent, type GaugeSpec } from "./shared";
 import { comboLanded } from "./gnb";
 
 const id = (key: string) => A[key].id;
@@ -268,6 +277,26 @@ const lanceCharge: JobCheck = (ctx) => burstWindowFindings(ctx, {
     })),
 });
 
+// Life of the Dragon (xivanalysis BloodOfTheDragon.tsx): 8 GCDs in the 20s
+// from each Geirskogul. It's +15%: the FFLogs multiplier with only it and
+// Power Surge is 1.26 (1.10 × 1.15), with Lance Charge too 1.39, on all
+// three Vamp Fatale kills checked (K6qfMamL7rN8yz2Q, grK2z6ptfZWGmVdj,
+// vVPtwaTQ62Jg391q). The status (1003177) is in the hit snapshots only,
+// never the buff stream, so the window is the Geirskogul cast + 20s (the
+// last hit carrying it lands 19-21.6s after, hits trailing their casts).
+// GCDs only: its oGCDs are Lance Charge's (above), which starts ~2s
+// before it, so they'd be counted twice. K6qfMamL7rN8yz2Q: 5:11 and 7:12
+// at 7/8, xivanalysis's two.
+const LOTD_MS = 20_000;
+const lifeOfTheDragon: JobCheck = (ctx) => burstWindowFindings(ctx, {
+  statusId: 1_003_177, name: "Life of the Dragon", bonus: 0.15,
+  bonusBasis: "Life of the Dragon is +15% (FFLogs multiplier: 1.26 with Power Surge alone)",
+  windows: (c) => c.player.casts.filter((x) => x.abilityId === id("GEIRSKOGUL"))
+    .map((x) => ({ startMs: x.timestamp, endMs: x.timestamp + LOTD_MS })),
+  expectedGcds: () => 8,
+  expected: () => [],
+});
+
 // Life Surge (xivanalysis LifeSurge.ts): its guaranteed crit belongs on
 // Drakesbane or Heavens' Thrust (Coerthan Torment in AoE). The GCD that
 // consumed it is the cast at the status's removal. xivanalysis also
@@ -280,7 +309,7 @@ const lanceCharge: JobCheck = (ctx) => burstWindowFindings(ctx, {
 // crit buffs (lib/damage/buffs.ts: ×1.55 at a 25% base rate, so a forced
 // crit adds 36% over an average hit). Marked inference.
 const LIFE_SURGE_GOOD = ["DRAKESBANE", "HEAVENS_THRUST", "COERTHAN_TORMENT", "FANG_AND_CLAW", "WHEELING_THRUST", "CHAOTIC_SPRING"];
-const FORCED_CRIT_SHARE = (1.55 - (1 + 0.25 * 0.55)) / (1 + 0.25 * 0.55);
+export const FORCED_CRIT_SHARE = (1.55 - (1 + 0.25 * 0.55)) / (1 + 0.25 * 0.55);
 
 const lifeSurge: JobCheck = (ctx): DamageFinding[] => {
   const out: DamageFinding[] = [];
@@ -713,7 +742,8 @@ export const MNK_CHECKS: JobCheck[] = [riddleOfFire];
 // Draconian Fury, cap 2, Wyrmwind Thrust spends 2. A stack gained at 2 is
 // half a Wyrmwind. On 2T1HzdPKgbhM43am fight 10 the cast simulation finds
 // xivanalysis's 2 lost stacks (3:17, 6:18) and never goes below zero.
-const firstmindsFocus: JobCheck = (ctx) => {
+// The timeline draws the same simulation (jobs/gauges.ts, gaugeTrack).
+export function firstmindsFocusSpec(ctx: PlayerCheckContext): GaugeSpec {
   const gain = new Set(ids("RAIDEN_THRUST", "DRACONIAN_FURY"));
   const spend = new Set(ids("WYRMWIND_THRUST"));
   const events: GaugeEvent[] = [];
@@ -723,13 +753,14 @@ const firstmindsFocus: JobCheck = (ctx) => {
   }
   for (const d of ctx.dead) events.push({ t: d.startMs, type: "reset", label: "death" });
   const perStack = ctx.values.perUse(id("WYRMWIND_THRUST")) / 2;
-  return gaugeFindings(ctx, {
+  return {
     name: "Firstminds' Focus", unit: "Firstminds' Focus", cap: 2, unitValue: perStack,
     valueBasis: `${k(perStack * 2)} average Wyrmwind Thrust per 2`,
     events,
-  });
-};
+  };
+}
+const firstmindsFocus: JobCheck = (ctx) => gaugeFindings(ctx, firstmindsFocusSpec(ctx));
 
-export const DRG_CHECKS: JobCheck[] = [uptime("POWER_SURGE", 0.1, "Power Surge is +10% (tooltip)", { cost: drgPowerSurgeRefreshCost, reapplyGcds: 1, restartIds: ids("RAIDEN_THRUST", "TRUE_THRUST") }), lanceCharge, lifeSurge, chaoticSpring, firstmindsFocus];
+export const DRG_CHECKS: JobCheck[] = [uptime("POWER_SURGE", 0.1, "Power Surge is +10% (tooltip)", { cost: drgPowerSurgeRefreshCost, reapplyGcds: 1, restartIds: ids("RAIDEN_THRUST", "TRUE_THRUST") }), lanceCharge, lifeOfTheDragon, lifeSurge, chaoticSpring, firstmindsFocus];
 export const NIN_CHECKS: JobCheck[] = [kunaisBane, ninki, kazematoi];
 export const RPR_CHECKS: JobCheck[] = [enshroud, arcaneCircle, deathsDesign, harvestMoon, shroud, whorl];

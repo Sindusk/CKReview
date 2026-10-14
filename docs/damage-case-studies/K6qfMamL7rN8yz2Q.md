@@ -100,6 +100,13 @@ all eight players on that kill are in `sampledata/damage-ff/`.
   absorb is a broken shield. Open: Phlegma III held to the kill (the
   charges-at-kill proposal).
 
+- **Sayacissa Morsaelth (Dragoon), Vamp Fatale.** Per-claim record in
+  lib/damage/ffxiv/jobs/melee.ts. Built: the Firstminds' Focus lane;
+  Life of the Dragon as a +15% window (status 1003177, only in hit
+  snapshots: measured 1.26 = 1.10 × 1.15 on three kills; burst windows
+  can now take their windows directly); Life Surge drift valued as a
+  forced crit (TrackedCooldownSpec.valuePerUse). Lost 748k → 762k + 25k.
+
 ## Open
 
 - Lock-model gaps seen in the drift test (they can hide delay, never

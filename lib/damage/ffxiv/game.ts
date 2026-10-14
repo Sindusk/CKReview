@@ -161,6 +161,7 @@ const TRACKED = new Map<string, TrackedCooldown[]>(
       damageIds:        spec.damage?.map((key) => XIVA_ACTIONS[key]?.id).filter((id): id is number => id !== undefined),
       landDelayMs:      spec.landDelayMs,
       petDamage:        spec.petDamage,
+      valuePerUse:      spec.valuePerUse,
     }];
   })]),
 );

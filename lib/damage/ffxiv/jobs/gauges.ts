@@ -26,6 +26,7 @@ import type { PlayerCheckContext } from "../../checks";
 import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import { beastGaugeSpec } from "./pld-war";
 import { paletteSpec } from "./caster";
+import { firstmindsFocusSpec } from "./melee";
 import { gaugeCastTimes, gaugeTrack, statusWindows } from "./shared";
 
 const ADDERSGALL_MAX = 3;
@@ -473,6 +474,8 @@ const pictomancerGauges = (ctx: PlayerCheckContext): GaugeTrack[] => {
 export const JOB_GAUGES: Record<string, ((ctx: PlayerCheckContext) => GaugeTrack[])[]> = {
   "Pictomancer": [pictomancerGauges],
   "Sage": [addersgall, addersting],
+  // Firstminds' Focus: the overcap check's own simulation (melee.ts).
+  "Dragoon": [(ctx) => [gaugeTrack(ctx, firstmindsFocusSpec(ctx))]],
   "Paladin": [oathGauge],
   "Dancer": [dancerGauges],
   "Astrologian": [arcana],

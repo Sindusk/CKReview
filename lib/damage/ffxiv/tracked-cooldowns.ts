@@ -16,6 +16,11 @@
 // Jobs whose batch hasn't come yet track only their two-minute party buff;
 // the role batches (docs/archive/damage-analysis-plan.md, Layer 3) add the rest.
 
+import type { PlayerInfo } from "@/types/PlayerInfo";
+import type { TrackedCooldown } from "../types";
+import { XIVA_ACTIONS } from "./xiva-data";
+import { FORCED_CRIT_SHARE } from "./jobs/melee";
+
 export type TrackedCooldownSpec = {
   actions:           string[];  // xivanalysis action keys; several = one shared recast
   firstUseOffsetMs?: number;    // how late the opener normally uses it
@@ -29,7 +34,28 @@ export type TrackedCooldownSpec = {
   landDelayMs?:      number;
   // Its damage is the player's pet hits (Bunshin's shadow).
   petDamage?:        boolean;
+  // A cooldown worth what it does to another action (TrackedCooldown.valuePerUse).
+  valuePerUse?:      TrackedCooldown["valuePerUse"];
 };
+
+// Life Surge: a forced crit on the best GCD, as the Life Surge check values
+// one misspent (jobs/melee.ts): the best of Drakesbane / Heavens' Thrust's
+// averages × FORCED_CRIT_SHARE. Without it a held Life Surge read as
+// nothing (no damage of its own): K6qfMamL7rN8yz2Q Vamp Fatale, 41.9s at
+// both charges from 7:41.6, xivanalysis's 13/14.
+function lifeSurgeValue(player: PlayerInfo, endMs: number): { value: number; basis: string } | undefined {
+  const avg = (key: string) => {
+    const id = XIVA_ACTIONS[key]?.id;
+    const hits = player.damageDone.filter((e) => e.abilityId === id && !e.isDoT && !e.pet && e.timestamp < endMs && (e.amount ?? 0) > 0);
+    return hits.length ? hits.reduce((a, e) => a + (e.amount ?? 0), 0) / hits.length : 0;
+  };
+  const best = Math.max(avg("DRAKESBANE"), avg("HEAVENS_THRUST"));
+  if (best <= 0) return undefined;
+  return {
+    value: best * FORCED_CRIT_SHARE,
+    basis: `${Math.round(best / 1000)}k best of Drakesbane / Heavens' Thrust × ${Math.round(FORCED_CRIT_SHARE * 100)}% (a forced crit over an average hit, estimated)`,
+  };
+}
 
 export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
   // ── Tanks (from xivanalysis gnb/Cooldowns.tsx, drk/OGCDDowntime.ts,
@@ -74,7 +100,7 @@ export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
     { actions: ["HIGH_JUMP"], firstUseOffsetMs: 14500 },
     { actions: ["GEIRSKOGUL"], firstUseOffsetMs: 14500 },
     { actions: ["DRAGONFIRE_DIVE"], firstUseOffsetMs: 14500 },
-    { actions: ["LIFE_SURGE"], firstUseOffsetMs: 12000 },
+    { actions: ["LIFE_SURGE"], firstUseOffsetMs: 12000, valuePerUse: lifeSurgeValue },
     { actions: ["LANCE_CHARGE"], firstUseOffsetMs: 7000 },
     { actions: ["BATTLE_LITANY"], firstUseOffsetMs: 7000 },
   ],

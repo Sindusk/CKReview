@@ -200,6 +200,10 @@ export type BurstWindowSpec = {
   // last action ends early (Reawaken, ended by Ouroboros). One whose full
   // span runs past the end of the pull was cut by the kill and is skipped.
   spanMs?:       (ctx: PlayerCheckContext) => number;
+  // The windows themselves, for a status only the hit snapshots carry
+  // (Dragoon's Life of the Dragon: 20s from each Geirskogul). Overrides
+  // statusId / allOf / onEnemy.
+  windows?:      (ctx: PlayerCheckContext) => Window[];
 };
 
 /** Windows where the player's own debuff is on any enemy. */
@@ -248,7 +252,8 @@ function overlapWindows(lists: Window[][]): Window[] {
 
 export function burstWindowFindings(ctx: PlayerCheckContext, specIn: BurstWindowSpec): DamageFinding[] {
   const out: DamageFinding[] = [];
-  const windows = specIn.allOf ? overlapWindows(specIn.allOf.map((id) => statusWindows(ctx, id)))
+  const windows = specIn.windows ? specIn.windows(ctx)
+    : specIn.allOf ? overlapWindows(specIn.allOf.map((id) => statusWindows(ctx, id)))
     : specIn.onEnemy ? enemyStatusWindows(ctx, specIn.statusId) : statusWindows(ctx, specIn.statusId);
   // The window's own cycle: the shortest gap between window starts (its
   // recast, give or take drift). With one window, nothing is unavailable.
