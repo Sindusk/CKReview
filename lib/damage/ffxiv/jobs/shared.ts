@@ -387,6 +387,10 @@ export type DotSpec = {
   // An early refresh in raid buffs is a snapshot, not a cost: the new DoT
   // ticks under the buffs for its whole duration (Bard's burst Iron Jaws).
   snapshotInBuffs?: boolean;
+  // The job's other DoTs, each needing its own GCD to apply once all have
+  // lapsed (Bard's Caustic Bite and Stormbite after an add or downtime):
+  // each one the player applied first in a gap adds a GCD to its grace.
+  pairedIds?:  number[];
 };
 
 const DOT_CAST_MS = 1_500;   // cast → status applied
@@ -721,11 +725,22 @@ export function dotFindings(ctx: PlayerCheckContext, spec: DotSpec): DamageFindi
   if (!active.length) return out;
   const forced = mergeWindows(ctx.forced);
   const grace = ctx.baseGcdMs + 1_000;
+  // Fresh applications of the paired DoTs (an Iron Jaws refresh logs
+  // "refreshed", so only a lapsed one counts).
+  const paired = new Set(spec.pairedIds ?? []);
+  const pairedApplies = paired.size ? (ctx.pull.bossDebuffs ?? [])
+    .filter((e) => paired.has(e.statusId) && e.sourceName === ctx.player.name && e.status === "applied")
+    : [];
   let cursor = active[0].startMs;
   for (const w of [...active, { startMs: ctx.endMs, endMs: ctx.endMs }]) {
     if (w.startMs > cursor) {
       const len = w.startMs - cursor - overlapMs(cursor, w.startMs, forced);
-      if (len >= grace) {
+      // 6XaWqwMbkZG9pLmx Vamp Fatale 1:58: both of the Bard's DoTs came off
+      // with Coffinmaker; Caustic Bite went on 2.9s later, Stormbite a GCD
+      // after it (5.0s), which the plain grace read as lost (user, 2026-10-13).
+      // One GCD per paired DoT, however many enemies it went on.
+      const firsts = new Set(pairedApplies.filter((e) => e.timestamp >= cursor && e.timestamp < w.startMs).map((e) => e.statusId)).size;
+      if (len >= grace + firsts * ctx.baseGcdMs) {
         out.push(finding(ctx, {
           kind: "dot-uptime", startMs: cursor, endMs: w.startMs, forced: false,
           label: `${spec.name} off the boss`,

@@ -64,6 +64,10 @@
 //   DoTs before invulnerability (3:04 and 11:46 are dot-clip findings,
 //   5:40 ticked to 6:15); Army's Muse 3/5 and 4/5 (the burst windows'
 //   GCD counts already hold them).
+//   6XaWqwMbkZG9pLmx Vamp Fatale (7.4, user, 2026-10-13): after both DoTs
+//   lapse (Coffinmaker's death at 1:58) one goes on a GCD after the other,
+//   in either order; Stormbite's 5.0s gap read as lost. Now each DoT's
+//   uptime grace adds a GCD when the other was applied first (pairedIds).
 // Machinist (unverified): Wildfire on the enemy, 6 GCDs (Wildfire.tsx);
 //   Hypercharge (Overheated), 5 Heat Blasts / Blazing Shots / Auto
 //   Crossbows (Hypercharge.tsx), each missing one its average; cooldowns
@@ -225,12 +229,15 @@ export const PROC_REPLACES = new Map(([
 // DoTs (shared.ts dotApplicationFindings, against Burst Shot, less the
 // Iron Jaws hit), a refresh in raid buffs is a snapshot and costs nothing,
 // and Caustic Bite, refreshed by the same casts, counts only its uptime.
+// After both lapse (an add, downtime), they go back on one GCD apart in
+// either order, so each gets a GCD's more grace for the other (pairedIds).
 const bardDots: JobCheck = (ctx) => [
-  ...dotFindings(ctx, { statusIds: [S.CAUSTIC_BITE.id], name: S.CAUSTIC_BITE.name, durationMs: S.CAUSTIC_BITE.duration ?? 45_000, uptimeOnly: true }),
+  ...dotFindings(ctx, { statusIds: [S.CAUSTIC_BITE.id], name: S.CAUSTIC_BITE.name, durationMs: S.CAUSTIC_BITE.duration ?? 45_000, uptimeOnly: true,
+    pairedIds: [S.STORMBITE.id] }),
   ...dotFindings(ctx, {
     statusIds: [S.STORMBITE.id], name: S.STORMBITE.name, durationMs: S.STORMBITE.duration ?? 45_000,
     fillerId: () => ({ id: A.BURST_SHOT.id, name: A.BURST_SHOT.name }),
-    castIds: [A.IRON_JAWS.id], snapshotInBuffs: true,
+    castIds: [A.IRON_JAWS.id], snapshotInBuffs: true, pairedIds: [S.CAUSTIC_BITE.id],
   }),
 ];
 
