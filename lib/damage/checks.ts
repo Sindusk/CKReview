@@ -373,6 +373,10 @@ export function checkPositionals(ctx: PlayerCheckContext): DamageFinding[] {
     if (e.bonusPercent === undefined && a.comboFrom) continue;
     if (!a.positional.missedBonus.includes(e.bonusPercent ?? 0)) continue;
     g.misses++;
+    // Anchored on the first miss, not the phase's first cast: a P2 Fang and
+    // Claw summary read "3:48", a hit that landed its positional
+    // (yBKPqGwHparm7Tk4 fight 5; the misses were 4:42.6 and 6:13.4).
+    if (g.misses === 1) g.start = e.timestamp;
     g.lost += (e.amount ?? 0) * a.positional.missCost;
     g.end = e.timestamp;
     g.moments.push({
