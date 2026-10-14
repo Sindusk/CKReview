@@ -417,42 +417,60 @@ function PlayerCard({ name, job, color, icon, lost, forced, movement, showMoveme
   );
 }
 
-// The top three themes by counted loss, each with its tip and worst instance.
-// Clicking one opens that kind's findings (single pull only).
+// The top three themes by counted loss, as one fixed-height row (user,
+// 2026-10-14: the timeline under it mustn't move between players). Each
+// card is two single lines: theme, loss and share; then the worst
+// instance, cut with an ellipsis. The tip and the full worst line are in
+// the card's hover. Three slots always, empty ones dashed. Clicking a card
+// opens that kind's findings (single pull only).
+const WIN_SLOTS = 3;
+const WIN_CARD_H = 52;
 function BiggestWins({ items, perPull, icons, onPick }: {
   items: CoachingItem[]; perPull?: number; icons: AbilityIcons; onPick?: (f: DamageFinding) => void;
 }) {
-  const wins = biggestWins(items);
-  if (wins.length === 0) return null;
+  const wins = biggestWins(items, WIN_SLOTS);
   const div = perPull ?? 1;
+  const line: React.CSSProperties = { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 };
   return (
-    <div style={{ marginBottom: 12 }}>
-      <div className="ck-section-label" style={{ margin: "0 0 6px" }}>Biggest wins{perPull ? " (per pull)" : ""}</div>
-      <div style={{ display: "grid", gridTemplateColumns: `repeat(${wins.length}, minmax(0, 1fr))`, gap: 6 }}>
-        {wins.map((w, i) => (
-          <div key={w.theme} className={onPick ? "ck-card ck-card--interactive" : "ck-card"} onClick={() => onPick?.(w.worst)}
-            style={{ padding: "9px 11px 10px", display: "grid", gap: 6, alignContent: "start", cursor: onPick ? "pointer" : undefined, minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <ThemeGlyph theme={w.theme} size={24} />
-              <span style={{ fontWeight: 600, fontSize: 13, flex: "1 1 auto", color: "var(--ck-text)" }}>{THEME_NAME[w.theme]}</span>
-              <span className="ck-num" style={{ color: "var(--ck-text-3)", fontSize: 11 }}>#{i + 1}</span>
+    <div style={{ marginBottom: 10 }}>
+      <div className="ck-section-label" style={{ margin: "0 0 5px" }}>Biggest wins{perPull ? " (per pull)" : ""}</div>
+      <div style={{ display: "grid", gridTemplateColumns: `repeat(${WIN_SLOTS}, minmax(0, 1fr))`, gap: 6 }}>
+        {Array.from({ length: WIN_SLOTS }, (_, i) => {
+          const w = wins[i];
+          if (!w) {
+            return (
+              <div key={`empty${i}`} style={{
+                height: WIN_CARD_H, border: "1px dashed var(--ck-line-2)", borderRadius: 3, display: "flex", alignItems: "center",
+                justifyContent: "center", color: "var(--ck-text-3)", fontSize: 11.5,
+              }}>
+                {i === 0 ? "No counted loss" : ""}
+              </div>
+            );
+          }
+          return (
+            <div key={w.theme} className={onPick ? "ck-card ck-card--interactive" : "ck-card"} onClick={() => onPick?.(w.worst)}
+              title={`${w.tip}\nWorst: ${fmtTime(w.worst.startMs)} ${w.worst.detail} (${fmtDamage(w.worst.lostDamage)}) · ${w.count} ${w.count === 1 ? "finding" : "findings"}`}
+              style={{
+                position: "relative", height: WIN_CARD_H, padding: "6px 10px 8px", display: "grid", gridTemplateRows: "auto auto",
+                alignContent: "center", gap: 3, cursor: onPick ? "pointer" : undefined, minWidth: 0, overflow: "hidden",
+              }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
+                <ThemeGlyph theme={w.theme} size={18} />
+                <span style={{ ...line, fontWeight: 600, fontSize: 12.5, flex: "1 1 auto", color: "var(--ck-text)" }}>{THEME_NAME[w.theme]}</span>
+                <span className="ck-num" style={{ color: LOSS_COLOR, fontSize: 14, fontWeight: 700, flex: "0 0 auto" }}>{fmtDamage(w.lostDamage / div)}</span>
+                <span className="ck-num" style={{ color: "var(--ck-text-3)", fontSize: 11, flex: "0 0 auto" }}>{Math.round(w.share * 100)}%</span>
+              </div>
+              <div style={{ ...line, color: "var(--ck-text-2)", fontSize: 11.5 }}>
+                <span className="ck-num" style={{ color: "var(--ck-text-3)" }}>{fmtTime(w.worst.startMs)}</span>{" "}
+                <RichDetail text={w.worst.detail} icons={icons} />
+              </div>
+              {/* The theme's share of the counted loss, along the bottom edge. */}
+              <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 2, background: "var(--ck-line)" }}>
+                <div style={{ width: `${w.share * 100}%`, height: "100%", background: THEME_COLOR[w.theme] }} />
+              </div>
             </div>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
-              <span className="ck-num" style={{ color: LOSS_COLOR, fontSize: 16, fontWeight: 700 }}>{fmtDamage(w.lostDamage / div)}</span>
-              <span style={{ color: "var(--ck-text-3)", fontSize: 11 }}>
-                {Math.round(w.share * 100)}% of the counted loss · {w.count} {w.count === 1 ? "finding" : "findings"}
-              </span>
-            </div>
-            <div style={{ height: 4, borderRadius: 2, background: "var(--ck-line)", overflow: "hidden" }}>
-              <div style={{ width: `${w.share * 100}%`, height: "100%", background: THEME_COLOR[w.theme] }} />
-            </div>
-            <div style={{ color: "var(--ck-text)", fontSize: 12.5, lineHeight: 1.45 }}>{w.tip}</div>
-            <div style={{ color: "var(--ck-text-2)", fontSize: 12, lineHeight: 1.5 }}>
-              Worst: <span className="ck-num">{fmtTime(w.worst.startMs)}</span> <RichDetail text={w.worst.detail} icons={icons} />{" "}
-              <span className="ck-num" style={{ color: LOSS_SOFT }}>{fmtDamage(w.worst.lostDamage)}</span>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
