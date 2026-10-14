@@ -115,6 +115,19 @@ export function castHits(ctx: PlayerCheckContext, abilityId: number): PlayerEven
   return out;
 }
 
+/**
+ * When each completed cast of an action went off. A gauge the action
+ * builds comes with the cast, hit or not, not ~1s later with the hit:
+ * K6qfMamL7rN8yz2Q Vamp Fatale, the Pictomancer's 3:19.17 Water in Blue
+ * hit at 3:20.15, after the 3:19.84 Subtractive Palette it paid for; Red
+ * Hot and Deep Blue, a 6:31.49 Water at a Watery Grave never landed, and a
+ * later Subtractive needed its 25. (xivanalysis counts only successful
+ * hits.)
+ */
+export function gaugeCastTimes(ctx: PlayerCheckContext, abilityId: number): number[] {
+  return ctx.player.casts.filter((c) => c.abilityId === abilityId).map((c) => c.timestamp);
+}
+
 // ── Burst windows ──────────────────────────────────────────────────────
 
 export type ExpectedAction = {
@@ -251,6 +264,10 @@ export function burstWindowFindings(ctx: PlayerCheckContext, specIn: BurstWindow
     const spec ={ ...specIn, bonus: specIn.bonus === "observed" ? observedBonus(ctx, w) : specIn.bonus };
     // Inclusive end: a stack-consumed buff (Delirium) loses its last stack
     // at the same timestamp as the cast that used it.
+    // Timed buffs too: a GCD cast at the removal instant snapshots it
+    // (4 of 4 such casts on the samples carry the status in the hit;
+    // K6qfMamL7rN8yz2Q's Hammer Brush at 8:30.12 as Starry Muse ended,
+    // where xivanalysis says it missed the window).
     const end = w.endMs + SAME_TIMESTAMP_MS;
     const gcds = ctx.uses.filter((u) => u.startMs >= w.startMs && u.startMs <= end && kinds.get(u.action.id) !== "heal" &&
       !spec.ignoreGcdIds?.has(u.action.id));

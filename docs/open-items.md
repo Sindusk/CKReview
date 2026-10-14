@@ -812,6 +812,13 @@ grouped by exact roster. The module headers hold the rules.
 - "All loaded pulls" on a 25-pull WoW report takes several seconds.
 
 **FFXIV:**
+- **Cooldown charges left at the kill (proposal, 2026-10-14).** The drift
+  check counts only time at full charges, so a charge held unused to the
+  kill reads as nothing: K6qfMamL7rN8yz2Q Vamp Fatale, the Pictomancer's
+  Living Muse charge unused from 8:17.9 to the kill (24s), xivanalysis's
+  14/16. A kills-only "charge available for N s before the kill and never
+  used = one lost use" rule would touch every job; not built without the
+  user's call.
 - **Unverified jobs:** PLD, WAR, WHM, SGE, MNK, DRG, NIN, RPR, BRD, MCH,
   BLM, SMN, RDM. `jN3XDrf2z8PmLgRJ` (the user's Vamp Fatale prog, no
   damage context) has PLD, SGE, RPR, DRG and RDM; the user is reviewing

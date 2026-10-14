@@ -83,6 +83,16 @@ all eight players on that kill are in `sampledata/damage-ff/`.
   or more weaves spends no movement (8:10, 1.87s: was movement, now a
   32k delay). Lost 477k → 509k.
 
+- **Kevin Brachydiar (Pictomancer), Vamp Fatale.** Per-claim record in
+  lib/damage/ffxiv/jobs/caster.ts. Built: Palette and Paint lanes (the
+  user reviews them next). Palette and Paint gain with the cast, hit or
+  not (the hit came after a spend at 3:19; a Water that never landed on
+  Red Hot paid for a later Subtractive): shortfalls across the samples
+  went from ~18 pulls to 2 wipes. Checked and kept as is: a GCD cast at
+  a timed buff's removal instant snapshots it (4 of 4 hits), so
+  xivanalysis's Hammer 1/3 at 8:09 is our 2/3. Open: Living Muse charge
+  held to the kill (open-items.md proposal).
+
 ## Open
 
 - Lock-model gaps seen in the drift test (they can hide delay, never

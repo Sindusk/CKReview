@@ -35,6 +35,20 @@
 //     Its 1 Additive (Holy in White, 6:03) was counted unforced until
 //     then. Cooldowns, 3 interrupted casts match; Swiftcast 12/23 is
 //     utility.
+//   - Checked against xivanalysis on K6qfMamL7rN8yz2Q Vamp Fatale (7.4,
+//     2026-10-14). Matched: 3 interrupted casts (1:59, 7:07, 8:39's
+//     Chromatic Fantasy), the 2:28 and 7:03 weaving gaps, its small delays
+//     by time. Overstated: the 8:09 Starry Muse's Hammer 1/3 (Hammer
+//     Brush cast at 8:30.12, the instant Starry Muse ended, carries it in
+//     its hit; the 1.30 → 1.24 drop is Technical Finish ending; ours 2/3).
+//     Ours adds three hits for 0 on a Charnel Cell at 7:12-7:21 (Polishing
+//     Hammer, Water in Blue, Holy in White; others damaged cells then).
+//     Open: Living Muse 14/16 is one charge unused from 8:17.9 to the kill
+//     (24s; the other came back 0.4s before it); the drift check counts
+//     only time at full charges, so it doesn't see it (docs/open-items.md).
+//     Built: the Palette and Paint lanes (jobs/gauges.ts); gauge from
+//     Water in Blue now comes with the cast, not its hit (gaugeCastTimes).
+//     Not adopted: Swiftcast 6/11, Lucid, Tempera Coat, Addle.
 //   - On dQ8wmb1VhKt6yBXk every Starry Muse window holds only one Hammer
 //     (the PCT starts Hammer Time at the window's end, after a second
 //     Subtractive round). Consistent across pulls, so likely a chosen
@@ -64,7 +78,7 @@ import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import type { DamageFinding, JobCheck } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";
 import { forcedPart, inWindows } from "../../timeline";
-import { aoeComboOnOneTarget, burstWindowFindings, castHits, dotFindings, gaugeFindings, k, statusWindows, type ExpectedAction, type GaugeEvent } from "./shared";
+import { aoeComboOnOneTarget, burstWindowFindings, castHits, dotFindings, gaugeFindings, k, statusWindows, gaugeCastTimes, type ExpectedAction, type GaugeEvent, type GaugeSpec } from "./shared";
 
 const ids = (...keys: string[]) => keys.filter((key) => A[key]).map((key) => A[key].id);
 const best = (ctx: PlayerCheckContext, list: number[]) => Math.max(0, ...list.map((x) => ctx.values.perUse(x)));
@@ -269,14 +283,15 @@ const avgOf = (ctx: PlayerCheckContext, list: number[]) => {
   }).filter((v) => v > 0);
   return vals.length ? vals.reduce((a, v) => a + v, 0) / vals.length : 0;
 };
-const palette: JobCheck = (ctx): DamageFinding[] => {
+// The timeline draws the same simulation (jobs/gauges.ts, gaugeTrack).
+export function paletteSpec(ctx: PlayerCheckContext): GaugeSpec | undefined {
   const sp = A.SUBTRACTIVE_PALETTE.id;
   const spCasts = ctx.player.casts.filter((c) => c.abilityId === sp);
-  if (spCasts.length === 0) return [];
+  if (spCasts.length === 0) return undefined;
   const spectrum = statusWindows(ctx, S.SUBTRACTIVE_SPECTRUM.id);
   const events: GaugeEvent[] = [];
   for (const id of ids("WATER_IN_BLUE", "WATER_II_IN_BLUE")) {
-    for (const h of castHits(ctx, id)) events.push({ t: h.timestamp, type: "gain", amount: 25, label: `${h.abilityName} at full Palette` });
+    for (const t of gaugeCastTimes(ctx, id)) events.push({ t, type: "gain", amount: 25, label: `${A.WATER_IN_BLUE.id === id ? "Water in Blue" : "Water II in Blue"} at full Palette` });
   }
   for (const c of spCasts) {
     if (!spectrum.some((w) => c.timestamp >= w.startMs && c.timestamp <= w.endMs + 200)) {
@@ -287,11 +302,20 @@ const palette: JobCheck = (ctx): DamageFinding[] => {
   const comet = avgOf(ctx, [A.COMET_IN_BLACK.id]), holy = avgOf(ctx, [A.HOLY_IN_WHITE.id]);
   const cometGain = Math.max(0, comet - holy);
   const perPalette = 3 * Math.max(0, avgOf(ctx, SUBTRACTIVE) - avgOf(ctx, ADDITIVE_ST)) + cometGain;
-  const out = gaugeFindings(ctx, {
+  return {
     name: "Palette", unit: "Palette gauge", cap: 100, unitValue: perPalette / 50,
     valueBasis: `(3 × (Subtractive − Additive) + Comet − Holy, averages outside raid buffs = ${k(perPalette)}) per 50`,
     events,
-  });
+  };
+}
+
+const palette: JobCheck = (ctx): DamageFinding[] => {
+  const spec = paletteSpec(ctx);
+  if (!spec) return [];
+  const spCasts = ctx.player.casts.filter((c) => c.abilityId === A.SUBTRACTIVE_PALETTE.id);
+  const comet = avgOf(ctx, [A.COMET_IN_BLACK.id]), holy = avgOf(ctx, [A.HOLY_IN_WHITE.id]);
+  const cometGain = Math.max(0, comet - holy);
+  const out = gaugeFindings(ctx, spec);
   const tones = statusWindows(ctx, S.MONOCHROME_TONES.id);
   for (const c of spCasts) {
     if (c.timestamp >= ctx.endMs || !tones.some((w) => w.startMs < c.timestamp - 50 && w.endMs >= c.timestamp)) continue;

@@ -25,7 +25,8 @@ import type { GaugeTrack } from "../../types";
 import type { PlayerCheckContext } from "../../checks";
 import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import { beastGaugeSpec } from "./pld-war";
-import { gaugeTrack } from "./shared";
+import { paletteSpec } from "./caster";
+import { gaugeCastTimes, gaugeTrack, statusWindows } from "./shared";
 
 const ADDERSGALL_MAX = 3;
 const ADDERSGALL_TIMER_MS = 20_000;
@@ -333,7 +334,80 @@ export function arcana(ctx: PlayerCheckContext): GaugeTrack[] {
   }];
 }
 
+// Pictomancer's Paint, after xivanalysis src/parser/jobs/pct/modules/Gauge.tsx
+// (5 at most, start 0): a White Paint per Water / Water II in Blue, Thunder /
+// Thunder II in Magenta or Rainbow Drip cast (with the cast, hit or not:
+// shared.ts gaugeCastTimes; xivanalysis waits for a successful hit); Holy in White spends a
+// White, Comet in Black the Black. Subtractive Palette turns a White into
+// the Black (or, with none held, the next White comes as the Black); with
+// Monochrome Tones still up it does nothing (that overwrite is its own
+// finding, caster.ts). A paint generated at 5 is lost: an amber tick. A
+// death empties it. Display only: White Paint is mostly the movement
+// tool, Holy in White in place of a cast that couldn't be made.
+const PAINT_MAX = 5;
+const WHITE_GENERATORS = ["WATER_IN_BLUE", "WATER_II_IN_BLUE", "THUNDER_IN_MAGENTA", "THUNDER_II_IN_MAGENTA", "RAINBOW_DRIP"];
+
+export function paint(ctx: PlayerCheckContext): GaugeTrack[] {
+  const sp = A.SUBTRACTIVE_PALETTE?.id, holy = A.HOLY_IN_WHITE?.id, comet = A.COMET_IN_BLACK?.id;
+  if (sp === undefined || holy === undefined || comet === undefined) return [];
+  type Ev = { t: number; kind: "white" | "holy" | "comet" | "sp" | "death" };
+  const events: Ev[] = [];
+  for (const id of idSet(WHITE_GENERATORS)) for (const t of gaugeCastTimes(ctx, id)) events.push({ t, kind: "white" });
+  for (const c of ctx.player.casts) {
+    if (c.abilityId === holy) events.push({ t: c.timestamp, kind: "holy" });
+    else if (c.abilityId === comet) events.push({ t: c.timestamp, kind: "comet" });
+    else if (c.abilityId === sp) events.push({ t: c.timestamp, kind: "sp" });
+  }
+  if (!events.some((e) => e.kind === "sp")) return [];
+  for (const d of ctx.dead) events.push({ t: d.startMs, kind: "death" });
+  events.sort((a, b) => a.t - b.t);
+  const tones = statusWindows(ctx, S.MONOCHROME_TONES.id);
+  let white = 0, black = 0, nextIsBlack = false, lost = 0, short = 0;
+  let cappedSince: number | null = null;
+  const steps: GaugeTrack["steps"] = [{ t: 0, value: 0 }];
+  const capped: GaugeTrack["capped"] = [];
+  const marks: NonNullable<GaugeTrack["marks"]> = [];
+  const set = (t: number) => {
+    const v = white + black;
+    if (cappedSince !== null && v < PAINT_MAX) { if (t > cappedSince) capped.push({ startMs: cappedSince, endMs: t }); cappedSince = null; }
+    else if (cappedSince === null && v >= PAINT_MAX) cappedSince = t;
+    if (steps[steps.length - 1].t === t) steps[steps.length - 1].value = v;
+    else steps.push({ t, value: v });
+  };
+  for (const e of events) {
+    if (e.t >= ctx.endMs) break;
+    if (e.kind === "white") {
+      if (white + black >= PAINT_MAX) { lost++; marks.push({ t: e.t, label: "Paint lost at the cap (5)", tone: "lost" }); continue; }
+      if (nextIsBlack) { black++; nextIsBlack = false; } else white++;
+    } else if (e.kind === "holy") {
+      if (white > 0) white--; else short++;
+    } else if (e.kind === "comet") {
+      if (black > 0) black--; else short++;
+      marks.push({ t: e.t, label: "Comet in Black (the Black Paint)", tone: "use" });
+    } else if (e.kind === "sp") {
+      if (tones.some((w) => w.startMs < e.t - 50 && w.endMs >= e.t)) continue;
+      if (white > 0) { white--; black++; } else nextIsBlack = true;
+    } else {
+      white = 0; black = 0; nextIsBlack = false;
+    }
+    set(e.t);
+  }
+  if (cappedSince !== null && ctx.endMs > cappedSince) capped.push({ startMs: cappedSince, endMs: ctx.endMs });
+  return [{
+    name: "Paint", max: PAINT_MAX, steps, capped, marks,
+    note: `${lost} paint lost at the cap (5)` +
+      (short > 0 ? `; ${short} Holy / Comet the simulation had no paint for (model or log off)` : "") +
+      "; ticks are Comets in Black. Display only: White Paint is mostly the movement tool",
+  }];
+}
+
+const pictomancerGauges = (ctx: PlayerCheckContext): GaugeTrack[] => {
+  const spec = paletteSpec(ctx);
+  return [...(spec ? [gaugeTrack(ctx, spec)] : []), ...paint(ctx)];
+};
+
 export const JOB_GAUGES: Record<string, ((ctx: PlayerCheckContext) => GaugeTrack[])[]> = {
+  "Pictomancer": [pictomancerGauges],
   "Sage": [addersgall],
   "Paladin": [oathGauge],
   "Dancer": [dancerGauges],
