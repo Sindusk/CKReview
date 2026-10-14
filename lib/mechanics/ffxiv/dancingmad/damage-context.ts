@@ -78,6 +78,17 @@ const GAZE_NAMES = new Set(["Ave Maria", "Indolent Will"]);
 const GAZE_BEFORE_MS = 6_000;
 const GAZE_AFTER_MS = 1_500;
 
+// P2 Trines (user, 2026-10-13): the whole group, tanks included, goes out
+// of melee range. yBKPqGwHparm7Tk4 fight 5: Trine (47840) at 6:07.4,
+// 6:09.4, 6:11.4, Wings of Destruction on both tanks 6:12.5; the Dragoon
+// Elusive Jump 6:08.4 / Piercing Talon 6:09.5, the Viper Uncoiled Fury
+// 6:08.9, the tanks Blade of Faith / Disesteem. One window per chain of
+// casts, from a GCD before the first to 1s after the last.
+const TRINE = 47840;
+const TRINE_CHAIN_MS = 3_000;
+const TRINE_BEFORE_MS = 1_500;
+const TRINE_AFTER_MS = 1_000;
+
 const EARTHQUAKE = 47866;          // Stompies' start marker when Kefka casts it
 const STOMPIES_BAIT = 47887;       // Exdeath's Blizzard III bait, Stompies wave 1
 const MARKER_LOOKBACK_MS = 15_000;
@@ -131,6 +142,17 @@ export const DANCING_MAD_DAMAGE_CONTEXT: DamageContext = {
     ...(pull.enemyCasts ?? [])
       .filter((e) => GAZE_NAMES.has(e.abilityName))
       .map((e) => ({ startMs: e.timestamp - GAZE_BEFORE_MS, endMs: e.timestamp + GAZE_AFTER_MS, cause: `${e.abilityName} (statue gaze)` })),
+    ...(pull.enemyCasts ?? [])
+      .filter((e) => e.abilityId === TRINE)
+      .map((e) => e.timestamp)
+      .sort((a, b) => a - b)
+      .reduce<{ startMs: number; endMs: number }[]>((chains, t) => {
+        const last = chains[chains.length - 1];
+        if (last && t - last.endMs <= TRINE_CHAIN_MS) last.endMs = t;
+        else chains.push({ startMs: t, endMs: t });
+        return chains;
+      }, [])
+      .map((ch) => ({ startMs: ch.startMs - TRINE_BEFORE_MS, endMs: ch.endMs + TRINE_AFTER_MS, cause: "Trines (out of melee)" })),
   ],
   mechanicLabel: (key) => mechanicLabelForKey(key) ?? RULE_KEY_LABELS[key],
 };
