@@ -880,7 +880,12 @@ export function aoeOnOneTargetFindings(
     const nextSame = next ? next.startMs + next.castMs : Infinity;
     const until = Math.min(nextSame, landed + AOE_HIT_MS);
     const hits = ctx.player.damageDone.filter((e) => e.abilityId === u.action.id && e.timestamp >= (u.ogcd ? landed - HIT_DELAY_SLACK_MS : u.startMs) && e.timestamp < until);
-    const targets = new Set(hits.map((e) => `${e.targetActorId ?? e.target}.${e.targetInstance ?? 1}`));
+    // A hit for nothing isn't a target: under Dancing Mad P3's Epic Hero /
+    // Fated Hero only one boss takes your damage, and the other logs a 0
+    // (yBKPqGwHparm7Tk4 fight 5, 9:06-12:05: a Sage's Toxikon IIs read as
+    // two-target).
+    const landedHits = hits.filter((e) => (e.amount ?? 0) > 0 || (e.absorbed ?? 0) > 0);
+    const targets = new Set(landedHits.map((e) => `${e.targetActorId ?? e.target}.${e.targetInstance ?? 1}`));
     // Some AoEs lose on two targets too (Freeze, 120 a target against
     // Blizzard IV's 300): minTargets. Judging every two-target AoE by its
     // damage against the single-target average flagged Gravity IIs worth
@@ -895,7 +900,7 @@ export function aoeOnOneTargetFindings(
       label: `${u.abilityName} on ${targets.size === 1 ? "one target" : "too few targets"}`,
       lostDamage: alt.value - dealt,
       basis: `${k(alt.value)} average ${alt.name} − ${k(dealt)} this ${u.abilityName} dealt`,
-      detail: targets.size === 1 ? `${u.abilityName} hit only ${hits[0].target ?? "one enemy"}`
+      detail: targets.size === 1 ? `${u.abilityName} hit only ${landedHits[0].target ?? "one enemy"}`
         : `${u.abilityName} hit ${targets.size} enemies for less than a ${alt.name}`,
     }));
   });

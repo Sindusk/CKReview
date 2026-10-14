@@ -31,6 +31,24 @@ Dragoon's POV (Sayacissa Morsaelth). No xivanalysis page.
     stayed in. Kefka casts Ultima Blaster ×8 at 8:51.2-8:52.7, after
     Cyclone / Aetherlink at 8:40-8:41. No module models this mechanic.
 
+- **P3's Epic Hero (1004192) / Fated Hero (1004194)** (user: "you get a
+  debuff where you cannot deal damage to the other boss"). Epic Hero:
+  only Chaos takes your damage; Fated Hero: only Exdeath. Every hit on
+  the other boss logs 0. Here both went out 7:12.3-7:43.8 and
+  9:06.6-12:05.9 (DRK, SGE, DRG, VPR Epic; PLD, AST, BRD, BLM Fated).
+  - The DRG is Epic Hero, so Chaos, where the 8:54 gap was, was theirs
+    the whole time: the finding stands. Exdeath does go out of their
+    reach at 9:06.6, so a DoT on Exdeath at 8:54 would have got ~4 ticks;
+    letting it lapse at 8:41 is fine (not flagged anyway).
+  - **Fixed:** `aoeOnOneTargetFindings` counted the 0-damage hit on the
+    other boss as a second target. Now only hits that dealt damage (or
+    were absorbed) count. Across every FF sample the only change is a new
+    BLM finding: Foul at 7:43.7, 99k (Xenoglossy 181k − Foul 82k), its
+    Chaos hit 0 under Fated Hero.
+  - Not handled: a DoT on the boss you can't damage still counts as
+    uptime in `dotFindings`. Not seen here (one 0 tick each for four
+    DoTs at a window's start).
+
 ## Next
 
 - Ask the user what the 8:47-8:54 mechanic is and whether it forces
