@@ -72,6 +72,12 @@ lib/mechanics/
                                 cones/stacks/spreads and deadline, Arcane
                                 stacks, Plummet, Lightning Burst, Derail
                                 strandings, falls, mass deaths, enrage)
+      necron.ts               — Necron (Necron's Embrace EX) per-pull rules
+                                (avoidables, Mori center, Fear of Death hands,
+                                Smite/Embrace/Grand Cross overlaps, empty
+                                towers, Shockwave cones, Blue Shockwave swap and
+                                cleaves, Mass Macabre portals, abyss deaths,
+                                Invitation, add check, mass deaths)
     arcadion/                 — AAC Heavyweight (Savage)
       vamp-fatale.ts          — Vamp Fatale (M9S) per-pull rules (Stomp bats and
                                 Bombpyre overlaps, Aetherletting drops/lines/overlap,
