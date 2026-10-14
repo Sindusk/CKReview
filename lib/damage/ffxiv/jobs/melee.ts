@@ -11,6 +11,18 @@
 //   - Meikyo Shisui (Meikyo.tsx): three Sen GCDs per window. A missing one
 //     loses a Sen, valued at a third of the player's average Midare or
 //     Tendo Setsugekka (inference).
+// Viper, checked against xivanalysis on K6qfMamL7rN8yz2Q Vamp Fatale (7.4,
+// 2026-10-14): the death at 5:30 (and its Weakness) and its 6 positional
+// misses match; the coil left at the kill (gained 8:36, ~2 GCDs before
+// the 8:41.5 check) read as forced because leftovers were judged at the
+// kill's instant (shared.ts gaugeFindings now judges the time held; 58k).
+// Not adopted, all from the death: Honed Reavers / Hindstung Venom dropped
+// at 5:28.3 with every buff; the 6:04 Serpent's Ire and 6:06 tincture with
+// one Reawaken (the gauge emptied; the free one was all there was);
+// Vicewinder 13/14 (two charges banked while dead); Uncoiled Fury 15/18
+// (coils lost at the death, plus the one at the kill). Built: the Rattling
+// Coil and Serpent Offerings lanes (jobs/gauges.ts; 20 Offerings over
+// the cap, under its 25 threshold). Feint, Bloodbath, Second Wind: mitigation.
 // Viper (verified on dQ8wmb1VhKt6yBXk):
 //   - Hunter's Instinct uptime (Buffs.tsx), +10% (multiplier 1.10).
 //   - Reawaken (Reawaken.tsx): four Generations, four Legacies, one
@@ -717,7 +729,9 @@ export const SAM_CHECKS: JobCheck[] = [uptime("FUGETSU", 0.13, "Fugetsu is +13%,
 // ends are lost too. On 2T1HzdPKgbhM43am fight 10 the cast simulation finds
 // xivanalysis's 3 overcapped (12:07, 14:08, 15:23) and 3 left at the end,
 // never going below zero.
-const rattlingCoils: JobCheck = (ctx) => {
+// Coils left at a kill are leftAtKill (judged by how long they were held,
+// shared.ts gaugeFindings). The timeline draws the same simulation.
+export function rattlingCoilSpec(ctx: PlayerCheckContext): GaugeSpec {
   const gain = new Set(ids("VICEWINDER", "VICEPIT", "SERPENTS_IRE"));
   const spend = new Set(ids("UNCOILED_FURY"));
   const events: GaugeEvent[] = [];
@@ -726,15 +740,15 @@ const rattlingCoils: JobCheck = (ctx) => {
     else if (spend.has(c.abilityId)) events.push({ t: c.timestamp, type: "spend", amount: 1, label: "Uncoiled Fury" });
   }
   for (const d of ctx.dead) events.push({ t: d.startMs, type: "reset", label: "death" });
-  if (ctx.pull.result === "Kill") events.push({ t: ctx.endMs - 1, type: "cap", cap: 0, label: "left when the boss died" });
   // Uncoiled Fury is a GCD: it replaces one, so only its excess counts.
   const perCoil = replacedGcd("UNCOILED_FURY")(ctx) + ctx.values.perUse(id("UNCOILED_TWINFANG")) + ctx.values.perUse(id("UNCOILED_TWINBLOOD"));
-  return gaugeFindings(ctx, {
-    name: "Rattling Coil", unit: "Rattling Coil", cap: 3, unitValue: perCoil,
-    valueBasis: `${k(perCoil)} per coil: Uncoiled Fury less the GCD it replaces, plus its Twinfang and Twinblood`,
-    events,
-  });
-};
+  const basis = `${k(perCoil)} per coil: Uncoiled Fury less the GCD it replaces, plus its Twinfang and Twinblood`;
+  return {
+    name: "Rattling Coil", unit: "Rattling Coil", cap: 3, unitValue: perCoil, valueBasis: basis, events,
+    leftAtKill: { unitValue: perCoil, valueBasis: basis },
+  };
+}
+const rattlingCoils: JobCheck = (ctx) => gaugeFindings(ctx, rattlingCoilSpec(ctx));
 
 export const VPR_CHECKS: JobCheck[] = [uptime("HUNTERS_INSTINCT", 0.1, "Hunter's Instinct is +10%, FFLogs multiplier"), reawaken, venoms, rattlingCoils];
 export const MNK_CHECKS: JobCheck[] = [riddleOfFire];

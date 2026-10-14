@@ -114,10 +114,17 @@ all eight players on that kill are in `sampledata/damage-ff/`.
   Starry Muse's haste, Viper's Vicewinder (~0.41s under the modelled
   lock), Sage's Eukrasian Dyskrasia (locked 2.41s, its recast is 1.5s).
 
+- **Mocha Dreams (Viper), Vamp Fatale.** Per-claim record in
+  lib/damage/ffxiv/jobs/melee.ts. Built: Rattling Coil and Serpent
+  Offerings lanes. Fixed in the engine: gauge left at a kill is judged by
+  how long it was held, not the kill's instant (a "boss at 1 HP" window
+  made every leftover forced); the coil check now uses leftAtKill.
+
 ## Next
 
-- Per player on Vamp Fatale against their xivanalysis pages (step 3):
-  Sin Dusk (SGE) first for the rest of their page (DoTs, Zoe,
-  Swiftcast, tincture), then Mocha Dreams (VPR), Kevin Brachydiar (PCT),
-  Yoro Shiku, Chauzey Solstice, Kade Kansado, Siegward Damvir,
-  Sayacissa Morsaelth.
+- Vamp Fatale is done for all eight players. Waiting on the user: the
+  charges-at-kill proposal (open-items.md), the lenient saws/towers/adds
+  window (Kade 4:54 / 5:47, Kevin 8:05), the PCT lanes' review.
+- The report's other kills are on disk (Red Hot and Deep Blue, The
+  Tyrant, Lindwurm, Lindwurm II) if the user wants them; xivanalysis
+  pages would go in sampledata/damage-ff/.

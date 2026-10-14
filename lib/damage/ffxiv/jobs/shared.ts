@@ -992,9 +992,20 @@ export function gaugeFindings(ctx: PlayerCheckContext, spec: GaugeSpec): DamageF
     waste.push({ t: ctx.endMs, amount: value, label: "left at the kill", ...spec.leftAtKill });
   }
   const forced = mergeWindows(ctx.forced);
+  // Gauge left at the kill is judged by the time it was held, not the
+  // kill's instant (always forced when a "boss at 1 HP" window ends the
+  // pull): forced only if, from the gauge's last change, there was under a
+  // GCD of unforced time to spend it. K6qfMamL7rN8yz2Q Vamp Fatale, the
+  // Viper's Rattling Coil, held for ~10s before the 8:41.5 check, read as
+  // forced; xivanalysis's "1 rattling coil remaining".
+  const { steps } = runGauge(ctx, spec);
+  const lastChange = steps[steps.length - 1]?.t ?? 0;
+  const heldUnforced = ctx.endMs - lastChange - overlapMs(lastChange, ctx.endMs, forced);
+  const isForced = (w: { t: number; label: string }) =>
+    w.label === "left at the kill" ? heldUnforced < ctx.baseGcdMs : inWindows(w.t, forced);
   return waste.map((w) => finding(ctx, {
-    kind: "gauge-overcap", startMs: w.t, endMs: w.t,
-    forced: inWindows(w.t, forced), cause: inWindows(w.t, forced) ? forcedPart(w.t - 1, w.t + 1, ctx.forced).cause : undefined,
+    kind: "gauge-overcap", startMs: w.label === "left at the kill" ? lastChange : w.t, endMs: w.t,
+    forced: isForced(w), cause: isForced(w) ? forcedPart(w.t - 1, w.t + 1, ctx.forced).cause : undefined,
     label: w.label === "left at the kill" ? `${spec.name} left at the kill` : `${spec.name} overcap (${w.label})`,
     lostDamage: w.amount * (w.unitValue ?? spec.unitValue),
     inference: negatives > 0 ? true : undefined,

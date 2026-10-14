@@ -26,7 +26,7 @@ import type { PlayerCheckContext } from "../../checks";
 import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import { beastGaugeSpec } from "./pld-war";
 import { paletteSpec } from "./caster";
-import { firstmindsFocusSpec } from "./melee";
+import { firstmindsFocusSpec, rattlingCoilSpec } from "./melee";
 import { gaugeCastTimes, gaugeTrack, statusWindows } from "./shared";
 
 const ADDERSGALL_MAX = 3;
@@ -466,6 +466,74 @@ export function paint(ctx: PlayerCheckContext): GaugeTrack[] {
   }];
 }
 
+// Viper's Serpent Offerings, after xivanalysis src/parser/jobs/vpr/modules/snilk.tsx
+// (100 at most, start 0): Hunter's / Swiftskin's Coil and Den +5; the four
+// finishers (Hindsbane, Hindsting, Flanksbane, Flanksting) and Jagged /
+// Bloodied Maw +10; Reawaken −50 unless Ready to Reawaken (Serpent's
+// Ire's free one) is up. Offerings gained at 100 are lost (amber tick);
+// each Reawaken is a tick. A death empties it (xivanalysis resets gauges
+// on death). Display only for now: what lost offerings cost isn't valued.
+const OFFERINGS_MAX = 100;
+const OFFERINGS_COST = 50;
+const OFFERING_GAINS: [string, number][] = [
+  ["HUNTERS_COIL", 5], ["SWIFTSKINS_COIL", 5], ["HUNTERS_DEN", 5], ["SWIFTSKINS_DEN", 5],
+  ["HINDSBANE_FANG", 10], ["HINDSTING_STRIKE", 10], ["FLANKSBANE_FANG", 10], ["FLANKSTING_STRIKE", 10],
+  ["JAGGED_MAW", 10], ["BLOODIED_MAW", 10],
+];
+
+export function serpentOfferings(ctx: PlayerCheckContext): GaugeTrack[] {
+  const reawaken = A.REAWAKEN?.id, ready = S.READY_TO_REAWAKEN?.id;
+  if (reawaken === undefined || ready === undefined) return [];
+  const gains = new Map(OFFERING_GAINS.filter(([k]) => A[k]).map(([k, n]) => [A[k].id, n]));
+  const free = statusWindows(ctx, ready);
+  type Ev = { t: number; delta: number; label?: string; death?: boolean };
+  const events: Ev[] = [];
+  for (const c of ctx.player.casts) {
+    const n = gains.get(c.abilityId);
+    if (n !== undefined) events.push({ t: c.timestamp, delta: n });
+    else if (c.abilityId === reawaken) {
+      const isFree = free.some((w) => c.timestamp >= w.startMs && c.timestamp <= w.endMs + 200);
+      events.push({ t: c.timestamp, delta: isFree ? 0 : -OFFERINGS_COST, label: isFree ? "Reawaken (Ready to Reawaken, free)" : "Reawaken (50 Offerings)" });
+    }
+  }
+  for (const d of ctx.dead) events.push({ t: d.startMs, delta: 0, death: true });
+  if (!events.some((e) => e.label)) return [];
+  events.sort((a, b) => a.t - b.t);
+  let value = 0, lost = 0, short = 0;
+  let cappedSince: number | null = null;
+  const steps: GaugeTrack["steps"] = [{ t: 0, value: 0 }];
+  const capped: GaugeTrack["capped"] = [];
+  const marks: NonNullable<GaugeTrack["marks"]> = [];
+  const set = (t: number, v: number) => {
+    if (cappedSince !== null && v < OFFERINGS_MAX) { if (t > cappedSince) capped.push({ startMs: cappedSince, endMs: t }); cappedSince = null; }
+    else if (cappedSince === null && v >= OFFERINGS_MAX) cappedSince = t;
+    value = v;
+    if (steps[steps.length - 1].t === t) steps[steps.length - 1].value = v;
+    else steps.push({ t, value: v });
+  };
+  for (const e of events) {
+    if (e.t >= ctx.endMs) break;
+    if (e.death) { set(e.t, 0); continue; }
+    if (e.label) marks.push({ t: e.t, label: e.label, tone: "use" });
+    const next = value + e.delta;
+    if (next > OFFERINGS_MAX) {
+      lost += next - OFFERINGS_MAX;
+      marks.push({ t: e.t, label: `${next - OFFERINGS_MAX} Serpent Offerings lost at the cap`, tone: "lost" });
+      set(e.t, OFFERINGS_MAX);
+    } else if (next < 0) { short++; set(e.t, 0); }
+    else set(e.t, next);
+  }
+  if (cappedSince !== null && ctx.endMs > cappedSince) capped.push({ startMs: cappedSince, endMs: ctx.endMs });
+  return [{
+    name: "Serpent Offerings", max: OFFERINGS_MAX, steps, capped, marks,
+    note: `${lost} Serpent Offerings lost at the cap (${Math.floor(lost / OFFERINGS_COST)} Reawaken${Math.floor(lost / OFFERINGS_COST) === 1 ? "" : "s"}' worth); ${value} held at the end` +
+      (short > 0 ? `; ${short} Reawaken${short === 1 ? "" : "s"} the simulation had no Offerings for (model or log off)` : "") +
+      "; display only",
+  }];
+}
+
+const viperGauges = (ctx: PlayerCheckContext): GaugeTrack[] => [gaugeTrack(ctx, rattlingCoilSpec(ctx)), ...serpentOfferings(ctx)];
+
 const pictomancerGauges = (ctx: PlayerCheckContext): GaugeTrack[] => {
   const spec = paletteSpec(ctx);
   return [...(spec ? [gaugeTrack(ctx, spec)] : []), ...paint(ctx)];
@@ -476,6 +544,7 @@ export const JOB_GAUGES: Record<string, ((ctx: PlayerCheckContext) => GaugeTrack
   "Sage": [addersgall, addersting],
   // Firstminds' Focus: the overcap check's own simulation (melee.ts).
   "Dragoon": [(ctx) => [gaugeTrack(ctx, firstmindsFocusSpec(ctx))]],
+  "Viper": [viperGauges],
   "Paladin": [oathGauge],
   "Dancer": [dancerGauges],
   "Astrologian": [arcana],
