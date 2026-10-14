@@ -13,7 +13,8 @@
 //   - job gauges, one lane each, when the job has any
 // Forced time is hatched over every lane, movement a mechanic required is a
 // blue tint, phase starts are gold dividers. Hovering anywhere shows the
-// GCD in effect (name, when it started, its cast time), what was woven
+// raid buffs and tincture up then (with who applied a boss debuff, and the
+// seconds left), the GCD in effect (name, when it started, its cast time), what was woven
 // after it before the next GCD, the idle after it, and the findings near
 // that moment. Clicking a loss dot hands its finding to `onPick`.
 //
@@ -48,6 +49,7 @@ const fmtPrecise = (ms: number) => {
   return `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, "0")}`;
 };
 
+type ActiveBuff = { name: string; icon?: string; leftMs: number; sources: string[]; pot: boolean };
 type Marker = { f: DamageFinding; startMs: number; endMs: number; lost: number; detail: string; moment: boolean };
 
 export default function DamageTimeline({ summary, analysis, highlight, onPick }: {
@@ -121,6 +123,23 @@ export default function DamageTimeline({ summary, analysis, highlight, onPick }:
   const near = hoverT === null ? [] : markers.filter((m) => Math.abs(m.startMs - hoverT) <= NEAR_MS || (hoverT >= m.startMs && hoverT <= m.endMs));
   const nearFindings = [...new Map(near.map((m) => [m.f, m])).values()];
   const hoverForced = hoverT === null ? undefined : tl.forced.find((f) => hoverT >= f.startMs && hoverT <= f.endMs);
+  // Raid buffs and tinctures up at the cursor: one line per buff name (two
+  // Dance Partners or a debuff on two boss actors are one), the longest
+  // left, with who applied it when the log says.
+  const hoverBuffs: ActiveBuff[] = [];
+  if (hoverT !== null) {
+    const byName = new Map<string, ActiveBuff>();
+    for (const b of tl.raidBuffs ?? []) {
+      if (hoverT < b.startMs || hoverT > b.endMs) continue;
+      const prev = byName.get(b.name);
+      const sources = new Set([...(prev?.sources ?? []), ...(b.source ? [b.source] : [])]);
+      byName.set(b.name, { name: b.name, icon: prev?.icon ?? b.icon, leftMs: Math.max(prev?.leftMs ?? 0, b.endMs - hoverT), sources: [...sources], pot: false });
+    }
+    hoverBuffs.push(...byName.values());
+    for (const p of tl.potWindows ?? []) {
+      if (hoverT >= p.startMs && hoverT <= p.endMs) hoverBuffs.push({ name: p.name ?? "Tincture", icon: p.icon, leftMs: p.endMs - hoverT, sources: [], pot: true });
+    }
+  }
 
   const lane = (y: number, h: number, label: string, sub?: string) => (
     <g key={`lane-${label}`}>
@@ -261,6 +280,22 @@ export default function DamageTimeline({ summary, analysis, highlight, onPick }:
           <div className="ck-num" style={{ color: "var(--ck-text-3)", fontSize: 11 }}>
             {fmtTime(hoverT)}{hoverForced ? ` · forced: ${hoverForced.cause}` : ""}
           </div>
+          {hoverBuffs.length > 0 && (
+            <div style={{ marginTop: 3, paddingBottom: 4, borderBottom: "1px solid var(--ck-line)" }}>
+              {hoverBuffs.map((b) => (
+                <div key={`${b.pot}-${b.name}`} style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 2 }}>
+                  {b.icon ? <AbilityIcon src={b.icon} size={15} /> : (
+                    <span style={{ width: 15, height: 15, flex: "0 0 auto", display: "grid", placeItems: "center" }}>
+                      <span style={{ width: 9, height: 9, borderRadius: 2, background: b.pot ? POT_COLOR : BUFF_COLOR }} />
+                    </span>
+                  )}
+                  <span style={{ color: b.pot ? POT_COLOR : BUFF_COLOR, fontWeight: 600 }}>{b.name}</span>
+                  {b.sources.length > 0 && <span style={{ color: "var(--ck-text-3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", minWidth: 0 }}>{b.sources.join(", ")}</span>}
+                  <span className="ck-num" style={{ color: "var(--ck-text-2)", marginLeft: "auto", flex: "0 0 auto" }}>{Math.max(0, b.leftMs / 1000).toFixed(0)}s left</span>
+                </div>
+              ))}
+            </div>
+          )}
           {hoverGcd && <GcdTip g={hoverGcd.g} next={hoverGcd.next} />}
           {nearFindings.map((m, i) => (
             <div key={i} style={{ display: "flex", gap: 8, marginTop: 4, alignItems: "baseline" }}>
@@ -272,7 +307,7 @@ export default function DamageTimeline({ summary, analysis, highlight, onPick }:
               </span>
             </div>
           ))}
-          {!hoverGcd && nearFindings.length === 0 && <div style={{ color: "var(--ck-text-3)" }}>No GCD or loss here</div>}
+          {!hoverGcd && nearFindings.length === 0 && hoverBuffs.length === 0 && <div style={{ color: "var(--ck-text-3)" }}>No GCD or loss here</div>}
         </div>
       )}
     </div>

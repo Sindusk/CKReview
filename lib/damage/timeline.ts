@@ -432,24 +432,45 @@ export function gcdLockMs(use: GcdUse, factor: number): number {
  * on any target.
  */
 export function raidBuffWindows(player: PlayerInfo, pull: Pull, game: DamageGame, endMs: number): Window[] {
-  const out: Window[] = [];
+  return mergeWindows(raidBuffSpans(player, pull, game, endMs));
+}
+
+export type RaidBuffSpan = Window & { name: string; source?: string; icon?: string };
+
+/**
+ * Each raid buff on this player (or party debuff on a boss) as its own
+ * named window, unmerged: the dialog's timeline hover lists them.
+ * `source` is the debuff's caster; player-buff events don't carry one.
+ */
+export function raidBuffSpans(player: PlayerInfo, pull: Pull, game: DamageGame, endMs: number): RaidBuffSpan[] {
+  const out: RaidBuffSpan[] = [];
   const open = new Map<string, number>();
-  const events: { t: number; key: string; on: boolean }[] = [];
+  const events: { t: number; key: string; on: boolean; name: string; source?: string; icon?: string }[] = [];
   for (const e of player.buffs ?? []) {
     if (!game.raidBuffStatusIds.has(e.abilityId)) continue;
-    events.push({ t: e.timestamp, key: `p${e.abilityId}`, on: e.buffStatus !== "removed" });
+    events.push({ t: e.timestamp, key: `p${e.abilityId}`, on: e.buffStatus !== "removed",
+      name: game.partyBuff(e.abilityId)?.name ?? e.abilityName, icon: e.abilityIcon });
   }
   for (const e of pull.bossDebuffs ?? []) {
     if (!game.raidBuffStatusIds.has(e.statusId)) continue;
-    events.push({ t: e.timestamp, key: `b${e.statusId}:${e.targetActorId}`, on: e.status !== "removed" });
+    events.push({ t: e.timestamp, key: `b${e.statusId}:${e.targetActorId}`, on: e.status !== "removed",
+      name: game.partyBuff(e.statusId)?.name ?? e.statusName, source: e.sourceName });
   }
   events.sort((a, b) => a.t - b.t);
+  const first = new Map<string, (typeof events)[number]>();
   for (const ev of events) {
-    if (ev.on) { if (!open.has(ev.key)) open.set(ev.key, ev.t); }
-    else if (open.has(ev.key)) { out.push({ startMs: open.get(ev.key)!, endMs: ev.t }); open.delete(ev.key); }
+    if (ev.on) { if (!open.has(ev.key)) { open.set(ev.key, ev.t); first.set(ev.key, ev); } }
+    else if (open.has(ev.key)) {
+      const f = first.get(ev.key)!;
+      out.push({ startMs: open.get(ev.key)!, endMs: ev.t, name: f.name, source: f.source, icon: f.icon });
+      open.delete(ev.key);
+    }
   }
-  for (const start of open.values()) out.push({ startMs: start, endMs });
-  return mergeWindows(out);
+  for (const [key, start] of open) {
+    const f = first.get(key)!;
+    out.push({ startMs: start, endMs, name: f.name, source: f.source, icon: f.icon });
+  }
+  return out.filter((w) => w.startMs < endMs).sort((a, b) => a.startMs - b.startMs);
 }
 
 // ── What each GCD did ──────────────────────────────────────────────────

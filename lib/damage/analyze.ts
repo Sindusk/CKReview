@@ -25,7 +25,7 @@ import {
   type PlayerCheckContext,
 } from "./checks";
 import {
-  deadWindows, gcdKinds, gcdLockMs, gcdUptime, gcdUses, limitBreakWindows, playerValues, raidBuffWindows, raidDowntime,
+  deadWindows, gcdKinds, gcdLockMs, gcdUptime, gcdUses, limitBreakWindows, playerValues, raidBuffSpans, raidBuffWindows, raidDowntime,
   speedProfile, statusWindows, wipeCollapseMs, type GcdKind, type GcdUse, type Window,
 } from "./timeline";
 import { buildBuffLedger, checkBuffCoverage } from "./buffs";
@@ -170,6 +170,7 @@ export function analyzePullDamage(
         movement,
         gauges: (game.jobGauges?.(job) ?? []).flatMap((g) => g(ctx)),
         potWindows: game.potWindows?.(player, endMs).filter((w) => w.startMs < endMs),
+        raidBuffs: raidBuffSpans(player, pull, game, endMs),
       },
     });
   }

@@ -33,7 +33,7 @@
 
 import type { Pull } from "@/types/Pull";
 import type { PlayerInfo } from "@/types/PlayerInfo";
-import type { DamageFinding, JobCheck } from "../../types";
+import type { DamageFinding, JobCheck, PotWindow } from "../../types";
 import { finding } from "../../checks";
 import { mergeWindows, overlapMs } from "../../timeline";
 import { k, s } from "./shared";
@@ -79,6 +79,30 @@ function pullBonus(pull: Pull): number | undefined {
   const out = xs.length ? med(xs) : undefined;
   pullBonusCache.set(pull, out);
   return out;
+}
+
+/**
+ * The player's combat potions for the dialog's timeline (DamageGame.potWindows):
+ * each potion buff from applied to removed, or a cast with no buff seen
+ * for DURATION_MS. Health potions aren't in POTIONS.
+ */
+export function potionWindows(player: PlayerInfo, endMs: number): PotWindow[] {
+  const out: PotWindow[] = [];
+  const open = new Map<number, { t: number; name: string; icon?: string }>();
+  for (const e of [...(player.buffs ?? [])].filter((b) => POTIONS.has(b.abilityId)).sort((a, b) => a.timestamp - b.timestamp)) {
+    if (e.buffStatus === "applied" && !open.has(e.abilityId)) open.set(e.abilityId, { t: e.timestamp, name: e.abilityName, icon: e.abilityIcon });
+    else if (e.buffStatus === "removed") {
+      const o = open.get(e.abilityId);
+      out.push({ startMs: o?.t ?? Math.max(0, e.timestamp - DURATION_MS), endMs: e.timestamp, name: o?.name ?? e.abilityName, icon: o?.icon ?? e.abilityIcon });
+      open.delete(e.abilityId);
+    }
+  }
+  for (const o of open.values()) out.push({ startMs: o.t, endMs: Math.min(o.t + DURATION_MS, endMs), name: o.name, icon: o.icon });
+  for (const c of player.casts) {
+    if (!POTIONS.has(c.abilityId) || out.some((w) => c.timestamp >= w.startMs - 1_000 && c.timestamp <= w.endMs)) continue;
+    out.push({ startMs: c.timestamp, endMs: Math.min(c.timestamp + DURATION_MS, endMs), name: c.abilityName, icon: c.abilityIcon });
+  }
+  return out.sort((a, b) => a.startMs - b.startMs);
 }
 
 export const combatPotion: JobCheck = (ctx): DamageFinding[] => {

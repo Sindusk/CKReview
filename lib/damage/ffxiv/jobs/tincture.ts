@@ -43,7 +43,7 @@
 
 import type { PlayerEvent, PlayerInfo } from "@/types/PlayerInfo";
 import type { Pull } from "@/types/Pull";
-import type { DamageFinding, DamageGame, JobCheck } from "../../types";
+import type { DamageFinding, DamageGame, JobCheck, PotWindow } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";
 import { estimateHitRates } from "../../crit-rates";
 import { inWindows, mergeWindows, overlapMs, type Window } from "../../timeline";
@@ -91,8 +91,11 @@ const clock = (ms: number) => {
 };
 
 /** Medicated windows on the player; a pre-pull one starts before 0. */
-export function tinctureWindows(player: PlayerInfo, endMs: number): Window[] {
-  const out: Window[] = [];
+// Named by the drink cast at its start ("Grade 4 Gemdraught of Strength"):
+// Medicated itself doesn't say which tincture it was.
+const TINCTURE_NAME = /gemdraught|tincture|draught/i;
+export function tinctureWindows(player: PlayerInfo, endMs: number): PotWindow[] {
+  const out: PotWindow[] = [];
   let open: number | undefined;
   for (const e of [...(player.buffs ?? [])].sort((a, b) => a.timestamp - b.timestamp)) {
     if (e.abilityId !== MEDICATED) continue;
@@ -104,6 +107,10 @@ export function tinctureWindows(player: PlayerInfo, endMs: number): Window[] {
     }
   }
   if (open !== undefined) out.push({ startMs: open, endMs: Math.min(open + DURATION_MS, endMs) });
+  for (const w of out) {
+    const drink = player.casts.find((c) => TINCTURE_NAME.test(c.abilityName) && c.timestamp >= w.startMs - 2_000 && c.timestamp <= w.startMs + 1_000);
+    if (drink) { w.name = drink.abilityName; w.icon = drink.abilityIcon; }
+  }
   return out;
 }
 
