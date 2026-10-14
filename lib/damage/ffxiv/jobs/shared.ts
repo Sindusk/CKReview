@@ -391,6 +391,10 @@ export type DotSpec = {
   // lapsed (Bard's Caustic Bite and Stormbite after an add or downtime):
   // each one the player applied first in a gap adds a GCD to its grace.
   pairedIds?:  number[];
+  // What applying it costs over not applying it, for a gap that forced
+  // time cuts short. Default: its own hit against an average GCD; a DoT
+  // on a combo route costs the route it displaces (Dragoon).
+  applyCost?:  (ctx: PlayerCheckContext) => number;
 };
 
 const DOT_CAST_MS = 1_500;   // cast → status applied
@@ -731,21 +735,56 @@ export function dotFindings(ctx: PlayerCheckContext, spec: DotSpec): DamageFindi
   const pairedApplies = paired.size ? (ctx.pull.bossDebuffs ?? [])
     .filter((e) => paired.has(e.statusId) && e.sourceName === ctx.player.name && e.status === "applied")
     : [];
+  // A stretch of the gap that forced time cuts off (downtime, an HP check
+  // passed) only had the ticks a fresh DoT could get before it, and that
+  // DoT cost a GCD: its own hit against an average GCD. yBKPqGwHparm7Tk4
+  // fight 5, Dragoon at 3:01: 8.7s between Kefka targetable again and the
+  // P1 check passing; 2 ticks (12k) against the Spiral Blow → Chaotic
+  // Spring route in place of Lance Barrage → Heavens' Thrust, ~33k less
+  // (user, 2026-10-13: "the boss is dead basically 10 seconds afterwards").
+  const applier = (() => {
+    const counts = new Map<number, number>();
+    for (const e of events) {
+      if (e.status !== "applied" && e.status !== "refreshed") continue;
+      const c = ctx.player.casts.filter((x) => x.timestamp <= e.timestamp && x.timestamp >= e.timestamp - DOT_CAST_MS).pop();
+      if (c) counts.set(c.abilityId, (counts.get(c.abilityId) ?? 0) + 1);
+    }
+    return [...counts].sort((a, b) => b[1] - a[1])[0]?.[0];
+  })();
+  const cutValue = (ms: number, at: number) => {
+    const cost = spec.applyCost ? Math.max(0, spec.applyCost(ctx)) : applier === undefined ? 0
+      : Math.max(0, ctx.values.gcdValue(ctx.phaseOf(at), false) - ctx.values.perUse(applier));
+    return Math.max(0, Math.floor(ms / DOT_TICK_MS) * avgTick - cost);
+  };
   let cursor = active[0].startMs;
   for (const w of [...active, { startMs: ctx.endMs, endMs: ctx.endMs }]) {
     if (w.startMs > cursor) {
-      const len = w.startMs - cursor - overlapMs(cursor, w.startMs, forced);
+      // Unforced stretches of the gap; those ending in forced time are cut.
+      const free: Window[] = [];
+      let at = cursor;
+      for (const f of forced) {
+        if (f.endMs <= at || f.startMs >= w.startMs) continue;
+        if (f.startMs > at) free.push({ startMs: at, endMs: f.startMs });
+        at = Math.max(at, f.endMs);
+      }
+      const tail = at < w.startMs ? w.startMs - at : 0;
+      const cut = free.reduce((a, x) => a + cutValue(x.endMs - x.startMs, x.startMs), 0);
+      const cutMs = free.reduce((a, x) => a + (cutValue(x.endMs - x.startMs, x.startMs) > 0 ? x.endMs - x.startMs : 0), 0);
       // 6XaWqwMbkZG9pLmx Vamp Fatale 1:58: both of the Bard's DoTs came off
       // with Coffinmaker; Caustic Bite went on 2.9s later, Stormbite a GCD
       // after it (5.0s), which the plain grace read as lost (user, 2026-10-13).
       // One GCD per paired DoT, however many enemies it went on.
       const firsts = new Set(pairedApplies.filter((e) => e.timestamp >= cursor && e.timestamp < w.startMs).map((e) => e.statusId)).size;
-      if (len >= grace + firsts * ctx.baseGcdMs) {
+      const tailMs = tail >= grace + firsts * ctx.baseGcdMs ? tail : 0;
+      const len = tailMs + cutMs;
+      const lost = (tailMs / DOT_TICK_MS) * avgTick + cut;
+      if (lost > 0) {
         out.push(finding(ctx, {
           kind: "dot-uptime", startMs: cursor, endMs: w.startMs, forced: false,
           label: `${spec.name} off the boss`,
-          lostDamage: (len / DOT_TICK_MS) * avgTick,
-          basis: `${s(len)} ÷ 3s ticks × ${k(avgTick)} average tick`,
+          lostDamage: lost,
+          basis: `${s(len)} ÷ 3s ticks × ${k(avgTick)} average tick` +
+            (cutMs ? `; ${s(cutMs)} of it cut short by forced time, counted as the ticks a fresh ${spec.name} gets there less its GCD's cost against an average GCD` : ""),
           detail: `${spec.name} wasn't on the boss for ${s(len)}`,
         }));
       }

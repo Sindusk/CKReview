@@ -64,6 +64,23 @@ Dragoon's POV (Sayacissa Morsaelth). No xivanalysis page.
     uptime in `dotFindings`. Not seen here (one 0 tick each for four
     DoTs at a window's start).
 
+- **Dragoon, `dot-uptime` 3:01 (23k, "11.2s") (user: the boss is dead
+  ~10s later).** Holds. Chaotic Spring ran out at 3:00.8; Kefka was
+  untargetable to 3:02.0 and under 15% (P1 check) at 3:10.7, so only
+  3:02.0-3:10.7 counted (the other 2.5s was P2's opening, within grace).
+  After Drakesbane 3:01.3 the DoT needed Raiden → Spiral Blow → Chaotic
+  Spring (~3:08.9): at most 2 ticks (12k) before the check, for the
+  Spiral route (37.0k + 45.6k) in place of Lance Barrage → Heavens'
+  Thrust (48.4k + 67.4k), ~33k less. Actual 3:03.8-3:10.7: Lance Barrage
+  71k, Heavens' Thrust 97k under Lance Charge.
+  - **Fixed:** `dotFindings` values a stretch of the gap that forced
+    time cuts off as the ticks a fresh DoT gets there less its cost
+    (`DotSpec.applyCost`, default its hit against an average GCD; Dragoon
+    the route difference). Only the stretch ending at the re-application
+    keeps the plain ticks × grace rule. This kill: 3:01 gone, 6:06 32k →
+    10k. Across the FF samples 937 → 865 DoT findings, mostly healer DoTs
+    just before downtime dropping or shrinking.
+
 ## Next
 
 - Ask the user what the 8:47-8:54 mechanic is and whether it forces

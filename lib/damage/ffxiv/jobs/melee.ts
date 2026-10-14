@@ -297,6 +297,13 @@ const lifeSurge: JobCheck = (ctx): DamageFinding[] => {
 
 const chaoticSpring: JobCheck = (ctx) => dotFindings(ctx, {
   statusIds: [S.CHAOTIC_SPRING.id], name: S.CHAOTIC_SPRING.name, durationMs: S.CHAOTIC_SPRING.duration ?? 24_000,
+  // Before a downtime or a passed check, Chaotic Spring means the Spiral
+  // Blow route instead of Lance Barrage → Heavens' Thrust (yBKPqGwHparm7Tk4
+  // fight 5 at 3:01: ~33k for 2 ticks).
+  applyCost: (ctx) => {
+    const v = (...keys: string[]) => ids(...keys).reduce((a, x) => a + ctx.values.perUse(x), 0);
+    return v("LANCE_BARRAGE", "HEAVENS_THRUST") - v("SPIRAL_BLOW", "CHAOTIC_SPRING");
+  },
 });
 
 // Kunai's Bane, from xivanalysis KunaisBaneWindow.tsx: 7 GCDs, mudras not
