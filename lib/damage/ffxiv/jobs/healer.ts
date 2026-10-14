@@ -88,6 +88,17 @@
 //   Coffinmaker (20s of ticks before it died, more than a Fall Malefic);
 //   the Arrow / Spire dropped (mitigation cards); overheal, defensives,
 //   Swiftcast.
+// - Sage, checked against xivanalysis on K6qfMamL7rN8yz2Q Vamp Fatale (7.4,
+//   2026-10-14). Matched: GCD uptime (97.0% / 96.6%), the 4 interrupted
+//   casts, Eukrasian Dosis III uptime (91.9%: the 1:05, 4:06, 7:36 and
+//   8:10 gaps here), the tincture. GCD gaps: its ABC measures from a hard
+//   cast's end (checks.ts header), so it lists 5 to our 18 (all real).
+//   Built: the Addersting lane (jobs/gauges.ts; 4 shields broke, 7
+//   Toxikons). Not adopted: the 1:42 Eukrasian Dosis on Coffinmaker
+//   (6 ticks, ~59k, before it died: more than a Dosis III); Addersgall
+//   30/34 (healing and MP); Zoe, Swiftcast. Open: Phlegma III 14/15 is a
+//   charge held to the kill (10.7s at full charges in all), the same gap
+//   as Living Muse (docs/open-items.md).
 // - Scholar, checked against xivanalysis on qjCMx4bRfgNKwX9T Dancing Mad
 //   kill (7.5, 2026-10-13): GCD uptime, Chain Stratagem and Aetherflow
 //   (no use lost), 6 interrupted casts and its weaving gaps (17:24 6.2s,

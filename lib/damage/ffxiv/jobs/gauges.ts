@@ -15,8 +15,8 @@
 // Time at 3 with the timer stopped is generation lost: one stack per 20s.
 // A spend the simulation says had no stack means the model or the log is
 // off; the note says how many.
-// Not built: Addersting. It comes from Eukrasian Diagnosis / Prognosis
-// shields breaking, and the shield statuses aren't in the buff stream.
+// Addersting is its own lane (addersting, below): the shields aren't in
+// the buff stream, but their absorbs and removals are in the healing one.
 //
 //   Copyright (c) 2018 Saxon Landers & contributors
 //   MIT License; full text in THIRD_PARTY_NOTICES.md.
@@ -89,6 +89,70 @@ export function addersgall(ctx: PlayerCheckContext): GaugeTrack[] {
     name: "Addersgall", max: ADDERSGALL_MAX, steps, capped,
     note: `${lost} stack${lost === 1 ? "" : "s"} of generation lost at the cap (${Math.round(cappedMs / 1000)}s at 3 with the timer stopped)` +
       (short > 0 ? `; ${short} spend${short === 1 ? "" : "s"} the simulation had no stack for (model or log off)` : ""),
+  }];
+}
+
+// Sage's Addersting, after xivanalysis sge/modules/Gauge.tsx: 3 at most, the
+// pull starts full; +1 when the Sage's Eukrasian Diagnosis on anyone, or
+// Eukrasian Prognosis on the Sage, breaks; −1 per Toxikon / Toxikon II. A
+// shield breaks when its removal (PlayerInfo.shieldRemovals) comes in the
+// same instant as a hit it absorbed; one that ran out, was taken by Pepsis
+// or overwritten by another healer's shield ends with no absorb beside it.
+// A sting gained at 3 is lost (amber tick). A death empties it (xivanalysis
+// resets gauges on death). Display only: Toxikon is the movement GCD.
+// Pulls fetched before 2026-10-14 have no shield removals: no lane.
+const ADDERSTING_MAX = 3;
+const SHIELD_BREAK_MS = 20;
+
+export function addersting(ctx: PlayerCheckContext): GaugeTrack[] {
+  const diag = S.EUKRASIAN_DIAGNOSIS?.id, prog = S.EUKRASIAN_PROGNOSIS?.id;
+  if (diag === undefined || prog === undefined) return [];
+  if (!ctx.pull.players.some((p) => p.shieldRemovals !== undefined)) return [];
+  const toxikon = idSet(["TOXIKON", "TOXIKON_II"]);
+  type Ev = { t: number; kind: "gain" | "spend" | "death"; label?: string };
+  const events: Ev[] = [];
+  for (const p of ctx.pull.players) {
+    for (const r of p.shieldRemovals ?? []) {
+      if (r.caster !== ctx.player.name) continue;
+      if (!(r.statusId === diag || (r.statusId === prog && p.name === ctx.player.name))) continue;
+      const broke = (p.shieldAbsorbs ?? []).some((a) => a.statusId === r.statusId && a.caster === r.caster &&
+        a.amount > 0 && Math.abs(a.timestamp - r.timestamp) <= SHIELD_BREAK_MS);
+      if (broke) events.push({ t: r.timestamp, kind: "gain", label: `${r.statusId === diag ? "Eukrasian Diagnosis" : "Eukrasian Prognosis"} broke${p.name !== ctx.player.name ? ` on ${p.name}` : ""}` });
+    }
+  }
+  for (const c of ctx.player.casts) if (toxikon.has(c.abilityId)) events.push({ t: c.timestamp, kind: "spend" });
+  for (const d of ctx.dead) events.push({ t: d.startMs, kind: "death" });
+  events.sort((a, b) => a.t - b.t);
+  let value = ADDERSTING_MAX, lost = 0, short = 0, gained = 0;
+  let cappedSince: number | null = 0;
+  const steps: GaugeTrack["steps"] = [{ t: 0, value }];
+  const capped: GaugeTrack["capped"] = [];
+  const marks: NonNullable<GaugeTrack["marks"]> = [];
+  const set = (t: number, v: number) => {
+    if (cappedSince !== null && v < ADDERSTING_MAX) { if (t > cappedSince) capped.push({ startMs: cappedSince, endMs: t }); cappedSince = null; }
+    else if (cappedSince === null && v >= ADDERSTING_MAX) cappedSince = t;
+    value = v;
+    if (steps[steps.length - 1].t === t) steps[steps.length - 1].value = v;
+    else steps.push({ t, value: v });
+  };
+  for (const e of events) {
+    if (e.t >= ctx.endMs) break;
+    if (e.kind === "gain") {
+      gained++;
+      if (value >= ADDERSTING_MAX) { lost++; marks.push({ t: e.t, label: `${e.label}: Addersting lost at the cap`, tone: "lost" }); continue; }
+      marks.push({ t: e.t, label: `${e.label}: +1 Addersting`, tone: "use" });
+      set(e.t, value + 1);
+    } else if (e.kind === "spend") {
+      if (value <= 0) { short++; continue; }
+      set(e.t, value - 1);
+    } else set(e.t, 0);
+  }
+  if (cappedSince !== null && ctx.endMs > cappedSince) capped.push({ startMs: cappedSince, endMs: ctx.endMs });
+  return [{
+    name: "Addersting", max: ADDERSTING_MAX, steps, capped, marks,
+    note: `${gained} shield${gained === 1 ? "" : "s"} broke, ${lost} Addersting lost at the cap` +
+      (short > 0 ? `; ${short} Toxikon${short === 1 ? "" : "s"} the simulation had no Addersting for (model or log off)` : "") +
+      "; display only: Toxikon is the movement GCD",
   }];
 }
 
@@ -408,7 +472,7 @@ const pictomancerGauges = (ctx: PlayerCheckContext): GaugeTrack[] => {
 
 export const JOB_GAUGES: Record<string, ((ctx: PlayerCheckContext) => GaugeTrack[])[]> = {
   "Pictomancer": [pictomancerGauges],
-  "Sage": [addersgall],
+  "Sage": [addersgall, addersting],
   "Paladin": [oathGauge],
   "Dancer": [dancerGauges],
   "Astrologian": [arcana],

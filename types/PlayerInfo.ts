@@ -186,6 +186,11 @@ export type PlayerInfo = {
   // which hit it absorbed. Undefined for WoW and for pulls fetched before
   // it existed.
   shieldAbsorbs?: ShieldAbsorb[];
+  // FFXIV only: each shield on this player ending, from the same healing
+  // stream (its removebuff; FFLogs logs no remaining amount). A removal in
+  // the same instant as an absorb of that shield is the shield breaking;
+  // without one it ran out or was cleared (Sage's Addersting, jobs/gauges.ts).
+  shieldRemovals?: { timestamp: number; statusId: number; caster?: string }[];
 
   // For the damage analysis. Undefined for pulls fetched before they
   // existed.

@@ -1588,6 +1588,9 @@ function buildFFPlayers(
           .map((e) => fflHealReceivedToPlayerEvent(e, actorMap, abilityMap, fightStart)),
 
         shieldAbsorbs: fflShieldAbsorbs(healingEvents, actorId, actorMap, abilityMap, fightStart),
+        shieldRemovals: healingEvents
+          .filter((e) => e.type === "removebuff" && e.targetID === actorId)
+          .map((e) => ({ timestamp: Math.max(0, e.timestamp - fightStart), statusId: e.abilityGameID ?? 0, caster: actorMap.get(e.sourceID)?.name })),
 
         debuffs: debuffEvents
           .filter((e) => e.targetID === actorId)

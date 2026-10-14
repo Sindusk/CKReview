@@ -93,6 +93,13 @@ all eight players on that kill are in `sampledata/damage-ff/`.
   xivanalysis's Hammer 1/3 at 8:09 is our 2/3. Open: Living Muse charge
   held to the kill (open-items.md proposal).
 
+- **Sin Dusk (Sage), Vamp Fatale.** Per-claim record in
+  lib/damage/ffxiv/jobs/healer.ts. Built: the Addersting lane. The
+  transform now keeps each player's shield removals from the healing
+  stream (PlayerInfo.shieldRemovals); a removal in the same instant as an
+  absorb is a broken shield. Open: Phlegma III held to the kill (the
+  charges-at-kill proposal).
+
 ## Open
 
 - Lock-model gaps seen in the drift test (they can hide delay, never
