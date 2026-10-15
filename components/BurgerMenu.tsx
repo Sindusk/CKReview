@@ -9,6 +9,7 @@ export type BurgerMenuProps = {
   onConnectWCL: () => void;
   onConnectFFL: () => void;
   onAddReviewToStatic: () => void;
+  onBatchImport:       () => void;
   onManageStatics:     () => void;
   onLogin:              () => void;
   onLogout:             () => void;
@@ -97,6 +98,7 @@ export default function BurgerMenu({
   onConnectWCL,
   onConnectFFL,
   onAddReviewToStatic,
+  onBatchImport,
   onManageStatics,
   onLogin,
   onLogout,
@@ -286,6 +288,14 @@ export default function BurgerMenu({
             sublabel={hasActiveSession ? "Save the current review to a static" : "Save some progress first"}
             onClick={handleAddReviewToStatic}
             disabled={!hasActiveSession}
+          />
+
+          <MenuItem
+            icon="📥"
+            label="Batch Import To Static"
+            sublabel="Import several reports, or resync a static"
+            onClick={() => { setOpen(false); onBatchImport(); }}
+            disabled={!currentUser}
           />
 
           <MenuItem

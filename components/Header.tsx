@@ -12,6 +12,7 @@ type HeaderProps = {
   onConnectWCL:         () => void;
   onConnectFFL:         () => void;
   onAddReviewToStatic:  () => void;
+  onBatchImport:        () => void;
   onManageStatics:      () => void;
   onLogin:              () => void;
   onLogout:             () => void;
@@ -24,6 +25,7 @@ export default function Header({
   onConnectWCL,
   onConnectFFL,
   onAddReviewToStatic,
+  onBatchImport,
   onManageStatics,
   onLogin,
   onLogout,
@@ -57,6 +59,7 @@ export default function Header({
           onConnectWCL={onConnectWCL}
           onConnectFFL={onConnectFFL}
           onAddReviewToStatic={onAddReviewToStatic}
+          onBatchImport={onBatchImport}
           onManageStatics={onManageStatics}
           onLogin={onLogin}
           onLogout={onLogout}

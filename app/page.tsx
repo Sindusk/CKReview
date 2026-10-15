@@ -10,6 +10,8 @@ import LoginDialog from "@/components/LoginDialog";
 import LogApiSetupDialog, { type LogProvider } from "@/components/LogApiSetupDialog";
 import AddReviewToStaticDialog from "@/components/AddReviewToStaticDialog";
 import ManageStaticsDialog from "@/components/ManageStaticsDialog";
+import BatchImportDialog, { type BatchItem, type BatchOutcome } from "@/components/BatchImportDialog";
+import { buildStaticReviewPayload, staticEligiblePulls } from "@/lib/static-review-data";
 import { parseYouTubeUrl, parseLogUrl } from "@/lib/url-parsers";
 import { isLocalVod, type Vod } from "../types/Vod";
 import { loadLocalVodSync, saveLocalVodSync, clearLocalVodSync } from "@/lib/local-vod-sync";
@@ -622,6 +624,19 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ?batchStatic=<id> (the static dashboard's "Import reports" link) opens
+  // the batch importer on that static. Opening it fetches nothing; the
+  // imports start on its Start button.
+  useEffect(() => {
+    const id = Number(new URLSearchParams(window.location.search).get("batchStatic"));
+    if (!Number.isInteger(id) || id <= 0) return;
+    setBatchStaticId(id);
+    setShowBatchImport(true);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("batchStatic");
+    window.history.replaceState({}, "", url.toString());
+  }, []);
+
   // "Call Wipe" — appends a manually-created Raid error (see
   // types/PullError.ts createCallWipeError) to the given pull at the given
   // timestamp (the current playback time, passed up from AnalysisPanel).
@@ -1029,18 +1044,21 @@ export default function Home() {
 
   // ── Unified import dispatcher ──────────────────────────────────────────────
 
+  // Resolves to the import's error message, or null once the log loaded (or
+  // a found-session / sample-data prompt took over). The batch importer
+  // reads it; the Import button ignores it (the bar shows the error).
   async function handleImportReport(
     rawInput: string,
     options?: { skipDuplicateCheck?: boolean; skipSampleCheck?: boolean }
-  ) {
+  ): Promise<string | null> {
     const parsed = parseLogUrl(rawInput);
 
     if (!parsed) {
-      setImportError(
+      const message =
         "Please paste a full WarcraftLogs or FFLogs report URL " +
-        "(e.g. https://www.warcraftlogs.com/reports/… or https://www.fflogs.com/reports/…)"
-      );
-      return;
+        "(e.g. https://www.warcraftlogs.com/reports/… or https://www.fflogs.com/reports/…)";
+      setImportError(message);
+      return message;
     }
 
     // Immediate feedback that the click registered — both pre-checks below
@@ -1063,7 +1081,7 @@ export default function Home() {
         setImporting(false);
         setDuplicateMatch(match);
         setPendingRawInput(rawInput);
-        return;
+        return null;
       }
     }
 
@@ -1079,7 +1097,7 @@ export default function Home() {
       if (meta) {
         setImporting(false);
         setSampleDataFound({ source: parsed.source, code: parsed.code, rawInput, meta });
-        return;
+        return null;
       }
     }
 
@@ -1098,11 +1116,14 @@ export default function Home() {
       } else {
         await handleImportFFL(parsed.code);
       }
+      return null;
     } catch (err) {
-      setImportError(err instanceof Error ? err.message : String(err));
+      const message = err instanceof Error ? err.message : String(err);
+      setImportError(message);
       setImportStatus(null);
       setLoadedReportCode(null);
       setLoadedReportStartedAt(null);
+      return message;
     } finally {
       setImporting(false);
     }
@@ -1135,11 +1156,20 @@ export default function Home() {
       return;
     }
 
-    sessionIdRef.current = match.id;
-    setSessionId(match.id);
+    adoptSession(match.id, session);
+    handleImportReport(rawInput, { skipDuplicateCheck: true });
+  }
+
+  // Makes a saved session the current one before its log is imported: its
+  // wipe calls, manual errors and duty overrides wait to be reattached, and
+  // its VODs replace the loaded ones. Used by the found-session dialog and
+  // the batch importer.
+  function adoptSession(id: string, session: SavedSession) {
+    sessionIdRef.current = id;
+    setSessionId(id);
     setSessionReportUrl(session.reportUrl);
     // Eagerly, not just via the mirroring effect: the handleImportReport()
-    // call below runs before that effect flushes, and its
+    // call that follows runs before that effect flushes, and its
     // startNewSessionIfDifferentLog() check would otherwise compare against
     // the PREVIOUS report's url and discard the session just adopted here.
     sessionReportUrlRef.current = session.reportUrl;
@@ -1156,10 +1186,90 @@ export default function Home() {
     }
 
     const url = new URL(window.location.href);
-    url.searchParams.set("session", match.id);
+    url.searchParams.set("session", id);
     window.history.replaceState({}, "", url.toString());
+  }
 
-    handleImportReport(rawInput, { skipDuplicateCheck: true });
+  // ── Batch import to a static (components/BatchImportDialog.tsx) ────────────
+  //
+  // One report: adopt its saved session (the one pinned by a static resync,
+  // else the log's earliest, else a new one), import it as Import would,
+  // wait for the pulls to render (displayPulls carries the cross-pull
+  // strategy errors) and the session to be saved, then post it to the static
+  // as AddReviewToStaticDialog does.
+
+  const [showBatchImport, setShowBatchImport] = useState(false);
+  const [batchStaticId, setBatchStaticId] = useState<number | null>(null);
+  // What the latest render shows, read by the batch's waits.
+  const batchViewRef = useRef({ pulls, displayPulls, code: loadedReportCode, startedAt: loadedReportStartedAt });
+  batchViewRef.current = { pulls, displayPulls, code: loadedReportCode, startedAt: loadedReportStartedAt };
+
+  async function waitUntil(cond: () => boolean, timeoutMs: number): Promise<boolean> {
+    const t0 = Date.now();
+    while (!cond()) {
+      if (Date.now() - t0 > timeoutMs) return false;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    return true;
+  }
+
+  async function runBatchItem(item: BatchItem, staticId: number): Promise<BatchOutcome> {
+    const parsed = parseLogUrl(item.url);
+    if (!parsed) throw new Error("Not a WarcraftLogs or FFLogs report URL");
+    if (!hasAcceptedUsageNotice()) {
+      throw new Error("Import one report with the Import button first, to accept the usage notice");
+    }
+
+    const targetId = item.sessionId ?? (await lookupSessionForLog(parsed.source, parsed.code))?.id ?? null;
+    if (targetId && targetId !== sessionIdRef.current) {
+      const session = await fetchSession(targetId);
+      if (!session) throw new Error(`Couldn't load saved session ${targetId}`);
+      // The previous report's VODs must not be saved into this session
+      // (adoptSession keeps them when the session has none).
+      vodsRef.current = [];
+      setVods([]);
+      setSelectedVodId(null);
+      adoptSession(targetId, session);
+    } else if (!targetId && parseLogUrl(sessionReportUrlRef.current ?? "")?.code !== parsed.code) {
+      // A new session for this log, without the previous report's VODs.
+      vodsRef.current = [];
+      setVods([]);
+      setSelectedVodId(null);
+    }
+
+    const before = batchViewRef.current.pulls;
+    // Local sample data when it exists (development), as a manual Import
+    // offers; otherwise a live fetch.
+    const sample = await tryFetchSampleReportMeta(parsed.source, parsed.code);
+    if (!sample && (parsed.source === "wcl" ? isWCLQuotaExhausted() : isFFLQuotaExhausted())) {
+      throw new Error(`Out of ${parsed.source === "wcl" ? "WarcraftLogs" : "FFLogs"} API points for this hour (rate limit)`);
+    }
+    const failure = sample
+      ? await loadSampleData(item.url, parsed.source, parsed.code)
+      : await handleImportReport(item.url, { skipDuplicateCheck: true, skipSampleCheck: true });
+    if (failure) throw new Error(failure);
+    // The new pulls rendered (so displayPulls is theirs) and the session saved.
+    const settled = await waitUntil(
+      () => batchViewRef.current.pulls !== before && batchViewRef.current.code === parsed.code && !!sessionIdRef.current,
+      15_000,
+    );
+    if (!settled) throw new Error("The import finished but its session wasn't saved in time");
+
+    const eligible = staticEligiblePulls(batchViewRef.current.displayPulls);
+    if (eligible.length === 0) throw new Error("No Mythic raid pulls in this report");
+    const res = await fetch(`/api/statics/${staticId}/reviews`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({
+        sessionId:       sessionIdRef.current,
+        reportUrl:       sessionReportUrlRef.current || item.url,
+        reportStartedAt: batchViewRef.current.startedAt,
+        ...buildStaticReviewPayload(eligible),
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `Adding to the static failed (${res.status})`);
+    return data.resynced ? "resynced" : "added";
   }
 
   function handleImportFreshInstead() {
@@ -1209,21 +1319,29 @@ export default function Home() {
     const found = sampleDataFound;
     setSampleDataFound(null);
     if (!found) return;
+    await loadSampleData(found.rawInput, found.source, found.code);
+  }
 
+  // Loads a report from local sample data; resolves to the error message, or
+  // null once loaded. Shared by the sample-data prompt and the batch importer.
+  async function loadSampleData(rawInput: string, source: "wcl" | "ffl", code: string): Promise<string | null> {
     setImporting(true);
     setImportError(null);
     setImportProgress(20);
-    setImportStatus(`Loading ${found.code} from local sample data…`);
-    startNewSessionIfDifferentLog(found.rawInput);
-    setSessionReportUrl(found.rawInput);
-    sessionReportUrlRef.current = found.rawInput;
+    setImportStatus(`Loading ${code} from local sample data…`);
+    startNewSessionIfDifferentLog(rawInput);
+    setSessionReportUrl(rawInput);
+    sessionReportUrlRef.current = rawInput;
 
     try {
-      const payload = await fetchSampleReport(found.source, found.code);
+      const payload = await fetchSampleReport(source, code);
       applySampleReport(payload);
+      return null;
     } catch (err) {
-      setImportError(err instanceof Error ? err.message : String(err));
+      const message = err instanceof Error ? err.message : String(err);
+      setImportError(message);
       setImportStatus(null);
+      return message;
     } finally {
       setImporting(false);
     }
@@ -1279,6 +1397,7 @@ export default function Home() {
         onConnectWCL={() => setLogApiSetup("wcl")}
         onConnectFFL={() => setLogApiSetup("ffl")}
         onAddReviewToStatic={() => setShowAddReviewToStaticDialog(true)}
+        onBatchImport={() => { setBatchStaticId(null); setShowBatchImport(true); }}
         onManageStatics={() => setShowManageStaticsDialog(true)}
         onLogin={() => setShowLoginDialog(true)}
         onLogout={handleLogout}
@@ -1502,6 +1621,14 @@ export default function Home() {
         pulls={displayPulls}
         onClose={() => setShowAddReviewToStaticDialog(false)}
         onOpenManageStatics={() => setShowManageStaticsDialog(true)}
+      />
+
+      <BatchImportDialog
+        open={showBatchImport}
+        onClose={() => setShowBatchImport(false)}
+        initialStaticId={batchStaticId}
+        runItem={runBatchItem}
+        progress={{ percent: importProgress, status: importStatus }}
       />
 
       <ManageStaticsDialog

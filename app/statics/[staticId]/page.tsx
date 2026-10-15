@@ -316,7 +316,14 @@ export default function StaticDashboardPage() {
         </Panel>
 
         <Panel>
-          <PanelHeader title="Sessions" count={sessions ? `(${sessions.length})` : undefined} />
+          <PanelHeader title="Sessions" count={sessions ? `(${sessions.length})` : undefined}>
+            {/* Opens the review screen's batch importer on this static (a
+                new tab; nothing is fetched until its Start button). */}
+            <a className="ck-btn ck-btn--sm" href={`/?batchStatic=${staticId}`} target="_blank" rel="noopener"
+              title="Import several reports into this static, or resync all of its sessions">
+              Import / resync reports
+            </a>
+          </PanelHeader>
       <div style={{ display: "flex", flexDirection: "column", gap: "8px", padding: "12px" }}>
         {removeError && <p className="ck-error-text" style={{ margin: "0 2px" }}>{removeError}</p>}
         {sessions == null ? (
