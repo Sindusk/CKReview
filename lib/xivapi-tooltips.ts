@@ -27,20 +27,20 @@ export type XivTooltip = {
   category?:   string;   // Spell / Weaponskill / Ability
   castMs?:     number;   // 0 = instant
   recastMs?:   number;
-  mpCost?:     number;
-  charges?:    number;   // only when more than one
+  mpCost?:     number;   // a gauge cost is a line in the description, as in-game
   range?:      number;   // yalms; melee rows come back as 3
   radius?:     number;
   level?:      number;
+  job?:        string;   // "Dancer"; none for role actions
   affinity?:   string;   // ClassJobCategory name ("AST", "GLA MRD PLD …")
 } | null;
 
 const API = "https://v2.xivapi.com/api/sheet";
 const STATUS_OFFSET = 1_000_000;
 const TTL_MS = 7 * 24 * 3600 * 1000;
-const STORE_PREFIX = "xivapi2:";  // bump when XivTooltip's shape changes
+const STORE_PREFIX = "xivapi3:";  // bump when XivTooltip's shape changes
 const MP_COST_TYPE = 3;
-const ACTION_FIELDS = "Name,ActionCategory.Name,Cast100ms,Recast100ms,PrimaryCostType,PrimaryCostValue,MaxCharges,Range,EffectRange,ClassJobLevel,ClassJobCategory.Name";
+const ACTION_FIELDS = "Name,ActionCategory.Name,Cast100ms,Recast100ms,PrimaryCostType,PrimaryCostValue,Range,EffectRange,ClassJobLevel,ClassJobCategory.Name,ClassJob.NameEnglish";
 const memory = new Map<string, Promise<XivTooltip>>();
 
 function urlOf(id: number): { key: string; url: string; status: boolean } {
@@ -92,7 +92,8 @@ type Row = {
     Name?: string; "Description@as(html)"?: string;
     ActionCategory?: { fields?: { Name?: string } }; ClassJobCategory?: { fields?: { Name?: string } };
     Cast100ms?: number; Recast100ms?: number; PrimaryCostType?: number; PrimaryCostValue?: number;
-    MaxCharges?: number; Range?: number; EffectRange?: number; ClassJobLevel?: number;
+    Range?: number; EffectRange?: number; ClassJobLevel?: number;
+    ClassJob?: { fields?: { NameEnglish?: string } };
   };
   transient?: { "Description@as(html)"?: string };
 };
@@ -109,11 +110,11 @@ function toTooltip(j: Row, status: boolean): XivTooltip {
     castMs:   f.Cast100ms !== undefined ? f.Cast100ms * 100 : undefined,
     recastMs: f.Recast100ms !== undefined ? f.Recast100ms * 100 : undefined,
     mpCost:   f.PrimaryCostType === MP_COST_TYPE && f.PrimaryCostValue ? f.PrimaryCostValue * 100 : undefined,
-    charges:  f.MaxCharges && f.MaxCharges > 1 ? f.MaxCharges : undefined,
     range:    f.Range === undefined ? undefined : f.Range < 0 ? 3 : f.Range,
     radius:   f.EffectRange,
     level:    f.ClassJobLevel || undefined,
     affinity: f.ClassJobCategory?.fields?.Name || undefined,
+    job:      f.ClassJob?.fields?.NameEnglish || undefined,
   };
 }
 

@@ -20,6 +20,7 @@
 import { useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { fetchXivTooltip, type XivSegment, type XivTooltip } from "@/lib/xivapi-tooltips";
+import { getFFJobIcon } from "@/lib/ffl-job-data";
 
 export const ABILITY_TIP_COLOR = "#9fd0ff";
 
@@ -46,13 +47,12 @@ function Description({ segs }: { segs: XivSegment[] }) {
   );
 }
 
-/** Cast / Recast / MP Cost / Charges, each over a short gold gauge line. */
+/** Cast / Recast / MP Cost, each over a short gold gauge line. */
 function StatBand({ tip }: { tip: NonNullable<XivTooltip> }) {
   const cols: [string, string][] = [];
   if (tip.castMs !== undefined) cols.push(["Cast", tip.castMs === 0 ? "Instant" : secs(tip.castMs)]);
   if (tip.recastMs !== undefined) cols.push(["Recast", secs(tip.recastMs)]);
   if (tip.mpCost) cols.push(["MP Cost", String(tip.mpCost)]);
-  if (tip.charges) cols.push(["Charges", String(tip.charges)]);
   if (!cols.length) return null;
   return (
     <div style={{
@@ -135,7 +135,15 @@ export function AbilityHoverTip({ game, id, name, icon, lines = [], fallbackLine
           {xiv && <Description segs={xiv.description} />}
           {xiv?.kind === "action" && (xiv.level || xiv.affinity) && (
             <div style={{ display: "grid", gridTemplateColumns: "64px 1fr", marginTop: 7, fontSize: 12 }}>
-              {xiv.level && <><span style={{ color: GOLD_LABEL }}>Acquired</span><span>Lv. {xiv.level}</span></>}
+              {xiv.level && (
+                <>
+                  <span style={{ color: GOLD_LABEL }}>Acquired</span>
+                  <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                    {xiv.job && <img src={getFFJobIcon(xiv.job)} alt="" width={16} height={16} onError={(e) => { e.currentTarget.style.display = "none"; }} />}
+                    Lv. {xiv.level}
+                  </span>
+                </>
+              )}
               {xiv.affinity && <><span style={{ color: GOLD_LABEL }}>Affinity</span><span>{xiv.affinity}</span></>}
             </div>
           )}
