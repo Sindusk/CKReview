@@ -29,7 +29,7 @@ import { tincture, tinctureWindows } from "./jobs/tincture";
 import { JOB_GAUGES } from "./jobs/gauges";
 import { patchOf } from "./patches";
 import { MELEE_PROC_SKIP_IDS, vprDisengageAlternative } from "./jobs/melee";
-import { PROC_REPLACES } from "./jobs/ranged";
+import { dncTechHoldValue, PROC_REPLACES } from "./jobs/ranged";
 import { FFXIV_ACTION_INDEX } from "../../mitigation/ffxiv-catalog";
 import type { DamageGame, GameAction, PartyBuff, TrackedCooldown } from "../types";
 
@@ -216,6 +216,7 @@ export const FFXIV_DAMAGE: DamageGame = {
   tankSwapActionIds: TANK_SWAP_IDS,
   disengageActionIds: DISENGAGE_IDS,
   movementActionIds: MOVEMENT_IDS,
+  holdValue: dncTechHoldValue,
   disengageAlternative: vprDisengageAlternative,
   jobChecks: (job) => [...(JOB_CHECKS[job] ?? []), noDamageCasts, tincture],
   jobGauges: (job) => JOB_GAUGES[job] ?? [],

@@ -232,9 +232,13 @@ Siegward, Yoro, Kade, Kevin, Sayacissa, Chauzey). Three deaths (Mocha
   Charge window had counted 16k). ~60 across the samples. Lost 264k →
   409k.
 - **Chauzey Solstice (Dancer).** Nothing to build; per-claim record in the
-  Dancer header of lib/damage/ffxiv/jobs/ranged.ts. Open (asked the user):
-  the 8:09 and 10:10 holds before Technical Finish (76k + 16k), which
-  line her Finish up with the Divinations.
+  Dancer header of lib/damage/ffxiv/jobs/ranged.ts. Then built (user:
+  "did the hold do more damage?"): a hold on the last dance step before
+  Technical Finish is valued by pressing it at once — her GCD time back,
+  less the party damage Technical Finish would give up at its end, plus
+  her own hits against the others' buffs (DamageGame.holdValue,
+  dncTechHoldValue). 8:09: 76k → 9k; 10:10: 16k → none (the hold paid
+  off). Lost 183k → 100k. 20 such holds across the samples, 0-26k.
 
 ## Open
 
@@ -262,8 +266,7 @@ Siegward, Yoro, Kade, Kevin, Sayacissa, Chauzey). Three deaths (Mocha
   - Still waiting on the user: the charges-at-kill proposal
     (docs/open-items.md). It comes up for Mocha's coils, Sin's Phlegma
     and Sayacissa's Dragonfire Dive.
-- The Tyrant kill (session 2026-10-15): all eight players done. Waiting
-  on the user: Technical Finish held to line up with Divination
-  (Chauzey's 8:09 / 10:10). Lindwurm and Lindwurm II kills are next. Patch review as above.
+- The Tyrant kill (session 2026-10-15): all eight players done, nothing
+  waiting on the user. Lindwurm and Lindwurm II kills are next. Patch review as above.
   The charges-at-kill question is settled (the kill rule above).
 - Lindwurm and Lindwurm II kills are on disk too.

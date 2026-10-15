@@ -239,6 +239,15 @@ export function checkGcdGaps(ctx: PlayerCheckContext): DamageFinding[] {
       acc.moments.push({ startMs: start, endMs: end, lostDamage: moveMs * perMs, detail: `${s(moveMs)} moving (${moveCause}) after ${after}` });
       moved.set(key, acc);
     }
+    // A deliberate hold is valued by what it changed (DamageGame.holdValue).
+    const hold = unforced >= DELAY_FINDING_MS ? ctx.game.holdValue?.(ctx, { gcdStartMs: gcdStart, fromMs: start, toMs: to, idleMs: unforced }) : undefined;
+    if (hold) {
+      if (hold.lostDamage >= 1) out.push(finding(ctx, {
+        kind: "gcd-delay", startMs: start, endMs: end, forced: false, delayMs: unforced, inference: true,
+        label: hold.label, lostDamage: hold.lostDamage, basis: hold.basis, detail: hold.detail,
+      }));
+      return;
+    }
     const swap = weaves.find((c) => ctx.game.tankSwapActionIds.has(c.abilityId)) ??
       ctx.player.casts.find((c) => ctx.game.tankSwapActionIds.has(c.abilityId) && c.timestamp >= start - 3_000 && c.timestamp <= end);
     if (unforced >= GAP_FINDING_MS) {

@@ -70,9 +70,9 @@
 //   time (6:03, 6:30, 7:02, 7:39 are Flatliner movement). The 8:09 hold
 //   (1.8s after Emboite, Quadruple Technical Finish at 8:11.06, 76k) is
 //   in both; ours adds 10:10 (1.2s after Entrechat, 16k). Both Finishes
-//   land with the Divinations (8:11.2, 10:11.9): likely held to line up
-//   the raid buffs. Counted as hers for now (raised with the user; 13
-//   holds of 1s+ after a dance step across the samples). Not adopted:
+//   land with the Divinations (8:11.2, 10:11.9). Built (user: judge it by
+//   whether holding did more damage): dncTechHoldValue below — 8:09 now
+//   9k, 10:10 no finding (the hold paid off). Not adopted:
 //   Shield Samba, Improvisation, Curing Waltz, Second Wind.
 // Bard: Caustic Bite / Stormbite (below), Hawk's Eye overwrites, AoE on
 //   one target, the burst window, cooldowns (OGCDDowntime.ts).
@@ -113,10 +113,10 @@
 //   MIT License; full text in THIRD_PARTY_NOTICES.md.
 
 import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
-import type { PlayerEvent } from "@/types/PlayerInfo";
+import type { PlayerEvent, PlayerInfo } from "@/types/PlayerInfo";
 import type { DamageFinding, JobCheck } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";
-import { aoeComboOnOneTarget, burstWindowFindings, dotFindings, k, statusWindows, type ExpectedAction } from "./shared";
+import { aoeComboOnOneTarget, burstWindowFindings, dotFindings, k, s, statusWindows, type ExpectedAction } from "./shared";
 import { forcedPart, inWindows, mergeWindows } from "../../timeline";
 import { espritGauge, featherGauge } from "./gauges";
 
@@ -150,6 +150,67 @@ const sabersExpected = (casts: PlayerEvent[]) => {
 // Technical Finish, ended by the kill at 8:23, read as 5/8 with Starfall
 // Dance and Tillana missing (242k).
 const TECH_SPAN_MS = S.TECHNICAL_FINISH.duration ?? 20_000;
+
+// A hold on the last dance step before Technical Finish (DamageGame.
+// holdValue), valued by what holding changed, not idle × GCD (user,
+// 2026-10-15). Pressed h earlier:
+//  - Technical Finish covers the party h earlier: its share gained on each
+//    player's hits in the h before it, lost on their hits in its last h
+//    (the party's burst peaks there, so this usually favours the hold);
+//  - her own hits from the Finish move h earlier, in or out of the other
+//    players' buffs (the ledger's measured share of each on her);
+//  - she gets h of GCD time back, at her average GCD outside raid buffs.
+// K6qfMamL7rN8yz2Q The Tyrant: 8:09's 1.8s cost 21k (39k of GCD time
+// back, less 26k of party damage Technical Finish would have lost, plus
+// 9k on her own hits), not the 76k of idle × in-buff GCD; 10:10's 1.2s
+// paid off. The party's play is taken as logged. Marked inference.
+const DANCE_STEP_IDS = new Set(ids("EMBOITE", "ENTRECHAT", "JETE", "PIROUETTE"));
+const TECH_FINISH_IDS = new Set(ids("TECHNICAL_FINISH", "SINGLE_TECHNICAL_FINISH", "DOUBLE_TECHNICAL_FINISH",
+  "TRIPLE_TECHNICAL_FINISH", "QUADRUPLE_TECHNICAL_FINISH"));
+const OWN_SHIFT_TAIL_MS = 30_000;
+export function dncTechHoldValue(ctx: PlayerCheckContext, gap: { gcdStartMs: number; toMs: number; idleMs: number }) {
+  if (ctx.job !== "Dancer" || !ctx.ledger) return undefined;
+  const step = ctx.uses.find((u) => u.startMs === gap.gcdStartMs);
+  const fin = ctx.uses.find((u) => u.startMs === gap.toMs);
+  if (!step || !fin || !DANCE_STEP_IDS.has(step.action.id) || !TECH_FINISH_IDS.has(fin.action.id)) return undefined;
+  const tech = statusWindows(ctx, S.TECHNICAL_FINISH.id).find((w) => w.startMs >= gap.toMs - 500 && w.startMs <= gap.toMs + 2_000);
+  if (!tech) return undefined;
+  const ledger = ctx.ledger, me = ctx.player, h = gap.idleMs;
+  // Its last h only counts while the pull lasts: a window the end cuts
+  // short loses nothing by starting earlier.
+  const t0 = tech.startMs, t1 = Math.min(tech.endMs, ctx.endMs), tailFrom = tech.endMs - h;
+  const direct = (p: PlayerInfo, a: number, b: number) =>
+    p.damageDone.filter((e) => !e.isDoT && e.timestamp >= a && e.timestamp < b).reduce((x, e) => x + (e.amount ?? 0), 0);
+  let head = 0, tail = 0, techDelta = 0;
+  for (const p of ctx.pull.players) {
+    if (p === me) continue;
+    const share = ledger.share(S.TECHNICAL_FINISH.id, p);
+    if (share <= 0 || share >= 1) continue;
+    const hd = direct(p, t0 - h, t0), tl = tailFrom < t1 ? direct(p, tailFrom, t1) : 0;
+    head += hd; tail += tl;
+    techDelta += hd * share / (1 - share) - tl * share;
+  }
+  // The others' buffs on her, each as a multiplier from its measured share.
+  const ext = ledger.casts.filter((c) => c.source !== me.name && c.recipients.has(me.name));
+  const multAt = (t: number) => ext.reduce((m, c) => {
+    if (t < c.startMs || t >= c.startMs + c.durationMs) return m;
+    const share = ledger.share(c.statusId, me);
+    return share > 0 && share < 1 ? m / (1 - share) : m;
+  }, 1);
+  const ownDelta = me.damageDone.filter((e) => e.timestamp >= gap.toMs && e.timestamp < t1 + OWN_SHIFT_TAIL_MS && e.timestamp < ctx.endMs)
+    .reduce((x, e) => x + (e.amount ?? 0) * (multAt(e.timestamp - h) / multAt(e.timestamp) - 1), 0);
+  const timeBack = h / ctx.baseGcdMs * ctx.values.gcdValue(undefined, false);
+  const lost = timeBack + techDelta + ownDelta;
+  const sign = (x: number) => (x < 0 ? `− ${k(-x)}` : `+ ${k(x)}`);
+  return {
+    lostDamage: lost,
+    label: "Technical Finish held",
+    basis: `${k(timeBack)} for ${s(h)} of GCD time (her average GCD outside raid buffs) ${sign(techDelta)} Technical Finish on the party ` +
+      `(${k(head)} of their hits in the ${s(h)} before it gain its share, ${k(tail)} in its last ${s(h)} lose it) ${sign(ownDelta)} ` +
+      `her own hits moved ${s(h)} earlier against the others' buffs; the party's play as logged`,
+    detail: `${fin.abilityName} held ${s(h)} after ${step.abilityName}: pressing it at once ${lost >= 1 ? "would have done more" : "would have done less"}`,
+  };
+}
 
 const technical: JobCheck = (ctx) => burstWindowFindings(ctx, {
   statusId: S.TECHNICAL_FINISH.id, name: "Technical Finish", bonus: 0.05, spanMs: () => TECH_SPAN_MS,

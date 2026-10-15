@@ -396,6 +396,11 @@ showed:
 - **Check the log's name against xivanalysis's** when keying by name:
   its data spells Hindsbane Fang "Hindbane Fang", which hid every
   Hindsbane positional miss.
+- **A deliberate hold is judged by its outcome** (user, 2026-10-15): the
+  counterfactual is pressing at once, with the party's play as logged.
+  `DamageGame.holdValue` replaces idle × GCD for such a gap (a Dancer's
+  last dance step before Technical Finish: GCD time back vs the party
+  damage the buff gives up at its end, where the raid's burst peaks).
 - **Late-ish movement windows**: a window that ends at the last ranged
   filler misses the walk back (Fire Breath lines: first melee GCD 1.2-2.4s
   after the cast on four kills).

@@ -63,6 +63,11 @@ export type DamageGame = {
   // Sprint and gap closers (Intervene): woven while a mechanic moves the
   // player, so they don't make a gap a weaving delay (checks.ts CLIP_WEAVES).
   movementActionIds?: Set<number>;
+  // A gap that's a deliberate hold, valued by what holding changed rather
+  // than idle × GCD (a Dancer's last dance step before Technical Finish):
+  // the net loss (≤ 0: the hold paid off, no finding) with its basis.
+  holdValue?(ctx: PlayerCheckContext, gap: { gcdStartMs: number; fromMs: number; toMs: number; idleMs: number }):
+    { lostDamage: number; label: string; basis: string; detail: string } | undefined;
   // A better ranged GCD the player held when they pressed a ranged filler
   // at t (Viper's Uncoiled Fury with a Rattling Coil): the filler isn't
   // forced then. Returns the reason, or undefined.
