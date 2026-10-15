@@ -222,6 +222,9 @@ Siegward, Yoro, Kade, Kevin, Sayacissa, Chauzey). Three deaths (Mocha
   e.g. Mocha's Slither in a Lindwurm II knockback (152k). Defensives
   alone weren't exempted: that also made healers' triple mitigation
   weaves movement. Lost 538k → 461k.
+- **Kevin Brachydiar (Pictomancer).** Nothing to build; per-claim record
+  in the Pictomancer header of lib/damage/ffxiv/jobs/caster.ts. Every
+  window and cooldown full; its gaps match ours by time.
 
 ## Open
 
@@ -249,7 +252,7 @@ Siegward, Yoro, Kade, Kevin, Sayacissa, Chauzey). Three deaths (Mocha
   - Still waiting on the user: the charges-at-kill proposal
     (docs/open-items.md). It comes up for Mocha's coils, Sin's Phlegma
     and Sayacissa's Dragonfire Dive.
-- The Tyrant kill (session 2026-10-15): Mocha, Sin, Siegward, Yoro, Kade
-  done; next Kevin, then Sayacissa, Chauzey. Patch review as above.
+- The Tyrant kill (session 2026-10-15): Mocha, Sin, Siegward, Yoro, Kade,
+  Kevin done; next Sayacissa, then Chauzey. Patch review as above.
   The charges-at-kill question is settled (the kill rule above).
 - Lindwurm and Lindwurm II kills are on disk too.

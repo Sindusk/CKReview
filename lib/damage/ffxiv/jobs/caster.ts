@@ -64,8 +64,18 @@
 //     II in Starry Muse out-did the average Water in Blue, so not flagged).
 //     The same Hammers-before-the-last-window habit: vVPtwaTQ62Jg391q Red
 //     Hot and Deep Blue 8:37 (71k). Not adopted: its Rainbow Drip, Comet
-//     and Mog missing at 8:39 (still to come at the kill); Living Muse 15/16
-//     (never at three charges; 1s held).
+//     and Mog missing at 8:39 (still to come at the kill). Living Muse
+//     15/16 (never at three charges; 1s held) is a lost use under the kill
+//     rule since 2026-10-15 (a charge back and unused before the kill;
+//     172k).
+//     Rechecked on the same report's The Tyrant kill (Pull 2, 2026-10-15),
+//     nothing to build. Matched: cooldowns 100% (no kill-rule finding
+//     either), all six Starry Muse windows complete, the 5 interrupted
+//     casts, the 9:35 weave (0.2s) and its GCD downtimes by time (7:02,
+//     7:44 are the Flatliner towers; 8:31.8's 1.6s in Starry Muse is his,
+//     113k: the other ranged kept casting). App-only and holding: 25
+//     Palette over the cap at 1:55 (85k), the tincture 5:56 → 10:08 (24k).
+//     No damage: Swiftcast, Lucid Dreaming, Tempera Coat, Addle.
 //   - On dQ8wmb1VhKt6yBXk every Starry Muse window holds only one Hammer
 //     (the PCT starts Hammer Time at the window's end, after a second
 //     Subtractive round). Consistent across pulls, so likely a chosen
