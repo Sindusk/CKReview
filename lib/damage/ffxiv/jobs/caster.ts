@@ -49,6 +49,23 @@
 //     Built: the Palette and Paint lanes (jobs/gauges.ts); gauge from
 //     Water in Blue now comes with the cast, not its hit (gaugeCastTimes).
 //     Not adopted: Swiftcast 6/11, Lucid, Tempera Coat, Addle.
+//     Rechecked on the same report's Red Hot and Deep Blue kill (Pull 2,
+//     2026-10-14). Matched: GCD uptime (94.2% / 94.3%), its GCD downtimes
+//     by time (4:56, 7:16, 7:20 are Hot Aerial / Freaky Pyrotation
+//     movement here; 8:18 Smudge + Sprint 2.3s, 69k; 8:30 the interrupted
+//     Stone in Yellow, 2.5s), the 7:41 weave, the first four Starry Muse
+//     windows full. Built, all from the 8:39.8 Starry Muse the kill cut at
+//     11.6s (it was skipped whole): its Hammers ×3 (Striking Muse 8:25,
+//     every Hammer at 8:32-8:38 with Hammer Time good to 8:55; 107k;
+//     ExpectedAction.readyAgain = the next Striking Muse); the Additive
+//     spells in it (Water II in Blue 8:46.5, Holy in White 8:47.8; 123k,
+//     upper bound, and with the Hammers it claims 5 GCD slots where 4
+//     followed Star Prism); AoE paint spells under 3 targets (that Water
+//     II in Starry Muse out-did the average Water in Blue, so not flagged).
+//     The same Hammers-before-the-last-window habit: vVPtwaTQ62Jg391q Red
+//     Hot and Deep Blue 8:37 (71k). Not adopted: its Rainbow Drip, Comet
+//     and Mog missing at 8:39 (still to come at the kill); Living Muse 15/16
+//     (never at three charges; 1s held).
 //   - On dQ8wmb1VhKt6yBXk every Starry Muse window holds only one Hammer
 //     (the PCT starts Hammer Time at the window's end, after a second
 //     Subtractive round). Consistent across pulls, so likely a chosen
@@ -119,7 +136,12 @@ const starryMuse: JobCheck = (ctx) => burstWindowFindings(ctx, {
       if (comets > 1) subtractive--;
     }
     return [
-      { ids: HAMMERS, count: hammers, name: "Hammer GCD" },
+      // A spent Hammer Time stack comes back only with the next Striking
+      // Muse (for a window the kill cut short: K6qfMamL7rN8yz2Q Red Hot and
+      // Deep Blue, all three Hammers at 8:32-8:38, Starry Muse at 8:39.8,
+      // Hammer Time good to 8:55).
+      { ids: HAMMERS, count: hammers, name: "Hammer GCD",
+        readyAgain: (c, t) => c.player.casts.find((x) => x.abilityId === A.STRIKING_MUSE.id && x.timestamp > t)?.timestamp ?? Infinity },
       { ids: ids("STAR_PRISM"), count: 1, name: "Star Prism" },
       { ids: ids("RAINBOW_DRIP"), count: motifs > 0 ? 0 : 1, name: "Rainbow Drip" },
       { ids: ids("COMET_IN_BLACK"), count: Math.max(1, comets), name: "Comet in Black" },
@@ -140,8 +162,12 @@ const starryFillers: JobCheck = (ctx): DamageFinding[] => {
   const additive = new Set(ADDITIVE);
   const sub = best(ctx, SUBTRACTIVE);
   const out: DamageFinding[] = [];
-  for (const w of statusWindows(ctx, S.STARRY_MUSE.id)) {
-    if (w.endMs > ctx.endMs) continue;
+  for (const win of statusWindows(ctx, S.STARRY_MUSE.id)) {
+    // A window the kill cut short counts up to the kill: an Additive cast
+    // in it was a choice (K6qfMamL7rN8yz2Q Red Hot and Deep Blue, Water II
+    // in Blue 8:46.5 and Holy in White 8:47.8 in the 8:39.8 window).
+    const w = { startMs: win.startMs, endMs: Math.min(win.endMs, ctx.endMs) };
+    if (w.startMs >= w.endMs) continue;
     const used = ctx.uses.filter((u) => u.startMs + u.castMs >= w.startMs && u.startMs + u.castMs <= w.endMs + 100 && additive.has(u.action.id));
     if (used.length === 0) continue;
     // As burstWindowFindings judges the window itself: the 6:03 window on
@@ -330,7 +356,15 @@ const palette: JobCheck = (ctx): DamageFinding[] => {
   return out;
 };
 
-export const PCT_CHECKS: JobCheck[] = [starryMuse, starryFillers, palette];
+// AoE paint spells under three targets, each against its single-target
+// spell (xivanalysis AoEUsages.ts). K6qfMamL7rN8yz2Q Red Hot and Deep
+// Blue: Water II in Blue at 8:46.5 on Deep Blue alone.
+const pctAoe = aoeComboOnOneTarget(([
+  ["FIRE_II_IN_RED", "FIRE_IN_RED"], ["AERO_II_IN_GREEN", "AERO_IN_GREEN"], ["WATER_II_IN_BLUE", "WATER_IN_BLUE"],
+  ["BLIZZARD_II_IN_CYAN", "BLIZZARD_IN_CYAN"], ["STONE_II_IN_YELLOW", "STONE_IN_YELLOW"], ["THUNDER_II_IN_MAGENTA", "THUNDER_IN_MAGENTA"],
+] as const).filter(([a, b]) => A[a] && A[b]).map(([a, b]) => [A[a].id, A[b].id, 3] as [number, number, number]));
+
+export const PCT_CHECKS: JobCheck[] = [starryMuse, starryFillers, palette, pctAoe];
 export const BLM_CHECKS: JobCheck[] = [highThunder, blmAoe];
 export const SMN_CHECKS: JobCheck[] = [searingLight];
 export const RDM_CHECKS: JobCheck[] = [manaStacks, dualcastWasted, verprocOverwrites];
