@@ -255,6 +255,10 @@ export const ERROR_RULES: PullErrorRule[] = [
       40308, 40309,                                          // The Path of Light / Darkness (exalines)
       40119, 40120,                                          // Cruel Path lanes exploding
       40321,   // Unmitigated Explosion (short tower)
+      // The Omega Protocol P1: omega.ts owns these.
+      31494,   // Storage Violation Obliteration (empty Program Loop tower)
+      31500,   // Ballistic Impact
+      31501, 32368,                                          // Flame Thrower
       // Enuo (The Unmaking EX): enuo.ts owns this.
       50014,   // Big Burst (empty Empty Shadow tower)
     ],

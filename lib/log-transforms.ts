@@ -74,6 +74,7 @@ import { detectTyrantErrors } from "./mechanics/ffxiv/arcadion/tyrant";
 import { detectLindwurmErrors } from "./mechanics/ffxiv/arcadion/lindwurm-1";
 import { detectLindwurm2Errors } from "./mechanics/ffxiv/arcadion/lindwurm-2";
 import { detectFatebreakerErrors } from "./mechanics/ffxiv/fru/fatebreaker";
+import { detectOmegaErrors } from "./mechanics/ffxiv/top/omega";
 import { detectUsurperOfFrostErrors, type HeadMarker } from "./mechanics/ffxiv/fru/usurper-of-frost";
 import { detectOracleOfDarknessErrors } from "./mechanics/ffxiv/fru/oracle-of-darkness";
 import { detectEnterTheDragonErrors } from "./mechanics/ffxiv/fru/enter-the-dragon";
@@ -1691,6 +1692,7 @@ export function transformFFightToPull(
     ...detectOracleOfDarknessErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
     ...detectEnterTheDragonErrors(players, deathEvents, enemyCastEvents, npcHits, reportedOccurrences),
     ...detectPandoraErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
+    ...detectOmegaErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
     ...detectDoomtrainErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
     ...detectNecronErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
     ...detectZeleniaErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),

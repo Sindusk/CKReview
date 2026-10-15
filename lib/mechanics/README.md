@@ -68,6 +68,12 @@ lib/mechanics/
                                 Paradise Regained wings / tethers / towers,
                                 Cruel Path lines and lanes, Pandora's Box,
                                 Paradise Lost enrage)
+    top/                      — The Omega Protocol (Ultimate); one pull, six phases
+      omega.ts                — Phase 1 per-pull rules (Program Loop towers and
+                                Blaster tethers, Pantokrator missiles and shared
+                                lines, Flame Thrower / Ballistic Impact, Diffuse
+                                and Wave Cannon Kyrios, Atomic Ray enrage); the
+                                other phase files are research models only
     trials/                   — Extreme trials
       doomtrain.ts            — Doomtrain (Hell on Rails EX) per-pull rules
                                 (avoidables, stored plasma spreads/pairs, orb

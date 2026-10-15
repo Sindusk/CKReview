@@ -88,6 +88,13 @@ philosophy and the data semantics this list assumes.
 - **Some debuffs go off at the holder's death.** A Dark Fire holder's
   death fires it on the body ~0.1s later. Report the chain once,
   player-less, and flag the first death's cause (Oracle of Darkness).
+- **Every phase's actors can share one name.** All of The Omega Protocol's
+  P1 and P2 casters are "Omega", so the phase ends at P2's first cast ID
+  (Firewall), not at a new actor name (Omega P1).
+- **A shared line's groups can be read from the pull itself.** Union the
+  players of every line that hit 2+; a component of four is one group and
+  the other group is its complement. One set's lines rarely place the
+  missile carriers (Omega P1's Pantokrator).
 
 ## Clean baselines
 
@@ -343,10 +350,12 @@ Classify every one before counting a called wipe. Known meanings:
   - Lindwurm: 2.4-2.9s
   - The Tyrant: 4.4s
   - Lindwurm II: 2.2-2.8s after a Mana Burst defam (off a platform)
+  - Omega P1: ~2.3s after a Guided Missile Kyrios hit on a non-carrier
 
   Keep these out of the called-wipe count.
 - **An uncleansed Doom:** no killing blow ~2s after it runs out at full
-  duration (Lindwurm II).
+  duration (Lindwurm II). Omega P1's 3s Doom from a doubled Twice-come
+  Ruin is sometimes credited to the hit that gave it instead.
 - **Falling with collapsing floor** (Lindwurm, 2.1s after the collapse
   hit).
 - **Left behind on a destroyed floor section:** 4.5s after the cast that

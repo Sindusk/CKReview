@@ -379,6 +379,10 @@ exposure("targeted", ["ffxiv-queen-eternal-prosecution"]);
 mechanic("ffxiv-fb-powder-swap", "Powder Mark swap", 1, ["ffxiv-fb-powder-swap"]);
 mechanic("ffxiv-fb-powder-death", "Powder Mark / Burn Mark survival", 1, ["ffxiv-fb-powder-death"]);
 exposure("targeted", ["ffxiv-fb-powder-swap", "ffxiv-fb-powder-death"]);
+// The Omega Protocol P1: each Program Loop round's towers test that round's
+// two In Line players (omega.ts reports both at every round).
+mechanic("ffxiv-top1-tower", "Program Loop towers (In Line soakers)", 1, ["ffxiv-top1-tower"]);
+exposure("targeted", ["ffxiv-top1-tower"]);
 // Futures Rewritten P2: Quadruple Slap tests the tanks; the Diamond Dust
 // cone and stone rules test the four Frigid Stone players
 // (usurper-of-frost.ts reports both at every instance).
