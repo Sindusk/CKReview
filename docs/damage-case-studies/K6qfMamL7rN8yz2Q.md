@@ -213,6 +213,15 @@ Siegward, Yoro, Kade, Kevin, Sayacissa, Chauzey). Three deaths (Mocha
   median first Psyche is 0:03.8), Siegward's banked Onslaught (13k). It
   settles the charges-at-kill proposal: the Vamp Fatale Living Muse
   (151k), Sin's Phlegma III, Sayacissa's Dragonfire Dive.
+- **Kade Kansado (Paladin).** Per-claim record in the Paladin header of
+  lib/damage/ffxiv/jobs/pld-war.ts. Built: an Atonement-chain step
+  dropped by another press (Royal Authority at 9:40.9 over Sepulchre
+  Ready, 26k; 54 across the samples). Fixed in the engine: Sprint and gap
+  closers don't make a gap a triple-weave clip, so his 6:29 / 7:39 tower
+  gaps (103k) read as movement; 75 player-pulls moved, 3.57M in all,
+  e.g. Mocha's Slither in a Lindwurm II knockback (152k). Defensives
+  alone weren't exempted: that also made healers' triple mitigation
+  weaves movement. Lost 538k → 461k.
 
 ## Open
 
@@ -240,7 +249,7 @@ Siegward, Yoro, Kade, Kevin, Sayacissa, Chauzey). Three deaths (Mocha
   - Still waiting on the user: the charges-at-kill proposal
     (docs/open-items.md). It comes up for Mocha's coils, Sin's Phlegma
     and Sayacissa's Dragonfire Dive.
-- The Tyrant kill (session 2026-10-15): Mocha, Sin, Siegward, Yoro done;
-  next Kade, then Kevin, Sayacissa, Chauzey. Patch review as above.
+- The Tyrant kill (session 2026-10-15): Mocha, Sin, Siegward, Yoro, Kade
+  done; next Kevin, then Sayacissa, Chauzey. Patch review as above.
   The charges-at-kill question is settled (the kill rule above).
 - Lindwurm and Lindwurm II kills are on disk too.

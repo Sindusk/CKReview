@@ -60,6 +60,9 @@ export type DamageGame = {
   tankSwapActionIds: Set<number>;
   // Ranged filler GCDs used when out of melee range (Lightning Shot).
   disengageActionIds: Set<number>;
+  // Sprint and gap closers (Intervene): woven while a mechanic moves the
+  // player, so they don't make a gap a weaving delay (checks.ts CLIP_WEAVES).
+  movementActionIds?: Set<number>;
   // A better ranged GCD the player held when they pressed a ranged filler
   // at t (Viper's Uncoiled Fury with a Rattling Coil): the filler isn't
   // forced then. Returns the reason, or undefined.

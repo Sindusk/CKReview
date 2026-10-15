@@ -111,6 +111,23 @@
 // 140k) counted as his, raised with the user: the other melee hit Deep
 // Blue then, but Kade's CABrk9zXLfJG8h6R kill has a 3.5s gap at 6:50.7
 // too, before the arena divides at 6:56.
+// Rechecked on the same report's The Tyrant kill (Pull 2, 2026-10-15).
+// Matched: its Fight or Flight misses one for one (6:13 and 9:17 at 7/8;
+// Royal Authority-group steps short at 6:13, 7:13, 9:17 ×2; Intervene at
+// 3:12, 4:13, 5:13, 7:13, 8:15; Expiacion 8:15, 9:17), Intervene ~7 lost
+// (15/23), the 2:32 broken combo, its GCD downtimes and the 1:06 tank-swap
+// triple weave by time. Built: Sepulchre 24/26 — Royal Authority at
+// 9:40.9 with Sepulchre Ready up removes it (atonementChainDropped, 26k;
+// the other was gained at the kill's last instant). Across the samples,
+// 54 drops, nearly all Royal Authority with Supplication or Sepulchre
+// Ready up. Fixed in the engine: the 6:29 (Rampart / Holy Sheltron /
+// Intervene) and 7:39 (Holy Sheltron / Intervene / Sprint) triple weaves
+// in the Flatliner towers, 103k as weaving delays, are movement: Sprint
+// and gap closers don't make a gap a clip (checks.ts; the raid idled to
+// 6:34.5 and 7:44.4). Not adopted: Expiacion and Circle of Scorn 20/21
+// (the extra use was ready 12-13s before the kill, under the kill rule's
+// 15s); the 6:03 tincture's 10/12 GCDs (the 6:01 Flatliner launch and
+// 6:29 towers); Oath gauge (Holy Sheltron is mitigation); defensives.
 //
 // Fight or Flight, ported from
 // xivanalysis src/parser/jobs/pld/modules/FightOrFlight.tsx: 8 GCDs;
@@ -127,7 +144,7 @@
 
 import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import type { DamageFinding, JobCheck } from "../../types";
-import { finding, type PlayerCheckContext } from "../../checks";
+import { finding, PROC_CONSUME_MS, PROC_EXPIRY_EARLY_MS, type PlayerCheckContext } from "../../checks";
 import { forcedPart, inWindows, mergeWindows } from "../../timeline";
 import { aoeComboOnOneTarget, burstWindowFindings, castHits, clock, gaugeFindings, k, statusWindows, uptimeFindings, type GaugeEvent, type GaugeSpec } from "./shared";
 import { comboLanded } from "./gnb";
@@ -273,8 +290,51 @@ const atonementChainAtKill: JobCheck = (ctx) => {
   return [];
 };
 
+// A chain step dropped by another press: Royal Authority with Sepulchre
+// Ready up removes it (K6qfMamL7rN8yz2Q The Tyrant, 9:40.9, Supplication
+// at 9:38.4; xivanalysis's Sepulchre 24/26, the other one gained at the
+// kill). checkProcs only sees expiries. The steps left are lost, each its
+// average minus a combo filler's (the GCD that ends up in its place),
+// outside Fight or Flight as above.
+const atonementChainDropped: JobCheck = (ctx) => {
+  const out: DamageFinding[] = [];
+  const fof = statusWindows(ctx, S.FIGHT_OR_FLIGHT.id);
+  const avgOutside = (actionId: number) => {
+    const hits = castHits(ctx, actionId).filter((h) => !inWindows(h.timestamp, fof));
+    return hits.length ? hits.reduce((a, h) => a + (h.amount ?? 0), 0) / hits.length : ctx.values.perUse(actionId);
+  };
+  const fillers = COMBO_FILLERS.filter((x) => A[x]).map(id).filter((x) => castHits(ctx, x).length > 0);
+  const filler = fillers.length ? fillers.reduce((a, x) => a + avgOutside(x), 0) / fillers.length : 0;
+  const gcdIds = new Set(ctx.uses.map((u) => u.action.id));
+  for (const [status, steps] of CHAIN) {
+    const sid = S[status].id, stepIds = new Set(steps.map(id));
+    for (const e of ctx.player.buffs ?? []) {
+      if (e.abilityId !== sid || e.buffStatus !== "removed" || e.timestamp >= ctx.endMs || inWindows(e.timestamp, ctx.dead)) continue;
+      const at = ctx.player.casts.find((c) => gcdIds.has(c.abilityId) && Math.abs(c.timestamp - e.timestamp) <= PROC_CONSUME_MS);
+      if (!at || stepIds.has(at.abilityId)) continue;
+      // Re-applied in the same instant: the chain restarted, not dropped.
+      if ((ctx.player.buffs ?? []).some((x) => x.abilityId === sid && x.buffStatus !== "removed" && Math.abs(x.timestamp - e.timestamp) <= PROC_CONSUME_MS)) continue;
+      // Run out: checkProcs counts the expiry.
+      const applied = [...(ctx.player.buffs ?? [])].reverse().find((x) => x.abilityId === sid && x.buffStatus !== "removed" && x.timestamp < e.timestamp);
+      if (applied?.durationMs && e.timestamp >= applied.timestamp + applied.durationMs - PROC_EXPIRY_EARLY_MS) continue;
+      const lost = steps.reduce((a, st) => a + Math.max(0, avgOutside(id(st)) - filler), 0);
+      if (lost < 1) continue;
+      const forced = inWindows(e.timestamp, mergeWindows(ctx.forced));
+      out.push(finding(ctx, {
+        kind: "proc-lost", startMs: e.timestamp, endMs: e.timestamp, forced,
+        cause: forced ? forcedPart(e.timestamp - 1, e.timestamp + 1, ctx.forced).cause : undefined,
+        label: `${S[status].name} dropped`, lostDamage: lost,
+        basis: steps.map((st) => `${k(avgOutside(id(st)))} ${A[st].name}`).join(" + ") +
+          ` − ${steps.length} × ${k(filler)} average combo filler (outside Fight or Flight)`,
+        detail: `${S[status].name} dropped: ${at.abilityName} at ${clock(at.timestamp)} went first`,
+      }));
+    }
+  }
+  return out;
+};
+
 const pldAoeCombo =aoeComboOnOneTarget([[id("TOTAL_ECLIPSE"), id("FAST_BLADE")], [id("PROMINENCE"), id("RIOT_BLADE")]]);
 const warAoeCombo = aoeComboOnOneTarget([[id("OVERPOWER"), id("HEAVY_SWING")], [id("MYTHRIL_TEMPEST"), id("MAIM")]]);
 
-export const PLD_CHECKS: JobCheck[] = [fightOrFlight, pldAoeCombo, atonementChainAtKill];
+export const PLD_CHECKS: JobCheck[] = [fightOrFlight, pldAoeCombo, atonementChainAtKill, atonementChainDropped];
 export const WAR_CHECKS: JobCheck[] = [surgingTempest, warAoeCombo, beastGauge, nascentChaos];

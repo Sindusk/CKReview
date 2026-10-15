@@ -210,7 +210,14 @@ export function checkGcdGaps(ctx: PlayerCheckContext): DamageFinding[] {
     // Fall Malefic, then Earthly Star, Divination and The Balance, the next
     // GCD 1.87s late inside Undead Deathmatch's window; xivanalysis's
     // weaving issue). Such a stretch is a clip and spends no movement.
-    for (const w of weaves.length >= CLIP_WEAVES ? [] : moveWins) {
+    // Sprint and gap closers don't count toward it: they're the movement
+    // (K6qfMamL7rN8yz2Q The Tyrant, the Paladin's 6:29 Rampart / Holy
+    // Sheltron / Intervene and 7:39 Holy Sheltron / Intervene / Sprint in
+    // the Flatliner towers, where the whole raid idled to 6:34.5 and
+    // 7:44.4). Defensives still do: leaving them out made healers' triple
+    // mitigation weaves movement too (Lindwurm Pull 7's Astrologian, 106k).
+    const clipWeaves = weaves.filter((c) => !ctx.game.movementActionIds?.has(c.abilityId)).length;
+    for (const w of clipWeaves >= CLIP_WEAVES ? [] : moveWins) {
       if (w.endMs <= start || w.startMs >= end) continue;
       const s0 = Math.max(start, w.startMs), e0 = Math.min(end, w.endMs);
       const o = e0 - s0 - overlapMs(s0, e0, forcedMerged);

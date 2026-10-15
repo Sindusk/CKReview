@@ -177,6 +177,12 @@ const TANK_SWAP_IDS = ids(["PROVOKE", "SHIRK"]);
 const DISENGAGE_IDS = ids(["LIGHTNING_SHOT", "TOMAHAWK", "UNMEND", "SHIELD_LOB",
   "ENPI", "PIERCING_TALON", "THROWING_DAGGER", "HARPE", "WRITHING_SNAP"]);
 
+// Sprint and each job's gap closers / dashes.
+const MOVEMENT_IDS = ids(["SPRINT", "INTERVENE", "ONSLAUGHT", "TRAJECTORY", "SHADOWSTRIDE",
+  "ICARUS", "SLITHER", "SMUDGE", "EN_AVANT", "SHUKUCHI", "THUNDERCLAP", "HELLS_INGRESS",
+  "HELLS_EGRESS", "REGRESS", "CORPS_A_CORPS", "DISPLACEMENT", "AETHERIAL_MANIPULATION",
+  "ELUSIVE_JUMP", "WINGED_GLIDE", "HISSATSU_GYOTEN", "HISSATSU_YATEN"]);
+
 // Statuses that force the hit carrying them to crit (Life Surge, Inner
 // Release, Reassembled also direct-hit): left out of crit-rate estimates
 // (lib/damage/crit-rates.ts). Life Surge shows in the hit's snapshot.
@@ -209,6 +215,7 @@ export const FFXIV_DAMAGE: DamageGame = {
   isDefensive: (actionId) => FFXIV_ACTION_INDEX.has(actionId),
   tankSwapActionIds: TANK_SWAP_IDS,
   disengageActionIds: DISENGAGE_IDS,
+  movementActionIds: MOVEMENT_IDS,
   disengageAlternative: vprDisengageAlternative,
   jobChecks: (job) => [...(JOB_CHECKS[job] ?? []), noDamageCasts, tincture],
   jobGauges: (job) => JOB_GAUGES[job] ?? [],
