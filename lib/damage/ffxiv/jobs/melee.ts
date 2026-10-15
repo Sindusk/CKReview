@@ -1009,9 +1009,9 @@ const mnkAoe = aoeComboOnOneTarget([
 // - Form Shift in uptime: a GCD that does nothing (its form GCD average).
 //   In downtime it's free: the top 100's Form Shifts sat in the bosses'
 //   2:52-2:58 absence.
-// Not built: Nadi overcap. 36 of the top 100 generate a Nadi they hold
-// after the opener (lining bursts up, phase timing); a bare overcap rule
-// would be fight-blind.
+// - Nadi overcap, judged by what it cost by the kill (Phantom Rushes lost,
+//   below), not as a bare rule: 36 of the top 100 generate a Nadi they hold
+//   after the opener, mostly shifting the cycle at no cost.
 const BLITZ_IDS = new Set(ids(...BLITZ_KEYS.filter((key) => A[key])));
 const FORM_GCD_IDS = new Set(ids("BOOTSHINE", "DRAGON_KICK", "LEAPING_OPO", "SHADOW_OF_THE_DESTROYER", "ARM_OF_THE_DESTROYER",
   "TRUE_STRIKE", "TWIN_SNAKES", "RISING_RAPTOR", "FOUR_POINT_FURY", "DEMOLISH", "SNAP_PUNCH", "POUNCING_COEURL", "ROCKBREAKER"));
@@ -1068,6 +1068,63 @@ const mnkBlitz: JobCheck = (ctx) => {
       label: "Perfect Balance pressed while one was running", lost: lostBlitz, basis: blitzBasis,
       detail: `Perfect Balance at ${clock(c.timestamp)} with the buff already up: a charge spent for nothing`,
     });
+  }
+
+  // Phantom Rushes lost to Nadi overcaps, judged by the kill: every Monk on
+  // disk opens Lunar, Lunar, Solar, Phantom Rush, then Lunar, Solar, Phantom
+  // Rush, so B Blitzes allow ⌊(B − 1) / 3⌋ Phantom Rushes. Fewer is a loss
+  // pinned to the overcaps after the opener. An overcap that only shifts the
+  // cycle costs nothing: YPhxRTb9Ld7BJaXp (a top parse) went LLLSPSLPSLPLCPL,
+  // 15 Blitzes, 4 Phantom Rushes of 4 (xivanalysis counts its overcaps as 1
+  // lost); bWDLM6zVXkqFAfjT went SCPSCPCSPCLLL, 3 of 4.
+  // A death empties the Nadi gauge (Xk2DKZwVp4Ar6d7y Enuo pull 3: an
+  // Elixir Burst after Lunar and Solar, 15s after a death): each stretch
+  // after one restarts at Lunar, Solar, Phantom Rush, ⌊B / 3⌋, and what the
+  // death cost is the death's.
+  const blitzCasts = casts.filter((c) => BLITZ_IDS.has(c.abilityId));
+  const segments: (typeof casts)[] = [[]];
+  let prevBlitz: (typeof casts)[number] | undefined;
+  for (const c of blitzCasts) {
+    if (prevBlitz && ctx.dead.some((d) => d.startMs > prevBlitz!.timestamp && d.startMs < c.timestamp)) segments.push([]);
+    segments[segments.length - 1].push(c);
+    prevBlitz = c;
+  }
+  // The opener's double Lunar costs one Blitz; an opener without it
+  // (Lunar, Celestial Revolution, Phantom Rush: rgTafHJ9MN47m3Vy pull 10)
+  // allows ⌊B / 3⌋ like a stretch after a death.
+  const lunarIds = new Set(ids("ELIXIR_BURST", "ELIXIR_FIELD"));
+  const doubleLunar = (seg: typeof casts) => seg.length >= 2 && lunarIds.has(seg[0].abilityId) && lunarIds.has(seg[1].abilityId);
+  const allowedIn = (seg: typeof casts, i: number) => Math.floor((seg.length - (i === 0 && doubleLunar(seg) ? 1 : 0)) / 3);
+  const allowed = segments.reduce((a, seg, i) => a + allowedIn(seg, i), 0);
+  const rushes = blitzCasts.filter((c) => c.abilityId === id("PHANTOM_RUSH")).length;
+  const lostRushes = segments.reduce((a, seg, i) =>
+    a + Math.max(0, allowedIn(seg, i) - seg.filter((c) => c.abilityId === id("PHANTOM_RUSH")).length), 0);
+  if (lostRushes > 0) {
+    const nadiBlitz = avgOf(ids("ELIXIR_BURST", "RISING_PHOENIX", "ELIXIR_FIELD", "FLINT_STRIKE"));
+    const rush = ctx.values.perUse(id("PHANTOM_RUSH"));
+    const LUNAR = new Set(ids("ELIXIR_BURST", "ELIXIR_FIELD")), SOLAR = new Set(ids("RISING_PHOENIX", "FLINT_STRIKE"));
+    let lunar = false, solar = false, n = 0;
+    const overcaps: number[] = [];
+    const firstOf = new Set(segments.slice(1).map((seg) => seg[0]));
+    for (const c of blitzCasts) {
+      n++;
+      if (firstOf.has(c)) lunar = solar = false;
+      if (c.abilityId === id("PHANTOM_RUSH") || c.abilityId === id("TORNADO_KICK")) { lunar = solar = false; continue; }
+      const gives = LUNAR.has(c.abilityId) ? "l" : SOLAR.has(c.abilityId) ? "s" : lunar ? "s" : "l";
+      // The opener's second Lunar is the standard line, not an overcap.
+      if (((gives === "l" && lunar) || (gives === "s" && solar)) && n > 2) overcaps.push(c.timestamp);
+      if (gives === "l") lunar = true; else solar = true;
+    }
+    if (rush > nadiBlitz && nadiBlitz > 0) {
+      const t = overcaps[0] ?? blitzCasts[blitzCasts.length - 1].timestamp;
+      push(t, {
+        label: `${lostRushes} Phantom Rush${lostRushes > 1 ? "es" : ""} lost to Nadi overcaps`,
+        lost: lostRushes * (rush - nadiBlitz),
+        basis: `${lostRushes} × (${k(rush)} average Phantom Rush − ${k(nadiBlitz)} average Elixir Burst / Rising Phoenix in its place)`,
+        detail: `${blitzCasts.length} Blitzes allow ${allowed} Phantom Rushes${segments.length > 1 ? " (counted between deaths)" : ""}, ${rushes} landed` +
+          (overcaps.length ? `; a Nadi already held at ${overcaps.map(clock).join(", ")}` : ""),
+      });
+    }
   }
 
   const phoenix = ctx.values.perUse(id("RISING_PHOENIX")) || ctx.values.perUse(id("ELIXIR_BURST"));
