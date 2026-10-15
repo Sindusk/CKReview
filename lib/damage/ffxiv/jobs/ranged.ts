@@ -85,7 +85,10 @@
 //   and fJxTNgwtRKjYbvZp 7:32.
 //   Dances (DirtyDancing.tsx, 2026-10-15): short finishes and wrong steps,
 //   `dancerDances` below. Found by searching the lowest Red Hot and Deep
-//   Blue rankings; not yet matched against xivanalysis.
+//   Blue rankings; matched against xivanalysis on five of those kills
+//   (2026-10-15). It counts a wrong step only past the dance's full step
+//   count; the app counts any press the finish didn't use
+//   (9zQqtBRL41XhADxG 9:06: 4 presses for a 3-step finish).
 // Bard: Caustic Bite / Stormbite (below), Hawk's Eye overwrites, AoE on
 //   one target, the burst window, cooldowns (OGCDDowntime.ts).
 //   Rechecked on dDar482XvFKBPJYh FRU kill (7.1, 2026-10-12): its 17
