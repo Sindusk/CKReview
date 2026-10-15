@@ -14,10 +14,14 @@
 //     a late start.
 //   - Cumulative: running totals restarted at the first session in range;
 //     each line starts at the player's first pull in it.
-// Filters: the fight (boss), a phase (detailed sessions only: per-error rows
-// carry the phase; older sessions are left out and counted in a note), and
-// the session range (from / to, with quick "last N" presets). Hovering shows
-// a compact tooltip at the cursor with the session and each player's value,
+// The chart draws its own panel header, laid out like the Mechanics panel's
+// (user, 2026-10-15): the title; in the middle the Per pull / Cumulative
+// switch with "Include Minors" under it (Majors only by default); on the
+// right the encounter (All by default, every pull in log order), its phase
+// when one encounter is picked (detailed sessions only: per-error rows carry
+// the phase; older sessions are left out and counted in a note), and the
+// session range (All, or from / to pickers). Hovering shows a compact
+// tooltip at the cursor with the pull, its session and each player's value,
 // errors and pulls.
 //
 // Series are keyed by resolved player IDENTITY (StaticPlayerIdentity), not
@@ -71,13 +75,11 @@ const GRIDLINE      = "#2c2c2a";
 const BASELINE      = "#383835";
 const FALLBACK_COLOR = "#aaaaaa";
 
-type Severity = "majorOnly" | "total";
 type Metric = "rate" | "cumulative";
 
 // Per pull: each point averages the player's last N pulls played.
 const ROLL_OPTIONS = [10, 20, 50];
 const ROLL_DEFAULT = 20;
-const RANGE_PRESETS = [5, 10, 20];
 
 function identityKey(p: ChartPullPlayerError): string {
   return p.identityId != null ? `id:${p.identityId}` : `name:${p.player}`;
@@ -123,7 +125,8 @@ type AxisPull = { pull: ChartPull; session: Session; sessionIdx: number };
 export default function StaticErrorChart({ pulls, phases = [] }: { pulls: ChartPull[]; phases?: ChartPhase[] }) {
   const [metric, setMetric] = useState<Metric>("rate");
   // Major-only is the default: Minors are noise-level and would bury them.
-  const [severity, setSeverity] = useState<Severity>("majorOnly");
+  // Majors only by default: Minors are noise-level and would bury them.
+  const [includeMinors, setIncludeMinors] = useState(false);
   const [rollPulls, setRollPulls] = useState<number>(ROLL_DEFAULT);
   const [boss, setBoss] = useState<string | null>(null);
   const [phase, setPhase] = useState<number | null>(null);
@@ -150,8 +153,9 @@ export default function StaticErrorChart({ pulls, phases = [] }: { pulls: ChartP
     for (const p of pulls) counts.set(p.bossName, (counts.get(p.bossName) ?? 0) + 1);
     return [...counts].sort((a, b) => b[1] - a[1]).map(([name, n]) => ({ name, pulls: n }));
   }, [pulls]);
-  const activeBoss = boss && bosses.some((b) => b.name === boss) ? boss : bosses[0]?.name ?? null;
-  const bossPhases = phases.filter((p) => p.bossName === activeBoss);
+  // null = every encounter, in log order. A phase needs one encounter.
+  const activeBoss = boss && bosses.some((b) => b.name === boss) ? boss : null;
+  const bossPhases = activeBoss ? phases.filter((p) => p.bossName === activeBoss) : [];
   const activePhase = phase !== null && bossPhases.some((p) => p.phaseId === phase) ? phase : null;
 
   // Sessions of this fight in log order, numbered as on the dashboard's list
@@ -162,7 +166,7 @@ export default function StaticErrorChart({ pulls, phases = [] }: { pulls: ChartP
     const out: Session[] = [];
     const byId = new Map<number, Session>();
     for (const p of pulls) {
-      if (p.bossName !== activeBoss) continue;
+      if (activeBoss && p.bossName !== activeBoss) continue;
       let s = byId.get(p.reviewId);
       if (!s) {
         s = { reviewId: p.reviewId, number: number.get(p.reviewId)!, label: p.reviewLabel, date: p.reviewDate ?? null, detailed: p.detailed ?? false, pulls: [] };
@@ -203,10 +207,10 @@ export default function StaticErrorChart({ pulls, phases = [] }: { pulls: ChartP
     const m = new Map<string, number>();
     for (const p of pull.players) {
       const counts = activePhase === null ? [p.majorCount, p.minorCount] : p.byPhase?.[activePhase] ?? [0, 0];
-      m.set(identityKey(p), severity === "majorOnly" ? counts[0] : counts[0] + counts[1]);
+      m.set(identityKey(p), includeMinors ? counts[0] + counts[1] : counts[0]);
     }
     return m;
-  }), [axis, activePhase, severity]);
+  }), [axis, activePhase, includeMinors]);
 
   // Rate: errors per pull over the player's last `rollPulls` pulls played,
   // a gap where they sat out. Cumulative: running total from their first
@@ -270,13 +274,13 @@ export default function StaticErrorChart({ pulls, phases = [] }: { pulls: ChartP
     });
   }
 
-  function setPreset(count: number | null) {
-    setToIdx(null);
-    setFromIdx(count === null ? null : Math.max(0, sessions.length - count));
-  }
-
   if (pulls.length === 0) {
-    return <p style={{ fontSize: "13px", color: INK_MUTED }}>No pulls imported yet — add a review to start building this chart.</p>;
+    return (
+      <div>
+        <div className="ck-panel-header"><h2 className="ck-panel-title">Error Trends</h2></div>
+        <p style={{ fontSize: "13px", color: INK_MUTED, padding: "12px 18px" }}>No pulls imported yet — add a review to start building this chart.</p>
+      </div>
+    );
   }
 
   const hoverAt = hover ? axis[hover.idx] : null;
@@ -290,29 +294,59 @@ export default function StaticErrorChart({ pulls, phases = [] }: { pulls: ChartP
   const sessionEnds = shown.map((s, si) => ({ s, i: axis.reduce((last, a, i) => (a.sessionIdx === si ? i : last), -1) })).filter((x) => x.i >= 0);
 
   const selectStyle = { padding: "3px 8px", fontSize: "12px" } as const;
-  const presetActive = (count: number | null) => (toIdx === null || toIdx >= last) && (count === null ? from === 0 : from === Math.max(0, sessions.length - count));
 
   return (
     <div>
-      {/* Controls: what's counted, then which slice of the static. */}
-      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "8px" }}>
-        <div style={{ display: "flex", gap: "4px" }}>
-          {(["rate", "cumulative"] as Metric[]).map((m) => (
-            <button key={m} onClick={() => setMetric(m)} className={`ck-tab${metric === m ? " ck-tab--active" : ""}`}
-              title={m === "rate" ? "Errors per pull, averaged over each player's last pulls played" : "Running total since the first session in range"}>
-              {m === "rate" ? "Per pull" : "Cumulative"}
-            </button>
-          ))}
+      {/* Header, laid out like the Mechanics panel's: title left, what's
+          counted in the middle, which slice of the static on the right. */}
+      <div className="ck-panel-header" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto minmax(0, 1fr)", alignItems: "center", columnGap: 12 }}>
+        <h2 className="ck-panel-title">Error Trends</h2>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+          <div style={{ display: "flex", gap: "4px" }}>
+            {(["rate", "cumulative"] as Metric[]).map((m) => (
+              <button key={m} onClick={() => setMetric(m)} className={`ck-tab ck-tab--sm${metric === m ? " ck-tab--active" : ""}`}
+                title={m === "rate" ? "Errors per pull, averaged over each player's last pulls played" : "Running total since the first session in range"}>
+                {m === "rate" ? "Per pull" : "Cumulative"}
+              </button>
+            ))}
+          </div>
+          <label style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "11px", color: INK_SECONDARY, cursor: "pointer" }}>
+            <input type="checkbox" checked={includeMinors} onChange={(e) => setIncludeMinors(e.target.checked)} />
+            Include Minors
+          </label>
         </div>
-        <div style={{ display: "flex", gap: "4px" }}>
-          {(["majorOnly", "total"] as Severity[]).map((m) => (
-            <button key={m} onClick={() => setSeverity(m)} className={`ck-tab${severity === m ? " ck-tab--active" : ""}`}>
-              {m === "total" ? "Major + Minor" : "Major only"}
-            </button>
-          ))}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "6px", flexWrap: "wrap", fontSize: "12px", color: INK_SECONDARY }}>
+          <select className="ck-field" value={activeBoss ?? ""} style={selectStyle} aria-label="Encounter"
+            onChange={(e) => { setBoss(e.target.value || null); setPhase(null); setFromIdx(null); setToIdx(null); }}>
+            <option value="">All encounters</option>
+            {bosses.map((b) => <option key={b.name} value={b.name}>{b.name}</option>)}
+          </select>
+          {activeBoss && bossPhases.length > 0 && (
+            <select className="ck-field" value={activePhase ?? ""} style={selectStyle} aria-label="Phase"
+              onChange={(e) => setPhase(e.target.value === "" ? null : Number(e.target.value))}
+              title="Count only errors in this phase, per pull that reached it">
+              <option value="">All phases</option>
+              {bossPhases.map((p) => <option key={p.phaseId} value={p.phaseId}>{p.name}</option>)}
+            </select>
+          )}
+          <select className="ck-field" value={fromIdx === null ? "" : from} style={selectStyle} aria-label="From session"
+            onChange={(e) => { if (e.target.value === "") { setFromIdx(null); return; } const v = Number(e.target.value); setFromIdx(v); if (v > to) setToIdx(v); }}>
+            <option value="">All sessions</option>
+            {sessions.map((s, i) => <option key={s.reviewId} value={i}>From {sessionName(s)}</option>)}
+          </select>
+          <select className="ck-field" value={toIdx === null ? "" : to} style={selectStyle} aria-label="To session"
+            onChange={(e) => { if (e.target.value === "") { setToIdx(null); return; } const v = Number(e.target.value); setToIdx(v); if (v < from) setFromIdx(v); }}>
+            <option value="">To latest</option>
+            {sessions.map((s, i) => <option key={s.reviewId} value={i} disabled={i < from}>To {sessionName(s)}</option>)}
+          </select>
         </div>
+      </div>
+
+      <div style={{ padding: "12px 18px 18px" }}>
+      {/* Body options: the rolling window (Per pull) and the table. */}
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "8px", fontSize: "12px", color: INK_SECONDARY }}>
         {metric === "rate" && (
-          <label style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "12px", color: INK_SECONDARY }}
+          <label style={{ display: "inline-flex", alignItems: "center", gap: "5px" }}
             title="Each point averages the player's errors over their last pulls played (in range)">
             Average of last
             <select className="ck-field" value={rollPulls} onChange={(e) => setRollPulls(Number(e.target.value))} style={{ padding: "2px 6px", fontSize: "12px" }}>
@@ -321,40 +355,9 @@ export default function StaticErrorChart({ pulls, phases = [] }: { pulls: ChartP
             pulls
           </label>
         )}
-        <button className="ck-btn" onClick={() => setShowTable((v) => !v)} style={{ marginLeft: "auto" }}>
+        <button className="ck-btn ck-btn--sm" onClick={() => setShowTable((v) => !v)} style={{ marginLeft: "auto" }}>
           {showTable ? "Show chart" : "Show table"}
         </button>
-      </div>
-
-      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "10px", fontSize: "12px", color: INK_SECONDARY }}>
-        {bosses.length > 1 && (
-          <select className="ck-field" value={activeBoss ?? ""} style={selectStyle}
-            onChange={(e) => { setBoss(e.target.value); setPhase(null); setFromIdx(null); setToIdx(null); }}>
-            {bosses.map((b) => <option key={b.name} value={b.name}>{b.name} ({b.pulls})</option>)}
-          </select>
-        )}
-        <select className="ck-field" value={activePhase ?? ""} style={selectStyle}
-          onChange={(e) => setPhase(e.target.value === "" ? null : Number(e.target.value))}
-          disabled={bossPhases.length === 0}
-          title={bossPhases.length === 0 ? "No session of this fight has phase detail yet (resync to add it)" : "Count only errors in this phase, per pull that reached it"}>
-          <option value="">All phases</option>
-          {bossPhases.map((p) => <option key={p.phaseId} value={p.phaseId}>{p.name}</option>)}
-        </select>
-        <span style={{ marginLeft: "6px" }}>Sessions</span>
-        {[...RANGE_PRESETS.filter((c) => c < sessions.length), null].map((c) => (
-          <button key={c ?? "all"} className={`ck-tab ck-tab--sm${presetActive(c) ? " ck-tab--active" : ""}`} onClick={() => setPreset(c)}>
-            {c === null ? "All" : `Last ${c}`}
-          </button>
-        ))}
-        <select className="ck-field" value={from} style={selectStyle} aria-label="From session"
-          onChange={(e) => { const v = Number(e.target.value); setFromIdx(v); if (v > to) setToIdx(v); }}>
-          {sessions.map((s, i) => <option key={s.reviewId} value={i}>{sessionName(s)}</option>)}
-        </select>
-        <span>to</span>
-        <select className="ck-field" value={to} style={selectStyle} aria-label="To session"
-          onChange={(e) => { const v = Number(e.target.value); setToIdx(v); if (v < from) setFromIdx(v); }}>
-          {sessions.map((s, i) => <option key={s.reviewId} value={i} disabled={i < from}>{sessionName(s)}</option>)}
-        </select>
       </div>
 
       {undetailed > 0 && (
@@ -514,6 +517,7 @@ export default function StaticErrorChart({ pulls, phases = [] }: { pulls: ChartP
           )}
         </div>
       )}
+      </div>
     </div>
   );
 }

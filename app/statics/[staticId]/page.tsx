@@ -292,14 +292,15 @@ export default function StaticDashboardPage() {
         </div>
 
         <Panel style={{ marginBottom: sectionGap }}>
-          <PanelHeader title="Error Trends" />
-          <div style={{ padding: "16px 18px 18px" }}>
-            {pulls == null ? (
-              <p className="ck-dialog-text">Loading chart...</p>
-            ) : (
-              <StaticErrorChart pulls={pulls} phases={chartPhases} />
-            )}
-          </div>
+          {/* The chart draws its own header (title, mode, filters). */}
+          {pulls == null ? (
+            <>
+              <PanelHeader title="Error Trends" />
+              <p className="ck-dialog-text" style={{ padding: "16px 18px" }}>Loading chart...</p>
+            </>
+          ) : (
+            <StaticErrorChart pulls={pulls} phases={chartPhases} />
+          )}
         </Panel>
 
         <Panel style={{ marginBottom: sectionGap }}>
