@@ -102,6 +102,11 @@ export type HitPart = {
   column?:       "physical" | "magical" | "none";  // this part's damage type
   statusIds:     number[];        // catalog statuses on the target for this part
   shieldAbsorbs: { statusId: number; caster?: string; amount: number }[];
+  multiplier?:   number;          // FFLogs' % product on this part
+  // Damage before shields of DoT ticks this part applied that kept its
+  // mitigation (Burnished Glory's Bleeding ticks log the hit's multiplier
+  // after the mitigation has worn off); analyze.ts applySequenceDrops.
+  snapshotDot?:  number;
 };
 
 export type HitTarget = {

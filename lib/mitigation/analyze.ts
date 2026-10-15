@@ -54,7 +54,10 @@
 // Hits starting within SEQUENCE_GAP_MS of the previous hit's end form a
 // sequence. Each target's laterDrop is how far their health fell after this
 // hit until the sequence ended (any enemy damage, DoTs included), so the
-// headroom a later hit needs is not offered up as droppable.
+// headroom a later hit needs is not offered up as droppable. DoT ticks a
+// part applied and that kept its mitigation (HitPart.snapshotDot: Burnished
+// Glory's Bleeding) count in the what-ifs at their full size, scaled with
+// the part's mitigation.
 // Droppable, only on an over hit, is greedy: repeatedly remove the active
 // mitigation whose removal leaves the lowest player highest, while that
 // player stays good (MARGIN_UNDER+) after the DAMAGE_ROLL_BUFFER and above
@@ -139,7 +142,7 @@ export function analyzePullMitigation(pull: Pull, game: MitigationGame, reach?: 
     hits.push(buildHit(pull, game, span.cluster, casts, { ...span, sequenceId }, reach));
   }
 
-  applySequenceDrops(hits, pull, playerNames);
+  applySequenceDrops(hits, pull, playerNames, game);
   for (const hit of hits) finishHit(hit, game, reach);
   return hits;
 }
@@ -465,6 +468,7 @@ function buildTarget(
       shieldAbsorbs: (player.shieldAbsorbs ?? [])
         .filter((a) => a.amount > 0 && Math.abs(a.timestamp - event.timestamp) <= SAME_HIT_MS)
         .map((a) => ({ statusId: a.statusId, caster: a.caster, amount: a.amount })),
+      multiplier:  event.multiplier,
     });
   }
   // As if every part landed at once: no healing between them counts.
@@ -635,8 +639,18 @@ function markReachMisses(players: PlayerMitigation[], cluster: TargetEvent[], re
 // spends that player's headroom. The follow-up runs while the player's next
 // enemy damage arrives within SEQUENCE_GAP_MS, up to FOLLOW_UP_MAX_MS.
 export const FOLLOW_UP_MAX_MS = 15_000;
+// A DoT tick in the follow-up belongs to a part (snapshotDot) when it logs
+// that part's multiplier and the DoT didn't tick on the player in this long
+// before the part, i.e. the part applied it. Enemy DoTs keep the mitigation
+// they were applied under: Burnished Glory's Bleeding ticks all log the
+// hit's 0.53 for 13s, after the 10-15s mitigations have worn off
+// (JZ1KXhDbqkNH3jxR, every pull). Five ticks at ~30% of max HP each, so
+// the what-ifs scale them with the hit (marginWith) instead of only the
+// net health drop they leave after healing (laterDrop).
+const SNAPSHOT_DOT_FRESH_MS = 4_000;
+const SNAPSHOT_MULTIPLIER_TOLERANCE = 0.005;
 
-function applySequenceDrops(hits: MitigationHit[], pull: Pull, playerNames: Set<string>) {
+function applySequenceDrops(hits: MitigationHit[], pull: Pull, playerNames: Set<string>, game: MitigationGame) {
   for (const hit of hits) {
     for (const t of hit.targets) {
       const player = pull.players.find((p) => p.name === t.player);
@@ -645,6 +659,15 @@ function applySequenceDrops(hits: MitigationHit[], pull: Pull, playerNames: Set<
         .filter((e) => e.timestamp > hit.endMs + SAME_HIT_MS && e.timestamp <= hit.endMs + FOLLOW_UP_MAX_MS
           && !!e.source && !playerNames.has(e.source))
         .sort((a, b) => a.timestamp - b.timestamp);
+      const snapshotPart = (e: PlayerEvent): HitPart | undefined => {
+        if (!(e.isDoT || game.isTick(e.abilityId)) || e.multiplier === undefined || e.multiplier >= 0.995) return undefined;
+        const part = [...t.parts].reverse().find((p) => p.multiplier !== undefined
+          && Math.abs(p.multiplier - e.multiplier!) <= SNAPSHOT_MULTIPLIER_TOLERANCE);
+        if (!part) return undefined;
+        const ticking = player.damageTaken.some((x) => x.abilityId === e.abilityId
+          && x.timestamp < part.timestampMs && x.timestamp >= part.timestampMs - SNAPSHOT_DOT_FRESH_MS);
+        return ticking ? undefined : part;
+      };
       // From the health actually logged after the last part: later events'
       // health is real too, unlike the all-at-once healthAfter.
       const start = t.parts[t.parts.length - 1].healthAfter;
@@ -653,6 +676,8 @@ function applySequenceDrops(hits: MitigationHit[], pull: Pull, playerNames: Set<
       for (const e of later) {
         if (e.timestamp - last > SEQUENCE_GAP_MS) break;
         last = e.timestamp;
+        const part = snapshotPart(e);
+        if (part) part.snapshotDot = (part.snapshotDot ?? 0) + (e.amount ?? 0) + (e.overkill ?? 0) + (e.absorbed ?? 0);
         // A single hit bigger than the player's whole health bar is a failed
         // mechanic, not something headroom could have survived; leave it out.
         // On a fatal hit `amount` stops at the health left, so add overkill
@@ -751,7 +776,10 @@ export type AddedMitigation = {
  * Added shields then subtract their size from the target's total.
  * `sequenceMargin` also scales the target's laterDrop by the removed %
  * mitigations (assumed to cover the follow-up too; conservative when they
- * didn't). Added ones don't scale it.
+ * didn't). Added ones don't scale it. A part's snapshotted DoT ticks
+ * (snapshotDot) move with that part's removed and added %, in full: the
+ * laterDrop they left is net of healing, so scaling it alone made dropping
+ * Burnished Glory's mitigation look ~10x cheaper than it is.
  * `game` is needed only when something is removed.
  */
 export function marginWith(
@@ -764,6 +792,7 @@ export function marginWith(
 ): { margin: number; sequenceMargin: number } {
   let toHealthTotal = 0;
   let factor = 1;
+  let dotChange = 0;
   for (const part of target.parts) {
     let shieldBack = 0;
     factor = 1;
@@ -792,11 +821,14 @@ export function marginWith(
     }
     const beforeShields = (part.damage + part.absorbed) / factor * rollBuffer * added;
     toHealthTotal += Math.max(0, beforeShields - (part.absorbed - shieldBack));
+    // Its snapshotted DoT ticks change with the same %; the shields and
+    // healing that met them are taken as they were.
+    if (part.snapshotDot) dotChange += part.snapshotDot * (rollBuffer * added / factor - 1);
   }
   const shields = add.reduce((s, a) => s + (a.entry.statuses.some((x) => x.shield) ? a.shield : 0), 0);
   toHealthTotal = Math.max(0, toHealthTotal - shields);
   const margin = (target.healthBefore - toHealthTotal) / target.maxHealth;
-  return { margin, sequenceMargin: margin - target.laterDrop / factor * rollBuffer };
+  return { margin, sequenceMargin: margin - target.laterDrop / factor * rollBuffer - dotChange / target.maxHealth };
 }
 
 /**
