@@ -45,6 +45,10 @@ validation harness (`scripts/validate.js`, `expectations/`), see
   --fight <id>...`. Phase 5 used `--min-minutes 14.1 --from-minutes 13.5`
   (P5 starts 14:07-14:20; 0.5-2.3MB per pull); the P4 folder's P5 pulls
   were refetched with its P4 flags minus `--to-minutes`.
+  `--min-phase <n>` keeps only fights whose FFLogs `lastPhase` reached n,
+  for when phase start times vary: The Omega Protocol P4 used
+  `--min-phase 4 --from-minutes 6.8 --to-minutes 9.5` (P4 starts
+  7:18-7:36; Blue Screen resolves by ~8:40).
   `validate.js` detects captures whose damage starts 2+ minutes in and runs
   only `lateCapture` mechanics on them.
   - **Re-running a fetch on such a folder must repeat its flags.** A

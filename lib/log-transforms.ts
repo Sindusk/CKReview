@@ -77,6 +77,7 @@ import { detectFatebreakerErrors } from "./mechanics/ffxiv/fru/fatebreaker";
 import { detectOmegaErrors } from "./mechanics/ffxiv/top/omega";
 import { detectOmegaMFErrors } from "./mechanics/ffxiv/top/omega-mf";
 import { detectOmegaReconfiguredErrors } from "./mechanics/ffxiv/top/omega-reconfiguredd";
+import { detectBlueScreenErrors } from "./mechanics/ffxiv/top/blue-screen";
 import { detectUsurperOfFrostErrors, type HeadMarker } from "./mechanics/ffxiv/fru/usurper-of-frost";
 import { detectOracleOfDarknessErrors } from "./mechanics/ffxiv/fru/oracle-of-darkness";
 import { detectEnterTheDragonErrors } from "./mechanics/ffxiv/fru/enter-the-dragon";
@@ -1697,6 +1698,7 @@ export function transformFFightToPull(
     ...detectOmegaErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
     ...detectOmegaMFErrors(players, deathEvents, enemyCastEvents, headMarkers, reportedOccurrences),
     ...detectOmegaReconfiguredErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
+    ...detectBlueScreenErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
     ...detectDoomtrainErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
     ...detectNecronErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
     ...detectZeleniaErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),

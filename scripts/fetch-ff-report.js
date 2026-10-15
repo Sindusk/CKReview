@@ -21,6 +21,8 @@
 //                    "Lindwurm" without "Lindwurm II"
 //   --creds <path>   Credentials file (default: .credentials/ffl-token.json)
 //   --min-minutes <n>  Only fights lasting at least n minutes (late-phase work)
+//   --min-phase <n>    Only fights that reached phase n (FFLogs lastPhase), e.g.
+//                      --min-phase 4 skips Omega pulls that wiped before P4
 //   --from-minutes <n> Start the bulky event streams n minutes into each fight.
 //                      deaths/combatantInfo stay whole, so offsets still hold.
 //                      Saves API points when only a late phase matters.
@@ -44,7 +46,7 @@ const { slimFflReport } = require('./lib/slim-report');
 const { killsFirst, withRateLimitWait, writeAtomic } = require('./lib/fetch-plan');
 
 function parseArgs(argv) {
-  const args = { fights: [], out: null, boss: null, bossExact: null, creds: null, minMinutes: 0, fromMinutes: 0, toMinutes: 0, refetch: false };
+  const args = { fights: [], out: null, boss: null, bossExact: null, creds: null, minMinutes: 0, minPhase: 0, fromMinutes: 0, toMinutes: 0, refetch: false };
   let reportCode = null;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -54,6 +56,7 @@ function parseArgs(argv) {
     else if (a === '--boss-exact') args.bossExact = argv[++i];
     else if (a === '--creds') args.creds = argv[++i];
     else if (a === '--min-minutes') args.minMinutes = Number(argv[++i]);
+    else if (a === '--min-phase') args.minPhase = Number(argv[++i]);
     else if (a === '--from-minutes') args.fromMinutes = Number(argv[++i]);
     else if (a === '--to-minutes') args.toMinutes = Number(argv[++i]);
     else if (a === '--refetch') args.refetch = true;
@@ -63,7 +66,7 @@ function parseArgs(argv) {
   if (!reportCode) {
     throw new Error(
       'Usage: node scripts/fetch-ff-report.js <reportCode> [--out dir] [--fight id]... [--boss name] [--boss-exact name] [--creds path] ' +
-      '[--min-minutes n] [--from-minutes n] [--to-minutes n] [--refetch]'
+      '[--min-minutes n] [--min-phase n] [--from-minutes n] [--to-minutes n] [--refetch]'
     );
   }
   return { reportCode: extractReportCode(reportCode), ...args };
@@ -79,7 +82,7 @@ function extractReportCode(input) {
 }
 
 async function main() {
-  const { reportCode, out, fights, boss, bossExact, creds, minMinutes, fromMinutes, toMinutes, refetch } = parseArgs(process.argv.slice(2));
+  const { reportCode, out, fights, boss, bossExact, creds, minMinutes, minPhase, fromMinutes, toMinutes, refetch } = parseArgs(process.argv.slice(2));
   const outDir    = out   ? path.resolve(out)   : path.join(ROOT, 'sampledata', 'ff', reportCode);
   const credsPath = creds ? path.resolve(creds) : path.join(ROOT, '.credentials', 'ffl-token.json');
 
@@ -114,6 +117,7 @@ async function main() {
   if (boss) targetFights = targetFights.filter((f) => (f.name ?? '').toLowerCase().includes(boss.toLowerCase()));
   if (bossExact) targetFights = targetFights.filter((f) => (f.name ?? '').toLowerCase() === bossExact.toLowerCase());
   if (minMinutes > 0) targetFights = targetFights.filter((f) => f.endTime - f.startTime >= minMinutes * 60000);
+  if (minPhase > 0) targetFights = targetFights.filter((f) => (f.lastPhase ?? 0) >= minPhase);
 
   if (targetFights.length === 0) {
     console.log('No matching fights — nothing to fetch.');

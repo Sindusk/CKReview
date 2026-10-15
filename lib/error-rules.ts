@@ -259,6 +259,8 @@ export const ERROR_RULES: PullErrorRule[] = [
       31494,   // Storage Violation Obliteration (empty Program Loop tower)
       31500,   // Ballistic Impact
       31501, 32368,                                          // Flame Thrower
+      // The Omega Protocol P4: blue-screen.ts owns these (P3 hands out no Damage Down).
+      31567, 31568, 31569, 31570,                            // Wave Repeater rings
       // Enuo (The Unmaking EX): enuo.ts owns this.
       50014,   // Big Burst (empty Empty Shadow tower)
     ],

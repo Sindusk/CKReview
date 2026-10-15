@@ -394,6 +394,15 @@ const MECHANICS = {
     },
   },
 
+  'blue-screen': {
+    game: 'ff',
+    lateCapture: true, // Phase 4 only — safe on --from-minutes captures (see isLateCapture)
+    load: () => requireTsFromRoot('lib/mechanics/ffxiv/top/blue-screen.ts'),
+    run({ mod, ctxs }) {
+      for (const c of ctxs) printPullErrors(c, mod.detectBlueScreenErrors(c.relPlayers(), c.relDeaths(), c.relEnemyCasts()));
+    },
+  },
+
   'usurper-of-frost': {
     game: 'ff',
     lateCapture: true, // Phase 2 only — safe on --from-minutes captures (see isLateCapture)

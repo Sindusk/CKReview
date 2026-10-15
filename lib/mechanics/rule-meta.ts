@@ -398,6 +398,10 @@ mechanic("ffxiv-top3-tower", "Hello World towers (rot carriers)", 3, ["ffxiv-top
 mechanic("ffxiv-top3-stack", "Hello World stacks (Remote players)", 3, ["ffxiv-top3-stack"]);
 mechanic("ffxiv-top3-patch", "Hello World tether breaks", 3, ["ffxiv-top3-patch"]);
 exposure("targeted", ["ffxiv-top3-tower", "ffxiv-top3-stack", "ffxiv-top3-patch"]);
+// The Omega Protocol P4: a round whose two stack markers share a half tests
+// its crossing pair (blue-screen.ts reports both at every such round).
+mechanic("ffxiv-top4-swap", "Blue Screen stack swap (crossing pair)", 4, ["ffxiv-top4-swap"]);
+exposure("targeted", ["ffxiv-top4-swap"]);
 // Futures Rewritten P2: Quadruple Slap tests the tanks; the Diamond Dust
 // cone and stone rules test the four Frigid Stone players
 // (usurper-of-frost.ts reports both at every instance).

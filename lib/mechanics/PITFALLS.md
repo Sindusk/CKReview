@@ -107,6 +107,15 @@ philosophy and the data semantics this list assumes.
 - **A tether that breaks the moment it appears means its pair stood apart
   already.** Omega P3's Remote tether ending ~1s before the towers put
   Patch on top of the resolution and killed the party (B23, E12, E16).
+- **A protean cast's target isn't always the player its line points at.**
+  Omega P4's Wave Cannon casts name one player each, but the lane (helper
+  facing + 180, and some helpers sit off-centre) points at another as
+  often as not. The player standing on the lane's bearing at the cast
+  owns it.
+- **A share's groups can come from the bait layout.** Omega P4's proteans
+  put four players on each half, and each half stacks together; with the
+  swap rule on top, the expected groups matched 170 of 187 rounds, and
+  the misses named who stood wrong.
 - **A shared line's groups can be read from the pull itself.** Union the
   players of every line that hit 2+; a component of four is one group and
   the other group is its complement. One set's lines rarely place the

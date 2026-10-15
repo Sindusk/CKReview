@@ -81,8 +81,11 @@ lib/mechanics/
                                 and Sniper Cannons; Hello World towers, rot
                                 hand-offs, stacks, defamations, tether breaks
                                 and penalties; Oversampled Wave Cannon; Ion
-                                Efflux enrage); the later phase files are
-                                research models only
+                                Efflux enrage)
+      blue-screen.ts          — Phase 4 per-pull rules (Wave Repeater rings,
+                                protean doubles, afterimages, stack groups
+                                and the marker swap, Blue Screen's HP check);
+                                the later phase files are research models only
       pantokrator-conga.ts    — cross-pull Pantokrator side order (who should
                                 have crossed in a same-number pair)
       synergy-order.ts        — cross-pull Party Synergy row order (which glitch
