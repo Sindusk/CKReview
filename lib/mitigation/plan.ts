@@ -26,7 +26,10 @@
 // Arms), no invulns or limit breaks, cooldown at least
 // DROP_MIN_COOLDOWN_MS (GCD shields and short personals count as always
 // used). Gated ones (Kerachole) may be moved and added, an added one marked
-// with its gate (user, 2026-10-11). A shield never seen absorbing has no
+// with its gate (user, 2026-10-11). Scholar's spreadlo is its own entry,
+// Deployment Tactics, its shields told apart from Galvanize by
+// ffxiv-deployment.ts (user, 2026-10-15; check:
+// node scripts/check-deployment-shields.js). A shield never seen absorbing has no
 // size estimate: it may be moved, never added. Boss debuffs count only on
 // attacks their reach evidence allows (debuff-reach.ts).
 //

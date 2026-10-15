@@ -50,6 +50,7 @@ import { TankingView, chipsFromAggregate, chipsFromPull } from "./MitigationTank
 import { PlayerPicker } from "./MitigationPlayerPicker";
 import { AggregateDetails, HitDetails } from "./MitigationHitDetails";
 import { FFXIV_MITIGATION } from "@/lib/mitigation/ffxiv-catalog";
+import { withDeploymentShields } from "@/lib/mitigation/ffxiv-deployment";
 import { useFFPullSelector } from "@/hooks/useFFPullSelector";
 import {
   AggregateTimeline, PullTimeline, TimelineLegend, buildPlayerGroups, fmtTime, hasMitigationData, rowUneventful, uneventful,
@@ -83,8 +84,11 @@ function Checkbox({ checked, onChange, children }: { checked: boolean; onChange:
 }
 
 export default function MitigationDialog({ open, onClose, pulls, currentPullId, onSeek }: MitigationDialogProps) {
-  const { ffPulls, selectedPullId, setSelectedPullId, selectedPull } =
+  const { ffPulls: rawFfPulls, selectedPullId, setSelectedPullId, selectedPull } =
     useFFPullSelector(pulls, open, currentPullId);
+  // Every mitigation view reads the pulls with spreadlo shields told apart
+  // from Galvanize (lib/mitigation/ffxiv-deployment.ts; memoized per pull).
+  const ffPulls = useMemo(() => rawFfPulls.map(withDeploymentShields), [rawFfPulls]);
   const [allPulls, setAllPulls] = useState(true);
   // Players whose personal mitigation columns are open (collapsed by default).
   const [expanded, setExpanded] = useState<Set<string>>(new Set());

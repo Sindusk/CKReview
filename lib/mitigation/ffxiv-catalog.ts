@@ -41,6 +41,7 @@
 // ability type 32) ignore % mitigation entirely; only shields apply.
 
 import type { CatalogEntry, CatalogStatus, MitigationGame } from "./types";
+import { DEPLOYMENT_STATUS_OFFSET } from "./ffxiv-deployment";
 
 const pct = (id: number, name: string, physical: number, magical = physical): CatalogStatus =>
   ({ id, name, physical, magical });
@@ -173,6 +174,13 @@ export const FFXIV_MITIGATION_CATALOG: CatalogEntry[] = [
   { key: "galvanize", name: "Galvanize", jobs: ["Scholar"], actionIds: [185, 37013, 37016],
     statuses: [shield(1000297, "Galvanize"), shield(1001918, "Catalyze")],
     kind: "shield", reach: "party", durationMs: 30_000, cooldownMs: 0, verified: true },
+  // "Spreadlo": Adloquium spread to the party by Deployment Tactics, a
+  // planned party shield (user, 2026-10-15). Its statuses are Galvanize and
+  // Catalyze renamed by ffxiv-deployment.ts when a Deployment gave them out.
+  // Cast 3585 seen in JZ1KXhDbqkNH3jxR and a dozen other FFXIV samples.
+  { key: "deployment-tactics", name: "Deployment Tactics", jobs: ["Scholar"], actionIds: [3585],
+    statuses: [shield(DEPLOYMENT_STATUS_OFFSET + 1000297, "Galvanize (spread)"), shield(DEPLOYMENT_STATUS_OFFSET + 1001918, "Catalyze (spread)")],
+    kind: "shield", reach: "party", durationMs: 30_000, cooldownMs: 90_000, gated: "Adloquium first (a crit for Catalyze)", verified: true },
 
   // ── Astrologian ─────────────────────────────────────────────────────
   // A channel of up to 18s; the 10% lingers briefly after it ends.
@@ -280,7 +288,7 @@ const FFXIV_MITIGATION_ICONS: Record<string, string> = {
   "tank-lb3": "000000-000103.png", "temperance": "002000-002645.png", "divine-caress": "002000-002128.png",
   "aquaveil": "002000-002648.png", "divine-benison": "002000-002638.png", "sacred-soil": "002000-002804.png",
   "expedient": "002000-002878.png", "fey-illumination": "002000-002853.png", "consolation": "002000-002851.png",
-  "galvanize": "002000-002801.png", "collective-unconscious": "003000-003140.png", "neutral-sect": "003000-003552.png",
+  "galvanize": "002000-002801.png", "deployment-tactics": "002000-002808.png", "collective-unconscious": "003000-003140.png", "neutral-sect": "003000-003552.png",
   "sun-sign": "003000-003109.png", "exaltation": "003000-003561.png", "celestial-intersection": "003000-003556.png",
   "the-bole": "003000-003111.png", "the-spire": "003000-003115.png", "kerachole": "003000-003666.png",
   "taurochole": "003000-003671.png", "holos": "003000-003678.png", "panhaima": "003000-003679.png",
