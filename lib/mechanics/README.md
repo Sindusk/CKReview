@@ -76,8 +76,13 @@ lib/mechanics/
       omega-mf.ts             — Phase 2 per-pull rules (Solar Ray aggro, Party
                                 Synergy clones/laser/glitch range/Fire/Spotlight
                                 stacks, Bladedance tethers, Beyond Defense and
-                                Pile Pitch, Laser Shower enrage); the later
-                                phase files are research models only
+                                Pile Pitch, Laser Shower enrage)
+      omega-reconfiguredd.ts  — Phase 3 per-pull rules (transition rings, arms
+                                and Sniper Cannons; Hello World towers, rot
+                                hand-offs, stacks, defamations, tether breaks
+                                and penalties; Oversampled Wave Cannon; Ion
+                                Efflux enrage); the later phase files are
+                                research models only
       pantokrator-conga.ts    — cross-pull Pantokrator side order (who should
                                 have crossed in a same-number pair)
       synergy-order.ts        — cross-pull Party Synergy row order (which glitch

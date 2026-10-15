@@ -69,7 +69,7 @@ philosophy and the data semantics this list assumes.
   Count them as hits; never compare them as amounts (The Tyrant).
 - **Not every fight hands out Damage Down.** Doomtrain gives only
   Vulnerability Up stacks, so its avoidables are Minor unless they kill.
-  Neither does The Omega Protocol's Phase 2. Check the debuff sweep before
+  Neither do The Omega Protocol's Phases 2 and 3. Check the debuff sweep before
   applying the FFXIV Major exception.
 - **Instance numbers collide across casting actors in one volley.** Omega
   P2's Fire spreads had two #1s from different actors, and Omega-M#2 and
@@ -96,6 +96,17 @@ philosophy and the data semantics this list assumes.
 - **Every phase's actors can share one name.** All of The Omega Protocol's
   P1 and P2 casters are "Omega", so the phase ends at P2's first cast ID
   (Firewall), not at a new actor name (Omega P1).
+- **A penalty can come from a dead player's status.** Omega P3's tower
+  defect stays on a body for its full 10s and still fires the raid-wide
+  penalty, so "who held it at expiry" includes the dead; the death's own
+  cause is the error (Omega P3, C11 and C21).
+- **A timer can prove a hand-off came too late.** Omega P3's rot runs 27s
+  and the next defect needs it gone 10.6s into the next 21s cycle, so a
+  rot taken over more than ~4.6s after the resolution can't cleanse; the
+  rot's start time names the pair (Omega P3, B36 D10 D36).
+- **A tether that breaks the moment it appears means its pair stood apart
+  already.** Omega P3's Remote tether ending ~1s before the towers put
+  Patch on top of the resolution and killed the party (B23, E12, E16).
 - **A shared line's groups can be read from the pull itself.** Union the
   players of every line that hit 2+; a component of four is one group and
   the other group is its complement. One set's lines rarely place the

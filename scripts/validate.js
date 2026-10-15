@@ -385,6 +385,15 @@ const MECHANICS = {
     },
   },
 
+  'omega-reconfigured': {
+    game: 'ff',
+    lateCapture: true, // Phase 3 only — safe on --from-minutes captures (see isLateCapture)
+    load: () => requireTsFromRoot('lib/mechanics/ffxiv/top/omega-reconfiguredd.ts'),
+    run({ mod, ctxs }) {
+      for (const c of ctxs) printPullErrors(c, mod.detectOmegaReconfiguredErrors(c.relPlayers(), c.relDeaths(), c.relEnemyCasts()));
+    },
+  },
+
   'usurper-of-frost': {
     game: 'ff',
     lateCapture: true, // Phase 2 only — safe on --from-minutes captures (see isLateCapture)

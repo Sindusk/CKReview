@@ -391,6 +391,13 @@ mechanic("ffxiv-top2-bladedance", "Bladedance tethers (tanks)", 2, ["ffxiv-top2-
 mechanic("ffxiv-top2-beyond-defense", "Beyond Defense bait (tanks)", 2, ["ffxiv-top2-beyond-defense"]);
 mechanic("ffxiv-top2-pile-pitch", "Pile Pitch: the jumped player leaves", 2, ["ffxiv-top2-pile-pitch"]);
 exposure("targeted", ["ffxiv-top2-solar-ray", "ffxiv-top2-bladedance", "ffxiv-top2-beyond-defense", "ffxiv-top2-pile-pitch"]);
+// The Omega Protocol P3: each Hello World cycle's towers test its four rot
+// carriers, its stacks the two Remote players, its tethers the four tethered
+// players (omega-reconfiguredd.ts reports them at every cycle).
+mechanic("ffxiv-top3-tower", "Hello World towers (rot carriers)", 3, ["ffxiv-top3-tower"]);
+mechanic("ffxiv-top3-stack", "Hello World stacks (Remote players)", 3, ["ffxiv-top3-stack"]);
+mechanic("ffxiv-top3-patch", "Hello World tether breaks", 3, ["ffxiv-top3-patch"]);
+exposure("targeted", ["ffxiv-top3-tower", "ffxiv-top3-stack", "ffxiv-top3-patch"]);
 // Futures Rewritten P2: Quadruple Slap tests the tanks; the Diamond Dust
 // cone and stone rules test the four Frigid Stone players
 // (usurper-of-frost.ts reports both at every instance).
