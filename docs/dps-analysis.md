@@ -360,6 +360,10 @@ showed:
   Hammer at 8:09); the inclusive window end stays.
 - **Three or more weaves are the delay, not movement**, even inside a
   movement window (AST's instant Fall Malefic then three oGCDs, 1.87s).
+  Sprint and gap closers don't count toward the three (2026-10-15: a
+  Paladin's Intervene / Sprint in a knockback the whole raid idled
+  through); defensives still do, or healers' triple mitigation weaves
+  turn into movement.
 - **Gauge left at a kill is judged by how long it was held**, not the
   kill's instant, which a "boss at 1 HP" forced window always covers.
 - **A cooldown with no damage of its own needs a value** to be judged at
@@ -380,6 +384,21 @@ showed:
   banked to the kill (Living Muse, Phlegma III). checks.ts
   usesLostAtKill; with no margin it was 282 findings across the FF kills,
   most a cooldown back 2-5s before the kill.
+- **A pre-pull use still has a recast** (2026-10-15): it's ready again a
+  recast into the pull at the latest, and the hold after that counts
+  (Earthly Star placed pre-pull, next cast 1:18).
+- **checkProcs sees only expiries.** A proc removed by pressing something
+  else (Royal Authority over Sepulchre Ready; Starcross Ready ending with
+  Life of the Dragon; Viper venoms) needs the job's own check; burst
+  windows otherwise value a lost action at the window's bonus only
+  (Starcross 16k against its 161k). A removal at the status's expiry
+  beside an unrelated press is still an expiry, not a drop.
+- **Check the log's name against xivanalysis's** when keying by name:
+  its data spells Hindsbane Fang "Hindbane Fang", which hid every
+  Hindsbane positional miss.
+- **Late-ish movement windows**: a window that ends at the last ranged
+  filler misses the walk back (Fire Breath lines: first melee GCD 1.2-2.4s
+  after the cast on four kills).
 - **Input:** the user saves each player's xivanalysis page as HTML;
   `tools/xiva-html.js` cuts a ~500KB page to ~20KB of text with named
   action icons (see the skill).
