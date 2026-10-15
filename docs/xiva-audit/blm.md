@@ -36,9 +36,9 @@
 | blm/AoEUsages/foul | verified | `blmAoe` (vs Xenoglossy) | Foul on too few targets | The app flags one target only: right from 7.2 (minimum 2); before 7.2 xivanalysis needs 3. |
 | blm/AoEUsages/flare | covered | `blmAoe` (vs Fire IV) | Flare on too few targets | Same: right from 7.1. |
 | blm/AoEUsages/freeze | verified | `blmAoe` (minimum 3) | Freeze on under 3 | 2T1HzdPKgbhM43am 7:55, 8:15 matched. |
-| blm/AoEUsages/high-fire-ii | candidate | — | High Fire II on under 3 | Not paired in `blmAoe`. Not built (2026-10-15): none on any pull on disk, so no premise check yet. |
-| blm/AoEUsages/high-blizzard-ii | candidate | — | High Blizzard II on under 3 | Same; none on disk. |
-| blm/AoEUsages/high-thunder-ii | candidate | — | High Thunder II on one target | Same; also counted as the DoT. The 4 on disk all hit 2+ targets. |
+| blm/AoEUsages/high-fire-ii | covered | `blmAoe` (vs Fire III / Fire IV, minimum 3) | High Fire II on under 3 | Built 2026-10-15. Fires on 7yXZbmqcrCga8PHz Red Hot and Deep Blue 9:27 (both bosses, 65k). No xivanalysis page for these pulls. |
+| blm/AoEUsages/high-blizzard-ii | covered | `blmAoe` (vs Blizzard III, minimum 3) | High Blizzard II on under 3 | Two targets clearly lose: ~9.5k a target against Blizzard III's ~45k. Fires on 7yXZbmqcrCga8PHz 5:29, 9:22, 9:50, djChYqt4b7K8aAfP 7:40, q4mQCNpRKwH1PZjb 9:04 (both bosses, 17-26k), xtcaT8y9CGjpPnHK 5:40 (Watery Grave alone, 21k). |
+| blm/AoEUsages/high-thunder-ii | covered | `blmAoe` (vs High Thunder, one target; direct hits only) | High Thunder II on one target | Fires on q4mQCNpRKwH1PZjb 6:53, 7:44, 9:18 (one boss with the two apart, 4-8k). The DoT difference isn't valued. |
 | blm/AoEUsages/thunder-iv, blizzard-ii, fire-ii | wrong | — | — | Replaced at level 82+; can't occur at 100. |
 | blm/OGCDDowntime/uses | covered | `checkCooldownDrift` (hold 5s, first use 15s / Manafont 25s) | Ley Lines, Manafont, Amplifier (and Triplecast before 7.2) held | The app tracks Triplecast on every patch; xivanalysis drops it from 7.2. |
 | blm/Procs/dropped-thunderhead | covered | `checkProcs` | Thunderhead expiring | Before 7.2 only (permanent from 7.2). |
@@ -94,12 +94,10 @@ fight 10.
 1. **blm/Gauge/lost-polyglot, overwritten-polyglot** (candidates). A lost
    Xenoglossy each; the Astral Fire / Umbral Ice simulation is the base for
    most of the rows below too.
-2. **blm/AoEUsages/high-fire-ii, high-blizzard-ii, high-thunder-ii**
-   (candidates). Add the pairs.
-3. **blm/Leylines/casts-72plus** (candidate). Casts outside Circle of
+2. **blm/Leylines/casts-72plus** (candidate). Casts outside Circle of
    Power, from the status.
-4. **blm/RotationWatchdog/ExtraF1, UptimeSouls, Triplecast/overwritten**
+3. **blm/RotationWatchdog/ExtraF1, UptimeSouls, Triplecast/overwritten**
    (candidates). Log-visible from casts.
-5. **blm/Gauge/overwritten-paradox, ColdF3, LukewarmF4, SkipThunder**
+4. **blm/Gauge/overwritten-paradox, ColdF3, LukewarmF4, SkipThunder**
    (candidates). Gauge-inferred.
-6. **MP-based rows** (unverifiable): need MP in the pull data first.
+5. **MP-based rows** (unverifiable): need MP in the pull data first.

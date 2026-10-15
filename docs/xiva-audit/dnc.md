@@ -43,7 +43,7 @@
 | dnc/OGCDDowntime/devilment | verified | `checkCooldownDrift` | Devilment held | The Tyrant 100%. |
 | dnc/OGCDDowntime/flourish | verified | `checkCooldownDrift` | Flourish held | The Tyrant 100%. |
 | dnc/AoEUsages/windmill | covered | `dancerAoe` (vs Cascade) | Windmill hitting one target | Built 2026-10-15. Premise holds: Cascade is always the alternative. Fires on jN3XDrf2z8PmLgRJ Red Hot and Deep Blue pull 34 3:59 (the bosses apart, both targetable), d3vRbwfpNBLzJ2Xh pull 2 2:42 (Red Hot left as it landed), pG319BgHTnPJc6Ft Necron pull 2 3:53 (one Icy Hand); 8-12k. No xivanalysis page for these pulls to match. |
-| dnc/AoEUsages/rising-windmill | covered | `dancerAoe` (vs Reverse Cascade) | Rising Windmill hitting one target | Fires on pG319BgHTnPJc6Ft Necron pull 7 2:24 (4k). |
+| dnc/AoEUsages/rising-windmill | covered | `dancerAoe` (vs Reverse Cascade) | Rising Windmill hitting one target | Fires on pG319BgHTnPJc6Ft Necron pull 7 2:24 and fJxTNgwtRKjYbvZp Red Hot and Deep Blue 7:32 (4k each). |
 | dnc/AoEUsages/bloodshower | covered | `dancerAoe` (vs Fountainfall) | Bloodshower hitting one target | Fires on bVDR2mTL7YGvMxK1 Red Hot and Deep Blue pull 1 5:18 (11k). |
 | dnc/Combos/broken | verified | `checkCombos` | Cascade → Fountain or Windmill → Bladeshower broken or timed out | qjCMx4bRfgNKwX9T: its 9 broken combos match by time; K6qfMamL7rN8yz2Q Cascade run out at 8:29 and 6:00 matched. |
 | dnc/Weaving/too-many-weaves | verified | `checkGcdGaps` `gcd-clipping` | 3 oGCDs after a GCD | K6qfMamL7rN8yz2Q Red Hot and Deep Blue 0:54 (2.0s) matched. |

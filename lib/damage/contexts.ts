@@ -36,6 +36,8 @@ const CONTEXTS: Record<string, DamageContext> = {
   "Lindwurm II": LINDWURM_II_DAMAGE_CONTEXT,
   "Vamp Fatale": VAMP_FATALE_DAMAGE_CONTEXT,
   "Red Hot and Deep Blue": RED_HOT_DEEP_BLUE_DAMAGE_CONTEXT,
+  // Some reports name the fight this way (mgTQJjX2nW6ANkP7, xtcaT8y9CGjpPnHK).
+  "Red Hot / Deep Blue": RED_HOT_DEEP_BLUE_DAMAGE_CONTEXT,
   "Doomtrain": DOOMTRAIN_DAMAGE_CONTEXT,
   "Necron": NECRON_DAMAGE_CONTEXT,
   "Zelenia": ZELENIA_DAMAGE_CONTEXT,

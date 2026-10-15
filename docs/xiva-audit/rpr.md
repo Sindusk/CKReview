@@ -49,7 +49,7 @@
 | rpr/OtherGauges/shroud-overcap | verified | `shroud` | Shroud over 100 | FRU 10 lost matched. |
 | rpr/DeathsDesign/uptime | verified | `deathsDesign` (from the Reaper's hits) | hits without Death's Design | Checklist 95%. Per target in the app; its union over foes hides gaps on a second boss. |
 | rpr/HarvestMoon/uses | verified | `harvestMoon` | a downtime without Soulsow, or Harvest Moon held through one | Checklist 100%. qjCMx4bRfgNKwX9T 5/4 matched; FRU: 7 chances from invulnerability vs the app's 9 from untargetable windows. |
-| rpr/AoE/too-few-targets | verified (Whorl), covered (the rest) | `rprAoe` (was `whorl`) | an AoE on too few targets (Executioner's Guillotine and Spinning Scythe 4, others 3) | Whorl of Death matched (Vamp 5:00, qjCMx4bRfgNKwX9T 2). All xivanalysis pairs built 2026-10-15; premise holds for each (same resource as its twin). Seen firing, no xivanalysis page for these pulls: jN3XDrf2z8PmLgRJ Red Hot and Deep Blue pull 44 5:18-5:19 (Grim Swathe, Guillotine on one boss, the two apart; 14k, 38k), pull 20 4:15 and bVDR2mTL7YGvMxK1 pull 1 3:40 (Lemure's Scythe, 29k, 40k), pull 13 3:48 (Soul Scythe on both, 29k). Not seen firing: Spinning Scythe (its one-target uses on disk are in The Omega Protocol samples, which aren't damage-analysed), Executioner's Guillotine, Grim Reaping. |
+| rpr/AoE/too-few-targets | verified (Whorl), covered (the rest) | `rprAoe` (was `whorl`) | an AoE on too few targets (Executioner's Guillotine and Spinning Scythe 4, others 3) | Whorl of Death matched (Vamp 5:00, qjCMx4bRfgNKwX9T 2). All xivanalysis pairs built 2026-10-15; premise holds for each (same resource as its twin). Seen firing, no xivanalysis page for these pulls: jN3XDrf2z8PmLgRJ Red Hot and Deep Blue pull 44 5:18-5:19 (Grim Swathe, Guillotine on one boss, the two apart; 14k, 38k), pull 20 4:15 and bVDR2mTL7YGvMxK1 pull 1 3:40 (Lemure's Scythe, 29k, 40k), pull 13 3:48 (Soul Scythe on both, 29k). xydWc2pK74HCbZ8q's kill fires the rest on both bosses: Spinning Scythe 3:07-7:35 (9-19k), Executioner's Guillotine 6:49 (34k), Grim Reaping 3:57 (23k). |
 | rpr/Combos/broken | verified | `checkCombos` | a broken or timed-out combo | Vamp, FRU 4 matched. |
 | rpr/Positionals/missed | verified | `checkPositionals` | a missed rear / flank | FRU 8, qjCMx4bRfgNKwX9T 14 matched by action. |
 | rpr/Interrupts/not-loaded | verified | `checkInterrupts` | a cancelled Harpe / Soulsow / Communio | The core module runs; the job file is dead. qjCMx4bRfgNKwX9T's cancelled Communio matched. |
@@ -86,6 +86,4 @@ In priority order (biggest damage cost first):
    `procOverwrites` to Enhanced Gibbet / Gallows.
 3. **rpr/OtherGauges/soul-overcap** (unverifiable until the missing Soul
    source is found).
-4. **rpr/Procs/expired-gibbet, gallows; rpr/AoE/too-few-targets for
-   Spinning Scythe, Executioner's Guillotine, Grim Reaping** (covered).
-   Not seen firing.
+4. **rpr/Procs/expired-gibbet, gallows** (covered). Not seen firing.

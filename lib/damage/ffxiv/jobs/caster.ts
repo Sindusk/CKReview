@@ -81,13 +81,22 @@
 //     Subtractive round). Consistent across pulls, so likely a chosen
 //     line; confirm with the player before treating it as a loss.
 // Red Mage: see its section below.
-// Black Mage, Summoner (unverified, no sample has them):
+// Black Mage, Summoner:
 //   - BLM High Thunder / High Thunder II uptime and clipping (DoTs.tsx),
 //     AoE on too few targets. Checked against xivanalysis on
 //     2T1HzdPKgbhM43am Dancing Mad fight 10 (2026-10-09): its 3
 //     interrupted casts and 2 AoE (both Freezes) match. Not built:
 //     Paradox overwrites, missing Despair and a weakened Fire III (gauge
 //     and MP, which the log doesn't carry).
+//     High Fire II, High Blizzard II (under 3) and High Thunder II (one
+//     target) added 2026-10-15 from AoEUsages.ts. Seen firing on Red Hot
+//     and Deep Blue kills, not matched against xivanalysis: High Blizzard
+//     II on both bosses deals ~9.5k a target to Blizzard III's ~45k
+//     (7yXZbmqcrCga8PHz 5:29, 9:22, 9:50; djChYqt4b7K8aAfP 7:40;
+//     q4mQCNpRKwH1PZjb 9:04; 17-26k each), and on Watery Grave alone
+//     (xtcaT8y9CGjpPnHK 5:40, 21k); High Fire II on both at
+//     7yXZbmqcrCga8PHz 9:27 (65k); High Thunder II on one boss with the two
+//     apart, q4mQCNpRKwH1PZjb 6:53, 7:44, 9:18 (4-8k, direct hit only).
 //   - SMN Searing Light with one Searing Flash (SearingLight.tsx).
 //     Checked against xivanalysis on qjCMx4bRfgNKwX9T fight 16 (7.5,
 //     2026-10-13, the first Summoner sample): Searing Flash 10/10, every
@@ -96,6 +105,14 @@
 //     the 2:56 downtime), 3:01 (past P1's HP check), 6:03 (P2's downtime),
 //     14:11 (past P4's HP check), 18:19 (the kill). Its one triple weave
 //     (16:11, 0.36s) is under the phase's 0.5s floor.
+//   - SMN AoE on too few targets (MultiHitSkills.ts, 2026-10-15):
+//     `smnAoe`. Seen firing on Red Hot and Deep Blue kills, not matched
+//     against xivanalysis: RaM97t3whCZrJBPm Tri-disaster 6:34 and Topaz
+//     Catastrophe 9:01 on one boss (25k, 28k), Emerald Catastrophe
+//     3:48-5:33, Umbral Flare 6:41-8:54 and Painflare 8:54 on both (8-30k
+//     each: two targets still lose to the single-target spell);
+//     fGjA9DKLQbRa2q1k Astral Flare on both 6:38, 6:41 (12-27k). Not seen:
+//     Energy Siphon, Brand of Purgatory, Ruby Catastrophe.
 //   - Cooldowns for all three in tracked-cooldowns.ts.
 //
 //   Copyright (c) 2018 Saxon Landers & contributors
@@ -212,6 +229,10 @@ const highThunder: JobCheck = (ctx) => dotFindings(ctx, {
 // xivanalysis's 2.
 const blmAoe = aoeComboOnOneTarget([
   [A.FOUL.id, A.XENOGLOSSY.id], [A.FLARE.id, A.FIRE_IV.id], [A.FREEZE.id, A.BLIZZARD_IV.id, 3],
+  [A.HIGH_FIRE_II.id, [A.FIRE_III.id, A.FIRE_IV.id], 3], [A.HIGH_BLIZZARD_II.id, A.BLIZZARD_III.id, 3],
+  // Direct hits only on both sides: High Thunder's average leaves its DoT
+  // out too.
+  [A.HIGH_THUNDER_II.id, A.HIGH_THUNDER.id],
 ]);
 
 const searingLight: JobCheck = (ctx) => burstWindowFindings(ctx, {
@@ -380,5 +401,14 @@ const pctAoe = aoeComboOnOneTarget(([
 
 export const PCT_CHECKS: JobCheck[] = [starryMuse, starryFillers, palette, pctAoe];
 export const BLM_CHECKS: JobCheck[] = [highThunder, blmAoe];
-export const SMN_CHECKS: JobCheck[] = [searingLight];
+// xivanalysis MultiHitSkills.ts, each at the highest minimum any patch
+// uses (Tri-disaster 4 from 7.3, Painflare 4 in 7.2-7.4): the damage
+// comparison lets through the patches where fewer targets win.
+const smnAoe = aoeComboOnOneTarget([
+  [A.TRI_DISASTER.id, A.RUIN_III.id, 4], [A.ENERGY_SIPHON.id, A.SMN_ENERGY_DRAIN.id], [A.PAINFLARE.id, A.NECROTIZE.id, 4],
+  [A.ASTRAL_FLARE.id, A.ASTRAL_IMPULSE.id, 3], [A.BRAND_OF_PURGATORY.id, A.FOUNTAIN_OF_FIRE.id, 3],
+  [A.UMBRAL_FLARE.id, A.UMBRAL_IMPULSE.id, 3], [A.RUBY_CATASTROPHE.id, A.RUBY_RITE.id, 3],
+  [A.TOPAZ_CATASTROPHE.id, A.TOPAZ_RITE.id, 3], [A.EMERALD_CATASTROPHE.id, A.EMERALD_RITE.id, 3],
+]);
+export const SMN_CHECKS: JobCheck[] = [searingLight, smnAoe];
 export const RDM_CHECKS: JobCheck[] = [manaStacks, dualcastWasted, verprocOverwrites];

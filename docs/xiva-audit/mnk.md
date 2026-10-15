@@ -38,7 +38,7 @@
 | mnk/CooldownDowntime/perfect-balance | verified | `checkCooldownDrift` (charges) | Perfect Balance at 2 charges | — |
 | mnk/CooldownDowntime/riddle-of-fire | verified | `checkCooldownDrift` | Riddle of Fire held | — |
 | mnk/CooldownDowntime/riddle-of-wind | verified | `checkCooldownDrift` | Riddle of Wind held | Fight 16 12/13 not adopted: 66s held in all, under one 90s recharge. |
-| mnk/AoE/shadow-of-the-destroyer | covered | `mnkAoe` (vs the opo-opo form's three GCDs, minimum 4) | Shadow of the Destroyer on under 4 targets | Built 2026-10-15. Not seen flagging: its two under-4 uses on disk (L9BzKkD2nxcVgHTC Necron pull 20 3:43, 3:50) hit 3 adds and out-damaged the form's average. |
+| mnk/AoE/shadow-of-the-destroyer | covered | `mnkAoe` (vs the opo-opo form's three GCDs, minimum 4) | Shadow of the Destroyer on under 4 targets | Built 2026-10-15. Fires on djChYqt4b7K8aAfP Red Hot and Deep Blue 0:33 (only Red Hot up, 36k). On 3 adds (L9BzKkD2nxcVgHTC Necron pull 20 3:43, 3:50) it out-damaged the form's average and passes. |
 | mnk/AoE/four-point-fury | covered | `mnkAoe` (vs True Strike / Twin Snakes / Rising Raptor, minimum 4) | Four-point Fury on under 4 | Fires on L9BzKkD2nxcVgHTC Necron pull 6 3:51 (two adds, 20k) and pull 20 3:52, 3:58 (three, 10-12k: near even at 3, so only those under the average show). No xivanalysis page for these pulls. |
 | mnk/AoE/rockbreaker | covered | `mnkAoe` (vs Demolish / Snap Punch / Pouncing Coeurl, minimum 4) | Rockbreaker on under 4 | Fires on L9BzKkD2nxcVgHTC Necron pull 20 3:48 (three, 3k) and 4:00 (two, 14k). |
 | mnk/AoE/enlightenment | covered | `mnkAoe` (vs The Forbidden Chakra, minimum 3) | Enlightenment on under 3 | Fires on kC7Y3WbzvKcZrBxT The Tyrant pull 1 6:29 (the boss alone, 10k). The damage comparison makes the pre-7.2 minimum moot. |
@@ -100,5 +100,4 @@ most of these need a second log first.
    mnk/PerfectBalance/form-shift-in-pb, mnk/RiddleOfFire/wasted-gcds**
    (candidates). Form mistakes: a lost empowered GCD each.
 4. **mnk/Balls/fury-overcap** (candidate).
-5. **mnk/Replies/*, mnk/AoE/shadow-of-the-destroyer** (covered). Not seen
-   firing.
+5. **mnk/Replies/*** (covered). Not seen firing.

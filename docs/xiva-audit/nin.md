@@ -41,8 +41,8 @@
 | nin/Ninjutsu/aoe-doton | candidate | — | Doton cut short (under 6 ticks) | Minor. |
 | nin/Ninjutsu/st-doton | candidate | — | Doton on a single target outside the opener | Minor 1, Medium 2, Major 3. |
 | nin/Ninki/overcap | verified | `ninki` | Ninki over 100 | Minor 20, Major 50. FRU: ~300 simulated vs its 250. |
-| nin/Ninki/hellfrog | candidate | — | Hellfrog Medium on too few targets (3 before 7.3, 2 from 7.3) | Medium. The app has no Ninja AoE check; Bhavacakra is the alternative. Not built (2026-10-15): no Hellfrog on any pull on disk, so no premise check yet. Built as an `aoeComboOnOneTarget` pair (minimum 3; the damage comparison covers 7.3's 2) once one turns up. |
-| nin/Ninki/deathfrog | candidate | — | Deathfrog Medium on too few targets | Medium. Same, vs Zesho Meppo. None on disk either. |
+| nin/Ninki/hellfrog | covered | `ninAoe` (vs Bhavacakra, one target) | Hellfrog Medium on too few targets (3 before 7.3, 2 from 7.3) | Built 2026-10-15. One target only: from 7.3 two out-damage Bhavacakra (pre-7.3 two-target frogs go unseen). Premise holds (same Ninki). Fires on Red Hot and Deep Blue kills with the bosses apart: mgTQJjX2nW6ANkP7 6:51 (21k), jXG76ba43VDLAvYz 4:07 (17k) and 9:16 as Deep Blue died (24k). No xivanalysis page for these. |
+| nin/Ninki/deathfrog | covered | `ninAoe` (vs Zesho Meppo, one target) | Deathfrog Medium on too few targets | Not seen firing (the one on disk hit both bosses). |
 | nin/Kazematoi/overcap | verified | `kazematoi` | Armor Crush at 4-5 stacks | FRU 9 lost matched. |
 | nin/Kazematoi/leftover | candidate | — | 3+ Kazematoi left at the end | Medium. Would follow the leftAtKill rule (kills only, time held). |
 | nin/Kazematoi/unbuffed-aeolian | verified | `kazematoi` | Aeolian Edge at 0 stacks | FRU 1 matched. |
@@ -77,9 +77,8 @@ In priority order (biggest damage cost first). One Ninja sample so far.
 1. **nin/Ninjutsu/rabbit, nin/Kassatsu/*** (candidates). A failed or
    misused ninjutsu costs a big hit each; all log-visible from casts.
 2. **nin/Raiju/dropped** (candidate). Raiju Ready removed by a combo GCD.
-3. **nin/Ninki/hellfrog, deathfrog** (candidates). AoE on too few
-   targets, patch-gated at 7.3.
-4. **nin/Ninjutsu/*-doton, hyoton** (candidates).
-5. **nin/Kazematoi/leftover** (candidate). Kills only, by time held.
-6. **nin/KunaisBaneWindow/limited-armor-crush** (candidate, a few k).
-7. **nin/Procs/*, nin/Positionals** (covered). Not matched on a page.
+3. **nin/Ninjutsu/*-doton, hyoton** (candidates).
+4. **nin/Kazematoi/leftover** (candidate). Kills only, by time held.
+5. **nin/KunaisBaneWindow/limited-armor-crush** (candidate, a few k).
+6. **nin/Procs/*, nin/Positionals** (covered). Not matched on a page.
+7. **nin/Ninki/deathfrog** (covered). Not seen firing.

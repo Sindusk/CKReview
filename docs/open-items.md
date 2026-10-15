@@ -182,10 +182,10 @@ and delete them from the header.
   module job by job against the FFXIV damage checks. Phases 1 and 2 done
   for all 21 jobs (2026-10-15). Phase 3 (premise and firing checks,
   building candidates) is ongoing: each ledger's "Open" list is its work.
-  Samples missing: a Machinist kill, White Mage, a recent Black Mage.
-  The AoE-on-too-few-targets candidates were built 2026-10-15 for DNC,
-  DRK, WAR, GNB, MNK, SAM, MCH and RPR; NIN, BLM and SMN wait for a pull
-  where one happens.
+  Samples missing: White Mage. The AoE-on-too-few-targets candidates
+  were built 2026-10-15 for all eleven jobs (DNC, DRK, WAR, GNB, MNK,
+  NIN, SAM, MCH, RPR, BLM, SMN), checked on 19 Red Hot and Deep Blue
+  kills the user picked.
   - [core.md](xiva-audit/core.md): core modules, 3 candidates.
   - [brd.md](xiva-audit/brd.md): Bard, 1 candidate, 4 covered.
   - [dnc.md](xiva-audit/dnc.md): Dancer, 6 candidates (dance step
@@ -203,15 +203,14 @@ and delete them from the header.
   - [rpr.md](xiva-audit/rpr.md): Reaper, 4 candidates, 5 covered.
   - [mnk.md](xiva-audit/mnk.md): Monk, 13 candidates (one case study;
     forms, Blitz resources), 5 covered.
-  - [nin.md](xiva-audit/nin.md): Ninja, 15 candidates (ninjutsu and
-    Kassatsu misuse, frogs), 6 covered.
+  - [nin.md](xiva-audit/nin.md): Ninja, 13 candidates (ninjutsu and
+    Kassatsu misuse), 8 covered.
   - [sam.md](xiva-audit/sam.md): Samurai, 6 candidates, 14 covered (no
     page compared yet).
-  - [mch.md](xiva-audit/mch.md): Machinist, 8 candidates, 10 covered (no
-    kill on disk).
-  - [blm.md](xiva-audit/blm.md): Black Mage, 16 candidates (Polyglot,
-    Ley Lines, rotation), 7 covered; MP-based rules unverifiable.
-  - [smn.md](xiva-audit/smn.md): Summoner, 10 candidates, 4 covered.
+  - [mch.md](xiva-audit/mch.md): Machinist, 8 candidates, 10 covered.
+  - [blm.md](xiva-audit/blm.md): Black Mage, 13 candidates (Polyglot,
+    Ley Lines, rotation), 10 covered; MP-based rules unverifiable.
+  - [smn.md](xiva-audit/smn.md): Summoner, 9 candidates, 5 covered.
   - [rdm.md](xiva-audit/rdm.md): Red Mage, 8 candidates, 9 covered.
   - [whm.md](xiva-audit/whm.md): White Mage, 3 candidates, 6 covered (no
     sample on disk).

@@ -24,7 +24,7 @@
 | drk/SaltAndDarkness/failed | covered | `noDamageCasts` | Salt and Darkness hitting nothing | Its count goes negative on multi-target hits, so it under-reports. |
 | drk/MultiHitSkills/flood-of-shadow | covered | `aoeCombo` (vs Edge of Shadow, minimum 3) | Flood of Shadow on under 3 targets | Built 2026-10-15. Premise holds (same MP). Fires on vFY7kHVWK19ZQ24A Lindwurm II pull 3 0:40 (one target, 21k) and jN3XDrf2z8PmLgRJ Red Hot and Deep Blue pull 13 3:06 (both bosses, still under an Edge, 21k); H9fnVZgPA3krpCzY Lindwurm II pull 11's pre-pull Flood is shown, not counted. No xivanalysis page for these pulls. |
 | drk/MultiHitSkills/quietus | covered | `aoeCombo` (vs Bloodspiller, minimum 3) | Quietus on under 3 targets | Fires on AYQm9Kd8Ct4FxcGp Lindwurm pull 24 4:51 (one target, 34k). |
-| drk/MultiHitSkills/impalement | covered | `aoeCombo` (vs the Delirium combo's average, minimum 3) | Impalement on under 3 targets | Not seen firing (the one Impalement on disk hit 3). |
+| drk/MultiHitSkills/impalement | covered | `aoeCombo` (vs the Delirium combo's average, minimum 3) | Impalement on under 3 targets | Fires on Red Hot and Deep Blue kills, both bosses: djChYqt4b7K8aAfP 9:38-9:43 (1-21k: two is close to the combo), VrJcQxq4RYPML6Zk 6:38 (6k). |
 | drk/MultiHitSkills/abyssal-drain | covered | `aoeCombo` (vs Carve and Spit, minimum 3) | Abyssal Drain on under 3 targets | Fires on jN3XDrf2z8PmLgRJ Red Hot and Deep Blue pull 44 4:19 (one boss, the two apart and both targetable; 24k). |
 | drk/MultiHitSkills/unleash | covered | `aoeCombo` | Unleash on too few targets | The app flags only one-target hits; xivanalysis needs 3. 2T1HzdPKgbhM43am 6:20 and 14:22 were past HP checks (forced). |
 | drk/OGCDDowntime/uses | verified | `checkCooldownDrift` | Delirium, Salted Earth, Carve and Spit, Shadowbringer or Living Shadow held | Same groups and offsets. Matched on qjCMx4bRfgNKwX9T. |
@@ -67,4 +67,3 @@ In priority order (biggest damage cost first):
    overwrite costs damage (a lost Edge of Shadow).
 2. **drk/MPUsage/wasted-mp** (candidate). Needs an MP simulation with
    downtime excused.
-3. **drk/MultiHitSkills/impalement** (covered). Not seen firing.

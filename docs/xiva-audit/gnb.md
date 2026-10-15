@@ -36,7 +36,7 @@
 | gnb/Continuation/dropped | covered | `checkProcs` | Ready to Rip / Tear / Gouge / Blast / Raze expiring | Fight 16: 100%, so never seen firing. |
 | gnb/Continuation/usage-checklist | superseded | `checkProcs` | — | The checklist form of the same rule (it also splices its list while iterating). |
 | gnb/SonicBreak/missing-ticks | candidate | — | a Sonic Break whose DoT stopped early (target died or turned untargetable) | Minor 1, Medium 5, Major 10 ticks. The app has no Gunbreaker DoT check; `dotFindings` could value the re-application. Premise check: most short Sonic Breaks are the target leaving. |
-| gnb/AoE/demon-slice | covered | `aoeCombo` | Demon Slice on one target | Not seen firing for GNB. |
+| gnb/AoE/demon-slice | covered | `aoeCombo` | Demon Slice on one target | Fires on yPHmaGTY2btq1wD9 Red Hot and Deep Blue 3:57 and 4:04 (Demon Slice, Demon Slaughter on one boss with the two apart; 16k, 19k). |
 | gnb/AoE/fated-circle | covered | `aoeCombo` (vs Burst Strike) | Fated Circle on one target | Built 2026-10-15. Premise holds (same cartridge). Fires on L9BzKkD2nxcVgHTC Necron pulls 7-21 and pG319BgHTnPJc6Ft Necron pulls 1-3 (one Gunbreaker spending the opener's Bloodfest cartridges on Necron alone, e.g. pull 14 0:11, 0:14, 0:17; and single Hands in the adds, pull 18 3:35, 3:53), 0-34k each. A pull with no Burst Strike has no average to compare against and stays silent (L9BzKkD2nxcVgHTC pull 10). Fight 16 8:09's two hit both P3 bosses (right). No xivanalysis page for these pulls. |
 | gnb/Cooldowns/uses | verified | `checkCooldownDrift` | Gnashing Fang, Blasting Zone, No Mercy, Bow Shock, Double Down or Bloodfest held | Fight 16: Gnashing Fang 37/38 and Sonic Break 18/19 were downtime (forced). |
 | gnb/Cooldowns/bloodfest-hold | covered | `checkCooldownDrift` (Bloodfest hold 0) | Bloodfest held | **Patch gap:** before 7.4 xivanalysis allows 10s of hold (Bloodfest waits for No Mercy); the app allows 0 on every patch. |
@@ -71,4 +71,4 @@ In priority order (biggest damage cost first):
 2. **gnb/Cooldowns/bloodfest-hold, pre-7.4.** Gate the hold allowance on
    patch once a 7.0-7.3 Gunbreaker pull is on disk.
 3. **gnb/Ammo/combo-overcap, bloodfest-expire-drop; gnb/Continuation/
-   dropped; gnb/AoE/demon-slice** (covered). None seen firing.
+   dropped** (covered). None seen firing.

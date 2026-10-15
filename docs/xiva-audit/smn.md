@@ -39,7 +39,7 @@
 | smn/Aetherflow/extra-ruin3 | candidate | — | more than 2 Ruin III fillers a minute | Major. Not fight-aware; usually forced by downtime. Premise check first. |
 | smn/Slipstream/missed-ticks | candidate | — | Slipstream ticks lost (target moved, died) | Minor 1, Medium 6, Major 12. A ground DoT the app doesn't value. xivanalysis's hook is suspect (bug). |
 | smn/Physick/cast | candidate | — | Physick cast outside downtime | Major. A GCD spent healing; the app's heal-GCD valuation is healers only. |
-| smn/AoEUsages/too-few-targets | candidate | — | Tri-Disaster, Energy Siphon, Painflare and other AoE on too few targets | The app has no Summoner AoE check; minimums are patch-gated (7.2, 7.3, 7.5). Not built (2026-10-15): no Summoner AoE cast on any pull on disk, so no premise check yet. The shared check's damage comparison would take each pair's highest minimum and need no patch branch. |
+| smn/AoEUsages/too-few-targets | covered | `smnAoe` | Tri-Disaster, Energy Siphon, Painflare and other AoE on too few targets | Built 2026-10-15 at each pair's highest minimum (Tri-disaster 4, Painflare 4, others 3, Energy Siphon 2); the damage comparison stands in for the patch branches. Premise holds (same resource or attunement). Fires on Red Hot and Deep Blue kills: RaM97t3whCZrJBPm Tri-disaster 6:34 and Topaz Catastrophe 9:01 on one boss (25k, 28k), Emerald Catastrophe, Umbral Flare and Painflare on both (8-30k each); fGjA9DKLQbRa2q1k Astral Flare on both 6:38, 6:41 (12-27k). Not seen: Energy Siphon, Brand of Purgatory, Ruby Catastrophe. No xivanalysis page for these pulls. |
 | smn/Swiftcast/bad-use | no-damage | — | Swiftcast unused | Utility. |
 | smn/Swiftcast+Lucid/utilities | no-damage | — | — | Display. |
 | smn/Defensives/radiant-aegis | no-damage | — | — | Display. |
@@ -68,7 +68,6 @@ these fired; a weaker Summoner's log is the next step.
 1. **smn/Summons/deathflare, enkindle; smn/Aetherflow/lost-stacks**
    (candidates). Lost oGCDs, log-visible.
 2. **smn/Summons/ruin4-in-demi, mountain-buster** (candidates).
-3. **smn/AoEUsages** (candidate).
-4. **smn/Slipstream/missed-ticks, smn/Physick/cast** (candidates).
-5. **smn/Aetherflow/ruin4-unused, extra-ruin3** (candidates; premise
+3. **smn/Slipstream/missed-ticks, smn/Physick/cast** (candidates).
+4. **smn/Aetherflow/ruin4-unused, extra-ruin3** (candidates; premise
    check, usually forced).

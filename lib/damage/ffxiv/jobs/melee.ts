@@ -109,7 +109,9 @@
 //     xivanalysis: kC7Y3WbzvKcZrBxT The Tyrant pull 1 6:29 (Enlightenment
 //     on the boss, 10k); L9BzKkD2nxcVgHTC Necron pulls 6 and 20 (Four-point
 //     Fury and Rockbreaker on 2-3 adds, 3-20k: three is near even, so
-//     only the ones that dealt less than the form's average show).
+//     only the ones that dealt less than the form's average show);
+//     djChYqt4b7K8aAfP 0:33 (Shadow of the Destroyer with only Red Hot
+//     up, 36k); 7yXZbmqcrCga8PHz 4:41 (Enlightenment on one boss, 34k).
 //   - Dragoon (checked against xivanalysis on jN3XDrf2z8PmLgRJ Vamp pull 8:
 //     Lance Charge and positionals match): Power Surge uptime, +10%
 //     (tooltip); Chaotic Spring DoT uptime; Life Surge (below); Lance Charge
@@ -176,6 +178,11 @@
 //     burst (no extra use fit before the kill); Armor Crush under Kunai's
 //     Bane with stacks isn't built (the stack goes to a later Aeolian
 //     Edge: ~10% of 100 potency each).
+//     Hellfrog / Deathfrog on one target (Ninki.tsx, 2026-10-15): `ninAoe`.
+//     Seen firing, not matched against xivanalysis: Hellfrog on one of Red
+//     Hot and Deep Blue's bosses with the two apart, mgTQJjX2nW6ANkP7 6:51
+//     and jXG76ba43VDLAvYz 4:07 (17-21k); jXG76ba43VDLAvYz 9:16 as Deep
+//     Blue died (24k). Deathfrog not seen on one target.
 //   - Reaper: Enshroud (Enshroud.tsx): four Reapings, two Lemure's, one
 //     Sacrificium, one Communio. Arcane Circle, Death's Design, Harvest
 //     Moon, Shroud and Whorl of Death below. Checked against xivanalysis
@@ -704,6 +711,9 @@ const enshroud: JobCheck = (ctx) => burstWindowFindings(ctx, {
 //   pull 44 5:18-5:19 (Grim Swathe and Guillotine on one boss, the two
 //   apart; 14k, 38k), pull 20 4:15 and bVDR2mTL7YGvMxK1 pull 1 3:40
 //   (Lemure's Scythe, 29k, 40k), pull 13 3:48 (Soul Scythe on both, 29k).
+//   xydWc2pK74HCbZ8q's Red Hot and Deep Blue kill fires the rest on both
+//   bosses: Spinning Scythe 3:07-7:35 (9-19k), Executioner's Guillotine
+//   6:49 (34k), Grim Reaping 3:57 (23k), Guillotine, Soul Scythe.
 // Rechecked on qjCMx4bRfgNKwX9T Dancing Mad kill (7.5, 2026-10-13):
 // GCD uptime, Harvest Moon 5/4, Death's Design, its 14 missed
 // positionals (same split by action), 2 Whorls on too few targets, the
@@ -989,5 +999,9 @@ export function firstmindsFocusSpec(ctx: PlayerCheckContext): GaugeSpec {
 const firstmindsFocus: JobCheck = (ctx) => gaugeFindings(ctx, firstmindsFocusSpec(ctx));
 
 export const DRG_CHECKS: JobCheck[] = [uptime("POWER_SURGE", 0.1, "Power Surge is +10% (tooltip)", { cost: drgPowerSurgeRefreshCost, reapplyGcds: 1, restartIds: ids("RAIDEN_THRUST", "TRUE_THRUST") }), lanceCharge, lifeOfTheDragon, lifeSurge, chaoticSpring, firstmindsFocus, starcrossDropped];
-export const NIN_CHECKS: JobCheck[] = [kunaisBane, ninki, kazematoi];
+// xivanalysis Ninki.tsx: the frogs against Bhavacakra / Zesho Meppo. From
+// 7.3 two targets out-damage them, so only one target is judged (as
+// Samurai's Guren).
+const ninAoe = aoeComboOnOneTarget([[id("HELLFROG_MEDIUM"), id("BHAVACAKRA")], [id("DEATHFROG_MEDIUM"), id("ZESHO_MEPPO")]]);
+export const NIN_CHECKS: JobCheck[] = [kunaisBane, ninki, kazematoi, ninAoe];
 export const RPR_CHECKS: JobCheck[] = [enshroud, arcaneCircle, deathsDesign, harvestMoon, shroud, rprAoe];

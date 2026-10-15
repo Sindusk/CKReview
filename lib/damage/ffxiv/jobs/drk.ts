@@ -28,7 +28,9 @@
 // (Quietus, 34k), jN3XDrf2z8PmLgRJ Red Hot and Deep Blue pull 44 4:19
 // (Abyssal Drain on one boss with the two apart, 24k) and pull 13 3:06
 // (Flood on both, 21k). A Flood pressed before the pull is shown, not
-// counted (H9fnVZgPA3krpCzY Lindwurm II pull 11).
+// counted (H9fnVZgPA3krpCzY Lindwurm II pull 11). Impalement on both Red
+// Hot and Deep Blue bosses: djChYqt4b7K8aAfP 9:38-9:43 (1-21k: two is
+// close to the Delirium combo), VrJcQxq4RYPML6Zk 6:38 (6k).
 //
 // Living Shadow (xivanalysis's Esteem evaluator): Esteem runs a set
 // sequence at fixed offsets from the summon (Abyssal Drain, Shadowbringer,

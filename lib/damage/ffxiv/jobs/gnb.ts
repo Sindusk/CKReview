@@ -57,7 +57,9 @@
 // Bloodfest cartridges on Necron alone (pull 14: 0:11, 0:14, 0:17) and on
 // single Icy / Beckoning Hands in the adds (pull 18: 3:35, 3:53), 0-18k
 // each. A pull with no Burst Strike (pull 10, a 31s wipe) has no average
-// to compare against, so its four don't show.
+// to compare against, so its four don't show. Demon Slice / Slaughter on
+// one Red Hot and Deep Blue boss, the two apart: yPHmaGTY2btq1wD9 3:57,
+// 4:04 (16k, 19k).
 //
 //   Copyright (c) 2018 Saxon Landers & contributors
 //   MIT License; full text in THIRD_PARTY_NOTICES.md.

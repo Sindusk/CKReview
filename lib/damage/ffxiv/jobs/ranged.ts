@@ -81,7 +81,8 @@
 //   and Bloodshower at bVDR2mTL7YGvMxK1 pull 1 5:18 (the bosses apart,
 //   both targetable; 11-12k each); Windmill at d3vRbwfpNBLzJ2Xh pull 2
 //   2:42 (Red Hot left as it landed, 11k) and pG319BgHTnPJc6Ft Necron
-//   pull 2 3:53 (one Icy Hand, 8k); Rising Windmill at Necron pull 7 2:24.
+//   pull 2 3:53 (one Icy Hand, 8k); Rising Windmill at Necron pull 7 2:24
+//   and fJxTNgwtRKjYbvZp 7:32.
 // Bard: Caustic Bite / Stormbite (below), Hawk's Eye overwrites, AoE on
 //   one target, the burst window, cooldowns (OGCDDowntime.ts).
 //   Rechecked on dDar482XvFKBPJYh FRU kill (7.1, 2026-10-12): its 17
@@ -123,7 +124,8 @@
 //   jN3XDrf2z8PmLgRJ Vamp Fatale pulls 9 and 12, Bioblaster on the boss
 //   after the adds died (5:25, 39k; 5:10, 33k); Scattergun and Auto
 //   Crossbow on the adds pass when they hit 3 (more than the single-target
-//   average) and flag on 2 (5:00, 11k; 5:04, 1k).
+//   average) and flag on 2 (5:00, 11k; 5:04, 1k). djChYqt4b7K8aAfP's Red
+//   Hot and Deep Blue kill: Bioblaster on both bosses at 8:48 (27k).
 //
 //   Copyright (c) 2018 Saxon Landers & contributors
 //   MIT License; full text in THIRD_PARTY_NOTICES.md.
