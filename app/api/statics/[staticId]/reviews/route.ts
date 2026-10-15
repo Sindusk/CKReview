@@ -7,6 +7,7 @@ import { getCurrentUser } from "@/lib/auth";
 import type { StaticReviewPayload, StaticReviewPullData } from "@/lib/static-review-data";
 import { resolvePlayerIdentities } from "@/lib/static-player-identity";
 import { parseLogUrl } from "@/lib/url-parsers";
+import { byLogDate } from "@/lib/static-analysis";
 
 // A 65-pull night writes a few thousand detail rows; the 5 s default
 // interactive-transaction timeout is too tight for that.
@@ -155,8 +156,8 @@ export async function GET(
 
   const reviews = await prisma.staticReview.findMany({
     where:   { staticId },
-    orderBy: { addedAt: "desc" },
   });
+  reviews.sort((a, b) => byLogDate(b, a));
 
   return NextResponse.json({ reviews });
 }

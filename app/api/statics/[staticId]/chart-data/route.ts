@@ -2,7 +2,7 @@
 //
 // Feeds StaticErrorChart and the static dashboard's pull list: every pull
 // ever imported into this static's reviews, in chronological order (by
-// review addedAt, then pullNumber within a review), with each player's
+// the log's recorded date (see byLogDate), then pullNumber within a review), with each player's
 // per-pull Major/Minor error counts, resolved player identity (see
 // StaticPlayerIdentity), and job/spec snapshot. The client computes the
 // cumulative running totals shown on the chart — this route just hands
@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { byLogDate } from "@/lib/static-analysis";
 
 export async function GET(
   _req: NextRequest,
@@ -40,6 +41,7 @@ export async function GET(
       },
     },
   });
+  reviews.sort(byLogDate);
 
   const pulls = reviews.flatMap((review) =>
     review.pulls.map((pull) => ({

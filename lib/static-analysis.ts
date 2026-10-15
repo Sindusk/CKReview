@@ -142,6 +142,16 @@ export type AnalysisContext = {
   pulls:               LoadedPull[];
 };
 
+/** Orders a static's sessions oldest-first by when the log was recorded
+ *  (reportStartedAt), not when it was added to the static; rows from before
+ *  that column existed fall back to addedAt. */
+export function byLogDate(
+  a: { id: number; addedAt: Date; reportStartedAt: Date | null },
+  b: { id: number; addedAt: Date; reportStartedAt: Date | null },
+): number {
+  return (a.reportStartedAt ?? a.addedAt).getTime() - (b.reportStartedAt ?? b.addedAt).getTime() || a.id - b.id;
+}
+
 /** Loads every detailed pull of the filter's boss and sessions. */
 export async function loadAnalysisContext(staticId: number, filter: AnalysisFilter): Promise<AnalysisContext> {
   const bossRows = await prisma.staticReviewPull.groupBy({
@@ -175,6 +185,7 @@ export async function loadAnalysisContext(staticId: number, filter: AnalysisFilt
     }),
   ]);
 
+  reviews.sort(byLogDate);
   let selected = reviews.filter((r) => {
     const when = r.reportStartedAt ?? r.addedAt;
     return (!filter.from || when >= filter.from) && (!filter.to || when <= filter.to);
@@ -206,6 +217,9 @@ export async function loadAnalysisContext(staticId: number, filter: AnalysisFilt
       playerErrors: { select: { identityId: true } },
     },
   });
+
+  const sessionOrder = new Map(selected.map((r, i) => [r.id, i]));
+  rawPulls.sort((a, b) => sessionOrder.get(a.staticReviewId)! - sessionOrder.get(b.staticReviewId)! || a.pullNumber - b.pullNumber);
 
   const pullCounts = new Map<number, number>();
   for (const p of rawPulls) pullCounts.set(p.staticReviewId, (pullCounts.get(p.staticReviewId) ?? 0) + 1);
