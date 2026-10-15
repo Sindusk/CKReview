@@ -525,6 +525,14 @@ Check them on the first VODs that reach P5:
   than both tanks in one wing, raidwide deaths (Fulgent after Box), boss
   facing, the limit break gauge, the order of Polarizing fronts.
 
+### The Omega Protocol P1: Omega (FFXIV)
+
+- **Pantokrator, two players with the same line number on one side**
+  (report b9FcR6vxAPd3zhkH, Pull 46 and Pull 55 at 1:21): one should have
+  crossed, but which one? NAUR's P1 flex priority is Tanks > Melee > Ranged
+  > Healer; nobody has confirmed which way it runs. Until then both stay
+  named.
+
 ### Dancing Mad (FFXIV)
 
 - **Phase 1 (graven-image / phase1.ts):**
