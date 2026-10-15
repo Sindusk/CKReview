@@ -60,11 +60,11 @@
 //   the user's VOD reviewer (2026-10-14, A46) one of them should have
 //   crossed to the other group; it isn't the whole group.
 // - Group A's slots (user, 2026-10-14, TOP only): WAR MT, DRK OT, WHM H1,
-//   SCH H2, PCT R1, DNC R2, DRG and RDM the melee. The Pantokrator groups
-//   follow one conga, H1 > M2 > R1 > MT > OT > M1 > R2 > H2 if the DRG is
-//   M1 (NAUR's H1 R1 M1 MT OT M2 R2 H2 if the RDM is M1): for each In Line
-//   number the earlier player goes to one side, the later to the other.
-//   It fits all 49 pulls with known groups, and no other order fits. By it,
+//   SCH H2, PCT R1, DNC R2, RDM M1, DRG M2 ("may have been": the data
+//   agrees). The Pantokrator groups follow NAUR's conga, H1 R1 M1 MT OT M2
+//   R2 H2: for each In Line number the earlier player goes to one side,
+//   the later to the other. It fits all 49 pulls with known groups, and no
+//   other order of the eight slots fits. By it,
 //   A46 +1:21.5's DRG and A55 +1:21.5's PCT didn't cross. Not built: the
 //   module doesn't know slots (roles.ts reads this comp's melee/ranged
 //   wrongly), so both of the pair stay named.
