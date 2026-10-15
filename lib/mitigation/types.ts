@@ -88,8 +88,9 @@ export type MitigationGame = {
 export type HitVerdict = "fail" | "under" | "good" | "over";
 
 // One damage event of a hit on one player. A multi-hit attack (Brutal Rain
-// hits four times about a second apart), or hits joined because they land
-// within seconds of each other, give each target several parts.
+// hits four times about a second apart), or waves of the same attack joined
+// because they land within seconds of each other, give each target several
+// parts.
 export type HitPart = {
   // The attack this part belongs to (a joined hit holds several), for
   // boss-debuff reach (debuff-reach.ts).

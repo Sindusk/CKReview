@@ -9,8 +9,9 @@
 // HIT_CLUSTER_GAP_MS apart (the game staggers a hit's events ~45ms per
 // target), landing on HIT_MIN_TARGETS+ players or on tanks only (a tank
 // buster: TANK_HIT_MIN_RAW, or taken under an invuln). A multi-hit attack's waves fall inside the
-// gap, and hits starting within JOIN_GAP_MS of the previous one's end are
-// joined to it whatever the ability, so either way one hit can give its
+// gap, and waves of the same attack starting within JOIN_GAP_MS of the
+// previous one's end are joined to it (different attacks never are, user
+// 2026-10-15), so either way one hit can give its
 // targets several parts (HitPart). Each target is judged as if every part
 // landed at once: health before the first part minus all their damage,
 // with no healing in between (user, 2026-10-08). DoT ticks and
@@ -79,18 +80,15 @@
 // (ability and dealing actor) for this.
 //
 // Not yet confirmed by the user (from docs/open-items.md 2026-10-15). The
-// verdict bands, the 3s join, the all-at-once judging and DoTs / autos
-// never being hits are settled (user, 2026-10-08); these are the builder's:
+// verdict bands, the 3s join (same attack only since 2026-10-15), the
+// all-at-once judging and DoTs / autos never being hits are settled (user,
+// 2026-10-08); these are the builder's:
 //   - a tank-only hit counts only when buster-sized (TANK_HIT_MIN_RAW, 40%
 //     of max HP raw); hits on non-tanks need HIT_MIN_TARGETS (4)
 //   - a joined hit stops growing at JOIN_MAX_SPAN_MS (10s)
 //   - invulnerable tanks are left out of HP%, like vulnerable players
 //   - on tank-only hits, tank cooldowns count for droppable and notes
 // Known rough edges:
-//   - A joined hit's cross-pull key (MitigationHit.id) is its first
-//     ability, so when a join starts with a different ability in different
-//     pulls the rows don't line up (Red Hot and Deep Blue's Plunging Snap /
-//     Re-Entry rows).
 //   - No minimum size for a 4+-target hit: a 25k-raw Bloody Bondage gets a
 //     row.
 //   - Notes and the hit details estimate added shields as nothing (their
@@ -317,18 +315,27 @@ function findHitClusters(pull: Pull, playerNames: Set<string>, game: MitigationG
   return clusters.sort((a, b) => a[0].event.timestamp - b[0].event.timestamp);
 }
 
-// Hits in quick succession are judged as one (user, 2026-10-08): a cluster
-// starting within JOIN_GAP_MS of the previous one's end joins it, whatever
-// the ability (Red Hot and Deep Blue's Pyrotation: three 4-target hits 2s
-// apart). A chain stops growing at JOIN_MAX_SPAN_MS, so a long run of
-// small hits can't fold a whole phase into one row.
+// Waves of one attack in quick succession are judged as one (user,
+// 2026-10-08): a cluster starting within JOIN_GAP_MS of the previous one's
+// end joins it when it is the same attack by name (Red Hot and Deep
+// Blue's Pyrotation: three 4-target hits 2s apart). Different attacks
+// stay separate rows (user, 2026-10-15): joining them named a hit after
+// whichever landed first, so FRU's Darkest Dance hid inside Dark Water III
+// in some pulls and its rows didn't line up. A later attack's damage
+// still counts against the earlier hit through laterDrop. A chain stops
+// growing at JOIN_MAX_SPAN_MS, so a long run of small hits can't fold a
+// whole phase into one row.
 export const JOIN_GAP_MS = 3_000;
 export const JOIN_MAX_SPAN_MS = 10_000;
 
 function joinClusters(clusters: TargetEvent[][]): TargetEvent[][] {
+  // Clusters of different attacks interleave in time, so each joins the
+  // latest earlier cluster of its own attack.
   const out: TargetEvent[][] = [];
+  const lastOf = new Map<string, TargetEvent[]>();
   for (const cluster of clusters) {
-    const prev = out[out.length - 1];
+    const name = cluster[0].event.abilityName;
+    const prev = lastOf.get(name);
     const start = cluster[0].event.timestamp;
     if (prev) {
       const prevStart = prev[0].event.timestamp;
@@ -338,10 +345,12 @@ function joinClusters(clusters: TargetEvent[][]): TargetEvent[][] {
         continue;
       }
     }
-    out.push([...cluster]);
+    const hit = [...cluster];
+    out.push(hit);
+    lastOf.set(name, hit);
   }
   for (const hit of out) hit.sort((a, b) => a.event.timestamp - b.event.timestamp);
-  return out;
+  return out.sort((a, b) => a[0].event.timestamp - b[0].event.timestamp);
 }
 
 // ── Cast timelines and cooldown simulation ─────────────────────────────
