@@ -17,7 +17,7 @@
 // nothing to add beyond the name stays hidden; boss debuffs (statuses)
 // do have one.
 
-import { useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { fetchXivTooltip, type XivSegment, type XivTooltip } from "@/lib/xivapi-tooltips";
 import { getFFJobIcon } from "@/lib/ffl-job-data";
@@ -85,35 +85,56 @@ export function AbilityHoverTip({ game, id, name, icon, lines = [], fallbackLine
   style?: CSSProperties;
 }) {
   const ref = useRef<HTMLSpanElement>(null);
-  const [pos, setPos] = useState<{ top?: number; bottom?: number; left: number } | null>(null);
+  const tipRef = useRef<HTMLDivElement>(null);
+  const [anchor, setAnchor] = useState<DOMRect | null>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const [xiv, setXiv] = useState<XivTooltip | undefined>(undefined);
   const wantXiv = game === "ffxiv" && id !== undefined && id > 0;
   const width = wantXiv ? 350 : 280;
   const show = () => {
     const r = ref.current?.getBoundingClientRect();
     if (!r) return;
-    const left = Math.max(8, Math.min(r.left, window.innerWidth - width - 10));
-    // Below the name, or above it in the lower part of the screen, where a
-    // long description would run off the bottom.
-    setPos(r.bottom > window.innerHeight * 0.55 ? { bottom: window.innerHeight - r.top + 6, left } : { top: r.bottom + 6, left });
+    setPos(null);
+    setAnchor(r);
     if (wantXiv && xiv === undefined) void fetchXivTooltip(id!, name).then(setXiv);
   };
+  const hide = () => { setAnchor(null); setPos(null); };
   const loading = wantXiv && xiv === undefined;
   const ownStats = xiv ? [] : fallbackLines;
   const logLines = [...ownStats, ...lines];
-  const visible = pos && (logLines.length > 0 || footer || loading || xiv);
+  const visible = anchor && (logLines.length > 0 || footer || loading || xiv);
+
+  // Placed after measuring, again whenever the content grows (the XIVAPI
+  // data lands): below the name if it fits, else above, else beside it
+  // with its top clamped on screen (Starry Muse's tooltip is taller than
+  // either gap). Hidden until placed, so it never flashes off screen.
+  useLayoutEffect(() => {
+    const el = tipRef.current;
+    if (!anchor || !el) return;
+    const M = 8, GAP = 6, vw = window.innerWidth, vh = window.innerHeight;
+    const h = el.offsetHeight;
+    const clampLeft = (l: number) => Math.max(M, Math.min(l, vw - width - M));
+    if (anchor.bottom + GAP + h <= vh - M) return setPos({ top: anchor.bottom + GAP, left: clampLeft(anchor.left) });
+    if (anchor.top - GAP - h >= M) return setPos({ top: anchor.top - GAP - h, left: clampLeft(anchor.left) });
+    const top = Math.max(M, Math.min(anchor.top + anchor.height / 2 - h / 2, vh - M - h));
+    const right = anchor.right + GAP, leftSide = anchor.left - GAP - width;
+    setPos({ top, left: right + width <= vw - M ? right : leftSide >= M ? leftSide : clampLeft(anchor.left) });
+  }, [anchor, xiv, width, logLines.length]);
   const category = xiv?.kind === "action" ? xiv.category : xiv?.kind === "status" ? "Status" : undefined;
   const showRange = xiv?.kind === "action" && xiv.range !== undefined;
 
   return (
     <>
       <span ref={ref} tabIndex={0} style={{ cursor: onClick ? "pointer" : "help", outline: "none", ...style }}
-        onMouseEnter={show} onMouseLeave={() => setPos(null)} onFocus={show} onBlur={() => setPos(null)}
+        onMouseEnter={show} onMouseLeave={hide} onFocus={show} onBlur={hide}
         onClick={onClick && ((e) => { e.stopPropagation(); onClick(); })}>
         {children}
       </span>
       {visible && createPortal(
-        <div role="tooltip" style={{ ...shell, top: pos.top, bottom: pos.bottom, left: pos.left, width }}>
+        <div ref={tipRef} role="tooltip" style={{
+          ...shell, top: pos?.top ?? 0, left: pos?.left ?? 0, width,
+          visibility: pos ? "visible" : "hidden", maxHeight: "calc(100vh - 16px)", overflow: "hidden",
+        }}>
           <div style={{ display: "flex", gap: 9, alignItems: "center" }}>
             {icon && (
               <img src={icon} alt="" width={40} height={40} style={{
