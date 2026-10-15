@@ -40,7 +40,7 @@
 | mch/YassQueen/missing-collider | candidate | — | a Queen summon without Crowned Collider | Medium 1, Major 3. No end-of-pull or downtime allowance in xivanalysis. |
 | mch/YassQueen/queenless-attack | no-damage | — | — | A broken-log trigger. |
 | mch/MultiHitSkills/bioblaster | verified | `mchAoe` (vs Drill, minimum 3, its DoT ticks counted) | Bioblaster on too few targets (2 before 7.3, 3 from 7.3) | Built 2026-10-15. Premise holds (shared charges). The ticks matter: the direct hit is 50 potency (5.3k at pull 9 5:26, ticks ~6.5k each). Fires on jN3XDrf2z8PmLgRJ Vamp Fatale pull 9 5:25 and pull 12 5:10, both on the boss after the adds died (39k, 33k); djChYqt4b7K8aAfP Red Hot and Deep Blue 8:48 on both bosses (27k). The damage comparison covers the pre-7.3 minimum. Matched xivanalysis on Vamp Fatale pull 12 (1 of its 1). |
-| mch/MultiHitSkills/auto-crossbow | covered | `mchAoe` (vs Blazing Shot, minimum 4) | Auto Crossbow on under 4 | Fires on the same report's pull 12 5:04 (two adds, 1k); on three (pull 9 5:03-5:06) it out-damaged Blazing Shot and passes. xivanalysis counts 5 on pull 12 (all on two targets); in the log two targets deal 31-51k against Blazing Shot's ~36k average, about even, so only the one under it shows. Its minimum of 4 is stricter than the damage; not adopted. |
+| mch/MultiHitSkills/auto-crossbow | covered | `mchAoe` (vs Blazing Shot, minimum 4) | Auto Crossbow on under 4 | Not seen firing. xivanalysis counts 5 on pull 12 (all on two targets). Buff-neutral, two targets out-damage Blazing Shot (raw 31-51k against its ~36k average), so none is a loss; the raw comparison had flagged one (5:04, 1k). Its minimum of 4 is stricter than the damage; not adopted. |
 | mch/MultiHitSkills/scattergun | covered | `mchAoe` (vs the Heated combo's average, minimum 4) | Scattergun on under 4 | Fires on pull 12 5:00 (two, 11k); on three it passes. xivanalysis counts 2 on pull 12: 5:00 matches; 5:18 hit three for 40k against the combo's ~34k average, not a loss (not adopted). |
 | mch/Tincture/tracked-actions | superseded | tincture.ts | 4 burst actions missing under the tincture | — |
 | mch/Tincture/blazing-shot | superseded | tincture.ts | under 10 Blazing Shots under the tincture | — |
@@ -73,3 +73,5 @@
 2. Then, by likely cost: **Reassemble** (bad GCD, dropped), **Queen**
    without Collider, **Heat / Battery** overcap, **Double Check /
    Checkmate** charges (needs refunds), **Wildfire fizzle**.
+3. **mch/MultiHitSkills/auto-crossbow** (covered). Not seen firing: two
+   targets aren't a loss.

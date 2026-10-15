@@ -306,14 +306,15 @@ const healGcds: JobCheck = (ctx): DamageFinding[] => {
 // Hardcast AoE damage GCDs: on one target they do less than the filler,
 // which takes the same cast (Gravity II 130 potency vs Fall Malefic 270;
 // xivanalysis flagged 3 on jN3XDrf2z8PmLgRJ Vamp pull 8, all found).
-// Each cast whose hits reached a single enemy loses the filler's average
-// minus what it dealt. The instant ones (Dyskrasia II, Art of War II) are
+// Each cast whose hits reached a single enemy loses the filler's value at
+// the same buffs minus its own (shared.ts aoeOnOneTargetFindings). The instant ones (Dyskrasia II, Art of War II) are
 // left out: they're what a healer presses while moving, when the filler
 // isn't an option, so the filler overstates the loss.
 const AOE_GCD_KEYS = ["GRAVITY", "GRAVITY_II", "HOLY", "HOLY_III"];
 const aoeOnOneTarget: JobCheck = (ctx) => {
   const fill = filler(ctx);
-  return aoeOnOneTargetFindings(ctx, AOE_GCD_KEYS.filter((key) => A[key]).map((key) => A[key].id), () => fill);
+  return aoeOnOneTargetFindings(ctx, AOE_GCD_KEYS.filter((key) => A[key]).map((key) => A[key].id),
+    () => ({ name: fill.name, ids: fill.id !== undefined ? [fill.id] : [] }));
 };
 
 const dot = (key: string, ...more: string[]): JobCheck => (ctx) => dotFindings(ctx, {

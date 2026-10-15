@@ -48,7 +48,8 @@ import type { PlayerEvent } from "@/types/PlayerInfo";
 import type { DamageFinding, GaugeTrack, JobCheck, Moment } from "../../types";
 import { finding, measuredPenaltyFactor, type PlayerCheckContext } from "../../checks";
 import { forcedPart, gcdKinds, inWindows, mergeWindows, overlapMs, type Window } from "../../timeline";
-import { estimateHitRates } from "../../crit-rates";
+import { estimateHitRates, ratesFromStats } from "../../crit-rates";
+import { XIVA_STATUSES } from "../xiva-data";
 
 // The removal's own timestamp, no later. A 100ms allowance counted a
 // Paladin's Sepulchre cast 40ms after Fight or Flight fell off
@@ -1074,12 +1075,28 @@ export function gaugeFindings(ctx: PlayerCheckContext, spec: GaugeSpec): DamageF
 // ── AoE GCDs on one target ─────────────────────────────────────────────
 
 const AOE_HIT_MS = 2_000;
+// Without gear stats in the log: a typical level-100 crit multiplier. It
+// divides out of both sides, so its exact value barely moves a verdict.
+const DEFAULT_CRIT_MULT = 1.55;
+// Statuses that force a crit (and direct hit): the same set as game.ts
+// GUARANTEED_HIT_STATUS_IDS, kept here to avoid importing game.ts.
+const SURE_HIT_STATUS_IDS = new Set(
+  ["LIFE_SURGE", "INNER_RELEASE", "REASSEMBLED"].map((k) => XIVA_STATUSES[k]?.id).filter((id): id is number => id !== undefined),
+);
+// An action that crit and direct-hit on this share of its hits always does
+// (Inner Chaos, Chaotic Cyclone); crit-luck.ts uses the same cut.
+const ALWAYS_SURE_SHARE = 0.95;
 // The longest AoE DoT counted with its hit (Bioblaster, 15s), plus a tick.
 const AOE_DOT_MS = 18_000;
 
 /**
- * An AoE GCD that hit one enemy and dealt less than the single-target GCD
- * it stood in for (`against`: the healer's filler, a tank's combo step).
+ * An AoE that hit too few enemies to beat the single-target action it
+ * stood in for (`against`: the healer's filler, a tank's combo step).
+ * Since 2026-10-15 both sides are compared buff-neutrally (baseValue
+ * below) and the loss is priced at the cast's own buffs (user: accuracy
+ * over keeping old findings). Losses quoted in job headers before then
+ * came from the raw comparison: this cast's damage against the pull's
+ * average single-target cast.
  * One pressed in forced time is shown, not counted: past a phase's HP
  * check a tank builds gauge with the AoE combo before downtime
  * (2T1HzdPKgbhM43am fight 10, Dark Knight at 6:20 and 14:22).
@@ -1095,10 +1112,28 @@ function hitDelayMs(ctx: PlayerCheckContext, abilityId: number): number {
   return delays.length ? delays[Math.floor(delays.length / 2)] : 0;
 }
 
+/**
+ * Buff-neutral value of hits: each hit's amount with its damage-%
+ * multiplier (party buffs, the target's own damage-taken modifier such as
+ * Necron's Hands at 0.5), crit and direct hit divided out. FFLogs ticks are
+ * logged at their expected value, so only the multiplier comes off them.
+ * Comparing an AoE with its single-target twin this way keeps a burst from
+ * deciding the verdict: two opener Fated Circles on Necron alone dealt
+ * 25-26k, level with Burst Strike's 25k pull average, and passed
+ * (L9BzKkD2nxcVgHTC Necron pull 15; xivanalysis counts them).
+ */
+function baseValue(e: PlayerEvent, critMult: number): number {
+  const m = e.multiplier && e.multiplier > 0 ? e.multiplier : 1;
+  if (e.isDoT) return (e.amount ?? 0) / m;
+  return (e.amount ?? 0) / m / (e.hitType === 2 ? critMult : 1) / (e.directHit ? 1.25 : 1);
+}
+
 export function aoeOnOneTargetFindings(
   ctx: PlayerCheckContext,
   aoeIds: number[],
-  against: (aoeId: number) => { name: string; value: number } | undefined,
+  // The single-target action(s) the AoE stood in for; several are
+  // averaged by casts (a Monk form's three GCDs).
+  against: (aoeId: number) => { name: string; ids: number[] } | undefined,
   minTargets: (aoeId: number) => number | undefined = () => undefined,
   // A DoT the AoE applies, logged under its own id: Bioblaster's direct
   // hit is 50 potency and its ticks most of the rest (jN3XDrf2z8PmLgRJ
@@ -1107,6 +1142,28 @@ export function aoeOnOneTargetFindings(
 ): DamageFinding[] {
   const out: DamageFinding[] = [];
   const aoe = new Set(aoeIds);
+  const critMult = ctx.player.stats ? ratesFromStats(ctx.player.stats.criticalHit, ctx.player.stats.directHit).critMult : DEFAULT_CRIT_MULT;
+  const own = ctx.player.damageDone.filter((e) => !e.pet && e.timestamp < ctx.endMs && (e.amount ?? 0) > 0);
+  // What crit and direct hit add on average, from the player's own direct
+  // hits: prices a base value back into damage.
+  const direct = own.filter((e) => !e.isDoT && !ctx.game.isTickAbility(e.abilityId));
+  const rolled = direct.reduce((a, e) => a + (e.amount ?? 0) / (e.multiplier && e.multiplier > 0 ? e.multiplier : 1), 0);
+  const unrolled = direct.reduce((a, e) => a + baseValue(e, critMult), 0);
+  const outcome = unrolled > 0 ? rolled / unrolled : 1;
+  const casts = new Map<number, number>();
+  for (const c of ctx.player.casts) if (c.timestamp < ctx.endMs) casts.set(c.abilityId, (casts.get(c.abilityId) ?? 0) + 1);
+  // The alternative's base value per cast, weighted by casts across its ids.
+  const baseOf = new Map<string, number>();
+  const altBase = (ids: number[]) => {
+    const key = ids.join(",");
+    if (!baseOf.has(key)) {
+      const set = new Set(ids);
+      const n = ids.reduce((a, id) => a + (casts.get(id) ?? 0), 0);
+      const sum = direct.filter((e) => set.has(e.abilityId)).reduce((a, e) => a + baseValue(e, critMult), 0);
+      baseOf.set(key, n > 0 ? sum / n : 0);
+    }
+    return baseOf.get(key)!;
+  };
   // GCDs, plus oGCD AoEs (Bard's Rain of Death against Heartbreak Shot).
   const uses = [
     ...ctx.uses.filter((u) => u.startMs < ctx.endMs)
@@ -1130,7 +1187,8 @@ export function aoeOnOneTargetFindings(
   uses.forEach((u, i) => {
     if (!aoe.has(u.action.id)) return;
     const alt = against(u.action.id);
-    if (!alt || alt.value <= 0) return;
+    const altPer = alt ? altBase(alt.ids) : 0;
+    if (!alt || altPer <= 0) return;
     const landed = landedAt(u);
     const next = uses.slice(i + 1).find((x) => x.action.id === u.action.id);
     const nextSame = next ? landedAt(next) : Infinity;
@@ -1150,24 +1208,38 @@ export function aoeOnOneTargetFindings(
     const landedHits = hits.filter((e) => (e.amount ?? 0) > 0 || (e.absorbed ?? 0) > 0);
     const targets = new Set(landedHits.map((e) => `${e.targetActorId ?? e.target}.${e.targetInstance ?? 1}`));
     // Some AoEs lose on two targets too (Freeze, 120 a target against
-    // Blizzard IV's 300): minTargets. Judging every two-target AoE by its
-    // damage against the single-target average flagged Gravity IIs worth
-    // 1-6k less, which is buff and crit noise.
+    // Blizzard IV's 300): minTargets, the most targets the AoE needs on any
+    // patch. At or above it the AoE isn't judged.
     if (targets.size === 0 || targets.size >= (minTargets(u.action.id) ?? 2)) return;
     const ticks = new Set(tickIds(u.action.id) ?? []);
-    const ticked = ticks.size === 0 ? 0 : ctx.player.damageDone
+    const tickHits = ticks.size === 0 ? [] : ctx.player.damageDone
       .filter((e) => ticks.has(e.abilityId) && e.timestamp >= landed && e.timestamp < Math.min(nextSame, landed + AOE_DOT_MS) &&
-        targets.has(`${e.targetActorId ?? e.target}.${e.targetInstance ?? 1}`))
-      .reduce((a, e) => a + (e.amount ?? 0), 0);
+        targets.has(`${e.targetActorId ?? e.target}.${e.targetInstance ?? 1}`));
+    const ticked = tickHits.reduce((a, e) => a + (e.amount ?? 0), 0);
     const dealt = hits.reduce((a, e) => a + (e.amount ?? 0), 0) + ticked;
-    if (dealt >= alt.value) return;
+    // Both sides buff-neutral (baseValue), then priced at this cast's own
+    // damage modifier and the player's average crit / direct-hit gain.
+    const aoeBase = [...landedHits, ...tickHits].reduce((a, e) => a + baseValue(e, critMult), 0);
+    if (aoeBase >= altPer) return;
+    const mods = landedHits.map((e) => (e.multiplier && e.multiplier > 0 ? e.multiplier : 1));
+    const modNow = mods.reduce((a, m) => a + m, 0) / mods.length;
+    // A forced crit and direct hit (Inner Release, or an action that always
+    // does: Chaotic Cyclone) is priced at that, not the average gain. A
+    // lucky crit-and-direct-hit cast isn't: it would overprice by ~60%.
+    const all = direct.filter((e) => e.abilityId === u.action.id);
+    const always = all.length > 0 && all.filter((e) => e.hitType === 2 && e.directHit).length >= all.length * ALWAYS_SURE_SHARE;
+    const sure = always || landedHits.every((e) => (e.statusIds ?? []).some((id) => SURE_HIT_STATUS_IDS.has(id)));
+    const gain = sure ? critMult * 1.25 : outcome;
+    const altNow = altPer * modNow * gain;
+    const aoeNow = aoeBase * modNow * gain;
     const during = forcedPart(u.startMs - 1, u.startMs + 1, ctx.forced);
     out.push(finding(ctx, {
       kind: "aoe-single", startMs: u.startMs, endMs: landed,
       forced: during.ms > 0, cause: during.ms > 0 ? during.cause : undefined,
       label: `${u.abilityName} on ${targets.size === 1 ? "one target" : "too few targets"}`,
-      lostDamage: alt.value - dealt,
-      basis: `${k(alt.value)} average ${alt.name} − ${k(dealt)} this ${u.abilityName} dealt${ticked > 0 ? ` (${k(ticked)} of it DoT ticks)` : ""}`,
+      lostDamage: altNow - aoeNow,
+      basis: `a ${alt.name} here averages ${k(altNow)} − ${k(aoeNow)} for this ${u.abilityName} at the same buffs` +
+        ` (both with crit and direct hit averaged out; it dealt ${k(dealt)}${ticked > 0 ? `, ${k(ticked)} of it DoT ticks` : ""})`,
       detail: targets.size === 1 ? `${u.abilityName} hit only ${landedHits[0].target ?? "one enemy"}`
         : `${u.abilityName} hit ${targets.size} enemies for less than a ${alt.name}`,
     }));
@@ -1197,9 +1269,8 @@ export const aoeComboOnOneTarget = (
   for (const c of ctx.player.casts) if (c.timestamp < ctx.endMs) count.set(c.abilityId, (count.get(c.abilityId) ?? 0) + 1);
   return aoeOnOneTargetFindings(ctx, pairs.map(([a]) => a), (aoeId) => {
     const used = st.get(aoeId)!.filter((id) => (count.get(id) ?? 0) > 0);
-    const n = used.reduce((a, id) => a + count.get(id)!, 0);
     const name = (used.length ? used : st.get(aoeId)!).map((id) => ctx.game.action(id)?.name ?? "single-target GCD").join(" / ");
-    return { name, value: n > 0 ? used.reduce((a, id) => a + ctx.values.perUse(id) * count.get(id)!, 0) / n : 0 };
+    return { name, ids: used };
   }, (aoeId) => min.get(aoeId), (aoeId) => ticks.get(aoeId));
 };
 

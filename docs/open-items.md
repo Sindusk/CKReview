@@ -185,16 +185,13 @@ and delete them from the header.
   Samples missing: White Mage. The AoE-on-too-few-targets candidates
   were built 2026-10-15 for all eleven jobs (DNC, DRK, WAR, GNB, MNK,
   NIN, SAM, MCH, RPR, BLM, SMN), checked on 19 Red Hot and Deep Blue
-  kills the user picked. Compared against 13 xivanalysis pages
-  (2026-10-15). **Waiting on the user:** the check compares each AoE's
-  damage with the player's pull-average single-target action, so an AoE
-  landing in a burst can pass (two opener Fated Circles on one target,
-  Umbral Flares and Freezes decided by crits). Proposed: judge it
-  buff-neutrally, with the AoE's own per-target average against the
-  alternative's. Also open: no finding when the alternative was never
-  pressed (Grim Swathe with no Blood Stalk); healer AoEs on targets that
-  take reduced damage (Necron's Hands, 0.5×) are priced against a full
-  Glare.
+  kills the user picked, and matched against 16 xivanalysis pages
+  (2026-10-15). The check is buff-neutral since then (user: accuracy
+  first): crit, direct hit and damage multipliers are divided out of both
+  sides, so bursts, crits and damage-reduced targets no longer decide it.
+  Still open: no finding when the single-target alternative was never
+  pressed in the pull (Grim Swathe with no Blood Stalk; no potency table
+  for most jobs to fall back on).
   - [core.md](xiva-audit/core.md): core modules, 3 candidates.
   - [brd.md](xiva-audit/brd.md): Bard, 1 candidate, 4 covered.
   - [dnc.md](xiva-audit/dnc.md): Dancer, 6 candidates (dance step
