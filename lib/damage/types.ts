@@ -252,6 +252,7 @@ export type FindingKind =
   | "pet-cut"           // a pet's set sequence cut short (Living Shadow)
   | "missed-followup"   // an action unlocked by another never pressed (Salt and Darkness)
   | "dance"             // a Dancer's dance finished short, or with wrong step presses
+  | "ninjutsu"          // a Ninja's failed or weak ninjutsu (Rabbit Medium, Hyoton, Kassatsu misspent)
   | "movement";         // idle a mechanic's movement explains (DamageContext.movementWindows)
 
 export type DamageFinding = {

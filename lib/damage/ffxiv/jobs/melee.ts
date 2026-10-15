@@ -187,6 +187,10 @@
 //     Hot and Deep Blue's bosses with the two apart, mgTQJjX2nW6ANkP7 6:51
 //     and jXG76ba43VDLAvYz 4:07 (17-21k); jXG76ba43VDLAvYz 9:16 as Deep
 //     Blue died (24k). Deathfrog not seen on one target.
+//     Ninjutsu mistakes (2026-10-15): Rabbit Medium, Hyoton, a weak Doton,
+//     Kassatsu misspent or lapsed, Raiju Ready dropped; `ninjutsu` below.
+//     Found by searching the lowest Red Hot and Deep Blue Ninja parses;
+//     not yet matched against xivanalysis.
 //   - Reaper: Enshroud (Enshroud.tsx): four Reapings, two Lemure's, one
 //     Sacrificium, one Communio. Arcane Circle, Death's Design, Harvest
 //     Moon, Shroud and Whorl of Death below. Checked against xivanalysis
@@ -204,7 +208,7 @@ import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import type { DamageFinding, JobCheck } from "../../types";
 import { chargesAt, finding, PROC_CONSUME_MS, PROC_EXPIRY_EARLY_MS, type PlayerCheckContext } from "../../checks";
 import { forcedPart, inWindows, mergeWindows } from "../../timeline";
-import { aoeComboOnOneTarget, burstWindowFindings, castHits, clock, dotFindings, gaugeFindings, gaugeTrack, k, offCooldownIn, s, statusWindows, uptimeFindings, type ExpectedAction, type GaugeEvent, type GaugeSpec } from "./shared";
+import { aoeComboOnOneTarget, baseValue, burstWindowFindings, castHits, clock, critMultOf, dotFindings, gaugeFindings, gaugeTrack, k, offCooldownIn, s, statusWindows, uptimeFindings, type ExpectedAction, type GaugeEvent, type GaugeSpec } from "./shared";
 import { comboLanded } from "./gnb";
 
 const id = (key: string) => A[key].id;
@@ -293,8 +297,11 @@ export const VPR_PROC_STATUS_IDS = new Set(VENOM_PROCS.map(([st]) => S[st]?.id).
 /** Melee statuses the generic proc check skips (game.ts): the venoms (their
  *  own check) and Dragoon's Enhanced Piercing Talon, a ranged insurance the
  *  Dragoon banks for a bad outcome, never a loss when it expires (user,
- *  2026-10-13; yBKPqGwHparm7Tk4 fight 5 flagged one at 1:50). */
-export const MELEE_PROC_SKIP_IDS = new Set([...VPR_PROC_STATUS_IDS, S.ENHANCED_PIERCING_TALON.id]);
+ *  2026-10-13; yBKPqGwHparm7Tk4 fight 5 flagged one at 1:50), and Ninja's
+ *  Kassatsu and Raiju Ready (the ninjutsu check values them: a lapsed
+ *  Kassatsu read as a whole Hyosho, or as a Raiton for a Ninja who always
+ *  spent it on Raiton). */
+export const MELEE_PROC_SKIP_IDS = new Set([...VPR_PROC_STATUS_IDS, S.ENHANCED_PIERCING_TALON.id, S.KASSATSU.id, S.RAIJU_READY.id]);
 
 const venoms: JobCheck = (ctx) => {
   const out: DamageFinding[] = [];
@@ -1007,5 +1014,160 @@ export const DRG_CHECKS: JobCheck[] = [uptime("POWER_SURGE", 0.1, "Power Surge i
 // 7.3 two targets out-damage them, so only one target is judged (as
 // Samurai's Guren).
 const ninAoe = aoeComboOnOneTarget([[id("HELLFROG_MEDIUM"), id("BHAVACAKRA")], [id("DEATHFROG_MEDIUM"), id("ZESHO_MEPPO")]]);
-export const NIN_CHECKS: JobCheck[] = [kunaisBane, ninki, kazematoi, ninAoe];
+// Ninjutsu mistakes (xivanalysis Ninjutsu.tsx, Kassatsu.tsx, Raiju.tsx),
+// checked on Red Hot and Deep Blue kills from a search of the lowest Ninja
+// parses (2026-10-15). Values come from the player's own averages: a
+// Raiton is worth its hit plus the Raiju Ready it grants (a Raiju over the
+// combo GCD it replaces).
+// - Rabbit Medium (a mudra slipped): the ninjutsu and its mudra charge
+//   lost, a Raiton's worth (cZ42C1y3JRNGXWLH 4:24, Ten Ten).
+// - Hyoton, or Doton dealing less than a Raiton (a Doton left early ticks
+//   4 times: zMJdajRYyNF3LVkr 2:34): a Raiton less what it dealt.
+// - Kassatsu, read from its buff: the ninjutsu cast as it was removed
+//   spent it. Anything but Hyosho Ranryu / Goka Mekkyaku costs a Hyosho
+//   over a Raiton (the mudra charge Kassatsu saved goes to a Raiton later;
+//   7zwpcLxk2Fd1h6Vr spent 7 of 9 on Raiton). Huton / Suiton included:
+//   xivanalysis allows them only for Kunai's Bane on 3+ targets. Rabbit
+//   Medium under Kassatsu loses the whole Hyosho; Kassatsu expiring unused
+//   (cZ42C1y3JRNGXWLH 4:20) a Hyosho over the GCD used instead.
+// - Raiju Ready dropped: a combo GCD with stacks held removes them all
+//   (cZ42C1y3JRNGXWLH 2:28, Aeolian Edge), each a Raiju over a combo GCD.
+// Not built: Ten Chi Jin's Doton / Hyoton (its own sequence).
+const NINJUTSU_NAMES = new Map(ids("FUMA_SHURIKEN", "KATON", "RAITON", "HYOTON", "HUTON", "DOTON", "SUITON",
+  "RABBIT_MEDIUM", "GOKA_MEKKYAKU", "HYOSHO_RANRYU").map((x) => [x, A[Object.keys(A).find((key) => A[key].id === x)!].name]));
+const KASSATSU_GOOD = new Set(ids("HYOSHO_RANRYU", "GOKA_MEKKYAKU"));
+const RAIJU_IDS = new Set(ids("FORKED_RAIJU", "FLEETING_RAIJU"));
+const RAITON_IDS = new Set(ids("RAITON", "RAITON_TCJ"));
+const RAIJU_BREAKERS = new Set(ids("SPINNING_EDGE", "GUST_SLASH", "AEOLIAN_EDGE", "ARMOR_CRUSH", "DEATH_BLOSSOM", "HAKKE_MUJINSATSU"));
+const KASSATSU_SPEND_MS = 150;
+const DEATH_STRIP_MS = 3_000;
+// Hyosho Ranryu over Raiton, buff-neutral first hits (Kassatsu's +30% is
+// in the base, not the log's multiplier): 2.20-2.36 on 16 Ninja pulls on
+// 7.4-7.5 (median 2.28); The Omega Protocol's older-patch log 2.62. Used
+// only for a Ninja who never cast Hyosho in the pull.
+const HYOSHO_PER_RAITON = 2.28;
+const NINJUTSU_HIT_MS = 2_000;
+const DOTON_SPAN_MS = 19_000;
+const ninjutsu: JobCheck = (ctx) => {
+  const out: DamageFinding[] = [];
+  const me = ctx.player;
+  const casts = me.casts.filter((c) => c.timestamp < ctx.endMs).sort((a, b) => a.timestamp - b.timestamp);
+  const count = new Map<number, number>();
+  for (const c of casts) count.set(c.abilityId, (count.get(c.abilityId) ?? 0) + 1);
+  const avgOf = (list: number[]) => {
+    const n = list.reduce((a, x) => a + (count.get(x) ?? 0), 0);
+    return n > 0 ? list.reduce((a, x) => a + ctx.values.perUse(x) * (count.get(x) ?? 0), 0) / n : 0;
+  };
+  const combo = avgOf([...RAIJU_BREAKERS].filter((x) => x !== id("DEATH_BLOSSOM") && x !== id("HAKKE_MUJINSATSU")));
+  const raijuOver = Math.max(0, avgOf([...RAIJU_IDS]) - combo);
+  const raitonHit = ctx.values.perUse(id("RAITON"));
+  const raiton = raitonHit + raijuOver;
+  const ownHyosho = ctx.values.perUse(id("HYOSHO_RANRYU"));
+  const hyosho = ownHyosho > 0 ? ownHyosho : raitonHit * HYOSHO_PER_RAITON;
+  const hyoshoBasis = ownHyosho > 0 ? `${k(hyosho)} average Hyosho Ranryu`
+    : `${k(hyosho)} Hyosho Ranryu (none in the pull: ${HYOSHO_PER_RAITON} × her average Raiton)`;
+  // A cast's buff-neutral base, priced at her average Raiton's conditions:
+  // a Hyoton in the opener burst isn't judged by the burst.
+  const critMult = critMultOf(ctx);
+  const raitonCasts = casts.filter((c) => c.abilityId === id("RAITON"));
+  const raitonBase = raitonCasts.length ? me.damageDone.filter((e) => e.abilityId === id("RAITON") && !e.pet && e.timestamp < ctx.endMs)
+    .reduce((a, e) => a + baseValue(e, critMult), 0) / raitonCasts.length : 0;
+  const atRaitonTerms = (b: number) => (raitonBase > 0 ? b * raitonHit / raitonBase : b);
+  const at = (t: number) => clock(t);
+  // The log strips buffs up to ~2s before the death event (djChYqt4b7K8aAfP:
+  // Kassatsu and Arm's Length removed at 7:32.07, Steam Burst death at 7:34):
+  // a buff ending just before a death went with the death.
+  const diedAfter = (t: number) => ctx.dead.some((d) => d.startMs >= t && d.startMs - t <= DEATH_STRIP_MS);
+  const push = (t: number, f: { kind: "ninjutsu" | "proc-lost"; label: string; lost: number; basis: string; detail: string }) => {
+    if (f.lost <= 0) return;
+    const during = forcedPart(t - 1, t + 1, ctx.forced);
+    const died = f.kind === "proc-lost" && diedAfter(t);
+    const forced = during.ms > 0 || died;
+    out.push(finding(ctx, {
+      kind: f.kind, startMs: t, endMs: t, forced, cause: during.ms > 0 ? during.cause : died ? "lost to the death that followed" : undefined, inference: true,
+      label: f.label, lostDamage: f.lost, basis: f.basis, detail: f.detail,
+    }));
+  };
+  const dealt = (c: { abilityId: number; timestamp: number }, ms = NINJUTSU_HIT_MS, name?: string) =>
+    atRaitonTerms(me.damageDone.filter((e) => (name ? e.abilityName === name : e.abilityId === c.abilityId) && !e.pet &&
+      e.timestamp >= c.timestamp && e.timestamp < c.timestamp + ms).reduce((a, e) => a + baseValue(e, critMult), 0));
+  const raitonBasis = `${k(raiton)}: her average Raiton plus the Raiju Ready it grants (a Raiju over a combo GCD)`;
+
+  // Kassatsu: what each removal was spent on.
+  const spentBy = new Map<number, number>();
+  for (const b of (me.buffs ?? []).filter((x) => x.abilityId === S.KASSATSU.id && x.buffStatus === "removed" && x.timestamp < ctx.endMs)) {
+    const spend = casts.find((c) => NINJUTSU_NAMES.has(c.abilityId) && Math.abs(c.timestamp - b.timestamp) <= KASSATSU_SPEND_MS);
+    if (spend) { spentBy.set(spend.timestamp, b.timestamp); continue; }
+    if (hyosho > 0) push(b.timestamp, {
+      kind: "proc-lost", label: "Kassatsu expired unused", lost: hyosho - combo,
+      basis: `${hyoshoBasis} − ${k(combo)} average combo GCD pressed instead`,
+      detail: `Kassatsu ran out at ${at(b.timestamp)} without a ninjutsu`,
+    });
+  }
+
+  // Raiju Ready running out on its own (no Raiju or combo GCD beside the
+  // removal): the generic proc check skips it now, so it's counted here.
+  const raijuEnds = (me.buffs ?? []).filter((b) => b.abilityId === S.RAIJU_READY.id && b.buffStatus === "removed" && b.timestamp < ctx.endMs &&
+    !casts.some((c) => (RAIJU_IDS.has(c.abilityId) || RAIJU_BREAKERS.has(c.abilityId)) && Math.abs(c.timestamp - b.timestamp) <= PROC_CONSUME_MS))
+    .map((b) => b.timestamp);
+  const events = [...casts.map((c) => ({ t: c.timestamp, c })), ...raijuEnds.map((t) => ({ t, c: undefined }))].sort((a, b) => a.t - b.t);
+
+  let raiju = 0;
+  for (const { t: when, c } of events) {
+    if (!c) {
+      if (raiju > 0 && raijuOver > 0) push(when, {
+        kind: "proc-lost", label: `Raiju Ready expired${raiju > 1 ? ` (${raiju})` : ""}`, lost: raiju * raijuOver,
+        basis: `${raiju} × (${k(avgOf([...RAIJU_IDS]))} average Raiju − ${k(combo)} average combo GCD)`,
+        detail: `${raiju} Raiju Ready ran out at ${at(when)}`,
+      });
+      raiju = 0;
+      continue;
+    }
+    const name = NINJUTSU_NAMES.get(c.abilityId);
+    const underKassatsu = spentBy.has(c.timestamp);
+    if (name && underKassatsu && !KASSATSU_GOOD.has(c.abilityId) && hyosho > 0) {
+      const rabbit = c.abilityId === id("RABBIT_MEDIUM");
+      push(c.timestamp, {
+        kind: "ninjutsu", label: `${name} under Kassatsu`,
+        lost: rabbit ? hyosho : hyosho - raiton,
+        basis: rabbit ? `${hyoshoBasis}: the Kassatsu and its GCD gave nothing`
+          : `${hyoshoBasis} − ${raitonBasis} (the mudra charge Kassatsu saved)`,
+        detail: `Kassatsu spent on ${name} at ${at(c.timestamp)}`,
+      });
+    } else if (c.abilityId === id("RABBIT_MEDIUM") && raiton > 0) {
+      push(c.timestamp, {
+        kind: "ninjutsu", label: "Rabbit Medium", lost: raiton, basis: `${raitonBasis}: the ninjutsu and its mudra charge lost`,
+        detail: `a failed ninjutsu at ${at(c.timestamp)}`,
+      });
+    } else if (c.abilityId === id("HYOTON") && raiton > 0) {
+      const d = dealt(c);
+      push(c.timestamp, {
+        kind: "ninjutsu", label: "Hyoton", lost: raiton - d,
+        basis: `${raitonBasis} − ${k(d)} for this Hyoton at the same buffs (crit and direct hit averaged out)`,
+        detail: `Hyoton at ${at(c.timestamp)}, the weakest ninjutsu`,
+      });
+    } else if (c.abilityId === id("DOTON") && raiton > 0) {
+      const d = dealt(c, DOTON_SPAN_MS, "Doton");
+      push(c.timestamp, {
+        kind: "ninjutsu", label: "Doton", lost: raiton - d,
+        basis: `${raitonBasis} − ${k(d)} for this Doton's ticks at the same buffs`,
+        detail: `Doton at ${at(c.timestamp)} dealt less than a Raiton`,
+      });
+    }
+    // Raiju Ready: Raiton grants a stack (up to 3), a Raiju spends one, a
+    // combo GCD drops what's left.
+    if (RAITON_IDS.has(c.abilityId)) raiju = Math.min(3, raiju + 1);
+    else if (RAIJU_IDS.has(c.abilityId)) raiju = Math.max(0, raiju - 1);
+    else if (RAIJU_BREAKERS.has(c.abilityId) && raiju > 0) {
+      if (raijuOver > 0) push(c.timestamp, {
+        kind: "proc-lost", label: `Raiju Ready dropped${raiju > 1 ? ` (${raiju})` : ""}`, lost: raiju * raijuOver,
+        basis: `${raiju} × (${k(avgOf([...RAIJU_IDS]))} average Raiju − ${k(combo)} average combo GCD)`,
+        detail: `${c.abilityName} at ${at(c.timestamp)} with ${raiju} Raiju Ready held`,
+      });
+      raiju = 0;
+    }
+  }
+  return out;
+};
+export const NIN_CHECKS: JobCheck[] = [kunaisBane, ninki, kazematoi, ninAoe, ninjutsu];
 export const RPR_CHECKS: JobCheck[] = [enshroud, arcaneCircle, deathsDesign, harvestMoon, shroud, rprAoe];
