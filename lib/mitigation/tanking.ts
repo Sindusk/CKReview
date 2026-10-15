@@ -433,24 +433,35 @@ function savedBy(pull: Pull, entry: { durationMs: number; statuses: { id: number
 /** A tank-job cooldown cast that lands on `tank`: their own, or the co-tank's on them. */
 export type TankCast = {
   key: string; name: string; by: string; atMs: number; durationMs: number;
-  kind: "invuln" | "short" | "cooldown";
+  // "healer": a healer's single-target cooldown on this tank (Aquaveil,
+  // Exaltation, Intersection, ...), shown so the tanks can plan around it
+  // (user, 2026-10-15). The optimizer counts it where logged, never moves it.
+  kind: "invuln" | "short" | "cooldown" | "healer";
 };
 
 const TANK_JOB_NAMES = ["Paladin", "Warrior", "Dark Knight", "Gunbreaker"];
 
-/** Every tank cooldown cast on `tank` in the pull (party mitigation left out), by time. */
+/**
+ * Every tank cooldown cast on `tank` in the pull, plus healers' targeted
+ * cooldowns on them (party mitigation, GCD shields and cards left out),
+ * by time.
+ */
 export function tankCasts(pull: Pull, game: MitigationGame, tank: string): TankCast[] {
   const out: TankCast[] = [];
-  for (const p of pull.players.filter((x) => x.role === "Tank")) {
+  for (const p of pull.players.filter((x) => x.role === "Tank" || x.role === "Healer")) {
+    const healer = p.role === "Healer";
     for (const c of p.casts) {
       const entry = game.actionIndex.get(c.abilityId);
       if (!entry || entry.reach === "party" || entry.kind === "limitBreak") continue;
-      if (!entry.jobs.some((j) => TANK_JOB_NAMES.includes(j))) continue;
+      if (healer) {
+        if (entry.reach !== "target" || entry.cooldownMs === 0 || entry.inSheet === false) continue;
+      } else if (!entry.jobs.some((j) => TANK_JOB_NAMES.includes(j))) continue;
       const target = entry.reach === "self" ? p.name : (c.target || p.name);
       if (target !== tank) continue;
       out.push({
         key: entry.key, name: entry.name, by: p.name, atMs: c.timestamp, durationMs: entry.durationMs,
-        kind: entry.kind === "invuln" ? "invuln" : SHORT_COOLDOWNS.includes(entry.key) || entry.cooldownMs < 30_000 ? "short" : "cooldown",
+        kind: healer ? "healer"
+          : entry.kind === "invuln" ? "invuln" : SHORT_COOLDOWNS.includes(entry.key) || entry.cooldownMs < 30_000 ? "short" : "cooldown",
       });
     }
   }

@@ -11,14 +11,22 @@
 //   - Left: both tanks on one fight clock, phases named along the top. The
 //     tank holding the boss most is above the axis, the other below.
 //       - Bars: damage taken per bin, coloured autos / busters / raidwides
-//         and mechanics / DoTs. The bin widens with the pull (about
-//         TARGET_BINS across it, at least 2s); a bin of 100% max HP fills
-//         its half, and a taller one is clipped with a white cap.
+//         and mechanics / DoTs, labelled "damage taken" beside each lane
+//         (a first-time user read them as HP left, 2026-10-15). The bin
+//         widens with the visible span (about TARGET_BINS across it, at
+//         least 1s); a bin of 100% max HP fills its half (the dashed
+//         line), and a taller one is clipped with a white cap.
+//       - Zoom (user, 2026-10-15): drag across the chart, Ctrl/⌘ + wheel
+//         at the cursor, Shift + wheel to pan, double-click to reset.
+//       - Hover info is the app's tooltip at the cursor, shown at once
+//         (native <title> waits about a second).
 //       - Cooldown rows outside the bars (the MT's above, the OT's below):
 //         one per cooldown, named once in the left margin, grey blocks
 //         (invulns blue), the co-tank's casts on this tank as their own
-//         "X ← caster" rows, short cooldowns as dots. Job colour is only on
-//         the tank's name.
+//         "X ← caster" rows, then the healers' cooldowns on this tank
+//         (Aquaveil, Exaltation, Intersection, ...) as green "X ← healer"
+//         rows (user, 2026-10-15: tanks plan around them; never moved),
+//         short cooldowns as dots. Job colour is only on the tank's name.
 //       - Busters: a triangle on the axis coloured by margin; only those
 //         under TANK_MARGIN_OVER get a name, staggered when close.
 //       - Proposed changes: a dashed box in the cooldown's row.
@@ -38,7 +46,9 @@
 // 2026-10-11): a picked tank sees only their lane, chips and cards; "Both",
 // everything.
 
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { Panel } from "./ui/Panel";
 import type { Pull } from "@/types/Pull";
 import { FFXIV_MITIGATION } from "@/lib/mitigation/ffxiv-catalog";
 import { phaseSpans } from "@/lib/mitigation/analyze";
@@ -53,6 +63,7 @@ import type { TankChange, TankPlanGroup, TankingPlan } from "@/lib/mitigation/ta
 import { getClassColor } from "@/lib/player-display";
 import { VERDICT_STYLE, fmtTime } from "./MitigationTimeline";
 import { SkillTip } from "./ui/MitigationGlyphs";
+import { InfoTip } from "./ui/InfoTip";
 
 const firstName = (player: string) => player.split(" ")[0];
 const pct = (x: number) => `${Math.round(x * 100)}%`;
@@ -62,6 +73,7 @@ const KIND_COLOR = { auto: "#b98632", buster: "#ef6b6b", other: "#53a9ff", tick:
 const KIND_LABEL = { auto: "autos", buster: "busters", other: "raidwides and mechanics", tick: "DoTs" } as const;
 const STACK = ["auto", "tick", "other", "buster"] as const;
 const COOLDOWN_COLOR = "#9aa0a8";
+const HEALER_COLOR = "#7fd1a8";
 const MOVE_COLOR = "#2bb38a";
 const NOW_COLOR = "#8b8f98";
 const INVULN_COLOR = "#53a9ff";
@@ -71,7 +83,7 @@ const INFO = [
   "Estimated from the log: margins, damage rolls and snapshot timing can be off. Confirm on VOD before relying on a change.",
   "A buster's margin is the tank's HP left, starting from full, after the buster and everything they take in the next 10s, with no healing. Under 15%: under; 15-30%: good; over 30%: over.",
   "All pulls: the clock shows the window pull that got furthest; the chips and the changes cover the whole window, at each anchor's typical time.",
-  "A full-height bar is 100% of max HP in that bar's span; a white cap marks one clipped above that.",
+  "The bars are damage TAKEN, not HP left: each bar is what the tank took in its few seconds, as a share of max HP. A full-height bar is 100% of max HP taken in that span; a white cap marks one clipped above that.",
   `Make a card's changes together, at most ${PLAN_MAX_CHANGES} at a time. Short cooldowns (Holy Sheltron, Heart of Corundum, The Blackest Night, Bloodwhetting) are expected on cooldown and never moved.`,
 ].join("\n\n");
 
@@ -91,13 +103,13 @@ const PHASE_H = 16;
 const BAR_H = 70;
 const ROW_H = 13;
 const TARGET_BINS = 200;
-const BIN_STEPS = [2, 3, 4, 5, 6, 8, 10, 15, 20, 30].map((s) => s * 1000);
+const BIN_STEPS = [1, 2, 3, 4, 5, 6, 8, 10, 15, 20, 30].map((s) => s * 1000);
 // Cooldown rows, top to bottom: invulns, the big ones, then the rest.
 const ROW_ORDER = ["hallowed-ground", "living-dead", "holmgang", "superbolide", "guardian", "shadowed-vigil", "damnation",
   "great-nebula", "rampart", "bulwark", "dark-mind", "camouflage", "oblation"];
 
 type Lane = { player: string; job: string; up: boolean };
-type Row = { label: string; key: string; casts: TankCast[]; dots?: boolean; co?: boolean };
+type Row = { label: string; key: string; casts: TankCast[]; dots?: boolean; co?: boolean; healer?: boolean };
 
 /** Where a change puts a cooldown, on whose lane, and the use it replaces. */
 function placement(c: TankChange) {
@@ -122,10 +134,18 @@ function rowsFor(pull: Pull, tank: string, changes: TankChange[]): Row[] {
     const name = own.find((c) => c.key === key)?.name ?? changes.find((c) => c.key === key)!.name;
     rows.push({ label: name, key, casts: own.filter((c) => c.key === key) });
   }
-  const co = casts.filter((c) => c.kind !== "short" && c.by !== tank);
+  const co = casts.filter((c) => c.kind !== "short" && c.kind !== "healer" && c.by !== tank);
   for (const key of [...new Set(co.map((c) => c.key))]) {
     const xs = co.filter((c) => c.key === key);
     rows.push({ label: `${xs[0].name} ← ${firstName(xs[0].by)}`, key, casts: xs, co: true });
+  }
+  // Healers' cooldowns on this tank, one row per healer and cooldown.
+  const healer = casts.filter((c) => c.kind === "healer");
+  for (const by of [...new Set(healer.map((c) => c.by))]) {
+    for (const key of [...new Set(healer.filter((c) => c.by === by).map((c) => c.key))]) {
+      const xs = healer.filter((c) => c.by === by && c.key === key);
+      rows.push({ label: `${xs[0].name} ← ${firstName(by)}`, key, casts: xs, co: true, healer: true });
+    }
   }
   for (const c of changes.filter((c) => placement(c).on === tank && c.player !== tank)) {
     if (!rows.some((r) => r.co && r.key === c.key)) rows.push({ label: `${c.name} ← ${firstName(c.player)}`, key: c.key, casts: [], co: true });
@@ -140,13 +160,96 @@ function rowsFor(pull: Pull, tank: string, changes: TankChange[]): Row[] {
   return rows;
 }
 
+/** The app's tooltip frame (components/ui/InfoTip.tsx), at the cursor, shown at once. */
+function CursorTip({ tip }: { tip: { x: number; y: number; text: string } | null }) {
+  if (!tip || typeof document === "undefined") return null;
+  const left = tip.x + 14 + 320 > window.innerWidth ? Math.max(4, tip.x - 14 - 320) : tip.x + 14;
+  return createPortal(
+    <div role="tooltip" style={{ position: "fixed", left, top: tip.y + 14, zIndex: 2000, maxWidth: 320, pointerEvents: "none" }}>
+      <Panel diamond={false} bodyStyle={{ padding: "6px 10px", fontSize: "12px", lineHeight: 1.5, color: "var(--ck-text)" }}>
+        <div style={{ whiteSpace: "pre-line" }}>{tip.text}</div>
+      </Panel>
+    </div>,
+    document.body,
+  );
+}
+
+const ZOOM_MIN_MS = 10_000;
+const TICK_STEPS = [5, 10, 15, 30, 60, 120].map((s) => s * 1000);
+
 function Clock({ pull, tanking, lanes, changes, hover }: {
   pull: Pull; tanking: PullTanking; lanes: Lane[]; changes: TankChange[]; hover: Set<TankChange>;
 }) {
   const dur = pull.fightDuration;
-  const x = (ms: number) => LEFT + (Math.min(Math.max(ms, 0), dur) / dur) * (W - LEFT - RIGHT);
-  const bin = BIN_STEPS.find((s) => dur / s <= TARGET_BINS) ?? BIN_STEPS[BIN_STEPS.length - 1];
-  const binW = Math.max(1, x(bin) - x(0) - 0.6);
+  // Zoom: the visible span of the fight clock. Drag across the chart to
+  // zoom to that span, Ctrl/⌘ + wheel to zoom at the cursor, Shift + wheel
+  // to pan, double-click or Reset to see the whole pull again.
+  const [view, setView] = useState<[number, number]>([0, dur]);
+  const [v0, v1] = view[1] > view[0] ? view : [0, dur];
+  const span = v1 - v0;
+  const zoomed = v0 > 0 || v1 < dur;
+  const [brush, setBrush] = useState<{ from: number; to: number } | null>(null);
+  const [tip, setTip] = useState<{ x: number; y: number; text: string } | null>(null);
+  const svgRef = useRef<SVGSVGElement>(null);
+  const plotW = W - LEFT - RIGHT;
+  const x = (ms: number) => LEFT + ((Math.min(Math.max(ms, v0), v1) - v0) / span) * plotW;
+  const visible = (a: number, b = a) => b >= v0 && a <= v1;
+  const bin = BIN_STEPS.find((s) => span / s <= TARGET_BINS) ?? BIN_STEPS[BIN_STEPS.length - 1];
+  const binW = Math.max(1, (bin / span) * plotW - 0.6);
+  const tipProps = (text: string) => ({
+    onMouseEnter: (e: ReactMouseEvent) => setTip({ x: e.clientX, y: e.clientY, text }),
+    onMouseMove: (e: ReactMouseEvent) => setTip({ x: e.clientX, y: e.clientY, text }),
+    onMouseLeave: () => setTip(null),
+  });
+
+  // Fight time under a client x (the svg is scaled to its box).
+  const msAt = (clientX: number) => {
+    const r = svgRef.current?.getBoundingClientRect();
+    if (!r) return v0;
+    const sx = ((clientX - r.left) / r.width) * W;
+    return v0 + ((Math.min(Math.max(sx, LEFT), W - RIGHT) - LEFT) / plotW) * span;
+  };
+  const clampView = (a: number, b: number): [number, number] => {
+    let s = Math.max(ZOOM_MIN_MS, Math.min(dur, b - a));
+    if (s >= dur) return [0, dur];
+    let start = Math.max(0, Math.min(dur - s, a));
+    if (start + s > dur) { start = dur - s; s = dur - start; }
+    return [start, start + s];
+  };
+  const zoomAt = (center: number, factor: number) => {
+    const s = span * factor;
+    const f = (center - v0) / span;
+    setView(clampView(center - f * s, center - f * s + s));
+  };
+
+  // Ctrl/⌘ + wheel zooms, Shift + wheel pans; a plain wheel still scrolls
+  // the dialog. Non-passive, so the page doesn't zoom or scroll as well.
+  const viewRef = useRef({ v0, v1, span });
+  viewRef.current = { v0, v1, span };
+  useEffect(() => {
+    const el = svgRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!(e.ctrlKey || e.metaKey || e.shiftKey)) return;
+      e.preventDefault();
+      const { v0: a, span: s } = viewRef.current;
+      const delta = e.deltaY || e.deltaX;
+      if (e.shiftKey && !(e.ctrlKey || e.metaKey)) {
+        setView(clampView(a + Math.sign(delta) * s * 0.15, a + Math.sign(delta) * s * 0.15 + s));
+        return;
+      }
+      const r = el.getBoundingClientRect();
+      const sx = ((e.clientX - r.left) / r.width) * W;
+      const center = a + ((Math.min(Math.max(sx, LEFT), W - RIGHT) - LEFT) / plotW) * s;
+      const ns = s * (delta > 0 ? 1.25 : 0.8);
+      const f = (center - a) / s;
+      setView(clampView(center - f * ns, center - f * ns + ns));
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  // clampView reads only `dur`.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dur]);
   const upper = lanes.find((l) => l.up);
   const lower = lanes.find((l) => !l.up);
   const upperRows = upper ? rowsFor(pull, upper.player, changes) : [];
@@ -166,10 +269,11 @@ function Clock({ pull, tanking, lanes, changes, hover }: {
     const last = phases[phases.length - 1];
     if (last && last.name === seg.name) last.end = seg.endMs; else phases.push({ name: seg.name, start: seg.startMs, end: seg.endMs });
   }
-  const tickMs = dur > 10 * 60_000 ? 60_000 : 30_000;
-  const labelEvery = dur > 10 * 60_000 ? 2 : dur > 4 * 60_000 ? 2 : 1;
+  // About 8-12 ticks across the visible span, every one labelled.
+  const tickMs = TICK_STEPS.find((s) => span / s <= 12) ?? TICK_STEPS[TICK_STEPS.length - 1];
+  const labelEvery = 1;
   const ticks: number[] = [];
-  for (let s = 0; s <= dur; s += tickMs) ticks.push(s);
+  for (let s = Math.ceil(v0 / tickMs) * tickMs; s <= v1; s += tickMs) ticks.push(s);
 
   const lane = (l: Lane, rows: Row[], base: number, rowsY: number) => {
     const color = getClassColor("ffxiv", l.job);
@@ -185,12 +289,25 @@ function Clock({ pull, tanking, lanes, changes, hover }: {
       <g key={l.player}>
         <text x={0} y={l.up ? base - 30 : base + 26} style={{ fontSize: 14, fontWeight: 600, fill: color }}>{firstName(l.player)}</text>
         <text x={0} y={l.up ? base - 15 : base + 41} style={text}>{l.up ? "MT" : "OT"} · {l.job}</text>
-        {[...bins].map(([i, b]) => {
+        {/* What the bars are: damage taken, growing away from the axis. */}
+        <text x={LEFT - 6} y={l.up ? base - 3 : base + 11} textAnchor="end" style={{ ...text, fontSize: 9.5 }}>
+          {l.up ? "↑" : "↓"} damage taken
+        </text>
+        <text x={LEFT - 6} y={l.up ? base - BAR_H + 8 : base + BAR_H - 2} textAnchor="end" style={{ ...text, fontSize: 9.5 }}>
+          100% HP / {bin / 1000}s
+        </text>
+        <line x1={LEFT} x2={W - RIGHT} y1={l.up ? base - BAR_H : base + BAR_H} y2={l.up ? base - BAR_H : base + BAR_H}
+          stroke="var(--ck-line)" strokeDasharray="2 4" />
+        {[...bins].filter(([i]) => visible(i * bin, (i + 1) * bin)).map(([i, b]) => {
           const total = STACK.reduce((s, k) => s + b[k], 0);
           let off = 0;
+          const tipText = `${firstName(l.player)} took ${pct(total)} of max HP, ${fmtTime(i * bin)}–${fmtTime((i + 1) * bin)}\n` +
+            STACK.filter((k) => b[k] > 0).map((k) => `${KIND_LABEL[k]} ${pct(b[k])}`).join(", ") +
+            "\nDamage taken in this span, not HP left";
           return (
-            <g key={i}>
-              <title>{`${firstName(l.player)} ${fmtTime(i * bin)}–${fmtTime((i + 1) * bin)}: ${STACK.filter((k) => b[k] > 0).map((k) => `${KIND_LABEL[k]} ${pct(b[k])}`).join(", ")} of max HP`}</title>
+            <g key={i} {...tipProps(tipText)}>
+              {/* Full height so a thin bar is easy to hover. */}
+              <rect x={x(i * bin)} y={l.up ? base - BAR_H : base} width={Math.max(2, binW)} height={BAR_H} fill="transparent" />
               {STACK.filter((k) => b[k] > 0).map((k) => {
                 if (off >= BAR_H) return null;
                 const h = Math.min(BAR_H - off, b[k] * BAR_H);
@@ -206,24 +323,24 @@ function Clock({ pull, tanking, lanes, changes, hover }: {
           const y = rowsY + k * ROW_H;
           return (
             <g key={`${r.label}${k}`}>
-              <text x={LEFT - 6} y={y + 9} textAnchor="end" style={{ ...text, fill: r.co ? "var(--ck-text-3)" : "var(--ck-text-2)" }}>{r.label}</text>
+              <text x={LEFT - 6} y={y + 9} textAnchor="end" style={{ ...text, fill: r.healer ? HEALER_COLOR : r.co ? "var(--ck-text-3)" : "var(--ck-text-2)" }}>{r.label}</text>
               <line x1={LEFT} x2={W - RIGHT} y1={y + 11.5} y2={y + 11.5} stroke="var(--ck-line)" />
-              {r.casts.map((c, i) => r.dots ? (
-                <circle key={i} cx={x(c.atMs)} cy={y + 6} r={2.2} fill={COOLDOWN_COLOR} opacity={0.8}>
-                  <title>{`${c.name}${r.co ? ` (${firstName(c.by)})` : ""} ${fmtTime(c.atMs)}`}</title>
-                </circle>
+              {r.casts.filter((c) => visible(c.atMs, c.atMs + (r.dots ? 0 : c.durationMs))).map((c, i) => r.dots ? (
+                <circle key={i} cx={x(c.atMs)} cy={y + 6} r={2.6} fill={COOLDOWN_COLOR} opacity={0.8}
+                  {...tipProps(`${c.name}${r.co ? ` (${firstName(c.by)})` : ""} ${fmtTime(c.atMs)}`)} />
               ) : (
                 <rect key={i} x={x(c.atMs)} y={y + 2} width={Math.max(2, x(c.atMs + c.durationMs) - x(c.atMs))} height={8} rx={1}
-                  fill={c.kind === "invuln" ? INVULN_COLOR : COOLDOWN_COLOR} opacity={c.kind === "invuln" ? 0.9 : 0.55}>
-                  <title>{`${c.name}${r.co ? ` (${firstName(c.by)})` : ""} ${fmtTime(c.atMs)}–${fmtTime(c.atMs + c.durationMs)}`}</title>
-                </rect>
+                  fill={c.kind === "invuln" ? INVULN_COLOR : c.kind === "healer" ? HEALER_COLOR : COOLDOWN_COLOR}
+                  opacity={c.kind === "invuln" ? 0.9 : c.kind === "healer" ? 0.75 : 0.55}
+                  {...tipProps(`${c.name}${r.co ? ` from ${firstName(c.by)}` : ""} ${fmtTime(c.atMs)}–${fmtTime(c.atMs + c.durationMs)}` +
+                    (c.kind === "healer" ? "\nA healer's cooldown on this tank: plan around it" : ""))} />
               ))}
               {!r.dots && changes.filter((c) => c.key === r.key && placement(c).on === l.player && (c.player === l.player) !== !!r.co).map((c, i) => {
                 const p = placement(c);
                 const lit = hover.has(c);
+                if (!visible(p.atMs, p.atMs + p.durationMs) && !(lit && p.fromMs !== undefined && visible(p.fromMs, p.fromMs + p.durationMs))) return null;
                 return (
-                  <g key={`p${i}`}>
-                    <title>{`${firstName(c.player)}${c.receiver ? ` → ${firstName(c.receiver)}` : ""}: ${c.name} ${c.kind === "add" ? "extra use" : "use here"} at ${fmtTime(p.atMs)}`}</title>
+                  <g key={`p${i}`} {...tipProps(`${firstName(c.player)}${c.receiver ? ` → ${firstName(c.receiver)}` : ""}: ${c.name} ${c.kind === "add" ? "extra use" : "use here"} at ${fmtTime(p.atMs)}`)}>
                     <rect x={x(p.atMs)} y={y + 0.5} width={x(p.atMs + p.durationMs) - x(p.atMs)} height={11} rx={1}
                       fill={lit ? MOVE_COLOR : "none"} fillOpacity={0.35} stroke={MOVE_COLOR} strokeWidth={1.5} strokeDasharray="3 2" />
                     {lit && p.fromMs !== undefined && (
@@ -245,12 +362,35 @@ function Clock({ pull, tanking, lanes, changes, hover }: {
   let level = 0;
   const shownBusters = tanking.busters.filter((b) => b.tanks.some((t) => lanes.some((l) => l.player === t.player)));
 
+  const zoomButton = (label: string, title: string, onClick: () => void, disabled = false) => (
+    <button className="ck-btn ck-btn--xs" title={title} onClick={onClick} disabled={disabled} style={{ minWidth: 22 }}>{label}</button>
+  );
+
   return (
-    <svg viewBox={`0 0 ${W} ${height}`} width="100%" style={{ display: "block", minWidth: 760 }}>
-      {phases.map((p, i) => (
-        <g key={i}>
+    <div>
+    <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, marginBottom: 4, ...dim }}>
+      {zoomButton("−", "Zoom out", () => zoomAt(v0 + span / 2, 1.5), !zoomed)}
+      {zoomButton("+", "Zoom in", () => zoomAt(v0 + span / 2, 1 / 1.5), span <= ZOOM_MIN_MS)}
+      {zoomed && zoomButton("Reset", "Show the whole pull (or double-click the chart)", () => setView([0, dur]))}
+      <span>
+        {zoomed ? `${fmtTime(v0)}–${fmtTime(v1)} · ` : ""}Drag across the chart to zoom · Ctrl+wheel zoom · Shift+wheel pan
+      </span>
+    </div>
+    <svg ref={svgRef} viewBox={`0 0 ${W} ${height}`} width="100%" style={{ display: "block", minWidth: 760, userSelect: "none", cursor: "crosshair" }}
+      onMouseDown={(e) => { if (e.button === 0) { const t = msAt(e.clientX); setBrush({ from: t, to: t }); } }}
+      onMouseMove={(e) => { if (brush) setBrush({ ...brush, to: msAt(e.clientX) }); }}
+      onMouseUp={() => {
+        if (brush && Math.abs(brush.to - brush.from) > span / 100) {
+          setView(clampView(Math.min(brush.from, brush.to), Math.max(brush.from, brush.to)));
+        }
+        setBrush(null);
+      }}
+      onMouseLeave={() => setBrush(null)}
+      onDoubleClick={() => setView([0, dur])}>
+      {phases.filter((p) => visible(p.start, p.end)).map((p, i) => (
+        <g key={`${p.name}${p.start}`}>
           {i % 2 === 1 && <rect x={x(p.start)} y={PHASE_H} width={x(p.end) - x(p.start)} height={height - PHASE_H} fill="#ffffff" opacity={0.025} />}
-          <line x1={x(p.start)} x2={x(p.start)} y1={2} y2={height} stroke="var(--ck-line-2)" />
+          {p.start >= v0 && <line x1={x(p.start)} x2={x(p.start)} y1={2} y2={height} stroke="var(--ck-line-2)" />}
           <text x={x(p.start) + 4} y={11} style={{ ...text, fontSize: 10.5 }}>{p.name}</text>
         </g>
       ))}
@@ -263,7 +403,7 @@ function Clock({ pull, tanking, lanes, changes, hover }: {
           {i % labelEvery === 0 && <text x={x(s)} y={axis + 3.5} textAnchor="middle" style={{ ...text, ...halo, strokeWidth: 4 }}>{fmtTime(s)}</text>}
         </g>
       ))}
-      {shownBusters.map((b) => {
+      {shownBusters.filter((b) => visible(b.timestampMs)).map((b) => {
         const mortal = b.tanks.filter((t) => !t.invuln && lanes.some((l) => l.player === t.player));
         const worst = mortal.length ? Math.min(...mortal.map((t) => t.margin)) : undefined;
         const color = tankVerdictColor(worst === undefined ? "invuln" : marginVerdict(worst));
@@ -281,24 +421,32 @@ function Clock({ pull, tanking, lanes, changes, hover }: {
           );
         }
         return (
-          <g key={b.id}>
-            <title>{`${b.abilityName} #${b.occurrence} ${fmtTime(b.timestampMs)}: ${b.tanks.map((t) => `${firstName(t.player)} ${t.invuln ? "invuln" : pct(t.margin)}`).join(", ")}`}</title>
-            <path d={`M${bx},${axis - 5} l4,7 h-8 z`} fill={color} />
+          <g key={b.id} {...tipProps(`${b.abilityName} #${b.occurrence} ${fmtTime(b.timestampMs)}\n` +
+            b.tanks.map((t) => `${firstName(t.player)}: ${t.invuln ? "under an invuln" : `${pct(t.margin)} HP left after it and the next 10s`}`).join("\n"))}>
+            <path d={`M${bx},${axis - 6} l5,9 h-10 z`} fill={color} />
             {label}
           </g>
         );
       })}
+      {brush && (
+        <rect x={x(Math.min(brush.from, brush.to))} y={PHASE_H} width={Math.abs(x(brush.to) - x(brush.from))} height={height - PHASE_H}
+          fill="var(--ck-arcane-text)" opacity={0.12} pointerEvents="none" />
+      )}
     </svg>
+    <CursorTip tip={brush ? null : tip} />
+    </div>
   );
 }
 
 function Legend() {
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 14px", fontSize: 11, ...dim }}>
+      <span style={{ color: "var(--ck-text-2)" }}>Bars: damage taken (not HP left) —</span>
       {STACK.map((k) => (
         <span key={k}><Swatch color={KIND_COLOR[k]} />{KIND_LABEL[k]}</span>
       ))}
       <span><Swatch color={COOLDOWN_COLOR} />cooldowns</span>
+      <span><Swatch color={HEALER_COLOR} />healer cooldowns on the tank</span>
       <span><Swatch color={INVULN_COLOR} />invulns</span>
       <span style={{ color: MOVE_COLOR }}>┅ proposed</span>
       <span>▲ buster, coloured by margin</span>
@@ -375,9 +523,10 @@ function OneChip({ c, onOpen }: { c: BusterChip; onOpen: (id: string) => void })
       {c.tanks.map((t) => {
         const invuln = t.margin === undefined;
         return (
-          <span key={t.player} title={t.invulnPulls ? `Under an invuln in ${t.invulnPulls} of ${t.pulls} pulls` : undefined}>
+          <span key={t.player}>
             {c.tanks.length > 1 && <span style={dim}>{firstName(t.player)} </span>}
             <span className="ck-num" style={{ color: invuln ? INVULN_COLOR : tankVerdictColor(marginVerdict(t.margin!)) }}>{invuln ? "invuln" : pct(t.margin!)}</span>
+            {!invuln && t.invulnPulls > 0 && <span className="ck-num" style={{ color: INVULN_COLOR }}> · invuln {t.invulnPulls}/{t.pulls}</span>}
           </span>
         );
       })}
@@ -430,7 +579,8 @@ function ShortCooldowns({ unused }: { unused: UnusedSummary[] }) {
           {i > 0 && " · "}
           <b style={{ color: "var(--ck-text)" }}>{firstName(u.player)}</b> <SkillTip entryKey={u.key}>{u.name}</SkillTip>:{" "}
           {u.basis === "mp"
-            ? <>{u.used.toFixed(1)} per pull{u.everyMs ? `, one per ${Math.round(u.everyMs / 1000)}s` : ""} <span style={dim} title="MP isn't in the log and is shared with damage, so there's no fair count of possible uses">(MP)</span></>
+            ? <>{u.used.toFixed(1)} per pull{u.everyMs ? `, one per ${Math.round(u.everyMs / 1000)}s` : ""} <InfoTip label="MP-gated" trigger={<span style={dim}>(MP)</span>}
+              content="MP isn't in the log and is shared with damage, so there's no fair count of possible uses." /></>
             : u.unused >= 0.5
               ? <>≈ {u.unused.toFixed(1)} unused per pull{u.savedPerUse !== undefined && <span style={dim}> (≈ {pct(u.unused * u.savedPerUse)} HP)</span>}</>
               : <span style={{ color: VERDICT_STYLE.good.color }}>on cooldown</span>}
@@ -464,10 +614,11 @@ function Card({ group, onHover }: { group: TankPlanGroup; onHover: (g: TankPlanG
       </span>
       {group.changes.map((c, i) => <div key={i} style={{ fontSize: 13 }}>{changeLine(c)}</div>)}
       {group.busters.map((b) => (
-        <div key={b.buster.id} style={{ fontSize: 12 }} title={`Worst pull ${pct(b.before.worst)} → ${pct(b.after.worst)}`}>
+        <div key={b.buster.id} style={{ fontSize: 12 }}>
           {b.buster.name} <span className="ck-num" style={{ color: tankVerdictColor(marginVerdict(b.before.median)) }}>{pct(b.before.median)}</span>
           <span style={dim}> → </span>
           <span className="ck-num" style={{ color: tankVerdictColor(marginVerdict(b.after.median)) }}>{pct(b.after.median)}</span>
+          <span className="ck-num" style={{ ...dim, fontSize: 11 }}> · worst {pct(b.before.worst)} → {pct(b.after.worst)}</span>
         </div>
       ))}
       {saved > 0.005 && <div style={{ fontSize: 12, ...dim }}>Tank damage −{pct(saved)} HP per pull</div>}
@@ -528,7 +679,8 @@ export function TankingView({ plan, pending, error, shown, shownLabel, chips, un
             pulls
           </label>
         )}
-        <span title={INFO} style={{ ...dim, cursor: "help" }}>ⓘ</span>
+        <InfoTip label="How the Tanking view reads the log" maxWidth={420}
+          content={<div style={{ whiteSpace: "pre-line" }}>{INFO}</div>} />
         <span style={{ fontSize: 12, ...dim }}>{shownLabel}</span>
         {pending && <span style={{ ...dim, fontSize: 12 }}>Working…</span>}
         <span style={{ flex: "1 1 auto" }} />
@@ -545,7 +697,7 @@ export function TankingView({ plan, pending, error, shown, shownLabel, chips, un
         <div style={{ flex: "1 1 760px", minWidth: 0, display: "grid", gap: 8 }}>
           <Legend />
           {shown && lanes.length > 0
-            ? <div style={{ overflowX: "auto" }}><Clock pull={shown.pull} tanking={shown.tanking} lanes={lanes} changes={changes} hover={new Set(hover?.changes ?? [])} /></div>
+            ? <div style={{ overflowX: "auto" }}><Clock key={`${shown.pull.id}`} pull={shown.pull} tanking={shown.tanking} lanes={lanes} changes={changes} hover={new Set(hover?.changes ?? [])} /></div>
             : <p className="ck-dialog-text" style={{ margin: 0 }}>No tank damage in this pull.</p>}
           <Chips chips={shownChips} onOpen={onOpenBuster} />
           <ShortCooldowns unused={shownUnused} />
