@@ -64,7 +64,11 @@
 // - Fire Breath / Meteowrath lines (46151, both split rounds), melee, 3s
 //   before to 1.5s after: melee resolving their lines on the islands press
 //   fillers 6:44.4-6:47.7 and 7:17.3 (lines 6:46.2 / 7:18.3); kC7Y and
-//   vVPt alike (2-4 melee each round).
+//   vVPt alike (2-4 melee each round). To 2.5s after, not 1.5s (2026-10-15):
+//   the last filler is +1.5s, but the walk back takes longer. Melee who
+//   didn't fill late landed their first melee GCD +1.2-2.4s after the cast
+//   on all four kills (those who did, +3-4s); K6qf's Warrior idled
+//   +1.5-+3.8s after a Tomahawk at -1.0s (xivanalysis 6:45, 2.33s).
 // - Arcadion Avalanche throw (the second Avalanche cast, ~9.5s after the
 //   first), melee, 4s before to 1s after: the dodge to the safe corner;
 //   melee fillers 7:49.6 (throw 7:52.1), kC7Y 7:48.0-7:51.0, vVPt 7:48.5-
@@ -109,7 +113,7 @@ const GUST: MoveDef = { cause: "Powerful Gust (melee bait the cones outward)", b
 const SHOCKWAVES: MoveDef = { cause: "Triple Tyrannhilation (melee hide behind the rocks)", before: 0, after: 5_500, meleeOnly: true };
 const LAUNCH: MoveDef = { cause: "Flatliner knockback to the islands", before: 1_000, after: 4_500, meleeOnly: false };
 const TOWERS: MoveDef = { cause: "Flatliner towers (knockback)", before: 2_000, after: 4_500, meleeOnly: false };
-const BREATHS: MoveDef = { cause: "Fire Breath / Meteowrath lines (melee out of reach)", before: 3_000, after: 1_500, meleeOnly: true };
+const BREATHS: MoveDef = { cause: "Fire Breath / Meteowrath lines (melee out of reach)", before: 3_000, after: 2_500, meleeOnly: true };
 const THROW: MoveDef = { cause: "Arcadion Avalanche (melee dodge to the safe corner)", before: 4_000, after: 1_000, meleeOnly: true };
 const STAMPEDE_TETHER = 46169;         // Majestic Meteowrath on each tower's tether holder
 const TETHER_BEFORE_MS = 4_000;

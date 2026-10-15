@@ -192,6 +192,13 @@ Siegward, Yoro, Kade, Kevin, Sayacissa, Chauzey). Three deaths (Mocha
   header of lib/damage/ffxiv/jobs/healer.ts. Every GCD downtime, weaving
   issue and interrupted cast matches by time. The early Eukrasian Dosis
   refreshes (7:15.5, 9:51.6 for the tincture; 58k) are app-only and hold.
+- **Siegward Damvir (Warrior).** Per-claim record in the Warrior header of
+  lib/damage/ffxiv/jobs/pld-war.ts. Fixed in the boss's damage context:
+  the Fire Breath lines' movement window ended at the last ranged filler
+  (+1.5s), before the melee walk back (first melee GCD +1.2-2.4s on all
+  four Tyrant kills); now +2.5s. His 6:47.7 gap: 36k → 1.1s movement plus
+  1.1s his. Across the Tyrant samples each melee moved by ≤40k. Lost
+  1.04M → 1.02M.
 
 ## Open
 
@@ -219,7 +226,6 @@ Siegward, Yoro, Kade, Kevin, Sayacissa, Chauzey). Three deaths (Mocha
   - Still waiting on the user: the charges-at-kill proposal
     (docs/open-items.md). It comes up for Mocha's coils, Sin's Phlegma
     and Sayacissa's Dragonfire Dive.
-- The Tyrant kill (session 2026-10-15): Mocha and Sin done; next
-  Siegward, then Yoro, Kade, Kevin, Sayacissa, Chauzey. Patch review as
-  above.
+- The Tyrant kill (session 2026-10-15): Mocha, Sin, Siegward done; next
+  Yoro, then Kade, Kevin, Sayacissa, Chauzey. Patch review as above.
 - Lindwurm and Lindwurm II kills are on disk too.

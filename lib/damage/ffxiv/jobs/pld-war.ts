@@ -39,6 +39,21 @@
 // samples). Not adopted: the 0:09 and 6:36 tinctures' Inner Chaos 1/2 and
 // Onslaught 0/3 (used just outside them: ~2% of each); Surging Tempest
 // (104.6%, its denominator); defensives.
+// Warrior rechecked on the same report's The Tyrant kill (Pull 2,
+// 2026-10-15). Matched: the 4:20.9 death, the 2:07 broken combo, Tomahawk
+// 9 (all in movement or before the first hit), its GCD downtimes by time
+// (2:27 1.6s, 3:16 1.1s; 6:03, 6:29, 7:02, 7:40, 9:28 are Flatliner and
+// Stampede movement). Fixed in the boss's context: 6:45's 2.33s (after a
+// Tomahawk at 6:45.2, melee GCD 6:50.0) fell past the Fire Breath lines'
+// movement window, which ended at the last filler; it now runs to the
+// walk back (tyrant-damage-context.ts): 36k → 1.1s movement + 1.1s his.
+// Not adopted: Upheaval 20/21 (27s held beyond the opener, under one 30s
+// recast) and Onslaught 22/23 (8.4s after the raise); the 6:02
+// tincture's Onslaught 1/3 and Inner Chaos 1/2 (5:33 / 5:49 Onslaughts
+// before it, the Tomahawk at 6:30 in the towers: a few k); the 10:33
+// tincture with 2 GCDs (drunk at 10:33.6 when it came back, 4.4s before
+// the kill: valuing it asks him to predict the kill, the tincture rule);
+// defensives.
 //
 // Paladin, checked against xivanalysis on jN3XDrf2z8PmLgRJ Vamp pull 8
 // (2026-10-08): the window counts match its 7 missed actions and 1
