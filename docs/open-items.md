@@ -179,12 +179,23 @@ and delete them from the header.
 ## Plans not started
 
 - [xiva-audit-plan.md](xiva-audit-plan.md): audit every xivanalysis
-  module job by job against the FFXIV damage checks. Pilot done
-  (2026-10-15); waiting on the user's verdict on the ledger format
-  before the other jobs.
-  - [xiva-audit/core.md](xiva-audit/core.md): core modules, 3 candidates.
-  - [xiva-audit/brd.md](xiva-audit/brd.md): Bard, 5 open (1 candidate,
-    4 covered without a firing match).
+  module job by job against the FFXIV damage checks. Pilot (Bard) and
+  batch 1 done (2026-10-15). Batch 2 next: VPR, RPR, MNK, NIN, SAM, MCH;
+  batch 3: BLM, SMN, RDM, WHM. Each ledger's "Open" list is its work.
+  - [core.md](xiva-audit/core.md): core modules, 3 candidates.
+  - [brd.md](xiva-audit/brd.md): Bard, 1 candidate, 4 covered.
+  - [dnc.md](xiva-audit/dnc.md): Dancer, 9 candidates (no AoE check;
+    dance step counts), 3 covered.
+  - [pct.md](xiva-audit/pct.md): Pictomancer, 2 candidates, 5 covered.
+  - [ast.md](xiva-audit/ast.md): Astrologian, 1 candidate, 3 covered.
+  - [sge.md](xiva-audit/sge.md): Sage, 1 candidate.
+  - [sch.md](xiva-audit/sch.md): Scholar, 3 covered.
+  - [pld.md](xiva-audit/pld.md): Paladin, 2 covered.
+  - [war.md](xiva-audit/war.md): Warrior, 3 candidates, 4 covered.
+  - [drk.md](xiva-audit/drk.md): Dark Knight, 6 candidates (4 AoE pairs),
+    4 covered.
+  - [gnb.md](xiva-audit/gnb.md): Gunbreaker, 2 candidates, 7 covered.
+  - [drg.md](xiva-audit/drg.md): Dragoon, 3 covered.
 - [wowa-audit-plan.md](wowa-audit-plan.md): the same for WoWAnalyzer
   (reference only, AGPL). After the FFXIV pilot.
 - [wow-sim-plan.md](wow-sim-plan.md): WoW simulation pipeline (talent
