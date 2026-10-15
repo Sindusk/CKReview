@@ -288,6 +288,19 @@ were to the app's own engine, found where xivanalysis was right.
   changes potency (Viper venoms and Reawaken, broken combos, procs). Add an
   order check only for a job where xivanalysis or the user names a
   sequence that loses damage when swapped.
+- **xivanalysis uptime percentages divide by fight time less
+  invulnerability** (K6qfMamL7rN8yz2Q Red Hot and Deep Blue, 2026-10-14):
+  Swiftscaled 104.5%, Power Surge 101.4%, Surging Tempest 104.6%. A ✓
+  there can hide real drops; read the buff stream (Hunter's Instinct down
+  34.6s at "97.5%").
+- **The end of the pull, for DoTs and tinctures** (same study):
+  - A DoT gap running to the end has no later refresh to push back, so
+    it's worth the ticks less the GCD re-applying would take.
+  - A moment with no enemy to target cuts a DoT gap however short.
+  - A tincture the kill cut short is compared over the same length at
+    its new start.
+  In each case the end of the pull was making a finding look bigger
+  than the play deserved.
 - **Raid-buff windows are valued at their measured bonus** (`bonus:
   "observed"`): Starry Muse, Searing Light, Arcane Circle, Divination
   (since 2026-10-14; it was a flat 6%), the Dancer's burst. An action
