@@ -48,7 +48,11 @@
 //   and the DRK 38 degrees off, their lines through the NIN (three died);
 //   L14 +70.7 the PCT on the DRK's south spot, 43 degrees off (died). J14
 //   +68.7: the DRG's line (18 degrees off) clipped the DRK on their spot;
-//   each took one line per set, so nobody died. Positions are read at the
+//   each took one line per set, so nobody died. Each line's Magic
+//   Vulnerability Up (1002941) lasts 1.96s and the second set lands 2.0s
+//   later: the DRK's first vuln came off in the same millisecond their own
+//   line reapplied it (31k then 39k, 117k HP). Two lines in one set kill
+//   (J7, K22); one per set is survivable with Brilliant Dynamis. Positions are read at the
 //   hit, so "off the spot" can be "still on the way" (a player in the
 //   fights, 2026-10-15). After a
 //   death the second set retargets a player already hit, who dies to it
