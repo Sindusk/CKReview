@@ -536,6 +536,36 @@
 //    helpers have distinct stack/tower penalty spells or only larger hits?
 // 8. Which Hector slots are actual roster players? Which failures were
 //    observed versus guide-only, and which deaths represent called resets?
+//
+// ── OPEN QUESTIONS (VOD needed; moved from docs/open-items.md 2026-10-15) ──
+// Reports A/B/C as above. VOD answers 2026-10-09 cover overlaps (boss-
+// relative clock spots), Cutback (aim described, nobody named), Deep Impact
+// (farthest player), busters on non-tanks, Xtreme Wave lanes and deaths
+// during Xtreme snaking, split-arena puddles and stacked tether holders.
+// Rulings then covered A8/A10/A14 and B1/B2/B3 (now also A5, B5, B7, N1-N5).
+//   - [STALE?] Other overlap layouts. (Split-arena cones now have the
+//     column rule, user 2026-10-14, N1 +7:11; Snaps and snaking Inferno are
+//     still open.) Only the all-party Double-Dip / Reverse volleys have known
+//     spots. Snaps, Inferno, Splash and the snaking / split-arena cones still
+//     name every player hit twice. VOD calls so far: B7 +3:41 Snaps the R2
+//     belonged on the boss's left (the M2 was fine); B5 +4:18 snaking Inferno
+//     the H2 belonged against the wall (the M2 was fine). Neither separates
+//     in the log yet: Snap cones' source names don't identify the snapping
+//     boss, and clean Inferno drops sit 3-9y off the wall. Needs the Air
+//     spread and snaking fire layouts.
+//   - Deep Impact during snaking with the water tank alive: B8 +5:15 the H1
+//     (Water, 17.5y) and B20 +5:15 the M2 (Water, 17.6y) baited it. Right?
+//   - Unreviewed B1-B26 checks (list given 2026-10-09): B8 +7:06 R2/M2 split
+//     drops swapped north/south; B12 +7:11 split Double-Dip overlap; B13
+//     +5:36 / B15 +5:05 OT wall deaths; B17 +5:48 / B25 +5:47 stacked tether
+//     holders; B18 Floater; B8/B12 tether deaths at 26-29y.
+//   - Xtreme Wave holders dying at 23-29y (surviving holders 28-39y) are
+//     called a short tether. Right?
+//   - Same-color Xtreme cleanses flag every cleanser on the volley; with the
+//     static's cleanse order, only the out-of-turn ones could be.
+//   - [STALE?] Walked into the wall with nothing before it (A6 +0:28 OT, A2
+//     +1:16 R1, A17 +4:18 OT): real, or resets? (N2 +1:49 a wall dash was
+//     ruled a real mistake 2026-10-14; these A pulls are still unreviewed.)
 
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import type { DeathEvent } from "@/types/DeathEvent";

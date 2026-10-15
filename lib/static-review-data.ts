@@ -10,6 +10,13 @@
 // has real Pull[] data in the browser (freshly fetched from WCL/FFL and run
 // through detectPullErrors), so this can't be recomputed from scratch on
 // the server.
+//
+// Values never tuned with the user (from docs/open-items.md 2026-10-15):
+// the death-chain gap 10s and end window 15s (DEATH_CHAIN_GAP_MS,
+// DEATH_CHAIN_END_WINDOW_MS below); in the Statics views, a trend needs 5+
+// chances (components/StaticAnalysisParts.tsx MIN_CHANCES; fewer are
+// dimmed, not hidden) and "first vs last" compares 3 sessions
+// (components/StaticPlayerAnalysisPanel.tsx COMPARE_SESSIONS).
 
 import type { Pull } from "@/types/Pull";
 import { CALL_WIPE_RULE_ID, type PullError } from "@/types/PullError";

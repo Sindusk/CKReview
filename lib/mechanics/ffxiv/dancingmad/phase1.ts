@@ -1213,6 +1213,19 @@
 // somewhere completely different from this report's, consistently, not by
 // mistake). It's cross-pull/learned-per-report instead, same reason
 // blackhole-strategy.ts is split out from blackhole.ts.
+//
+// ── OPEN QUESTIONS (VOD needed; moved from docs/open-items.md 2026-10-15) ──
+//   - Graven 2 Puddle Linger (report h2JvDkntZCaBgmLF pull 41): the user
+//     flags only one player, but every metric ranks that player mid-pack.
+//     No ruling yet.
+//   - Pull 49 bait positions (same report): the user named a different pair
+//     than detection flags.
+// Not built:
+//   - [STALE?] the second Confetti resolution (its holder/victim geometry is
+//     still unbuilt, but CONFETTI GROUP MISPLACED above already checks the
+//     second resolution's headcount)
+//   - relative Confetti stack cohesion
+//   - a "Phase 4 enrage / died to Meteor" Raid error
 
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import type { PullError, EnemyEvent } from "@/types/PullError";

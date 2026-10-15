@@ -77,6 +77,12 @@
 // Matched by MitigationHit.id: median and worst margin over the pulls not
 // taken under an invuln, the most common kind, and `rare` (BUSTER_MIN_PULLS)
 // for tank-only hits that landed on a tank by accident.
+//
+// Not yet confirmed by the user (from docs/open-items.md 2026-10-15):
+// TANK_MARGIN_UNDER / TANK_MARGIN_OVER 15% / 30% (the Analysis's values,
+// kept separate); BUSTER_MIN_PULLS 3 with aggregate.ts RARE_SHARE 25%;
+// The Blackest Night as usage only; the Oath Gauge simulated from 0 at pull
+// start, +5 per landed auto.
 
 import type { Pull } from "@/types/Pull";
 import type { PlayerEvent, PlayerInfo } from "@/types/PlayerInfo";
@@ -86,7 +92,7 @@ import { busterLabel } from "./buster-kinds";
 import { RARE_SHARE } from "./aggregate";
 
 export const FOLLOW_UP_MS = 10_000;  // user
-// Tunables: chosen by the builder, not yet confirmed (docs/open-items.md).
+// Tunables: chosen by the builder, not yet confirmed (the "Not yet confirmed" list above).
 export const TANK_MARGIN_UNDER = 0.15;
 export const TANK_MARGIN_OVER = 0.30;
 const SAME_HIT_MS = 100;

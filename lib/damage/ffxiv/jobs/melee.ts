@@ -674,6 +674,9 @@ const enshroud: JobCheck = (ctx) => burstWindowFindings(ctx, {
 // - Arcane Circle (xivanalysis ArcaneCircle.ts): two Communios and one
 //   Plentiful Harvest, one Communio in the opener (the first window).
 //   +3% from the tooltip. A missing one was used outside the window.
+//   On that pull (2026-10-08, the rule then) it found the 8:22 window's
+//   second Communio 2s late; xivanalysis said 2 missed, the other not
+//   visible in the log. Gluttony drift: 1 use found, xivanalysis 8 of 10.
 // - Not built: Soul gauge overcap (xivanalysis: 20 lost). Simulated from
 //   casts (+10 per combo step, +50 per Soul Slice, −50 per spender) the
 //   kill gains 1800 and spends 1850, going below zero 4 times: some gains

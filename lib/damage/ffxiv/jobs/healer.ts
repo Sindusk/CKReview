@@ -136,7 +136,8 @@
 //   (6 ticks, ~59k, before it died: more than a Dosis III); Addersgall
 //   30/34 (healing and MP); Zoe, Swiftcast. Open: Phlegma III 14/15 is a
 //   charge held to the kill (10.7s at full charges in all), the same gap
-//   as Living Muse (docs/open-items.md).
+//   as Living Muse, which the kill rule (checks.ts usesLostAtKill) now
+//   counts; not rechecked on this kill.
 //   Rechecked on the same report's Red Hot and Deep Blue kill (Pull 2,
 //   2026-10-14). Matched: GCD uptime (94.7% both), the 4 interrupted
 //   Dosis IIIs (1:29 Red Hot leaving, 5:39 the Deep Aerial tower: forced;
@@ -203,6 +204,14 @@
 //   Addersgall / Addersting are healing resources (Addersgall is drawn on
 //   the timeline, gauges.ts). 1 of its 4 interrupted casts (12:55) was
 //   the boss going untargetable.
+// - Sage on jN3XDrf2z8PmLgRJ Vamp pull 8 (2026-10-08, under the DoT
+//   valuation of the time): 64.3s clipped over 6 refreshes, read from the
+//   log, against xivanalysis's 17.5s a minute (~171s). Not explained then;
+//   likely its per-enemy counting again (the FRU note above), unchecked.
+// - DoT refreshes while moving (from docs/open-items.md 2026-10-15): the
+//   DoT is instant, so a refresh pressed to move cost little; the finding
+//   says so but still counts it (Dia refreshes with 25s left are common on
+//   dQ8wmb1VhKt6yBXk). Needs VOD checks.
 // White Mage is unverified: no sample pull has one.
 //
 //   Copyright (c) 2018 Saxon Landers & contributors

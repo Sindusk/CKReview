@@ -20,6 +20,9 @@
 // - The snapshot keeps the same player-buff ids, so a hit records which
 //   tracked auras were on the attacker (WCL lists ~14 per hit, ~107 bytes;
 //   all of them would be ~8.6MB per long pull).
+// Data slack (from docs/open-items.md 2026-10-15): a few non-DoT debuffs
+// pass the enemy-debuff filter (Rune of Lingering, Banish, Mortal Coil)
+// because they share an id with something a spec casts.
 
 import { WOW_SPELL_DATA } from "./spell-data";
 import { WOW_HASTE_STATUS_IDS } from "./haste-statuses";

@@ -4,6 +4,8 @@
 // per pull and which findings recur. A finding recurs when the same label
 // appears in the same phase in several pulls (labels are pull-independent:
 // "GCD gap during Limit Cut", "Technical Step drift"). Pure.
+// Performance (from docs/open-items.md 2026-10-15): "All loaded pulls" on
+// a 25-pull WoW report takes several seconds.
 
 import type { DamageFinding, FindingKind, PullDamageAnalysis } from "./types";
 

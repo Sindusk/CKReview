@@ -164,6 +164,10 @@
 // - The 7s/3s drop-time offsets, the distance threshold for check 1, and
 //   the angle tolerance for check 2 are all first-pass estimates from a
 //   single pull's data, not yet cross-validated against a second report.
+//
+// ── OPEN QUESTIONS (VOD needed; moved from docs/open-items.md 2026-10-15) ──
+//   - Bait-too-close is unfixable on report PM8HY9nJ7kTR4tdQ pull 3: the
+//     puddle positions are duplicated and grid-snapped.
 
 import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { PullError } from "@/types/PullError";

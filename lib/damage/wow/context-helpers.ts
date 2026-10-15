@@ -11,6 +11,14 @@
 // and buffs on enemies (Pull.enemyBuffs / enemyBuffRemovals). Pulls saved
 // before 2026-10-06 have no enemy casts or buffs, so those windows come out
 // empty there.
+//
+// Gaps (from docs/open-items.md 2026-10-15):
+// - Multi-target is set per phase, so fights without log phases (Vashnik's
+//   Venoms, Twin Fangs, Nymrissa's Bubblefins) can't mark add windows.
+// - Partial losses (a mechanic that halves a melee's uptime) are excused in
+//   full or not at all.
+// - Enrage timers are mostly unobserved in the sample wipes (each boss's
+//   context header says what was seen).
 
 import type { Pull } from "@/types/Pull";
 import type { PlayerInfo } from "@/types/PlayerInfo";

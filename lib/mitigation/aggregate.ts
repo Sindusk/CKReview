@@ -10,6 +10,12 @@
 // The verdict uses the MEDIAN margin, so one pull lost to a healing gap
 // doesn't relabel a hit; it is fail only when most pulls had a death.
 // Deaths and the worst margin are shown next to it.
+//
+// Not yet confirmed by the user (from docs/open-items.md 2026-10-15): rare
+// = taken in under RARE_SHARE (25%) of the pulls that got that far, once
+// RARE_MIN_REACHED (3)+ did; rare hits are hidden in all-pulls (that part
+// is settled). Red Hot and Deep Blue's Vertical Plunge (7/39) and Re-Entry
+// Plunge #2 (7/34) get hidden this way and may be variants, not mistakes.
 
 import type {
   DroppableResult, HitVerdict, MitigationGame, MitigationHit, MitigationKind,

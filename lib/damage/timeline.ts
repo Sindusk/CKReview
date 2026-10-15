@@ -26,6 +26,13 @@
 // hit. With eight players attacking, a stretch like that means nothing was
 // targetable (a transition, a jump). It is the fallback awareness every
 // fight gets, with or without a DamageContext.
+//
+// Open (from docs/open-items.md 2026-10-15): gcdTierMs on Viper. The
+// skill-speed-420 Viper recorder (qjCMx4bRfgNKwX9T fight 16, so 2.12s with
+// Swiftscaled) reads 2.10 (the old mode read 2.14): its 2.5s-recast
+// intervals cluster at 2.087 and 2.131, neither on 2.12. Ninja (2.10)
+// likely has the same issue. Needs a look at which VPR GCDs the intervals
+// pair up.
 
 import type { Pull } from "@/types/Pull";
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";

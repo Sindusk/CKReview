@@ -112,6 +112,14 @@
 // positioning that follows — every failure observed so far surfaces as an
 // out-of-schedule hit, a multi-player tether hit, or an early Primordial
 // Crust loss, which are what's detected here.
+//
+// ── OPEN QUESTIONS (VOD needed; moved from docs/open-items.md 2026-10-15) ──
+//   - Incorrect Direction (blackhole-strategy.ts) is gated to the SDA
+//     strategy until the Support vs DPS convention for DSA/Double Tether is
+//     confirmed.
+//   - The DSA/SDA display label is a guess.
+// Not built:
+//   - the mechanic past tether 10
 
 import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { PullError } from "@/types/PullError";

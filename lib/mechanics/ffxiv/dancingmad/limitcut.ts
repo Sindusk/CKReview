@@ -102,6 +102,10 @@
 // Pulls that wipe before Limit Cut never see 1001602/1001603, so the
 // module self-gates on the debuffs' presence rather than any
 // encounter-name or timing check.
+//
+// ── OPEN QUESTIONS (VOD needed; moved from docs/open-items.md 2026-10-15) ──
+// Not built:
+//   - a 4+-player scramble goes unflagged
 
 import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { PullError } from "@/types/PullError";

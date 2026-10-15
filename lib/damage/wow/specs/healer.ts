@@ -33,6 +33,10 @@
 // Not judged: DoTs (WoW healers aren't expected to keep them up) and Power
 // Infusion's recast (its casts log in pairs 1ms apart; the measured median
 // interval, 23s, is no recast).
+//
+// Mistweaver's observed GCD in the survey (spell-data.ts observedGcdMs) is
+// 740ms, which is suspect (from docs/open-items.md 2026-10-15): check it on
+// a log with more Mistweavers before trusting its gap findings.
 
 import type { DamageFinding, JobCheck } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";

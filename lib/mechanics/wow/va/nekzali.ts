@@ -332,6 +332,33 @@
 //   direct signals. Ordinary Uncoiling ticks, planned Rite hits during
 //   Ignition, Soul Exhaustion on well exit, and Corpse Blight from planned
 //   add kills are expected mechanics, not standalone mistakes.
+//
+// ── OPEN QUESTIONS (VOD needed; moved from docs/open-items.md 2026-10-15) ──
+//
+// Report nRGxQ1b8LdMvzC4D (only 6 pulls exist, one a kill); no VOD ground
+// truth yet — most thresholds rest on one or two failures.
+//
+//   - Latent Cultist volume: every pool contact is flagged (31 Minors in the
+//     kill). Groups of 4+ at once are annotated "pool may have moved onto
+//     the group". Keep all, drop single ticks, or drop the group cases?
+//   - Vessel revival blame: revivals are player-less (evidence in the
+//     VERIFIED section above). What actually decides which corpses rise,
+//     and who should own it?
+//   - Possession Barrage blames the targeted tank when the median raid hit
+//     is >=100k (clean 50-68k, one failure at 137k). Is it the tank's
+//     distance, or could the raid have been stacked on the path?
+//   - Pyre under-soak (<=6 soakers) and uncompleted Curse are player-less.
+//     Is there an assignment (soak group, kick order) that would let them
+//     name players?
+//   - Invoke silence is a Minor per silenced caster (8 in the kill). Keep?
+//   - Unverified rule wow-nek-unscheduled-rite (Rite outside Ignition/
+//     Invoke): its only firing is 4 +355.3, after the Vessel cutoff —
+//     likely a revived Amani reaching the well; not confirmed.
+//   - Tank-death marker only fires when the pull ends within 30s (5 +452.9
+//     lost a tank at 12% and fought 67s more). Right call?
+//   (Well re-entry with Soul Exhaustion, and the not-flagged Hollowing
+//   stacks / Swirling Spirit / Grasping Depths and Uncoiling raid ticks, are
+//   already recorded in the VERIFIED section's notes and "Not flagged".)
 
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import type { DeathEvent } from "@/types/DeathEvent";

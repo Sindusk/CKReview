@@ -209,6 +209,21 @@
 // them and exactly four clears. On Mythic the visible count disappears
 // quickly. Wrong combinations, especially a sum above four, can kill; an
 // unresolved toxin expires into Cultivated Burst.
+//
+// ── OPEN QUESTIONS (VOD needed; moved from docs/open-items.md 2026-10-15) ──
+//
+// Report Mvz3r1AnVKYpdFTH; no VOD ground truth yet.
+//
+//   - Living Venom blame: should it fall on the victim (current), the orb
+//     collector, or both?
+//   - Protovenom eruption flags both the marked and the unmarked player
+//     (since 2026-10-11 under two rules: wow-es-protovenom-eruption on the
+//     marked, wow-es-protovenom-unmarked on the unmarked). Keep that?
+//   - Undispelled Blighted Blood with no one else hit is a player-less
+//     Minor (wow-es-blighted-blood-pool). Keep it?
+//   - Not built yet: tank-swap misses; non-lethal Blighted Blood ticks.
+//     (Mark-refresh and Ula'tek's Dominance are already recorded above as
+//     not flagged, with their reasons.)
 
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import type { DeathEvent } from "@/types/DeathEvent";

@@ -440,6 +440,15 @@
 //    are salvageable in practice, versus a justified Raid cutoff?
 // 9. Real roster-to-MT/OT/H1/H2/M1/M2/R1/R2 assignments and assignment
 //    changes across pulls; positions/visual objects absent from the log?
+//
+// ── OPEN QUESTIONS (VOD needed; moved from docs/open-items.md 2026-10-15) ──
+// Report jN3XDrf2z8PmLgRJ; pulls 1 and 3 partly reviewed when this was
+// written (rulings in expectations/; rulings now also cover pulls 2 and 4,
+// and report bVDR2mTL7YGvMxK1 pull 1).
+//   - Stomp overlap blame goes to whoever stood further from their clock
+//     spot (45+ degrees), both when neither did. Confirm on pulls 1/3/13.
+//   - Third Brutal Rain deaths (pulls 5, 7) are a player-less Raid (healing
+//     check). Should anyone be named?
 
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import type { DeathEvent } from "@/types/DeathEvent";

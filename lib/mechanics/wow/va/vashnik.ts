@@ -311,6 +311,17 @@
 // does not expose. Do not hard-code Method's markers, grip assignments,
 // fountain order, healer count, or a precise timing before a real Mythic log
 // confirms the raid's strategy and this encounter's event sequence.
+//
+// ── OPEN QUESTIONS (VOD needed; moved from docs/open-items.md 2026-10-15) ──
+//
+// Report kGVX7tafBT2pM1N3; no VOD ground truth yet.
+//
+//   - Plague Wave blame: should the Froth carrier whose lane it was also be
+//     blamed? The description already names the carrier.
+//   - Stygian Burst on non-holders (92 Minors): it may not be dodgeable.
+//     Keep it, drop it, or make it a raid-wide healing error?
+//   - Player-less errors: missed totems and undispelled Exploding Infection
+//     name no player. Should they?
 
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import type { DeathEvent } from "@/types/DeathEvent";

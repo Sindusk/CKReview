@@ -334,6 +334,31 @@
 // here; the Sentinels detector's first actual wipe-marker approach is the
 // relevant precedent. Do not hard-code one set of markers, a static cyst
 // popper assignment, an exact tank taunt plan, or an unverified rage timer.
+//
+// ── OPEN QUESTIONS (VOD needed; moved from docs/open-items.md 2026-10-15) ──
+//
+// Report rNL38zFGMbyADRTh is not the user's group and has no VOD — ask once
+// the user's group reaches the boss.
+//
+//   - Tempest volume: every tornado pass is flagged (~15 per pull, ~4 on
+//     tanks). Should tank hits count, and should a single hit stay Minor?
+//   - Missed Mutilate soaks: the most frequent misses were a player skipping
+//     their group's first soak, players knocked back by Crosswinds 7s before
+//     the +55 soak, and the Serpent's Fury mark holder. The description
+//     names the knockback / mark. Real errors, or assigned exceptions to
+//     exclude?
+//   - Virulence blame: a reinfection flags both the spreader and the
+//     reinfected player. Correct, or only one of them?
+//   - Early cyst pops blame whoever stood nearest the drop spot (within
+//     8yd). A tank dragging the boss is often nearest. Is that the real
+//     popper, or is the boss/tank pathing the cause?
+//   - Two cysts in one gale is player-less and names both droppers. Should
+//     blame go to a dropper (placement) or the raid's positioning?
+//   - Crosswinds fall flags only the player who fell and names their
+//     opposite-direction partners. Should a partner share the blame?
+//   - The "5 dead" marker ended two pulls 20-70s before Unbound Ferocity
+//     actually wiped them. Keep 5 as the threshold?
+//   - Caustic Claws and Caustic Residue (see "Not flagged" above): wanted?
 
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import type { DeathEvent } from "@/types/DeathEvent";

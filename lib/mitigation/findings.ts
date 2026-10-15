@@ -7,7 +7,7 @@
 // cheap, so the view opens fast; the optimizer runs when the user clicks
 // Analyze (user, 2026-10-14), and only then come the plan, its "Try"
 // changes and the "Idea" suggestions. Thresholds are the builder's, not yet
-// confirmed (docs/open-items.md).
+// confirmed (listed under "Not yet confirmed" below).
 //
 // ── Categories ─────────────────────────────────────────────────────────
 //   under   Planned hits (the plan's anchors: plan.ts classifyHit "plan",
@@ -52,6 +52,14 @@
 // cast a plan move would make unavailable (by more than SNAPSHOT_SLACK_MS:
 // a recast a second later is the same cast) is marked lost. `inFindings`
 // lanes are the ones a finding names; the view shows those first.
+//
+// Not yet confirmed by the user (from docs/open-items.md 2026-10-15): the
+// thresholds above (UNUSED_MAX_SHARE ½, UNUSED_MIN_READY_SHARE ⅓,
+// LATE_MAX_MS 8s, STACK_MIN_COOLDOWNS 4, STACK_MIN_MARGIN 45%,
+// READY_GAP_MIN_MS 20s); "Cooldown plan" being its own group and also each
+// fixed hit's Try line; ideas outside the plan shown, marked as ideas.
+// Performance: Dancing Mad (one 18-minute pull window) took ~10s to plan in
+// the worker; watch for that on long single pulls.
 
 import type { Pull } from "@/types/Pull";
 import type { CatalogEntry, MitigationGame, MitigationHit } from "./types";

@@ -43,6 +43,22 @@
 //
 // The fit runs on the buffs in the player-buff stream; haste-statuses.ts
 // lists the measured haste buffs the stream keeps (gear procs included).
+//
+// Leftovers (from docs/open-items.md 2026-10-15):
+// - The haste list was measured on one kill (qpZx3mWaG7gcDdYB fight 5).
+//   Specs and gear not in it only make the model lenient (the ±15s cap).
+//   To extend it, run the same fit on unfiltered buffs of a new kill.
+// - WoW samples fetched before 2026-10-13 lack the haste rating and the
+//   gear haste buffs: refetch with `--refetch` to get them.
+// - Rating → haste varies across players (18–37 rating per 1% on that
+//   kill: passive talent haste), so the rating base is a rough fallback;
+//   nobody on that kill needed it. The published gear conversion is 44 per
+//   1% with diminishing returns (docs/dps-analysis.md, "WoW secondary
+//   stats"); the gap to the fit is talent haste.
+// - Blood DK Veinglas fits a 0.90s base with no haste buff (rating says
+//   ~1.1s). The 99th-percentile Blood DK Frostydn (ACmXHMFtaPLR9k8w) fits
+//   0.91s at the same rating haste, so it's Blood's GCD (an unlisted
+//   passive or shorter GCDs), not a play gap; harmless to the checks.
 
 import type { Pull } from "@/types/Pull";
 import type { PlayerInfo } from "@/types/PlayerInfo";

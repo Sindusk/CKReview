@@ -20,6 +20,12 @@
 // other side keeps the error and the other is dropped. Left as is when the
 // report gives no conga, the fitting orders disagree, or the stack's side
 // isn't consistent.
+//
+// ── OPEN QUESTIONS (VOD needed; moved from docs/open-items.md 2026-10-15) ──
+//   - Two players with the same line number on one side (report
+//     b9FcR6vxAPd3zhkH, Pull 46 and Pull 55 at 1:21): settled by the
+//     report's own conga (the DRG in Pull 46, the PCT in Pull 55). Not yet
+//     confirmed on VOD.
 
 import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { DeathEvent } from "@/types/DeathEvent";

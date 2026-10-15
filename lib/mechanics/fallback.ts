@@ -124,6 +124,15 @@
 //     bomb carrier.
 //   - A shared hit split into groups (Ultrasonic Amp: 4 and 4) can't name
 //     who was missing from which group.
+//
+// ── OPEN QUESTIONS (VOD needed; moved from docs/open-items.md 2026-10-15) ──
+// Built blind against Vamp Fatale (jN3XDrf2z8PmLgRJ), which now has its own
+// module.
+//   - Blame on a double-up: the victim is named (Known gaps above). When the
+//     second hit was another player's bomb or spread, should the carrier
+//     share it?
+//   - WoW: enabled for FFXIV only. Turn on when a WoW boss without a module
+//     is tested (Nymrissa Wavecaller is the obvious candidate).
 
 import type { EnemyStackEvent, Pull } from "@/types/Pull";
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";

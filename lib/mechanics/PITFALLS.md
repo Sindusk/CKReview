@@ -395,8 +395,8 @@ philosophy and the data semantics this list assumes.
 - **A cleanse can be the fatal hit.** Don't drop death-time removals
   blindly (Red Hot and Deep Blue's Xtreme).
 - **With few pulls, annotate instead of exempting.** Add the context to
-  the description and list the question in docs/open-items.md
-  (Nek'zali).
+  the description and list the question in the module header's OPEN
+  QUESTIONS block (Nek'zali).
 - **No clean/failure gap means a judgment call.** Use relative attribution
   (the worst member of the cluster) or ask the user. Don't silently pick a
   threshold (Wave Cannon, Tele-Trouncing).

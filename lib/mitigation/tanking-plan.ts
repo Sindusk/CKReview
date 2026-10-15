@@ -74,6 +74,29 @@
 // both tanks: changes by both, or a cooldown one tank casts on the other.
 // Each change names its receiver for a target-reach cooldown. A move from
 // A to B plus an add back on A is shown as one add on B.
+//
+// Not yet confirmed by the user (from docs/open-items.md 2026-10-15):
+// TANK_MIN_PULLS 3; heavy windows (HEAVY_WINDOWS_PER_DURATION 3, HEAVY_MIN
+// 30%); TANK_CHANGE_COST 10%; INVULN_COST (tie-break only);
+// TANK_MECHANIC_MARGIN -50%; the invuln rules above, including a
+// Superbolide on a ~50% Plummet tower being allowed; busters reached in 1-2
+// window pulls protected, not planned; busters judged from full HP even
+// right after another heavy hit (Vamp A4 +333.9: Kade enters Plummet #3 at
+// 74%); the window keeping only pulls with the latest pull's tank jobs, so
+// Vamp's Kade/Alice (Paladin only in A7-A8) get no plan yet; Bulwark never
+// moved. (The Superbolide, protect and full-HP calls: user deferred,
+// 2026-10-11.)
+// Not built: "one tank takes both hits" for dual busters (no labelled dual
+// buster allows it yet); re-planning shared busters around an invuln;
+// crediting self-healing cooldowns (Bloodwhetting, Clarity of Corundum).
+// Known rough edges:
+//   - A target-reach cooldown (Oblation) placed on an anchor goes to the
+//     lowest tank there, and can be credited on two overlapping anchors of
+//     different tanks.
+//   - A placed cast's value counts only the damage inside anchors, so a
+//     long cooldown's tail past its anchor isn't credited.
+//   - Living Dead, Holmgang and Superbolide count their covered damage as
+//     saved, though the healers still have to heal the tank from 1 HP.
 
 import type { Pull } from "@/types/Pull";
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
@@ -91,7 +114,7 @@ import {
   type AggregatedBuster, type BusterKind, type PullTanking, type TankStream,
 } from "./tanking";
 
-// Tunables: chosen by the builder, not yet confirmed (docs/open-items.md).
+// Tunables: chosen by the builder, not yet confirmed (the "Not yet confirmed" list above).
 // Window pulls the Tanking view needs, and a buster needs to be planned:
 // the Analysis's old PLAN_MIN_PULLS, kept here when that went to 1 (user,
 // 2026-10-14, for the Analysis only).

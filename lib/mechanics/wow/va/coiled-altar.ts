@@ -426,6 +426,58 @@
 // * Preserve overlap context in stage 3. A death during a required
 //   intercept, orb clear, or Gloombomb may have several contributors;
 //   prefer direct failed mechanics over assigning blame from damage alone.
+//
+// ── OPEN QUESTIONS (VOD needed; moved from docs/open-items.md 2026-10-15) ──
+//
+// Report wThYvpJkbK6Pjrdc (30 pulls, the kill in pull 30; only pulls 1-17
+// fetched, so no kill baseline yet); no VOD ground truth yet — each wipe's
+// cutoff is in the wipe survey above.
+//
+// TODO: fetch pulls 18-30, especially the kill, and re-check every
+//   threshold and Minor volume against it
+//   (`node scripts/fetch-wow-report.js wThYvpJkbK6Pjrdc --fight 23 ...
+//   --fight 35`).
+//
+//   - Orb collisions name every carrier whose Volatile/Mutagenic Venom was
+//     picked up or dropped early in the 0.4s before the eruption (P7 two
+//     purple carriers, P12 a fresh purple pickup, P5 the tank grabbing a
+//     purple while carrying a normal orb). Who actually caused each one on
+//     VOD — the purple carrier, the player they walked into, or both?
+//   - Deluge eruptions (P6 +172.2 at the stage-1 overrun, P9 +529.7 in
+//     stage 3) are player-less: a Mutation was still out when Toxic Deluge
+//     was cast. Who was meant to clear it?
+//   - Tank-death cutoffs that may have a better cause: P8 +232.1 (tank died
+//     with no killing blow — a fall?), P11 +509.7 (tank died to an
+//     uncollected Soul Fragment), P12 +157.7 (tank died to axes; Sever then
+//     hit a healer and an orb collision killed 15 at +168.1). Which event
+//     really ended each pull?
+//   - Malevolent Resonance flags both players whose ghosts touched, Major
+//     for both if either died; a ghost inherited from a player who just died
+//     is exempt. 48 flags in 17 pulls. Is the pair the right blame, or only
+//     the player who walked their ghost into the other?
+//   - Dreadmarch falls are player-less Minors naming the victim (the raid's
+//     job to break the absorb). Should they be Major on anyone, e.g.
+//     assigned damage dealers?
+//   - Wail of Terror completions are player-less (no kick order in the
+//     log). P14 +204.0 was the first Wail of the pull, never kicked at all.
+//     Is there a kick assignment per add that would let detection name
+//     someone?
+//   - Soulcoiler shield flags an add whose Spirit Shield survived a
+//     Gloombomb wave. It's player-less because add positions are stale
+//     (adds relocate after each kick). Is there a bomb-to-add assignment?
+//   - Spirit Erasure deaths are player-less; the log doesn't show who
+//     intercepted a fragment. P15 +413.3 (11 dead) is the only intermission
+//     wipe.
+//   - Gloombomb bystanders (14) and Soul Sever on non-tanks (19): are some
+//     of these deliberate (e.g. immunities soaking ghosts)? Zero-damage hits
+//     are already skipped.
+//   - The "Not flagged" volume above (roaming axes, Noxious Ground,
+//     carrier-proximity Volatile/Mutagenic ticks, Widow's Touch): should any
+//     of these count?
+//   - Collapse marker at 6 dead (every pull ended within 45s of it). Right
+//     threshold?
+//   (Soulbound never reached in pulls 1-17 / no rule yet: already recorded
+//   in "Not flagged" above.)
 
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import type { DeathEvent } from "@/types/DeathEvent";

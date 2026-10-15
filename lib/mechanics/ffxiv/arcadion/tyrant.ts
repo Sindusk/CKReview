@@ -184,7 +184,6 @@
 // Resistance Down holders) from -stack.
 //
 // Not built: Shockwave line-of-sight (no damage logged), rock collisions,
-// clock-spot attribution of scythe cone / Gust overlaps (both players named),
 // Wall front swaps (the static invulns Wall 1), kick cooldown timing, tank
 // deaths to their own busters (mitigation).
 //
@@ -548,6 +547,29 @@
 //    Which opposite corners can Mammoth Meteor choose, fixed or variable?
 // 8. What roster matches H slots, actual kick plan and mitigation handoffs?
 //    Which failures are observed, and which no-ability deaths are resets?
+//
+// ── OPEN QUESTIONS (VOD needed; moved from docs/open-items.md 2026-10-15) ──
+// Reports A/B/C as above; built 2026-10-09. (The open-items note said "no
+// VOD review yet"; the VOD reviews of A1-A29 and N1-N9 above came after.)
+//   - Kill, Two-Way Fireball (C20 +9:35): the M2 died taking the front with
+//     Fire Resistance Down II, and the H2 joined no line, leaving it one
+//     short. Both flag. Right?
+//   - [STALE?] Scythe cone / tornado overlaps name both players hit twice
+//     (no clock-spot attribution yet). With the Hector spots (MT N, OT S, H1
+//     W, H2 E, M1 SW, M2 SE, R1 NW, R2 NE) the off-spot player could be named
+//     instead, as for Red Hot and Deep Blue. Wanted? (Scythe cones now use
+//     SCYTHE_CLOCK and Gust names a known owner alone, per RULES IMPLEMENTED;
+//     A7 ruled 2026-10-09.)
+//   - [STALE?] Merged Sharp Taste lines (A18 +1:35, C5 +3:21) blame both
+//     healers. Or the one on the wrong side? (Answered by A11, 2026-10-09:
+//     the healer in both lines is now named alone, -sharp-taste-side.)
+//   - Comet drop on the party (B1 +5:13 healers, B4 +5:23 ranged) blames the
+//     drop's two baiters. Or the players who stood under it?
+//   - Heartbreak Kick: a non-tank killed in a kick tower is a Major
+//     (tank-only plan). Tank deaths in the towers aren't flagged. Right?
+//   - [STALE?] Lone mid-pull falls with nothing before them (A29 +1:34 R2,
+//     B8 +1:50 R1): real, or resets? (A29 ruled real 2026-10-09, "smudged
+//     off the edge"; B8 still open.)
 
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import type { DeathEvent } from "@/types/DeathEvent";

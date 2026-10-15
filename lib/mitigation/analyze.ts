@@ -71,6 +71,24 @@
 // timeline carries how many attempts showed it never reaches this hit's
 // attacks (PlayerMitigation.reachMisses). Each HitPart names its attack
 // (ability and dealing actor) for this.
+//
+// Not yet confirmed by the user (from docs/open-items.md 2026-10-15). The
+// verdict bands, the 3s join, the all-at-once judging and DoTs / autos
+// never being hits are settled (user, 2026-10-08); these are the builder's:
+//   - a tank-only hit counts only when buster-sized (TANK_HIT_MIN_RAW, 40%
+//     of max HP raw); hits on non-tanks need HIT_MIN_TARGETS (4)
+//   - a joined hit stops growing at JOIN_MAX_SPAN_MS (10s)
+//   - invulnerable tanks are left out of HP%, like vulnerable players
+//   - on tank-only hits, tank cooldowns count for droppable and notes
+// Known rough edges:
+//   - A joined hit's cross-pull key (MitigationHit.id) is its first
+//     ability, so when a join starts with a different ability in different
+//     pulls the rows don't line up (Red Hot and Deep Blue's Plunging Snap /
+//     Re-Entry rows).
+//   - No minimum size for a 4+-target hit: a 25k-raw Bloody Bondage gets a
+//     row.
+//   - Notes and the hit details estimate added shields as nothing (their
+//     size isn't logged per hit), so a shield is never "enough alone".
 
 import type { Pull } from "@/types/Pull";
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";

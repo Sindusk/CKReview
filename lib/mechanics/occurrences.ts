@@ -38,6 +38,14 @@
 // nobody performed). A module that reports a mechanic must report every
 // instance it can see: an anchored instance it names nobody for counts as
 // nobody's.
+//
+// Instance clustering in the WoW modules' reported occurrences, chosen by
+// the builder, not yet confirmed (from docs/open-items.md 2026-10-15):
+// Coiled Altar fixate / Gravebound refreshes 3s, Guillotine marks 3s with
+// the impact within 8s of its mark; Ula'tek Grasping Fangs waves 3s and
+// Volatile Purge sets 2s; Entombed Sentinels Protovenom casts 3s; Lost
+// Explorers shard sets 5s and element debuffs within 5s of a Frostfire
+// Volley.
 
 import type { EnemyEvent } from "@/types/PullError";
 

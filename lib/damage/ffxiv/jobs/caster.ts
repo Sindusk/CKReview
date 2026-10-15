@@ -234,6 +234,10 @@ const searingLight: JobCheck = (ctx) => burstWindowFindings(ctx, {
 //   a Verfire over the Jolt III cast instead (its 5 mana not valued).
 //   Matches xivanalysis's 4 + 5; the opener's two (Verthunder III under
 //   Swiftcast and Acceleration) and finisher refreshes count too.
+// Not built (from docs/open-items.md 2026-10-15): White Mana overcap
+// (xivanalysis: 3 mana on that pull). The cooldown drift check counts
+// fewer lost Fleche / Contre Sixte / Corps-a-corps uses than xivanalysis's
+// x/y, by method: it counts whole lost uses, with dead time forced.
 const FINISHERS = ids("VERFLARE", "VERHOLY");
 const BASE_CAST_MS = new Map(Object.values(A).map((a) => [a.id, a.castTime ?? 0]));
 const COMBO_ENDS = ids("ENCHANTED_REDOUBLEMENT", "ENCHANTED_MOULINET_TROIS");

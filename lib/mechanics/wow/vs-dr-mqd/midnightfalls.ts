@@ -92,6 +92,23 @@
 // suppressDuplicateRaidErrors — one Light's End detonation lands as ~18
 // per-player damage events, which previously produced ~18 identical Raid
 // errors within 300ms.
+//
+// ── OPEN QUESTIONS (VOD needed; moved from docs/open-items.md 2026-10-15) ──
+//
+// Deprecated by the user on 2026-10-06: nothing below will be picked up; it
+// stays only as a record.
+//
+//   - Resume point: VOD review of report Dn87j4ARzNwYqLvV should resume at
+//     pull 3. Pulls 1/2/5/16/22 are done. Phase 2 has never been reached in
+//     any capture.
+//   - Crystal-holder-hit: is a Dark Quasar landing on a crystal carrier
+//     intended strategy?
+//   - Self-break severity: should a Starsplinter breaking your OWN crystal
+//     be Major on that player instead of Raid?
+//   - Unmapped: Dark Rune assignment order, Starsplinter blast radius,
+//     spec 1480.
+//   - Late-kick Terminate misses are unattributable: WCL has no per-matrix
+//     instance id.
 
 import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { DeathEvent } from "@/types/DeathEvent";

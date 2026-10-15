@@ -32,7 +32,8 @@
 // the engine's log-inferred raid downtime. Per-player busy windows (tower
 // soakers, debuff carriers, baits) are the next step; until then a gap
 // during a mechanic is labelled with it ("during Towers (P5)") but still
-// counted.
+// counted. Candidate (from docs/open-items.md 2026-10-15): the Dark
+// Knight's 4.6–4.9s idle after LB3 during Limit Cut, in every pull.
 
 import type { DamageContext, ForcedWindow } from "../../../damage/types";
 import { phaseSpans } from "../../../damage/wow/context-helpers";

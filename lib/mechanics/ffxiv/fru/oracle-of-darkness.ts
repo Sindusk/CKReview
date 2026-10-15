@@ -126,8 +126,8 @@
 //   walk-offs. ffxiv-ood-enrage / -called-wipe / -collapse (Raid).
 // The Damage Down causes are excluded from ffxiv-damage-down (error-rules.ts).
 // Not built: deaths to raidwides (healing), light ownership / relative
-// north / Return snapshot positions, NAUR/LPDU/MUR presets and who should
-// flex in Refrain (priority), Water / Eruption behaviour on a holder's death.
+// north / Return snapshot positions, LPDU/MUR presets (NAUR's Refrain flex
+// priority is built: naurGroups), Water / Eruption behaviour on a holder's death.
 //
 // -- GUIDE-DERIVED MODEL: ORACLE OF DARKNESS (FRU PHASE 3) --
 // Futures Rewritten (Ultimate), patch 7.11 origin; checked 2026-10-09.
@@ -319,6 +319,45 @@
 // 5. Are rewind-location samples and facing available? Measure beam/eruption
 //    geometry, stun timing, enrage rez-invulnerability bypass and reset
 //    signatures. Distinguish snapshot mistake from earlier mis-aimed beam.
+//
+// ── OPEN QUESTIONS (VOD needed; moved from docs/open-items.md 2026-10-15) ──
+// Built 2026-10-12 from 133 P3 pulls of two statics (six Memory's End
+// passes) with no VODs (report j6Zhc8kNYKrFWAGT's review above came after).
+// Times are from Gaia's first cast (Hell's Judgment, ~7:25 into the pull).
+// These apply to any P3 pull; check them on the first VODs that reach P3:
+//   - Fire in the Unholy stack (Relativity, ~0:26 / 0:36 / 0:46): a fire
+//     that hit three or more names only its holder. One or two caught names
+//     the holder and them. Right, or did the group walk into the holder?
+//   - First Sinbound Meltdown shot through others (~0:31 / 0:41 / 0:52): the
+//     line names everyone it hit, or only the baiter when it went through
+//     three or more. Who was wrong: the baiter's angle, or the players
+//     behind?
+//   - One follow-up beam through 4+ players is player-less. Who should be
+//     named (the baiter whose beam it was, the stack's caller)?
+//   - Dark Blizzard III donut on 3+ names the holder (off the stack's
+//     middle). One or two hit names them. Right?
+//   - A baiter at ~0% after their own single Meltdown shot, or a death to
+//     Relativity's raidwide right after Hell's Judgment, starts a fire
+//     cascade with nobody named (healing, or personal mitigation?).
+//   - Rewind Eruption overlap names the Eruption holder and anyone it hit
+//     (one or two), as for the fires. Is the snapshot spot the holder's
+//     fault?
+//   - [STALE?] Refrain Water, 5/3 split with nobody missing: the oversized
+//     group's members who share a Water timer are named (one of them had to
+//     flex). With the static's flex priority, only the one who should have
+//     moved could be. Which priority does the static use (NAUR role, LPDU,
+//     MUR)? (Answered 2026-10-12: NAUR priority; ffxiv-ood-water now names
+//     the misplaced player via naurGroups.)
+//   - Darkest Dance knockback into the wall names everyone who died, even
+//     five at once (R21 ~2:11). Should the tank who baited the jump be named
+//     instead when several die?
+//   - [STALE?] Spirit Taker shared: everyone hit is named when the log drops
+//     the target. Is the jump's target ever at fault? (One answer: pull 9
+//     +111.5 the NIN didn't move far enough; positions too sparse to read.)
+//   - Apocalypse wave on 4+ players is one player-less error. Should each
+//     player still be named (each got Damage Down)?
+//   - Shadoweye Doom names the player who faced the eye, eye holders too. Can
+//     a misplaced eye ever be the cause instead?
 
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import type { DeathEvent } from "@/types/DeathEvent";

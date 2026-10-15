@@ -9,6 +9,8 @@
 // The fight is the `?fight=` in a pasted URL, or the report's last kill.
 // WoW clears come from WarcraftLogs the same way (scripts/fetch-wow-report.js
 // samples, else lib/wcl-client.ts).
+// Deferred (from docs/open-items.md 2026-10-15): automatic search for
+// comparable clears; the user pastes one.
 
 import type { Pull } from "@/types/Pull";
 import { fetchFFReport, fetchFFightData } from "../ffl-client";

@@ -41,6 +41,28 @@
 // assigned mechanic only takes effect where its module reports instances
 // with their responsible players (lib/mechanics/occurrences.ts
 // ReportedOccurrence); anywhere else it counts as everyone.
+//
+// Left as everyone after the exposure sweep, doubtful (from
+// docs/open-items.md 2026-10-15):
+// - Dancing Mad: Forsaken towers (team inference falls back to timing when
+//   the burst inference fails), Forsaken cone baits (a failure flags every
+//   candidate), Revolting Ruin OT threat (arguably an assigned OT job).
+// - Red Hot and Deep Blue: Cutback Blaze aim (the target is only computed
+//   on a failure), Deep Aerial tower (one failure in 96 pulls).
+// - The Tyrant: the rest of Meteorain (Clipped by a Comet, Not Behind a
+//   Rock, Missed Fearsome Fireball) mixes scopes; Missed Stampede tower
+//   would be "everyone but the two marked".
+// - Vamp Fatale: Last Lash (no clean-instance signal).
+// - Vashnik: dispel overlap (healers, no visible assignment).
+// - Nek'zali: the Soulcoil Well team (needs the Grasping Depths buff).
+// - Ula'tek egg carriers (no stable assignment seen).
+// - Interrupts everywhere (Twin Fangs Visceral Burst, Coiled Altar
+//   Wail/Nightfall, Ula'tek add casts, Lost Explorers Icebound Flames): the
+//   log shows no kicker, only casts that went through.
+// Mechanic anchors are missing for the split-by-name generic rules
+// (ffxiv-damage-down and the like): they fall back to phase exposure, or
+// pull exposure on bosses without log phases. Every Venomous Abyss
+// mechanic without reported instances does the same.
 
 export type Exposure = "everyone" | "targeted" | "assigned";
 

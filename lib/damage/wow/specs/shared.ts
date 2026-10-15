@@ -28,6 +28,9 @@
 // next cast (within 3s) minus this cast's amount after its cost, median
 // over casts that weren't near the cap. Lost = units wasted × the player's
 // damage per unit from the resource's spenders.
+// The measured gain includes regen between the two casts, so for Energy it
+// runs high (Subtlety's Energy-cap estimate; from docs/open-items.md
+// 2026-10-15).
 
 import type { DamageFinding, Moment } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";

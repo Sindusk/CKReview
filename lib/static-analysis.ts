@@ -30,6 +30,11 @@
 //   sessions; assigned duties are left out (they're in the Strategy
 //   dialog). Wording and formula settled with the user 2026-10-11.
 // - Sessions are ordered by addedAt, like the rest of the statics views.
+//
+// Not yet confirmed by the user (from docs/open-items.md 2026-10-15):
+// Adjusted / pull covers detailed sessions only, Majors only. Sessions
+// imported before per-player exposure count every player at every
+// instance until resynced (the analysis says how many).
 
 import { prisma } from "@/lib/prisma";
 import type { Exposure } from "@/lib/mechanics/rule-meta";

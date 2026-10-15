@@ -64,6 +64,11 @@
 // Off-meta comps (no ranged, double caster, 3+ tanks, ...) degrade
 // gracefully: leftover DPS spill into unfilled slots in stable order,
 // always tentative, same fallback shape the old resolveMitigationSlots used.
+//
+// ── OPEN QUESTIONS (VOD needed; moved from docs/open-items.md 2026-10-15) ──
+//   - [STALE?] M1 vs M2 has no signal and is always tentative. (Contradicted
+//     above: M1/M2 now come from the Wave Cannon conga, tentative only when
+//     the pull never reaches Wave Cannon or a melee has no hit position.)
 
 import type { PlayerInfo } from "@/types/PlayerInfo";
 import { getFFRosterSortOrder } from "@/lib/ffl-job-data";

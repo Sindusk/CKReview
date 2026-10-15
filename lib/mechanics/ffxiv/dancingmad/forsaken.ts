@@ -78,6 +78,15 @@
 // downstream consequences of the tower errors already detected here at
 // their root cause, so modeling them would mostly re-flag the same
 // mistakes.
+//
+// ── OPEN QUESTIONS (VOD needed; moved from docs/open-items.md 2026-10-15) ──
+//   - [STALE?] Post-death missed towers: should a missed-tower flag after a
+//     death be suppressed? (DEATH DURING FORSAKEN already drops every tower
+//     after the fatal one, h2JvDkntZCaBgmLF pull 45; only the fatal tower's
+//     own errors survive.)
+// Not modeled:
+//   - the 47807 failed-tower kill
+//   - clone-overlap positioning geometry (the rule is outcome-gated only)
 
 import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { PullError, EnemyEvent } from "@/types/PullError";

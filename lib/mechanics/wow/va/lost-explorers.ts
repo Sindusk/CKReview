@@ -362,6 +362,56 @@
 //   Fishy Feedback and crate bleeds, tank stack mechanics, and avoidable
 //   hits. Attribute a wipe to a direct trigger when evidence supports it;
 //   avoid assigning blame from a downstream death or damage total alone.
+//
+// ── OPEN QUESTIONS (VOD needed; moved from docs/open-items.md 2026-10-15) ──
+//
+// A = nRGxQ1b8LdMvzC4D (15 wipes), B = 8PQFgdDh3R9BW71t (19 wipes + kill in
+// pull 20); no VOD ground truth yet — cutoffs per pull are in the wipe
+// survey above.
+//
+//   - Late fish blame: a Final Ascension that completes before the Command
+//     blames the fish thrower (Major if it killed anyone): A1 +66.7, A6
+//     +185.8, B7 +312.8 (Raid-level) and B1 +187.5, B12 +183.9 (no deaths).
+//     Is the thrower the right owner, or was the fish late for another
+//     reason (crate opened late, carrier moving, the call)?
+//   - No fish at all (B2 +65, 12 dead) is player-less. What happened to the
+//     fish that cycle? The log can't show who picked it up.
+//   - Blast Wave: every player hit flags, with the timing in the text (no
+//     bounce, bounced too late, or too early). Several "too early" deaths
+//     bounced exactly 2.5-2.6s before the wave — stepping on the mushroom
+//     too soon, or a mushroom auto-launch? Should any of these not be the
+//     victim's fault?
+//   - Nobody bounced over a wave five times (A15 +381, B3/B4/B6/B10 second
+//     wave), player-less; the mushroom existed in the log each time. Who
+//     places the mushroom — was it baited somewhere unreachable?
+//   - Elemental Explosion flags every Burning Flames holder within 12.5yd of
+//     a Frost missile's target (A5: 2, A8: 4, A10: 1; A9: nobody
+//     placeable). Should the missile's target also share blame, and is
+//     12.5yd too wide?
+//   - Mighty Thud under-soak (<=8 soakers) is player-less and names the
+//     marked player. B11 +327.8 and B7 +333.4: the marked player was alone.
+//     Did they run from the group, or did the group not follow?
+//   - Icebound Flames completions are player-less Minors (15, one in the
+//     kill). Is there a kick rotation that would let them name the missed
+//     kicker?
+//   - Shredding Shards flags a tank at 9+ stacks (two casts without a
+//     swap). Should the other tank (who didn't taunt) share it?
+//   - Splinters overlap isn't flagged (the stomper isn't in the log; the
+//     kill ran 3-4 stacks routinely). B3 +98.7 opened five crates at once
+//     (10 dead): the Throw Junk hits are flagged, the generic 7-dead marker
+//     is the cutoff. Want a Raid error for "5 crates at once"?
+//   - Blink Nova deaths aren't flagged (no distance falloff in the log). Any
+//     positioning or defensive expectation that should make them someone's
+//     fault?
+//   - Minor volume: Aftershock (84), Throw Junk (72), Evil Eyes (43) and
+//     Spreading Flames (19) flag every hit. The kill had 5 Aftershock, 3
+//     Evil Eyes, 2 Spreading Flames, 1 Throw Junk. Keep all?
+//   - Thresholds changed from other bosses: the collapse marker is 7 dead
+//     (5-6 was survived 50-120s here), and a burst of deaths with no killing
+//     blow logged is read as a called wipe. Right calls?
+//   (The not-flagged list — United Defense, Shell Spin stuns, Steady Strikes
+//   stacks, patch ticks, Haunting Spirits, Falling — is already recorded in
+//   the VERIFIED section's "Not flagged".)
 
 import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import type { DeathEvent } from "@/types/DeathEvent";

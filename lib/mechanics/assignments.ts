@@ -12,7 +12,7 @@
 // boss-specific code here.
 //
 // Detection (thresholds chosen by the builder, not yet confirmed — listed
-// in docs/open-items.md):
+// under "Not yet confirmed" below):
 // - "group": a soak-style duty, done by GROUP_MIN_PERFORMERS or more
 //   players at a time on average (user, 2026-10-11: build group
 //   detection). Groups are the players who perform it together: seeded
@@ -41,6 +41,17 @@
 //
 // Applied in app/page.tsx's displayPulls layer, so the Report tab, the pull
 // list and the static import all see the same attribution.
+//
+// Not yet confirmed by the user (from docs/open-items.md 2026-10-15): the
+// values below: single at SINGLE_SHARE 75%+ of performed instances; shared
+// at SHARED_MIN_SHARE 25%+ each and 75%+ together; MIN_PERFORMED 3; a group
+// duty at GROUP_MIN_PERFORMERS 2.5+ performers per instance on average,
+// groups by co-occurrence (GROUP_JACCARD 0.4) among players in
+// GROUP_MIN_SHARE 25%+ of the instances.
+// Group duties that look loose: Hungering Pyre's detected "group" is 11
+// players (nearly the raid), and Guillotine's main group is 7 for a
+// 5-player soak, so a missed soak names 2-4 absent members. Check against a
+// real raid plan before trusting those names.
 
 import type { Pull } from "@/types/Pull";
 import type { PullError } from "@/types/PullError";

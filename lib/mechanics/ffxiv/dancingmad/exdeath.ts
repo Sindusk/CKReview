@@ -66,6 +66,15 @@
 // gap: a death credited to Shockwave with no preceding Damage Down
 // application is flagged directly, under the same "missed the mechanic"
 // assumption the debuff-triggered rule already makes.
+//
+// ── OPEN QUESTIONS (VOD needed; moved from docs/open-items.md 2026-10-15) ──
+//   - Thunder III marking two non-tanks is a distinct, unexplained failure
+//     (skipped in detectThunderIIIErrors). It may be Phase 5's Lightning
+//     Resistance Down II, which shares ID 1002998 and goes to two players at
+//     once. The marks are now filtered to cause 47884 (2026-09-27), so
+//     recheck whether the observation survives; no recheck is recorded.
+// Not built:
+//   - Shockwave role-stack markers
 
 import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { PullError } from "@/types/PullError";

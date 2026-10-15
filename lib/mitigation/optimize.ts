@@ -86,6 +86,12 @@
 // that needs help (a raid lead fixes one hit at a time); and two changes
 // where, with one taken out, the other becomes illegal or stops helping
 // (the objective without both equals the objective without the first).
+//
+// Not yet confirmed by the user (from docs/open-items.md 2026-10-15):
+// CAST_LEAD_MS 2s (not yet checked against how early real casts land);
+// BEAM_WIDTH 50; the legality share ½; tier 3 `freedom` as above; the edit
+// pruning (shifts and adds only to failing or tight hits, a swap only when
+// it helps one, one free shift per cast); the grouping rules above.
 
 import type { Pull } from "@/types/Pull";
 import type { PlayerInfo } from "@/types/PlayerInfo";
@@ -96,7 +102,7 @@ import {
 } from "./analyze";
 import { reachesPart, type DebuffReach } from "./debuff-reach";
 
-// Tunables: chosen by the builder, not yet confirmed (docs/open-items.md).
+// Tunables: chosen by the builder, not yet confirmed (the "Not yet confirmed" list above).
 // A placed cast's lead before its anchor hit's first damage.
 export const CAST_LEAD_MS = 2_000;
 export const BEAM_WIDTH = 50;
