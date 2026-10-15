@@ -58,8 +58,16 @@
 // - Both lines in one stack (A46 +1:21.5, A55 +1:21.5): the two players
 //   of the set's line number (In Line 3 both times) on the same side. Per
 //   the user's VOD reviewer (2026-10-14, A46) one of them should have
-//   crossed to the other group; it isn't the whole group. Which one isn't
-//   settled (NAUR's P1 flex priority is Tanks > Melee > Ranged > Healer).
+//   crossed to the other group; it isn't the whole group.
+// - Group A's slots (user, 2026-10-14, TOP only): WAR MT, DRK OT, WHM H1,
+//   SCH H2, PCT R1, DNC R2, DRG and RDM the melee. The Pantokrator groups
+//   follow one conga, H1 > M2 > R1 > MT > OT > M1 > R2 > H2 if the DRG is
+//   M1 (NAUR's H1 R1 M1 MT OT M2 R2 H2 if the RDM is M1): for each In Line
+//   number the earlier player goes to one side, the later to the other.
+//   It fits all 49 pulls with known groups, and no other order fits. By it,
+//   A46 +1:21.5's DRG and A55 +1:21.5's PCT didn't cross. Not built: the
+//   module doesn't know slots (roles.ts reads this comp's melee/ranged
+//   wrongly), so both of the pair stay named.
 // - Missile-knockback deaths and Doom deaths log with no killing blow in
 //   some pulls; neither counts toward a called wipe.
 // - Diffuse on non-tanks (A8 +1:48.2, A24, A36 ...): the cone goes to the
