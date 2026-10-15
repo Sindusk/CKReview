@@ -18,12 +18,16 @@
 //
 // Generic rules: some rule ids cover many different abilities and name
 // each error after the ability (ffxiv-damage-down → "Damage Down (Big
-// Bang)", wow-ula-avoidable → "Hit by Falling Debris", every *-pull-over →
-// "Raid Collapse" / "Tank Died"). Those are split by name: each name is its
-// own mechanic. Rules whose name only varies cosmetically ("Egg Hatched" /
-// "Viper Hatched") are grouped with mechanic() instead. A rule that is
-// neither keeps one mechanic per rule id, so renaming it doesn't break its
-// trend.
+// Bang)", ffxiv-uof-avoidable → "Hit by Twin Silence", every *-pull-over →
+// "Raid Collapse" / "Tank Died"). Every rule without an entry here is
+// split by name: each distinct error name is its own mechanic, unless a
+// mechanic() groups it explicitly (user, 2026-10-15: "Hit by Twin
+// Silence" showed only inside a "Hit by Burst" row). Rules whose name only
+// varies cosmetically ("Egg Hatched" / "Viper Hatched") are grouped with
+// mechanic(). A rule with a phase() or exposure() entry but no mechanic()
+// keeps one mechanic per rule id: its anchors and reported instances
+// (occurrences.ts) are keyed by the rule id. SPLIT_BY_NAME forces a split
+// for such a rule.
 //
 // Exposure (docs/archive/exposure-plan.md) says who a mechanic tests, which sets a
 // player's chances in the Statics analysis:
@@ -81,7 +85,10 @@ type RuleMetaEntry = Partial<RuleMeta> & {
 
 const RULE_META: Record<string, RuleMetaEntry> = {};
 
-/** Generic rules split into one mechanic per error name (see header). */
+/**
+ * Rules split into one mechanic per error name even though they have an
+ * entry (see header). Most generic rules have none and split anyway.
+ */
 const SPLIT_BY_NAME = new Set<string>([
   "manual-added-error",  // MANUAL_ERROR_RULE_ID: the reviewer's own label
   "ffxiv-damage-down",
@@ -93,7 +100,7 @@ const SPLIT_BY_NAME = new Set<string>([
 ]);
 
 function isSplitByName(ruleId: string): boolean {
-  return SPLIT_BY_NAME.has(ruleId) || ruleId.endsWith("-pull-over");
+  return SPLIT_BY_NAME.has(ruleId) || ruleId.endsWith("-pull-over") || !RULE_META[ruleId];
 }
 
 /** Several rules forming one mechanic. */
