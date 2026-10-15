@@ -52,6 +52,16 @@
 //   from 2:00.3 and everyone else attacked by 2:01, the Dancer's next GCD
 //   was Technical Step at 2:02.7; xivanalysis counts that stretch as
 //   downtime. Not adopted: Curing Waltz uses (healing).
+//   Rechecked on the same report's Red Hot and Deep Blue kill (Pull 2,
+//   2026-10-14), nothing to build. Matched: GCD uptime 98.3%, every
+//   Technical window full (8:38 5/5 before the kill), the 0:54 triple
+//   weave (2.0s, 31k), the 1:59 gap (1.4s, 21k), Threefold Fan Dance
+//   overwritten at 8:49 (36k), 2 feathers and 2-3 Saber Dances "may have
+//   been lost" (estimates, not valued). Fixed on the app's side: its
+//   tincture finding 8:35 → 6:31 "11s more raid buffs" (16k) came from
+//   the kill cutting the 8:35 tincture at 16s; a cut tincture is now
+//   compared over the same length (tincture.ts). Not adopted: Shield
+//   Samba, Curing Waltz, Second Wind.
 // Bard: Caustic Bite / Stormbite (below), Hawk's Eye overwrites, AoE on
 //   one target, the burst window, cooldowns (OGCDDowntime.ts).
 //   Rechecked on dDar482XvFKBPJYh FRU kill (7.1, 2026-10-12): its 17

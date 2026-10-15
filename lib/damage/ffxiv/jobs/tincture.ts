@@ -39,7 +39,9 @@
 //   that only won filler, or only gained because the pull ended, asked the
 //   player to predict the kill). When the best placement's move for a
 //   tincture fails those reasons, the best passing start within 30s of
-//   it is taken instead (2026-10-14; never for one the kill cut short).
+//   it is taken instead (2026-10-14). A tincture the kill (or a wipe) cut
+//   short is compared at its new start over the same length it got, so
+//   the end of the pull is never the reason for a move.
 //   Pulls with no tincture are skipped: in
 //   prog, not drinking is a choice about cost, not play.
 // Marked inference: it assumes the rotation would have been the same.
@@ -311,7 +313,22 @@ export const tincture: JobCheck = (ctx: PlayerCheckContext): DamageFinding[] => 
   const buffMs = (bin: number) => overlapMs(...spanOf(bin), ctx.buffWindows);
   const downMs = (bin: number) => overlapMs(...spanOf(bin), downtime);
   if (best && best.total > actual) {
-    const moveTo = (b: number, to: number) => ({ from: b, to, gain: cover(to) - cover(b), buffs: buffMs(to) - buffMs(b), down: downMs(b) - downMs(to) });
+    // A tincture the kill cut short is compared over the part it got: the
+    // same length at the new start. Measured over a full 30s there, the
+    // Dancer's 8:35 one on K6qfMamL7rN8yz2Q Red Hot and Deep Blue (16s
+    // before the kill) read as 8:35 → 6:31 "11s more raid buffs", which
+    // only the kill made fewer (asking the player to predict it).
+    const lenOf = (b: number) => Math.min(DURATION_MS, ctx.endMs - atMs(b));
+    const coverLen = (bin: number, len: number) => prefix[Math.min(bins, bin + Math.round(len / STEP_MS))] - prefix[Math.min(bins, bin)];
+    const spanLen = (bin: number, len: number) => [atMs(bin), Math.min(atMs(bin) + len, ctx.endMs)] as const;
+    const moveTo = (b: number, to: number) => {
+      const len = lenOf(b);
+      return {
+        from: b, to, gain: coverLen(to, len) - coverLen(b, len),
+        buffs: overlapMs(...spanLen(to, len), ctx.buffWindows) - buffMs(b),
+        down: downMs(b) - overlapMs(...spanLen(to, len), downtime),
+      };
+    };
     const passes = (m: ReturnType<typeof moveTo>) => Math.abs(m.to - m.from) * STEP_MS >= MOVE_MIN_SHIFT_MS &&
       m.gain > Math.max(1, cover(m.from)) * MOVE_MIN_SHARE && (m.buffs >= MOVE_MIN_MS || m.down >= MOVE_MIN_MS);
     // When the best placement's move fails those reasons, the best start
@@ -324,9 +341,6 @@ export const tincture: JobCheck = (ctx: PlayerCheckContext): DamageFinding[] => 
     let moves = actualBins.map((b, i) => {
       const dp = moveTo(b, best.starts[i]);
       if (passes(dp)) return dp;
-      // Not for a tincture the kill cut short: its "fewer raid buffs" is
-      // the kill's doing (the Dancer's 8:35 one there read as 8:35 → 6:31).
-      if (atMs(b) + DURATION_MS > ctx.endMs) return undefined;
       let alt: ReturnType<typeof moveTo> | undefined;
       // Nearby only (within one tincture's span): the same burst, timed
       // better. Unbounded, it moved opener pots to the 2:00 burst for 2-3s

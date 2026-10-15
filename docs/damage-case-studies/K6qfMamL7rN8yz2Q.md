@@ -162,6 +162,11 @@ xivanalysis pages for all eight players saved 2026-10-14 in
 - **Siegward Damvir (Warrior).** Per-claim record in the Warrior header of
   lib/damage/ffxiv/jobs/pld-war.ts. Built: Nascent Chaos overwritten by
   Infuriate (0:14.4, 36k). Lost 305k → 341k.
+- **Chauzey Solstice (Dancer).** Nothing to build from xivanalysis. Fixed
+  on the app's side: a tincture the kill cut short is compared over the
+  same length at its new start (tincture.ts). Her 8:35 → 6:31 finding
+  (16k) was the kill's doing, as were 8 others across the samples. Lost
+  133k → 117k.
 - Kade's 6:50-6:57 question: the user doesn't know (no VOD). It stays
   counted as his.
 
@@ -184,7 +189,11 @@ xivanalysis pages for all eight players saved 2026-10-14 in
   charges-at-kill proposal (open-items.md), the lenient saws/towers/adds
   window (Kade 4:54 / 5:47, Kevin 8:05), the PCT lanes' review.
 - Red Hot and Deep Blue kill (session 2026-10-14): Mocha, Yoro, Kade,
-  Sayacissa, Sin, Kevin and Siegward done. Next: Chauzey (133k). The page is
-  already in sampledata/damage-ff/. Patch review: same report and comp as
-  Vamp Fatale (7.4), nothing new.
+  all eight players done (pages in sampledata/damage-ff/; patch review:
+  same report and comp as Vamp Fatale, 7.4, nothing new).
+  - Unresolved without a VOD: Mocha 8:33-8:39 (idle with coils in Insane
+    Air), Kade 6:50-6:57 (Shield Lobs before the divide).
+  - Still waiting on the user: the charges-at-kill proposal
+    (docs/open-items.md). It comes up for Mocha's coils, Sin's Phlegma
+    and Sayacissa's Dragonfire Dive.
 - The Tyrant, Lindwurm and Lindwurm II kills are on disk too.
