@@ -18,13 +18,14 @@
 // raid buffs and tincture up then (with who applied a boss debuff, and the
 // seconds left), the GCD in effect (name, when it started, its cast time), what was woven
 // after it before the next GCD, the idle after it, and the findings near
-// that moment. Clicking a loss dot hands its finding to `onPick`.
+// that moment. Clicking a loss dot hands its finding to `onPick`; clicking
+// anywhere else plays the video from that moment (`onSeek`).
 //
 // Long-span findings and pull-wide rates aren't drawn (user, 2026-10-13):
 // a finding without moments over SPAN_MARK_MS is one dot where it starts;
 // a pull-wide rate (GCD pace) has no moment; tinctures show in their lane.
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type MouseEvent } from "react";
 import type { DamageFinding, GaugeTrack, PlayerDamageSummary, PullDamageAnalysis, TimelineGcd } from "@/lib/damage/types";
 import { KIND_THEME } from "@/lib/damage/coaching";
 import { THEME_COLOR } from "./ui/DamageGlyphs";
@@ -58,9 +59,11 @@ type ActiveBuff = { name: string; icon?: string; leftMs: number; sources: string
 type Marker = { f: DamageFinding; startMs: number; endMs: number; lost: number; detail: string; moment: boolean; drift: boolean };
 const DRIFT_KINDS = new Set<DamageFinding["kind"]>(["gcd-delay", "gcd-drift", "gcd-clipping"]);
 
-export default function DamageTimeline({ summary, analysis, highlight, onPick }: {
+export default function DamageTimeline({ summary, analysis, highlight, onPick, onSeek }: {
   summary: PlayerDamageSummary; analysis: PullDamageAnalysis;
   highlight?: DamageFinding | null; onPick?: (f: DamageFinding) => void;
+  // Clicking the plot anywhere but a marker plays the video from there.
+  onSeek?: (ms: number) => void;
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(900);
@@ -163,11 +166,13 @@ export default function DamageTimeline({ summary, analysis, highlight, onPick }:
   return (
     <div ref={wrapRef} style={{ position: "relative", marginBottom: 4 }}
       onMouseLeave={() => setHoverX(null)}>
-      <svg width={width} height={height} style={{ display: "block", fontFamily: "var(--font-inter), system-ui, sans-serif" }}
+      <svg width={width} height={height}
+        style={{ display: "block", fontFamily: "var(--font-inter), system-ui, sans-serif", cursor: onSeek && hoverX !== null ? "pointer" : undefined }}
         onMouseMove={(e) => {
           const mx = e.clientX - e.currentTarget.getBoundingClientRect().left;
           setHoverX(mx >= GUTTER && mx <= GUTTER + pw ? mx : null);
-        }}>
+        }}
+        onClick={() => { if (onSeek && hoverT !== null) onSeek(Math.max(0, Math.round(hoverT))); }}>
         <defs>
           <pattern id={hatchId} width={6} height={6} patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
             <rect width={6} height={6} fill="rgba(255,255,255,0.025)" />
@@ -256,7 +261,7 @@ export default function DamageTimeline({ summary, analysis, highlight, onPick }:
             a small delay or clip as a thin line under them. */}
         {markers.filter((m) => m.drift).map((m, i) => {
           const hl = highlight === m.f;
-          const props = { style: { cursor: onPick ? "pointer" : undefined }, onClick: () => onPick?.(m.f) };
+          const props = { style: { cursor: onPick ? "pointer" : undefined }, onClick: (e: MouseEvent) => { e.stopPropagation(); onPick?.(m.f); } };
           if (m.f.minor) {
             return (
               <rect key={`d${i}`} x={x(m.startMs)} y={gcdY + gcdH - 5} width={Math.max(2.5, w(m.startMs, m.endMs))} height={hl ? 5 : 3}
@@ -277,14 +282,14 @@ export default function DamageTimeline({ summary, analysis, highlight, onPick }:
           if (m.moment) {
             return (
               <rect key={`m${i}`} x={x(m.startMs) - 1} y={lossY + 4} width={Math.max(2.5, w(m.startMs, m.endMs))} height={8}
-                fill={color} opacity={hl ? 1 : 0.6} style={{ cursor: onPick ? "pointer" : undefined }} onClick={() => onPick?.(m.f)} />
+                fill={color} opacity={hl ? 1 : 0.6} style={{ cursor: onPick ? "pointer" : undefined }} onClick={(e) => { e.stopPropagation(); onPick?.(m.f); }} />
             );
           }
           const r = 3.5 + Math.sqrt(m.lost / maxLost) * 8;
           return (
             <circle key={`m${i}`} cx={x(m.startMs)} cy={lossY + lossH / 2 + 3} r={hl ? r + 2.5 : r}
               fill={color} fillOpacity={hl ? 1 : 0.85} stroke={hl ? "#fff" : "var(--ck-bg-deep)"} strokeWidth={hl ? 2 : 1.5}
-              style={{ cursor: onPick ? "pointer" : undefined }} onClick={() => onPick?.(m.f)} />
+              style={{ cursor: onPick ? "pointer" : undefined }} onClick={(e) => { e.stopPropagation(); onPick?.(m.f); }} />
           );
         })}
 
@@ -313,6 +318,7 @@ export default function DamageTimeline({ summary, analysis, highlight, onPick }:
         }}>
           <div className="ck-num" style={{ color: "var(--ck-text-3)", fontSize: 11 }}>
             {fmtTime(hoverT)}{hoverForced ? ` · forced: ${hoverForced.cause}` : ""}
+            {onSeek && <span style={{ float: "right", color: "var(--ck-arcane-text)" }}>Click to watch from here</span>}
           </div>
           {hoverBuffs.length > 0 && (
             <div style={{ marginTop: 3, paddingBottom: 4, borderBottom: "1px solid var(--ck-line)" }}>

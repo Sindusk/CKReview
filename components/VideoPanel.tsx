@@ -88,6 +88,10 @@ type VideoPanelProps = {
   // seeking to the same time twice in a row still re-fires the effect below.
   seekRequest: SeekRequest | null;
 
+  // ONE-TIME PAUSE COMMAND: each new value pauses the player once (the
+  // Damage and Mitigation dialogs cover the video while open). 0 does nothing.
+  pauseRequest?: number;
+
   // continuous playback reporting
   onCurrentTimeChange?: (time: number) => void;
 
@@ -148,6 +152,7 @@ function loadYouTubeAPI(): Promise<void> {
 export default function VideoPanel({
   vod,
   seekRequest,
+  pauseRequest = 0,
   onCurrentTimeChange,
   onUnsync,
   onResync,
@@ -406,6 +411,10 @@ export default function VideoPanel({
     playerRef.current.seekTo(seekRequest.time);
     playerRef.current.play();
   }, [seekRequest]);
+
+  useEffect(() => {
+    if (pauseRequest && playerReadyRef.current) playerRef.current?.pause();
+  }, [pauseRequest]);
 
   // Pause when the no-coverage card goes up. The seek that lifts it (a
   // new pull or VOD) starts playback again through the effect above.

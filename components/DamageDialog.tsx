@@ -51,6 +51,9 @@ type DamageDialogProps = {
   pulls:         Pull[];
   // The app's globally-selected pull; the dropdown resets to it on open.
   currentPullId: number | null;
+  // Play the video from `ms` into that pull (closes the dialog). Unset
+  // without a synced VOD.
+  onSeek?: (pullId: number, ms: number) => void;
 };
 
 // Red, not the Major orange: beside the raid-buff gold the orange read as
@@ -107,7 +110,7 @@ const KIND_LABEL: Record<DamageFinding["kind"], string> = {
 
 const gameOf = (p: Pull) => (p.game === "wow" ? WOW_DAMAGE : FFXIV_DAMAGE);
 
-export default function DamageDialog({ open, onClose, pulls, currentPullId }: DamageDialogProps) {
+export default function DamageDialog({ open, onClose, pulls, currentPullId, onSeek }: DamageDialogProps) {
   const { ffPulls: gamePulls, selectedPullId, setSelectedPullId, selectedPull } =
     useFFPullSelector(pulls, open, currentPullId, ["ffxiv", "wow"]);
   const [allPulls, setAllPulls] = useState(false);
@@ -305,6 +308,7 @@ export default function DamageDialog({ open, onClose, pulls, currentPullId }: Da
                   iconFor={iconFor}
                   pull={selectedPull}
                   pulls={gamePulls}
+                  onSeek={onSeek && selectedPull ? (ms) => onSeek(selectedPull.id, ms) : undefined}
                 />
               ) : (
                 <p className="ck-dialog-text">No players in this pull.</p>
@@ -521,8 +525,9 @@ function BiggestWins({ items, perPull, dealt, icons, onPick }: {
   );
 }
 
-function PlayerDetail({ summary, analysis, colorFor, iconFor, pull, pulls }: {
+function PlayerDetail({ summary, analysis, colorFor, iconFor, pull, pulls, onSeek }: {
   summary: PlayerDamageSummary; analysis: PullDamageAnalysis; colorFor: ColorFor; iconFor: ColorFor; pull?: Pull; pulls: Pull[];
+  onSeek?: (ms: number) => void;
 }) {
   const shown = summary.findings.filter((f) => f.lostDamage >= 1 || NO_VALUE_KINDS.has(f.kind));
   const icons = useMemo(() => abilityIconsOf(pull ? [pull] : [], summary.player), [pull, summary.player]);
@@ -606,7 +611,7 @@ function PlayerDetail({ summary, analysis, colorFor, iconFor, pull, pulls }: {
           }] : []),
       ]} />
       <BiggestWins items={items} dealt={summary.damage} icons={icons} onPick={pick} />
-      <DamageTimeline summary={summary} analysis={analysis} highlight={hovered ?? picked} onPick={pick} />
+      <DamageTimeline summary={summary} analysis={analysis} highlight={hovered ?? picked} onPick={pick} onSeek={onSeek} />
       {shown.length === 0 ? (
         <p className="ck-dialog-text" style={{ marginTop: 12 }}>Nothing found for this player.</p>
       ) : (

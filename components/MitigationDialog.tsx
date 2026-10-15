@@ -64,9 +64,12 @@ type MitigationDialogProps = {
   // The app's globally-selected pull — the dialog's pull dropdown resets to
   // it on open when "one pull" mode is picked (hooks/useFFPullSelector.ts).
   currentPullId: number | null;
+  // Play the video from `ms` into that pull (closes the dialog). Unset
+  // without a synced VOD.
+  onSeek?: (pullId: number, ms: number) => void;
 };
 
-type View = "analysis" | "timeline" | "tanking";
+type View ="analysis" | "timeline" | "tanking";
 
 const rosterKey = (pull: Pull) => pull.players.map((p) => p.name).sort().join("|");
 
@@ -79,7 +82,7 @@ function Checkbox({ checked, onChange, children }: { checked: boolean; onChange:
   );
 }
 
-export default function MitigationDialog({ open, onClose, pulls, currentPullId }: MitigationDialogProps) {
+export default function MitigationDialog({ open, onClose, pulls, currentPullId, onSeek }: MitigationDialogProps) {
   const { ffPulls, selectedPullId, setSelectedPullId, selectedPull } =
     useFFPullSelector(pulls, open, currentPullId);
   const [allPulls, setAllPulls] = useState(true);
@@ -388,7 +391,8 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId }
                       selectedId={selectedHitId} onSelect={setSelectedHitId} />
               ) : shownHits && shownHits.length > 0 ? (
                 <PullTimeline hits={shownHits} groups={shownGroups} expanded={shownExpanded} onToggle={toggleExpanded}
-                  selectedId={selectedHitId} onSelect={setSelectedHitId} />
+                  selectedId={selectedHitId} onSelect={setSelectedHitId}
+                  onSeek={onSeek && selectedPull ? (ms) => onSeek(selectedPull.id, ms) : undefined} />
               ) : (
                 <p className="ck-dialog-text" style={{ padding: 12 }}>
                   {selectedHits?.length ? "Every hit in this pull was uneventful." : "No raidwide hits in this pull."}

@@ -308,9 +308,16 @@ function spanOf(groups: VisibleGroup[]): number {
   return SIDE_HEADERS.length + groups.reduce((s, g) => s + g.columns.length, 0) + 1;
 }
 
-function sideCells(time: string, mechanic: ReactNode, selected: boolean): ReactNode[] {
+// With `onWatch`, the time is a button that plays the video from there.
+function sideCells(time: string, mechanic: ReactNode, selected: boolean, onWatch?: () => void): ReactNode[] {
   return [
-    <td key="t" style={{ ...td, ...stickyLeft(0), width: TIME_WIDTH, ...selectedBg(selected) }} className="ck-num">{time}</td>,
+    <td key="t" style={{ ...td, ...stickyLeft(0), width: TIME_WIDTH, ...selectedBg(selected) }} className="ck-num">
+      {onWatch ? (
+        <button title="Watch from here" onClick={(e) => { e.stopPropagation(); onWatch(); }} style={{
+          font: "inherit", color: "var(--ck-arcane-text)", background: "transparent", border: 0, padding: 0, cursor: "pointer",
+        }}>▶ {time}</button>
+      ) : time}
+    </td>,
     <td key="m" style={{ ...td, ...stickyLeft(TIME_WIDTH), color: "var(--ck-text)", ...selectedBg(selected) }}>{mechanic}</td>,
   ];
 }
@@ -328,7 +335,11 @@ const rowStyle: CSSProperties = { cursor: "pointer" };
 
 // ── Single pull ─────────────────────────────────────────────────────────
 
-export function PullTimeline({ hits, groups, expanded, onToggle, selectedId, onSelect }: TimelineProps & { hits: MitigationHit[] }) {
+export function PullTimeline({ hits, groups, expanded, onToggle, selectedId, onSelect, onSeek }: TimelineProps & {
+  hits: MitigationHit[];
+  // Plays the video from a hit's time (ms into the pull).
+  onSeek?: (ms: number) => void;
+}) {
   const visible = visibleGroups(groups, expanded);
   const span = spanOf(visible);
   let lastPhase: string | undefined;
@@ -345,7 +356,8 @@ export function PullTimeline({ hits, groups, expanded, onToggle, selectedId, onS
             phaseRow,
             <tr key={hit.id} style={rowStyle} onClick={() => onSelect(selected ? null : hit.id)}>
               {sideCells(fmtTime(hit.timestampMs),
-                <MechanicLabel name={hit.abilityNames.join(" + ")} occurrence={hit.occurrence} waves={hit.waves} tankOnly={hit.tankOnly} />, selected)}
+                <MechanicLabel name={hit.abilityNames.join(" + ")} occurrence={hit.occurrence} waves={hit.waves} tankOnly={hit.tankOnly} />, selected,
+                onSeek && (() => onSeek(hit.timestampMs)))}
               <OutcomeCell after={hit.margin} verdict={hit.verdict} selected={selected} />
               {visible.flatMap(({ group, columns }) => columns.map((c, i) => {
                 const base = { ...cellTd, ...ruled(i === 0), ...selectedBg(selected) };

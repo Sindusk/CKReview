@@ -466,6 +466,24 @@ export default function Home() {
     timeline.seekToPullStart(ms / 1000);
   }, [activePull, selectedVod, timeline]);
 
+  // The Damage and Mitigation dialogs cover the video, so opening either
+  // pauses it. Clicking a moment on their timelines closes them and plays
+  // from there, switching to that pull (and a VOD covering it) when the
+  // dialog showed another one.
+  const [pauseToken, setPauseToken] = useState(0);
+  useEffect(() => {
+    if (showDamage || showMitigation) setPauseToken((t) => t + 1);
+  }, [showDamage, showMitigation]);
+  const canSeekFromDialog = !!selectedVod && isSynced(selectedVod);
+  const handleDialogSeek = useCallback((pullId: number, ms: number) => {
+    setShowDamage(false);
+    setShowMitigation(false);
+    timeline.seekInPull(pullId, ms / 1000);
+    if (pullId !== activePull?.id) handleSelectPullFromList(pullId);
+  // handleSelectPullFromList is a plain function re-created each render.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeline, activePull]);
+
   // Debounced session save. Lazily creates a session (and stamps
   // ?session=<id> onto the URL) the first time anything savable exists;
   // every subsequent call overwrites that same session. Safe to call
@@ -1325,6 +1343,7 @@ export default function Home() {
         onClose={() => setShowDamage(false)}
         pulls={pulls}
         currentPullId={selectedPullId}
+        onSeek={canSeekFromDialog ? handleDialogSeek : undefined}
       />
 
       <MitigationDialog
@@ -1332,6 +1351,7 @@ export default function Home() {
         onClose={() => setShowMitigation(false)}
         pulls={pulls}
         currentPullId={selectedPullId}
+        onSeek={canSeekFromDialog ? handleDialogSeek : undefined}
       />
 
       <div
@@ -1394,6 +1414,7 @@ export default function Home() {
             <VideoPanel
               vod={selectedVod}
               seekRequest={timeline.seekRequest}
+              pauseRequest={pauseToken}
               onCurrentTimeChange={handleVideoTimeUpdate}
               onUnsync={handleUnsyncVod}
               onResync={resyncFromPull}

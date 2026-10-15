@@ -97,6 +97,9 @@ export default function useTimelineController({
   // gives it the right `seekRequest`, no race.
   const prevPullIdRef = useRef<number | null>(null);
   const autoSeekKeyRef = useRef<string | null>(null);
+  // A position to land on in a pull about to be selected (seekInPull), in
+  // place of its start.
+  const queuedOffsetRef = useRef<{ pullId: number; sec: number } | null>(null);
   const autoSeekKey = vod && pull ? `${vod.id}:${pull.id}` : null;
 
   // Skipped while on hold. The key is forgotten so the seek fires as soon
@@ -110,8 +113,10 @@ export default function useTimelineController({
     const pullChanged = prevPullIdRef.current !== pull.id;
     prevPullIdRef.current = pull.id;
 
-    const withinPull = pullChanged ? 0 : playbackTime;
-    if (pullChanged) setPlaybackTime(0);
+    const queued = queuedOffsetRef.current?.pullId === pull.id ? queuedOffsetRef.current.sec : undefined;
+    queuedOffsetRef.current = null;
+    const withinPull = queued ?? (pullChanged ? 0 : playbackTime);
+    if (pullChanged || queued !== undefined) setPlaybackTime(withinPull);
 
     seekTokenRef.current += 1;
     const target = (offsetForPull(vod, pull) ?? 0) + pull.startTime + withinPull;
@@ -209,6 +214,21 @@ export default function useTimelineController({
     emitSeek((offsetForPull(vod, pull) ?? 0) + pull.startTime + offsetOverride);
   }
 
+  // ─── Jump into a pull (Damage / Mitigation timelines) ────────────────────────
+  //
+  // The selected pull: seek now. Another pull: the caller selects it and the
+  // auto-seek above lands on this offset instead of the pull's start.
+
+  function seekInPull(pullId: number, offsetSec: number) {
+    if (pull && pull.id === pullId) {
+      if (!vod) return;
+      setPlaybackTime(offsetSec);
+      emitSeek((offsetForPull(vod, pull) ?? 0) + pull.startTime + offsetSec);
+      return;
+    }
+    queuedOffsetRef.current = { pullId, sec: offsetSec };
+  }
+
   // ─── Raw video time (for the Sync button label) ───────────────────────────────
 
   // Stored separately so the Sync button can display it without needing a pull
@@ -233,6 +253,7 @@ export default function useTimelineController({
     // Actions
     seekWithinPull,
     seekToPullStart,
+    seekInPull,
     calibrate,
     updateFromVideo,
     updateRawVideoTime,
