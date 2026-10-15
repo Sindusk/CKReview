@@ -5,8 +5,9 @@
 // One player's view of the static's detailed sessions: their mechanics
 // ranked for the selected boss/phase/sessions (chances limited to pulls they
 // played), their first sessions against their last per mechanic, and a strip
-// across the fight timeline showing where their counted errors cluster.
-// Clicking a mechanic narrows the strip to it. Data:
+// across the fight timeline showing where their counted errors cluster,
+// and which sessions (and pulls) those errors came from. Clicking a mechanic
+// narrows the strip and the session list to it. Data:
 // /api/statics/[staticId]/analysis/players/[identityId]
 // (lib/static-analysis.ts). Separate from StaticPlayersPanel, which is the
 // identity-management tool.
@@ -20,7 +21,7 @@ import {
   analysisQuery, rankMechanics,
   type AnalysisContextResponse, type AnalysisFilterState, type MechanicStats, type SessionTallyPoint,
 } from "@/components/StaticAnalysisParts";
-import type { TimelineError } from "@/lib/static-analysis";
+import type { AnalysisSession, TimelineError } from "@/lib/static-analysis";
 
 type PlayerOption = {
   id:         number;
@@ -157,6 +158,16 @@ export default function StaticPlayerAnalysisPanel({ staticId, dataVersion = 0 }:
                 maxDurationMs={shown.maxDurationMs}
               />
             </section>
+            <section>
+              <h3 className="ck-section-label" style={{ margin: "0 0 8px" }}>
+                Errors by session{selectedLabel ? `: ${selectedLabel}` : ""}
+              </h3>
+              <SessionBreakdown
+                errors={selectedMechanic ? shown.timeline.filter((t) => t.mechanicKey === selectedMechanic) : shown.timeline}
+                sessions={shown.sessions}
+                detailed={selectedMechanic !== null}
+              />
+            </section>
           </>
         )}
       </div>
@@ -254,6 +265,52 @@ function TimelineStrip({ errors, maxDurationMs }: { errors: TimelineError[]; max
         </span>
       ))}
     </div>
+    </div>
+  );
+}
+
+/**
+ * Which sessions the errors came from, newest first: each session's date
+ * and label, then its errors by mechanic. With one mechanic selected
+ * (`detailed`) every error is listed as "Pull 14 3:12"; otherwise each
+ * mechanic is a count, its pulls and times in the tooltip.
+ */
+function SessionBreakdown({ errors, sessions, detailed }: {
+  errors: TimelineError[]; sessions: AnalysisSession[]; detailed: boolean;
+}) {
+  if (errors.length === 0) return <p className="ck-dialog-text" style={{ margin: 0 }}>No counted errors.</p>;
+  const bySession = new Map<number, TimelineError[]>();
+  for (const e of errors) bySession.set(e.sessionId, [...(bySession.get(e.sessionId) ?? []), e]);
+  const rows = [...sessions].reverse().filter((s) => bySession.has(s.id));
+  const where = (e: TimelineError) => `Pull ${e.pullNumber} ${fmt(e.timestampMs)}`;
+  const sevColor = (es: TimelineError[]) => (es.some((e) => e.severity !== "Minor") ? SEVERITY_COLOR.Major : SEVERITY_COLOR.Minor);
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+      {rows.map((s) => {
+        const list = bySession.get(s.id)!.sort((a, b) => a.pullNumber - b.pullNumber || a.timestampMs - b.timestampMs);
+        const byLabel = new Map<string, TimelineError[]>();
+        for (const e of list) byLabel.set(e.label, [...(byLabel.get(e.label) ?? []), e]);
+        return (
+          <div key={s.id} style={{ display: "grid", gridTemplateColumns: "150px 40px minmax(0, 1fr)", gap: "10px", alignItems: "baseline", fontSize: "12px", padding: "4px 0", borderTop: "1px solid var(--ck-line)" }}>
+            <span style={{ color: "var(--ck-text-2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={s.label ?? undefined}>
+              <span className="ck-num">{new Date(s.date).toLocaleDateString()}</span>
+              {s.label && <span style={{ color: "var(--ck-text-3)" }}> · {s.label}</span>}
+            </span>
+            <span className="ck-num" style={{ color: "var(--ck-text)", textAlign: "right" }}>{list.length}</span>
+            <span style={{ display: "flex", flexWrap: "wrap", gap: "4px 10px", color: "var(--ck-text-2)" }}>
+              {detailed
+                ? list.map((e, i) => (
+                    <span key={i} className="ck-num" style={{ color: e.severity === "Minor" ? SEVERITY_COLOR.Minor : "var(--ck-text-2)" }}>{where(e)}</span>
+                  ))
+                : [...byLabel].sort((a, b) => b[1].length - a[1].length).map(([label, es]) => (
+                    <span key={label} title={es.map(where).join("\n")} style={{ whiteSpace: "nowrap" }}>
+                      <span style={{ color: sevColor(es) }}>●</span> {label}{es.length > 1 && <span className="ck-num" style={{ color: "var(--ck-text-3)" }}> ×{es.length}</span>}
+                    </span>
+                  ))}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }

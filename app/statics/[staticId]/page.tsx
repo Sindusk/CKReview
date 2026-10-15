@@ -25,6 +25,9 @@ type StaticInfo = { id: number; name: string; role: "OWNER" | "MEMBER" };
 
 type ReviewSummary = {
   id:        number;
+  // The saved review session (data/sessions/<id>.json): `/?session=` reopens
+  // it with its VODs and the log in the import box.
+  sessionId: string;
   reportUrl: string;
   label:     string | null;
   addedAt:   string;
@@ -368,6 +371,29 @@ export default function StaticDashboardPage() {
                     >
                       {recordedAt ? new Date(recordedAt).toLocaleDateString() : "—"}
                     </span>
+                    {/* A new tab, so the dashboard stays open. The review
+                        screen restores the session's VODs and fills in the
+                        log; fetching it is still the user's Import click. */}
+                    <a
+                      className="ck-btn ck-btn--xs"
+                      href={`/?session=${encodeURIComponent(session.review.sessionId)}`}
+                      target="_blank"
+                      rel="noopener"
+                      title="Open this session's log and VODs in the review screen (new tab)"
+                    >
+                      Open log
+                    </a>
+                    {/^https?:\/\//.test(session.review.reportUrl) && (
+                      <a
+                        className="ck-btn ck-btn--xs"
+                        href={session.review.reportUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={session.review.reportUrl}
+                      >
+                        {/fflogs/i.test(session.review.reportUrl) ? "FFLogs" : "WCL"} &#8599;
+                      </a>
+                    )}
                     <button
                       className="ck-btn ck-btn--xs ck-btn--danger"
                       onClick={() => setPendingRemove({ review: session.review, number: sessionIdx + 1 })}
