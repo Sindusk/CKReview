@@ -90,7 +90,7 @@ export function CdChip({ player, job, entryKey, name, showName = true }: {
 }) {
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 4, verticalAlign: "middle", whiteSpace: "nowrap" }}>
-      <JobIcon job={job} player={player} size={15} />
+      <JobIcon job={job} player={player} size={17} />
       <SkillIcon entryKey={entryKey} name={`${name} (${player})`} size={17} />
       {showName && <span style={{ fontWeight: 600, color: "var(--ck-text)" }}>{name}</span>}
     </span>

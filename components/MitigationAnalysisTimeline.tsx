@@ -169,7 +169,7 @@ export default function AnalysisTimeline({ f, selectedId, onSelect }: {
                 height: LANE_H, display: "flex", alignItems: "center", gap: 5, fontSize: 12, whiteSpace: "nowrap", overflow: "hidden",
                 borderTop: "1px solid rgba(255,255,255,.05)", color: "var(--ck-text)",
               }}>
-                <JobIcon job={l.job} player={l.player} size={16} />
+                <JobIcon job={l.job} player={l.player} size={20} />
                 <SkillIcon entryKey={l.key} name={l.name} size={20} />
                 <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>{l.name}</span>
               </div>
