@@ -55,6 +55,11 @@
 // - Pantokrator: the line one short (a group member in no line: A7
 //   +1:33.5, A8, A17, A22 ...), the carrier keeping the missile in the
 //   stack (A58 +1:21.5, A100), puddles and Flame Thrower deaths.
+// - Both lines in one stack (A46 +1:21.5, A55 +1:21.5): the two players
+//   of the set's line number (In Line 3 both times) on the same side. Per
+//   the user's VOD reviewer (2026-10-14, A46) one of them should have
+//   crossed to the other group; it isn't the whole group. Which one isn't
+//   settled (NAUR's P1 flex priority is Tanks > Melee > Ranged > Healer).
 // - Missile-knockback deaths and Doom deaths log with no killing blow in
 //   some pulls; neither counts toward a called wipe.
 // - Diffuse on non-tanks (A8 +1:48.2, A24, A36 ...): the cone goes to the
@@ -80,10 +85,11 @@
 //   the holder, unless they held it the round before).
 // ffxiv-top1-missile (Major on death, else Minor): a missile hitting
 //   others (the carrier; with one other, both), or the carrier in a line.
-// ffxiv-top1-line (Major on death, else Minor), all eight alive: a group
-//   member in neither line or the other group's (groups read from the
-//   pull's lines), the aimed player taking the line to the other group, a
-//   player in both lines.
+// ffxiv-top1-line (Major on death, else Minor), all eight alive: both
+//   line-marked players inside one line (both named, nobody else that
+//   set); else a group member in neither line or the other group's
+//   (groups read from the pull's lines), the aimed player taking the line
+//   to the other group, a player in both lines.
 // ffxiv-top1-diffuse (Major on death, else Minor), both tanks alive: the
 //   farthest non-tank a cone hit, and a tank no cone reached.
 // ffxiv-top1-wave-cannon: a line hitting 2+ players, all six non-tanks
@@ -714,6 +720,26 @@ function detectPantokrator(players: PlayerInfo[], life: Life, deaths: DeathEvent
     // one's fault at the line).
     if (!allAlive(players, life, s.t - 500)) continue;
     const lineErrors: PullError[] = [];
+    const targets = players.filter((p) => p.debuffs.some((e) => LINE_MARKS.includes(e.abilityId) && e.debuffStatus === "removed" && Math.abs(e.timestamp - s.t) <= 1000));
+    // Both lines aim at the set's two players of one In Line number, one per
+    // group. Both of them inside one line means they stood on the same side:
+    // one should have crossed to the other group (user's VOD reviewer,
+    // 2026-10-14, A46 +1:21.5; also A55). The rest of that stack is fallout.
+    const paired = targets.length === 2 && s.lines.some((l) => targets.every((p) => l.hit.includes(p)));
+    if (paired) {
+      const hit = uniq(s.lines.flatMap((l) => l.hit));
+      const died = hit.filter((p) => life.diedFrom(p, s.t));
+      for (const p of targets) {
+        const other = targets.find((x) => x !== p)!;
+        lineErrors.push(playerError(p, {
+          ruleId: TOP1_LINE_RULE_ID, severity: died.length ? "Major" : "Minor", name: "Same Number, Same Side",
+          description: `Set ${s.k}: had In Line ${num.get(p) ?? "?"} like ${other.name} and stood on the same side, so both lines went into one stack (${namesOf(hit)})${died.length ? `; ${namesOf(died)} died` : ""}. One of the two should have crossed to the other group; the log can't say which. ${LINE_WHY}`,
+          timestamp: s.t, abilityId: LINE, abilityName: "Condensed Wave Cannon Kyrios",
+        }));
+      }
+      errors.push(...lineErrors);
+      continue;
+    }
     // Anyone in both lines took two shares under Magic Vulnerability Up.
     if (s.lines.length === 2) {
       const both = s.lines[0].hit.filter((p) => s.lines[1].hit.includes(p));
@@ -726,8 +752,7 @@ function detectPantokrator(players: PlayerInfo[], life: Life, deaths: DeathEvent
         }));
       }
     }
-    const targets = players.filter((p) => p.debuffs.some((e) => LINE_MARKS.includes(e.abilityId) && e.debuffStatus === "removed" && Math.abs(e.timestamp - s.t) <= 1000));
-    const lineDied = (l: { hit: PlayerInfo[] }) => l.hit.filter((p) => life.diedFrom(p, s.t));
+    const lineDied =(l: { hit: PlayerInfo[] }) => l.hit.filter((p) => life.diedFrom(p, s.t));
     for (const g of groups ?? []) {
       const carrier = g.find((p) => num.get(p) === s.k);
       const target = targets.find((p) => g.includes(p));
