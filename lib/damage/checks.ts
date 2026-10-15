@@ -570,6 +570,7 @@ export function checkCooldownDrift(ctx: PlayerCheckContext): DamageFinding[] {
       .map((w) => prePull && w.startMs === 0 ? { ...w, startMs: cd.cooldownMs } : w)
       .filter((w) => w.endMs > w.startMs);
     let unforced = 0, heldForDeciding = 0, stretchLost = 0, longest: Window | undefined, longestHeld = 0;
+    const heldBy: { endMs: number; held: number }[] = [];
     for (const w of capped) {
       const len = w.endMs - w.startMs;
       // Capping inside downtime is a lost recharge when a charge was
@@ -591,6 +592,7 @@ export function checkCooldownDrift(ctx: PlayerCheckContext): DamageFinding[] {
       const allowance = (cd.holdMs ?? COOLDOWN_HOLD_MS) + (w.startMs === 0 ? cd.firstUseOffsetMs : 0);
       const held = Math.max(0, len - forced - allowance);
       unforced += held;
+      heldBy.push({ endMs: w.endMs, held });
       // Per stretch: from the first moment it could have been pressed to
       // when it was. A recast's worth or more lost a use, even when
       // downtime filled part of it (dDar482XvFKBPJYh FRU kill: Dream Within
@@ -617,9 +619,17 @@ export function checkCooldownDrift(ctx: PlayerCheckContext): DamageFinding[] {
     // drift to 0; see docs/open-items.md (cooldown room) before changing.
     const landed = casts.filter((t) => t + (cd.landDelayMs ?? 0) < ctx.endMs).length;
     const openerLost = cd.openerUse && !prePull && casts.length > 0 && casts[0] > cd.firstUseOffsetMs + OPENER_LATE_MS ? 1 : 0;
-    const lostUses = Math.min(Math.max(stretchLost, Math.floor(unforced / cd.cooldownMs), openerLost),
+    const killLost = ctx.pull.result === "Kill" ? usesLostAtKill(cd, casts, heldBy, prePull, ctx.endMs, forcedMerged) : 0;
+    const lostUses = Math.min(Math.max(stretchLost, Math.floor(unforced / cd.cooldownMs), openerLost, killLost),
       Math.max(0, room - landed - (prePull ? 1 : 0)));
+    // A charge banked to the kill without ever reaching full charges has no
+    // hold to anchor on: anchored from the last use to the end (the Vamp
+    // Fatale Pictomancer's Living Muse, one of three left from 8:17.9).
+    if (!longest && killLost > 0 && casts.length > 0) longest = { startMs: casts[casts.length - 1], endMs: ctx.endMs };
     if (lostUses < 1 || !longest) continue;
+    const atKill = killLost > Math.max(stretchLost, Math.floor(unforced / cd.cooldownMs), openerLost)
+      ? "; without the holds, one more would have landed before the kill" : "";
+    const heldText = unforced > 0 ? `sat ready for ${s(unforced)} in total` : "had a charge back and unused at the kill";
     const custom = cd.valuePerUse?.(ctx.player, ctx.endMs);
     if (cd.valuePerUse) {
       if (!custom || custom.value <= 0) continue;
@@ -629,7 +639,7 @@ export function checkCooldownDrift(ctx: PlayerCheckContext): DamageFinding[] {
         label: `${cd.name} drift`,
         lostDamage: lostUses * custom.value,
         basis: `${uses(lostUses)} × ${custom.basis}; room for ${room} in the pull`,
-        detail: `${cd.name} sat ready for ${s(unforced)} in total (${uses(casts.length)}): about ${uses(lostUses)} lost`,
+        detail: `${cd.name} ${heldText} (${uses(casts.length)}): about ${uses(lostUses)} lost${atKill}`,
       }));
       continue;
     }
@@ -654,7 +664,7 @@ export function checkCooldownDrift(ctx: PlayerCheckContext): DamageFinding[] {
       lostDamage: lostUses * each,
       basis: `${uses(lostUses)} × ${onGcd ? `(${k(perUse)} average ${cd.name} − ${k(filler)} average GCD in its place)` : `${k(perUse)} average per ${cd.name}`}` +
         `; room for ${room} in the pull`,
-      detail: `${cd.name} sat ready for ${s(unforced)} in total (${uses(casts.length)}): about ${uses(lostUses)} lost` +
+      detail: `${cd.name} ${heldText} (${uses(casts.length)}): about ${uses(lostUses)} lost${atKill}` +
         (heldForDeciding > 0 ? `; ${s(heldForDeciding)} more held for the deciding phase is fine` : ""),
     }));
   }
@@ -700,6 +710,34 @@ export function roomForUses(cd: TrackedCooldown, endMs: number, forced: Window[]
 }
 
 const ROOM_SPEND_GAP_MS = 2_500;
+
+/**
+ * Kills only (user, 2026-10-15): uses lost because the holds pushed the
+ * last recharge past the kill. Each use is moved earlier by the unforced
+ * time held before it; then the charges back by the kill, early enough to
+ * land before it (and a hold allowance before that), would have been
+ * spent. That counts held time short of a whole recast when the end had
+ * room: K6qfMamL7rN8yz2Q The Tyrant's Earthly Star (59.6s held, a tenth
+ * star landing ~10:21 against a 10:38 kill), Psyche (27s), Upheaval (27s);
+ * xivanalysis's count each time. It also counts a charge banked unused
+ * to the kill (the Vamp Fatale Pictomancer's Living Muse from 8:17.9).
+ * The kill is where a forced stretch runs to the end (the boss at 1 HP),
+ * else the end. The extra use must have been ready KILL_USE_MARGIN_MS
+ * before it would have to be pressed, so holding it wasn't a guess about
+ * when the boss dies (user, 2026-10-15: 15s; with none, 282 new findings
+ * across the FF kills, many a cooldown back 2-5s before the kill; at 15s,
+ * 145).
+ */
+const KILL_USE_MARGIN_MS = 15_000;
+function usesLostAtKill(cd: TrackedCooldown, casts: number[], heldBy: { endMs: number; held: number }[],
+  prePull: boolean, endMs: number, forced: Window[]): number {
+  const tail = forced.find((f) => f.startMs < endMs && f.endMs >= endMs);
+  const pressBy = (tail ? tail.startMs : endMs) - (cd.landDelayMs ?? 0) - (cd.holdMs ?? COOLDOWN_HOLD_MS);
+  if (pressBy <= 0) return 0;
+  const shifted = casts.map((t) => t - heldBy.filter((h) => h.endMs <= t).reduce((a, h) => a + h.held, 0));
+  // A pre-pull use is a press at 0:00 (its recast ended by then at the latest).
+  return chargesAt(prePull ? [0, ...shifted] : shifted, cd.cooldownMs, cd.charges, pressBy - KILL_USE_MARGIN_MS);
+}
 
 /** The first moment in [startMs, endMs) whose press would land (+landMs) outside forced time. */
 function firstPressable(startMs: number, endMs: number, landMs: number, forced: Window[]): number | undefined {

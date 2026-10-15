@@ -119,10 +119,10 @@
 //   ended a minute into the pull at the latest (the star exploded 0:18.5,
 //   the next cast 1:18.1), so 18.1s went uncounted (checks.ts). That also
 //   corrects the qjCMx4bRfgNKwX9T fight 16 note above: xivanalysis's
-//   count from 0:00 was nearer than ours. Still no finding here: 59.6s
-//   after the per-stretch hold allowance, under the 60s recast, though a
-//   tenth star would have landed before the kill (the drift-at-the-kill
-//   question, docs/open-items.md). Not adopted: 5 interrupted casts to our
+//   count from 0:00 was nearer than ours. 59.6s after the per-stretch
+//   hold allowance, under the 60s recast, but a tenth star would have
+//   landed ~10:21 against the 10:38 kill: a lost use under the kill rule
+//   (checks.ts usesLostAtKill, 40k). Not adopted: 5 interrupted casts to our
 //   4 (the 7:06 one is in the towers' movement; the idle is in the gaps
 //   either way); Lightspeed (its cost is the 10:07 gap); overheal,
 //   defensives, Swiftcast 6/14, Horoscope.

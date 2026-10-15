@@ -43,9 +43,9 @@
 //     its hit; the 1.30 → 1.24 drop is Technical Finish ending; ours 2/3).
 //     Ours adds three hits for 0 on a Charnel Cell at 7:12-7:21 (Polishing
 //     Hammer, Water in Blue, Holy in White; others damaged cells then).
-//     Open: Living Muse 14/16 is one charge unused from 8:17.9 to the kill
-//     (24s; the other came back 0.4s before it); the drift check counts
-//     only time at full charges, so it doesn't see it (docs/open-items.md).
+//     Living Muse 14/16 is one charge unused from 8:17.9 to the kill (24s;
+//     the other came back 0.4s before it): a cooldown-drift finding since
+//     2026-10-15 (checks.ts usesLostAtKill, 151k).
 //     Built: the Palette and Paint lanes (jobs/gauges.ts); gauge from
 //     Water in Blue now comes with the cast, not its hit (gaugeCastTimes).
 //     Not adopted: Swiftcast 6/11, Lucid, Tempera Coat, Addle.

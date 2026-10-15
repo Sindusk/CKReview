@@ -373,8 +373,13 @@ showed:
   short transitions as downtime (the 1.5s after Coffinmaker dies); it
   doesn't see casts on a target that takes 0 (a Charnel Cell that isn't
   the player's).
-- **Open (user's call):** charges held to a kill aren't lost uses to the
-  drift check (Living Muse, Phlegma III; docs/open-items.md).
+- **Uses lost at a kill (user, 2026-10-15):** on kills, a use counts as
+  lost when, with the holds taken out, one more would have been ready 15s
+  before it had to be pressed to land before the kill. That covers held
+  time short of a whole recast (Earthly Star 59.6s, Psyche) and charges
+  banked to the kill (Living Muse, Phlegma III). checks.ts
+  usesLostAtKill; with no margin it was 282 findings across the FF kills,
+  most a cooldown back 2-5s before the kill.
 - **Input:** the user saves each player's xivanalysis page as HTML;
   `tools/xiva-html.js` cuts a ~500KB page to ~20KB of text with named
   action icons (see the skill).

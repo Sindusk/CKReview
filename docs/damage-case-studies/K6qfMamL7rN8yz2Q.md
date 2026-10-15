@@ -205,8 +205,14 @@ Siegward, Yoro, Kade, Kevin, Sayacissa, Chauzey). Three deaths (Mocha
   from one recast into the pull (Earthly Star 0:18.5 → 1:18.1, 18.1s).
   Two new Earthly Star findings across the samples (L9BzKkD2nxcVgHTC
   Necron Pull 15, bVDR2mTL7YGvMxK1 The Tyrant Pull 10), no WoW change.
-  Hers is still no finding (59.6s after allowances): asked the user about
-  drift that costs a use at the kill (docs/open-items.md).
+  Then (user's call, 2026-10-15) the kill rule: on kills, a use is lost
+  when, with the holds taken out, one more would have been ready 15s
+  before it had to be pressed (checks.ts usesLostAtKill). 167 new
+  findings across the FF kills, 1 on WoW. This kill: Earthly Star (40k),
+  Sin's Psyche (68k: the opener's 0:14.6 Psyche is a real hold, Sages'
+  median first Psyche is 0:03.8), Siegward's banked Onslaught (13k). It
+  settles the charges-at-kill proposal: the Vamp Fatale Living Muse
+  (151k), Sin's Phlegma III, Sayacissa's Dragonfire Dive.
 
 ## Open
 
@@ -236,5 +242,5 @@ Siegward, Yoro, Kade, Kevin, Sayacissa, Chauzey). Three deaths (Mocha
     and Sayacissa's Dragonfire Dive.
 - The Tyrant kill (session 2026-10-15): Mocha, Sin, Siegward, Yoro done;
   next Kade, then Kevin, Sayacissa, Chauzey. Patch review as above.
-  Waiting on the user: drift that costs a use at the kill (open-items.md).
+  The charges-at-kill question is settled (the kill rule above).
 - Lindwurm and Lindwurm II kills are on disk too.
