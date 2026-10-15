@@ -117,8 +117,11 @@
 //     djChYqt4b7K8aAfP 0:33 (Shadow of the Destroyer with only Red Hot
 //     up, 36k); 7yXZbmqcrCga8PHz 4:41 (Enlightenment on one boss, 34k).
 //   - Blitz resources (2026-10-15): Perfect Balance lost, Celestial
-//     Revolution, Form Shift in uptime; `mnkBlitz` below. Not yet matched
-//     against xivanalysis.
+//     Revolution, Form Shift in uptime; `mnkBlitz` below. Matched against
+//     xivanalysis on five searched kills (2026-10-15): Celestial
+//     Revolution on all four with one. It misses a Perfect Balance that
+//     ran out with stacks (bqmRpGxDvfT8AZc6 6:47) and counts Form Shifts in
+//     downtime and out-of-reach mechanics, which this check excuses.
 //   - Dragoon (checked against xivanalysis on jN3XDrf2z8PmLgRJ Vamp pull 8:
 //     Lance Charge and positionals match): Power Surge uptime, +10%
 //     (tooltip); Chaotic Spring DoT uptime; Life Surge (below); Lance Charge
