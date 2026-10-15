@@ -38,6 +38,7 @@ import DamageTimeline, { MOVEMENT_COLOR } from "./DamageTimeline";
 import { abilityIconsOf, AbilityTip, firstAbility, RichDetail, type AbilityIcons } from "./DamageAbilities";
 import { getClassColor, getPlayerClassIcon, getPlayerSpecIcon } from "@/lib/player-display";
 import { useFFPullSelector } from "@/hooks/useFFPullSelector";
+import { useWheelStep } from "@/hooks/useWheelStep";
 import { SEVERITY_COLOR } from "./SeverityIcon";
 import { fmtTime } from "./MitigationTimeline";
 import { Dialog } from "./ui/Dialog";
@@ -136,6 +137,16 @@ export default function DamageDialog({ open, onClose, pulls, currentPullId }: Da
     return out;
   }, [open, allPulls, gamePulls, selectedPull, refs]);
   const aggregate = useMemo(() => (allPulls ? aggregateDamage([...analyses.values()]) : []), [allPulls, analyses]);
+  // The wheel over the Pulls picker steps through its options, "All" first.
+  const pullPickerRef = useWheelStep<HTMLSelectElement>((dir) => {
+    const ids = gamePulls.map((p) => p.id);
+    const at = allPulls ? -1 : ids.indexOf(selectedPullId ?? -2);
+    const next = Math.max(-1, Math.min(ids.length - 1, at + dir));
+    if (next === at) return;
+    if (next === -1) { setAllPulls(true); return; }
+    setAllPulls(false);
+    setSelectedPullId(ids[next]);
+  });
 
   if (!open) return null;
 
@@ -193,7 +204,9 @@ export default function DamageDialog({ open, onClose, pulls, currentPullId }: Da
             </div>
             <span className="ck-label" style={{ margin: 0 }}>Pulls</span>
             <select
+              ref={pullPickerRef}
               className="ck-field"
+              title="Scroll to step through the pulls"
               value={allPulls ? "all" : String(selectedPullId ?? "")}
               onChange={(e) => {
                 if (e.target.value === "all") { setAllPulls(true); return; }

@@ -85,7 +85,7 @@ export default function DamageTimeline({ summary, analysis, highlight, onPick }:
   const showPhases = analysis.phases.length > 1;
 
   // Lane geometry, top to bottom.
-  const axisH = 16, phaseH = showPhases ? 14 : 0;
+  const axisH = 16, phaseH = showPhases ? 18 : 0;
   const burstY = axisH + phaseH + 4, burstH = 24;
   const gcdY = burstY + burstH + LANE_GAP, gcdH = 22;
   const lossY = gcdY + gcdH + LANE_GAP, lossH = 34;
@@ -191,18 +191,31 @@ export default function DamageTimeline({ summary, analysis, highlight, onPick }:
         ))}
         <text x={GUTTER + pw} y={axisH - 4} textAnchor="end" fontSize={11} style={{ fill: "var(--ck-text-3)" }}>{fmtTime(total)}</text>
 
-        {/* Phases: a gold divider at each start, the name where it fits. */}
-        {analysis.phases.map((p, i) => (
-          <g key={`p${p.phaseId}-${p.startMs}`}>
-            {i > 0 && <line x1={x(p.startMs)} x2={x(p.startMs)} y1={axisH} y2={lanesBottom} style={{ stroke: "var(--ck-frame)" }} />}
-            {showPhases && w(p.startMs, p.endMs) > 44 && (
-              <text x={x(p.startMs) + 4} y={axisH + phaseH - 3} fontSize={10.5} style={{ fill: "var(--ck-text-gold)" }}>
-                {p.name}
-                <title>{`${p.name} ${fmtTime(p.startMs)}–${fmtTime(p.endMs)}`}</title>
-              </text>
-            )}
-          </g>
-        ))}
+        {/* Phases: a band along the top (every other phase tinted, over
+            the lanes too), a gold divider at each start, and the name. */}
+        {analysis.phases.map((p, i) => {
+          const pw2 = w(p.startMs, p.endMs);
+          const label = phaseLabel(p.name, pw2);
+          return (
+            <g key={`p${p.phaseId}-${p.startMs}`}>
+              {showPhases && (
+                <rect x={x(p.startMs)} y={axisH + 1} width={pw2} height={phaseH - 3}
+                  fill={i % 2 === 0 ? "rgba(225,189,106,0.16)" : "rgba(225,189,106,0.07)"}>
+                  <title>{`${p.name} ${fmtTime(p.startMs)}–${fmtTime(p.endMs)}`}</title>
+                </rect>
+              )}
+              {showPhases && i % 2 === 1 && (
+                <rect x={x(p.startMs)} y={lanesTop} width={pw2} height={lanesBottom - lanesTop} fill="#ffffff" opacity={0.025} pointerEvents="none" />
+              )}
+              {i > 0 && <line x1={x(p.startMs)} x2={x(p.startMs)} y1={axisH} y2={lanesBottom} style={{ stroke: "var(--ck-frame)" }} />}
+              {showPhases && label && (
+                <text x={x(p.startMs) + 4} y={axisH + phaseH - 6} fontSize={10.5} fontWeight={600} pointerEvents="none" style={{ fill: "var(--ck-text-gold)" }}>
+                  {label}
+                </text>
+              )}
+            </g>
+          );
+        })}
 
         {/* Burst lane: raid buffs on top, tinctures under them. */}
         {tl.buffWindows.map((b, i) => (
@@ -333,6 +346,14 @@ export default function DamageTimeline({ summary, analysis, highlight, onPick }:
       )}
     </div>
   );
+}
+
+// A phase's band label: its name when it fits (~6px a character), else cut
+// short with an ellipsis, else nothing; the band's tooltip has the full name.
+function phaseLabel(name: string, width: number): string | null {
+  const fits = Math.floor((width - 8) / 6);
+  if (name.length <= fits) return name;
+  return fits >= 4 ? `${name.slice(0, fits - 1).trimEnd()}…` : null;
 }
 
 function AbilityIcon({ src, size = 16 }: { src?: string; size?: number }) {
