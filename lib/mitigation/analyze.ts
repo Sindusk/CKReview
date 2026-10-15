@@ -295,6 +295,13 @@ function findHitClusters(pull: Pull, playerNames: Set<string>, game: MitigationG
       // for them (Vamp Fatale pull 1 +221.4, a tank buster's 3.4-3.8x max HP
       // killing four non-tanks), or by an enrage.
       const mitigable = names.filter((n) => !beyond.has(n)).length;
+      // A targeted attack the group plans for is graded on whoever it hit,
+      // any number, buster-sized or not (MitigationGame.isTargetedHit).
+      const targeted = game.isTargetedHit?.(hit[0].event.abilityName) ?? false;
+      if (targeted) {
+        if (mitigable >= 1 && dealt) clusters.push(hit);
+        return;
+      }
       const needed = tankOnly ? 1 : HIT_MIN_TARGETS;
       // A tank-only hit taken under an invuln is a buster even when it logs
       // no damage or raw size: Red Hot and Deep Blue pull A23's opening Hot
@@ -989,10 +996,40 @@ export function findDroppable(hits: MitigationHit[], game: MitigationGame): Drop
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 
+// Parts of an FFLogs phase the mitigation view names as their own phase:
+// from the boss's first cast of `startCastId` in that phase to the
+// phase's end. FRU's crystal intermission sits inside FFLogs' P2 (user,
+// 2026-10-15); Usurper's Swelling Frost (40225) opens it ~3s after
+// Absolute Zero in every pull that gets there (JZ1KXhDbqkNH3jxR).
+const SUB_PHASES: { encounter: string; phase: number; name: string; startCastId: number }[] = [
+  { encounter: "Futures Rewritten", phase: 2, name: "Intermission", startCastId: 40225 },
+];
+
+export type PhaseSpan = { name: string; startMs: number; endMs: number };
+const phaseSpanCache = new WeakMap<Pull, PhaseSpan[]>();
+
+/** The pull's phases as the mitigation views name them: FFLogs' segments, with SUB_PHASES split out. */
+export function phaseSpans(pull: Pull): PhaseSpan[] {
+  const cached = phaseSpanCache.get(pull);
+  if (cached) return cached;
+  const out: PhaseSpan[] = [];
+  for (const seg of pull.phaseSegments ?? []) {
+    const name = pull.encounterPhases?.find((p) => p.id === seg.phase)?.name ?? `Phase ${seg.phase}`;
+    const sub = SUB_PHASES.find((s) => s.encounter === pull.name && s.phase === seg.phase);
+    const at = sub && (pull.enemyCasts ?? []).find((c) => c.abilityId === sub.startCastId
+      && c.timestamp >= seg.startMs && c.timestamp < seg.endMs)?.timestamp;
+    if (sub && at !== undefined) {
+      out.push({ name, startMs: seg.startMs, endMs: at }, { name: sub.name, startMs: at, endMs: seg.endMs });
+    } else {
+      out.push({ name, startMs: seg.startMs, endMs: seg.endMs });
+    }
+  }
+  phaseSpanCache.set(pull, out);
+  return out;
+}
+
 export function phaseName(pull: Pull, atMs: number): string | undefined {
-  const seg = pull.phaseSegments?.find((s) => atMs >= s.startMs && atMs < s.endMs);
-  if (!seg) return undefined;
-  return pull.encounterPhases?.find((p) => p.id === seg.phase)?.name ?? `Phase ${seg.phase}`;
+  return phaseSpans(pull).find((s) => atMs >= s.startMs && atMs < s.endMs)?.name;
 }
 
 /** Earliest timestamp after `afterMs` that this player shows any sign of being alive. */

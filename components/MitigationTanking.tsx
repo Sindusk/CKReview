@@ -41,7 +41,7 @@
 import { useState, type CSSProperties, type ReactNode } from "react";
 import type { Pull } from "@/types/Pull";
 import { FFXIV_MITIGATION } from "@/lib/mitigation/ffxiv-catalog";
-import { phaseName } from "@/lib/mitigation/analyze";
+import { phaseSpans } from "@/lib/mitigation/analyze";
 import { CAST_LEAD_MS } from "@/lib/mitigation/optimize";
 import { PLAN_MAX_CHANGES, PLAN_WINDOW_DEFAULT } from "@/lib/mitigation/plan";
 import { TANK_MIN_PULLS } from "@/lib/mitigation/tanking-plan";
@@ -162,10 +162,9 @@ function Clock({ pull, tanking, lanes, changes, hover }: {
 
   // Phases: contiguous runs of one phase name.
   const phases: { name: string; start: number; end: number }[] = [];
-  for (const seg of pull.phaseSegments ?? []) {
-    const name = phaseName(pull, seg.startMs) ?? "";
+  for (const seg of phaseSpans(pull)) {
     const last = phases[phases.length - 1];
-    if (last && last.name === name) last.end = seg.endMs; else phases.push({ name, start: seg.startMs, end: seg.endMs });
+    if (last && last.name === seg.name) last.end = seg.endMs; else phases.push({ name: seg.name, start: seg.startMs, end: seg.endMs });
   }
   const tickMs = dur > 10 * 60_000 ? 60_000 : 30_000;
   const labelEvery = dur > 10 * 60_000 ? 2 : dur > 4 * 60_000 ? 2 : 1;

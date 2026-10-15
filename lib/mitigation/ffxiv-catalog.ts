@@ -313,6 +313,13 @@ export const FFXIV_ACTION_INDEX: Map<number, CatalogEntry> = new Map(
 // unknown by the analysis.
 export const FFXIV_DAMAGE_TYPE = { physical: 128, magical: 1024, unaspected: 32 } as const;
 
+// Targeted attacks given a row at any target count (analyze.ts
+// findHitClusters). Hiemal Ray (FRU intermission, 40257): the crystals'
+// tethers hit 1-4 players per wave, 2-4 waves ~2s apart, ~40k raw (25-30%
+// of max HP) each, the only damage of a clean intermission (user,
+// 2026-10-15, JZ1KXhDbqkNH3jxR).
+const FFXIV_TARGETED_HITS = new Set(["Hiemal Ray"]);
+
 export const FFXIV_MITIGATION: MitigationGame = {
   catalog:     FFXIV_MITIGATION_CATALOG,
   statusIndex: FFXIV_STATUS_INDEX,
@@ -322,6 +329,7 @@ export const FFXIV_MITIGATION: MitigationGame = {
   // "Combined DoTs" pseudo-ability.
   isTick: (abilityId) => abilityId >= 1_000_000 || abilityId === 500_000,
   isAutoAttack: (abilityName) => abilityName === "Attack",
+  isTargetedHit: (abilityName) => FFXIV_TARGETED_HITS.has(abilityName),
   damageColumn(type) {
     if (type === FFXIV_DAMAGE_TYPE.physical) return "physical";
     if (type === FFXIV_DAMAGE_TYPE.magical) return "magical";

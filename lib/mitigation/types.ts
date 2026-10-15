@@ -76,6 +76,9 @@ export type MitigationGame = {
   // and enemy auto-attacks.
   isTick(abilityId: number): boolean;
   isAutoAttack(abilityName: string): boolean;
+  // Targeted attacks graded on whoever they hit, below the usual 4-player
+  // minimum (FRU's Hiemal Ray on its tethered players).
+  isTargetedHit?(abilityName: string): boolean;
   // "none" = % mitigation does not apply (FFXIV unaspected); undefined =
   // unknown (pull fetched before damage types were kept).
   damageColumn(damageType: number | undefined): "physical" | "magical" | "none" | undefined;
