@@ -84,8 +84,14 @@ lib/mechanics/
                                 Efflux enrage)
       blue-screen.ts          — Phase 4 per-pull rules (Wave Repeater rings,
                                 protean doubles, afterimages, stack groups
-                                and the marker swap, Blue Screen's HP check);
-                                the later phase files are research models only
+                                and the marker swap, Blue Screen's HP check)
+      run-dynamis.ts          — Phase 5 per-pull rules (Delta tethers / Patch,
+                                monitors, arms and fists; Sigma prey and arm
+                                baits, glitch range at the towers, empty
+                                towers; Omega clones, monitors and Blaster;
+                                Hello World chains and the Dynamis count,
+                                walls, Blind Faith's HP check); P6 is a
+                                research model only
       pantokrator-conga.ts    — cross-pull Pantokrator side order (who should
                                 have crossed in a same-number pair)
       synergy-order.ts        — cross-pull Party Synergy row order (which glitch

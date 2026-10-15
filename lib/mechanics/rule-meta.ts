@@ -402,6 +402,10 @@ exposure("targeted", ["ffxiv-top3-tower", "ffxiv-top3-stack", "ffxiv-top3-patch"
 // its crossing pair (blue-screen.ts reports both at every such round).
 mechanic("ffxiv-top4-swap", "Blue Screen stack swap (crossing pair)", 4, ["ffxiv-top4-swap"]);
 exposure("targeted", ["ffxiv-top4-swap"]);
+// The Omega Protocol P5 (Run: Dynamis): Delta's tether breaks are the
+// tethered pair's (run-dynamis.ts reports every pair at its break).
+mechanic("ffxiv-top5-patch", "Run: Dynamis tether breaks (each pair)", 5, ["ffxiv-top5-patch"]);
+exposure("targeted", ["ffxiv-top5-patch"]);
 // Futures Rewritten P2: Quadruple Slap tests the tanks; the Diamond Dust
 // cone and stone rules test the four Frigid Stone players
 // (usurper-of-frost.ts reports both at every instance).

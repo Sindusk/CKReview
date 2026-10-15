@@ -261,6 +261,12 @@ export const ERROR_RULES: PullErrorRule[] = [
       31501, 32368,                                          // Flame Thrower
       // The Omega Protocol P4: blue-screen.ts owns these (P3 hands out no Damage Down).
       31567, 31568, 31569, 31570,                            // Wave Repeater rings
+      // The Omega Protocol P5: run-dynamis.ts owns these (31494 is P1's too).
+      31600, 31601,                                          // Hyper Pulse (Delta arms)
+      31530, 31531, 31532, 31533,                            // Superliminal Steel / Optimized Blizzard III
+      31609, 31525, 31526,                                   // Omega's clone combo
+      31631, 31632, 31636, 31637,                            // Rear Lasers, Swivel Cannon
+      31627, 32505,                                          // Hello World / Patch failures (raid penalties)
       // Enuo (The Unmaking EX): enuo.ts owns this.
       50014,   // Big Burst (empty Empty Shadow tower)
     ],

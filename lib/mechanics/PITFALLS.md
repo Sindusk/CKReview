@@ -27,6 +27,11 @@ philosophy and the data semantics this list assumes.
   still has every death, so bound the module's window by the last damage
   or cast event, not the last death (Usurper of Frost, Ultimate Kefka,
   Enter the Dragon).
+- **Before building the next phase, check where the earlier capture
+  stopped.** Omega P4's `--to-minutes 9.5` left P5's first 60s on disk,
+  and six Delta wipes died 4-6s past the cut: their deaths were there, the
+  failure that killed them wasn't. Refetch every pull whose last death is
+  past the cut, with the old `--from-minutes` so baselines hold (Omega P5).
 - **Two reports from different raids beat one big one.** Label them A/B
   at the top of the header and cite pulls as `A6 +188.9` (The Lost
   Explorers).
@@ -116,6 +121,14 @@ philosophy and the data semantics this list assumes.
   put four players on each half, and each half stacks together; with the
   swap rule on top, the expected groups matched 170 of 187 rounds, and
   the misses named who stood wrong.
+- **A partner penalty's timing pairs the partners.** Omega P5's glitch
+  tethers aren't logged, but Vulnerability Up lands on and leaves both
+  partners in the same millisecond every time, so identical timings are
+  the pairs. One still up when the towers cast is the lethal pair.
+- **One raid penalty can have several triggers.** Omega P5's Hello World
+  raidwide followed a second player in a World circle, a World holder's
+  death, or a glitch player's death; read what happened in the 1-2s
+  before it and flag that, never the penalty's victims.
 - **A shared line's groups can be read from the pull itself.** Union the
   players of every line that hit 2+; a component of four is one group and
   the other group is its complement. One set's lines rarely place the
@@ -170,7 +183,9 @@ philosophy and the data semantics this list assumes.
 - **A healer LB3 locks its caster ~8-9s.** It's in the caster's own casts
   (Techne Makre, Astral Stasis): excuse them from a positional duty in that
   window (Lindwurm II towers, user ruling).
-- **A cast that hit several players can lose its target.** Find the owner
+- **A cast that hit several players can lose its target** (Omega P5's
+  Sigma arms: only the overlaps lost it; the baiter is the victim with no
+  World duty). Find the owner
   among the hit players who held that timer's status (Oracle of Darkness).
 - **Head markers name bait owners** (`HeadMarker[]`, marked player as
   `sourceID`; Usurper of Frost).
@@ -406,6 +421,12 @@ Classify every one before counting a called wipe. Known meanings:
 - **Stepping off a raised platform over the edge:** death 2.0-2.4s after
   the platform aura (1004721) ends (Doomtrain).
 - **Walking Dead running out unhealed** (Dark Knight): player-less.
+- **Deliberate deaths to drop Damage Down.** Every Omega P5 Blind Faith
+  pull had its Damage Down holders walk into the wall after Blaster, once
+  their Worlds were done; Dynamis survives death. Not errors.
+- **A duty holder's wall death sets off the penalty in the same 0.1s.**
+  Omega P5's World holders and tethered players dying at the wall fired
+  Hello World or the failed Patch at once; the death is the error.
 - **A reset after the player's own Damage Down** (Fatebreaker): the Damage
   Down's cause is the error.
 - **A delayed death:** Mark of Mortality, Doom (Oracle of Darkness).

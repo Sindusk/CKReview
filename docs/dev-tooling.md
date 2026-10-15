@@ -48,7 +48,9 @@ validation harness (`scripts/validate.js`, `expectations/`), see
   `--min-phase <n>` keeps only fights whose FFLogs `lastPhase` reached n,
   for when phase start times vary: The Omega Protocol P4 used
   `--min-phase 4 --from-minutes 6.8 --to-minutes 9.5` (P4 starts
-  7:18-7:36; Blue Screen resolves by ~8:40).
+  7:18-7:36; Blue Screen resolves by ~8:40); its P5 pulls were refetched
+  with `--refetch --fight <id>... --min-phase 4 --from-minutes 6.8
+  --to-minutes 14.2` (P5 starts 8:28-8:45, Blind Faith resolves by ~13:41).
   `validate.js` detects captures whose damage starts 2+ minutes in and runs
   only `lateCapture` mechanics on them.
   - **Re-running a fetch on such a folder must repeat its flags.** A
