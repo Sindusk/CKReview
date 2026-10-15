@@ -406,6 +406,10 @@ exposure("targeted", ["ffxiv-top4-swap"]);
 // tethered pair's (run-dynamis.ts reports every pair at its break).
 mechanic("ffxiv-top5-patch", "Run: Dynamis tether breaks (each pair)", 5, ["ffxiv-top5-patch"]);
 exposure("targeted", ["ffxiv-top5-patch"]);
+// The Omega Protocol P6 (Alpha Omega): Flash Gale tests the two tanks
+// (alpha-omega.ts reports both at every volley with both alive).
+mechanic("ffxiv-top6-gale", "Flash Gale: one tank close, one farthest", 6, ["ffxiv-top6-gale"]);
+exposure("targeted", ["ffxiv-top6-gale"]);
 // Futures Rewritten P2: Quadruple Slap tests the tanks; the Diamond Dust
 // cone and stone rules test the four Frigid Stone players
 // (usurper-of-frost.ts reports both at every instance).

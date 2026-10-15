@@ -90,8 +90,12 @@ lib/mechanics/
                                 baits, glitch range at the towers, empty
                                 towers; Omega clones, monitors and Blaster;
                                 Hello World chains and the Dynamis count,
-                                walls, Blind Faith's HP check); P6 is a
-                                research model only
+                                walls, Blind Faith's HP check)
+      alpha-omega.ts          — Phase 6 per-pull rules (Wave Cannon spread
+                                overlaps by the NAUR clock, Wild Charge line,
+                                Flash Gale on the party, Arrow / Unlimited
+                                avoidables, Magic Number not cleansed, mass
+                                deaths after Brilliant Dynamis is lost)
       pantokrator-conga.ts    — cross-pull Pantokrator side order (who should
                                 have crossed in a same-number pair)
       synergy-order.ts        — cross-pull Party Synergy row order (which glitch

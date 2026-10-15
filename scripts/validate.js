@@ -412,6 +412,15 @@ const MECHANICS = {
     },
   },
 
+  'alpha-omega': {
+    game: 'ff',
+    lateCapture: true, // Phase 6 only — safe on --from-minutes captures (see isLateCapture)
+    load: () => requireTsFromRoot('lib/mechanics/ffxiv/top/alpha-omega.ts'),
+    run({ mod, ctxs }) {
+      for (const c of ctxs) printPullErrors(c, mod.detectAlphaOmegaErrors(c.relPlayers(), c.relDeaths(), c.relEnemyCasts()));
+    },
+  },
+
   'usurper-of-frost': {
     game: 'ff',
     lateCapture: true, // Phase 2 only — safe on --from-minutes captures (see isLateCapture)

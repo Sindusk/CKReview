@@ -32,6 +32,8 @@ philosophy and the data semantics this list assumes.
   and six Delta wipes died 4-6s past the cut: their deaths were there, the
   failure that killed them wasn't. Refetch every pull whose last death is
   past the cut, with the old `--from-minutes` so baselines hold (Omega P5).
+  Omega P6's eight pulls had only deaths on disk; `meta.json`'s
+  `lastPhase` picks them, `--fight <id>` refetches just those.
 - **Two reports from different raids beat one big one.** Label them A/B
   at the top of the header and cite pulls as `A6 +188.9` (The Lost
   Explorers).
@@ -288,6 +290,16 @@ philosophy and the data semantics this list assumes.
 - **A late arrival doesn't show at the hit.** Positions are logged at the
   damage, after the player got there; "late to the spot" at the snapshot
   is a VOD call (The Tyrant's scythe, both players on their spots).
+- **A buff lost on death makes the next deaths fallout.** Omega P6's
+  Brilliant Dynamis goes at death and raises don't restore it: a raised
+  player dies to a share or their own spread that everyone else survives.
+  Count only players who hadn't died yet in the phase toward "a mechanic
+  killed several" (Omega P6).
+- **A clock layout by role group can name the off-spot player without
+  roles.ts.** Omega P6's Wave Cannon puts supports on cardinals and DPS on
+  intercardinals; clean hits stayed within 21 degrees, overlap culprits
+  were 25-43 off or within 5y of the boss. Late captures have no opening
+  auto, so roles.ts's MT/OT is unreliable there anyway.
 - **Process of elimination beats geometry.** With N interchangeable
   candidates and N-1 accounted for, the last one is decisive (Fatebreaker
   towers; Lindwurm's Metamitosis free players).
