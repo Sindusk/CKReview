@@ -36,8 +36,8 @@
 | gnb/Continuation/dropped | covered | `checkProcs` | Ready to Rip / Tear / Gouge / Blast / Raze expiring | Fight 16: 100%, so never seen firing. |
 | gnb/Continuation/usage-checklist | superseded | `checkProcs` | — | The checklist form of the same rule (it also splices its list while iterating). |
 | gnb/SonicBreak/missing-ticks | candidate | — | a Sonic Break whose DoT stopped early (target died or turned untargetable) | Minor 1, Medium 5, Major 10 ticks. The app has no Gunbreaker DoT check; `dotFindings` could value the re-application. Premise check: most short Sonic Breaks are the target leaving. |
-| gnb/AoE/demon-slice | covered | `aoeCombo` | Demon Slice on one target | Fires on yPHmaGTY2btq1wD9 Red Hot and Deep Blue 3:57 and 4:04 (Demon Slice, Demon Slaughter on one boss with the two apart; 16k, 19k). |
-| gnb/AoE/fated-circle | covered | `aoeCombo` (vs Burst Strike) | Fated Circle on one target | Built 2026-10-15. Premise holds (same cartridge). Fires on L9BzKkD2nxcVgHTC Necron pulls 7-21 and pG319BgHTnPJc6Ft Necron pulls 1-3 (one Gunbreaker spending the opener's Bloodfest cartridges on Necron alone, e.g. pull 14 0:11, 0:14, 0:17; and single Hands in the adds, pull 18 3:35, 3:53), 0-34k each. A pull with no Burst Strike has no average to compare against and stays silent (L9BzKkD2nxcVgHTC pull 10). Fight 16 8:09's two hit both P3 bosses (right). No xivanalysis page for these pulls. |
+| gnb/AoE/demon-slice | verified | `aoeCombo` | Demon Slice on one target | Fires on yPHmaGTY2btq1wD9 Red Hot and Deep Blue 3:57 and 4:04 (Demon Slice, Demon Slaughter on one boss with the two apart; 16k, 19k). Matched xivanalysis on L9BzKkD2nxcVgHTC Necron pull 15 (1 of its 1; the app also flags a Demon Slaughter, which xivanalysis doesn't track). |
+| gnb/AoE/fated-circle | covered | `aoeCombo` (vs Burst Strike) | Fated Circle on one target | Built 2026-10-15. Premise holds (same cartridge). Fires on L9BzKkD2nxcVgHTC Necron pulls 7-21 and pG319BgHTnPJc6Ft Necron pulls 1-3 (one Gunbreaker spending the opener's Bloodfest cartridges on Necron alone, e.g. pull 14 0:11, 0:14, 0:17; and single Hands in the adds, pull 18 3:35, 3:53), 0-34k each. A pull with no Burst Strike has no average to compare against and stays silent (L9BzKkD2nxcVgHTC pull 10). Fight 16 8:09's two hit both P3 bosses (right). Checked against xivanalysis on L9BzKkD2nxcVgHTC Necron pull 15: the app finds 2 of its 4 (0:54, 1:29). The opener's two (0:05, 0:18) hit Necron alone for 25-26k, level with Burst Strike's 25k average because they landed in the burst, so the per-cast comparison passes them (see Open). |
 | gnb/Cooldowns/uses | verified | `checkCooldownDrift` | Gnashing Fang, Blasting Zone, No Mercy, Bow Shock, Double Down or Bloodfest held | Fight 16: Gnashing Fang 37/38 and Sonic Break 18/19 were downtime (forced). |
 | gnb/Cooldowns/bloodfest-hold | covered | `checkCooldownDrift` (Bloodfest hold 0) | Bloodfest held | **Patch gap:** before 7.4 xivanalysis allows 10s of hold (Bloodfest waits for No Mercy); the app allows 0 on every patch. |
 | gnb/Tincture/expected-actions | superseded | tincture.ts | Gnashing Fang ×2 and the burst actions under the tincture | Fight 16's 4: one Gnashing Fang of two each, ~3% of a GF combo. |
@@ -67,8 +67,12 @@
 
 In priority order (biggest damage cost first):
 
-1. **gnb/SonicBreak/missing-ticks** (candidate). Premise check first.
-2. **gnb/Cooldowns/bloodfest-hold, pre-7.4.** Gate the hold allowance on
+1. **gnb/AoE/fated-circle in the burst.** A one-target Fated Circle
+   inside No Mercy can match the pull's average Burst Strike and pass.
+   Waits on the user's call on comparing each AoE buff-neutrally
+   (open-items.md, xivanalysis audit).
+2. **gnb/SonicBreak/missing-ticks** (candidate). Premise check first.
+3. **gnb/Cooldowns/bloodfest-hold, pre-7.4.** Gate the hold allowance on
    patch once a 7.0-7.3 Gunbreaker pull is on disk.
-3. **gnb/Ammo/combo-overcap, bloodfest-expire-drop; gnb/Continuation/
+4. **gnb/Ammo/combo-overcap, bloodfest-expire-drop; gnb/Continuation/
    dropped** (covered). None seen firing.

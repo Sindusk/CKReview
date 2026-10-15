@@ -1114,23 +1114,35 @@ export function aoeOnOneTargetFindings(
     ...ctx.player.casts.filter((c) => aoe.has(c.abilityId) && c.timestamp < ctx.endMs && ctx.game.action(c.abilityId)?.onGcd === false)
       .map((c) => ({ action: { id: c.abilityId }, startMs: c.timestamp, castMs: hitDelayMs(ctx, c.abilityId), abilityName: c.abilityName, ogcd: true })),
   ].sort((a, b) => a.startMs - b.startMs);
+  // For an oGCD, castMs is its measured hit delay: Rain of Death hits
+  // 1.65s after the press, after the next press when they're stacked
+  // (fight 16's Bard: 8:08.15, 8:09.84, hits 8:09.80 / 8:09.93).
+  // Hits run up to the next cast of the same AoE, not the next GCD: a
+  // Bard's Shadowbite lands 1.4s after its cast and the second target's
+  // hit 0.15s after that, past the next GCD's start. (When it lands, not
+  // starts: a Black Mage's next Flare begins casting before this one's
+  // second hit.)
+  const landedAt = (u: (typeof uses)[number]) => u.startMs + u.castMs;
+  const untilOf = uses.map((u, i) => {
+    const next = uses.slice(i + 1).find((x) => x.action.id === u.action.id);
+    return Math.min(next ? landedAt(next) : Infinity, landedAt(u) + AOE_HIT_MS);
+  });
   uses.forEach((u, i) => {
     if (!aoe.has(u.action.id)) return;
     const alt = against(u.action.id);
     if (!alt || alt.value <= 0) return;
-    // For an oGCD, castMs is its measured hit delay: Rain of Death hits
-    // 1.65s after the press, after the next press when they're stacked
-    // (fight 16's Bard: 8:08.15, 8:09.84, hits 8:09.80 / 8:09.93).
-    const landed = u.startMs + u.castMs;
-    // Up to the next cast of the same AoE, not the next GCD: a Bard's
-    // Shadowbite lands 1.4s after its cast and the second target's hit
-    // 0.15s after that, past the next GCD's start.
-    // (When it lands, not starts: a Black Mage's next Flare begins casting
-    // before this one's second hit.)
+    const landed = landedAt(u);
     const next = uses.slice(i + 1).find((x) => x.action.id === u.action.id);
-    const nextSame = next ? next.startMs + next.castMs : Infinity;
-    const until = Math.min(nextSame, landed + AOE_HIT_MS);
-    const hits = ctx.player.damageDone.filter((e) => e.abilityId === u.action.id && e.timestamp >= (u.ogcd ? landed - HIT_DELAY_SLACK_MS : u.startMs) && e.timestamp < until);
+    const nextSame = next ? landedAt(next) : Infinity;
+    const until = untilOf[i];
+    // From where the previous cast's window ended: a Flare cast while the
+    // last one's hit is still in flight would take that hit as its own
+    // (7yXZbmqcrCga8PHz 7:43 / 7:45, two 57k one-target Flares read as one
+    // 115k Flare that out-damaged Fire IV).
+    let prev = -1;
+    for (let j = i - 1; j >= 0; j--) if (uses[j].action.id === u.action.id) { prev = j; break; }
+    const from = Math.max(u.ogcd ? landed - HIT_DELAY_SLACK_MS : u.startMs, prev >= 0 ? untilOf[prev] : -Infinity);
+    const hits = ctx.player.damageDone.filter((e) => e.abilityId === u.action.id && e.timestamp >= from && e.timestamp < until);
     // A hit for nothing isn't a target: under Dancing Mad P3's Epic Hero /
     // Fated Hero only one boss takes your damage, and the other logs a 0
     // (yBKPqGwHparm7Tk4 fight 5, 9:06-12:05: a Sage's Toxikon IIs read as
