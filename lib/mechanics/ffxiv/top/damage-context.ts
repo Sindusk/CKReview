@@ -125,6 +125,7 @@ const RULE_KEY_LABELS: Record<string, string> = {
   "ffxiv-top4-blue-screen": "Blue Screen",
   "ffxiv-top5-avoidable":   "Run: Dynamis",
   "ffxiv-top5-wall":        "Run: Dynamis",
+  "ffxiv-top5-delta-arm":   "Delta arms",
   "ffxiv-top5-monitor":     "Oversampled Wave Cannon (P5)",
   "ffxiv-top5-world":       "Hello World (P5)",
   "ffxiv-top5-hello-world": "Hello World (P5)",

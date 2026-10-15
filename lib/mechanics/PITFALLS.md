@@ -218,6 +218,14 @@ philosophy and the data semantics this list assumes.
   Kefka).
 - **A doubled stack usually means a dead target.** 7 of 9 doubled Sharp
   Tastes followed a healer's death (The Tyrant).
+- **A rotating line that sweeps the party is its baiter's.** Omega P5's
+  Delta arms rotate out of the arena when baited from the right side;
+  lines on the party (six players in K8) name the player nearest the arm
+  at its first line, not the players hit (a player in the fight).
+- **Fixed spots move the blame onto whoever missed theirs.** Omega P5's
+  World spots are set, so a jump onto a sit-out names the chain player
+  who took no hit, and a player in an origin circle is the extra, not the
+  holder (a player in the fight).
 - **An aimed share follows its aimer into the wrong zone.** When the
   player a shared cone is aimed at took an avoidable hit, their partners
   "missing" the cone is fallout; the aimer's avoidable is the error

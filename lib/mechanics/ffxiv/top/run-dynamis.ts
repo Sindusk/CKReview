@@ -61,7 +61,15 @@
 //   No early break by two living partners on disk.
 // - Silent deaths ~+60-62 are the deathwall while baiting Delta's arms;
 //   a holder's or tethered player's wall death sets off Hello World or
-//   the Patch failure in the same 0.1s.
+//   the Patch failure in the same 0.1s. A silent death within 20s of
+//   another P5 death is the raid resetting: any death here is close to a
+//   wipe (a player who was in the fight, 2026-10-15; L2, E20, G9).
+// - Delta's arms: a correct bait rotates the lines out of the arena, so
+//   lines on the party mean the baiter turned it inwards (same player).
+//   Only three of the six arms log their 31600 cast (with the arm's x/y;
+//   the target only sometimes): F18 #4's logged target was 1.5y from it,
+//   the next player 16.0y; K8 #6 (six hit) had the WAR nearest at 5.7y,
+//   the next 9.3y. Clean pulls' nearest players sat 5.0-13.2y away.
 // - Fists: Unmitigated Explosion 31483 hit all eight (I17, K10); the
 //   fists' colours and owners aren't logged.
 // - Delta monitors pick the four Local players in every pull with
@@ -81,14 +89,19 @@
 //   duty.
 // - Towers: Obliteration 31494 (Damage Down and Doom on all): H5 two
 //   players in no tower; J18 three in a double; K11 one in none and three
-//   in a double.
+//   in a double. In both overfills two of the three were glitch partners
+//   (same Vulnerability Up timings, 1.3-2.2y apart): partners never share
+//   a tower, so one of that pair owed the empty one.
 // - Worlds: six distinct players per set in every clean pull, all eight
 //   at three Dynamis by the end (from the World hits; the Dynamis buff
 //   1003444 isn't in the fetched buff stream). H24's monitor sit-out took
 //   a Distant jump in Omega's first set, went to four and left one player
 //   at two; Blind Faith then failed at 30.2% anyway.
 // - Omega's first monitors went to the two sit-outs; one also caught by a
-//   World jump died (H24, K12: the Second origin). Blaster hit two players
+//   World jump died (H24, K12: the Second origin). The World spots are
+//   fixed, so the fault is the chain player the jump should have picked:
+//   the one living player with neither a World hit nor a monitor (H24's
+//   DRG). In K12 that player (the WAR) was already dead: fallout. Blaster hit two players
 //   with one circle once (J10); the extra then took a jump and died.
 // - Every Blind Faith pull drops its Damage Downs with silent deaths after
 //   Blaster (J7 J17 J20 K22 L14 L16 H24); K12's Sigma Damage Down holder
@@ -105,17 +118,22 @@
 // none; the kill's only P5 error is a Superliminal Steel Damage Down.
 //
 // -- RULES IMPLEMENTED --
-// ffxiv-top5-avoidable (Major on Damage Down or death, else Minor): Delta's
-//   arms, Optical Laser, Swivel Cannon, Rear Lasers, Omega-F's stance and
-//   the clone combo.
-// ffxiv-top5-wall (Major): a silent death no Doom, failure, called wipe or
-//   Damage Down reset explains (a Damage Down holder's silent death counts
-//   as a reset after Blaster, or before it while holding no World or
-//   tether).
+// ffxiv-top5-avoidable (Major on Damage Down or death, else Minor): Optical
+//   Laser, Swivel Cannon, Rear Lasers, Omega-F's stance and the clone combo.
+// ffxiv-top5-delta-arm: a Delta arm whose lines hit anyone names its
+//   baiter (the cast's target, else the player 3y+ nearer the arm than the
+//   next), not the players hit; Major on a death or Damage Down. Player-
+//   less when the arm's cast isn't logged or nobody is clearly nearest.
+// ffxiv-top5-wall (Major): a silent death no Doom, failure, called wipe,
+//   reset (another P5 death in the 20s before) or Damage Down reset
+//   explains (a Damage Down holder's silent death counts as a reset after
+//   Blaster, or before it while holding no World or tether).
 // ffxiv-top5-patch (targeted: each tether pair at its break): a failed
 //   Patch with both partners alive (ran out or broke early), both named.
 // ffxiv-top5-monitor: a Delta monitor on a non-Local player, everyone
-//   alive; an Omega monitor sit-out also hit by that set's World.
+//   alive; an Omega monitor sit-out reached by a World jump names the
+//   chain player who took no hit (fallout if they were dead, player-less
+//   with several).
 // ffxiv-top5-world: a player in another World's origin circle (the extra,
 //   not the holder); a jump over two (all); a jump back to a player
 //   already hit that set; a hit at three Dynamis. Hits after the set's
@@ -126,14 +144,14 @@
 //   death or a World holder); both when the baiter can't be told.
 // ffxiv-top5-glitch: both partners of a pair out of range at the towers.
 // ffxiv-top5-tower: an empty tower: players in no tower, and an
-//   overfilled tower's players as candidates.
+//   overfilled tower's glitch pair (else all its players) as candidates.
 // ffxiv-top5-blaster: one Blaster circle over two players (both).
 // Raid, the earliest kept: -hello-world, -patch (failed Patch), -fist,
 //   -tower (empty), -dynamis (someone under three after the fourth set),
 //   -raidwide (a Run raidwide killing 3+), -blind-faith (with Omega-M's
 //   HP). -called-wipe and -collapse (4 dead at once, K4; never checked in
 //   a pull that passed Blind Faith) only before them.
-// Not built: who aimed a Delta arm or a fist pair (not in the log);
+// Not built: who met wrong in a fist pair (not in the log);
 // Solar Ray tank deaths (raw damage; no non-tank was ever hit with both
 // tanks alive); Pile Pitch with the Defense target (never seen); glitch
 // range at the prey hit (no failure tied to it); which partner of a
@@ -551,11 +569,13 @@ import type { DeathEvent } from "@/types/DeathEvent";
 import type { PullError, EnemyEvent } from "@/types/PullError";
 import type { ReportedOccurrence } from "@/lib/mechanics/occurrences";
 import { distanceBetween } from "@/lib/mechanics/geometry";
+import { interpolatePlayerPosition } from "@/lib/mechanics/player-position";
 import { kFmt, joinNames, playerError, raidMarker, playerlessMinor, clusterByGap } from "@/lib/mechanics/wow/common";
 import { DAMAGE_DOWN, DEATH_EVENT_LAG_MS, PREVIEW_AMOUNT, type Life, bodyHit, buildLife, uniq, realAmount, resetCluster } from "../fru/common";
 
 export const TOP5_AVOIDABLE_RULE_ID   = "ffxiv-top5-avoidable";
 export const TOP5_WALL_RULE_ID        = "ffxiv-top5-wall";
+export const TOP5_DELTA_ARM_RULE_ID   = "ffxiv-top5-delta-arm";
 export const TOP5_PATCH_RULE_ID       = "ffxiv-top5-patch";
 export const TOP5_MONITOR_RULE_ID     = "ffxiv-top5-monitor";
 export const TOP5_WORLD_RULE_ID       = "ffxiv-top5-world";
@@ -593,18 +613,22 @@ const MONITOR      = 31597;
 const DOOM         = 1002519;
 const PREY         = 31604;
 const SIGMA_ARM    = 31602;
+const DELTA_ARM    = [31600, 31601]; // Hyper Pulse: the first line at the nearest player, then the rotating repeats
+// Delta arm baiter: the nearest player to the arm at its first line, when
+// that player is this much nearer than the next (F18 #4: the logged target
+// at 1.5y, the next 16.0y; clean pulls' nearest 5.0-13.2y).
+const ARM_NEAREST_MARGIN = 300;
 const TOWER_1      = 31492;
 const TOWER_2      = 31493;
 const GLITCH_VULN  = 1003366; // both glitch partners, while out of range
 const BLASTER      = 32373;
 const AVOIDABLE: Record<number, string> = {
-  31600: "Hyper Pulse", 31601: "Hyper Pulse", 31521: "Optical Laser",
+  31521: "Optical Laser",
   31636: "Swivel Cannon", 31637: "Swivel Cannon", 31631: "Rear Lasers", 31632: "Rear Lasers",
   31530: "Superliminal Steel", 31531: "Superliminal Steel", 31532: "Superliminal Steel", 31533: "Optimized Blizzard III",
   31609: "Diffuse Wave Cannon", 31525: "Beyond Strength", 31526: "Efficient Bladework",
 };
 const AVOID_WHY: Record<string, string> = {
-  "Hyper Pulse": "Delta's arms fire their lines at the player nearest each one, then rotate: bait your own arm from its correct side and leave only once the line is telegraphed.",
   "Optical Laser": "the eye's laser crosses the arena during Delta: stand off its line.",
   "Swivel Cannon": "the Beetle's Swivel Cannon cleaves 210 degrees: take the World positions on its safe side.",
   "Rear Lasers": "Sigma's rear lasers rotate from the centre: follow behind the cleared laser.",
@@ -624,6 +648,7 @@ const FAILURE_KILL_FROM_MS = 400;
 const FAILURE_KILL_TO_MS   = 4000;
 const RAIDWIDE_DEATHS      = 3; // E20 Delta (5), G9 Sigma (4), K4 Omega (4); no pass lost 1
 const COLLAPSE_DEAD_COUNT  = 4;
+const RESET_AFTER_DEATH_MS = 20_000; // G9's wall came 17.7s after the raidwide deaths
 const CALLED_WIPE_END_MS   = 12_000;
 const CALLED_WIPE_COUNT    = 3;
 const CALLED_WIPE_WINDOW   = 10_000;
@@ -693,6 +718,57 @@ function detectAvoidable(players: PlayerInfo[], life: Life, from: number, to: nu
 }
 
 
+// ── Delta: the arms ─────────────────────────────────────────────────────────
+
+/**
+ * Delta's arms lock their first line on the nearest player, then rotate; a
+ * correct bait turns the rotation out of the arena, so lines on the party
+ * mean the arm was baited inwards and the baiter is named, not the players
+ * hit (a player who was in the fight, 2026-10-15: "if people are getting
+ * hit, especially 6, that's an arm baited incorrectly"). F18: Sumi's arm
+ * (#4, its logged target, 1.5y) hit three; K8: arm #6 hit six. Only three
+ * of the six arms log their casts; a line from an unlogged arm, or with no
+ * clear nearest player, stays player-less.
+ */
+function detectDeltaArms(players: PlayerInfo[], life: Life, casts: EnemyEvent[], from: number, to: number): PullError[] {
+  const errors: PullError[] = [];
+  const hits = liveHits(players, life, DELTA_ARM, from, to).filter((h) => realAmount(h.e) > 0 || (h.e.amount ?? 0) >= PREVIEW_AMOUNT);
+  const by = new Map<number, WorldHit[]>();
+  for (const h of hits) by.set(h.e.sourceInstance ?? -1, [...(by.get(h.e.sourceInstance ?? -1) ?? []), h]);
+  for (const [inst, hs] of by) {
+    const first = hs.sort((a, b) => a.e.timestamp - b.e.timestamp)[0].e;
+    const cast = casts.filter((c) => c.abilityId === DELTA_ARM[0] && c.sourceInstance === inst && c.timestamp <= first.timestamp && first.timestamp - c.timestamp <= 5000).pop();
+    const victims = uniq(hs.map((h) => h.p));
+    const died = victims.filter((p) => deathsAfter(p, life, hs.filter((h) => h.p === p).pop()!.e.timestamp));
+    const dd = victims.filter((p) => gotDamageDown(p, first.timestamp, hs[hs.length - 1].e.timestamp));
+    let baiter = cast?.target ? byName(players, cast.target) : undefined;
+    let gap: number | undefined;
+    if (!baiter && cast?.x !== undefined && cast.y !== undefined) {
+      const near = players.filter((p) => life.alive(p, cast.timestamp)).map((p) => {
+        const q = interpolatePlayerPosition(p, cast.timestamp, { windowMs: 2500, maxSpanMs: 4000 });
+        return q ? { p, d: distanceBetween(q, { x: cast.x!, y: cast.y! }) } : undefined;
+      }).filter((x): x is { p: PlayerInfo; d: number } => !!x).sort((a, b) => a.d - b.d);
+      if (near.length > 1 && near[1].d - near[0].d >= ARM_NEAREST_MARGIN) { baiter = near[0].p; gap = near[0].d; }
+    }
+    const outcome = `Its lines hit ${names(victims.map((p) => p.name))}${died.length ? `; ${names(died.map((p) => p.name))} died` : dd.length ? `; ${names(dd.map((p) => p.name))} got Damage Down` : ""}.`;
+    const why = "Bait your arm from its correct side so its rotation turns out of the arena, and stay until the line is telegraphed.";
+    const sev = died.length || dd.length ? "Major" : "Minor";
+    if (baiter) {
+      errors.push(playerError(baiter, {
+        ruleId: TOP5_DELTA_ARM_RULE_ID, severity: sev, name: "Arm Baited Inwards",
+        description: `Baited a Delta arm's Hyper Pulse${gap !== undefined ? ` (nearest to it, ~${(gap / 100).toFixed(1)}y)` : ""} so it rotated into the party. ${outcome} ${why}`,
+        timestamp: first.timestamp, abilityId: first.abilityId, abilityName: first.abilityName,
+      }));
+    } else {
+      errors.push(playerlessMinor(TOP5_DELTA_ARM_RULE_ID, "Arm Baited Inwards",
+        `A Delta arm's Hyper Pulse rotated into the party; its baiter isn't in the log. ${outcome} ${why}`,
+        first.timestamp, first.abilityId, first.abilityName));
+    }
+  }
+  return errors;
+}
+
+
 // ── Deaths with no killing blow ─────────────────────────────────────────────
 
 function calledWipeDeaths(deaths: DeathEvent[], pullEnd: number): Set<DeathEvent> {
@@ -724,6 +800,10 @@ function detectWallDeaths(players: PlayerInfo[], deaths: DeathEvent[], called: S
     const p = byName(players, d.player);
     if (!p) continue;
     const fatal = d.timestamp - DEATH_EVENT_LAG_MS;
+    // Any death in P5 is close to a wipe, so a silent death soon after
+    // another is the raid resetting (L2: the glitch towers killed two, then
+    // the WHM and the RPR walked out; E20, G9 after a raidwide killed 4-5).
+    if (deaths.some((k) => k !== d && k.timestamp >= start && k.timestamp <= d.timestamp && d.timestamp - k.timestamp <= RESET_AFTER_DEATH_MS)) continue;
     if (p.debuffs.some((x) => x.abilityId === DOOM && x.debuffStatus === "applied" && x.timestamp <= fatal && fatal - x.timestamp <= 15_000)) continue;
     if (casts.some((c) => FAILURE_CASTS.includes(c.abilityId) && fatal - c.timestamp >= FAILURE_KILL_FROM_MS && fatal - c.timestamp <= FAILURE_KILL_TO_MS)) continue;
     if (holds(p, DAMAGE_DOWN, fatal - 100) && (fatal > blaster || !hasDuty(p, fatal))) continue;
@@ -802,7 +882,7 @@ function detectTethers(players: PlayerInfo[], life: Life, tethers: Tether[], occ
  * Omega's first monitors are the two sit-outs; one also taken by a World
  * jump died to it (H24, K12).
  */
-function detectMonitors(players: PlayerInfo[], life: Life, start: number, tethers: Tether[], sets: WorldSet[]): PullError[] {
+function detectMonitors(players: PlayerInfo[], life: Life, start: number, tethers: Tether[], sets: WorldSet[], jumpedSitOuts: Set<string>): PullError[] {
   const errors: PullError[] = [];
   const local = uniq(tethers.filter((t) => t.kind === "Local").flatMap((t) => t.pair));
   const delta = liveHits(players, life, [MONITOR], start + 55_000, start + 80_000);
@@ -823,15 +903,36 @@ function detectMonitors(players: PlayerInfo[], life: Life, start: number, tether
   const omega = liveHits(players, life, [MONITOR], start + 230_000, start + 250_000);
   const set = sets.find((s) => omega.length && s.t >= omega[0].e.timestamp - 3000 && s.t <= omega[0].e.timestamp + 3000);
   if (set) {
-    for (const p of uniq(omega.map((h) => h.p))) {
-      const w = set.hits.find((h) => h.p === p && (set.hw === undefined || h.e.timestamp < set.hw));
+    // The World and monitor positions are fixed, so a jump onto a monitor
+    // sit-out means the chain player it should have picked wasn't far (or
+    // near) enough (a player who was in the fight, 2026-10-15): name the
+    // living player with neither a World hit nor a monitor this set (H24's
+    // DRG). When that player was dead (K12: the WAR died at the clones),
+    // it's fallout; with several candidates, nobody.
+    const t0 = omega[0].e.timestamp;
+    const sitOuts = uniq(omega.map((h) => h.p));
+    const valid = set.hits.filter((h) => set.hw === undefined || h.e.timestamp < set.hw);
+    for (const p of sitOuts) {
+      const w = valid.find((h) => h.p === p);
       if (!w) continue;
+      jumpedSitOuts.add(p.name);
+      const missing = players.filter((q) => !sitOuts.includes(q) && !valid.some((h) => h.p === q));
+      const alive = missing.filter((q) => life.alive(q, t0));
+      if (missing.length !== alive.length) continue;
       const died = deathsAfter(p, life, w.e.timestamp);
-      errors.push(playerError(p, {
-        ruleId: TOP5_MONITOR_RULE_ID, severity: died ? "Major" : "Minor", name: "Monitor and World",
-        description: `Sat out on the monitor side but a World jump (${w.e.abilityName}) still reached them${died ? ": the second hit killed them" : ""}, and its stack went to a player who should have sat out. The two monitor players spread on the firing side, well clear of every chain player, so neither Near nor Distant picks them.`,
-        timestamp: w.e.timestamp, abilityId: w.e.abilityId, abilityName: w.e.abilityName,
-      }));
+      const what = `${w.e.abilityName} jumped onto ${p.name}, a monitor sit-out${died ? ", and the second hit killed them" : ""}`;
+      const why = "The World spots are fixed: each jump player stands where Near picks them as the next-nearest and Distant as the next-farthest, beyond the sit-outs on the monitor side.";
+      if (alive.length === 1) {
+        errors.push(playerError(alive[0], {
+          ruleId: TOP5_MONITOR_RULE_ID, severity: died ? "Major" : "Minor", name: "Missed a World Jump",
+          description: `Took no World hit in Omega's first set: ${what}, so the jump wasn't picking ${alive[0].name}. ${why}`,
+          timestamp: w.e.timestamp, abilityId: w.e.abilityId, abilityName: w.e.abilityName,
+        }));
+      } else {
+        errors.push(playerlessMinor(TOP5_MONITOR_RULE_ID, "Missed a World Jump",
+          `${what}; the chain player it should have picked can't be told (${alive.length ? names(alive.map((q) => q.name)) : "nobody"} took no hit). ${why}`,
+          w.e.timestamp, w.e.abilityId, w.e.abilityName));
+      }
     }
   }
   return errors;
@@ -1037,11 +1138,19 @@ function detectTowers(players: PlayerInfo[], life: Life, casts: EnemyEvent[], fr
   const soaks = liveHits(players, life, [TOWER_1, TOWER_2], ob.timestamp - 1000, ob.timestamp + 2500);
   const by = new Map<number, WorldHit[]>();
   for (const h of soaks) by.set(h.e.sourceInstance ?? -1, [...(by.get(h.e.sourceInstance ?? -1) ?? []), h]);
-  const over = [...by.values()].filter((g) => g.length > (g[0].e.abilityId === TOWER_2 ? 2 : 1)).flatMap((g) => g.map((h) => h.p));
+  // Glitch partners can't share a tower, so a pair together in an
+  // overfilled one is the candidates, not everyone in it (J18, K11: the
+  // DNC with their partner; a player who was in the fight, 2026-10-15).
+  const glitchKey = (p: PlayerInfo) => auraIntervals(p, GLITCH_VULN).filter((w) => w.start >= from && w.start <= ob.timestamp).map((w) => Math.round(w.start / 100)).join(",");
+  const over = [...by.values()].filter((g) => g.length > (g[0].e.abilityId === TOWER_2 ? 2 : 1)).flatMap((g) => {
+    const ps = g.map((h) => h.p);
+    const pair = ps.filter((p) => glitchKey(p) !== "" && ps.some((q) => q !== p && glitchKey(q) === glitchKey(p)));
+    return pair.length === 2 ? pair : ps;
+  });
   const none = players.filter((p) => life.alive(p, ob.timestamp) && !soaks.some((h) => h.p === p));
   const out: PullError[] = [];
   for (const p of none) out.push(playerError(p, { ruleId: TOP5_TOWER_RULE_ID, severity: "Major", name: "Missed a Tower", description: `In no Sigma tower when one stood empty: Storage Violation Obliteration gave everyone Damage Down and Doom.${over.length ? ` ${names(over.map((q) => q.name))} crowded one tower.` : ""} Every player soaks: Mid has four singles and two doubles, Remote two singles and three doubles.`, timestamp: ob.timestamp, abilityId: OBLITERATION, abilityName: "Storage Violation Obliteration" }));
-  for (const p of uniq(over)) out.push(playerError(p, { ruleId: TOP5_TOWER_RULE_ID, severity: "Major", name: "Overfilled a Tower", description: `In a Sigma tower holding more players than it takes (${names(over.map((q) => q.name))}) while another stood empty: Storage Violation Obliteration gave everyone Damage Down and Doom. One of them belonged in the empty tower.`, timestamp: ob.timestamp, abilityId: OBLITERATION, abilityName: "Storage Violation Obliteration" }));
+  for (const p of uniq(over)) out.push(playerError(p, { ruleId: TOP5_TOWER_RULE_ID, severity: "Major", name: "Overfilled a Tower", description: `In an overfilled Sigma tower${over.length === 2 ? ` with their glitch partner ${names(over.filter((q) => q !== p).map((q) => q.name))}` : ` (${names(over.map((q) => q.name))})`} while another stood empty: Storage Violation Obliteration gave everyone Damage Down and Doom. ${over.length === 2 ? "Partners never share a tower: one of the two" : "One of them"} belonged in the empty tower.`, timestamp: ob.timestamp, abilityId: OBLITERATION, abilityName: "Storage Violation Obliteration" }));
   return out;
 }
 
@@ -1106,6 +1215,7 @@ export function detectRunDynamisErrors(
   const sets = readWorldSets(players, life, casts, start, end);
   const errors: PullError[] = [
     ...detectAvoidable(players, life, start, end),
+    ...detectDeltaArms(players, life, casts, start + 55_000, start + 80_000),
     ...detectWallDeaths(players, p5Deaths, called, casts, start),
     ...detectTethers(players, life, tethers, occurrences),
     ...detectSigmaArms(players, life, casts, start + 100_000, start + 200_000),
@@ -1113,9 +1223,11 @@ export function detectRunDynamisErrors(
     ...detectTowers(players, life, casts, start + 100_000, start + 170_000),
     ...detectBlaster(players, life, start + 230_000, end),
   ];
-  const monitors = detectMonitors(players, life, start, tethers, sets);
-  errors.push(...monitors);
-  errors.push(...detectWorlds(players, life, sets, new Set(monitors.map((e) => e.player!).filter(Boolean))));
+  // A sit-out a jump reached gets a stack too many: their later hit at
+  // three (H24's RDM in the fourth set) is that jump's fallout.
+  const jumpedSitOuts = new Set<string>();
+  errors.push(...detectMonitors(players, life, start, tethers, sets, jumpedSitOuts));
+  errors.push(...detectWorlds(players, life, sets, jumpedSitOuts));
 
   // Mechanic Raids: only the earliest is kept.
   const raids: PullError[] = [];
