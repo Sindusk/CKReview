@@ -14,9 +14,23 @@
 //   Omega's death (+2:04-2:10.7), so it's a fixed pool and damage past
 //   1 HP is wasted. Omega's death to P2's first hit is untargetable time,
 //   inferred from the log.
-// - P2-P6: no module yet and no clear past P2 in the samples; left out.
-//   The run's last hard enrage is P6's (Alpha Omega), so no phase is
-//   marked as deciding it until that phase is measured.
+// - P2 Omega-M and Omega-F (added 2026-10-14 from omega-mf.ts's header and
+//   reports BKQ92ndywPaLtbMm, 8hnVr24MtBqNvRAb, ZPpBNMGyrnzJ2LRC: 64 P2
+//   pulls fetched 2:00-5:30, 22 P2 clears). Two bosses of 4.31M each,
+//   both logged as "Omega" with no instance on damage done, so the pool is
+//   the pair: 8.62M, fixed (the clears dealt 7.34-8.13M on them, the rest
+//   being the pre-Firewall cleave in P1's segment). Both down at +129.9 to
+//   +140.9 from Firewall in every clear, before Laser Shower completes at
+//   +141.7 (the enrage wipes A57, A74, B9 had 1.3-15.1% left on the
+//   survivor). No hold: the clears kill at full pace up to Laser Shower.
+//   FFLogs ends the P2 segment at the second death (B18: last real hit
+//   4:31.5, P3 from 4:32.0), so nothing in P2 needs forcing past the kill;
+//   Party Synergy's untargetable stretch is inferred from the log. Not
+//   built: damage into Omega-F while Omega-M's shield makes her invulnerable
+//   (Limitless Synergy), since the log can't tell the two bosses apart.
+// - P3-P6: no module yet; left out. The run's last hard enrage is P6's
+//   (Alpha Omega), so no phase is marked as deciding it until that phase
+//   is measured.
 //
 // Not built: per-player busy windows (Program Loop's tower soakers and
 // tether holders, Pantokrator's missile carriers): the module knows who,
@@ -37,6 +51,10 @@ const RULE_KEY_LABELS: Record<string, string> = {
   "ffxiv-top1-line":        "Pantokrator",
   "ffxiv-top1-diffuse":     "Diffuse Wave Cannon Kyrios",
   "ffxiv-top1-wave-cannon": "Wave Cannon Kyrios",
+  "ffxiv-top2-glitch":      "Party Synergy",
+  "ffxiv-top2-fire":        "Party Synergy",
+  "ffxiv-top2-stack":       "Party Synergy",
+  "ffxiv-top2-synergy":     "Party Synergy",
 };
 
 /** First hit in the span leaving `target` at or under `line` of its max HP. */
@@ -51,6 +69,7 @@ export const TOP_DAMAGE_CONTEXT: DamageContext = {
   encounter: "The Omega Protocol",
   phases: {
     1: { pool: 8_560_000, fixedPool: true, carriesOver: false, note: "Omega to 1 HP before Atomic Ray (~2:08); no hold" },
+    2: { pool: 8_620_000, fixedPool: true, carriesOver: false, multiTarget: true, note: "Omega-M and Omega-F (4.31M each) both down before Laser Shower (Firewall +141.7); no hold" },
   },
   forcedWindows: (pull) => {
     const out: ForcedWindow[] = [];
