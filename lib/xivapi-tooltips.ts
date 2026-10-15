@@ -28,7 +28,7 @@ export type XivTooltip = {
   castMs?:     number;   // 0 = instant
   recastMs?:   number;
   mpCost?:     number;   // a gauge cost is a line in the description, as in-game
-  range?:      number;   // yalms; melee rows come back as 3
+  range?:      number;   // yalms
   radius?:     number;
   level?:      number;
   job?:        string;   // "Dancer"; none for role actions
@@ -38,9 +38,9 @@ export type XivTooltip = {
 const API = "https://v2.xivapi.com/api/sheet";
 const STATUS_OFFSET = 1_000_000;
 const TTL_MS = 7 * 24 * 3600 * 1000;
-const STORE_PREFIX = "xivapi3:";  // bump when XivTooltip's shape changes
+const STORE_PREFIX = "xivapi4:";  // bump when XivTooltip's shape changes
 const MP_COST_TYPE = 3;
-const ACTION_FIELDS = "Name,ActionCategory.Name,Cast100ms,Recast100ms,PrimaryCostType,PrimaryCostValue,Range,EffectRange,ClassJobLevel,ClassJobCategory.Name,ClassJob.NameEnglish";
+const ACTION_FIELDS = "Name,ActionCategory.Name,Cast100ms,Recast100ms,PrimaryCostType,PrimaryCostValue,Range,EffectRange,ClassJobLevel,ClassJobCategory.Name,ClassJob.NameEnglish,ClassJob.Role";
 const memory = new Map<string, Promise<XivTooltip>>();
 
 function urlOf(id: number): { key: string; url: string; status: boolean } {
@@ -93,7 +93,7 @@ type Row = {
     ActionCategory?: { fields?: { Name?: string } }; ClassJobCategory?: { fields?: { Name?: string } };
     Cast100ms?: number; Recast100ms?: number; PrimaryCostType?: number; PrimaryCostValue?: number;
     Range?: number; EffectRange?: number; ClassJobLevel?: number;
-    ClassJob?: { fields?: { NameEnglish?: string } };
+    ClassJob?: { fields?: { NameEnglish?: string; Role?: number } };
   };
   transient?: { "Description@as(html)"?: string };
 };
@@ -110,7 +110,9 @@ function toTooltip(j: Row, status: boolean): XivTooltip {
     castMs:   f.Cast100ms !== undefined ? f.Cast100ms * 100 : undefined,
     recastMs: f.Recast100ms !== undefined ? f.Recast100ms * 100 : undefined,
     mpCost:   f.PrimaryCostType === MP_COST_TYPE && f.PrimaryCostValue ? f.PrimaryCostValue * 100 : undefined,
-    range:    f.Range === undefined ? undefined : f.Range < 0 ? 3 : f.Range,
+    // -1: the job's auto-attack range, 3y for tanks and melee (Role 1, 2),
+    // 25y for ranged and healers (3, 4): Saber Dance is 25y, Sonic Break 3y.
+    range:    f.Range === undefined ? undefined : f.Range >= 0 ? f.Range : (f.ClassJob?.fields?.Role ?? 0) >= 3 ? 25 : 3,
     radius:   f.EffectRange,
     level:    f.ClassJobLevel || undefined,
     affinity: f.ClassJobCategory?.fields?.Name || undefined,
