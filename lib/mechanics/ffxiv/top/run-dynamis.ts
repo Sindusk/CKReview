@@ -66,8 +66,10 @@
 //   wipe (a player who was in the fight, 2026-10-15; L2, E20, G9).
 // - Delta's arms: a correct bait rotates the lines out of the arena, so
 //   lines on the party mean the baiter turned it inwards (same player).
-//   Only three of the six arms log their 31600 cast (with the arm's x/y;
-//   the target only sometimes): F18 #4's logged target was 1.5y from it,
+//   Only the three "right arm unit" arms are in the log (31600 casts with
+//   the arm's x/y, the target only sometimes); the "left arm unit" actor
+//   appears in no cast, damage or debuff stream of any report, only in
+//   head markers, so a left arm's lines and their victims are invisible: F18 #4's logged target was 1.5y from it,
 //   the next player 16.0y; K8 #6 (six hit) had the WAR nearest at 5.7y,
 //   the next 9.3y. Clean pulls' nearest players sat 5.0-13.2y away.
 // - Fists: Unmitigated Explosion 31483 hit all eight (I17, K10); the
@@ -84,9 +86,11 @@
 //   before the cast; everyone gets it briefly at +120 and +140.
 // - Sigma arms pick the two unmarked players in every clean pull. An arm
 //   on a prey-marked player (F19, L12) killed them with both hits; the
-//   unmarked player wasn't farthest. Arm lines that hit two lose their
-//   cast target (K4 K12 K20 K21 L9); the baiter is the one with no World
-//   duty.
+//   unmarked player wasn't farthest. The farthest player from the arm at
+//   its cast was its target in all 25 targeted casts. Arm lines that hit
+//   two lose their cast target (K4 K12 K20 K21 L9); the baiter is the
+//   victim farthest from the arm (39.0-39.2y; the next player 2.2-11.1y
+//   nearer), else the one with no World duty.
 // - Towers: Obliteration 31494 (Damage Down and Doom on all): H5 two
 //   players in no tower; J18 three in a double; K11 one in none and three
 //   in a double. In both overfills two of the three were glitch partners
@@ -141,7 +145,9 @@
 // ffxiv-top5-prey: a Sigma arm on a prey-marked player: the unmarked
 //   player not farthest (player-less when prey casts lost targets: F19).
 // ffxiv-top5-arm: a Sigma arm line on a player it didn't target (Major on
-//   death or a World holder); both when the baiter can't be told.
+//   death or a World holder); a line that lost its target goes to the
+//   victim farthest from the arm, else the one with no World duty, else
+//   both.
 // ffxiv-top5-glitch: both partners of a pair out of range at the towers.
 // ffxiv-top5-tower: an empty tower: players in no tower, and an
 //   overfilled tower's glitch pair (else all its players) as candidates.
@@ -726,9 +732,9 @@ function detectAvoidable(players: PlayerInfo[], life: Life, from: number, to: nu
  * mean the arm was baited inwards and the baiter is named, not the players
  * hit (a player who was in the fight, 2026-10-15: "if people are getting
  * hit, especially 6, that's an arm baited incorrectly"). F18: Sumi's arm
- * (#4, its logged target, 1.5y) hit three; K8: arm #6 hit six. Only three
- * of the six arms log their casts; a line from an unlogged arm, or with no
- * clear nearest player, stays player-less.
+ * (#4, its logged target, 1.5y) hit three; K8: arm #6 hit six. Only the
+ * three right arms are in the log at all (the left arms' casts and hits
+ * never are); a right arm with no clear nearest player stays player-less.
  */
 function detectDeltaArms(players: PlayerInfo[], life: Life, casts: EnemyEvent[], from: number, to: number): PullError[] {
   const errors: PullError[] = [];
@@ -1070,9 +1076,18 @@ function detectSigmaArms(players: PlayerInfo[], life: Life, casts: EnemyEvent[],
       }
       const hits = liveHits(players, life, [SIGMA_ARM], c.timestamp, c.timestamp + 1500).filter((h) => h.e.sourceInstance === c.sourceInstance);
       // A line over two players loses its cast target (K4 K12 K20 K21 L9).
-      // Its baiter is then the one with no World duty: not holding a World
-      // and not hit by the chain that follows (K20: the Distant origin).
+      // The arm picks the player farthest from it: that player was the
+      // target in all 25 targeted casts on disk (a player who was in the
+      // fight, 2026-10-15, confirms the rule), so a victim who was the
+      // farthest is the baiter. Failing that, the victim with no World duty.
       let baiter = c.target;
+      if (!baiter && hits.length > 1 && c.x !== undefined && c.y !== undefined) {
+        const far = players.filter((p) => life.alive(p, c.timestamp)).map((p) => {
+          const q = interpolatePlayerPosition(p, c.timestamp, { windowMs: 2500, maxSpanMs: 4000 });
+          return q ? { p, d: distanceBetween(q, { x: c.x!, y: c.y! }) } : undefined;
+        }).filter((x): x is { p: PlayerInfo; d: number } => !!x).sort((a, b) => b.d - a.d)[0];
+        if (far && hits.some((h) => h.p === far.p)) baiter = far.p.name;
+      }
       if (!baiter && hits.length > 1) {
         const free = hits.filter((h) => !holds(h.p, NEAR_AURA, h.e.timestamp) && !holds(h.p, DIST_AURA, h.e.timestamp) &&
           !h.p.damageTaken.some((e) => WORLD_HITS.includes(e.abilityId) && e.timestamp >= h.e.timestamp - 1000 && e.timestamp <= h.e.timestamp + 4000));
