@@ -75,6 +75,7 @@ import { detectLindwurmErrors } from "./mechanics/ffxiv/arcadion/lindwurm-1";
 import { detectLindwurm2Errors } from "./mechanics/ffxiv/arcadion/lindwurm-2";
 import { detectFatebreakerErrors } from "./mechanics/ffxiv/fru/fatebreaker";
 import { detectOmegaErrors } from "./mechanics/ffxiv/top/omega";
+import { detectOmegaMFErrors } from "./mechanics/ffxiv/top/omega-mf";
 import { detectUsurperOfFrostErrors, type HeadMarker } from "./mechanics/ffxiv/fru/usurper-of-frost";
 import { detectOracleOfDarknessErrors } from "./mechanics/ffxiv/fru/oracle-of-darkness";
 import { detectEnterTheDragonErrors } from "./mechanics/ffxiv/fru/enter-the-dragon";
@@ -1693,6 +1694,7 @@ export function transformFFightToPull(
     ...detectEnterTheDragonErrors(players, deathEvents, enemyCastEvents, npcHits, reportedOccurrences),
     ...detectPandoraErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
     ...detectOmegaErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
+    ...detectOmegaMFErrors(players, deathEvents, enemyCastEvents, headMarkers, reportedOccurrences),
     ...detectDoomtrainErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
     ...detectNecronErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
     ...detectZeleniaErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
@@ -1726,6 +1728,7 @@ export function transformFFightToPull(
     castEvents,
     blackHoleGeometry,
     enemyCasts:    enemyCastEvents,
+    headMarkers:   headMarkers.length ? headMarkers : undefined,
     enemyStacks:   fflBuildEnemyStacks(data.enemyBuffEvents ?? [], actorMap, abilityMap, fightStart),
     bossDebuffs:   data.enemyDebuffEvents
       ? fflBuildBossDebuffs(data.enemyDebuffEvents, actorMap, abilityMap, fightStart)

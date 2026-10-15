@@ -69,7 +69,12 @@ philosophy and the data semantics this list assumes.
   Count them as hits; never compare them as amounts (The Tyrant).
 - **Not every fight hands out Damage Down.** Doomtrain gives only
   Vulnerability Up stacks, so its avoidables are Minor unless they kill.
-  Check the debuff sweep before applying the FFXIV Major exception.
+  Neither does The Omega Protocol's Phase 2. Check the debuff sweep before
+  applying the FFXIV Major exception.
+- **Instance numbers collide across casting actors in one volley.** Omega
+  P2's Fire spreads had two #1s from different actors, and Omega-M#2 and
+  Omega-F#2 both cast a Bladedance. Key a cast by the actor's name plus the
+  instance (the hit's `source` matches the cast's `actorName`).
 - **A "marked circle" can be a split stack.** Doomtrain's Plummet marks
   2-5 players but all 8 share them in every kill; the failure is a player
   under two, not anyone under one.
@@ -255,6 +260,13 @@ philosophy and the data semantics this list assumes.
   the static's clean resolutions first: the user's static followed NAUR's
   Refrain Water swap (MT > OT > H1 > H2, melee > R1 > R2) every time, and
   it named both reviewed failures (Oracle of Darkness `naurGroups`).
+- **A partner-distance penalty marks both partners; a learned layout names
+  one.** Omega P2's glitch Vulnerability Up lands on both. The report's
+  clean Fire rows give the side order (one order fit 131 of 131 pairs), and
+  a slot model built from that pull's clean players (side, distance off the
+  axis, rank along the row) puts the culprit 9-31y off their slot and the
+  partner within 7y. Where both stood near their slots, keep the pair
+  (synergy-order.ts).
 - **A stack that splits names the member who stood off its spot,** not
   the players waiting in the middle (Oracle of Darkness's Shell Crusher:
   the BRD 6y out, the four missers within 1y of center).
@@ -351,6 +363,7 @@ Classify every one before counting a called wipe. Known meanings:
   - The Tyrant: 4.4s
   - Lindwurm II: 2.2-2.8s after a Mana Burst defam (off a platform)
   - Omega P1: ~2.3s after a Guided Missile Kyrios hit on a non-carrier
+  - Omega P2: 2.5-2.8s after Beyond Defense jumped the party
 
   Keep these out of the called-wipe count.
 - **An uncleansed Doom:** no killing blow ~2s after it runs out at full

@@ -383,6 +383,14 @@ exposure("targeted", ["ffxiv-fb-powder-swap", "ffxiv-fb-powder-death"]);
 // two In Line players (omega.ts reports both at every round).
 mechanic("ffxiv-top1-tower", "Program Loop towers (In Line soakers)", 1, ["ffxiv-top1-tower"]);
 exposure("targeted", ["ffxiv-top1-tower"]);
+// The Omega Protocol P2: Solar Ray, Bladedance and Beyond Defense test the
+// tanks; Pile Pitch tests the player Beyond Defense jumped (omega-mf.ts
+// reports them at every instance).
+mechanic("ffxiv-top2-solar-ray", "Solar Ray: one buster per tank", 2, ["ffxiv-top2-solar-ray"]);
+mechanic("ffxiv-top2-bladedance", "Bladedance tethers (tanks)", 2, ["ffxiv-top2-bladedance"]);
+mechanic("ffxiv-top2-beyond-defense", "Beyond Defense bait (tanks)", 2, ["ffxiv-top2-beyond-defense"]);
+mechanic("ffxiv-top2-pile-pitch", "Pile Pitch: the jumped player leaves", 2, ["ffxiv-top2-pile-pitch"]);
+exposure("targeted", ["ffxiv-top2-solar-ray", "ffxiv-top2-bladedance", "ffxiv-top2-beyond-defense", "ffxiv-top2-pile-pitch"]);
 // Futures Rewritten P2: Quadruple Slap tests the tanks; the Diamond Dust
 // cone and stone rules test the four Frigid Stone players
 // (usurper-of-frost.ts reports both at every instance).

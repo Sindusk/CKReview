@@ -41,6 +41,7 @@ import { learnGravenImageLayout, detectGravenImageSpreadErrors, detectGravenImag
 import { learnWaveCannonLayout, detectWaveCannonPositionErrors } from "@/lib/mechanics/ffxiv/dancingmad/wave-cannon";
 import { applyFallback, buildFallbackProfiles } from "@/lib/mechanics/fallback";
 import { learnPantokratorConga, applyPantokratorConga } from "@/lib/mechanics/ffxiv/top/pantokrator-conga";
+import { learnSynergyOrder, applySynergyOrder } from "@/lib/mechanics/ffxiv/top/synergy-order";
 import type { Pull } from "../types/Pull";
 import { createCallWipeError, CALL_WIPE_RULE_ID, createManualError, type ManualErrorInput } from "@/types/PullError";
 import type { SavedSession, SavedSessionVod } from "@/types/Session";
@@ -198,6 +199,12 @@ export default function Home() {
     () => learnPantokratorConga(pulls.map((p) => ({ players: p.players, deathEvents: p.deathEvents, enemyCasts: p.enemyCasts ?? [] }))),
     [pulls]
   );
+  // Its Party Synergy order (synergy-order.ts): it names which glitch
+  // partner stood in the wrong row or stack.
+  const synergyOrder = useMemo(
+    () => learnSynergyOrder(pulls.filter((p) => p.name === "The Omega Protocol").map((p) => ({ players: p.players, deathEvents: p.deathEvents, enemyCasts: p.enemyCasts ?? [], headMarkers: p.headMarkers }))),
+    [pulls]
+  );
   // Bosses without an encounter module get the fallback model, which learns
   // each ability's normal targets from the pull itself and the report's
   // earlier pulls of that boss, never later ones (lib/mechanics/fallback.ts).
@@ -230,9 +237,12 @@ export default function Home() {
   const displayPulls = useMemo(() => {
     return pulls.map((pull) => {
       const base = applyDutyAssignments(applyFallback(pull, fallbackProfiles), dutyAssignments);
-      const p = pantokratorConga && base.name === "The Omega Protocol"
+      const conga = pantokratorConga && base.name === "The Omega Protocol"
         ? { ...base, errors: applyPantokratorConga(base.errors, base.players, base.deathEvents, base.enemyCasts ?? [], pantokratorConga) }
         : base;
+      const p = synergyOrder && conga.name === "The Omega Protocol"
+        ? { ...conga, errors: applySynergyOrder(conga.errors, conga.players, conga.deathEvents, conga.enemyCasts ?? [], conga.headMarkers, synergyOrder) }
+        : conga;
       const blackHoleErrors = [
         ...detectMissedAssignedTetherErrors(p, blackHoleStrategy),
         ...detectClippedByNeighborTetherErrors(p, blackHoleStrategy),

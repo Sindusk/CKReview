@@ -5,6 +5,7 @@ import type { PlayerInfo } from "./PlayerInfo";
 import type { PullError, EnemyEvent }  from "./PullError";
 import type { EncounterPhase, PullPhaseSegment } from "../lib/pull-phases";
 import type { MechanicOccurrence } from "../lib/mechanics/occurrences";
+import type { HeadMarker } from "../lib/mechanics/ffxiv/fru/usurper-of-frost";
 
 // Raw positional data for the Dancing Mad (FFXIV) Black Hole mechanic's
 // direction/priority detection — see lib/mechanics/ffxiv/dancingmad/
@@ -80,6 +81,11 @@ export type Pull = {
   // wow/va/*-damage-context.ts). WoW since 2026-10-06; undefined on pulls
   // saved before.
   enemyCasts?: EnemyEvent[];
+  // FFXIV only: head markers on players (marker id + player), for
+  // cross-pull passes that need them after import (The Omega Protocol's
+  // Party Synergy order, lib/mechanics/ffxiv/top/synergy-order.ts).
+  // Undefined when the pull had none, and on pulls saved before 2026-10-14.
+  headMarkers?: HeadMarker[];
   // WoW only: buffs gained and lost by enemies (the same lists the WoW
   // encounter modules get as enemyBuffs / enemyBuffRemovals), for the damage
   // contexts' untargetable and shielded windows. Undefined on pulls saved

@@ -72,10 +72,16 @@ lib/mechanics/
       omega.ts                — Phase 1 per-pull rules (Program Loop towers and
                                 Blaster tethers, Pantokrator missiles and shared
                                 lines, Flame Thrower / Ballistic Impact, Diffuse
-                                and Wave Cannon Kyrios, Atomic Ray enrage); the
-                                other phase files are research models only
+                                and Wave Cannon Kyrios, Atomic Ray enrage)
+      omega-mf.ts             — Phase 2 per-pull rules (Solar Ray aggro, Party
+                                Synergy clones/laser/glitch range/Fire/Spotlight
+                                stacks, Bladedance tethers, Beyond Defense and
+                                Pile Pitch, Laser Shower enrage); the later
+                                phase files are research models only
       pantokrator-conga.ts    — cross-pull Pantokrator side order (who should
                                 have crossed in a same-number pair)
+      synergy-order.ts        — cross-pull Party Synergy row order (which glitch
+                                partner was off their row slot or stack)
     trials/                   — Extreme trials
       doomtrain.ts            — Doomtrain (Hell on Rails EX) per-pull rules
                                 (avoidables, stored plasma spreads/pairs, orb
