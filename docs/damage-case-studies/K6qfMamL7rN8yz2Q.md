@@ -170,6 +170,25 @@ xivanalysis pages for all eight players saved 2026-10-14 in
 - Kade's 6:50-6:57 question: the user doesn't know (no VOD). It stays
   counted as his.
 
+### The Tyrant (fight 5, the app's Pull 2, kill)
+
+xivanalysis pages for all eight players saved 2026-10-15 in
+`sampledata/damage-ff/`. Order: highest loss first (Mocha, Sin,
+Siegward, Yoro, Kade, Kevin, Sayacissa, Chauzey). Three deaths (Mocha
+3:49.8, Sin 3:29, Siegward 4:20) dominate the top three.
+
+- **Mocha Dreams (Viper).** Per-claim record in the Viper header of
+  lib/damage/ffxiv/jobs/melee.ts. Fixed:
+  - Hindsbane Fang positional misses were never caught anywhere:
+    game.ts's table was keyed by the log's spelling, while xivanalysis's
+    data says "Hindbane Fang". 8:04.9 here, plus ~25 across the samples.
+  - The 6:37.5 Hindstung and 6:39.3 Honed Reavers losses are expiries now,
+    not drops by a Generation.
+  - A Writhing Snap under raid buffs with coils held is a choice; an
+    excused Snap doesn't claim a coil. 6:29.4 and 6:31.5 with 3 coils
+    (68k each, forced before). One more on CABrk9zXLfJG8h6R's Tyrant kill.
+  Lost 1.83M → 1.97M.
+
 ## Open
 
 - Lock-model gaps seen in the drift test (they can hide delay, never
@@ -196,4 +215,6 @@ xivanalysis pages for all eight players saved 2026-10-14 in
   - Still waiting on the user: the charges-at-kill proposal
     (docs/open-items.md). It comes up for Mocha's coils, Sin's Phlegma
     and Sayacissa's Dragonfire Dive.
-- The Tyrant, Lindwurm and Lindwurm II kills are on disk too.
+- The Tyrant kill (session 2026-10-15): Mocha done; next Sin Dusk, then
+  Siegward, Yoro, Kade, Kevin, Sayacissa, Chauzey. Patch review as above.
+- Lindwurm and Lindwurm II kills are on disk too.

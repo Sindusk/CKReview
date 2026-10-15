@@ -39,6 +39,22 @@
 // Ouroboros to 7:10-7:12, past the tincture; Uncoiled Fury mid-Reawaken was
 // the ranged GCD it needed); 8:39 Ire (cut by the kill); Vicewinder 13/15
 // (18.8s at full charges in all, under one 40s recharge).
+// Rechecked on K6qfMamL7rN8yz2Q The Tyrant (Pull 2, 7.4, 2026-10-15).
+// Matched: the 3:49.8 death, 2 coils overcapped (6:10.7 and 10:11.9
+// Serpent's Ire) and 1 left at the kill, Hindstung 8/10 and the Honed
+// drop / overwrite, the 5:40 combo expiry, the Flanksting misses, its GCD
+// downtimes (7:01-7:06 and 6:01 are the Flatliner towers / launch
+// movement). Fixed: Hindsbane Fang misses were never caught (8:04.9; the
+// positional table used the log's spelling, game.ts); the 6:37.5
+// Hindstung and 6:39.3 Honed Reavers expiries read as dropped by a
+// Generation; Snaps under raid buffs with coils held are a choice
+// (6:29.4 and 6:31.5 with 3, 136k; vprDisengageAlternative). Not
+// adopted: the 4:10 Ire / tincture with one Reawaken (the death emptied
+// the gauge); 6:10's second Ouroboros (the towers' Snaps pushed it to
+// 6:41, counted at those Snaps); Vicewinder 15/17 (35s held unforced
+// beyond the opener, under one 40s recharge; one regained ~10:20 is the
+// kill); the 7:25 triple weave with Feint (0.3s, under the 0.5s clipping
+// floor).
 // Viper (verified on dQ8wmb1VhKt6yBXk):
 //   - Hunter's Instinct uptime (Buffs.tsx), +10% (multiplier 1.10).
 //   - Reawaken (Reawaken.tsx): four Generations, four Legacies, one
@@ -274,11 +290,17 @@ const venoms: JobCheck = (ctx) => {
         expiresAt = e.durationMs ? e.timestamp + e.durationMs : undefined;
       } else if (e.buffStatus === "removed") {
         const at = presses.find((c) => Math.abs(c.timestamp - e.timestamp) <= PROC_CONSUME_MS);
-        if (at && !consumerIds.has(at.abilityId) && !inWindows(e.timestamp, ctx.dead)) lose(e.timestamp, `dropped: ${at.abilityName} went first`);
         // No upper bound: the 13:17 removal logged 1.6s after its 60s ran
-        // out, past the generic check's 1.5s.
-        else if (!at && expiresAt !== undefined && e.timestamp >= expiresAt - PROC_EXPIRY_EARLY_MS &&
-          !inWindows(e.timestamp, ctx.dead)) lose(e.timestamp, "expired unused");
+        // out, past the generic check's 1.5s. An expiry beside a press that
+        // isn't a consumer is still an expiry: K6qfMamL7rN8yz2Q The Tyrant's
+        // Hindstung Venom (6:37.5) and Honed Reavers (6:39.3) ran out 61.6s
+        // and 61.1s after they were applied, beside Third / Fourth
+        // Generation, which never consume them.
+        const expired = expiresAt !== undefined && e.timestamp >= expiresAt - PROC_EXPIRY_EARLY_MS;
+        if (at && consumerIds.has(at.abilityId)) { /* consumed */ }
+        else if (inWindows(e.timestamp, ctx.dead)) { /* lost to the death */ }
+        else if (expired) lose(e.timestamp, "expired unused");
+        else if (at) lose(e.timestamp, `dropped: ${at.abilityName} went first`);
         expiresAt = undefined;
       }
     }
@@ -817,18 +839,31 @@ export function vprDisengageAlternative(ctx: PlayerCheckContext, t: number): str
   const heldAt = (x: number) => [...steps].reverse().find((st) => st.t < x)?.value ?? 0;
   const held = heldAt(t);
   if (held <= 0) return undefined;
-  // One coil covers one Snap: earlier Snaps since the last Fury holding a
-  // coil claim it first (CABrk9zXLfJG8h6R The Tyrant, 0:50 and 1:39 with
-  // the same coil, spent 1:46).
+  // One coil covers one Snap: earlier Snaps since the last Fury that were
+  // a choice claim it first (CABrk9zXLfJG8h6R The Tyrant, 0:50 and 1:39
+  // with the same coil, spent 1:46). An excused one claims none: its coil
+  // stayed pooled (K6qfMamL7rN8yz2Q The Tyrant, five at 5:42-5:57 with 2
+  // held, before the 6:29.4 one with 3).
   const fury = id("UNCOILED_FURY"), snap = id("WRITHING_SNAP");
   const lastFury = [...ctx.player.casts].reverse().find((c) => c.abilityId === fury && c.timestamp < t)?.timestamp ?? -Infinity;
-  const earlier = ctx.player.casts.filter((c) => c.abilityId === snap && c.timestamp > lastFury && c.timestamp < t && heldAt(c.timestamp) > 0).length;
+  const earlier = ctx.player.casts.filter((c) => c.abilityId === snap && c.timestamp > lastFury && c.timestamp < t &&
+    vprDisengageAlternative(ctx, c.timestamp) !== undefined).length;
   if (earlier >= held) return undefined;
   const coils = `${held} Rattling Coil${held === 1 ? "" : "s"} held (Uncoiled Fury is the ranged GCD)`;
   const next = ctx.player.casts.find((c) => c.abilityId === fury && c.timestamp > t && c.timestamp < ctx.endMs);
   if (!next) return `${coils}, never spent`;
   const at = next.timestamp;
-  if (inWindows(at, ctx.buffWindows) || inWindows(at, ctx.forced) || inWindows(at, ctx.movement ?? [])) return undefined;
+  const rangedNeed = inWindows(at, ctx.forced) || inWindows(at, ctx.movement ?? []);
+  // A Snap under raid buffs spends nothing on pooling: the coil goes under
+  // buffs either way. Only a last coil the next ranged need takes excuses
+  // it. K6qfMamL7rN8yz2Q The Tyrant: 6:29.4 and 6:31.5, in the 6:10
+  // Serpent's Ire window and the tincture with 3 coils (the Ire had just
+  // overcapped one); the next Fury, 6:34.5, was the towers' knockback.
+  if (inWindows(t, ctx.buffWindows)) {
+    if (rangedNeed && held - earlier <= 1) return undefined;
+    return `${coils} under raid buffs`;
+  }
+  if (inWindows(at, ctx.buffWindows) || rangedNeed) return undefined;
   return `${coils}, next spent at ${clock(at)} outside raid buffs`;
 }
 

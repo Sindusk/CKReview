@@ -112,8 +112,11 @@ function toGameAction(a: XivaAction): GameAction {
 // finishers log 48 with the positional and 40 without; the 40s match
 // xivanalysis's misses one for one on 2T1HzdPKgbhM43am fight 10 (8 of 8),
 // and dQ8wmb1VhKt6yBXk's Viper shows the same 48 / 40 split.
+// Keyed by xivanalysis's names: it spells Hindsbane Fang "Hindbane Fang",
+// so under the log's spelling its misses were never caught (K6qfMamL7rN8yz2Q
+// The Tyrant 8:04.9, xivanalysis's 8/9).
 const POSITIONAL_MISSED_EXTRA: Record<string, number[]> = {
-  "Hindsting Strike": [40], "Hindsbane Fang": [40], "Flanksting Strike": [40], "Flanksbane Fang": [40],
+  "Hindsting Strike": [40], "Hindbane Fang": [40], "Flanksting Strike": [40], "Flanksbane Fang": [40],
 };
 
 function positionalInfo(a: XivaAction): GameAction["positional"] {
