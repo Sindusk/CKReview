@@ -28,6 +28,17 @@
 // simulation). Not adopted: the 8:07 tincture's Onslaught 2/3 (the third
 // at 8:38.0, 0.3s after it ended) and Inner Chaos 1/2 (~5% of each, a few
 // k); weaving at 0:09 (0.14s, inside the tolerance); defensives.
+// Warrior rechecked on the same report's Red Hot and Deep Blue kill (Pull
+// 2, 2026-10-14). Matched: GCD uptime (97.0%), the Beast Gauge's 30 lost
+// (0:14 Infuriate 20, 6:35 Maim 10), the 4:27 and 6:16 broken combos, the
+// 3:24 and 4:27 triple weaves, its GCD downtimes by time (0:34, 2:15,
+// 6:54, 7:35, 7:54; 3:13, 7:16, 8:03 are Insane Air / Freaky Pyrotation
+// movement here), Tomahawk 6 (5 in movement or before the first hit; 4:48
+// counted, 1.3s before Hot Aerial began). Built: Nascent Chaos
+// overwritten (nascentChaos below; 0:14.4, 36k, the only one across the
+// samples). Not adopted: the 0:09 and 6:36 tinctures' Inner Chaos 1/2 and
+// Onslaught 0/3 (used just outside them: ~2% of each); Surging Tempest
+// (104.6%, its denominator); defensives.
 //
 // Paladin, checked against xivanalysis on jN3XDrf2z8PmLgRJ Vamp pull 8
 // (2026-10-08): the window counts match its 7 missed actions and 1
@@ -100,9 +111,9 @@
 //   MIT License; full text in THIRD_PARTY_NOTICES.md.
 
 import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
-import type { JobCheck } from "../../types";
+import type { DamageFinding, JobCheck } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";
-import { forcedPart, inWindows } from "../../timeline";
+import { forcedPart, inWindows, mergeWindows } from "../../timeline";
 import { aoeComboOnOneTarget, burstWindowFindings, castHits, clock, gaugeFindings, k, statusWindows, uptimeFindings, type GaugeEvent, type GaugeSpec } from "./shared";
 import { comboLanded } from "./gnb";
 
@@ -176,6 +187,31 @@ export function beastGaugeSpec(ctx: PlayerCheckContext): GaugeSpec {
 }
 const beastGauge: JobCheck = (ctx) => gaugeFindings(ctx, beastGaugeSpec(ctx));
 
+// Nascent Chaos overwritten (xivanalysis "Infuriate with Nascent Chaos
+// applied"): an Infuriate pressed while the last one's Nascent Chaos was
+// unused refreshes it, so one Inner Chaos became a Fell Cleave. Its gauge
+// still counts (the overcap finding values any lost). K6qfMamL7rN8yz2Q
+// Red Hot and Deep Blue: Infuriate at 0:01.4, Inner Release's free Fell
+// Cleaves, Infuriate again at 0:14.4 before an Inner Chaos.
+const nascentChaos: JobCheck = (ctx): DamageFinding[] => {
+  const st = S.NASCENT_CHAOS?.id;
+  if (st === undefined) return [];
+  const ir = statusWindows(ctx, S.INNER_RELEASE.id).map((w) => ({ startMs: w.startMs, endMs: w.endMs + 100 }));
+  const plain = castHits(ctx, id("FELL_CLEAVE")).filter((h) => !inWindows(h.timestamp, ir));
+  const fell = plain.length ? plain.reduce((a, h) => a + (h.amount ?? 0), 0) / plain.length : ctx.values.perUse(id("FELL_CLEAVE"));
+  const value = Math.max(0, ctx.values.perUse(id("INNER_CHAOS")) - fell);
+  if (value <= 0) return [];
+  const forced = mergeWindows(ctx.forced);
+  return (ctx.player.buffs ?? []).filter((e) => e.abilityId === st && e.buffStatus === "refreshed" && e.timestamp < ctx.endMs)
+    .map((e) => finding(ctx, {
+      kind: "proc-lost", startMs: e.timestamp, endMs: e.timestamp, forced: inWindows(e.timestamp, forced),
+      label: "Nascent Chaos overwritten",
+      lostDamage: value,
+      basis: `${k(ctx.values.perUse(id("INNER_CHAOS")))} average Inner Chaos − ${k(fell)} average Fell Cleave outside Inner Release`,
+      detail: `Infuriate at ${clock(e.timestamp)} with the last one's Nascent Chaos unused: one Inner Chaos lost`,
+    }));
+};
+
 // The Atonement chain still up at the kill while combo fillers went out
 // (K6qfMamL7rN8yz2Q Vamp Fatale, 8:19: Atonement Ready from the last
 // Royal Authority, then Fast Blade 8:37 and Riot Blade 8:39 before the
@@ -226,4 +262,4 @@ const pldAoeCombo =aoeComboOnOneTarget([[id("TOTAL_ECLIPSE"), id("FAST_BLADE")],
 const warAoeCombo = aoeComboOnOneTarget([[id("OVERPOWER"), id("HEAVY_SWING")], [id("MYTHRIL_TEMPEST"), id("MAIM")]]);
 
 export const PLD_CHECKS: JobCheck[] = [fightOrFlight, pldAoeCombo, atonementChainAtKill];
-export const WAR_CHECKS: JobCheck[] = [surgingTempest, warAoeCombo, beastGauge];
+export const WAR_CHECKS: JobCheck[] = [surgingTempest, warAoeCombo, beastGauge, nascentChaos];

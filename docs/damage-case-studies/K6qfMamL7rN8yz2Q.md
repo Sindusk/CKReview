@@ -159,6 +159,9 @@ xivanalysis pages for all eight players saved 2026-10-14 in
   - AoE paint spells are judged on under 3 targets.
   Lost 475k → 705k. The Hammer habit shows on his vVPtwaTQ62Jg391q kill
   too.
+- **Siegward Damvir (Warrior).** Per-claim record in the Warrior header of
+  lib/damage/ffxiv/jobs/pld-war.ts. Built: Nascent Chaos overwritten by
+  Infuriate (0:14.4, 36k). Lost 305k → 341k.
 - Kade's 6:50-6:57 question: the user doesn't know (no VOD). It stays
   counted as his.
 
@@ -181,8 +184,7 @@ xivanalysis pages for all eight players saved 2026-10-14 in
   charges-at-kill proposal (open-items.md), the lenient saws/towers/adds
   window (Kade 4:54 / 5:47, Kevin 8:05), the PCT lanes' review.
 - Red Hot and Deep Blue kill (session 2026-10-14): Mocha, Yoro, Kade,
-  Sayacissa, Sin and Kevin done. Next, in order of the app's loss: Siegward
-  (305k), Chauzey (133k). Their pages are
+  Sayacissa, Sin, Kevin and Siegward done. Next: Chauzey (133k). The page is
   already in sampledata/damage-ff/. Patch review: same report and comp as
   Vamp Fatale (7.4), nothing new.
 - The Tyrant, Lindwurm and Lindwurm II kills are on disk too.
