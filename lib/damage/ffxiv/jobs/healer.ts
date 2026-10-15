@@ -88,6 +88,22 @@
 //   Coffinmaker (20s of ticks before it died, more than a Fall Malefic);
 //   the Arrow / Spire dropped (mitigation cards); overheal, defensives,
 //   Swiftcast.
+//   Rechecked on the same report's Red Hot and Deep Blue kill (Pull 2,
+//   2026-10-14). Matched: GCD uptime (87.6% / 88.9%), its 6 GCD downtimes
+//   and 10 weaving issues by time (6:34 4.1s and 8:41 5.4s are the two
+//   Divinations' weaves; 4:53-5:01 is Hot Aerial movement here), the
+//   6:36 Divination at 6/8 and the tincture 8s after it, Combust missing
+//   from the opener's Divination, the 8:26 interrupted cast (2:43's is the
+//   bosses leaving). Combust uptime 81.2%: the 5:02-5:20 gap (18.6s,
+//   nothing re-applied through Hot Aerial though Combust is the instant)
+//   holds. Fixed: the last 17.1s (no Combust after 8:03, kill 8:51) read
+//   as 53k; a gap running to the end has no later refresh to push back,
+//   so it's the ticks less the GCD (shared.ts dotFindings; 10k). Not
+//   adopted: 7 Combusts "before invulnerability" (5:20 / 5:23 got 6 and 5
+//   ticks, 6:13 on Watery Grave 6: each more than a Fall Malefic); the
+//   missing Lightspeed at 6:35 (its cost is the 4.1s gap); Lord of Crowns
+//   played at 7:45 instead of in the 8:41 Divination (a window the kill
+//   cut at 10.6s is skipped; ~6% of one Lord).
 // - Sage, checked against xivanalysis on K6qfMamL7rN8yz2Q Vamp Fatale (7.4,
 //   2026-10-14). Matched: GCD uptime (97.0% / 96.6%), the 4 interrupted
 //   casts, Eukrasian Dosis III uptime (91.9%: the 1:05, 4:06, 7:36 and

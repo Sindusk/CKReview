@@ -120,10 +120,15 @@ xivanalysis pages for all eight players saved 2026-10-14 in
   - A Writhing Snap with an unpooled Rattling Coil held counts as a
     choice (DamageGame.disengageAlternative): 8:15.7 with 2 coils, which
     were left at the kill (34k).
-  Lost 839k → 883k. Open (asked the user): 8:33-8:39, no GCD for 4.1s
-  inside the last Insane Air volley with 2 coils held, counted as
-  movement. The two tanks kept their GCDs rolling; the Dragoon was 1.3s
-  late.
+  Lost 839k → 883k. Unresolved (no VOD for this session): 8:33-8:39, no
+  GCD for 4.1s inside the last Insane Air volley with 2 coils held. It
+  stays counted as movement. The two tanks kept their GCDs rolling; the
+  Dragoon was 1.3s late.
+- **Yoro Shiku (Astrologian).** Per-claim record in the Astrologian
+  header of lib/damage/ffxiv/jobs/healer.ts. Fixed in the engine: a DoT
+  gap that runs to the end of the pull is valued at the ticks less the
+  GCD re-applying it costs (shared.ts dotFindings). The last 17.1s with
+  no Combust went from 53k to 10k. Lost 766k → 722k.
 
 ## Open
 
@@ -143,8 +148,8 @@ xivanalysis pages for all eight players saved 2026-10-14 in
 - Vamp Fatale is done for all eight players. Waiting on the user: the
   charges-at-kill proposal (open-items.md), the lenient saws/towers/adds
   window (Kade 4:54 / 5:47, Kevin 8:05), the PCT lanes' review.
-- Red Hot and Deep Blue kill (session 2026-10-14): Mocha done. Next, in
-  order of the app's loss: Yoro (766k), Kade (655k), Sayacissa (554k), Sin
+- Red Hot and Deep Blue kill (session 2026-10-14): Mocha and Yoro done.
+  Next, in order of the app's loss: Kade (655k), Sayacissa (554k), Sin
   (524k), Kevin (475k), Siegward (305k), Chauzey (133k). Their pages are
   already in sampledata/damage-ff/. Patch review: same report and comp as
   Vamp Fatale (7.4), nothing new.

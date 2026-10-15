@@ -826,11 +826,9 @@ export function dotFindings(ctx: PlayerCheckContext, spec: DotSpec): DamageFindi
     }
     return [...counts].sort((a, b) => b[1] - a[1])[0]?.[0];
   })();
-  const cutValue = (ms: number, at: number) => {
-    const cost = spec.applyCost ? Math.max(0, spec.applyCost(ctx)) : applier === undefined ? 0
-      : Math.max(0, ctx.values.gcdValue(ctx.phaseOf(at), false) - ctx.values.perUse(applier));
-    return Math.max(0, Math.floor(ms / DOT_TICK_MS) * avgTick - cost);
-  };
+  const applyCostAt = (at: number) => spec.applyCost ? Math.max(0, spec.applyCost(ctx)) : applier === undefined ? 0
+    : Math.max(0, ctx.values.gcdValue(ctx.phaseOf(at), false) - ctx.values.perUse(applier));
+  const cutValue = (ms: number, at: number) => Math.max(0, Math.floor(ms / DOT_TICK_MS) * avgTick - applyCostAt(at));
   let cursor = active[0].startMs;
   for (const w of [...active, { startMs: ctx.endMs, endMs: ctx.endMs }]) {
     if (w.startMs > cursor) {
@@ -882,13 +880,28 @@ export function dotFindings(ctx: PlayerCheckContext, spec: DotSpec): DamageFindi
       }
       const tailMs = tail >= needed + (moveWin ? moveCount * ctx.baseGcdMs : 0) ? tail : 0;
       const len = tailMs + cutMs;
-      const lost = (tailMs / DOT_TICK_MS) * avgTick + cut;
+      // A gap that runs to the end of the pull had no later refresh to
+      // push back: re-applying was this DoT's ticks to the end against the
+      // GCD it took, like a cut (K6qfMamL7rN8yz2Q Red Hot and Deep Blue,
+      // the AST's last 17.1s: 5 ticks, 45k, against a 37k Fall Malefic,
+      // read as 53k lost).
+      // One application per duration; one that can't pay for its GCD
+      // wouldn't have been pressed.
+      const atEnd = w.startMs >= ctx.endMs;
+      let tailLost = 0, applies = 0;
+      if (!atEnd) tailLost = (tailMs / DOT_TICK_MS) * avgTick;
+      else for (let left = tailMs; left > 0; left -= spec.durationMs) {
+        const v = Math.floor(Math.min(left, spec.durationMs) / DOT_TICK_MS) * avgTick - applyCostAt(tailFrom);
+        if (v > 0) { tailLost += v; applies++; }
+      }
+      const lost = tailLost + cut;
       if (lost > 0) {
         out.push(finding(ctx, {
           kind: "dot-uptime", startMs: cutMs ? cursor : at, endMs: w.startMs, forced: false,
           label: `${spec.name} off the boss`,
           lostDamage: lost,
           basis: `${s(len)} ÷ 3s ticks × ${k(avgTick)} average tick` +
+            (atEnd && applies ? `; it ran to the end of the pull, so less ${k(applies * applyCostAt(tailFrom))} for the GCD${applies > 1 ? "s" : ""} re-applying it would have taken` : "") +
             (cutMs ? `; ${s(cutMs)} of it cut short by forced time, counted as the ticks a fresh ${spec.name} gets there less its GCD's cost against an average GCD` : ""),
           detail: `${spec.name} wasn't on the boss for ${s(len)}`,
         }));
