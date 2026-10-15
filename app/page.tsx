@@ -20,6 +20,8 @@ import {
 import VideoPanel, { type CoverageGap } from "../components/VideoPanel";
 import VODSidebar from "../components/VODSidebar";
 import { Panel } from "../components/ui/Panel";
+import { ResizeHandle } from "../components/ui/ResizeHandle";
+import { usePanelLayout } from "@/hooks/usePanelLayout";
 import TranscriptDialog from "../components/TranscriptDialog";
 import AnalysisPanel from "../components/AnalysisPanel";
 import RosterPanel from "../components/RosterPanel";
@@ -92,6 +94,8 @@ const FIGHT_FETCH_CONCURRENCY = 3;
 // against the hourly points quota, and isWCLQuotaExhausted()/
 // isFFLQuotaExhausted() skip the cycle entirely if the quota is already spent.
 const LIVE_POLL_INTERVAL_MS = 30_000;
+// Space between the review screen's panels, which the resize handles fill.
+const GAP = 14;
 
 async function mapWithConcurrency<T, R>(
   items: T[],
@@ -470,6 +474,18 @@ export default function Home() {
   // pauses it. Clicking a moment on their timelines closes them and plays
   // from there, switching to that pull (and a VOD covering it) when the
   // dialog showed another one.
+  // Resizable columns and roster height (hooks/usePanelLayout.ts). A
+  // column drag converts pixels to a share of the columns' width.
+  const layout = usePanelLayout();
+  const gridRef = useRef<HTMLDivElement>(null);
+  const leftColRef = useRef<HTMLDivElement>(null);
+  const dragColumn = (i: 0 | 1, deltaPx: number) => {
+    const grid = gridRef.current;
+    if (!grid) return;
+    const tracks = grid.clientWidth - 24 - 2 * GAP;   // less the side padding and the two handles
+    if (tracks > 0) layout.moveColumnBorder(i, (deltaPx / tracks) * 100);
+  };
+
   const [pauseToken, setPauseToken] = useState(0);
   useEffect(() => {
     if (showDamage || showMitigation) setPauseToken((t) => t + 1);
@@ -1355,14 +1371,16 @@ export default function Home() {
       />
 
       <div
+        ref={gridRef}
         style={{
           flex:                1,
           display:             "grid",
-          gridTemplateColumns: "1fr 2fr 1fr",
+          // The columns' shares are the user's (usePanelLayout); the 14px
+          // tracks between them are the drag handles.
+          gridTemplateColumns: `minmax(0, ${layout.cols[0]}fr) ${GAP}px minmax(0, ${layout.cols[1]}fr) ${GAP}px minmax(0, ${layout.cols[2]}fr)`,
           gridTemplateRows:    "minmax(0, 1fr)",
           // Gaps and padding leave room for the Panel corner ornaments,
           // which hang ~5px outside each frame.
-          gap:                 "14px",
           padding:             "14px 12px 12px",
           overflow:            "hidden",
           minHeight:           0,
@@ -1370,16 +1388,17 @@ export default function Home() {
       >
         {/* The column itself must not clip — the Panels' corner ornaments
             overhang it. Each Panel clips its own body instead. */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "14px", minHeight: 0 }}>
+        <div ref={leftColRef} style={{ display: "flex", flexDirection: "column", minHeight: 0 }}>
           <Panel
             style={{
-              // Fixed to fit exactly one column of 5 players (header + 5 rows)
+              // Defaults to exactly one column of 5 players (header + 5 rows)
               // for WoW, and 4 rows of paired players (MT/OT, H1/H2, M1/M2,
               // R1/R2) for FFXIV — a bit of empty space below FFXIV's 4th row
               // is expected and fine. Drilling into a player's detail tabs
               // scrolls WITHIN this height instead of expanding the panel.
+              // The handle below resizes it.
               flex:          "0 0 auto",
-              height:        "300px",
+              height:        `${layout.rosterH}px`,
             }}
           >
             {/*
@@ -1396,6 +1415,9 @@ export default function Home() {
             />
           </Panel>
 
+          <ResizeHandle orientation="row" size={GAP} onReset={layout.resetRoster}
+            onDrag={(d) => layout.moveRosterBorder(d, (leftColRef.current?.clientHeight ?? 800) - GAP - 160)} />
+
           <Panel style={{ flex: "1 1 0" }}>
             <AnalysisPanel
               pull={activePull}
@@ -1408,6 +1430,8 @@ export default function Home() {
             />
           </Panel>
         </div>
+
+        <ResizeHandle orientation="col" size={GAP} onReset={layout.resetColumns} onDrag={(d) => dragColumn(0, d)} />
 
         <Panel diamondBottom>
           <div style={{ flex: 1, minHeight: 0 }}>
@@ -1430,6 +1454,8 @@ export default function Home() {
             {videoBottom}
           </div>
         </Panel>
+
+        <ResizeHandle orientation="col" size={GAP} onReset={layout.resetColumns} onDrag={(d) => dragColumn(1, d)} />
 
         <VODSidebar
           pulls={displayPulls}
