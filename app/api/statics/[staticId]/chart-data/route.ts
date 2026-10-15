@@ -5,9 +5,10 @@
 // the log's recorded date (see byLogDate), then pullNumber within a review), with each player's
 // per-pull Major/Minor error counts, resolved player identity (see
 // StaticPlayerIdentity), and job/spec snapshot. The client computes the
-// cumulative running totals shown on the chart — this route just hands
-// over the raw per-pull numbers so the client can also support a
-// Major-only toggle without a second round-trip.
+// rates and running totals shown on the chart — this route just hands
+// over the raw per-pull numbers so the client can switch Major-only, the
+// session range, fight and phase without a second round-trip. Detailed
+// sessions also carry each pull's reached phases and per-phase counts.
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -31,16 +32,33 @@ export async function GET(
   });
   if (!membership) return NextResponse.json({ error: "Not a member of this static" }, { status: 403 });
 
-  const reviews = await prisma.staticReview.findMany({
-    where:   { staticId },
-    orderBy: { addedAt: "asc" },
-    include: {
-      pulls: {
-        orderBy: { pullNumber: "asc" },
-        include: { playerErrors: { include: { identity: true } } },
+  const [reviews, phaseRows] = await Promise.all([
+    prisma.staticReview.findMany({
+      where:   { staticId },
+      orderBy: { addedAt: "asc" },
+      include: {
+        pulls: {
+          orderBy: { pullNumber: "asc" },
+          include: {
+            playerErrors: { include: { identity: true } },
+            // Detailed sessions only (detailVersion): the phases each pull
+            // reached and its counted Major/Minor errors, for the chart's
+            // phase filter.
+            phases: { select: { phase: true } },
+            errors: {
+              where:  { afterCutoff: false, severity: { in: ["Major", "Minor"] } },
+              select: { identityId: true, player: true, phase: true, severity: true },
+            },
+          },
+        },
       },
-    },
-  });
+    }),
+    prisma.staticPhase.findMany({
+      where:   { staticId },
+      orderBy: [{ bossName: "asc" }, { phaseId: "asc" }],
+      select:  { bossName: true, phaseId: true, name: true },
+    }),
+  ]);
   reviews.sort(byLogDate);
 
   const pulls = reviews.flatMap((review) =>
@@ -48,6 +66,9 @@ export async function GET(
       id:            pull.id,
       reviewId:      review.id,
       reviewLabel:   review.label,
+      reviewDate:    (review.reportStartedAt ?? review.addedAt).toISOString(),
+      detailed:      review.detailVersion !== null,
+      phasesReached: [...new Set(pull.phases.map((p) => p.phase))],
       fightId:       pull.fightId,
       pullNumber:    pull.pullNumber,
       bossName:      pull.bossName,
@@ -67,9 +88,22 @@ export async function GET(
         role:        pe.role,
         majorCount:  pe.majorCount,
         minorCount:  pe.minorCount,
+        // phase id -> [major, minor] counted errors in that phase.
+        byPhase:     phaseCounts(pull.errors.filter((e) =>
+          pe.identityId != null ? e.identityId === pe.identityId : e.player === pe.player)),
       })),
     }))
   );
 
-  return NextResponse.json({ pulls });
+  return NextResponse.json({ pulls, phases: phaseRows });
+}
+
+function phaseCounts(errors: { phase: number | null; severity: string }[]): Record<number, [number, number]> {
+  const out: Record<number, [number, number]> = {};
+  for (const e of errors) {
+    if (e.phase === null) continue;
+    const c = (out[e.phase] ??= [0, 0]);
+    if (e.severity === "Major") c[0] += 1; else c[1] += 1;
+  }
+  return out;
 }

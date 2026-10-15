@@ -12,7 +12,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import StaticErrorChart, { type ChartPull } from "@/components/StaticErrorChart";
+import StaticErrorChart, { type ChartPhase, type ChartPull } from "@/components/StaticErrorChart";
 import StaticPlayersPanel from "@/components/StaticPlayersPanel";
 import StaticMechanicsPanel from "@/components/StaticMechanicsPanel";
 import StaticPlayerAnalysisPanel from "@/components/StaticPlayerAnalysisPanel";
@@ -85,6 +85,7 @@ export default function StaticDashboardPage() {
   const [staticInfo, setStaticInfo] = useState<StaticInfo | null>(null);
   const [reviews, setReviews] = useState<ReviewSummary[] | null>(null);
   const [pulls, setPulls] = useState<ChartPull[] | null>(null);
+  const [chartPhases, setChartPhases] = useState<ChartPhase[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [editingPull, setEditingPull] = useState<number | null>(null);
   const [summaryDraft, setSummaryDraft] = useState("");
@@ -133,7 +134,7 @@ export default function StaticDashboardPage() {
     fetch(`/api/statics/${staticId}/chart-data`)
       .then(async (res) => {
         const data = await res.json();
-        if (res.ok) setPulls(data.pulls);
+        if (res.ok) { setPulls(data.pulls); setChartPhases(data.phases ?? []); }
       })
       .catch(() => {});
   }, [staticId, dataVersion]);
@@ -296,7 +297,7 @@ export default function StaticDashboardPage() {
             {pulls == null ? (
               <p className="ck-dialog-text">Loading chart...</p>
             ) : (
-              <StaticErrorChart pulls={pulls} />
+              <StaticErrorChart pulls={pulls} phases={chartPhases} />
             )}
           </div>
         </Panel>
