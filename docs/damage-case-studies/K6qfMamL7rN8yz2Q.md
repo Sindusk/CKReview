@@ -199,6 +199,14 @@ Siegward, Yoro, Kade, Kevin, Sayacissa, Chauzey). Three deaths (Mocha
   four Tyrant kills); now +2.5s. His 6:47.7 gap: 36k → 1.1s movement plus
   1.1s his. Across the Tyrant samples each melee moved by ≤40k. Lost
   1.04M → 1.02M.
+- **Yoro Shiku (Astrologian).** Per-claim record in the Astrologian header
+  of lib/damage/ffxiv/jobs/healer.ts. Fixed in the drift engine
+  (checks.ts): a pre-pull use's stretch was dropped whole; it now counts
+  from one recast into the pull (Earthly Star 0:18.5 → 1:18.1, 18.1s).
+  Two new Earthly Star findings across the samples (L9BzKkD2nxcVgHTC
+  Necron Pull 15, bVDR2mTL7YGvMxK1 The Tyrant Pull 10), no WoW change.
+  Hers is still no finding (59.6s after allowances): asked the user about
+  drift that costs a use at the kill (docs/open-items.md).
 
 ## Open
 
@@ -226,6 +234,7 @@ Siegward, Yoro, Kade, Kevin, Sayacissa, Chauzey). Three deaths (Mocha
   - Still waiting on the user: the charges-at-kill proposal
     (docs/open-items.md). It comes up for Mocha's coils, Sin's Phlegma
     and Sayacissa's Dragonfire Dive.
-- The Tyrant kill (session 2026-10-15): Mocha, Sin, Siegward done; next
-  Yoro, then Kade, Kevin, Sayacissa, Chauzey. Patch review as above.
+- The Tyrant kill (session 2026-10-15): Mocha, Sin, Siegward, Yoro done;
+  next Kade, then Kevin, Sayacissa, Chauzey. Patch review as above.
+  Waiting on the user: drift that costs a use at the kill (open-items.md).
 - Lindwurm and Lindwurm II kills are on disk too.

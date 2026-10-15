@@ -33,7 +33,11 @@ const clock = (t) => { const s = Math.round(t / 100) / 10; return `${Math.floor(
   console.log(`${cd.name}: ${cd.cooldownMs / 1000}s, ${cd.charges} charge(s), ${casts.length} casts; room for ${mod.roomForUses(cd, a.endMs, forced, prePull)}` +
     (prePull ? ' (used before the pull too: the first stretch is its recharge)' : ' (no pre-pull use)'));
   let u = 0;
-  for (const w of mod.cappedStretches(casts, cd.cooldownMs, cd.charges, a.endMs).filter((w) => !(prePull && w.startMs === 0))) {
+  // As checks.ts: a pre-pull use was ready again a recast into the pull.
+  const stretches = mod.cappedStretches(casts, cd.cooldownMs, cd.charges, a.endMs)
+    .map((w) => prePull && w.startMs === 0 ? { ...w, startMs: cd.cooldownMs } : w)
+    .filter((w) => w.endMs > w.startMs);
+  for (const w of stretches) {
     const f = mod.overlapMs(w.startMs, w.endMs, forced);
     u += w.endMs - w.startMs - f;
     console.log(`  full ${clock(w.startMs)}-${clock(w.endMs)}: ${((w.endMs - w.startMs) / 1000).toFixed(1)}s, forced ${(f / 1000).toFixed(1)}s`);

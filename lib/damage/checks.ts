@@ -561,7 +561,14 @@ export function checkCooldownDrift(ctx: PlayerCheckContext): DamageFinding[] {
     const evidence = new Set(cd.prePullEvidenceIds ?? []);
     const prePull = evidence.size > 0 && [...ctx.player.casts, ...ctx.player.damageDone]
       .some((c) => evidence.has(c.abilityId) && c.timestamp < (casts[0] ?? Infinity));
-    const capped = cappedStretches(casts, cd.cooldownMs, cd.charges, ctx.endMs).filter((w) => !(prePull && w.startMs === 0));
+    // Its recharge ran from the pre-pull press (at 0:00 or before), so it
+    // was ready again a recast into the pull at the latest; held from
+    // there to the first use counts. Dropping the whole stretch hid
+    // K6qfMamL7rN8yz2Q The Tyrant's Earthly Star (exploded 0:18.5, next
+    // cast 1:18.1: 18.1s, 71s in all, xivanalysis's 1 lost).
+    const capped = cappedStretches(casts, cd.cooldownMs, cd.charges, ctx.endMs)
+      .map((w) => prePull && w.startMs === 0 ? { ...w, startMs: cd.cooldownMs } : w)
+      .filter((w) => w.endMs > w.startMs);
     let unforced = 0, heldForDeciding = 0, stretchLost = 0, longest: Window | undefined, longestHeld = 0;
     for (const w of capped) {
       const len = w.endMs - w.startMs;

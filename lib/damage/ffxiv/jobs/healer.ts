@@ -107,6 +107,25 @@
 //   played at 7:45 from the 7:35 Astral Draw (Balance from the same draw
 //   was held to 8:41; Umbral Draw waited until 8:42); and Divination is
 //   valued at the window's measured bonus (17% there), not 6%.
+//   Rechecked on the same report's The Tyrant kill (Pull 2, 2026-10-15).
+//   Matched: GCD uptime (90.5% / 90.6%), its GCD downtimes and 14 weaving
+//   issues by time (10:07's 5.4s is the Divination's 8 weaves without
+//   Lightspeed: 99k, plus 7/8 GCDs; 6:02, 6:29, 7:41 are Flatliner
+//   movement), Combust missing from the opener's Divination, 12/12
+//   cards. Ours is larger at 3:34-3:46 (6.0s against 3.6s): it times
+//   that GCD from Helios Conjunction's end and skips the 1.4s after the
+//   interrupted Fall Malefic. Fixed: Earthly Star held 1:11 in all (its
+//   claim): a pre-pull use's stretch was dropped whole, though its recast
+//   ended a minute into the pull at the latest (the star exploded 0:18.5,
+//   the next cast 1:18.1), so 18.1s went uncounted (checks.ts). That also
+//   corrects the qjCMx4bRfgNKwX9T fight 16 note above: xivanalysis's
+//   count from 0:00 was nearer than ours. Still no finding here: 59.6s
+//   after the per-stretch hold allowance, under the 60s recast, though a
+//   tenth star would have landed before the kill (the drift-at-the-kill
+//   question, docs/open-items.md). Not adopted: 5 interrupted casts to our
+//   4 (the 7:06 one is in the towers' movement; the idle is in the gaps
+//   either way); Lightspeed (its cost is the 10:07 gap); overheal,
+//   defensives, Swiftcast 6/14, Horoscope.
 // - Sage, checked against xivanalysis on K6qfMamL7rN8yz2Q Vamp Fatale (7.4,
 //   2026-10-14). Matched: GCD uptime (97.0% / 96.6%), the 4 interrupted
 //   casts, Eukrasian Dosis III uptime (91.9%: the 1:05, 4:06, 7:36 and

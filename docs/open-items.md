@@ -853,6 +853,14 @@ grouped by exact roster. The module headers hold the rules.
   14/16. A kills-only "charge available for N s before the kill and never
   used = one lost use" rule would touch every job; not built without the
   user's call.
+  The same question, more generally (K6qfMamL7rN8yz2Q The Tyrant,
+  2026-10-15): a use is counted lost only when the held time reaches a
+  whole recast, though held time short of one can still cost a use when
+  the last one comes back before the kill with nothing pressed. Each of
+  these is xivanalysis's count, and each reads as no loss here:
+  Earthly Star (59.6s held; a tenth star would have landed ~10:21 against
+  a 10:38 kill), Sage's Psyche (27s; 11th ~10:16), Warrior's Upheaval
+  (27s; 21st ~10:25), Viper's Vicewinder (35s of 40s).
 - **Unverified jobs:** PLD, WAR, WHM, SGE, MNK, DRG, NIN, RPR, BRD, MCH,
   BLM, SMN, RDM. `jN3XDrf2z8PmLgRJ` (the user's Vamp Fatale prog, no
   damage context) has PLD, SGE, RPR, DRG and RDM; the user is reviewing
