@@ -225,6 +225,12 @@ Siegward, Yoro, Kade, Kevin, Sayacissa, Chauzey). Three deaths (Mocha
 - **Kevin Brachydiar (Pictomancer).** Nothing to build; per-claim record
   in the Pictomancer header of lib/damage/ffxiv/jobs/caster.ts. Every
   window and cooldown full; its gaps match ours by time.
+- **Sayacissa Morsaelth (Dragoon).** Per-claim record in the Dragoon
+  header of lib/damage/ffxiv/jobs/melee.ts. Built: a Starcross Ready lost
+  unused (ends with Life of the Dragon) costs the whole Starcross
+  (starcrossDropped): 5:29.0 Stardiver, proc gone 5:31.3, 161k (the Lance
+  Charge window had counted 16k). ~60 across the samples. Lost 264k →
+  409k.
 
 ## Open
 
@@ -252,7 +258,7 @@ Siegward, Yoro, Kade, Kevin, Sayacissa, Chauzey). Three deaths (Mocha
   - Still waiting on the user: the charges-at-kill proposal
     (docs/open-items.md). It comes up for Mocha's coils, Sin's Phlegma
     and Sayacissa's Dragonfire Dive.
-- The Tyrant kill (session 2026-10-15): Mocha, Sin, Siegward, Yoro, Kade,
-  Kevin done; next Sayacissa, then Chauzey. Patch review as above.
+- The Tyrant kill (session 2026-10-15): all but Chauzey done; next
+  Chauzey Solstice (Dancer). Patch review as above.
   The charges-at-kill question is settled (the kill rule above).
 - Lindwurm and Lindwurm II kills are on disk too.

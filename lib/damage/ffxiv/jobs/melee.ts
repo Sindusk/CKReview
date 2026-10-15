@@ -141,6 +141,17 @@
 //     shortfalls (the kill); Chaotic Spring before invulnerability (above).
 //     Mirage Dive missing from Life of the Dragon is valued at Lance
 //     Charge's 10% only (a few k).
+//     Rechecked on the same report's The Tyrant kill (Pull 2, 2026-10-15).
+//     Matched: its 13 positionals one for one (Chaotic Spring 3, Wheeling
+//     Thrust 6, Fang and Claw 4), cooldowns 100%, Lance Charge 9:10's
+//     Mirage Dive, Power Surge and Chaotic Spring uptime, its GCD
+//     downtimes (3:37 1.6s, 4:57; 6:03, 6:29, 6:44, 7:02, 7:39 are
+//     Flatliner / Fire Breath movement). Built: its dropped Starcross proc —
+//     the 5:29.0 Stardiver came 2.3s before Life of the Dragon ended and
+//     Starcross Ready went with it (starcrossDropped, 161k; the Lance Charge
+//     window counted only its 10%, 16k). About 60 across the samples, e.g.
+//     her Lindwurm 4:11 Stardiver with Starcross Ready held 18s while every
+//     other oGCD went out. No damage: Feint, Bloodbath, Second Wind.
 //   - Ninja: Kunai's Bane window, Ninki and Kazematoi (below). Checked
 //     against xivanalysis on dDar482XvFKBPJYh FRU kill (7.1, 2026-10-12):
 //     its 9 Kazematoi lost and 1 unbuffed Aeolian Edge match; Ninki ~300
@@ -356,9 +367,37 @@ const lanceCharge: JobCheck = (ctx) => burstWindowFindings(ctx, {
       // Follow-ups are available when what grants them was.
       availableIf: key === "RISE_OF_THE_DRAGON" ? (c, w, cycle) => offCooldownIn(c, ids("DRAGONFIRE_DIVE"), w, cycle)
         : key === "MIRAGE_DIVE" ? (c, w, cycle) => offCooldownIn(c, ids("HIGH_JUMP"), w, cycle)
+        // A Starcross Ready lost unused is starcrossDropped's (the whole
+        // Starcross), not this window's share of it.
+        : key === "STARCROSS" ? (c, w) => !statusWindows(c, S.STARCROSS_READY.id)
+          .some((r) => r.startMs < w.endMs && r.endMs > w.startMs && starcrossLostAt(c, r.endMs))
         : undefined,
     })),
 });
+
+// Starcross Ready ends with Life of the Dragon: a Stardiver pressed in
+// its last seconds loses the Starcross (K6qfMamL7rN8yz2Q The Tyrant,
+// Stardiver 5:29.0, Starcross Ready gone 5:31.3 as Life of the Dragon
+// from the 5:11 Geirskogul ran out; xivanalysis's dropped proc). Lost:
+// the player's average Starcross. checkProcs only sees expiries.
+function starcrossLostAt(ctx: PlayerCheckContext, t: number): boolean {
+  return !ctx.player.casts.some((c) => c.abilityId === id("STARCROSS") && Math.abs(c.timestamp - t) <= PROC_CONSUME_MS) &&
+    !inWindows(t, ctx.dead) && t < ctx.endMs;
+}
+const starcrossDropped: JobCheck = (ctx) => {
+  const value = ctx.values.perUse(id("STARCROSS"));
+  if (value <= 0) return [];
+  return statusWindows(ctx, S.STARCROSS_READY.id).filter((r) => starcrossLostAt(ctx, r.endMs)).map((r) => {
+    const forced = inWindows(r.endMs, mergeWindows(ctx.forced));
+    return finding(ctx, {
+      kind: "proc-lost", startMs: r.endMs, endMs: r.endMs, forced,
+      cause: forced ? forcedPart(r.endMs - 1, r.endMs + 1, ctx.forced).cause : undefined,
+      label: "Starcross Ready lost", lostDamage: value,
+      basis: `${k(value)} average Starcross`,
+      detail: `Starcross Ready from the ${clock(r.startMs)} Stardiver ended unused at ${clock(r.endMs)} (${s(r.endMs - r.startMs)} later)`,
+    });
+  });
+};
 
 // Life of the Dragon (xivanalysis BloodOfTheDragon.tsx): 8 GCDs in the 20s
 // from each Geirskogul. It's +15%: the FFLogs multiplier with only it and
@@ -898,6 +937,6 @@ export function firstmindsFocusSpec(ctx: PlayerCheckContext): GaugeSpec {
 }
 const firstmindsFocus: JobCheck = (ctx) => gaugeFindings(ctx, firstmindsFocusSpec(ctx));
 
-export const DRG_CHECKS: JobCheck[] = [uptime("POWER_SURGE", 0.1, "Power Surge is +10% (tooltip)", { cost: drgPowerSurgeRefreshCost, reapplyGcds: 1, restartIds: ids("RAIDEN_THRUST", "TRUE_THRUST") }), lanceCharge, lifeOfTheDragon, lifeSurge, chaoticSpring, firstmindsFocus];
+export const DRG_CHECKS: JobCheck[] = [uptime("POWER_SURGE", 0.1, "Power Surge is +10% (tooltip)", { cost: drgPowerSurgeRefreshCost, reapplyGcds: 1, restartIds: ids("RAIDEN_THRUST", "TRUE_THRUST") }), lanceCharge, lifeOfTheDragon, lifeSurge, chaoticSpring, firstmindsFocus, starcrossDropped];
 export const NIN_CHECKS: JobCheck[] = [kunaisBane, ninki, kazematoi];
 export const RPR_CHECKS: JobCheck[] = [enshroud, arcaneCircle, deathsDesign, harvestMoon, shroud, whorl];
