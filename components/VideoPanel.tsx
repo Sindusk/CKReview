@@ -194,6 +194,10 @@ export default function VideoPanel({
   // Holds the browser's MediaError detail (Firefox names the codec, e.g.
   // "video/hevc"); empty string when it gives none.
   const [localError, setLocalError] = useState<string | null>(null);
+  // Set when a local file plays audio but no video frames: Chromium drops a
+  // video track it can't decode (HEVC/AV1 without the Windows codec
+  // extension) instead of raising an error, leaving a black screen.
+  const [localNoVideo, setLocalNoVideo] = useState(false);
 
   const isLocal = !!vod && isLocalVod(vod);
 
@@ -246,6 +250,7 @@ export default function VideoPanel({
    */
   useEffect(() => {
     setLocalError(null);
+    setLocalNoVideo(false);
 
     if (!vod) {
       playerReadyRef.current = false;
@@ -349,6 +354,8 @@ export default function VideoPanel({
     const video = videoRef.current;
     if (!video) return;
 
+    if (video.videoWidth === 0) setLocalNoVideo(true);
+
     const player = videoElementAdapter(video);
     playerRef.current = player;
     playerReadyRef.current = true;
@@ -358,6 +365,17 @@ export default function VideoPanel({
     const target = latestSeekRef.current?.time;
     if (target !== undefined) player.seekTo(target);
     player.play();
+  }
+
+  // Backstop for decoders that report a size but never produce a frame.
+  function handleLocalTimeUpdate() {
+    const video = videoRef.current;
+    if (!video || localNoVideo || video.paused) return;
+    const quality = video.getVideoPlaybackQuality?.();
+    if (quality && quality.totalVideoFrames === 0 && video.played.length > 0
+      && video.played.end(video.played.length - 1) - video.played.start(0) > 3) {
+      setLocalNoVideo(true);
+    }
   }
 
   function handleLocalError() {
@@ -496,6 +514,7 @@ export default function VideoPanel({
               controls
               playsInline
               onLoadedMetadata={handleLocalMetadata}
+              onTimeUpdate={handleLocalTimeUpdate}
               onError={handleLocalError}
               style={{ position: "absolute", inset: 0, width: "100%", height: "100%", background: "#000" }}
             />
@@ -527,6 +546,33 @@ export default function VideoPanel({
               }}
             >
               {note.text}
+            </div>
+          )}
+
+          {isLocal && localError === null && localNoVideo && (
+            <div
+              style={{
+                position: "absolute",
+                top: "40%",
+                left: 0,
+                right: 0,
+                padding: "0 24px",
+                fontSize: "13px",
+                lineHeight: 1.55,
+                color: "var(--ck-text-2)",
+                textAlign: "center",
+                pointerEvents: "none",
+              }}
+            >
+              <div style={{ color: "#ff8a8a", fontWeight: 600 }}>
+                Audio only: your browser can&apos;t decode this file&apos;s video.
+              </div>
+              <div>
+                The recording is likely HEVC (H.265) or AV1. On Windows, install
+                Microsoft&apos;s HEVC Video Extensions (or AV1 Video Extension)
+                from the Microsoft Store and keep graphics acceleration on, or
+                record in H.264 in OBS (Settings → Output → Video Encoder).
+              </div>
             </div>
           )}
 
