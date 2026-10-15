@@ -179,7 +179,12 @@ and delete them from the header.
 ## Plans not started
 
 - [xiva-audit-plan.md](xiva-audit-plan.md): audit every xivanalysis
-  module job by job against the FFXIV damage checks. Pilot first.
+  module job by job against the FFXIV damage checks. Pilot done
+  (2026-10-15); waiting on the user's verdict on the ledger format
+  before the other jobs.
+  - [xiva-audit/core.md](xiva-audit/core.md): core modules, 3 candidates.
+  - [xiva-audit/brd.md](xiva-audit/brd.md): Bard, 5 open (1 candidate,
+    4 covered without a firing match).
 - [wowa-audit-plan.md](wowa-audit-plan.md): the same for WoWAnalyzer
   (reference only, AGPL). After the FFXIV pilot.
 - [wow-sim-plan.md](wow-sim-plan.md): WoW simulation pipeline (talent
