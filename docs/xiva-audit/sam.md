@@ -8,7 +8,7 @@
   for Guren / Senei. The changelog says 7.2 raised it from 2 to 3, so 7.05-7.1
   logs are likely judged at 3 when they should be 2. Supported 7.05–7.5.
 - **App:** `lib/damage/ffxiv/jobs/melee.ts` (header, `SAM_CHECKS`: Fugetsu
-  `uptime`, `meikyo`), `tracked-cooldowns.ts` ("Samurai"), generic checks.
+  `uptime`, `meikyo`, `samAoe`), `tracked-cooldowns.ts` ("Samurai"), generic checks.
   Verified on dQ8wmb1VhKt6yBXk only; no xivanalysis page compared yet.
 - **xivanalysis quirks found** (from the extraction):
   - `data/STATUSES/root/SAM.ts:92-94`: three Tsubame-gaeshi statuses are
@@ -45,7 +45,8 @@
 | sam/Shoha/meditation-checklist | superseded | — | — | Checklist form of the overcap. |
 | sam/Shoha/meditation-overcap | candidate | — | Meditation gained at 3 | Minor 1, Medium 3, Major 6. A lost third of a Shoha each. |
 | sam/Sen/wasted-sen | candidate | — | a Sen gained while held | Minor 1, Medium 2, Major 3. A wasted GCD's Sen; log-visible from casts. |
-| sam/AoeChecker/too-few-targets | candidate | — | Fuko / Mangetsu / Oka / Tenka Goken / Guren on too few targets | The app has no Samurai AoE check. Use 7.2's Guren 3 / 7.4's 2 by patch (xivanalysis's own branch is likely off before 7.2). |
+| sam/AoeChecker/too-few-targets/combo | candidate | — | Fuko, or Oka / Mangetsu under Meikyo, on under 3 | Split from the row below 2026-10-15. None seen on too few targets on disk. |
+| sam/AoeChecker/too-few-targets | covered | `samAoe` | Tenka / Tendo Goken, their Kaeshi, Kyuten or Guren on too few targets | Built 2026-10-15: Kyuten, Tenka / Tendo Goken and both Kaeshi under 3; Guren on one target only (7.4's breakpoint; pre-7.4 two-target Gurens go unseen). Fires on Xk2DKZwVp4Ar6d7y Enuo pull 2 0:27 (Tendo Goken + Kaeshi, 179k + 154k: the second Meikyo went Gekko, Kasha, Gekko, so 2 Sen where Yukikaze makes 3 in the same GCDs, so the whole Setsugekka difference is lost), pull 4 6:42, pull 5 0:23 (Kyuten); pG319BgHTnPJc6Ft Necron pulls 2, 3, 10; L9BzKkD2nxcVgHTC Necron pull 15 1:13 (Guren, 38k). No xivanalysis page for these pulls. Fuko, Oka, Mangetsu: the row above. |
 | sam/Defensives/use-table | no-damage | — | — | Mitigation. |
 | sam/Tincture/window-table | no-damage | — | — | Table only. |
 
@@ -78,6 +79,7 @@ yet; the covered rows need one.
 1. **sam/Higanbana/uptime** (candidate). A dot check like the healers'.
 2. **sam/Sen/wasted-sen, sam/Kenki/overcap, sam/Shoha/meditation-overcap**
    (candidates). Resource waste, log-inferred.
-3. **sam/AoeChecker/too-few-targets** (candidate).
-4. **sam/ReadyProcs/overwritten** (candidate).
+3. **sam/ReadyProcs/overwritten** (candidate).
+4. **sam/AoeChecker/too-few-targets/combo** (candidate).
+   Oka / Mangetsu need the Meikyo condition; wait for a pull with one.
 5. Every covered row: compare against a Samurai xivanalysis page.

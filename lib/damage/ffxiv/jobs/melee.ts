@@ -11,6 +11,14 @@
 //   - Meikyo Shisui (Meikyo.tsx): three Sen GCDs per window. A missing one
 //     loses a Sen, valued at a third of the player's average Midare or
 //     Tendo Setsugekka (inference).
+//   - AoE on too few targets (AoeChecker.ts, 2026-10-15): Kyuten, Tenka /
+//     Tendo Goken and their Kaeshi under 3, Guren on one target (7.4's
+//     breakpoint), each against its single-target twin. Seen firing, not matched against xivanalysis:
+//     Xk2DKZwVp4Ar6d7y Enuo pull 2 0:27 (Tendo Goken and its Kaeshi,
+//     179k + 154k: the opener's second Meikyo went Gekko, Kasha, Gekko, so
+//     2 Sen where Yukikaze would have made 3 in the same GCDs), pull 4
+//     6:42, pG319BgHTnPJc6Ft Necron pulls 2, 3, 10, L9BzKkD2nxcVgHTC
+//     Necron pull 15 1:13 (Guren on the boss, 38k).
 // Viper, checked against xivanalysis on K6qfMamL7rN8yz2Q Vamp Fatale (7.4,
 // 2026-10-14): the death at 5:30 (and its Weakness) and its 6 positional
 // misses match; the coil left at the kill (gained 8:36, ~2 GCDs before
@@ -95,6 +103,13 @@
 //     triple weave (end-of-P3 hold). Not built: "Perfect Balance after
 //     Opo-opo 22/29" (form order; its cost depends on the Blitz planned
 //     and isn't measurable from one press).
+//   - AoE on too few targets (AoE.tsx, 2026-10-15): each form's AoE under
+//     4 against that form's three single-target GCDs, Enlightenment under 3
+//     against The Forbidden Chakra. Seen firing, not matched against
+//     xivanalysis: kC7Y3WbzvKcZrBxT The Tyrant pull 1 6:29 (Enlightenment
+//     on the boss, 10k); L9BzKkD2nxcVgHTC Necron pulls 6 and 20 (Four-point
+//     Fury and Rockbreaker on 2-3 adds, 3-20k: three is near even, so
+//     only the ones that dealt less than the form's average show).
 //   - Dragoon (checked against xivanalysis on jN3XDrf2z8PmLgRJ Vamp pull 8:
 //     Lance Charge and positionals match): Power Surge uptime, +10%
 //     (tooltip); Chaotic Spring DoT uptime; Life Surge (below); Lance Charge
@@ -178,7 +193,7 @@ import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import type { DamageFinding, JobCheck } from "../../types";
 import { chargesAt, finding, PROC_CONSUME_MS, PROC_EXPIRY_EARLY_MS, type PlayerCheckContext } from "../../checks";
 import { forcedPart, inWindows, mergeWindows } from "../../timeline";
-import { aoeComboOnOneTarget, aoeOnOneTargetFindings, burstWindowFindings, castHits, clock, dotFindings, gaugeFindings, gaugeTrack, k, offCooldownIn, s, statusWindows, uptimeFindings, type ExpectedAction, type GaugeEvent, type GaugeSpec } from "./shared";
+import { aoeComboOnOneTarget, burstWindowFindings, castHits, clock, dotFindings, gaugeFindings, gaugeTrack, k, offCooldownIn, s, statusWindows, uptimeFindings, type ExpectedAction, type GaugeEvent, type GaugeSpec } from "./shared";
 import { comboLanded } from "./gnb";
 
 const id = (key: string) => A[key].id;
@@ -683,7 +698,12 @@ const enshroud: JobCheck = (ctx) => burstWindowFindings(ctx, {
 //   aren't casts (likely +10 when an enemy dies under Death's Design), so
 //   a cast simulation runs short and would hide overcaps.
 // - AoE on too few targets (Whorl of Death at 5:00 hit 2; it needs about
-//   3 to beat Shadow of Death): `whorl` below.
+//   3 to beat Shadow of Death): `rprAoe` below. Since 2026-10-15 it holds
+//   all of xivanalysis AoE.ts's pairs. The new ones, seen firing but not
+//   matched against xivanalysis: jN3XDrf2z8PmLgRJ Red Hot and Deep Blue
+//   pull 44 5:18-5:19 (Grim Swathe and Guillotine on one boss, the two
+//   apart; 14k, 38k), pull 20 4:15 and bVDR2mTL7YGvMxK1 pull 1 3:40
+//   (Lemure's Scythe, 29k, 40k), pull 13 3:48 (Soul Scythe on both, 29k).
 // Rechecked on qjCMx4bRfgNKwX9T Dancing Mad kill (7.5, 2026-10-13):
 // GCD uptime, Harvest Moon 5/4, Death's Design, its 14 missed
 // positionals (same split by action), 2 Whorls on too few targets, the
@@ -830,13 +850,32 @@ const shroud: JobCheck = (ctx) => {
   });
 };
 
-// Whorl of Death on too few targets: Shadow of Death does more under 3
-// (xivanalysis AoE.ts). Judged by what it dealt against the average
-// Shadow of Death, so a patch's potency change moves the verdict with it.
-const whorl: JobCheck = (ctx) => aoeOnOneTargetFindings(ctx, ids("WHORL_OF_DEATH"),
-  () => ({ name: "Shadow of Death", value: ctx.values.perUse(id("SHADOW_OF_DEATH")) }), () => 3);
+// The AoE line on too few targets (xivanalysis AoE.ts minimums): each
+// judged by what it dealt against the player's average for the
+// single-target action it replaced, so a patch's potency change moves the
+// verdict with it.
+const rprAoe = aoeComboOnOneTarget([
+  [id("WHORL_OF_DEATH"), id("SHADOW_OF_DEATH"), 3], [id("SPINNING_SCYTHE"), id("SLICE"), 4],
+  [id("SOUL_SCYTHE"), id("SOUL_SLICE"), 3], [id("GRIM_SWATHE"), id("BLOOD_STALK"), 3],
+  [id("GUILLOTINE"), ids("GALLOWS", "GIBBET"), 3],
+  [id("EXECUTIONERS_GUILLOTINE"), ids("EXECUTIONERS_GALLOWS", "EXECUTIONERS_GIBBET"), 4],
+  [id("LEMURES_SCYTHE"), id("LEMURES_SLICE"), 3], [id("GRIM_REAPING"), ids("VOID_REAPING", "CROSS_REAPING"), 3],
+]);
 
-export const SAM_CHECKS: JobCheck[] = [uptime("FUGETSU", 0.13, "Fugetsu is +13%, FFLogs multiplier"), meikyo];
+// xivanalysis AoeChecker, without its Fuko / Oka / Mangetsu rows (Oka and
+// Mangetsu only count under Meikyo Shisui there; none seen on a log yet).
+// Tenka Goken spends 2 Sen to Midare's 3. On one target it's usually a
+// missed Sen in a Meikyo (Enuo pull 2 in the header), where the third Sen
+// cost no extra GCD, so the whole Midare difference is lost. Guren only on
+// one target: from 7.4 two out-damage Senei, and judging two by the
+// damage would flag crit noise (pre-7.4 logs' two-target Gurens go unseen).
+const samAoe = aoeComboOnOneTarget([
+  [id("HISSATSU_GUREN"), id("HISSATSU_SENEI")], [id("HISSATSU_KYUTEN"), id("HISSATSU_SHINTEN"), 3],
+  [id("TENKA_GOKEN"), id("MIDARE_SETSUGEKKA"), 3], [id("TENDO_GOKEN"), id("TENDO_SETSUGEKKA"), 3],
+  [id("KAESHI_GOKEN"), id("KAESHI_SETSUGEKKA"), 3], [id("TENDO_KAESHI_GOKEN"), id("TENDO_KAESHI_SETSUGEKKA"), 3],
+]);
+
+export const SAM_CHECKS: JobCheck[] = [uptime("FUGETSU", 0.13, "Fugetsu is +13%, FFLogs multiplier"), meikyo, samAoe];
 // Rattling Coil (xivanalysis UncoiledFury): +1 per Vicewinder / Vicepit /
 // Serpent's Ire, cap 3, Uncoiled Fury spends 1. Coils left when a kill
 // ends are lost too. On 2T1HzdPKgbhM43am fight 10 the cast simulation finds
@@ -916,7 +955,16 @@ export function vprDisengageAlternative(ctx: PlayerCheckContext, t: number): str
 const vprAoe = aoeComboOnOneTarget([[id("STEEL_MAW"), id("STEEL_FANGS"), 3], [id("REAVING_MAW"), id("REAVING_FANGS"), 3]]);
 
 export const VPR_CHECKS: JobCheck[] = [uptime("HUNTERS_INSTINCT", 0.1, "Hunter's Instinct is +10%, FFLogs multiplier"), reawaken, venoms, rattlingCoils, vprAoe];
-export const MNK_CHECKS: JobCheck[] = [riddleOfFire];
+// xivanalysis AoE.tsx: each form's AoE against that form's three
+// single-target GCDs (their cast-weighted average), Enlightenment against
+// The Forbidden Chakra.
+const mnkAoe = aoeComboOnOneTarget([
+  [id("SHADOW_OF_THE_DESTROYER"), ids("BOOTSHINE", "DRAGON_KICK", "LEAPING_OPO"), 4],
+  [id("FOUR_POINT_FURY"), ids("TRUE_STRIKE", "TWIN_SNAKES", "RISING_RAPTOR"), 4],
+  [id("ROCKBREAKER"), ids("DEMOLISH", "SNAP_PUNCH", "POUNCING_COEURL"), 4],
+  [id("ENLIGHTENMENT"), id("THE_FORBIDDEN_CHAKRA"), 3],
+]);
+export const MNK_CHECKS: JobCheck[] = [riddleOfFire, mnkAoe];
 // Firstminds' Focus (xivanalysis FirstmindsFocus): +1 per Raiden Thrust /
 // Draconian Fury, cap 2, Wyrmwind Thrust spends 2. A stack gained at 2 is
 // half a Wyrmwind. On 2T1HzdPKgbhM43am fight 10 the cast simulation finds
@@ -942,4 +990,4 @@ const firstmindsFocus: JobCheck = (ctx) => gaugeFindings(ctx, firstmindsFocusSpe
 
 export const DRG_CHECKS: JobCheck[] = [uptime("POWER_SURGE", 0.1, "Power Surge is +10% (tooltip)", { cost: drgPowerSurgeRefreshCost, reapplyGcds: 1, restartIds: ids("RAIDEN_THRUST", "TRUE_THRUST") }), lanceCharge, lifeOfTheDragon, lifeSurge, chaoticSpring, firstmindsFocus, starcrossDropped];
 export const NIN_CHECKS: JobCheck[] = [kunaisBane, ninki, kazematoi];
-export const RPR_CHECKS: JobCheck[] = [enshroud, arcaneCircle, deathsDesign, harvestMoon, shroud, whorl];
+export const RPR_CHECKS: JobCheck[] = [enshroud, arcaneCircle, deathsDesign, harvestMoon, shroud, rprAoe];

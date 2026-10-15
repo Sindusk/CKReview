@@ -22,10 +22,10 @@
 | drk/MPUsage/wasted-mp | candidate | — | MP over the cap (3000 = one Edge of Shadow) | 2T1HzdPKgbhM43am: one Edge of Shadow's worth, not built. MP regen is inferred; MP fills in downtime, which needs excusing. |
 | drk/SaltAndDarkness/unused | verified | `saltAndDarkness` | Salted Earth with no Salt and Darkness | qjCMx4bRfgNKwX9T 7:36 built from it. |
 | drk/SaltAndDarkness/failed | covered | `noDamageCasts` | Salt and Darkness hitting nothing | Its count goes negative on multi-target hits, so it under-reports. |
-| drk/MultiHitSkills/flood-of-shadow | candidate | — | Flood of Shadow on under 3 targets | `aoeCombo` pairs only Unleash / Hard Slash and Stalwart Soul / Syphon Strike, at the one-target minimum. Flood vs Edge of Shadow is the common case (same MP). |
-| drk/MultiHitSkills/quietus | candidate | — | Quietus on under 3 targets | vs Bloodspiller. |
-| drk/MultiHitSkills/impalement | candidate | — | Impalement on under 3 targets | The Delirium window accepts Impalements in place of the single-target GCDs; this catches them on one target. |
-| drk/MultiHitSkills/abyssal-drain | candidate | — | Abyssal Drain on under 3 targets | vs Carve and Spit (shared recast). |
+| drk/MultiHitSkills/flood-of-shadow | covered | `aoeCombo` (vs Edge of Shadow, minimum 3) | Flood of Shadow on under 3 targets | Built 2026-10-15. Premise holds (same MP). Fires on vFY7kHVWK19ZQ24A Lindwurm II pull 3 0:40 (one target, 21k) and jN3XDrf2z8PmLgRJ Red Hot and Deep Blue pull 13 3:06 (both bosses, still under an Edge, 21k); H9fnVZgPA3krpCzY Lindwurm II pull 11's pre-pull Flood is shown, not counted. No xivanalysis page for these pulls. |
+| drk/MultiHitSkills/quietus | covered | `aoeCombo` (vs Bloodspiller, minimum 3) | Quietus on under 3 targets | Fires on AYQm9Kd8Ct4FxcGp Lindwurm pull 24 4:51 (one target, 34k). |
+| drk/MultiHitSkills/impalement | covered | `aoeCombo` (vs the Delirium combo's average, minimum 3) | Impalement on under 3 targets | Not seen firing (the one Impalement on disk hit 3). |
+| drk/MultiHitSkills/abyssal-drain | covered | `aoeCombo` (vs Carve and Spit, minimum 3) | Abyssal Drain on under 3 targets | Fires on jN3XDrf2z8PmLgRJ Red Hot and Deep Blue pull 44 4:19 (one boss, the two apart and both targetable; 24k). |
 | drk/MultiHitSkills/unleash | covered | `aoeCombo` | Unleash on too few targets | The app flags only one-target hits; xivanalysis needs 3. 2T1HzdPKgbhM43am 6:20 and 14:22 were past HP checks (forced). |
 | drk/OGCDDowntime/uses | verified | `checkCooldownDrift` | Delirium, Salted Earth, Carve and Spit, Shadowbringer or Living Shadow held | Same groups and offsets. Matched on qjCMx4bRfgNKwX9T. |
 | drk/Delirium/expected-gcds | verified | `delirium` | under 3 Delirium GCDs (Impalements allowed) | Matched on qjCMx4bRfgNKwX9T. |
@@ -63,10 +63,8 @@ proc list), Swiftcast, Lucid, Overheal, Interrupts.
 
 In priority order (biggest damage cost first):
 
-1. **drk/MultiHitSkills/flood-of-shadow, quietus, impalement,
-   abyssal-drain** (candidates). Add the pairs (minimum 3) to `aoeCombo`;
-   Flood of Shadow first. Check on a pull with adds.
-2. **drk/MPUsage/blackest-night-dark-arts** (candidate). Only the
+1. **drk/MPUsage/blackest-night-dark-arts** (candidate). Only the
    overwrite costs damage (a lost Edge of Shadow).
-3. **drk/MPUsage/wasted-mp** (candidate). Needs an MP simulation with
+2. **drk/MPUsage/wasted-mp** (candidate). Needs an MP simulation with
    downtime excused.
+3. **drk/MultiHitSkills/impalement** (covered). Not seen firing.

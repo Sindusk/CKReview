@@ -28,8 +28,8 @@
 | war/OGCDDowntime/inner-release | verified | `checkCooldownDrift` (first use 15s, hold 2.5s) | Inner Release held | Same groups as xivanalysis. |
 | war/OGCDDowntime/upheaval-orogeny | verified | `checkCooldownDrift` | Upheaval / Orogeny held | qjCMx4bRfgNKwX9T 33/34 and The Tyrant 20/21 not adopted: each stretch held under one recast. |
 | war/OGCDDowntime/onslaught | verified | `checkCooldownDrift` (charges) | Onslaught at 3 charges | qjCMx4bRfgNKwX9T: it says 2 lost, the app 1 (the other is the opener's normal hold). |
-| war/AoE/chaotic-cyclone | candidate | — | Chaotic Cyclone on under 3 targets | `warAoeCombo` pairs only Overpower and Mythril Tempest. Add Chaotic Cyclone / Inner Chaos and Decimate / Fell Cleave (minimum 3). |
-| war/AoE/decimate | candidate | — | Decimate on under 3 targets | See chaotic-cyclone. |
+| war/AoE/chaotic-cyclone | covered | `warAoeCombo` (vs Inner Chaos, minimum 3) | Chaotic Cyclone on under 3 targets | Built 2026-10-15. Premise holds (same Nascent Chaos). Fires on L9BzKkD2nxcVgHTC Necron pull 15 0:38 (one target, 43k) and pull 9 3:46 (two, 14k). No xivanalysis page for these pulls. |
+| war/AoE/decimate | covered | `warAoeCombo` (vs Fell Cleave, minimum 3) | Decimate on under 3 targets | Fires on L9BzKkD2nxcVgHTC Necron pull 15 (0:33, 2:23-2:28, the boss alone, 41-51k each), pulls 7, 16, 21; n6zTGPJh8wkLFRZ9 Vamp Fatale pull 1 5:17-5:22 (one or two targets, 22-51k). |
 | war/AoE/overpower | verified | `warAoeCombo` | Overpower on one target | qjCMx4bRfgNKwX9T 6 matched (3 forced past HP checks). The app also checks Mythril Tempest. |
 | war/Combos/broken | verified | `checkCombos` | a broken or timed-out combo | Red Hot 4:27, 6:16 and The Tyrant 2:07 matched. |
 | war/Tincture/gcd-count | superseded | tincture.ts | under 12 GCDs in the tincture | The Tyrant 10:33 (2 GCDs, drunk 4.4s before the kill): valuing it asks him to predict the kill. |
@@ -64,9 +64,7 @@ the Beast Gauge graph.
 
 In priority order (biggest damage cost first):
 
-1. **war/AoE/chaotic-cyclone, decimate** (candidates). Add the pairs to
-   `warAoeCombo` (minimum 3) once a pull with one turns up.
-2. **war/OGCDDowntime/infuriate** (candidate). Needs drift with spender
+1. **war/OGCDDowntime/infuriate** (candidate). Needs drift with spender
    refunds (xivanalysis's `resetBy`).
-3. **war/Procs/dropped-primal-rend, primal-ruination, primal-wrath,
+2. **war/Procs/dropped-primal-rend, primal-ruination, primal-wrath,
    nascent-chaos-dropped** (covered). None seen firing.

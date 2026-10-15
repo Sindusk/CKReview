@@ -20,6 +20,15 @@
 // outside Delirium. 50 Blood is worth one average Bloodspiller.
 //
 // AoE combo on one target (shared.ts aoeComboOnOneTarget, every tank).
+// The spenders too (xivanalysis MultiHitSkills.ts, 2026-10-15): Flood of
+// Shadow, Quietus, Impalement and Abyssal Drain under 3 targets, against
+// Edge of Shadow, Bloodspiller, the Delirium combo and Carve and Spit.
+// Seen firing, not matched against xivanalysis: vFY7kHVWK19ZQ24A Lindwurm
+// II pull 3 0:40 (Flood, 21k), AYQm9Kd8Ct4FxcGp Lindwurm pull 24 4:51
+// (Quietus, 34k), jN3XDrf2z8PmLgRJ Red Hot and Deep Blue pull 44 4:19
+// (Abyssal Drain on one boss with the two apart, 24k) and pull 13 3:06
+// (Flood on both, 21k). A Flood pressed before the pull is shown, not
+// counted (H9fnVZgPA3krpCzY Lindwurm II pull 11).
 //
 // Living Shadow (xivanalysis's Esteem evaluator): Esteem runs a set
 // sequence at fixed offsets from the summon (Abyssal Drain, Shadowbringer,
@@ -135,7 +144,9 @@ const blood: JobCheck = (ctx) => {
   });
 };
 
-const aoeCombo = aoeComboOnOneTarget([[id("UNLEASH"), id("HARD_SLASH")], [id("STALWART_SOUL"), id("SYPHON_STRIKE")]]);
+const aoeCombo = aoeComboOnOneTarget([[id("UNLEASH"), id("HARD_SLASH")], [id("STALWART_SOUL"), id("SYPHON_STRIKE")],
+  [id("FLOOD_OF_SHADOW"), id("EDGE_OF_SHADOW"), 3], [id("QUIETUS"), id("BLOODSPILLER"), 3],
+  [id("IMPALEMENT"), [id("SCARLET_DELIRIUM"), id("COMEUPPANCE"), id("TORCLEAVER")], 3], [id("ABYSSAL_DRAIN"), id("CARVE_AND_SPIT"), 3]]);
 
 const ESTEEM_IDS = new Set(Object.entries(A).filter(([key]) => key.startsWith("ESTEEM_")).map(([, a]) => a.id));
 const SUMMON_SPAN_MS = 30_000;

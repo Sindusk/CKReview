@@ -39,7 +39,7 @@
 | smn/Aetherflow/extra-ruin3 | candidate | — | more than 2 Ruin III fillers a minute | Major. Not fight-aware; usually forced by downtime. Premise check first. |
 | smn/Slipstream/missed-ticks | candidate | — | Slipstream ticks lost (target moved, died) | Minor 1, Medium 6, Major 12. A ground DoT the app doesn't value. xivanalysis's hook is suspect (bug). |
 | smn/Physick/cast | candidate | — | Physick cast outside downtime | Major. A GCD spent healing; the app's heal-GCD valuation is healers only. |
-| smn/AoEUsages/too-few-targets | candidate | — | Tri-Disaster, Energy Siphon, Painflare and other AoE on too few targets | The app has no Summoner AoE check; minimums are patch-gated (7.2, 7.3, 7.5). |
+| smn/AoEUsages/too-few-targets | candidate | — | Tri-Disaster, Energy Siphon, Painflare and other AoE on too few targets | The app has no Summoner AoE check; minimums are patch-gated (7.2, 7.3, 7.5). Not built (2026-10-15): no Summoner AoE cast on any pull on disk, so no premise check yet. The shared check's damage comparison would take each pair's highest minimum and need no patch branch. |
 | smn/Swiftcast/bad-use | no-damage | — | Swiftcast unused | Utility. |
 | smn/Swiftcast+Lucid/utilities | no-damage | — | — | Display. |
 | smn/Defensives/radiant-aegis | no-damage | — | — | Display. |

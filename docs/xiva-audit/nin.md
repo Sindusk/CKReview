@@ -41,8 +41,8 @@
 | nin/Ninjutsu/aoe-doton | candidate | — | Doton cut short (under 6 ticks) | Minor. |
 | nin/Ninjutsu/st-doton | candidate | — | Doton on a single target outside the opener | Minor 1, Medium 2, Major 3. |
 | nin/Ninki/overcap | verified | `ninki` | Ninki over 100 | Minor 20, Major 50. FRU: ~300 simulated vs its 250. |
-| nin/Ninki/hellfrog | candidate | — | Hellfrog Medium on too few targets (3 before 7.3, 2 from 7.3) | Medium. The app has no Ninja AoE check; Bhavacakra is the alternative. |
-| nin/Ninki/deathfrog | candidate | — | Deathfrog Medium on too few targets | Medium. Same, vs Zesho Meppo. |
+| nin/Ninki/hellfrog | candidate | — | Hellfrog Medium on too few targets (3 before 7.3, 2 from 7.3) | Medium. The app has no Ninja AoE check; Bhavacakra is the alternative. Not built (2026-10-15): no Hellfrog on any pull on disk, so no premise check yet. Built as an `aoeComboOnOneTarget` pair (minimum 3; the damage comparison covers 7.3's 2) once one turns up. |
+| nin/Ninki/deathfrog | candidate | — | Deathfrog Medium on too few targets | Medium. Same, vs Zesho Meppo. None on disk either. |
 | nin/Kazematoi/overcap | verified | `kazematoi` | Armor Crush at 4-5 stacks | FRU 9 lost matched. |
 | nin/Kazematoi/leftover | candidate | — | 3+ Kazematoi left at the end | Medium. Would follow the leftAtKill rule (kills only, time held). |
 | nin/Kazematoi/unbuffed-aeolian | verified | `kazematoi` | Aeolian Edge at 0 stacks | FRU 1 matched. |

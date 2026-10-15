@@ -8,7 +8,7 @@
   code switches on whether the log has `gaugeUpdate` events, not on patch.
 - **App:** `lib/damage/ffxiv/jobs/ranged.ts` (header, `DNC_CHECKS`:
   `technical`, `technicalFillers`, `dancerOverwrites`,
-  `dancerGaugeEstimates` + `unpooledFeathers`), `gauges.ts` (Feathers,
+  `dancerGaugeEstimates` + `unpooledFeathers`, `dancerAoe`), `gauges.ts` (Feathers,
   Esprit), `tracked-cooldowns.ts` ("Dancer"), generic checks in
   `lib/damage/checks.ts`. Case studies: jN3XDrf2z8PmLgRJ Vamp pull 8,
   dQ8wmb1VhKt6yBXk, qjCMx4bRfgNKwX9T kill, K6qfMamL7rN8yz2Q (Vamp Fatale,
@@ -42,9 +42,9 @@
 | dnc/OGCDDowntime/standard-step-finishing-move | verified | `checkCooldownDrift` (shared group, pre-pull evidence) | Standard Step / Finishing Move held | qjCMx4bRfgNKwX9T: xivanalysis 35/37 vs the app's room of 34. Not adopted: the drift simulation has room for only 34. |
 | dnc/OGCDDowntime/devilment | verified | `checkCooldownDrift` | Devilment held | The Tyrant 100%. |
 | dnc/OGCDDowntime/flourish | verified | `checkCooldownDrift` | Flourish held | The Tyrant 100%. |
-| dnc/AoEUsages/windmill | candidate | — | Windmill hitting one target | **The app has no Dancer AoE check** (`DNC_CHECKS` has no `aoeComboOnOneTarget`). Pairs to add: Windmill/Cascade, Rising Windmill/Reverse Cascade, Bloodshower/Fountainfall, all minimum 2. |
-| dnc/AoEUsages/rising-windmill | candidate | — | Rising Windmill hitting one target | See windmill. |
-| dnc/AoEUsages/bloodshower | candidate | — | Bloodshower hitting one target | See windmill. |
+| dnc/AoEUsages/windmill | covered | `dancerAoe` (vs Cascade) | Windmill hitting one target | Built 2026-10-15. Premise holds: Cascade is always the alternative. Fires on jN3XDrf2z8PmLgRJ Red Hot and Deep Blue pull 34 3:59 (the bosses apart, both targetable), d3vRbwfpNBLzJ2Xh pull 2 2:42 (Red Hot left as it landed), pG319BgHTnPJc6Ft Necron pull 2 3:53 (one Icy Hand); 8-12k. No xivanalysis page for these pulls to match. |
+| dnc/AoEUsages/rising-windmill | covered | `dancerAoe` (vs Reverse Cascade) | Rising Windmill hitting one target | Fires on pG319BgHTnPJc6Ft Necron pull 7 2:24 (4k). |
+| dnc/AoEUsages/bloodshower | covered | `dancerAoe` (vs Fountainfall) | Bloodshower hitting one target | Fires on bVDR2mTL7YGvMxK1 Red Hot and Deep Blue pull 1 5:18 (11k). |
 | dnc/Combos/broken | verified | `checkCombos` | Cascade → Fountain or Windmill → Bladeshower broken or timed out | qjCMx4bRfgNKwX9T: its 9 broken combos match by time; K6qfMamL7rN8yz2Q Cascade run out at 8:29 and 6:00 matched. |
 | dnc/Weaving/too-many-weaves | verified | `checkGcdGaps` `gcd-clipping` | 3 oGCDs after a GCD | K6qfMamL7rN8yz2Q Red Hot and Deep Blue 0:54 (2.0s) matched. |
 | dnc/AlwaysBeCasting/uptime | superseded | `checkGcdGaps` | idle GCD time | Uptime 98.3% matched on Red Hot and Deep Blue. Its GCD downtime list matches the app's gaps by time; the app adds a few it treats as downtime (Coffinmaker's death at 2:00). |
@@ -94,14 +94,11 @@ In priority order (biggest damage cost first):
    valued at the buff lost on the party's damage over its duration (the
    ledger's measured Technical / Standard Finish share). Premise check:
    find a short dance outside forced time.
-2. **dnc/AoEUsages/*** (candidates). Add `aoeComboOnOneTarget` pairs to
-   `DNC_CHECKS`; a trivial build once a pull with a one-target Windmill
-   turns up.
-3. **dnc/Procs/overwritten, Flourishing Starfall and Flourishing Finish.**
+2. **dnc/Procs/overwritten, Flourishing Starfall and Flourishing Finish.**
    Add them to `DNC_PROCS` after checking that a Flourish / Technical
    Step with one held logs a "refreshed".
-4. **dnc/DirtyDancing/no-extra-moves** (candidate). ~1s per wrong step.
-5. **dnc/Technicalities/bad-devilments** and
+3. **dnc/DirtyDancing/no-extra-moves** (candidate). ~1s per wrong step.
+4. **dnc/Technicalities/bad-devilments** and
    **dnc/DirtyDancing/closed-position-uptime** (candidates, rare).
-6. **dnc/DirtyDancing/hit-target** (covered). Not seen firing; the buff
+5. **dnc/DirtyDancing/hit-target** (covered). Not seen firing; the buff
    it fails to give isn't valued.

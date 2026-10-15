@@ -36,9 +36,9 @@
 | blm/AoEUsages/foul | verified | `blmAoe` (vs Xenoglossy) | Foul on too few targets | The app flags one target only: right from 7.2 (minimum 2); before 7.2 xivanalysis needs 3. |
 | blm/AoEUsages/flare | covered | `blmAoe` (vs Fire IV) | Flare on too few targets | Same: right from 7.1. |
 | blm/AoEUsages/freeze | verified | `blmAoe` (minimum 3) | Freeze on under 3 | 2T1HzdPKgbhM43am 7:55, 8:15 matched. |
-| blm/AoEUsages/high-fire-ii | candidate | — | High Fire II on under 3 | Not paired in `blmAoe`. |
-| blm/AoEUsages/high-blizzard-ii | candidate | — | High Blizzard II on under 3 | Same. |
-| blm/AoEUsages/high-thunder-ii | candidate | — | High Thunder II on one target | Same; also counted as the DoT. |
+| blm/AoEUsages/high-fire-ii | candidate | — | High Fire II on under 3 | Not paired in `blmAoe`. Not built (2026-10-15): none on any pull on disk, so no premise check yet. |
+| blm/AoEUsages/high-blizzard-ii | candidate | — | High Blizzard II on under 3 | Same; none on disk. |
+| blm/AoEUsages/high-thunder-ii | candidate | — | High Thunder II on one target | Same; also counted as the DoT. The 4 on disk all hit 2+ targets. |
 | blm/AoEUsages/thunder-iv, blizzard-ii, fire-ii | wrong | — | — | Replaced at level 82+; can't occur at 100. |
 | blm/OGCDDowntime/uses | covered | `checkCooldownDrift` (hold 5s, first use 15s / Manafont 25s) | Ley Lines, Manafont, Amplifier (and Triplecast before 7.2) held | The app tracks Triplecast on every patch; xivanalysis drops it from 7.2. |
 | blm/Procs/dropped-thunderhead | covered | `checkProcs` | Thunderhead expiring | Before 7.2 only (permanent from 7.2). |

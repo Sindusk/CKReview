@@ -1074,6 +1074,8 @@ export function gaugeFindings(ctx: PlayerCheckContext, spec: GaugeSpec): DamageF
 // ── AoE GCDs on one target ─────────────────────────────────────────────
 
 const AOE_HIT_MS = 2_000;
+// The longest AoE DoT counted with its hit (Bioblaster, 15s), plus a tick.
+const AOE_DOT_MS = 18_000;
 
 /**
  * An AoE GCD that hit one enemy and dealt less than the single-target GCD
@@ -1098,6 +1100,10 @@ export function aoeOnOneTargetFindings(
   aoeIds: number[],
   against: (aoeId: number) => { name: string; value: number } | undefined,
   minTargets: (aoeId: number) => number | undefined = () => undefined,
+  // A DoT the AoE applies, logged under its own id: Bioblaster's direct
+  // hit is 50 potency and its ticks most of the rest (jN3XDrf2z8PmLgRJ
+  // Vamp Fatale pull 9, 5:26: 5.3k direct, about 6.5k a tick).
+  tickIds: (aoeId: number) => number[] | undefined = () => undefined,
 ): DamageFinding[] {
   const out: DamageFinding[] = [];
   const aoe = new Set(aoeIds);
@@ -1136,7 +1142,12 @@ export function aoeOnOneTargetFindings(
     // damage against the single-target average flagged Gravity IIs worth
     // 1-6k less, which is buff and crit noise.
     if (targets.size === 0 || targets.size >= (minTargets(u.action.id) ?? 2)) return;
-    const dealt = hits.reduce((a, e) => a + (e.amount ?? 0), 0);
+    const ticks = new Set(tickIds(u.action.id) ?? []);
+    const ticked = ticks.size === 0 ? 0 : ctx.player.damageDone
+      .filter((e) => ticks.has(e.abilityId) && e.timestamp >= landed && e.timestamp < Math.min(nextSame, landed + AOE_DOT_MS) &&
+        targets.has(`${e.targetActorId ?? e.target}.${e.targetInstance ?? 1}`))
+      .reduce((a, e) => a + (e.amount ?? 0), 0);
+    const dealt = hits.reduce((a, e) => a + (e.amount ?? 0), 0) + ticked;
     if (dealt >= alt.value) return;
     const during = forcedPart(u.startMs - 1, u.startMs + 1, ctx.forced);
     out.push(finding(ctx, {
@@ -1144,7 +1155,7 @@ export function aoeOnOneTargetFindings(
       forced: during.ms > 0, cause: during.ms > 0 ? during.cause : undefined,
       label: `${u.abilityName} on ${targets.size === 1 ? "one target" : "too few targets"}`,
       lostDamage: alt.value - dealt,
-      basis: `${k(alt.value)} average ${alt.name} − ${k(dealt)} this ${u.abilityName} dealt`,
+      basis: `${k(alt.value)} average ${alt.name} − ${k(dealt)} this ${u.abilityName} dealt${ticked > 0 ? ` (${k(ticked)} of it DoT ticks)` : ""}`,
       detail: targets.size === 1 ? `${u.abilityName} hit only ${landedHits[0].target ?? "one enemy"}`
         : `${u.abilityName} hit ${targets.size} enemies for less than a ${alt.name}`,
     }));
@@ -1157,14 +1168,27 @@ export function aoeOnOneTargetFindings(
  * step it replaces ([AoE id, single-target id] pairs), at the player's own
  * average for it. From xivanalysis's AoE-usage check (Unleash and Stalwart
  * Soul on one target).
+ *
+ * `single` may list several actions (a Monk form's three GCDs, Gallows
+ * and Gibbet): the value is their average weighted by the player's casts.
+ * `minTargets` is the most targets any patch needs; the damage comparison
+ * decides, so a patch that lowered the breakpoint (Guren 3 to 2 in 7.4)
+ * needs no branch: two targets that out-damage the alternative pass.
  */
-export const aoeComboOnOneTarget = (pairs: [aoe: number, single: number, minTargets?: number][]): JobCheck => (ctx) => {
-  const st = new Map(pairs.map(([a, b]) => [a, b]));
+export const aoeComboOnOneTarget = (
+  pairs: [aoe: number, single: number | number[], minTargets?: number, tickIds?: number[]][],
+): JobCheck => (ctx) => {
+  const st = new Map(pairs.map(([a, b]) => [a, Array.isArray(b) ? b : [b]]));
   const min = new Map(pairs.map(([a, , m]) => [a, m]));
+  const ticks = new Map(pairs.map(([a, , , t]) => [a, t]));
+  const count = new Map<number, number>();
+  for (const c of ctx.player.casts) if (c.timestamp < ctx.endMs) count.set(c.abilityId, (count.get(c.abilityId) ?? 0) + 1);
   return aoeOnOneTargetFindings(ctx, pairs.map(([a]) => a), (aoeId) => {
-    const id = st.get(aoeId)!;
-    return { name: ctx.game.action(id)?.name ?? "single-target GCD", value: ctx.values.perUse(id) };
-  }, (aoeId) => min.get(aoeId));
+    const used = st.get(aoeId)!.filter((id) => (count.get(id) ?? 0) > 0);
+    const n = used.reduce((a, id) => a + count.get(id)!, 0);
+    const name = (used.length ? used : st.get(aoeId)!).map((id) => ctx.game.action(id)?.name ?? "single-target GCD").join(" / ");
+    return { name, value: n > 0 ? used.reduce((a, id) => a + ctx.values.perUse(id) * count.get(id)!, 0) / n : 0 };
+  }, (aoeId) => min.get(aoeId), (aoeId) => ticks.get(aoeId));
 };
 
 // ── Casts that did no damage ───────────────────────────────────────────

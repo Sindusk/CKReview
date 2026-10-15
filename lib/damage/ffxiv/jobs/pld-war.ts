@@ -54,6 +54,12 @@
 // tincture with 2 GCDs (drunk at 10:33.6 when it came back, 4.4s before
 // the kill: valuing it asks him to predict the kill, the tincture rule);
 // defensives.
+// Warrior's spenders on too few targets (xivanalysis AoE.ts, 2026-10-15):
+// Chaotic Cyclone and Decimate under 3, against Inner Chaos and Fell
+// Cleave (warAoeCombo). Seen firing, not matched against xivanalysis:
+// L9BzKkD2nxcVgHTC Necron pull 15 (Decimate ×4 and Chaotic Cyclone on the
+// boss alone, 0:33-2:28, 41-51k each), n6zTGPJh8wkLFRZ9 Vamp Fatale pull 1
+// (Decimate 5:20 on the boss, 51k; 5:17 and 5:22 on two, 22-24k).
 //
 // Paladin, checked against xivanalysis on jN3XDrf2z8PmLgRJ Vamp pull 8
 // (2026-10-08): the window counts match its 7 missed actions and 1
@@ -334,7 +340,8 @@ const atonementChainDropped: JobCheck = (ctx) => {
 };
 
 const pldAoeCombo =aoeComboOnOneTarget([[id("TOTAL_ECLIPSE"), id("FAST_BLADE")], [id("PROMINENCE"), id("RIOT_BLADE")]]);
-const warAoeCombo = aoeComboOnOneTarget([[id("OVERPOWER"), id("HEAVY_SWING")], [id("MYTHRIL_TEMPEST"), id("MAIM")]]);
+const warAoeCombo = aoeComboOnOneTarget([[id("OVERPOWER"), id("HEAVY_SWING")], [id("MYTHRIL_TEMPEST"), id("MAIM")],
+  [id("CHAOTIC_CYCLONE"), id("INNER_CHAOS"), 3], [id("DECIMATE"), id("FELL_CLEAVE"), 3]]);
 
 export const PLD_CHECKS: JobCheck[] = [fightOrFlight, pldAoeCombo, atonementChainAtKill, atonementChainDropped];
 export const WAR_CHECKS: JobCheck[] = [surgingTempest, warAoeCombo, beastGauge, nascentChaos];

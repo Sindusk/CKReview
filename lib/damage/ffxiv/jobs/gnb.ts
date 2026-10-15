@@ -51,6 +51,13 @@
 //   are the app's 9 disengages (6 unforced, 3 in the end-of-P3 hold).
 //   The 8:09 window's two Fated Circles hit both P3 bosses (right).
 // - Continuations 100%: none lost, so nothing to value.
+// Fated Circle on one target (xivanalysis AoE.ts, 2026-10-15), against
+// Burst Strike (aoeCombo). Seen firing, not matched against xivanalysis:
+// L9BzKkD2nxcVgHTC Necron pulls 7-21, a Gunbreaker spending the opener's
+// Bloodfest cartridges on Necron alone (pull 14: 0:11, 0:14, 0:17) and on
+// single Icy / Beckoning Hands in the adds (pull 18: 3:35, 3:53), 0-18k
+// each. A pull with no Burst Strike (pull 10, a 31s wipe) has no average
+// to compare against, so its four don't show.
 //
 //   Copyright (c) 2018 Saxon Landers & contributors
 //   MIT License; full text in THIRD_PARTY_NOTICES.md.
@@ -136,6 +143,7 @@ const cartridges: JobCheck = (ctx): DamageFinding[] => {
   });
 };
 
-const aoeCombo = aoeComboOnOneTarget([[A.DEMON_SLICE.id, A.KEEN_EDGE.id], [A.DEMON_SLAUGHTER.id, A.BRUTAL_SHELL.id]]);
+const aoeCombo = aoeComboOnOneTarget([[A.DEMON_SLICE.id, A.KEEN_EDGE.id], [A.DEMON_SLAUGHTER.id, A.BRUTAL_SHELL.id],
+  [A.FATED_CIRCLE.id, A.BURST_STRIKE.id]]);
 
 export const GNB_CHECKS: JobCheck[] = [noMercy, cartridges, aoeCombo];

@@ -182,31 +182,33 @@ and delete them from the header.
   module job by job against the FFXIV damage checks. Phases 1 and 2 done
   for all 21 jobs (2026-10-15). Phase 3 (premise and firing checks,
   building candidates) is ongoing: each ledger's "Open" list is its work.
-  Samples missing: Machinist, White Mage, a recent Black Mage.
+  Samples missing: a Machinist kill, White Mage, a recent Black Mage.
+  The AoE-on-too-few-targets candidates were built 2026-10-15 for DNC,
+  DRK, WAR, GNB, MNK, SAM, MCH and RPR; NIN, BLM and SMN wait for a pull
+  where one happens.
   - [core.md](xiva-audit/core.md): core modules, 3 candidates.
   - [brd.md](xiva-audit/brd.md): Bard, 1 candidate, 4 covered.
-  - [dnc.md](xiva-audit/dnc.md): Dancer, 9 candidates (no AoE check;
-    dance step counts), 3 covered.
+  - [dnc.md](xiva-audit/dnc.md): Dancer, 6 candidates (dance step
+    counts), 3 covered.
   - [pct.md](xiva-audit/pct.md): Pictomancer, 2 candidates, 5 covered.
   - [ast.md](xiva-audit/ast.md): Astrologian, 1 candidate, 3 covered.
   - [sge.md](xiva-audit/sge.md): Sage, 1 candidate.
   - [sch.md](xiva-audit/sch.md): Scholar, 3 covered.
   - [pld.md](xiva-audit/pld.md): Paladin, 2 covered.
-  - [war.md](xiva-audit/war.md): Warrior, 3 candidates, 4 covered.
-  - [drk.md](xiva-audit/drk.md): Dark Knight, 6 candidates (4 AoE pairs),
-    4 covered.
-  - [gnb.md](xiva-audit/gnb.md): Gunbreaker, 2 candidates, 7 covered.
+  - [war.md](xiva-audit/war.md): Warrior, 1 candidate, 4 covered.
+  - [drk.md](xiva-audit/drk.md): Dark Knight, 2 candidates, 5 covered.
+  - [gnb.md](xiva-audit/gnb.md): Gunbreaker, 1 candidate, 7 covered.
   - [drg.md](xiva-audit/drg.md): Dragoon, 3 covered.
   - [vpr.md](xiva-audit/vpr.md): Viper, 4 candidates, 2 covered.
   - [rpr.md](xiva-audit/rpr.md): Reaper, 4 candidates, 5 covered.
-  - [mnk.md](xiva-audit/mnk.md): Monk, 17 candidates (one sample; forms,
-    Blitz resources, AoE), 4 covered.
+  - [mnk.md](xiva-audit/mnk.md): Monk, 13 candidates (one case study;
+    forms, Blitz resources), 5 covered.
   - [nin.md](xiva-audit/nin.md): Ninja, 15 candidates (ninjutsu and
     Kassatsu misuse, frogs), 6 covered.
-  - [sam.md](xiva-audit/sam.md): Samurai, 6 candidates, 13 covered (no
+  - [sam.md](xiva-audit/sam.md): Samurai, 6 candidates, 14 covered (no
     page compared yet).
-  - [mch.md](xiva-audit/mch.md): Machinist, 11 candidates, 7 covered (no
-    sample on disk).
+  - [mch.md](xiva-audit/mch.md): Machinist, 8 candidates, 10 covered (no
+    kill on disk).
   - [blm.md](xiva-audit/blm.md): Black Mage, 16 candidates (Polyglot,
     Ley Lines, rotation), 7 covered; MP-based rules unverifiable.
   - [smn.md](xiva-audit/smn.md): Summoner, 10 candidates, 4 covered.

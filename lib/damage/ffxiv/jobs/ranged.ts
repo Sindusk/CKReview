@@ -74,6 +74,14 @@
 //   whether holding did more damage): dncTechHoldValue below — 8:09 now
 //   9k, 10:10 no finding (the hold paid off). Not adopted:
 //   Shield Samba, Improvisation, Curing Waltz, Second Wind.
+//   AoE on one target (AoEUsages.ts, 2026-10-15): Windmill, Rising
+//   Windmill and Bloodshower against Cascade, Reverse Cascade and
+//   Fountainfall. Seen firing, not yet matched against an xivanalysis
+//   page: Windmill at jN3XDrf2z8PmLgRJ Red Hot and Deep Blue pull 34 3:59
+//   and Bloodshower at bVDR2mTL7YGvMxK1 pull 1 5:18 (the bosses apart,
+//   both targetable; 11-12k each); Windmill at d3vRbwfpNBLzJ2Xh pull 2
+//   2:42 (Red Hot left as it landed, 11k) and pG319BgHTnPJc6Ft Necron
+//   pull 2 3:53 (one Icy Hand, 8k); Rising Windmill at Necron pull 7 2:24.
 // Bard: Caustic Bite / Stormbite (below), Hawk's Eye overwrites, AoE on
 //   one target, the burst window, cooldowns (OGCDDowntime.ts).
 //   Rechecked on dDar482XvFKBPJYh FRU kill (7.1, 2026-10-12): its 17
@@ -108,6 +116,14 @@
 //   Crossbows (Hypercharge.tsx), each missing one its average; cooldowns
 //   (GeneralCDDowntime.tsx). Double Check / Checkmate are left out:
 //   Heat Blast refunds their cooldown, which the drift check doesn't model.
+//   AoE on too few targets (MultiHitSkills.ts, 2026-10-15): Bioblaster
+//   under 3 against Drill (its DoT ticks count toward what it dealt),
+//   Auto Crossbow and Scattergun under 4 against Blazing Shot and the
+//   Heated combo. Seen firing, not matched against xivanalysis:
+//   jN3XDrf2z8PmLgRJ Vamp Fatale pulls 9 and 12, Bioblaster on the boss
+//   after the adds died (5:25, 39k; 5:10, 33k); Scattergun and Auto
+//   Crossbow on the adds pass when they hit 3 (more than the single-target
+//   average) and flag on 2 (5:00, 11k; 5:04, 1k).
 //
 //   Copyright (c) 2018 Saxon Landers & contributors
 //   MIT License; full text in THIRD_PARTY_NOTICES.md.
@@ -437,7 +453,12 @@ function unpooledFeathers(ctx: PlayerCheckContext): DamageFinding[] {
   return out;
 }
 
-export const DNC_CHECKS: JobCheck[] = [technical, technicalFillers, dancerOverwrites, dancerGaugeEstimates];
+// xivanalysis AoEUsages: the AoE line on one target, each against its
+// single-target counterpart.
+const dancerAoe = aoeComboOnOneTarget([[A.WINDMILL.id, A.CASCADE.id], [A.RISING_WINDMILL.id, A.REVERSE_CASCADE.id],
+  [A.BLOODSHOWER.id, A.FOUNTAINFALL.id]]);
+
+export const DNC_CHECKS: JobCheck[] = [technical, technicalFillers, dancerOverwrites, dancerGaugeEstimates, dancerAoe];
 // The burst window (xivanalysis BuffWindows/BurstWindow.tsx): where
 // Raging Strikes, Battle Voice and Radiant Finale are all up. 7 GCDs, 8
 // when Army's Muse covers 2+ of them; Barrage consumed in it (a Refulgent
@@ -493,4 +514,11 @@ const bardBurst: JobCheck = (ctx) => {
 };
 
 export const BRD_CHECKS: JobCheck[] = [bardDots, bardOverwrites, bardAoe, bardBurst];
-export const MCH_CHECKS: JobCheck[] = [wildfire, hypercharge];
+// xivanalysis MultiHitSkills. Bioblaster shares Drill's charges; its DoT
+// ticks count toward what it dealt. Scattergun stands in for any step of
+// the Heated combo, so it's judged against their average.
+const mchAoe = aoeComboOnOneTarget([[A.BIOBLASTER.id, A.DRILL.id, 3, [S.BIOBLASTER.id]],
+  [A.AUTO_CROSSBOW.id, A.BLAZING_SHOT.id, 4],
+  [A.SCATTERGUN.id, [A.HEATED_SPLIT_SHOT.id, A.HEATED_SLUG_SHOT.id, A.HEATED_CLEAN_SHOT.id], 4]]);
+
+export const MCH_CHECKS: JobCheck[] = [wildfire, hypercharge, mchAoe];

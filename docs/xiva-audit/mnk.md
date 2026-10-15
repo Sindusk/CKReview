@@ -8,8 +8,9 @@
   Enlightenment's target count (hard-coded at 3 now) and added a 10-GCD
   Brotherhood target; 7.4 changed Chakra gauge events.
 - **App:** `lib/damage/ffxiv/jobs/melee.ts` (`MNK_CHECKS`: `riddleOfFire`
-  with `blitzesExpected`), `tracked-cooldowns.ts` ("Monk"), generic checks.
-  The only Monk sample is qjCMx4bRfgNKwX9T fight 16.
+  with `blitzesExpected`, `mnkAoe`), `tracked-cooldowns.ts` ("Monk"),
+  generic checks. The only Monk case study is qjCMx4bRfgNKwX9T fight 16;
+  L9BzKkD2nxcVgHTC Necron and kC7Y3WbzvKcZrBxT The Tyrant also have one.
 - **xivanalysis bugs found** (source-confirmed):
   - `RiddleOfFire.tsx:24-28, 104` and `Brotherhood.tsx:15, 65`: the GCD
     tiers are written for a GCD count (10 Minor, 9 Medium, 6 Major) but
@@ -37,10 +38,10 @@
 | mnk/CooldownDowntime/perfect-balance | verified | `checkCooldownDrift` (charges) | Perfect Balance at 2 charges | — |
 | mnk/CooldownDowntime/riddle-of-fire | verified | `checkCooldownDrift` | Riddle of Fire held | — |
 | mnk/CooldownDowntime/riddle-of-wind | verified | `checkCooldownDrift` | Riddle of Wind held | Fight 16 12/13 not adopted: 66s held in all, under one 90s recharge. |
-| mnk/AoE/shadow-of-the-destroyer | candidate | — | Shadow of the Destroyer on under 4 targets | The app has no Monk AoE check. |
-| mnk/AoE/four-point-fury | candidate | — | Four-point Fury on under 4 | Same. |
-| mnk/AoE/rockbreaker | candidate | — | Rockbreaker on under 4 | Same. |
-| mnk/AoE/enlightenment | candidate | — | Enlightenment on under 3 | Same; xivanalysis applies 3 to pre-7.2 logs too. |
+| mnk/AoE/shadow-of-the-destroyer | covered | `mnkAoe` (vs the opo-opo form's three GCDs, minimum 4) | Shadow of the Destroyer on under 4 targets | Built 2026-10-15. Not seen flagging: its two under-4 uses on disk (L9BzKkD2nxcVgHTC Necron pull 20 3:43, 3:50) hit 3 adds and out-damaged the form's average. |
+| mnk/AoE/four-point-fury | covered | `mnkAoe` (vs True Strike / Twin Snakes / Rising Raptor, minimum 4) | Four-point Fury on under 4 | Fires on L9BzKkD2nxcVgHTC Necron pull 6 3:51 (two adds, 20k) and pull 20 3:52, 3:58 (three, 10-12k: near even at 3, so only those under the average show). No xivanalysis page for these pulls. |
+| mnk/AoE/rockbreaker | covered | `mnkAoe` (vs Demolish / Snap Punch / Pouncing Coeurl, minimum 4) | Rockbreaker on under 4 | Fires on L9BzKkD2nxcVgHTC Necron pull 20 3:48 (three, 3k) and 4:00 (two, 14k). |
+| mnk/AoE/enlightenment | covered | `mnkAoe` (vs The Forbidden Chakra, minimum 3) | Enlightenment on under 3 | Fires on kC7Y3WbzvKcZrBxT The Tyrant pull 1 6:29 (the boss alone, 10k). The damage comparison makes the pre-7.2 minimum moot. |
 | mnk/Positionals/missed | verified | `checkPositionals` | a missed rear / flank | Fight 16 7 matched. |
 | mnk/Replies/dropped-fires-reply | covered | `checkProcs` | Fire's Rumination expiring | Major at 1. Not seen firing. |
 | mnk/Replies/dropped-winds-reply | covered | `checkProcs` | Wind's Rumination expiring | Medium 1, Major 2. Not seen firing. |
@@ -93,11 +94,11 @@ most of these need a second log first.
 1. **mnk/PerfectBalance/dropped-stacks, nadi-overcap;
    mnk/Revolution/celestial-revolution** (candidates). Wrong or lost Blitz
    resources: each costs a Blitz or a Phantom Rush. Log-visible from casts.
-2. **mnk/AoE/*** (candidates). Four pairs.
-3. **mnk/Brotherhood/drift, missed-window** (candidates). Premise check:
+2. **mnk/Brotherhood/drift, missed-window** (candidates). Premise check:
    phase holds.
-4. **mnk/Forms/*, mnk/Bookending/formless-overwrite,
+3. **mnk/Forms/*, mnk/Bookending/formless-overwrite,
    mnk/PerfectBalance/form-shift-in-pb, mnk/RiddleOfFire/wasted-gcds**
    (candidates). Form mistakes: a lost empowered GCD each.
-5. **mnk/Balls/fury-overcap** (candidate).
-6. **mnk/Replies/*** (covered). Not seen firing.
+4. **mnk/Balls/fury-overcap** (candidate).
+5. **mnk/Replies/*, mnk/AoE/shadow-of-the-destroyer** (covered). Not seen
+   firing.
