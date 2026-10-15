@@ -52,6 +52,7 @@ import {
 import type { TankChange, TankPlanGroup, TankingPlan } from "@/lib/mitigation/tanking-plan";
 import { getClassColor } from "@/lib/player-display";
 import { VERDICT_STYLE, fmtTime } from "./MitigationTimeline";
+import { SkillTip } from "./ui/MitigationGlyphs";
 
 const firstName = (player: string) => player.split(" ")[0];
 const pct = (x: number) => `${Math.round(x * 100)}%`;
@@ -428,7 +429,7 @@ function ShortCooldowns({ unused }: { unused: UnusedSummary[] }) {
       {unused.map((u, i) => (
         <span key={i}>
           {i > 0 && " · "}
-          <b style={{ color: "var(--ck-text)" }}>{firstName(u.player)}</b> {u.name}:{" "}
+          <b style={{ color: "var(--ck-text)" }}>{firstName(u.player)}</b> <SkillTip entryKey={u.key}>{u.name}</SkillTip>:{" "}
           {u.basis === "mp"
             ? <>{u.used.toFixed(1)} per pull{u.everyMs ? `, one per ${Math.round(u.everyMs / 1000)}s` : ""} <span style={dim} title="MP isn't in the log and is shared with damage, so there's no fair count of possible uses">(MP)</span></>
             : u.unused >= 0.5
@@ -445,7 +446,7 @@ function changeLine(c: TankChange): ReactNode {
   const where = (r: TankChange["to"]) => r.kind === "autos" ? `autos ${fmtTime(r.medianMs)}–${fmtTime(r.endMs ?? r.medianMs)}` : `${r.name} (${fmtTime(r.medianMs)})`;
   return (
     <>
-      {who}{c.receiver && <> → <b>{firstName(c.receiver)}</b></>}: <b>{c.name}</b>{" "}
+      {who}{c.receiver && <> → <b>{firstName(c.receiver)}</b></>}: <SkillTip entryKey={c.key}><b>{c.name}</b></SkillTip>{" "}
       {c.kind === "add" ? <>extra use on {where(c.to)}</> : <>{where(c.from!)} → {where(c.to)}</>}
       {c.invuln && <span style={{ color: INVULN_COLOR }}> (invuln)</span>}
       <span style={dim}> · fits {c.legal}/{c.pulls}</span>

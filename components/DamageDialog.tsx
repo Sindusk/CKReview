@@ -751,7 +751,7 @@ function FindingRow({ f, icons, maxLost, picked, onHover }: {
       ) : <ThemeGlyph theme={KIND_THEME[f.kind]} size={22} />}
       <div style={{ minWidth: 0 }}>
         <div style={{ color: "var(--ck-text)", fontSize: 13, lineHeight: 1.5 }}>
-          <RichDetail text={f.detail} icons={icons} />
+          <RichDetail text={f.detail} icons={icons} lead={lead} />
           {f.target && <span style={{ color: "var(--ck-text-2)" }}> · on {f.target}</span>}
           {f.cause && !f.movement && <span style={{ color: "var(--ck-text-3)" }}> — {f.forced ? `forced: ${f.cause}` : f.cause}</span>}
           {f.movement && <span style={{ color: MOVEMENT_COLOR }}> — movement, not counted</span>}

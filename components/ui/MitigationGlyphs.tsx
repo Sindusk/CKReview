@@ -9,6 +9,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { getFFAbilityIconUrl } from "@/lib/ability-icons";
 import { FFXIV_MITIGATION } from "@/lib/mitigation/ffxiv-catalog";
 import { getPlayerClassIcon } from "@/lib/player-display";
+import { AbilityHoverTip } from "./AbilityHoverTip";
 
 export type FindingGlyphKind = "fail" | "tight" | "plan" | "unused" | "late" | "stacked" | "other";
 
@@ -65,15 +66,33 @@ const PATHS: Record<FindingGlyphKind, ReactNode> = {
 // ── Skill and job icons (user, 2026-10-14: icons over names) ─────────────
 
 const iconOf = new Map(FFXIV_MITIGATION.catalog.map((e) => [e.key, getFFAbilityIconUrl(e.icon)]));
+const entryOf = new Map(FFXIV_MITIGATION.catalog.map((e) => [e.key, e]));
 const hideBroken = (e: React.SyntheticEvent<HTMLImageElement>) => { e.currentTarget.style.visibility = "hidden"; };
+
+/** Hover tooltip for a catalog mitigation: its name, `label` when that
+ *  says more (e.g. who cast it), and the XIVAPI description. */
+export function SkillTip({ entryKey, label, children, style }: { entryKey: string; label?: string; children: ReactNode; style?: CSSProperties }) {
+  const entry = entryOf.get(entryKey);
+  if (!entry) return <span title={label} style={style}>{children}</span>;
+  return (
+    <AbilityHoverTip game="ffxiv" id={entry.actionIds[0]} name={entry.name} icon={iconOf.get(entryKey)}
+      lines={label && label !== entry.name ? [label] : []} style={style}>
+      {children}
+    </AbilityHoverTip>
+  );
+}
 
 /** A mitigation's icon from the catalog (a blank square when it has none). */
 export function SkillIcon({ entryKey, name, size = 18, style }: { entryKey: string; name: string; size?: number; style?: CSSProperties }) {
   const src = iconOf.get(entryKey);
   const box: CSSProperties = { width: size, height: size, borderRadius: 3, flex: "0 0 auto", display: "inline-block", verticalAlign: "middle", ...style };
-  return src
-    ? <img src={src} alt={name} title={name} width={size} height={size} style={box} onError={hideBroken} />
-    : <span title={name} style={{ ...box, background: "var(--ck-line-2)" }} />;
+  return (
+    <SkillTip entryKey={entryKey} label={name} style={{ display: "inline-flex", flex: "0 0 auto", verticalAlign: "middle" }}>
+      {src
+        ? <img src={src} alt={name} width={size} height={size} style={box} onError={hideBroken} />
+        : <span style={{ ...box, background: "var(--ck-line-2)" }} />}
+    </SkillTip>
+  );
 }
 
 /** A job's icon, the player's name in its tooltip. */

@@ -18,17 +18,16 @@
 // on the first hover and cached (lib/xivapi-tooltips.ts). For WoW,
 // clicking opens its Wowhead page in a new tab; FFXIV names don't link out.
 
-import { useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { fetchXivTooltip, type XivTooltip } from "@/lib/xivapi-tooltips";
-import { createPortal } from "react-dom";
+import type { CSSProperties, ReactNode } from "react";
 import type { Pull } from "@/types/Pull";
+import { AbilityHoverTip, ABILITY_TIP_COLOR } from "./ui/AbilityHoverTip";
 import type { DamageGame } from "@/lib/damage/types";
 import { FFXIV_DAMAGE } from "@/lib/damage/ffxiv/game";
 import { WOW_DAMAGE } from "@/lib/damage/wow/game";
 
 // Ability names: a pale arcane blue, apart from the cream text, the loss
 // reds and the raid-buff gold; it reads as a link, which it is.
-export const ABILITY_COLOR = "#9fd0ff";
+export const ABILITY_COLOR = ABILITY_TIP_COLOR;
 
 type AbilityInfo = {
   name:      string;
@@ -114,25 +113,27 @@ export const firstAbility = (text: string, a: AbilityIcons): string | undefined 
   return a.re.exec(text)?.[1];
 };
 
-/** Finding text with each matched ability name drawn as an AbilityName. */
-export function RichDetail({ text, icons }: { text: string; icons: AbilityIcons }) {
+/** Finding text with each matched ability name drawn as an AbilityName.
+ *  `lead` is the ability already drawn as the row's icon: its name here
+ *  goes without the small icon, so the row doesn't show it twice. */
+export function RichDetail({ text, icons, lead }: { text: string; icons: AbilityIcons; lead?: string }) {
   if (!icons.re) return <>{text}</>;
   const parts = text.split(icons.re);
   // split with one capture group: odd indexes are the matched names.
   return (
     <>
-      {parts.map((part, i) => i % 2 === 0 ? part : <AbilityName key={i} name={part} icons={icons} />)}
+      {parts.map((part, i) => i % 2 === 0 ? part : <AbilityName key={i} name={part} icons={icons} noIcon={part === lead} />)}
     </>
   );
 }
 
 /** An ability's icon and name, with the hover tooltip and click-through. */
-export function AbilityName({ name, icons }: { name: string; icons: AbilityIcons }) {
+export function AbilityName({ name, icons, noIcon }: { name: string; icons: AbilityIcons; noIcon?: boolean }) {
   return (
     <AbilityTip name={name} icons={icons} style={{ whiteSpace: "nowrap", fontWeight: 600, color: ABILITY_COLOR }}>
-      <img src={icons.icons.get(name)} alt="" width={15} height={15}
+      {!noIcon && <img src={icons.icons.get(name)} alt="" width={15} height={15}
         style={{ verticalAlign: -3, marginRight: 3, borderRadius: 2 }}
-        onError={(e) => { e.currentTarget.style.display = "none"; }} />
+        onError={(e) => { e.currentTarget.style.display = "none"; }} />}
       {name}
     </AbilityTip>
   );
@@ -150,23 +151,9 @@ const secs = (ms: number) => `${(ms / 1000).toFixed(ms % 1000 === 0 ? 0 : 1)}s`;
 export function AbilityTip({ name, icons, children, style }: {
   name: string; icons: AbilityIcons; children: ReactNode; style?: CSSProperties;
 }) {
-  const ref = useRef<HTMLSpanElement>(null);
-  const [pos, setPos] = useState<{ top?: number; bottom?: number; left: number } | null>(null);
-  const [xiv, setXiv] = useState<XivTooltip | undefined>(undefined);
   const a = icons.info.get(name);
   if (!a) return <span style={style}>{children}</span>;
   const url = externalUrl(a, icons.game);
-  const wantXiv = icons.game === "ffxiv" && a.id !== undefined && a.id > 0 && !a.aliasOf;
-  const width = wantXiv ? 340 : 280;
-  const show = () => {
-    const r = ref.current?.getBoundingClientRect();
-    if (!r) return;
-    const left = Math.max(8, Math.min(r.left, window.innerWidth - width - 10));
-    // Below the name, or above it in the lower part of the screen, where a
-    // long description would run off the bottom.
-    setPos(r.bottom > window.innerHeight * 0.55 ? { bottom: window.innerHeight - r.top + 6, left } : { top: r.bottom + 6, left });
-    if (wantXiv && xiv === undefined) void fetchXivTooltip(a.id!, a.name).then(setXiv);
-  };
   const action = a.status || a.id === undefined ? undefined : gameOf(icons.game).action(a.id);
   const lines: string[] = [];
   if (a.aliasOf) lines.push(`Gauge timer, kept up by ${a.aliasOf}`);
@@ -183,40 +170,10 @@ export function AbilityTip({ name, icons, children, style }: {
   else if (a.applied > 0) lines.push(`Applied ${a.applied} time${a.applied === 1 ? "" : "s"} ${where}`);
 
   return (
-    <>
-      <span ref={ref} tabIndex={0} style={{ cursor: url ? "pointer" : "help", outline: "none", ...style }}
-        onMouseEnter={show} onMouseLeave={() => setPos(null)} onFocus={show} onBlur={() => setPos(null)}
-        onClick={(e) => { if (!url) return; e.stopPropagation(); window.open(url, "_blank", "noopener,noreferrer"); }}>
-        {children}
-      </span>
-      {pos && createPortal(
-        <div role="tooltip" style={{
-          position: "fixed", top: pos.top, bottom: pos.bottom, left: pos.left, zIndex: 2100, width, pointerEvents: "none",
-          background: "#0d1013", border: "1px solid var(--ck-frame-soft)", borderRadius: 3, padding: "8px 10px",
-          fontSize: 12, lineHeight: 1.5, color: "var(--ck-text)", boxShadow: "0 6px 20px rgba(0,0,0,0.55)",
-          fontWeight: 400, whiteSpace: "normal",
-        }}>
-          <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 4 }}>
-            {a.icon && <img src={a.icon} alt="" width={30} height={30} style={{ borderRadius: 3, flex: "0 0 auto" }} />}
-            <span style={{ color: ABILITY_COLOR, fontWeight: 700, fontSize: 13 }}>{a.name}</span>
-          </div>
-          {lines.map((l, i) => <div key={i} style={{ color: i === 0 ? "var(--ck-text)" : "var(--ck-text-2)" }}>{l}</div>)}
-          {xiv && (
-            <div style={{ marginTop: 6, paddingTop: 6, borderTop: "1px solid var(--ck-frame-soft)", whiteSpace: "pre-line", color: "var(--ck-text-2)" }}>
-              {xiv.description}
-            </div>
-          )}
-          {wantXiv && xiv === undefined && (
-            <div style={{ color: "var(--ck-text-3)", fontSize: 11, marginTop: 4 }}>Loading description…</div>
-          )}
-          {url && (
-            <div style={{ color: "var(--ck-text-3)", fontSize: 11, marginTop: 4 }}>
-              Click for the full tooltip on Wowhead
-            </div>
-          )}
-        </div>,
-        document.body,
-      )}
-    </>
+    <AbilityHoverTip game={icons.game} id={a.aliasOf ? undefined : a.id} name={a.name} icon={a.icon} lines={lines}
+      footer={url && "Click for the full tooltip on Wowhead"} style={style}
+      onClick={url ? () => window.open(url, "_blank", "noopener,noreferrer") : undefined}>
+      {children}
+    </AbilityHoverTip>
   );
 }

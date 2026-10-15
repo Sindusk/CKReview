@@ -34,6 +34,7 @@ import { detectFFRoles, FF_ROLE_SLOTS } from "@/lib/mechanics/ffxiv/roles";
 import { getClassColor } from "@/lib/player-display";
 import { getFFAbilityIconUrl } from "@/lib/ability-icons";
 import { InfoTip } from "./ui/InfoTip";
+import { SkillTip } from "./ui/MitigationGlyphs";
 
 export type MitigationColumn = {
   player: string;
@@ -209,11 +210,13 @@ function TimelineHead({ groups, expanded, onToggle, aggregate }: {
           if (!col) return <th key={`${group.player}|empty`} style={style} />;
           const personal = group.personal.includes(col);
           return (
-            <th key={colKey(col)} style={{ ...style, background: personal ? "#1b1712" : th.background }} title={`${col.player} (${col.job}) — ${col.name}${personal ? " (personal)" : ""}`}>
-              {col.icon
-                // eslint-disable-next-line @next/next/no-img-element
-                ? <img src={col.icon} alt={col.name} width={20} height={20} style={{ display: "block", margin: "0 auto", borderRadius: 3 }} />
-                : <span style={{ fontSize: 9 }}>{col.name.slice(0, 4)}</span>}
+            <th key={colKey(col)} style={{ ...style, background: personal ? "#1b1712" : th.background }}>
+              <SkillTip entryKey={col.key} label={`${col.player} (${col.job})${personal ? " · personal" : ""}`} style={{ display: "block" }}>
+                {col.icon
+                  // eslint-disable-next-line @next/next/no-img-element
+                  ? <img src={col.icon} alt={col.name} width={20} height={20} style={{ display: "block", margin: "0 auto", borderRadius: 3 }} />
+                  : <span style={{ fontSize: 9 }}>{col.name.slice(0, 4)}</span>}
+              </SkillTip>
             </th>
           );
         }))}

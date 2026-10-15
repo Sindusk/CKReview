@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { isLandedHeal, type PlayerInfo, type PlayerEvent } from "@/types/PlayerInfo";
 import { getClassColor, getRoleColor, formatSpecClass, getPlayerSpecIcon } from "@/lib/player-display";
 import { detectFFRoles } from "@/lib/mechanics/ffxiv/roles";
 import { PanelHeader } from "./ui/Panel";
+import { AbilityHoverTip } from "./ui/AbilityHoverTip";
 
 type Tab = "DamageDone" | "DamageTaken" | "Healing" | "Debuffs" | "Casts";
 const TABS: Tab[] = ["DamageDone", "DamageTaken", "Healing", "Debuffs", "Casts"];
@@ -39,8 +40,9 @@ function formatAmount(n: number): string {
 // For WoW only, wraps the icon in a Wowhead tooltip link — WCL's abilityId
 // IS the real WoW spell ID, so `wowhead.com/spell={id}` plus the power.js
 // widget (loaded in app/layout.tsx) gives a full hover tooltip for free,
-// no extra data/lookup needed. FFXIV has no equivalent widget yet, so its
-// icons stay plain.
+// no extra data/lookup needed. FFXIV has no equivalent widget; its icon
+// and name get the app's own hover tooltip with the XIVAPI description
+// instead (AbilityLabel below).
 function AbilityIcon({
   src,
   abilityId,
@@ -77,6 +79,20 @@ function AbilityIcon({
   }
 
   return img;
+}
+
+/** A row's ability icon and name; FFXIV hover shows the XIVAPI tooltip on both. */
+function AbilityLabel({ event, game, children }: { event: PlayerEvent; game: "wow" | "ffxiv"; children?: ReactNode }) {
+  const icon = <AbilityIcon src={event.abilityIcon} abilityId={event.abilityId} game={game} />;
+  const name = <>{event.abilityName}{children}</>;
+  if (game !== "ffxiv" || !event.abilityName) return <>{icon}<span style={abilityStyle}>{name}</span></>;
+  const tip = { game, id: event.abilityId, name: event.abilityName, icon: event.abilityIcon };
+  return (
+    <>
+      {event.abilityIcon && <AbilityHoverTip {...tip} style={{ display: "inline-flex", flexShrink: 0 }}>{icon}</AbilityHoverTip>}
+      <AbilityHoverTip {...tip} style={abilityStyle}>{name}</AbilityHoverTip>
+    </>
+  );
 }
 
 // Overview grid tile — name + role only. Specialization/job is no longer
@@ -210,8 +226,7 @@ function DamageDoneRow({ event, playbackTimeMs, game }: RowProps) {
     <div style={{ ...rowShellStyle, backgroundColor: rowBackground(hasPassed) }}>
       <div style={line1Style}>
         <span style={timeStyle}>{formatMs(event.timestamp)}</span>
-        <AbilityIcon src={event.abilityIcon} abilityId={event.abilityId} game={game} />
-        <span style={abilityStyle}>{event.abilityName}</span>
+        <AbilityLabel event={event} game={game} />
         {event.isDoT && (
           <span style={{ fontSize: "9px", fontWeight: 700, color: "#a78bfa", border: "1px solid #a78bfa44", borderRadius: "3px", padding: "0 4px", flexShrink: 0 }}>
             DoT
@@ -237,11 +252,9 @@ function DamageTakenRow({ event, playbackTimeMs, game }: RowProps) {
     <div style={{ ...rowShellStyle, backgroundColor: rowBackground(hasPassed) }}>
       <div style={line1Style}>
         <span style={timeStyle}>{formatMs(event.timestamp)}</span>
-        <AbilityIcon src={event.abilityIcon} abilityId={event.abilityId} game={game} />
-        <span style={abilityStyle}>
-          {event.abilityName}
+        <AbilityLabel event={event} game={game}>
           {event.source && <span style={{ color: "#555" }}> ({event.source})</span>}
-        </span>
+        </AbilityLabel>
         {event.amount !== undefined && (
           <span style={{ color: "#ccc", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>
             {formatAmount(event.amount)}
@@ -268,8 +281,7 @@ function HealingRow({ event, playbackTimeMs, game }: RowProps) {
     <div style={{ ...rowShellStyle, backgroundColor: rowBackground(hasPassed) }}>
       <div style={line1Style}>
         <span style={timeStyle}>{formatMs(event.timestamp)}</span>
-        <AbilityIcon src={event.abilityIcon} abilityId={event.abilityId} game={game} />
-        <span style={abilityStyle}>{event.abilityName}</span>
+        <AbilityLabel event={event} game={game} />
         {event.amount !== undefined && (
           <span style={{ color: "#ccc", flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>
             {formatAmount(event.amount)}
@@ -287,8 +299,7 @@ function CastRow({ event, playbackTimeMs, game }: RowProps) {
     <div style={{ ...rowShellStyle, backgroundColor: rowBackground(hasPassed) }}>
       <div style={line1Style}>
         <span style={timeStyle}>{formatMs(event.timestamp)}</span>
-        <AbilityIcon src={event.abilityIcon} abilityId={event.abilityId} game={game} />
-        <span style={abilityStyle}>{event.abilityName}</span>
+        <AbilityLabel event={event} game={game} />
       </div>
       {event.target && <div style={line2Style}>→ {event.target}</div>}
     </div>
@@ -312,8 +323,7 @@ function DebuffRow({ event, playbackTimeMs, game }: RowProps) {
     <div style={{ ...rowShellStyle, backgroundColor: rowBackground(hasPassed) }}>
       <div style={line1Style}>
         <span style={timeStyle}>{formatMs(event.timestamp)}</span>
-        <AbilityIcon src={event.abilityIcon} abilityId={event.abilityId} game={game} />
-        <span style={abilityStyle}>{event.abilityName}</span>
+        <AbilityLabel event={event} game={game} />
         <span
           style={{
             fontSize: "9px",
