@@ -270,8 +270,28 @@ were to the app's own engine, found where xivanalysis was right.
   2.47s into 2.45/2.49 (GNB's 8-or-9 rule now reads the mean).
 - **End of the pull:** gauge left at a kill is lost (GNB cartridges,
   `leftAtKill`); a cooldown pressed too late for its effect isn't a use
-  (SCH's last Aetherflow, 0.2s before the kill); a window whose full span
-  runs past the kill is skipped (VPR Reawaken ended early by Ouroboros).
+  (SCH's last Aetherflow, 0.2s before the kill). A burst window the kill
+  (or a wipe) cuts short is judged only on what the end didn't take away
+  (user, 2026-10-14): the GCDs that fit before it, and an expected action
+  only if it was spent outside the window since the previous one and
+  couldn't have come back before the kill (`ExpectedAction.readyAgain`;
+  Lord of Crowns comes back with the next Astral Draw). Before this, such
+  windows were skipped whole, which hid the AST's Lord of Crowns played at
+  7:45 for the 8:41 Divination on K6qfMamL7rN8yz2Q Red Hot and Deep Blue.
+  Across the samples the rule finds the same habit on the last window of
+  many kills: Expiacion / Circle of Scorn, High Jump or Blasting Zone
+  pressed a few seconds before the final Fight or Flight, Lance Charge or
+  No Mercy.
+- **Order inside a burst window isn't checked generically** (user,
+  2026-10-14). The burst-window check counts what's missing; A → C → B
+  passes when all three are there. Order is checked per job only where it
+  changes potency (Viper venoms and Reawaken, broken combos, procs). Add an
+  order check only for a job where xivanalysis or the user names a
+  sequence that loses damage when swapped.
+- **Raid-buff windows are valued at their measured bonus** (`bonus:
+  "observed"`): Starry Muse, Searing Light, Arcane Circle, Divination
+  (since 2026-10-14; it was a flat 6%), the Dancer's burst. An action
+  moved out of one loses every raid buff it would have had.
 - **First Monk and Summoner samples.** Monk Blitzes in Riddle of Fire
   are built (one per Perfect Balance charge with time, xivanalysis's
   rule); Riddle of Fire's +15% is confirmed from the multiplier. The

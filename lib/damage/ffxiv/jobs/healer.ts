@@ -101,9 +101,12 @@
 //   so it's the ticks less the GCD (shared.ts dotFindings; 10k). Not
 //   adopted: 7 Combusts "before invulnerability" (5:20 / 5:23 got 6 and 5
 //   ticks, 6:13 on Watery Grave 6: each more than a Fall Malefic); the
-//   missing Lightspeed at 6:35 (its cost is the 4.1s gap); Lord of Crowns
-//   played at 7:45 instead of in the 8:41 Divination (a window the kill
-//   cut at 10.6s is skipped; ~6% of one Lord).
+//   missing Lightspeed at 6:35 (its cost is the 4.1s gap). Built after: a
+//   window the kill cuts short is judged up to the kill (shared.ts
+//   burstWindowFindings), so the 8:41 Divination counts Lord of Crowns,
+//   played at 7:45 from the 7:35 Astral Draw (Balance from the same draw
+//   was held to 8:41; Umbral Draw waited until 8:42); and Divination is
+//   valued at the window's measured bonus (17% there), not 6%.
 // - Sage, checked against xivanalysis on K6qfMamL7rN8yz2Q Vamp Fatale (7.4,
 //   2026-10-14). Matched: GCD uptime (97.0% / 96.6%), the 4 interrupted
 //   casts, Eukrasian Dosis III uptime (91.9%: the 1:05, 4:06, 7:36 and
@@ -268,17 +271,24 @@ const dot = (key: string, ...more: string[]): JobCheck => (ctx) => dotFindings(c
 const divination: JobCheck = (ctx) => burstWindowFindings(ctx, {
   statusId: S.DIVINATION.id,
   name: "Divination",
-  bonus: 0.06,
-  bonusBasis: "Divination is +6% (FFLogs multiplier with Technical Finish: 1.11)",
+  // Measured per window (user, 2026-10-14): an action moved out of it
+  // loses every raid buff it would have had, not Divination's 6% alone.
+  bonus: "observed",
+  bonusBasis: "the window's bonus measured from the AST's own hits (FFLogs multiplier in it over their median outside raid buffs; Divination alone is +6%)",
   expectedGcds: () => 8,
   expected: () => [
-    { ids: [A.LORD_OF_CROWNS.id], count: 1, name: "Lord of Crowns" },
+    // A card: back only with the next Astral Draw.
+    { ids: [A.LORD_OF_CROWNS.id], count: 1, name: "Lord of Crowns", readyAgain: nextAstralDraw },
     { ids: [A.ORACLE.id], count: 1, name: "Oracle" },
     // Combust deals no direct damage: a refresh inside Divination is worth
-    // its ten ticks snapshotting the +6%.
-    { ids: [A.COMBUST_III.id], count: 1, name: "Combust III", value: (c) => avgTick(c, S.COMBUST_III.id) * 10 * 0.06 },
+    // its ten ticks snapshotting the window's bonus.
+    { ids: [A.COMBUST_III.id], count: 1, name: "Combust III", value: (c) => avgTick(c, S.COMBUST_III.id) * 10, scaled: true },
   ],
 });
+
+function nextAstralDraw(ctx: PlayerCheckContext, t: number): number {
+  return ctx.player.casts.find((c) => c.abilityId === A.ASTRAL_DRAW?.id && c.timestamp > t)?.timestamp ?? Infinity;
+}
 
 function avgTick(ctx: PlayerCheckContext, statusId: number): number {
   const ticks = ctx.player.damageDone.filter((e) => e.abilityId === statusId);

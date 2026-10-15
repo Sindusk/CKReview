@@ -128,7 +128,11 @@ xivanalysis pages for all eight players saved 2026-10-14 in
   header of lib/damage/ffxiv/jobs/healer.ts. Fixed in the engine: a DoT
   gap that runs to the end of the pull is valued at the ticks less the
   GCD re-applying it costs (shared.ts dotFindings). The last 17.1s with
-  no Combust went from 53k to 10k. Lost 766k → 722k.
+  no Combust went from 53k to 10k. Then (user's call):
+  - Kill-cut burst windows are judged up to the kill, not skipped.
+  - Divination is valued at its measured bonus.
+  - Order checks stay per job (docs/dps-analysis.md).
+  The 8:41 Divination now counts Lord of Crowns (31k). Lost 766k → 781k.
 
 ## Open
 

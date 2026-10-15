@@ -154,6 +154,11 @@ export type ExpectedAction = {
   // How many this window expects, when it depends on the window (Monk's
   // Blitzes: one per Perfect Balance charge it had time for). Overrides count.
   countIn?: (ctx: PlayerCheckContext, w: Window) => number;
+  // When a use at t is next possible, for a window the kill cut short (see
+  // burstWindowFindings). Default: t + its cooldown (an action with charges
+  // is never judged there: a banked charge may have been coming). Lord of
+  // Crowns: the next Astral Draw.
+  readyAgain?: (ctx: PlayerCheckContext, t: number) => number;
 };
 
 // Pressed this soon before the window, it could have been held for it.
@@ -198,7 +203,8 @@ export type BurstWindowSpec = {
   inference?:    boolean;
   // How long the full window takes from its start, for a window its own
   // last action ends early (Reawaken, ended by Ouroboros). One whose full
-  // span runs past the end of the pull was cut by the kill and is skipped.
+  // span runs past the end of the pull was cut by the kill (see
+  // burstWindowFindings).
   spanMs?:       (ctx: PlayerCheckContext) => number;
   // The windows themselves, for a status only the hit snapshots carry
   // (Dragoon's Life of the Dragon: 20s from each Geirskogul). Overrides
@@ -263,9 +269,25 @@ export function burstWindowFindings(ctx: PlayerCheckContext, specIn: BurstWindow
   // ignores Clemency: two at 5:14 on the dDar482XvFKBPJYh FRU kill made
   // its 4/8 our 6/8).
   const kinds = gcdKinds(ctx.player, ctx.pull, ctx.uses);
-  for (const w of windows) {
-    if (w.endMs > ctx.endMs) continue;
-    if (specIn.spanMs && w.startMs + specIn.spanMs(ctx) > ctx.endMs) continue;
+  // A window the kill cut short (still up at the end, or its full span runs
+  // past it) is judged only on what the kill didn't take away (user,
+  // 2026-10-14): the GCDs that fit before the kill, and an expected action
+  // only if the player spent it outside the window since the previous one
+  // and it couldn't have come back before the kill (it was the window's
+  // use, pressed early). An action still to come when the boss died isn't
+  // a miss: vVPtwaTQ62Jg391q Vamp Fatale's 8:11 Technical Finish, ended at
+  // 8:23 with Starfall Dance and Tillana unpressed (once read as 242k).
+  // K6qfMamL7rN8yz2Q Red Hot and Deep Blue: the AST's 8:41 Divination,
+  // with the Lord of Crowns from the 7:35 Astral Draw played at 7:45.
+  windows.forEach((w, wi) => {
+    const cut = w.endMs > ctx.endMs || (specIn.spanMs !== undefined && w.startMs + specIn.spanMs(ctx) > ctx.endMs);
+    if (cut && w.startMs >= ctx.endMs) return;
+    const prevEnd = wi > 0 ? windows[wi - 1].endMs : -Infinity;
+    judge(cut ? { startMs: w.startMs, endMs: Math.min(w.endMs, ctx.endMs) } : w, cut, prevEnd);
+  });
+  return out;
+
+  function judge(w: Window, cut: boolean, prevEnd: number) {
     const spec ={ ...specIn, bonus: specIn.bonus === "observed" ? observedBonus(ctx, w) : specIn.bonus };
     // Inclusive end: a stack-consumed buff (Delirium) loses its last stack
     // at the same timestamp as the cast that used it.
@@ -277,18 +299,30 @@ export function burstWindowFindings(ctx: PlayerCheckContext, specIn: BurstWindow
     const gcds = ctx.uses.filter((u) => u.startMs >= w.startMs && u.startMs <= end && kinds.get(u.action.id) !== "heal" &&
       !spec.ignoreGcdIds?.has(u.action.id));
     const casts = ctx.player.casts.filter((c) => c.timestamp >= w.startMs && c.timestamp <= end);
-    const expectedGcds = spec.expectedGcds?.(ctx, casts);
+    const fullGcds = spec.expectedGcds?.(ctx, casts);
+    // Cut by the kill: only the GCDs that fit before it.
+    const expectedGcds = fullGcds !== undefined && cut ? Math.min(fullGcds, Math.floor((w.endMs - w.startMs) / ctx.baseGcdMs)) : fullGcds;
     const missingGcds = expectedGcds !== undefined ? Math.max(0, expectedGcds - gcds.length) : 0;
     const missing: { name: string; n: number; value: number }[] = [];
     for (const e of spec.expected(ctx, casts)) {
       if (!(e.availableIf ? e.availableIf(ctx, w, cycleMs) : offCooldownIn(ctx, e.ids, w, cycleMs))) continue;
       const got = e.got ? e.got(ctx, w, casts) : casts.filter((c) => e.ids.includes(c.abilityId)).length;
-      const n = Math.max(0, (e.countIn ? e.countIn(ctx, w) : e.count) - got);
+      let n = Math.max(0, (e.countIn ? e.countIn(ctx, w) : e.count) - got);
+      if (cut && n > 0) {
+        // Only uses spent since the previous window that couldn't have come
+        // back before the kill: the window's own, pressed early.
+        const readyAgain = e.readyAgain ?? ((c: PlayerCheckContext, t: number) => {
+          const a = ctx.game.action(e.ids.find((id) => ctx.game.action(id)) ?? -1);
+          return !a || a.charges > 1 ? -Infinity : t + a.cooldownMs;
+        });
+        n = Math.min(n, ctx.player.casts.filter((c) => e.ids.includes(c.abilityId) && c.timestamp > prevEnd && c.timestamp < w.startMs &&
+          readyAgain(ctx, c.timestamp) > w.endMs).length);
+      }
       if (n === 0) continue;
       const each = e.value ? e.value(ctx) * (e.scaled ? spec.bonus : 1) : Math.max(...e.ids.map((id) => ctx.values.perUse(id))) * spec.bonus;
       missing.push({ name: e.name, n, value: n * each });
     }
-    if (missingGcds === 0 && missing.length === 0) continue;
+    if (missingGcds === 0 && missing.length === 0) return;
 
     const phaseId = ctx.phaseOf(w.startMs);
     const gcdValue = ctx.values.gcdValue(phaseId, inWindows(w.startMs, ctx.buffWindows));
@@ -310,10 +344,9 @@ export function burstWindowFindings(ctx: PlayerCheckContext, specIn: BurstWindow
         missing.length ? `each missing action × its average × ${Math.round(spec.bonus * 100)}% (used outside the window instead; a never-used one shows as drift)` : undefined,
         spec.bonusBasis,
       ].filter(Boolean).join("; "),
-      detail: `${spec.name} at ${clock(w.startMs)}: ${parts.join("; ")}`,
+      detail: `${spec.name} at ${clock(w.startMs)}${cut ? ` (cut by the ${ctx.pull.result === "Kill" ? "kill" : "wipe"})` : ""}: ${parts.join("; ")}`,
     }));
   }
-  return out;
 }
 
 // ── Buff uptime ────────────────────────────────────────────────────────
