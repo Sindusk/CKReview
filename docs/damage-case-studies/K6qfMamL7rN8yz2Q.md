@@ -133,6 +133,14 @@ xivanalysis pages for all eight players saved 2026-10-14 in
   - Divination is valued at its measured bonus.
   - Order checks stay per job (docs/dps-analysis.md).
   The 8:41 Divination now counts Lord of Crowns (31k). Lost 766k → 781k.
+- **Kade Kansado (Paladin).** Per-claim record in the Paladin header of
+  lib/damage/ffxiv/jobs/pld-war.ts. Built: tincture placement falls back
+  to the best passing start within 30s, when the best placement's move
+  fails the raid-buff rule. That surfaced 6:43 → 6:33 (10k), and about 55
+  small same-burst shifts across the samples. Lost 668k → 678k.
+  - Asked the user: the 6:50-6:57 Shield Lobs and gap (140k + 55k).
+  - Unresolved: the Divine Might lost at 8:06.7 to a Holy Spirit that
+    never went off.
 
 ## Open
 
@@ -152,8 +160,8 @@ xivanalysis pages for all eight players saved 2026-10-14 in
 - Vamp Fatale is done for all eight players. Waiting on the user: the
   charges-at-kill proposal (open-items.md), the lenient saws/towers/adds
   window (Kade 4:54 / 5:47, Kevin 8:05), the PCT lanes' review.
-- Red Hot and Deep Blue kill (session 2026-10-14): Mocha and Yoro done.
-  Next, in order of the app's loss: Kade (655k), Sayacissa (554k), Sin
+- Red Hot and Deep Blue kill (session 2026-10-14): Mocha, Yoro and Kade
+  done. Next, in order of the app's loss: Sayacissa (554k), Sin
   (524k), Kevin (475k), Siegward (305k), Chauzey (133k). Their pages are
   already in sampledata/damage-ff/. Patch review: same report and comp as
   Vamp Fatale (7.4), nothing new.

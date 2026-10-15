@@ -68,6 +68,23 @@
 // - Weaving 2:14, 5:53 (0.08s each): inside the 0.15s tolerance.
 // - Oath gauge (570 lost) and defensives: mitigation. The Oath Gauge is
 //   on the timeline (jobs/gauges.ts oathGauge, 570 there too), not counted.
+// Rechecked on the same report's Red Hot and Deep Blue kill (Pull 2,
+// 2026-10-14). Matched: GCD uptime (93.7% / 94.0%); every Fight or Flight
+// window's misses (its 7 Royal Authority-type and 11 oGCDs: 1:10, 2:10,
+// 3:10, 4:11, 5:12, 6:35, 7:35, and 8:36 now that kill-cut windows are
+// judged; its 2/3 there is the kill); Intervene ~5 lost (13/19),
+// Expiacion and Circle of Scorn 1 each (15/17); the Divine Might expired
+// at 5:17 (granted 4:46, then 11s of Hot Aerial with no GCD, where the
+// instant Holy Spirit is ranged). Built: the tincture placement search
+// (tincture.ts): 6:43 → 6:33, before the 6:34 Fight or Flight (10k);
+// the best placement had picked 6:17 in the prison, which the
+// raid-buff rule rejected, hiding it. Not adopted: Divine Might 17/20's
+// other two (8:06.7, dropped by a Holy Spirit that never went off as the
+// bosses jumped for Insane Air, movement; 8:33's at the kill); Sepulchre
+// 19/20 (the kill); 6:50-6:57 (1.7s gap, Shield Lobs at 6:52 and 6:55,
+// 140k) counted as his, raised with the user: the other melee hit Deep
+// Blue then, but Kade's CABrk9zXLfJG8h6R kill has a 3.5s gap at 6:50.7
+// too, before the arena divides at 6:56.
 //
 // Fight or Flight, ported from
 // xivanalysis src/parser/jobs/pld/modules/FightOrFlight.tsx: 8 GCDs;

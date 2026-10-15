@@ -37,7 +37,10 @@
 //   MOVE_MIN_MS more raid buffs or less downtime; an extra tincture only
 //   when it adds EXTRA_MIN_BUFF_MS of raid buffs (user, 2026-10-13: moves
 //   that only won filler, or only gained because the pull ended, asked the
-//   player to predict the kill). Pulls with no tincture are skipped: in
+//   player to predict the kill). When the best placement's move for a
+//   tincture fails those reasons, the best passing start within 30s of
+//   it is taken instead (2026-10-14; never for one the kill cut short).
+//   Pulls with no tincture are skipped: in
 //   prog, not drinking is a choice about cost, not play.
 // Marked inference: it assumes the rotation would have been the same.
 
@@ -308,11 +311,33 @@ export const tincture: JobCheck = (ctx: PlayerCheckContext): DamageFinding[] => 
   const buffMs = (bin: number) => overlapMs(...spanOf(bin), ctx.buffWindows);
   const downMs = (bin: number) => overlapMs(...spanOf(bin), downtime);
   if (best && best.total > actual) {
+    const moveTo = (b: number, to: number) => ({ from: b, to, gain: cover(to) - cover(b), buffs: buffMs(to) - buffMs(b), down: downMs(b) - downMs(to) });
+    const passes = (m: ReturnType<typeof moveTo>) => Math.abs(m.to - m.from) * STEP_MS >= MOVE_MIN_SHIFT_MS &&
+      m.gain > Math.max(1, cover(m.from)) * MOVE_MIN_SHARE && (m.buffs >= MOVE_MIN_MS || m.down >= MOVE_MIN_MS);
+    // When the best placement's move fails those reasons, the best start
+    // that passes them, with the other tinctures where they were: on
+    // K6qfMamL7rN8yz2Q Red Hot and Deep Blue the PLD's 6:42 tincture (after
+    // the 6:34 Fight or Flight) had its best spot at 6:17 in the prison
+    // (more raw damage, fewer raid buffs: rejected), which hid 6:33 in the
+    // downtime before the burst.
+    const gap = RECAST_MS / STEP_MS;
     let moves = actualBins.map((b, i) => {
-      const to = best.starts[i];
-      return { from: b, to, gain: cover(to) - cover(b), buffs: buffMs(to) - buffMs(b), down: downMs(b) - downMs(to) };
-    }).filter((m) => Math.abs(m.to - m.from) * STEP_MS >= MOVE_MIN_SHIFT_MS &&m.gain > Math.max(1, cover(m.from)) * MOVE_MIN_SHARE &&
-      (m.buffs >= MOVE_MIN_MS || m.down >= MOVE_MIN_MS));
+      const dp = moveTo(b, best.starts[i]);
+      if (passes(dp)) return dp;
+      // Not for a tincture the kill cut short: its "fewer raid buffs" is
+      // the kill's doing (the Dancer's 8:35 one there read as 8:35 → 6:31).
+      if (atMs(b) + DURATION_MS > ctx.endMs) return undefined;
+      let alt: ReturnType<typeof moveTo> | undefined;
+      // Nearby only (within one tincture's span): the same burst, timed
+      // better. Unbounded, it moved opener pots to the 2:00 burst for 2-3s
+      // more buffs on ~70 samples' pulls.
+      for (let t = Math.max(0, b - per); t < Math.min(bins, b + per + 1); t++) {
+        if (!allowed[t] || actualBins.some((o, j) => j !== i && Math.abs(o - t) < gap)) continue;
+        const m = moveTo(b, t);
+        if (passes(m) && (!alt || m.gain > alt.gain)) alt = m;
+      }
+      return alt;
+    }).filter((m): m is ReturnType<typeof moveTo> => m !== undefined);
     // The kept moves must still respect the recast against the pots that
     // stay where they were.
     const startsIf = () => actualBins.map((b) => moves.find((m) => m.from === b)?.to ?? b).sort((a, b) => a - b);
