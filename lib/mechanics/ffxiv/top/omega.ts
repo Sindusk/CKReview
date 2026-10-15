@@ -57,17 +57,19 @@
 //   stack (A58 +1:21.5, A100), puddles and Flame Thrower deaths.
 // - Both lines in one stack (A46 +1:21.5, A55 +1:21.5): the two players
 //   of the set's line number (In Line 3 both times) on the same side. Per
-//   the user's VOD reviewer (2026-10-14, A46) one of them should have
-//   crossed to the other group; it isn't the whole group.
+//   a player the user asked (2026-10-14, A46; from the strat, no VOD) one
+//   of them should have crossed to the other group; it isn't the whole
+//   group. No ruling: nobody has checked it on VOD.
 // - Group A's slots (user, 2026-10-14, TOP only): WAR MT, DRK OT, WHM H1,
 //   SCH H2, PCT R1, DNC R2, RDM M1, DRG M2 ("may have been": the data
 //   agrees). The Pantokrator groups follow NAUR's conga, H1 R1 M1 MT OT M2
 //   R2 H2: for each In Line number the earlier player goes to one side,
 //   the later to the other. It fits all 49 pulls with known groups, and no
 //   other order of the eight slots fits. By it,
-//   A46 +1:21.5's DRG and A55 +1:21.5's PCT didn't cross. Not built: the
-//   module doesn't know slots (roles.ts reads this comp's melee/ranged
-//   wrongly), so both of the pair stay named.
+//   A46 +1:21.5's DRG and A55 +1:21.5's PCT didn't cross. Built as a
+//   cross-pull pass (pantokrator-conga.ts; app/page.tsx and validate.js's
+//   omega run): the report's conga is learned over player names from its
+//   own splits (A: one order fits 55 of 55), so slots aren't needed.
 // - Missile-knockback deaths and Doom deaths log with no killing blow in
 //   some pulls; neither counts toward a called wipe.
 // - Diffuse on non-tanks (A8 +1:48.2, A24, A36 ...): the cone goes to the
@@ -95,7 +97,8 @@
 //   others (the carrier; with one other, both), or the carrier in a line.
 // ffxiv-top1-line (Major on death, else Minor), all eight alive: both
 //   line-marked players inside one line (both named, nobody else that
-//   set); else a group member in neither line or the other group's
+//   set; the cross-pull conga then keeps only the one who belonged on the
+//   other side, "Didn't Cross"); else a group member in neither line or the other group's
 //   (groups read from the pull's lines), the aimed player taking the line
 //   to the other group, a player in both lines.
 // ffxiv-top1-diffuse (Major on death, else Minor), both tanks alive: the
@@ -681,16 +684,53 @@ function lineGroups(players: PlayerInfo[], sets: { lines: PlayerInfo[][] }[]): P
 const LINE_WHY = "Each group of four has one missile carrier and three players sharing the group's Condensed Wave Cannon Kyrios line; the line splits its damage over whoever stands in it, so two players take a lethal share.";
 const MISSILE_WHY = "The In Line carrier leaves their group before Guided Missile Kyrios lands (drop it at the edge of the hitbox) and rejoins for the next line; anyone else it hits is knocked back toward the wall.";
 
-function detectPantokrator(players: PlayerInfo[], life: Life, deaths: DeathEvent[], casts: EnemyEvent[], end: number): PullError[] {
+type PantoSet = {
+  k: number; t: number;
+  lines: { c: EnemyEvent; hit: PlayerInfo[] }[];
+  missiles: { c: EnemyEvent; hit: PlayerInfo[] }[];
+};
+type PantoRead = { num: Map<PlayerInfo, number>; sets: PantoSet[]; groups?: PlayerInfo[][] };
+
+/** Pantokrator's In Line numbers, its four missile/line sets and the two groups (when the lines show them). */
+function pantokratorSets(players: PlayerInfo[], life: Life, casts: EnemyEvent[], end: number): PantoRead | undefined {
   const panto = castsOf(casts, PANTOKRATOR, end)[0];
-  if (!panto) return [];
+  if (!panto) return undefined;
   const num = numbersIn(players, panto.timestamp, panto.timestamp + 10_000);
   const sets = clusterByGap(castsOf(casts, [MISSILE, LINE], end), (c) => c.timestamp, ROUND_GAP_MS).slice(0, 4).map((g, k) => ({
     k: k + 1, t: g[0].timestamp,
     lines: g.filter((c) => c.abilityId === LINE).map((c) => ({ c, hit: instanceHits(players, life, c).map((x) => x.p) })),
     missiles: g.filter((c) => c.abilityId === MISSILE).map((c) => ({ c, hit: instanceHits(players, life, c).map((x) => x.p) })),
   }));
-  const groups = lineGroups(players, sets.map((s) => ({ lines: s.lines.map((l) => l.hit) })));
+  return { num, sets, groups: lineGroups(players, sets.map((s) => ({ lines: s.lines.map((l) => l.hit) }))) };
+}
+
+/**
+ * The pull's Pantokrator as names, for the cross-pull conga
+ * (pantokrator-conga.ts): each player's In Line number, the two groups
+ * when the lines show them, and per set who stood in each line.
+ */
+export function readPantokrator(players: PlayerInfo[], deathEvents: DeathEvent[], enemyCasts: EnemyEvent[]): {
+  num: Map<string, number>; groups?: string[][]; sets: { t: number; lines: string[][] }[];
+} | undefined {
+  if (!enemyCasts.some((c) => c.abilityId === PROGRAM_LOOP)) return undefined;
+  const p2 = phase1End(enemyCasts);
+  const life = buildLife(players, deathEvents.filter((d) => d.timestamp <= p2));
+  const read = pantokratorSets(players, life, enemyCasts, p2);
+  if (!read) return undefined;
+  return {
+    num: new Map([...read.num].map(([p, n]) => [p.name, n])),
+    groups: read.groups?.map((g) => g.map((p) => p.name)),
+    sets: read.sets.map((s) => ({ t: s.t, lines: s.lines.map((l) => l.hit.map((p) => p.name)) })),
+  };
+}
+
+/** The error both players of a same-number pair get (pantokrator-conga.ts narrows it to one). */
+export const SAME_SIDE_NAME = "Same Number, Same Side";
+
+function detectPantokrator(players: PlayerInfo[], life: Life, deaths: DeathEvent[], casts: EnemyEvent[], end: number): PullError[] {
+  const read = pantokratorSets(players, life, casts, end);
+  if (!read) return [];
+  const { num, sets, groups } = read;
   const errors: PullError[] = [];
   for (const s of sets) {
     const inLine = (p: PlayerInfo) => s.lines.some((l) => l.hit.includes(p));
@@ -731,7 +771,7 @@ function detectPantokrator(players: PlayerInfo[], life: Life, deaths: DeathEvent
     const targets = players.filter((p) => p.debuffs.some((e) => LINE_MARKS.includes(e.abilityId) && e.debuffStatus === "removed" && Math.abs(e.timestamp - s.t) <= 1000));
     // Both lines aim at the set's two players of one In Line number, one per
     // group. Both of them inside one line means they stood on the same side:
-    // one should have crossed to the other group (user's VOD reviewer,
+    // one should have crossed to the other group (a player the user asked,
     // 2026-10-14, A46 +1:21.5; also A55). The rest of that stack is fallout.
     const paired = targets.length === 2 && s.lines.some((l) => targets.every((p) => l.hit.includes(p)));
     if (paired) {
@@ -740,7 +780,7 @@ function detectPantokrator(players: PlayerInfo[], life: Life, deaths: DeathEvent
       for (const p of targets) {
         const other = targets.find((x) => x !== p)!;
         lineErrors.push(playerError(p, {
-          ruleId: TOP1_LINE_RULE_ID, severity: died.length ? "Major" : "Minor", name: "Same Number, Same Side",
+          ruleId: TOP1_LINE_RULE_ID, severity: died.length ? "Major" : "Minor", name: SAME_SIDE_NAME,
           description: `Set ${s.k}: had In Line ${num.get(p) ?? "?"} like ${other.name} and stood on the same side, so both lines went into one stack (${namesOf(hit)})${died.length ? `; ${namesOf(died)} died` : ""}. One of the two should have crossed to the other group; the log can't say which. ${LINE_WHY}`,
           timestamp: s.t, abilityId: LINE, abilityName: "Condensed Wave Cannon Kyrios",
         }));

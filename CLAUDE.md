@@ -92,6 +92,9 @@ These are standing preferences, each learned from a real correction:
     later call seems to contradict it. A ruling for a report not on disk
     stays as written. Only when it's on disk and a change makes it fail,
     report the failure and let the user decide whether to update it.
+  - **Rulings only from a VOD review** (user, 2026-10-14). An answer about
+    the strat or the fight, with no VOD behind it, shapes the code and the
+    header but never becomes a ruling.
 - **Asking for VOD checks: one numbered list per loaded VOD** (user,
   2026-10-09). When the user has a VOD loaded, ask only about the pulls in
   that VOD. Number every question sequentially (1, 2, 3 …, no sub-letters)

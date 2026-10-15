@@ -74,6 +74,8 @@ lib/mechanics/
                                 lines, Flame Thrower / Ballistic Impact, Diffuse
                                 and Wave Cannon Kyrios, Atomic Ray enrage); the
                                 other phase files are research models only
+      pantokrator-conga.ts    — cross-pull Pantokrator side order (who should
+                                have crossed in a same-number pair)
     trials/                   — Extreme trials
       doomtrain.ts            — Doomtrain (Hell on Rails EX) per-pull rules
                                 (avoidables, stored plasma spreads/pairs, orb

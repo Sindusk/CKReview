@@ -40,6 +40,7 @@ import {
 import { learnGravenImageLayout, detectGravenImageSpreadErrors, detectGravenImageStackErrors } from "@/lib/mechanics/ffxiv/dancingmad/graven-image";
 import { learnWaveCannonLayout, detectWaveCannonPositionErrors } from "@/lib/mechanics/ffxiv/dancingmad/wave-cannon";
 import { applyFallback, buildFallbackProfiles } from "@/lib/mechanics/fallback";
+import { learnPantokratorConga, applyPantokratorConga } from "@/lib/mechanics/ffxiv/top/pantokrator-conga";
 import type { Pull } from "../types/Pull";
 import { createCallWipeError, CALL_WIPE_RULE_ID, createManualError, type ManualErrorInput } from "@/types/PullError";
 import type { SavedSession, SavedSessionVod } from "@/types/Session";
@@ -190,6 +191,13 @@ export default function Home() {
   // wave-cannon.ts's module header for why a hardcoded table doesn't
   // generalize across raid teams.
   const waveCannonLayout = useMemo(() => learnWaveCannonLayout(pulls), [pulls]);
+  // The Omega Protocol's Pantokrator conga, learned from the report's own
+  // clean splits (pantokrator-conga.ts): it names which player of a
+  // same-number pair didn't cross.
+  const pantokratorConga = useMemo(
+    () => learnPantokratorConga(pulls.map((p) => ({ players: p.players, deathEvents: p.deathEvents, enemyCasts: p.enemyCasts ?? [] }))),
+    [pulls]
+  );
   // Bosses without an encounter module get the fallback model, which learns
   // each ability's normal targets from the pull itself and the report's
   // earlier pulls of that boss, never later ones (lib/mechanics/fallback.ts).
@@ -221,7 +229,10 @@ export default function Home() {
   // calls / manual errors) and re-derived on strategy swap.
   const displayPulls = useMemo(() => {
     return pulls.map((pull) => {
-      const p = applyDutyAssignments(applyFallback(pull, fallbackProfiles), dutyAssignments);
+      const base = applyDutyAssignments(applyFallback(pull, fallbackProfiles), dutyAssignments);
+      const p = pantokratorConga && base.name === "The Omega Protocol"
+        ? { ...base, errors: applyPantokratorConga(base.errors, base.players, base.deathEvents, base.enemyCasts ?? [], pantokratorConga) }
+        : base;
       const blackHoleErrors = [
         ...detectMissedAssignedTetherErrors(p, blackHoleStrategy),
         ...detectClippedByNeighborTetherErrors(p, blackHoleStrategy),
@@ -235,7 +246,7 @@ export default function Home() {
       const extra = [...blackHoleErrors, ...gravenImageErrors, ...waveCannonErrors];
       return extra.length === 0 ? p : { ...p, errors: [...p.errors, ...extra] };
     });
-  }, [pulls, blackHoleStrategy, gravenImageLayout, waveCannonLayout, fallbackProfiles, dutyAssignments]);
+  }, [pulls, blackHoleStrategy, gravenImageLayout, waveCannonLayout, pantokratorConga, fallbackProfiles, dutyAssignments]);
   const [selectedPullId, setSelectedPullId] = useState<number | null>(null);
 
   const [importError, setImportError] = useState<string | null>(null);

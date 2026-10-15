@@ -348,9 +348,20 @@ const MECHANICS = {
 
   omega: {
     game: 'ff',
-    load: () => requireTsFromRoot('lib/mechanics/ffxiv/top/omega.ts'),
+    load: () => ({
+      ...requireTsFromRoot('lib/mechanics/ffxiv/top/omega.ts'),
+      ...requireTsFromRoot('lib/mechanics/ffxiv/top/pantokrator-conga.ts'),
+    }),
     run({ mod, ctxs }) {
-      for (const c of ctxs) printPullErrors(c, mod.detectOmegaErrors(c.relPlayers(), c.relDeaths(), c.relEnemyCasts()));
+      // Cross-pull, as in the app: the report's Pantokrator conga narrows
+      // each same-number pair to the player on the wrong side.
+      const pullLikes = ctxs.map((c) => ({ c, players: c.relPlayers(), deathEvents: c.relDeaths(), enemyCasts: c.relEnemyCasts() }));
+      const conga = mod.learnPantokratorConga(pullLikes);
+      if (conga) console.log(`  Pantokrator conga: ${conga.orders.length} order(s) fit ${conga.fits} of ${conga.pulls} splits`);
+      for (const p of pullLikes) {
+        const errors = mod.detectOmegaErrors(p.players, p.deathEvents, p.enemyCasts);
+        printPullErrors(p.c, mod.applyPantokratorConga(errors, p.players, p.deathEvents, p.enemyCasts, conga));
+      }
     },
   },
 
