@@ -12,10 +12,12 @@
 // both tanks on one fight clock, buster margins and the tank optimizer's
 // changes (lib/mitigation/tanking-plan.ts, in lib/mitigation/tanking.worker.ts),
 // computed only while it is open. Analysis (components/MitigationPlan.tsx,
-// lib/mitigation/plan.ts), a few coordinated cooldown changes for the raid
-// lead, searched over the group's last N pulls (a "Last N pulls" input,
-// blank = 5) in a web worker (lib/mitigation/plan.worker.ts), opened first
-// whenever the group has PLAN_MIN_PULLS+ analyzable pulls; and the full Timeline
+// lib/mitigation/plan.ts, lib/mitigation/findings.ts), findings in
+// categories with suggestions and a few coordinated cooldown changes for the
+// raid lead, searched over the group's last N pulls (a "Last N pulls" input,
+// blank = 5) or the one selected pull (user, 2026-10-14) in a web worker
+// (lib/mitigation/plan.worker.ts), opened first whenever there is an
+// analyzable pull; and the full Timeline
 // (components/MitigationTimeline.tsx), with a details panel for the
 // clicked hit (components/MitigationHitDetails.tsx). The timeline hides
 // uneventful hits (raid hits nobody died to, taken at full health) and,
@@ -38,7 +40,7 @@ import type { Pull } from "@/types/Pull";
 import { analyzePullMitigation } from "@/lib/mitigation/analyze";
 import { aggregateMitigation } from "@/lib/mitigation/aggregate";
 import { buildDebuffReach } from "@/lib/mitigation/debuff-reach";
-import { PLAN_MIN_PULLS, buildMitigationPlan, planWindow, type OptimizedPlan } from "@/lib/mitigation/plan";
+import { buildMitigationPlan, planWindow, type OptimizedPlan } from "@/lib/mitigation/plan";
 import type { PlanReply, PlanRequest } from "@/lib/mitigation/plan.worker";
 import { aggregateBusters, analyzePullTanking, summarizeUnused } from "@/lib/mitigation/tanking";
 import { buildTankingPlan, clockPull, tankWindow, type TankingPlan } from "@/lib/mitigation/tanking-plan";
@@ -139,20 +141,25 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId }
     }));
   }, [open, analyzable, reach]);
   const aggregate = useMemo(() => (allPulls ? aggregateMitigation(perPull, FFXIV_MITIGATION, reach) : []), [allPulls, perPull, reach]);
-  const view: View = viewPick ?? (allPulls && perPull.length >= PLAN_MIN_PULLS ? "analysis" : "timeline");
+  const view: View = viewPick ?? (perPull.length > 0 ? "analysis" : "timeline");
 
-  // The Analysis searches the group's last N pulls (lib/mitigation/plan.ts)
-  // in a web worker; blank input = the default window.
+  // The Analysis searches the group's last N pulls (lib/mitigation/plan.ts),
+  // or the one selected pull (user, 2026-10-14), in a web worker; blank
+  // input = the default window.
   const [windowInput, setWindowInput] = useState("");
   const windowSize = /^\d+$/.test(windowInput.trim()) ? Number(windowInput) : undefined;
   const [planResult, setPlanResult] = useState<{ plan: OptimizedPlan | null; pending: boolean; error?: string }>({ plan: null, pending: false });
   const worker = useRef<Worker | null>(null);
   const requestId = useRef(0);
-  const planWanted = open && allPulls && view === "analysis" && perPull.length >= PLAN_MIN_PULLS;
+  const planWin = useMemo(() => {
+    const byId = new Map(analyzable.map((p) => [p.id, p]));
+    const picked = allPulls ? planWindow(perPull, windowSize) : perPull.filter((p) => p.pullId === selectedPull?.id);
+    return picked.map((p) => ({ ...p, pull: byId.get(p.pullId)! }));
+  }, [allPulls, perPull, analyzable, windowSize, selectedPull]);
+  const planWanted = open && view === "analysis" && planWin.length > 0;
   useEffect(() => {
     if (!planWanted) return;
-    const byId = new Map(analyzable.map((p) => [p.id, p]));
-    const window = planWindow(perPull, windowSize).map((p) => ({ ...p, pull: byId.get(p.pullId)! }));
+    const window = planWin;
     const allHits = perPull.map((p) => p.hits);
     const id = ++requestId.current;
     setPlanResult((r) => ({ ...r, pending: true }));
@@ -169,7 +176,7 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId }
     }
     const request: PlanRequest = { id, window, allHits, reach };
     worker.current.postMessage(request);
-  }, [planWanted, perPull, analyzable, reach, windowSize]);
+  }, [planWanted, planWin, perPull, reach]);
   // The Tanking view (components/MitigationTanking.tsx): each pull's tank
   // streams and busters, only while that view is open; its changes are
   // searched over the window of pulls with the latest tank jobs, in a
@@ -342,21 +349,20 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId }
                         setSelectedHitId(id);
                       }} />
               ) : view === "analysis" ? (
-                !allPulls ? (
+                selectedStale ? (
                   <p className="ck-dialog-text" style={{ padding: 12 }}>
-                    The analysis reads all of a group&apos;s pulls: one pull is too noisy to plan from.{" "}
-                    <button className="ck-btn ck-btn--sm" onClick={() => setAllPulls(true)}>Use all pulls</button>
+                    This pull was fetched before mitigation data was kept. Re-fetch the report to analyze it.
                   </p>
-                ) : perPull.length < PLAN_MIN_PULLS ? (
-                  <p className="ck-dialog-text" style={{ padding: 12 }}>
-                    The analysis needs at least {PLAN_MIN_PULLS} pulls with mitigation data from this group ({perPull.length} loaded).
-                    The Timeline still shows them.
-                  </p>
-                ) : <PlanView plan={planResult.plan} pending={planResult.pending} error={planResult.error} focus={null}
+                ) : planWin.length === 0 ? (
+                  <p className="ck-dialog-text" style={{ padding: 12 }}>No loaded pull has mitigation data yet. Re-fetch the report to analyze it.</p>
+                ) : <PlanView plan={planResult.plan} pending={planResult.pending} error={planResult.error}
+                      window={planWin} reach={reach} allPulls={allPulls}
                       windowInput={windowInput} onWindowInput={setWindowInput} groupPulls={perPull.length}
                       onOpenHit={(id) => {
                         const row = aggregate.find((r) => r.id === id);
                         if (row && rowUneventful(row)) setShowUneventful(true);
+                        if (row?.rare) setShowRare(true);
+                        if (!allPulls && selectedHits?.some((h) => h.id === id && uneventful(h))) setShowUneventful(true);
                         setViewPick("timeline");
                         setSelectedHitId(id);
                       }} />

@@ -708,6 +708,23 @@ grouped by exact roster. The module headers hold the rules.
   Outcome cell, marks only used / free-on-a-short-hit / ineffective, and
   opens a details panel on click. Notes list only adds that lift the hit
   to good alone. Waiting on the user's review.
+- **Mitigation Analysis findings layout (built 2026-10-14, to be refined
+  in use):** the Analysis view reworked after the Damage dialog (user
+  picked the mockup): major findings, a fight timeline with cooldown
+  lanes, findings in categories with Try / Idea suggestions
+  (`lib/mitigation/findings.ts`, `components/MitigationPlan.tsx`,
+  `components/MitigationAnalysisTimeline.tsx`).
+  - **Chosen by the builder, not yet confirmed** (findings.ts header):
+    - unused: under ½ of the possible casts and ready at ⅓+ of the
+      planned raidwides; gated entries left out
+    - late: cast within 8s after a hit it wasn't on, in at least half
+      the pulls that had the hit, and not on a later raidwide that pull
+    - stacked: 4+ party cooldowns on an over hit with a 45%+ median
+    - ready stretches shown on the lanes from 20s
+    - "Cooldown plan" is its own group and also each fixed hit's Try line
+    - ideas outside the plan are shown, marked as ideas
+  - Dancing Mad (one 18-minute pull window) took ~10s to plan in the
+    worker; watch for that on long single pulls.
 - **Mitigation optimizer (built 2026-10-11, waiting on the user's review
   in the running app):** the Analysis view is now a schedule optimizer
   over the group's last 5 pulls (`lib/mitigation/plan.ts` for the party
@@ -718,8 +735,10 @@ grouped by exact roster. The module headers hold the rules.
   objective order, tank busters out, boss debuffs only where reach is
   known, gated entries addable and marked, reach per hit, tier 3 only when
   nothing fails, the roll buffer applied to changes only.
+  - **Settled 2026-10-14 (user):** `PLAN_MIN_PULLS` 1, so a single pull
+    gets suggestions and the dialog's "one pull" mode runs the Analysis;
+    the Tanking view keeps 3 (`tanking-plan.ts` `TANK_MIN_PULLS`).
   - **Chosen by the builder, not yet confirmed:**
-    - `PLAN_MIN_PULLS` 3: window pulls a hit needs to be planned
     - `CAST_LEAD_MS` 2s: a placed cast's lead before its hit (not yet
       checked against how early real casts land)
     - `BEAM_WIDTH` 50; legality share ½ (a change must fit the cooldowns
@@ -739,7 +758,8 @@ grouped by exact roster. The module headers hold the rules.
       several bosses) count for a player whose debuff lands on all of them
   - **Open questions:**
     - Short windows lose late hits: hits only the best pull reached get
-      no plan. Ask once it shows on real data.
+      no plan. Ask once it shows on real data. (Partly moot since
+      `PLAN_MIN_PULLS` went to 1: such hits are planned now.)
     - A reach fallback: a planned debuff on a hit the player never
       debuffed goes on their usual boss. On Divers' Dare #2 (Deep Blue's
       only) that boss is Red Hot, so Sonder's Feint gets no credit there.

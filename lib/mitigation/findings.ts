@@ -1,0 +1,419 @@
+// lib/mitigation/findings.ts
+//
+// The Mitigation dialog's Analysis view as findings (user, 2026-10-14,
+// modelled on the Damage dialog): major findings at the top, a fight
+// timeline, then findings in categories, each with a suggestion. Pure:
+// (window pulls, the optimizer's OptimizedPlan) -> AnalysisFindings. The
+// plan (plan.ts) is unchanged; this reads it and adds the checks below.
+// Thresholds are the builder's, not yet confirmed (docs/open-items.md).
+//
+// ── Categories ─────────────────────────────────────────────────────────
+//   under   Failing (median fail/under) or tight (worst pull under
+//           MARGIN_UNDER) planned hits: the plan's anchors, so reached in
+//           PLAN_MIN_PULLS+ window pulls. The fix is the plan group that
+//           lifts it; else the best free add (notes.ts aggregateAddOptions)
+//           as an idea.
+//   plan    The plan's "do together" groups, lettered A, B, ...
+//   unused  Party cooldowns (partyEligible, or situational ones, shown but
+//           never suggested) cast under UNUSED_MAX_SHARE of the casts the
+//           window's pulls allowed (one at pull start, then one per
+//           cooldown) and ready at UNUSED_MIN_READY_SHARE+ of the planned
+//           raidwides. Gated entries are left out (their availability is
+//           a guess). The idea is the neediest under hit where it was free
+//           in every pull that reached it, unless the plan already uses it.
+//   timing  late: a party cooldown cast within LATE_MAX_MS after a hit it
+//           wasn't on, in at least half the pulls that had the hit (one
+//           pull is enough: single pulls get suggestions, user, 2026-10-14), and not on a later raidwide that pull (then
+//           it was for that one). Only hits that aren't over on the median.
+//           stacked: an over hit with STACK_MIN_COOLDOWNS+ party cooldowns
+//           on it in at least half its pulls and a median of
+//           STACK_MIN_MARGIN+.
+//   other   Healing and mechanic hits that fail (plan.ts classifyHit), any
+//           pull count; tank busters are counted and left to the Tanking
+//           view.
+//
+// ── Timeline ───────────────────────────────────────────────────────────
+// Hits at their median time over the window: the non-tank ones with their
+// median and worst lowest HP, tank busters as marks. Cooldown lanes are
+// the clock pull's (the window's longest, tanking-plan.ts clockPull) casts
+// of every party cooldown, the stretches it sat ready READY_GAP_MIN_MS+,
+// and marks for the plan's changes, ideas and late casts. A clock-pull
+// cast a plan move would make unavailable (by more than
+// SNAPSHOT_SLACK_MS: a recast a second later is the same cast) is marked
+// lost.
+
+import type { Pull } from "@/types/Pull";
+import type { CatalogEntry, MitigationGame, MitigationHit } from "./types";
+import { aggregateMitigation, type AggregatedHit } from "./aggregate";
+import { MARGIN_OVER, MARGIN_UNDER, chargesAt, playerCasts, SNAPSHOT_SLACK_MS } from "./analyze";
+import type { DebuffReach } from "./debuff-reach";
+import { aggregateAddOptions } from "./notes";
+import {
+  PLAN_MIN_PULLS, classifyHit, partyEligible,
+  type HitClass, type HitRef, type HitSide, type OptimizedChange, type OptimizedPlan, type PlanGroup,
+} from "./plan";
+import { clockPull } from "./tanking-plan";
+
+export const UNUSED_MAX_SHARE = 0.5;
+export const UNUSED_MIN_READY_SHARE = 1 / 3;
+export const LATE_MAX_MS = 8_000;
+export const STACK_MIN_COOLDOWNS = 4;
+export const STACK_MIN_MARGIN = 0.45;
+export const READY_GAP_MIN_MS = 20_000;
+
+export type FindingCategory = "under" | "plan" | "unused" | "timing" | "other";
+// A timeline pin over a hit: which finding is about it.
+export type PinKind = "fail" | "tight" | "late" | "stacked" | "other";
+
+export type FindingsWindowPull = { pull: Pull; pullId: number; pullNumber: number; durationMs?: number; hits: MitigationHit[] };
+
+export type PlanLetter = { letter: string; group: PlanGroup };
+
+export type UnderFinding = {
+  hit:       HitRef;
+  failing:   boolean;           // else tight
+  median:    number;
+  worst:     number;
+  worstPull: number;            // pull number
+  deathPulls: number;
+  pulls:     number;            // window pulls that had it
+  reached:   number;
+  column?:   "physical" | "magical" | "none";
+  steady:    string[];          // party cooldowns on it every pull
+  fix?:      { letter: string; changes: OptimizedChange[]; after: HitSide };
+  idea?:     { player: string; job: string; name: string; freePulls: number; est?: number };
+};
+
+export type UnusedFinding = {
+  player:    string;
+  job:       string;
+  key:       string;
+  name:      string;
+  cooldownMs: number;
+  casts:     number;
+  possible:  number;
+  pulls:     number;
+  noCastPulls: number[];        // window pulls with no cast
+  readyHits: number;
+  totalHits: number;
+  situational?: string;
+  inPlan?:   string;            // the plan letter that already uses it
+  idea?:     { hit: HitRef; freePulls: number; pulls: number };
+};
+
+export type LateCast = { pullNumber: number; castMs: number; hitMs: number; readyMs: number; prevCastMs?: number };
+
+export type LateFinding = {
+  kind:      "late";
+  hit:       HitRef;
+  player:    string;
+  job:       string;
+  key:       string;
+  name:      string;
+  casts:     LateCast[];
+  pulls:     number;             // pulls that had the hit
+  readyInTime: number;           // of those casts, how many had it ready before the hit
+};
+
+export type StackedFinding = {
+  kind:      "stacked";
+  hit:       HitRef;
+  median:    number;
+  worst:     number;
+  pulls:     number;
+  cooldowns: { name: string; player: string; job: string }[];
+  alternatives: string[];        // droppable on its own
+  planMove?: { letter: string; change: OptimizedChange; after: HitSide };
+};
+
+export type OtherFinding = { hit: HitRef; cls: Exclude<HitClass, "plan">; deaths: number; median: number; pulls: number };
+
+export type TimelineHit = {
+  id:      string;
+  name:    string;
+  medianMs: number;
+  tank:    boolean;
+  median:  number;
+  worst:   number;
+  pulls:   number;
+  tone:    "fail" | "tight" | "good" | "over" | "other";
+  deaths:  number;
+  pins:    PinKind[];
+};
+
+export type LaneMark =
+  | { kind: "move"; fromMs: number; toMs: number; letter: string }
+  | { kind: "add"; atMs: number; letter: string }
+  | { kind: "idea"; atMs: number; label: string };
+
+export type Lane = {
+  player:  string;
+  job:     string;
+  key:     string;
+  name:    string;
+  casts:   { atMs: number; durationMs: number; late?: string; lost?: string }[];
+  ready:   [number, number][];
+  marks:   LaneMark[];
+};
+
+export type AnalysisFindings = {
+  windowPulls: number[];         // pull numbers
+  clock?:     { pullNumber: number; durationMs: number };
+  reachSteps: { untilMs: number; pulls: number }[];  // pulls still going, by time
+  hits:       TimelineHit[];
+  lanes:      Lane[];
+  letters:    PlanLetter[];
+  under:      UnderFinding[];
+  unused:     UnusedFinding[];
+  timing:     (LateFinding | StackedFinding)[];
+  other:      OtherFinding[];
+  tankBusters: number;
+};
+
+const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const refOf = (r: AggregatedHit): HitRef => ({ id: r.id, name: r.abilityName, occurrence: r.occurrence, phase: r.phase, medianMs: r.medianMs });
+const isTankRow = (r: AggregatedHit) => r.byPull.every((b) => b.hit.tankOnly);
+const failingRow = (r: AggregatedHit) => r.verdict === "fail" || r.verdict === "under";
+const tightRow = (r: AggregatedHit) => !failingRow(r) && r.worstMargin < MARGIN_UNDER;
+/** A party cooldown the view tracks: one the plan may move, or a situational one shown for reference. */
+const tracked = (e: CatalogEntry) => partyEligible(e) || (e.reach === "party" && !!e.situational && e.inSheet !== false
+  && e.kind !== "invuln" && e.kind !== "limitBreak");
+
+export function buildAnalysisFindings(window: FindingsWindowPull[], plan: OptimizedPlan, game: MitigationGame,
+  reach?: DebuffReach): AnalysisFindings {
+  const rows = aggregateMitigation(window.map(({ pull, ...w }) => ({ ...w, durationMs: w.durationMs ?? pull.fightDuration })), game, reach)
+    .filter((r) => !r.rare)
+    .sort((a, b) => a.medianMs - b.medianMs);
+  const entryOf = new Map(game.catalog.map((e) => [e.key, e]));
+  const jobOf = new Map(window.flatMap((w) => w.pull.players.map((p) => [p.name, p.className] as const)));
+  const anchors = rows.filter((r) => r.pulls >= PLAN_MIN_PULLS && !isTankRow(r));
+  const letters: PlanLetter[] = plan.groups.map((group, i) => ({ letter: LETTERS[i] ?? String(i + 1), group }));
+
+  // ── under ──
+  const under: UnderFinding[] = anchors
+    .filter((r) => classifyHit(r) === "plan" && (failingRow(r) || tightRow(r)))
+    .map((r) => {
+      const worst = r.byPull.reduce((a, b) => (b.hit.margin < a.hit.margin ? b : a));
+      const steady = r.active
+        .filter((a) => a.pulls === r.pulls && entryOf.get(a.key) && partyEligible(entryOf.get(a.key)!))
+        .map((a) => a.name);
+      const fixGroup = letters.find((l) => l.group.purpose === "fix" && l.group.hits.some((h) => h.hit.id === r.id
+        && (h.after.median > h.before.median + 1e-9 || h.after.worst > h.before.worst + 1e-9)));
+      const out: UnderFinding = {
+        hit: refOf(r), failing: failingRow(r), median: r.medianMargin, worst: r.worstMargin, worstPull: worst.pullNumber,
+        deathPulls: r.deathPulls, pulls: r.pulls, reached: r.reached, column: r.damageColumn, steady,
+      };
+      if (fixGroup) {
+        const outcome = fixGroup.group.hits.find((h) => h.hit.id === r.id)!;
+        const touching = fixGroup.group.changes.filter((c) => c.to.id === r.id || c.from?.id === r.id);
+        out.fix = { letter: fixGroup.letter, changes: touching.length ? touching : fixGroup.group.changes, after: outcome.after };
+      } else {
+        const opt = aggregateAddOptions(r, game, reach).find((o) => entryOf.get(o.key) && partyEligible(entryOf.get(o.key)!));
+        if (opt) out.idea = { player: opt.player, job: jobOf.get(opt.player) ?? "", name: opt.name, freePulls: opt.pulls ?? 0, est: opt.est };
+      }
+      return out;
+    })
+    .sort((a, b) => Number(b.failing) - Number(a.failing) || a.median - b.median);
+
+  // ── unused ──
+  const planned = anchors.filter((r) => classifyHit(r) === "plan");
+  const inPlan = new Map<string, string>();
+  for (const l of letters) for (const c of l.group.changes) inPlan.set(`${c.player}|${c.key}`, l.letter);
+  const unused: UnusedFinding[] = [];
+  for (const player of window[window.length - 1]?.pull.players ?? []) {
+    for (const entry of game.catalog) {
+      // Gated entries' availability is a guess (Tempera Grassa shares Tempera Coat's cooldown).
+      if (!entry.jobs.includes(player.className) || !tracked(entry) || entry.cooldownMs <= 0 || entry.gated) continue;
+      let casts = 0, possible = 0;
+      const noCastPulls: number[] = [];
+      for (const w of window) {
+        const p = w.pull.players.find((x) => x.name === player.name);
+        const n = p ? playerCasts(p, entry).length : 0;
+        casts += n;
+        if (n === 0) noCastPulls.push(w.pullNumber);
+        possible += Math.floor((w.durationMs ?? w.pull.fightDuration) / entry.cooldownMs) + (entry.charges ?? 1);
+      }
+      let readyHits = 0, totalHits = 0;
+      for (const r of planned) {
+        for (const { hit } of r.byPull) {
+          const m = hit.players.find((x) => x.player === player.name && x.key === entry.key);
+          if (!m || m.dead) continue;
+          totalHits++;
+          if (m.state === "free" || m.state === "available") readyHits++;
+        }
+      }
+      if (possible === 0 || casts >= possible * UNUSED_MAX_SHARE || totalHits === 0 || readyHits < totalHits * UNUSED_MIN_READY_SHARE) continue;
+      const f: UnusedFinding = {
+        player: player.name, job: player.className, key: entry.key, name: entry.name, cooldownMs: entry.cooldownMs,
+        casts, possible, pulls: window.length, noCastPulls, readyHits, totalHits,
+        situational: entry.situational, inPlan: inPlan.get(`${player.name}|${entry.key}`),
+      };
+      if (!f.situational && !f.inPlan) {
+        for (const u of under) {
+          const row = planned.find((r) => r.id === u.hit.id)!;
+          const opt = aggregateAddOptions(row, game, reach).find((o) => o.player === player.name && o.key === entry.key);
+          if (opt && (opt.pulls ?? 0) === row.pulls) { f.idea = { hit: u.hit, freePulls: opt.pulls ?? 0, pulls: row.pulls }; break; }
+        }
+      }
+      unused.push(f);
+    }
+  }
+  unused.sort((a, b) => Number(!!a.situational) - Number(!!b.situational) || a.casts / a.possible - b.casts / b.possible);
+
+  // ── timing: late ──
+  const timing: (LateFinding | StackedFinding)[] = [];
+  for (const r of rows) {
+    if (isTankRow(r) || r.verdict === "over" || classifyHit(r) !== "plan") continue;
+    const byKey = new Map<string, LateCast[]>();
+    for (const { pullNumber, hit } of r.byPull) {
+      const w = window.find((x) => x.pullNumber === pullNumber)!;
+      const later = w.hits.filter((h) => h.timestampMs > hit.timestampMs && !h.tankOnly);
+      for (const p of w.pull.players) {
+        for (const entry of game.catalog) {
+          if (!entry.jobs.includes(p.className) || !partyEligible(entry)) continue;
+          if (hit.active.some((a) => a.key === entry.key && a.casters.includes(p.name))) continue;
+          const casts = playerCasts(p, entry);
+          const late = casts.find((c) => c > hit.timestampMs && c - hit.timestampMs <= LATE_MAX_MS);
+          if (late === undefined) continue;
+          // On a later raidwide that pull: it was cast for that one.
+          if (later.some((h) => h.timestampMs - late <= entry.durationMs + SNAPSHOT_SLACK_MS
+            && h.active.some((a) => a.key === entry.key && a.casters.includes(p.name)))) continue;
+          const state = chargesAt(casts.filter((c) => c < late), entry, hit.timestampMs);
+          const readyMs = state.charges > 0 ? Math.max(0, ...casts.filter((c) => c < late).map((c) => c + entry.cooldownMs).filter((t) => t <= hit.timestampMs), 0)
+            : state.nextReadyMs;
+          const prev = [...casts].reverse().find((c) => c < late);
+          const k = `${p.name}|${entry.key}`;
+          byKey.set(k, [...(byKey.get(k) ?? []), { pullNumber, castMs: late, hitMs: hit.timestampMs, readyMs, prevCastMs: prev }]);
+        }
+      }
+    }
+    for (const [k, casts] of byKey) {
+      if (casts.length * 2 < r.pulls) continue;
+      const [player, key] = k.split("|");
+      timing.push({
+        kind: "late", hit: refOf(r), player, job: jobOf.get(player) ?? "", key, name: entryOf.get(key)!.name,
+        casts, pulls: r.pulls, readyInTime: casts.filter((c) => c.readyMs <= c.hitMs).length,
+      });
+    }
+  }
+
+  // ── timing: stacked ──
+  const moveOff = new Map<string, { letter: string; change: OptimizedChange; after: HitSide }>();
+  for (const l of letters) {
+    for (const c of l.group.changes) {
+      if (c.kind !== "move" || !c.from) continue;
+      const after = l.group.hits.find((h) => h.hit.id === c.from!.id)?.after;
+      if (after) moveOff.set(c.from.id, { letter: l.letter, change: c, after });
+    }
+  }
+  for (const r of anchors) {
+    if (r.verdict !== "over" || r.medianMargin < STACK_MIN_MARGIN || classifyHit(r) !== "plan") continue;
+    const cds = r.active
+      .filter((a) => a.pulls * 2 >= r.pulls && entryOf.get(a.key) && partyEligible(entryOf.get(a.key)!))
+      .map((a) => {
+        const player = Object.entries(a.casters).sort((x, y) => y[1] - x[1])[0]?.[0] ?? "";
+        return { name: a.name, player, job: jobOf.get(player) ?? "" };
+      });
+    if (cds.length < STACK_MIN_COOLDOWNS) continue;
+    timing.push({
+      kind: "stacked", hit: refOf(r), median: r.medianMargin, worst: r.worstMargin, pulls: r.pulls, cooldowns: cds,
+      alternatives: r.droppable.alternatives, planMove: moveOff.get(r.id),
+    });
+  }
+  timing.sort((a, b) => Number(a.kind === "stacked") - Number(b.kind === "stacked") || a.hit.medianMs - b.hit.medianMs);
+
+  // ── other ──
+  const other: OtherFinding[] = rows
+    .filter((r) => !isTankRow(r) && failingRow(r) && classifyHit(r) !== "plan")
+    .map((r) => ({ hit: refOf(r), cls: classifyHit(r) as Exclude<HitClass, "plan">, deaths: r.deaths, median: r.medianMargin, pulls: r.pulls }));
+  const tankBusters = rows.filter(isTankRow).length;
+
+  // ── timeline ──
+  const pinsOf = new Map<string, Set<PinKind>>();
+  const pin = (id: string, c: PinKind) => pinsOf.set(id, (pinsOf.get(id) ?? new Set()).add(c));
+  for (const u of under) pin(u.hit.id, u.failing ? "fail" : "tight");
+  for (const t of timing) pin(t.hit.id, t.kind);
+  for (const o of other) pin(o.hit.id, "other");
+  const underIds = new Map(under.map((u) => [u.hit.id, u]));
+  const otherIds = new Set(other.map((o) => o.hit.id));
+  const hits: TimelineHit[] = rows.map((r) => ({
+    id: r.id, name: r.abilityName, medianMs: r.medianMs, tank: isTankRow(r), median: r.medianMargin, worst: r.worstMargin,
+    pulls: r.pulls, deaths: r.deaths, pins: [...(pinsOf.get(r.id) ?? [])],
+    tone: otherIds.has(r.id) ? "other" : underIds.get(r.id)?.failing ? "fail" : underIds.has(r.id) ? "tight"
+      : failingRow(r) ? "fail" : r.medianMargin >= MARGIN_OVER ? "over" : "good",
+  }));
+
+  const durations = window.map((w) => w.durationMs ?? w.pull.fightDuration).sort((a, b) => a - b);
+  const reachSteps = durations.map((d, i) => ({ untilMs: d, pulls: durations.length - i }))
+    .filter((s, i, all) => i === all.length - 1 || s.untilMs !== all[i + 1].untilMs);
+
+  const clock = clockPull(window.map((w) => ({ ...w, durationMs: w.durationMs ?? w.pull.fightDuration })));
+  const lanes: Lane[] = [];
+  if (clock) {
+    const lateByKey = new Map<string, LateFinding>();
+    for (const t of timing) if (t.kind === "late") lateByKey.set(`${t.player}|${t.key}`, t);
+    for (const player of clock.pull.players) {
+      for (const entry of game.catalog) {
+        if (!entry.jobs.includes(player.className) || !tracked(entry)) continue;
+        const k = `${player.name}|${entry.key}`;
+        const castTimes = playerCasts(player, entry);
+        const late = lateByKey.get(k)?.casts.find((c) => c.pullNumber === clock.pullNumber);
+        const casts: Lane["casts"] = castTimes.map((t) => ({
+          atMs: t, durationMs: entry.durationMs,
+          late: late && late.castMs === t ? `${Math.round((t - late.hitMs) / 1000)}s after ${lateByKey.get(k)!.hit.name}` : undefined,
+        }));
+        const marks: LaneMark[] = [];
+        for (const l of letters) {
+          for (const c of l.group.changes) {
+            if (c.player !== player.name || c.key !== entry.key) continue;
+            if (c.kind === "move" && c.from) {
+              marks.push({ kind: "move", fromMs: c.from.medianMs, toMs: c.to.medianMs, letter: l.letter });
+              // A clock-pull cast the move makes unavailable: the one after the moved cast, while it would still be down.
+              const moved = [...castTimes].reverse().find((t) => t <= c.from!.medianMs + SNAPSHOT_SLACK_MS);
+              for (const cast of casts) {
+                if (moved !== undefined && cast.atMs > moved && cast.atMs > c.to.medianMs - entry.cooldownMs
+                  && cast.atMs + SNAPSHOT_SLACK_MS < c.to.medianMs + entry.cooldownMs) {
+                  cast.lost = `Lost if ${entry.name} moves to ${c.to.name} (plan ${l.letter})`;
+                }
+              }
+            } else marks.push({ kind: "add", atMs: c.to.medianMs, letter: l.letter });
+          }
+        }
+        const u = unused.find((x) => x.player === player.name && x.key === entry.key);
+        if (u?.idea) marks.push({ kind: "idea", atMs: u.idea.hit.medianMs, label: u.idea.hit.name });
+        const ready = entry.cooldownMs > 0 ? readyIntervals(castTimes, entry, clock.durationMs).filter(([a, b]) => b - a >= READY_GAP_MIN_MS) : [];
+        lanes.push({ player: player.name, job: player.className, key: entry.key, name: entry.name, casts, ready, marks });
+      }
+    }
+  }
+
+  return {
+    windowPulls: window.map((w) => w.pullNumber),
+    clock: clock ? { pullNumber: clock.pullNumber, durationMs: clock.durationMs } : undefined,
+    reachSteps, hits, lanes, letters, under, unused, timing, other, tankBusters,
+  };
+}
+
+/** When the entry had a charge ready, from pull start to `endMs`, given its (accepted) casts. */
+export function readyIntervals(casts: number[], entry: CatalogEntry, endMs: number): [number, number][] {
+  const max = entry.charges ?? 1;
+  const out: [number, number][] = [];
+  let charges = max, next = Infinity, open: number | null = 0, i = 0;
+  for (;;) {
+    const cast = i < casts.length ? casts[i] : Infinity;
+    const t = Math.min(cast, next);
+    if (t >= endMs) break;
+    if (next <= cast) {
+      charges++;
+      if (open === null) open = next;
+      next = charges < max ? next + entry.cooldownMs : Infinity;
+    } else {
+      charges--;
+      if (next === Infinity) next = cast + entry.cooldownMs;
+      if (charges === 0 && open !== null) { out.push([open, cast]); open = null; }
+      i++;
+    }
+  }
+  if (open !== null) out.push([open, endMs]);
+  return out;
+}

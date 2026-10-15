@@ -346,6 +346,14 @@ const MECHANICS = {
     },
   },
 
+  omega: {
+    game: 'ff',
+    load: () => requireTsFromRoot('lib/mechanics/ffxiv/top/omega.ts'),
+    run({ mod, ctxs }) {
+      for (const c of ctxs) printPullErrors(c, mod.detectOmegaErrors(c.relPlayers(), c.relDeaths(), c.relEnemyCasts()));
+    },
+  },
+
   'usurper-of-frost': {
     game: 'ff',
     lateCapture: true, // Phase 2 only — safe on --from-minutes captures (see isLateCapture)
@@ -811,7 +819,7 @@ MECHANICS['mitigation-analysis'] = {
     // the default window: buster counts and tank damage before -> after,
     // each card's changes with buster margins (median) before -> after.
     const tw = mod.tankWindow(perPull.map((p, i) => ({ ...p, tanking: tankingPulls[i].tanking })));
-    if (!tw.length) console.log(`  TANK PLAN: fewer than ${mod.PLAN_MIN_PULLS} pulls with the latest pull's tank jobs`);
+    if (!tw.length) console.log(`  TANK PLAN: fewer than ${mod.TANK_MIN_PULLS} pulls with the latest pull's tank jobs`);
     if (tw.length) {
       const t0 = Date.now();
       const tplan = mod.buildTankingPlan(tw, mod.FFXIV_MITIGATION);

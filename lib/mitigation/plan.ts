@@ -10,7 +10,9 @@
 // The last PLAN_WINDOW_DEFAULT pulls of the selected group (same boss,
 // exact roster) define the current plan and are what changes are checked
 // against (user, 2026-10-11); the dialog's number input overrides it,
-// clamped to PLAN_MIN_PULLS..the group's pull count.
+// clamped to PLAN_MIN_PULLS..the group's pull count. A window of one pull
+// is fine (user, 2026-10-14: suggest something on a single pull too); the
+// dialog's "one pull" mode plans that pull alone.
 //
 // ── What gets planned ──────────────────────────────────────────────────
 // Anchors: hits reached in PLAN_MIN_PULLS+ window pulls, not rare, and not
@@ -72,8 +74,10 @@ import {
 
 export const PLAN_WINDOW_DEFAULT = 5;  // user
 export const PLAN_MAX_CHANGES = 3;     // user
+// Any hit any window pull reached can be planned (user, 2026-10-14; was 3).
+// The Tanking view keeps its own minimum (tanking-plan.ts TANK_MIN_PULLS).
+export const PLAN_MIN_PULLS = 1;
 // Tunables below: chosen by the builder, not yet confirmed (docs/open-items.md).
-export const PLAN_MIN_PULLS = 3;
 // A short hit whose median lowest player ends below this (overkill of half
 // a health bar) is a mechanic failure, not something one more mitigation
 // covers: Red Hot and Deep Blue's Plunging Snap #3 at -674%.

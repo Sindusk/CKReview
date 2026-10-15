@@ -43,7 +43,8 @@ import type { Pull } from "@/types/Pull";
 import { FFXIV_MITIGATION } from "@/lib/mitigation/ffxiv-catalog";
 import { phaseName } from "@/lib/mitigation/analyze";
 import { CAST_LEAD_MS } from "@/lib/mitigation/optimize";
-import { PLAN_MAX_CHANGES, PLAN_MIN_PULLS, PLAN_WINDOW_DEFAULT } from "@/lib/mitigation/plan";
+import { PLAN_MAX_CHANGES, PLAN_WINDOW_DEFAULT } from "@/lib/mitigation/plan";
+import { TANK_MIN_PULLS } from "@/lib/mitigation/tanking-plan";
 import {
   TANK_MARGIN_OVER, TANK_MARGIN_UNDER, tankCasts,
   type AggregatedBuster, type Buster, type BusterKind, type PullTanking, type TankCast, type TankVerdict, type UnusedSummary,
@@ -512,7 +513,7 @@ export function TankingView({ plan, pending, error, shown, shownLabel, chips, un
 
   let advice: ReactNode;
   if (!allPulls) advice = <p className="ck-dialog-text" style={{ margin: 0 }}>Changes read all of a group&apos;s pulls: pick &ldquo;All pulls&rdquo; to see them.</p>;
-  else if (!windowPulls) advice = <p className="ck-dialog-text" style={{ margin: 0 }}>Changes need {PLAN_MIN_PULLS} pulls with the tanks on their current jobs.</p>;
+  else if (!windowPulls) advice = <p className="ck-dialog-text" style={{ margin: 0 }}>Changes need {TANK_MIN_PULLS} pulls with the tanks on their current jobs.</p>;
   else if (plan && !groups.length) advice = <p className="ck-dialog-text" style={{ margin: 0 }}>{focusTank ? `No change for ${firstName(focusTank)} this round.` : "No change worth making in these pulls."}</p>;
   else advice = groups.map((g, i) => <Card key={i} group={g} onHover={setHover} />);
 
@@ -522,7 +523,7 @@ export function TankingView({ plan, pending, error, shown, shownLabel, chips, un
         {allPulls && (
           <label style={{ fontSize: 12, color: "var(--ck-text-2)", display: "inline-flex", alignItems: "center", gap: 5 }}>
             Last
-            <input className="ck-field" type="number" min={PLAN_MIN_PULLS} max={groupPulls} placeholder={String(Math.min(PLAN_WINDOW_DEFAULT, groupPulls))}
+            <input className="ck-field" type="number" min={TANK_MIN_PULLS} max={groupPulls} placeholder={String(Math.min(PLAN_WINDOW_DEFAULT, groupPulls))}
               value={windowInput} onChange={(e) => onWindowInput(e.target.value)} style={{ width: 48, padding: "2px 4px" }} />
             pulls
           </label>

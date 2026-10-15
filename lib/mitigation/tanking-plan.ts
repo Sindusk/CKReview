@@ -23,7 +23,7 @@
 // Buster classes: "mechanic" when the median margin is below
 // TANK_MECHANIC_MARGIN (a bait or overlap failure: Deep Impact hitting a
 // non-tank's spot, Plummet towers left empty): listed, never changed and
-// never made worse. "protect" when reached in fewer than PLAN_MIN_PULLS
+// never made worse. "protect" when reached in fewer than TANK_MIN_PULLS
 // window pulls: not planned, but never made worse, so a cooldown isn't
 // spent just before a buster the group is only starting to reach (Vamp
 // A9-A13: a Rampart on autos ending 5s before Hardcore #2; builder's
@@ -85,13 +85,17 @@ import {
   CAST_LEAD_MS, evaluatePlan, groupChanges, prepareProblem, searchPlan,
   type Change, type HitEstimate, type OptimizerProblem, type PlanEvaluation,
 } from "./optimize";
-import { PLAN_MAX_CHANGES, PLAN_MIN_PULLS, planWindow } from "./plan";
+import { PLAN_MAX_CHANGES, PLAN_WINDOW_DEFAULT } from "./plan";
 import {
   FOLLOW_UP_MS, SHORT_COOLDOWNS, TANK_MARGIN_UNDER, aggregateBusters,
   type AggregatedBuster, type BusterKind, type PullTanking, type TankStream,
 } from "./tanking";
 
 // Tunables: chosen by the builder, not yet confirmed (docs/open-items.md).
+// Window pulls the Tanking view needs, and a buster needs to be planned:
+// the Analysis's old PLAN_MIN_PULLS, kept here when that went to 1 (user,
+// 2026-10-14, for the Analysis only).
+export const TANK_MIN_PULLS = 3;
 export const HEAVY_WINDOWS_PER_DURATION = 3;
 export const HEAVY_MIN = 0.3;
 export const TANK_CHANGE_COST = 0.10;
@@ -168,14 +172,15 @@ export type TankingPlan = {
  * The window (plan.ts planWindow) over the group's pulls whose tanks played
  * the jobs they play in the latest one: advice is for the current jobs
  * (Vamp Fatale A4-A6 had Kade on Gunbreaker, A7-A8 on Paladin). Empty
- * when fewer than PLAN_MIN_PULLS match.
+ * when fewer than TANK_MIN_PULLS match; never shorter than that.
  */
 export function tankWindow<T extends { pull: Pull }>(perPull: T[], size?: number): T[] {
   const jobs = (p: Pull) => p.players.filter((x) => x.role === "Tank").map((x) => `${x.name}:${x.className}`).sort().join("|");
   const last = perPull[perPull.length - 1];
   if (!last) return [];
   const same = perPull.filter((p) => jobs(p.pull) === jobs(last.pull));
-  return same.length < PLAN_MIN_PULLS ? [] : planWindow(same, size);
+  if (same.length < TANK_MIN_PULLS) return [];
+  return same.slice(-Math.max(TANK_MIN_PULLS, Math.min(same.length, size ?? PLAN_WINDOW_DEFAULT)));
 }
 
 /**
@@ -332,7 +337,7 @@ function heavyWindows(window: TankWindowPull[], busters: AggregatedBuster[], gam
           vals.push(stream.events.filter((e) => e.timestampMs >= s && e.timestampMs <= s + span)
             .reduce((sum, e) => sum + e.taken + e.absorbed, 0));
         }
-        if (vals.length >= PLAN_MIN_PULLS) scores.push({ s, score: median(vals) });
+        if (vals.length >= TANK_MIN_PULLS) scores.push({ s, score: median(vals) });
       }
       scores.sort((a, b) => b.score - a.score);
       let picked = 0;
@@ -407,7 +412,7 @@ export function tankSetup(window: TankWindowPull[], game: MitigationGame,
   const classes = new Map<string, BusterClass>();
   for (const r of busters) {
     classes.set(r.id, r.medianMargin !== undefined && r.medianMargin < TANK_MECHANIC_MARGIN ? "mechanic"
-      : r.pulls < PLAN_MIN_PULLS ? "protect" : "plan");
+      : r.pulls < TANK_MIN_PULLS ? "protect" : "plan");
   }
   const isBuster = (id: string) => refs.get(id)?.kind === "buster";
   const planned = (id: string) => classes.get(id) === "plan";

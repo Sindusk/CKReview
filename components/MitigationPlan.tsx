@@ -2,285 +2,559 @@
 
 // components/MitigationPlan.tsx
 //
-// The Mitigation dialog's Analysis view: lib/mitigation/plan.ts's
-// OptimizedPlan laid out for a raid lead to read in ten seconds, with no
-// paragraphs (user, 2026-10-11; docs/archive/mitigation-optimizer-plan.md
-// "UI").
-//   - Header: the "Last N pulls" input (blank = 5), one ⓘ holding the
-//     disclaimers and the legend, and the before → after counts.
-//   - One card per "do together" group, drawn on the fight clock (user
-//     picked this over a sentence list, 2026-10-11, asking that it be
-//     clear when each cooldown is used now and when it should be): the
-//     hits involved on a time line, then one lane per cooldown that
-//     changes (name and player in job colour) with a hollow "now" dot
-//     where it is used today, an arrow to a filled "use here" dot, or a
-//     "+ extra use" dot for an add. A legend line on each card says what
-//     the marks mean. Below, the lowest HP before → after on each hit the
-//     group changes (typical pull; the worst pull in the tooltip); each
-//     lane's tooltip says "fits N/M pulls".
-//   - Footer: the hits that need healing or mechanics rather than
-//     mitigation, and the ones no plan within budget fixes, each collapsed
-//     to one line; expanded, each hit opens in the Timeline.
-// Given a player (`focus`), it shows only a checklist of their own changes
-// and the summary line; the dialog has no picker on this view since
-// 2026-10-11 (user) and passes none.
+// The Mitigation dialog's Analysis view, laid out like the Damage dialog
+// (user, 2026-10-14; it replaced the card-per-group fight clocks): the
+// optimizer's OptimizedPlan (lib/mitigation/plan.ts) read as findings by
+// lib/mitigation/findings.ts.
+//   - Header: the "Last N pulls" input (all-pulls mode; blank = 5), one ⓘ
+//     with the disclaimers, the window and the clock pull.
+//   - Major findings: a stat strip (failing and tight before → after,
+//     unused cooldowns, mistimed windows, plan changes) and the three
+//     biggest wins.
+//   - The fight timeline (components/MitigationAnalysisTimeline.tsx).
+//   - Findings in categories (under-mitigated hits, cooldown plan, unused
+//     mitigation, mistimed windows, not mitigation), filter chips over
+//     them, each group collapsible, each row with a suggestion: "Try" for
+//     the plan's changes, "Idea" for one the plan doesn't make.
+// Works on one pull as well as a window (user, 2026-10-14). Clicking a
+// hit's time or bar opens it in the Timeline view.
 
-import { useState, type CSSProperties, type ReactNode } from "react";
-import type { HitRef, OptimizedChange, OptimizedPlan, PlanGroup } from "@/lib/mitigation/plan";
+import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import type { HitRef, OptimizedChange, OptimizedPlan } from "@/lib/mitigation/plan";
 import { PLAN_MAX_CHANGES, PLAN_MIN_PULLS, PLAN_WINDOW_DEFAULT } from "@/lib/mitigation/plan";
-import { verdictFor } from "@/lib/mitigation/analyze";
-import { getClassColor } from "@/lib/player-display";
-import { VERDICT_STYLE, fmtTime } from "./MitigationTimeline";
+import {
+  buildAnalysisFindings, type AnalysisFindings, type FindingsWindowPull, type LateFinding, type OtherFinding,
+  type PlanLetter, type StackedFinding, type UnderFinding, type UnusedFinding,
+} from "@/lib/mitigation/findings";
+import type { DebuffReach } from "@/lib/mitigation/debuff-reach";
+import { FFXIV_MITIGATION } from "@/lib/mitigation/ffxiv-catalog";
+import { VERDICT_STYLE, afterColor, fmtTime } from "./MitigationTimeline";
+import AnalysisTimeline, { jobText } from "./MitigationAnalysisTimeline";
+import { FINDING_COLOR, FindingGlyph, type FindingGlyphKind } from "./ui/MitigationGlyphs";
 
 const firstName = (player: string) => player.split(" ")[0];
 const hp = (x: number) => (x < 0 ? "dead" : `${Math.round(x * 100)}%`);
+const hpColor = (x: number) => (x < 0 ? VERDICT_STYLE.fail.color : afterColor(x));
 const dim: CSSProperties = { color: "var(--ck-text-3)" };
+const sectionLabel: CSSProperties = {
+  fontSize: 11, fontWeight: 600, letterSpacing: ".08em", textTransform: "uppercase", color: "var(--ck-text-3)",
+};
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 const INFO = [
   "Estimated from the log: HP margins, damage rolls, snapshot timing and shield sizes can be off. Confirm on VOD before relying on a change.",
-  `Make a card's changes together, at most ${PLAN_MAX_CHANGES} at a time, then re-check after a few pulls: if everyone moves their own cooldowns, the next pull fails the other way.`,
-  "Times are the typical (median) time of each hit in these pulls. Red hit: failing; amber: tight. Lowest HP is the lowest player after the hit on a typical pull (the worst pull in the tooltip).",
+  `Make a plan's changes together, at most ${PLAN_MAX_CHANGES} at a time, then re-check after a few pulls: if everyone moves their own cooldowns, the next pull fails the other way.`,
+  "Times are each hit's typical (median) time in these pulls; the cooldown lanes show the longest pull's casts. Lowest HP is the lowest player after the hit on a typical pull (worst pull in the tick and the tooltip).",
+  "Ideas are changes the plan doesn't make: check them on the Timeline first.",
+  "Tank busters are on the Tanking tab.",
 ].join("\n\n");
 
 function Hp({ value }: { value: number }) {
-  return <span className="ck-num" style={{ color: VERDICT_STYLE[verdictFor(value, value < 0 ? 1 : 0)].color }}>{hp(value)}</span>;
+  return <span className="ck-num" style={{ color: hpColor(value) }}>{hp(value)}</span>;
+}
+function Before({ from, to }: { from: number; to: number }) {
+  return <><Hp value={from} /> <span style={{ ...dim, fontWeight: 400 }}>→</span> <Hp value={to} /></>;
+}
+function Who({ player, job }: { player: string; job: string }) {
+  return <span style={{ color: jobText(job) }}>{firstName(player)}</span>;
+}
+const At = ({ ms }: { ms: number }) => <span className="ck-num" style={dim}>{fmtTime(ms)}</span>;
+const hitLabel = (h: HitRef) => `${h.name}${h.occurrence > 1 ? ` #${h.occurrence}` : ""}`;
+
+// ── Major findings ───────────────────────────────────────────────────────
+
+type Tile = { label: string; value: ReactNode; sub?: string; edge: string; title?: string };
+
+function StatStrip({ tiles }: { tiles: Tile[] }) {
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fit, minmax(170px, 1fr))`, gap: 6, marginBottom: 8 }}>
+      {tiles.map((t) => (
+        <div key={t.label} title={t.title} style={{
+          background: "var(--ck-bg-card-hi)", border: "1px solid var(--ck-line-2)", borderTop: `2px solid ${t.edge}`,
+          borderRadius: 3, padding: "5px 9px", minWidth: 0,
+        }}>
+          <div style={{ ...dim, fontSize: 11 }}>{t.label}</div>
+          <div className="ck-num" style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.3 }}>{t.value}</div>
+          {t.sub && <div style={{ ...dim, fontSize: 11, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.sub}</div>}
+        </div>
+      ))}
+    </div>
+  );
 }
 
-function changeTip(c: OptimizedChange): string {
-  const what = c.kind === "add" ? `Add on ${c.to.name} #${c.to.occurrence}` : `Move from ${c.from!.name} #${c.from!.occurrence} to ${c.to.name} #${c.to.occurrence}`;
-  return `${c.name} (${c.player}): ${what}\nFits the cooldowns in ${c.legal}/${c.pulls} pulls${c.gated ? `\nNeeds ${c.gated}: check the gauge` : ""}`;
-}
+type Win = { key: string; glyph: FindingGlyphKind; title: string; value: ReactNode; line: ReactNode; tip: string };
 
-// The fight clock's geometry (SVG units; the card scales it to its width).
-const CLOCK_W = 760;
-const LABEL_W = 190;   // the cooldown names on the left
-const PLOT_L = LABEL_W + 20;
-const PLOT_R = CLOCK_W - 40;
-const AXIS_Y = 46;     // the fight's time line, hits on it
-const LANE_H = 34;
-const MOVE_COLOR = "#2bb38a";
-const NOW_COLOR = "#8b8f98";
-
-/** The hit a change is for: red when it needs help, grey otherwise. */
-function hitColor(group: PlanGroup, id: string): string {
-  const o = group.hits.find((h) => h.hit.id === id);
-  if (!o) return NOW_COLOR;
-  const b = o.before;
-  if (b.verdict === "fail" || b.verdict === "under") return VERDICT_STYLE.fail.color;
-  return b.tight ? VERDICT_STYLE.under.color : NOW_COLOR;
-}
-
-/**
- * One group on the fight clock: the hits it involves on a time line, and
- * one lane per cooldown with a hollow dot where it is used now, a filled dot
- * where to use it instead, and an arrow between (a new use: a filled dot
- * with a plus).
- */
-function FightClock({ group }: { group: PlanGroup }) {
-  const hits = new Map<string, HitRef>();
-  for (const c of group.changes) {
-    hits.set(c.to.id, c.to);
-    if (c.from) hits.set(c.from.id, c.from);
+/** The plan group's headline effect: the needy hit it lifts most. */
+function groupImpact(l: PlanLetter): { hit: HitRef; from: number; to: number } | undefined {
+  let best: { hit: HitRef; from: number; to: number; gain: number } | undefined;
+  for (const h of l.group.hits) {
+    const failing = h.before.verdict === "fail" || h.before.verdict === "under";
+    if (!failing && !h.before.tight) continue;
+    const [from, to] = failing ? [h.before.median, h.after.median] : [h.before.worst, h.after.worst];
+    if (!best || to - from > best.gain) best = { hit: h.hit, from, to, gain: to - from };
   }
-  const marks = [...hits.values()].sort((a, b) => a.medianMs - b.medianMs);
-  const t0 = marks[0].medianMs;
-  const t1 = marks[marks.length - 1].medianMs;
-  const pad = Math.max(10_000, (t1 - t0) * 0.06);
-  const x = (ms: number) => PLOT_L + ((ms - (t0 - pad)) / (t1 - t0 + 2 * pad)) * (PLOT_R - PLOT_L);
-  // Hit labels alternate above the line when two would collide.
-  let lastX = -Infinity;
-  let row = 0;
-  const labelled = marks.map((h) => {
-    const hx = x(h.medianMs);
-    row = hx - lastX < 150 ? 1 - row : 0;
-    lastX = hx;
-    return { h, hx, ly: AXIS_Y - 10 - row * 15 };
-  });
-  const height = AXIS_Y + 22 + group.changes.length * LANE_H;
-  const text = { fontSize: 12, fill: "var(--ck-text-2)" };
-  return (
-    <svg viewBox={`0 0 ${CLOCK_W} ${height}`} width="100%" style={{ display: "block", maxWidth: CLOCK_W }}>
-      <defs>
-        <marker id="ck-move-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
-          <path d="M0,0L10,5L0,10z" fill={MOVE_COLOR} />
-        </marker>
-      </defs>
-      <text x={0} y={AXIS_Y + 4} style={{ ...text, fill: "var(--ck-text-3)" }}>Fight time</text>
-      <line x1={PLOT_L - 10} y1={AXIS_Y} x2={PLOT_R + 10} y2={AXIS_Y} stroke="var(--ck-line-2)" />
-      {labelled.map(({ h, hx, ly }) => (
-        <g key={h.id}>
-          <line x1={hx} y1={AXIS_Y} x2={hx} y2={height - 6} stroke="var(--ck-line)" strokeDasharray="2 4" />
-          <circle cx={hx} cy={AXIS_Y} r={5} fill={hitColor(group, h.id)} />
-          <text x={hx} y={ly} textAnchor="middle" style={{ ...text, fill: "var(--ck-text)" }}>
-            {h.name} #{h.occurrence} <tspan style={{ fill: "var(--ck-text-3)" }}>{fmtTime(h.medianMs)}</tspan>
-          </text>
-        </g>
-      ))}
-      {group.changes.map((c, i) => {
-        const y = AXIS_Y + 30 + i * LANE_H;
-        const tx = x(c.to.medianMs);
-        const fx = c.from ? x(c.from.medianMs) : undefined;
-        const tip = changeTip(c);
-        const color = getClassColor("ffxiv", c.job);
-        return (
-          <g key={i}>
-            <title>{tip}</title>
-            <text x={0} y={y + 4} style={{ ...text, fill: "var(--ck-text)" }}>
-              {c.name} <tspan style={{ fill: color }}>{firstName(c.player)}</tspan>
-            </text>
-            {fx !== undefined ? (
-              <>
-                <line x1={fx + (tx > fx ? 7 : -7)} y1={y} x2={tx + (tx > fx ? -9 : 9)} y2={y}
-                  stroke={MOVE_COLOR} strokeWidth={2} markerEnd="url(#ck-move-arrow)" />
-                <circle cx={fx} cy={y} r={6} fill="none" stroke={NOW_COLOR} strokeWidth={2} />
-                <text x={fx} y={y + 19} textAnchor="middle" style={{ ...text, fontSize: 11, fill: "var(--ck-text-3)" }}>now</text>
-                <circle cx={tx} cy={y} r={6} fill={MOVE_COLOR} />
-                <text x={tx} y={y + 19} textAnchor="middle" style={{ ...text, fontSize: 11, fill: MOVE_COLOR }}>use here</text>
-              </>
-            ) : (
-              <>
-                <circle cx={tx} cy={y} r={7} fill={MOVE_COLOR} />
-                <text x={tx} y={y + 4} textAnchor="middle" style={{ fontSize: 13, fontWeight: 700, fill: "#0b0b0b" }}>+</text>
-                <text x={tx} y={y + 20} textAnchor="middle" style={{ ...text, fontSize: 11, fill: MOVE_COLOR }}>
-                  extra use{c.gated ? ` (needs ${c.gated})` : ""}
-                </text>
-              </>
-            )}
-          </g>
-        );
-      })}
-    </svg>
-  );
+  return best;
 }
 
-/** What the group does to each hit it changes, in fight order. */
-function Effects({ group }: { group: PlanGroup }) {
-  const list = [...group.hits].sort((a, b) => a.hit.medianMs - b.hit.medianMs);
+const changeNames = (cs: OptimizedChange[]) => [...new Set(cs.map((c) => c.name))].join(" + ");
+
+function biggestWins(f: AnalysisFindings): Win[] {
+  const wins: Win[] = [];
+  for (const l of f.letters.filter((x) => x.group.purpose === "fix")) {
+    const imp = groupImpact(l);
+    const c = l.group.changes[0];
+    wins.push({
+      key: `plan${l.letter}`, glyph: "plan",
+      title: `Plan ${l.letter} · ${l.group.changes.length === 1 ? `${c.name} to ${c.to.name}` : changeNames(l.group.changes)}`,
+      value: imp ? <Before from={imp.from} to={imp.to} /> : null,
+      line: imp ? <><At ms={imp.hit.medianMs} /> {hitLabel(imp.hit)}{l.group.changes.length > 1 ? ` · ${plural(l.group.changes.length, "change")} together` : ""}</> : null,
+      tip: l.group.changes.map(changeLine).join("\n"),
+    });
+  }
+  for (const t of f.timing.filter((x): x is LateFinding => x.kind === "late")) {
+    wins.push({
+      key: `late${t.player}${t.key}${t.hit.id}`, glyph: "late", title: `${t.name} lands late`,
+      value: <span style={{ color: FINDING_COLOR.late }}>{t.casts.length} of {t.pulls}</span>,
+      line: <><At ms={t.hit.medianMs} /> cast after {hitLabel(t.hit)}, not on it</>,
+      tip: lateLine(t),
+    });
+  }
+  for (const u of f.under.filter((x) => !x.fix && x.idea)) {
+    wins.push({
+      key: `idea${u.hit.id}`, glyph: "unused", title: `Idea · ${u.idea!.name} on ${hitLabel(u.hit)}`,
+      value: u.idea!.est !== undefined ? <Before from={u.median} to={u.idea!.est} /> : <Hp value={u.median} />,
+      line: <><At ms={u.hit.medianMs} /> {firstName(u.idea!.player)}&apos;s is free there</>, tip: "Not in the plan: check it on the Timeline.",
+    });
+  }
+  for (const u of f.unused.filter((x) => !x.situational)) {
+    wins.push({
+      key: `unused${u.player}${u.key}`, glyph: "unused", title: `${u.name} sits unused`,
+      value: <span style={{ color: FINDING_COLOR.unused }}>{u.casts} of {u.possible}</span>,
+      line: <>{firstName(u.player)} · possible casts over {plural(u.pulls, "pull")}</>, tip: unusedLine(u),
+    });
+  }
+  for (const s of f.timing.filter((x): x is StackedFinding => x.kind === "stacked")) {
+    wins.push({
+      key: `stack${s.hit.id}`, glyph: "stacked", title: `${hitLabel(s.hit)} over-mitigated`, value: <Hp value={s.median} />,
+      line: <><At ms={s.hit.medianMs} /> {plural(s.cooldowns.length, "party cooldown")} on it</>, tip: s.cooldowns.map((c) => c.name).join(", "),
+    });
+  }
+  return wins.slice(0, 3);
+}
+
+function BiggestWins({ wins }: { wins: Win[] }) {
+  if (!wins.length) return null;
+  const line: CSSProperties = { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", minWidth: 0 };
   return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 16px", fontSize: 12, marginTop: 6, color: "var(--ck-text-2)" }}>
-      <span style={dim}>Lowest HP, typical pull:</span>
-      {list.map(({ hit, before, after }) => (
-        <span key={hit.id} title={`Worst pull ${hp(before.worst)} → ${hp(after.worst)}`}>
-          {hit.name} #{hit.occurrence} <Hp value={before.median} /> <span style={dim}>→</span> <Hp value={after.median} />
-        </span>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 6, marginBottom: 16 }}>
+      {wins.map((w) => (
+        <div key={w.key} className="ck-card" title={w.tip} style={{
+          position: "relative", boxSizing: "border-box", padding: "7px 10px 9px", overflow: "hidden", display: "grid", gap: 3, minWidth: 0,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+            <FindingGlyph kind={w.glyph} size={20} />
+            <span style={{ ...line, flex: "1 1 auto", fontWeight: 600, fontSize: 12.5, color: "var(--ck-text)" }}>{w.title}</span>
+            <span className="ck-num" style={{ fontSize: 14, fontWeight: 700, flex: "0 0 auto" }}>{w.value}</span>
+          </div>
+          <div style={{ ...line, fontSize: 11.5, color: "var(--ck-text-2)" }}>{w.line}</div>
+          <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 2, background: FINDING_COLOR[w.glyph] }} />
+        </div>
       ))}
     </div>
   );
 }
 
-function GroupCard({ group }: { group: PlanGroup }) {
-  const moves = group.changes.some((c) => c.kind === "move");
-  const adds = group.changes.some((c) => c.kind === "add");
+// ── Finding rows ─────────────────────────────────────────────────────────
+
+function changeLine(c: OptimizedChange): string {
+  return c.kind === "add"
+    ? `${c.name} (${firstName(c.player)}): extra use on ${hitLabel(c.to)} ${fmtTime(c.to.medianMs)}${c.gated ? ` (needs ${c.gated})` : ""}`
+    : `${c.name} (${firstName(c.player)}): ${hitLabel(c.from!)} ${fmtTime(c.from!.medianMs)} → ${hitLabel(c.to)} ${fmtTime(c.to.medianMs)}`;
+}
+function lateLine(t: LateFinding): string {
+  return t.casts.map((c) => `Pull ${c.pullNumber}: cast ${fmtTime(c.castMs)}, ${Math.max(1, Math.round((c.castMs - c.hitMs) / 1000))}s after the hit` +
+    (c.readyMs <= c.hitMs ? `, ready from ${fmtTime(c.readyMs)}` : `, down until ${fmtTime(c.readyMs)}`)).join("\n");
+}
+function unusedLine(u: UnusedFinding): string {
+  return `${u.name} (${firstName(u.player)}): ${u.casts} of ${u.possible} possible casts; ready at ${u.readyHits} of ${u.totalHits} raidwides`;
+}
+
+const ROW: CSSProperties = {
+  display: "grid", gridTemplateColumns: "46px 24px minmax(0, 1fr) minmax(0, 360px) 130px", columnGap: 12, alignItems: "start",
+  padding: "8px 4px", borderTop: "1px solid var(--ck-line)",
+};
+const TRY_EDGE: Record<"try" | "idea" | "note", string> = { try: FINDING_COLOR.plan, idea: FINDING_COLOR.unused, note: "var(--ck-line-2)" };
+
+function Row({ time, onTime, glyph, main, basis, suggestion, impact, faded }: {
+  time: ReactNode; onTime?: () => void; glyph: ReactNode; main: ReactNode; basis?: ReactNode;
+  suggestion?: { kind: "try" | "idea" | "note"; body: ReactNode }; impact?: ReactNode; faded?: boolean;
+}) {
+  const s = suggestion;
   return (
-    <div className="ck-card" style={{ padding: "8px 10px", marginBottom: 8 }}>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap", marginBottom: 2 }}>
-        <span style={{ color: "var(--ck-text-gold)", fontWeight: 600, fontSize: 12 }}>
-          {group.purpose === "fix" ? "Do these together" : "Frees cooldowns for later mechanics"}
-        </span>
-        <span style={{ ...dim, fontSize: 11 }}>
-          {moves && <>
-            <span style={{ color: NOW_COLOR }}>○ now</span>: where it&apos;s used today{" · "}
-            <span style={{ color: MOVE_COLOR }}>→ ● use here</span>: move it to this hit instead
-          </>}
-          {moves && adds && " · "}
-          {adds && <span style={{ color: MOVE_COLOR }}>+ extra use</span>}
-          {adds && ": cast it one more time here"}
-        </span>
+    <div style={{ ...ROW, opacity: faded ? 0.7 : 1 }}>
+      {onTime ? (
+        <button className="ck-num" title="Open in the Timeline" onClick={onTime} style={{
+          font: "inherit", fontSize: 12, color: "var(--ck-text-2)", background: "transparent", border: 0, padding: "2px 0 0", textAlign: "left", cursor: "pointer",
+        }}>{time}</button>
+      ) : <span className="ck-num" style={{ fontSize: 12, color: "var(--ck-text-2)", paddingTop: 2 }}>{time}</span>}
+      {glyph}
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontSize: 13, lineHeight: 1.5, color: "var(--ck-text)" }}>{main}</div>
+        {basis && <div style={{ fontSize: 11.5, ...dim }}>{basis}</div>}
       </div>
-      <FightClock group={group} />
-      <Effects group={group} />
+      <div style={{ minWidth: 0 }}>
+        {s && (
+          <div style={{
+            fontSize: 12.5, lineHeight: 1.45, color: s.kind === "note" ? "var(--ck-text-2)" : "var(--ck-text)", borderRadius: 3, padding: "5px 9px",
+            border: `1px solid ${s.kind === "note" ? TRY_EDGE.note : `color-mix(in srgb, ${TRY_EDGE[s.kind]} 35%, transparent)`}`,
+            background: s.kind === "note" ? "transparent" : `color-mix(in srgb, ${TRY_EDGE[s.kind]} 8%, transparent)`,
+          }}>
+            {s.kind !== "note" && <b style={{ color: TRY_EDGE[s.kind] }}>{s.kind === "try" ? "Try:" : "Idea:"}</b>} {s.body}
+          </div>
+        )}
+      </div>
+      <div className="ck-num" style={{ textAlign: "right", fontSize: 13, fontWeight: 600 }}>{impact}</div>
     </div>
   );
 }
 
-function Collapsible({ label, hits, onOpenHit }: { label: string; hits: HitRef[]; onOpenHit: (id: string) => void }) {
-  const [open, setOpen] = useState(false);
-  if (!hits.length) return null;
+const Sub = ({ children }: { children: ReactNode }) => <div style={{ fontSize: 11, fontWeight: 400, ...dim }}>{children}</div>;
+
+/** One plan change, told from the hit's side. */
+function changeHere(c: OptimizedChange, hitId: string): ReactNode {
+  const who = <Who player={c.player} job={c.job} />;
+  if (c.kind === "add") return <>{who} adds {c.name}{c.to.id !== hitId ? <> on {hitLabel(c.to)} (<At ms={c.to.medianMs} />)</> : null}</>;
+  if (c.to.id === hitId) return <>{who} moves {c.name} here from {hitLabel(c.from!)} (<At ms={c.from!.medianMs} />)</>;
+  if (c.from!.id === hitId) return <>{who} moves {c.name} from here to {hitLabel(c.to)} (<At ms={c.to.medianMs} />)</>;
+  return <>{who} moves {c.name} from {hitLabel(c.from!)} to {hitLabel(c.to)}</>;
+}
+
+function UnderRow({ u, total, onOpenHit }: { u: UnderFinding; total: number; onOpenHit: (id: string) => void }) {
+  const single = u.pulls === 1;
+  const main = u.failing
+    ? <><b>{hitLabel(u.hit)}</b> leaves the lowest player at <Hp value={u.median} />{single ? "" : " on a typical pull"}
+        {!single && u.worst < u.median ? <>; <Hp value={u.worst} /> in Pull {u.worstPull}</> : null}.</>
+    : <><b>{hitLabel(u.hit)}</b> is tight: <Hp value={u.median} />{single ? "" : <> typical, <Hp value={u.worst} /> in Pull {u.worstPull}</>}.</>;
+  const basis = [
+    total > 1 ? `Reached in ${u.pulls} of ${total} pulls` : undefined,
+    u.column && u.column !== "none" ? u.column : undefined,
+    u.deathPulls ? `a death in ${u.deathPulls} of ${plural(u.pulls, "pull")}` : undefined,
+    `on it ${single ? "" : "every pull"}: ${u.steady.length ? u.steady.join(", ") : "no party cooldown"}`.replace("on it :", "on it:"),
+  ].filter(Boolean).join(" · ");
+  let suggestion: Parameters<typeof Row>[0]["suggestion"];
+  let impact: ReactNode;
+  if (u.fix) {
+    suggestion = { kind: "try", body: <>{u.fix.changes.map((c, i) => <span key={i}>{i ? "; " : ""}{changeHere(c, u.hit.id)}</span>)}. <span style={dim}>Plan {u.fix.letter}</span></> };
+    impact = <><Before from={u.median} to={u.fix.after.median} />{!single && <Sub>worst {hp(u.worst)} → {hp(u.fix.after.worst)}</Sub>}</>;
+  } else if (u.idea) {
+    suggestion = { kind: "idea", body: <><Who player={u.idea.player} job={u.idea.job} /> adds {u.idea.name}, free here{single ? "" : ` in ${u.idea.freePulls} of ${u.pulls} pulls`}.</> };
+    impact = u.idea.est !== undefined ? <Before from={u.median} to={u.idea.est} /> : <Hp value={u.median} />;
+  } else {
+    suggestion = { kind: "note", body: `No change within ${PLAN_MAX_CHANGES} fits the cooldowns, and nothing is free here.` };
+    impact = <Hp value={u.median} />;
+  }
+  return <Row time={fmtTime(u.hit.medianMs)} onTime={() => onOpenHit(u.hit.id)} glyph={<FindingGlyph kind={u.failing ? "fail" : "tight"} />}
+    main={main} basis={basis} suggestion={suggestion} impact={impact} />;
+}
+
+function PlanRow({ l, lost }: { l: PlanLetter; lost: string[] }) {
+  const g = l.group;
+  const fits = g.changes.map((c) => `${c.legal} of ${c.pulls}`).join(", ");
+  const sorted = [...g.hits].sort((a, b) => a.hit.medianMs - b.hit.medianMs);
   return (
-    <div style={{ marginTop: 6, fontSize: 12 }}>
-      <button className="ck-btn ck-btn--xs" onClick={() => setOpen((o) => !o)}>{label} {open ? "‹" : "›"}</button>
-      {open && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
-          {hits.map((h) => (
-            <button key={h.id} className="ck-btn ck-btn--xs" title="Open in the Timeline" onClick={() => onOpenHit(h.id)}>
-              {h.name} #{h.occurrence} <span style={dim}>{fmtTime(h.medianMs)}</span>
-            </button>
-          ))}
+    <Row time={<b style={{ color: FINDING_COLOR.plan }}>{l.letter}</b>} glyph={<FindingGlyph kind="plan" />}
+      main={g.changes.map((c, i) => (
+        <div key={i}>
+          <b>{c.name}</b> <Who player={c.player} job={c.job} />:{" "}
+          {c.kind === "add"
+            ? <>extra use on {hitLabel(c.to)} <At ms={c.to.medianMs} />{c.gated ? <span style={dim}> (needs {c.gated})</span> : null}</>
+            : <>{hitLabel(c.from!)} <At ms={c.from!.medianMs} /> → {hitLabel(c.to)} <At ms={c.to.medianMs} /></>}
+        </div>
+      ))}
+      basis={<>Fits the cooldowns in {fits} pulls{lost.length ? ` · ${lost.join(" · ")}` : ""}</>}
+      suggestion={{
+        kind: "note", body: g.purpose === "free" ? "Nothing failing needs these: they free cooldowns for later mechanics."
+          : g.changes.length > 1 ? "Do these on the same pull: each depends on the others." : "Make this change on its own.",
+      }}
+      impact={<div style={{ fontSize: 12, fontWeight: 400, color: "var(--ck-text-2)" }}>
+        {sorted.map((h) => (
+          <div key={h.hit.id} title={`Worst pull ${hp(h.before.worst)} → ${hp(h.after.worst)}`}>
+            {h.hit.name} <Before from={h.before.median} to={h.after.median} />
+          </div>
+        ))}
+      </div>} />
+  );
+}
+
+function UnusedRow({ u, hasPlan }: { u: UnusedFinding; hasPlan: boolean }) {
+  const none = u.pulls > 1 && u.noCastPulls.length > 0 && u.casts > 0
+    ? `; none in Pull ${u.noCastPulls.join(", ")}` : "";
+  let suggestion: Parameters<typeof Row>[0]["suggestion"];
+  if (u.situational) suggestion = { kind: "note", body: <>Situational ({u.situational}), so it&apos;s never suggested.</> };
+  else if (u.inPlan && hasPlan) suggestion = { kind: "try", body: <>as in Plan {u.inPlan}.</> };
+  else if (u.idea) {
+    suggestion = { kind: "idea", body: <>{hitLabel(u.idea.hit)} (<At ms={u.idea.hit.medianMs} />): free there{u.idea.pulls > 1 ? ` in ${u.idea.freePulls} of ${u.idea.pulls} pulls` : ""}.</> };
+  } else suggestion = { kind: "note", body: "Nothing failing has it free; see where it sits ready on the timeline above." };
+  return (
+    <Row time="—" glyph={<FindingGlyph kind="unused" />} faded={!!u.situational}
+      main={<><b>{u.name}</b> <Who player={u.player} job={u.job} />:{" "}
+        {u.casts === 0 ? `never cast in ${plural(u.pulls, "pull")}` : `cast ${plural(u.casts, "time")} in ${plural(u.pulls, "pull")}${none}`}.</>}
+      basis={`Ready at ${u.readyHits} of ${u.totalHits} raidwides · ${Math.round(u.cooldownMs / 1000)}s cooldown`}
+      suggestion={suggestion}
+      impact={<span style={{ color: u.situational ? "var(--ck-text-3)" : FINDING_COLOR.unused }}>{u.casts} of {u.possible}<Sub>possible casts</Sub></span>} />
+  );
+}
+
+function LateRow({ t, onOpenHit }: { t: LateFinding; onOpenHit: (id: string) => void }) {
+  const secs = t.casts.map((c) => Math.max(1, Math.round((c.castMs - c.hitMs) / 1000)));
+  const lo = Math.min(...secs), hi = Math.max(...secs);
+  const down = t.casts.filter((c) => c.readyMs > c.hitMs);
+  const ready = t.casts.filter((c) => c.readyMs <= c.hitMs);
+  const basis = [
+    ...ready.slice(0, 2).map((c) => `ready from ${fmtTime(c.readyMs)} in Pull ${c.pullNumber}`),
+    ...down.slice(0, 2).map((c) => `Pull ${c.pullNumber}: down until ${fmtTime(c.readyMs)}${c.prevCastMs !== undefined ? ` after the ${fmtTime(c.prevCastMs)} cast` : ""}`),
+  ].join(" · ");
+  const hitAt = fmtTime(Math.min(...t.casts.map((c) => c.hitMs)));
+  return (
+    <Row time={fmtTime(t.hit.medianMs)} onTime={() => onOpenHit(t.hit.id)} glyph={<FindingGlyph kind="late" />}
+      main={<><b>{t.name}</b> <Who player={t.player} job={t.job} /> lands just after {hitLabel(t.hit)}: cast {lo === hi ? `${lo}s` : `${lo}–${hi}s`} after it
+        {t.pulls > 1 ? ` in ${t.casts.length} of ${t.pulls} pulls` : ""} ({t.casts.map((c) => fmtTime(c.castMs)).join(", ")}).</>}
+      basis={basis}
+      suggestion={{
+        kind: "try", body: ready.length
+          ? <>cast it as it comes back, before {hitAt}.{down.length ? " Where it was still down, the cast before it needs to come earlier." : ""}</>
+          : <>it was still down at {hitAt}: bring the cast before it earlier so it&apos;s back in time.</>,
+      }}
+      impact={<span style={{ color: FINDING_COLOR.late }}>{t.casts.length} of {t.pulls}<Sub>{t.pulls === 1 ? "pull" : "pulls"} late</Sub></span>} />
+  );
+}
+
+function StackedRow({ s, onOpenHit }: { s: StackedFinding; onOpenHit: (id: string) => void }) {
+  return (
+    <Row time={fmtTime(s.hit.medianMs)} onTime={() => onOpenHit(s.hit.id)} glyph={<FindingGlyph kind="stacked" />}
+      main={<><b>{hitLabel(s.hit)}</b> takes {plural(s.cooldowns.length, "party cooldown")} and leaves the lowest player at <Hp value={s.median} />:{" "}
+        {s.cooldowns.map((c, i) => <span key={i}>{i ? ", " : ""}{c.name} <Who player={c.player} job={c.job} /></span>)}.</>}
+      basis={[s.pulls > 1 ? `worst ${hp(s.worst)}` : undefined, s.alternatives.length ? `any one could go: ${s.alternatives.join(", ")}` : undefined]
+        .filter(Boolean).join(" · ")}
+      suggestion={s.planMove
+        ? { kind: "try", body: <><Who player={s.planMove.change.player} job={s.planMove.change.job} /> moves {s.planMove.change.name} to {hitLabel(s.planMove.change.to)} (<At ms={s.planMove.change.to.medianMs} />). <span style={dim}>Plan {s.planMove.letter}</span></> }
+        : s.alternatives.length ? { kind: "idea", body: <>{s.alternatives[0]} can go elsewhere; this hit stays over 30% without it.</> } : undefined}
+      impact={s.planMove ? <><Before from={s.median} to={s.planMove.after.median} /><Sub>still {s.planMove.after.median >= 0.3 ? "over" : "good"}</Sub></> : <Hp value={s.median} />} />
+  );
+}
+
+function OtherRow({ o, onOpenHit }: { o: OtherFinding; onOpenHit: (id: string) => void }) {
+  return (
+    <Row time={fmtTime(o.hit.medianMs)} onTime={() => onOpenHit(o.hit.id)} glyph={<FindingGlyph kind="other" />}
+      main={o.cls === "mechanic"
+        ? <><b>{hitLabel(o.hit)}</b>: {plural(o.deaths, "death")}, lowest <Hp value={o.median} />. Far past what mitigation covers: a mechanic failure.</>
+        : <><b>{hitLabel(o.hit)}</b>: the deaths came from low health before the hit, a healing or timing problem.</>}
+      basis={o.pulls > 1 ? `${plural(o.pulls, "pull")}` : undefined}
+      suggestion={{ kind: "note", body: "Check it on VOD; mitigation changes are never made for it." }}
+      impact={<span style={{ color: "var(--ck-text-3)" }}>{o.cls}</span>} />
+  );
+}
+
+// ── Groups ───────────────────────────────────────────────────────────────
+
+type GroupKey = "under" | "plan" | "unused" | "timing" | "other";
+const GROUP: Record<GroupKey, { label: string; glyph: FindingGlyphKind; chip: string }> = {
+  under:  { label: "Under-mitigated hits", glyph: "fail",    chip: "Under-mitigated" },
+  plan:   { label: "Cooldown plan",        glyph: "plan",    chip: "Cooldown plan" },
+  unused: { label: "Unused mitigation",    glyph: "unused",  chip: "Unused mitigation" },
+  timing: { label: "Mistimed windows",     glyph: "late",    chip: "Mistimed windows" },
+  other:  { label: "Not mitigation",       glyph: "other",   chip: "Not mitigation" },
+};
+
+function Group({ k, open, onToggle, summary, metric, children }: {
+  k: GroupKey; open: boolean; onToggle: () => void; summary: ReactNode; metric: ReactNode; children: ReactNode;
+}) {
+  const g = GROUP[k];
+  return (
+    <div style={{ borderTop: "1px solid var(--ck-line)" }}>
+      <button onClick={onToggle} style={{
+        display: "flex", alignItems: "center", gap: 10, padding: "8px 0", width: "100%", font: "inherit", background: "transparent",
+        border: 0, textAlign: "left", color: "inherit", cursor: "pointer", opacity: k === "other" ? 0.8 : 1,
+      }}>
+        <span style={{ ...dim, fontSize: 11, width: 12, flex: "0 0 auto" }}>{open ? "▾" : "▸"}</span>
+        <FindingGlyph kind={g.glyph} size={24} />
+        <span style={{ fontWeight: 600, fontSize: 13.5, color: "var(--ck-text)", flex: "0 0 auto" }}>{g.label}</span>
+        <span style={{ ...dim, fontSize: 12, flex: "1 1 auto", minWidth: 0 }}>{summary}</span>
+        <span className="ck-num" style={{ fontSize: 13, fontWeight: 700, flex: "0 0 auto", color: FINDING_COLOR[g.glyph] }}>{metric}</span>
+      </button>
+      {open && <div style={{ paddingLeft: 22, paddingBottom: 6 }}>{children}</div>}
+    </div>
+  );
+}
+
+function Findings({ f, plan, onOpenHit }: { f: AnalysisFindings; plan: OptimizedPlan; onOpenHit: (id: string) => void }) {
+  const [filter, setFilter] = useState<GroupKey | null>(null);
+  const [closed, setClosed] = useState<Set<GroupKey>>(() => new Set(["other"]));
+  const toggle = (k: GroupKey) => setClosed((prev) => {
+    const next = new Set(prev);
+    if (next.has(k)) next.delete(k); else next.add(k);
+    return next;
+  });
+  const lostByLetter = new Map<string, string[]>();
+  for (const l of f.lanes) {
+    for (const c of l.casts) {
+      const letter = c.lost?.match(/plan (\w+)\)$/)?.[1];
+      if (letter) lostByLetter.set(letter, [...(lostByLetter.get(letter) ?? []), `Pull ${f.clock?.pullNumber}'s ${l.name} at ${fmtTime(c.atMs)} is lost`]);
+    }
+  }
+  const late = f.timing.filter((t): t is LateFinding => t.kind === "late");
+  const stacked = f.timing.filter((t): t is StackedFinding => t.kind === "stacked");
+  const counts: Record<GroupKey, number> = {
+    under: f.under.length, plan: f.letters.length, unused: f.unused.length, timing: f.timing.length, other: f.other.length,
+  };
+  const keys = (Object.keys(GROUP) as GroupKey[]).filter((k) => counts[k] > 0 || (k === "other" && f.tankBusters > 0));
+  const total = keys.reduce((s, k) => s + counts[k], 0);
+  if (!keys.length) return <p className="ck-dialog-text" style={{ margin: "4px 0" }}>Nothing failing, tight, unused or mistimed in {plural(f.windowPulls.length, "pull")}.</p>;
+  const fixed = f.under.filter((u) => u.fix).length;
+  const failingN = f.under.filter((u) => u.failing).length;
+  const chip = (k: GroupKey | null, label: string, n: number, color?: string) => {
+    const on = filter === k;
+    return (
+      <button key={k ?? "all"} onClick={() => setFilter(k)} style={{
+        font: "inherit", fontSize: 12, borderRadius: 12, padding: "3px 11px", display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer",
+        color: on ? "var(--ck-text)" : "var(--ck-text-2)", background: on ? "rgba(83,169,255,.14)" : "transparent",
+        border: `1px solid ${on ? "var(--ck-arcane-edge)" : "var(--ck-line-2)"}`,
+      }}>
+        {color && <span style={{ width: 8, height: 8, borderRadius: "50%", background: color }} />}
+        {label} <span className="ck-num" style={dim}>{n}</span>
+      </button>
+    );
+  };
+  const shown = (k: GroupKey) => keys.includes(k) && (filter === null || filter === k);
+  return (
+    <>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", margin: "0 0 8px" }}>
+        <span style={{ ...sectionLabel, marginRight: 6 }}>Findings</span>
+        {chip(null, "All", total)}
+        {keys.map((k) => chip(k, GROUP[k].chip, counts[k], FINDING_COLOR[GROUP[k].glyph]))}
+      </div>
+      <div style={{ border: "1px solid var(--ck-line-2)", borderRadius: 3, padding: "0 12px 4px" }}>
+        {shown("under") && (
+          <Group k="under" open={!closed.has("under")} onToggle={() => toggle("under")}
+            summary={[failingN ? `${failingN} failing` : "", f.under.length - failingN ? `${f.under.length - failingN} tight` : ""].filter(Boolean).join(", ")}
+            metric={fixed === f.under.length ? `all ${fixed} fixed by the plan` : `${fixed} of ${f.under.length} fixed by the plan`}>
+            {f.under.map((u) => <UnderRow key={u.hit.id} u={u} total={f.windowPulls.length} onOpenHit={onOpenHit} />)}
+          </Group>
+        )}
+        {shown("plan") && (
+          <Group k="plan" open={!closed.has("plan")} onToggle={() => toggle("plan")}
+            summary={`changes to make together, at most ${PLAN_MAX_CHANGES} at a time`}
+            metric={`failing ${plan.summary.before.failing} → ${plan.summary.after.failing} · tight ${plan.summary.before.tight} → ${plan.summary.after.tight}`}>
+            {f.letters.map((l) => <PlanRow key={l.letter} l={l} lost={lostByLetter.get(l.letter) ?? []} />)}
+          </Group>
+        )}
+        {shown("unused") && (
+          <Group k="unused" open={!closed.has("unused")} onToggle={() => toggle("unused")}
+            summary="party cooldowns cast under half as often as they could be" metric={plural(f.unused.length, "cooldown")}>
+            {f.unused.map((u) => <UnusedRow key={`${u.player}|${u.key}`} u={u} hasPlan={f.letters.length > 0} />)}
+          </Group>
+        )}
+        {shown("timing") && (
+          <Group k="timing" open={!closed.has("timing")} onToggle={() => toggle("timing")}
+            summary="cast just after the hit, or stacked where it isn't needed"
+            metric={[late.length ? `${late.length} late` : "", stacked.length ? `${stacked.length} stacked` : ""].filter(Boolean).join(", ")}>
+            {late.map((t) => <LateRow key={`${t.player}|${t.key}|${t.hit.id}`} t={t} onOpenHit={onOpenHit} />)}
+            {stacked.map((s) => <StackedRow key={s.hit.id} s={s} onOpenHit={onOpenHit} />)}
+          </Group>
+        )}
+        {shown("other") && (
+          <Group k="other" open={!closed.has("other")} onToggle={() => toggle("other")}
+            summary={[f.other.length ? "healing and mechanic failures" : "", f.tankBusters ? `${plural(f.tankBusters, "tank buster")} on the Tanking tab` : ""].filter(Boolean).join(" · ")}
+            metric={f.other.length || ""}>
+            {f.other.map((o) => <OtherRow key={o.hit.id} o={o} onOpenHit={onOpenHit} />)}
+          </Group>
+        )}
+      </div>
+    </>
+  );
+}
+
+// ── The view ─────────────────────────────────────────────────────────────
+
+export function PlanView({ plan, pending, error, window, reach, allPulls, windowInput, onWindowInput, groupPulls, onOpenHit }: {
+  plan:          OptimizedPlan | null;
+  pending:       boolean;
+  error?:        string;
+  window:        FindingsWindowPull[];  // the pulls the plan was searched over
+  reach?:        DebuffReach;
+  allPulls:      boolean;               // false: one pull, no window input
+  windowInput:   string;
+  onWindowInput: (v: string) => void;
+  groupPulls:    number;                // the group's analyzable pulls (the window's ceiling)
+  onOpenHit:     (hitId: string) => void;
+}) {
+  // The plan answers an earlier window while a new one is pending; findings
+  // are built only for the window it was searched over.
+  const matches = plan !== null && plan.windowPulls.length === window.length && plan.windowPulls.every((id, i) => window[i]?.pullId === id);
+  const f = useMemo(() => (plan && matches ? buildAnalysisFindings(window, plan, FFXIV_MITIGATION, reach) : null), [plan, matches, window, reach]);
+  const nums = f?.windowPulls ?? window.map((w) => w.pullNumber);
+  const windowLabel = nums.length === 1 ? `Pull ${nums[0]}` : `Pulls ${nums[0]}–${nums[nums.length - 1]}`;
+  const late = f?.timing.filter((t) => t.kind === "late").length ?? 0;
+  const changes = plan?.groups.reduce((s, g) => s + g.changes.length, 0) ?? 0;
+  const worstUnused = f?.unused.find((u) => !u.situational);
+  return (
+    <div style={{ padding: "8px 12px 12px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+        {allPulls && (
+          <label style={{ fontSize: 12, color: "var(--ck-text-2)", display: "inline-flex", alignItems: "center", gap: 5 }}>
+            Last
+            <input className="ck-field" type="number" min={PLAN_MIN_PULLS} max={groupPulls} placeholder={String(Math.min(PLAN_WINDOW_DEFAULT, groupPulls))}
+              value={windowInput} onChange={(e) => onWindowInput(e.target.value)} style={{ width: 48, padding: "2px 4px" }} />
+            pulls
+          </label>
+        )}
+        <span className="ck-num" style={{ ...dim, fontSize: 12 }}>
+          {windowLabel}{f?.clock && nums.length > 1 ? ` · longest ${fmtTime(f.clock.durationMs)} (Pull ${f.clock.pullNumber})` : ""}
+        </span>
+        <span title={INFO} style={{ ...dim, cursor: "help" }}>ⓘ</span>
+        {pending && <span style={{ ...dim, fontSize: 12 }}>Working…</span>}
+      </div>
+      {error && <p style={{ color: VERDICT_STYLE.fail.color, fontSize: 12 }}>The analysis failed: {error}</p>}
+      {plan && f && (
+        <div style={{ opacity: pending ? 0.5 : 1 }}>
+          <div style={{ ...sectionLabel, margin: "0 0 6px" }}>Major findings</div>
+          <StatStrip tiles={[
+            { label: "Failing hits", edge: VERDICT_STYLE.fail.color, sub: f.under.filter((u) => u.failing).map((u) => u.hit.name).join(", ") || "none",
+              value: <>{plan.summary.before.failing} <span style={dim}>→</span> <span style={{ color: FINDING_COLOR.plan }}>{plan.summary.after.failing}</span></>,
+              title: "Planned hits failing on the median, now → with the plan" },
+            { label: "Tight hits", edge: VERDICT_STYLE.under.color, sub: f.under.filter((u) => !u.failing).map((u) => u.hit.name).join(", ") || "none",
+              value: <>{plan.summary.before.tight} <span style={dim}>→</span> <span style={{ color: FINDING_COLOR.plan }}>{plan.summary.after.tight}</span></>,
+              title: "Good on the median, under 15% on the worst pull, now → with the plan" },
+            { label: "Unused cooldowns", edge: FINDING_COLOR.unused, value: <span style={{ color: FINDING_COLOR.unused }}>{f.unused.length}</span>,
+              sub: worstUnused ? `${worstUnused.name} ${worstUnused.casts} of ${worstUnused.possible} possible casts` : undefined },
+            { label: "Mistimed windows", edge: FINDING_COLOR.late, value: <span style={{ color: FINDING_COLOR.late }}>{f.timing.length}</span>,
+              sub: f.timing.length ? [late ? `${late} late` : "", f.timing.length - late ? `${f.timing.length - late} stacked` : ""].filter(Boolean).join(", ") : undefined },
+            { label: "Plan", edge: FINDING_COLOR.plan, value: <span style={{ color: FINDING_COLOR.plan }}>{plural(changes, "change")}</span>,
+              sub: f.letters.length ? `in ${plural(f.letters.length, "group")} (${f.letters.map((l) => l.letter).join(", ")})` : "nothing to change" },
+          ]} />
+          <BiggestWins wins={biggestWins(f)} />
+          <div style={{ ...sectionLabel, margin: "0 0 6px", display: "flex", gap: 14, alignItems: "baseline", flexWrap: "wrap" }}>
+            <span>Fight timeline</span>
+            <Legend />
+          </div>
+          <div style={{ marginBottom: 16 }}><AnalysisTimeline f={f} onOpenHit={onOpenHit} /></div>
+          <Findings f={f} plan={plan} onOpenHit={onOpenHit} />
         </div>
       )}
     </div>
   );
 }
 
-function Summary({ plan }: { plan: OptimizedPlan }) {
-  const { before, after } = plan.summary;
-  const n = plan.groups.reduce((s, g) => s + g.changes.length, 0);
+function Legend() {
+  const item: CSSProperties = { display: "inline-flex", alignItems: "center", gap: 5 };
   return (
-    <span style={{ fontSize: 12, color: "var(--ck-text-2)", whiteSpace: "nowrap" }}>
-      Failing <b style={{ color: "var(--ck-text)" }}>{before.failing} → {after.failing}</b>
-      {" · "}Tight <b style={{ color: "var(--ck-text)" }}>{before.tight} → {after.tight}</b>
-      {" · "}{n} change{n === 1 ? "" : "s"}
+    <span style={{ fontSize: 11, color: "var(--ck-text-3)", textTransform: "none", letterSpacing: 0, fontWeight: 400, display: "inline-flex", gap: 14, flexWrap: "wrap" }}>
+      <span style={item}><span style={{ width: 14, height: 8, borderRadius: 2, background: "#80a0f0" }} /> cast</span>
+      <span style={item}><span style={{ width: 18, height: 6, background: "repeating-linear-gradient(135deg, rgba(79,209,197,.6) 0 3px, transparent 3px 6px)" }} /> ready, not used</span>
+      <span style={item}><span style={{ width: 8, height: 8, border: "2px solid #8b8f98", borderRadius: "50%" }} /><span style={{ color: FINDING_COLOR.plan }}>→ ●</span> plan: move</span>
+      <span style={{ ...item, color: FINDING_COLOR.plan }}>⊕ plan: extra use</span>
+      <span style={item}><span style={{ width: 8, height: 8, border: `2px dashed ${FINDING_COLOR.unused}`, borderRadius: "50%" }} /> idea, not in the plan</span>
+      <span style={item}><span style={{ width: 12, height: 8, borderRadius: 2, outline: `2px solid ${FINDING_COLOR.late}`, outlineOffset: 1 }} /> late cast</span>
     </span>
-  );
-}
-
-function Checklist({ plan, player }: { plan: OptimizedPlan; player: string }) {
-  const mine = plan.groups.flatMap((g) => g.changes).filter((c) => c.player === player);
-  if (!mine.length) return <p className="ck-dialog-text" style={{ margin: "10px 0 0" }}>No change for {firstName(player)} this round.</p>;
-  return (
-    <ul style={{ margin: "10px 0 0", paddingLeft: 18, fontSize: 13, color: "var(--ck-text)" }}>
-      {mine.map((c, i) => (
-        <li key={i} title={changeTip(c)} style={{ marginBottom: 4 }}>
-          <b>{c.name}</b>: {c.from ? <>{c.from.name} #{c.from.occurrence} → </> : "add on "}{c.to.name} #{c.to.occurrence}
-          <span style={dim}> ({fmtTime(c.to.medianMs)}){c.gated ? ` · needs ${c.gated}` : ""}</span>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-export function PlanView({ plan, pending, error, focus, windowInput, onWindowInput, groupPulls, onOpenHit }: {
-  plan:          OptimizedPlan | null;
-  pending:       boolean;
-  error?:        string;
-  focus:         string | null;  // the selected player; null: everything
-  windowInput:   string;
-  onWindowInput: (v: string) => void;
-  groupPulls:    number;         // the group's analyzable pulls (the window's ceiling)
-  onOpenHit:     (hitId: string) => void;
-}) {
-  const nothing = plan && plan.summary.before.failing + plan.summary.before.tight === 0;
-  let body: ReactNode = null;
-  if (plan && focus) body = <Checklist plan={plan} player={focus} />;
-  else if (plan) {
-    body = (
-      <>
-        {nothing && <p className="ck-dialog-text" style={{ margin: "10px 0 8px" }}>Nothing failing or tight in the last {plan.windowPulls.length} pulls.</p>}
-        {!nothing && plan.groups.length === 0 && <p className="ck-dialog-text" style={{ margin: "10px 0 8px" }}>No change within {PLAN_MAX_CHANGES} fits the cooldowns.</p>}
-        <div style={{ marginTop: 10 }}>{plan.groups.map((g, i) => <GroupCard key={i} group={g} />)}</div>
-        <Collapsible label={plan.notMitigation.length === 1 ? "1 hit needs healing or mechanics, not mitigation"
-            : `${plan.notMitigation.length} hits need healing or mechanics, not mitigation`}
-          hits={plan.notMitigation} onOpenHit={onOpenHit} />
-        <Collapsible label={`${plan.unfixed.length} not fixable within ${PLAN_MAX_CHANGES} changes`} hits={plan.unfixed} onOpenHit={onOpenHit} />
-      </>
-    );
-  }
-  return (
-    <div style={{ padding: "8px 12px 12px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-        <label style={{ fontSize: 12, color: "var(--ck-text-2)", display: "inline-flex", alignItems: "center", gap: 5 }}>
-          Last
-          <input className="ck-field" type="number" min={PLAN_MIN_PULLS} max={groupPulls} placeholder={String(Math.min(PLAN_WINDOW_DEFAULT, groupPulls))}
-            value={windowInput} onChange={(e) => onWindowInput(e.target.value)} style={{ width: 48, padding: "2px 4px" }} />
-          pulls
-        </label>
-        <span title={INFO} style={{ ...dim, cursor: "help" }}>ⓘ</span>
-        {pending && <span style={{ ...dim, fontSize: 12 }}>Working…</span>}
-        <span style={{ flex: "1 1 auto" }} />
-        {plan && <Summary plan={plan} />}
-      </div>
-      {error && <p style={{ color: VERDICT_STYLE.fail.color, fontSize: 12 }}>The analysis failed: {error}</p>}
-      <div style={{ opacity: pending ? 0.5 : 1 }}>{body}</div>
-    </div>
   );
 }
