@@ -135,6 +135,19 @@
 //   Phlegma III 14/15 (11.1s at full charges; one held at the kill, the
 //   charges-at-kill proposal); Addersgall (healing); overheal, defensives,
 //   Swiftcast.
+//   Rechecked on the same report's The Tyrant kill (Pull 2, 2026-10-15),
+//   nothing to build. Matched: the 3:29 death, all 12 GCD downtimes and 5
+//   weaving issues by time (6:03, 6:31, 7:02, 7:40 are Flatliner movement;
+//   4:00-4:05, 4.4s after the raise, is hers: the other ranged kept
+//   casting), the 4 interrupted casts, Eukrasian Dosis uptime (85%: its
+//   gaps are ours plus the death). App-only, holds: Eukrasian Dosis
+//   refreshed 18s early at 7:15.5 and 20s early at 9:51.6 to snapshot the
+//   tincture (58k). Not adopted: Psyche 10/11 (27s held beyond the
+//   opener, under one 60s recharge); the 9:50 tincture's Phlegma 1/2 and
+//   Psyche 0/1 (Psyche went at 9:42.6 with Zoe; the second Phlegma
+//   charge waited to 10:29.9; our tincture finding moves it to 10:08,
+//   which covers both); Addersgall (it says 1 stack lost, we show 2;
+//   healing), overheal, Kardia, defensives, Swiftcast.
 // - Scholar, checked against xivanalysis on qjCMx4bRfgNKwX9T Dancing Mad
 //   kill (7.5, 2026-10-13): GCD uptime, Chain Stratagem and Aetherflow
 //   (no use lost), 6 interrupted casts and its weaving gaps (17:24 6.2s,

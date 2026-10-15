@@ -188,6 +188,10 @@ Siegward, Yoro, Kade, Kevin, Sayacissa, Chauzey). Three deaths (Mocha
     excused Snap doesn't claim a coil. 6:29.4 and 6:31.5 with 3 coils
     (68k each, forced before). One more on CABrk9zXLfJG8h6R's Tyrant kill.
   Lost 1.83M → 1.97M.
+- **Sin Dusk (Sage).** Nothing to build; per-claim record in the Sage
+  header of lib/damage/ffxiv/jobs/healer.ts. Every GCD downtime, weaving
+  issue and interrupted cast matches by time. The early Eukrasian Dosis
+  refreshes (7:15.5, 9:51.6 for the tincture; 58k) are app-only and hold.
 
 ## Open
 
@@ -215,6 +219,7 @@ Siegward, Yoro, Kade, Kevin, Sayacissa, Chauzey). Three deaths (Mocha
   - Still waiting on the user: the charges-at-kill proposal
     (docs/open-items.md). It comes up for Mocha's coils, Sin's Phlegma
     and Sayacissa's Dragonfire Dive.
-- The Tyrant kill (session 2026-10-15): Mocha done; next Sin Dusk, then
-  Siegward, Yoro, Kade, Kevin, Sayacissa, Chauzey. Patch review as above.
+- The Tyrant kill (session 2026-10-15): Mocha and Sin done; next
+  Siegward, then Yoro, Kade, Kevin, Sayacissa, Chauzey. Patch review as
+  above.
 - Lindwurm and Lindwurm II kills are on disk too.
