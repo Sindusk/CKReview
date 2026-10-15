@@ -862,6 +862,12 @@ export function dotFindings(ctx: PlayerCheckContext, spec: DotSpec): DamageFindi
   const applyCostAt = (at: number) => spec.applyCost ? Math.max(0, spec.applyCost(ctx)) : applier === undefined ? 0
     : Math.max(0, ctx.values.gcdValue(ctx.phaseOf(at), false) - ctx.values.perUse(applier));
   const cutValue = (ms: number, at: number) => Math.max(0, Math.floor(ms / DOT_TICK_MS) * avgTick - applyCostAt(at));
+  // No enemy to target at all cuts a gap however short: every DoT ended
+  // there (K6qfMamL7rN8yz2Q Red Hot and Deep Blue, the Sage's Eukrasian
+  // Dosis on Watery Grave, run out at 6:12, then the prison breaking at
+  // 6:31.9 with 3.6s of no target: one 33.4s gap, 124k, before this).
+  const noTarget = ctx.forced.filter((f) => f.cause?.startsWith("no target"));
+  const cuts = (f: Window) => f.endMs - f.startMs >= CUT_MIN_MS || noTarget.some((n) => n.startMs < f.endMs && n.endMs > f.startMs);
   let cursor = active[0].startMs;
   for (const w of [...active, { startMs: ctx.endMs, endMs: ctx.endMs }]) {
     if (w.startMs > cursor) {
@@ -869,7 +875,7 @@ export function dotFindings(ctx: PlayerCheckContext, spec: DotSpec): DamageFindi
       const free: Window[] = [];
       let at = cursor;
       for (const f of forced) {
-        if (f.endMs <= at || f.startMs >= w.startMs || f.endMs - f.startMs < CUT_MIN_MS) continue;
+        if (f.endMs <= at || f.startMs >= w.startMs || !cuts(f)) continue;
         if (f.startMs > at) free.push({ startMs: at, endMs: f.startMs });
         at = Math.max(at, f.endMs);
       }

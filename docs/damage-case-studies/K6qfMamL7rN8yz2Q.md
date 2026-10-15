@@ -145,6 +145,14 @@ xivanalysis pages for all eight players saved 2026-10-14 in
   the Dragoon header of lib/damage/ffxiv/jobs/melee.ts. The biggest real
   loss is one route mistake at 6:42 (Lance Barrage where Spiral Blow was
   due): Power Surge and Chaotic Spring off through the 6:35 burst (158k).
+- **Sin Dusk (Sage).** Per-claim record in the Sage header of
+  lib/damage/ffxiv/jobs/healer.ts. Fixed in the engine: a moment with no
+  enemy to target cuts a DoT gap however short (shared.ts dotFindings).
+  The 6:12-6:48 Eukrasian Dosis gap through the prison break went from
+  124k to 81k. Across the samples, the 1:22-1:31 Chaotic Spring / Combust
+  gaps over Red Hot leaving now read as cut. Lost 524k → 481k.
+- Kade's 6:50-6:57 question: the user doesn't know (no VOD). It stays
+  counted as his.
 
 ## Open
 
@@ -164,8 +172,8 @@ xivanalysis pages for all eight players saved 2026-10-14 in
 - Vamp Fatale is done for all eight players. Waiting on the user: the
   charges-at-kill proposal (open-items.md), the lenient saws/towers/adds
   window (Kade 4:54 / 5:47, Kevin 8:05), the PCT lanes' review.
-- Red Hot and Deep Blue kill (session 2026-10-14): Mocha, Yoro, Kade and
-  Sayacissa done. Next, in order of the app's loss: Sin (524k), Kevin (475k), Siegward (305k), Chauzey (133k). Their pages are
+- Red Hot and Deep Blue kill (session 2026-10-14): Mocha, Yoro, Kade,
+  Sayacissa and Sin done. Next, in order of the app's loss: Kevin (475k), Siegward (305k), Chauzey (133k). Their pages are
   already in sampledata/damage-ff/. Patch review: same report and comp as
   Vamp Fatale (7.4), nothing new.
 - The Tyrant, Lindwurm and Lindwurm II kills are on disk too.

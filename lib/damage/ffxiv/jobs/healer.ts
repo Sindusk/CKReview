@@ -118,6 +118,23 @@
 //   30/34 (healing and MP); Zoe, Swiftcast. Open: Phlegma III 14/15 is a
 //   charge held to the kill (10.7s at full charges in all), the same gap
 //   as Living Muse (docs/open-items.md).
+//   Rechecked on the same report's Red Hot and Deep Blue kill (Pull 2,
+//   2026-10-14). Matched: GCD uptime (94.7% both), the 4 interrupted
+//   Dosis IIIs (1:29 Red Hot leaving, 5:39 the Deep Aerial tower: forced;
+//   4:27 a 2.4s gap in raid buffs, 71k; 7:15), the 2:04 weave, 6:37's
+//   1.2s gap, Eukrasian Dosis uptime 73.2%: 7:21-7:40 (18.8s through
+//   Freaky Pyrotation, Toxikon II pressed where Eukrasian Dosis was the
+//   instant due) and 8:12 hold. Fixed: the 6:12-6:48 gap (124k) ran
+//   through the prison breaking (3.6s with no target, under the 5s a
+//   forced stretch needs to cut a gap); no target at all now cuts it
+//   (shared.ts dotFindings): the Watery Grave stretch is the ticks a
+//   refresh at 6:12 had left (6, against a Dosis III), then the 14s from
+//   the bosses' return to 6:48.9 (two shields, three Toxikons), 81k. Not
+//   adopted: 8 Eukrasian Dosis "before invulnerability" (each ran its
+//   course or out-did a Dosis III; the application check finds none);
+//   Phlegma III 14/15 (11.1s at full charges; one held at the kill, the
+//   charges-at-kill proposal); Addersgall (healing); overheal, defensives,
+//   Swiftcast.
 // - Scholar, checked against xivanalysis on qjCMx4bRfgNKwX9T Dancing Mad
 //   kill (7.5, 2026-10-13): GCD uptime, Chain Stratagem and Aetherflow
 //   (no use lost), 6 interrupted casts and its weaving gaps (17:24 6.2s,
