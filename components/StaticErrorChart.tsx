@@ -3,16 +3,17 @@
 // components/StaticErrorChart.tsx
 //
 // The static dashboard's Error Trends chart (app/api/statics/[staticId]/
-// chart-data/route.ts), one point per session (StaticReview), one line per
-// player identity. Two views (user, 2026-10-15, from a mockup on CK Dancing
-// Mad):
-//   - Rate (default): errors per pull the player played in that session,
-//     optionally averaged over their last 3 sessions in range. A player who
-//     sat a session out has a gap there, so a replacement joining late, or
-//     someone who left, reads on the same scale as everyone else instead of
-//     as a flat line or a late start.
+// chart-data/route.ts), one point per pull (user, 2026-10-15: per pull
+// reads better than per session), session starts marked by a faint divider
+// and their date, one line per player identity. Two views (user,
+// 2026-10-15, from a mockup on CK Dancing Mad):
+//   - Per pull (default): errors per pull, averaged over the player's last
+//     N pulls played in range (10 / 20 / 50). A player who sat a pull out
+//     has a gap there, so a replacement joining late, or someone who left,
+//     reads on the same scale as everyone else instead of as a flat line or
+//     a late start.
 //   - Cumulative: running totals restarted at the first session in range;
-//     each line starts at the player's first session in it.
+//     each line starts at the player's first pull in it.
 // Filters: the fight (boss), a phase (detailed sessions only: per-error rows
 // carry the phase; older sessions are left out and counted in a note), and
 // the session range (from / to, with quick "last N" presets). Hovering shows
@@ -73,7 +74,9 @@ const FALLBACK_COLOR = "#aaaaaa";
 type Severity = "majorOnly" | "total";
 type Metric = "rate" | "cumulative";
 
-const SMOOTH_SESSIONS = 3;
+// Per pull: each point averages the player's last N pulls played.
+const ROLL_OPTIONS = [10, 20, 50];
+const ROLL_DEFAULT = 20;
 const RANGE_PRESETS = [5, 10, 20];
 
 function identityKey(p: ChartPullPlayerError): string {
@@ -108,16 +111,20 @@ function playersOf(pulls: ChartPull[]): SeriesPlayer[] {
 
 type Session = { reviewId: number; number: number; label: string | null; date: string | null; detailed: boolean; pulls: ChartPull[] };
 
-/** One session's tally for a player: pulls played (in the phase, when set) and their errors. */
+/** Errors over pulls played: the rolling window (rate) or since the range start (cumulative). */
 type Tally = { pulls: number; errors: number };
 
-type Point = { value: number; tally: Tally } | null;
+/** A player's value at one pull, with that pull's own errors (undefined: sat it out). */
+type Point = { value: number; tally: Tally; here?: number } | null;
+
+/** One x position: a pull of the fight in range (that reached the phase, when one is picked). */
+type AxisPull = { pull: ChartPull; session: Session; sessionIdx: number };
 
 export default function StaticErrorChart({ pulls, phases = [] }: { pulls: ChartPull[]; phases?: ChartPhase[] }) {
   const [metric, setMetric] = useState<Metric>("rate");
   // Major-only is the default: Minors are noise-level and would bury them.
   const [severity, setSeverity] = useState<Severity>("majorOnly");
-  const [smooth, setSmooth] = useState(true);
+  const [rollPulls, setRollPulls] = useState<number>(ROLL_DEFAULT);
   const [boss, setBoss] = useState<string | null>(null);
   const [phase, setPhase] = useState<number | null>(null);
   // Indices into the fight's sessions; null = the first / last.
@@ -179,53 +186,59 @@ export default function StaticErrorChart({ pulls, phases = [] }: { pulls: ChartP
 
   const players = useMemo(() => playersOf(shown.flatMap((s) => s.pulls)), [shown]);
 
-  const tallies = useMemo(() => shown.map((s) => {
-    const m = new Map<string, Tally>();
-    for (const pull of s.pulls) {
-      if (activePhase !== null && !(pull.phasesReached ?? []).includes(activePhase)) continue;
-      for (const p of pull.players) {
-        const counts = activePhase === null ? [p.majorCount, p.minorCount] : p.byPhase?.[activePhase] ?? [0, 0];
-        const t = m.get(identityKey(p)) ?? { pulls: 0, errors: 0 };
-        t.pulls += 1;
-        t.errors += severity === "majorOnly" ? counts[0] : counts[0] + counts[1];
-        m.set(identityKey(p), t);
+  // One x position per pull, in log order.
+  const axis = useMemo(() => {
+    const out: AxisPull[] = [];
+    shown.forEach((session, sessionIdx) => {
+      for (const pull of session.pulls) {
+        if (activePhase !== null && !(pull.phasesReached ?? []).includes(activePhase)) continue;
+        out.push({ pull, session, sessionIdx });
       }
+    });
+    return out;
+  }, [shown, activePhase]);
+
+  // Each pull's errors per player who played it.
+  const perPull = useMemo(() => axis.map(({ pull }) => {
+    const m = new Map<string, number>();
+    for (const p of pull.players) {
+      const counts = activePhase === null ? [p.majorCount, p.minorCount] : p.byPhase?.[activePhase] ?? [0, 0];
+      m.set(identityKey(p), severity === "majorOnly" ? counts[0] : counts[0] + counts[1]);
     }
     return m;
-  }), [shown, activePhase, severity]);
+  }), [axis, activePhase, severity]);
 
+  // Rate: errors per pull over the player's last `rollPulls` pulls played,
+  // a gap where they sat out. Cumulative: running total from their first
+  // pull in range, flat while they sat out.
   const series = useMemo(() => {
     const out = new Map<string, Point[]>();
     for (const player of players) {
       const points: Point[] = [];
+      const recent: number[] = [];
       let running = 0;
-      let started = false;
-      tallies.forEach((m, i) => {
-        const t = m.get(player.key);
+      let played = 0;
+      perPull.forEach((m) => {
+        const here = m.get(player.key);
+        if (here !== undefined) { running += here; played += 1; recent.push(here); if (recent.length > rollPulls) recent.shift(); }
         if (metric === "cumulative") {
-          if (t) { started = true; running += t.errors; }
-          points.push(started ? { value: running, tally: t ?? { pulls: 0, errors: 0 } } : null);
+          points.push(played > 0 ? { value: running, tally: { pulls: played, errors: running }, here } : null);
           return;
         }
-        if (!t || t.pulls === 0) { points.push(null); return; }
-        let errors = 0, played = 0, used = 0;
-        for (let j = i; j >= 0 && used < (smooth ? SMOOTH_SESSIONS : 1); j--) {
-          const u = tallies[j].get(player.key);
-          if (!u || u.pulls === 0) continue;
-          errors += u.errors; played += u.pulls; used += 1;
-        }
-        points.push({ value: errors / played, tally: t });
+        if (here === undefined) { points.push(null); return; }
+        const errors = recent.reduce((s, x) => s + x, 0);
+        points.push({ value: errors / recent.length, tally: { pulls: recent.length, errors }, here });
       });
       out.set(player.key, points);
     }
     return out;
-  }, [players, tallies, metric, smooth]);
+  }, [players, perPull, metric, rollPulls]);
 
   const colorFor = (p: SeriesPlayer) => (p.className ? getClassColor(p.game as "wow" | "ffxiv", p.className) : FALLBACK_COLOR);
   const iconFor = (p: SeriesPlayer) => (p.className && p.game ? getPlayerSpecIcon(p.game as "wow" | "ffxiv", p.specId ?? 0, p.className) : null);
   const visible = players.filter((p) => !hidden.has(p.key));
 
-  const n = shown.length;
+  const n = axis.length;
   const maxY = Math.max(metric === "rate" ? 0.1 : 1, ...visible.flatMap((p) => (series.get(p.key) ?? []).map((pt) => pt?.value ?? 0)));
   const width = Math.max(plotWidth, PAD_LEFT + PAD_RIGHT + 40);
   const innerWidth = width - PAD_LEFT - PAD_RIGHT;
@@ -242,8 +255,12 @@ export default function StaticErrorChart({ pulls, phases = [] }: { pulls: ChartP
     for (let v = 0; v <= maxY + 1e-9; v += step) out.push(+v.toFixed(4));
     return out;
   }, [maxY]);
-  // About one date label per 70px.
-  const labelEvery = Math.max(1, Math.ceil(n / Math.max(1, Math.floor(innerWidth / 70))));
+  // Session starts: a faint divider each, and the date where 60px+ from the last label.
+  const sessionStarts = axis.map((a, i) => (i === 0 || axis[i - 1].sessionIdx !== a.sessionIdx ? i : -1)).filter((i) => i >= 0);
+  const dateLabels: number[] = [];
+  for (const i of sessionStarts) {
+    if (dateLabels.length === 0 || xAt(i) - xAt(dateLabels[dateLabels.length - 1]) >= 60) dateLabels.push(i);
+  }
 
   function toggle(key: string) {
     setHidden((prev) => {
@@ -262,14 +279,15 @@ export default function StaticErrorChart({ pulls, phases = [] }: { pulls: ChartP
     return <p style={{ fontSize: "13px", color: INK_MUTED }}>No pulls imported yet — add a review to start building this chart.</p>;
   }
 
-  const hoverSession = hover ? shown[hover.idx] : null;
+  const hoverAt = hover ? axis[hover.idx] : null;
   const hoverRows = hover
     ? visible
         .map((p) => ({ p, pt: series.get(p.key)?.[hover.idx] ?? null }))
-        .filter((r): r is { p: SeriesPlayer; pt: { value: number; tally: Tally } } => r.pt !== null)
+        .filter((r): r is { p: SeriesPlayer; pt: NonNullable<Point> } => r.pt !== null)
         .sort((a, b) => b.pt.value - a.pt.value)
     : [];
-  const hoverPulls = hover ? Math.max(0, ...[...tallies[hover.idx].values()].map((t) => t.pulls)) : 0;
+  // The table: each session's value at its last pull in range.
+  const sessionEnds = shown.map((s, si) => ({ s, i: axis.reduce((last, a, i) => (a.sessionIdx === si ? i : last), -1) })).filter((x) => x.i >= 0);
 
   const selectStyle = { padding: "3px 8px", fontSize: "12px" } as const;
   const presetActive = (count: number | null) => (toIdx === null || toIdx >= last) && (count === null ? from === 0 : from === Math.max(0, sessions.length - count));
@@ -281,7 +299,7 @@ export default function StaticErrorChart({ pulls, phases = [] }: { pulls: ChartP
         <div style={{ display: "flex", gap: "4px" }}>
           {(["rate", "cumulative"] as Metric[]).map((m) => (
             <button key={m} onClick={() => setMetric(m)} className={`ck-tab${metric === m ? " ck-tab--active" : ""}`}
-              title={m === "rate" ? "Errors per pull played, each session" : "Running total since the first session in range"}>
+              title={m === "rate" ? "Errors per pull, averaged over each player's last pulls played" : "Running total since the first session in range"}>
               {m === "rate" ? "Per pull" : "Cumulative"}
             </button>
           ))}
@@ -294,10 +312,13 @@ export default function StaticErrorChart({ pulls, phases = [] }: { pulls: ChartP
           ))}
         </div>
         {metric === "rate" && (
-          <label style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "12px", color: INK_SECONDARY, cursor: "pointer" }}
-            title={`Average each point over the player's last ${SMOOTH_SESSIONS} sessions in range`}>
-            <input type="checkbox" checked={smooth} onChange={(e) => setSmooth(e.target.checked)} />
-            {SMOOTH_SESSIONS}-session average
+          <label style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "12px", color: INK_SECONDARY }}
+            title="Each point averages the player's errors over their last pulls played (in range)">
+            Average of last
+            <select className="ck-field" value={rollPulls} onChange={(e) => setRollPulls(Number(e.target.value))} style={{ padding: "2px 6px", fontSize: "12px" }}>
+              {ROLL_OPTIONS.map((r) => <option key={r} value={r}>{r}</option>)}
+            </select>
+            pulls
           </label>
         )}
         <button className="ck-btn" onClick={() => setShowTable((v) => !v)} style={{ marginLeft: "auto" }}>
@@ -368,12 +389,12 @@ export default function StaticErrorChart({ pulls, phases = [] }: { pulls: ChartP
           <table style={{ borderCollapse: "collapse", width: "100%", fontSize: "12px" }}>
             <thead>
               <tr>
-                <th style={{ ...thStyle, textAlign: "left" }}>Session</th>
+                <th style={{ ...thStyle, textAlign: "left" }}>Session (value at its last pull)</th>
                 {visible.map((p) => <th key={p.key} style={{ ...thStyle, textAlign: "right", color: colorFor(p) }}>{p.name}</th>)}
               </tr>
             </thead>
             <tbody>
-              {shown.map((s, i) => (
+              {sessionEnds.map(({ s, i }) => (
                 <tr key={s.reviewId}>
                   <td style={{ padding: "6px 8px", color: INK_PRIMARY, whiteSpace: "nowrap" }}>{sessionName(s)}{s.label ? ` · ${s.label}` : ""}</td>
                   {visible.map((p) => {
@@ -410,11 +431,15 @@ export default function StaticErrorChart({ pulls, phases = [] }: { pulls: ChartP
               transform={`rotate(-90 12 ${PAD_TOP + innerHeight / 2})`}>
               {metric === "rate" ? "errors per pull" : "errors in range"}
             </text>
-            {shown.map((s, i) => (i % labelEvery === 0 || i === n - 1) && (i === n - 1 || n - 1 - i >= labelEvery / 2) ? (
-              <text key={s.reviewId} x={xAt(i)} y={CHART_HEIGHT - 8} textAnchor={n <= 1 ? "middle" : i === 0 ? "start" : i === n - 1 ? "end" : "middle"} fontSize={11} fill={INK_MUTED}>
-                {sessionDate(s)}
+            {sessionStarts.slice(1).map((i) => (
+              <line key={`s${i}`} x1={(xAt(i - 1) + xAt(i)) / 2} x2={(xAt(i - 1) + xAt(i)) / 2} y1={PAD_TOP} y2={PAD_TOP + innerHeight}
+                stroke={GRIDLINE} strokeWidth={1} />
+            ))}
+            {dateLabels.map((i) => (
+              <text key={`d${i}`} x={xAt(i)} y={CHART_HEIGHT - 8} textAnchor={i === 0 ? "start" : xAt(i) > width - 40 ? "end" : "middle"} fontSize={11} fill={INK_MUTED}>
+                {sessionDate(axis[i].session)}
               </text>
-            ) : null)}
+            ))}
 
             {hover && <line x1={xAt(hover.idx)} y1={PAD_TOP} x2={xAt(hover.idx)} y2={PAD_TOP + innerHeight} stroke={INK_MUTED} strokeWidth={1} strokeDasharray="3,3" />}
 
@@ -450,7 +475,7 @@ export default function StaticErrorChart({ pulls, phases = [] }: { pulls: ChartP
           </svg>
 
           {/* Compact tooltip at the cursor, flipped left near the right edge. */}
-          {hover && hoverSession && (
+          {hover && hoverAt && (
             <div style={{
               position: "absolute", pointerEvents: "none", zIndex: 5, width: TOOLTIP_WIDTH,
               left: hover.x + 14 + TOOLTIP_WIDTH > width ? Math.max(0, hover.x - 14 - TOOLTIP_WIDTH) : hover.x + 14,
@@ -458,23 +483,33 @@ export default function StaticErrorChart({ pulls, phases = [] }: { pulls: ChartP
               background: "#0d1013", border: "1px solid var(--ck-line-2)", borderRadius: 4, padding: "7px 9px",
               fontSize: "11.5px", lineHeight: 1.45, color: INK_SECONDARY, boxShadow: "0 6px 20px rgba(0,0,0,0.5)",
             }}>
-              <div style={{ color: INK_PRIMARY, fontWeight: 600 }}>{sessionName(hoverSession)}</div>
-              <div style={{ color: INK_MUTED, marginBottom: 4 }}>
-                {hoverSession.label ? `${hoverSession.label} · ` : ""}{hoverPulls} pull{hoverPulls === 1 ? "" : "s"}
-                {activePhase !== null ? ` reaching ${bossPhases.find((p) => p.phaseId === activePhase)?.name ?? "the phase"}` : ""}
+              <div style={{ color: INK_PRIMARY, fontWeight: 600 }}>
+                {hoverAt.pull.bossName} #{hoverAt.pull.pullNumber}{" "}
+                <span style={{ color: hoverAt.pull.result === "Kill" ? "#4ade80" : INK_SECONDARY, fontWeight: 400 }}>{hoverAt.pull.result}</span>
               </div>
-              {hoverRows.length === 0 && <div style={{ color: INK_MUTED }}>Nobody shown played this session.</div>}
-              {hoverRows.map(({ p, pt }) => (
-                <div key={p.key} style={{ display: "grid", gridTemplateColumns: "8px minmax(0, 1fr) auto auto", gap: 6, alignItems: "center" }}>
-                  <span style={{ width: 8, height: 8, borderRadius: 2, background: colorFor(p) }} />
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
-                  <span style={{ color: INK_PRIMARY, fontVariantNumeric: "tabular-nums" }}>{fmtValue(pt.value)}</span>
-                  <span style={{ color: INK_MUTED, fontVariantNumeric: "tabular-nums", minWidth: 44, textAlign: "right" }}
-                    title="This session: errors / pulls played">
-                    {pt.tally.pulls > 0 ? `${pt.tally.errors}/${pt.tally.pulls}` : "sat out"}
-                  </span>
+              <div style={{ color: INK_MUTED, marginBottom: 4 }}>
+                {sessionName(hoverAt.session)}{hoverAt.session.label ? ` · ${hoverAt.session.label}` : ""}
+              </div>
+              {hoverRows.length === 0 && <div style={{ color: INK_MUTED }}>Nobody shown played this pull.</div>}
+              {hoverRows.length > 0 && (
+                <div style={{ display: "grid", gridTemplateColumns: "8px minmax(0, 1fr) auto auto auto", gap: "0 6px", alignItems: "center" }}>
+                  <span /><span />
+                  <span style={{ color: INK_MUTED, fontSize: 10.5 }}>{metric === "rate" ? `last ${rollPulls}` : "total"}</span>
+                  <span style={{ color: INK_MUTED, fontSize: 10.5, textAlign: "right" }}>{metric === "rate" ? "err/pulls" : "pulls"}</span>
+                  <span style={{ color: INK_MUTED, fontSize: 10.5, textAlign: "right" }}>this pull</span>
+                  {hoverRows.map(({ p, pt }) => [
+                    <span key={`c${p.key}`} style={{ width: 8, height: 8, borderRadius: 2, background: colorFor(p) }} />,
+                    <span key={`n${p.key}`} style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>,
+                    <span key={`v${p.key}`} style={{ color: INK_PRIMARY, fontVariantNumeric: "tabular-nums" }}>{fmtValue(pt.value)}</span>,
+                    <span key={`t${p.key}`} style={{ color: INK_MUTED, fontVariantNumeric: "tabular-nums", textAlign: "right" }}>
+                      {metric === "rate" ? `${pt.tally.errors}/${pt.tally.pulls}` : pt.tally.pulls}
+                    </span>,
+                    <span key={`h${p.key}`} style={{ fontVariantNumeric: "tabular-nums", textAlign: "right", color: pt.here ? INK_PRIMARY : INK_MUTED }}>
+                      {pt.here === undefined ? "sat out" : pt.here}
+                    </span>,
+                  ])}
                 </div>
-              ))}
+              )}
             </div>
           )}
         </div>
