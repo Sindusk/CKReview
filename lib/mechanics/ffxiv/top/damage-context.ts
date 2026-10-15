@@ -141,8 +141,7 @@ const RULE_KEY_LABELS: Record<string, string> = {
   "ffxiv-top6-avoidable":    "Alpha Omega",
   "ffxiv-top6-spread":       "Wave Cannon (P6)",
   "ffxiv-top6-charge":       "Wild Charge",
-  "ffxiv-top6-wild-charge":  "Wild Charge",
-  "ffxiv-top6-mass-death":   "Alpha Omega",
+  "ffxiv-top6-death":        "Alpha Omega",
   "ffxiv-top6-magic-number": "Magic Number",
 };
 

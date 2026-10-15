@@ -300,9 +300,11 @@ philosophy and the data semantics this list assumes.
   is a VOD call (The Tyrant's scythe, both players on their spots).
 - **A buff lost on death makes the next deaths fallout.** Omega P6's
   Brilliant Dynamis goes at death and raises don't restore it: a raised
-  player dies to a share or their own spread that everyone else survives.
-  Count only players who hadn't died yet in the phase toward "a mechanic
-  killed several" (Omega P6).
+  player dies to a share or their own spread that everyone else survives,
+  and their LB refund is gone. The first death is the cutoff, minus a
+  planned sacrifice (a DRK dying to Magic Number after their tank LB3),
+  and a mechanic judged after it (a share with seven) is moot (Omega P6,
+  a player in the fights).
 - **A clock layout by role group can name the off-spot player without
   roles.ts.** Omega P6's Wave Cannon puts supports on cardinals and DPS on
   intercardinals; clean hits stayed within 21 degrees, overlap culprits

@@ -41,11 +41,16 @@
 //   DRK S, WHM W), DPS on the intercardinals (DNC NE, DRG SE, the second
 //   melee or RDM SW, PCT NW) in all three reports. 91 clean hits sat within
 //   21 degrees of their group's clock and 7.0y+ out. A line that hits two
-//   players loses its cast target. Overlaps: J7 +68.7 the WHM 3.3y from
-//   the boss (inside every line) and the DRG 30 degrees off; K22 +68.7 the
-//   WHM 4.1y out and the DRK 38 degrees off (three died); L14 +70.7 the PCT
-//   on the DRK's south spot, 43 degrees off (died). J14 +68.7: a line
-//   clipped the DRG (18 degrees off) and the DRK, nobody died. After a
+//   players loses its cast target; its owner is the victim no line of the
+//   4 + 4 pair targeted. Overlaps: J7 +68.7 the WHM 3.3y from the boss,
+//   inside every line, clipped by two (the DRG's own line among them: the
+//   DRG, 30 degrees off, wasn't the cause); K22 +68.7 the WHM 4.1y out
+//   and the DRK 38 degrees off, their lines through the NIN (three died);
+//   L14 +70.7 the PCT on the DRK's south spot, 43 degrees off (died). J14
+//   +68.7: the DRG's line (18 degrees off) clipped the DRK on their spot;
+//   each took one line per set, so nobody died. Positions are read at the
+//   hit, so "off the spot" can be "still on the way" (a player in the
+//   fights, 2026-10-15). After a
 //   death the second set retargets a player already hit, who dies to it
 //   (J17 +104.5, the DNC after the WAR's Arrow death): fallout.
 // - Wild Charge stacks south, tanks in front (they take 2-4x and invuln:
@@ -55,9 +60,11 @@
 //   died. A charge with fewer than eight kills: L14 (7 sharing, 2 died),
 //   L15 (7, 5), J17 (6, 6), K22 (5, 5); J20 (7, 1) and J14 (8, 1) didn't
 //   end the pull.
-// - Flash Gale went to the two tanks in every volley with both alive but
-//   one: J17 +81.9, a circle lost its target and hit six non-tanks while
-//   the DRK, who took that slot's gale 3s later, was hit by neither. With a
+// - Flash Gale: the WAR holds the boss at 4-7y, the DRK baits the far gale
+//   at ~15y (both reports). It went to the two tanks in every volley with
+//   both alive but one: J17 +81.9, the DRK was 8.8y out (Walking Dead,
+//   inside the party), the DRG farthest at 11.1y, and the far circle hit
+//   six non-tanks. With a
 //   tank dead the gales land on the party (J20 +39.7; J7, J20, L14 after
 //   the first charge: four died in J20).
 // - Avoidables: Unlimited's puddles hit only J7's DRK (four at once,
@@ -70,32 +77,38 @@
 //   J14's second ran out at 6.0-6.2s with no SCH LB and killed the five
 //   holders 2s later (silent deaths). The WAR who gave the LB before it
 //   had died at Meteor (+177.5) and been raised, so their Land Waker
-//   refunded nothing to the SCH. The DRK dies to both Numbers in both pulls after Dark
-//   Force: the planned DRK sacrifice [EL].
+//   refunded nothing to the SCH. The DRK dies to both Numbers in both
+//   pulls after Dark Force: the planned DRK sacrifice [EL].
+// - Any other P6 death ends the pull (a player in the fights, 2026-10-15):
+//   Brilliant Dynamis (~80% mitigation and the LB refund) goes with it, so
+//   a dead tank can't survive Magic Number and the LB chain breaks. Every
+//   wipe bears it out: no pull recovered from a P6 death.
 // - LB3 order in the kill: RPR after the second Dive, DNC for the Meteors,
 //   DRK, WHM, WAR, SCH for the Numbers.
 // - Silent deaths all came after a cutoff: Walking Dead running out (J7,
 //   L14), the Number aura (J14), resets. No deathwall death before one.
 // No wipe left unexplained. Cutoffs (first Raid error) over the 7 P6
-// wipes: Wild Charge killing 2+ 4 (J7 L14 L15 J17), one mechanic killing
-// 3+ Brilliant holders 2 (K22 Wave Cannon spreads, J20 Flash Gale), Magic
-// Number not cleansed 1 (J14). The kill has no P6 error.
+// wipes, all the first P6 death: Wave Cannon spread overlaps 2 (K22 the
+// WHM, L14 the PCT), Cosmo Arrow 2 (J17 WAR, L15 RPR), Unlimited's
+// puddles 1 (J7 DRK), and two raw-damage deaths nobody is named for (J20
+// the WAR to the first Dive buster, J14 the DRG to the second charge with
+// eight sharing). The kill has no P6 error.
 //
 // -- RULES IMPLEMENTED --
 // ffxiv-top6-avoidable (Major on death, else Minor: P6 gives no Damage
 //   Down): Cosmo Arrow, Unlimited's exaflares and puddles, Meteor baits.
-// ffxiv-top6-spread: a Wave Cannon line that hit anyone besides its
-//   target. Names the players off their group's clock (23+ degrees) or
-//   within 5y of the boss; all involved when nobody is. Major on a death.
-// ffxiv-top6-charge: a living player 4y+ off the Wild Charge line, or
-//   (nobody off it) a living player it missed. Major on a charge death.
+// ffxiv-top6-spread: a Wave Cannon line that hit anyone besides its owner.
+//   Players within 5y of the boss own every line they're in; otherwise
+//   the line's players off their group's clock (23+ degrees), else the
+//   one 10+ degrees worse than the rest, else all. Major on a death.
+// ffxiv-top6-charge: with all eight alive, a player 4y+ off the Wild
+//   Charge line, or (nobody off it) a player it missed. Major on a death.
 // ffxiv-top6-gale (targeted: both tanks at each volley with both alive):
-//   two or more non-tanks hit; names the tank who took neither gale
-//   (player-less when both were hit). Major on a death.
-// Raid, the earliest kept: -wild-charge (2+ died who still held
-//   Brilliant), -mass-death (one ability, 3s window, 3+ Brilliant holders
-//   died; Wild Charge excluded), -magic-number (the aura ran out on a living
-//   player). -called-wipe and -collapse (4 dead at once) only before them.
+//   two or more non-tanks hit and a non-tank the farthest player: names
+//   the tank who took neither gale; player-less otherwise.
+// Raid, the earliest kept: -death (the first P6 death, bar a tank dying to
+//   Magic Number after their tank LB3; -called-wipe when that death is a
+//   reset), -magic-number (the aura ran out with nobody dead yet).
 // Exposure: gale is targeted (the tanks); the rest test everyone.
 // Not built: the opening tank LB, Cosmo Dive (busters always on the tanks,
 // the share always six: open question 1 stays open), Meteor spreads,
@@ -427,11 +440,9 @@ export const TOP6_AVOIDABLE_RULE_ID    = "ffxiv-top6-avoidable";
 export const TOP6_SPREAD_RULE_ID       = "ffxiv-top6-spread";
 export const TOP6_CHARGE_RULE_ID       = "ffxiv-top6-charge";
 export const TOP6_GALE_RULE_ID         = "ffxiv-top6-gale";
-export const TOP6_WILD_CHARGE_RULE_ID  = "ffxiv-top6-wild-charge";
-export const TOP6_MASS_DEATH_RULE_ID   = "ffxiv-top6-mass-death";
+export const TOP6_DEATH_RULE_ID        = "ffxiv-top6-death";
 export const TOP6_MAGIC_NUMBER_RULE_ID = "ffxiv-top6-magic-number";
 export const TOP6_CALLED_WIPE_RULE_ID  = "ffxiv-top6-called-wipe";
-export const TOP6_COLLAPSE_RULE_ID     = "ffxiv-top6-collapse";
 
 const COSMO_MEMORY = 31649; // P6's opening raidwide: the module's gate and clock
 const SPREAD       = 31659; // Wave Cannon's 4 + 4 spread lines
@@ -458,6 +469,7 @@ const LB3 = new Set([
   "Sagittarius Arrow", "Satellite Beam", "Crimson Lotus",
   "Meteor", "Teraflare", "Vermilion Scourge", "Chromatic Fantasy",
 ]);
+const TANK_LB3   = new Set(["Last Bastion", "Land Waker", "Dark Force", "Gunmetal Soul"]);
 const HEALER_LB3 = new Set(["Pulse of Life", "Angel Feathers", "Astral Stasis", "Techne Makre"]);
 
 // Wave Cannon spreads (NAUR): supports on the cardinals, DPS on the
@@ -469,16 +481,14 @@ const HEALER_LB3 = new Set(["Pulse of Life", "Angel Feathers", "Astral Stasis", 
 const SUPPORT_CLOCKS = [0, 90, 180, 270];
 const DPS_CLOCKS     = [45, 135, 225, 315];
 const SPOT_DEG       = 23;
+const SPOT_MARGIN_DEG = 10; // below SPOT_DEG, a line's player this much worse than the rest owns it
 const CENTRE_Y       = 5;
 // Wild Charge: the party stacks on one line out from the boss. Clean
 // charges held every player within 1.5y of the line (J14 / J17 / L16); the
 // misplaced player stood 7.5y off it (J7). Line half-width is ~4y.
 const CHARGE_LATERAL_Y = 4;
 const CHARGE_MIN_R_Y   = 5; // closer than this the bearing is noise (the front tanks)
-const CHARGE_RAID_DEATHS = 2; // clean: 0-1 dead (J14, J20); failures 2-6 (J7 L14 2, K22 L15 5, J17 6)
-const MASS_DEATHS        = 3; // one mechanic killing this many Brilliant holders at once (K22 spreads, J20 gales)
 const NUMBER_EXPIRY_MS   = 5000; // healer LB3 cleared the aura 2.3-3.4s after it landed; J14 ran out at 6.0-6.2s
-const COLLAPSE_DEAD_COUNT = 4;
 const CALLED_WIPE_END_MS  = 12_000;
 const CALLED_WIPE_COUNT   = 3;
 const CALLED_WIPE_WINDOW  = 10_000;
@@ -552,35 +562,67 @@ function detectSpreads(players: PlayerInfo[], life: Life, casts: EnemyEvent[], f
   for (const set of clusterByGap(all, (c) => c.timestamp, 300)) {
     const t = set[0].timestamp;
     const hits = liveHits(players, life, [SPREAD], t - 100, t + 1500).filter((h) => realAmount(h.e) > 0 || (h.e.amount ?? 0) >= PREVIEW_AMOUNT);
-    // Each overlapping line: the players it hit plus its target.
-    const groups: Set<PlayerInfo>[] = [];
-    for (const inst of uniq(hits.map((h) => h.e.sourceInstance))) {
-      const victims = uniq(hits.filter((h) => h.e.sourceInstance === inst).map((h) => h.p));
-      const target = byName(players, set.find((c) => c.sourceInstance === inst)?.target ?? "");
-      if (victims.length < 2 && (!target || victims[0] === target)) continue;
-      groups.push(new Set([...victims, ...(target && life.alive(target, t) ? [target] : [])]));
-    }
-    // Merge lines that share a player into one overlap.
-    const merged: Set<PlayerInfo>[] = [];
-    for (const g of groups) {
-      const hit = merged.filter((m) => [...g].some((p) => m.has(p)));
-      const u = new Set([...g, ...hit.flatMap((m) => [...m])]);
-      merged.splice(0, merged.length, ...merged.filter((m) => !hit.includes(m)), u);
-    }
-    for (const g of merged) {
-      const involved = [...g];
-      const spot = new Map(involved.map((p) => {
+    // Targets of this set and the set paired with it: a line that lost its
+    // target belongs to the victim no other line in the pair targeted
+    // (J14 +68.7: the DRG's line, since the DRK was targeted 2s later).
+    const pairTargets = new Set(all.filter((c) => Math.abs(c.timestamp - t) <= 3000 && c.target).map((c) => c.target!));
+    const spotCache = new Map<PlayerInfo, Spot | undefined>();
+    const spotAt = (p: PlayerInfo) => {
+      if (!spotCache.has(p)) {
         const e = hits.find((h) => h.p === p)?.e;
         const pos = e ?? (() => { const q = interpolatePlayerPosition(p, t, { windowMs: 1500 }); return q ? { ...q } as PlayerEvent : undefined; })();
-        return [p, pos ? spotOf(p, pos) : undefined] as const;
-      }));
-      const off = involved.filter((p) => offSpot(spot.get(p)));
-      const named = off.length ? off : involved;
+        spotCache.set(p, pos ? spotOf(p, pos) : undefined);
+      }
+      return spotCache.get(p);
+    };
+    const inCentre = (p: PlayerInfo) => (spotAt(p)?.r ?? Infinity) < CENTRE_Y;
+    // Each overlapping line: who's involved, and who caused it.
+    const lines: { involved: Set<PlayerInfo>; named: Set<PlayerInfo> }[] = [];
+    for (const inst of uniq(hits.map((h) => h.e.sourceInstance))) {
+      const victims = uniq(hits.filter((h) => h.e.sourceInstance === inst).map((h) => h.p));
+      const cast = set.find((c) => c.sourceInstance === inst);
+      let owner = byName(players, cast?.target ?? "");
+      if (owner && !life.alive(owner, t)) owner = undefined;
+      if (!owner) {
+        const cands = victims.filter((p) => !pairTargets.has(p.name) && !inCentre(p));
+        if (cands.length === 1) owner = cands[0];
+      }
+      const extras = victims.filter((p) => p !== owner);
+      if (!extras.length || (!owner && victims.length < 2)) continue;
+      const involved = new Set([...victims, ...(owner ? [owner] : [])]);
+      // A player near the boss stands in every line: theirs alone (J7's WHM:
+      // the DRG's own line clipped them, so the DRG's angle didn't matter).
+      const centre = [...involved].filter(inCentre);
+      const named = new Set<PlayerInfo>(centre);
+      const rest = [...involved].filter((p) => !inCentre(p));
+      if (extras.some((p) => !inCentre(p))) {
+        const devOf = (p: PlayerInfo) => spotAt(p)?.dev ?? 0;
+        const off = rest.filter((p) => offSpot(spotAt(p)));
+        // Nobody past the line: the clearly worse angle when it's 10+ degrees
+        // worse than everyone else's (J14: the DRG 18 vs the DRK 2), else all.
+        const worst = [...rest].sort((a, b) => devOf(b) - devOf(a));
+        const clear = worst.length >= 2 && devOf(worst[0]) - devOf(worst[1]) >= SPOT_MARGIN_DEG ? [worst[0]] : rest;
+        (off.length ? off : clear).forEach((p) => named.add(p));
+      }
+      lines.push({ involved, named });
+    }
+    // Merge lines that share a player into one overlap.
+    const merged: { involved: Set<PlayerInfo>; named: Set<PlayerInfo> }[] = [];
+    for (const l of lines) {
+      const hit = merged.filter((m) => [...l.involved].some((p) => m.involved.has(p)));
+      const u = { involved: new Set([...l.involved, ...hit.flatMap((m) => [...m.involved])]), named: new Set([...l.named, ...hit.flatMap((m) => [...m.named])]) };
+      merged.splice(0, merged.length, ...merged.filter((m) => !hit.includes(m)), u);
+    }
+    for (const m of merged) {
+      const involved = [...m.involved];
+      const spot = new Map(involved.map((p) => [p, spotAt(p)] as const));
+      const named = [...m.named];
+      const off = named.filter((p) => offSpot(spot.get(p)) || named.length < involved.length);
       const victimsHit = involved.filter((p) => hits.filter((h) => h.p === p).length > 0);
       const dead = victimsHit.filter((p) => hits.some((h) => h.p === p && life.diedFrom(p, h.e.timestamp)));
       const doubled = involved.filter((p) => hits.filter((h) => h.p === p).length >= 2);
       const why = off.length
-        ? off.map((p) => spotText(p, spot.get(p)!)).join("; ")
+        ? off.map((p) => { const s = spot.get(p); return s ? spotText(p, s) : `${p.name}'s position isn't logged`; }).join("; ") + " (read at the hit, so a player still on their way to their spot reads as off it)"
         : `nobody was clearly off their clock (${involved.map((p) => { const s = spot.get(p); return s ? `${p.name} ${s.dev.toFixed(0)} degrees, ${s.r.toFixed(1)}y out` : p.name; }).join("; ")}), so all are named`;
       const what = `Wave Cannon's spread lines overlapped on ${names(involved.map((p) => p.name))}${doubled.length ? ` (${names(doubled.map((p) => p.name))} took two lines)` : ""}: ${why}.`;
       for (const p of named) {
@@ -598,21 +640,22 @@ function detectSpreads(players: PlayerInfo[], life: Life, casts: EnemyEvent[], f
 
 // ── Wild Charge ─────────────────────────────────────────────────────────────
 
-type ChargeResult = { errors: PullError[]; raid?: PullError };
-
 /**
- * Wild Charge shares one line among everyone alive, aimed out from the boss
- * at a player. A player standing off the party's line drags the line (or
- * leaves the share short): named. When nobody stood off it but living
- * players weren't hit, those players are named.
+ * Wild Charge shares one line among all eight, aimed out from the boss at a
+ * player. A player standing off the party's line drags the line (or leaves
+ * the share short): named. When nobody stood off it but living players
+ * weren't hit, those players are named. Only judged with all eight alive:
+ * after a death the pull is already lost (player in the fights, 2026-10-15:
+ * K9nq Pull 7's charge with seven alive is moot).
  */
-function detectCharges(players: PlayerInfo[], life: Life, deaths: DeathEvent[], casts: EnemyEvent[], start: number, to: number): ChargeResult {
-  const out: ChargeResult = { errors: [] };
+function detectCharges(players: PlayerInfo[], life: Life, deaths: DeathEvent[], casts: EnemyEvent[], start: number, to: number): PullError[] {
+  const errors: PullError[] = [];
   for (const c of casts.filter((x) => x.abilityId === CHARGE && x.timestamp >= start && x.timestamp <= to)) {
     const t = c.timestamp;
     const hits = liveHits(players, life, [CHARGE], t - 100, t + 1500);
     if (!hits.length) continue;
     const alive = players.filter((p) => life.alive(p, t));
+    if (alive.length < players.length) continue;
     const pos = new Map(alive.map((p) => {
       const e = hits.find((h) => h.p === p)?.e;
       if (e?.x !== undefined && e.y !== undefined) return [p, { x: e.x, y: e.y }] as const;
@@ -629,20 +672,14 @@ function detectCharges(players: PlayerInfo[], life: Life, deaths: DeathEvent[], 
     const named = offLine.length ? offLine : missed;
     for (const p of named) {
       const off = offLine.includes(p);
-      out.errors.push(playerError(p, {
+      errors.push(playerError(p, {
         ruleId: TOP6_CHARGE_RULE_ID, severity: killed.length ? "Major" : "Minor", name: off ? "Off the Wild Charge Line" : "Missed the Wild Charge",
         description: `${off ? `Stood ~${lateral(p) > 50 ? "far" : lateral(p).toFixed(1) + " yalms"} off the party's Wild Charge line` : "Wasn't in Wild Charge's shared line"}: ${hits.length} of ${alive.length} living players shared it${missed.length && off ? ` (${names(missed.map((x) => x.name))} weren't hit)` : ""}.${killed.length ? ` ${names(killed.map((x) => x.name))} died.` : ""} Everyone stacks on one line behind the tanks so all eight split the charge.`,
         timestamp: t, abilityId: CHARGE, abilityName: "Wave Cannon (Wild Charge)",
       }));
     }
-    if (!out.raid && killed.length >= CHARGE_RAID_DEATHS) {
-      const short = alive.length < players.length ? ` with only ${alive.length} alive` : "";
-      out.raid = raidMarker(TOP6_WILD_CHARGE_RULE_ID, "Wild Charge Killed Several",
-        `Wild Charge killed ${killed.length} players (${names(killed.map((x) => x.name))})${short}${missed.length ? `, ${missed.length} living players outside the line` : ""}. With fewer than eight sharing, the charge is lethal, and every death costs a Brilliant Dynamis refund. Unresolvable from here; treated as the cutoff point.`,
-        Math.min(...hits.filter((h) => killed.includes(h.p)).map((h) => h.e.timestamp)), CHARGE, "Wave Cannon (Wild Charge)");
-    }
   }
-  return out;
+  return errors;
 }
 
 
@@ -650,9 +687,11 @@ function detectCharges(players: PlayerInfo[], life: Life, deaths: DeathEvent[], 
 
 /**
  * Each volley is two Flash Gales: one on the enmity target, one on the
- * farthest player, each a 5y circle. Both tanks alive and two or more
- * non-tanks hit means a circle landed on the party: the tank it missed
- * owed it (J17 +1:22.7: the DRK took the same slot's gale 3s later).
+ * farthest player, each a 5y circle. In both reports the WAR holds the boss
+ * at 4-7y and the DRK baits the far one at ~15y. Both tanks alive and two
+ * or more non-tanks hit means a circle landed on the party. The tank it
+ * missed owed it when a non-tank was the farthest player (J17 +81.9: the
+ * DRK 8.8y out, inside the party; the DRG farthest at 11.1y).
  */
 function detectGales(players: PlayerInfo[], life: Life, casts: EnemyEvent[], from: number, to: number, occurrences?: ReportedOccurrence[]): PullError[] {
   const errors: PullError[] = [];
@@ -670,14 +709,20 @@ function detectGales(players: PlayerInfo[], life: Life, casts: EnemyEvent[], fro
     const dead = others.filter((p) => hits.some((h) => h.p === p && life.diedFrom(p, h.e.timestamp)));
     const what = `Flash Gale's circle landed on the party (${others.length} non-tanks hit${dead.length ? `; ${names(dead.map((p) => p.name))} died` : ""}).`;
     const fix = "One tank holds the boss close and the other stands farthest from it, both clear of the party, through both volleys.";
-    if (missed.length) {
-      for (const p of missed) errors.push(playerError(p, {
+    const dist = new Map(players.filter((p) => life.alive(p, t)).map((p) => {
+      const q = interpolatePlayerPosition(p, t, { windowMs: 2000 });
+      return [p, q ? yalms(q.x, q.y) : undefined] as const;
+    }));
+    const farthest = [...dist].filter(([, d]) => d !== undefined).sort((a, b) => b[1]! - a[1]!)[0];
+    const owed = farthest && farthest[0].role !== "Tank" ? missed : [];
+    if (owed.length) {
+      for (const p of owed) errors.push(playerError(p, {
         ruleId: TOP6_GALE_RULE_ID, severity: dead.length ? "Major" : "Minor", name: "Flash Gale on the Party",
-        description: `${what} ${p.name} took neither gale, so they weren't the farthest player (or the enmity target). ${fix}`,
+        description: `${what} ${p.name} took neither gale: they stood ~${dist.get(p)?.toFixed(1) ?? "?"} yalms from the boss while ${farthest[0].name} was farthest at ~${farthest[1]!.toFixed(1)}, so the far gale went to the party. ${fix}`,
         timestamp: t, abilityId: FLASH_GALE, abilityName: "Flash Gale",
       }));
     } else {
-      errors.push(playerlessMinor(TOP6_GALE_RULE_ID, "Flash Gale on the Party", `${what} Both tanks were hit too, so the log can't say who stood wrong. ${fix}`, t, FLASH_GALE, "Flash Gale"));
+      errors.push(playerlessMinor(TOP6_GALE_RULE_ID, "Flash Gale on the Party", `${what} ${missed.length ? "The far tank was still the farthest player" : "Both tanks were hit too"}, so the log can't say who stood wrong. ${fix}`, t, FLASH_GALE, "Flash Gale"));
     }
   }
   return errors;
@@ -709,21 +754,32 @@ function numberExpiry(players: PlayerInfo[], life: Life, deaths: DeathEvent[], c
   return undefined;
 }
 
-/** One mechanic killing several players who still held Brilliant Dynamis. */
-function massDeaths(players: PlayerInfo[], life: Life, deaths: DeathEvent[], start: number, end: number): PullError[] {
-  const out: PullError[] = [];
-  const all = players.flatMap((p) => p.damageTaken.filter((e) => e.timestamp >= start && e.timestamp <= end && e.abilityId !== CHARGE && !bodyHit(e) && life.hitAlive(p, e.timestamp)).map((e) => ({ p, e })));
-  for (const id of uniq(all.map((h) => h.e.abilityId))) {
-    for (const g of clusterByGap(all.filter((h) => h.e.abilityId === id), (h) => h.e.timestamp, 3000)) {
-      const killed = uniq(g.filter((h) => life.diedFrom(h.p, h.e.timestamp) && !diedBefore(h.p, deaths, start, h.e.timestamp)).map((h) => h.p));
-      if (killed.length < MASS_DEATHS) continue;
-      const first = g.find((h) => killed.includes(h.p))!;
-      out.push(raidMarker(TOP6_MASS_DEATH_RULE_ID, `${first.e.abilityName} Killed Several`,
-        `${first.e.abilityName} killed ${killed.length} players (${names(killed.map((p) => p.name))}). Each death loses Brilliant Dynamis and its Limit Break refund, which the rest of the phase depends on. Unresolvable from here; treated as the cutoff point.`,
-        first.e.timestamp, id, first.e.abilityName));
-    }
+/**
+ * The first P6 death ends the pull (player in the fights, 2026-10-15): the
+ * dead player loses Brilliant Dynamis, its large damage reduction and its
+ * Limit Break refund, so the tank and healer LB chain can't get through
+ * both Magic Numbers. The planned DRK sacrifice is exempt: a tank who used
+ * their tank LB3 earlier in P6 dying to Magic Number (L16, J14).
+ */
+function firstDeath(players: PlayerInfo[], deaths: DeathEvent[], called: Set<DeathEvent>, start: number): PullError | undefined {
+  const sacrifice = (d: DeathEvent) => {
+    const p = byName(players, d.player);
+    return d.killingAbilityGameId === MAGIC_NUMBER && p?.role === "Tank" &&
+      p.casts.some((e) => TANK_LB3.has(e.abilityName) && e.timestamp >= start && e.timestamp < d.timestamp);
+  };
+  const d = deaths.filter((x) => x.timestamp >= start && !sacrifice(x)).sort((a, b) => a.timestamp - b.timestamp)[0];
+  if (!d) return undefined;
+  if (called.has(d)) {
+    const list = [...called].filter((x) => x.timestamp >= start).sort((a, b) => a.timestamp - b.timestamp);
+    return raidMarker(TOP6_CALLED_WIPE_RULE_ID, "Wipe Called",
+      `${names(list.map((x) => x.player))} died with no killing blow: the wipe was called and the raid reset into the deathwall.`,
+      d.timestamp - DEATH_EVENT_LAG_MS, 0, "Deaths");
   }
-  return out;
+  const id = d.killingAbilityGameId ?? 0;
+  const ability = id ? byName(players, d.player)?.damageTaken.find((e) => e.abilityId === id)?.abilityName ?? `ability ${id}` : undefined;
+  return raidMarker(TOP6_DEATH_RULE_ID, "Brilliant Dynamis Lost",
+    `${d.player} died (${ability ?? "no killing blow"}), losing Brilliant Dynamis: its damage reduction and its Limit Break refund are gone, and a raise doesn't bring them back, so the LB chain through both Magic Numbers can't be completed. Treated as the cutoff point.`,
+    d.timestamp - DEATH_EVENT_LAG_MS, id, ability ?? "Death");
 }
 
 
@@ -768,41 +824,19 @@ export function detectAlphaOmegaErrors(
   const p6Deaths = deathEvents.filter((d) => d.timestamp >= start);
   const casts = enemyCasts.filter((c) => c.timestamp >= start - 1000);
 
-  const charges = detectCharges(players, life, deathEvents, casts, start, end);
   const errors: PullError[] = [
     ...detectAvoidable(players, life, start - 1000, end),
     ...detectSpreads(players, life, casts, start, end),
-    ...charges.errors,
+    ...detectCharges(players, life, deathEvents, casts, start, end),
     ...detectGales(players, life, casts, start, end, occurrences),
   ];
 
-  // Mechanic Raids: only the earliest is kept.
-  const raids: PullError[] = [...massDeaths(players, life, deathEvents, start, end)];
-  if (charges.raid) raids.push(charges.raid);
-  const number = numberExpiry(players, life, deathEvents, casts, start);
-  if (number) raids.push(number);
-  const firstMech = raids.sort((a, b) => a.timestamp - b.timestamp)[0];
-  if (firstMech) errors.push(firstMech);
-
-  // Generic cutoffs, only the earliest and only before the mechanic Raid.
-  const generic: PullError[] = [];
-  const called = calledWipeDeaths(players, p6Deaths, end);
-  const calledList = p6Deaths.filter((d) => called.has(d)).sort((a, b) => a.timestamp - b.timestamp);
-  if (calledList.length >= CALLED_WIPE_COUNT) {
-    generic.push(raidMarker(TOP6_CALLED_WIPE_RULE_ID, "Wipe Called",
-      `${calledList.length} players died with no killing blow (${names(calledList.map((d) => d.player))}): the wipe was called and the raid reset into the deathwall.`,
-      calledList[0].timestamp - DEATH_EVENT_LAG_MS, 0, "Deaths"));
-  }
-  const outAt = (t: number) => players.filter((p) => !life.alive(p, t));
-  const collapseT = life.outIntervals.map((w) => w.start).filter((t) => t >= start && t <= end).sort((a, b) => a - b)
-    .find((t) => outAt(t).length >= COLLAPSE_DEAD_COUNT);
-  if (collapseT !== undefined) {
-    const who = outAt(collapseT).map((p) => p.name);
-    generic.push(raidMarker(TOP6_COLLAPSE_RULE_ID, "Party Collapse",
-      `${who.length} players were dead at once (${joinNames(who)}): without their Brilliant Dynamis refunds the Limit Break chain can't finish. Treated as the cutoff point.`,
-      collapseT + DEATH_EVENT_LAG_MS, 0, "Deaths"));
-  }
-  const marker = generic.sort((a, b) => a.timestamp - b.timestamp)[0];
-  if (marker && marker.timestamp < (firstMech?.timestamp ?? Infinity)) errors.push(marker);
+  // The cutoff: the first P6 death, or Magic Number running out with
+  // nobody dead yet, whichever came first.
+  const raids = [
+    firstDeath(players, p6Deaths, calledWipeDeaths(players, p6Deaths, end), start),
+    numberExpiry(players, life, deathEvents, casts, start),
+  ].filter((x): x is PullError => !!x).sort((a, b) => a.timestamp - b.timestamp);
+  if (raids.length) errors.push(raids[0]);
   return errors.sort((a, b) => a.timestamp - b.timestamp);
 }
