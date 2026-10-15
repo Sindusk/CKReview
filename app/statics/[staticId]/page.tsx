@@ -96,6 +96,12 @@ export default function StaticDashboardPage() {
   // Bumped when a player delete removes pulls, so the analysis panels
   // (which fetch for themselves) reload. Database reads only.
   const [dataVersion, setDataVersion] = useState(0);
+  // The static's content version (/version) as of the data on screen, and
+  // a newer one seen since: sessions added, resynced or removed elsewhere
+  // (another tab, another member). A notice offers the reload; the check
+  // is two aggregate queries in this app's database.
+  const [shownVersion, setShownVersion] = useState<string | null>(null);
+  const [newerVersion, setNewerVersion] = useState<{ version: string; reviews: number; was: number } | null>(null);
 
   useEffect(() => {
     if (!Number.isInteger(staticId)) return;
@@ -112,6 +118,11 @@ export default function StaticDashboardPage() {
   useEffect(() => {
     if (!Number.isInteger(staticId)) return;
 
+    setNewerVersion(null);
+    fetch(`/api/statics/${staticId}/version`)
+      .then(async (res) => { if (res.ok) setShownVersion((await res.json()).version); })
+      .catch(() => {});
+
     fetch(`/api/statics/${staticId}/reviews`)
       .then(async (res) => {
         const data = await res.json();
@@ -126,6 +137,30 @@ export default function StaticDashboardPage() {
       })
       .catch(() => {});
   }, [staticId, dataVersion]);
+
+  // Checks for a newer version when the tab comes back into view and every
+  // 30s while it's visible.
+  useEffect(() => {
+    if (!Number.isInteger(staticId) || shownVersion === null) return;
+    const check = () => {
+      if (document.visibilityState !== "visible") return;
+      fetch(`/api/statics/${staticId}/version`)
+        .then(async (res) => {
+          if (!res.ok) return;
+          const d: { version: string; reviews: number } = await res.json();
+          if (d.version !== shownVersion) setNewerVersion({ ...d, was: Number(shownVersion.split(":")[0]) });
+        })
+        .catch(() => {});
+    };
+    const timer = setInterval(check, 30_000);
+    document.addEventListener("visibilitychange", check);
+    window.addEventListener("focus", check);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", check);
+      window.removeEventListener("focus", check);
+    };
+  }, [staticId, shownVersion]);
 
   const sessions = useMemo(
     () => (pulls && reviews ? groupIntoSessions(pulls, reviews) : null),
@@ -182,6 +217,10 @@ export default function StaticDashboardPage() {
     }
     setReviews((prev) => prev?.filter((r) => r.id !== reviewId) ?? null);
     setPulls((prev) => prev?.filter((p) => p.reviewId !== reviewId) ?? null);
+    // This tab's own removal isn't news: take the new version as seen.
+    fetch(`/api/statics/${staticId}/version`)
+      .then(async (res) => { if (res.ok) setShownVersion((await res.json()).version); })
+      .catch(() => {});
     setExpanded((prev) => {
       const next = new Set(prev);
       next.delete(reviewId);
@@ -223,6 +262,23 @@ export default function StaticDashboardPage() {
   return (
     <div className="ck-app" style={{ minHeight: "100vh" }}>
       {header}
+
+      {newerVersion && (
+        <div role="status" style={{
+          position: "sticky", top: 0, zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center", gap: "12px",
+          padding: "9px 16px", background: "#14202b", borderBottom: "1px solid var(--ck-arcane-edge)", fontSize: "13px", color: "var(--ck-text)",
+        }}>
+          <span>
+            {newerVersion.reviews > newerVersion.was
+              ? `${newerVersion.reviews - newerVersion.was === 1 ? "A new session was" : `${newerVersion.reviews - newerVersion.was} new sessions were`} added to this static.`
+              : newerVersion.reviews < newerVersion.was
+                ? "A session was removed from this static."
+                : "A session in this static was resynced."}
+          </span>
+          <button className="ck-btn ck-btn--sm ck-btn--primary" onClick={() => setDataVersion((v) => v + 1)}>Refresh</button>
+          <button className="ck-btn ck-btn--sm" onClick={() => { setShownVersion(newerVersion.version); setNewerVersion(null); }}>Dismiss</button>
+        </div>
+      )}
 
       <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "28px 20px 48px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "22px" }}>
