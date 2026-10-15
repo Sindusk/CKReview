@@ -62,7 +62,7 @@
 
 import type { Pull } from "@/types/Pull";
 import type { CatalogEntry, HitPart, MitigationGame, MitigationHit } from "./types";
-import { HIT_CLUSTER_GAP_MS, SNAPSHOT_SLACK_MS, hitSpans, judged, phaseName } from "./analyze";
+import { HIT_CLUSTER_GAP_MS, SNAPSHOT_SLACK_MS, buildTankSurvival, hitSpans, judged, phaseName, type TankSurvival } from "./analyze";
 import { DEBUFF_REACH_OVERRIDES } from "./debuff-reach-overrides";
 
 // Applies of one cast on several enemies land within this of each other.
@@ -95,6 +95,11 @@ type Landing = {
 export type DebuffReach = {
   evidence: Map<string, ReachEvidence>;  // reachKey(ability, source, boss, statusId)
   landings: Landing[];
+  // Not debuff evidence, but cross-pull like it and handed to the analysis
+  // the same way: how much raw damage tanks survived per ability, so a
+  // buster that killed a tank isn't dropped as beyond mitigation
+  // (analyze.ts buildTankSurvival).
+  tankSurvival?: TankSurvival;
 };
 
 export const reachKey = (ability: string, source: string, boss: string, statusId: number) =>
@@ -145,9 +150,10 @@ function buildWindows(pull: Pull, statuses: Map<number, CatalogEntry>): Window[]
   return out;
 }
 
-function buildLandings(pull: Pull, statuses: Map<number, CatalogEntry>, game: MitigationGame): Landing[] {
+function buildLandings(pull: Pull, statuses: Map<number, CatalogEntry>, game: MitigationGame,
+  tankSurvival: TankSurvival): Landing[] {
   const out: Landing[] = [];
-  const hits = hitSpans(pull, game);
+  const hits = hitSpans(pull, game, tankSurvival);
   const applies = (pull.bossDebuffs ?? [])
     .filter((e) => statuses.has(e.statusId) && e.status !== "removed")
     .sort((a, b) => a.timestamp - b.timestamp);
@@ -237,12 +243,13 @@ export function buildDebuffReach(pulls: Pull[], game: MitigationGame, onAttempt?
   const statuses = debuffStatuses(game);
   const evidence = new Map<string, ReachEvidence>();
   const landings: Landing[] = [];
+  const tankSurvival = buildTankSurvival(pulls, game);
   const fresh = (ability: string, source: string, boss: string, debuff: string, statusId: number): ReachEvidence =>
     ({ ability, source, boss, debuff, statusId, reached: 0, missed: 0, shared: 0, inconclusive: 0, state: "unknown" });
 
   for (const pull of pulls) {
     const windows = buildWindows(pull, statuses);
-    landings.push(...buildLandings(pull, statuses, game));
+    landings.push(...buildLandings(pull, statuses, game, tankSurvival));
     if (windows.length === 0) continue;
     for (const wave of buildWaves(pull, game)) {
       const t = wave.startMs;
@@ -300,7 +307,7 @@ export function buildDebuffReach(pulls: Pull[], game: MitigationGame, onAttempt?
       evidence.set(reachKey(o.ability, source, o.boss, s.id), ev);
     }
   }
-  return { evidence, landings };
+  return { evidence, landings, tankSurvival };
 }
 
 /** The bosses `player` would put this status on for this hit (see header). */

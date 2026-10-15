@@ -18,7 +18,10 @@
 // count toward a sequence's later damage. Dead players' bodies still log
 // hits (immune, at 0 HP); those are left out. A hit whose targets were
 // mostly killed by damage no mitigation saves (beyondMitigation) isn't
-// graded: a mechanic hit the wrong players, or an enrage.
+// graded: a mechanic hit the wrong players, or an enrage. A tank's death
+// isn't "no mitigation saves" when a tank survived that ability at similar
+// raw damage in another loaded pull (TankSurvival, passed in with the
+// reach evidence): that is a buster the mitigation failed.
 //
 // Raw and taken damage are averages per target over the non-tanks (the
 // tanks on a tank-only hit); health before and after are the lowest of
@@ -136,7 +139,7 @@ export function analyzePullMitigation(pull: Pull, game: MitigationGame, reach?: 
   let sequenceId = 0;
   let lastEnd = -Infinity;
 
-  for (const span of spans(pull, playerNames, game)) {
+  for (const span of spans(pull, playerNames, game, reach?.tankSurvival)) {
     if (span.timestampMs - lastEnd > SEQUENCE_GAP_MS) sequenceId++;
     lastEnd = Math.max(lastEnd, span.endMs);
     hits.push(buildHit(pull, game, span.cluster, casts, { ...span, sequenceId }, reach));
@@ -149,13 +152,13 @@ export function analyzePullMitigation(pull: Pull, game: MitigationGame, reach?: 
 
 type Span = { cluster: TargetEvent[]; id: string; occurrence: number; timestampMs: number; endMs: number };
 
-function spans(pull: Pull, playerNames: Set<string>, game: MitigationGame): Span[] {
+function spans(pull: Pull, playerNames: Set<string>, game: MitigationGame, survived?: TankSurvival): Span[] {
   // Numbered by name within the phase: one mechanic can use several ability
   // IDs (Kefka's Flagrant Fire III variants), and counting per phase keeps
   // the cross-pull match key stable when an earlier phase plays out
   // differently (a skip, or a pull that started from a checkpoint).
   const occurrence = new Map<string, number>();
-  return joinClusters(findHitClusters(pull, playerNames, game)).map((cluster) => {
+  return joinClusters(findHitClusters(pull, playerNames, game, survived)).map((cluster) => {
     const first = cluster[0].event;
     const counter = `${phaseName(pull, first.timestamp) ?? ""}|${first.abilityName}`;
     const n = (occurrence.get(counter) ?? 0) + 1;
@@ -168,8 +171,8 @@ function spans(pull: Pull, playerNames: Set<string>, game: MitigationGame): Span
 }
 
 /** Each hit's cross-pull id and time span, without the analysis (debuff-reach.ts ties debuff casts to hits with it). */
-export function hitSpans(pull: Pull, game: MitigationGame): { id: string; timestampMs: number; endMs: number }[] {
-  return spans(pull, new Set(pull.players.map((p) => p.name)), game)
+export function hitSpans(pull: Pull, game: MitigationGame, survived?: TankSurvival): { id: string; timestampMs: number; endMs: number }[] {
+  return spans(pull, new Set(pull.players.map((p) => p.name)), game, survived)
     .map(({ id, timestampMs, endMs }) => ({ id, timestampMs, endMs }));
 }
 
@@ -182,12 +185,55 @@ export function hitSpans(pull: Pull, game: MitigationGame): { id: string; timest
 // damage alone can't tell. Vulnerable targets are left to the margin rules.
 const BEYOND_MITIGATION_RATIO = 1.5;
 const TANK_BEYOND_MITIGATION_RATIO = 2.0;
+// A tank killed by an ability isn't beyond mitigation when a tank survived
+// the same ability in some loaded pull at raw damage up to this much less
+// (TankSurvival, from every pull of the boss). FRU's Darkest Dance logs
+// 2.4-3.0x a tank's max HP raw: Amelia survived 2.9x in Pull 3 and died to
+// 3.0x in Pulls 11 and 24, which the 2.0x ratio alone hid from the timeline
+// (JZ1KXhDbqkNH3jxR, user 2026-10-15). Enrages and failed mechanics that
+// kill tanks run 6-45x and are never survived.
+const TANK_SURVIVED_SLACK = 1.15;
 
-function beyondMitigation({ player, event }: TargetEvent): boolean {
+/** Per ability ID, the highest raw damage / max HP a tank took and survived. */
+export type TankSurvival = Map<number, number>;
+
+/**
+ * The highest raw / max HP each enemy ability dealt to a tank who lived
+ * through it, over the given pulls (one boss's). Left out: DoTs, autos,
+ * a tank under an invuln or a vulnerability, and hits fully absorbed.
+ */
+export function buildTankSurvival(pulls: Pull[], game: MitigationGame): TankSurvival {
+  const out: TankSurvival = new Map();
+  for (const pull of pulls) {
+    const names = new Set(pull.players.map((p) => p.name));
+    for (const player of pull.players) {
+      if (player.role !== "Tank") continue;
+      for (const e of player.damageTaken) {
+        if (e.isDoT || game.isTick(e.abilityId) || game.isAutoAttack(e.abilityName)) continue;
+        if (!e.source || names.has(e.source) || e.overkill || !e.maxHealth || e.unmitigatedAmount === undefined) continue;
+        if (!e.healthBefore || (e.amount ?? 0) + (e.absorbed ?? 0) <= 0) continue;
+        // Some lethal hits log health before far above max (Lindwurm II's
+        // Mighty Magic: 1.51M before on 291k max, "surviving" 5.7x raw at
+        // 0.9): not a survival.
+        if (e.healthBefore > e.maxHealth) continue;
+        if ((e.activeBuffNames ?? []).some((b) => /Vulnerability Up/.test(b))) continue;
+        if ((e.statusIds ?? []).some((id) => game.statusIndex.get(id)?.entry.kind === "invuln")) continue;
+        const ratio = e.unmitigatedAmount / e.maxHealth;
+        if (ratio > (out.get(e.abilityId) ?? 0)) out.set(e.abilityId, ratio);
+      }
+    }
+  }
+  return out;
+}
+
+function beyondMitigation({ player, event }: TargetEvent, survived?: TankSurvival): boolean {
   if (!event.maxHealth || event.unmitigatedAmount === undefined || !event.overkill) return false;
   if ((event.activeBuffNames ?? []).some((b) => /Vulnerability Up/.test(b))) return false;
-  const limit = player.role === "Tank" ? TANK_BEYOND_MITIGATION_RATIO : BEYOND_MITIGATION_RATIO;
-  return event.unmitigatedAmount >= limit * event.maxHealth;
+  const tank = player.role === "Tank";
+  const limit = tank ? TANK_BEYOND_MITIGATION_RATIO : BEYOND_MITIGATION_RATIO;
+  const ratio = event.unmitigatedAmount / event.maxHealth;
+  if (tank && ratio <= (survived?.get(event.abilityId) ?? 0) * TANK_SURVIVED_SLACK) return false;
+  return ratio >= limit;
 }
 
 // A tank-only hit is graded only when it is a tank buster: raw damage on
@@ -214,7 +260,7 @@ function busterSized(hit: TargetEvent[]): boolean {
   return [...byPlayer.values()].some((b) => b.raw >= TANK_HIT_MIN_RAW * b.max);
 }
 
-function findHitClusters(pull: Pull, playerNames: Set<string>, game: MitigationGame): TargetEvent[][] {
+function findHitClusters(pull: Pull, playerNames: Set<string>, game: MitigationGame, survived?: TankSurvival): TargetEvent[][] {
   const byAbility = new Map<number, TargetEvent[]>();
   for (const player of pull.players) {
     for (const event of player.damageTaken) {
@@ -241,7 +287,7 @@ function findHitClusters(pull: Pull, playerNames: Set<string>, game: MitigationG
       current = [];
       if (hit.length === 0) return;
       const names = [...new Set(hit.map((t) => t.player.name))];
-      const beyond = new Set(hit.filter(beyondMitigation).map((t) => t.player.name));
+      const beyond = new Set(hit.filter((t) => beyondMitigation(t, survived)).map((t) => t.player.name));
       const tankOnly = hit.every((t) => t.player.role === "Tank");
       // A hit nobody took damage from (a gaze that was looked away from) is
       // not a damaging mechanic.
