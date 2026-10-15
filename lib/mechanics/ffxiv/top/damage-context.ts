@@ -68,9 +68,22 @@
 //   inferred from the log). Not built: per-player duties (World holders,
 //   monitor and Blaster sit-outs, tower soakers): nobody has measured that
 //   they cost damage.
-// - P6: no module yet; left out. The run's last hard enrage is P6's
-//   (Alpha Omega), so no phase is marked as deciding it until that phase
-//   is measured.
+// - P6 Alpha Omega (added 2026-10-15 from alpha-omega.ts's header and its
+//   reports J-L: 8 P6 pulls refetched from 6.8 min to the end, the kill
+//   bNcrLh7Y4dkHxM9q pull 16). 20.53M on every pull, and the kill took it
+//   to 0 at 18:52.0, 10.8s after the final Run's cast (31648, +241.2 from
+//   Cosmo Memory; the model puts its completion ~30s after it begins). The only hard enrage left, so this
+//   phase decides it: a fixed pool with no check before the kill. No hold:
+//   50% -> 30% took 59s and 20% -> 15% 19.5s, but those stretches are the
+//   Meteor adds and the two Magic Numbers, where the LB3 users are locked
+//   in their animations (not a group holding damage); 15% -> 1 HP took
+//   17.8s at full pace. The ~55s transition after Blind Faith (P6's
+//   segment starts at Blind Faith, Alpha Omega's first hit ~+56s later) is
+//   untargetable time, inferred from the log. The wipes dealt 6.3-14.2M.
+//   Not built: the LB3 users' animation lock (Meteor adds, Magic Numbers;
+//   nobody has measured what it costs here) and damage on the Cosmo
+//   Meteor adds (the plan kills them with the caster and ranged LB3s; the
+//   kill's players dealt 0.02M to them).
 //
 // Not built: per-player busy windows (Program Loop's tower soakers and
 // tether holders, Pantokrator's missile carriers): the module knows who,
@@ -124,6 +137,12 @@ const RULE_KEY_LABELS: Record<string, string> = {
   "ffxiv-top5-fist":        "Rocket Punch",
   "ffxiv-top5-raidwide":    "Run: Dynamis",
   "ffxiv-top5-blind-faith": "Blind Faith",
+  "ffxiv-top6-avoidable":    "Alpha Omega",
+  "ffxiv-top6-spread":       "Wave Cannon (P6)",
+  "ffxiv-top6-charge":       "Wild Charge",
+  "ffxiv-top6-wild-charge":  "Wild Charge",
+  "ffxiv-top6-mass-death":   "Alpha Omega",
+  "ffxiv-top6-magic-number": "Magic Number",
 };
 
 // The revived Omega's first P4 hits can log a stale near-0 HP (C28 +7.7):
@@ -147,6 +166,7 @@ export const TOP_DAMAGE_CONTEXT: DamageContext = {
     3: { pool: 11_126_000, fixedPool: true, carriesOver: false, note: "Omega Reconfigured to 1 HP before Ion Efflux (~+178 from the transition); the phase ends at a fixed time; no hold" },
     4: { pool: 4_900_000, fixedPool: false, carriesOver: false, note: "Omega under 20% by Blue Screen (+62 from P4's first cast); P5 is a new enemy; no hold" },
     5: { pool: 13_710_000, fixedPool: false, carriesOver: false, note: "Omega-M under 20% by Blind Faith (+294 from P5's first cast); P6 is a new enemy; no hold" },
+    6: { pool: 20_530_000, fixedPool: true, carriesOver: false, decidesEnrage: true, note: "Alpha Omega killed during the final Run (cast +241 from Cosmo Memory, ~30s to the enrage); no hold" },
   },
   forcedWindows: (pull) => {
     const out: ForcedWindow[] = [];
