@@ -13,8 +13,9 @@
 //     Tendo Setsugekka (inference).
 //   - AoE on too few targets (AoeChecker.ts, 2026-10-15): Kyuten, Tenka /
 //     Tendo Goken and their Kaeshi under 3, Guren on one target (7.4's
-//     breakpoint), each against its single-target twin. Seen firing, not matched against xivanalysis:
-//     Xk2DKZwVp4Ar6d7y Enuo pull 2 0:27 (Tendo Goken and its Kaeshi,
+//     breakpoint), each against its single-target twin. Matched against
+//     xivanalysis on Enuo pull 2 (Tendo Goken and its Kaeshi) and Necron
+//     pull 15 (Guren). Seen firing: Xk2DKZwVp4Ar6d7y Enuo pull 2 0:27 (Tendo Goken and its Kaeshi,
 //     179k + 154k: the opener's second Meikyo went Gekko, Kasha, Gekko, so
 //     2 Sen where Yukikaze would have made 3 in the same GCDs), pull 4
 //     6:42, pG319BgHTnPJc6Ft Necron pulls 2, 3, 10, L9BzKkD2nxcVgHTC
