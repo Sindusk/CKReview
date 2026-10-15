@@ -28,7 +28,20 @@
 //   Party Synergy's untargetable stretch is inferred from the log. Not
 //   built: damage into Omega-F while Omega-M's shield makes her invulnerable
 //   (Limitless Synergy), since the log can't tell the two bosses apart.
-// - P3-P6: no module yet; left out. The run's last hard enrage is P6's
+// - P3 Omega Reconfigured (added 2026-10-14 from omega-reconfiguredd.ts's
+//   header and its five reports: 42 P3 pulls fetched to 8:00, 13 P3
+//   clears). 11.13M on every pull, first hittable ~+23.7 from the
+//   transition's first cast (the transition before it is untargetable,
+//   inferred from the log). Every clear took it to 1 HP at +166.6 (D26) to
+//   +177.8 (E19), before Ion Efflux (begins +178.2; the enrage wipes B63
+//   and C17 had 2.5% and 0.1% left). FFLogs ends the P3 segment at a fixed
+//   ~+179 (7:28-7:36 into the pull) however early 1 HP came, so it's a
+//   fixed pool and damage past 1 HP is wasted. No hold: 10% -> 5% took
+//   4.6-9.2s and 5% -> 1 HP 5.5-12.8s across the clears, the same pace as
+//   before. Not built: per-player Hello World duties (tower soakers, rot
+//   hand-offs, tethers) and the monitor holders: nobody has measured that
+//   they cost damage.
+// - P4-P6: no module yet; left out. The run's last hard enrage is P6's
 //   (Alpha Omega), so no phase is marked as deciding it until that phase
 //   is measured.
 //
@@ -55,6 +68,15 @@ const RULE_KEY_LABELS: Record<string, string> = {
   "ffxiv-top2-fire":        "Party Synergy",
   "ffxiv-top2-stack":       "Party Synergy",
   "ffxiv-top2-synergy":     "Party Synergy",
+  "ffxiv-top3-avoidable":   "Omega Reconfigured transition",
+  "ffxiv-top3-sniper":      "Sniper Cannon",
+  "ffxiv-top3-transition":  "Omega Reconfigured transition",
+  "ffxiv-top3-rot-pass":    "Hello World",
+  "ffxiv-top3-rot-contact": "Hello World",
+  "ffxiv-top3-rot-clip":    "Hello World",
+  "ffxiv-top3-defamation":  "Hello World",
+  "ffxiv-top3-hello-world": "Hello World",
+  "ffxiv-top3-monitor":     "Oversampled Wave Cannon",
 };
 
 /** First hit in the span leaving `target` at or under `line` of its max HP. */
@@ -70,12 +92,17 @@ export const TOP_DAMAGE_CONTEXT: DamageContext = {
   phases: {
     1: { pool: 8_560_000, fixedPool: true, carriesOver: false, note: "Omega to 1 HP before Atomic Ray (~2:08); no hold" },
     2: { pool: 8_620_000, fixedPool: true, carriesOver: false, multiTarget: true, note: "Omega-M and Omega-F (4.31M each) both down before Laser Shower (Firewall +141.7); no hold" },
+    3: { pool: 11_126_000, fixedPool: true, carriesOver: false, note: "Omega Reconfigured to 1 HP before Ion Efflux (~+178 from the transition); the phase ends at a fixed time; no hold" },
   },
   forcedWindows: (pull) => {
     const out: ForcedWindow[] = [];
     for (const span of phaseSpans(pull, 1)) {
       const dead = crossed(pull, span, "Omega", ONE_HP);
       if (dead !== undefined) out.push({ startMs: dead, endMs: span.endMs, cause: "P1 done: Omega at 1 HP" });
+    }
+    for (const span of phaseSpans(pull, 3)) {
+      const dead = crossed(pull, span, "Omega", ONE_HP);
+      if (dead !== undefined) out.push({ startMs: dead, endMs: span.endMs, cause: "P3 done: Omega Reconfigured at 1 HP" });
     }
     return out;
   },
