@@ -1,6 +1,6 @@
 // lib/xivapi-tooltips.ts
 //
-// In-game descriptions for FFXIV actions and statuses, from XIVAPI v2
+// In-game tooltip data for FFXIV actions and statuses, from XIVAPI v2
 // (v2.xivapi.com, CORS-open), for the ability hover tooltips. Fetched
 // lazily on the first hover of each ability, never on navigation, and
 // cached in memory and localStorage (7 days, so a patch's tooltip
@@ -9,42 +9,117 @@
 // FFLogs ids: an action's abilityGameID is its Action row id; a status
 // (buff, debuff, DoT tick) is 1,000,000 + its Status row id. An action's
 // description lives on the ActionTransient sheet, which v2 joins in via
-// `transient=Description`. A row whose name doesn't match the log's is
-// dropped, so an id from another sheet (items, pets) shows nothing
-// rather than the wrong text.
+// `transient=`. A row whose name doesn't match the log's is dropped, so
+// an id from another sheet (items, pets) shows nothing rather than the
+// wrong text. Boss casts are Action rows with an empty description, so
+// they come back null too.
+//
+// The description is asked for `@as(html)`, which keeps the game's
+// keyword colours (green "Additional Effect:", yellow status names) as
+// <span style="color:rgba(…)"> and line breaks as <br>. It's parsed into
+// plain segments here, never injected as HTML.
 
-export type XivTooltip = { description: string } | null;
+export type XivSegment = { text: string; color?: string } | { br: true };
+
+export type XivTooltip = {
+  kind:        "action" | "status";
+  description: XivSegment[];
+  category?:   string;   // Spell / Weaponskill / Ability
+  castMs?:     number;   // 0 = instant
+  recastMs?:   number;
+  mpCost?:     number;
+  charges?:    number;   // only when more than one
+  range?:      number;   // yalms; melee rows come back as 3
+  radius?:     number;
+  level?:      number;
+  affinity?:   string;   // ClassJobCategory name ("AST", "GLA MRD PLD …")
+} | null;
 
 const API = "https://v2.xivapi.com/api/sheet";
 const STATUS_OFFSET = 1_000_000;
 const TTL_MS = 7 * 24 * 3600 * 1000;
+const STORE_PREFIX = "xivapi2:";  // bump when XivTooltip's shape changes
+const MP_COST_TYPE = 3;
+const ACTION_FIELDS = "Name,ActionCategory.Name,Cast100ms,Recast100ms,PrimaryCostType,PrimaryCostValue,MaxCharges,Range,EffectRange,ClassJobLevel,ClassJobCategory.Name";
 const memory = new Map<string, Promise<XivTooltip>>();
 
-function urlOf(id: number): { key: string; url: string } {
+function urlOf(id: number): { key: string; url: string; status: boolean } {
   if (id >= STATUS_OFFSET) {
     const row = id - STATUS_OFFSET;
-    return { key: `Status/${row}`, url: `${API}/Status/${row}?fields=Name,Description` };
+    return { key: `Status/${row}`, status: true, url: `${API}/Status/${row}?fields=Name,Description@as(html)` };
   }
-  return { key: `Action/${id}`, url: `${API}/Action/${id}?fields=Name&transient=Description` };
+  return { key: `Action/${id}`, status: false, url: `${API}/Action/${id}?fields=${ACTION_FIELDS}&transient=Description@as(html)` };
 }
 
 function readStore(key: string): XivTooltip | undefined {
   try {
-    const raw = localStorage.getItem(`xivapi:${key}`);
+    const raw = localStorage.getItem(STORE_PREFIX + key);
     if (!raw) return undefined;
     const v = JSON.parse(raw) as { at: number; tip: XivTooltip };
     return Date.now() - v.at < TTL_MS ? v.tip : undefined;
   } catch { return undefined; }
 }
 function writeStore(key: string, tip: XivTooltip) {
-  try { localStorage.setItem(`xivapi:${key}`, JSON.stringify({ at: Date.now(), tip })); } catch { /* private window */ }
+  try { localStorage.setItem(STORE_PREFIX + key, JSON.stringify({ at: Date.now(), tip })); } catch { /* private window */ }
+}
+
+const ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', "#39": "'", apos: "'", nbsp: " " };
+const decode = (s: string) => s.replace(/&(amp|lt|gt|quot|#39|apos|nbsp);/g, (_, e: string) => ENTITIES[e]);
+
+/** XIVAPI's description HTML → segments: <br>, coloured <span>s, text. Other tags are dropped. */
+export function parseXivHtml(html: string): XivSegment[] {
+  const out: XivSegment[] = [];
+  const colors: (string | undefined)[] = [];
+  for (const m of html.matchAll(/<br\s*\/?>|<span\b([^>]*)>|<\/span>|<[^>]*>|[^<]+/gi)) {
+    const tok = m[0];
+    if (/^<br/i.test(tok)) out.push({ br: true });
+    else if (/^<span/i.test(tok)) {
+      const c = /color:\s*(rgba?\([\d.,\s]+\)|#[0-9a-f]{3,8})/i.exec(m[1] ?? "")?.[1];
+      colors.push(c ?? colors[colors.length - 1]);
+    } else if (/^<\/span/i.test(tok)) colors.pop();
+    else if (!tok.startsWith("<")) {
+      const color = colors[colors.length - 1];
+      out.push(color ? { text: decode(tok), color } : { text: decode(tok) });
+    }
+  }
+  return out;
 }
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 
-/** The ability's in-game description, or null when XIVAPI has none for it. */
+type Row = {
+  fields?: {
+    Name?: string; "Description@as(html)"?: string;
+    ActionCategory?: { fields?: { Name?: string } }; ClassJobCategory?: { fields?: { Name?: string } };
+    Cast100ms?: number; Recast100ms?: number; PrimaryCostType?: number; PrimaryCostValue?: number;
+    MaxCharges?: number; Range?: number; EffectRange?: number; ClassJobLevel?: number;
+  };
+  transient?: { "Description@as(html)"?: string };
+};
+
+function toTooltip(j: Row, status: boolean): XivTooltip {
+  const f = j.fields ?? {};
+  const html = (j.transient?.["Description@as(html)"] ?? f["Description@as(html)"] ?? "").trim();
+  if (!html) return null;
+  const description = parseXivHtml(html);
+  if (status) return { kind: "status", description };
+  return {
+    kind: "action", description,
+    category: f.ActionCategory?.fields?.Name || undefined,
+    castMs:   f.Cast100ms !== undefined ? f.Cast100ms * 100 : undefined,
+    recastMs: f.Recast100ms !== undefined ? f.Recast100ms * 100 : undefined,
+    mpCost:   f.PrimaryCostType === MP_COST_TYPE && f.PrimaryCostValue ? f.PrimaryCostValue * 100 : undefined,
+    charges:  f.MaxCharges && f.MaxCharges > 1 ? f.MaxCharges : undefined,
+    range:    f.Range === undefined ? undefined : f.Range < 0 ? 3 : f.Range,
+    radius:   f.EffectRange,
+    level:    f.ClassJobLevel || undefined,
+    affinity: f.ClassJobCategory?.fields?.Name || undefined,
+  };
+}
+
+/** The ability's in-game tooltip data, or null when XIVAPI has none for it. */
 export function fetchXivTooltip(id: number, name: string): Promise<XivTooltip> {
-  const { key, url } = urlOf(id);
+  const { key, url, status } = urlOf(id);
   const hit = memory.get(key);
   if (hit) return hit;
   const stored = readStore(key);
@@ -57,10 +132,9 @@ export function fetchXivTooltip(id: number, name: string): Promise<XivTooltip> {
     .then(async (r) => {
       if (r.status === 404) return null;
       if (!r.ok) throw new Error(`XIVAPI ${r.status}`);
-      const j = await r.json() as { fields?: { Name?: string; Description?: string }; transient?: { Description?: string } };
-      const desc = (j.transient?.Description ?? j.fields?.Description ?? "").trim();
-      if (!desc || norm(j.fields?.Name ?? "") !== norm(name)) return null;
-      return { description: desc };
+      const j = await r.json() as Row;
+      if (norm(j.fields?.Name ?? "") !== norm(name)) return null;
+      return toTooltip(j, status);
     })
     .then((tip) => { writeStore(key, tip); return tip; })
     .catch(() => { memory.delete(key); return null; });  // network error: retry on a later hover

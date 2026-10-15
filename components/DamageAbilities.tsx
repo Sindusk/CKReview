@@ -155,6 +155,8 @@ export function AbilityTip({ name, icons, children, style }: {
   if (!a) return <span style={style}>{children}</span>;
   const url = externalUrl(a, icons.game);
   const action = a.status || a.id === undefined ? undefined : gameOf(icons.game).action(a.id);
+  // The app's own stats: shown only when XIVAPI has no tooltip for it.
+  const stats: string[] = [];
   const lines: string[] = [];
   if (a.aliasOf) lines.push(`Gauge timer, kept up by ${a.aliasOf}`);
   else if (action) {
@@ -162,15 +164,15 @@ export function AbilityTip({ name, icons, children, style }: {
     if (action.onGcd && action.recastMs > 0) parts.push(`${secs(action.recastMs)} recast`);
     if (action.cooldownMs > Math.max(action.recastMs, 0) || (!action.onGcd && action.cooldownMs > 0)) parts.push(`${secs(action.cooldownMs)} cooldown`);
     if (action.charges > 1) parts.push(`${action.charges} charges`);
-    lines.push(parts.join(" · "));
-  } else if (a.status) lines.push(a.applied > 0 ? "Status" : "Damage or effect");
+    stats.push(parts.join(" · "));
+  } else if (a.status) stats.push(a.applied > 0 ? "Status" : "Damage or effect");
   if (a.castMsMedian) lines.push(`${secs(Math.round(a.castMsMedian / 100) * 100)} cast (this player's median)`);
   const where = icons.pulls > 1 ? `in ${icons.pulls} pulls` : "this pull";
   if (a.casts > 0) lines.push(`Used ${a.casts} time${a.casts === 1 ? "" : "s"} ${where}`);
   else if (a.applied > 0) lines.push(`Applied ${a.applied} time${a.applied === 1 ? "" : "s"} ${where}`);
 
   return (
-    <AbilityHoverTip game={icons.game} id={a.aliasOf ? undefined : a.id} name={a.name} icon={a.icon} lines={lines}
+    <AbilityHoverTip game={icons.game} id={a.aliasOf ? undefined : a.id} name={a.name} icon={a.icon} lines={lines} fallbackLines={stats}
       footer={url && "Click for the full tooltip on Wowhead"} style={style}
       onClick={url ? () => window.open(url, "_blank", "noopener,noreferrer") : undefined}>
       {children}
