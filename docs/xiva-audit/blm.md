@@ -1,0 +1,105 @@
+# xivanalysis audit: Black Mage
+
+- **Clone:** xivanalysis `f532855e635bdfb4211cec8128d582dadfdc6a75`
+  (2026-09-25). Records extracted 2026-10-15 by a Sonnet subagent (batch 3),
+  spot-checked (3 of 3 matched their source); reconciled in the main session.
+  Sources are relative to `src/parser/jobs/blm/` in the clone.
+- **Patch:** heavily patch-branched: 7.2 reworked the job (Thunder moved to
+  core DoTs, Triplecast dropped from the cooldown checklist, Ley Lines judged
+  by casts under Circle of Power instead of uptime, Firestarter / Thunderhead
+  made permanent, a Cold Fire III rule replacing the Firestarter one). Foul
+  needs 3 targets before 7.2 and 2 from 7.2; Flare 3 before 7.1, 2 from 7.1.
+  Supported 7.0–7.5.
+- **App:** `lib/damage/ffxiv/jobs/caster.ts` (`BLM_CHECKS`: `highThunder`,
+  `blmAoe`), `tracked-cooldowns.ts` ("Black Mage"), generic checks. Checked
+  against xivanalysis once (2T1HzdPKgbhM43am fight 10: 3 interrupted casts,
+  2 Freezes). **No Black Mage in the samples' rosters since; most rows are
+  unverified.**
+- **xivanalysis bugs found** (from the extraction):
+  - `FlareStarUsageEvaluator.tsx:33` and `IceMageEvaluator.tsx:54`: the
+    "don't count it if they died" test is inverted, so these two suggestions
+    count only windows where the player *died*.
+  - `RotationWatchdog.tsx:455` reads `lastFlareIndex` inside a branch keyed
+    on `manafontFlareIndex`.
+  - Thunderhead and Firestarter are permanent from 7.2, so their dropped
+    suggestions can't fire there.
+
+## Ledger
+
+| id | status | app check | fires-on | notes |
+|---|---|---|---|---|
+| blm/DoTs/uptime | covered | `highThunder` (`dotFindings`, against Fire IV) | High Thunder / II off the target | 7.2+ in xivanalysis; it adds two per-status averages, not a union. |
+| blm/DoTs/clipping | wrong | — | High Thunder refreshed early (6s / 9s / 12s a minute) | Target-blind, and a Thunderhead refresh up to ~3s early is expected. The app values each refresh (2T1HzdPKgbhM43am: 0.66M read by the old seconds basis). |
+| blm/DoTs/applied-into-invuln | superseded | `highThunder` | a High Thunder shortly before invulnerability | Table only. |
+| blm/Thunder/uptime | superseded | `highThunder` | (before 7.2) High Thunder off the target | Pre-7.2 module; same check. |
+| blm/Thunder/excess-clipping | wrong | — | (before 7.2) clipping past 3s a refresh | Same reasons as clipping. |
+| blm/AoEUsages/foul | verified | `blmAoe` (vs Xenoglossy) | Foul on too few targets | The app flags one target only: right from 7.2 (minimum 2); before 7.2 xivanalysis needs 3. |
+| blm/AoEUsages/flare | covered | `blmAoe` (vs Fire IV) | Flare on too few targets | Same: right from 7.1. |
+| blm/AoEUsages/freeze | verified | `blmAoe` (minimum 3) | Freeze on under 3 | 2T1HzdPKgbhM43am 7:55, 8:15 matched. |
+| blm/AoEUsages/high-fire-ii | candidate | — | High Fire II on under 3 | Not paired in `blmAoe`. |
+| blm/AoEUsages/high-blizzard-ii | candidate | — | High Blizzard II on under 3 | Same. |
+| blm/AoEUsages/high-thunder-ii | candidate | — | High Thunder II on one target | Same; also counted as the DoT. |
+| blm/AoEUsages/thunder-iv, blizzard-ii, fire-ii | wrong | — | — | Replaced at level 82+; can't occur at 100. |
+| blm/OGCDDowntime/uses | covered | `checkCooldownDrift` (hold 5s, first use 15s / Manafont 25s) | Ley Lines, Manafont, Amplifier (and Triplecast before 7.2) held | The app tracks Triplecast on every patch; xivanalysis drops it from 7.2. |
+| blm/Procs/dropped-thunderhead | covered | `checkProcs` | Thunderhead expiring | Before 7.2 only (permanent from 7.2). |
+| blm/Procs/dropped-firestarter | covered | `checkProcs` | Firestarter expiring | Same. |
+| blm/Procs/overwritten-and-invuln-table | no-damage | — | — | Table only. |
+| blm/Gauge/lost-polyglot | candidate | — | the Polyglot timer stopping (Enochian dropped) | Major. A lost Xenoglossy per 30s. Inferred from Astral Fire / Umbral Ice, which the casts determine. |
+| blm/Gauge/overwritten-polyglot | candidate | — | a Polyglot gained at the cap | Major. A lost Xenoglossy each; inferred from the timer and spends. |
+| blm/Gauge/dropped-enochian | candidate | — | (before 7.2) Astral Fire / Umbral Ice timing out | Medium. The same loss as lost-polyglot. |
+| blm/Gauge/overwritten-paradox | candidate | — | a Paradox gained while one is held | Major (the first on 7.2+ forgiven). Header: not built (gauge). |
+| blm/Leylines/uptime-pre72 | candidate | — | (before 7.2) Circle of Power uptime under 90% of Ley Lines | Leaving the circle loses the 15% speed. |
+| blm/Leylines/casts-72plus | candidate | — | (7.2+) GCDs cast outside Circle of Power while Ley Lines is up | Checklist 95%. The log has the Circle of Power status. |
+| blm/Swiftcast/unused | no-damage | — | Swiftcast unused | Utility. |
+| blm/Triplecast/overwritten | candidate | — | Triplecast pressed with stacks still up | Minor 1, Medium 2, Major 4. Lost instant casts; log-visible. |
+| blm/RotationWatchdog/ExpectedFire/despair | unverifiable | — | a fire phase missing Despair | Minor 1, Medium 3, Major 5. Rests on MP, which the app's pull data doesn't carry. |
+| blm/RotationWatchdog/ExpectedFire/fire4 | unverifiable | — | a fire phase short of Fire IVs | Display only; MP-based. |
+| blm/RotationWatchdog/ExpectedFire/flarestar-count | unverifiable | — | a fire phase without Flare Star | Display only; Astral Soul inferred. |
+| blm/RotationWatchdog/FlareStarUsage/suggestion | wrong | — | Flare Star missing | Counts only windows where the player died (inverted test, bug). |
+| blm/RotationWatchdog/ManafontTiming/suggestion | unverifiable | — | Manafont before Despair | Minor 1, Medium 2, Major 3. MP-gated. |
+| blm/RotationWatchdog/ExtraF1/suggestion | candidate | — | any Fire I | Medium 1, Major 2. All Fire I is wrong in Dawntrail; log-visible. |
+| blm/RotationWatchdog/FirestarterUsage/suggestion-pre72 | candidate | — | (before 7.2) Paradox then a hardcast Fire III | Minor. |
+| blm/RotationWatchdog/ColdF3/suggestion | candidate | — | (7.2+) Fire III from Umbral Ice 3 with 3 hearts | Minor 1, Medium 3, Major 5. Inferred gauge. |
+| blm/RotationWatchdog/LukewarmF4/suggestion | candidate | — | Fire IV before Astral Fire 3 | Medium 1, Major 2. Inferred gauge. |
+| blm/RotationWatchdog/IceMage/suggestion | wrong | — | an ice-only rotation window | Same inverted death test (bug). |
+| blm/RotationWatchdog/SkipThunder/suggestion | candidate | — | a Thunder in the last fire phase before downtime / the kill that cost a fire spell | Minor 1, Medium 2, Major 3. |
+| blm/RotationWatchdog/UptimeSouls/suggestion | candidate | — | Umbral Soul while the boss is targetable | Minor 1, Medium 3, Major 5. A GCD with no damage; log-visible. |
+| blm/RotationWatchdog/MissedIceParadox/error-code | no-damage | — | — | A note code only. |
+| blm/Weaving/too-many-weaves | covered | `checkGcdGaps` | weaves past the limit (1 allowed in some AF3 / UI3 cases) | — |
+| blm/Interrupts | verified | `checkInterrupts` | a cancelled cast | 2T1HzdPKgbhM43am 3 matched. |
+| blm/AlwaysBeCasting, Death | covered | `checkGcdGaps`, `checkDeaths` | — | Generic. |
+
+## Records
+
+| id | source | trigger / threshold | damage | log-visible | doubts |
+|---|---|---|---|---|---|
+| blm/DoTs/* | modules/DoTs.tsx:9-77; DoTsCommon.tsx | uptime checklist 95% (7.2+); clipping Minor 6s, Medium 9s, Major 12s a minute | yes | yes | sum of averages; target-blind |
+| blm/Thunder/* | modules/Thunder.tsx:20-155 | before 7.2: uptime 95%; clipping past 3s a refresh: Medium, 2× Major | yes | yes | — |
+| blm/AoEUsages/* | modules/AoEUsages.ts:4-53 | Foul 3 / 2 (7.2), Flare 3 / 2 (7.1), Thunder IV 2, HT2 2, Blizzard II 3, HB2 3, Fire II 4, HF2 3, Freeze 3: Minor 1, Medium 4, Major 7 | yes | yes | — |
+| blm/OGCDDowntime/uses | modules/OGCDDowntime.tsx:4-33 | hold 5s, first use 15s (Manafont 25s); Triplecast before 7.2; checklist 95% | yes | yes | — |
+| blm/Procs/* | modules/Procs.tsx:12-65 | Thunderhead / Firestarter dropped: Medium | yes | yes | permanent from 7.2 |
+| blm/Gauge/* | modules/Gauge.tsx:122-691 | lost / overwritten Polyglot: Major; dropped Enochian: Medium; overwritten Paradox: Major | yes | no (AF / UI inferred) | death counted as expiry |
+| blm/Leylines/* | modules/Leylines.tsx:63-322 | before 7.2: CoP ÷ Ley Lines uptime 90%; 7.2+: casts under CoP 95% | yes | yes | 0% with no Ley Lines |
+| blm/Swiftcast/unused | modules/Swiftcast.tsx:11-44 | core: Major at 1 | no | yes | — |
+| blm/Triplecast/overwritten | modules/Triplecast.tsx:41-108 | Minor 1, Medium 2, Major 4 | yes | yes | — |
+| blm/RotationWatchdog/* | modules/RotationWatchdog.tsx:63-506; RotationWatchdog/*Evaluator.tsx | per fire-phase window: missing Despair / Fire IV / Flare Star, Manafont timing, extra Fire I, cold Fire III, lukewarm Fire IV, ice-only windows, Thunder before downtime, Umbral Soul in uptime | yes | partly (MP and gauge inferred) | inverted death tests |
+| blm/Weaving/too-many-weaves | modules/Weaving.tsx:7-51 | core limit, 1 allowed with Transpose / role actions / AF3-UI3 casts: Medium 1, Major 5 | yes | yes | — |
+
+## Open
+
+In priority order (biggest damage cost first). **A Black Mage sample with
+its xivanalysis page is needed first**; nothing here has been seen since
+fight 10.
+
+1. **blm/Gauge/lost-polyglot, overwritten-polyglot** (candidates). A lost
+   Xenoglossy each; the Astral Fire / Umbral Ice simulation is the base for
+   most of the rows below too.
+2. **blm/AoEUsages/high-fire-ii, high-blizzard-ii, high-thunder-ii**
+   (candidates). Add the pairs.
+3. **blm/Leylines/casts-72plus** (candidate). Casts outside Circle of
+   Power, from the status.
+4. **blm/RotationWatchdog/ExtraF1, UptimeSouls, Triplecast/overwritten**
+   (candidates). Log-visible from casts.
+5. **blm/Gauge/overwritten-paradox, ColdF3, LukewarmF4, SkipThunder**
+   (candidates). Gauge-inferred.
+6. **MP-based rows** (unverifiable): need MP in the pull data first.

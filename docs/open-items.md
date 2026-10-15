@@ -179,9 +179,10 @@ and delete them from the header.
 ## Plans not started
 
 - [xiva-audit-plan.md](xiva-audit-plan.md): audit every xivanalysis
-  module job by job against the FFXIV damage checks. Pilot (Bard),
-  batch 1 and batch 2 done (2026-10-15). Batch 3 next: BLM, SMN, RDM, WHM.
-  Each ledger's "Open" list is its work.
+  module job by job against the FFXIV damage checks. Phases 1 and 2 done
+  for all 21 jobs (2026-10-15). Phase 3 (premise and firing checks,
+  building candidates) is ongoing: each ledger's "Open" list is its work.
+  Samples missing: Machinist, White Mage, a recent Black Mage.
   - [core.md](xiva-audit/core.md): core modules, 3 candidates.
   - [brd.md](xiva-audit/brd.md): Bard, 1 candidate, 4 covered.
   - [dnc.md](xiva-audit/dnc.md): Dancer, 9 candidates (no AoE check;
@@ -205,6 +206,12 @@ and delete them from the header.
   - [sam.md](xiva-audit/sam.md): Samurai, 6 candidates, 13 covered (no
     page compared yet).
   - [mch.md](xiva-audit/mch.md): Machinist, 11 candidates, 7 covered (no
+    sample on disk).
+  - [blm.md](xiva-audit/blm.md): Black Mage, 16 candidates (Polyglot,
+    Ley Lines, rotation), 7 covered; MP-based rules unverifiable.
+  - [smn.md](xiva-audit/smn.md): Summoner, 10 candidates, 4 covered.
+  - [rdm.md](xiva-audit/rdm.md): Red Mage, 8 candidates, 9 covered.
+  - [whm.md](xiva-audit/whm.md): White Mage, 3 candidates, 6 covered (no
     sample on disk).
 - [wowa-audit-plan.md](wowa-audit-plan.md): the same for WoWAnalyzer
   (reference only, AGPL). After the FFXIV pilot.
