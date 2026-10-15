@@ -56,7 +56,9 @@ function StatBand({ tip }: { tip: NonNullable<XivTooltip> }) {
   if (!cols.length) return null;
   return (
     <div style={{
-      display: "grid", gridTemplateColumns: `repeat(${cols.length}, 1fr)`, margin: "7px -10px 7px", padding: "4px 10px 7px",
+      // Fixed slots, like in-game: with no MP cost the columns keep their
+      // width and the band's right end stays empty.
+      display: "grid", gridTemplateColumns: `repeat(${Math.max(3, cols.length)}, 1fr)`, margin: "7px -10px 7px", padding: "4px 10px 7px",
       background: "rgba(0, 0, 0, 0.3)", borderTop: RULE, borderBottom: RULE,
     }}>
       {cols.map(([label, value]) => (
