@@ -191,7 +191,9 @@ export default function VideoPanel({
 
   const [playerReady, setPlayerReady] = useState(false);
   // Set when the browser can't decode the selected local file.
-  const [localError, setLocalError] = useState(false);
+  // Holds the browser's MediaError detail (Firefox names the codec, e.g.
+  // "video/hevc"); empty string when it gives none.
+  const [localError, setLocalError] = useState<string | null>(null);
 
   const isLocal = !!vod && isLocalVod(vod);
 
@@ -243,7 +245,7 @@ export default function VideoPanel({
    * main source of the load-time delay between VODs.
    */
   useEffect(() => {
-    setLocalError(false);
+    setLocalError(null);
 
     if (!vod) {
       playerReadyRef.current = false;
@@ -359,10 +361,11 @@ export default function VideoPanel({
   }
 
   function handleLocalError() {
+    const err = videoRef.current?.error;
     playerRef.current = null;
     playerReadyRef.current = false;
     setPlayerReady(false);
-    setLocalError(true);
+    setLocalError(err ? err.message || `MediaError code ${err.code}` : "");
   }
 
   /**
@@ -486,7 +489,7 @@ export default function VideoPanel({
             style={{ position: "absolute", inset: 0, display: isLocal ? "none" : "block" }}
           />
 
-          {isLocal && vod?.localFile && !localError && (
+          {isLocal && vod?.localFile && localError === null && (
             <video
               ref={videoRef}
               src={vod.localFile.objectUrl}
@@ -527,7 +530,7 @@ export default function VideoPanel({
             </div>
           )}
 
-          {isLocal && localError && (
+          {isLocal && localError !== null && (
             <div
               style={{
                 position: "absolute",
@@ -551,6 +554,18 @@ export default function VideoPanel({
                 recording with File → Remux Recordings. MKV only plays in
                 Chrome and Edge; HEVC and AV1 depend on your hardware.
               </div>
+              {/hevc|hvc1|hev1|h\.?265/i.test(localError) && (
+                <div>
+                  This recording is HEVC (H.265). Set OBS → Settings → Output →
+                  Video Encoder to an H.264 option for future recordings, or
+                  open this one in Chrome or Edge.
+                </div>
+              )}
+              {localError && (
+                <div style={{ fontSize: "11px", opacity: 0.7, wordBreak: "break-word" }}>
+                  Browser says: {localError}
+                </div>
+              )}
             </div>
           )}
         </div>
