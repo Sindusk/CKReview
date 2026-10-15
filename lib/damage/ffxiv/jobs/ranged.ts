@@ -62,6 +62,18 @@
 //   the kill cutting the 8:35 tincture at 16s; a cut tincture is now
 //   compared over the same length (tincture.ts). Not adopted: Shield
 //   Samba, Curing Waltz, Second Wind.
+//   Rechecked on the same report's The Tyrant kill (Pull 2, 2026-10-15),
+//   nothing to build. Matched: cooldowns and Standard Finish 100%, every
+//   Technical window full, 4 Saber Dances / 1 feather "may have been
+//   lost" and the 6:11 window not pooled (estimates, not valued), Silken
+//   Flow dropped 8:30.8, the 6:00 Cascade run out, its GCD downtimes by
+//   time (6:03, 6:30, 7:02, 7:39 are Flatliner movement). The 8:09 hold
+//   (1.8s after Emboite, Quadruple Technical Finish at 8:11.06, 76k) is
+//   in both; ours adds 10:10 (1.2s after Entrechat, 16k). Both Finishes
+//   land with the Divinations (8:11.2, 10:11.9): likely held to line up
+//   the raid buffs. Counted as hers for now (raised with the user; 13
+//   holds of 1s+ after a dance step across the samples). Not adopted:
+//   Shield Samba, Improvisation, Curing Waltz, Second Wind.
 // Bard: Caustic Bite / Stormbite (below), Hawk's Eye overwrites, AoE on
 //   one target, the burst window, cooldowns (OGCDDowntime.ts).
 //   Rechecked on dDar482XvFKBPJYh FRU kill (7.1, 2026-10-12): its 17
