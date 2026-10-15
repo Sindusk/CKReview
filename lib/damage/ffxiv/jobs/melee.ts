@@ -106,6 +106,25 @@
 //     (tracked-cooldowns.ts; its 13/14, 1 use, 25k); the Firstminds' Focus
 //     lane (jobs/gauges.ts; 0 lost, as it says). Not adopted: Chaotic
 //     Spring before invulnerability (above); Feint, Bloodbath, Second Wind.
+//     Rechecked on the same report's Red Hot and Deep Blue kill (Pull 2,
+//     2026-10-14), nothing to build. Matched: its 4 positionals by time,
+//     the Lance Charge misses (2:07 High Jump and Mirage Dive; Mirage Dive
+//     at 3:10, 4:13, 5:13), Life of the Dragon 3:12 6/8 and 6:39 7/8, the
+//     6:39 weave, the Firstminds' Focus lost at 8:46, Battle Litany at 4:16
+//     missing Kade and Mocha (80k), its GCD downtimes by time (4:54, 7:16,
+//     8:35 are Hot Aerial / Freaky Pyrotation / Insane Air movement here).
+//     Held: Power Surge 101.4% and Chaotic Spring 62.2% are its uptime ÷
+//     fight time less invulnerability; the log has Power Surge down 11.9s
+//     from 6:43 and Chaotic Spring 20.2s from 6:39, one mistake: Raiden
+//     Thrust → Lance Barrage at 6:42, the same route as 6:24, where Spiral
+//     Blow was due (120k + 38k, both counted). Not adopted: High Jump
+//     16/17, Life Surge 13/14, Dragonfire Dive 4/5 (36.8s, 46.4s and 47s
+//     held after the burst holds, each under one recharge; the fifth
+//     Dragonfire Dive came back 8:45.8, 5.6s before the kill, in the
+//     Lance Charge window the kill cut short); the 8:43 / 8:45 windows'
+//     shortfalls (the kill); Chaotic Spring before invulnerability (above).
+//     Mirage Dive missing from Life of the Dragon is valued at Lance
+//     Charge's 10% only (a few k).
 //   - Ninja: Kunai's Bane window, Ninki and Kazematoi (below). Checked
 //     against xivanalysis on dDar482XvFKBPJYh FRU kill (7.1, 2026-10-12):
 //     its 9 Kazematoi lost and 1 unbuffed Aeolian Edge match; Ninki ~300

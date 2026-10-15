@@ -141,6 +141,10 @@ xivanalysis pages for all eight players saved 2026-10-14 in
   - Asked the user: the 6:50-6:57 Shield Lobs and gap (140k + 55k).
   - Unresolved: the Divine Might lost at 8:06.7 to a Holy Spirit that
     never went off.
+- **Sayacissa Morsaelth (Dragoon).** Nothing to build; per-claim record in
+  the Dragoon header of lib/damage/ffxiv/jobs/melee.ts. The biggest real
+  loss is one route mistake at 6:42 (Lance Barrage where Spiral Blow was
+  due): Power Surge and Chaotic Spring off through the 6:35 burst (158k).
 
 ## Open
 
@@ -160,9 +164,8 @@ xivanalysis pages for all eight players saved 2026-10-14 in
 - Vamp Fatale is done for all eight players. Waiting on the user: the
   charges-at-kill proposal (open-items.md), the lenient saws/towers/adds
   window (Kade 4:54 / 5:47, Kevin 8:05), the PCT lanes' review.
-- Red Hot and Deep Blue kill (session 2026-10-14): Mocha, Yoro and Kade
-  done. Next, in order of the app's loss: Sayacissa (554k), Sin
-  (524k), Kevin (475k), Siegward (305k), Chauzey (133k). Their pages are
+- Red Hot and Deep Blue kill (session 2026-10-14): Mocha, Yoro, Kade and
+  Sayacissa done. Next, in order of the app's loss: Sin (524k), Kevin (475k), Siegward (305k), Chauzey (133k). Their pages are
   already in sampledata/damage-ff/. Patch review: same report and comp as
   Vamp Fatale (7.4), nothing new.
 - The Tyrant, Lindwurm and Lindwurm II kills are on disk too.
