@@ -721,7 +721,14 @@ grouped by exact roster. The module headers hold the rules.
   picked the mockup): major findings, a fight timeline with cooldown
   lanes, findings in categories with Try / Idea suggestions
   (`lib/mitigation/findings.ts`, `components/MitigationPlan.tsx`,
-  `components/MitigationAnalysisTimeline.tsx`).
+  `components/MitigationAnalysisTimeline.tsx`). Second pass the same day
+  (user): two columns (list | timeline), labels only on under-mitigated
+  hits, idle time as a thin line, only the lanes findings name, and the
+  optimizer runs on an Analyze badge, never on open.
+  - **Open question:** "tight" follows the optimizer (good on the median,
+    worst pull under 15%), so a hit over 30% typical with a bad worst pull
+    (Red Hot's Plunging Snap, 37% / 5%) isn't flagged or planned. Counting
+    it would change the optimizer's tier 2.
   - **Chosen by the builder, not yet confirmed** (findings.ts header):
     - unused: under ½ of the possible casts and ready at ⅓+ of the
       planned raidwides; gated entries left out

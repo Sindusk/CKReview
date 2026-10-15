@@ -16,8 +16,8 @@
 // categories with suggestions and a few coordinated cooldown changes for the
 // raid lead, searched over the group's last N pulls (a "Last N pulls" input,
 // blank = 5) or the one selected pull (user, 2026-10-14) in a web worker
-// (lib/mitigation/plan.worker.ts), opened first whenever there is an
-// analyzable pull; and the full Timeline
+// (lib/mitigation/plan.worker.ts) when the user clicks Analyze, never on
+// open; opened first whenever there is an analyzable pull; and the full Timeline
 // (components/MitigationTimeline.tsx), with a details panel for the
 // clicked hit (components/MitigationHitDetails.tsx). The timeline hides
 // uneventful hits (raid hits nobody died to, taken at full health) and,
@@ -156,7 +156,13 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId }
     const picked = allPulls ? planWindow(perPull, windowSize) : perPull.filter((p) => p.pullId === selectedPull?.id);
     return picked.map((p) => ({ ...p, pull: byId.get(p.pullId)! }));
   }, [allPulls, perPull, analyzable, windowSize, selectedPull]);
-  const planWanted = open && view === "analysis" && planWin.length > 0;
+  // Opening the view reads the log only; the optimizer runs when the user
+  // clicks Analyze (user, 2026-10-14), for the window shown then. Another
+  // window waits for another click.
+  const winKey = planWin.map((p) => p.pullId).join(",");
+  const [analyzeKey, setAnalyzeKey] = useState<string | null>(null);
+  useEffect(() => { if (open) setAnalyzeKey(null); }, [open]);
+  const planWanted = open && view === "analysis" && planWin.length > 0 && analyzeKey === winKey;
   useEffect(() => {
     if (!planWanted) return;
     const window = planWin;
@@ -268,6 +274,8 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId }
     <Dialog
       title="Mitigation"
       width={ffPulls.length > 0 ? "min(1500px, 97vw)" : "480px"}
+      // Fixed for the Analysis, so its list and timeline scroll on their own.
+      height={ffPulls.length > 0 && view === "analysis" ? "88vh" : undefined}
       maxHeight="88vh"
       zIndex={1100}
       onBackdropClick={onClose}
@@ -355,8 +363,8 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId }
                   </p>
                 ) : planWin.length === 0 ? (
                   <p className="ck-dialog-text" style={{ padding: 12 }}>No loaded pull has mitigation data yet. Re-fetch the report to analyze it.</p>
-                ) : <PlanView plan={planResult.plan} pending={planResult.pending} error={planResult.error}
-                      window={planWin} reach={reach} allPulls={allPulls}
+                ) : <PlanView plan={planResult.plan} pending={planResult.pending && analyzeKey === winKey} error={planResult.error}
+                      window={planWin} reach={reach} allPulls={allPulls} onAnalyze={() => setAnalyzeKey(winKey)}
                       windowInput={windowInput} onWindowInput={setWindowInput} groupPulls={perPull.length}
                       onOpenHit={(id) => {
                         const row = aggregate.find((r) => r.id === id);

@@ -1,46 +1,53 @@
 // lib/mitigation/findings.ts
 //
 // The Mitigation dialog's Analysis view as findings (user, 2026-10-14,
-// modelled on the Damage dialog): major findings at the top, a fight
-// timeline, then findings in categories, each with a suggestion. Pure:
-// (window pulls, the optimizer's OptimizedPlan) -> AnalysisFindings. The
-// plan (plan.ts) is unchanged; this reads it and adds the checks below.
-// Thresholds are the builder's, not yet confirmed (docs/open-items.md).
+// modelled on the Damage dialog): findings in categories beside a fight
+// timeline. Pure: (window pulls, the optimizer's OptimizedPlan or null) ->
+// AnalysisFindings. Without a plan it is facts read from the log only and
+// cheap, so the view opens fast; the optimizer runs when the user clicks
+// Analyze (user, 2026-10-14), and only then come the plan, its "Try"
+// changes and the "Idea" suggestions. Thresholds are the builder's, not yet
+// confirmed (docs/open-items.md).
 //
 // ── Categories ─────────────────────────────────────────────────────────
-//   under   Failing (median fail/under) or tight (worst pull under
-//           MARGIN_UNDER) planned hits: the plan's anchors, so reached in
-//           PLAN_MIN_PULLS+ window pulls. The fix is the plan group that
-//           lifts it; else the best free add (notes.ts aggregateAddOptions)
-//           as an idea.
-//   plan    The plan's "do together" groups, lettered A, B, ...
+//   under   Planned hits (the plan's anchors: plan.ts classifyHit "plan",
+//           not tank-only) that fail (median fail/under) or are tight, as
+//           the plan counts them: good on the median, worst pull under
+//           MARGIN_UNDER. Analyzed: the fix is the plan group that lifts it;
+//           else the best free add (notes.ts aggregateAddOptions) as an
+//           idea.
+//   plan    Analyzed: the plan's "do together" groups, lettered A, B, ...
 //   unused  Party cooldowns (partyEligible, or situational ones, shown but
 //           never suggested) cast under UNUSED_MAX_SHARE of the casts the
 //           window's pulls allowed (one at pull start, then one per
 //           cooldown) and ready at UNUSED_MIN_READY_SHARE+ of the planned
 //           raidwides. Gated entries are left out (their availability is
-//           a guess). The idea is the neediest under hit where it was free
+//           a guess). `readyAt` names the under hits where it sat ready.
+//           Analyzed: the idea is the neediest under hit where it was free
 //           in every pull that reached it, unless the plan already uses it.
 //   timing  late: a party cooldown cast within LATE_MAX_MS after a hit it
 //           wasn't on, in at least half the pulls that had the hit (one
-//           pull is enough: single pulls get suggestions, user, 2026-10-14), and not on a later raidwide that pull (then
-//           it was for that one). Only hits that aren't over on the median.
+//           pull is enough, user, 2026-10-14), and not on a later raidwide
+//           that pull (then it was for that one). Only hits that aren't
+//           over on the median.
 //           stacked: an over hit with STACK_MIN_COOLDOWNS+ party cooldowns
 //           on it in at least half its pulls and a median of
-//           STACK_MIN_MARGIN+.
+//           STACK_MIN_MARGIN+. Highest first.
 //   other   Healing and mechanic hits that fail (plan.ts classifyHit), any
 //           pull count; tank busters are counted and left to the Tanking
 //           view.
 //
 // ── Timeline ───────────────────────────────────────────────────────────
-// Hits at their median time over the window: the non-tank ones with their
-// median and worst lowest HP, tank busters as marks. Cooldown lanes are
-// the clock pull's (the window's longest, tanking-plan.ts clockPull) casts
-// of every party cooldown, the stretches it sat ready READY_GAP_MIN_MS+,
-// and marks for the plan's changes, ideas and late casts. A clock-pull
-// cast a plan move would make unavailable (by more than
-// SNAPSHOT_SLACK_MS: a recast a second later is the same cast) is marked
-// lost.
+// Hits at their median time over the window, the non-tank ones with their
+// median and worst lowest HP. Cooldown lanes are the clock pull's (the
+// window's longest, tanking-plan.ts clockPull) casts of every party
+// cooldown but gated ones (Tempera Grassa shares Tempera Coat's cooldown),
+// the stretches from the first raidwide on that it sat ready
+// READY_GAP_MIN_MS+, a dot on each under hit it sat ready for, and marks
+// for late casts and, analyzed, the plan's changes and ideas. A clock-pull
+// cast a plan move would make unavailable (by more than SNAPSHOT_SLACK_MS:
+// a recast a second later is the same cast) is marked lost. `inFindings`
+// lanes are the ones a finding names; the view shows those first.
 
 import type { Pull } from "@/types/Pull";
 import type { CatalogEntry, MitigationGame, MitigationHit } from "./types";
@@ -96,6 +103,7 @@ export type UnusedFinding = {
   noCastPulls: number[];        // window pulls with no cast
   readyHits: number;
   totalHits: number;
+  readyAt:   HitRef[];          // under hits it sat ready for, in every pull that had them
   situational?: string;
   inPlan?:   string;            // the plan letter that already uses it
   idea?:     { hit: HitRef; freePulls: number; pulls: number };
@@ -153,10 +161,13 @@ export type Lane = {
   name:    string;
   casts:   { atMs: number; durationMs: number; late?: string; lost?: string }[];
   ready:   [number, number][];
+  readyDots: { atMs: number; hit: string }[];  // ready, unused, at an under hit (clock pull)
   marks:   LaneMark[];
+  inFindings: boolean;
 };
 
 export type AnalysisFindings = {
+  analyzed:   boolean;           // built with a plan
   windowPulls: number[];         // pull numbers
   clock?:     { pullNumber: number; durationMs: number };
   reachSteps: { untilMs: number; pulls: number }[];  // pulls still going, by time
@@ -174,12 +185,14 @@ const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const refOf = (r: AggregatedHit): HitRef => ({ id: r.id, name: r.abilityName, occurrence: r.occurrence, phase: r.phase, medianMs: r.medianMs });
 const isTankRow = (r: AggregatedHit) => r.byPull.every((b) => b.hit.tankOnly);
 const failingRow = (r: AggregatedHit) => r.verdict === "fail" || r.verdict === "under";
-const tightRow = (r: AggregatedHit) => !failingRow(r) && r.worstMargin < MARGIN_UNDER;
+// As the optimizer counts it (optimize.ts HitEstimate.tight), so the counts agree.
+const tightRow = (r: AggregatedHit) => r.verdict === "good" && r.worstMargin < MARGIN_UNDER;
+const readyState = (s: string) => s === "free" || s === "available";
 /** A party cooldown the view tracks: one the plan may move, or a situational one shown for reference. */
 const tracked = (e: CatalogEntry) => partyEligible(e) || (e.reach === "party" && !!e.situational && e.inSheet !== false
   && e.kind !== "invuln" && e.kind !== "limitBreak");
 
-export function buildAnalysisFindings(window: FindingsWindowPull[], plan: OptimizedPlan, game: MitigationGame,
+export function buildAnalysisFindings(window: FindingsWindowPull[], plan: OptimizedPlan | null, game: MitigationGame,
   reach?: DebuffReach): AnalysisFindings {
   const rows = aggregateMitigation(window.map(({ pull, ...w }) => ({ ...w, durationMs: w.durationMs ?? pull.fightDuration })), game, reach)
     .filter((r) => !r.rare)
@@ -187,22 +200,24 @@ export function buildAnalysisFindings(window: FindingsWindowPull[], plan: Optimi
   const entryOf = new Map(game.catalog.map((e) => [e.key, e]));
   const jobOf = new Map(window.flatMap((w) => w.pull.players.map((p) => [p.name, p.className] as const)));
   const anchors = rows.filter((r) => r.pulls >= PLAN_MIN_PULLS && !isTankRow(r));
-  const letters: PlanLetter[] = plan.groups.map((group, i) => ({ letter: LETTERS[i] ?? String(i + 1), group }));
+  const planned = anchors.filter((r) => classifyHit(r) === "plan");
+  const letters: PlanLetter[] = (plan?.groups ?? []).map((group, i) => ({ letter: LETTERS[i] ?? String(i + 1), group }));
 
   // ── under ──
-  const under: UnderFinding[] = anchors
-    .filter((r) => classifyHit(r) === "plan" && (failingRow(r) || tightRow(r)))
+  const under: UnderFinding[] = planned
+    .filter((r) => failingRow(r) || tightRow(r))
     .map((r) => {
       const worst = r.byPull.reduce((a, b) => (b.hit.margin < a.hit.margin ? b : a));
       const steady = r.active
         .filter((a) => a.pulls === r.pulls && entryOf.get(a.key) && partyEligible(entryOf.get(a.key)!))
         .map((a) => a.name);
-      const fixGroup = letters.find((l) => l.group.purpose === "fix" && l.group.hits.some((h) => h.hit.id === r.id
-        && (h.after.median > h.before.median + 1e-9 || h.after.worst > h.before.worst + 1e-9)));
       const out: UnderFinding = {
         hit: refOf(r), failing: failingRow(r), median: r.medianMargin, worst: r.worstMargin, worstPull: worst.pullNumber,
         deathPulls: r.deathPulls, pulls: r.pulls, reached: r.reached, column: r.damageColumn, steady,
       };
+      if (!plan) return out;
+      const fixGroup = letters.find((l) => l.group.purpose === "fix" && l.group.hits.some((h) => h.hit.id === r.id
+        && (h.after.median > h.before.median + 1e-9 || h.after.worst > h.before.worst + 1e-9)));
       if (fixGroup) {
         const outcome = fixGroup.group.hits.find((h) => h.hit.id === r.id)!;
         const touching = fixGroup.group.changes.filter((c) => c.to.id === r.id || c.from?.id === r.id);
@@ -216,9 +231,9 @@ export function buildAnalysisFindings(window: FindingsWindowPull[], plan: Optimi
     .sort((a, b) => Number(b.failing) - Number(a.failing) || a.median - b.median);
 
   // ── unused ──
-  const planned = anchors.filter((r) => classifyHit(r) === "plan");
   const inPlan = new Map<string, string>();
   for (const l of letters) for (const c of l.group.changes) inPlan.set(`${c.player}|${c.key}`, l.letter);
+  const underRows = under.map((u) => planned.find((r) => r.id === u.hit.id)!);
   const unused: UnusedFinding[] = [];
   for (const player of window[window.length - 1]?.pull.players ?? []) {
     for (const entry of game.catalog) {
@@ -239,20 +254,23 @@ export function buildAnalysisFindings(window: FindingsWindowPull[], plan: Optimi
           const m = hit.players.find((x) => x.player === player.name && x.key === entry.key);
           if (!m || m.dead) continue;
           totalHits++;
-          if (m.state === "free" || m.state === "available") readyHits++;
+          if (readyState(m.state)) readyHits++;
         }
       }
       if (possible === 0 || casts >= possible * UNUSED_MAX_SHARE || totalHits === 0 || readyHits < totalHits * UNUSED_MIN_READY_SHARE) continue;
+      const readyAt = underRows
+        .filter((r) => r.byPull.every(({ hit }) => hit.players.some((m) => m.player === player.name && m.key === entry.key
+          && !m.dead && readyState(m.state))))
+        .map(refOf);
       const f: UnusedFinding = {
         player: player.name, job: player.className, key: entry.key, name: entry.name, cooldownMs: entry.cooldownMs,
-        casts, possible, pulls: window.length, noCastPulls, readyHits, totalHits,
+        casts, possible, pulls: window.length, noCastPulls, readyHits, totalHits, readyAt,
         situational: entry.situational, inPlan: inPlan.get(`${player.name}|${entry.key}`),
       };
-      if (!f.situational && !f.inPlan) {
-        for (const u of under) {
-          const row = planned.find((r) => r.id === u.hit.id)!;
+      if (plan && !f.situational && !f.inPlan) {
+        for (const row of underRows) {
           const opt = aggregateAddOptions(row, game, reach).find((o) => o.player === player.name && o.key === entry.key);
-          if (opt && (opt.pulls ?? 0) === row.pulls) { f.idea = { hit: u.hit, freePulls: opt.pulls ?? 0, pulls: row.pulls }; break; }
+          if (opt && (opt.pulls ?? 0) === row.pulls) { f.idea = { hit: refOf(row), freePulls: opt.pulls ?? 0, pulls: row.pulls }; break; }
         }
       }
       unused.push(f);
@@ -278,12 +296,13 @@ export function buildAnalysisFindings(window: FindingsWindowPull[], plan: Optimi
           // On a later raidwide that pull: it was cast for that one.
           if (later.some((h) => h.timestampMs - late <= entry.durationMs + SNAPSHOT_SLACK_MS
             && h.active.some((a) => a.key === entry.key && a.casters.includes(p.name)))) continue;
-          const state = chargesAt(casts.filter((c) => c < late), entry, hit.timestampMs);
-          const readyMs = state.charges > 0 ? Math.max(0, ...casts.filter((c) => c < late).map((c) => c + entry.cooldownMs).filter((t) => t <= hit.timestampMs), 0)
+          const before = casts.filter((c) => c < late);
+          const state = chargesAt(before, entry, hit.timestampMs);
+          const readyMs = state.charges > 0
+            ? Math.max(0, ...before.map((c) => c + entry.cooldownMs).filter((t) => t <= hit.timestampMs))
             : state.nextReadyMs;
-          const prev = [...casts].reverse().find((c) => c < late);
           const k = `${p.name}|${entry.key}`;
-          byKey.set(k, [...(byKey.get(k) ?? []), { pullNumber, castMs: late, hitMs: hit.timestampMs, readyMs, prevCastMs: prev }]);
+          byKey.set(k, [...(byKey.get(k) ?? []), { pullNumber, castMs: late, hitMs: hit.timestampMs, readyMs, prevCastMs: before[before.length - 1] }]);
         }
       }
     }
@@ -306,8 +325,8 @@ export function buildAnalysisFindings(window: FindingsWindowPull[], plan: Optimi
       if (after) moveOff.set(c.from.id, { letter: l.letter, change: c, after });
     }
   }
-  for (const r of anchors) {
-    if (r.verdict !== "over" || r.medianMargin < STACK_MIN_MARGIN || classifyHit(r) !== "plan") continue;
+  for (const r of planned) {
+    if (r.verdict !== "over" || r.medianMargin < STACK_MIN_MARGIN) continue;
     const cds = r.active
       .filter((a) => a.pulls * 2 >= r.pulls && entryOf.get(a.key) && partyEligible(entryOf.get(a.key)!))
       .map((a) => {
@@ -320,7 +339,8 @@ export function buildAnalysisFindings(window: FindingsWindowPull[], plan: Optimi
       alternatives: r.droppable.alternatives, planMove: moveOff.get(r.id),
     });
   }
-  timing.sort((a, b) => Number(a.kind === "stacked") - Number(b.kind === "stacked") || a.hit.medianMs - b.hit.medianMs);
+  timing.sort((a, b) => Number(a.kind === "stacked") - Number(b.kind === "stacked")
+    || (a.kind === "stacked" && b.kind === "stacked" ? b.median - a.median : a.hit.medianMs - b.hit.medianMs));
 
   // ── other ──
   const other: OtherFinding[] = rows
@@ -352,15 +372,19 @@ export function buildAnalysisFindings(window: FindingsWindowPull[], plan: Optimi
   if (clock) {
     const lateByKey = new Map<string, LateFinding>();
     for (const t of timing) if (t.kind === "late") lateByKey.set(`${t.player}|${t.key}`, t);
+    const unusedKeys = new Set(unused.filter((u) => !u.situational).map((u) => `${u.player}|${u.key}`));
+    const firstRaidwide = clock.hits.find((h) => !h.tankOnly)?.timestampMs ?? 0;
+    const clockUnder = clock.hits.filter((h) => underIds.has(h.id));
     for (const player of clock.pull.players) {
       for (const entry of game.catalog) {
-        if (!entry.jobs.includes(player.className) || !tracked(entry)) continue;
+        if (!entry.jobs.includes(player.className) || !tracked(entry) || entry.gated) continue;
         const k = `${player.name}|${entry.key}`;
         const castTimes = playerCasts(player, entry);
-        const late = lateByKey.get(k)?.casts.find((c) => c.pullNumber === clock.pullNumber);
+        const lateFinding = lateByKey.get(k);
+        const late = lateFinding?.casts.find((c) => c.pullNumber === clock.pullNumber);
         const casts: Lane["casts"] = castTimes.map((t) => ({
           atMs: t, durationMs: entry.durationMs,
-          late: late && late.castMs === t ? `${Math.round((t - late.hitMs) / 1000)}s after ${lateByKey.get(k)!.hit.name}` : undefined,
+          late: late && late.castMs === t ? `${Math.max(1, Math.round((t - late.hitMs) / 1000))}s after ${lateFinding!.hit.name}` : undefined,
         }));
         const marks: LaneMark[] = [];
         for (const l of letters) {
@@ -381,13 +405,27 @@ export function buildAnalysisFindings(window: FindingsWindowPull[], plan: Optimi
         }
         const u = unused.find((x) => x.player === player.name && x.key === entry.key);
         if (u?.idea) marks.push({ kind: "idea", atMs: u.idea.hit.medianMs, label: u.idea.hit.name });
-        const ready = entry.cooldownMs > 0 ? readyIntervals(castTimes, entry, clock.durationMs).filter(([a, b]) => b - a >= READY_GAP_MIN_MS) : [];
-        lanes.push({ player: player.name, job: player.className, key: entry.key, name: entry.name, casts, ready, marks });
+        for (const und of under) {
+          if (und.idea?.player === player.name && entryOf.get(entry.key)?.name === und.idea.name) {
+            marks.push({ kind: "idea", atMs: und.hit.medianMs, label: und.hit.name });
+          }
+        }
+        const readyDots = clockUnder
+          .filter((h) => h.players.some((m) => m.player === player.name && m.key === entry.key && !m.dead && readyState(m.state)))
+          .map((h) => ({ atMs: underIds.get(h.id)!.hit.medianMs, hit: h.abilityName }));
+        const ready = entry.cooldownMs > 0
+          ? readyIntervals(castTimes, entry, clock.durationMs)
+            .map(([a, b]): [number, number] => [Math.max(a, firstRaidwide), b])
+            .filter(([a, b]) => b - a >= READY_GAP_MIN_MS)
+          : [];
+        const inFindings = marks.length > 0 || casts.some((c) => c.late || c.lost) || unusedKeys.has(k);
+        lanes.push({ player: player.name, job: player.className, key: entry.key, name: entry.name, casts, ready, readyDots, marks, inFindings });
       }
     }
   }
 
   return {
+    analyzed: plan !== null,
     windowPulls: window.map((w) => w.pullNumber),
     clock: clock ? { pullNumber: clock.pullNumber, durationMs: clock.durationMs } : undefined,
     reachSteps, hits, lanes, letters, under, unused, timing, other, tankBusters,
