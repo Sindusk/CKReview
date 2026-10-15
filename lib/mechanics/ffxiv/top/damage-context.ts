@@ -54,7 +54,21 @@
 //   the crossing is read from 20s into the phase (50% comes at +35.6 at the
 //   earliest). Not built: per-player duties (the stack crossers): nobody
 //   has measured that they cost damage.
-// - P5-P6: no module yet; left out. The run's last hard enrage is P6's
+// - P5 Run: Dynamis (added 2026-10-15 from run-dynamis.ts's header and its
+//   reports E-L: 42 P5 pulls fetched to 14.2 min, 9 reached Blind Faith,
+//   the kill bNcrLh7Y4dkHxM9q pull 16). One enemy, logged as Omega-M with
+//   13.71M on every pull (Omega-F's hits land on it too). Blind Faith
+//   (31623, +294.2 from P5's first cast) passes when it's under 20% (passes
+//   13.3-19.4% at the cast, the one fail 30.2%, H24), and P6 is a new
+//   enemy, so damage past 20% is wasted: forced from the first hit leaving
+//   Omega-M under 20% to the phase end. The passes crossed 20% at 13:06.4
+//   (K22) to 13:20.1 (J7), 2-16s before the cast; FFLogs ends the segment
+//   ~1.2s after it. No hold: 25% -> 20% took 10-13s, the same pace as
+//   50% -> 30% (30% -> 25% spans Omega's untargetable clone dodges,
+//   inferred from the log). Not built: per-player duties (World holders,
+//   monitor and Blaster sit-outs, tower soakers): nobody has measured that
+//   they cost damage.
+// - P6: no module yet; left out. The run's last hard enrage is P6's
 //   (Alpha Omega), so no phase is marked as deciding it until that phase
 //   is measured.
 //
@@ -96,6 +110,20 @@ const RULE_KEY_LABELS: Record<string, string> = {
   "ffxiv-top4-stack":       "Wave Cannon stacks",
   "ffxiv-top4-wave-cannon": "Wave Cannon (P4)",
   "ffxiv-top4-blue-screen": "Blue Screen",
+  "ffxiv-top5-avoidable":   "Run: Dynamis",
+  "ffxiv-top5-wall":        "Run: Dynamis",
+  "ffxiv-top5-monitor":     "Oversampled Wave Cannon (P5)",
+  "ffxiv-top5-world":       "Hello World (P5)",
+  "ffxiv-top5-hello-world": "Hello World (P5)",
+  "ffxiv-top5-dynamis":     "Hello World (P5)",
+  "ffxiv-top5-prey":        "Sigma Wave Cannon",
+  "ffxiv-top5-arm":         "Sigma Hyper Pulse",
+  "ffxiv-top5-glitch":      "Sigma towers",
+  "ffxiv-top5-tower":       "Sigma towers",
+  "ffxiv-top5-blaster":     "Blaster (P5)",
+  "ffxiv-top5-fist":        "Rocket Punch",
+  "ffxiv-top5-raidwide":    "Run: Dynamis",
+  "ffxiv-top5-blind-faith": "Blind Faith",
 };
 
 // The revived Omega's first P4 hits can log a stale near-0 HP (C28 +7.7):
@@ -118,6 +146,7 @@ export const TOP_DAMAGE_CONTEXT: DamageContext = {
     2: { pool: 8_620_000, fixedPool: true, carriesOver: false, multiTarget: true, note: "Omega-M and Omega-F (4.31M each) both down before Laser Shower (Firewall +141.7); no hold" },
     3: { pool: 11_126_000, fixedPool: true, carriesOver: false, note: "Omega Reconfigured to 1 HP before Ion Efflux (~+178 from the transition); the phase ends at a fixed time; no hold" },
     4: { pool: 4_900_000, fixedPool: false, carriesOver: false, note: "Omega under 20% by Blue Screen (+62 from P4's first cast); P5 is a new enemy; no hold" },
+    5: { pool: 13_710_000, fixedPool: false, carriesOver: false, note: "Omega-M under 20% by Blind Faith (+294 from P5's first cast); P6 is a new enemy; no hold" },
   },
   forcedWindows: (pull) => {
     const out: ForcedWindow[] = [];
@@ -132,6 +161,10 @@ export const TOP_DAMAGE_CONTEXT: DamageContext = {
     for (const span of phaseSpans(pull, 4)) {
       const under = crossed(pull, { startMs: span.startMs + P4_STALE_MS, endMs: span.endMs }, "Omega", 0.2);
       if (under !== undefined) out.push({ startMs: under, endMs: span.endMs, cause: "P4 check passed: Omega under 20% for Blue Screen" });
+    }
+    for (const span of phaseSpans(pull, 5)) {
+      const under = crossed(pull, span, "Omega-M", 0.2);
+      if (under !== undefined) out.push({ startMs: under, endMs: span.endMs, cause: "P5 check passed: Omega-M under 20% for Blind Faith" });
     }
     return out;
   },
