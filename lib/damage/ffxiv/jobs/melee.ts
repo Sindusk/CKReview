@@ -190,7 +190,9 @@
 //     Ninjutsu mistakes (2026-10-15): Rabbit Medium, Hyoton, a weak Doton,
 //     Kassatsu misspent or lapsed, Raiju Ready dropped; `ninjutsu` below.
 //     Found by searching the lowest Red Hot and Deep Blue Ninja parses;
-//     not yet matched against xivanalysis.
+//     matched against xivanalysis on six of those kills (2026-10-15). Not
+//     adopted: a Ten Chi Jin Doton it counts by target count alone
+//     (zMJdajRYyNF3LVkr 2:33 out-damaged its Suiton).
 //   - Reaper: Enshroud (Enshroud.tsx): four Reapings, two Lemure's, one
 //     Sacrificium, one Communio. Arcane Circle, Death's Design, Harvest
 //     Moon, Shroud and Whorl of Death below. Checked against xivanalysis
@@ -1032,7 +1034,9 @@ const ninAoe = aoeComboOnOneTarget([[id("HELLFROG_MEDIUM"), id("BHAVACAKRA")], [
 //   (cZ42C1y3JRNGXWLH 4:20) a Hyosho over the GCD used instead.
 // - Raiju Ready dropped: a combo GCD with stacks held removes them all
 //   (cZ42C1y3JRNGXWLH 2:28, Aeolian Edge), each a Raiju over a combo GCD.
-// Not built: Ten Chi Jin's Doton / Hyoton (its own sequence).
+// - Ten Chi Jin (Fuma, Raiton, Suiton): its Hyoton against its Raiton
+//   (VzycM18rpn6bWxXY 2:26: Fuma, Hyoton, Huton), its Doton against its
+//   Suiton by damage.
 const NINJUTSU_NAMES = new Map(ids("FUMA_SHURIKEN", "KATON", "RAITON", "HYOTON", "HUTON", "DOTON", "SUITON",
   "RABBIT_MEDIUM", "GOKA_MEKKYAKU", "HYOSHO_RANRYU").map((x) => [x, A[Object.keys(A).find((key) => A[key].id === x)!].name]));
 const KASSATSU_GOOD = new Set(ids("HYOSHO_RANRYU", "GOKA_MEKKYAKU"));
@@ -1062,6 +1066,10 @@ const ninjutsu: JobCheck = (ctx) => {
   const raijuOver = Math.max(0, avgOf([...RAIJU_IDS]) - combo);
   const raitonHit = ctx.values.perUse(id("RAITON"));
   const raiton = raitonHit + raijuOver;
+  // Ten Chi Jin's own Raiton / Suiton (Fuma, Raiton, Suiton is the set
+  // sequence); the regular ones when the pull has none.
+  const tcjRaiton = (ctx.values.perUse(id("RAITON_TCJ")) || raitonHit) + raijuOver;
+  const tcjSuiton = ctx.values.perUse(id("SUITON_TCJ")) || ctx.values.perUse(id("SUITON"));
   const ownHyosho = ctx.values.perUse(id("HYOSHO_RANRYU"));
   const hyosho = ownHyosho > 0 ? ownHyosho : raitonHit * HYOSHO_PER_RAITON;
   const hyoshoBasis = ownHyosho > 0 ? `${k(hyosho)} average Hyosho Ranryu`
@@ -1145,6 +1153,20 @@ const ninjutsu: JobCheck = (ctx) => {
         kind: "ninjutsu", label: "Hyoton", lost: raiton - d,
         basis: `${raitonBasis} − ${k(d)} for this Hyoton at the same buffs (crit and direct hit averaged out)`,
         detail: `Hyoton at ${at(c.timestamp)}, the weakest ninjutsu`,
+      });
+    } else if (c.abilityId === id("HYOTON_TCJ") && tcjRaiton > 0) {
+      const d = dealt(c);
+      push(c.timestamp, {
+        kind: "ninjutsu", label: "Hyoton in Ten Chi Jin", lost: tcjRaiton - d,
+        basis: `${k(tcjRaiton)}: her average Ten Chi Jin Raiton plus its Raiju Ready − ${k(d)} for this Hyoton at the same buffs`,
+        detail: `Ten Chi Jin's Hyoton at ${at(c.timestamp)} where its Raiton goes`,
+      });
+    } else if (c.abilityId === id("DOTON_TCJ") && tcjSuiton > 0) {
+      const d = dealt(c, DOTON_SPAN_MS, "Doton");
+      push(c.timestamp, {
+        kind: "ninjutsu", label: "Doton in Ten Chi Jin", lost: tcjSuiton - d,
+        basis: `${k(tcjSuiton)} average Ten Chi Jin Suiton − ${k(d)} for this Doton's ticks at the same buffs`,
+        detail: `Ten Chi Jin's Doton at ${at(c.timestamp)} dealt less than its Suiton`,
       });
     } else if (c.abilityId === id("DOTON") && raiton > 0) {
       const d = dealt(c, DOTON_SPAN_MS, "Doton");

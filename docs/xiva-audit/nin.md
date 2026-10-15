@@ -30,16 +30,16 @@
 | nin/KunaisBaneUsage/held | verified | `checkCooldownDrift` (Kunai's Bane) | Kunai's Bane held | Medium 1, Major 2. |
 | nin/KunaisBaneUsage/none | superseded | `checkCooldownDrift` | no Kunai's Bane at all | Major. Fires on any pull shorter than the opener. |
 | nin/OGCDDowntime/uses | verified | `checkCooldownDrift` | Kassatsu, Dokumori, Bunshin, Kunai's Bane, DWaD, TCJ or Meisui held | Same groups and offsets. FRU: Bunshin 2 lost (its 3 counts burst alignment); Dokumori / TCJ / Meisui held for the 14:17 burst (no extra use fit). |
-| nin/Kassatsu/dropped | covered | `ninjutsu` | Kassatsu expiring unused | Built 2026-10-15, read from the Kassatsu buff (a removal with no ninjutsu cast beside it); the generic proc check now skips Kassatsu. A Hyosho Ranryu over the combo GCD pressed instead. One ending up to 3s before a death is shown, not counted (the log strips buffs before the death event: djChYqt4b7K8aAfP 7:32). Fires on cZ42C1y3JRNGXWLH 3:19, 4:21; cBZXM6kayd7Tf9Fg 4:16; 7zwpcLxk2Fd1h6Vr 8:00; yPHmaGTY2btq1wD9 0:17; JZ1KXhDbqkNH3jxR FRU pull 7 1:53 (110-243k). Found by searching the 108 lowest Red Hot and Deep Blue Ninja parses. |
-| nin/Kassatsu/huton | covered | `ninjutsu` | Huton under Kassatsu | A Hyosho over a Raiton (the mudra charge Kassatsu saved goes to a Raiton). Fires on LmwgxA7B4d1NzqWH 5:28 (63k, for Kunai's Bane on two bosses). |
-| nin/Kassatsu/generalbads | covered | `ninjutsu` | Fuma Shuriken, Raiton or Doton under Kassatsu | Same value. Fires on VzycM18rpn6bWxXY ×4 (72k each), 7zwpcLxk2Fd1h6Vr ×7 (77k; she never cast Hyosho, so it's 2.28 × her Raiton, the ratio measured on 16 pulls), djChYqt4b7K8aAfP 9:44. The search's cast-only reading over-counted it: a Kassatsu that had already lapsed was blamed on the next ninjutsu. |
-| nin/Kassatsu/suiton | covered | `ninjutsu` | Suiton under Kassatsu | Same value (the Suiton was needed for Kunai's Bane; Kassatsu saved its charge). Fires on cZ42C1y3JRNGXWLH 1:07 (31k). |
-| nin/Kassatsu/rabbit | covered | `ninjutsu` | Rabbit Medium under Kassatsu | One finding, a whole Hyosho (not counted again as a Rabbit). Fires on cBZXM6kayd7Tf9Fg 2:17 (201k). |
-| nin/Ninjutsu/hyoton | covered | `ninjutsu` | Hyoton | A Raiton (with its Raiju) less the Hyoton, buff-neutral. Fires on cZ42C1y3JRNGXWLH 3:23, VzycM18rpn6bWxXY 0:20, yPHmaGTY2btq1wD9 0:19, kC7Y3WbzvKcZrBxT The Tyrant 10:13, JZ1KXhDbqkNH3jxR FRU pull 15 8:43 (75-111k). |
-| nin/Ninjutsu/rabbit | covered | `ninjutsu` | Rabbit Medium | A Raiton and its Raiju lost. Fires on cZ42C1y3JRNGXWLH 4:24 (Ten Ten), cBZXM6kayd7Tf9Fg ×4, fGjA9DKLQbRa2q1k 7:20, kC7Y3WbzvKcZrBxT The Tyrant 9:30 (110-159k). |
-| nin/Ninjutsu/tcj-doton | candidate | — | Ten Chi Jin's Doton on one target | Medium 1, Major 2. Not built (Ten Chi Jin's own sequence); none seen. |
-| nin/Ninjutsu/aoe-doton | covered | `ninjutsu` | Doton cut short (under 6 ticks) | Judged by damage: a Doton is flagged when its ticks (buff-neutral) deal less than a Raiton, on any number of targets. |
-| nin/Ninjutsu/st-doton | covered | `ninjutsu` | Doton on a single target outside the opener | Same check. Fires on zMJdajRYyNF3LVkr 5:50 (left after 4 ticks on both bosses, 67k) and 6:33 (no ticks at all, 108k). |
+| nin/Kassatsu/dropped | verified | `ninjutsu` | Kassatsu expiring unused | Built 2026-10-15, read from the Kassatsu buff (a removal with no ninjutsu cast beside it); the generic proc check now skips Kassatsu. A Hyosho Ranryu over the combo GCD pressed instead. One ending up to 3s before a death is shown, not counted (the log strips buffs before the death event: djChYqt4b7K8aAfP 7:32). Fires on cZ42C1y3JRNGXWLH 3:19, 4:21; cBZXM6kayd7Tf9Fg 4:16; 7zwpcLxk2Fd1h6Vr 8:00; yPHmaGTY2btq1wD9 0:17; JZ1KXhDbqkNH3jxR FRU pull 7 1:53 (110-243k). Found by searching the 108 lowest Red Hot and Deep Blue Ninja parses. Matched xivanalysis (2026-10-15): cZ42C1y3JRNGXWLH 2, cBZXM6kayd7Tf9Fg 1, 7zwpcLxk2Fd1h6Vr 1. |
+| nin/Kassatsu/huton | verified | `ninjutsu` | Huton under Kassatsu | A Hyosho over a Raiton (the mudra charge Kassatsu saved goes to a Raiton). Fires on LmwgxA7B4d1NzqWH 5:28 (63k, for Kunai's Bane on two bosses). Matched xivanalysis there (1). |
+| nin/Kassatsu/generalbads | verified | `ninjutsu` | Fuma Shuriken, Raiton or Doton under Kassatsu | Same value. Fires on VzycM18rpn6bWxXY ×4 (72k each), 7zwpcLxk2Fd1h6Vr ×7 (77k; she never cast Hyosho, so it's 2.28 × her Raiton, the ratio measured on 16 pulls), djChYqt4b7K8aAfP 9:44. The search's cast-only reading over-counted it: a Kassatsu that had already lapsed was blamed on the next ninjutsu. Matched xivanalysis: VzycM18rpn6bWxXY 4, 7zwpcLxk2Fd1h6Vr 7. |
+| nin/Kassatsu/suiton | verified | `ninjutsu` | Suiton under Kassatsu | Same value (the Suiton was needed for Kunai's Bane; Kassatsu saved its charge). Fires on cZ42C1y3JRNGXWLH 1:07 (31k). Matched xivanalysis there (1). |
+| nin/Kassatsu/rabbit | verified | `ninjutsu` | Rabbit Medium under Kassatsu | One finding, a whole Hyosho (not counted again as a Rabbit). Fires on cBZXM6kayd7Tf9Fg 2:17 (201k). Matched xivanalysis there (1). |
+| nin/Ninjutsu/hyoton | verified | `ninjutsu` | Hyoton | A Raiton (with its Raiju) less the Hyoton, buff-neutral; in Ten Chi Jin, against its Raiton (added after VzycM18rpn6bWxXY 2:26: Fuma, Hyoton, Huton; 75k). Matched xivanalysis: cZ42C1y3JRNGXWLH 1, VzycM18rpn6bWxXY 2. Fires on cZ42C1y3JRNGXWLH 3:23, VzycM18rpn6bWxXY 0:20, yPHmaGTY2btq1wD9 0:19, kC7Y3WbzvKcZrBxT The Tyrant 10:13, JZ1KXhDbqkNH3jxR FRU pull 15 8:43 (75-111k). |
+| nin/Ninjutsu/rabbit | verified | `ninjutsu` | Rabbit Medium | A Raiton and its Raiju lost. Fires on cZ42C1y3JRNGXWLH 4:24 (Ten Ten), cBZXM6kayd7Tf9Fg ×4, fGjA9DKLQbRa2q1k 7:20, kC7Y3WbzvKcZrBxT The Tyrant 9:30 (110-159k). Matched xivanalysis: cZ42C1y3JRNGXWLH 1; cBZXM6kayd7Tf9Fg 5 (its 5 include the one under Kassatsu, which the app counts once, as Kassatsu/rabbit). |
+| nin/Ninjutsu/tcj-doton | covered | `ninjutsu` | Ten Chi Jin's Doton on one target | Built 2026-10-15: its ticks (buff-neutral) against her average Ten Chi Jin Suiton. Not adopted on zMJdajRYyNF3LVkr 2:33 (xivanalysis 1): Fuma, Katon, Doton, but the Doton ticked 67k across both bosses against ~55k for a Ten Chi Jin Suiton, and that Suiton's Shadow Walker (20s) wouldn't have reached the next Kunai's Bane (3:08). |
+| nin/Ninjutsu/aoe-doton | verified | `ninjutsu` | Doton cut short (under 6 ticks) | Judged by damage: a Doton is flagged when its ticks (buff-neutral) deal less than a Raiton, on any number of targets. |
+| nin/Ninjutsu/st-doton | verified | `ninjutsu` | Doton on a single target outside the opener | Same check. Fires on zMJdajRYyNF3LVkr 5:50 (left after 4 ticks on both bosses, 67k) and 6:33 (no ticks at all, 108k). Matched xivanalysis there: its "unoptimized" 1 and "single-target" 1. |
 | nin/Ninki/overcap | verified | `ninki` | Ninki over 100 | Minor 20, Major 50. FRU: ~300 simulated vs its 250. |
 | nin/Ninki/hellfrog | verified | `ninAoe` (vs Bhavacakra, one target) | Hellfrog Medium on too few targets (3 before 7.3, 2 from 7.3) | Built 2026-10-15. One target only: from 7.3 two out-damage Bhavacakra (pre-7.3 two-target frogs go unseen). Premise holds (same Ninki). Fires on Red Hot and Deep Blue kills with the bosses apart: mgTQJjX2nW6ANkP7 6:51 (21k), jXG76ba43VDLAvYz 4:07 (17k) and 9:16 as Deep Blue died (24k). Matched xivanalysis on jXG76ba43VDLAvYz (2 of its 2). |
 | nin/Ninki/deathfrog | covered | `ninAoe` (vs Zesho Meppo, one target) | Deathfrog Medium on too few targets | Not seen firing (the one on disk hit both bosses). |
@@ -48,7 +48,7 @@
 | nin/Kazematoi/unbuffed-aeolian | verified | `kazematoi` | Aeolian Edge at 0 stacks | FRU 1 matched. |
 | nin/Procs/dropped-phantom-kamaitachi | covered | `checkProcs` | Phantom Kamaitachi Ready expiring | Medium 1, Major 2. Not seen firing. |
 | nin/Procs/dropped-tenri-jindo | covered | `checkProcs` | Tenri Jindo Ready expiring | Same. |
-| nin/Raiju/dropped | covered | `ninjutsu` | Raiju Ready stacks lost to a combo GCD | Stacks simulated from casts (Raiton +1 to 3, a Raiju −1, a combo GCD drops the rest); expiries come from the buff (the generic proc check skips Raiju Ready now). Each a Raiju over a combo GCD (27-42k). Fires on every searched pull, e.g. cZ42C1y3JRNGXWLH 2:28 (Aeolian Edge removed the buff in the log). |
+| nin/Raiju/dropped | verified | `ninjutsu` | Raiju Ready stacks lost to a combo GCD | Stacks simulated from casts (Raiton +1 to 3, a Raiju −1, a combo GCD drops the rest); expiries come from the buff (the generic proc check skips Raiju Ready now). Each a Raiju over a combo GCD (27-42k). Fires on every searched pull, e.g. cZ42C1y3JRNGXWLH 2:28 (Aeolian Edge removed the buff in the log). Matched xivanalysis on all six: 6, 6, 1, 2, 4, 2 stacks. Its count leaves out stacks that simply expire; the app adds those as "Raiju Ready expired" (cZ42C1y3JRNGXWLH 8:42, VzycM18rpn6bWxXY 5:05). |
 | nin/Positionals/missed | covered | `checkPositionals` | a missed flank / rear | Not matched against a page. Its Trick Attack entry is dead. |
 | nin/Combos/broken | covered | `checkCombos` | a broken combo | Generic. |
 | nin/Weaving/too-many | covered | `checkGcdGaps` | weaves past the limit (+1 per Dream Within a Dream) | Mudras have a 0.5s recast in its data, so it allows one weave after a mudra. |
@@ -74,10 +74,9 @@
 
 In priority order (biggest damage cost first).
 
-1. **nin/Kassatsu/*, nin/Ninjutsu/*, nin/Raiju/dropped** (covered). Match
-   against xivanalysis pages for the searched pulls.
-2. **nin/Kazematoi/leftover** (candidate). Kills only, by time held.
-3. **nin/Ninjutsu/tcj-doton** (candidate). None seen.
-4. **nin/KunaisBaneWindow/limited-armor-crush** (candidate, a few k).
-5. **nin/Procs/*, nin/Positionals** (covered). Not matched on a page.
-6. **nin/Ninki/deathfrog** (covered). Not seen firing.
+1. **nin/Kazematoi/leftover** (candidate). Kills only, by time held.
+2. **nin/KunaisBaneWindow/limited-armor-crush** (candidate, a few k).
+3. **nin/Procs/*, nin/Positionals** (covered). Not matched on a page.
+4. **nin/Ninjutsu/tcj-doton** (covered). Not seen as a loss yet (the one
+   on disk out-damaged its Suiton).
+5. **nin/Ninki/deathfrog** (covered). Not seen firing.

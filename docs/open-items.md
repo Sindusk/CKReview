@@ -209,8 +209,8 @@ and delete them from the header.
   - [rpr.md](xiva-audit/rpr.md): Reaper, 4 candidates, 5 covered.
   - [mnk.md](xiva-audit/mnk.md): Monk, 13 candidates (one case study;
     forms, Blitz resources), 5 covered.
-  - [nin.md](xiva-audit/nin.md): Ninja, 3 candidates, 18 covered
-    (ninjutsu checks built, awaiting xivanalysis pages).
+  - [nin.md](xiva-audit/nin.md): Ninja, 2 candidates, 9 covered
+    (ninjutsu, Kassatsu and Raiju checks verified 2026-10-15).
   - [sam.md](xiva-audit/sam.md): Samurai, 6 candidates, 14 covered (no
     page compared yet).
   - [mch.md](xiva-audit/mch.md): Machinist, 8 candidates, 10 covered.
