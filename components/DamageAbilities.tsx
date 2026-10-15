@@ -11,13 +11,15 @@
 // left out (Dia and Bio are 3); the match is case-sensitive, so a name
 // doesn't hit an ordinary word.
 //
-// Hovering a name or icon shows what the app knows about it without a
-// fetch: GCD or off-GCD, recast / cooldown and charges (the game layer's
+// Hovering a name or icon shows what the app knows about it: GCD or
+// off-GCD, recast / cooldown and charges (the game layer's
 // DamageGame.action), the player's median cast time and how often they
-// used it. For WoW, clicking opens its Wowhead page in a new tab; FFXIV
-// names don't link out.
+// used it. For FFXIV it adds the in-game description from XIVAPI, fetched
+// on the first hover and cached (lib/xivapi-tooltips.ts). For WoW,
+// clicking opens its Wowhead page in a new tab; FFXIV names don't link out.
 
 import { useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { fetchXivTooltip, type XivTooltip } from "@/lib/xivapi-tooltips";
 import { createPortal } from "react-dom";
 import type { Pull } from "@/types/Pull";
 import type { DamageGame } from "@/lib/damage/types";
@@ -149,13 +151,21 @@ export function AbilityTip({ name, icons, children, style }: {
   name: string; icons: AbilityIcons; children: ReactNode; style?: CSSProperties;
 }) {
   const ref = useRef<HTMLSpanElement>(null);
-  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const [pos, setPos] = useState<{ top?: number; bottom?: number; left: number } | null>(null);
+  const [xiv, setXiv] = useState<XivTooltip | undefined>(undefined);
   const a = icons.info.get(name);
   if (!a) return <span style={style}>{children}</span>;
   const url = externalUrl(a, icons.game);
+  const wantXiv = icons.game === "ffxiv" && a.id !== undefined && a.id > 0 && !a.aliasOf;
+  const width = wantXiv ? 340 : 280;
   const show = () => {
     const r = ref.current?.getBoundingClientRect();
-    if (r) setPos({ top: r.bottom + 6, left: Math.max(8, Math.min(r.left, window.innerWidth - 290)) });
+    if (!r) return;
+    const left = Math.max(8, Math.min(r.left, window.innerWidth - width - 10));
+    // Below the name, or above it in the lower part of the screen, where a
+    // long description would run off the bottom.
+    setPos(r.bottom > window.innerHeight * 0.55 ? { bottom: window.innerHeight - r.top + 6, left } : { top: r.bottom + 6, left });
+    if (wantXiv && xiv === undefined) void fetchXivTooltip(a.id!, a.name).then(setXiv);
   };
   const action = a.status || a.id === undefined ? undefined : gameOf(icons.game).action(a.id);
   const lines: string[] = [];
@@ -181,7 +191,7 @@ export function AbilityTip({ name, icons, children, style }: {
       </span>
       {pos && createPortal(
         <div role="tooltip" style={{
-          position: "fixed", top: pos.top, left: pos.left, zIndex: 2100, width: 280, pointerEvents: "none",
+          position: "fixed", top: pos.top, bottom: pos.bottom, left: pos.left, zIndex: 2100, width, pointerEvents: "none",
           background: "#0d1013", border: "1px solid var(--ck-frame-soft)", borderRadius: 3, padding: "8px 10px",
           fontSize: 12, lineHeight: 1.5, color: "var(--ck-text)", boxShadow: "0 6px 20px rgba(0,0,0,0.55)",
           fontWeight: 400, whiteSpace: "normal",
@@ -191,6 +201,14 @@ export function AbilityTip({ name, icons, children, style }: {
             <span style={{ color: ABILITY_COLOR, fontWeight: 700, fontSize: 13 }}>{a.name}</span>
           </div>
           {lines.map((l, i) => <div key={i} style={{ color: i === 0 ? "var(--ck-text)" : "var(--ck-text-2)" }}>{l}</div>)}
+          {xiv && (
+            <div style={{ marginTop: 6, paddingTop: 6, borderTop: "1px solid var(--ck-frame-soft)", whiteSpace: "pre-line", color: "var(--ck-text-2)" }}>
+              {xiv.description}
+            </div>
+          )}
+          {wantXiv && xiv === undefined && (
+            <div style={{ color: "var(--ck-text-3)", fontSize: 11, marginTop: 4 }}>Loading description…</div>
+          )}
           {url && (
             <div style={{ color: "var(--ck-text-3)", fontSize: 11, marginTop: 4 }}>
               Click for the full tooltip on Wowhead
