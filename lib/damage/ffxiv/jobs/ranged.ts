@@ -124,7 +124,11 @@
 //   jN3XDrf2z8PmLgRJ Vamp Fatale pulls 9 and 12, Bioblaster on the boss
 //   after the adds died (5:25, 39k; 5:10, 33k); Scattergun and Auto
 //   Crossbow on the adds pass when they hit 3 (more than the single-target
-//   average) and flag on 2 (5:00, 11k; 5:04, 1k). djChYqt4b7K8aAfP's Red
+//   average) and flag on 2 (5:00, 11k; 5:04, 1k). Checked against
+//   xivanalysis on pull 12: Bioblaster 1 matches. Not adopted: its 5 Auto
+//   Crossbows on two targets (31-51k each against Blazing Shot's ~36k,
+//   about even; only 5:04 fell short) and the 5:18 Scattergun on three
+//   (40k against the combo's ~34k). Its minimum of 4 outruns the damage. djChYqt4b7K8aAfP's Red
 //   Hot and Deep Blue kill: Bioblaster on both bosses at 8:48 (27k).
 //
 //   Copyright (c) 2018 Saxon Landers & contributors

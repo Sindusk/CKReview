@@ -105,8 +105,11 @@
 //     and isn't measurable from one press).
 //   - AoE on too few targets (AoE.tsx, 2026-10-15): each form's AoE under
 //     4 against that form's three single-target GCDs, Enlightenment under 3
-//     against The Forbidden Chakra. Seen firing, not matched against
-//     xivanalysis: kC7Y3WbzvKcZrBxT The Tyrant pull 1 6:29 (Enlightenment
+//     against The Forbidden Chakra. Checked against xivanalysis on
+//     L9BzKkD2nxcVgHTC Necron pull 20: its 2 Four-point Fury and 2
+//     Rockbreaker match; not adopted: its 2 Shadow of the Destroyer, which
+//     hit 3 adds for more than the form's average. Seen firing:
+//     kC7Y3WbzvKcZrBxT The Tyrant pull 1 6:29 (Enlightenment
 //     on the boss, 10k); L9BzKkD2nxcVgHTC Necron pulls 6 and 20 (Four-point
 //     Fury and Rockbreaker on 2-3 adds, 3-20k: three is near even, so
 //     only the ones that dealt less than the form's average show);
