@@ -41,7 +41,8 @@
 // Hits at their median time over the window, the non-tank ones with their
 // median and worst lowest HP. Cooldown lanes are the clock pull's (the
 // window's longest, tanking-plan.ts clockPull) casts of every party
-// cooldown but gated ones (Tempera Grassa shares Tempera Coat's cooldown),
+// cooldown but gated ones (Tempera Grassa shares Tempera Coat's cooldown)
+// the plan doesn't touch,
 // the stretches from the first raidwide on that it sat ready, split
 // (user, 2026-10-14) into free (READY_GAP_MIN_MS+; a cast there delays
 // nothing) and held (the cooldown's length before each later cast: the
@@ -90,9 +91,9 @@ export type UnderFinding = {
   pulls:     number;            // window pulls that had it
   reached:   number;
   column?:   "physical" | "magical" | "none";
-  steady:    string[];          // party cooldowns on it every pull
+  steady:    CooldownRef[];     // party cooldowns on it every pull
   fix?:      { letter: string; changes: OptimizedChange[]; after: HitSide };
-  idea?:     { player: string; job: string; name: string; freePulls: number; est?: number };
+  idea?:     { player: string; job: string; key: string; name: string; freePulls: number; est?: number };
 };
 
 export type UnusedFinding = {
@@ -133,7 +134,7 @@ export type StackedFinding = {
   median:    number;
   worst:     number;
   pulls:     number;
-  cooldowns: { name: string; player: string; job: string }[];
+  cooldowns: CooldownRef[];
   alternatives: string[];        // droppable on its own
   planMove?: { letter: string; change: OptimizedChange; after: HitSide };
 };
@@ -189,6 +190,13 @@ export type AnalysisFindings = {
   tankBusters: number;
 };
 
+// A cooldown on a hit, by its usual caster.
+export type CooldownRef = { key: string; name: string; player: string; job: string };
+function cooldownOf(a: AggregatedHit["active"][number], jobOf: Map<string, string>): CooldownRef {
+  const player = Object.entries(a.casters).sort((x, y) => y[1] - x[1])[0]?.[0] ?? "";
+  return { key: a.key, name: a.name, player, job: jobOf.get(player) ?? "" };
+}
+
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const refOf = (r: AggregatedHit): HitRef => ({ id: r.id, name: r.abilityName, occurrence: r.occurrence, phase: r.phase, medianMs: r.medianMs });
 const isTankRow = (r: AggregatedHit) => r.byPull.every((b) => b.hit.tankOnly);
@@ -218,7 +226,7 @@ export function buildAnalysisFindings(window: FindingsWindowPull[], plan: Optimi
       const worst = r.byPull.reduce((a, b) => (b.hit.margin < a.hit.margin ? b : a));
       const steady = r.active
         .filter((a) => a.pulls === r.pulls && entryOf.get(a.key) && partyEligible(entryOf.get(a.key)!))
-        .map((a) => a.name);
+        .map((a) => cooldownOf(a, jobOf));
       const out: UnderFinding = {
         hit: refOf(r), failing: failingRow(r), median: r.medianMargin, worst: r.worstMargin, worstPull: worst.pullNumber,
         deathPulls: r.deathPulls, pulls: r.pulls, reached: r.reached, column: r.damageColumn, steady,
@@ -232,7 +240,7 @@ export function buildAnalysisFindings(window: FindingsWindowPull[], plan: Optimi
         out.fix = { letter: fixGroup.letter, changes: touching.length ? touching : fixGroup.group.changes, after: outcome.after };
       } else {
         const opt = aggregateAddOptions(r, game, reach).find((o) => entryOf.get(o.key) && partyEligible(entryOf.get(o.key)!));
-        if (opt) out.idea = { player: opt.player, job: jobOf.get(opt.player) ?? "", name: opt.name, freePulls: opt.pulls ?? 0, est: opt.est };
+        if (opt) out.idea = { player: opt.player, job: jobOf.get(opt.player) ?? "", key: opt.key, name: opt.name, freePulls: opt.pulls ?? 0, est: opt.est };
       }
       return out;
     })
@@ -337,10 +345,7 @@ export function buildAnalysisFindings(window: FindingsWindowPull[], plan: Optimi
     if (r.verdict !== "over" || r.medianMargin < STACK_MIN_MARGIN) continue;
     const cds = r.active
       .filter((a) => a.pulls * 2 >= r.pulls && entryOf.get(a.key) && partyEligible(entryOf.get(a.key)!))
-      .map((a) => {
-        const player = Object.entries(a.casters).sort((x, y) => y[1] - x[1])[0]?.[0] ?? "";
-        return { name: a.name, player, job: jobOf.get(player) ?? "" };
-      });
+      .map((a) => cooldownOf(a, jobOf));
     if (cds.length < STACK_MIN_COOLDOWNS) continue;
     timing.push({
       kind: "stacked", hit: refOf(r), median: r.medianMargin, worst: r.worstMargin, pulls: r.pulls, cooldowns: cds,
@@ -385,8 +390,9 @@ export function buildAnalysisFindings(window: FindingsWindowPull[], plan: Optimi
     const clockUnder = clock.hits.filter((h) => underIds.has(h.id));
     for (const player of clock.pull.players) {
       for (const entry of game.catalog) {
-        if (!entry.jobs.includes(player.className) || !tracked(entry) || entry.gated) continue;
         const k = `${player.name}|${entry.key}`;
+        // Gated ones only when the plan moves or adds them (Tempera Grassa).
+        if (!entry.jobs.includes(player.className) || !tracked(entry) || (entry.gated && !inPlan.has(k))) continue;
         const castTimes = playerCasts(player, entry);
         const lateFinding = lateByKey.get(k);
         const late = lateFinding?.casts.find((c) => c.pullNumber === clock.pullNumber);
@@ -414,7 +420,7 @@ export function buildAnalysisFindings(window: FindingsWindowPull[], plan: Optimi
         const u = unused.find((x) => x.player === player.name && x.key === entry.key);
         if (u?.idea) marks.push({ kind: "idea", atMs: u.idea.hit.medianMs, label: u.idea.hit.name });
         for (const und of under) {
-          if (und.idea?.player === player.name && entryOf.get(entry.key)?.name === und.idea.name) {
+          if (und.idea?.player === player.name && und.idea.key === entry.key) {
             marks.push({ kind: "idea", atMs: und.hit.medianMs, label: und.hit.name });
           }
         }

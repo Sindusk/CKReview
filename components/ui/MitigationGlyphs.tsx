@@ -6,6 +6,9 @@
 // tiles, the timeline pins and the finding groups and rows.
 
 import type { CSSProperties, ReactNode } from "react";
+import { getFFAbilityIconUrl } from "@/lib/ability-icons";
+import { FFXIV_MITIGATION } from "@/lib/mitigation/ffxiv-catalog";
+import { getPlayerClassIcon } from "@/lib/player-display";
 
 export type FindingGlyphKind = "fail" | "tight" | "plan" | "unused" | "late" | "stacked" | "other";
 
@@ -58,6 +61,41 @@ const PATHS: Record<FindingGlyphKind, ReactNode> = {
     </>
   ),
 };
+
+// ── Skill and job icons (user, 2026-10-14: icons over names) ─────────────
+
+const iconOf = new Map(FFXIV_MITIGATION.catalog.map((e) => [e.key, getFFAbilityIconUrl(e.icon)]));
+const hideBroken = (e: React.SyntheticEvent<HTMLImageElement>) => { e.currentTarget.style.visibility = "hidden"; };
+
+/** A mitigation's icon from the catalog (a blank square when it has none). */
+export function SkillIcon({ entryKey, name, size = 18, style }: { entryKey: string; name: string; size?: number; style?: CSSProperties }) {
+  const src = iconOf.get(entryKey);
+  const box: CSSProperties = { width: size, height: size, borderRadius: 3, flex: "0 0 auto", display: "inline-block", verticalAlign: "middle", ...style };
+  return src
+    ? <img src={src} alt={name} title={name} width={size} height={size} style={box} onError={hideBroken} />
+    : <span title={name} style={{ ...box, background: "var(--ck-line-2)" }} />;
+}
+
+/** A job's icon, the player's name in its tooltip. */
+export function JobIcon({ job, player, size = 16 }: { job: string; player?: string; size?: number }) {
+  return (
+    <img src={getPlayerClassIcon("ffxiv", job)} alt={job} title={player ? `${player} (${job})` : job} width={size} height={size}
+      style={{ flex: "0 0 auto", display: "inline-block", verticalAlign: "middle" }} onError={hideBroken} />
+  );
+}
+
+/** Job icon, skill icon and the skill's name: who uses what, one glance. */
+export function CdChip({ player, job, entryKey, name, showName = true }: {
+  player: string; job: string; entryKey: string; name: string; showName?: boolean;
+}) {
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 4, verticalAlign: "middle", whiteSpace: "nowrap" }}>
+      <JobIcon job={job} player={player} size={15} />
+      <SkillIcon entryKey={entryKey} name={`${name} (${player})`} size={17} />
+      {showName && <span style={{ fontWeight: 600, color: "var(--ck-text)" }}>{name}</span>}
+    </span>
+  );
+}
 
 /** The finding's glyph in a tinted disc. */
 export function FindingGlyph({ kind, size = 22, style, title }: { kind: FindingGlyphKind; size?: number; style?: CSSProperties; title?: string }) {
