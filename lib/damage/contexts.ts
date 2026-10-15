@@ -6,6 +6,7 @@
 import type { DamageContext } from "./types";
 import { DANCING_MAD_DAMAGE_CONTEXT } from "../mechanics/ffxiv/dancingmad/damage-context";
 import { FRU_DAMAGE_CONTEXT } from "../mechanics/ffxiv/fru/damage-context";
+import { TOP_DAMAGE_CONTEXT } from "../mechanics/ffxiv/top/damage-context";
 import { TYRANT_DAMAGE_CONTEXT } from "../mechanics/ffxiv/arcadion/tyrant-damage-context";
 import { LINDWURM_DAMAGE_CONTEXT } from "../mechanics/ffxiv/arcadion/lindwurm-damage-context";
 import { LINDWURM_II_DAMAGE_CONTEXT } from "../mechanics/ffxiv/arcadion/lindwurm-2-damage-context";
@@ -29,6 +30,7 @@ import { ULATEK_DAMAGE_CONTEXT } from "../mechanics/wow/va/ulatek-damage-context
 const CONTEXTS: Record<string, DamageContext> = {
   "Dancing Mad": DANCING_MAD_DAMAGE_CONTEXT,
   "Futures Rewritten": FRU_DAMAGE_CONTEXT,
+  "The Omega Protocol": TOP_DAMAGE_CONTEXT,
   "The Tyrant": TYRANT_DAMAGE_CONTEXT,
   "Lindwurm": LINDWURM_DAMAGE_CONTEXT,
   "Lindwurm II": LINDWURM_II_DAMAGE_CONTEXT,
