@@ -110,6 +110,11 @@
 //   chains-to-curse change the closest chained pairs in failed pulls
 //   (13.7-15.9y: A3, H2, T8, T18) overlap the clean ones (14.3y+), and the
 //   tether partners aren't logged. It stays player-less.
+// VOD review 2026-10-15 (user): report JZ1KXhDbqkNH3jxR (fatebreaker.ts's
+// group J), pull 22: the PLD's no-killing-blow death in the crystal
+// intermission (6:30) was the wall, as flagged; the DNC then took that
+// player's Hiemal Ray tether and died to it (fallout, unflagged). Ruling
+// in expectations/rulings.json.
 // - Diamond Dust deaths: per the user the pull was over once the GNB died
 //   in T19 Diamond Dust. On disk 11 of 46 pulls with a Diamond Dust death
 //   still reached Hallowed Ray (T29 among them), so there is no cutoff for

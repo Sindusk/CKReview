@@ -91,6 +91,16 @@
 // - Spirit Taker 9 +111.5: the NIN didn't move far enough, the DRK was
 //   fine. Not readable: positions are too sparse to say who moved into
 //   whom (18 shared jumps on disk), so both stay named.
+// VOD review 2026-10-15 (user): report JZ1KXhDbqkNH3jxR (fatebreaker.ts's
+// group J, 2026-10-14; P3 starts ~7:24), pulls 3, 23; rulings in
+// expectations/rulings.json. It set:
+// - the first Meltdown shot through three as the baiter's alone (23 +44.4:
+//   the BLM went west instead of southeast, baiting it through the center);
+// - Spirit Taker 3 +112.8: the WAR was off their spot (should have been
+//   closer to the center), the DNC fine. Not readable: the DNC stood at
+//   16.8y (clean far spots 17.6-17.7y) but the WAR's 8.4y matches clean
+//   middle spots (8.7-9.0y) and their own spot isn't logged, so both stay
+//   named.
 //
 // -- RULES IMPLEMENTED --
 // ffxiv-ood-fire: a Relativity fire that caught others (Major on a death):
@@ -331,7 +341,8 @@
 //   - First Sinbound Meltdown shot through others (~0:31 / 0:41 / 0:52): the
 //     line names everyone it hit, or only the baiter when it went through
 //     three or more. Who was wrong: the baiter's angle, or the players
-//     behind?
+//     behind? (Partly answered 2026-10-15: through three, the baiter, JZ1KXh
+//     23. One or two caught still unruled.)
 //   - One follow-up beam through 4+ players is player-less. Who should be
 //     named (the baiter whose beam it was, the stack's caller)?
 //   - Dark Blizzard III donut on 3+ names the holder (off the stack's

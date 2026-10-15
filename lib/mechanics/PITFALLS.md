@@ -400,6 +400,16 @@ philosophy and the data semantics this list assumes.
 - **No clean/failure gap means a judgment call.** Use relative attribution
   (the worst member of the cluster) or ask the user. Don't silently pick a
   threshold (Wave Cannon, Tele-Trouncing).
+- **Read MT from the boss's first assigned buster, not the opening
+  auto.** roles.ts's opening auto-attack named the off-tank as MT in 4 of
+  24 FRU pulls of one static; the first Powder Mark Trail was on the same
+  tank every pull (Fatebreaker's Fall of Faith conga).
+- **A whole-raid failure is a call, not eight errors.** Everyone alive in
+  one wrong safe spot followed a wrong call: one player-less Raid marker,
+  with the per-player hits as fallout (Fatebreaker's Blasting Zone).
+- **A clean-looking overlap can be a group's plan.** Ask before flagging a
+  doubled hit that recurs every pull with nobody dying: one static stacks
+  both tanks for the second Burn Mark on purpose (Fatebreaker).
 
 ## Deaths with no killing blow
 

@@ -125,6 +125,21 @@
 // (tether 3, lightning): the AST went to the wrong side and the BRD was
 // right. Not readable: no player keeps one side across clean lightning
 // tethers (the AST was left in 11, right in 10), so both stay named.
+// VOD review 2026-10-15 (user): report J JZ1KXhDbqkNH3jxR (a different
+// static, NAUR, 24 pulls, none past P3), pulls 1, 2, 6, 14; rulings in
+// expectations/rulings.json. It set:
+// - the second Burn Mark on both tanks as this static's plan (J1 +2:27: they
+//   stand together and mitigate through it, as spreading too far can bait it
+//   onto others; all 16 J pulls at the towers, nobody died to it);
+// - all eight in Blasting Zone as one wrong call, player-less (J2 +0:51);
+// - the WAR on the wrong Fall of Faith side (J14 +1:47): five in tether 1's
+//   Sinblaze, three east, so tether 2's third Bow Shock cone went through
+//   tether 3's carrier into the west group (five dead). Group J follows
+//   NAUR's conga (R1, H1, M1, MT, OT, M2, H2, R2 west to east) in all 18 of
+//   its clean Fall of Faiths: the AST and NIN swap their 225/270 cone spots
+//   every pull, the RPR is always SE (135). The opening auto-attack names
+//   the WAR as MT in 4 of 24 pulls (J14 one of them); the first Powder Mark
+//   was always on the PLD.
 // Cutoffs (first Raid error): player dead going into a mechanic 62, called
 // wipe 41, collapse 40, Fated Burn Mark 22, enrage 11, tower 3; the 18 P1
 // clears have none.
@@ -149,8 +164,13 @@
 //   did. ffxiv-fb-powder-death (Major): a tank killed by the Powder Mark
 //   buster or by a single expiry Burn Mark with the other tank alive
 //   (their mitigation; with the other tank dead it's fallout, A45).
-// ffxiv-fb-burn-mark: both expiry explosions on one tank (both tanks named),
-//   or one on a non-tank with all eight alive (that player alone: A58).
+// ffxiv-fb-burn-mark: both expiry explosions on one tank (both tanks named;
+//   not when both tanks took both, nobody else was hit and nobody died: a
+//   stacked plan, J1), or one on a non-tank with all eight alive (that
+//   player alone: A58).
+// ffxiv-fb-wrong-call (Raid): everyone alive (6+) hit by one Blasting Zone;
+//   its per-player avoidable hits and the overlaps/stacks within 1.5s are
+//   dropped as fallout (J2).
 // ffxiv-fb-fated-burn-mark (Raid): a Fated Burn Mark explosion hitting 3+
 //   others; the holder (the one who died before it) is flagged by what
 //   killed them.
@@ -170,6 +190,10 @@
 //   direction to them, else the carrier by Floating Fetters; fewer: those
 //   players), a short Sinblaze's missing members (player-less if unknown).
 //   A death in a clean resolution is never flagged (mitigation).
+//   When none of that names anyone and all eight were alive at tether 1:
+//   the one untethered player in the other side's first tether, by the
+//   NAUR conga (MT = first Powder Mark holder, M2 = the SE cone melee; no
+//   call when either is unreadable): "Fall of Faith Wrong Side" (J14).
 // ffxiv-fb-tower (Raid + Major): a short tower; with the six non-tanks
 //   alive, a non-tank in no tower, else the extras in an overfilled one.
 //   Skipped with 3+ non-tanks dead.
@@ -425,6 +449,7 @@ import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import type { DeathEvent } from "@/types/DeathEvent";
 import type { PullError, EnemyEvent } from "@/types/PullError";
 import type { ReportedOccurrence } from "@/lib/mechanics/occurrences";
+import { detectFFRoles, type FFRoleSlot } from "@/lib/mechanics/ffxiv/roles";
 import { kFmt, sec, yd, joinNames, playerError, playerlessMinor, raidMarker, clusterByGap } from "@/lib/mechanics/wow/common";
 import {
   DAMAGE_DOWN, MARK_OF_MORTALITY, DEATH_EVENT_LAG_MS, PREVIEW_AMOUNT, type Hit, type Life,
@@ -449,6 +474,7 @@ export const FB_COLLAPSE_RULE_ID     = "ffxiv-fb-collapse";
 export const FB_DEAD_GOING_IN_RULE_ID = "ffxiv-fb-dead-going-in";
 export const FB_TANKS_DEAD_RULE_ID   = "ffxiv-fb-tanks-dead";
 export const FB_MARK_RULE_ID         = "ffxiv-fb-mark";
+export const FB_WRONG_CALL_RULE_ID   = "ffxiv-fb-wrong-call";
 
 // ── log IDs (VERIFIED above) ────────────────────────────────────────────────
 
@@ -471,6 +497,9 @@ const POWDER = 40168;
 const BURN_MARK = 40169;
 const AUTO = 40116;
 const SINBLAZE = 40156;
+const BLASTING_ZONE = 40157;
+// Everyone alive (at least this many) in one Blasting Zone: a wrong call.
+const WRONG_CALL_MIN = 6;
 const FALL_CARRIER = 40142;
 const BOW_SHOCK = 40143;
 const ENRAGE = 40128;
@@ -832,6 +861,11 @@ function detectPowderMark(players: PlayerInfo[], life: Life, casts: EnemyEvent[]
     const stacked = tanks.filter((p) => hits.filter((h) => h.p === p).length > 1);
     if (stacked.length && other && life.alive(other, expiry.timestamp)) {
       const killed = tanks.filter((p) => hits.some((h) => h.p === p && life.diedFrom(p, h.e.timestamp)));
+      // Both tanks in both explosions, nobody else, nobody dead: a stacked
+      // plan mitigated through, not a mistake (user, 2026-10-15, report
+      // JZ1KXhDbqkNH3jxR: every pull at the towers, on purpose, as spreading
+      // too far can bait the explosion onto others).
+      if (!killed.length && !nonTanks.length && stacked.length === tanks.length) return;
       for (const p of tanks) {
         errors.push(playerError(p, {
           ruleId: FB_BURN_MARK_RULE_ID, severity: killed.length ? "Major" : "Minor", name: "Burn Marks Overlapped",
@@ -1087,6 +1121,73 @@ function detectFallOfFaith(players: PlayerInfo[], life: Life, end: number): Pull
       }
     }
   });
+  if (!errors.length) errors.push(...congaWrongSide(players, life, res, preyOrder));
+  return errors;
+}
+
+// NAUR's Fall of Faith conga, west (tethers 1/3) to east (2/4); the four
+// untethered players fill the two spots left on each side in this order.
+const NAUR_FALL_CONGA: FFRoleSlot[] = ["R1", "H1", "M1", "MT", "OT", "M2", "H2", "R2"];
+// The M2's initial Cyclonic Break cone sits at SE (135 degrees) on the
+// standard modified clocks (every pull of JZ1KXh: 134-137).
+const M2_CLOCK = 135;
+
+/**
+ * Each untethered player's Fall of Faith side by the NAUR conga, or
+ * undefined when a slot that decides it can't be read. MT = the first
+ * Powder Mark Trail's holder (JZ1KXh: the PLD in all 24 pulls, where the
+ * opening auto-attack named the WAR in 4); M2 = the melee whose initial
+ * cone was at SE. JZ1KXh's 18 clean Fall of Faiths all match it.
+ */
+function congaSides(players: PlayerInfo[], preyOrder: PlayerInfo[]): Map<PlayerInfo, 0 | 1> | undefined {
+  if (players.length !== 8 || preyOrder.length !== 4) return undefined;
+  const slots = new Map<PlayerInfo, FFRoleSlot>();
+  for (const a of detectFFRoles(players)) if (a.player && (a.slot[0] === "H" || a.slot[0] === "R") && !a.tentative) slots.set(a.player, a.slot);
+  const tanks = players.filter(isTank);
+  const powder = (p: PlayerInfo) => p.debuffs.find((e) => e.abilityId === POWDER_MARK && e.debuffStatus === "applied")?.timestamp ?? Infinity;
+  const [mt, ot] = [...tanks].sort((a, b) => powder(a) - powder(b));
+  if (tanks.length !== 2 || powder(mt) === Infinity) return undefined;
+  slots.set(mt, "MT").set(ot, "OT");
+  const melee = players.filter((p) => !slots.has(p) && p.role === "DPS");
+  const coneAt = (p: PlayerInfo) => { const e = p.damageTaken.find((x) => x.abilityId === CYCLONIC_CONE); return e ? bearingOf(e) : undefined; };
+  const m2 = melee.filter((p) => { const b = coneAt(p); return b !== undefined && angleApart(b, M2_CLOCK) <= CONE_SPOT_MOVED; });
+  if (melee.length !== 2 || m2.length !== 1) return undefined;
+  slots.set(m2[0], "M2").set(melee.find((p) => p !== m2[0])!, "M1");
+  if (slots.size !== 8) return undefined;
+  const untethered = players.filter((p) => !preyOrder.includes(p))
+    .sort((a, b) => NAUR_FALL_CONGA.indexOf(slots.get(a)!) - NAUR_FALL_CONGA.indexOf(slots.get(b)!));
+  return new Map(untethered.map((p, i) => [p, i < 2 ? 0 : 1]));
+}
+
+/**
+ * When neither side's group could be read from the log: an untethered
+ * player standing in the other side's first tether, the only one there,
+ * went to the wrong side (user, 2026-10-15, JZ1KXh Pull 14 +1:47: the WAR
+ * stood west for tether 1, five in its Sinblaze; tether 2's east group was
+ * one short, so a Bow Shock cone went through tether 3's carrier into the
+ * west group and killed five).
+ */
+function congaWrongSide(players: PlayerInfo[], life: Life, res: Hit[][], preyOrder: PlayerInfo[]): PullError[] {
+  if (res.length < 2 || !allAlive(players, life, res[0][0].e.timestamp - 500)) return [];
+  const sides = congaSides(players, preyOrder);
+  if (!sides) return [];
+  const errors: PullError[] = [];
+  for (const side of [0, 1] as const) {
+    const r = res[1 - side];
+    const per = byPlayer(r);
+    const wrong = [...per.keys()].filter((p) => sides.get(p) === side);
+    if (wrong.length !== 1 || [...per.values()].some((es) => es.length > 1 && !es.some((e) => e.abilityId === BOW_SHOCK))) continue;
+    const p = wrong[0];
+    const window = res.slice(0, 2).flat();
+    const killed = uniq(window.filter((h) => life.diedFrom(h.p, h.e.timestamp)).map((h) => h.p));
+    const mom = players.filter((x) => gotAura(x, MARK_OF_MORTALITY, res[1][0].e.timestamp));
+    const mine = side === 0 ? "west (tethers 1 and 3)" : "east (tethers 2 and 4)";
+    errors.push(playerError(p, {
+      ruleId: FB_FALL_RULE_ID, severity: killed.length || mom.length ? "Major" : "Minor", name: "Fall of Faith Wrong Side",
+      description: `Stood with the other group for Fall of Faith: hit by tether ${2 - side}'s ${r.some((h) => h.e.abilityId === SINBLAZE) ? "Sinblaze" : "Bow Shock"} (${per.size} players), while by the conga their spot was ${mine}. Their own group was one short.${killed.length ? ` ${namesOf(killed)} died.` : ""}${mom.length ? ` ${namesOf(mom)} got Mark of Mortality.` : ""} The four untethered players fill the conga's open spots, R1, H1, M1, MT, OT, M2, H2, R2 west to east: two each side.`,
+      timestamp: r[0].e.timestamp, abilityId: r[0].e.abilityId, abilityName: r[0].e.abilityName,
+    }));
+  }
   return errors;
 }
 
@@ -1274,6 +1375,25 @@ export function detectFatebreakerErrors(
     ...detectDeadGoingIn(players, life, enemyCasts, end),
     ...detectWallDeaths(players, enemyCasts, deaths, called, end),
   ];
+  // Everyone alive in Blasting Zone at once: the raid followed one wrong
+  // call (user, 2026-10-15, JZ1KXh Pull 2 +0:51: all eight). The per-player
+  // hits and the spread/stack overlaps packed into that wedge are its
+  // fallout; one player-less Raid marker instead.
+  for (const res of clusterByGap(hitsOf(players, life, BLASTING_ZONE, end), (h) => h.e.timestamp, 1500)) {
+    const t0 = res[0].e.timestamp;
+    const living = players.filter((p) => life.alive(p, t0 - 500));
+    const hit = uniq(res.map((h) => h.p));
+    if (living.length < WRONG_CALL_MIN || living.some((p) => !hit.includes(p))) continue;
+    const killed = hit.filter((p) => res.some((h) => h.p === p && life.diedFrom(p, h.e.timestamp)));
+    for (let i = errors.length - 1; i >= 0; i--) {
+      const e = errors[i];
+      if (Math.abs(e.timestamp - t0) > 1500) continue;
+      if ((e.ruleId === FB_AVOIDABLE_RULE_ID && e.abilityId === BLASTING_ZONE) || e.ruleId === FB_OVERLAP_RULE_ID || e.ruleId === FB_STACK_RULE_ID) errors.splice(i, 1);
+    }
+    errors.push(raidMarker(FB_WRONG_CALL_RULE_ID, "Raid in Blasting Zone",
+      `All ${hit.length} living players were hit by Blasting Zone at once${killed.length === hit.length ? ", and all of them died" : killed.length ? ` (${namesOf(killed)} died)` : ""}: the raid followed one wrong call for the safe wedge. Unresolvable from here; treated as the cutoff point. Read the raised weapons at your clock and the opposite one; the open wedge is away from them.`,
+      t0, BLASTING_ZONE, "Blasting Zone"));
+  }
   errors.push(...unexplainedMarks(players, deaths, errors, 0, end, FB_MARK_RULE_ID));
 
   // Generic cutoffs, only the earliest and only before any mechanic Raid.
