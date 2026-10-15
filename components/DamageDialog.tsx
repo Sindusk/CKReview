@@ -105,6 +105,7 @@ const KIND_LABEL: Record<DamageFinding["kind"], string> = {
   "tincture":         "Tincture",
   "pet-cut":          "Pet cut short",
   "missed-followup":  "Missed follow-up",
+  "dance":            "Dance",
   "movement":         "Movement",
 };
 

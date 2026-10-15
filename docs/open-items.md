@@ -194,8 +194,8 @@ and delete them from the header.
   for most jobs to fall back on).
   - [core.md](xiva-audit/core.md): core modules, 3 candidates.
   - [brd.md](xiva-audit/brd.md): Bard, 1 candidate, 4 covered.
-  - [dnc.md](xiva-audit/dnc.md): Dancer, 6 candidates (dance step
-    counts), 3 covered.
+  - [dnc.md](xiva-audit/dnc.md): Dancer, 2 candidates, 7 covered (dance
+    checks built, awaiting xivanalysis pages).
   - [pct.md](xiva-audit/pct.md): Pictomancer, 2 candidates, 5 covered.
   - [ast.md](xiva-audit/ast.md): Astrologian, 1 candidate, 3 covered.
   - [sge.md](xiva-audit/sge.md): Sage, 1 candidate.

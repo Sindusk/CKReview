@@ -251,6 +251,7 @@ export type FindingKind =
   | "tincture"          // tinctures placed where they covered less than they could, or one not used
   | "pet-cut"           // a pet's set sequence cut short (Living Shadow)
   | "missed-followup"   // an action unlocked by another never pressed (Salt and Darkness)
+  | "dance"             // a Dancer's dance finished short, or with wrong step presses
   | "movement";         // idle a mechanic's movement explains (DamageContext.movementWindows)
 
 export type DamageFinding = {

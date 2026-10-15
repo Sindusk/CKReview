@@ -27,10 +27,10 @@
 | dnc/Technicalities/late-standard | superseded | `technical` | Standard Step as the last action of a window | The window's GCD and action counts carry what a late Standard displaces. Fires even when the finish still landed inside the buff. |
 | dnc/Technicalities/players-buffed | covered | buffs.ts coverage | a Technical Finish that missed a player | Display only in xivanalysis. |
 | dnc/Technicalities/raid-buff-overwrite | no-damage | — | two Dancers' Technical Finishes overlapping | A note column; no single-Dancer static hits it. |
-| dnc/DirtyDancing/correct-finish | candidate | — | a dance finished with fewer steps than Double Standard / Quadruple Technical | A short dance lowers Standard / Technical Finish's buff for the party. The app sees the dance's time (holds, gaps) but not the step count. The 0-step Standard Finish at qjCMx4bRfgNKwX9T 11:50 was in forced time. Double-counts with the zero-step rules. |
-| dnc/DirtyDancing/zero-step-standard | candidate | — | Standard Finish with no steps | Same as correct-finish; tiers 1 Medium, 2 Major. |
-| dnc/DirtyDancing/zero-step-technical | candidate | — | Technical Finish with no steps | No party buff at all: the costliest Dancer mistake. Major at 1. |
-| dnc/DirtyDancing/no-extra-moves | candidate | — | a wrong step pressed in a dance | Each costs ~1s of GCD time the gap check can't see (a step is a 1s GCD). |
+| dnc/DirtyDancing/correct-finish | covered | `dancerDances` | a dance finished with fewer steps than Double Standard / Quadruple Technical | Built 2026-10-15; one finding per short finish, so the zero-step rules aren't counted twice. Valued as the buff gap on the recipients' hits (percentages measured from hit multipliers: Technical 1/2/3/5%, Standard 0/2/5%) plus the finisher's own lower damage, buff-neutral. Found by searching the 71 lowest Red Hot and Deep Blue Dancer parses (18 had a dance mistake). Fires on 9zQqtBRL41XhADxG 9:06 and at2GMBcywChApnfY 4:21 (Triple Technical after moving mid-dance; 96k, 161k), Jv7XZL2zwYgyhdFj 7:14 and 8:51 (Single Standard; 129k, 180k), and on older samples (JZ1KXhDbqkNH3jxR, r83YhVvDwpzBkLyF, rFQT8XZckzvH1LNx, pG319BgHTnPJc6Ft). Premise holds on each: none was near downtime or the kill. The 0-step Standard Finish at qjCMx4bRfgNKwX9T 11:50 was in forced time. Awaiting xivanalysis pages. |
+| dnc/DirtyDancing/zero-step-standard | covered | `dancerDances` | Standard Finish with no steps | Fires on MFGhwLnJ34pz7cWQ 7:45 (Standard Step, Finish 1.5s later; 120k: the old buff ran on, so most of it is the finisher's own 0-step damage) and r83YhVvDwpzBkLyF Queen Eternal pull 12 5:59 (both steps wrong). |
+| dnc/DirtyDancing/zero-step-technical | covered | `dancerDances` | Technical Finish with no steps | Fires on ZVCqpA8DPJgMK2Yr 6:47 (472k: no party buff for 20s in the burst, 285k, plus a 0-step finisher). |
+| dnc/DirtyDancing/no-extra-moves | covered | `dancerDances` | a wrong step pressed in a dance | Presses beyond the finisher's step count, each a 1s step GCD at her average GCD (11-32k). Fires on zPJaZNfkFAKhY42t 2:07, 6:35, 8:00, at2GMBcywChApnfY 5:15, Jv7XZL2zwYgyhdFj 7:14, 8:16, 9zQqtBRL41XhADxG 9:06 (4 presses, one wrong, so the press count alone hides it), and Chauzey Solstice on several statics' pulls. |
 | dnc/DirtyDancing/hit-target | covered | `noDamageCasts` | a finish that hit nothing | The app values the finish's own damage, not the buff that wasn't given. Not seen firing. |
 | dnc/DirtyDancing/standard-finish-uptime | superseded | `checkCooldownDrift` (Standard Step) | Standard Finish lapsing | Re-dancing on time is the Standard Step drift. Sums over every friend and subtracts downtime from both sides. |
 | dnc/DirtyDancing/closed-position-uptime | candidate | — | no dance partner, or Closed Position dropped | Losing a partner costs their Standard Finish and Devilment. Rare in a static. Premise check: a partner's death shouldn't count. |
@@ -89,16 +89,14 @@ feather and Esprit graphs, the proc issue table.
 
 In priority order (biggest damage cost first):
 
-1. **dnc/DirtyDancing/zero-step-technical, correct-finish,
-   zero-step-standard** (candidates). One check: the finisher's step count,
-   valued at the buff lost on the party's damage over its duration (the
-   ledger's measured Technical / Standard Finish share). Premise check:
-   find a short dance outside forced time.
+1. **dnc/DirtyDancing/*** (covered). Match against the five Red Hot and
+   Deep Blue pages the user is collecting (9zQqtBRL41XhADxG 10,
+   at2GMBcywChApnfY 13, MFGhwLnJ34pz7cWQ 14, Jv7XZL2zwYgyhdFj 129,
+   zPJaZNfkFAKhY42t 19).
 2. **dnc/Procs/overwritten, Flourishing Starfall and Flourishing Finish.**
    Add them to `DNC_PROCS` after checking that a Flourish / Technical
    Step with one held logs a "refreshed".
-3. **dnc/DirtyDancing/no-extra-moves** (candidate). ~1s per wrong step.
-4. **dnc/Technicalities/bad-devilments** and
+3. **dnc/Technicalities/bad-devilments** and
    **dnc/DirtyDancing/closed-position-uptime** (candidates, rare).
-5. **dnc/DirtyDancing/hit-target** (covered). Not seen firing; the buff
+4. **dnc/DirtyDancing/hit-target** (covered). Not seen firing; the buff
    it fails to give isn't valued.

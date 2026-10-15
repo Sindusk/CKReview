@@ -83,6 +83,9 @@
 //   2:42 (Red Hot left as it landed, 11k) and pG319BgHTnPJc6Ft Necron
 //   pull 2 3:53 (one Icy Hand, 8k); Rising Windmill at Necron pull 7 2:24
 //   and fJxTNgwtRKjYbvZp 7:32.
+//   Dances (DirtyDancing.tsx, 2026-10-15): short finishes and wrong steps,
+//   `dancerDances` below. Found by searching the lowest Red Hot and Deep
+//   Blue rankings; not yet matched against xivanalysis.
 // Bard: Caustic Bite / Stormbite (below), Hawk's Eye overwrites, AoE on
 //   one target, the burst window, cooldowns (OGCDDowntime.ts).
 //   Rechecked on dDar482XvFKBPJYh FRU kill (7.1, 2026-10-12): its 17
@@ -128,8 +131,9 @@
 //   xivanalysis on pull 12: Bioblaster 1 matches. Not adopted: its 5 Auto
 //   Crossbows on two targets (31-51k each against Blazing Shot's ~36k,
 //   about even; only 5:04 fell short) and the 5:18 Scattergun on three
-//   (40k against the combo's ~34k). Its minimum of 4 outruns the damage. djChYqt4b7K8aAfP's Red
-//   Hot and Deep Blue kill: Bioblaster on both bosses at 8:48 (27k).
+//   (40k against the combo's ~34k). Its minimum of 4 outruns the damage.
+//   djChYqt4b7K8aAfP's Red Hot and Deep Blue kill: Bioblaster on both
+//   bosses at 8:48 (27k).
 //
 //   Copyright (c) 2018 Saxon Landers & contributors
 //   MIT License; full text in THIRD_PARTY_NOTICES.md.
@@ -138,7 +142,7 @@ import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import type { PlayerEvent, PlayerInfo } from "@/types/PlayerInfo";
 import type { DamageFinding, JobCheck } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";
-import { aoeComboOnOneTarget, burstWindowFindings, dotFindings, k, s, statusWindows, type ExpectedAction } from "./shared";
+import { aoeComboOnOneTarget, baseValue, burstWindowFindings, critMultOf, dotFindings, k, rollGainOf, s, statusWindows, type ExpectedAction } from "./shared";
 import { forcedPart, inWindows, mergeWindows } from "../../timeline";
 import { espritGauge, featherGauge } from "./gauges";
 
@@ -464,7 +468,135 @@ function unpooledFeathers(ctx: PlayerCheckContext): DamageFinding[] {
 const dancerAoe = aoeComboOnOneTarget([[A.WINDMILL.id, A.CASCADE.id], [A.RISING_WINDMILL.id, A.REVERSE_CASCADE.id],
   [A.BLOODSHOWER.id, A.FOUNTAINFALL.id]]);
 
-export const DNC_CHECKS: JobCheck[] = [technical, technicalFillers, dancerOverwrites, dancerGaugeEstimates, dancerAoe];
+// Dances (xivanalysis DirtyDancing.tsx: CleanDance, Footloose, the zero-step
+// evaluators). A dance's step count is in its finisher's id, so both
+// mistakes are read from casts:
+// - Finished short: fewer steps than Double Standard / Quadruple Technical
+//   Finish. The buff is weaker or missing. Measured from FFLogs hit
+//   multipliers on 9zQqtBRL41XhADxG, Jv7XZL2zwYgyhdFj, MFGhwLnJ34pz7cWQ:
+//   Triple Technical +3% against Quadruple's +5%, Single Standard +2%
+//   against Double's +5%, and a zero-step Standard Finish applies nothing
+//   (the previous buff just runs on). Valued as the buff gap on every hit
+//   the buff's recipients landed while it covered them (the party for
+//   Technical, 20s; the Dancer and partner for Standard, up to 60s or the
+//   next Standard Finish), plus the finisher's own lower damage against
+//   the player's full one, both compared buff-neutrally.
+// - Wrong steps: presses beyond the steps the finisher used. Each is a 1s
+//   step GCD wasted, valued at her average GCD outside raid buffs
+//   (inference: it also delays the finish).
+// Pressed in forced time, or with the target leaving within 2s of the
+// finish, it's shown, not counted.
+const TECH_PCT = [0, 0.01, 0.02, 0.03, 0.05];
+const STD_PCT = [0, 0.02, 0.05];
+const DANCE_FINISH = new Map<number, { kind: "Technical" | "Standard"; steps: number }>(([
+  ["STANDARD_FINISH", "Standard", 0], ["SINGLE_STANDARD_FINISH", "Standard", 1], ["DOUBLE_STANDARD_FINISH", "Standard", 2],
+  ["TECHNICAL_FINISH", "Technical", 0], ["SINGLE_TECHNICAL_FINISH", "Technical", 1], ["DOUBLE_TECHNICAL_FINISH", "Technical", 2],
+  ["TRIPLE_TECHNICAL_FINISH", "Technical", 3], ["QUADRUPLE_TECHNICAL_FINISH", "Technical", 4],
+] as const).filter(([key]) => A[key]).map(([key, kind, steps]) => [A[key].id, { kind, steps }]));
+const DANCE_START = new Map(([["STANDARD_STEP", "Standard"], ["TECHNICAL_STEP", "Technical"]] as const)
+  .filter(([key]) => A[key]).map(([key, kind]) => [A[key].id, kind]));
+const FULL_FINISH = { Standard: A.DOUBLE_STANDARD_FINISH.id, Technical: A.QUADRUPLE_TECHNICAL_FINISH.id };
+const STEP_GCD_MS = 1_000;
+const BUFF_APPLY_MS = 1_500;
+const LEAVING_MS = 2_000;
+const STANDARD_SPAN_MS = 60_000;
+
+const dancerDances: JobCheck = (ctx) => {
+  const out: DamageFinding[] = [];
+  const me = ctx.player;
+  const critMult = critMultOf(ctx), gain = rollGainOf(ctx, critMult);
+  const casts = me.casts.filter((c) => c.timestamp < ctx.endMs).sort((a, b) => a.timestamp - b.timestamp);
+  const finishes = casts.filter((c) => DANCE_FINISH.has(c.abilityId));
+  const stdIds = new Set([S.STANDARD_FINISH.id, S.STANDARD_FINISH_PARTNER.id]);
+  // A finisher's own hits: its largest base value (the first target; the
+  // rest take falloff) per cast, for the full finisher's average.
+  const hitsOf = (c: PlayerEvent) => me.damageDone.filter((e) => e.abilityId === c.abilityId && !e.pet &&
+    e.timestamp >= c.timestamp && e.timestamp < c.timestamp + 2_000 && (e.amount ?? 0) > 0);
+  const topBase = (c: PlayerEvent) => Math.max(0, ...hitsOf(c).map((e) => baseValue(e, critMult)));
+  const fullTop = (kind: "Technical" | "Standard") => {
+    const tops = finishes.filter((c) => c.abilityId === FULL_FINISH[kind]).map(topBase).filter((v) => v > 0);
+    return tops.length ? tops.reduce((a, v) => a + v, 0) / tops.length : 0;
+  };
+  // Each recipient's hits from t to `until` with the dance buff's share
+  // they carried: pct when the hit carries a status of `statusIds`, else 0.
+  const buffGap = (recipients: PlayerInfo[], statusIds: Set<number>, t: number, until: number, carried: number, full: number) => {
+    let lost = 0;
+    for (const p of recipients) {
+      for (const e of p.damageDone) {
+        if (e.timestamp < t + BUFF_APPLY_MS || e.timestamp >= until || (e.amount ?? 0) <= 0) continue;
+        const has = (e.statusIds ?? []).some((id) => statusIds.has(id));
+        const pct = has ? carried : 0;
+        lost += (e.amount ?? 0) * ((1 + full) / (1 + pct) - 1);
+      }
+    }
+    return lost;
+  };
+  let dance: { kind: "Technical" | "Standard"; at: number; presses: number } | undefined;
+  let lastFinishAt = -Infinity;
+  for (const c of casts) {
+    const start = DANCE_START.get(c.abilityId);
+    if (start) { dance = { kind: start, at: c.timestamp, presses: 0 }; continue; }
+    if (DANCE_STEP_IDS.has(c.abilityId)) { if (dance) dance.presses++; continue; }
+    const fin = DANCE_FINISH.get(c.abilityId);
+    // Technical Finish logs a second id ~0.6s later (33218): one finish.
+    if (!fin || c.timestamp - lastFinishAt < 1_000) continue;
+    lastFinishAt = c.timestamp;
+    const t = c.timestamp;
+    const during = forcedPart(t - 1, t + LEAVING_MS, ctx.forced);
+    const forced = during.ms > 0;
+    const full = fin.kind === "Technical" ? 4 : 2;
+    const wrong = dance && dance.kind === fin.kind ? Math.max(0, dance.presses - fin.steps) : 0;
+    if (wrong > 0) {
+      out.push(finding(ctx, {
+        kind: "dance", startMs: dance!.at, endMs: t, forced, cause: forced ? during.cause : undefined, inference: true,
+        label: `${wrong} wrong step${wrong > 1 ? "s" : ""} in ${fin.kind} Step`,
+        lostDamage: wrong * STEP_GCD_MS / ctx.baseGcdMs * ctx.values.gcdValue(undefined, false),
+        basis: `${wrong} × ${s(STEP_GCD_MS)} step GCD × her average GCD outside raid buffs (it also delays the finish)`,
+        detail: `${dance!.presses} step presses for a ${fin.steps}-step ${c.abilityName}`,
+      }));
+    }
+    dance = undefined;
+    if (fin.steps >= full) continue;
+    const pcts = fin.kind === "Technical" ? TECH_PCT : STD_PCT;
+    const got = pcts[fin.steps], best = pcts[full];
+    let buffLost = 0;
+    if (fin.kind === "Technical") {
+      const techIds = new Set([S.TECHNICAL_FINISH.id]);
+      const applied = ctx.pull.players.filter((p) => (p.buffs ?? []).some((b) => b.abilityId === S.TECHNICAL_FINISH.id &&
+        b.source === me.name && b.buffStatus !== "removed" && Math.abs(b.timestamp - t) <= BUFF_APPLY_MS));
+      const recipients = applied.length ? applied : ctx.pull.players;
+      buffLost = buffGap(recipients, techIds, t, Math.min(t + TECH_SPAN_MS, ctx.endMs), got, best);
+    } else {
+      // The Dancer and her partner; the next Standard Finish ends the stretch.
+      const partner = ctx.pull.players.find((p) => p !== me && (p.buffs ?? []).some((b) =>
+        b.abilityId === S.STANDARD_FINISH_PARTNER.id && b.source === me.name));
+      const next = finishes.find((x) => x.timestamp > t + 1_000 && DANCE_FINISH.get(x.abilityId)?.kind === "Standard");
+      const until = Math.min(t + STANDARD_SPAN_MS, next?.timestamp ?? Infinity, ctx.endMs);
+      // A zero-step finish applies nothing: hits still carrying the buff
+      // carry the last full one.
+      buffLost = buffGap([me, ...(partner ? [partner] : [])], stdIds, t, until, fin.steps === 0 ? best : got, best);
+    }
+    const top = fullTop(fin.kind);
+    const hits = hitsOf(c);
+    const mine = hits.reduce((a, e) => a + baseValue(e, critMult), 0);
+    const thisTop = topBase(c);
+    const mod = hits.length ? hits.reduce((a, e) => a + (e.multiplier && e.multiplier > 0 ? e.multiplier : 1), 0) / hits.length : 1;
+    const ownLost = top > 0 && thisTop > 0 && thisTop < top ? mine * (top / thisTop - 1) * mod * gain : 0;
+    out.push(finding(ctx, {
+      kind: "dance", startMs: t, endMs: t, forced, cause: forced ? during.cause : undefined,
+      label: `${c.abilityName}: ${fin.steps} of ${full} steps`,
+      lostDamage: buffLost + ownLost,
+      basis: `${k(buffLost)} of buff: +${Math.round(got * 100)}% instead of +${Math.round(best * 100)}% on what ` +
+        `${fin.kind === "Technical" ? "the party" : "she and her partner"} dealt under it` +
+        (ownLost > 0 ? `, plus ${k(ownLost)} on the finish itself against her average full one (buff-neutral)` : ""),
+      detail: `${c.abilityName} at ${Math.floor(t / 60000)}:${String(Math.floor(t / 1000) % 60).padStart(2, "0")}, ` +
+        `${fin.steps} step${fin.steps === 1 ? "" : "s"} of ${full}`,
+    }));
+  }
+  return out;
+};
+
+export const DNC_CHECKS: JobCheck[] = [technical, technicalFillers, dancerOverwrites, dancerGaugeEstimates, dancerAoe, dancerDances];
 // The burst window (xivanalysis BuffWindows/BurstWindow.tsx): where
 // Raging Strikes, Battle Voice and Radiant Finale are all up. 7 GCDs, 8
 // when Army's Muse covers 2+ of them; Barrage consumed in it (a Refulgent

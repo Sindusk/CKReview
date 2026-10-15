@@ -1122,10 +1122,27 @@ function hitDelayMs(ctx: PlayerCheckContext, abilityId: number): number {
  * 25-26k, level with Burst Strike's 25k pull average, and passed
  * (L9BzKkD2nxcVgHTC Necron pull 15; xivanalysis counts them).
  */
-function baseValue(e: PlayerEvent, critMult: number): number {
+export function baseValue(e: PlayerEvent, critMult: number): number {
   const m = e.multiplier && e.multiplier > 0 ? e.multiplier : 1;
   if (e.isDoT) return (e.amount ?? 0) / m;
   return (e.amount ?? 0) / m / (e.hitType === 2 ? critMult : 1) / (e.directHit ? 1.25 : 1);
+}
+
+/** The player's crit multiplier: from gear stats when the log has them. */
+export function critMultOf(ctx: PlayerCheckContext): number {
+  return ctx.player.stats ? ratesFromStats(ctx.player.stats.criticalHit, ctx.player.stats.directHit).critMult : DEFAULT_CRIT_MULT;
+}
+
+/**
+ * What crit and direct hit add on average, from the player's own direct
+ * hits (rolled ÷ unrolled): prices a base value back into damage.
+ */
+export function rollGainOf(ctx: PlayerCheckContext, critMult = critMultOf(ctx)): number {
+  const direct = ctx.player.damageDone.filter((e) => !e.pet && e.timestamp < ctx.endMs && (e.amount ?? 0) > 0 &&
+    !e.isDoT && !ctx.game.isTickAbility(e.abilityId));
+  const rolled = direct.reduce((a, e) => a + (e.amount ?? 0) / (e.multiplier && e.multiplier > 0 ? e.multiplier : 1), 0);
+  const unrolled = direct.reduce((a, e) => a + baseValue(e, critMult), 0);
+  return unrolled > 0 ? rolled / unrolled : 1;
 }
 
 export function aoeOnOneTargetFindings(
@@ -1142,14 +1159,10 @@ export function aoeOnOneTargetFindings(
 ): DamageFinding[] {
   const out: DamageFinding[] = [];
   const aoe = new Set(aoeIds);
-  const critMult = ctx.player.stats ? ratesFromStats(ctx.player.stats.criticalHit, ctx.player.stats.directHit).critMult : DEFAULT_CRIT_MULT;
-  const own = ctx.player.damageDone.filter((e) => !e.pet && e.timestamp < ctx.endMs && (e.amount ?? 0) > 0);
-  // What crit and direct hit add on average, from the player's own direct
-  // hits: prices a base value back into damage.
-  const direct = own.filter((e) => !e.isDoT && !ctx.game.isTickAbility(e.abilityId));
-  const rolled = direct.reduce((a, e) => a + (e.amount ?? 0) / (e.multiplier && e.multiplier > 0 ? e.multiplier : 1), 0);
-  const unrolled = direct.reduce((a, e) => a + baseValue(e, critMult), 0);
-  const outcome = unrolled > 0 ? rolled / unrolled : 1;
+  const critMult = critMultOf(ctx);
+  const direct = ctx.player.damageDone.filter((e) => !e.pet && e.timestamp < ctx.endMs && (e.amount ?? 0) > 0 &&
+    !e.isDoT && !ctx.game.isTickAbility(e.abilityId));
+  const outcome = rollGainOf(ctx, critMult);
   const casts = new Map<number, number>();
   for (const c of ctx.player.casts) if (c.timestamp < ctx.endMs) casts.set(c.abilityId, (casts.get(c.abilityId) ?? 0) + 1);
   // The alternative's base value per cast, weighted by casts across its ids.
