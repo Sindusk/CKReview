@@ -769,8 +769,11 @@ MECHANICS.fallback = {
 // analysis (lib/mitigation/analyze.ts) for every pull, one line per hit
 // plus its active mitigations, free ones, droppable set and note.
 // docs/archive/mitigation-redesign.md describes the columns.
+// Named only (user, 2026-10-15): it was 100s of a 146s `--check --game ff`
+// and adds nothing to the baselines.
 MECHANICS['mitigation-analysis'] = {
   game: 'ff',
+  namedOnly: true,
   load: () => ({
     store: requireTsFromRoot('lib/sample-report-store.ts'),
     lt: requireTsFromRoot('lib/log-transforms.ts', { './log-auth': {} }),
@@ -1011,8 +1014,10 @@ MECHANICS['crit-rates'] = {
   },
 };
 
+// Named only, like mitigation-analysis (20s of the FF check).
 MECHANICS['damage-analysis'] = {
   game: 'ff',
+  namedOnly: true,
   load: () => ({
     store: requireTsFromRoot('lib/sample-report-store.ts'),
     lt: requireTsFromRoot('lib/log-transforms.ts', { './log-auth': {} }),

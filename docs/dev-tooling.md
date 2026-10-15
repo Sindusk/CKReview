@@ -137,7 +137,8 @@ It loads pulls lazily and keeps three in memory, so narrowing with
   `node scripts/validate.js damage-analysis sampledata/ff/<code>` prints
   each pull's phase summary and every player's estimated loss with their
   top findings. Add `--all-findings` for every finding and its basis.
-  Print-only. It needs a capture fetched after 2026-10-06 (player buffs,
+  Print-only, so it runs only when named: `--check` and `--update` skip
+  it. It needs a capture fetched after 2026-10-06 (player buffs,
   begin-cast durations, damage detail); `dQ8wmb1VhKt6yBXk` has them.
 - **Reference clears.** `node scripts/validate.js damage-compare
   sampledata/ff/<own> --refs=<code>,<code>` compares the folder's pulls
@@ -201,7 +202,9 @@ It loads pulls lazily and keeps three in memory, so narrowing with
   with enough pulls also gets its `PLAN` (`lib/mitigation/plan.ts`):
   each listed hit with its change or the reason it has none, then the
   spare hits.
-  Print-only; it needs a full capture fetched after 2026-10-06.
+  Print-only, so it runs only when named (`--check` skips it; after a
+  mitigation change, name it, or run the optimizer/tanking example
+  scripts). It needs a full capture fetched after 2026-10-06.
 - **Inspecting one hit:** load pulls the way the runner does
   (`lib/sample-report-store.ts` `loadSampleReport` →
   `lib/log-transforms.ts` `transformFFReportToPulls`), call
