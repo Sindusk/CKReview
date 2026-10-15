@@ -104,7 +104,7 @@ function createLogAuth(config: ProviderConfig) {
     const id = getClientId();
     if (!id) {
       throw new Error(
-        `No ${providerLabel} API client set up — open the menu and use "Connect ${providerLabel}" to add your client ID.`
+        `${providerLabel} isn't connected yet. Importing needs your own ${providerLabel} API client: open the ☰ menu at the top left and choose "Connect ${providerLabel}" for the steps.`
       );
     }
     return id;
@@ -226,7 +226,7 @@ function createLogAuth(config: ProviderConfig) {
     } catch {
       logout();
       throw new Error(
-        `${providerLabel} session expired — open the menu and use "Connect ${providerLabel}" to log in again.`
+        `${providerLabel} session expired — open the ☰ menu at the top left and choose "Connect ${providerLabel}" to log in again.`
       );
     }
     return localStorage.getItem(storageKeys.accessToken)!;
@@ -241,7 +241,7 @@ function createLogAuth(config: ProviderConfig) {
   async function getAccessToken(): Promise<string> {
     dropOrphanedSession();
     const token = localStorage.getItem(storageKeys.accessToken);
-    if (!token) throw new Error(`Not authenticated with ${providerLabel} — open the menu and use "Connect ${providerLabel}".`);
+    if (!token) throw new Error(`${providerLabel} isn't connected yet: open the ☰ menu at the top left and choose "Connect ${providerLabel}".`);
 
     const expiresAt  = Number(localStorage.getItem(storageKeys.expiresAt) ?? 0);
     const nearExpiry = Date.now() > expiresAt - 60_000;

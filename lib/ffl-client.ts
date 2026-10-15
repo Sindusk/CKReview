@@ -84,7 +84,7 @@ async function gql<T>(query: string, variables?: Record<string, unknown>, logLab
       }
       ffLogout();
       throw new Error(
-        'FFLogs session expired — open the menu and use "Connect FFLogs" to log in again.'
+        'FFLogs session expired — open the ☰ menu at the top left and choose "Connect FFLogs" to log in again.'
       );
     }
 

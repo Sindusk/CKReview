@@ -1279,6 +1279,7 @@ export default function Home() {
           onLiveLogEnabledChange={handleLiveLogEnabledChange}
           liveLogError={liveLogError}
           loadedFromSampleData={loadedFromSampleData}
+          onConnect={setLogApiSetup}
         />
         <button
           className="ck-btn"
@@ -1564,7 +1565,9 @@ function WCLImportBar({
   onLiveLogEnabledChange,
   liveLogError,
   loadedFromSampleData,
+  onConnect,
 }: {
+  onConnect:        (provider: LogProvider) => void;
   value:            string;
   onChange:         (v: string) => void;
   importing:        boolean;
@@ -1597,6 +1600,12 @@ function WCLImportBar({
     if (!trimmed) return;
     onImport(trimmed);
   }
+
+  // An error asking the user to connect a provider (lib/log-auth.ts) gets a
+  // button that opens the setup dialog directly, rather than sending them
+  // hunting for the menu.
+  const connectMatch = error?.match(/"Connect (FFLogs|WarcraftLogs)"/);
+  const connectProvider: LogProvider | null = connectMatch ? (connectMatch[1] === "FFLogs" ? "ffl" : "wcl") : null;
 
   // #7 — "Import Another" was removed. Once a report is loaded, this bar
   // just shows the loaded-state badge; there's no in-place reset flow to
@@ -1713,6 +1722,11 @@ function WCLImportBar({
         <span style={{ fontSize: "11px", color: "#f87171", maxWidth: "320px" }}>
           {error}
         </span>
+      )}
+      {connectProvider && (
+        <button className="ck-btn ck-btn--primary" onClick={() => onConnect(connectProvider)} style={{ whiteSpace: "nowrap" }}>
+          Connect {connectProvider === "ffl" ? "FFLogs" : "WarcraftLogs"}
+        </button>
       )}
     </div>
   );

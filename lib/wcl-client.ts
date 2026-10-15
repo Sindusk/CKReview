@@ -84,7 +84,7 @@ async function gql<T>(query: string, variables?: Record<string, unknown>, logLab
       }
       logout();
       throw new Error(
-        'WarcraftLogs session expired — open the menu and use "Connect WarcraftLogs" to log in again.'
+        'WarcraftLogs session expired — open the ☰ menu at the top left and choose "Connect WarcraftLogs" to log in again.'
       );
     }
 
