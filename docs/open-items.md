@@ -179,9 +179,9 @@ and delete them from the header.
 ## Plans not started
 
 - [xiva-audit-plan.md](xiva-audit-plan.md): audit every xivanalysis
-  module job by job against the FFXIV damage checks. Pilot (Bard) and
-  batch 1 done (2026-10-15). Batch 2 next: VPR, RPR, MNK, NIN, SAM, MCH;
-  batch 3: BLM, SMN, RDM, WHM. Each ledger's "Open" list is its work.
+  module job by job against the FFXIV damage checks. Pilot (Bard),
+  batch 1 and batch 2 done (2026-10-15). Batch 3 next: BLM, SMN, RDM, WHM.
+  Each ledger's "Open" list is its work.
   - [core.md](xiva-audit/core.md): core modules, 3 candidates.
   - [brd.md](xiva-audit/brd.md): Bard, 1 candidate, 4 covered.
   - [dnc.md](xiva-audit/dnc.md): Dancer, 9 candidates (no AoE check;
@@ -196,6 +196,16 @@ and delete them from the header.
     4 covered.
   - [gnb.md](xiva-audit/gnb.md): Gunbreaker, 2 candidates, 7 covered.
   - [drg.md](xiva-audit/drg.md): Dragoon, 3 covered.
+  - [vpr.md](xiva-audit/vpr.md): Viper, 4 candidates, 2 covered.
+  - [rpr.md](xiva-audit/rpr.md): Reaper, 4 candidates, 5 covered.
+  - [mnk.md](xiva-audit/mnk.md): Monk, 17 candidates (one sample; forms,
+    Blitz resources, AoE), 4 covered.
+  - [nin.md](xiva-audit/nin.md): Ninja, 15 candidates (ninjutsu and
+    Kassatsu misuse, frogs), 6 covered.
+  - [sam.md](xiva-audit/sam.md): Samurai, 6 candidates, 13 covered (no
+    page compared yet).
+  - [mch.md](xiva-audit/mch.md): Machinist, 11 candidates, 7 covered (no
+    sample on disk).
 - [wowa-audit-plan.md](wowa-audit-plan.md): the same for WoWAnalyzer
   (reference only, AGPL). After the FFXIV pilot.
 - [wow-sim-plan.md](wow-sim-plan.md): WoW simulation pipeline (talent
