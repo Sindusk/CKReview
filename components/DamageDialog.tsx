@@ -107,6 +107,7 @@ const KIND_LABEL: Record<DamageFinding["kind"], string> = {
   "missed-followup":  "Missed follow-up",
   "dance":            "Dance",
   "ninjutsu":         "Ninjutsu",
+  "blitz":            "Blitz",
   "movement":         "Movement",
 };
 

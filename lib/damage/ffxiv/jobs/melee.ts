@@ -116,6 +116,9 @@
 //     only the ones that dealt less than the form's average show);
 //     djChYqt4b7K8aAfP 0:33 (Shadow of the Destroyer with only Red Hot
 //     up, 36k); 7yXZbmqcrCga8PHz 4:41 (Enlightenment on one boss, 34k).
+//   - Blitz resources (2026-10-15): Perfect Balance lost, Celestial
+//     Revolution, Form Shift in uptime; `mnkBlitz` below. Not yet matched
+//     against xivanalysis.
 //   - Dragoon (checked against xivanalysis on jN3XDrf2z8PmLgRJ Vamp pull 8:
 //     Lance Charge and positionals match): Power Surge uptime, +10%
 //     (tooltip); Chaotic Spring DoT uptime; Life Surge (below); Lance Charge
@@ -987,7 +990,121 @@ const mnkAoe = aoeComboOnOneTarget([
   [id("ROCKBREAKER"), ids("DEMOLISH", "SNAP_PUNCH", "POUNCING_COEURL"), 4],
   [id("ENLIGHTENMENT"), id("THE_FORBIDDEN_CHAKRA"), 3],
 ]);
-export const MNK_CHECKS: JobCheck[] = [riddleOfFire, mnkAoe];
+// Blitz resources (xivanalysis PerfectBalance.tsx, Revolution.tsx), from a
+// search of the lowest Red Hot and Deep Blue Monk parses against the top
+// 100 (2026-10-15):
+// - Perfect Balance lost: stacks left when the buff ended (read from its
+//   stack events), or pressed again while one ran (Q18Xc93x4wpfMFdT 7:32,
+//   7:33: a charge gone). Beast Chakra only comes from Perfect Balance, so
+//   either loses its Blitz: her average Blitz over the form GCD in its
+//   place. One in forced time, or ending just before a death (the log
+//   strips buffs ~2s early), is shown, not counted. None of the top 100
+//   lost one; 18 of the lowest 122 did.
+// - Celestial Revolution (two of one form and one other): Rising Phoenix
+//   less what it dealt, buff-neutral. Even a top parse did one
+//   (YPhxRTb9Ld7BJaXp 7:48: Dragon Kick, Leaping Opo, Twin Snakes).
+// - Form Shift in uptime: a GCD that does nothing (its form GCD average).
+//   In downtime it's free: the top 100's Form Shifts sat in the bosses'
+//   2:52-2:58 absence.
+// Not built: Nadi overcap. 36 of the top 100 generate a Nadi they hold
+// after the opener (lining bursts up, phase timing); a bare overcap rule
+// would be fight-blind.
+const BLITZ_IDS = new Set(ids(...BLITZ_KEYS.filter((key) => A[key])));
+const FORM_GCD_IDS = new Set(ids("BOOTSHINE", "DRAGON_KICK", "LEAPING_OPO", "SHADOW_OF_THE_DESTROYER", "ARM_OF_THE_DESTROYER",
+  "TRUE_STRIKE", "TWIN_SNAKES", "RISING_RAPTOR", "FOUR_POINT_FURY", "DEMOLISH", "SNAP_PUNCH", "POUNCING_COEURL", "ROCKBREAKER"));
+const PB_STACKS = 3;
+const mnkBlitz: JobCheck = (ctx) => {
+  const out: DamageFinding[] = [];
+  const me = ctx.player;
+  const casts = me.casts.filter((c) => c.timestamp < ctx.endMs).sort((a, b) => a.timestamp - b.timestamp);
+  const count = new Map<number, number>();
+  for (const c of casts) count.set(c.abilityId, (count.get(c.abilityId) ?? 0) + 1);
+  const avgOf = (list: number[]) => {
+    const n = list.reduce((a, x) => a + (count.get(x) ?? 0), 0);
+    return n > 0 ? list.reduce((a, x) => a + ctx.values.perUse(x) * (count.get(x) ?? 0), 0) / n : 0;
+  };
+  const formGcd = avgOf([...FORM_GCD_IDS]);
+  const blitz = avgOf([...BLITZ_IDS].filter((x) => x !== id("CELESTIAL_REVOLUTION")));
+  const lostBlitz = blitz - formGcd;
+  const diedAfter = (t: number) => ctx.dead.some((d) => d.startMs >= t && d.startMs - t <= DEATH_STRIP_MS);
+  const push = (t: number, f: { label: string; lost: number; basis: string; detail: string; deathExcuses?: boolean }) => {
+    if (f.lost <= 0) return;
+    const during = forcedPart(t - 1, t + 1, ctx.forced);
+    const died = f.deathExcuses === true && diedAfter(t);
+    const forced = during.ms > 0 || died;
+    out.push(finding(ctx, {
+      kind: "blitz", startMs: t, endMs: t, forced, cause: during.ms > 0 ? during.cause : died ? "lost to the death that followed" : undefined,
+      inference: true, label: f.label, lostDamage: f.lost, basis: f.basis, detail: f.detail,
+    }));
+  };
+  const blitzBasis = `${k(blitz)} average Blitz − ${k(formGcd)} average form GCD in its place`;
+
+  // Perfect Balance, from its stack events: 3 on applying, one off per form
+  // GCD; the last one shows as the removal beside a form GCD.
+  let stacks = 0, startedAt = 0;
+  const pbBuffs = (me.buffs ?? []).filter((b) => b.abilityId === S.PERFECT_BALANCE.id && b.timestamp < ctx.endMs)
+    .sort((a, b) => a.timestamp - b.timestamp);
+  for (const b of pbBuffs) {
+    if (b.buffStatus === "applied") { stacks = PB_STACKS; startedAt = b.timestamp; }
+    else if (b.buffStatus === "stackRemoved") stacks = Math.max(0, stacks - 1);
+    else if (b.buffStatus === "removed") {
+      const used = casts.some((c) => FORM_GCD_IDS.has(c.abilityId) && Math.abs(c.timestamp - b.timestamp) <= PROC_CONSUME_MS);
+      const left = Math.max(0, stacks - (used ? 1 : 0));
+      if (left > 0 && lostBlitz > 0) push(b.timestamp, {
+        label: `Perfect Balance ended with ${left} stack${left > 1 ? "s" : ""} unused`, lost: lostBlitz, basis: blitzBasis, deathExcuses: true,
+        detail: `Perfect Balance from ${clock(startedAt)} ran out at ${clock(b.timestamp)} with ${left} of ${PB_STACKS} stacks: no Blitz`,
+      });
+      stacks = 0;
+    }
+  }
+  // Pressed again while one ran: the charge is gone.
+  const pbWindows = statusWindows(ctx, S.PERFECT_BALANCE.id);
+  for (const c of casts.filter((x) => x.abilityId === id("PERFECT_BALANCE"))) {
+    if (!pbWindows.some((w) => c.timestamp > w.startMs + PROC_CONSUME_MS && c.timestamp < w.endMs)) continue;
+    if (lostBlitz > 0) push(c.timestamp, {
+      label: "Perfect Balance pressed while one was running", lost: lostBlitz, basis: blitzBasis,
+      detail: `Perfect Balance at ${clock(c.timestamp)} with the buff already up: a charge spent for nothing`,
+    });
+  }
+
+  const phoenix = ctx.values.perUse(id("RISING_PHOENIX")) || ctx.values.perUse(id("ELIXIR_BURST"));
+  const critMult = critMultOf(ctx);
+  for (const c of casts) {
+    if (c.abilityId === id("CELESTIAL_REVOLUTION") && phoenix > 0) {
+      // Rising Phoenix's damage per base value prices this cast's base.
+      const rpCasts = count.get(id("RISING_PHOENIX")) ?? 0;
+      const rpBase = rpCasts ? me.damageDone.filter((e) => e.abilityId === id("RISING_PHOENIX") && e.timestamp < ctx.endMs)
+        .reduce((a, e) => a + baseValue(e, critMult), 0) / rpCasts : 0;
+      const base = me.damageDone.filter((e) => e.abilityId === c.abilityId && e.timestamp >= c.timestamp && e.timestamp < c.timestamp + 2_000)
+        .reduce((a, e) => a + baseValue(e, critMult), 0);
+      const dealt = rpBase > 0 ? base * phoenix / rpBase : base;
+      push(c.timestamp, {
+        label: "Celestial Revolution", lost: phoenix - dealt,
+        basis: `${k(phoenix)} average Rising Phoenix − ${k(dealt)} for this Celestial Revolution at the same buffs`,
+        detail: `Celestial Revolution at ${clock(c.timestamp)}: two of one form and one other`,
+      });
+    } else if (c.abilityId === id("FORM_SHIFT") && formGcd > 0) {
+      // A Monk has no ranged GCD: out of reach in a mechanic's movement
+      // window, Form Shift is the right press (as a disengage is,
+      // checks.ts checkDisengages).
+      const moving = (ctx.movement ?? []).find((w) => c.timestamp >= w.startMs && c.timestamp <= w.endMs);
+      if (moving) {
+        out.push(finding(ctx, {
+          kind: "blitz", startMs: c.timestamp, endMs: c.timestamp, forced: true, movement: true, cause: moving.cause,
+          label: `Form Shift during ${moving.cause}`, lostDamage: formGcd, basis: `${k(formGcd)} average form GCD`,
+          detail: `Form Shift at ${clock(c.timestamp)}, out of reach`,
+        }));
+        continue;
+      }
+      push(c.timestamp, {
+        label: "Form Shift in uptime", lost: formGcd, basis: `${k(formGcd)} average form GCD: Form Shift does no damage`,
+        detail: `Form Shift at ${clock(c.timestamp)} with a target to hit`,
+      });
+    }
+  }
+  return out;
+};
+export const MNK_CHECKS: JobCheck[] = [riddleOfFire, mnkAoe, mnkBlitz];
 // Firstminds' Focus (xivanalysis FirstmindsFocus): +1 per Raiden Thrust /
 // Draconian Fury, cap 2, Wyrmwind Thrust spends 2. A stack gained at 2 is
 // half a Wyrmwind. On 2T1HzdPKgbhM43am fight 10 the cast simulation finds

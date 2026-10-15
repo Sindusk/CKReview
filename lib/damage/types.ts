@@ -253,6 +253,7 @@ export type FindingKind =
   | "missed-followup"   // an action unlocked by another never pressed (Salt and Darkness)
   | "dance"             // a Dancer's dance finished short, or with wrong step presses
   | "ninjutsu"          // a Ninja's failed or weak ninjutsu (Rabbit Medium, Hyoton, Kassatsu misspent)
+  | "blitz"             // a Monk's Blitz lost or wrong (Perfect Balance wasted, Celestial Revolution, Form Shift in uptime)
   | "movement";         // idle a mechanic's movement explains (DamageContext.movementWindows)
 
 export type DamageFinding = {

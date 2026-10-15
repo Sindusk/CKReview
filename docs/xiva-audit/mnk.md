@@ -8,7 +8,7 @@
   Enlightenment's target count (hard-coded at 3 now) and added a 10-GCD
   Brotherhood target; 7.4 changed Chakra gauge events.
 - **App:** `lib/damage/ffxiv/jobs/melee.ts` (`MNK_CHECKS`: `riddleOfFire`
-  with `blitzesExpected`, `mnkAoe`), `tracked-cooldowns.ts` ("Monk"),
+  with `blitzesExpected`, `mnkAoe`, `mnkBlitz`), `tracked-cooldowns.ts` ("Monk"),
   generic checks. The only Monk case study is qjCMx4bRfgNKwX9T fight 16;
   L9BzKkD2nxcVgHTC Necron and kC7Y3WbzvKcZrBxT The Tyrant also have one.
 - **xivanalysis bugs found** (source-confirmed):
@@ -45,19 +45,19 @@
 | mnk/Positionals/missed | verified | `checkPositionals` | a missed rear / flank | Fight 16 7 matched. |
 | mnk/Replies/dropped-fires-reply | covered | `checkProcs` | Fire's Rumination expiring | Major at 1. Not seen firing. |
 | mnk/Replies/dropped-winds-reply | covered | `checkProcs` | Wind's Rumination expiring | Medium 1, Major 2. Not seen firing. |
-| mnk/Revolution/celestial-revolution | candidate | — | Celestial Revolution (a wrong Blitz) | Major for any use; worth Rising Phoenix minus Celestial Revolution each. Log-visible. |
+| mnk/Revolution/celestial-revolution | covered | `mnkBlitz` | Celestial Revolution (a wrong Blitz) | Built 2026-10-15: Rising Phoenix less what it dealt, buff-neutral. Found by searching the 122 lowest Red Hot and Deep Blue Monk parses against the top 100. Even a top parse did one (YPhxRTb9Ld7BJaXp 7:48: Dragon Kick, Leaping Opo, Twin Snakes; 72k). Fires on Q18Xc93x4wpfMFdT 3:29, 8:34, bWDLM6zVXkqFAfjT ×4, bqmRpGxDvfT8AZc6 7:41, 8:29, and the user's statics (rgTafHJ9MN47m3Vy, pnLBzfbH8NjGAJRg, wNHvD38WTbFtGJKr): 13-122k. |
 | mnk/Balls/fury-overcap | candidate | — | Opo / Raptor / Coeurl Fury gained at the cap | Minor 1, Medium 3, Major 5. Inferred from the form actions; a lost Fury is a lost empowered GCD. |
 | mnk/Chakra/overcap | unverifiable | — | Chakra over 5 (10 under Meditative Brotherhood) | Minor 1, Medium 5, Major 8. Read only from gauge events, which only the log's recorder has; party Chakra gain is random. |
 | mnk/Forms/formless-combo-starter | candidate | — | an Opo-opo skill with no form up | Minor 1, Medium 2. Forms aren't combos in the app's data, so `checkCombos` doesn't see them. Reachability doubt (see bugs). |
 | mnk/Forms/reset-by-opo | candidate | — | an Opo-opo skill in Raptor / Coeurl form | Medium. Same gap. |
-| mnk/Forms/skipped-form-shift | candidate | — | Form Shift used while a form was up, outside downtime | Medium. A Form Shift in uptime is a GCD with no damage. |
+| mnk/Forms/skipped-form-shift | covered | `mnkBlitz` | Form Shift used while a form was up, outside downtime | Any Form Shift in uptime: its form GCD average. In forced time it's free, and in a fight context's movement window it's shown, not counted (a Monk has no ranged GCD; like a disengage). The movement windows excuse most mid-skill Red Hot and Deep Blue Form Shifts (Hot Aerial, Alley-Oop Inferno, Insane Air). Still counted: at2GMBcywChApnfY 9:07; kNQKG6yHmvZTJ2hf 6:59, 7:01 (1-3s before the Alley-Oop window: early, or the window's edge). |
 | mnk/Forms/dropped-form | candidate | — | a form left to expire (30s) | Major. Possibly unreachable in xivanalysis (see bugs). |
 | mnk/Bookending/formless-on-opo | unverifiable | — | Formless Fist spent on a non-Opo-opo skill | Checklist. Its cost depends on the Blitz planned; not measurable from one press (fight 16: "PB after Opo-opo 22/29" not built). |
 | mnk/Bookending/pb-fr-after-opo | unverifiable | — | Perfect Balance / Fire's Reply not after an Opo-opo GCD | Same. |
 | mnk/Bookending/formless-overwrite | candidate | — | a Formless applier while Formless Fist is up | Minor 1, Medium 3. A lost free form; log-visible. |
-| mnk/PerfectBalance/dropped-stacks | candidate | — | Perfect Balance stacks unused | Medium 1, Major 2. No end-of-pull or death allowance in xivanalysis. The app's Blitz check sees a late Blitz, not lost stacks. |
-| mnk/PerfectBalance/form-shift-in-pb | candidate | — | Form Shift during Perfect Balance | Minor. A wasted stack. |
-| mnk/PerfectBalance/nadi-overcap | candidate | — | a Blitz giving a Nadi already held | Minor 1, else Major. A wasted Blitz on the way to Phantom Rush. Inferred from Blitz casts (gauge starts empty). |
+| mnk/PerfectBalance/dropped-stacks | covered | `mnkBlitz` | Perfect Balance stacks unused | Built 2026-10-15 from the buff's stack events: stacks left at its end lose the Blitz (Beast Chakra only comes from Perfect Balance), her average Blitz over a form GCD. Also a Perfect Balance pressed while one ran (Q18Xc93x4wpfMFdT 7:32 then 7:33: a charge gone, 103k). Shown, not counted in forced time or ending just before a death (the log strips buffs ~2s early): most short ones on disk are deaths. Counted: bqmRpGxDvfT8AZc6 6:47 (pressed before the 7:00 Alley-Oop Inferno, 2 stacks left, 91k). None of the top 100 lost one; 18 of the lowest 122 did. |
+| mnk/PerfectBalance/form-shift-in-pb | covered | `mnkBlitz` | Form Shift during Perfect Balance | Folded into skipped-form-shift (the same GCD with no damage). The top 100's ones were all in the 2:52-2:58 downtime, which is free. |
+| mnk/PerfectBalance/nadi-overcap | wrong | — | a Blitz giving a Nadi already held | Fight-blind as a bare rule: 36 of the top 100 Red Hot and Deep Blue Monks generate a Nadi they hold after the opener (lining bursts up with the fight), and nearly every Monk does it in the opener (double Lunar). Its real cost is a Phantom Rush lost by the kill, which needs the whole fight's Blitz count; not built. |
 | mnk/Weaving/too-many | verified | `checkGcdGaps` | triple weaves (4 allowed after Six-sided Star) | Fight 16 12:02 (end-of-P3 hold, forced) matched. |
 | mnk/AlwaysBeCasting/uptime | superseded | `checkGcdGaps` | idle GCD time | Fight 16 13:02 delay matched. |
 | mnk/AlwaysBeCasting/gcd-downtime | covered | `checkGcdGaps` | a gap past GCD + 150ms | — |
@@ -88,16 +88,15 @@ Overheal.
 
 ## Open
 
-In priority order (biggest damage cost first). One Monk sample so far;
-most of these need a second log first.
+In priority order (biggest damage cost first).
 
-1. **mnk/PerfectBalance/dropped-stacks, nadi-overcap;
-   mnk/Revolution/celestial-revolution** (candidates). Wrong or lost Blitz
-   resources: each costs a Blitz or a Phantom Rush. Log-visible from casts.
+1. **mnk/PerfectBalance/dropped-stacks, mnk/Revolution/celestial-revolution,
+   mnk/Forms/skipped-form-shift** (covered). Match against xivanalysis
+   pages for the searched pulls.
 2. **mnk/Brotherhood/drift, missed-window** (candidates). Premise check:
    phase holds.
-3. **mnk/Forms/*, mnk/Bookending/formless-overwrite,
-   mnk/PerfectBalance/form-shift-in-pb, mnk/RiddleOfFire/wasted-gcds**
+3. **mnk/Forms/formless-combo-starter, reset-by-opo, dropped-form,
+   mnk/Bookending/formless-overwrite, mnk/RiddleOfFire/wasted-gcds**
    (candidates). Form mistakes: a lost empowered GCD each.
 4. **mnk/Balls/fury-overcap** (candidate).
 5. **mnk/Replies/*** (covered). Not seen firing.
