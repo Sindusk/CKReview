@@ -1035,6 +1035,28 @@ grouped by exact roster. The module headers hold the rules.
     ~1.1s). The 99th-percentile Blood DK Frostydn (ACmXHMFtaPLR9k8w)
     fits 0.91s at the same rating haste, so it's Blood's GCD (an unlisted
     passive or shorter GCDs), not a play gap; harmless to the checks.
+- **WoW healers judged on healing, not damage (user decision 2026-10-15,
+  deferred: "in due time", no plan doc yet).** In the Damage tab, WoW
+  healers should be judged on healing, their version of DPS. FFXIV
+  healers stay damage-first. Today `lib/damage/wow/specs/healer.ts` only
+  prices mostly-overheal heal GCDs as lost filler damage. Raw HPS alone
+  misleads (healing is capped by incoming damage, healers snipe each
+  other's heals, overheal inflates it), so the discussed shape is:
+  - effective healing in the seconds after each raid hit, reusing the
+    mitigation analysis's hit timeline;
+  - healing cooldowns lined up with damage events (cooldown drift for
+    healing);
+  - mana: running out before the kill, or ending it with a lot unspent;
+  - a same-spec top parse on the same boss as the reference, as damage
+    uses;
+  - damage and wasted heal GCDs kept as a secondary line.
+
+  It depends on talent effects from [wow-sim-plan.md](wow-sim-plan.md)
+  stage 0. QuestionablyEpic (the healers' gear and stat tool) has **no
+  licence** (checked 2026-10-15: no LICENSE file, none in package.json),
+  so it's all rights reserved. It can be read as a reference only, through
+  that plan's clean-room process; reusing any of its code needs the
+  author's permission.
 
 ### Statics analysis
 
