@@ -280,6 +280,7 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId, 
   return (
     <Dialog
       title="Mitigation"
+      resizeKey="mitigation"
       width={ffPulls.length > 0 ? "min(1500px, 97vw)" : "480px"}
       // Fixed for the Analysis, so its list and timeline scroll on their own.
       height={ffPulls.length > 0 && view === "analysis" ? "88vh" : undefined}

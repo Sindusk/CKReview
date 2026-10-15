@@ -324,6 +324,7 @@ export default function StrategyDialog({
   return (
     <Dialog
       title="Strategy"
+      resizeKey="strategy"
       width={showBlackHole || showRoster || showDuties ? "min(680px, 94vw)" : "480px"}
       maxHeight="80vh"
       zIndex={1100}
