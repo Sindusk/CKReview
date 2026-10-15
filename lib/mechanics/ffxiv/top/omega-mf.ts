@@ -70,14 +70,20 @@
 //   (C7: five in both stacks).
 // - Bladedance: clean = one cone per tank. A25: the MT held both tethers, a
 //   cone went through the party (all six died); A38: the OT aimed theirs
-//   into the party; A66, B18: one non-tank in a cone.
+//   into the party; A66, B18: one non-tank in a cone. A raider present in
+//   these pulls (no VOD, 2026-10-14) confirms A25 (the OT took no tether)
+//   and A38 (the OT's cone into the party).
 // - Beyond Defense: clean = one tank (jumped through an invuln or
 //   mitigation), Twice-come Ruin on them. A66, B6: it jumped the party (no
 //   tank nearest); the knockback put four/five into the wall 2.5-2.8s
-//   later, no killing blow. Pile Pitch lands on the unhit tank in every
-//   clean pull (open question 2: the closest); on the jumped tank in A41,
-//   B35, C11, C25 (the MT every time): Doom, death ~2.8s later credited to
-//   Pile Pitch. All four still cleared P2.
+//   later, no killing blow. Both tanks named: confirmed by the same raider.
+// - Pile Pitch (open question 2, answered by the same raider): it targets
+//   one of the two players closest to the clone, EL's reading. So the
+//   jumped tank must leave the stack; the unhit tank isn't at fault for
+//   not being closer, since being nearest doesn't guarantee the target.
+//   It landed on the unhit tank in every clean pull, and on the jumped tank
+//   in A41, B35, C11, C25 (the MT every time): Doom, death ~2.8s later
+//   credited to Pile Pitch. All four still cleared P2.
 // - Sagittarius Arrow: A50 and B23, the H1 both times (died).
 // - Deaths with no killing blow: Beyond Defense knockbacks (above), called
 //   wipes after the Synergy deaths, B54 +40.2 (one before the Fire, nothing
@@ -329,6 +335,7 @@
 // 1. Firewall: IV/EL describe nearest four to EACH boss; TH says nearest
 //    four to M and ALL OTHERS to F. Which selection actually occurs?
 // 2. Pile Pitch: EL says random of two closest, IV/TH/BM say closest.
+//    ANSWERED above (VERIFIED): one of the two closest.
 //    Is there a tie/snapshot explanation, or true two-candidate selection?
 // 3. IV compares Spotlight to P1 while enforcing four; verify P1 has
 //    three and P2 four, and whether this is damage scaling or hard fail.
@@ -883,7 +890,7 @@ function detectBladedance(players: PlayerInfo[], life: Life, casts: EnemyEvent[]
   return { errors: firstPer(errors, (e) => `${e.player ?? "raid"}`), owned };
 }
 
-const JUMP_WHY = "Beyond Defense jumps one of the two players nearest the shield clone: the tanks stand closest, the party behind them. The jumped tank then leaves the stack, because Pile Pitch goes to the nearest player and a second Ruin is Doom.";
+const JUMP_WHY = "Beyond Defense jumps one of the two players nearest the shield clone: the tanks stand closest, the party behind them. The jumped tank then leaves the stack: Pile Pitch goes to one of the two players nearest the clone, and a second Ruin is Doom.";
 
 /**
  * Beyond Defense on non-tanks only, both tanks alive: neither tank was
@@ -925,7 +932,7 @@ function detectBeyondDefense(players: PlayerInfo[], life: Life, deaths: DeathEve
       const died = !!deaths.some((d) => d.player === p.name && d.timestamp > e.timestamp && d.timestamp - e.timestamp <= 6000);
       errors.push(playerError(p, {
         ruleId: TOP2_PILE_PITCH_RULE_ID, severity: "Major", name: "Stayed for Pile Pitch",
-        description: `Jumped by Beyond Defense (Twice-come Ruin), then still nearest for Pile Pitch: a second Ruin gave them Doom${died ? " and they died" : ""}. ${JUMP_WHY}`,
+        description: `Jumped by Beyond Defense (Twice-come Ruin), then still close enough to be picked for Pile Pitch: a second Ruin gave them Doom${died ? " and they died" : ""}. ${JUMP_WHY}`,
         timestamp: e.timestamp, abilityId: PILE_PITCH, abilityName: "Pile Pitch",
       }));
     }
