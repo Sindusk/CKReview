@@ -45,7 +45,7 @@ import type { PlanReply, PlanRequest } from "@/lib/mitigation/plan.worker";
 import { aggregateBusters, analyzePullTanking, summarizeUnused } from "@/lib/mitigation/tanking";
 import { buildTankingPlan, clockPull, tankWindow, type TankingPlan } from "@/lib/mitigation/tanking-plan";
 import type { TankingReply, TankingRequest } from "@/lib/mitigation/tanking.worker";
-import { PlanView } from "./MitigationPlan";
+import { AnalysisWindowControls, PlanView } from "./MitigationPlan";
 import { TankingView, chipsFromAggregate, chipsFromPull } from "./MitigationTanking";
 import { PlayerPicker } from "./MitigationPlayerPicker";
 import { AggregateDetails, HitDetails } from "./MitigationHitDetails";
@@ -312,6 +312,10 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId }
                 setSelectedPullId(pick.pullId);
               }}
             />
+            {view === "analysis" && planWin.length > 0 && (
+              <AnalysisWindowControls window={planWin} allPulls={allPulls} windowInput={windowInput} onWindowInput={setWindowInput}
+                groupPulls={perPull.length} />
+            )}
             {groups.length > 0 && view === "timeline" && <PlayerPicker groups={groups} focus={shownFocus} onPick={setFocus} />}
             {groups.length > 0 && view === "tanking" && <PlayerPicker groups={groups} focus={tankFocus} onPick={setFocus} tanksOnly />}
             {stale > 0 && (
@@ -364,8 +368,7 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId }
                 ) : planWin.length === 0 ? (
                   <p className="ck-dialog-text" style={{ padding: 12 }}>No loaded pull has mitigation data yet. Re-fetch the report to analyze it.</p>
                 ) : <PlanView plan={planResult.plan} pending={planResult.pending && analyzeKey === winKey} error={planResult.error}
-                      window={planWin} reach={reach} allPulls={allPulls} onAnalyze={() => setAnalyzeKey(winKey)}
-                      windowInput={windowInput} onWindowInput={setWindowInput} groupPulls={perPull.length}
+                      window={planWin} reach={reach} onAnalyze={() => setAnalyzeKey(winKey)}
                       onOpenHit={(id) => {
                         const row = aggregate.find((r) => r.id === id);
                         if (row && rowUneventful(row)) setShowUneventful(true);

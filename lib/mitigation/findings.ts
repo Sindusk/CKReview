@@ -42,8 +42,11 @@
 // median and worst lowest HP. Cooldown lanes are the clock pull's (the
 // window's longest, tanking-plan.ts clockPull) casts of every party
 // cooldown but gated ones (Tempera Grassa shares Tempera Coat's cooldown),
-// the stretches from the first raidwide on that it sat ready
-// READY_GAP_MIN_MS+, a dot on each under hit it sat ready for, and marks
+// the stretches from the first raidwide on that it sat ready, split
+// (user, 2026-10-14) into free (READY_GAP_MIN_MS+; a cast there delays
+// nothing) and held (the cooldown's length before each later cast: the
+// player was holding it for that one, so a cast there pushes it back), a
+// dot on each under hit it sat ready for, and marks
 // for late casts and, analyzed, the plan's changes and ideas. A clock-pull
 // cast a plan move would make unavailable (by more than SNAPSHOT_SLACK_MS:
 // a recast a second later is the same cast) is marked lost. `inFindings`
@@ -67,6 +70,7 @@ export const LATE_MAX_MS = 8_000;
 export const STACK_MIN_COOLDOWNS = 4;
 export const STACK_MIN_MARGIN = 0.45;
 export const READY_GAP_MIN_MS = 20_000;
+export const HELD_MIN_MS = 3_000;
 
 export type FindingCategory = "under" | "plan" | "unused" | "timing" | "other";
 // A timeline pin over a hit: which finding is about it.
@@ -160,7 +164,11 @@ export type Lane = {
   key:     string;
   name:    string;
   casts:   { atMs: number; durationMs: number; late?: string; lost?: string }[];
-  ready:   [number, number][];
+  // Off cooldown and unused: free (a cast there delays nothing) or held,
+  // the cooldown's length before a later cast (a cast there would push
+  // that one back).
+  free:    [number, number][];
+  held:    [number, number][];
   readyDots: { atMs: number; hit: string }[];  // ready, unused, at an under hit (clock pull)
   marks:   LaneMark[];
   inFindings: boolean;
@@ -413,13 +421,20 @@ export function buildAnalysisFindings(window: FindingsWindowPull[], plan: Optimi
         const readyDots = clockUnder
           .filter((h) => h.players.some((m) => m.player === player.name && m.key === entry.key && !m.dead && readyState(m.state)))
           .map((h) => ({ atMs: underIds.get(h.id)!.hit.medianMs, hit: h.abilityName }));
-        const ready = entry.cooldownMs > 0
-          ? readyIntervals(castTimes, entry, clock.durationMs)
-            .map(([a, b]): [number, number] => [Math.max(a, firstRaidwide), b])
-            .filter(([a, b]) => b - a >= READY_GAP_MIN_MS)
-          : [];
+        const free: [number, number][] = [];
+        const held: [number, number][] = [];
+        if (entry.cooldownMs > 0) {
+          for (const [a0, b] of readyIntervals(castTimes, entry, clock.durationMs)) {
+            const a = Math.max(a0, firstRaidwide);
+            if (b <= a) continue;
+            // Ending at a cast: the cooldown's length before it was held for it (user, 2026-10-14).
+            const holdFrom = b < clock.durationMs ? Math.max(a, b - entry.cooldownMs) : b;
+            if (holdFrom - a >= READY_GAP_MIN_MS) free.push([a, holdFrom]);
+            if (b - holdFrom >= HELD_MIN_MS) held.push([holdFrom, b]);
+          }
+        }
         const inFindings = marks.length > 0 || casts.some((c) => c.late || c.lost) || unusedKeys.has(k);
-        lanes.push({ player: player.name, job: player.className, key: entry.key, name: entry.name, casts, ready, readyDots, marks, inFindings });
+        lanes.push({ player: player.name, job: player.className, key: entry.key, name: entry.name, casts, free, held, readyDots, marks, inFindings });
       }
     }
   }

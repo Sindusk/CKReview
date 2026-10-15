@@ -6,12 +6,13 @@
 // (user, 2026-10-14): findings from lib/mitigation/findings.ts beside the
 // fight timeline (components/MitigationAnalysisTimeline.tsx), on one
 // screen.
-//   - Header: the "Last N pulls" input (all-pulls mode; blank = 5), the
-//     window and the clock pull, one ⓘ with the disclaimers.
-//   - Tiles: failing, tight, unused, mistimed, plan. Each filters the list.
+//   - The window controls (AnalysisWindowControls) sit in the dialog's top
+//     bar (user, 2026-10-14).
 //   - Left: three badges, then the findings in groups (under-mitigated,
 //     plan, unused, mistimed, not mitigation), two lines a row. Right: the
-//     timeline. Picking a row or a bar selects that hit in both.
+//     tiles (failing, tight, unused, mistimed, plan; each filters the
+//     list), over the timeline. Picking a row or a bar selects that hit in
+//     both.
 // Opening it reads the log only: facts, no suggestions, so it is quick
 // (user, 2026-10-14: the panel supplies information rather than running a
 // task). The first badge is an Analyze button; it runs the optimizer
@@ -345,16 +346,48 @@ function GroupHead({ k, count, extra, open, onToggle }: { k: GroupKey; count: nu
 
 // ── The view ─────────────────────────────────────────────────────────────
 
-export function PlanView({ plan, pending, error, window, reach, allPulls, windowInput, onWindowInput, groupPulls, onAnalyze, onOpenHit }: {
+/**
+ * The Analysis's window controls, in the dialog's top bar after the pull
+ * picker (user, 2026-10-14): the "Last N pulls" input (all-pulls mode;
+ * blank = 5), the window and its longest pull, the ⓘ.
+ */
+export function AnalysisWindowControls({ window, allPulls, windowInput, onWindowInput, groupPulls }: {
+  window:        FindingsWindowPull[];
+  allPulls:      boolean;               // false: one pull, no window input
+  windowInput:   string;
+  onWindowInput: (v: string) => void;
+  groupPulls:    number;                // the group's analyzable pulls (the window's ceiling)
+}) {
+  const nums = window.map((w) => w.pullNumber);
+  const longest = window.reduce<FindingsWindowPull | undefined>((a, w) =>
+    (!a || (w.durationMs ?? 0) >= (a.durationMs ?? 0) ? w : a), undefined);
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 10, fontSize: 12 }}>
+      {allPulls && (
+        <label style={{ color: "var(--ck-text-2)", display: "inline-flex", alignItems: "center", gap: 5 }}>
+          Last
+          <input className="ck-field" type="number" min={PLAN_MIN_PULLS} max={groupPulls} placeholder={String(Math.min(PLAN_WINDOW_DEFAULT, groupPulls))}
+            value={windowInput} onChange={(e) => onWindowInput(e.target.value)} style={{ width: 48, padding: "2px 4px" }} />
+          pulls
+        </label>
+      )}
+      {nums.length > 0 && (
+        <span className="ck-num" style={dim}>
+          {nums.length === 1 ? `Pull ${nums[0]}` : `Pulls ${nums[0]}–${nums[nums.length - 1]}`}
+          {longest && nums.length > 1 && longest.durationMs ? ` · longest ${fmtTime(longest.durationMs)} (Pull ${longest.pullNumber})` : ""}
+        </span>
+      )}
+      <span title={INFO} style={{ ...dim, cursor: "help" }}>ⓘ</span>
+    </span>
+  );
+}
+
+export function PlanView({ plan, pending, error, window, reach, onAnalyze, onOpenHit }: {
   plan:          OptimizedPlan | null;
   pending:       boolean;
   error?:        string;
   window:        FindingsWindowPull[];  // the pulls shown (and planned, on Analyze)
   reach?:        DebuffReach;
-  allPulls:      boolean;               // false: one pull, no window input
-  windowInput:   string;
-  onWindowInput: (v: string) => void;
-  groupPulls:    number;                // the group's analyzable pulls (the window's ceiling)
   onAnalyze:     () => void;            // runs the optimizer over `window`
   onOpenHit:     (hitId: string) => void;
 }) {
@@ -378,7 +411,6 @@ export function PlanView({ plan, pending, error, window, reach, allPulls, window
   };
 
   const nums = f.windowPulls;
-  const windowLabel = nums.length === 1 ? `Pull ${nums[0]}` : `Pulls ${nums[0]}–${nums[nums.length - 1]}`;
   const failing = f.under.filter((u) => u.failing);
   const tight = f.under.filter((u) => !u.failing);
   const unused = f.unused.filter((u) => !u.situational);
@@ -414,25 +446,8 @@ export function PlanView({ plan, pending, error, window, reach, allPulls, window
     : <>{before}<span style={{ ...dim, fontWeight: 400 }}> → </span><span style={{ color: FINDING_COLOR.plan }}>{after}</span></>);
   const shown = (k: GroupKey) => filter === null || filter === k;
 
-  return (
-    <div style={{ height: "100%", boxSizing: "border-box", padding: "8px 12px 12px", display: "flex", flexDirection: "column", gap: 10 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", fontSize: 12 }}>
-        {allPulls && (
-          <label style={{ color: "var(--ck-text-2)", display: "inline-flex", alignItems: "center", gap: 5 }}>
-            Last
-            <input className="ck-field" type="number" min={PLAN_MIN_PULLS} max={groupPulls} placeholder={String(Math.min(PLAN_WINDOW_DEFAULT, groupPulls))}
-              value={windowInput} onChange={(e) => onWindowInput(e.target.value)} style={{ width: 48, padding: "2px 4px" }} />
-            pulls
-          </label>
-        )}
-        <span className="ck-num" style={dim}>
-          {windowLabel}{f.clock && nums.length > 1 ? ` · longest ${fmtTime(f.clock.durationMs)} (Pull ${f.clock.pullNumber})` : ""}
-        </span>
-        <span title={INFO} style={{ ...dim, cursor: "help" }}>ⓘ</span>
-        {error && <span style={{ color: VERDICT_STYLE.fail.color }}>The analysis failed: {error}</span>}
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 6 }}>
+  const tiles = (
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 6 }}>
         {tile("under", "Failing hits", "fail", VERDICT_STYLE.fail.color, arrow(failing.length, analyzed ? plan!.summary.after.failing : undefined),
           failing.map((u) => u.hit.name).join(", ") || undefined)}
         {tile("under", "Tight hits", "tight", VERDICT_STYLE.under.color, arrow(tight.length, analyzed ? plan!.summary.after.tight : undefined),
@@ -444,7 +459,11 @@ export function PlanView({ plan, pending, error, window, reach, allPulls, window
           analyzed ? <span style={{ color: FINDING_COLOR.plan }}>{plural(changes, "change")}</span> : <span style={dim}>—</span>,
           analyzed ? undefined : "Click Analyze")}
       </div>
+  );
 
+  return (
+    <div style={{ height: "100%", boxSizing: "border-box", padding: "8px 12px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
+      {error && <p style={{ color: VERDICT_STYLE.fail.color, fontSize: 12, margin: 0 }}>The analysis failed: {error}</p>}
       <div style={{ flex: "1 1 auto", minHeight: 0, display: "grid", gridTemplateColumns: "430px minmax(0, 1fr)", gap: 10 }}>
         <div style={{ minHeight: 0, overflowY: "auto", border: "1px solid var(--ck-line-2)", borderRadius: 3 }}>
           <Badges f={f} pending={pending} onAnalyze={onAnalyze} onSelect={(id) => setSelectedId(id)} />
@@ -503,8 +522,11 @@ export function PlanView({ plan, pending, error, window, reach, allPulls, window
             </p>
           )}
         </div>
-        <div style={{ minHeight: 0, overflow: "auto", border: "1px solid var(--ck-line-2)", borderRadius: 3, padding: "8px 12px", opacity: pending ? 0.6 : 1 }}>
-          <AnalysisTimeline f={f} selectedId={selectedId} onSelect={(id) => setSelectedId(id)} />
+        <div style={{ minHeight: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+          {tiles}
+          <div style={{ flex: "1 1 auto", minHeight: 0, overflow: "auto", border: "1px solid var(--ck-line-2)", borderRadius: 3, padding: "8px 12px", opacity: pending ? 0.6 : 1 }}>
+            <AnalysisTimeline f={f} selectedId={selectedId} onSelect={(id) => setSelectedId(id)} />
+          </div>
         </div>
       </div>
     </div>

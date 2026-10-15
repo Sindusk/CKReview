@@ -13,7 +13,8 @@
 //   - how many window pulls got that far, with those hits' names on it
 //   - lanes for the cooldowns the findings name, all on request: the
 //     clock pull's casts (late ones outlined, ones a plan move loses
-//     dashed), a thin line while it sat ready, a dot where it sat ready
+//     dashed), a thin line while it sat free, a dotted yellow one while it
+//     was held for the next cast (user, 2026-10-14), a dot where it sat ready
 //     at an under-mitigated hit, the plan's moves and extra uses, ideas
 // The selected hit (a finding row or a bar) is a band down the chart and
 // lanes. Positions are percentages of the clock, so the plot stretches.
@@ -34,7 +35,8 @@ const MOVE = FINDING_COLOR.plan;
 const IDEA = FINDING_COLOR.unused;
 const LATE = FINDING_COLOR.late;
 const NOW = "#8b8f98";
-const IDLE = "rgba(79,209,197,.38)";
+const IDLE = "rgba(79,209,197,.45)";
+const HELD = "#e3c34a";
 const MUTED_HATCH = "repeating-linear-gradient(135deg, rgba(157,161,168,.5) 0 3px, transparent 3px 7px)";
 const SELECT_BG = "rgba(83,169,255,.14)";
 
@@ -208,7 +210,8 @@ function Legend({ analyzed, clockPull }: { analyzed: boolean; clockPull?: number
       <span style={item}><span style={{ width: 10, height: 8, background: VERDICT_STYLE.over.color, opacity: 0.55 }} /> lowest HP, typical pull</span>
       <span style={item}><span style={{ width: 12, height: 2, background: "var(--ck-text)" }} /> worst pull</span>
       <span style={item}><span style={{ width: 14, height: 8, borderRadius: 2, background: "#80a0f0" }} /> cast{clockPull !== undefined ? ` (Pull ${clockPull})` : ""}</span>
-      <span style={item}><span style={{ width: 16, height: 2, background: IDLE }} /> ready</span>
+      <span style={item}><span style={{ width: 16, height: 2, background: IDLE }} /> free</span>
+      <span style={item}><span style={{ width: 16, height: 0, borderTop: `2px dotted ${HELD}` }} /> held for the next cast</span>
       <span style={item}><span style={{ width: 8, height: 8, borderRadius: "50%", background: IDEA }} /> ready at a flagged hit</span>
       <span style={item}><span style={{ width: 12, height: 8, borderRadius: 2, outline: `2px solid ${LATE}`, outlineOffset: 1 }} /> late cast</span>
       {analyzed && <span style={{ ...item, color: MOVE }}>○→● plan move · ⊕ extra use</span>}
@@ -227,9 +230,14 @@ function LaneRow({ lane, pct }: { lane: Lane; pct: (ms: number) => number }) {
   );
   return (
     <div style={{ position: "relative", height: LANE_H, borderTop: "1px solid rgba(255,255,255,.05)" }}>
-      {lane.ready.map(([a, b]) => (
-        <div key={a} title={`Ready ${fmtTime(a)}–${fmtTime(b)}, not used`} style={{
+      {lane.free.map(([a, b]) => (
+        <div key={`f${a}`} title={`Free ${fmtTime(a)}–${fmtTime(b)}: a cast here delays nothing`} style={{
           position: "absolute", left: `${pct(a)}%`, width: `${pct(b) - pct(a)}%`, top: 12, height: 2, borderRadius: 1, background: IDLE,
+        }} />
+      ))}
+      {lane.held.map(([a, b]) => (
+        <div key={`h${a}`} title={`Held ${fmtTime(a)}–${fmtTime(b)} for the ${fmtTime(b)} cast: a cast here pushes that one back`} style={{
+          position: "absolute", left: `${pct(a)}%`, width: `${pct(b) - pct(a)}%`, top: 12, height: 0, borderTop: `2px dotted ${HELD}`,
         }} />
       ))}
       {lane.casts.map((c) => (
