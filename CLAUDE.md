@@ -26,6 +26,7 @@ sampling it.
 | Damage output / rotation analysis, or tooling for it | [docs/dps-analysis.md](docs/dps-analysis.md) (method and pitfalls) |
 | Auditing xivanalysis modules job by job against the app's damage checks | [docs/xiva-audit-plan.md](docs/xiva-audit-plan.md); per-job ledgers go in `docs/xiva-audit/` |
 | The same audit for WoWAnalyzer (reference-only, AGPL) | [docs/wowa-audit-plan.md](docs/wowa-audit-plan.md); per-spec ledgers go in `docs/wowa-audit/` |
+| WoW simulation pipeline (talent effects, budget model, simc as dev-only oracle) | [docs/wow-sim-plan.md](docs/wow-sim-plan.md) — includes the clean-room rule for reading GPL/AGPL sources |
 | A damage case study of a kill against xivanalysis (FFXIV) or WoWAnalyzer (WoW) feedback | the `/damage-analysis` skill ([.claude/skills/damage-analysis/](.claude/skills/damage-analysis/SKILL.md)); unfinished studies resume from [docs/damage-case-studies/](docs/damage-case-studies/) |
 | A boss's damage context (pools, checks, holds) | the `/build-fight-context` skill ([.claude/skills/build-fight-context/](.claude/skills/build-fight-context/SKILL.md)) |
 | Changing the Damage, Mitigation or Statics analysis | The module headers (`lib/damage/`, `lib/mitigation/`, `lib/static-analysis.ts`). Design records and log-semantics findings are in [docs/archive/](docs/archive/) |
