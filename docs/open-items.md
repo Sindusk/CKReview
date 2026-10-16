@@ -215,7 +215,10 @@ and delete them from the header.
     (ninjutsu, Kassatsu and Raiju checks verified 2026-10-15).
   - [sam.md](xiva-audit/sam.md): Samurai, 6 candidates, 14 covered (no
     page compared yet).
-  - [mch.md](xiva-audit/mch.md): Machinist, 8 candidates, 10 covered.
+  - [mch.md](xiva-audit/mch.md): Machinist, 3 candidates (Double Check /
+    Checkmate charges, Wildfire fizzle), 14 covered (Heat / Battery
+    overcap and Reassemble built 2026-10-15, awaiting pages; Queen
+    without Collider not adopted).
   - [blm.md](xiva-audit/blm.md): Black Mage, 1 candidate (pre-7.2
     Firestarter), 15 covered (full gauge
     simulation and lanes; Polyglot, Paradox, cold Fire III, Ley Lines,

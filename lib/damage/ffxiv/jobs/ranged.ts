@@ -123,6 +123,11 @@
 //   Crossbows (Hypercharge.tsx), each missing one its average; cooldowns
 //   (GeneralCDDowntime.tsx). Double Check / Checkmate are left out:
 //   Heat Blast refunds their cooldown, which the drift check doesn't model.
+//   Heat / Battery overcap (Gauge.tsx, `mchGauges`) and Reassemble on a
+//   weak GCD (Reassemble.tsx, `reassemble`), 2026-10-15, below. Not
+//   adopted: a Queen without Crowned Collider (YassQueen.tsx), which six
+//   Red Hot and Deep Blue Machinists miss on the same 1:12-1:18 Queen, the
+//   top parse included.
 //   AoE on too few targets (MultiHitSkills.ts, 2026-10-15): Bioblaster
 //   under 3 against Drill (its DoT ticks count toward what it dealt),
 //   Auto Crossbow and Scattergun under 4 against Blazing Shot and the
@@ -145,7 +150,8 @@ import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import type { PlayerEvent, PlayerInfo } from "@/types/PlayerInfo";
 import type { DamageFinding, JobCheck } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";
-import { aoeComboOnOneTarget, baseValue, burstWindowFindings, critMultOf, dotFindings, k, rollGainOf, s, statusWindows, type ExpectedAction } from "./shared";
+import { aoeComboOnOneTarget, baseValue, burstWindowFindings, critMultOf, dotFindings, gaugeFindings, k, rollGainOf, s, statusWindows, type ExpectedAction, type GaugeEvent, type GaugeSpec } from "./shared";
+import { comboLanded } from "./gnb";
 import { forcedPart, inWindows, mergeWindows } from "../../timeline";
 import { espritGauge, featherGauge } from "./gauges";
 
@@ -662,4 +668,96 @@ const mchAoe = aoeComboOnOneTarget([[A.BIOBLASTER.id, A.DRILL.id, 3, [S.BIOBLAST
   [A.AUTO_CROSSBOW.id, A.BLAZING_SHOT.id, 4],
   [A.SCATTERGUN.id, [A.HEATED_SPLIT_SHOT.id, A.HEATED_SLUG_SHOT.id, A.HEATED_CLEAN_SHOT.id], 4]]);
 
-export const MCH_CHECKS: JobCheck[] = [wildfire, hypercharge, mchAoe];
+// Heat and Battery (xivanalysis Gauge.tsx), simulated from casts:
+// - Heat (cap 100): Heated Split Shot, Spread Shot +5, Heated Slug / Clean
+//   Shot +5 when the combo landed, Scattergun +10; Hypercharge spends 50
+//   unless Hypercharged (Barrel Stabilizer's free one) is up. 50 lost is a
+//   Hypercharge: 5 Blazing Shots in the time of 3 combo GCDs.
+// - Battery (cap 100): Air Anchor, Chain Saw, Excavator +20, Heated Clean
+//   Shot +10 when the combo landed; Automaton Queen spends it all. Lost
+//   Battery is worth her Queen damage per Battery spent.
+// A death empties both. Also the Machinist's timeline lanes (gauges.ts).
+const HEAT_PER_HYPERCHARGE = 50;
+export function mchGaugeSpecs(ctx: PlayerCheckContext): GaugeSpec[] {
+  const casts = ctx.player.casts.filter((c) => c.timestamp < ctx.endMs).sort((a, b) => a.timestamp - b.timestamp);
+  const hypercharged = statusWindows(ctx, S.HYPERCHARGED.id);
+  const landed = (c: PlayerEvent) => comboLanded(ctx, c.abilityId, c.timestamp);
+  const heat: GaugeEvent[] = [], battery: GaugeEvent[] = [];
+  const heatGain = new Map(([["HEATED_SPLIT_SHOT", 5], ["SPREAD_SHOT", 5], ["SCATTERGUN", 10]] as const)
+    .filter(([key]) => A[key]).map(([key, n]) => [A[key].id, n]));
+  const comboHeat = new Set(ids("HEATED_SLUG_SHOT", "HEATED_CLEAN_SHOT"));
+  const batteryGain = new Set(ids("AIR_ANCHOR", "CHAIN_SAW", "EXCAVATOR"));
+  // The Queen spends what's held: a first pass finds how much.
+  let held = 0;
+  const spent: number[] = [];
+  for (const c of casts) {
+    if (inWindows(c.timestamp, ctx.dead)) held = 0;
+    const gain = batteryGain.has(c.abilityId) ? 20 : c.abilityId === A.HEATED_CLEAN_SHOT.id && landed(c) ? 10 : 0;
+    if (gain) {
+      held = Math.min(100, held + gain);
+      battery.push({ t: c.timestamp, type: "gain", amount: gain, label: `${c.abilityName} at 100 Battery` });
+    } else if (c.abilityId === A.AUTOMATON_QUEEN.id) {
+      spent.push(held);
+      battery.push({ t: c.timestamp, type: "spend", amount: held, label: "Automaton Queen" });
+      held = 0;
+    }
+    const h = heatGain.get(c.abilityId) ?? (comboHeat.has(c.abilityId) && landed(c) ? 5 : 0);
+    if (h) heat.push({ t: c.timestamp, type: "gain", amount: h, label: `${c.abilityName} at 100 Heat` });
+    else if (c.abilityId === A.HYPERCHARGE.id && !hypercharged.some((w) => c.timestamp > w.startMs && c.timestamp <= w.endMs + 50))
+      heat.push({ t: c.timestamp, type: "spend", amount: HEAT_PER_HYPERCHARGE, label: "Hypercharge" });
+  }
+  for (const d of ctx.dead) { heat.push({ t: d.startMs, type: "reset", label: "death" }); battery.push({ t: d.startMs, type: "reset", label: "death" }); }
+  const queenDamage = ctx.player.damageDone.filter((e) => e.pet === "Automaton Queen" && e.timestamp < ctx.endMs + 20_000)
+    .reduce((a, e) => a + (e.amount ?? 0), 0);
+  const spentTotal = spent.reduce((a, x) => a + x, 0);
+  const perBattery = spentTotal > 0 ? queenDamage / spentTotal : 0;
+  const blazing = Math.max(...ids("BLAZING_SHOT", "HEAT_BLAST").map((x) => ctx.values.perUse(x)));
+  const combo = ids("HEATED_SPLIT_SHOT", "HEATED_SLUG_SHOT", "HEATED_CLEAN_SHOT").map((x) => ctx.values.perUse(x)).filter((v) => v > 0);
+  const filler = combo.length ? combo.reduce((a, v) => a + v, 0) / combo.length : 0;
+  const hyper = Math.max(0, 5 * blazing - 3 * filler);
+  return [
+    { name: "Heat", unit: "Heat", cap: 100, unitValue: hyper / HEAT_PER_HYPERCHARGE, events: heat,
+      valueBasis: `(5 × ${k(blazing)} average Blazing Shot − 3 × ${k(filler)} average combo GCD in the same time) per 50 Heat` },
+    { name: "Battery", unit: "Battery", cap: 100, unitValue: perBattery, events: battery,
+      valueBasis: `${k(perBattery * 10)} of her Queen damage per 10 Battery spent` },
+  ];
+}
+const mchGauges: JobCheck = (ctx) => mchGaugeSpecs(ctx).flatMap((spec) => (spec.unitValue > 0 ? gaugeFindings(ctx, spec) : []));
+
+// Reassemble (xivanalysis Reassemble.tsx): its sure crit and direct hit
+// belong on Chain Saw, Excavator, Air Anchor or Drill (Scattergun on
+// several targets). The GCD at the status's removal consumed it. On
+// another GCD it loses (her best of those averages − that GCD's average) ×
+// what a sure crit and direct hit add over her average roll. One that ran
+// out is checkProcs's (it caught RaM97t3whCZrJBPm 2:47.9). 449 of 464
+// Reassembles on disk went on the four; the three that ran out all sit in
+// Red Hot and Deep Blue's 2:47 downtime (forced).
+const REASSEMBLE_GOOD = ["CHAIN_SAW", "EXCAVATOR", "AIR_ANCHOR", "DRILL", "SCATTERGUN"];
+const MCH_GCDS = ["CHAIN_SAW", "EXCAVATOR", "AIR_ANCHOR", "DRILL", "SCATTERGUN", "BIOBLASTER", "BLAZING_SHOT", "HEAT_BLAST",
+  "AUTO_CROSSBOW", "HEATED_SPLIT_SHOT", "HEATED_SLUG_SHOT", "HEATED_CLEAN_SHOT", "FULL_METAL_FIELD"];
+const reassemble: JobCheck = (ctx) => {
+  const out: DamageFinding[] = [];
+  const good = new Set(ids(...REASSEMBLE_GOOD));
+  const gcds = new Set(ids(...MCH_GCDS));
+  const best = Math.max(0, ...ids("CHAIN_SAW", "EXCAVATOR", "AIR_ANCHOR", "DRILL").map((x) => ctx.values.perUse(x)));
+  const critMult = critMultOf(ctx), roll = rollGainOf(ctx, critMult);
+  const share = Math.max(0, (critMult * 1.25) / roll - 1);
+  const shareText = `${Math.round(share * 100)}% (a sure crit and direct hit over her average roll)`;
+  for (const e of ctx.player.buffs ?? []) {
+    if (e.abilityId !== S.REASSEMBLED.id || e.buffStatus !== "removed" || e.source !== ctx.player.name || e.timestamp >= ctx.endMs) continue;
+    const used = ctx.player.casts.find((c) => gcds.has(c.abilityId) && Math.abs(c.timestamp - e.timestamp) <= 100);
+    // One that ran out (no GCD at its removal) is checks.ts checkProcs's.
+    if (!used || good.has(used.abilityId)) continue;
+    const lost = Math.max(0, best - ctx.values.perUse(used.abilityId)) * share;
+    if (lost < 1) continue;
+    out.push(finding(ctx, {
+      kind: "burst-window", startMs: e.timestamp, endMs: e.timestamp, forced: false, inference: true,
+      label: `Reassemble on ${used.abilityName}`, lostDamage: lost,
+      basis: `(${k(best)} her best of Chain Saw / Excavator / Air Anchor / Drill − ${k(ctx.values.perUse(used.abilityId))} average ${used.abilityName}) × ${shareText}`,
+      detail: `Reassemble spent on ${used.abilityName}`,
+    }));
+  }
+  return out;
+};
+
+export const MCH_CHECKS: JobCheck[] = [wildfire, hypercharge, mchAoe, mchGauges, reassemble];

@@ -27,6 +27,7 @@ import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import { beastGaugeSpec } from "./pld-war";
 import { blmGaugeTracks, paletteSpec } from "./caster";
 import { firstmindsFocusSpec, mnkFurySpecs, rattlingCoilSpec } from "./melee";
+import { mchGaugeSpecs } from "./ranged";
 import { gaugeCastTimes, gaugeTrack, statusWindows } from "./shared";
 
 const ADDERSGALL_MAX = 3;
@@ -551,6 +552,8 @@ export const JOB_GAUGES: Record<string, ((ctx: PlayerCheckContext) => GaugeTrack
   // Polyglot, Astral Fire, Umbral Ice, Hearts, Astral Soul, Paradox (caster.ts blmGauge).
   "Black Mage": [blmGaugeTracks],
   // Opo-opo, Raptor and Coeurl Fury: the overcap check's simulation (melee.ts mnkFurySpecs).
+  // Heat and Battery: the overcap check's simulation (ranged.ts mchGaugeSpecs).
+  "Machinist": [(ctx) => mchGaugeSpecs(ctx).map((spec) => gaugeTrack(ctx, spec))],
   "Monk": [(ctx) => mnkFurySpecs(ctx).map((spec) => gaugeTrack(ctx, spec))],
   // Beast Gauge: the overcap check's own simulation (pld-war.ts beastGaugeSpec).
   "Warrior": [(ctx) => [gaugeTrack(ctx, beastGaugeSpec(ctx), "Beast")]],
