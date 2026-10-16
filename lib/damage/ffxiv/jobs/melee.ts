@@ -341,7 +341,10 @@ export const VPR_PROC_STATUS_IDS = new Set(VENOM_PROCS.map(([st]) => S[st]?.id).
  *  spent it on Raiton). */
 export const MELEE_PROC_SKIP_IDS = new Set([...VPR_PROC_STATUS_IDS, S.ENHANCED_PIERCING_TALON.id, S.KASSATSU.id, S.RAIJU_READY.id,
   // Reaper's enhancements: reaperEnhancedOverwrites values their expiries.
-  S.ENHANCED_GIBBET.id, S.ENHANCED_GALLOWS.id, S.ENHANCED_VOID_REAPING.id, S.ENHANCED_CROSS_REAPING.id]);
+  S.ENHANCED_GIBBET.id, S.ENHANCED_GALLOWS.id, S.ENHANCED_VOID_REAPING.id, S.ENHANCED_CROSS_REAPING.id,
+  // Paladin's Atonement chain: pld-war.ts atonementChainDropped counts its
+  // expiries (the whole chain left, not one step).
+  S.ATONEMENT_READY.id, S.SUPPLICATION_READY.id, S.SEPULCHRE_READY.id]);
 
 const venoms: JobCheck = (ctx) => {
   const out: DamageFinding[] = [];

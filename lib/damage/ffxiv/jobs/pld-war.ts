@@ -320,22 +320,29 @@ const atonementChainDropped: JobCheck = (ctx) => {
     for (const e of ctx.player.buffs ?? []) {
       if (e.abilityId !== sid || e.buffStatus !== "removed" || e.timestamp >= ctx.endMs || inWindows(e.timestamp, ctx.dead)) continue;
       const at = ctx.player.casts.find((c) => gcdIds.has(c.abilityId) && Math.abs(c.timestamp - e.timestamp) <= PROC_CONSUME_MS);
-      if (!at || stepIds.has(at.abilityId)) continue;
+      if (at && stepIds.has(at.abilityId)) continue;
       // Re-applied in the same instant: the chain restarted, not dropped.
       if ((ctx.player.buffs ?? []).some((x) => x.abilityId === sid && x.buffStatus !== "removed" && Math.abs(x.timestamp - e.timestamp) <= PROC_CONSUME_MS)) continue;
-      // Run out: checkProcs counts the expiry.
+      // Run out (2026-10-16): counted here too, not left to checkProcs,
+      // which skips these statuses (its consumer inference failed when the
+      // chain was mostly dropped: 7jtwv9aVpJmDbCXk Ryoko Yui, Atonement
+      // Ready used 3 of 15, 8 run out, none reported; xivanalysis 3 / 15).
+      // A removal with neither a cast nor its expiry is a death's strip.
       const applied = [...(ctx.player.buffs ?? [])].reverse().find((x) => x.abilityId === sid && x.buffStatus !== "removed" && x.timestamp < e.timestamp);
-      if (applied?.durationMs && e.timestamp >= applied.timestamp + applied.durationMs - PROC_EXPIRY_EARLY_MS) continue;
+      const ranOut = !!applied?.durationMs && e.timestamp >= applied.timestamp + applied.durationMs - PROC_EXPIRY_EARLY_MS;
+      if (!at && !ranOut) continue;
+      if (ranOut && ctx.dead.some((d) => d.startMs >= e.timestamp && d.startMs - e.timestamp <= 3_000)) continue;
       const lost = steps.reduce((a, st) => a + Math.max(0, avgOutside(id(st)) - filler), 0);
       if (lost < 1) continue;
       const forced = inWindows(e.timestamp, mergeWindows(ctx.forced));
       out.push(finding(ctx, {
         kind: "proc-lost", startMs: e.timestamp, endMs: e.timestamp, forced,
         cause: forced ? forcedPart(e.timestamp - 1, e.timestamp + 1, ctx.forced).cause : undefined,
-        label: `${S[status].name} dropped`, lostDamage: lost,
+        label: `${S[status].name} ${at ? "dropped" : "ran out"}`, lostDamage: lost,
         basis: steps.map((st) => `${k(avgOutside(id(st)))} ${A[st].name}`).join(" + ") +
           ` − ${steps.length} × ${k(filler)} average combo filler (outside Fight or Flight)`,
-        detail: `${S[status].name} dropped: ${at.abilityName} at ${clock(at.timestamp)} went first`,
+        detail: at ? `${S[status].name} dropped: ${at.abilityName} at ${clock(at.timestamp)} went first`
+          : `${S[status].name} ran out unused at ${clock(e.timestamp)}`,
       }));
     }
   }
