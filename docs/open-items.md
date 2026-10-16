@@ -215,10 +215,11 @@ and delete them from the header.
   - [sam.md](xiva-audit/sam.md): Samurai, 6 candidates, 14 covered (no
     page compared yet).
   - [mch.md](xiva-audit/mch.md): Machinist, 8 candidates, 10 covered.
-  - [blm.md](xiva-audit/blm.md): Black Mage, 5 candidates (gauge-inferred
-    rotation: Paradox overwrite, cold Fire III, lukewarm Fire IV, Thunder
-    before downtime), 12 covered (Polyglot, Ley Lines and Fire I verified
-    on 5 xivanalysis pages 2026-10-15); MP-based rules unverifiable.
+  - [blm.md](xiva-audit/blm.md): Black Mage, 2 candidates (Thunder
+    before downtime; pre-7.2 Firestarter), 15 covered (full gauge
+    simulation and lanes; Polyglot, Paradox, cold Fire III, Ley Lines,
+    Fire I, Umbral Soul verified on 8 xivanalysis pages 2026-10-15;
+    lukewarm Fire IV awaiting a page); MP-based rules unverifiable.
   - [smn.md](xiva-audit/smn.md): Summoner, 9 candidates, 5 covered.
   - [rdm.md](xiva-audit/rdm.md): Red Mage, 8 candidates, 9 covered.
   - [whm.md](xiva-audit/whm.md): White Mage, 3 candidates, 6 covered (no

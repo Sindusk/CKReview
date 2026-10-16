@@ -136,10 +136,11 @@
 //   MIT License; full text in THIRD_PARTY_NOTICES.md.
 
 import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
-import type { DamageFinding, JobCheck } from "../../types";
+import type { DamageFinding, GaugeTrack, JobCheck } from "../../types";
+import type { PlayerEvent } from "@/types/PlayerInfo";
 import { finding, type PlayerCheckContext } from "../../checks";
 import { forcedPart, inWindows } from "../../timeline";
-import { aoeComboOnOneTarget, burstWindowFindings, castHits, clock, dotFindings, gaugeFindings, k, statusWindows, gaugeCastTimes, type ExpectedAction, type GaugeEvent, type GaugeSpec } from "./shared";
+import { aoeComboOnOneTarget, baseValue, burstWindowFindings, castHits, clock, critMultOf, dotFindings, gaugeFindings, gaugeTrack, k, rollGainOf, statusWindows, gaugeCastTimes, type ExpectedAction, type GaugeEvent, type GaugeSpec } from "./shared";
 
 const ids = (...keys: string[]) => keys.filter((key) => A[key]).map((key) => A[key].id);
 const best = (ctx: PlayerCheckContext, list: number[]) => Math.max(0, ...list.map((x) => ctx.values.perUse(x)));
@@ -432,66 +433,195 @@ export const PCT_CHECKS: JobCheck[] = [starryMuse, starryFillers, palette, pctAo
 // Earlier logs, where the element could time out, aren't judged. A
 // Polyglot gained at the cap, or still held at a kill, is a Xenoglossy
 // over the GCD it would have replaced.
+//
+// The whole gauge (blmGauge), after xivanalysis Gauge.tsx's 7.2+ branch,
+// one pass over the casts (each applies its cast effect, then its hit
+// effect, at the cast's time):
+// - Astral Fire / Umbral Ice, 0-3: Fire II / High Fire II / Fire III /
+//   Despair / Flare / Manafont give AF3, Blizzard II / High Blizzard II /
+//   Blizzard III UI3, Fire IV / Blizzard IV / Freeze 1 from none, Umbral
+//   Soul +1 UI, Transpose swaps to 1 of the other. Fire I in Umbral Ice or
+//   Blizzard I in Astral Fire (and Umbral Soul in Astral Fire) end the
+//   element: hearts and Astral Soul empty, the Polyglot timer stops.
+// - Umbral Hearts, 0-3: Blizzard IV / Freeze fill them, Umbral Soul (in
+//   Umbral Ice) and Manafont add; each Fire I / II / High Fire II / IV and
+//   a hardcast Fire III spends one in Astral Fire (a Firestarter Fire III
+//   doesn't), Flare all of them.
+// - Astral Soul, 0-6: Fire IV +1, Flare +3; Flare Star, Umbral Ice or the
+//   element ending empty it.
+// - Paradox, 0-1: gained leaving Umbral Ice III with 3 hearts, leaving
+//   Astral Fire III, or by Manafont; Paradox spends it. One gained while
+//   held is an overwrite (paradoxFindings below).
+// - Polyglot, as above.
+// A death empties all of it. Before 7.2 (element timers) it isn't run.
+// Shown as six lanes in the Damage dialog (gauges.ts JOB_GAUGES).
 const POLYGLOT_MS = 30_000;
 const POLYGLOT_CAP = 3;
-const FIRE_ELEMENT_IDS = new Set(ids("FIRE_II", "FIRE_III", "FIRE_IV", "HIGH_FIRE_II", "FLARE", "DESPAIR", "FLARE_STAR", "MANAFONT"));
-const ICE_ELEMENT_IDS = new Set(ids("BLIZZARD_II", "BLIZZARD_III", "BLIZZARD_IV", "HIGH_BLIZZARD_II", "FREEZE", "UMBRAL_SOUL"));
 const POLYGLOT_SPEND = new Set(ids("XENOGLOSSY", "FOUL"));
-type Element = "fire" | "ice" | undefined;
-const nextElement = (element: Element, abilityId: number): Element => {
-  if (FIRE_ELEMENT_IDS.has(abilityId)) return "fire";
-  if (ICE_ELEMENT_IDS.has(abilityId)) return "ice";
-  if (abilityId === A.FIRE_I.id) return element === "ice" ? undefined : "fire";
-  if (abilityId === A.BLIZZARD_I.id) return element === "fire" ? undefined : "ice";
-  if (abilityId === A.TRANSPOSE.id && element) return element === "fire" ? "ice" : "fire";
-  return element;
-};
 const PRE_72 = ["7.0", "7.01", "7.05", "7.1"];
-const polyglot: JobCheck = (ctx) => {
-  if (ctx.patch && PRE_72.includes(ctx.patch)) return [];
+const ELEMENT_MAX = 3, HEARTS_MAX = 3, SOUL_MAX = 6;
+const idOf = (key: string) => A[key]?.id ?? -1;
+
+export type BlmState = { af: number; ui: number; hearts: number; soul: number; paradox: number };
+type BlmLane = "af" | "ui" | "hearts" | "soul" | "paradox";
+export type BlmGauge = {
+  casts: { cast: PlayerEvent; before: BlmState; after: BlmState; proc: boolean }[];
+  polyglot: GaugeEvent[];
+  paradoxGains: { t: number; overwrite: boolean; label: string }[];
+  paradoxShort: number;
+  steps: Record<BlmLane, GaugeTrack["steps"]>;
+};
+const blmCache = new WeakMap<PlayerCheckContext, BlmGauge | undefined>();
+
+export function blmGauge(ctx: PlayerCheckContext): BlmGauge | undefined {
+  if (blmCache.has(ctx)) return blmCache.get(ctx);
+  const result = ctx.patch && PRE_72.includes(ctx.patch) ? undefined : runBlmGauge(ctx);
+  blmCache.set(ctx, result);
+  return result;
+}
+
+function runBlmGauge(ctx: PlayerCheckContext): BlmGauge {
   const casts = ctx.player.casts.filter((c) => c.timestamp < ctx.endMs).sort((a, b) => a.timestamp - b.timestamp);
   const deaths = [...ctx.dead].sort((a, b) => a.startMs - b.startMs);
-  const events: GaugeEvent[] = [];
+  const firestarter = statusWindows(ctx, S.FIRESTARTER.id);
+  const out: BlmGauge = {
+    casts: [], polyglot: [], paradoxGains: [], paradoxShort: 0,
+    steps: { af: [{ t: 0, value: 0 }], ui: [{ t: 0, value: 0 }], hearts: [{ t: 0, value: 0 }], soul: [{ t: 0, value: 0 }], paradox: [{ t: 0, value: 0 }] },
+  };
+  const s: BlmState = { af: 0, ui: 0, hearts: 0, soul: 0, paradox: 0 };
   let since: number | undefined;
-  let element: Element;
   let d = 0;
+  const record = (t: number) => {
+    for (const lane of Object.keys(out.steps) as BlmLane[]) {
+      const steps = out.steps[lane];
+      const last = steps[steps.length - 1];
+      if (last.value === s[lane]) continue;
+      if (last.t === t) last.value = s[lane];
+      else steps.push({ t, value: s[lane] });
+    }
+  };
   const tickTo = (t: number) => {
     if (since === undefined) return;
     while (since + POLYGLOT_MS <= t) {
       since += POLYGLOT_MS;
-      events.push({ t: since, type: "gain", amount: 1, label: "Enochian's 30s at 3 Polyglot" });
+      out.polyglot.push({ t: since, type: "gain", amount: 1, label: "Enochian's 30s at 3 Polyglot" });
     }
   };
   const diesBy = (t: number) => {
     while (d < deaths.length && deaths[d].startMs <= t) {
-      tickTo(deaths[d].startMs);
-      events.push({ t: deaths[d].startMs, type: "reset", label: "death" });
+      const at = deaths[d].startMs;
+      tickTo(at);
+      out.polyglot.push({ t: at, type: "reset", label: "death" });
+      Object.assign(s, { af: 0, ui: 0, hearts: 0, soul: 0, paradox: 0 });
       since = undefined;
-      element = undefined;
+      record(at);
       d++;
     }
   };
+  const endElement = () => { Object.assign(s, { af: 0, ui: 0, hearts: 0, soul: 0 }); since = undefined; };
+  const gainAF = (n: number, drops = true) => {
+    if (s.ui > 0 && drops) return endElement();
+    s.ui = 0;
+    s.af = Math.min(ELEMENT_MAX, s.af + n);
+  };
+  const gainUI = (n: number, drops = true) => {
+    if (s.af > 0 && drops) return endElement();
+    s.af = 0;
+    s.ui = Math.min(ELEMENT_MAX, s.ui + n);
+    s.soul = 0;
+  };
+  const spendHearts = (n: number, force = false) => { if (s.hearts > 0 && (s.af > 0 || force)) s.hearts = Math.max(0, s.hearts - n); };
+  const gainParadox = (t: number, label: string) => {
+    out.paradoxGains.push({ t, overwrite: s.paradox > 0, label });
+    s.paradox = 1;
+  };
+  // xivanalysis addEvent: a change from the previous state can grant
+  // Paradox, and any element starts the Polyglot timer.
+  const settle = (prev: BlmState, t: number) => {
+    if (prev.ui === ELEMENT_MAX && s.af > 0 && s.hearts === HEARTS_MAX) gainParadox(t, "Paradox from Umbral Ice III with 3 hearts");
+    else if (prev.af === ELEMENT_MAX && s.ui > 0) gainParadox(t, "Paradox from Astral Fire III");
+    if ((s.af > 0 || s.ui > 0) && since === undefined) since = t;
+  };
   for (const c of casts) {
-    diesBy(c.timestamp);
-    tickTo(c.timestamp);
-    const before = element;
-    element = nextElement(element, c.abilityId);
-    if (before && !element) since = undefined;
-    else if (element && since === undefined) since = c.timestamp;
-    if (c.abilityId === A.AMPLIFIER.id) events.push({ t: c.timestamp, type: "gain", amount: 1, label: "Amplifier at 3 Polyglot" });
-    if (POLYGLOT_SPEND.has(c.abilityId)) events.push({ t: c.timestamp, type: "spend", amount: 1, label: c.abilityName });
+    const t = c.timestamp, id = c.abilityId;
+    diesBy(t);
+    tickTo(t);
+    const before = { ...s };
+    const proc = id === idOf("FIRE_III") && firestarter.some((w) => w.startMs < t && Math.abs(w.endMs - t) <= 300);
+    // On cast.
+    if (id === idOf("UMBRAL_SOUL")) { gainUI(1); if (s.ui > 0) s.hearts = Math.min(HEARTS_MAX, s.hearts + 1); }
+    else if ([idOf("FIRE_I"), idOf("FIRE_II"), idOf("HIGH_FIRE_II"), idOf("FIRE_IV")].includes(id)) spendHearts(1);
+    else if (id === idOf("FIRE_III")) { if (!proc) spendHearts(1); }
+    else if (id === idOf("FLARE")) spendHearts(HEARTS_MAX, true);
+    else if (POLYGLOT_SPEND.has(id)) out.polyglot.push({ t, type: "spend", amount: 1, label: c.abilityName });
+    else if (id === idOf("TRANSPOSE")) { if (s.af > 0) gainUI(1, false); else if (s.ui > 0) gainAF(1, false); }
+    else if (id === idOf("PARADOX")) { if (s.paradox > 0) s.paradox = 0; else out.paradoxShort++; }
+    else if (id === idOf("AMPLIFIER")) out.polyglot.push({ t, type: "gain", amount: 1, label: "Amplifier at 3 Polyglot" });
+    else if (id === idOf("FLARE_STAR")) s.soul = 0;
+    else if (id === idOf("MANAFONT")) { gainAF(ELEMENT_MAX, false); s.hearts = HEARTS_MAX; gainParadox(t, "Paradox from Manafont"); }
+    settle(before, t);
+    // On hit.
+    const mid = { ...s };
+    if (id === idOf("BLIZZARD_I")) gainUI(1);
+    else if ([idOf("BLIZZARD_II"), idOf("HIGH_BLIZZARD_II"), idOf("BLIZZARD_III")].includes(id)) gainUI(ELEMENT_MAX, false);
+    else if (id === idOf("FREEZE") || id === idOf("BLIZZARD_IV")) { if (s.ui === 0) gainUI(1, false); s.hearts = HEARTS_MAX; }
+    else if (id === idOf("FIRE_I")) gainAF(1);
+    else if ([idOf("FIRE_II"), idOf("HIGH_FIRE_II"), idOf("FIRE_III"), idOf("DESPAIR")].includes(id)) gainAF(ELEMENT_MAX, false);
+    else if (id === idOf("FIRE_IV")) { if (s.af === 0) gainAF(1, false); s.soul = Math.min(SOUL_MAX, s.soul + 1); }
+    else if (id === idOf("FLARE")) { gainAF(ELEMENT_MAX, false); s.soul = Math.min(SOUL_MAX, s.soul + 3); }
+    settle(mid, t);
+    record(t);
+    out.casts.push({ cast: c, before, after: { ...s }, proc });
   }
   diesBy(ctx.endMs);
   tickTo(ctx.endMs);
+  return out;
+}
+
+const xenoUnit = (ctx: PlayerCheckContext) => {
   const xeno = ctx.values.perUse(A.XENOGLOSSY.id) || ctx.values.perUse(A.FOUL.id);
-  const unit = Math.max(0, xeno - ctx.values.gcdValue(undefined, false));
-  if (unit <= 0) return [];
-  const basis = `${k(xeno)} average Xenoglossy − ${k(ctx.values.gcdValue(undefined, false))} average GCD it would have replaced`;
-  return gaugeFindings(ctx, {
-    name: "Polyglot", unit: "Polyglot", cap: POLYGLOT_CAP, unitValue: unit, valueBasis: basis, events,
-    leftAtKill: { unitValue: unit, valueBasis: basis },
-  });
+  const gcd = ctx.values.gcdValue(undefined, false);
+  return { unit: Math.max(0, xeno - gcd), basis: `${k(xeno)} average Xenoglossy − ${k(gcd)} average GCD it would have replaced` };
 };
+
+export function polyglotSpec(ctx: PlayerCheckContext): GaugeSpec | undefined {
+  const gauge = blmGauge(ctx);
+  if (!gauge) return undefined;
+  const { unit, basis } = xenoUnit(ctx);
+  return {
+    name: "Polyglot", unit: "Polyglot", cap: POLYGLOT_CAP, unitValue: unit, valueBasis: basis, events: gauge.polyglot,
+    leftAtKill: { unitValue: unit, valueBasis: basis },
+  };
+}
+
+const polyglot: JobCheck = (ctx) => {
+  const spec = polyglotSpec(ctx);
+  return spec && spec.unitValue > 0 ? gaugeFindings(ctx, spec) : [];
+};
+
+/** The Damage dialog's Black Mage lanes, from blmGauge. */
+export function blmGaugeTracks(ctx: PlayerCheckContext): GaugeTrack[] {
+  const gauge = blmGauge(ctx);
+  const spec = polyglotSpec(ctx);
+  if (!gauge || !spec) return [];
+  const lane = (name: string, max: number, steps: GaugeTrack["steps"], note: string, marks?: GaugeTrack["marks"]): GaugeTrack =>
+    ({ name, max, steps, capped: [], note, marks });
+  const overwrites = gauge.paradoxGains.filter((g) => g.overwrite);
+  const flareStars = gauge.casts.filter((c) => c.cast.abilityId === idOf("FLARE_STAR"));
+  return [
+    gaugeTrack(ctx, spec),
+    lane("Astral Fire", ELEMENT_MAX, gauge.steps.af, "Astral Fire stacks, simulated from casts"),
+    lane("Umbral Ice", ELEMENT_MAX, gauge.steps.ui, "Umbral Ice stacks, simulated from casts"),
+    lane("Hearts", HEARTS_MAX, gauge.steps.hearts, "Umbral Hearts, simulated from casts"),
+    lane("Astral Soul", SOUL_MAX, gauge.steps.soul, "Astral Soul (6 for Flare Star); ticks are Flare Stars",
+      flareStars.map((c) => ({ t: c.cast.timestamp, label: "Flare Star", tone: "use" as const }))),
+    lane("Paradox", 1, gauge.steps.paradox,
+      `${overwrites.length} Paradox overwritten (amber)` +
+        (gauge.paradoxShort > 0 ? `; ${gauge.paradoxShort} Paradox the simulation had no marker for (model or log off)` : ""),
+      overwrites.map((g, i) => ({ t: g.t, label: `${g.label}, one already held: overwritten${i === 0 ? " (the first, forgiven)" : ""}`,
+        tone: i === 0 ? "use" as const : "lost" as const }))),
+  ];
+}
 
 // Ley Lines left (xivanalysis Leylines.tsx, 7.2+ "casts affected by Circle
 // of Power"): a GCD begun or finished while Ley Lines is up, with Circle of
@@ -547,14 +677,13 @@ const leyLines: JobCheck = (ctx) => {
 // In a mechanic's movement or forced time both are shown, not counted.
 const blmWrongGcds: JobCheck = (ctx) => {
   const out: DamageFinding[] = [];
-  const casts = ctx.player.casts.filter((c) => c.timestamp >= 0 && c.timestamp < ctx.endMs).sort((a, b) => a.timestamp - b.timestamp);
   const fire1 = ctx.values.perUse(A.FIRE_I.id);
   const fire4 = ctx.values.perUse(A.FIRE_IV.id);
-  let element: Element;
-  for (const c of casts) {
-    if (inWindows(c.timestamp, ctx.dead)) element = undefined;
-    const before = element;
-    element = nextElement(element, c.abilityId);
+  // Before 7.2 there's no gauge run: every Fire I is judged against Fire IV.
+  const casts = blmGauge(ctx)?.casts ??
+    ctx.player.casts.filter((c) => c.timestamp < ctx.endMs).map((cast) => ({ cast, before: undefined }));
+  for (const { cast: c, before } of casts) {
+    if (c.timestamp < 0) continue;
     const isFire1 = c.abilityId === A.FIRE_I.id;
     if (!isFire1 && c.abilityId !== A.UMBRAL_SOUL.id) continue;
     // An Umbral Soul whose GCD runs into downtime is excused too: no cast
@@ -565,7 +694,7 @@ const blmWrongGcds: JobCheck = (ctx) => {
     const moving = inWindows(c.timestamp, ctx.movement ?? []);
     if (!isFire1 && during.ms > 0) continue;
     const gcd = ctx.values.gcdValue(ctx.phaseOf(c.timestamp), inWindows(c.timestamp, ctx.buffWindows));
-    const inIce = isFire1 && before === "ice";
+    const inIce = isFire1 && (before?.ui ?? 0) > 0;
     const alt = isFire1 && !inIce && fire4 > 0 ? fire4 : gcd;
     const lost = Math.max(0, alt - (isFire1 ? fire1 : 0));
     if (lost < 1) continue;
@@ -586,7 +715,82 @@ const blmWrongGcds: JobCheck = (ctx) => {
   return out;
 };
 
-export const BLM_CHECKS: JobCheck[] = [highThunder, blmAoe, polyglot, leyLines, blmWrongGcds];
+// From the gauge (xivanalysis Gauge.tsx, RotationWatchdog ColdF3Evaluator,
+// LukewarmF4Evaluator), 7.2+:
+// - Paradox overwritten: a Paradox gained with one held, the pull's first
+//   forgiven (the opener's, deliberate). Worth her average Paradox less
+//   her average Fire IV (the filler it would have replaced; the average
+//   GCD carries Xenoglossy and Flare Star and read it as ~2k). In forced
+//   time shown, not counted. r4qDkR9btJCXnKWd Doomtrain pull 6 1:58.9,
+//   3:16.8, 4:12.0 and pull 14 4:16.0 matched xivanalysis (1:58, 3:16,
+//   4:11; 4:15); qh3VDQFy274mNPfJ's only one is its first (none there).
+// - Cold Fire III matched xivanalysis on pull 6 (1:29.7, 2:13.6, 4:12.0,
+//   its "3 phases"), wNHvD38WTbFtGJKr fight 11 (6:48.1), and none on
+//   pull 14 and qh3VDQFy274mNPfJ.
+// - Cold Fire III: a hardcast Fire III from Umbral Ice III with 3 hearts,
+//   which the Umbral Ice penalty weakens (Transpose, Paradox and the
+//   Firestarter Fire III reach Astral Fire III without it).
+// - Lukewarm Fire IV: a Fire IV below Astral Fire III.
+// Both are measured: her buff-neutral average of the same spell cast the
+// right way (Fire III from Astral Fire, Fire IV at Astral Fire III) less
+// this cast's, priced at this cast's buffs and her crit / direct-hit
+// rate.
+const PARADOX_HIT_MS = 3_000;
+const blmGaugeChecks: JobCheck = (ctx) => {
+  const gauge = blmGauge(ctx);
+  if (!gauge) return [];
+  const out: DamageFinding[] = [];
+  const excused = (t: number) => {
+    const during = forcedPart(t - 1, t + 1, ctx.forced);
+    const moving = inWindows(t, ctx.movement ?? []);
+    return { forced: during.ms > 0 || moving, movement: moving || undefined, cause: during.ms > 0 ? during.cause : undefined };
+  };
+  const paradox = ctx.values.perUse(A.PARADOX.id);
+  const fire4 = ctx.values.perUse(A.FIRE_IV.id) || ctx.values.gcdValue(undefined, false);
+  const overwrites = gauge.paradoxGains.filter((g) => g.overwrite && g.t >= 0);
+  // The first is forgiven, as xivanalysis does: the 5+7 opener spends that
+  // MP on an extra Fire IV for a second Flare Star.
+  for (const g of overwrites.slice(1)) {
+    if (paradox <= fire4) continue;
+    out.push(finding(ctx, {
+      kind: "gauge-overcap", startMs: g.t, endMs: g.t, ...excused(g.t), inference: true,
+      label: "Paradox overwritten", lostDamage: paradox - fire4,
+      basis: `${k(paradox)} average Paradox − ${k(fire4)} average Fire IV it would have replaced`,
+      detail: `${g.label} with one already held: the held Paradox was lost`,
+    }));
+  }
+  const critMult = critMultOf(ctx), roll = rollGainOf(ctx, critMult);
+  const hitOf = (c: PlayerEvent) => ctx.player.damageDone.find((e) => e.abilityId === c.abilityId && !e.isDoT && !e.pet &&
+    (e.amount ?? 0) > 0 && e.timestamp >= c.timestamp && e.timestamp < c.timestamp + PARADOX_HIT_MS);
+  const judge = (abilityId: number, isGood: (b: BlmState, proc: boolean) => boolean, isBad: (b: BlmState, proc: boolean) => boolean,
+    label: string, detail: string, goodName: string) => {
+    const mine = gauge.casts.filter((c) => c.cast.abilityId === abilityId && c.cast.timestamp >= 0)
+      .map((c) => ({ ...c, hit: hitOf(c.cast) })).filter((c) => c.hit);
+    const good = mine.filter((c) => isGood(c.before, c.proc));
+    if (good.length === 0) return;
+    const ref = good.reduce((a, c) => a + baseValue(c.hit!, critMult), 0) / good.length;
+    for (const c of mine) {
+      if (!isBad(c.before, c.proc)) continue;
+      const hit = c.hit!, m = hit.multiplier && hit.multiplier > 0 ? hit.multiplier : 1;
+      const lost = (ref - baseValue(hit, critMult)) * m * roll;
+      if (lost < 1) continue;
+      out.push(finding(ctx, {
+        kind: "wrong-gcd", startMs: c.cast.timestamp, endMs: c.cast.timestamp, ...excused(c.cast.timestamp), inference: true,
+        label, lostDamage: lost,
+        basis: `${k(ref * m * roll)} her ${goodName} at this cast's buffs (${good.length} cast${good.length === 1 ? "" : "s"}) − ${k(baseValue(hit, critMult) * m * roll)} this one`,
+        detail,
+      }));
+    }
+  };
+  judge(A.FIRE_III.id, (b) => b.af > 0, (b, proc) => !proc && b.ui === ELEMENT_MAX && b.hearts === HEARTS_MAX,
+    "Cold Fire III", "Fire III from Umbral Ice III with 3 hearts: Transpose, Paradox and the Firestarter Fire III skip the Umbral Ice penalty",
+    "average Fire III from Astral Fire");
+  judge(A.FIRE_IV.id, (b) => b.af === ELEMENT_MAX, (b) => b.af > 0 && b.af < ELEMENT_MAX,
+    "Fire IV below Astral Fire III", "Fire IV before reaching Astral Fire III", "average Fire IV at Astral Fire III");
+  return out;
+};
+
+export const BLM_CHECKS: JobCheck[] = [highThunder, blmAoe, polyglot, leyLines, blmWrongGcds, blmGaugeChecks];
 // xivanalysis MultiHitSkills.ts, each at the highest minimum any patch
 // uses (Tri-disaster 4 from 7.3, Painflare 4 in 7.2-7.4): the damage
 // comparison lets through the patches where fewer targets win.

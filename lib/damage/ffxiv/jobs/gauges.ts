@@ -25,7 +25,7 @@ import type { GaugeTrack } from "../../types";
 import type { PlayerCheckContext } from "../../checks";
 import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import { beastGaugeSpec } from "./pld-war";
-import { paletteSpec } from "./caster";
+import { blmGaugeTracks, paletteSpec } from "./caster";
 import { firstmindsFocusSpec, rattlingCoilSpec } from "./melee";
 import { gaugeCastTimes, gaugeTrack, statusWindows } from "./shared";
 
@@ -548,6 +548,8 @@ export const JOB_GAUGES: Record<string, ((ctx: PlayerCheckContext) => GaugeTrack
   "Paladin": [oathGauge],
   "Dancer": [dancerGauges],
   "Astrologian": [arcana],
+  // Polyglot, Astral Fire, Umbral Ice, Hearts, Astral Soul, Paradox (caster.ts blmGauge).
+  "Black Mage": [blmGaugeTracks],
   // Beast Gauge: the overcap check's own simulation (pld-war.ts beastGaugeSpec).
   "Warrior": [(ctx) => [gaugeTrack(ctx, beastGaugeSpec(ctx), "Beast")]],
 };
