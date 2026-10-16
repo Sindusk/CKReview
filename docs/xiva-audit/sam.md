@@ -80,7 +80,9 @@ In priority order (biggest damage cost first). Three pages compared
 2. Fuko on too few targets: built 2026-10-16 (`samFukoAoe`), the chain
    per GCD against the single-target rate with Sen valued. 14 on
    LmwgxA7B4d1NzqWH (Jena Steel), 14-41k each; 1 on 7jtwv9aVpJmDbCXk.
-   Needs a page with Fuko on it to compare.
+   Matched her page 2026-10-16: Fuko 14 = 14, and the whole AoE table
+   (47): Oka 9 and Mangetsu 6 under Meikyo, Kyuten 2, Tenka / Tendo
+   Goken and both Kaeshi 4 each.
 3. OGCDDowntime: Alison's Guren / Senei 8 / 10 on her page, about 1
    lost here (83.2s held). Traced 2026-10-16: Senei at 0:04, 1:05, 2:06,
    3:22, 4:23, 5:27, 7:25, 8:41, kill 9:32; on time, 10 fit. The app's
