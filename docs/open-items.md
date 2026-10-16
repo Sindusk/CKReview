@@ -226,7 +226,9 @@ and delete them from the header.
   - [gnb.md](xiva-audit/gnb.md): Gunbreaker, 0 candidates, 7 covered.
     Bloodfest drift valued 2026-10-16 (Reign combo + 1.5 cartridges);
     its 120s pre-7.4 recast and Gnashing Fang's single pre-7.4 charge
-    are now per patch. Not matched on a page yet.
+    are now per patch. Not matched on a page yet. Dropped Continuations
+    fire since 2026-10-16 (the next GCD clears them; the check only looked
+    at expiries), awaiting a page.
   - [drg.md](xiva-audit/drg.md): Dragoon, 3 covered.
   - [vpr.md](xiva-audit/vpr.md): Viper, 1 candidate (Vices, rare), 5
     covered (Serpent Offerings overcap and Reawaken left at a kill, Death

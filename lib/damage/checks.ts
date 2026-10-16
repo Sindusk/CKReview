@@ -988,7 +988,9 @@ export function checkProcs(ctx: PlayerCheckContext): DamageFinding[] {
         lostDamage: value, inference: true,
         basis: replacedName
           ? `${n} × (${k(ctx.values.perUse(consumerId))} average ${consumerName} − ${k(replaced)} average ${replacedName}, the GCD it takes the place of)`
-          : `${n} × ${k(ctx.values.perUse(consumerId))} average ${consumerName} (upper bound: the GCD used instead did some damage)`,
+          : ctx.game.procsClearedByGcd?.has(e.abilityId)
+            ? `${n} × ${k(ctx.values.perUse(consumerId))} average ${consumerName} (the next weaponskill clears it, so it's gone)`
+            : `${n} × ${k(ctx.values.perUse(consumerId))} average ${consumerName} (upper bound: the GCD used instead did some damage)`,
         detail: `${e.abilityName} ${how}${n > 1 ? ` with ${n} stacks` : ""}`,
       }));
     };
@@ -1012,9 +1014,12 @@ export function checkProcs(ctx: PlayerCheckContext): DamageFinding[] {
         c.timestamp > st.lastAt + PROC_CONSUME_MS && c.timestamp < e.timestamp - PROC_CONSUME_MS);
       const usedIt = pressedWhileHeld || near !== undefined && (near.abilityId === consumerId ||
         (consumedBy.get(e.abilityId)?.get(near.abilityId) ?? 0) >= (removals.get(e.abilityId) ?? 0) * PROC_CONSUMER_ALT_SHARE);
+      const consumerBeside = casts.some((c) => c.abilityId === consumerId && Math.abs(c.timestamp - e.timestamp) <= PROC_CONSUME_MS);
       if (st?.expiresAt !== undefined && !usedIt &&
           e.timestamp >= st.expiresAt - PROC_EXPIRY_EARLY_MS && e.timestamp <= st.expiresAt + PROC_EXPIRY_LATE_MS) {
         lose(e.timestamp, Math.max(1, st.stacks), "expired unused");
+      } else if (st && near && !consumerBeside && !pressedWhileHeld && ctx.game.procsClearedByGcd?.has(e.abilityId)) {
+        lose(e.timestamp, 1, `cleared by ${near.abilityName}`);
       }
       state.delete(e.abilityId);
     }

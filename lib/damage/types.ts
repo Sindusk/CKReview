@@ -96,6 +96,11 @@ export type DamageGame = {
   // show it: the generic check infers a consumer only from 60% of 3+
   // removals, so a player who drops most of a proc went unjudged.
   procConsumers?: Map<number, number>;
+  // Procs another weaponskill clears (Gunbreaker's Continuation: Ready to
+  // Rip ends at the next GCD). They never reach their expiry, so a removal
+  // at another cast with no consumer beside it is the loss. Each needs a
+  // procConsumers entry.
+  procsClearedByGcd?: Set<number>;
   // Channelled mitigation (Passage of Arms), by action id: from the cast
   // to the player's next action, at most maxMs, is forced (the raid plan,
   // not play).

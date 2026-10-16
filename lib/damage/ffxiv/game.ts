@@ -29,7 +29,7 @@ import { tincture, tinctureWindows } from "./jobs/tincture";
 import { JOB_GAUGES } from "./jobs/gauges";
 import { patchOf } from "./patches";
 import { MELEE_PROC_SKIP_IDS, vprDisengageAlternative } from "./jobs/melee";
-import { dncTechHoldValue, PROC_CONSUMERS, PROC_REPLACES } from "./jobs/ranged";
+import { dncTechHoldValue, PROC_CONSUMERS, PROC_REPLACES, PROCS_CLEARED_BY_GCD } from "./jobs/ranged";
 import { FFXIV_ACTION_INDEX } from "../../mitigation/ffxiv-catalog";
 import type { DamageGame, GameAction, PartyBuff, TrackedCooldown } from "../types";
 
@@ -247,6 +247,7 @@ export const FFXIV_DAMAGE: DamageGame = {
   jobProcStatusIds: MELEE_PROC_SKIP_IDS,
   procReplaces: PROC_REPLACES,
   procConsumers: PROC_CONSUMERS,
+  procsClearedByGcd: PROCS_CLEARED_BY_GCD,
   mitigationChannels: MITIGATION_CHANNELS,
   // Army's Muse speeds the Bard's GCDs for 10s by a fixed amount per window
   // (from the Repertoire held when Army's Paeon ended): measured from the

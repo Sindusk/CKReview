@@ -50,7 +50,11 @@
 //   tolerance) is under the phase's 0.5s floor. Its "Lightning Shots 9"
 //   are the app's 9 disengages (6 unforced, 3 in the end-of-P3 hold).
 //   The 8:09 window's two Fated Circles hit both P3 bosses (right).
-// - Continuations 100%: none lost, so nothing to value.
+// - Continuations 100%: none lost, so nothing to value. Dropped ones
+//   (2026-10-16) are checkProcs' (DamageGame.procsClearedByGcd): the next
+//   weaponskill clears Ready to Rip and the rest, so they never reach the
+//   expiry the generic check looked for. Seen on Mg4p7XG9dtrLVwBf (14,
+//   mostly Ready to Raze cleared by Demon Slice) and ~40 pulls on disk.
 // Fated Circle on one target (xivanalysis AoE.ts, 2026-10-15), against
 // Burst Strike (aoeCombo). Seen firing, not matched against xivanalysis:
 // L9BzKkD2nxcVgHTC Necron pulls 7-21, a Gunbreaker spending the opener's

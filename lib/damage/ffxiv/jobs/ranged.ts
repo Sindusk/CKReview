@@ -377,7 +377,18 @@ export const PROC_CONSUMERS = new Map(([
   // Refulgent Arrow can't be pressed without Hawk's Eye (checks.ts reads a
   // press while held as using it when the log missed the removal).
   ["HAWKS_EYE", "REFULGENT_ARROW"],
+  // Gunbreaker's Continuation (xivanalysis gnb/Continuation.tsx); the next
+  // weaponskill clears each (PROCS_CLEARED_BY_GCD).
+  ["READY_TO_RIP", "JUGULAR_RIP"], ["READY_TO_TEAR", "ABDOMEN_TEAR"], ["READY_TO_GOUGE", "EYE_GOUGE"],
+  ["READY_TO_BLAST", "HYPERVELOCITY"], ["READY_TO_RAZE", "FATED_BRAND"],
 ] as const).filter(([s, a]) => S[s] && A[a]).map(([s, a]) => [S[s].id, A[a].id]));
+
+// DamageGame.procsClearedByGcd. Mg4p7XG9dtrLVwBf Red Hot and Deep Blue
+// (Momo First): Ready to Raze cleared by Demon Slice 9 times, Ready to Rip
+// by Fated Circle / Keen Edge / Reign of Beasts, Ready to Blast by Demon
+// Slice / Lightning Shot; none reached its expiry, so none was reported.
+export const PROCS_CLEARED_BY_GCD = new Set((["READY_TO_RIP", "READY_TO_TEAR", "READY_TO_GOUGE", "READY_TO_BLAST", "READY_TO_RAZE"] as const)
+  .filter((s) => S[s]).map((s) => S[s].id));
 
 // ── Bard, Machinist (unverified) ───────────────────────────────────────
 
