@@ -27,12 +27,12 @@
 | id | status | app check | fires-on | notes |
 |---|---|---|---|---|
 | mch/Wildfire/gcds | verified | `wildfire` | under 6 weaponskills in Wildfire | Minor 1, Medium 2, Major 3. Rebuilt 2026-10-15: the old check counted casts and valued a missing one at 0 (bonus 0). It now counts weaponskill hits on the Wildfire's target between its status landing (~0.6s after the cast) and the detonation; a missing one is her detonation damage per counted weaponskill (~23k). The usual miss is the last Blazing Shot cast just before the detonation, landing after it (Brk8fQGnhJaxFKvb 4:18.68 against 4:18.19), or a hit between the cast and the status (6:09.32). Matched xivanalysis: Brk8fQGnhJaxFKvb fight 12 3 of 3 (4:08, 6:09, 8:11; the detonations 116k, 106k, 121k against 150k at 2:07), jN3XDrf2z8PmLgRJ fight 21 1 (2:10), L9BzKkD2nxcVgHTC fight 20 none. 72 counted across the samples, 5 on the top parse YPhxRTb9Ld7BJaXp. |
-| mch/Wildfire/fizzle | candidate | — | Wildfire dealing 0 | Medium 1, Major 2. Usually the target leaving; premise check. |
+| mch/Wildfire/fizzle | superseded | `wildfire` | Wildfire dealing 0 | Medium 1, Major 2. The rebuilt `wildfire` (2026-10-15) values every weaponskill a Wildfire didn't get, a fizzle included ("it never detonated"); a window cut by forced time (the target leaving) or the kill is shown, not counted. |
 | mch/Hypercharge/gcd-count | covered | `hypercharge` | under 5 Blazing Shots / Heat Blasts in Overheated | Display only in xivanalysis; the app values each missing one. |
 | mch/GeneralCDDowntime/uses | covered | `checkCooldownDrift` | Wildfire, Barrel Stabilizer, Reassemble, Air Anchor, Drill / Bioblaster or Chain Saw held | Checklist 95%. Same groups and offsets. |
 | mch/Drift/gcd-drift | superseded | `checkCooldownDrift` | Air Anchor / Drill / Chain Saw drifting | A table only. |
-| mch/OGCDCharges/double-check-overcap | candidate | — | Double Check at 3 charges | Minor 2, Medium 3, Major 4. Left out of the drift check because Heat Blast / Blazing Shot refund 15s; needs a charge simulation with refunds. xivanalysis's own count is unreliable (bug). |
-| mch/OGCDCharges/checkmate-overcap | candidate | — | Checkmate at 3 charges | Same. |
+| mch/OGCDCharges/double-check-overcap | covered | `mchCharges` (cooldown-drift; also timeline lanes) | Double Check at 3 charges | Built 2026-10-15 as a charge simulation from casts: 3 charges, 30s each, Blazing Shot / Heat Blast refund 15s to both. Time at 3 and refunds landing there are recharge lost, each 30s her average Double Check; forced time, the pre-pull and an opening stretch under 15s aren't counted. 102 stretches across the samples, mostly 1-15k (the top parse YPhxRTb9Ld7BJaXp: Checkmate 8:17-8:21, 15k). Not comparable with xivanalysis: it refunds only on Heat Blast, which level 100 replaces with Blazing Shot, so its counts run high. |
+| mch/OGCDCharges/checkmate-overcap | covered | `mchCharges` | Checkmate at 3 charges | Same simulation. |
 | mch/Gauge/heat-overcap | verified | `mchGauges` (gauge-overcap; also a timeline lane) | Heat over 100 | Built 2026-10-15 as Gauge.tsx's simulation from casts (Slug / Clean Shot only when the combo landed; Hypercharge free under Hypercharged). 50 Heat lost is 5 Blazing Shots over 3 combo GCDs. Fires on L9BzKkD2nxcVgHTC Necron pull 20 (Sonder Dreams, 130 Heat: one Hypercharge, the free one, between 2:43 and 6:12; 4k per 5). Matched xivanalysis's 130 there; none on the other two pages. |
 | mch/Gauge/battery-overcap | verified | `mchGauges` (gauge-overcap; also a timeline lane) | Battery over 100 | Built 2026-10-15. Lost Battery is worth her Queen damage per Battery spent (pet hits ÷ the Battery her Queens took). 10-20 at a time on 6 pulls: jN3XDrf2z8PmLgRJ Vamp Fatale pulls 9, 11, 12 (Mika Katsune, a Chain Saw at 100 at 2:05 and 4:05 each time; 28-60k), Brk8fQGnhJaxFKvb 6:03, RaM97t3whCZrJBPm 6:26, L9BzKkD2nxcVgHTC Necron pulls 18, 20. Matched xivanalysis: L9BzKkD2nxcVgHTC fight 20 50, jN3XDrf2z8PmLgRJ fight 21 30, Brk8fQGnhJaxFKvb fight 12 10. |
 | mch/Reassemble/bad-gcd | verified | `reassemble` (burst-window) | Reassemble on a weak GCD | Built 2026-10-15: (her best of Chain Saw / Excavator / Air Anchor / Drill − that GCD's average) × what a sure crit and direct hit add over her average roll. 449 of 464 Reassembles on disk went on the four; 12 didn't (17-57k), e.g. Brk8fQGnhJaxFKvb 5:27.2 Heated Slug Shot, bWDLM6zVXkqFAfjT 8:37.8 Heated Clean Shot, L9BzKkD2nxcVgHTC Necron pull 18 0:07.5 Blazing Shot. Matched xivanalysis: L9BzKkD2nxcVgHTC fight 20 2, Brk8fQGnhJaxFKvb fight 12 1, jN3XDrf2z8PmLgRJ fight 21 none. |
@@ -68,7 +68,7 @@
 
 ## Open
 
-1. **Double Check / Checkmate** charges (needs a charge simulation with
-   Heat Blast / Blazing Shot refunds), **Wildfire fizzle**.
+1. **mch/OGCDCharges/*** (covered): no xivanalysis count to match (its
+   refund bug); a hand check of one stretch against the log would do.
 2. **mch/MultiHitSkills/auto-crossbow** (covered). Not seen firing: two
    targets aren't a loss.

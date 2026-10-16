@@ -151,7 +151,7 @@
 
 import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import type { PlayerEvent, PlayerInfo } from "@/types/PlayerInfo";
-import type { DamageFinding, JobCheck } from "../../types";
+import type { DamageFinding, GaugeTrack, JobCheck } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";
 import { aoeComboOnOneTarget, baseValue, burstWindowFindings, clock, critMultOf, dotFindings, gaugeFindings, k, rollGainOf, s, statusWindows, type ExpectedAction, type GaugeEvent, type GaugeSpec } from "./shared";
 import { comboLanded } from "./gnb";
@@ -770,6 +770,92 @@ export function mchGaugeSpecs(ctx: PlayerCheckContext): GaugeSpec[] {
 }
 const mchGauges: JobCheck = (ctx) => mchGaugeSpecs(ctx).flatMap((spec) => (spec.unitValue > 0 ? gaugeFindings(ctx, spec) : []));
 
+// Double Check / Checkmate charges (xivanalysis oGCDCharges.tsx), simulated
+// from casts: 3 charges, one per 30s, and each Blazing Shot / Heat Blast
+// takes 15s off both recharges. At 3 the recharge stops, so the time spent
+// there and any refund landing there are recharge lost; every 30s of it a
+// charge. xivanalysis refunds only on Heat Blast, which level 100 replaces
+// with Blazing Shot, so its counts aren't comparable. Time before her
+// first action (the pre-pull) and forced time (downtime, death) aren't
+// counted. Also the Machinist's timeline lanes (gauges.ts).
+const CHARGE_MS = 30_000, CHARGE_REFUND_MS = 15_000, CHARGES_MAX = 3, OPENER_GRACE_MS = 15_000;
+export type ChargeTrack = { name: string; spenderId: number; steps: GaugeTrack["steps"]; capped: { startMs: number; endMs: number; refunds: number[] }[] };
+export function mchChargeTracks(ctx: PlayerCheckContext): ChargeTrack[] {
+  const casts = ctx.player.casts.filter((c) => c.timestamp < ctx.endMs).sort((a, b) => a.timestamp - b.timestamp);
+  const refundIds = new Set(ids("BLAZING_SHOT", "HEAT_BLAST"));
+  const firstAct = casts[0]?.timestamp ?? 0;
+  const run = (name: string, spend: Set<number>, spenderId: number): ChargeTrack => {
+    let charges = CHARGES_MAX, progress = 0, at = firstAct;
+    const steps: GaugeTrack["steps"] = [{ t: 0, value: CHARGES_MAX }];
+    const capped: ChargeTrack["capped"] = [];
+    let cap: ChargeTrack["capped"][number] | undefined = { startMs: firstAct, endMs: firstAct, refunds: [] };
+    const set = (t: number) => {
+      const last = steps[steps.length - 1];
+      if (last.value === charges) return;
+      if (last.t === t) last.value = charges; else steps.push({ t, value: charges });
+    };
+    // Recharge up to t (no refunds in between).
+    const advance = (t: number) => {
+      if (charges >= CHARGES_MAX) { at = t; return; }
+      progress += t - at;
+      while (progress >= CHARGE_MS && charges < CHARGES_MAX) {
+        progress -= CHARGE_MS;
+        charges++;
+        const filled = t - progress;
+        set(filled);
+        if (charges === CHARGES_MAX) { cap = { startMs: filled, endMs: filled, refunds: [] }; progress = 0; }
+      }
+      at = t;
+    };
+    for (const c of casts) {
+      advance(c.timestamp);
+      if (spend.has(c.abilityId)) {
+        if (cap) { cap.endMs = c.timestamp; capped.push(cap); cap = undefined; }
+        charges = Math.max(0, charges - 1);
+        set(c.timestamp);
+      } else if (refundIds.has(c.abilityId)) {
+        if (cap) cap.refunds.push(c.timestamp);
+        else {
+          progress += CHARGE_REFUND_MS;
+          advance(c.timestamp);
+        }
+      }
+    }
+    advance(ctx.endMs);
+    if (cap) { cap.endMs = ctx.endMs; capped.push(cap); }
+    // The opener spends the pre-pull charges within a few GCDs: that first
+    // stretch at 3 isn't a loss unless it runs on.
+    return { name, spenderId, steps, capped: capped.filter((w) => (w.endMs > w.startMs || w.refunds.length) &&
+      !(w.startMs === firstAct && w.endMs - firstAct <= OPENER_GRACE_MS)) };
+  };
+  return [
+    run("Double Check", new Set(ids("DOUBLE_CHECK", "GAUSS_ROUND")), A.DOUBLE_CHECK.id),
+    run("Checkmate", new Set(ids("CHECKMATE", "RICOCHET")), A.CHECKMATE.id),
+  ];
+}
+const mchCharges: JobCheck = (ctx) => {
+  const out: DamageFinding[] = [];
+  for (const track of mchChargeTracks(ctx)) {
+    const value = ctx.values.perUse(track.spenderId);
+    if (value <= 0) continue;
+    for (const w of track.capped) {
+      const forcedMs = forcedPart(w.startMs, w.endMs, ctx.forced).ms;
+      const refunds = w.refunds.filter((t) => !inWindows(t, ctx.forced)).length;
+      const lostMs = Math.max(0, w.endMs - w.startMs - forcedMs) + refunds * CHARGE_REFUND_MS;
+      const lost = (lostMs / CHARGE_MS) * value;
+      if (lostMs < 1_000 || lost < 1) continue;
+      out.push(finding(ctx, {
+        kind: "cooldown-drift", startMs: w.startMs, endMs: w.endMs, forced: false, inference: true,
+        label: `${track.name} at 3 charges`, lostDamage: lost,
+        basis: `${s(lostMs)} of recharge lost (${s(Math.max(0, w.endMs - w.startMs - forcedMs))} at 3 charges` +
+          `${refunds ? `, ${refunds} Blazing Shot refund${refunds === 1 ? "" : "s"} of 15s` : ""}) ÷ 30s × ${k(value)} average ${track.name}`,
+        detail: `${track.name} sat at 3 charges ${clock(w.startMs)}-${clock(w.endMs)}` + (forcedMs > 0 ? ` (${s(forcedMs)} of it forced, not counted)` : ""),
+      }));
+    }
+  }
+  return out;
+};
+
 // Reassemble (xivanalysis Reassemble.tsx): its sure crit and direct hit
 // belong on Chain Saw, Excavator, Air Anchor or Drill (Scattergun on
 // several targets). The GCD at the status's removal consumed it. On
@@ -806,4 +892,4 @@ const reassemble: JobCheck = (ctx) => {
   return out;
 };
 
-export const MCH_CHECKS: JobCheck[] = [wildfire, hypercharge, mchAoe, mchGauges, reassemble];
+export const MCH_CHECKS: JobCheck[] = [wildfire, hypercharge, mchAoe, mchGauges, reassemble, mchCharges];

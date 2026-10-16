@@ -27,7 +27,7 @@ import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import { beastGaugeSpec } from "./pld-war";
 import { blmGaugeTracks, paletteSpec } from "./caster";
 import { firstmindsFocusSpec, mnkFurySpecs, rattlingCoilSpec } from "./melee";
-import { mchGaugeSpecs } from "./ranged";
+import { mchChargeTracks, mchGaugeSpecs } from "./ranged";
 import { gaugeCastTimes, gaugeTrack, statusWindows } from "./shared";
 
 const ADDERSGALL_MAX = 3;
@@ -553,7 +553,15 @@ export const JOB_GAUGES: Record<string, ((ctx: PlayerCheckContext) => GaugeTrack
   "Black Mage": [blmGaugeTracks],
   // Opo-opo, Raptor and Coeurl Fury: the overcap check's simulation (melee.ts mnkFurySpecs).
   // Heat and Battery: the overcap check's simulation (ranged.ts mchGaugeSpecs).
-  "Machinist": [(ctx) => mchGaugeSpecs(ctx).map((spec) => gaugeTrack(ctx, spec))],
+  "Machinist": [(ctx) => [
+    ...mchGaugeSpecs(ctx).map((spec) => gaugeTrack(ctx, spec)),
+    // Double Check / Checkmate charges (ranged.ts mchChargeTracks): amber where recharge is lost at 3.
+    ...mchChargeTracks(ctx).map((tr) => ({
+      name: tr.name, max: 3, steps: tr.steps, capped: tr.capped.map((w) => ({ startMs: w.startMs, endMs: w.endMs })),
+      note: "charges, simulated from casts (Blazing Shot refunds 15s); amber: at 3, recharge lost",
+      marks: tr.capped.flatMap((w) => w.refunds.map((t) => ({ t, label: "Blazing Shot refund lost at 3 charges", tone: "lost" as const }))),
+    })),
+  ]],
   "Monk": [(ctx) => mnkFurySpecs(ctx).map((spec) => gaugeTrack(ctx, spec))],
   // Beast Gauge: the overcap check's own simulation (pld-war.ts beastGaugeSpec).
   "Warrior": [(ctx) => [gaugeTrack(ctx, beastGaugeSpec(ctx), "Beast")]],
