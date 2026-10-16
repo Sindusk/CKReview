@@ -299,9 +299,8 @@ const searingLight: JobCheck = (ctx) => burstWindowFindings(ctx, {
 //   Matches xivanalysis's 4 + 5; the opener's two (Verthunder III under
 //   Swiftcast and Acceleration) and finisher refreshes count too.
 // - White / Black Mana overcap and imbalance (2026-10-15): `rdmManaCheck`
-//   below. On that pull it finds none against xivanalysis's 3 White: it
-//   adds mana per damage event, so AoE finishers on two targets count
-//   twice there.
+//   below. Since mana counts per cast, hit or not (2026-10-16), it finds
+//   xivanalysis's 3 White on that pull (2:18.3, Resolution at 100).
 // - The wrong finisher (MeleeCombos.tsx, 2026-10-16): `rdmWrongFinisher`
 //   below, on the simulated mana. Not matched against a page yet. Not
 //   adopted: the 7.0-7.3 Manafication window rules (6 GCDs; allowed
@@ -1129,14 +1128,20 @@ export function smnGaugeTracks(ctx: PlayerCheckContext): GaugeTrack[] {
 
 export const SMN_CHECKS: JobCheck[] = [searingLight, smnAoe, smnDemis, smnRuin4InDemi, smnAetherflow, smnMountainBuster, smnPhysick];
 // White / Black Mana (xivanalysis ManaGauge.tsx), simulated from casts:
-// a spell gives its mana when it lands (a cast with no hit gives none),
-// halved (rounded down) for the lower colour while the other leads it by
+// a spell gives its mana once per completed cast, whether or not it hits
+// (xivanalysis adds it per damage event and drops it on a hit that does
+// nothing; dropping a cast with no hit left 24 of 262 lanes with a spend
+// the simulation had no mana for, e.g. jN3XDrf2z8PmLgRJ Vamp pull 8 6:50.0,
+// 5 White short after the 1:08.4 Verstone on an untargetable Vamp Fatale
+// and the 2:05.0 Veraero III on a dead Coffinmaker; per cast, none are
+// short, and the cap losses match xivanalysis's pages: Vamp pull 8 3
+// White, Red Hot and Deep Blue pull 44 5 White / 15 Black), halved (rounded down) for the lower colour while the other leads it by
 // more than 30; the enchanted melee steps spend theirs, nothing under
 // Magicked Swordplay; cap 100 each; a death empties both. Dawntrail's
 // Manafication grants no mana. Mana lost at the cap or to the imbalance
 // is worth an enchanted combo's chain over the spells its time would hold,
 // per 50 mana. Also the Red Mage's timeline lanes (gauges.ts).
-const MANA_CAP = 100, MANA_IMBALANCE = 30, MANA_PER_COMBO = 50, RDM_HIT_MS = 3_000;
+const MANA_CAP = 100, MANA_IMBALANCE = 30, MANA_PER_COMBO = 50;
 const MANA_GAIN: [string, number, number][] = [
   ["VERAERO", 6, 0], ["VERAERO_II", 7, 0], ["VERAERO_III", 6, 0], ["VERSTONE", 5, 0], ["VERHOLY", 11, 0],
   ["VERTHUNDER", 0, 6], ["VERTHUNDER_II", 0, 7], ["VERTHUNDER_III", 0, 6], ["VERFIRE", 0, 5], ["VERFLARE", 0, 11],
@@ -1172,9 +1177,6 @@ export function rdmMana(ctx: PlayerCheckContext): RdmMana {
     }
     const gain = gains.get(c.abilityId);
     if (gain) {
-      const landed = ctx.player.damageDone.some((e) => e.abilityId === c.abilityId && (e.amount ?? 0) > 0 &&
-        e.timestamp >= c.timestamp && e.timestamp < c.timestamp + RDM_HIT_MS);
-      if (!landed) continue;
       if (FINISHERS.includes(c.abilityId)) finishers.push({ t: c.timestamp, id: c.abilityId, white: w, black: b });
       const gw = w > 0 && b - w > MANA_IMBALANCE ? Math.floor(gain.w / 2) : gain.w;
       const gb = b > 0 && w - b > MANA_IMBALANCE ? Math.floor(gain.b / 2) : gain.b;
@@ -1223,11 +1225,14 @@ export function rdmMana(ctx: PlayerCheckContext): RdmMana {
 // the lower colour's proc not held and the two not about to run 30 apart
 // (the finisher's 11 would put them there: xivanalysis then allows it),
 // gave up a sure proc for a 20% one: 80% of a proc spell over the Jolt III
-// it replaces. Mana is the simulation's (rdmMana), so inference, and it
-// runs ~5 short on some lanes: colours under RDM_FINISHER_MARGIN apart
-// aren't judged (at 0-2 apart the first version called 25 of 36 on disk).
+// it replaces. Mana is the simulation's (rdmMana), so inference. Any
+// difference counts, as in xivanalysis; equal colours make either right.
+// Until mana counted per cast (2026-10-16) the simulation ran ~5 short on
+// some lanes and colours under 6 apart weren't judged; replayed by hand
+// since, jN3XDrf2z8PmLgRJ Red Hot and Deep Blue pull 20 3:37.2 (Verflare
+// at 22 White / 24 Black, no Verstone Ready held) holds.
 // The opener's first 30s is forgiven, as in xivanalysis.
-const RDM_FINISHER_PROC_CHANCE = 0.2, RDM_OPENER_FORGIVE_MS = 30_000, RDM_FINISHER_MARGIN = 6;
+const RDM_FINISHER_PROC_CHANCE = 0.2, RDM_OPENER_FORGIVE_MS = 30_000;
 const rdmWrongFinisher: JobCheck = (ctx) => {
   const out: DamageFinding[] = [];
   const flare = A.VERFLARE?.id, holy = A.VERHOLY?.id;
@@ -1237,7 +1242,7 @@ const rdmWrongFinisher: JobCheck = (ctx) => {
   const jolt = ctx.values.perUse(A.JOLT_III?.id ?? -1);
   const forced = mergeWindows(ctx.forced);
   for (const f of rdmMana(ctx).finishers) {
-    if (f.t < RDM_OPENER_FORGIVE_MS || f.t >= ctx.endMs || Math.abs(f.white - f.black) < RDM_FINISHER_MARGIN) continue;
+    if (f.t < RDM_OPENER_FORGIVE_MS || f.t >= ctx.endMs || f.white === f.black) continue;
     const blackLower = f.black < f.white;
     const right = blackLower ? flare : holy;
     if (f.id === right) continue;
