@@ -89,6 +89,12 @@
 //   (2026-10-15). It counts a wrong step only past the dance's full step
 //   count; the app counts any press the finish didn't use
 //   (9zQqtBRL41XhADxG 9:06: 4 presses for a 3-step finish).
+//   Devilment outside Technical Finish (Technicalities.tsx "bad
+//   Devilments", 2026-10-16): `devilmentMisaligned` below. Not matched
+//   against a page yet. Not adopted: Flourishing Starfall / Finish
+//   overwrites (both last under their 120s source's cooldown: never
+//   refreshed on 442 pulls), Closed Position uptime (never down past a
+//   2s partner swap).
 // Bard: Caustic Bite / Stormbite (below), Hawk's Eye overwrites, AoE on
 //   one target, the burst window, cooldowns (OGCDDowntime.ts).
 //   Rechecked on dDar482XvFKBPJYh FRU kill (7.1, 2026-10-12): its 17
@@ -157,6 +163,7 @@ import { aoeComboOnOneTarget, baseValue, burstWindowFindings, clock, critMultOf,
 import { comboLanded } from "./gnb";
 import { forcedPart, inWindows, mergeWindows } from "../../timeline";
 import { espritGauge, featherGauge } from "./gauges";
+import { estimateHitRates } from "../../crit-rates";
 
 const ids = (...keys: string[]) => keys.filter((key) => A[key]).map((key) => A[key].id);
 const replacedGcd = (...keys: string[]) => (ctx: PlayerCheckContext) =>
@@ -651,7 +658,68 @@ const dancerDances: JobCheck = (ctx) => {
   return out;
 };
 
-export const DNC_CHECKS: JobCheck[] = [technical, technicalFillers, dancerOverwrites, dancerGaugeEstimates, dancerAoe, dancerDances];
+// Devilment pressed so far from Technical Finish that its 20s covered none
+// of the window (xivanalysis Technicalities "bad Devilments"). Its +20%
+// crit and direct-hit rate went on the Dancer's and their partner's hits
+// in those 20s instead of the window's: the loss is the gain on the
+// difference, each hit taken without its crit / direct hit (it keeps
+// its damage multipliers, which are what the window is for) and priced
+// at each player's own rates. Starfall Dance always crits and direct-hits:
+// left out. Only a Technical Finish within DEVILMENT_REACH_MS counts as the
+// one it was meant for; with none (a dropped Technical Step) there was
+// nothing to hold it for. 1178 Devilments on the 442 Dancer pulls on disk:
+// one fits, zPJaZNfkFAKhY42t Red Hot and Deep Blue 6:22 (21s before the
+// 6:43 Technical Finish).
+const DEVILMENT_REACH_MS = 60_000;
+const DEVILMENT_LEAD_MS = 2_500;
+const devilmentMisaligned: JobCheck = (ctx): DamageFinding[] => {
+  const out: DamageFinding[] = [];
+  const buff = ctx.game.partyBuff(S.DEVILMENT.id);
+  const spanMs = S.DEVILMENT.duration ?? 20_000;
+  const techs = statusWindows(ctx, S.TECHNICAL_FINISH.id);
+  const starfall = A.STARFALL_DANCE?.id;
+  for (const c of ctx.player.casts.filter((x) => x.abilityId === A.DEVILMENT.id && x.timestamp < ctx.endMs)) {
+    const t = c.timestamp;
+    if (techs.some((w) => t >= w.startMs - DEVILMENT_LEAD_MS && t <= w.endMs)) continue;
+    const near = techs.filter((w) => Math.abs(w.startMs - t) <= DEVILMENT_REACH_MS && w.startMs < ctx.endMs)
+      .sort((a, b) => Math.abs(a.startMs - t) - Math.abs(b.startMs - t))[0];
+    if (!near) continue;
+    const len = Math.min(spanMs, ctx.endMs - t, ctx.endMs - near.startMs);
+    if (len <= 0) continue;
+    const partner = ctx.pull.players
+      .filter((p) => p !== ctx.player)
+      .map((p) => ({ p, n: p.damageDone.filter((e) => e.timestamp >= t && e.timestamp <= t + len && e.statusIds?.includes(S.DEVILMENT.id)).length }))
+      .sort((a, b) => b.n - a.n)[0];
+    const players = [ctx.player, ...(partner && partner.n > 0 ? [partner.p] : [])];
+    let lost = 0;
+    for (const p of players) {
+      const rates = estimateHitRates([p], ctx.game, new Set());
+      const c0 = rates?.crit ?? 0.25, d0 = rates?.directHit ?? 0.3, m = rates?.critMult ?? 1.55;
+      const expect = (cr: number, dh: number) => (1 + Math.min(1, cr) * (m - 1)) * (1 + Math.min(1, dh) * 0.25);
+      const gain = expect(c0 + (buff?.crit ?? 0.2), d0 + (buff?.directHit ?? 0.2)) - expect(c0, d0);
+      const sum = (from: number) => p.damageDone
+        .filter((e) => e.timestamp >= from && e.timestamp < from + len && !e.isDoT && e.abilityId !== starfall && (e.amount ?? 0) > 0)
+        .reduce((a, e) => a + baseValue(e, m) * (e.multiplier && e.multiplier > 0 ? e.multiplier : 1), 0);
+      lost += gain * (sum(near.startMs) - sum(t));
+    }
+    if (lost <= 0) continue;
+    // Nothing forces Devilment early; a window that was itself forced
+    // (held past a phase's check) is.
+    const during = forcedPart(near.startMs, near.startMs + len, ctx.forced);
+    const forced = during.ms >= 1_500;
+    out.push(finding(ctx, {
+      kind: "burst-window", startMs: t, endMs: t, forced, cause: forced ? during.cause : undefined, inference: true,
+      label: "Devilment outside Technical Finish",
+      lostDamage: lost,
+      basis: `Devilment's +20% crit and direct-hit rate on what the Dancer${partner?.n ? " and their partner" : ""} dealt in the ` +
+        `Technical Finish window minus in the ${s(len)} it covered (crit and direct hit taken out, damage buffs kept), at their own rates`,
+      detail: `Devilment at ${clock(t)}, Technical Finish at ${clock(near.startMs)}`,
+    }));
+  }
+  return out;
+};
+
+export const DNC_CHECKS: JobCheck[] = [technical, technicalFillers, dancerOverwrites, dancerGaugeEstimates, dancerAoe, dancerDances, devilmentMisaligned];
 // The burst window (xivanalysis BuffWindows/BurstWindow.tsx): where
 // Raging Strikes, Battle Voice and Radiant Finale are all up. 7 GCDs, 8
 // when Army's Muse covers 2+ of them; Barrage consumed in it (a Refulgent

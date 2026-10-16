@@ -23,7 +23,7 @@
 | dnc/Technicalities/bad-gcds | verified | `technicalFillers` | Cascade, Fountain, Reverse Cascade, Windmill, Rising Windmill or Bladeshower in the window | Same list (Fountainfall and Bloodshower allowed). A filler in a missing Saber's slot is charged once. |
 | dnc/Technicalities/pooled-feathers | verified | `unpooledFeathers` (named, not valued) | under 3 Fan Dances in a window after feathers were spent between windows | K6qfMamL7rN8yz2Q Vamp 6:09 matched. Rests on the estimated feather gauge. |
 | dnc/Technicalities/timely-devilment | wrong | — | Devilment not the first action in the window | The advice holds: Technical Finish leaves one weave slot, and Devilment belongs in it. The check is wrong as a damage charge: it fires without asking whether any GCD missed Devilment. A Devilment 0.67s late still covered every GCD (dps-analysis.md): jN3XDrf2z8PmLgRJ Vamp pull 8 (fight 8) 8:21, Shield Samba woven first, Devilment second, Starfall Dance 2.0s after the finish (a ~0.5s clip, which is the real cost). The late Devilment at qjCMx4bRfgNKwX9T fight 1 (the first of its two kills; Dancer actor 17) 14:07 was in forced time: Tillana went first, and the P4 window ends at 14:18.9 with nothing cast until 14:43. |
-| dnc/Technicalities/bad-devilments | candidate | — | Devilment pressed with no Technical Finish up | Devilment's own drift is covered (tracked cooldown); its misalignment isn't. No opener excuse in the code despite the text. Premise check: usually the opener or a phase hold. Low cost. |
+| dnc/Technicalities/bad-devilments | covered | `devilmentMisaligned` | Devilment pressed with no Technical Finish up | Built 2026-10-16. Premise check on all 442 Dancer pulls on disk (1178 Devilments): 12 were pressed under 2.5s before the Technical Finish status landed (xivanalysis counts those; the app allows them). Two had no Technical Finish to go with: CABrk9zXLfJG8h6R Lindwurm II pull 1 (a 20s wipe) and cZ42C1y3JRNGXWLH 8:58 (the 8:34 Technical Step was never finished). One is real: zPJaZNfkFAKhY42t 6:23, 21s before the 6:43 Technical Finish, 185k: Devilment's crit and direct-hit gain on the Dancer's and partner's damage in the window minus in the 20s it covered (crit and DH taken out, damage buffs kept). Not matched on a page yet. |
 | dnc/Technicalities/late-standard | superseded | `technical` | Standard Step as the last action of a window | Only Standard Step, the dance's start, so the finish may land after the buff. Finishing Move as the last GCD isn't checked, nor the Last Dance it then pushes out of the window: the real cost of a late Standard, raised by a Dancer (2026-10-15). The window's GCD and Last/Saber counts carry both. The window ignores autos, the four steps and Technical Finishes (Technicalities.tsx `ignoreActions`; CommonData.tsx `DANCE_MOVES`), but not the Standard Finishes. So a finish inside the buff becomes the last action and passes: it fails only when the Step was pressed in the buff and the finish landed after it. Never fired on qjCMx4bRfgNKwX9T fight 1: no window ends on Standard Step. Three end on Finishing Move (0:21, 2:21, 14:18). At 14:18 the P4 window is 6 of 8 GCDs (xivanalysis's gcd-count) and its Last Dance waits until 14:49, in forced time. |
 | dnc/Technicalities/players-buffed | covered | buffs.ts coverage | a Technical Finish that missed a player | Display only in xivanalysis. |
 | dnc/Technicalities/raid-buff-overwrite | no-damage | — | two Dancers' Technical Finishes overlapping | A note column; no single-Dancer static hits it. |
@@ -33,9 +33,9 @@
 | dnc/DirtyDancing/no-extra-moves | verified | `dancerDances` | a wrong step pressed in a dance | Presses beyond the finisher's step count, each a 1s step GCD at her average GCD (11-32k). Fires on zPJaZNfkFAKhY42t 2:07, 6:35, 8:00, at2GMBcywChApnfY 5:15, Jv7XZL2zwYgyhdFj 7:14, 8:16, 9zQqtBRL41XhADxG 9:06 (4 presses, one wrong, so the press count alone hides it), and Chauzey Solstice on several statics' pulls. Matched xivanalysis on at2GMBcywChApnfY (1), Jv7XZL2zwYgyhdFj (2), zPJaZNfkFAKhY42t (3). Not matched by design: 9zQqtBRL41XhADxG 9:06, where xivanalysis counts a wrong step only when presses exceed the dance's full step count (4 presses for a Technical isn't over 4); one of the 4 didn't count toward the 3-step finish, so it was still a wasted 1s step GCD. |
 | dnc/DirtyDancing/hit-target | covered | `noDamageCasts` | a finish that hit nothing | The app values the finish's own damage, not the buff that wasn't given. Not seen firing. |
 | dnc/DirtyDancing/standard-finish-uptime | superseded | `checkCooldownDrift` (Standard Step) | Standard Finish lapsing | Re-dancing on time is the Standard Step drift. Sums over every friend and subtracts downtime from both sides. |
-| dnc/DirtyDancing/closed-position-uptime | candidate | — | no dance partner, or Closed Position dropped | Losing a partner costs their Standard Finish and Devilment. Rare in a static. Premise check: a partner's death shouldn't count. |
+| dnc/DirtyDancing/closed-position-uptime | candidate | — | no dance partner, or Closed Position dropped | Losing a partner costs their Standard Finish and Devilment. Not built (2026-10-16): on 442 Dancer pulls every Dancer had a partner from the pull, and each of the 26 drops was re-applied within 2s (a partner swap). Build it when a pull shows a real gap. |
 | dnc/Procs/dropped | verified | `checkProcs` | a proc left to expire | K6qfMamL7rN8yz2Q matched: Silken Flow 4:29 and 8:30.8, Silken Symmetry 8:30. jN3XDrf2z8PmLgRJ pull 8 Symmetry matched. |
-| dnc/Procs/overwritten | verified | `dancerOverwrites` | a proc granted while held | Matched on jN3XDrf2z8PmLgRJ pull 8, qjCMx4bRfgNKwX9T 15:59, K6qfMamL7rN8yz2Q 8:49. The app tracks 6 of xivanalysis's 8: Flourishing Starfall and Flourishing Finish are not in `DNC_PROCS` (a Flourish or Technical Step with Starfall / Tillana still held). |
+| dnc/Procs/overwritten | verified | `dancerOverwrites` | a proc granted while held | Matched on jN3XDrf2z8PmLgRJ pull 8, qjCMx4bRfgNKwX9T 15:59, K6qfMamL7rN8yz2Q 8:49. The app tracks 6 of xivanalysis's 8. Flourishing Starfall and Flourishing Finish can't be overwritten: they come from Devilment and Technical Finish (120s cooldowns) and last 20s / 30s. 0 "refreshed" in 442 Dancer pulls (2026-10-16), so they stay out. |
 | dnc/Gauge/esprit-overcap | verified | `dancerGaugeEstimates` (named, not valued) | Esprit at the cap while generating | User's choice (2026-10-14): an estimate, so never valued. Counts matched on K6qfMamL7rN8yz2Q. |
 | dnc/Gauge/feather-overcap | verified | `dancerGaugeEstimates` (named, not valued) | 4 feathers while pressing feather procs | Same. |
 | dnc/OGCDDowntime/technical-step | verified | `checkCooldownDrift` | Technical Step held | 100% matched on The Tyrant kill. Hold 250ms as in xivanalysis. |
@@ -89,12 +89,11 @@ feather and Esprit graphs, the proc issue table.
 
 In priority order (biggest damage cost first):
 
-1. **dnc/Procs/overwritten, Flourishing Starfall and Flourishing Finish.**
-   Add them to `DNC_PROCS` after checking that a Flourish / Technical
-   Step with one held logs a "refreshed".
-2. **dnc/Technicalities/bad-devilments** and
-   **dnc/DirtyDancing/closed-position-uptime** (candidates, rare).
-3. **dnc/DirtyDancing/zero-step-technical** (covered). Fires on
+1. **dnc/DirtyDancing/zero-step-technical** (covered). Fires on
    ZVCqpA8DPJgMK2Yr 6:47; no xivanalysis page for it yet.
-4. **dnc/DirtyDancing/hit-target** (covered). Not seen firing; the buff
+2. **dnc/Technicalities/bad-devilments** (covered 2026-10-16). Fires on
+   zPJaZNfkFAKhY42t 6:23; no xivanalysis page for it yet.
+3. **dnc/DirtyDancing/hit-target** (covered). Not seen firing; the buff
    it fails to give isn't valued.
+4. **dnc/DirtyDancing/closed-position-uptime** (candidate). Never seen
+   down past a 2s partner swap on 442 pulls.

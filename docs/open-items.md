@@ -197,8 +197,9 @@ and delete them from the header.
     BuffGroupWindow); procs on an invulnerable target are
     `noDamageCasts`'s (2026-10-16).
   - [brd.md](xiva-audit/brd.md): Bard, 1 candidate, 4 covered.
-  - [dnc.md](xiva-audit/dnc.md): Dancer, 2 candidates, 7 covered (dance
-    checks built, awaiting xivanalysis pages).
+  - [dnc.md](xiva-audit/dnc.md): Dancer, 1 candidate (Closed Position,
+    never seen), 8 covered (dance checks and Devilment outside Technical
+    Finish built, awaiting xivanalysis pages).
   - [pct.md](xiva-audit/pct.md): Pictomancer, 2 candidates, 5 covered.
   - [ast.md](xiva-audit/ast.md): Astrologian, 1 candidate, 3 covered.
   - [sge.md](xiva-audit/sge.md): Sage, 1 candidate.
