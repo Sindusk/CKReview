@@ -192,7 +192,10 @@ and delete them from the header.
   Still open: no finding when the single-target alternative was never
   pressed in the pull (Grim Swathe with no Blood Stalk; no potency table
   for most jobs to fall back on).
-  - [core.md](xiva-audit/core.md): core modules, 3 candidates.
+  - [core.md](xiva-audit/core.md): core modules, 2 candidates (raid
+    buffs of one job overlapping, rare in a fixed static; Bard's
+    BuffGroupWindow); procs on an invulnerable target are
+    `noDamageCasts`'s (2026-10-16).
   - [brd.md](xiva-audit/brd.md): Bard, 1 candidate, 4 covered.
   - [dnc.md](xiva-audit/dnc.md): Dancer, 2 candidates, 7 covered (dance
     checks built, awaiting xivanalysis pages).
