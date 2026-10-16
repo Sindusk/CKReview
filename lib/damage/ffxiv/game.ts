@@ -248,6 +248,7 @@ export const FFXIV_DAMAGE: DamageGame = {
   procReplaces: PROC_REPLACES,
   procConsumers: PROC_CONSUMERS,
   procsClearedByGcd: PROCS_CLEARED_BY_GCD,
+  procConsumerDots: new Set([XIVA_ACTIONS.SONIC_BREAK?.id].filter((id): id is number => id !== undefined)),
   mitigationChannels: MITIGATION_CHANNELS,
   // Army's Muse speeds the Bard's GCDs for 10s by a fixed amount per window
   // (from the Repertoire held when Army's Paeon ended): measured from the

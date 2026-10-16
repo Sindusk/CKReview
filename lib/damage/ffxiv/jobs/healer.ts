@@ -335,8 +335,15 @@ const healGcds: JobCheck = (ctx): DamageFinding[] => {
 const AOE_GCD_KEYS = ["GRAVITY", "GRAVITY_II", "HOLY", "HOLY_III"];
 const aoeOnOneTarget: JobCheck = (ctx) => {
   const fill = filler(ctx);
+  // Gravity II needs 3 targets before 7.2, 2 from 7.2 (xivanalysis
+  // AoEUsages): before 7.2 two targets are judged too, and the damage
+  // against the filler decides. From 7.2 two-target ones came out level
+  // with Fall Malefic on disk (0-1k either way), so they're left alone.
+  const gravity2 = A.GRAVITY_II?.id;
+  const pre72 = ctx.patch !== undefined && Number(ctx.patch) < 7.2;
   return aoeOnOneTargetFindings(ctx, AOE_GCD_KEYS.filter((key) => A[key]).map((key) => A[key].id),
-    () => ({ name: fill.name, ids: fill.id !== undefined ? [fill.id] : [] }));
+    () => ({ name: fill.name, ids: fill.id !== undefined ? [fill.id] : [] }),
+    (aoeId) => (aoeId === gravity2 && pre72 ? 3 : undefined));
 };
 
 // Eukrasian Dyskrasia ticking on one enemy (xivanalysis AoEUsages): its

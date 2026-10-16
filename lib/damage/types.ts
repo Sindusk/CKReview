@@ -101,6 +101,10 @@ export type DamageGame = {
   // at another cast with no consumer beside it is the loss. Each needs a
   // procConsumers entry.
   procsClearedByGcd?: Set<number>;
+  // Proc consumers whose own DoT counts in a lost proc's value (Sonic
+  // Break): their ticks log under the status's id. Not for a DoT that has
+  // its own uptime check.
+  procConsumerDots?: Set<number>;
   // Channelled mitigation (Passage of Arms), by action id: from the cast
   // to the player's next action, at most maxMs, is forced (the raid plan,
   // not play).

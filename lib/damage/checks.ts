@@ -987,7 +987,18 @@ export function checkProcs(ctx: PlayerCheckContext): DamageFinding[] {
       const replacesId = ctx.game.procReplaces?.get(consumerId);
       const replaced = replacesId !== undefined ? ctx.values.perUse(replacesId) : 0;
       const replacedName = replacesId !== undefined ? ctx.game.action(replacesId)?.name ?? "the GCD it replaces" : undefined;
-      const value = Math.max(0, ctx.values.perUse(consumerId) - replaced) * n;
+      // A consumer's own DoT ticks log under the status's id, not its own:
+      // Sonic Break's 5 ticks (~10k each) are most of it, its hit 27k
+      // (Mg4p7XG9dtrLVwBf), so they're added per cast. Declared consumers
+      // only (procConsumerDots): a DoT with its own uptime check (Thunder)
+      // would count twice.
+      const dotIds = new Set(ctx.game.procConsumerDots?.has(consumerId) ? ctx.game.action(consumerId)?.appliesStatusIds ?? [] : []);
+      const consumerCasts = casts.filter((c) => c.abilityId === consumerId && c.timestamp < ctx.endMs).length;
+      const ticksPerCast = dotIds.size === 0 || consumerCasts === 0 ? 0 : player.damageDone
+        .filter((x) => x.isDoT && dotIds.has(x.abilityId) && x.timestamp < ctx.endMs + 30_000)
+        .reduce((a, x) => a + (x.amount ?? 0), 0) / consumerCasts;
+      const consumerValue = ctx.values.perUse(consumerId) + ticksPerCast;
+      const value = Math.max(0, consumerValue - replaced) * n;
       // A consumer with no damage of its own (Horoscope detonates at
       // expiry by design) loses nothing.
       if (value <= 0) return;
@@ -997,13 +1008,14 @@ export function checkProcs(ctx: PlayerCheckContext): DamageFinding[] {
         label: `${e.abilityName} ${how}`,
         cause: forced ? forcedPart(t - 1, t + 1, ctx.forced).cause : undefined,
         lostDamage: value, inference: true,
-        basis: replacedName
-          ? `${n} × (${k(ctx.values.perUse(consumerId))} average ${consumerName} − ${k(replaced)} average ${replacedName}, the GCD it takes the place of)`
+        basis: (replacedName
+          ? `${n} × (${k(consumerValue)} average ${consumerName} − ${k(replaced)} average ${replacedName}, the GCD it takes the place of)`
           : ctx.game.procsClearedByGcd?.has(e.abilityId)
-            ? `${n} × ${k(ctx.values.perUse(consumerId))} average ${consumerName} (the next weaponskill clears it, so it's gone)`
+            ? `${n} × ${k(consumerValue)} average ${consumerName} (the next weaponskill clears it, so it's gone)`
             : ctx.game.action(consumerId)?.onGcd === false
-              ? `${n} × ${k(ctx.values.perUse(consumerId))} average ${consumerName} (off the GCD, so nothing took its place)`
-              : `${n} × ${k(ctx.values.perUse(consumerId))} average ${consumerName} (upper bound: the GCD used instead did some damage)`,
+              ? `${n} × ${k(consumerValue)} average ${consumerName} (off the GCD, so nothing took its place)`
+              : `${n} × ${k(consumerValue)} average ${consumerName} (upper bound: the GCD used instead did some damage)`) +
+          (ticksPerCast > 0 ? `; its average includes ${k(ticksPerCast)} of DoT ticks a cast` : ""),
         detail: `${e.abilityName} ${how}${n > 1 ? ` with ${n} stacks` : ""}`,
       }));
     };

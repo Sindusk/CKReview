@@ -196,6 +196,15 @@ and delete them from the header.
   its expiries show nothing (24C9awg1fKhFjBPt Warrior, 6 Wrathful;
   VhyrDATFKNGt8f6M Samurai, 4 Ogi Namikiri Ready; Mg4p7XG9dtrLVwBf's Eye
   Gouge). Web potency tables weren't reliable enough to fall back on.
+  Party buffs held too long go unreported (2026-10-16): a cooldown
+  that deals no damage has no value in the drift check. The five self
+  damage buffs are valued now (`selfBuffValue` in tracked-cooldowns.ts:
+  No Mercy, Fight or Flight, Riddle of Fire, Raging Strikes, Lance
+  Charge; matched No Mercy 7/10 and Lance Charge 7/10 on pages). Party
+  buffs (Battle Litany, Searing Light, Embolden, Brotherhood, Divination,
+  Arcane Circle, Starry Muse, Technical Finish, Mug / Dokumori) and
+  crit / direct-hit buffs (Devilment, Inner Release) still aren't; their
+  value is mostly other players' damage.
   15 pages compared 2026-10-16 (GNB, RDM, BLM, DNC ×2, DRK ×2, PCT, NIN,
   RPR, SGE, WAR, VPR, BRD): most checks built that day matched; fixes from
   them: declared proc consumers (Primal Rend drops went unjudged), a GCD

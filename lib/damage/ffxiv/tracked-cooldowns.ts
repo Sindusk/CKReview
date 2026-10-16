@@ -18,7 +18,7 @@
 
 import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { TrackedCooldown } from "../types";
-import { XIVA_ACTIONS } from "./xiva-data";
+import { XIVA_ACTIONS, XIVA_STATUSES } from "./xiva-data";
 import { FORCED_CRIT_SHARE } from "./jobs/melee";
 
 export type TrackedCooldownSpec = {
@@ -97,6 +97,65 @@ function bloodfestValue(player: PlayerInfo, endMs: number): { value: number; bas
   };
 }
 
+// Gnashing Fang: valued alone (its hit against the GCD in its slot) a lost
+// use came to 0 and was never reported (Mg4p7XG9dtrLVwBf Momo First, 8
+// casts, room for 21, xivanalysis 8 / 21; qjCMx4bRfgNKwX9T fight 16's 1).
+// A lost use is the combo: Gnashing Fang, Savage Claw, Wicked Talon and
+// their three Continuations, less what the cartridge buys instead (a
+// Burst Strike and Hypervelocity) and the two combo GCDs in the other
+// slots. The player's own averages; a step never pressed counts 0.
+function gnashingFangValue(player: PlayerInfo, endMs: number): { value: number; basis: string } | undefined {
+  const avg = (key: string) => {
+    const id = XIVA_ACTIONS[key]?.id;
+    const hits = player.damageDone.filter((e) => e.abilityId === id && !e.isDoT && !e.pet && e.timestamp < endMs && (e.amount ?? 0) > 0);
+    if (!hits.length) return 0;
+    return hits.reduce((a, e) => a + (e.amount ?? 0), 0) / hits.length;
+  };
+  const combo = ["GNASHING_FANG", "SAVAGE_CLAW", "WICKED_TALON", "JUGULAR_RIP", "ABDOMEN_TEAR", "EYE_GOUGE"].reduce((a, key) => a + avg(key), 0);
+  const cartridge = avg("BURST_STRIKE") + avg("HYPERVELOCITY");
+  const filler = ["KEEN_EDGE", "BRUTAL_SHELL", "SOLID_BARREL"].map(avg);
+  if (avg("GNASHING_FANG") <= 0 || cartridge <= 0 || filler.some((c) => c <= 0)) return undefined;
+  const fillerAvg = filler.reduce((a, c) => a + c, 0) / 3;
+  const value = combo - cartridge - 2 * fillerAvg;
+  if (value <= 0) return undefined;
+  const k = (n: number) => `${Math.round(n / 1000)}k`;
+  return {
+    value,
+    basis: `(${k(combo)} Gnashing Fang combo with its Continuations − ${k(cartridge)} Burst Strike and Hypervelocity the cartridge buys instead − 2 × ${k(fillerAvg)} average combo GCD)`,
+  };
+}
+
+// A self damage buff (No Mercy +20%, Fight or Flight +25%, Riddle of Fire
+// and Raging Strikes +15%, Lance Charge +10%): no damage of its own, so
+// its drift was never reported (perUse 0). One lost use is the bonus's
+// share of what the player dealt in an average window of it, from their
+// own windows in the pull (raw: what it multiplied). Mg4p7XG9dtrLVwBf
+// (Momo First): No Mercy 0:06 ... 5:57, then 8:58 (7 uses, room for 10;
+// xivanalysis 7 / 10), unreported until this.
+function selfBuffValue(statusKey: string, bonus: number) {
+  return (player: PlayerInfo, endMs: number): { value: number; basis: string } | undefined => {
+    const status = XIVA_STATUSES[statusKey];
+    if (!status) return undefined;
+    const events = (player.buffs ?? []).filter((e) => e.abilityId === status.id && e.source === player.name).sort((a, b) => a.timestamp - b.timestamp);
+    const windows: [number, number][] = [];
+    let open: number | undefined;
+    for (const e of events) {
+      if (e.buffStatus === "applied" && open === undefined) open = e.timestamp;
+      else if (e.buffStatus === "removed" && open !== undefined) { if (e.timestamp <= endMs) windows.push([open, e.timestamp]); open = undefined; }
+    }
+    if (windows.length === 0) return undefined;
+    const dealt = windows.reduce((a, [s, t]) => a + player.damageDone
+      .filter((e) => e.timestamp >= s && e.timestamp <= t + 500 && (e.amount ?? 0) > 0)
+      .reduce((b, e) => b + (e.amount ?? 0), 0), 0) / windows.length;
+    if (dealt <= 0) return undefined;
+    const share = bonus / (1 + bonus);
+    return {
+      value: dealt * share,
+      basis: `${Math.round(dealt / 1000)}k dealt in an average ${status.name} window × ${Math.round(bonus * 100)}/${Math.round((1 + bonus) * 100)} (its +${Math.round(bonus * 100)}%)`,
+    };
+  };
+}
+
 export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
   // ── Tanks (from xivanalysis gnb/Cooldowns.tsx, drk/OGCDDowntime.ts,
   //    war/OGCDDowntime.ts; its 7.4 values) ───────────────────────────
@@ -104,9 +163,9 @@ export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
   // so its "drift" only repeats No Mercy's.
   "Gunbreaker": [
     // One charge before 7.4 (xivanalysis's patch 7.4 layer).
-    { actions: ["GNASHING_FANG"], firstUseOffsetMs: 12500, recastOnPatches: onPatches(PRE_7_4, { charges: 1 }) },
+    { actions: ["GNASHING_FANG"], firstUseOffsetMs: 12500, recastOnPatches: onPatches(PRE_7_4, { charges: 1 }), valuePerUse: gnashingFangValue },
     { actions: ["BLASTING_ZONE", "DANGER_ZONE"], firstUseOffsetMs: 12500 },
-    { actions: ["NO_MERCY"], firstUseOffsetMs: 5000 },
+    { actions: ["NO_MERCY"], firstUseOffsetMs: 5000, valuePerUse: selfBuffValue("NO_MERCY", 0.2) },
     { actions: ["BOW_SHOCK"], firstUseOffsetMs: 10000 },
     { actions: ["DOUBLE_DOWN"], firstUseOffsetMs: 10000 },
     // Before 7.4 Bloodfest had a 120s recast and waited for No Mercy:
@@ -146,7 +205,7 @@ export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
     { actions: ["GEIRSKOGUL"], firstUseOffsetMs: 14500 },
     { actions: ["DRAGONFIRE_DIVE"], firstUseOffsetMs: 14500 },
     { actions: ["LIFE_SURGE"], firstUseOffsetMs: 12000, valuePerUse: lifeSurgeValue },
-    { actions: ["LANCE_CHARGE"], firstUseOffsetMs: 7000 },
+    { actions: ["LANCE_CHARGE"], firstUseOffsetMs: 7000, valuePerUse: selfBuffValue("LANCE_CHARGE", 0.1) },
     { actions: ["BATTLE_LITANY"], firstUseOffsetMs: 7000 },
   ],
   "Ninja": [
@@ -177,7 +236,7 @@ export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
     { actions: ["EMPYREAL_ARROW"], firstUseOffsetMs: 4000, holdMs: 1 },
     { actions: ["BATTLE_VOICE"], firstUseOffsetMs: 7500 },
     { actions: ["RADIANT_FINALE"], firstUseOffsetMs: 7500, holdMs: 10000 },
-    { actions: ["RAGING_STRIKES"], firstUseOffsetMs: 2500 },
+    { actions: ["RAGING_STRIKES"], firstUseOffsetMs: 2500, valuePerUse: selfBuffValue("RAGING_STRIKES", 0.15) },
     { actions: ["BARRAGE"], firstUseOffsetMs: 12000 },
     { actions: ["SIDEWINDER"], firstUseOffsetMs: 12000 },
   ],
@@ -220,11 +279,11 @@ export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
   "Monk": [
     { actions: ["BROTHERHOOD"], firstUseOffsetMs: 7000 },
     { actions: ["PERFECT_BALANCE"], firstUseOffsetMs: 3000 },
-    { actions: ["RIDDLE_OF_FIRE"], firstUseOffsetMs: 5000 },
+    { actions: ["RIDDLE_OF_FIRE"], firstUseOffsetMs: 5000, valuePerUse: selfBuffValue("RIDDLE_OF_FIRE", 0.15) },
     { actions: ["RIDDLE_OF_WIND"], firstUseOffsetMs: 10000 },
   ],
   "Paladin": [
-    { actions: ["FIGHT_OR_FLIGHT"], firstUseOffsetMs: 7500 },
+    { actions: ["FIGHT_OR_FLIGHT"], firstUseOffsetMs: 7500, valuePerUse: selfBuffValue("FIGHT_OR_FLIGHT", 0.25) },
     { actions: ["IMPERATOR"], firstUseOffsetMs: 7500 },
     { actions: ["EXPIACION"], firstUseOffsetMs: 10000 },
     { actions: ["CIRCLE_OF_SCORN"], firstUseOffsetMs: 10000 },

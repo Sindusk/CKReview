@@ -81,9 +81,14 @@ Utilities (Lightspeed, Swiftcast, Lucid).
 
 In priority order (biggest damage cost first):
 
-1. **ast/AoEUsages/gravity-ii, pre-7.2 minimum.** Two-target Gravity II on
-   7.0/7.1 logs isn't seen. Needs a per-patch minimum in
-   `aoeOnOneTargetFindings` and a 7.1 pull with one to test it.
+1. **ast/AoEUsages/gravity-ii, pre-7.2 minimum.** Built 2026-10-16:
+   before 7.2 two-target Gravity IIs are judged too (`minTargets` 3 by
+   patch) and the damage against Fall Malefic decides. From 7.2 two
+   targets came out level with Fall Malefic on disk (0-1k either way on
+   14 casts), so they stay unjudged there. Untested: no 7.0/7.1
+   Astrologian on disk ever cast Gravity II, and the one fetched for it
+   (twTbAknqQgPBxaXF, Brute Bomber 7.1, Clover Puripuri) hit one target
+   (1:14.4 and 1:17.9, caught as one-target).
 2. **ast/Divination/expected-cards** (covered). The app values unplayed
    cards, not cards played outside Divination; check whether that ever
    costs damage the card check misses.
