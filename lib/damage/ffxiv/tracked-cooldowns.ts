@@ -154,6 +154,46 @@ function innerReleaseValue(player: PlayerInfo, endMs: number): { value: number; 
   };
 }
 
+// Cooldowns worth what they unlock (2026-10-16): with no damage of their
+// own, a held one was never reported (on disk: Meisui, Kassatsu,
+// Delirium, Amplifier, Acceleration, Reassemble, Striking Muse, Presence
+// of Mind, Flourish; MzjZgVWBaLw7tHyT Natalie Suki's Meisui 4 / 5 on
+// xivanalysis). A lost use is the player's averages of what it grants
+// (`plus`, each key once per use) less what those GCDs replace (`minus`).
+// A key never pressed in the pull counts 0 on either side, so the
+// estimate errs low; no plus at all, no value.
+function unlockValue(plus: string[], minus: string[]) {
+  return (player: PlayerInfo, endMs: number): { value: number; basis: string } | undefined => {
+    const avg = (key: string) => {
+      const id = XIVA_ACTIONS[key]?.id;
+      const hits = player.damageDone.filter((e) => e.abilityId === id && !e.isDoT && !e.pet && e.timestamp < endMs && (e.amount ?? 0) > 0);
+      // Per cast: several targets' hits within a second are one use.
+      let uses = 0, last = -Infinity;
+      for (const e of hits) { if (e.timestamp - last > 1_000) uses++; last = e.timestamp; }
+      return uses ? hits.reduce((a, e) => a + (e.amount ?? 0), 0) / uses : 0;
+    };
+    const gain = plus.reduce((a, key) => a + avg(key), 0);
+    if (gain <= 0) return undefined;
+    const cost = minus.reduce((a, key) => a + avg(key), 0);
+    const value = gain - cost;
+    if (value <= 0) return undefined;
+    const k = (n: number) => `${Math.round(n / 1000)}k`;
+    const names = (keys: string[]) => keys.map((key) => XIVA_ACTIONS[key]?.name ?? key).join(" + ");
+    return { value, basis: `(${k(gain)} ${names(plus)}${minus.length ? ` − ${k(cost)} ${names(minus)} in their place` : ""}, the player's averages)` };
+  };
+}
+
+// Reassemble: a forced crit and direct hit on the best tool, as Life Surge.
+function reassembleValue(player: PlayerInfo, endMs: number): { value: number; basis: string } | undefined {
+  const best = Math.max(...["DRILL", "AIR_ANCHOR", "CHAIN_SAW", "EXCAVATOR"].map((key) => {
+    const id = XIVA_ACTIONS[key]?.id;
+    const hits = player.damageDone.filter((e) => e.abilityId === id && !e.isDoT && !e.pet && e.timestamp < endMs && (e.amount ?? 0) > 0);
+    return hits.length ? hits.reduce((a, e) => a + (e.amount ?? 0), 0) / hits.length : 0;
+  }));
+  if (best <= 0) return undefined;
+  return { value: best * FORCED_CRIT_SHARE, basis: `${Math.round(best / 1000)}k best of Drill / Air Anchor / Chain Saw / Excavator × ${Math.round(FORCED_CRIT_SHARE * 100)}% (a forced crit over an average hit, estimated)` };
+}
+
 // A self damage buff (No Mercy +20%, Fight or Flight +25%, Riddle of Fire
 // and Raging Strikes +15%, Lance Charge +10%): no damage of its own, so
 // its drift was never reported (perUse 0). One lost use is the bonus's
@@ -204,11 +244,13 @@ export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
       holdMsOnPatches: onPatches(PRE_7_4, 10_000), recastOnPatches: onPatches(PRE_7_4, { cooldownMs: 120_000 }) },
   ],
   "Dark Knight": [
-    { actions: ["DELIRIUM"], firstUseOffsetMs: 10000 },
+    { actions: ["DELIRIUM"], firstUseOffsetMs: 10000,
+      valuePerUse: unlockValue(["SCARLET_DELIRIUM", "COMEUPPANCE", "TORCLEAVER", "DISESTEEM"], ["HARD_SLASH", "SYPHON_STRIKE", "SOULEATER", "HARD_SLASH"]) },
     { actions: ["SALTED_EARTH"], firstUseOffsetMs: 12500 },
     { actions: ["CARVE_AND_SPIT", "ABYSSAL_DRAIN"], firstUseOffsetMs: 17500 },
     { actions: ["SHADOWBRINGER"], firstUseOffsetMs: 20000 },
-    { actions: ["LIVING_SHADOW"], firstUseOffsetMs: 5000 },
+    // Its damage is Esteem's (the only Dark Knight pet).
+    { actions: ["LIVING_SHADOW"], firstUseOffsetMs: 5000, petDamage: true },
   ],
   // Infuriate is left out: Fell Cleave and its kin refund 5s of its
   // cooldown, which the drift check doesn't model.
@@ -238,14 +280,14 @@ export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
     { actions: ["BATTLE_LITANY"], firstUseOffsetMs: 7000 },
   ],
   "Ninja": [
-    { actions: ["KASSATSU"], firstUseOffsetMs: 1000 },
+    { actions: ["KASSATSU"], firstUseOffsetMs: 1000, valuePerUse: unlockValue(["HYOSHO_RANRYU"], ["RAITON"]) },
     { actions: ["DOKUMORI"], firstUseOffsetMs: 6000 },
     // Bunshin's damage is its shadow's (pet hits, Phantom Kamaitachi included).
     { actions: ["BUNSHIN"], firstUseOffsetMs: 7000, petDamage: true },
     { actions: ["KUNAIS_BANE"], firstUseOffsetMs: 10000 },
     { actions: ["DREAM_WITHIN_A_DREAM"], firstUseOffsetMs: 12250 },
     { actions: ["TEN_CHI_JIN"], firstUseOffsetMs: 17250 },
-    { actions: ["MEISUI"], firstUseOffsetMs: 20750 },
+    { actions: ["MEISUI"], firstUseOffsetMs: 20750, valuePerUse: unlockValue(["ZESHO_MEPPO"], []) },
   ],
 
   // ── Physical ranged (from xivanalysis dnc/OGCDDowntime, brd/OGCDDowntime,
@@ -259,7 +301,7 @@ export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
     { actions: ["STANDARD_STEP", "FINISHING_MOVE"], holdMs: 250,
       prePullEvidence: ["STANDARD_FINISH", "SINGLE_STANDARD_FINISH", "DOUBLE_STANDARD_FINISH"] },
     { actions: ["DEVILMENT"] },
-    { actions: ["FLOURISH"] },
+    { actions: ["FLOURISH"], valuePerUse: unlockValue(["FAN_DANCE_III", "FAN_DANCE_IV", "FOUNTAINFALL", "REVERSE_CASCADE"], ["FOUNTAIN", "CASCADE"]) },
   ],
   "Bard": [
     { actions: ["EMPYREAL_ARROW"], firstUseOffsetMs: 4000, holdMs: 1 },
@@ -272,7 +314,7 @@ export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
   "Machinist": [
     { actions: ["WILDFIRE"], firstUseOffsetMs: 10000 },
     { actions: ["BARREL_STABILIZER"], firstUseOffsetMs: 3000 },
-    { actions: ["REASSEMBLE"], holdMs: 5000 },
+    { actions: ["REASSEMBLE"], holdMs: 5000, valuePerUse: reassembleValue },
     { actions: ["AIR_ANCHOR"], holdMs: 100 },
     { actions: ["DRILL", "BIOBLASTER"], firstUseOffsetMs: 2500, holdMs: 100 },
     { actions: ["CHAIN_SAW"], firstUseOffsetMs: 12500, holdMs: 100 },
@@ -286,7 +328,7 @@ export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
     { actions: ["LEY_LINES"], firstUseOffsetMs: 15000, holdMs: 5000, recastOnPatches: onPatches(PRE_7_1, { charges: 1 }) },
     { actions: ["MANAFONT"], firstUseOffsetMs: 25000, holdMs: 5000 },
     { actions: ["TRIPLECAST"], firstUseOffsetMs: 15000, holdMs: 5000 },
-    { actions: ["AMPLIFIER"], firstUseOffsetMs: 15000, holdMs: 5000 },
+    { actions: ["AMPLIFIER"], firstUseOffsetMs: 15000, holdMs: 5000, valuePerUse: unlockValue(["XENOGLOSSY"], ["FIRE_IV"]) },
   ],
   "Summoner": [
     { actions: ["SUMMON_BAHAMUT", "SUMMON_PHOENIX", "SUMMON_SOLAR_BAHAMUT"], firstUseOffsetMs: 4500 },
@@ -295,7 +337,7 @@ export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
   ],
   // Red Mage allows 1s of hold by default.
   "Red Mage": [
-    { actions: ["ACCELERATION"], holdMs: 4000 },
+    { actions: ["ACCELERATION"], holdMs: 4000, valuePerUse: unlockValue(["GRAND_IMPACT"], ["JOLT_III"]) },
     { actions: ["MANAFICATION"], firstUseOffsetMs: 17500, holdMs: 1000 },
     { actions: ["EMBOLDEN"], firstUseOffsetMs: 7500, holdMs: 1000 },
     { actions: ["FLECHE"], holdMs: 1000 },
@@ -321,7 +363,8 @@ export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
   "Pictomancer": [
     { actions: ["POM_MUSE", "WINGED_MUSE", "CLAWED_MUSE", "FANGED_MUSE"] },
     // xivanalysis drops it on 7.2 ("not strictly a gain for that patch").
-    { actions: ["STRIKING_MUSE"], notOnPatches: ["7.2"] },
+    { actions: ["STRIKING_MUSE"], notOnPatches: ["7.2"],
+      valuePerUse: unlockValue(["HAMMER_STAMP", "HAMMER_BRUSH", "POLISHING_HAMMER"], ["FIRE_IN_RED", "FIRE_IN_RED", "FIRE_IN_RED"]) },
     { actions: ["STARRY_MUSE"] },
   ],
   "Reaper": [
@@ -356,5 +399,5 @@ export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
   // oGCD). The FFLogs top 15 for Red Hot and Deep Blue press the first at
   // 0:01-0:10 (most ~0:09, in the burst) and hold 11-45s in all over 13
   // uses.
-  "White Mage":  [{ actions: ["PRESENCE_OF_MIND"] }, { actions: ["ASSIZE"], firstUseOffsetMs: 10000 }],
+  "White Mage":  [{ actions: ["PRESENCE_OF_MIND"], valuePerUse: unlockValue(["GLARE_IV", "GLARE_IV", "GLARE_IV"], ["GLARE_III", "GLARE_III", "GLARE_III"]) }, { actions: ["ASSIZE"], firstUseOffsetMs: 10000 }],
 };

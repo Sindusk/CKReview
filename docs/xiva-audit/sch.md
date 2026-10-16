@@ -18,7 +18,7 @@
 | sch/DoTs/uptime | verified | Biolysis `dot` | Biolysis off the target | Fight 16's 82.3% is downtime plus the two P5 findings the app has. |
 | sch/DoTs/clipping | wrong | — | Biolysis refreshed early (6s / 9s / 12s a minute) | 15.8s a minute on Dancing Mad was P3's two bosses; per target ~48s over the pull. |
 | sch/DoTs/applied-into-invuln | superseded | Biolysis `dot` | Biolysis shortly before invulnerability | Table only. 6:03 / 6:06 got 3-5 ticks, a Broil IV's worth; 11:56 and 14:03 are dot findings. |
-| sch/CooldownDowntime/chain-stratagem | verified | `checkCooldownDrift` | Chain Stratagem held | Fight 16 9/10 not adopted: held across P4's downtime to meet the 16:16 raid buffs. |
+| sch/CooldownDowntime/chain-stratagem | verified | `checkCooldownDrift` | Chain Stratagem held | Fight 16 9/10 not adopted: held across P4's downtime to meet the 16:16 raid buffs. Valued since 2026-10-16 as what an average Chain Stratagem added to the party (`BuffLedger.addedBy`; before, no value, never reported). Matched pnLBzfbH8NjGAJRg Enuo pull 8 (Yoro Shiku): 4/5 = 1 (431k). |
 | sch/CooldownDowntime/aetherflow | verified | `checkCooldownDrift` (valued from Energy Drain) | Aetherflow held | Fight 16 17/18 built from it: the last one came back 0.2s before the kill, so no use. |
 | sch/Aetherflow/drift | superseded | `checkCooldownDrift` | Aetherflow / Dissipation drift, wasted stacks | A table only. Its Dissipation drift counts time Seraph locks Dissipation out (user-confirmed lockout). |
 | sch/Procs/impact-imminent-dropped | covered | `checkProcs` | Impact Imminent expiring without Baneful Impaction | Medium at 1. Not seen firing. |
