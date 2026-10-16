@@ -60,6 +60,13 @@
 // to compare against, so its four don't show. Demon Slice / Slaughter on
 // one Red Hot and Deep Blue boss, the two apart: yPHmaGTY2btq1wD9 3:57,
 // 4:04 (16k, 19k).
+// Bloodfest drift (2026-10-16, tracked-cooldowns.ts bloodfestValue): it
+// deals nothing itself, so it was never reported. Valued as the Reign of
+// Beasts combo plus 1.5 net cartridges. Its recast is 120s before 7.4 (60s
+// from 7.4), and Gnashing Fang has one charge before 7.4; the vendored 7.4
+// data had judged the 7.2 Zelenia kills at 60s. Seen firing on 7.5 kills
+// (Xk2DKZwVp4Ar6d7y Enuo pull 10: ready 4:09, pressed 4:41 with a late No
+// Mercy, ~224k) and 7.3 Necron wipes; not matched on a page yet.
 //
 //   Copyright (c) 2018 Saxon Landers & contributors
 //   MIT License; full text in THIRD_PARTY_NOTICES.md.

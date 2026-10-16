@@ -191,6 +191,9 @@ export type TrackedCooldown = {
   // holdMs on these patches instead (Gunbreaker's Bloodfest waited for
   // No Mercy before 7.4: 10s).
   holdMsOnPatches?: Record<string, number>;
+  // Its recast or charges on these patches, where they differ from the
+  // vendored 7.4 data (Bloodfest was 120s before 7.4, not 60s).
+  recastOnPatches?: Record<string, { cooldownMs?: number; charges?: number }>;
 };
 
 // ── Fight context (per boss)───────────────────────────────────────────

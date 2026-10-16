@@ -40,7 +40,14 @@ export type TrackedCooldownSpec = {
   notOnPatches?:     string[];
   // Its hold allowance on these patches (TrackedCooldown.holdMsOnPatches).
   holdMsOnPatches?:  Record<string, number>;
+  // Its recast / charges on these patches (TrackedCooldown.recastOnPatches).
+  recastOnPatches?:  TrackedCooldown["recastOnPatches"];
 };
+
+// Patches before a given one, for the per-patch overrides below.
+const PRE_7_1 = ["7.0", "7.01", "7.05"];
+const PRE_7_4 = [...PRE_7_1, "7.1", "7.2", "7.3"];
+const onPatches = <T,>(patches: string[], v: T): Record<string, T> => Object.fromEntries(patches.map((p) => [p, v]));
 
 // Life Surge: a forced crit on the best GCD, as the Life Surge check values
 // one misspent (jobs/melee.ts): the best of Drakesbane / Heavens' Thrust's
@@ -61,20 +68,52 @@ function lifeSurgeValue(player: PlayerInfo, endMs: number): { value: number; bas
   };
 }
 
+// Bloodfest: no damage of its own, so without this its drift was never
+// reported (perUse 0). One lost use is 3 cartridges and the Reign of Beasts
+// combo (3 GCDs). The 6 GCDs they'd have taken go to the 1-2-3 combo, whose
+// Solid Barrels give back a cartridge every 3 GCDs, spent on a Burst Strike
+// in a GCD of its own: 4.5 combo GCDs and 1.5 Burst Strikes fill the 6, so
+// 1.5 cartridges are lost net, not 3. Value: Reign combo + 1.5 × (Burst
+// Strike + Hypervelocity) − 4.5 × the average combo GCD, the player's own
+// averages (raw; Bloodfest sits in No Mercy, so the real loss runs higher).
+function bloodfestValue(player: PlayerInfo, endMs: number): { value: number; basis: string } | undefined {
+  const avg = (key: string) => {
+    const id = XIVA_ACTIONS[key]?.id;
+    const hits = player.damageDone.filter((e) => e.abilityId === id && !e.isDoT && !e.pet && e.timestamp < endMs && (e.amount ?? 0) > 0);
+    return hits.length ? hits.reduce((a, e) => a + (e.amount ?? 0), 0) / hits.length : 0;
+  };
+  const reign = avg("REIGN_OF_BEASTS") + avg("NOBLE_BLOOD") + avg("LION_HEART");
+  const burst = avg("BURST_STRIKE") + avg("HYPERVELOCITY");
+  const combo = ["KEEN_EDGE", "BRUTAL_SHELL", "SOLID_BARREL"].map(avg);
+  if (reign <= 0 || burst <= 0 || combo.some((c) => c <= 0)) return undefined;
+  const comboAvg = combo.reduce((a, c) => a + c, 0) / 3;
+  const value = reign + 1.5 * burst - 4.5 * comboAvg;
+  if (value <= 0) return undefined;
+  const k = (n: number) => `${Math.round(n / 1000)}k`;
+  return {
+    value,
+    basis: `(${k(reign)} Reign of Beasts combo + 1.5 × ${k(burst)} Burst Strike and Hypervelocity − 4.5 × ${k(comboAvg)} average combo GCD; ` +
+      `the 3 cartridges come back 1.5 net through extra Solid Barrels, estimated)`,
+  };
+}
+
 export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
   // ── Tanks (from xivanalysis gnb/Cooldowns.tsx, drk/OGCDDowntime.ts,
   //    war/OGCDDowntime.ts; its 7.4 values) ───────────────────────────
   // Sonic Break is left out: in 7.x it needs Ready to Break from No Mercy,
   // so its "drift" only repeats No Mercy's.
   "Gunbreaker": [
-    { actions: ["GNASHING_FANG"], firstUseOffsetMs: 12500 },
+    // One charge before 7.4 (xivanalysis's patch 7.4 layer).
+    { actions: ["GNASHING_FANG"], firstUseOffsetMs: 12500, recastOnPatches: onPatches(PRE_7_4, { charges: 1 }) },
     { actions: ["BLASTING_ZONE", "DANGER_ZONE"], firstUseOffsetMs: 12500 },
     { actions: ["NO_MERCY"], firstUseOffsetMs: 5000 },
     { actions: ["BOW_SHOCK"], firstUseOffsetMs: 10000 },
     { actions: ["DOUBLE_DOWN"], firstUseOffsetMs: 10000 },
-    // Before 7.4 Bloodfest waited for No Mercy: xivanalysis allows 10s.
-    { actions: ["BLOODFEST"], firstUseOffsetMs: 2500, holdMs: 0,
-      holdMsOnPatches: Object.fromEntries(["7.0", "7.01", "7.05", "7.1", "7.2", "7.3"].map((p) => [p, 10_000])) },
+    // Before 7.4 Bloodfest had a 120s recast and waited for No Mercy:
+    // xivanalysis allows 10s. Judged at 60s there, the 7.2 Zelenia kills
+    // read as 3 uses lost from a Bloodfest every two minutes.
+    { actions: ["BLOODFEST"], firstUseOffsetMs: 2500, holdMs: 0, valuePerUse: bloodfestValue,
+      holdMsOnPatches: onPatches(PRE_7_4, 10_000), recastOnPatches: onPatches(PRE_7_4, { cooldownMs: 120_000 }) },
   ],
   "Dark Knight": [
     { actions: ["DELIRIUM"], firstUseOffsetMs: 10000 },
@@ -155,7 +194,8 @@ export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
   //    rdm/GeneralCDDowntime) ─────────────────────────────────────────
   // Black Mage allows 5s of hold and a 15s first-use offset by default.
   "Black Mage": [
-    { actions: ["LEY_LINES"], firstUseOffsetMs: 15000, holdMs: 5000 },
+    // One charge before 7.1.
+    { actions: ["LEY_LINES"], firstUseOffsetMs: 15000, holdMs: 5000, recastOnPatches: onPatches(PRE_7_1, { charges: 1 }) },
     { actions: ["MANAFONT"], firstUseOffsetMs: 25000, holdMs: 5000 },
     { actions: ["TRIPLECAST"], firstUseOffsetMs: 15000, holdMs: 5000 },
     { actions: ["AMPLIFIER"], firstUseOffsetMs: 15000, holdMs: 5000 },

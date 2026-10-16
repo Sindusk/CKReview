@@ -40,7 +40,7 @@
 | blm/AoEUsages/high-blizzard-ii | verified | `blmAoe` (vs Blizzard III, minimum 3) | High Blizzard II on under 3 | Two targets clearly lose: ~9.5k a target against Blizzard III's ~45k. Fires on 7yXZbmqcrCga8PHz 5:29, 9:22, 9:50, djChYqt4b7K8aAfP 7:40, q4mQCNpRKwH1PZjb 9:04 (both bosses, 17-26k), xtcaT8y9CGjpPnHK 5:40 (Watery Grave alone, 21k). Matched xivanalysis on 7yXZbmqcrCga8PHz (3 of 3). |
 | blm/AoEUsages/high-thunder-ii | covered | `blmAoe` (vs High Thunder, one target; direct hits only) | High Thunder II on one target | Fires on q4mQCNpRKwH1PZjb 6:53, 7:44, 9:18 (one boss with the two apart, 4-8k). The DoT difference isn't valued. |
 | blm/AoEUsages/thunder-iv, blizzard-ii, fire-ii | wrong | — | — | Replaced at level 82+; can't occur at 100. |
-| blm/OGCDDowntime/uses | covered | `checkCooldownDrift` (hold 5s, first use 15s / Manafont 25s) | Ley Lines, Manafont, Amplifier (and Triplecast before 7.2) held | The app tracks Triplecast on every patch; xivanalysis drops it from 7.2. |
+| blm/OGCDDowntime/uses | covered | `checkCooldownDrift` (hold 5s, first use 15s / Manafont 25s) | Ley Lines, Manafont, Amplifier (and Triplecast before 7.2) held | The app tracks Triplecast on every patch; xivanalysis drops it from 7.2. Ley Lines has one charge before 7.1 (`recastOnPatches`, 2026-10-16). |
 | blm/Procs/dropped-thunderhead | covered | `checkProcs` | Thunderhead expiring | Before 7.2 only (permanent from 7.2). |
 | blm/Procs/dropped-firestarter | covered | `checkProcs` | Firestarter expiring | Same. |
 | blm/Procs/overwritten-and-invuln-table | no-damage | — | — | Table only. |
