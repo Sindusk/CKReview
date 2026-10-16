@@ -42,6 +42,24 @@
 //   the mine tank, Water/Lightning moves): no measurement yet that they cost
 //   damage.
 //
+// - Temporal Stasis (phase 4, alexander-prime.ts), added 2026-10-16: the
+//   freeze, then Alexander Prime targetable at +11.4. Only Cruise Chaser's
+//   leftover hits land here (0-10k, report Q9zqJb4VLmjhd1B6); damage
+//   doesn't count.
+// - P3 Alexander Prime (phase 5, alexander-prime.ts), from report
+//   Q9zqJb4VLmjhd1B6's five phase clears (Pulls 3, 4, 9, 11 and the kill
+//   16's; kills 4, 11, 16). Alexander Prime's 3.18M plus the Brute Justice
+//   and Cruise Chaser that Summon Alexander brings at +199.8 (0.43M each),
+//   all to 1 HP in every clear: a fixed 4.04M pool over three targets.
+//   Summon is scripted (8:21-8:28 into the pull, Alexander Prime at 10-20%
+//   then, so earlier damage shortens the finish); Alexander Prime is
+//   protected until both adds die (Cruise Chaser 8:39-8:44, Brute Justice
+//   8:52-8:58) and reached 1 HP at 9:29-9:36. Divine Judgment's success
+//   and the transition hit follow, and Perfect Alexander starts ~70s
+//   later: that wait is forced. Inception and Wormhole downtime is
+//   inferred from the log. True heart (0.26M, invulnerable) takes no
+//   damage that matters. The deciding phase stays the last.
+//
 // Not built: the doll owners' and the raid's deliberate damage control
 // (dolls fed under 25%, balancing the two bosses for Hand of Pain): the log
 // can't separate a planned hold from a lazy one.
@@ -60,6 +78,17 @@ const RULE_KEY_LABELS: Record<string, string> = {
   "ffxiv-ll-pain":       "Hand of Pain",
   "ffxiv-lc-stray":      "Limit Cut swords and charges",
   "ffxiv-lc-hawk-blaster": "Hawk Blaster",
+  "ffxiv-ap-stasis-cone":  "Temporal Stasis",
+  "ffxiv-ap-stasis-tether": "Temporal Stasis",
+  "ffxiv-ap-fire":         "Inception Flarethrowers",
+  "ffxiv-ap-sacrament":    "Sacrament",
+  "ffxiv-ap-inception-sword": "Inception swords",
+  "ffxiv-ap-super-jump":   "Super Jump",
+  "ffxiv-ap-wormhole-stray": "Wormhole swords and charges",
+  "ffxiv-ap-avoidable":    "Wormhole avoidables",
+  "ffxiv-ap-soak-extra":   "Void of Repentance soaks",
+  "ffxiv-ap-heat-stack":   "Incinerating Heat",
+  "ffxiv-ap-enumeration":  "Enumeration",
 };
 
 export const TEA_DAMAGE_CONTEXT: DamageContext = {
@@ -70,6 +99,9 @@ export const TEA_DAMAGE_CONTEXT: DamageContext = {
     2: { damageCounts: false, note: "Limit Cut: nothing targetable until ~3s after J Kick" },
     3: { pool: 4_340_000, fixedPool: true, carriesOver: false, multiTarget: true,
       note: "Brute Justice and Cruise Chaser, 2.17M each, both to 1 HP and kept level; HP-gated" },
+    4: { damageCounts: false, note: "Temporal Stasis: nothing targetable until Alexander Prime at +11s" },
+    5: { pool: 4_040_000, fixedPool: true, carriesOver: false, multiTarget: true,
+      note: "Alexander Prime 3.18M plus the summoned Brute Justice and Cruise Chaser (0.43M each), all to 1 HP; Summon scripted, finish HP-gated" },
   },
   forcedWindows: (pull) => {
     const out: ForcedWindow[] = [];
@@ -80,6 +112,12 @@ export const TEA_DAMAGE_CONTEXT: DamageContext = {
       const bj = atOne("brute justice");
       const cc = atOne("cruise chaser");
       if (bj !== undefined && cc !== undefined && Math.max(bj, cc) < span.endMs) out.push({ startMs: Math.max(bj, cc), endMs: span.endMs, cause: "P2 over: both Brute Justice and Cruise Chaser at 1 HP, waiting for the transition" });
+    }
+    for (const span of phaseSpans(pull, 5)) {
+      const ap = pull.players.flatMap((p) => p.damageDone)
+        .filter((e) => e.target?.toLowerCase() === "alexander prime" && e.timestamp >= span.startMs && e.timestamp <= span.endMs && e.healthAfter !== undefined && e.maxHealth && e.healthAfter / e.maxHealth <= 0.001)
+        .reduce<number | undefined>((min, e) => (min === undefined || e.timestamp < min ? e.timestamp : min), undefined);
+      if (ap !== undefined && ap < span.endMs) out.push({ startMs: ap, endMs: span.endMs, cause: "P3 over: Alexander Prime at 1 HP, waiting for Divine Judgment and the transition" });
     }
     for (const span of phaseSpans(pull, 1)) {
       const dead = pull.players.flatMap((p) => p.damageDone)
