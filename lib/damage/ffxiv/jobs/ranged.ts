@@ -365,6 +365,8 @@ export const PROC_REPLACES = new Map(([
   ["LAST_DANCE", "CASCADE"], ["REFULGENT_ARROW", "BURST_SHOT"],
   ["FELL_CLEAVE", "MAIM"], ["PRIMAL_REND", "MAIM"], ["PRIMAL_RUINATION", "MAIM"],
   ["HAMMER_STAMP", "FIRE_IN_RED"], ["GRAND_IMPACT", "JOLT_III"], ["SONIC_BREAK", "KEEN_EDGE"],
+  // A lost Tendo leaves the plain Midare (its Kaeshi's upgrade not counted).
+  ["TENDO_SETSUGEKKA", "MIDARE_SETSUGEKKA"],
 ] as const).filter(([a, b]) => A[a] && A[b]).map(([a, b]) => [A[a].id, A[b].id]));
 
 // Declared consumers (DamageGame.procConsumers), from xivanalysis's
@@ -397,6 +399,11 @@ export const PROC_CONSUMERS = new Map(([
   // VhyrDATFKNGt8f6M's Samurai let 4 run out and never pressed Ogi
   // Namikiri, so nothing inferred a consumer.
   ["OGI_NAMIKIRI_READY", "OGI_NAMIKIRI"],
+  // VhyrDATFKNGt8f6M (Heddy Donc): Tendo split 5 Tendo Setsugekka / 5
+  // Tendo Goken, under the 60%, so the one from Meikyo at 4:42.4 that ran
+  // out at 5:13.1 went unjudged (xivanalysis: Tendos 20 / 22). Tendo Goken
+  // stays an accepted alternative.
+  ["TENDO", "TENDO_SETSUGEKKA"],
 ] as const).filter(([s, a]) => S[s] && A[a]).map(([s, a]) => [S[s].id, A[a].id]));
 
 // DamageGame.procConsumerFallback (2026-10-16): consumers a player may
