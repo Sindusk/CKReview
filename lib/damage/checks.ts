@@ -567,6 +567,7 @@ export function checkCooldownDrift(ctx: PlayerCheckContext): DamageFinding[] {
     : forcedMerged;
 
   for (const cd of ctx.game.trackedCooldowns(ctx.job)) {
+    if (ctx.patch && cd.notOnPatches?.includes(ctx.patch)) continue;
     const ids = new Set(cd.actionIds);
     const casts = ctx.player.casts
       .filter((c) => ids.has(c.abilityId) && c.timestamp < ctx.endMs)

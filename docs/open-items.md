@@ -200,7 +200,9 @@ and delete them from the header.
   - [dnc.md](xiva-audit/dnc.md): Dancer, 1 candidate (Closed Position,
     never seen), 8 covered (dance checks and Devilment outside Technical
     Finish built, awaiting xivanalysis pages).
-  - [pct.md](xiva-audit/pct.md): Pictomancer, 2 candidates, 5 covered.
+  - [pct.md](xiva-audit/pct.md): Pictomancer, 1 candidate
+    (Hyperphantasia, only lost at deaths on disk), 6 covered (portrait
+    overwrites built 2026-10-16; Striking Muse not judged on 7.2).
   - [ast.md](xiva-audit/ast.md): Astrologian, 1 candidate, 3 covered.
   - [sge.md](xiva-audit/sge.md): Sage, 1 candidate.
   - [sch.md](xiva-audit/sch.md): Scholar, 3 covered.

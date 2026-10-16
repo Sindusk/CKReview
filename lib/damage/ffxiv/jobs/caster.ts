@@ -20,6 +20,11 @@
 //     for known downtime would be a real loss, which needs the fight
 //     context.
 //   - Palette gauge and Monochrome Tones overwrites (below).
+//   - Portraits painted over (Gauge.tsx, 2026-10-16): `portraitOverwrites`
+//     below. Not matched against a page yet. Striking Muse's drift is
+//     skipped on 7.2 logs, as xivanalysis does (tracked-cooldowns.ts).
+//     Not adopted: Hyperphantasia stacks lost (on 670 windows on disk,
+//     only at deaths and wipes).
 //   - Checked against xivanalysis on dDar482XvFKBPJYh FRU kill (7.1,
 //     2026-10-12): its 11 missing Starry Muse actions, 1 Additive in
 //     Starry Muse, 1 Subtractive Palette lost to overcap and 1 Monochrome
@@ -456,7 +461,49 @@ const pctAoe = aoeComboOnOneTarget(([
   ["BLIZZARD_II_IN_CYAN", "BLIZZARD_IN_CYAN"], ["STONE_II_IN_YELLOW", "STONE_IN_YELLOW"], ["THUNDER_II_IN_MAGENTA", "THUNDER_IN_MAGENTA"],
 ] as const).filter(([a, b]) => A[a] && A[b]).map(([a, b]) => [A[a].id, A[b].id, 3] as [number, number, number]));
 
-export const PCT_CHECKS: JobCheck[] = [starryMuse, starryFillers, palette, pctAoe];
+// A portrait overwritten (xivanalysis Gauge.tsx "overwrote portrait"):
+// Winged Muse paints the Moogle portrait (Mog of the Ages), Fanged Muse
+// the Madeen (Retribution of the Madeen); painting the next one while
+// the last is unspent loses it, at its average. A portrait survives a
+// death. One with under PORTRAIT_FREE_MS outside forced time and death
+// after the shared 30s recast came back had no room to be used: forced. 7 of 992 muses on the 263 Pictomancer
+// pulls on disk; vVPtwaTQ62Jg391q Lindwurm II pull 4 (kill): the 1:16
+// Fanged Muse's Madeen held through the 2:12 Starry Muse, lost to the
+// 2:21 Winged Muse.
+const PORTRAIT_FREE_MS = 2_500;
+const portraitOverwrites: JobCheck = (ctx): DamageFinding[] => {
+  const out: DamageFinding[] = [];
+  const painters = new Map([[A.WINGED_MUSE?.id, A.MOG_OF_THE_AGES?.id], [A.FANGED_MUSE?.id, A.RETRIBUTION_OF_THE_MADEEN?.id]]);
+  const spenders = new Set([A.MOG_OF_THE_AGES?.id, A.RETRIBUTION_OF_THE_MADEEN?.id]);
+  let held: PlayerEvent | undefined;
+  for (const c of ctx.player.casts) {
+    if (c.timestamp >= ctx.endMs) break;
+    if (spenders.has(c.abilityId)) { held = undefined; continue; }
+    if (!painters.has(c.abilityId)) continue;
+    if (held) {
+      const lostId = painters.get(held.abilityId)!;
+      const lostName = ctx.player.casts.find((x) => x.abilityId === lostId)?.abilityName ??
+        (lostId === A.MOG_OF_THE_AGES.id ? "Mog of the Ages" : "Retribution of the Madeen");
+      const avg = ctx.values.perUse(lostId) || Math.max(...[...spenders].map((id) => ctx.values.perUse(id)));
+      // Usable from when the shared recast was back.
+      const lastSpend = ctx.player.casts.filter((x) => spenders.has(x.abilityId) && x.timestamp < held!.timestamp).pop();
+      const from = Math.max(held.timestamp, (lastSpend?.timestamp ?? -Infinity) + (A.MOG_OF_THE_AGES?.cooldown ?? 30_000));
+      const blocked = forcedPart(from, c.timestamp, [...ctx.forced, ...ctx.dead.map((w) => ({ ...w, cause: "dead" }))]);
+      const forced = c.timestamp - from - blocked.ms < PORTRAIT_FREE_MS;
+      out.push(finding(ctx, {
+        kind: "proc-lost", startMs: c.timestamp, endMs: c.timestamp, forced, cause: forced ? blocked.cause : undefined,
+        label: `${lostName} portrait overwritten`,
+        lostDamage: avg,
+        basis: `one ${lostName} lost (${k(avg)} average)`,
+        detail: `${c.abilityName} at ${clock(c.timestamp)} painted over the portrait from the ${clock(held.timestamp)} ${held.abilityName}`,
+      }));
+    }
+    held = c;
+  }
+  return out;
+};
+
+export const PCT_CHECKS: JobCheck[] = [starryMuse, starryFillers, palette, pctAoe, portraitOverwrites];
 // Polyglot (xivanalysis Gauge.tsx), simulated from casts: Enochian (Astral
 // Fire / Umbral Ice) adds one every 30s from the first fire or ice spell,
 // Amplifier one more, Xenoglossy and Foul spend one; cap 3. A death empties

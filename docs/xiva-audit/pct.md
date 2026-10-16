@@ -9,7 +9,7 @@
   Subtractive spells; no Additive check; a 9-GCD display column). Supported
   7.0–7.5.
 - **App:** `lib/damage/ffxiv/jobs/caster.ts` (header, `PCT_CHECKS`:
-  `starryMuse`, `starryFillers`, `palette`, `pctAoe`), `gauges.ts`
+  `starryMuse`, `starryFillers`, `palette`, `pctAoe`, `portraitOverwrites`), `gauges.ts`
   (Palette, Paint), `tracked-cooldowns.ts` ("Pictomancer"), generic checks.
   Case studies: dQ8wmb1VhKt6yBXk, dDar482XvFKBPJYh FRU (7.1),
   qjCMx4bRfgNKwX9T (7.5), K6qfMamL7rN8yz2Q (three kills).
@@ -31,12 +31,12 @@
 | pct/Procs/dropped-rainbow-bright | covered | `checkProcs` | Rainbow Bright expiring | Not seen firing. |
 | pct/Procs/dropped-starstruck | covered | `checkProcs` | Starstruck expiring | Not seen firing. |
 | pct/Procs/dropped-aetherhues | covered | `checkProcs` | Aetherhues / Aetherhues II expiring (the paint combo running out) | Not seen firing. Several consumers (single and AoE); checkProcs takes a second one only past 10% of removals. |
-| pct/Procs/dropped-hyperphantasia | candidate | — | Hyperphantasia stacks expiring unused | Consumed by every Additive and Subtractive spell, so `checkProcs` finds no single consumer and skips it. A lost stack can cost Rainbow Bright (an instant Rainbow Drip). Value it at the Rainbow Drip's cast time saved, not a whole spell. |
+| pct/Procs/dropped-hyperphantasia | candidate | — | Hyperphantasia stacks expiring unused | Consumed by every Additive and Subtractive spell, so `checkProcs` finds no single consumer and skips it. A lost stack can cost Rainbow Bright (an instant Rainbow Drip). Premise check (2026-10-16), 670 Hyperphantasia windows on the 263 Pictomancer pulls on disk: 636 used all 5 stacks, 9 more. Every short one ended in the player's death (all statuses removed at once) or the wipe; xivanalysis counts those. Not built; build it if a living one shows up. |
 | pct/Procs/core-dropped-overwritten-invuln-off | no-damage | — | — | A table only; the job's own suggestions above are the rules. |
 | pct/Gauge/palette-overcap | verified | `palette` (gaugeFindings) | Palette over 100 | FRU 1 matched. The app also finds 25 over at K6qfMamL7rN8yz2Q The Tyrant 1:55 (85k), app-only and holding. Gauge comes with the cast, not the hit. |
 | pct/Gauge/overwrote-monochrome-tones | verified | `palette` Monochrome Tones | Subtractive Palette with Monochrome Tones still up | FRU 1 matched. |
-| pct/Gauge/overwrote-portrait | candidate | — | a Winged / Fanged Muse while a portrait is still held | A lost Mog of the Ages or Madeen. Gauge-inferred from muse and portrait casts, so log-checkable from the cast order. Rare. |
-| pct/CooldownDowntime/uses | verified | `checkCooldownDrift` + `usesLostAtKill` | Living, Striking or Starry Muse held | The Tyrant 100%; Living Muse 14/16 and 15/16 matched by the kill rule. **Patch gap:** the app tracks Striking Muse in 7.2 too, where xivanalysis drops it ("not strictly a gain"). |
+| pct/Gauge/overwrote-portrait | covered | `portraitOverwrites` | a Winged / Fanged Muse while a portrait is still held | Built 2026-10-16: the lost Mog of the Ages / Retribution of the Madeen at its average; forced when under 2.5s outside forced time and death was left after the shared 30s recast. 7 in 992 muses on disk, all unforced, 138-190k: bVDR2mTL7YGvMxK1 The Tyrant pull 11 10:05, rFQT8XZckzvH1LNx Queen Eternal pull 1 2:12, vFY7kHVWK19ZQ24A Lindwurm II pulls 6, 11, 13, vVPtwaTQ62Jg391q The Tyrant pull 2 6:20 and Lindwurm II pull 4 2:21 (kill; hand-checked: the 1:16 Madeen held through the 2:12 Starry Muse, no Madeen hit in between). Six are one player. Not matched on a page yet. |
+| pct/CooldownDowntime/uses | verified | `checkCooldownDrift` + `usesLostAtKill` | Living, Striking or Starry Muse held | The Tyrant 100%; Living Muse 14/16 and 15/16 matched by the kill rule. Striking Muse is skipped on 7.2 logs since 2026-10-16, as in xivanalysis (`notOnPatches`). The two 7.2 reports on disk (Y9Fh2BHyj3xAqZ6V, wNHvD38WTbFtGJKr) had no Striking Muse finding before or after. |
 | pct/AoEUsages/too-few-targets | verified | `pctAoe` (minimum 3) | an AoE paint spell on under 3 targets | K6qfMamL7rN8yz2Q Red Hot and Deep Blue 8:46.5 built from it. The app skips a use that out-did the single-target average. |
 | pct/Weaving/too-many | verified | `checkGcdGaps` | weaves past the GCD after a long cast | K6qfMamL7rN8yz2Q 2:28, 7:03, 7:41, 9:35 matched. xivanalysis computes max weaves from cast and recast for motifs; the app counts the idle. |
 | pct/Interrupts/cancelled-casts | verified | `checkInterrupts` | a cast cut by movement | 3 (qjCMx4bRfgNKwX9T, K6qfMamL7rN8yz2Q Vamp) and 5 (The Tyrant) matched. |
@@ -77,12 +77,9 @@ players-buffed and overwrite columns.
 
 In priority order (biggest damage cost first):
 
-1. **pct/Procs/dropped-hyperphantasia** (candidate). The generic proc check
-   skips it (many consumers). Premise check: find a pull where stacks run
-   out, and value what the lost Rainbow Bright cost.
-2. **pct/CooldownDowntime/uses, 7.2 Striking Muse.** Gate it out of the
-   tracked cooldowns on 7.2 logs, as xivanalysis does, once a 7.2 pull is
-   on disk to check it against.
-3. **pct/Gauge/overwrote-portrait** (candidate, rare).
-4. **pct/Procs/dropped-hammer-time, rainbow-bright, starstruck,
+1. **pct/Gauge/overwrote-portrait** (covered 2026-10-16). Fires on 7
+   pulls; match it on a page (vVPtwaTQ62Jg391q Lindwurm II pull 4).
+2. **pct/Procs/dropped-hammer-time, rainbow-bright, starstruck,
    aetherhues** (covered). None seen firing.
+3. **pct/Procs/dropped-hyperphantasia** (candidate). Only deaths and
+   wipes drop stacks on disk.

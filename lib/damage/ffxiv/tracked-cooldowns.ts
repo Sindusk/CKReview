@@ -36,6 +36,8 @@ export type TrackedCooldownSpec = {
   petDamage?:        boolean;
   // A cooldown worth what it does to another action (TrackedCooldown.valuePerUse).
   valuePerUse?:      TrackedCooldown["valuePerUse"];
+  // Patches where holding it costs nothing (TrackedCooldown.notOnPatches).
+  notOnPatches?:     string[];
 };
 
 // Life Surge: a forced crit on the best GCD, as the Life Surge check values
@@ -186,7 +188,8 @@ export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
   ],
   "Pictomancer": [
     { actions: ["POM_MUSE", "WINGED_MUSE", "CLAWED_MUSE", "FANGED_MUSE"] },
-    { actions: ["STRIKING_MUSE"] },
+    // xivanalysis drops it on 7.2 ("not strictly a gain for that patch").
+    { actions: ["STRIKING_MUSE"], notOnPatches: ["7.2"] },
     { actions: ["STARRY_MUSE"] },
   ],
   "Reaper": [

@@ -185,9 +185,12 @@ export type TrackedCooldown = {
   // casts could slide). Nearby's Vanish (qpZx3mWaG7gcDdYB): first at 2:04,
   // the next fitting after Stasis anyway.
   openerUse?: boolean;
+  // Patches (DamageGame.patchOf) where it isn't judged: using it on
+  // cooldown wasn't a gain there (Pictomancer's Striking Muse in 7.2).
+  notOnPatches?: string[];
 };
 
-// ── Fight context (per boss) ───────────────────────────────────────────
+// ── Fight context (per boss)───────────────────────────────────────────
 
 export type PhaseContext = {
   pool?:          number;    // the phase's HP pool, when fixed
