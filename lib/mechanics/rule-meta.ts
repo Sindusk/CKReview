@@ -436,6 +436,14 @@ exposure("targeted", ["ffxiv-bjcc-water-short", "ffxiv-bjcc-lightning-alone", "f
 mechanic("ffxiv-ap-wormhole-aim", "Wormhole sword/charge aim (number holder)", 3, ["ffxiv-ap-wormhole-aim", "ffxiv-ap-wormhole-knockback"]);
 mechanic("ffxiv-ap-soak-missed", "Void of Repentance soaks (owed numbers)", 3, ["ffxiv-ap-soak-missed"]);
 exposure("targeted", ["ffxiv-ap-wormhole-aim", "ffxiv-ap-wormhole-knockback", "ffxiv-ap-soak-missed"]);
+// The Epic of Alexander P4 (perfect-alexander.ts): each march tests its two
+// beacons, each Fate Calibration α its Defamation and Assault holders, each
+// β its four tethered players (reported at every instance).
+mechanic("ffxiv-pa-beacon", "March beacons (light / dark beacon)", 4, ["ffxiv-pa-beacon"]);
+mechanic("ffxiv-pa-defamation-aim", "Fate Calibration α Defamation spot (holder)", 4, ["ffxiv-pa-defamation-aim"]);
+mechanic("ffxiv-pa-assault-shared", "Fate Calibration α Assaults out of the stack", 4, ["ffxiv-pa-assault-shared"]);
+mechanic("ffxiv-pa-tether", "Fate Calibration β tethers (House Arrest / Restraining Order)", 4, ["ffxiv-pa-tether"]);
+exposure("targeted", ["ffxiv-pa-beacon", "ffxiv-pa-defamation-aim", "ffxiv-pa-assault-shared", "ffxiv-pa-tether"]);
 // The Omega Protocol P1: each Program Loop round's towers test that round's
 // two In Line players (omega.ts reports both at every round).
 mechanic("ffxiv-top1-tower", "Program Loop towers (In Line soakers)", 1, ["ffxiv-top1-tower"]);

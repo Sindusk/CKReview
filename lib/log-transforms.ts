@@ -78,6 +78,7 @@ import { detectLivingLiquidErrors } from "./mechanics/ffxiv/tea/living-liquid";
 import { detectTeaLimitCutErrors } from "./mechanics/ffxiv/tea/intermission-limit-cut";
 import { detectBjccErrors } from "./mechanics/ffxiv/tea/bj-cc";
 import { detectAlexanderPrimeErrors } from "./mechanics/ffxiv/tea/alexander-prime";
+import { detectPerfectAlexanderErrors } from "./mechanics/ffxiv/tea/perfect-alexander";
 import { detectOmegaErrors } from "./mechanics/ffxiv/top/omega";
 import { detectOmegaMFErrors } from "./mechanics/ffxiv/top/omega-mf";
 import { detectOmegaReconfiguredErrors } from "./mechanics/ffxiv/top/omega-reconfiguredd";
@@ -1707,6 +1708,7 @@ export function transformFFightToPull(
     ...detectTeaLimitCutErrors(players, deathEvents, enemyCastEvents, headMarkers, reportedOccurrences),
     ...detectBjccErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
     ...detectAlexanderPrimeErrors(players, deathEvents, enemyCastEvents, headMarkers, reportedOccurrences),
+    ...detectPerfectAlexanderErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
     ...detectOmegaErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
     ...detectOmegaMFErrors(players, deathEvents, enemyCastEvents, headMarkers, reportedOccurrences),
     ...detectOmegaReconfiguredErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),

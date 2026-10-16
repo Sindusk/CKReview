@@ -379,6 +379,15 @@ const MECHANICS = {
     },
   },
 
+  'perfect-alexander': {
+    game: 'ff',
+    lateCapture: true, // Phase 4 only — safe on --from-minutes captures (see isLateCapture)
+    load: () => requireTsFromRoot('lib/mechanics/ffxiv/tea/perfect-alexander.ts'),
+    run({ mod, ctxs }) {
+      for (const c of ctxs) printPullErrors(c, mod.detectPerfectAlexanderErrors(c.relPlayers(), c.relDeaths(), c.relEnemyCasts()));
+    },
+  },
+
   omega: {
     game: 'ff',
     load: () => ({

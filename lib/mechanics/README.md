@@ -121,8 +121,12 @@ lib/mechanics/
                                 Wormhole aim / strays / knock-offs, puddle
                                 soaks and Confession; Heat stack,
                                 Enumeration, J Waves, enrages)
-      damage-context.ts       — Phase 1 damage context
-                                (the other tea/ files are research models only)
+      perfect-alexander.ts    — Phase 4 per-pull rules (Motion/Stillness
+                                checks, march beacons and followers, Fate
+                                Calibration α crosses / Defamation / Assaults,
+                                β tethers / J Jumps / donut, Optical Sight
+                                overlaps, busters, trines, Grace, cutoffs)
+      damage-context.ts       — damage context, phase by phase
     trials/                   — Extreme trials
       doomtrain.ts            — Doomtrain (Hell on Rails EX) per-pull rules
                                 (avoidables, stored plasma spreads/pairs, orb

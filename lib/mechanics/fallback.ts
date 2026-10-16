@@ -164,7 +164,7 @@ const COVERED_ENCOUNTERS: Record<Pull["game"], Set<string>> = {
 const MODULE_PHASES: Record<string, number[]> = {
   "Futures Rewritten": [1, 2, 3, 4, 5],
   "The Omega Protocol": [1, 2, 3, 4, 5, 6],
-  "The Epic of Alexander": [1, 2, 3, 4, 5],
+  "The Epic of Alexander": [1, 2, 3, 4, 5, 6],
 };
 
 /** `t` (ms into the pull) falls in a phase an encounter module covers. */

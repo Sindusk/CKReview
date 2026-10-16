@@ -170,6 +170,11 @@ philosophy and the data semantics this list assumes.
   in the same millisecond, then both die. Holding two colors at once is the
   collision; a color whose last copy runs out on a living player is a
   missed pass (TEA BJ/CC).
+- **A preview clone keeps its instance number into the playback.** TEA
+  P4's Fate Projection clones are boss instances: preview Defamation #n
+  becomes the real Plaint of Obloquy #n, cast at its holder. Fate
+  Calibration β goes further and puts the real roles (beacons, tethers) on
+  the players as statuses when playback starts.
 - **A shared line's groups can be read from the pull itself.** Union the
   players of every line that hit 2+; a component of four is one group and
   the other group is its complement. One set's lines rarely place the
@@ -262,6 +267,10 @@ philosophy and the data semantics this list assumes.
 - **Proximity baits retarget onto survivors.** Gate them on everyone being
   alive, or on the slots not having shifted (The Tyrant, Pandora, Ultimate
   Kefka).
+- **A spread can always place every circle.** TEA P4's Optical Sight puts
+  eight circles on the living however many are dead, so the spares double
+  onto survivors and kill them (four wipes and a kill). Count overlaps only
+  with everyone up.
 - **A doubled stack usually means a dead target.** 7 of 9 doubled Sharp
   Tastes followed a healer's death (The Tyrant).
 - **A rotating line that sweeps the party is its baiter's.** Omega P5's
