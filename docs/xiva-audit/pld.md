@@ -22,8 +22,8 @@
 | pld/FightOrFlight/high-potency-gcds | verified | `fightOrFlight` expected | Goring Blade, Confiteor or a Blade missing | Same windows. |
 | pld/FightOrFlight/low-potency-gcd-group | verified | `fightOrFlight` Royal Authority group (3) | under 3 Royal Authority / Atonement / Supplication / Sepulchre / Holy Spirit | 2T1HzdPKgbhM43am 10, fight 16 12, Red Hot 7 matched. |
 | pld/FightOrFlight/ogcds | verified | `fightOrFlight` expected | Blade of Honor, Expiacion, Circle of Scorn or Intervene missing | Fight 16 14, Red Hot 11, The Tyrant one for one. Some held across downtime into the next window (right). |
-| pld/Requiescat/confiteor-chain | superseded | `fightOrFlight` (Confiteor + Blades) | a Requiescat window missing Confiteor or a Blade | Major at 1. Its one miss on 2T1HzdPKgbhM43am was the chain held past P1's HP check into P2, which is right. |
-| pld/Confiteor/timeouts | covered | `checkProcs` | Confiteor Ready expiring | Major at 1. Not seen firing. Not fight-aware in xivanalysis (downtime, death). |
+| pld/Requiescat/confiteor-chain | covered | `fightOrFlight` (Confiteor + Blades) + `requiescatChainLost` | a Requiescat window missing Confiteor or a Blade | Major at 1. Its one miss on 2T1HzdPKgbhM43am was the chain held past P1's HP check into P2, which is right. Gap found 2026-10-16: a Blade missing from Fight or Flight cost only its 25% ("used outside the window"), but when Requiescat ran out the Blade was never used at all. `requiescatChainLost` now values each step unpressed when Requiescat reaches its expiry or its last stack goes to another action (Holy Spirit, Clemency), at its average minus a combo filler (buff strips at deaths and wipes left out). Sample: 7HVZra4GNRxfpKzT (fetched for this; fight 3, Koneko Ashi, a low Red Hot and Deep Blue parse): 4:56 and 8:10, Blade of Truth and Valor never pressed (143k each). 17 on disk, e.g. the user's statics: 2T1HzdPKgbhM43am / yBKPqGwHparm7Tk4 3:35 (Jamie Rheinmetall's Clemency at 3:20.9 took a stack, so no Blade of Valor; 12k), qjCMx4bRfgNKwX9T pulls 2-3 7:29 (Shinsya Rei, Holy Spirit in Valor's place; 10-40k). Awaiting a page. |
+| pld/Confiteor/timeouts | covered | `checkProcs` | Confiteor Ready expiring | Major at 1. Not fight-aware in xivanalysis (downtime, death). Searched 2026-10-16 (15 lowest Red Hot and Deep Blue Paladins): Confiteor Ready was used every time, even in chains that then ran out; the loss there is the Blades (row above). Not seen firing. |
 | pld/RoyalAuthority/follow-up-skills | verified | `atonementChainDropped` + `atonementChainAtKill` | Atonement / Supplication / Sepulchre Ready lost | Checklist 94%. The Tyrant Sepulchre 24/26 and Vamp 21/22 built from it; 54 drops across the samples, nearly all Royal Authority pressed with Supplication or Sepulchre Ready up. |
 | pld/DivineMight/stack-use | verified | `checkProcs` | Divine Might expiring | Checklist 94%. Fight 16 38/42 explained (2 forced, 1 real at 12:21, 1 at the kill); Red Hot 5:17 matched. |
 | pld/Gauge/oath-gauge-overcap | no-damage | — | Oath Gauge over 100 | Mitigation. Drawn on the timeline (570 lost on Vamp, both tools). |
@@ -64,4 +64,7 @@ the Oath graph.
 
 ## Open
 
-1. **pld/Confiteor/timeouts** (covered). Not seen firing.
+1. **pld/Requiescat/confiteor-chain** (covered 2026-10-16): match the
+   Requiescat run-outs on 7HVZra4GNRxfpKzT's page.
+2. **pld/Confiteor/timeouts** (covered). Not seen firing (Confiteor Ready
+   is pressed even by the weakest parses).

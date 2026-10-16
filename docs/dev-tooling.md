@@ -84,6 +84,20 @@ casts, about 15 API points per fight. `scripts/analyze-dps.js` then compares
 one group's pulls against other groups' clears. The method and its pitfalls
 are in [dps-analysis.md](dps-analysis.md).
 
+**Finding a pull where a mistake happens** (xiva-audit phase 3), read-only,
+nothing written:
+- `node scripts/ff-rankings.js "<encounter>" <Job> [--from-pct n] [--pages n]`
+  lists a job's ranked parses from the bottom up (code, fight id, player).
+  About 10 points to find the last page, then 1 a page; it stops at half
+  the hour's budget (`--stop-at`).
+- `node scripts/ff-probe.js <code> <fightId> <Job|name> [--buff text] [--casts text]`
+  reads that player's casts and self-buffs (about 5 points) and prints,
+  per buff, which casts removed it and which removals had no cast beside
+  them (expiries), marked near a death or the end. A proc cleared by the
+  wrong cast shows up there too (Gunbreaker's Continuation).
+- Then fetch only the pull you'll use, into its own report folder:
+  `node scripts/fetch-ff-report.js <code> --fight <id>`.
+
 ## Analyzing a report (`scripts/analyze-report.js`)
 
 The standard investigation recipes for verifying a model or debugging a

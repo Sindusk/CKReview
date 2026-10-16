@@ -141,7 +141,8 @@
 // xivanalysis src/parser/jobs/pld/modules/FightOrFlight.tsx: 8 GCDs;
 // Goring Blade, Confiteor and the three Blades once each; Blade of Honor,
 // Expiacion, Circle of Scorn and Intervene once each; three of Royal
-// Authority / Atonement / Supplication / Sepulchre / Holy Spirit.
+// Authority / Atonement / Supplication / Sepulchre / Holy Spirit. A Blade
+// that never came at all is requiescatChainLost's (below).
 //
 // Warrior, Surging Tempest (+10%, xivanalysis
 // src/parser/jobs/war/modules/SurgingTempest.tsx tracks its uptime): drops
@@ -341,11 +342,54 @@ const atonementChainDropped: JobCheck = (ctx) => {
   return out;
 };
 
+// The Confiteor chain run out (2026-10-16): Requiescat's stacks pay for
+// Confiteor and the three Blades; when it ends, each step not pressed
+// since it went up is lost, its average minus a combo filler's, outside
+// Fight or Flight as above (the window finding counts the 25%, and read
+// those steps as "used outside the window"). xivanalysis's Confiteor
+// timeout watches only Confiteor Ready, always used on the samples.
+// 7HVZra4GNRxfpKzT (Koneko Ashi): Requiescat 4:24.9, Confiteor 4:26.6,
+// Blade of Faith 4:41.0, a Holy Spirit took a stack at 4:48.2, ran out
+// 4:56.2 with Blade of Truth and Valor never pressed.
+const REQUIESCAT_STEPS = ["CONFITEOR", "BLADE_OF_FAITH", "BLADE_OF_TRUTH", "BLADE_OF_VALOR"].filter((x) => A[x]);
+const requiescatChainLost: JobCheck = (ctx) => {
+  const out: DamageFinding[] = [];
+  const fof = statusWindows(ctx, S.FIGHT_OR_FLIGHT.id);
+  const avgOutside = (actionId: number) => {
+    const hits = castHits(ctx, actionId).filter((h) => !inWindows(h.timestamp, fof));
+    return hits.length ? hits.reduce((a, h) => a + (h.amount ?? 0), 0) / hits.length : ctx.values.perUse(actionId);
+  };
+  const fillers = COMBO_FILLERS.filter((x) => A[x]).map(id).filter((x) => castHits(ctx, x).length > 0);
+  const filler = fillers.length ? fillers.reduce((a, x) => a + avgOutside(x), 0) / fillers.length : 0;
+  for (const w of statusWindows(ctx, S.REQUIESCAT.id)) {
+    if (w.endMs >= ctx.endMs || inWindows(w.endMs, ctx.dead) || ctx.dead.some((d) => d.startMs >= w.endMs && d.startMs - w.endMs <= 3_000)) continue;
+    // Its 30s expiry, or its last stack spent at a cast; any other end is
+    // the log stripping every buff at a death or wipe (d3vRbwfpNBLzJ2Xh
+    // The Tyrant pull 15, 1:09.4).
+    const expired = w.endMs - w.startMs >= (S.REQUIESCAT.duration ?? 30_000) - PROC_EXPIRY_EARLY_MS;
+    if (!expired && !ctx.player.casts.some((c) => Math.abs(c.timestamp - w.endMs) <= PROC_CONSUME_MS)) continue;
+    const missing = REQUIESCAT_STEPS.filter((st) => !ctx.player.casts.some((c) =>
+      c.abilityId === id(st) && c.timestamp >= w.startMs - PROC_CONSUME_MS && c.timestamp <= w.endMs + PROC_CONSUME_MS));
+    const lost = missing.reduce((a, st) => a + Math.max(0, avgOutside(id(st)) - filler), 0);
+    if (missing.length === 0 || lost < 1) continue;
+    const forced = inWindows(w.endMs, mergeWindows(ctx.forced));
+    out.push(finding(ctx, {
+      kind: "proc-lost", startMs: w.endMs, endMs: w.endMs, forced,
+      cause: forced ? forcedPart(w.endMs - 1, w.endMs + 1, ctx.forced).cause : undefined,
+      label: "Requiescat ran out", lostDamage: lost,
+      basis: missing.map((st) => `${k(avgOutside(id(st)))} ${A[st].name}`).join(" + ") +
+        ` − ${missing.length} × ${k(filler)} average combo filler (outside Fight or Flight; its window finding counts the 25%)`,
+      detail: `Requiescat from ${clock(w.startMs)} ran out at ${clock(w.endMs)} without ${missing.map((st) => A[st].name).join(", ")}`,
+    }));
+  }
+  return out;
+};
+
 const pldAoeCombo =aoeComboOnOneTarget([[id("TOTAL_ECLIPSE"), id("FAST_BLADE")], [id("PROMINENCE"), id("RIOT_BLADE")]]);
 const warAoeCombo = aoeComboOnOneTarget([[id("OVERPOWER"), id("HEAVY_SWING")], [id("MYTHRIL_TEMPEST"), id("MAIM")],
   [id("CHAOTIC_CYCLONE"), id("INNER_CHAOS"), 3], [id("DECIMATE"), id("FELL_CLEAVE"), 3]]);
 
-export const PLD_CHECKS: JobCheck[] = [fightOrFlight, pldAoeCombo, atonementChainAtKill, atonementChainDropped];
+export const PLD_CHECKS: JobCheck[] = [fightOrFlight, pldAoeCombo, atonementChainAtKill, atonementChainDropped, requiescatChainLost];
 // Infuriate held at two charges (xivanalysis OGCDDowntime.ts with
 // `resetBy`): not in tracked-cooldowns.ts, because each Fell Cleave,
 // Decimate, Inner Chaos or Chaotic Cyclone takes 5s off its recharge,

@@ -216,7 +216,8 @@ and delete them from the header.
   - [sge.md](xiva-audit/sge.md): Sage, 0 candidates (Eukrasian
     Dyskrasia on one enemy built 2026-10-16).
   - [sch.md](xiva-audit/sch.md): Scholar, 3 covered.
-  - [pld.md](xiva-audit/pld.md): Paladin, 2 covered.
+  - [pld.md](xiva-audit/pld.md): Paladin, 2 covered (Requiescat run
+    out with Blades unpressed valued 2026-10-16).
   - [war.md](xiva-audit/war.md): Warrior, 0 candidates, 5 covered
     (Infuriate drift with its refunds built 2026-10-16).
   - [drk.md](xiva-audit/drk.md): Dark Knight, 0 candidates, 7 covered

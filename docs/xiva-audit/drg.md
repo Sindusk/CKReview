@@ -70,5 +70,8 @@ Bloodbath, Second Wind: not adopted).
 
 ## Open
 
-1. **drg/Procs/dropped** (covered). Expiries of Dive Ready, Nastrond
-   Ready and Dragon's Flight not seen firing.
+1. **drg/Procs/dropped** (covered). Dive Ready expiries fire on
+   QhRqZBwpyCY3Pja9 (fetched 2026-10-16; fight 2, Vyseras Targaryen): 0:29.8
+   and 5:56.3 (45k each), 2:56.8 forced (boss untargetable); match on its
+   page. Nastrond Ready and Dragon's Flight were lost only at deaths in the
+   15 lowest Red Hot and Deep Blue Dragoons.

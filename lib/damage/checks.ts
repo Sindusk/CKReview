@@ -990,7 +990,9 @@ export function checkProcs(ctx: PlayerCheckContext): DamageFinding[] {
           ? `${n} × (${k(ctx.values.perUse(consumerId))} average ${consumerName} − ${k(replaced)} average ${replacedName}, the GCD it takes the place of)`
           : ctx.game.procsClearedByGcd?.has(e.abilityId)
             ? `${n} × ${k(ctx.values.perUse(consumerId))} average ${consumerName} (the next weaponskill clears it, so it's gone)`
-            : `${n} × ${k(ctx.values.perUse(consumerId))} average ${consumerName} (upper bound: the GCD used instead did some damage)`,
+            : ctx.game.action(consumerId)?.onGcd === false
+              ? `${n} × ${k(ctx.values.perUse(consumerId))} average ${consumerName} (off the GCD, so nothing took its place)`
+              : `${n} × ${k(ctx.values.perUse(consumerId))} average ${consumerName} (upper bound: the GCD used instead did some damage)`,
         detail: `${e.abilityName} ${how}${n > 1 ? ` with ${n} stacks` : ""}`,
       }));
     };
