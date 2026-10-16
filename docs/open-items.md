@@ -254,9 +254,10 @@ and delete them from the header.
     2026-10-16; Enkindle, Mountain Buster, Ruin IV in a demi and
     Aetherflow at a kill matched three pages; Slipstream ticks and extra
     Ruin III not adopted).
-  - [rdm.md](xiva-audit/rdm.md): Red Mage, 5 candidates, 12 covered (mana
-    simulation with lanes and Dualcast running out built 2026-10-15,
-    compared on two pages).
+  - [rdm.md](xiva-audit/rdm.md): Red Mage, 2 candidates (invuln casts),
+    13 covered (mana simulation with lanes and Dualcast running out built
+    2026-10-15, compared on two pages; wrong finisher built 2026-10-16;
+    the pre-7.4 Manafication rules not adopted).
   - [whm.md](xiva-audit/whm.md): White Mage, 0 candidates, 10 covered
     (Blood Lily overcap and Misery left at a kill with Lily / Blood Lily
     lanes, Assize tracked, Lilies lost at the cap counted where a later

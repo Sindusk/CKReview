@@ -39,13 +39,13 @@
 | rdm/Combos/not-enough-mana | covered | `checkCombos` | an unenchanted melee GCD breaking the combo | Major. |
 | rdm/Combos/the-rest | covered | `checkCombos` | other combo breaks | Major. |
 | rdm/Combos/core-fallback | covered | `checkCombos` | timeouts and misses | Core tiers; dropped when any other break exists (xivanalysis quirk). |
-| rdm/MeleeCombos/wrong-finisher | candidate | — | Verholy / Verflare chosen against mana and procs | Minor 1, Medium 2, Major 3. Rests on the inferred mana gauge. |
+| rdm/MeleeCombos/wrong-finisher | covered | `rdmWrongFinisher` | Verholy / Verflare chosen against mana and procs | Built 2026-10-16 on the mana simulation: the higher colour's finisher while the lower colour's proc wasn't held and the colours stay under 30 apart gives up a sure proc for a 20% one, 80% of (proc spell − Jolt III). Opener's first 30s forgiven, as in xivanalysis. Colours under 6 apart aren't judged (the simulation runs ~5 short on some lanes; at 0-2 apart the first version made 25 of its 36 calls). 8 on disk, 1-8k: e.g. jN3XDrf2z8PmLgRJ Vamp Fatale pull 1 2:12 (78 White / 67 Black, Verholy; hand-checked: no proc followed), Doomtrain pull 5 6:03 and 7:30. Not matched on a page yet. |
 | rdm/MeleeCombos/delay-combo | wrong | — | — | Dead rule (counter commented out). |
 | rdm/ManaGauge/overcap | covered | `rdmManaCheck` (gauge-overcap; also White / Black Mana timeline lanes) | White / Black Mana over 100 | Built 2026-10-15 as ManaGauge.tsx's simulation: a spell's mana when it lands (none when it hits nothing: jN3XDrf2z8PmLgRJ Vamp pull 8's 1:08.4 Verstone on an untargetable Vamp Fatale, 2:05.0 Veraero III on a dead Coffinmaker), once per cast (xivanalysis adds it per damage event, so its AoE finishers on two targets count twice), enchanted melee spending, free under Magicked Swordplay; Dawntrail's Manafication grants none. Lost mana is an enchanted combo's chain over the 12s of spells it replaces, per 50. About a dozen on disk, mostly the finishers capping right after a free Magicked Swordplay combo (jN3XDrf2z8PmLgRJ Red Hot and Deep Blue pull 44 4:17-4:22, 4 + 4 + 4 Black). Model gap: 24 of 262 lanes have a spend the simulation lacked mana for (Vamp pull 8 6:49.9, ~5 White short; no gain in xivanalysis's table explains it), so those lanes are marked inference. Vamp pull 8: 0 here against xivanalysis's 3 (its double-counted AoE gains). jN3XDrf2z8PmLgRJ fight 58 (Red Hot and Deep Blue pull 44): 2 White, 12 Black here against its 5 and 15, the same 3-each gap (a two-target Scorch / Resolution counted twice there); both reset at the 2:10 death. |
 | rdm/ManaGauge/imbalance-loss | covered | `rdmManaCheck` | mana gained while the colours are 30+ apart | Built with xivanalysis's rule (the lower colour's gains halved while the other leads by more than 30); one finding per pull. None on disk: the samples never run 30 apart. |
 | rdm/ManaGauge/invuln-miss-loss | unverifiable | — | mana spells that didn't land | Needs the mana model; any non-hit counts (no downtime allowance). |
-| rdm/Manafication/gcd-count | candidate | — | (7.0-7.3) under 6 GCDs in Manafication | Major. Off from 7.4 in xivanalysis. |
-| rdm/Manafication/allowed-gcds | candidate | — | (7.0-7.3) a non-melee GCD in Manafication | Medium 1, Major 2. |
+| rdm/Manafication/gcd-count | wrong | — | (7.0-7.3) under 6 GCDs in Manafication | Major. Off from 7.4 in xivanalysis. Checked 2026-10-16 on the 32 pre-7.4 Red Mage pulls on disk (7.1 Queen Eternal, 7.2 Zelenia, 7.3 Necron): 97 of 101 windows had 6 GCDs; the other 4 ended in the Red Mage's death (xivanalysis counts those). Not adopted. |
+| rdm/Manafication/allowed-gcds | no-damage | — | (7.0-7.3) a non-melee GCD in Manafication | Medium 1, Major 2. The allowed list takes nearly every GCD (casts for rushing, Vercure). On the 101 windows the only one outside it was a Verraise (wNHvD38WTbFtGJKr Zelenia pull 8, 8:09): a raise. Not adopted. |
 | rdm/Swiftcast/unused | no-damage | — | Swiftcast unused | Utility. |
 | rdm/Swiftcast/bad-spell | no-damage | — | Swiftcast on a short spell | Utility, as for every job. |
 | rdm/CooldownDowntime/uses | verified | `checkCooldownDrift` | Acceleration, Manafication, Embolden, Fleche, Contre Sixte, Corps-a-corps held | The app counts fewer lost uses by method (whole uses, dead time forced). |
@@ -76,7 +76,11 @@ In priority order (biggest damage cost first):
 
 1. **rdm/ManaGauge/*** (covered): find the ~5 White Mana missing on Vamp
    pull 8 before 6:49.9 (24 of 262 lanes run a few short).
-2. **rdm/MeleeCombos/wrong-finisher** (candidate). Rests on the mana model.
-3. **rdm/Manafication/*** (candidates, 7.0-7.3 logs only).
-4. **rdm/Procs/grand-impact-dropped, Prefulgence, Vice of Thorns,
+2. **rdm/MeleeCombos/wrong-finisher** (covered 2026-10-16). Fires on 8
+   pulls; match it on a page (jN3XDrf2z8PmLgRJ Vamp Fatale pull 1, 2:12).
+   Fixing item 1 may move its calls.
+3. **rdm/Procs/grand-impact-dropped, Prefulgence, Vice of Thorns,
    Magicked Swordplay** (covered). Not seen firing.
+4. **rdm/Procs/invuln, rdm/MagickedSwordplay/invuln** (candidates).
+   `noDamageCasts` already values a cast that hit nothing; check whether
+   these add anything before building.

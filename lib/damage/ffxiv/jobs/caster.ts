@@ -164,7 +164,7 @@ import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import type { DamageFinding, GaugeTrack, JobCheck } from "../../types";
 import type { PlayerEvent } from "@/types/PlayerInfo";
 import { finding, type PlayerCheckContext } from "../../checks";
-import { forcedPart, inWindows, overlapMs } from "../../timeline";
+import { forcedPart, inWindows, mergeWindows, overlapMs } from "../../timeline";
 import { aoeComboOnOneTarget, baseValue, burstWindowFindings, castHits, clock, critMultOf, dotFindings, gaugeFindings, gaugeTrack, k, rollGainOf, statusWindows, gaugeCastTimes, type ExpectedAction, type GaugeEvent, type GaugeSpec } from "./shared";
 
 const ids = (...keys: string[]) => keys.filter((key) => A[key]).map((key) => A[key].id);
@@ -301,7 +301,12 @@ const searingLight: JobCheck = (ctx) => burstWindowFindings(ctx, {
 // - White / Black Mana overcap and imbalance (2026-10-15): `rdmManaCheck`
 //   below. On that pull it finds none against xivanalysis's 3 White: it
 //   adds mana per damage event, so AoE finishers on two targets count
-//   twice there. The cooldown drift check counts
+//   twice there.
+// - The wrong finisher (MeleeCombos.tsx, 2026-10-16): `rdmWrongFinisher`
+//   below, on the simulated mana. Not matched against a page yet. Not
+//   adopted: the 7.0-7.3 Manafication window rules (6 GCDs; allowed
+//   GCDs): on 101 pre-7.4 windows on disk, every short one was a death and
+//   the one disallowed GCD a Verraise. The cooldown drift check counts
 // fewer lost Fleche / Contre Sixte / Corps-a-corps uses than xivanalysis's
 // x/y, by method: it counts whole lost uses, with dead time forced.
 const FINISHERS = ids("VERFLARE", "VERHOLY");
@@ -1143,7 +1148,11 @@ const MANA_SPEND: [string, number][] = [
   ["ENCHANTED_RIPOSTE", 20], ["MANAFICATION_ENCHANTED_RIPOSTE", 20], ["ENCHANTED_ZWERCHHAU", 15],
   ["MANAFICATION_ENCHANTED_ZWERCHHAU", 15], ["ENCHANTED_REDOUBLEMENT", 15], ["MANAFICATION_ENCHANTED_REDOUBLEMENT", 15],
 ];
-export type RdmMana = { specs: GaugeSpec[]; imbalance: { t: number; white: number; black: number }[] };
+export type RdmMana = {
+  specs: GaugeSpec[]; imbalance: { t: number; white: number; black: number }[];
+  // Each landed Verflare / Verholy with the simulated mana just before it.
+  finishers: { t: number; id: number; white: number; black: number }[];
+};
 export function rdmMana(ctx: PlayerCheckContext): RdmMana {
   const gains = new Map(MANA_GAIN.filter(([key]) => A[key]).map(([key, w, b]) => [A[key].id, { w, b }]));
   const spends = new Map(MANA_SPEND.filter(([key]) => A[key]).map(([key, n]) => [A[key].id, n]));
@@ -1152,6 +1161,7 @@ export function rdmMana(ctx: PlayerCheckContext): RdmMana {
   const deaths = [...ctx.dead].sort((a, b) => a.startMs - b.startMs);
   const white: GaugeEvent[] = [], black: GaugeEvent[] = [];
   const imbalance: RdmMana["imbalance"] = [];
+  const finishers: RdmMana["finishers"] = [];
   let w = 0, b = 0, d = 0;
   for (const c of casts) {
     while (d < deaths.length && deaths[d].startMs <= c.timestamp) {
@@ -1165,6 +1175,7 @@ export function rdmMana(ctx: PlayerCheckContext): RdmMana {
       const landed = ctx.player.damageDone.some((e) => e.abilityId === c.abilityId && (e.amount ?? 0) > 0 &&
         e.timestamp >= c.timestamp && e.timestamp < c.timestamp + RDM_HIT_MS);
       if (!landed) continue;
+      if (FINISHERS.includes(c.abilityId)) finishers.push({ t: c.timestamp, id: c.abilityId, white: w, black: b });
       const gw = w > 0 && b - w > MANA_IMBALANCE ? Math.floor(gain.w / 2) : gain.w;
       const gb = b > 0 && w - b > MANA_IMBALANCE ? Math.floor(gain.b / 2) : gain.b;
       if (gw < gain.w || gb < gain.b) imbalance.push({ t: c.timestamp, white: gain.w - gw, black: gain.b - gb });
@@ -1202,8 +1213,55 @@ export function rdmMana(ctx: PlayerCheckContext): RdmMana {
       { name: "Black Mana", unit: "Black Mana", cap: MANA_CAP, unitValue: perMana, valueBasis: basis, events: black },
     ],
     imbalance,
+    finishers,
   };
 }
+
+// The wrong finisher (xivanalysis MeleeCombos.tsx): Verflare gives Verfire
+// Ready for sure when Black Mana is the lower colour, Verholy Verstone
+// Ready when White is (20% otherwise). The higher colour's finisher, with
+// the lower colour's proc not held and the two not about to run 30 apart
+// (the finisher's 11 would put them there: xivanalysis then allows it),
+// gave up a sure proc for a 20% one: 80% of a proc spell over the Jolt III
+// it replaces. Mana is the simulation's (rdmMana), so inference, and it
+// runs ~5 short on some lanes: colours under RDM_FINISHER_MARGIN apart
+// aren't judged (at 0-2 apart the first version called 25 of 36 on disk).
+// The opener's first 30s is forgiven, as in xivanalysis.
+const RDM_FINISHER_PROC_CHANCE = 0.2, RDM_OPENER_FORGIVE_MS = 30_000, RDM_FINISHER_MARGIN = 6;
+const rdmWrongFinisher: JobCheck = (ctx) => {
+  const out: DamageFinding[] = [];
+  const flare = A.VERFLARE?.id, holy = A.VERHOLY?.id;
+  if (!flare || !holy) return out;
+  const fire = statusWindows(ctx, S.VERFIRE_READY.id), stone = statusWindows(ctx, S.VERSTONE_READY.id);
+  const held = (ws: { startMs: number; endMs: number }[], t: number) => ws.some((x) => x.startMs < t - 50 && x.endMs >= t);
+  const jolt = ctx.values.perUse(A.JOLT_III?.id ?? -1);
+  const forced = mergeWindows(ctx.forced);
+  for (const f of rdmMana(ctx).finishers) {
+    if (f.t < RDM_OPENER_FORGIVE_MS || f.t >= ctx.endMs || Math.abs(f.white - f.black) < RDM_FINISHER_MARGIN) continue;
+    const blackLower = f.black < f.white;
+    const right = blackLower ? flare : holy;
+    if (f.id === right) continue;
+    // The right one's proc already held: using it would overwrite.
+    if (held(blackLower ? fire : stone, f.t)) continue;
+    // The wrong one would push the colours 30+ apart: xivanalysis's balance case.
+    if (Math.abs(f.white - f.black) + 11 > MANA_IMBALANCE) continue;
+    const procSpell = blackLower ? A.VERFIRE.id : A.VERSTONE.id;
+    const lost = (1 - RDM_FINISHER_PROC_CHANCE) * Math.max(0, ctx.values.perUse(procSpell) - jolt);
+    if (lost <= 0) continue;
+    const isForced = inWindows(f.t, forced);
+    const usedName = f.id === flare ? "Verflare" : "Verholy", rightName = blackLower ? "Verflare" : "Verholy";
+    out.push(finding(ctx, {
+      kind: "proc-lost", startMs: f.t, endMs: f.t, forced: isForced, inference: true,
+      cause: isForced ? forcedPart(f.t - 1, f.t + 1, ctx.forced).cause : undefined,
+      label: `${usedName} instead of ${rightName}`,
+      lostDamage: lost,
+      basis: `80% of (${k(ctx.values.perUse(procSpell))} average ${blackLower ? "Verfire" : "Verstone"} − ${k(jolt)} average Jolt III): ` +
+        `the sure proc given up for a 20% one (mana simulated from casts)`,
+      detail: `${usedName} at ${f.white} White / ${f.black} Black Mana: ${rightName} would have given ${blackLower ? "Verfire" : "Verstone"} Ready for sure`,
+    }));
+  }
+  return out;
+};
 const rdmManaCheck: JobCheck = (ctx) => {
   const mana = rdmMana(ctx);
   const out = mana.specs.flatMap((spec) => (spec.unitValue > 0 ? gaugeFindings(ctx, spec) : []));
@@ -1222,4 +1280,4 @@ const rdmManaCheck: JobCheck = (ctx) => {
   return out;
 };
 
-export const RDM_CHECKS: JobCheck[] = [manaStacks, dualcastWasted, verprocOverwrites, rdmManaCheck];
+export const RDM_CHECKS: JobCheck[] = [manaStacks, dualcastWasted, verprocOverwrites, rdmManaCheck, rdmWrongFinisher];
