@@ -106,6 +106,11 @@ lib/mechanics/
                                 doubled Exhaust, doll fed early / killed, Hand
                                 of Prayer / Pain, Throttle cleanses, Drainage
                                 tethers, Outburst, dead going into proteans)
+      intermission-limit-cut.ts — Limit Cut per-pull rules (numbers from head
+                                markers; stray sword/charge hits, sword aimed off
+                                the route, charge through the party, own knockback
+                                off the edge, Hawk Blaster, dead going in)
+      damage-context.ts       — Phase 1 damage context
                                 (the other tea/ files are research models only)
     trials/                   — Extreme trials
       doomtrain.ts            — Doomtrain (Hell on Rails EX) per-pull rules

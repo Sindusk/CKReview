@@ -143,6 +143,12 @@ philosophy and the data semantics this list assumes.
   opening tornado wave).
 - **Shadowbringers fights give no Damage Down.** TEA's avoidables are
   Minor unless they kill, like Doomtrain.
+- **A mechanic's casts can be missing from some pulls.** TEA's Hawk
+  Blaster casts are absent in 7 of 59 Limit Cut pulls while its swords are
+  there; anchor the clock on a second cast (TEA Limit Cut).
+- **A logged facing can point backwards.** TEA's Alpha Sword cone runs
+  along the cast's facing + 180: check the axis against the owner's
+  position in clean casts before measuring aim (TEA Limit Cut).
 - **A shared line's groups can be read from the pull itself.** Union the
   players of every line that hit 2+; a component of four is one group and
   the other group is its complement. One set's lines rarely place the
@@ -202,7 +208,14 @@ philosophy and the data semantics this list assumes.
   World duty). Find the owner
   among the hit players who held that timer's status (Oracle of Darkness).
 - **Head markers name bait owners** (`HeadMarker[]`, marked player as
-  `sourceID`; Usurper of Frost).
+  `sourceID`; Usurper of Frost). Numbered markers give the whole order:
+  TEA's Limit Cut 79-86 are numbers 1-8, and a player dead at the markers
+  gets none. The cast target names the holder only when the hit lands on
+  one player.
+- **A stray hit in a numbered sequence usually kills later.** TEA's Limit
+  Cut hits leave a 17s vulnerability, so the stray victim dies at their
+  own number; count that death on the stray hit, and skip the next attack
+  when it hits the same knocked-apart pair.
 - **A numbered debuff can be the assignment.** In Line I-IV plus the
   alpha/beta chain fixed which tower each player soaks. Check that the
   tower kind still matches its slot: after a death the order shifts
@@ -451,6 +464,8 @@ Classify every one before counting a called wipe. Known meanings:
   - Lindwurm II: 2.2-2.8s after a Mana Burst defam (off a platform)
   - Omega P1: ~2.3s after a Guided Missile Kyrios hit on a non-carrier
   - Omega P2: 2.5-2.8s after Beyond Defense jumped the party
+  - TEA Limit Cut: 2.1-3.1s after a sword or charge's damage event (often
+    the holder's own 20y charge)
 
   Keep these out of the called-wipe count.
 - **An uncleansed Doom:** no killing blow ~2s after it runs out at full

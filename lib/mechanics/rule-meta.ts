@@ -415,6 +415,11 @@ mechanic("ffxiv-ll-doll-feed", "Jagd Doll fed under 25% (owner)", 1, ["ffxiv-ll-
 mechanic("ffxiv-ll-throttle", "Throttle cleanses (healers)", 1, ["ffxiv-ll-throttle"]);
 mechanic("ffxiv-ll-drainage", "Drainage tethers (tanks)", 1, ["ffxiv-ll-drainage"]);
 exposure("targeted", ["ffxiv-ll-doll-feed", "ffxiv-ll-throttle", "ffxiv-ll-drainage"]);
+// The Epic of Alexander Limit Cut (intermission-limit-cut.ts): each numbered
+// sword/charge tests its number's holder (aim, own knockback).
+mechanic("ffxiv-lc-aim", "Limit Cut sword/charge aim (number holder)", 2, ["ffxiv-lc-aim"]);
+mechanic("ffxiv-lc-knockback", "Limit Cut own knockback (number holder)", 2, ["ffxiv-lc-knockback"]);
+exposure("targeted", ["ffxiv-lc-aim", "ffxiv-lc-knockback"]);
 // The Omega Protocol P1: each Program Loop round's towers test that round's
 // two In Line players (omega.ts reports both at every round).
 mechanic("ffxiv-top1-tower", "Program Loop towers (In Line soakers)", 1, ["ffxiv-top1-tower"]);

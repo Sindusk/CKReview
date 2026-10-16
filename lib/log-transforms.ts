@@ -75,6 +75,7 @@ import { detectLindwurmErrors } from "./mechanics/ffxiv/arcadion/lindwurm-1";
 import { detectLindwurm2Errors } from "./mechanics/ffxiv/arcadion/lindwurm-2";
 import { detectFatebreakerErrors } from "./mechanics/ffxiv/fru/fatebreaker";
 import { detectLivingLiquidErrors } from "./mechanics/ffxiv/tea/living-liquid";
+import { detectTeaLimitCutErrors } from "./mechanics/ffxiv/tea/intermission-limit-cut";
 import { detectOmegaErrors } from "./mechanics/ffxiv/top/omega";
 import { detectOmegaMFErrors } from "./mechanics/ffxiv/top/omega-mf";
 import { detectOmegaReconfiguredErrors } from "./mechanics/ffxiv/top/omega-reconfiguredd";
@@ -1699,6 +1700,7 @@ export function transformFFightToPull(
     ...detectEnterTheDragonErrors(players, deathEvents, enemyCastEvents, npcHits, reportedOccurrences),
     ...detectPandoraErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
     ...detectLivingLiquidErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
+    ...detectTeaLimitCutErrors(players, deathEvents, enemyCastEvents, headMarkers, reportedOccurrences),
     ...detectOmegaErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),
     ...detectOmegaMFErrors(players, deathEvents, enemyCastEvents, headMarkers, reportedOccurrences),
     ...detectOmegaReconfiguredErrors(players, deathEvents, enemyCastEvents, reportedOccurrences),

@@ -354,6 +354,14 @@ const MECHANICS = {
     },
   },
 
+  'limit-cut-tea': {
+    game: 'ff',
+    load: () => requireTsFromRoot('lib/mechanics/ffxiv/tea/intermission-limit-cut.ts'),
+    run({ mod, ctxs }) {
+      for (const c of ctxs) printPullErrors(c, mod.detectTeaLimitCutErrors(c.relPlayers(), c.relDeaths(), c.relEnemyCasts(), c.relHeadMarkers()));
+    },
+  },
+
   omega: {
     game: 'ff',
     load: () => ({
