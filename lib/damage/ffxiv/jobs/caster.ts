@@ -892,8 +892,61 @@ const blmGaugeChecks: JobCheck = (ctx) => {
     "average Fire III from Astral Fire");
   judge(A.FIRE_IV.id, (b) => b.af === ELEMENT_MAX, (b) => b.af > 0 && b.af < ELEMENT_MAX,
     "Fire IV below Astral Fire III", "Fire IV before reaching Astral Fire III", "average Fire IV at Astral Fire III");
+  out.push(...despairSkipped(ctx, gauge, cycle));
   return out;
 };
+
+// Despair skipped (xivanalysis RotationWatchdog ExpectedFireSpellsEvaluator's
+// Despair count), from the logged MP (PlayerEvent.mp, before the cast's
+// cost; samples fetched before 2026-10-16 have none and aren't judged): a
+// cast that leaves Astral Fire with 800+ MP and no Despair since the fire
+// phase began or the last Manafont refilled it. Despair spends whatever is
+// left, and Umbral Ice refills it anyway. Dawntrail's rotation has one each
+// side of Manafont (after its six Fire IVs, 2800 MP remain). Worth her
+// average Despair less her average rotation GCD (the GCD it adds to the
+// cycle). Downtime within a GCD of the exit, or a death in the phase, makes
+// it forced (shown, not counted): the fire phase was cut short.
+// r4qDkR9btJCXnKWd Doomtrain pull 6 3:16.8: Blizzard III at 2800 MP after
+// the 2:45.7 Manafont's six Fire IVs and Flare Star, no Despair.
+const DESPAIR_MIN_MP = 800;
+function despairSkipped(ctx: PlayerCheckContext, gauge: BlmGauge, cycle: number): DamageFinding[] {
+  const despair = ctx.values.perUse(A.DESPAIR.id);
+  if (despair <= 0) return [];
+  const out: DamageFinding[] = [];
+  let since: number | undefined, despaired = false;
+  const ICE_GCDS = new Set(ids("BLIZZARD_I", "BLIZZARD_II", "HIGH_BLIZZARD_II", "BLIZZARD_III", "BLIZZARD_IV", "FREEZE", "UMBRAL_SOUL"));
+  // Back in Astral Fire before any ice spell: the MP carried over
+  // (7zwpcLxk2Fd1h6Vr 2:06.1, Transpose then a Firestarter Fire III).
+  const returns = (i: number) => {
+    for (const n of gauge.casts.slice(i + 1)) {
+      if (ICE_GCDS.has(n.cast.abilityId)) return false;
+      if (n.after.af > 0) return true;
+    }
+    return false;
+  };
+  for (const [i, { cast: c, before, after }] of gauge.casts.entries()) {
+    if (after.af > 0 && (before.af === 0 || c.abilityId === A.MANAFONT.id)) { since = c.timestamp; despaired = false; }
+    if (c.abilityId === A.DESPAIR.id) despaired = true;
+    if (!(before.af > 0 && after.af === 0)) continue;
+    if (returns(i)) continue;
+    const start = since;
+    since = undefined;
+    if (despaired || start === undefined || c.mp === undefined || c.mp < DESPAIR_MIN_MP || c.timestamp < 0) continue;
+    const gcdMs = ctx.baseGcdMs * ctx.factorAt(c.timestamp);
+    const during = forcedPart(c.timestamp - gcdMs, c.timestamp + gcdMs, ctx.forced);
+    const died = ctx.dead.some((d) => d.startMs >= start && d.startMs <= c.timestamp + gcdMs);
+    const moving = inWindows(c.timestamp, ctx.movement ?? []);
+    const forced = during.ms > 0 || died || moving;
+    out.push(finding(ctx, {
+      kind: "wrong-gcd", startMs: c.timestamp, endMs: c.timestamp, forced, movement: moving || undefined,
+      cause: during.ms > 0 ? during.cause : died ? "dead" : undefined,
+      label: "Despair skipped", lostDamage: Math.max(0, despair - cycle),
+      basis: `${k(despair)} average Despair − ${k(cycle)} her average rotation GCD (the GCD it adds)`,
+      detail: `${c.abilityName} left Astral Fire at ${c.mp} MP with no Despair since ${clock(start)}: ${DESPAIR_MIN_MP}+ MP buys one`,
+    }));
+  }
+  return out;
+}
 
 export const BLM_CHECKS: JobCheck[] = [highThunder, blmAoe, polyglot, leyLines, blmWrongGcds, blmGaugeChecks];
 // xivanalysis MultiHitSkills.ts, each at the highest minimum any patch

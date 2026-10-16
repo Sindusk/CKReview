@@ -244,11 +244,12 @@ and delete them from the header.
     (Double Check / Checkmate charge simulation and lanes 2026-10-15; Heat / Battery
     overcap, Reassemble and the rebuilt Wildfire count verified on 3
     pages 2026-10-15; Queen without Collider not adopted).
-  - [blm.md](xiva-audit/blm.md): Black Mage, 1 candidate (pre-7.2
-    Firestarter), 15 covered (full gauge
+  - [blm.md](xiva-audit/blm.md): Black Mage, 2 candidates (pre-7.2
+    Firestarter; Manafont timing, never seen), 16 covered (full gauge
     simulation and lanes; Polyglot, Paradox, cold Fire III, Ley Lines,
     Fire I, Umbral Soul, lukewarm Fire IV verified on 10 xivanalysis
-    pages 2026-10-15); MP-based rules unverifiable.
+    pages 2026-10-15; Despair skipped built 2026-10-16 from the logged MP
+    on 9 re-fetched pulls, not matched on a page).
   - [smn.md](xiva-audit/smn.md): Summoner, 0 candidates, 11 covered
     (demi Enkindle / Deathflare / Sunflare, Mountain Buster, Ruin IV in a
     demi, Aetherflow and Further Ruin with lanes, Physick built
