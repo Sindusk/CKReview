@@ -25,7 +25,7 @@
 | rdm/ManaStackGauge/lost-stacks | verified | `manaStacks` | a GCD other than the finisher chain after 3 Mana Stacks | Major. Vamp 5:04 (Grand Impact) matched. The app sees every GCD; xivanalysis misses Jolt III (bug). |
 | rdm/ManaStackGauge/overcap | covered | `manaStacks` | a 4th enchanted melee GCD with 3 stacks | Major. |
 | rdm/Dualcast/wasted | verified | `dualcastWasted` | Dualcast spent on an instant (enchanted melee, Grand Impact) or short cast | Minor 1, Medium 3, Major 5. Matched on Vamp. |
-| rdm/Dualcast/expired | candidate | — | Dualcast expiring unused | Medium 1, Major 2. Consumed by any spell, so `checkProcs` finds no single consumer. No death allowance in xivanalysis. |
+| rdm/Dualcast/expired | covered | `dualcastWasted` ("Dualcast ran out") | Dualcast expiring unused | Medium 1, Major 2. Built 2026-10-15: a Dualcast removed with no cast at that moment is the free hardcast lost (a Verthunder / Veraero III over a Jolt III); forced time or a death right after: shown, not counted. 18 on disk (14 counted). xivanalysis's "lost due to not casting" also counts a Dualcast an instant GCD consumed (its cast hook only clears it for spells with a cast time): jN3XDrf2z8PmLgRJ fight 58's one is the 5:14.2 Enchanted Riposte, which `dualcastWasted` already reports as "spent on Enchanted Riposte" (1 = 1). |
 | rdm/Procs/missed-verfire-verstone | verified | `checkProcs` | Verfire / Verstone Ready expiring | Minor 1, Medium 2, Major 7. Vamp's expired Verfire matched. |
 | rdm/Procs/overwritten | verified | `verprocOverwrites` | Verfire / Verstone Ready granted while held | Minor 1, Medium 100 (deliberately soft). Vamp 4 + 5 matched. |
 | rdm/Procs/invuln | candidate | — | Verfire / Verstone spent on an invulnerable target | Minor 1, Medium 2, Major 3. `noDamageCasts` sees a cast that hit nothing; this is most of it. |
@@ -41,7 +41,7 @@
 | rdm/Combos/core-fallback | covered | `checkCombos` | timeouts and misses | Core tiers; dropped when any other break exists (xivanalysis quirk). |
 | rdm/MeleeCombos/wrong-finisher | candidate | — | Verholy / Verflare chosen against mana and procs | Minor 1, Medium 2, Major 3. Rests on the inferred mana gauge. |
 | rdm/MeleeCombos/delay-combo | wrong | — | — | Dead rule (counter commented out). |
-| rdm/ManaGauge/overcap | covered | `rdmManaCheck` (gauge-overcap; also White / Black Mana timeline lanes) | White / Black Mana over 100 | Built 2026-10-15 as ManaGauge.tsx's simulation: a spell's mana when it lands (none when it hits nothing: jN3XDrf2z8PmLgRJ Vamp pull 8's 1:08.4 Verstone on an untargetable Vamp Fatale, 2:05.0 Veraero III on a dead Coffinmaker), once per cast (xivanalysis adds it per damage event, so its AoE finishers on two targets count twice), enchanted melee spending, free under Magicked Swordplay; Dawntrail's Manafication grants none. Lost mana is an enchanted combo's chain over the 12s of spells it replaces, per 50. About a dozen on disk, mostly the finishers capping right after a free Magicked Swordplay combo (jN3XDrf2z8PmLgRJ Red Hot and Deep Blue pull 44 4:17-4:22, 4 + 4 + 4 Black). Model gap: 24 of 262 lanes have a spend the simulation lacked mana for (Vamp pull 8 6:49.9, ~5 White short; no gain in xivanalysis's table explains it), so those lanes are marked inference. Vamp pull 8: 0 here against xivanalysis's 3 (its double-counted AoE gains). |
+| rdm/ManaGauge/overcap | covered | `rdmManaCheck` (gauge-overcap; also White / Black Mana timeline lanes) | White / Black Mana over 100 | Built 2026-10-15 as ManaGauge.tsx's simulation: a spell's mana when it lands (none when it hits nothing: jN3XDrf2z8PmLgRJ Vamp pull 8's 1:08.4 Verstone on an untargetable Vamp Fatale, 2:05.0 Veraero III on a dead Coffinmaker), once per cast (xivanalysis adds it per damage event, so its AoE finishers on two targets count twice), enchanted melee spending, free under Magicked Swordplay; Dawntrail's Manafication grants none. Lost mana is an enchanted combo's chain over the 12s of spells it replaces, per 50. About a dozen on disk, mostly the finishers capping right after a free Magicked Swordplay combo (jN3XDrf2z8PmLgRJ Red Hot and Deep Blue pull 44 4:17-4:22, 4 + 4 + 4 Black). Model gap: 24 of 262 lanes have a spend the simulation lacked mana for (Vamp pull 8 6:49.9, ~5 White short; no gain in xivanalysis's table explains it), so those lanes are marked inference. Vamp pull 8: 0 here against xivanalysis's 3 (its double-counted AoE gains). jN3XDrf2z8PmLgRJ fight 58 (Red Hot and Deep Blue pull 44): 2 White, 12 Black here against its 5 and 15, the same 3-each gap (a two-target Scorch / Resolution counted twice there); both reset at the 2:10 death. |
 | rdm/ManaGauge/imbalance-loss | covered | `rdmManaCheck` | mana gained while the colours are 30+ apart | Built with xivanalysis's rule (the lower colour's gains halved while the other leads by more than 30); one finding per pull. None on disk: the samples never run 30 apart. |
 | rdm/ManaGauge/invuln-miss-loss | unverifiable | — | mana spells that didn't land | Needs the mana model; any non-hit counts (no downtime allowance). |
 | rdm/Manafication/gcd-count | candidate | — | (7.0-7.3) under 6 GCDs in Manafication | Major. Off from 7.4 in xivanalysis. |
@@ -74,11 +74,9 @@
 
 In priority order (biggest damage cost first):
 
-1. **rdm/ManaGauge/*** (covered): compare a page where it fires, e.g.
-   jN3XDrf2z8PmLgRJ Red Hot and Deep Blue pull 44 (Laura Razzy), and
-   find the ~5 White Mana missing on Vamp pull 8 before 6:49.9.
-2. **rdm/Dualcast/expired** (candidate). A lost free hardcast each.
-3. **rdm/MeleeCombos/wrong-finisher** (candidate). Rests on the mana model.
-4. **rdm/Manafication/*** (candidates, 7.0-7.3 logs only).
-5. **rdm/Procs/grand-impact-dropped, Prefulgence, Vice of Thorns,
+1. **rdm/ManaGauge/*** (covered): find the ~5 White Mana missing on Vamp
+   pull 8 before 6:49.9 (24 of 262 lanes run a few short).
+2. **rdm/MeleeCombos/wrong-finisher** (candidate). Rests on the mana model.
+3. **rdm/Manafication/*** (candidates, 7.0-7.3 logs only).
+4. **rdm/Procs/grand-impact-dropped, Prefulgence, Vice of Thorns,
    Magicked Swordplay** (covered). Not seen firing.

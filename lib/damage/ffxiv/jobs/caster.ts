@@ -309,8 +309,25 @@ const dualcastWasted: JobCheck = (ctx): DamageFinding[] => {
   for (const e of ctx.player.buffs ?? []) {
     if (e.abilityId !== S.DUALCAST.id || e.buffStatus !== "removed" || e.timestamp >= ctx.endMs) continue;
     const used = ctx.uses.find((u) => Math.abs(u.startMs - e.timestamp) <= 100);
+    // Ran out with no GCD to spend it (xivanalysis Dualcast.tsx, "lost due
+    // to not casting"): the same free hardcast lost. In forced time or
+    // just before a death: shown, not counted. jN3XDrf2z8PmLgRJ Red Hot
+    // and Deep Blue pull 44 (Laura Razzy) matches its one.
+    if (!used) {
+      if (ctx.player.casts.some((c) => Math.abs(c.timestamp - e.timestamp) <= 100)) continue;
+      const during = forcedPart(e.timestamp - 1, e.timestamp + 1, ctx.forced);
+      const died = ctx.dead.some((d) => d.startMs >= e.timestamp - 100 && d.startMs - e.timestamp <= 2_000);
+      out.push(finding(ctx, {
+        kind: "proc-lost", startMs: e.timestamp, endMs: e.timestamp, forced: during.ms > 0 || died, inference: true,
+        cause: during.ms > 0 ? during.cause : died ? "lost to the death that followed" : undefined,
+        label: "Dualcast ran out", lostDamage: value,
+        basis: `a free Verthunder / Veraero III (${k(best(ctx, ids("VERTHUNDER_III", "VERAERO_III")))}) over a Jolt III (${k(ctx.values.perUse(A.JOLT_III.id))})`,
+        detail: "Dualcast ran out with no spell cast",
+      }));
+      continue;
+    }
     // A spell with a base cast time is what Dualcast is for.
-    if (!used || (BASE_CAST_MS.get(used.action.id) ?? 0) > 0) continue;
+    if ((BASE_CAST_MS.get(used.action.id) ?? 0) > 0) continue;
     out.push(finding(ctx, {
       kind: "proc-lost", startMs: e.timestamp, endMs: e.timestamp, forced: false, inference: true,
       label: `Dualcast spent on ${used.abilityName}`,
