@@ -138,7 +138,21 @@ philosophy and the data semantics this list assumes.
   before it and flag that, never the penalty's victims.
 - **A killed add's killer is in damageDone.** Player hits carry the
   target's HP after the hit; the one leaving a Jagd Doll at 0, 0.1-0.2s
-  before its failure cast, names who killed it (TEA Living Liquid).
+  before its failure cast, names who killed it (TEA Living Liquid). A DoT
+  tick that kills logs the HP from before it, equal to its own amount, and
+  no 0-HP event.
+- **A bait nobody took is the absent baiter's, not the takers'.** With
+  nearest-player baits, a group member standing too far pulls their bait
+  onto the next nearest: name the one who baited nothing, not those it
+  landed on (TEA Living Liquid waves; user, VOD).
+- **A lost sequence makes everything after it fallout.** Once a numbered
+  sequence loses a holder whose turn is still to come, or a shared
+  status loses its last lasting copy, later attacks and passes can't be
+  resolved: stop flagging them and mark the cutoff at the loss (TEA Limit
+  Cut, Decree Nisi; user, VOD).
+- **An assignment by party-list order isn't in the log.** Healer cleanse
+  splits follow it, so "the healer who cleansed fewer" is usually the
+  wrong one; keep such misses player-less (TEA Throttle; user).
 - **An add's owner is its auto-attack target.** TEA's dolls fixate their
   first attacker; the autos named the owner every pull, and the one DPS
   without a doll owned the one fed before it ever swung.

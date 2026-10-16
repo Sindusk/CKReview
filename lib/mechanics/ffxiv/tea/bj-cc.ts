@@ -58,6 +58,20 @@
 //   B42 +106.3, C6 +104.3) end in a full-raid Final Sentence at Gavel
 //   (B40, B42, C8), as does a player dead at Gavel (B44, the tank killed by
 //   autos at +125).
+// - A death loses the colors when the player is still dead from Limit Cut
+//   at the first pass (B1, user: "without all 8 alive it's not
+//   resolvable"), or dies holding a color whose other copies run out
+//   within 5s (B25 the Paladin walked into the wall 1.8s before the
+//   donor's ran out; B31 the Warrior died to a chakram holding the only γ;
+//   B36). Nisi errors after it are fallout (user: B1, B31). A player
+//   raised before the first pass, or dying beside a lasting copy, is not.
+// - Passes 1-3: the supports stand still and the DPS walk to them (NAUR;
+//   user, B14: the black mage didn't go to the sage). Pass 4 at the ice is
+//   a crowd where players dodge each other ("car crash", B22).
+// - No-killing-blow deaths outside a called wipe: walked into the wall
+//   (B25, user). B11's Paladin at +38 is unreviewed.
+// - Lightning 2 is Brute Justice's tank's to carry at the wall; both melee
+//   in it (B22, B24) is the tank's position, Minor (user, B24).
 // - Water: 3-4 players in 90 of 95 rounds; 1-2 in B24, B30, C6, C11, C19,
 //   all lethal (29-32k each). Lightning: exactly two in 87; three or four
 //   in B22, B24, B30, B37, B42, C19, C22 (survivable unless already low);
@@ -96,12 +110,20 @@
 //   Wind, and Flarethrower on anyone beside the tank who baited it.
 // ffxiv-bjcc-nisi-collision (Major, both players: the log can't say who
 //   moved), ffxiv-bjcc-nisi-wrong-color (Major, the receiver and the one
-//   other-side donor of that color), ffxiv-bjcc-nisi-dropped (Major, the
-//   last holder and the player it was owed to: after Verdict the matching
-//   Judgment, before it the one free player of the other side). A drop
-//   owed to a dead player is fallout (C6). Each sets the Raid
-//   ffxiv-bjcc-nisi-failed; ffxiv-bjcc-gavel (Raid) marks a Gavel that
-//   killed three or more with nothing earlier.
+//   other-side donor of that color), ffxiv-bjcc-nisi-dropped (Major: at
+//   passes 1-3 the DPS of the pair, holder or receiver; at pass 4 both, the
+//   receiver being after Verdict the matching Judgment, before it the one
+//   free player of the other side). A drop owed to a dead player is
+//   fallout (C6). Each sets the Raid ffxiv-bjcc-nisi-failed;
+//   ffxiv-bjcc-gavel (Raid) marks a Gavel that killed three or more with
+//   nothing earlier.
+// ffxiv-bjcc-nisi-death (Raid): a player dead at Judgment Nisi and still
+//   dead 20s later, or a death taking a color with no other copy lasting
+//   5s more. Every Nisi error after it is fallout (not reported). It yields
+//   to a penalty within 3s (Punishing on a carrier's death).
+// ffxiv-bjcc-wall (Major): a no-killing-blow death that's not a called
+//   wipe, a Photon-tick death, or within 6s of a Drainage / Propeller Wind
+//   hit.
 // ffxiv-bjcc-water-short (Major if it killed or Punishing followed, else
 //   Minor): every free pool player missing from a Water under 3. Pool:
 //   healers and ranged DPS in rounds 1-2, all DPS in round 3, minus the
@@ -109,7 +131,8 @@
 // ffxiv-bjcc-lightning-alone (Major/Minor), on the round's helper: round 1
 //   Brute Justice's tank, round 2 the healer under Water Resistance Down,
 //   round 3 Cruise Chaser's tank. ffxiv-bjcc-lightning-extra (Minor; Major
-//   if it killed): anyone else in a Lightning with its helper.
+//   if it killed): anyone else in a Lightning with its helper; in round 2
+//   carried by Brute Justice's tank, that tank instead (stand at the wall).
 // ffxiv-bjcc-punishing (Raid), naming the carrier's death or the
 //   re-application; skipped for a reset death in the last 12s (C30).
 // ffxiv-bjcc-mine-missed (Major, the first mine's target, if alive at the
@@ -133,14 +156,19 @@
 //   hits under their own Resistance Down (none on disk); tank deaths to
 //   autos (C6, C24, B19, B44: mitigation; their Punishing / Gavel is the
 //   cutoff); the enrage (never reached).
-// OPEN QUESTIONS (no VOD yet):
-// 1. Collisions name both players. Who moved (B43 +63 two melee in the
-//    west Enumeration; C22 +101.5 two ranged at pass 3)?
-// 2. Wrong colors name receiver and donor. At pass 3 supports stand in a
-//    line and DPS walk to them; is the DPS donor the one at fault?
-// 3. A pre-Verdict drop with no single free receiver names the holder only
-//    (B25 +51.9, the Paladin dead 2s before with no killing blow).
-// 4. Lightning 2 with two melee besides the healer (B24): plan or error?
+// VOD review 2026-10-16 (user): report B pulls 1, 14, 22, 24, 25, 31,
+//   rulings in expectations/rulings.json. Old questions 3 (B25: the
+//   Paladin walked into the wall) and 4 (B24: the tank's position) are
+//   answered above; pass 3's wrong color (B31) turned out fallout, and the
+//   pass-4 wrong color (B22) was the support running into the DPS, with
+//   the user unsure, so both stay named.
+// OPEN QUESTIONS:
+// 1. Collisions name both players. Who moved (B37 pass 4, B43 +63 two
+//    melee in the west Enumeration; C22 +101.5 two ranged at pass 3)?
+// 2. Wrong colors at pass 3 name receiver and donor: is the DPS donor at
+//    fault, as for drops?
+// 3. A drop at passes 1-3 held by a support with no single free receiver
+//    now names nobody (the DPS who should have come is unknown).
 //
 // -- GUIDE-DERIVED MODEL (2026-10-15) --
 // Research only, no detector and no claims verified against local logs.
@@ -456,6 +484,8 @@ export const BJCC_NISI_COLLISION_RULE_ID  = "ffxiv-bjcc-nisi-collision";
 export const BJCC_NISI_WRONG_RULE_ID      = "ffxiv-bjcc-nisi-wrong-color";
 export const BJCC_NISI_DROPPED_RULE_ID    = "ffxiv-bjcc-nisi-dropped";
 export const BJCC_NISI_FAILED_RULE_ID     = "ffxiv-bjcc-nisi-failed";
+export const BJCC_NISI_DEATH_RULE_ID      = "ffxiv-bjcc-nisi-death";
+export const BJCC_WALL_RULE_ID            = "ffxiv-bjcc-wall";
 export const BJCC_GAVEL_RULE_ID           = "ffxiv-bjcc-gavel";
 export const BJCC_WATER_SHORT_RULE_ID     = "ffxiv-bjcc-water-short";
 export const BJCC_LIGHTNING_ALONE_RULE_ID = "ffxiv-bjcc-lightning-alone";
@@ -530,6 +560,18 @@ const CALLED_WIPE_END_MS  = 12_000;
 // Photon leaves everyone at 1 HP; a Nisi tick right after kills with no
 // killing blow (B8, B12). That's healing, not a reset.
 const PHOTON_DOT_MS = 10_000;
+// A Nisi-death cutoff yields to a penalty this soon after it (Punishing on
+// a carrier's death lands within ~0.2s).
+const NISI_DEATH_YIELD_MS = 3_000;
+// Judgment Nisi lands ~+16 after J Kick and the first pass at +38-40.
+const NISI_FIRST_PASS_MS = 20_000;
+// A color whose other copies all run out this soon after its holder died
+// is lost with them (B25: 1.8s). A fresh copy lasts 36s.
+const NISI_LAST_COPY_MS = 5_000;
+// A no-killing-blow death this soon after a Drainage knockback or Propeller
+// Wind is that hit's (knockbacks off the edge die 2.1-3.4s later elsewhere
+// in TEA).
+const WALL_PUSH_MS = 6_000;
 
 type Iv = { p: PlayerInfo; col: string; a: number; b: number };
 
@@ -537,6 +579,16 @@ const isDps = (p: PlayerInfo) => p.role === "DPS";
 const range = (p: PlayerInfo) => FF_JOB_BY_NAME[p.specName.replace(/ /g, "")]?.rangeType;
 const ranged = (p: PlayerInfo) => isDps(p) && range(p) !== "Melee";
 const sameSide = (a: PlayerInfo, b: PlayerInfo) => isDps(a) === isDps(b);
+
+/** A death's cause for a description: the killing ability, or what it wasn't. */
+function causeOf(players: PlayerInfo[], d: DeathEvent): string {
+  if (d.killingAbilityGameId) {
+    const p = players.find((x) => x.name === d.player);
+    const hit = p?.damageTaken.filter((e) => e.abilityId === d.killingAbilityGameId && e.timestamp <= d.timestamp).pop();
+    return d.cause || hit?.abilityName || "an attack";
+  }
+  return afterPhoton(players, d) ? "a Decree Nisi tick at 1 HP after Photon" : "no killing blow";
+}
 
 /** One status's intervals on one player, refreshes merged. */
 function intervals(p: PlayerInfo, ids: number[]): { id: number; a: number; b: number }[] {
@@ -587,7 +639,9 @@ export function detectBjccErrors(
   const errors: PullError[] = [];
   const raids: PullError[] = [];
   errors.push(...detectAvoidables(players, life, start, end));
-  const nisi = detectNisi(players, deathEvents, life, casts, start, end);
+  const resets = resetDeaths(players, deathEvents, start, lastEvent);
+  errors.push(...detectWallDeaths(players, deathEvents, start, end, resets));
+  const nisi = detectNisi(players, deathEvents, life, casts, start, end, resets);
   errors.push(...nisi.errors);
   raids.push(...nisi.raids);
   const el = detectElements(players, deathEvents, life, casts, mt, ot, lastEvent, occurrences);
@@ -599,7 +653,14 @@ export function detectBjccErrors(
 
   // Only the earliest mechanic Raid marker; generic cutoffs only without one,
   // and only for this phase's own wipes.
-  const firstRaid = raids.sort((a, b) => a.timestamp - b.timestamp)[0];
+  raids.sort((a, b) => a.timestamp - b.timestamp);
+  let firstRaid = raids[0];
+  // A death that also set off Punishing (its carrier) or another mechanic
+  // penalty within 3s: that penalty names the same death more precisely.
+  if (firstRaid?.ruleId === BJCC_NISI_DEATH_RULE_ID) {
+    const same = raids.find((r) => r !== firstRaid && r.timestamp - firstRaid!.timestamp <= NISI_DEATH_YIELD_MS);
+    if (same) firstRaid = same;
+  }
   if (firstRaid) errors.push(firstRaid);
   else if (!stasis && lastEvent - start > LC_HANDOFF_MS) {
     const marker = genericCutoff(players, deathEvents, life, start, lastEvent);
@@ -645,7 +706,7 @@ const NISI_ADVICE = "Keep apart from every other Decree Nisi carrier and touch o
  *   taking it (B4, B14, B19, B25, B36, B38, B42, C6).
  * Each dooms the pull: Gavel then kills everyone (B40, B42, C8).
  */
-function detectNisi(players: PlayerInfo[], deaths: DeathEvent[], life: Life, casts: EnemyEvent[], start: number, end: number) {
+function detectNisi(players: PlayerInfo[], deaths: DeathEvent[], life: Life, casts: EnemyEvent[], start: number, end: number, resets: Set<DeathEvent>) {
   const errors: PullError[] = [];
   const raids: PullError[] = [];
   const ivs: Iv[] = players.flatMap((p) => intervals(p, Object.keys(NISI).map(Number))
@@ -660,10 +721,43 @@ function detectNisi(players: PlayerInfo[], deaths: DeathEvent[], life: Life, cas
   const sentenced = (p: PlayerInfo, t: number) => deaths.some((d) => d.player === p.name && d.killingAbilityGameId === FINAL_SENTENCE && d.timestamp >= t && d.timestamp <= t + 4000);
   const fail = (t: number, what: string) => raids.push(raidMarker(BJCC_NISI_FAILED_RULE_ID, "Decree Nisi Failed",
     `${what} The Nisi colors can't all reach Gavel from here; unresolvable from here, treated as the cutoff point.`, t, FINAL_SENTENCE, "Final Sentence"));
-  const passName = (t: number) => {
+  const passOf = (t: number) => {
     const rel = t - start;
-    return rel < 30_000 ? "before the first pass" : rel < 55_000 ? "at the first pass" : rel < 82_000 ? "at the second pass" : rel < 110_000 ? "at the third pass" : "at the fourth pass";
+    return rel < 30_000 ? 0 : rel < 55_000 ? 1 : rel < 82_000 ? 2 : rel < 110_000 ? 3 : 4;
   };
+  const passName = (t: number) => ["before the first pass", "at the first pass", "at the second pass", "at the third pass", "at the fourth pass"][passOf(t)];
+
+  // Every player must be alive from Judgment Nisi to Gavel to hold a color
+  // (user, 2026-10-16: B1's sage dead since Limit Cut made its first-pass
+  // collision fallout; B25 the Paladin's death lost the color it held; B31
+  // the dancer's death to a mine made the pass-3 wrong color fallout).
+  // Nisi errors after that are its fallout, and the death is the cutoff.
+  const applyT = Math.min(...ivs.filter((w) => w.a >= start).map((w) => w.a));
+  const lastT = gavel ? gavel.timestamp - 1000 : end;
+  let lost: { t: number; text: string } | undefined;
+  // Two deaths lose the colors: a player still dead from before Judgment
+  // Nisi at the first pass, or a death taking a color whose only other
+  // copies run out within NISI_LAST_COPY_MS (B25: the donor's copy ran out
+  // 1.8s after the Paladin died holding the new one). A raised player can
+  // still be passed a color, so other deaths aren't the cutoff.
+  const deadIn = Number.isFinite(applyT) ? players.filter((p) => !life.alive(p, applyT + 500) && !life.alive(p, applyT + NISI_FIRST_PASS_MS)) : [];
+  if (deadIn.length) {
+    lost = { t: applyT, text: `${namesOf(deadIn)} ${deadIn.length === 1 ? "was" : "were"} dead when Judgment Nisi went out and still dead at the first pass, so not every color can be passed and held to Gavel.` };
+  } else if (Number.isFinite(applyT)) {
+    for (const d of deaths.filter((x) => x.killingAbilityGameId !== FINAL_SENTENCE && !resets.has(x) && x.timestamp - DEATH_EVENT_LAG_MS > applyT && x.timestamp - DEATH_EVENT_LAG_MS < lastT).sort((a, b) => a.timestamp - b.timestamp)) {
+      const t = d.timestamp - DEATH_EVENT_LAG_MS;
+      const held = ivs.filter((y) => y.p.name === d.player && y.a <= t + 100 && y.b >= t - 100).map((y) => y.col);
+      const gone = held.filter((col) => !ivs.some((y) => y.col === col && y.p.name !== d.player && y.a <= t + 100 && y.b > t + NISI_LAST_COPY_MS && life.alive(y.p, t + 100)));
+      if (!gone.length) continue;
+      lost = { t, text: `${d.player} died (${causeOf(players, d)}) holding Decree Nisi ${gone.join("/")}, its last lasting copy, so the color is lost before Gavel.` };
+      break;
+    }
+  }
+  // Not on a Limit Cut wipe (ended within 30s of J Kick): that module's.
+  if (lost && end - start <= LC_HANDOFF_MS) lost = undefined;
+  if (lost) raids.push(raidMarker(BJCC_NISI_DEATH_RULE_ID, "Decree Nisi Lost to a Death",
+    `${lost.text} Unresolvable from here; treated as the cutoff point.`, lost.t, JUDGMENT_NISI, "Judgment Nisi"));
+  const fallout = (t: number) => !!lost && t > lost.t;
 
   // Collisions: gaining a color while holding another.
   const collided = new Set<PlayerInfo>();
@@ -678,6 +772,7 @@ function detectNisi(players: PlayerInfo[], deaths: DeathEvent[], life: Life, cas
   for (const h of hits) {
     const who = h.ps.map((q) => q.p);
     who.forEach((p) => collided.add(p));
+    if (fallout(h.t)) continue;
     for (const q of h.ps) {
       const others = h.ps.filter((o) => o.p !== q.p);
       const dead = sentenced(q.p, h.t);
@@ -693,7 +788,7 @@ function detectNisi(players: PlayerInfo[], deaths: DeathEvent[], life: Life, cas
   // After Verdict: picking up a color the Judgment doesn't match.
   if (verdict) {
     for (const x of ivs) {
-      if (x.a < verdict.timestamp || collided.has(x.p)) continue;
+      if (x.a < verdict.timestamp || collided.has(x.p) || fallout(x.a)) continue;
       const need = judgment.get(x.p);
       if (!need || need === x.col || !life.alive(x.p, x.a)) continue;
       const donors = ivs.filter((y) => y.col === x.col && y.p !== x.p && y.a < x.a - 50 && y.b >= x.a - 50 && !sameSide(y.p, x.p)).map((y) => y.p);
@@ -711,7 +806,7 @@ function detectNisi(players: PlayerInfo[], deaths: DeathEvent[], life: Life, cas
 
   // A color's last copy running out on a living player.
   for (const x of ivs) {
-    if (x.b === Infinity || x.b > end || collided.has(x.p)) continue;
+    if (x.b === Infinity || x.b > end || collided.has(x.p) || fallout(x.b)) continue;
     if (gavel && x.b >= gavel.timestamp - 1000) continue;            // Gavel clears them
     if (deaths.some((d) => d.player === x.p.name && d.timestamp >= x.b - 500 && d.timestamp <= x.b + DEATH_EVENT_LAG_MS + 800)) continue;
     if (!life.alive(x.p, x.b - 100)) continue;
@@ -733,14 +828,22 @@ function detectNisi(players: PlayerInfo[], deaths: DeathEvent[], life: Life, cas
       }
       receiver = owed && !holding(owed) ? owed : undefined;
     } else { const free = otherSide.filter((p) => !holding(p)); if (free.length === 1) receiver = free[0]; }
-    errors.push(playerError(x.p, {
+    // Passes 1-3: the supports plant and the DPS walk to them (NAUR; user,
+    // 2026-10-16, B14 +3:35.2: the sage stays, the black mage goes to take
+    // it), so the DPS of the pair missed it. Pass 4 at the ice: both named.
+    const pass = passOf(t);
+    const dpsMoves = pass >= 1 && pass <= 3;
+    const carrierBlamed = !dpsMoves || isDps(x.p);
+    const receiverBlamed = !!receiver && (!dpsMoves || isDps(receiver));
+    const whoMissed = dpsMoves ? " The supports stand still for this pass and the DPS walk to them." : " The log can't say whether the carrier or the receiver missed the pass.";
+    if (carrierBlamed) errors.push(playerError(x.p, {
       ruleId: BJCC_NISI_DROPPED_RULE_ID, severity: "Major", name: "Decree Nisi Not Passed",
-      description: `Their Decree Nisi ${x.col} ran out ${passName(t)} with nobody else holding ${x.col}${receiver ? `; ${receiver.name} should have taken it` : ""}, so the color is lost and Gavel will fail. The log can't say whether the carrier or the receiver missed the pass. Pass before your timer ends.`,
+      description: `Their Decree Nisi ${x.col} ran out ${passName(t)} with nobody else holding ${x.col}${receiver ? `; ${receiver.name} should have taken it` : ""}, so the color is lost and Gavel will fail.${whoMissed} Pass before your timer ends.`,
       timestamp: t, abilityId: JUDGMENT_NISI, abilityName: "Judgment Nisi",
     }));
-    if (receiver) errors.push(playerError(receiver, {
+    if (receiver && receiverBlamed) errors.push(playerError(receiver, {
       ruleId: BJCC_NISI_DROPPED_RULE_ID, severity: "Major", name: "Decree Nisi Not Passed",
-      description: `${x.p.name}'s Decree Nisi ${x.col} ran out ${passName(t)} and they were the one to take it (${verdict && t > verdict.timestamp ? `their Judgment is ${x.col}` : "the only player of their side without a color"}). The log can't say whether the carrier or the receiver missed the pass.`,
+      description: `${x.p.name}'s Decree Nisi ${x.col} ran out ${passName(t)} and they were the one to take it (${verdict && t > verdict.timestamp ? `their Judgment is ${x.col}` : "the only player of their side without a color"}).${whoMissed}`,
       timestamp: t, abilityId: JUDGMENT_NISI, abilityName: "Judgment Nisi",
     }));
     fail(t, `Decree Nisi ${x.col} ran out on ${x.p.name} with no other copy.`);
@@ -823,7 +926,20 @@ function detectElements(players: PlayerInfo[], deaths: DeathEvent[], life: Life,
     }
     // Lightning taken by extra players.
     if (light.length >= 3 && helper && light.includes(helper)) {
-      for (const p of light.filter((q) => q !== lCarrier && q !== helper)) {
+      const extras = light.filter((q) => q !== lCarrier && q !== helper);
+      // Round 2's carrier is Brute Justice's tank, who takes it at the wall
+      // so the melee on the boss stay out (user, 2026-10-16, B24 +3:43.6:
+      // the tank should have been closer to the wall; extra damage, Minor).
+      if (n === 2 && lCarrier === mt) {
+        const died = extras.filter((p) => life.diedFrom(p, t));
+        errors.push(playerError(lCarrier, {
+          ruleId: BJCC_LIGHTNING_EXTRA_RULE_ID, severity: died.length ? "Major" : "Minor", name: "Lightning Taken Into the Party",
+          description: `Lightning round 2 also hit ${namesOf(extras)} besides ${helper.name}${died.length ? `; ${namesOf(died)} died` : ""}. Holding the Lightning, take it at the wall so only the healer joins you and the melee stay on the boss.`,
+          timestamp: t, abilityId: CRASHING_THUNDER, abilityName: "Crashing Thunder",
+        }));
+        return;
+      }
+      for (const p of extras) {
         const died = life.diedFrom(p, t);
         errors.push(playerError(p, {
           ruleId: BJCC_LIGHTNING_EXTRA_RULE_ID, severity: died ? "Major" : "Minor", name: "Extra in the Lightning Stack",
@@ -846,7 +962,7 @@ function detectElements(players: PlayerInfo[], deaths: DeathEvent[], life: Life,
     // tick at 1 HP after Photon (B12).
     const photon = !!d && afterPhoton(players, d);
     if (d && !d.killingAbilityGameId && !photon && lastEvent - d.timestamp <= CALLED_WIPE_END_MS) continue;
-    const how = !d ? "" : d.killingAbilityGameId ? ` (${d.cause})` : photon ? " (a Decree Nisi tick at 1 HP after Photon)" : " (no killing blow)";
+    const how = d ? ` (${causeOf(players, d)})` : "";
     const why = !holder ? "" : d ? ` ${holder.name}, carrying Compressed ${water ? "Water" : "Lightning"}, died${how}.` : ` Compressed ${water ? "Water" : "Lightning"} came back onto ${holder.name} under its own Resistance Down.`;
     raids.push(raidMarker(BJCC_PUNISHING_RULE_ID, water ? "Punishing Wave" : "Punishing Thunder",
       `${water ? "Punishing Wave" : "Punishing Thunder"} hit the raid.${why} Unresolvable from here; treated as the cutoff point.`,
@@ -955,6 +1071,45 @@ function detectArena(players: PlayerInfo[], life: Life, casts: EnemyEvent[], mt:
     }
   }
   return { errors, raids };
+}
+
+/**
+ * No-killing-blow deaths that are the wipe being called: within 12s of the
+ * end or 3+ in 10s. A Nisi tick at 1 HP after Photon is not one.
+ */
+function resetDeaths(players: PlayerInfo[], deaths: DeathEvent[], start: number, lastEvent: number): Set<DeathEvent> {
+  const silent = deaths.filter((d) => !d.killingAbilityGameId && d.timestamp - DEATH_EVENT_LAG_MS >= start && !afterPhoton(players, d));
+  const out = new Set<DeathEvent>();
+  for (const d of silent) {
+    if (lastEvent - d.timestamp <= CALLED_WIPE_END_MS) out.add(d);
+    const near = resetCluster(silent.filter((x) => Math.abs(x.timestamp - d.timestamp) <= CALLED_WIPE_WINDOW), deaths);
+    if (near.length >= CALLED_WIPE_COUNT) near.forEach((x) => out.add(x));
+  }
+  return new Set(resetCluster([...out], deaths));
+}
+
+/**
+ * Any other no-killing-blow death is a walk into the arena's lethal edge
+ * (user, 2026-10-16, B25 +3:03.5: the Paladin walked into the wall holding
+ * the color it was passed). Not after a knockback (Drainage) or under
+ * Propeller Wind's confusion: those are the avoidable hit's.
+ */
+function detectWallDeaths(players: PlayerInfo[], deaths: DeathEvent[], start: number, end: number, resets: Set<DeathEvent>): PullError[] {
+  const out: PullError[] = [];
+  for (const d of deaths) {
+    const t = d.timestamp - DEATH_EVENT_LAG_MS;
+    if (d.killingAbilityGameId || resets.has(d) || t < start + 5000 || t > end || afterPhoton(players, d)) continue;
+    const p = players.find((x) => x.name === d.player);
+    if (!p) continue;
+    const pushed = p.damageTaken.some((e) => (e.abilityId === 18500 || e.abilityId === 18482) && e.timestamp <= d.timestamp && d.timestamp - e.timestamp <= WALL_PUSH_MS);
+    if (pushed) continue;
+    out.push(playerError(p, {
+      ruleId: BJCC_WALL_RULE_ID, severity: "Major", name: "Walked Into the Wall",
+      description: `Died with no killing blow: they walked into the arena's lethal edge. Brute Justice and Cruise Chaser's arena kills at its rim; keep inside the floor ring while passing and baiting.`,
+      timestamp: t, abilityId: 0, abilityName: "Wall",
+    }));
+  }
+  return out;
 }
 
 /** Called wipe or collapse, when no mechanic marked the cutoff. */

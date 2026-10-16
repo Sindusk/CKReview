@@ -53,6 +53,15 @@
 //   1, took it and died (A35, A37, A40, A44, A59, A62, A66, A68; A26 the
 //   black mage). The white mage died to the frontal 18467 in sequence 2 in
 //   6 pulls (A36, A40, A57, A64, A68; A41 after the cutoff).
+//   A wave that went to an outsider because a group member stood too far
+//   out is the non-baiter's alone (user, B11 +0:38.6 the Living Liquid tank
+//   too far from the tornado, B41 +1:14.7 the sage too far out): this
+//   answers open question 2 (sage too far).
+// - Embolus: the Outburst cast sits where the orb burst; its toucher stood
+//   0.8y from it, the next player 3.5y (B21, user: the dragoon). A19's
+//   nearest was 3.9y with the rest 20y+ (unreviewed, maybe the boss).
+// - A doll killed by a DoT tick logs no 0-HP event: the tick's HP is from
+//   before it and equals its own amount (B34 +0:45.15, Chaos Thrust 104).
 // - Hand of Parting/Prayer: clean hits 1-2k on everyone; Prayer at A3 and
 //   A12 hit 29k+ and killed seven.
 // - Hand of Pain: clean resolution medians up to 5k (A72 +1:10.9), failures
@@ -63,7 +72,9 @@
 //   blow 2.0s after a 10.0s removal. The healers split cleanses every pull
 //   (white mage: tanks + self; sage: ranged + self; melee either). Expiries
 //   A25, A27, A29, A41, A42 left the sage short (1-2 cleanses vs 3-4);
-//   A18 neither healer cleansed anyone.
+//   A18 neither healer cleansed anyone. The split follows party-list order,
+//   which the log doesn't carry, and the healer with fewer cleanses is
+//   usually not the one at fault (user, B17): answers open question 3.
 // - Drainage: both tanks every clean pull; the three non-tank holders (A20,
 //   A21, A28) all followed a tank death. A cast that hits two players loses
 //   its target (A23: tank + sage).
@@ -82,18 +93,21 @@
 //   waves (the LL tank's opening one excepted), the frontal wave, Sluice,
 //   cleaves on non-tanks, Drainage splash on non-holders, Dropsy.
 // ffxiv-ll-wave-bait (Minor; Major when the extra player died to water
-//   within 6s): per invisible volley, players outside its role group who
-//   took a wave and living group members who took none; with the group
-//   right, a wave on two groupmates names the doubled player and the
-//   wave's baiter. Skipped with a group member dead.
+//   within 6s): per invisible volley, living group members who took no
+//   wave; only when none did, players outside its role group who took one
+//   (a non-baiter's wave lands on the next nearest: their fallout). With
+//   the group right, a wave on two groupmates names the doubled player and
+//   the wave's baiter. Skipped with a group member dead.
 // ffxiv-ll-exhaust (Major if lethal): two Exhausts / a second stack.
 // ffxiv-ll-doll-feed (Major, owner) + ffxiv-ll-doll-wipe (Raid): fed at
 //   25%+. ffxiv-ll-doll-kill (Major, killing blow) + doll-wipe (Raid).
 // ffxiv-ll-hand (Raid), ffxiv-ll-pain (Raid): player-less.
-// ffxiv-ll-throttle (Major on the healer(s) with fewer cleanses; player-
-//   less Minor with a healer dead).
+// ffxiv-ll-doll-kill names the hit that took the doll to 0 HP, or the DoT
+//   tick whose amount equals the HP it logged.
+// ffxiv-ll-throttle (player-less Minor, with each healer's cleanse count).
 // ffxiv-ll-drainage (Minor/Major on the idle tank, both tanks alive).
-// ffxiv-ll-outburst (Raid, player-less).
+// ffxiv-ll-outburst (Raid), with ffxiv-ll-orb (Major) on the player within
+//   2y of the burst and 2y+ nearer than anyone else.
 // Generic cutoffs, P1 wipes only, the earliest and only before a mechanic
 // Raid: ffxiv-ll-dead-going-in (anyone dead at a boss protean sequence's
 // visible waves), ffxiv-ll-called-wipe (3+ no-killing-blow deaths in 10s,
@@ -105,15 +119,16 @@
 // Not built: Hand of Parting/Prayer and Pain blame (which tank moved, who
 // over-damaged); Pressurize orb paths (one Outburst on disk, A19); tank
 // deaths in the opening invulnerability window (mitigation).
-// OPEN QUESTIONS (no VOD yet):
+// VOD review 2026-10-16 (user): report B = HwjvVh3TNAZmMQyq pulls 11, 17,
+//   21, 41, rulings in expectations/rulings.json. Its 15 P1 wipes are now
+//   on disk too (B3, B7, B9, B10, B16, B21, B23, B26, B27, B32-B34, B39,
+//   B41, B45).
+// OPEN QUESTIONS:
 // 1. roles.ts names the paladin MT (opening auto) but the warrior holds
 //    Living Liquid and does the opening invulnerability every pull, NAUR's
 //    MT duty. The module keys on "LL tank" (first Fluid Swing target).
-// 2. Sequence 2 volley 2: is the sage meant to bait it from the south
-//    (NAUR: shield healer S), and was the tank/melee too close or the
-//    sage too far? Both are named now.
-// 3. Throttle: is the cleanse split assigned (white mage tanks, sage
-//    ranged)? The rule names whoever cleansed fewer.
+// 2. A volley where one group member baited nothing but four outsiders
+//    took waves (A26) names only the non-baiter; unreviewed.
 //
 // -- GUIDE-DERIVED MODEL (2026-10-15) --
 // Research only: no detector, report sampling, or VOD rulings. All failure
@@ -371,7 +386,7 @@
 // 7. Late Splash count (CB six vs BM four), Drainage targeting/clearing,
 //    Embolus contact radius/cleanup, and actual phase exit event ordering.
 
-import type { PlayerInfo } from "@/types/PlayerInfo";
+import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
 import type { DeathEvent } from "@/types/DeathEvent";
 import type { PullError, EnemyEvent } from "@/types/PullError";
 import type { ReportedOccurrence } from "@/lib/mechanics/occurrences";
@@ -392,6 +407,7 @@ export const LL_PAIN_RULE_ID        = "ffxiv-ll-pain";
 export const LL_THROTTLE_RULE_ID    = "ffxiv-ll-throttle";
 export const LL_DRAINAGE_RULE_ID    = "ffxiv-ll-drainage";
 export const LL_OUTBURST_RULE_ID    = "ffxiv-ll-outburst";
+export const LL_ORB_RULE_ID         = "ffxiv-ll-orb";
 export const LL_DEAD_GOING_IN_RULE_ID = "ffxiv-ll-dead-going-in";
 export const LL_CALLED_WIPE_RULE_ID = "ffxiv-ll-called-wipe";
 export const LL_COLLAPSE_RULE_ID    = "ffxiv-ll-collapse";
@@ -447,6 +463,10 @@ const THROTTLE_EXPIRY_MS = 9_500;
 // The doll's killing blow lands within this long before its Reducible
 // Complexity (A2-A71: 0.1-0.2s).
 const DOLL_KILL_MS       = 2_000;
+// The Embolus toucher stands on the Outburst's cast point (B21: 0.8y, the
+// next player 3.5y); orbToucher() has both pulls on disk.
+const ORB_TOUCH_Y        = 2;
+const ORB_TOUCH_MARGIN_Y = 2;
 // Water Resistance Down II from a wave lasts ~4s, so a wave error's player
 // who dies this soon after to more water died of it.
 const WAVE_DEATH_MS      = 6_000;
@@ -610,18 +630,22 @@ function detectWaveBaits(players: PlayerInfo[], life: Life, casts: EnemyEvent[],
     const killed = extras.filter((p) => waterDeath(p, deaths, t0, WAVE_DEATH_MS));
     const sev = killed.length ? "Major" : "Minor";
     const deathText = killed.length ? ` ${namesOf(killed)} died to water within seconds.` : "";
-    for (const p of extras) {
+    // A group member who baited nothing pulled their wave onto the next
+    // nearest: the extras are that miss's fallout (user, 2026-10-16: B11
+    // +0:38.6 the Living Liquid tank too far from the tornado, B41 +1:14.7
+    // the sage too far out; the players who took the waves were fine).
+    if (!missing.length) for (const p of extras) {
       const n = hits.filter((h) => h.p === p).length;
       errors.push(playerError(p, {
         ruleId: LL_WAVE_BAIT_RULE_ID, severity: killed.includes(p) ? "Major" : "Minor", name: "Took Someone Else's Wave",
-        description: `Took ${n > 1 ? `${n} waves` : "a wave"} of the ${label}, which belongs to ${namesOf(group)}: they stood too close${missing.length ? `, and ${namesOf(missing)} baited nothing` : ""}.${killed.includes(p) ? " They died to water within seconds (Water Resistance Down II makes a second wave lethal)." : deathText} ${why}`,
+        description: `Took ${n > 1 ? `${n} waves` : "a wave"} of the ${label}, which belongs to ${namesOf(group)}: they stood too close.${killed.includes(p) ? " They died to water within seconds (Water Resistance Down II makes a second wave lethal)." : deathText} ${why}`,
         timestamp: t0, abilityId: kind, abilityName: "Protean Wave",
       }));
     }
     for (const p of missing) {
       errors.push(playerError(p, {
         ruleId: LL_WAVE_BAIT_RULE_ID, severity: sev, name: "Didn't Bait Their Wave",
-        description: `Baited no wave of the ${label}: they stood farther out than ${extras.length ? namesOf(extras) : "another player"}, who took it instead.${deathText} ${why}`,
+        description: `Baited no wave of the ${label}: they stood too far out, so ${extras.length ? `${namesOf(extras)}, nearer, took it instead` : "another player took it instead"}.${deathText} ${why}`,
         timestamp: t0, abilityId: kind, abilityName: "Protean Wave",
       }));
     }
@@ -742,9 +766,14 @@ function detectDolls(players: PlayerInfo[], life: Life, casts: EnemyEvent[], end
         `A Jagd Doll${owner ? ` (${owner.name}'s)` : ""} was fed at ${hp.toFixed(1)}% HP and Reducible Complexity hit everyone for ${kFmt(med)}.${deadText} Unrecoverable from here; treated as the cutoff point.`,
         c.timestamp, FEED_OK, "Reducible Complexity"));
     } else {
-      // The hit that took this doll to 0 HP (damageDone carries the target's HP).
-      const blows = players.flatMap((p) => p.damageDone.filter((e) => e.target === DOLL && e.healthAfter === 0 && e.timestamp <= c.timestamp && c.timestamp - e.timestamp <= DOLL_KILL_MS).map((e) => ({ p, e })))
+      // The hit that took this doll to 0 HP (damageDone carries the target's
+      // HP). A DoT tick that kills logs the HP from before it, equal to its
+      // own amount (B34 +0:45.15: Chaos Thrust 104 at 104 HP, no 0-HP event).
+      const near = (e: PlayerEvent) => e.target === DOLL && e.timestamp <= c.timestamp && c.timestamp - e.timestamp <= DOLL_KILL_MS;
+      const byHp = (pred: (e: PlayerEvent) => boolean) => players.flatMap((p) => p.damageDone.filter((e) => near(e) && pred(e)).map((e) => ({ p, e })))
         .sort((a, b) => b.e.timestamp - a.e.timestamp);
+      const zeroed = byHp((e) => e.healthAfter === 0);
+      const blows = zeroed.length ? zeroed : byHp((e) => !!e.healthAfter && e.amount === e.healthAfter);
       const killer = blows[0]?.p;
       if (killer) errors.push(playerError(killer, {
         ruleId: LL_DOLL_KILL_RULE_ID, severity: "Major", name: "Killed a Jagd Doll",
@@ -838,22 +867,13 @@ function detectThrottle(players: PlayerInfo[], life: Life, deaths: DeathEvent[],
     if (!expired.length) continue;
     const who = expired.map((x) => x.p);
     const living = healers.filter((h) => life.alive(h, t0) && life.alive(h, t0 + THROTTLE_EXPIRY_MS));
-    const counts = living.map((h) => ({ h, n: uniq(cleansedBy.get(h) ?? []).length }));
-    const low = counts.length ? Math.min(...counts.map((c) => c.n)) : 0;
-    const blamed = living.length === 2 ? counts.filter((c) => c.n === low).map((c) => c.h) : [];
-    const tally = counts.map((c) => `${c.h.name} ${c.n}`).join(", ");
-    const text = `Throttle ran out on ${namesOf(who)} and killed ${who.length > 1 ? "them" : `them`}.`;
-    if (blamed.length) {
-      for (const h of blamed) errors.push(playerError(h, {
-        ruleId: LL_THROTTLE_RULE_ID, severity: "Major", name: "Throttle Not Cleansed",
-        description: `${text} Successful cleanses: ${tally}. The healers split the six Throttles (Esuna, 10s each); the healer with fewer cleanses left theirs.`,
-        timestamp: t0 + THROTTLE_EXPIRY_MS, abilityId: THROTTLE, abilityName: "Throttle",
-      }));
-    } else {
-      errors.push(playerlessMinor(LL_THROTTLE_RULE_ID, "Throttle Not Cleansed",
-        `${text}${living.length < 2 ? " A healer was dead, so the cleanses were short." : ""}`,
-        t0 + THROTTLE_EXPIRY_MS, THROTTLE, "Throttle"));
-    }
+    const tally = living.map((h) => `${h.name} ${uniq(cleansedBy.get(h) ?? []).length}`).join(", ");
+    // Player-less: the healers split by party-list order, which the log
+    // doesn't carry, and the healer with fewer cleanses is usually not the
+    // one who missed it (user, 2026-10-16, B17 +1:45.8).
+    errors.push(playerlessMinor(LL_THROTTLE_RULE_ID, "Throttle Not Cleansed",
+      `Throttle ran out on ${namesOf(who)} and killed ${who.length > 1 ? "them" : "them"}.${living.length < 2 ? " A healer was dead, so the cleanses were short." : ` Successful cleanses: ${tally}. The healers split the six Throttles by party-list order (Esuna, 10s each), which the log doesn't show.`}`,
+      t0 + THROTTLE_EXPIRY_MS, THROTTLE, "Throttle"));
   }
   return { errors, expiryDeaths };
 }
@@ -885,6 +905,27 @@ function detectDrainage(players: PlayerInfo[], life: Life, casts: EnemyEvent[], 
     }));
   }
   return errors;
+}
+
+/** Yalms from where the orb exploded to a player's position at its hit. */
+function orbDistance(c: EnemyEvent, h: Hit): number | undefined {
+  if (c.x === undefined || c.y === undefined || h.e.x === undefined || h.e.y === undefined) return undefined;
+  return Math.hypot(h.e.x - c.x, h.e.y - c.y) / 100;
+}
+
+/**
+ * Who touched the Embolus: the Outburst cast sits where the orb burst, and
+ * the toucher stands on it. B21 (user: the dragoon touched it): 0.8y, next
+ * 3.5y (the tank holding a boss). A19, unreviewed, nearest 3.9y with the
+ * rest 20y+ out: maybe the boss, so a player is named only within
+ * ORB_TOUCH_Y and ORB_TOUCH_MARGIN_Y clear of everyone else.
+ */
+function orbToucher(c: EnemyEvent, res: Hit[]): PlayerInfo | undefined {
+  const d = uniq(res.map((h) => h.p)).map((p) => ({ p, y: orbDistance(c, res.find((h) => h.p === p)!) }))
+    .filter((x): x is { p: PlayerInfo; y: number } => x.y !== undefined).sort((a, b) => a.y - b.y);
+  if (!d.length || d[0].y > ORB_TOUCH_Y) return undefined;
+  if (d[1] && d[1].y - d[0].y < ORB_TOUCH_MARGIN_Y) return undefined;
+  return d[0].p;
 }
 
 // ── deaths, called wipes ────────────────────────────────────────────────────
@@ -937,8 +978,14 @@ export function detectLivingLiquidErrors(
   if (outburst) {
     const res = hitsOf(players, life, OUTBURST, Math.min(end, outburst.timestamp + 1500)).filter((h) => h.e.timestamp >= outburst.timestamp);
     const dead = uniq(res.filter((h) => life.diedFrom(h.p, h.e.timestamp)).map((h) => h.p));
+    const toucher = orbToucher(outburst, res);
+    if (toucher) errors.push(playerError(toucher, {
+      ruleId: LL_ORB_RULE_ID, severity: "Major", name: "Touched an Embolus",
+      description: `Stood where an Embolus orb exploded (${(orbDistance(outburst, res.find((h) => h.p === toucher)!) ?? 0).toFixed(1)}y from it, everyone else ${ORB_TOUCH_MARGIN_Y}y+ further): Outburst hit the raid${dead.length ? ` and ${namesOf(dead)} died` : ""}. The orbs drift toward the bosses; step out of their path, never through it.`,
+      timestamp: outburst.timestamp, abilityId: OUTBURST, abilityName: "Outburst",
+    }));
     errors.push(raidMarker(LL_OUTBURST_RULE_ID, "Embolus Collision",
-      `An Embolus orb touched a player or a boss and exploded (Outburst)${dead.length ? `; ${namesOf(dead)} died` : ""}. Bait the orbs' paths outside, then bring the bosses back in behind them. Treated as the cutoff point.`,
+      `An Embolus orb touched ${toucher ? toucher.name : "a player or a boss"} and exploded (Outburst)${dead.length ? `; ${namesOf(dead)} died` : ""}. Bait the orbs' paths outside, then bring the bosses back in behind them. Treated as the cutoff point.`,
       outburst.timestamp, OUTBURST, "Outburst"));
   }
 

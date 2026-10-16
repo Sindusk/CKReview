@@ -53,8 +53,14 @@
 // - Dead going in: all 10 pulls with a player dead at the markers wiped in
 //   Limit Cut (A35, A36, A44, A56, A57, A59, A64, A66, A67, A69 and B17,
 //   where the holderless #8 charge hit five).
-// - Two or three Limit Cut deaths are recoverable: B1, B4, B8 carried into
-//   BJ/CC. J Kick deaths (A47, A50, A52, A54, B17) are raw damage on a short-
+// - A stray hit killing a player whose number is still to come (the hit
+//   itself or a knock off the edge) loses that number: B3's #3 sword
+//   knocked #8 off, and the user called the #4 charge through three
+//   players after it unresolvable anyway (VOD, 2026-10-16). A partner
+//   killed AT their own number by an earlier hit's vulnerability isn't one
+//   (B3 #2): their number had its holder.
+// - Two or three Limit Cut deaths can carry into BJ/CC (B1, B4, B8), but
+//   a player still dead at the first Nisi pass loses BJ/CC (bj-cc.ts). J Kick deaths (A47, A50, A52, A54, B17) are raw damage on a short-
 //   handed party, mitigation territory.
 // Cutoffs (28 Limit Cut wipes = pulls ending within 30s of J Kick or
 // before it; every one has one): dead going in 11 (A35, A36, A44, A56, A57,
@@ -80,15 +86,20 @@
 // Not flagged: attacks whose holder was dead (they retarget), the attack
 //   right after one that hit an extra player when it hits the same players
 //   (the pair was knocked apart: B5, A69), J Kick.
+// Fallout: every attack after a stray hit killed a later number's holder.
 // Cutoffs, Limit Cut wipes only, the earliest: ffxiv-lc-dead-going-in (a
-//   player dead at the markers), ffxiv-lc-called-wipe (3+ no-killing-blow
+//   player dead at the markers), ffxiv-lc-number-lost (that stray hit),
+//   ffxiv-lc-called-wipe (3+ no-killing-blow
 //   deaths in 10s or any within 12s of the end, knock-offs excluded),
 //   ffxiv-lc-collapse (4 dead, pull over within 30s).
 // Exposure: aim and knockback are targeted (each attack's holder, reported
 //   per attack); stray and blaster are everyone.
-// OPEN QUESTIONS (no VOD yet):
+// VOD review 2026-10-16 (user): report B pull 3, ruling in
+//   expectations/rulings.json. Questions 2 and 3 below were asked (B3, B8)
+//   and the VOD couldn't show either.
+// OPEN QUESTIONS:
 // 1. A charge through two or more players names the even holder and the
-//    players hit (A45 #2, A49 #2, A50 #8). Which was it?
+//    players hit (A45 #2, A50 #8, B9 #2). Which was it?
 // 2. A sword partner at the cone's apex is named alone (the odd holder's
 //    facing was normal): too close behind, or did the odd player stop?
 // 3. #6 caught at the edge of #7's sword (B8, B30, B38): should #6 have been
@@ -274,6 +285,7 @@ export const LC_STRAY_RULE_ID        = "ffxiv-lc-stray";
 export const LC_AIM_RULE_ID          = "ffxiv-lc-aim";
 export const LC_KNOCKBACK_RULE_ID    = "ffxiv-lc-knockback";
 export const LC_DEAD_GOING_IN_RULE_ID = "ffxiv-lc-dead-going-in";
+export const LC_NUMBER_LOST_RULE_ID  = "ffxiv-lc-number-lost";
 export const LC_CALLED_WIPE_RULE_ID  = "ffxiv-lc-called-wipe";
 export const LC_COLLAPSE_RULE_ID     = "ffxiv-lc-collapse";
 
@@ -362,8 +374,15 @@ const knockedOff = (d: DeathEvent | undefined, hitT: number) =>
  * next attack when the one before it already hit an extra player: the
  * pair was knocked apart (B5 #3 -> #4, A69 #3 -> #4).
  */
-function detectNumberedAttacks(attacks: Attack[], deaths: DeathEvent[], kickT: number, displaced: Map<PlayerInfo, number[]>, occurrences?: ReportedOccurrence[]) {
+function detectNumberedAttacks(attacks: Attack[], numbers: Map<number, PlayerInfo>, deaths: DeathEvent[], kickT: number, displaced: Map<PlayerInfo, number[]>, occurrences?: ReportedOccurrence[]) {
   const errors: PullError[] = [];
+  // A stray hit that killed a player whose own number is still to come
+  // leaves that number without a holder: the sequence is lost, and every
+  // later attack is its fallout (user, 2026-10-16, B3 +2:15.9: #3's sword
+  // knocked #8 off and caught #7, so #4's charge through three others was
+  // unresolvable anyway).
+  let broken: { t: number; p: PlayerInfo; n: number; by: Attack } | undefined;
+  const numberOf = (p: PlayerInfo) => [...numbers].find(([, q]) => q === p)?.[0] ?? attacks.find((x) => x.owner === p)?.n;
   const nextDeath = (p: PlayerInfo, t: number) => deaths
     .filter((d) => d.player === p.name && d.timestamp > t && d.timestamp - DEATH_EVENT_LAG_MS <= kickT)
     .sort((a, b) => a.timestamp - b.timestamp)[0];
@@ -385,7 +404,7 @@ function detectNumberedAttacks(attacks: Attack[], deaths: DeathEvent[], kickT: n
       occurrences?.push({ mechanicKey: LC_AIM_RULE_ID, timestamp: t, players: [a.owner.name] });
       occurrences?.push({ mechanicKey: LC_KNOCKBACK_RULE_ID, timestamp: t, players: [a.owner.name] });
     }
-    if (a.retarget) return;
+    if (a.retarget || (broken && t > broken.t)) return;
     const prev = attacks[i - 1];
     const fallout = !!prev && t - prev.cast.timestamp < 2500 && a.hits.some((h) => prev.extras.includes(h.p) || (prev.retarget && prev.hits.some((x) => x.p === h.p)));
     const owner = a.owner!;
@@ -407,6 +426,16 @@ function detectNumberedAttacks(attacks: Attack[], deaths: DeathEvent[], kickT: n
     const dev = a.sword ? swordDeviation(a.cast) : undefined;
     const killed = a.extras.filter((p) => killedBy(p, t));
     const deadText = killed.length ? ` ${namesOf(killed)} died.` : "";
+    for (const p of killed) {
+      const n = numberOf(p);
+      if (n === undefined || n <= a.n || broken) continue;
+      // Not when they lived to take their own number and died to it under
+      // this hit's vulnerability (B3's #2 at #1's apex): it had its holder.
+      const d = killedBy(p, t)!;
+      const own = attacks.find((x) => x.n === n);
+      const hitT = a.hits.find((h) => h.p === p)!.e.timestamp;
+      if (knockedOff(d, hitT) || !own || d.timestamp - DEATH_EVENT_LAG_MS < own.cast.timestamp - 300) broken = { t, p, n, by: a };
+    }
     const where = (p: PlayerInfo) => {
       const e = a.hits.find((h) => h.p === p)?.e;
       if (!e || e.x === undefined || e.y === undefined || a.cast.x === undefined || a.cast.y === undefined) return "";
@@ -448,7 +477,7 @@ function detectNumberedAttacks(attacks: Attack[], deaths: DeathEvent[], kickT: n
       }));
     }
   });
-  return errors;
+  return { errors, broken };
 }
 
 /**
@@ -504,8 +533,8 @@ export function detectTeaLimitCutErrors(
   }
   const attacks = buildAttacks(players, life, enemyCasts, numbers, start, end);
   const displaced = new Map<PlayerInfo, number[]>();
-  const numbered = detectNumberedAttacks(attacks, deathEvents, end, displaced, occurrences);
-  const errors: PullError[] = [...numbered, ...detectHawkBlaster(players, life, start, end, displaced)];
+  const numbered = detectNumberedAttacks(attacks, numbers, deathEvents, end, displaced, occurrences);
+  const errors: PullError[] = [...numbered.errors, ...detectHawkBlaster(players, life, start, end, displaced)];
 
   // Cutoffs, for wipes in this intermission only.
   const lcWipe = !kick || lastEvent - kick.timestamp <= LC_WIPE_AFTER_KICK_MS;
@@ -517,6 +546,12 @@ export function detectTeaLimitCutErrors(
     generic.push(raidMarker(LC_DEAD_GOING_IN_RULE_ID, "Player Dead Going Into Limit Cut",
       `${namesOf(unmarked)} ${unmarked.length === 1 ? "was" : "were"} dead when the Limit Cut numbers went out, so ${unmarked.length === 1 ? "a number has" : "numbers have"} no holder: Cruise Chaser's sword or charge for it lands on whoever is nearest. Unresolvable from here; treated as the cutoff point.`,
       markT, 0, "Limit Cut"));
+  }
+  const lost = numbered.broken;
+  if (lost) {
+    generic.push(raidMarker(LC_NUMBER_LOST_RULE_ID, "Limit Cut Number Lost",
+      `${ordinal(lost.by)} killed ${lost.p.name} (#${lost.n}) before their own number came up, so #${lost.n}'s attack has no holder and lands on whoever is nearest. Unresolvable from here; treated as the cutoff point.`,
+      lost.t, lost.by.cast.abilityId, lost.by.cast.abilityName));
   }
   const knockoffs = new Set(deathEvents.filter((d) => attacks.some((a) => a.hits.some((h) => h.p.name === d.player && knockedOff(d, h.e.timestamp)))));
   const silent = deathEvents.filter((d) => !d.killingAbilityGameId && !knockoffs.has(d) && d.timestamp - DEATH_EVENT_LAG_MS >= start);
