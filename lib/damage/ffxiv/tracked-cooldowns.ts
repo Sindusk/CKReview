@@ -125,6 +125,33 @@ function gnashingFangValue(player: PlayerInfo, endMs: number): { value: number; 
   };
 }
 
+// Inner Release: no damage of its own, so its drift was never reported
+// (L9BzKkD2nxcVgHTC Necron pull 7, Widow Shadowimage: xivanalysis 2 / 3).
+// A lost use is its three free Fell Cleaves (sure crit and direct hit)
+// and the Primal Rend, Primal Ruination and Primal Wrath it unlocks, the
+// GCDs each against the Maim in its slot. The player's own averages (Fell
+// Cleave under Inner Release); one never pressed counts 0.
+function innerReleaseValue(player: PlayerInfo, endMs: number): { value: number; basis: string } | undefined {
+  const irId = XIVA_STATUSES.INNER_RELEASE?.id;
+  const avg = (key: string, underIr?: boolean) => {
+    const id = XIVA_ACTIONS[key]?.id;
+    const hits = player.damageDone.filter((e) => e.abilityId === id && !e.isDoT && !e.pet && e.timestamp < endMs && (e.amount ?? 0) > 0 &&
+      (underIr === undefined || (e.statusIds ?? []).includes(irId ?? -1) === underIr));
+    return hits.length ? hits.reduce((a, e) => a + (e.amount ?? 0), 0) / hits.length : 0;
+  };
+  const maim = avg("MAIM");
+  const cleave = avg("FELL_CLEAVE", true) || avg("FELL_CLEAVE");
+  if (maim <= 0 || cleave <= 0) return undefined;
+  const gcds = 3 * (cleave - maim) + Math.max(0, avg("PRIMAL_REND") - maim) + Math.max(0, avg("PRIMAL_RUINATION") - maim);
+  const value = gcds + avg("PRIMAL_WRATH");
+  if (value <= 0) return undefined;
+  const k = (n: number) => `${Math.round(n / 1000)}k`;
+  return {
+    value,
+    basis: `(3 × (${k(cleave)} Fell Cleave in Inner Release − ${k(maim)} Maim) + Primal Rend and Primal Ruination over Maim + ${k(avg("PRIMAL_WRATH"))} Primal Wrath, estimated)`,
+  };
+}
+
 // A self damage buff (No Mercy +20%, Fight or Flight +25%, Riddle of Fire
 // and Raging Strikes +15%, Lance Charge +10%): no damage of its own, so
 // its drift was never reported (perUse 0). One lost use is the bonus's
@@ -184,7 +211,7 @@ export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
   // Infuriate is left out: Fell Cleave and its kin refund 5s of its
   // cooldown, which the drift check doesn't model.
   "Warrior": [
-    { actions: ["INNER_RELEASE"], firstUseOffsetMs: 15000, holdMs: 2500 },
+    { actions: ["INNER_RELEASE"], firstUseOffsetMs: 15000, holdMs: 2500, valuePerUse: innerReleaseValue },
     { actions: ["UPHEAVAL", "OROGENY"], firstUseOffsetMs: 12500 },
     { actions: ["ONSLAUGHT"], firstUseOffsetMs: 18500 },
   ],

@@ -36,7 +36,7 @@
 | mnk/Brotherhood/raid-buff-overwrite | no-damage | — | — | Note column. |
 | mnk/CooldownDowntime/brotherhood | verified | `checkCooldownDrift` | Brotherhood held | Hold 2.425s per use in xivanalysis (its comment says 4.85s). Fight 16 matched. |
 | mnk/CooldownDowntime/perfect-balance | verified | `checkCooldownDrift` (charges) | Perfect Balance at 2 charges | — |
-| mnk/CooldownDowntime/riddle-of-fire | verified | `checkCooldownDrift` | Riddle of Fire held | — |
+| mnk/CooldownDowntime/riddle-of-fire | verified | `checkCooldownDrift` (`selfBuffValue`, +15%) | Riddle of Fire held | Never reported before 2026-10-16 (no damage of its own). Matched 7HVZra4GNRxfpKzT (Fluffy Nline): 9/10 = 1 lost (153k). |
 | mnk/CooldownDowntime/riddle-of-wind | verified | `checkCooldownDrift` | Riddle of Wind held | Fight 16 12/13 not adopted: 66s held in all, under one 90s recharge. |
 | mnk/AoE/shadow-of-the-destroyer | covered | `mnkAoe` (vs the opo-opo form's three GCDs, minimum 4) | Shadow of the Destroyer on under 4 targets | Built 2026-10-15. Fires on djChYqt4b7K8aAfP Red Hot and Deep Blue 0:33 (only Red Hot up, 36k). On 3 adds (L9BzKkD2nxcVgHTC Necron pull 20 3:43, 3:50) it out-damaged the form's average and passes; xivanalysis counts both (minimum 4). Not adopted: three targets weren't a loss in the log. |
 | mnk/AoE/four-point-fury | verified | `mnkAoe` (vs True Strike / Twin Snakes / Rising Raptor, minimum 4) | Four-point Fury on under 4 | Fires on L9BzKkD2nxcVgHTC Necron pull 6 3:51 (two adds, 20k) and pull 20 3:52, 3:58 (three, 10-12k: near even at 3, so only those under the average show). Matched xivanalysis on Necron pull 20 (2 of its 2). |
