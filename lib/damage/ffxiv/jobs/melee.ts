@@ -654,12 +654,10 @@ const kunaisBane: JobCheck = (ctx) => burstWindowFindings(ctx, {
 // Dagger hit; +40 Mug / Dokumori; +50 Meisui; +5 per Bunshin shadow hit
 // (+10 its Phantom Kamaitachi); −50 Bhavacakra, Zesho Meppo, Hellfrog,
 // Deathfrog, Bunshin. Starts at 0; a death empties it. 50 Ninki is one
-// average Bhavacakra. Known gap (2026-10-16): 113 Ninki findings on disk
-// still say the simulation went below zero, about 5 short per two
-// minutes (JZ1KXhDbqkNH3jxR FRU pull 3: Bhavacakra at a simulated 45 at
-// 0:27.5, 2:53.6, 4:27.9, every shadow hit counted); some gain is missing
-// from both this table and xivanalysis's. zMJdajRYyNF3LVkr: 75 lost here,
-// xivanalysis 60.
+// average Bhavacakra. Every gain is read at the cast (2026-10-16): with
+// hit-timed gains, 113 Ninki findings on disk had the simulation below
+// zero; none do now. zMJdajRYyNF3LVkr: 70 lost here, xivanalysis 60
+// (its gains wait for hits, and a shadow hit can go unlogged).
 const NINKI_COMBO = new Map([
   ...ids("SPINNING_EDGE", "GUST_SLASH", "DEATH_BLOSSOM", "HAKKE_MUJINSATSU").map((x) => [x, 5] as const),
   ...ids("AEOLIAN_EDGE", "ARMOR_CRUSH").map((x) => [x, 15] as const),
@@ -680,21 +678,28 @@ const ninki: JobCheck = (ctx) => {
     if (c.abilityId === id("MEISUI")) events.push({ t: c.timestamp, type: "gain", amount: 50, label: "Meisui at high Ninki" });
     if (NINKI_SPEND.has(c.abilityId)) events.push({ t: c.timestamp, type: "spend", amount: 50, label: c.abilityName });
   }
-  // One gain per hit cast (several targets = one), from the player's hits.
-  // Mug / Dokumori's 40 counts at the cast once it lands: its hit can log
-  // after a spender it paid for (zMJdajRYyNF3LVkr: Dokumori cast 6:23.4,
-  // hit 6:24.50, Zesho Meppo 6:24.48; read at the hit, the gauge went
-  // below zero).
-  const atCast = new Set(ids("MUG", "DOKUMORI"));
-  for (const [aid, amount] of NINKI_HIT) {
-    for (const h of castHits(ctx, aid)) {
-      const cast = atCast.has(aid) ? [...ctx.player.casts].reverse().find((c) => c.abilityId === aid && c.timestamp <= h.timestamp && h.timestamp - c.timestamp < 3_000) : undefined;
-      events.push({ t: cast?.timestamp ?? h.timestamp, type: "gain", amount, label: `${h.abilityName} at high Ninki` });
-    }
+  // Every gain comes with the cast, hit or not (see gaugeCastTimes), not with
+  // the hit, which logs ~0.7s later and can follow the spender it paid
+  // for. JZ1KXhDbqkNH3jxR FRU pull 3: Fleeting Raiju cast 0:26.80, its
+  // hit and its shadow's at 0:27.56 / 0:27.65, Bhavacakra 0:27.51; a
+  // Throwing Dagger at 2:39.97 that never landed (Fatebreaker leaving)
+  // paid for the 2:53.55 Bhavacakra. Read at the hits, 113 Ninki findings
+  // on disk had the gauge below zero.
+  for (const c of ctx.player.casts) {
+    const amount = NINKI_HIT.get(c.abilityId);
+    if (amount !== undefined) events.push({ t: c.timestamp, type: "gain", amount, label: `${c.abilityName} at high Ninki` });
   }
-  for (const e of ctx.player.damageDone) {
-    if (!e.pet || !(e.amount && e.amount > 0)) continue;
-    events.push({ t: e.timestamp, type: "gain", amount: e.abilityId === id("PHANTOM_KAMAITACHI_BUNSHIN") ? 10 : 5, label: "Bunshin hit at high Ninki" });
+  // Bunshin's shadow: +5 per weaponskill it copies, read from the stack
+  // each one takes at the player's cast (the shadow's hit can go unlogged:
+  // MFGhwLnJ34pz7cWQ, Keichi's 1:46.28 Aeolian Edge took a stack, no
+  // shadow hit); +10 its Phantom Kamaitachi.
+  const castTimes = ctx.player.casts.map((c) => c.timestamp);
+  for (const b of ctx.player.buffs ?? []) {
+    if (b.abilityId !== S.BUNSHIN.id || (b.buffStatus !== "stackRemoved" && b.buffStatus !== "removed")) continue;
+    if (castTimes.some((t) => Math.abs(t - b.timestamp) <= 20)) events.push({ t: b.timestamp, type: "gain", amount: 5, label: "Bunshin hit at high Ninki" });
+  }
+  for (const c of ctx.player.casts) {
+    if (c.abilityId === id("PHANTOM_KAMAITACHI")) events.push({ t: c.timestamp, type: "gain", amount: 10, label: "Phantom Kamaitachi at high Ninki" });
   }
   for (const d of ctx.dead) events.push({ t: d.startMs, type: "reset", label: "death" });
   const perPoint = ctx.values.perUse(id("BHAVACAKRA")) / 50;

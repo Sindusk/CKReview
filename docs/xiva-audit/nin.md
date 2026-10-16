@@ -40,7 +40,7 @@
 | nin/Ninjutsu/tcj-doton | covered | `ninjutsu` | Ten Chi Jin's Doton on one target | Built 2026-10-15: its ticks (buff-neutral) against her average Ten Chi Jin Suiton. Not adopted on zMJdajRYyNF3LVkr 2:33 (xivanalysis 1): Fuma, Katon, Doton, but the Doton ticked 67k across both bosses against ~55k for a Ten Chi Jin Suiton, and that Suiton's Shadow Walker (20s) wouldn't have reached the next Kunai's Bane (3:08). |
 | nin/Ninjutsu/aoe-doton | verified | `ninjutsu` | Doton cut short (under 6 ticks) | Judged by damage: a Doton is flagged when its ticks (buff-neutral) deal less than a Raiton, on any number of targets. |
 | nin/Ninjutsu/st-doton | verified | `ninjutsu` | Doton on a single target outside the opener | Same check. Fires on zMJdajRYyNF3LVkr 5:50 (left after 4 ticks on both bosses, 67k) and 6:33 (no ticks at all, 108k). Matched xivanalysis there: its "unoptimized" 1 and "single-target" 1. |
-| nin/Ninki/overcap | verified | `ninki` | Ninki over 100 | Minor 20, Major 50. FRU: ~300 simulated vs its 250. |
+| nin/Ninki/overcap | verified | `ninki` | Ninki over 100 | Minor 20, Major 50. FRU: ~300 simulated vs its 250. Every gain is read at the cast since 2026-10-16 (xivanalysis reads hits): hits log ~0.7s late and can follow the spender they paid for (JZ1KXhDbqkNH3jxR FRU pull 3, Fleeting Raiju 0:26.80, hits 0:27.56 / 0:27.65, Bhavacakra 0:27.51); a Throwing Dagger that never landed still paid for a Bhavacakra (same pull, 2:39.97); and a Bunshin shadow hit can go unlogged, so the shadow's +5 comes from the Bunshin stack each weaponskill takes (MFGhwLnJ34pz7cWQ, Keichi 1:46.28). Findings with the simulation below zero 113 → 0 on disk, Ninki findings 186 → 151. zMJdajRYyNF3LVkr: 70 lost here, xivanalysis 60 (the 8:45.8 Dokumori at 100 is real). |
 | nin/Ninki/hellfrog | verified | `ninAoe` (vs Bhavacakra, one target) | Hellfrog Medium on too few targets (3 before 7.3, 2 from 7.3) | Built 2026-10-15. One target only: from 7.3 two out-damage Bhavacakra (pre-7.3 two-target frogs go unseen). Premise holds (same Ninki). Fires on Red Hot and Deep Blue kills with the bosses apart: mgTQJjX2nW6ANkP7 6:51 (21k), jXG76ba43VDLAvYz 4:07 (17k) and 9:16 as Deep Blue died (24k). Matched xivanalysis on jXG76ba43VDLAvYz (2 of its 2). |
 | nin/Ninki/deathfrog | covered | `ninAoe` (vs Zesho Meppo, one target) | Deathfrog Medium on too few targets | Not seen firing (the one on disk hit both bosses). |
 | nin/Kazematoi/overcap | verified | `kazematoi` | Armor Crush at 4-5 stacks | FRU 9 lost matched. |
@@ -82,9 +82,9 @@ In priority order (biggest damage cost first).
    6:23.4, hit 6:24.50, Zesho Meppo 6:24.48), so the simulation went below
    zero and its clamp overstated later overcaps. Now added at the cast:
    findings carrying an underflow 235 → 113 on disk, Ninki-lost findings
-   278 → 186. The rest are about 5 short per two minutes with every
-   listed gain counted (JZ1KXhDbqkNH3jxR FRU pull 3); a gain is missing
-   from both tables. Find it before trusting Ninki totals.
+   278 → 186. The rest were hit-timed gains (no gain was missing from
+   the table): every gain is read at the cast now, and no simulation
+   goes below zero (see nin/Ninki/overcap).
 2. **nin/Ninjutsu/tcj-doton** (covered). Not seen as a loss yet (the one
    on disk out-damaged its Suiton).
 3. **nin/Ninki/deathfrog** (covered). Not seen firing.

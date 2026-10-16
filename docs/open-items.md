@@ -242,7 +242,8 @@ and delete them from the header.
     Brotherhood timing and Formless overwrite not adopted).
   - [nin.md](xiva-audit/nin.md): Ninja, 0 candidates, 11 covered
     (ninjutsu, Kassatsu and Raiju checks verified 2026-10-15; Kazematoi
-    left at the kill and Armor Crush in Kunai's Bane built 2026-10-16).
+    left at the kill and Armor Crush in Kunai's Bane built 2026-10-16;
+    Ninki gains read at the cast, no simulation underflow left on disk).
   - [sam.md](xiva-audit/sam.md): Samurai, 2 candidates, 18 covered
     (Higanbana and Kenki / Meditation / Sen gauges built 2026-10-15 and
     matched on 3 xivanalysis pages).
