@@ -45,7 +45,7 @@
 | blm/Procs/dropped-firestarter | covered | `checkProcs` | Firestarter expiring | Same. |
 | blm/Procs/overwritten-and-invuln-table | no-damage | — | — | Table only. |
 | blm/Gauge/lost-polyglot | superseded | `polyglot` (death resets) | the Polyglot timer stopping (Enochian dropped) | From 7.2 Astral Fire / Umbral Ice never time out, so Enochian only drops on a death; the gauge simulation resets there, and the death finding carries the cost. |
-| blm/Gauge/overwritten-polyglot | verified | `polyglot` | a Polyglot gained at the cap | Built 2026-10-15 as a gauge simulation from casts (gaugeFindings): Enochian from the first fire or ice spell, +1 every 30s, +1 per Amplifier, −1 per Xenoglossy / Foul, cap 3, reset on death; 7.2+ only. A Polyglot at the cap, or held at a kill (by time held), is her average Xenoglossy over her average GCD. Hand-checked on xz1wjC6gfXmkMKYt (Dester Whitegloomer): Amplifier at 2:05 with 2 held, no spend before the 2:30 tick, a fourth at the cap (66k). Fires on 11 Black Mages on disk, about one each (41-76k). Matched xivanalysis's "Xenoglossy got overwritten" (2026-10-15) on xz1wjC6gfXmkMKYt 1, Q18Xc93x4wpfMFdT 2, 7zwpcLxk2Fd1h6Vr 1, Y9Fh2BHyj3xAqZ6V Zelenia pull 3 1 (its "2 Polyglot stacks lost" there is a death). Open: r4qDkR9btJCXnKWd Doomtrain pull 6 (Laura Razzy), where the app finds Amplifier at 3 Polyglot at 4:12 (a 4:00 tick, three Xenoglossys spent since the 2:11 Amplifier) and xivanalysis none; the 3:50-4:12 stretch looks like downtime, so its timer may differ there. Check before trusting the 4:12 finding. |
+| blm/Gauge/overwritten-polyglot | verified | `polyglot` | a Polyglot gained at the cap | Built 2026-10-15 as a gauge simulation from casts (gaugeFindings): Enochian from the first fire or ice spell, +1 every 30s, +1 per Amplifier, −1 per Xenoglossy / Foul, cap 3, reset on death; 7.2+ only. A Polyglot at the cap, or held at a kill (by time held), is her average Xenoglossy over her average GCD. Hand-checked on xz1wjC6gfXmkMKYt (Dester Whitegloomer): Amplifier at 2:05 with 2 held, no spend before the 2:30 tick, a fourth at the cap (66k). Fires on 11 Black Mages on disk, about one each (41-76k). Matched xivanalysis's "Xenoglossy got overwritten" (2026-10-15) on xz1wjC6gfXmkMKYt 1, Q18Xc93x4wpfMFdT 2, 7zwpcLxk2Fd1h6Vr 1, Y9Fh2BHyj3xAqZ6V Zelenia pull 3 1 (its "2 Polyglot stacks lost" there is a death). r4qDkR9btJCXnKWd Doomtrain pull 6 (Laura Razzy) 4:12 was the app's error, not downtime: Fire I in Umbral Ice at 1:00.2 removes the element, so Enochian drops and the timer restarts at the 1:02 Fire III (xivanalysis: "Astral Fire or Umbral Ice was dropped 1 time"); every later tick moves ~2s and she holds 2, not 3, at the Amplifier. Fixed 2026-10-15 (Fire I in Umbral Ice / Blizzard I in Astral Fire stop the timer), plus deaths after the last cast now reset the gauge (pulls 1 and 19 had ticks after an unraised death). Now 5 of 5 pages match. |
 | blm/Gauge/dropped-enochian | wrong | — | (before 7.2) Astral Fire / Umbral Ice timing out | Can't happen from 7.2; pre-7.2 logs aren't judged by `polyglot`. |
 | blm/Gauge/overwritten-paradox | candidate | — | a Paradox gained while one is held | Major (the first on 7.2+ forgiven). Header: not built (gauge). |
 | blm/Leylines/uptime-pre72 | candidate | — | (before 7.2) Circle of Power uptime under 90% of Ley Lines | Leaving the circle loses the 15% speed. |
@@ -89,14 +89,10 @@
 
 In priority order (biggest damage cost first).
 
-1. **blm/Gauge/overwritten-polyglot** (verified, one open case).
-   r4qDkR9btJCXnKWd Doomtrain pull 6 4:12: the app counts an overcap that
-   xivanalysis doesn't; look at its gauge timeline around the 3:50-4:12
-   downtime.
-2. **blm/Leylines/casts-72plus** (candidate). Casts outside Circle of
+1. **blm/Leylines/casts-72plus** (candidate). Casts outside Circle of
    Power, from the status.
-3. **blm/RotationWatchdog/ExtraF1, UptimeSouls, Triplecast/overwritten**
+2. **blm/RotationWatchdog/ExtraF1, UptimeSouls, Triplecast/overwritten**
    (candidates). Log-visible from casts.
-4. **blm/Gauge/overwritten-paradox, ColdF3, LukewarmF4, SkipThunder**
+3. **blm/Gauge/overwritten-paradox, ColdF3, LukewarmF4, SkipThunder**
    (candidates). Gauge-inferred.
-5. **MP-based rows** (unverifiable): need MP in the pull data first.
+4. **MP-based rows** (unverifiable): need MP in the pull data first.

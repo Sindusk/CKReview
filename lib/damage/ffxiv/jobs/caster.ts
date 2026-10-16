@@ -99,6 +99,9 @@
 //     apart, q4mQCNpRKwH1PZjb 6:53, 7:44, 9:18 (4-8k, direct hit only).
 //     Polyglot overcap (Gauge.tsx, 2026-10-15): `polyglot` below, a gauge
 //     simulation from casts; hand-checked on xz1wjC6gfXmkMKYt 2:30.
+//     Matched xivanalysis on five pages; the one disagreement
+//     (r4qDkR9btJCXnKWd Doomtrain pull 6, 4:12) was the app's: Fire I in
+//     Umbral Ice drops Enochian, fixed 2026-10-15.
 //   - SMN Searing Light with one Searing Flash (SearingLight.tsx).
 //     Checked against xivanalysis on qjCMx4bRfgNKwX9T fight 16 (7.5,
 //     2026-10-13, the first Summoner sample): Searing Flash 10/10, every
@@ -406,14 +409,21 @@ export const PCT_CHECKS: JobCheck[] = [starryMuse, starryFillers, palette, pctAo
 // Fire / Umbral Ice) adds one every 30s from the first fire or ice spell,
 // Amplifier one more, Xenoglossy and Foul spend one; cap 3. A death empties
 // the gauge and stops the timer until the next fire or ice spell. From 7.2
-// Astral Fire / Umbral Ice never time out, so Enochian only drops on a
-// death; earlier logs, where it could time out, aren't judged. A Polyglot
-// gained at the cap, or still held at a kill, is a Xenoglossy over the GCD
-// it would have replaced.
+// Astral Fire / Umbral Ice never time out, so Enochian drops only on a
+// death, or when Fire I is cast in Umbral Ice (or Blizzard I in Astral
+// Fire): it removes the element without granting the other, so the timer
+// stops (the Polyglots held stay) until the next fire or ice spell
+// restarts it from zero. r4qDkR9btJCXnKWd Doomtrain pull 6 (Laura Razzy):
+// Fire I in Umbral Ice at 1:00.2, half a second before a tick; missing it
+// put every later tick a Polyglot high and read the 4:12 Amplifier as an
+// overcap that xivanalysis ("dropped 1 time") rightly didn't count.
+// Earlier logs, where the element could time out, aren't judged. A
+// Polyglot gained at the cap, or still held at a kill, is a Xenoglossy
+// over the GCD it would have replaced.
 const POLYGLOT_MS = 30_000;
 const POLYGLOT_CAP = 3;
-const ENOCHIAN_IDS = new Set(ids("FIRE_I", "FIRE_II", "FIRE_III", "FIRE_IV", "HIGH_FIRE_II", "FLARE", "DESPAIR", "FLARE_STAR",
-  "BLIZZARD_I", "BLIZZARD_II", "BLIZZARD_III", "BLIZZARD_IV", "HIGH_BLIZZARD_II", "FREEZE", "UMBRAL_SOUL", "TRANSPOSE"));
+const FIRE_ELEMENT_IDS = new Set(ids("FIRE_II", "FIRE_III", "FIRE_IV", "HIGH_FIRE_II", "FLARE", "DESPAIR", "FLARE_STAR", "MANAFONT"));
+const ICE_ELEMENT_IDS = new Set(ids("BLIZZARD_II", "BLIZZARD_III", "BLIZZARD_IV", "HIGH_BLIZZARD_II", "FREEZE", "UMBRAL_SOUL"));
 const POLYGLOT_SPEND = new Set(ids("XENOGLOSSY", "FOUL"));
 const PRE_72 = ["7.0", "7.01", "7.05", "7.1"];
 const polyglot: JobCheck = (ctx) => {
@@ -422,6 +432,7 @@ const polyglot: JobCheck = (ctx) => {
   const deaths = [...ctx.dead].sort((a, b) => a.startMs - b.startMs);
   const events: GaugeEvent[] = [];
   let since: number | undefined;
+  let element: "fire" | "ice" | undefined;
   let d = 0;
   const tickTo = (t: number) => {
     if (since === undefined) return;
@@ -430,18 +441,30 @@ const polyglot: JobCheck = (ctx) => {
       events.push({ t: since, type: "gain", amount: 1, label: "Enochian's 30s at 3 Polyglot" });
     }
   };
-  for (const c of casts) {
-    while (d < deaths.length && deaths[d].startMs <= c.timestamp) {
+  const diesBy = (t: number) => {
+    while (d < deaths.length && deaths[d].startMs <= t) {
       tickTo(deaths[d].startMs);
       events.push({ t: deaths[d].startMs, type: "reset", label: "death" });
       since = undefined;
+      element = undefined;
       d++;
     }
+  };
+  for (const c of casts) {
+    diesBy(c.timestamp);
     tickTo(c.timestamp);
-    if (ENOCHIAN_IDS.has(c.abilityId) && since === undefined) since = c.timestamp;
+    const before = element;
+    if (FIRE_ELEMENT_IDS.has(c.abilityId)) element = "fire";
+    else if (ICE_ELEMENT_IDS.has(c.abilityId)) element = "ice";
+    else if (c.abilityId === A.FIRE_I.id) element = element === "ice" ? undefined : "fire";
+    else if (c.abilityId === A.BLIZZARD_I.id) element = element === "fire" ? undefined : "ice";
+    else if (c.abilityId === A.TRANSPOSE.id && element) element = element === "fire" ? "ice" : "fire";
+    if (before && !element) since = undefined;
+    else if (element && since === undefined) since = c.timestamp;
     if (c.abilityId === A.AMPLIFIER.id) events.push({ t: c.timestamp, type: "gain", amount: 1, label: "Amplifier at 3 Polyglot" });
     if (POLYGLOT_SPEND.has(c.abilityId)) events.push({ t: c.timestamp, type: "spend", amount: 1, label: c.abilityName });
   }
+  diesBy(ctx.endMs);
   tickTo(ctx.endMs);
   const xeno = ctx.values.perUse(A.XENOGLOSSY.id) || ctx.values.perUse(A.FOUL.id);
   const unit = Math.max(0, xeno - ctx.values.gcdValue(undefined, false));

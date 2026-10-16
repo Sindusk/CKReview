@@ -216,7 +216,7 @@ and delete them from the header.
     page compared yet).
   - [mch.md](xiva-audit/mch.md): Machinist, 8 candidates, 10 covered.
   - [blm.md](xiva-audit/blm.md): Black Mage, 10 candidates (Ley Lines,
-    rotation), 11 covered (Polyglot overcap built, awaiting xivanalysis
+    rotation), 11 covered (Polyglot overcap verified on 5 xivanalysis
     pages); MP-based rules unverifiable.
   - [smn.md](xiva-audit/smn.md): Summoner, 9 candidates, 5 covered.
   - [rdm.md](xiva-audit/rdm.md): Red Mage, 8 candidates, 9 covered.
