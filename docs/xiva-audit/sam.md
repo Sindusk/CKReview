@@ -30,21 +30,21 @@
 | sam/OGCDDowntime/meikyo | covered | `checkCooldownDrift` (hold 4.36s) | Meikyo at 2 charges | — |
 | sam/OGCDDowntime/guren-senei | covered | `checkCooldownDrift` | Guren / Senei held | — |
 | sam/OGCDDowntime/ikishoten | covered | `checkCooldownDrift` | Ikishoten held | — |
-| sam/Higanbana/uptime | candidate | — | Higanbana off the target | Checklist 90%. The app has no Samurai DoT check; `dotFindings` against a Gekko / Kasha filler would value it. |
+| sam/Higanbana/uptime | covered | `higanbana` (dotFindings, against Gekko) | Higanbana off the target | Built 2026-10-15: uptime on any enemy, forced time excused, refreshes valued against Gekko (a one-Sen GCD). Fires widely (235 on 58 reports). Checked kNQKG6yHmvZTJ2hf (Genichiro Ashina): off 6:20-7:28 while he hit both bosses throughout (the 7:17 cast left no debuff), 118k. Awaiting a page. |
 | sam/Higanbana/clipping | wrong | — | Higanbana refreshed early | Target-blind sum, and the tiers barely reach Medium. |
 | sam/Combos/combo-issues | covered | `checkCombos` | a broken or timed-out combo | Generic. |
 | sam/Combos/meikyo-cast-breaker | wrong | — | Meikyo pressed with a combo open | Meikyo is pressed mid-combo on purpose; an expired combo still counts in xivanalysis. The app's combo check follows the GCDs, not the Meikyo press. |
 | sam/Positionals/gekko-kasha | covered | `checkPositionals` | a missed Gekko / Kasha positional | Generic. |
 | sam/Interrupts/iaijutsu-cancel | covered | `checkInterrupts` | a cancelled Iaijutsu | Its tiers start at 2; the app counts each. |
 | sam/ReadyProcs/dropped | covered | `checkProcs` | Ogi Namikiri / Kaeshi / Tendo / Tsubame / Zanshin Ready expiring | Minor 1, Medium 2, Major 3. Three of its statuses are id 0 (bug). Not seen firing. |
-| sam/ReadyProcs/overwritten | candidate | — | Ikishoten with Ogi / Zanshin Ready held | Minor 1, Medium 2, Major 3. Counts one overwrite twice (both statuses). |
+| sam/ReadyProcs/overwritten | candidate | — | Ikishoten with Ogi / Zanshin Ready held | Minor 1, Medium 2, Major 3. Counts one overwrite twice (both statuses). Not seen: 0 of 202 Ikishotens on disk (2026-10-15); build when a pull has one. |
 | sam/ReadyProcs/ogi-checklist | covered | `checkProcs` | Ogi Namikiri or Kaeshi: Namikiri not pressed | Checklist. |
 | sam/ReadyProcs/tendo-checklist | covered | `checkProcs` | Tendo or its Kaeshi not pressed | Checklist. |
 | sam/ReadyProcs/tsubame-checklist | covered | `checkProcs` | a Tsubame-gaeshi not pressed | Broken in xivanalysis (id-0 statuses). |
-| sam/Kenki/overcap | candidate | — | Kenki over 100 | Minor 5, Medium 20, Major 35. Built from casts and combos; Kenki is spent on Shinten (a damage oGCD). |
+| sam/Kenki/overcap | covered | `samGauges` (gauge-overcap; also a timeline lane) | Kenki over 100 | Built 2026-10-15 from casts (combo steps when the combo landed or under Meikyo) plus Meditate ticks, Hagakure and Tengentsu (+10 when hit in its 4s, read from the cast and damage taken: the status isn't in the buff stream; without it 43 of 66 lanes ran negative, now 13 with 1-3 spends each, marked inference). Lost Kenki is her Shinten per 25. 0-65 lost in most pulls. Awaiting a page. |
 | sam/Shoha/meditation-checklist | superseded | — | — | Checklist form of the overcap. |
-| sam/Shoha/meditation-overcap | candidate | — | Meditation gained at 3 | Minor 1, Medium 3, Major 6. A lost third of a Shoha each. |
-| sam/Sen/wasted-sen | candidate | — | a Sen gained while held | Minor 1, Medium 2, Major 3. A wasted GCD's Sen; log-visible from casts. |
+| sam/Shoha/meditation-overcap | covered | `samGauges` (gauge-overcap; also a timeline lane) | Meditation gained at 3 | Built 2026-10-15: +1 per Iaijutsu / Ogi Namikiri and per 3s of Meditate, Shoha −3; a third of her Shoha each. 35 on disk (20 counted). Awaiting a page. |
+| sam/Sen/wasted-sen | covered | `samGauges` (gauge-overcap; also timeline lanes) | a Sen gained while held | Built 2026-10-15: Setsu / Getsu / Ka each one at most, cleared by Iaijutsu and Hagakure; a wasted one is a third of (her Midare − an average GCD). Premise: the FFLogs top 20 waste 3 in all (two near 4:32-4:36); the samples 115, only 6 just before a Meikyo. kNQKG6yHmvZTJ2hf (Genichiro Ashina) 5 Setsu, e.g. Yukikaze 5:07.6 and again 5:11.9. Awaiting a page. |
 | sam/AoeChecker/too-few-targets/combo | candidate | — | Fuko, or Oka / Mangetsu under Meikyo, on under 3 | Split from the row below 2026-10-15. None seen on too few targets on disk. |
 | sam/AoeChecker/too-few-targets | verified | `samAoe` | Tenka / Tendo Goken, their Kaeshi, Kyuten or Guren on too few targets | Built 2026-10-15: Kyuten, Tenka / Tendo Goken and both Kaeshi under 3; Guren on one target only (7.4's breakpoint; pre-7.4 two-target Gurens go unseen). Fires on Xk2DKZwVp4Ar6d7y Enuo pull 2 0:27 (Tendo Goken + Kaeshi, 179k + 154k: the second Meikyo went Gekko, Kasha, Gekko, so 2 Sen where Yukikaze makes 3 in the same GCDs, so the whole Setsugekka difference is lost), pull 4 6:42, pull 5 0:23 (Kyuten); pG319BgHTnPJc6Ft Necron pulls 2, 3, 10; L9BzKkD2nxcVgHTC Necron pull 15 1:13 (Guren, 38k). Matched xivanalysis (2026-10-15): Enuo pull 2 (Tendo Goken 1, Tendo Kaeshi Goken 1) and Necron pull 15 (Guren 1). Fuko, Oka, Mangetsu: the row above. |
 | sam/Defensives/use-table | no-damage | — | — | Mitigation. |
@@ -76,10 +76,11 @@ Weaving, AlwaysBeCasting and Death run unconfigured (covered by
 In priority order (biggest damage cost first). No Samurai page compared
 yet; the covered rows need one.
 
-1. **sam/Higanbana/uptime** (candidate). A dot check like the healers'.
-2. **sam/Sen/wasted-sen, sam/Kenki/overcap, sam/Shoha/meditation-overcap**
-   (candidates). Resource waste, log-inferred.
-3. **sam/ReadyProcs/overwritten** (candidate).
-4. **sam/AoeChecker/too-few-targets/combo** (candidate).
+1. **Compare pages** for the 2026-10-15 builds (Higanbana, Kenki,
+   Meditation, Sen) and the older covered rows:
+   https://xivanalysis.com/fflogs/kNQKG6yHmvZTJ2hf/1 (Genichiro Ashina),
+   https://xivanalysis.com/fflogs/at2GMBcywChApnfY/13 (Alexia Renzella),
+   https://xivanalysis.com/fflogs/7zwpcLxk2Fd1h6Vr/2 (Alison Octavious).
+2. **sam/ReadyProcs/overwritten** (candidate): not seen on disk.
+3. **sam/AoeChecker/too-few-targets/combo** (candidate).
    Oka / Mangetsu need the Meikyo condition; wait for a pull with one.
-5. Every covered row: compare against a Samurai xivanalysis page.

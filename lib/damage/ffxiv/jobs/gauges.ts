@@ -26,7 +26,7 @@ import type { PlayerCheckContext } from "../../checks";
 import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import { beastGaugeSpec } from "./pld-war";
 import { blmGaugeTracks, paletteSpec } from "./caster";
-import { firstmindsFocusSpec, mnkFurySpecs, rattlingCoilSpec } from "./melee";
+import { firstmindsFocusSpec, mnkFurySpecs, rattlingCoilSpec, samGaugeSpecs } from "./melee";
 import { mchChargeTracks, mchGaugeSpecs } from "./ranged";
 import { gaugeCastTimes, gaugeTrack, statusWindows } from "./shared";
 
@@ -552,6 +552,8 @@ export const JOB_GAUGES: Record<string, ((ctx: PlayerCheckContext) => GaugeTrack
   // Polyglot, Astral Fire, Umbral Ice, Hearts, Astral Soul, Paradox (caster.ts blmGauge).
   "Black Mage": [blmGaugeTracks],
   // Opo-opo, Raptor and Coeurl Fury: the overcap check's simulation (melee.ts mnkFurySpecs).
+  // Kenki, Meditation and the three Sen: the overcap check's simulation (melee.ts samGaugeSpecs).
+  "Samurai": [(ctx) => samGaugeSpecs(ctx).map((spec) => gaugeTrack(ctx, spec))],
   // Heat and Battery: the overcap check's simulation (ranged.ts mchGaugeSpecs).
   "Machinist": [(ctx) => [
     ...mchGaugeSpecs(ctx).map((spec) => gaugeTrack(ctx, spec)),

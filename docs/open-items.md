@@ -213,7 +213,8 @@ and delete them from the header.
     Brotherhood timing and Formless overwrite not adopted).
   - [nin.md](xiva-audit/nin.md): Ninja, 2 candidates, 9 covered
     (ninjutsu, Kassatsu and Raiju checks verified 2026-10-15).
-  - [sam.md](xiva-audit/sam.md): Samurai, 6 candidates, 14 covered (no
+  - [sam.md](xiva-audit/sam.md): Samurai, 2 candidates, 18 covered
+    (Higanbana and Kenki / Meditation / Sen gauges built 2026-10-15; no
     page compared yet).
   - [mch.md](xiva-audit/mch.md): Machinist, 0 candidates, 17 covered
     (Double Check / Checkmate charge simulation and lanes 2026-10-15; Heat / Battery

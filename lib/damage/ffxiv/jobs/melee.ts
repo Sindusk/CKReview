@@ -6,6 +6,13 @@
 // uptimes, ported from xivanalysis src/parser/jobs/<job>/modules/:
 //
 // Samurai (verified on dQ8wmb1VhKt6yBXk):
+//   - Higanbana uptime (DoTs.tsx) and Kenki / Meditation / Sen waste
+//     (Kenki.tsx, Shoha.tsx, Sen.tsx), 2026-10-15: `higanbana` and
+//     `samGauges` below, with the gauges as timeline lanes. Premise for
+//     Sen: the FFLogs top 20 Red Hot and Deep Blue Samurai waste 3 Sen in
+//     all, the 58 sample reports 115 (6 of them just before a Meikyo).
+//     Not built: Ikishoten over a held Ogi Namikiri / Zanshin Ready (0 of
+//     202 Ikishotens on disk).
 //   - Fugetsu uptime (Buffs.tsx). +13%: FFLogs' multiplier for Standard
 //     Finish + Fugetsu is 1.19 = 1.05 × 1.13.
 //   - Meikyo Shisui (Meikyo.tsx): three Sen GCDs per window. A missing one
@@ -914,7 +921,105 @@ const samAoe = aoeComboOnOneTarget([
   [id("KAESHI_GOKEN"), id("KAESHI_SETSUGEKKA"), 3], [id("TENDO_KAESHI_GOKEN"), id("TENDO_KAESHI_SETSUGEKKA"), 3],
 ]);
 
-export const SAM_CHECKS: JobCheck[] = [uptime("FUGETSU", 0.13, "Fugetsu is +13%, FFLogs multiplier"), meikyo, samAoe];
+// Higanbana (xivanalysis DoTs.tsx, 90% uptime): the shared DoT check, its
+// refreshes against Gekko (a one-Sen GCD, as Higanbana spends one Sen).
+const higanbana: JobCheck = (ctx) => dotFindings(ctx, {
+  statusIds: [S.HIGANBANA.id], name: S.HIGANBANA.name, durationMs: S.HIGANBANA.duration ?? 60_000,
+  fillerId: () => ({ id: id("GEKKO"), name: "Gekko" }),
+});
+
+// Kenki, Meditation and Sen (xivanalysis Kenki.tsx, Shoha.tsx, Sen.tsx),
+// simulated from casts. A combo step counts when its combo landed or
+// under Meikyo Shisui.
+// - Kenki (cap 100): Hakaze / Gyofu +5, Enpi / Fuko +10, Ikishoten +50;
+//   combo steps Jinpu / Shifu +5, Gekko / Kasha / Mangetsu / Oka +10,
+//   Yukikaze +15; Meditate +10 per 3s (5 at most); Hagakure +10 per Sen;
+//   Third Eye / Tengentsu +10 when hit under it.
+//   Zanshin −50, Guren / Kyuten / Shinten / Senei −25, Gyoten / Yaten −10.
+//   Lost Kenki is her Shinten per 25.
+// - Meditation (cap 3): +1 per Iaijutsu and Ogi Namikiri, +1 per 3s of
+//   Meditate; Shoha −3. Lost, a third of her Shoha.
+// - Sen (Setsu, Getsu, Ka; one each): Yukikaze Setsu, Gekko / Mangetsu
+//   Getsu, Kasha / Oka Ka. Iaijutsu and Hagakure clear them. One gained while held is
+//   wasted: a third of (her Midare Setsugekka − an average GCD), the
+//   Midare it delays.
+// A death empties all three. Also the Samurai's timeline lanes (gauges.ts).
+const SAM_ACTION_KENKI: [string, number][] = [["HAKAZE", 5], ["GYOFU", 5], ["ENPI", 10], ["FUKO", 10], ["IKISHOTEN", 50]];
+const SAM_COMBO_KENKI: [string, number][] = [["JINPU", 5], ["SHIFU", 5], ["GEKKO", 10], ["KASHA", 10], ["MANGETSU", 10], ["OKA", 10], ["YUKIKAZE", 15]];
+const SAM_KENKI_SPEND: [string, number][] = [["ZANSHIN", 50], ["HISSATSU_GUREN", 25], ["HISSATSU_KYUTEN", 25], ["HISSATSU_SHINTEN", 25],
+  ["HISSATSU_SENEI", 25], ["HISSATSU_GYOTEN", 10], ["HISSATSU_YATEN", 10]];
+const SAM_IAIJUTSU = ["HIGANBANA", "TENKA_GOKEN", "MIDARE_SETSUGEKKA", "TENDO_GOKEN", "TENDO_SETSUGEKKA"];
+const SAM_SEN: [string, ("setsu" | "getsu" | "ka")[]][] = [["YUKIKAZE", ["setsu"]], ["GEKKO", ["getsu"]], ["MANGETSU", ["getsu"]],
+  ["KASHA", ["ka"]], ["OKA", ["ka"]]];
+const MEDITATE_TICK_MS = 3_000, EYE_MS = 4_000;
+export function samGaugeSpecs(ctx: PlayerCheckContext): GaugeSpec[] {
+  const casts = ctx.player.casts.filter((c) => c.timestamp < ctx.endMs).sort((a, b) => a.timestamp - b.timestamp);
+  const meikyoW = statusWindows(ctx, S.MEIKYO_SHISUI.id);
+  const comboOk = (c: { abilityId: number; timestamp: number }) =>
+    meikyoW.some((w) => c.timestamp > w.startMs && c.timestamp <= w.endMs + 50) || comboLanded(ctx, c.abilityId, c.timestamp);
+  const byId = <T,>(list: [string, T][]) => new Map(list.filter(([key]) => A[key]).map(([key, v]) => [A[key].id, v]));
+  const actionKenki = byId(SAM_ACTION_KENKI), comboKenki = byId(SAM_COMBO_KENKI), spendKenki = byId(SAM_KENKI_SPEND), senOf = byId(SAM_SEN);
+  const iaijutsu = new Set(ids(...SAM_IAIJUTSU));
+  const kenki: GaugeEvent[] = [], meditation: GaugeEvent[] = [];
+  const sen: Record<"setsu" | "getsu" | "ka", GaugeEvent[]> = { setsu: [], getsu: [], ka: [] };
+  const held = { setsu: false, getsu: false, ka: false };
+  const clearSen = (t: number, label: string) => {
+    for (const s of ["setsu", "getsu", "ka"] as const) if (held[s]) { sen[s].push({ t, type: "spend", amount: 1, label }); held[s] = false; }
+  };
+  let d = 0;
+  const deaths = [...ctx.dead].sort((a, b) => a.startMs - b.startMs);
+  for (const c of casts) {
+    while (d < deaths.length && deaths[d].startMs <= c.timestamp) { held.setsu = held.getsu = held.ka = false; d++; }
+    const id = c.abilityId, t = c.timestamp;
+    const ak = actionKenki.get(id), ck = comboKenki.get(id), sk = spendKenki.get(id);
+    if (ak) kenki.push({ t, type: "gain", amount: ak, label: `${c.abilityName} at 100 Kenki` });
+    else if (ck && comboOk(c)) kenki.push({ t, type: "gain", amount: ck, label: `${c.abilityName} at 100 Kenki` });
+    else if (sk) kenki.push({ t, type: "spend", amount: sk, label: c.abilityName });
+    if (iaijutsu.has(id) || id === A.OGI_NAMIKIRI.id) meditation.push({ t, type: "gain", amount: 1, label: `${c.abilityName} at 3 Meditation` });
+    else if (id === A.SHOHA.id) meditation.push({ t, type: "spend", amount: 3, label: "Shoha" });
+    const gives = senOf.get(id);
+    if (gives && comboOk(c)) for (const s of gives) { sen[s].push({ t, type: "gain", amount: 1, label: `${c.abilityName} with the Sen held` }); held[s] = true; }
+    if (iaijutsu.has(id)) clearSen(t, c.abilityName);
+    else if (id === A.HAGAKURE.id) {
+      const n = Number(held.setsu) + Number(held.getsu) + Number(held.ka);
+      if (n) kenki.push({ t, type: "gain", amount: 10 * n, label: "Hagakure at 100 Kenki" });
+      clearSen(t, "Hagakure");
+    }
+  }
+  // Third Eye / Tengentsu: +10 when a hit lands on her while it's up (the
+  // first hit only). Without it Kenki ran negative in 43 of the samples'
+  // lanes (kNQKG6yHmvZTJ2hf Genichiro Ashina 3:57-8:44). The status isn't
+  // in the buff stream: from the cast, for its 4s.
+  const eyes = new Set(ids("THIRD_EYE", "TENGENTSU"));
+  for (const c of casts.filter((x) => eyes.has(x.abilityId))) {
+    const hit = ctx.player.damageTaken.find((e) => e.timestamp > c.timestamp && e.timestamp <= c.timestamp + EYE_MS);
+    if (hit) kenki.push({ t: hit.timestamp, type: "gain", amount: 10, label: "Tengentsu at 100 Kenki" });
+  }
+  for (const w of statusWindows(ctx, S.MEDITATE.id)) {
+    const ticks = Math.min(5, Math.floor((Math.min(w.endMs, ctx.endMs) - w.startMs) / MEDITATE_TICK_MS));
+    for (let i = 1; i <= ticks; i++) {
+      const t = w.startMs + i * MEDITATE_TICK_MS;
+      kenki.push({ t, type: "gain", amount: 10, label: "Meditate at 100 Kenki" });
+      if (i <= 3) meditation.push({ t, type: "gain", amount: 1, label: "Meditate at 3 Meditation" });
+    }
+  }
+  for (const dd of ctx.dead) for (const list of [kenki, meditation, sen.setsu, sen.getsu, sen.ka]) list.push({ t: dd.startMs, type: "reset", label: "death" });
+  const shinten = ctx.values.perUse(A.HISSATSU_SHINTEN.id), shoha = ctx.values.perUse(A.SHOHA.id);
+  const midare = ctx.values.perUse(A.MIDARE_SETSUGEKKA.id), gcd = ctx.values.gcdValue(undefined, false);
+  const perSen = Math.max(0, (midare - gcd) / 3);
+  const senSpec = (name: string, events: GaugeEvent[]): GaugeSpec => ({
+    name, unit: name, cap: 1, unitValue: perSen, events,
+    valueBasis: `(${k(midare)} average Midare Setsugekka − ${k(gcd)} average GCD) ÷ 3 (the Midare it delays)`,
+  });
+  return [
+    { name: "Kenki", unit: "Kenki", cap: 100, unitValue: shinten / 25, events: kenki, valueBasis: `${k(shinten)} average Shinten per 25 Kenki` },
+    { name: "Meditation", unit: "Meditation", cap: 3, unitValue: shoha / 3, events: meditation, valueBasis: `${k(shoha)} average Shoha per 3 Meditation` },
+    senSpec("Setsu", sen.setsu), senSpec("Getsu", sen.getsu), senSpec("Ka", sen.ka),
+  ];
+}
+const samGauges: JobCheck = (ctx) => samGaugeSpecs(ctx).flatMap((spec) => (spec.unitValue > 0 ? gaugeFindings(ctx, spec) : []));
+
+export const SAM_CHECKS: JobCheck[] = [uptime("FUGETSU", 0.13, "Fugetsu is +13%, FFLogs multiplier"), meikyo, samAoe, higanbana, samGauges];
 // Rattling Coil (xivanalysis UncoiledFury): +1 per Vicewinder / Vicepit /
 // Serpent's Ire, cap 3, Uncoiled Fury spends 1. Coils left when a kill
 // ends are lost too. On 2T1HzdPKgbhM43am fight 10 the cast simulation finds
