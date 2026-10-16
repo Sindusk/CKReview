@@ -182,7 +182,7 @@ and delete them from the header.
   module job by job against the FFXIV damage checks. Phases 1 and 2 done
   for all 21 jobs (2026-10-15). Phase 3 (premise and firing checks,
   building candidates) is ongoing: each ledger's "Open" list is its work.
-  Samples missing: White Mage. The AoE-on-too-few-targets candidates
+  Every job now has samples on disk. The AoE-on-too-few-targets candidates
   were built 2026-10-15 for all eleven jobs (DNC, DRK, WAR, GNB, MNK,
   NIN, SAM, MCH, RPR, BLM, SMN), checked on 19 Red Hot and Deep Blue
   kills the user picked, and matched against 16 xivanalysis pages
@@ -243,8 +243,9 @@ and delete them from the header.
   - [rdm.md](xiva-audit/rdm.md): Red Mage, 5 candidates, 12 covered (mana
     simulation with lanes and Dualcast running out built 2026-10-15,
     compared on two pages).
-  - [whm.md](xiva-audit/whm.md): White Mage, 3 candidates, 6 covered (no
-    sample on disk).
+  - [whm.md](xiva-audit/whm.md): White Mage, 0 candidates, 9 covered
+    (Blood Lily overcap and Misery left at a kill with Lily / Blood Lily
+    lanes, Assize tracked, 2026-10-16; awaiting xivanalysis pages).
 - [wowa-audit-plan.md](wowa-audit-plan.md): the same for WoWAnalyzer
   (reference only, AGPL). After the FFXIV pilot.
 - [wow-sim-plan.md](wow-sim-plan.md): WoW simulation pipeline (talent

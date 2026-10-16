@@ -217,6 +217,9 @@ export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
     { actions: ["DIVINATION"] },
     { actions: ["EARTHLY_STAR"], prePullEvidence: ["STELLAR_EXPLOSION", "STELLAR_BURST"], damage: ["STELLAR_EXPLOSION", "STELLAR_BURST"], landDelayMs: 10_000 },
   ],
-  // Unverified (no White Mage in any sample).
-  "White Mage":  [{ actions: ["PRESENCE_OF_MIND"] }],
+  // Assize added 2026-10-16 (xivanalysis oGCDs.tsx checklist; a damage
+  // oGCD). The FFLogs top 15 for Red Hot and Deep Blue press the first at
+  // 0:01-0:10 (most ~0:09, in the burst) and hold 11-45s in all over 13
+  // uses.
+  "White Mage":  [{ actions: ["PRESENCE_OF_MIND"] }, { actions: ["ASSIZE"], firstUseOffsetMs: 10000 }],
 };

@@ -8,9 +8,11 @@
   gauges start at 3 and the Lily timer waits for the first Afflatus.
   Supported 7.0–7.5.
 - **App:** `lib/damage/ffxiv/jobs/healer.ts` (`WHM_CHECKS`: `healGcds`,
-  `aoeOnOneTarget`, Dia `dot`), `tracked-cooldowns.ts` ("White Mage":
-  Presence of Mind only). **No White Mage in any sample**, so every app row
-  is at most `covered`.
+  `aoeOnOneTarget`, Dia `dot`, `bloodLily`; Lily and Blood Lily lanes via
+  `whmGaugeTracks` in `gauges.ts`), `tracked-cooldowns.ts` ("White Mage":
+  Presence of Mind, Assize). Phase 3 (2026-10-16): 88 level-100 White
+  Mage pulls on disk scanned, premise checked on the FFLogs top 37 for
+  Red Hot and Deep Blue. No xivanalysis page compared yet.
 
 ## Ledger
 
@@ -19,13 +21,13 @@
 | whm/DoTs/uptime | covered | Dia `dot` | Dia off the target | Checklist 95%. |
 | whm/DoTs/clipping | wrong | — | Dia refreshed early (6s / 9s / 12s a minute) | Target-blind, as for every healer DoT. |
 | whm/DoTs/applied-into-invuln | superseded | Dia `dot` | Dia shortly before invulnerability | Table only. |
-| whm/GlareFlare/dropped-glare-iv | candidate | — | Sacred Sight stacks unused (Glare IV) | Medium 1, Major 2. Three Glare IVs per Presence of Mind; `checkProcs` handles stacks, but the consumer test is unchecked for this one. Worth a Glare IV each. |
-| whm/Lilies/bloodlily-overcap | candidate | — | Blood Lily gained at 3 | Medium 1, Major 2. A third of an Afflatus Misery each. Inferred from Afflatus casts. |
-| whm/Lilies/bloodlily-leftover | candidate | — | 3 Blood Lilies unspent at the end | Major. Would follow the leftAtKill rule (kills only, time held). |
+| whm/GlareFlare/dropped-glare-iv | covered | `checkProcs` | Sacred Sight stacks unused (Glare IV) | Medium 1, Major 2. Scanned 2026-10-16 on every level-100 White Mage pull on disk: 2 Sacred Sights lost, both at the player's death (mgTQJjX2nW6ANkP7 8:41, ZVCqpA8DPJgMK2Yr 8:41). Synced ultimates (TEA) have no Glare IV. |
+| whm/Lilies/bloodlily-overcap | covered | `bloodLily` | Blood Lily gained at 3 | Built 2026-10-16 as a gauge from casts with Lily and Blood Lily lanes: full at the start from 7.4, empty before (52 of 52 level-100 7.4+ pulls pressed Misery before any Lily; no Misery ever went out under 3); a death empties it. A third of (Misery − Glare III) each. 33 counted on disk, 6 forced. FFLogs top 37: 2. No xivanalysis page yet. |
+| whm/Lilies/bloodlily-leftover | covered | `bloodLily` | 3 Blood Lilies unspent at the end | Built 2026-10-16, kills only, a GCD of unforced time since the third: one Misery. pG319BgHTnPJc6Ft Necron pull 3 (9:38, 185k); 2 shown forced. FFLogs top 37: 1. |
 | whm/Lilies/lily-overcap | no-damage | — | Lilies capped with the timer running | Medium 1, Major 3. A lost heal, and indirectly a slower Misery. |
 | whm/Lilies/gcd-heals-instead-of-lily | superseded | `healGcds` | Cure / Medica with Lilies available | Major at 3. The app values each heal GCD by what it did. |
 | whm/DivineCaress/dropped | no-damage | — | Divine Grace unused | A shield. |
-| whm/OGCDs/checklist | covered | `checkCooldownDrift` (Presence of Mind) | Presence of Mind / Assize held | xivanalysis's checklist target is 75%. The app tracks Presence of Mind only; **Assize** (a damage oGCD) isn't tracked. |
+| whm/OGCDs/checklist | covered | `checkCooldownDrift` (Presence of Mind, Assize) | Presence of Mind / Assize held | xivanalysis's checklist target is 75%. Assize added 2026-10-16 with a 10s opener allowance (the FFLogs top 15 press it at 0:01-0:10 and hold 11-45s in all over 13 uses). Fires on 23 pulls on disk (bqmRpGxDvfT8AZc6 3 uses, fGjA9DKLQbRa2q1k 2). No xivanalysis page yet. |
 | whm/OGCDs/liturgy-of-the-bell | no-damage | — | Liturgy unused | Mitigation / healing. |
 | whm/OGCDs/asylum | no-damage | — | — | Healing. |
 | whm/OGCDs/aquaveil | no-damage | — | — | Mitigation. |
@@ -57,6 +59,12 @@ has no White Mage AoE rule.
 
 ## Open
 
-1. **Get a White Mage sample** with its xivanalysis page.
-2. **whm/OGCDs/checklist, Assize.** Add Assize to the tracked cooldowns.
-3. **whm/GlareFlare/dropped-glare-iv, whm/Lilies/bloodlily-*** (candidates).
+No candidates left (2026-10-16; 74 reports with a White Mage on disk now).
+Waiting on xivanalysis pages:
+
+1. **whm/Lilies/bloodlily-***: fGjA9DKLQbRa2q1k (Kai Dazkar, 3 counted),
+   pG319BgHTnPJc6Ft Necron pull 3 (Eastborn Shadowimage, 7.3, Misery held
+   at the kill).
+2. **whm/OGCDs/checklist, Assize**: bqmRpGxDvfT8AZc6 (Caramel Tiramisu),
+   fGjA9DKLQbRa2q1k.
+3. **whm/GlareFlare/dropped-glare-iv**: no living loss on disk.

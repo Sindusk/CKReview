@@ -212,16 +212,18 @@
 //   DoT is instant, so a refresh pressed to move cost little; the finding
 //   says so but still counts it (Dia refreshes with 25s left are common on
 //   dQ8wmb1VhKt6yBXk). Needs VOD checks.
-// White Mage is unverified: no sample pull has one.
+// White Mage (first samples 2026-10-16): Blood Lily and Lily below, Assize
+// in tracked-cooldowns.ts; Sacred Sight (Glare IV) is checkProcs's (2 lost
+// on disk, both at a death). Not matched against xivanalysis yet.
 //
 //   Copyright (c) 2018 Saxon Landers & contributors
 //   MIT License; full text in THIRD_PARTY_NOTICES.md.
 
 import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
-import type { DamageFinding, JobCheck } from "../../types";
+import type { DamageFinding, GaugeTrack, JobCheck } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";
-import { gcdKinds, inWindows, mergeWindows } from "../../timeline";
-import { aoeOnOneTargetFindings, burstWindowFindings, dotFindings, k } from "./shared";
+import { forcedPart, gcdKinds, inWindows, mergeWindows } from "../../timeline";
+import { aoeOnOneTargetFindings, burstWindowFindings, dotFindings, gaugeFindings, gaugeTrack, k, type GaugeEvent, type GaugeSpec } from "./shared";
 
 export const HEAL_WASTE_SHARE = 0.2;
 const HEAL_LAND_MS = 1_500;
@@ -424,5 +426,107 @@ const cards: JobCheck = (ctx): DamageFinding[] => {
 };
 
 export const AST_CHECKS: JobCheck[] = [healGcds, aoeOnOneTarget, dot("COMBUST_III"), divination, cards];
-export const WHM_CHECKS: JobCheck[] = [healGcds, aoeOnOneTarget, dot("DIA")];
+// White Mage Lilies and Blood Lily (xivanalysis Lilies.tsx), simulated
+// from casts:
+// - Lily: 3 at most, one every 20s while under 3 (the timer stops at 3);
+//   Afflatus Solace / Rapture spend one and restart a stopped timer.
+// - Blood Lily: 3 at most; each Lily spent adds one, Afflatus Misery
+//   spends 3.
+// Both start full from 7.4 and empty before (xivanalysis; on disk 52 of
+// 52 level-100 7.4+ pulls pressed Misery before any Lily, and no Misery
+// ever went out with under 3). A death empties Blood Lily (12 deaths on
+// disk: the first Misery after each came 3 or more Lilies later); Lilies
+// aren't reset (not shown either way).
+// Blood Lily gained at 3 is a third of a Misery lost: her average Misery
+// over her average Glare III (the GCD it replaces), ÷ 3. Three held at a
+// kill, with a GCD of unforced time since the third, is a Misery lost
+// (Lilies.tsx "leftover"). The Lily gauge is drawn only: a Lily lost at
+// the cap is a heal (and a Blood Lily later, which this doesn't follow).
+// FFLogs top 37 for Red Hot and Deep Blue: 2 overcaps, 1 held at the end.
+const LILY_MAX = 3, LILY_TIMER_MS = 20_000, MISERY_COST = 3;
+const LILY_SPENDERS = new Set([A.AFFLATUS_SOLACE.id, A.AFFLATUS_RAPTURE.id]);
+const PRE_74 = ["7.0", "7.01", "7.05", "7.1", "7.2", "7.3"];
+const startsFull = (ctx: PlayerCheckContext) => !ctx.patch || !PRE_74.includes(ctx.patch);
+
+export function bloodLilySpec(ctx: PlayerCheckContext): GaugeSpec | undefined {
+  const casts = ctx.player.casts.filter((c) => LILY_SPENDERS.has(c.abilityId) || c.abilityId === A.AFFLATUS_MISERY.id);
+  if (casts.length === 0) return undefined;
+  const first = Math.min(0, ...casts.map((c) => c.timestamp)) - 1;
+  const events: GaugeEvent[] = startsFull(ctx) ? [{ t: first, type: "gain", amount: MISERY_COST, label: "start (7.4+)" }] : [];
+  for (const c of casts) {
+    events.push(c.abilityId === A.AFFLATUS_MISERY.id
+      ? { t: c.timestamp, type: "spend", amount: MISERY_COST, label: "Afflatus Misery" }
+      : { t: c.timestamp, type: "gain", amount: 1, label: `${c.abilityName} at 3 Blood Lilies` });
+  }
+  for (const d of ctx.dead) events.push({ t: d.startMs, type: "reset", label: "death" });
+  const misery = ctx.values.perUse(A.AFFLATUS_MISERY.id), glare = ctx.values.perUse(A.GLARE_III.id);
+  return { name: "Blood Lily", unit: "Blood Lily", cap: MISERY_COST, unitValue: Math.max(0, misery - glare) / MISERY_COST,
+    valueBasis: `(${k(misery)} average Afflatus Misery − ${k(glare)} average Glare III) ÷ 3`, events };
+}
+
+const bloodLily: JobCheck = (ctx) => {
+  const spec = bloodLilySpec(ctx);
+  if (!spec || spec.unitValue <= 0) return [];
+  const out = gaugeFindings(ctx, spec);
+  if (ctx.pull.result !== "Kill") return out;
+  const steps = gaugeTrack(ctx, spec).steps;
+  const last = steps[steps.length - 1];
+  if (!last || last.value < MISERY_COST) return out;
+  const since = Math.max(0, last.t);
+  const unforced = ctx.endMs - since - forcedPart(since, ctx.endMs, ctx.forced).ms;
+  const forced = unforced < ctx.baseGcdMs;
+  out.push(finding(ctx, {
+    kind: "gauge-overcap", startMs: since, endMs: ctx.endMs, forced,
+    cause: forced ? forcedPart(since, ctx.endMs, ctx.forced).cause : undefined,
+    label: "Afflatus Misery left at the kill", lostDamage: spec.unitValue * MISERY_COST,
+    basis: spec.valueBasis.replace(" ÷ 3", ""),
+    detail: `3 Blood Lilies held from ${clock(since)} to the kill`,
+  }));
+  return out;
+};
+
+/** The Damage dialog's White Mage lanes: Lily and Blood Lily. */
+export function whmGaugeTracks(ctx: PlayerCheckContext): GaugeTrack[] {
+  const spec = bloodLilySpec(ctx);
+  if (!spec) return [];
+  // Lily, with its timer.
+  const spends = ctx.player.casts.filter((c) => LILY_SPENDERS.has(c.abilityId) && c.timestamp < ctx.endMs)
+    .map((c) => c.timestamp).sort((a, b) => a - b);
+  let lilies = startsFull(ctx) ? LILY_MAX : 0;
+  let timerFrom: number | undefined = lilies < LILY_MAX ? 0 : undefined;
+  let short = 0;
+  const steps: GaugeTrack["steps"] = [{ t: 0, value: lilies }];
+  const capped: GaugeTrack["capped"] = [];
+  let cappedSince: number | undefined = lilies >= LILY_MAX ? 0 : undefined;
+  const set = (t: number) => {
+    if (steps[steps.length - 1].t === t) steps[steps.length - 1].value = lilies; else steps.push({ t, value: lilies });
+    if (lilies >= LILY_MAX && cappedSince === undefined) cappedSince = t;
+    if (lilies < LILY_MAX && cappedSince !== undefined) { if (t > cappedSince) capped.push({ startMs: cappedSince, endMs: t }); cappedSince = undefined; }
+  };
+  const tickTo = (t: number) => {
+    while (timerFrom !== undefined && timerFrom + LILY_TIMER_MS <= t) {
+      const at: number = timerFrom + LILY_TIMER_MS;
+      lilies = Math.min(LILY_MAX, lilies + 1);
+      timerFrom = lilies < LILY_MAX ? at : undefined;
+      set(at);
+    }
+  };
+  for (const t of spends) {
+    tickTo(t);
+    if (lilies <= 0) short++; else lilies--;
+    if (timerFrom === undefined) timerFrom = Math.max(0, t);
+    set(Math.max(0, t));
+  }
+  tickTo(ctx.endMs);
+  if (cappedSince !== undefined && ctx.endMs > cappedSince) capped.push({ startMs: cappedSince, endMs: ctx.endMs });
+  const lostLilies = Math.floor(capped.reduce((a, w) => a + w.endMs - w.startMs, 0) / LILY_TIMER_MS);
+  return [
+    { name: "Lily", max: LILY_MAX, steps, capped,
+      note: `Lilies, simulated from casts (20s timer, stopped at 3); about ${lostLilies} lost at the cap (healing, not valued)` +
+        (short > 0 ? `; ${short} Lily spend${short === 1 ? "" : "s"} the simulation had no Lily for (model or log off)` : "") },
+    gaugeTrack(ctx, spec),
+  ];
+}
+
+export const WHM_CHECKS: JobCheck[] = [healGcds, aoeOnOneTarget, dot("DIA"), bloodLily];
 export const SGE_CHECKS: JobCheck[] = [healGcds, aoeOnOneTarget, dot("EUKRASIAN_DOSIS_III", "EUKRASIAN_DYSKRASIA")];
