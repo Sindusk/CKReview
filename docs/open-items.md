@@ -205,7 +205,9 @@ and delete them from the header.
   - [sch.md](xiva-audit/sch.md): Scholar, 3 covered.
   - [pld.md](xiva-audit/pld.md): Paladin, 2 covered.
   - [war.md](xiva-audit/war.md): Warrior, 1 candidate, 4 covered.
-  - [drk.md](xiva-audit/drk.md): Dark Knight, 2 candidates, 5 covered.
+  - [drk.md](xiva-audit/drk.md): Dark Knight, 0 candidates, 6 covered
+    (Dark Arts overwrite built 2026-10-16); MP overcap unverifiable until
+    player MP is kept from the log (the fetch drops it).
   - [gnb.md](xiva-audit/gnb.md): Gunbreaker, 1 candidate, 7 covered.
   - [drg.md](xiva-audit/drg.md): Dragoon, 3 covered.
   - [vpr.md](xiva-audit/vpr.md): Viper, 1 candidate (Vices, rare), 5

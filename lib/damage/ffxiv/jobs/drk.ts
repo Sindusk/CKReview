@@ -44,7 +44,8 @@
 // Checked against xivanalysis on 2T1HzdPKgbhM43am Dancing Mad fight 10
 // (2026-10-08): its 60 Blood overcapped matches; its AoE-on-one-target
 // uses (6:20, 14:22) were past a phase's HP check, building Blood before
-// downtime, so they're forced. Not built: MP overcap (one Edge of Shadow).
+// downtime, so they're forced. Not built: MP overcap (one Edge of Shadow):
+// player MP isn't in the fetched streams. Dark Arts overwrite: below.
 // Tinctures are every job's (tincture.ts).
 //
 // Checked against xivanalysis on qjCMx4bRfgNKwX9T Dancing Mad kill (7.5,
@@ -269,4 +270,46 @@ const clock = (ms: number) => {
   return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
 };
 
-export const DRK_CHECKS: JobCheck[] = [delirium, darkside, blood, aoeCombo, livingShadow, saltAndDarkness];
+// Dark Arts overwritten (xivanalysis MPUsage.tsx): The Blackest Night that
+// breaks grants Dark Arts, a free Edge / Flood of Shadow; another break
+// before an Edge or Flood spends it loses one: her average Edge of
+// Shadow. Neither status is in the buff stream; the shield is in the
+// healing one: a break is its "removebuff" at the same instant as an
+// absorb on that target. In forced time or with a death between: shown,
+// not counted. On disk 14 in 932 breaks (bVDR2mTL7YGvMxK1 The Tyrant pull
+// 11, 10:16.8 then 10:41.9); the FFLogs top 38 for Red Hot and Deep Blue 1
+// in 226. Not counted: a shield that never breaks (126 of 1,058 on disk,
+// 15 of 241 among the top 38): a mitigation call whose cost is MP, which
+// the log streams the app fetches don't carry for players.
+const TBN_ABSORB_MS = 50;
+const darkArtsOverwrite: JobCheck = (ctx) => {
+  const tbn = S.BLACKEST_NIGHT?.id;
+  if (tbn === undefined) return [];
+  const h = (ctx.player.healing ?? []).filter((e) => e.abilityId === tbn && e.timestamp < ctx.endMs);
+  const absorbs = h.filter((e) => e.healType === "absorbed");
+  const breaks = h.filter((e) => e.healType === "removebuff" &&
+    absorbs.some((a) => a.target === e.target && Math.abs(a.timestamp - e.timestamp) <= TBN_ABSORB_MS)).map((e) => e.timestamp);
+  const spends = ctx.player.casts.filter((c) => c.abilityId === id("EDGE_OF_SHADOW") || c.abilityId === id("FLOOD_OF_SHADOW")).map((c) => c.timestamp);
+  const edge = ctx.values.perUse(id("EDGE_OF_SHADOW"));
+  const out: DamageFinding[] = [];
+  let held: number | undefined;
+  const events = [...breaks.map((t) => ({ t, brk: true })), ...spends.map((t) => ({ t, brk: false }))].sort((a, b) => a.t - b.t);
+  for (const e of events) {
+    if (!e.brk) { held = undefined; continue; }
+    if (held !== undefined) {
+      const during = forcedPart(held, e.t, ctx.forced);
+      const died = ctx.dead.some((d) => d.startMs >= held! && d.startMs <= e.t);
+      out.push(finding(ctx, {
+        kind: "proc-lost", startMs: e.t, endMs: e.t, forced: died || during.ms > 0,
+        cause: died ? "dead" : during.ms > 0 ? during.cause : undefined,
+        label: "Dark Arts overwritten", lostDamage: edge,
+        basis: `one free Edge of Shadow lost (${k(edge)} average)`,
+        detail: `The Blackest Night broke at ${clock(e.t)} with the Dark Arts from ${clock(held)} still unspent`,
+      }));
+    }
+    held = e.t;
+  }
+  return out;
+};
+
+export const DRK_CHECKS: JobCheck[] = [delirium, darkside, blood, aoeCombo, livingShadow, saltAndDarkness, darkArtsOverwrite];
