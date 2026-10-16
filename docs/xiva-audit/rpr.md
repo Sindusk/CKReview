@@ -46,7 +46,7 @@
 | rpr/Harpe/statistic | verified | `checkInterrupts` + `checkDisengages` | Harpe pressed | A statistic. Vamp's cancelled Harpes matched. |
 | rpr/Reaver/dropped | verified | `reaperStacks` | a Soul Reaver stack lost to another press | Built 2026-10-16 from the buff stream (removed or refreshed beside a non-spender press, stacks counted); each a Gibbet over her average combo GCD (Shroud not valued). 21 counted on disk, 7 at a death or forced (xydWc2pK74HCbZ8q, 7 in one kill: Unveiled Gibbet 1:28.6 then Shadow of Death 1:31.8). FFLogs top 20: 4 stacks in 629 builds. Matched xivanalysis's 7 on xydWc2pK74HCbZ8q (Cynder Gentleheart). |
 | rpr/Executioner/dropped | verified | `reaperStacks` | an Executioner stack lost to another press | Built 2026-10-16, same: 17 counted (6XaWqwMbkZG9pLmx Vamp Fatale 8:32.6, Perfectio with both stacks from Gluttony; fJxTNgwtRKjYbvZp 6:45 Plentiful Harvest and 9:07 Perfectio, 107k each), 3 forced. Matched xivanalysis: fJxTNgwtRKjYbvZp (Bancho Shera) 4 stacks, xydWc2pK74HCbZ8q 2. |
-| rpr/OtherGauges/soul-overcap | unverifiable | — | Soul over 100 | Minor 10, Medium 30, Major 50. A cast simulation runs short: the kill gains 1800, spends 1850 and goes below zero 4 times (some gains aren't casts, probably an enemy dying under Death's Design). qjCMx4bRfgNKwX9T's 20 not adopted. |
+| rpr/OtherGauges/soul-overcap | covered | `rprSoul` (lower bound, 2026-10-16; Open item 2) | Soul over 100 | Minor 10, Medium 30, Major 50. A cast simulation runs short: the kill gains 1800, spends 1850 and goes below zero 4 times (some gains aren't casts, probably an enemy dying under Death's Design). qjCMx4bRfgNKwX9T's 20 not adopted. |
 | rpr/OtherGauges/shroud-overcap | verified | `shroud` | Shroud over 100 | FRU 10 lost matched. |
 | rpr/DeathsDesign/uptime | verified | `deathsDesign` (from the Reaper's hits) | hits without Death's Design | Checklist 95%. Per target in the app; its union over foes hides gaps on a second boss. |
 | rpr/HarvestMoon/uses | verified | `harvestMoon` | a downtime without Soulsow, or Harvest Moon held through one | Checklist 100%. qjCMx4bRfgNKwX9T 5/4 matched; FRU: 7 chances from invulnerability vs the app's 9 from untargetable windows. |
@@ -88,6 +88,16 @@ In priority order (biggest damage cost first):
    1 overwrite (60 potency) = the app's Gallows at 0:48 (9k). Its "lost 1
    stack" is an Executioner stack removed at 1:11.9 with no cast, 2s
    before her death ended the wipe: not adopted.
-2. **rpr/OtherGauges/soul-overcap** (unverifiable until the missing Soul
-   source is found).
+2. **rpr/OtherGauges/soul-overcap**: built 2026-10-16 as a lower bound
+   (`rprSoul`). xivanalysis's own model (Harpe, Harvest Moon, +10 per
+   enemy dying under Death's Design) still goes below zero on 54 of 342
+   Reaper pulls on disk, mostly fights with adds (Necron, Futures
+   Rewritten, TEA), so the missing gains are adds dying under Death's
+   Design. The check counts only gains that surely happened (combo steps
+   that landed, Slice, Spinning Scythe, Soul Slice / Scythe), floors at
+   0 and resets at a death, so it never runs above the real gauge and
+   any overcap it reports happened. It fires nowhere on disk; the full
+   model's overcaps (10-50 on four Sonder Dreams Necron pulls) depend on
+   Harpe / Harvest Moon gains. qjCMx4bRfgNKwX9T's xivanalysis 20: the
+   full model shows none on that kill (likely its add-death gains).
 3. **rpr/Procs/expired-gibbet, gallows** (covered). Not seen firing.

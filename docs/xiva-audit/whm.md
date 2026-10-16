@@ -62,10 +62,17 @@ has no White Mage AoE rule.
 No candidates left (2026-10-16; 74 reports with a White Mage on disk now).
 Blood Lily and Assize compared on three pages the same day.
 
-1. **whm/Lilies/lily-overcap**: xivanalysis's Lily totals run higher
-   than the simulation's (8 vs 3, 8 vs 6); find why before trusting
-   either total. The counted findings don't depend on it much (each is
-   paired with a heal).
+1. **whm/Lilies/lily-overcap**: xivanalysis's Lily totals ran higher
+   than the simulation's (8 vs 3, 8 vs 6). Found 2026-10-16: the sim
+   rounded each stretch at 3 down on its own; with the timer paused at
+   the cap every second there delays every later Lily, so the paused
+   time adds up (xivanalysis: total expired time ÷ 20s). Fixed in
+   `lilySim`: Eastborn Shadowimage (pG319BgHTnPJc6Ft pull 3) now 8 = 8.
+   Still apart: Kai Dazkar 5 against 8 (no deaths; walked by hand from
+   his casts, ~119s at the cap, so its 8 counts time this model doesn't,
+   possibly a pre-7.4 start), Chizu Wu 11 against 7 (four deaths;
+   xivanalysis empties the gauge at each, the app doesn't, since the log
+   can't show it). The counted findings stay paired with heals.
 2. **whm/GlareFlare/dropped-glare-iv**: no living loss on disk until
    2026-10-16. Found by ff-probe (6 lowest Vamp Fatale White Mages):
    3HrGydmRZApkCtXz fight 3 (Chizu Wu, fetched) let Sacred Sight run out

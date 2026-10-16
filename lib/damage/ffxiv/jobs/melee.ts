@@ -1010,6 +1010,48 @@ const shroud: JobCheck = (ctx) => {
   });
 };
 
+// Soul over 100 (xivanalysis OtherGauges.tsx, 2026-10-16). Its model
+// (+10 per combo step, Harpe and Harvest Moon, +50 per Soul Slice, −50
+// per spender, +10 per enemy dying under Death's Design) still went below
+// zero on 54 of 342 Reaper pulls on disk, mostly Necron, Futures Rewritten
+// and The Epic of Alexander: adds dying under Death's Design, which the
+// pull doesn't carry. So this counts only gains that surely happened
+// (Slice, Spinning Scythe, Waxing / Infernal Slice and Nightmare Scythe
+// when their combo landed, Soul Slice / Scythe), floors spends at 0 and
+// resets at a death: it never runs above the real gauge, so an overcap it
+// sees happened (a lower bound; missed gains only hide overcaps). 50 Soul
+// is a spender (Blood Stalk / Unveiled Gibbet / Gallows) plus the
+// Gibbet / Gallows it unlocks over the combo GCD that one replaces.
+const SOUL_GAIN_10 = new Set(ids("SLICE", "SPINNING_SCYTHE"));
+const SOUL_GAIN_COMBO = new Set(ids("WAXING_SLICE", "INFERNAL_SLICE", "NIGHTMARE_SCYTHE"));
+const SOUL_GAIN_50 = new Set(ids("SOUL_SLICE", "SOUL_SCYTHE"));
+const SOUL_SPEND = new Set(ids("BLOOD_STALK", "GRIM_SWATHE", "UNVEILED_GIBBET", "UNVEILED_GALLOWS", "GLUTTONY"));
+const rprSoul: JobCheck = (ctx) => {
+  const events: GaugeEvent[] = [];
+  for (const c of ctx.player.casts) {
+    if (SOUL_GAIN_10.has(c.abilityId) || (SOUL_GAIN_COMBO.has(c.abilityId) && comboLanded(ctx, c.abilityId, c.timestamp))) {
+      events.push({ t: c.timestamp, type: "gain", amount: 10, label: `${c.abilityName} at full Soul` });
+    } else if (SOUL_GAIN_50.has(c.abilityId)) events.push({ t: c.timestamp, type: "gain", amount: 50, label: `${c.abilityName} with Soul above 50` });
+    else if (SOUL_SPEND.has(c.abilityId)) events.push({ t: c.timestamp, type: "spend", amount: 50, label: c.abilityName });
+  }
+  for (const d of ctx.dead) events.push({ t: d.startMs, type: "reset", label: "death" });
+  const avg = (...keys: string[]) => {
+    const list = ids(...keys).map((i) => ({ v: ctx.values.perUse(i), n: ctx.player.casts.filter((x) => x.abilityId === i).length }));
+    const n = list.reduce((a, u) => a + u.n, 0);
+    return n > 0 ? list.reduce((a, u) => a + u.v * u.n, 0) / n : 0;
+  };
+  const spender = avg("BLOOD_STALK", "UNVEILED_GIBBET", "UNVEILED_GALLOWS");
+  const reaver = avg("GIBBET", "GALLOWS");
+  const combo = avg("SLICE", "WAXING_SLICE", "INFERNAL_SLICE");
+  const per50 = spender + reaver - combo;
+  if (spender <= 0 || reaver <= 0 || combo <= 0 || per50 <= 0) return [];
+  return gaugeFindings(ctx, {
+    name: "Soul", unit: "Soul", cap: 100, unitValue: per50 / 50,
+    valueBasis: `(${k(spender)} average Blood Stalk / Unveiled spender + ${k(reaver)} Gibbet / Gallows − ${k(combo)} combo GCD in its place) per 50 (a lower bound: gains the log can't show aren't counted)`,
+    events,
+  }).filter((f) => f.label !== "Soul left at the kill");
+};
+
 // The AoE line on too few targets (xivanalysis AoE.ts minimums): each
 // judged by what it dealt against the player's average for the
 // single-target action it replaced, so a patch's potency change moves the
@@ -2142,4 +2184,4 @@ const RPR_ENHANCED_CONSUMERS: [status: string, consumers: string[]][] = [
   ["ENHANCED_VOID_REAPING", ["VOID_REAPING"]], ["ENHANCED_CROSS_REAPING", ["CROSS_REAPING"]],
 ];
 
-export const RPR_CHECKS: JobCheck[] = [enshroud, arcaneCircle, deathsDesign, harvestMoon, shroud, rprAoe, reaperStacks, reaperEnhancedOverwrites];
+export const RPR_CHECKS: JobCheck[] = [enshroud, arcaneCircle, deathsDesign, harvestMoon, shroud, rprSoul, rprAoe, reaperStacks, reaperEnhancedOverwrites];

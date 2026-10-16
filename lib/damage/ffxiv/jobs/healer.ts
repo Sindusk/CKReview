@@ -646,10 +646,20 @@ function lilySim(ctx: PlayerCheckContext): LilySim {
   // From 7.4 the timer waits for the first Afflatus (xivanalysis): full
   // until then loses nothing.
   const firstSpend = spends.length ? Math.max(0, spends[0]) : ctx.endMs;
-  const lost = capped.flatMap((w) => {
+  // The paused time adds up across stretches: every second at 3 pushes
+  // every later Lily back, so a Lily is lost each time the total reaches
+  // another 20s (xivanalysis: expired time ÷ 20s). Rounding each stretch
+  // down on its own read Kai Dazkar's fGjA9DKLQbRa2q1k as 3 where
+  // xivanalysis has 8 (2026-10-16).
+  const lost: number[] = [];
+  let paused = 0;
+  for (const w of capped) {
     const from = startsFull(ctx) && w.startMs === 0 ? firstSpend : w.startMs;
-    return Array.from({ length: Math.max(0, Math.floor((w.endMs - from) / LILY_TIMER_MS)) }, (_, i) => from + (i + 1) * LILY_TIMER_MS);
-  });
+    if (w.endMs <= from) continue;
+    const before = paused;
+    paused += w.endMs - from;
+    for (let n = Math.floor(before / LILY_TIMER_MS) + 1; n * LILY_TIMER_MS <= paused; n++) lost.push(from + n * LILY_TIMER_MS - before);
+  }
   return { steps, capped, lost, short };
 }
 

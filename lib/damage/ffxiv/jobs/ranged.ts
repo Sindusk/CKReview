@@ -114,8 +114,8 @@
 //   window; 6:07, 12:08 and 14:08 are forced. Its 15 Hawk's Eye overwrites
 //   match by time (3:28 forced). Built: Rain of Death on one target (8:55,
 //   hit only Exdeath; oGCD AoEs are now checked, hits matched by their
-//   measured delay). Open: Empyreal Arrow 67/69 (31.7s held; the drift
-//   cap hides it, docs/open-items.md "cooldown room"). Not adopted: DoT
+//   measured delay). Empyreal Arrow 67/69 (31.7s held) was hidden by the
+//   drift cap; 1 lost since 2026-10-16 (checks.ts room). Not adopted: DoT
 //   clipping 37s a minute (P3's two bosses plus Iron Jaws snapshots);
 //   DoTs before invulnerability (3:04 and 11:46 are dot-clip findings,
 //   5:40 ticked to 6:15); Army's Muse 3/5 and 4/5 (the burst windows'

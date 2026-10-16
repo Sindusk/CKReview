@@ -632,18 +632,22 @@ export function checkCooldownDrift(ctx: PlayerCheckContext): DamageFinding[] {
     // Never more lost uses than the pull had room for: Vamp's Dancer used
     // Standard Step 19 times in 587s (room for 20), yet its ready time
     // summed to 163s, "5 lost", because each use came a few seconds late.
-    const room = roomForUses(cd, ctx.endMs, forcedMerged, prePull);
+    // A forced window the player pressed this cooldown in didn't stop it
+    // there, so it doesn't block the room either (2026-10-16): skipping it
+    // let room come out below the casts (the qjCMx4bRfgNKwX9T fight-16
+    // Bard: 67 Empyreal Arrows, 5 in forced time, room for 66), which
+    // capped a real drift (31.7s held unforced; xivanalysis 67/69) to 0.
+    const roomForced = forcedMerged.filter((w) => !casts.some((t) => t >= w.startMs && t < w.endMs));
+    const room = roomForUses(cd, ctx.endMs, roomForced, prePull);
     // A press whose effect can't land before the end isn't a use: the
     // qjCMx4bRfgNKwX9T fight 16 Scholar's last Aetherflow came back 0.2s
     // before the kill after 26s of drift in P5, and its stacks went unspent.
-    // Room can come out below the casts (the fight-16 Bard: 67 Empyreal
-    // Arrows, room for 66, 5 of them in forced time), which caps a real
-    // drift to 0; see docs/open-items.md (cooldown room) before changing.
     const landed = casts.filter((t) => t + (cd.landDelayMs ?? 0) < ctx.endMs).length;
     const openerLost = cd.openerUse && !prePull && casts.length > 0 && casts[0] > cd.firstUseOffsetMs + OPENER_LATE_MS ? 1 : 0;
     const killLost = ctx.pull.result === "Kill" ? usesLostAtKill(cd, casts, heldBy, prePull, ctx.endMs, forcedMerged) : 0;
     const lostUses = Math.min(Math.max(stretchLost, Math.floor(unforced / cd.cooldownMs), openerLost, killLost),
-      Math.max(0, room - landed - (prePull ? 1 : 0)));    // A charge banked to the kill without ever reaching full charges has no
+      Math.max(0, room - landed - (prePull ? 1 : 0)));
+    // A charge banked to the kill without ever reaching full charges has no
     // hold to anchor on: anchored from the last use to the end (the Vamp
     // Fatale Pictomancer's Living Muse, one of three left from 8:17.9).
     if (!longest && killLost > 0 && casts.length > 0) longest = { startMs: casts[casts.length - 1], endMs: ctx.endMs };

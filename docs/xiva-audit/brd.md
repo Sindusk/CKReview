@@ -91,9 +91,14 @@ shows them.
 
 In priority order (biggest damage cost first):
 
-1. **brd/OGCDDowntime/uses, Empyreal Arrow.** Covered but hidden on
-   fight 16 (67/69, 31.7s held). Needs the room simulation in
-   open-items "cooldown room".
+1. **brd/OGCDDowntime/uses, Empyreal Arrow.** Was hidden on fight 16
+   (67/69, 31.7s held): room skipped forced windows the Bard pressed it
+   in. Since 2026-10-16 a forced window with a press of that cooldown
+   doesn't block the room (checks.ts): fight 16 (qjCMx4bRfgNKwX9T pull 4)
+   now reads 1 lost (27.7s held) against xivanalysis's 2. Across the FF
+   samples it added 10 drift findings and removed none, each with at
+   least a recast of unforced holds; one disagrees with xivanalysis (the
+   same pull's Paladin Expiacion, 30.5s held, xivanalysis 34/34).
 2. **brd/BurstWindow/failed-overlap** (candidate). Never seen on 322
    applications (2026-10-16); a weaker parse from FFLogs rankings is the
    place to look.

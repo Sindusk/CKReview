@@ -85,17 +85,6 @@ What doesn't go here (trimmed 2026-10-15):
   --fight 27 --fight 28`), then `--check` and `--update`.
 
 **Damage:**
-- **Cooldown drift: room for uses vs casts in forced time (2026-10-13).**
-  `checks.ts checkCooldownDrift` caps lost uses at `roomForUses − casts`.
-  Room skips forced time; casts include presses made in it, so room can
-  come out below the casts and hide a real drift. qjCMx4bRfgNKwX9T fight
-  16's Bard: Empyreal Arrow 67 casts (5 in forced time), room 66, 31.7s
-  held unforced; xivanalysis says 67/69, the app says nothing. Not
-  counting forced-time casts fixes that but makes the same report's
-  Paladin lose an Expiacion (xivanalysis 34/34) and adds ~25 drift
-  findings across the samples. Needs a room simulation that models
-  presses in forced time, then a recheck against the xivanalysis counts
-  in the job headers.
 - **Viper (and likely Ninja) GCD tier.** The skill-speed-420 Viper on
   qjCMx4bRfgNKwX9T fight 16 (2.12s with Swiftscaled) reads 2.10; its
   intervals cluster at 2.087 and 2.131. Needs a look at which VPR GCDs the
