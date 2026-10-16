@@ -36,6 +36,8 @@ export type TrackedCooldownSpec = {
   petDamage?:        boolean;
   // A cooldown worth what it does to another action (TrackedCooldown.valuePerUse).
   valuePerUse?:      TrackedCooldown["valuePerUse"];
+  // Status keys of a party buff a use leads to (TrackedCooldown.partyBuffStatusIds).
+  partyBuffs?:       string[];
   // Patches where holding it costs nothing (TrackedCooldown.notOnPatches).
   notOnPatches?:     string[];
   // Its hold allowance on these patches (TrackedCooldown.holdMsOnPatches).
@@ -253,7 +255,7 @@ export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
   // from a Standard Finish before the first Step (Vamp kill: Finish at
   // 0:00.8, first Finishing Move at 0:21.8).
   "Dancer": [
-    { actions: ["TECHNICAL_STEP"], holdMs: 250 },
+    { actions: ["TECHNICAL_STEP"], holdMs: 250, partyBuffs: ["TECHNICAL_FINISH"] },
     { actions: ["STANDARD_STEP", "FINISHING_MOVE"], holdMs: 250,
       prePullEvidence: ["STANDARD_FINISH", "SINGLE_STANDARD_FINISH", "DOUBLE_STANDARD_FINISH"] },
     { actions: ["DEVILMENT"] },

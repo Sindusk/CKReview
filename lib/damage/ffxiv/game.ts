@@ -184,6 +184,7 @@ const TRACKED = new Map<string, TrackedCooldown[]>(
       landDelayMs:      spec.landDelayMs,
       petDamage:        spec.petDamage,
       valuePerUse:      spec.valuePerUse,
+      partyBuffStatusIds: spec.partyBuffs?.map((key) => XIVA_STATUSES[key]?.id).filter((id): id is number => id !== undefined),
       notOnPatches:     spec.notOnPatches,
       holdMsOnPatches:  spec.holdMsOnPatches,
       recastOnPatches:  spec.recastOnPatches,

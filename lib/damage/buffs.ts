@@ -45,6 +45,10 @@ export type BuffLedger = {
   share(statusId: number, recipient: PlayerInfo): number;
   approximate(statusId: number): boolean;
   contributions: Map<string, { given: number; received: number; approximate: boolean }>;
+  // What each buff added, by caster and status (`${source}|${statusId}`),
+  // the caster's own hits included: a held party buff's value per use
+  // (checks.ts checkCooldownDrift).
+  addedBy: Map<string, number>;
   // Every party-wide buff cast: who cast it, when, and who got it.
   casts: { source: string; statusId: number; name: string; startMs: number; durationMs: number; recipients: Set<string> }[];
   dead: Map<string, Window[]>;
@@ -132,6 +136,7 @@ export function buildBuffLedger(pull: Pull, game: DamageGame, endMs: number, fro
     return c;
   };
   for (const p of players) entry(p.name);
+  const addedBy = new Map<string, number>();
   for (const p of players) {
     const mine = applied.get(p.name)!;
     for (const e of p.damageDone) {
@@ -141,8 +146,10 @@ export function buildBuffLedger(pull: Pull, game: DamageGame, endMs: number, fro
         const b = game.partyBuff(id);
         if (!b) continue;
         const src = sourceAt(mine.get(id) ?? bossApplied.get(id), e.timestamp);
-        if (!src || src === p.name || !contributions.has(src)) continue;
+        if (!src || !contributions.has(src)) continue;
         const add = (e.amount ?? 0) * shareOf(id, b, p);
+        addedBy.set(`${src}|${id}`, (addedBy.get(`${src}|${id}`) ?? 0) + add);
+        if (src === p.name) continue;
         const approx = isApprox(b);
         const giver = entry(src), taker = entry(p.name);
         giver.given += add; taker.received += add;
@@ -175,7 +182,7 @@ export function buildBuffLedger(pull: Pull, game: DamageGame, endMs: number, fro
   return {
     share: (statusId, recipient) => { const b = game.partyBuff(statusId); return b ? shareOf(statusId, b, recipient) : 0; },
     approximate: (statusId) => { const b = game.partyBuff(statusId); return !!b && isApprox(b); },
-    contributions, casts, dead,
+    contributions, casts, dead, addedBy,
   };
 }
 

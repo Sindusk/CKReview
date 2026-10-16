@@ -669,6 +669,29 @@ export function checkCooldownDrift(ctx: PlayerCheckContext): DamageFinding[] {
       ? ctx.player.damageDone.filter((e) => (cd.petDamage ? !!e.pet : damageIds.has(e.abilityId)) && e.timestamp < ctx.endMs)
         .reduce((a, e) => a + (e.amount ?? 0), 0) / Math.max(1, casts.length + (prePull ? 1 : 0))
       : cd.actionIds.reduce((a, id) => Math.max(a, ctx.values.perUse(id)), 0);
+    // A party buff deals nothing itself; a lost use is what an average
+    // cast of it added to the party's hits, the caster's own included
+    // (BuffLedger.addedBy). Battle Litany, Divination and the rest were
+    // never reported before (2026-10-16).
+    const buffIds = perUse === 0 && ctx.ledger
+      ? [...new Set([...cd.actionIds.flatMap((id) => ctx.game.action(id)?.appliesStatusIds ?? []), ...(cd.partyBuffStatusIds ?? [])])]
+        .filter((sid) => ctx.game.partyBuff(sid)) : [];
+    const buffAdded = buffIds.reduce((a, sid) => a + (ctx.ledger!.addedBy.get(`${ctx.player.name}|${sid}`) ?? 0), 0);
+    const buffCasts = casts.filter((t) => t < ctx.endMs).length;
+    if (perUse === 0 && buffAdded > 0 && buffCasts > 0) {
+      const each = buffAdded / buffCasts;
+      const uses = (n: number) => `${n} use${n === 1 ? "" : "s"}`;
+      const names = buffIds.map((sid) => ctx.game.partyBuff(sid)!.name).join(" / ");
+      out.push(finding(ctx, {
+        kind: "cooldown-drift", startMs: longest.startMs, endMs: longest.endMs, forced: false, inference: true,
+        label: `${cd.name} drift`,
+        lostDamage: lostUses * each,
+        basis: `${uses(lostUses)} × ${k(each)} that an average ${names} added to the party's hits (${uses(buffCasts)}, ${k(buffAdded)} in all); room for ${room} in the pull`,
+        detail: `${cd.name} ${heldText} (${uses(casts.length)}): about ${uses(lostUses)} lost${atKill}` +
+          (heldForDeciding > 0 ? `; ${s(heldForDeciding)} more held for the deciding phase is fine` : ""),
+      }));
+      continue;
+    }
     // A cooldown that deals no damage itself (Devilment) has no estimate,
     // and a 0 line says nothing.
     if (perUse === 0) continue;

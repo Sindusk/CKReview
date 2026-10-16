@@ -200,11 +200,12 @@ and delete them from the header.
   that deals no damage has no value in the drift check. The five self
   damage buffs are valued now (`selfBuffValue` in tracked-cooldowns.ts:
   No Mercy, Fight or Flight, Riddle of Fire, Raging Strikes, Lance
-  Charge; matched No Mercy 7/10 and Lance Charge 7/10 on pages). Party
-  buffs (Battle Litany, Searing Light, Embolden, Brotherhood, Divination,
-  Arcane Circle, Starry Muse, Technical Finish, Mug / Dokumori) and
-  crit / direct-hit buffs (Devilment, Inner Release) still aren't; their
-  value is mostly other players' damage.
+  Charge; matched No Mercy 7/10 and Lance Charge 7/10 on pages), and so
+  are Inner Release (`innerReleaseValue`) and the party buffs: a lost use
+  is what an average cast of the buff added to the party's hits, the
+  caster's own included (`BuffLedger.addedBy`; full value, user
+  2026-10-16, though a static may hold them to stay in sync). Technical
+  Step still isn't: its party buff comes from the finish, not the step.
   15 pages compared 2026-10-16 (GNB, RDM, BLM, DNC ×2, DRK ×2, PCT, NIN,
   RPR, SGE, WAR, VPR, BRD): most checks built that day matched; fixes from
   them: declared proc consumers (Primal Rend drops went unjudged), a GCD

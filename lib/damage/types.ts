@@ -196,6 +196,10 @@ export type TrackedCooldown = {
   // Vanish: the empowered Garrote it allows): the value of one use, with
   // the basis to print. Overrides damageIds / petDamage / own damage.
   valuePerUse?(player: PlayerInfo, endMs: number): { value: number; basis: string } | undefined;
+  // Party buffs a use leads to that its action doesn't apply itself
+  // (Technical Step → Technical Finish): valued as the buff's average
+  // window (checks.ts checkCooldownDrift).
+  partyBuffStatusIds?: number[];
   // The opener should use it: a first cast later than firstUseOffsetMs +
   // OPENER_LATE_MS is one use lost whenever the pull had room for one more
   // than were cast, even if the wait was under a full cooldown (the later
