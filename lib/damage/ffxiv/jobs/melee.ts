@@ -122,6 +122,16 @@
 //     Revolution on all four with one. It misses a Perfect Balance that
 //     ran out with stacks (bqmRpGxDvfT8AZc6 6:47) and counts Form Shifts in
 //     downtime and out-of-reach mechanics, which this check excuses.
+//   - Smaller form rules (2026-10-15), from a scan of the 101 Monk pulls
+//     on disk: an Opo-opo skill with no form (Forms.tsx; in `mnkBlitz`,
+//     the opener and the GCD after Perfect Balance exempt) fires once,
+//     rgTafHJ9MN47m3Vy Doomtrain pull 8 4:03.7 (Coeurl Form ran out in
+//     downtime); Fury overcap (Balls.tsx, `mnkFury`, also the timeline
+//     lanes) 32 times, 20 of them bWDLM6zVXkqFAfjT. Not adopted:
+//     Brotherhood against Riddle of Fire (305 of 337 within 3s; the
+//     outliers cost the Monk's own 5% off the 15% window, ~3k, and 14 sit
+//     on the party's raid buffs instead) and Formless Fist overwritten
+//     (many in downtime; its cost depends on the Blitz planned).
 //   - Dragoon (checked against xivanalysis on jN3XDrf2z8PmLgRJ Vamp pull 8:
 //     Lance Charge and positionals match): Power Surge uptime, +10%
 //     (tooltip); Chaotic Spring DoT uptime; Life Surge (below); Lance Charge
@@ -216,7 +226,7 @@ import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import type { DamageFinding, JobCheck } from "../../types";
 import { chargesAt, finding, PROC_CONSUME_MS, PROC_EXPIRY_EARLY_MS, type PlayerCheckContext } from "../../checks";
 import { forcedPart, inWindows, mergeWindows } from "../../timeline";
-import { aoeComboOnOneTarget, baseValue, burstWindowFindings, castHits, clock, critMultOf, dotFindings, gaugeFindings, gaugeTrack, k, offCooldownIn, s, statusWindows, uptimeFindings, type ExpectedAction, type GaugeEvent, type GaugeSpec } from "./shared";
+import { aoeComboOnOneTarget, baseValue, burstWindowFindings, castHits, clock, critMultOf, dotFindings, gaugeFindings, gaugeTrack, k, offCooldownIn, rollGainOf, s, statusWindows, uptimeFindings, type ExpectedAction, type GaugeEvent, type GaugeSpec } from "./shared";
 import { comboLanded } from "./gnb";
 
 const id = (key: string) => A[key].id;
@@ -1017,6 +1027,10 @@ const FORM_GCD_IDS = new Set(ids("BOOTSHINE", "DRAGON_KICK", "LEAPING_OPO", "SHA
   "TRUE_STRIKE", "TWIN_SNAKES", "RISING_RAPTOR", "FOUR_POINT_FURY", "DEMOLISH", "SNAP_PUNCH", "POUNCING_COEURL", "ROCKBREAKER"));
 const PB_STACKS = 3;
 const OPO_IDS = new Set(ids("BOOTSHINE", "DRAGON_KICK", "LEAPING_OPO"));
+// Each Fury's share of its spender's potency (xiva-data: Leaping Opo 260 /
+// 460 with Opo-opo's Fury, Rising Raptor 330 / 480 with Raptor's Fury,
+// Pouncing Coeurl 340 / 440 with Coeurl's Fury).
+const OPO_FURY_SHARE = 200 / 460, RAPTOR_FURY_SHARE = 150 / 480, COEURL_FURY_SHARE = 100 / 440;
 const mnkBlitz: JobCheck = (ctx) => {
   const out: DamageFinding[] = [];
   const me = ctx.player;
@@ -1133,6 +1147,25 @@ const mnkBlitz: JobCheck = (ctx) => {
   const inAny = (ws: { startMs: number; endMs: number }[], t: number) => ws.some((w) => t > w.startMs && t <= w.endMs);
   const raptor = statusWindows(ctx, S.RAPTOR_FORM.id), coeurl = statusWindows(ctx, S.COEURL_FORM.id);
   const formless = statusWindows(ctx, S.FORMLESS_FIST.id);
+  const opo = statusWindows(ctx, S.OPO_OPO_FORM.id);
+  const allForms = [...opo, ...raptor, ...coeurl, ...formless, ...pbWindows];
+  const formsSeenBefore = (t: number) => allForms.some((w) => w.startMs < t);
+  const lastFormEnd = (t: number) => Math.max(-Infinity, ...allForms.filter((w) => w.endMs <= t).map((w) => w.endMs));
+  const lastFormWasPb = (t: number) => pbWindows.some((w) => w.endMs <= t && w.endMs >= lastFormEnd(t));
+  const roll = rollGainOf(ctx, critMult);
+  const pushNoForm = (c: { timestamp: number; abilityName: string }, died: boolean, lost: number, basis: string) => {
+    if (died) {
+      out.push(finding(ctx, {
+        kind: "blitz", startMs: c.timestamp, endMs: c.timestamp, forced: true, cause: "the form went with a death",
+        label: `${c.abilityName} with no form`, lostDamage: lost, basis, detail: `${c.abilityName} at ${clock(c.timestamp)} after a death: no form`,
+      }));
+      return;
+    }
+    push(c.timestamp, {
+      label: `${c.abilityName} with no form`, lost, basis,
+      detail: `${c.abilityName} at ${clock(c.timestamp)} with no form: the last ran out at ${clock(lastFormEnd(c.timestamp))} (Form Shift in downtime keeps one)`,
+    });
+  };
   for (const c of casts) {
     if (c.abilityId === id("CELESTIAL_REVOLUTION") && phoenix > 0) {
       // Rising Phoenix's damage per base value prices this cast's base.
@@ -1176,7 +1209,31 @@ const mnkBlitz: JobCheck = (ctx) => {
       // bWDLM6zVXkqFAfjT did it 49 times. Valued as that form's average
       // GCD less what this one dealt at its average conditions.
       const form = inAny(raptor, c.timestamp) ? "Raptor" : inAny(coeurl, c.timestamp) ? "Coeurl" : undefined;
-      if (!form) continue;
+      if (!form) {
+        // No form at all (xivanalysis Forms.tsx formless starter / dropped
+        // form): a form ran out, usually over downtime with no Form Shift.
+        // Dragon Kick then grants no Opo-opo's Fury (+200 on the next
+        // Leaping Opo, 460 with it); Leaping Opo / Bootshine lose the Fury
+        // and the form's sure crit. The opener (no form seen yet) isn't
+        // judged: a pre-pull Form Shift can fall before the log.
+        // Nor the GCD after Perfect Balance ends: its three GCDs leave no
+        // form, and the Opo-opo skill before the Blitz is the standard line
+        // (YPhxRTb9Ld7BJaXp 5:21.8, a top parse; xivanalysis exempts it).
+        if (inAny(opo, c.timestamp) || !formsSeenBefore(c.timestamp) || lastFormWasPb(c.timestamp)) continue;
+        const leaping = ctx.values.perUse(id("LEAPING_OPO"));
+        const died = ctx.dead.some((d) => d.startMs < c.timestamp && d.endMs >= lastFormEnd(c.timestamp));
+        if (c.abilityId === id("DRAGON_KICK")) {
+          const lost = leaping * OPO_FURY_SHARE;
+          if (lost > 0) pushNoForm(c, died, lost, `${k(leaping)} average Leaping Opo × 200 / 460 (the Opo-opo's Fury it didn't grant)`);
+        } else {
+          const avg = ctx.values.perUse(c.abilityId);
+          const hit = me.damageDone.find((e) => e.abilityId === c.abilityId && e.timestamp >= c.timestamp && e.timestamp < c.timestamp + 2_000 && (e.amount ?? 0) > 0);
+          if (!hit || avg <= 0) continue;
+          const dealt = baseValue(hit, critMult) * roll * (hit.multiplier && hit.multiplier > 0 ? hit.multiplier : 1);
+          if (avg - dealt > 0) pushNoForm(c, died, avg - dealt, `${k(avg)} average ${c.abilityName} (in form: Fury and a sure crit) − ${k(dealt)} for this one at average crit and direct hit`);
+        }
+        continue;
+      }
       const formAvg = avgOf(form === "Raptor" ? ids("TRUE_STRIKE", "TWIN_SNAKES", "RISING_RAPTOR") : ids("DEMOLISH", "SNAP_PUNCH", "POUNCING_COEURL"));
       const ownCasts = count.get(c.abilityId) ?? 0;
       const ownBase = ownCasts ? me.damageDone.filter((e) => e.abilityId === c.abilityId && e.timestamp < ctx.endMs)
@@ -1193,7 +1250,43 @@ const mnkBlitz: JobCheck = (ctx) => {
   }
   return out;
 };
-export const MNK_CHECKS: JobCheck[] = [riddleOfFire, mnkAoe, mnkBlitz];
+// Fury gauges (xivanalysis Balls.tsx): Opo-opo's Fury (max 1) from Dragon
+// Kick in Opo-opo form, Formless Fist or Perfect Balance (a formless
+// Dragon Kick grants none), spent by Leaping Opo / Bootshine; Raptor's
+// Fury (max 1) from Twin Snakes, spent by Rising Raptor / True Strike;
+// Coeurl's Fury (max 2, +2) from Demolish, spent by Pouncing Coeurl / Snap
+// Punch. One gained at the cap is that Fury's share of her average
+// spender. A death empties them. Also the Monk's timeline lanes
+// (gauges.ts).
+export function mnkFurySpecs(ctx: PlayerCheckContext): GaugeSpec[] {
+  const grants = [
+    ...statusWindows(ctx, S.OPO_OPO_FORM.id), ...statusWindows(ctx, S.FORMLESS_FIST.id), ...statusWindows(ctx, S.PERFECT_BALANCE.id),
+  ];
+  const furyFrom = (t: number) => grants.some((w) => t > w.startMs && t <= w.endMs);
+  const spec = (name: string, cap: number, gain: { ids: number[]; amount: number; when?: (t: number) => boolean },
+    spend: number[], share: number, spender: string): GaugeSpec => {
+    const events: GaugeEvent[] = [];
+    for (const c of ctx.player.casts) {
+      if (gain.ids.includes(c.abilityId) && (!gain.when || gain.when(c.timestamp)))
+        events.push({ t: c.timestamp, type: "gain", amount: gain.amount, label: `${c.abilityName} with ${name} held` });
+      else if (spend.includes(c.abilityId)) events.push({ t: c.timestamp, type: "spend", amount: 1, label: c.abilityName });
+    }
+    for (const d of ctx.dead) events.push({ t: d.startMs, type: "reset", label: "death" });
+    const avg = ctx.values.perUse(id(spender));
+    return {
+      name, unit: name, cap, unitValue: avg * share, events,
+      valueBasis: `${k(avg)} average ${ctx.game.action(id(spender))?.name ?? spender} × the Fury's share of its potency (${Math.round(share * 100)}%)`,
+    };
+  };
+  return [
+    spec("Opo-opo's Fury", 1, { ids: ids("DRAGON_KICK"), amount: 1, when: furyFrom }, ids("LEAPING_OPO", "BOOTSHINE"), OPO_FURY_SHARE, "LEAPING_OPO"),
+    spec("Raptor's Fury", 1, { ids: ids("TWIN_SNAKES"), amount: 1 }, ids("RISING_RAPTOR", "TRUE_STRIKE"), RAPTOR_FURY_SHARE, "RISING_RAPTOR"),
+    spec("Coeurl's Fury", 2, { ids: ids("DEMOLISH"), amount: 2 }, ids("POUNCING_COEURL", "SNAP_PUNCH"), COEURL_FURY_SHARE, "POUNCING_COEURL"),
+  ];
+}
+const mnkFury: JobCheck = (ctx) => mnkFurySpecs(ctx).flatMap((spec) => (spec.unitValue > 0 ? gaugeFindings(ctx, spec) : []));
+
+export const MNK_CHECKS: JobCheck[] = [riddleOfFire, mnkAoe, mnkBlitz, mnkFury];
 // Firstminds' Focus (xivanalysis FirstmindsFocus): +1 per Raiden Thrust /
 // Draconian Fury, cap 2, Wyrmwind Thrust spends 2. A stack gained at 2 is
 // half a Wyrmwind. On 2T1HzdPKgbhM43am fight 10 the cast simulation finds
