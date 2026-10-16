@@ -4,8 +4,7 @@
 // (lib/damage/types.ts DamageContext). Phase 1 and the Limit Cut
 // intermission, built 2026-10-16 from living-liquid.ts's header and HP
 // measured from players' hits on report 1NG4Zah79yKYHCDv (73 pulls, no
-// kill, 27 Phase 1 clears; fetched to 3:00). Phase 2 (BJ/CC) is below;
-// the later phases get log-inferred downtime only.
+// kill, 27 Phase 1 clears; fetched to 3:00). Phases 2-4 are below.
 //
 // - P1 Living Liquid: Cascade (+0:19) splits Living Liquid's 3.36M between
 //   it and Liquid Hand (the Hand appears at ~39%). Only Living Liquid has to
@@ -60,6 +59,18 @@
 //   inferred from the log. True heart (0.26M, invulnerable) takes no
 //   damage that matters. The deciding phase stays the last.
 //
+// - P4 Perfect Alexander (phase 6, perfect-alexander.ts), added 2026-10-16
+//   from report Q9zqJb4VLmjhd1B6's three kills (Pulls 4, 11, 16; the app's
+//   pull numbers) and wipes 3 and 12. One target, 7.54M, killed outright in
+//   every kill: a fixed pool. Perfect Alexander is the fight's last phase
+//   and its enrage (Temporal Prison) decides the fight. The kills finished
+//   during Temporal Interference, 5:04-5:16 after the phase began, before
+//   any prison. The HP curve is steady (Pull 4: 75% at +1:08, 50% +2:25,
+//   25% +4:05, 5% +4:53): no check and no hold. The two Fate Calibrations'
+//   untargetable playback is inferred from the log. Not built: the forced
+//   marches (Final Word, Fate Calibration β, ~5s each) and Temporal Prison
+//   (never reached): no measurement that they cost damage.
+//
 // Not built: the doll owners' and the raid's deliberate damage control
 // (dolls fed under 25%, balancing the two bosses for Hand of Pain): the log
 // can't separate a planned hold from a lazy one.
@@ -89,6 +100,17 @@ const RULE_KEY_LABELS: Record<string, string> = {
   "ffxiv-ap-soak-extra":   "Void of Repentance soaks",
   "ffxiv-ap-heat-stack":   "Incinerating Heat",
   "ffxiv-ap-enumeration":  "Enumeration",
+  "ffxiv-pa-ordained":     "Ordained Motion / Stillness",
+  "ffxiv-pa-march":        "the forced march",
+  "ffxiv-pa-sacrament":    "Fate Calibration α Sacrament",
+  "ffxiv-pa-defamation":   "Fate Calibration α Defamation",
+  "ffxiv-pa-spread":       "Optical Sight spreads",
+  "ffxiv-pa-stack":        "Optical Sight stacks",
+  "ffxiv-pa-capital":      "Ordained Capital Punishment",
+  "ffxiv-pa-jump":         "J Jump",
+  "ffxiv-pa-donut":        "Radiant Sacrament",
+  "ffxiv-pa-trine":        "Almighty Judgment",
+  "ffxiv-pa-grace":        "Irresistible Grace",
 };
 
 export const TEA_DAMAGE_CONTEXT: DamageContext = {
@@ -102,6 +124,8 @@ export const TEA_DAMAGE_CONTEXT: DamageContext = {
     4: { damageCounts: false, note: "Temporal Stasis: nothing targetable until Alexander Prime at +11s" },
     5: { pool: 4_040_000, fixedPool: true, carriesOver: false, multiTarget: true,
       note: "Alexander Prime 3.18M plus the summoned Brute Justice and Cruise Chaser (0.43M each), all to 1 HP; Summon scripted, finish HP-gated" },
+    6: { pool: 7_540_000, fixedPool: true, carriesOver: false, decidesEnrage: true,
+      note: "Perfect Alexander 7.54M to 0 before Temporal Prison; the kills ended during Temporal Interference, no check or hold" },
   },
   forcedWindows: (pull) => {
     const out: ForcedWindow[] = [];
