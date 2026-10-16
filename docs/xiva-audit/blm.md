@@ -49,7 +49,7 @@
 | blm/Gauge/dropped-enochian | wrong | — | (before 7.2) Astral Fire / Umbral Ice timing out | Can't happen from 7.2; pre-7.2 logs aren't judged by `polyglot`. |
 | blm/Gauge/overwritten-paradox | candidate | — | a Paradox gained while one is held | Major (the first on 7.2+ forgiven). Header: not built (gauge). |
 | blm/Leylines/uptime-pre72 | candidate | — | (before 7.2) Circle of Power uptime under 90% of Ley Lines | Leaving the circle loses the 15% speed. |
-| blm/Leylines/casts-72plus | candidate | — | (7.2+) GCDs cast outside Circle of Power while Ley Lines is up | Checklist 95%. The log has the Circle of Power status. |
+| blm/Leylines/casts-72plus | verified | `leyLines` | GCDs cast outside Circle of Power while Ley Lines is up | Built 2026-10-15 for every patch (CoP's speed is the same before 7.2): a GCD with Circle of Power off at its begin-cast and its completion, one finding per Ley Lines, each GCD 15% of an average GCD; in forced or movement time shown, not counted. Matched all five xivanalysis pages' Ley Lines tables (xz1wjC6gfXmkMKYt 6:36 1 of 9; 7zwpcLxk2Fd1h6Vr 4:00 1 of 9, 8:53 2 of 8; r4qDkR9btJCXnKWd Doomtrain pull 6 1:03 1 of 9; Q18Xc93x4wpfMFdT, Y9Fh2BHyj3xAqZ6V pull 3 none). 107 windows across the 57 Black Mage reports on disk, mostly one GCD (6-15k); the worst VrJcQxq4RYPML6Zk 5:08, 8 of 9 (98k). The GCD-gap check doesn't see this: Circle of Power isn't a haste window there. |
 | blm/Swiftcast/unused | no-damage | — | Swiftcast unused | Utility. |
 | blm/Triplecast/overwritten | candidate | — | Triplecast pressed with stacks still up | Minor 1, Medium 2, Major 4. Lost instant casts; log-visible. |
 | blm/RotationWatchdog/ExpectedFire/despair | unverifiable | — | a fire phase missing Despair | Minor 1, Medium 3, Major 5. Rests on MP, which the app's pull data doesn't carry. |
@@ -89,9 +89,7 @@
 
 In priority order (biggest damage cost first).
 
-1. **blm/Leylines/casts-72plus** (candidate). Casts outside Circle of
-   Power, from the status.
-2. **blm/RotationWatchdog/ExtraF1, UptimeSouls, Triplecast/overwritten**
+1. **blm/RotationWatchdog/ExtraF1, UptimeSouls, Triplecast/overwritten**
    (candidates). Log-visible from casts.
 3. **blm/Gauge/overwritten-paradox, ColdF3, LukewarmF4, SkipThunder**
    (candidates). Gauge-inferred.

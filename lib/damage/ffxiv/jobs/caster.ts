@@ -102,6 +102,11 @@
 //     Matched xivanalysis on five pages; the one disagreement
 //     (r4qDkR9btJCXnKWd Doomtrain pull 6, 4:12) was the app's: Fire I in
 //     Umbral Ice drops Enochian, fixed 2026-10-15.
+//     Ley Lines casts outside Circle of Power (Leylines.tsx, 2026-10-15):
+//     `leyLines` below. Matched xivanalysis's Ley Lines table on all five
+//     pages (xz1wjC6gfXmkMKYt 6:36 1 of 9; 7zwpcLxk2Fd1h6Vr 4:00 1 of 9,
+//     8:53 2 of 8; r4qDkR9btJCXnKWd Doomtrain pull 6 1:03 1 of 9;
+//     Q18Xc93x4wpfMFdT and Y9Fh2BHyj3xAqZ6V Zelenia pull 3 none).
 //   - SMN Searing Light with one Searing Flash (SearingLight.tsx).
 //     Checked against xivanalysis on qjCMx4bRfgNKwX9T fight 16 (7.5,
 //     2026-10-13, the first Summoner sample): Searing Flash 10/10, every
@@ -127,7 +132,7 @@ import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import type { DamageFinding, JobCheck } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";
 import { forcedPart, inWindows } from "../../timeline";
-import { aoeComboOnOneTarget, burstWindowFindings, castHits, dotFindings, gaugeFindings, k, statusWindows, gaugeCastTimes, type ExpectedAction, type GaugeEvent, type GaugeSpec } from "./shared";
+import { aoeComboOnOneTarget, burstWindowFindings, castHits, clock, dotFindings, gaugeFindings, k, statusWindows, gaugeCastTimes, type ExpectedAction, type GaugeEvent, type GaugeSpec } from "./shared";
 
 const ids = (...keys: string[]) => keys.filter((key) => A[key]).map((key) => A[key].id);
 const best = (ctx: PlayerCheckContext, list: number[]) => Math.max(0, ...list.map((x) => ctx.values.perUse(x)));
@@ -476,7 +481,43 @@ const polyglot: JobCheck = (ctx) => {
   });
 };
 
-export const BLM_CHECKS: JobCheck[] = [highThunder, blmAoe, polyglot];
+// Ley Lines left (xivanalysis Leylines.tsx, 7.2+ "casts affected by Circle
+// of Power"): a GCD begun or finished while Ley Lines is up, with Circle of
+// Power off at both ends, missed its 15% cast and recast speed. One finding
+// per Ley Lines; each such GCD is worth 15% of an average GCD (the time it
+// lost, at the end of the pull, buys that share of one more). GCDs in a
+// mechanic's movement or forced time are shown, not counted.
+// r4qDkR9btJCXnKWd Doomtrain pull 6 (Laura Razzy): the 1:03 Ley Lines,
+// Paradox at 1:22.6 outside it (xivanalysis 8/9).
+const LEY_LINES_SPEED = 0.15;
+const leyLines: JobCheck = (ctx) => {
+  const lines = statusWindows(ctx, S.LEY_LINES.id);
+  const circle = statusWindows(ctx, S.CIRCLE_OF_POWER.id);
+  const excused = [...ctx.forced, ...(ctx.movement ?? [])];
+  const out: DamageFinding[] = [];
+  for (const w of lines) {
+    const uses = ctx.uses.filter((u) => u.startMs < ctx.endMs && (inWindows(u.startMs, [w]) || inWindows(u.startMs + u.castMs, [w])));
+    const outside = uses.filter((u) => !inWindows(u.startMs, circle) && !inWindows(u.startMs + u.castMs, circle));
+    if (outside.length === 0) continue;
+    const counted = outside.filter((u) => !inWindows(u.startMs, excused));
+    const lost = counted.reduce((sum, u) => sum + LEY_LINES_SPEED * ctx.values.gcdValue(ctx.phaseOf(u.startMs), inWindows(u.startMs, ctx.buffWindows)), 0);
+    const names = outside.map((u) => `${u.abilityName} ${clock(u.startMs)}`).join(", ");
+    const last = outside[outside.length - 1];
+    out.push(finding(ctx, {
+      kind: "buff-uptime", startMs: outside[0].startMs, endMs: last.startMs + Math.max(last.castMs, 1),
+      forced: counted.length === 0,
+      movement: (counted.length === 0 && outside.some((u) => inWindows(u.startMs, ctx.movement ?? []))) || undefined,
+      label: "Circle of Power left during Ley Lines",
+      lostDamage: lost,
+      basis: `${counted.length} GCD${counted.length === 1 ? "" : "s"} × 15% (Circle of Power's speed) × the average GCD` +
+        (counted.length < outside.length ? `; ${outside.length - counted.length} in forced or movement time not counted` : ""),
+      detail: `${outside.length} of ${uses.length} GCDs in Ley Lines (${clock(w.startMs)}) outside Circle of Power: ${names}`,
+    }));
+  }
+  return out;
+};
+
+export const BLM_CHECKS: JobCheck[] = [highThunder, blmAoe, polyglot, leyLines];
 // xivanalysis MultiHitSkills.ts, each at the highest minimum any patch
 // uses (Tri-disaster 4 from 7.3, Painflare 4 in 7.2-7.4): the damage
 // comparison lets through the patches where fewer targets win.
