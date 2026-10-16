@@ -75,4 +75,10 @@
 In priority order (biggest damage cost first):
 
 1. **rdm/Procs/grand-impact-dropped, Prefulgence, Vice of Thorns,
-   Magicked Swordplay** (covered). Not seen firing.
+   Magicked Swordplay** (covered). Seen firing (2026-10-16 index of every
+   finding on disk): jN3XDrf2z8PmLgRJ Laura Razzy's Red Hot and Deep Blue
+   wipes (pull 38 Prefulgence Ready 240k and Thorned Flourish 139k; Grand
+   Impact Ready on pulls 41, 48, 50, 51, 53 ×2), Apollo Tomyris on three
+   reports. rgTafHJ9MN47m3Vy Doomtrain pull 5's one Grand Impact Ready
+   expiry (xivanalysis "timed out 1 time") is 3:59.2, which the app marks
+   forced (boss untargetable). Pages requested for pulls 38 and 53.
