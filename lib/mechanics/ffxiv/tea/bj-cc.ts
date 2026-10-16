@@ -69,7 +69,16 @@
 //   user, B14: the black mage didn't go to the sage). Pass 4 at the ice is
 //   a crowd where players dodge each other ("car crash", B22).
 // - No-killing-blow deaths outside a called wipe: walked into the wall
-//   (B25, user). B11's Paladin at +38 is unreviewed.
+//   (B25, user), or knocked into it 1.6s after a knockback hit, which an
+//   invulnerability can log as 0 damage (B11 Spin Crusher, user).
+// - Drainage leaves its victim at a few thousand HP: B36's Paladin (ice
+//   on him) died to the mine 2.4s after it, the user's Major for the
+//   tornado contact.
+// - Water 3 is for the DPS and the free healer (user, B24: both melee and
+//   the white mage should have joined).
+// - Collisions: the position samples (seconds apart for melee) can't show
+//   who doubled back. User: B37 the dragoon changed course, B43 the monk
+//   moved too far; both still named.
 // - Lightning 2 is Brute Justice's tank's to carry at the wall; both melee
 //   in it (B22, B24) is the tank's position, Minor (user, B24).
 // - Water: 3-4 players in 90 of 95 rounds; 1-2 in B24, B30, C6, C11, C19,
@@ -105,7 +114,9 @@
 // Kick are intermission-limit-cut.ts's.
 //
 // -- RULES IMPLEMENTED --
-// ffxiv-bjcc-avoidable (Minor; Major if it killed): Eye of the Chakram,
+// ffxiv-bjcc-avoidable (Minor; Major if it killed, including a knock into
+//   the wall 1.8-4.5s after Spin Crusher / Drainage and any death within
+//   5s of Drainage): Eye of the Chakram,
 //   Hawk Blaster, Spin Crusher, Drainage, Sludge, Frostbite, Propeller
 //   Wind, and Flarethrower on anyone beside the tank who baited it.
 // ffxiv-bjcc-nisi-collision (Major, both players: the log can't say who
@@ -126,7 +137,7 @@
 //   hit.
 // ffxiv-bjcc-water-short (Major if it killed or Punishing followed, else
 //   Minor): every free pool player missing from a Water under 3. Pool:
-//   healers and ranged DPS in rounds 1-2, all DPS in round 3, minus the
+//   healers and ranged DPS in rounds 1-2, all DPS and healers in round 3, minus the
 //   Lightning carrier and helper and anyone under Water Resistance Down.
 // ffxiv-bjcc-lightning-alone (Major/Minor), on the round's helper: round 1
 //   Brute Justice's tank, round 2 the healer under Water Resistance Down,
@@ -156,7 +167,8 @@
 //   hits under their own Resistance Down (none on disk); tank deaths to
 //   autos (C6, C24, B19, B44: mitigation; their Punishing / Gavel is the
 //   cutoff); the enrage (never reached).
-// VOD review 2026-10-16 (user): report B pulls 1, 14, 22, 24, 25, 31,
+// VOD review 2026-10-16 (user): report B pulls 1, 11, 14, 22, 24, 25, 31,
+//   36, 37, 43,
 //   rulings in expectations/rulings.json. Old questions 3 (B25: the
 //   Paladin walked into the wall) and 4 (B24: the tank's position) are
 //   answered above; pass 3's wrong color (B31) turned out fallout, and the
@@ -572,6 +584,15 @@ const NISI_LAST_COPY_MS = 5_000;
 // Wind is that hit's (knockbacks off the edge die 2.1-3.4s later elsewhere
 // in TEA).
 const WALL_PUSH_MS = 6_000;
+// Hits that knock back: Spin Crusher, Drainage (10y), and the death event
+// of a knock into the wall lands this long after (B11: 3.6s; Limit Cut's
+// knock-offs 2.1-3.1s).
+const KNOCKBACK = [19058, 18500];
+const KNOCKED_MIN_MS = 1_800;
+const KNOCKED_MAX_MS = 4_500;
+// Drainage's victim dying to anything this soon after (death event; B36:
+// 4.4s) died of it.
+const DRAINAGE_DEATH_MS = 5_000;
 
 type Iv = { p: PlayerInfo; col: string; a: number; b: number };
 
@@ -638,7 +659,7 @@ export function detectBjccErrors(
 
   const errors: PullError[] = [];
   const raids: PullError[] = [];
-  errors.push(...detectAvoidables(players, life, start, end));
+  errors.push(...detectAvoidables(players, life, deathEvents, start, end));
   const resets = resetDeaths(players, deathEvents, start, lastEvent);
   errors.push(...detectWallDeaths(players, deathEvents, start, end, resets));
   const nisi = detectNisi(players, deathEvents, life, casts, start, end, resets);
@@ -670,20 +691,26 @@ export function detectBjccErrors(
 }
 
 /** Avoidable ground and frontal hits: one error per player per ability per 3s. */
-function detectAvoidables(players: PlayerInfo[], life: Life, start: number, end: number): PullError[] {
+function detectAvoidables(players: PlayerInfo[], life: Life, deaths: DeathEvent[], start: number, end: number): PullError[] {
   const out: PullError[] = [];
   for (const p of players) {
     let last: { id: number; t: number } | undefined;
     for (const e of p.damageTaken.filter((x) => AVOIDABLE[x.abilityId] && x.timestamp >= start && x.timestamp <= end && !bodyHit(x)).sort((a, b) => a.timestamp - b.timestamp)) {
       if (!life.hitAlive(p, e.timestamp)) continue;
       if (last && last.id === e.abilityId && e.timestamp - last.t <= 3000) continue;
-      const died = life.diedFrom(p, e.timestamp);
+      // Knocked into the wall: a no-killing-blow death right after a
+      // knockback hit, even one an invulnerability took to 0 (user,
+      // 2026-10-16, B11 +3:06.6: Spin Crusher for 0, dead 1.6s later).
+      const wall = KNOCKBACK.includes(e.abilityId) ? deaths.find((d) => d.player === p.name && !d.killingAbilityGameId && d.timestamp - e.timestamp >= KNOCKED_MIN_MS && d.timestamp - e.timestamp <= KNOCKED_MAX_MS) : undefined;
+      // Drainage leaves its victim low: a death within ~3s to anything is
+      // its (B36 +3:20.4: 33k, then a mine 2.4s later; user: Major).
+      const died = wall ?? life.diedFrom(p, e.timestamp) ?? (e.abilityId === 18500 ? deaths.find((d) => d.player === p.name && d.timestamp >= e.timestamp && d.timestamp - e.timestamp <= DRAINAGE_DEATH_MS) : undefined);
       if (!died && realAmount(e) <= 0) continue;   // an invulnerability
       last = { id: e.abilityId, t: e.timestamp };
       const k = AVOIDABLE[e.abilityId];
       out.push(playerError(p, {
         ruleId: BJCC_AVOIDABLE_RULE_ID, severity: died ? "Major" : "Minor", name: `Hit by ${k.name}`,
-        description: `Hit by ${k.name} (${kFmt(realAmount(e))})${died ? " and died" : ""}: ${k.advice}.`,
+        description: `Hit by ${k.name}${realAmount(e) > 0 ? ` (${kFmt(realAmount(e))})` : ""}${wall ? ", knocked into the wall and died" : died ? " and died" : ""}: ${k.advice}.`,
         timestamp: e.timestamp, abilityId: e.abilityId, abilityName: k.name,
       }));
     }
@@ -897,7 +924,9 @@ function detectElements(players: PlayerInfo[], deaths: DeathEvent[], life: Life,
     const wRes = (p: PlayerInfo) => holds(p, WATER_RES_DOWN, t - 100);
     const healers = players.filter((p) => p.role === "Healer");
     const helper = n === 1 ? mt : n === 2 ? (healers.find(wRes) ?? healers.find((p) => !water.includes(p))) : ot;
-    const pool = players.filter((p) => (n < 3 ? p.role === "Healer" || ranged(p) : isDps(p)) && life.alive(p, t - 300) && !wRes(p) && p !== lCarrier && p !== helper);
+    // Round 3: the DPS and any healer still free (user, 2026-10-16, B24
+    // +4:13.3: both melee and the white mage should have joined).
+    const pool = players.filter((p) => (n < 3 ? p.role === "Healer" || ranged(p) : isDps(p) || p.role === "Healer") &&life.alive(p, t - 300) && !wRes(p) && p !== lCarrier && p !== helper);
     if (helper && lCarrier && helper !== lCarrier) occurrences?.push({ mechanicKey: BJCC_LIGHTNING_ALONE_RULE_ID, timestamp: t, players: [helper.name] });
     occurrences?.push({ mechanicKey: BJCC_WATER_SHORT_RULE_ID, timestamp: t, players: pool.map((p) => p.name) });
 
@@ -1101,7 +1130,7 @@ function detectWallDeaths(players: PlayerInfo[], deaths: DeathEvent[], start: nu
     if (d.killingAbilityGameId || resets.has(d) || t < start + 5000 || t > end || afterPhoton(players, d)) continue;
     const p = players.find((x) => x.name === d.player);
     if (!p) continue;
-    const pushed = p.damageTaken.some((e) => (e.abilityId === 18500 || e.abilityId === 18482) && e.timestamp <= d.timestamp && d.timestamp - e.timestamp <= WALL_PUSH_MS);
+    const pushed = p.damageTaken.some((e) => ([...KNOCKBACK, 18482].includes(e.abilityId)) &&e.timestamp <= d.timestamp && d.timestamp - e.timestamp <= WALL_PUSH_MS);
     if (pushed) continue;
     out.push(playerError(p, {
       ruleId: BJCC_WALL_RULE_ID, severity: "Major", name: "Walked Into the Wall",
