@@ -107,6 +107,10 @@
 //     pages (xz1wjC6gfXmkMKYt 6:36 1 of 9; 7zwpcLxk2Fd1h6Vr 4:00 1 of 9,
 //     8:53 2 of 8; r4qDkR9btJCXnKWd Doomtrain pull 6 1:03 1 of 9;
 //     Q18Xc93x4wpfMFdT and Y9Fh2BHyj3xAqZ6V Zelenia pull 3 none).
+//     Fire I and Umbral Soul in uptime (RotationWatchdog, 2026-10-15):
+//     `blmWrongGcds` below. Fire I matched the five pages (one, on
+//     r4qDkR9btJCXnKWd pull 6). Not adopted: Triplecast pressed over a
+//     stack (a lost instant costs damage only if movement later needed it).
 //   - SMN Searing Light with one Searing Flash (SearingLight.tsx).
 //     Checked against xivanalysis on qjCMx4bRfgNKwX9T fight 16 (7.5,
 //     2026-10-13, the first Summoner sample): Searing Flash 10/10, every
@@ -430,6 +434,15 @@ const POLYGLOT_CAP = 3;
 const FIRE_ELEMENT_IDS = new Set(ids("FIRE_II", "FIRE_III", "FIRE_IV", "HIGH_FIRE_II", "FLARE", "DESPAIR", "FLARE_STAR", "MANAFONT"));
 const ICE_ELEMENT_IDS = new Set(ids("BLIZZARD_II", "BLIZZARD_III", "BLIZZARD_IV", "HIGH_BLIZZARD_II", "FREEZE", "UMBRAL_SOUL"));
 const POLYGLOT_SPEND = new Set(ids("XENOGLOSSY", "FOUL"));
+type Element = "fire" | "ice" | undefined;
+const nextElement = (element: Element, abilityId: number): Element => {
+  if (FIRE_ELEMENT_IDS.has(abilityId)) return "fire";
+  if (ICE_ELEMENT_IDS.has(abilityId)) return "ice";
+  if (abilityId === A.FIRE_I.id) return element === "ice" ? undefined : "fire";
+  if (abilityId === A.BLIZZARD_I.id) return element === "fire" ? undefined : "ice";
+  if (abilityId === A.TRANSPOSE.id && element) return element === "fire" ? "ice" : "fire";
+  return element;
+};
 const PRE_72 = ["7.0", "7.01", "7.05", "7.1"];
 const polyglot: JobCheck = (ctx) => {
   if (ctx.patch && PRE_72.includes(ctx.patch)) return [];
@@ -437,7 +450,7 @@ const polyglot: JobCheck = (ctx) => {
   const deaths = [...ctx.dead].sort((a, b) => a.startMs - b.startMs);
   const events: GaugeEvent[] = [];
   let since: number | undefined;
-  let element: "fire" | "ice" | undefined;
+  let element: Element;
   let d = 0;
   const tickTo = (t: number) => {
     if (since === undefined) return;
@@ -459,11 +472,7 @@ const polyglot: JobCheck = (ctx) => {
     diesBy(c.timestamp);
     tickTo(c.timestamp);
     const before = element;
-    if (FIRE_ELEMENT_IDS.has(c.abilityId)) element = "fire";
-    else if (ICE_ELEMENT_IDS.has(c.abilityId)) element = "ice";
-    else if (c.abilityId === A.FIRE_I.id) element = element === "ice" ? undefined : "fire";
-    else if (c.abilityId === A.BLIZZARD_I.id) element = element === "fire" ? undefined : "ice";
-    else if (c.abilityId === A.TRANSPOSE.id && element) element = element === "fire" ? "ice" : "fire";
+    element = nextElement(element, c.abilityId);
     if (before && !element) since = undefined;
     else if (element && since === undefined) since = c.timestamp;
     if (c.abilityId === A.AMPLIFIER.id) events.push({ t: c.timestamp, type: "gain", amount: 1, label: "Amplifier at 3 Polyglot" });
@@ -517,7 +526,64 @@ const leyLines: JobCheck = (ctx) => {
   return out;
 };
 
-export const BLM_CHECKS: JobCheck[] = [highThunder, blmAoe, polyglot, leyLines];
+// Wasted GCDs (xivanalysis RotationWatchdog ExtraF1Evaluator,
+// UptimeSoulsEvaluator):
+// - Fire I: every one is wrong in Dawntrail. In Astral Fire it spends a
+//   Fire IV's MP for less, so it's worth her average Fire IV less her
+//   average Fire I (the Astral Soul it didn't give, which can cost a Flare
+//   Star, isn't valued: that needs MP). In Umbral Ice it removes the
+//   element (see Polyglot above): worth an average GCD less the Fire I.
+//   wNHvD38WTbFtGJKr Zelenia pull 10 (Nez Oomoom) 2:10.3, in the middle
+//   of the fire phase's Fire IVs.
+// - Umbral Soul while the boss is targetable: a GCD with no damage, worth
+//   an average GCD. Downtime is forced time, where it's the right press.
+//   r4qDkR9btJCXnKWd Doomtrain: Laura Razzy's 2:10-2:12 Umbral Souls
+//   (pulls 10, 12, 15, 19) come 2-3s after the boss is back at 2:08.5,
+//   with High Thunder or Paradox pressed right after; pull 15 2:47.9 is
+//   after a High Thunder on Aether at 2:45.5.
+// In a mechanic's movement or forced time both are shown, not counted.
+const blmWrongGcds: JobCheck = (ctx) => {
+  const out: DamageFinding[] = [];
+  const casts = ctx.player.casts.filter((c) => c.timestamp >= 0 && c.timestamp < ctx.endMs).sort((a, b) => a.timestamp - b.timestamp);
+  const fire1 = ctx.values.perUse(A.FIRE_I.id);
+  const fire4 = ctx.values.perUse(A.FIRE_IV.id);
+  let element: Element;
+  for (const c of casts) {
+    if (inWindows(c.timestamp, ctx.dead)) element = undefined;
+    const before = element;
+    element = nextElement(element, c.abilityId);
+    const isFire1 = c.abilityId === A.FIRE_I.id;
+    if (!isFire1 && c.abilityId !== A.UMBRAL_SOUL.id) continue;
+    // An Umbral Soul whose GCD runs into downtime is excused too: no cast
+    // would have landed (djChYqt4b7K8aAfP Red Hot and Deep Blue 2:42.6,
+    // 0.1s before both bosses left).
+    const gcdEnd = isFire1 ? c.timestamp + 1 : c.timestamp + ctx.baseGcdMs * ctx.factorAt(c.timestamp);
+    const during = forcedPart(c.timestamp - 1, gcdEnd, ctx.forced);
+    const moving = inWindows(c.timestamp, ctx.movement ?? []);
+    if (!isFire1 && during.ms > 0) continue;
+    const gcd = ctx.values.gcdValue(ctx.phaseOf(c.timestamp), inWindows(c.timestamp, ctx.buffWindows));
+    const inIce = isFire1 && before === "ice";
+    const alt = isFire1 && !inIce && fire4 > 0 ? fire4 : gcd;
+    const lost = Math.max(0, alt - (isFire1 ? fire1 : 0));
+    if (lost < 1) continue;
+    out.push(finding(ctx, {
+      kind: "wrong-gcd", startMs: c.timestamp, endMs: c.timestamp, forced: during.ms > 0 || moving, movement: moving || undefined,
+      cause: during.ms > 0 ? during.cause : undefined,
+      label: isFire1 ? "Fire I" : "Umbral Soul in uptime",
+      lostDamage: lost,
+      basis: isFire1
+        ? `${k(alt)} average ${inIce ? "GCD" : "Fire IV"} − ${k(fire1)} average Fire I`
+        : `${k(gcd)} average GCD (Umbral Soul deals no damage)`,
+      detail: isFire1
+        ? inIce ? "Fire I in Umbral Ice: it removed Umbral Ice and restarted the Polyglot timer (the restart isn't valued)"
+          : "Fire I in place of a Fire IV"
+        : "Umbral Soul while the boss was targetable",
+    }));
+  }
+  return out;
+};
+
+export const BLM_CHECKS: JobCheck[] = [highThunder, blmAoe, polyglot, leyLines, blmWrongGcds];
 // xivanalysis MultiHitSkills.ts, each at the highest minimum any patch
 // uses (Tri-disaster 4 from 7.3, Painflare 4 in 7.2-7.4): the damage
 // comparison lets through the patches where fewer targets win.

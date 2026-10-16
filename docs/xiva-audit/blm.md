@@ -48,22 +48,22 @@
 | blm/Gauge/overwritten-polyglot | verified | `polyglot` | a Polyglot gained at the cap | Built 2026-10-15 as a gauge simulation from casts (gaugeFindings): Enochian from the first fire or ice spell, +1 every 30s, +1 per Amplifier, −1 per Xenoglossy / Foul, cap 3, reset on death; 7.2+ only. A Polyglot at the cap, or held at a kill (by time held), is her average Xenoglossy over her average GCD. Hand-checked on xz1wjC6gfXmkMKYt (Dester Whitegloomer): Amplifier at 2:05 with 2 held, no spend before the 2:30 tick, a fourth at the cap (66k). Fires on 11 Black Mages on disk, about one each (41-76k). Matched xivanalysis's "Xenoglossy got overwritten" (2026-10-15) on xz1wjC6gfXmkMKYt 1, Q18Xc93x4wpfMFdT 2, 7zwpcLxk2Fd1h6Vr 1, Y9Fh2BHyj3xAqZ6V Zelenia pull 3 1 (its "2 Polyglot stacks lost" there is a death). r4qDkR9btJCXnKWd Doomtrain pull 6 (Laura Razzy) 4:12 was the app's error, not downtime: Fire I in Umbral Ice at 1:00.2 removes the element, so Enochian drops and the timer restarts at the 1:02 Fire III (xivanalysis: "Astral Fire or Umbral Ice was dropped 1 time"); every later tick moves ~2s and she holds 2, not 3, at the Amplifier. Fixed 2026-10-15 (Fire I in Umbral Ice / Blizzard I in Astral Fire stop the timer), plus deaths after the last cast now reset the gauge (pulls 1 and 19 had ticks after an unraised death). Now 5 of 5 pages match. |
 | blm/Gauge/dropped-enochian | wrong | — | (before 7.2) Astral Fire / Umbral Ice timing out | Can't happen from 7.2; pre-7.2 logs aren't judged by `polyglot`. |
 | blm/Gauge/overwritten-paradox | candidate | — | a Paradox gained while one is held | Major (the first on 7.2+ forgiven). Header: not built (gauge). |
-| blm/Leylines/uptime-pre72 | candidate | — | (before 7.2) Circle of Power uptime under 90% of Ley Lines | Leaving the circle loses the 15% speed. |
+| blm/Leylines/uptime-pre72 | superseded | `leyLines` | (before 7.2) Circle of Power uptime under 90% of Ley Lines | The per-GCD check runs on every patch. |
 | blm/Leylines/casts-72plus | verified | `leyLines` | GCDs cast outside Circle of Power while Ley Lines is up | Built 2026-10-15 for every patch (CoP's speed is the same before 7.2): a GCD with Circle of Power off at its begin-cast and its completion, one finding per Ley Lines, each GCD 15% of an average GCD; in forced or movement time shown, not counted. Matched all five xivanalysis pages' Ley Lines tables (xz1wjC6gfXmkMKYt 6:36 1 of 9; 7zwpcLxk2Fd1h6Vr 4:00 1 of 9, 8:53 2 of 8; r4qDkR9btJCXnKWd Doomtrain pull 6 1:03 1 of 9; Q18Xc93x4wpfMFdT, Y9Fh2BHyj3xAqZ6V pull 3 none). 107 windows across the 57 Black Mage reports on disk, mostly one GCD (6-15k); the worst VrJcQxq4RYPML6Zk 5:08, 8 of 9 (98k). The GCD-gap check doesn't see this: Circle of Power isn't a haste window there. |
 | blm/Swiftcast/unused | no-damage | — | Swiftcast unused | Utility. |
-| blm/Triplecast/overwritten | candidate | — | Triplecast pressed with stacks still up | Minor 1, Medium 2, Major 4. Lost instant casts; log-visible. |
+| blm/Triplecast/overwritten | no-damage | — | Triplecast pressed with stacks still up | Minor 1, Medium 2, Major 4. Holds (2026-10-15): 3 on disk, each wasting the last stack (wNHvD38WTbFtGJKr Zelenia pull 3 5:22.5, Y9Fh2BHyj3xAqZ6V Zelenia pull 7 3:12.6, zPJaZNfkFAKhY42t 9:19.4). Not adopted: a lost instant costs damage only if movement or a weave later needed it, which the log can't show (the GCD-gap and movement findings carry that cost when it happens). |
 | blm/RotationWatchdog/ExpectedFire/despair | unverifiable | — | a fire phase missing Despair | Minor 1, Medium 3, Major 5. Rests on MP, which the app's pull data doesn't carry. |
 | blm/RotationWatchdog/ExpectedFire/fire4 | unverifiable | — | a fire phase short of Fire IVs | Display only; MP-based. |
 | blm/RotationWatchdog/ExpectedFire/flarestar-count | unverifiable | — | a fire phase without Flare Star | Display only; Astral Soul inferred. |
 | blm/RotationWatchdog/FlareStarUsage/suggestion | wrong | — | Flare Star missing | Counts only windows where the player died (inverted test, bug). |
 | blm/RotationWatchdog/ManafontTiming/suggestion | unverifiable | — | Manafont before Despair | Minor 1, Medium 2, Major 3. MP-gated. |
-| blm/RotationWatchdog/ExtraF1/suggestion | candidate | — | any Fire I | Medium 1, Major 2. All Fire I is wrong in Dawntrail; log-visible. |
+| blm/RotationWatchdog/ExtraF1/suggestion | verified | `blmWrongGcds` ("wrong-gcd") | any Fire I | Built 2026-10-15: in Astral Fire her average Fire IV less her average Fire I (the lost Astral Soul / Flare Star needs MP, not valued); in Umbral Ice (drops the element) an average GCD less it. 4 on disk: wNHvD38WTbFtGJKr Zelenia pull 10 2:10.3 (29k, mid fire phase), qh3VDQFy274mNPfJ 6:18.8 (58k, Watery Grave, AF1 with a Firestarter ready), r4qDkR9btJCXnKWd Doomtrain pull 6 1:00.2 (46k, in Umbral Ice), Jv7XZL2zwYgyhdFj 7:45.8 (forced: just raised). Matched xivanalysis on the pull 6 page ("1 Astral Fire phase lost a Flare Star") and the other four pages (none). |
 | blm/RotationWatchdog/FirestarterUsage/suggestion-pre72 | candidate | — | (before 7.2) Paradox then a hardcast Fire III | Minor. |
 | blm/RotationWatchdog/ColdF3/suggestion | candidate | — | (7.2+) Fire III from Umbral Ice 3 with 3 hearts | Minor 1, Medium 3, Major 5. Inferred gauge. |
 | blm/RotationWatchdog/LukewarmF4/suggestion | candidate | — | Fire IV before Astral Fire 3 | Medium 1, Major 2. Inferred gauge. |
 | blm/RotationWatchdog/IceMage/suggestion | wrong | — | an ice-only rotation window | Same inverted death test (bug). |
 | blm/RotationWatchdog/SkipThunder/suggestion | candidate | — | a Thunder in the last fire phase before downtime / the kill that cost a fire spell | Minor 1, Medium 2, Major 3. |
-| blm/RotationWatchdog/UptimeSouls/suggestion | candidate | — | Umbral Soul while the boss is targetable | Minor 1, Medium 3, Major 5. A GCD with no damage; log-visible. |
+| blm/RotationWatchdog/UptimeSouls/suggestion | covered | `blmWrongGcds` ("wrong-gcd") | Umbral Soul while the boss is targetable | Built 2026-10-15: an average GCD each, outside forced time (including a GCD that runs into downtime: djChYqt4b7K8aAfP 2:42.6, 0.1s before the bosses left); movement shown, not counted. Fires only on r4qDkR9btJCXnKWd Doomtrain (Laura Razzy, 10 in pulls 10, 12, 14, 15, 18, 19, 65-105k): 2-3s after the boss is back at 2:08.5, and after a hit on Aether at 2:45. xivanalysis agrees on the five pages (none); not yet compared on a pull where it fires. |
 | blm/RotationWatchdog/MissedIceParadox/error-code | no-damage | — | — | A note code only. |
 | blm/Weaving/too-many-weaves | covered | `checkGcdGaps` | weaves past the limit (1 allowed in some AF3 / UI3 cases) | — |
 | blm/Interrupts | verified | `checkInterrupts` | a cancelled cast | 2T1HzdPKgbhM43am 3 matched. |
@@ -89,8 +89,10 @@
 
 In priority order (biggest damage cost first).
 
-1. **blm/RotationWatchdog/ExtraF1, UptimeSouls, Triplecast/overwritten**
-   (candidates). Log-visible from casts.
-3. **blm/Gauge/overwritten-paradox, ColdF3, LukewarmF4, SkipThunder**
-   (candidates). Gauge-inferred.
-4. **MP-based rows** (unverifiable): need MP in the pull data first.
+1. **blm/RotationWatchdog/UptimeSouls** (covered): compare a xivanalysis
+   page where it fires, e.g. r4qDkR9btJCXnKWd fight 15 (Doomtrain pull 14,
+   Laura Razzy: 2:42.2, 2:47.1).
+2. **blm/Gauge/overwritten-paradox, ColdF3, LukewarmF4, SkipThunder**
+   (candidates). Gauge-inferred. Laura's pull 6 page has 3 Paradox
+   overwrites and 3 cold Fire IIIs to compare against.
+3. **MP-based rows** (unverifiable): need MP in the pull data first.
