@@ -58,9 +58,9 @@
 //   B42 +106.3, C6 +104.3) end in a full-raid Final Sentence at Gavel
 //   (B40, B42, C8), as does a player dead at Gavel (B44, the tank killed by
 //   autos at +125).
-// - A death loses the colors when the player is still dead from Limit Cut
-//   at the first pass (B1, user: "without all 8 alive it's not
-//   resolvable"), or dies holding a color whose other copies run out
+// - A death loses the colors when the player is dead as Judgment Nisi goes
+//   out (B1, user: "without all 8 alive it's not resolvable"; C4, raised
+//   10s later, still over), or dies holding a color whose other copies run out
 //   within 5s (B25 the Paladin walked into the wall 1.8s before the
 //   donor's ran out; B31 the Warrior died to a chakram holding the only γ;
 //   B36). Nisi errors after it are fallout (user: B1, B31). A player
@@ -128,10 +128,13 @@
 //   fallout (C6). Each sets the Raid ffxiv-bjcc-nisi-failed;
 //   ffxiv-bjcc-gavel (Raid) marks a Gavel that killed three or more with
 //   nothing earlier.
-// ffxiv-bjcc-nisi-death (Raid): a player dead at Judgment Nisi and still
-//   dead 20s later, or a death taking a color with no other copy lasting
-//   5s more. Every Nisi error after it is fallout (not reported). It yields
-//   to a penalty within 3s (Punishing on a carrier's death).
+// ffxiv-bjcc-nisi-death (Raid): a player dead at Judgment Nisi, or a death
+//   taking a color with no other copy lasting 5s more. Every Nisi error
+//   after it is fallout (not reported, on Limit Cut wipes too). It yields
+//   to a penalty within 3s (Punishing on a carrier's death). Deaths after
+//   Gavel don't matter for Nisi (user, C10).
+// Wrong colors at pass 3 name only the DPS of the pair (user, C8: the
+//   supports stand still and the DPS pass).
 // ffxiv-bjcc-wall (Major): a no-killing-blow death that's not a called
 //   wipe, a Photon-tick death, or within 6s of a Drainage / Propeller Wind
 //   hit.
@@ -168,7 +171,7 @@
 //   autos (C6, C24, B19, B44: mitigation; their Punishing / Gavel is the
 //   cutoff); the enrage (never reached).
 // VOD review 2026-10-16 (user): report B pulls 1, 11, 14, 22, 24, 25, 31,
-//   36, 37, 43,
+//   36, 37, 43 and report C pulls 4, 8, 11,
 //   rulings in expectations/rulings.json. Old questions 3 (B25: the
 //   Paladin walked into the wall) and 4 (B24: the tank's position) are
 //   answered above; pass 3's wrong color (B31) turned out fallout, and the
@@ -177,9 +180,7 @@
 // OPEN QUESTIONS:
 // 1. Collisions name both players. Who moved (B37 pass 4, B43 +63 two
 //    melee in the west Enumeration; C22 +101.5 two ranged at pass 3)?
-// 2. Wrong colors at pass 3 name receiver and donor: is the DPS donor at
-//    fault, as for drops?
-// 3. A drop at passes 1-3 held by a support with no single free receiver
+// 2. A drop at passes 1-3 held by a support with no single free receiver
 //    now names nobody (the DPS who should have come is unknown).
 //
 // -- GUIDE-DERIVED MODEL (2026-10-15) --
@@ -575,8 +576,6 @@ const PHOTON_DOT_MS = 10_000;
 // A Nisi-death cutoff yields to a penalty this soon after it (Punishing on
 // a carrier's death lands within ~0.2s).
 const NISI_DEATH_YIELD_MS = 3_000;
-// Judgment Nisi lands ~+16 after J Kick and the first pass at +38-40.
-const NISI_FIRST_PASS_MS = 20_000;
 // A color whose other copies all run out this soon after its holder died
 // is lost with them (B25: 1.8s). A fresh copy lasts 36s.
 const NISI_LAST_COPY_MS = 5_000;
@@ -762,14 +761,16 @@ function detectNisi(players: PlayerInfo[], deaths: DeathEvent[], life: Life, cas
   const applyT = Math.min(...ivs.filter((w) => w.a >= start).map((w) => w.a));
   const lastT = gavel ? gavel.timestamp - 1000 : end;
   let lost: { t: number; text: string } | undefined;
-  // Two deaths lose the colors: a player still dead from before Judgment
-  // Nisi at the first pass, or a death taking a color whose only other
-  // copies run out within NISI_LAST_COPY_MS (B25: the donor's copy ran out
-  // 1.8s after the Paladin died holding the new one). A raised player can
-  // still be passed a color, so other deaths aren't the cutoff.
-  const deadIn = Number.isFinite(applyT) ? players.filter((p) => !life.alive(p, applyT + 500) && !life.alive(p, applyT + NISI_FIRST_PASS_MS)) : [];
+  // Two deaths lose the colors: a player dead when Judgment Nisi goes out
+  // (user, 2026-10-16, C4: the black mage dead to J Kick, raised 10s
+  // later; "at that point everything was kind of over"), or a death taking
+  // a color whose only other copies run out within NISI_LAST_COPY_MS (B25:
+  // the donor's copy ran out 1.8s after the Paladin died holding the new
+  // one). A raised player can still be passed a color, so other deaths
+  // aren't the cutoff.
+  const deadIn = Number.isFinite(applyT) ? players.filter((p) => !life.alive(p, applyT + 500)) : [];
   if (deadIn.length) {
-    lost = { t: applyT, text: `${namesOf(deadIn)} ${deadIn.length === 1 ? "was" : "were"} dead when Judgment Nisi went out and still dead at the first pass, so not every color can be passed and held to Gavel.` };
+    lost = { t: applyT, text: `${namesOf(deadIn)} ${deadIn.length === 1 ? "was" : "were"} dead when Judgment Nisi went out, so not every color can be passed and held to Gavel.` };
   } else if (Number.isFinite(applyT)) {
     for (const d of deaths.filter((x) => x.killingAbilityGameId !== FINAL_SENTENCE && !resets.has(x) && x.timestamp - DEATH_EVENT_LAG_MS > applyT && x.timestamp - DEATH_EVENT_LAG_MS < lastT).sort((a, b) => a.timestamp - b.timestamp)) {
       const t = d.timestamp - DEATH_EVENT_LAG_MS;
@@ -780,9 +781,9 @@ function detectNisi(players: PlayerInfo[], deaths: DeathEvent[], life: Life, cas
       break;
     }
   }
-  // Not on a Limit Cut wipe (ended within 30s of J Kick): that module's.
-  if (lost && end - start <= LC_HANDOFF_MS) lost = undefined;
-  if (lost) raids.push(raidMarker(BJCC_NISI_DEATH_RULE_ID, "Decree Nisi Lost to a Death",
+  // The cutoff marker isn't on a Limit Cut wipe (ended within 30s of J
+  // Kick: that module's); its fallout still is (C4).
+  if (lost && end - start > LC_HANDOFF_MS) raids.push(raidMarker(BJCC_NISI_DEATH_RULE_ID, "Decree Nisi Lost to a Death",
     `${lost.text} Unresolvable from here; treated as the cutoff point.`, lost.t, JUDGMENT_NISI, "Judgment Nisi"));
   const fallout = (t: number) => !!lost && t > lost.t;
 
@@ -820,11 +821,15 @@ function detectNisi(players: PlayerInfo[], deaths: DeathEvent[], life: Life, cas
       if (!need || need === x.col || !life.alive(x.p, x.a)) continue;
       const donors = ivs.filter((y) => y.col === x.col && y.p !== x.p && y.a < x.a - 50 && y.b >= x.a - 50 && !sameSide(y.p, x.p)).map((y) => y.p);
       const donor = uniq(donors).length === 1 ? donors[0] : undefined;
+      // Pass 3: the supports stand in their line and the DPS walk to them,
+      // so the DPS of the pair went to the wrong one (user, 2026-10-16, C8
+      // +3:58.1: the dancer passed to the wrong healer).
+      const dpsMoves = passOf(x.a) === 3 && !!donor;
       const text = `After Verdict they needed ${need} but took ${x.col}${donor ? ` from ${donor.name}` : ""} ${passName(x.a)}. A wrong color can't be undone before Gavel, so Gavel will fail. Match your Final Judgment color with the partner holding it (the BPOG line at the fourth pass).`;
-      errors.push(playerError(x.p, { ruleId: BJCC_NISI_WRONG_RULE_ID, severity: "Major", name: "Wrong Decree Nisi Color", description: text, timestamp: x.a, abilityId: VERDICT, abilityName: "Verdict" }));
-      if (donor) errors.push(playerError(donor, {
+      if (!dpsMoves || isDps(x.p)) errors.push(playerError(x.p, { ruleId: BJCC_NISI_WRONG_RULE_ID, severity: "Major", name: "Wrong Decree Nisi Color", description: text, timestamp: x.a, abilityId: VERDICT, abilityName: "Verdict" }));
+      if (donor && (!dpsMoves || isDps(donor))) errors.push(playerError(donor, {
         ruleId: BJCC_NISI_WRONG_RULE_ID, severity: "Major", name: "Wrong Decree Nisi Color",
-        description: `Passed Decree Nisi ${x.col} to ${x.p.name}, whose Final Judgment needed ${need} (${passName(x.a)}). The log can't say which of the two went to the wrong partner. Pass each color to the player whose Judgment matches it.`,
+        description: `Passed Decree Nisi ${x.col} to ${x.p.name}, whose Final Judgment needed ${need} (${passName(x.a)}).${dpsMoves ? " At this pass the supports stand still and the DPS walk to the one whose Judgment matches their color." : " The log can't say which of the two went to the wrong partner."} Pass each color to the player whose Judgment matches it.`,
         timestamp: x.a, abilityId: VERDICT, abilityName: "Verdict",
       }));
       fail(x.a, `${x.p.name} took Decree Nisi ${x.col} against a ${need} Judgment.`);

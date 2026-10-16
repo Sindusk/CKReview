@@ -149,7 +149,10 @@ philosophy and the data semantics this list assumes.
   sequence loses a holder whose turn is still to come, or a shared
   status loses its last lasting copy, later attacks and passes can't be
   resolved: stop flagging them and mark the cutoff at the loss (TEA Limit
-  Cut, Decree Nisi; user, VOD).
+  Cut, where any death counts, and Decree Nisi; user, VOD).
+- **Read "anyone dead" at the snapshot, not the cast start.** A player
+  raised during a long cast is alive for its resolution: TEA's Temporal
+  Stasis check at the cast skipped a pull whose tank was back 4s into it.
 - **An assignment by party-list order isn't in the log.** Healer cleanse
   splits follow it, so "the healer who cleansed fewer" is usually the
   wrong one; keep such misses player-less (TEA Throttle; user).

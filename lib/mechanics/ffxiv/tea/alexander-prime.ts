@@ -120,14 +120,21 @@
 // ffxiv-ap-stasis-cone (Major when a Stasis cone killed, else Minor): in
 //   order, the player on the wrong side for their debuff; the owner who
 //   wasn't there to take their cone; else the owner whose cone ran through
-//   others. Skipped with anyone dead at the freeze; a cone hitting only
-//   players already hit is fallout.
+//   others. Also Minor for anyone frozen on the wrong side whom no cone
+//   reached (C10's Paladin, user). Skipped with anyone dead at the first
+//   cone (not the cast: C10's Paladin was raised 4s into it); a cone
+//   hitting only players already hit is fallout.
+// ffxiv-ap-stasis-deaths (Raid, fallback): 2+ Stasis deaths with a player
+//   still dead at Inception Formation, on a pull that never reaches
+//   Wormhole and has no mechanic Raid (C10, user: "over after multiple
+//   deaths"; E4 and E30 played on to the final check after the same shape).
 // ffxiv-ap-stasis-tether (Major, both players: the log can't say who
 //   moved): Plaint of Surety for 100+ damage or killing.
 // ffxiv-ap-electromagnetic-burst (Raid, player-less).
 // ffxiv-ap-fire (Minor; Major if they died within 10s): anyone beside the
 //   tank in the first two fires, and anyone hit under an earlier fire's
-//   Fire Resistance Down.
+//   Fire Resistance Down. With a player dead the tank fires' extras (and
+//   their later repeat) are fallout (C10, user); a tank's repeat isn't.
 // ffxiv-ap-sacrament (Major when it killed) and ffxiv-ap-sacrament-party
 //   (Raid, 4+ in one cross).
 // ffxiv-ap-inception-sword (Minor/Major): with two or more in a sword, the
@@ -166,7 +173,9 @@
 // Not built: Divine Spear / Chastening Heat and Tetrashatter deaths
 //   (cooldowns and healing); Plaint of Solidarity short (one case, B28, in a
 //   cascade); the transition hit (no LB in any clear, 17-31k).
-// OPEN QUESTIONS (no VOD yet):
+// VOD review 2026-10-16 (user): report C pull 10, rulings in
+//   expectations/rulings.json.
+// OPEN QUESTIONS:
 // 1. Electromagnetic Burst names nobody (C27, D5, D16). Which orb went
 //    wrong, and can its taker be told from the tether order?
 // 2. Wormhole #3's sword into the waiting group (D10, D13, D19, F2, F7):
@@ -524,6 +533,9 @@ import {
 
 export const AP_STASIS_TETHER_RULE_ID   = "ffxiv-ap-stasis-tether";
 export const AP_STASIS_CONE_RULE_ID     = "ffxiv-ap-stasis-cone";
+export const AP_STASIS_DEATHS_RULE_ID   = "ffxiv-ap-stasis-deaths";
+// Temporal Stasis's cones resolve within ~10s of its cast completing.
+const STASIS_DEATH_MS = 14_000;
 export const AP_EMB_RULE_ID             = "ffxiv-ap-electromagnetic-burst";
 export const AP_FIRE_RULE_ID            = "ffxiv-ap-fire";
 export const AP_SACRAMENT_RULE_ID       = "ffxiv-ap-sacrament";
@@ -682,6 +694,25 @@ export function detectAlexanderPrimeErrors(
   detectStasis(c, t0);
   detectSurety(c, start, end);
   const formation = casts.find((x) => x.abilityId === INCEPTION_FORMATION);
+  // Two or more Temporal Stasis deaths with a player still dead at
+  // Inception Formation: the rest of the phase can't be played (user,
+  // 2026-10-16, C10: "over after multiple deaths"; raised by Inception it's
+  // "kind of recoverable"). A fallback cutoff: only without a mechanic Raid
+  // and on pulls that never reached Wormhole (E4 and E30 went on to the
+  // final check after the same shape).
+  let stasisRaid: PullError | undefined;
+  const stasisDeaths = deathEvents.filter((d) => d.timestamp - DEATH_EVENT_LAG_MS >= t0 && d.timestamp - DEATH_EVENT_LAG_MS <= t0 + STASIS_DEATH_MS)
+    .sort((a, b) => a.timestamp - b.timestamp);
+  const stasisDead = uniq(stasisDeaths.map((d) => d.player));
+  if (formation && stasisDead.length >= 2) {
+    const still = players.filter((p) => !life.alive(p, formation.timestamp));
+    if (still.length) {
+      const second = stasisDeaths.find((d) => d.player === stasisDead[1])!;
+      stasisRaid = (raidMarker(AP_STASIS_DEATHS_RULE_ID, "Temporal Stasis Deaths",
+        `${joinNames(stasisDead)} died in Temporal Stasis and ${namesOf(still)} ${still.length === 1 ? "was" : "were"} still dead at Inception Formation: Inception's baits and fires need the whole party. Unresolvable from here; treated as the cutoff point.`,
+        second.timestamp - DEATH_EVENT_LAG_MS, second.killingAbilityGameId, second.cause || "Temporal Stasis"));
+    }
+  }
   if (formation) detectInception(c, formation.timestamp, casts.find((x) => x.abilityId === INCEPTION)?.timestamp);
   const wormhole = casts.find((x) => x.abilityId === WORMHOLE);
   if (wormhole) detectWormhole(c, wormhole.timestamp, headMarkers, end);
@@ -691,6 +722,7 @@ export function detectAlexanderPrimeErrors(
   const errors = c.errors;
   const firstRaid = c.raids.sort((a, b) => a.timestamp - b.timestamp)[0];
   if (firstRaid) errors.push(firstRaid);
+  else if (stasisRaid && !wormhole) errors.push(stasisRaid);
   else if (!transition) {
     const marker = genericCutoff(c, start, lastEvent);
     if (marker) errors.push(marker);
@@ -717,7 +749,11 @@ const ORD = ["first", "second", "third"];
  */
 function detectStasis(c: Ctx, t0: number) {
   const { players, life } = c;
-  if (players.some((p) => !life.alive(p, t0))) return;   // a dead player shifts every bait
+  const firstCone = c.casts.find((x) => (x.abilityId === ALPHA_SWORD_P3 || x.abilityId === FLARETHROWER_P3) && x.timestamp > t0);
+  // A dead player shifts every bait. Read at the first cone, not the cast:
+  // C10's Paladin was raised 4s into it, before the swords (user: his
+  // wrong side and the far tether's distance were the errors).
+  if (!firstCone || players.some((p) => !life.alive(p, firstCone.timestamp - 300))) return;
   const role = new Map<PlayerInfo, number | undefined>(players.map((p) => [p, statusIn(p, [HOUSE_ARREST, RESTRAINING, AGGRAVATED], t0 - 12_000, t0 + 3_000)]));
   if (![...role.values()].some((r) => r === HOUSE_ARREST)) return;
   // Frozen positions: any hit during the freeze.
@@ -808,6 +844,19 @@ function detectStasis(c: Ctx, t0: number) {
     push(owner, "Temporal Stasis: Cone Through Others",
       `${coneName}, their bait, also hit ${namesOf(victims.filter((v) => v !== owner))}${severe ? `; ${namesOf(deaths)} died under its vulnerability` : ""}. They stood ${isNaN(off) ? "off" : yd(off)} east-west of the boss rather than straight north or south, so the cone ran toward the wall spots behind it.`);
   }
+  // Frozen on the wrong side with no cone reaching them: still the plan
+  // broken (user, 2026-10-16, C10 +5:11: the Paladin's Assault at Cruise
+  // Chaser's wall). Minor: the cones went elsewhere.
+  for (const p of players) {
+    const s = expectedSide(p);
+    if (s === undefined || flagged.has(p) || !pos.has(p) || side(pos.get(p)!.x) === s) continue;
+    flagged.add(p);
+    c.errors.push(playerError(p, {
+      ruleId: AP_STASIS_CONE_RULE_ID, severity: "Minor", name: "Temporal Stasis: Wrong Side",
+      description: `With ${roleName(p)} they were frozen on the ${side(pos.get(p)!.x) === "E" ? "east" : "west"} side, by ${boss(side(pos.get(p)!.x))}. NAUR: Aggravated Assault waits at Brute Justice's wall, House Arrest flanks the east boss, no debuff the west boss.`,
+      timestamp: swords[0].timestamp, abilityId: TEMPORAL_STASIS, abilityName: "Temporal Stasis",
+    }));
+  }
 }
 
 /** Plaint of Surety deals 1 damage when the tether holds; a failed check hits each end hard. */
@@ -851,14 +900,20 @@ function detectInception(c: Ctx, formation: number, inception: number | undefine
   // Three Flarethrowers after the orbs: two tank baits, then the party.
   const fires = c.casts.filter((x) => x.abilityId === FLARETHROWER_P3 && x.timestamp > formation + 20_000 && x.timestamp <= formation + 45_000);
   const flagged = new Set<PlayerInfo>();
+  const excused = new Set<PlayerInfo>();   // a short party's tank-fire extras: their later repeat too
   fires.forEach((f, i) => {
     const hits = hitsIn(players, life, FLARETHROWER_P3, f.timestamp, Math.min(fires[i + 1]?.timestamp ?? Infinity, f.timestamp + 1_800));
     const victims = uniq(hits.map((h) => h.p));
     if (!victims.length) return;
+    // A short party can't keep the fire order: the tank fires' extras are
+    // fallout (user, 2026-10-16, C10 +6:13.4, a black mage still dead from
+    // Temporal Stasis). A repeat under Fire Resistance Down is still flagged.
+    const short = players.some((p) => !life.alive(p, f.timestamp - 300));
+    if (short && i < 2) victims.filter((p) => p.name !== f.target).forEach((p) => excused.add(p));
     // The next fire under Fire Resistance Down kills: C10's first-fire
     // extras died at the third, 4.5s later.
     const died = (p: PlayerInfo) => diedSoon(c, p, f.timestamp, 10_000);
-    if (i < 2) {
+    if (i < 2 && !short) {
       const baiter = victims.find((p) => p.name === f.target) ?? [...victims].sort((a, b) => dist(hits.find((h) => h.p === a)!.e, f) - dist(hits.find((h) => h.p === b)!.e, f))[0];
       for (const p of victims.filter((v) => v !== baiter)) {
         flagged.add(p);
@@ -872,7 +927,7 @@ function detectInception(c: Ctx, formation: number, inception: number | undefine
     for (const h of hits) {
       // Fire Resistance Down lands ~0.3-0.9s before its own fire's damage:
       // read it at the cast.
-      if (flagged.has(h.p) || !holds(h.p, FIRE_RES_DOWN, f.timestamp - 200)) continue;
+      if (flagged.has(h.p) || excused.has(h.p) || !holds(h.p, FIRE_RES_DOWN, f.timestamp - 200)) continue;
       flagged.add(h.p);
       c.errors.push(playerError(h.p, {
         ruleId: AP_FIRE_RULE_ID, severity: died(h.p) ? "Major" : "Minor", name: "Fire Under Fire Resistance Down",
