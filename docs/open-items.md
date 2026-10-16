@@ -192,7 +192,7 @@ and delete them from the header.
   Still open: no finding when the single-target alternative was never
   pressed in the pull (Grim Swathe with no Blood Stalk; no potency table
   for most jobs to fall back on). The same gap for procs was closed
-  2026-10-16 for the three seen (Primal Wrath, Ogi Namikiri, Eye Gouge):
+  2026-10-16 for the four seen (Primal Wrath, Primal Rend, Ogi Namikiri, Eye Gouge):
   a never-pressed consumer is priced from a sibling by a ratio measured on
   disk (`PROC_CONSUMER_FALLBACK` in jobs/ranged.ts); others still show
   nothing until a ratio is measured for them.

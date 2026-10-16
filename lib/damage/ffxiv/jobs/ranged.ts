@@ -406,9 +406,11 @@ export const PROC_CONSUMERS = new Map(([
 // divided out and compared within one crit class (so forced crits and
 // crit rate cancel): Primal Wrath / Fell Cleave 1.197 (194 samples,
 // 1.08-1.32), Ogi Namikiri / Midare Setsugekka 1.746 (43, 1.46-1.98),
-// Eye Gouge / Jugular Rip 1.362 (160, 1.25-1.45).
+// Eye Gouge / Jugular Rip 1.362 (160, 1.25-1.45), Primal Rend / Fell
+// Cleave 1.241 (200, 1.15-1.53; 24C9awg1fKhFjBPt's Warrior never pressed
+// it in 10 Inner Releases, xivanalysis's "9 uses of Primal Rend").
 export const PROC_CONSUMER_FALLBACK = new Map(([
-  ["PRIMAL_WRATH", "FELL_CLEAVE", 1.2], ["OGI_NAMIKIRI", "MIDARE_SETSUGEKKA", 1.75], ["EYE_GOUGE", "JUGULAR_RIP", 1.36],
+  ["PRIMAL_WRATH", "FELL_CLEAVE", 1.2], ["PRIMAL_REND", "FELL_CLEAVE", 1.24], ["OGI_NAMIKIRI", "MIDARE_SETSUGEKKA", 1.75], ["EYE_GOUGE", "JUGULAR_RIP", 1.36],
 ] as const).filter(([a, b]) => A[a] && A[b]).map(([a, b, ratio]) => [A[a].id, { refId: A[b].id, ratio }]));
 
 // DamageGame.procsClearedByGcd. Mg4p7XG9dtrLVwBf Red Hot and Deep Blue

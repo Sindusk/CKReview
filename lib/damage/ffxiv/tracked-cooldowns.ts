@@ -300,8 +300,13 @@ export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
     { actions: ["SALTED_EARTH"], firstUseOffsetMs: 12500 },
     { actions: ["CARVE_AND_SPIT", "ABYSSAL_DRAIN"], firstUseOffsetMs: 17500 },
     { actions: ["SHADOWBRINGER"], firstUseOffsetMs: 20000 },
-    // Its damage is Esteem's (the only Dark Knight pet).
-    { actions: ["LIVING_SHADOW"], firstUseOffsetMs: 5000, petDamage: true },
+    // Its damage is Esteem's (the only Dark Knight pet). Esteem acting
+    // before the first cast shows one pressed before the pull
+    // (gNBGDwLzva1JdHXA Cryptknight Myth: Esteem at 0:05.5, first cast
+    // 5:10; read as 2 uses, 3 lost at 401k, three runs over two casts;
+    // xivanalysis 3 / 5).
+    { actions: ["LIVING_SHADOW"], firstUseOffsetMs: 5000, petDamage: true,
+      prePullEvidence: ["ESTEEM_ABYSSAL_DRAIN", "ESTEEM_SHADOWBRINGER", "ESTEEM_EDGE_OF_SHADOW", "ESTEEM_BLOODSPILLER", "ESTEEM_DISESTEEM"] },
   ],
   // Infuriate is left out: Fell Cleave and its kin refund 5s of its
   // cooldown, which the drift check doesn't model.

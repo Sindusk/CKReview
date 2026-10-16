@@ -643,8 +643,7 @@ export function checkCooldownDrift(ctx: PlayerCheckContext): DamageFinding[] {
     const openerLost = cd.openerUse && !prePull && casts.length > 0 && casts[0] > cd.firstUseOffsetMs + OPENER_LATE_MS ? 1 : 0;
     const killLost = ctx.pull.result === "Kill" ? usesLostAtKill(cd, casts, heldBy, prePull, ctx.endMs, forcedMerged) : 0;
     const lostUses = Math.min(Math.max(stretchLost, Math.floor(unforced / cd.cooldownMs), openerLost, killLost),
-      Math.max(0, room - landed - (prePull ? 1 : 0)));
-    // A charge banked to the kill without ever reaching full charges has no
+      Math.max(0, room - landed - (prePull ? 1 : 0)));    // A charge banked to the kill without ever reaching full charges has no
     // hold to anchor on: anchored from the last use to the end (the Vamp
     // Fatale Pictomancer's Living Muse, one of three left from 8:17.9).
     if (!longest && killLost > 0 && casts.length > 0) longest = { startMs: casts[casts.length - 1], endMs: ctx.endMs };
