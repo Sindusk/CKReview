@@ -27,7 +27,7 @@
 | pct/StarryMuse/expected-actions-portrait | verified | `starryMuse` Mog / Madeen | neither Mog of the Ages nor Retribution of the Madeen | — |
 | pct/StarryMuse/limited-additive | verified | `starryFillers` | an Additive spell inside Starry Muse | FRU 1 and qjCMx4bRfgNKwX9T 6:03 matched. Skipped on 7.2 in both. The app judges by when the spell lands. |
 | pct/StarryMuse/gcd-count-72 | superseded | `starryMuse` | under 9 GCDs (7.2 only) | Display only. |
-| pct/Procs/dropped-hammer-time | covered | `checkProcs` (stacks) | Hammer Time stacks expiring | Not seen firing. Hammers held out of the last window are a burst-window finding instead. |
+| pct/Procs/dropped-hammer-time | covered | `checkProcs` (stacks; declared Hammer Stamp, against Fire in Red) | Hammer Time stacks expiring | Hammers held out of the last window are a burst-window finding instead. Never fired before 2026-10-16: Stamp, Brush and Polishing split the removals, under the consumer inference's 60%. Declared now, each stack its Hammer Stamp average less a Fire in Red. Sample: 9zdH43vCn8Dr2Nqm (fetched for this; fight 5, Iloya Maeve, a low Red Hot and Deep Blue parse): 0:33.3 (2 stacks), 2:14.9 (3), 4:22.6 (2), 152-228k. On disk ~20 on Kevin Brachydiar's Lindwurm / Lindwurm II wipes (AYQm9Kd8Ct4FxcGp pull 5 1:27.7 hand-checked: Hammers held from 0:56.8 to 1:22, Smudge in Polishing Hammer's slot, ran out). Awaiting the page. |
 | pct/Procs/dropped-rainbow-bright | covered | `checkProcs` | Rainbow Bright expiring | Not seen firing. |
 | pct/Procs/dropped-starstruck | covered | `checkProcs` | Starstruck expiring | Not seen firing. |
 | pct/Procs/dropped-aetherhues | covered | `checkProcs` | Aetherhues / Aetherhues II expiring (the paint combo running out) | Not seen firing. Several consumers (single and AoE); checkProcs takes a second one only past 10% of removals. |
@@ -77,7 +77,10 @@ players-buffed and overwrite columns.
 
 In priority order (biggest damage cost first):
 
-1. **pct/Procs/dropped-hammer-time, rainbow-bright, starstruck,
-   aetherhues** (covered). None seen firing.
+1. **pct/Procs/dropped-hammer-time** (covered): fires since 2026-10-16
+   (Hammer Time declared; see the row), awaiting 9zdH43vCn8Dr2Nqm's page.
+   **rainbow-bright, starstruck, aetherhues** (covered): the 10 lowest
+   Red Hot and Deep Blue Pictomancers (ff-probe.js) lost Starstruck once
+   (NjKbPXFH27v6wkWQ 8:35) and Aetherhues at combo timeouts only.
 2. **pct/Procs/dropped-hyperphantasia** (candidate). Only deaths and
    wipes drop stacks on disk.

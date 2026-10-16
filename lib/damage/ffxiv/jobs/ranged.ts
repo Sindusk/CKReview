@@ -364,6 +364,7 @@ export const PROC_REPLACES = new Map(([
   ["FOUNTAINFALL", "FOUNTAIN"], ["BLOODSHOWER", "BLADESHOWER"],
   ["LAST_DANCE", "CASCADE"], ["REFULGENT_ARROW", "BURST_SHOT"],
   ["FELL_CLEAVE", "MAIM"], ["PRIMAL_REND", "MAIM"], ["PRIMAL_RUINATION", "MAIM"],
+  ["HAMMER_STAMP", "FIRE_IN_RED"],
 ] as const).filter(([a, b]) => A[a] && A[b]).map(([a, b]) => [A[a].id, A[b].id]));
 
 // Declared consumers (DamageGame.procConsumers), from xivanalysis's
@@ -379,6 +380,10 @@ export const PROC_CONSUMERS = new Map(([
   // and 6:38 expiries went unjudged (xivanalysis: 6 stacks expired).
   // Decimate stays an accepted alternative (PROC_CONSUMER_ALT_SHARE).
   ["INNER_RELEASE", "FELL_CLEAVE"],
+  // 9zdH43vCn8Dr2Nqm (Iloya Maeve): Hammer Time ran out with its stacks
+  // at 0:33.3, 2:14.9, 4:22.6, unjudged (the three Hammers split its
+  // removals). Valued against Fire in Red (PROC_REPLACES).
+  ["HAMMER_TIME", "HAMMER_STAMP"],
   // Refulgent Arrow can't be pressed without Hawk's Eye (checks.ts reads a
   // press while held as using it when the log missed the removal).
   ["HAWKS_EYE", "REFULGENT_ARROW"],

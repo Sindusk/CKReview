@@ -339,7 +339,9 @@ export const VPR_PROC_STATUS_IDS = new Set(VENOM_PROCS.map(([st]) => S[st]?.id).
  *  Kassatsu and Raiju Ready (the ninjutsu check values them: a lapsed
  *  Kassatsu read as a whole Hyosho, or as a Raiton for a Ninja who always
  *  spent it on Raiton). */
-export const MELEE_PROC_SKIP_IDS = new Set([...VPR_PROC_STATUS_IDS, S.ENHANCED_PIERCING_TALON.id, S.KASSATSU.id, S.RAIJU_READY.id]);
+export const MELEE_PROC_SKIP_IDS = new Set([...VPR_PROC_STATUS_IDS, S.ENHANCED_PIERCING_TALON.id, S.KASSATSU.id, S.RAIJU_READY.id,
+  // Reaper's enhancements: reaperEnhancedOverwrites values their expiries.
+  S.ENHANCED_GIBBET.id, S.ENHANCED_GALLOWS.id, S.ENHANCED_VOID_REAPING.id, S.ENHANCED_CROSS_REAPING.id]);
 
 const venoms: JobCheck = (ctx) => {
   const out: DamageFinding[] = [];
@@ -2024,7 +2026,52 @@ const reaperEnhancedOverwrites: JobCheck = (ctx) => {
       }));
     }
   }
+  // Run out (2026-10-16): the next one of the pair goes unenhanced, the
+  // same ~10%. checkProcs skips these statuses (it charged a whole Gibbet,
+  // and missed most: Gibbet and Executioner's Gibbet split the removals
+  // under its 60%). HbJ7m1rpTQvh2aDw (Chihiro Omochi): Enhanced Gibbet
+  // from 2:17.6 ran out at 3:18.1, the Soul Reaver between went to a
+  // Guillotine.
+  for (const [statusKey, consumerKeys] of RPR_ENHANCED_CONSUMERS) {
+    const status = S[statusKey];
+    if (!status) continue;
+    const consumer = ids(...consumerKeys).find((x) => ctx.values.perUse(x) > 0);
+    if (consumer === undefined) continue;
+    const durationMs = status.duration ?? 30_000;
+    let appliedAt: number | undefined;
+    for (const e of [...(ctx.player.buffs ?? [])].sort((a, b) => a.timestamp - b.timestamp)) {
+      if (e.abilityId !== status.id || e.timestamp >= ctx.endMs) continue;
+      if (e.buffStatus === "applied" || e.buffStatus === "refreshed") { appliedAt = e.timestamp; continue; }
+      if (e.buffStatus !== "removed" || appliedAt === undefined) continue;
+      const start = appliedAt;
+      appliedAt = undefined;
+      if (e.timestamp - start < durationMs - PROC_EXPIRY_EARLY_MS) continue;
+      if (ctx.player.casts.some((c) => Math.abs(c.timestamp - e.timestamp) <= PROC_CONSUME_MS && ids(...consumerKeys).includes(c.abilityId))) continue;
+      if (inWindows(e.timestamp, ctx.dead) || ctx.dead.some((d) => d.startMs >= e.timestamp && d.startMs - e.timestamp <= 3_000)) continue;
+      // Gibbet / Gallows: only when a Soul Reaver or Executioner came in
+      // between and went elsewhere. With none, nothing could have used it
+      // (downtime: the same moment on every pull, pG319BgHTnPJc6Ft Necron
+      // ~5:00, rgTafHJ9MN47m3Vy Doomtrain ~4:30).
+      if (statusKey === "ENHANCED_GIBBET" || statusKey === "ENHANCED_GALLOWS") {
+        const reaver = new Set([S.SOUL_REAVER?.id, S.EXECUTIONER?.id]);
+        if (!(ctx.player.buffs ?? []).some((b) => reaver.has(b.abilityId) && (b.buffStatus === "applied" || b.buffStatus === "stack") &&
+          b.timestamp > start && b.timestamp < e.timestamp)) continue;
+      }
+      const avg = ctx.values.perUse(consumer);
+      const during = forcedPart(e.timestamp - 1, e.timestamp + 1, ctx.forced);
+      out.push(finding(ctx, {
+        kind: "proc-lost", startMs: e.timestamp, endMs: e.timestamp, forced: during.ms > 0, cause: during.cause, inference: true,
+        label: `${status.name} expired`, lostDamage: avg * RPR_ENHANCED_SHARE,
+        basis: `${k(avg)} average ${A[consumerKeys[0]]?.name ?? "consumer"} × ${Math.round(RPR_ENHANCED_SHARE * 100)}% (the enhancement, measured: enhanced hits ~11.5% over plain)`,
+        detail: `${status.name} from ${clock(start)} ran out at ${clock(e.timestamp)}`,
+      }));
+    }
+  }
   return out;
 };
+const RPR_ENHANCED_CONSUMERS: [status: string, consumers: string[]][] = [
+  ["ENHANCED_GIBBET", ["GIBBET", "EXECUTIONERS_GIBBET"]], ["ENHANCED_GALLOWS", ["GALLOWS", "EXECUTIONERS_GALLOWS"]],
+  ["ENHANCED_VOID_REAPING", ["VOID_REAPING"]], ["ENHANCED_CROSS_REAPING", ["CROSS_REAPING"]],
+];
 
 export const RPR_CHECKS: JobCheck[] = [enshroud, arcaneCircle, deathsDesign, harvestMoon, shroud, rprAoe, reaperStacks, reaperEnhancedOverwrites];

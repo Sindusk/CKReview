@@ -191,7 +191,11 @@ and delete them from the header.
   sides, so bursts, crits and damage-reduced targets no longer decide it.
   Still open: no finding when the single-target alternative was never
   pressed in the pull (Grim Swathe with no Blood Stalk; no potency table
-  for most jobs to fall back on).
+  for most jobs to fall back on). The same gap for procs (2026-10-16):
+  a proc whose consumer was never pressed in the pull has no average, so
+  its expiries show nothing (24C9awg1fKhFjBPt Warrior, 6 Wrathful;
+  VhyrDATFKNGt8f6M Samurai, 4 Ogi Namikiri Ready; Mg4p7XG9dtrLVwBf's Eye
+  Gouge). Web potency tables weren't reliable enough to fall back on.
   15 pages compared 2026-10-16 (GNB, RDM, BLM, DNC ×2, DRK ×2, PCT, NIN,
   RPR, SGE, WAR, VPR, BRD): most checks built that day matched; fixes from
   them: declared proc consumers (Primal Rend drops went unjudged), a GCD
