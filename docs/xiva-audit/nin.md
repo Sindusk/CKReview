@@ -42,7 +42,7 @@
 | nin/Ninjutsu/st-doton | verified | `ninjutsu` | Doton on a single target outside the opener | Same check. Fires on zMJdajRYyNF3LVkr 5:50 (left after 4 ticks on both bosses, 67k) and 6:33 (no ticks at all, 108k). Matched xivanalysis there: its "unoptimized" 1 and "single-target" 1. |
 | nin/Ninki/overcap | verified | `ninki` | Ninki over 100 | Minor 20, Major 50. FRU: ~300 simulated vs its 250. Every gain is read at the cast since 2026-10-16 (xivanalysis reads hits): hits log ~0.7s late and can follow the spender they paid for (JZ1KXhDbqkNH3jxR FRU pull 3, Fleeting Raiju 0:26.80, hits 0:27.56 / 0:27.65, Bhavacakra 0:27.51); a Throwing Dagger that never landed still paid for a Bhavacakra (same pull, 2:39.97); and a Bunshin shadow hit can go unlogged, so the shadow's +5 comes from the Bunshin stack each weaponskill takes (MFGhwLnJ34pz7cWQ, Keichi 1:46.28). Findings with the simulation below zero 113 → 0 on disk, Ninki findings 186 → 151. zMJdajRYyNF3LVkr: 70 lost here, xivanalysis 60 (the 8:45.8 Dokumori at 100 is real). |
 | nin/Ninki/hellfrog | verified | `ninAoe` (vs Bhavacakra, one target) | Hellfrog Medium on too few targets (3 before 7.3, 2 from 7.3) | Built 2026-10-15. One target only: from 7.3 two out-damage Bhavacakra (pre-7.3 two-target frogs go unseen). Premise holds (same Ninki). Fires on Red Hot and Deep Blue kills with the bosses apart: mgTQJjX2nW6ANkP7 6:51 (21k), jXG76ba43VDLAvYz 4:07 (17k) and 9:16 as Deep Blue died (24k). Matched xivanalysis on jXG76ba43VDLAvYz (2 of its 2). |
-| nin/Ninki/deathfrog | covered | `ninAoe` (vs Zesho Meppo, one target) | Deathfrog Medium on too few targets | Not seen firing (the one on disk hit both bosses). |
+| nin/Ninki/deathfrog | covered | `ninAoe` (vs Zesho Meppo, one target) | Deathfrog Medium on too few targets | Fires since 2026-10-16 on MzjZgVWBaLw7tHyT (fetched for this; Vamp Fatale fight 21, Natalie Suki, found with ff-probe.js --hits on a single-boss fight): 4:24.3, 30k (Zesho Meppo 61k at the same buffs); her Hellfrog at 7:04.7 too (14k). Awaiting the page. |
 | nin/Kazematoi/overcap | verified | `kazematoi` | Armor Crush at 4-5 stacks | FRU 9 lost matched. |
 | nin/Kazematoi/leftover | verified | `kazematoi` ("Kazematoi left at the kill") | 3+ Kazematoi left at the end | Built 2026-10-16, kills only: 3+ at the kill means the last Armor Crush could have been a buffed Aeolian Edge (the swap costs 3 stacks, so never two), valued at their averages' difference. Forced when that Armor Crush was. 6 of 16 Ninja kills on disk end with 3-5; 5 fire (2-18k: 7zwpcLxk2Fd1h6Vr, cZ42C1y3JRNGXWLH, YPhxRTb9Ld7BJaXp, zMJdajRYyNF3LVkr; kC7Y3WbzvKcZrBxT forced by the closing Limit Break). Matched xivanalysis 2026-10-16 on zMJdajRYyNF3LVkr: 5 left at the kill; its 12 Kazematoi lost at the cap match the app's too. |
 | nin/Kazematoi/unbuffed-aeolian | verified | `kazematoi` | Aeolian Edge at 0 stacks | FRU 1 matched. |
@@ -85,6 +85,9 @@ In priority order (biggest damage cost first).
    278 → 186. The rest were hit-timed gains (no gain was missing from
    the table): every gain is read at the cast now, and no simulation
    goes below zero (see nin/Ninki/overcap).
-2. **nin/Ninjutsu/tcj-doton** (covered). Not seen as a loss yet (the one
-   on disk out-damaged its Suiton).
-3. **nin/Ninki/deathfrog** (covered). Not seen firing.
+2. **nin/Ninjutsu/tcj-doton** (covered). Not seen as a loss yet. A second
+   one-target case, MzjZgVWBaLw7tHyT 6:38.4 (Fuma, Hyoton, Doton): 7 ticks,
+   ~44k, level with her Ten Chi Jin Suiton average, so no finding (its
+   Hyoton is one, 60k). Awaiting the page.
+3. **nin/Ninki/deathfrog** (covered). Fires on MzjZgVWBaLw7tHyT; awaiting
+   the page.

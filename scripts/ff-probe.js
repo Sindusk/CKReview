@@ -18,6 +18,10 @@
 //   --buff <text>    only buffs whose name contains this (repeatable)
 //   --casts <text>   also list the times of casts whose name contains this
 //                    (repeatable)
+//   --hits <text>    also fetch the player's damage (a few more points) and,
+//                    per cast whose name contains this, the enemies it hit
+//                    (repeatable): "Deathfrog Medium 3:12.4 x1 (0 dmg: 0)".
+//                    Finds AoE on one target, or a finish that hit nothing.
 //   --creds <path>   default .credentials/ffl-token.json
 //
 // Find candidate pulls with scripts/ff-rankings.js; fetch the one you'll
@@ -31,9 +35,10 @@ const { ROOT } = require('./lib/require-ts');
 const { createNodeLogAuth } = require('./lib/node-log-auth');
 
 const argv = process.argv.slice(2);
-const opt = { buffs: [], casts: [], creds: null, pos: [] };
+const opt = { buffs: [], casts: [], hits: [], creds: null, pos: [] };
 for (let i = 0; i < argv.length; i++) {
   if (argv[i] === '--buff') opt.buffs.push(argv[++i].toLowerCase());
+  else if (argv[i] === '--hits') opt.hits.push(argv[++i].toLowerCase());
   else if (argv[i] === '--casts') opt.casts.push(argv[++i].toLowerCase());
   else if (argv[i] === '--creds') opt.creds = argv[++i];
   else opt.pos.push(argv[i]);
@@ -139,6 +144,27 @@ const clock = (ms) => { const s = Math.round(ms / 100) / 10; return `${Math.floo
   for (const x of opt.casts) {
     const hits = casts.filter((c) => (name.get(c.abilityGameID) ?? '').toLowerCase().includes(x));
     console.log(`  "${x}": ${hits.map((c) => `${name.get(c.abilityGameID)} ${clock(c.timestamp - t0)}`).join(', ') || 'none'}`);
+  }
+  if (opt.hits.length) {
+    const all = (await events(fight, 'DamageDone', actor.id)).filter((e) => e.type === 'damage');
+    const dmg = all.filter((e) => !e.tick);
+    for (const x of opt.hits) {
+      const sel = casts.filter((c) => (name.get(c.abilityGameID) ?? '').toLowerCase().includes(x));
+      const out = sel.map((c, i) => {
+        // Hits of the same ability from this cast until the next one (at most 3s).
+        const until = Math.min(sel[i + 1]?.timestamp ?? Infinity, c.timestamp + 3000);
+        let hs = dmg.filter((e) => e.abilityGameID === c.abilityGameID && e.timestamp >= c.timestamp && e.timestamp < until);
+        // A DoT-only action (Doton): its ticks, by name, over the next 20s.
+        if (hs.length === 0) {
+          const nm = name.get(c.abilityGameID);
+          hs = all.filter((e) => e.tick && name.get(e.abilityGameID) === nm && e.timestamp >= c.timestamp && e.timestamp < c.timestamp + 20_000);
+        }
+        const landed = hs.filter((e) => (e.amount ?? 0) + (e.absorbed ?? 0) > 0);
+        const targets = new Set(landed.map((e) => `${e.targetID}.${e.targetInstance ?? 1}`));
+        return `${name.get(c.abilityGameID)} ${clock(c.timestamp - t0)} x${targets.size}${hs.length > landed.length ? ` (${hs.length - landed.length} for 0)` : ''}${hs.some((e) => e.tick) ? ` ${landed.length} ticks` : ''}`;
+      });
+      console.log(`  hits "${x}": ${out.join(', ') || 'none'}`);
+    }
   }
   console.log(`[points: ${budget.pointsSpentThisHour.toFixed(0)} of ${budget.limitPerHour} this hour, resets in ${Math.ceil(budget.pointsResetIn / 60)} min]`);
 })().catch((e) => { console.error(e.message); process.exit(1); });
