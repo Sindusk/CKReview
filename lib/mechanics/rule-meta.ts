@@ -408,6 +408,13 @@ exposure("targeted", ["ffxiv-queen-eternal-prosecution"]);
 mechanic("ffxiv-fb-powder-swap", "Powder Mark swap", 1, ["ffxiv-fb-powder-swap"]);
 mechanic("ffxiv-fb-powder-death", "Powder Mark / Burn Mark survival", 1, ["ffxiv-fb-powder-death"]);
 exposure("targeted", ["ffxiv-fb-powder-swap", "ffxiv-fb-powder-death"]);
+// The Epic of Alexander P1 (living-liquid.ts): each doll feed tests its
+// owner, each Throttle set the healers, each Drainage the tanks (reported
+// at every instance).
+mechanic("ffxiv-ll-doll-feed", "Jagd Doll fed under 25% (owner)", 1, ["ffxiv-ll-doll-feed"]);
+mechanic("ffxiv-ll-throttle", "Throttle cleanses (healers)", 1, ["ffxiv-ll-throttle"]);
+mechanic("ffxiv-ll-drainage", "Drainage tethers (tanks)", 1, ["ffxiv-ll-drainage"]);
+exposure("targeted", ["ffxiv-ll-doll-feed", "ffxiv-ll-throttle", "ffxiv-ll-drainage"]);
 // The Omega Protocol P1: each Program Loop round's towers test that round's
 // two In Line players (omega.ts reports both at every round).
 mechanic("ffxiv-top1-tower", "Program Loop towers (In Line soakers)", 1, ["ffxiv-top1-tower"]);

@@ -346,6 +346,14 @@ const MECHANICS = {
     },
   },
 
+  'living-liquid': {
+    game: 'ff',
+    load: () => requireTsFromRoot('lib/mechanics/ffxiv/tea/living-liquid.ts'),
+    run({ mod, ctxs }) {
+      for (const c of ctxs) printPullErrors(c, mod.detectLivingLiquidErrors(c.relPlayers(), c.relDeaths(), c.relEnemyCasts()));
+    },
+  },
+
   omega: {
     game: 'ff',
     load: () => ({

@@ -1,5 +1,120 @@
 // The Epic of Alexander (Ultimate) -- Phase 1: Living Liquid.
 //
+// -- VERIFIED AGAINST LOGS (2026-10-16) --
+// Report A = 1NG4Zah79yKYHCDv: 73 pulls, no kill, 27 cleared Phase 1
+// (phase 2 from ~+2:01). Fetched with --to-minutes 3, so later phases have
+// deaths only. NAUR plan (user); no VODs; roles.ts slots per the user, but
+// see open question 1 on MT/OT. Pulls are cited A<n> = the app's Pull n.
+// Clock (every pull within ~1s): Fluid Swing +0:11; Cascade +0:19; Hand of
+// Parting +0:36; tornado waves visible +0:36 / invisible +0:38; cleaves
+// +0:37; Exhaust +0:39 and +0:50; Pressurize +0:41; Hand of Pain +0:42,
+// +1:10, +1:29, +1:49, +2:09; feeds +0:44-0:57; cleaves +0:56; boss
+// sequence 1: visible +1:09, invisible volleys +1:12 / +1:15, Sluice +1:15;
+// Splash x6 +1:21; Drainage +1:27; Cascade +1:31; Liquid Gaol/Throttle
+// +1:36; sequence 2: visible +1:47, volleys +1:49 / +1:52, Sluice +1:52,
+// tornado waves +1:53 / +1:55; Living Liquid dies ~+2:01 (Hawk Blaster,
+// the first P2 cast, sometimes credited to a "liquid rage" actor). The
+// enrage Cascade (18867) never happened.
+// Log IDs: Fluid Swing 18864 (LL), Fluid Strike 18871 (Hand); Cascade
+// 18470; Protean Wave: boss visible 18466/18468, frontal 18467 (cast by
+// "living liquid" with no instance), boss invisible 18469 (helpers #1-8),
+// tornado visible 18869 / invisible 18870; Sluice 18865; Splash 18866;
+// Drainage 18471 (cast target = tether holder); Liquid Gaol 18472 ->
+// Throttle 1000700 (10.0s); Pressurize 18473; Outburst 18474; Exhaust
+// 18462 -> Luminous Aetheroplasm 1000706 (~5s); Exhaust 18463 = the
+// two-stack overload, hitting its holder and anyone beside them;
+// Reducible Complexity 18464 (fed) / 18465 (doll killed); Hand of Prayer
+// 18475, Parting 18476, Pain 18477; doll autos 19278; tornado puddle
+// Dropsy 1000289; Water Resistance Down II 1001025 (~4s, lands ~0.8s before
+// its hit's damage event). TEA gives no Damage Down: avoidables are Minor
+// unless they kill.
+// Findings:
+// - Dolls: owner = the doll's auto-attack target, consistent every pull
+//   (the fourth DPS by elimination when a doll was fed before it swung:
+//   A6, A14, A22). Feed HP is the caster HP on 18464: clean 0.3-24.9%
+//   (A55 +0:56.1, A64 +0:53.9), failures 26.4% (A32) to 86.9% (A1), each
+//   hitting the raid 12k-87k and killing 6-8. Report A's melee doll was fed
+//   early 7 times (A5-A46). Killed dolls (18465, 9 pulls): damageDone's
+//   target HP 0 names the killer, 0.1-0.2s before: own DoT/oGCD (DRG A2,
+//   A9, A10; BLM Fire IV A13, A31, A34, A71) or a healer's AoE (WHM
+//   Assize A17, SGE Dosis A38).
+// - Exhaust: report A's healers and the Hand tank stand in one melee
+//   doll's circle on purpose (one stack each, every clean pull). Two
+//   instances / a stack event happened 7 times (A1, A2, A4, A6, A19, A46,
+//   A71), always lethal; the 18463 overload also killed whoever stood with
+//   the doubled player (A19: three others).
+// - Wave volleys follow NAUR's role groups: opening tornado = LL tank +
+//   both ranged (63/72 volleys); boss volley 1 = tanks + melee (81/91);
+//   volley 2 = healers + ranged (66/91); second tornado volley = Hand tank
+//   + melee (14 clean). The LL tank takes the opening visible tornado wave
+//   and both cleaves under Holmgang (0 damage at 0 HP, every pull).
+//   Sequence 2's volley 2 is the wall: in 9 pulls the sage baited nothing
+//   and a tank or melee, still under Water Resistance Down II from volley
+//   1, took it and died (A35, A37, A40, A44, A59, A62, A66, A68; A26 the
+//   black mage). The white mage died to the frontal 18467 in sequence 2 in
+//   6 pulls (A36, A40, A57, A64, A68; A41 after the cutoff).
+// - Hand of Parting/Prayer: clean hits 1-2k on everyone; Prayer at A3 and
+//   A12 hit 29k+ and killed seven.
+// - Hand of Pain: clean resolution medians up to 5k (A72 +1:10.9), failures
+//   14k+ (A16 +1:30, A72 +1:30, A33 +1:50). The HP percentages on the
+//   casts don't reproduce the guides' 5-point gap (A30 +1:49 passed at a
+//   6-point reading), so the rule gates on damage.
+// - Throttle: no expiry has its own event; the holder dies with no killing
+//   blow 2.0s after a 10.0s removal. The healers split cleanses every pull
+//   (white mage: tanks + self; sage: ranged + self; melee either). Expiries
+//   A25, A27, A29, A41, A42 left the sage short (1-2 cleanses vs 3-4);
+//   A18 neither healer cleansed anyone.
+// - Drainage: both tanks every clean pull; the three non-tank holders (A20,
+//   A21, A28) all followed a tank death. A cast that hits two players loses
+//   its target (A23: tank + sage).
+// - Deaths with no killing blow: Throttle expiries (above); the LL tank in
+//   the opening invulnerability window (A5, A7 +0:39.4: not flagged, raw
+//   damage); called wipes (A28).
+// - Every wipe ended within 25s of 4 dead at once.
+// Cutoffs (46 P1 wipes, every one has one): dead going into a protean
+// sequence 10, collapse 9, doll killed 8, doll fed above 25% 7, both
+// healers dead (ffxiv/common.ts) 6, Hand of Pain 3, Hand of Prayer 2,
+// called wipe 1. Unexplained: none; deaths to Splash/autos at low HP are
+// mitigation territory.
+//
+// -- RULES IMPLEMENTED --
+// ffxiv-ll-avoidable (Minor; Major if it killed): visible boss and tornado
+//   waves (the LL tank's opening one excepted), the frontal wave, Sluice,
+//   cleaves on non-tanks, Drainage splash on non-holders, Dropsy.
+// ffxiv-ll-wave-bait (Minor; Major when the extra player died to water
+//   within 6s): per invisible volley, players outside its role group who
+//   took a wave and living group members who took none; with the group
+//   right, a wave on two groupmates names the doubled player and the
+//   wave's baiter. Skipped with a group member dead.
+// ffxiv-ll-exhaust (Major if lethal): two Exhausts / a second stack.
+// ffxiv-ll-doll-feed (Major, owner) + ffxiv-ll-doll-wipe (Raid): fed at
+//   25%+. ffxiv-ll-doll-kill (Major, killing blow) + doll-wipe (Raid).
+// ffxiv-ll-hand (Raid), ffxiv-ll-pain (Raid): player-less.
+// ffxiv-ll-throttle (Major on the healer(s) with fewer cleanses; player-
+//   less Minor with a healer dead).
+// ffxiv-ll-drainage (Minor/Major on the idle tank, both tanks alive).
+// ffxiv-ll-outburst (Raid, player-less).
+// Generic cutoffs, P1 wipes only, the earliest and only before a mechanic
+// Raid: ffxiv-ll-dead-going-in (anyone dead at a boss protean sequence's
+// visible waves), ffxiv-ll-called-wipe (3+ no-killing-blow deaths in 10s,
+// Throttle expiries excluded, or any within 12s of the end),
+// ffxiv-ll-collapse (4 dead, pull over within 30s), ffxiv-ll-enrage.
+// Only the first Raid error is kept.
+// Exposure: doll-feed (owner), throttle (healers), drainage (tanks) are
+// targeted; the rest everyone.
+// Not built: Hand of Parting/Prayer and Pain blame (which tank moved, who
+// over-damaged); Pressurize orb paths (one Outburst on disk, A19); tank
+// deaths in the opening invulnerability window (mitigation).
+// OPEN QUESTIONS (no VOD yet):
+// 1. roles.ts names the paladin MT (opening auto) but the warrior holds
+//    Living Liquid and does the opening invulnerability every pull, NAUR's
+//    MT duty. The module keys on "LL tank" (first Fluid Swing target).
+// 2. Sequence 2 volley 2: is the sage meant to bait it from the south
+//    (NAUR: shield healer S), and was the tank/melee too close or the
+//    sage too far? Both are named now.
+// 3. Throttle: is the cleanse split assigned (white mage tanks, sage
+//    ranged)? The rule names whoever cleansed fewer.
+//
 // -- GUIDE-DERIVED MODEL (2026-10-15) --
 // Research only: no detector, report sampling, or VOD rulings. All failure
 // signals below are guide/source-derived, NOT observed in this project's
@@ -255,3 +370,616 @@
 //    selection, and whether expiry death has its own named damage event.
 // 7. Late Splash count (CB six vs BM four), Drainage targeting/clearing,
 //    Embolus contact radius/cleanup, and actual phase exit event ordering.
+
+import type { PlayerInfo } from "@/types/PlayerInfo";
+import type { DeathEvent } from "@/types/DeathEvent";
+import type { PullError, EnemyEvent } from "@/types/PullError";
+import type { ReportedOccurrence } from "@/lib/mechanics/occurrences";
+import { kFmt, joinNames, playerError, playerlessMinor, raidMarker, clusterByGap } from "@/lib/mechanics/wow/common";
+import {
+  DEATH_EVENT_LAG_MS, PREVIEW_AMOUNT, type Hit, type Life,
+  bodyHit, buildLife, hitsOf, castsOf, uniq, namesOf, isTank, realAmount, resetCluster,
+} from "@/lib/mechanics/ffxiv/fru/common";
+
+export const LL_AVOIDABLE_RULE_ID   = "ffxiv-ll-avoidable";
+export const LL_WAVE_BAIT_RULE_ID   = "ffxiv-ll-wave-bait";
+export const LL_EXHAUST_RULE_ID     = "ffxiv-ll-exhaust";
+export const LL_DOLL_FEED_RULE_ID   = "ffxiv-ll-doll-feed";
+export const LL_DOLL_KILL_RULE_ID   = "ffxiv-ll-doll-kill";
+export const LL_DOLL_WIPE_RULE_ID   = "ffxiv-ll-doll-wipe";
+export const LL_HAND_RULE_ID        = "ffxiv-ll-hand";
+export const LL_PAIN_RULE_ID        = "ffxiv-ll-pain";
+export const LL_THROTTLE_RULE_ID    = "ffxiv-ll-throttle";
+export const LL_DRAINAGE_RULE_ID    = "ffxiv-ll-drainage";
+export const LL_OUTBURST_RULE_ID    = "ffxiv-ll-outburst";
+export const LL_DEAD_GOING_IN_RULE_ID = "ffxiv-ll-dead-going-in";
+export const LL_CALLED_WIPE_RULE_ID = "ffxiv-ll-called-wipe";
+export const LL_COLLAPSE_RULE_ID    = "ffxiv-ll-collapse";
+export const LL_ENRAGE_RULE_ID      = "ffxiv-ll-enrage";
+
+// ── log IDs (VERIFIED section above) ────────────────────────────────────────
+
+const CASCADE        = 18470;
+const FLUID_SWING    = 18864;   // Living Liquid's cleave
+const FLUID_STRIKE   = 18871;   // Liquid Hand's cleave
+const VISIBLE_BOSS   = [18466, 18468];
+const FRONTAL        = 18467;   // the unbaited "shadow" wave out of LL's front
+const INVISIBLE_BOSS = 18469;   // nearest-four boss cones
+const VISIBLE_TORNADO   = 18869;
+const INVISIBLE_TORNADO = 18870; // each tornado's nearest player
+const SLUICE         = 18865;
+const SPLASH         = 18866;
+const DRAINAGE       = 18471;
+const EXHAUST        = 18462;
+const EXHAUST_BURST  = 18463;   // the two-stack Aetheroplasm overload, on its holder and anyone near
+const FEED_OK        = 18464;   // Reducible Complexity: a doll fed to a boss
+const FEED_DEAD      = 18465;   // Reducible Complexity: a doll killed
+const PRAYER         = 18475;
+const PARTING        = 18476;
+const PAIN           = 18477;
+const OUTBURST       = 18474;
+const ENRAGE         = 18867;   // the final Cascade (never reached in report A)
+const AETHEROPLASM   = 1000706;
+const THROTTLE       = 1000700;
+const DROPSY         = 1000289;
+const DOLL_AUTO      = 19278;
+const DOLL           = "jagd doll";
+const SIGNATURE      = [CASCADE, FLUID_SWING];
+const WATER = [...VISIBLE_BOSS, FRONTAL, INVISIBLE_BOSS, VISIBLE_TORNADO, INVISIBLE_TORNADO, SLUICE, SPLASH, FLUID_SWING, FLUID_STRIKE, DRAINAGE];
+// Every Phase 1 cast: the first cast of anything else (Hawk Blaster) is
+// Phase 2, whose casts are sometimes credited to a liquid rage actor.
+const P1_IDS = new Set([CASCADE, FLUID_SWING, FLUID_STRIKE, ...VISIBLE_BOSS, FRONTAL, INVISIBLE_BOSS, VISIBLE_TORNADO, INVISIBLE_TORNADO,
+  SLUICE, SPLASH, DRAINAGE, 18472, 18473, EXHAUST, FEED_OK, FEED_DEAD, PRAYER, PARTING, PAIN, OUTBURST, ENRAGE]);
+
+// ── thresholds (both extremes in the header's VERIFIED section) ─────────────
+
+// A doll must be under 25% HP when it touches a boss. Clean feeds 0.3-24.9%
+// (A55 +0:56.1, A64 +0:53.9), failures 26.4%+ (A32 +0:45.5): the game's line.
+const FEED_MAX_PCT       = 25;
+// Hand of Parting / Prayer resolution median: clean 2k at most (every pull),
+// failures 29k+ (A3, A12).
+const HAND_FAIL_DAMAGE   = 10_000;
+// Hand of Pain resolution median: clean 5k at most (A72 +1:10.9), failures
+// 14k+ (A16 +1:30.0, A72 +1:30.0, A33 +1:49.9).
+const PAIN_FAIL_DAMAGE   = 10_000;
+// Throttle lasts 10.0s; a removal this late with a death after is expiry.
+const THROTTLE_EXPIRY_MS = 9_500;
+// The doll's killing blow lands within this long before its Reducible
+// Complexity (A2-A71: 0.1-0.2s).
+const DOLL_KILL_MS       = 2_000;
+// Water Resistance Down II from a wave lasts ~4s, so a wave error's player
+// who dies this soon after to more water died of it.
+const WAVE_DEATH_MS      = 6_000;
+// Every wipe on disk ended within 25s of 4 dead at once (A47 +2:31, the
+// latest after P1; P1 wipes within 12s).
+const COLLAPSE_DEAD_COUNT = 4;
+const COLLAPSE_END_MS     = 30_000;
+const CALLED_WIPE_COUNT   = 3;
+const CALLED_WIPE_WINDOW  = 10_000;
+const CALLED_WIPE_END_MS  = 12_000;
+
+type Avoidable = { name: string; hit: string; why: string };
+const AVOIDABLE: Record<number, Avoidable> = {
+  18466: { name: "Protean Wave", hit: "Hit by a visible Protean Wave",
+    why: "Living Liquid's visible waves are telegraphed; step out of the lines before the invisible volleys." },
+  18468: { name: "Protean Wave", hit: "Hit by a visible Protean Wave",
+    why: "Living Liquid's visible waves are telegraphed; step out of the lines before the invisible volleys." },
+  [FRONTAL]: { name: "Protean Wave (front)", hit: "Stood in front of Living Liquid for its unbaited frontal wave",
+    why: "Every invisible volley also fires a wave straight out of Living Liquid's front; never stand in front of the boss." },
+  [SLUICE]: { name: "Sluice", hit: "Hit by Sluice",
+    why: "Sluice drops a circle under the four farthest players; bait it out, then step out of your own circle." },
+  [VISIBLE_TORNADO]: { name: "Protean Wave (tornado)", hit: "Hit by a tornado's visible Protean Wave",
+    why: "The tornadoes' visible waves are telegraphed; only the tank under invulnerability takes the opening one." },
+  [FLUID_SWING]: { name: "Fluid Swing", hit: "Hit by Living Liquid's Fluid Swing cleave",
+    why: "Fluid Swing cleaves in front of Living Liquid; only the tanks belong there." },
+  [FLUID_STRIKE]: { name: "Fluid Strike", hit: "Hit by Liquid Hand's Fluid Strike cleave",
+    why: "Fluid Strike cleaves in front of Liquid Hand; only the tanks belong there." },
+  [DRAINAGE]: { name: "Drainage", hit: "Hit by a tank's Drainage splash",
+    why: "Each tank takes one Drainage tether and stands clear of the party for the splash; stay away from the tanks." },
+};
+
+// ── helpers ─────────────────────────────────────────────────────────────────
+
+/** When Phase 1 ends: the first Phase 2 cast (Infinity on a P1 wipe). */
+function phase1End(casts: EnemyEvent[]): number {
+  return casts.filter((c) => !P1_IDS.has(c.abilityId) && c.abilityName.toLowerCase() !== "attack").reduce((m, c) => Math.min(m, c.timestamp), Infinity);
+}
+
+const median = (xs: number[]) => { const s = [...xs].sort((a, b) => a - b); return s.length ? s[Math.floor(s.length / 2)] : 0; };
+const pct = (c: EnemyEvent) => (c.hitPoints !== undefined && c.maxHitPoints ? 100 * c.hitPoints / c.maxHitPoints : undefined);
+const isMelee = (p: PlayerInfo) => p.role === "DPS" && p.rangeType === "Melee";
+const isRangedDps = (p: PlayerInfo) => p.role === "DPS" && p.rangeType !== "Melee";
+
+/** The death this player suffered to water within `ms` after `t`, if any. */
+function waterDeath(p: PlayerInfo, deaths: DeathEvent[], t: number, ms: number): DeathEvent | undefined {
+  return deaths.find((d) => d.player === p.name && d.timestamp > t && d.timestamp <= t + ms + DEATH_EVENT_LAG_MS &&
+    (d.killingAbilityGameId === undefined || d.killingAbilityGameId === 0 || WATER.includes(d.killingAbilityGameId)));
+}
+
+// ── plain avoidable hits ────────────────────────────────────────────────────
+
+/**
+ * Hits nobody should take. TEA hands out no Damage Down, so each is Minor
+ * unless it killed. The opening visible tornado wave belongs to the tank
+ * who takes Living Liquid (under invulnerability, every pull), cleaves and
+ * Drainage to the tanks / tether holders. Dropsy is the tornado puddle.
+ */
+function detectAvoidable(players: PlayerInfo[], life: Life, casts: EnemyEvent[], deaths: DeathEvent[], llTank: PlayerInfo | undefined, end: number): PullError[] {
+  const errors: PullError[] = [];
+  const drainTargets = castsOf(casts, DRAINAGE, end);
+  for (const p of players) {
+    const hits = p.damageTaken.filter((e) => {
+      if (!AVOIDABLE[e.abilityId] || e.timestamp > end || bodyHit(e) || !life.hitAlive(p, e.timestamp)) return false;
+      if ((e.abilityId === FLUID_SWING || e.abilityId === FLUID_STRIKE) && isTank(p)) return false;
+      if (e.abilityId === VISIBLE_TORNADO && (p === llTank || (isTank(p) && e.timestamp < 60_000))) return false;
+      // A Drainage hit on its own tether holder is the mechanic. A cast that
+      // hit two players loses its target (A23 +1:27: the tank and the sage
+      // beside him), so a tank is always taken as a holder.
+      if (e.abilityId === DRAINAGE && (isTank(p) || drainTargets.some((c) => c.target === p.name && Math.abs(c.timestamp - e.timestamp) < 1500))) return false;
+      return true;
+    });
+    for (const g of clusterByGap(hits, (e) => e.timestamp, 2000)) {
+      const kinds = uniq(g.map((e) => AVOIDABLE[e.abilityId]));
+      const death = life.diedFrom(p, g[g.length - 1].timestamp);
+      const total = g.reduce((s, e) => s + realAmount(e), 0);
+      errors.push(playerError(p, {
+        ruleId: LL_AVOIDABLE_RULE_ID, severity: death ? "Major" : "Minor", name: `Hit by ${uniq(kinds.map((k) => k.name)).join(" / ")}`,
+        description: `${kinds.map((k, i) => (i ? k.hit.charAt(0).toLowerCase() + k.hit.slice(1) : k.hit)).join(", and ")} (${g.length > 1 ? `${g.length} hits, ` : ""}${kFmt(total)}).${death ? " They died." : ""} ${uniq(kinds.map((k) => k.why)).join(" ")}`,
+        timestamp: g[0].timestamp, abilityId: g[0].abilityId, abilityName: g[0].abilityName,
+      }));
+    }
+    // Dropsy: stood in a tornado's puddle.
+    for (const e of p.debuffs.filter((x) => x.abilityId === DROPSY && x.debuffStatus === "applied" && x.timestamp <= end && life.alive(p, x.timestamp))) {
+      const death = deaths.find((d) => d.player === p.name && d.killingAbilityGameId === DROPSY && d.timestamp > e.timestamp && d.timestamp - e.timestamp < 20_000);
+      errors.push(playerError(p, {
+        ruleId: LL_AVOIDABLE_RULE_ID, severity: death ? "Major" : "Minor", name: "Stood in a Tornado Puddle",
+        description: `Got Dropsy from standing in a Liquid Rage tornado's puddle${death ? " and died to it" : ""}. The tornadoes leave water on the ground until Drainage; stay out of it.`,
+        timestamp: e.timestamp, abilityId: DROPSY, abilityName: "Dropsy",
+      }));
+    }
+  }
+  return errors;
+}
+
+// ── nearest-player wave volleys ─────────────────────────────────────────────
+
+/**
+ * Each invisible volley aims one wave at each of the nearest players, and
+ * a wave's Water Resistance Down II (~4s) makes a second one lethal. NAUR
+ * gives every volley to a role group, and report A followed it in every
+ * clean volley:
+ * - the opening tornado volley (+0:38): the tank holding Living Liquid
+ *   (the first Fluid Swing's target) and both ranged DPS (63 of 72);
+ * - each boss sequence's first volley: both tanks and both melee (81 of
+ *   91), its second, 3s later: both healers and both ranged (66 of 91);
+ * - the second tornado volley (+1:55): the Liquid Hand tank and both melee.
+ * A player outside the group who took one stood too close; a living group
+ * member who took none stood too far, and their wave went to someone else.
+ * Both are named (README philosophy 3). Major when the extra player died
+ * to water within WAVE_DEATH_MS (usually the next volley, still holding
+ * the resistance down). Skipped when a group member was dead or died in
+ * the 3s before: the waves retarget onto whoever is left.
+ */
+function detectWaveBaits(players: PlayerInfo[], life: Life, casts: EnemyEvent[], deaths: DeathEvent[], llTank: PlayerInfo | undefined, end: number): PullError[] {
+  const errors: PullError[] = [];
+  const tanks = players.filter(isTank);
+  const handTank = llTank ? tanks.find((p) => p !== llTank) : undefined;
+  const volleys = clusterByGap(castsOf(casts, [INVISIBLE_BOSS, INVISIBLE_TORNADO], end), (c) => c.timestamp, 600);
+  let tornadoN = 0;
+  volleys.forEach((v, i) => {
+    const t0 = v[0].timestamp;
+    const kind = v[0].abilityId;
+    let group: PlayerInfo[]; let label: string; let why: string;
+    if (kind === INVISIBLE_TORNADO) {
+      tornadoN++;
+      if (!llTank || !handTank) return;
+      if (tornadoN === 1) {
+        group = [llTank, ...players.filter(isRangedDps)]; label = "opening tornado waves";
+        why = "The opening tornado waves go to the Living Liquid tank (south, under invulnerability) and the two ranged DPS (west and east, aiming them north); everyone else stays out.";
+      } else {
+        group = [handTank, ...players.filter(isMelee)]; label = "second tornado waves";
+        why = "After the second boss volley, the Liquid Hand tank and the two melee bait the three tornadoes' waves; everyone else stays clear of them.";
+      }
+    } else {
+      const prev = volleys[i - 1];
+      const second = !!prev && prev[0].abilityId === INVISIBLE_BOSS && t0 - prev[0].timestamp < 4500;
+      if (second) {
+        group = players.filter((p) => p.role === "Healer" || isRangedDps(p)); label = "second boss volley";
+        why = "Each boss sequence's second invisible volley belongs to the healers and ranged: they move in while the tanks and melee, still under Water Resistance Down II, move out.";
+      } else {
+        group = players.filter((p) => isTank(p) || isMelee(p)); label = "first boss volley";
+        why = "Each boss sequence's first invisible volley belongs to the tanks and melee close to Living Liquid; healers and ranged stay out (baiting Sluice) and come in for the second.";
+      }
+    }
+    if (group.length < 3) return;
+    // A dead group member's wave retargets onto whoever is next nearest.
+    if (group.some((p) => !life.alive(p, t0 - 500))) return;
+    // Not hitsOf: the Living Liquid tank's invulnerability (Holmgang) logs
+    // its opening tornado wave as 0 damage at 0 HP, which reads as a body;
+    // the life intervals alone say who was alive.
+    const hits: Hit[] = players.flatMap((p) => p.damageTaken
+      .filter((e) => e.abilityId === kind && e.timestamp >= t0 - 200 && e.timestamp <= Math.min(end, t0 + 1500) && life.hitAlive(p, e.timestamp))
+      .map((e) => ({ p, e })));
+    const hit = uniq(hits.map((h) => h.p));
+    const extras = hit.filter((p) => !group.includes(p));
+    const missing = group.filter((p) => !hit.includes(p));
+    if (!extras.length && !missing.length) {
+      errors.push(...sharedWaves(players, hits, deaths, t0, label, why));
+      return;
+    }
+    const killed = extras.filter((p) => waterDeath(p, deaths, t0, WAVE_DEATH_MS));
+    const sev = killed.length ? "Major" : "Minor";
+    const deathText = killed.length ? ` ${namesOf(killed)} died to water within seconds.` : "";
+    for (const p of extras) {
+      const n = hits.filter((h) => h.p === p).length;
+      errors.push(playerError(p, {
+        ruleId: LL_WAVE_BAIT_RULE_ID, severity: killed.includes(p) ? "Major" : "Minor", name: "Took Someone Else's Wave",
+        description: `Took ${n > 1 ? `${n} waves` : "a wave"} of the ${label}, which belongs to ${namesOf(group)}: they stood too close${missing.length ? `, and ${namesOf(missing)} baited nothing` : ""}.${killed.includes(p) ? " They died to water within seconds (Water Resistance Down II makes a second wave lethal)." : deathText} ${why}`,
+        timestamp: t0, abilityId: kind, abilityName: "Protean Wave",
+      }));
+    }
+    for (const p of missing) {
+      errors.push(playerError(p, {
+        ruleId: LL_WAVE_BAIT_RULE_ID, severity: sev, name: "Didn't Bait Their Wave",
+        description: `Baited no wave of the ${label}: they stood farther out than ${extras.length ? namesOf(extras) : "another player"}, who took it instead.${deathText} ${why}`,
+        timestamp: t0, abilityId: kind, abilityName: "Protean Wave",
+      }));
+    }
+  });
+  return errors;
+}
+
+/**
+ * The right players baited, but one wave hit two of them: a player took
+ * their own wave and a groupmate's (A36 +1:55, A69 +1:55: a melee died to
+ * the Liquid Hand tank's tornado wave on top of their own). The wave's
+ * baiter is the one it hit alone (PITFALLS: a shared cone is its
+ * baiter's); they aimed it through the other, or the other stood in its
+ * lane, so both are named. Major when the doubled player died.
+ */
+function sharedWaves(players: PlayerInfo[], hits: Hit[], deaths: DeathEvent[], t0: number, label: string, why: string): PullError[] {
+  const errors: PullError[] = [];
+  const instOf = (h: Hit) => h.e.sourceInstance ?? 0;
+  for (const inst of uniq(hits.map(instOf))) {
+    const on = uniq(hits.filter((h) => instOf(h) === inst).map((h) => h.p));
+    if (on.length < 2) continue;
+    const doubled = on.filter((p) => uniq(hits.filter((h) => h.p === p).map(instOf)).length > 1);
+    const baiter = on.filter((p) => !doubled.includes(p));
+    if (!doubled.length || baiter.length !== 1) continue;
+    const killed = doubled.filter((p) => waterDeath(p, deaths, t0, 3000));
+    const sev = killed.length ? "Major" : "Minor";
+    for (const p of doubled) errors.push(playerError(p, {
+      ruleId: LL_WAVE_BAIT_RULE_ID, severity: killed.includes(p) ? "Major" : "Minor", name: "Shared a Wave",
+      description: `Took two waves of the ${label}: their own and ${baiter[0].name}'s${killed.includes(p) ? ", and died" : ""}. They stood in ${baiter[0].name}'s wave, or it was aimed through them. ${why}`,
+      timestamp: t0, abilityId: hits[0].e.abilityId, abilityName: "Protean Wave",
+    }));
+    errors.push(playerError(baiter[0], {
+      ruleId: LL_WAVE_BAIT_RULE_ID, severity: sev, name: "Wave Aimed Into a Groupmate",
+      description: `Their wave of the ${label} also hit ${namesOf(doubled)}, who had their own${killed.length ? `; ${namesOf(killed)} died` : ""}. Aim your wave away from the others' positions, or they stood in its lane. ${why}`,
+      timestamp: t0, abilityId: hits[0].e.abilityId, abilityName: "Protean Wave",
+    }));
+  }
+  return errors;
+}
+
+// ── Jagd Dolls ──────────────────────────────────────────────────────────────
+
+/** Each doll's owner: the player its auto-attacks hit, else the one DPS left. */
+function dollOwners(players: PlayerInfo[]): Map<number, PlayerInfo> {
+  const owners = new Map<number, PlayerInfo>();
+  for (const inst of [1, 2, 3, 4]) {
+    const counts = new Map<PlayerInfo, number>();
+    for (const p of players) {
+      const n = p.damageTaken.filter((e) => e.abilityId === DOLL_AUTO && e.sourceInstance === inst).length;
+      if (n) counts.set(p, n);
+    }
+    const best = [...counts].sort((a, b) => b[1] - a[1])[0];
+    if (best) owners.set(inst, best[0]);
+  }
+  // A doll fed before it ever swung (A6, A14, A22): the DPS who owns no other doll.
+  const free = players.filter((p) => p.role === "DPS" && ![...owners.values()].includes(p));
+  const unowned = [1, 2, 3, 4].filter((i) => !owners.has(i));
+  if (free.length === 1 && unowned.length === 1) owners.set(unowned[0], free[0]);
+  return owners;
+}
+
+/**
+ * Exhaust gives Luminous Aetheroplasm; a second stack kills. A player hit
+ * by two dolls' Exhausts at once (or gaining a second stack) stood in two
+ * circles. Report A's healers and the Liquid Hand tank stand in one melee
+ * doll's circle on purpose, so one Exhaust is normal.
+ */
+function detectExhaust(players: PlayerInfo[], life: Life, end: number, owners: Map<number, PlayerInfo>): PullError[] {
+  const errors: PullError[] = [];
+  for (const set of clusterByGap(hitsOf(players, life, EXHAUST, end), (h) => h.e.timestamp, 1000)) {
+    const t0 = set[0].e.timestamp;
+    for (const p of uniq(set.map((h) => h.p))) {
+      const insts = uniq(set.filter((h) => h.p === p).map((h) => h.e.sourceInstance ?? 0));
+      const stacked = p.debuffs.some((e) => e.abilityId === AETHEROPLASM && e.debuffStatus === "stack" && Math.abs(e.timestamp - t0) < 1500);
+      if (insts.length < 2 && !stacked) continue;
+      const death = life.diedFrom(p, t0);
+      const dollOf = insts.map((i) => owners.get(i)).filter((o): o is PlayerInfo => !!o && o !== p);
+      // The overload explodes (EXHAUST_BURST) on players standing with
+      // them: A19's sage took two Exhausts and three others in that circle
+      // died to the burst. Those deaths are this player's.
+      const splashed = players.filter((o) => o !== p && o.damageTaken.some((e) => e.abilityId === EXHAUST_BURST && Math.abs(e.timestamp - t0) < 1500) &&
+        !uniq(set.filter((h) => h.p === o).map((h) => h.e.sourceInstance ?? 0)).slice(1).length && life.diedFrom(o, t0));
+      errors.push(playerError(p, {
+        ruleId: LL_EXHAUST_RULE_ID, severity: death || splashed.length ? "Major" : "Minor", name: "Doubled Exhaust",
+        description: `Hit by ${insts.length > 1 ? `${insts.length} dolls' Exhausts` : "a second Exhaust"} at once${dollOf.length ? ` (the dolls of ${namesOf(dollOf)})` : ""}, taking two stacks of Luminous Aetheroplasm${death ? ", and died" : ""}.${splashed.length ? ` The overload burst also killed ${namesOf(splashed)}, who stood with them.` : ""} Each doll's Exhaust may hit you only once: stand in one doll's circle at most, and doll owners keep their dolls apart.`,
+        timestamp: t0, abilityId: EXHAUST, abilityName: "Exhaust",
+      }));
+    }
+  }
+  return errors;
+}
+
+/**
+ * Reducible Complexity. A doll fed at 25% HP or more hits the raid for
+ * lethal damage (clean feeds ~10k, failures 26k-87k with mass deaths): its
+ * owner brought it to a boss too early (Major) and the pull is lost (Raid).
+ * A doll killed instead of fed (FEED_DEAD) is the same wipe; the player
+ * whose hit took it to 0 HP is named, with the owner mentioned.
+ */
+function detectDolls(players: PlayerInfo[], life: Life, casts: EnemyEvent[], end: number, owners: Map<number, PlayerInfo>, occurrences?: ReportedOccurrence[]): PullError[] {
+  const errors: PullError[] = [];
+  for (const c of castsOf(casts, [FEED_OK, FEED_DEAD], end)) {
+    const owner = owners.get(c.sourceInstance ?? 0);
+    if (owner) occurrences?.push({ mechanicKey: LL_DOLL_FEED_RULE_ID, timestamp: c.timestamp, players: [owner.name] });
+    const hits = players.flatMap((p) => p.damageTaken.filter((e) => e.abilityId === c.abilityId && e.timestamp >= c.timestamp && e.timestamp - c.timestamp < 1500 && !bodyHit(e)).map((e) => ({ p, e })));
+    const dead = uniq(hits.filter((h) => life.diedFrom(h.p, h.e.timestamp)).map((h) => h.p));
+    const deadText = dead.length ? ` ${dead.length} player${dead.length > 1 ? "s" : ""} died to it (${namesOf(dead)}).` : "";
+    if (c.abilityId === FEED_OK) {
+      const hp = pct(c);
+      if (hp === undefined || hp < FEED_MAX_PCT) continue;
+      const med = median(hits.map((h) => realAmount(h.e)).filter((a) => a > 0));
+      if (owner) errors.push(playerError(owner, {
+        ruleId: LL_DOLL_FEED_RULE_ID, severity: "Major", name: "Doll Fed Too Early",
+        description: `Their Jagd Doll touched a boss at ${hp.toFixed(1)}% HP; it must be under 25%. Reducible Complexity hit the raid for ${kFmt(med)} each.${deadText} Keep the doll away from both bosses until it's below 25%, then feed it.`,
+        timestamp: c.timestamp, abilityId: FEED_OK, abilityName: "Reducible Complexity",
+      }));
+      errors.push(raidMarker(LL_DOLL_WIPE_RULE_ID, "Doll Fed Above 25%",
+        `A Jagd Doll${owner ? ` (${owner.name}'s)` : ""} was fed at ${hp.toFixed(1)}% HP and Reducible Complexity hit everyone for ${kFmt(med)}.${deadText} Unrecoverable from here; treated as the cutoff point.`,
+        c.timestamp, FEED_OK, "Reducible Complexity"));
+    } else {
+      // The hit that took this doll to 0 HP (damageDone carries the target's HP).
+      const blows = players.flatMap((p) => p.damageDone.filter((e) => e.target === DOLL && e.healthAfter === 0 && e.timestamp <= c.timestamp && c.timestamp - e.timestamp <= DOLL_KILL_MS).map((e) => ({ p, e })))
+        .sort((a, b) => b.e.timestamp - a.e.timestamp);
+      const killer = blows[0]?.p;
+      if (killer) errors.push(playerError(killer, {
+        ruleId: LL_DOLL_KILL_RULE_ID, severity: "Major", name: "Killed a Jagd Doll",
+        description: `Their ${blows[0].e.abilityName} killed ${owner === killer ? "their own" : owner ? `${owner.name}'s` : "a"} Jagd Doll instead of leaving it to be fed: a dead doll's Reducible Complexity hits the raid hard.${deadText} Stop attacking a doll once it's under 25%; watch AoEs and DoTs near the dolls.`,
+        timestamp: blows[0].e.timestamp, abilityId: blows[0].e.abilityId, abilityName: blows[0].e.abilityName,
+      }));
+      errors.push(raidMarker(LL_DOLL_WIPE_RULE_ID, "Jagd Doll Killed",
+        `A Jagd Doll${owner ? ` (${owner.name}'s)` : ""} was killed instead of fed${killer ? ` (killing blow: ${killer.name})` : ""}.${deadText} Unrecoverable from here; treated as the cutoff point.`,
+        c.timestamp, FEED_DEAD, "Reducible Complexity"));
+    }
+  }
+  return errors;
+}
+
+// ── Hand of Parting / Prayer / Pain ─────────────────────────────────────────
+
+/**
+ * Hand of Parting / Prayer punishes the bosses' distance: clean resolutions
+ * hit ~2k, a wrong one 29k+ on everyone. The tanks move the bosses, but
+ * which one moved wrong isn't in the log, so this is a player-less Raid.
+ * Hand of Pain punishes an HP gap between the two: a resolution whose
+ * median hit is PAIN_FAIL_DAMAGE+ is the gap check failing (Raid).
+ */
+function detectHands(players: PlayerInfo[], life: Life, casts: EnemyEvent[], end: number): PullError[] {
+  const errors: PullError[] = [];
+  const tanks = players.filter(isTank);
+  for (const res of clusterByGap(hitsOf(players, life, [PRAYER, PARTING], end), (h) => h.e.timestamp, 1000)) {
+    const t0 = res[0].e.timestamp;
+    const med = median(res.map((h) => realAmount(h.e)));
+    if (med < HAND_FAIL_DAMAGE && !res.some((h) => (h.e.amount ?? 0) >= PREVIEW_AMOUNT)) continue;
+    const prayer = res[0].e.abilityId === PRAYER;
+    const dead = uniq(res.filter((h) => life.diedFrom(h.p, h.e.timestamp)).map((h) => h.p));
+    errors.push(raidMarker(LL_HAND_RULE_ID, `${prayer ? "Hand of Prayer" : "Hand of Parting"} Failed`,
+      `${prayer ? "Hand of Prayer (closed fist: bosses apart)" : "Hand of Parting (open palm: bosses together)"} hit everyone for ${kFmt(med)}${dead.length ? `; ${namesOf(dead)} died` : ""}: the bosses were at the wrong distance when it resolved. The tanks (${namesOf(tanks)}) reverse the bosses' distance at the hand cue. Unrecoverable from here; treated as the cutoff point.`,
+      t0, res[0].e.abilityId, res[0].e.abilityName));
+  }
+  // Living Liquid's own HP: its own casts (not the helper copies, which
+  // carry an instance number and full HP).
+  const llHp = (t: number) => castsOf(casts, [FLUID_SWING, CASCADE, SPLASH, ...VISIBLE_BOSS, FRONTAL], end)
+    .filter((c) => c.actorName === "living liquid" && !c.sourceInstance && Math.abs(c.timestamp - t) <= 3000 && pct(c) !== undefined)
+    .sort((a, b) => Math.abs(a.timestamp - t) - Math.abs(b.timestamp - t))[0];
+  for (const c of castsOf(casts, PAIN, end)) {
+    const res = hitsOf(players, life, PAIN, Math.min(end, c.timestamp + 1500)).filter((h) => h.e.timestamp >= c.timestamp);
+    if (!res.length) continue;
+    const med = median(res.map((h) => realAmount(h.e)));
+    if (med < PAIN_FAIL_DAMAGE) continue;
+    const dead = uniq(res.filter((h) => life.diedFrom(h.p, h.e.timestamp)).map((h) => h.p));
+    const hand = pct(c), ll = llHp(c.timestamp);
+    const hpText = hand !== undefined && ll ? ` Liquid Hand was at ${hand.toFixed(1)}% and Living Liquid at ${pct(ll)!.toFixed(1)}%.` : "";
+    errors.push(raidMarker(LL_PAIN_RULE_ID, "Hand of Pain Failed",
+      `Hand of Pain hit everyone for ${kFmt(med)}${dead.length ? `; ${namesOf(dead)} died` : ""}: the two bosses' HP were too far apart.${hpText} Keep Living Liquid and Liquid Hand within a few percent of each other (cleave both, shift damage to the higher one). Unrecoverable from here; treated as the cutoff point.`,
+      c.timestamp, PAIN, "Hand of Pain"));
+  }
+  return errors;
+}
+
+// ── Throttle ────────────────────────────────────────────────────────────────
+
+/**
+ * Liquid Gaol puts Throttle (10s) on six players; it kills on expiry unless
+ * cleansed. Report A's healers split the cleanses every pull (the white
+ * mage took the tanks, the sage the ranged, melee varied), so on an expiry
+ * with both healers alive the healer with fewer successful cleanses is
+ * named (both on a tie). With a healer dead the expiry is that death's
+ * fallout: player-less.
+ */
+function detectThrottle(players: PlayerInfo[], life: Life, deaths: DeathEvent[], end: number, occurrences?: ReportedOccurrence[]): { errors: PullError[]; expiryDeaths: Set<DeathEvent> } {
+  const errors: PullError[] = [];
+  const expiryDeaths = new Set<DeathEvent>();
+  const applies = players.flatMap((p) => p.debuffs.filter((e) => e.abilityId === THROTTLE && e.debuffStatus === "applied" && e.timestamp <= end).map((e) => ({ p, e })));
+  const healers = players.filter((p) => p.role === "Healer");
+  for (const set of clusterByGap(applies, (a) => a.e.timestamp, 1000)) {
+    const t0 = set[0].e.timestamp;
+    occurrences?.push({ mechanicKey: LL_THROTTLE_RULE_ID, timestamp: t0, players: healers.map((p) => p.name) });
+    const cleansedBy = new Map<PlayerInfo, PlayerInfo[]>();
+    const expired: { p: PlayerInfo; d: DeathEvent }[] = [];
+    for (const { p, e } of set) {
+      const rm = p.debuffs.find((x) => x.abilityId === THROTTLE && x.debuffStatus === "removed" && x.timestamp > e.timestamp);
+      if (!rm) continue;
+      if (rm.timestamp - e.timestamp >= THROTTLE_EXPIRY_MS) {
+        const d = deaths.find((x) => x.player === p.name && x.timestamp >= rm.timestamp - 500 && x.timestamp - rm.timestamp <= 3000);
+        if (d) { expired.push({ p, d }); expiryDeaths.add(d); }
+        continue;
+      }
+      for (const h of healers) {
+        if (h.casts.some((c) => /Esuna|Warden's Paean/.test(c.abilityName) && c.target === p.name && Math.abs(c.timestamp - rm.timestamp) <= 1500)) {
+          cleansedBy.set(h, [...(cleansedBy.get(h) ?? []), p]);
+        }
+      }
+    }
+    if (!expired.length) continue;
+    const who = expired.map((x) => x.p);
+    const living = healers.filter((h) => life.alive(h, t0) && life.alive(h, t0 + THROTTLE_EXPIRY_MS));
+    const counts = living.map((h) => ({ h, n: uniq(cleansedBy.get(h) ?? []).length }));
+    const low = counts.length ? Math.min(...counts.map((c) => c.n)) : 0;
+    const blamed = living.length === 2 ? counts.filter((c) => c.n === low).map((c) => c.h) : [];
+    const tally = counts.map((c) => `${c.h.name} ${c.n}`).join(", ");
+    const text = `Throttle ran out on ${namesOf(who)} and killed ${who.length > 1 ? "them" : `them`}.`;
+    if (blamed.length) {
+      for (const h of blamed) errors.push(playerError(h, {
+        ruleId: LL_THROTTLE_RULE_ID, severity: "Major", name: "Throttle Not Cleansed",
+        description: `${text} Successful cleanses: ${tally}. The healers split the six Throttles (Esuna, 10s each); the healer with fewer cleanses left theirs.`,
+        timestamp: t0 + THROTTLE_EXPIRY_MS, abilityId: THROTTLE, abilityName: "Throttle",
+      }));
+    } else {
+      errors.push(playerlessMinor(LL_THROTTLE_RULE_ID, "Throttle Not Cleansed",
+        `${text}${living.length < 2 ? " A healer was dead, so the cleanses were short." : ""}`,
+        t0 + THROTTLE_EXPIRY_MS, THROTTLE, "Throttle"));
+    }
+  }
+  return { errors, expiryDeaths };
+}
+
+// ── Drainage tethers and Outburst ───────────────────────────────────────────
+
+/**
+ * Drainage tethers go to the two tanks. One on a non-tank with both tanks
+ * alive names the tank who didn't hold a tether. (Report A's three
+ * non-tank Drainages all followed a tank's death: fallout.) A splash on
+ * anyone else is in the avoidable table.
+ */
+function detectDrainage(players: PlayerInfo[], life: Life, casts: EnemyEvent[], end: number, occurrences?: ReportedOccurrence[]): PullError[] {
+  const errors: PullError[] = [];
+  const tanks = players.filter(isTank);
+  for (const set of clusterByGap(castsOf(casts, DRAINAGE, end), (c) => c.timestamp, 1500)) {
+    const t0 = set[0].timestamp;
+    occurrences?.push({ mechanicKey: LL_DRAINAGE_RULE_ID, timestamp: t0, players: tanks.map((p) => p.name) });
+    if (tanks.length !== 2 || tanks.some((p) => !life.alive(p, t0 - 500))) continue;
+    const holders = set.map((c) => players.find((p) => p.name === c.target)).filter((p): p is PlayerInfo => !!p);
+    const wrong = holders.filter((p) => !isTank(p));
+    if (!wrong.length) continue;
+    const idle = tanks.filter((p) => !holders.includes(p));
+    const died = wrong.filter((p) => life.diedFrom(p, t0));
+    for (const t of idle) errors.push(playerError(t, {
+      ruleId: LL_DRAINAGE_RULE_ID, severity: died.length ? "Major" : "Minor", name: "Drainage Tether Not Taken",
+      description: `A Drainage tether went to ${namesOf(wrong)} instead of a tank${died.length ? `, who died to it` : ""}. Each tank takes one tornado's tether and stands clear of the party.`,
+      timestamp: t0, abilityId: DRAINAGE, abilityName: "Drainage",
+    }));
+  }
+  return errors;
+}
+
+// ── deaths, called wipes ────────────────────────────────────────────────────
+
+/** No-killing-blow deaths that are the wipe being called (not Throttle expiries). */
+function calledWipeDeaths(deaths: DeathEvent[], skip: Set<DeathEvent>, pullEnd: number): Set<DeathEvent> {
+  const silent = deaths.filter((d) => !d.killingAbilityGameId && !skip.has(d));
+  const out = new Set<DeathEvent>();
+  for (const d of silent) {
+    if (pullEnd - d.timestamp <= CALLED_WIPE_END_MS) out.add(d);
+    const near = resetCluster(silent.filter((x) => Math.abs(x.timestamp - d.timestamp) <= CALLED_WIPE_WINDOW), deaths);
+    if (near.length >= CALLED_WIPE_COUNT) near.forEach((x) => out.add(x));
+  }
+  return new Set(resetCluster([...out], deaths));
+}
+
+// ── entry point ─────────────────────────────────────────────────────────────
+
+/**
+ * The Epic of Alexander Phase 1 (Living Liquid). Self-gates on Cascade /
+ * Fluid Swing, which no other fight casts, and stops at the first Phase 2
+ * cast (Hawk Blaster): later phases belong to their own modules (and the
+ * fallback model until those exist).
+ */
+export function detectLivingLiquidErrors(
+  players: PlayerInfo[], deathEvents: DeathEvent[], enemyCasts: EnemyEvent[], occurrences?: ReportedOccurrence[],
+): PullError[] {
+  if (!enemyCasts.some((c) => SIGNATURE.includes(c.abilityId))) return [];
+  const p2 = phase1End(enemyCasts);
+  const deaths = deathEvents.filter((d) => d.timestamp - DEATH_EVENT_LAG_MS <= p2);
+  const life = buildLife(players, deaths);
+  const lastEvent = Math.max(0, ...players.flatMap((p) => [...p.damageTaken, ...p.casts].map((e) => e.timestamp)), ...deathEvents.map((d) => d.timestamp));
+  const end = Math.min(p2, lastEvent);
+  const llTankName = castsOf(enemyCasts, FLUID_SWING, end)[0]?.target;
+  const llTank = players.find((p) => p.name === llTankName && isTank(p));
+  const owners = dollOwners(players);
+  const throttle = detectThrottle(players, life, deaths, end, occurrences);
+
+  const errors = [
+    ...detectAvoidable(players, life, enemyCasts, deaths, llTank, end),
+    ...detectWaveBaits(players, life, enemyCasts, deaths, llTank, end),
+    ...detectExhaust(players, life, end, owners),
+    ...detectDolls(players, life, enemyCasts, end, owners, occurrences),
+    ...detectHands(players, life, enemyCasts, end),
+    ...throttle.errors,
+    ...detectDrainage(players, life, enemyCasts, end, occurrences),
+  ];
+  // An Embolus touched someone: Outburst on the raid.
+  const outburst = castsOf(enemyCasts, OUTBURST, end)[0];
+  if (outburst) {
+    const res = hitsOf(players, life, OUTBURST, Math.min(end, outburst.timestamp + 1500)).filter((h) => h.e.timestamp >= outburst.timestamp);
+    const dead = uniq(res.filter((h) => life.diedFrom(h.p, h.e.timestamp)).map((h) => h.p));
+    errors.push(raidMarker(LL_OUTBURST_RULE_ID, "Embolus Collision",
+      `An Embolus orb touched a player or a boss and exploded (Outburst)${dead.length ? `; ${namesOf(dead)} died` : ""}. Bait the orbs' paths outside, then bring the bosses back in behind them. Treated as the cutoff point.`,
+      outburst.timestamp, OUTBURST, "Outburst"));
+  }
+
+  // Generic cutoffs, P1 wipes only: the earliest, and only before any
+  // mechanic Raid.
+  const generic: PullError[] = [];
+  if (p2 === Infinity) {
+    // A boss protean sequence needs all eight: four close, four far.
+    for (const v of clusterByGap(castsOf(enemyCasts, VISIBLE_BOSS, end), (c) => c.timestamp, 1000)) {
+      const t = v[0].timestamp;
+      const dead = players.filter((p) => !life.alive(p, t - 500));
+      if (!dead.length) continue;
+      generic.push(raidMarker(LL_DEAD_GOING_IN_RULE_ID, "Player Dead Going Into Protean Wave",
+        `${namesOf(dead)} ${dead.length === 1 ? "was" : "were"} still dead when Living Liquid's Protean Wave sequence began. Its volleys need all eight (four close, four far), so the waves fall on players still under Water Resistance Down II; unresolvable from here, treated as the cutoff point.`,
+        t, v[0].abilityId, "Protean Wave"));
+      break;
+    }
+    const called = calledWipeDeaths(deaths, throttle.expiryDeaths, lastEvent);
+    const calledList = deaths.filter((d) => called.has(d)).sort((a, b) => a.timestamp - b.timestamp);
+    if (calledList.length >= CALLED_WIPE_COUNT) {
+      generic.push(raidMarker(LL_CALLED_WIPE_RULE_ID, "Wipe Called",
+        `${calledList.length} players died with no killing blow (${joinNames(uniq(calledList.map((d) => d.player)))}): the wipe was called.`,
+        calledList[0].timestamp - DEATH_EVENT_LAG_MS, 0, "Deaths"));
+    }
+    const outAt = (t: number) => players.filter((p) => !life.alive(p, t));
+    const collapseT = life.outIntervals.map((w) => w.start).sort((a, b) => a - b)
+      .find((t) => outAt(t).length >= COLLAPSE_DEAD_COUNT && lastEvent - t <= COLLAPSE_END_MS);
+    if (collapseT !== undefined) {
+      const who = outAt(collapseT).map((p) => p.name);
+      generic.push(raidMarker(LL_COLLAPSE_RULE_ID, "Party Collapse",
+        `${who.length} players were dead at once (${joinNames(who)}). Treated as the cutoff point.`,
+        collapseT + DEATH_EVENT_LAG_MS, 0, "Deaths"));
+    }
+    const enrage = castsOf(enemyCasts, ENRAGE, end)[0];
+    if (enrage) generic.push(raidMarker(LL_ENRAGE_RULE_ID, "Cascade (Enrage)",
+      "The final Cascade, Phase 1's enrage, went off: Living Liquid wasn't killed in time.", enrage.timestamp, ENRAGE, "Cascade"));
+  }
+  const firstRaid = Math.min(...errors.filter((e) => e.severity === "Raid").map((e) => e.timestamp));
+  const marker = generic.sort((a, b) => a.timestamp - b.timestamp)[0];
+  if (marker && marker.timestamp < firstRaid) errors.push(marker);
+  // One mechanic Raid per pull is enough: later ones are the wipe's fallout.
+  const raids = errors.filter((e) => e.severity === "Raid").sort((a, b) => a.timestamp - b.timestamp);
+  return errors.filter((e) => e.severity !== "Raid" || e === raids[0]).sort((a, b) => a.timestamp - b.timestamp);
+}

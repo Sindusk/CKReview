@@ -131,6 +131,18 @@ philosophy and the data semantics this list assumes.
   raidwide followed a second player in a World circle, a World holder's
   death, or a glitch player's death; read what happened in the 1-2s
   before it and flag that, never the penalty's victims.
+- **A killed add's killer is in damageDone.** Player hits carry the
+  target's HP after the hit; the one leaving a Jagd Doll at 0, 0.1-0.2s
+  before its failure cast, names who killed it (TEA Living Liquid).
+- **An add's owner is its auto-attack target.** TEA's dolls fixate their
+  first attacker; the autos named the owner every pull, and the one DPS
+  without a doll owned the one fed before it ever swung.
+- **Invulnerability hits look like bodies.** Holmgang logs 0 damage at
+  0 HP, so `bodyHit` drops a living tank's bait; check the life
+  intervals instead when a tank under invulnerability baits (TEA's
+  opening tornado wave).
+- **Shadowbringers fights give no Damage Down.** TEA's avoidables are
+  Minor unless they kill, like Doomtrain.
 - **A shared line's groups can be read from the pull itself.** Union the
   players of every line that hit 2+; a component of four is one group and
   the other group is its complement. One set's lines rarely place the
@@ -392,6 +404,14 @@ philosophy and the data semantics this list assumes.
 - **A ground hazard's activation delay separates groups from
   stragglers.** Four or more burning at once is the party on the wrong
   side (Red Hot and Deep Blue).
+- **A nearest-player volley can belong to a role group.** TEA's
+  invisible protean volleys go to fixed groups (tanks + melee, then
+  healers + ranged); a player outside the group who took one and a group
+  member who took none are the pair out of position, and the outsider
+  usually dies to the next volley under the resistance down.
+- **Who cleansed is the Esuna cast on the holder at the removal.** A
+  missed cleanse names the healer with fewer successful cleanses when the
+  pair splits them every pull (TEA's Throttle).
 - **A cleanse can be the fatal hit.** Don't drop death-time removals
   blindly (Red Hot and Deep Blue's Xtreme).
 - **With few pulls, annotate instead of exempting.** Add the context to

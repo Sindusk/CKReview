@@ -100,6 +100,13 @@ lib/mechanics/
                                 have crossed in a same-number pair)
       synergy-order.ts        — cross-pull Party Synergy row order (which glitch
                                 partner was off their row slot or stack)
+    tea/                      — The Epic of Alexander (Ultimate); one pull, four phases
+      living-liquid.ts        — Phase 1 per-pull rules (avoidable waves/cleaves/
+                                Sluice/puddles, wave volleys by NAUR role group,
+                                doubled Exhaust, doll fed early / killed, Hand
+                                of Prayer / Pain, Throttle cleanses, Drainage
+                                tethers, Outburst, dead going into proteans)
+                                (the other tea/ files are research models only)
     trials/                   — Extreme trials
       doomtrain.ts            — Doomtrain (Hell on Rails EX) per-pull rules
                                 (avoidables, stored plasma spreads/pairs, orb
