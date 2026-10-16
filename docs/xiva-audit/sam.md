@@ -25,18 +25,18 @@
 | id | status | app check | fires-on | notes |
 |---|---|---|---|---|
 | sam/Buffs/fugetsu-fuka-uptime | covered | Fugetsu `uptime` | Fugetsu or Fuka dropping | Checklist 95%. Fugetsu +13% from FFLogs' multiplier; Fuka is haste, seen through the gap check. Not matched against a page. |
-| sam/Meikyo/gcd-count | covered | `meikyo` | under 3 Sen GCDs in Meikyo Shisui | Medium 1, Major 2. A missing one is a third of a Midare / Tendo Setsugekka. |
+| sam/Meikyo/gcd-count | covered | `meikyo` | under 3 Sen GCDs in Meikyo Shisui | Medium 1, Major 2. A missing one is a third of a Midare / Tendo Setsugekka. Against xivanalysis 2026-10-16: its one (7zwpcLxk2Fd1h6Vr 1:42, 2 of 3) is the bosses leaving at ~1:47, its third GCD's Kasha only previewed: forced, not counted here, rightly. None counted on the three pages. |
 | sam/Meikyo/bad-gcd | covered | `meikyo` | a starter (Hakaze, Gyofu, Fuko...) under Meikyo | Major 1. It takes a Sen GCD's slot, which `meikyo` values. |
 | sam/OGCDDowntime/meikyo | covered | `checkCooldownDrift` (hold 4.36s) | Meikyo at 2 charges | — |
 | sam/OGCDDowntime/guren-senei | covered | `checkCooldownDrift` | Guren / Senei held | — |
 | sam/OGCDDowntime/ikishoten | covered | `checkCooldownDrift` | Ikishoten held | — |
 | sam/Higanbana/uptime | covered | `higanbana` (dotFindings, against Gekko) | Higanbana off the target | Built 2026-10-15: uptime on any enemy, forced time excused, refreshes valued against Gekko (a one-Sen GCD). Fires widely (235 on 58 reports). Checked kNQKG6yHmvZTJ2hf (Genichiro Ashina): off 6:20-7:28 while he hit both bosses throughout (the 7:17 cast left no debuff), 118k. xivanalysis agrees it's low on all three pages (uptime 50%, 57%, 57%: kNQKG6yHmvZTJ2hf fight 1, at2GMBcywChApnfY fight 13, 7zwpcLxk2Fd1h6Vr fight 2); its checklist has no per-gap count to match. |
 | sam/Higanbana/clipping | wrong | — | Higanbana refreshed early | Target-blind sum, and the tiers barely reach Medium. |
-| sam/Combos/combo-issues | covered | `checkCombos` | a broken or timed-out combo | Generic. |
+| sam/Combos/combo-issues | verified | `checkCombos` | a broken or timed-out combo | Generic. **Gap fixed 2026-10-16:** a finisher with no combo but a hit positional logs a bonusPercent too (Kasha 23 = 1 − 160/210; combo'd 56 / 61), which read as "combo landed". The potency table now gives each combo step its no-combo bonus values (`GameAction.comboMissedBonus`; `checkCombos`, `comboLanded`), so 7zwpcLxk2Fd1h6Vr 8:06.8 (Kasha after Gyofu, no Shifu) counts. About 40 more broken combos on disk, Samurai and Dragoon (e.g. Xk2DKZwVp4Ar6d7y Enuo pull 3 2:11.3, a Gekko with no Jinpu after Meikyo ran out; jN3XDrf2z8PmLgRJ Red Hot and Deep Blue pull 39 0:56.7, Fang and Claw twice); valued at the combo share (56%, was the misread 23%). Against xivanalysis 2026-10-16: Alexia Renzella 3 = 3; Alison Octavious its 3 = 2 here + 1 Meikyo-breaks-combo (not adopted, row below); Genichiro Ashina its 3 are all Meikyo (0 here). |
 | sam/Combos/meikyo-cast-breaker | wrong | — | Meikyo pressed with a combo open | Meikyo is pressed mid-combo on purpose; an expired combo still counts in xivanalysis. The app's combo check follows the GCDs, not the Meikyo press. |
-| sam/Positionals/gekko-kasha | covered | `checkPositionals` | a missed Gekko / Kasha positional | Generic. |
-| sam/Interrupts/iaijutsu-cancel | covered | `checkInterrupts` | a cancelled Iaijutsu | Its tiers start at 2; the app counts each. |
-| sam/ReadyProcs/dropped | covered | `checkProcs` | Ogi Namikiri / Kaeshi / Tendo / Tsubame / Zanshin Ready expiring | Minor 1, Medium 2, Major 3. Three of its statuses are id 0 (bug). Not seen firing. |
+| sam/Positionals/gekko-kasha | verified | `checkPositionals` | a missed Gekko / Kasha positional | Generic. Matched xivanalysis 2026-10-16 time for time: Alexia Renzella 10 + 8, Genichiro Ashina 3 + 10, Alison Octavious 8 + 6 against its 8 + 7. Its extra Kasha (1:46.4) never landed (FFLogs previewed it as Deep Blue left; xivanalysis reads the preview). |
+| sam/Interrupts/iaijutsu-cancel | verified | `checkInterrupts` | a cancelled Iaijutsu | Its tiers start at 2; the app counts each. Genichiro Ashina 7 = 7 (2026-10-16). |
+| sam/ReadyProcs/dropped | verified | `checkProcs` | Ogi Namikiri / Kaeshi / Tendo / Tsubame / Zanshin Ready expiring | Minor 1, Medium 2, Major 3. Three of its statuses are id 0 (bug). Matched 2026-10-16: Alexia Renzella's Tendo (4:27.5) and Genichiro Ashina's Ogi Namikiri Ready (4:44.3), 1 each. Genichiro's Tendo checklist 10 / 11 isn't reported here (not traced). |
 | sam/ReadyProcs/overwritten | candidate | — | Ikishoten with Ogi / Zanshin Ready held | Minor 1, Medium 2, Major 3. Counts one overwrite twice (both statuses). Not seen: 0 of 202 Ikishotens on disk (2026-10-15); build when a pull has one. |
 | sam/ReadyProcs/ogi-checklist | covered | `checkProcs` | Ogi Namikiri or Kaeshi: Namikiri not pressed | Checklist. |
 | sam/ReadyProcs/tendo-checklist | covered | `checkProcs` | Tendo or its Kaeshi not pressed | Checklist. |
@@ -45,7 +45,7 @@
 | sam/Shoha/meditation-checklist | superseded | — | — | Checklist form of the overcap. |
 | sam/Shoha/meditation-overcap | verified | `samGauges` (gauge-overcap; also a timeline lane) | Meditation gained at 3 | Built 2026-10-15: +1 per Iaijutsu / Ogi Namikiri and per 3s of Meditate, Shoha −3; a third of her Shoha each. 35 on disk (20 counted). Matched xivanalysis: 7zwpcLxk2Fd1h6Vr fight 2 4, none on the other two pages. |
 | sam/Sen/wasted-sen | verified | `samGauges` (gauge-overcap; also timeline lanes) | a Sen gained while held | Built 2026-10-15: Setsu / Getsu / Ka each one at most, cleared by Iaijutsu and Hagakure; a wasted one is a third of (her Midare − an average GCD). Premise: the FFLogs top 20 waste 3 in all (two near 4:32-4:36); the samples 115, only 6 just before a Meikyo. kNQKG6yHmvZTJ2hf (Genichiro Ashina) 5 Setsu, e.g. Yukikaze 5:07.6 and again 5:11.9. Sen held at a death are lost too (shown, not counted: the death carries it), as xivanalysis counts them. Matched xivanalysis: kNQKG6yHmvZTJ2hf fight 1 7 (5 + 2 at the death), at2GMBcywChApnfY fight 13 3 (2 + 1), 7zwpcLxk2Fd1h6Vr fight 2 none (its 8:07.45 Kasha had no Shifu before it, so no Sen: read from the cast order, see Kenki). |
-| sam/AoeChecker/too-few-targets/combo | candidate | — | Fuko, or Oka / Mangetsu under Meikyo, on under 3 | Split from the row below 2026-10-15. None seen on too few targets on disk. |
+| sam/AoeChecker/too-few-targets/combo | verified | `samMeikyoAoe` (Oka / Mangetsu under Meikyo) | Fuko, or Oka / Mangetsu under Meikyo, on under 3 | Split from the row below 2026-10-15. Built 2026-10-16 for Meikyo only (Kasha / Gekko's average is the alternative; outside Meikyo a 2-step Fuko combo against a 3-step finisher misprices). Matched xivanalysis on 7zwpcLxk2Fd1h6Vr (Alison Octavious): Oka 3:01.8, 3:51.5, Mangetsu 3:46.9 on Red Hot and Deep Blue, 20-23k each = its 2 + 1; its 3 Kyuten and both Tendo Gokens match too. LmwgxA7B4d1NzqWH's Samurai does it in every Meikyo on two bosses (15). Fuko not built. |
 | sam/AoeChecker/too-few-targets | verified | `samAoe` | Tenka / Tendo Goken, their Kaeshi, Kyuten or Guren on too few targets | Built 2026-10-15: Kyuten, Tenka / Tendo Goken and both Kaeshi under 3; Guren on one target only (7.4's breakpoint; pre-7.4 two-target Gurens go unseen). Fires on Xk2DKZwVp4Ar6d7y Enuo pull 2 0:27 (Tendo Goken + Kaeshi, 179k + 154k: the second Meikyo went Gekko, Kasha, Gekko, so 2 Sen where Yukikaze makes 3 in the same GCDs, so the whole Setsugekka difference is lost), pull 4 6:42, pull 5 0:23 (Kyuten); pG319BgHTnPJc6Ft Necron pulls 2, 3, 10; L9BzKkD2nxcVgHTC Necron pull 15 1:13 (Guren, 38k). Matched xivanalysis (2026-10-15): Enuo pull 2 (Tendo Goken 1, Tendo Kaeshi Goken 1) and Necron pull 15 (Guren 1). Fuko, Oka, Mangetsu: the row above. |
 | sam/Defensives/use-table | no-damage | — | — | Mitigation. |
 | sam/Tincture/window-table | no-damage | — | — | Table only. |
@@ -73,11 +73,12 @@ Weaving, AlwaysBeCasting and Death run unconfigured (covered by
 
 ## Open
 
-In priority order (biggest damage cost first). No Samurai page compared
-yet; the covered rows need one.
+In priority order (biggest damage cost first). Three pages compared
+2026-10-16 (at2GMBcywChApnfY, 7zwpcLxk2Fd1h6Vr, kNQKG6yHmvZTJ2hf).
 
-1. The older covered rows (combos, positionals, Meikyo, AoE) against the
-   three pages now in sampledata/damage-ff (not yet compared).
-2. **sam/ReadyProcs/overwritten** (candidate): not seen on disk.
-3. **sam/AoeChecker/too-few-targets/combo** (candidate).
-   Oka / Mangetsu need the Meikyo condition; wait for a pull with one.
+1. **sam/ReadyProcs/overwritten** (candidate): not seen on disk.
+2. Fuko on too few targets (candidate part of AoeChecker/combo): needs a
+   2-step-combo comparison.
+3. Genichiro Ashina's Tendo checklist (10 / 11) has no app finding; trace
+   it. OGCDDowntime: Alison's Guren / Senei 8 / 10 there, about 1 lost
+   here (83.2s held).

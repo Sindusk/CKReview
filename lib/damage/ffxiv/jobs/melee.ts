@@ -1024,6 +1024,18 @@ const samAoe = aoeComboOnOneTarget([
   [id("TENKA_GOKEN"), id("MIDARE_SETSUGEKKA"), 3], [id("TENDO_GOKEN"), id("TENDO_SETSUGEKKA"), 3],
   [id("KAESHI_GOKEN"), id("KAESHI_SETSUGEKKA"), 3], [id("TENDO_KAESHI_GOKEN"), id("TENDO_KAESHI_SETSUGEKKA"), 3],
 ]);
+// Oka / Mangetsu under Meikyo Shisui on under 3 (xivanalysis AoeChecker.ts):
+// the same Sen as Kasha / Gekko from one GCD each, so the finisher's average
+// is the alternative. Outside Meikyo they end the 2-step Fuko combo, which
+// a 3-step finisher's average misprices: not judged. 7zwpcLxk2Fd1h6Vr
+// (Alison Octavious): Oka 3:01.8 and 3:51.5, Mangetsu 3:46.9, each on Red
+// Hot and Deep Blue (22k for the Oka against ~38k for her Kasha);
+// xivanalysis's 2 + 1.
+const samMeikyoAoeAll = aoeComboOnOneTarget([[id("OKA"), id("KASHA"), 3], [id("MANGETSU"), id("GEKKO"), 3]]);
+const samMeikyoAoe: JobCheck = (ctx) => {
+  const meikyo = statusWindows(ctx, S.MEIKYO_SHISUI.id);
+  return samMeikyoAoeAll(ctx).filter((f) => meikyo.some((w) => f.startMs > w.startMs && f.startMs <= w.endMs + 50));
+};
 
 // Higanbana (xivanalysis DoTs.tsx, 90% uptime): the shared DoT check, its
 // refreshes against Gekko (a one-Sen GCD, as Higanbana spends one Sen).
@@ -1159,7 +1171,7 @@ export function samGaugeSpecs(ctx: PlayerCheckContext): GaugeSpec[] {
 }
 const samGauges: JobCheck = (ctx) => samGaugeSpecs(ctx).flatMap((spec) => (spec.unitValue > 0 ? gaugeFindings(ctx, spec) : []));
 
-export const SAM_CHECKS: JobCheck[] = [uptime("FUGETSU", 0.13, "Fugetsu is +13%, FFLogs multiplier"), meikyo, samAoe, higanbana, samGauges];
+export const SAM_CHECKS: JobCheck[] = [uptime("FUGETSU", 0.13, "Fugetsu is +13%, FFLogs multiplier"), meikyo, samAoe, samMeikyoAoe, higanbana, samGauges];
 // Rattling Coil (xivanalysis UncoiledFury): +1 per Vicewinder / Vicepit /
 // Serpent's Ire, cap 3, Uncoiled Fury spends 1. Coils left when a kill
 // ends are lost too. On 2T1HzdPKgbhM43am fight 10 the cast simulation finds

@@ -30,7 +30,7 @@
 | drg/Procs/dropped | covered | `checkProcs` + `starcrossDropped` | Dive Ready, Nastrond Ready, Dragon's Flight or Starcross Ready lost | Medium 1, Major 2. Starcross is the one removed by another press (Life of the Dragon ending): The Tyrant 5:29 built (161k), ~60 across the samples. Expiries of the others not seen firing. |
 | drg/Procs/overwritten-and-invuln | no-damage | — | — | Off for Dragoon. |
 | drg/Positionals/missed | verified | `checkPositionals` | a missed rear / flank | jN3XDrf2z8PmLgRJ, 2T1HzdPKgbhM43am 13, qjCMx4bRfgNKwX9T 17, Vamp 5, Red Hot 4, The Tyrant 13 matched one for one. |
-| drg/Combos/broken | covered | `checkCombos` | a broken combo | Red Hot's wrong route at 6:42 is counted through Power Surge and Chaotic Spring (120k + 38k). |
+| drg/Combos/broken | covered | `checkCombos` | a broken combo | Red Hot's wrong route at 6:42 is counted through Power Surge and Chaotic Spring (120k + 38k). Since 2026-10-16 a positional-only bonus no longer reads as a landed combo (see sam.md, Combos): Fang and Claw / Wheeling Thrust pressed out of the chain now count (jN3XDrf2z8PmLgRJ Red Hot and Deep Blue pull 39 0:56.7, Fang and Claw twice; ~20 on disk, one player). Not matched on a Dragoon page. |
 | drg/LanceCharge/gcd-count | verified | `lanceCharge` expectedGcds 8 | Lance Charge under 8 GCDs | 2T1HzdPKgbhM43am 9 matched (most forced); qjCMx4bRfgNKwX9T's are forced; Vamp every window full. |
 | drg/LanceCharge/expected-actions | verified | `lanceCharge` expected | High Jump, Mirage Dive, DFD, Rise, Geirskogul, Nastrond, Stardiver or Starcross missing | Red Hot 2:07 High Jump and Mirage Dive, 3:10, 4:13, 5:13 Mirage Dive; The Tyrant 9:10 matched. |
 | drg/LanceCharge/life-surge-display | no-damage | — | — | Display only. |

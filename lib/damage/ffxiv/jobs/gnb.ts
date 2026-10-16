@@ -115,7 +115,8 @@ export function comboLanded(ctx: PlayerCheckContext, abilityId: number, t: numbe
   const hits = castHits(ctx, abilityId);
   if (!hits.some((h) => h.bonusPercent !== undefined)) return true;
   const hit = hits.find((h) => h.timestamp >= t && h.timestamp <= t + 1_500);
-  return hit === undefined || hit.bonusPercent !== undefined;
+  return hit === undefined || (hit.bonusPercent !== undefined &&
+    !ctx.game.action(abilityId)?.comboMissedBonus?.includes(hit.bonusPercent));
 }
 
 const cartridges: JobCheck = (ctx): DamageFinding[] => {

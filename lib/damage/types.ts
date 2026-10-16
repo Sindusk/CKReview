@@ -36,6 +36,10 @@ export type GameAction = {
   // positional was missed, and what a miss costs (hit potency ÷ miss
   // potency − 1, applied to the missed hit).
   positional?:   { missedBonus: number[]; missCost: number };
+  // bonusPercent values a combo step shows when its combo did NOT land
+  // (only a positional hit): Kasha 160 → 210 logs 23. Any other value
+  // means the combo landed.
+  comboMissedBonus?: number[];
 };
 
 export type DamageGame = {

@@ -100,7 +100,26 @@ function toGameAction(a: XivaAction): GameAction {
     comboFrom:   a.combo?.from === undefined ? undefined : Array.isArray(a.combo.from) ? a.combo.from : [a.combo.from],
     autoAttack:  a.autoAttack,
     positional:  positionalInfo(a),
+    comboMissedBonus: comboMissedBonus(a),
   };
+}
+
+// A combo step's bonusPercent without the combo: a bonus potency with no
+// COMBO modifier over the base (7zwpcLxk2Fd1h6Vr 8:07.45: a Kasha with no
+// Shifu before it logged 23 = 1 − 160/210, the positional alone, and read
+// as combo'd; xivanalysis's combo table has it).
+function comboMissedBonus(a: XivaAction): number[] | undefined {
+  if (a.combo?.from === undefined) return undefined;
+  const pots = a.potencies ?? [];
+  const out = new Set<number>();
+  for (const base of pots.filter((p) => p.bonusModifiers.length === 0)) {
+    for (const p of pots) {
+      if (p.bonusModifiers.length === 0 || p.bonusModifiers.includes("COMBO") || p.value <= base.value) continue;
+      if ((p.baseModifiers ?? []).join() !== (base.baseModifiers ?? []).join()) continue;
+      out.add(Math.trunc(100 * (1 - base.value / p.value)));
+    }
+  }
+  return out.size ? [...out] : undefined;
 }
 
 // Ported from xivanalysis src/parser/core/modules/Positionals.tsx

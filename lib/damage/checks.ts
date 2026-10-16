@@ -457,7 +457,7 @@ export function checkCombos(ctx: PlayerCheckContext): DamageFinding[] {
   const hits = ctx.player.damageDone.filter((e) => !e.isDoT && (e.amount ?? 0) > 0);
   const minBonus = new Map<number, number>();
   for (const e of hits) {
-    if (e.bonusPercent === undefined) continue;
+    if (e.bonusPercent === undefined || ctx.game.action(e.abilityId)?.comboMissedBonus?.includes(e.bonusPercent)) continue;
     minBonus.set(e.abilityId, Math.min(minBonus.get(e.abilityId) ?? Infinity, e.bonusPercent));
   }
   const uses = ctx.uses;
@@ -468,7 +468,7 @@ export function checkCombos(ctx: PlayerCheckContext): DamageFinding[] {
     const bonus = minBonus.get(u.action.id);
     if (bonus === undefined) continue;
     const hit = hits.find((e) => e.abilityId === u.action.id && e.timestamp >= u.startMs && e.timestamp <= u.startMs + u.castMs + 1_500);
-    if (!hit || hit.bonusPercent !== undefined) continue;
+    if (!hit || (hit.bonusPercent !== undefined && !u.action.comboMissedBonus?.includes(hit.bonusPercent))) continue;
     broken.add(u);
     const prev = uses[i - 1];
     const since = prev ? u.startMs - prev.startMs : Infinity;

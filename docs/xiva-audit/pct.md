@@ -20,7 +20,7 @@
 |---|---|---|---|---|
 | pct/StarryMuse/expected-actions-hammer | verified | `starryMuse` Hammer GCD | under 3 Hammers in Starry Muse | Matched on FRU (11 actions) and qjCMx4bRfgNKwX9T (15). The 7.2 trade is ported. K6qfMamL7rN8yz2Q 8:09: xivanalysis 1/3 is overstated (a Hammer cast at the window's end carries the buff); the app says 2/3. |
 | pct/StarryMuse/expected-actions-star-prism | verified | `starryMuse` Star Prism | no Star Prism | Same windows. |
-| pct/StarryMuse/expected-actions-rainbow-drip | verified | `starryMuse` Rainbow Drip | no Rainbow Drip (0 if a motif was painted) | Same adjustment. |
+| pct/StarryMuse/expected-actions-rainbow-drip | verified | `starryMuse` Rainbow Drip | no Rainbow Drip (0 if a motif was painted) | Same adjustment. vVPtwaTQ62Jg391q Lindwurm II pull 4 (2026-10-16): its 6:19 Rainbow Drip = the app's; its other 4 misses are the 8:21 window the kill cut to 11s (Rainbow Drip, 3 Subtractive spells), which the app doesn't judge. That page also matched the portrait overwrite (2:21). |
 | pct/StarryMuse/expected-actions-comet | verified | `starryMuse` Comet in Black | no Comet | qjCMx4bRfgNKwX9T 14:04 matched. |
 | pct/StarryMuse/expected-actions-subtractive | verified | `starryMuse` Subtractive spell | under 3 Subtractive spells (−2 with a motif, −1 with a carried Comet; 7.2 +1) | Same adjustments, patch-gated the same way. Neither counts AoE Subtractive spells. |
 | pct/StarryMuse/expected-actions-muse | verified | `starryMuse` Living Muse | no Living Muse (xivanalysis: 1 + motifs painted) | The app expects 1 regardless of motifs. |
