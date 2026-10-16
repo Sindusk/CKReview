@@ -88,6 +88,10 @@ In priority order (biggest damage cost first).
 2. **nin/Ninjutsu/tcj-doton** (covered). Not seen as a loss yet. A second
    one-target case, MzjZgVWBaLw7tHyT 6:38.4 (Fuma, Hyoton, Doton): 7 ticks,
    ~44k, level with her Ten Chi Jin Suiton average, so no finding (its
-   Hyoton is one, 60k). Awaiting the page.
+   Hyoton is one, 60k). Awaiting the page. Seen firing 2026-10-16:
+   JZ1KXhDbqkNH3jxR Futures Rewritten pull 5 4:25 (Alfie Brine; 1k, its
+   ticks 54k against a 55k Ten Chi Jin Suiton). The three Ten Chi Jin
+   Dotons on disk all come out within a few k of a Suiton: a small loss
+   at most.
 3. **nin/Ninki/deathfrog** (covered). Fires on MzjZgVWBaLw7tHyT; awaiting
    the page.

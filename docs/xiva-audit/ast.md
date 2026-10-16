@@ -90,5 +90,14 @@ In priority order (biggest damage cost first):
    (twTbAknqQgPBxaXF, Brute Bomber 7.1, Clover Puripuri) hit one target
    (1:14.4 and 1:17.9, caught as one-target).
 2. **ast/Divination/expected-cards** (covered). The app values unplayed
-   cards, not cards played outside Divination; check whether that ever
-   costs damage the card check misses.
+   cards, not cards played outside Divination. Checked 2026-10-16 on
+   every Astrologian on disk: 53 of 1,098 The Balance plays started
+   outside Divination (added ~34k each against ~61k inside, from the
+   target's hits under it × 6/106). Most aren't misplays: 3-5s before
+   Divination (still covering the burst: 9zQqtBRL41XhADxG,
+   fJxTNgwtRKjYbvZp, JZ1KXhDbqkNH3jxR), or late in a wipe with no
+   Divination left (Yoro Shiku's Lindwurm and Tyrant wipes). The few
+   others had the next Divination 47-68s away, past the next Draw
+   (L9BzKkD2nxcVgHTC Necron pull 15 1:29, jN3XDrf2z8PmLgRJ Vamp pull 6
+   7:12, 9zQqtBRL41XhADxG 7:50). Not built: rare, and the hold that would
+   fix it isn't clearly available.
