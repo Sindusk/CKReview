@@ -26,16 +26,16 @@
 
 | id | status | app check | fires-on | notes |
 |---|---|---|---|---|
-| mch/Wildfire/gcds | covered | `wildfire` | under 6 weaponskills in Wildfire | Minor 1, Medium 2, Major 3. Valued at the average GCD (unchecked). |
+| mch/Wildfire/gcds | verified | `wildfire` | under 6 weaponskills in Wildfire | Minor 1, Medium 2, Major 3. Rebuilt 2026-10-15: the old check counted casts and valued a missing one at 0 (bonus 0). It now counts weaponskill hits on the Wildfire's target between its status landing (~0.6s after the cast) and the detonation; a missing one is her detonation damage per counted weaponskill (~23k). The usual miss is the last Blazing Shot cast just before the detonation, landing after it (Brk8fQGnhJaxFKvb 4:18.68 against 4:18.19), or a hit between the cast and the status (6:09.32). Matched xivanalysis: Brk8fQGnhJaxFKvb fight 12 3 of 3 (4:08, 6:09, 8:11; the detonations 116k, 106k, 121k against 150k at 2:07), jN3XDrf2z8PmLgRJ fight 21 1 (2:10), L9BzKkD2nxcVgHTC fight 20 none. 72 counted across the samples, 5 on the top parse YPhxRTb9Ld7BJaXp. |
 | mch/Wildfire/fizzle | candidate | — | Wildfire dealing 0 | Medium 1, Major 2. Usually the target leaving; premise check. |
 | mch/Hypercharge/gcd-count | covered | `hypercharge` | under 5 Blazing Shots / Heat Blasts in Overheated | Display only in xivanalysis; the app values each missing one. |
 | mch/GeneralCDDowntime/uses | covered | `checkCooldownDrift` | Wildfire, Barrel Stabilizer, Reassemble, Air Anchor, Drill / Bioblaster or Chain Saw held | Checklist 95%. Same groups and offsets. |
 | mch/Drift/gcd-drift | superseded | `checkCooldownDrift` | Air Anchor / Drill / Chain Saw drifting | A table only. |
 | mch/OGCDCharges/double-check-overcap | candidate | — | Double Check at 3 charges | Minor 2, Medium 3, Major 4. Left out of the drift check because Heat Blast / Blazing Shot refund 15s; needs a charge simulation with refunds. xivanalysis's own count is unreliable (bug). |
 | mch/OGCDCharges/checkmate-overcap | candidate | — | Checkmate at 3 charges | Same. |
-| mch/Gauge/heat-overcap | covered | `mchGauges` (gauge-overcap; also a timeline lane) | Heat over 100 | Built 2026-10-15 as Gauge.tsx's simulation from casts (Slug / Clean Shot only when the combo landed; Hypercharge free under Hypercharged). 50 Heat lost is 5 Blazing Shots over 3 combo GCDs. Fires on L9BzKkD2nxcVgHTC Necron pull 20 (Sonder Dreams, 130 Heat: one Hypercharge, the free one, between 2:43 and 6:12; 4k per 5). Awaiting a page. |
-| mch/Gauge/battery-overcap | covered | `mchGauges` (gauge-overcap; also a timeline lane) | Battery over 100 | Built 2026-10-15. Lost Battery is worth her Queen damage per Battery spent (pet hits ÷ the Battery her Queens took). 10-20 at a time on 6 pulls: jN3XDrf2z8PmLgRJ Vamp Fatale pulls 9, 11, 12 (Mika Katsune, a Chain Saw at 100 at 2:05 and 4:05 each time; 28-60k), Brk8fQGnhJaxFKvb 6:03, RaM97t3whCZrJBPm 6:26, L9BzKkD2nxcVgHTC Necron pulls 18, 20. Awaiting a page. |
-| mch/Reassemble/bad-gcd | covered | `reassemble` (burst-window) | Reassemble on a weak GCD | Built 2026-10-15: (her best of Chain Saw / Excavator / Air Anchor / Drill − that GCD's average) × what a sure crit and direct hit add over her average roll. 449 of 464 Reassembles on disk went on the four; 12 didn't (17-57k), e.g. Brk8fQGnhJaxFKvb 5:27.2 Heated Slug Shot, bWDLM6zVXkqFAfjT 8:37.8 Heated Clean Shot, L9BzKkD2nxcVgHTC Necron pull 18 0:07.5 Blazing Shot. Awaiting a page. |
+| mch/Gauge/heat-overcap | verified | `mchGauges` (gauge-overcap; also a timeline lane) | Heat over 100 | Built 2026-10-15 as Gauge.tsx's simulation from casts (Slug / Clean Shot only when the combo landed; Hypercharge free under Hypercharged). 50 Heat lost is 5 Blazing Shots over 3 combo GCDs. Fires on L9BzKkD2nxcVgHTC Necron pull 20 (Sonder Dreams, 130 Heat: one Hypercharge, the free one, between 2:43 and 6:12; 4k per 5). Matched xivanalysis's 130 there; none on the other two pages. |
+| mch/Gauge/battery-overcap | verified | `mchGauges` (gauge-overcap; also a timeline lane) | Battery over 100 | Built 2026-10-15. Lost Battery is worth her Queen damage per Battery spent (pet hits ÷ the Battery her Queens took). 10-20 at a time on 6 pulls: jN3XDrf2z8PmLgRJ Vamp Fatale pulls 9, 11, 12 (Mika Katsune, a Chain Saw at 100 at 2:05 and 4:05 each time; 28-60k), Brk8fQGnhJaxFKvb 6:03, RaM97t3whCZrJBPm 6:26, L9BzKkD2nxcVgHTC Necron pulls 18, 20. Matched xivanalysis: L9BzKkD2nxcVgHTC fight 20 50, jN3XDrf2z8PmLgRJ fight 21 30, Brk8fQGnhJaxFKvb fight 12 10. |
+| mch/Reassemble/bad-gcd | verified | `reassemble` (burst-window) | Reassemble on a weak GCD | Built 2026-10-15: (her best of Chain Saw / Excavator / Air Anchor / Drill − that GCD's average) × what a sure crit and direct hit add over her average roll. 449 of 464 Reassembles on disk went on the four; 12 didn't (17-57k), e.g. Brk8fQGnhJaxFKvb 5:27.2 Heated Slug Shot, bWDLM6zVXkqFAfjT 8:37.8 Heated Clean Shot, L9BzKkD2nxcVgHTC Necron pull 18 0:07.5 Blazing Shot. Matched xivanalysis: L9BzKkD2nxcVgHTC fight 20 2, Brk8fQGnhJaxFKvb fight 12 1, jN3XDrf2z8PmLgRJ fight 21 none. |
 | mch/Reassemble/dropped | covered | `checkProcs` | Reassemble expiring unused | 3 on disk, all in Red Hot and Deep Blue's 2:47 downtime (forced): RaM97t3whCZrJBPm 2:47.9 (checkProcs fires there), jXG76ba43VDLAvYz 2:47.7, xtcaT8y9CGjpPnHK 2:46.9 (it doesn't: one consumer doesn't dominate). Free in downtime either way. |
 | mch/YassQueen/missing-collider | wrong | — | a Queen summon without Crowned Collider | Medium 1, Major 3. Not adopted (2026-10-15): fight-blind. Six Red Hot and Deep Blue Machinists' 1:12-1:18 Queen ends on Pile Bunker with no Collider, the top parse YPhxRTb9Ld7BJaXp included (1:13.8, Pile Bunker 1:28.6): a mechanic, not a mistake. Most others are at the kill. |
 | mch/YassQueen/queenless-attack | no-damage | — | — | A broken-log trigger. |
@@ -68,13 +68,7 @@
 
 ## Open
 
-1. **Compare pages** for the 2026-10-15 builds and `wildfire` /
-   `hypercharge`: https://xivanalysis.com/fflogs/L9BzKkD2nxcVgHTC/20
-   (Sonder Dreams: Heat, Battery, 2 Reassembles),
-   https://xivanalysis.com/fflogs/jN3XDrf2z8PmLgRJ/21 (Mika Katsune:
-   Battery), https://xivanalysis.com/fflogs/Brk8fQGnhJaxFKvb/12 (Dra
-   Nakyuek: Battery, Reassemble on Heated Slug Shot).
-2. **Double Check / Checkmate** charges (needs a charge simulation with
+1. **Double Check / Checkmate** charges (needs a charge simulation with
    Heat Blast / Blazing Shot refunds), **Wildfire fizzle**.
-3. **mch/MultiHitSkills/auto-crossbow** (covered). Not seen firing: two
+2. **mch/MultiHitSkills/auto-crossbow** (covered). Not seen firing: two
    targets aren't a loss.

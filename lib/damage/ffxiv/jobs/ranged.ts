@@ -118,7 +118,10 @@
 //   lapse (Coffinmaker's death at 1:58) one goes on a GCD after the other,
 //   in either order; Stormbite's 5.0s gap read as lost. Now each DoT's
 //   uptime grace adds a GCD when the other was applied first (pairedIds).
-// Machinist (unverified): Wildfire on the enemy, 6 GCDs (Wildfire.tsx);
+// Machinist (checked against xivanalysis on three pages, 2026-10-15:
+//   Brk8fQGnhJaxFKvb fight 12, jN3XDrf2z8PmLgRJ fight 21,
+//   L9BzKkD2nxcVgHTC fight 20; Wildfire, Heat, Battery, Reassemble and
+//   combos all matched): Wildfire weaponskills landed (Wildfire.tsx);
 //   Hypercharge (Overheated), 5 Heat Blasts / Blazing Shots / Auto
 //   Crossbows (Hypercharge.tsx), each missing one its average; cooldowns
 //   (GeneralCDDowntime.tsx). Double Check / Checkmate are left out:
@@ -150,7 +153,7 @@ import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import type { PlayerEvent, PlayerInfo } from "@/types/PlayerInfo";
 import type { DamageFinding, JobCheck } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";
-import { aoeComboOnOneTarget, baseValue, burstWindowFindings, critMultOf, dotFindings, gaugeFindings, k, rollGainOf, s, statusWindows, type ExpectedAction, type GaugeEvent, type GaugeSpec } from "./shared";
+import { aoeComboOnOneTarget, baseValue, burstWindowFindings, clock, critMultOf, dotFindings, gaugeFindings, k, rollGainOf, s, statusWindows, type ExpectedAction, type GaugeEvent, type GaugeSpec } from "./shared";
 import { comboLanded } from "./gnb";
 import { forcedPart, inWindows, mergeWindows } from "../../timeline";
 import { espritGauge, featherGauge } from "./gauges";
@@ -388,12 +391,55 @@ const bardAoe = aoeComboOnOneTarget([[A.LADONSBITE.id, A.BURST_SHOT.id], [A.SHAD
   // Shot (qjCMx4bRfgNKwX9T fight 16: one at 8:57 hit only Exdeath).
   [A.RAIN_OF_DEATH.id, A.HEARTBREAK_SHOT.id]]);
 
-const wildfire: JobCheck = (ctx) => burstWindowFindings(ctx, {
-  statusId: S.WILDFIRE.id, name: "Wildfire", bonus: 0, onEnemy: true,
-  bonusBasis: "Wildfire adds potency per weaponskill landed; a missing one is valued at the player's average GCD (not yet checked against a log)",
-  expectedGcds: () => 6,
-  expected: () => [],
-});
+// Wildfire (xivanalysis Wildfire.tsx): it detonates 10s after landing for
+// 150 potency per weaponskill that hit its target in that time, 6 at
+// most. Counted from hits, not casts: a Blazing Shot cast just before the
+// detonation lands after it and doesn't count (Brk8fQGnhJaxFKvb 4:17.8
+// and 8:20, jN3XDrf2z8PmLgRJ Vamp Fatale pull 9 2:20.4: the detonation is
+// a sixth short, xivanalysis's "fewer than 6 GCDs"; casts read 6/6). A
+// missing one is worth her detonation damage per counted weaponskill. A
+// window cut by forced time or the kill is shown, not counted.
+const WILDFIRE_MAX = 6;
+const WILDFIRE_MS = 10_700;
+const WILDFIRE_APPLY_MS = 650;
+const MCH_WEAPONSKILLS = new Set(ids("CHAIN_SAW", "EXCAVATOR", "AIR_ANCHOR", "DRILL", "SCATTERGUN", "BIOBLASTER", "BLAZING_SHOT",
+  "HEAT_BLAST", "AUTO_CROSSBOW", "HEATED_SPLIT_SHOT", "HEATED_SLUG_SHOT", "HEATED_CLEAN_SHOT", "FULL_METAL_FIELD", "SPREAD_SHOT"));
+const wildfire: JobCheck = (ctx) => {
+  const me = ctx.player;
+  const windows = me.casts.filter((c) => c.abilityId === A.WILDFIRE.id && c.timestamp < ctx.endMs).map((c) => {
+    const det = me.damageDone.find((e) => e.abilityId === S.WILDFIRE.id && e.timestamp > c.timestamp && e.timestamp <= c.timestamp + WILDFIRE_MS);
+    const end = det?.timestamp ?? c.timestamp + WILDFIRE_MS;
+    // From the status landing (~0.6s after the cast), read from the
+    // player's own Wildfire status: a hit between the cast and it doesn't
+    // count (Brk8fQGnhJaxFKvb 6:09.32 Chain Saw, status at 6:09.68).
+    const start = (me.buffs ?? []).find((b) => b.abilityName === "Wildfire" && b.buffStatus === "applied" &&
+      b.timestamp >= c.timestamp && b.timestamp <= c.timestamp + 2_000)?.timestamp ?? c.timestamp + WILDFIRE_APPLY_MS;
+    // The first hit of each weaponskill cast on the Wildfire's target.
+    const counted = me.casts.filter((x) => MCH_WEAPONSKILLS.has(x.abilityId) && x.timestamp > c.timestamp - 1_000 && x.timestamp < end).filter((x) => {
+      const hit = me.damageDone.find((e) => e.abilityId === x.abilityId && !e.isDoT && e.timestamp >= x.timestamp && e.timestamp < x.timestamp + 2_000);
+      return hit !== undefined && hit.timestamp >= start && hit.timestamp <= end && (!c.target || hit.target === c.target);
+    }).length;
+    return { cast: c, det, end, counted: Math.min(WILDFIRE_MAX, counted) };
+  });
+  const withDet = windows.filter((w) => w.det && w.counted > 0);
+  const perGcd = withDet.length ? withDet.reduce((a, w) => a + (w.det!.amount ?? 0), 0) / withDet.reduce((a, w) => a + w.counted, 0) : 0;
+  const out: DamageFinding[] = [];
+  for (const w of windows) {
+    const missing = WILDFIRE_MAX - w.counted;
+    if (missing <= 0 || perGcd <= 0) continue;
+    const during = forcedPart(w.cast.timestamp, w.end, ctx.forced);
+    const cut = w.end >= ctx.endMs;
+    out.push(finding(ctx, {
+      kind: "burst-window", startMs: w.cast.timestamp, endMs: w.end, forced: during.ms > 0 || cut,
+      cause: during.ms > 0 ? during.cause : cut ? "the pull ended" : undefined,
+      label: "Wildfire short", lostDamage: missing * perGcd,
+      basis: `${missing} × ${k(perGcd)} (her Wildfire detonations per weaponskill counted)`,
+      detail: `Wildfire at ${clock(w.cast.timestamp)}: ${w.counted}/${WILDFIRE_MAX} weaponskills landed on ${w.cast.target ?? "its target"} before it detonated` +
+        (w.det ? "" : " (it never detonated)"),
+    }));
+  }
+  return out;
+};
 
 const hypercharge: JobCheck = (ctx) => burstWindowFindings(ctx, {
   statusId: S.OVERHEATED.id, name: "Hypercharge", bonus: 0,

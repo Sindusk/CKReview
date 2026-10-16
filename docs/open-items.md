@@ -217,8 +217,8 @@ and delete them from the header.
     page compared yet).
   - [mch.md](xiva-audit/mch.md): Machinist, 3 candidates (Double Check /
     Checkmate charges, Wildfire fizzle), 14 covered (Heat / Battery
-    overcap and Reassemble built 2026-10-15, awaiting pages; Queen
-    without Collider not adopted).
+    overcap, Reassemble and the rebuilt Wildfire count verified on 3
+    pages 2026-10-15; Queen without Collider not adopted).
   - [blm.md](xiva-audit/blm.md): Black Mage, 1 candidate (pre-7.2
     Firestarter), 15 covered (full gauge
     simulation and lanes; Polyglot, Paradox, cold Fire III, Ley Lines,
