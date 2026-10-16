@@ -197,8 +197,8 @@ and delete them from the header.
   disk (`PROC_CONSUMER_FALLBACK` in jobs/ranged.ts); others still show
   nothing until a ratio is measured for them.
   Cooldown drift valued 2026-10-16 for Perfect Balance, Meikyo Shisui,
-  Serpent's Ire, Manafication and Ley Lines (tracked-cooldowns.ts); none
-  compared with a page yet. Manafont and Triplecast stay unvalued (no
+  Serpent's Ire, Manafication and Ley Lines (tracked-cooldowns.ts); each
+  matched one xivanalysis page on uses lost. Manafont and Triplecast stay unvalued (no
   single action to price). Amplifier skipped below level 86 (TEA).
   Party buffs held too long go unreported (2026-10-16): a cooldown
   that deals no damage has no value in the drift check. The five self
