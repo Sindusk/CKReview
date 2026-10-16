@@ -79,6 +79,7 @@ In priority order (biggest damage cost first). Three pages compared
 1. **sam/ReadyProcs/overwritten** (candidate): not seen on disk.
 2. Fuko on too few targets (candidate part of AoeChecker/combo): needs a
    2-step-combo comparison.
-3. Genichiro Ashina's Tendo checklist (10 / 11) has no app finding; trace
-   it. OGCDDowntime: Alison's Guren / Senei 8 / 10 there, about 1 lost
-   here (83.2s held).
+3. OGCDDowntime: Alison's Guren / Senei 8 / 10 on her page, about 1
+   lost here (83.2s held). (Genichiro's Tendo 10 / 11, traced
+   2026-10-16: the 8:49.3 Meikyo's Tendo was removed at 9:07.9 by his
+   death, 11s into its 30s; lost to the death, not counted here.)
