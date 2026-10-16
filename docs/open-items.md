@@ -209,7 +209,7 @@ and delete them from the header.
   - [rpr.md](xiva-audit/rpr.md): Reaper, 4 candidates, 5 covered.
   - [mnk.md](xiva-audit/mnk.md): Monk, 0 candidates, 10 covered (Blitz,
     Phantom Rush and form checks verified 2026-10-15; Fury overcap and
-    the no-form Opo-opo skill built 2026-10-15, awaiting pages;
+    the no-form Opo-opo skill built 2026-10-15, Fury matched 3 pages;
     Brotherhood timing and Formless overwrite not adopted).
   - [nin.md](xiva-audit/nin.md): Ninja, 2 candidates, 9 covered
     (ninjutsu, Kassatsu and Raiju checks verified 2026-10-15).
