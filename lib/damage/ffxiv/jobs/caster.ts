@@ -108,8 +108,11 @@
 //     8:53 2 of 8; r4qDkR9btJCXnKWd Doomtrain pull 6 1:03 1 of 9;
 //     Q18Xc93x4wpfMFdT and Y9Fh2BHyj3xAqZ6V Zelenia pull 3 none).
 //     Fire I and Umbral Soul in uptime (RotationWatchdog, 2026-10-15):
-//     `blmWrongGcds` below. Fire I matched the five pages (one, on
-//     r4qDkR9btJCXnKWd pull 6). Not adopted: Triplecast pressed over a
+//     `blmWrongGcds` below. Fire I matched eight pages (one each on
+//     r4qDkR9btJCXnKWd pull 6, wNHvD38WTbFtGJKr fight 11,
+//     qh3VDQFy274mNPfJ fight 22). Umbral Soul: r4qDkR9btJCXnKWd fight 15
+//     2 of xivanalysis's 5; its other 3 (4:49-4:55) are in a car change
+//     with no party hits, which it doesn't excuse. Not adopted: Triplecast pressed over a
 //     stack (a lost instant costs damage only if movement later needed it).
 //   - SMN Searing Light with one Searing Flash (SearingLight.tsx).
 //     Checked against xivanalysis on qjCMx4bRfgNKwX9T fight 16 (7.5,
