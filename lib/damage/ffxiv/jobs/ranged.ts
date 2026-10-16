@@ -17,7 +17,7 @@
 //     are allowed, as in xivanalysis): each one beyond the Saber shortfall
 //     is the player's average Saber Dance minus the filler's own average.
 //   Checked against xivanalysis on qjCMx4bRfgNKwX9T Dancing Mad kill
-//   (7.5, 2026-10-13). Until then Fountainfall counted as a filler and
+//   (fight 1, 7.5, 2026-10-13). Until then Fountainfall counted as a filler and
 //   four Sabers were always expected, so 0:02, 4:03, 8:03 and 10:03 each
 //   read as a missing Saber plus a Fountainfall filler (78k each) where
 //   xivanalysis has 3/3; and a filler in a missing Saber's slot was
