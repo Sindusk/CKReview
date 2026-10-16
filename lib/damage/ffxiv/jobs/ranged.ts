@@ -374,6 +374,11 @@ export const PROC_REPLACES = new Map(([
 // also loses the Primal Ruination it unlocks; that isn't valued here.
 export const PROC_CONSUMERS = new Map(([
   ["PRIMAL_REND_READY", "PRIMAL_REND"], ["PRIMAL_RUINATION_READY", "PRIMAL_RUINATION"], ["WRATHFUL", "PRIMAL_WRATH"],
+  // x7z6cyRZBQYD3nrL (Setzuna Meio): stacks split 11 Fell Cleave / 7
+  // Decimate on two bosses, under the 60% the inference needs, so the 4:45
+  // and 6:38 expiries went unjudged (xivanalysis: 6 stacks expired).
+  // Decimate stays an accepted alternative (PROC_CONSUMER_ALT_SHARE).
+  ["INNER_RELEASE", "FELL_CLEAVE"],
   // Refulgent Arrow can't be pressed without Hawk's Eye (checks.ts reads a
   // press while held as using it when the log missed the removal).
   ["HAWKS_EYE", "REFULGENT_ARROW"],

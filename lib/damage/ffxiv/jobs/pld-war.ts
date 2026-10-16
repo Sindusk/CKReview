@@ -362,14 +362,27 @@ const requiescatChainLost: JobCheck = (ctx) => {
   const fillers = COMBO_FILLERS.filter((x) => A[x]).map(id).filter((x) => castHits(ctx, x).length > 0);
   const filler = fillers.length ? fillers.reduce((a, x) => a + avgOutside(x), 0) / fillers.length : 0;
   for (const w of statusWindows(ctx, S.REQUIESCAT.id)) {
-    if (w.endMs >= ctx.endMs || inWindows(w.endMs, ctx.dead) || ctx.dead.some((d) => d.startMs >= w.endMs && d.startMs - w.endMs <= 3_000)) continue;
-    // Its 30s expiry, or its last stack spent at a cast; any other end is
-    // the log stripping every buff at a death or wipe (d3vRbwfpNBLzJ2Xh
-    // The Tyrant pull 15, 1:09.4).
-    const expired = w.endMs - w.startMs >= (S.REQUIESCAT.duration ?? 30_000) - PROC_EXPIRY_EARLY_MS;
-    if (!expired && !ctx.player.casts.some((c) => Math.abs(c.timestamp - w.endMs) <= PROC_CONSUME_MS)) continue;
-    const missing = REQUIESCAT_STEPS.filter((st) => !ctx.player.casts.some((c) =>
+    if (w.endMs >= ctx.endMs) continue;
+    let missing = REQUIESCAT_STEPS.filter((st) => !ctx.player.casts.some((c) =>
       c.abilityId === id(st) && c.timestamp >= w.startMs - PROC_CONSUME_MS && c.timestamp <= w.endMs + PROC_CONSUME_MS));
+    // Its 30s expiry, or its last stack spent at a cast. Any other end is
+    // the log stripping every buff at a death or wipe (d3vRbwfpNBLzJ2Xh
+    // The Tyrant pull 15, 1:09.4): there, only steps another GCD took the
+    // place of after the last one pressed count (7HVZra4GNRxfpKzT 8:42:
+    // Blade of Truth 8:53.7, Fast Blade 8:56.2, stripped 9:05.2, died
+    // 9:07.2; xivanalysis's Blade of Valor 0/1).
+    const expired = w.endMs - w.startMs >= (S.REQUIESCAT.duration ?? 30_000) - PROC_EXPIRY_EARLY_MS;
+    const spentAtCast = ctx.player.casts.some((c) => Math.abs(c.timestamp - w.endMs) <= PROC_CONSUME_MS);
+    const byDeath = inWindows(w.endMs, ctx.dead) || ctx.dead.some((d) => d.startMs >= w.endMs && d.startMs - w.endMs <= 3_000);
+    if (byDeath || (!expired && !spentAtCast)) {
+      const stepIds = new Set(REQUIESCAT_STEPS.map(id));
+      const lastStep = Math.max(w.startMs, ...ctx.player.casts.filter((c) => stepIds.has(c.abilityId) && c.timestamp >= w.startMs && c.timestamp <= w.endMs).map((c) => c.timestamp));
+      // Goring Blade is the burst's other GCD, not one in a Blade's place
+      // (HwjvVh3TNAZmMQyq TEA pull 14: Goring Blade 3:26.2, died 3:27.9).
+      const instead = ctx.uses.filter((u) => u.startMs > lastStep && u.startMs < w.endMs && !stepIds.has(u.action.id) &&
+        u.action.id !== id("GORING_BLADE")).length;
+      missing = missing.slice(0, instead);
+    }
     const lost = missing.reduce((a, st) => a + Math.max(0, avgOutside(id(st)) - filler), 0);
     if (missing.length === 0 || lost < 1) continue;
     const forced = inWindows(w.endMs, mergeWindows(ctx.forced));

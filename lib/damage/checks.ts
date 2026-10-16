@@ -997,6 +997,13 @@ export function checkProcs(ctx: PlayerCheckContext): DamageFinding[] {
       }));
     };
     if (e.buffStatus === "applied" || e.buffStatus === "refreshed") {
+      // Re-applied while held, by its own trigger, loses the one held
+      // (Mg4p7XG9dtrLVwBf: Fated Circle 3:42.50, again 3:44.91 before any
+      // Fated Brand; xivanalysis counts the overwrite).
+      if (e.buffStatus === "refreshed" && st && ctx.game.procsClearedByGcd?.has(e.abilityId) &&
+          !casts.some((c) => c.abilityId === consumerId && c.timestamp > st.lastAt + PROC_CONSUME_MS && c.timestamp <= e.timestamp + PROC_CONSUME_MS)) {
+        lose(e.timestamp, 1, `overwritten by ${castNear(e.timestamp)?.abilityName ?? "a new one"}`);
+      }
       state.set(e.abilityId, { expiresAt: e.durationMs ? e.timestamp + e.durationMs : undefined, stacks: e.stack ?? st?.stacks ?? 1, lastAt: e.timestamp });
     } else if (e.buffStatus === "stack" || e.buffStatus === "stackRemoved") {
       if (st) { st.stacks = e.stack ?? st.stacks; st.lastAt = e.timestamp; }
