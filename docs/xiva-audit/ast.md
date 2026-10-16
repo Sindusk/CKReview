@@ -31,7 +31,7 @@
 | ast/Draw/draw-drift | wrong | — | Draws later than their cooldown | Same: FRU "2 Draws missed" were alignment holds. |
 | ast/Draw/overwrite-available-card | verified | `cards` | a Draw while The Balance / Lord of Crowns is unplayed | FRU 17:19 → 18:19 matched; K6qfMamL7rN8yz2Q 4 replaced unplayed matched (card log 10/10 draws). The app values the card at what a play of it added to the party. |
 | ast/EarthlyStar/missed-uses | verified | `checkCooldownDrift` + `usesLostAtKill` (Earthly Star) | Earthly Star held | The Tyrant: its 1:11 claim was right, and the app was fixed (pre-pull use's recast). Earlier "1 missed" claims were the pre-pull star. |
-| ast/EarthlyStar/uncooked-detonation | candidate | — | Stellar Burst (detonated before it matured) | Lower damage than Stellar Explosion. The app values Earthly Star from its hits, so an early burst lowers the measured value but isn't flagged. Premise check: a heal emergency may justify it. Rare. Checked 2026-10-16 on 410 Astrologian pulls: not rare. 97 detonations came before the star matured (124 Stellar Burst hits, median 20k against 34k for a Stellar Explosion), most by the user's static's Astrologian. They line up with raidwide damage no more often than matured ones (54% vs 52% with 6+ players hit in the 4s before), and many repeat at the same moment across pulls (Red Hot and Deep Blue 5:19, Lindwurm II about 1:05), which looks planned. Not built: waiting on the user (is an early detonation in the static's plan?). Earthly Star is a pet, so its heals aren't in the player's healing stream to judge need. |
+| ast/EarthlyStar/uncooked-detonation | covered | `earthlyStarEarly` (built 2026-10-16: the user calls an early detonation a mistake worth a finding; each Stellar Burst × (Explosion / Burst − 1), the ratio measured from her base hits, 1.48-1.53 on disk against the 310 / 205 potencies; forced when maturing would run into downtime, past the kill, or she died; 99 on disk, 69 Yoro Shiku's) | Stellar Burst (detonated before it matured) | Lower damage than Stellar Explosion. The app values Earthly Star from its hits, so an early burst lowers the measured value but isn't flagged. Premise check: a heal emergency may justify it. Rare. Checked 2026-10-16 on 410 Astrologian pulls: not rare. 97 detonations came before the star matured (124 Stellar Burst hits, median 20k against 34k for a Stellar Explosion), most by the user's static's Astrologian. They line up with raidwide damage no more often than matured ones (54% vs 52% with 6+ players hit in the 4s before), and many repeat at the same moment across pulls (Red Hot and Deep Blue 5:19, Lindwurm II about 1:05), which looks planned. Not built: waiting on the user (is an early detonation in the static's plan?). Earthly Star is a pet, so its heals aren't in the player's healing stream to judge need. |
 | ast/Macrocosmos/underuse | no-damage | — | Macrocosmos used under its maximum | A GCD at about Fall Malefic's potency, so pressing it gains little damage; its use is healing. Its max adds invulnerable time (`duration - - invuln`, a sign bug). |
 | ast/Helios/no-horoscope | no-damage | — | Helios / Aspected Helios with Horoscope or Neutral Sect available | Healing plan. It doesn't track Helios Conjunction, so it can't fire at level 100. |
 | ast/Synastry/non-synastry-heals | no-damage | — | Benefic / Benefic II with Synastry ready | Healing efficiency. |
@@ -84,8 +84,9 @@ In priority order (biggest damage cost first):
 1. **ast/AoEUsages/gravity-ii, pre-7.2 minimum.** Two-target Gravity II on
    7.0/7.1 logs isn't seen. Needs a per-patch minimum in
    `aoeOnOneTargetFindings` and a 7.1 pull with one to test it.
-2. **ast/EarthlyStar/uncooked-detonation** (candidate). 97 early
-   detonations on disk, mostly planned-looking; waiting on the user.
+2. **ast/EarthlyStar/uncooked-detonation** (covered 2026-10-16): match
+   on a page (Yoro Shiku, any Red Hot and Deep Blue pull with the 5:19
+   detonation).
 3. **ast/Divination/expected-cards** (covered). The app values unplayed
    cards, not cards played outside Divination; check whether that ever
    costs damage the card check misses.

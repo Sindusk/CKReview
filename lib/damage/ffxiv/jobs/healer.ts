@@ -485,7 +485,65 @@ const cards: JobCheck = (ctx): DamageFinding[] => {
   return out;
 };
 
-export const AST_CHECKS: JobCheck[] = [healGcds, aoeOnOneTarget, dot("COMBUST_III"), divination, cards];
+// Earthly Star detonated before it matured (xivanalysis EarthlyStar.tsx,
+// "uncooked"): the star becomes Giant Dominance 10s after it's placed;
+// detonated earlier it deals Stellar Burst instead of Stellar Explosion
+// (its pet's hits). Each early detonation costs what its hits would have
+// gained as an Explosion: the Explosion / Burst ratio of her base hits in
+// the pull (crit, direct hit and multipliers out), else the 310 / 205
+// potency ratio. Forced (shown, not counted) when maturing would have
+// run into downtime or past the kill, or she died in between. Checked
+// 2026-10-16 on 410 Astrologian pulls: 97 early detonations, median 20k
+// against 34k for an Explosion, most by one static's Astrologian at the
+// same moments each pull (Red Hot and Deep Blue 5:19, Lindwurm II
+// ~1:05); the user calls them a mistake worth a finding.
+const STAR_MATURE_MS = 10_000, STAR_GROUP_MS = 1_000, STAR_POTENCY_RATIO = 310 / 205;
+const earthlyStarEarly: JobCheck = (ctx): DamageFinding[] => {
+  const burstId = A.STELLAR_BURST?.id, explosionId = A.STELLAR_EXPLOSION?.id, starId = A.EARTHLY_STAR?.id;
+  if (burstId === undefined || explosionId === undefined || starId === undefined) return [];
+  const pet = ctx.player.damageDone.filter((e) => !e.isDoT && (e.amount ?? 0) > 0 && e.timestamp < ctx.endMs + 2_000);
+  const bursts = pet.filter((e) => e.abilityId === burstId).sort((a, b) => a.timestamp - b.timestamp);
+  if (bursts.length === 0) return [];
+  const critMult = critMultOf(ctx);
+  const mean = (xs: number[]) => xs.reduce((a, x) => a + x, 0) / xs.length;
+  const expBase = pet.filter((e) => e.abilityId === explosionId).map((e) => baseValue(e, critMult));
+  const burstBase = bursts.map((e) => baseValue(e, critMult));
+  const measured = expBase.length > 0 ? mean(expBase) / mean(burstBase) : 0;
+  const ratio = measured > 1 ? measured : STAR_POTENCY_RATIO;
+  const basisRatio = measured > 1
+    ? `her base Stellar Explosion hit is ${measured.toFixed(2)}× her base Stellar Burst hit in this pull`
+    : `the potency ratio, 310 / 205 (no Stellar Explosion to measure in this pull)`;
+  const stars = ctx.player.casts.filter((c) => c.abilityId === starId).map((c) => c.timestamp).sort((a, b) => a - b);
+  const groups: (typeof bursts)[] = [];
+  for (const e of bursts) {
+    const g = groups[groups.length - 1];
+    if (g && e.timestamp - g[0].timestamp <= STAR_GROUP_MS) g.push(e); else groups.push([e]);
+  }
+  const out: DamageFinding[] = [];
+  for (const g of groups) {
+    const t = g[0].timestamp;
+    if (t >= ctx.endMs) continue;
+    const placed = [...stars].reverse().find((s) => s < t && t - s < 2 * STAR_MATURE_MS);
+    const matures = (placed ?? t) + STAR_MATURE_MS;
+    const dealt = g.reduce((a, e) => a + (e.amount ?? 0), 0);
+    const during = forcedPart(t, matures + 500, ctx.forced);
+    const died = ctx.dead.some((d) => d.startMs >= (placed ?? t) && d.startMs <= matures);
+    const pastKill = ctx.pull.result === "Kill" && matures >= ctx.endMs;
+    const forced = during.ms > 0 || died || pastKill;
+    out.push(finding(ctx, {
+      kind: "wrong-gcd", startMs: t, endMs: t, forced, inference: true,
+      cause: during.ms > 0 ? during.cause : died ? "dead" : pastKill ? "the kill came before it matured" : undefined,
+      label: "Earthly Star detonated early",
+      lostDamage: dealt * (ratio - 1),
+      basis: `${k(dealt)} Stellar Burst × ${(ratio - 1).toFixed(2)} (${basisRatio})`,
+      detail: `Earthly Star${placed !== undefined ? ` placed ${clock(placed)}` : ""} detonated at ${clock(t)}, ` +
+        `${placed !== undefined ? `${((matures - t) / 1000).toFixed(1)}s ` : ""}before it matured: a Stellar Burst (${g.length} target${g.length > 1 ? "s" : ""}) instead of a Stellar Explosion`,
+    }));
+  }
+  return out;
+};
+
+export const AST_CHECKS: JobCheck[] = [healGcds, aoeOnOneTarget, dot("COMBUST_III"), divination, cards, earthlyStarEarly];
 // White Mage Lilies and Blood Lily (xivanalysis Lilies.tsx), simulated
 // from casts:
 // - Lily: 3 at most, one every 20s while under 3 (the timer stops at 3);

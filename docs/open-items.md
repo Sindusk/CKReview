@@ -209,9 +209,9 @@ and delete them from the header.
   - [pct.md](xiva-audit/pct.md): Pictomancer, 1 candidate
     (Hyperphantasia, only lost at deaths on disk), 6 covered (portrait
     overwrites built 2026-10-16; Striking Muse not judged on 7.2).
-  - [ast.md](xiva-audit/ast.md): Astrologian, 1 candidate, 3 covered.
-    Early Earthly Star detonations: 97 on disk, mostly the static's AST
-    at the same moments each pull; waiting on the user (planned?).
+  - [ast.md](xiva-audit/ast.md): Astrologian, 0 candidates, 4 covered.
+    Early Earthly Star detonations built 2026-10-16 (the user: a mistake
+    worth a finding); 99 on disk, not matched on a page yet.
   - [sge.md](xiva-audit/sge.md): Sage, 0 candidates (Eukrasian
     Dyskrasia on one enemy built 2026-10-16).
   - [sch.md](xiva-audit/sch.md): Scholar, 3 covered.

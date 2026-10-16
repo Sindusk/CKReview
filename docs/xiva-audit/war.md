@@ -19,7 +19,7 @@
 | war/Gauge/beast-overcap | verified | `beastGauge` | Beast Gauge over 100 | Tiers start at 20, so Vamp's 10 shows only in the app. qjCMx4bRfgNKwX9T 60 and Red Hot 30 matched exactly. |
 | war/Procs/dropped-inner-release | verified | `checkProcs` (stacks; `procReplaces`) | an Inner Release stack expiring | Major at 1. Vamp 1:26 matched, valued as Fell Cleave minus the Maim in its slot (50k). |
 | war/Procs/dropped-primal-rend | verified | `checkProcs` (consumer declared: `procConsumers`) | Primal Rend Ready expiring | **Gap fixed 2026-10-16:** the generic check infers a proc's consumer only from 60% of 3+ removals, so a player who drops most of them (L9BzKkD2nxcVgHTC Necron pull 18: 1 of 3 consumed) went unjudged. Consumers now declared from xivanalysis's war/Procs.tsx; priced against Maim, like Fell Cleave (the Primal Ruination it unlocks isn't valued). Matched xivanalysis on that pull: 2 = 2 (1:38.8, 3:17.2). 16 on disk now, 3 forced. |
-| war/Procs/dropped-primal-ruination | covered | `checkProcs` (declared) | Primal Ruination Ready expiring | Its text says 20s; the data says 30s. Fires since the consumers are declared: mgTQJjX2nW6ANkP7 1:37.9 (hand-checked: ready 1:16.7, Fell Cleaves and Inner Chaos pressed instead), cBZXM6kayd7Tf9Fg 9:20.6, Necron wipes. Not matched on a page. |
+| war/Procs/dropped-primal-ruination | verified | `checkProcs` (declared) | Primal Ruination Ready expiring | Its text says 20s; the data says 30s. Fires since the consumers are declared: mgTQJjX2nW6ANkP7 1:37.9 (hand-checked: ready 1:16.7, Fell Cleaves and Inner Chaos pressed instead), cBZXM6kayd7Tf9Fg 9:20.6, Necron wipes. Matched xivanalysis 2026-10-16 on mgTQJjX2nW6ANkP7 (Kahn Aar): 1 = 1; its Inner Release stacks (2), Beast gauge lost (210) and combos (3) matched too. |
 | war/Procs/dropped-primal-wrath | covered | `checkProcs` (declared) | Wrathful expiring | Not seen firing. |
 | war/Infuriate/nascent-chaos-dropped | covered | `checkProcs` | Nascent Chaos expiring | Not seen firing. |
 | war/Infuriate/nascent-chaos-overwritten | verified | `nascentChaos` | Infuriate with Nascent Chaos held | Red Hot 0:14.4 (36k) built from it; the only one across the samples. |
@@ -64,8 +64,6 @@ the Beast Gauge graph.
 
 In priority order (biggest damage cost first):
 
-1. **war/Procs/dropped-primal-ruination** (covered): fires since the
-   consumers are declared; match on a page (mgTQJjX2nW6ANkP7, Kahn Aar,
-   1:37.9). **dropped-primal-wrath, nascent-chaos-dropped**: not seen.
+1. **war/Procs/dropped-primal-wrath, nascent-chaos-dropped**: not seen.
 2. **war/OGCDDowntime/infuriate**: compared, xivanalysis's count not
    adopted (see the row).
