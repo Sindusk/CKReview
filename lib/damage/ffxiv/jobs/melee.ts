@@ -1047,6 +1047,71 @@ const samMeikyoAoe: JobCheck = (ctx) => {
   return samMeikyoAoeAll(ctx).filter((f) => meikyo.some((w) => f.startMs > w.startMs && f.startMs <= w.endMs + 50));
 };
 
+// Fuko outside Meikyo on under 3 targets (xivanalysis AoeChecker.ts's
+// Fuko row, 2026-10-16). Its combo is two GCDs (Fuko, then Mangetsu or
+// Oka for a Sen); the single-target ones take eight GCDs for three Sen
+// (Gyofu, Jinpu, Gekko; Gyofu, Shifu, Kasha; Gyofu, Yukikaze). So a
+// Fuko chain is judged per GCD: its GCDs × the single-target rate (the
+// eight GCDs' averages plus three Sen, over eight) against what the chain
+// dealt plus its Sen. A Sen is a third of what Midare and its Kaeshi add
+// over two combo GCDs. Buff-neutral, priced at the cast's buffs. In 7.4
+// minimum: LmwgxA7B4d1NzqWH (Jena Steel, 14 Fukos on Red Hot and Deep
+// Blue) has a two-target chain at 53-55k base against 61k for two
+// single-target GCDs, three targets would be ~71k. A chain without its
+// finisher counts one GCD and no Sen.
+const FUKO_IDS = new Set(ids("FUKO", "FUGA"));
+const FUKO_FINISHER_IDS = new Set(ids("MANGETSU", "OKA"));
+const FUKO_COMBO_MS = 30_000;
+const FUKO_HIT_MS = 2_000;
+const samFukoAoe: JobCheck = (ctx) => {
+  const out: DamageFinding[] = [];
+  const critMult = critMultOf(ctx);
+  const outcome = rollGainOf(ctx, critMult);
+  const direct = ctx.player.damageDone.filter((e) => !e.pet && !e.isDoT && e.timestamp < ctx.endMs && (e.amount ?? 0) > 0);
+  const avgBase = (...keys: string[]) => {
+    const set = new Set(ids(...keys));
+    const n = ctx.player.casts.filter((c) => set.has(c.abilityId) && c.timestamp < ctx.endMs).length;
+    return n > 0 ? direct.filter((e) => set.has(e.abilityId)).reduce((a, e) => a + baseValue(e, critMult), 0) / n : 0;
+  };
+  const steps = [avgBase("GYOFU", "HAKAZE"), avgBase("JINPU"), avgBase("SHIFU"), avgBase("GEKKO"), avgBase("KASHA"), avgBase("YUKIKAZE")];
+  const midare = avgBase("MIDARE_SETSUGEKKA") + avgBase("KAESHI_SETSUGEKKA");
+  if (steps.some((v) => v <= 0) || avgBase("MIDARE_SETSUGEKKA") <= 0 || avgBase("KAESHI_SETSUGEKKA") <= 0) return out;
+  const eight = 3 * steps[0] + steps.slice(1).reduce((a, v) => a + v, 0);
+  const sen = Math.max(0, (midare - 2 * (eight / 8)) / 3);
+  const rate = (eight + 3 * sen) / 8;  const meikyo = statusWindows(ctx, S.MEIKYO_SHISUI.id);
+  const uses = ctx.uses.filter((u) => u.startMs < ctx.endMs);
+  uses.forEach((u, i) => {
+    if (!FUKO_IDS.has(u.action.id) || meikyo.some((w) => u.startMs > w.startMs && u.startMs <= w.endMs + 50)) return;
+    const next = uses[i + 1];
+    const finisher = next && FUKO_FINISHER_IDS.has(next.action.id) && next.startMs - u.startMs <= FUKO_COMBO_MS ? next : undefined;
+    const hitsOf = (id: number, from: number, to: number) =>
+      ctx.player.damageDone.filter((e) => e.abilityId === id && e.timestamp >= from && e.timestamp < to && ((e.amount ?? 0) > 0 || (e.absorbed ?? 0) > 0));
+    const fukoHits = hitsOf(u.action.id, u.startMs, Math.min(u.startMs + FUKO_HIT_MS, next?.startMs ?? Infinity));
+    const targets = new Set(fukoHits.map((e) => `${e.targetActorId ?? e.target}.${e.targetInstance ?? 1}`));
+    if (targets.size === 0 || targets.size >= 3) return;
+    if (targets.size === 1 && fukoHits.some((e) => (e.overkill ?? 0) > 0 || e.healthAfter === 0)) return;
+    const finHits = finisher ? hitsOf(finisher.action.id, finisher.startMs, finisher.startMs + FUKO_HIT_MS) : [];
+    const chain = [...fukoHits, ...finHits];
+    const gcds = finisher ? 2 : 1;
+    const got = chain.reduce((a, e) => a + baseValue(e, critMult), 0) + (finisher ? sen : 0);
+    const lostBase = gcds * rate - got;    if (lostBase <= 0) return;
+    const mods = chain.map((e) => (e.multiplier && e.multiplier > 0 ? e.multiplier : 1));
+    const price = (mods.reduce((a, m) => a + m, 0) / mods.length) * outcome;
+    const during = forcedPart(u.startMs - 1, u.startMs + 1, ctx.forced);
+    const dealt = chain.reduce((a, e) => a + (e.amount ?? 0), 0);
+    out.push(finding(ctx, {
+      kind: "aoe-single", startMs: u.startMs, endMs: (finisher ?? u).startMs,
+      forced: during.ms > 0, cause: during.ms > 0 ? during.cause : undefined,
+      label: `Fuko on ${targets.size === 1 ? "one target" : "too few targets"}`,
+      lostDamage: lostBase * price,
+      basis: `${gcds} GCD${gcds > 1 ? "s" : ""} × ${k(rate * price)} single-target combo rate (its GCDs and Sen over eight) − ${k(got * price)} for ` +
+        `${finisher ? `Fuko and ${finisher.abilityName} with their Sen (${k(sen * price)})` : "Fuko"} at the same buffs (crit and direct hit averaged out; it dealt ${k(dealt)})`,
+      detail: `Fuko hit ${targets.size === 1 ? `only ${fukoHits[0].target ?? "one enemy"}` : `${targets.size} enemies`}${finisher ? `, then ${finisher.abilityName}` : ""}`,
+    }));
+  });
+  return out;
+};
+
 // Higanbana (xivanalysis DoTs.tsx, 90% uptime): the shared DoT check, its
 // refreshes against Gekko (a one-Sen GCD, as Higanbana spends one Sen).
 const higanbana: JobCheck = (ctx) => dotFindings(ctx, {
@@ -1181,7 +1246,7 @@ export function samGaugeSpecs(ctx: PlayerCheckContext): GaugeSpec[] {
 }
 const samGauges: JobCheck = (ctx) => samGaugeSpecs(ctx).flatMap((spec) => (spec.unitValue > 0 ? gaugeFindings(ctx, spec) : []));
 
-export const SAM_CHECKS: JobCheck[] = [uptime("FUGETSU", 0.13, "Fugetsu is +13%, FFLogs multiplier"), meikyo, samAoe, samMeikyoAoe, higanbana, samGauges];
+export const SAM_CHECKS: JobCheck[] = [uptime("FUGETSU", 0.13, "Fugetsu is +13%, FFLogs multiplier"), meikyo, samAoe, samMeikyoAoe, samFukoAoe, higanbana, samGauges];
 // Rattling Coil (xivanalysis UncoiledFury): +1 per Vicewinder / Vicepit /
 // Serpent's Ire, cap 3, Uncoiled Fury spends 1. Coils left when a kill
 // ends are lost too. On 2T1HzdPKgbhM43am fight 10 the cast simulation finds
