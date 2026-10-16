@@ -719,8 +719,7 @@ const blmWrongGcds: JobCheck = (ctx) => {
 // LukewarmF4Evaluator), 7.2+:
 // - Paradox overwritten: a Paradox gained with one held, the pull's first
 //   forgiven (the opener's, deliberate). Worth her average Paradox less
-//   her average Fire IV (the filler it would have replaced; the average
-//   GCD carries Xenoglossy and Flare Star and read it as ~2k). In forced
+//   her average rotation GCD (cycleGcdValue). In forced
 //   time shown, not counted. r4qDkR9btJCXnKWd Doomtrain pull 6 1:58.9,
 //   3:16.8, 4:12.0 and pull 14 4:16.0 matched xivanalysis (1:58, 3:16,
 //   4:11; 4:15); qh3VDQFy274mNPfJ's only one is its first (none there).
@@ -736,6 +735,21 @@ const blmWrongGcds: JobCheck = (ctx) => {
 // this cast's, priced at this cast's buffs and her crit / direct-hit
 // rate.
 const PARADOX_HIT_MS = 3_000;
+// A Paradox costs no MP, so one lost makes the fire and ice cycle a GCD
+// shorter: that GCD's time goes to the cycle's average GCD. Xenoglossy,
+// Foul and High Thunder come with time, not with cycles, so they're left
+// out. Against her Fire IV (Paradox is unaspected, Fire IV has Astral
+// Fire's bonus) the two are level, and djChYqt4b7K8aAfP's 2:40 and 3:53
+// overwrites (xivanalysis 2) were valued at nothing. Even so a Paradox is
+// about an average rotation GCD (Flare Star and Despair lift it), so most
+// overwrites cost little directly: each is still listed (0 when the
+// Paradox averages under the cycle) so the count matches xivanalysis.
+const TIME_GATED_GCDS = new Set(ids("XENOGLOSSY", "FOUL", "HIGH_THUNDER", "HIGH_THUNDER_II"));
+function cycleGcdValue(ctx: PlayerCheckContext): number {
+  const uses = ctx.uses.filter((u) => u.startMs < ctx.endMs && !TIME_GATED_GCDS.has(u.action.id));
+  if (uses.length === 0) return ctx.values.gcdValue(undefined, false);
+  return uses.reduce((a, u) => a + ctx.values.perUse(u.action.id), 0) / uses.length;
+}
 const blmGaugeChecks: JobCheck = (ctx) => {
   const gauge = blmGauge(ctx);
   if (!gauge) return [];
@@ -746,16 +760,17 @@ const blmGaugeChecks: JobCheck = (ctx) => {
     return { forced: during.ms > 0 || moving, movement: moving || undefined, cause: during.ms > 0 ? during.cause : undefined };
   };
   const paradox = ctx.values.perUse(A.PARADOX.id);
-  const fire4 = ctx.values.perUse(A.FIRE_IV.id) || ctx.values.gcdValue(undefined, false);
+  const cycle = cycleGcdValue(ctx);
   const overwrites = gauge.paradoxGains.filter((g) => g.overwrite && g.t >= 0);
   // The first is forgiven, as xivanalysis does: the 5+7 opener spends that
   // MP on an extra Fire IV for a second Flare Star.
   for (const g of overwrites.slice(1)) {
-    if (paradox <= fire4) continue;
     out.push(finding(ctx, {
       kind: "gauge-overcap", startMs: g.t, endMs: g.t, ...excused(g.t), inference: true,
-      label: "Paradox overwritten", lostDamage: paradox - fire4,
-      basis: `${k(paradox)} average Paradox − ${k(fire4)} average Fire IV it would have replaced`,
+      label: "Paradox overwritten", lostDamage: Math.max(0, paradox - cycle),
+      basis: `${k(paradox)} average Paradox − ${k(cycle)} her average rotation GCD (Xenoglossy, Foul and High Thunder left out: ` +
+        "they come with time, not with the cycle a Paradox lengthens); the Firestarter an Astral Fire Paradox grants isn't " +
+        "valued here (a cold Fire III it forces is its own finding)",
       detail: `${g.label} with one already held: the held Paradox was lost`,
     }));
   }
