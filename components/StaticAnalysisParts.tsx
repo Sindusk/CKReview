@@ -44,6 +44,7 @@ export const MIN_CHANCES = 5;
 
 const SESSION_OPTIONS: { value: number | null; label: string }[] = [
   { value: null, label: "All sessions" },
+  { value: 1,    label: "Last session" },
   { value: 3,    label: "Last 3 sessions" },
   { value: 5,    label: "Last 5 sessions" },
   { value: 10,   label: "Last 10 sessions" },
