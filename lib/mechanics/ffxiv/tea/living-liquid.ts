@@ -91,7 +91,14 @@
 // -- RULES IMPLEMENTED --
 // ffxiv-ll-avoidable (Minor; Major if it killed): visible boss and tornado
 //   waves (the LL tank's opening one excepted), the frontal wave, Sluice,
-//   cleaves on non-tanks, Drainage splash on non-holders, Dropsy.
+//   cleaves on non-tanks, Drainage splash on non-holders (not with a tank
+//   dead), Dropsy.
+// ffxiv-ll-threat (Minor; Major if it killed): a cleave on 3+ non-tanks,
+//   on the tank it targeted (or the tank it hit); its victims aren't
+//   flagged (user, D22: the off tank took aggro in the party). Single
+//   victims (A7-A65) stay the victims'.
+// ffxiv-ll-drainage-tank-dead (Raid): a tank dead at Drainage (user, D3,
+//   D6: unresolvable).
 // ffxiv-ll-wave-bait (Minor; Major when the extra player died to water
 //   within 6s): per invisible volley, living group members who took no
 //   wave; only when none did, players outside its role group who took one
@@ -125,7 +132,9 @@
 //   21, 41, rulings in expectations/rulings.json. Its 15 P1 wipes are now
 //   on disk too (B3, B7, B9, B10, B16, B21, B23, B26, B27, B32-B34, B39,
 //   B41, B45). Report C = LxAVFd29kwPm8HnB pulls 23, 26 (deaths to Hand
-//   of Pain and a Drainage tether: mitigation, user) and 28.
+//   of Pain and a Drainage tether: mitigation, user) and 28. Report D =
+//   6pzyKv8fnYBZ2XGa pulls 3, 6, 14 (a Throttle expiring after Living
+//   Liquid died: now read with every death), 22.
 // OPEN QUESTIONS:
 // 1. roles.ts names the paladin MT (opening auto) but the warrior holds
 //    Living Liquid and does the opening invulnerability every pull, NAUR's
@@ -411,6 +420,8 @@ export const LL_THROTTLE_RULE_ID    = "ffxiv-ll-throttle";
 export const LL_DRAINAGE_RULE_ID    = "ffxiv-ll-drainage";
 export const LL_OUTBURST_RULE_ID    = "ffxiv-ll-outburst";
 export const LL_ORB_RULE_ID         = "ffxiv-ll-orb";
+export const LL_THREAT_RULE_ID      = "ffxiv-ll-threat";
+export const LL_DRAINAGE_TANK_DEAD_RULE_ID = "ffxiv-ll-drainage-tank-dead";
 export const LL_DEAD_GOING_IN_RULE_ID = "ffxiv-ll-dead-going-in";
 export const LL_CALLED_WIPE_RULE_ID = "ffxiv-ll-called-wipe";
 export const LL_COLLAPSE_RULE_ID    = "ffxiv-ll-collapse";
@@ -471,6 +482,11 @@ const SECOND_EXHAUST_MS  = 45_000;
 // The Embolus toucher stands on the Outburst's cast point (B21: 0.8y, the
 // next player 3.5y); orbToucher() has both pulls on disk.
 const ORB_TOUCH_Y        = 2;
+// A tank cleave on this many non-tanks is the tank's threat or facing:
+// single victims (A7-A65, one each) walked into it; D22's hit six.
+const CLEAVE_PARTY_MIN   = 3;
+// The cleave's hits land up to ~1.1s after its cast (D22).
+const CLEAVE_HIT_MS      = 1_500;
 const ORB_TOUCH_MARGIN_Y = 2;
 // Water Resistance Down II from a wave lasts ~4s, so a wave error's player
 // who dies this soon after to more water died of it.
@@ -532,10 +548,34 @@ function waterDeath(p: PlayerInfo, deaths: DeathEvent[], t: number, ms: number):
 function detectAvoidable(players: PlayerInfo[], life: Life, casts: EnemyEvent[], deaths: DeathEvent[], llTank: PlayerInfo | undefined, end: number): PullError[] {
   const errors: PullError[] = [];
   const drainTargets = castsOf(casts, DRAINAGE, end);
+  const tanks = players.filter(isTank);
+  // Drainage with a tank dead: its tether lands on someone else, and the
+  // splash on whoever stands near is fallout (user, 2026-10-16, D3, D6:
+  // "a tank was dead, someone else was going to die regardless").
+  const tankDeadAt = (t: number) => tanks.some((p) => !life.alive(p, t - 1500));
+  // A cleave through the party: the tank it targeted had the boss's threat
+  // in the wrong place (user, D22 +0:11.6: the off tank took aggro and the
+  // swing landed on him in the party; six hit). Its victims are fallout.
+  const cleaves = castsOf(casts, [FLUID_SWING, FLUID_STRIKE], end).map((c) => ({
+    c, victims: uniq(players.filter((p) => !isTank(p) && p.damageTaken.some((e) => e.abilityId === c.abilityId && Math.abs(e.timestamp - c.timestamp) <= CLEAVE_HIT_MS &&!bodyHit(e) && life.hitAlive(p, e.timestamp)))),
+  })).filter((x) => x.victims.length >= CLEAVE_PARTY_MIN);
+  for (const { c, victims } of cleaves) {
+    // A cast that hits several players loses its target: the tank it hit.
+    const target = players.find((p) => p.name === c.target)
+      ?? tanks.find((p) => p.damageTaken.some((e) => e.abilityId === c.abilityId && Math.abs(e.timestamp - c.timestamp) <= CLEAVE_HIT_MS));
+    const dead = victims.filter((p) => life.diedFrom(p, c.timestamp));
+    if (target) errors.push(playerError(target, {
+      ruleId: LL_THREAT_RULE_ID, severity: dead.length ? "Major" : "Minor", name: "Cleave Into the Party",
+      description: `${c.abilityName} targeted them and cleaved ${namesOf(victims)}${dead.length ? `; ${namesOf(dead)} died` : ""}. Only the tank holding ${c.actorName === "liquid hand" ? "Liquid Hand" : "Living Liquid"} should have its threat, faced away from the party: the other tank keeps their threat below it.`,
+      timestamp: c.timestamp, abilityId: c.abilityId, abilityName: c.abilityName,
+    }));
+  }
+  const cleaveFallout = (e: PlayerEvent) => cleaves.some((x) => x.c.abilityId === e.abilityId && Math.abs(x.c.timestamp - e.timestamp) <= CLEAVE_HIT_MS);
   for (const p of players) {
     const hits = p.damageTaken.filter((e) => {
       if (!AVOIDABLE[e.abilityId] || e.timestamp > end || bodyHit(e) || !life.hitAlive(p, e.timestamp)) return false;
-      if ((e.abilityId === FLUID_SWING || e.abilityId === FLUID_STRIKE) && isTank(p)) return false;
+      if ((e.abilityId === FLUID_SWING || e.abilityId === FLUID_STRIKE) && (isTank(p) || cleaveFallout(e))) return false;
+      if (e.abilityId === DRAINAGE && tankDeadAt(e.timestamp)) return false;
       if (e.abilityId === VISIBLE_TORNADO && (p === llTank || (isTank(p) && e.timestamp < 60_000))) return false;
       // A Drainage hit on its own tether holder is the mechanic. A cast that
       // hit two players loses its target (A23 +1:27: the tank and the sage
@@ -981,7 +1021,9 @@ export function detectLivingLiquidErrors(
   const llTankName = castsOf(enemyCasts, FLUID_SWING, end)[0]?.target;
   const llTank = players.find((p) => p.name === llTankName && isTank(p));
   const owners = dollOwners(players);
-  const throttle = detectThrottle(players, life, deaths, end, occurrences);
+  // All deaths: a Throttle applied in Phase 1 can expire after it (D14:
+  // Living Liquid died first, the expiry landed as Limit Cut began).
+  const throttle = detectThrottle(players, buildLife(players, deathEvents), deathEvents, end, occurrences);
 
   const errors = [
     ...detectAvoidable(players, life, enemyCasts, deaths, llTank, end),
@@ -992,6 +1034,15 @@ export function detectLivingLiquidErrors(
     ...throttle.errors,
     ...detectDrainage(players, life, enemyCasts, end, occurrences),
   ];
+  // Drainage with a tank dead: unresolvable (user, D3, D6).
+  const tanks = players.filter(isTank);
+  const drain = castsOf(enemyCasts, DRAINAGE, end)[0];
+  if (drain && tanks.length === 2) {
+    const dead = tanks.filter((p) => !life.alive(p, drain.timestamp - 1500));
+    if (dead.length) errors.push(raidMarker(LL_DRAINAGE_TANK_DEAD_RULE_ID, "Tank Dead at Drainage",
+      `${namesOf(dead)} was dead when Drainage went out: its tether lands on someone who can't take it. Unresolvable from here; treated as the cutoff point.`,
+      drain.timestamp, DRAINAGE, "Drainage"));
+  }
   // An Embolus touched someone: Outburst on the raid.
   const outburst = castsOf(enemyCasts, OUTBURST, end)[0];
   if (outburst) {

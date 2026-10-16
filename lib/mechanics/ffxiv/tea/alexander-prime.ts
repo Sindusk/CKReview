@@ -76,7 +76,9 @@
 //   C12, D2, E30; C9's knocked off).
 // - Tetrashatter: tanks and the sage stand by a crystal and take 22-38k
 //   where the stack takes ~10k; it killed the sage in D12 and F15 (survived
-//   at 26.8k in D7) and a crystal player in B28: mitigation, not flagged.
+//   at 26.8k in D7) and a crystal player in B28. User (D12): a death to it
+//   is standing too close, now flagged. A clean Inception has four
+//   Tetrashatter casts (32 hits); three or fewer is a missed crystal.
 // - Heat / Spear: Hallowed Ground on the first set, Holmgang on the second.
 //   Deaths to them (D7 reversed order, F1, F11's late Hallowed Ground) are
 //   tank cooldowns: Mitigation Analysis territory.
@@ -124,9 +126,22 @@
 //   reached (C10's Paladin, user). Skipped with anyone dead at the first
 //   cone (not the cast: C10's Paladin was raised 4s into it); a cone
 //   hitting only players already hit is fallout.
+// ffxiv-ap-tetrashatter (Major): died to a crystal's burst (user, D12; the
+//   earlier note calling these deaths mitigation is overturned).
+// ffxiv-ap-true-heart (Raid): fewer than four Tetrashatter casts in
+//   Inception, so the Heart missed a crystal and can't turn gold (D23,
+//   user; also C10 two, C18 three; every other Inception on disk had four).
+// ffxiv-ap-wall (Major): a no-killing-blow death not within 10s of a
+//   sword / charge / jump hit, not a called-wipe reset, with fewer than 4
+//   others dead (D12, user: the white mage, twice).
+// ffxiv-ap-wormhole-death (Raid): the first death in Wormhole before its
+//   third soak, still dead at Wormhole's end, on a pull that never reaches
+//   J Storm; every later Wormhole error is fallout (user, D10: "the first
+//   death during Wormhole indicates a wipe, unless it's at the very end";
+//   E30 raised theirs and played on, so it's excluded).
 // ffxiv-ap-stasis-deaths (Raid, fallback): 2+ Stasis deaths with a player
 //   still dead at Inception Formation, on a pull that never reaches
-//   Wormhole and has no mechanic Raid (C10, user: "over after multiple
+//   Wormhole, when earlier than any mechanic Raid (C10, user: "over after multiple
 //   deaths"; E4 and E30 played on to the final check after the same shape).
 // ffxiv-ap-stasis-tether (Major, both players: the log can't say who
 //   moved): Plaint of Surety for 100+ damage or killing.
@@ -175,8 +190,13 @@
 // Not built: Divine Spear / Chastening Heat and Tetrashatter deaths
 //   (cooldowns and healing); Plaint of Solidarity short (one case, B28, in a
 //   cascade); the transition hit (no LB in any clear, 17-31k).
-// VOD review 2026-10-16 (user): report C pulls 9, 10, 12, 14, 29, rulings
-//   in expectations/rulings.json. Confirmed as detected: the Inception
+// VOD review 2026-10-16 (user): report C pulls 9, 10, 12, 14, 29 and
+//   report D = 6pzyKv8fnYBZ2XGa (all 28 pulls on disk, full captures)
+//   pulls 2, 10, 11, 12, 16, 17, 21, 23, rulings in
+//   expectations/rulings.json. D17: the odd number caught by the charge
+//   should step slightly toward the wormhole. D21: the soak-extra healer
+//   tried to get across while the wormhole went off. D28 (#7 at 7.2y from
+//   #5's strike point) the VOD couldn't settle. Confirmed as detected: the Inception
 //   sword on a dragoon nearest Cruise Chaser (C9 with Assault, C14 off the
 //   west side), C12's Stasis cone not baited cleanly south, C29's jump
 //   extras too close. C14's jump extras: probably, the VOD can't confirm.
@@ -187,8 +207,9 @@
 // OPEN QUESTIONS:
 // 1. Electromagnetic Burst names nobody (C27, D5, D16): can the orbs'
 //    paths be read from anything the log keeps?
-// 2. Wormhole #3's sword into the waiting group (D10, D13, D19, F2, F7):
-//    #3's facing, or #1/#5/#7 standing in its path?
+// 2. Wormhole #3's sword into the waiting group (D13, D19, F2, F7; D10
+//    was fallout of an earlier death): #3's facing, or #1/#5/#7 standing
+//    in its path?
 // 3. Charges hitting the odd number before them (D17, E14, E31, F11) name
 //    the odd number: did they face wrong, or should the even have moved?
 // 4. Stasis near-pair players 0.8-1.6y off the line (C13, C27, E4): the
@@ -544,6 +565,16 @@ import {
 export const AP_STASIS_TETHER_RULE_ID   = "ffxiv-ap-stasis-tether";
 export const AP_STASIS_CONE_RULE_ID     = "ffxiv-ap-stasis-cone";
 export const AP_STASIS_DEATHS_RULE_ID   = "ffxiv-ap-stasis-deaths";
+export const AP_WH_DEATH_RULE_ID        = "ffxiv-ap-wormhole-death";
+export const AP_WALL_RULE_ID            = "ffxiv-ap-wall";
+export const AP_TRUE_HEART_RULE_ID      = "ffxiv-ap-true-heart";
+export const AP_TETRASHATTER_RULE_ID    = "ffxiv-ap-tetrashatter";
+const TETRASHATTER = 19080;
+const J_STORM = 18550;
+// Wormhole's numbers and soaks are done ~40s after its cast.
+const WORMHOLE_SPAN_MS = 45_000;
+// A death this soon after a knockback hit is that flight's, not the wall's.
+const WALL_KNOCK_MS = 10_000;
 // Temporal Stasis's cones resolve within ~10s of its cast completing.
 const STASIS_DEATH_MS = 14_000;
 export const AP_EMB_RULE_ID             = "ffxiv-ap-electromagnetic-burst";
@@ -725,14 +756,43 @@ export function detectAlexanderPrimeErrors(
   }
   if (formation) detectInception(c, formation.timestamp, casts.find((x) => x.abilityId === INCEPTION)?.timestamp);
   const wormhole = casts.find((x) => x.abilityId === WORMHOLE);
-  if (wormhole) detectWormhole(c, wormhole.timestamp, headMarkers, end);
+  if (wormhole) {
+    detectWormhole(c, wormhole.timestamp, headMarkers, end);
+    // The first death in Wormhole is the wipe unless it comes at the very
+    // end (after the third soak), and everything after it is fallout (user,
+    // 2026-10-16, D10: a dragoon died to a chakram, then #3's sword went
+    // into the group). The attack that caused it is kept.
+    // Not when they were back up by Wormhole's end: E30 raised its first
+    // Wormhole death and played on to the J Waves.
+    const wh = wormhole.timestamp;
+    const whEnd = Math.min(wh + WORMHOLE_SPAN_MS, lastEvent);
+    const first = deathEvents.filter((d) => d.timestamp - DEATH_EVENT_LAG_MS >= wh && d.timestamp - DEATH_EVENT_LAG_MS < wh + SOAK_AT_MS[2])
+      .sort((a, b) => a.timestamp - b.timestamp)
+      .find((d) => { const p = players.find((x) => x.name === d.player); return !p || !life.alive(p, whEnd); });
+    // Nor on a pull that played on to the final check (J Storm): it wasn't
+    // the wipe there (E30, a short party to the J Waves).
+    const finalCheck = casts.some((x) => x.abilityId === J_STORM && x.timestamp > wh);
+    if (first && !finalCheck) {
+      const t = first.timestamp - DEATH_EVENT_LAG_MS;
+      const whRules = new Set([AP_WH_AIM_RULE_ID, AP_WH_STRAY_RULE_ID, AP_WH_KNOCKBACK_RULE_ID, AP_SOAK_EXTRA_RULE_ID, AP_SOAK_MISSED_RULE_ID, AP_JUMP_RULE_ID, AP_AVOIDABLE_RULE_ID]);
+      c.errors = c.errors.filter((e) => !(whRules.has(e.ruleId) && e.timestamp > t + 500 && e.timestamp <= wh + WORMHOLE_SPAN_MS));
+      const fp = players.find((p) => p.name === first.player);
+      const killer = fp?.damageTaken.filter((e) => e.abilityId === first.killingAbilityGameId && e.timestamp <= first.timestamp).pop()?.abilityName;
+      c.raids.push(raidMarker(AP_WH_DEATH_RULE_ID, "Death in Wormhole",
+        `${first.player} died (${first.killingAbilityGameId ? first.cause || killer || "an attack" : "no killing blow"}) during Wormhole: with a number down, the soaks and the rest of the sequence can't all be covered, so later hits are its fallout. Treated as the cutoff point.`,
+        t, first.killingAbilityGameId, first.cause || killer || "Death"));
+    }
+  }
+  detectApWall(c, start, end, lastEvent);
   detectSacrament(c, start, end);
   detectEnding(c, headMarkers, wormhole?.timestamp, end);
 
   const errors = c.errors;
   const firstRaid = c.raids.sort((a, b) => a.timestamp - b.timestamp)[0];
-  if (firstRaid) errors.push(firstRaid);
-  else if (stasisRaid && !wormhole) errors.push(stasisRaid);
+  // The Stasis fallback wins when earlier than a mechanic Raid (C10: its
+  // True Heart Raid came after the Stasis deaths).
+  if (stasisRaid && !wormhole && (!firstRaid || stasisRaid.timestamp < firstRaid.timestamp)) errors.push(stasisRaid);
+  else if (firstRaid) errors.push(firstRaid);
   else if (!transition) {
     const marker = genericCutoff(c, start, lastEvent);
     if (marker) errors.push(marker);
@@ -905,6 +965,28 @@ function detectInception(c: Ctx, formation: number, inception: number | undefine
     c.raids.push(raidMarker(AP_EMB_RULE_ID, "Electromagnetic Burst",
       `Electromagnetic Burst went off as the plasmaspheres were taken${killed.length ? ` and killed ${killed.length}` : ""}: the raid penalty when the orbs' explosions meet. The orb pops sat where the clean pulls' do, and the log doesn't track the orbs' paths, so it can't say whose orb. Unresolvable from here; treated as the cutoff point.`,
       emb.timestamp, EMB, "Electromagnetic Burst"));
+  }
+
+  // The True Heart touches all four crystals; each bursts (Tetrashatter
+  // 19080). Fewer than four bursts: the Heart missed one and never turns
+  // gold, so Perfect Alexander can't be cleared (user, 2026-10-16, D23).
+  // Every other Inception on disk had four (C10 two, C18 and D23 three).
+  const pullEnd = Math.max(0, ...players.flatMap((p) => p.damageTaken.map((e) => e.timestamp)));
+  const bursts = c.casts.filter((x) => x.abilityId === TETRASHATTER && x.timestamp > formation + 15_000 && x.timestamp <= formation + 40_000);
+  if (!emb && bursts.length && bursts.length < 4 && pullEnd > formation + 35_000) {
+    c.raids.push(raidMarker(AP_TRUE_HEART_RULE_ID, "True Heart Not Awakened",
+      `Only ${bursts.length} of the four Judgment Crystals burst: the True Heart missed one and didn't turn gold, so its Enigma Codex is lost and Perfect Alexander can't be cleared. Unresolvable from here; treated as the cutoff point.`,
+      bursts[bursts.length - 1].timestamp + 1_000, TETRASHATTER, "Tetrashatter"));
+  }
+  // Dying to a crystal's burst is standing too close to it (user, D12
+  // +6:07.3: the sage, two crystals' bursts).
+  for (const d of c.deaths.filter((x) => x.killingAbilityGameId === TETRASHATTER && x.timestamp >= formation && x.timestamp <= formation + 45_000)) {
+    const p = players.find((x) => x.name === d.player);
+    if (p) c.errors.push(playerError(p, {
+      ruleId: AP_TETRASHATTER_RULE_ID, severity: "Major", name: "Killed by a Crystal Burst",
+      description: "Died to Tetrashatter, the Judgment Crystals' proximity burst when the True Heart touches them: after placing or passing a crystal, step away from it toward Alexander Prime.",
+      timestamp: d.timestamp - DEATH_EVENT_LAG_MS, abilityId: TETRASHATTER, abilityName: "Tetrashatter",
+    }));
   }
 
   // Three Flarethrowers after the orbs: two tank baits, then the party.
@@ -1290,8 +1372,9 @@ function detectEnding(c: Ctx, headMarkers: HeadMarker[], wh: number | undefined,
  * a called wipe (3+ no-killing-blow deaths in 10s, or any within 12s of
  * the end, knock-offs excluded) or a collapse (4 dead, pull over in 30s).
  */
-function genericCutoff(c: Ctx, start: number, lastEvent: number): PullError | undefined {
-  const { players, deaths, life } = c;
+/** No-killing-blow deaths: knock-offs (after a sword, charge, jump) and called-wipe resets. */
+function silentDeaths(c: Ctx, start: number, lastEvent: number) {
+  const { players, deaths } = c;
   const knock = new Set(deaths.filter((d) => players.some((p) => p.name === d.player && p.damageTaken.some((e) =>
     [WH_SWORD, WH_CHARGE, SUPER_JUMP, ALPHA_SWORD_P3].includes(e.abilityId) && d.timestamp - e.timestamp >= KNOCKOFF_MIN_MS && d.timestamp - e.timestamp <= KNOCKOFF_MAX_MS))));
   const silent = deaths.filter((d) => !d.killingAbilityGameId && !knock.has(d) && d.timestamp - DEATH_EVENT_LAG_MS >= start);
@@ -1301,6 +1384,36 @@ function genericCutoff(c: Ctx, start: number, lastEvent: number): PullError | un
     const near = resetCluster(silent.filter((x) => Math.abs(x.timestamp - d.timestamp) <= CALLED_WIPE_WINDOW), deaths);
     if (near.length >= CALLED_WIPE_COUNT) near.forEach((x) => called.add(x));
   }
+  return { silent, called };
+}
+
+/**
+ * Any other no-killing-blow death walked into the arena's lethal edge
+ * (user, 2026-10-16, D12 +6:29.8 and +6:46.0: the white mage, twice in
+ * Inception, no hit before either).
+ */
+function detectApWall(c: Ctx, start: number, end: number, lastEvent: number) {
+  const { silent, called } = silentDeaths(c, start, lastEvent);
+  for (const d of silent) {
+    const t = d.timestamp - DEATH_EVENT_LAG_MS;
+    if (called.has(d) || t > end) continue;
+    const p = c.players.find((x) => x.name === d.player);
+    if (!p) continue;
+    // Not a knock-off from a longer flight (C9: a Super Jump 8s before),
+    // nor a reset once the pull is over (4+ already dead: E30, B28).
+    if (p.damageTaken.some((e) => [WH_SWORD, WH_CHARGE, SUPER_JUMP, ALPHA_SWORD_P3].includes(e.abilityId) && e.timestamp <= d.timestamp && d.timestamp - e.timestamp <= WALL_KNOCK_MS)) continue;
+    if (c.players.filter((q) => q !== p && !c.life.alive(q, t)).length >= 4) continue;
+    c.errors.push(playerError(p, {
+      ruleId: AP_WALL_RULE_ID, severity: "Major", name: "Walked Into the Wall",
+      description: "Died with no killing blow and no knockback before it: they walked into the arena's lethal edge.",
+      timestamp: t, abilityId: 0, abilityName: "Wall",
+    }));
+  }
+}
+
+function genericCutoff(c: Ctx, start: number, lastEvent: number): PullError | undefined {
+  const { players, deaths, life } = c;
+  const { called } = silentDeaths(c, start, lastEvent);
   const out: PullError[] = [];
   const calledList = resetCluster([...called], deaths).sort((a, b) => a.timestamp - b.timestamp);
   if (calledList.length >= CALLED_WIPE_COUNT || (calledList.length && lastEvent - calledList[0].timestamp <= CALLED_WIPE_END_MS)) {

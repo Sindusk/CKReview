@@ -548,10 +548,12 @@ export function detectTeaLimitCutErrors(
       markT, 0, "Limit Cut"));
   }
   if (firstDeath) {
-    const killer = players.find((p) => p.name === firstDeath.player)?.damageTaken
-      .filter((e) => e.abilityId === firstDeath.killingAbilityGameId && e.timestamp <= firstDeath.timestamp).pop()?.abilityName;
+    const fp = players.find((p) => p.name === firstDeath.player);
+    const killer = fp?.damageTaken.filter((e) => e.abilityId === firstDeath.killingAbilityGameId && e.timestamp <= firstDeath.timestamp).pop()?.abilityName;
+    // A Phase 1 Throttle can run out here (D14): it ends as they die.
+    const throttled = fp?.debuffs.some((e) => e.abilityId === 1000700 && e.debuffStatus === "removed" && Math.abs(e.timestamp - firstDeath.timestamp) <= 3000);
     generic.push(raidMarker(LC_DEATH_RULE_ID, "Death in Limit Cut",
-      `${firstDeath.player} died (${firstDeath.killingAbilityGameId ? firstDeath.cause || killer || "an attack" : "no killing blow"}) during Limit Cut: with a number down the rest of the sequence lands on the wrong players, so later hits are its fallout. Treated as the cutoff point.`,
+      `${firstDeath.player} died (${firstDeath.killingAbilityGameId ? firstDeath.cause || killer || "an attack" : throttled ? "Throttle not cleansed" : "no killing blow"}) during Limit Cut: with a number down the rest of the sequence lands on the wrong players, so later hits are its fallout. Treated as the cutoff point.`,
       firstDeath.timestamp - DEATH_EVENT_LAG_MS, firstDeath.killingAbilityGameId, firstDeath.cause || "Death"));
   }
   const knockoffs = new Set(deathEvents.filter((d) => attacks.some((a) => a.hits.some((h) => h.p.name === d.player && knockedOff(d, h.e.timestamp)))));
