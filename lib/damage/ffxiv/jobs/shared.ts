@@ -1075,6 +1075,8 @@ export function gaugeFindings(ctx: PlayerCheckContext, spec: GaugeSpec): DamageF
 // ── AoE GCDs on one target ─────────────────────────────────────────────
 
 const AOE_HIT_MS = 2_000;
+// A single-target cast's hit, at most this long after the cast event.
+const ALT_HIT_MS = 3_000;
 // Without gear stats in the log: a typical level-100 crit multiplier. It
 // divides out of both sides, so its exact value barely moves a verdict.
 const DEFAULT_CRIT_MULT = 1.55;
@@ -1171,8 +1173,13 @@ export function aoeOnOneTargetFindings(
     const key = ids.join(",");
     if (!baseOf.has(key)) {
       const set = new Set(ids);
-      const n = ids.reduce((a, id) => a + (casts.get(id) ?? 0), 0);
-      const sum = direct.filter((e) => set.has(e.abilityId)).reduce((a, e) => a + baseValue(e, critMult), 0);
+      // Casts that landed: one that hit nothing (VrJcQxq4RYPML6Zk Steak
+      // Steak's 1:28.8 Blizzard IV) would pull the average down to where
+      // her three Freezes on two targets passed (xivanalysis counts them).
+      const hits = direct.filter((e) => set.has(e.abilityId));
+      const n = ctx.player.casts.filter((c) => set.has(c.abilityId) && c.timestamp < ctx.endMs &&
+        hits.some((e) => e.abilityId === c.abilityId && e.timestamp >= c.timestamp && e.timestamp < c.timestamp + ALT_HIT_MS)).length;
+      const sum = hits.reduce((a, e) => a + baseValue(e, critMult), 0);
       baseOf.set(key, n > 0 ? sum / n : 0);
     }
     return baseOf.get(key)!;
@@ -1224,6 +1231,11 @@ export function aoeOnOneTargetFindings(
     // Blizzard IV's 300): minTargets, the most targets the AoE needs on any
     // patch. At or above it the AoE isn't judged.
     if (targets.size === 0 || targets.size >= (minTargets(u.action.id) ?? 2)) return;
+    // A killing blow on its only target: the single-target spell would have
+    // dealt no more (djChYqt4b7K8aAfP 9:47.5, a 5k Foul that finished Red
+    // Hot read as 128k; xivanalysis doesn't count it). FFLogs carries no
+    // overkill, but the fatal hit leaves healthAfter at 0.
+    if (targets.size === 1 && landedHits.some((e) => (e.overkill ?? 0) > 0 || e.healthAfter === 0)) return;
     const ticks = new Set(tickIds(u.action.id) ?? []);
     const tickHits = ticks.size === 0 ? [] : ctx.player.damageDone
       .filter((e) => ticks.has(e.abilityId) && e.timestamp >= landed && e.timestamp < Math.min(nextSame, landed + AOE_DOT_MS) &&
