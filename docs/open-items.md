@@ -211,7 +211,8 @@ and delete them from the header.
     overwrites built 2026-10-16; Striking Muse not judged on 7.2).
   - [ast.md](xiva-audit/ast.md): Astrologian, 0 candidates, 4 covered.
     Early Earthly Star detonations built 2026-10-16 (the user: a mistake
-    worth a finding); 99 on disk, not matched on a page yet.
+    worth a finding); 99 on disk; matched xivanalysis's Stellar Burst
+    count (2) on K6qfMamL7rN8yz2Q (its suggestion can't fire: bug).
   - [sge.md](xiva-audit/sge.md): Sage, 0 candidates (Eukrasian
     Dyskrasia on one enemy built 2026-10-16).
   - [sch.md](xiva-audit/sch.md): Scholar, 3 covered.
