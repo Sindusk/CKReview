@@ -1,10 +1,11 @@
 // lib/mechanics/ffxiv/tea/damage-context.ts
 //
 // The Epic of Alexander (Ultimate)'s fight context for the damage analysis
-// (lib/damage/types.ts DamageContext). Phase 1 only, built 2026-10-16 from
-// living-liquid.ts's header and HP measured from players' hits on report
-// 1NG4Zah79yKYHCDv (73 pulls, no kill, 27 Phase 1 clears; fetched to 3:00).
-// Phases 2-4 have no module yet and get log-inferred downtime only.
+// (lib/damage/types.ts DamageContext). Phase 1 and the Limit Cut
+// intermission, built 2026-10-16 from living-liquid.ts's header and HP
+// measured from players' hits on report 1NG4Zah79yKYHCDv (73 pulls, no
+// kill, 27 Phase 1 clears; fetched to 3:00). The later phases have no
+// module yet and get log-inferred downtime only.
 //
 // - P1 Living Liquid: Cascade (+0:19) splits Living Liquid's 3.36M between
 //   it and Liquid Hand (the Hand appears at ~39%). Only Living Liquid has to
@@ -18,6 +19,13 @@
 //   nothing. The Hand's damage only keeps Hand of Pain's HP gap closed, so
 //   P1 is multi-target. The enrage Cascade (~+2:22) never happened on disk.
 //   The deciding phase is the fight's last (Perfect Alexander), not P1.
+//
+// - Intermission: Limit Cut (phase 2, intermission-limit-cut.ts): nothing
+//   is targetable from Living Liquid's death to ~3s after J Kick. No
+//   player damage landed in any of report HwjvVh3TNAZmMQyq's 32 Limit Cuts;
+//   the first hit on Brute Justice / Cruise Chaser came 3.6-4.1s after J
+//   Kick, just after FFLogs' phase 3 starts. Damage doesn't count; the
+//   downtime itself is inferred from the log.
 //
 // Not built: the doll owners' and the raid's deliberate damage control
 // (dolls fed under 25%, balancing the two bosses for Hand of Pain): the log
@@ -35,6 +43,8 @@ const RULE_KEY_LABELS: Record<string, string> = {
   "ffxiv-ll-doll-kill":  "Jagd Dolls",
   "ffxiv-ll-hand":       "Hand of Parting / Prayer",
   "ffxiv-ll-pain":       "Hand of Pain",
+  "ffxiv-lc-stray":      "Limit Cut swords and charges",
+  "ffxiv-lc-hawk-blaster": "Hawk Blaster",
 };
 
 export const TEA_DAMAGE_CONTEXT: DamageContext = {
@@ -42,6 +52,7 @@ export const TEA_DAMAGE_CONTEXT: DamageContext = {
   phases: {
     1: { pool: 3_360_000, fixedPool: true, carriesOver: false, multiTarget: true,
       note: "Living Liquid to 0 (Cascade splits its HP with Liquid Hand, which needn't die); HP-gated, no hold" },
+    2: { damageCounts: false, note: "Limit Cut: nothing targetable until ~3s after J Kick" },
   },
   forcedWindows: (pull) => {
     const out: ForcedWindow[] = [];
