@@ -370,6 +370,15 @@ const MECHANICS = {
     },
   },
 
+  'alexander-prime': {
+    game: 'ff',
+    lateCapture: true, // Phase 3 only — safe on --from-minutes captures (see isLateCapture)
+    load: () => requireTsFromRoot('lib/mechanics/ffxiv/tea/alexander-prime.ts'),
+    run({ mod, ctxs }) {
+      for (const c of ctxs) printPullErrors(c, mod.detectAlexanderPrimeErrors(c.relPlayers(), c.relDeaths(), c.relEnemyCasts(), c.relHeadMarkers()));
+    },
+  },
+
   omega: {
     game: 'ff',
     load: () => ({

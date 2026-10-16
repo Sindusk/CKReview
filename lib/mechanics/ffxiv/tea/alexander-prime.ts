@@ -1,6 +1,181 @@
 // The Epic of Alexander (Ultimate) -- Phase 3: Alexander Prime.
 // Includes entry Temporal Stasis and the Divine Judgment transition.
 //
+// -- VERIFIED AGAINST LOGS (2026-10-16) --
+// Same static as the other tea/ modules, NAUR plan (user), roles.ts
+// slots roughly right (user), no VODs. Pulls are cited by the app's Pull
+// n with the whole report imported (B and C as in bj-cc.ts).
+// Report B = HwjvVh3TNAZmMQyq: B28, B46 reached Temporal Stasis (whole
+//   capture). Report C = LxAVFd29kwPm8HnB: C9, C10, C12, C13, C14, C18, C20,
+//   C27, C29, refetched --from-minutes 2.1 --to-minutes 10.
+// Reports D = 6pzyKv8fnYBZ2XGa (16 pulls), E = AHw6VfLrZ97Gj1Dn (15),
+//   F = Q9zqJb4VLmjhd1B6 (11): --min-phase 3 --from-minutes 4.6
+//   --to-minutes 10, the pulls that reached Perfect Alexander to 11.5.
+// 53 pulls reached Stasis; 10 cleared the phase (E10, E21, E27, E28, E31,
+// F3, F4, F12 and the kills F4, F11, F16). FFLogs phases: 4 = Temporal
+// Stasis (+4:39 to +5:03 into the pull), 5 = Alexander Prime, 6 = Perfect
+// Alexander.
+// Clock (from Temporal Stasis's cast completing; every pull within ~0.3s,
+// matching [CB]): Plaints +3.0 (hits +3.7); swords +5.0 / 6.1 / 7.2; fires
+// +5.3 / 7.6; Chastening Heat +21.5; Inception Formation +38; crystal head
+// markers +53.2; Judgment Crystal drops +58.2; orbs taken +59.4 to +62.6;
+// Tetrashatter +65 / +66; Flarethrowers +69.6 / 71.7 / 73.9; Inception
+// +81.2; Plaints and Sacrament +89.2 / +89.5; swords +95.5 / 96.6 / 97.7;
+// Super Jump +98.6; Heat +110.9; Wormhole Formation +129.4 (Wormhole's own
+// clock in the constants: numbers +12.3, soaks +26.4 / 30.6 / 34.8);
+// Incinerating Heat +170.2; Enumeration +174.9; Mega Holy +183 / +190;
+// Summon Alexander +199.8; J Storm +206; J Waves every ~3.05s; Divine
+// Judgment success 18553 at +275 to +278 in the clears, transition hit
+// 18554 15.4s later (17-31k on everyone; no tank LB in any clear).
+// Log IDs: Temporal Stasis 18522; House Arrest / Restraining Order /
+// Aggravated Assault / Shared Sentence 1001123 / 1001124 / 1001121 /
+// 1001122 (Temporal Displacement 1001119); Plaint of Surety 18531 (1-7
+// damage when the tether holds), Severity 18529 (Assault holders), Solidarity
+// 18530 (the shared stack: both tanks + Shared Sentence); Alpha Sword 18539
+// (Stasis and Inception), Flarethrower 18540, Fire Resistance Down II
+// 1002098 (applied 0.3-0.9s before its own fire's damage); Chastening Heat
+// 19072, Divine Spear 19074; crystal head marker 96, Judgment Crystal 18523
+// / 18524, Tetrashatter 19080 (32 proximity hits per clean pull);
+// Aetheroplasm 18546 (cast target = the player who took the orb),
+// Electromagnetic Burst 18548; Heavy 1001796 (orb residue, routine);
+// true heart success 19024; Sacrament 18527 (Inception) / 18519
+// (Wormhole), lethal (2-3M preview hits); Super Jump 18506; Wormhole
+// 18542, Limit Cut numbers = head markers 79..86, Alpha Sword 18484 (the
+// intermission's ID, reused), Super Blassty Charge 18883, Apocalyptic Ray
+// 18508, Eye of the Chakram 18517, Repentance 18537 / 18536 / 18535 (first
+// / second / third soak; cast target = soaker), Confession 18538 (cast at
+// the unsoaked puddle, often twice); Incinerating Heat 19025 (head marker
+// 93); Enumeration 18512 (damage only on a wrong count; marks = head
+// marker 65); J Storm 18550, J Wave 18551, Eternal Darkness 18549 and
+// Divine Judgment 18552 (completed casts only when an enrage finished).
+// Damage Down 1002092 comes only from Confession and Electromagnetic Burst
+// (raid penalties): avoidables are Minor unless they kill.
+// Findings:
+// - Temporal Stasis (NAUR, all 37 clean freezes): Cruise Chaser and Brute
+//   Justice ~6y east/west of center. House Arrest flanks the east boss
+//   north/south, no debuff the west boss, Aggravated Assault at Brute
+//   Justice's wall, Restraining Order players at opposite walls; the one
+//   on Cruise Chaser's side, 7-9y from it, takes its third sword. Failures
+//   (all ended in deaths): an Assault holder on Cruise Chaser's side (B28,
+//   D7, F4 in the kill); a near-pair player off the north-south line so
+//   the cone ran through the far tether behind (C12, C13, C27, E4: 0.8-1.6y
+//   off; D16: 3y past the boss); the far tether at the wall, 12y from
+//   Cruise Chaser and no closer than the far pair, so the third sword
+//   crossed the arena (C10); a no-debuff player at the east wall (E30).
+//   Surety failed once: B46's House Arrest pair (32k / 47k, both died).
+// - Inception: Electromagnetic Burst at the last orb, 6 dead each time
+//   (C27, D5, D16); the orbs were taken where the clean pulls take them, and
+//   the orbs' own paths aren't logged. Fires: Paladin, Warrior, then the
+//   party; C10's first fire hit four (two died at the third under Fire
+//   Resistance Down), D10's both tanks, B28's MT stayed in the second.
+//   C18: Sacrament hit all eight (wrong safe spot). Swords: regen healer
+//   north, shield healer south, far-tether DPS west of Cruise Chaser, the
+//   Paladin's Super Jump at the east wall; failures C9 (an Assault holder
+//   1.8y from Cruise Chaser), C14 and C20 (the far-tether DPS east of it,
+//   C20's cone through five); jump extras 9-14y from the Paladin (B28, C9,
+//   C12, D2, E30; C9's knocked off).
+// - Tetrashatter: tanks and the sage stand by a crystal and take 22-38k
+//   where the stack takes ~10k; it killed the sage in D12 and F15 (survived
+//   at 26.8k in D7) and a crystal player in B28: mitigation, not flagged.
+// - Heat / Spear: Hallowed Ground on the first set, Holmgang on the second.
+//   Deaths to them (D7 reversed order, F1, F11's late Hallowed Ground) are
+//   tank cooldowns: Mitigation Analysis territory.
+// - Wormhole: odd numbers' swords hit at the NW/SW dots, even charges at
+//   NE/SE. The holder's facing isn't usable as a fixed axis (clean sword
+//   axes 15 median / 76 p90 degrees off "outward"), so aim is read from
+//   the outcome: a victim 10y+ down the cone means the holder aimed it into
+//   the waiting group (12.9-28.5y: D2, D10, D12, D13, D19, E2, F2, F7, the
+//   #3 sword five times); victims within 7.2y stood too close (D11, D28,
+//   F6). A charge hitting the odd number whose sword just preceded it
+//   (Cruise Chaser came out on their wall side): D17, E14, E31, F11 (kill).
+//   Knock-offs: no-killing-blow deaths 2.1-3.4s after an own sword/charge
+//   (D2, D7, D25, E14, E16, E20, E26) or a jump (C14, C29: #6 and #8
+//   standing by the jump baiter).
+//   Soaks: 5/6, 7/8, 1/2, odds west; a wrong-round soaker took a check that
+//   wasn't theirs and died to its vulnerability (D12 #8, D21 #2, E13 #2, F6
+//   #4); D12's #8 then couldn't soak their own: Confession. Every Confession
+//   ended the pull (15). Apocalyptic Ray killed the jump partner #3/#4
+//   (C14, E9, E20, E26) or #5 (D17, F9); Sacrament killed #3 (E2) and #4
+//   (E30); Eye of the Chakram killed #3 (D7) and #7 (D10).
+// - Incinerating Heat: E14 had five in it with six alive (three died).
+//   Other Heat deaths (E4, E10, E13, E30, F15) were a full stack on players
+//   still under the soak/number vulnerabilities: healing.
+// - Enumeration: D20, a healer in the tanks' circle (four vs two), six died.
+// - Final check: the clears killed Brute Justice after 10-11 J Waves with
+//   nobody dying to them; D24, E30, F15 died from the 10th to 12th wave.
+//   E4 let Eternal Darkness finish. Mega Holy / J Storm deaths on short or
+//   low parties (E13, E16, E29) end as collapse or both healers dead.
+// Cutoffs (43 phase-3 wipes, every one has one): Confession 15 (C12, C14,
+// C29, D11, D12, D13, D21, D25, D28, E9, E20, E26, F2, F6, F7); both
+// healers dead (ffxiv/common.ts) 15 (B28, B46, C9, C13, D2, D7, D10, D17,
+// D19, E2, E4, E13, E29, F1, F9); Electromagnetic Burst 3 (C27, D5, D16);
+// J Waves 3 (D24, E30, F15); called wipe 3 (C10, D23, E14); collapse 2 (C20,
+// E16); party in Sacrament 1 (C18); Enumeration 1 (D20). Unexplained: D23,
+// four no-killing-blow deaths right after the orbs (+71 to +74) with the
+// heart never awakening.
+//
+// -- RULES IMPLEMENTED --
+// Self-gates on Temporal Stasis; runs from its cast start to the
+// transition hit (or Perfect Alexander's first cast, or the last event).
+// ffxiv-ap-stasis-cone (Major when a Stasis cone killed, else Minor): in
+//   order, the player on the wrong side for their debuff; the owner who
+//   wasn't there to take their cone; else the owner whose cone ran through
+//   others. Skipped with anyone dead at the freeze; a cone hitting only
+//   players already hit is fallout.
+// ffxiv-ap-stasis-tether (Major, both players: the log can't say who
+//   moved): Plaint of Surety for 100+ damage or killing.
+// ffxiv-ap-electromagnetic-burst (Raid, player-less).
+// ffxiv-ap-fire (Minor; Major if they died within 10s): anyone beside the
+//   tank in the first two fires, and anyone hit under an earlier fire's
+//   Fire Resistance Down.
+// ffxiv-ap-sacrament (Major when it killed) and ffxiv-ap-sacrament-party
+//   (Raid, 4+ in one cross).
+// ffxiv-ap-inception-sword (Minor/Major): with two or more in a sword, the
+//   victim nearest Cruise Chaser (it set the cone's direction), plus any
+//   other non-baiter within 4y. Skipped with anyone dead.
+// ffxiv-ap-super-jump (Minor; Major if killed or knocked off): anyone in
+//   the jump besides its baiter (Inception: the farthest, 12y+ out;
+//   Wormhole: #3 or #4, skipped when that player was already hit by
+//   another number's attack).
+// ffxiv-ap-wormhole-aim (on the holder): a sword victim 10y+ down the cone,
+//   or a charge through two or more others (those are named too).
+//   ffxiv-ap-wormhole-stray: everyone else hit by another number's attack,
+//   including the odd number caught by the charge after their sword.
+//   ffxiv-ap-wormhole-knockback (Major): knocked off by their own attack.
+//   Attacks whose holder was dead or already hit are fallout.
+// ffxiv-ap-avoidable (Minor; Major if it killed, later pulses included):
+//   Apocalyptic Ray, Eye of the Chakram.
+// ffxiv-ap-soak-extra (Minor; Major if they died within 10s): soaking a
+//   check owed to a living number. ffxiv-ap-soak-missed (Major): the owed
+//   number, alive and unhit, missed the puddle. ffxiv-ap-confession (Raid).
+// ffxiv-ap-heat-stack (Minor; Major if the stack killed): alive and outside
+//   Incinerating Heat.
+// ffxiv-ap-enumeration (Major: a healer in the tanks' circle, a tank in the
+//   healers', an unmarked DPS in either) and ffxiv-ap-enumeration-failed
+//   (Raid).
+// ffxiv-ap-j-wave (Raid: 3+ J Wave deaths starting at wave 9 or later),
+//   ffxiv-ap-enrage (Raid: Eternal Darkness or Divine Judgment completed).
+// Generic, phase-3 wipes without a mechanic Raid: ffxiv-ap-called-wipe (3+
+//   no-killing-blow deaths in 10s or any within 12s of the end, knock-offs
+//   excluded), ffxiv-ap-collapse (4 dead, pull over within 30s). Only the
+//   earliest Raid marker is kept; ffxiv-ap-wormhole-dead-going-in (Raid) when
+//   a number has no holder.
+// Exposure: wormhole-aim and wormhole-knockback are targeted (each attack's
+//   holder), soak-missed targeted (each check's two owed numbers); the rest
+//   are everyone.
+// Not built: Divine Spear / Chastening Heat and Tetrashatter deaths
+//   (cooldowns and healing); Plaint of Solidarity short (one case, B28, in a
+//   cascade); the transition hit (no LB in any clear, 17-31k).
+// OPEN QUESTIONS (no VOD yet):
+// 1. Electromagnetic Burst names nobody (C27, D5, D16). Which orb went
+//    wrong, and can its taker be told from the tether order?
+// 2. Wormhole #3's sword into the waiting group (D10, D13, D19, F2, F7):
+//    #3's facing, or #1/#5/#7 standing in its path?
+// 3. Charges hitting the odd number before them (D17, E14, E31, F11) name
+//    the odd number: did they face wrong, or should the even have moved?
+// 4. Stasis near-pair players 0.8-1.6y off the line (C12, C13, C27, E4):
+//    is it the near player's spot or the far tether standing in line?
+//
 // -- GUIDE-DERIVED MODEL (2026-10-15) --
 // Research only: no detector, live-report verification or VOD rulings.
 // Eight-player level-80 Ultimate (5.11), item-level sync 475. This model
@@ -336,3 +511,741 @@
 //    unsoaked Confession timing. Confirm six hits vs three time steps.
 // 5. Tank LB3 coverage, final cast begin/end/interrupt IDs, 18553 success,
 //    18554 transition source, J Wave scaling and kill-dependent anchors.
+
+import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
+import type { DeathEvent } from "@/types/DeathEvent";
+import type { PullError, EnemyEvent } from "@/types/PullError";
+import type { ReportedOccurrence } from "@/lib/mechanics/occurrences";
+import type { HeadMarker } from "@/lib/mechanics/ffxiv/fru/usurper-of-frost";
+import { kFmt, joinNames, playerError, raidMarker } from "@/lib/mechanics/wow/common";
+import {
+  DEATH_EVENT_LAG_MS, type Life, bodyHit, buildLife, castsOf, uniq, namesOf, realAmount, resetCluster, isTank,
+} from "@/lib/mechanics/ffxiv/fru/common";
+
+export const AP_STASIS_TETHER_RULE_ID   = "ffxiv-ap-stasis-tether";
+export const AP_STASIS_CONE_RULE_ID     = "ffxiv-ap-stasis-cone";
+export const AP_EMB_RULE_ID             = "ffxiv-ap-electromagnetic-burst";
+export const AP_FIRE_RULE_ID            = "ffxiv-ap-fire";
+export const AP_SACRAMENT_RULE_ID       = "ffxiv-ap-sacrament";
+export const AP_SACRAMENT_RAID_RULE_ID  = "ffxiv-ap-sacrament-party";
+export const AP_INCEPTION_SWORD_RULE_ID = "ffxiv-ap-inception-sword";
+export const AP_JUMP_RULE_ID            = "ffxiv-ap-super-jump";
+export const AP_WH_AIM_RULE_ID          = "ffxiv-ap-wormhole-aim";
+export const AP_WH_STRAY_RULE_ID        = "ffxiv-ap-wormhole-stray";
+export const AP_WH_KNOCKBACK_RULE_ID    = "ffxiv-ap-wormhole-knockback";
+export const AP_WH_DEAD_GOING_IN_RULE_ID = "ffxiv-ap-wormhole-dead-going-in";
+export const AP_AVOIDABLE_RULE_ID       = "ffxiv-ap-avoidable";
+export const AP_SOAK_EXTRA_RULE_ID      = "ffxiv-ap-soak-extra";
+export const AP_SOAK_MISSED_RULE_ID     = "ffxiv-ap-soak-missed";
+export const AP_CONFESSION_RULE_ID      = "ffxiv-ap-confession";
+export const AP_HEAT_RULE_ID            = "ffxiv-ap-heat-stack";
+export const AP_ENUMERATION_RULE_ID     = "ffxiv-ap-enumeration";
+export const AP_ENUMERATION_RAID_RULE_ID = "ffxiv-ap-enumeration-failed";
+export const AP_J_WAVE_RULE_ID          = "ffxiv-ap-j-wave";
+export const AP_ENRAGE_RULE_ID          = "ffxiv-ap-enrage";
+export const AP_CALLED_WIPE_RULE_ID     = "ffxiv-ap-called-wipe";
+export const AP_COLLAPSE_RULE_ID        = "ffxiv-ap-collapse";
+
+const TEMPORAL_STASIS = 18522;
+const HOUSE_ARREST    = 1001123;
+const RESTRAINING     = 1001124;
+const AGGRAVATED      = 1001121;
+const SHARED_SENTENCE = 1001122;
+const SURETY          = 18531;   // Plaint of Surety: the tether check (1 damage when it holds)
+const ALPHA_SWORD_P3  = 18539;   // Stasis / Inception swords (Wormhole's are 18484)
+const FLARETHROWER_P3 = 18540;
+const INCEPTION_FORMATION = 18543;
+const INCEPTION       = 18526;
+const EMB             = 18548;   // Electromagnetic Burst
+const FIRE_RES_DOWN   = 1002098;
+const SACRAMENT       = [18527, 18519]; // Inception's cross / Wormhole's cross
+const SUPER_JUMP      = 18506;
+const WORMHOLE        = 18542;
+const WH_SWORD        = 18484;
+const WH_CHARGE       = 18883;
+const REPENTANCE      = [18537, 18536, 18535]; // first / second / third soak
+const CONFESSION      = 18538;
+const INCINERATING_HEAT = 19025;
+const ENUMERATION     = 18512;
+const J_WAVE          = 18551;
+const ETERNAL_DARKNESS = 18549;
+const DIVINE_JUDGMENT_ENRAGE = 18552;
+const TRANSITION      = 18554;   // giant Alexander's Divine Judgment: the phase is over
+const FINAL_WORD      = 18557;   // Perfect Alexander's first cast
+
+const FIRST_NUMBER_MARKER = 79;  // head markers 79..86 = Limit Cut numbers 1..8
+const ENUMERATION_MARKER = 65;
+
+type Avoidable = { name: string; advice: string };
+// Never in a clean Wormhole (B, C, D, E, F); no Damage Down (Shadowbringers).
+const AVOIDABLE: Record<number, Avoidable> = {
+  18508: { name: "Apocalyptic Ray", advice: "after landing, Brute Justice fires five pulses toward the center: the jump baiter steps toward the wall, everyone else stays off its line" },
+  18517: { name: "Eye of the Chakram", advice: "bait the chakrams in the center together, then leave along the wall before they fire" },
+};
+
+// Wormhole soaks, by round: [west owner, east owner] (odds soak west).
+const SOAK_OWNERS: [number, number][] = [[5, 6], [7, 8], [1, 2]];
+// Wormhole clock from Wormhole Formation, every pull within ~0.2s: numbers
+// +12.3, first sword +21.7, jump +22.7, soaks +26.4 / +30.6 / +34.8.
+const SOAK_AT_MS = [26_400, 30_600, 34_800];
+// A sword extra this far down the cone means the holder aimed it into the
+// waiting group: 12.9-28.5y in D2, D10, D12, D13, D19, E2, F2, F7. Extras
+// standing near the holder were 4.1-7.2y (D11, D28, F6).
+const AIM_EXTRA_MIN_Y = 10;
+// Knocked off the arena by a sword/charge/jump: a death with no killing
+// blow 1.8-3.6s after the hit (C14, C29, D2, D28; Limit Cut: 2.1-3.1s).
+const KNOCKOFF_MIN_MS = 1_800;
+const KNOCKOFF_MAX_MS = 3_600;
+// A Super Jump baiter stands at the wall (17-18y out); a closer "farthest
+// player" means the baiter was dead and the jump went elsewhere.
+const JUMP_BAIT_MIN_Y = 12;
+// Inception swords: a non-baiter within this of Cruise Chaser took a bait.
+const BAIT_ZONE_Y = 4;
+// Clean Plaint of Surety hits are 1-7 damage; failures 32-47k (B46).
+const SURETY_FAIL_MIN = 100;
+const J_WAVE_DEATHS = 3;
+// The clears killed Brute Justice after 10-11 waves with nobody dying to
+// them; slow kills lost players from the 10th on (D24, E30, F15). Deaths
+// after a wave or two are a short-handed party (E14), not the check.
+const J_WAVE_LATE = 9;
+const COLLAPSE_DEAD_COUNT = 4;
+const COLLAPSE_END_MS     = 30_000;
+const CALLED_WIPE_COUNT   = 3;
+const CALLED_WIPE_WINDOW  = 10_000;
+const CALLED_WIPE_END_MS  = 12_000;
+
+const dist = (a: { x?: number; y?: number }, b: { x?: number; y?: number }) =>
+  a.x === undefined || a.y === undefined || b.x === undefined || b.y === undefined ? NaN : Math.hypot(a.x - b.x, a.y - b.y) / 100;
+const fromCenter = (e: { x?: number; y?: number }) => dist(e, { x: 10000, y: 10000 });
+const yd = (n: number) => `~${n.toFixed(1)}y`;
+const side = (x: number | undefined) => (x === undefined ? "?" : x > 10000 ? "E" : "W");
+
+/** Hits of one ability on living players in [a, b]. */
+function hitsIn(players: PlayerInfo[], life: Life, ids: number | number[], a: number, b: number): { p: PlayerInfo; e: PlayerEvent }[] {
+  const set = new Set(Array.isArray(ids) ? ids : [ids]);
+  const out: { p: PlayerInfo; e: PlayerEvent }[] = [];
+  for (const p of players) for (const e of p.damageTaken) {
+    if (!set.has(e.abilityId) || e.timestamp < a || e.timestamp > b || bodyHit(e)) continue;
+    if (life.hitAlive(p, e.timestamp)) out.push({ p, e });
+  }
+  return out.sort((x, y) => x.e.timestamp - y.e.timestamp);
+}
+
+/** A death with no killing blow shortly after a hit: knocked off the arena. */
+function knockedOff(deaths: DeathEvent[], p: PlayerInfo, hitT: number): DeathEvent | undefined {
+  return deaths.find((d) => d.player === p.name && !d.killingAbilityGameId && d.timestamp - hitT >= KNOCKOFF_MIN_MS && d.timestamp - hitT <= KNOCKOFF_MAX_MS);
+}
+
+/** The status (one of `ids`) a player gained in [a, b]. */
+function statusIn(p: PlayerInfo, ids: number[], a: number, b: number): number | undefined {
+  return p.debuffs.find((e) => ids.includes(e.abilityId) && e.debuffStatus === "applied" && e.timestamp >= a && e.timestamp <= b)?.abilityId;
+}
+
+function holds(p: PlayerInfo, id: number, t: number): boolean {
+  let on = false;
+  for (const e of p.debuffs.filter((x) => x.abilityId === id && x.timestamp <= t).sort((a, b) => a.timestamp - b.timestamp)) on = e.debuffStatus === "applied";
+  return on;
+}
+
+type Ctx = {
+  players: PlayerInfo[];
+  deaths: DeathEvent[];
+  life: Life;
+  casts: EnemyEvent[];
+  errors: PullError[];
+  raids: PullError[];
+  occurrences?: ReportedOccurrence[];
+};
+
+const diedSoon = (c: Ctx, p: PlayerInfo, t: number, ms: number) => c.deaths.some((d) => d.player === p.name && d.timestamp >= t && d.timestamp <= t + ms + DEATH_EVENT_LAG_MS);
+
+/**
+ * The Epic of Alexander, Phase 3: Alexander Prime, from Temporal Stasis to
+ * the transition hit. Self-gates on Temporal Stasis (only this phase casts
+ * it).
+ */
+export function detectAlexanderPrimeErrors(
+  players: PlayerInfo[], deathEvents: DeathEvent[], enemyCasts: EnemyEvent[], headMarkers: HeadMarker[] = [], occurrences?: ReportedOccurrence[],
+): PullError[] {
+  const stasis = castsOf(enemyCasts, TEMPORAL_STASIS, Infinity)[0];
+  if (!stasis) return [];
+  const t0 = stasis.timestamp;
+  const start = t0 - 9_000;   // the 8s cast begins at -8
+  const lastEvent = Math.max(0, ...players.flatMap((p) => [...p.damageTaken, ...p.casts].map((e) => e.timestamp)));
+  const transition = enemyCasts.find((x) => x.abilityId === TRANSITION && x.timestamp > t0);
+  const finalWord = enemyCasts.find((x) => x.abilityId === FINAL_WORD && x.timestamp > t0);
+  const end = Math.min(transition ? transition.timestamp + 3_000 : Infinity, finalWord ? finalWord.timestamp : Infinity, lastEvent);
+  const life = buildLife(players, deathEvents);
+  const casts = enemyCasts.filter((x) => x.timestamp >= start && x.timestamp <= end);
+  const c: Ctx = { players, deaths: deathEvents, life, casts, errors: [], raids: [], occurrences };
+
+  detectStasis(c, t0);
+  detectSurety(c, start, end);
+  const formation = casts.find((x) => x.abilityId === INCEPTION_FORMATION);
+  if (formation) detectInception(c, formation.timestamp, casts.find((x) => x.abilityId === INCEPTION)?.timestamp);
+  const wormhole = casts.find((x) => x.abilityId === WORMHOLE);
+  if (wormhole) detectWormhole(c, wormhole.timestamp, headMarkers, end);
+  detectSacrament(c, start, end);
+  detectEnding(c, headMarkers, wormhole?.timestamp, end);
+
+  const errors = c.errors;
+  const firstRaid = c.raids.sort((a, b) => a.timestamp - b.timestamp)[0];
+  if (firstRaid) errors.push(firstRaid);
+  else if (!transition) {
+    const marker = genericCutoff(c, start, lastEvent);
+    if (marker) errors.push(marker);
+  }
+  return errors.sort((a, b) => a.timestamp - b.timestamp);
+}
+
+// ── Temporal Stasis ─────────────────────────────────────────────────────────
+
+const STASIS_ROLE: Record<number, string> = { [HOUSE_ARREST]: "House Arrest", [RESTRAINING]: "Restraining Order", [AGGRAVATED]: "Aggravated Assault" };
+const ORD = ["first", "second", "third"];
+
+/**
+ * Temporal Stasis freezes everyone, then Cruise Chaser cuts its three
+ * nearest players with Alpha Sword and Brute Justice its two nearest with
+ * Flarethrower. NAUR (the static's plan in every clean pull): House Arrest
+ * flanks the east boss north/south, no debuff the west boss, Aggravated
+ * Assault waits at Brute Justice's wall, and the Restraining Order on
+ * Cruise Chaser's side stands at its inner marker for the third sword.
+ * A cone that hits two players, an Assault holder or someone it isn't
+ * meant for names, in order: whoever stood on the wrong side; the owner who
+ * wasn't there to take it; else the owner whose cone ran through the
+ * others (stood off the north-south line).
+ */
+function detectStasis(c: Ctx, t0: number) {
+  const { players, life } = c;
+  if (players.some((p) => !life.alive(p, t0))) return;   // a dead player shifts every bait
+  const role = new Map<PlayerInfo, number | undefined>(players.map((p) => [p, statusIn(p, [HOUSE_ARREST, RESTRAINING, AGGRAVATED], t0 - 12_000, t0 + 3_000)]));
+  if (![...role.values()].some((r) => r === HOUSE_ARREST)) return;
+  // Frozen positions: any hit during the freeze.
+  const pos = new Map<PlayerInfo, PlayerEvent>();
+  for (const p of players) {
+    const e = p.damageTaken.find((x) => x.timestamp >= t0 + 2_000 && x.timestamp <= t0 + 9_000 && x.x !== undefined);
+    if (e) pos.set(p, e);
+  }
+  const swords = c.casts.filter((x) => x.abilityId === ALPHA_SWORD_P3 && x.timestamp > t0 && x.timestamp <= t0 + 12_000);
+  const flares = c.casts.filter((x) => x.abilityId === FLARETHROWER_P3 && x.timestamp > t0 && x.timestamp <= t0 + 12_000);
+  if (!swords.length || swords[0].x === undefined) return;
+  const ccSide = side(swords[0].x);
+  const bjSide = ccSide === "E" ? "W" : "E";
+  const boss = (s: string) => (s === ccSide ? "Cruise Chaser" : "Brute Justice");
+  const expectedSide = (p: PlayerInfo): string | undefined => {
+    const r = role.get(p);
+    return r === HOUSE_ARREST ? "E" : r === undefined ? "W" : r === AGGRAVATED ? bjSide : undefined;
+  };
+  const roleName = (p: PlayerInfo) => STASIS_ROLE[role.get(p) ?? 0] ?? "no debuff";
+  const nearPair = (s: string) => players.filter((p) => (s === "E" ? role.get(p) === HOUSE_ARREST : role.get(p) === undefined));
+  const ccRO = players.filter((p) => role.get(p) === RESTRAINING && side(pos.get(p)?.x) === ccSide);
+
+  type Cone = { cast: EnemyEvent; name: string; idx: number; owners: PlayerInfo[]; hits: { p: PlayerInfo; e: PlayerEvent }[] };
+  const cones: Cone[] = [];
+  const build = (list: EnemyEvent[], name: string, bossSide: string) => list.forEach((cast, idx) => {
+    const next = list[idx + 1]?.timestamp ?? cast.timestamp + 1_500;
+    const hits = hitsIn(players, life, cast.abilityId, cast.timestamp, Math.min(next, cast.timestamp + 1_500));
+    const owners = bossSide === ccSide && idx === 2 ? ccRO : nearPair(bossSide);
+    cones.push({ cast, name, idx, owners, hits });
+  });
+  build(swords, "Alpha Sword", ccSide);
+  build(flares, "Flarethrower", bjSide);
+  cones.sort((a, b) => a.cast.timestamp - b.cast.timestamp);
+
+  const flagged = new Set<PlayerInfo>();
+  const tainted = new Set<PlayerInfo>();   // already hit by a failed cone
+  const stasisEnd = t0 + 14_000;
+  for (const k of cones) {
+    const victims = uniq(k.hits.map((h) => h.p));
+    if (!victims.length) continue;
+    const earlier = cones.filter((o) => o.cast.abilityId === k.cast.abilityId && o.idx < k.idx).flatMap((o) => o.hits.map((h) => h.p));
+    const wrongVictim = victims.some((p) => !k.owners.includes(p));
+    if (victims.length < 2 && !wrongVictim) continue;
+    if (victims.every((p) => tainted.has(p))) continue;   // the same pair again: fallout
+    victims.forEach((p) => tainted.add(p));
+    const coneName = `${boss(side(k.cast.x))}'s ${ORD[k.idx]} ${k.name}`;
+    const deaths = victims.filter((p) => diedSoon(c, p, k.cast.timestamp, stasisEnd - k.cast.timestamp));
+    // A misplaced bait usually kills at a later cone of the same freeze (E30).
+    const severe = deaths.length > 0 || c.deaths.some((d) => [ALPHA_SWORD_P3, FLARETHROWER_P3].includes(d.killingAbilityGameId)
+      && d.timestamp >= k.cast.timestamp && d.timestamp <= stasisEnd + DEATH_EVENT_LAG_MS);
+    const outcome = (who: PlayerInfo[]) => {
+      const others = who.length ? ` and hit ${namesOf(who)}` : "";
+      return `${others}${severe ? `; ${namesOf(deaths)} died under its vulnerability` : ""}`;
+    };
+    const push = (p: PlayerInfo, name: string, description: string) => {
+      if (flagged.has(p)) return;
+      flagged.add(p);
+      c.errors.push(playerError(p, {
+        ruleId: AP_STASIS_CONE_RULE_ID, severity: severe ? "Major" : "Minor", name, description,
+        timestamp: k.cast.timestamp, abilityId: k.cast.abilityId, abilityName: k.name,
+      }));
+    };
+    // (a) Standing on the wrong side.
+    const wrongSide = victims.filter((p) => { const s = expectedSide(p); return s !== undefined && side(pos.get(p)?.x) !== s; });
+    if (wrongSide.length) {
+      for (const p of wrongSide) {
+        push(p, "Temporal Stasis: Wrong Side",
+          `With ${roleName(p)} they were frozen on the ${side(pos.get(p)?.x) === "E" ? "east" : "west"} side, by ${boss(side(pos.get(p)?.x))}: ${coneName} reached them${outcome(victims.filter((v) => v !== p))}. NAUR: Aggravated Assault waits at Brute Justice's wall, House Arrest flanks the east boss, no debuff the west boss.`);
+      }
+      continue;
+    }
+    // (b) The owner wasn't there: the bait went to the next-nearest player.
+    const available = k.owners.filter((p) => life.alive(p, k.cast.timestamp) && !earlier.includes(p));
+    if (!victims.some((p) => k.owners.includes(p)) && available.length) {
+      for (const p of available) {
+        const d = dist(pos.get(p) ?? {}, k.cast);
+        const v = victims.map((q) => dist(pos.get(q) ?? {}, k.cast)).filter((x) => !isNaN(x));
+        push(p, "Temporal Stasis: Missed Bait",
+          `${coneName} was theirs (${roleName(p)}), but they were frozen ${isNaN(d) ? "too far" : yd(d)} from it${v.length ? `, no closer than ${namesOf(victims)} (${yd(Math.min(...v))})` : ""}: the cone went to the nearest players instead${outcome(victims)}. ${k.idx === 2 ? "The Restraining Order on Cruise Chaser's side stands at its inner marker, closer than the far boss's pair." : "Stand right beside your boss, north or south of it."}`);
+      }
+      continue;
+    }
+    // (c) The owner's cone ran through someone else.
+    const owner = victims.filter((p) => k.owners.includes(p)).sort((a, b) => dist(pos.get(a) ?? {}, k.cast) - dist(pos.get(b) ?? {}, k.cast))[0];
+    if (!owner) continue;
+    const e = pos.get(owner);
+    const off = e && k.cast.x !== undefined ? Math.abs(e.x! - k.cast.x) / 100 : NaN;
+    push(owner, "Temporal Stasis: Cone Through Others",
+      `${coneName}, their bait, also hit ${namesOf(victims.filter((v) => v !== owner))}${severe ? `; ${namesOf(deaths)} died under its vulnerability` : ""}. They stood ${isNaN(off) ? "off" : yd(off)} east-west of the boss rather than straight north or south, so the cone ran toward the wall spots behind it.`);
+  }
+}
+
+/** Plaint of Surety deals 1 damage when the tether holds; a failed check hits each end hard. */
+function detectSurety(c: Ctx, start: number, end: number) {
+  const hits = hitsIn(c.players, c.life, SURETY, start, end).filter((h) => (h.e.amount ?? 0) >= SURETY_FAIL_MIN
+    || c.deaths.some((d) => d.player === h.p.name && d.killingAbilityGameId === SURETY && d.timestamp >= h.e.timestamp && d.timestamp <= h.e.timestamp + 3_000));
+  const seen = new Set<string>();
+  for (const h of hits) {
+    const key = `${h.e.sourceInstance}@${Math.round(h.e.timestamp / 2000)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const pair = hits.filter((x) => x.e.sourceInstance === h.e.sourceInstance && Math.abs(x.e.timestamp - h.e.timestamp) <= 1_000);
+    const who = uniq(pair.map((x) => x.p));
+    // House Arrest comes off at the resolution, just before the check's hit.
+    const close = who.some((p) => statusIn(p, [HOUSE_ARREST], h.e.timestamp - 15_000, h.e.timestamp) !== undefined);
+    const killed = who.filter((p) => c.life.diedFrom(p, h.e.timestamp));
+    const sep = who.length === 2 ? dist(pair[0].e, pair[1].e) : NaN;
+    for (const p of who) {
+      c.errors.push(playerError(p, {
+        ruleId: AP_STASIS_TETHER_RULE_ID, severity: "Major", name: close ? "House Arrest Too Far" : "Restraining Order Too Close",
+        description: `Plaint of Surety punished their ${close ? "House Arrest" : "Restraining Order"} tether (${kFmt(realAmount(pair.find((x) => x.p === p)!.e))}${isNaN(sep) ? "" : `, ${yd(sep)} apart`})${killed.length ? `; ${namesOf(killed)} died` : ""}. ${close ? "House Arrest partners stand together, within ~5y" : "Restraining Order partners go to opposite walls"}. The log can't say which of the two moved.`,
+        timestamp: h.e.timestamp, abilityId: SURETY, abilityName: "Plaint of Surety",
+      }));
+    }
+  }
+}
+
+// ── Inception ───────────────────────────────────────────────────────────────
+
+function detectInception(c: Ctx, formation: number, inception: number | undefined) {
+  const { players, life } = c;
+  // Electromagnetic Burst: the plasmaspheres' penalty, a raid-wide wipe.
+  const emb = c.casts.find((x) => x.abilityId === EMB && x.timestamp > formation && x.timestamp <= formation + 40_000);
+  if (emb) {
+    const killed = players.filter((p) => c.deaths.some((d) => d.player === p.name && d.killingAbilityGameId === EMB));
+    c.raids.push(raidMarker(AP_EMB_RULE_ID, "Electromagnetic Burst",
+      `Electromagnetic Burst went off as the plasmaspheres were taken${killed.length ? ` and killed ${killed.length}` : ""}: the raid penalty when the orbs' explosions meet. The orb pops sat where the clean pulls' do, and the log doesn't track the orbs' paths, so it can't say whose orb. Unresolvable from here; treated as the cutoff point.`,
+      emb.timestamp, EMB, "Electromagnetic Burst"));
+  }
+
+  // Three Flarethrowers after the orbs: two tank baits, then the party.
+  const fires = c.casts.filter((x) => x.abilityId === FLARETHROWER_P3 && x.timestamp > formation + 20_000 && x.timestamp <= formation + 45_000);
+  const flagged = new Set<PlayerInfo>();
+  fires.forEach((f, i) => {
+    const hits = hitsIn(players, life, FLARETHROWER_P3, f.timestamp, Math.min(fires[i + 1]?.timestamp ?? Infinity, f.timestamp + 1_800));
+    const victims = uniq(hits.map((h) => h.p));
+    if (!victims.length) return;
+    // The next fire under Fire Resistance Down kills: C10's first-fire
+    // extras died at the third, 4.5s later.
+    const died = (p: PlayerInfo) => diedSoon(c, p, f.timestamp, 10_000);
+    if (i < 2) {
+      const baiter = victims.find((p) => p.name === f.target) ?? [...victims].sort((a, b) => dist(hits.find((h) => h.p === a)!.e, f) - dist(hits.find((h) => h.p === b)!.e, f))[0];
+      for (const p of victims.filter((v) => v !== baiter)) {
+        flagged.add(p);
+        c.errors.push(playerError(p, {
+          ruleId: AP_FIRE_RULE_ID, severity: died(p) ? "Major" : "Minor", name: "In a Tank's Flarethrower",
+          description: `Hit by the ${ORD[i]} Flarethrower, ${baiter.name}'s bait${died(p) ? ", and died (Fire Resistance Down II made the next fire lethal)" : ""}. The first two fires go to the tanks one at a time; everyone else waits away from Brute Justice for the third.`,
+          timestamp: f.timestamp, abilityId: FLARETHROWER_P3, abilityName: "Flarethrower",
+        }));
+      }
+    }
+    for (const h of hits) {
+      // Fire Resistance Down lands ~0.3-0.9s before its own fire's damage:
+      // read it at the cast.
+      if (flagged.has(h.p) || !holds(h.p, FIRE_RES_DOWN, f.timestamp - 200)) continue;
+      flagged.add(h.p);
+      c.errors.push(playerError(h.p, {
+        ruleId: AP_FIRE_RULE_ID, severity: died(h.p) ? "Major" : "Minor", name: "Fire Under Fire Resistance Down",
+        description: `Hit by the ${ORD[i]} Flarethrower (${kFmt(realAmount(h.e))}) while still under Fire Resistance Down II from an earlier one${died(h.p) ? ", and died" : ""}. After taking a fire, leave the next bait's path.`,
+        timestamp: h.e.timestamp, abilityId: FLARETHROWER_P3, abilityName: "Flarethrower",
+      }));
+    }
+  });
+
+  if (inception === undefined) return;
+  // Inception's three swords: two baiters near Cruise Chaser plus the
+  // non-tank far tether. Baiters: non-tanks with no debuff, or the far tether.
+  const debuff = new Map<PlayerInfo, number | undefined>(players.map((p) => [p, statusIn(p, [RESTRAINING, AGGRAVATED, SHARED_SENTENCE], inception - 20_000, inception + 2_000)]));
+  const baiterRole = (p: PlayerInfo) => !isTank(p) && (debuff.get(p) === undefined || debuff.get(p) === RESTRAINING);
+  const swords = c.casts.filter((x) => x.abilityId === ALPHA_SWORD_P3 && x.timestamp > inception && x.timestamp <= inception + 20_000);
+  if (players.every((p) => life.alive(p, swords[0]?.timestamp ?? inception))) {
+    const tainted = new Set<PlayerInfo>();
+    swords.forEach((s, i) => {
+      const hits = hitsIn(players, life, ALPHA_SWORD_P3, s.timestamp, Math.min(swords[i + 1]?.timestamp ?? Infinity, s.timestamp + 1_000));
+      if (hits.length < 2 || hits.every((h) => tainted.has(h.p))) return;
+      hits.forEach((h) => tainted.add(h.p));
+      const byDist = [...hits].sort((a, b) => dist(a.e, s) - dist(b.e, s));
+      const owner = byDist[0];
+      const others = byDist.slice(1).map((h) => h.p);
+      const killed = hits.filter((h) => diedSoon(c, h.p, s.timestamp, 8_000)).map((h) => h.p);
+      const d = dist(owner.e, s);
+      const what = baiterRole(owner.p)
+        ? `They were nearest Cruise Chaser (${yd(d)}) and its cone ran through ${namesOf(others)}. NAUR's three baiters stand close in: regen healer north, shield healer south, far-tether DPS west, so each cone points away from the rest`
+        : `With ${debuff.get(owner.p) === SHARED_SENTENCE ? "Shared Sentence" : debuff.get(owner.p) === AGGRAVATED ? "Aggravated Assault" : "a tank's role"} they don't bait a sword, but stood ${yd(d)} from Cruise Chaser, nearest: the sword took them and ${namesOf(others)}`;
+      c.errors.push(playerError(owner.p, {
+        ruleId: AP_INCEPTION_SWORD_RULE_ID, severity: killed.length ? "Major" : "Minor", name: "Inception Sword Through Others",
+        description: `${ORD[i][0].toUpperCase()}${ORD[i].slice(1)} Alpha Sword after Inception. ${what}.${killed.length ? ` ${namesOf(killed)} died under its vulnerability.` : ""}`,
+        timestamp: s.timestamp, abilityId: ALPHA_SWORD_P3, abilityName: "Alpha Sword",
+      }));
+      // A second non-baiter standing in the bait zone too.
+      for (const h of byDist.slice(1)) {
+        if (baiterRole(h.p) || dist(h.e, s) > BAIT_ZONE_Y || !baiterRole(owner.p)) continue;
+        c.errors.push(playerError(h.p, {
+          ruleId: AP_INCEPTION_SWORD_RULE_ID, severity: killed.includes(h.p) ? "Major" : "Minor", name: "Inception Sword Through Others",
+          description: `They don't bait a sword but stood ${yd(dist(h.e, s))} from Cruise Chaser and took ${owner.p.name}'s cone.`,
+          timestamp: s.timestamp, abilityId: ALPHA_SWORD_P3, abilityName: "Alpha Sword",
+        }));
+      }
+    });
+  }
+  // Super Jump after the swords: the jump tank at the east wall.
+  detectJump(c, inception + 5_000, inception + 22_000, undefined);
+}
+
+/** Super Jump: the farthest player baits it at the wall; anyone else in its circle stood too close. */
+function detectJump(c: Ctx, a: number, b: number, owners: PlayerInfo[] | undefined, displaced?: (p: PlayerInfo, t: number) => boolean) {
+  const jump = c.casts.find((x) => x.abilityId === SUPER_JUMP && x.timestamp >= a && x.timestamp <= b);
+  if (!jump) return;
+  const hits = hitsIn(c.players, c.life, SUPER_JUMP, jump.timestamp, jump.timestamp + 2_000);
+  if (hits.length < 2) return;
+  const baiter = owners
+    ? hits.find((h) => owners.includes(h.p))
+    : [...hits].sort((x, y) => fromCenter(y.e) - fromCenter(x.e))[0];
+  if (!baiter || fromCenter(baiter.e) < JUMP_BAIT_MIN_Y || displaced?.(baiter.p, jump.timestamp)) return;
+  for (const h of hits.filter((x) => x !== baiter && x.p !== baiter.p)) {
+    const off = knockedOff(c.deaths, h.p, h.e.timestamp);
+    const died = !!c.life.diedFrom(h.p, h.e.timestamp) || !!off;
+    c.errors.push(playerError(h.p, {
+      ruleId: AP_JUMP_RULE_ID, severity: died ? "Major" : "Minor", name: "Hit by Super Jump",
+      description: `Caught in Super Jump on ${baiter.p.name} (${yd(dist(h.e, baiter.e))} from them, ${kFmt(realAmount(h.e))})${off ? " and knocked off the arena" : died ? " and died" : ""}. Only the jump baiter stands at the wall; everyone else keeps ~10y away from them.`,
+      timestamp: h.e.timestamp, abilityId: SUPER_JUMP, abilityName: "Super Jump",
+    }));
+  }
+}
+
+/** Sacrament's cross is lethal; four or more inside it at once is the party on the wrong safe spot. */
+function detectSacrament(c: Ctx, start: number, end: number) {
+  const hits = hitsIn(c.players, c.life, SACRAMENT, start, end);
+  const groups: (typeof hits)[] = [];
+  for (const h of hits) {
+    const g = groups[groups.length - 1];
+    if (g && h.e.timestamp - g[0].e.timestamp <= 1_500) g.push(h); else groups.push([h]);
+  }
+  for (const g of groups) {
+    const who = uniq(g.map((h) => h.p));
+    const t = g[0].e.timestamp;
+    if (who.length >= 4) {
+      c.raids.push(raidMarker(AP_SACRAMENT_RAID_RULE_ID, "Party in Sacrament",
+        `Sacrament's cross hit ${who.length} players (${namesOf(who)}): the party stood in its lanes, a wrong safe spot rather than one player's mistake. Unresolvable from here; treated as the cutoff point.`,
+        t, g[0].e.abilityId, "Sacrament"));
+      continue;
+    }
+    for (const p of who) {
+      const died = !!c.life.diedFrom(p, t) || diedSoon(c, p, t, 3_000);
+      c.errors.push(playerError(p, {
+        ruleId: AP_SACRAMENT_RULE_ID, severity: died ? "Major" : "Minor", name: "Hit by Sacrament",
+        description: `Hit by Sacrament${died ? " and died" : ""}: Alexander Prime's cross covers 16y-wide lanes through its new spot. ${g[0].e.abilityId === 18519 ? "In Wormhole, #3 and #4 move along the wall away from Alexander Prime after their hits." : "Stand on the far-tether or stack spot outside both lanes."}`,
+        timestamp: t, abilityId: g[0].e.abilityId, abilityName: "Sacrament",
+      }));
+    }
+  }
+}
+
+// ── Wormhole ────────────────────────────────────────────────────────────────
+
+type Attack = { n: number; sword: boolean; cast: EnemyEvent; holder?: PlayerInfo; hits: { p: PlayerInfo; e: PlayerEvent }[] };
+
+/**
+ * Wormhole: Limit Cut numbers from head markers. Odd numbers take Cruise
+ * Chaser's sword (it teleports behind them; the cone runs along their
+ * facing), even numbers its charge. Two puddles need one soaker each at
+ * three checks: 5/6, then 7/8, then 1/2 (odds west, evens east); a missed
+ * check is Confession, a raid-wide wipe.
+ */
+function detectWormhole(c: Ctx, wh: number, headMarkers: HeadMarker[], end: number) {
+  const { players, life } = c;
+  const marks = headMarkers.filter((m) => m.markerId >= FIRST_NUMBER_MARKER && m.markerId <= FIRST_NUMBER_MARKER + 7 && m.timestamp >= wh && m.timestamp <= wh + 20_000);
+  const number = new Map<PlayerInfo, number>();
+  for (const m of marks) {
+    const p = players.find((x) => x.name === m.player);
+    if (p) number.set(p, m.markerId - FIRST_NUMBER_MARKER + 1);
+  }
+  const holderOf = (n: number) => [...number.entries()].find(([, k]) => k === n)?.[0];
+  const markT = marks.length ? Math.min(...marks.map((m) => m.timestamp)) : wh + 12_300;
+  if (marks.length) {
+    const unmarked = players.filter((p) => !number.has(p) && !life.alive(p, markT));
+    if (unmarked.length) {
+      c.raids.push(raidMarker(AP_WH_DEAD_GOING_IN_RULE_ID, "Player Dead Going Into Wormhole",
+        `${namesOf(unmarked)} ${unmarked.length === 1 ? "was" : "were"} dead when the Wormhole numbers went out: ${unmarked.length === 1 ? "a number has" : "numbers have"} no holder and the puddle soaks can't all be covered. Unresolvable from here; treated as the cutoff point.`,
+        markT, 0, "Limit Cut"));
+    }
+  }
+
+  // Numbered attacks, in order: sword #1, charge #2, sword #3, ...
+  const atkCasts = c.casts.filter((x) => (x.abilityId === WH_SWORD || x.abilityId === WH_CHARGE) && x.timestamp >= wh && x.timestamp <= wh + 45_000);
+  const attacks: Attack[] = atkCasts.map((cast, i) => {
+    const hits = hitsIn(players, life, cast.abilityId, cast.timestamp, Math.min(atkCasts[i + 1]?.timestamp ?? Infinity, cast.timestamp + 900));
+    return { n: i + 1, sword: cast.abilityId === WH_SWORD, cast, holder: holderOf(i + 1), hits };
+  });
+  // Hit by someone else's attack (or a beam): their later deaths are that hit's.
+  const doomedAt = new Map<PlayerInfo, number>();
+  const doomed = { has: (p: PlayerInfo, t: number) => (doomedAt.get(p) ?? Infinity) <= t, add: (p: PlayerInfo, t: number) => { if (!doomedAt.has(p)) doomedAt.set(p, t); } };
+  const flagged = new Set<string>();
+  const deathAfter = (p: PlayerInfo, t: number) => diedSoon(c, p, t, 15_000);
+  const push = (p: PlayerInfo, ruleId: string, severity: PullError["severity"], name: string, description: string, a: Attack) => {
+    const key = `${ruleId}|${p.name}`;
+    if (flagged.has(key)) return;
+    flagged.add(key);
+    c.errors.push(playerError(p, { ruleId, severity, name, description, timestamp: a.cast.timestamp, abilityId: a.cast.abilityId, abilityName: a.sword ? "Alpha Sword" : "Super Blassty Charge" }));
+  };
+  let prev: Attack | undefined;
+  for (const a of attacks) {
+    const h = a.holder;
+    if (h) c.occurrences?.push({ mechanicKey: AP_WH_AIM_RULE_ID, timestamp: a.cast.timestamp, players: [h.name] });
+    const label = `${a.sword ? "Alpha Sword" : "Super Blassty Charge"} (#${a.n})`;
+    if (!h || !life.hitAlive(h, a.cast.timestamp) || doomed.has(h, a.cast.timestamp)) {   // retargets: fallout
+      a.hits.filter((x) => x.p !== h).forEach((x) => doomed.add(x.p, a.cast.timestamp));
+      prev = a;
+      continue;
+    }
+    const victims = uniq(a.hits.map((x) => x.p));
+    const extras = victims.filter((p) => p !== h && !doomed.has(p, a.cast.timestamp));
+    const ownHit = a.hits.find((x) => x.p === h);
+    if (!extras.length) {
+      const off = ownHit ? knockedOff(c.deaths, h, ownHit.e.timestamp) : undefined;
+      if (off && !victims.some((p) => p !== h)) {
+        push(h, AP_WH_KNOCKBACK_RULE_ID, "Major", "Knocked Off by Own Attack",
+          `Their own ${label} knocked them off the arena; they died ${((off.timestamp - ownHit!.e.timestamp) / 1000).toFixed(1)}s later. Take it with Cruise Chaser between you and the center, so the knockback carries you along the edge, not over it.`, a);
+      }
+      prev = a;
+      continue;
+    }
+    const dead = extras.filter((p) => deathAfter(p, a.cast.timestamp));
+    const deadText = dead.length ? ` ${namesOf(dead)} died (a second numbered hit under the vulnerability kills, and the sword and charge knock back).` : "";
+    const sev: PullError["severity"] = dead.length ? "Major" : "Minor";
+    const strike = { x: a.cast.x, y: a.cast.y };
+    if (a.sword) {
+      const far = extras.filter((p) => dist(a.hits.find((x) => x.p === p)!.e, strike) >= AIM_EXTRA_MIN_Y);
+      if (far.length) {
+        const ds = far.map((p) => dist(a.hits.find((x) => x.p === p)!.e, strike));
+        push(h, AP_WH_AIM_RULE_ID, sev, "Wormhole Sword Aimed Into the Party",
+          `Their ${label} ran ${yd(Math.max(...ds))} down the cone into ${namesOf(extras)}.${deadText} Cruise Chaser appears behind you and cuts along your facing: face out toward the wall so the cone points away from the players waiting on the north side.`, a);
+      } else {
+        for (const p of extras) {
+          push(p, AP_WH_STRAY_RULE_ID, deathAfter(p, a.cast.timestamp) ? "Major" : "Minor", "Hit by Another Number's Attack",
+            `Hit by #${a.n}'s ${label} while standing ${yd(dist(a.hits.find((x) => x.p === p)!.e, strike))} from where Cruise Chaser struck${deathAfter(p, a.cast.timestamp) ? ", and died" : ""}. Wait at your own spot along the wall, clear of the active number.`, a);
+        }
+      }
+    } else {
+      const partner = prev && prev.sword && a.cast.timestamp - prev.cast.timestamp <= 2_500 ? prev.holder : undefined;
+      if (partner && extras.includes(partner)) {
+        push(partner, AP_WH_STRAY_RULE_ID, deathAfter(partner, a.cast.timestamp) ? "Major" : "Minor", "In the Charge After Own Sword",
+          `After their own sword (#${a.n - 1}), Cruise Chaser charged #${a.n} from beside them and the line hit them${deathAfter(partner, a.cast.timestamp) ? "; they died under the sword's vulnerability" : ""}. Face out so Cruise Chaser appears on the inner side, then step away from its line to #${a.n}.`, a);
+      }
+      const rest = extras.filter((p) => p !== partner);
+      if (rest.length >= 2) {
+        push(h, AP_WH_AIM_RULE_ID, sev, "Wormhole Charge Through the Party",
+          `Their ${label} hit ${namesOf(rest)} on its way to them.${deadText} The log can't say whether the line came to the group or the group stood on the line, so the players hit are named too.`, a);
+      }
+      for (const p of rest) {
+        push(p, AP_WH_STRAY_RULE_ID, deathAfter(p, a.cast.timestamp) ? "Major" : "Minor", "Hit by Another Number's Attack",
+          `Hit by #${a.n}'s ${label}${deathAfter(p, a.cast.timestamp) ? ", and died" : ""}. Stay off the line between Cruise Chaser and the even number it charges.`, a);
+      }
+    }
+    extras.forEach((p) => doomed.add(p, a.cast.timestamp));
+    prev = a;
+  }
+
+  // Super Jump on #3 or #4, whichever is farther from Brute Justice.
+  // A baiter already knocked about by another number's attack drags the
+  // jump onto the waiting players: that's the earlier hit's (C12, D7).
+  const jumpOwners = [holderOf(3), holderOf(4)].filter((p): p is PlayerInfo => !!p);
+  detectJump(c, wh + 15_000, wh + 26_000, jumpOwners, (p, t) => doomed.has(p, t));
+
+  // Avoidable ground and beam hits.
+  for (const [id, k] of Object.entries(AVOIDABLE)) {
+    for (const x of hitsIn(players, life, Number(id), wh, Math.min(end, wh + 45_000))) {
+      if (flagged.has(`${AP_AVOIDABLE_RULE_ID}|${x.p.name}|${id}`)) continue;
+      flagged.add(`${AP_AVOIDABLE_RULE_ID}|${x.p.name}|${id}`);
+      // Apocalyptic Ray pulses five times: a later pulse can be the lethal one (C14).
+      const died = !!life.diedFrom(x.p, x.e.timestamp)
+        || c.deaths.some((d) => d.player === x.p.name && d.killingAbilityGameId === x.e.abilityId && d.timestamp >= x.e.timestamp && d.timestamp <= x.e.timestamp + 8_000);
+      c.errors.push(playerError(x.p, {
+        ruleId: AP_AVOIDABLE_RULE_ID, severity: died ? "Major" : "Minor", name: `Hit by ${k.name}`,
+        description: `Hit by ${k.name} (${kFmt(realAmount(x.e))})${died ? " and died" : ""}: ${k.advice}.`,
+        timestamp: x.e.timestamp, abilityId: x.e.abilityId, abilityName: k.name,
+      }));
+      doomed.add(x.p, x.e.timestamp);
+    }
+  }
+
+  // Puddle soaks.
+  const wrongSoak = new Set<PlayerInfo>();
+  REPENTANCE.forEach((id, r) => {
+    const at = wh + SOAK_AT_MS[r];
+    const owed = SOAK_OWNERS[r];
+    const owners = owed.map((n) => holderOf(n));
+    const live = owners.filter((p): p is PlayerInfo => !!p && life.alive(p, at - 500));
+    if (live.length) c.occurrences?.push({ mechanicKey: AP_SOAK_MISSED_RULE_ID, timestamp: at - 1_000, players: live.map((p) => p.name) });
+    const soaks = hitsIn(players, life, id, at - 1_500, at + 1_500);
+    for (const s of soaks) {
+      const n = number.get(s.p);
+      const sideIdx = side(s.e.x) === "W" ? 0 : 1;
+      if (n === owed[sideIdx]) continue;
+      const owner = owners[sideIdx];
+      if (!owner || !life.alive(owner, at - 500) || doomed.has(owner, at)) continue;   // covering for a missing soaker
+      wrongSoak.add(s.p);
+      const died = diedSoon(c, s.p, s.e.timestamp, 10_000);
+      const theirs = n === undefined ? "" : n === 3 || n === 4 ? ` #${n} never soaks.` : ` #${n} soaks ${["first", "second", "third"][SOAK_OWNERS.findIndex((o) => o.includes(n))]}.`;
+      c.errors.push(playerError(s.p, {
+        ruleId: AP_SOAK_EXTRA_RULE_ID, severity: died ? "Major" : "Minor", name: "Soaked the Wrong Puddle Check",
+        description: `Soaked the ${["first", "second", "third"][r]} Void of Repentance check on the ${sideIdx ? "east" : "west"} puddle, which was #${owed[sideIdx]}'s (${owner.name}).${theirs}${died ? " The soak's vulnerability then killed them." : ""}`,
+        timestamp: s.e.timestamp, abilityId: id, abilityName: "Repentance",
+      }));
+    }
+    // Confession: a puddle left unsoaked (often two casts per puddle).
+    const confSides = new Set<number>();
+    for (const conf of c.casts.filter((x) => x.abilityId === CONFESSION && Math.abs(x.timestamp - at) <= 1_500)) {
+      const sideIdx = side(conf.x) === "W" ? 0 : 1;
+      if (confSides.has(sideIdx)) continue;
+      confSides.add(sideIdx);
+      const owner = owners[sideIdx];
+      const ownerOk = !!owner && life.alive(owner, at - 500) && !doomed.has(owner, at) && !wrongSoak.has(owner);
+      const soaked = soaks.some((s) => s.p === owner);
+      if (owner && ownerOk && !soaked) {
+        c.errors.push(playerError(owner, {
+          ruleId: AP_SOAK_MISSED_RULE_ID, severity: "Major", name: "Missed Puddle Soak",
+          description: `As #${owed[sideIdx]} they owed the ${["first", "second", "third"][r]} soak of the ${sideIdx ? "east" : "west"} puddle and weren't in it: Confession hit the whole raid.`,
+          timestamp: conf.timestamp, abilityId: CONFESSION, abilityName: "Confession",
+        }));
+      }
+      const why = !owner ? `#${owed[sideIdx]} had no holder`
+        : ownerOk ? `#${owed[sideIdx]} (${owner.name}) didn't soak it`
+        : wrongSoak.has(owner) ? `#${owed[sideIdx]} (${owner.name}) had soaked an earlier check by mistake`
+        : `#${owed[sideIdx]} (${owner.name}) was already dead or hit by another number's attack`;
+      c.raids.push(raidMarker(AP_CONFESSION_RULE_ID, "Confession",
+        `The ${["first", "second", "third"][r]} Void of Repentance check went unsoaked on the ${sideIdx ? "east" : "west"} puddle (${why}): Confession hit the raid. Unresolvable from here; treated as the cutoff point.`,
+        conf.timestamp, CONFESSION, "Confession"));
+    }
+  });
+}
+
+// ── Enumeration and the final check ─────────────────────────────────────────
+
+function detectEnding(c: Ctx, headMarkers: HeadMarker[], wh: number | undefined, end: number) {
+  const { players, life } = c;
+  // Enumeration deals damage only when a circle has the wrong count.
+  const heat = c.casts.find((x) => x.abilityId === INCINERATING_HEAT && (wh === undefined || x.timestamp > wh));
+  if (heat) {
+    // Incinerating Heat: all eight share it. A living player outside it
+    // leaves it to fewer (E14: five took it with six alive, three died).
+    const heatHits = hitsIn(players, life, INCINERATING_HEAT, heat.timestamp - 200, heat.timestamp + 2_000);
+    if (heatHits.length) {
+      const t = heatHits[0].e.timestamp;
+      const inStack = new Set(heatHits.map((h) => h.p));
+      const killed = uniq(heatHits.filter((h) => life.diedFrom(h.p, h.e.timestamp)).map((h) => h.p));
+      for (const p of players.filter((q) => !inStack.has(q) && life.alive(q, t) && life.alive(q, t - 5_000))) {
+        c.errors.push(playerError(p, {
+          ruleId: AP_HEAT_RULE_ID, severity: killed.length ? "Major" : "Minor", name: "Missed the Incinerating Heat Stack",
+          description: `Alive but outside Incinerating Heat, which ${inStack.size} shared${killed.length ? `; ${namesOf(killed)} died` : ""}. After the last soak everyone gathers in the center for it, the 7/8 pair as soon as their attacks are done.`,
+          timestamp: t, abilityId: INCINERATING_HEAT, abilityName: "Incinerating Heat",
+        }));
+      }
+    }
+    const hits = hitsIn(players, life, ENUMERATION, heat.timestamp, heat.timestamp + 10_000);
+    if (hits.length) {
+      const marked = new Set(headMarkers.filter((m) => m.markerId === ENUMERATION_MARKER && Math.abs(m.timestamp - heat.timestamp) <= 10_000).map((m) => m.player));
+      const circles = new Map<number, PlayerInfo[]>();
+      for (const h of hits) circles.set(h.e.sourceInstance ?? 0, uniq([...(circles.get(h.e.sourceInstance ?? 0) ?? []), h.p]));
+      const t = hits[0].e.timestamp;
+      const blamed: PlayerInfo[] = [];
+      for (const members of circles.values()) {
+        const tanks = members.filter(isTank).length, healers = members.filter((p) => p.role === "Healer").length;
+        for (const p of members) {
+          const why = p.role === "DPS" && !marked.has(p.name) ? "an unmarked DPS stays out of both circles"
+            : p.role === "Healer" && tanks > healers ? "both healers help the west circle, the tanks the east one"
+            : isTank(p) && healers > tanks ? "both tanks help the east circle, the healers the west one" : "";
+          if (!why) continue;
+          blamed.push(p);
+          c.errors.push(playerError(p, {
+            ruleId: AP_ENUMERATION_RULE_ID, severity: "Major", name: "Wrong Enumeration Circle",
+            description: `In an Enumeration circle with ${namesOf(members.filter((q) => q !== p))}, which went off with the wrong count: NAUR, ${why}. Each circle takes exactly three.`,
+            timestamp: t, abilityId: ENUMERATION, abilityName: "Enumeration",
+          }));
+        }
+      }
+      const killed = uniq(hits.filter((h) => life.diedFrom(h.p, h.e.timestamp)).map((h) => h.p));
+      c.raids.push(raidMarker(AP_ENUMERATION_RAID_RULE_ID, "Enumeration Failed",
+        `Enumeration went off with the wrong count${killed.length ? ` and killed ${namesOf(killed)}` : ""}${blamed.length ? "" : " (no one was in the wrong circle by role: the count was short)"}. Unresolvable from here; treated as the cutoff point.`,
+        t, ENUMERATION, "Enumeration"));
+    }
+  }
+  // The final check: kill Cruise Chaser before Eternal Darkness, Brute
+  // Justice before its J Waves outgrow the healing, then Alexander Prime.
+  const ed = c.casts.find((x) => x.abilityId === ETERNAL_DARKNESS);
+  if (ed) c.raids.push(raidMarker(AP_ENRAGE_RULE_ID, "Eternal Darkness", "Cruise Chaser finished Eternal Darkness: it wasn't killed in time. Treated as the cutoff point.", ed.timestamp, ETERNAL_DARKNESS, "Eternal Darkness"));
+  const dj = c.casts.find((x) => x.abilityId === DIVINE_JUDGMENT_ENRAGE);
+  if (dj) c.raids.push(raidMarker(AP_ENRAGE_RULE_ID, "Divine Judgment", "Alexander Prime finished Divine Judgment: it wasn't killed in time. Treated as the cutoff point.", dj.timestamp, DIVINE_JUDGMENT_ENRAGE, "Divine Judgment"));
+  const waveDeaths = c.deaths.filter((d) => d.killingAbilityGameId === J_WAVE && d.timestamp <= end + DEATH_EVENT_LAG_MS).sort((a, b) => a.timestamp - b.timestamp);
+  const waves = waveDeaths.length ? c.casts.filter((x) => x.abilityId === J_WAVE && x.timestamp <= waveDeaths[0].timestamp).length : 0;
+  if (waveDeaths.length >= J_WAVE_DEATHS && waves >= J_WAVE_LATE) {
+    c.raids.push(raidMarker(AP_J_WAVE_RULE_ID, "J Waves Overwhelmed the Raid",
+      `J Wave killed ${uniq(waveDeaths.map((d) => d.player)).length} players, the first after ${waves} waves (the clears killed Brute Justice by the 10th or 11th): its damage grows every wave until it dies. Treated as the cutoff point.`,
+      waveDeaths[0].timestamp - DEATH_EVENT_LAG_MS, J_WAVE, "J Wave"));
+  }
+}
+
+/**
+ * Generic cutoffs for wipes in this phase with no mechanic Raid error:
+ * a called wipe (3+ no-killing-blow deaths in 10s, or any within 12s of
+ * the end, knock-offs excluded) or a collapse (4 dead, pull over in 30s).
+ */
+function genericCutoff(c: Ctx, start: number, lastEvent: number): PullError | undefined {
+  const { players, deaths, life } = c;
+  const knock = new Set(deaths.filter((d) => players.some((p) => p.name === d.player && p.damageTaken.some((e) =>
+    [WH_SWORD, WH_CHARGE, SUPER_JUMP, ALPHA_SWORD_P3].includes(e.abilityId) && d.timestamp - e.timestamp >= KNOCKOFF_MIN_MS && d.timestamp - e.timestamp <= KNOCKOFF_MAX_MS))));
+  const silent = deaths.filter((d) => !d.killingAbilityGameId && !knock.has(d) && d.timestamp - DEATH_EVENT_LAG_MS >= start);
+  const called = new Set<DeathEvent>();
+  for (const d of silent) {
+    if (lastEvent - d.timestamp <= CALLED_WIPE_END_MS) called.add(d);
+    const near = resetCluster(silent.filter((x) => Math.abs(x.timestamp - d.timestamp) <= CALLED_WIPE_WINDOW), deaths);
+    if (near.length >= CALLED_WIPE_COUNT) near.forEach((x) => called.add(x));
+  }
+  const out: PullError[] = [];
+  const calledList = resetCluster([...called], deaths).sort((a, b) => a.timestamp - b.timestamp);
+  if (calledList.length >= CALLED_WIPE_COUNT || (calledList.length && lastEvent - calledList[0].timestamp <= CALLED_WIPE_END_MS)) {
+    out.push(raidMarker(AP_CALLED_WIPE_RULE_ID, "Wipe Called",
+      `${calledList.length} player${calledList.length > 1 ? "s" : ""} died with no killing blow (${joinNames(uniq(calledList.map((d) => d.player)))}) near the end: the wipe was called.`,
+      calledList[0].timestamp - DEATH_EVENT_LAG_MS, 0, "Deaths"));
+  }
+  const outAt = (t: number) => players.filter((p) => !life.alive(p, t));
+  const collapseT = life.outIntervals.map((w) => w.start).filter((t) => t >= start).sort((a, b) => a - b)
+    .find((t) => outAt(t).length >= COLLAPSE_DEAD_COUNT && lastEvent - t <= COLLAPSE_END_MS);
+  if (collapseT !== undefined) {
+    const who = outAt(collapseT).map((p) => p.name);
+    out.push(raidMarker(AP_COLLAPSE_RULE_ID, "Party Collapse",
+      `${who.length} players were dead at once (${joinNames(who)}). Treated as the cutoff point.`,
+      collapseT + DEATH_EVENT_LAG_MS, 0, "Deaths"));
+  }
+  return out.sort((a, b) => a.timestamp - b.timestamp)[0];
+}

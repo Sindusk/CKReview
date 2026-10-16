@@ -43,6 +43,11 @@ philosophy and the data semantics this list assumes.
   jump-off cutoff put 234 Raid markers on five other fights before
   phase1.ts gated on Kefka's casts. `refine-module`'s `pull-errors.js
   --summary` shows rule ids from other modules when one leaks.
+- **A later phase can reuse an earlier module's signature ID.** TEA's
+  Wormhole reuses the Limit Cut intermission's Alpha Sword (18484); on a
+  capture starting after Limit Cut, that module read Wormhole as its own
+  and called wipes there. Bound an earlier phase's casts by the next
+  phase's first cast (TEA Alexander Prime).
 - **A checkpoint stub can share the fight's name.** A Lindwurm II
   checkpoint resume was logged as "Lindwurm" (Refreshing Overkill at
   +0:01, then a reset). Self-gate on signature casts so the module skips
@@ -149,6 +154,14 @@ philosophy and the data semantics this list assumes.
 - **A logged facing can point backwards.** TEA's Alpha Sword cone runs
   along the cast's facing + 180: check the axis against the owner's
   position in clean casts before measuring aim (TEA Limit Cut).
+- **A hit's own debuff can land before its damage event.** TEA's Fire
+  Resistance Down II is applied 0.3-0.9s before the Flarethrower damage
+  that causes it: "held at the hit" read every party fire as a repeat.
+  Check a resistance at the cast instead (TEA Alexander Prime).
+- **Read a cone's aim from how far down it the extras were.** Wormhole
+  swords have no fixed clean axis, but an extra 10y+ from the strike point
+  was always the holder aiming into the group (12.9-28.5y), and extras
+  within ~7y had stood too close (TEA Alexander Prime).
 - **A penalty can exist only as a killing blow.** TEA's Final Sentence
   (Decree Nisi) logs no damage event; find it in the deaths'
   `killingAbilityGameId` (TEA BJ/CC).

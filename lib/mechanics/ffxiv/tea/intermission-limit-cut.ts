@@ -281,6 +281,7 @@ const HAWK_BLASTER = 18480;     // the ground circles (P2's Optical Sight blasts
 const ALPHA_SWORD  = 18484;     // odd numbers' cone (P3's is 18539)
 const CHARGE       = 19279;     // Super Blassty Charge, even numbers' line
 const J_KICK       = 18516;
+const TEMPORAL_STASIS = 18522;  // phase 3's first cast
 const FIRST_SWORD_MS = 7_400;   // first blast -> first sword, every pull
 const FIRST_MARKER = 79;        // head markers 79..86 = numbers 1..8
 const LAST_MARKER  = 86;
@@ -483,7 +484,10 @@ export function detectTeaLimitCutErrors(
   // Hawk Blaster's casts are missing from 7 pulls that reached the swords
   // (A63, B2, ...); the first sword comes 7.4s after the first blast.
   const blasts = castsOf(enemyCasts, HAWK_BLASTER, Infinity);
-  const swords = castsOf(enemyCasts, ALPHA_SWORD, Infinity);
+  // Phase 3's Wormhole reuses this sword: on a capture starting after
+  // Limit Cut it would read as this intermission (alexander-prime.ts).
+  const stasis = enemyCasts.find((c) => c.abilityId === TEMPORAL_STASIS);
+  const swords = castsOf(enemyCasts, ALPHA_SWORD, stasis ? stasis.timestamp : Infinity);
   if (!blasts.length && !swords.length) return [];
   const firstBlast = Math.min(blasts[0]?.timestamp ?? Infinity, swords.length ? swords[0].timestamp - FIRST_SWORD_MS : Infinity);
   const start = firstBlast - 5_000;

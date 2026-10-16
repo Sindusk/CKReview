@@ -115,6 +115,12 @@ lib/mechanics/
                                 colors, Gavel; Water/Lightning stacks by NAUR
                                 round, Punishing; mines, ice, Flarethrower,
                                 Severe Contamination, Plasma Shield; avoidables)
+      alexander-prime.ts      — Phase 3 per-pull rules (Temporal Stasis cones
+                                and tethers, Electromagnetic Burst, fires,
+                                Sacrament, Inception swords, Super Jump;
+                                Wormhole aim / strays / knock-offs, puddle
+                                soaks and Confession; Heat stack,
+                                Enumeration, J Waves, enrages)
       damage-context.ts       — Phase 1 damage context
                                 (the other tea/ files are research models only)
     trials/                   — Extreme trials

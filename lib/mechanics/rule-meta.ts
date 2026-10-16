@@ -430,6 +430,12 @@ mechanic("ffxiv-bjcc-mine-missed", "Hidden Mine soaks (mine tank)", 3, ["ffxiv-b
 mechanic("ffxiv-bjcc-ice", "Ice freezes the tornado (ice tank)", 3, ["ffxiv-bjcc-ice"]);
 mechanic("ffxiv-bjcc-flarethrower", "Flarethrower bait (Brute Justice's tank)", 3, ["ffxiv-bjcc-flarethrower"]);
 exposure("targeted", ["ffxiv-bjcc-water-short", "ffxiv-bjcc-lightning-alone", "ffxiv-bjcc-mine-missed", "ffxiv-bjcc-ice", "ffxiv-bjcc-flarethrower"]);
+// The Epic of Alexander P3 (alexander-prime.ts): each Wormhole sword/charge
+// tests its number's holder; each puddle check its two owed numbers
+// (reported at every attack and check).
+mechanic("ffxiv-ap-wormhole-aim", "Wormhole sword/charge aim (number holder)", 3, ["ffxiv-ap-wormhole-aim", "ffxiv-ap-wormhole-knockback"]);
+mechanic("ffxiv-ap-soak-missed", "Void of Repentance soaks (owed numbers)", 3, ["ffxiv-ap-soak-missed"]);
+exposure("targeted", ["ffxiv-ap-wormhole-aim", "ffxiv-ap-wormhole-knockback", "ffxiv-ap-soak-missed"]);
 // The Omega Protocol P1: each Program Loop round's towers test that round's
 // two In Line players (omega.ts reports both at every round).
 mechanic("ffxiv-top1-tower", "Program Loop towers (In Line soakers)", 1, ["ffxiv-top1-tower"]);
