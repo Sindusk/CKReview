@@ -8,7 +8,8 @@
   Vicewinder, Honed buffs) can't be reached on a supported log. The 7.05
   data layer reworked venom and coil potencies; the app values from the log.
 - **App:** `lib/damage/ffxiv/jobs/melee.ts` (header, `VPR_CHECKS`: Hunter's
-  Instinct `uptime`, `reawaken`, `venoms`, `rattlingCoils`, `vprAoe`;
+  Instinct `uptime`, `reawaken`, `venoms`, `rattlingCoils`,
+  `serpentOfferingsCheck`, `serpentsTail`, `vprAoe`;
   `vprDisengageAlternative` in game.ts), `gauges.ts` (Rattling Coil and
   Serpent Offerings lanes), `tracked-cooldowns.ts` ("Viper"), generic
   checks. Case studies: dQ8wmb1VhKt6yBXk, 2T1HzdPKgbhM43am,
@@ -53,10 +54,10 @@
 | vpr/SerpentsIre/expected-actions | wrong | — | under 2 Reawakens / 2 Ouroboros in the 30s after Serpent's Ire | Medium 1, Major 2. Fight 16's "8 missed": the first Reawaken pressed one GCD before Serpent's Ire, both inside the buffs; others cut by HP checks or the kill. No end-of-pull or downtime allowance. |
 | vpr/Tincture/expected-actions | superseded | tincture.ts | 2 Reawakens / 2 Ouroboros under the tincture | Vamp 6:06, The Tyrant 4:10 followed deaths; Red Hot 6:39 lost Ouroboros to the split-arena Inferno. |
 | vpr/Tincture/window-table | no-damage | — | — | Table only. |
-| vpr/SerpentsTail/checklist | candidate | — | Death Rattle / Last Lash not pressed after a finisher, or a Legacy skipped | Checklist 100%. Legacies are in `reawaken`; Death Rattle and Last Lash aren't checked (2T1HzdPKgbhM43am: 1 Death Rattle, not built). Each is lost when the next GCD replaces it, which the log shows by press order. |
+| vpr/SerpentsTail/checklist | covered | `serpentsTail` (+ `reawaken` for Legacies) | Death Rattle / Last Lash not pressed after a finisher, or a Legacy skipped | Built 2026-10-16: lost when the next GCD comes first (press order); her average; forced, movement or death between shown, not counted. On disk 15 of 2,220 finishers, no Last Lash; 4 counted (yBKPqGwHparm7Tk4 Dancing Mad pull 2 10:47 and 17:08, cZ42C1y3JRNGXWLH 9:18, zPJaZNfkFAKhY42t 6:50; ~30k each), 8 shown. FFLogs top 20: 9 of 596 lost, 2 at the 1:47 downtime. Matched xivanalysis's 1 on 2T1HzdPKgbhM43am fight 10 (13:28, fetched back 2026-10-16). |
 | vpr/Vices/checklist | candidate | — | a coil or Bite missing after Vicewinder / Vicepit | Checklist 100%. The app checks the Poised buffs after a coil, not a coil skipped after Vicewinder. Rare. |
-| vpr/snilk/overcap | candidate | `viperGauges` (Serpent Offerings lane, not valued) | Serpent Offerings over 100 | Medium 25, Major 50. Vamp 20 over (under its threshold). Deterministic from the casts, so it could be valued like the coils. |
-| vpr/snilk/lost-reawaken-at-end | candidate | — | 50+ Offerings or Ready to Reawaken held at the end | Major. Would follow the leftAtKill rule (time held, kill only). |
+| vpr/snilk/overcap | covered | `serpentOfferingsCheck` (and the Offerings lane, now the same simulation) | Serpent Offerings over 100 | Built 2026-10-16: each Offering is a fiftieth of her Reawaken (Reawaken, Generations and Ouroboros over the GCDs they replace, plus Legacies). K6qfMamL7rN8yz2Q Vamp Fatale 20 over (3:26, 3:29, 7:18), xivanalysis's 20. 37 on disk across 12 pulls; cBZXM6kayd7Tf9Fg Red Hot and Deep Blue 12 (6 paid Reawakens in 9:36). |
+| vpr/snilk/lost-reawaken-at-end | covered | `serpentOfferingsCheck` | 50+ Offerings or Ready to Reawaken held at the end | Built 2026-10-16, kills only: from the later of reaching it and the last Reawaken's end, counted when six ordinary GCDs (a Reawaken's worth) went by. 4 counted (CABrk9zXLfJG8h6R Lindwurm pull 2, cBZXM6kayd7Tf9Fg, jXG76ba43VDLAvYz, pnLBzfbH8NjGAJRg Enuo pull 12; 380-520k), 6 shown (0-4 GCDs left: pooled for the last Serpent's Ire, or the Limit Break). xivanalysis has no time allowance. |
 | vpr/Weaving/too-many-weaves | verified | `checkGcdGaps` | triple weaves (+1 allowed after Uncoiled Fury) | Red Hot 4 matched. The Tyrant 7:25 (0.3s, with Feint) is under the 0.5s floor. |
 | vpr/Combos/broken | verified | `checkCombos` | a broken or timed-out combo | Fight 16 16:02, Red Hot 6:39, The Tyrant 5:40 matched. |
 | vpr/AlwaysBeCasting/uptime | superseded | `checkGcdGaps` (Swiftscaled as haste) | idle GCD time | Downtimes match by time on three kills. |
@@ -91,11 +92,13 @@ Core modules that can't fire for Viper: DoTs (Noxious Gnash removed in
 
 In priority order (biggest damage cost first):
 
-1. **vpr/snilk/lost-reawaken-at-end, overcap** (candidates). Serpent
-   Offerings is already simulated for the lane; value its overcap and the
-   gauge left at a kill like the coils.
-2. **vpr/SerpentsTail/checklist** (candidate). Death Rattle / Last Lash
-   lost to the next GCD.
+1. **vpr/snilk/lost-reawaken-at-end** (covered 2026-10-16): needs a
+   xivanalysis page for a counted one (cBZXM6kayd7Tf9Fg, jXG76ba43VDLAvYz).
+2. **vpr/SerpentsTail/checklist**: verified on one page (2T1HzdPKgbhM43am);
+   Last Lash never seen.
 3. **vpr/Venoms/dropped, the Bite venoms** (covered). A wrong Bite after a
    coil isn't seen; add the four venoms to `VENOM_PROCS` once one turns up.
-4. **vpr/Vices/checklist** (candidate, rare).
+4. **vpr/Vices/checklist** (candidate, rare): 22 of 1,043 Vicewinders /
+   Vicepits on disk without both coils, most at a death or a wipe's end
+   (cZ42C1y3JRNGXWLH 0:49: two Uncoiled Furies, then the combo, coils
+   never pressed). Needs the rule for when a coil stops being available.

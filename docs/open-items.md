@@ -205,7 +205,9 @@ and delete them from the header.
   - [drk.md](xiva-audit/drk.md): Dark Knight, 2 candidates, 5 covered.
   - [gnb.md](xiva-audit/gnb.md): Gunbreaker, 1 candidate, 7 covered.
   - [drg.md](xiva-audit/drg.md): Dragoon, 3 covered.
-  - [vpr.md](xiva-audit/vpr.md): Viper, 4 candidates, 2 covered.
+  - [vpr.md](xiva-audit/vpr.md): Viper, 1 candidate (Vices, rare), 5
+    covered (Serpent Offerings overcap and Reawaken left at a kill, Death
+    Rattle / Last Lash built 2026-10-16; the overcap matched one page).
   - [rpr.md](xiva-audit/rpr.md): Reaper, 4 candidates, 5 covered.
   - [mnk.md](xiva-audit/mnk.md): Monk, 0 candidates, 10 covered (Blitz,
     Phantom Rush and form checks verified 2026-10-15; Fury overcap and

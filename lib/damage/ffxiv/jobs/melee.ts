@@ -81,7 +81,7 @@
 //     against xivanalysis on 2T1HzdPKgbhM43am Dancing Mad fight 10
 //     (2026-10-09): venoms 7, Honed 3 + 1 overwrite, coils 3 + 3 left,
 //     positionals and the Reawaken at 6:05 all match. Not built: Serpent's
-//     Ire pooling (9 actions) and Death Rattle (1).
+//     Ire pooling (9 actions). Death Rattle (1) built 2026-10-16 (below).
 //     Rechecked on qjCMx4bRfgNKwX9T fight 16 (7.5, 2026-10-13): Honed
 //     Reavers 30/31 (7:17 expiry), Third Legacy 24/25 (0:55), the 6:06
 //     Reawaken cut to two Generations (Kefka hit 0% at 6:15, after the
@@ -95,6 +95,14 @@
 //     6:02 is the cut Reawaken; 14:03's second one would land past P4's
 //     HP check at 14:09); Vicewinder 28/29 (its banked charge capped in
 //     P2's downtime, 35s held in all, under one 40s recharge).
+//   - Serpent Offerings overcap and a Reawaken held at the kill (snilk.tsx)
+//     and Death Rattle / Last Lash lost (SerpentsTail.tsx), 2026-10-16:
+//     `serpentOfferingsCheck`, `serpentsTail` below. Death Rattle matched
+//     xivanalysis's 1 on 2T1HzdPKgbhM43am fight 10 (13:28); the Offerings
+//     overcap its 20 on K6qfMamL7rN8yz2Q Vamp Fatale. Not built: a coil
+//     skipped after Vicewinder (Vices.tsx; 22 of 1,043 on disk, most at a
+//     death or a wipe's end, and when a coil stops being available isn't
+//     known).
 // Monk (checked against xivanalysis on qjCMx4bRfgNKwX9T fight 16, 7.5,
 // 2026-10-13, the first Monk sample):
 //   - Riddle of Fire (RiddleOfFire.tsx): 11 GCDs; +15% (FFLogs multiplier
@@ -1082,6 +1090,93 @@ export function rattlingCoilSpec(ctx: PlayerCheckContext): GaugeSpec {
 }
 const rattlingCoils: JobCheck = (ctx) => gaugeFindings(ctx, rattlingCoilSpec(ctx));
 
+// Serpent Offerings, after xivanalysis vpr/modules/snilk.tsx (100 at most,
+// start 0): Hunter's / Swiftskin's Coil and Den +5; the four finishers
+// (Hindsbane, Hindsting, Flanksbane, Flanksting) and Jagged / Bloodied Maw
+// +10; Reawaken −50 unless Ready to Reawaken (Serpent's Ire's free one) is
+// up. A death empties it (xivanalysis resets gauges on death). 50 of them
+// are one Reawaken: Reawaken, four Generations and Ouroboros over the six
+// GCDs they replace, plus four Legacies (her averages). Offerings over 100
+// are lost at that rate. At a kill, a Reawaken that could still have been
+// played out (50 or more held, or Ready to Reawaken up, while six ordinary
+// GCDs went by) is one Reawaken lost (snilk.tsx "lost a use"); fewer than
+// 50 isn't. Also the Offerings lane (gauges.ts).
+// K6qfMamL7rN8yz2Q Vamp Fatale: 20 over the cap (3:26 5 + 5, 7:18 10),
+// xivanalysis's 20. cBZXM6kayd7Tf9Fg Red Hot and Deep Blue: 6 paid
+// Reawakens in 9:36 (2:19 to 4:19 none), 11 overcaps and 80 held at the
+// kill.
+const OFFERINGS_MAX = 100, OFFERINGS_COST = 50;
+const OFFERING_GAINS: [string, number][] = [
+  ["HUNTERS_COIL", 5], ["SWIFTSKINS_COIL", 5], ["HUNTERS_DEN", 5], ["SWIFTSKINS_DEN", 5],
+  ["HINDSBANE_FANG", 10], ["HINDSTING_STRIKE", 10], ["FLANKSBANE_FANG", 10], ["FLANKSTING_STRIKE", 10],
+  ["JAGGED_MAW", 10], ["BLOODIED_MAW", 10],
+];
+const REAWAKEN_GCDS = ["REAWAKEN", "FIRST_GENERATION", "SECOND_GENERATION", "THIRD_GENERATION", "FOURTH_GENERATION", "OUROBOROS"];
+const LEGACIES = ["FIRST_LEGACY", "SECOND_LEGACY", "THIRD_LEGACY", "FOURTH_LEGACY"];
+function reawakenValue(ctx: PlayerCheckContext): { value: number; basis: string } {
+  const gcds = REAWAKEN_GCDS.filter((key) => A[key]).reduce((a, key) => a + replacedGcd(key)(ctx), 0);
+  const legacies = LEGACIES.filter((key) => A[key]).reduce((a, key) => a + ctx.values.perUse(A[key].id), 0);
+  return { value: gcds + legacies,
+    basis: `one Reawaken ${k(gcds + legacies)}: Reawaken, four Generations and Ouroboros less the average GCD each replaces (${k(gcds)}), plus four Legacies (${k(legacies)})` };
+}
+export function serpentOfferingsSpec(ctx: PlayerCheckContext): GaugeSpec | undefined {
+  const reawaken = A.REAWAKEN?.id, ready = S.READY_TO_REAWAKEN?.id;
+  if (reawaken === undefined || ready === undefined) return undefined;
+  const gains = new Map(OFFERING_GAINS.filter(([key]) => A[key]).map(([key, n]) => [A[key].id, n]));
+  const free = statusWindows(ctx, ready);
+  const events: GaugeEvent[] = [];
+  for (const c of ctx.player.casts) {
+    const n = gains.get(c.abilityId);
+    if (n !== undefined) events.push({ t: c.timestamp, type: "gain", amount: n, label: `${c.abilityName} at 100 Offerings` });
+    else if (c.abilityId === reawaken && !free.some((w) => c.timestamp >= w.startMs && c.timestamp <= w.endMs + 200)) {
+      events.push({ t: c.timestamp, type: "spend", amount: OFFERINGS_COST, label: "Reawaken" });
+    }
+  }
+  if (!events.some((e) => e.type === "spend") && !ctx.player.casts.some((c) => c.abilityId === reawaken)) return undefined;
+  for (const d of ctx.dead) events.push({ t: d.startMs, type: "reset", label: "death" });
+  const { value, basis } = reawakenValue(ctx);
+  return { name: "Serpent Offerings", unit: "Serpent Offerings", cap: OFFERINGS_MAX, unitValue: value / OFFERINGS_COST,
+    valueBasis: `(${basis}) ÷ 50`, events };
+}
+const serpentOfferingsCheck: JobCheck = (ctx) => {
+  const spec = serpentOfferingsSpec(ctx);
+  if (!spec || spec.unitValue <= 0) return [];
+  const out = gaugeFindings(ctx, spec);
+  if (ctx.pull.result !== "Kill") return out;
+  const steps = gaugeTrack(ctx, spec).steps;
+  const held = steps[steps.length - 1]?.value ?? 0;
+  // Since when a Reawaken was ready: the last time the gauge reached 50,
+  // or Ready to Reawaken came up.
+  const reachedAt = held >= OFFERINGS_COST
+    ? [...steps].reverse().find((st, i, rev) => st.value >= OFFERINGS_COST && (rev[i + 1]?.value ?? 0) < OFFERINGS_COST)?.t
+    : undefined;
+  const readyAt = statusWindows(ctx, S.READY_TO_REAWAKEN.id).find((w) => w.endMs > ctx.endMs)?.startMs;
+  const { value, basis } = reawakenValue(ctx);
+  // From when it could have been pressed: the later of reaching it and the
+  // last Reawaken window's end (pooling for Serpent's Ire is right:
+  // pnLBzfbH8NjGAJRg Enuo pull 9 held 50 from 7:41 into the 8:27 burst).
+  // Lost only if a whole Reawaken's six GCDs went to ordinary GCDs since,
+  // outside forced time (that Enuo pull ended Ouroboros 8:54, its Limit
+  // Break 8:59, one Vicewinder; K6qfMamL7rN8yz2Q Red Hot and Deep Blue
+  // reached 50 8.1s before the kill).
+  const windowEnd = statusWindows(ctx, S.REAWAKENED.id).filter((w) => w.startMs < ctx.endMs).pop()?.endMs ?? -Infinity;
+  const reawakenIds = new Set(ids(...REAWAKEN_GCDS));
+  for (const [reached, what] of [[reachedAt, `${held} Serpent Offerings`], [readyAt, "Ready to Reawaken"]] as const) {
+    if (reached === undefined) continue;
+    const since = Math.max(reached, windowEnd);
+    const ordinary = ctx.uses.filter((u) => u.startMs >= since && u.startMs < ctx.endMs && !reawakenIds.has(u.action.id) &&
+      !inWindows(u.startMs, ctx.forced)).length;
+    const forced = ordinary < REAWAKEN_GCDS.length;
+    out.push(finding(ctx, {
+      kind: "gauge-overcap", startMs: since, endMs: ctx.endMs, forced,
+      cause: forced ? `only ${ordinary} ordinary GCD${ordinary === 1 ? "" : "s"} before the kill, under a Reawaken's ${REAWAKEN_GCDS.length}` : undefined,
+      label: "Reawaken left at the kill", lostDamage: value, basis,
+      detail: `${what} held from ${clock(since)} to the kill, ${ordinary} ordinary GCDs meanwhile: one Reawaken never pressed`,
+    }));
+  }
+  return out;
+};
+
 // Writhing Snap with a Rattling Coil held: Uncoiled Fury is Viper's ranged
 // GCD (xivanalysis Snaps.tsx: "save Uncoiled Fury for when you cannot stay
 // in melee range"). Spending the coil there frees a melee GCD later, so the
@@ -1134,7 +1229,45 @@ export function vprDisengageAlternative(ctx: PlayerCheckContext, t: number): str
 // Blue alone as the bosses came back (15.6k against 31k).
 const vprAoe = aoeComboOnOneTarget([[id("STEEL_MAW"), id("STEEL_FANGS"), 3], [id("REAVING_MAW"), id("REAVING_FANGS"), 3]]);
 
-export const VPR_CHECKS: JobCheck[] = [uptime("HUNTERS_INSTINCT", 0.1, "Hunter's Instinct is +10%, FFLogs multiplier"), reawaken, venoms, rattlingCoils, vprAoe];
+// Death Rattle / Last Lash (xivanalysis SerpentsTail.tsx): each finisher
+// (Hindsbane, Hindsting, Flanksbane, Flanksting) readies a Death Rattle,
+// each Jagged / Bloodied Maw a Last Lash, until the next GCD. One the next
+// GCD replaced is lost: her average of it. Forced, death or movement
+// between the two: shown, not counted; one the pull's end cut isn't
+// judged. On disk 15 of 2,220 finishers (2026-10-16); the FFLogs top 20
+// for Red Hot and Deep Blue lose 9 of 596, two of them at the 1:47
+// downtime.
+const SERPENTS_TAIL: [readers: string[], follow: string][] = [
+  [["HINDSBANE_FANG", "HINDSTING_STRIKE", "FLANKSBANE_FANG", "FLANKSTING_STRIKE"], "DEATH_RATTLE"],
+  [["JAGGED_MAW", "BLOODIED_MAW"], "LAST_LASH"],
+];
+const serpentsTail: JobCheck = (ctx) => {
+  const out: DamageFinding[] = [];
+  const gcds = ctx.uses.filter((u) => u.startMs < ctx.endMs);
+  for (const [readers, follow] of SERPENTS_TAIL) {
+    const readyIds = new Set(ids(...readers)), followId = id(follow);
+    const avg = ctx.values.perUse(followId);
+    for (const u of gcds) {
+      if (!readyIds.has(u.action.id)) continue;
+      const next = gcds.find((x) => x.startMs > u.startMs);
+      if (!next) continue;
+      if (ctx.player.casts.some((c) => c.abilityId === followId && c.timestamp > u.startMs && c.timestamp < next.startMs)) continue;
+      const during = forcedPart(u.startMs, next.startMs, ctx.forced);
+      const moving = ctx.movement?.some((w) => w.startMs < next.startMs && w.endMs > u.startMs) ?? false;
+      const died = ctx.dead.some((d) => d.startMs >= u.startMs && d.startMs <= next.startMs);
+      out.push(finding(ctx, {
+        kind: "missed-followup", startMs: u.startMs, endMs: next.startMs, forced: during.ms > 0 || moving || died,
+        movement: (!during.ms && moving) || undefined, cause: during.ms > 0 ? during.cause : died ? "dead" : undefined,
+        label: `${A[follow].name} lost`, lostDamage: avg,
+        basis: `her average ${A[follow].name} (${k(avg)})`,
+        detail: `${u.abilityName} at ${clock(u.startMs)}: its ${A[follow].name} was replaced by ${next.abilityName} at ${clock(next.startMs)}`,
+      }));
+    }
+  }
+  return out;
+};
+
+export const VPR_CHECKS: JobCheck[] = [uptime("HUNTERS_INSTINCT", 0.1, "Hunter's Instinct is +10%, FFLogs multiplier"), reawaken, venoms, rattlingCoils, serpentOfferingsCheck, serpentsTail, vprAoe];
 // xivanalysis AoE.tsx: each form's AoE against that form's three
 // single-target GCDs (their cast-weighted average), Enlightenment against
 // The Forbidden Chakra.
