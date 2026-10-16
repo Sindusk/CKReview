@@ -537,7 +537,8 @@ const earthlyStarEarly: JobCheck = (ctx): DamageFinding[] => {
       lostDamage: dealt * (ratio - 1),
       basis: `${k(dealt)} Stellar Burst × ${(ratio - 1).toFixed(2)} (${basisRatio})`,
       detail: `Earthly Star${placed !== undefined ? ` placed ${clock(placed)}` : ""} detonated at ${clock(t)}, ` +
-        `${placed !== undefined ? `${((matures - t) / 1000).toFixed(1)}s ` : ""}before it matured: a Stellar Burst (${g.length} target${g.length > 1 ? "s" : ""}) instead of a Stellar Explosion`,
+        // The star lands a moment after the cast: a Burst can log at +10.2s.
+        `${placed !== undefined && matures - t >= 100 ? `${((matures - t) / 1000).toFixed(1)}s ` : "just "}before it matured: a Stellar Burst (${g.length} target${g.length > 1 ? "s" : ""}) instead of a Stellar Explosion`,
     }));
   }
   return out;
