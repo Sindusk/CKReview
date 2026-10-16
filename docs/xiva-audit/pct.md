@@ -27,11 +27,11 @@
 | pct/StarryMuse/expected-actions-portrait | verified | `starryMuse` Mog / Madeen | neither Mog of the Ages nor Retribution of the Madeen | — |
 | pct/StarryMuse/limited-additive | verified | `starryFillers` | an Additive spell inside Starry Muse | FRU 1 and qjCMx4bRfgNKwX9T 6:03 matched. Skipped on 7.2 in both. The app judges by when the spell lands. |
 | pct/StarryMuse/gcd-count-72 | superseded | `starryMuse` | under 9 GCDs (7.2 only) | Display only. |
-| pct/Procs/dropped-hammer-time | covered | `checkProcs` (stacks; declared Hammer Stamp, against Fire in Red) | Hammer Time stacks expiring | Hammers held out of the last window are a burst-window finding instead. Never fired before 2026-10-16: Stamp, Brush and Polishing split the removals, under the consumer inference's 60%. Declared now, each stack its Hammer Stamp average less a Fire in Red. Sample: 9zdH43vCn8Dr2Nqm (fetched for this; fight 5, Iloya Maeve, a low Red Hot and Deep Blue parse): 0:33.3 (2 stacks), 2:14.9 (3), 4:22.6 (2), 152-228k. On disk ~20 on Kevin Brachydiar's Lindwurm / Lindwurm II wipes (AYQm9Kd8Ct4FxcGp pull 5 1:27.7 hand-checked: Hammers held from 0:56.8 to 1:22, Smudge in Polishing Hammer's slot, ran out). Awaiting the page. |
+| pct/Procs/dropped-hammer-time | verified | `checkProcs` (stacks; declared Hammer Stamp, against Fire in Red) | Hammer Time stacks expiring | Hammers held out of the last window are a burst-window finding instead. Never fired before 2026-10-16: Stamp, Brush and Polishing split the removals, under the consumer inference's 60%. Declared now, each stack its Hammer Stamp average less a Fire in Red. Sample: 9zdH43vCn8Dr2Nqm (fetched for this; fight 5, Iloya Maeve, a low Red Hot and Deep Blue parse): 0:33.3 (2 stacks), 2:14.9 (3), 4:22.6 (2), 152-228k. On disk ~20 on Kevin Brachydiar's Lindwurm / Lindwurm II wipes (AYQm9Kd8Ct4FxcGp pull 5 1:27.7 hand-checked: Hammers held from 0:56.8 to 1:22, Smudge in Polishing Hammer's slot, ran out). Matched xivanalysis 2026-10-16: 7 stacks = 7. |
 | pct/Procs/dropped-rainbow-bright | covered | `checkProcs` | Rainbow Bright expiring | Not seen firing. |
 | pct/Procs/dropped-starstruck | covered | `checkProcs` | Starstruck expiring | Not seen firing. |
 | pct/Procs/dropped-aetherhues | covered | `checkProcs` | Aetherhues / Aetherhues II expiring (the paint combo running out) | Not seen firing. Several consumers (single and AoE); checkProcs takes a second one only past 10% of removals. |
-| pct/Procs/dropped-hyperphantasia | candidate | — | Hyperphantasia stacks expiring unused | Consumed by every Additive and Subtractive spell, so `checkProcs` finds no single consumer and skips it. A lost stack can cost Rainbow Bright (an instant Rainbow Drip). Premise check (2026-10-16), 670 Hyperphantasia windows on the 263 Pictomancer pulls on disk: 636 used all 5 stacks, 9 more. Every short one ended in the player's death (all statuses removed at once) or the wipe; xivanalysis counts those. Not built; build it if a living one shows up. |
+| pct/Procs/dropped-hyperphantasia | covered | `hyperphantasiaLost` | Hyperphantasia stacks expiring unused | Consumed by every Additive and Subtractive spell, so `checkProcs` finds no single consumer and skips it. A lost stack can cost Rainbow Bright (an instant Rainbow Drip). Premise check (2026-10-16), 670 Hyperphantasia windows on the 263 Pictomancer pulls on disk: 636 used all 5 stacks, 9 more. Every short one ended in the player's death (all statuses removed at once) or the wipe; xivanalysis counts those. Built 2026-10-16 once a living one showed up on 9zdH43vCn8Dr2Nqm's page (Iloya Maeve, "2 stacks unused"): Starry Muse 8:49.2 spent on Star Prism, Comet, a hardcast Pom Motif and Holy, ran out 9:19.8. A window reaching its 30s expiry without Rainbow Bright loses a Rainbow Drip less a Fire in Red (89k there); deaths, wipe strips and the kill aren't counted. Also fires on Brk8fQGnhJaxFKvb (Nyclatus Noctula) 7:06 and 9:17 (25k: hammers and Mog in the window, no Rainbow Bright). Stack removals can go unlogged (none logged in Iloya's last window), so it reads Rainbow Bright, not the stacks. |
 | pct/Procs/core-dropped-overwritten-invuln-off | no-damage | — | — | A table only; the job's own suggestions above are the rules. |
 | pct/Gauge/palette-overcap | verified | `palette` (gaugeFindings) | Palette over 100 | FRU 1 matched. The app also finds 25 over at K6qfMamL7rN8yz2Q The Tyrant 1:55 (85k), app-only and holding. Gauge comes with the cast, not the hit. |
 | pct/Gauge/overwrote-monochrome-tones | verified | `palette` Monochrome Tones | Subtractive Palette with Monochrome Tones still up | FRU 1 matched. |
@@ -77,10 +77,12 @@ players-buffed and overwrite columns.
 
 In priority order (biggest damage cost first):
 
-1. **pct/Procs/dropped-hammer-time** (covered): fires since 2026-10-16
-   (Hammer Time declared; see the row), awaiting 9zdH43vCn8Dr2Nqm's page.
+1. **pct/Procs/dropped-hammer-time** (verified 2026-10-16:
+   9zdH43vCn8Dr2Nqm's 7 stacks = the app's 2 + 3 + 2; its Monochrome
+   Tones overwrite 1 = 1).
    **rainbow-bright, starstruck, aetherhues** (covered): the 10 lowest
    Red Hot and Deep Blue Pictomancers (ff-probe.js) lost Starstruck once
    (NjKbPXFH27v6wkWQ 8:35) and Aetherhues at combo timeouts only.
-2. **pct/Procs/dropped-hyperphantasia** (candidate). Only deaths and
+2. **pct/Procs/dropped-hyperphantasia** (covered 2026-10-16, matched in
+   kind on 9zdH43vCn8Dr2Nqm; see the row). Before: only deaths and
    wipes drop stacks on disk.

@@ -507,7 +507,40 @@ const portraitOverwrites: JobCheck = (ctx): DamageFinding[] => {
   return out;
 };
 
-export const PCT_CHECKS: JobCheck[] = [starryMuse, starryFillers, palette, pctAoe, portraitOverwrites];
+// Hyperphantasia run out (xivanalysis pct/Procs.tsx, 2026-10-16): its 5
+// stacks go to aetherhue / Subtractive spells, and the fifth grants
+// Rainbow Bright (an instant Rainbow Drip). A window that ends without it
+// loses that Rainbow Drip, less the Fire in Red in its slot. Deaths and
+// the kill aren't counted (on 263 pulls every other short window was
+// one). 9zdH43vCn8Dr2Nqm (Iloya Maeve): Starry Muse 8:49.2 went to Star
+// Prism, Comet, a Pom Motif and Holy; Hyperphantasia ran out 9:19.8
+// (xivanalysis: 2 stacks unused).
+const hyperphantasiaLost: JobCheck = (ctx) => {
+  const hyper = S.HYPERPHANTASIA, bright = S.RAINBOW_BRIGHT;
+  if (!hyper || !bright) return [];
+  const drip = ctx.values.perUse(A.RAINBOW_DRIP.id), filler = ctx.values.perUse(A.FIRE_IN_RED.id);
+  const value = Math.max(0, drip - filler);
+  if (value <= 0) return [];
+  const brights = (ctx.player.buffs ?? []).filter((b) => b.abilityId === bright.id && b.buffStatus === "applied").map((b) => b.timestamp);
+  const out: DamageFinding[] = [];
+  for (const w of statusWindows(ctx, hyper.id)) {
+    if (w.endMs >= ctx.endMs || inWindows(w.endMs, ctx.dead) || ctx.dead.some((d) => d.startMs >= w.endMs && d.startMs - w.endMs <= 3_000)) continue;
+    if (brights.some((t) => t >= w.startMs && t <= w.endMs + 100)) continue;
+    // Its 30s expiry only: an earlier end is the log stripping buffs at a
+    // wipe (AYQm9Kd8Ct4FxcGp Lindwurm pull 21, 4:08 to 4:11).
+    if (w.endMs - w.startMs < (hyper.duration ?? 30_000) - 1_000) continue;
+    const during = forcedPart(w.endMs - 1, w.endMs + 1, ctx.forced);
+    out.push(finding(ctx, {
+      kind: "proc-lost", startMs: w.endMs, endMs: w.endMs, forced: during.ms > 0, cause: during.cause, inference: true,
+      label: "Hyperphantasia ran out", lostDamage: value,
+      basis: `${k(drip)} average Rainbow Drip − ${k(filler)} average Fire in Red (no Rainbow Bright without all 5 stacks)`,
+      detail: `Hyperphantasia from ${clock(w.startMs)} ran out at ${clock(w.endMs)} with stacks unused: no Rainbow Bright`,
+    }));
+  }
+  return out;
+};
+
+export const PCT_CHECKS: JobCheck[] = [starryMuse, starryFillers, palette, pctAoe, portraitOverwrites, hyperphantasiaLost];
 // Polyglot (xivanalysis Gauge.tsx), simulated from casts: Enochian (Astral
 // Fire / Umbral Ice) adds one every 30s from the first fire or ice spell,
 // Amplifier one more, Xenoglossy and Foul spend one; cap 3. A death empties
