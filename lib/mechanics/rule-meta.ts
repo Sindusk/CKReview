@@ -420,6 +420,16 @@ exposure("targeted", ["ffxiv-ll-doll-feed", "ffxiv-ll-throttle", "ffxiv-ll-drain
 mechanic("ffxiv-lc-aim", "Limit Cut sword/charge aim (number holder)", 2, ["ffxiv-lc-aim"]);
 mechanic("ffxiv-lc-knockback", "Limit Cut own knockback (number holder)", 2, ["ffxiv-lc-knockback"]);
 exposure("targeted", ["ffxiv-lc-aim", "ffxiv-lc-knockback"]);
+// The Epic of Alexander P2 (bj-cc.ts): each Water round tests the players
+// free to share it, each Lightning round its fixed helper; the mines test
+// Cruise Chaser's tank, the ice its tank, Flarethrower Brute Justice's tank
+// (reported at every instance).
+mechanic("ffxiv-bjcc-water-short", "Water stack (free healers / DPS)", 3, ["ffxiv-bjcc-water-short"]);
+mechanic("ffxiv-bjcc-lightning-alone", "Lightning stack helper", 3, ["ffxiv-bjcc-lightning-alone"]);
+mechanic("ffxiv-bjcc-mine-missed", "Hidden Mine soaks (mine tank)", 3, ["ffxiv-bjcc-mine-missed"]);
+mechanic("ffxiv-bjcc-ice", "Ice freezes the tornado (ice tank)", 3, ["ffxiv-bjcc-ice"]);
+mechanic("ffxiv-bjcc-flarethrower", "Flarethrower bait (Brute Justice's tank)", 3, ["ffxiv-bjcc-flarethrower"]);
+exposure("targeted", ["ffxiv-bjcc-water-short", "ffxiv-bjcc-lightning-alone", "ffxiv-bjcc-mine-missed", "ffxiv-bjcc-ice", "ffxiv-bjcc-flarethrower"]);
 // The Omega Protocol P1: each Program Loop round's towers test that round's
 // two In Line players (omega.ts reports both at every round).
 mechanic("ffxiv-top1-tower", "Program Loop towers (In Line soakers)", 1, ["ffxiv-top1-tower"]);

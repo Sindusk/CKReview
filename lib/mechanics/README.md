@@ -110,6 +110,11 @@ lib/mechanics/
                                 markers; stray sword/charge hits, sword aimed off
                                 the route, charge through the party, own knockback
                                 off the edge, Hawk Blaster, dead going in)
+      bj-cc.ts                — Phase 2 Brute Justice / Cruise Chaser per-pull
+                                rules (Decree Nisi collisions, wrong and dropped
+                                colors, Gavel; Water/Lightning stacks by NAUR
+                                round, Punishing; mines, ice, Flarethrower,
+                                Severe Contamination, Plasma Shield; avoidables)
       damage-context.ts       — Phase 1 damage context
                                 (the other tea/ files are research models only)
     trials/                   — Extreme trials

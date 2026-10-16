@@ -1,5 +1,147 @@
 // The Epic of Alexander (Ultimate) -- Phase 2: Brute Justice / Cruise Chaser.
 //
+// -- VERIFIED AGAINST LOGS (2026-10-16) --
+// Same static as intermission-limit-cut.ts, NAUR plan (user), no VODs, no
+// kill. Pulls are cited A<n> / B<n> / C<n> = the app's Pull n with the
+// whole report imported.
+// Report A = 1NG4Zah79yKYHCDv (73 pulls captured --to-minutes 3: its 9 J
+//   Kick pulls hold only BJ/CC's first ~35s).
+// Report B = HwjvVh3TNAZmMQyq (47 pulls; the 32 that reached phase 2 on
+//   disk, 30 reached J Kick; BJ/CC cleared in B28, B46).
+// Report C = LxAVFd29kwPm8HnB (30 pulls; the 19 that reached phase 2
+//   fetched --min-phase 2 --from-minutes 2.1 --to-minutes 5.7; BJ/CC
+//   cleared in C9, C10, C12, C13, C14, C18, C20, C27, C29).
+// The 11 clears carry no BJ/CC error (two tanks died to Double Rocket
+// Punch after Gavel, C10/C20: mitigation).
+// Clock (from J Kick, every pull within ~0.3s): Whirlwind +12.1; Judgment
+// Nisi +15.2 (Decree Nisi on all four DPS or all four supports +15.9, 36s);
+// Link-Up +21.3 (Water on a healer, Lightning on a DPS, 29s); Optical Sight
+// +29.4, Hawk Blaster +34.5, Photon +36.9; pass 1 +38-40; Spin Crusher
+// +46.7; Water/Lightning 1 +51.1; Missile Command +58.6; ice Earth Missile
+// +66.7 (a random tank); Hidden Mines +66-72; Enumeration +66.7; pass 2
+// +68-75; Water/Lightning 2 +80.9; Verdict +82.6 (Final Judgment, 45s);
+// Limit Cut (shield) +87.7; Flarethrower +90.0; pass 3 +96-106; Whirlwind
+// +101.9; Water/Lightning 3 +110.6; pass 4 +118-128; Propeller Wind +129;
+// Gavel +131.1 (every Nisi cleared +133.2); tank Photon +141; Double Rocket
+// Punch +149.4; Super Jump +156.8 and Apocalyptic Ray +159 only in the
+// slower clears (B46, C14, C27); Temporal Stasis +167 / +182.
+// Log IDs: Decree Nisi α/β/γ/δ 1002222/1002223/1002137/1002138; Final
+// Judgment α/β/γ/δ 1002224/1002225/1002139/1002140 (refreshed every ~3s);
+// Final Sentence 18493 is the Nisi penalty, logged only as the killing
+// blow (no damage event); 18518 is the enrage cast (never finished).
+// Compressed Water/Lightning 1002142/1002143; Water/Lightning Resistance
+// Down II 1002144/1002145 (31s, carrier only); Crashing Wave/Thunder
+// 18496/18497; Punishing Wave/Thunder 18498/18499. Hidden Mine 18514 (cast
+// target = soaker), Hidden Mine Shrapnel 18515, ice Earth Missile 18511
+// (cast target = ice tank), Frostbite 1000285, Sludge 1000287, Drainage
+// 18500 (tornado contact), Severe Contamination 18891 (a tornado left
+// alive, cast by "liquid rage"), Flarethrower 18502, Eye of the Chakram
+// 18517, Propeller Wind 18482 (Confused 1001283, 5s), Brute Justice's
+// autos 18811, Cruise Chaser's 18810. Cruise Chaser's Invincibility 1000775
+// lifts when the shield breaks (+92.5 to +96.6); Damage Up 1000290 at +96.8
+// means it timed out. Damage Down 1002092 comes only from the raid
+// penalties (Punishing, Severe Contamination, Shrapnel), so avoidables are
+// Minor unless they kill.
+// Roles on disk: Brute Justice's tank (most BJ autos) is the Warrior in
+// every pull: Lightning 1 helper, Flarethrower bait. Cruise Chaser's tank
+// (Paladin) soaks both mines and is Lightning 3's helper.
+// Findings:
+// - Decree Nisi passes copy the color; the donor keeps theirs until its 36s
+//   run out. NAUR pairs held in every clear (phys/OT, M1/MT, caster/shield
+//   healer, M2/regen healer). Two colors touching give each player the
+//   other's in the same millisecond, and Final Sentence kills both ~0.8s
+//   later: B1, B8, B11, B22, B37, B43, C4, C19, C22. Never in a clear.
+// - After Verdict every player must hold their Judgment color at Gavel;
+//   clear holders may already have run out (C9). Wrong colors picked up
+//   after Verdict (B22 +115.6, B31, B40 +121, C8 +99.8, C21) and colors
+//   whose last copy ran out (B4 +79.4, B14 +75.0, B19, B25 +51.9, B36, B38,
+//   B42 +106.3, C6 +104.3) end in a full-raid Final Sentence at Gavel
+//   (B40, B42, C8), as does a player dead at Gavel (B44, the tank killed by
+//   autos at +125).
+// - Water: 3-4 players in 90 of 95 rounds; 1-2 in B24, B30, C6, C11, C19,
+//   all lethal (29-32k each). Lightning: exactly two in 87; three or four
+//   in B22, B24, B30, B37, B42, C19, C22 (survivable unless already low);
+//   alone once (B15), when Compressed Lightning came straight back onto
+//   its carrier under its resistance and Punishing Thunder went off. Every
+//   Punishing ended the pull; its usual cause is a carrier's death.
+// - Drainage (a tornado) killed in B11, B13, B18, B25, B29, B31, B35, C21,
+//   ~5s after a Water explosion or walking through one; the Paladin's 0-dmg
+//   hits were Hallowed Ground.
+// - Severe Contamination: the first tornado unfrozen at +77 (B14 the ice
+//   tank alive, B36 the ice tank dead), the second unburned at +107 (B4,
+//   Flarethrower hit five non-tanks and missed the Warrior).
+// - Mines: the Paladin soaked both in every clear; Shrapnel when the second
+//   went off unsoaked (B38 the Paladin dead to Frostbite, C19 alive). Mines
+//   on a non-tank: B31 and B36 (the phys ranged, both died).
+// - Plasma Shield timed out in B29, B35, B47, C21; only B47 still had a
+//   party, and its Whirlwind hit 22-47k (median 32k, all eight died) vs
+//   at most 19k with the shield broken.
+// - Photon leaves everyone at 1 HP: a Nisi tick right after killed three in
+//   B12 and one in B8 with no killing blow (healing, not a reset).
+// - Eye of the Chakram killed in A58, B2, B31; no Hawk Blaster, Spin
+//   Crusher (bar one 0-dmg tank hit), Enumeration (bar B13, after three
+//   deaths), Super Jump extra or Apocalyptic Ray hit in any pull.
+// Cutoffs (34 BJ/CC wipes in B and C, every one has one): Decree Nisi
+// failed 14 (B1, B4, B14, B22, B25, B31, B37, B40, B42, B43, C4, C6, C8,
+// C22), Punishing Wave 9 (B2, B12, B13, B18, B24, B30, B36, C11, C24),
+// Punishing Thunder 3 (B15, B19, B35), both healers dead (ffxiv/common.ts)
+// 4 (B11, B29, C21, C30), Shrapnel 2 (B38, C19), Gavel 1 (B44), shield 1
+// (B47). In A: healers dead A58, A70; collapse A73 (its deaths are past
+// the capture's end). Unexplained: none. Pulls ending within 30s of J
+// Kick are intermission-limit-cut.ts's.
+//
+// -- RULES IMPLEMENTED --
+// ffxiv-bjcc-avoidable (Minor; Major if it killed): Eye of the Chakram,
+//   Hawk Blaster, Spin Crusher, Drainage, Sludge, Frostbite, Propeller
+//   Wind, and Flarethrower on anyone beside the tank who baited it.
+// ffxiv-bjcc-nisi-collision (Major, both players: the log can't say who
+//   moved), ffxiv-bjcc-nisi-wrong-color (Major, the receiver and the one
+//   other-side donor of that color), ffxiv-bjcc-nisi-dropped (Major, the
+//   last holder and the player it was owed to: after Verdict the matching
+//   Judgment, before it the one free player of the other side). A drop
+//   owed to a dead player is fallout (C6). Each sets the Raid
+//   ffxiv-bjcc-nisi-failed; ffxiv-bjcc-gavel (Raid) marks a Gavel that
+//   killed three or more with nothing earlier.
+// ffxiv-bjcc-water-short (Major if it killed or Punishing followed, else
+//   Minor): every free pool player missing from a Water under 3. Pool:
+//   healers and ranged DPS in rounds 1-2, all DPS in round 3, minus the
+//   Lightning carrier and helper and anyone under Water Resistance Down.
+// ffxiv-bjcc-lightning-alone (Major/Minor), on the round's helper: round 1
+//   Brute Justice's tank, round 2 the healer under Water Resistance Down,
+//   round 3 Cruise Chaser's tank. ffxiv-bjcc-lightning-extra (Minor; Major
+//   if it killed): anyone else in a Lightning with its helper.
+// ffxiv-bjcc-punishing (Raid), naming the carrier's death or the
+//   re-application; skipped for a reset death in the last 12s (C30).
+// ffxiv-bjcc-mine-missed (Major, the first mine's target, if alive at the
+//   Shrapnel) with the Raid ffxiv-bjcc-shrapnel; ffxiv-bjcc-mine-clip
+//   (Minor/Major) for anyone else hit while the soaker was alive.
+// ffxiv-bjcc-ice (Major, the ice tank alive throughout) and
+//   ffxiv-bjcc-flarethrower (Major/Minor, Brute Justice's tank when the
+//   cone went to others); ffxiv-bjcc-severe-contamination (Raid).
+// ffxiv-bjcc-shield (Raid): the Whirlwind after the shield with a median
+//   hit of 24k+ on four or more.
+// Generic, BJ/CC wipes only (no Temporal Stasis, ended 30s+ after J Kick),
+//   without a mechanic Raid: ffxiv-bjcc-called-wipe (3+ no-killing-blow
+//   deaths in 10s or any within 12s of the end; Photon-tick deaths
+//   excluded), ffxiv-bjcc-collapse (4 dead, pull over within 30s). Only the
+//   earliest Raid marker is kept.
+// Exposure: water-short, lightning-alone, mine-missed, ice and flarethrower
+//   are targeted (reported per instance); the rest are everyone (all eight
+//   carry Nisi).
+// Not built: Enumeration (its one failure, B13, followed three deaths);
+//   Super Jump / Apocalyptic Ray extras (no failure on disk); Water/Lightning
+//   hits under their own Resistance Down (none on disk); tank deaths to
+//   autos (C6, C24, B19, B44: mitigation; their Punishing / Gavel is the
+//   cutoff); the enrage (never reached).
+// OPEN QUESTIONS (no VOD yet):
+// 1. Collisions name both players. Who moved (B43 +63 two melee in the
+//    west Enumeration; C22 +101.5 two ranged at pass 3)?
+// 2. Wrong colors name receiver and donor. At pass 3 supports stand in a
+//    line and DPS walk to them; is the DPS donor the one at fault?
+// 3. A pre-Verdict drop with no single free receiver names the holder only
+//    (B25 +51.9, the Paladin dead 2s before with no killing blow).
+// 4. Lightning 2 with two melee besides the healer (B24): plan or error?
+//
 // -- GUIDE-DERIVED MODEL (2026-10-15) --
 // Research only, no detector and no claims verified against local logs.
 // Scope: eight-player level-80 Ultimate (patch 5.11), item-level sync 475.
@@ -298,3 +440,547 @@
 //    Apocalyptic Ray's exact targeting and geometry after Super Jump.
 // 6. Last-boss defeat windows, HP/targetability evidence and exact late
 //    enrage clock; distinguish voluntary edge resets and death fallout.
+
+import type { PlayerInfo, PlayerEvent } from "@/types/PlayerInfo";
+import type { DeathEvent } from "@/types/DeathEvent";
+import type { PullError, EnemyEvent } from "@/types/PullError";
+import type { ReportedOccurrence } from "@/lib/mechanics/occurrences";
+import { FF_JOB_BY_NAME } from "@/lib/ffl-job-data";
+import { kFmt, joinNames, playerError, raidMarker } from "@/lib/mechanics/wow/common";
+import {
+  DEATH_EVENT_LAG_MS, type Life, bodyHit, buildLife, castsOf, uniq, namesOf, realAmount, resetCluster, isTank,
+} from "@/lib/mechanics/ffxiv/fru/common";
+
+export const BJCC_AVOIDABLE_RULE_ID       = "ffxiv-bjcc-avoidable";
+export const BJCC_NISI_COLLISION_RULE_ID  = "ffxiv-bjcc-nisi-collision";
+export const BJCC_NISI_WRONG_RULE_ID      = "ffxiv-bjcc-nisi-wrong-color";
+export const BJCC_NISI_DROPPED_RULE_ID    = "ffxiv-bjcc-nisi-dropped";
+export const BJCC_NISI_FAILED_RULE_ID     = "ffxiv-bjcc-nisi-failed";
+export const BJCC_GAVEL_RULE_ID           = "ffxiv-bjcc-gavel";
+export const BJCC_WATER_SHORT_RULE_ID     = "ffxiv-bjcc-water-short";
+export const BJCC_LIGHTNING_ALONE_RULE_ID = "ffxiv-bjcc-lightning-alone";
+export const BJCC_LIGHTNING_EXTRA_RULE_ID = "ffxiv-bjcc-lightning-extra";
+export const BJCC_PUNISHING_RULE_ID       = "ffxiv-bjcc-punishing";
+export const BJCC_MINE_MISSED_RULE_ID     = "ffxiv-bjcc-mine-missed";
+export const BJCC_MINE_CLIP_RULE_ID       = "ffxiv-bjcc-mine-clip";
+export const BJCC_SHRAPNEL_RULE_ID        = "ffxiv-bjcc-shrapnel";
+export const BJCC_ICE_RULE_ID             = "ffxiv-bjcc-ice";
+export const BJCC_FLARETHROWER_RULE_ID    = "ffxiv-bjcc-flarethrower";
+export const BJCC_CONTAMINATION_RULE_ID   = "ffxiv-bjcc-severe-contamination";
+export const BJCC_SHIELD_RULE_ID          = "ffxiv-bjcc-shield";
+export const BJCC_CALLED_WIPE_RULE_ID     = "ffxiv-bjcc-called-wipe";
+export const BJCC_COLLAPSE_RULE_ID        = "ffxiv-bjcc-collapse";
+
+const J_KICK          = 18516;
+const JUDGMENT_NISI   = 18494;
+const VERDICT         = 18491;
+const GAVEL           = 18492;
+const FINAL_SENTENCE  = 18493;     // the Nisi penalty: a death, no damage event
+const LIMIT_CUT       = 18483;     // Plasma Shield goes up
+const TEMPORAL_STASIS = 18522;     // the next phase's first cast
+const CRASHING_WAVE   = 18496;
+const CRASHING_THUNDER = 18497;
+const PUNISHING_WAVE  = 18498;
+const PUNISHING_THUNDER = 18499;
+const COMPRESSED_WATER = 1002142;
+const COMPRESSED_LIGHTNING = 1002143;
+const WATER_RES_DOWN  = 1002144;
+const LIGHTNING_RES_DOWN = 1002145;
+const ICE_MISSILE     = 18511;     // Earth Missile on a tank: the ice
+const HIDDEN_MINE     = 18514;
+const MINE_SHRAPNEL   = 18515;
+const FLARETHROWER    = 18502;
+const SEVERE_CONTAMINATION = 18891; // a tornado left alive
+const WHIRLWIND       = 18882;
+const BJ_ATTACK       = 18811;
+const PHOTON          = 18487;
+
+const NISI: Record<number, string> = { 1002222: "α", 1002223: "β", 1002137: "γ", 1002138: "δ" };
+const JUDGMENT: Record<number, string> = { 1002224: "α", 1002225: "β", 1002139: "γ", 1002140: "δ" };
+
+type Avoidable = { name: string; advice: string };
+// Hits in no BJ/CC clear (11 on disk). Shadowbringers: no Damage Down from
+// any of these, so Minor unless the hit killed (PITFALLS).
+const AVOIDABLE: Record<number, Avoidable> = {
+  18517: { name: "Eye of the Chakram", advice: "the chakrams fire long lines through the center: after baiting them in the stack, step off their paths" },
+  18481: { name: "Hawk Blaster", advice: "Optical Sight drops a circle on every player: move out of your own before it lands" },
+  19058: { name: "Spin Crusher", advice: "Cruise Chaser's untelegraphed frontal: only its tank stays near the front, and moves behind it during the cast" },
+  18500: { name: "Drainage", advice: "every Water explosion leaves a tornado: move off the stack spot right after it goes off and never walk through a tornado" },
+  1000287: { name: "Sludge", advice: "the Earth Missile puddles stay on the ground: the missile baiters step out, everyone else stays clear" },
+  1000285: { name: "Frostbite", advice: "the ice tank's puddle expands until it freezes the tornado: keep away from it, and the ice tank drops it beside the tornado, not under themselves" },
+  18482: { name: "Propeller Wind", advice: "hide behind the frozen tornado, on the side away from Cruise Chaser" },
+};
+
+// Water was shared by 3-4 players in 90 of 95 rounds (B, C); every 1- or
+// 2-player Water killed its takers (B24, B30, C6, C11, C19).
+const WATER_MIN = 3;
+// The second Whirlwind with an unbroken shield (Damage Up) hit 22-47k and
+// killed all eight (B47); with the shield broken it hit up to 19k (B37).
+const SHIELD_WHIRLWIND_MEDIAN = 24_000;
+// The Plasma Shield broke 4.1-8.2s after Limit Cut in every pull that broke
+// it (timed out at +9.1); the Whirlwind it powers comes at +14.2.
+const SHIELD_WINDOW_MS = 10_000;
+// Pulls ending within 30s of J Kick are Limit Cut's (intermission-limit-cut.ts).
+const LC_HANDOFF_MS = 30_000;
+const COLLAPSE_DEAD_COUNT = 4;   // 4 dead -> pull over within 15s in all three reports
+const COLLAPSE_END_MS     = 30_000;
+const CALLED_WIPE_COUNT   = 3;
+const CALLED_WIPE_WINDOW  = 10_000;
+const CALLED_WIPE_END_MS  = 12_000;
+// Photon leaves everyone at 1 HP; a Nisi tick right after kills with no
+// killing blow (B8, B12). That's healing, not a reset.
+const PHOTON_DOT_MS = 10_000;
+
+type Iv = { p: PlayerInfo; col: string; a: number; b: number };
+
+const isDps = (p: PlayerInfo) => p.role === "DPS";
+const range = (p: PlayerInfo) => FF_JOB_BY_NAME[p.specName.replace(/ /g, "")]?.rangeType;
+const ranged = (p: PlayerInfo) => isDps(p) && range(p) !== "Melee";
+const sameSide = (a: PlayerInfo, b: PlayerInfo) => isDps(a) === isDps(b);
+
+/** One status's intervals on one player, refreshes merged. */
+function intervals(p: PlayerInfo, ids: number[]): { id: number; a: number; b: number }[] {
+  const out: { id: number; a: number; b: number }[] = [];
+  for (const id of ids) {
+    let open: number | null = null;
+    for (const e of p.debuffs.filter((x) => x.abilityId === id).sort((x, y) => x.timestamp - y.timestamp)) {
+      if (e.debuffStatus === "applied") { if (open === null) open = e.timestamp; }
+      else if (open !== null) { out.push({ id, a: open, b: e.timestamp }); open = null; }
+    }
+    if (open !== null) out.push({ id, a: open, b: Infinity });
+  }
+  return out;
+}
+const holds = (p: PlayerInfo, id: number, t: number) => intervals(p, [id]).some((w) => w.a <= t && w.b > t);
+/** A death soon after Photon left the player at 1 HP: a Nisi tick, not a reset. */
+function afterPhoton(players: PlayerInfo[], d: DeathEvent): boolean {
+  const p = players.find((x) => x.name === d.player);
+  return !!p && p.damageTaken.some((e: PlayerEvent) => e.abilityId === PHOTON && e.timestamp <= d.timestamp && d.timestamp - e.timestamp <= PHOTON_DOT_MS);
+}
+
+/**
+ * The Epic of Alexander, Phase 2: Brute Justice and Cruise Chaser. Self-gates
+ * on Judgment Nisi (only this phase casts it) and covers J Kick to Temporal
+ * Stasis, or to the last logged event.
+ */
+export function detectBjccErrors(
+  players: PlayerInfo[], deathEvents: DeathEvent[], enemyCasts: EnemyEvent[], occurrences?: ReportedOccurrence[],
+): PullError[] {
+  const nisiCast = castsOf(enemyCasts, JUDGMENT_NISI, Infinity)[0];
+  if (!nisiCast) return [];
+  const kick = castsOf(enemyCasts, J_KICK, nisiCast.timestamp).pop();
+  const start = kick ? kick.timestamp : nisiCast.timestamp - 15_000;
+  const stasis = enemyCasts.find((c) => c.abilityId === TEMPORAL_STASIS && c.timestamp > start);
+  const lastEvent = Math.max(0, ...players.flatMap((p) => [...p.damageTaken, ...p.casts].map((e) => e.timestamp)));
+  const end = stasis ? stasis.timestamp : lastEvent;
+  const life = buildLife(players, deathEvents);
+  const inWindow = (t: number) => t >= start && t <= end;
+  const casts = enemyCasts.filter((c) => inWindow(c.timestamp));
+
+  // Brute Justice's tank: the tank its autos hit most before the Water and
+  // Lightning go off (the Warrior in every pull on disk).
+  const tanks = players.filter(isTank);
+  const bjHits = (p: PlayerInfo) => p.damageTaken.filter((e) => e.abilityId === BJ_ATTACK && e.timestamp >= start && e.timestamp <= start + 50_000).length;
+  const mt = [...tanks].sort((a, b) => bjHits(b) - bjHits(a))[0];
+  const ot = tanks.find((p) => p !== mt);
+
+  const errors: PullError[] = [];
+  const raids: PullError[] = [];
+  errors.push(...detectAvoidables(players, life, start, end));
+  const nisi = detectNisi(players, deathEvents, life, casts, start, end);
+  errors.push(...nisi.errors);
+  raids.push(...nisi.raids);
+  const el = detectElements(players, deathEvents, life, casts, mt, ot, lastEvent, occurrences);
+  errors.push(...el.errors);
+  raids.push(...el.raids);
+  const arena = detectArena(players, life, casts, mt, occurrences);
+  errors.push(...arena.errors);
+  raids.push(...arena.raids);
+
+  // Only the earliest mechanic Raid marker; generic cutoffs only without one,
+  // and only for this phase's own wipes.
+  const firstRaid = raids.sort((a, b) => a.timestamp - b.timestamp)[0];
+  if (firstRaid) errors.push(firstRaid);
+  else if (!stasis && lastEvent - start > LC_HANDOFF_MS) {
+    const marker = genericCutoff(players, deathEvents, life, start, lastEvent);
+    if (marker) errors.push(marker);
+  }
+  return errors.sort((a, b) => a.timestamp - b.timestamp);
+}
+
+/** Avoidable ground and frontal hits: one error per player per ability per 3s. */
+function detectAvoidables(players: PlayerInfo[], life: Life, start: number, end: number): PullError[] {
+  const out: PullError[] = [];
+  for (const p of players) {
+    let last: { id: number; t: number } | undefined;
+    for (const e of p.damageTaken.filter((x) => AVOIDABLE[x.abilityId] && x.timestamp >= start && x.timestamp <= end && !bodyHit(x)).sort((a, b) => a.timestamp - b.timestamp)) {
+      if (!life.hitAlive(p, e.timestamp)) continue;
+      if (last && last.id === e.abilityId && e.timestamp - last.t <= 3000) continue;
+      const died = life.diedFrom(p, e.timestamp);
+      if (!died && realAmount(e) <= 0) continue;   // an invulnerability
+      last = { id: e.abilityId, t: e.timestamp };
+      const k = AVOIDABLE[e.abilityId];
+      out.push(playerError(p, {
+        ruleId: BJCC_AVOIDABLE_RULE_ID, severity: died ? "Major" : "Minor", name: `Hit by ${k.name}`,
+        description: `Hit by ${k.name} (${kFmt(realAmount(e))})${died ? " and died" : ""}: ${k.advice}.`,
+        timestamp: e.timestamp, abilityId: e.abilityId, abilityName: k.name,
+      }));
+    }
+  }
+  return out;
+}
+
+const NISI_ADVICE = "Keep apart from every other Decree Nisi carrier and touch only your partner for the pass";
+
+/**
+ * Decree Nisi. Contact copies a color onto an unmarked player; contact
+ * between two different colors gives each the other's (same millisecond)
+ * and Final Sentence kills both ~0.8s later. After Verdict every player
+ * must end on their Final Judgment color at Gavel. The failures:
+ * - collision: a player holding two colors at once (B1, B8, B11, B22, B37,
+ *   B43, C4, C19, C22; never in a clear);
+ * - wrong color: after Verdict a player picks up a color their Judgment
+ *   doesn't match (B22, B31, B40, C8, C21) and can't lose it before Gavel;
+ * - dropped: a color's last copy runs out on a living player with nobody
+ *   taking it (B4, B14, B19, B25, B36, B38, B42, C6).
+ * Each dooms the pull: Gavel then kills everyone (B40, B42, C8).
+ */
+function detectNisi(players: PlayerInfo[], deaths: DeathEvent[], life: Life, casts: EnemyEvent[], start: number, end: number) {
+  const errors: PullError[] = [];
+  const raids: PullError[] = [];
+  const ivs: Iv[] = players.flatMap((p) => intervals(p, Object.keys(NISI).map(Number))
+    .filter((w) => w.b >= start && w.a <= end).map((w) => ({ p, col: NISI[w.id], a: w.a, b: w.b })));
+  const judgment = new Map<PlayerInfo, string>();
+  for (const p of players) {
+    const j = p.debuffs.find((e) => JUDGMENT[e.abilityId] && e.debuffStatus === "applied" && e.timestamp >= start && e.timestamp <= end);
+    if (j) judgment.set(p, JUDGMENT[j.abilityId]);
+  }
+  const verdict = casts.find((c) => c.abilityId === VERDICT);
+  const gavel = casts.find((c) => c.abilityId === GAVEL);
+  const sentenced = (p: PlayerInfo, t: number) => deaths.some((d) => d.player === p.name && d.killingAbilityGameId === FINAL_SENTENCE && d.timestamp >= t && d.timestamp <= t + 4000);
+  const fail = (t: number, what: string) => raids.push(raidMarker(BJCC_NISI_FAILED_RULE_ID, "Decree Nisi Failed",
+    `${what} The Nisi colors can't all reach Gavel from here; unresolvable from here, treated as the cutoff point.`, t, FINAL_SENTENCE, "Final Sentence"));
+  const passName = (t: number) => {
+    const rel = t - start;
+    return rel < 30_000 ? "before the first pass" : rel < 55_000 ? "at the first pass" : rel < 82_000 ? "at the second pass" : rel < 110_000 ? "at the third pass" : "at the fourth pass";
+  };
+
+  // Collisions: gaining a color while holding another.
+  const collided = new Set<PlayerInfo>();
+  const hits: { t: number; ps: { p: PlayerInfo; had: string; got: string }[] }[] = [];
+  for (const x of ivs) {
+    const other = ivs.find((y) => y.p === x.p && y.col !== x.col && y.a < x.a + 50 && y.b > x.a + 50);
+    if (!other || !life.alive(x.p, x.a)) continue;
+    const g = hits.find((h) => Math.abs(h.t - x.a) <= 300);
+    const entry = { p: x.p, had: other.col, got: x.col };
+    if (g) { if (!g.ps.some((q) => q.p === x.p)) g.ps.push(entry); } else hits.push({ t: x.a, ps: [entry] });
+  }
+  for (const h of hits) {
+    const who = h.ps.map((q) => q.p);
+    who.forEach((p) => collided.add(p));
+    for (const q of h.ps) {
+      const others = h.ps.filter((o) => o.p !== q.p);
+      const dead = sentenced(q.p, h.t);
+      errors.push(playerError(q.p, {
+        ruleId: BJCC_NISI_COLLISION_RULE_ID, severity: "Major", name: "Decree Nisi Collision",
+        description: `Carrying Decree Nisi ${q.had}, they touched ${others.length ? `${namesOf(others.map((o) => o.p))} (${uniq(others.map((o) => o.had)).join("/")})` : "another color"} ${passName(h.t)}: different colors collide${dead ? " and Final Sentence killed them" : ""}. The log can't say which of the two moved. ${NISI_ADVICE}.`,
+        timestamp: h.t, abilityId: FINAL_SENTENCE, abilityName: "Final Sentence",
+      }));
+    }
+    fail(h.t, `${namesOf(who)} collided with different Decree Nisi colors ${passName(h.t)}.`);
+  }
+
+  // After Verdict: picking up a color the Judgment doesn't match.
+  if (verdict) {
+    for (const x of ivs) {
+      if (x.a < verdict.timestamp || collided.has(x.p)) continue;
+      const need = judgment.get(x.p);
+      if (!need || need === x.col || !life.alive(x.p, x.a)) continue;
+      const donors = ivs.filter((y) => y.col === x.col && y.p !== x.p && y.a < x.a - 50 && y.b >= x.a - 50 && !sameSide(y.p, x.p)).map((y) => y.p);
+      const donor = uniq(donors).length === 1 ? donors[0] : undefined;
+      const text = `After Verdict they needed ${need} but took ${x.col}${donor ? ` from ${donor.name}` : ""} ${passName(x.a)}. A wrong color can't be undone before Gavel, so Gavel will fail. Match your Final Judgment color with the partner holding it (the BPOG line at the fourth pass).`;
+      errors.push(playerError(x.p, { ruleId: BJCC_NISI_WRONG_RULE_ID, severity: "Major", name: "Wrong Decree Nisi Color", description: text, timestamp: x.a, abilityId: VERDICT, abilityName: "Verdict" }));
+      if (donor) errors.push(playerError(donor, {
+        ruleId: BJCC_NISI_WRONG_RULE_ID, severity: "Major", name: "Wrong Decree Nisi Color",
+        description: `Passed Decree Nisi ${x.col} to ${x.p.name}, whose Final Judgment needed ${need} (${passName(x.a)}). The log can't say which of the two went to the wrong partner. Pass each color to the player whose Judgment matches it.`,
+        timestamp: x.a, abilityId: VERDICT, abilityName: "Verdict",
+      }));
+      fail(x.a, `${x.p.name} took Decree Nisi ${x.col} against a ${need} Judgment.`);
+    }
+  }
+
+  // A color's last copy running out on a living player.
+  for (const x of ivs) {
+    if (x.b === Infinity || x.b > end || collided.has(x.p)) continue;
+    if (gavel && x.b >= gavel.timestamp - 1000) continue;            // Gavel clears them
+    if (deaths.some((d) => d.player === x.p.name && d.timestamp >= x.b - 500 && d.timestamp <= x.b + DEATH_EVENT_LAG_MS + 800)) continue;
+    if (!life.alive(x.p, x.b - 100)) continue;
+    if (ivs.some((y) => y !== x && y.col === x.col && y.a <= x.b + 100 && y.b > x.b + 100)) continue;
+    // Who should have taken it: after Verdict, the other side's player with
+    // that Judgment; before it, the one living player of the other side
+    // holding nothing (the partner, by elimination).
+    const otherSide = players.filter((p) => !sameSide(p, x.p) && life.alive(p, x.b));
+    const holding = (p: PlayerInfo) => ivs.some((y) => y.p === p && y.a <= x.b && y.b > x.b);
+    let receiver: PlayerInfo | undefined;
+    const t = x.b;
+    if (verdict && x.b > verdict.timestamp) {
+      const owed = players.find((p) => !sameSide(p, x.p) && judgment.get(p) === x.col);
+      // The player it was owed to had died: fallout of that death (C6, the
+      // tank who needed it died 0.6s before).
+      if (owed && !life.alive(owed, x.b - 1000)) {
+        fail(t, `Decree Nisi ${x.col} ran out on ${x.p.name}: ${owed.name}, whose Judgment needed it, was dead.`);
+        continue;
+      }
+      receiver = owed && !holding(owed) ? owed : undefined;
+    } else { const free = otherSide.filter((p) => !holding(p)); if (free.length === 1) receiver = free[0]; }
+    errors.push(playerError(x.p, {
+      ruleId: BJCC_NISI_DROPPED_RULE_ID, severity: "Major", name: "Decree Nisi Not Passed",
+      description: `Their Decree Nisi ${x.col} ran out ${passName(t)} with nobody else holding ${x.col}${receiver ? `; ${receiver.name} should have taken it` : ""}, so the color is lost and Gavel will fail. The log can't say whether the carrier or the receiver missed the pass. Pass before your timer ends.`,
+      timestamp: t, abilityId: JUDGMENT_NISI, abilityName: "Judgment Nisi",
+    }));
+    if (receiver) errors.push(playerError(receiver, {
+      ruleId: BJCC_NISI_DROPPED_RULE_ID, severity: "Major", name: "Decree Nisi Not Passed",
+      description: `${x.p.name}'s Decree Nisi ${x.col} ran out ${passName(t)} and they were the one to take it (${verdict && t > verdict.timestamp ? `their Judgment is ${x.col}` : "the only player of their side without a color"}). The log can't say whether the carrier or the receiver missed the pass.`,
+      timestamp: t, abilityId: JUDGMENT_NISI, abilityName: "Judgment Nisi",
+    }));
+    fail(t, `Decree Nisi ${x.col} ran out on ${x.p.name} with no other copy.`);
+  }
+
+  // Gavel: Final Sentence on three or more right after it.
+  if (gavel) {
+    const killed = deaths.filter((d) => d.killingAbilityGameId === FINAL_SENTENCE && d.timestamp >= gavel.timestamp && d.timestamp <= gavel.timestamp + 8000);
+    if (uniq(killed.map((d) => d.player)).length >= 3) {
+      const t = gavel.timestamp;
+      const dead = players.filter((p) => judgment.has(p) && !life.alive(p, t));
+      const wrong = players.filter((p) => life.alive(p, t) && judgment.has(p)).flatMap((p) => {
+        const held = ivs.filter((y) => y.p === p && y.a <= t && y.b > t).map((y) => y.col);
+        return held.length && !held.includes(judgment.get(p)!) ? [`${p.name} held ${held.join("/")} for ${judgment.get(p)}`] : [];
+      });
+      const why = [dead.length ? `${namesOf(dead)} ${dead.length === 1 ? "was" : "were"} dead, so ${dead.length === 1 ? "their Judgment" : "their Judgments"} couldn't be met` : "", ...wrong].filter(Boolean);
+      raids.push(raidMarker(BJCC_GAVEL_RULE_ID, "Gavel Failed",
+        `Final Sentence at Gavel killed ${uniq(killed.map((d) => d.player)).length}${why.length ? `: ${why.join("; ")}` : ""}. Every Final Judgment must be met by a living player when Gavel resolves. Treated as the cutoff point.`,
+        t, GAVEL, "Gavel"));
+    }
+  }
+  return { errors, raids };
+}
+
+/**
+ * Compressed Water and Lightning, three rounds (+51 / +81 / +111 after J
+ * Kick). NAUR's split: Water is shared by 3+ of the healers and ranged in
+ * rounds 1-2 and by the DPS in round 3; Lightning by exactly two, its
+ * carrier and a fixed helper (round 1 Brute Justice's tank, round 2 the
+ * healer under Water Resistance Down, round 3 the other tank). A Lightning
+ * shared by nobody comes back onto its carrier under Lightning Resistance
+ * Down: Punishing Thunder at once (B15).
+ */
+function detectElements(players: PlayerInfo[], deaths: DeathEvent[], life: Life, casts: EnemyEvent[], mt: PlayerInfo | undefined, ot: PlayerInfo | undefined, lastEvent: number, occurrences?: ReportedOccurrence[]) {
+  const errors: PullError[] = [];
+  const raids: PullError[] = [];
+  const crash = castsOf(casts, [CRASHING_WAVE, CRASHING_THUNDER], Infinity);
+  const rounds: number[] = [];
+  for (const c of crash) if (!rounds.some((t) => Math.abs(t - c.timestamp) < 1500)) rounds.push(c.timestamp);
+  const carrierOf = (id: number, t: number) => players.find((p) => intervals(p, [id]).some((w) => Math.abs(w.b - t) <= 600));
+  const hitBy = (id: number, t: number) => uniq(players.filter((p) => life.alive(p, t - 300) && p.damageTaken.some((e) => e.abilityId === id && e.timestamp >= t - 200 && e.timestamp <= t + 1500 && !bodyHit(e))));
+  const dmg = (p: PlayerInfo, id: number, t: number) => p.damageTaken.filter((e) => e.abilityId === id && e.timestamp >= t - 200 && e.timestamp <= t + 1500).reduce((s, e) => s + realAmount(e), 0);
+  const punishedAfter = (t: number, id: number) => casts.some((c) => c.abilityId === id && c.timestamp >= t && c.timestamp <= t + 6000);
+
+  rounds.forEach((t, i) => {
+    const n = i + 1;
+    const wCarrier = carrierOf(COMPRESSED_WATER, t);
+    const lCarrier = carrierOf(COMPRESSED_LIGHTNING, t);
+    const water = hitBy(CRASHING_WAVE, t);
+    const light = hitBy(CRASHING_THUNDER, t);
+    const wRes = (p: PlayerInfo) => holds(p, WATER_RES_DOWN, t - 100);
+    const healers = players.filter((p) => p.role === "Healer");
+    const helper = n === 1 ? mt : n === 2 ? (healers.find(wRes) ?? healers.find((p) => !water.includes(p))) : ot;
+    const pool = players.filter((p) => (n < 3 ? p.role === "Healer" || ranged(p) : isDps(p)) && life.alive(p, t - 300) && !wRes(p) && p !== lCarrier && p !== helper);
+    if (helper && lCarrier && helper !== lCarrier) occurrences?.push({ mechanicKey: BJCC_LIGHTNING_ALONE_RULE_ID, timestamp: t, players: [helper.name] });
+    occurrences?.push({ mechanicKey: BJCC_WATER_SHORT_RULE_ID, timestamp: t, players: pool.map((p) => p.name) });
+
+    // Water shared by too few.
+    if (wCarrier && water.length && water.length < WATER_MIN) {
+      const missing = pool.filter((p) => !water.includes(p) && p !== wCarrier);
+      const killed = water.filter((p) => life.diedFrom(p, t));
+      const severe = killed.length > 0 || punishedAfter(t, PUNISHING_WAVE);
+      const each = water.map((p) => `${p.name} ${kFmt(dmg(p, CRASHING_WAVE, t))}`).join(", ");
+      for (const p of missing) errors.push(playerError(p, {
+        ruleId: BJCC_WATER_SHORT_RULE_ID, severity: severe ? "Major" : "Minor", name: "Missed the Water Stack",
+        description: `Water round ${n} was shared by only ${water.length} (${each})${killed.length ? `; ${namesOf(killed)} died` : ""}. They were free to take it (${p.role === "Healer" ? "a healer" : "a DPS"} without Water Resistance Down, not in the Lightning pair)${light.includes(p) ? " but stood in the Lightning stack instead" : ""}. Water needs three or more.`,
+        timestamp: t, abilityId: CRASHING_WAVE, abilityName: "Crashing Wave",
+      }));
+    }
+
+    if (!lCarrier || !light.length) return;
+    // Lightning alone: its helper never came.
+    if (light.length === 1 && light[0] === lCarrier && helper && helper !== lCarrier && life.alive(helper, t - 300)) {
+      const severe = punishedAfter(t, PUNISHING_THUNDER) || !!life.diedFrom(lCarrier, t);
+      errors.push(playerError(helper, {
+        ruleId: BJCC_LIGHTNING_ALONE_RULE_ID, severity: severe ? "Major" : "Minor", name: "Missed the Lightning Stack",
+        description: `Lightning round ${n} hit only its carrier, ${lCarrier.name}${severe ? ", and came straight back onto them under Lightning Resistance Down: Punishing Thunder" : ""}. ${n === 1 ? "Brute Justice's tank" : n === 2 ? "The healer under Water Resistance Down" : "Cruise Chaser's tank"} shares this one with the carrier.`,
+        timestamp: t, abilityId: CRASHING_THUNDER, abilityName: "Crashing Thunder",
+      }));
+    }
+    // Lightning taken by extra players.
+    if (light.length >= 3 && helper && light.includes(helper)) {
+      for (const p of light.filter((q) => q !== lCarrier && q !== helper)) {
+        const died = life.diedFrom(p, t);
+        errors.push(playerError(p, {
+          ruleId: BJCC_LIGHTNING_EXTRA_RULE_ID, severity: died ? "Major" : "Minor", name: "Extra in the Lightning Stack",
+          description: `Took Lightning round ${n} (${kFmt(dmg(p, CRASHING_THUNDER, t))}) with its carrier ${lCarrier.name} and ${helper.name}${died ? " and died" : ""}. Lightning is for exactly two: the carrier and ${helper.name}.${n < 3 && (p.role === "Healer" || ranged(p)) ? " You belong in the Water stack." : ""}`,
+          timestamp: t, abilityId: CRASHING_THUNDER, abilityName: "Crashing Thunder",
+        }));
+      }
+    }
+  });
+
+  // Punishing Wave / Thunder: a carrier died, or the status came back onto
+  // a player under its resistance. Raid-wide, every one ended the pull.
+  for (const c of castsOf(casts, [PUNISHING_WAVE, PUNISHING_THUNDER], Infinity)) {
+    const water = c.abilityId === PUNISHING_WAVE;
+    const id = water ? COMPRESSED_WATER : COMPRESSED_LIGHTNING;
+    const holder = players.find((p) => intervals(p, [id]).some((w) => w.a <= c.timestamp + 200 && w.b >= c.timestamp - 3000));
+    const d = holder && deaths.find((x) => x.player === holder.name && x.timestamp >= c.timestamp - 3000 && x.timestamp <= c.timestamp + DEATH_EVENT_LAG_MS + 1000);
+    // A carrier's no-killing-blow death near the end is the reset itself
+    // (C30): the called wipe is the cutoff, not its Punishing. Not a Nisi
+    // tick at 1 HP after Photon (B12).
+    const photon = !!d && afterPhoton(players, d);
+    if (d && !d.killingAbilityGameId && !photon && lastEvent - d.timestamp <= CALLED_WIPE_END_MS) continue;
+    const how = !d ? "" : d.killingAbilityGameId ? ` (${d.cause})` : photon ? " (a Decree Nisi tick at 1 HP after Photon)" : " (no killing blow)";
+    const why = !holder ? "" : d ? ` ${holder.name}, carrying Compressed ${water ? "Water" : "Lightning"}, died${how}.` : ` Compressed ${water ? "Water" : "Lightning"} came back onto ${holder.name} under its own Resistance Down.`;
+    raids.push(raidMarker(BJCC_PUNISHING_RULE_ID, water ? "Punishing Wave" : "Punishing Thunder",
+      `${water ? "Punishing Wave" : "Punishing Thunder"} hit the raid.${why} Unresolvable from here; treated as the cutoff point.`,
+      c.timestamp, c.abilityId, water ? "Punishing Wave" : "Punishing Thunder"));
+  }
+  return { errors, raids };
+}
+
+/**
+ * Mines, ice, fire, tornadoes and the shield. Cruise Chaser's tank (the
+ * Paladin on disk) baits the missiles and soaks both Hidden Mines; Earth
+ * Missile's ice lands on a random tank, who drops it to freeze the first
+ * tornado; Brute Justice's tank baits Flarethrower through the second.
+ */
+function detectArena(players: PlayerInfo[], life: Life, casts: EnemyEvent[], mt: PlayerInfo | undefined, occurrences?: ReportedOccurrence[]) {
+  const errors: PullError[] = [];
+  const raids: PullError[] = [];
+  const byName = (n?: string) => players.find((p) => p.name === n);
+
+  // Hidden Mines: the first mine's target is the soaker.
+  const mines = castsOf(casts, HIDDEN_MINE, Infinity);
+  const soaker = byName(mines[0]?.target);
+  if (soaker) occurrences?.push({ mechanicKey: BJCC_MINE_MISSED_RULE_ID, timestamp: mines[0].timestamp, players: [soaker.name] });
+  for (const p of players) {
+    if (p === soaker) continue;
+    for (const e of p.damageTaken.filter((x) => x.abilityId === HIDDEN_MINE && !bodyHit(x) && mines.length && x.timestamp >= mines[0].timestamp - 200 && x.timestamp <= mines[0].timestamp + 15_000)) {
+      if (!soaker || !life.alive(soaker, e.timestamp) || !life.hitAlive(p, e.timestamp)) continue;
+      const died = life.diedFrom(p, e.timestamp);
+      errors.push(playerError(p, {
+        ruleId: BJCC_MINE_CLIP_RULE_ID, severity: died ? "Major" : "Minor", name: "Hit by Hidden Mine",
+        description: `Caught a Hidden Mine (${kFmt(realAmount(e))})${died ? " and died" : ""} while ${soaker.name} was soaking them. Only the mine tank stands in the mines: wait until both have gone off before moving in.`,
+        timestamp: e.timestamp, abilityId: HIDDEN_MINE, abilityName: "Hidden Mine",
+      }));
+    }
+  }
+  const shrapnel = castsOf(casts, MINE_SHRAPNEL, Infinity)[0];
+  if (shrapnel) {
+    const ok = soaker && life.alive(soaker, shrapnel.timestamp);
+    if (ok) errors.push(playerError(soaker!, {
+      ruleId: BJCC_MINE_MISSED_RULE_ID, severity: "Major", name: "Hidden Mine Not Soaked",
+      description: `A Hidden Mine went off unsoaked (Hidden Mine Shrapnel on the whole raid, with Damage Down) while they were alive. The mine tank soaks both mines, one after the other.`,
+      timestamp: shrapnel.timestamp, abilityId: MINE_SHRAPNEL, abilityName: "Hidden Mine Shrapnel",
+    }));
+    raids.push(raidMarker(BJCC_SHRAPNEL_RULE_ID, "Hidden Mine Shrapnel",
+      `A Hidden Mine went off unsoaked${soaker && !ok ? ` (${soaker.name}, the mine tank, was dead)` : ""}: Shrapnel on the whole raid with Damage Down. Unresolvable from here; treated as the cutoff point.`,
+      shrapnel.timestamp, MINE_SHRAPNEL, "Hidden Mine Shrapnel"));
+  }
+
+  // Flarethrower: Brute Justice's nearest player, its tank in every clear.
+  const flare = castsOf(casts, FLARETHROWER, Infinity)[0];
+  const contamination = castsOf(casts, SEVERE_CONTAMINATION, Infinity);
+  if (flare && mt) {
+    occurrences?.push({ mechanicKey: BJCC_FLARETHROWER_RULE_ID, timestamp: flare.timestamp, players: [mt.name] });
+    const hit = uniq(players.filter((p) => life.alive(p, flare.timestamp) && p.damageTaken.some((e) => e.abilityId === FLARETHROWER && e.timestamp >= flare.timestamp - 100 && e.timestamp <= flare.timestamp + 1500 && !bodyHit(e))));
+    const killed = hit.filter((p) => life.diedFrom(p, flare.timestamp + 500));
+    const tornadoLeft = contamination.some((c) => c.timestamp > flare.timestamp && c.timestamp - flare.timestamp <= 25_000);
+    const others = hit.filter((p) => p !== mt);
+    if (others.length && !hit.includes(mt) && life.alive(mt, flare.timestamp)) {
+      errors.push(playerError(mt, {
+        ruleId: BJCC_FLARETHROWER_RULE_ID, severity: killed.length || tornadoLeft ? "Major" : "Minor", name: "Flarethrower Not Baited",
+        description: `Flarethrower went to ${namesOf(others)} instead of them${killed.length ? `; ${namesOf(killed)} died` : ""}${tornadoLeft ? ", and the second tornado survived it (Severe Contamination)" : ""}. It aims at Brute Justice's nearest player: as its tank, stay closest and point the cone through the second tornado, away from the party.`,
+        timestamp: flare.timestamp, abilityId: FLARETHROWER, abilityName: "Flarethrower",
+      }));
+    } else if (hit.includes(mt)) {
+      for (const p of others) errors.push(playerError(p, {
+        ruleId: BJCC_AVOIDABLE_RULE_ID, severity: life.diedFrom(p, flare.timestamp + 500) ? "Major" : "Minor", name: "Hit by Flarethrower",
+        description: `Stood in Flarethrower, baited by ${mt.name}${life.diedFrom(p, flare.timestamp + 500) ? ", and died" : ""}: stay out of Brute Justice's front while its tank aims the cone at the tornado.`,
+        timestamp: flare.timestamp, abilityId: FLARETHROWER, abilityName: "Flarethrower",
+      }));
+    }
+  }
+
+  // Severe Contamination: a tornado left alive. Before Flarethrower it's
+  // the first (the ice missed it); after, the second (the fire missed it).
+  const ice = castsOf(casts, ICE_MISSILE, Infinity)[0];
+  const iceTank = byName(ice?.target);
+  if (ice && iceTank) occurrences?.push({ mechanicKey: BJCC_ICE_RULE_ID, timestamp: ice.timestamp, players: [iceTank.name] });
+  for (const c of contamination) {
+    const first = !flare || c.timestamp < flare.timestamp;
+    let cause = first ? "The first tornado wasn't frozen by the ice." : "The second tornado wasn't burned by Flarethrower.";
+    if (first && iceTank && ice) {
+      if (life.alive(iceTank, ice.timestamp + 3000) && life.alive(iceTank, c.timestamp - 5000)) {
+        errors.push(playerError(iceTank, {
+          ruleId: BJCC_ICE_RULE_ID, severity: "Major", name: "Ice Missed the Tornado",
+          description: `They had the ice (Earth Missile) and the first tornado wasn't frozen: Severe Contamination hit the whole raid with Damage Down. Drop the ice right beside the tornado so the expanding puddle freezes it, without standing on the tornado.`,
+          timestamp: c.timestamp, abilityId: SEVERE_CONTAMINATION, abilityName: "Severe Contamination",
+        }));
+      } else cause += ` ${iceTank.name}, who had the ice, died first.`;
+    }
+    raids.push(raidMarker(BJCC_CONTAMINATION_RULE_ID, "Severe Contamination",
+      `${cause} Severe Contamination hit the whole raid with Damage Down. Unresolvable from here; treated as the cutoff point.`,
+      c.timestamp, SEVERE_CONTAMINATION, "Severe Contamination"));
+  }
+
+  // Plasma Shield left up: Cruise Chaser's Damage Up Whirlwind.
+  const lc = castsOf(casts, LIMIT_CUT, Infinity)[0];
+  const ww = lc && casts.find((c) => c.abilityId === WHIRLWIND && c.timestamp > lc.timestamp + SHIELD_WINDOW_MS);
+  if (ww) {
+    const hs = players.flatMap((p) => p.damageTaken.filter((e) => e.abilityId === WHIRLWIND && e.timestamp >= ww.timestamp - 100 && e.timestamp <= ww.timestamp + 2000 && !bodyHit(e)).map((e) => ({ p, e })));
+    const amounts = hs.map((h) => realAmount(h.e)).sort((a, b) => a - b);
+    const median = amounts.length ? amounts[Math.floor(amounts.length / 2)] : 0;
+    if (hs.length >= 4 && median >= SHIELD_WHIRLWIND_MEDIAN) {
+      raids.push(raidMarker(BJCC_SHIELD_RULE_ID, "Plasma Shield Not Broken",
+        `The Plasma Shield wasn't broken in time, so Cruise Chaser's Whirlwind came with Damage Up (median ${kFmt(median)} per player). Hit the shield from its front during its short window. Unresolvable from here; treated as the cutoff point.`,
+        ww.timestamp, WHIRLWIND, "Whirlwind"));
+    }
+  }
+  return { errors, raids };
+}
+
+/** Called wipe or collapse, when no mechanic marked the cutoff. */
+function genericCutoff(players: PlayerInfo[], deaths: DeathEvent[], life: Life, start: number, lastEvent: number): PullError | undefined {
+  const generic: PullError[] = [];
+  const silent = deaths.filter((d) => !d.killingAbilityGameId && d.timestamp - DEATH_EVENT_LAG_MS >= start + 5000 && !afterPhoton(players, d));
+  const called = new Set<DeathEvent>();
+  for (const d of silent) {
+    if (lastEvent - d.timestamp <= CALLED_WIPE_END_MS) called.add(d);
+    const near = resetCluster(silent.filter((x) => Math.abs(x.timestamp - d.timestamp) <= CALLED_WIPE_WINDOW), deaths);
+    if (near.length >= CALLED_WIPE_COUNT) near.forEach((x) => called.add(x));
+  }
+  const calledList = resetCluster([...called], deaths).sort((a, b) => a.timestamp - b.timestamp);
+  if (calledList.length >= CALLED_WIPE_COUNT || (calledList.length && lastEvent - calledList[0].timestamp <= CALLED_WIPE_END_MS)) {
+    generic.push(raidMarker(BJCC_CALLED_WIPE_RULE_ID, "Wipe Called",
+      `${calledList.length} player${calledList.length > 1 ? "s" : ""} died with no killing blow (${joinNames(uniq(calledList.map((d) => d.player)))}) near the end: the wipe was called.`,
+      calledList[0].timestamp - DEATH_EVENT_LAG_MS, 0, "Deaths"));
+  }
+  const outAt = (t: number) => players.filter((p) => !life.alive(p, t));
+  const collapseT = life.outIntervals.map((w) => w.start).filter((t) => t >= start).sort((a, b) => a - b)
+    .find((t) => outAt(t).length >= COLLAPSE_DEAD_COUNT && lastEvent - t <= COLLAPSE_END_MS);
+  if (collapseT !== undefined) {
+    const who = outAt(collapseT).map((p) => p.name);
+    generic.push(raidMarker(BJCC_COLLAPSE_RULE_ID, "Party Collapse",
+      `${who.length} players were dead at once (${joinNames(who)}). Treated as the cutoff point.`,
+      collapseT + DEATH_EVENT_LAG_MS, 0, "Deaths"));
+  }
+  return generic.sort((a, b) => a.timestamp - b.timestamp)[0];
+}

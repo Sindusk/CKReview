@@ -149,6 +149,14 @@ philosophy and the data semantics this list assumes.
 - **A logged facing can point backwards.** TEA's Alpha Sword cone runs
   along the cast's facing + 180: check the axis against the owner's
   position in clean casts before measuring aim (TEA Limit Cut).
+- **A penalty can exist only as a killing blow.** TEA's Final Sentence
+  (Decree Nisi) logs no damage event; find it in the deaths'
+  `killingAbilityGameId` (TEA BJ/CC).
+- **A contact-copied status shows who touched whom.** TEA's Decree Nisi
+  colors copy on contact; two colors touching give each player the other's
+  in the same millisecond, then both die. Holding two colors at once is the
+  collision; a color whose last copy runs out on a living player is a
+  missed pass (TEA BJ/CC).
 - **A shared line's groups can be read from the pull itself.** Union the
   players of every line that hit 2+; a component of four is one group and
   the other group is its complement. One set's lines rarely place the
@@ -488,6 +496,10 @@ Classify every one before counting a called wipe. Known meanings:
 - **Stepping off a raised platform over the edge:** death 2.0-2.4s after
   the platform aura (1004721) ends (Doomtrain).
 - **Walking Dead running out unhealed** (Dark Knight): player-less.
+- **A DoT tick after an HP-to-1 mechanic.** TEA's Photon sets everyone to
+  1 HP; a Decree Nisi tick before the heals lands kills with no killing
+  blow (B12: three at once). Healing, not a reset: keep them out of the
+  called-wipe count (TEA BJ/CC).
 - **Deliberate deaths to drop Damage Down.** Every Omega P5 Blind Faith
   pull had its Damage Down holders walk into the wall after Blaster, once
   their Worlds were done; Dynamis survives death. Not errors.
