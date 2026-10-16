@@ -154,7 +154,9 @@
 //   Apocalyptic Ray, Eye of the Chakram.
 // ffxiv-ap-soak-extra (Minor; Major if they died within 10s): soaking a
 //   check owed to a living number. ffxiv-ap-soak-missed (Major): the owed
-//   number, alive and unhit, missed the puddle. ffxiv-ap-confession (Raid).
+//   number, alive and unhit, missed the puddle, unless anyone died earlier
+//   in Wormhole (C12, user: fallout of #1's sword killing a healer).
+//   ffxiv-ap-confession (Raid).
 // ffxiv-ap-heat-stack (Minor; Major if the stack killed): alive and outside
 //   Incinerating Heat.
 // ffxiv-ap-enumeration (Major: a healer in the tanks' circle, a tank in the
@@ -173,17 +175,25 @@
 // Not built: Divine Spear / Chastening Heat and Tetrashatter deaths
 //   (cooldowns and healing); Plaint of Solidarity short (one case, B28, in a
 //   cascade); the transition hit (no LB in any clear, 17-31k).
-// VOD review 2026-10-16 (user): report C pull 10, rulings in
-//   expectations/rulings.json.
+// VOD review 2026-10-16 (user): report C pulls 9, 10, 12, 14, 29, rulings
+//   in expectations/rulings.json. Confirmed as detected: the Inception
+//   sword on a dragoon nearest Cruise Chaser (C9 with Assault, C14 off the
+//   west side), C12's Stasis cone not baited cleanly south, C29's jump
+//   extras too close. C14's jump extras: probably, the VOD can't confirm.
+//   C27's Electromagnetic Burst: the warrior and the white mage moved to
+//   the wrong orb positions (user), but every orb take sat on the four
+//   clean spots and no take order or timing separates the burst pulls
+//   (C27, D5, D16) from clean ones, so it stays player-less.
 // OPEN QUESTIONS:
-// 1. Electromagnetic Burst names nobody (C27, D5, D16). Which orb went
-//    wrong, and can its taker be told from the tether order?
+// 1. Electromagnetic Burst names nobody (C27, D5, D16): can the orbs'
+//    paths be read from anything the log keeps?
 // 2. Wormhole #3's sword into the waiting group (D10, D13, D19, F2, F7):
 //    #3's facing, or #1/#5/#7 standing in its path?
 // 3. Charges hitting the odd number before them (D17, E14, E31, F11) name
 //    the odd number: did they face wrong, or should the even have moved?
-// 4. Stasis near-pair players 0.8-1.6y off the line (C12, C13, C27, E4):
-//    is it the near player's spot or the far tether standing in line?
+// 4. Stasis near-pair players 0.8-1.6y off the line (C13, C27, E4): the
+//    user called C12 the near player's (not baited cleanly south); same
+//    for the others?
 //
 // -- GUIDE-DERIVED MODEL (2026-10-15) --
 // Research only: no detector, live-report verification or VOD rulings.
@@ -1187,7 +1197,11 @@ function detectWormhole(c: Ctx, wh: number, headMarkers: HeadMarker[], end: numb
       const owner = owners[sideIdx];
       const ownerOk = !!owner && life.alive(owner, at - 500) && !doomed.has(owner, at) && !wrongSoak.has(owner);
       const soaked = soaks.some((s) => s.p === owner);
-      if (owner && ownerOk && !soaked) {
+      // A death earlier in Wormhole throws the soak order off: the miss is
+      // its fallout (user, 2026-10-16, C12 +7:43: #7's miss after a healer
+      // died to #1's sword at +7:34).
+      const earlierDeath = c.deaths.find((d) => d.timestamp - DEATH_EVENT_LAG_MS >= wh && d.timestamp - DEATH_EVENT_LAG_MS < at - 500);
+      if (owner && ownerOk && !soaked && !earlierDeath) {
         c.errors.push(playerError(owner, {
           ruleId: AP_SOAK_MISSED_RULE_ID, severity: "Major", name: "Missed Puddle Soak",
           description: `As #${owed[sideIdx]} they owed the ${["first", "second", "third"][r]} soak of the ${sideIdx ? "east" : "west"} puddle and weren't in it: Confession hit the whole raid.`,
@@ -1195,6 +1209,7 @@ function detectWormhole(c: Ctx, wh: number, headMarkers: HeadMarker[], end: numb
         }));
       }
       const why = !owner ? `#${owed[sideIdx]} had no holder`
+        : ownerOk && earlierDeath ? `#${owed[sideIdx]} (${owner.name}) didn't soak it, after ${earlierDeath.player}'s death had thrown the order off`
         : ownerOk ? `#${owed[sideIdx]} (${owner.name}) didn't soak it`
         : wrongSoak.has(owner) ? `#${owed[sideIdx]} (${owner.name}) had soaked an earlier check by mistake`
         : `#${owed[sideIdx]} (${owner.name}) was already dead or hit by another number's attack`;

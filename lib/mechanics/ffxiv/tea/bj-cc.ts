@@ -171,7 +171,9 @@
 //   autos (C6, C24, B19, B44: mitigation; their Punishing / Gavel is the
 //   cutoff); the enrage (never reached).
 // VOD review 2026-10-16 (user): report B pulls 1, 11, 14, 22, 24, 25, 31,
-//   36, 37, 43 and report C pulls 4, 8, 11,
+//   36, 37, 43 and report C pulls 4, 8, 11, 19 (the mine tank's first
+//   puddle dropped out of position hid the mine: confirmed), 22 (the black
+//   mage moved toward the wrong partner; both still named),
 //   rulings in expectations/rulings.json. Old questions 3 (B25: the
 //   Paladin walked into the wall) and 4 (B24: the tank's position) are
 //   answered above; pass 3's wrong color (B31) turned out fallout, and the

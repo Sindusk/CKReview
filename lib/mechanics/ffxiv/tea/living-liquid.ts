@@ -98,7 +98,9 @@
 //   (a non-baiter's wave lands on the next nearest: their fallout). With
 //   the group right, a wave on two groupmates names the doubled player and
 //   the wave's baiter. Skipped with a group member dead.
-// ffxiv-ll-exhaust (Major if lethal): two Exhausts / a second stack.
+// ffxiv-ll-exhaust (Major if lethal): two Exhausts / a second stack; at the
+//   second Exhaust with a melee doll among the sources, its owner instead
+//   ("Doll Fed Too Late": the melee feed after Exhaust 1; user, C28).
 // ffxiv-ll-doll-feed (Major, owner) + ffxiv-ll-doll-wipe (Raid): fed at
 //   25%+. ffxiv-ll-doll-kill (Major, killing blow) + doll-wipe (Raid).
 // ffxiv-ll-hand (Raid), ffxiv-ll-pain (Raid): player-less.
@@ -122,7 +124,8 @@
 // VOD review 2026-10-16 (user): report B = HwjvVh3TNAZmMQyq pulls 11, 17,
 //   21, 41, rulings in expectations/rulings.json. Its 15 P1 wipes are now
 //   on disk too (B3, B7, B9, B10, B16, B21, B23, B26, B27, B32-B34, B39,
-//   B41, B45).
+//   B41, B45). Report C = LxAVFd29kwPm8HnB pulls 23, 26 (deaths to Hand
+//   of Pain and a Drainage tether: mitigation, user) and 28.
 // OPEN QUESTIONS:
 // 1. roles.ts names the paladin MT (opening auto) but the warrior holds
 //    Living Liquid and does the opening invulnerability every pull, NAUR's
@@ -463,6 +466,8 @@ const THROTTLE_EXPIRY_MS = 9_500;
 // The doll's killing blow lands within this long before its Reducible
 // Complexity (A2-A71: 0.1-0.2s).
 const DOLL_KILL_MS       = 2_000;
+// Exhaust goes off at +0:39 and +0:50 (every pull within ~1s).
+const SECOND_EXHAUST_MS  = 45_000;
 // The Embolus toucher stands on the Outburst's cast point (B21: 0.8y, the
 // next player 3.5y); orbToucher() has both pulls on disk.
 const ORB_TOUCH_Y        = 2;
@@ -723,11 +728,25 @@ function detectExhaust(players: PlayerInfo[], life: Life, end: number, owners: M
       if (insts.length < 2 && !stacked) continue;
       const death = life.diedFrom(p, t0);
       const dollOf = insts.map((i) => owners.get(i)).filter((o): o is PlayerInfo => !!o && o !== p);
+      // The melee feed after the first Exhaust: a melee doll still
+      // exhausting at the second (+0:50) is its owner's slow feed, and the
+      // double is theirs, not the healer's who stands in a melee circle by
+      // plan (user, 2026-10-16, C28 +0:50.1: the dragoon too slow feeding).
+      const slow = t0 >= SECOND_EXHAUST_MS ? dollOf.filter(isMelee) : [];
       // The overload explodes (EXHAUST_BURST) on players standing with
       // them: A19's sage took two Exhausts and three others in that circle
       // died to the burst. Those deaths are this player's.
       const splashed = players.filter((o) => o !== p && o.damageTaken.some((e) => e.abilityId === EXHAUST_BURST && Math.abs(e.timestamp - t0) < 1500) &&
         !uniq(set.filter((h) => h.p === o).map((h) => h.e.sourceInstance ?? 0)).slice(1).length && life.diedFrom(o, t0));
+      if (slow.length) {
+        const dead = [...(death ? [p] : []), ...splashed];
+        for (const o of slow) errors.push(playerError(o, {
+          ruleId: LL_EXHAUST_RULE_ID, severity: dead.length ? "Major" : "Minor", name: "Doll Fed Too Late",
+          description: `Their Jagd Doll was still up for the second Exhaust, which doubled up on ${p.name} with another doll's${dead.length ? `; ${namesOf(dead)} died` : ""}. The melee feed their dolls between the first and second Exhaust.`,
+          timestamp: t0, abilityId: EXHAUST, abilityName: "Exhaust",
+        }));
+        continue;
+      }
       errors.push(playerError(p, {
         ruleId: LL_EXHAUST_RULE_ID, severity: death || splashed.length ? "Major" : "Minor", name: "Doubled Exhaust",
         description: `Hit by ${insts.length > 1 ? `${insts.length} dolls' Exhausts` : "a second Exhaust"} at once${dollOf.length ? ` (the dolls of ${namesOf(dollOf)})` : ""}, taking two stacks of Luminous Aetheroplasm${death ? ", and died" : ""}.${splashed.length ? ` The overload burst also killed ${namesOf(splashed)}, who stood with them.` : ""} Each doll's Exhaust may hit you only once: stand in one doll's circle at most, and doll owners keep their dolls apart.`,
