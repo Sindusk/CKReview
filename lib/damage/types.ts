@@ -81,6 +81,9 @@ export type DamageGame = {
   // The patch a pull was played on ("7.1"), for checks whose rule changed
   // between patches; undefined = unknown, checks use the current rules.
   patchOf?(pull: Pull): string | undefined;
+  // The level the encounter syncs players to (FFXIV's older ultimates);
+  // undefined = the current cap. Cooldowns learned above it aren't judged.
+  levelOf?(pull: Pull): number | undefined;
   // Job gauges for the dialog's timeline (display only).
   jobGauges?(job: string): ((ctx: PlayerCheckContext) => GaugeTrack[])[];
   // The player's tincture / potion windows, for the timeline (display only).
@@ -105,6 +108,10 @@ export type DamageGame = {
   // Break): their ticks log under the status's id. Not for a DoT that has
   // its own uptime check.
   procConsumerDots?: Set<number>;
+  // A consumer never pressed in the pull has no average of its own: valued
+  // as `ratio` × the player's average of `refId`, a ratio measured on the
+  // samples (Primal Wrath ≈ 1.20 Fell Cleave).
+  procConsumerFallback?: Map<number, { refId: number; ratio: number }>;
   // Channelled mitigation (Passage of Arms), by action id: from the cast
   // to the player's next action, at most maxMs, is forced (the raid plan,
   // not play).
@@ -209,6 +216,10 @@ export type TrackedCooldown = {
   // Patches (DamageGame.patchOf) where it isn't judged: using it on
   // cooldown wasn't a gain there (Pictomancer's Striking Muse in 7.2).
   notOnPatches?: string[];
+  // The level it's learned at, when an encounter syncs below it
+  // (DamageGame.levelOf): Black Mage's Amplifier (86) in TEA (80) read as
+  // never pressed.
+  minLevel?: number;
   // holdMs on these patches instead (Gunbreaker's Bloodfest waited for
   // No Mercy before 7.4: 10s).
   holdMsOnPatches?: Record<string, number>;

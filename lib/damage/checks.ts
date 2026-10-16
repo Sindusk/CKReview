@@ -568,6 +568,7 @@ export function checkCooldownDrift(ctx: PlayerCheckContext): DamageFinding[] {
 
   for (const tracked of ctx.game.trackedCooldowns(ctx.job)) {
     if (ctx.patch && tracked.notOnPatches?.includes(ctx.patch)) continue;
+    if (tracked.minLevel !== undefined && (ctx.game.levelOf?.(ctx.pull) ?? Infinity) < tracked.minLevel) continue;
     const patchHold = ctx.patch !== undefined ? tracked.holdMsOnPatches?.[ctx.patch] : undefined;
     const patchRecast = ctx.patch !== undefined ? tracked.recastOnPatches?.[ctx.patch] : undefined;
     const cd = patchHold !== undefined || patchRecast
@@ -1005,7 +1006,7 @@ export function checkProcs(ctx: PlayerCheckContext): DamageFinding[] {
     if (consumerId === undefined) continue;
     const st = state.get(e.abilityId);
     const lose = (t: number, n: number, how: string) => {
-      const consumerName = casts.find((c) => c.abilityId === consumerId)?.abilityName ?? "its consumer";
+      const consumerName = casts.find((c) => c.abilityId === consumerId)?.abilityName ?? ctx.game.action(consumerId)?.name ?? "its consumer";
       // The GCD it takes the place of, when the game names one.
       const replacesId = ctx.game.procReplaces?.get(consumerId);
       const replaced = replacesId !== undefined ? ctx.values.perUse(replacesId) : 0;
@@ -1020,7 +1021,16 @@ export function checkProcs(ctx: PlayerCheckContext): DamageFinding[] {
       const ticksPerCast = dotIds.size === 0 || consumerCasts === 0 ? 0 : player.damageDone
         .filter((x) => x.isDoT && dotIds.has(x.abilityId) && x.timestamp < ctx.endMs + 30_000)
         .reduce((a, x) => a + (x.amount ?? 0), 0) / consumerCasts;
-      const consumerValue = ctx.values.perUse(consumerId) + ticksPerCast;
+      // Never pressed in the pull: priced from a sibling action by a ratio
+      // measured on the samples (24C9awg1fKhFjBPt's Warrior let 6 Wrathful
+      // run out and never pressed Primal Wrath, so nothing showed).
+      const measured = ctx.values.perUse(consumerId) + ticksPerCast;
+      const fb = measured > 0 ? undefined : ctx.game.procConsumerFallback?.get(consumerId);
+      const fbRef = fb ? ctx.values.perUse(fb.refId) : 0;
+      const consumerValue = measured > 0 ? measured : fb ? fb.ratio * fbRef : 0;
+      const fbNote = fb && fbRef > 0
+        ? `; never pressed in the pull, so ${fb.ratio.toFixed(2)} × ${k(fbRef)} average ${ctx.game.action(fb.refId)?.name ?? "its sibling"} (the ratio on the samples)` : "";
+      const avgWord = fb ? "estimated" : "average";
       const value = Math.max(0, consumerValue - replaced) * n;
       // A consumer with no damage of its own (Horoscope detonates at
       // expiry by design) loses nothing.
@@ -1032,13 +1042,13 @@ export function checkProcs(ctx: PlayerCheckContext): DamageFinding[] {
         cause: forced ? forcedPart(t - 1, t + 1, ctx.forced).cause : undefined,
         lostDamage: value, inference: true,
         basis: (replacedName
-          ? `${n} × (${k(consumerValue)} average ${consumerName} − ${k(replaced)} average ${replacedName}, the GCD it takes the place of)`
+          ? `${n} × (${k(consumerValue)} ${avgWord} ${consumerName} − ${k(replaced)} average ${replacedName}, the GCD it takes the place of)`
           : ctx.game.procsClearedByGcd?.has(e.abilityId)
-            ? `${n} × ${k(consumerValue)} average ${consumerName} (the next weaponskill clears it, so it's gone)`
+            ? `${n} × ${k(consumerValue)} ${avgWord} ${consumerName} (the next weaponskill clears it, so it's gone)`
             : ctx.game.action(consumerId)?.onGcd === false
-              ? `${n} × ${k(consumerValue)} average ${consumerName} (off the GCD, so nothing took its place)`
-              : `${n} × ${k(consumerValue)} average ${consumerName} (upper bound: the GCD used instead did some damage)`) +
-          (ticksPerCast > 0 ? `; its average includes ${k(ticksPerCast)} of DoT ticks a cast` : ""),
+              ? `${n} × ${k(consumerValue)} ${avgWord} ${consumerName} (off the GCD, so nothing took its place)`
+              : `${n} × ${k(consumerValue)} ${avgWord} ${consumerName} (upper bound: the GCD used instead did some damage)`) +
+          (ticksPerCast > 0 ? `; its average includes ${k(ticksPerCast)} of DoT ticks a cast` : "") + fbNote,
         detail: `${e.abilityName} ${how}${n > 1 ? ` with ${n} stacks` : ""}`,
       }));
     };

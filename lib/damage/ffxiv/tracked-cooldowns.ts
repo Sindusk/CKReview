@@ -44,6 +44,8 @@ export type TrackedCooldownSpec = {
   holdMsOnPatches?:  Record<string, number>;
   // Its recast / charges on these patches (TrackedCooldown.recastOnPatches).
   recastOnPatches?:  TrackedCooldown["recastOnPatches"];
+  // The level it's learned at (TrackedCooldown.minLevel).
+  minLevel?:         number;
 };
 
 // Patches before a given one, for the per-patch overrides below.
@@ -160,13 +162,18 @@ function innerReleaseValue(player: PlayerInfo, endMs: number): { value: number; 
 // of Mind, Flourish; MzjZgVWBaLw7tHyT Natalie Suki's Meisui 4 / 5 on
 // xivanalysis). A lost use is the player's averages of what it grants
 // (`plus`, each key once per use) less what those GCDs replace (`minus`).
-// A key never pressed in the pull counts 0 on either side, so the
-// estimate errs low; no plus at all, no value.
-function unlockValue(plus: string[], minus: string[]) {
+// A granted key never pressed in the pull counts 0, so the estimate errs
+// low; no plus at all, or a replaced key never pressed, no value.
+// Later (2026-10-16): Perfect Balance, Meikyo Shisui, Serpent's Ire and
+// Manafication. A group of keys is one use
+// of any of them, averaged over all their uses: Monk's Blitzes, Red
+// Mage's Verflare or Verholy, a job's filler GCDs.
+type UnlockKey = string | { keys: string[]; label: string };
+function unlockValue(plus: UnlockKey[], minus: UnlockKey[]) {
   return (player: PlayerInfo, endMs: number): { value: number; basis: string } | undefined => {
-    const avg = (key: string) => {
-      const id = XIVA_ACTIONS[key]?.id;
-      const hits = player.damageDone.filter((e) => e.abilityId === id && !e.isDoT && !e.pet && e.timestamp < endMs && (e.amount ?? 0) > 0);
+    const avg = (key: UnlockKey) => {
+      const ids = new Set((typeof key === "string" ? [key] : key.keys).map((k) => XIVA_ACTIONS[k]?.id).filter((id) => id !== undefined));
+      const hits = player.damageDone.filter((e) => ids.has(e.abilityId) && !e.isDoT && !e.pet && e.timestamp < endMs && (e.amount ?? 0) > 0);
       // Per cast: several targets' hits within a second are one use.
       let uses = 0, last = -Infinity;
       for (const e of hits) { if (e.timestamp - last > 1_000) uses++; last = e.timestamp; }
@@ -174,13 +181,57 @@ function unlockValue(plus: string[], minus: string[]) {
     };
     const gain = plus.reduce((a, key) => a + avg(key), 0);
     if (gain <= 0) return undefined;
+    // A replaced GCD never pressed would price the gain whole: no value
+    // (L9BzKkD2nxcVgHTC Necron pull 13, a 2:15 wipe with Tendo but no plain
+    // Midare yet, read 349k for one Meikyo).
+    if (minus.some((key) => avg(key) <= 0)) return undefined;
     const cost = minus.reduce((a, key) => a + avg(key), 0);
     const value = gain - cost;
     if (value <= 0) return undefined;
     const k = (n: number) => `${Math.round(n / 1000)}k`;
-    const names = (keys: string[]) => keys.map((key) => XIVA_ACTIONS[key]?.name ?? key).join(" + ");
+    const name = (key: UnlockKey) => (typeof key === "string" ? XIVA_ACTIONS[key]?.name ?? key : key.label);
+    // Repeated keys print once with a count ("6 × filler GCD").
+    const names = (keys: UnlockKey[]) => {
+      const counts = new Map<string, number>();
+      for (const key of keys) counts.set(name(key), (counts.get(name(key)) ?? 0) + 1);
+      return [...counts].map(([n, c]) => (c > 1 ? `${c} × ${n}` : n)).join(" + ");
+    };
     return { value, basis: `(${k(gain)} ${names(plus)}${minus.length ? ` − ${k(cost)} ${names(minus)} in their place` : ""}, the player's averages)` };
   };
+}
+
+// Groups for unlockValue: GCDs a granted one replaces.
+const MNK_FORM_GCD = { label: "form GCD", keys: ["BOOTSHINE", "DRAGON_KICK", "LEAPING_OPO", "TRUE_STRIKE", "TWIN_SNAKES", "RISING_RAPTOR", "DEMOLISH", "SNAP_PUNCH", "POUNCING_COEURL"] };
+const MNK_BLITZ = { label: "Blitz", keys: ["ELIXIR_FIELD", "ELIXIR_BURST", "FLINT_STRIKE", "RISING_PHOENIX", "TORNADO_KICK", "PHANTOM_RUSH"] };
+const VPR_DUAL_WIELD_GCD = { label: "dual-wield GCD", keys: ["STEEL_FANGS", "REAVING_FANGS", "HUNTERS_STING", "SWIFTSKINS_STING", "FLANKSTING_STRIKE", "FLANKSBANE_FANG", "HINDSTING_STRIKE", "HINDSBANE_FANG"] };
+const RDM_FILLER_GCD = { label: "Jolt / Ver- GCD", keys: ["JOLT_III", "VERAERO_III", "VERTHUNDER_III", "VERFIRE", "VERSTONE"] };
+
+// Ley Lines (2026-10-16): no damage of its own; its Circle of Power cuts
+// cast and recast times by 15% (xivanalysis CIRCLE_OF_POWER.speedModifier
+// 0.85) while the Black Mage stands in it. A lost use is 15% of what they
+// dealt inside the circle in an average Ley Lines window: those GCDs
+// would have taken 1 / 0.85 as long. Time spent outside the circle is
+// already left out, so a player who leaves it is valued at what they used.
+function leyLinesValue(player: PlayerInfo, endMs: number): { value: number; basis: string } | undefined {
+  const lines = XIVA_STATUSES.LEY_LINES?.id, circle = XIVA_STATUSES.CIRCLE_OF_POWER?.id;
+  if (lines === undefined || circle === undefined) return undefined;
+  const windowsOf = (statusId: number) => {
+    const out: [number, number][] = [];
+    let open: number | undefined;
+    for (const e of (player.buffs ?? []).filter((b) => b.abilityId === statusId && b.source === player.name).sort((a, b) => a.timestamp - b.timestamp)) {
+      if (e.buffStatus === "applied" && open === undefined) open = e.timestamp;
+      else if (e.buffStatus === "removed" && open !== undefined) { if (e.timestamp <= endMs) out.push([open, e.timestamp]); open = undefined; }
+    }
+    return out;
+  };
+  const uses = windowsOf(lines).length;
+  if (uses === 0) return undefined;
+  const inCircle = windowsOf(circle);
+  const dealt = player.damageDone
+    .filter((e) => (e.amount ?? 0) > 0 && !e.isDoT && !e.pet && inCircle.some(([s, t]) => e.timestamp >= s && e.timestamp <= t + 500))
+    .reduce((a, e) => a + (e.amount ?? 0), 0) / uses;
+  if (dealt <= 0) return undefined;
+  return { value: dealt * 0.15, basis: `${Math.round(dealt / 1000)}k dealt in Circle of Power in an average Ley Lines window × 15% (its faster casts)` };
 }
 
 // Reassemble: a forced crit and direct hit on the best tool, as Life Surge.
@@ -263,12 +314,27 @@ export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
   // ── Melee (from xivanalysis sam/vpr/drg/nin OGCDDowntime) ───────────
   // Samurai and Viper allow 2.18s of hold (one GCD), Meikyo two.
   "Samurai": [
-    { actions: ["MEIKYO_SHISUI"], holdMs: 4360 },
+    // Valued by its Tendo alone (xivanalysis ReadyProcs: Meikyo grants
+    // Tendo, which turns the next Midare Setsugekka and its Kaeshi into
+    // the Tendo ones), the upgrade over the plain pair. The three Sen it
+    // gives in three GCDs aren't counted, so this errs low; below level
+    // 100 (no Tendo) it has no value.
+    { actions: ["MEIKYO_SHISUI"], holdMs: 4360,
+      valuePerUse: unlockValue(["TENDO_SETSUGEKKA", "TENDO_KAESHI_SETSUGEKKA"], ["MIDARE_SETSUGEKKA", "KAESHI_SETSUGEKKA"]) },
     { actions: ["HISSATSU_GUREN", "HISSATSU_SENEI"], firstUseOffsetMs: 13400, holdMs: 2180 },
     { actions: ["IKISHOTEN"], firstUseOffsetMs: 2500, holdMs: 2180 },
   ],
   "Viper": [
-    { actions: ["SERPENTS_IRE"], firstUseOffsetMs: 2500, holdMs: 2180 },
+    // A lost use is one Reawaken (its Ready to Reawaken makes one free of
+    // Serpent Offerings, so the pull has one fewer) and one Rattling Coil
+    // (xivanalysis RattlingCoil.tsx): the Reawaken sequence and Uncoiled
+    // Fury with their oGCDs, against seven dual-wield GCDs in their slots.
+    // GCD lengths aren't weighed.
+    { actions: ["SERPENTS_IRE"], firstUseOffsetMs: 2500, holdMs: 2180,
+      valuePerUse: unlockValue(
+        ["REAWAKEN", "FIRST_GENERATION", "SECOND_GENERATION", "THIRD_GENERATION", "FOURTH_GENERATION", "OUROBOROS",
+          "FIRST_LEGACY", "SECOND_LEGACY", "THIRD_LEGACY", "FOURTH_LEGACY", "UNCOILED_FURY", "UNCOILED_TWINFANG", "UNCOILED_TWINBLOOD"],
+        Array(7).fill(VPR_DUAL_WIELD_GCD)) },
     { actions: ["VICEWINDER", "VICEPIT"], firstUseOffsetMs: 7500, holdMs: 2180 },
   ],
   "Dragoon": [
@@ -325,10 +391,15 @@ export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
   // Black Mage allows 5s of hold and a 15s first-use offset by default.
   "Black Mage": [
     // One charge before 7.1.
-    { actions: ["LEY_LINES"], firstUseOffsetMs: 15000, holdMs: 5000, recastOnPatches: onPatches(PRE_7_1, { charges: 1 }) },
+    { actions: ["LEY_LINES"], firstUseOffsetMs: 15000, holdMs: 5000, recastOnPatches: onPatches(PRE_7_1, { charges: 1 }), valuePerUse: leyLinesValue },
+    // Manafont and Triplecast stay unvalued: Manafont's worth is an extra
+    // Astral Fire phase (MP, Umbral Hearts, Thunderhead, Paradox), with no
+    // single action to average; Triplecast only makes casts instant, worth
+    // something only where the fight forces movement.
     { actions: ["MANAFONT"], firstUseOffsetMs: 25000, holdMs: 5000 },
     { actions: ["TRIPLECAST"], firstUseOffsetMs: 15000, holdMs: 5000 },
-    { actions: ["AMPLIFIER"], firstUseOffsetMs: 15000, holdMs: 5000, valuePerUse: unlockValue(["XENOGLOSSY"], ["FIRE_IV"]) },
+    // Learned at 86: TEA's Black Mage (80) read as 1-3 uses lost a pull.
+    { actions: ["AMPLIFIER"], firstUseOffsetMs: 15000, holdMs: 5000, minLevel: 86, valuePerUse: unlockValue(["XENOGLOSSY"], ["FIRE_IV"]) },
   ],
   "Summoner": [
     { actions: ["SUMMON_BAHAMUT", "SUMMON_PHOENIX", "SUMMON_SOLAR_BAHAMUT"], firstUseOffsetMs: 4500 },
@@ -338,7 +409,16 @@ export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
   // Red Mage allows 1s of hold by default.
   "Red Mage": [
     { actions: ["ACCELERATION"], holdMs: 4000, valuePerUse: unlockValue(["GRAND_IMPACT"], ["JOLT_III"]) },
-    { actions: ["MANAFICATION"], firstUseOffsetMs: 17500, holdMs: 1000 },
+    // A lost use is one melee combo (Magicked Swordplay makes one free of
+    // mana, so the pull has one fewer) with its finishers, and Prefulgence
+    // (xivanalysis: Manafication applies Magicked Swordplay ×3 and
+    // Prefulgence Ready), against six filler GCDs. Its +5% on six GCDs
+    // isn't counted, nor GCD lengths.
+    { actions: ["MANAFICATION"], firstUseOffsetMs: 17500, holdMs: 1000,
+      valuePerUse: unlockValue(
+        ["MANAFICATION_ENCHANTED_RIPOSTE", "MANAFICATION_ENCHANTED_ZWERCHHAU", "MANAFICATION_ENCHANTED_REDOUBLEMENT",
+          { label: "Verflare / Verholy", keys: ["VERFLARE", "VERHOLY"] }, "SCORCH", "RESOLUTION", "PREFULGENCE"],
+        Array(6).fill(RDM_FILLER_GCD)) },
     { actions: ["EMBOLDEN"], firstUseOffsetMs: 7500, holdMs: 1000 },
     { actions: ["FLECHE"], holdMs: 1000 },
     { actions: ["CONTRE_SIXTE"], holdMs: 1000 },
@@ -349,7 +429,9 @@ export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
   // ── From xivanalysis ────────────────────────────────────────────────
   "Monk": [
     { actions: ["BROTHERHOOD"], firstUseOffsetMs: 7000 },
-    { actions: ["PERFECT_BALANCE"], firstUseOffsetMs: 3000 },
+    // A lost use is a Blitz against the form GCD in its slot, as mnkBlitz
+    // (jobs/melee.ts) values one lost to a Perfect Balance run out.
+    { actions: ["PERFECT_BALANCE"], firstUseOffsetMs: 3000, valuePerUse: unlockValue([MNK_BLITZ], [MNK_FORM_GCD]) },
     { actions: ["RIDDLE_OF_FIRE"], firstUseOffsetMs: 5000, valuePerUse: selfBuffValue("RIDDLE_OF_FIRE", 0.15) },
     { actions: ["RIDDLE_OF_WIND"], firstUseOffsetMs: 10000 },
   ],

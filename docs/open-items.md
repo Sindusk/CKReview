@@ -191,11 +191,15 @@ and delete them from the header.
   sides, so bursts, crits and damage-reduced targets no longer decide it.
   Still open: no finding when the single-target alternative was never
   pressed in the pull (Grim Swathe with no Blood Stalk; no potency table
-  for most jobs to fall back on). The same gap for procs (2026-10-16):
-  a proc whose consumer was never pressed in the pull has no average, so
-  its expiries show nothing (24C9awg1fKhFjBPt Warrior, 6 Wrathful;
-  VhyrDATFKNGt8f6M Samurai, 4 Ogi Namikiri Ready; Mg4p7XG9dtrLVwBf's Eye
-  Gouge). Web potency tables weren't reliable enough to fall back on.
+  for most jobs to fall back on). The same gap for procs was closed
+  2026-10-16 for the three seen (Primal Wrath, Ogi Namikiri, Eye Gouge):
+  a never-pressed consumer is priced from a sibling by a ratio measured on
+  disk (`PROC_CONSUMER_FALLBACK` in jobs/ranged.ts); others still show
+  nothing until a ratio is measured for them.
+  Cooldown drift valued 2026-10-16 for Perfect Balance, Meikyo Shisui,
+  Serpent's Ire, Manafication and Ley Lines (tracked-cooldowns.ts); none
+  compared with a page yet. Manafont and Triplecast stay unvalued (no
+  single action to price). Amplifier skipped below level 86 (TEA).
   Party buffs held too long go unreported (2026-10-16): a cooldown
   that deals no damage has no value in the drift check. The five self
   damage buffs are valued now (`selfBuffValue` in tracked-cooldowns.ts:

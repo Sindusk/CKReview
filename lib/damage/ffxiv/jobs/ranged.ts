@@ -394,7 +394,22 @@ export const PROC_CONSUMERS = new Map(([
   // weaponskill clears each (PROCS_CLEARED_BY_GCD).
   ["READY_TO_RIP", "JUGULAR_RIP"], ["READY_TO_TEAR", "ABDOMEN_TEAR"], ["READY_TO_GOUGE", "EYE_GOUGE"],
   ["READY_TO_BLAST", "HYPERVELOCITY"], ["READY_TO_RAZE", "FATED_BRAND"],
+  // VhyrDATFKNGt8f6M's Samurai let 4 run out and never pressed Ogi
+  // Namikiri, so nothing inferred a consumer.
+  ["OGI_NAMIKIRI_READY", "OGI_NAMIKIRI"],
 ] as const).filter(([s, a]) => S[s] && A[a]).map(([s, a]) => [S[s].id, A[a].id]));
+
+// DamageGame.procConsumerFallback (2026-10-16): consumers a player may
+// never press in a pull, priced from a sibling the same player pressed.
+// Ratios are medians over the samples on disk of per-player ratios of
+// single-target hits, each with its damage-% multiplier and direct hit
+// divided out and compared within one crit class (so forced crits and
+// crit rate cancel): Primal Wrath / Fell Cleave 1.197 (194 samples,
+// 1.08-1.32), Ogi Namikiri / Midare Setsugekka 1.746 (43, 1.46-1.98),
+// Eye Gouge / Jugular Rip 1.362 (160, 1.25-1.45).
+export const PROC_CONSUMER_FALLBACK = new Map(([
+  ["PRIMAL_WRATH", "FELL_CLEAVE", 1.2], ["OGI_NAMIKIRI", "MIDARE_SETSUGEKKA", 1.75], ["EYE_GOUGE", "JUGULAR_RIP", 1.36],
+] as const).filter(([a, b]) => A[a] && A[b]).map(([a, b, ratio]) => [A[a].id, { refId: A[b].id, ratio }]));
 
 // DamageGame.procsClearedByGcd. Mg4p7XG9dtrLVwBf Red Hot and Deep Blue
 // (Momo First): Ready to Raze cleared by Demon Slice 9 times, Ready to Rip

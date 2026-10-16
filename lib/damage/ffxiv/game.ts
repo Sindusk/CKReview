@@ -27,9 +27,9 @@ import { JOB_CHECKS } from "./jobs";
 import { noDamageCasts } from "./jobs/shared";
 import { tincture, tinctureWindows } from "./jobs/tincture";
 import { JOB_GAUGES } from "./jobs/gauges";
-import { patchOf } from "./patches";
+import { levelOf, patchOf } from "./patches";
 import { MELEE_PROC_SKIP_IDS, vprDisengageAlternative } from "./jobs/melee";
-import { dncTechHoldValue, PROC_CONSUMERS, PROC_REPLACES, PROCS_CLEARED_BY_GCD } from "./jobs/ranged";
+import { dncTechHoldValue, PROC_CONSUMER_FALLBACK, PROC_CONSUMERS, PROC_REPLACES, PROCS_CLEARED_BY_GCD } from "./jobs/ranged";
 import { FFXIV_ACTION_INDEX } from "../../mitigation/ffxiv-catalog";
 import type { DamageGame, GameAction, PartyBuff, TrackedCooldown } from "../types";
 
@@ -188,6 +188,7 @@ const TRACKED = new Map<string, TrackedCooldown[]>(
       notOnPatches:     spec.notOnPatches,
       holdMsOnPatches:  spec.holdMsOnPatches,
       recastOnPatches:  spec.recastOnPatches,
+      minLevel:         spec.minLevel,
     }];
   })]),
 );
@@ -245,9 +246,11 @@ export const FFXIV_DAMAGE: DamageGame = {
   jobGauges: (job) => JOB_GAUGES[job] ?? [],
   potWindows: tinctureWindows,
   patchOf,
+  levelOf,
   jobProcStatusIds: MELEE_PROC_SKIP_IDS,
   procReplaces: PROC_REPLACES,
   procConsumers: PROC_CONSUMERS,
+  procConsumerFallback: PROC_CONSUMER_FALLBACK,
   procsClearedByGcd: PROCS_CLEARED_BY_GCD,
   procConsumerDots: new Set([XIVA_ACTIONS.SONIC_BREAK?.id].filter((id): id is number => id !== undefined)),
   mitigationChannels: MITIGATION_CHANNELS,

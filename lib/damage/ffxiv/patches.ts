@@ -27,6 +27,21 @@ const PATCHES: [patch: string, startsSec: number][] = [
   ["7.5", 1777363200],  // 28/04/26
 ];
 
+// Older ultimates sync players below the cap: skills learned above it
+// can't be pressed there (Black Mage's Amplifier, level 86, in TEA).
+const SYNC_LEVELS: Record<string, number> = {
+  "The Unending Coil of Bahamut": 70,
+  "The Weapon's Refrain": 70,
+  "The Epic of Alexander": 80,
+  "Dragonsong's Reprise": 90,
+  "The Omega Protocol": 90,
+};
+
+/** The level the encounter syncs to, or undefined at the current cap. */
+export function levelOf(pull: Pull): number | undefined {
+  return SYNC_LEVELS[pull.name];
+}
+
 /** The patch live when the log started, or undefined when the date isn't known. */
 export function patchOf(pull: Pull): string | undefined {
   const t = pull.reportStartedAt;

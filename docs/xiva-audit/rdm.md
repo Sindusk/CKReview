@@ -48,7 +48,7 @@
 | rdm/Manafication/allowed-gcds | no-damage | — | (7.0-7.3) a non-melee GCD in Manafication | Medium 1, Major 2. The allowed list takes nearly every GCD (casts for rushing, Vercure). On the 101 windows the only one outside it was a Verraise (wNHvD38WTbFtGJKr Zelenia pull 8, 8:09): a raise. Not adopted. |
 | rdm/Swiftcast/unused | no-damage | — | Swiftcast unused | Utility. |
 | rdm/Swiftcast/bad-spell | no-damage | — | Swiftcast on a short spell | Utility, as for every job. |
-| rdm/CooldownDowntime/uses | verified | `checkCooldownDrift` | Acceleration, Manafication, Embolden, Fleche, Contre Sixte, Corps-a-corps held | The app counts fewer lost uses by method (whole uses, dead time forced). |
+| rdm/CooldownDowntime/uses | verified | `checkCooldownDrift` | Acceleration, Manafication, Embolden, Fleche, Contre Sixte, Corps-a-corps held | The app counts fewer lost uses by method (whole uses, dead time forced). Manafication valued 2026-10-16 (its Magicked Swordplay combo, finishers and Prefulgence − 6 Jolt / Ver- GCDs): 7 on disk, 254-524k on 7.4 kills (RTa4wfbNDQX9CM1k, QhRqZBwpyCY3Pja9, Mg4p7XG9dtrLVwBf), 4-18k on 7.2 Zelenia (errs low there). No page compared yet. |
 | rdm/AlwaysBeCasting/uptime | superseded | `checkGcdGaps` | idle GCD time | — |
 | rdm/Weaving/too-many | covered | `checkGcdGaps` | triple weaves | — |
 | rdm/Interrupts/cancelled-casts | verified | `checkInterrupts` | a cancelled cast | Vamp 17 matched. |
