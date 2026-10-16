@@ -207,9 +207,9 @@ and delete them from the header.
   - [drg.md](xiva-audit/drg.md): Dragoon, 3 covered.
   - [vpr.md](xiva-audit/vpr.md): Viper, 4 candidates, 2 covered.
   - [rpr.md](xiva-audit/rpr.md): Reaper, 4 candidates, 5 covered.
-  - [mnk.md](xiva-audit/mnk.md): Monk, 8 candidates (forms,
-    Brotherhood), 8 covered (Blitz checks verified 2026-10-15, Phantom
-    Rushes lost by the kill built).
+  - [mnk.md](xiva-audit/mnk.md): Monk, 6 candidates (smaller form
+    mistakes, Brotherhood, Fury), 8 covered (Blitz, Phantom Rush and form
+    checks verified 2026-10-15).
   - [nin.md](xiva-audit/nin.md): Ninja, 2 candidates, 9 covered
     (ninjutsu, Kassatsu and Raiju checks verified 2026-10-15).
   - [sam.md](xiva-audit/sam.md): Samurai, 6 candidates, 14 covered (no

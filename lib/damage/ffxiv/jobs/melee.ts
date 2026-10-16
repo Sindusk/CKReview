@@ -1016,6 +1016,7 @@ const BLITZ_IDS = new Set(ids(...BLITZ_KEYS.filter((key) => A[key])));
 const FORM_GCD_IDS = new Set(ids("BOOTSHINE", "DRAGON_KICK", "LEAPING_OPO", "SHADOW_OF_THE_DESTROYER", "ARM_OF_THE_DESTROYER",
   "TRUE_STRIKE", "TWIN_SNAKES", "RISING_RAPTOR", "FOUR_POINT_FURY", "DEMOLISH", "SNAP_PUNCH", "POUNCING_COEURL", "ROCKBREAKER"));
 const PB_STACKS = 3;
+const OPO_IDS = new Set(ids("BOOTSHINE", "DRAGON_KICK", "LEAPING_OPO"));
 const mnkBlitz: JobCheck = (ctx) => {
   const out: DamageFinding[] = [];
   const me = ctx.player;
@@ -1129,6 +1130,9 @@ const mnkBlitz: JobCheck = (ctx) => {
 
   const phoenix = ctx.values.perUse(id("RISING_PHOENIX")) || ctx.values.perUse(id("ELIXIR_BURST"));
   const critMult = critMultOf(ctx);
+  const inAny = (ws: { startMs: number; endMs: number }[], t: number) => ws.some((w) => t > w.startMs && t <= w.endMs);
+  const raptor = statusWindows(ctx, S.RAPTOR_FORM.id), coeurl = statusWindows(ctx, S.COEURL_FORM.id);
+  const formless = statusWindows(ctx, S.FORMLESS_FIST.id);
   for (const c of casts) {
     if (c.abilityId === id("CELESTIAL_REVOLUTION") && phoenix > 0) {
       // Rising Phoenix's damage per base value prices this cast's base.
@@ -1144,21 +1148,46 @@ const mnkBlitz: JobCheck = (ctx) => {
         detail: `Celestial Revolution at ${clock(c.timestamp)}: two of one form and one other`,
       });
     } else if (c.abilityId === id("FORM_SHIFT") && formGcd > 0) {
-      // A Monk has no ranged GCD: out of reach in a mechanic's movement
-      // window, Form Shift is the right press (as a disengage is,
-      // checks.ts checkDisengages).
+      // A GCD that does no damage. A Monk has no ranged GCD: out of reach
+      // in a mechanic's movement window it's the right press (as a
+      // disengage is, checks.ts checkDisengages), and in downtime it's free.
+      // Meditation (a 1s GCD) isn't judged: the top parse YPhxRTb9Ld7BJaXp
+      // Meditates at 2:06, 3:23, 3:30 and 7:15 with the bosses up and no
+      // movement window known, most likely out of reach, which the log
+      // can't show.
+      const lost = formGcd;
+      const basis = `${k(formGcd)} average form GCD: Form Shift does no damage`;
       const moving = (ctx.movement ?? []).find((w) => c.timestamp >= w.startMs && c.timestamp <= w.endMs);
       if (moving) {
         out.push(finding(ctx, {
           kind: "blitz", startMs: c.timestamp, endMs: c.timestamp, forced: true, movement: true, cause: moving.cause,
-          label: `Form Shift during ${moving.cause}`, lostDamage: formGcd, basis: `${k(formGcd)} average form GCD`,
-          detail: `Form Shift at ${clock(c.timestamp)}, out of reach`,
+          label: `${c.abilityName} during ${moving.cause}`, lostDamage: lost, basis,
+          detail: `${c.abilityName} at ${clock(c.timestamp)}, out of reach`,
         }));
         continue;
       }
       push(c.timestamp, {
-        label: "Form Shift in uptime", lost: formGcd, basis: `${k(formGcd)} average form GCD: Form Shift does no damage`,
-        detail: `Form Shift at ${clock(c.timestamp)} with a target to hit`,
+        label: `${c.abilityName} in uptime`, lost, basis,
+        detail: `${c.abilityName} at ${clock(c.timestamp)} with a target to hit`,
+      });
+    } else if (OPO_IDS.has(c.abilityId) && !inAny(pbWindows, c.timestamp) && !inAny(formless, c.timestamp)) {
+      // An Opo-opo skill in Raptor or Coeurl form restarts the cycle: the
+      // form's GCD is skipped. None of the top 100's sampled parse did it;
+      // bWDLM6zVXkqFAfjT did it 49 times. Valued as that form's average
+      // GCD less what this one dealt at its average conditions.
+      const form = inAny(raptor, c.timestamp) ? "Raptor" : inAny(coeurl, c.timestamp) ? "Coeurl" : undefined;
+      if (!form) continue;
+      const formAvg = avgOf(form === "Raptor" ? ids("TRUE_STRIKE", "TWIN_SNAKES", "RISING_RAPTOR") : ids("DEMOLISH", "SNAP_PUNCH", "POUNCING_COEURL"));
+      const ownCasts = count.get(c.abilityId) ?? 0;
+      const ownBase = ownCasts ? me.damageDone.filter((e) => e.abilityId === c.abilityId && e.timestamp < ctx.endMs)
+        .reduce((a, e) => a + baseValue(e, critMult), 0) / ownCasts : 0;
+      const base = me.damageDone.filter((e) => e.abilityId === c.abilityId && e.timestamp >= c.timestamp && e.timestamp < c.timestamp + 2_000)
+        .reduce((a, e) => a + baseValue(e, critMult), 0);
+      const dealt = ownBase > 0 ? base * ctx.values.perUse(c.abilityId) / ownBase : base;
+      push(c.timestamp, {
+        label: `${c.abilityName} in ${form} form`, lost: formAvg - dealt,
+        basis: `${k(formAvg)} average ${form} form GCD − ${k(dealt)} for this ${c.abilityName} at the same buffs`,
+        detail: `${c.abilityName} at ${clock(c.timestamp)} skipped ${form} form`,
       });
     }
   }

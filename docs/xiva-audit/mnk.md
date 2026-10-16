@@ -27,7 +27,7 @@
 |---|---|---|---|---|
 | mnk/RiddleOfFire/gcd-count | verified | `riddleOfFire` expectedGcds 11 | Riddle of Fire under 11 GCDs | Fight 16's 3 short windows (3:02, 6:02, 7:03) matched; all forced. xivanalysis's own tiers hide 1-5 missed (bug). |
 | mnk/RiddleOfFire/blitz-count | verified | `riddleOfFire` Blitzes (`blitzesExpected`) | a Blitz missing from Riddle of Fire | Minor 1, Medium 3, Major 6. Built from fight 16: the opener's Elixir Burst at 0:24, 1.2s after the window (27k). |
-| mnk/RiddleOfFire/wasted-gcds | candidate | — | Form Shift / Meditation GCDs inside Riddle of Fire | Medium 1, Major 2. A GCD in the burst that does no damage costs the window's bonus on a real GCD. Downtime casts excused. |
+| mnk/RiddleOfFire/wasted-gcds | superseded | `mnkBlitz` (Form Shift in uptime) | Form Shift / Meditation GCDs inside Riddle of Fire | Form Shift is judged anywhere in uptime (skipped-form-shift); the Riddle of Fire window's own GCD count carries the burst cost. Meditation not judged (2026-10-15): the top parse YPhxRTb9Ld7BJaXp Meditates at 2:06, 3:23, 3:30, 7:15 with the bosses up and no known movement window, most likely out of reach, which the log can't show. |
 | mnk/RiddleOfFire/riddle-of-wind-column | no-damage | — | — | Display only. |
 | mnk/Brotherhood/gcd-count | superseded | `riddleOfFire` | Brotherhood under 10 GCDs | Brotherhood sits inside Riddle of Fire, which the app judges. Tiers inverted (bug). |
 | mnk/Brotherhood/drift | candidate | — | Brotherhood pressed early or late against Riddle of Fire | Minor. Like Bard's failed overlap: the app doesn't see a buff outside the burst. Premise check: phase holds. |
@@ -49,7 +49,7 @@
 | mnk/Balls/fury-overcap | candidate | — | Opo / Raptor / Coeurl Fury gained at the cap | Minor 1, Medium 3, Major 5. Inferred from the form actions; a lost Fury is a lost empowered GCD. |
 | mnk/Chakra/overcap | unverifiable | — | Chakra over 5 (10 under Meditative Brotherhood) | Minor 1, Medium 5, Major 8. Read only from gauge events, which only the log's recorder has; party Chakra gain is random. |
 | mnk/Forms/formless-combo-starter | candidate | — | an Opo-opo skill with no form up | Minor 1, Medium 2. Forms aren't combos in the app's data, so `checkCombos` doesn't see them. Reachability doubt (see bugs). |
-| mnk/Forms/reset-by-opo | candidate | — | an Opo-opo skill in Raptor / Coeurl form | Medium. Same gap. |
+| mnk/Forms/reset-by-opo | verified | `mnkBlitz` | an Opo-opo skill in Raptor / Coeurl form | Built 2026-10-15 from the form buffs (Perfect Balance and Formless Fist excused): that form's average GCD less what the Opo-opo skill dealt, buff-neutral. None in the top parse; most competent Monks on disk 0-2. Matched xivanalysis: Q18Xc93x4wpfMFdT 1 of 1, bqmRpGxDvfT8AZc6 4 of 5, bWDLM6zVXkqFAfjT 47 of 49 (the rest dealt at least the form's average). Fires on the user's static at 6-17k each (rgTafHJ9MN47m3Vy, pnLBzfbH8NjGAJRg, wNHvD38WTbFtGJKr). |
 | mnk/Forms/skipped-form-shift | covered | `mnkBlitz` | Form Shift used while a form was up, outside downtime | Any Form Shift in uptime: its form GCD average. In forced time it's free, and in a fight context's movement window it's shown, not counted (a Monk has no ranged GCD; like a disengage). The movement windows excuse most mid-skill Red Hot and Deep Blue Form Shifts (Hot Aerial, Alley-Oop Inferno, Insane Air). Still counted: at2GMBcywChApnfY 9:07; kNQKG6yHmvZTJ2hf 6:59, 7:01 (1-3s before the Alley-Oop window: early, or the window's edge). Against xivanalysis: it has no downtime or reach exception, so its "2 forms skipped by Form Shift" on bqmRpGxDvfT8AZc6 are both in movement windows here (not counted), and its Form Shift-in-Perfect-Balance counts (bqmRpGxDvfT8AZc6 1, kNQKG6yHmvZTJ2hf 3, YPhxRTb9Ld7BJaXp 1) are movement or downtime except kNQKG6yHmvZTJ2hf's first two. |
 | mnk/Forms/dropped-form | candidate | — | a form left to expire (30s) | Major. Possibly unreachable in xivanalysis (see bugs). |
 | mnk/Bookending/formless-on-opo | unverifiable | — | Formless Fist spent on a non-Opo-opo skill | Checklist. Its cost depends on the Blitz planned; not measurable from one press (fight 16: "PB after Opo-opo 22/29" not built). |
@@ -90,13 +90,9 @@ Overheal.
 
 In priority order (biggest damage cost first).
 
-1. **mnk/PerfectBalance/dropped-stacks, mnk/Revolution/celestial-revolution,
-   mnk/Forms/skipped-form-shift** (covered). Match against xivanalysis
-   pages for the searched pulls.
-2. **mnk/Brotherhood/drift, missed-window** (candidates). Premise check:
-   phase holds.
-3. **mnk/Forms/formless-combo-starter, reset-by-opo, dropped-form,
-   mnk/Bookending/formless-overwrite, mnk/RiddleOfFire/wasted-gcds**
-   (candidates). Form mistakes: a lost empowered GCD each.
-4. **mnk/Balls/fury-overcap** (candidate).
-5. **mnk/Replies/*** (covered). Not seen firing.
+1. **mnk/Brotherhood/drift, missed-window** (candidates). Party-buff
+   alignment against Riddle of Fire; premise check: phase holds.
+2. **mnk/Forms/formless-combo-starter, dropped-form,
+   mnk/Bookending/formless-overwrite** (candidates). Smaller form mistakes.
+3. **mnk/Balls/fury-overcap** (candidate).
+4. **mnk/Replies/*** (covered). Not seen firing.
