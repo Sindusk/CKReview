@@ -97,4 +97,9 @@ In priority order (biggest damage cost first).
    Fire's 7:17.0, MAJBybNh819Gr2kX fight 2 Fire's 0:25.3,
    APLmHrf3h2Rx1XbN fight 3 Earth's 3:51.1). 37PGL4tgpvfjrXNa fetched:
    the app reports it (121k, the whole Fire's Reply as an upper bound).
-   Page: https://xivanalysis.com/fflogs/37PGL4tgpvfjrXNa/7/12
+   Matched his page 2026-10-16: Fire's Rumination fell off 1 = 1;
+   Celestial Revolution 7 = 7; Fury lost 5 = 3 Opo-opo + 1 Raptor + 1
+   Coeurl; Brotherhood 4 / 5 = 1. Perfect Balance 13 / 16 and Riddle of
+   Fire 8 / 10 against the app's 2 and 1 (three deaths; whole uses
+   outside forced time). Its 9 Blitzes missed in Riddle of Fire against
+   the app's 6 in five windows, not traced.

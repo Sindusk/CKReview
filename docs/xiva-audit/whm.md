@@ -72,5 +72,8 @@ Blood Lily and Assize compared on three pages the same day.
    at 4:56.8 (1 stack) and 7:14.1 (3 stacks), no death beside either;
    r9RxNhcgqa7BQMYD fight 2 one at 2:37.3. Both fire; priced since then
    as Glare IV − Glare III a stack (`procReplaces`; was the whole Glare
-   IV, 191k for the three): 31k and 92k. Page:
-   https://xivanalysis.com/fflogs/3HrGydmRZApkCtXz/3/7
+   IV, 191k for the three): 31k and 92k. Matched her page 2026-10-16:
+   "dropped 4 procs" = the 1 + 3 stacks; Presence of Mind 4 / 5 = 1;
+   Assize 12 / 15 (whole uses, as elsewhere). Its other "dropped 1 proc"
+   is a Divine Caress never pressed after the 6:44.7 Temperance (healing,
+   not adopted).
