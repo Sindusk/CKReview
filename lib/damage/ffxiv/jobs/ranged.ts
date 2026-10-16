@@ -363,8 +363,18 @@ export const PROC_REPLACES = new Map(([
   ["REVERSE_CASCADE", "CASCADE"], ["RISING_WINDMILL", "WINDMILL"],
   ["FOUNTAINFALL", "FOUNTAIN"], ["BLOODSHOWER", "BLADESHOWER"],
   ["LAST_DANCE", "CASCADE"], ["REFULGENT_ARROW", "BURST_SHOT"],
-  ["FELL_CLEAVE", "MAIM"],
+  ["FELL_CLEAVE", "MAIM"], ["PRIMAL_REND", "MAIM"], ["PRIMAL_RUINATION", "MAIM"],
 ] as const).filter(([a, b]) => A[a] && A[b]).map(([a, b]) => [A[a].id, A[b].id]));
+
+// Declared consumers (DamageGame.procConsumers), from xivanalysis's
+// war/Procs.tsx. L9BzKkD2nxcVgHTC Necron pull 18 (Widow Shadowimage): two
+// of three Primal Rend Ready ran out (1:38.8, 3:17.2), so the one consumed
+// fell under the inference's 60% and neither drop was reported
+// (xivanalysis: "You missed 2 uses of Primal Rend"). A lost Primal Rend
+// also loses the Primal Ruination it unlocks; that isn't valued here.
+export const PROC_CONSUMERS = new Map(([
+  ["PRIMAL_REND_READY", "PRIMAL_REND"], ["PRIMAL_RUINATION_READY", "PRIMAL_RUINATION"], ["WRATHFUL", "PRIMAL_WRATH"],
+] as const).filter(([s, a]) => S[s] && A[a]).map(([s, a]) => [S[s].id, A[a].id]));
 
 // ── Bard, Machinist (unverified) ───────────────────────────────────────
 

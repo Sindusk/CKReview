@@ -962,6 +962,7 @@ export function checkProcs(ctx: PlayerCheckContext): DamageFinding[] {
     const top = [...(consumedBy.get(statusId) ?? new Map<number, number>()).entries()].sort((a, b) => b[1] - a[1])[0];
     if (n >= PROC_MIN_REMOVALS && top && top[1] >= n * PROC_CONSUMED_SHARE) consumer.set(statusId, top[0]);
   }
+  for (const [statusId, consumerId] of ctx.game.procConsumers ?? []) consumer.set(statusId, consumerId);
 
   const state = new Map<number, { expiresAt?: number; stacks: number }>();
   for (const e of own) {

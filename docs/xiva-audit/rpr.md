@@ -38,7 +38,7 @@
 | rpr/Tincture/window-table | no-damage | — | — | Table only. |
 | rpr/CooldownDowntime/uses | verified | `checkCooldownDrift` | Arcane Circle, Soul Slice / Scythe or Gluttony held | FRU Soul Slice 36/38 recharged through P4's downtime (not counted); Arcane Circle 9/10 held for the 14:18 burst. |
 | rpr/Drift/gluttony | superseded | `checkCooldownDrift` | Gluttony drifting | A table only. qjCMx4bRfgNKwX9T 31s / 25s at two-minute marks: 18/18, no use lost. Vamp: 1 use found against its 8 of 10. |
-| rpr/Procs/overwritten-gibbet | covered | `reaperEnhancedOverwrites` | Enhanced Gibbet granted while held | Built 2026-10-16 with Gallows and Void / Cross Reaping: a "refreshed" event beside the unenhanced press; ~10% of her average of it (enhanced hits measured ~11.5% over plain on disk). 49 on disk (AYQm9Kd8Ct4FxcGp Lindwurm pull 32, Cross Reaping twice at 6:19.6 and 6:22.6). FFLogs top 20: 1 in 794. No xivanalysis page yet. |
+| rpr/Procs/overwritten-gibbet | covered | `reaperEnhancedOverwrites` | Enhanced Gibbet granted while held | Built 2026-10-16 with Gallows and Void / Cross Reaping: a "refreshed" event beside the unenhanced press; ~10% of her average of it (enhanced hits measured ~11.5% over plain on disk). 49 on disk (AYQm9Kd8Ct4FxcGp Lindwurm pull 32, Cross Reaping twice at 6:19.6 and 6:22.6). FFLogs top 20: 1 in 794. xivanalysis's page for that pull (Sonder Dreams) is silent by design: its RPR Procs tracks Void / Cross Reaping but reports overwrites only for Gibbet / Gallows. The log confirms the 6:22.6 refresh; the app's call stands. A Gibbet / Gallows overwrite is still unmatched on a page. |
 | rpr/Procs/overwritten-gallows | covered | `reaperEnhancedOverwrites` | Enhanced Gallows granted while held | Same. |
 | rpr/Procs/expired-gibbet | covered | `checkProcs` | Enhanced Gibbet expiring | Medium 1, Major 2. Not seen firing. |
 | rpr/Procs/expired-gallows | covered | `checkProcs` | Enhanced Gallows expiring | Same. |
@@ -82,9 +82,9 @@
 In priority order (biggest damage cost first):
 
 1. **rpr/Procs/overwritten-gibbet, gallows** (covered 2026-10-16): no
-   page with one yet. fJxTNgwtRKjYbvZp and xydWc2pK74HCbZ8q have none in
-   either tool; a page for AYQm9Kd8Ct4FxcGp Lindwurm pull 32 (Sonder
-   Dreams, 6:22.6) would test it.
+   page with one yet. AYQm9Kd8Ct4FxcGp pull 32's 6:22.6 is a Void /
+   Cross Reaping overwrite, which xivanalysis never reports; a pull with
+   a Gibbet / Gallows one is still needed.
 2. **rpr/OtherGauges/soul-overcap** (unverifiable until the missing Soul
    source is found).
 3. **rpr/Procs/expired-gibbet, gallows** (covered). Not seen firing.

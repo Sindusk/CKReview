@@ -88,6 +88,10 @@ export type DamageGame = {
   // → Cascade). A lost proc costs the difference, not the consumer's whole
   // average. Consumers not listed keep the upper bound.
   procReplaces?: Map<number, number>;
+  // Proc status → its consumer, declared where the pull can't be trusted to
+  // show it: the generic check infers a consumer only from 60% of 3+
+  // removals, so a player who drops most of a proc went unjudged.
+  procConsumers?: Map<number, number>;
   // Channelled mitigation (Passage of Arms), by action id: from the cast
   // to the player's next action, at most maxMs, is forced (the raid plan,
   // not play).

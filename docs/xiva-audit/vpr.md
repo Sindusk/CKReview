@@ -39,7 +39,7 @@
 | vpr/FinisherProcs/dropped | verified | `venoms` (Hind / Flank venoms) | a finisher venom lost | Medium 1, Major 3. 2T1HzdPKgbhM43am venoms 7; The Tyrant Hindstung 8/10 matched; fight 16's Hindstung drops are Hindsbane Fangs pressed instead. Grimskin's / Grimhunter's (AoE) are left to the generic `checkProcs` (expiry only), and xivanalysis never reports Grimhunter's (bug). |
 | vpr/FinisherProcs/overwritten | verified | `venoms` | a finisher venom granted while held | Same. |
 | vpr/Venoms/checklist | superseded | `venoms` | — | Checklist form. |
-| vpr/Venoms/dropped | verified | `venoms` (Poised), `viperBites` (Bite venoms) + `checkProcs` | an oGCD venom lost (Hunter's / Swiftskin's / Fellhunter's / Fellskin's Venom, Poised for Twinfang / Twinblood) | Poised drops built from Red Hot 7:06.9 (4k). Bite venoms built 2026-10-16 (`viperBites`): dropped by a GCD, the coil's unpressed Bites are lost (one or two, her average Bite); by the other Bite, the venom's boost (~27%, measured). On disk 8 + 11 counted, 12 shown. Matched xivanalysis on jXG76ba43VDLAvYz (Rinn Kuma): its 3 dropped oGCD procs are the two Poised drops (5:00, 8:28) and the Hunter's Venom Uncoiled Fury dropped at 9:01.3 (Twinfang Bite lost); its 200 potency of finisher venoms our two (7:24, 8:40). |
+| vpr/Venoms/dropped | verified | `venoms` (Poised), `viperBites` (Bite venoms) + `checkProcs` | an oGCD venom lost (Hunter's / Swiftskin's / Fellhunter's / Fellskin's Venom, Poised for Twinfang / Twinblood) | Poised drops built from Red Hot 7:06.9 (4k). Bite venoms built 2026-10-16 (`viperBites`): dropped by a GCD, the coil's unpressed Bites are lost (one or two, her average Bite); by the other Bite, the venom's boost (~27%, measured). On disk 8 + 11 counted, 12 shown. Matched xivanalysis on jXG76ba43VDLAvYz (Rinn Kuma): its 3 dropped oGCD procs are the two Poised drops (5:00, 8:28) and the Hunter's Venom Uncoiled Fury dropped at 9:01.3 (Twinfang Bite lost); its 200 potency of finisher venoms our two (7:24, 8:40). Matched xivanalysis 2026-10-16 on VzycM18rpn6bWxXY (L'othe Thampur), its 5 dropped oGCD procs: 0:31 Poised (Uncoiled Twinfang went first), 0:41 and 3:37 Hunter's Venom (the wrong Bite, first page match for that case), 8:17 Hunter's Venom (the app: forced) and 6:35 Poised for Twinblood. That last one was missed: Reawaken, a GCD, ended it, and the venom check only looked for an oGCD beside the removal. Fixed: a GCD ending Poised loses the whole Uncoiled follow-up (her average of it); 5 on disk. Honed Steel 1 expired, Honed Reavers 2 overwritten (its 100 + 200 potency) matched too. |
 | vpr/Venoms/overwritten | covered | `venoms` (Poised) | an oGCD venom granted while held | Not seen firing for the Bite venoms. |
 | vpr/OGCDDowntime/uses | verified | `checkCooldownDrift` (hold 2.18s) | Serpent's Ire or Vicewinder held | Vicewinder 13/14, 13/15, 15/17 and fight 16 28/29 not adopted: each under one 40s recharge or banked while dead. |
 | vpr/Positionals/missed | verified | `checkPositionals` | a missed flank / rear | Vamp 6, Red Hot 3, fight 16 8 matched. The Tyrant's Hindsbane misses were never caught until the app's name lookup was fixed (xivanalysis's data spells it "Hindbane"). |
@@ -94,10 +94,7 @@ In priority order (biggest damage cost first):
 
 1. **vpr/SerpentsTail/checklist**: verified on one page (2T1HzdPKgbhM43am);
    Last Lash never seen.
-2. **vpr/Venoms/dropped, the wrong Bite** (`viperBites`, 2026-10-16): the
-   GCD case matched a page; the wrong-Bite case (11 on disk) hasn't been
-   on one yet.
-3. **vpr/Vices/checklist** (candidate, rare; Bites now covered): 22 of 1,043 Vicewinders /
+2. **vpr/Vices/checklist** (candidate, rare; Bites now covered): 22 of 1,043 Vicewinders /
    Vicepits on disk without both coils, most at a death or a wipe's end
    (cZ42C1y3JRNGXWLH 0:49: two Uncoiled Furies, then the combo, coils
    never pressed). Needs the rule for when a coil stops being available.

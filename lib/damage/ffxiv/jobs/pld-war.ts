@@ -357,7 +357,13 @@ export const PLD_CHECKS: JobCheck[] = [fightOrFlight, pldAoeCombo, atonementChai
 // Nascent Chaos are one more Inner Chaos). Marked inference: the
 // simulation can be off, and says so when an Infuriate was pressed at 0
 // charges. 43 of the 164 Warrior pulls on disk sat at two charges for
-// 15s+ before forced time was taken out (2026-10-16).
+// 15s+ before forced time was taken out (2026-10-16). A spender pressed
+// at two charges wasted its refund, which counts as 5s more held.
+// Against xivanalysis on L9BzKkD2nxcVgHTC Necron pull 18 (Widow
+// Shadowimage): its checklist says 4 / 7, the app 1 lost (111.5s held:
+// Infuriate at 0:05 and 0:14, then not until 3:12). Its 7 assumes refunds
+// the player never earned (200 Beast gauge lost at the cap, few Fell
+// Cleaves) and runs to the wipe's end; not adopted.
 const INFURIATE_REFUND_MS = 5_000;
 const INFURIATE_OPENER_MS = 2_500;
 const infuriateHeld: JobCheck = (ctx) => {
@@ -366,6 +372,7 @@ const infuriateHeld: JobCheck = (ctx) => {
   const recast = inf.cooldown ?? 60_000, max = inf.charges ?? 2;
   const refunds = new Set(["FELL_CLEAVE", "DECIMATE", "INNER_CHAOS", "CHAOTIC_CYCLONE"].filter((x) => A[x]).map(id));
   let charges = max, next: number | null = null, capFrom = 0, negatives = 0, uses = 0;
+  const wasted: number[] = [];
   const capped: { startMs: number; endMs: number }[] = [];
   const advance = (t: number) => {
     while (next !== null && next <= t) {
@@ -381,9 +388,10 @@ const infuriateHeld: JobCheck = (ctx) => {
       if (charges === max) { capped.push({ startMs: capFrom, endMs: c.timestamp }); next = c.timestamp + recast; }
       if (charges === 0) negatives++;
       charges = Math.max(0, charges - 1);
-    } else if (refunds.has(c.abilityId) && next !== null) {
+    } else if (refunds.has(c.abilityId)) {
       advance(c.timestamp);
       if (next !== null) { next -= INFURIATE_REFUND_MS; advance(c.timestamp); }
+      else wasted.push(c.timestamp);
     }
   }
   if (uses === 0) return [];
@@ -393,7 +401,9 @@ const infuriateHeld: JobCheck = (ctx) => {
   let held = 0, longest: { startMs: number; endMs: number; held: number } | undefined;
   for (const w of capped) {
     const allowance = COOLDOWN_HOLD_MS + (w.startMs === 0 ? INFURIATE_OPENER_MS : 0);
-    const h = Math.max(0, w.endMs - w.startMs - forcedPart(w.startMs, w.endMs, blockers).ms - allowance);
+    // A spender pressed at two charges wasted its 5s refund too.
+    const refundsLost = wasted.filter((t) => t > w.startMs + allowance && t <= w.endMs && !inWindows(t, blockers)).length;
+    const h = Math.max(0, w.endMs - w.startMs - forcedPart(w.startMs, w.endMs, blockers).ms - allowance) + refundsLost * INFURIATE_REFUND_MS;
     held += h;
     if (h > 0 && (!longest || h > longest.held)) longest = { ...w, held: h };
   }

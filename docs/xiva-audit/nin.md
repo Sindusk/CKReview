@@ -25,7 +25,7 @@
 | nin/KunaisBaneWindow/gcd-count | verified | `kunaisBane` (7 GCDs, 8 with Ten Chi Jin; mudras not counted) | Kunai's Bane under 7 GCDs | Medium 1, Major 2. FRU matched. |
 | nin/KunaisBaneWindow/kassatsu-actions | verified | `kunaisBane` | no Hyosho Ranryu / Goka Mekkyaku in the window | Major. |
 | nin/KunaisBaneWindow/tracked-actions | verified | `kunaisBane` | Raiton ×2 (×1 in the opener), Dream Within a Dream, Tenri Jindo (with TCJ) missing | Medium 1, Major 3. |
-| nin/KunaisBaneWindow/limited-armor-crush | covered | `kazematoi` ("Armor Crush in Kunai's Bane") | Armor Crush inside Kunai's Bane (outside the opener) | Built 2026-10-16: only an Armor Crush with Kazematoi held (so the opener's, at 0, never counts), valued at (buffed Aeolian Edge − Armor Crush) × the window's observed bonus. Fires on most Red Hot and Deep Blue Ninja kills on disk, 0-2k each (e.g. 7zwpcLxk2Fd1h6Vr 3:04). A window whose removal never logged is cut at 16s. Not matched on a page yet. |
+| nin/KunaisBaneWindow/limited-armor-crush | verified | `kazematoi` ("Armor Crush in Kunai's Bane") | Armor Crush inside Kunai's Bane (outside the opener) | Built 2026-10-16: only an Armor Crush with Kazematoi held (so the opener's, at 0, never counts), valued at (buffed Aeolian Edge − Armor Crush) × the window's observed bonus. Fires on most Red Hot and Deep Blue Ninja kills on disk, 0-2k each (e.g. 7zwpcLxk2Fd1h6Vr 3:04). A window whose removal never logged is cut at 16s. Against xivanalysis 2026-10-16 on zMJdajRYyNF3LVkr (Eternal Gem): its 3 are 1:05, 6:16 and 7:29; its code counts every Armor Crush in a window but the opener's, never checking Kazematoi despite its text, and the 1:18.0 one came at 0 stacks (not counted here, by design). The 6:16.7 window on Watery Grave was missed: hits on the add show no bonus in their multipliers, so the value came out 0; it falls back to Kunai's Bane's 10% now (6:27.9, 2k). 2 of its 3, the third rightly not. |
 | nin/KunaisBaneWindow/tcj-used | no-damage | — | — | Note column. |
 | nin/KunaisBaneUsage/held | verified | `checkCooldownDrift` (Kunai's Bane) | Kunai's Bane held | Medium 1, Major 2. |
 | nin/KunaisBaneUsage/none | superseded | `checkCooldownDrift` | no Kunai's Bane at all | Major. Fires on any pull shorter than the opener. |
@@ -44,7 +44,7 @@
 | nin/Ninki/hellfrog | verified | `ninAoe` (vs Bhavacakra, one target) | Hellfrog Medium on too few targets (3 before 7.3, 2 from 7.3) | Built 2026-10-15. One target only: from 7.3 two out-damage Bhavacakra (pre-7.3 two-target frogs go unseen). Premise holds (same Ninki). Fires on Red Hot and Deep Blue kills with the bosses apart: mgTQJjX2nW6ANkP7 6:51 (21k), jXG76ba43VDLAvYz 4:07 (17k) and 9:16 as Deep Blue died (24k). Matched xivanalysis on jXG76ba43VDLAvYz (2 of its 2). |
 | nin/Ninki/deathfrog | covered | `ninAoe` (vs Zesho Meppo, one target) | Deathfrog Medium on too few targets | Not seen firing (the one on disk hit both bosses). |
 | nin/Kazematoi/overcap | verified | `kazematoi` | Armor Crush at 4-5 stacks | FRU 9 lost matched. |
-| nin/Kazematoi/leftover | covered | `kazematoi` ("Kazematoi left at the kill") | 3+ Kazematoi left at the end | Built 2026-10-16, kills only: 3+ at the kill means the last Armor Crush could have been a buffed Aeolian Edge (the swap costs 3 stacks, so never two), valued at their averages' difference. Forced when that Armor Crush was. 6 of 16 Ninja kills on disk end with 3-5; 5 fire (2-18k: 7zwpcLxk2Fd1h6Vr, cZ42C1y3JRNGXWLH, YPhxRTb9Ld7BJaXp, zMJdajRYyNF3LVkr; kC7Y3WbzvKcZrBxT forced by the closing Limit Break). Not matched on a page yet. |
+| nin/Kazematoi/leftover | verified | `kazematoi` ("Kazematoi left at the kill") | 3+ Kazematoi left at the end | Built 2026-10-16, kills only: 3+ at the kill means the last Armor Crush could have been a buffed Aeolian Edge (the swap costs 3 stacks, so never two), valued at their averages' difference. Forced when that Armor Crush was. 6 of 16 Ninja kills on disk end with 3-5; 5 fire (2-18k: 7zwpcLxk2Fd1h6Vr, cZ42C1y3JRNGXWLH, YPhxRTb9Ld7BJaXp, zMJdajRYyNF3LVkr; kC7Y3WbzvKcZrBxT forced by the closing Limit Break). Matched xivanalysis 2026-10-16 on zMJdajRYyNF3LVkr: 5 left at the kill; its 12 Kazematoi lost at the cap match the app's too. |
 | nin/Kazematoi/unbuffed-aeolian | verified | `kazematoi` | Aeolian Edge at 0 stacks | FRU 1 matched. |
 | nin/Procs/dropped-phantom-kamaitachi | covered | `checkProcs` | Phantom Kamaitachi Ready expiring | Medium 1, Major 2. Not seen firing. |
 | nin/Procs/dropped-tenri-jindo | covered | `checkProcs` | Tenri Jindo Ready expiring | Same. |
@@ -74,10 +74,11 @@
 
 In priority order (biggest damage cost first).
 
-1. **nin/Kazematoi/leftover** and
-   **nin/KunaisBaneWindow/limited-armor-crush** (covered 2026-10-16).
-   Match on a page (zMJdajRYyNF3LVkr: 5 left at the kill).
-2. **nin/Procs/*, nin/Positionals** (covered). Not matched on a page.
-3. **nin/Ninjutsu/tcj-doton** (covered). Not seen as a loss yet (the one
+1. **nin/Procs/*, nin/Positionals** (covered). Not matched on a page.
+   zMJdajRYyNF3LVkr's page (2026-10-16): Raiju Ready dropped 4 = the
+   app's 4 (3:17, 6:01, 8:57, 9:12). Ninki lost: xivanalysis 60, the app
+   85 (4:19 25, 8:41 15, 8:47 40, 9:15 5; its simulation went below zero
+   once there); find which 25 differ.
+2. **nin/Ninjutsu/tcj-doton** (covered). Not seen as a loss yet (the one
    on disk out-damaged its Suiton).
-4. **nin/Ninki/deathfrog** (covered). Not seen firing.
+3. **nin/Ninki/deathfrog** (covered). Not seen firing.

@@ -18,7 +18,7 @@
 |---|---|---|---|---|
 | sge/DoTs/uptime | verified | Eukrasian Dosis III / Dyskrasia `dot` | the DoT off the target | K6qfMamL7rN8yz2Q 91.9% (gaps 1:05, 4:06, 7:36, 8:10), 73.2% and 85% matched. |
 | sge/DoTs/clipping | wrong | — | the DoT refreshed early (6s / 9s / 12s a minute) | FRU 24.4s a minute was double casts on P4's two bosses. The app finds tincture-snapshot refreshes itself (The Tyrant 7:15, 9:51; 58k). |
-| sge/AoEUsages/dyskrasia | covered | `dyskrasiaOnOne` | Eukrasian Dyskrasia hitting under 3 targets | Built 2026-10-16 for one target only. Premise check on 393 Sage pulls (36 Eukrasian Dyskrasias): on two enemies it's even (100-118k over 30s against about 100k for one Dosis III), so xivanalysis's 3-target minimum overstates. On one enemy each tick loses the average Dosis III tick (multiplier out, this tick's back in) minus what it dealt: H9fnVZgPA3krpCzY Lindwurm II pull 24 0:57 (56k), jN3XDrf2z8PmLgRJ Vamp Fatale pull 4 5:46 (33k), K6qfMamL7rN8yz2Q Vamp Fatale pull 1 5:21 (25k). The instant Dyskrasia II is left out on purpose (the moving GCD). Not matched on a page yet. |
+| sge/AoEUsages/dyskrasia | covered | `dyskrasiaOnOne` | Eukrasian Dyskrasia hitting under 3 targets | Built 2026-10-16 for one target only. Premise check on 393 Sage pulls (36 Eukrasian Dyskrasias): on two enemies it's even (100-118k over 30s against about 100k for one Dosis III), so xivanalysis's 3-target minimum overstates. On one enemy each tick loses the average Dosis III tick (multiplier out, this tick's back in) minus what it dealt: H9fnVZgPA3krpCzY Lindwurm II pull 24 0:57 (56k), jN3XDrf2z8PmLgRJ Vamp Fatale pull 4 5:46 (33k), K6qfMamL7rN8yz2Q Vamp Fatale pull 1 5:21 (25k). The instant Dyskrasia II is left out on purpose (the moving GCD). xivanalysis's page for H9fnVZgPA3krpCzY pull 24 (Sin Dusk) is silent, by a bug: its core AoEUsages counts targets on the action's own damage event, and Eukrasian Dyskrasia has none (DoT ticks only: 0:57.1 cast, ten ticks on Lindwurm from 0:59.5), so the rule can never fire. The app's call stands. |
 | sge/CooldownDowntime/phlegma | verified | `checkCooldownDrift` + `usesLostAtKill` | Phlegma III held at 2 charges | Checklist target 80%. FRU 28/29 is perfect play only (not counted). K6qfMamL7rN8yz2Q 14/15: a charge held to the kill, the kill rule. |
 | sge/CooldownDowntime/psyche | verified | `checkCooldownDrift` | Psyche held | FRU 16/17 holds (5:10, 41s before P2's downtime). The Tyrant 10/11: 27s held, under a recast (not counted). |
 | sge/Tincture/expected-actions | superseded | tincture.ts | 2 Phlegma, Psyche missing under the tincture | The Tyrant 9:50: the app moves the tincture to 10:08, which covers both. |
@@ -60,5 +60,5 @@ application checked ran its course or out-did a Dosis III).
 
 ## Open
 
-1. **sge/AoEUsages/dyskrasia** (covered 2026-10-16). Fires on 3 pulls;
-   match it on a page (H9fnVZgPA3krpCzY Lindwurm II pull 24, 0:57).
+None. sge/AoEUsages/dyskrasia can't be matched on a page: xivanalysis's
+rule never fires (see the row).

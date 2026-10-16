@@ -30,8 +30,8 @@
 | gnb/NoMercy/rushed-window-adjust | superseded | burst window cut short by the kill | a window the kill cuts short | xivanalysis subtracts 1 from each; the app keeps what could still fit (`readyAgain`). |
 | gnb/NoMercy/bloodfest-used-notes | no-damage | — | — | A note column before 7.3. |
 | gnb/Ammo/leftover-cartridges | verified | `cartridges` (`leftAtKill`) | cartridges left at the kill | Fight 16's 1 built from it. No end-of-pull allowance in xivanalysis (wipes count too); the app judges how long it was held. |
-| gnb/Ammo/combo-overcap | covered | `cartridges` (gaugeFindings) | Solid Barrel / Demon Slaughter at 3 cartridges | Not matched against a page (fight 16 had none). |
-| gnb/Ammo/bloodfest-expire-drop | covered | `cartridges` (cap 6, loss over 3 at the end) | Bloodfest ending with more than 3 cartridges | 7.4+ only. Not seen firing. |
+| gnb/Ammo/combo-overcap | verified | `cartridges` (gaugeFindings) | Solid Barrel / Demon Slaughter at 3 cartridges | Matched xivanalysis 2026-10-16 on Xk2DKZwVp4Ar6d7y Enuo pull 10 (Solarus Thalan): 2 = 2 (4:40.2, 5:26.0). |
+| gnb/Ammo/bloodfest-expire-drop | verified | `cartridges` (cap 6, loss over 3 at the end) | Bloodfest ending with more than 3 cartridges | 7.4+ only. Matched xivanalysis 2026-10-16 on Xk2DKZwVp4Ar6d7y Enuo pull 10: 1 = 1 (1:37.9). |
 | gnb/Ammo/cartridge-usage-checklist | superseded | `cartridges` | cartridges generated but not spent | The same loss as the overcap and leftover rules. |
 | gnb/Continuation/dropped | covered | `checkProcs` | Ready to Rip / Tear / Gouge / Blast / Raze expiring | Fight 16: 100%, so never seen firing. |
 | gnb/Continuation/usage-checklist | superseded | `checkProcs` | — | The checklist form of the same rule (it also splices its list while iterating). |
@@ -39,7 +39,7 @@
 | gnb/AoE/demon-slice | verified | `aoeCombo` | Demon Slice on one target | Fires on yPHmaGTY2btq1wD9 Red Hot and Deep Blue 3:57 and 4:04 (Demon Slice, Demon Slaughter on one boss with the two apart; 16k, 19k). Matched xivanalysis on L9BzKkD2nxcVgHTC Necron pull 15 (1 of its 1; the app also flags a Demon Slaughter, which xivanalysis doesn't track). |
 | gnb/AoE/fated-circle | verified | `aoeCombo` (vs Burst Strike) | Fated Circle on one target | Built 2026-10-15. Premise holds (same cartridge). Fires on L9BzKkD2nxcVgHTC Necron pulls 7-21 and pG319BgHTnPJc6Ft Necron pulls 1-3 (one Gunbreaker spending the opener's Bloodfest cartridges on Necron alone, e.g. pull 14 0:11, 0:14, 0:17; and single Hands in the adds, pull 18 3:35, 3:53), 0-34k each. A pull with no Burst Strike has no average to compare against and stays silent (L9BzKkD2nxcVgHTC pull 10). Fight 16 8:09's two hit both P3 bosses (right). Matched xivanalysis on L9BzKkD2nxcVgHTC Necron pull 15: 4 of 4. The raw comparison found only 2: the opener's two (0:05, 0:18) dealt 25-26k in the burst, level with Burst Strike's 25k pull average. The buff-neutral comparison (2026-10-15) prices them at 9-11k each, a Fated Circle being 0.63 of a Burst Strike (300 against 460 potency). |
 | gnb/Cooldowns/uses | verified | `checkCooldownDrift` | Gnashing Fang, Blasting Zone, No Mercy, Bow Shock, Double Down or Bloodfest held | Fight 16: Gnashing Fang 37/38 and Sonic Break 18/19 were downtime (forced). |
-| gnb/Cooldowns/bloodfest-hold | covered | `checkCooldownDrift` (Bloodfest hold 0; 10s and a 120s recast on 7.0-7.3 via `holdMsOnPatches` / `recastOnPatches`; valued by `bloodfestValue`, 2026-10-16) | Bloodfest held | As xivanalysis: before 7.4 Bloodfest waits for No Mercy. Valued as the Reign of Beasts combo + 1.5 × (Burst Strike + Hypervelocity) − 4.5 combo GCDs (the 6 freed GCDs go to the combo, whose Solid Barrels give 1.5 cartridges back). Found while building it: the vendored 7.4 data gave Bloodfest a 60s recast on every patch (120s before 7.4), which read the 7.2 Zelenia kills as 3 uses lost; Gnashing Fang likewise has 1 charge before 7.4 (and BLM's Ley Lines before 7.1), now per patch. Fires on 7.5 kills, ~1 use (Xk2DKZwVp4Ar6d7y Enuo pull 10 4:09-4:41, 224k; Red Hot and Deep Blue kills 153-180k) and the 7.3 Necron wipes. Not matched on a page yet. |
+| gnb/Cooldowns/bloodfest-hold | verified | `checkCooldownDrift` (Bloodfest hold 0; 10s and a 120s recast on 7.0-7.3 via `holdMsOnPatches` / `recastOnPatches`; valued by `bloodfestValue`, 2026-10-16) | Bloodfest held | As xivanalysis: before 7.4 Bloodfest waits for No Mercy. Valued as the Reign of Beasts combo + 1.5 × (Burst Strike + Hypervelocity) − 4.5 combo GCDs (the 6 freed GCDs go to the combo, whose Solid Barrels give 1.5 cartridges back). Found while building it: the vendored 7.4 data gave Bloodfest a 60s recast on every patch (120s before 7.4), which read the 7.2 Zelenia kills as 3 uses lost; Gnashing Fang likewise has 1 charge before 7.4 (and BLM's Ley Lines before 7.1), now per patch. Fires on 7.5 kills, ~1 use (Xk2DKZwVp4Ar6d7y Enuo pull 10 4:09-4:41, 224k; Red Hot and Deep Blue kills 153-180k) and the 7.3 Necron wipes. Matched xivanalysis 2026-10-16 on Enuo pull 10: Bloodfest 9 / 10, the app's 1 lost; its combo breaks (5) matched too. |
 | gnb/Tincture/expected-actions | superseded | tincture.ts | Gnashing Fang ×2 and the burst actions under the tincture | Fight 16's 4: one Gnashing Fang of two each, ~3% of a GF combo. |
 | gnb/Combos/broken | covered | `checkCombos` | a broken combo | Generic. |
 | gnb/Weaving/too-many | verified | `checkGcdGaps` | triple weaves | Fight 16: 6:03, 8:07, 11:08 matched; most of its 13 are 0.02-0.2s jitter or a defensive with Bloodfest + No Mercy. |
@@ -67,9 +67,5 @@
 
 In priority order (biggest damage cost first):
 
-1. **gnb/Cooldowns/bloodfest-hold** (built 2026-10-16): match against a
-   page. Ask for xivanalysis's Gunbreaker page on Xk2DKZwVp4Ar6d7y Enuo
-   pull 10 (Solarus Thalan; the app: Bloodfest ready 4:09, pressed 4:41,
-   1 use lost at the kill).
-2. **gnb/Ammo/combo-overcap, bloodfest-expire-drop; gnb/Continuation/
-   dropped** (covered). None seen firing.
+1. **gnb/Continuation/dropped** (covered). Not seen firing. (Bloodfest
+   drift and both cartridge rows matched a page 2026-10-16.)

@@ -18,13 +18,13 @@
 | war/SurgingTempest/uptime | verified | `surgingTempest` (`uptimeFindings`) | Surging Tempest drops of 2.5s+ | Checklist 90%. Matched on qjCMx4bRfgNKwX9T. Its 104.6% on Red Hot comes from dividing by fight time less invulnerability. |
 | war/Gauge/beast-overcap | verified | `beastGauge` | Beast Gauge over 100 | Tiers start at 20, so Vamp's 10 shows only in the app. qjCMx4bRfgNKwX9T 60 and Red Hot 30 matched exactly. |
 | war/Procs/dropped-inner-release | verified | `checkProcs` (stacks; `procReplaces`) | an Inner Release stack expiring | Major at 1. Vamp 1:26 matched, valued as Fell Cleave minus the Maim in its slot (50k). |
-| war/Procs/dropped-primal-rend | covered | `checkProcs` | Primal Rend Ready expiring | Not seen firing. |
-| war/Procs/dropped-primal-ruination | covered | `checkProcs` | Primal Ruination Ready expiring | Not seen firing. Its text says 20s; the data says 30s. |
-| war/Procs/dropped-primal-wrath | covered | `checkProcs` | Wrathful expiring | Not seen firing. |
+| war/Procs/dropped-primal-rend | verified | `checkProcs` (consumer declared: `procConsumers`) | Primal Rend Ready expiring | **Gap fixed 2026-10-16:** the generic check infers a proc's consumer only from 60% of 3+ removals, so a player who drops most of them (L9BzKkD2nxcVgHTC Necron pull 18: 1 of 3 consumed) went unjudged. Consumers now declared from xivanalysis's war/Procs.tsx; priced against Maim, like Fell Cleave (the Primal Ruination it unlocks isn't valued). Matched xivanalysis on that pull: 2 = 2 (1:38.8, 3:17.2). 16 on disk now, 3 forced. |
+| war/Procs/dropped-primal-ruination | covered | `checkProcs` (declared) | Primal Ruination Ready expiring | Its text says 20s; the data says 30s. Fires since the consumers are declared: mgTQJjX2nW6ANkP7 1:37.9 (hand-checked: ready 1:16.7, Fell Cleaves and Inner Chaos pressed instead), cBZXM6kayd7Tf9Fg 9:20.6, Necron wipes. Not matched on a page. |
+| war/Procs/dropped-primal-wrath | covered | `checkProcs` (declared) | Wrathful expiring | Not seen firing. |
 | war/Infuriate/nascent-chaos-dropped | covered | `checkProcs` | Nascent Chaos expiring | Not seen firing. |
 | war/Infuriate/nascent-chaos-overwritten | verified | `nascentChaos` | Infuriate with Nascent Chaos held | Red Hot 0:14.4 (36k) built from it; the only one across the samples. |
 | war/Infuriate/cdr-hook | no-damage | — | — | A cooldown model (5s per spender), no rule. |
-| war/OGCDDowntime/infuriate | covered | `infuriateHeld` | Infuriate sitting at 2 charges | Built 2026-10-16 as its own check (not tracked-cooldowns.ts): the recharge is simulated with the 5s refund per Fell Cleave / Decimate / Inner Chaos / Chaotic Cyclone; time at two charges outside forced time and death, past 2.5s (opener) and 1.25s per stretch, counts; each whole 60s is a use lost, worth Inner Chaos over the average GCD. 43 of 164 Warrior pulls on disk sat capped 15s+ before forced time came out; after it, only the Necron Warrior on L9BzKkD2nxcVgHTC fires (pulls 9, 18, 20; 34-50k; pull 18 hand-checked: no Infuriate from about 1:30 to 3:12). qjCMx4bRfgNKwX9T and the FRU pulls are all downtime, as the hand simulation said. Not matched on a page yet. |
+| war/OGCDDowntime/infuriate | covered | `infuriateHeld` | Infuriate sitting at 2 charges | Built 2026-10-16 as its own check (not tracked-cooldowns.ts): the recharge is simulated with the 5s refund per Fell Cleave / Decimate / Inner Chaos / Chaotic Cyclone; time at two charges outside forced time and death, past 2.5s (opener) and 1.25s per stretch, counts; each whole 60s is a use lost, worth Inner Chaos over the average GCD. 43 of 164 Warrior pulls on disk sat capped 15s+ before forced time came out; after it, only the Necron Warrior on L9BzKkD2nxcVgHTC fires (pulls 9, 18, 20; 34-50k; pull 18 hand-checked: no Infuriate from about 1:30 to 3:12). qjCMx4bRfgNKwX9T and the FRU pulls are all downtime, as the hand simulation said. Against xivanalysis 2026-10-16 on L9BzKkD2nxcVgHTC Necron pull 18 (Widow Shadowimage): its checklist 4 / 7, the app 1 lost (111.5s held, now counting the 5s refunds of spenders pressed at two charges). Its 7 assumes refunds the player never earned (200 Beast gauge lost at the cap) and runs to the wipe's end: not adopted. |
 | war/OGCDDowntime/inner-release | verified | `checkCooldownDrift` (first use 15s, hold 2.5s) | Inner Release held | Same groups as xivanalysis. |
 | war/OGCDDowntime/upheaval-orogeny | verified | `checkCooldownDrift` | Upheaval / Orogeny held | qjCMx4bRfgNKwX9T 33/34 and The Tyrant 20/21 not adopted: each stretch held under one recast. |
 | war/OGCDDowntime/onslaught | verified | `checkCooldownDrift` (charges) | Onslaught at 3 charges | qjCMx4bRfgNKwX9T: it says 2 lost, the app 1 (the other is the opener's normal hold). |
@@ -64,7 +64,8 @@ the Beast Gauge graph.
 
 In priority order (biggest damage cost first):
 
-1. **war/OGCDDowntime/infuriate** (covered 2026-10-16). Match it on a
-   page (L9BzKkD2nxcVgHTC Necron pull 18 or 20).
-2. **war/Procs/dropped-primal-rend, primal-ruination, primal-wrath,
-   nascent-chaos-dropped** (covered). None seen firing.
+1. **war/Procs/dropped-primal-ruination** (covered): fires since the
+   consumers are declared; match on a page (mgTQJjX2nW6ANkP7, Kahn Aar,
+   1:37.9). **dropped-primal-wrath, nascent-chaos-dropped**: not seen.
+2. **war/OGCDDowntime/infuriate**: compared, xivanalysis's count not
+   adopted (see the row).

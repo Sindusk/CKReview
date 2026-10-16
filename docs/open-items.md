@@ -192,6 +192,11 @@ and delete them from the header.
   Still open: no finding when the single-target alternative was never
   pressed in the pull (Grim Swathe with no Blood Stalk; no potency table
   for most jobs to fall back on).
+  15 pages compared 2026-10-16 (GNB, RDM, BLM, DNC ×2, DRK ×2, PCT, NIN,
+  RPR, SGE, WAR, VPR, BRD): most checks built that day matched; fixes from
+  them: declared proc consumers (Primal Rend drops went unjudged), a GCD
+  ending Viper's Poised, Kunai's Bane on an add, Infuriate's wasted
+  refunds. Each ledger row says what matched and what wasn't adopted.
   - [core.md](xiva-audit/core.md): core modules, 2 candidates (raid
     buffs of one job overlapping, rare in a fixed static; Bard's
     BuffGroupWindow); procs on an invulnerable target are

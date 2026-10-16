@@ -379,8 +379,23 @@ const venoms: JobCheck = (ctx) => {
         // and 61.1s after they were applied, beside Third / Fourth
         // Generation, which never consume them.
         const expired = expiresAt !== undefined && e.timestamp >= expiresAt - PROC_EXPIRY_EARLY_MS;
+        // Poised ended by a GCD: the Uncoiled follow-up itself is gone, not
+        // only its bonus (VzycM18rpn6bWxXY 6:35.7, Reawaken with Poised for
+        // Twinblood up; xivanalysis's fifth dropped oGCD proc).
+        const gcdAt = !onGcd && !at ? ctx.player.casts.find((c) => !!ctx.game.action(c.abilityId)?.onGcd &&
+          Math.abs(c.timestamp - e.timestamp) <= PROC_CONSUME_MS) : undefined;
         if (at && consumerIds.has(at.abilityId)) { /* consumed */ }
         else if (inWindows(e.timestamp, ctx.dead)) { /* lost to the death */ }
+        else if (gcdAt && !expired) {
+          const avg = ctx.values.perUse(consumer.id), isForced = inWindows(e.timestamp, forced);
+          out.push(finding(ctx, {
+            kind: "missed-followup", startMs: e.timestamp, endMs: e.timestamp, forced: isForced,
+            cause: isForced ? forcedPart(e.timestamp - 1, e.timestamp + 1, ctx.forced).cause : undefined,
+            label: `${consumer.name} lost`, lostDamage: avg,
+            basis: `her average ${consumer.name} (${k(avg)})`,
+            detail: `${gcdAt.abilityName} at ${clock(e.timestamp)} with ${status.name} up: its ${consumer.name} was lost`,
+          }));
+        }
         else if (expired) lose(e.timestamp, "expired unused");
         else if (at) lose(e.timestamp, `dropped: ${at.abilityName} went first`);
         expiresAt = undefined;
@@ -763,7 +778,9 @@ const kazematoi: JobCheck = (ctx) => {
     const w = { startMs: raw.startMs, endMs: Math.min(raw.endMs, raw.startMs + kbMs) };
     const inside = acWithStacks.filter((t) => t >= w.startMs && t <= w.endMs && t < ctx.endMs);
     if (inside.length === 0) continue;
-    const bonus = observedBonus(ctx, w);
+    // On an add the hits' multipliers show no bonus (the 6:16.7 window on
+    // Watery Grave read 0): Kunai's Bane's own 10% then.
+    const bonus = observedBonus(ctx, w) || KUNAIS_BANE_BONUS;
     const lost = inside.length * perStack * bonus;
     if (lost <= 0) continue;
     const during = forcedPart(w.startMs, w.endMs, ctx.forced);
@@ -779,7 +796,7 @@ const kazematoi: JobCheck = (ctx) => {
   }
   return out;
 };
-const KAZEMATOI_LEFTOVER = 3;
+const KAZEMATOI_LEFTOVER = 3, KUNAIS_BANE_BONUS = 0.1;
 
 const enshroud: JobCheck = (ctx) => burstWindowFindings(ctx, {
   statusId: S.ENSHROUDED.id, name: "Enshroud", bonus: 0,
