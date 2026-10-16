@@ -22,12 +22,12 @@
 | whm/DoTs/clipping | wrong | — | Dia refreshed early (6s / 9s / 12s a minute) | Target-blind, as for every healer DoT. |
 | whm/DoTs/applied-into-invuln | superseded | Dia `dot` | Dia shortly before invulnerability | Table only. |
 | whm/GlareFlare/dropped-glare-iv | covered | `checkProcs` | Sacred Sight stacks unused (Glare IV) | Medium 1, Major 2. Scanned 2026-10-16 on every level-100 White Mage pull on disk: 2 Sacred Sights lost, both at the player's death (mgTQJjX2nW6ANkP7 8:41, ZVCqpA8DPJgMK2Yr 8:41). Synced ultimates (TEA) have no Glare IV. |
-| whm/Lilies/bloodlily-overcap | covered | `bloodLily` | Blood Lily gained at 3 | Built 2026-10-16 as a gauge from casts with Lily and Blood Lily lanes: full at the start from 7.4, empty before (52 of 52 level-100 7.4+ pulls pressed Misery before any Lily; no Misery ever went out under 3); a death empties it. A third of (Misery − Glare III) each. 33 counted on disk, 6 forced. FFLogs top 37: 2. No xivanalysis page yet. |
-| whm/Lilies/bloodlily-leftover | covered | `bloodLily` | 3 Blood Lilies unspent at the end | Built 2026-10-16, kills only, a GCD of unforced time since the third: one Misery. pG319BgHTnPJc6Ft Necron pull 3 (9:38, 185k); 2 shown forced. FFLogs top 37: 1. |
-| whm/Lilies/lily-overcap | no-damage | — | Lilies capped with the timer running | Medium 1, Major 3. A lost heal, and indirectly a slower Misery. |
+| whm/Lilies/bloodlily-overcap | covered | `bloodLily` | Blood Lily gained at 3 | Built 2026-10-16 as a gauge from casts with Lily and Blood Lily lanes: full at the start from 7.4, empty before (52 of 52 level-100 7.4+ pulls pressed Misery before any Lily; no Misery ever went out under 3); a death empties it. A third of (Misery − Glare III) each. 33 counted on disk, 6 forced. FFLogs top 37: 2. Matched Kai Dazkar's page (fGjA9DKLQbRa2q1k): 4 over the cap here (3 counted, 1 forced) = its "1 Blood Lily did not bloom" (it floors to whole Miseries). |
+| whm/Lilies/bloodlily-leftover | verified (pG319BgHTnPJc6Ft Necron pull 3 matches its "1 Blood Lily went unused") | `bloodLily` | 3 Blood Lilies unspent at the end | Built 2026-10-16, kills only, a GCD of unforced time since the third: one Misery. pG319BgHTnPJc6Ft Necron pull 3 (9:38, 185k); 2 shown forced. FFLogs top 37: 1. |
+| whm/Lilies/lily-overcap | covered | `lilyOvercap` | Lilies capped with the timer running | Was `no-damage`; the user (2026-10-16): fewer Lilies, fewer Blood Lilies, fewer Miseries. Measured: single-target Misery = 4.00 Glare III (buff-neutral medians, 45 / 1,096 hits), so Lilies spent in place of Glares break even; a Lily gains only in place of a heal GCD the healer cast anyway. Built: a Lily lost at the cap counts (a third of Misery − Glare III) when a later Cure / Medica / Regen, not mostly overheal, went out with no Lily before the gauge next reached 3. 5 counted on disk, 1 forced. Pages: Kai Dazkar (fGjA9DKLQbRa2q1k) xivanalysis 8 lost, the sim 3 (first Afflatus 0:43; at 3 from 2:03 to 3:19), none counted; Eastborn Shadowimage (pG319BgHTnPJc6Ft Necron pull 3) 8, the sim 6, 1 counted (Regen 5:53). The difference in totals isn't reconciled. Movement GCDs a Lily could have covered aren't followed. |
 | whm/Lilies/gcd-heals-instead-of-lily | superseded | `healGcds` | Cure / Medica with Lilies available | Major at 3. The app values each heal GCD by what it did. |
 | whm/DivineCaress/dropped | no-damage | — | Divine Grace unused | A shield. |
-| whm/OGCDs/checklist | covered | `checkCooldownDrift` (Presence of Mind, Assize) | Presence of Mind / Assize held | xivanalysis's checklist target is 75%. Assize added 2026-10-16 with a 10s opener allowance (the FFLogs top 15 press it at 0:01-0:10 and hold 11-45s in all over 13 uses). Fires on 23 pulls on disk (bqmRpGxDvfT8AZc6 3 uses, fGjA9DKLQbRa2q1k 2). No xivanalysis page yet. |
+| whm/OGCDs/checklist | covered | `checkCooldownDrift` (Presence of Mind, Assize) | Presence of Mind / Assize held | xivanalysis's checklist target is 75%. Assize added 2026-10-16 with a 10s opener allowance (the FFLogs top 15 press it at 0:01-0:10 and hold 11-45s in all over 13 uses). Fires on 23 pulls on disk (bqmRpGxDvfT8AZc6 3 uses, fGjA9DKLQbRa2q1k 2). Pages: xivanalysis 11/14 on both (3 short), 13/15 on pG319BgHTnPJc6Ft Necron pull 3 (here 1 lost); its x/y counts possible uses its own way, so the counts agree within one. |
 | whm/OGCDs/liturgy-of-the-bell | no-damage | — | Liturgy unused | Mitigation / healing. |
 | whm/OGCDs/asylum | no-damage | — | — | Healing. |
 | whm/OGCDs/aquaveil | no-damage | — | — | Mitigation. |
@@ -60,11 +60,10 @@ has no White Mage AoE rule.
 ## Open
 
 No candidates left (2026-10-16; 74 reports with a White Mage on disk now).
-Waiting on xivanalysis pages:
+Blood Lily and Assize compared on three pages the same day.
 
-1. **whm/Lilies/bloodlily-***: fGjA9DKLQbRa2q1k (Kai Dazkar, 3 counted),
-   pG319BgHTnPJc6Ft Necron pull 3 (Eastborn Shadowimage, 7.3, Misery held
-   at the kill).
-2. **whm/OGCDs/checklist, Assize**: bqmRpGxDvfT8AZc6 (Caramel Tiramisu),
-   fGjA9DKLQbRa2q1k.
-3. **whm/GlareFlare/dropped-glare-iv**: no living loss on disk.
+1. **whm/Lilies/lily-overcap**: xivanalysis's Lily totals run higher
+   than the simulation's (8 vs 3, 8 vs 6); find why before trusting
+   either total. The counted findings don't depend on it much (each is
+   paired with a heal).
+2. **whm/GlareFlare/dropped-glare-iv**: no living loss on disk.

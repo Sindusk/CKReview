@@ -214,7 +214,11 @@
 //   dQ8wmb1VhKt6yBXk). Needs VOD checks.
 // White Mage (first samples 2026-10-16): Blood Lily and Lily below, Assize
 // in tracked-cooldowns.ts; Sacred Sight (Glare IV) is checkProcs's (2 lost
-// on disk, both at a death). Not matched against xivanalysis yet.
+// on disk, both at a death). Checked against xivanalysis pages
+// (2026-10-16): Blood Lily overcap on fGjA9DKLQbRa2q1k (4 here, its 1
+// Misery), the Misery left at pG319BgHTnPJc6Ft Necron pull 3's kill,
+// Assize within one use on three pages. Its Lily totals (8, 8) run above
+// the simulation's (3, 6), unexplained.
 //
 //   Copyright (c) 2018 Saxon Landers & contributors
 //   MIT License; full text in THIRD_PARTY_NOTICES.md.
@@ -222,7 +226,7 @@
 import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import type { DamageFinding, GaugeTrack, JobCheck } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";
-import { forcedPart, gcdKinds, inWindows, mergeWindows } from "../../timeline";
+import { forcedPart, gcdKinds, inWindows, mergeWindows, type GcdUse } from "../../timeline";
 import { aoeOnOneTargetFindings, burstWindowFindings, dotFindings, gaugeFindings, gaugeTrack, k, type GaugeEvent, type GaugeSpec } from "./shared";
 
 export const HEAL_WASTE_SHARE = 0.2;
@@ -247,14 +251,15 @@ function filler(ctx: PlayerCheckContext): { id?: number; name: string; value: nu
   return top ? { id: top[0], name: top[1].name, value: ctx.values.perUse(top[0]) } : { name: "damage GCD", value: 0 };
 }
 
-const healGcds: JobCheck = (ctx): DamageFinding[] => {
-  const out: DamageFinding[] = [];
+type HealUse = { use: GcdUse; healed: number; absorbed: number; over: number };
+/** Each heal GCD with what it healed, shielded and overhealed (direct, its HoT, its shield). */
+function healGcdUses(ctx: PlayerCheckContext): HealUse[] {
   const kinds = gcdKinds(ctx.player, ctx.pull, ctx.uses);
   const heals = ctx.player.healing.filter((e) => e.healType === undefined || e.healType === "heal");
   const absorbs = ctx.pull.players.flatMap((p) => (p.shieldAbsorbs ?? []).map((a) => ({ ...a, target: p.name })))
     .filter((a) => a.caster === ctx.player.name);
   const healUses = ctx.uses.filter((u) => u.startMs < ctx.endMs && kinds.get(u.action.id) === "heal");
-  if (healUses.length === 0) return out;
+  if (healUses.length === 0) return [];
 
   // Shield absorbs credited to the latest cast applying that status to that
   // player: a single-target cast only shields its target, a party cast
@@ -271,10 +276,7 @@ const healGcds: JobCheck = (ctx): DamageFinding[] => {
     if (best) credited.set(best, (credited.get(best) ?? 0) + a.amount);
   }
 
-  const fill = filler(ctx);
-  const forced = mergeWindows(ctx.forced);
-  for (let i = 0; i < healUses.length; i++) {
-    const u = healUses[i];
+  return healUses.map((u, i) => {
     const landed = u.startMs + u.castMs;
     const next = healUses.slice(i + 1).find((x) => x.action.id === u.action.id)?.startMs ?? Infinity;
     const hotEnd = Math.min(next, landed + HOT_MAX_MS);
@@ -286,7 +288,23 @@ const healGcds: JobCheck = (ctx): DamageFinding[] => {
       healed += h.amount ?? 0;
       over += h.overheal ?? 0;
     }
-    const absorbed = credited.get(u) ?? 0;
+    return { use: u, healed, absorbed: credited.get(u) ?? 0, over };
+  });
+}
+/** A heal GCD that healed (or shielded) under HEAL_WASTE_SHARE of what it could: healGcds' finding. */
+const mostlyWasted = (h: HealUse) => {
+  const potential = h.healed + h.absorbed + h.over;
+  return potential > 0 && (h.healed + h.absorbed) / potential < HEAL_WASTE_SHARE;
+};
+
+const healGcds: JobCheck = (ctx): DamageFinding[] => {
+  const out: DamageFinding[] = [];
+  const fill = filler(ctx);
+  const forced = mergeWindows(ctx.forced);
+  const absorbs = ctx.pull.players.flatMap((p) => (p.shieldAbsorbs ?? []).map((a) => ({ ...a, target: p.name })))
+    .filter((a) => a.caster === ctx.player.name);
+  for (const { use: u, healed, absorbed, over } of healGcdUses(ctx)) {
+    const landed = u.startMs + u.castMs;
     const potential = healed + absorbed + over;
     if (potential <= 0) continue;
     const share = (healed + absorbed) / potential;
@@ -440,8 +458,7 @@ export const AST_CHECKS: JobCheck[] = [healGcds, aoeOnOneTarget, dot("COMBUST_II
 // Blood Lily gained at 3 is a third of a Misery lost: her average Misery
 // over her average Glare III (the GCD it replaces), ÷ 3. Three held at a
 // kill, with a GCD of unforced time since the third, is a Misery lost
-// (Lilies.tsx "leftover"). The Lily gauge is drawn only: a Lily lost at
-// the cap is a heal (and a Blood Lily later, which this doesn't follow).
+// (Lilies.tsx "leftover"). Lilies lost at the cap: `lilyOvercap` below.
 // FFLogs top 37 for Red Hot and Deep Blue: 2 overcaps, 1 held at the end.
 const LILY_MAX = 3, LILY_TIMER_MS = 20_000, MISERY_COST = 3;
 const LILY_SPENDERS = new Set([A.AFFLATUS_SOLACE.id, A.AFFLATUS_RAPTURE.id]);
@@ -485,11 +502,10 @@ const bloodLily: JobCheck = (ctx) => {
   return out;
 };
 
-/** The Damage dialog's White Mage lanes: Lily and Blood Lily. */
-export function whmGaugeTracks(ctx: PlayerCheckContext): GaugeTrack[] {
-  const spec = bloodLilySpec(ctx);
-  if (!spec) return [];
-  // Lily, with its timer.
+// The Lily gauge, simulated from casts: steps, the stretches at 3 (timer
+// stopped) and when each Lily was lost there (one per 20s at the cap).
+type LilySim = { steps: GaugeTrack["steps"]; capped: GaugeTrack["capped"]; lost: number[]; short: number };
+function lilySim(ctx: PlayerCheckContext): LilySim {
   const spends = ctx.player.casts.filter((c) => LILY_SPENDERS.has(c.abilityId) && c.timestamp < ctx.endMs)
     .map((c) => c.timestamp).sort((a, b) => a - b);
   let lilies = startsFull(ctx) ? LILY_MAX : 0;
@@ -519,14 +535,72 @@ export function whmGaugeTracks(ctx: PlayerCheckContext): GaugeTrack[] {
   }
   tickTo(ctx.endMs);
   if (cappedSince !== undefined && ctx.endMs > cappedSince) capped.push({ startMs: cappedSince, endMs: ctx.endMs });
-  const lostLilies = Math.floor(capped.reduce((a, w) => a + w.endMs - w.startMs, 0) / LILY_TIMER_MS);
+  // From 7.4 the timer waits for the first Afflatus (xivanalysis): full
+  // until then loses nothing.
+  const firstSpend = spends.length ? Math.max(0, spends[0]) : ctx.endMs;
+  const lost = capped.flatMap((w) => {
+    const from = startsFull(ctx) && w.startMs === 0 ? firstSpend : w.startMs;
+    return Array.from({ length: Math.max(0, Math.floor((w.endMs - from) / LILY_TIMER_MS)) }, (_, i) => from + (i + 1) * LILY_TIMER_MS);
+  });
+  return { steps, capped, lost, short };
+}
+
+// Lilies lost at the cap (Lilies.tsx "lily overcap"; the user, 2026-10-16:
+// fewer Lilies, fewer Blood Lilies, fewer Miseries). Measured on disk:
+// single-target Afflatus Misery is 4.00 Glare IIIs (buff-neutral medians,
+// 45 Miseries, 1,096 Glares), so three Lilies spent in place of Glares and
+// a Misery break even with four Glares. A Lily gains only where it stands
+// in for a GCD that isn't a Glare: a heal GCD the healer had to cast. So a
+// Lily lost at the cap is counted when a later non-Lily heal GCD (Cure,
+// Medica, Regen) went out with no Lily in the gauge before the gauge next
+// reached 3 (past that the extra Lily would have capped too, or gone on a
+// Glare), each lost Lily paired with the first such heal: a third of her
+// Misery over her Glare III. Heals healGcds already counts as wasted (mostly overheal) aren't
+// paired; movement GCDs a Lily could have covered aren't followed.
+const NON_LILY_HEALS = new Set(["CURE", "CURE_II", "CURE_III", "MEDICA", "MEDICA_II", "MEDICA_III", "REGEN"]
+  .filter((key) => A[key]).map((key) => A[key].id));
+const lilyOvercap: JobCheck = (ctx) => {
+  const spec = bloodLilySpec(ctx);
+  if (!spec || spec.unitValue <= 0) return [];
+  const sim = lilySim(ctx);
+  if (sim.lost.length === 0) return [];
+  const lilyAt = (t: number) => [...sim.steps].reverse().find((st) => st.t <= t)?.value ?? 0;
+  const heals = healGcdUses(ctx).filter((h) => NON_LILY_HEALS.has(h.use.action.id) && !mostlyWasted(h) && lilyAt(h.use.startMs) === 0)
+    .map((h) => h.use).sort((a, b) => a.startMs - b.startMs);
+  const out: DamageFinding[] = [];
+  const used = new Set<GcdUse>();
+  for (const t of sim.lost) {
+    // The extra Lily lasts until the gauge next reaches 3 (then it would
+    // have capped too, or gone on a Glare, which breaks even).
+    const stretch = sim.capped.find((w) => w.startMs <= t && w.endMs >= t);
+    const nextCap = sim.capped.find((w) => stretch && w.startMs > stretch.endMs)?.startMs ?? ctx.endMs;
+    const heal = heals.find((h) => !used.has(h) && h.startMs > t && h.startMs < nextCap);
+    if (!heal) continue;
+    used.add(heal);
+    const during = forcedPart(t - 1, t + 1, ctx.forced);
+    out.push(finding(ctx, {
+      kind: "gauge-overcap", startMs: t, endMs: heal.startMs, forced: during.ms > 0, cause: during.cause, inference: true,
+      label: "Lily lost at the cap", lostDamage: spec.unitValue,
+      basis: `a Blood Lily: ${spec.valueBasis} (a Lily in place of a Glare breaks even; this one would have replaced ${heal.abilityName})`,
+      detail: `A Lily lost at the cap at ${clock(t)}; ${heal.abilityName} at ${clock(heal.startMs)} went out with no Lily to cast instead`,
+    }));
+  }
+  return out;
+};
+
+/** The Damage dialog's White Mage lanes: Lily and Blood Lily. */
+export function whmGaugeTracks(ctx: PlayerCheckContext): GaugeTrack[] {
+  const spec = bloodLilySpec(ctx);
+  if (!spec) return [];
+  const { steps, capped, lost, short } = lilySim(ctx);
   return [
     { name: "Lily", max: LILY_MAX, steps, capped,
-      note: `Lilies, simulated from casts (20s timer, stopped at 3); about ${lostLilies} lost at the cap (healing, not valued)` +
+      note: `Lilies, simulated from casts (20s timer, stopped at 3); ${lost.length} lost at the cap` +
+        " (counted only where a later Cure / Medica went out with no Lily)" +
         (short > 0 ? `; ${short} Lily spend${short === 1 ? "" : "s"} the simulation had no Lily for (model or log off)` : "") },
     gaugeTrack(ctx, spec),
   ];
 }
 
-export const WHM_CHECKS: JobCheck[] = [healGcds, aoeOnOneTarget, dot("DIA"), bloodLily];
+export const WHM_CHECKS: JobCheck[] = [healGcds, aoeOnOneTarget, dot("DIA"), bloodLily, lilyOvercap];
 export const SGE_CHECKS: JobCheck[] = [healGcds, aoeOnOneTarget, dot("EUKRASIAN_DOSIS_III", "EUKRASIAN_DYSKRASIA")];

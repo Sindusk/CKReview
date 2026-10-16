@@ -243,9 +243,11 @@ and delete them from the header.
   - [rdm.md](xiva-audit/rdm.md): Red Mage, 5 candidates, 12 covered (mana
     simulation with lanes and Dualcast running out built 2026-10-15,
     compared on two pages).
-  - [whm.md](xiva-audit/whm.md): White Mage, 0 candidates, 9 covered
+  - [whm.md](xiva-audit/whm.md): White Mage, 0 candidates, 10 covered
     (Blood Lily overcap and Misery left at a kill with Lily / Blood Lily
-    lanes, Assize tracked, 2026-10-16; awaiting xivanalysis pages).
+    lanes, Assize tracked, Lilies lost at the cap counted where a later
+    Cure / Medica needed one, 2026-10-16; matched three pages; Lily
+    totals differ from xivanalysis's, unexplained).
 - [wowa-audit-plan.md](wowa-audit-plan.md): the same for WoWAnalyzer
   (reference only, AGPL). After the FFXIV pilot.
 - [wow-sim-plan.md](wow-sim-plan.md): WoW simulation pipeline (talent
