@@ -213,9 +213,11 @@
 //     simulated vs its 250; Bunshin 2 lost (its 3 counts burst
 //     alignment); Dokumori, Ten Chi Jin and Meisui's missing uses were
 //     ready a few seconds before P4's downtime and held for the 14:17
-//     burst (no extra use fit before the kill); Armor Crush under Kunai's
-//     Bane with stacks isn't built (the stack goes to a later Aeolian
-//     Edge: ~10% of 100 potency each).
+//     burst (no extra use fit before the kill). Built 2026-10-16 (in
+//     `kazematoi`): Kazematoi left at the kill (3+: the last Armor Crush
+//     could have been an Aeolian Edge) and Armor Crush under Kunai's Bane
+//     with stacks held (the difference × the window's bonus, 0-2k). Not
+//     matched against a page yet.
 //     Hellfrog / Deathfrog on one target (Ninki.tsx, 2026-10-15): `ninAoe`.
 //     Seen firing, not matched against xivanalysis: Hellfrog on one of Red
 //     Hot and Deep Blue's bosses with the two apart, mgTQJjX2nW6ANkP7 6:51
@@ -244,7 +246,7 @@ import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import type { DamageFinding, JobCheck } from "../../types";
 import { chargesAt, finding, PROC_CONSUME_MS, PROC_EXPIRY_EARLY_MS, type PlayerCheckContext } from "../../checks";
 import { forcedPart, inWindows, mergeWindows } from "../../timeline";
-import { aoeComboOnOneTarget, baseValue, burstWindowFindings, castHits, clock, critMultOf, dotFindings, gaugeFindings, gaugeTrack, k, offCooldownIn, rollGainOf, s, statusWindows, uptimeFindings, type ExpectedAction, type GaugeEvent, type GaugeSpec } from "./shared";
+import { aoeComboOnOneTarget, baseValue, burstWindowFindings, castHits, clock, critMultOf, dotFindings, enemyStatusWindows, gaugeFindings, observedBonus, gaugeTrack, k, offCooldownIn, rollGainOf, s, statusWindows, uptimeFindings, type ExpectedAction, type GaugeEvent, type GaugeSpec } from "./shared";
 import { comboLanded } from "./gnb";
 
 const id = (key: string) => A[key].id;
@@ -688,14 +690,21 @@ const kazematoi: JobCheck = (ctx) => {
   const aeHits = castHits(ctx, ae), acAvg = ctx.values.perUse(ac);
   const hitOf = (t: number) => aeHits.find((h) => h.timestamp >= t && h.timestamp <= t + 1_500)?.amount ?? 0;
   let stacks = 0;
+  let lastAc: number | undefined, prevT = -Infinity;
+  const acWithStacks: number[] = [];
   const buffed: number[] = [];
   const unbuffed: { t: number; dealt: number }[] = [];
   const events: GaugeEvent[] = [];
   for (const c of casts) {
+    if (c.timestamp >= ctx.endMs) break;
     if (inWindows(c.timestamp, ctx.dead)) continue;
+    if (ctx.dead.some((d) => d.startMs > prevT && d.startMs <= c.timestamp)) { stacks = 0; lastAc = undefined; }
+    prevT = c.timestamp;
     if (c.abilityId === ac) {
       events.push({ t: c.timestamp, type: "gain", amount: 2, label: "Armor Crush at 4+ Kazematoi" });
+      if (stacks > 0) acWithStacks.push(c.timestamp);
       stacks = Math.min(5, stacks + 2);
+      lastAc = c.timestamp;
     } else if (stacks > 0) {
       events.push({ t: c.timestamp, type: "spend", amount: 1, label: "Aeolian Edge" });
       stacks--;
@@ -724,8 +733,53 @@ const kazematoi: JobCheck = (ctx) => {
       detail: "Aeolian Edge at 0 Kazematoi (Armor Crush does more unbuffed)",
     }));
   }
+  // Kazematoi left at the kill (xivanalysis "leftover", 3+): the last
+  // Armor Crush could have been a buffed Aeolian Edge. That swap costs 3
+  // stacks (2 not gained, 1 spent), and the stacks it spent were there,
+  // so 3+ at the kill is always one swap, never two (cap 5). 6 of the 16
+  // Ninja kills on disk end with 3-5 (2026-10-16).
+  const deadAtEnd = ctx.dead.some((d) => d.endMs >= ctx.endMs - 1 && d.startMs > prevT);
+  if (ctx.pull.result === "Kill" && !deadAtEnd && stacks >= KAZEMATOI_LEFTOVER && lastAc !== undefined && perStack > 0) {
+    const isForced = inWindows(lastAc, forced);
+    out.push(finding(ctx, {
+      kind: "gauge-overcap", startMs: lastAc, endMs: lastAc, forced: isForced,
+      cause: isForced ? forcedPart(lastAc - 1, lastAc + 1, ctx.forced).cause : undefined,
+      label: "Kazematoi left at the kill",
+      lostDamage: perStack, inference: true,
+      basis: `${k(buffedAvg)} average buffed Aeolian Edge − ${k(acAvg)} average Armor Crush (Kazematoi simulated from casts)`,
+      detail: `${stacks} Kazematoi left at the kill: the ${clock(lastAc)} Armor Crush could have been an Aeolian Edge`,
+    }));
+  }
+  // Armor Crush in Kunai's Bane with Kazematoi held (xivanalysis
+  // KunaisBaneWindow "limited Armor Crush"; the opener's, at 0 stacks,
+  // never counts): the buffed Aeolian Edge belonged in the window and the
+  // Armor Crush after it. The swap moves their difference into the window:
+  // worth that difference × the window's observed bonus.
+  // A window whose removal never logged runs to the end of the pull: cut
+  // it at the debuff's duration (a 9:14 Armor Crush read as in the 6:24
+  // window, 7zwpcLxk2Fd1h6Vr).
+  const kbMs = (S.KUNAIS_BANE.duration ?? 15_000) + 1_000;
+  for (const raw of enemyStatusWindows(ctx, S.KUNAIS_BANE.id)) {
+    const w = { startMs: raw.startMs, endMs: Math.min(raw.endMs, raw.startMs + kbMs) };
+    const inside = acWithStacks.filter((t) => t >= w.startMs && t <= w.endMs && t < ctx.endMs);
+    if (inside.length === 0) continue;
+    const bonus = observedBonus(ctx, w);
+    const lost = inside.length * perStack * bonus;
+    if (lost <= 0) continue;
+    const during = forcedPart(w.startMs, w.endMs, ctx.forced);
+    out.push(finding(ctx, {
+      kind: "burst-window", startMs: inside[0], endMs: inside[inside.length - 1], inference: true,
+      forced: during.ms >= 1_500, cause: during.ms >= 1_500 ? during.cause : undefined,
+      label: "Armor Crush in Kunai's Bane",
+      lostDamage: lost,
+      basis: `${inside.length} × (${k(buffedAvg)} average buffed Aeolian Edge − ${k(acAvg)} average Armor Crush) × ` +
+        `${Math.round(bonus * 100)}% (the window's observed bonus; Kazematoi simulated from casts)`,
+      detail: `${inside.length} Armor Crush${inside.length > 1 ? "es" : ""} in the ${clock(w.startMs)} Kunai's Bane with Kazematoi held`,
+    }));
+  }
   return out;
 };
+const KAZEMATOI_LEFTOVER = 3;
 
 const enshroud: JobCheck = (ctx) => burstWindowFindings(ctx, {
   statusId: S.ENSHROUDED.id, name: "Enshroud", bonus: 0,

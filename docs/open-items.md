@@ -226,8 +226,9 @@ and delete them from the header.
     Phantom Rush and form checks verified 2026-10-15; Fury overcap and
     the no-form Opo-opo skill built 2026-10-15, Fury matched 3 pages;
     Brotherhood timing and Formless overwrite not adopted).
-  - [nin.md](xiva-audit/nin.md): Ninja, 2 candidates, 9 covered
-    (ninjutsu, Kassatsu and Raiju checks verified 2026-10-15).
+  - [nin.md](xiva-audit/nin.md): Ninja, 0 candidates, 11 covered
+    (ninjutsu, Kassatsu and Raiju checks verified 2026-10-15; Kazematoi
+    left at the kill and Armor Crush in Kunai's Bane built 2026-10-16).
   - [sam.md](xiva-audit/sam.md): Samurai, 2 candidates, 18 covered
     (Higanbana and Kenki / Meditation / Sen gauges built 2026-10-15 and
     matched on 3 xivanalysis pages).

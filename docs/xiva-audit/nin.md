@@ -25,7 +25,7 @@
 | nin/KunaisBaneWindow/gcd-count | verified | `kunaisBane` (7 GCDs, 8 with Ten Chi Jin; mudras not counted) | Kunai's Bane under 7 GCDs | Medium 1, Major 2. FRU matched. |
 | nin/KunaisBaneWindow/kassatsu-actions | verified | `kunaisBane` | no Hyosho Ranryu / Goka Mekkyaku in the window | Major. |
 | nin/KunaisBaneWindow/tracked-actions | verified | `kunaisBane` | Raiton ×2 (×1 in the opener), Dream Within a Dream, Tenri Jindo (with TCJ) missing | Medium 1, Major 3. |
-| nin/KunaisBaneWindow/limited-armor-crush | candidate | — | Armor Crush inside Kunai's Bane (outside the opener) | Minor. FRU: not built, worth ~10% of 100 potency each (the stack goes to a later Aeolian Edge). Lowest priority. |
+| nin/KunaisBaneWindow/limited-armor-crush | covered | `kazematoi` ("Armor Crush in Kunai's Bane") | Armor Crush inside Kunai's Bane (outside the opener) | Built 2026-10-16: only an Armor Crush with Kazematoi held (so the opener's, at 0, never counts), valued at (buffed Aeolian Edge − Armor Crush) × the window's observed bonus. Fires on most Red Hot and Deep Blue Ninja kills on disk, 0-2k each (e.g. 7zwpcLxk2Fd1h6Vr 3:04). A window whose removal never logged is cut at 16s. Not matched on a page yet. |
 | nin/KunaisBaneWindow/tcj-used | no-damage | — | — | Note column. |
 | nin/KunaisBaneUsage/held | verified | `checkCooldownDrift` (Kunai's Bane) | Kunai's Bane held | Medium 1, Major 2. |
 | nin/KunaisBaneUsage/none | superseded | `checkCooldownDrift` | no Kunai's Bane at all | Major. Fires on any pull shorter than the opener. |
@@ -44,7 +44,7 @@
 | nin/Ninki/hellfrog | verified | `ninAoe` (vs Bhavacakra, one target) | Hellfrog Medium on too few targets (3 before 7.3, 2 from 7.3) | Built 2026-10-15. One target only: from 7.3 two out-damage Bhavacakra (pre-7.3 two-target frogs go unseen). Premise holds (same Ninki). Fires on Red Hot and Deep Blue kills with the bosses apart: mgTQJjX2nW6ANkP7 6:51 (21k), jXG76ba43VDLAvYz 4:07 (17k) and 9:16 as Deep Blue died (24k). Matched xivanalysis on jXG76ba43VDLAvYz (2 of its 2). |
 | nin/Ninki/deathfrog | covered | `ninAoe` (vs Zesho Meppo, one target) | Deathfrog Medium on too few targets | Not seen firing (the one on disk hit both bosses). |
 | nin/Kazematoi/overcap | verified | `kazematoi` | Armor Crush at 4-5 stacks | FRU 9 lost matched. |
-| nin/Kazematoi/leftover | candidate | — | 3+ Kazematoi left at the end | Medium. Would follow the leftAtKill rule (kills only, time held). |
+| nin/Kazematoi/leftover | covered | `kazematoi` ("Kazematoi left at the kill") | 3+ Kazematoi left at the end | Built 2026-10-16, kills only: 3+ at the kill means the last Armor Crush could have been a buffed Aeolian Edge (the swap costs 3 stacks, so never two), valued at their averages' difference. Forced when that Armor Crush was. 6 of 16 Ninja kills on disk end with 3-5; 5 fire (2-18k: 7zwpcLxk2Fd1h6Vr, cZ42C1y3JRNGXWLH, YPhxRTb9Ld7BJaXp, zMJdajRYyNF3LVkr; kC7Y3WbzvKcZrBxT forced by the closing Limit Break). Not matched on a page yet. |
 | nin/Kazematoi/unbuffed-aeolian | verified | `kazematoi` | Aeolian Edge at 0 stacks | FRU 1 matched. |
 | nin/Procs/dropped-phantom-kamaitachi | covered | `checkProcs` | Phantom Kamaitachi Ready expiring | Medium 1, Major 2. Not seen firing. |
 | nin/Procs/dropped-tenri-jindo | covered | `checkProcs` | Tenri Jindo Ready expiring | Same. |
@@ -74,9 +74,10 @@
 
 In priority order (biggest damage cost first).
 
-1. **nin/Kazematoi/leftover** (candidate). Kills only, by time held.
-2. **nin/KunaisBaneWindow/limited-armor-crush** (candidate, a few k).
-3. **nin/Procs/*, nin/Positionals** (covered). Not matched on a page.
-4. **nin/Ninjutsu/tcj-doton** (covered). Not seen as a loss yet (the one
+1. **nin/Kazematoi/leftover** and
+   **nin/KunaisBaneWindow/limited-armor-crush** (covered 2026-10-16).
+   Match on a page (zMJdajRYyNF3LVkr: 5 left at the kill).
+2. **nin/Procs/*, nin/Positionals** (covered). Not matched on a page.
+3. **nin/Ninjutsu/tcj-doton** (covered). Not seen as a loss yet (the one
    on disk out-damaged its Suiton).
-5. **nin/Ninki/deathfrog** (covered). Not seen firing.
+4. **nin/Ninki/deathfrog** (covered). Not seen firing.
