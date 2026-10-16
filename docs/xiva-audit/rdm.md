@@ -88,4 +88,9 @@ In priority order (biggest damage cost first):
    overwrites 3 Verfire + 2 Verstone = 5, wrong finisher 1 = 2:14.0.
    Its "4 enchanted combos lost" against the app's 2 (Redoublement
    without its combo bonus at 2:11.8 and 4:11.2, the second after
-   Manafication broke the combo at 4:10.2) not traced further.
+   Manafication broke the combo at 4:10.2). Traced 2026-10-16
+   (rdm/Combos.tsx breaks a combo on any cast begun after a combo
+   action): its other two are a Verfire begun at 2:34.7 and a Verstone
+   at 3:30.0, each after Resolution had finished the chain, so nothing
+   was broken. The 2:11.8 break is a Jolt III begun at 2:10.7 between
+   Zwerchhau and Redoublement and interrupted. The app's 2 stand.

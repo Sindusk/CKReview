@@ -102,4 +102,9 @@ In priority order (biggest damage cost first).
    Coeurl; Brotherhood 4 / 5 = 1. Perfect Balance 13 / 16 and Riddle of
    Fire 8 / 10 against the app's 2 and 1 (three deaths; whole uses
    outside forced time). Its 9 Blitzes missed in Riddle of Fire against
-   the app's 6 in five windows, not traced.
+   the app's 6: traced 2026-10-16, xivanalysis's expected count runs one
+   high at 3:18, 4:25 and 6:56. Simulating Perfect Balance (2 charges,
+   40s) from his casts: no charge at 3:18.9 and one back at 3:28.7 (one
+   Blitz, the app's 1 missing); one charge at 4:25.7 and 6:56.3 with
+   none back in time (one Blitz each, pressed: Phantom Rush 4:36.9, and
+   the 6:34.3 Rising Phoenix just before). The app's 6 stands.
