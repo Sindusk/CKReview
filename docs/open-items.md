@@ -214,8 +214,8 @@ and delete them from the header.
   - [nin.md](xiva-audit/nin.md): Ninja, 2 candidates, 9 covered
     (ninjutsu, Kassatsu and Raiju checks verified 2026-10-15).
   - [sam.md](xiva-audit/sam.md): Samurai, 2 candidates, 18 covered
-    (Higanbana and Kenki / Meditation / Sen gauges built 2026-10-15; no
-    page compared yet).
+    (Higanbana and Kenki / Meditation / Sen gauges built 2026-10-15 and
+    matched on 3 xivanalysis pages).
   - [mch.md](xiva-audit/mch.md): Machinist, 0 candidates, 17 covered
     (Double Check / Checkmate charge simulation and lanes 2026-10-15; Heat / Battery
     overcap, Reassemble and the rebuilt Wildfire count verified on 3

@@ -951,12 +951,36 @@ const SAM_KENKI_SPEND: [string, number][] = [["ZANSHIN", 50], ["HISSATSU_GUREN",
 const SAM_IAIJUTSU = ["HIGANBANA", "TENKA_GOKEN", "MIDARE_SETSUGEKKA", "TENDO_GOKEN", "TENDO_SETSUGEKKA"];
 const SAM_SEN: [string, ("setsu" | "getsu" | "ka")[]][] = [["YUKIKAZE", ["setsu"]], ["GEKKO", ["getsu"]], ["MANGETSU", ["getsu"]],
   ["KASHA", ["ka"]], ["OKA", ["ka"]]];
-const MEDITATE_TICK_MS = 3_000, EYE_MS = 4_000;
+const MEDITATE_TICK_MS = 3_000, EYE_MS = 4_000, SAM_COMBO_MS = 30_000;
+// Enpi doesn't break the combo (7zwpcLxk2Fd1h6Vr 4:41.5, Gekko after Enpi
+// with its full combo bonus).
+const SAM_CHAIN = new Set(ids("HAKAZE", "GYOFU", "JINPU", "SHIFU", "GEKKO", "KASHA", "YUKIKAZE", "FUKO", "MANGETSU", "OKA"));
+const SAM_COMBO_FROM = new Map<number, Set<number>>([
+  ...ids("JINPU", "SHIFU", "YUKIKAZE").map((x) => [x, new Set(ids("HAKAZE", "GYOFU"))] as [number, Set<number>]),
+  [id("GEKKO"), new Set(ids("JINPU"))], [id("KASHA"), new Set(ids("SHIFU"))],
+  ...ids("MANGETSU", "OKA").map((x) => [x, new Set(ids("FUKO"))] as [number, Set<number>]),
+]);
 export function samGaugeSpecs(ctx: PlayerCheckContext): GaugeSpec[] {
   const casts = ctx.player.casts.filter((c) => c.timestamp < ctx.endMs).sort((a, b) => a.timestamp - b.timestamp);
   const meikyoW = statusWindows(ctx, S.MEIKYO_SHISUI.id);
-  const comboOk = (c: { abilityId: number; timestamp: number }) =>
-    meikyoW.some((w) => c.timestamp > w.startMs && c.timestamp <= w.endMs + 50) || comboLanded(ctx, c.abilityId, c.timestamp);
+  // A pre-pull Meikyo shows first as a stack removed, which statusWindows
+  // doesn't open a window for (pG319BgHTnPJc6Ft Necron pull 2: 0:00.76,
+  // removed 0:05.58): from the pull's start to its first removal.
+  const meikyoEvents = (ctx.player.buffs ?? []).filter((e) => e.abilityId === S.MEIKYO_SHISUI.id).sort((a, b) => a.timestamp - b.timestamp);
+  if (meikyoEvents.length && meikyoEvents[0].buffStatus !== "applied") {
+    const end = meikyoEvents.find((e) => e.buffStatus === "removed")?.timestamp;
+    if (end !== undefined && !meikyoW.some((w) => w.startMs <= 0 && w.endMs >= end)) meikyoW.push({ startMs: -Infinity, endMs: end });
+  }
+  // The combo is read from the cast order, not the hit's bonus: Gekko and
+  // Kasha's positional shows as a bonus too (7zwpcLxk2Fd1h6Vr 8:07.45, a
+  // Kasha with no Shifu before it at +23%, read as a Sen).
+  const chain = casts.filter((c) => SAM_CHAIN.has(c.abilityId));
+  const comboOk = (c: { abilityId: number; timestamp: number }) => {
+    if (meikyoW.some((w) => c.timestamp > w.startMs && c.timestamp <= w.endMs + 50)) return true;
+    const prev = [...chain].reverse().find((x) => x.timestamp < c.timestamp);
+    const from = SAM_COMBO_FROM.get(c.abilityId);
+    return !!prev && !!from && from.has(prev.abilityId) && c.timestamp - prev.timestamp <= SAM_COMBO_MS;
+  };
   const byId = <T,>(list: [string, T][]) => new Map(list.filter(([key]) => A[key]).map(([key, v]) => [A[key].id, v]));
   const actionKenki = byId(SAM_ACTION_KENKI), comboKenki = byId(SAM_COMBO_KENKI), spendKenki = byId(SAM_KENKI_SPEND), senOf = byId(SAM_SEN);
   const iaijutsu = new Set(ids(...SAM_IAIJUTSU));
@@ -969,7 +993,15 @@ export function samGaugeSpecs(ctx: PlayerCheckContext): GaugeSpec[] {
   let d = 0;
   const deaths = [...ctx.dead].sort((a, b) => a.startMs - b.startMs);
   for (const c of casts) {
-    while (d < deaths.length && deaths[d].startMs <= c.timestamp) { held.setsu = held.getsu = held.ka = false; d++; }
+    // Sen held at a death are lost with it (xivanalysis counts them as
+    // wasted): a gain at the cap just before the reset, so forced.
+    while (d < deaths.length && deaths[d].startMs <= c.timestamp) {
+      for (const s of ["setsu", "getsu", "ka"] as const) {
+        if (held[s]) sen[s].push({ t: deaths[d].startMs, type: "gain", amount: 1, label: "Sen held at a death" });
+        held[s] = false;
+      }
+      d++;
+    }
     const id = c.abilityId, t = c.timestamp;
     const ak = actionKenki.get(id), ck = comboKenki.get(id), sk = spendKenki.get(id);
     if (ak) kenki.push({ t, type: "gain", amount: ak, label: `${c.abilityName} at 100 Kenki` });
@@ -1003,7 +1035,11 @@ export function samGaugeSpecs(ctx: PlayerCheckContext): GaugeSpec[] {
       if (i <= 3) meditation.push({ t, type: "gain", amount: 1, label: "Meditate at 3 Meditation" });
     }
   }
-  for (const dd of ctx.dead) for (const list of [kenki, meditation, sen.setsu, sen.getsu, sen.ka]) list.push({ t: dd.startMs, type: "reset", label: "death" });
+  // The Sen resets come 1ms after their "held at a death" losses.
+  for (const dd of ctx.dead) {
+    for (const list of [kenki, meditation]) list.push({ t: dd.startMs, type: "reset", label: "death" });
+    for (const list of [sen.setsu, sen.getsu, sen.ka]) list.push({ t: dd.startMs + 1, type: "reset", label: "death" });
+  }
   const shinten = ctx.values.perUse(A.HISSATSU_SHINTEN.id), shoha = ctx.values.perUse(A.SHOHA.id);
   const midare = ctx.values.perUse(A.MIDARE_SETSUGEKKA.id), gcd = ctx.values.gcdValue(undefined, false);
   const perSen = Math.max(0, (midare - gcd) / 3);
