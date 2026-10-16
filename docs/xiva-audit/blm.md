@@ -44,9 +44,9 @@
 | blm/Procs/dropped-thunderhead | covered | `checkProcs` | Thunderhead expiring | Before 7.2 only (permanent from 7.2). |
 | blm/Procs/dropped-firestarter | covered | `checkProcs` | Firestarter expiring | Same. |
 | blm/Procs/overwritten-and-invuln-table | no-damage | — | — | Table only. |
-| blm/Gauge/lost-polyglot | candidate | — | the Polyglot timer stopping (Enochian dropped) | Major. A lost Xenoglossy per 30s. Inferred from Astral Fire / Umbral Ice, which the casts determine. |
-| blm/Gauge/overwritten-polyglot | candidate | — | a Polyglot gained at the cap | Major. A lost Xenoglossy each; inferred from the timer and spends. |
-| blm/Gauge/dropped-enochian | candidate | — | (before 7.2) Astral Fire / Umbral Ice timing out | Medium. The same loss as lost-polyglot. |
+| blm/Gauge/lost-polyglot | superseded | `polyglot` (death resets) | the Polyglot timer stopping (Enochian dropped) | From 7.2 Astral Fire / Umbral Ice never time out, so Enochian only drops on a death; the gauge simulation resets there, and the death finding carries the cost. |
+| blm/Gauge/overwritten-polyglot | covered | `polyglot` | a Polyglot gained at the cap | Built 2026-10-15 as a gauge simulation from casts (gaugeFindings): Enochian from the first fire or ice spell, +1 every 30s, +1 per Amplifier, −1 per Xenoglossy / Foul, cap 3, reset on death; 7.2+ only. A Polyglot at the cap, or held at a kill (by time held), is her average Xenoglossy over her average GCD. Hand-checked on xz1wjC6gfXmkMKYt (Dester Whitegloomer): Amplifier at 2:05 with 2 held, no spend before the 2:30 tick, a fourth at the cap (66k). Fires on 11 Black Mages on disk, about one each (41-76k). Not yet matched against xivanalysis. |
+| blm/Gauge/dropped-enochian | wrong | — | (before 7.2) Astral Fire / Umbral Ice timing out | Can't happen from 7.2; pre-7.2 logs aren't judged by `polyglot`. |
 | blm/Gauge/overwritten-paradox | candidate | — | a Paradox gained while one is held | Major (the first on 7.2+ forgiven). Header: not built (gauge). |
 | blm/Leylines/uptime-pre72 | candidate | — | (before 7.2) Circle of Power uptime under 90% of Ley Lines | Leaving the circle loses the 15% speed. |
 | blm/Leylines/casts-72plus | candidate | — | (7.2+) GCDs cast outside Circle of Power while Ley Lines is up | Checklist 95%. The log has the Circle of Power status. |
@@ -87,13 +87,10 @@
 
 ## Open
 
-In priority order (biggest damage cost first). **A Black Mage sample with
-its xivanalysis page is needed first**; nothing here has been seen since
-fight 10.
+In priority order (biggest damage cost first).
 
-1. **blm/Gauge/lost-polyglot, overwritten-polyglot** (candidates). A lost
-   Xenoglossy each; the Astral Fire / Umbral Ice simulation is the base for
-   most of the rows below too.
+1. **blm/Gauge/overwritten-polyglot** (covered). Match against xivanalysis
+   pages for pulls where it fires.
 2. **blm/Leylines/casts-72plus** (candidate). Casts outside Circle of
    Power, from the status.
 3. **blm/RotationWatchdog/ExtraF1, UptimeSouls, Triplecast/overwritten**

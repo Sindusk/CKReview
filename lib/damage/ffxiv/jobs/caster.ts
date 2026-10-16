@@ -97,6 +97,8 @@
 //     (xtcaT8y9CGjpPnHK 5:40, 21k); High Fire II on both at
 //     7yXZbmqcrCga8PHz 9:27 (65k); High Thunder II on one boss with the two
 //     apart, q4mQCNpRKwH1PZjb 6:53, 7:44, 9:18 (4-8k, direct hit only).
+//     Polyglot overcap (Gauge.tsx, 2026-10-15): `polyglot` below, a gauge
+//     simulation from casts; hand-checked on xz1wjC6gfXmkMKYt 2:30.
 //   - SMN Searing Light with one Searing Flash (SearingLight.tsx).
 //     Checked against xivanalysis on qjCMx4bRfgNKwX9T fight 16 (7.5,
 //     2026-10-13, the first Summoner sample): Searing Flash 10/10, every
@@ -400,7 +402,58 @@ const pctAoe = aoeComboOnOneTarget(([
 ] as const).filter(([a, b]) => A[a] && A[b]).map(([a, b]) => [A[a].id, A[b].id, 3] as [number, number, number]));
 
 export const PCT_CHECKS: JobCheck[] = [starryMuse, starryFillers, palette, pctAoe];
-export const BLM_CHECKS: JobCheck[] = [highThunder, blmAoe];
+// Polyglot (xivanalysis Gauge.tsx), simulated from casts: Enochian (Astral
+// Fire / Umbral Ice) adds one every 30s from the first fire or ice spell,
+// Amplifier one more, Xenoglossy and Foul spend one; cap 3. A death empties
+// the gauge and stops the timer until the next fire or ice spell. From 7.2
+// Astral Fire / Umbral Ice never time out, so Enochian only drops on a
+// death; earlier logs, where it could time out, aren't judged. A Polyglot
+// gained at the cap, or still held at a kill, is a Xenoglossy over the GCD
+// it would have replaced.
+const POLYGLOT_MS = 30_000;
+const POLYGLOT_CAP = 3;
+const ENOCHIAN_IDS = new Set(ids("FIRE_I", "FIRE_II", "FIRE_III", "FIRE_IV", "HIGH_FIRE_II", "FLARE", "DESPAIR", "FLARE_STAR",
+  "BLIZZARD_I", "BLIZZARD_II", "BLIZZARD_III", "BLIZZARD_IV", "HIGH_BLIZZARD_II", "FREEZE", "UMBRAL_SOUL", "TRANSPOSE"));
+const POLYGLOT_SPEND = new Set(ids("XENOGLOSSY", "FOUL"));
+const PRE_72 = ["7.0", "7.01", "7.05", "7.1"];
+const polyglot: JobCheck = (ctx) => {
+  if (ctx.patch && PRE_72.includes(ctx.patch)) return [];
+  const casts = ctx.player.casts.filter((c) => c.timestamp < ctx.endMs).sort((a, b) => a.timestamp - b.timestamp);
+  const deaths = [...ctx.dead].sort((a, b) => a.startMs - b.startMs);
+  const events: GaugeEvent[] = [];
+  let since: number | undefined;
+  let d = 0;
+  const tickTo = (t: number) => {
+    if (since === undefined) return;
+    while (since + POLYGLOT_MS <= t) {
+      since += POLYGLOT_MS;
+      events.push({ t: since, type: "gain", amount: 1, label: "Enochian's 30s at 3 Polyglot" });
+    }
+  };
+  for (const c of casts) {
+    while (d < deaths.length && deaths[d].startMs <= c.timestamp) {
+      tickTo(deaths[d].startMs);
+      events.push({ t: deaths[d].startMs, type: "reset", label: "death" });
+      since = undefined;
+      d++;
+    }
+    tickTo(c.timestamp);
+    if (ENOCHIAN_IDS.has(c.abilityId) && since === undefined) since = c.timestamp;
+    if (c.abilityId === A.AMPLIFIER.id) events.push({ t: c.timestamp, type: "gain", amount: 1, label: "Amplifier at 3 Polyglot" });
+    if (POLYGLOT_SPEND.has(c.abilityId)) events.push({ t: c.timestamp, type: "spend", amount: 1, label: c.abilityName });
+  }
+  tickTo(ctx.endMs);
+  const xeno = ctx.values.perUse(A.XENOGLOSSY.id) || ctx.values.perUse(A.FOUL.id);
+  const unit = Math.max(0, xeno - ctx.values.gcdValue(undefined, false));
+  if (unit <= 0) return [];
+  const basis = `${k(xeno)} average Xenoglossy − ${k(ctx.values.gcdValue(undefined, false))} average GCD it would have replaced`;
+  return gaugeFindings(ctx, {
+    name: "Polyglot", unit: "Polyglot", cap: POLYGLOT_CAP, unitValue: unit, valueBasis: basis, events,
+    leftAtKill: { unitValue: unit, valueBasis: basis },
+  });
+};
+
+export const BLM_CHECKS: JobCheck[] = [highThunder, blmAoe, polyglot];
 // xivanalysis MultiHitSkills.ts, each at the highest minimum any patch
 // uses (Tri-disaster 4 from 7.3, Painflare 4 in 7.2-7.4): the damage
 // comparison lets through the patches where fewer targets win.
