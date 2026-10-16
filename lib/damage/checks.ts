@@ -566,8 +566,10 @@ export function checkCooldownDrift(ctx: PlayerCheckContext): DamageFinding[] {
     ? mergeWindows([...ctx.forced, { startMs: 0, endMs: ctx.decidingPhaseStart, cause: "held for the deciding phase" }])
     : forcedMerged;
 
-  for (const cd of ctx.game.trackedCooldowns(ctx.job)) {
-    if (ctx.patch && cd.notOnPatches?.includes(ctx.patch)) continue;
+  for (const tracked of ctx.game.trackedCooldowns(ctx.job)) {
+    if (ctx.patch && tracked.notOnPatches?.includes(ctx.patch)) continue;
+    const patchHold = ctx.patch !== undefined ? tracked.holdMsOnPatches?.[ctx.patch] : undefined;
+    const cd = patchHold !== undefined ? { ...tracked, holdMs: patchHold } : tracked;
     const ids = new Set(cd.actionIds);
     const casts = ctx.player.casts
       .filter((c) => ids.has(c.abilityId) && c.timestamp < ctx.endMs)

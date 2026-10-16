@@ -188,6 +188,9 @@ export type TrackedCooldown = {
   // Patches (DamageGame.patchOf) where it isn't judged: using it on
   // cooldown wasn't a gain there (Pictomancer's Striking Muse in 7.2).
   notOnPatches?: string[];
+  // holdMs on these patches instead (Gunbreaker's Bloodfest waited for
+  // No Mercy before 7.4: 10s).
+  holdMsOnPatches?: Record<string, number>;
 };
 
 // ── Fight context (per boss)───────────────────────────────────────────

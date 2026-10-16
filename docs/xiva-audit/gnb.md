@@ -35,11 +35,11 @@
 | gnb/Ammo/cartridge-usage-checklist | superseded | `cartridges` | cartridges generated but not spent | The same loss as the overcap and leftover rules. |
 | gnb/Continuation/dropped | covered | `checkProcs` | Ready to Rip / Tear / Gouge / Blast / Raze expiring | Fight 16: 100%, so never seen firing. |
 | gnb/Continuation/usage-checklist | superseded | `checkProcs` | — | The checklist form of the same rule (it also splices its list while iterating). |
-| gnb/SonicBreak/missing-ticks | candidate | — | a Sonic Break whose DoT stopped early (target died or turned untargetable) | Minor 1, Medium 5, Major 10 ticks. The app has no Gunbreaker DoT check; `dotFindings` could value the re-application. Premise check: most short Sonic Breaks are the target leaving. |
+| gnb/SonicBreak/missing-ticks | wrong | — | a Sonic Break whose DoT stopped early (target died or turned untargetable) | Minor 1, Medium 5, Major 10 ticks. The app has no Gunbreaker DoT check; `dotFindings` could value the re-application. Premise check: most short Sonic Breaks are the target leaving. Checked 2026-10-16 on 141 Gunbreaker pulls: a 15s Sonic Break ticks 5 times (453 of them; the 177 with 10 are two targets). The 21 with under 4 ticks sit at the same fight moments across pulls (Necron 3:13-3:21 and 4:42-5:51, Enuo 2:24-2:35, Doomtrain 2:24-2:28, Zelenia 2:13-2:19): the target leaving inside No Mercy, which the player can't hold through. Not adopted. |
 | gnb/AoE/demon-slice | verified | `aoeCombo` | Demon Slice on one target | Fires on yPHmaGTY2btq1wD9 Red Hot and Deep Blue 3:57 and 4:04 (Demon Slice, Demon Slaughter on one boss with the two apart; 16k, 19k). Matched xivanalysis on L9BzKkD2nxcVgHTC Necron pull 15 (1 of its 1; the app also flags a Demon Slaughter, which xivanalysis doesn't track). |
 | gnb/AoE/fated-circle | verified | `aoeCombo` (vs Burst Strike) | Fated Circle on one target | Built 2026-10-15. Premise holds (same cartridge). Fires on L9BzKkD2nxcVgHTC Necron pulls 7-21 and pG319BgHTnPJc6Ft Necron pulls 1-3 (one Gunbreaker spending the opener's Bloodfest cartridges on Necron alone, e.g. pull 14 0:11, 0:14, 0:17; and single Hands in the adds, pull 18 3:35, 3:53), 0-34k each. A pull with no Burst Strike has no average to compare against and stays silent (L9BzKkD2nxcVgHTC pull 10). Fight 16 8:09's two hit both P3 bosses (right). Matched xivanalysis on L9BzKkD2nxcVgHTC Necron pull 15: 4 of 4. The raw comparison found only 2: the opener's two (0:05, 0:18) dealt 25-26k in the burst, level with Burst Strike's 25k pull average. The buff-neutral comparison (2026-10-15) prices them at 9-11k each, a Fated Circle being 0.63 of a Burst Strike (300 against 460 potency). |
 | gnb/Cooldowns/uses | verified | `checkCooldownDrift` | Gnashing Fang, Blasting Zone, No Mercy, Bow Shock, Double Down or Bloodfest held | Fight 16: Gnashing Fang 37/38 and Sonic Break 18/19 were downtime (forced). |
-| gnb/Cooldowns/bloodfest-hold | covered | `checkCooldownDrift` (Bloodfest hold 0) | Bloodfest held | **Patch gap:** before 7.4 xivanalysis allows 10s of hold (Bloodfest waits for No Mercy); the app allows 0 on every patch. |
+| gnb/Cooldowns/bloodfest-hold | covered | `checkCooldownDrift` (Bloodfest hold 0; 10s on 7.0-7.3 via `holdMsOnPatches`, 2026-10-16) | Bloodfest held | As xivanalysis: before 7.4 Bloodfest waits for No Mercy. **Gap found 2026-10-16:** the drift check never reports Bloodfest at all, since it deals no damage (perUse 0, skipped); no finding on the 7.3 Necron logs before or after the patch change. Needs a `valuePerUse` (3 cartridges + Reign of Beasts). |
 | gnb/Tincture/expected-actions | superseded | tincture.ts | Gnashing Fang ×2 and the burst actions under the tincture | Fight 16's 4: one Gnashing Fang of two each, ~3% of a GF combo. |
 | gnb/Combos/broken | covered | `checkCombos` | a broken combo | Generic. |
 | gnb/Weaving/too-many | verified | `checkGcdGaps` | triple weaves | Fight 16: 6:03, 8:07, 11:08 matched; most of its 13 are 0.02-0.2s jitter or a defensive with Bloodfest + No Mercy. |
@@ -67,8 +67,10 @@
 
 In priority order (biggest damage cost first):
 
-1. **gnb/SonicBreak/missing-ticks** (candidate). Premise check first.
-2. **gnb/Cooldowns/bloodfest-hold, pre-7.4.** Gate the hold allowance on
-   patch once a 7.0-7.3 Gunbreaker pull is on disk.
-3. **gnb/Ammo/combo-overcap, bloodfest-expire-drop; gnb/Continuation/
+1. **gnb/Cooldowns/bloodfest-hold: Bloodfest drift is never valued.**
+   Found 2026-10-16: Bloodfest deals no damage, so `checkCooldownDrift`
+   skips it (perUse 0) on every patch. A lost Bloodfest is 3 cartridges
+   plus the Reign of Beasts combo; it needs a `valuePerUse`. The pre-7.4
+   10s allowance is in place for when it is.
+2. **gnb/Ammo/combo-overcap, bloodfest-expire-drop; gnb/Continuation/
    dropped** (covered). None seen firing.

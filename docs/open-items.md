@@ -196,7 +196,8 @@ and delete them from the header.
     buffs of one job overlapping, rare in a fixed static; Bard's
     BuffGroupWindow); procs on an invulnerable target are
     `noDamageCasts`'s (2026-10-16).
-  - [brd.md](xiva-audit/brd.md): Bard, 1 candidate, 4 covered.
+  - [brd.md](xiva-audit/brd.md): Bard, 1 candidate (failed buff
+    overlap, never seen on 322 applications), 4 covered.
   - [dnc.md](xiva-audit/dnc.md): Dancer, 1 candidate (Closed Position,
     never seen), 8 covered (dance checks and Devilment outside Technical
     Finish built, awaiting xivanalysis pages).
@@ -204,15 +205,21 @@ and delete them from the header.
     (Hyperphantasia, only lost at deaths on disk), 6 covered (portrait
     overwrites built 2026-10-16; Striking Muse not judged on 7.2).
   - [ast.md](xiva-audit/ast.md): Astrologian, 1 candidate, 3 covered.
-  - [sge.md](xiva-audit/sge.md): Sage, 1 candidate.
+    Early Earthly Star detonations: 97 on disk, mostly the static's AST
+    at the same moments each pull; waiting on the user (planned?).
+  - [sge.md](xiva-audit/sge.md): Sage, 0 candidates (Eukrasian
+    Dyskrasia on one enemy built 2026-10-16).
   - [sch.md](xiva-audit/sch.md): Scholar, 3 covered.
   - [pld.md](xiva-audit/pld.md): Paladin, 2 covered.
-  - [war.md](xiva-audit/war.md): Warrior, 1 candidate, 4 covered.
+  - [war.md](xiva-audit/war.md): Warrior, 0 candidates, 5 covered
+    (Infuriate drift with its refunds built 2026-10-16).
   - [drk.md](xiva-audit/drk.md): Dark Knight, 0 candidates, 7 covered
     (Dark Arts overwrite, and MP overcap from the logged MP with an MP
     lane, 2026-10-16). Player MP is kept on casts since then; samples
     fetched earlier have none.
-  - [gnb.md](xiva-audit/gnb.md): Gunbreaker, 1 candidate, 7 covered.
+  - [gnb.md](xiva-audit/gnb.md): Gunbreaker, 0 candidates, 7 covered.
+    Bloodfest drift is never valued (no damage of its own); needs a
+    valuePerUse (2026-10-16).
   - [drg.md](xiva-audit/drg.md): Dragoon, 3 covered.
   - [vpr.md](xiva-audit/vpr.md): Viper, 1 candidate (Vices, rare), 5
     covered (Serpent Offerings overcap and Reawaken left at a kill, Death

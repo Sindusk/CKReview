@@ -208,6 +208,8 @@
 //   valuation of the time): 64.3s clipped over 6 refreshes, read from the
 //   log, against xivanalysis's 17.5s a minute (~171s). Not explained then;
 //   likely its per-enemy counting again (the FRU note above), unchecked.
+// - Sage: Eukrasian Dyskrasia on one enemy (AoEUsages.ts, 2026-10-16):
+//   `dyskrasiaOnOne` below. Not matched against a page yet.
 // - DoT refreshes while moving (from docs/open-items.md 2026-10-15): the
 //   DoT is instant, so a refresh pressed to move cost little; the finding
 //   says so but still counts it (Dia refreshes with 25s left are common on
@@ -335,6 +337,46 @@ const aoeOnOneTarget: JobCheck = (ctx) => {
   const fill = filler(ctx);
   return aoeOnOneTargetFindings(ctx, AOE_GCD_KEYS.filter((key) => A[key]).map((key) => A[key].id),
     () => ({ name: fill.name, ids: fill.id !== undefined ? [fill.id] : [] }));
+};
+
+// Eukrasian Dyskrasia ticking on one enemy (xivanalysis AoEUsages): its
+// ticks are about half an Eukrasian Dosis III's, and both are instant, so
+// the Dosis was always the option. On two enemies they're even (two
+// Dyskrasia ticks 100-118k over 30s, one Dosis about 100k, on disk), so
+// only one counts, as xivanalysis's 3-target minimum would overstate.
+// Each tick loses the player's average Dosis III tick (multiplier taken
+// out, then this tick's put back) minus what it dealt. Ticks run until the
+// next application of either. 3 of 36 on the 393 Sage pulls on disk
+// (2026-10-16): H9fnVZgPA3krpCzY Lindwurm II pull 24 0:57, jN3XDrf2z8PmLgRJ
+// Vamp Fatale pull 4 5:46, K6qfMamL7rN8yz2Q Vamp Fatale pull 1 5:21.
+const dyskrasiaOnOne: JobCheck = (ctx) => {
+  const dysk = S.EUKRASIAN_DYSKRASIA?.id, dosis = S.EUKRASIAN_DOSIS_III?.id;
+  if (!dysk || !dosis) return [];
+  const base = (e: { amount?: number; multiplier?: number }) => (e.amount ?? 0) / (e.multiplier && e.multiplier > 0 ? e.multiplier : 1);
+  const dosisTicks = ctx.player.damageDone.filter((e) => e.isDoT && e.abilityId === dosis && (e.amount ?? 0) > 0);
+  if (dosisTicks.length === 0) return [];
+  const dosisBase = dosisTicks.reduce((a, e) => a + base(e), 0) / dosisTicks.length;
+  const applies = ctx.player.casts.filter((c) => c.abilityId === A.EUKRASIAN_DYSKRASIA?.id || c.abilityId === A.EUKRASIAN_DOSIS_III?.id);
+  const out: DamageFinding[] = [];
+  applies.forEach((c, i) => {
+    if (c.abilityId !== A.EUKRASIAN_DYSKRASIA.id || c.timestamp >= ctx.endMs) return;
+    const until = Math.min(applies[i + 1]?.timestamp ?? Infinity, c.timestamp + (S.EUKRASIAN_DYSKRASIA.duration ?? 30_000) + 1_500);
+    const ticks = ctx.player.damageDone.filter((e) => e.isDoT && e.abilityId === dysk && e.timestamp > c.timestamp && e.timestamp <= until);
+    const targets = new Set(ticks.map((e) => `${e.targetActorId ?? e.target}.${e.targetInstance ?? 1}`));
+    if (ticks.length === 0 || targets.size !== 1) return;
+    const lost = ticks.reduce((a, e) => a + Math.max(0, dosisBase * (e.multiplier && e.multiplier > 0 ? e.multiplier : 1) - (e.amount ?? 0)), 0);
+    if (lost <= 0) return;
+    const forced = inWindows(c.timestamp, mergeWindows(ctx.forced));
+    out.push(finding(ctx, {
+      kind: "aoe-single", startMs: c.timestamp, endMs: c.timestamp, forced,
+      cause: forced ? forcedPart(c.timestamp - 1, c.timestamp + 1, ctx.forced).cause : undefined,
+      label: "Eukrasian Dyskrasia on one enemy",
+      lostDamage: lost,
+      basis: `${ticks.length} ticks × the average Eukrasian Dosis III tick (${k(dosisBase)} before damage buffs) minus what each dealt`,
+      detail: `Eukrasian Dyskrasia ticked on one enemy only (${ticks.length} ticks, ${k(ticks.reduce((a, e) => a + (e.amount ?? 0), 0))})`,
+    }));
+  });
+  return out;
 };
 
 const dot = (key: string, ...more: string[]): JobCheck => (ctx) => dotFindings(ctx, {
@@ -639,4 +681,4 @@ export function whmGaugeTracks(ctx: PlayerCheckContext): GaugeTrack[] {
 }
 
 export const WHM_CHECKS: JobCheck[] = [healGcds, aoeOnOneTarget, dot("DIA"), bloodLily, lilyOvercap];
-export const SGE_CHECKS: JobCheck[] = [healGcds, aoeOnOneTarget, dot("EUKRASIAN_DOSIS_III", "EUKRASIAN_DYSKRASIA")];
+export const SGE_CHECKS: JobCheck[] = [healGcds, aoeOnOneTarget, dot("EUKRASIAN_DOSIS_III", "EUKRASIAN_DYSKRASIA"), dyskrasiaOnOne];

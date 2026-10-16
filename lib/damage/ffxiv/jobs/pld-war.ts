@@ -60,6 +60,8 @@
 // L9BzKkD2nxcVgHTC Necron pull 15 (Decimate ×4 and Chaotic Cyclone on the
 // boss alone, 0:33-2:28, 41-51k each), n6zTGPJh8wkLFRZ9 Vamp Fatale pull 1
 // (Decimate 5:20 on the boss, 51k; 5:17 and 5:22 on two, 22-24k).
+// Infuriate drift with its 5s refunds (OGCDDowntime.ts, 2026-10-16):
+// `infuriateHeld` below. Not matched against a page yet.
 //
 // Paladin, checked against xivanalysis on jN3XDrf2z8PmLgRJ Vamp pull 8
 // (2026-10-08): the window counts match its 7 missed actions and 1
@@ -150,7 +152,7 @@
 
 import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import type { DamageFinding, JobCheck } from "../../types";
-import { finding, PROC_CONSUME_MS, PROC_EXPIRY_EARLY_MS, type PlayerCheckContext } from "../../checks";
+import { COOLDOWN_HOLD_MS, finding, PROC_CONSUME_MS, PROC_EXPIRY_EARLY_MS, type PlayerCheckContext } from "../../checks";
 import { forcedPart, inWindows, mergeWindows } from "../../timeline";
 import { aoeComboOnOneTarget, burstWindowFindings, castHits, clock, gaugeFindings, k, statusWindows, uptimeFindings, type GaugeEvent, type GaugeSpec } from "./shared";
 import { comboLanded } from "./gnb";
@@ -344,4 +346,70 @@ const warAoeCombo = aoeComboOnOneTarget([[id("OVERPOWER"), id("HEAVY_SWING")], [
   [id("CHAOTIC_CYCLONE"), id("INNER_CHAOS"), 3], [id("DECIMATE"), id("FELL_CLEAVE"), 3]]);
 
 export const PLD_CHECKS: JobCheck[] = [fightOrFlight, pldAoeCombo, atonementChainAtKill, atonementChainDropped];
-export const WAR_CHECKS: JobCheck[] = [surgingTempest, warAoeCombo, beastGauge, nascentChaos];
+// Infuriate held at two charges (xivanalysis OGCDDowntime.ts with
+// `resetBy`): not in tracked-cooldowns.ts, because each Fell Cleave,
+// Decimate, Inner Chaos or Chaotic Cyclone takes 5s off its recharge,
+// which the drift check can't model. Simulated here: two charges at the
+// pull, 60s recharge less the refunds. Time at two charges, past the 2.5s
+// opener allowance and 1.25s per stretch, outside forced time and death,
+// is held; each whole recharge of it is a use lost, worth one Inner Chaos
+// over the combo GCD it would have replaced (Infuriate's 50 gauge and
+// Nascent Chaos are one more Inner Chaos). Marked inference: the
+// simulation can be off, and says so when an Infuriate was pressed at 0
+// charges. 43 of the 164 Warrior pulls on disk sat at two charges for
+// 15s+ before forced time was taken out (2026-10-16).
+const INFURIATE_REFUND_MS = 5_000;
+const INFURIATE_OPENER_MS = 2_500;
+const infuriateHeld: JobCheck = (ctx) => {
+  const inf = A.INFURIATE;
+  if (!inf) return [];
+  const recast = inf.cooldown ?? 60_000, max = inf.charges ?? 2;
+  const refunds = new Set(["FELL_CLEAVE", "DECIMATE", "INNER_CHAOS", "CHAOTIC_CYCLONE"].filter((x) => A[x]).map(id));
+  let charges = max, next: number | null = null, capFrom = 0, negatives = 0, uses = 0;
+  const capped: { startMs: number; endMs: number }[] = [];
+  const advance = (t: number) => {
+    while (next !== null && next <= t) {
+      charges++;
+      if (charges >= max) { charges = max; capFrom = next; next = null; } else next += recast;
+    }
+  };
+  for (const c of ctx.player.casts) {
+    if (c.timestamp >= ctx.endMs) break;
+    if (c.abilityId === inf.id) {
+      uses++;
+      advance(c.timestamp);
+      if (charges === max) { capped.push({ startMs: capFrom, endMs: c.timestamp }); next = c.timestamp + recast; }
+      if (charges === 0) negatives++;
+      charges = Math.max(0, charges - 1);
+    } else if (refunds.has(c.abilityId) && next !== null) {
+      advance(c.timestamp);
+      if (next !== null) { next -= INFURIATE_REFUND_MS; advance(c.timestamp); }
+    }
+  }
+  if (uses === 0) return [];
+  advance(ctx.endMs);
+  if (charges === max) capped.push({ startMs: capFrom, endMs: ctx.endMs });
+  const blockers = [...ctx.forced, ...ctx.dead.map((w) => ({ ...w, cause: "dead" }))];
+  let held = 0, longest: { startMs: number; endMs: number; held: number } | undefined;
+  for (const w of capped) {
+    const allowance = COOLDOWN_HOLD_MS + (w.startMs === 0 ? INFURIATE_OPENER_MS : 0);
+    const h = Math.max(0, w.endMs - w.startMs - forcedPart(w.startMs, w.endMs, blockers).ms - allowance);
+    held += h;
+    if (h > 0 && (!longest || h > longest.held)) longest = { ...w, held: h };
+  }
+  const lostUses = Math.floor(held / recast);
+  if (lostUses < 1 || !longest) return [];
+  const each = Math.max(0, ctx.values.perUse(id("INNER_CHAOS")) - ctx.values.gcdValue(undefined, false));
+  if (each <= 0) return [];
+  return [finding(ctx, {
+    kind: "cooldown-drift", startMs: longest.startMs, endMs: longest.endMs, forced: false, inference: true,
+    label: "Infuriate drift",
+    lostDamage: lostUses * each,
+    basis: `${lostUses} use${lostUses > 1 ? "s" : ""} × (${k(ctx.values.perUse(id("INNER_CHAOS")))} average Inner Chaos − ` +
+      `${k(ctx.values.gcdValue(undefined, false))} average GCD outside raid buffs); recharge simulated with the 5s refunds` +
+      (negatives ? ` (${negatives} press${negatives > 1 ? "es" : ""} at 0 simulated charges: the simulation is off)` : ""),
+    detail: `Infuriate sat at two charges for ${(held / 1000).toFixed(1)}s in total (${uses} uses): about ${lostUses} use${lostUses > 1 ? "s" : ""} lost`,
+  })];
+};
+
+export const WAR_CHECKS: JobCheck[] = [surgingTempest, warAoeCombo, beastGauge, nascentChaos, infuriateHeld];

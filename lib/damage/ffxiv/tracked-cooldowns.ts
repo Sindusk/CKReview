@@ -38,6 +38,8 @@ export type TrackedCooldownSpec = {
   valuePerUse?:      TrackedCooldown["valuePerUse"];
   // Patches where holding it costs nothing (TrackedCooldown.notOnPatches).
   notOnPatches?:     string[];
+  // Its hold allowance on these patches (TrackedCooldown.holdMsOnPatches).
+  holdMsOnPatches?:  Record<string, number>;
 };
 
 // Life Surge: a forced crit on the best GCD, as the Life Surge check values
@@ -70,7 +72,9 @@ export const TRACKED_COOLDOWNS: Record<string, TrackedCooldownSpec[]> = {
     { actions: ["NO_MERCY"], firstUseOffsetMs: 5000 },
     { actions: ["BOW_SHOCK"], firstUseOffsetMs: 10000 },
     { actions: ["DOUBLE_DOWN"], firstUseOffsetMs: 10000 },
-    { actions: ["BLOODFEST"], firstUseOffsetMs: 2500, holdMs: 0 },
+    // Before 7.4 Bloodfest waited for No Mercy: xivanalysis allows 10s.
+    { actions: ["BLOODFEST"], firstUseOffsetMs: 2500, holdMs: 0,
+      holdMsOnPatches: Object.fromEntries(["7.0", "7.01", "7.05", "7.1", "7.2", "7.3"].map((p) => [p, 10_000])) },
   ],
   "Dark Knight": [
     { actions: ["DELIRIUM"], firstUseOffsetMs: 10000 },

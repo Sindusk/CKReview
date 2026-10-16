@@ -31,7 +31,7 @@
 | brd/BurstWindow/ea-sidewinder | verified | `bardBurst` Empyreal / Sidewinder | either one missing | FRU 3 and fight 16 Sidewinder matched. |
 | brd/BurstWindow/heartbreak | verified | `bardBurst` Heartbreak Shot | under 3 Heartbreak Shot / Rain of Death in the window | FRU 6 and fight 16 ×2 matched. |
 | brd/BurstWindow/end-of-pull | superseded | burst window cut short by the kill (dps-analysis.md) | a window the kill cuts short | xivanalysis drops each expectation by a fixed amount (oGCDs to 0; IJ and Barrage −1; only Encore). The app keeps the GCDs that fit, and an action only if it couldn't have come back before the kill (`readyAgain`). |
-| brd/BurstWindow/failed-overlap | candidate | — | Raging Strikes, Battle Voice or Radiant Finale ending before all three overlapped | Suggestion: Medium under 3, Major at 3 or more. The app judges only windows where all three overlap, so a buff pressed alone isn't seen at all; a short overlap is caught only as missing GCDs. Premise check needed: a buff pressed alone before downtime, or held for a phase, may be a choice. |
+| brd/BurstWindow/failed-overlap | candidate | — | Raging Strikes, Battle Voice or Radiant Finale ending before all three overlapped | Suggestion: Medium under 3, Major at 3 or more. The app judges only windows where all three overlap, so a buff pressed alone isn't seen at all; a short overlap is caught only as missing GCDs. Premise check needed: a buff pressed alone before downtime, or held for a phase, may be a choice. Checked 2026-10-16 on the 29 Bard pulls on disk (ultimates before Dancing Mad left out): 322 buff applications, one never overlapped the other two (qjCMx4bRfgNKwX9T Dancing Mad pull 2, Battle Voice 16:08, cut by the wipe a second later). Not built; build it when a real one shows. |
 | brd/MuseBuffWindow/per-buff-gcds | superseded | `bardBurst` | under 8 GCDs (9 with Army's Muse) in a Raging Strikes, Battle Voice or Radiant Finale window | Severity IGNORE: shows as ✗ cells, never a suggestion. The burst window carries the same count. Its Muse bonus needs only 1 GCD under Muse (the burst window needs 2; the code comment says 3). |
 | brd/ArmysMuse/gcds | superseded | gap check with Army's Muse as a haste window (game.ts) | under 5 GCDs while Army's Muse is up | Severity IGNORE. The "4/5 GCDs" cells were edge GCDs; the real cost was weave delays (FRU 2:10). Not adopted, per the header. |
 | brd/AlwaysBeCasting/uptime | superseded | `checkGcdGaps` | idle GCD time | Leaves Army's Paeon and Army's Muse time **out** of uptime entirely, since it can't model their speed. The app judges that time: Muse at its measured speed, Paeon at the base GCD (lenient). |
@@ -94,10 +94,9 @@ In priority order (biggest damage cost first):
 1. **brd/OGCDDowntime/uses, Empyreal Arrow.** Covered but hidden on
    fight 16 (67/69, 31.7s held). Needs the room simulation in
    open-items "cooldown room".
-2. **brd/BurstWindow/failed-overlap** (candidate). A buff outside the
-   overlap loses its multiplier on the other two buffs for the party.
-   Premise check first: find a pull where it happens, and check whether
-   it was a downtime or phase hold.
+2. **brd/BurstWindow/failed-overlap** (candidate). Never seen on 322
+   applications (2026-10-16); a weaker parse from FFLogs rankings is the
+   place to look.
 3. **brd/RefulgentProcs/dropped** (covered). Fires in the app
    (yBKPqGwHparm7Tk4 12:26). Needs a Bard xivanalysis page to match it,
    and a pull with Shadowbite to test the second-consumer doubt.

@@ -166,6 +166,7 @@ const TRACKED = new Map<string, TrackedCooldown[]>(
       petDamage:        spec.petDamage,
       valuePerUse:      spec.valuePerUse,
       notOnPatches:     spec.notOnPatches,
+      holdMsOnPatches:  spec.holdMsOnPatches,
     }];
   })]),
 );

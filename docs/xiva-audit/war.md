@@ -24,7 +24,7 @@
 | war/Infuriate/nascent-chaos-dropped | covered | `checkProcs` | Nascent Chaos expiring | Not seen firing. |
 | war/Infuriate/nascent-chaos-overwritten | verified | `nascentChaos` | Infuriate with Nascent Chaos held | Red Hot 0:14.4 (36k) built from it; the only one across the samples. |
 | war/Infuriate/cdr-hook | no-damage | — | — | A cooldown model (5s per spender), no rule. |
-| war/OGCDDowntime/infuriate | candidate | — | Infuriate sitting at 2 charges | The app doesn't track Infuriate: its recast drops 5s per Fell Cleave / Decimate / Inner Chaos / Chaotic Cyclone, which the drift check can't model. qjCMx4bRfgNKwX9T 29/30 simulated by hand: at two charges only in downtime, so no loss there. |
+| war/OGCDDowntime/infuriate | covered | `infuriateHeld` | Infuriate sitting at 2 charges | Built 2026-10-16 as its own check (not tracked-cooldowns.ts): the recharge is simulated with the 5s refund per Fell Cleave / Decimate / Inner Chaos / Chaotic Cyclone; time at two charges outside forced time and death, past 2.5s (opener) and 1.25s per stretch, counts; each whole 60s is a use lost, worth Inner Chaos over the average GCD. 43 of 164 Warrior pulls on disk sat capped 15s+ before forced time came out; after it, only the Necron Warrior on L9BzKkD2nxcVgHTC fires (pulls 9, 18, 20; 34-50k; pull 18 hand-checked: no Infuriate from about 1:30 to 3:12). qjCMx4bRfgNKwX9T and the FRU pulls are all downtime, as the hand simulation said. Not matched on a page yet. |
 | war/OGCDDowntime/inner-release | verified | `checkCooldownDrift` (first use 15s, hold 2.5s) | Inner Release held | Same groups as xivanalysis. |
 | war/OGCDDowntime/upheaval-orogeny | verified | `checkCooldownDrift` | Upheaval / Orogeny held | qjCMx4bRfgNKwX9T 33/34 and The Tyrant 20/21 not adopted: each stretch held under one recast. |
 | war/OGCDDowntime/onslaught | verified | `checkCooldownDrift` (charges) | Onslaught at 3 charges | qjCMx4bRfgNKwX9T: it says 2 lost, the app 1 (the other is the opener's normal hold). |
@@ -64,7 +64,7 @@ the Beast Gauge graph.
 
 In priority order (biggest damage cost first):
 
-1. **war/OGCDDowntime/infuriate** (candidate). Needs drift with spender
-   refunds (xivanalysis's `resetBy`).
+1. **war/OGCDDowntime/infuriate** (covered 2026-10-16). Match it on a
+   page (L9BzKkD2nxcVgHTC Necron pull 18 or 20).
 2. **war/Procs/dropped-primal-rend, primal-ruination, primal-wrath,
    nascent-chaos-dropped** (covered). None seen firing.
