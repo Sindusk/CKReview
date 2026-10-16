@@ -364,7 +364,7 @@ export const PROC_REPLACES = new Map(([
   ["FOUNTAINFALL", "FOUNTAIN"], ["BLOODSHOWER", "BLADESHOWER"],
   ["LAST_DANCE", "CASCADE"], ["REFULGENT_ARROW", "BURST_SHOT"],
   ["FELL_CLEAVE", "MAIM"], ["PRIMAL_REND", "MAIM"], ["PRIMAL_RUINATION", "MAIM"],
-  ["HAMMER_STAMP", "FIRE_IN_RED"],
+  ["HAMMER_STAMP", "FIRE_IN_RED"], ["GRAND_IMPACT", "JOLT_III"],
 ] as const).filter(([a, b]) => A[a] && A[b]).map(([a, b]) => [A[a].id, A[b].id]));
 
 // Declared consumers (DamageGame.procConsumers), from xivanalysis's

@@ -54,4 +54,5 @@ the Aetherflow table, Defensives / Utilities.
 
 ## Open
 
-1. **sch/Procs/impact-imminent-dropped** (covered). Not seen firing.
+1. **sch/Procs/impact-imminent-dropped** (covered). Not seen firing; the
+   10 lowest Red Hot and Deep Blue Scholars (2026-10-16) used every one.

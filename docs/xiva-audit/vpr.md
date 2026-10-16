@@ -93,7 +93,9 @@ Core modules that can't fire for Viper: DoTs (Noxious Gnash removed in
 In priority order (biggest damage cost first):
 
 1. **vpr/SerpentsTail/checklist**: verified on one page (2T1HzdPKgbhM43am);
-   Last Lash never seen.
+   Last Lash never seen. The 12 lowest Red Hot and Deep Blue Vipers
+   (2026-10-16) barely use the AoE combo; aPDVMgkNh42Xw6pK (fetched)
+   has one Jagged Maw, and its Last Lash came (6:42.8, 6:43.8).
 2. **vpr/Vices/checklist** (candidate, rare; Bites now covered): 22 of 1,043 Vicewinders /
    Vicepits on disk without both coils, most at a death or a wipe's end
    (cZ42C1y3JRNGXWLH 0:49: two Uncoiled Furies, then the combo, coils

@@ -757,7 +757,18 @@ function usesLostAtKill(cd: TrackedCooldown, casts: number[], heldBy: { endMs: n
   if (pressBy <= 0) return 0;
   const shifted = casts.map((t) => t - heldBy.filter((h) => h.endMs <= t).reduce((a, h) => a + h.held, 0));
   // A pre-pull use is a press at 0:00 (its recast ended by then at the latest).
-  return chargesAt(prePull ? [0, ...shifted] : shifted, cd.cooldownMs, cd.charges, pressBy - KILL_USE_MARGIN_MS);
+  // Every press that fits, not the charges in hand at the end: a
+  // one-charge cooldown can fit two (7zwpcLxk2Fd1h6Vr, Alison's Senei:
+  // 83s held, the last use shifts from 8:41 to 7:18, room for 8:18 and
+  // 9:18 before the 9:32 kill; xivanalysis's 8 / 10).
+  const last = pressBy - KILL_USE_MARGIN_MS;
+  const presses = prePull ? [0, ...shifted] : [...shifted];
+  let n = 0;
+  for (let t = presses.length ? presses[presses.length - 1] : 0; t <= last && n < 50;) {
+    if (chargesAt(presses, cd.cooldownMs, cd.charges, t) >= 1) { presses.push(t); n++; continue; }
+    t += 250;
+  }
+  return n;
 }
 
 /** The first moment in [startMs, endMs) whose press would land (+landMs) outside forced time. */

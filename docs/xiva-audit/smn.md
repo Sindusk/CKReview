@@ -67,7 +67,9 @@ No candidates left (2026-10-16). Enkindle, Mountain Buster and Ruin IV
 in a demi verified on three pages the same day. Still waiting:
 
 1. **smn/Summons/deathflare (Sunflare)**: Deathflare not seen; Sunflare
-   only on pnLBzfbH8NjGAJRg Enuo wipes.
+   only on pnLBzfbH8NjGAJRg Enuo wipes. The 12 lowest Red Hot and Deep
+   Blue Summoners (2026-10-16) pressed Deathflare in every Bahamut; the
+   two missing Sunflares came 2-3s before a death.
 2. **smn/Aetherflow/ruin4-unused**: qjCMx4bRfgNKwX9T Dancing Mad pull 2
    (Alun Kumiho, 11:35).
 3. **smn/Aetherflow/lost-stacks**: the kill case matched YPhxRTb9Ld7BJaXp;

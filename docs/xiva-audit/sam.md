@@ -80,6 +80,15 @@ In priority order (biggest damage cost first). Three pages compared
 2. Fuko on too few targets (candidate part of AoeChecker/combo): needs a
    2-step-combo comparison.
 3. OGCDDowntime: Alison's Guren / Senei 8 / 10 on her page, about 1
-   lost here (83.2s held). (Genichiro's Tendo 10 / 11, traced
+   lost here (83.2s held). Traced 2026-10-16: Senei at 0:04, 1:05, 2:06,
+   3:22, 4:23, 5:27, 7:25, 8:41, kill 9:32; on time, 10 fit. The app's
+   "one more before the kill" counted only the charges in hand at the
+   end, never more than one for a one-charge cooldown; it now counts the
+   presses that fit (93 drift findings on disk change, most by one use;
+   23 drop, where the "unused" charge was in fact pressed inside the
+   final 15s, e.g. K6qfMamL7rN8yz2Q Red Hot pull 2 Kevin's Clawed Muse
+   at 8:47.2). Alison stays at 1: shifted by her holds, the second extra
+   Senei would land at 9:18, 14s before the kill, inside the deliberate
+   15s kill margin (KILL_USE_MARGIN_MS). Not adopted past that. (Genichiro's Tendo 10 / 11, traced
    2026-10-16: the 8:49.3 Meikyo's Tendo was removed at 9:07.9 by his
    death, 11s into its 30s; lost to the death, not counted here.)
