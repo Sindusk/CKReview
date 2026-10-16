@@ -127,7 +127,8 @@
 //   cone (not the cast: C10's Paladin was raised 4s into it); a cone
 //   hitting only players already hit is fallout.
 // ffxiv-ap-tetrashatter (Major): died to a crystal's burst (user, D12; the
-//   earlier note calling these deaths mitigation is overturned).
+//   earlier note calling these deaths mitigation is overturned), not after
+//   Electromagnetic Burst (D16, user: the pull is over).
 // ffxiv-ap-true-heart (Raid): fewer than four Tetrashatter casts in
 //   Inception, so the Heart missed a crystal and can't turn gold (D23,
 //   user; also C10 two, C18 three; every other Inception on disk had four).
@@ -139,8 +140,9 @@
 //   J Storm; every later Wormhole error is fallout (user, D10: "the first
 //   death during Wormhole indicates a wipe, unless it's at the very end";
 //   E30 raised theirs and played on, so it's excluded).
-// ffxiv-ap-stasis-deaths (Raid, fallback): 2+ Stasis deaths with a player
-//   still dead at Inception Formation, on a pull that never reaches
+// ffxiv-ap-stasis-deaths (Raid, fallback): 2+ Stasis deaths with two or
+//   more players still dead at Inception Formation (D16's one was
+//   recovered from, user), on a pull that never reaches
 //   Wormhole, when earlier than any mechanic Raid (C10, user: "over after multiple
 //   deaths"; E4 and E30 played on to the final check after the same shape).
 // ffxiv-ap-stasis-tether (Major, both players: the log can't say who
@@ -203,7 +205,10 @@
 //   C27's Electromagnetic Burst: the warrior and the white mage moved to
 //   the wrong orb positions (user), but every orb take sat on the four
 //   clean spots and no take order or timing separates the burst pulls
-//   (C27, D5, D16) from clean ones, so it stays player-less.
+//   (C27, D5, D16) from clean ones, so it stays player-less. D16 (user):
+//   the white mage didn't go to the red dot. The crystal players form a
+//   clean four-corner box in every pull (D16 too; that healer had no
+//   crystal), so the orb route is the likely meaning; still unreadable.
 // OPEN QUESTIONS:
 // 1. Electromagnetic Burst names nobody (C27, D5, D16): can the orbs'
 //    paths be read from anything the log keeps?
@@ -746,8 +751,10 @@ export function detectAlexanderPrimeErrors(
     .sort((a, b) => a.timestamp - b.timestamp);
   const stasisDead = uniq(stasisDeaths.map((d) => d.player));
   if (formation && stasisDead.length >= 2) {
+    // Two or more still down: C10 had three; D16's one was recovered from
+    // and the raid wiped later, to Electromagnetic Burst (user).
     const still = players.filter((p) => !life.alive(p, formation.timestamp));
-    if (still.length) {
+    if (still.length >= 2) {
       const second = stasisDeaths.find((d) => d.player === stasisDead[1])!;
       stasisRaid = (raidMarker(AP_STASIS_DEATHS_RULE_ID, "Temporal Stasis Deaths",
         `${joinNames(stasisDead)} died in Temporal Stasis and ${namesOf(still)} ${still.length === 1 ? "was" : "were"} still dead at Inception Formation: Inception's baits and fires need the whole party. Unresolvable from here; treated as the cutoff point.`,
@@ -980,7 +987,8 @@ function detectInception(c: Ctx, formation: number, inception: number | undefine
   }
   // Dying to a crystal's burst is standing too close to it (user, D12
   // +6:07.3: the sage, two crystals' bursts).
-  for (const d of c.deaths.filter((x) => x.killingAbilityGameId === TETRASHATTER && x.timestamp >= formation && x.timestamp <= formation + 45_000)) {
+  // Not after Electromagnetic Burst: the pull is over (D16, user).
+  for (const d of c.deaths.filter((x) => x.killingAbilityGameId === TETRASHATTER && x.timestamp >= formation && x.timestamp <= formation + 45_000 && !(emb && x.timestamp > emb.timestamp))) {
     const p = players.find((x) => x.name === d.player);
     if (p) c.errors.push(playerError(p, {
       ruleId: AP_TETRASHATTER_RULE_ID, severity: "Major", name: "Killed by a Crystal Burst",
