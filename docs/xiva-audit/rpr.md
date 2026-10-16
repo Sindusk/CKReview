@@ -10,7 +10,8 @@
   (data only).
 - **App:** `lib/damage/ffxiv/jobs/melee.ts` (Reaper section, `RPR_CHECKS`:
   `enshroud`, `arcaneCircle`, `deathsDesign`, `harvestMoon`, `shroud`,
-  `rprAoe`), `tracked-cooldowns.ts` ("Reaper"), generic checks. Case
+  `rprAoe`, `reaperStacks`, `reaperEnhancedOverwrites`),
+  `tracked-cooldowns.ts` ("Reaper"), generic checks. Case
   studies: jN3XDrf2z8PmLgRJ Vamp pull 8, dDar482XvFKBPJYh FRU,
   qjCMx4bRfgNKwX9T Dancing Mad.
 - **xivanalysis quirks found** (from the extraction):
@@ -37,14 +38,14 @@
 | rpr/Tincture/window-table | no-damage | — | — | Table only. |
 | rpr/CooldownDowntime/uses | verified | `checkCooldownDrift` | Arcane Circle, Soul Slice / Scythe or Gluttony held | FRU Soul Slice 36/38 recharged through P4's downtime (not counted); Arcane Circle 9/10 held for the 14:18 burst. |
 | rpr/Drift/gluttony | superseded | `checkCooldownDrift` | Gluttony drifting | A table only. qjCMx4bRfgNKwX9T 31s / 25s at two-minute marks: 18/18, no use lost. Vamp: 1 use found against its 8 of 10. |
-| rpr/Procs/overwritten-gibbet | candidate | — | Enhanced Gibbet granted while held | Minor 1, Medium 5. The app's `procOverwrites` covers Dancer and Bard only. 60 potency each. |
-| rpr/Procs/overwritten-gallows | candidate | — | Enhanced Gallows granted while held | Same. |
+| rpr/Procs/overwritten-gibbet | covered | `reaperEnhancedOverwrites` | Enhanced Gibbet granted while held | Built 2026-10-16 with Gallows and Void / Cross Reaping: a "refreshed" event beside the unenhanced press; ~10% of her average of it (enhanced hits measured ~11.5% over plain on disk). 49 on disk (AYQm9Kd8Ct4FxcGp Lindwurm pull 32, Cross Reaping twice at 6:19.6 and 6:22.6). FFLogs top 20: 1 in 794. No xivanalysis page yet. |
+| rpr/Procs/overwritten-gallows | covered | `reaperEnhancedOverwrites` | Enhanced Gallows granted while held | Same. |
 | rpr/Procs/expired-gibbet | covered | `checkProcs` | Enhanced Gibbet expiring | Medium 1, Major 2. Not seen firing. |
 | rpr/Procs/expired-gallows | covered | `checkProcs` | Enhanced Gallows expiring | Same. |
 | rpr/Procs/core-suggestions-off | no-damage | — | — | Enhanced Cross / Void Reaping and Harpe aren't reported in xivanalysis. |
 | rpr/Harpe/statistic | verified | `checkInterrupts` + `checkDisengages` | Harpe pressed | A statistic. Vamp's cancelled Harpes matched. |
-| rpr/Reaver/dropped | candidate | — | a Soul Reaver stack lost to another press | Medium 1, Major 2. A lost Gibbet / Gallows (and its Shroud). The log shows the stack's removal beside the wrong press. It never counts a plain timeout (that's `checkProcs`). |
-| rpr/Executioner/dropped | candidate | — | an Executioner stack lost to another press | Same, for Executioner's Gibbet / Gallows. |
+| rpr/Reaver/dropped | covered | `reaperStacks` | a Soul Reaver stack lost to another press | Built 2026-10-16 from the buff stream (removed or refreshed beside a non-spender press, stacks counted); each a Gibbet over her average combo GCD (Shroud not valued). 21 counted on disk, 7 at a death or forced (xydWc2pK74HCbZ8q, 7 in one kill: Unveiled Gibbet 1:28.6 then Shadow of Death 1:31.8). FFLogs top 20: 4 stacks in 629 builds. No xivanalysis page yet. |
+| rpr/Executioner/dropped | covered | `reaperStacks` | an Executioner stack lost to another press | Built 2026-10-16, same: 17 counted (6XaWqwMbkZG9pLmx Vamp Fatale 8:32.6, Perfectio with both stacks from Gluttony; fJxTNgwtRKjYbvZp 6:45 Plentiful Harvest and 9:07 Perfectio, 107k each), 3 forced. |
 | rpr/OtherGauges/soul-overcap | unverifiable | — | Soul over 100 | Minor 10, Medium 30, Major 50. A cast simulation runs short: the kill gains 1800, spends 1850 and goes below zero 4 times (some gains aren't casts, probably an enemy dying under Death's Design). qjCMx4bRfgNKwX9T's 20 not adopted. |
 | rpr/OtherGauges/shroud-overcap | verified | `shroud` | Shroud over 100 | FRU 10 lost matched. |
 | rpr/DeathsDesign/uptime | verified | `deathsDesign` (from the Reaper's hits) | hits without Death's Design | Checklist 95%. Per target in the app; its union over foes hides gaps on a second boss. |
@@ -80,10 +81,11 @@
 
 In priority order (biggest damage cost first):
 
-1. **rpr/Reaver/dropped, rpr/Executioner/dropped** (candidates). A lost
-   Gibbet / Gallows each. Needs a pull where a stack is dropped.
-2. **rpr/Procs/overwritten-gibbet, gallows** (candidates). Extend
-   `procOverwrites` to Enhanced Gibbet / Gallows.
+1. **rpr/Reaver/dropped, rpr/Executioner/dropped** (covered 2026-10-16):
+   a xivanalysis page for fJxTNgwtRKjYbvZp or xydWc2pK74HCbZ8q (Red Hot
+   and Deep Blue kills).
+2. **rpr/Procs/overwritten-gibbet, gallows** (covered 2026-10-16): same
+   pages.
 3. **rpr/OtherGauges/soul-overcap** (unverifiable until the missing Soul
    source is found).
 4. **rpr/Procs/expired-gibbet, gallows** (covered). Not seen firing.

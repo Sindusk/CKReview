@@ -768,6 +768,13 @@ const enshroud: JobCheck = (ctx) => burstWindowFindings(ctx, {
 // tinctures" (1:58, 17:48) is the tincture placement finding. Not
 // adopted: Gluttony drift (31s and 25s at two-minute marks; 18/18, no
 // use lost); Soul gauge 20 (the cast simulation's reason above stands).
+// Soul Reaver / Executioner stacks dropped and Enhanced Gibbet / Gallows /
+// Void / Cross Reaping overwritten (Reaver.tsx, Executioner.tsx,
+// Procs.tsx), 2026-10-16: `reaperStacks`, `reaperEnhancedOverwrites`
+// below. On disk 38 drops counted (21 Soul Reaver, 17 Executioner; 10 at
+// a death or forced) and 49 overwrites; the FFLogs top 20 for Red Hot and
+// Deep Blue drop 4 stacks in 629 and press the same one twice once in 794.
+// Not matched against xivanalysis yet.
 // Arcane Circle, from xivanalysis ArcaneCircle.tsx: the two-minute burst
 // is a double Enshroud inside the window: 7 Reapings, 4 Lemure's, 2
 // Sacrificium, 1 Plentiful Harvest, 2 Communio; the opener half of that
@@ -1765,4 +1772,97 @@ const ninjutsu: JobCheck = (ctx) => {
   return out;
 };
 export const NIN_CHECKS: JobCheck[] = [kunaisBane, ninki, kazematoi, ninAoe, ninjutsu];
-export const RPR_CHECKS: JobCheck[] = [enshroud, arcaneCircle, deathsDesign, harvestMoon, shroud, rprAoe];
+// Soul Reaver and Executioner stacks dropped (xivanalysis Reaver.tsx,
+// Executioner.tsx): the status removed beside a press that doesn't spend
+// it (a combo GCD, Harpe, Perfectio, another Blood Stalk), with the stacks
+// still on it lost. Counted from the buff stream: applied (1), "stack"
+// (+1; Gluttony's Executioner logs applied then stack), "stackRemoved"
+// (−1). Each stack is a Gibbet / Gallows / Guillotine over the combo GCD
+// it would have replaced (her averages; its 10 Shroud isn't valued, so a
+// lower bound). One running out with no press is checkProcs's. Lost to a
+// death, or in forced time: shown, not counted (xivanalysis counts stacks
+// lost at a death as dropped). 6XaWqwMbkZG9pLmx Vamp Fatale 8:32.6:
+// Perfectio pressed with both Executioner stacks from the 8:30.2 Gluttony.
+const REAPER_STACKS: [status: string, consumers: string[]][] = [
+  ["SOUL_REAVER", ["GIBBET", "GALLOWS", "GUILLOTINE"]],
+  ["EXECUTIONER", ["EXECUTIONERS_GIBBET", "EXECUTIONERS_GALLOWS", "EXECUTIONERS_GUILLOTINE"]],
+];
+const RPR_COMBO = ["SLICE", "WAXING_SLICE", "INFERNAL_SLICE"];
+const reaperStacks: JobCheck = (ctx) => {
+  const out: DamageFinding[] = [];
+  // The GCD a held stack would have replaced: her average combo GCD, by
+  // cast count (the pull's average GCD holds Enshroud's and the AoE).
+  const combo = ids(...RPR_COMBO).map((x) => ({ v: ctx.values.perUse(x), n: ctx.player.casts.filter((c) => c.abilityId === x).length }));
+  const comboN = combo.reduce((a, c) => a + c.n, 0);
+  const comboAvg = comboN > 0 ? combo.reduce((a, c) => a + c.v * c.n, 0) / comboN : ctx.values.gcdValue(undefined, false);
+  for (const [statusKey, consumerKeys] of REAPER_STACKS) {
+    const status = S[statusKey];
+    if (!status) continue;
+    const consumers = new Set(ids(...consumerKeys));
+    const each = Math.max(0, Math.max(...ids(...consumerKeys).map((x) => ctx.values.perUse(x))) - comboAvg);
+    let stacks = 0;
+    for (const e of [...(ctx.player.buffs ?? [])].sort((a, b) => a.timestamp - b.timestamp)) {
+      if (e.abilityId !== status.id || e.timestamp >= ctx.endMs) continue;
+      if (e.buffStatus === "applied") { stacks = Math.max(stacks, 1); continue; }
+      if (e.buffStatus === "stack") { stacks++; continue; }
+      if (e.buffStatus === "stackRemoved") { stacks = Math.max(0, stacks - 1); continue; }
+      if (e.buffStatus !== "removed" && e.buffStatus !== "refreshed") continue;
+      // Refreshed: granted again (Blood Stalk with Soul Reaver held), the
+      // held stacks replaced by the new one.
+      const held = stacks;
+      stacks = e.buffStatus === "refreshed" ? 1 : 0;
+      if (e.buffStatus === "refreshed" && held === 0) continue;
+      const at = ctx.player.casts.filter((c) => Math.abs(c.timestamp - e.timestamp) <= PROC_CONSUME_MS);
+      if (at.length === 0 || at.some((c) => consumers.has(c.abilityId))) continue;
+      const lost = Math.max(1, held);
+      const died = ctx.dead.some((d) => d.startMs >= e.timestamp - 100 && d.startMs - e.timestamp <= 3_000);
+      const during = forcedPart(e.timestamp - 1, e.timestamp + 1, ctx.forced);
+      const by = at.find((c) => ctx.game.action(c.abilityId)?.onGcd) ?? at[0];
+      out.push(finding(ctx, {
+        kind: "proc-lost", startMs: e.timestamp, endMs: e.timestamp, forced: died || during.ms > 0, inference: true,
+        cause: during.ms > 0 ? during.cause : died ? "lost to the death that followed" : undefined,
+        label: `${status.name} dropped`, lostDamage: lost * each,
+        basis: `${lost} × (${A[consumerKeys[0]].name} / ${A[consumerKeys[1]].name} average − ${k(comboAvg)} average combo GCD it replaces); its 10 Shroud isn't valued`,
+        detail: `${by.abilityName} at ${clock(e.timestamp)} dropped ${lost} ${status.name} stack${lost > 1 ? "s" : ""}`,
+      }));
+    }
+  }
+  return out;
+};
+
+// Enhanced Gibbet / Gallows / Void Reaping / Cross Reaping refreshed
+// (xivanalysis Procs.tsx overwrites): the press that granted it again was
+// itself unenhanced (the wrong one of the pair), so it lost the
+// enhancement. Measured on disk (2026-10-16, three Reapers): enhanced hits
+// ~11.5% over plain ones, buff-neutral medians (Cross Reaping 47.2k vs
+// 42.4k, Gallows 47.8k vs 42.9k), so each is ~10% of her average of the
+// action pressed.
+const RPR_ENHANCED: [status: string, pressed: string[]][] = [
+  ["ENHANCED_GIBBET", ["GALLOWS", "EXECUTIONERS_GALLOWS"]], ["ENHANCED_GALLOWS", ["GIBBET", "EXECUTIONERS_GIBBET"]],
+  ["ENHANCED_VOID_REAPING", ["CROSS_REAPING"]], ["ENHANCED_CROSS_REAPING", ["VOID_REAPING"]],
+];
+const RPR_ENHANCED_SHARE = 1 - 1 / 1.115;
+const reaperEnhancedOverwrites: JobCheck = (ctx) => {
+  const out: DamageFinding[] = [];
+  for (const [statusKey, pressedKeys] of RPR_ENHANCED) {
+    const status = S[statusKey];
+    if (!status) continue;
+    const pressed = new Set(ids(...pressedKeys));
+    for (const e of ctx.player.buffs ?? []) {
+      if (e.abilityId !== status.id || e.buffStatus !== "refreshed" || e.timestamp >= ctx.endMs) continue;
+      const cast = ctx.player.casts.find((c) => pressed.has(c.abilityId) && Math.abs(c.timestamp - e.timestamp) <= PROC_CONSUME_MS);
+      if (!cast) continue;
+      const avg = ctx.values.perUse(cast.abilityId);
+      const during = forcedPart(e.timestamp - 1, e.timestamp + 1, ctx.forced);
+      out.push(finding(ctx, {
+        kind: "proc-lost", startMs: e.timestamp, endMs: e.timestamp, forced: during.ms > 0, cause: during.cause, inference: true,
+        label: `${status.name} overwritten`, lostDamage: avg * RPR_ENHANCED_SHARE,
+        basis: `${k(avg)} average ${cast.abilityName} × ${Math.round(RPR_ENHANCED_SHARE * 100)}% (the enhancement, measured: enhanced hits ~11.5% over plain)`,
+        detail: `${cast.abilityName} at ${clock(e.timestamp)} went unenhanced and granted ${status.name} while one was held`,
+      }));
+    }
+  }
+  return out;
+};
+
+export const RPR_CHECKS: JobCheck[] = [enshroud, arcaneCircle, deathsDesign, harvestMoon, shroud, rprAoe, reaperStacks, reaperEnhancedOverwrites];

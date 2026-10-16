@@ -208,7 +208,9 @@ and delete them from the header.
   - [vpr.md](xiva-audit/vpr.md): Viper, 1 candidate (Vices, rare), 5
     covered (Serpent Offerings overcap and Reawaken left at a kill, Death
     Rattle / Last Lash built 2026-10-16; the overcap matched one page).
-  - [rpr.md](xiva-audit/rpr.md): Reaper, 4 candidates, 5 covered.
+  - [rpr.md](xiva-audit/rpr.md): Reaper, 0 candidates, 9 covered
+    (Soul Reaver / Executioner drops and Enhanced overwrites built
+    2026-10-16, awaiting xivanalysis pages); Soul overcap unverifiable.
   - [mnk.md](xiva-audit/mnk.md): Monk, 0 candidates, 10 covered (Blitz,
     Phantom Rush and form checks verified 2026-10-15; Fury overcap and
     the no-form Opo-opo skill built 2026-10-15, Fury matched 3 pages;
