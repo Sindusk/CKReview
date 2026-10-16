@@ -107,10 +107,13 @@ const FFL_PROJECTORS = {
   // them) feed crit luck (lib/damage/crit-luck.ts); skill / spell speed give
   // the recorder's exact GCD tier. Gear and auras are bloat.
   combatantInfo: (e) => pick(e, ['timestamp', 'type', 'sourceID', 'criticalHit', 'directHit', 'determination', 'skillSpeed', 'spellSpeed']),
-  // `duration` is a begincast's cast time (damage analysis).
+  // `duration` is a begincast's cast time (damage analysis). The caster's
+  // own MP (sourceResources.mp / maxMP) on completed casts feeds the Dark
+  // Knight MP check (2026-10-16); kept only when present.
   casts: (e) => ({
     ...pick(e, ['timestamp', 'type', 'sourceID', 'targetID', 'sourceInstance', 'targetInstance', 'abilityGameID', 'duration']),
     targetResources: pickNested(e, 'targetResources', FF_RESOURCE_SUBKEYS),
+    ...(e.type === 'cast' && e.sourceResources?.mp !== undefined ? { sourceResources: pickNested(e, 'sourceResources', ['mp', 'maxMP']) } : {}),
   }),
   // `overkill` and `buffs` used to be dropped here along with the rest of
   // the ~20-field bloat this module exists to trim — but both turned out to

@@ -19,7 +19,7 @@
 | drk/Darkside/drop-table | no-damage | — | — | Table only. |
 | drk/BloodGauge/overcap | verified | `blood` | Blood over 100 | Minor 50, Medium 100, Major 200. 2T1HzdPKgbhM43am 60 matched. |
 | drk/MPUsage/blackest-night-dark-arts | covered | `darkArtsOverwrite` | The Blackest Night not breaking, or a Dark Arts overwritten by another break | Built 2026-10-16 for the overwrite: breaks read from the healing stream (the shield's "removebuff" at an absorb's instant; neither status is in the buff stream), her average Edge of Shadow each. 11 counted on disk, 2 forced (rgTafHJ9MN47m3Vy Doomtrain pull 4: broke ~3:11, the 3:22 TBN broke at 3:24 before the 3:25.8 Edge). FFLogs top 38: 1 in 226 breaks. A shield that doesn't break isn't counted (126 of 1,058 on disk, 15 of 241 among the top 38: a mitigation call; its cost is MP). No xivanalysis page yet. |
-| drk/MPUsage/wasted-mp | unverifiable | — | MP over the cap (3000 = one Edge of Shadow) | 2T1HzdPKgbhM43am: one Edge of Shadow's worth, not built. xivanalysis reads MP from the log (actorUpdate). FFLogs does give the player's MP on each cast (`sourceResources.mp`), but the sample fetch drops it (`scripts/lib/slim-report.js` keeps target resources only) and the live transform doesn't map it. Keeping it is a pipeline change plus re-fetching the Dark Knight samples (2026-10-16, asked the user). |
+| drk/MPUsage/wasted-mp | covered | `drkMp` (and the MP lane) | MP over the cap (3000 = one Edge of Shadow) | Built 2026-10-16 from the logged MP: FFLogs' `sourceResources.mp` on each player cast is now kept (slim-report.js, the FF transform, `PlayerEvent.mp`); the user chose this over a simulation. Re-fetched with MP: 2T1HzdPKgbhM43am fight 10, qjCMx4bRfgNKwX9T fight 16, q4mQCNpRKwH1PZjb fight 6, ZVCqpA8DPJgMK2Yr fight 20; older samples carry no MP and stay silent. Between casts the MP runs from the logged value (cost, gains at their hits, regen 200 / 3s); a loss counts only if the next cast still logs 10000; downtime, the opener and stretches under 200 aren't counted. 2T1HzdPKgbhM43am: ~1900 here against xivanalysis's "one Edge of Shadow" (3000+); its extra is the 7:12 Comeuppance, whose MP the log shows arriving after the 7:12.5 Blackest Night spent 3000 (7:13.1 logs 8000). |
 | drk/SaltAndDarkness/unused | verified | `saltAndDarkness` | Salted Earth with no Salt and Darkness | qjCMx4bRfgNKwX9T 7:36 built from it. |
 | drk/SaltAndDarkness/failed | covered | `noDamageCasts` | Salt and Darkness hitting nothing | Its count goes negative on multi-target hits, so it under-reports. |
 | drk/MultiHitSkills/flood-of-shadow | covered | `aoeCombo` (vs Edge of Shadow, minimum 3) | Flood of Shadow on under 3 targets | Built 2026-10-15. Premise holds (same MP). Fires on vFY7kHVWK19ZQ24A Lindwurm II pull 3 0:40 (one target, 21k) and jN3XDrf2z8PmLgRJ Red Hot and Deep Blue pull 13 3:06 (both bosses, still under an Edge, 21k); H9fnVZgPA3krpCzY Lindwurm II pull 11's pre-pull Flood is shown, not counted. No xivanalysis page for these pulls. |
@@ -63,8 +63,9 @@ proc list), Swiftcast, Lucid, Overheal, Interrupts.
 
 In priority order (biggest damage cost first):
 
-1. **drk/MPUsage/wasted-mp** (unverifiable until player MP is kept from
-   the log; see its row).
+1. **drk/MPUsage/wasted-mp** (covered 2026-10-16): fires on 2 of the 4
+   re-fetched kills; other samples need a re-fetch for MP (`--fight N
+   --refetch`) before it can fire there.
 2. **drk/MPUsage/blackest-night-dark-arts** (covered 2026-10-16): needs a
    xivanalysis page (bVDR2mTL7YGvMxK1 The Tyrant pull 11, q4mQCNpRKwH1PZjb
    Red Hot and Deep Blue).

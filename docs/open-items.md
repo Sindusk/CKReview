@@ -205,9 +205,10 @@ and delete them from the header.
   - [sch.md](xiva-audit/sch.md): Scholar, 3 covered.
   - [pld.md](xiva-audit/pld.md): Paladin, 2 covered.
   - [war.md](xiva-audit/war.md): Warrior, 1 candidate, 4 covered.
-  - [drk.md](xiva-audit/drk.md): Dark Knight, 0 candidates, 6 covered
-    (Dark Arts overwrite built 2026-10-16); MP overcap unverifiable until
-    player MP is kept from the log (the fetch drops it).
+  - [drk.md](xiva-audit/drk.md): Dark Knight, 0 candidates, 7 covered
+    (Dark Arts overwrite, and MP overcap from the logged MP with an MP
+    lane, 2026-10-16). Player MP is kept on casts since then; samples
+    fetched earlier have none.
   - [gnb.md](xiva-audit/gnb.md): Gunbreaker, 1 candidate, 7 covered.
   - [drg.md](xiva-audit/drg.md): Dragoon, 3 covered.
   - [vpr.md](xiva-audit/vpr.md): Viper, 1 candidate (Vices, rare), 5

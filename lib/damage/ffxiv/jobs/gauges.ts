@@ -26,6 +26,7 @@ import type { PlayerCheckContext } from "../../checks";
 import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import { beastGaugeSpec } from "./pld-war";
 import { whmGaugeTracks } from "./healer";
+import { drkMpTracks } from "./drk";
 import { blmGaugeTracks, paletteSpec, rdmMana, smnGaugeTracks } from "./caster";
 import { firstmindsFocusSpec, mnkFurySpecs, rattlingCoilSpec, samGaugeSpecs, serpentOfferingsSpec } from "./melee";
 import { mchChargeTracks, mchGaugeSpecs } from "./ranged";
@@ -502,6 +503,8 @@ export const JOB_GAUGES: Record<string, ((ctx: PlayerCheckContext) => GaugeTrack
   "Astrologian": [arcana],
   // Polyglot, Astral Fire, Umbral Ice, Hearts, Astral Soul, Paradox (caster.ts blmGauge).
   "Black Mage": [blmGaugeTracks],
+  // MP as logged (drk.ts drkMpTracks; samples fetched before 2026-10-16 have none).
+  "Dark Knight": [drkMpTracks],
   // Lily and Blood Lily (healer.ts whmGaugeTracks).
   "White Mage": [whmGaugeTracks],
   // Aetherflow and Further Ruin (caster.ts aetherflowSpec, furtherRuins).

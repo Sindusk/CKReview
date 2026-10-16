@@ -44,8 +44,8 @@
 // Checked against xivanalysis on 2T1HzdPKgbhM43am Dancing Mad fight 10
 // (2026-10-08): its 60 Blood overcapped matches; its AoE-on-one-target
 // uses (6:20, 14:22) were past a phase's HP check, building Blood before
-// downtime, so they're forced. Not built: MP overcap (one Edge of Shadow):
-// player MP isn't in the fetched streams. Dark Arts overwrite: below.
+// downtime, so they're forced. MP overcap (one Edge of Shadow) and Dark
+// Arts overwrite: below.
 // Tinctures are every job's (tincture.ts).
 //
 // Checked against xivanalysis on qjCMx4bRfgNKwX9T Dancing Mad kill (7.5,
@@ -64,8 +64,8 @@
 //   MIT License; full text in THIRD_PARTY_NOTICES.md.
 
 import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
-import type { DamageFinding, JobCheck } from "../../types";
-import { finding } from "../../checks";
+import type { DamageFinding, GaugeTrack, JobCheck } from "../../types";
+import { finding, type PlayerCheckContext } from "../../checks";
 import { forcedPart, inWindows, mergeWindows, overlapMs, type Window } from "../../timeline";
 import { aoeComboOnOneTarget, burstWindowFindings, castHits, gaugeFindings, k, statusWindows, uptimeFindings, type GaugeEvent } from "./shared";
 import { comboLanded } from "./gnb";
@@ -282,13 +282,18 @@ const clock = (ms: number) => {
 // 15 of 241 among the top 38): a mitigation call whose cost is MP, which
 // the log streams the app fetches don't carry for players.
 const TBN_ABSORB_MS = 50;
-const darkArtsOverwrite: JobCheck = (ctx) => {
+/** When The Blackest Night broke (each grants Dark Arts). */
+function darkArtsBreaks(ctx: PlayerCheckContext): number[] {
   const tbn = S.BLACKEST_NIGHT?.id;
   if (tbn === undefined) return [];
   const h = (ctx.player.healing ?? []).filter((e) => e.abilityId === tbn && e.timestamp < ctx.endMs);
   const absorbs = h.filter((e) => e.healType === "absorbed");
-  const breaks = h.filter((e) => e.healType === "removebuff" &&
-    absorbs.some((a) => a.target === e.target && Math.abs(a.timestamp - e.timestamp) <= TBN_ABSORB_MS)).map((e) => e.timestamp);
+  return h.filter((e) => e.healType === "removebuff" &&
+    absorbs.some((a) => a.target === e.target && Math.abs(a.timestamp - e.timestamp) <= TBN_ABSORB_MS))
+    .map((e) => e.timestamp).sort((a, b) => a - b);
+}
+const darkArtsOverwrite: JobCheck = (ctx) => {
+  const breaks = darkArtsBreaks(ctx);
   const spends = ctx.player.casts.filter((c) => c.abilityId === id("EDGE_OF_SHADOW") || c.abilityId === id("FLOOD_OF_SHADOW")).map((c) => c.timestamp);
   const edge = ctx.values.perUse(id("EDGE_OF_SHADOW"));
   const out: DamageFinding[] = [];
@@ -312,4 +317,136 @@ const darkArtsOverwrite: JobCheck = (ctx) => {
   return out;
 };
 
-export const DRK_CHECKS: JobCheck[] = [delirium, darkside, blood, aoeCombo, livingShadow, saltAndDarkness, darkArtsOverwrite];
+// MP over the cap (xivanalysis MPUsage.tsx), read from the log: each cast
+// carries the Dark Knight's MP before its effect (FFLogs
+// sourceResources.mp; kept since 2026-10-16, so older samples have none and
+// this stays silent). Lost:
+// - regen, 200 per 3s tick, between two casts both at the cap;
+// - a gain landing at or near the cap, by xivanalysis's amounts: Syphon
+//   Strike / Stalwart Soul in combo and Carve and Spit 600, a GCD that
+//   spends a Blood Weapon stack 600, Scarlet Delirium / Comeuppance /
+//   Torcleaver 200, Impalement 500.
+// In forced time not counted (MP fills in downtime), nor before the first
+// spend (the pull starts full), nor a stretch under one tick (200). 3000
+// MP is one Edge of Shadow (her average); one finding per stretch at the
+// cap. Also the MP lane (gauges.ts). 2T1HzdPKgbhM43am fight 10 (Toast
+// Takelci): ~1900 MP here (12:16-12:20, Comeuppance and Torcleaver into a
+// full gauge), xivanalysis "one Edge of Shadow" (3000+): its extra is
+// the 7:12 Comeuppance, whose MP the log shows arriving after the 7:12.5
+// Blackest Night spent 3000.
+const MP_TICK = 200, MP_TICK_MS = 3_000, EDGE_MP = 3_000;
+const MP_GAINS: [string, number][] = [
+  ["SYPHON_STRIKE", 600], ["STALWART_SOUL", 600], ["CARVE_AND_SPIT", 600],
+  ["SCARLET_DELIRIUM", 200], ["COMEUPPANCE", 200], ["TORCLEAVER", 200], ["IMPALEMENT", 500],
+];
+type MpLoss = { t: number; mp: number; how: string };
+const MP_HIT_MS = 1_500, MP_HIT_DEFAULT_MS = 600;
+// Between two casts the MP runs from the first's logged value: its own cost
+// (The Blackest Night, or an Edge / Flood without Dark Arts: 3000), then
+// each gain when its hit lands, then regen at 200 per 3s spread evenly.
+// What would pass 10000 is lost only if the next cast still logs 10000:
+// 2T1HzdPKgbhM43am fight 10, Comeuppance cast at 10000 (7:11.9) hit after
+// the 7:12.5 Blackest Night and its MP arrived (7:13.1 logs 8000);
+// Torcleaver at 12:19.6 hit before the 12:20.4 Edge, which logged 10000.
+export function drkMpLosses(ctx: PlayerCheckContext): MpLoss[] | undefined {
+  const casts = ctx.player.casts.filter((c) => c.mp !== undefined && c.timestamp < ctx.endMs).sort((a, b) => a.timestamp - b.timestamp);
+  if (casts.length === 0) return undefined;
+  const max = casts[0].maxMp ?? 10_000;
+  const gainOf = new Map(MP_GAINS.filter(([key]) => A[key]).map(([key, n]) => [A[key].id, n]));
+  const bloodWeapon = (ctx.player.buffs ?? []).filter((b) => b.abilityId === S.BLOOD_WEAPON?.id &&
+    (b.buffStatus === "stackRemoved" || b.buffStatus === "removed")).map((b) => b.timestamp);
+  const hitAt = (c: (typeof casts)[number]) => ctx.player.damageDone.find((e) => e.abilityId === c.abilityId && !e.isDoT && !e.pet &&
+    e.timestamp >= c.timestamp && e.timestamp <= c.timestamp + MP_HIT_MS)?.timestamp ?? c.timestamp + MP_HIT_DEFAULT_MS;
+  const gains: { t: number; mp: number; how: string }[] = [];
+  for (const c of ctx.player.casts) {
+    let gain = gainOf.get(c.abilityId) ?? 0;
+    // The combo steps give MP only in combo.
+    if ((c.abilityId === id("SYPHON_STRIKE") || c.abilityId === id("STALWART_SOUL")) && !comboLanded(ctx, c.abilityId, c.timestamp)) gain = 0;
+    if (bloodWeapon.some((t) => Math.abs(t - c.timestamp) <= 100)) gain += 600;
+    if (gain > 0) gains.push({ t: hitAt(c), mp: gain, how: c.abilityName });
+  }
+  // Dark Arts (darkArtsBreaks) makes the next Edge / Flood free.
+  const breaks = darkArtsBreaks(ctx);
+  const spenders = new Set([id("EDGE_OF_SHADOW"), id("FLOOD_OF_SHADOW")]);
+  let darkArts = false, bi = 0;
+  const out: MpLoss[] = [];
+  casts.forEach((c, i) => {
+    while (bi < breaks.length && breaks[bi] <= c.timestamp) { darkArts = true; bi++; }
+    let cost = 0;
+    if (c.abilityId === id("THE_BLACKEST_NIGHT")) cost = EDGE_MP;
+    else if (spenders.has(c.abilityId)) { cost = darkArts ? 0 : EDGE_MP; darkArts = false; }
+    const next = casts[i + 1];
+    if (!next || next.mp! < max) return;
+    let mp = c.mp! - cost, last = c.timestamp;
+    const lost: MpLoss[] = [];
+    const add = (t: number, n: number, how: string) => {
+      mp += n;
+      if (mp > max) { lost.push({ t, mp: mp - max, how }); mp = max; }
+    };
+    for (const g of gains.filter((x) => x.t > c.timestamp && x.t <= next.timestamp).sort((a, b) => a.t - b.t)) {
+      add(g.t, (MP_TICK * (g.t - last)) / MP_TICK_MS, "regen");
+      last = g.t;
+      add(g.t, g.mp, g.how);
+    }
+    add(next.timestamp, (MP_TICK * (next.timestamp - last)) / MP_TICK_MS, "regen");
+    out.push(...lost.filter((l) => l.mp >= 1));
+  });
+  return out;
+}
+const drkMp: JobCheck = (ctx) => {
+  const losses = drkMpLosses(ctx);
+  if (!losses?.length) return [];
+  const forced = mergeWindows(ctx.forced);
+  // The pull starts at 10000: regen before the first spend is everyone's.
+  const firstSpend = ctx.player.casts.find((c) => [id("EDGE_OF_SHADOW"), id("FLOOD_OF_SHADOW"), id("THE_BLACKEST_NIGHT")].includes(c.abilityId))?.timestamp ?? 0;
+  const counted = losses.filter((l) => !inWindows(l.t, forced) && l.t > firstSpend);
+  const edge = ctx.values.perUse(id("EDGE_OF_SHADOW"));
+  // One finding per stretch: losses less than 10s apart.
+  const out: DamageFinding[] = [];
+  let group: MpLoss[] = [];
+  const flush = () => {
+    if (!group.length) return;
+    const mp = Math.round(group.reduce((a, l) => a + l.mp, 0));
+    const regen = Math.round(group.filter((l) => l.how === "regen").reduce((a, l) => a + l.mp, 0));
+    // Under one regen tick is within the model's timing error.
+    if (mp < MP_TICK) { group = []; return; }
+    out.push(finding(ctx, {
+      kind: "gauge-overcap", startMs: group[0].t, endMs: group[group.length - 1].t, forced: false,
+      label: "MP over the cap", lostDamage: (mp / EDGE_MP) * edge,
+      basis: `${mp} MP ÷ 3000 × ${k(edge)} average Edge of Shadow`,
+      detail: `${mp} MP lost at 10000 from ${clock(group[0].t)}` + (regen ? ` (${regen} of it regen)` : "") +
+        (mp > regen ? `; gains at the cap: ${[...new Set(group.filter((l) => l.how !== "regen").map((l) => l.how))].join(", ")}` : ""),
+    }));
+    group = [];
+  };
+  for (const l of counted) {
+    if (group.length && l.t - group[group.length - 1].t > 10_000) flush();
+    group.push(l);
+  }
+  flush();
+  return out;
+};
+
+/** The Damage dialog's Dark Knight MP lane: the logged MP at each cast. */
+export function drkMpTracks(ctx: PlayerCheckContext): GaugeTrack[] {
+  const casts = ctx.player.casts.filter((c) => c.mp !== undefined && c.timestamp < ctx.endMs).sort((a, b) => a.timestamp - b.timestamp);
+  if (casts.length === 0) return [];
+  const max = casts[0].maxMp ?? 10_000;
+  const steps: GaugeTrack["steps"] = [];
+  const capped: GaugeTrack["capped"] = [];
+  let since: number | undefined;
+  for (const c of casts) {
+    const v = c.mp! / 1000;
+    if (!steps.length || steps[steps.length - 1].value !== v) steps.push({ t: Math.max(0, c.timestamp), value: v });
+    if (c.mp! >= max) since ??= Math.max(0, c.timestamp);
+    else if (since !== undefined) { capped.push({ startMs: since, endMs: c.timestamp }); since = undefined; }
+  }
+  const losses = drkMpLosses(ctx) ?? [];
+  const lost = Math.round(losses.reduce((a, l) => a + l.mp, 0));
+  return [{
+    name: "MP", max: max / 1000, steps, capped,
+    note: `MP in thousands, as logged at each cast; amber at 10000; about ${lost} MP lost at the cap in all (the MP findings count it outside downtime)`,
+  }];
+}
+
+export const DRK_CHECKS: JobCheck[] = [delirium, darkside, blood, aoeCombo, livingShadow, saltAndDarkness, darkArtsOverwrite, drkMp];

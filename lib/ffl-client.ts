@@ -284,7 +284,8 @@ export type FFLCastEvent = {
   // mechanic's directional reference, since his logged x/y stays pinned at
   // arena center the whole phase (see blackhole-strategy.ts's module
   // comment for the full story).
-  sourceResources?: { x?: number; y?: number; facing?: number; hitPoints?: number; maxHitPoints?: number };
+  // mp / maxMP: the caster's MP (player casts too; the Dark Knight MP check).
+  sourceResources?: { x?: number; y?: number; facing?: number; hitPoints?: number; maxHitPoints?: number; mp?: number; maxMP?: number };
   targetResources?: { x?: number; y?: number; facing?: number; hitPoints?: number; maxHitPoints?: number };
   // "begincast" only: the cast time after speed, in ms. The matching "cast"
   // lands ~0.5s before the bar ends (the slidecast point), so the cast

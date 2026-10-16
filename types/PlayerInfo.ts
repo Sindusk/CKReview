@@ -107,6 +107,13 @@ export type PlayerEvent = {
   // Undefined for WoW and for pulls fetched before it was kept. Count heals
   // with isLandedHeal().
   healType?: "heal" | "calculatedheal" | "absorbed" | "removebuff";
+  // Casts — FFXIV only. The caster's own MP when the cast went off (FFLogs
+  // sourceResources.mp, before its cost). Undefined for WoW and for samples
+  // fetched before 2026-10-16 (the sample slimmer dropped it). Read by the
+  // Dark Knight MP check (lib/damage/ffxiv/jobs/drk.ts).
+  mp?: number;
+  maxMp?: number;
+
   // Healing: the part of the heal that went over full HP (absent when 0).
   // Read by the damage analysis's heal-GCD checks (FFXIV; WoW since
   // 2026-10-06).

@@ -1224,6 +1224,8 @@ function fflCastToPlayerEvent(
     // player-position.ts's findPlayerPosition `casts: "self"` option.
     x: event.targetResources?.x,
     y: event.targetResources?.y,
+    mp: event.sourceResources?.mp,
+    maxMp: event.sourceResources?.maxMP,
   };
 }
 
