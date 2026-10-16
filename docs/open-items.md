@@ -210,10 +210,12 @@ and delete them from the header.
   - [drg.md](xiva-audit/drg.md): Dragoon, 3 covered.
   - [vpr.md](xiva-audit/vpr.md): Viper, 1 candidate (Vices, rare), 5
     covered (Serpent Offerings overcap and Reawaken left at a kill, Death
-    Rattle / Last Lash built 2026-10-16; the overcap matched one page).
+    Rattle / Last Lash, the coils' Bites built 2026-10-16; all but the
+    wrong-Bite case matched xivanalysis pages).
   - [rpr.md](xiva-audit/rpr.md): Reaper, 0 candidates, 9 covered
     (Soul Reaver / Executioner drops and Enhanced overwrites built
-    2026-10-16, awaiting xivanalysis pages); Soul overcap unverifiable.
+    2026-10-16; the drops matched two pages, overwrites untested on a
+    page); Soul overcap unverifiable.
   - [mnk.md](xiva-audit/mnk.md): Monk, 0 candidates, 10 covered (Blitz,
     Phantom Rush and form checks verified 2026-10-15; Fury overcap and
     the no-form Opo-opo skill built 2026-10-15, Fury matched 3 pages;
@@ -235,7 +237,8 @@ and delete them from the header.
   - [smn.md](xiva-audit/smn.md): Summoner, 0 candidates, 11 covered
     (demi Enkindle / Deathflare / Sunflare, Mountain Buster, Ruin IV in a
     demi, Aetherflow and Further Ruin with lanes, Physick built
-    2026-10-16, awaiting xivanalysis pages; Slipstream ticks and extra
+    2026-10-16; Enkindle, Mountain Buster, Ruin IV in a demi and
+    Aetherflow at a kill matched three pages; Slipstream ticks and extra
     Ruin III not adopted).
   - [rdm.md](xiva-audit/rdm.md): Red Mage, 5 candidates, 12 covered (mana
     simulation with lanes and Dualcast running out built 2026-10-15,

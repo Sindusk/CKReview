@@ -99,7 +99,10 @@
 //     and Death Rattle / Last Lash lost (SerpentsTail.tsx), 2026-10-16:
 //     `serpentOfferingsCheck`, `serpentsTail` below. Death Rattle matched
 //     xivanalysis's 1 on 2T1HzdPKgbhM43am fight 10 (13:28); the Offerings
-//     overcap its 20 on K6qfMamL7rN8yz2Q Vamp Fatale. Not built: a coil
+//     overcap its 20 on K6qfMamL7rN8yz2Q Vamp Fatale and 110 on
+//     cBZXM6kayd7Tf9Fg, the Reawaken left at the kill on cBZXM6kayd7Tf9Fg
+//     and jXG76ba43VDLAvYz. The coils' Bites (`viperBites`, from that
+//     jXG76ba43VDLAvYz page's third dropped proc). Not built: a coil
 //     skipped after Vicewinder (Vices.tsx; 22 of 1,043 on disk, most at a
 //     death or a wipe's end, and when a coil stops being available isn't
 //     known).
@@ -774,7 +777,9 @@ const enshroud: JobCheck = (ctx) => burstWindowFindings(ctx, {
 // below. On disk 38 drops counted (21 Soul Reaver, 17 Executioner; 10 at
 // a death or forced) and 49 overwrites; the FFLogs top 20 for Red Hot and
 // Deep Blue drop 4 stacks in 629 and press the same one twice once in 794.
-// Not matched against xivanalysis yet.
+// Drops matched xivanalysis (2026-10-16): xydWc2pK74HCbZ8q 7 Soul Reaver
+// + 2 Executioner, fJxTNgwtRKjYbvZp 4 Executioner. Overwrites not yet on
+// a page.
 // Arcane Circle, from xivanalysis ArcaneCircle.tsx: the two-minute burst
 // is a double Enshroud inside the window: 7 Reapings, 4 Lemure's, 2
 // Sacrificium, 1 Plentiful Harvest, 2 Communio; the opener half of that
@@ -1274,7 +1279,63 @@ const serpentsTail: JobCheck = (ctx) => {
   return out;
 };
 
-export const VPR_CHECKS: JobCheck[] = [uptime("HUNTERS_INSTINCT", 0.1, "Hunter's Instinct is +10%, FFLogs multiplier"), reawaken, venoms, rattlingCoils, serpentOfferingsCheck, serpentsTail, vprAoe];
+// The coils' Bites (xivanalysis Venoms.tsx, Vices.tsx): Hunter's /
+// Swiftskin's Coil (Den) readies Twinfang and Twinblood Bite (Thresh),
+// the coil's venom boosting the first and the first Bite's venom the
+// second, until the next GCD. A venom removed beside:
+// - a GCD: the Bites not yet pressed are lost, two if none was pressed
+//   since the coil, else one; her average Bite each. jXG76ba43VDLAvYz Red
+//   Hot and Deep Blue (Rinn Kuma), Twinblood Bite 9:00.6 then Uncoiled
+//   Fury 9:01.3: xivanalysis's third dropped oGCD proc.
+// - the other Bite: that Bite went unboosted and the venom is gone. Twinfang
+//   Bite measured 13.3k with its venom, 9.6k without (buff-neutral
+//   medians on disk, 2026-10-16), so ~27% of her average Bite.
+// A death, or forced or movement time since the coil: shown, not counted.
+// On disk 20 by a GCD and 12 by the wrong Bite in 4,185 venoms.
+const BITE_VENOMS: [status: string, bite: string, other: string][] = [
+  ["HUNTERS_VENOM", "TWINFANG_BITE", "TWINBLOOD_BITE"], ["SWIFTSKINS_VENOM", "TWINBLOOD_BITE", "TWINFANG_BITE"],
+  ["FELLHUNTERS_VENOM", "TWINFANG_THRESH", "TWINBLOOD_THRESH"], ["FELLSKINS_VENOM", "TWINBLOOD_THRESH", "TWINFANG_THRESH"],
+];
+const BITE_VENOM_SHARE = 1 - 9.6 / 13.3;
+const viperBites: JobCheck = (ctx) => {
+  const out: DamageFinding[] = [];
+  const coils = new Set(ids("HUNTERS_COIL", "SWIFTSKINS_COIL", "HUNTERS_DEN", "SWIFTSKINS_DEN"));
+  const bites = new Set(ids("TWINFANG_BITE", "TWINBLOOD_BITE", "TWINFANG_THRESH", "TWINBLOOD_THRESH"));
+  for (const [statusKey, biteKey, otherKey] of BITE_VENOMS) {
+    const status = S[statusKey];
+    if (!status || !A[biteKey] || !A[otherKey]) continue;
+    const avg = ctx.values.perUse(A[biteKey].id);
+    for (const e of ctx.player.buffs ?? []) {
+      if (e.abilityId !== status.id || e.buffStatus !== "removed" || e.timestamp >= ctx.endMs) continue;
+      const at = ctx.player.casts.filter((c) => Math.abs(c.timestamp - e.timestamp) <= PROC_CONSUME_MS);
+      if (at.length === 0 || at.some((c) => c.abilityId === A[biteKey].id)) continue;
+      const gcd = at.find((c) => ctx.game.action(c.abilityId)?.onGcd);
+      const wrongBite = at.find((c) => c.abilityId === A[otherKey].id);
+      if (!gcd && !wrongBite) continue;
+      const coil = [...ctx.player.casts].reverse().find((c) => coils.has(c.abilityId) && c.timestamp < e.timestamp);
+      const pressed = coil ? ctx.player.casts.some((c) => bites.has(c.abilityId) && c.timestamp > coil.timestamp && c.timestamp < e.timestamp - 50) : true;
+      const lostBites = gcd ? (pressed ? 1 : 2) : 0;
+      const died = ctx.dead.some((d) => d.startMs >= e.timestamp - 200 && d.startMs - e.timestamp <= 3_000);
+      const from = coil?.timestamp ?? e.timestamp;
+      const during = forcedPart(from, e.timestamp + 1, ctx.forced);
+      const moving = gcd !== undefined && (ctx.movement?.some((w) => w.startMs < e.timestamp && w.endMs > from) ?? false);
+      out.push(finding(ctx, {
+        kind: gcd ? "missed-followup" : "proc-lost", startMs: e.timestamp, endMs: e.timestamp, forced: died || during.ms > 0 || moving,
+        movement: (moving && !during.ms) || undefined,
+        cause: during.ms > 0 ? during.cause : died ? "lost to the death that followed" : undefined, inference: !gcd || undefined,
+        label: gcd ? `${A[biteKey].name} lost` : `${status.name} dropped`,
+        lostDamage: gcd ? lostBites * avg : avg * BITE_VENOM_SHARE,
+        basis: gcd ? `${lostBites} × her average ${A[biteKey].name} (${k(avg)})`
+          : `${k(avg)} average ${A[biteKey].name} × ${Math.round(BITE_VENOM_SHARE * 100)}% (its venom's boost, measured)`,
+        detail: gcd ? `${gcd.abilityName} at ${clock(e.timestamp)} before the coil's Bites: ${lostBites} Bite${lostBites > 1 ? "s" : ""} lost`
+          : `${A[otherKey].name} at ${clock(e.timestamp)} with ${status.name} held: the ${A[biteKey].name} went unboosted`,
+      }));
+    }
+  }
+  return out;
+};
+
+export const VPR_CHECKS: JobCheck[] = [uptime("HUNTERS_INSTINCT", 0.1, "Hunter's Instinct is +10%, FFLogs multiplier"), reawaken, venoms, rattlingCoils, serpentOfferingsCheck, serpentsTail, viperBites, vprAoe];
 // xivanalysis AoE.tsx: each form's AoE against that form's three
 // single-target GCDs (their cast-weighted average), Enlightenment against
 // The Forbidden Chakra.

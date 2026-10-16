@@ -39,7 +39,7 @@
 | vpr/FinisherProcs/dropped | verified | `venoms` (Hind / Flank venoms) | a finisher venom lost | Medium 1, Major 3. 2T1HzdPKgbhM43am venoms 7; The Tyrant Hindstung 8/10 matched; fight 16's Hindstung drops are Hindsbane Fangs pressed instead. Grimskin's / Grimhunter's (AoE) are left to the generic `checkProcs` (expiry only), and xivanalysis never reports Grimhunter's (bug). |
 | vpr/FinisherProcs/overwritten | verified | `venoms` | a finisher venom granted while held | Same. |
 | vpr/Venoms/checklist | superseded | `venoms` | — | Checklist form. |
-| vpr/Venoms/dropped | covered | `venoms` (Poised) + `checkProcs` | an oGCD venom lost (Hunter's / Swiftskin's / Fellhunter's / Fellskin's Venom, Poised for Twinfang / Twinblood) | Poised drops built from Red Hot 7:06.9 (4k). The Bite venoms after a coil fall to `checkProcs`, which sees expiries only, not the wrong Bite pressed. |
+| vpr/Venoms/dropped | verified | `venoms` (Poised), `viperBites` (Bite venoms) + `checkProcs` | an oGCD venom lost (Hunter's / Swiftskin's / Fellhunter's / Fellskin's Venom, Poised for Twinfang / Twinblood) | Poised drops built from Red Hot 7:06.9 (4k). Bite venoms built 2026-10-16 (`viperBites`): dropped by a GCD, the coil's unpressed Bites are lost (one or two, her average Bite); by the other Bite, the venom's boost (~27%, measured). On disk 8 + 11 counted, 12 shown. Matched xivanalysis on jXG76ba43VDLAvYz (Rinn Kuma): its 3 dropped oGCD procs are the two Poised drops (5:00, 8:28) and the Hunter's Venom Uncoiled Fury dropped at 9:01.3 (Twinfang Bite lost); its 200 potency of finisher venoms our two (7:24, 8:40). |
 | vpr/Venoms/overwritten | covered | `venoms` (Poised) | an oGCD venom granted while held | Not seen firing for the Bite venoms. |
 | vpr/OGCDDowntime/uses | verified | `checkCooldownDrift` (hold 2.18s) | Serpent's Ire or Vicewinder held | Vicewinder 13/14, 13/15, 15/17 and fight 16 28/29 not adopted: each under one 40s recharge or banked while dead. |
 | vpr/Positionals/missed | verified | `checkPositionals` | a missed flank / rear | Vamp 6, Red Hot 3, fight 16 8 matched. The Tyrant's Hindsbane misses were never caught until the app's name lookup was fixed (xivanalysis's data spells it "Hindbane"). |
@@ -55,9 +55,9 @@
 | vpr/Tincture/expected-actions | superseded | tincture.ts | 2 Reawakens / 2 Ouroboros under the tincture | Vamp 6:06, The Tyrant 4:10 followed deaths; Red Hot 6:39 lost Ouroboros to the split-arena Inferno. |
 | vpr/Tincture/window-table | no-damage | — | — | Table only. |
 | vpr/SerpentsTail/checklist | covered | `serpentsTail` (+ `reawaken` for Legacies) | Death Rattle / Last Lash not pressed after a finisher, or a Legacy skipped | Built 2026-10-16: lost when the next GCD comes first (press order); her average; forced, movement or death between shown, not counted. On disk 15 of 2,220 finishers, no Last Lash; 4 counted (yBKPqGwHparm7Tk4 Dancing Mad pull 2 10:47 and 17:08, cZ42C1y3JRNGXWLH 9:18, zPJaZNfkFAKhY42t 6:50; ~30k each), 8 shown. FFLogs top 20: 9 of 596 lost, 2 at the 1:47 downtime. Matched xivanalysis's 1 on 2T1HzdPKgbhM43am fight 10 (13:28, fetched back 2026-10-16). |
-| vpr/Vices/checklist | candidate | — | a coil or Bite missing after Vicewinder / Vicepit | Checklist 100%. The app checks the Poised buffs after a coil, not a coil skipped after Vicewinder. Rare. |
-| vpr/snilk/overcap | covered | `serpentOfferingsCheck` (and the Offerings lane, now the same simulation) | Serpent Offerings over 100 | Built 2026-10-16: each Offering is a fiftieth of her Reawaken (Reawaken, Generations and Ouroboros over the GCDs they replace, plus Legacies). K6qfMamL7rN8yz2Q Vamp Fatale 20 over (3:26, 3:29, 7:18), xivanalysis's 20. 37 on disk across 12 pulls; cBZXM6kayd7Tf9Fg Red Hot and Deep Blue 12 (6 paid Reawakens in 9:36). |
-| vpr/snilk/lost-reawaken-at-end | covered | `serpentOfferingsCheck` | 50+ Offerings or Ready to Reawaken held at the end | Built 2026-10-16, kills only: from the later of reaching it and the last Reawaken's end, counted when six ordinary GCDs (a Reawaken's worth) went by. 4 counted (CABrk9zXLfJG8h6R Lindwurm pull 2, cBZXM6kayd7Tf9Fg, jXG76ba43VDLAvYz, pnLBzfbH8NjGAJRg Enuo pull 12; 380-520k), 6 shown (0-4 GCDs left: pooled for the last Serpent's Ire, or the Limit Break). xivanalysis has no time allowance. |
+| vpr/Vices/checklist | candidate (Bites covered by `viperBites`) | — | a coil or Bite missing after Vicewinder / Vicepit | Checklist 100%. The app checks the Poised buffs after a coil, not a coil skipped after Vicewinder. Rare. |
+| vpr/snilk/overcap | verified | `serpentOfferingsCheck` (and the Offerings lane, now the same simulation) | Serpent Offerings over 100 | Built 2026-10-16: each Offering is a fiftieth of her Reawaken (Reawaken, Generations and Ouroboros over the GCDs they replace, plus Legacies). K6qfMamL7rN8yz2Q Vamp Fatale 20 over (3:26, 3:29, 7:18), xivanalysis's 20. 37 on disk across 12 pulls; cBZXM6kayd7Tf9Fg Red Hot and Deep Blue 12 (6 paid Reawakens in 9:36): 110 Offerings, xivanalysis's 110. |
+| vpr/snilk/lost-reawaken-at-end | verified (cBZXM6kayd7Tf9Fg, jXG76ba43VDLAvYz pages match) | `serpentOfferingsCheck` | 50+ Offerings or Ready to Reawaken held at the end | Built 2026-10-16, kills only: from the later of reaching it and the last Reawaken's end, counted when six ordinary GCDs (a Reawaken's worth) went by. 4 counted (CABrk9zXLfJG8h6R Lindwurm pull 2, cBZXM6kayd7Tf9Fg, jXG76ba43VDLAvYz, pnLBzfbH8NjGAJRg Enuo pull 12; 380-520k), 6 shown (0-4 GCDs left: pooled for the last Serpent's Ire, or the Limit Break). xivanalysis has no time allowance. |
 | vpr/Weaving/too-many-weaves | verified | `checkGcdGaps` | triple weaves (+1 allowed after Uncoiled Fury) | Red Hot 4 matched. The Tyrant 7:25 (0.3s, with Feint) is under the 0.5s floor. |
 | vpr/Combos/broken | verified | `checkCombos` | a broken or timed-out combo | Fight 16 16:02, Red Hot 6:39, The Tyrant 5:40 matched. |
 | vpr/AlwaysBeCasting/uptime | superseded | `checkGcdGaps` (Swiftscaled as haste) | idle GCD time | Downtimes match by time on three kills. |
@@ -92,13 +92,12 @@ Core modules that can't fire for Viper: DoTs (Noxious Gnash removed in
 
 In priority order (biggest damage cost first):
 
-1. **vpr/snilk/lost-reawaken-at-end** (covered 2026-10-16): needs a
-   xivanalysis page for a counted one (cBZXM6kayd7Tf9Fg, jXG76ba43VDLAvYz).
-2. **vpr/SerpentsTail/checklist**: verified on one page (2T1HzdPKgbhM43am);
+1. **vpr/SerpentsTail/checklist**: verified on one page (2T1HzdPKgbhM43am);
    Last Lash never seen.
-3. **vpr/Venoms/dropped, the Bite venoms** (covered). A wrong Bite after a
-   coil isn't seen; add the four venoms to `VENOM_PROCS` once one turns up.
-4. **vpr/Vices/checklist** (candidate, rare): 22 of 1,043 Vicewinders /
+2. **vpr/Venoms/dropped, the wrong Bite** (`viperBites`, 2026-10-16): the
+   GCD case matched a page; the wrong-Bite case (11 on disk) hasn't been
+   on one yet.
+3. **vpr/Vices/checklist** (candidate, rare; Bites now covered): 22 of 1,043 Vicewinders /
    Vicepits on disk without both coils, most at a death or a wipe's end
    (cZ42C1y3JRNGXWLH 0:49: two Uncoiled Furies, then the combo, coils
    never pressed). Needs the rule for when a coil stops being available.

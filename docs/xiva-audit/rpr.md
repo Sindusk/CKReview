@@ -44,8 +44,8 @@
 | rpr/Procs/expired-gallows | covered | `checkProcs` | Enhanced Gallows expiring | Same. |
 | rpr/Procs/core-suggestions-off | no-damage | — | — | Enhanced Cross / Void Reaping and Harpe aren't reported in xivanalysis. |
 | rpr/Harpe/statistic | verified | `checkInterrupts` + `checkDisengages` | Harpe pressed | A statistic. Vamp's cancelled Harpes matched. |
-| rpr/Reaver/dropped | covered | `reaperStacks` | a Soul Reaver stack lost to another press | Built 2026-10-16 from the buff stream (removed or refreshed beside a non-spender press, stacks counted); each a Gibbet over her average combo GCD (Shroud not valued). 21 counted on disk, 7 at a death or forced (xydWc2pK74HCbZ8q, 7 in one kill: Unveiled Gibbet 1:28.6 then Shadow of Death 1:31.8). FFLogs top 20: 4 stacks in 629 builds. No xivanalysis page yet. |
-| rpr/Executioner/dropped | covered | `reaperStacks` | an Executioner stack lost to another press | Built 2026-10-16, same: 17 counted (6XaWqwMbkZG9pLmx Vamp Fatale 8:32.6, Perfectio with both stacks from Gluttony; fJxTNgwtRKjYbvZp 6:45 Plentiful Harvest and 9:07 Perfectio, 107k each), 3 forced. |
+| rpr/Reaver/dropped | verified | `reaperStacks` | a Soul Reaver stack lost to another press | Built 2026-10-16 from the buff stream (removed or refreshed beside a non-spender press, stacks counted); each a Gibbet over her average combo GCD (Shroud not valued). 21 counted on disk, 7 at a death or forced (xydWc2pK74HCbZ8q, 7 in one kill: Unveiled Gibbet 1:28.6 then Shadow of Death 1:31.8). FFLogs top 20: 4 stacks in 629 builds. Matched xivanalysis's 7 on xydWc2pK74HCbZ8q (Cynder Gentleheart). |
+| rpr/Executioner/dropped | verified | `reaperStacks` | an Executioner stack lost to another press | Built 2026-10-16, same: 17 counted (6XaWqwMbkZG9pLmx Vamp Fatale 8:32.6, Perfectio with both stacks from Gluttony; fJxTNgwtRKjYbvZp 6:45 Plentiful Harvest and 9:07 Perfectio, 107k each), 3 forced. Matched xivanalysis: fJxTNgwtRKjYbvZp (Bancho Shera) 4 stacks, xydWc2pK74HCbZ8q 2. |
 | rpr/OtherGauges/soul-overcap | unverifiable | — | Soul over 100 | Minor 10, Medium 30, Major 50. A cast simulation runs short: the kill gains 1800, spends 1850 and goes below zero 4 times (some gains aren't casts, probably an enemy dying under Death's Design). qjCMx4bRfgNKwX9T's 20 not adopted. |
 | rpr/OtherGauges/shroud-overcap | verified | `shroud` | Shroud over 100 | FRU 10 lost matched. |
 | rpr/DeathsDesign/uptime | verified | `deathsDesign` (from the Reaper's hits) | hits without Death's Design | Checklist 95%. Per target in the app; its union over foes hides gaps on a second boss. |
@@ -81,11 +81,10 @@
 
 In priority order (biggest damage cost first):
 
-1. **rpr/Reaver/dropped, rpr/Executioner/dropped** (covered 2026-10-16):
-   a xivanalysis page for fJxTNgwtRKjYbvZp or xydWc2pK74HCbZ8q (Red Hot
-   and Deep Blue kills).
-2. **rpr/Procs/overwritten-gibbet, gallows** (covered 2026-10-16): same
-   pages.
-3. **rpr/OtherGauges/soul-overcap** (unverifiable until the missing Soul
+1. **rpr/Procs/overwritten-gibbet, gallows** (covered 2026-10-16): no
+   page with one yet. fJxTNgwtRKjYbvZp and xydWc2pK74HCbZ8q have none in
+   either tool; a page for AYQm9Kd8Ct4FxcGp Lindwurm pull 32 (Sonder
+   Dreams, 6:22.6) would test it.
+2. **rpr/OtherGauges/soul-overcap** (unverifiable until the missing Soul
    source is found).
-4. **rpr/Procs/expired-gibbet, gallows** (covered). Not seen firing.
+3. **rpr/Procs/expired-gibbet, gallows** (covered). Not seen firing.

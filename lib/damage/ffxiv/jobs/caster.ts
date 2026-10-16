@@ -144,6 +144,12 @@
 //     never fires anyway: it filters casts by the status id 2706, not the
 //     action's 25837) and more than 2 Ruin III a minute (fight-blind: 9
 //     of 19 top parses cast 8-12 in the Energy Drain minute around 5:00).
+//     Matched xivanalysis (2026-10-16): Enkindle 1 on fGjA9DKLQbRa2q1k
+//     and LmwgxA7B4d1NzqWH, Mountain Buster 1 and 3, Ruin IV in a demi 1,
+//     Aetherflow held at the kill on YPhxRTb9Ld7BJaXp. Its other
+//     Aetherflow stacks are lost at a death or within 1.1s of the kill,
+//     and its Mountain Buster on YPhxRTb9Ld7BJaXp is a Topaz Rite 1.5s
+//     before the kill: none counted here.
 //   - Cooldowns for all three in tracked-cooldowns.ts.
 //
 //   Copyright (c) 2018 Saxon Landers & contributors
