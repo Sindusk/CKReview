@@ -227,7 +227,7 @@ import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import type { DamageFinding, GaugeTrack, JobCheck } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";
 import { forcedPart, gcdKinds, inWindows, mergeWindows, type GcdUse } from "../../timeline";
-import { aoeOnOneTargetFindings, burstWindowFindings, dotFindings, gaugeFindings, gaugeTrack, k, type GaugeEvent, type GaugeSpec } from "./shared";
+import { aoeOnOneTargetFindings, baseValue, burstWindowFindings, castHits, critMultOf, dotFindings, gaugeFindings, gaugeTrack, k, type GaugeEvent, type GaugeSpec } from "./shared";
 
 export const HEAL_WASTE_SHARE = 0.2;
 const HEAL_LAND_MS = 1_500;
@@ -555,10 +555,36 @@ function lilySim(ctx: PlayerCheckContext): LilySim {
 // Medica, Regen) went out with no Lily in the gauge before the gauge next
 // reached 3 (past that the extra Lily would have capped too, or gone on a
 // Glare), each lost Lily paired with the first such heal: a third of her
-// Misery over her Glare III. Heals healGcds already counts as wasted (mostly overheal) aren't
+// Misery over her Glare III. An unpaired one is worth the Misery's cleave
+// share (miseryCleave above): nothing on one target. Heals healGcds already counts as wasted (mostly overheal) aren't
 // paired; movement GCDs a Lily could have covered aren't followed.
 const NON_LILY_HEALS = new Set(["CURE", "CURE_II", "CURE_III", "MEDICA", "MEDICA_II", "MEDICA_III", "REGEN"]
   .filter((key) => A[key]).map((key) => A[key].id));
+// Misery hits nearby enemies for 50% (the user, 2026-10-16): off a single
+// target three Lilies and a Misery out-damage four Glares by what it deals
+// to the other targets. Measured per pull, buff-neutral: each Misery's
+// hits beyond its largest, averaged over her Miseries, against her median
+// Glare III hit; a Lily is a third of that, priced at her average Glare
+// III. A single-target pull values nothing (the whole-Misery ratio read
+// 4.01-4.12 there, noise).
+const MISERY_HIT_MS = 2_000;
+function miseryCleave(ctx: PlayerCheckContext): { perLily: number; basis: string } {
+  const critMult = critMultOf(ctx);
+  const glares = castHits(ctx, A.GLARE_III.id).map((h) => baseValue(h, critMult)).sort((a, b) => a - b);
+  const glare = glares[Math.floor(glares.length / 2)] ?? 0;
+  const extras = ctx.player.casts.filter((c) => c.abilityId === A.AFFLATUS_MISERY.id && c.timestamp < ctx.endMs).map((c) => {
+    const hits = ctx.player.damageDone.filter((e) => e.abilityId === c.abilityId && !e.isDoT && (e.amount ?? 0) > 0 &&
+      e.timestamp >= c.timestamp && e.timestamp < c.timestamp + MISERY_HIT_MS).map((e) => baseValue(e, critMult));
+    return hits.length ? hits.reduce((a, v) => a + v, 0) - Math.max(...hits) : undefined;
+  }).filter((v): v is number => v !== undefined);
+  if (glare <= 0 || extras.length === 0) return { perLily: 0, basis: "" };
+  const extra = extras.reduce((a, v) => a + v, 0) / extras.length / glare;
+  const glareAvg = ctx.values.perUse(A.GLARE_III.id);
+  return { perLily: (extra / 3) * glareAvg,
+    basis: `her Miseries dealt ${extra.toFixed(2)} Glare IIIs to targets beyond the first on average (buff-neutral), ` +
+      `so a Lily is ${extra.toFixed(2)} ÷ 3 × ${k(glareAvg)} average Glare III` };
+}
+
 const lilyOvercap: JobCheck = (ctx) => {
   const spec = bloodLilySpec(ctx);
   if (!spec || spec.unitValue <= 0) return [];
@@ -569,15 +595,25 @@ const lilyOvercap: JobCheck = (ctx) => {
     .map((h) => h.use).sort((a, b) => a.startMs - b.startMs);
   const out: DamageFinding[] = [];
   const used = new Set<GcdUse>();
+  const cleave = miseryCleave(ctx);
   for (const t of sim.lost) {
     // The extra Lily lasts until the gauge next reaches 3 (then it would
     // have capped too, or gone on a Glare, which breaks even).
     const stretch = sim.capped.find((w) => w.startMs <= t && w.endMs >= t);
     const nextCap = sim.capped.find((w) => stretch && w.startMs > stretch.endMs)?.startMs ?? ctx.endMs;
     const heal = heals.find((h) => !used.has(h) && h.startMs > t && h.startMs < nextCap);
-    if (!heal) continue;
-    used.add(heal);
     const during = forcedPart(t - 1, t + 1, ctx.forced);
+    if (!heal) {
+      // In place of a Glare: worth what her Miseries' cleave added.
+      if (cleave.perLily <= 0) continue;
+      out.push(finding(ctx, {
+        kind: "gauge-overcap", startMs: t, endMs: t, forced: during.ms > 0, cause: during.cause, inference: true,
+        label: "Lily lost at the cap", lostDamage: cleave.perLily, basis: cleave.basis,
+        detail: `A Lily lost at the cap at ${clock(t)}: a third of a Misery, which hit more than one target this pull`,
+      }));
+      continue;
+    }
+    used.add(heal);
     out.push(finding(ctx, {
       kind: "gauge-overcap", startMs: t, endMs: heal.startMs, forced: during.ms > 0, cause: during.cause, inference: true,
       label: "Lily lost at the cap", lostDamage: spec.unitValue,
