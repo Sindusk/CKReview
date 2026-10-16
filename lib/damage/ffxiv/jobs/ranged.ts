@@ -374,6 +374,9 @@ export const PROC_REPLACES = new Map(([
 // also loses the Primal Ruination it unlocks; that isn't valued here.
 export const PROC_CONSUMERS = new Map(([
   ["PRIMAL_REND_READY", "PRIMAL_REND"], ["PRIMAL_RUINATION_READY", "PRIMAL_RUINATION"], ["WRATHFUL", "PRIMAL_WRATH"],
+  // Refulgent Arrow can't be pressed without Hawk's Eye (checks.ts reads a
+  // press while held as using it when the log missed the removal).
+  ["HAWKS_EYE", "REFULGENT_ARROW"],
 ] as const).filter(([s, a]) => S[s] && A[a]).map(([s, a]) => [S[s].id, A[a].id]));
 
 // ── Bard, Machinist (unverified) ───────────────────────────────────────

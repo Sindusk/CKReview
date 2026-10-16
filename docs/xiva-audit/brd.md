@@ -42,7 +42,7 @@
 | brd/DoTs/clipping | wrong | — | a mean of 10s+ a minute clipped (Minor), 15s Medium, 20s Major | Burst Iron Jaws snapshots count as clipping, and targets add up: 1:05 a minute on FRU, 1:06 on 2T1HzdPKgbhM43am, 37s on fight 16 (two bosses in P3). Not adopted. |
 | brd/DoTs/applied-into-invuln | superseded | `bardDots` | a DoT applied shortly before the target turns invulnerable | Table only. Fight 16 3:04 and 11:46 are DoT findings in the app; 5:40 ticked to 6:15. |
 | brd/RefulgentProcs/overwritten | verified | `bardOverwrites` (`procOverwrites`) | Burst Shot / Iron Jaws / Caustic Bite / Stormbite granting Hawk's Eye while one is held | Tiers: Minor 1, Medium 2, Major 3. Matched 17/17 on FRU, 15/15 on fight 16 and 4/4 on 2T1HzdPKgbhM43am. |
-| brd/RefulgentProcs/dropped | covered | `checkProcs` | Hawk's Eye expiring unused | Suggestion only (the table hides drops). The app's version fires on yBKPqGwHparm7Tk4 Dancing Mad Pull 2 at 12:26 (16k; the kill, FFLogs fight 5), plus a forced one at 6:51 in boss downtime. A page for fight 2 (a 2:58 wipe, fetched 2026-10-16 to compare, then removed: it renumbers the report's baselines) matched with none dropped and 1 overwrite (Iron Jaws 2:48.7); the fight 5 page is still wanted: https://xivanalysis.com/fflogs/yBKPqGwHparm7Tk4/5/39. Doubt: xivanalysis also counts Shadowbite as a consumer; the app takes a second consumer only once it has 10% of the removals, so a Shadowbite in a mostly single-target pull could read as an expiry. |
+| brd/RefulgentProcs/dropped | verified | `checkProcs` | Hawk's Eye expiring unused | Suggestion only (the table hides drops). The app's version fires on yBKPqGwHparm7Tk4 Dancing Mad Pull 2 at 12:26 (16k; the kill, FFLogs fight 5), plus a forced one at 6:51 in boss downtime. A page for fight 2 (a 2:58 wipe, fetched 2026-10-16 to compare, then removed: it renumbers the report's baselines) matched with none dropped and 1 overwrite (Iron Jaws 2:48.7); the fight 5 page (2026-10-16) has no drop and 7 overwrites = the app's 7. Its 12:26 expiry was wrong: Refulgent Arrow was pressed at 12:11.8 (no target, the P3-P4 transition) with Hawk's Eye held and the log never recorded the removal, so the proc "ran out" at its 30s. A declared consumer that can't be pressed without the proc (`procConsumers`: Hawk's Eye → Refulgent Arrow, the Primal Rends) now counts as using it when pressed while held; only that call changed on disk. Doubt: xivanalysis also counts Shadowbite as a consumer; the app takes a second consumer only once it has 10% of the removals, so a Shadowbite in a mostly single-target pull could read as an expiry. |
 | brd/MultiHitSkills/ladonsbite | verified | `bardAoe` | Ladonsbite hitting under 2 targets | 2T1HzdPKgbhM43am: both AoE matched. |
 | brd/MultiHitSkills/shadowbite | covered | `bardAoe` | Shadowbite hitting under 2 targets | xivanalysis compares it with Burst Shot; the app with Refulgent Arrow, which is what Hawk's Eye would otherwise buy. Not seen firing. |
 | brd/MultiHitSkills/rain-of-death | verified | `bardAoe` | Rain of Death hitting under 2 targets | Built from fight 16 8:55/8:57 (hit only Exdeath). xivanalysis's alternative is Bloodletter; the app's is Heartbreak Shot (its upgrade). |
@@ -97,11 +97,8 @@ In priority order (biggest damage cost first):
 2. **brd/BurstWindow/failed-overlap** (candidate). Never seen on 322
    applications (2026-10-16); a weaker parse from FFLogs rankings is the
    place to look.
-3. **brd/RefulgentProcs/dropped** (covered). Fires in the app
-   (yBKPqGwHparm7Tk4 12:26, the kill: FFLogs fight 5). Needs that
-   pull's page (https://xivanalysis.com/fflogs/yBKPqGwHparm7Tk4/5/39;
-   the fight 2 page matched, no drops), and a pull with Shadowbite to
-   test the second-consumer doubt.
+3. **brd/RefulgentProcs/dropped** (verified 2026-10-16): still needs a
+   pull with Shadowbite to test the second-consumer doubt.
 4. **brd/Weaving/too-many** (covered). Fires on r4qDkR9btJCXnKWd. Match it
    against a Bard page.
 5. **brd/MultiHitSkills/shadowbite** (covered). Needs a pull where

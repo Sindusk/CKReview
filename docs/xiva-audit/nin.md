@@ -77,8 +77,14 @@ In priority order (biggest damage cost first).
 1. **nin/Procs/*, nin/Positionals** (covered). Not matched on a page.
    zMJdajRYyNF3LVkr's page (2026-10-16): Raiju Ready dropped 4 = the
    app's 4 (3:17, 6:01, 8:57, 9:12). Ninki lost: xivanalysis 60, the app
-   85 (4:19 25, 8:41 15, 8:47 40, 9:15 5; its simulation went below zero
-   once there); find which 25 differ.
+   85, now 75. Traced 2026-10-16: Mug / Dokumori's 40 was added at the
+   hit, which can log after the spender it paid for (Dokumori cast
+   6:23.4, hit 6:24.50, Zesho Meppo 6:24.48), so the simulation went below
+   zero and its clamp overstated later overcaps. Now added at the cast:
+   findings carrying an underflow 235 → 113 on disk, Ninki-lost findings
+   278 → 186. The rest are about 5 short per two minutes with every
+   listed gain counted (JZ1KXhDbqkNH3jxR FRU pull 3); a gain is missing
+   from both tables. Find it before trusting Ninki totals.
 2. **nin/Ninjutsu/tcj-doton** (covered). Not seen as a loss yet (the one
    on disk out-damaged its Suiton).
 3. **nin/Ninki/deathfrog** (covered). Not seen firing.

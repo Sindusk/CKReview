@@ -964,7 +964,7 @@ export function checkProcs(ctx: PlayerCheckContext): DamageFinding[] {
   }
   for (const [statusId, consumerId] of ctx.game.procConsumers ?? []) consumer.set(statusId, consumerId);
 
-  const state = new Map<number, { expiresAt?: number; stacks: number }>();
+  const state = new Map<number, { expiresAt?: number; stacks: number; lastAt: number }>();
   for (const e of own) {
     if (e.timestamp >= ctx.endMs) break;
     const consumerId = consumer.get(e.abilityId);
@@ -993,15 +993,24 @@ export function checkProcs(ctx: PlayerCheckContext): DamageFinding[] {
       }));
     };
     if (e.buffStatus === "applied" || e.buffStatus === "refreshed") {
-      state.set(e.abilityId, { expiresAt: e.durationMs ? e.timestamp + e.durationMs : undefined, stacks: e.stack ?? st?.stacks ?? 1 });
+      state.set(e.abilityId, { expiresAt: e.durationMs ? e.timestamp + e.durationMs : undefined, stacks: e.stack ?? st?.stacks ?? 1, lastAt: e.timestamp });
     } else if (e.buffStatus === "stack" || e.buffStatus === "stackRemoved") {
-      if (st) st.stacks = e.stack ?? st.stacks;
+      if (st) { st.stacks = e.stack ?? st.stacks; st.lastAt = e.timestamp; }
     } else if (e.buffStatus === "removed") {
       // Only a consumer pressed beside the expiry used it: qjCMx4bRfgNKwX9T
       // fight 16's Paladin let Divine Might run out 0.17s before a Blade
       // of Valor, which read as consumed.
       const near = castNear(e.timestamp);
-      const usedIt = near !== undefined && (near.abilityId === consumerId ||
+      // Or one pressed while it was held with nothing logged since: the
+      // log missed that removal (yBKPqGwHparm7Tk4 kill: Refulgent Arrow at
+      // 12:11.8 on no target in the P3-P4 transition, Hawk's Eye "removed"
+      // at its 30s expiry, 12:26.2; xivanalysis counts it used).
+      // Declared consumers only: they can't be pressed without the proc
+      // (Reverse Cascade spends Silken or Flourishing Symmetry, so it proves
+      // nothing about either).
+      const pressedWhileHeld = st !== undefined && ctx.game.procConsumers?.get(e.abilityId) === consumerId && casts.some((c) => c.abilityId === consumerId &&
+        c.timestamp > st.lastAt + PROC_CONSUME_MS && c.timestamp < e.timestamp - PROC_CONSUME_MS);
+      const usedIt = pressedWhileHeld || near !== undefined && (near.abilityId === consumerId ||
         (consumedBy.get(e.abilityId)?.get(near.abilityId) ?? 0) >= (removals.get(e.abilityId) ?? 0) * PROC_CONSUMER_ALT_SHARE);
       if (st?.expiresAt !== undefined && !usedIt &&
           e.timestamp >= st.expiresAt - PROC_EXPIRY_EARLY_MS && e.timestamp <= st.expiresAt + PROC_EXPIRY_LATE_MS) {
