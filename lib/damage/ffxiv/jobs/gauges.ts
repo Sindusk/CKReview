@@ -25,7 +25,7 @@ import type { GaugeTrack } from "../../types";
 import type { PlayerCheckContext } from "../../checks";
 import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import { beastGaugeSpec } from "./pld-war";
-import { blmGaugeTracks, paletteSpec, rdmMana } from "./caster";
+import { blmGaugeTracks, paletteSpec, rdmMana, smnGaugeTracks } from "./caster";
 import { firstmindsFocusSpec, mnkFurySpecs, rattlingCoilSpec, samGaugeSpecs } from "./melee";
 import { mchChargeTracks, mchGaugeSpecs } from "./ranged";
 import { gaugeCastTimes, gaugeTrack, statusWindows } from "./shared";
@@ -551,6 +551,8 @@ export const JOB_GAUGES: Record<string, ((ctx: PlayerCheckContext) => GaugeTrack
   "Astrologian": [arcana],
   // Polyglot, Astral Fire, Umbral Ice, Hearts, Astral Soul, Paradox (caster.ts blmGauge).
   "Black Mage": [blmGaugeTracks],
+  // Aetherflow and Further Ruin (caster.ts aetherflowSpec, furtherRuins).
+  "Summoner": [smnGaugeTracks],
   // White and Black Mana: the overcap check's simulation (caster.ts rdmMana).
   "Red Mage": [(ctx) => rdmMana(ctx).specs.map((spec) => gaugeTrack(ctx, spec))],
   // Opo-opo, Raptor and Coeurl Fury: the overcap check's simulation (melee.ts mnkFurySpecs).

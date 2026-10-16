@@ -130,6 +130,20 @@
 //     each: two targets still lose to the single-target spell);
 //     fGjA9DKLQbRa2q1k Astral Flare on both 6:38, 6:41 (12-27k). Not seen:
 //     Energy Siphon, Brand of Purgatory, Ruby Catastrophe.
+//   - SMN demi windows, Aetherflow, Further Ruin, Mountain Buster and
+//     Physick (Summons.tsx, Aetherflow.tsx, Physick.tsx, 2026-10-16):
+//     `smnDemis`, `smnRuin4InDemi`, `smnAetherflow`, `smnMountainBuster`,
+//     `smnPhysick` below, with Aetherflow and Further Ruin lanes
+//     (gauges.ts). Premise checked on 38 FFLogs Red Hot and Deep Blue
+//     parses (rankings pages 1 and 3): 1 demi without Enkindle and
+//     Sunflare, 1 Ruin IV in a demi, 6 Mountain Busters lost, 11 Energy
+//     Drain minutes without a Ruin IV (at least 3 with a Ruin III in
+//     them: the loss this counts).
+//     Not adopted: Slipstream ticks (the top 20 got all 6 on 86 of 165
+//     casts, so the fight moves the bosses out of it; xivanalysis's hook
+//     never fires anyway: it filters casts by the status id 2706, not the
+//     action's 25837) and more than 2 Ruin III a minute (fight-blind: 9
+//     of 19 top parses cast 8-12 in the Energy Drain minute around 5:00).
 //   - Cooldowns for all three in tracked-cooldowns.ts.
 //
 //   Copyright (c) 2018 Saxon Landers & contributors
@@ -139,7 +153,7 @@ import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import type { DamageFinding, GaugeTrack, JobCheck } from "../../types";
 import type { PlayerEvent } from "@/types/PlayerInfo";
 import { finding, type PlayerCheckContext } from "../../checks";
-import { forcedPart, inWindows } from "../../timeline";
+import { forcedPart, inWindows, overlapMs } from "../../timeline";
 import { aoeComboOnOneTarget, baseValue, burstWindowFindings, castHits, clock, critMultOf, dotFindings, gaugeFindings, gaugeTrack, k, rollGainOf, statusWindows, gaugeCastTimes, type ExpectedAction, type GaugeEvent, type GaugeSpec } from "./shared";
 
 const ids = (...keys: string[]) => keys.filter((key) => A[key]).map((key) => A[key].id);
@@ -834,7 +848,228 @@ const smnAoe = aoeComboOnOneTarget([
   [A.UMBRAL_FLARE.id, A.UMBRAL_IMPULSE.id, 3], [A.RUBY_CATASTROPHE.id, A.RUBY_RITE.id, 3],
   [A.TOPAZ_CATASTROPHE.id, A.TOPAZ_RITE.id, 3], [A.EMERALD_CATASTROPHE.id, A.EMERALD_RITE.id, 3],
 ]);
-export const SMN_CHECKS: JobCheck[] = [searingLight, smnAoe];
+
+// Demi summons (xivanalysis Summons.tsx), each 15s from its Summon: one
+// Enkindle (any demi) and one Deathflare (Bahamut) or Sunflare (Solar
+// Bahamut; xivanalysis doesn't check it) expected, usable only while the
+// demi is out, so one not pressed is lost whole: her average of it.
+// Rekindle (Phoenix) is a heal. An Enkindle's damage is the demi's (Akh
+// Morn, Revelation, Exodus, logged as pet hits): all of them over her
+// Enkindle presses. A window the pull's end cut isn't judged; one with
+// under a GCD of time neither forced nor dead is shown, not counted.
+// Seen: fGjA9DKLQbRa2q1k Red Hot and Deep Blue, the 4:03 Solar Bahamut
+// (Sunflare at 4:11.7, no Enkindle).
+const DEMI_MS = 15_000;
+const DEMIS: { summon: string; gcds: string[]; enkindle: string; petHit: string; flow?: string }[] = [
+  { summon: "SUMMON_BAHAMUT", gcds: ["ASTRAL_IMPULSE", "ASTRAL_FLARE"], enkindle: "ENKINDLE_BAHAMUT", petHit: "AKH_MORN", flow: "DEATHFLARE" },
+  { summon: "SUMMON_PHOENIX", gcds: ["FOUNTAIN_OF_FIRE", "BRAND_OF_PURGATORY"], enkindle: "ENKINDLE_PHOENIX", petHit: "REVELATION" },
+  { summon: "SUMMON_SOLAR_BAHAMUT", gcds: ["UMBRAL_IMPULSE", "UMBRAL_FLARE"], enkindle: "ENKINDLE_SOLAR_BAHAMUT", petHit: "EXODUS", flow: "SUNFLARE" },
+];
+const enkindleValue = (ctx: PlayerCheckContext, demi: (typeof DEMIS)[number]) => {
+  const presses = ctx.player.casts.filter((c) => c.abilityId === A[demi.enkindle].id && c.timestamp < ctx.endMs).length;
+  const dealt = ctx.player.damageDone.filter((e) => e.abilityId === A[demi.petHit]?.id && e.timestamp < ctx.endMs)
+    .reduce((a, e) => a + (e.amount ?? 0), 0);
+  return presses > 0 ? dealt / presses : 0;
+};
+type DemiWindow = { demi: (typeof DEMIS)[number]; startMs: number; endMs: number; casts: PlayerEvent[] };
+function demiWindows(ctx: PlayerCheckContext): DemiWindow[] {
+  const byId = new Map(DEMIS.filter((d) => A[d.summon]).map((d) => [A[d.summon].id, d]));
+  const summons = ctx.player.casts.filter((c) => byId.has(c.abilityId)).sort((a, b) => a.timestamp - b.timestamp);
+  return summons.map((c, i) => {
+    const endMs = Math.min(c.timestamp + DEMI_MS, summons[i + 1]?.timestamp ?? Infinity);
+    return { demi: byId.get(c.abilityId)!, startMs: c.timestamp, endMs,
+      casts: ctx.player.casts.filter((x) => x.timestamp >= c.timestamp && x.timestamp < endMs) };
+  });
+}
+const smnDemis: JobCheck = (ctx) => {
+  const out: DamageFinding[] = [];
+  for (const w of demiWindows(ctx)) {
+    if (w.startMs + DEMI_MS > ctx.endMs) continue;
+    const span = w.endMs - w.startMs;
+    const blocked = forcedPart(w.startMs, w.endMs, ctx.forced);
+    const dead = overlapMs(w.startMs, w.endMs, ctx.dead);
+    const forced = span - blocked.ms - dead < ctx.baseGcdMs;
+    for (const key of [w.demi.enkindle, w.demi.flow]) {
+      if (!key || !A[key] || w.casts.some((c) => c.abilityId === A[key].id)) continue;
+      const isEnkindle = key === w.demi.enkindle;
+      const avg = isEnkindle ? enkindleValue(ctx, w.demi) : ctx.values.perUse(A[key].id);
+      const what = isEnkindle ? `${A[key].name} (${A[w.demi.petHit].name})` : A[key].name;
+      out.push(finding(ctx, {
+        kind: "missed-followup", startMs: w.startMs, endMs: w.endMs, forced,
+        cause: forced ? (dead > 0 ? "dead" : blocked.cause) : undefined,
+        label: `${A[key].name} not used`, lostDamage: avg,
+        basis: avg > 0 ? `her average ${what} (${k(avg)}); usable only while the demi is out` : `no ${what} landed this pull to average`,
+        detail: `${A[w.demi.summon].name} at ${clock(w.startMs)} ended without ${A[key].name}`,
+      }));
+    }
+  }
+  return out;
+};
+
+// Ruin IV inside a demi (Summons.tsx): it takes one of the demi's GCD
+// slots, and the demi's GCDs can't wait. Only when the window got fewer
+// demi GCDs than her fullest window this pull. Worth her average demi GCD
+// over her average Ruin III (the Ruin IV, held, would have replaced one).
+// LmwgxA7B4d1NzqWH Red Hot and Deep Blue, Ruin IV at 8:45.3 in the 8:31.6
+// Solar Bahamut.
+const smnRuin4InDemi: JobCheck = (ctx) => {
+  const out: DamageFinding[] = [];
+  const windows = demiWindows(ctx);
+  const gcdsIn = (w: DemiWindow) => w.casts.filter((c) => w.demi.gcds.some((key) => A[key]?.id === c.abilityId)).length;
+  const full = Math.max(0, ...windows.filter((w) => w.endMs - w.startMs >= DEMI_MS && w.startMs + DEMI_MS <= ctx.endMs).map(gcdsIn));
+  const r3 = ctx.values.perUse(A.RUIN_III.id);
+  for (const w of windows) {
+    const r4 = w.casts.filter((c) => c.abilityId === A.RUIN_IV.id);
+    if (r4.length === 0 || gcdsIn(w) >= full) continue;
+    const demi = best(ctx, ids(...w.demi.gcds));
+    const during = forcedPart(r4[0].timestamp - 1, r4[0].timestamp + 1, ctx.forced);
+    out.push(finding(ctx, {
+      kind: "wrong-gcd", startMs: r4[0].timestamp, endMs: r4[0].timestamp, forced: during.ms > 0, cause: during.cause, inference: true,
+      label: "Ruin IV in a demi summon", lostDamage: r4.length * Math.max(0, demi - r3),
+      basis: `${k(demi)} her average demi GCD − ${k(r3)} her average Ruin III (the Ruin IV, held, would have replaced one)`,
+      detail: `Ruin IV at ${clock(r4[0].timestamp)} in the ${clock(w.startMs)} ${A[w.demi.summon].name}: ${gcdsIn(w)} demi GCDs, ${full} in her fullest`,
+    }));
+  }
+  return out;
+};
+
+// Aetherflow and Further Ruin (xivanalysis Aetherflow.tsx), simulated from
+// casts (neither is in the log): Energy Drain / Energy Siphon give 2
+// Aetherflow (cap 2) and Further Ruin; Fester / Necrotize / Painflare spend
+// one, Ruin IV spends Further Ruin (60s); a death clears both. An Aetherflow
+// lost at the cap, or held at the kill, is her average Necrotize. A
+// Further Ruin lost (replaced by the next Energy Drain, run out, or held at
+// the kill) is counted only if a Ruin III or Tri-disaster landed while it
+// was held: that GCD could have been the Ruin IV, so it's worth her average
+// Ruin IV over her average filler. On disk every lost Aetherflow was a
+// death's (2026-10-16). Further Ruin starts when Energy Drain hits, not
+// when it's pressed: ZJ6WqpvNCDYA8X2G Vamp Fatale's Ruin IV at 3:04.48
+// went 60.4s after the 2:04.06 Energy Drain.
+const AF_CAP = 2, FURTHER_RUIN_MS = 60_000 + 1_500;
+const AF_GEN = new Set(ids("SMN_ENERGY_DRAIN", "ENERGY_SIPHON"));
+const AF_SPEND = new Set(ids("FESTER", "NECROTIZE", "PAINFLARE"));
+const SMN_FILLERS = new Set(ids("RUIN_III", "TRI_DISASTER"));
+type FurtherRuin = { gainMs: number; endMs: number; how: "used" | "replaced" | "ran out" | "death" | "end"; fillers: PlayerEvent[] };
+export function aetherflowSpec(ctx: PlayerCheckContext): GaugeSpec | undefined {
+  const casts = ctx.player.casts.filter((c) => AF_GEN.has(c.abilityId) || AF_SPEND.has(c.abilityId));
+  if (!casts.some((c) => AF_GEN.has(c.abilityId))) return undefined;
+  const events: GaugeEvent[] = casts.map((c) => AF_GEN.has(c.abilityId)
+    ? { t: c.timestamp, type: "gain" as const, amount: AF_CAP, label: `${c.abilityName} with Aetherflow held` }
+    : { t: c.timestamp, type: "spend" as const, amount: 1, label: c.abilityName });
+  for (const d of ctx.dead) events.push({ t: d.startMs, type: "reset", label: "death" });
+  const unit = best(ctx, ids("NECROTIZE", "FESTER"));
+  const basis = `her average Necrotize (${k(unit)})`;
+  return { name: "Aetherflow", unit: "Aetherflow", cap: AF_CAP, unitValue: unit, valueBasis: basis, events, leftAtKill: { unitValue: unit, valueBasis: basis } };
+}
+export function furtherRuins(ctx: PlayerCheckContext): FurtherRuin[] {
+  const out: FurtherRuin[] = [];
+  const casts = ctx.player.casts.filter((c) => c.timestamp < ctx.endMs).sort((a, b) => a.timestamp - b.timestamp);
+  const deaths = ctx.dead.map((d) => d.startMs).sort((a, b) => a - b);
+  let held: FurtherRuin | undefined;
+  const close = (t: number, how: FurtherRuin["how"]) => { if (held) { held.endMs = t; held.how = how; out.push(held); held = undefined; } };
+  const expireBy = (t: number) => {
+    if (held && held.gainMs + FURTHER_RUIN_MS <= t) close(held.gainMs + FURTHER_RUIN_MS, "ran out");
+    while (deaths.length && deaths[0] <= t) close(deaths.shift()!, "death");
+  };
+  for (const c of casts) {
+    expireBy(c.timestamp);
+    if (AF_GEN.has(c.abilityId)) {
+      close(c.timestamp, "replaced");
+      held = { gainMs: c.timestamp, endMs: Infinity, how: "end", fillers: [] };
+    } else if (c.abilityId === A.RUIN_IV.id) close(c.timestamp, "used");
+    else if (held && SMN_FILLERS.has(c.abilityId) && ctx.player.damageDone.some((e) => e.abilityId === c.abilityId &&
+      (e.amount ?? 0) > 0 && e.timestamp >= c.timestamp && e.timestamp < c.timestamp + 3_000)) held.fillers.push(c);
+  }
+  expireBy(ctx.endMs);
+  close(ctx.endMs, "end");
+  return out;
+}
+const smnAetherflow: JobCheck = (ctx) => {
+  const spec = aetherflowSpec(ctx);
+  const out = spec && spec.unitValue > 0 ? gaugeFindings(ctx, spec) : [];
+  const r4 = ctx.values.perUse(A.RUIN_IV.id);
+  for (const fr of furtherRuins(ctx)) {
+    if (fr.how === "used" || fr.fillers.length === 0) continue;
+    if (fr.how === "end" && ctx.pull.result !== "Kill") continue;
+    const filler = Math.max(...fr.fillers.map((c) => ctx.values.perUse(c.abilityId)));
+    const first = fr.fillers[0];
+    out.push(finding(ctx, {
+      kind: "proc-lost", startMs: first.timestamp, endMs: fr.endMs, forced: fr.how === "death", cause: fr.how === "death" ? "dead" : undefined,
+      inference: true, label: "Ruin IV lost",
+      lostDamage: Math.max(0, r4 - filler),
+      basis: `${k(r4)} her average Ruin IV − ${k(filler)} her average ${first.abilityName}`,
+      detail: `Further Ruin from ${clock(fr.gainMs)} ${fr.how === "replaced" ? `replaced by the ${clock(fr.endMs)} Energy Drain` :
+        fr.how === "end" ? "held at the kill" : fr.how === "death" ? "lost to the death" : "ran out"} while ` +
+        `${fr.fillers.map((c) => `${c.abilityName} ${clock(c.timestamp)}`).join(", ")} landed`,
+    }));
+  }
+  return out;
+};
+
+// Mountain Buster (Summons.tsx): each Topaz Rite / Catastrophe grants one
+// (Titan's Favor, not in the log); the next Topaz GCD or Summon replaces it.
+// On disk every Mountain Buster came within 2.4s of its Topaz GCD (538);
+// 7 were replaced (LmwgxA7B4d1NzqWH Red Hot and Deep Blue 5:43.0, 6:50.1,
+// 7:56.0). Her average Mountain Buster each. One cut by the pull's end
+// isn't judged; one lost to a death is shown, not counted.
+const smnMountainBuster: JobCheck = (ctx) => {
+  const out: DamageFinding[] = [];
+  const topaz = new Set(ids("TOPAZ_RITE", "TOPAZ_CATASTROPHE"));
+  const casts = ctx.player.casts.filter((c) => c.timestamp < ctx.endMs).sort((a, b) => a.timestamp - b.timestamp);
+  const avg = ctx.values.perUse(A.SMN_MOUNTAIN_BUSTER.id);
+  casts.forEach((c, i) => {
+    if (!topaz.has(c.abilityId)) return;
+    const rest = casts.slice(i + 1);
+    const mb = rest.findIndex((x) => x.abilityId === A.SMN_MOUNTAIN_BUSTER.id);
+    const next = rest.findIndex((x) => topaz.has(x.abilityId) || /^Summon /.test(x.abilityName));
+    if (mb >= 0 && (next < 0 || mb < next)) return;
+    if (next < 0) return;
+    const lostAt = rest[next].timestamp;
+    const died = ctx.dead.some((d) => d.startMs >= c.timestamp && d.startMs <= lostAt);
+    out.push(finding(ctx, {
+      kind: "missed-followup", startMs: c.timestamp, endMs: lostAt, forced: died, cause: died ? "dead" : undefined,
+      label: "Mountain Buster not used", lostDamage: avg,
+      basis: `her average Mountain Buster (${k(avg)})`,
+      detail: `${c.abilityName} at ${clock(c.timestamp)}: its Mountain Buster was replaced by ${rest[next].abilityName} at ${clock(lostAt)}`,
+    }));
+  });
+  return out;
+};
+
+// Physick in uptime (xivanalysis Physick.tsx): a GCD spent on a small heal,
+// worth an average GCD. In forced time it costs nothing and isn't shown.
+const smnPhysick: JobCheck = (ctx) => ctx.player.casts
+  .filter((c) => c.abilityId === A.SMN_PHYSICK.id && c.timestamp >= 0 && c.timestamp < ctx.endMs &&
+    forcedPart(c.timestamp - 1, c.timestamp + 1, ctx.forced).ms === 0)
+  .map((c) => {
+    const gcd = ctx.values.gcdValue(ctx.phaseOf(c.timestamp), inWindows(c.timestamp, ctx.buffWindows));
+    return finding(ctx, {
+      kind: "wrong-gcd", startMs: c.timestamp, endMs: c.timestamp, forced: false,
+      label: "Physick", lostDamage: gcd,
+      basis: `${k(gcd)} average GCD`, detail: "Physick cast while the boss was targetable",
+    });
+  });
+
+/** The Damage dialog's Summoner lanes: Aetherflow and Further Ruin. */
+export function smnGaugeTracks(ctx: PlayerCheckContext): GaugeTrack[] {
+  const spec = aetherflowSpec(ctx);
+  if (!spec) return [];
+  const ruins = furtherRuins(ctx);
+  const steps: GaugeTrack["steps"] = [{ t: 0, value: 0 }];
+  for (const fr of ruins) steps.push({ t: fr.gainMs, value: 1 }, { t: fr.endMs, value: 0 });
+  const lost = ruins.filter((fr) => fr.how !== "used" && fr.fillers.length > 0 && (fr.how !== "end" || ctx.pull.result === "Kill"));
+  return [
+    gaugeTrack(ctx, spec),
+    { name: "Further Ruin", max: 1, steps, capped: [],
+      note: `Further Ruin, simulated from casts; ${lost.length} lost with a Ruin III or Tri-disaster cast while it was held (amber)`,
+      marks: [
+        ...ctx.player.casts.filter((c) => c.abilityId === A.RUIN_IV.id).map((c) => ({ t: c.timestamp, label: "Ruin IV", tone: "use" as const })),
+        ...lost.map((fr) => ({ t: fr.endMs, label: `Further Ruin lost (${fr.how})`, tone: "lost" as const })),
+      ] },
+  ];
+}
+
+export const SMN_CHECKS: JobCheck[] = [searingLight, smnAoe, smnDemis, smnRuin4InDemi, smnAetherflow, smnMountainBuster, smnPhysick];
 // White / Black Mana (xivanalysis ManaGauge.tsx), simulated from casts:
 // a spell gives its mana when it lands (a cast with no hit gives none),
 // halved (rounded down) for the lower colour while the other leads it by

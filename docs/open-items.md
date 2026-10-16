@@ -225,7 +225,11 @@ and delete them from the header.
     simulation and lanes; Polyglot, Paradox, cold Fire III, Ley Lines,
     Fire I, Umbral Soul, lukewarm Fire IV verified on 10 xivanalysis
     pages 2026-10-15); MP-based rules unverifiable.
-  - [smn.md](xiva-audit/smn.md): Summoner, 9 candidates, 5 covered.
+  - [smn.md](xiva-audit/smn.md): Summoner, 0 candidates, 11 covered
+    (demi Enkindle / Deathflare / Sunflare, Mountain Buster, Ruin IV in a
+    demi, Aetherflow and Further Ruin with lanes, Physick built
+    2026-10-16, awaiting xivanalysis pages; Slipstream ticks and extra
+    Ruin III not adopted).
   - [rdm.md](xiva-audit/rdm.md): Red Mage, 5 candidates, 12 covered (mana
     simulation with lanes and Dualcast running out built 2026-10-15,
     compared on two pages).
