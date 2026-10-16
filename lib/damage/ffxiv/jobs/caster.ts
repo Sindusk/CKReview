@@ -273,8 +273,10 @@ const searingLight: JobCheck = (ctx) => burstWindowFindings(ctx, {
 //   a Verfire over the Jolt III cast instead (its 5 mana not valued).
 //   Matches xivanalysis's 4 + 5; the opener's two (Verthunder III under
 //   Swiftcast and Acceleration) and finisher refreshes count too.
-// Not built (from docs/open-items.md 2026-10-15): White Mana overcap
-// (xivanalysis: 3 mana on that pull). The cooldown drift check counts
+// - White / Black Mana overcap and imbalance (2026-10-15): `rdmManaCheck`
+//   below. On that pull it finds none against xivanalysis's 3 White: it
+//   adds mana per damage event, so AoE finishers on two targets count
+//   twice there. The cooldown drift check counts
 // fewer lost Fleche / Contre Sixte / Corps-a-corps uses than xivanalysis's
 // x/y, by method: it counts whole lost uses, with dead time forced.
 const FINISHERS = ids("VERFLARE", "VERHOLY");
@@ -816,4 +818,103 @@ const smnAoe = aoeComboOnOneTarget([
   [A.TOPAZ_CATASTROPHE.id, A.TOPAZ_RITE.id, 3], [A.EMERALD_CATASTROPHE.id, A.EMERALD_RITE.id, 3],
 ]);
 export const SMN_CHECKS: JobCheck[] = [searingLight, smnAoe];
-export const RDM_CHECKS: JobCheck[] = [manaStacks, dualcastWasted, verprocOverwrites];
+// White / Black Mana (xivanalysis ManaGauge.tsx), simulated from casts:
+// a spell gives its mana when it lands (a cast with no hit gives none),
+// halved (rounded down) for the lower colour while the other leads it by
+// more than 30; the enchanted melee steps spend theirs, nothing under
+// Magicked Swordplay; cap 100 each; a death empties both. Dawntrail's
+// Manafication grants no mana. Mana lost at the cap or to the imbalance
+// is worth an enchanted combo's chain over the spells its time would hold,
+// per 50 mana. Also the Red Mage's timeline lanes (gauges.ts).
+const MANA_CAP = 100, MANA_IMBALANCE = 30, MANA_PER_COMBO = 50, RDM_HIT_MS = 3_000;
+const MANA_GAIN: [string, number, number][] = [
+  ["VERAERO", 6, 0], ["VERAERO_II", 7, 0], ["VERAERO_III", 6, 0], ["VERSTONE", 5, 0], ["VERHOLY", 11, 0],
+  ["VERTHUNDER", 0, 6], ["VERTHUNDER_II", 0, 7], ["VERTHUNDER_III", 0, 6], ["VERFIRE", 0, 5], ["VERFLARE", 0, 11],
+  ["JOLT", 2, 2], ["JOLT_II", 2, 2], ["JOLT_III", 2, 2], ["SCATTER", 3, 3], ["IMPACT", 3, 3], ["GRAND_IMPACT", 3, 3],
+  ["SCORCH", 4, 4], ["RESOLUTION", 4, 4],
+];
+const MANA_SPEND: [string, number][] = [
+  ["ENCHANTED_REPRISE", 5], ["ENCHANTED_MOULINET", 20], ["ENCHANTED_MOULINET_DEUX", 15], ["ENCHANTED_MOULINET_TROIS", 15],
+  ["ENCHANTED_RIPOSTE", 20], ["MANAFICATION_ENCHANTED_RIPOSTE", 20], ["ENCHANTED_ZWERCHHAU", 15],
+  ["MANAFICATION_ENCHANTED_ZWERCHHAU", 15], ["ENCHANTED_REDOUBLEMENT", 15], ["MANAFICATION_ENCHANTED_REDOUBLEMENT", 15],
+];
+export type RdmMana = { specs: GaugeSpec[]; imbalance: { t: number; white: number; black: number }[] };
+export function rdmMana(ctx: PlayerCheckContext): RdmMana {
+  const gains = new Map(MANA_GAIN.filter(([key]) => A[key]).map(([key, w, b]) => [A[key].id, { w, b }]));
+  const spends = new Map(MANA_SPEND.filter(([key]) => A[key]).map(([key, n]) => [A[key].id, n]));
+  const swordplay = statusWindows(ctx, S.MAGICKED_SWORDPLAY.id);
+  const casts = ctx.player.casts.filter((c) => c.timestamp < ctx.endMs).sort((a, b) => a.timestamp - b.timestamp);
+  const deaths = [...ctx.dead].sort((a, b) => a.startMs - b.startMs);
+  const white: GaugeEvent[] = [], black: GaugeEvent[] = [];
+  const imbalance: RdmMana["imbalance"] = [];
+  let w = 0, b = 0, d = 0;
+  for (const c of casts) {
+    while (d < deaths.length && deaths[d].startMs <= c.timestamp) {
+      w = b = 0;
+      white.push({ t: deaths[d].startMs, type: "reset", label: "death" });
+      black.push({ t: deaths[d].startMs, type: "reset", label: "death" });
+      d++;
+    }
+    const gain = gains.get(c.abilityId);
+    if (gain) {
+      const landed = ctx.player.damageDone.some((e) => e.abilityId === c.abilityId && (e.amount ?? 0) > 0 &&
+        e.timestamp >= c.timestamp && e.timestamp < c.timestamp + RDM_HIT_MS);
+      if (!landed) continue;
+      const gw = w > 0 && b - w > MANA_IMBALANCE ? Math.floor(gain.w / 2) : gain.w;
+      const gb = b > 0 && w - b > MANA_IMBALANCE ? Math.floor(gain.b / 2) : gain.b;
+      if (gw < gain.w || gb < gain.b) imbalance.push({ t: c.timestamp, white: gain.w - gw, black: gain.b - gb });
+      if (gw) white.push({ t: c.timestamp, type: "gain", amount: gw, label: `${c.abilityName} at 100 White Mana` });
+      if (gb) black.push({ t: c.timestamp, type: "gain", amount: gb, label: `${c.abilityName} at 100 Black Mana` });
+      w = Math.min(MANA_CAP, w + gw);
+      b = Math.min(MANA_CAP, b + gb);
+      continue;
+    }
+    const spend = spends.get(c.abilityId);
+    if (spend && !swordplay.some((x) => c.timestamp > x.startMs && c.timestamp <= x.endMs + 50)) {
+      white.push({ t: c.timestamp, type: "spend", amount: spend, label: c.abilityName });
+      black.push({ t: c.timestamp, type: "spend", amount: spend, label: c.abilityName });
+      w = Math.max(0, w - spend);
+      b = Math.max(0, b - spend);
+    }
+  }
+  for (; d < deaths.length; d++) {
+    white.push({ t: deaths[d].startMs, type: "reset", label: "death" });
+    black.push({ t: deaths[d].startMs, type: "reset", label: "death" });
+  }
+  // An enchanted combo and its finishers, against the spells their time
+  // would hold: 3 melee GCDs at 1.5s and 3 at 2.5s, 12s of Jolt III /
+  // Verthunder III-Veraero III (dualcast pairs, so their average).
+  const v = (key: string) => ctx.values.perUse(A[key]?.id ?? -1);
+  const combo = v("ENCHANTED_RIPOSTE") + v("ENCHANTED_ZWERCHHAU") + v("ENCHANTED_REDOUBLEMENT") +
+    best(ctx, FINISHERS) + v("SCORCH") + v("RESOLUTION");
+  const spell = (v("JOLT_III") + best(ctx, ids("VERTHUNDER_III", "VERAERO_III"))) / 2;
+  const perMana = Math.max(0, combo - (12_000 / 2_500) * spell) / MANA_PER_COMBO;
+  const basis = `(${k(combo)} an enchanted combo with Verflare / Verholy, Scorch and Resolution − ${k((12_000 / 2_500) * spell)} ` +
+    `for the 12s of spells it replaces) ÷ 50 mana`;
+  return {
+    specs: [
+      { name: "White Mana", unit: "White Mana", cap: MANA_CAP, unitValue: perMana, valueBasis: basis, events: white },
+      { name: "Black Mana", unit: "Black Mana", cap: MANA_CAP, unitValue: perMana, valueBasis: basis, events: black },
+    ],
+    imbalance,
+  };
+}
+const rdmManaCheck: JobCheck = (ctx) => {
+  const mana = rdmMana(ctx);
+  const out = mana.specs.flatMap((spec) => (spec.unitValue > 0 ? gaugeFindings(ctx, spec) : []));
+  const lost = mana.imbalance.filter((x) => !inWindows(x.t, ctx.forced));
+  const total = lost.reduce((a, x) => a + x.white + x.black, 0);
+  const perMana = mana.specs[0].unitValue;
+  if (total > 0 && perMana > 0) {
+    out.push(finding(ctx, {
+      kind: "gauge-overcap", startMs: lost[0].t, endMs: lost[lost.length - 1].t, forced: false, inference: true,
+      label: "Mana lost to imbalance", lostDamage: total * perMana,
+      basis: `${total} mana × ${mana.specs[0].valueBasis}`,
+      detail: `${lost.length} spell${lost.length === 1 ? "" : "s"} gave half their mana while the other colour led by more than 30 ` +
+        `(${clock(lost[0].t)}${lost.length > 1 ? `-${clock(lost[lost.length - 1].t)}` : ""})`,
+    }));
+  }
+  return out;
+};
+
+export const RDM_CHECKS: JobCheck[] = [manaStacks, dualcastWasted, verprocOverwrites, rdmManaCheck];

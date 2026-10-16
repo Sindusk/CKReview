@@ -41,8 +41,8 @@
 | rdm/Combos/core-fallback | covered | `checkCombos` | timeouts and misses | Core tiers; dropped when any other break exists (xivanalysis quirk). |
 | rdm/MeleeCombos/wrong-finisher | candidate | — | Verholy / Verflare chosen against mana and procs | Minor 1, Medium 2, Major 3. Rests on the inferred mana gauge. |
 | rdm/MeleeCombos/delay-combo | wrong | — | — | Dead rule (counter commented out). |
-| rdm/ManaGauge/overcap | candidate | — | White / Black Mana over 100 | Minor 1, Medium 20, Major 80. Vamp: 3 mana (not built; open-items). Inferred from casts; Manafication's mana isn't modelled. |
-| rdm/ManaGauge/imbalance-loss | candidate | — | mana gained while the colours are 30+ apart | Same tiers. Inferred; needs the game rule confirmed. |
+| rdm/ManaGauge/overcap | covered | `rdmManaCheck` (gauge-overcap; also White / Black Mana timeline lanes) | White / Black Mana over 100 | Built 2026-10-15 as ManaGauge.tsx's simulation: a spell's mana when it lands (none when it hits nothing: jN3XDrf2z8PmLgRJ Vamp pull 8's 1:08.4 Verstone on an untargetable Vamp Fatale, 2:05.0 Veraero III on a dead Coffinmaker), once per cast (xivanalysis adds it per damage event, so its AoE finishers on two targets count twice), enchanted melee spending, free under Magicked Swordplay; Dawntrail's Manafication grants none. Lost mana is an enchanted combo's chain over the 12s of spells it replaces, per 50. About a dozen on disk, mostly the finishers capping right after a free Magicked Swordplay combo (jN3XDrf2z8PmLgRJ Red Hot and Deep Blue pull 44 4:17-4:22, 4 + 4 + 4 Black). Model gap: 24 of 262 lanes have a spend the simulation lacked mana for (Vamp pull 8 6:49.9, ~5 White short; no gain in xivanalysis's table explains it), so those lanes are marked inference. Vamp pull 8: 0 here against xivanalysis's 3 (its double-counted AoE gains). |
+| rdm/ManaGauge/imbalance-loss | covered | `rdmManaCheck` | mana gained while the colours are 30+ apart | Built with xivanalysis's rule (the lower colour's gains halved while the other leads by more than 30); one finding per pull. None on disk: the samples never run 30 apart. |
 | rdm/ManaGauge/invuln-miss-loss | unverifiable | — | mana spells that didn't land | Needs the mana model; any non-hit counts (no downtime allowance). |
 | rdm/Manafication/gcd-count | candidate | — | (7.0-7.3) under 6 GCDs in Manafication | Major. Off from 7.4 in xivanalysis. |
 | rdm/Manafication/allowed-gcds | candidate | — | (7.0-7.3) a non-melee GCD in Manafication | Medium 1, Major 2. |
@@ -74,8 +74,9 @@
 
 In priority order (biggest damage cost first):
 
-1. **rdm/ManaGauge/overcap** (candidate). Already in open-items; needs a
-   mana simulation, with Manafication's mana.
+1. **rdm/ManaGauge/*** (covered): compare a page where it fires, e.g.
+   jN3XDrf2z8PmLgRJ Red Hot and Deep Blue pull 44 (Laura Razzy), and
+   find the ~5 White Mana missing on Vamp pull 8 before 6:49.9.
 2. **rdm/Dualcast/expired** (candidate). A lost free hardcast each.
 3. **rdm/MeleeCombos/wrong-finisher** (candidate). Rests on the mana model.
 4. **rdm/Manafication/*** (candidates, 7.0-7.3 logs only).

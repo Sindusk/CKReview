@@ -226,7 +226,9 @@ and delete them from the header.
     Fire I, Umbral Soul, lukewarm Fire IV verified on 10 xivanalysis
     pages 2026-10-15); MP-based rules unverifiable.
   - [smn.md](xiva-audit/smn.md): Summoner, 9 candidates, 5 covered.
-  - [rdm.md](xiva-audit/rdm.md): Red Mage, 8 candidates, 9 covered.
+  - [rdm.md](xiva-audit/rdm.md): Red Mage, 6 candidates, 11 covered (mana
+    simulation, overcap / imbalance and lanes built 2026-10-15, awaiting a
+    page).
   - [whm.md](xiva-audit/whm.md): White Mage, 3 candidates, 6 covered (no
     sample on disk).
 - [wowa-audit-plan.md](wowa-audit-plan.md): the same for WoWAnalyzer
