@@ -71,7 +71,8 @@ in a demi verified on three pages the same day. Still waiting:
    Blue Summoners (2026-10-16) pressed Deathflare in every Bahamut; the
    two missing Sunflares came 2-3s before a death.
 2. **smn/Aetherflow/ruin4-unused**: qjCMx4bRfgNKwX9T Dancing Mad pull 2
-   (Alun Kumiho, 11:35).
+   (Alun Kumiho, 11:35). Matched his page 2026-10-16: "1 cast of Ruin 4
+   lost" = the app's Further Ruin at 11:35 (26k).
 3. **smn/Aetherflow/lost-stacks**: the kill case matched YPhxRTb9Ld7BJaXp;
    none lost at the cap on disk.
 4. **smn/Physick/cast**: no unforced one on disk.

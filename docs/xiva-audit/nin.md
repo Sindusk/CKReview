@@ -93,5 +93,12 @@ In priority order (biggest damage cost first).
    ticks 54k against a 55k Ten Chi Jin Suiton). The three Ten Chi Jin
    Dotons on disk all come out within a few k of a Suiton: a small loss
    at most.
-3. **nin/Ninki/deathfrog** (covered). Fires on MzjZgVWBaLw7tHyT; awaiting
-   the page.
+3. **nin/Ninki/deathfrog** (covered). Fires on MzjZgVWBaLw7tHyT; matched
+   Natalie Suki's page 2026-10-16: Deathfrog 1 = 1 (4:24.3). The same page:
+   Kazematoi lost 17 = the app's six 2s and five 1s, 3 left at the kill =
+   3, Kunai's Bane 2 uses lost = 2, combo misuse 7 = 6 + 1 forced,
+   Kassatsu Fuma 1 = 1 (9:29), Suiton 1 = 1 (3:11), Hyoton 1 = 1 (6:36).
+   Hellfrog 2 against the app's 1 (7:04.7): the 5:53.7 Hellfrog hit
+   nothing, which xivanalysis counts as too few targets and the app
+   doesn't judge. Ten Chi Jin Doton 1 against 0 (its ticks equal a
+   Suiton; row above).

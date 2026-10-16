@@ -81,4 +81,11 @@ In priority order (biggest damage cost first):
    Impact Ready on pulls 41, 48, 50, 51, 53 ×2), Apollo Tomyris on three
    reports. rgTafHJ9MN47m3Vy Doomtrain pull 5's one Grand Impact Ready
    expiry (xivanalysis "timed out 1 time") is 3:59.2, which the app marks
-   forced (boss untargetable). Pages requested for pulls 38 and 53.
+   forced (boss untargetable). Matched Laura Razzy's pages 2026-10-16:
+   pull 38's 2 dropped procs = Prefulgence Ready and Thorned Flourish,
+   its overwrites 2 Verfire + 1 Verstone = 3; pull 53's Grand Impact
+   Ready timed out 2 = 2:09.6 and 4:30.8, Verstone missed 1 = 2:35.2,
+   overwrites 3 Verfire + 2 Verstone = 5, wrong finisher 1 = 2:14.0.
+   Its "4 enchanted combos lost" against the app's 2 (Redoublement
+   without its combo bonus at 2:11.8 and 4:11.2, the second after
+   Manafication broke the combo at 4:10.2) not traced further.

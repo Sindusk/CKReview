@@ -83,8 +83,11 @@ In priority order (biggest damage cost first):
 
 1. **rpr/Procs/overwritten-gibbet, gallows** (covered 2026-10-16): no
    page with one yet. AYQm9Kd8Ct4FxcGp pull 32's 6:22.6 is a Void /
-   Cross Reaping overwrite, which xivanalysis never reports; a pull with
-   a Gibbet / Gallows one is still needed.
+   Cross Reaping overwrite, which xivanalysis never reports. Matched
+   2026-10-16 on AYQm9Kd8Ct4FxcGp Lindwurm II pull 6 (Sonder Dreams): its
+   1 overwrite (60 potency) = the app's Gallows at 0:48 (9k). Its "lost 1
+   stack" is an Executioner stack removed at 1:11.9 with no cast, 2s
+   before her death ended the wipe: not adopted.
 2. **rpr/OtherGauges/soul-overcap** (unverifiable until the missing Soul
    source is found).
 3. **rpr/Procs/expired-gibbet, gallows** (covered). Not seen firing.

@@ -99,6 +99,9 @@ In priority order (biggest damage cost first):
    place to look.
 3. **brd/RefulgentProcs/dropped** (verified 2026-10-16): still needs a
    pull with Shadowbite to test the second-consumer doubt.
-4. **brd/Weaving/too-many** (covered). Fires on r4qDkR9btJCXnKWd. Match it
-   against a Bard page.
+4. **brd/Weaving/too-many** (covered). Fires on r4qDkR9btJCXnKWd. Matched
+   Hana Razzy's page (Doomtrain pull 1) 2026-10-16: 4 incorrect weaves =
+   the app's four GCDs after three weaves (0:10.4 clip, 0:24.2, 0:47.0,
+   1:29.1); proc overwrites 2 = 2 (Hawk's Eye 0:31.5, 0:36.4); its burst
+   window's missing Iron Jaws and Sidewinder = the app's 0:10 window.
 5. **brd/MultiHitSkills/shadowbite** (verified 2026-10-16, Fz72hLDPtrv8Wq1M).
