@@ -90,4 +90,11 @@ Overheal.
 
 In priority order (biggest damage cost first).
 
-1. **mnk/Replies/*** (covered). Not seen firing.
+1. **mnk/Replies/*** (covered). Seen firing 2026-10-16 (ff-probe, 6
+   lowest Vamp Fatale Monks; the statuses are Fire's / Wind's / Earth's
+   Rumination): 4 of 6 let one run out with no death beside it
+   (BfXQyTC6hNgvFb3R fight 43 Wind's 8:40.2, 37PGL4tgpvfjrXNa fight 7
+   Fire's 7:17.0, MAJBybNh819Gr2kX fight 2 Fire's 0:25.3,
+   APLmHrf3h2Rx1XbN fight 3 Earth's 3:51.1). 37PGL4tgpvfjrXNa fetched:
+   the app reports it (121k, the whole Fire's Reply as an upper bound).
+   Page: https://xivanalysis.com/fflogs/37PGL4tgpvfjrXNa/7/12

@@ -76,7 +76,10 @@ Weaving, AlwaysBeCasting and Death run unconfigured (covered by
 In priority order (biggest damage cost first). Three pages compared
 2026-10-16 (at2GMBcywChApnfY, 7zwpcLxk2Fd1h6Vr, kNQKG6yHmvZTJ2hf).
 
-1. **sam/ReadyProcs/overwritten** (candidate): not seen on disk.
+1. **sam/ReadyProcs/overwritten** (candidate): not seen on disk, nor in
+   the 6 lowest Vamp Fatale Samurai (ff-probe, 2026-10-16), whose lost
+   Ready procs were all expiries (Tendo, Ogi Namikiri, Zanshin; the
+   app's checkProcs judges those) or deaths.
 2. Fuko on too few targets: built 2026-10-16 (`samFukoAoe`), the chain
    per GCD against the single-target rate with Sen valued. 14 on
    LmwgxA7B4d1NzqWH (Jena Steel), 14-41k each; 1 on 7jtwv9aVpJmDbCXk.

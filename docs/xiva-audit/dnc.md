@@ -92,4 +92,6 @@ In priority order (biggest damage cost first):
 1. **dnc/DirtyDancing/hit-target** (covered). Not seen firing; the buff
    it fails to give isn't valued.
 2. **dnc/DirtyDancing/closed-position-uptime** (candidate). Never seen
-   down past a 2s partner swap on 442 pulls.
+   down past a 2s partner swap on 442 pulls. The 4 lowest Vamp Fatale
+   Dancers (ff-probe, 2026-10-16) never reapplied Closed Position in the
+   fight (held from before the pull throughout).

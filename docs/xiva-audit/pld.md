@@ -65,4 +65,5 @@ the Oath graph.
 ## Open
 
 1. **pld/Confiteor/timeouts** (covered). Not seen firing (Confiteor Ready
-   is pressed even by the weakest parses).
+   is pressed even by the weakest parses; again 2026-10-16 in the 6
+   lowest Vamp Fatale Paladins, 42 of 42 pressed).

@@ -66,4 +66,11 @@ Blood Lily and Assize compared on three pages the same day.
    than the simulation's (8 vs 3, 8 vs 6); find why before trusting
    either total. The counted findings don't depend on it much (each is
    paired with a heal).
-2. **whm/GlareFlare/dropped-glare-iv**: no living loss on disk.
+2. **whm/GlareFlare/dropped-glare-iv**: no living loss on disk until
+   2026-10-16. Found by ff-probe (6 lowest Vamp Fatale White Mages):
+   3HrGydmRZApkCtXz fight 3 (Chizu Wu, fetched) let Sacred Sight run out
+   at 4:56.8 (1 stack) and 7:14.1 (3 stacks), no death beside either;
+   r9RxNhcgqa7BQMYD fight 2 one at 2:37.3. Both fire; priced since then
+   as Glare IV − Glare III a stack (`procReplaces`; was the whole Glare
+   IV, 191k for the three): 31k and 92k. Page:
+   https://xivanalysis.com/fflogs/3HrGydmRZApkCtXz/3/7

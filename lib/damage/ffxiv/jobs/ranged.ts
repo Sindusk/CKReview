@@ -367,6 +367,9 @@ export const PROC_REPLACES = new Map(([
   ["HAMMER_STAMP", "FIRE_IN_RED"], ["GRAND_IMPACT", "JOLT_III"], ["SONIC_BREAK", "KEEN_EDGE"],
   // A lost Tendo leaves the plain Midare (its Kaeshi's upgrade not counted).
   ["TENDO_SETSUGEKKA", "MIDARE_SETSUGEKKA"],
+  // A lost Sacred Sight stack leaves a Glare III in its slot
+  // (3HrGydmRZApkCtXz Chizu Wu: 3 stacks out at 7:14.1 read 191k whole).
+  ["GLARE_IV", "GLARE_III"],
 ] as const).filter(([a, b]) => A[a] && A[b]).map(([a, b]) => [A[a].id, A[b].id]));
 
 // Declared consumers (DamageGame.procConsumers), from xivanalysis's
