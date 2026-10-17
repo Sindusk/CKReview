@@ -6,7 +6,8 @@
 // (lib/damage/wow/spell-data.ts, the status the spec's cooldown puts on
 // them). Sample players per spec: Arms 19, Windwalker 10, Havoc 9,
 // Retribution 8, Assassination 6, Subtlety 4, Unholy 3, Frost DK 2, Fury 2,
-// Feral, Survival and Outlaw 1 each (fewer than 3: unverified).
+// Feral, Survival and Outlaw 1 each (fewer than 3: unverified; Feral has
+// 14 player-pulls since its audit pass, below).
 //
 // Every melee spec gets:
 // - its main cooldown's window (burstGcdFindings): GCDs that fit vs GCDs
@@ -112,6 +113,24 @@
 // 10–27% of generation on every player, a GCD-bound floor (frostdk.ts).
 // The Pillar of Frost window stays: top 0–31k, weaker up to 95k a pull.
 //
+// Feral Druid, WoWAnalyzer audit phase 3 (2026-10-17, docs/wowa-audit/
+// druid-feral.md; no case study). Measured on 14 player-pulls of 13
+// players fetched for it (top Catalyà, 万花通灵, Vydal, Scaricat, Samarae;
+// weak Cheezywizzy, Chesteria, Lylyvienne, Munchkinz, Tyger). feral.ts
+// holds the models and numbers: "Rip off every enemy" (top none, weak up
+// to 241k), "Ferocious Bite below 5 points" (top 0–37k, weak up to 332k),
+// and the tracked cooldowns' values per use (Tiger's Fury, Berserk,
+// Incarnation, Convoke, Feral Frenzy were all worth 0, so their drift
+// never showed; Convoke is 120s, Incarnation newly tracked). Clearcasting
+// and Apex Predator's Craving expire in procs.ts. Lunar Inspiration's
+// Moonfire is a GCD press (game.ts: Scaricat's gaps and delays 6.74M →
+// 2.76M). Kept after re-running on the top players: the Berserk window
+// (top 0.04–0.52M, Scaricat the most; weak 0.02–0.29M: it prices idle the
+// gap check also sees, at the window's bonus) and Energy at the cap (top
+// 0.05–0.82M, Catalyà the most from seven Tiger's Furies pressed at 120
+// Energy; weak 0.35–1.07M). Tiger's Fury grants no Energy now (the next
+// cast shows only regen), so a TF at the cap wastes only the regen.
+//
 // Havoc, checked against WoWAnalyzer on qpZx3mWaG7gcDdYB pull 3
 // (Mythnarra; reference 3Vz6Qt2RyTPXwpJn's Hawkerton, 100th percentile,
 // page saved; checked 2026-10-13):
@@ -144,6 +163,7 @@ import { ARMS_CHECKS } from "./arms";
 import { RETRIBUTION_CHECKS } from "./retribution";
 import { FROST_DK_CHECKS } from "./frostdk";
 import { ASSASSINATION_CHECKS } from "./assassination";
+import { FERAL_CHECKS } from "./feral";
 
 const window = (statusId: number, name: string): JobCheck => (ctx) => burstGcdFindings(ctx, {
   statusId, name,
@@ -242,5 +262,6 @@ export const MELEE_CHECKS: Record<string, JobCheck[]> = Object.fromEntries(
     ...(spec === "Retribution Paladin" ? [holyPowerWaste, ...RETRIBUTION_CHECKS] : []),
     ...(spec === "Windwalker Monk" ? WINDWALKER_CHECKS : []),
     ...(spec === "Assassination Rogue" ? ASSASSINATION_CHECKS : []),
+    ...(spec === "Feral Druid" ? FERAL_CHECKS : []),
   ]]),
 );
