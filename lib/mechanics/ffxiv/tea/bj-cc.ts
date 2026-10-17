@@ -198,9 +198,15 @@
 //    melee in the west Enumeration; C22 +101.5 two ranged at pass 3)?
 // 2. A drop at passes 1-3 held by a support with no single free receiver
 //    now names nobody (the DPS who should have come is unknown).
-// 3. Pass-4 wrong colors: the support ran into the DPS in both reviewed
-//    cases (B22, E24). Position samples are too sparse to show who moved.
-//    Do the supports move at the fourth pass, so the support is named?
+// 3. Pass-4 wrong colors name both players. Plan (user, 2026-10-17): the
+//    Nisi holders line up in BPOG and stand still; each player without a
+//    Nisi walks in to take the matching color. The exception is the
+//    off tank on Cruise Chaser, who waits for its cast to lock in (or it
+//    moves in and kills everyone), then goes to their Nisi spot. So a
+//    receiver at the wrong holder is the receiver's error, and a holder who
+//    left the line is the holder's. Both reviewed cases were the holder
+//    walking into the receiver (B22, E24), but position samples are too
+//    sparse to tell which one moved.
 //
 // -- GUIDE-DERIVED MODEL (2026-10-15) --
 // Research only, no detector and no claims verified against local logs.

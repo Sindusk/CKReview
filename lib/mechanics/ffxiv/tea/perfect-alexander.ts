@@ -119,12 +119,13 @@
 //   targeted; the rest everyone.
 // Not built: Temporal Prison order (never reached); shared stacks short of
 //   players (only after deaths); Faithlessness (B3, after the cutoff).
-// VOD review 2026-10-17 (user): report A pulls 21, 28, rulings in
+// VOD review 2026-10-17 (user): report A pulls 21, 28, 31, rulings in
 //   expectations/rulings.json. A28: the light beacon didn't go to its spot
 //   (Major, as detected). A21: many players out of position, too messy for
 //   the VOD; the dancer was on the right spot and moved (her Stillness).
 // OPEN QUESTIONS:
-// 1. A31 / B3 light beacon in the group: as A28 (the beacon didn't go)?
+// 1. B3 light beacon in the group: as A28 and A31 (the beacon didn't go
+//    to the wall)?
 // 2. A21's crosses stay unruled (the user couldn't sort them out).
 // 3. B3: the dancer marched into the wall from south of a dark beacon that
 //    stood ~1-2y north of its usual spot: beacon or follower?

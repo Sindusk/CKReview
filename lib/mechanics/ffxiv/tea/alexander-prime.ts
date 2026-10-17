@@ -226,8 +226,10 @@
 // 2. Wormhole #3's sword into the waiting group (D13, D19, F2, F7; D10
 //    was fallout of an earlier death): #3's facing, or #1/#5/#7 standing
 //    in its path?
-// 3. Charges hitting the odd number before them (D17, E31, F11) name the
-//    odd number: E14 was theirs (walked into the dash); the others?
+// 3. Charges hitting the odd number before them (D17, F11) name the odd
+//    number: E14 (walked into the dash) and E31 (should have faced out at
+//    a different angle) were theirs; the others? E16: #6 didn't use
+//    knockback resist (user).
 // 4. Stasis near-pair players 0.8-1.6y off the line (C13, C27): C12 and
 //    E4 were the near player's; same for the others?
 //
