@@ -198,6 +198,7 @@ import { AUGMENTATION_CHECKS } from "./augmentation";
 import { BALANCE_CHECKS } from "./balance";
 import { BEAST_MASTERY_CHECKS } from "./beastmastery";
 import { DEMONOLOGY_CHECKS } from "./demonology";
+import { DEVASTATION_CHECKS } from "./devastation";
 import { ELEMENTAL_CHECKS } from "./elemental";
 import { MARKSMANSHIP_CHECKS } from "./marksmanship";
 import { burstGcdFindings, castTimeProcFindings, dotUptimeFindings, k, observedWindowBonus, primaryResourceCapFindings, spentCooldownDrift } from "./shared";
@@ -393,7 +394,7 @@ export const RANGED_CHECKS: Record<string, JobCheck[]> = {
   "Affliction Warlock":   [window(442726, "Malevolence"), dot("Agony", 980), dot("Unstable Affliction", 1259790), dot("Wither / Corruption", 445474, 146739), ...AFFLICTION_CHECKS],
   "Demonology Warlock":   [window(265187, "Demonic Tyrant"), ...DEMONOLOGY_CHECKS],
   "Destruction Warlock":  [window(442726, "Malevolence"), dot("Wither", 445474), backdraft, havocTarget],
-  "Devastation Evoker":   [window(375087, "Dragonrage"), strafingRun],
+  "Devastation Evoker":   [window(375087, "Dragonrage"), strafingRun, ...DEVASTATION_CHECKS],
   "Augmentation Evoker":  [...AUGMENTATION_CHECKS],
   "Devourer Demon Hunter": [],
 };
