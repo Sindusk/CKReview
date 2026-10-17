@@ -15,13 +15,15 @@
 // - firstUseOffsetMs: how late the opener uses it, from the median first
 //   cast across the survey (rounded up).
 // - Only when the median interval is within 1.25× of the shortest: a bigger
-//   spread means resets or cooldown reduction (Divine Toll for Retribution:
-//   shortest 30s, median 62s), and the shortest would invent drift.
+//   spread means resets or cooldown reduction, and the shortest would
+//   invent drift. (Divine Toll's 30s / 62s spread was the survey mixing
+//   specs; measured on Retribution alone it's a clean 60s, tracked below.)
 // Defensives are left out: holding them is a choice. So are cooldowns gated
 // by a resource (Eye Beam, Breath of Sindragosa) or charges (Shadow Dance).
 
 import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { TrackedCooldown } from "../types";
+import { avengingWrathValue, divineTollValue } from "./specs/retribution";
 
 /**
  * One Vanish's worth to an Assassination Rogue: the damage of a Garrote cast
@@ -79,10 +81,19 @@ export const WOW_TRACKED_COOLDOWNS: Record<string, TrackedCooldown[]> = {
     { name: "Recklessness", actionIds: [1719], cooldownMs: 41_000, charges: 1, firstUseOffsetMs: 2_000 },     // 41.5 / 49.3s, 0.4s
     { name: "Odyn's Fury", actionIds: [385062], cooldownMs: 45_000, charges: 1, firstUseOffsetMs: 3_000 },    // 45.0 / 47.8s, 1.2s
   ],
+  // Retribution (values per use and burstHold: specs/retribution.ts's
+  // header, WoWAnalyzer audit phase 3, 2026-10-17). Divine Toll on
+  // Retribution alone: shortest 60.0s, typical 62–75s over 58 player-pulls
+  // (the survey's 30s was another spec's).
   "Retribution Paladin": [
-    { name: "Wake of Ashes", actionIds: [255937], cooldownMs: 30_000, charges: 1, firstUseOffsetMs: 6_000 },      // 30.0 / 31.7s, 5.5s
-    { name: "Avenging Wrath", actionIds: [31884], cooldownMs: 60_000, charges: 1, firstUseOffsetMs: 4_000 },      // 60.0 / 62.1s, 3.4s
-    { name: "Execution Sentence", actionIds: [343527], cooldownMs: 60_000, charges: 1, firstUseOffsetMs: 4_000 }, // 60.0 / 62.1s, 3.9s
+    { name: "Wake of Ashes", actionIds: [255937], cooldownMs: 30_000, charges: 1, firstUseOffsetMs: 6_000,       // 30.0 / 31.7s, 5.5s
+      damageIds: [255937, 405345, 405350, 403695], burstHold: true },
+    { name: "Avenging Wrath", actionIds: [31884], cooldownMs: 60_000, charges: 1, firstUseOffsetMs: 4_000,       // 60.0 / 62.1s, 3.4s
+      valuePerUse: avengingWrathValue, burstHold: true },
+    { name: "Execution Sentence", actionIds: [343527], cooldownMs: 60_000, charges: 1, firstUseOffsetMs: 4_000,  // 60.0 / 62.1s, 3.9s
+      damageIds: [387113, 1260251], burstHold: true },
+    { name: "Divine Toll", actionIds: [375576], cooldownMs: 60_000, charges: 1, firstUseOffsetMs: 10_000,
+      valuePerUse: divineTollValue, burstHold: true },
   ],
   "Havoc Demon Hunter": [
     { name: "Essence Break", actionIds: [258860], cooldownMs: 30_000, charges: 1, firstUseOffsetMs: 5_000 },   // 30.0 / 35.5s, 4.7s
