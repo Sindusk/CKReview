@@ -68,7 +68,7 @@ damage rows are measured.
 | 24 | Subtlety | [rogue-subtlety.md](rogue-subtlety.md) | done 2026-10-17: big finisher without Ancient Arts (netted against the cost of a builder first, after the main session's follow-up), Secret Technique just before Shadow Dance, Shadow Dance window, Energy cap skips clone casts, Shadow Blades / Goremaw's Bite valued, Shadow Dance tracked (subtlety.ts); Shuriken Toss press (game.ts); verified by the main session |
 | 25 | Enhancement | [shaman-enhancement.md](shaman-enhancement.md) | done 2026-10-17: Ascendance and Voltaic Blaze tracked, Maelstrom Weapon capped, idle in Ascendance (enhancement.ts); Stormsurge expiry (procs.ts); Thorim's spenders and Storm Unleashed Crash Lightnings are twins of their press (game.ts); verified by the main session |
 | 26 | Destruction | [warlock-destruction.md](warlock-destruction.md) | done 2026-10-17: checks moved to destruction.ts (Havoc on the main target now needs another enemy up), Summon Infernal / Malevolence valued, Havoc held (from a `no-damage` row); verified by the main session |
-| 27 | Fury | [warrior-fury.md](warrior-fury.md) | |
+| 27 | Fury | [warrior-fury.md](warrior-fury.md) | done 2026-10-17: Rampage held while unenraged, Recklessness drift (rebuilt 72s less 1s per 40 Rage), Rage cap outside Recklessness / Bladestorm, Odyn's Fury valued (fury.ts); Slayer Bladestorm's Bloodthirsts aren't presses (game.ts); verified by the main session |
 | 28 | Blood | [deathknight-blood.md](deathknight-blood.md) | |
 | 29 | Unholy | [deathknight-unholy.md](deathknight-unholy.md) | |
 | 30 | Devourer | [demonhunter-devourer.md](demonhunter-devourer.md) | |
@@ -414,6 +414,10 @@ measured for it.
   `wrong`: Havoc window grades, Soul Fire shard cut, execute Shadowburn.
   Havoc / Cataclysm efficiency moved from `no-damage` to `covered` (Havoc
   held). Evidence in [warlock-destruction.md](warlock-destruction.md).
+- Fury (2026-10-17): proposed `wrong`: Slayer Execute overuse (an
+  Execute out-hits the Raging Blow or Rampage it displaces). Enrage
+  uptime overturned from `wrong` to `covered`. Evidence in
+  [warrior-fury.md](warrior-fury.md).
 
 - Elemental (2026-10-17): `CallOfTheAncestors/other-checks`,
   `statistics` (and whether "Stormkeeper before Ascendance" should be
