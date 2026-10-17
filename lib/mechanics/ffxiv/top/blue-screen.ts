@@ -34,8 +34,8 @@
 // Findings:
 // - Proteans: one cast per living player, but the cast's target is NOT the
 //   player its lane points at (D13 R3: the cast "on" the DRG at 136 points
-//   at 89, where the DNC stood). The lane is the helper's facing + 180
-//   degrees from the helper, and some helpers sit at (100, 90), not the
+//   at 89, where the DNC stood). The lane runs along the helper's facing
+//   from the helper, and some helpers sit at (100, 90), not the
 //   centre. The player on that bearing at the cast owns it. Afterimages
 //   repeat the round's lanes within ~1 degree (median 0.6).
 // - The static's layout: protean slots four east (about 65 / 90 / 112 /
@@ -355,7 +355,7 @@ function phase4Window(casts: EnemyEvent[], lastEvent: number): { start: number; 
 /** The bearing (0 = north) a lane cast points along, LANE_RADIUS out from its caster (some helpers sit 10y north of centre). */
 function laneBearing(c: EnemyEvent): number | undefined {
   if (c.facing === undefined || c.x === undefined || c.y === undefined) return undefined;
-  const dir = (facingToCompassBearing(c.facing) + 180) * Math.PI / 180; // the helpers face away from their lane
+  const dir = facingToCompassBearing(c.facing) * Math.PI / 180; // the helpers face along their lane
   return compassBearingOf(c.x + LANE_RADIUS * Math.sin(dir), c.y - LANE_RADIUS * Math.cos(dir));
 }
 

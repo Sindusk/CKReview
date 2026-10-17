@@ -266,9 +266,11 @@ file's header comment. Mechanic detection has its own guide:
   almost never sizes, because detection counts who was hit. A shape whose
   size nobody measured is dashed. Add a mechanic there with its source
   module cited, the same way.
-- **Boss facing:** the replay uses its own measured `facingToBearing`.
-  The shared `facingToCompassBearing` reads 180° off on boss auto-attacks
-  (docs/open-items.md).
+- **Facing:** players get a wedge, bosses a wedge and a front arc, from
+  geometry.ts's `facingToCompassBearing`. The replay's auto-attack check
+  is what showed that helper returned the back until 2026-10-17.
+- **Play/pause with a synced VOD** drives the hidden video through
+  VideoPanel's `playRequest` / `pauseRequest` tokens.
 - **Map art** comes from FFLogs' `fights.maps` + `gameData.map` (filename,
   sizeFactor, offsets). The browser loads the texture from XIVAPI v2
   (`v2.xivapi.com/api/asset/map/<id>/<index>`), not from FFLogs' CDN. The

@@ -2,7 +2,7 @@
 //
 // Shared angle/bearing/distance math for mechanic modules, unified from
 // per-module copies (limitcut's angleOf/angularDist, stompies' trueBearing/
-// angleDiff/distanceFromCenter, blackhole-strategy's kefkaFacingToBearing).
+// angleDiff/distanceFromCenter, blackhole-strategy's Kefka bearing).
 //
 // ── THE TWO ANGLE CONVENTIONS (do not mix them) ────────────────────────────
 //
@@ -27,12 +27,20 @@
 // ── FFLOGS `facing` ────────────────────────────────────────────────────────
 //
 // An actor's `sourceResources.facing` is in CENTI-radians.
-// `facingToCompassBearing` converts it to a compass bearing:
-// bearing = (facing * 180/PI)/100 + 270 (mod 360) — derivation
-// reverse-engineered from analyzer.wtfdig.info's bundle and validated
-// against VOD review (report VtdBqhLQkWJXMvDg pull 22: reads N/NW/N across
-// the three Black Hole tether-set facings, matching the user's own review
-// exactly); see blackhole-strategy.ts's module comment for the full story.
+// `facingToCompassBearing` converts it to the compass bearing the actor
+// FACES: bearing = (facing * 180/PI)/100 + 90 (mod 360). VERIFIED
+// 2026-10-17:
+// - Measured on Dancing Mad kills: boss auto-attacks (Kefka, Chaos, Exdeath)
+//   land on a target at this bearing, 34/37 on yBKPqGwHparm7Tk4 fight 5 and
+//   28/36 within 20° on 2T1HzdPKgbhM43am fight 10.
+// - VOD on 2T1HzdPKgbhM43am pull 9: Kefka faces N at the MT on Revolting
+//   Ruin, and SW / SE / NW at the three Black Hole Slap Happys and SW at
+//   Stomp-a-Mole, all matching this formula.
+// Until then this added 270 (from analyzer.wtfdig.info's bundle), which is
+// the direction BEHIND the actor. Callers built on that reading were moved
+// over unchanged in behaviour: Black Hole and Stomp-a-Mole use Kefka's
+// back on purpose (he stands on the rim facing centre, so his back points
+// at where he stands); the others had added 180 to get the front.
 
 import type { Position } from "@/lib/mechanics/player-position";
 
@@ -83,8 +91,8 @@ export function angularDistance(a: number, b: number): number {
   return d > 180 ? 360 - d : d;
 }
 
-/** Converts an FFLogs `facing` value (centi-radians) into a compass bearing (0=N, 90=E, 180=S, 270=W) — see header for the derivation. */
+/** Converts an FFLogs `facing` value (centi-radians) into the compass bearing the actor faces (0=N, 90=E, 180=S, 270=W) — see header for the evidence. */
 export function facingToCompassBearing(facing: number): number {
-  const deg = (facing * 180) / Math.PI / 100 + 270;
+  const deg = (facing * 180) / Math.PI / 100 + 90;
   return ((deg % 360) + 360) % 360;
 }

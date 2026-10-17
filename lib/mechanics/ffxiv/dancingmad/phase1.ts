@@ -93,7 +93,10 @@
 // hit 1 that occurrence — which tank ends up holding it varies (sometimes
 // MT, sometimes OT provokes and takes over), and either way the other tank
 // may legitimately also be caught by it. See
-// detectRevoltingRuinOutOfPositionErrors below.
+// detectRevoltingRuinOutOfPositionErrors below. The cone points along
+// Kefka's facing: VOD 2T1HzdPKgbhM43am pull 9 (2026-10-17), he faces north
+// at the MT (Jamie) at 0:16, and geometry.ts's facingToCompassBearing
+// reads 358°.
 //
 // ── GRAVEN 2 SPREAD MISPLACED (confirmed 2026-07-30, report ─────────────────
 // ── Q3GzJNZg64k1hLRm, pull 31) ───────────────────────────────────────────

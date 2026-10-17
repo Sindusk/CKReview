@@ -603,7 +603,9 @@ export function detectClippedByNeighborTetherErrors(pull: Pull, strategy: BlackH
 //    `theta = -facing/100`), then a compass bearing via
 //    `atan2(-sin(theta), cos(theta))`, which simplifies to `bearing =
 //    -theta`. In degrees: `bearing = (facing * 180/PI)/100 + 270 (mod
-//    360)`. Validated against pull 22 (report VtdBqhLQkWJXMvDg): this
+//    360)`, which is the direction BEHIND Kefka: he stands at that bearing
+//    on the rim, facing centre (VOD, 2T1HzdPKgbhM43am pull 9; see
+//    kefkaPositionBearing below). Validated against pull 22 (report VtdBqhLQkWJXMvDg): this
 //    reads North for moments 1-2, Northwest for moments 3-5, North again
 //    for moments 6-8 — exactly matching the user's own VOD review, and
 //    Kefka's facing only ever changes at a tether-SET boundary (the same 4
@@ -644,8 +646,17 @@ function classifyCardinal(x: number, y: number): Cardinal {
 // reference analyzer's own `d <= 3` yalm filter.
 const KEFKA_NEAR_CENTER_TOLERANCE = 300;
 
-/** Converts Kefka's raw logged `facing` into a compass bearing (0=N, 90=E, 180=S, 270=W) — the derivation in the module comment above now lives (condensed) in lib/mechanics/geometry.ts's shared facingToCompassBearing, which this re-exports under its historical name. */
-export const kefkaFacingToBearing = facingToCompassBearing;
+/**
+ * Where Kefka stands, as a compass bearing from centre: the direction
+ * BEHIND his logged facing. VOD on 2T1HzdPKgbhM43am pull 9 (2026-10-17):
+ * at each set's first Slap Happy he stands on the rim facing centre (NE
+ * facing SW, NW facing SE, SE facing NW), so his back points at his spot.
+ * This is the reading the derivation above was validated on; before
+ * 2026-10-17 geometry.ts's facingToCompassBearing returned it directly.
+ */
+export function kefkaPositionBearing(facing: number): number {
+  return (facingToCompassBearing(facing) + 180) % 360;
+}
 
 // The 4 tether-set groupings blackhole.ts's mechanic model already
 // establishes, given as the 1-based moment each set STARTS on.
@@ -700,7 +711,7 @@ function resolveKefkaBearingsBySet(pull: Pull, burstTimestamp: number): Map<numb
     const windowStart = i === 0 ? setStart - 30000 : burstTimestamp + TETHER_MOMENT_OFFSETS_MS[TETHER_SET_START_MOMENT[i - 1] - 1];
 
     const earliestSample = samples.find((s) => s.timestamp >= windowStart && s.timestamp < setStart);
-    if (earliestSample !== undefined) bearings.set(i + 1, kefkaFacingToBearing(earliestSample.facing));
+    if (earliestSample !== undefined) bearings.set(i + 1, kefkaPositionBearing(earliestSample.facing));
   }
   return bearings;
 }

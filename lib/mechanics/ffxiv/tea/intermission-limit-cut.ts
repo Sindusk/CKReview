@@ -29,7 +29,7 @@
 //   the hit lands on one player (312 of 331); it is lost when two or more
 //   are hit, and a dead holder's attack retargets onto someone near.
 // - Geometry: the sword cast's x/y is Cruise Chaser's strike point (r ~13-
-//   15y), and its logged facing + 180 is the cone's axis. Clean swords'
+//   15y), and its logged facing is the cone's axis. Clean swords'
 //   axis runs clockwise along the track: within 19 degrees (p90, median 9,
 //   152 swords). The two swords that hit a partner from a wrong facing were
 //   118 (A69 #3) and 137 (B5 #3) off. Sword extras inside a correctly aimed
@@ -356,13 +356,15 @@ const yalms = (dx: number, dy: number) => Math.hypot(dx, dy) / 100;
 const sdiff = (a: number, b: number) => ((a - b) % 360 + 540) % 360 - 180;
 
 /**
- * How far a sword's cone pointed off the clockwise track. The cast logs
- * Cruise Chaser's facing reversed: in every clean sword the owner stands
- * along facing + 180, which runs clockwise along the route.
+ * How far a sword's cone pointed off the clockwise track. In every clean
+ * sword the owner stands along Cruise Chaser's facing, which runs
+ * clockwise along the route. (Written as "facing + 180" until
+ * geometry.ts's facingToCompassBearing was corrected on 2026-10-17; it
+ * had returned the direction behind.)
  */
 function swordDeviation(c: EnemyEvent): number | undefined {
   if (c.x === undefined || c.y === undefined || c.facing === undefined) return undefined;
-  const axis = (facingToCompassBearing(c.facing) + 180) % 360;
+  const axis = facingToCompassBearing(c.facing);
   const tangent = (compassBearingOf(c.x, c.y) + 90) % 360;
   return sdiff(axis, tangent);
 }

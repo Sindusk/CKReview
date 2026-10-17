@@ -14,8 +14,10 @@
 // own cast, always the FIRST of that name in a pull; several NPC-ghost
 // repeats of the same ability name immediately follow and are not this) as
 // this mechanic's start marker. His FACING at that exact cast, run through
-// the SAME kefkaFacingToBearing conversion already validated for Black Hole
-// (imported from blackhole-strategy.ts), gives a
+// the SAME conversion already validated for Black Hole
+// (blackhole-strategy.ts's kefkaPositionBearing: the direction BEHIND his
+// facing; VOD 2T1HzdPKgbhM43am pull 9 shows him dead centre facing SW at
+// this cast while K reads NE), gives a
 // bearing K that — confirmed directly against the user's VOD review — reads
 // as "relative north" ALREADY, with no further 180-degree flip needed in
 // code: on report LF2yJZabVprjXYvm pull 1 the user watched Kefka visually
@@ -176,7 +178,8 @@ import type { EnemyEvent } from "@/types/PullError";
 import type { BlackHoleGeometry } from "@/types/Pull";
 import { detectFFRoles, type FFRoleSlot } from "@/lib/mechanics/ffxiv/roles";
 import { findPlayerPosition } from "@/lib/mechanics/player-position";
-import { compassBearingOf, angularDistance, distanceFromCenter, facingToCompassBearing as kefkaFacingToBearing } from "@/lib/mechanics/geometry";
+import { compassBearingOf, angularDistance, distanceFromCenter } from "@/lib/mechanics/geometry";
+import { kefkaPositionBearing } from "@/lib/mechanics/ffxiv/dancingmad/blackhole-strategy";
 
 export const STOMPIES_BAIT_TOO_CLOSE_RULE_ID = "ffxiv-stompies-bait-too-close-to-center";
 export const STOMPIES_WRONG_TOWER_RULE_ID    = "ffxiv-stompies-wrong-tower";
@@ -291,7 +294,7 @@ function resolveKefkaBearing(geometry: BlackHoleGeometry | undefined): number | 
   const sample = (geometry?.kefkaFacingSamples ?? [])
     .filter((s) => s.abilityName === STOMP_A_MOLE_ABILITY_NAME)
     .sort((a, b) => a.timestamp - b.timestamp)[0];
-  return sample ? kefkaFacingToBearing(sample.facing) : null;
+  return sample ? kefkaPositionBearing(sample.facing) : null;
 }
 
 // A real wave is Exdeath spawning one personal ghost puddle per player

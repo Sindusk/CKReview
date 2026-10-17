@@ -14,15 +14,6 @@ What doesn't go here (trimmed 2026-10-15):
 
 ## Decisions waiting on the user
 
-- **FFXIV `facingToCompassBearing` looks 180° off (found 2026-10-17).**
-  On Dancing Mad kill yBKPqGwHparm7Tk4 fight 5, 34 of 37 boss
-  auto-attacks (Kefka, Chaos, Exdeath) land at raw·180/(100π) + **90**,
-  while `lib/mechanics/geometry.ts` adds **270**. kefka-says.ts's own
-  decode agrees with +90. The +270 version feeds Black Hole role order
-  (blackhole-strategy.ts, VOD-checked on N/NW facings only) and the
-  Stomp-a-Mole bearings (stompies.ts, one pull). Flipping it would move
-  their results, so it needs a VOD check first. The replay uses its own
-  measured `facingToBearing` (lib/replay/ffxiv-replay.ts).
 
 - **Dancing Mad: hide Raid errors after the pull's cutoff too?** Player
   errors after the cutoff are already hidden. The user's expected readings

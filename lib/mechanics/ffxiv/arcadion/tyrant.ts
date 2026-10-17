@@ -967,12 +967,17 @@ function resolveSlots(players: PlayerInfo[], life: Life, casts: EnemyEvent[]): S
   return slots;
 }
 
-/** A hit's angle around the scythe, degrees clockwise from its facing (-180..180). */
+/**
+ * A hit's angle around the scythe, degrees clockwise from the direction
+ * BEHIND the cast's logged facing (-180..180). The slot angles were fitted
+ * while geometry.ts's facingToCompassBearing returned that back direction
+ * (corrected 2026-10-17), so the reference keeps it explicitly.
+ */
 function scytheAngle(casts: EnemyEvent[], e: PlayerEvent): number | undefined {
   const sc = casts.filter((c) => c.abilityId === SCYTHE_CAST && c.timestamp <= e.timestamp + 200 && c.timestamp > e.timestamp - 4000 && c.x !== undefined && c.facing !== undefined).pop();
   if (!sc || e.x === undefined || e.y === undefined) return undefined;
   const bearing = (Math.atan2(e.x - sc.x!, -(e.y - sc.y!)) * 180 / Math.PI + 360) % 360;
-  const rel = bearing - facingToCompassBearing(sc.facing!);
+  const rel = bearing - (facingToCompassBearing(sc.facing!) + 180);
   return ((rel % 360) + 540) % 360 - 180;
 }
 

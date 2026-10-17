@@ -20,7 +20,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Pull } from "@/types/Pull";
-import { facingToBearing, ffMapImageUrl, fitReplayView, mapImageBounds, poseAt, type ReplayData } from "@/lib/replay/ffxiv-replay";
+import { ffMapImageUrl, fitReplayView, mapImageBounds, poseAt, type ReplayData } from "@/lib/replay/ffxiv-replay";
+import { facingToCompassBearing } from "@/lib/mechanics/geometry";
 import { indexOverlays, overlaysAt, type OverlayShape } from "@/lib/replay/dancing-mad-overlays";
 import { getClassColor, getRoleColor } from "@/lib/player-display";
 
@@ -190,7 +191,7 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
             if (!p || (p.stale && a.samples[a.samples.length - 1][0] < t)) return null;
             const x = toX(p.x), y = toY(p.y);
             const r = a.targetable ? 16 : 6;
-            const b = (facingToBearing(p.facing) * Math.PI) / 180;
+            const b = (facingToCompassBearing(p.facing) * Math.PI) / 180;
             return (
               <g key={a.key} opacity={a.targetable ? 1 : 0.5}>
                 {a.targetable && (
@@ -216,7 +217,7 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
             const color = getClassColor("ffxiv", a.job ?? "");
             return (
               <g key={a.key} opacity={dead ? 0.45 : p.stale ? 0.7 : 1}>
-                {!dead && <FacingWedge x={x} y={y} r={14} b={(facingToBearing(p.facing) * Math.PI) / 180} color={color} size={9} />}
+                {!dead && <FacingWedge x={x} y={y} r={14} b={(facingToCompassBearing(p.facing) * Math.PI) / 180} color={color} size={9} />}
                 <circle cx={x} cy={y} r={14} fill={color} stroke={getRoleColor(roleByName.get(a.name))} strokeWidth={4} />
                 {dead && (
                   <path d={`M${x - 9} ${y - 9} L${x + 9} ${y + 9} M${x + 9} ${y - 9} L${x - 9} ${y + 9}`} stroke="#111" strokeWidth={4} />

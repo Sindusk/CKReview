@@ -20,7 +20,8 @@
 //
 // Units are the log's: centi-yalms, +x east, +y SOUTH (see
 // lib/mechanics/geometry.ts). `facing` is centi-radians; convert with
-// geometry.ts's facingToCompassBearing.
+// geometry.ts's facingToCompassBearing (corrected 2026-10-17 with this
+// replay's auto-attack check and a VOD review).
 //
 // ── INTERPOLATION ─────────────────────────────────────────────────────────
 //
@@ -296,19 +297,6 @@ export function poseAt(actor: ReplayActor, t: number): ReplayPose | undefined {
   }
   const f = (t - a[0]) / (b[0] - a[0]);
   return { x: a[1] + (b[1] - a[1]) * f, y: a[2] + (b[2] - a[2]) * f, facing: a[3], hp: a[4], stale: false };
-}
-
-/**
- * Compass bearing (0 = N, 90 = E) an actor faces, from FFLogs' raw
- * `facing` (centi-radians). Measured, not derived: on Dancing Mad kill
- * yBKPqGwHparm7Tk4 fight 5, 34 of 37 boss auto-attacks (Kefka, Chaos,
- * Exdeath) land on a target at raw*180/(100π) + 90 degrees, ±15°.
- * lib/mechanics/geometry.ts's facingToCompassBearing adds 270 instead,
- * 180° from this; it feeds detection, so it's left alone here (see
- * docs/open-items.md).
- */
-export function facingToBearing(raw: number): number {
-  return (((raw * 180) / (100 * Math.PI) + 90) % 360 + 360) % 360;
 }
 
 /**

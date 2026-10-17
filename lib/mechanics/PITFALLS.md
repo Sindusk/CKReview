@@ -125,7 +125,7 @@ philosophy and the data semantics this list assumes.
   Patch on top of the resolution and killed the party (B23, E12, E16).
 - **A protean cast's target isn't always the player its line points at.**
   Omega P4's Wave Cannon casts name one player each, but the lane (helper
-  facing + 180, and some helpers sit off-centre) points at another as
+  facing, and some helpers sit off-centre) points at another as
   often as not. The player standing on the lane's bearing at the cast
   owns it.
 - **A share's groups can come from the bait layout.** Omega P4's proteans
@@ -180,9 +180,12 @@ philosophy and the data semantics this list assumes.
 - **A mechanic's casts can be missing from some pulls.** TEA's Hawk
   Blaster casts are absent in 7 of 59 Limit Cut pulls while its swords are
   there; anchor the clock on a second cast (TEA Limit Cut).
-- **A logged facing can point backwards.** TEA's Alpha Sword cone runs
-  along the cast's facing + 180: check the axis against the owner's
-  position in clean casts before measuring aim (TEA Limit Cut).
+- **Check a facing conversion against a known target before trusting
+  it.** geometry.ts's `facingToCompassBearing` returned the direction
+  BEHIND the actor until 2026-10-17. TEA's swords, Omega's protean lanes
+  and Deep Blue's clock each looked "logged backwards" and added 180.
+  Boss auto-attacks are a free check: the boss faces the tank it hits
+  (Dancing Mad).
 - **A hit's own debuff can land before its damage event.** TEA's Fire
   Resistance Down II is applied 0.3-0.9s before the Flarethrower damage
   that causes it: "held at the hit" read every party fire as a repeat.

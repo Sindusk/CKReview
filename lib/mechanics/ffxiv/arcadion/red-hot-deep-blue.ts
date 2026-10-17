@@ -703,8 +703,9 @@ const FAMILIES: Family[] = [
 
 // Boss-relative clock spots for the all-party Double-Dip / Reverse volleys
 // (+126 and +545), degrees clockwise from Deep Blue's front (user,
-// 2026-10-09: the OT is behind the boss, H2 to its right). Deep Blue's
-// logged facing points at the OT's spot, so "front" is facing + 180.
+// 2026-10-09: the OT is behind the boss, H2 to its right). "Front" is
+// Deep Blue's logged facing (geometry.ts's facingToCompassBearing; until
+// 2026-10-17 that helper returned the back, so this read "facing + 180").
 const CLOCK_SPOT: Record<FFRoleSlot, number> = { MT: 0, OT: 180, H1: 270, H2: 90, M1: 225, M2: 135, R1: 315, R2: 45 };
 const CLOCK_SPOT_NAME: Record<FFRoleSlot, string> = {
   MT: "in front", OT: "behind", H1: "on the left", H2: "on the right",
@@ -1073,7 +1074,7 @@ function clockVolleys(players: PlayerInfo[], casts: EnemyEvent[]): ClockVolley[]
   const out: ClockVolley[] = [];
   for (const c of castsOf(casts, Object.keys(CLOCK_CASTS).map(Number))) {
     if (c.facing === undefined || c.x === undefined || c.y === undefined) continue;
-    const front = facingToCompassBearing(c.facing) + 180;
+    const front = facingToCompassBearing(c.facing);
     const hitId = CLOCK_CASTS[c.abilityId];
     const angles = new Map<PlayerInfo, number>();
     for (const p of players) {
