@@ -130,6 +130,7 @@ import { HAVOC_CHECKS } from "./havoc";
 import { ARMS_CHECKS } from "./arms";
 import { RETRIBUTION_CHECKS } from "./retribution";
 import { FROST_DK_CHECKS } from "./frostdk";
+import { ASSASSINATION_CHECKS } from "./assassination";
 
 const window = (statusId: number, name: string): JobCheck => (ctx) => burstGcdFindings(ctx, {
   statusId, name,
@@ -227,5 +228,6 @@ export const MELEE_CHECKS: Record<string, JobCheck[]> = Object.fromEntries(
     ...(spec === "Havoc Demon Hunter" ? [eternalHunt, ...HAVOC_CHECKS] : []),
     ...(spec === "Retribution Paladin" ? [holyPowerWaste, ...RETRIBUTION_CHECKS] : []),
     ...(spec === "Windwalker Monk" ? WINDWALKER_CHECKS : []),
+    ...(spec === "Assassination Rogue" ? ASSASSINATION_CHECKS : []),
   ]]),
 );
