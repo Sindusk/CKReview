@@ -116,6 +116,9 @@ export type AoeShape = {
   style: "aoe" | "tower" | "tankbuster";
   name: string;
   start: number; resolve: number; // ms from pull start: telegraph start, resolution
+  // WoW: the shape rides on this actor (an aura around a debuffed player)
+  // instead of staying at x/y.
+  follow?: string;
 };
 
 /**

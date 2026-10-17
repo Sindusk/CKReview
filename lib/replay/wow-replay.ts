@@ -38,15 +38,21 @@
 // panel's conversion holds. Not yet confirmed against a VOD.
 
 import type { ReplayActor, ReplayCast, ReplayData, ReplayHit, ReplaySample } from "@/lib/replay/ffxiv-replay";
+import { WOW_AURA_SHAPES } from "@/lib/replay/wow-shapes";
 
-/** Server-side filter for the replay fetch: the event types that carry resources, plus casts and deaths. */
+/**
+ * Server-side filter for the replay fetch: the event types that carry
+ * resources, plus casts and deaths, plus the few debuffs the replay draws
+ * as shapes (wow-shapes.ts).
+ */
 export const WOW_REPLAY_EVENT_FILTER =
-  `type in ("cast", "begincast", "damage", "heal", "resourcechange", "death")`;
+  `type in ("cast", "begincast", "damage", "heal", "resourcechange", "death")` +
+  ` or (type in ("applydebuff", "removedebuff") and ability.id in (${Object.keys(WOW_AURA_SHAPES).join(", ")}))`;
 
 const ENEMY_SAMPLE_MS = 200;
 // A begincast with no matching cast within this is an interrupted or
-// cancelled cast: it gets no bar.
-const MAX_CAST_MS = 15000;
+// cancelled cast: it gets no bar. Long enough for Vashnik's 85s Malignance.
+const MAX_CAST_MS = 90000;
 
 /** The fields of a raw WCL event the replay reads. */
 export type WowReplayRawEvent = {
@@ -117,6 +123,7 @@ export function buildWowReplayData(
   const enemyCasts: ReplayCast[] = [];
   const enemyHits: ReplayHit[] = [];
   const hitNames: Record<number, string> = {};
+  const enemyAuras: [number, number, string, 0 | 1][] = [];
   // Open begincasts by "sourceKey:ability", for the cast time.
   const openCasts = new Map<string, number>();
 
@@ -159,6 +166,9 @@ export function buildWowReplayData(
 
     if (e.type === "death" && dst && e.targetID !== undefined) {
       deaths.push([t, keyFor(e.targetID, e.targetInstance, isPlayer(dst))]);
+    }
+    if ((e.type === "applydebuff" || e.type === "removedebuff") && dst && e.abilityGameID !== undefined && e.abilityGameID in WOW_AURA_SHAPES) {
+      enemyAuras.push([t, e.abilityGameID, keyFor(dst.id, e.targetInstance, isPlayer(dst)), e.type === "applydebuff" ? 1 : 0]);
     }
 
     // ── Enemy casts: a bar from begincast to cast, a flash on the cast ──
@@ -228,6 +238,6 @@ export function buildWowReplayData(
 
   return {
     version: 1, game: "wow", reportCode, fightId, durationMs: fightEndMs - fightStartMs,
-    actors: out, map: null, mapName, enemyCasts, enemyHits, abilityNames: hitNames,
+    actors: out, map: null, mapName, enemyCasts, enemyHits, abilityNames: hitNames, enemyAuras,
   };
 }

@@ -14,6 +14,10 @@ validation harness (`scripts/validate.js`, `expectations/`), see
   (FFXIV) or `fetch-wow-replay.js` (WoW) saves one pull's top-down replay
   positions to `sampledata/{ff,wow}/<code>/replay/fight<N>.json` (FFXIV
   ~1MB, a few requests; a 6:24 WoW kill is 3.9MB, ~30 pages at about a point each).
+  WoW AoE radii: `node scripts/fetch-wow-spell-geometry.js` adds every
+  new spell id from saved WoW replays and the `lib/mechanics/wow/va/`
+  headers to `lib/replay/wow-spell-geometry.json` (one wago.tools request
+  per spell; run it after fetching a new boss's replay).
   A sample-data load's Load replay reads it instead of fetching live.
   It sits in a subfolder because every report-folder loader reads each
   top-level `*.json` except `meta.json` as a fight file.

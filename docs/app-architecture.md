@@ -284,8 +284,18 @@ file's header comment. Mechanic detection has its own guide:
   - the roster's second bar is the primary resource, coloured by its
     power type
   - cast bars run from begincast to the matching cast (WCL gives no cast
-    duration). No AoE shapes, tethers or hitboxes yet: see
-    [wow-replay-plan.md](wow-replay-plan.md).
+    duration)
+  - AoEs (`lib/replay/wow-shapes.ts`): circle radii from Blizzard's db2
+    (`lib/replay/wow-spell-geometry.json`, built by
+    `scripts/fetch-wow-spell-geometry.js` from wago.tools, which the
+    browser can't call). Caster-centred spells sit on the caster; the
+    rest are centred on the players they hit and show 1s before the hit,
+    since the log has no telegraph. Per-boss tables cover what the data
+    can't link (Vashnik's Plague Froth circle rides on its carrier; its
+    expiry draws the four Plague Wave lanes). Room-wide spells (radius
+    60y+) get a label top right instead of a circle, unless they land
+    every few seconds (ambient damage). No cones, tethers or hitboxes yet:
+    see [wow-replay-plan.md](wow-replay-plan.md).
 - **AoE shapes come from game data, not per-boss models**
   (`lib/replay/action-shapes.ts`): XIVAPI's Action sheet gives CastType,
   EffectRange and XAxisModifier for every ability, so every enemy AoE is

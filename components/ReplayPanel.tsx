@@ -14,8 +14,10 @@
 // clicks Load replay (one FFLogs fetch per pull, never on navigation).
 //
 // WoW pulls (lib/replay/wow-replay.ts, same ReplayData) draw on a blank
-// arena: WCL has no map art, and no AoE shapes, tethers or hitboxes yet.
-// Players get spec icons, enemies WCL's own icon; units read as yards.
+// arena: WCL has no map art, and no tethers or hitboxes yet. AoEs come
+// from lib/replay/wow-shapes.ts (db2 radii placed by hits), and raid-wide
+// hits show as labels top right. Players get spec icons, enemies WCL's own
+// icon; units read as yards.
 //
 // Two clocks:
 // - `syncedTimeMs` set: the VOD drives the replay (playback time from
@@ -36,6 +38,7 @@ import { facingToCompassBearing } from "@/lib/mechanics/geometry";
 import { detectFFRoles } from "@/lib/mechanics/ffxiv/roles";
 import { getClassColor, getPlayerClassIcon, getPlayerSpecIcon, getRoleColor } from "@/lib/player-display";
 import { wowEnemyIconUrl } from "@/lib/replay/wow-replay";
+import { buildWowAoeShapes, buildWowRaidwide, wowRaidwideAt } from "@/lib/replay/wow-shapes";
 import type { PlayerInfo } from "@/types/PlayerInfo";
 
 function formatMs(ms: number): string {
@@ -154,7 +157,8 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
   // ── Per-pull precomputation ──────────────────────────────────────────────
   const wow = data?.game === "wow";
   const view = useMemo(() => (data ? fitReplayView(data) : null), [data]);
-  const aoes = useMemo(() => (data && data.game !== "wow" ? buildAoeShapes(data) : []), [data]);
+  const aoes = useMemo(() => (!data ? [] : data.game === "wow" ? buildWowAoeShapes(data) : buildAoeShapes(data)), [data]);
+  const raidwide = useMemo(() => (data?.game === "wow" ? buildWowRaidwide(data) : []), [data]);
   const tethers = useMemo(() => (data && data.game !== "wow" ? buildTethers(data) : []), [data]);
   const players = useMemo(() => new Map((pull?.players ?? []).map((p) => [p.name, p])), [pull]);
   const slotByName = useMemo(() => {
@@ -238,9 +242,13 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
             )}
             {showGrid && <Grid cx={cx} cy={cy} half={half} toX={toX} toY={toY} S={S} />}
             {showRings && <Rings cx={cx} cy={cy} half={half} toX={toX} toY={toY} scale={scale} />}
-            {showAoes && aoesAt(aoes, t).map(({ s, opacity, resolving }, i) => (
-              <Aoe key={i} uid={`${i}-${s.resolve}`} s={s} opacity={opacity} resolving={resolving} toX={toX} toY={toY} scale={scale} />
-            ))}
+            {showAoes && aoesAt(aoes, t).map(({ s, opacity, resolving }, i) => {
+              // An aura shape rides on its actor (WoW Plague Froth).
+              const rider = s.follow ? actorByKey.get(s.follow) : undefined;
+              const at = rider && poseAt(rider, t);
+              if (s.follow && !at) return null;
+              return <Aoe key={i} uid={`${i}-${s.resolve}`} s={at ? { ...s, x: at.x, y: at.y } : s} opacity={opacity} resolving={resolving} toX={toX} toY={toY} scale={scale} />;
+            })}
             {tethers.filter((tt) => t >= tt.start && t <= tt.end).map((tt, i) => {
               const src = actorByKey.get(tt.source), dst = actorByKey.get(tt.target);
               const a = src && (poseAt(src, t) ?? sampleNear(src, t, TETHER_LOOKUP_MS));
@@ -319,6 +327,16 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
           )}
         </svg>
 
+        {showAoes && raidwide.length > 0 && (
+          <div style={{ position: "absolute", top: 14, right: 14, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, pointerEvents: "none" }}>
+            {wowRaidwideAt(raidwide, t).slice(0, 3).map((r) => (
+              <div key={`${r.t}-${r.name}`} style={{ background: "rgba(60,20,90,0.85)", border: "1px solid #b47bff", borderRadius: 4, padding: "3px 8px", fontSize: 12, color: "#f1e2ff", whiteSpace: "nowrap" }}
+                title="A room-wide hit">
+                {r.name} <span style={{ color: "#c99bff" }}>· {r.players} hit</span>
+              </div>
+            ))}
+          </div>
+        )}
         {casting.length > 0 && (
           <div style={{ position: "absolute", top: 14, left: 14, display: "flex", flexDirection: "column", gap: 4, pointerEvents: "none", maxWidth: "45%" }}>
             {casting.slice(0, 4).map((c) => (
@@ -367,7 +385,7 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
         <button className="ck-btn" onClick={() => setLayersOpen((v) => !v)} aria-expanded={layersOpen}>Layers ▾</button>
         {layersOpen && (
           <div className="ck-menu" style={{ position: "absolute", right: 10, bottom: "100%", marginBottom: 4, zIndex: 5, padding: "6px 10px", display: "flex", flexDirection: "column", gap: 4 }}>
-            {!wow && <Toggle label="AoEs" title="Enemy AoEs at their game-data size" checked={showAoes} onChange={setShowAoes} />}
+            <Toggle label="AoEs" title={wow ? "Enemy AoEs at their game-data size, placed where they hit" : "Enemy AoEs at their game-data size"} checked={showAoes} onChange={setShowAoes} />
             {mapUrl && <Toggle label="Map" title={`In-game map: ${data.map!.name}`} checked={showMap} onChange={setShowMap} />}
             <Toggle label="5y rings" title={`Rings every 5 ${unit} from the ${wow ? "party's median position" : "arena centre"}`} checked={showRings} onChange={setShowRings} />
             <Toggle label="5y grid" title={`A 5-${unit.slice(0, -1)} grid with 0,0 at the ${wow ? "party's median position" : "arena centre"}`} checked={showGrid} onChange={setShowGrid} />

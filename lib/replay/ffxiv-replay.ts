@@ -142,6 +142,9 @@ export type ReplayData = {
   tethers?:    [number, string, string, number][];
   // [ms, marked actor key, markerID].
   headMarkers?: [number, string, number][];
+  // WoW: [ms, abilityGameID, target actor key, 1 applied / 0 removed] for
+  // the debuffs lib/replay/wow-shapes.ts draws (WOW_AURA_SHAPES).
+  enemyAuras?: [number, number, string, 0 | 1][];
   abilityNames?: Record<number, string>;   // names of the abilities in enemyHits
   // Game data looked up after the fetch (lib/replay/action-shapes.ts).
   actionGeometry?: Record<number, ActionGeometry>;
