@@ -285,7 +285,20 @@ and delete them from the header.
     Cure / Medica needed one, 2026-10-16; matched three pages; Lily
     totals differ from xivanalysis's, unexplained).
 - [wowa-audit-plan.md](wowa-audit-plan.md): the same for WoWAnalyzer
-  (reference only, AGPL). After the FFXIV pilot.
+  (reference only, AGPL). Pilot started 2026-10-16 at WoWAnalyzer
+  `0ffe845` (12.1.0): phase 0 marked 20 specs current, 17 lagging (12.0.x),
+  3 stale (Marksmanship declares 11.0.5, Protection Paladin unmaintained,
+  Assassination untouched since 2025). Waiting on the user's check of the
+  pilot ledger format before the other specs.
+  - [core.md](wowa-audit/core.md): shared core, 3 candidates (melee swing
+    uptime, pandemic refreshes, AoE hits per cast); every percentage
+    there divides by the whole fight.
+  - [shaman-elemental.md](wowa-audit/shaman-elemental.md): Elemental,
+    7 candidates (spender before a ready Lava Burst with Master of the
+    Elements, Stormkeeper tracked through Offering From Beyond, non-overload
+    casts in Ascendance, Lava Burst without Flame Shock, one-target Chain
+    Lightning, Flame Shock refreshes, Ascendance spenders), Call of the
+    Ancestors active time `wrong` (double-graded idle).
 - [wow-sim-plan.md](wow-sim-plan.md): WoW simulation pipeline (talent
   effects, budget model, simc as a dev-only oracle). Four questions for
   the user before stage 0.
