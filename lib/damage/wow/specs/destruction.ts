@@ -76,6 +76,32 @@
 // 0:27.7 on the Venom) stay flagged: both bosses were taking raid damage
 // while they attacked the Havoc target.
 //
+// ── Havoc held (havocHeld) ─────────────────────────────────────────────
+// WoWAnalyzer has Havoc's cast efficiency switched off and phase 2 called
+// it no-damage, but a Havoc is the biggest thing a Destruction player
+// presses: the copies on its target come to 1.2–2.3M a window (hits of the
+// Havoc spells on the Havoc target in windows where nothing was aimed at
+// it; 0.56M on Vashnik, where the second target is an add). Its cooldown is
+// a flat 30s (shortest interval 30.0–30.2s on 20 of the 32 player-pulls
+// that press it, never under 30.0s). A second held
+// pushes every later Havoc back a second, so held time ÷ 30s is the share
+// of a Havoc lost, worth the copies less the press's GCD.
+// Held = ready → next press, counted only while two enemies took raid hits
+// within ±2s (a second target to copy to), outside forced time and the
+// fight's hold windows, not in the last 10s, past HAVOC_ALLOW_MS a cycle:
+// the top players' own holds before a press reach 5.5–5.8s (극세사이불 1:27,
+// 3:37), the shards they bank for the window. A Havoc pressed before the
+// pull counts from the debuff at the start (Wyrmtongues's 0:00).
+// Measured (lost a pull): top Kellslocks and Babybrain none, 극세사이불 172k
+// (two holds of 1.4–1.5s), Xyron 245k (ready 4:13, pressed 4:35, 4.4s of it
+// with two enemies). Others: Neerthus 1.09M (LCFp3wbHvQqNP4my, ready 3:57,
+// pressed 4:34), 龍蛋蛋 573k (A49h3gvBnRYHZQNX, 3:44 → 4:02), Henzillxlock
+// 307k, Lumilol 299k, Junibacken 169k, Demosucc 154k, Dwnx 107k,
+// Lowercaseg 102k, 淺若晨曦 67k, 15 players none; the static's Wyrmtongues
+// 89–449k on four of six pulls (gVDPhzp61Zm29HMw Pull 5: ready 0:30,
+// pressed 1:01, 8.8s held with both bosses up), none on the case study.
+// Girthgate 254k on Vashnik. Mayhem players (no Havoc presses) are skipped.
+//
 // ── Measured and not built ─────────────────────────────────────────────
 // - Conflagrate capped (17962, 2 charges): WoWAnalyzer's 13s ÷ haste
 //   recharge doesn't fit the log. The fastest presses need ~9–11s of
@@ -108,10 +134,10 @@
 //   and a flask follow 0.7s+ gaps, both off the GCD.
 
 import type { PlayerInfo } from "@/types/PlayerInfo";
-import type { JobCheck } from "../../types";
-import { finding } from "../../checks";
-import { mergeWindows, overlapMs, type Window } from "../../timeline";
-import { castTimeProcFindings, k } from "./shared";
+import type { JobCheck, Moment } from "../../types";
+import { finding, type PlayerCheckContext } from "../../checks";
+import { holdWindowsFor, mergeWindows, overlapMs, type Window } from "../../timeline";
+import { castTimeProcFindings, k, s } from "./shared";
 
 const SUMMON_INFERNAL = 1122;
 const INFERNAL_AWAKENING = 22703;
@@ -234,25 +260,41 @@ const backdraft: JobCheck = (ctx) => castTimeProcFindings(ctx, {
 // in windows where nothing was aimed at it), × the window's unforced share.
 // Inference: what a proper target would have copied.
 const HAVOC_SPELLS = new Set([CHAOS_BOLT, INCINERATE, CONFLAGRATE, SHADOWBURN, SOUL_FIRE]);
-const havocTarget: JobCheck = (ctx) => {
+
+type HavocWindow = { startMs: number; endMs: number; target: string };
+
+/** The player's Havoc windows (the debuff on an enemy, apply → remove). */
+function havocWindows(ctx: PlayerCheckContext): HavocWindow[] {
   const ev = (ctx.pull.bossDebuffs ?? []).filter((e) => e.statusId === HAVOC && e.sourceName === ctx.player.name)
     .sort((a, b) => a.timestamp - b.timestamp);
-  const wins: { startMs: number; endMs: number; target: string }[] = [];
+  const wins: HavocWindow[] = [];
   for (const e of ev) {
     if (e.status === "applied") wins.push({ startMs: e.timestamp, endMs: ctx.endMs, target: e.targetName });
     else if (e.status === "removed" && wins.length && wins[wins.length - 1].target === e.targetName) wins[wins.length - 1].endMs = e.timestamp;
   }
-  if (wins.length === 0) return [];
-  const own = ctx.player.damageDone.filter((h) => !h.pet);
-  // The raid's hits by time, to tell whether another enemy was there to attack.
+  return wins;
+}
+
+/** The raid's hits by time: whether an enemy other than `not` (or any two enemies) took a hit within ALT_ALIVE_MS of t. */
+function raidTargets(ctx: PlayerCheckContext) {
   const raid = ctx.pull.players.flatMap((pl) => pl.damageDone.filter((h) => h.target).map((h) => ({ t: h.timestamp, target: h.target! })))
     .sort((a, b) => a.t - b.t);
-  const otherAlive = (t: number, havocTarget: string) => {
+  const scan = (t: number, ok: (target: string, seen: Set<string>) => boolean) => {
     let lo = 0, hi = raid.length;
     while (lo < hi) { const mid = (lo + hi) >> 1; if (raid[mid].t < t - ALT_ALIVE_MS) lo = mid + 1; else hi = mid; }
-    for (let i = lo; i < raid.length && raid[i].t <= t + ALT_ALIVE_MS; i++) if (raid[i].target !== havocTarget) return true;
+    const seen = new Set<string>();
+    for (let i = lo; i < raid.length && raid[i].t <= t + ALT_ALIVE_MS; i++) { if (ok(raid[i].target, seen)) return true; seen.add(raid[i].target); }
     return false;
   };
+  return {
+    otherAlive: (t: number, not: string) => scan(t, (target) => target !== not),
+    twoAlive: (t: number) => scan(t, (target, seen) => seen.size > 0 && !seen.has(target)),
+  };
+}
+
+/** Per window: casts, casts at the Havoc target, its copied hits; and the player's copied damage per clean window (nothing aimed at the target). */
+function havocStats(ctx: PlayerCheckContext, wins: HavocWindow[], otherAlive: (t: number, not: string) => boolean) {
+  const own = ctx.player.damageDone.filter((h) => !h.pet);
   const stats = wins.map((w) => {
     const casts = ctx.player.casts.filter((c) => HAVOC_SPELLS.has(c.abilityId) && c.timestamp >= w.startMs && c.timestamp <= w.endMs);
     const atTarget = casts.filter((c) => c.target === w.target);
@@ -263,8 +305,16 @@ const havocTarget: JobCheck = (ctx) => {
     return { w, casts: casts.length, atTarget: atTarget.length, aimed, onTarget, other };
   });
   const clean = stats.filter((x) => x.casts >= 3 && x.atTarget === 0);
-  if (clean.length < 2) return [];
-  const perWindow = clean.reduce((a, x) => a + x.onTarget, 0) / clean.length;
+  const perWindow = clean.length ? clean.reduce((a, x) => a + x.onTarget, 0) / clean.length : 0;
+  return { stats, clean: clean.length, perWindow };
+}
+
+const havocTarget: JobCheck = (ctx) => {
+  const wins = havocWindows(ctx);
+  if (wins.length === 0) return [];
+  const { otherAlive } = raidTargets(ctx);
+  const { stats, clean, perWindow } = havocStats(ctx, wins, otherAlive);
+  if (clean < 2) return [];
   const forced = mergeWindows(ctx.forced);
   return stats.filter((x) => x.casts >= 3 && x.other && x.aimed / x.casts >= 0.6 && x.w.endMs <= ctx.endMs).map((x) => {
     const len = x.w.endMs - x.w.startMs;
@@ -275,11 +325,76 @@ const havocTarget: JobCheck = (ctx) => {
       kind: "burst-window", startMs: x.w.startMs, endMs: x.w.endMs, forced: false,
       label: "Havoc on the main target", inference: true,
       lostDamage: share * perWindow * unforced,
-      basis: `${x.aimed} of ${x.casts} single-target spells at the Havoc target while another enemy was up (${Math.round(share * 100)}%) × ${k(perWindow)} copied per Havoc on another enemy (${clean.length} windows)` +
+      basis: `${x.aimed} of ${x.casts} single-target spells at the Havoc target while another enemy was up (${Math.round(share * 100)}%) × ${k(perWindow)} copied per Havoc on another enemy (${clean} windows)` +
         (unforced < 1 ? ` × ${Math.round(unforced * 100)}% of the window outside forced time` : ""),
       detail: `Havoc at ${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")} on ${x.w.target}, then ${x.aimed} of ${x.casts} spells went at it: nothing to copy them to`,
     });
   });
 };
 
-export const DESTRUCTION_CHECKS: JobCheck[] = [backdraft, havocTarget];
+// ── Havoc held (havocHeld) ─────────────────────────────────────────────
+// See the header. Held = ready (press + 30s) → next press, counted only
+// while two enemies were taking raid hits (a second target to copy to),
+// outside forced time and the fight's hold windows (one recharge of them),
+// not in the pull's last HAVOC_TAIL_MS, past HAVOC_ALLOW_MS a cycle.
+// Lost = held ÷ 30s × (copied per clean window − the press's GCD).
+const HAVOC_CD_MS = 30_000;
+const HAVOC_ALLOW_MS = 6_000;
+const HAVOC_TAIL_MS = 10_000;
+const HAVOC_MIN_PRESSES = 3;
+const HAVOC_PREPULL_MS = 3_000;
+const STEP_MS = 250;
+const MIN_HELD_MS = 500;
+
+const clock = (ms: number) => {
+  const t = Math.max(0, Math.round(ms / 1000));
+  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
+};
+
+const havocHeld: JobCheck = (ctx) => {
+  const presses: number[] = [];
+  for (const t of ctx.player.casts.filter((c) => !c.fake && c.abilityId === HAVOC && c.timestamp < ctx.endMs).map((c) => c.timestamp).sort((a, b) => a - b)) {
+    if (presses.length && t - presses[presses.length - 1] < 100) continue;
+    presses.push(t);
+  }
+  // Mayhem puts Havoc on enemies by itself: no presses, nothing to judge.
+  if (presses.length < HAVOC_MIN_PRESSES) return [];
+  const wins = havocWindows(ctx);
+  // Pressed before the pull: the debuff is on an enemy at the start with no cast.
+  if (wins.length && wins[0].startMs <= HAVOC_PREPULL_MS && wins[0].startMs < presses[0] - 1_000) presses.unshift(wins[0].startMs);
+  const { otherAlive, twoAlive } = raidTargets(ctx);
+  const { clean, perWindow } = havocStats(ctx, wins, otherAlive);
+  if (clean < 2) return [];
+  const gcd = ctx.values.gcdValue(undefined, false);
+  const value = perWindow - gcd;
+  if (!(value > 0)) return [];
+  const perMs = value / HAVOC_CD_MS;
+  const notCounted = mergeWindows([...ctx.forced, ...holdWindowsFor(ctx.context?.cooldownHoldWindows?.(ctx.pull), HAVOC_CD_MS)]);
+  const lastUseful = ctx.endMs - HAVOC_TAIL_MS;
+  const moments: Moment[] = [];
+  let heldMs = 0;
+  presses.forEach((prev, i) => {
+    const ready = prev + HAVOC_CD_MS;
+    const next = presses[i + 1];
+    const until = Math.min(next ?? lastUseful, lastUseful);
+    if (until <= ready) return;
+    let open = 0;
+    for (let t = ready; t < until; t += STEP_MS) if (!inAny(notCounted, t) && twoAlive(t)) open += Math.min(STEP_MS, until - t);
+    const held = open - HAVOC_ALLOW_MS;
+    if (held < MIN_HELD_MS) return;
+    heldMs += held;
+    moments.push({ startMs: ready, endMs: next ?? ctx.endMs, lostDamage: held * perMs,
+      detail: `Havoc ready at ${clock(ready)}, ${next !== undefined ? `pressed at ${clock(next)}` : "not pressed again"}: ${s(held)} held with a second enemy up` });
+  });
+  if (moments.length === 0) return [];
+  return [finding(ctx, {
+    kind: "cooldown-drift", startMs: moments[0].startMs, endMs: moments[moments.length - 1].endMs, forced: false, inference: true,
+    label: "Havoc held",
+    lostDamage: heldMs * perMs,
+    basis: `held time (past ${s(HAVOC_ALLOW_MS)} a cycle, with two enemies taking hits, outside forced time) ÷ ${s(HAVOC_CD_MS)} cooldown × (${k(perWindow)} copied per Havoc on another enemy, ${clean} windows, − ${k(gcd)} average GCD)`,
+    detail: `Havoc sat ready ${s(heldMs)} past the allowance in ${moments.length} cycle${moments.length > 1 ? "s" : ""} while a second enemy was there to copy onto`,
+    moments,
+  })];
+};
+
+export const DESTRUCTION_CHECKS: JobCheck[] = [backdraft, havocTarget, havocHeld];
