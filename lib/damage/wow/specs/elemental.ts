@@ -79,6 +79,16 @@
 // MOTE_BONUS. Excused when a Lava Burst first would have capped Maelstrom
 // (its gain measured from the casts' Maelstrom, ~9). WoWAnalyzer counts the
 // whole spender; this is ~5–35k each, 0–123k a pull on the eight players.
+//
+// ── Chain Lightning on one enemy (chainLightningOneTarget) ─────────────
+// A Chain Lightning (188443; overloads 45297) whose own hits found one
+// enemy, against the player's one-target Lightning Bolt (188196; overloads
+// 45284) in the same Ascendance state, outside Stormkeeper (its own check).
+// With the Ancestors out it costs their answer too: they cast Lava Burst
+// ~1s after a Lightning Bolt (53–94k a cast here) but only a Chain
+// Lightning of their own, at once, after a Chain Lightning (~16k on one
+// enemy). The Maelstrom difference isn't counted (too few casts to measure
+// it). ~20–110k each; top players 0–4 a pull.
 
 import type { PlayerEvent } from "@/types/PlayerInfo";
 import type { DamageFinding, JobCheck, Moment } from "../../types";
@@ -112,6 +122,9 @@ const SPENDERS = new Set(["Elemental Blast", "Earthquake"]);
 const MOTE_BONUS = 0.065;
 // Lava Surge that appeared this soon before the spender wasn't seen in time.
 const SURGE_REACT_MS = 500;
+const STORMKEEPER = 191634;
+// The Ancestors' casts that answer one of the player's land this soon after it.
+const ECHO_MS = 1_700;
 
 const clock = (ms: number) => {
   const t = Math.max(0, Math.round(ms / 1000));
@@ -448,4 +461,54 @@ const spenderWithoutMote: JobCheck = (ctx) => {
   })];
 };
 
-export const ELEMENTAL_CHECKS: JobCheck[] = [ascendanceNonOverload, lavaBurstUnshocked, ancestorIdle, spenderWithoutMote];
+// ── Chain Lightning on one enemy ───────────────────────────────────────
+
+const chainLightningOneTarget: JobCheck = (ctx) => {
+  const T = tools(ctx);
+  const asc = statusWindows(ctx, ASCENDANCE);
+  const sk = statusWindows(ctx, STORMKEEPER);
+  const anc = statusWindows(ctx, CALL_OF_THE_ANCESTORS);
+  const fillers = T.casts.filter((c) => c.abilityName === "Lightning Bolt" || c.abilityName === "Chain Lightning");
+  // The Ancestors answer a Lightning Bolt with Lava Bursts ~1s later, a Chain Lightning with their own at once.
+  const echo = (c: PlayerEvent) => {
+    const bolt = c.abilityName === "Lightning Bolt";
+    const from = c.timestamp + (bolt ? 500 : -50), to = c.timestamp + (bolt ? ECHO_MS : 300);
+    return ctx.player.damageDone.filter((e) => e.pet === "Ancestor" && e.abilityName === (bolt ? "Lava Burst" : "Chain Lightning") && e.timestamp >= from && e.timestamp <= to)
+      .reduce((a, e) => a + (e.amount ?? 0), 0);
+  };
+  const rows = fillers.filter((c) => !inside(sk, c.timestamp)).map((c) => {
+    const next = fillers.find((x) => x.timestamp > c.timestamp)?.timestamp ?? Infinity;
+    const hits = ctx.player.damageDone.filter((e) => !e.pet && !e.isDoT && e.timestamp >= c.timestamp && e.timestamp < Math.min(next, c.timestamp + 1_500) && baseName(e.abilityName) === c.abilityName);
+    const targets = new Set(hits.filter((e) => e.abilityName === c.abilityName).map((e) => `${e.targetActorId}.${e.targetInstance ?? 1}`)).size;
+    return { c, targets, asc: inside(asc, c.timestamp), anc: inside(anc, c.timestamp), own: hits.reduce((a, e) => a + (e.amount ?? 0), 0), echo: echo(c) };
+  });
+  const bolts = rows.filter((r) => r.c.abilityName === "Lightning Bolt" && r.targets === 1);
+  const boltAvg = (inAsc: boolean) => {
+    const same = bolts.filter((r) => r.asc === inAsc);
+    return avg((same.length >= 3 ? same : bolts).map((r) => r.own));
+  };
+  const boltEcho = avg(bolts.filter((r) => r.anc).map((r) => r.echo));
+  const moments: Moment[] = [];
+  for (const r of rows.filter((r) => r.c.abilityName === "Chain Lightning" && r.targets === 1)) {
+    const lb = boltAvg(r.asc);
+    if (!(lb > 0)) continue;
+    const ancestors = r.anc && boltEcho > 0 ? Math.max(0, boltEcho - r.echo) : 0;
+    const loss = Math.max(0, lb - r.own) + ancestors;
+    if (loss < 1) continue;
+    moments.push({ startMs: r.c.timestamp, endMs: r.c.timestamp, lostDamage: loss,
+      detail: `Chain Lightning on ${r.c.target ?? "one enemy"} at ${clock(r.c.timestamp)}: ${k(r.own)} against a Lightning Bolt's ${k(lb)}` +
+        (ancestors ? `, and the Ancestors' ${k(r.echo)} against ${k(boltEcho)}` : "") });
+  }
+  if (moments.length === 0) return [];
+  return [finding(ctx, {
+    kind: "aoe-single", startMs: moments[0].startMs, endMs: moments[moments.length - 1].startMs, forced: false,
+    label: "Chain Lightning on one enemy",
+    lostDamage: moments.reduce((a, m) => a + m.lostDamage, 0),
+    basis: `${moments.length} × (the player's one-target Lightning Bolt with overloads, in or out of Ascendance as the cast was − the Chain Lightning)` +
+      ` + with the Ancestors out, their casts after it against after a Lightning Bolt (${k(boltEcho)})`,
+    detail: `${moments.length} Chain Lightning${moments.length > 1 ? "s" : ""} that hit one enemy`,
+    moments,
+  })];
+};
+
+export const ELEMENTAL_CHECKS: JobCheck[] = [ascendanceNonOverload, lavaBurstUnshocked, ancestorIdle, spenderWithoutMote, chainLightningOneTarget];
