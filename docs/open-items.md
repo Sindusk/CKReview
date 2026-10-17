@@ -288,8 +288,13 @@ and delete them from the header.
   (reference only, AGPL). Pilot started 2026-10-16 at WoWAnalyzer
   `0ffe845` (12.1.0): phase 0 marked 20 specs current, 17 lagging (12.0.x),
   3 stale (Marksmanship declares 11.0.5, Protection Paladin unmaintained,
-  Assassination untouched since 2025). Waiting on the user's check of the
-  pilot ledger format before the other specs.
+  Assassination untouched since 2025). Phases 1–2 done for all 40 specs
+  (fan-out 2026-10-16). Phase 3 (top-parse checks, building) is next, one
+  spec at a time in the plan's order. Below, each ledger gives its
+  candidate count and the first candidate it lists; none is measured yet,
+  and most will fail the premise check.
+  Open question for the user: should consumables and gear at the pull
+  stay out of scope (core.md marks them `no-damage`)?
   - [core.md](wowa-audit/core.md): shared core, 3 candidates (melee swing
     uptime, pandemic refreshes, AoE hits per cast); every percentage
     there divides by the whole fight.
@@ -299,6 +304,84 @@ and delete them from the header.
     (double-graded idle). Stormkeeper drift built (60s less 3s per
     Ancestor summoned; Vashnik holds for the Venoms after Imbibe allowed).
     Open: Ascendance spenders (low value).
+  - [monk-windwalker.md](wowa-audit/monk-windwalker.md): 12 candidates;
+    Fists of Fury cadence (reduction model).
+  - [demonhunter-havoc.md](wowa-audit/demonhunter-havoc.md): 11; Eye
+    Beam drift with Cycle of Hatred.
+  - [mage-arcane.md](wowa-audit/mage-arcane.md): 17; Arcane Barrage
+    ladder (Salvo stacks at the cast); 8 `wrong`.
+  - [warlock-demonology.md](wowa-audit/warlock-demonology.md): 10; Call
+    Dreadstalkers cadence with Demonic Calling.
+  - [warlock-affliction.md](wowa-audit/warlock-affliction.md): 5; Dark
+    Harvest drift with Cull the Weak.
+  - [warrior-arms.md](wowa-audit/warrior-arms.md): 11; Bladestorm drift
+    with Executioner; the priority list folded into one candidate.
+  - [evoker-preservation.md](wowa-audit/evoker-preservation.md): healer,
+    0 candidates.
+  - [monk-mistweaver.md](wowa-audit/monk-mistweaver.md): healer, 6
+    damage candidates; Celestial Conduit as a tracked cooldown.
+  - [druid-restoration.md](wowa-audit/druid-restoration.md): healer, 0
+    candidates.
+  - [shaman-restoration.md](wowa-audit/shaman-restoration.md): healer, 0
+    candidates.
+  - [hunter-beastmastery.md](wowa-audit/hunter-beastmastery.md): 4; Cobra
+    Shot over Barbed Shot.
+  - [druid-balance.md](wowa-audit/druid-balance.md): 9; Fury of Elune
+    drift with Lunation.
+  - [paladin-retribution.md](wowa-audit/paladin-retribution.md): 5; Divine
+    Toll drift.
+  - [deathknight-frost.md](wowa-audit/deathknight-frost.md): 5;
+    Frostscythe targets per cast.
+  - [demonhunter-vengeance.md](wowa-audit/demonhunter-vengeance.md): tank,
+    17; Fury at the cap (wire the existing check).
+  - [druid-guardian.md](wowa-audit/druid-guardian.md): tank, 4; offensive
+    cooldown drift. WoWAnalyzer's own spec is rough.
+  - [rogue-assassination.md](wowa-audit/rogue-assassination.md): stale
+    (12.0.0), 11; Rupture and Garrote clip and uptime.
+  - [hunter-marksmanship.md](wowa-audit/hunter-marksmanship.md): stale
+    (declares 11.0.5, active 2026), 8; Precise Shots use.
+  - [druid-feral.md](wowa-audit/druid-feral.md): 14; Rip uptime and
+    refreshes.
+  - [evoker-augmentation.md](wowa-audit/evoker-augmentation.md): 7;
+    Breath of Eons on an enemy that died early.
+  - [evoker-devastation.md](wowa-audit/evoker-devastation.md): 11;
+    Disintegrate tick efficiency.
+  - [monk-brewmaster.md](wowa-audit/monk-brewmaster.md): tank, 9; Niuzao
+    window count.
+  - [priest-shadow.md](wowa-audit/priest-shadow.md): 11; Insidious Ire
+    coverage.
+  - [rogue-subtlety.md](wowa-audit/rogue-subtlety.md): 15; Ancient Arts
+    pairing (Deathstalker); 6 `wrong`.
+  - [shaman-enhancement.md](wowa-audit/shaman-enhancement.md): 14; Doom
+    Winds and the other major cooldowns as tracked cooldowns.
+  - [warlock-destruction.md](wowa-audit/warlock-destruction.md): 6;
+    Immolate uptime without Wither.
+  - [warrior-fury.md](wowa-audit/warrior-fury.md): 11; Avatar drift (the
+    Arms Anger Management model).
+  - [deathknight-blood.md](wowa-audit/deathknight-blood.md): tank, 7;
+    Death and Decay with Crimson Scourge.
+  - [deathknight-unholy.md](wowa-audit/deathknight-unholy.md): 7;
+    Virulent / Dread Plague uptime.
+  - [demonhunter-devourer.md](wowa-audit/demonhunter-devourer.md): 6;
+    Void Metamorphosis window. WoWAnalyzer says its own Reap / Cull data
+    is bugged.
+  - [hunter-survival.md](wowa-audit/hunter-survival.md): 11; Tip of the
+    Spear stack waste.
+  - [mage-fire.md](wowa-audit/mage-fire.md): 8; Hot Streak expiry.
+  - [mage-frost.md](wowa-audit/mage-frost.md): 4; Fingers of Frost
+    overcap.
+  - [paladin-holy.md](wowa-audit/paladin-holy.md): healer, 5; Avenging
+    Wrath and Divine Toll drift.
+  - [priest-discipline.md](wowa-audit/priest-discipline.md): healer, 3;
+    Shadow Word: Pain uptime (a question first).
+  - [priest-holy.md](wowa-audit/priest-holy.md): healer, 0 candidates.
+  - [rogue-outlaw.md](wowa-audit/rogue-outlaw.md): 9; Adrenaline Rush
+    recharge with Restless Blades.
+  - [warrior-protection.md](wowa-audit/warrior-protection.md): tank, 5;
+    survey its cooldowns first.
+  - [paladin-protection.md](wowa-audit/paladin-protection.md): stale
+    (unmaintained), tank, 8; Avenger's Shield after a Grand Crusader
+    reset.
 - [wow-sim-plan.md](wow-sim-plan.md): WoW simulation pipeline (talent
   effects, budget model, simc as a dev-only oracle). Four questions for
   the user before stage 0.
