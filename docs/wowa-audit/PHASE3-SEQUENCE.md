@@ -244,6 +244,15 @@ measured for it.
   read `cooldownHoldWindows` through `holdWindowsFor(windows, recharge)`
   (timeline.ts), never raw. Raw, Ula'tek's ~2 min P2 window excused a 15s
   Implosion held 50s (Fwîî 4.08M → 0.93M; 2.22M capped).
+- **The survey sweep covers every spec on disk** (step 16a, 2026-10-17;
+  game.ts `SWEEP_PRESSES`): `node sampledata/wow/_scratch/survey-sweep.js`
+  lists, per spec, casts that aren't GCD presses yet sit 0.7s+ from the
+  next press, presses followed by 2s+ (an untimed channel or lock buff),
+  and GCD uptime of the top and bottom players (`OUT=x.json` saves it;
+  `survey-sweep-diff.js before.json after.json` compares two runs;
+  `SPEC=... PRESS=id,id survey-spec.js` tests a hypothesis by the nearest
+  press, start to start). Rerun it after fetching a spec it hasn't seen,
+  and before trusting a spec's GCD delays.
 - **Class resources not in the fetch** (Arcane Charges) make a rule
   `unverifiable` until the fetch carries resource events; say so in the
   row.
