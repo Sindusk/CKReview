@@ -521,6 +521,7 @@ export default function Home() {
 
   const [pauseToken, setPauseToken] = useState(0);
   const [playToken, setPlayToken] = useState(0);   // the replay's play button
+  const [vodPlaying, setVodPlaying] = useState(false);
   useEffect(() => {
     if (showDamage || showMitigation) setPauseToken((t) => t + 1);
   }, [showDamage, showMitigation]);
@@ -1603,7 +1604,7 @@ export default function Home() {
                   error={replayLoad?.key === replayKey ? replayLoad.error : null}
                   onLoad={handleLoadReplay}
                   syncedTimeMs={videoUsable ? timeline.playbackTimeMs : undefined}
-                  onSeekMs={videoUsable ? handleSeekToMs : undefined}
+                  vodPlaying={vodPlaying}
                   onVodPlay={() => setPlayToken((n) => n + 1)}
                   onVodPause={() => setPauseToken((n) => n + 1)}
                 />
@@ -1615,6 +1616,7 @@ export default function Home() {
               seekRequest={timeline.seekRequest}
               pauseRequest={pauseToken}
               playRequest={playToken}
+              onPlayingChange={setVodPlaying}
               onCurrentTimeChange={handleVideoTimeUpdate}
               onUnsync={handleUnsyncVod}
               onResync={resyncFromPull}
@@ -1627,11 +1629,11 @@ export default function Home() {
             />
           </div>
           </div>
-          {centerView === "video" && (
-            <div style={{ flexShrink: 0 }}>
-              {videoBottom}
-            </div>
-          )}
+          {/* The same timeline under both views, so flipping to the replay
+              leaves it exactly where it was. */}
+          <div style={{ flexShrink: 0 }}>
+            {videoBottom}
+          </div>
         </Panel>
 
         <ResizeHandle orientation="col" size={GAP} onReset={layout.resetColumns} onDrag={(d) => dragColumn(1, d)} />

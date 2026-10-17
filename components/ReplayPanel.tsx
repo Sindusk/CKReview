@@ -12,11 +12,13 @@
 //
 // Two clocks:
 // - `syncedTimeMs` set: the VOD drives the replay (playback time from
-//   useTimelineController), and the scrubber seeks the video through
-//   `onSeekMs`. The video reports its time ~5 times a second, so between
-//   reports the panel runs the clock forward itself while the video is
-//   playing, which keeps the dots moving smoothly instead of hopping.
-// - No VOD synced: the panel keeps its own clock with play/pause and speed.
+//   useTimelineController). The page's own timeline bar stays under the
+//   replay, so seeking is done there; this panel only adds play/pause for
+//   the hidden video. The video reports its time ~5 times a second, so
+//   between reports the panel runs the clock forward itself while the
+//   video is playing, which keeps the dots moving smoothly.
+// - No VOD synced: the panel keeps its own clock with play/pause, speed
+//   and scrubber.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Pull } from "@/types/Pull";
@@ -38,7 +40,7 @@ type Props = {
   error:         string | null;
   onLoad:        () => void;
   syncedTimeMs?: number;          // VOD playback time; undefined = own clock
-  onSeekMs?:     (ms: number) => void;
+  vodPlaying?:   boolean;           // the synced video's own play state
   onVodPlay?:    () => void;        // play/pause drive the hidden video when synced
   onVodPause?:   () => void;
 };
@@ -51,7 +53,7 @@ const MAX_EXTRAPOLATE_MS = 350;
 // readable on both.
 const LABEL = { stroke: "rgba(0,0,0,0.75)", strokeWidth: 4, paintOrder: "stroke" } as const;
 
-export default function ReplayPanel({ pull, data, loading, progress, error, onLoad, syncedTimeMs, onSeekMs, onVodPlay, onVodPause }: Props) {
+export default function ReplayPanel({ pull, data, loading, progress, error, onLoad, syncedTimeMs, vodPlaying = false, onVodPlay, onVodPause }: Props) {
   const synced = syncedTimeMs !== undefined;
   const durationMs = data?.durationMs ?? (pull ? (pull.endTime - pull.startTime) * 1000 : 0);
 
@@ -65,17 +67,15 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
   const [showAoes, setShowAoes] = useState(true);
   const [showHits, setShowHits] = useState(true);
 
-  const extRef = useRef<{ value: number; at: number; moving: boolean }>({ value: 0, at: 0, moving: false });
-  // Whether the synced video is playing, read from its time reports: it
-  // reports ~5 times a second whether playing or not, so a report that
-  // repeats the last time means paused.
-  const [vodPlaying, setVodPlaying] = useState(false);
+  // The last VOD time report and when it arrived. Whether the video plays
+  // comes from the player itself (`vodPlaying`): a paused player's repeated
+  // reading never re-renders anything, so the time can't tell.
+  const extRef = useRef<{ value: number; at: number }>({ value: 0, at: 0 });
+  const vodPlayingRef = useRef(vodPlaying);
+  vodPlayingRef.current = vodPlaying;
   useEffect(() => {
     if (syncedTimeMs === undefined) return;
-    const prev = extRef.current;
-    const moving = syncedTimeMs !== prev.value && Math.abs(syncedTimeMs - prev.value) < 2000;
-    extRef.current = { value: syncedTimeMs, at: performance.now(), moving };
-    setVodPlaying(moving);
+    extRef.current = { value: syncedTimeMs, at: performance.now() };
   }, [syncedTimeMs]);
 
   useEffect(() => { setOwnTimeMs(0); setPlaying(false); }, [pull?.id]);
@@ -89,7 +89,7 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
       last = now;
       if (synced) {
         const e = extRef.current;
-        setFrameMs(e.moving ? e.value + Math.min(now - e.at, MAX_EXTRAPOLATE_MS) : e.value);
+        setFrameMs(vodPlayingRef.current ? e.value + Math.min(now - e.at, MAX_EXTRAPOLATE_MS) : e.value);
       } else if (playing) {
         setOwnTimeMs((t) => {
           const next = t + dt * speed;
@@ -155,11 +155,7 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
 
   const shapes = overlaysAt(overlayIndex!, t, showHits).filter((s) => showAoes || s.hit);
 
-  const seek = (ms: number) => {
-    const clamped = Math.max(0, Math.min(durationMs, ms));
-    if (synced) onSeekMs?.(clamped);
-    else setOwnTimeMs(clamped);
-  };
+  const seek = (ms: number) => setOwnTimeMs(Math.max(0, Math.min(durationMs, ms)));
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
@@ -259,15 +255,19 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
             </select>
           </>
         )}
-        <span className="ck-num" style={{ color: "var(--ck-text-2)", minWidth: 90 }}>
-          {formatMs(t)} / {formatMs(durationMs)}
-        </span>
-        <input
-          type="range" min={0} max={durationMs} step={100} value={Math.min(t, durationMs)}
-          onChange={(e) => seek(Number(e.target.value))}
-          style={{ flex: 1 }}
-          disabled={synced && !onSeekMs}
-        />
+        {/* Synced, the page's timeline bar below is the scrubber. */}
+        {synced ? <div style={{ flex: 1 }} /> : (
+          <>
+            <span className="ck-num" style={{ color: "var(--ck-text-2)", minWidth: 90 }}>
+              {formatMs(t)} / {formatMs(durationMs)}
+            </span>
+            <input
+              type="range" min={0} max={durationMs} step={100} value={Math.min(t, durationMs)}
+              onChange={(e) => seek(Number(e.target.value))}
+              style={{ flex: 1 }}
+            />
+          </>
+        )}
         <label style={{ color: "var(--ck-text-3)", fontSize: 12, whiteSpace: "nowrap" }} title="Untargetable actors that place AoEs">
           <input type="checkbox" checked={showHelpers} onChange={(e) => setShowHelpers(e.target.checked)} /> helpers
         </label>
@@ -282,7 +282,6 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
             <input type="checkbox" checked={showMap} onChange={(e) => setShowMap(e.target.checked)} /> map
           </label>
         )}
-        {synced && <span style={{ color: "var(--ck-text-3)", fontSize: 12 }}>following VOD</span>}
       </div>
     </div>
   );

@@ -270,7 +270,12 @@ file's header comment. Mechanic detection has its own guide:
   geometry.ts's `facingToCompassBearing`. The replay's auto-attack check
   is what showed that helper returned the back until 2026-10-17.
 - **Play/pause with a synced VOD** drives the hidden video through
-  VideoPanel's `playRequest` / `pauseRequest` tokens.
+  VideoPanel's `playRequest` / `pauseRequest` tokens. The button's state
+  comes from the player (`onPlayingChange`, polled with the time), never
+  from whether the time moved: a paused player's repeated reading changes
+  no state, so a time-based guess stayed on "playing".
+- **The page's timeline bar stays under both views**, unchanged, and is
+  the replay's scrubber when synced.
 - **Map art** comes from FFLogs' `fights.maps` + `gameData.map` (filename,
   sizeFactor, offsets). The browser loads the texture from XIVAPI v2
   (`v2.xivapi.com/api/asset/map/<id>/<index>`), not from FFLogs' CDN. The

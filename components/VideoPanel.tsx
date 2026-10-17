@@ -19,6 +19,7 @@ type YTPlayer = {
   pauseVideo(): void;
   getCurrentTime(): number;
   getDuration(): number;
+  getPlayerState(): number;   // 1 playing, 2 paused, 3 buffering, 0 ended, -1 unstarted, 5 cued
   loadVideoById(options: { videoId: string; startSeconds?: number }): void;
 };
 
@@ -39,6 +40,8 @@ type PlayerAdapter = {
   pause(): void;
   getCurrentTime(): number;
   getDuration(): number;
+  // Playing or about to (buffering counts: the user asked it to play).
+  isPlaying(): boolean;
 };
 
 function youTubeAdapter(player: YTPlayer): PlayerAdapter {
@@ -48,6 +51,7 @@ function youTubeAdapter(player: YTPlayer): PlayerAdapter {
     pause:          () => player.pauseVideo(),
     getCurrentTime: () => player.getCurrentTime(),
     getDuration:    () => player.getDuration(),
+    isPlaying:      () => { const s = player.getPlayerState(); return s === 1 || s === 3; },
   };
 }
 
@@ -67,6 +71,7 @@ function videoElementAdapter(video: HTMLVideoElement): PlayerAdapter {
     pause: () => video.pause(),
     getCurrentTime: () => video.currentTime,
     getDuration:    () => (Number.isFinite(video.duration) ? video.duration : 0),
+    isPlaying:      () => !video.paused && !video.ended,
   };
 }
 
@@ -94,6 +99,8 @@ type VideoPanelProps = {
   // ONE-TIME PLAY COMMAND, same shape: the replay's play button while the
   // video is hidden under it. Ignored while the no-coverage hold is up.
   playRequest?: number;
+  // Called when the player starts or stops playing (polled with the time).
+  onPlayingChange?: (playing: boolean) => void;
 
   // continuous playback reporting
   onCurrentTimeChange?: (time: number) => void;
@@ -157,6 +164,7 @@ export default function VideoPanel({
   seekRequest,
   pauseRequest = 0,
   playRequest = 0,
+  onPlayingChange,
   onCurrentTimeChange,
   onUnsync,
   onResync,
@@ -193,6 +201,9 @@ export default function VideoPanel({
   latestDurationRef.current = vod?.durationSec;
   const onDurationKnownRef = useRef(onDurationKnown);
   onDurationKnownRef.current = onDurationKnown;
+  const onPlayingChangeRef = useRef(onPlayingChange);
+  onPlayingChangeRef.current = onPlayingChange;
+  const lastPlayingRef = useRef<boolean | null>(null);
 
   // Bumped on every reuse-swap so an in-flight readiness poll (below) from
   // an earlier swap can tell it's been superseded and stop.
@@ -448,6 +459,15 @@ export default function VideoPanel({
         onCurrentTimeChange(time);
       }
 
+      // Play state for the replay's play/pause button. Read from the player:
+      // the time alone can't tell paused from playing, since a paused
+      // player's repeated reading changes nothing downstream.
+      const playing = playerRef.current?.isPlaying() ?? false;
+      if (playing !== lastPlayingRef.current) {
+        lastPlayingRef.current = playing;
+        onPlayingChangeRef.current?.(playing);
+      }
+
       // Record the length the first time the player knows it. The page
       // decides whether a later, longer reading is worth re-saving.
       const duration = playerRef.current?.getDuration();
@@ -460,7 +480,15 @@ export default function VideoPanel({
       }
     }, 200);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      // The loop is about to stop (player swapped or torn down): don't
+      // leave the replay thinking the old player still plays.
+      if (lastPlayingRef.current) {
+        lastPlayingRef.current = false;
+        onPlayingChangeRef.current?.(false);
+      }
+    };
   }, [onCurrentTimeChange, playerReady, vod?.id]);
 
   return (
