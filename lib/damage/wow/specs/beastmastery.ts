@@ -82,6 +82,27 @@
 // Deathstriker 159k on the case study (10) and 113–473k on each of his
 // static's 16 pulls (6–23 a pull; Ula'tek 473k, 23). WoWAnalyzer only
 // annotates each unbuffed cast.
+//
+// ── Wild Thrash on one enemy (wildThrashOneTarget) ─────────────────────
+// Wild Thrash (1264359, 35 Focus like a Cobra Shot) is the AoE press: the
+// pet's hit (1264355) on every enemy in reach, and Beast Cleave (268877, a
+// ~10s buff on the player it applies each press) makes the pet's attacks
+// cleave (Beast Cleave 118459, Kill Cleave 389448). On one enemy the hit is
+// 16–83k (median ~40k) against the player's Cobra Shot's 72–113k, and the
+// buff does nothing visible there (Deathstriker Kith'ix Pull 2: pet Claw
+// and melee ×0.95–0.98 with it). It doesn't give Nature's Ally either. So
+// a press whose pet hit one enemy, and whose Beast Cleave (to the next
+// press) cleaved nothing, lost a Cobra Shot less its own hit. This is the
+// premise of WoWAnalyzer's "Beast Cleave windows with no hits" rule, which
+// phase 2 had marked `wrong` because Beast Cleave used to come for free.
+// Not counted in forced time or the pull's last WT_HIT_MS.
+// Measured (lost a pull): top Luumu, Yaji (Entombed Sentinels),
+// Волкерокхант, Käächhunt, Minttu none; Yaji (Vashnik) 60k (1), 小红手经年
+// 181k (3: 2:42, 4:49, 5:23). Weaker: Arteyparty 121k, Hirvihotline 96k,
+// 嗜血魔圣 50k. Deathstriker none on the case study but a habit on
+// single-target bosses: Kith'ix Pull 2 782k (17 of 19 presses, every ~10s
+// to keep Beast Cleave up), Nek'zali Pulls 1 and 2 648k and 682k (18, 15),
+// Ula'tek 637k (8).
 
 import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { JobCheck, Moment } from "../../types";
@@ -254,4 +275,48 @@ const killCommandUnbuffed: JobCheck = (ctx) => {
   })];
 };
 
-export const BEAST_MASTERY_CHECKS: JobCheck[] = [bestialWrathHeld, killCommandUnbuffed];
+// ── Wild Thrash on one enemy ───────────────────────────────────────────
+
+const WILD_THRASH = 1264359;             // the player's press
+const WILD_THRASH_HIT = 1264355;         // the pet's hit
+const BEAST_CLEAVE = 268877;             // the player's buff Wild Thrash applies
+const CLEAVE_HITS = new Set([118459, 389448]);   // Beast Cleave, Kill Cleave
+const COBRA_SHOT = 193455;
+const WT_HIT_MS = 2_000;
+
+const wildThrashOneTarget: JobCheck = (ctx) => {
+  const p = ctx.player;
+  const wt = presses(ctx, WILD_THRASH);
+  if (wt.length === 0) return [];
+  const cobraN = p.casts.filter((c) => !c.fake && c.abilityId === COBRA_SHOT && c.timestamp < ctx.endMs).length;
+  if (cobraN < 5) return [];
+  const cobra = p.damageDone.filter((e) => !e.pet && e.abilityId === COBRA_SHOT && e.timestamp < ctx.endMs).reduce((a, e) => a + (e.amount ?? 0), 0) / cobraN;
+  const bc = statusWindows(ctx, BEAST_CLEAVE);
+  const forced = mergeWindows(ctx.forced);
+  const enemy = (e: { target?: string; targetActorId?: number; targetInstance?: number }) => `${e.targetActorId ?? e.target}.${e.targetInstance ?? 1}`;
+  const moments: Moment[] = [];
+  wt.forEach((t, i) => {
+    if (inWindows(t, forced) || t > ctx.endMs - WT_HIT_MS) return;
+    const hits = p.damageDone.filter((e) => e.pet && e.abilityId === WILD_THRASH_HIT && e.timestamp >= t && e.timestamp < t + WT_HIT_MS);
+    if (new Set(hits.map(enemy)).size > 1) return;
+    // The Beast Cleave it started (or refreshed), to the next Wild Thrash: any cleave hit is its payoff.
+    const win = bc.find((w) => t >= w.startMs - 50 && t <= w.endMs);
+    const until = Math.min(win?.endMs ?? t + 10_000, wt[i + 1] ?? Infinity);
+    if (p.damageDone.some((e) => e.pet && CLEAVE_HITS.has(e.abilityId) && e.timestamp >= t && e.timestamp < until)) return;
+    const dmg = hits.reduce((a, e) => a + (e.amount ?? 0), 0);
+    const lost = cobra - dmg;
+    if (lost <= 0) return;
+    moments.push({ startMs: t, endMs: t, lostDamage: lost, detail: `Wild Thrash at ${clock(t)} on one enemy (${k(dmg)}), no cleave in its Beast Cleave` });
+  });
+  if (moments.length === 0) return [];
+  return [finding(ctx, {
+    kind: "burst-window", startMs: moments[0].startMs, endMs: moments[moments.length - 1].startMs, forced: false, inference: true,
+    label: "Wild Thrash on one enemy",
+    lostDamage: moments.reduce((a, m) => a + (m.lostDamage ?? 0), 0),
+    basis: `each one's GCD as a Cobra Shot (the player's average, ${k(cobra)}) − its own hit; its Beast Cleave hit nothing`,
+    detail: `${moments.length} Wild Thrash${moments.length > 1 ? "es" : ""} pressed with one enemy in reach: its Beast Cleave had nothing to cleave to`,
+    moments,
+  })];
+};
+
+export const BEAST_MASTERY_CHECKS: JobCheck[] = [bestialWrathHeld, killCommandUnbuffed, wildThrashOneTarget];
