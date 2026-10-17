@@ -155,6 +155,7 @@ import { finding, type PlayerCheckContext } from "../../checks";
 import { inWindows, mergeWindows, overlapMs, statusWindows } from "../../timeline";
 import { AFFLICTION_CHECKS } from "./affliction";
 import { ARCANE_CHECKS } from "./arcane";
+import { BALANCE_CHECKS } from "./balance";
 import { BEAST_MASTERY_CHECKS } from "./beastmastery";
 import { DEMONOLOGY_CHECKS } from "./demonology";
 import { ELEMENTAL_CHECKS } from "./elemental";
@@ -396,7 +397,7 @@ export const RANGED_CHECKS: Record<string, JobCheck[]> = {
   "Arcane Mage":          [window(365362, "Arcane Surge"), ...ARCANE_CHECKS],
   "Fire Mage":            [window(190319, "Combustion")],
   "Frost Mage":           [],
-  "Balance Druid":        [window(102560, "Incarnation"), primaryResourceCapFindings, dot("Moonfire", 164812), dot("Sunfire", 164815), spenderOutsideEclipse],
+  "Balance Druid":        [window(102560, "Incarnation"), primaryResourceCapFindings, dot("Moonfire", 164812), dot("Sunfire", 164815), spenderOutsideEclipse, ...BALANCE_CHECKS],
   "Beast Mastery Hunter": [window(19574, "Bestial Wrath"), (ctx) => primaryResourceCapFindings(ctx, [BARBED_SHOT]), ...BEAST_MASTERY_CHECKS],
   "Marksmanship Hunter":  [window(288613, "Trueshot"), primaryResourceCapFindings],
   "Shadow Priest":        [window(194249, "Voidform"), primaryResourceCapFindings, dot("Shadow Word: Pain", 589), dot("Vampiric Touch", 34914)],
