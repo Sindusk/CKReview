@@ -47,7 +47,9 @@
 // time inside each Ancestor window (under 75%), the same idle. Fewer
 // Spiritwalker's Grace (4 vs 6) fits his larger movement share (2.79M vs
 // 0.74M, not counted by the user's rule). Astral Shift / Earth Elemental:
-// utility.
+// utility. The WoWAnalyzer audit's phase 3 (2026-10-16) added Elemental's
+// own checks in elemental.ts (casts that can't overload inside Ascendance,
+// Lava Burst without Flame Shock); docs/wowa-audit/shaman-elemental.md.
 //
 // Beast Mastery, checked against WoWAnalyzer on qpZx3mWaG7gcDdYB pull 3
 // (Deathstriker; reference jmprxRc62fHCZy7g fight 25's Matcheh, 99th
@@ -121,6 +123,7 @@
 import type { JobCheck, Moment } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";
 import { inWindows, mergeWindows, overlapMs, statusWindows } from "../../timeline";
+import { ELEMENTAL_CHECKS } from "./elemental";
 import { burstGcdFindings, castTimeProcFindings, dotUptimeFindings, k, observedWindowBonus, primaryResourceCapFindings, spentCooldownDrift } from "./shared";
 
 // Backdraft (117828): Conflagrate (17962) adds a stack, max 2; Chaos Bolt
@@ -363,7 +366,7 @@ export const RANGED_CHECKS: Record<string, JobCheck[]> = {
   "Beast Mastery Hunter": [window(19574, "Bestial Wrath"), (ctx) => primaryResourceCapFindings(ctx, [BARBED_SHOT])],
   "Marksmanship Hunter":  [window(288613, "Trueshot"), primaryResourceCapFindings],
   "Shadow Priest":        [window(194249, "Voidform"), primaryResourceCapFindings, dot("Shadow Word: Pain", 589), dot("Vampiric Touch", 34914)],
-  "Elemental Shaman":     [window(1219480, "Ascendance"), primaryResourceCapFindings, dot("Flame Shock", 188389), stormkeeper],
+  "Elemental Shaman":     [window(1219480, "Ascendance"), primaryResourceCapFindings, dot("Flame Shock", 188389), stormkeeper, ...ELEMENTAL_CHECKS],
   "Affliction Warlock":   [window(442726, "Malevolence"), dot("Agony", 980), dot("Unstable Affliction", 1259790), dot("Wither / Corruption", 445474, 146739)],
   "Demonology Warlock":   [window(265187, "Demonic Tyrant")],
   "Destruction Warlock":  [window(442726, "Malevolence"), dot("Wither", 445474), backdraft, havocTarget],

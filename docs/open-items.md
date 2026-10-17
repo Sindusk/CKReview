@@ -303,9 +303,10 @@ and delete them from the header.
     there divides by the whole fight.
   - [shaman-elemental.md](wowa-audit/shaman-elemental.md): Elemental,
     phase 3 done 2026-10-16 against seven top parses, re-measured as
-    damage lost the same day. Four real losses to build, by value:
-    non-overload casts in Ascendance (130-590k each), Lava Burst without
-    Flame Shock (~120k), unbuffed spenders (~6.5% each), one-target Chain
+    damage lost the same day. Built and verified: non-overload casts in
+    Ascendance and Lava Burst without Flame Shock
+    (lib/damage/wow/specs/elemental.ts). Left to build, by value: unbuffed
+    spenders (~6.5% each), one-target Chain
     Lightning (~35k); early Flame Shock refreshes are a fifth, low
     (5-62k a pull). Idle in a Call of the Ancestors window is a sixth:
     the Ancestors lose ~33k a second while the player is idle, on top of
