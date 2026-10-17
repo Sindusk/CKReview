@@ -78,7 +78,16 @@
 //   is already ready, not a loss.
 // - Umbral Embrace (393763) 15s: 6 of 10 top Balance players let one run
 //   out (7/167), the static 14 of 19 pulls; and it empowers a Wrath or
-//   Starfire, so a whole Starfire would overstate it. For the Balance pass.
+//   Starfire, so a whole Starfire would overstate it. Settled in the
+//   Balance pass (2026-10-17, 50 player-pulls): a Starfire with it does
+//   +3k outside Eclipse, +61k in Eclipse, +98k in Incarnation (medians of
+//   the players' own with − without), and it runs out 0–4 times a pull on
+//   the top players (Painseekerr, Новеон 4) as on the weak (Sylmigron
+//   0–3): at most ~0.2M a pull on anyone, top included. Not added.
+// - Starweaver's Warp (393942) / Weft (393944) and Touch the Cosmos
+//   (450360), the free spenders: 1, 5 and 3 removals without a consumer in
+//   1,258 on the 50 Balance player-pulls (Jugular's Weft at 30.0s, a
+//   Touch the Cosmos at 15.0s in forced time). Not added.
 // - Crimson Scourge (81141) 15s: 9 of 18 top Blood players let one run
 //   out (12/349). A free Death and Decay on a tank; for the Blood pass.
 // - Burnout (375802) 15s and Backdraft (117828) 10s: they cut a cast time

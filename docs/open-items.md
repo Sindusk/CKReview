@@ -416,8 +416,22 @@ and delete them from the header.
     (every spec). `unverifiable`: Kill Command and Barbed Shot efficiency
     (their recharges can't be rebuilt). Macro'd pet basic attacks
     negligible. `wrong` kept: Cobra Shot at low Focus.
-  - [druid-balance.md](wowa-audit/druid-balance.md): 9; Fury of Elune
-    drift with Lunation.
+  - [druid-balance.md](wowa-audit/druid-balance.md): phase 3 done
+    2026-10-17 on the 50 Balance player-pulls on disk (Elune's Chosen and
+    Keeper of the Grove; top Entombed Sentinels and Vashnik parses,
+    Sylmigron's 17 pulls), nothing fetched. Built in
+    lib/damage/wow/specs/balance.ts: Eclipse charges capped (Eclipse is a
+    press now: two charges, 30s; the case study's 1.06M), Fury of Elune
+    held (cooldown fitted: 45s less 1.5s per Starfire / Starsurge /
+    Starfall / Moonfire), Starfall on one enemy (the phase-2 `wrong`
+    overturned at one enemy), and spenders outside Eclipse reworked (it
+    read 1.2–2.3M on the top players: free procs, Incarnation and
+    Starfall's enemy count in its price). Left unbuilt with numbers:
+    Incarnation drift (never at two charges past the opener), Force of
+    Nature (holds end at Incarnation), Starfire in Solar, Umbral Embrace
+    (runs out on top and weak alike, ≤60k a proc). `unverifiable`:
+    Moonfire / Sunfire early refresh (their extensions aren't logged),
+    New Moon, Convoke (nobody takes them).
   - [paladin-retribution.md](wowa-audit/paladin-retribution.md): 5; Divine
     Toll drift.
   - [deathknight-frost.md](wowa-audit/deathknight-frost.md): 5;
