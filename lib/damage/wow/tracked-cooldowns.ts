@@ -33,6 +33,7 @@ import { dragonrageValue } from "./specs/devastation";
 import { niuzaoValue } from "./specs/brewmaster";
 import { voidformValue } from "./specs/shadow";
 import { shadowDanceValue } from "./specs/subtlety";
+import { ascendanceValue, voltaicBlazeValue } from "./specs/enhancement";
 
 /**
  * One Vanish's worth to an Assassination Rogue: the damage of a Garrote cast
@@ -279,6 +280,18 @@ export const WOW_TRACKED_COOLDOWNS: Record<string, TrackedCooldown[]> = {
     { name: "Halo", actionIds: [120644], damageIds: [390964], prePullEvidenceIds: [390964], cooldownMs: 60_000, charges: 1, firstUseOffsetMs: 6_000, burstHold: true },           // 60.6 / 62.9s, 6.0s
     { name: "Voidform", actionIds: [228260], cooldownMs: 120_000, charges: 1, firstUseOffsetMs: 8_000, burstHold: true, valuePerUse: voidformValue },      // 120.6 / 126.9s, 7.2s
     { name: "Void Torrent", actionIds: [263165], cooldownMs: 30_000, charges: 1, firstUseOffsetMs: 11_000 },  // 30.0 / 33.5s, 10.8s
+  ],
+  // Enhancement (the WoWAnalyzer audit's phase 3, 2026-10-17; 23
+  // player-pulls, specs/enhancement.ts has the numbers): Ascendance
+  // shortest 120.0s (median 120–180s: the top Vashnik players hold it for
+  // the Imbibes, burstHold), first press median 3.0s; Voltaic Blaze a fixed
+  // 10.0s (shortest 9.98–10.13s on 22 of 23), first press median 0.6s.
+  // Neither has hits of its own worth pricing a use by (Ascendance deals
+  // 29–106k; its window is the value), so both take valuePerUse. Doom Winds
+  // isn't pressed by anyone (Ascendance and spenders give it).
+  "Enhancement Shaman": [
+    { name: "Ascendance", actionIds: [114051], cooldownMs: 120_000, charges: 1, firstUseOffsetMs: 6_000, burstHold: true, valuePerUse: ascendanceValue },
+    { name: "Voltaic Blaze", actionIds: [470057], cooldownMs: 10_000, charges: 1, firstUseOffsetMs: 3_000, burstHold: true, valuePerUse: voltaicBlazeValue },
   ],
   "Elemental Shaman": [
     { name: "Ascendance", actionIds: [114050], cooldownMs: 120_000, charges: 1, firstUseOffsetMs: 2_000 },  // 120.2 / 139.9s, 1.6s

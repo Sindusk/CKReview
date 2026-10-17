@@ -125,6 +125,16 @@
 //   lapse, not a proc), Mass Disintegrate 15s (2 at D; it widens a
 //   Disintegrate, a whole one overstates it), Leaping Flames (no duration:
 //   unused spans 6–41s), Unbound Flame (1 unused in 21 gains).
+// - Stormsurge 12s (Enhancement; added in its phase 3, 2026-10-17, 23
+//   player-pulls): a Stormstrike reset (201846), spent by Stormstrike or
+//   Windstrike. 1,102 gains; run out with no consumer beside it, 12.0s
+//   after the last gain (max span 12.03s): Macroos LCFp3wbHvQqNP4my 4
+//   (2:30, 4:10, 5:09, 6:00), Cocroach gVDPhzp61Zm29HMw 1–2 on three
+//   pulls, Vanilla v8bmgMAdcnBCj9Ya 2, Tolu, Zóhrg, Ripzug, Toranha, Thaw,
+//   Throttnuk 1 each; none on the four top players. Worth a whole
+//   Stormstrike (36–50k with the off-hand; an upper bound). Its 6–21
+//   refreshes a pull come within 1s of the gain (two resets at once) on
+//   every player, top included: not a loss.
 //
 // ── Measured and left out ──────────────────────────────────────────────
 // - Lava Surge (77762) 10s, clean, but 75 of 657 run out on the top
@@ -191,4 +201,5 @@ export const WOW_MEASURED_PROCS = new Map<number, MeasuredProc>([
   [135700,  { durationMs: 15_000, consumerIds: [5221, 106785] }],                 // Clearcasting (Feral) → Shred, Swipe
   [391882,  { durationMs: 15_000, consumerIds: [22568, 441591] }],                // Apex Predator's Craving → Ferocious Bite, Ravage
   [359618,  { durationMs: 15_000, consumerIds: [356995, 357211] }],               // Essence Burst → Disintegrate, Pyre
+  [201846,  { durationMs: 12_000, consumerIds: [17364, 115356] }],                // Stormsurge → Stormstrike, Windstrike
 ]);

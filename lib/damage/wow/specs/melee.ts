@@ -151,6 +151,25 @@
 // (top 0–39k, weak 0–82k). Nobody presses Rupture, so the Assassination
 // bleed models have nothing to judge here.
 //
+// Enhancement Shaman, WoWAnalyzer audit phase 3 (2026-10-17, docs/wowa-audit/
+// shaman-enhancement.md; no case study, not in the user's raids). Measured
+// on 23 player-pulls (top Jshaman, Fjedn, Kurugh, Zaappers, fetched for it;
+// weak Niky, Macroos, Anfall, Tolu, Morkkâ; the static's Cocroach on four
+// pulls). Every player is the same Stormbringer / Ascendance build; nobody
+// presses Doom Winds (a buff Ascendance and spenders give). Enhancement has
+// no MELEE_WINDOWS entry: burstGcdFindings on Ascendance never fired
+// (presses inside come every ~0.96s against the 1.1–1.25s modelled GCD), so
+// enhancement.ts prices the gap check's idle inside it instead ("Idle in
+// Ascendance": top 0–25k, weak up to 404k). And no primaryResourceCapFindings:
+// its casts log only Mana; Maelstrom Weapon is a buff stack, read by
+// "Maelstrom Weapon capped" (a non-spending press at 10 stacks: top
+// 118–291k, weak up to 1.01M). Tracked (tracked-cooldowns.ts): Ascendance
+// 120s valued by its window (3.5–7.5M a use; top none, Macroos 5.96M) and
+// Voltaic Blaze 10s (top 42–147k, weak up to 774k), both burstHold for
+// Vashnik's Imbibes. Flame Shock uptime (top none). Stormsurge expiry
+// (procs.ts). game.ts: a Stormstrike's Thorim's spender and Storm
+// Unleashed's Crash Lightning are its twins (one GCD, not two).
+//
 // Havoc, checked against WoWAnalyzer on qpZx3mWaG7gcDdYB pull 3
 // (Mythnarra; reference 3Vz6Qt2RyTPXwpJn's Hawkerton, 100th percentile,
 // page saved; checked 2026-10-13):
@@ -185,6 +204,7 @@ import { FROST_DK_CHECKS } from "./frostdk";
 import { ASSASSINATION_CHECKS } from "./assassination";
 import { FERAL_CHECKS } from "./feral";
 import { SUBTLETY_CHECKS } from "./subtlety";
+import { ENHANCEMENT_CHECKS } from "./enhancement";
 
 const window = (statusId: number, name: string): JobCheck => (ctx) => burstGcdFindings(ctx, {
   statusId, name,
@@ -273,8 +293,8 @@ const eternalHunt: JobCheck = (ctx) => {
 // (shared.ts spenderSnapshotWaste has the method and its check).
 const holyPowerWaste: JobCheck = (ctx) => spenderSnapshotWaste(ctx, { type: 9, name: "Holy Power" });
 
-export const MELEE_CHECKS: Record<string, JobCheck[]> = Object.fromEntries(
-  Object.entries(MELEE_WINDOWS).map(([spec, [id, name]]) => [spec, [
+export const MELEE_CHECKS: Record<string, JobCheck[]> = {
+  ...Object.fromEntries(Object.entries(MELEE_WINDOWS).map(([spec, [id, name]]) => [spec, [
     window(id, name),
     // Frost DK: no Runic Power cap check (see the header's Frost Death Knight notes).
     // Subtlety: its own Energy cap check, without the clones' Secret Technique casts (subtlety.ts).
@@ -285,5 +305,8 @@ export const MELEE_CHECKS: Record<string, JobCheck[]> = Object.fromEntries(
     ...(spec === "Windwalker Monk" ? WINDWALKER_CHECKS : []),
     ...(spec === "Assassination Rogue" ? ASSASSINATION_CHECKS : []),
     ...(spec === "Feral Druid" ? FERAL_CHECKS : []),
-  ]]),
-);
+  ]])),
+  // Enhancement: no MELEE_WINDOWS entry and no resource cap check (see the
+  // header's Enhancement notes); its checks are all enhancement.ts's.
+  "Enhancement Shaman": ENHANCEMENT_CHECKS,
+};
