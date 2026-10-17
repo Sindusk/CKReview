@@ -240,6 +240,13 @@ pull, so level-100 analysis is untouched. On a synced pull:
   Black Mage's Paradox and Flare Star gauge, a Sage's Eukrasian Dosis III,
   a Gunbreaker's third cartridge. On the TEA report 6pzyKv8fnYBZ2XGa this
   dropped 705 Paradox overcaps and 249 burst-window misses.
+Level 90 was checked on the TOP kill bNcrLh7Y4dkHxM9q fight 17: no
+finding names an action learned above 90, and the Pictomancer's Starry
+Muse rule holds (Subtractive Spectrum and Hyperphantasia are in its
+buffs). The on-disk TOP captures start late (`--from-minutes`), which
+the damage analysis skips, so the full kill lives in
+`sampledata/damage-ff/bNcrLh7Y4dkHxM9q-full/` and is swapped over the
+partial Pull 16 only for a print-only run, then restored.
 Learn levels come from XIVAPI (`action-levels.ts`, generated). Trait
 levels that change a rule (a gauge cap, a charge) aren't in it; they're
 read from the job guides and named in the `fromLevel` comment. The
