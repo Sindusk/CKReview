@@ -243,7 +243,10 @@ export default function StaticErrorChart({ pulls, phases = [] }: { pulls: ChartP
   const visible = players.filter((p) => !hidden.has(p.key));
 
   const n = axis.length;
-  const maxY = Math.max(metric === "rate" ? 0.1 : 1, ...visible.flatMap((p) => (series.get(p.key) ?? []).map((pt) => pt?.value ?? 0)));
+  // A loop, not Math.max(...points): a Party Finder static (hundreds of
+  // players x thousands of pulls) overflows the engine's argument limit.
+  let maxY = metric === "rate" ? 0.1 : 1;
+  for (const p of visible) for (const pt of series.get(p.key) ?? []) if (pt && pt.value > maxY) maxY = pt.value;
   const width = Math.max(plotWidth, PAD_LEFT + PAD_RIGHT + 40);
   const innerWidth = width - PAD_LEFT - PAD_RIGHT;
   const innerHeight = CHART_HEIGHT - PAD_TOP - PAD_BOTTOM;
