@@ -551,8 +551,19 @@ and delete them from the header.
     top players as much; Voidform extension, Void Volley charges,
     Tentacle Slam misses negligible. Lead: Mind Blast presses (weak 3.6
     a minute, top 4.7–7.8), no cooldown model fits. No `wrong` rows.
-  - [rogue-subtlety.md](wowa-audit/rogue-subtlety.md): 16; Ancient Arts
-    pairing (Deathstalker); 3 `wrong`.
+  - [rogue-subtlety.md](wowa-audit/rogue-subtlety.md): phase 3 done
+    2026-10-17 on 41 player-pulls (four top kills fetched). Built
+    (specs/subtlety.ts): "Big finisher without Ancient Arts" (Secret
+    Technique, Coup de Grace or a Darkest Night Eviscerate without the
+    buff that echoes it: top 0–0.53M but Zikli 4.57M and 小胖啵 2.10M,
+    weak 1.3–6.4M), "Secret Technique just before Shadow Dance", the
+    Shadow Dance window; Shadow Dance tracked (two charges, 20s);
+    Shadow Blades and Goremaw's Bite valued by their hits (were 0); the
+    Energy cap without the clones' Secret Technique casts (top players
+    1.1M → 0–0.25M); Shuriken Toss a GCD press. Nobody presses Rupture.
+    Proposed `wrong`: Secret Technique efficiency, dance entry Energy,
+    Vanish for Find Weakness; kept `wrong`: cooldown alignment,
+    Shadowstrike outside stealth, generator after Vanish.
   - [shaman-enhancement.md](wowa-audit/shaman-enhancement.md): 16; Doom
     Winds and the other major cooldowns as tracked cooldowns.
   - [warlock-destruction.md](wowa-audit/warlock-destruction.md): 6;
