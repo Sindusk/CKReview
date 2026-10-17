@@ -45,7 +45,7 @@ damage rows are measured.
 | 3a | Engine: WoW proc expiries | 18 ledgers cite `checkProcs` | `checkProcs` never fired on WoW (no buff durations in the log; confirmed on LckJC7GMhQvD6rdw: 0 of 36,543 buff events carry one). Done 2026-10-17: measured durations for ten procs (lib/damage/wow/procs.ts, `DamageGame.measuredProcs`); Windwalker, Elemental and Arcane proc rows rechecked |
 | 4 | Demonology | [warlock-demonology.md](warlock-demonology.md) | done 2026-10-17: Implosion held (the phase-2 `wrong` overturned: To Hell and Back), Call Dreadstalkers held (demonology.ts); verified by the main session |
 | 5 | Affliction | [warlock-affliction.md](warlock-affliction.md) | done 2026-10-17: Haunt dropped (affliction.ts), Nightfall expiry (procs.ts), Drain Soul added as a GCD channel (game.ts); verified by the main session |
-| 6 | Arms | [warrior-arms.md](warrior-arms.md) | |
+| 6 | Arms | [warrior-arms.md](warrior-arms.md) | done 2026-10-17: Bladestorm outside Colossus Smash; Colossus Smash drift revalued by its armor window (arms.ts); verified by the main session |
 | 7 | Preservation | [evoker-preservation.md](evoker-preservation.md) | |
 | 8 | Mistweaver | [monk-mistweaver.md](monk-mistweaver.md) | |
 | 9 | Restoration Druid | [druid-restoration.md](druid-restoration.md) | |
@@ -214,6 +214,10 @@ measured for it.
 - **Pets copy or extend a press under their own names** ("Wild Imp
   (Inner Demons/To Hell and Back)"): value a press by the pet damage in
   the seconds after it against the pet's baseline rate.
+- **A window that lowers armor isn't seen by `observedWindowBonus`**,
+  which reads unmitigated hits (×1.0). Arms' Colossus Smash read 10–24%;
+  after armor it's ×1.3–1.6. Compare hits after mitigation for any
+  armor or damage-taken debuff.
 - **Value a hit by its own events, not a total divided by presses**
   (Arcane Orb: 294k claimed, 47–63k a pressed Orb).
 - **Class resources not in the fetch** (Arcane Charges) make a rule
@@ -253,6 +257,10 @@ measured for it.
   lets Unstable Affliction drop while spamming Seed of Corruption on adds
   and reads 423k; Haunt dropped excuses those gaps (2+ Seeds), the shared
   check doesn't.
+- Arms (2026-10-17): kept `wrong` (Sweeping Strikes with Colossus Smash,
+  Deep Wounds refresh, Cleave efficiency) and proposed `wrong` (Rend
+  early refresh: Rend is pressed by name twice in 44 pulls), evidence in
+  [warrior-arms.md](warrior-arms.md).
 
 - Elemental (2026-10-17): `CallOfTheAncestors/other-checks`,
   `statistics` (and whether "Stormkeeper before Ascendance" should be
