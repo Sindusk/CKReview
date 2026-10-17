@@ -564,8 +564,21 @@ and delete them from the header.
     Proposed `wrong`: Secret Technique efficiency, dance entry Energy,
     Vanish for Find Weakness; kept `wrong`: cooldown alignment,
     Shadowstrike outside stealth, generator after Vanish.
-  - [shaman-enhancement.md](wowa-audit/shaman-enhancement.md): 16; Doom
-    Winds and the other major cooldowns as tracked cooldowns.
+  - [shaman-enhancement.md](wowa-audit/shaman-enhancement.md): phase 3
+    done 2026-10-17 on 23 player-pulls (four top kills fetched; every
+    player the same Stormbringer / Ascendance build, nobody presses Doom
+    Winds or takes Hot Hand, Surging Totem or Primordial Storm). Built
+    (specs/enhancement.ts): Ascendance tracked (120s, valued by its window:
+    top none, Macroos 5.96M), Voltaic Blaze tracked (10s: top 42–147k, weak
+    up to 774k), "Maelstrom Weapon capped" (a non-spending press at 10
+    stacks: top 118–291k, weak up to 1.01M), "Idle in Ascendance", Flame
+    Shock uptime; Stormsurge expiry (procs.ts). Engine: a Stormstrike's
+    Thorim's spender and Storm Unleashed's Crash Lightning are twins of
+    their press (game.ts). No generic window or resource cap check for the
+    spec (neither could read it). Proposed `wrong`: Tempest overwritten,
+    Tempest below 10 stacks, Chain Lightning on one target, Flame Shock
+    early refresh. Left: the Doom Winds / Hot Hand / Surging Totem /
+    Primordial Storm rows, for want of a log of those builds.
   - [warlock-destruction.md](wowa-audit/warlock-destruction.md): 6;
     Immolate uptime without Wither.
   - [warrior-fury.md](wowa-audit/warrior-fury.md): 11; Avatar drift (the
