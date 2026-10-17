@@ -59,10 +59,10 @@ const MAX_EXTRAPOLATE_MS = 350;
 const FFLOGS_ICON = (name: string) => `https://assets.rpglogs.com/img/ff/icons/${name}.png`;
 // Guide-style AoE colours by kind: blue AoEs, yellow towers, purple
 // tankbusters; white rims. `flash` is the fill as it resolves.
-const AOE_COLORS: Record<AoeShape["style"], { fill: string; flash: string; rim: string }> = {
-  aoe:        { fill: "#2f5bff", flash: "#7fa2ff", rim: "#ffffff" },
-  tower:      { fill: "#f2c230", flash: "#ffe27a", rim: "#fff6c8" },
-  tankbuster: { fill: "#8a3dff", flash: "#c99bff", rim: "#f1e2ff" },
+const AOE_COLORS: Record<AoeShape["style"], { fill: string; flash: string; rim: string; glow: string }> = {
+  aoe:        { fill: "#2f5bff", flash: "#7fa2ff", rim: "#dfe8ff", glow: "#5f8bff" },
+  tower:      { fill: "#f2c230", flash: "#ffe27a", rim: "#fff6c8", glow: "#ffb84a" },   // non-circle towers only; circles use Tower
+  tankbuster: { fill: "#8a3dff", flash: "#c99bff", rim: "#f1e2ff", glow: "#b47bff" },
 };
 const PLAYER_ICON = 34;   // SVG units, at icon scale 1
 const BOSS_ICON = 46;
@@ -216,7 +216,7 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
             {showGrid && <Grid cx={cx} cy={cy} half={half} toX={toX} toY={toY} S={S} />}
             {showRings && <Rings cx={cx} cy={cy} half={half} toX={toX} toY={toY} scale={scale} />}
             {showAoes && aoesAt(aoes, t).map(({ s, opacity, resolving }, i) => (
-              <Aoe key={i} s={s} opacity={opacity} resolving={resolving} toX={toX} toY={toY} scale={scale} />
+              <Aoe key={i} uid={`${i}-${s.resolve}`} s={s} opacity={opacity} resolving={resolving} toX={toX} toY={toY} scale={scale} />
             ))}
             {tethers.filter((tt) => t >= tt.start && t <= tt.end).map((tt, i) => {
               const src = actorByKey.get(tt.source), dst = actorByKey.get(tt.target);
@@ -437,23 +437,32 @@ function Rings({ cx, cy, half, toX, toY, scale }: { cx: number; cy: number; half
   return <g pointerEvents="none">{out}</g>;
 }
 
-/** One AoE in guide style: coloured fill by kind, white rim; brighter as it resolves. */
-function Aoe({ s, opacity, resolving, toX, toY, scale }: { s: AoeShape; opacity: number; resolving: boolean; toX: (x: number) => number; toY: (y: number) => number; scale: number }) {
+/**
+ * One AoE, drawn like the game's telegraphs: a gradient fill that is
+ * faint at the origin and strongest at the edge, a soft glow just outside
+ * the rim, and a crisp rim line. Brighter as it resolves. Towers get their
+ * own art (Tower). `uid` keeps each shape's gradient id unique.
+ */
+function Aoe({ s, opacity, resolving, toX, toY, scale, uid }: { s: AoeShape; opacity: number; resolving: boolean; toX: (x: number) => number; toY: (y: number) => number; scale: number; uid: string }) {
   const x = toX(s.x), y = toY(s.y);
   const r = s.range * scale;
   const b = (s.bearing * Math.PI) / 180;
+  if (s.style === "tower" && s.kind === "circle") return <Tower x={x} y={y} r={r} opacity={opacity} resolving={resolving} uid={uid} />;
   const c = AOE_COLORS[s.style];
-  const common = { fill: resolving ? c.flash : c.fill, fillOpacity: resolving ? 0.8 : 0.62, stroke: c.rim, strokeWidth: 3.5 } as const;
+  const base = resolving ? c.flash : c.fill;
+  const grad = `aoe-${uid}`;
+  // Radial shapes shade outward from their origin; lines across their width.
+  const radial = s.kind === "circle" || s.kind === "donut" || s.kind === "cone";
   let d: string;
-  if (s.kind === "circle") {
-    return <g opacity={opacity} pointerEvents="none"><circle cx={x} cy={y} r={r} {...common} /></g>;
+  let evenOdd = false;
+  if (s.kind === "circle" || (s.kind === "cone" && s.angle >= 360)) {
+    d = `M${x - r} ${y} a${r} ${r} 0 1 0 ${2 * r} 0 a${r} ${r} 0 1 0 ${-2 * r} 0 Z`;
   } else if (s.kind === "donut") {
     const ri = s.inner * scale;
     d = `M${x - r} ${y} a${r} ${r} 0 1 0 ${2 * r} 0 a${r} ${r} 0 1 0 ${-2 * r} 0 Z M${x - ri} ${y} a${ri} ${ri} 0 1 1 ${2 * ri} 0 a${ri} ${ri} 0 1 1 ${-2 * ri} 0 Z`;
-    return <g opacity={opacity} pointerEvents="none"><path d={d} fillRule="evenodd" {...common} /></g>;
+    evenOdd = true;
   } else if (s.kind === "cone") {
     const h = ((s.angle / 2) * Math.PI) / 180;
-    if (s.angle >= 360) return <g opacity={opacity} pointerEvents="none"><circle cx={x} cy={y} r={r} {...common} /></g>;
     const p = (a: number) => `${x + Math.sin(a) * r} ${y - Math.cos(a) * r}`;
     d = `M${x} ${y} L${p(b - h)} A${r} ${r} 0 ${s.angle > 180 ? 1 : 0} 1 ${p(b + h)} Z`;
   } else if (s.kind === "cross") {
@@ -469,7 +478,68 @@ function Aoe({ s, opacity, resolving, toX, toY, scale }: { s: AoeShape; opacity:
     const ux = Math.sin(b), uy = -Math.cos(b), px = -uy, py = ux;
     d = `M${x + px * w} ${y + py * w} L${x + ux * r + px * w} ${y + uy * r + py * w} L${x + ux * r - px * w} ${y + uy * r - py * w} L${x - px * w} ${y - py * w} Z`;
   }
-  return <g opacity={opacity} pointerEvents="none"><path d={d} {...common} /></g>;
+  const w = (s.width * scale) / 2;
+  const ux = Math.sin(b), uy = -Math.cos(b);
+  return (
+    <g opacity={opacity} pointerEvents="none">
+      <defs>
+        {radial ? (
+          <radialGradient id={grad} gradientUnits="userSpaceOnUse" cx={x} cy={y} r={Math.max(1, r)}>
+            <stop offset="0%" stopColor={base} stopOpacity={resolving ? 0.55 : 0.32} />
+            <stop offset="65%" stopColor={base} stopOpacity={resolving ? 0.7 : 0.5} />
+            <stop offset="100%" stopColor={base} stopOpacity={resolving ? 0.95 : 0.82} />
+          </radialGradient>
+        ) : (
+          // Across the line's width: strong at both long edges, faint mid.
+          <linearGradient id={grad} gradientUnits="userSpaceOnUse" x1={x + uy * w} y1={y - ux * w} x2={x - uy * w} y2={y + ux * w}>
+            <stop offset="0%" stopColor={base} stopOpacity={resolving ? 0.95 : 0.82} />
+            <stop offset="50%" stopColor={base} stopOpacity={resolving ? 0.6 : 0.38} />
+            <stop offset="100%" stopColor={base} stopOpacity={resolving ? 0.95 : 0.82} />
+          </linearGradient>
+        )}
+      </defs>
+      <path d={d} fill="none" stroke={c.glow} strokeWidth={11} strokeOpacity={0.4} strokeLinejoin="round" />
+      <path d={d} fill={`url(#${grad})`} fillRule={evenOdd ? "evenodd" : undefined} stroke={c.rim} strokeWidth={2.5} strokeLinejoin="round" />
+    </g>
+  );
+}
+
+/**
+ * A tower, after the ones Dancing Mad drops in P1: a scorched orange ring
+ * on the floor with a dark centre and rune-like dashes, and a violet pillar
+ * of light rising from its middle (seen from above, leaning north as in
+ * strategy-guide art). Flares white as it resolves.
+ */
+function Tower({ x, y, r, opacity, resolving, uid }: { x: number; y: number; r: number; opacity: number; resolving: boolean; uid: string }) {
+  const floor = `tw-floor-${uid}`, beam = `tw-beam-${uid}`;
+  const pw = Math.max(6, r * 0.3);        // pillar width
+  const ph = r * 1.05;                     // pillar length (toward north)
+  return (
+    <g opacity={opacity} pointerEvents="none">
+      <defs>
+        <radialGradient id={floor} gradientUnits="userSpaceOnUse" cx={x} cy={y} r={Math.max(1, r)}>
+          <stop offset="0%" stopColor="#1c0828" stopOpacity={0.72} />
+          <stop offset="62%" stopColor="#4a1030" stopOpacity={0.62} />
+          <stop offset="86%" stopColor="#ff6a1f" stopOpacity={resolving ? 0.95 : 0.75} />
+          <stop offset="100%" stopColor="#ffb14a" stopOpacity={resolving ? 1 : 0.9} />
+        </radialGradient>
+        <linearGradient id={beam} gradientUnits="userSpaceOnUse" x1={x} y1={y} x2={x} y2={y - ph}>
+          <stop offset="0%" stopColor="#ffffff" stopOpacity={0.95} />
+          <stop offset="35%" stopColor={resolving ? "#f3e6ff" : "#c48bff"} stopOpacity={0.85} />
+          <stop offset="100%" stopColor="#8a3dff" stopOpacity={0} />
+        </linearGradient>
+      </defs>
+      {/* Floor: glow, gradient disc, swirling rune dashes, rim. */}
+      <circle cx={x} cy={y} r={r} fill="none" stroke="#ff7a2a" strokeWidth={12} strokeOpacity={0.45} />
+      <circle cx={x} cy={y} r={r} fill={`url(#${floor})`} stroke="#ffc074" strokeWidth={2.5} />
+      <circle cx={x} cy={y} r={r * 0.82} fill="none" stroke="#ffcf8a" strokeOpacity={0.75} strokeWidth={2} strokeDasharray={`${r * 0.35} ${r * 0.18}`} />
+      <circle cx={x} cy={y} r={r * 0.62} fill="none" stroke="#ff8a3d" strokeOpacity={0.5} strokeWidth={1.5} strokeDasharray={`${r * 0.12} ${r * 0.2}`} />
+      {/* Pillar of light. */}
+      <rect x={x - pw * 0.9} y={y - ph} width={pw * 1.8} height={ph} rx={pw * 0.9} fill="#a65cff" fillOpacity={0.25} />
+      <rect x={x - pw / 2} y={y - ph} width={pw} height={ph} rx={pw / 2} fill={`url(#${beam})`} />
+      <circle cx={x} cy={y} r={pw * 0.75} fill="#ffffff" fillOpacity={resolving ? 1 : 0.9} stroke="#d6b0ff" strokeWidth={3} />
+    </g>
+  );
 }
 
 /** A small triangle just outside a dot, pointing along compass bearing `b` (radians, 0 = N). */
