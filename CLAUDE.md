@@ -126,11 +126,11 @@ These are standing preferences, each learned from a real correction:
   The optimizer once moved a 60s Reprisal four minutes later when it was
   free three times over in between (user, 2026-10-11).
 - **Dropping an analyzer rule needs the user's approval** (user,
-  2026-10-16). In the WoWAnalyzer audit, a rule marked `wrong` or
-  `no-damage` must first be checked in the log, then brought to the user
-  with the evidence. Mark it only after they agree. `covered` and
-  `superseded` don't need approval. Details are in
-  docs/wowa-audit-plan.md, phase 3.
+  2026-10-16). In the WoWAnalyzer and xivanalysis audits, a rule marked
+  `wrong` or `no-damage` must first be checked in the log, then brought
+  to the user with the evidence. Mark it only after they agree.
+  `covered` and `superseded` don't need approval. Details are in phase 3
+  of docs/wowa-audit-plan.md and docs/xiva-audit-plan.md.
 - **Narrow overrides, not wholesale replacement.** When a working mechanism
   fails for one specific case, add a scoped override for that case. Don't
   swap the whole mechanism.

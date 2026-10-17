@@ -127,7 +127,32 @@ case study for that job.
 - **Premise check** (any pull with the job): does the rule's logic hold for
   this fight? Downtime, adds, untargetable windows, forced movement. A
   `candidate` whose premise holds can be built; one whose premise fails
-  becomes `wrong`.
+  becomes `wrong`, after the user's approval (below).
+- **Value every candidate as damage lost first** (user, 2026-10-16).
+  Measure what the action cost against what the player would have done
+  instead. Top players doing the same thing is evidence about the
+  premise, not proof that it costs nothing. The WoW audit's Elemental
+  pass marked five real losses `wrong` that way.
+- **Ask what it costs on the timeline** (user, 2026-10-16): would doing
+  this here cost something later in the fight (a cooldown pushed out of
+  the two-minute window, a gauge or charge not there when burst opens, a
+  DoT due again sooner)? Count that in the loss, and in the case for
+  `wrong` or `no-damage`.
+- **`wrong` and `no-damage` need the user's approval** (user,
+  2026-10-16), job by job as phase 3 reaches it. These are the two
+  statuses that drop a rule. Before marking one:
+  - check the verdict yourself: measure the loss in the log, or show
+    why the rule's premise fails;
+  - then bring the user the evidence, one numbered item per row, with
+    pull, MM:SS and numbers they can check;
+  - mark the row only after the user agrees, and add "Approved by the
+    user YYYY-MM-DD." to its notes;
+  - an approved row isn't raised again.
+
+  A row the user rejects goes back to `candidate`. `covered`, `verified`
+  and `superseded` need no approval. The `wrong` and `no-damage` rows
+  already in `docs/xiva-audit/` are proposals until their job's next
+  phase 3 pass has this review.
 - **Firing check** (needs a pull where the mistake happens): does the app's
   check fire where xivanalysis's does, and with a sensible cost? A clean
   pull proves nothing here: both tools report zero. Look for the mistake in
