@@ -60,7 +60,7 @@ damage rows are measured.
 | 16a | Engine: spell-survey sweep, every spec | game.ts / spell-data.ts | Four passes found presses or channels missing from the survey (Reaver's Glaive, Drain Soul, Sigil of Chains, Guardian's kit). One sweep over every spec on disk. Done 2026-10-17 (13104a3, `SWEEP_PRESSES`): Protection Warrior, Enhancement and Discipline had no survey data at all (top players 1–39% GCD uptime, now 83–92%); Devourer, Frost Mage, Outlaw, Destruction and others gained too; verified by the main session |
 | 17 | Assassination | [rogue-assassination.md](rogue-assassination.md) | done 2026-10-17: Rupture / Garrote off every enemy (replaces the shared uptime check for the spec), Rupture refreshed early, Vanish drift priced for players who never Vanish (assassination.ts, tracked-cooldowns.ts); verified by the main session |
 | 18 | Marksmanship | [hunter-marksmanship.md](hunter-marksmanship.md) | done 2026-10-17: Precise Shots lost (marksmanship.ts), Trueshot valued, Moonlight Chakram expiry (procs.ts), Focus cap check removed for the spec; verified by the main session |
-| 19 | Feral | [druid-feral.md](druid-feral.md) | |
+| 19 | Feral | [druid-feral.md](druid-feral.md) | done 2026-10-17: tracked cooldowns valued (Tiger's Fury, Berserk, Incarnation, Convoke 120s, Feral Frenzy), Rip off every enemy, Ferocious Bite below 5 points, Incarnation window (feral.ts); Moonfire / Frantic Frenzy / Stampeding Roar presses (game.ts); Clearcasting and Apex Predator's Craving expiries (procs.ts); verified by the main session |
 | 20 | Augmentation | [evoker-augmentation.md](evoker-augmentation.md) | |
 | 21 | Devastation | [evoker-devastation.md](evoker-devastation.md) | |
 | 22 | Brewmaster | [monk-brewmaster.md](monk-brewmaster.md) | |
@@ -364,6 +364,12 @@ measured for it.
   efficiency, Focus at the cap. Note: talented players who never press
   Kill Shot can't be flagged (the app has no talent names). Evidence in
   [hunter-marksmanship.md](hunter-marksmanship.md).
+- Feral (2026-10-17): proposed `wrong`: Rip refreshed early (top players
+  clip as much; Vydal 1.25M, unexplained) and Tiger's Fury Energy waste
+  (Tiger's Fury no longer grants Energy); kept `wrong`: Chomp, Sudden
+  Ambush on Rake. Worth a look: the Berserk window and Energy capped fire
+  on top players about as much as on weaker ones (top 0.04–0.82M), kept
+  unchanged. Evidence in [druid-feral.md](druid-feral.md).
 
 - Elemental (2026-10-17): `CallOfTheAncestors/other-checks`,
   `statistics` (and whether "Stormkeeper before Ascendance" should be
