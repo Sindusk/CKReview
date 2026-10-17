@@ -40,7 +40,7 @@ damage rows are measured.
 | # | Spec | Ledger | Status |
 |---|---|---|---|
 | 1 | Windwalker | [monk-windwalker.md](monk-windwalker.md) | done 2026-10-17: Fists of Fury held, Zenith Stomp unused (windwalker.ts); verified by the main session |
-| 2 | Havoc | [demonhunter-havoc.md](demonhunter-havoc.md) | |
+| 2 | Havoc | [demonhunter-havoc.md](demonhunter-havoc.md) | done 2026-10-17: Eye Beam held, Death Sweep reset unused (havoc.ts); Reaver's Glaive added as a GCD press (game.ts); verified by the main session |
 | 3 | Arcane | [mage-arcane.md](mage-arcane.md) | |
 | 4 | Demonology | [warlock-demonology.md](warlock-demonology.md) | |
 | 5 | Affliction | [warlock-affliction.md](warlock-affliction.md) | |
@@ -176,6 +176,16 @@ measured for it.
   outside, against a held second's value), never past one recharge.
 - **Forced time explains much of WoWAnalyzer's efficiency gap**
   (Vitriolic Stasis): measure outside it before calling a loss real.
+- **Check the spell survey for the spec's hero-talent presses.** Havoc's
+  Reaver's Glaive wasn't in it, so every press read as an idle GCD and
+  doubled the top players' GCD delays. If the top players' delays look
+  high, list the casts that precede the "idle" gaps.
+- **Fit a cooldown to the log before trusting a modelled cut.** Havoc's
+  Eye Beam sat at exactly 20.0s whatever the spender count, so the
+  per-spender cut WoWAnalyzer models wasn't there.
+- **A trial check that fires on the top players about as much as on the
+  weak ones is dropped**, with its numbers in the ledger (Havoc's Essence
+  Break window).
 
 ## Held for the user's review
 
@@ -185,6 +195,12 @@ measured for it.
   [monk-windwalker.md](monk-windwalker.md). Also an unvalued lead outside
   any WoWAnalyzer rule: Blkphnx casts 4.9 paid Blackout Kicks a minute
   against the top players' 1.0–3.0.
+- Havoc (2026-10-17): `BladeDance/low-target` and the two Inertia window
+  rows kept `wrong` (every sample player takes First Blood; nobody takes
+  Inertia), evidence in [demonhunter-havoc.md](demonhunter-havoc.md).
+  Open, not a decision: Blade Dance / Death Sweep presses (9.5 per
+  unforced minute against the top players' 10.8–12.7) is the largest
+  unpriced Havoc loss; its cooldown couldn't be rebuilt from the log.
 
 - Elemental (2026-10-17): `CallOfTheAncestors/other-checks`,
   `statistics` (and whether "Stormkeeper before Ascendance" should be
