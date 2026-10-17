@@ -167,6 +167,14 @@
 //   tank is a bad bait by someone unnamed, not the tank's avoidable (user,
 //   E22: the tank "didn't make a mistake - the Chakram was baited incorrectly";
 //   also B31, D26).
+// ffxiv-bjcc-lightning-swap (Major when a Punishing Thunder follows, else
+//   Minor; the helper and whoever shared it instead: the log can't say
+//   which moved): Lightning round 1 or 2 shared without its helper, so it
+//   passes off the plan (user's cheat sheet: Lightning goes DPS > MT >
+//   Water healer > OT). Later Lightning errors are its fallout. F13 round 1
+//   went to the dragoon instead of Brute Justice's tank; round 2 then went
+//   to the tank and round 3 hit the tank alone (Punishing Thunder), which
+//   used to name Cruise Chaser's tank. Also B43, C19.
 // Generic, BJ/CC wipes only (no Temporal Stasis, ended 30s+ after J Kick),
 //   without a mechanic Raid: ffxiv-bjcc-called-wipe (3+ no-killing-blow
 //   deaths in 10s or any within 12s of the end; Photon-tick deaths
@@ -193,6 +201,11 @@
 //   on disk) pulls 18, 22, 24, rulings in expectations/rulings.json. E24
 //   +4:17.4 pass 4: the white mage (donor) walked into the dancer, who was
 //   correct; both still named (see question 3).
+// VOD review 2026-10-17 (user): report F = Q9zqJb4VLmjhd1B6 (all 16 pulls
+//   on disk) pull 5 (the dragoon not far enough from the chakram's line),
+//   rulings in expectations/rulings.json. F13 / F14 Lightning: the user
+//   couldn't tell who should have shared; F14 followed the plan up to
+//   round 3, so Cruise Chaser's tank stays named there.
 // OPEN QUESTIONS:
 // 1. Collisions name both players. Who moved (B37 pass 4, B43 +63 two
 //    melee in the west Enumeration; C22 +101.5 two ranged at pass 3)?
@@ -540,6 +553,7 @@ export const BJCC_CALLED_WIPE_RULE_ID     = "ffxiv-bjcc-called-wipe";
 export const BJCC_COLLAPSE_RULE_ID        = "ffxiv-bjcc-collapse";
 export const BJCC_TANK_DEAD_RULE_ID       = "ffxiv-bjcc-tank-dead";
 export const BJCC_CHAKRAM_BAIT_RULE_ID    = "ffxiv-bjcc-chakram-bait";
+export const BJCC_LIGHTNING_SWAP_RULE_ID  = "ffxiv-bjcc-lightning-swap";
 
 const J_KICK          = 18516;
 const JUDGMENT_NISI   = 18494;
@@ -973,6 +987,7 @@ function detectElements(players: PlayerInfo[], deaths: DeathEvent[], life: Life,
   const dmg = (p: PlayerInfo, id: number, t: number) => p.damageTaken.filter((e) => e.abilityId === id && e.timestamp >= t - 200 && e.timestamp <= t + 1500).reduce((s, e) => s + realAmount(e), 0);
   const punishedAfter = (t: number, id: number) => casts.some((c) => c.abilityId === id && c.timestamp >= t && c.timestamp <= t + 6000);
 
+  let shifted = false;
   rounds.forEach((t, i) => {
     const n = i + 1;
     const wCarrier = carrierOf(COMPRESSED_WATER, t);
@@ -1001,7 +1016,25 @@ function detectElements(players: PlayerInfo[], deaths: DeathEvent[], life: Life,
       }));
     }
 
-    if (!lCarrier || !light.length) return;
+    if (!lCarrier || !light.length || shifted) return;
+    // Lightning shared with someone other than its helper: it passes to
+    // them, and every later round's carrier and helper are off the plan
+    // (DPS > MT > Water healer > OT). F13 round 1: the monk shared with the
+    // dragoon instead of Brute Justice's tank; round 2 went to that tank and
+    // round 3 hit it alone. Later Lightning errors are its fallout.
+    // Rounds 1-2 only: round 3's Lightning has no later round to break.
+    if (n < 3 && light.length >= 2 && helper && helper !== lCarrier && !light.includes(helper) && life.alive(helper, t - 300)) {
+      shifted = true;
+      const subs = light.filter((p) => p !== lCarrier);
+      const severe = casts.some((c) => c.abilityId === PUNISHING_THUNDER && c.timestamp > t);
+      const role = n === 1 ? "Brute Justice's tank" : n === 2 ? "the healer under Water Resistance Down" : "Cruise Chaser's tank";
+      for (const p of [helper, ...subs]) errors.push(playerError(p, {
+        ruleId: BJCC_LIGHTNING_SWAP_RULE_ID, severity: severe ? "Major" : "Minor", name: "Lightning Passed to the Wrong Player",
+        description: `Lightning round ${n} (carried by ${lCarrier.name}) was shared by ${namesOf(subs)} instead of ${helper.name}, ${role}, so it passed to the wrong player and every later Lightning round was off the plan (DPS > MT > Water healer > OT)${severe ? "; it ended in Punishing Thunder" : ""}. The log can't say whether ${helper.name} was late or ${namesOf(subs)} stepped in.`,
+        timestamp: t, abilityId: CRASHING_THUNDER, abilityName: "Crashing Thunder",
+      }));
+      return;
+    }
     // Lightning alone: its helper never came.
     if (light.length === 1 && light[0] === lCarrier && helper && helper !== lCarrier && life.alive(helper, t - 300)) {
       const severe = punishedAfter(t, PUNISHING_THUNDER) || !!life.diedFrom(lCarrier, t);

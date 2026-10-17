@@ -108,6 +108,9 @@
 //   on disk) pull 7, rulings in expectations/rulings.json. NAUR's 1256
 //   group starts on the north-west half, 3478 on the south-east (the user's
 //   cheat sheet).
+// VOD review 2026-10-17 (user): report F = Q9zqJb4VLmjhd1B6 pulls 2 (#2
+//   no knockback resist; facing Cruise Chaser shortens the knockback a lot)
+//   and 10 (#1 angled the sword wrong), rulings in expectations/rulings.json.
 // OPEN QUESTIONS:
 // 1. A charge through two or more players names the even holder and the
 //    players hit (A45 #2, A50 #8, B9 #2). Which was it?
@@ -429,7 +432,7 @@ function detectNumberedAttacks(attacks: Attack[], deaths: DeathEvent[], kickT: n
       const d = nextDeath(owner, ownHit.e.timestamp);
       if (knockedOff(d, ownHit.e.timestamp)) errors.push(playerError(owner, {
         ruleId: LC_KNOCKBACK_RULE_ID, severity: "Major", name: "Knocked Off by Own Number",
-        description: `Their own ${a.sword ? "Alpha Sword" : "Super Blassty Charge"} (#${a.n}) knocked them off the arena; they died ${((d!.timestamp - ownHit.e.timestamp) / 1000).toFixed(1)}s later. ${a.sword ? "The sword knocks back along your facing" : "The charge knocks you 20y along its line"}: take it with the edge behind Cruise Chaser, not behind you, and keep to the route's inside track.`,
+        description: `Their own ${a.sword ? "Alpha Sword" : "Super Blassty Charge"} (#${a.n}) knocked them off the arena; they died ${((d!.timestamp - ownHit.e.timestamp) / 1000).toFixed(1)}s later. ${a.sword ? "The sword knocks back along your facing" : "The charge knocks you 20y along its line"}: use knockback immunity (Arm's Length / Surecast), or face Cruise Chaser, which shortens the knockback a lot, and keep to the route's inside track.`,
         timestamp: ownHit.e.timestamp, abilityId: a.cast.abilityId, abilityName: a.cast.abilityName,
       }));
     }

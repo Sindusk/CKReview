@@ -81,7 +81,10 @@
 //   Tetrashatter casts (32 hits); three or fewer is a missed crystal.
 // - Heat / Spear: Hallowed Ground on the first set, Holmgang on the second.
 //   Deaths to them (D7 reversed order, F1, F11's late Hallowed Ground) are
-//   tank cooldowns: Mitigation Analysis territory.
+//   the targeted tank's mistimed invulnerability (user, 2026-10-17, F1:
+//   the Warrior "mistimed invulnerability"; this overturns the earlier note that
+//   called them Mitigation Analysis territory). F1's spears killed the
+//   Paladin on the second set and then cut through the party.
 // - Wormhole: odd numbers' swords hit at the NW/SW dots, even charges at
 //   NE/SE. The holder's facing isn't usable as a fixed axis (clean sword
 //   axes 15 median / 76 p90 degrees off "outward"), so aim is read from
@@ -189,8 +192,9 @@
 // Exposure: wormhole-aim and wormhole-knockback are targeted (each attack's
 //   holder), soak-missed targeted (each check's two owed numbers); the rest
 //   are everyone.
-// Not built: Divine Spear / Chastening Heat and Tetrashatter deaths
-//   (cooldowns and healing); Plaint of Solidarity short (one case, B28, in a
+// ffxiv-ap-tank-buster (Major): a tank killed by the Chastening Heat or
+//   Divine Spear aimed at them (F1, F11, D7, B28, C9).
+// Not built: Plaint of Solidarity short (one case, B28, in a
 //   cascade); the transition hit (no LB in any clear, 17-31k).
 // VOD review 2026-10-16 (user): report C pulls 9, 10, 12, 14, 29 and
 //   report D = 6pzyKv8fnYBZ2XGa (all 28 pulls on disk, full captures)
@@ -220,7 +224,14 @@
 //   points with a bearing, so the cone descriptions give those. Apocalyptic
 //   Ray aims at the player farthest from Brute Justice, not the jump
 //   baiter (user; NAUR's red dot); E9 (#4 in it) the VOD couldn't show.
+// VOD review 2026-10-17 (user): report F (all 16 pulls now on disk, full
+//   captures) pulls 1, 4, 6, 7, 11, 15, rulings in expectations/rulings.json.
+//   F6: #1's stray was the waiting player too close (should move south
+//   along the wall); F7: #3 aimed into the group (answers question 2 for
+//   F7); F11 #7 caught by the charge after their sword. Facing Cruise
+//   Chaser shortens its knockback a lot (user).
 // OPEN QUESTIONS:
+// 5. F1: the Paladin also died to the second Spear set (6:49): his too?
 // 1. Electromagnetic Burst names nobody (C27, D5, D16): can the orbs'
 //    paths be read from anything the log keeps?
 // 2. Wormhole #3's sword into the waiting group (D13, D19, F2, F7; D10
@@ -586,7 +597,10 @@ export const AP_WH_DEATH_RULE_ID        = "ffxiv-ap-wormhole-death";
 export const AP_WALL_RULE_ID            = "ffxiv-ap-wall";
 export const AP_TRUE_HEART_RULE_ID      = "ffxiv-ap-true-heart";
 export const AP_TETRASHATTER_RULE_ID    = "ffxiv-ap-tetrashatter";
+export const AP_TANK_BUSTER_RULE_ID     = "ffxiv-ap-tank-buster";
 const TETRASHATTER = 19080;
+const CHASTENING_HEAT = 19072;
+const DIVINE_SPEAR = 19074;
 const J_STORM = 18550;
 // Wormhole's numbers and soaks are done ~40s after its cast.
 const WORMHOLE_SPAN_MS = 45_000;
@@ -811,6 +825,7 @@ export function detectAlexanderPrimeErrors(
     }
   }
   detectApWall(c, start, end, lastEvent);
+  detectTankBuster(c, start, end);
   detectSacrament(c, start, end);
   detectEnding(c, headMarkers, wormhole?.timestamp, end);
 
@@ -1209,7 +1224,7 @@ function detectWormhole(c: Ctx, wh: number, headMarkers: HeadMarker[], end: numb
       const off = ownHit ? knockedOff(c.deaths, h, ownHit.e.timestamp) : undefined;
       if (off && !victims.some((p) => p !== h)) {
         push(h, AP_WH_KNOCKBACK_RULE_ID, "Major", "Knocked Off by Own Attack",
-          `Their own ${label} knocked them off the arena; they died ${((off.timestamp - ownHit!.e.timestamp) / 1000).toFixed(1)}s later. Use knockback immunity (Arm's Length / Surecast) for it, or take it with Cruise Chaser between you and the center so the knockback carries you along the edge.`, a);
+          `Their own ${label} knocked them off the arena; they died ${((off.timestamp - ownHit!.e.timestamp) / 1000).toFixed(1)}s later. Use knockback immunity (Arm's Length / Surecast) for it, or face Cruise Chaser, which shortens the knockback a lot.`, a);
       }
       prev = a;
       continue;
@@ -1419,6 +1434,30 @@ function silentDeaths(c: Ctx, start: number, lastEvent: number) {
  * (user, 2026-10-16, D12 +6:29.8 and +6:46.0: the white mage, twice in
  * Inception, no hit before either).
  */
+/**
+ * Chastening Heat and Divine Spear target a tank, who takes the set under an
+ * invulnerability (Hallowed Ground the first, Holmgang the second). A tank
+ * killed by the set aimed at them mistimed it (user, 2026-10-17, F1
+ * +5:21.8: the Warrior "mistimed invulnerability"; the earlier note calling these
+ * deaths cooldown territory is overturned).
+ */
+function detectTankBuster(c: Ctx, start: number, end: number) {
+  for (const d of c.deaths.filter((x) => (x.killingAbilityGameId === CHASTENING_HEAT || x.killingAbilityGameId === DIVINE_SPEAR)
+    && x.timestamp - DEATH_EVENT_LAG_MS >= start && x.timestamp - DEATH_EVENT_LAG_MS <= end)) {
+    const p = c.players.find((x) => x.name === d.player);
+    if (!p || !isTank(p)) continue;
+    const hit = p.damageTaken.filter((e) => e.abilityId === d.killingAbilityGameId && e.timestamp <= d.timestamp).pop();
+    const cast = hit && c.casts.filter((x) => x.abilityId === d.killingAbilityGameId && x.timestamp <= hit.timestamp && hit.timestamp - x.timestamp <= 1_500).pop();
+    if (!hit || !cast || cast.target !== p.name) continue;
+    const name = d.killingAbilityGameId === CHASTENING_HEAT ? "Chastening Heat" : "Divine Spear";
+    c.errors.push(playerError(p, {
+      ruleId: AP_TANK_BUSTER_RULE_ID, severity: "Major", name: "Died to the Tank Buster",
+      description: `Died to ${name}, aimed at them. Chastening Heat and its three Divine Spears go on one tank, who takes the whole set under an invulnerability (Hallowed Ground the first set, Holmgang the second): time it to cover the last Spear.`,
+      timestamp: hit.timestamp, abilityId: d.killingAbilityGameId, abilityName: name,
+    }));
+  }
+}
+
 function detectApWall(c: Ctx, start: number, end: number, lastEvent: number) {
   const { silent, called } = silentDeaths(c, start, lastEvent);
   for (const d of silent) {

@@ -103,7 +103,12 @@
 //   the spot: the victims). ffxiv-pa-assault-shared (Severity holder in
 //   Solidarity).
 // ffxiv-pa-tether (Major, both: the log can't say who moved): Surety for
-//   100+ damage with both partners alive. ffxiv-pa-jump (a J Jump on anyone
+//   100+ damage with both partners alive, unless β's stack was short.
+// ffxiv-pa-stack-short (Raid, player-less): β's Plaint of Solidarity on
+//   fewer than 5 (every clean β: 5, 8-16k each) with all eight up. B12
+//   (F12): 3 took 21k and the Surety partners died; the user: "the far
+//   tether is completely fine", the stack holder stood apart from the
+//   group. The log doesn't mark the holder. ffxiv-pa-jump (a J Jump on anyone
 //   but its three dark baiters, or two on one, with all three alive).
 //   ffxiv-pa-donut (Radiant Sacrament hit).
 // ffxiv-pa-spread / -stack (doubled circles or both stacks, only with all
@@ -123,6 +128,10 @@
 //   expectations/rulings.json. A28: the light beacon didn't go to its spot
 //   (Major, as detected). A21: many players out of position, too messy for
 //   the VOD; the dancer was on the right spot and moved (her Stillness).
+// VOD review 2026-10-17 (user): report B (all 16 pulls now on disk) pulls
+//   11 (donut: didn't reach the circle before the snapshot; question 4's
+//   circle size answered) and 12 (stack short, above). B11's escaped dark
+//   follower probably started in the wrong place; the VOD can't show it.
 // OPEN QUESTIONS:
 // 1. B3 light beacon in the group: as A28 and A31 (the beacon didn't go
 //    to the wall)?
@@ -510,6 +519,7 @@ export const PA_SPREAD_RULE_ID         = "ffxiv-pa-spread";
 export const PA_STACK_RULE_ID          = "ffxiv-pa-stack";
 export const PA_CAPITAL_RULE_ID        = "ffxiv-pa-capital";
 export const PA_TETHER_RULE_ID         = "ffxiv-pa-tether";
+export const PA_STACK_SHORT_RULE_ID    = "ffxiv-pa-stack-short";
 export const PA_JUMP_RULE_ID           = "ffxiv-pa-jump";
 export const PA_DONUT_RULE_ID          = "ffxiv-pa-donut";
 export const PA_TRINE_RULE_ID          = "ffxiv-pa-trine";
@@ -584,6 +594,7 @@ const DEFAM_SPOT_MAX_Y = 9;
 // Restraining Order: clean pairs 34.2-34.3y apart (B4, B11, B16); B12's
 // pair 29.7y apart failed (both died).
 const SURETY_FAIL_MIN = 100;      // clean Plaint of Surety hits are 0 damage
+const BETA_STACK_COUNT = 5;       // β's Plaint of Solidarity in every clean pull
 const MASS_DEATH_COUNT = 4;
 const MASS_DEATH_WINDOW = 8_000;
 const COLLAPSE_DEAD = 6;
@@ -878,7 +889,22 @@ function detectCalibrationBeta(c: Ctx, cal: number) {
 
   // Tethers: a pair that held the check takes 0 damage.
   const checkAt = cal + 12_200;
-  for (const [id, kind] of [[HOUSE_ARREST, "close"], [RESTRAINING, "far"]] as [number, string][]) {
+  // The shared stack lands with the tethers: five in every clean β (F4,
+  // F11, F16; 8-16k each). Short of that with all eight up, its takers
+  // (21k each) die at the Surety check and the tether isn't at fault
+  // (user, 2026-10-17, F12 +13:58.3: "the far tether is completely fine...
+  // there were not enough people in the stack"). The log doesn't say who
+  // held the stack, so it names nobody.
+  const stack = uniq(hitsIn(c, SOLIDARITY, checkAt - 1_000, checkAt + 2_000).map((h) => h.p));
+  const allUp = c.players.every((p) => c.life.alive(p, checkAt - 1_000));
+  const stackShort = allUp && stack.length > 0 && stack.length < BETA_STACK_COUNT;
+  if (stackShort) {
+    const deadAfter = c.players.filter((p) => c.deaths.some((d) => d.player === p.name && d.timestamp >= checkAt - 1_000 && d.timestamp <= checkAt + 4_000));
+    c.raids.push(raidMarker(PA_STACK_SHORT_RULE_ID, "Shared Stack Short",
+      `Fate Calibration β's shared stack (Plaint of Solidarity) took only ${stack.length} (${namesOf(stack)}); it needs ${BETA_STACK_COUNT}, with the whole north group under it.${deadAfter.length ? ` ${namesOf(deadAfter)} died at the check.` : ""} Whoever holds the stack goes to the group, and the group stands under it. Unresolvable from here; treated as the cutoff point.`,
+      checkAt - 1_000, SOLIDARITY, "Plaint of Solidarity"));
+  }
+  for (const [id, kind] of stackShort ? [] : [[HOUSE_ARREST, "close"], [RESTRAINING, "far"]] as [number, string][]) {
     const pair = tether(id);
     if (pair.length !== 2) continue;
     c.occurrences?.push({ mechanicKey: PA_TETHER_RULE_ID, timestamp: checkAt - 1_000, players: pair.map((p) => p.name) });
