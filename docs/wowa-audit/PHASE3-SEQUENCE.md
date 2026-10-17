@@ -57,7 +57,7 @@ damage rows are measured.
 | 14 | Frost DK | [deathknight-frost.md](deathknight-frost.md) | done 2026-10-17: Killing Machine lost, Rime overwritten, Frostscythe on one enemy, Breath / Frostwyrm's Fury held; Pillar and Reaper's Mark valued; Runic Power cap removed for Frost (frostdk.ts); verified by the main session |
 | 15 | Vengeance | [demonhunter-vengeance.md](demonhunter-vengeance.md) | done 2026-10-17: Sigil of Flame / Spite drift valued by their hits (vengeance.ts, tracked-cooldowns.ts); Sigil of Chains a GCD press (game.ts); verified by the main session |
 | 16 | Guardian | [druid-guardian.md](druid-guardian.md) | done 2026-10-17: Guardian's bear presses added to the survey (game.ts: the 100th-percentile tank read 4.5% GCD uptime, now 92.6%); Lunar Beam tracked; Gore in procs.ts; verified by the main session |
-| 16a | Engine: spell-survey sweep, every spec | game.ts / spell-data.ts | Four passes found presses or channels missing from the survey (Reaver's Glaive, Drain Soul, Sigil of Chains, Guardian's kit). One sweep over every spec on disk, 2026-10-17 |
+| 16a | Engine: spell-survey sweep, every spec | game.ts / spell-data.ts | Four passes found presses or channels missing from the survey (Reaver's Glaive, Drain Soul, Sigil of Chains, Guardian's kit). One sweep over every spec on disk. Done 2026-10-17 (13104a3, `SWEEP_PRESSES`): Protection Warrior, Enhancement and Discipline had no survey data at all (top players 1–39% GCD uptime, now 83–92%); Devourer, Frost Mage, Outlaw, Destruction and others gained too; verified by the main session |
 | 17 | Assassination | [rogue-assassination.md](rogue-assassination.md) | |
 | 18 | Marksmanship | [hunter-marksmanship.md](hunter-marksmanship.md) | |
 | 19 | Feral | [druid-feral.md](druid-feral.md) | |
