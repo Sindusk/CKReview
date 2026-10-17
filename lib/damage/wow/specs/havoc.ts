@@ -63,6 +63,31 @@
 // 3:00); Célestiia (Vashnik) 232k; Hertydh 123k. A use was worth 0.17–1.42M
 // (median ~0.8M). Eye Beam is well kept by everyone (case study 99%): this
 // is a small loss, not a habit.
+//
+// ── Death Sweep reset unused (sweepResetUnused) ────────────────────────
+// Each Eye Beam leaves a buff, logged as "Eternal Hunt" (1271092; one per
+// beam on all 16 players), applied as the beam ends. The next Blade Dance
+// (188499) or Death Sweep (210152) takes it (removed ~0.5s after the press)
+// and its cooldown comes back at once: the top five pressed the second
+// Death Sweep 0.2–2.5s after the removal for 73 of 76 resets (Maryjanedh
+// 3.1s, and 12.4s and one run out, both in forced time; Vairuh 7.7s, in
+// forced time), against a shortest
+// unreset interval of 4.3–5.9s in Metamorphosis. That's WoWAnalyzer's
+// "two Death Sweeps per Eye Beam" rule, whose own count is broken (it
+// judges each window one Eye Beam late) but whose premise holds.
+// A reset whose next press didn't come within RESET_USE_MS (about the
+// natural cooldown, so the reset bought nothing), or a buff that ran out
+// with no press, lost one Death Sweep for the GCD that took its place:
+// the player's Death Sweep − their Annihilation (201427) per press, or
+// Blade Dance − Chaos Strike (162794) outside Metamorphosis. Mostly it's a
+// first Death Sweep pressed late in the ~8s window, so the reset lands
+// after it closes (Mythnarra 4:05 on the case study: first sweep 7.4s in,
+// window over 1.1s later). Not counted: a reset whose next RESET_USE_MS is
+// mostly forced time, or the pull's last seconds.
+// Measured: top five none; Bentwo 154k, Безкайфа 240k (2:45 at 5.3s, 3:58),
+// Hertydh 146k. Mythnarra 317k on the case study (0:36, 5:50; his 2:31 and
+// 4:12 ran into forced time) and 2.94M over his static's 16 pulls (754k at
+// Coiled Altar: 2:37, 3:02 expired, 4:15, 4:38; 454k at Kith'ix Pull 2).
 
 import type { PlayerEvent } from "@/types/PlayerInfo";
 import type { DamageFinding, JobCheck, Moment } from "../../types";
@@ -84,6 +109,13 @@ const EYE_BEAM_ALLOW_MS = 3_000;
 const EYE_BEAM_SPAN_MS = 4_000;
 const MIN_HELD_MS = 250;
 const RESET_SEEN_MS = 1_000;
+const BLADE_DANCE = 188499;
+const DEATH_SWEEP = 210152;
+const CHAOS_STRIKE = 162794;
+const ANNIHILATION = 201427;
+const SWEEP_RESET = 1271092;   // logged as "Eternal Hunt": the buff each Eye Beam leaves
+const RESET_CONSUME_MS = 1_500;
+const RESET_USE_MS = 5_000;
 
 const clock = (ms: number) => {
   const t = Math.max(0, Math.round(ms / 1000));
@@ -206,4 +238,58 @@ const eyeBeamHeld: JobCheck = (ctx) => {
   })];
 };
 
-export const HAVOC_CHECKS: JobCheck[] = [eyeBeamHeld];
+// ── Death Sweep reset unused ───────────────────────────────────────────
+
+/** The player's average damage per press of a spell, by hit name. */
+function perPress(ctx: PlayerCheckContext, id: number, name: string): number {
+  const n = presses(ctx, id).length;
+  const dmg = ctx.player.damageDone.filter((e) => !e.pet && e.timestamp < ctx.endMs && e.abilityName === name).reduce((a, e) => a + (e.amount ?? 0), 0);
+  return n >= 3 ? dmg / n : NaN;
+}
+
+const sweepResetUnused: JobCheck = (ctx) => {
+  const events = (ctx.player.buffs ?? []).filter((b) => b.abilityId === SWEEP_RESET && b.timestamp < ctx.endMs).sort((a, b) => a.timestamp - b.timestamp);
+  if (events.length < 4) return [];
+  const dances = [...presses(ctx, BLADE_DANCE), ...presses(ctx, DEATH_SWEEP)].sort((a, b) => a.timestamp - b.timestamp);
+  const sweep = perPress(ctx, DEATH_SWEEP, "Death Sweep"), annihilation = perPress(ctx, ANNIHILATION, "Annihilation");
+  const dance = perPress(ctx, BLADE_DANCE, "Blade Dance"), strike = perPress(ctx, CHAOS_STRIKE, "Chaos Strike");
+  if (!(sweep > annihilation)) return [];
+  const inMetaWorth = sweep - annihilation;
+  const outMetaWorth = dance > strike ? dance - strike : inMetaWorth;
+  const meta = statusWindows(ctx, METAMORPHOSIS);
+  const forced = mergeWindows(ctx.forced);
+  const clockS = (ms: number) => `${clock(ms)}`;
+
+  const moments: Moment[] = [];
+  let open: number | undefined;
+  for (const e of events) {
+    if (e.buffStatus === "applied") { open = e.timestamp; continue; }
+    if (e.buffStatus !== "removed" || open === undefined) continue;
+    const gained = open; open = undefined;
+    const r = e.timestamp;
+    const consumer = [...dances].reverse().find((c) => c.timestamp <= r + 50 && c.timestamp >= r - RESET_CONSUME_MS);
+    const from = consumer ? r : gained;
+    const next = dances.find((c) => c.timestamp > (consumer?.timestamp ?? r) + 100);
+    const gap = (next?.timestamp ?? ctx.endMs) - r;
+    if (consumer && gap <= RESET_USE_MS) continue;
+    if (r + RESET_USE_MS > ctx.endMs) continue;
+    if (overlapMs(from, r + RESET_USE_MS, forced) >= (r + RESET_USE_MS - from) / 2) continue;
+    const inMeta = inside(meta, r);
+    const worth = inMeta ? inMetaWorth : outMetaWorth;
+    moments.push({ startMs: from, endMs: next?.timestamp ?? ctx.endMs, lostDamage: worth,
+      detail: consumer
+        ? `Eye Beam's reset taken by the ${consumer.abilityName} at ${clockS(consumer.timestamp)}: the next ${next ? `came at ${clockS(next.timestamp)}, ${s(gap)} later` : "never came"}${inMeta && next && !inside(meta, next.timestamp) ? ", after Metamorphosis ended" : ""}`
+        : `Eye Beam's reset (gained at ${clockS(gained)}) ran out with no Blade Dance or Death Sweep` });
+  }
+  if (moments.length === 0) return [];
+  return [finding(ctx, {
+    kind: "proc-lost", startMs: moments[0].startMs, endMs: moments[moments.length - 1].endMs, forced: false, inference: true,
+    label: "Death Sweep reset unused",
+    lostDamage: moments.reduce((a, m) => a + (m.lostDamage ?? 0), 0),
+    basis: `${moments.length} × (${k(sweep)}, the player's Death Sweep − ${k(annihilation)}, their Annihilation, in Metamorphosis; ${k(dance)} Blade Dance − ${k(strike)} Chaos Strike outside it)`,
+    detail: `${moments.length} of the Blade Dance / Death Sweep resets Eye Beam grants went unused (no second press within ${s(RESET_USE_MS)})`,
+    moments,
+  })];
+};
+
+export const HAVOC_CHECKS: JobCheck[] = [eyeBeamHeld, sweepResetUnused];
