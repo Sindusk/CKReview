@@ -216,7 +216,10 @@ export function gcdUses(player: PlayerInfo, game: DamageGame): GcdUse[] {
   return out;
 }
 
-const STATUS_LOCK_MAX_MS = 6_000;
+// Longest lock a status can hold. Mistweaver's Mana Tea channels a third of
+// a second per stack: up to 7.1s (Chiyune ZjVtM1vFcrp7w3WC, Monkfupera
+// Ftj4vwHf9RazPcqV 6.9s at 20 stacks); at 6s the whole channel read as idle.
+const STATUS_LOCK_MAX_MS = 10_000;
 
 /** DamageGame.lockStatus: the lock runs to the first removal of the status after the cast. */
 function statusLocks(player: PlayerInfo, game: DamageGame, uses: GcdUse[]): void {
