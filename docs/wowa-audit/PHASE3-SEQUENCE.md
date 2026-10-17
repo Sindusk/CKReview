@@ -200,8 +200,10 @@ measured for it.
   whole second with a consumer nowhere near, from a log where it runs
   out: `_scratch/proc-durs.js`, `proc-expiries.js`) and add it there with
   its consumers. Read its findings as "<proc> expired unused", valued at
-  a whole consumer press (an upper bound; for a proc that only empowers a
-  press, say so or value it yourself). Check the top players first: a
+  a whole consumer press (an upper bound). For a proc that only empowers
+  a press (Killing Machine, Dance of Chi-Ji, Precise Shots, Umbral
+  Embrace), the spec's pass values it: the press with the proc minus
+  without, measured in the log, as a priced override. Check the top players first: a
   proc that runs out on most of them isn't a loss (Lava Surge did).
 - **Value a hit by its own events, not a total divided by presses**
   (Arcane Orb: 294k claimed, 47–63k a pressed Orb).
