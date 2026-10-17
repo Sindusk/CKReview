@@ -84,6 +84,9 @@ export type DamageGame = {
   // The level the encounter syncs players to (FFXIV's older ultimates);
   // undefined = the current cap. Cooldowns learned above it aren't judged.
   levelOf?(pull: Pull): number | undefined;
+  // The level an action is learned at (FFXIV: action-levels.ts), for the
+  // checks a synced pull can't be judged on (checks.ts learnedAt).
+  actionLevel?(actionId: number): number | undefined;
   // Job gauges for the dialog's timeline (display only).
   jobGauges?(job: string): ((ctx: PlayerCheckContext) => GaugeTrack[])[];
   // The player's tincture / potion windows, for the timeline (display only).
@@ -464,6 +467,9 @@ export type PullDamageAnalysis = {
   // The game patch the pull was played on (DamageGame.patchOf), when known:
   // the rules patch-specific checks applied.
   patch?:        string;
+  // The level the encounter syncs to (DamageGame.levelOf), below the cap:
+  // checks that need a later kit weren't judged.
+  level?:        number;
   // Data the pull lacks (fetched before it existed). Re-fetching is the
   // user's call.
   missingData:   string[];

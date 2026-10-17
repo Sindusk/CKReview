@@ -46,7 +46,7 @@
 
 import type { PlayerEvent } from "@/types/PlayerInfo";
 import type { DamageFinding, GaugeTrack, JobCheck, Moment } from "../../types";
-import { finding, measuredPenaltyFactor, type PlayerCheckContext } from "../../checks";
+import { finding, learnedAt, measuredPenaltyFactor, type PlayerCheckContext } from "../../checks";
 import { forcedPart, gcdKinds, inWindows, mergeWindows, overlapMs, type Window } from "../../timeline";
 import { estimateHitRates, ratesFromStats } from "../../crit-rates";
 import { XIVA_STATUSES } from "../xiva-data";
@@ -98,6 +98,17 @@ export function statusWindows(ctx: PlayerCheckContext, statusId: number): Window
   if (open !== undefined) out.push({ startMs: open, endMs: ctx.endMs + 1 });
   return out;
 }
+
+/**
+ * A job check whose rule needs the kit at `level`: an action, gauge or
+ * trait learned there. Not judged on a pull synced below it (older
+ * ultimates; DamageGame.levelOf). Burst windows and tracked cooldowns
+ * follow the sync level on their own (learnedAt); this is for the rest,
+ * whose rule changes with the kit (Black Mage's Paradox is 90, a Sage's
+ * Eukrasian Dosis III 82, a Gunbreaker's third cartridge 88).
+ */
+export const fromLevel = (level: number, check: JobCheck): JobCheck => (ctx) =>
+  ctx.level !== undefined && ctx.level < level ? [] : check(ctx);
 
 export function castsIn(ctx: PlayerCheckContext, ids: number[], startMs: number, endMs: number): PlayerEvent[] {
   const set = new Set(ids);
@@ -306,6 +317,8 @@ export function burstWindowFindings(ctx: PlayerCheckContext, specIn: BurstWindow
     const missingGcds = expectedGcds !== undefined ? Math.max(0, expectedGcds - gcds.length) : 0;
     const missing: { name: string; n: number; value: number }[] = [];
     for (const e of spec.expected(ctx, casts)) {
+      // Synced below the level it's learned at (a TEA Dancer has no Tillana).
+      if (!e.ids.some((id) => learnedAt(ctx, id))) continue;
       if (!(e.availableIf ? e.availableIf(ctx, w, cycleMs) : offCooldownIn(ctx, e.ids, w, cycleMs))) continue;
       const got = e.got ? e.got(ctx, w, casts) : casts.filter((c) => e.ids.includes(c.abilityId)).length;
       let n = Math.max(0, (e.countIn ? e.countIn(ctx, w) : e.count) - got);

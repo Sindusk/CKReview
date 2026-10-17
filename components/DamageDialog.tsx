@@ -261,6 +261,12 @@ export default function DamageDialog({ open, onClose, pulls, currentPullId, onSe
                 <InfoTip label="No rules found for this patch." content="No rules found for this patch."
                   trigger={<span className="ck-badge" style={{ color: BADGE_BAD, fontSize: 11 }}>Patch ?</span>} />
               ))}
+              {/* An older ultimate syncs below the cap (lib/damage/ffxiv/patches.ts levelOf). */}
+              {!isWow && patchAnalysis?.level !== undefined && (
+                <InfoTip label={`Synced to level ${patchAnalysis.level}.`}
+                  content={<>Synced to level {patchAnalysis.level}.<br />Actions learned above it are not expected, and checks built on a later kit (gauges, rotations) are not judged.</>}
+                  trigger={<span className="ck-badge" style={{ color: BADGE_GOOD, fontSize: 11 }}>Level {patchAnalysis.level}</span>} />
+              )}
               <InfoTip label="Analysis here can be inaccurate." content="Analysis here can be inaccurate." />
             </span>
           </div>

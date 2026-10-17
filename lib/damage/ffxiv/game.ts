@@ -28,6 +28,7 @@ import { noDamageCasts } from "./jobs/shared";
 import { tincture, tinctureWindows } from "./jobs/tincture";
 import { JOB_GAUGES } from "./jobs/gauges";
 import { levelOf, patchOf } from "./patches";
+import { ACTION_LEVELS } from "./action-levels";
 import { MELEE_PROC_SKIP_IDS, vprDisengageAlternative } from "./jobs/melee";
 import { dncTechHoldValue, PROC_CONSUMER_FALLBACK, PROC_CONSUMERS, PROC_REPLACES, PROCS_CLEARED_BY_GCD } from "./jobs/ranged";
 import { FFXIV_ACTION_INDEX } from "../../mitigation/ffxiv-catalog";
@@ -247,6 +248,7 @@ export const FFXIV_DAMAGE: DamageGame = {
   potWindows: tinctureWindows,
   patchOf,
   levelOf,
+  actionLevel: (id) => ACTION_LEVELS[id],
   jobProcStatusIds: MELEE_PROC_SKIP_IDS,
   procReplaces: PROC_REPLACES,
   procConsumers: PROC_CONSUMERS,

@@ -132,7 +132,19 @@ export type PlayerCheckContext = {
   decidingPhaseStart?: number;
   ledger?:     BuffLedger;      // party buffs across the pull (lib/damage/buffs.ts)
   patch?:      string;          // the patch the pull was played on (DamageGame.patchOf), if known
+  level?:      number;          // the sync level (DamageGame.levelOf), below the cap only
 };
+
+/**
+ * Whether the player can press the action at the pull's sync level. Older
+ * ultimates sync below the cap (TEA 80): a Dancer there has no Tillana or
+ * Starfall Dance, so a window "missing" them lost nothing.
+ */
+export function learnedAt(ctx: PlayerCheckContext, actionId: number): boolean {
+  if (ctx.level === undefined) return true;
+  const lv = ctx.game.actionLevel?.(actionId);
+  return lv === undefined || lv <= ctx.level;
+}
 
 export function finding(ctx: PlayerCheckContext, f: Omit<DamageFinding, "player" | "job" | "phaseId" | "phase">): DamageFinding {
   const phaseId = ctx.phaseOf(f.startMs);
@@ -568,7 +580,13 @@ export function checkCooldownDrift(ctx: PlayerCheckContext): DamageFinding[] {
 
   for (const tracked of ctx.game.trackedCooldowns(ctx.job)) {
     if (ctx.patch && tracked.notOnPatches?.includes(ctx.patch)) continue;
-    if (tracked.minLevel !== undefined && (ctx.game.levelOf?.(ctx.pull) ?? Infinity) < tracked.minLevel) continue;
+    // Synced below the cap: not judged when learned above the sync level,
+    // or when it has charges (they come with traits, and the vendored data
+    // is the cap's: Reassemble has one charge before 84).
+    if (ctx.level !== undefined) {
+      if (tracked.minLevel !== undefined && ctx.level < tracked.minLevel) continue;
+      if (!tracked.actionIds.some((id) => learnedAt(ctx, id)) || tracked.charges > 1) continue;
+    }
     const patchHold = ctx.patch !== undefined ? tracked.holdMsOnPatches?.[ctx.patch] : undefined;
     const patchRecast = ctx.patch !== undefined ? tracked.recastOnPatches?.[ctx.patch] : undefined;
     const cd = patchHold !== undefined || patchRecast

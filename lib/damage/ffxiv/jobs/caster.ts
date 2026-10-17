@@ -165,7 +165,7 @@ import type { DamageFinding, GaugeTrack, JobCheck } from "../../types";
 import type { PlayerEvent } from "@/types/PlayerInfo";
 import { finding, type PlayerCheckContext } from "../../checks";
 import { forcedPart, inWindows, mergeWindows, overlapMs } from "../../timeline";
-import { aoeComboOnOneTarget, baseValue, burstWindowFindings, castHits, clock, critMultOf, dotFindings, gaugeFindings, gaugeTrack, k, rollGainOf, statusWindows, gaugeCastTimes, type ExpectedAction, type GaugeEvent, type GaugeSpec } from "./shared";
+import { aoeComboOnOneTarget, baseValue, burstWindowFindings, castHits, clock, critMultOf, dotFindings, fromLevel, gaugeFindings, gaugeTrack, k, rollGainOf, statusWindows, gaugeCastTimes, type ExpectedAction, type GaugeEvent, type GaugeSpec } from "./shared";
 
 const ids = (...keys: string[]) => keys.filter((key) => A[key]).map((key) => A[key].id);
 const best = (ctx: PlayerCheckContext, list: number[]) => Math.max(0, ...list.map((x) => ctx.values.perUse(x)));
@@ -540,7 +540,9 @@ const hyperphantasiaLost: JobCheck = (ctx) => {
   return out;
 };
 
-export const PCT_CHECKS: JobCheck[] = [starryMuse, starryFillers, palette, pctAoe, portraitOverwrites, hyperphantasiaLost];
+// fromLevel: the level each rule needs (shared.ts), for synced ultimates.
+export const PCT_CHECKS: JobCheck[] = [starryMuse, starryFillers, fromLevel(90, palette), pctAoe,
+  fromLevel(96, portraitOverwrites), fromLevel(92, hyperphantasiaLost)];
 // Polyglot (xivanalysis Gauge.tsx), simulated from casts: Enochian (Astral
 // Fire / Umbral Ice) adds one every 30s from the first fire or ice spell,
 // Amplifier one more, Xenoglossy and Foul spend one; cap 3. A death empties
@@ -981,7 +983,10 @@ function despairSkipped(ctx: PlayerCheckContext, gauge: BlmGauge, cycle: number)
   return out;
 }
 
-export const BLM_CHECKS: JobCheck[] = [highThunder, blmAoe, polyglot, leyLines, blmWrongGcds, blmGaugeChecks];
+// Synced: Thunder III before High Thunder (92), a 2-Polyglot cap before
+// Enhanced Polyglot II (98), no Paradox (90) or Flare Star (100).
+export const BLM_CHECKS: JobCheck[] = [fromLevel(92, highThunder), blmAoe, fromLevel(98, polyglot), leyLines,
+  fromLevel(100, blmWrongGcds), fromLevel(100, blmGaugeChecks)];
 // xivanalysis MultiHitSkills.ts, each at the highest minimum any patch
 // uses (Tri-disaster 4 from 7.3, Painflare 4 in 7.2-7.4): the damage
 // comparison lets through the patches where fewer targets win.
@@ -1212,7 +1217,8 @@ export function smnGaugeTracks(ctx: PlayerCheckContext): GaugeTrack[] {
   ];
 }
 
-export const SMN_CHECKS: JobCheck[] = [searingLight, smnAoe, smnDemis, smnRuin4InDemi, smnAetherflow, smnMountainBuster, smnPhysick];
+export const SMN_CHECKS: JobCheck[] = [searingLight, smnAoe, smnDemis, smnRuin4InDemi, fromLevel(92, smnAetherflow),
+  fromLevel(86, smnMountainBuster), smnPhysick];
 // White / Black Mana (xivanalysis ManaGauge.tsx), simulated from casts:
 // a spell gives its mana once per completed cast, whether or not it hits
 // (xivanalysis adds it per damage event and drops it on a hit that does
@@ -1371,4 +1377,5 @@ const rdmManaCheck: JobCheck = (ctx) => {
   return out;
 };
 
-export const RDM_CHECKS: JobCheck[] = [manaStacks, dualcastWasted, verprocOverwrites, rdmManaCheck, rdmWrongFinisher];
+export const RDM_CHECKS: JobCheck[] = [fromLevel(90, manaStacks), fromLevel(84, dualcastWasted), fromLevel(84, verprocOverwrites),
+  fromLevel(90, rdmManaCheck), fromLevel(90, rdmWrongFinisher)];

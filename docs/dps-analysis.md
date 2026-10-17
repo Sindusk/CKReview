@@ -225,6 +225,27 @@ the current rules. First rule switched on it: Pictomancer's Starry Muse
 patch-specific rule goes in the check that encodes it, keyed on
 `ctx.patch`, with the patch and its source in the comment.
 
+**Level sync (2026-10-16).** Older ultimates sync players below the cap
+(`levelOf` in patches.ts: TEA 80, TOP/DSR 90, UCoB/UwU 70). The kit is
+the current patch's at that level, not the expansion's it came from: a TEA
+log on 7.5 is 7.5's level-80 Warrior. `ctx.level` is set only on a synced
+pull, so level-100 analysis is untouched. On a synced pull:
+- burst windows drop expected actions learned above the level (a TEA
+  Dancer's Technical Finish no longer "misses" Tillana or Starfall Dance);
+- tracked cooldowns learned above it, or with charges, aren't judged
+  (charges come with traits, and the vendored data is the cap's: Life
+  Surge and Onslaught have fewer charges at 80);
+- job checks whose rule needs a later kit are wrapped in
+  `fromLevel(level, check)` (jobs/shared.ts) in each job's `*_CHECKS`:
+  Black Mage's Paradox and Flare Star gauge, a Sage's Eukrasian Dosis III,
+  a Gunbreaker's third cartridge. On the TEA report 6pzyKv8fnYBZ2XGa this
+  dropped 705 Paradox overcaps and 249 burst-window misses.
+Learn levels come from XIVAPI (`action-levels.ts`, generated). Trait
+levels that change a rule (a gauge cap, a charge) aren't in it; they're
+read from the job guides and named in the `fromLevel` comment. The
+Damage dialog shows a "Level N" badge beside the patch. Mitigation has
+its own level bands (`lib/mitigation/ffxiv-catalog.ts` header).
+
 Built from the eight-player comparison (each job module's header records
 what matched and what wasn't adopted): pet damage credited to owners,
 tinctures, Living Shadow, Passage of Arms channel as forced time, heal

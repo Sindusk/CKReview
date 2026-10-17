@@ -229,7 +229,7 @@ import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import type { DamageFinding, GaugeTrack, JobCheck } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";
 import { forcedPart, gcdKinds, inWindows, mergeWindows, type GcdUse } from "../../timeline";
-import { aoeOnOneTargetFindings, baseValue, burstWindowFindings, castHits, critMultOf, dotFindings, gaugeFindings, gaugeTrack, k, type GaugeEvent, type GaugeSpec } from "./shared";
+import { aoeOnOneTargetFindings, baseValue, burstWindowFindings, castHits, critMultOf, dotFindings, fromLevel, gaugeFindings, gaugeTrack, k, type GaugeEvent, type GaugeSpec } from "./shared";
 
 export const HEAL_WASTE_SHARE = 0.2;
 const HEAL_LAND_MS = 1_500;
@@ -423,7 +423,9 @@ function avgTick(ctx: PlayerCheckContext, statusId: number): number {
   return ticks.length ? ticks.reduce((a, e) => a + (e.amount ?? 0), 0) / ticks.length : 0;
 }
 
-export const SCH_CHECKS: JobCheck[] = [healGcds, aoeOnOneTarget, dot("BIOLYSIS")];
+// fromLevel (shared.ts): each DoT check needs the DoT it names (Biolysis,
+// Combust III and Dia are 72, Eukrasian Dosis III 82).
+export const SCH_CHECKS: JobCheck[] = [healGcds, aoeOnOneTarget, fromLevel(72, dot("BIOLYSIS"))];
 // Astrologian cards. Astral Draw gives The Balance (Play I) and Lord of
 // Crowns, Umbral Draw The Spear; the next Draw replaces what's unplayed
 // (xivanalysis's Draw "used when there was an available Play I or Lord of
@@ -551,7 +553,7 @@ const earthlyStarEarly: JobCheck = (ctx): DamageFinding[] => {
   return out;
 };
 
-export const AST_CHECKS: JobCheck[] = [healGcds, aoeOnOneTarget, dot("COMBUST_III"), divination, cards, earthlyStarEarly];
+export const AST_CHECKS: JobCheck[] = [healGcds, aoeOnOneTarget, fromLevel(72, dot("COMBUST_III")), divination, cards, earthlyStarEarly];
 // White Mage Lilies and Blood Lily (xivanalysis Lilies.tsx), simulated
 // from casts:
 // - Lily: 3 at most, one every 20s while under 3 (the timer stops at 3);
@@ -756,5 +758,7 @@ export function whmGaugeTracks(ctx: PlayerCheckContext): GaugeTrack[] {
   ];
 }
 
-export const WHM_CHECKS: JobCheck[] = [healGcds, aoeOnOneTarget, dot("DIA"), bloodLily, lilyOvercap];
-export const SGE_CHECKS: JobCheck[] = [healGcds, aoeOnOneTarget, dot("EUKRASIAN_DOSIS_III", "EUKRASIAN_DYSKRASIA"), dyskrasiaOnOne];
+// The Lily checks value a Misery against Glare III (82).
+export const WHM_CHECKS: JobCheck[] = [healGcds, aoeOnOneTarget, fromLevel(72, dot("DIA")), fromLevel(82, bloodLily), fromLevel(82, lilyOvercap)];
+export const SGE_CHECKS: JobCheck[] = [healGcds, aoeOnOneTarget, fromLevel(82, dot("EUKRASIAN_DOSIS_III", "EUKRASIAN_DYSKRASIA")),
+  fromLevel(82, dyskrasiaOnOne)];

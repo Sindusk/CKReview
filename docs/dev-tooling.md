@@ -163,7 +163,10 @@ It loads pulls lazily and keeps three in memory, so narrowing with
   `git clone --depth 1 https://github.com/xivanalysis/xivanalysis.git <new-empty-dir>`
   and then `node scripts/sync-xiva-data.js <that-dir>`. The script parses
   their files and never runs them. Clone outside the repo, and don't run
-  anything inside the clone.
+  anything inside the clone. Then refresh the learn levels with
+  `node scripts/sync-action-levels.js` (XIVAPI, writes
+  `lib/damage/ffxiv/action-levels.ts`; the shell edit gate needs
+  `ALLOW_SHELL_EDITS=1` for it).
 - Model and choices: [damage-analysis-plan.md](archive/damage-analysis-plan.md).
 
 ## Damage analysis (WoW)

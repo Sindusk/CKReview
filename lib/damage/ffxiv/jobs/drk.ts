@@ -67,7 +67,7 @@ import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import type { DamageFinding, GaugeTrack, JobCheck } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";
 import { forcedPart, inWindows, mergeWindows, overlapMs, type Window } from "../../timeline";
-import { aoeComboOnOneTarget, burstWindowFindings, castHits, gaugeFindings, k, statusWindows, uptimeFindings, type GaugeEvent } from "./shared";
+import { aoeComboOnOneTarget, burstWindowFindings, castHits, fromLevel, gaugeFindings, k, statusWindows, uptimeFindings, type GaugeEvent } from "./shared";
 import { comboLanded } from "./gnb";
 
 const id = (key: string) => A[key].id;
@@ -449,4 +449,7 @@ export function drkMpTracks(ctx: PlayerCheckContext): GaugeTrack[] {
   }];
 }
 
-export const DRK_CHECKS: JobCheck[] = [delirium, darkside, blood, aoeCombo, livingShadow, saltAndDarkness, darkArtsOverwrite, drkMp];
+// fromLevel (shared.ts): Edge / Flood of Shadow are 74 (Edge of Darkness
+// before), Salt and Darkness 86.
+export const DRK_CHECKS: JobCheck[] = [delirium, fromLevel(74, darkside), blood, aoeCombo, livingShadow, fromLevel(86, saltAndDarkness),
+  fromLevel(74, darkArtsOverwrite), fromLevel(74, drkMp)];

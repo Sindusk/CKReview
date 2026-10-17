@@ -159,7 +159,7 @@ import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import type { PlayerEvent, PlayerInfo } from "@/types/PlayerInfo";
 import type { DamageFinding, GaugeTrack, JobCheck } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";
-import { aoeComboOnOneTarget, baseValue, burstWindowFindings, clock, critMultOf, dotFindings, gaugeFindings, k, rollGainOf, s, statusWindows, type ExpectedAction, type GaugeEvent, type GaugeSpec } from "./shared";
+import { aoeComboOnOneTarget, baseValue, burstWindowFindings, clock, critMultOf, dotFindings, fromLevel, gaugeFindings, k, rollGainOf, s, statusWindows, type ExpectedAction, type GaugeEvent, type GaugeSpec } from "./shared";
 import { comboLanded } from "./gnb";
 import { forcedPart, inWindows, mergeWindows } from "../../timeline";
 import { espritGauge, featherGauge } from "./gauges";
@@ -261,9 +261,13 @@ const technical: JobCheck = (ctx) => burstWindowFindings(ctx, {
   statusId: S.TECHNICAL_FINISH.id, name: "Technical Finish", bonus: 0.05, spanMs: () => TECH_SPAN_MS,
   bonusBasis: "a missing GCD = its average minus the GCD used instead; Fan Dance IV × 5% (Technical Finish, FFLogs multiplier 1.05)",
   expectedGcds: () => 8,
-  expected: (_ctx, casts): ExpectedAction[] => [
+  // The four Sabers are the cap's plan; synced (TEA 80, no Tillana or
+  // Starfall Dance) the window is filled otherwise and only its GCD count
+  // is judged.
+  expected: (c, casts): ExpectedAction[] => [
     ...TECH_EXPECTED.map(([key, count]) => ({ ids: ids(key), count, name: A[key].name, value: replacedGcd(key) })),
-    { ids: ids(...SABERS), count: sabersExpected(casts), name: "Last Dance / Saber Dance", value: replacedGcd("SABER_DANCE") },
+    ...(c.level === undefined
+      ? [{ ids: ids(...SABERS), count: sabersExpected(casts), name: "Last Dance / Saber Dance", value: replacedGcd("SABER_DANCE") }] : []),
     { ids: ids("FAN_DANCE_IV"), count: 1, name: "Fan Dance IV" },
   ],
 });
@@ -783,7 +787,9 @@ const devilmentMisaligned: JobCheck = (ctx): DamageFinding[] => {
   return out;
 };
 
-export const DNC_CHECKS: JobCheck[] = [technical, technicalFillers, dancerOverwrites, dancerGaugeEstimates, dancerAoe, dancerDances, devilmentMisaligned];
+// fromLevel (shared.ts): the level each rule needs, for synced ultimates.
+export const DNC_CHECKS: JobCheck[] = [technical, fromLevel(100, technicalFillers), dancerOverwrites, dancerGaugeEstimates, dancerAoe, dancerDances,
+  fromLevel(90, devilmentMisaligned)];
 // The burst window (xivanalysis BuffWindows/BurstWindow.tsx): where
 // Raging Strikes, Battle Voice and Radiant Finale are all up. 7 GCDs, 8
 // when Army's Muse covers 2+ of them; Barrage consumed in it (a Refulgent
@@ -1024,4 +1030,4 @@ const reassemble: JobCheck = (ctx) => {
   return out;
 };
 
-export const MCH_CHECKS: JobCheck[] = [wildfire, hypercharge, mchAoe, mchGauges, reassemble, mchCharges];
+export const MCH_CHECKS: JobCheck[] = [wildfire, hypercharge, mchAoe, fromLevel(96, mchGauges), fromLevel(90, reassemble), fromLevel(92, mchCharges)];

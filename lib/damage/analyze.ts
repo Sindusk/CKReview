@@ -94,6 +94,7 @@ export function analyzePullDamage(
 
   const ledger = buildBuffLedger(pull, game, endMs);
   const patch = game.patchOf?.(pull);
+  const level = game.levelOf?.(pull);
   const players: PlayerDamageSummary[] = [];
   const usesOf = new Map(pull.players.map((p) => [p.name, gcdUses(p, game)]));
   const speedModels = game.speedModels?.(pull, usesOf, endMs);
@@ -128,6 +129,7 @@ export function analyzePullDamage(
       decidingPhaseStart: decidingSegment?.startMs,
       ledger,
       patch,
+      level,
     };
     const findings: DamageFinding[] = [
       ...checkGcdGaps(ctx),
@@ -200,6 +202,7 @@ export function analyzePullDamage(
     pullId: pull.id, pullNumber: pull.pullNumber, endMs, collapseMs,
     context: context?.encounter,
     patch,
+    level,
     missingData: missingData(pull),
     raidDowntime: downtime,
     players, phases,

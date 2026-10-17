@@ -246,7 +246,7 @@ import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import type { DamageFinding, JobCheck } from "../../types";
 import { chargesAt, finding, PROC_CONSUME_MS, PROC_EXPIRY_EARLY_MS, type PlayerCheckContext } from "../../checks";
 import { forcedPart, inWindows, mergeWindows } from "../../timeline";
-import { aoeComboOnOneTarget, baseValue, burstWindowFindings, castHits, clock, critMultOf, dotFindings, enemyStatusWindows, gaugeFindings, observedBonus, gaugeTrack, k, offCooldownIn, rollGainOf, s, statusWindows, uptimeFindings, type ExpectedAction, type GaugeEvent, type GaugeSpec } from "./shared";
+import { aoeComboOnOneTarget, baseValue, burstWindowFindings, castHits, clock, critMultOf, dotFindings, enemyStatusWindows, fromLevel, gaugeFindings, observedBonus, gaugeTrack, k, offCooldownIn, rollGainOf, s, statusWindows, uptimeFindings, type ExpectedAction, type GaugeEvent, type GaugeSpec } from "./shared";
 import { comboLanded } from "./gnb";
 
 const id = (key: string) => A[key].id;
@@ -1288,7 +1288,9 @@ export function samGaugeSpecs(ctx: PlayerCheckContext): GaugeSpec[] {
 }
 const samGauges: JobCheck = (ctx) => samGaugeSpecs(ctx).flatMap((spec) => (spec.unitValue > 0 ? gaugeFindings(ctx, spec) : []));
 
-export const SAM_CHECKS: JobCheck[] = [uptime("FUGETSU", 0.13, "Fugetsu is +13%, FFLogs multiplier"), meikyo, samAoe, samMeikyoAoe, samFukoAoe, higanbana, samGauges];
+// fromLevel (shared.ts): the level each rule needs, for synced ultimates.
+export const SAM_CHECKS: JobCheck[] = [uptime("FUGETSU", 0.13, "Fugetsu is +13%, FFLogs multiplier"), fromLevel(100, meikyo), samAoe, samMeikyoAoe,
+  samFukoAoe, higanbana, fromLevel(90, samGauges)];
 // Rattling Coil (xivanalysis UncoiledFury): +1 per Vicewinder / Vicepit /
 // Serpent's Ire, cap 3, Uncoiled Fury spends 1. Coils left when a kill
 // ends are lost too. On 2T1HzdPKgbhM43am fight 10 the cast simulation finds
@@ -1548,7 +1550,8 @@ const viperBites: JobCheck = (ctx) => {
   return out;
 };
 
-export const VPR_CHECKS: JobCheck[] = [uptime("HUNTERS_INSTINCT", 0.1, "Hunter's Instinct is +10%, FFLogs multiplier"), reawaken, venoms, rattlingCoils, serpentOfferingsCheck, serpentsTail, viperBites, vprAoe];
+export const VPR_CHECKS: JobCheck[] = [uptime("HUNTERS_INSTINCT", 0.1, "Hunter's Instinct is +10%, FFLogs multiplier"), fromLevel(100, reawaken), venoms,
+  fromLevel(92, rattlingCoils), fromLevel(90, serpentOfferingsCheck), serpentsTail, viperBites, vprAoe];
 // xivanalysis AoE.tsx: each form's AoE against that form's three
 // single-target GCDs (their cast-weighted average), Enlightenment against
 // The Forbidden Chakra.
@@ -1841,7 +1844,7 @@ export function mnkFurySpecs(ctx: PlayerCheckContext): GaugeSpec[] {
 }
 const mnkFury: JobCheck = (ctx) => mnkFurySpecs(ctx).flatMap((spec) => (spec.unitValue > 0 ? gaugeFindings(ctx, spec) : []));
 
-export const MNK_CHECKS: JobCheck[] = [riddleOfFire, mnkAoe, mnkBlitz, mnkFury];
+export const MNK_CHECKS: JobCheck[] = [riddleOfFire, mnkAoe, fromLevel(92, mnkBlitz), fromLevel(92, mnkFury)];
 // Firstminds' Focus (xivanalysis FirstmindsFocus): +1 per Raiden Thrust /
 // Draconian Fury, cap 2, Wyrmwind Thrust spends 2. A stack gained at 2 is
 // half a Wyrmwind. On 2T1HzdPKgbhM43am fight 10 the cast simulation finds
@@ -1865,7 +1868,8 @@ export function firstmindsFocusSpec(ctx: PlayerCheckContext): GaugeSpec {
 }
 const firstmindsFocus: JobCheck = (ctx) => gaugeFindings(ctx, firstmindsFocusSpec(ctx));
 
-export const DRG_CHECKS: JobCheck[] = [uptime("POWER_SURGE", 0.1, "Power Surge is +10% (tooltip)", { cost: drgPowerSurgeRefreshCost, reapplyGcds: 1, restartIds: ids("RAIDEN_THRUST", "TRUE_THRUST") }), lanceCharge, lifeOfTheDragon, lifeSurge, chaoticSpring, firstmindsFocus, starcrossDropped];
+export const DRG_CHECKS: JobCheck[] = [uptime("POWER_SURGE", 0.1, "Power Surge is +10% (tooltip)", { cost: drgPowerSurgeRefreshCost, reapplyGcds: 1, restartIds: ids("RAIDEN_THRUST", "TRUE_THRUST") }), lanceCharge, lifeOfTheDragon,
+  fromLevel(86, lifeSurge), fromLevel(96, chaoticSpring), fromLevel(90, firstmindsFocus), fromLevel(100, starcrossDropped)];
 // xivanalysis Ninki.tsx: the frogs against Bhavacakra / Zesho Meppo. From
 // 7.3 two targets out-damage them, so only one target is judged (as
 // Samurai's Guren).
@@ -2045,7 +2049,7 @@ const ninjutsu: JobCheck = (ctx) => {
   }
   return out;
 };
-export const NIN_CHECKS: JobCheck[] = [kunaisBane, ninki, kazematoi, ninAoe, ninjutsu];
+export const NIN_CHECKS: JobCheck[] = [kunaisBane, fromLevel(82, ninki), fromLevel(92, kazematoi), ninAoe, ninjutsu];
 // Soul Reaver and Executioner stacks dropped (xivanalysis Reaver.tsx,
 // Executioner.tsx): the status removed beside a press that doesn't spend
 // it (a combo GCD, Harpe, Perfectio, another Blood Stalk), with the stacks
@@ -2184,4 +2188,5 @@ const RPR_ENHANCED_CONSUMERS: [status: string, consumers: string[]][] = [
   ["ENHANCED_VOID_REAPING", ["VOID_REAPING"]], ["ENHANCED_CROSS_REAPING", ["CROSS_REAPING"]],
 ];
 
-export const RPR_CHECKS: JobCheck[] = [enshroud, arcaneCircle, deathsDesign, harvestMoon, shroud, rprSoul, rprAoe, reaperStacks, reaperEnhancedOverwrites];
+export const RPR_CHECKS: JobCheck[] = [fromLevel(92, enshroud), arcaneCircle, deathsDesign, fromLevel(82, harvestMoon), fromLevel(88, shroud),
+  rprSoul, rprAoe, reaperStacks, reaperEnhancedOverwrites];

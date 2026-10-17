@@ -155,7 +155,7 @@ import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
 import type { DamageFinding, JobCheck } from "../../types";
 import { COOLDOWN_HOLD_MS, finding, PROC_CONSUME_MS, PROC_EXPIRY_EARLY_MS, type PlayerCheckContext } from "../../checks";
 import { forcedPart, inWindows, mergeWindows } from "../../timeline";
-import { aoeComboOnOneTarget, burstWindowFindings, castHits, clock, gaugeFindings, k, statusWindows, uptimeFindings, type GaugeEvent, type GaugeSpec } from "./shared";
+import { aoeComboOnOneTarget, burstWindowFindings, castHits, clock, fromLevel, gaugeFindings, k, statusWindows, uptimeFindings, type GaugeEvent, type GaugeSpec } from "./shared";
 import { comboLanded } from "./gnb";
 
 const id = (key: string) => A[key].id;
@@ -409,7 +409,8 @@ const pldAoeCombo =aoeComboOnOneTarget([[id("TOTAL_ECLIPSE"), id("FAST_BLADE")],
 const warAoeCombo = aoeComboOnOneTarget([[id("OVERPOWER"), id("HEAVY_SWING")], [id("MYTHRIL_TEMPEST"), id("MAIM")],
   [id("CHAOTIC_CYCLONE"), id("INNER_CHAOS"), 3], [id("DECIMATE"), id("FELL_CLEAVE"), 3]]);
 
-export const PLD_CHECKS: JobCheck[] = [fightOrFlight, pldAoeCombo, atonementChainAtKill, atonementChainDropped, requiescatChainLost];
+// The Confiteor chain's Blades are 90 (shared.ts fromLevel).
+export const PLD_CHECKS: JobCheck[] = [fightOrFlight, pldAoeCombo, atonementChainAtKill, atonementChainDropped, fromLevel(90, requiescatChainLost)];
 // Infuriate held at two charges (xivanalysis OGCDDowntime.ts with
 // `resetBy`): not in tracked-cooldowns.ts, because each Fell Cleave,
 // Decimate, Inner Chaos or Chaotic Cyclone takes 5s off its recharge,
