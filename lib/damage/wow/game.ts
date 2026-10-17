@@ -401,11 +401,20 @@ const FELBLADE_WEAVE_MS = 700;
 // - Blade Dance / Death Sweep → Throw Glaive (Havoc; 153 of 173 Death
 //   Sweeps, 34 of 35 Blade Dances).
 // - Evangelism → Power Word: Radiance (Discipline; 12 of 12).
+// - Stormstrike → Lightning Bolt, Chain Lightning, Tempest, logged 10–30ms
+//   after it (Enhancement, the WoWAnalyzer audit's phase 3, 2026-10-17:
+//   202 of 2,111 Stormstrikes on 23 player-pulls), and Lightning Bolt /
+//   Chain Lightning / Tempest → Crash Lightning in the same instant (285 of
+//   1,191 Crash Lightnings; Storm Unleashed is spent there). Each pair
+//   takes one GCD: the next press comes a median 1.17s / 1.08s later, as
+//   after a lone Stormstrike (1.19s) or spender (1.18s).
 // Dropping Havoc's twins cuts its GCD count (Backendorse K4x8cMZYVpGCDbJH
 // 300 → 280), so each GCD is worth more and a few Havoc gap totals rose
 // (his 3.78M → 4.30M; Mythnarra gVDPhzp61Zm29HMw +0.6–1.3M a pull).
 const COINCIDENT_AUTO = new Map<number, number[]>([
   [115356, [188196, 188443, 452201]],
+  [17364, [188196, 188443, 452201]],
+  [188196, [187874]], [188443, [187874]], [452201, [187874]],
   [188499, [185123]], [210152, [185123]],
   [472433, [194509]],
 ]);
