@@ -5,20 +5,23 @@
 // cooldown; the Demonic Core and Infernal Bolt expiries in procs.ts). Built
 // in the WoWAnalyzer audit's phase 3 (docs/wowa-audit/warlock-demonology.md),
 // every rule valued as damage lost, demons included (pets are ~70% of a
-// Demonology player's damage). Measured 2026-10-17 on 33 Demonology
+// Demonology player's damage). Measured 2026-10-17 on 35 Demonology
 // player-pulls, all Mythic: the top Entombed Sentinels parses 닭콤
 // (aZ6NnwL8g9PdpGJ1, 100th) and Darkenedlife (LckJC7GMhQvD6rdw), probes of
 // 燃烧之灭 (4M7YDKWTfnxgQctC, 99.9th) and 닥꼼 (N48PJjHAYbdF3Zmx, 99.7th),
-// with Bryon (VWMbYPRyxCAmhZFj), Neltarian (Vr8dLPtFYWA4G1yg), Petonpassive
+// and other Entombed Sentinels kills (160–230k DPS): Bryon
+// (VWMbYPRyxCAmhZFj), Neltarian (Vr8dLPtFYWA4G1yg), Petonpassive
 // (ACmXHMFtaPLR9k8w), Swaguldan (JvQpZk3CXj78Dx2f), Tuskanoita, Pazlock,
-// Bulzwei (wWx8B1GPZMLghAyz); on Vashnik Lanlv and Happywarlock
-// (9w3bK4qhrRC82gVX), Wamp (hjHXmdnJFwTPpMtK), Fetznhi (r9CX1kpRGLmKJH4M);
+// Bulzwei (wWx8B1GPZMLghAyz); on Vashnik the 99.9th Lydd and 遥远懦夫斯基
+// (VbAHWZDdPwJBajmx), probes of Hemlöck and 岁月长衣衫薄 (100th), Lanlv
+// and Happywarlock (9w3bK4qhrRC82gVX), Wamp (hjHXmdnJFwTPpMtK), Fetznhi
+// (r9CX1kpRGLmKJH4M);
 // the weaker Embed (LCFp3wbHvQqNP4my, 20th; probes of Raeffi and Fuzïtîv,
 // 23rd) and the static's Fwîî (qpZx3mWaG7gcDdYB, 77th, the case study, and
 // his 16 pulls in gVDPhzp61Zm29HMw on six bosses), with Wyrmtongues's two
 // Demonology pulls there. Spell ids are from those logs' masterData.
 //
-// Talents (from casts, buffs and pets; every one of the 33): Diabolist
+// Talents (from casts, buffs and pets; every one of the 35): Diabolist
 // (Ruination, Infernal Bolt, the Diabolic Ritual demons), Grimoire: Imp
 // Lord, To Hell and Back (imps return after an Implosion), and a Gloomhound
 // (or Charhound) that comes with each Call Dreadstalkers. Nobody takes
@@ -61,8 +64,8 @@
 // ordinary delay), only while Wild Imps are out (an imp hit in the last
 // IMP_SEEN_MS). Lost = held ÷ 15s × (the player's returned-imp damage per
 // press outside Tyrant − their average GCD).
-// Measured (lost a pull): top Entombed Sentinels kills 닭콤 none, Darkenedlife
-// 27k, Neltarian 293k, Pazlock 298k, Petonpassive 319k, Swaguldan 343k,
+// Measured (lost a pull): 닭콤 none, Darkenedlife 27k; the other Entombed
+// Sentinels kills Neltarian 293k, Pazlock 298k, Petonpassive 319k, Swaguldan 343k,
 // Bryon 371k. Vashnik is looser: the 99.9th Lydd (VbAHWZDdPwJBajmx) 2.24M
 // (14 presses in 6:35, where the two other top Vashnik players probed made
 // 18 and 22; WoWAnalyzer's 90% rule flags him too), 遥远懦夫斯基 1.83M on
@@ -83,8 +86,9 @@
 // DS_TYRANT_EXCUSE_MS: 0.22M ÷ (0.45M − a ~54k GCD) × 20s ≈ 11s.
 // Held = ready → next cast, past DS_ALLOW_MS a cycle. Lost = held ÷ 20s ×
 // (the player's damage per cast not before a Tyrant − their average GCD).
-// Measured (lost a pull): top 닭콤 and Bryon none, Neltarian 5k,
-// Darkenedlife 6k, Pazlock 12k, Petonpassive 53k, Lydd 139k, Swaguldan 276k.
+// Measured (lost a pull): 닭콤 none, Darkenedlife 6k, Lydd 139k; the other
+// Entombed Sentinels kills Bryon none, Neltarian 5k, Pazlock 12k,
+// Petonpassive 53k, Swaguldan 276k.
 // Weaker: Tuskanoita 756k (ready 1:19, pressed 1:36), Happywarlock 621k,
 // Bulzwei 268k, Embed 64k (his long gaps were in Stasis); Fwîî 5k on the
 // case study, 1.26M over his static's 16 pulls (Ula'tek 635k: ready 3:14,

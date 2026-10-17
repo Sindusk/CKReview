@@ -347,8 +347,18 @@ and delete them from the header.
     Found: `checkProcs` never sees a WoW expiry (WoW buff events carry no
     duration), so "covered by checkProcs (expiries)" rows need a second
     look in every WoW ledger.
-  - [warlock-demonology.md](wowa-audit/warlock-demonology.md): 10; Call
-    Dreadstalkers cadence with Demonic Calling.
+  - [warlock-demonology.md](wowa-audit/warlock-demonology.md): phase 3
+    done 2026-10-17 on 35 Demonology player-pulls (all Diabolist, To Hell
+    and Back; four 99.7–100th parses, Embed at the 20th, Fwîî's 16 pulls).
+    Built: Implosion held (the phase-2 `wrong` overturned: each press
+    brings back ~0.5M of imps; the largest Demonology loss, Fwîî 15M over
+    16 pulls) and Call Dreadstalkers held (small; it costs no Soul Shards)
+    in lib/damage/wow/specs/demonology.ts. Left unbuilt with numbers: the
+    Tyrant-window rows (Dreadstalkers timing, shards at the cast and the
+    end, Grimoire, cores: negligible or the top players do the same).
+    `unverifiable`: Vilefiend, Power Siphon, Doomguard, Demonic Calling
+    (nobody takes them). Open: on Vashnik the 99.9th Lydd also holds
+    Implosion (2.24M).
   - [warlock-affliction.md](wowa-audit/warlock-affliction.md): 5; Dark
     Harvest drift with Cull the Weak.
   - [warrior-arms.md](wowa-audit/warrior-arms.md): 11; Bladestorm drift
