@@ -435,7 +435,22 @@ const PISTOL_FOLLOW_MS = 500;
 // qpZx3mWaG7gcDdYB pull 3: 71k of 150k; ×1.8–3.3 on all 37 BM player-pulls
 // on disk), so every BM gap was priced at half. Pet melee, Bloodshed's DoT
 // and Beast Cleave keep going while the player idles and stay out.
-const PET_PRESS_HITS = new Set([83381, 1232922, 389448, 344572, 1264355, 201754]);
+// Unholy Death Knight's presses too (phase 3, 2026-10-17): the Lesser
+// Ghouls' Death Order (1294264) and Epidemic Order (1300330) land 0–0.4s
+// after a Vampiric / Scourge Strike, Necrotic Coil, Graveyard or Soul Reaper
+// (71% in the first 100ms against 10% for a random instant, 553 instants on
+// four kills). See UNHOLY_PRESS_HITS for the player's own.
+const PET_PRESS_HITS = new Set([83381, 1232922, 389448, 344572, 1264355, 201754, 1294264, 1300330]);
+
+// Unholy Death Knight's plague Erupts (Virulent 1241167, Dread 1241171) are
+// the player's own hits a press causes, under ids no cast has: 99% of
+// Vampiric Strikes (46k of Erupt each) and Scourge Strikes (19k) burst one in
+// the same instant, and Blightfall's damage is all Erupt (1.04M a press).
+// Without them an Unholy GCD read 49–93k on 31 player-pulls; with them and
+// the Orders above, +27–79k (Blightfall's share 0–36k of that, counted as
+// Graveyard's hits already are: the average press). Measured in
+// docs/wowa-audit/deathknight-unholy.md.
+const UNHOLY_PRESS_HITS = new Set([1241167, 1241171]);
 
 // Augmentation's support damage (the WoWAnalyzer audit's phase 3,
 // 2026-10-17): Warcraft Logs writes what Ebon Might and Prescience add to
@@ -619,11 +634,12 @@ export const WOW_DAMAGE: DamageGame = {
   // Strike, Annihilation and Eye Beam hit under other ids than their casts,
   // and by id alone Mythnarra's average GCD read 7k of a real ~219k
   // (qpZx3mWaG7gcDdYB pull 3), pricing every gap at a thirtieth.
-  // A Beast Mastery press's pet hits too (PET_PRESS_HITS). Never
-  // Augmentation's support hits (AUG_SUPPORT_HITS).
+  // A Beast Mastery or Unholy press's pet hits too (PET_PRESS_HITS), and
+  // Unholy's plague Erupts (UNHOLY_PRESS_HITS). Never Augmentation's support
+  // hits (AUG_SUPPORT_HITS).
   isGcdDamage: (e, gcdNames) => e.pet
     ? PET_PRESS_HITS.has(e.abilityId)
-    : !AUG_SUPPORT_HITS.has(e.abilityId) && (ACTIONS.get(e.abilityId)?.onGcd === true || gcdNames.has(e.abilityName)),
+    : !AUG_SUPPORT_HITS.has(e.abilityId) && (UNHOLY_PRESS_HITS.has(e.abilityId) || ACTIONS.get(e.abilityId)?.onGcd === true || gcdNames.has(e.abilityName)),
   compareFromPullStart: true,
   compareRolesPerPlayer: true,
 };
