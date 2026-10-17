@@ -383,8 +383,16 @@ and delete them from the header.
     Essence Burst never runs out on the sample players. Open for the
     user: `healGcds` flags Echo by Echo's own small heal (0.8–2.0M a
     pull on top players), though its value is the echoed copy.
-  - [monk-mistweaver.md](wowa-audit/monk-mistweaver.md): healer, 6
-    damage candidates; Celestial Conduit as a tracked cooldown.
+  - [monk-mistweaver.md](wowa-audit/monk-mistweaver.md): healer,
+    phase 3 done 2026-10-17: Celestial Conduit drift built
+    (tracked-cooldowns.ts). The 740ms "GCD" was Rushing Wind Kick's and
+    Soothing Mist's own short GCD; with Sheilun's Gift, Detox, Revival
+    and the Mana Tea / Soothing Mist channels added (game.ts, haste.ts,
+    timeline.ts) GCD uptime moved 48–82% → 65–89%. Kick drift is
+    `unverifiable` (resets not in the log). Open: Touch of Death unbuilt
+    (287–450k a press; 2 of 5 top players skip it); Windwalker's tracked
+    Celestial Conduit is valued by its cast id 443028, but its hits log
+    as 443038, so it never fires (not changed: Windwalker's pass).
   - [druid-restoration.md](wowa-audit/druid-restoration.md): healer,
     phase 3 done 2026-10-17: nothing built. Convoke the Spirits (3.0s)
     and Soulcoiler Ritual Vessel (2.0s) now lock the GCD (game.ts), which

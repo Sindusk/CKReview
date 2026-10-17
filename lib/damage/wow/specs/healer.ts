@@ -6,8 +6,10 @@
 // same as FFXIV's (lib/damage/ffxiv/jobs/healer.ts): what each heal GCD
 // actually healed. Which specs: Holy Priest (12 sample players),
 // Restoration Druid (10), Holy Paladin, Restoration Shaman, Preservation
-// Evoker (9 each), Mistweaver (2, unverified); Discipline isn't in any
-// sample (unverified).
+// Evoker (9 each), Mistweaver (2 in the survey; 14 on 13 reports in the
+// WoWAnalyzer audit, 2026-10-17, below); Discipline isn't in any sample
+// (unverified). Mistweaver's one damage check of its own is Celestial
+// Conduit drift (tracked-cooldowns.ts).
 //
 // ── Heal GCDs ──────────────────────────────────────────────────────────
 // WCL's healing stream (kGVX7tafBT2pM1N3 pull 19): `heal` events carry
