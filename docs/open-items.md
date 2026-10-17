@@ -432,8 +432,20 @@ and delete them from the header.
     (runs out on top and weak alike, ≤60k a proc). `unverifiable`:
     Moonfire / Sunfire early refresh (their extensions aren't logged),
     New Moon, Convoke (nobody takes them).
-  - [paladin-retribution.md](wowa-audit/paladin-retribution.md): 5; Divine
-    Toll drift.
+  - [paladin-retribution.md](wowa-audit/paladin-retribution.md): phase 3
+    done 2026-10-17 on the 58 Retribution player-pulls on disk (two top
+    Vashnik kills fetched: Pipala 7pFPAqzc2NHLXjwZ, Pçpaladin
+    1NL29tyvbzGhZgPK). Built in lib/damage/wow/specs/retribution.ts: the
+    tracked cooldowns valued (Avenging Wrath and Execution Sentence were
+    worth 0 a use, so their drift never showed), Divine Toll tracked (a
+    clean 60s on Retribution), all four honoring the fight's hold windows
+    (new `burstHold` in checks.ts; Ula'tek's context got Heart windows),
+    and Divine Arbiter expired unused. Hammer of Light (Templar) is now a
+    GCD press (game.ts; Yenvenger's gaps 942k → 0). Left unbuilt with
+    numbers: Expurgation uptime, Hammer of Light after Wake (never
+    missed), Execution Sentence before Wake (≤0.18M), melee swings missed
+    (1.12M on the 100th-percentile Pipala). `unverifiable`: Art of War
+    (its removals don't sit at a duration). No `wrong` rows.
   - [deathknight-frost.md](wowa-audit/deathknight-frost.md): 5;
     Frostscythe targets per cast.
   - [demonhunter-vengeance.md](wowa-audit/demonhunter-vengeance.md): tank,
