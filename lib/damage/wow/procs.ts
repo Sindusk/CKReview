@@ -153,7 +153,11 @@
 //   1,258 on the 50 Balance player-pulls (Jugular's Weft at 30.0s, a
 //   Touch the Cosmos at 15.0s in forced time). Not added.
 // - Crimson Scourge (81141) 15s: 9 of 18 top Blood players let one run
-//   out (12/349). A free Death and Decay on a tank; for the Blood pass.
+//   out (12/349). A free Death and Decay on a tank. Settled in the Blood
+//   pass (2026-10-17): judged in specs/blood.ts by the time it's held with
+//   no Death and Decay on the ground ("Free Death and Decay held"), which
+//   separates top from weak; expiries alone don't, and a whole Death and
+//   Decay less its GCD is worth ~0 for many players.
 // - Burnout (375802) 15s and Backdraft (117828) 10s: they cut a cast time
 //   rather than grant a press, so a whole Living Flame or Chaos Bolt isn't
 //   their price (Destruction's Backdraft has its own check).

@@ -26,6 +26,7 @@ import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { TrackedCooldown } from "../types";
 import { avengingWrathValue, divineTollValue } from "./specs/retribution";
 import { pillarOfFrostValue } from "./specs/frostdk";
+import { dancingRuneWeaponValue } from "./specs/blood";
 import { sigilValue } from "./specs/vengeance";
 import { trueshotValue } from "./specs/marksmanship";
 import { convokeValue, feralFrenzyValue, feralWindowValue } from "./specs/feral";
@@ -76,10 +77,18 @@ function vanishGarroteValue(player: PlayerInfo, endMs: number): { value: number;
 export const WOW_TRACKED_COOLDOWNS: Record<string, TrackedCooldown[]> = {
   // ── Tanks ───────────────────────────────────────────────────────────
   "Blood Death Knight": [
-    // min interval 90.0s (69 casts), first use median 2.1s (15 players)
-    { name: "Dancing Rune Weapon", actionIds: [49028], cooldownMs: 90_000, charges: 1, firstUseOffsetMs: 3_000 },
+    // min interval 90.0s (69 casts), first use median 2.1s (15 players).
+    // Dancing Rune Weapon deals nothing itself (its copies log under the
+    // Rune Weapon pet), so a use was worth 0 until the WoWAnalyzer audit's
+    // phase 3 (2026-10-17): valued by specs/blood.ts dancingRuneWeaponValue.
+    // Raise Dead stays unvalued (its ghoul is 38–147k a use, and the top
+    // players skip uses: 蕾米蕾米蕾 J3ckBVtrZNfWv1h7 190s / 182s apart).
+    // Reaper's Mark (Deathbringer): shortest 45s, hits under three ids as
+    // for Frost; specs/blood.ts has the numbers.
+    { name: "Dancing Rune Weapon", actionIds: [49028], cooldownMs: 90_000, charges: 1, firstUseOffsetMs: 3_000, valuePerUse: dancingRuneWeaponValue },
     // min 120.0s (37 casts), first use median 2.1s
     { name: "Raise Dead", actionIds: [46585], cooldownMs: 120_000, charges: 1, firstUseOffsetMs: 3_000 },
+    { name: "Reaper's Mark", actionIds: [439843], damageIds: [439843, 436304, 439594], cooldownMs: 45_000, charges: 1, firstUseOffsetMs: 3_000 },
   ],
   "Protection Paladin": [
     // min 59.9s (51 casts), first use median 1.7s (8 players)

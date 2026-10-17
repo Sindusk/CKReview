@@ -44,17 +44,25 @@
 //   a pull on top players, 21–23 on the weakest, ~150k at most).
 //
 // ── Blood Death Knight ─────────────────────────────────────────────────
+// WoWAnalyzer audit phase 3, 2026-10-17 (docs/wowa-audit/deathknight-blood.md;
+// specs/blood.ts holds the model and every number, 97 player-pulls).
 // - Dancing Rune Weapon (buff 81256): the Rune Weapon copies the DK's
 //   strikes, so a GCD short in the window loses that copy too. The bonus is
 //   measured per window: the Rune Weapon's damage ÷ the DK's own damage in
-//   it.
+//   it. Top players 6–63k a pull, the weaker 100–250k.
+// - Dancing Rune Weapon drift is valued now (blood.ts
+//   dancingRuneWeaponValue: the Rune Weapon's hits, 0.6–2.5M a use); it was
+//   worth 0 and never showed. Reaper's Mark tracked for Deathbringer.
+// - Free Death and Decay held (blood.ts): Crimson Scourge held with no
+//   Death and Decay down, top 1–36k, weak up to 346k.
 // - Blood Plague (55078) uptime.
-// - Runic Power (resource 6, logged ×10, max 1250): it's logged on every
-//   cast, builders included, so generating at the cap is visible directly.
-//   kGVX7tafBT2pM1N3 pull 19: one Blood DK cast 86 of 395 abilities at full
-//   Runic Power (Blood Boil, Infliction of Sorrow, Death Grip). Valued at
-//   Death Strike's damage per Runic Power: small, since Death Strike is
-//   mostly a heal.
+// - Runic Power at the cap: removed for Blood (2026-10-17, for the user's
+//   review). It read 0.34–1.56M on the top players by pricing casts that
+//   generate none (Blood Boil, Death Grip); rebuilt from the real
+//   generators it doesn't separate top from weak (blood.ts). The note
+//   below is the case study's, from before. Death Strike isn't "mostly a
+//   heal" in these logs: 20–30% of a top player's damage (Lyrîa 20M,
+//   180k a press).
 // - Checked against WoWAnalyzer on qpZx3mWaG7gcDdYB pull 3 (Veinglas;
 //   reference ACmXHMFtaPLR9k8w's Frostydn, 99th percentile; 2026-10-13):
 //   Runic Power wasted 354 vs 48 there; this check finds 115 vs 40 (only
@@ -106,11 +114,11 @@
 //   weaker 10–28%), Blackout Combo on Keg Smash, Touch of Death, Chi Burst.
 
 import type { JobCheck } from "../../types";
-import { burstGcdFindings, dotUptimeFindings, observedWindowBonus, resourceCapFindings } from "./shared";
+import { burstGcdFindings, dotUptimeFindings, observedWindowBonus } from "./shared";
+import { BLOOD_SPEC_CHECKS } from "./blood";
 
 const DANCING_RUNE_WEAPON_BUFF = 81256;
 const BLOOD_PLAGUE = 55078;
-const DEATH_STRIKE = 49998;
 const SENTINEL = 389539;
 
 const bloodDrw: JobCheck = (ctx) => burstGcdFindings(ctx, {
@@ -127,10 +135,6 @@ const bloodDrw: JobCheck = (ctx) => burstGcdFindings(ctx, {
 
 const bloodPlague: JobCheck = (ctx) => dotUptimeFindings(ctx, { statusIds: [BLOOD_PLAGUE], name: "Blood Plague" });
 
-const bloodRunicPower: JobCheck = (ctx) => resourceCapFindings(ctx, {
-  type: 6, name: "Runic Power", scale: 10, spenderIds: [DEATH_STRIKE],
-});
-
 const protPalSentinel: JobCheck = (ctx) => burstGcdFindings(ctx, {
   statusId: SENTINEL,
   name: "Sentinel",
@@ -140,5 +144,5 @@ const protPalSentinel: JobCheck = (ctx) => burstGcdFindings(ctx, {
 });
 
 export { BREWMASTER_CHECKS } from "./brewmaster";
-export const BLOOD_CHECKS: JobCheck[] = [bloodDrw, bloodPlague, bloodRunicPower];
+export const BLOOD_CHECKS: JobCheck[] = [bloodDrw, bloodPlague, ...BLOOD_SPEC_CHECKS];
 export const PROT_PALADIN_CHECKS: JobCheck[] = [protPalSentinel];
