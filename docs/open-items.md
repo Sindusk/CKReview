@@ -290,20 +290,26 @@ and delete them from the header.
   3 stale (Marksmanship declares 11.0.5, Protection Paladin unmaintained,
   Assassination untouched since 2025). Phases 1–2 done for all 40 specs
   (fan-out 2026-10-16). Phase 3 (top-parse checks, building) is next, one
-  spec at a time in the plan's order. Below, each ledger gives its
-  candidate count and the first candidate it lists; none is measured yet,
-  and most will fail the premise check.
+  spec at a time in the plan's order. Phase 3 values each candidate as
+  damage lost in the log first: top players doing the same thing is
+  evidence about the premise, not proof it costs nothing (Elemental's
+  re-measure turned four `wrong` calls back into candidates). Below,
+  each ledger gives its candidate count and the first candidate it
+  lists; none is measured yet.
   Open question for the user: should consumables and gear at the pull
   stay out of scope (core.md marks them `no-damage`)?
   - [core.md](wowa-audit/core.md): shared core, 3 candidates (melee swing
     uptime, pandemic refreshes, AoE hits per cast); every percentage
     there divides by the whole fight.
   - [shaman-elemental.md](wowa-audit/shaman-elemental.md): Elemental,
-    phase 3 done 2026-10-16 against seven top parses: five candidates
-    failed the premise check, Call of the Ancestors active time `wrong`
-    (double-graded idle). Stormkeeper drift built (60s less 3s per
-    Ancestor summoned; Vashnik holds for the Venoms after Imbibe allowed).
-    Open: Ascendance spenders (low value).
+    phase 3 done 2026-10-16 against seven top parses, re-measured as
+    damage lost the same day. Four real losses to build, by value:
+    non-overload casts in Ascendance (130-590k each), Lava Burst without
+    Flame Shock (~120k), unbuffed spenders (~6.5% each), one-target Chain
+    Lightning (~35k). Early Flame Shock refreshes and Call of the
+    Ancestors active time stay `wrong`. Stormkeeper drift built (60s
+    less 3s per Ancestor summoned; Vashnik holds for the Venoms after
+    Imbibe allowed). Open: Ascendance spenders (low value).
   - [monk-windwalker.md](wowa-audit/monk-windwalker.md): 12 candidates;
     Fists of Fury cadence (reduction model).
   - [demonhunter-havoc.md](wowa-audit/demonhunter-havoc.md): 11; Eye

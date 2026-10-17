@@ -28,11 +28,15 @@
   some. The app's checks gave the top seven no Ascendance, Maelstrom or
   Flame Shock finding (one 8k Ascendance window on Shaziggla) and fired
   on Cocroach (potions, Flame Shock 18.2s at Coiled Altar 2:56, short
-  Ascendance windows). Four candidates were marked `wrong` because the
-  top players did the same as often or more. That is weak evidence on
-  its own (top players also lose damage). The fifth, one-target Chain
-  Lightning, was re-measured as a real loss (overloads included) and is
-  a candidate again.
+  Ascendance windows). The first pass marked five candidates `wrong`
+  because the top players did the same as often or more, which is weak
+  evidence on its own (top players also lose damage). **Re-measured
+  2026-10-16 as damage lost** on the same pulls (Cocroach's 12 Elemental
+  pulls, counting a 0:52 Kith'ix wipe): one-target Chain Lightning, Lava
+  Burst without Flame Shock, non-overload casts in Ascendance and
+  unbuffed spenders are real losses, top players included, and are
+  candidates; early Flame Shock refreshes cost almost nothing and stay
+  `wrong`.
 - **Core rules** (active time, cast efficiency, potions, cancelled casts)
   are in [core.md](core.md); rows below cover only what Elemental sets or
   adds.
@@ -45,14 +49,14 @@
 | shaman-elemental/CancelledCasts/rate | covered | `checkInterrupts` | none | a cast cut by movement | Above 5 / 7.5 / 10%. Not shown in the guide. |
 | shaman-elemental/MaelstromDetails/waste | verified | `primaryResourceCapFindings` | none | Maelstrom generated into a full bar | Wasted ÷ generated, above 0 / 2 / 5%. Case study 2.7% vs 2.2%, both pages matched. WoWAnalyzer's cap leaves out Primordial Capacity; the app reads the max from the log. |
 | shaman-elemental/MaelstromSpenders/waste-since-last | covered | `primaryResourceCapFindings` | none | capping between spenders | The same waste, scored per spender (worst at 25+ wasted). |
-| shaman-elemental/MaelstromSpenders/spender-before-lava-burst | wrong | — | Master of the Elements | a spender cast without Master of the Elements while Lava Burst sat ready | Scored from ready time (worst at 10s+). "Missed opportunity" at 5s+; any one fails the overview counter. **Fight-blind:** measured as an unbuffed spender with Lava Surge up (an instant Lava Burst ready, outside Ascendance). On Vashnik the top three did it 8, 9 and 10 times (mostly Earthquake chains on adds; 19-27 unbuffed spenders each), more than Cocroach (2-7). On Entombed Sentinels the top four did it 0-2 times, Cocroach 0. The bonus itself didn't measure: too few unbuffed Elemental Blasts outside Ascendance (0-3 a pull). |
+| shaman-elemental/MaelstromSpenders/spender-before-lava-burst | candidate | — | Master of the Elements | a spender cast without Master of the Elements while Lava Burst sat ready | Scored from ready time (worst at 10s+). "Missed opportunity" at 5s+; any one fails the overview counter. **A real but small loss.** Measured as an unbuffed spender with Lava Surge up (an instant Lava Burst ready), outside Ascendance. The bonus: non-crit Elemental Blast direct hits did 192.6k buffed vs 180.9k unbuffed, pooled over all pulls (212 vs 82 hits), so ×1.065. Earthquake consumes the buff too (13 buffed Earthquakes on Vashnik), so its unbuffed casts also lose ~6.5%; its own bonus didn't measure (Earthquakes overlap). Counts: top players 1-7 on Entombed Sentinels, 12-13 on Vashnik (6-9 of them Earthquakes on adds); Cocroach 48 in 12 pulls (27 Earthquakes). At the pooled bonus, the Elemental Blasts alone cost the top players 40-223k a pull, Cocroach 46k; each Earthquake adds roughly 20-60k. The top players lose more than Cocroach, so this doesn't separate them. What would separate a mistake: whether a Lava Burst first would have capped Maelstrom (Maelstrom is on the cast events). Value: the spender's own damage × the pooled bonus. Low value. |
 | shaman-elemental/FlameShock/uptime | verified | `dotUptimeFindings` (Flame Shock) | none | Flame Shock left off | Under 99 / 95 / 85% of the whole fight, pooled over enemies. Shown, not graded, in Elemental's guide. Case study 99.5% both. Phase 3: none on the top seven; Cocroach Coiled Altar 2:56 (18.2s, 200k), Kith'ix 0:38 and 1:36, Nek'zali 2:01 and 3:30. |
-| shaman-elemental/FlameShock/early-refresh | wrong | — | none | Flame Shock refreshed with more than 30% left | Bad casts over 10 / 20 / 30% of Flame Shock casts; the core pandemic rule (core.md). Duration confirmed 18s in the log. **Fight-blind:** on Entombed Sentinels (two bosses) the top four refreshed early 1, 4, 4 and 2 times; Cocroach 0-2 a pull. WoWAnalyzer itself marks Flame Shock a movement filler. |
-| shaman-elemental/FlameShock/lava-burst-unshocked | wrong | — | none | Lava Burst landing on an enemy without Flame Shock | Counted, no tier. Measured as player Lava Bursts that didn't crit (certain crit on a Flame Shocked target): top seven 0-3 (Unlucky 3 on Vashnik itself), Cocroach 0-3 (new adds: Burning Venom, Spiteful Soulcoiler, Hex Lord Malacrass). ~75k each. No difference between top and weaker players, and it comes from target swaps. |
+| shaman-elemental/FlameShock/early-refresh | wrong | — | none | Flame Shock refreshed with more than 30% left | Bad casts over 10 / 20 / 30% of Flame Shock casts; the core pandemic rule (core.md). Duration confirmed 18s in the log. **Almost no loss** (re-measured 2026-10-16). The DoT keeps ticking either way, so clipping only means more Flame Shock GCDs over the fight: lost seconds ÷ 18s of one GCD, worth a Lightning Bolt (with overloads) less the Flame Shock hit when standing, about nothing when moving. Most refreshes with time left come from Voltaic Blaze spreading Flame Shock (41 each on Elemeta's and Shaziggla's Vashnik pulls), not from a Flame Shock cast, and those cost nothing. Flame Shock casts that clipped: top four on Entombed Sentinels 2-7 each, half while moving (position from hits taken); the standing ones cost 9-62k a pull. Cocroach 4 in 12 pulls, 5k a pull. The premise holds, but the loss is too small to judge. |
+| shaman-elemental/FlameShock/lava-burst-unshocked | candidate | — | none | Lava Burst landing on an enemy without Flame Shock | Counted, no tier. **A real loss, 70-140k each, ~120k on average** (re-measured 2026-10-16 against the player's own Flame Shock on the target, from the debuff events). Every Lava Burst on a shocked target crit (1,487 of 1,487); the unshocked ones that didn't crit did ~40-100k with overloads, against 147-213k shocked. The first pass valued them at ~75k. Top seven 0-4 a pull (Unlucky 4 on Vashnik, 280k; Fauni 1, 140k); Cocroach 15 in 12 pulls (1.86M), including 5 on one add in 23s at Coiled Altar 2:48-3:11 (736k). It comes from target swaps onto new adds. What separates a mistake: a Flame Shock first costs a GCD, which its DoT about pays for, so the loss stands unless the add dies within a few seconds. Cheap to build: a non-crit Lava Burst on a target without the player's Flame Shock, valued at the player's own shocked average. |
 | shaman-elemental/SubOptimalChainLightning/one-target | candidate | — | none | Chain Lightning hitting one target | Above 0 / 1 / 2 a minute; a timeline note, not in the guide. Top seven 0-5 a pull, Cocroach 0-3. **A real loss, top players included.** Re-measured 2026-10-16 on r9CX1kpRGLmKJH4M fight 56 (Vashnik): a one-target Chain Lightning did 51.9k (Elemeta, 5 casts) and 67.2k (Unlucky, 1 cast), against a Lightning Bolt's 87.9k and 104.4k once its overloads count (23-35k a cast; none of the one-target Chain Lightnings overloaded). Non-crit direct hits 17.6k vs 25.8k, the 116 / 170 spell power ratio. The first pass compared direct damage only, on five mostly-crit casts, and wrongly found no loss. Value: each one-target cast at the player's own Lightning Bolt average, overloads included, less the cast; ~35k each, small per pull. Excuse casts where a second target was in range but out of reach of the bounce (unclear from the log). |
 | shaman-elemental/Ascendance/window-downtime | covered | `burstGcdFindings` (Ascendance) + `checkGcdGaps` | Ascendance | idle in Ascendance | Under 0.5 / 1.25 / 2s per window. Counts forced movement and windows cut by death or the kill; the app values the missing GCDs at the window's bonus, less forced time. |
 | shaman-elemental/Ascendance/window-spenders | candidate | — | Ascendance | Maelstrom held through Ascendance | Spenders cast vs what the starting Maelstrom plus what was generated could pay for; 0 / 1 / 2 / 3+ missed. Unspent Maelstrom isn't lost (it's spent later, or capped, which the cap check counts), so the loss is only the Ascendance bonus on a spender moved out. Low value; build only if a page and a log disagree with the cap check. |
-| shaman-elemental/Ascendance/window-non-overload | wrong | — | Ascendance | Flame Shock, Frost Shock or other GCDs that can't overload, cast inside Ascendance | 0 / 1 / 2 / 3+ per window; a Voltaic Blaze hitting 2+ targets is excused (Purging Flames). **Fight-blind:** the top seven cast 0-6 a pull (Voltaic Blaze on Vashnik, Flame Shock and Stormkeeper on Entombed Sentinels), Cocroach 0-4. Top players do it as often. |
+| shaman-elemental/Ascendance/window-non-overload | candidate | — | Ascendance | Flame Shock, Frost Shock or other GCDs that can't overload, cast inside Ascendance | 0 / 1 / 2 / 3+ per window; a Voltaic Blaze hitting 2+ targets is excused (Purging Flames). **The largest of the four losses** (re-measured 2026-10-16). Inside Ascendance the overloading casts did 246-477k a second, against 62-107k a second for Lightning Bolt outside it. A cast that can't overload is moved, not lost: it still happens after the window, in a GCD a Lightning Bolt would have filled. So it costs the difference times its GCD, 130-590k each. Top seven 0-5 a pull: Voltaic Blaze 3-5 times on Vashnik (0.6-1.3M a pull), Flame Shock 1-2 on Entombed Sentinels (0.4M); Cocroach 11 in 12 pulls (3.8M), 4 Voltaic Blazes at Ula'tek alone (2.2M). That is an upper bound: Voltaic Blaze recharges in ~7.5s (shortest interval; medians 9-17s), so holding it through the window can cost a use, worth a Voltaic Blaze (90-550k, more on two targets) less a Lightning Bolt. Value: (window rate − Lightning Bolt rate) × the cast's GCD, less a lost Voltaic Blaze use when the player cast it on recharge. Stormkeeper inside the window is left out (a cooldown, the Stormkeeper drift check's). |
 | shaman-elemental/Ascendance/window-overall | superseded | — | Ascendance | — | The average of the three marks above, rounded down. |
 | shaman-elemental/CallOfTheAncestors/active-time | wrong | `checkGcdGaps` | Call of the Ancestors (Farseer) | idle while Ancestors are out | Above 95 / 85 / 75% active per window. The same idle the gap check counts, graded a second time (case study: 24 of 41 "bad" vs 8 of 38, all idle). Counts forced time too. |
 | shaman-elemental/CallOfTheAncestors/other-checks | no-damage | — | Call of the Ancestors | — | What summoned them, damage per Ancestor, a timeline; always "perfect". |
@@ -71,13 +75,24 @@ Call), Ancestor window merging. An unregistered Haste file is dead code.
 
 ## Candidates left
 
+By expected value, all measured on the pulls above as damage lost:
+
+- **window-non-overload**: 130-590k a cast, top players up to 1.3M a
+  pull, Cocroach 3.8M over 12 pulls. Net out a lost Voltaic Blaze use.
+- **lava-burst-unshocked**: ~120k each, cheap and exact (crit is
+  certain on a shocked target). Cocroach 1.86M over 12 pulls.
+- **spender-before-lava-burst**: ~6.5% of the spender, top players lose
+  more than Cocroach; build only with the Maelstrom-cap exception.
 - **one-target Chain Lightning**: ~35k a cast against the player's own
   Lightning Bolt with overloads, top players 0-5 a pull. Cheap to build.
 - **window-spenders**: low value, not measured.
 
-The four other candidates were marked `wrong` in phase 3 (above). Measured with
-a scratch script, not kept: per player and pull it counted unbuffed
-spenders with Lava Surge up, non-crit Lava Bursts and whether the target
-had the player's Flame Shock, Chain Lightning targets per cast,
-non-overload casts in Ascendance, early Flame Shock refreshes and
-Stormkeeper intervals against Ancestor summons.
+Lesson from the re-measure: value a rule as damage lost first. Top
+players doing the same thing is evidence about the premise, not proof
+that it costs nothing. The first pass also left out overloads and used
+a cast's direct hit only. Measured with scratch scripts, not kept:
+`ele-rules2.js` (per player and pull: buffed and unbuffed spenders with
+Lava Surge up, the pooled bonus, Flame Shock pandemic clipping with
+position from hits taken, Lava Bursts against the player's Flame Shock
+debuff, Ascendance window rates and Voltaic Blaze cadence) and
+`cl-vs-lb.js`.
