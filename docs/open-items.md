@@ -491,7 +491,14 @@ and delete them from the header.
     For the user: Kingsbane drift reads 777k on the 99.8th Ireath, who
     opened his whole burst at 0:19.
   - [hunter-marksmanship.md](wowa-audit/hunter-marksmanship.md): stale
-    (declares 11.0.5, active 2026), 8; Precise Shots use.
+    (declares 11.0.5, active 2026). Phase 3 done 2026-10-17: Precise
+    Shots lost (specs/marksmanship.ts), the Moonlight Chakram expiry
+    (procs.ts), Trueshot valued for its drift (worth 0 before). For the
+    user: the Focus cap check was removed for the spec (0.15–2.0M on top
+    players; Focus never limits it). Proposed `wrong`: Kill Shot
+    efficiency (top players hold it as much), Volley efficiency (held for
+    Trueshot by top players), Focus at the cap. Black Arrow, Wailing
+    Arrow and Sentinel's Mark `unverifiable` (no sample player has them).
   - [druid-feral.md](wowa-audit/druid-feral.md): 14; Rip uptime and
     refreshes.
   - [evoker-augmentation.md](wowa-audit/evoker-augmentation.md): 7;
