@@ -62,7 +62,7 @@ damage rows are measured.
 | 18 | Marksmanship | [hunter-marksmanship.md](hunter-marksmanship.md) | done 2026-10-17: Precise Shots lost (marksmanship.ts), Trueshot valued, Moonlight Chakram expiry (procs.ts), Focus cap check removed for the spec; verified by the main session |
 | 19 | Feral | [druid-feral.md](druid-feral.md) | done 2026-10-17: tracked cooldowns valued (Tiger's Fury, Berserk, Incarnation, Convoke 120s, Feral Frenzy), Rip off every enemy, Ferocious Bite below 5 points, Incarnation window (feral.ts); Moonfire / Frantic Frenzy / Stampeding Roar presses (game.ts); Clearcasting and Apex Predator's Craving expiries (procs.ts); verified by the main session |
 | 20 | Augmentation | [evoker-augmentation.md](evoker-augmentation.md) | done 2026-10-17: support hits (Ebon Might, Prescience) no longer GCD damage (game.ts: GCDs were priced ~3× high); cooldown recovery model with Time Skip; Ebon Might down while ready, Prescience charges capped, Breath of Eons / Time Skip held, Breath never exploded (augmentation.ts); verified by the main session |
-| 21 | Devastation | [evoker-devastation.md](evoker-devastation.md) | |
+| 21 | Devastation | [evoker-devastation.md](evoker-devastation.md) | done 2026-10-17: Disintegrate ticks clipped, Fire Breath / Eternity Surge held, Dragonrage valued (devastation.ts); clipped Disintegrate is channel time (timeline.ts channelTicks); pre-pull tracked cooldowns seen from their buff (checks.ts); Essence Burst expiry (procs.ts); verified by the main session (clip margins checked: no jitter cluster) |
 | 22 | Brewmaster | [monk-brewmaster.md](monk-brewmaster.md) | |
 | 23 | Shadow | [priest-shadow.md](priest-shadow.md) | |
 | 24 | Subtlety | [rogue-subtlety.md](rogue-subtlety.md) | |
@@ -377,6 +377,14 @@ measured for it.
   Fire Breath presses (top 2.65–3.04 a minute, weak 2.25–2.47; ~0.5–1M a
   pull), no recharge model fits. Evidence in
   [evoker-augmentation.md](evoker-augmentation.md).
+- Devastation (2026-10-17): proposed `wrong`: Essence at the cap. Worth a
+  look: Disintegrate ticks clipped fires on top players (Tëemo 960k,
+  fcj1YgaCJBT2kXFm) close to weaker ones (Qiyue 1.42M); the clip margins
+  spread the same for both (54% vs 49% under 150ms), only the count
+  differs (median 6 vs 14 a pull), so it's kept as a real, common loss.
+  Kept `wrong`: per-empower count, Mass Disintegrate ticks, channel
+  cancel, fight-end procs. Evidence in
+  [evoker-devastation.md](evoker-devastation.md).
 
 - Elemental (2026-10-17): `CallOfTheAncestors/other-checks`,
   `statistics` (and whether "Stormkeeper before Ascendance" should be
