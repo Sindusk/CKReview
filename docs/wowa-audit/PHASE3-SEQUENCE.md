@@ -56,7 +56,8 @@ damage rows are measured.
 | 13a | Engine: hold windows capped per cooldown | readers of `cooldownHoldWindows` | Every reader excused a whole hold window whatever the cooldown (a 15s Implosion got 30–90s on Ula'tek). Done 2026-10-17 (7d97590): `holdWindowsFor` trims each window to one recharge before its target (Imbibe, Heart); all seven readers use it; verified by the main session. Ula'tek's P2-start extension waits on the user's answer |
 | 14 | Frost DK | [deathknight-frost.md](deathknight-frost.md) | done 2026-10-17: Killing Machine lost, Rime overwritten, Frostscythe on one enemy, Breath / Frostwyrm's Fury held; Pillar and Reaper's Mark valued; Runic Power cap removed for Frost (frostdk.ts); verified by the main session |
 | 15 | Vengeance | [demonhunter-vengeance.md](demonhunter-vengeance.md) | done 2026-10-17: Sigil of Flame / Spite drift valued by their hits (vengeance.ts, tracked-cooldowns.ts); Sigil of Chains a GCD press (game.ts); verified by the main session |
-| 16 | Guardian | [druid-guardian.md](druid-guardian.md) | |
+| 16 | Guardian | [druid-guardian.md](druid-guardian.md) | done 2026-10-17: Guardian's bear presses added to the survey (game.ts: the 100th-percentile tank read 4.5% GCD uptime, now 92.6%); Lunar Beam tracked; Gore in procs.ts; verified by the main session |
+| 16a | Engine: spell-survey sweep, every spec | game.ts / spell-data.ts | Four passes found presses or channels missing from the survey (Reaver's Glaive, Drain Soul, Sigil of Chains, Guardian's kit). One sweep over every spec on disk, 2026-10-17 |
 | 17 | Assassination | [rogue-assassination.md](rogue-assassination.md) | |
 | 18 | Marksmanship | [hunter-marksmanship.md](hunter-marksmanship.md) | |
 | 19 | Feral | [druid-feral.md](druid-feral.md) | |
@@ -327,6 +328,14 @@ measured for it.
   `no-damage` row: Metamorphosis is a 1.8–3.2× damage window (Untethered
   Rage), but a trial window check read the top players as weak, so it
   was dropped. Evidence in [demonhunter-vengeance.md](demonhunter-vengeance.md).
+- Guardian (2026-10-17), **a role-wide valuation question**: GCD gaps
+  are priced at the player's average GCD, which counts DoT ticks by name
+  (Thrash's bleed, Moonfire). For Guardian that's 86–113k, while the
+  press an idle GCD really loses is a Swipe (~20k with its Gore chance):
+  Guardian gaps read ~4× high. Should an idle GCD be priced at the
+  filler rather than the average press, for every spec? Kept `wrong`:
+  Mangle, Thrash, Swipe, Berserk per-use. Evidence in
+  [druid-guardian.md](druid-guardian.md).
 
 - Elemental (2026-10-17): `CallOfTheAncestors/other-checks`,
   `statistics` (and whether "Stormkeeper before Ascendance" should be
