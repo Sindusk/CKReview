@@ -39,9 +39,21 @@
 // three top Preservations (Drizzy VWMbYPRyxCAmhZFj, Tsonge and
 // Pelinmerkkii baRCnPv62YQ1dJZN; WoWAnalyzer audit, 2026-10-17).
 //
-// Mistweaver's observed GCD in the survey (spell-data.ts observedGcdMs) is
-// 740ms, which is suspect (from docs/open-items.md 2026-10-15): check it on
-// a log with more Mistweavers before trusting its gap findings.
+// Mistweaver's GCD (settled 2026-10-17, WoWAnalyzer audit phase 3, seven
+// Mistweavers on six reports and the static's Abuki on gVDPhzp61Zm29HMw):
+// the survey's observed 740ms (spell-data.ts observedGcdMs) is Rushing Wind
+// Kick's and Soothing Mist's own short GCD (the next press p25 0.74–0.76s),
+// not the base: after a Renewing Mist or Vivify it's 0.84–0.97s, the
+// ordinary 1.5s hasted GCD. Rushing Wind Kick sat on the haste fit's
+// short-GCD threshold and dragged some bases to 0.77s (haste.ts
+// SHORT_GCD_IDS now lists both). The survey also missed Sheilun's Gift,
+// Detox, Revival and Mana Tea's channel (game.ts), which read as idle: GCD
+// uptime moved 48–82% → 65–89% (Karambicaak 6kHtGaQXCMWYxFpZ 48 → 83%,
+// Chiyune ZjVtM1vFcrp7w3WC 73 → 89%, Abuki's 16 pulls +0–9 points), and
+// gap + delay loss fell by up to 93% a pull (Karambicaak 3.73M → 0.28M;
+// Abuki Vashnik Pull 4 1.61M → 0.99M). Tiger Palm and Blackout Kick take
+// Windwalker's fixed 1.0s lock (the action table is per id, not per spec):
+// a Mistweaver's is ~0.87s, so idle after them is undercounted (lenient).
 
 import type { DamageFinding, JobCheck } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";

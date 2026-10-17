@@ -16,7 +16,8 @@
 // - instants: the interval to the next GCD, back to back only (0.7–1.6s),
 //   and only the faster 40% of those within ±20s: the slower ones carry
 //   the player's own delays. Abilities with a shorter GCD of their own
-//   (Sweeping Strikes, Execution Sentence: ~0.74s) are left out.
+//   (Sweeping Strikes, Execution Sentence: ~0.74s) are left out, found by
+//   their median or listed (SHORT_GCD_IDS).
 // Model: log(observation) = intercept − Σ log(1 + haste of each active
 // candidate buff). Candidates are the lust family, Power Infusion and
 // WOW_HASTE_STATUSES; greedy forward selection keeps one while it cuts the
@@ -84,6 +85,17 @@ const FLOOR_MS = 750;
 const MIN_INSTANTS = 15;
 const MAX_TERMS = 6;
 const LOCAL_MS = 15_000;
+// Abilities with a shorter GCD of their own that the 0.85× median test
+// above misses: Mistweaver's Rushing Wind Kick and Soothing Mist (the
+// WoWAnalyzer audit's phase 3, 2026-10-17). The next press after either
+// comes at the 0.75s floor (p25 0.74–0.76s on seven Mistweavers: Abuki
+// gVDPhzp61Zm29HMw, Chiyune ZjVtM1vFcrp7w3WC, Icyricy wWx8B1GPZMLghAyz,
+// Zolairoshi r9CX1kpRGLmKJH4M and three more), against 0.84–0.97s after a
+// Renewing Mist or Vivify. Rushing Wind Kick's median sat on the
+// threshold (Abuki 759 vs 757ms, Chiyune 785 vs 770), so on some pulls it
+// stayed in and pulled the base down: Abuki's base read 768–789ms on three
+// Vashnik pulls and 865–884ms on two at the same rating.
+const SHORT_GCD_IDS = [467307, 115175];
 
 /** Speed models for every hasted WoW player in the pull (none for fixed 1.0s GCD specs). */
 export function wowSpeedModels(
@@ -157,6 +169,7 @@ function fitPlayer(player: PlayerInfo, uses: GcdUse[], endMs: number, candidateI
   const byId = new Map<number, number[]>();
   for (const x of raw) (byId.get(x.id) ?? byId.set(x.id, []).get(x.id)!).push(x.iv);
   const short = new Set([...byId].filter(([, xs]) => xs.length >= 3 && median(xs) < overall * 0.85).map(([id]) => id));
+  for (const id of SHORT_GCD_IDS) short.add(id);
   const inst = raw.filter((x) => !short.has(x.id));
   const fast = inst.filter((x) => {
     const near = inst.filter((y) => Math.abs(y.t - x.t) <= 20_000).map((y) => y.iv).sort((a, b) => a - b);

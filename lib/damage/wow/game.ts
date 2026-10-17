@@ -91,6 +91,9 @@ const CHANNEL_IDS = new Set([
   740,     // Tranquility
   64843,   // Divine Hymn
   446035,  // Bladestorm (ticks as 50622 "Bladestorm"; see BLADESTORM below)
+  115175,  // Soothing Mist (Mistweaver; see MISTWEAVER below)
+  399491,  // Sheilun's Gift (Mistweaver, not in the survey)
+  117952,  // Crackling Jade Lightning (not in the survey)
 ]);
 
 // GCDs that lock the player for as long as a buff of their own: Scalecommander
@@ -113,7 +116,31 @@ const LOCK_STATUSES = new Map<number, number>([
   [433874, 433874],     // Deep Breath
   [391528, 391528],     // Convoke the Spirits
   [1291894, 1291894],   // Soulcoiler Ritual Vessel
+  [115294, 115294],     // Mana Tea (Mistweaver; see MISTWEAVER below)
 ]);
+
+// Mistweaver (the WoWAnalyzer audit's phase 3, 2026-10-17; seven
+// Mistweavers on 6kHtGaQXCMWYxFpZ, 7B1wQbjNhgXJDaHC, aZ6NnwL8g9PdpGJ1,
+// r9CX1kpRGLmKJH4M, wWx8B1GPZMLghAyz, ZjVtM1vFcrp7w3WC, gVDPhzp61Zm29HMw).
+// The survey had two Mistweavers and missed presses that sat inside the
+// "idle" gaps: Sheilun's Gift (inside 53 of them, 168s), Detox (50, 83s),
+// Revival (5).
+// - Sheilun's Gift (399491) is a channel: its cast logs at the start, no
+//   begin-cast, its heals land over 1.0s (median; 2.8s at p90) and the
+//   next GCD comes 1.1s+ after it (p10, 81 casts).
+// - Detox (115450) and Revival (115310): plain hasted GCDs (next GCD p10
+//   0.90s and 0.92s).
+// - Mana Tea (115294) is a channel whose buff (same id) runs cast to
+//   removal, 1.0–3.3s (p10–p90; 101 casts), the next GCD 0.1–0.3s after
+//   the removal; it preceded 119s of the "idle".
+// - Soothing Mist (115175) is a channel the healer casts Vivify and
+//   Enveloping Mist into; its lock runs to its last heal before the next
+//   press. Its short GCD is in haste.ts (SHORT_GCD_IDS).
+// - Crackling Jade Lightning (117952): a channel (two casts on the samples).
+const SHEILUNS_GIFT = 399491;
+const DETOX = 115450;
+const REVIVAL = 115310;
+const CRACKLING_JADE_LIGHTNING = 117952;
 
 // Arms' Bladestorm: a ~4.5s channel that casts Mortal Strike by itself,
 // logged as ordinary casts (39–46 of each Arms Warrior's ~75–100 Mortal
@@ -185,6 +212,12 @@ const ACTIONS = new Map<number, GameAction>();
     id: DRAIN_SOUL, name: "Drain Soul", onGcd: true, recastMs: HASTED_GCD_MS, cooldownMs: HASTED_GCD_MS,
     charges: 1, speedScaled: true, appliesStatusIds: [DRAIN_SOUL],
   });
+  for (const [id, name] of [[SHEILUNS_GIFT, "Sheilun's Gift"], [DETOX, "Detox"], [REVIVAL, "Revival"], [CRACKLING_JADE_LIGHTNING, "Crackling Jade Lightning"]] as const) {
+    if (!ACTIONS.has(id)) ACTIONS.set(id, {
+      id, name, onGcd: true, recastMs: HASTED_GCD_MS, cooldownMs: HASTED_GCD_MS,
+      charges: 1, speedScaled: true, appliesStatusIds: [id],
+    });
+  }
   // Retribution's Crusading Strikes replaces the auto-attack and logs a
   // cast per swing (Polpo, 172 of them on gVDPhzp61Zm29HMw Kith'ix pull 2):
   // read as presses, every swing was a weave in gap labels and the
