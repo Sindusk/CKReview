@@ -91,6 +91,7 @@
 //   Entombed Sentinels' Venom Coagulations and Vashnik's Venoms in the
 //   execute range to the raid. Kill Shot also takes Precise Shots from an
 //   Arcane Shot, so a press isn't free. Not built.
+// - Focus at the cap: removed for Marksmanship (ranged.ts has why).
 // - Arcane Shot / Multi-Shot without Precise Shots: 0–12 a pull (Ardisus
 //   12, Válï 9; top players 0–3). Unbuffed it does 39–65k against a Steady
 //   Shot's 37–42k, and the Focus it spends costs nothing (above): about

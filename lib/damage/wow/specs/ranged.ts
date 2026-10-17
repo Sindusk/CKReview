@@ -14,7 +14,8 @@
 //   Dragonrage. Frost Mage, Augmentation and Devourer have none here
 //   (Icy Veins wasn't cast in the samples; Ebon Might is up 97% of the time).
 // - Main resource at the cap (primaryResourceCapFindings): Maelstrom,
-//   Insanity, Astral Power, Focus. Mages log only mana; Soul Shards and
+//   Insanity, Astral Power, Focus (Beast Mastery only since 2026-10-17;
+//   see Marksmanship below). Mages log only mana; Soul Shards and
 //   Essence only on their spenders: not judged.
 // - DoT uptime (dotUptimeFindings, from Pull.bossDebuffs): Shadow Word:
 //   Pain, Vampiric Touch; Agony, Unstable Affliction, Wither / Corruption;
@@ -147,6 +148,15 @@
 //   the tracked Trueshot (worth 0 before: it has no hits; now its Moonlight
 //   Chakram and window bonus, 0.9–2.9M a use). The Moonlight Chakram
 //   Trueshot grants is in procs.ts (17s; a lost one is a whole Chakram).
+// - Focus at the cap was removed for Marksmanship (2026-10-17): it read
+//   0.15–2.0M on the top players (Firaa ACmXHMFtaPLR9k8w 2.04M, Leevilh
+//   baRCnPv62YQ1dJZN 1.58M, Qenjua 6qVxPcBdCgXrkG8a 1.13M, Taewoos 935k),
+//   mostly Rapid Fire pressed at full Focus, priced at ~10k a Focus point
+//   from Aimed Shot. But Focus never limits a Marksmanship player: on 18
+//   player-pulls checked (top and weak), 22–50% of casts are made at the
+//   125 cap, no Steady Shot is pressed under 40 Focus and no paid Aimed
+//   Shot under its 35. Aimed Shot waits on its charges, not on Focus, so
+//   Focus lost at the cap costs no spender. For the user's review.
 //
 // Devastation, checked against WoWAnalyzer on qpZx3mWaG7gcDdYB pull 3
 // (Bragontix, Scalecommander; log 2026-10-02, checked 2026-10-13):
@@ -364,7 +374,7 @@ export const RANGED_CHECKS: Record<string, JobCheck[]> = {
   "Frost Mage":           [],
   "Balance Druid":        [window(102560, "Incarnation"), primaryResourceCapFindings, dot("Moonfire", 164812), dot("Sunfire", 164815), ...BALANCE_CHECKS],
   "Beast Mastery Hunter": [window(19574, "Bestial Wrath"), (ctx) => primaryResourceCapFindings(ctx, [BARBED_SHOT]), ...BEAST_MASTERY_CHECKS],
-  "Marksmanship Hunter":  [window(288613, "Trueshot"), primaryResourceCapFindings, ...MARKSMANSHIP_CHECKS],
+  "Marksmanship Hunter":  [window(288613, "Trueshot"), ...MARKSMANSHIP_CHECKS],
   "Shadow Priest":        [window(194249, "Voidform"), primaryResourceCapFindings, dot("Shadow Word: Pain", 589), dot("Vampiric Touch", 34914)],
   "Elemental Shaman":     [window(1219480, "Ascendance"), primaryResourceCapFindings, dot("Flame Shock", 188389), stormkeeper, ...ELEMENTAL_CHECKS],
   "Affliction Warlock":   [window(442726, "Malevolence"), dot("Agony", 980), dot("Unstable Affliction", 1259790), dot("Wither / Corruption", 445474, 146739), ...AFFLICTION_CHECKS],
