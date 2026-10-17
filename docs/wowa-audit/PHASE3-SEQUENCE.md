@@ -43,7 +43,7 @@ damage rows are measured.
 | 2 | Havoc | [demonhunter-havoc.md](demonhunter-havoc.md) | done 2026-10-17: Eye Beam held, Death Sweep reset unused (havoc.ts); Reaver's Glaive added as a GCD press (game.ts); verified by the main session |
 | 3 | Arcane | [mage-arcane.md](mage-arcane.md) | done 2026-10-17: Touch of the Magi window (arcane.ts; `burstGcdFindings` takes a `windows()` override); verified by the main session |
 | 3a | Engine: WoW proc expiries | 18 ledgers cite `checkProcs` | `checkProcs` never fired on WoW (no buff durations in the log; confirmed on LckJC7GMhQvD6rdw: 0 of 36,543 buff events carry one). Done 2026-10-17: measured durations for ten procs (lib/damage/wow/procs.ts, `DamageGame.measuredProcs`); Windwalker, Elemental and Arcane proc rows rechecked |
-| 4 | Demonology | [warlock-demonology.md](warlock-demonology.md) | |
+| 4 | Demonology | [warlock-demonology.md](warlock-demonology.md) | done 2026-10-17: Implosion held (the phase-2 `wrong` overturned: To Hell and Back), Call Dreadstalkers held (demonology.ts); verified by the main session |
 | 5 | Affliction | [warlock-affliction.md](warlock-affliction.md) | |
 | 6 | Arms | [warrior-arms.md](warrior-arms.md) | |
 | 7 | Preservation | [evoker-preservation.md](evoker-preservation.md) | |
@@ -205,6 +205,13 @@ measured for it.
   Embrace), the spec's pass values it: the press with the proc minus
   without, measured in the log, as a priced override. Check the top players first: a
   proc that runs out on most of them isn't a loss (Lava Surge did).
+- **A phase-2 `wrong` can hide the spec's biggest loss.** Demonology's
+  Implosion was `wrong` ("imps are worth more kept"); with To Hell and
+  Back each press returns 0.24–0.78M of imps. Read the talent that
+  changes the rule before accepting the premise.
+- **Pets copy or extend a press under their own names** ("Wild Imp
+  (Inner Demons/To Hell and Back)"): value a press by the pet damage in
+  the seconds after it against the pet's baseline rate.
 - **Value a hit by its own events, not a total divided by presses**
   (Arcane Orb: 294k claimed, 47–63k a pressed Orb).
 - **Class resources not in the fetch** (Arcane Charges) make a rule
@@ -232,6 +239,11 @@ measured for it.
   [mage-arcane.md](mage-arcane.md). Open: Arcane Charges aren't fetched,
   so the charge-count rules can't be checked; fetching resource events
   would settle them.
+- Demonology (2026-10-17): Implosion held reads 2.24M on the 99.9th
+  Lydd on Vashnik (VbAHWZDdPwJBajmx: 14 presses in 6:35, against 18 and 22
+  for two other top Vashnik players; WoWAnalyzer flags him too). Does
+  Vashnik need an exception? No Vashnik-specific reason was found.
+  Evidence in [warlock-demonology.md](warlock-demonology.md).
 
 - Elemental (2026-10-17): `CallOfTheAncestors/other-checks`,
   `statistics` (and whether "Stormkeeper before Ascendance" should be
