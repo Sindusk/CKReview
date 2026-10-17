@@ -623,8 +623,13 @@ export function checkCooldownDrift(ctx: PlayerCheckContext): DamageFinding[] {
     // Used before the pull (Dancer's Standard Step, shown by a Standard
     // Finish before the first Step): still recharging until the first use.
     const evidence = new Set(cd.prePullEvidenceIds ?? []);
-    const prePull = evidence.size > 0 && [...ctx.player.casts, ...ctx.player.damageDone]
-      .some((c) => evidence.has(c.abilityId) && c.timestamp < (casts[0] ?? Infinity));
+    const statusEvidence = new Set(cd.prePullStatusIds ?? []);
+    const firstStatus = statusEvidence.size > 0
+      ? (ctx.player.buffs ?? []).filter((b) => statusEvidence.has(b.abilityId) && b.source === ctx.player.name)
+        .sort((a, b) => a.timestamp - b.timestamp)[0] : undefined;
+    const prePull = (evidence.size > 0 && [...ctx.player.casts, ...ctx.player.damageDone]
+      .some((c) => evidence.has(c.abilityId) && c.timestamp < (casts[0] ?? Infinity))) ||
+      (firstStatus !== undefined && firstStatus.buffStatus === "removed" && firstStatus.timestamp < (casts[0] ?? Infinity));
     // Its recharge ran from the pre-pull press (at 0:00 or before), so it
     // was ready again a recast into the pull at the latest; held from
     // there to the first use counts. Dropping the whole stretch hid

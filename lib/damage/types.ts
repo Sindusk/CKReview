@@ -212,6 +212,10 @@ export type TrackedCooldown = {
   // Actions that only follow this cooldown: one cast (or hit) before its
   // first use in the pull means it was used before the pull.
   prePullEvidenceIds?: number[];
+  // A status of the player's own that only this cooldown applies: removed
+  // before its first use with no application before it, it was used
+  // before the pull (Devastation's Dragonrage, pressed at −1s).
+  prePullStatusIds?: number[];
   // Where its damage logs, when not under its own id (Earthly Star's pet
   // explodes as Stellar Explosion): the value of a lost use.
   damageIds?: number[];
