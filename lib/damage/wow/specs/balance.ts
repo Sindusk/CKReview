@@ -103,6 +103,28 @@
 // 3:38 → 3:47), Boomtoast 71k, Lazerbares 57k; Sylmigron 335k on the case
 // study (1:54 → 2:10, 4:56 → 5:10) and 0–288k on his static's Elune pulls
 // (Ula'tek 288k: 4:21 → 4:43, 6:40 → 6:52).
+//
+// ── Starfall on one enemy (starfallOneTarget) ──────────────────────────
+// Starfall (191034, the cast and an 8s buff that stacks: a second press
+// adds a stack, Sylmigron 1:28.3 / 1:29.4 on the case study; hits 191037,
+// 1301742) and Starsurge (78674; hits by name, Star Cascade's included)
+// spend the same Astral Power. An isolated Starfall whose hits found one
+// enemy did 0.40× (Eclipse, 9 casts) and 0.46× (outside, 5) the player's
+// Starsurge per Astral Power; on two enemies Starfall already wins (1.35×
+// pooled, overlaps included), so WoWAnalyzer's three-target line is wrong
+// but its one-target premise holds. Starfalls chained within 8s share
+// their hits, so each chain is judged: when all its hits found one enemy,
+// its paid Starfalls' Astral Power × the player's own Starsurge damage per
+// Astral Power (in or out of Eclipse / Incarnation as each was cast) − the
+// chain's hits (the paid share, free Starweaver's Warp ones left out).
+// Not counted: a chain in forced time or running past the pull's end.
+// Lost (a pull): top Entombed Sentinels players none (three bosses, always
+// a second enemy); on Vashnik Kihmarhi, Adrenalift, Acíz, 一队萨满, 德大叔,
+// 予你 none, 星尘魅影 105k, 秋風怒 107k, Mortychen 63k, Meekii 203k (two at
+// 5:41). Weaker: Jugular 740k (Ftj4vwHf9RazPcqV: 1:22, 4:11, 5:50, all on
+// Vashnik alone), Nopsu 394k; Sylmigron 386k on the case study (1:28,
+// 2:07, 3:41) and 0–348k on his static's pulls (Vashnik 3 348k, Vashnik
+// 5 316k).
 
 import type { JobCheck, Moment } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";
@@ -145,6 +167,11 @@ const FOE_INC_RATIO = 1.62;
 const ASTRAL_POWER = 8;      // WCL classResources type, logged ×10
 const AP_PAIR_MS = 3_000;
 const AP_NEAR_CAP = 50;
+
+const STARFALL = 191034;      // the cast and the player's buff
+const STARSURGE = 78674;
+const STARFALL_MS = 8_000;
+const SURGE_HIT_MS = 2_000;
 
 const clock = (ms: number) => {
   const t = Math.max(0, Math.round(ms / 1000));
@@ -378,4 +405,65 @@ function astralPerUse(ctx: PlayerCheckContext, foe: number[]): { value: number; 
   return { value: extra * perUnit, basis: `${Math.round(extra / 10)} Astral Power over its beam × ${k(perUnit * 10)} per Astral Power from the spenders` };
 }
 
-export const BALANCE_CHECKS: JobCheck[] = [eclipseCapped, furyHeld];
+// ── Starfall on one enemy ──────────────────────────────────────────────
+
+const starfallOneTarget: JobCheck = (ctx) => {
+  const p = ctx.player;
+  const casts = p.casts.filter((c) => !c.fake && c.timestamp < ctx.endMs).sort((a, b) => a.timestamp - b.timestamp);
+  const falls = casts.filter((c) => c.abilityId === STARFALL);
+  if (falls.length === 0) return [];
+  const burst = statusWindows(p, new Set([ECLIPSE_LUNAR_BUFF, ECLIPSE_SOLAR_BUFF, INCARNATION]), ctx.endMs);
+  const forced = mergeWindows(ctx.forced);
+  const cost = (c: (typeof casts)[number]) => (c.resources?.find((r) => r.type === ASTRAL_POWER)?.cost ?? 0) / 10;
+
+  // The player's Starsurge damage per Astral Power, in and out of Eclipse / Incarnation.
+  const surges = casts.filter((c) => c.abilityId === STARSURGE);
+  const surgeHits = p.damageDone.filter((e) => !e.pet && e.abilityName.startsWith("Starsurge"));
+  const perAp = { in: [] as number[], out: [] as number[] };
+  surges.forEach((c, i) => {
+    if (cost(c) <= 0) return;
+    const until = Math.min(c.timestamp + SURGE_HIT_MS, surges[i + 1]?.timestamp ?? Infinity);
+    const d = surgeHits.filter((e) => e.timestamp >= c.timestamp && e.timestamp < until).reduce((a, e) => a + (e.amount ?? 0), 0);
+    (inside(burst, c.timestamp) ? perAp.in : perAp.out).push(d / cost(c));
+  });
+  const surgeIn = perAp.in.length >= 3 ? avg(perAp.in) : avg([...perAp.in, ...perAp.out]);
+  const surgeOut = perAp.out.length >= 3 ? avg(perAp.out) : avg([...perAp.in, ...perAp.out]);
+  if (!(surgeIn > 0) || !(surgeOut > 0)) return [];
+
+  // Starfalls chained within their duration share their hits (a second press stacks the buff): judge each chain.
+  const fallHits = p.damageDone.filter((e) => !e.pet && e.abilityName === "Starfall");
+  const chains: (typeof falls)[] = [];
+  for (const c of falls) {
+    const last = chains[chains.length - 1];
+    if (last && c.timestamp - last[last.length - 1].timestamp < STARFALL_MS) last.push(c); else chains.push([c]);
+  }
+  const moments: Moment[] = [];
+  let n = 0;
+  for (const chain of chains) {
+    const from = chain[0].timestamp, to = chain[chain.length - 1].timestamp + STARFALL_MS;
+    if (to > ctx.endMs || chain.some((c) => inside(forced, c.timestamp))) continue;
+    const hs = fallHits.filter((e) => e.timestamp >= from && e.timestamp < to);
+    const enemies = new Set(hs.map((e) => `${e.targetActorId}.${e.targetInstance ?? 1}`));
+    if (enemies.size !== 1) continue;
+    const paid = chain.filter((c) => cost(c) > 0);
+    if (paid.length === 0) continue;
+    const damage = hs.reduce((a, e) => a + (e.amount ?? 0), 0) * paid.length / chain.length;
+    const asSurges = paid.reduce((a, c) => a + cost(c) * (inside(burst, c.timestamp) ? surgeIn : surgeOut), 0);
+    const loss = asSurges - damage;
+    if (loss <= 0) continue;
+    n += paid.length;
+    moments.push({ startMs: from, endMs: to, lostDamage: loss,
+      detail: `${paid.length > 1 ? `${paid.length} Starfalls` : "Starfall"} at ${clock(from)} on ${hs[0]?.target ?? "one enemy"} alone: ${k(damage)} for ${paid.reduce((a, c) => a + cost(c), 0)} Astral Power, ${k(asSurges)} as Starsurges` });
+  }
+  if (moments.length === 0) return [];
+  return [finding(ctx, {
+    kind: "aoe-single", startMs: moments[0].startMs, endMs: moments[moments.length - 1].endMs, forced: false, inference: true,
+    label: "Starfall on one enemy",
+    lostDamage: moments.reduce((a, m) => a + m.lostDamage, 0),
+    basis: `each paid Starfall whose hits found one enemy: its Astral Power × the player's Starsurge damage per Astral Power (${k(surgeIn * 10)} per 10 in Eclipse or Incarnation, ${k(surgeOut * 10)} outside) − the Starfall's own hits (chained Starfalls share theirs)`,
+    detail: `${n} Starfall${n > 1 ? "s" : ""} that hit one enemy, where Starsurge does more with the same Astral Power`,
+    moments,
+  })];
+};
+
+export const BALANCE_CHECKS: JobCheck[] = [eclipseCapped, furyHeld, starfallOneTarget];
