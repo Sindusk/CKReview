@@ -26,7 +26,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Pull } from "@/types/Pull";
 import { ffMapImageUrl, fitReplayView, mapImageBounds, poseAt, type ReplayActor, type ReplayData, type ReplayPose } from "@/lib/replay/ffxiv-replay";
-import { aoesAt, buildAoeShapes, type AoeShape } from "@/lib/replay/action-shapes";
+import { aoesAt, buildAoeShapes, buildTethers, type AoeShape } from "@/lib/replay/action-shapes";
+import { sampleNear } from "@/lib/replay/ffxiv-replay";
 import { facingToCompassBearing } from "@/lib/mechanics/geometry";
 import { detectFFRoles } from "@/lib/mechanics/ffxiv/roles";
 import { getClassColor, getPlayerClassIcon, getRoleColor } from "@/lib/player-display";
@@ -56,11 +57,20 @@ const MAX_EXTRAPOLATE_MS = 350;
 // FFLogs' own actor icons ("Boss", "NPC"), the CDN the app already uses
 // for ability icons (lib/ability-icons.ts).
 const FFLOGS_ICON = (name: string) => `https://assets.rpglogs.com/img/ff/icons/${name}.png`;
-// Guide-style AoE colours: translucent blue fill, white rim.
-const AOE_FILL = "#2f5bff";
-const AOE_RIM = "#ffffff";
-const PLAYER_ICON = 34;   // SVG units
+// Guide-style AoE colours by kind: blue AoEs, yellow towers, purple
+// tankbusters; white rims. `flash` is the fill as it resolves.
+const AOE_COLORS: Record<AoeShape["style"], { fill: string; flash: string; rim: string }> = {
+  aoe:        { fill: "#2f5bff", flash: "#7fa2ff", rim: "#ffffff" },
+  tower:      { fill: "#f2c230", flash: "#ffe27a", rim: "#fff6c8" },
+  tankbuster: { fill: "#8a3dff", flash: "#c99bff", rim: "#f1e2ff" },
+};
+const PLAYER_ICON = 34;   // SVG units, at icon scale 1
 const BOSS_ICON = 46;
+const TETHER_COLOR = "#ff5fd2";
+// A tether's source is often a helper with sparse samples; take its
+// nearest one within this window.
+const TETHER_LOOKUP_MS = 20000;
+const GRID_STEP = 500;    // 5y, centi-yalms
 
 export default function ReplayPanel({ pull, data, loading, progress, error, onLoad, syncedTimeMs, vodPlaying = false, onVodPlay, onVodPause }: Props) {
   const synced = syncedTimeMs !== undefined;
@@ -76,6 +86,9 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
   const [showMap, setShowMap] = useState(true);
   const [showAoes, setShowAoes] = useState(true);
   const [showHelpers, setShowHelpers] = useState(false);
+  const [showRings, setShowRings] = useState(false);
+  const [showGrid, setShowGrid] = useState(false);
+  const [iconScale, setIconScale] = useState(1);
   const [layersOpen, setLayersOpen] = useState(false);
   const [hoverKey, setHoverKey] = useState<string | null>(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -121,6 +134,7 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
   // ── Per-pull precomputation ──────────────────────────────────────────────
   const view = useMemo(() => (data ? fitReplayView(data) : null), [data]);
   const aoes = useMemo(() => (data ? buildAoeShapes(data) : []), [data]);
+  const tethers = useMemo(() => (data ? buildTethers(data) : []), [data]);
   const players = useMemo(() => new Map((pull?.players ?? []).map((p) => [p.name, p])), [pull]);
   const slotByName = useMemo(() => {
     const m = new Map<string, string>();
@@ -186,6 +200,12 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
           <defs>
             <clipPath id="replay-clip"><rect x={0} y={0} width={S} height={S} rx={8} /></clipPath>
             <filter id="replay-gray"><feColorMatrix type="saturate" values="0" /></filter>
+            <filter id="replay-shadow" x="-30%" y="-30%" width="160%" height="160%">
+              <feDropShadow dx="0" dy="1.5" stdDeviation="2" floodColor="#000" floodOpacity="0.85" />
+            </filter>
+            <filter id="replay-glow" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="4" />
+            </filter>
           </defs>
           <rect x={0} y={0} width={S} height={S} rx={8} fill="var(--ck-bg-deep)" />
           <g clipPath="url(#replay-clip)">
@@ -193,47 +213,63 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
               <image href={mapUrl} x={toX(mapBox.x)} y={toY(mapBox.y)} width={mapBox.size * scale} height={mapBox.size * scale}
                 preserveAspectRatio="none" />
             )}
+            {showGrid && <Grid cx={cx} cy={cy} half={half} toX={toX} toY={toY} S={S} />}
+            {showRings && <Rings cx={cx} cy={cy} half={half} toX={toX} toY={toY} scale={scale} />}
             {showAoes && aoesAt(aoes, t).map(({ s, opacity, resolving }, i) => (
               <Aoe key={i} s={s} opacity={opacity} resolving={resolving} toX={toX} toY={toY} scale={scale} />
             ))}
+            {tethers.filter((tt) => t >= tt.start && t <= tt.end).map((tt, i) => {
+              const src = actorByKey.get(tt.source), dst = actorByKey.get(tt.target);
+              const a = src && (poseAt(src, t) ?? sampleNear(src, t, TETHER_LOOKUP_MS));
+              const b = dst && (poseAt(dst, t) ?? sampleNear(dst, t, TETHER_LOOKUP_MS));
+              if (!a || !b) return null;
+              const line = { x1: toX(a.x), y1: toY(a.y), x2: toX(b.x), y2: toY(b.y) };
+              return (
+                <g key={i} pointerEvents="none">
+                  <line {...line} stroke={TETHER_COLOR} strokeWidth={12} strokeOpacity={0.35} strokeLinecap="round" filter="url(#replay-glow)" />
+                  <line {...line} stroke={TETHER_COLOR} strokeWidth={4} strokeLinecap="round" />
+                  <circle cx={line.x1} cy={line.y1} r={7} fill={TETHER_COLOR} stroke="#fff" strokeWidth={2} />
+                </g>
+              );
+            })}
           </g>
           <text x={S / 2} y={24} textAnchor="middle" fill="#fff" fontSize={20} fontWeight={700} {...LABEL}>N</text>
 
-          {/* Bosses: hitbox ring with a front marker, FFLogs' Boss icon. */}
+          {/* Bosses: the game's target ring at hitbox size, FFLogs' Boss icon. */}
           {live.filter((l) => l.a.kind === "enemy").map(({ a, p }) => {
             const x = toX(p.x), y = toY(p.y);
-            const b = (facingToCompassBearing(p.facing) * Math.PI) / 180;
-            const ring = Math.max(BOSS_ICON / 2 + 6, (a.hitbox ?? 0) * scale);
+            const deg = facingToCompassBearing(p.facing);
+            const ring = Math.max(BOSS_ICON / 2 + 8, (a.hitbox ?? 0) * scale);
             const size = a.targetable ? BOSS_ICON : 18;
             return (
               <g key={a.key} style={{ cursor: "pointer" }} opacity={a.targetable ? 1 : 0.55}
                 onMouseEnter={() => setHoverKey(a.key)} onMouseLeave={() => setHoverKey((k) => (k === a.key ? null : k))}
                 onClick={(e) => { e.stopPropagation(); setSelectedKey(a.key); }}>
-                {a.targetable && <TargetRing x={x} y={y} r={ring} b={b} color="#ff6b5e" strong={selectedKey === a.key} />}
+                {a.targetable && <TargetRing x={x} y={y} r={ring} deg={deg} />}
                 <image href={FFLOGS_ICON(a.icon === "Boss" ? "Boss" : "NPC")} x={x - size / 2} y={y - size / 2} width={size} height={size} />
               </g>
             );
           })}
 
-          {/* Players: job icon in a role-coloured ring, facing wedge. */}
+          {/* Players: job icon with a drop shadow, a facing wedge in role colour. */}
           {live.filter((l) => l.a.kind === "player").map(({ a, p }) => {
             const x = toX(p.x), y = toY(p.y);
             const dead = p.hp === 0;
             const info = players.get(a.name);
             const roleColor = getRoleColor(info?.role);
-            const b = (facingToCompassBearing(p.facing) * Math.PI) / 180;
-            const r = PLAYER_ICON / 2;
+            const deg = facingToCompassBearing(p.facing);
+            const size = PLAYER_ICON * iconScale;
+            const r = size / 2;
             return (
               <g key={a.key} style={{ cursor: "pointer" }} opacity={dead ? 0.5 : p.stale ? 0.75 : 1}
                 onMouseEnter={() => setHoverKey(a.key)} onMouseLeave={() => setHoverKey((k) => (k === a.key ? null : k))}
                 onClick={(e) => { e.stopPropagation(); setSelectedKey(a.key); }}>
-                {selectedKey === a.key && <TargetRing x={x} y={y} r={Math.max(r + 8, (a.hitbox ?? 50) * scale)} b={b} color="#ffd34d" strong />}
-                {!dead && <FacingWedge x={x} y={y} r={r + 2} b={b} color={roleColor} size={9} />}
-                <circle cx={x} cy={y} r={r + 2} fill="#10131a" stroke={roleColor} strokeWidth={4} />
-                <image href={getPlayerClassIcon("ffxiv", info?.className ?? a.job ?? "")} x={x - r} y={y - r} width={PLAYER_ICON} height={PLAYER_ICON}
-                  filter={dead ? "url(#replay-gray)" : undefined} />
+                {selectedKey === a.key && <TargetRing x={x} y={y} r={Math.max(r + 10, (a.hitbox ?? 50) * scale)} deg={deg} />}
+                {!dead && <FacingWedge x={x} y={y} r={r} b={(deg * Math.PI) / 180} color={roleColor} size={8 * iconScale} />}
+                <image href={getPlayerClassIcon("ffxiv", info?.className ?? a.job ?? "")} x={x - r} y={y - r} width={size} height={size}
+                  filter={dead ? "url(#replay-gray)" : "url(#replay-shadow)"} />
                 {dead && (
-                  <path d={`M${x - 10} ${y - 10} L${x + 10} ${y + 10} M${x + 10} ${y - 10} L${x - 10} ${y + 10}`} stroke="#ff4d4d" strokeWidth={4} strokeLinecap="round" />
+                  <path d={`M${x - r * 0.6} ${y - r * 0.6} L${x + r * 0.6} ${y + r * 0.6} M${x + r * 0.6} ${y - r * 0.6} L${x - r * 0.6} ${y + r * 0.6}`} stroke="#ff4d4d" strokeWidth={4} strokeLinecap="round" />
                 )}
               </g>
             );
@@ -299,9 +335,16 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
         <button className="ck-btn" onClick={() => setLayersOpen((v) => !v)} aria-expanded={layersOpen}>Layers ▾</button>
         {layersOpen && (
           <div className="ck-menu" style={{ position: "absolute", right: 10, bottom: "100%", marginBottom: 4, zIndex: 5, padding: "6px 10px", display: "flex", flexDirection: "column", gap: 4 }}>
-            <Toggle label="AoEs" title="Enemy AoEs at their game-data size. Dashed: cone angle or donut hole estimated" checked={showAoes} onChange={setShowAoes} />
+            <Toggle label="AoEs" title="Enemy AoEs at their game-data size" checked={showAoes} onChange={setShowAoes} />
             {mapUrl && <Toggle label="Map" title={`In-game map: ${data.map!.name}`} checked={showMap} onChange={setShowMap} />}
+            <Toggle label="5y rings" title="Rings every 5 yalms from the arena centre" checked={showRings} onChange={setShowRings} />
+            <Toggle label="5y grid" title="A 5-yalm grid with 0,0 at the arena centre" checked={showGrid} onChange={setShowGrid} />
             <Toggle label="Helper actors" title="Untargetable actors that place AoEs" checked={showHelpers} onChange={setShowHelpers} />
+            <label style={{ color: "var(--ck-text-2)", fontSize: 13, whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6 }} title="Size of the player icons">
+              Icons
+              <input type="range" min={0.5} max={2} step={0.1} value={iconScale} onChange={(e) => setIconScale(Number(e.target.value))} style={{ width: 90 }} />
+              <span className="ck-num">{Math.round(iconScale * 100)}%</span>
+            </label>
           </div>
         )}
       </div>
@@ -335,26 +378,72 @@ function Tooltip({ x, y, S, lines, color }: { x: number; y: number; S: number; l
   );
 }
 
-/** An in-game style target ring: the hitbox circle with a front notch. */
-function TargetRing({ x, y, r, b, color, strong }: { x: number; y: number; r: number; b: number; color: string; strong?: boolean }) {
-  const fx = x + Math.sin(b) * r, fy = y - Math.cos(b) * r;
-  const n = 11;
+/**
+ * The game's target ring, drawn after it: a glowing orange arc at the
+ * hitbox radius, open at the back, a thin inner ring, a pointed marker at
+ * the front, and double chevrons at each side pointing forward. Drawn
+ * front-up and rotated to the actor's facing (`deg`, compass).
+ */
+function TargetRing({ x, y, r, deg }: { x: number; y: number; r: number; deg: number }) {
+  const GAP = 32;                 // half the back opening, degrees
+  const p = (a: number, rad: number) => `${x + Math.sin((a * Math.PI) / 180) * rad} ${y - Math.cos((a * Math.PI) / 180) * rad}`;
+  const arc = `M${p(-180 + GAP, r)} A${r} ${r} 0 1 1 ${p(180 - GAP, r)}`;
+  const top = y - r;
+  const chevron = (sx: number, dy: number) => `M${sx - 8} ${y + dy + 5} L${sx} ${y + dy - 4} L${sx + 8} ${y + dy + 5}`;
   return (
-    <g pointerEvents="none">
-      <circle cx={x} cy={y} r={r} fill={color} fillOpacity={strong ? 0.14 : 0.06} stroke={color} strokeWidth={strong ? 4 : 3} strokeOpacity={strong ? 1 : 0.75} />
-      <path d={`M${fx + Math.sin(b) * n} ${fy - Math.cos(b) * n} L${fx + Math.cos(b) * n * 0.8} ${fy + Math.sin(b) * n * 0.8} L${fx - Math.cos(b) * n * 0.8} ${fy - Math.sin(b) * n * 0.8} Z`}
-        fill={color} stroke="rgba(0,0,0,0.6)" strokeWidth={1.5} />
+    <g pointerEvents="none" transform={`rotate(${deg} ${x} ${y})`}>
+      <circle cx={x} cy={y} r={r * 0.8} fill="rgba(20,8,4,0.28)" stroke="#ffb76b" strokeOpacity={0.55} strokeWidth={1.5} />
+      <path d={arc} fill="none" stroke="#ff9d3c" strokeWidth={14} strokeOpacity={0.45} filter="url(#replay-glow)" />
+      <path d={arc} fill="none" stroke="#ffc27a" strokeWidth={5} strokeLinecap="round" />
+      <path d={`M${x} ${top - 30} Q${x + 15} ${top - 14} ${x + 10} ${top + 4} L${x} ${top - 3} L${x - 10} ${top + 4} Q${x - 15} ${top - 14} ${x} ${top - 30} Z`}
+        fill="#ffd9a3" stroke="#ff9d3c" strokeWidth={2} />
+      <path d={`M${x} ${top - 22} L${x} ${top - 9}`} stroke="#c2581b" strokeWidth={3} strokeLinecap="round" />
+      {[-r, r].map((dx) => (
+        <g key={dx} fill="none" stroke="#ffd9a3" strokeWidth={2.5} strokeLinejoin="round">
+          <path d={chevron(x + dx, -3)} />
+          <path d={chevron(x + dx, 6)} />
+        </g>
+      ))}
     </g>
   );
 }
 
-/** One AoE in guide style: blue fill, white rim; brighter as it resolves. */
+/** A 5y grid, origin at the arena centre, labelled in yalms along the top and left. */
+function Grid({ cx, cy, half, toX, toY, S }: { cx: number; cy: number; half: number; toX: (x: number) => number; toY: (y: number) => number; S: number }) {
+  const n = Math.ceil(half / GRID_STEP) + 1;
+  const lines = [];
+  for (let k = -n; k <= n; k++) {
+    const gx = toX(cx + k * GRID_STEP), gy = toY(cy + k * GRID_STEP);
+    const axis = k === 0;
+    const stroke = { stroke: "#ffffff", strokeOpacity: axis ? 0.75 : 0.32, strokeWidth: axis ? 2 : 1 };
+    lines.push(<line key={`v${k}`} x1={gx} y1={0} x2={gx} y2={S} {...stroke} />, <line key={`h${k}`} x1={0} y1={gy} x2={S} y2={gy} {...stroke} />);
+    if (k !== 0 && k % 2 === 0) {
+      lines.push(
+        <text key={`tx${k}`} x={gx} y={44} textAnchor="middle" fill="#fff" fontSize={14} {...LABEL}>{k * 5}</text>,
+        <text key={`ty${k}`} x={8} y={gy + 5} fill="#fff" fontSize={14} {...LABEL}>{k * 5}</text>,
+      );
+    }
+  }
+  return <g pointerEvents="none">{lines}</g>;
+}
+
+/** Concentric rings every 5y from the arena centre, labelled along the east axis. */
+function Rings({ cx, cy, half, toX, toY, scale }: { cx: number; cy: number; half: number; toX: (x: number) => number; toY: (y: number) => number; scale: number }) {
+  const out = [];
+  for (let r = GRID_STEP, k = 1; r <= half * 1.45; r += GRID_STEP, k++) {
+    out.push(<circle key={r} cx={toX(cx)} cy={toY(cy)} r={r * scale} fill="none" stroke="#ffffff" strokeOpacity={k % 2 === 0 ? 0.5 : 0.3} strokeWidth={k % 2 === 0 ? 1.5 : 1} />);
+    if (k % 2 === 0) out.push(<text key={`l${r}`} x={toX(cx + r) + 4} y={toY(cy) - 5} fill="#fff" fontSize={13} {...LABEL}>{k * 5}y</text>);
+  }
+  return <g pointerEvents="none">{out}</g>;
+}
+
+/** One AoE in guide style: coloured fill by kind, white rim; brighter as it resolves. */
 function Aoe({ s, opacity, resolving, toX, toY, scale }: { s: AoeShape; opacity: number; resolving: boolean; toX: (x: number) => number; toY: (y: number) => number; scale: number }) {
   const x = toX(s.x), y = toY(s.y);
   const r = s.range * scale;
   const b = (s.bearing * Math.PI) / 180;
-  const fill = resolving ? "#7fa2ff" : AOE_FILL;
-  const common = { fill, fillOpacity: resolving ? 0.8 : 0.62, stroke: AOE_RIM, strokeWidth: 3.5, strokeDasharray: s.estimated ? "12 8" : undefined } as const;
+  const c = AOE_COLORS[s.style];
+  const common = { fill: resolving ? c.flash : c.fill, fillOpacity: resolving ? 0.8 : 0.62, stroke: c.rim, strokeWidth: 3.5 } as const;
   let d: string;
   if (s.kind === "circle") {
     return <g opacity={opacity} pointerEvents="none"><circle cx={x} cy={y} r={r} {...common} /></g>;

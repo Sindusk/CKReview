@@ -269,13 +269,24 @@ file's header comment. Mechanic detection has its own guide:
   EffectRange and XAxisModifier for every ability, so every enemy AoE is
   drawn at its real size from its cast, hit or miss. Cone angles and donut
   holes aren't in the data for new rows; they're estimated from who was
-  hit and drawn dashed.
+  hit. What the data gets wrong is fixed per ability in `OVERRIDES` there,
+  each with its evidence (Revolting Ruin 90° purple tankbuster; Blowout
+  47771 deals no damage; towers without a "trap" omen are yellow).
+  Targetless stacks cast by a parked helper are centred on the players
+  they hit; a beam whose caster has no nearby sample starts where its hit
+  says the caster stood.
+- **Tethers** come from the API's `tether` events (fetched with the
+  replay). The log marks only when one forms, so each lasts until its
+  source's next cast on that player, capped at 15s.
+- **Layers menu:** AoEs, map, 5y rings, 5y grid (0,0 at the arena centre),
+  helper actors, and an icon-size slider.
 - **Hitboxes** are the game's: BNpcBase (FFLogs actor `gameID`) gives the
   model and Scale, ModelSkeleton the Radius; radius × scale.
 - **Waymarks: not available yet.** FFLogs' API has no marker field or
   event. Tomestone shows them from its own copy of each log.
-- **Facing:** players get a wedge, bosses a front notch on their hitbox
-  ring, from geometry.ts's `facingToCompassBearing`. The replay's
+- **Facing:** players get a wedge, bosses the game's target ring (orange
+  arc open at the back, front marker, side chevrons) at hitbox size, from
+  geometry.ts's `facingToCompassBearing`. The replay's
   auto-attack check is what showed that helper returned the back until
   2026-10-17.
 - **Play/pause with a synced VOD** drives the hidden video through

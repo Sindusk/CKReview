@@ -36,7 +36,7 @@ import type { ActionGeometry } from "@/lib/replay/action-shapes";
 
 /** Server-side filter for the replay fetch: event types that carry resources. */
 export const REPLAY_EVENT_FILTER =
-  `type in ("cast", "begincast", "damage", "calculateddamage", "heal", "calculatedheal", "death")`;
+  `type in ("cast", "begincast", "damage", "calculateddamage", "heal", "calculatedheal", "death", "tether", "headmarker")`;
 
 const MAX_INTERP_GAP_MS = 4000;
 
@@ -51,6 +51,8 @@ export type ReplayRawEvent = {
   hitType?:        number;
   amount?:         number;
   abilityGameID?:  number;
+  tetherID?:       number;   // tether: the tether's kind
+  markerID?:       number;   // headmarker: the marker's kind
   duration?:       number;   // begincast: cast time in ms
   unpaired?:       boolean;  // calculateddamage with no landed "damage" event
   packetID?:       number;
@@ -126,6 +128,11 @@ export type ReplayData = {
   map?:        ReplayMap | null;
   enemyCasts?: ReplayCast[];
   enemyHits?:  ReplayHit[];
+  // [ms, source actor key, target actor key, tetherID]. The log marks only
+  // when a tether forms, never when it breaks.
+  tethers?:    [number, string, string, number][];
+  // [ms, marked actor key, markerID].
+  headMarkers?: [number, string, number][];
   abilityNames?: Record<number, string>;   // names of the abilities in enemyHits
   // Game data looked up after the fetch (lib/replay/action-shapes.ts).
   actionGeometry?: Record<number, ActionGeometry>;
@@ -167,6 +174,8 @@ export function buildReplayData(
   const enemyHits: ReplayHit[] = [];
   const hitNames: Record<number, string> = {};
   const previewSource = new Map<number, ReplayRawResources>();
+  const tethers: [number, string, string, number][] = [];
+  const headMarkers: [number, string, number][] = [];
   const byKey = new Map<string, ReplayActor>();
   const damagedEnemies = new Set<string>();
 
@@ -217,6 +226,18 @@ export function buildReplayData(
         }
       }
     }
+    if (e.type === "tether" && e.sourceID !== undefined && e.targetID !== undefined && e.tetherID !== undefined) {
+      const s = actorById.get(e.sourceID), d = actorById.get(e.targetID);
+      if (s && d) tethers.push([e.timestamp - fightStartMs, keyFor(e.sourceID, e.sourceInstance, s.type === "Player"),
+        keyFor(e.targetID, e.targetInstance, d.type === "Player"), e.tetherID]);
+    }
+    if (e.type === "headmarker" && e.markerID !== undefined) {
+      // The marked actor is the source when there's no target (-1).
+      const id = e.targetID !== undefined && e.targetID >= 0 ? e.targetID : e.sourceID;
+      const inst = e.targetID !== undefined && e.targetID >= 0 ? e.targetInstance : e.sourceInstance;
+      const m = id !== undefined ? actorById.get(id) : undefined;
+      if (m) headMarkers.push([e.timestamp - fightStartMs, keyFor(id!, inst, m.type === "Player"), e.markerID]);
+    }
     if (e.type === "calculateddamage" && e.packetID !== undefined && e.sourceResources?.x !== undefined) {
       previewSource.set(e.packetID, e.sourceResources);
     }
@@ -265,7 +286,7 @@ export function buildReplayData(
   }
   out.sort((a, b) => (a.kind === b.kind ? a.actorId - b.actorId : a.kind === "player" ? -1 : 1));
 
-  return { version: 1, reportCode, fightId, durationMs: fightEndMs - fightStartMs, actors: out, map, enemyCasts, enemyHits, abilityNames: hitNames };
+  return { version: 1, reportCode, fightId, durationMs: fightEndMs - fightStartMs, actors: out, map, enemyCasts, enemyHits, abilityNames: hitNames, tethers, headMarkers };
 }
 
 export type ReplayPose = {

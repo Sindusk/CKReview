@@ -112,13 +112,35 @@ export type AoeShape = {
   width: number;                 // rect / cross width, centi-yalms
   angle: number;                 // cone full angle, degrees
   inner: number;                 // donut inner radius, centi-yalms
-  estimated: boolean;            // angle or inner radius guessed: draw dashed
+  estimated: boolean;            // angle or inner radius guessed (not drawn differently)
+  style: "aoe" | "tower" | "tankbuster";
   name: string;
   start: number; resolve: number; // ms from pull start: telegraph start, resolution
 };
 
+/**
+ * Per-ability corrections the game data can't give, each from a log or the
+ * user's VOD review. Keyed by ability id.
+ */
+const OVERRIDES: Record<number, { angle?: number; style?: AoeShape["style"]; hidden?: boolean }> = {
+  // Dancing Mad Revolting Ruin III, both hits: a 90° tankbuster cone (user,
+  // VOD review 2026-10-17). The game data has the cone but not its angle.
+  50179: { angle: 90, style: "tankbuster" },
+  50401: { angle: 90, style: "tankbuster" },
+  // Dancing Mad Blizzard III Blowout 47771 damages nobody: in Mystery Magic
+  // II, players stood 16° inside its facing untouched (2T1HzdPKgbhM43am
+  // fight 10, 0:54) while 47774, cast with it, hit a player 36° off its
+  // facing (yBKPqGwHparm7Tk4 fight 3, 0:55). Drawing it covered the safe
+  // quadrant.
+  47771: { hidden: true },
+  // Towers whose rows carry no omen to say so.
+  47806: { style: "tower" },   // The Path of Light (Forsaken)
+  47939: { style: "tower" }, 47940: { style: "tower" }, 47941: { style: "tower" },  // Celestriad
+};
+
 const RAIDWIDE_RANGE = 30;
 const FLASH_BEFORE_MS = 900;     // instant casts: shown this long before resolving
+const HIT_WINDOW_MS = 1500;      // a cast's hits land within this of it
 const STANDARD_ANGLES = [30, 45, 60, 90, 120, 150, 180, 270];
 
 const bearingTo = (ax: number, ay: number, bx: number, by: number) =>
@@ -137,12 +159,19 @@ export function buildAoeShapes(data: ReplayData): AoeShape[] {
     const [t, key, name, dur, id, targetKey] = casts[i];
     if (dur !== 0 || id === undefined) continue;
     const g = geo[id];
-    if (!g || g.castType === 1 || g.range <= 0) continue;
+    const over = OVERRIDES[id] ?? {};
+    if (!g || over.hidden || g.castType === 1 || g.range <= 0) continue;
     const isCircle = g.castType === 2 || g.castType === 5 || g.castType === 6 || g.castType === 7;
     if (isCircle && g.range >= RAIDWIDE_RANGE) continue;
+    const style: AoeShape["style"] = over.style ?? (/trap/i.test(g.omen) ? "tower" : "aoe");
+
+    // This cast's hits: who it landed on, and (from the hit) where its
+    // caster stood, for helpers with no position sample near the cast.
+    const own = hits.filter((h) => h[1] === id && h[2] === key && h[0] >= t - 200 && h[0] - t <= HIT_WINDOW_MS && h[6] !== null);
 
     const caster = actorByKey.get(key);
-    const casterPose = caster && sampleNear(caster, t, 1500);
+    let casterPose: { x: number; y: number; facing: number } | undefined = caster && sampleNear(caster, t, 1500);
+    if (!casterPose && own[0]?.[4] != null) casterPose = { x: own[0][4]!, y: own[0][5]!, facing: 0 };
     const target = targetKey ? actorByKey.get(targetKey) : undefined;
     const targetPose = target && target.kind === "player" ? poseAt(target, t) : undefined;
     if (!casterPose && !(isCircle && targetPose)) continue;
@@ -154,32 +183,36 @@ export function buildAoeShapes(data: ReplayData): AoeShape[] {
       if (b[1] === key && b[3] > 0 && Math.abs(b[0] + b[3] - t) < 800) { start = b[0]; break; }
     }
 
-    const base = { name, start, resolve: t, width: g.width * 100, range: g.range * 100, angle: 0, inner: 0, estimated: false };
+    const base = { name, start, resolve: t, width: g.width * 100, range: g.range * 100, angle: 0, inner: 0, estimated: false, style };
     if (isCircle) {
-      const o = targetPose ?? casterPose!;
+      let o: { x: number; y: number } = targetPose ?? casterPose!;
+      // A stack or knockback cast by a helper parked elsewhere (Flagrant
+      // Fire III and Double-Trouble Trap come from (100, 90)) lands on the
+      // players it hit, not on the helper: centre it on them.
+      if (!targetPose && own.length) {
+        const mx = own.reduce((s, h) => s + h[6]!, 0) / own.length;
+        const my = own.reduce((s, h) => s + h[7]!, 0) / own.length;
+        if (Math.hypot(mx - o.x, my - o.y) > base.range) o = { x: mx, y: my };
+      }
       // CastType 5 grows with the caster's hitbox; the hitbox is unknown
       // for helpers, so it's drawn at the listed range.
       out.push({ ...base, kind: "circle", x: o.x, y: o.y, bearing: 0 });
       continue;
     }
     const cp = casterPose!;
-    const bearing = targetPose ? bearingTo(cp.x, cp.y, targetPose.x, targetPose.y) : facingToCompassBearing(cp.facing);
+    const bearing = targetPose ? bearingTo(cp.x, cp.y, targetPose.x, targetPose.y)
+      : own.length && !caster?.samples.length ? bearingTo(cp.x, cp.y, own[0][6]!, own[0][7]!)
+      : facingToCompassBearing(cp.facing);
     if (g.castType === 3 || g.castType === 13) {
-      // Angle: the narrowest standard one holding every player it hit.
-      let widest = 0, any = false;
-      for (const h of hits) {
-        if (h[1] !== id || h[2] !== key || Math.abs(h[0] - t) > 1500 || h[6] === null) continue;
-        any = true;
-        widest = Math.max(widest, angDiff(bearingTo(cp.x, cp.y, h[6], h[7]!), bearing) * 2);
-      }
-      const angle = any ? STANDARD_ANGLES.find((a) => a >= widest - 3) ?? 360 : 90;
-      out.push({ ...base, kind: "cone", x: cp.x, y: cp.y, bearing, angle, estimated: true });
+      // Angle: the override, else the narrowest standard one holding every
+      // player it hit, else 90°.
+      let widest = 0;
+      for (const h of own) widest = Math.max(widest, angDiff(bearingTo(cp.x, cp.y, h[6]!, h[7]!), bearing) * 2);
+      const angle = over.angle ?? (own.length ? STANDARD_ANGLES.find((a) => a >= widest - 3) ?? 360 : 90);
+      out.push({ ...base, kind: "cone", x: cp.x, y: cp.y, bearing, angle, estimated: over.angle === undefined });
     } else if (g.castType === 10) {
       let nearest = Infinity;
-      for (const h of hits) {
-        if (h[1] !== id || h[2] !== key || Math.abs(h[0] - t) > 1500 || h[6] === null) continue;
-        nearest = Math.min(nearest, Math.hypot(h[6] - cp.x, h[7]! - cp.y));
-      }
+      for (const h of own) nearest = Math.min(nearest, Math.hypot(h[6]! - cp.x, h[7]! - cp.y));
       const inner = Number.isFinite(nearest) ? Math.max(100, nearest - 50) : base.range / 3;
       out.push({ ...base, kind: "donut", x: cp.x, y: cp.y, bearing: 0, inner, estimated: true });
     } else if (g.castType === 11) {
@@ -189,6 +222,30 @@ export function buildAoeShapes(data: ReplayData): AoeShape[] {
     }
   }
   return out.sort((a, b) => a.start - b.start);
+}
+
+export type TetherSpan = { source: string; target: string; id: number; start: number; end: number };
+
+const TETHER_MAX_MS = 15000;
+const TETHER_GRACE_MS = 500;
+
+/**
+ * When each tether shows. The log marks only when a tether forms, so it
+ * ends at its source's next cast on the tethered actor (Dancing Mad's
+ * Graven Image tethers pay off with Pulse Wave), else at the source's next
+ * tether, else after 15s.
+ */
+export function buildTethers(data: ReplayData): TetherSpan[] {
+  const casts = data.enemyCasts ?? [];
+  const tethers = data.tethers ?? [];
+  return tethers.map(([t, source, target, id]) => {
+    let end = t + TETHER_MAX_MS;
+    const next = tethers.find((o) => o[1] === source && o[0] > t);
+    if (next) end = Math.min(end, next[0]);
+    const payoff = casts.find((c) => c[1] === source && c[0] > t && c[3] === 0 && c[5] === target);
+    if (payoff) end = Math.min(end, payoff[0] + TETHER_GRACE_MS);
+    return { source, target, id, start: t, end };
+  });
 }
 
 const AFTER_MS = 500;
