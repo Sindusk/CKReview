@@ -324,7 +324,14 @@ const SWEEP_PRESSES: { spec: string; specId: number; ids: SweepPress[] }[] = [
   { spec: "Balance Druid", specId: 102, ids: [[61391, "Typhoon"], [77761, "Stampeding Roar"]] },
   // Feral (小奶酱丶 RbhPKYWd6t1nAC3f, the only one): Swipe (18, near p05
   // 0.97s) and Primal Wrath (8, p25 0.98s) sat inside 51s of "idle".
-  { spec: "Feral Druid", specId: 103, ids: [[106785, "Swipe"], [285381, "Primal Wrath"]] },
+  // Feral's phase 3 (2026-10-17, 14 player-pulls on 11 reports): Lunar
+  // Inspiration's Moonfire 155625 (243 casts on the four Entombed
+  // Sentinels players who take it, ~30 a pull, near p05 0.74s), Frantic
+  // Frenzy 1243807 (Lylyvienne KB1a9CWc6pT4VGqA, 6, near p05 0.96s) and
+  // Feral's Stampeding Roar 77764 (13 casts, 8 players, near p05 0.74s).
+  { spec: "Feral Druid", specId: 103, ids: [
+    [106785, "Swipe"], [285381, "Primal Wrath"], [155625, "Moonfire"], [1243807, "Frantic Frenzy"], [77764, "Stampeding Roar"],
+  ] },
   // Rogues (fixed 1.0s GCD): Poisoned Knife (Assassination, 8, near p05
   // 0.99s), Gloomblade (Subtlety, Nickledon, 49, 0.99s), Pistol Shot
   // (Outlaw Buffoutlaw a4kX1DNT27yHGvqJ, Loktark Kag91qVZ2YJ7MQAb: 294
