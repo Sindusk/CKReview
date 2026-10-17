@@ -25,6 +25,7 @@ import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { TrackedCooldown } from "../types";
 import { avengingWrathValue, divineTollValue } from "./specs/retribution";
 import { pillarOfFrostValue } from "./specs/frostdk";
+import { sigilValue } from "./specs/vengeance";
 
 /**
  * One Vanish's worth to an Assassination Rogue: the damage of a Garrote cast
@@ -68,11 +69,16 @@ export const WOW_TRACKED_COOLDOWNS: Record<string, TrackedCooldown[]> = {
   "Brewmaster Monk": [
     { name: "Exploding Keg", actionIds: [325153], cooldownMs: 60_000, charges: 1, firstUseOffsetMs: 7_000 },
   ],
-  // Unverified (1 player): Sigil of Spite min 63.0s, first use 4.4s; Sigil
-  // of Flame min 30.9s.
+  // Vengeance (the WoWAnalyzer audit's phase 3, 2026-10-17; 24
+  // player-pulls on nine reports, specs/vengeance.ts has the numbers):
+  // Sigil of Spite min 60.2s (83 intervals, median 65.8s), Sigil of Flame
+  // min 30.0s (171, median 32.8s). Both hit under another id than the cast
+  // (389860, 204598), which also shows a pre-pull press; a use is valued
+  // by sigilValue (its hits less the GCD it took). burstHold: the top
+  // Vashnik tanks hold Sigil of Flame for the Venoms after Imbibe.
   "Vengeance Demon Hunter": [
-    { name: "Sigil of Spite", actionIds: [390163], cooldownMs: 63_000, charges: 1, firstUseOffsetMs: 5_000 },
-    { name: "Sigil of Flame", actionIds: [204596], cooldownMs: 31_000, charges: 1, firstUseOffsetMs: 5_000 },
+    { name: "Sigil of Spite", actionIds: [390163], cooldownMs: 60_000, charges: 1, firstUseOffsetMs: 5_000, prePullEvidenceIds: [389860], burstHold: true, valuePerUse: sigilValue("Sigil of Spite", 390163) },
+    { name: "Sigil of Flame", actionIds: [204596], cooldownMs: 30_000, charges: 1, firstUseOffsetMs: 5_000, prePullEvidenceIds: [204598], burstHold: true, valuePerUse: sigilValue("Sigil of Flame", 204596) },
   ],
 
   // ── Melee (shortest / median interval, first use median) ─────────────
