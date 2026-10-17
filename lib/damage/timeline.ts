@@ -86,6 +86,30 @@ export function forcedPart(startMs: number, endMs: number, forced: ForcedWindow[
 }
 
 /**
+ * A fight's cooldownHoldWindows (DamageContext) as they apply to one
+ * cooldown of recharge `rechargeMs`: each window keeps only
+ * [max(start, target − recharge), end], target being the window's targetMs
+ * (the Heart, the Imbibe) or its end. Holding a button for a burst can pay
+ * for at most one recharge before it: held longer, a use is lost whatever
+ * it lands in (Windwalker's and Demonology's own burst excuses cap the same
+ * way). A long cooldown (Avenging Wrath, Avatar) keeps the whole 30s
+ * window; a 15s Implosion gets 15s of it. For a variable or charge-based
+ * cooldown, pass the player's average recharge, as the reader prices it.
+ * Measured 2026-10-17 on gVDPhzp61Zm29HMw Ula'tek Pull 1, lost with no
+ * windows / uncapped / capped: Fwîî's Implosion 4.08M / 0.93M / 2.22M,
+ * Deathstriker's Bestial Wrath (30s) 881k / 30k / 696k, Hervous's Avatar
+ * + Colossus Smash 2.10M / 0 / 0, Polpo's Avenging Wrath (60s) 3.12M /
+ * 0 / 3.12M. The rest of the sample pulls are in types.ts
+ * cooldownHoldWindows.
+ */
+export function holdWindowsFor(holds: ForcedWindow[] | undefined, rechargeMs: number): ForcedWindow[] {
+  if (!holds || !(rechargeMs > 0)) return [];
+  return holds
+    .map((w) => ({ ...w, startMs: Math.max(w.startMs, (w.targetMs ?? w.endMs) - rechargeMs) }))
+    .filter((w) => w.endMs > w.startMs);
+}
+
+/**
  * GCD uptime: the share of the time the player could have been pressing
  * GCDs that a GCD lock covered. Each GCD counts from its start for its lock,
  * cut at the next GCD. Excluded time (dead, boss untargetable, a limit

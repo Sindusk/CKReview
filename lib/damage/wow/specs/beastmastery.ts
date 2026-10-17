@@ -118,7 +118,7 @@
 import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { JobCheck, Moment } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";
-import { inWindows, mergeWindows, overlapMs, type Window } from "../../timeline";
+import { holdWindowsFor, inWindows, mergeWindows, overlapMs, type Window } from "../../timeline";
 import { k, s, statusWindows } from "./shared";
 
 const BESTIAL_WRATH = 19574;             // the cast and the player's 15s buff
@@ -202,7 +202,7 @@ const bestialWrathHeld: JobCheck = (ctx) => {
   const gcd = ctx.values.gcdValue(undefined, false);
   const value = use.value - gcd;
   if (!(value > 0)) return [];
-  const notHeld = mergeWindows([...ctx.forced, ...(ctx.context?.cooldownHoldWindows?.(ctx.pull) ?? [])]);
+  const notHeld = mergeWindows([...ctx.forced, ...holdWindowsFor(ctx.context?.cooldownHoldWindows?.(ctx.pull), BW_CD_MS)]);
   const lastUseful = ctx.endMs - BW_TAIL_MS;
   const counts = (t: number) => t < lastUseful && !inside(notHeld, t) && overlapMs(t, t + BW_LOOKAHEAD_MS, notHeld) <= BW_LOOKAHEAD_MS / 2;
   const perMs = value / BW_CD_MS;

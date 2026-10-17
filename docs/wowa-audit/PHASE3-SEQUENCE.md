@@ -239,6 +239,10 @@ measured for it.
   idle otherwise.
 - **Value a hit by its own events, not a total divided by presses**
   (Arcane Orb: 294k claimed, 47–63k a pressed Orb).
+- **A fight's hold window excuses one recharge at most** (2026-10-17):
+  read `cooldownHoldWindows` through `holdWindowsFor(windows, recharge)`
+  (timeline.ts), never raw. Raw, Ula'tek's ~2 min P2 window excused a 15s
+  Implosion held 50s (Fwîî 4.08M → 0.93M; 2.22M capped).
 - **Class resources not in the fetch** (Arcane Charges) make a rule
   `unverifiable` until the fetch carries resource events; say so in the
   row.

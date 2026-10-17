@@ -78,7 +78,7 @@ import type { PlayerEvent, PlayerInfo } from "@/types/PlayerInfo";
 import type { DamageContext, DamageFinding, DamageGame, ForcedWindow, Moment, TrackedCooldown } from "./types";
 import type { BuffLedger } from "./buffs";
 import {
-  forcedPart, gcdLockMs, inWindows, latestBegin, overlapMs, mergeWindows,
+  forcedPart, gcdLockMs, holdWindowsFor, inWindows, latestBegin, overlapMs, mergeWindows,
   type GcdUse, type PlayerValues, type Window,
 } from "./timeline";
 
@@ -593,14 +593,11 @@ export function checkCooldownDrift(ctx: PlayerCheckContext): DamageFinding[] {
   // Imbibes, 84s apart; counted as holds, they read 10.3M lost). Opt-in per
   // cooldown: other specs' short cooldowns weren't measured against it.
   // The windows don't block the room: the cooldown could be pressed there.
+  // Each window counts only for the cooldown's last recharge before its
+  // target (holdWindowsFor).
   const holds = ctx.context?.cooldownHoldWindows?.(ctx.pull) ?? [];
-  const holdMerged = holds.length ? mergeWindows([...ctx.forced, ...holds]) : forcedMerged;
 
   for (const tracked of ctx.game.trackedCooldowns(ctx.job)) {
-    const notHeld = tracked.burstHold ? holdMerged : forcedMerged;
-    const withDeciding = ctx.decidingPhaseStart !== undefined
-      ? mergeWindows([...notHeld, { startMs: 0, endMs: ctx.decidingPhaseStart, cause: "held for the deciding phase" }])
-      : notHeld;
     if (ctx.patch && tracked.notOnPatches?.includes(ctx.patch)) continue;
     // Synced below the cap: not judged when learned above the sync level,
     // or when it has charges (they come with traits, and the vendored data
@@ -613,6 +610,11 @@ export function checkCooldownDrift(ctx: PlayerCheckContext): DamageFinding[] {
     const patchRecast = ctx.patch !== undefined ? tracked.recastOnPatches?.[ctx.patch] : undefined;
     const cd = patchHold !== undefined || patchRecast
       ? { ...tracked, ...patchRecast, ...(patchHold !== undefined ? { holdMs: patchHold } : {}) } : tracked;
+    const notHeld = tracked.burstHold && holds.length
+      ? mergeWindows([...ctx.forced, ...holdWindowsFor(holds, cd.cooldownMs)]) : forcedMerged;
+    const withDeciding = ctx.decidingPhaseStart !== undefined
+      ? mergeWindows([...notHeld, { startMs: 0, endMs: ctx.decidingPhaseStart, cause: "held for the deciding phase" }])
+      : notHeld;
     const ids = new Set(cd.actionIds);
     const casts = ctx.player.casts
       .filter((c) => ids.has(c.abilityId) && c.timestamp < ctx.endMs)

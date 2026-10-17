@@ -37,5 +37,6 @@ export const VASHNIK_DAMAGE_CONTEXT: DamageContext = {
   encounter: "Vashnik the Malignant",
   phases: {},
   forcedWindows: (pull) => debuffWindows(pull, [PLAGUE_FROTH], "carrying Plague Froth", { who: isMelee, maxMs: 8_000, tailMs: 2_000 }),
-  cooldownHoldWindows: (pull) => castWindows(pull, [IMBIBE], 35_000, "held for the Venoms after Imbibe", { offsetMs: -30_000 }),
+  cooldownHoldWindows: (pull) => castWindows(pull, [IMBIBE], 35_000, "held for the Venoms after Imbibe", { offsetMs: -30_000 })
+    .map((w) => ({ ...w, targetMs: w.startMs + 30_000 })),   // the Imbibe; each reader trims to one recharge before it (holdWindowsFor)
 };

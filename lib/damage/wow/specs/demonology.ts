@@ -112,7 +112,7 @@
 
 import type { JobCheck, Moment } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";
-import { mergeWindows, overlapMs, type Window } from "../../timeline";
+import { holdWindowsFor, mergeWindows, overlapMs, type Window } from "../../timeline";
 import { k, s, statusWindows } from "./shared";
 
 const IMPLOSION = 196277;
@@ -171,7 +171,7 @@ type HeldSpec = {
 
 /** Held time on a flat cooldown, priced as a share of a use, with the Tyrant line-up excused to its break-even. */
 function heldFindings(ctx: PlayerCheckContext, spec: HeldSpec) {
-  const forced = mergeWindows([...ctx.forced, ...(ctx.context?.cooldownHoldWindows?.(ctx.pull) ?? [])]);
+  const forced = mergeWindows([...ctx.forced, ...holdWindowsFor(ctx.context?.cooldownHoldWindows?.(ctx.pull), spec.cdMs)]);
   const lastUseful = ctx.endMs - TAIL_MS;
   const counts = (t: number) => t < lastUseful && !inside(forced, t)
     && overlapMs(t, t + LOOKAHEAD_MS, forced) <= LOOKAHEAD_MS / 2

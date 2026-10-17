@@ -163,7 +163,7 @@
 
 import type { JobCheck, Moment } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";
-import { mergeWindows, overlapMs, statusWindows, type Window } from "../../timeline";
+import { holdWindowsFor, mergeWindows, overlapMs, statusWindows, type Window } from "../../timeline";
 import { k, s } from "./shared";
 
 const LUNAR_ECLIPSE = 1233272;
@@ -296,7 +296,7 @@ const eclipseCapped: JobCheck = (ctx) => {
   const p = ctx.player;
   const inc = statusWindows(p, new Set([INCARNATION]), ctx.endMs);
   const forced = mergeWindows(ctx.forced);
-  const notHeld = mergeWindows([...ctx.forced, ...inc, ...(ctx.context?.cooldownHoldWindows?.(ctx.pull) ?? [])]);
+  const notHeld = mergeWindows([...ctx.forced, ...inc, ...holdWindowsFor(ctx.context?.cooldownHoldWindows?.(ctx.pull), ECL_RECHARGE_MS)]);
   const lastUseful = ctx.endMs - ECL_TAIL_MS;
   const counts = (t: number) => t >= ECL_OPENER_MS && t < lastUseful && !inside(notHeld, t)
     && overlapMs(t, t + ECL_MS, forced) <= ECL_MS / 2;
@@ -387,7 +387,7 @@ const furyHeld: JobCheck = (ctx) => {
   const avgRecharge = avg(recharges);
   const perMs = value / avgRecharge;
   const excuseMs = Math.min(avgRecharge, Math.max(0, (avgIn - avgOut) / perMs));
-  const notHeld = mergeWindows([...ctx.forced.map((w) => ({ startMs: w.startMs, endMs: w.endMs + FOE_SETTLE_MS })), ...(ctx.context?.cooldownHoldWindows?.(ctx.pull) ?? [])]);
+  const notHeld = mergeWindows([...ctx.forced.map((w) => ({ startMs: w.startMs, endMs: w.endMs + FOE_SETTLE_MS })), ...holdWindowsFor(ctx.context?.cooldownHoldWindows?.(ctx.pull), avgRecharge)]);
   const lastUseful = ctx.endMs - FOE_TAIL_MS;
   const counts = (t: number) => t < lastUseful && !inside(notHeld, t) && overlapMs(t, t + FOE_BEAM_MS, forced) <= FOE_BEAM_MS / 2;
 

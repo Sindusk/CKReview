@@ -34,7 +34,7 @@
 
 import type { DamageFinding, Moment } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";
-import { forcedPart, gcdLockMs, inWindows, mergeWindows, overlapMs, type Window } from "../../timeline";
+import { forcedPart, gcdLockMs, holdWindowsFor, inWindows, mergeWindows, overlapMs, type Window } from "../../timeline";
 import { k, s, statusWindows } from "../../ffxiv/jobs/shared";
 
 export { k, s, statusWindows };
@@ -271,7 +271,9 @@ export function castTimeProcFindings(ctx: PlayerCheckContext, spec: CastTimeProc
 // From Beyond; docs/wowa-audit/shaman-elemental.md, measured on seven top
 // parses 2026-10-16: never back sooner, usually pressed ~1.8s after).
 // Ready time inside the context's cooldownHoldWindows isn't held (Vashnik:
-// the top players keep Stormkeeper for the Venom burst after Imbibe). A
+// the top players keep Stormkeeper for the Venom burst after Imbibe), only
+// for the last average recharge before each window's target
+// (timeline.ts holdWindowsFor). A
 // window buff seen before the first cast means it was cast before the pull.
 
 export type SpentCooldownSpec = {
@@ -323,7 +325,6 @@ export function spentCooldownDrift(ctx: PlayerCheckContext, spec: SpentCooldownS
     return Math.max(t, t + spec.baseMs - reduced);
   };
   const forced = mergeWindows(ctx.forced);
-  const notHeld = mergeWindows([...ctx.forced, ...(ctx.context?.cooldownHoldWindows?.(ctx.pull) ?? [])]);
   const stretches: Window[] = prePull ? [] : [{ startMs: spec.firstUseOffsetMs, endMs: casts[0] }];
   const recharges: number[] = [];
   for (let i = 0; i < casts.length; i++) {
@@ -331,6 +332,9 @@ export function spentCooldownDrift(ctx: PlayerCheckContext, spec: SpentCooldownS
     recharges.push(ready - casts[i]);
     stretches.push({ startMs: ready, endMs: casts[i + 1] ?? ctx.endMs });
   }
+  const avgRecharge = recharges.reduce((a, x) => a + x, 0) / recharges.length;
+  // A hold window excuses at most the last average recharge before its target.
+  const notHeld = mergeWindows([...ctx.forced, ...holdWindowsFor(ctx.context?.cooldownHoldWindows?.(ctx.pull), avgRecharge)]);
   let held = 0;
   let longest: Window | undefined, longestHeld = 0;
   for (const w of stretches) {
@@ -339,7 +343,6 @@ export function spentCooldownDrift(ctx: PlayerCheckContext, spec: SpentCooldownS
     held += h;
     if (h > longestHeld) { longestHeld = h; longest = w; }
   }
-  const avgRecharge = recharges.reduce((a, x) => a + x, 0) / recharges.length;
   const lost = Math.floor(held / avgRecharge);
   if (lost < 1 || !longest) return [];
   const detail = `${spec.name} sat ready for ${s(held)} in total (${casts.length} uses${prePull ? ", one before the pull" : ""}; recharge ${s(spec.baseMs)} − ${spec.reduceOn ? spec.reduceOn.label : `1s per ${spec.unitsPerSecond} spent`}, ${s(avgRecharge)} on average here): about ${lost} use${lost > 1 ? "s" : ""} lost`;

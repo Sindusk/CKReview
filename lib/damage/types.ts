@@ -268,6 +268,9 @@ export type ForcedWindow = {
   endMs:    number;
   cause:    string;
   players?: string[];        // undefined = everyone
+  // A cooldownHoldWindows window's target moment (the Heart, the Imbibe):
+  // the part after it isn't trimmed by holdWindowsFor. Unset: the end.
+  targetMs?: number;
 };
 
 export type DamageContext = {
@@ -285,6 +288,20 @@ export type DamageContext = {
   // Only the drift checks that read it (wow/specs/shared.ts
   // spentCooldownDrift, some spec checks, and checkCooldownDrift for a
   // tracked cooldown marked burstHold); never excuses a GCD gap.
+  // Each reader trims a window to its cooldown's last recharge before the
+  // window's targetMs (timeline.ts holdWindowsFor): holding a button longer
+  // than one recharge loses a use whatever it's held for. Without the cap
+  // (to 2026-10-17) a 15s Implosion was excused for Ula'tek's whole P2
+  // window (~2 min). Measured with the cap on every Vashnik and Ula'tek
+  // sample pull: only short cooldowns moved (Implosion 27.6M → 35.3M over
+  // 23 Vashnik rows, Eye Beam 8.3M → 10.1M, Call Dreadstalkers 1.7M →
+  // 2.1M); Retribution's 60s cooldowns and Stormkeeper kept their Imbibe
+  // excuse (Pçpaladin, Pipala unchanged; Lydd's Implosion 2.24M → 2.50M).
+  // On Ula'tek every change is in P2, before the Heart: the P2-start
+  // extension now reaches only a cooldown as long as P2's ~2 min before
+  // the Heart. Hervous's Avatar and Colossus Smash stay excused (held
+  // within one recharge); Polpo's 60s Avenging Wrath, held 3:16 → 4:45,
+  // reads 3.12M again (Jgwentworth spent his on the adds at 3:39).
   cooldownHoldWindows?(pull: Pull): ForcedWindow[];
   // A name for a mechanic occurrence key, used to say what was happening
   // during a gap ("during Towers (P5)"). Labels only; never excuses a gap.

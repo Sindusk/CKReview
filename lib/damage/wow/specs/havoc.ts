@@ -93,7 +93,7 @@
 import type { PlayerEvent } from "@/types/PlayerInfo";
 import type { DamageFinding, JobCheck, Moment } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";
-import { mergeWindows, overlapMs, type Window } from "../../timeline";
+import { holdWindowsFor, mergeWindows, overlapMs, type Window } from "../../timeline";
 import { k, s, statusWindows } from "./shared";
 
 const EYE_BEAM = 198013;
@@ -190,7 +190,6 @@ const eyeBeamHeld: JobCheck = (ctx) => {
   const ordV = avg(beamDmg.filter((_, i) => !isEmp[i]));
   const hunts = presses(ctx, THE_HUNT).map((c) => c.timestamp);
 
-  const excluded = mergeWindows([...ctx.forced, ...(ctx.movement ?? []), ...(ctx.context?.cooldownHoldWindows?.(ctx.pull) ?? [])]);
   type Cycle = { prev: number; ready: number; next: number; cdMs: number; reset: boolean };
   const cdAt = (t: number) => EYE_BEAM_BASE_MS - EYE_BEAM_STACK_MS * cycleStacksAt(ctx, t);
   // The reset is a talent (Chaotic Transformation): only a player who has
@@ -205,6 +204,8 @@ const eyeBeamHeld: JobCheck = (ctx) => {
   });
   const cooldown = avg(cycles.map((c) => c.cdMs));
   const perMs = use.value / cooldown;
+  // The fight's hold windows, each only for the last average cooldown before its target.
+  const excluded = mergeWindows([...ctx.forced, ...(ctx.movement ?? []), ...holdWindowsFor(ctx.context?.cooldownHoldWindows?.(ctx.pull), cooldown)]);
 
   const moments: Moment[] = [];
   let heldMs = 0, excusedMs = 0;

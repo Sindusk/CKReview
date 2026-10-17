@@ -74,14 +74,17 @@ export const ULATEK_DAMAGE_CONTEXT: DamageContext = {
   // Wrath and Execution Sentence at 2:17 and 4:46 (Hearts at 2:16 and
   // 4:45); Polpo held his from 3:17 through the P2 adds (read 4.8M lost
   // before this window), Jgwentworth spent one on the adds at 3:40 and was
-  // back for the Heart.
+  // back for the Heart. Each reader keeps only the cooldown's last recharge
+  // before the Heart (targetMs; timeline.ts holdWindowsFor, 2026-10-17), so
+  // the P2-start part excuses only a cooldown about as long as P2 before
+  // the Heart: Polpo's 60s Avenging Wrath hold reads 3.12M again.
   cooldownHoldWindows: (pull) => {
     const out: ForcedWindow[] = [];
     const p2 = phaseSpans(pull, 2);
     for (const e of pull.enemyBuffs ?? []) {
       if (e.abilityId !== HEART_EXPOSED) continue;
       const inP2 = p2.find((s) => e.timestamp >= s.startMs && e.timestamp <= s.endMs);
-      out.push({ startMs: Math.min(e.timestamp - 30_000, inP2?.startMs ?? Infinity), endMs: e.timestamp + 5_000, cause: "held for the Heart window" });
+      out.push({ startMs: Math.min(e.timestamp - 30_000, inP2?.startMs ?? Infinity), endMs: e.timestamp + 5_000, targetMs: e.timestamp, cause: "held for the Heart window" });
     }
     return out;
   },
