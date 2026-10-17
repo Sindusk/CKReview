@@ -58,12 +58,36 @@
 // Arteyparty 916k, Hirvihotline 557k, Nidzoz 353k, Floala 359k; Deathstriker
 // 125k on the case study (5:02 → 5:07) and 0–881k on each of his static's
 // 16 pulls (Ula'tek 881k: 2:40 → 2:59, 3:29 → 3:42, 4:12 → 4:18).
+//
+// ── Kill Command without Nature's Ally (killCommandUnbuffed) ───────────
+// Nature's Ally (1276720, every one of the 37) is a buff each Cobra Shot
+// (193455) or Barbed Shot (217200) applies and each Kill Command (34026)
+// takes: its removal logs at the cast's instant (Luumu, 76 of 76; no other
+// consumer). It raises the Kill Command: the pet's (83381) and the Pack
+// Leader beasts' (1232922) non-crit hits ×1.13–1.65 with it vs without
+// (players with 5+ unbuffed; median ~1.3; Deathstriker 26k vs 21k, beasts
+// 16k vs 12k), so a Kill Command without it lost its hits × (1 − 1/ratio):
+// the player's own ratio when NA_MIN_UNBUFFED_HITS each side, else
+// NA_DEFAULT_RATIO. Kill Cleave (389448) is a share of the Kill Command
+// and counts too. What it is, nearly always: two Kill Commands in a row
+// (Deathstriker 0:03.9 → 0:04.8, 0:20.8 → 0:21.9, 0:34.4 → 0:35.4 on the
+// case study), where a Cobra Shot between would have given the buff. The
+// top players almost never do it, so the extra GCD doesn't cost them Kill
+// Commands (15–18 a minute). Not counted in forced time.
+// Measured (lost a pull): top Luumu, Yaji (Entombed Sentinels),
+// Волкерокхант none; Yaji (Vashnik) 37k, Minttu 21k, 干嘛喵 54k, 小红手经年
+// 143k (4: 0:04 after the opener's Bestial Wrath, 1:35, 5:10, 5:34),
+// Käächhunt 189k (5). Weaker: 嗜血魔圣 491k (13), 爱美女的菠萝 264k (11),
+// Yolt 194k, Arteyparty 177k, Jimache 151k, Nidzoz 64k (13, small hits);
+// Deathstriker 159k on the case study (10) and 113–473k on each of his
+// static's 16 pulls (6–23 a pull; Ula'tek 473k, 23). WoWAnalyzer only
+// annotates each unbuffed cast.
 
 import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { JobCheck, Moment } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";
-import { mergeWindows, overlapMs, type Window } from "../../timeline";
-import { k, s } from "./shared";
+import { inWindows, mergeWindows, overlapMs, type Window } from "../../timeline";
+import { k, s, statusWindows } from "./shared";
 
 const BESTIAL_WRATH = 19574;             // the cast and the player's 15s buff
 const BESTIAL_WRATH_HIT = 344572;        // the pet's hit
@@ -184,4 +208,50 @@ const BW_LOOKAHEAD_MS = 10_000;
 const BW_STEP_MS = 250;
 const BW_MIN_HELD_MS = 250;
 
-export const BEAST_MASTERY_CHECKS: JobCheck[] = [bestialWrathHeld];
+// ── Kill Command without Nature's Ally ─────────────────────────────────
+
+const KILL_COMMAND = 34026;              // the player's cast
+const KC_HITS = new Set([83381, 1232922, 389448]);   // the pet's, the Pack Leader beasts', Kill Cleave
+const KC_RATIO_HITS = new Set([83381, 1232922]);
+const NATURES_ALLY = 1276720;
+const NA_DEFAULT_RATIO = 1.3;
+const NA_MIN_UNBUFFED_HITS = 8;
+const NA_MAX_RATIO = 1.6;
+const KC_SPAN_MS = 1_500;
+const NA_TAKEN_MS = 50;
+
+const killCommandUnbuffed: JobCheck = (ctx) => {
+  const p = ctx.player;
+  const na = statusWindows(ctx, NATURES_ALLY);
+  if (na.length === 0) return [];
+  const kc = presses(ctx, KILL_COMMAND);
+  if (kc.length < 10) return [];
+  const forced = mergeWindows(ctx.forced);
+  const hits = p.damageDone.filter((e) => e.pet && KC_HITS.has(e.abilityId) && e.timestamp < ctx.endMs + KC_SPAN_MS);
+  const rows = kc.map((t, i) => {
+    const until = Math.min(t + KC_SPAN_MS, kc[i + 1] ?? Infinity);
+    const mine = hits.filter((e) => e.timestamp >= t && e.timestamp < until);
+    // The Kill Command takes the buff: its removal logs at the cast's instant or just after.
+    return { t, buffed: na.some((x) => t >= x.startMs && t <= x.endMs + NA_TAKEN_MS), mine, dmg: mine.reduce((a, e) => a + (e.amount ?? 0), 0) };
+  });
+  const nonCrit = (rs: typeof rows) => rs.flatMap((r) => r.mine.filter((e) => KC_RATIO_HITS.has(e.abilityId) && e.hitType === 1 && e.amount! > 0).map((e) => e.amount!));
+  const w = nonCrit(rows.filter((r) => r.buffed)), o = nonCrit(rows.filter((r) => !r.buffed));
+  const own = o.length >= NA_MIN_UNBUFFED_HITS && w.length >= NA_MIN_UNBUFFED_HITS;
+  const ratio = own ? Math.min(NA_MAX_RATIO, Math.max(1, median(w) / median(o))) : NA_DEFAULT_RATIO;
+  const bad = rows.filter((r) => !r.buffed && !inWindows(r.t, forced) && r.dmg > 0);
+  if (bad.length === 0) return [];
+  const moments: Moment[] = bad.map((r) => ({ startMs: r.t, endMs: r.t, lostDamage: r.dmg * (1 - 1 / ratio),
+    detail: `Kill Command at ${clock(r.t)} without Nature's Ally (${k(r.dmg)})` }));
+  const lost = moments.reduce((a, m) => a + (m.lostDamage ?? 0), 0);
+  return [finding(ctx, {
+    kind: "burst-window", startMs: bad[0].t, endMs: bad[bad.length - 1].t, forced: false, inference: true,
+    label: "Kill Command without Nature's Ally",
+    lostDamage: lost,
+    basis: `each one's pet hits (Kill Command, the beasts' Kill Command, Kill Cleave) × (1 − 1/${ratio.toFixed(2)}), ` +
+      (own ? `the player's own Kill Command hits with Nature's Ally vs without (non-crit medians, ${w.length} / ${o.length})` : `Nature's Ally's ×${NA_DEFAULT_RATIO} measured on the sample players (too few unbuffed hits to read the player's own)`),
+    detail: `${bad.length} Kill Command${bad.length > 1 ? "s" : ""} pressed without Nature's Ally (a Cobra Shot or Barbed Shot first gives it), mostly two Kill Commands in a row`,
+    moments,
+  })];
+};
+
+export const BEAST_MASTERY_CHECKS: JobCheck[] = [bestialWrathHeld, killCommandUnbuffed];
