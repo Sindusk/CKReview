@@ -54,6 +54,15 @@
 // Abuki Vashnik Pull 4 1.61M → 0.99M). Tiger Palm and Blackout Kick take
 // Windwalker's fixed 1.0s lock (the action table is per id, not per spec):
 // a Mistweaver's is ~0.87s, so idle after them is undercounted (lenient).
+//
+// Mistweaver's filler: Rushing Wind Kick (cast 467307) hits as 468179, so
+// by id it's never a damage GCD; the filler is Tiger Palm or Blackout Kick
+// (5–13k) when pressed, else none, and heal GCDs price at 0 on 14 of
+// Abuki's 16 pulls. That is about right: a Mistweaver's spare GCD is a
+// Tiger Palm, since the kick is already pressed on cooldown. Matching hits
+// by name instead was measured and not adopted: it makes the kick the
+// filler (47–70k), and for other healers it picks cooldowns (Lava Burst
+// over Flame Shock for Resto Shamans, ~2×; Fire Breath for Preservation).
 
 import type { DamageFinding, JobCheck } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";
@@ -64,12 +73,17 @@ export const HEAL_WASTE_SHARE = 0.2;
 const HEAL_LAND_MS = 1_500;
 const HOT_MAX_MS = 30_000;
 const NOT_JUDGED = new Set([364343]);   // Echo: its value is the copied heal
+// Never a filler: Touch of Death (322109, a 90–180s execute). Abuki's one
+// press (282k) priced 40 Vivifies and 4 Enveloping Mists at 12.4M on
+// gVDPhzp61Zm29HMw Coiled Altar Pull 1; at his Blackout Kick (9k) it's
+// 0.38M (WoWAnalyzer audit, 2026-10-17).
+const NOT_FILLER = new Set([322109]);
 
 function filler(ctx: PlayerCheckContext): { name: string; value: number } {
   const kinds = gcdKinds(ctx.player, ctx.pull, ctx.uses);
   const counts = new Map<number, { name: string; n: number }>();
   for (const u of ctx.uses) {
-    if (kinds.get(u.action.id) !== "damage") continue;
+    if (kinds.get(u.action.id) !== "damage" || NOT_FILLER.has(u.action.id)) continue;
     const c = counts.get(u.action.id) ?? { name: u.abilityName, n: 0 };
     c.n++;
     counts.set(u.action.id, c);
