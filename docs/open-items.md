@@ -307,15 +307,17 @@ and delete them from the header.
     non-overload casts in Ascendance (130-590k each), Lava Burst without
     Flame Shock (~120k), unbuffed spenders (~6.5% each), one-target Chain
     Lightning (~35k); early Flame Shock refreshes are a fifth, low
-    (5-62k a pull). Call of the Ancestors active time stays `wrong`. Stormkeeper drift built (60s
+    (5-62k a pull). Idle in a Call of the Ancestors window is a sixth:
+    the Ancestors lose ~33k a second while the player is idle, on top of
+    the GCD the gap check prices. Stormkeeper drift built (60s
     less 3s per Ancestor summoned; Vashnik holds for the Venoms after
     Imbibe allowed). Open: Ascendance spenders (low value).
   - [monk-windwalker.md](wowa-audit/monk-windwalker.md): 12 candidates;
     Fists of Fury cadence (reduction model).
   - [demonhunter-havoc.md](wowa-audit/demonhunter-havoc.md): 11; Eye
     Beam drift with Cycle of Hatred.
-  - [mage-arcane.md](wowa-audit/mage-arcane.md): 17; Arcane Barrage
-    ladder (Salvo stacks at the cast); 8 `wrong`.
+  - [mage-arcane.md](wowa-audit/mage-arcane.md): 18; Arcane Barrage
+    ladder (Salvo stacks at the cast); 5 `wrong`.
   - [warlock-demonology.md](wowa-audit/warlock-demonology.md): 10; Call
     Dreadstalkers cadence with Demonic Calling.
   - [warlock-affliction.md](wowa-audit/warlock-affliction.md): 5; Dark
@@ -356,9 +358,9 @@ and delete them from the header.
     window count.
   - [priest-shadow.md](wowa-audit/priest-shadow.md): 11; Insidious Ire
     coverage.
-  - [rogue-subtlety.md](wowa-audit/rogue-subtlety.md): 15; Ancient Arts
-    pairing (Deathstalker); 6 `wrong`.
-  - [shaman-enhancement.md](wowa-audit/shaman-enhancement.md): 14; Doom
+  - [rogue-subtlety.md](wowa-audit/rogue-subtlety.md): 16; Ancient Arts
+    pairing (Deathstalker); 3 `wrong`.
+  - [shaman-enhancement.md](wowa-audit/shaman-enhancement.md): 16; Doom
     Winds and the other major cooldowns as tracked cooldowns.
   - [warlock-destruction.md](wowa-audit/warlock-destruction.md): 6;
     Immolate uptime without Wither.
@@ -368,7 +370,7 @@ and delete them from the header.
     Death and Decay with Crimson Scourge.
   - [deathknight-unholy.md](wowa-audit/deathknight-unholy.md): 7;
     Virulent / Dread Plague uptime.
-  - [demonhunter-devourer.md](wowa-audit/demonhunter-devourer.md): 6;
+  - [demonhunter-devourer.md](wowa-audit/demonhunter-devourer.md): 7;
     Void Metamorphosis window. WoWAnalyzer says its own Reap / Cull data
     is bugged.
   - [hunter-survival.md](wowa-audit/hunter-survival.md): 11; Tip of the

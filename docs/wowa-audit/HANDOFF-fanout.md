@@ -58,9 +58,12 @@ or build anything in it.
   list (APL) or checklist, only guide sections. Grades live in guide
   sections; record those too.
 - **Reconcile rules learned:**
-  - A section that grades active time inside a window (Elemental's Call
-    of the Ancestors) double-counts the idle that `checkGcdGaps` already
-    counts. Mark it `wrong`.
+  - A section that grades active time inside a damage window is **not**
+    a double count (corrected 2026-10-16): idle there costs more than a
+    normal GCD (Elemental's Ancestors did 58.4k/s while the player cast,
+    25.7k/s while idle), and `checkGcdGaps` prices only the normal GCD.
+    `covered` where the app has `burstGcdFindings` on that window,
+    `candidate` where it doesn't, `no-damage` for a healing window.
   - Whole-fight cast efficiency: `covered` by `checkCooldownDrift`, with
     a note that WoWAnalyzer counts forced time as ready.
   - A spender-only "efficiency" target is `superseded` by the resource-cap
