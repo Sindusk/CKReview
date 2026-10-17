@@ -314,8 +314,15 @@ and delete them from the header.
     (asked 2026-10-17; questions in
     [HANDOFF-elemental-build.md](wowa-audit/HANDOFF-elemental-build.md)),
     Ascendance spenders (low value). Windwalker is next.
-  - [monk-windwalker.md](wowa-audit/monk-windwalker.md): 12 candidates;
-    Fists of Fury cadence (reduction model).
+  - [monk-windwalker.md](wowa-audit/monk-windwalker.md): Windwalker,
+    phase 3 done 2026-10-17 against nine top parses and the user's
+    Blkphnx (14 pulls). Built and verified: Fists of Fury held (cooldown
+    rebuilt from the log; holds into Zenith / Xuen excused to their
+    break-even) and Zenith Stomp unused
+    (lib/damage/wow/specs/windwalker.ts). Left unbuilt with numbers: Rising
+    Sun Kick and chi waste (`unverifiable`), Whirling Dragon Punch, Combo
+    Strikes, Touch of Death, Fists clips, Zenith charges. Proposed `wrong`
+    for the user's review: the filler order, Conduit targets.
   - [demonhunter-havoc.md](wowa-audit/demonhunter-havoc.md): 11; Eye
     Beam drift with Cycle of Hatred.
   - [mage-arcane.md](wowa-audit/mage-arcane.md): 18; Arcane Barrage

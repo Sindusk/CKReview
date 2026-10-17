@@ -25,13 +25,14 @@
 // - Matched: Invoke Xuen and Zenith 100%, Celestial Conduit 5/5 for both;
 //   potions 2/2. GCDs a minute 39.6 vs 47.9 (WW's GCD is a fixed 1.0s),
 //   counted as gaps and delays.
-// - Not built (open, case study): Fists of Fury 65% vs 84%, 4.4 vs 7.2
-//   casts per unforced minute, unforced interval median 12.9s vs 7.7s.
-//   WoWAnalyzer's own stretches put the cooldown at a 9.3s vs 6.5s median
-//   (haste and resets) and the ready-but-unpressed part at ~3.6s vs ~1.2s
-//   a cast. Its resets aren't in our log, so the ready times can't be
-//   rebuilt; a rate against a same-spec reference would mix in the
-//   shorter cooldown.
+// - Fists of Fury 65% vs 84%, 4.4 vs 7.2 casts per unforced minute:
+//   built in the WoWAnalyzer audit's phase 3 (2026-10-17) as "Fists of
+//   Fury held", with the cooldown rebuilt from what the log shows (haste,
+//   Heart of the Jade Serpent, Blackout Kicks, critical kicks), and
+//   "Zenith Stomp unused" beside it. Both live in windwalker.ts, whose
+//   header has the models and measurements. Most of the gap WoWAnalyzer
+//   counted sits in Vitriolic Stasis (forced): the check finds 394k on
+//   Blkphnx here, none on Styphi.
 // - Not adopted: Touch of Karma 1 cast vs 3 (a defensive); Combo Strikes
 //   mastery breaks 3 vs 0; proc grades similar.
 //
