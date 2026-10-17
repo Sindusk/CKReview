@@ -24,6 +24,7 @@
 import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { TrackedCooldown } from "../types";
 import { avengingWrathValue, divineTollValue } from "./specs/retribution";
+import { pillarOfFrostValue } from "./specs/frostdk";
 
 /**
  * One Vanish's worth to an Assassination Rogue: the damage of a Garrote cast
@@ -106,10 +107,20 @@ export const WOW_TRACKED_COOLDOWNS: Record<string, TrackedCooldown[]> = {
     // damageIds a use was worth 0 and the drift never showed (2026-10-17).
     { name: "Celestial Conduit", actionIds: [443028], damageIds: [443038], cooldownMs: 90_000, charges: 1, firstUseOffsetMs: 13_000 },   // 90.2 / 95.8s, 12.6s
   ],
-  "Frost Death Knight": [   // unverified (2 players)
-    { name: "Pillar of Frost", actionIds: [51271], cooldownMs: 45_000, charges: 1, firstUseOffsetMs: 3_000 },       // 45.0 / 49.8s, 2.4s
-    { name: "Reaper's Mark", actionIds: [439843], cooldownMs: 45_000, charges: 1, firstUseOffsetMs: 3_000 },        // 45.0 / 49.7s, 2.2s
-    { name: "Frostwyrm's Fury", actionIds: [279302], cooldownMs: 91_000, charges: 1, firstUseOffsetMs: 6_000 },     // 91.9 / 98.8s, 5.0s
+  // Frost DK, re-measured in the WoWAnalyzer audit's phase 3 (2026-10-17;
+  // specs/frostdk.ts's header) on 31 player-pulls of 16 players: shortest /
+  // median interval Pillar of Frost 45.0 / 47.3s, Reaper's Mark 45.0 /
+  // 47.7s, Frostwyrm's Fury 90.1 / 96.2s, Breath of Sindragosa 90.2 / 96.3s.
+  // Pillar had been worth 0 a use, so its drift never showed (it deals
+  // nothing itself: valued by its window now), and most of Reaper's Mark's
+  // damage logs as 436304 and 439594. Frostwyrm's Fury (hits 279303) and
+  // Breath of Sindragosa, held to line up with every other Pillar, are
+  // judged in specs/frostdk.ts with that wait excused: tracked here at a
+  // flat 90s they flagged the top players (Winningdk dG8D9y6WxrfmtgXp
+  // 1.19M and 498k).
+  "Frost Death Knight": [
+    { name: "Pillar of Frost", actionIds: [51271], cooldownMs: 45_000, charges: 1, firstUseOffsetMs: 3_000, valuePerUse: pillarOfFrostValue },
+    { name: "Reaper's Mark", actionIds: [439843], damageIds: [439843, 436304, 439594], cooldownMs: 45_000, charges: 1, firstUseOffsetMs: 3_000 },
   ],
   "Unholy Death Knight": [
     { name: "Dark Transformation", actionIds: [1233448], cooldownMs: 45_000, charges: 1, firstUseOffsetMs: 4_000 }, // 45.1 / 46.5s, 3.8s

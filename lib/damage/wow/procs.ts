@@ -53,6 +53,12 @@
 //   Spinning Crane Kick.
 // - Killing Machine 10s: 10 at D (3 reports), max 10.02s of 1754.
 //   Consumers: Obliterate, Frostscythe, Exterminate (each beside removals).
+//   Moved to specs/frostdk.ts (Frost DK phase 3, 2026-10-17): it empowers
+//   an Obliterate (81–118k with it, 22–44k without), so a lost one is
+//   worth the difference, and checkProcs priced it at the hits logged
+//   under Obliterate's cast id (0–63k). The duration above is used there,
+//   with Empower Rune Weapon pressed at two stacks as the other way to lose
+//   one.
 // - Sudden Death 12s: 15 at D (7 reports), max 12.01s of 1118. Arms spends
 //   it with Execute 281000; Fury with 5308 or 280735.
 // - Demonic Core 20s: 7 at D (3 reports), max 20.01s of 681.
@@ -95,8 +101,11 @@
 //   their price (Destruction's Backdraft has its own check).
 // - Precise Shots (260242) 15s: empowers an Arcane Shot; a whole Arcane
 //   Shot would overstate it. For the Marksmanship pass.
+// - Rime (59052): never runs out (0 of 1,347 gains on the 31 Frost DK
+//   player-pulls, max span 14.4s), so no duration. Its loss is the
+//   overwrite: specs/frostdk.ts "Rime overwritten".
 // - No duration in the samples (no clean cluster, or never run out):
-//   Rime, Sudden Doom, Essence Burst, Fingers of Frost, Brain Freeze,
+//   Sudden Doom, Essence Burst, Fingers of Frost, Brain Freeze,
 //   Galactic Guardian, Prismatic Bolt!, Tempest, Art of War. Power of the
 //   Maelstrom loses stacks without a timer (Rakkt LckJC7GMhQvD6rdw: a
 //   stack spent at 1:06.47 with no cast, the other 1.4s later), so no
@@ -110,7 +119,7 @@
 // of Fury). The static (gVDPhzp61Zm29HMw, wWx8B1GPZMLghAyz,
 // qpZx3mWaG7gcDdYB): 18, led by Fwîî's Infernal Bolt (5 in 16 pulls, four
 // of them at 1:55–2:00; Demonbolts and Hand of Gul'dan pressed through
-// it) and Veinglas's Killing Machine (3). The lost value is checkProcs'
+// it) and Veinglas's Killing Machine (3; frostdk.ts's since 2026-10-17). The lost value is checkProcs'
 // upper bound, the consumer's average press (hits matched by name: Execute,
 // Obliterate and Rushing Wind Kick hit under other ids than their casts).
 
@@ -120,7 +129,6 @@ export const WOW_MEASURED_PROCS = new Map<number, MeasuredProc>([
   [116768,  { durationMs: 15_000, consumerIds: [100784] }],                       // Blackout Kick! (Combo Breaker) → Blackout Kick
   [1250554, { durationMs: 15_000, consumerIds: [467307] }],                       // Rushing Wind Kick
   [325202,  { durationMs: 15_000, consumerIds: [101546] }],                       // Dance of Chi-Ji → Spinning Crane Kick
-  [51124,   { durationMs: 10_000, consumerIds: [49020, 207230, 441426] }],        // Killing Machine → Obliterate, Frostscythe, Exterminate
   [52437,   { durationMs: 12_000, consumerIds: [281000, 163201, 5308, 280735] }], // Sudden Death → Execute
   [264173,  { durationMs: 20_000, consumerIds: [264178] }],                       // Demonic Core → Demonbolt
   [433891,  { durationMs: 20_000, consumerIds: [434506] }],                       // Infernal Bolt

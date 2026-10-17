@@ -83,6 +83,22 @@
 // rules fire on nothing. Rend and Deep Wounds uptime measured and not
 // built (Rend ~3k/s; Deep Wounds fires on the top players as much).
 //
+// Frost Death Knight, WoWAnalyzer audit phase 3 (2026-10-17, docs/wowa-audit/
+// deathknight-frost.md; WoWAnalyzer's Frost lags a patch and grades only a
+// guide). No case study; measured on 31 player-pulls (top Winningdk,
+// Vildk, 眼口补偿器, Jiyeon; the static's Veinglas on 16). frostdk.ts holds
+// the models and numbers: "Killing Machine lost" (expiries and Empower Rune
+// Weapon pressed at two stacks, valued as an Obliterate with it less one
+// without; moved there from procs.ts), "Rime overwritten", "Frostscythe on
+// one enemy", and Breath of Sindragosa / Frostwyrm's Fury held with the
+// wait for the next Pillar excused up to its break-even. The tracked
+// Pillar of Frost now has a value per use (its window) and Reaper's Mark
+// counts its hits under all three ids. Frost gets no Runic Power cap
+// check: the shared one read 0.08–2.49M on the top players as on the weak,
+// from casts that generate nothing, and rebuilt properly the overflow is
+// 10–27% of generation on every player, a GCD-bound floor (frostdk.ts).
+// The Pillar of Frost window stays: top 0–31k, weaker up to 95k a pull.
+//
 // Havoc, checked against WoWAnalyzer on qpZx3mWaG7gcDdYB pull 3
 // (Mythnarra; reference 3Vz6Qt2RyTPXwpJn's Hawkerton, 100th percentile,
 // page saved; checked 2026-10-13):
@@ -113,6 +129,7 @@ import { WINDWALKER_CHECKS } from "./windwalker";
 import { HAVOC_CHECKS } from "./havoc";
 import { ARMS_CHECKS } from "./arms";
 import { RETRIBUTION_CHECKS } from "./retribution";
+import { FROST_DK_CHECKS } from "./frostdk";
 
 const window = (statusId: number, name: string): JobCheck => (ctx) => burstGcdFindings(ctx, {
   statusId, name,
@@ -203,7 +220,10 @@ const holyPowerWaste: JobCheck = (ctx) => spenderSnapshotWaste(ctx, { type: 9, n
 
 export const MELEE_CHECKS: Record<string, JobCheck[]> = Object.fromEntries(
   Object.entries(MELEE_WINDOWS).map(([spec, [id, name]]) => [spec, [
-    window(id, name), primaryResourceCapFindings, ...(spec === "Arms Warrior" ? [...ARMS_SPENT, ...ARMS_CHECKS] : []),
+    window(id, name),
+    // Frost DK: no Runic Power cap check (see the header's Frost Death Knight notes).
+    ...(spec === "Frost Death Knight" ? FROST_DK_CHECKS : [primaryResourceCapFindings]),
+    ...(spec === "Arms Warrior" ? [...ARMS_SPENT, ...ARMS_CHECKS] : []),
     ...(spec === "Havoc Demon Hunter" ? [eternalHunt, ...HAVOC_CHECKS] : []),
     ...(spec === "Retribution Paladin" ? [holyPowerWaste, ...RETRIBUTION_CHECKS] : []),
     ...(spec === "Windwalker Monk" ? WINDWALKER_CHECKS : []),
