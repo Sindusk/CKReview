@@ -17,6 +17,8 @@ import {
 } from "./rate-limit";
 import { attachEncounterPhases, type EncounterPhase, type ReportEncounterPhases } from "./pull-phases";
 import { WOW_ENEMY_DEBUFF_FILTER, WOW_PLAYER_BUFF_FILTER } from "./damage/wow/buff-stream";
+import { WOW_REPLAY_EVENT_FILTER, buildWowReplayData, type WowReplayActorInfo, type WowReplayRawEvent } from "./replay/wow-replay";
+import type { ReplayData } from "./replay/ffxiv-replay";
 
 const GQL_ENDPOINT = "https://www.warcraftlogs.com/api/v2/user";
 
@@ -803,4 +805,99 @@ export async function fetchInterruptsTable(
     logLabel ? `${logLabel} interrupts` : false
   );
   return data.reportData.report.table;
+}
+
+// ─── Query: Replay positions (lib/replay/wow-replay.ts) ─────────────────────
+//
+// Every position-carrying event of ONE fight, for the top-down replay.
+// Mirrors lib/ffl-client.ts's fetchFFReplayData: separate from
+// fetchFightData because it is many times larger (a resource block on
+// every cast, hit and heal) and only runs when the user clicks Load replay.
+// Actors come with it so a sample-data load doesn't need report-level
+// masterData in memory.
+
+const WOW_REPLAY_EVENTS_QUERY = `
+  query($code: String!, $fightIDs: [Int]!, $startTime: Float!, $endTime: Float!, $filter: String!, $withActors: Boolean!) {
+    rateLimitData { limitPerHour pointsSpentThisHour pointsResetIn }
+    reportData {
+      report(code: $code) {
+        masterData(translate: true) @include(if: $withActors) {
+          actors { id name type subType petOwner gameID icon }
+          abilities { gameID name }
+        }
+        events(
+          fightIDs: $fightIDs, startTime: $startTime, endTime: $endTime,
+          dataType: All, includeResources: true, filterExpression: $filter, limit: 10000
+        ) { data nextPageTimestamp }
+      }
+    }
+  }
+`;
+
+type WowReplayEventsQueryResult = {
+  reportData: { report: {
+    masterData?: { actors: WowReplayActorInfo[]; abilities: { gameID: number; name: string }[] };
+    events: { data: WowReplayRawEvent[]; nextPageTimestamp: number | null };
+  } };
+};
+
+type WowReplayFightQueryResult = {
+  reportData: { report: { fights: { id: number; startTime: number; endTime: number; maps: { id: number }[] | null }[] } };
+};
+
+/** Just the fields buildWowReplayData reads: a long pull is a few hundred thousand events. */
+function slimWowReplayEvent(e: WowReplayRawEvent): WowReplayRawEvent {
+  const r = e.classResources?.[0];
+  return {
+    timestamp: e.timestamp, type: e.type,
+    sourceID: e.sourceID, sourceInstance: e.sourceInstance, targetID: e.targetID, targetInstance: e.targetInstance,
+    abilityGameID: e.abilityGameID, resourceActor: e.resourceActor,
+    x: e.x, y: e.y, facing: e.facing, hitPoints: e.hitPoints, maxHitPoints: e.maxHitPoints,
+    classResources: r ? [{ amount: r.amount, max: r.max, type: r.type }] : undefined,
+  };
+}
+
+export async function fetchWowReplayData(
+  reportCode: string,
+  fightId:    number,
+  onProgress?: (fraction: number) => void,
+): Promise<ReplayData> {
+  const fightsData = await gql<WowReplayFightQueryResult>(
+    `query($code: String!, $fightIDs: [Int]!) { reportData { report(code: $code) { fights(fightIDs: $fightIDs) { id startTime endTime maps { id } } } } }`,
+    { code: reportCode, fightIDs: [fightId] }, false,
+  );
+  const fight = fightsData.reportData.report.fights[0];
+  if (!fight) throw new Error(`Fight ${fightId} not found in report ${reportCode}`);
+
+  // WCL gives a map only an id and a name: no art or calibration.
+  let mapName: string | undefined;
+  const mapId = fight.maps?.[0]?.id;
+  if (mapId !== undefined) {
+    const mapData = await gql<{ gameData: { map: { id: number; name: string } | null } }>(
+      `query($id: Int!) { gameData { map(id: $id) { id name } } }`, { id: mapId }, false,
+    );
+    mapName = mapData.gameData.map?.name;
+  }
+
+  let actors: WowReplayActorInfo[] = [];
+  let abilityNames = new Map<number, string>();
+  const events: WowReplayRawEvent[] = [];
+  let cursor = fight.startTime;
+  for (let page = 0; page < MAX_PAGES_PER_FIGHT; page++) {
+    const data = await gql<WowReplayEventsQueryResult>(WOW_REPLAY_EVENTS_QUERY, {
+      code: reportCode, fightIDs: [fightId], startTime: cursor, endTime: fight.endTime,
+      filter: WOW_REPLAY_EVENT_FILTER, withActors: page === 0,
+    }, false);
+    const report = data.reportData.report;
+    if (report.masterData) {
+      actors = report.masterData.actors;
+      abilityNames = new Map(report.masterData.abilities.map((a) => [a.gameID, a.name]));
+    }
+    for (const e of report.events.data) events.push(slimWowReplayEvent(e));
+    const next = report.events.nextPageTimestamp;
+    if (!next || next >= fight.endTime) break;
+    cursor = next;
+    onProgress?.((next - fight.startTime) / Math.max(1, fight.endTime - fight.startTime));
+  }
+  return buildWowReplayData(reportCode, fightId, fight.startTime, fight.endTime, events, actors, abilityNames, mapName);
 }

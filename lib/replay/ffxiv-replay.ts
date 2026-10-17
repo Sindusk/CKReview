@@ -80,9 +80,12 @@ export type ReplayActor = {
   // that never take damage are mostly invisible helper actors that place
   // AoEs; the panel hides them by default.
   targetable?: boolean;
-  gameId?:  number;     // enemies: BNpcBase id (FFLActor.gameID)
-  icon?:    string;     // FFLogs' icon name: "Boss", "NPC", ...
+  gameId?:  number;     // enemies: BNpcBase id (FFLActor.gameID); WoW: creature id
+  icon?:    string;     // the log's icon name: "Boss", "NPC", WoW "custom-icon-<ability icon>.jpg"
   hitbox?:  number;     // radius in centi-yalms (action-shapes.ts's enrichReplayData)
+  // WoW players: the primary resource's power type (0 mana, 1 rage, 3
+  // energy, 6 runic power, 17 fury, ...), which colours the roster's second bar.
+  powerType?: number;
   samples:  ReplaySample[];
 };
 
@@ -122,6 +125,10 @@ export type ReplayHit = [number, number, string, string, number | null, number |
 
 export type ReplayData = {
   version:     1;
+  // Absent = FFXIV. WoW tracks come from lib/replay/wow-replay.ts, already
+  // turned into this file's units and axes (+x east, +y south, centi-yards).
+  game?:       "wow";
+  mapName?:    string;  // WoW: the zone's name (WCL has no map art or calibration)
   reportCode:  string;
   fightId:     number;
   durationMs:  number;
@@ -330,13 +337,15 @@ export function poseAt(actor: ReplayActor, t: number): ReplayPose | undefined {
   return { x: a[1] + (b[1] - a[1]) * f, y: a[2] + (b[2] - a[2]) * f, facing: a[3], hp: a[4], mp: a[5] ?? -1, stale: false };
 }
 
-/** Each player's HP and MP fraction at `t` (-1 where unknown), by name. */
-export function playerVitalsAt(data: ReplayData, t: number): Map<string, { hp: number; mp: number }> {
-  const out = new Map<string, { hp: number; mp: number }>();
+export type PlayerVitals = { hp: number; mp: number; powerType?: number };
+
+/** Each player's HP and MP (WoW: primary resource) fraction at `t` (-1 where unknown), by name. */
+export function playerVitalsAt(data: ReplayData, t: number): Map<string, PlayerVitals> {
+  const out = new Map<string, PlayerVitals>();
   for (const a of data.actors) {
     if (a.kind !== "player") continue;
     const p = poseAt(a, t);
-    if (p) out.set(a.name, { hp: p.hp, mp: p.mp });
+    if (p) out.set(a.name, { hp: p.hp, mp: p.mp, powerType: a.powerType });
   }
   return out;
 }
@@ -375,8 +384,10 @@ export function fitReplayView(data: ReplayData): { cx: number; cy: number; half:
   // FFXIV arenas sit on round coordinates (Dancing Mad: 100,100 yalms).
   // Snap the median to the nearest 10 yalms so the rings stay concentric
   // with the arena rather than with where the party happened to stand.
-  const cx = Math.round(median(xs) / 1000) * 1000;
-  const cy = Math.round(median(ys) / 1000) * 1000;
+  // WoW arenas don't: there the rings centre on the party's median.
+  const snap = (v: number) => (data.game === "wow" ? Math.round(v) : Math.round(v / 1000) * 1000);
+  const cx = snap(median(xs));
+  const cy = snap(median(ys));
   const d = xs.map((x, i) => Math.hypot(x - cx, ys[i] - cy)).sort((p, q) => p - q);
   const r99 = d[Math.min(d.length - 1, Math.floor(d.length * 0.99))];
   return { cx, cy, half: Math.max(1000, r99 + 300) };

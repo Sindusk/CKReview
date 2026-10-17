@@ -5,6 +5,8 @@ import type { CSSProperties, ReactNode } from "react";
 import { isLandedHeal, type PlayerInfo, type PlayerEvent } from "@/types/PlayerInfo";
 import { getClassColor, getRoleColor, formatSpecClass, getPlayerSpecIcon } from "@/lib/player-display";
 import { detectFFRoles } from "@/lib/mechanics/ffxiv/roles";
+import type { PlayerVitals } from "@/lib/replay/ffxiv-replay";
+import { WOW_POWER_COLORS } from "@/lib/replay/wow-replay";
 import { PanelHeader } from "./ui/Panel";
 import { AbilityHoverTip } from "./ui/AbilityHoverTip";
 
@@ -119,7 +121,7 @@ function PlayerButton({
   // RosterPanel's ffRows.
   large?:   boolean;
   // HP / MP fractions at the replay's moment; bars only when given.
-  vitals?:  { hp: number; mp: number };
+  vitals?:  PlayerVitals;
 }) {
   const color = getClassColor(player.game, player.className);
   const roleColor = getRoleColor(player.role);
@@ -179,9 +181,9 @@ function PlayerButton({
           so the tiles keep the height the fixed roster panel is sized for. */}
       {vitals && (
         <span style={{ position: "absolute", left: 6, right: 6, bottom: 2, display: "flex", flexDirection: "column", gap: 1 }}
-          title={`HP ${vitals.hp >= 0 ? Math.round(vitals.hp * 100) + "%" : "?"} · MP ${vitals.mp >= 0 ? Math.round(vitals.mp * 100) + "%" : "?"}`}>
+          title={`HP ${vitals.hp >= 0 ? Math.round(vitals.hp * 100) + "%" : "?"} · ${vitals.powerType !== undefined ? "Power" : "MP"} ${vitals.mp >= 0 ? Math.round(vitals.mp * 100) + "%" : "?"}`}>
           <VitalBar value={vitals.hp} color={vitals.hp > 0.5 ? "#5fd36a" : vitals.hp > 0.25 ? "#e3c44a" : "#e5534b"} height={3} />
-          <VitalBar value={vitals.mp} color="#d36ad8" height={2} />
+          <VitalBar value={vitals.mp} color={vitals.powerType !== undefined ? WOW_POWER_COLORS[vitals.powerType] ?? "#d36ad8" : "#d36ad8"} height={2} />
         </span>
       )}
     </button>
@@ -498,8 +500,9 @@ type RosterPanelProps = {
   playbackTimeMs: number;
   // HP and MP fractions per player name at the replay's current moment
   // (lib/replay/ffxiv-replay.ts playerVitalsAt). Only set once the pull's
-  // replay is loaded; the tiles show no bars without it.
-  vitals?: Map<string, { hp: number; mp: number }>;
+  // replay is loaded; the tiles show no bars without it. WoW: the second
+  // bar is the primary resource, coloured by its power type.
+  vitals?: Map<string, PlayerVitals>;
 };
 
 export default function RosterPanel({ players, playbackTimeMs, vitals }: RosterPanelProps) {

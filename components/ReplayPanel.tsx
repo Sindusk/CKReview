@@ -13,6 +13,10 @@
 // lib/replay/ffxiv-replay.ts; page.tsx loads them only when the user
 // clicks Load replay (one FFLogs fetch per pull, never on navigation).
 //
+// WoW pulls (lib/replay/wow-replay.ts, same ReplayData) draw on a blank
+// arena: WCL has no map art, and no AoE shapes, tethers or hitboxes yet.
+// Players get spec icons, enemies WCL's own icon; units read as yards.
+//
 // Two clocks:
 // - `syncedTimeMs` set: the VOD drives the replay (playback time from
 //   useTimelineController). The page's own timeline bar stays under the
@@ -30,7 +34,9 @@ import { aoesAt, buildAoeShapes, buildTethers, type AoeShape } from "@/lib/repla
 import { sampleNear } from "@/lib/replay/ffxiv-replay";
 import { facingToCompassBearing } from "@/lib/mechanics/geometry";
 import { detectFFRoles } from "@/lib/mechanics/ffxiv/roles";
-import { getClassColor, getPlayerClassIcon, getRoleColor } from "@/lib/player-display";
+import { getClassColor, getPlayerClassIcon, getPlayerSpecIcon, getRoleColor } from "@/lib/player-display";
+import { wowEnemyIconUrl } from "@/lib/replay/wow-replay";
+import type { PlayerInfo } from "@/types/PlayerInfo";
 
 function formatMs(ms: number): string {
   const s = Math.max(0, Math.floor(ms / 1000));
@@ -146,9 +152,10 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
   }, [t, onTimeChange]);
 
   // ── Per-pull precomputation ──────────────────────────────────────────────
+  const wow = data?.game === "wow";
   const view = useMemo(() => (data ? fitReplayView(data) : null), [data]);
-  const aoes = useMemo(() => (data ? buildAoeShapes(data) : []), [data]);
-  const tethers = useMemo(() => (data ? buildTethers(data) : []), [data]);
+  const aoes = useMemo(() => (data && data.game !== "wow" ? buildAoeShapes(data) : []), [data]);
+  const tethers = useMemo(() => (data && data.game !== "wow" ? buildTethers(data) : []), [data]);
   const players = useMemo(() => new Map((pull?.players ?? []).map((p) => [p.name, p])), [pull]);
   const slotByName = useMemo(() => {
     const m = new Map<string, string>();
@@ -158,7 +165,6 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
   const actorByKey = useMemo(() => new Map((data?.actors ?? []).map((a) => [a.key, a])), [data]);
 
   if (!pull) return <Empty>Select a pull to see its replay.</Empty>;
-  if (pull.game !== "ffxiv") return <Empty>Replay is FFXIV-only for now.</Empty>;
   if (!data) {
     return (
       <Empty>
@@ -177,6 +183,9 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
   const toY = (y: number) => ((y - (cy - half)) / (2 * half)) * S;
   const scale = S / (2 * half);              // svg units per centi-yalm
 
+  const game = wow ? "wow" : "ffxiv";
+  const unit = wow ? "yards" : "yalms";
+  const playerColor = (a: ReplayActor) => getClassColor(game, players.get(a.name)?.className ?? a.job ?? "");
   const mapUrl = data.map ? ffMapImageUrl(data.map.filename) : null;
   const mapBox = data.map ? mapImageBounds(data.map) : null;
 
@@ -260,7 +269,15 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
                 onMouseEnter={() => setHoverKey(a.key)} onMouseLeave={() => setHoverKey((k) => (k === a.key ? null : k))}
                 onClick={(e) => { e.stopPropagation(); setSelectedKey(a.key); }}>
                 {a.targetable && <TargetRing x={x} y={y} r={ring} deg={deg} />}
-                <image href={FFLOGS_ICON(a.icon === "Boss" ? "Boss" : "NPC")} x={x - size / 2} y={y - size / 2} width={size} height={size} />
+                {wow && a.icon?.startsWith("custom-icon-") ? (
+                  // WCL's enemy icons are square ability icons: framed like the roster's.
+                  <g filter="url(#replay-shadow)">
+                    <image href={wowEnemyIconUrl(a.icon)} x={x - size / 2} y={y - size / 2} width={size} height={size} />
+                    <rect x={x - size / 2} y={y - size / 2} width={size} height={size} rx={3} fill="none" stroke="#ff8a80" strokeWidth={2} />
+                  </g>
+                ) : (
+                  <image href={FFLOGS_ICON(a.icon === "Boss" ? "Boss" : "NPC")} x={x - size / 2} y={y - size / 2} width={size} height={size} />
+                )}
               </g>
             );
           })}
@@ -280,7 +297,8 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
                 onClick={(e) => { e.stopPropagation(); setSelectedKey(a.key); }}>
                 {selectedKey === a.key && <TargetRing x={x} y={y} r={Math.max(r + 10, (a.hitbox ?? 50) * scale)} deg={deg} />}
                 {!dead && <FacingWedge x={x} y={y} r={r} b={(deg * Math.PI) / 180} color={roleColor} size={8 * iconScale} />}
-                <image href={getPlayerClassIcon("ffxiv", info?.className ?? a.job ?? "")} x={x - r} y={y - r} width={size} height={size}
+                <image href={wow && info ? getPlayerSpecIcon("wow", info.specId, info.className) : getPlayerClassIcon(game, info?.className ?? a.job ?? "")}
+                  x={x - r} y={y - r} width={size} height={size}
                   filter={dead ? "url(#replay-gray)" : "url(#replay-shadow)"} />
                 {dead && (
                   <path d={`M${x - r * 0.6} ${y - r * 0.6} L${x + r * 0.6} ${y + r * 0.6} M${x + r * 0.6} ${y - r * 0.6} L${x - r * 0.6} ${y + r * 0.6}`} stroke="#ff4d4d" strokeWidth={4} strokeLinecap="round" />
@@ -291,13 +309,13 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
 
           {hovered && (
             <Tooltip x={toX(hovered.p.x)} y={toY(hovered.p.y)} S={S}
-              lines={tooltipLines(hovered.a, hovered.p, slotByName, players)}
-              color={hovered.a.kind === "player" ? getClassColor("ffxiv", players.get(hovered.a.name)?.className ?? hovered.a.job ?? "") : "#ff8a80"} />
+              lines={tooltipLines(hovered.a, hovered.p, slotByName, players, wow)}
+              color={hovered.a.kind === "player" ? playerColor(hovered.a) : "#ff8a80"} />
           )}
           {selected && !hovered && (
             <Tooltip x={toX(selected.p.x)} y={toY(selected.p.y)} S={S}
-              lines={tooltipLines(selected.a, selected.p, slotByName, players)}
-              color={selected.a.kind === "player" ? getClassColor("ffxiv", players.get(selected.a.name)?.className ?? selected.a.job ?? "") : "#ff8a80"} />
+              lines={tooltipLines(selected.a, selected.p, slotByName, players, wow)}
+              color={selected.a.kind === "player" ? playerColor(selected.a) : "#ff8a80"} />
           )}
         </svg>
 
@@ -349,10 +367,10 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
         <button className="ck-btn" onClick={() => setLayersOpen((v) => !v)} aria-expanded={layersOpen}>Layers ▾</button>
         {layersOpen && (
           <div className="ck-menu" style={{ position: "absolute", right: 10, bottom: "100%", marginBottom: 4, zIndex: 5, padding: "6px 10px", display: "flex", flexDirection: "column", gap: 4 }}>
-            <Toggle label="AoEs" title="Enemy AoEs at their game-data size" checked={showAoes} onChange={setShowAoes} />
+            {!wow && <Toggle label="AoEs" title="Enemy AoEs at their game-data size" checked={showAoes} onChange={setShowAoes} />}
             {mapUrl && <Toggle label="Map" title={`In-game map: ${data.map!.name}`} checked={showMap} onChange={setShowMap} />}
-            <Toggle label="5y rings" title="Rings every 5 yalms from the arena centre" checked={showRings} onChange={setShowRings} />
-            <Toggle label="5y grid" title="A 5-yalm grid with 0,0 at the arena centre" checked={showGrid} onChange={setShowGrid} />
+            <Toggle label="5y rings" title={`Rings every 5 ${unit} from the ${wow ? "party's median position" : "arena centre"}`} checked={showRings} onChange={setShowRings} />
+            <Toggle label="5y grid" title={`A 5-${unit.slice(0, -1)} grid with 0,0 at the ${wow ? "party's median position" : "arena centre"}`} checked={showGrid} onChange={setShowGrid} />
             <Toggle label="Helper actors" title="Untargetable actors that place AoEs" checked={showHelpers} onChange={setShowHelpers} />
             <label style={{ color: "var(--ck-text-2)", fontSize: 13, whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6 }} title="Size of the player icons">
               Icons
@@ -366,13 +384,20 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
   );
 }
 
-/** Name, slot, job, coordinates (yalms) and HP for the hover card. */
-function tooltipLines(a: ReplayActor, p: ReplayPose, slots: Map<string, string>, players: Map<string, { className: string }>): string[] {
-  const where = `X ${(p.x / 100).toFixed(1)}  Y ${(p.y / 100).toFixed(1)}`;
+/**
+ * Name, slot (FFXIV) or role and spec (WoW), coordinates and HP for the
+ * hover card. Coordinates are the log's own: yalms, or WCL's yards with +y
+ * north (the track stores y negated, see wow-replay.ts).
+ */
+function tooltipLines(a: ReplayActor, p: ReplayPose, slots: Map<string, string>, players: Map<string, PlayerInfo>, wow: boolean): string[] {
+  const where = `X ${(p.x / 100).toFixed(1)}  Y ${((wow ? -p.y : p.y) / 100).toFixed(1)}`;
   const hp = p.hp >= 0 ? `HP ${Math.round(p.hp * 100)}%` : "";
   if (a.kind === "player") {
-    const slot = slots.get(a.name);
-    return [a.name, [slot, players.get(a.name)?.className ?? a.job].filter(Boolean).join(" · "), [where, hp].filter(Boolean).join("   ")];
+    const info = players.get(a.name);
+    const who = wow
+      ? [info?.role, [info?.specName, info?.className ?? a.job].filter(Boolean).join(" ")]
+      : [slots.get(a.name), info?.className ?? a.job];
+    return [a.name, who.filter(Boolean).join(" · "), [where, hp].filter(Boolean).join("   ")];
   }
   return [a.name, [where, a.hitbox ? `hitbox ${(a.hitbox / 100).toFixed(1)}y` : ""].filter(Boolean).join("   "), hp].filter(Boolean);
 }

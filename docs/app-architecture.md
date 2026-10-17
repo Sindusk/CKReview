@@ -257,7 +257,7 @@ file's header comment. Mechanic detection has its own guide:
 
 ## Top-down replay (`components/ReplayPanel.tsx`, `lib/replay/ffxiv-replay.ts`)
 
-- **FFXIV only,** behind a Video | Replay switch centred in the video
+- **FFXIV and WoW,** behind a Video | Replay switch centred in the video
   panel's header (the header reads "Replay" while it shows; the replay is
   VideoPanel's `overlay`, drawn over the still-running player),
   styled after strategy-guide diagrams: the in-game map, job icons in
@@ -265,7 +265,27 @@ file's header comment. Mechanic detection has its own guide:
   icons/Boss.png`, the CDN `lib/ability-icons.ts` already uses) with its
   hitbox ring and front notch, enemy AoEs as blue shapes with white rims,
   and a cast bar. Hover shows name, strategy slot (`detectFFRoles`),
-  coordinates and HP; click pins a hitbox ring. No WoW yet.
+  coordinates and HP; click pins a hitbox ring. WoW is below.
+- **WoW** (`lib/replay/wow-replay.ts`, `fetchWowReplayData` in
+  `lib/wcl-client.ts`) builds the same `ReplayData`, so the panel, clock
+  and roster bars are shared. Differences, all from what WCL provides:
+  - one actor per event (`resourceActor`), 7 to 12 samples a second per
+    player; enemy tracks are thinned to 5 a second
+  - WCL's +y is north; the builder negates it so the panel stays
+    north-up, and the hover card shows WCL's own numbers in yards. The
+    axes were checked against Blizzard's UiMap bounds, the facing formula
+    (same as FFLogs') against player casts and boss auto-attacks; the
+    header has the numbers. A VOD check is still open.
+  - blank arena: WCL has no map art or calibration, so the rings and grid
+    centre on the party's median position
+  - spec icons for players and WCL's own icon for enemies (ability icons
+    from `assets.rpglogs.com/img/warcraft/abilities/`; there is no WoW
+    Boss.png)
+  - the roster's second bar is the primary resource, coloured by its
+    power type
+  - cast bars run from begincast to the matching cast (WCL gives no cast
+    duration). No AoE shapes, tethers or hitboxes yet: see
+    [wow-replay-plan.md](wow-replay-plan.md).
 - **AoE shapes come from game data, not per-boss models**
   (`lib/replay/action-shapes.ts`): XIVAPI's Action sheet gives CastType,
   EffectRange and XAxisModifier for every ability, so every enemy AoE is

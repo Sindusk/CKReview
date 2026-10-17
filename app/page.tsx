@@ -53,7 +53,7 @@ import type { Pull } from "../types/Pull";
 import { createCallWipeError, CALL_WIPE_RULE_ID, createManualError, type ManualErrorInput } from "@/types/PullError";
 import type { SavedSession, SavedSessionVod } from "@/types/Session";
 import useTimelineController from "@/hooks/useTimelineController";
-import { fetchReport, fetchFightData, buildFightLogLabels, getWCLRateLimitStatus, isWCLQuotaExhausted, beginWCLImportMeasure, endWCLImportMeasure, type WCLReport } from "@/lib/wcl-client";
+import { fetchReport, fetchFightData, fetchWowReplayData, buildFightLogLabels, getWCLRateLimitStatus, isWCLQuotaExhausted, beginWCLImportMeasure, endWCLImportMeasure, type WCLReport } from "@/lib/wcl-client";
 import {
   transformReportToPulls,
   transformFFReportToPulls,
@@ -407,7 +407,7 @@ export default function Home() {
 
   // Top-down replay (components/ReplayPanel.tsx). Tracks are fetched only
   // on Load replay, cached per pull for the session. A sample-data load
-  // reads a replay saved by scripts/fetch-ff-replay.js first.
+  // reads a replay saved by scripts/fetch-{ff,wow}-replay.js first.
   const [centerView, setCenterView] = useState<"video" | "replay">("video");
   const [replays, setReplays] = useState<Record<string, ReplayData>>({});
   // The replay's own clock (it can run without a VOD); the roster's HP and
@@ -422,16 +422,19 @@ export default function Home() {
     setReplayLoad({ key, progress: null, error: null });
     try {
       let data: ReplayData | null = null;
+      const wow = activePull.logSource === "wcl";
       if (loadedFromSampleData) {
-        const res = await fetch(`/api/sample-report/ffl/${activePull.reportCode}/replay/${activePull.fightId}`);
+        const res = await fetch(`/api/sample-report/${activePull.logSource}/${activePull.reportCode}/replay/${activePull.fightId}`);
         if (res.ok) data = await res.json();
       }
       if (!data) {
-        data = await fetchFFReplayData(activePull.reportCode, activePull.fightId,
-          (progress) => setReplayLoad({ key, progress, error: null }));
+        const onProgress = (progress: number) => setReplayLoad({ key, progress, error: null });
+        data = wow
+          ? await fetchWowReplayData(activePull.reportCode, activePull.fightId, onProgress)
+          : await fetchFFReplayData(activePull.reportCode, activePull.fightId, onProgress);
       }
-      // AoE shapes and hitboxes (XIVAPI); saved sample tracks may have them.
-      if (!data.actionGeometry) data = await enrichReplayData(data);
+      // AoE shapes and hitboxes (XIVAPI, FFXIV only); saved sample tracks may have them.
+      if (!wow && !data.actionGeometry) data = await enrichReplayData(data);
       setReplays((prev) => ({ ...prev, [key]: data! }));
       setReplayLoad(null);
     } catch (err) {
