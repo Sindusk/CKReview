@@ -171,8 +171,12 @@ The FFXIV plan's premise and firing checks, plus:
   in the fan-out ledgers are proposals until their spec's phase 3 has
   this review.
 - **Firing needs a weaker log.** The top parses rarely make the mistake.
-  Look in lower-percentile logs of the spec on WCL rankings, fetching only
-  the one fight (`fetch-wow-report.js <code> --fight <id>`).
+  Look in lower-percentile logs of the spec on WCL rankings
+  (`scripts/wow-rankings.js`), probe a candidate cheaply
+  (`scripts/wow-probe.js`), and fetch only the one fight
+  (`fetch-wow-report.js <code> --fight <id>`). The same rankings give the
+  top parses for the premise check (`--from-pct 99`). See
+  docs/dev-tooling.md.
 - Spell IDs a built check needs come from that log, commented with the
   source log, per the licence rules.
 

@@ -98,6 +98,19 @@ nothing written:
 - Then fetch only the pull you'll use, into its own report folder:
   `node scripts/fetch-ff-report.js <code> --fight <id>`.
 
+**The same for WoW** (wowa-audit phase 3), read-only, nothing written:
+- `node scripts/wow-rankings.js "<encounter>" <spec> [--from-pct n] [--pages n] [--difficulty 5]`
+  lists a spec's ranked kills from the given percentile up (code, fight
+  id, ilvl, player). The encounter is a name or part of one, or its WCL
+  id; the spec is "Windwalker" or, where two classes share the name,
+  "Frost Mage". Mythic by default. About 80 points the first time on an
+  encounter, then a few a page.
+- `node scripts/wow-probe.js <code> <fightId> <name|spec> [--buff text] [--casts text] [--gaps text] [--hits text]`
+  is ff-probe.js for WoW (about 6 points), plus `--gaps`: the intervals
+  between a cast's uses, with the longest five and their times (a held
+  cooldown).
+- Then `node scripts/fetch-wow-report.js <code> --fight <id>`.
+
 ## Analyzing a report (`scripts/analyze-report.js`)
 
 The standard investigation recipes for verifying a model or debugging a

@@ -68,8 +68,8 @@ the same method as Elemental:
 2. Value each candidate as damage lost, overloads, procs, pets and DoTs
    included.
 3. Ask what it costs on the timeline.
-4. Fetch top parses of the spec (ask the user for logs; fetch only the
-   fight).
+4. Find top and weak parses with `scripts/wow-rankings.js`, probe them
+   with `scripts/wow-probe.js`, and fetch only the fight.
 5. Build in order of value, committing after each check.
 
 ## Lessons from the Elemental build (apply them to Windwalker)
