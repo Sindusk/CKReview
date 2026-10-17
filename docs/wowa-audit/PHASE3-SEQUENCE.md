@@ -66,7 +66,7 @@ damage rows are measured.
 | 22 | Brewmaster | [monk-brewmaster.md](monk-brewmaster.md) | done 2026-10-17: Breath of Fire reset lost (brewmaster.ts); Exploding Keg valued with its later hits and `burstHold`; Invoke Niuzao tracked at 120s; verified by the main session |
 | 23 | Shadow | [priest-shadow.md](priest-shadow.md) | done 2026-10-17: no new spec check; Halo and Voidform valued per use with hold windows (shadow.ts); clipped Mind Flay / Mind Flay: Insanity are channel time (game.ts); verified by the main session |
 | 24 | Subtlety | [rogue-subtlety.md](rogue-subtlety.md) | done 2026-10-17: big finisher without Ancient Arts (netted against the cost of a builder first, after the main session's follow-up), Secret Technique just before Shadow Dance, Shadow Dance window, Energy cap skips clone casts, Shadow Blades / Goremaw's Bite valued, Shadow Dance tracked (subtlety.ts); Shuriken Toss press (game.ts); verified by the main session |
-| 25 | Enhancement | [shaman-enhancement.md](shaman-enhancement.md) | |
+| 25 | Enhancement | [shaman-enhancement.md](shaman-enhancement.md) | done 2026-10-17: Ascendance and Voltaic Blaze tracked, Maelstrom Weapon capped, idle in Ascendance (enhancement.ts); Stormsurge expiry (procs.ts); Thorim's spenders and Storm Unleashed Crash Lightnings are twins of their press (game.ts); verified by the main session |
 | 26 | Destruction | [warlock-destruction.md](warlock-destruction.md) | |
 | 27 | Fury | [warrior-fury.md](warrior-fury.md) | |
 | 28 | Blood | [deathknight-blood.md](deathknight-blood.md) | |
@@ -403,6 +403,12 @@ measured for it.
   outside stealth, generator after Vanish. Top players are all Trickster
   (best Deathstalker sample 95.9th). Evidence in
   [rogue-subtlety.md](rogue-subtlety.md).
+- Enhancement (2026-10-17): proposed `wrong`: Tempest overwritten,
+  Tempest below 10 stacks, Chain Lightning on one target, Flame Shock
+  early refresh. Two floors on top players kept (weak players read 2–5×
+  higher): Maelstrom Weapon capped 118–291k, Voltaic Blaze drift up to
+  147k (Jshaman amZr6A4Pn8fWqcN9). Evidence in
+  [shaman-enhancement.md](shaman-enhancement.md).
 
 - Elemental (2026-10-17): `CallOfTheAncestors/other-checks`,
   `statistics` (and whether "Stormkeeper before Ascendance" should be
