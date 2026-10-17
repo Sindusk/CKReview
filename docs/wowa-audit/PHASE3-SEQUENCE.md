@@ -47,7 +47,7 @@ damage rows are measured.
 | 5 | Affliction | [warlock-affliction.md](warlock-affliction.md) | done 2026-10-17: Haunt dropped (affliction.ts), Nightfall expiry (procs.ts), Drain Soul added as a GCD channel (game.ts); verified by the main session |
 | 6 | Arms | [warrior-arms.md](warrior-arms.md) | done 2026-10-17: Bladestorm outside Colossus Smash; Colossus Smash drift revalued by its armor window (arms.ts); verified by the main session |
 | 7 | Preservation | [evoker-preservation.md](evoker-preservation.md) | done 2026-10-17 (with 9 and 10, one healer pass): no candidates; Soulcoiler Ritual Vessel locks the GCD (game.ts); Echo no longer judged by its own heal (healer.ts, main session) |
-| 8 | Mistweaver | [monk-mistweaver.md](monk-mistweaver.md) | |
+| 8 | Mistweaver | [monk-mistweaver.md](monk-mistweaver.md) | done 2026-10-17: Celestial Conduit drift (tracked-cooldowns.ts); Mistweaver presses, channels and short GCDs (game.ts, haste.ts); status locks up to 10s (timeline.ts, WoW-only in effect: FFXIV has no lockStatus); healer filler never Touch of Death; verified by the main session, which also gave Windwalker's Conduit its hit id |
 | 9 | Restoration Druid | [druid-restoration.md](druid-restoration.md) | done 2026-10-17 (healer pass): no candidates; Convoke the Spirits locks the GCD (game.ts) |
 | 10 | Restoration Shaman | [shaman-restoration.md](shaman-restoration.md) | done 2026-10-17 (healer pass): no candidates |
 | 11 | Beast Mastery | [hunter-beastmastery.md](hunter-beastmastery.md) | |
@@ -218,6 +218,10 @@ measured for it.
   which reads unmitigated hits (×1.0). Arms' Colossus Smash read 10–24%;
   after armor it's ×1.3–1.6. Compare hits after mitigation for any
   armor or damage-taken debuff.
+- **A tracked cooldown whose hits log under another id needs
+  `damageIds`**, or a use is worth 0 and its drift never shows
+  (Celestial Conduit: cast 443028, hits 443038). Check each tracked
+  cooldown of the spec has a non-zero value per use.
 - **Buffs that lock the player go in `LOCK_STATUSES`** (game.ts): a
   channel whose spells log as their own casts (Convoke the Spirits) or an
   on-use item that roots the player (Soulcoiler Ritual Vessel) reads as
@@ -270,6 +274,10 @@ measured for it.
   pull, though druids pre-place them for Abundance and Swiftmend. Should
   Rejuvenation be judged by its own healing? (Preservation's Echo, the
   same kind of false loss, was excluded: its value is the copied heal.)
+- Mistweaver (2026-10-17): Touch of Death left unbuilt (worth 287–450k a
+  press; 3 of 5 top players press it, Abuki 1 of 7 kills). Should a
+  healer be judged on a damage execute? Evidence in
+  [monk-mistweaver.md](monk-mistweaver.md).
 
 - Elemental (2026-10-17): `CallOfTheAncestors/other-checks`,
   `statistics` (and whether "Stormkeeper before Ascendance" should be
