@@ -42,7 +42,7 @@ damage rows are measured.
 | 1 | Windwalker | [monk-windwalker.md](monk-windwalker.md) | done 2026-10-17: Fists of Fury held, Zenith Stomp unused (windwalker.ts); verified by the main session |
 | 2 | Havoc | [demonhunter-havoc.md](demonhunter-havoc.md) | done 2026-10-17: Eye Beam held, Death Sweep reset unused (havoc.ts); Reaver's Glaive added as a GCD press (game.ts); verified by the main session |
 | 3 | Arcane | [mage-arcane.md](mage-arcane.md) | done 2026-10-17: Touch of the Magi window (arcane.ts; `burstGcdFindings` takes a `windows()` override); verified by the main session |
-| 3a | Engine: WoW proc expiries | 18 ledgers cite `checkProcs` | `checkProcs` never fires on WoW (no buff durations in the log; confirmed on LckJC7GMhQvD6rdw: 0 of 36,543 buff events carry one). Fixed before Demonology, then the done ledgers' proc rows rechecked |
+| 3a | Engine: WoW proc expiries | 18 ledgers cite `checkProcs` | `checkProcs` never fired on WoW (no buff durations in the log; confirmed on LckJC7GMhQvD6rdw: 0 of 36,543 buff events carry one). Done 2026-10-17: measured durations for ten procs (lib/damage/wow/procs.ts, `DamageGame.measuredProcs`); Windwalker, Elemental and Arcane proc rows rechecked |
 | 4 | Demonology | [warlock-demonology.md](warlock-demonology.md) | |
 | 5 | Affliction | [warlock-affliction.md](warlock-affliction.md) | |
 | 6 | Arms | [warrior-arms.md](warrior-arms.md) | |
@@ -191,6 +191,18 @@ measured for it.
   WoW pull.** Arcane found `checkProcs` had never produced a WoW expiry.
   Run the app's findings (`validate.js damage-analysis-wow <folder>
   --all-findings`) and look for the label.
+- **`checkProcs` fires on WoW only for the procs in
+  lib/damage/wow/procs.ts** (2026-10-17): Combo Breaker, Rushing Wind
+  Kick, Dance of Chi-Ji, Killing Machine, Sudden Death, Demonic Core,
+  Infernal Bolt, Lock and Load, Divine Purpose, Storm Unleashed. A row
+  marked "covered by `checkProcs` (expiries)" for any other proc is
+  uncovered until you measure its duration (gain → removal spans at one
+  whole second with a consumer nowhere near, from a log where it runs
+  out: `_scratch/proc-durs.js`, `proc-expiries.js`) and add it there with
+  its consumers. Read its findings as "<proc> expired unused", valued at
+  a whole consumer press (an upper bound; for a proc that only empowers a
+  press, say so or value it yourself). Check the top players first: a
+  proc that runs out on most of them isn't a loss (Lava Surge did).
 - **Value a hit by its own events, not a total divided by presses**
   (Arcane Orb: 294k claimed, 47–63k a pressed Orb).
 - **Class resources not in the fetch** (Arcane Charges) make a rule
