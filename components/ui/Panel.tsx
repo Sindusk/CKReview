@@ -43,8 +43,11 @@ export function PanelHeader({
   subtitle,
   children,
   shrinkTitle,
+  center,
 }: {
   title:        ReactNode;
+  /** Centred in the header between the title and the controls (the video panel's Video | Replay switch). */
+  center?:      ReactNode;
   /** Rendered after the title in muted sans, e.g. "(26)". */
   count?:       ReactNode;
   /** Small sans line under the title. */
@@ -59,6 +62,18 @@ export function PanelHeader({
       {count !== undefined && <span className="ck-panel-title__count">{count}</span>}
     </h2>
   );
+
+  if (center) {
+    // Three columns so the centre piece stays centred however long the
+    // title or the controls are.
+    return (
+      <div className="ck-panel-header" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto minmax(0, 1fr)" }}>
+        <div style={{ minWidth: 0, display: "flex" }}>{heading}</div>
+        <div>{center}</div>
+        <div className="ck-panel-meta">{children}</div>
+      </div>
+    );
+  }
 
   return (
     <div className="ck-panel-header">

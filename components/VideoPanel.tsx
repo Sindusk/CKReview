@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { isLocalVod, type Vod } from "@/types/Vod";
 import type { SeekRequest } from "@/hooks/useTimelineController";
 import { PanelHeader } from "./ui/Panel";
@@ -101,6 +101,12 @@ type VideoPanelProps = {
   playRequest?: number;
   // Called when the player starts or stops playing (polled with the time).
   onPlayingChange?: (playing: boolean) => void;
+  // The Video | Replay switch, centred in the header; while the replay
+  // shows, the header title reads `titleOverride` and `overlay` covers
+  // the player.
+  headerCenter?: ReactNode;
+  titleOverride?: string;
+  overlay?: ReactNode;
 
   // continuous playback reporting
   onCurrentTimeChange?: (time: number) => void;
@@ -165,6 +171,9 @@ export default function VideoPanel({
   pauseRequest = 0,
   playRequest = 0,
   onPlayingChange,
+  headerCenter,
+  titleOverride,
+  overlay,
   onCurrentTimeChange,
   onUnsync,
   onResync,
@@ -500,7 +509,7 @@ export default function VideoPanel({
         flexDirection: "column",
       }}
     >
-      <PanelHeader title={vod ? vod.player : "No VOD Selected"} shrinkTitle>
+      <PanelHeader title={titleOverride ?? (vod ? vod.player : "No VOD Selected")} shrinkTitle center={headerCenter}>
         {vod?.isCalibrated && syncPointLabels && syncPointLabels.length > 1 && (
           <span
             title="This VOD was re-synced after a skip. Each pull uses the latest sync at or before it."
@@ -567,6 +576,14 @@ export default function VideoPanel({
 
           {coverageGap && (
             <CoverageGapCard gap={coverageGap} onSelectVod={onSelectVod} />
+          )}
+
+          {/* The replay draws over the player, which keeps running under it
+              so its clock still drives the timeline. */}
+          {overlay && (
+            <div style={{ position: "absolute", inset: 0, zIndex: 3, background: "var(--ck-bg-panel)" }}>
+              {overlay}
+            </div>
           )}
 
           {/* Swap note: drawn over the player briefly, and click-through so

@@ -1589,16 +1589,20 @@ export default function Home() {
         <ResizeHandle orientation="col" size={GAP} onReset={layout.resetColumns} onDrag={(d) => dragColumn(0, d)} />
 
         <Panel diamondBottom>
-          <div style={{ display: "flex", gap: 4, padding: "6px 8px 4px", flexShrink: 0 }}>
-            <button className={`ck-tab ck-tab--sm${centerView === "video" ? " ck-tab--active" : ""}`} onClick={() => setCenterView("video")}>Video</button>
-            <button className={`ck-tab ck-tab--sm${centerView === "replay" ? " ck-tab--active" : ""}`} onClick={() => setCenterView("replay")}
-              title="Top-down positions from the log, following the VOD when one is synced">Replay</button>
-          </div>
-          {/* The video stays mounted under the replay so its clock keeps
-              driving the timeline (and the replay) while hidden. */}
-          <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
-            {centerView === "replay" && (
-              <div style={{ position: "absolute", inset: 0, zIndex: 1, background: "var(--ck-bg-panel)" }}>
+          {/* The Video | Replay switch sits centred in the video header. The
+              replay draws over the player, which stays mounted so its clock
+              keeps driving the timeline (and the replay). */}
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <VideoPanel
+              headerCenter={
+                <div style={{ display: "flex", gap: 4 }}>
+                  <button className={`ck-tab ck-tab--sm${centerView === "video" ? " ck-tab--active" : ""}`} onClick={() => setCenterView("video")}>Video</button>
+                  <button className={`ck-tab ck-tab--sm${centerView === "replay" ? " ck-tab--active" : ""}`} onClick={() => setCenterView("replay")}
+                    title="Top-down positions from the log, following the VOD when one is synced">Replay</button>
+                </div>
+              }
+              titleOverride={centerView === "replay" ? "Replay" : undefined}
+              overlay={centerView === "replay" ? (
                 <ReplayPanel
                   pull={activePull}
                   data={replayKey ? replays[replayKey] ?? null : null}
@@ -1611,10 +1615,7 @@ export default function Home() {
                   onVodPlay={() => setPlayToken((n) => n + 1)}
                   onVodPause={() => setPauseToken((n) => n + 1)}
                 />
-              </div>
-            )}
-          <div style={{ position: "absolute", inset: 0, visibility: centerView === "replay" ? "hidden" : "visible" }}>
-            <VideoPanel
+              ) : undefined}
               vod={selectedVod}
               seekRequest={timeline.seekRequest}
               pauseRequest={pauseToken}
@@ -1630,7 +1631,6 @@ export default function Home() {
               onSelectVod={setSelectedVodId}
               onDurationKnown={handleVodDuration}
             />
-          </div>
           </div>
           {/* The same timeline under both views, so flipping to the replay
               leaves it exactly where it was. */}

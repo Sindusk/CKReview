@@ -257,7 +257,9 @@ file's header comment. Mechanic detection has its own guide:
 
 ## Top-down replay (`components/ReplayPanel.tsx`, `lib/replay/ffxiv-replay.ts`)
 
-- **FFXIV only,** behind a Video | Replay toggle in the center panel,
+- **FFXIV only,** behind a Video | Replay switch centred in the video
+  panel's header (the header reads "Replay" while it shows; the replay is
+  VideoPanel's `overlay`, drawn over the still-running player),
   styled after strategy-guide diagrams: the in-game map, job icons in
   role-coloured rings, FFLogs' Boss icon (`assets.rpglogs.com/img/ff/
   icons/Boss.png`, the CDN `lib/ability-icons.ts` already uses) with its
