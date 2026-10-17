@@ -12,7 +12,8 @@
 //   inference): Arcane Surge, Combustion, Incarnation, Bestial Wrath,
 //   Trueshot, Voidform, Ascendance, Malevolence, Demonic Tyrant,
 //   Dragonrage. Frost Mage, Augmentation and Devourer have none here
-//   (Icy Veins wasn't cast in the samples; Ebon Might is up 97% of the time).
+//   (Icy Veins wasn't cast in the samples; Augmentation has no burst
+//   window of its own: augmentation.ts).
 // - Main resource at the cap (primaryResourceCapFindings): Maelstrom,
 //   Insanity, Astral Power, Focus (Beast Mastery only since 2026-10-17;
 //   see Marksmanship below). Mages log only mana; Soul Shards and
@@ -21,9 +22,20 @@
 //   Pain, Vampiric Touch; Agony, Unstable Affliction, Wither / Corruption;
 //   Moonfire, Sunfire; Flame Shock; Destruction's Wither.
 // - Cancelled casts are the engine's own check (begin-casts with no cast).
-// - Augmentation's support (Ebon Might, Prescience) isn't in the rDPS split
-//   yet: WCL credits it its own way and our streams don't carry it.
+// - Augmentation's support (Ebon Might, Prescience, Breath of Eons and
+//   the rest) is in the Evoker's own damage: Warcraft Logs writes it as
+//   their hits (about three quarters of their damage), so it isn't in the
+//   rDPS split as buffs given.
 // Tracked cooldowns are in tracked-cooldowns.ts.
+//
+// Augmentation has no case study. The WoWAnalyzer audit's phase 3
+// (2026-10-17; docs/wowa-audit/evoker-augmentation.md, 31 player-pulls)
+// found its support counted as GCD damage, pricing every gap ~3× high
+// (game.ts AUG_SUPPORT_HITS), and built augmentation.ts: Ebon Might down
+// while ready, Prescience charges capped, Breath of Eons and Time Skip
+// held (a recovery model for Time Skip and Temporal Burst replaces the
+// fixed 74s / 135s tracked cooldowns, which were worth 0 a use), and
+// Breath of Eons that never exploded.
 //
 // Balance, checked against WoWAnalyzer on qpZx3mWaG7gcDdYB pull 3
 // (Sylmigron, 6th percentile; reference dBxtMyAc1zYHXQnK fight 18's Kadss,
@@ -182,6 +194,7 @@ import { finding, type PlayerCheckContext } from "../../checks";
 import { inWindows, mergeWindows, overlapMs, statusWindows } from "../../timeline";
 import { AFFLICTION_CHECKS } from "./affliction";
 import { ARCANE_CHECKS } from "./arcane";
+import { AUGMENTATION_CHECKS } from "./augmentation";
 import { BALANCE_CHECKS } from "./balance";
 import { BEAST_MASTERY_CHECKS } from "./beastmastery";
 import { DEMONOLOGY_CHECKS } from "./demonology";
@@ -381,6 +394,6 @@ export const RANGED_CHECKS: Record<string, JobCheck[]> = {
   "Demonology Warlock":   [window(265187, "Demonic Tyrant"), ...DEMONOLOGY_CHECKS],
   "Destruction Warlock":  [window(442726, "Malevolence"), dot("Wither", 445474), backdraft, havocTarget],
   "Devastation Evoker":   [window(375087, "Dragonrage"), strafingRun],
-  "Augmentation Evoker":  [],
+  "Augmentation Evoker":  [...AUGMENTATION_CHECKS],
   "Devourer Demon Hunter": [],
 };

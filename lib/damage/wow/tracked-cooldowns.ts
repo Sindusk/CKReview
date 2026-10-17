@@ -204,7 +204,8 @@ export const WOW_TRACKED_COOLDOWNS: Record<string, TrackedCooldown[]> = {
   // (20.8 / 104.7s), Elemental's Stormkeeper (38.2 / 48.9s: Ancestors cut
   // it, so wow/specs/ranged.ts judges it with spentCooldownDrift), Fire's Meteor
   // (53.9 / 68.7s), Augmentation's Tip the Scales (47.8 / 64.0s): spread too
-  // far. Demonology's Call Dreadstalkers and Implosion are judged in
+  // far (Tip the Scales is 90s, sped by Time Skip and Temporal Burst:
+  // wow/specs/augmentation.ts's recovery model; not judged). Demonology's Call Dreadstalkers and Implosion are judged in
   // wow/specs/demonology.ts (held time with a Tyrant line-up excused).
   "Arcane Mage": [
     { name: "Touch of the Magi", actionIds: [321507], cooldownMs: 45_000, charges: 1, firstUseOffsetMs: 4_000 }, // 45.0 / 46.8s, 3.2s
@@ -278,10 +279,13 @@ export const WOW_TRACKED_COOLDOWNS: Record<string, TrackedCooldown[]> = {
     { name: "Dragonrage", actionIds: [375087], cooldownMs: 120_000, charges: 1, firstUseOffsetMs: 3_000 },     // 120.0 / 122.5s, 2.8s
     { name: "Tip the Scales", actionIds: [370553], cooldownMs: 120_000, charges: 1, firstUseOffsetMs: 4_000 }, // 120.7 / 123.4s, 3.0s
   ],
-  "Augmentation Evoker": [   // unverified (3 players)
-    { name: "Breath of Eons", actionIds: [403631], cooldownMs: 74_000, charges: 1, firstUseOffsetMs: 2_000 },  // 74.6 / 91.3s, 1.6s
-    { name: "Time Skip", actionIds: [404977], cooldownMs: 135_000, charges: 1, firstUseOffsetMs: 8_000 },     // 135.8 / 155.8s, 7.2s
-  ],
+  // Augmentation's Breath of Eons and Time Skip moved to
+  // wow/specs/augmentation.ts (the WoWAnalyzer audit's phase 3,
+  // 2026-10-17). A fixed recast can't judge them: Time Skip speeds every
+  // cooldown elevenfold for its 3s and Tip the Scales' Temporal Burst up to
+  // 30%, so Breath's 120s came back in 71–122s and its 74s here invented
+  // holds. Neither was worth anything a use here either (Breath's damage
+  // logs under 409632, Time Skip has none), so neither ever reported.
   "Devourer Demon Hunter": [   // unverified (2 players)
     { name: "The Hunt", actionIds: [1246167], cooldownMs: 91_000, charges: 1, firstUseOffsetMs: 11_000 },  // 91.6 / 105.6s, 10.7s
   ],

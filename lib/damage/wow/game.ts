@@ -57,8 +57,8 @@
 // - Augmentation's support damage (Ebon Might, Prescience) isn't in the
 //   rDPS split as buffs given: Warcraft Logs writes it as the Evoker's own
 //   hits under the buffs' ids (about three quarters of an Augmentation's
-//   damage), so it
-//   counts as their damage done already (AUG_SUPPORT_HITS below).
+//   damage), so it counts as their damage done already
+//   (AUG_SUPPORT_HITS below; checks in specs/augmentation.ts).
 
 import type { PlayerEvent, PlayerInfo } from "@/types/PlayerInfo";
 import { SPEC_DATA } from "../../spec-data";
