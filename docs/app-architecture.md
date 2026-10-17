@@ -257,9 +257,14 @@ file's header comment. Mechanic detection has its own guide:
 
 ## Top-down replay (`components/ReplayPanel.tsx`, `lib/replay/ffxiv-replay.ts`)
 
-- **Stage 1 prototype, FFXIV only:** player and boss dots on a blank arena
-  (yalm rings), behind a Video | Replay toggle in the center panel. No map
-  art, AoE shapes or WoW yet.
+- **FFXIV only,** behind a Video | Replay toggle in the center panel:
+  player and boss dots on the fight's in-game map, yalm rings, a cast bar
+  for enemy casts in progress, and a flash at the caster when a cast
+  resolves. No AoE shapes or WoW yet.
+- **Map art** comes from FFLogs' `fights.maps` + `gameData.map` (filename,
+  sizeFactor, offsets). The browser loads the texture from XIVAPI v2
+  (`v2.xivapi.com/api/asset/map/<id>/<index>`), not from FFLogs' CDN. The
+  pixel formula is in `ffxiv-replay.ts`.
 - **Its own fetch, on click only.** The pull's normal streams keep too few
   positions, so Load replay pages `dataType: All, includeResources: true`
   for that one fight (`fetchFFReplayData`). Tracks are cached per pull for

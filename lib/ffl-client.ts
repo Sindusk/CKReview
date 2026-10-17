@@ -20,7 +20,7 @@ import {
 } from "./rate-limit";
 import { attachEncounterPhases, type EncounterPhase, type ReportEncounterPhases } from "./pull-phases";
 import { PLAYER_BUFF_FILTER } from "./damage/ffxiv/buff-stream";
-import { REPLAY_EVENT_FILTER, buildReplayData, type ReplayData, type ReplayRawEvent } from "./replay/ffxiv-replay";
+import { REPLAY_EVENT_FILTER, buildReplayData, type ReplayData, type ReplayMap, type ReplayRawEvent } from "./replay/ffxiv-replay";
 
 const GQL_ENDPOINT = "https://www.fflogs.com/api/v2/user";
 
@@ -969,6 +969,7 @@ const REPLAY_EVENTS_QUERY = `
       report(code: $code) {
         masterData(translate: true) @include(if: $withActors) {
           actors { id name type subType petOwner }
+          abilities { gameID name }
         }
         events(
           fightIDs: $fightIDs, startTime: $startTime, endTime: $endTime,
@@ -981,9 +982,13 @@ const REPLAY_EVENTS_QUERY = `
 
 type ReplayEventsQueryResult = {
   reportData: { report: {
-    masterData?: { actors: FFLActor[] };
+    masterData?: { actors: FFLActor[]; abilities: { gameID: number; name: string }[] };
     events: { data: ReplayRawEvent[]; nextPageTimestamp: number | null };
   } };
+};
+
+type ReplayFightQueryResult = {
+  reportData: { report: { fights: { id: number; startTime: number; endTime: number; maps: { id: number }[] | null }[] } };
 };
 
 export async function fetchFFReplayData(
@@ -991,14 +996,27 @@ export async function fetchFFReplayData(
   fightId:    number,
   onProgress?: (fraction: number) => void,
 ): Promise<ReplayData> {
-  const fightsData = await gql<{ reportData: { report: { fights: { id: number; startTime: number; endTime: number }[] } } }>(
-    `query($code: String!, $fightIDs: [Int]!) { reportData { report(code: $code) { fights(fightIDs: $fightIDs) { id startTime endTime } } } }`,
+  const fightsData = await gql<ReplayFightQueryResult>(
+    `query($code: String!, $fightIDs: [Int]!) { reportData { report(code: $code) { fights(fightIDs: $fightIDs) { id startTime endTime maps { id } } } } }`,
     { code: reportCode, fightIDs: [fightId] }, false,
   );
   const fight = fightsData.reportData.report.fights[0];
   if (!fight) throw new Error(`Fight ${fightId} not found in report ${reportCode}`);
 
+  // A fight can list several maps (dungeons); FFLogs doesn't say when each
+  // applies, so the replay uses the first.
+  let map: ReplayMap | null = null;
+  const mapId = fight.maps?.[0]?.id;
+  if (mapId !== undefined) {
+    const mapData = await gql<{ gameData: { map: ReplayMap | null } }>(
+      `query($id: Int!) { gameData { map(id: $id) { id name filename sizeFactor offsetX offsetY } } }`,
+      { id: mapId }, false,
+    );
+    map = mapData.gameData.map;
+  }
+
   let actors: FFLActor[] = [];
+  let abilityNames = new Map<number, string>();
   const events: ReplayRawEvent[] = [];
   let cursor = fight.startTime;
   for (let page = 0; page < MAX_PAGES_PER_FIGHT; page++) {
@@ -1007,14 +1025,17 @@ export async function fetchFFReplayData(
       filter: REPLAY_EVENT_FILTER, withActors: page === 0,
     }, false);
     const report = data.reportData.report;
-    if (report.masterData) actors = report.masterData.actors;
+    if (report.masterData) {
+      actors = report.masterData.actors;
+      abilityNames = new Map(report.masterData.abilities.map((a) => [a.gameID, a.name]));
+    }
     events.push(...report.events.data);
     const next = report.events.nextPageTimestamp;
     if (!next || next >= fight.endTime) break;
     cursor = next;
     onProgress?.((next - fight.startTime) / Math.max(1, fight.endTime - fight.startTime));
   }
-  return buildReplayData(reportCode, fightId, fight.startTime, fight.endTime, events, actors);
+  return buildReplayData(reportCode, fightId, fight.startTime, fight.endTime, events, actors, abilityNames, map);
 }
 
 // ─── Query: Interrupts table ─────────────────────────────────────────────────

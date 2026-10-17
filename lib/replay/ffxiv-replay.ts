@@ -1,9 +1,9 @@
 // lib/replay/ffxiv-replay.ts
 //
-// Top-down replay of one FFXIV pull (stage 1: player and enemy dots on a
-// blank arena, no map art, no AoE shapes). Pure code: turns raw FFLogs
-// events into per-actor position tracks and answers "where was this actor
-// at time T". lib/ffl-client.ts fetches the events (fetchFFReplayEvents),
+// Top-down replay of one FFXIV pull: player and enemy dots on the fight's
+// in-game map, with enemy casts (no AoE shapes yet). Pure code: turns raw
+// FFLogs events into per-actor position tracks and a cast list, and
+// answers "where was this actor at time T". lib/ffl-client.ts fetches the events (fetchFFReplayEvents),
 // components/ReplayPanel.tsx draws them.
 //
 // ── WHERE THE POSITIONS COME FROM ─────────────────────────────────────────
@@ -48,6 +48,8 @@ export type ReplayRawEvent = {
   targetInstance?: number;
   hitType?:        number;
   amount?:         number;
+  abilityGameID?:  number;
+  duration?:       number;   // begincast: cast time in ms
   sourceResources?: ReplayRawResources;
   targetResources?: ReplayRawResources;
 };
@@ -73,17 +75,60 @@ export type ReplayActor = {
   samples:  ReplaySample[];
 };
 
+/**
+ * The fight's in-game map (FFLogs `fights.maps` + `gameData.map`). The map
+ * texture is 2048px square; a log coordinate lands on pixel
+ * `(x/100 + offsetX) * sizeFactor/100 + 1024` (same for y). Checked on
+ * Dancing Mad (Sigmascape V4.0, sizeFactor 400): the arena disc spans
+ * 160px, a 20-yalm radius, matching the edge the module headers use.
+ */
+export type ReplayMap = {
+  id:         number;
+  name:       string;
+  filename:   string;   // e.g. "m-z3oy-z3oy.00.jpg"
+  sizeFactor: number;
+  offsetX:    number;
+  offsetY:    number;
+};
+
+/**
+ * One enemy cast: [ms from pull start, actor key, ability name, cast time
+ * in ms (0 = instant)]. A begincast and its matching cast are both kept;
+ * the panel draws a bar for the first and a flash for the second.
+ */
+export type ReplayCast = [number, string, string, number];
+
 export type ReplayData = {
   version:     1;
   reportCode:  string;
   fightId:     number;
   durationMs:  number;
   actors:      ReplayActor[];
+  // Absent on tracks saved before the map and casts were added.
+  map?:        ReplayMap | null;
+  enemyCasts?: ReplayCast[];
 };
+
+/** XIVAPI v2 URL of a map texture from its FFLogs filename, or null if the name doesn't parse. */
+export function ffMapImageUrl(filename: string): string | null {
+  const m = filename.match(/^m-[^-]+-([a-z0-9]+)\.(\d+)\.jpg$/i);
+  return m ? `https://v2.xivapi.com/api/asset/map/${m[1]}/${m[2]}` : null;
+}
+
+/** The map texture's square in log units (centi-yalms): left/top edge and side length. */
+export function mapImageBounds(map: ReplayMap): { x: number; y: number; size: number } {
+  const pxPerYalm = map.sizeFactor / 100;
+  return {
+    x:    (-1024 / pxPerYalm - map.offsetX) * 100,
+    y:    (-1024 / pxPerYalm - map.offsetY) * 100,
+    size: (2048 / pxPerYalm) * 100,
+  };
+}
 
 /**
  * Builds per-actor tracks from raw events. `fightStartMs` / `fightEndMs`
- * are report-relative ms (FFLFight.startTime / endTime).
+ * are report-relative ms (FFLFight.startTime / endTime). `abilityNames`
+ * maps abilityGameID to a name for the enemy cast list.
  */
 export function buildReplayData(
   reportCode: string,
@@ -92,8 +137,11 @@ export function buildReplayData(
   fightEndMs:   number,
   events:     ReplayRawEvent[],
   actors:     FFLActor[],
+  abilityNames: Map<number, string> = new Map(),
+  map:        ReplayMap | null = null,
 ): ReplayData {
   const actorById = new Map(actors.map((a) => [a.id, a]));
+  const enemyCasts: ReplayCast[] = [];
   const byKey = new Map<string, ReplayActor>();
   const damagedEnemies = new Set<string>();
 
@@ -127,6 +175,23 @@ export function buildReplayData(
     if (e.timestamp < fightStartMs || e.timestamp > fightEndMs) continue;
     add(e.sourceID, e.sourceInstance, e.sourceResources, e.timestamp);
     add(e.targetID, e.targetInstance, e.targetResources, e.timestamp);
+    if ((e.type === "begincast" || e.type === "cast") && e.sourceID !== undefined && e.abilityGameID !== undefined) {
+      const source = actorById.get(e.sourceID);
+      if (source && source.type !== "Player" && source.type !== "Pet") {
+        const name = abilityNames.get(e.abilityGameID);
+        // Unnamed ids are auto-attacks and server-side helpers ("attack",
+        // numeric names): noise in a cast list.
+        if (name && !/^(attack|\d+)$/i.test(name)) {
+          const t = e.timestamp - fightStartMs;
+          const dur = e.type === "begincast" ? e.duration ?? 0 : 0;
+          const last = enemyCasts[enemyCasts.length - 1];
+          // Several helpers often cast the same ability together: keep one.
+          if (!(last && last[2] === name && last[3] === dur && t - last[0] < 200)) {
+            enemyCasts.push([t, keyFor(e.sourceID, e.sourceInstance, false), name, dur]);
+          }
+        }
+      }
+    }
     if (e.type === "damage" && e.sourceID !== undefined && e.targetID !== undefined) {
       const source = actorById.get(e.sourceID);
       const target = actorById.get(e.targetID);
@@ -154,7 +219,7 @@ export function buildReplayData(
   }
   out.sort((a, b) => (a.kind === b.kind ? a.actorId - b.actorId : a.kind === "player" ? -1 : 1));
 
-  return { version: 1, reportCode, fightId, durationMs: fightEndMs - fightStartMs, actors: out };
+  return { version: 1, reportCode, fightId, durationMs: fightEndMs - fightStartMs, actors: out, map, enemyCasts };
 }
 
 export type ReplayPose = {

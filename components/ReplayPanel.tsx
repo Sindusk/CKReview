@@ -2,8 +2,10 @@
 
 // components/ReplayPanel.tsx
 //
-// Top-down replay of the selected pull, stage 1: player and enemy dots on a
-// blank arena (yalm rings, compass), no map art or AoE shapes. Tracks come
+// Top-down replay of the selected pull: player and enemy dots on the
+// fight's in-game map (XIVAPI's copy of the texture) with yalm rings, a
+// cast bar for enemy casts in progress, and a flash at the caster when a
+// cast resolves. No AoE shapes yet. Tracks come
 // from lib/replay/ffxiv-replay.ts; page.tsx loads them only when the user
 // clicks Load replay (one FFLogs fetch per pull, never on navigation).
 //
@@ -17,7 +19,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Pull } from "@/types/Pull";
-import { fitReplayView, poseAt, type ReplayData } from "@/lib/replay/ffxiv-replay";
+import { ffMapImageUrl, fitReplayView, mapImageBounds, poseAt, type ReplayData } from "@/lib/replay/ffxiv-replay";
 import { facingToCompassBearing } from "@/lib/mechanics/geometry";
 import { getClassColor, getRoleColor } from "@/lib/player-display";
 
@@ -41,6 +43,11 @@ const SPEEDS = [0.5, 1, 2, 4];
 // How far past the last VOD report the panel extrapolates. A little over
 // the report interval: if reports stop (paused, buffering), the dots stop.
 const MAX_EXTRAPOLATE_MS = 350;
+// How long a resolved enemy cast flashes at its caster.
+const RESOLVE_FLASH_MS = 1500;
+// Labels sit on a light map or a dark background: a dark halo keeps them
+// readable on both.
+const LABEL = { stroke: "rgba(0,0,0,0.75)", strokeWidth: 4, paintOrder: "stroke" } as const;
 
 export default function ReplayPanel({ pull, data, loading, progress, error, onLoad, syncedTimeMs, onSeekMs }: Props) {
   const synced = syncedTimeMs !== undefined;
@@ -52,6 +59,7 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
   const [speed, setSpeed] = useState(1);
   const [frameMs, setFrameMs] = useState(0);
   const [showHelpers, setShowHelpers] = useState(false);
+  const [showMap, setShowMap] = useState(true);
 
   const extRef = useRef<{ value: number; at: number; moving: boolean }>({ value: 0, at: 0, moving: false });
   useEffect(() => {
@@ -118,6 +126,23 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
   const enemies = data.actors.filter((a) => a.kind === "enemy" && (a.targetable || showHelpers));
   const players = data.actors.filter((a) => a.kind === "player");
 
+  const mapUrl = data.map ? ffMapImageUrl(data.map.filename) : null;
+  const mapBox = data.map ? mapImageBounds(data.map) : null;
+
+  // Casts in progress (bars) and casts that just resolved (a flash at the
+  // caster: often an invisible helper standing where the AoE lands).
+  const casts = data.enemyCasts ?? [];
+  const actorByKey = new Map(data.actors.map((a) => [a.key, a]));
+  let ci = casts.length;
+  { let lo = 0, hi = casts.length; while (lo < hi) { const m = (lo + hi) >> 1; if (casts[m][0] <= t) lo = m + 1; else hi = m; } ci = lo; }
+  const casting: { name: string; actor: string; f: number; key: string }[] = [];
+  const resolved: { name: string; key: string; age: number; id: string }[] = [];
+  for (let i = ci - 1; i >= 0 && t - casts[i][0] < 12000; i--) {
+    const [ct, key, name, dur] = casts[i];
+    if (dur > 0 && t < ct + dur) casting.push({ name, actor: actorByKey.get(key)?.name ?? "", f: (t - ct) / dur, key: `${i}` });
+    else if (dur === 0 && t - ct < RESOLVE_FLASH_MS) resolved.push({ name, key, age: t - ct, id: `${i}` });
+  }
+
   const seek = (ms: number) => {
     const clamped = Math.max(0, Math.min(durationMs, ms));
     if (synced) onSeekMs?.(clamped);
@@ -126,16 +151,32 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
-      <div style={{ flex: 1, minHeight: 0, display: "flex", justifyContent: "center", alignItems: "center", padding: 8 }}>
+      <div style={{ flex: 1, minHeight: 0, display: "flex", justifyContent: "center", alignItems: "center", padding: 8, position: "relative" }}>
         <svg viewBox={`0 0 ${S} ${S}`} style={{ width: "100%", height: "100%" }}>
           <defs>
             <clipPath id="replay-clip"><rect x={0} y={0} width={S} height={S} rx={8} /></clipPath>
           </defs>
           <rect x={0} y={0} width={S} height={S} rx={8} fill="var(--ck-bg-deep)" />
           <g clipPath="url(#replay-clip)">
+            {showMap && mapUrl && mapBox && (
+              <image href={mapUrl} x={toX(mapBox.x)} y={toY(mapBox.y)} width={mapBox.size * scale} height={mapBox.size * scale}
+                preserveAspectRatio="none" opacity={0.85} />
+            )}
             {rings.map((r) => (
-              <circle key={r} cx={toX(cx)} cy={toY(cy)} r={r * scale} fill="none" stroke="var(--ck-line)" strokeWidth={1} />
+              <circle key={r} cx={toX(cx)} cy={toY(cy)} r={r * scale} fill="none" stroke={showMap && mapUrl ? "rgba(0,0,0,0.18)" : "var(--ck-line)"} strokeWidth={1} />
             ))}
+            {resolved.map((c) => {
+              const a = actorByKey.get(c.key);
+              const p = a && poseAt(a, t);
+              if (!p) return null;
+              const k = c.age / RESOLVE_FLASH_MS;
+              return (
+                <g key={c.id} opacity={1 - k}>
+                  <circle cx={toX(p.x)} cy={toY(p.y)} r={10 + 30 * k} fill="none" stroke="#ffb347" strokeWidth={3} />
+                  <text x={toX(p.x)} y={toY(p.y) - 16 - 30 * k} textAnchor="middle" fill="#ffd28a" fontSize={16} {...LABEL}>{c.name}</text>
+                </g>
+              );
+            })}
           </g>
           <line x1={toX(cx)} y1={0} x2={toX(cx)} y2={S} stroke="var(--ck-line)" strokeWidth={1} strokeDasharray="4 6" />
           <line x1={0} y1={toY(cy)} x2={S} y2={toY(cy)} stroke="var(--ck-line)" strokeWidth={1} strokeDasharray="4 6" />
@@ -156,7 +197,7 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
                 {a.targetable && (
                   <>
                     <line x1={x} y1={y} x2={x + Math.sin(b) * (r + 12)} y2={y - Math.cos(b) * (r + 12)} stroke="#e06c6c" strokeWidth={3} />
-                    <text x={x} y={y - r - 8} textAnchor="middle" fill="#e8a0a0" fontSize={20}>{a.name}</text>
+                    <text x={x} y={y - r - 8} textAnchor="middle" fill="#e8a0a0" fontSize={20} {...LABEL}>{a.name}</text>
                   </>
                 )}
               </g>
@@ -175,11 +216,25 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
                 {dead && (
                   <path d={`M${x - 9} ${y - 9} L${x + 9} ${y + 9} M${x + 9} ${y - 9} L${x - 9} ${y + 9}`} stroke="#111" strokeWidth={4} />
                 )}
-                <text x={x} y={y + 36} textAnchor="middle" fill="var(--ck-text)" fontSize={20}>{a.name.split(" ")[0]}</text>
+                <text x={x} y={y + 36} textAnchor="middle" fill="#f2efe6" fontSize={20} {...LABEL}>{a.name.split(" ")[0]}</text>
               </g>
             );
           })}
         </svg>
+        {casting.length > 0 && (
+          <div style={{ position: "absolute", top: 14, left: 14, display: "flex", flexDirection: "column", gap: 4, pointerEvents: "none", maxWidth: "45%" }}>
+            {casting.slice(0, 4).map((c) => (
+              <div key={c.key} style={{ background: "rgba(10,10,14,0.82)", border: "1px solid var(--ck-line)", borderRadius: 4, padding: "3px 6px", fontSize: 12 }}>
+                <div style={{ color: "var(--ck-text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  <span style={{ color: "#e8a0a0" }}>{c.actor}</span> {c.name}
+                </div>
+                <div style={{ height: 4, background: "var(--ck-line)", borderRadius: 2, marginTop: 3 }}>
+                  <div style={{ width: `${Math.min(100, c.f * 100)}%`, height: "100%", background: "#ffb347", borderRadius: 2 }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 10px 8px", flexShrink: 0 }}>
@@ -205,6 +260,11 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
         <label style={{ color: "var(--ck-text-3)", fontSize: 12, whiteSpace: "nowrap" }} title="Untargetable actors that place AoEs">
           <input type="checkbox" checked={showHelpers} onChange={(e) => setShowHelpers(e.target.checked)} /> helpers
         </label>
+        {mapUrl && (
+          <label style={{ color: "var(--ck-text-3)", fontSize: 12, whiteSpace: "nowrap" }} title={`In-game map: ${data.map!.name}`}>
+            <input type="checkbox" checked={showMap} onChange={(e) => setShowMap(e.target.checked)} /> map
+          </label>
+        )}
         {synced && <span style={{ color: "var(--ck-text-3)", fontSize: 12 }}>following VOD</span>}
       </div>
     </div>
