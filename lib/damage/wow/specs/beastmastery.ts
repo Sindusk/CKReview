@@ -2,7 +2,7 @@
 //
 // Beast Mastery Hunter's own checks and values, beside the shared ones
 // ranged.ts gives it (the Bestial Wrath window, Focus at the cap with
-// Barbed Shot excluded) and the tracked Bestial Wrath cooldown. Built in the
+// Barbed Shot excluded). Built in the
 // WoWAnalyzer audit's phase 3 (docs/wowa-audit/hunter-beastmastery.md),
 // every rule valued as damage lost, pets included: the pet and the beasts
 // it brings do 47–61% of a BM player's damage. Measured 2026-10-17 on the
@@ -14,10 +14,12 @@
 // Arteyparty (hjHXmdnJFwTPpMtK), Hirvihotline (8kVQMJ4rmpnyRjBH), 曉月的終焉
 // (7B1wQbjNhgXJDaHC), Полли and Авалайзи (7L3RKpavDA8T4MjY), 爱美女的菠萝 and
 // 嗜血魔圣 (9rGDw4WB3bv6VmnK), Yolt (Ftj4vwHf9RazPcqV), Floala
-// (r9CX1kpRGLmKJH4M); the weaker Jimache and Nidzoz (v8bmgMAdcnBCj9Ya), and
-// the static's Deathstriker (qpZx3mWaG7gcDdYB, the case study, and his 16
-// pulls on seven bosses in gVDPhzp61Zm29HMw). Spell ids are from those
-// logs' masterData.
+// (r9CX1kpRGLmKJH4M), and the 100th-percentile 爹丶爹 (RbhPKYWd6t1nAC3f
+// fight 40, fetched); the weaker Koralie (8AFnLQKdrcgawzDC fight 224, 20th,
+// fetched) and Snobshot beside her, Jimache and Nidzoz (v8bmgMAdcnBCj9Ya),
+// and the static's Deathstriker (qpZx3mWaG7gcDdYB, the case study, and his
+// 16 pulls on seven bosses in gVDPhzp61Zm29HMw): 40 player-pulls. Spell
+// ids are from those logs' masterData.
 //
 // Talents (from casts, buffs and pet hits; every one of the 37): Pack
 // Leader (Howl of the Pack Leader, the boar's Boar Charge, the bear's Rend
@@ -53,7 +55,9 @@
 // takes). The opener counts from BW_FIRST_MS.
 // Measured (lost a pull): top Luumu, Yaji (both kills), Волкерокхант,
 // 小红手经年, 爱美女的菠萝, 曉月的終焉 none; Käächhunt 18k, 干嘛喵 33k, Minttu
-// 89k. Weaker: 嗜血魔圣 2.10M (9rGDw4WB3bv6VmnK; ready 2:20, pressed 2:41 and
+// 89k, 爹丶爹 229k (2.4s at 3:44, 1.6s at 5:09: he presses it 30–34s
+// apart, and opens with it at 0:27, inside the first hold window). Weaker:
+// Koralie 154k (2:03), Snobshot 20k; 嗜血魔圣 2.10M (9rGDw4WB3bv6VmnK; ready 2:20, pressed 2:41 and
 // 3:44 → 4:19, 15s each), Jimache 1.84M (v8bmgMAdcnBCj9Ya; 3:57 → 4:50),
 // Arteyparty 916k, Hirvihotline 557k, Nidzoz 353k, Floala 359k; Deathstriker
 // 125k on the case study (5:02 → 5:07) and 0–881k on each of his static's
@@ -72,15 +76,22 @@
 // and counts too. What it is, nearly always: two Kill Commands in a row
 // (Deathstriker 0:03.9 → 0:04.8, 0:20.8 → 0:21.9, 0:34.4 → 0:35.4 on the
 // case study), where a Cobra Shot between would have given the buff. The
-// top players almost never do it, so the extra GCD doesn't cost them Kill
-// Commands (15–18 a minute). Not counted in forced time.
+// top players almost never do it on one enemy, so the extra GCD doesn't
+// cost them Kill Commands (15–18 a minute). Not counted: forced time, and a
+// Kill Command whose hits found two or more enemies. On Vashnik the top
+// players double up in the Venom burst after Imbibe (the 100th-percentile
+// 爹丶爹, RbhPKYWd6t1nAC3f fight 40: 11 unbuffed, the three largest at
+// 0:29, 1:52 and 3:17 on the Venoms, 4–5s after each Imbibe), where a
+// Kill Command held a GCD can land on dead adds; with them counted he read
+// 229k against the 20th-percentile Koralie's 322k.
 // Measured (lost a pull): top Luumu, Yaji (Entombed Sentinels),
-// Волкерокхант none; Yaji (Vashnik) 37k, Minttu 21k, 干嘛喵 54k, 小红手经年
-// 143k (4: 0:04 after the opener's Bestial Wrath, 1:35, 5:10, 5:34),
-// Käächhunt 189k (5). Weaker: 嗜血魔圣 491k (13), 爱美女的菠萝 264k (11),
-// Yolt 194k, Arteyparty 177k, Jimache 151k, Nidzoz 64k (13, small hits);
-// Deathstriker 159k on the case study (10) and 113–473k on each of his
-// static's 16 pulls (6–23 a pull; Ula'tek 473k, 23). WoWAnalyzer only
+// Волкерокхант none; Yaji (Vashnik) 37k, Minttu 21k, 爹丶爹 47k (4), 干嘛喵
+// 54k, Käächhunt 86k (3), 小红手经年 104k (3: 0:04 after the opener's
+// Bestial Wrath, 5:10, 5:34). Weaker: Koralie 144k (8AFnLQKdrcgawzDC fight
+// 224, 20th; 9), Snobshot 58k beside her, 嗜血魔圣 277k (10), 爱美女的菠萝
+// 131k, Jimache 151k, Yolt 140k, Nidzoz 64k (13, small hits); Deathstriker
+// 159k on the case study (10) and 113–342k on each of his static's 16
+// pulls (6–18 a pull; Entombed Sentinels Pull 5 342k, 14). WoWAnalyzer only
 // annotates each unbuffed cast.
 //
 // ── Wild Thrash on one enemy (wildThrashOneTarget) ─────────────────────
@@ -97,9 +108,9 @@
 // phase 2 had marked `wrong` because Beast Cleave used to come for free.
 // Not counted in forced time or the pull's last WT_HIT_MS.
 // Measured (lost a pull): top Luumu, Yaji (Entombed Sentinels),
-// Волкерокхант, Käächhunt, Minttu none; Yaji (Vashnik) 60k (1), 小红手经年
-// 181k (3: 2:42, 4:49, 5:23). Weaker: Arteyparty 121k, Hirvihotline 96k,
-// 嗜血魔圣 50k. Deathstriker none on the case study but a habit on
+// Волкерокхант, Käächhunt, Minttu none; Yaji (Vashnik) 60k (1), 爹丶爹 76k
+// (1, 2:19), 小红手经年 181k (3: 2:42, 4:49, 5:23). Weaker: Koralie 284k
+// (5, from 0:05), Arteyparty 121k, Hirvihotline 96k, 嗜血魔圣 50k. Deathstriker none on the case study but a habit on
 // single-target bosses: Kith'ix Pull 2 782k (17 of 19 presses, every ~10s
 // to keep Beast Cleave up), Nek'zali Pulls 1 and 2 648k and 682k (18, 15),
 // Ula'tek 637k (8).
@@ -259,7 +270,9 @@ const killCommandUnbuffed: JobCheck = (ctx) => {
   const w = nonCrit(rows.filter((r) => r.buffed)), o = nonCrit(rows.filter((r) => !r.buffed));
   const own = o.length >= NA_MIN_UNBUFFED_HITS && w.length >= NA_MIN_UNBUFFED_HITS;
   const ratio = own ? Math.min(NA_MAX_RATIO, Math.max(1, median(w) / median(o))) : NA_DEFAULT_RATIO;
-  const bad = rows.filter((r) => !r.buffed && !inWindows(r.t, forced) && r.dmg > 0);
+  const enemies = (r: (typeof rows)[number]) => new Set(r.mine.map((e) => `${e.targetActorId ?? e.target}.${e.targetInstance ?? 1}`)).size;
+  // On adds, pressing the Kill Command at once can beat buffing it (they die): one enemy only.
+  const bad = rows.filter((r) => !r.buffed && !inWindows(r.t, forced) && r.dmg > 0 && enemies(r) <= 1);
   if (bad.length === 0) return [];
   const moments: Moment[] = bad.map((r) => ({ startMs: r.t, endMs: r.t, lostDamage: r.dmg * (1 - 1 / ratio),
     detail: `Kill Command at ${clock(r.t)} without Nature's Ally (${k(r.dmg)})` }));
