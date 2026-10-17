@@ -132,6 +132,24 @@
 // Energy; weak 0.35–1.07M). Tiger's Fury grants no Energy now (the next
 // cast shows only regen), so a TF at the cap wastes only the regen.
 //
+// Subtlety Rogue, WoWAnalyzer audit phase 3 (2026-10-17, docs/wowa-audit/
+// rogue-subtlety.md; no case study). Measured on 41 player-pulls (top
+// 绯弹的亚莉亚, 小胖啵, Amirmur, 志命韓吉, Messerknecht, Charrend, Zikli;
+// weak 棉花糖丨, Djamyth, Nami, Nýn, Mystôgân, Västolord). subtlety.ts holds
+// the models and numbers: "Big finisher without Ancient Arts" (Secret
+// Technique, Coup de Grace or a Darkest Night Eviscerate pressed without
+// the buff that echoes it; top 0–0.53M but Zikli 4.57M, weak 1.3–6.4M),
+// "Secret Technique just before Shadow Dance" (top none but Zikli 142k,
+// weak up to 646k) and the Shadow Dance window (top 0–39k, weak up to
+// 222k). Its Energy cap check skips the clones' Secret Technique casts
+// (282449), which read as casts at the cap (top players 1.08–1.12M, now
+// 0–251k). Tracked cooldowns: Shadow Blades and Goremaw's Bite were worth
+// 0 a use (their hits log under other ids) and now count them; Shadow
+// Dance is tracked (two charges, a fixed 20.0s recharge fitted to every
+// player). None fires on the top players. The Shadow Blades window stays
+// (top 0–39k, weak 0–82k). Nobody presses Rupture, so the Assassination
+// bleed models have nothing to judge here.
+//
 // Havoc, checked against WoWAnalyzer on qpZx3mWaG7gcDdYB pull 3
 // (Mythnarra; reference 3Vz6Qt2RyTPXwpJn's Hawkerton, 100th percentile,
 // page saved; checked 2026-10-13):
@@ -165,6 +183,7 @@ import { RETRIBUTION_CHECKS } from "./retribution";
 import { FROST_DK_CHECKS } from "./frostdk";
 import { ASSASSINATION_CHECKS } from "./assassination";
 import { FERAL_CHECKS } from "./feral";
+import { SUBTLETY_CHECKS } from "./subtlety";
 
 const window = (statusId: number, name: string): JobCheck => (ctx) => burstGcdFindings(ctx, {
   statusId, name,
@@ -257,7 +276,8 @@ export const MELEE_CHECKS: Record<string, JobCheck[]> = Object.fromEntries(
   Object.entries(MELEE_WINDOWS).map(([spec, [id, name]]) => [spec, [
     window(id, name),
     // Frost DK: no Runic Power cap check (see the header's Frost Death Knight notes).
-    ...(spec === "Frost Death Knight" ? FROST_DK_CHECKS : [primaryResourceCapFindings]),
+    // Subtlety: its own Energy cap check, without the clones' Secret Technique casts (subtlety.ts).
+    ...(spec === "Frost Death Knight" ? FROST_DK_CHECKS : spec === "Subtlety Rogue" ? SUBTLETY_CHECKS : [primaryResourceCapFindings]),
     ...(spec === "Arms Warrior" ? [...ARMS_SPENT, ...ARMS_CHECKS] : []),
     ...(spec === "Havoc Demon Hunter" ? [eternalHunt, ...HAVOC_CHECKS] : []),
     ...(spec === "Retribution Paladin" ? [holyPowerWaste, ...RETRIBUTION_CHECKS] : []),

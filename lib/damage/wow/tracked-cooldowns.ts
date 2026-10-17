@@ -19,7 +19,8 @@
 //   invent drift. (Divine Toll's 30s / 62s spread was the survey mixing
 //   specs; measured on Retribution alone it's a clean 60s, tracked below.)
 // Defensives are left out: holding them is a choice. So are cooldowns gated
-// by a resource (Eye Beam, Breath of Sindragosa) or charges (Shadow Dance).
+// by a resource (Eye Beam, Breath of Sindragosa). Charges are simulated
+// (Shadow Dance's two, since 2026-10-17: a fixed recharge fitted them).
 
 import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { TrackedCooldown } from "../types";
@@ -31,6 +32,7 @@ import { convokeValue, feralFrenzyValue, feralWindowValue } from "./specs/feral"
 import { dragonrageValue } from "./specs/devastation";
 import { niuzaoValue } from "./specs/brewmaster";
 import { voidformValue } from "./specs/shadow";
+import { shadowDanceValue } from "./specs/subtlety";
 
 /**
  * One Vanish's worth to an Assassination Rogue: the damage of a Garrote cast
@@ -190,9 +192,17 @@ export const WOW_TRACKED_COOLDOWNS: Record<string, TrackedCooldown[]> = {
     // one (WoWAnalyzer 61%). Value of a use: vanishGarroteValue.
     { name: "Vanish", actionIds: [1856], cooldownMs: 120_000, charges: 1, firstUseOffsetMs: 10_000, valuePerUse: vanishGarroteValue, openerUse: true },
   ],
+  // Subtlety (the WoWAnalyzer audit's phase 3, 2026-10-17; specs/subtlety.ts
+  // has the numbers): Shadow Blades and Goremaw's Bite were worth 0 a use,
+  // their hits logging as 279043 and 426592 / 426593 / 1309309 / 1269217
+  // (the last two the echoes of Goremaw's Bite's 14s window; masterData of
+  // LckJC7GMhQvD6rdw). Shadow Dance: two charges, 20.0s, the largest fixed
+  // recharge every player's casts fit (37 of 41 player-pulls at exactly
+  // 20.00s); valued by its window (shadowDanceValue).
   "Subtlety Rogue": [
-    { name: "Shadow Blades", actionIds: [121471], cooldownMs: 90_000, charges: 1, firstUseOffsetMs: 5_000 },  // 90.5 / 97.2s, 5.0s
-    { name: "Goremaw's Bite", actionIds: [426591], cooldownMs: 45_000, charges: 1, firstUseOffsetMs: 5_000 }, // 45.0 / 47.5s, 4.7s
+    { name: "Shadow Blades", actionIds: [121471], cooldownMs: 90_000, charges: 1, firstUseOffsetMs: 5_000, damageIds: [279043] },  // 90.5 / 97.2s, 5.0s
+    { name: "Goremaw's Bite", actionIds: [426591], cooldownMs: 45_000, charges: 1, firstUseOffsetMs: 5_000, damageIds: [426592, 426593, 1309309, 1269217] }, // 45.0 / 47.5s, 4.7s
+    { name: "Shadow Dance", actionIds: [185313], cooldownMs: 20_000, charges: 2, firstUseOffsetMs: 9_000, valuePerUse: shadowDanceValue },
   ],
   // Feral, re-measured in the WoWAnalyzer audit's phase 3 (2026-10-17;
   // specs/feral.ts's header) on 14 player-pulls of 13 players: shortest /
