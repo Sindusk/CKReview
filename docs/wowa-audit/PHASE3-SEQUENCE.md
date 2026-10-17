@@ -46,10 +46,10 @@ damage rows are measured.
 | 4 | Demonology | [warlock-demonology.md](warlock-demonology.md) | done 2026-10-17: Implosion held (the phase-2 `wrong` overturned: To Hell and Back), Call Dreadstalkers held (demonology.ts); verified by the main session |
 | 5 | Affliction | [warlock-affliction.md](warlock-affliction.md) | done 2026-10-17: Haunt dropped (affliction.ts), Nightfall expiry (procs.ts), Drain Soul added as a GCD channel (game.ts); verified by the main session |
 | 6 | Arms | [warrior-arms.md](warrior-arms.md) | done 2026-10-17: Bladestorm outside Colossus Smash; Colossus Smash drift revalued by its armor window (arms.ts); verified by the main session |
-| 7 | Preservation | [evoker-preservation.md](evoker-preservation.md) | |
+| 7 | Preservation | [evoker-preservation.md](evoker-preservation.md) | done 2026-10-17 (with 9 and 10, one healer pass): no candidates; Soulcoiler Ritual Vessel locks the GCD (game.ts); Echo no longer judged by its own heal (healer.ts, main session) |
 | 8 | Mistweaver | [monk-mistweaver.md](monk-mistweaver.md) | |
-| 9 | Restoration Druid | [druid-restoration.md](druid-restoration.md) | |
-| 10 | Restoration Shaman | [shaman-restoration.md](shaman-restoration.md) | |
+| 9 | Restoration Druid | [druid-restoration.md](druid-restoration.md) | done 2026-10-17 (healer pass): no candidates; Convoke the Spirits locks the GCD (game.ts) |
+| 10 | Restoration Shaman | [shaman-restoration.md](shaman-restoration.md) | done 2026-10-17 (healer pass): no candidates |
 | 11 | Beast Mastery | [hunter-beastmastery.md](hunter-beastmastery.md) | |
 | 12 | Balance | [druid-balance.md](druid-balance.md) | |
 | 13 | Retribution | [paladin-retribution.md](paladin-retribution.md) | |
@@ -218,6 +218,10 @@ measured for it.
   which reads unmitigated hits (×1.0). Arms' Colossus Smash read 10–24%;
   after armor it's ×1.3–1.6. Compare hits after mitigation for any
   armor or damage-taken debuff.
+- **Buffs that lock the player go in `LOCK_STATUSES`** (game.ts): a
+  channel whose spells log as their own casts (Convoke the Spirits) or an
+  on-use item that roots the player (Soulcoiler Ritual Vessel) reads as
+  idle otherwise.
 - **Value a hit by its own events, not a total divided by presses**
   (Arcane Orb: 294k claimed, 47–63k a pressed Orb).
 - **Class resources not in the fetch** (Arcane Charges) make a rule
@@ -261,6 +265,11 @@ measured for it.
   Deep Wounds refresh, Cleave efficiency) and proposed `wrong` (Rend
   early refresh: Rend is pressed by name twice in 44 pulls), evidence in
   [warrior-arms.md](warrior-arms.md).
+- Restoration Druid (2026-10-17), about the app's own heal-GCD check,
+  not a WoWAnalyzer rule: overhealed Rejuvenations price at 1.4–3.0M a
+  pull, though druids pre-place them for Abundance and Swiftmend. Should
+  Rejuvenation be judged by its own healing? (Preservation's Echo, the
+  same kind of false loss, was excluded: its value is the copied heal.)
 
 - Elemental (2026-10-17): `CallOfTheAncestors/other-checks`,
   `statistics` (and whether "Stormkeeper before Ascendance" should be
