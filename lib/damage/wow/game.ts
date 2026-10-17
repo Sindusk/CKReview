@@ -86,6 +86,7 @@ const CHANNEL_IDS = new Set([
   5143,    // Arcane Missiles
   205021,  // Ray of Frost
   1261153, // Malefic Grasp
+  198590,  // Drain Soul (not in the survey: DRAIN_SOUL below)
   740,     // Tranquility
   64843,   // Divine Hymn
   446035,  // Bladestorm (ticks as 50622 "Bladestorm"; see BLADESTORM below)
@@ -112,6 +113,13 @@ const MORTAL_STRIKE = 12294;
 // 0.99–1.15s; Poetry LckJC7GMhQvD6rdw, Ldh baRCnPv62YQ1dJZN, Mythnarra
 // qpZx3mWaG7gcDdYB, 20–26 a pull).
 const REAVERS_GLAIVE = 442294;
+// Affliction's Drain Soul (198590; the WoWAnalyzer audit's phase 3,
+// 2026-10-17) isn't in the survey either, so each channel read as idle: on
+// a4kX1DNT27yHGvqJ (Vashnik) Fluffalicous's 44 Drain Souls put his GCD
+// uptime at 57% and 25.3M in gaps. It's an on-GCD channel that ticks under
+// its own id: 4 ticks, the last 1.4s after the cast, the next cast 0.2–0.6s
+// after that (median; Fluffalicous, and 八十參 on 7B1wQbjNhgXJDaHC).
+const DRAIN_SOUL = 198590;
 const CRUSADING_STRIKES = 408385;
 
 // Taunts (spell-data.ts): Dark Command, Hand of Reckoning, Provoke, Torment.
@@ -157,6 +165,10 @@ const ACTIONS = new Map<number, GameAction>();
   if (!ACTIONS.has(REAVERS_GLAIVE)) ACTIONS.set(REAVERS_GLAIVE, {
     id: REAVERS_GLAIVE, name: "Reaver's Glaive", onGcd: true, recastMs: HASTED_GCD_MS, cooldownMs: HASTED_GCD_MS,
     charges: 1, speedScaled: true, appliesStatusIds: [REAVERS_GLAIVE],
+  });
+  if (!ACTIONS.has(DRAIN_SOUL)) ACTIONS.set(DRAIN_SOUL, {
+    id: DRAIN_SOUL, name: "Drain Soul", onGcd: true, recastMs: HASTED_GCD_MS, cooldownMs: HASTED_GCD_MS,
+    charges: 1, speedScaled: true, appliesStatusIds: [DRAIN_SOUL],
   });
   // Retribution's Crusading Strikes replaces the auto-attack and logs a
   // cast per swing (Polpo, 172 of them on gVDPhzp61Zm29HMw Kith'ix pull 2):
