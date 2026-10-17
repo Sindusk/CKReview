@@ -52,11 +52,15 @@ export type BurstGcdSpec = {
   bonus(ctx: PlayerCheckContext, w: Window): number;  // 0.2 = +20%
   bonusBasis: string;
   inference?: boolean;
+  // Windows that aren't the player's own buff (Arcane's Touch of the Magi
+  // is a debuff on the enemy, read from its cast and its burst): replace
+  // the statusId's windows.
+  windows?(ctx: PlayerCheckContext): Window[];
 };
 
 export function burstGcdFindings(ctx: PlayerCheckContext, spec: BurstGcdSpec): DamageFinding[] {
   const out: DamageFinding[] = [];
-  for (const w of statusWindows(ctx, spec.statusId)) {
+  for (const w of spec.windows ? spec.windows(ctx) : statusWindows(ctx, spec.statusId)) {
     if (w.endMs > ctx.endMs) continue;
     const gcdMs = ctx.baseGcdMs / ctx.factor * ctx.factorAt(w.startMs);
     // Time a channel, cast or flight held the player past one GCD isn't
