@@ -59,7 +59,7 @@ damage rows are measured.
 | 16 | Guardian | [druid-guardian.md](druid-guardian.md) | done 2026-10-17: Guardian's bear presses added to the survey (game.ts: the 100th-percentile tank read 4.5% GCD uptime, now 92.6%); Lunar Beam tracked; Gore in procs.ts; verified by the main session |
 | 16a | Engine: spell-survey sweep, every spec | game.ts / spell-data.ts | Four passes found presses or channels missing from the survey (Reaver's Glaive, Drain Soul, Sigil of Chains, Guardian's kit). One sweep over every spec on disk. Done 2026-10-17 (13104a3, `SWEEP_PRESSES`): Protection Warrior, Enhancement and Discipline had no survey data at all (top players 1–39% GCD uptime, now 83–92%); Devourer, Frost Mage, Outlaw, Destruction and others gained too; verified by the main session |
 | 17 | Assassination | [rogue-assassination.md](rogue-assassination.md) | done 2026-10-17: Rupture / Garrote off every enemy (replaces the shared uptime check for the spec), Rupture refreshed early, Vanish drift priced for players who never Vanish (assassination.ts, tracked-cooldowns.ts); verified by the main session |
-| 18 | Marksmanship | [hunter-marksmanship.md](hunter-marksmanship.md) | |
+| 18 | Marksmanship | [hunter-marksmanship.md](hunter-marksmanship.md) | done 2026-10-17: Precise Shots lost (marksmanship.ts), Trueshot valued, Moonlight Chakram expiry (procs.ts), Focus cap check removed for the spec; verified by the main session |
 | 19 | Feral | [druid-feral.md](druid-feral.md) | |
 | 20 | Augmentation | [evoker-augmentation.md](evoker-augmentation.md) | |
 | 21 | Devastation | [evoker-devastation.md](evoker-devastation.md) | |
@@ -228,6 +228,10 @@ measured for it.
   `isGcdDamage` counts those pet hits (game.ts `PET_PRESS_HITS`; Beast
   Mastery's Kill Command). Check a pet spec's GCD value against its
   presses' pet hits.
+- **The shared resource-cap check often fires on top players** when the
+  resource never limits the spec (Frost DK Runic Power, Marksmanship
+  Focus: both removed for their spec, pending the user's review). Look
+  at how often top players cast at the cap before trusting it.
 - **Re-run the spec's existing checks on the top players** too, not only
   the new ones: Balance's verified "spenders outside Eclipse" read
   1.2–2.3M on them and had to be rewritten.
@@ -353,6 +357,13 @@ measured for it.
   rows; kept `wrong`: Crimson Tempest spread, Mutilate after Vanish, both
   Deathmark/Kingsbane alignment rows. Evidence in
   [rogue-assassination.md](rogue-assassination.md).
+- Marksmanship (2026-10-17): **an existing app check removed, for the
+  user to approve or reject:** the Focus cap check for the spec (read
+  0.15–2.0M on top players; Focus never limits Marksmanship: 22–50% of
+  casts at the 125 cap). Proposed `wrong`: Kill Shot efficiency, Volley
+  efficiency, Focus at the cap. Note: talented players who never press
+  Kill Shot can't be flagged (the app has no talent names). Evidence in
+  [hunter-marksmanship.md](hunter-marksmanship.md).
 
 - Elemental (2026-10-17): `CallOfTheAncestors/other-checks`,
   `statistics` (and whether "Stormkeeper before Ascendance" should be
