@@ -180,6 +180,13 @@ const DRAIN_SOUL = 198590;
 // it logs as casts are procs, not presses.
 const HAMMER_OF_LIGHT = 427453;
 const CRUSADING_STRIKES = 408385;
+// Vengeance's Sigil of Chains (202138; the WoWAnalyzer audit's phase 3,
+// 2026-10-17) isn't in the survey, so each press read as an idle GCD. It's
+// an on-GCD press: the next GCD came 0.77s+ after it (p10 0.77–1.03s,
+// median 1.0–1.6s; Supadh atJRCq3YM8P4KGpD, Felsky 9w3bK4qhrRC82gVX,
+// Chajinadh Ftj4vwHf9RazPcqV, Misohornie gVDPhzp61Zm29HMw; 1–5 a pull on
+// 11 of 24 Vengeance player-pulls).
+const SIGIL_OF_CHAINS = 202138;
 
 // Beast Mastery's presses land through the pet (the WoWAnalyzer audit's
 // phase 3, 2026-10-17): Kill Command's attack is the pet's (83381; 1232922
@@ -246,7 +253,7 @@ const ACTIONS = new Map<number, GameAction>();
     id: DRAIN_SOUL, name: "Drain Soul", onGcd: true, recastMs: HASTED_GCD_MS, cooldownMs: HASTED_GCD_MS,
     charges: 1, speedScaled: true, appliesStatusIds: [DRAIN_SOUL],
   });
-  for (const [id, name] of [[SHEILUNS_GIFT, "Sheilun's Gift"], [DETOX, "Detox"], [REVIVAL, "Revival"], [CRACKLING_JADE_LIGHTNING, "Crackling Jade Lightning"]] as const) {
+  for (const [id, name] of [[SHEILUNS_GIFT, "Sheilun's Gift"], [DETOX, "Detox"], [REVIVAL, "Revival"], [CRACKLING_JADE_LIGHTNING, "Crackling Jade Lightning"], [SIGIL_OF_CHAINS, "Sigil of Chains"]] as const) {
     if (!ACTIONS.has(id)) ACTIONS.set(id, {
       id, name, onGcd: true, recastMs: HASTED_GCD_MS, cooldownMs: HASTED_GCD_MS,
       charges: 1, speedScaled: true, appliesStatusIds: [id],
