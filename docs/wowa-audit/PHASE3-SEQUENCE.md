@@ -64,7 +64,7 @@ damage rows are measured.
 | 20 | Augmentation | [evoker-augmentation.md](evoker-augmentation.md) | done 2026-10-17: support hits (Ebon Might, Prescience) no longer GCD damage (game.ts: GCDs were priced ~3× high); cooldown recovery model with Time Skip; Ebon Might down while ready, Prescience charges capped, Breath of Eons / Time Skip held, Breath never exploded (augmentation.ts); verified by the main session |
 | 21 | Devastation | [evoker-devastation.md](evoker-devastation.md) | done 2026-10-17: Disintegrate ticks clipped, Fire Breath / Eternity Surge held, Dragonrage valued (devastation.ts); clipped Disintegrate is channel time (timeline.ts channelTicks); pre-pull tracked cooldowns seen from their buff (checks.ts); Essence Burst expiry (procs.ts); verified by the main session (clip margins checked: no jitter cluster) |
 | 22 | Brewmaster | [monk-brewmaster.md](monk-brewmaster.md) | done 2026-10-17: Breath of Fire reset lost (brewmaster.ts); Exploding Keg valued with its later hits and `burstHold`; Invoke Niuzao tracked at 120s; verified by the main session |
-| 23 | Shadow | [priest-shadow.md](priest-shadow.md) | |
+| 23 | Shadow | [priest-shadow.md](priest-shadow.md) | done 2026-10-17: no new spec check; Halo and Voidform valued per use with hold windows (shadow.ts); clipped Mind Flay / Mind Flay: Insanity are channel time (game.ts); verified by the main session |
 | 24 | Subtlety | [rogue-subtlety.md](rogue-subtlety.md) | |
 | 25 | Enhancement | [shaman-enhancement.md](shaman-enhancement.md) | |
 | 26 | Destruction | [warlock-destruction.md](warlock-destruction.md) | |
@@ -388,6 +388,12 @@ measured for it.
 - Brewmaster (2026-10-17): proposed `wrong`: Wisdom of the Wall count,
   Blackout Combo on Keg Smash. Evidence in
   [monk-brewmaster.md](monk-brewmaster.md).
+- Shadow (2026-10-17): proposed `wrong`: Madness uptime (0.44–1.47M on
+  top and weak alike; holding Insanity delays a Madness rather than
+  losing one). Every sample player is Archon: the Voidweaver rows stay
+  unmeasured until a Voidweaver log turns up. Open lead: Mind Blast
+  presses (weak 3.6–4.0 a minute, top 4.7–7.8), no cooldown model fits.
+  Evidence in [priest-shadow.md](priest-shadow.md).
 
 - Elemental (2026-10-17): `CallOfTheAncestors/other-checks`,
   `statistics` (and whether "Stormkeeper before Ascendance" should be
