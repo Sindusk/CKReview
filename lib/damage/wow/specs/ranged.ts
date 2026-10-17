@@ -123,6 +123,7 @@
 import type { JobCheck, Moment } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";
 import { inWindows, mergeWindows, overlapMs, statusWindows } from "../../timeline";
+import { ARCANE_CHECKS } from "./arcane";
 import { ELEMENTAL_CHECKS } from "./elemental";
 import { burstGcdFindings, castTimeProcFindings, dotUptimeFindings, k, observedWindowBonus, primaryResourceCapFindings, spentCooldownDrift } from "./shared";
 
@@ -359,7 +360,7 @@ const window = (statusId: number, name: string): JobCheck => (ctx) => burstGcdFi
 const dot = (name: string, ...statusIds: number[]): JobCheck => (ctx) => dotUptimeFindings(ctx, { statusIds, name });
 
 export const RANGED_CHECKS: Record<string, JobCheck[]> = {
-  "Arcane Mage":          [window(365362, "Arcane Surge")],
+  "Arcane Mage":          [window(365362, "Arcane Surge"), ...ARCANE_CHECKS],
   "Fire Mage":            [window(190319, "Combustion")],
   "Frost Mage":           [],
   "Balance Druid":        [window(102560, "Incarnation"), primaryResourceCapFindings, dot("Moonfire", 164812), dot("Sunfire", 164815), spenderOutsideEclipse],
