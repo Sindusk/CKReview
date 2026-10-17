@@ -84,7 +84,7 @@
 // and added Haunt dropped in affliction.ts (a Haunt recast late loses a
 // share of a Haunt), the Nightfall expiry (procs.ts) and Drain Soul as a
 // channel (game.ts: its channels had read as idle). The DoT checks here
-// fire on top and weak players alike for Unstable Affliction (top 0.1–0.9M
+// fire on top and weak players alike for Unstable Affliction (top 0–0.45M
 // a pull); its gaps end on a cast with 3–5 Soul Shards banked, so they're
 // delays, not shard starvation. Dark Harvest held measured negligible.
 //

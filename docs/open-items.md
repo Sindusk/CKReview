@@ -359,8 +359,15 @@ and delete them from the header.
     `unverifiable`: Vilefiend, Power Siphon, Doomguard, Demonic Calling
     (nobody takes them). Open: on Vashnik the 99.9th Lydd also holds
     Implosion (2.24M).
-  - [warlock-affliction.md](wowa-audit/warlock-affliction.md): 5; Dark
-    Harvest drift with Cull the Weak.
+  - [warlock-affliction.md](wowa-audit/warlock-affliction.md): phase 3
+    done 2026-10-17. Built Haunt dropped (lib/damage/wow/specs/
+    affliction.ts), the Nightfall expiry (procs.ts) and Drain Soul as a
+    channel (game.ts; its channels had read as idle). Left unbuilt with
+    numbers: Dark Harvest held, its DoT coverage, Cull the Weak (all
+    negligible); Grimoire of Sacrifice (nobody takes it). The two `wrong`
+    rows stay `wrong` (Haunt cast efficiency, Dark Harvest empty cast).
+    Open: one-target DoT uptime during Seed of Corruption AoE stretches
+    (the 100th-percentile Soul Harvester's Unstable Affliction gaps).
   - [warrior-arms.md](wowa-audit/warrior-arms.md): 11; Bladestorm drift
     with Executioner; the priority list folded into one candidate.
   - [evoker-preservation.md](wowa-audit/evoker-preservation.md): healer,
