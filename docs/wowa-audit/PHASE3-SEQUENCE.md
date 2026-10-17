@@ -61,7 +61,7 @@ damage rows are measured.
 | 17 | Assassination | [rogue-assassination.md](rogue-assassination.md) | done 2026-10-17: Rupture / Garrote off every enemy (replaces the shared uptime check for the spec), Rupture refreshed early, Vanish drift priced for players who never Vanish (assassination.ts, tracked-cooldowns.ts); verified by the main session |
 | 18 | Marksmanship | [hunter-marksmanship.md](hunter-marksmanship.md) | done 2026-10-17: Precise Shots lost (marksmanship.ts), Trueshot valued, Moonlight Chakram expiry (procs.ts), Focus cap check removed for the spec; verified by the main session |
 | 19 | Feral | [druid-feral.md](druid-feral.md) | done 2026-10-17: tracked cooldowns valued (Tiger's Fury, Berserk, Incarnation, Convoke 120s, Feral Frenzy), Rip off every enemy, Ferocious Bite below 5 points, Incarnation window (feral.ts); Moonfire / Frantic Frenzy / Stampeding Roar presses (game.ts); Clearcasting and Apex Predator's Craving expiries (procs.ts); verified by the main session |
-| 20 | Augmentation | [evoker-augmentation.md](evoker-augmentation.md) | |
+| 20 | Augmentation | [evoker-augmentation.md](evoker-augmentation.md) | done 2026-10-17: support hits (Ebon Might, Prescience) no longer GCD damage (game.ts: GCDs were priced ~3× high); cooldown recovery model with Time Skip; Ebon Might down while ready, Prescience charges capped, Breath of Eons / Time Skip held, Breath never exploded (augmentation.ts); verified by the main session |
 | 21 | Devastation | [evoker-devastation.md](evoker-devastation.md) | |
 | 22 | Brewmaster | [monk-brewmaster.md](monk-brewmaster.md) | |
 | 23 | Shadow | [priest-shadow.md](priest-shadow.md) | |
@@ -370,6 +370,13 @@ measured for it.
   Ambush on Rake. Worth a look: the Berserk window and Energy capped fire
   on top players about as much as on weaker ones (top 0.04–0.82M), kept
   unchanged. Evidence in [druid-feral.md](druid-feral.md).
+- Augmentation (2026-10-17): proposed `wrong`:
+  `window-empower-and-time-skip-use`, `essence-at-cap`. The phase-2
+  blocker was wrong: WCL logs the support damage as the Evoker's own
+  hits under the buffs' ids, so it's priced from the log. Open lead:
+  Fire Breath presses (top 2.65–3.04 a minute, weak 2.25–2.47; ~0.5–1M a
+  pull), no recharge model fits. Evidence in
+  [evoker-augmentation.md](evoker-augmentation.md).
 
 - Elemental (2026-10-17): `CallOfTheAncestors/other-checks`,
   `statistics` (and whether "Stormkeeper before Ascendance" should be
