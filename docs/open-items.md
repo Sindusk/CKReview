@@ -579,8 +579,21 @@ and delete them from the header.
     Tempest below 10 stacks, Chain Lightning on one target, Flame Shock
     early refresh. Left: the Doom Winds / Hot Hand / Surging Totem /
     Primordial Storm rows, for want of a log of those builds.
-  - [warlock-destruction.md](wowa-audit/warlock-destruction.md): 6;
-    Immolate uptime without Wither.
+  - [warlock-destruction.md](wowa-audit/warlock-destruction.md): phase 3
+    done 2026-10-17 on 34 player-pulls already on disk (four 99.4–99.8th
+    Entombed Sentinels kills, 20 others, the static's Wyrmtongues; every
+    player Hellcaller with Shadowburn, Soul Fire and Crashing Chaos; nobody
+    casts Immolate, Channel Demonfire or takes Grimoire of Sacrifice).
+    Built (specs/destruction.ts): Havoc held (top 0–245k, Neerthus 1.09M,
+    Wyrmtongues 89–449k on four of six pulls); Summon Infernal and
+    Malevolence valued per use (were worth 0, so their drift never
+    reported); Havoc on the main target no longer counts casts after the
+    other enemies died (Phycookie 1.36M → 0). Backdraft and Havoc on the
+    main target moved there from ranged.ts. Not built: Conflagrate capped
+    (recharge not pinnable, near the top players' floor). Proposed
+    `wrong`: Shadowburn efficiency and kill reset (no cooldown). Kept
+    `wrong`: Havoc window grades, Soul Fire shard cut. Left: Immolate,
+    Channel Demonfire and Grimoire of Sacrifice rows, for want of a log.
   - [warrior-fury.md](wowa-audit/warrior-fury.md): 11; Avatar drift (the
     Arms Anger Management model).
   - [deathknight-blood.md](wowa-audit/deathknight-blood.md): tank, 7;

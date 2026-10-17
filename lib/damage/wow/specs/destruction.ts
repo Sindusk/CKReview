@@ -49,7 +49,8 @@
 //   Infernal). Chaos Bolt rose ×1.09–1.51, Incinerate ×0.86–1.11; the
 //   bonus came out +5–49% (median ~29%), capped at CC_BONUS_CAP. A use:
 //   pet 331–859k, Awakening 2–12k, Crashing Chaos 0.21–1.05M; 0.82–1.64M
-//   in all (top 0.82–1.51M). Overfiend's damage isn't counted: it also
+//   in all (top 0.82–1.51M), 0.56M for Demosucc, who doesn't take
+//   Crashing Chaos. Overfiend's damage isn't counted: it also
 //   comes on a proc, not only at Infernal.
 // - Malevolence (442726): its hit at the cast (446285, 77–316k, all of it
 //   within 3s of a cast) plus its Chaos Bolt bonus inside the cast's own
@@ -121,7 +122,7 @@
 //   (one GCD), and in execute 극세사이불 chains four to seven in a row
 //   (3:59–4:05). It is a one-shard spender; Fiendish Cruelty (1245664)
 //   makes one free and is always spent (0–1 removed without a Shadowburn
-//   a pull, the last at the kill). No cooldown to hold, so no efficiency
+//   a pull). No cooldown to hold, so no efficiency
 //   or kill-reset model.
 // - Soul Fire's shard cut: the shortest begin after the previous landing is
 //   44.8s with 19–32 shards spent in between, the same as with 12; a 2s

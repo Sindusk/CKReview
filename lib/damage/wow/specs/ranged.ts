@@ -6,7 +6,8 @@
 // from our own logs (lib/damage/wow/spell-data.ts). Sample players: Arcane
 // 19, Elemental 13, Beast Mastery 11, Balance 11, Shadow 9, Demonology 9,
 // Marksmanship 8, Devastation 7, Affliction 6; Augmentation 3, Fire 2,
-// Devourer 2, Frost Mage 1, Destruction 1 (under 3: unverified).
+// Devourer 2, Frost Mage 1, Destruction 1 (under 3: unverified;
+// Destruction since measured on 34 in its phase 3, below).
 //
 // - Main cooldown window (burstGcdFindings, bonus read from the hits,
 //   inference): Arcane Surge, Combustion, Incarnation, Bestial Wrath,
@@ -130,6 +131,16 @@
 // fire on top and weak players alike for Unstable Affliction (top 0–0.45M
 // a pull); its gaps end on a cast with 3–5 Soul Shards banked, so they're
 // delays, not shard starvation. Dark Harvest held measured negligible.
+//
+// Destruction's case study (qpZx3mWaG7gcDdYB pull 3, Wyrmtongues) built
+// Backdraft and Havoc on the main target; the WoWAnalyzer audit's phase 3
+// (2026-10-17; docs/wowa-audit/warlock-destruction.md, 34 player-pulls,
+// four of them 99.4–99.8th) moved both to destruction.ts and added Havoc
+// held, and values for the tracked Summon Infernal and Malevolence (worth
+// 0 a use before: no hits under their cast ids). Re-run on the top
+// players: the Malevolence window 0–161k (weak up to 764k), Wither uptime
+// none, Backdraft 0–328k (weak up to 594k), Soul Fire drift none (weak up
+// to 1.03M). Soul Shards stay unjudged: logged on spenders only.
 //
 // Arcane, checked against WoWAnalyzer on qpZx3mWaG7gcDdYB pull 3
 // (Neximage; reference 3Vz6Qt2RyTPXwpJn's Màzz, 100th percentile, page
