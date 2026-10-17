@@ -84,7 +84,9 @@
 //   the targeted tank's mistimed invulnerability (user, 2026-10-17, F1:
 //   the Warrior "mistimed invulnerability"; this overturns the earlier note that
 //   called them Mitigation Analysis territory). F1's spears killed the
-//   Paladin on the second set and then cut through the party.
+//   Paladin on the second set and then cut through the party: his
+//   mitigation for it wasn't sorted (user, also his error). F9's Apocalyptic
+//   Ray death the VOD couldn't show.
 // - Wormhole: odd numbers' swords hit at the NW/SW dots, even charges at
 //   NE/SE. The holder's facing isn't usable as a fixed axis (clean sword
 //   axes 15 median / 76 p90 degrees off "outward"), so aim is read from
@@ -231,7 +233,6 @@
 //   F7); F11 #7 caught by the charge after their sword. Facing Cruise
 //   Chaser shortens its knockback a lot (user).
 // OPEN QUESTIONS:
-// 5. F1: the Paladin also died to the second Spear set (6:49): his too?
 // 1. Electromagnetic Burst names nobody (C27, D5, D16): can the orbs'
 //    paths be read from anything the log keeps?
 // 2. Wormhole #3's sword into the waiting group (D13, D19, F2, F7; D10

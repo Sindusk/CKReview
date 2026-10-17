@@ -168,13 +168,19 @@
 //   E22: the tank "didn't make a mistake - the Chakram was baited incorrectly";
 //   also B31, D26).
 // ffxiv-bjcc-lightning-swap (Major when a Punishing Thunder follows, else
-//   Minor; the helper and whoever shared it instead: the log can't say
-//   which moved): Lightning round 1 or 2 shared without its helper, so it
-//   passes off the plan (user's cheat sheet: Lightning goes DPS > MT >
-//   Water healer > OT). Later Lightning errors are its fallout. F13 round 1
-//   went to the dragoon instead of Brute Justice's tank; round 2 then went
-//   to the tank and round 3 hit the tank alone (Punishing Thunder), which
-//   used to name Cruise Chaser's tank. Also B43, C19.
+//   Minor): Lightning round 1 or 2 shared without its helper, so it passes
+//   off the plan (user's cheat sheet: Lightning goes DPS > MT > Water
+//   healer > OT). Later Lightning errors are its fallout. Round 1 names
+//   the DPS carrier, who goes to Brute Justice's tank to pass it (user,
+//   F13 +3:05.6: the monk "should have gone to" the Warrior, "not" the
+//   dragoon's or the Warrior's fault); round 2 names the helper and whoever
+//   shared instead (unreviewed, C19). F13's round 2 then went to the tank
+//   and round 3 hit the tank alone (Punishing Thunder), which used to name
+//   Cruise Chaser's tank. Also B43.
+// ffxiv-bjcc-chakram-death (Raid): a non-tank's death to Eye of the
+//   Chakram, right before the first Nisi pass (user, F5 +2:44.5: "basically
+//   ends the pull. Everyone walks into the wall after"). A tank's is
+//   ffxiv-bjcc-tank-dead.
 // Generic, BJ/CC wipes only (no Temporal Stasis, ended 30s+ after J Kick),
 //   without a mechanic Raid: ffxiv-bjcc-called-wipe (3+ no-killing-blow
 //   deaths in 10s or any within 12s of the end; Photon-tick deaths
@@ -203,9 +209,10 @@
 //   correct; both still named (see question 3).
 // VOD review 2026-10-17 (user): report F = Q9zqJb4VLmjhd1B6 (all 16 pulls
 //   on disk) pull 5 (the dragoon not far enough from the chakram's line),
-//   rulings in expectations/rulings.json. F13 / F14 Lightning: the user
-//   couldn't tell who should have shared; F14 followed the plan up to
-//   round 3, so Cruise Chaser's tank stays named there.
+//   and 13 (the first Lightning's carrier), rulings in
+//   expectations/rulings.json. F14 followed the Lightning plan up to round
+//   3, so Cruise Chaser's tank stays named there (unruled: the user
+//   couldn't tell).
 // OPEN QUESTIONS:
 // 1. Collisions name both players. Who moved (B37 pass 4, B43 +63 two
 //    melee in the west Enumeration; C22 +101.5 two ranged at pass 3)?
@@ -554,6 +561,7 @@ export const BJCC_COLLAPSE_RULE_ID        = "ffxiv-bjcc-collapse";
 export const BJCC_TANK_DEAD_RULE_ID       = "ffxiv-bjcc-tank-dead";
 export const BJCC_CHAKRAM_BAIT_RULE_ID    = "ffxiv-bjcc-chakram-bait";
 export const BJCC_LIGHTNING_SWAP_RULE_ID  = "ffxiv-bjcc-lightning-swap";
+export const BJCC_CHAKRAM_DEATH_RULE_ID   = "ffxiv-bjcc-chakram-death";
 
 const J_KICK          = 18516;
 const JUDGMENT_NISI   = 18494;
@@ -720,6 +728,16 @@ export function detectBjccErrors(
   const tankDeath = deathEvents.filter((d) => tanks.some((p) => p.name === d.player) && !resets.has(d)
     && d.timestamp - DEATH_EVENT_LAG_MS >= start && d.timestamp - DEATH_EVENT_LAG_MS < gavelT)
     .sort((a, b) => a.timestamp - b.timestamp)[0];
+  // A death to Eye of the Chakram, just before the first Nisi pass, ends
+  // the pull (user, 2026-10-17, F5 +2:44.5: "the death to the Chakram
+  // basically ends the pull. Everyone walks into the wall after").
+  // A tank's chakram death is already the tank's cutoff (E22).
+  const chakramDeath = deathEvents.filter((d) => d.killingAbilityGameId === CHAKRAM && !resets.has(d) && !tanks.some((p) => p.name === d.player)
+    && d.timestamp - DEATH_EVENT_LAG_MS >= start && d.timestamp - DEATH_EVENT_LAG_MS < gavelT)
+    .sort((a, b) => a.timestamp - b.timestamp)[0];
+  if (chakramDeath && end - start > LC_HANDOFF_MS) raids.push(raidMarker(BJCC_CHAKRAM_DEATH_RULE_ID, "Death to a Chakram",
+    `${chakramDeath.player} died to Eye of the Chakram right before the first Decree Nisi pass, which needs everyone. Treated as the cutoff point.`,
+    chakramDeath.timestamp - DEATH_EVENT_LAG_MS, CHAKRAM, "Eye of the Chakram"));
   if (tankDeath && end - start > LC_HANDOFF_MS) raids.push(raidMarker(BJCC_TANK_DEAD_RULE_ID, "Tank Died",
     `${tankDeath.player} died (${causeOf(players, tankDeath)}) before Gavel. Each tank holds a boss and has duties (Lightning, mines, Flarethrower, Decree Nisi): the phase can't be resolved without them. Treated as the cutoff point.`,
     tankDeath.timestamp - DEATH_EVENT_LAG_MS, tankDeath.killingAbilityGameId, tankDeath.cause || "Death"));
@@ -732,7 +750,7 @@ export function detectBjccErrors(
   // penalty within 3s: that penalty names the same death more precisely.
   // A tank's death yields the same way, and to the Nisi color it took with
   // it (B31, B36) or a penalty it caused (B38 Shrapnel, D8 Punishing).
-  const rank = (r: PullError) => (r.ruleId === BJCC_TANK_DEAD_RULE_ID ? 0 : r.ruleId === BJCC_NISI_DEATH_RULE_ID ? 1 : 2);
+  const rank = (r: PullError) => (r.ruleId === BJCC_TANK_DEAD_RULE_ID || r.ruleId === BJCC_CHAKRAM_DEATH_RULE_ID ? 0 : r.ruleId === BJCC_NISI_DEATH_RULE_ID ? 1 : 2);
   while (firstRaid && rank(firstRaid) < 2) {
     const from = firstRaid;
     const same = raids.find((r) => r.timestamp >= from.timestamp && r.timestamp - from.timestamp <= NISI_DEATH_YIELD_MS && rank(r) > rank(from));
@@ -1028,9 +1046,16 @@ function detectElements(players: PlayerInfo[], deaths: DeathEvent[], life: Life,
       const subs = light.filter((p) => p !== lCarrier);
       const severe = casts.some((c) => c.abilityId === PUNISHING_THUNDER && c.timestamp > t);
       const role = n === 1 ? "Brute Justice's tank" : n === 2 ? "the healer under Water Resistance Down" : "Cruise Chaser's tank";
-      for (const p of [helper, ...subs]) errors.push(playerError(p, {
+      // Round 1: the DPS carrier goes to Brute Justice's tank to pass it,
+      // so it's theirs alone (user, 2026-10-17, F13 +3:05.6: the monk
+      // should have gone to the Warrior; not the dragoon's fault). Round 2
+      // names the helper and whoever shared instead.
+      const named = n === 1 ? [lCarrier] : [helper, ...subs];
+      for (const p of named) errors.push(playerError(p, {
         ruleId: BJCC_LIGHTNING_SWAP_RULE_ID, severity: severe ? "Major" : "Minor", name: "Lightning Passed to the Wrong Player",
-        description: `Lightning round ${n} (carried by ${lCarrier.name}) was shared by ${namesOf(subs)} instead of ${helper.name}, ${role}, so it passed to the wrong player and every later Lightning round was off the plan (DPS > MT > Water healer > OT)${severe ? "; it ended in Punishing Thunder" : ""}. The log can't say whether ${helper.name} was late or ${namesOf(subs)} stepped in.`,
+        description: n === 1
+          ? `Carrying the first Lightning, they shared it with ${namesOf(subs)} instead of going to ${helper.name}, ${role}, so it passed to the wrong player and every later Lightning round was off the plan (DPS > MT > Water healer > OT)${severe ? "; it ended in Punishing Thunder" : ""}. Take the first Lightning to Brute Justice's tank.`
+          : `Lightning round ${n} (carried by ${lCarrier.name}) was shared by ${namesOf(subs)} instead of ${helper.name}, ${role}, so it passed to the wrong player and the last round was off the plan (DPS > MT > Water healer > OT)${severe ? "; it ended in Punishing Thunder" : ""}. The log can't say whether ${helper.name} was late or ${namesOf(subs)} stepped in.`,
         timestamp: t, abilityId: CRASHING_THUNDER, abilityName: "Crashing Thunder",
       }));
       return;
