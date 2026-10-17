@@ -27,7 +27,21 @@
   ACmXHMFtaPLR9k8w (Styphi, 99th), both pages saved; the header of melee.ts
   and docs/damage-case-studies/qpZx3mWaG7gcDdYB.md record what matched. The
   one open item is Fists of Fury cadence (below).
-- **Phase 3:** not started.
+- **Phase 3:** started 2026-10-17. Talent check: Blkphnx and Styphi have
+  identical talent trees; Jordomonk (VWMbYPRyxCAmhZFj fight 9) differs in
+  six nodes. Fists of Fury rebuilt in a scratch model (the cooldown 24s
+  divided by haste from rating at 44 per 1%; recovery ×1.75 per Heart of the
+  Jade Serpent buff and ×1.3 in lust; 1s per Blackout Kick, 2s in Zenith,
+  again on a Teachings consume; 4s per crit Rising Sun Kick, Rushing Wind
+  Kick or Glory of the Dawn; 0.5s per Spinning Crane Kick target, cap
+  2.5s), with the app's forced windows removed. It reproduces the case
+  study: ready-but-unpressed 2.95s a cast for Blkphnx against 0.46s
+  (Styphi) and 0.95s (Jordomonk); past 2s a cycle, 45s against 6s and 12s.
+  The model is lenient in Zenith (the references cast up to ~2s before
+  its ready time there), never harsh. Open: Blkphnx's longest hold (26s,
+  4:19–4:45) is Fists held through adds into his Xuen/Zenith burst;
+  Styphi held 7s into his burst, Jordomonk none. Next: more reference
+  logs, then decide how holds into a burst count.
 - **Core rules** (active time, cast efficiency, potions, cancelled casts,
   the priority-list checker) are in [core.md](core.md); rows below cover
   only what Windwalker sets or adds. The Monk shared layer (Celestial
