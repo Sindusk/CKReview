@@ -36,6 +36,7 @@ import { voidformValue } from "./specs/shadow";
 import { shadowDanceValue } from "./specs/subtlety";
 import { ascendanceValue, voltaicBlazeValue } from "./specs/enhancement";
 import { infernalValue, malevolenceValue } from "./specs/destruction";
+import { armyOfTheDeadValue, darkTransformationValue } from "./specs/unholy";
 
 /**
  * One Vanish's worth to an Assassination Rogue: the damage of a Garrote cast
@@ -199,9 +200,15 @@ export const WOW_TRACKED_COOLDOWNS: Record<string, TrackedCooldown[]> = {
     { name: "Pillar of Frost", actionIds: [51271], cooldownMs: 45_000, charges: 1, firstUseOffsetMs: 3_000, valuePerUse: pillarOfFrostValue },
     { name: "Reaper's Mark", actionIds: [439843], damageIds: [439843, 436304, 439594], cooldownMs: 45_000, charges: 1, firstUseOffsetMs: 3_000 },
   ],
+  // Unholy (the WoWAnalyzer audit's phase 3, 2026-10-17; specs/unholy.ts
+  // has the numbers): neither deals damage under its own id (Dark
+  // Transformation's is its window, Army of the Dead's its Abomination and
+  // Forbidden Knowledge's Necrotic Coils), so both were worth 0 a use and
+  // their drift never showed. Valued by darkTransformationValue and
+  // armyOfTheDeadValue.
   "Unholy Death Knight": [
-    { name: "Dark Transformation", actionIds: [1233448], cooldownMs: 45_000, charges: 1, firstUseOffsetMs: 4_000 }, // 45.1 / 46.5s, 3.8s
-    { name: "Army of the Dead", actionIds: [42650], cooldownMs: 91_000, charges: 1, firstUseOffsetMs: 4_000 },      // 91.1 / 95.2s, 4.0s
+    { name: "Dark Transformation", actionIds: [1233448], cooldownMs: 45_000, charges: 1, firstUseOffsetMs: 4_000, valuePerUse: darkTransformationValue }, // 45.1 / 46.5s, 3.8s
+    { name: "Army of the Dead", actionIds: [42650], cooldownMs: 91_000, charges: 1, firstUseOffsetMs: 4_000, valuePerUse: armyOfTheDeadValue },      // 91.1 / 95.2s, 4.0s
   ],
   "Assassination Rogue": [
     { name: "Kingsbane", actionIds: [385627], cooldownMs: 60_000, charges: 1, firstUseOffsetMs: 11_000 },   // 60.0 / 64.8s, 10.9s

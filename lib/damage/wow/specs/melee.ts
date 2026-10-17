@@ -5,7 +5,8 @@
 // by WoWAnalyzer (read, not copied: AGPL); every id is from our own logs
 // (lib/damage/wow/spell-data.ts, the status the spec's cooldown puts on
 // them). Sample players per spec: Arms 19, Windwalker 10, Havoc 9,
-// Retribution 8, Assassination 6, Subtlety 4, Unholy 3, Frost DK 2, Fury 2
+// Retribution 8, Assassination 6, Subtlety 4, Unholy 3 (31 player-pulls
+// since its audit pass, below), Frost DK 2, Fury 2
 // (18 player-pulls since its audit pass, below),
 // Feral, Survival and Outlaw 1 each (fewer than 3: unverified; Feral has
 // 14 player-pulls since its audit pass, below).
@@ -131,6 +132,22 @@
 // 10–27% of generation on every player, a GCD-bound floor (frostdk.ts).
 // The Pillar of Frost window stays: top 0–31k, weaker up to 95k a pull.
 //
+// Unholy Death Knight, WoWAnalyzer audit phase 3 (2026-10-17, docs/wowa-audit/
+// deathknight-unholy.md; WoWAnalyzer's Unholy lags a patch and grades only a
+// guide). No case study; measured on 31 player-pulls (top Youlongdk, Yldksi,
+// Finesthour, Zetalive; weak Skargur, Klingdeath, Dkchilly, 默陌然).
+// unholy.ts holds the models and numbers: "Dread Plague off every enemy" and
+// "Virulent Plague off every enemy" (valued by ticks and the Erupts the
+// strikes burst from it; Blightfall without a Putrefy after it leaves Dread
+// Plague off: top 0–160k, weak up to 1.85M), "Strike without a Lesser Ghoul"
+// (top 0–4 a pull, weak 17–37) and "Sudden Doom lost" (expired or gained at
+// two stacks, priced at what it adds to the coil). The tracked Dark
+// Transformation and Army of the Dead now have a value per use (both were
+// worth 0). Unholy gets no Runic Power cap check: every cast it could see at
+// the cap generates none (unholy.ts). An Unholy GCD now counts the plague
+// Erupts and the Lesser Ghouls' Orders its presses set off (game.ts). The
+// Dark Transformation window stays: top 0k, weak up to 170k a pull.
+//
 // Feral Druid, WoWAnalyzer audit phase 3 (2026-10-17, docs/wowa-audit/
 // druid-feral.md; no case study). Measured on 14 player-pulls of 13
 // players fetched for it (top Catalyà, 万花通灵, Vydal, Scaricat, Samarae;
@@ -224,6 +241,7 @@ import { FERAL_CHECKS } from "./feral";
 import { SUBTLETY_CHECKS } from "./subtlety";
 import { ENHANCEMENT_CHECKS } from "./enhancement";
 import { FURY_CHECKS } from "./fury";
+import { UNHOLY_CHECKS } from "./unholy";
 
 const window = (statusId: number, name: string): JobCheck => (ctx) => burstGcdFindings(ctx, {
   statusId, name,
@@ -318,8 +336,9 @@ export const MELEE_CHECKS: Record<string, JobCheck[]> = {
     // Frost DK: no Runic Power cap check (see the header's Frost Death Knight notes).
     // Subtlety: its own Energy cap check, without the clones' Secret Technique casts (subtlety.ts).
     // Fury: its own Rage cap check, outside Recklessness (fury.ts).
+    // Unholy DK: no Runic Power cap check either (unholy.ts header).
     ...(spec === "Frost Death Knight" ? FROST_DK_CHECKS : spec === "Subtlety Rogue" ? SUBTLETY_CHECKS
-      : spec === "Fury Warrior" ? FURY_CHECKS : [primaryResourceCapFindings]),
+      : spec === "Fury Warrior" ? FURY_CHECKS : spec === "Unholy Death Knight" ? UNHOLY_CHECKS : [primaryResourceCapFindings]),
     ...(spec === "Arms Warrior" ? [...ARMS_SPENT, ...ARMS_CHECKS] : []),
     ...(spec === "Havoc Demon Hunter" ? [eternalHunt, ...HAVOC_CHECKS] : []),
     ...(spec === "Retribution Paladin" ? [holyPowerWaste, ...RETRIBUTION_CHECKS] : []),
