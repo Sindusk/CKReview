@@ -95,6 +95,13 @@ const CHANNEL_IDS = new Set([
   115175,  // Soothing Mist (Mistweaver; see MISTWEAVER below)
   399491,  // Sheilun's Gift (Mistweaver, not in the survey)
   117952,  // Crackling Jade Lightning (not in the survey)
+  // Font of Venomous Rage, an on-use trinket of any spec: a 2s channel
+  // whose five hits log under its id at +0, 0.5, 1.0, 1.5, 2.0s; the next
+  // GCD came 2.1–2.4s after the use (p10–median, 32 uses on 11 players of
+  // 7 specs, fixed-GCD Rogues too; the Beast Mastery pass of the
+  // WoWAnalyzer audit, 2026-10-17). Read as a plain GCD, each use was ~1s
+  // of idle ("No GCD after Font of Venomous Rage" on the top BM Yaji).
+  1297908,
 ]);
 
 // GCDs that lock the player for as long as a buff of their own: Scalecommander
