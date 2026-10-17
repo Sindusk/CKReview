@@ -619,8 +619,19 @@ and delete them from the header.
     Marrowrend overuse (Bone Shield stacks to 12; top players refresh at
     9–12), Exterminate stacks. Open lead: Blood Boil presses (no recharge
     model).
-  - [deathknight-unholy.md](wowa-audit/deathknight-unholy.md): 7;
-    Virulent / Dread Plague uptime.
+  - [deathknight-unholy.md](wowa-audit/deathknight-unholy.md): phase 3
+    done 2026-10-17 on 31 player-pulls (three fights fetched; 30
+    San'layn, one Rider). Built (specs/unholy.ts): Dread / Virulent Plague
+    off every enemy (Blightfall with no Putrefy after it; top 0–160k, weak
+    up to 1.85M), strike without a Lesser Ghoul (top 0–4 a pull, weak
+    17–37), Sudden Doom lost (expired or gained at two stacks), Dark
+    Transformation and Army of the Dead valued (both were worth 0); an
+    Unholy GCD counts its plague Erupts and ghoul Orders (game.ts).
+    **Removed for the user's review:** the Runic Power cap check for
+    Unholy (it read only casts that generate none). Kept `wrong`: Soul
+    Reaper outside the window, Sudden Doom speed. Not built: Putrefy
+    charges (no model fits), Reaping run out (~0), Festering Scythe buff
+    (no visible effect). Lead: Lesser Ghoul charges lost to the cap.
   - [demonhunter-devourer.md](wowa-audit/demonhunter-devourer.md): 7;
     Void Metamorphosis window. WoWAnalyzer says its own Reap / Cull data
     is bugged.

@@ -166,8 +166,16 @@
 // - Rime (59052): never runs out (0 of 1,347 gains on the 31 Frost DK
 //   player-pulls, max span 14.4s), so no duration. Its loss is the
 //   overwrite: specs/frostdk.ts "Rime overwritten".
+// - Sudden Doom (81340) 10s (Unholy phase 3, 2026-10-17, 31 player-pulls):
+//   4 removals with no coil at 10.00–10.06s, max span 10.06s of 1,585. Not
+//   listed here: it empowers a coil (Necrotic Coil +75–100k, Death Coil
+//   +10–25k) rather than granting one, its removal lands up to ~0.35s after
+//   the coil (past PROC_CONSUME_MS), and gains at two stacks lose one too, so
+//   specs/unholy.ts "Sudden Doom lost" judges it. Reaping (1242654, 30s, a
+//   Soul Reaper per Dark Transformation) is measured there and worth ~0.
+//   Blightfall's ready buff (1271975) never runs out (held up to 44s).
 // - No duration in the samples (no clean cluster, or never run out):
-//   Sudden Doom, Fingers of Frost, Brain Freeze,
+//   Fingers of Frost, Brain Freeze,
 //   Galactic Guardian (0 of 85 removals unconsumed on the three Guardians
 //   who take it, J3ckBVtrZNfWv1h7, JvQpZk3CXj78Dx2f, LCFp3wbHvQqNP4my;
 //   max span 12.75s), Prismatic Bolt!, Tempest, Art of War. Power of the
