@@ -282,6 +282,12 @@ file's header comment. Mechanic detection has its own guide:
   source's next cast on that player, capped at 15s.
 - **Layers menu:** AoEs, map, 5y rings, 5y grid (0,0 at the arena centre),
   helper actors, and an icon-size slider.
+- **Roster HP / MP bars.** Once a pull's replay is loaded, each roster
+  tile shows thin HP and MP bars for the replay's moment
+  (`playerVitalsAt`; the replay reports its clock via `onTimeChange`, the
+  VOD's timeline when the video view shows). They sit in the tile's
+  bottom padding: the FFXIV roster is a fixed 300px, and taller tiles
+  clipped its last row.
 - **Hitboxes** are the game's: BNpcBase (FFLogs actor `gameID`) gives the
   model and Scale, ModelSkeleton the Radius; radius × scale.
 - **Waymarks: not available yet.** FFLogs' API has no marker field or

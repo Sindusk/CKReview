@@ -48,6 +48,9 @@ type Props = {
   vodPlaying?:   boolean;         // the synced video's own play state
   onVodPlay?:    () => void;      // play/pause drive the hidden video when synced
   onVodPause?:   () => void;
+  // The replay's current time, reported a few times a second (the roster
+  // shows HP and MP for this moment).
+  onTimeChange?: (ms: number) => void;
 };
 
 const SPEEDS = [0.5, 1, 2, 4];
@@ -72,7 +75,7 @@ const TETHER_COLOR = "#ff5fd2";
 const TETHER_LOOKUP_MS = 20000;
 const GRID_STEP = 500;    // 5y, centi-yalms
 
-export default function ReplayPanel({ pull, data, loading, progress, error, onLoad, syncedTimeMs, vodPlaying = false, onVodPlay, onVodPause }: Props) {
+export default function ReplayPanel({ pull, data, loading, progress, error, onLoad, syncedTimeMs, vodPlaying = false, onVodPlay, onVodPause, onTimeChange }: Props) {
   const synced = syncedTimeMs !== undefined;
   const durationMs = data?.durationMs ?? (pull ? (pull.endTime - pull.startTime) * 1000 : 0);
 
@@ -130,6 +133,17 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
   }, [data, synced, playing, speed, durationMs]);
 
   const t = synced ? frameMs : ownTimeMs;
+
+  // Report the time at most every 200ms: the roster doesn't need 60fps.
+  const lastReportRef = useRef({ at: 0, value: -1 });
+  useEffect(() => {
+    if (!onTimeChange) return;
+    const now = performance.now();
+    const last = lastReportRef.current;
+    if (now - last.at < 200 && Math.abs(t - last.value) < 2000) return;
+    lastReportRef.current = { at: now, value: t };
+    onTimeChange(t);
+  }, [t, onTimeChange]);
 
   // ── Per-pull precomputation ──────────────────────────────────────────────
   const view = useMemo(() => (data ? fitReplayView(data) : null), [data]);

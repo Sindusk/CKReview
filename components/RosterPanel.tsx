@@ -104,6 +104,7 @@ function PlayerButton({
   roleSlot,
   onClick,
   large,
+  vitals,
 }: {
   player:   PlayerInfo;
   // Auto-detected FFXIV party slot (MT/OT/H1/H2/M1/M2/R1/R2 — see
@@ -117,6 +118,8 @@ function PlayerButton({
   // to use the freed-up vertical space instead of leaving it blank — see
   // RosterPanel's ffRows.
   large?:   boolean;
+  // HP / MP fractions at the replay's moment; bars only when given.
+  vitals?:  { hp: number; mp: number };
 }) {
   const color = getClassColor(player.game, player.className);
   const roleColor = getRoleColor(player.role);
@@ -132,6 +135,7 @@ function PlayerButton({
       style={{
         // Hover edge picks up the class colour (see .ck-tile in theme.css).
         ["--ck-accent" as string]: color + "88",
+        position: "relative",
         display: "flex",
         flexDirection: "row",
         alignItems: "center",
@@ -171,7 +175,25 @@ function PlayerButton({
           {roleSlot && <span style={{ color: "var(--ck-text-3)", fontWeight: 700, flexShrink: 0 }}>{roleSlot}</span>}
         </span>
       </div>
+      {/* HP / MP strip along the tile's bottom edge, inside its padding,
+          so the tiles keep the height the fixed roster panel is sized for. */}
+      {vitals && (
+        <span style={{ position: "absolute", left: 6, right: 6, bottom: 2, display: "flex", flexDirection: "column", gap: 1 }}
+          title={`HP ${vitals.hp >= 0 ? Math.round(vitals.hp * 100) + "%" : "?"} · MP ${vitals.mp >= 0 ? Math.round(vitals.mp * 100) + "%" : "?"}`}>
+          <VitalBar value={vitals.hp} color={vitals.hp > 0.5 ? "#5fd36a" : vitals.hp > 0.25 ? "#e3c44a" : "#e5534b"} height={3} />
+          <VitalBar value={vitals.mp} color="#d36ad8" height={2} />
+        </span>
+      )}
     </button>
+  );
+}
+
+/** A thin resource bar; an unknown value (-1) draws an empty track. */
+function VitalBar({ value, color, height }: { value: number; color: string; height: number }) {
+  return (
+    <span style={{ display: "block", width: "100%", height, background: "rgba(0,0,0,0.55)", borderRadius: 2, overflow: "hidden", boxShadow: "0 0 0 1px rgba(255,255,255,0.06)" }}>
+      {value >= 0 && <span style={{ display: "block", width: `${Math.round(value * 100)}%`, height: "100%", background: color, transition: "width 0.2s linear" }} />}
+    </span>
   );
 }
 
@@ -474,9 +496,13 @@ function PlayerDetail({
 type RosterPanelProps = {
   players: PlayerInfo[];
   playbackTimeMs: number;
+  // HP and MP fractions per player name at the replay's current moment
+  // (lib/replay/ffxiv-replay.ts playerVitalsAt). Only set once the pull's
+  // replay is loaded; the tiles show no bars without it.
+  vitals?: Map<string, { hp: number; mp: number }>;
 };
 
-export default function RosterPanel({ players, playbackTimeMs }: RosterPanelProps) {
+export default function RosterPanel({ players, playbackTimeMs, vitals }: RosterPanelProps) {
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerInfo | null>(null);
 
   const filteredPlayers = players.filter(
@@ -606,6 +632,7 @@ export default function RosterPanel({ players, playbackTimeMs }: RosterPanelProp
                     roleSlot={roleSlotByActorId.get(player.actorId)}
                     onClick={() => setSelectedPlayer(player)}
                     large
+                    vitals={vitals?.get(player.name)}
                   />
                 ) : (
                   <div key={ci} />
@@ -636,6 +663,7 @@ export default function RosterPanel({ players, playbackTimeMs }: RosterPanelProp
                   player={player}
                   roleSlot={roleSlotByActorId.get(player.actorId)}
                   onClick={() => setSelectedPlayer(player)}
+                  vitals={vitals?.get(player.name)}
                 />
               ))}
             </div>

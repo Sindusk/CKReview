@@ -63,10 +63,12 @@ export type ReplayRawEvent = {
 type ReplayRawResources = {
   x?: number; y?: number; facing?: number;
   hitPoints?: number; maxHitPoints?: number;
+  mp?: number; maxMP?: number;
 };
 
 /** [ms from pull start, x, y, facing (centi-rad), HP fraction 0..1 or -1 unknown] */
-export type ReplaySample = [number, number, number, number, number];
+export type ReplaySample = [number, number, number, number, number, number?];
+// (6th field: MP fraction 0..1, -1 unknown; absent on tracks saved before 2026-10-17.)
 
 export type ReplayActor = {
   key:      string;     // "actorId" or "actorId.instance" for enemy instances
@@ -202,7 +204,8 @@ export function buildReplayData(
       byKey.set(key, track);
     }
     const hp = res.maxHitPoints ? Math.max(0, Math.min(1, (res.hitPoints ?? 0) / res.maxHitPoints)) : -1;
-    track.samples.push([t - fightStartMs, res.x, res.y, res.facing ?? 0, hp]);
+    const mp = res.maxMP ? Math.max(0, Math.min(1, (res.mp ?? 0) / res.maxMP)) : -1;
+    track.samples.push([t - fightStartMs, res.x, res.y, res.facing ?? 0, hp, mp]);
   }
 
   for (const e of events) {
@@ -277,7 +280,7 @@ export function buildReplayData(
     for (const s of track.samples) {
       const last = kept[kept.length - 1];
       if (last && last[0] === s[0]) { kept[kept.length - 1] = s; continue; }
-      if (last && last[1] === s[1] && last[2] === s[2] && last[3] === s[3] && last[4] === s[4]) continue;
+      if (last && last[1] === s[1] && last[2] === s[2] && last[3] === s[3] && last[4] === s[4] && last[5] === s[5]) continue;
       kept.push(s);
     }
     track.samples = kept;
@@ -292,6 +295,7 @@ export function buildReplayData(
 export type ReplayPose = {
   x: number; y: number; facing: number;
   hp: number;          // 0..1, -1 unknown
+  mp: number;          // 0..1, -1 unknown
   stale: boolean;      // held across a gap longer than MAX_INTERP_GAP_MS
 };
 
@@ -315,15 +319,26 @@ export function poseAt(actor: ReplayActor, t: number): ReplayPose | undefined {
   const i = sampleIndexAt(s, t);
   if (i < 0) {
     if (actor.kind !== "player" || s.length === 0) return undefined;
-    return { x: s[0][1], y: s[0][2], facing: s[0][3], hp: s[0][4], stale: true };
+    return { x: s[0][1], y: s[0][2], facing: s[0][3], hp: s[0][4], mp: s[0][5] ?? -1, stale: true };
   }
   const a = s[i];
   const b = s[i + 1];
   if (!b || b[0] - a[0] > MAX_INTERP_GAP_MS) {
-    return { x: a[1], y: a[2], facing: a[3], hp: a[4], stale: !b ? t - a[0] > MAX_INTERP_GAP_MS : true };
+    return { x: a[1], y: a[2], facing: a[3], hp: a[4], mp: a[5] ?? -1, stale: !b ? t - a[0] > MAX_INTERP_GAP_MS : true };
   }
   const f = (t - a[0]) / (b[0] - a[0]);
-  return { x: a[1] + (b[1] - a[1]) * f, y: a[2] + (b[2] - a[2]) * f, facing: a[3], hp: a[4], stale: false };
+  return { x: a[1] + (b[1] - a[1]) * f, y: a[2] + (b[2] - a[2]) * f, facing: a[3], hp: a[4], mp: a[5] ?? -1, stale: false };
+}
+
+/** Each player's HP and MP fraction at `t` (-1 where unknown), by name. */
+export function playerVitalsAt(data: ReplayData, t: number): Map<string, { hp: number; mp: number }> {
+  const out = new Map<string, { hp: number; mp: number }>();
+  for (const a of data.actors) {
+    if (a.kind !== "player") continue;
+    const p = poseAt(a, t);
+    if (p) out.set(a.name, { hp: p.hp, mp: p.mp });
+  }
+  return out;
 }
 
 /**
@@ -340,7 +355,7 @@ export function sampleNear(actor: ReplayActor, t: number, windowMs: number): Rep
     const c = s[j];
     if (c && Math.abs(c[0] - t) <= windowMs && (!best || Math.abs(c[0] - t) < Math.abs(best[0] - t))) best = c;
   }
-  return best && { x: best[1], y: best[2], facing: best[3], hp: best[4], stale: false };
+  return best && { x: best[1], y: best[2], facing: best[3], hp: best[4], mp: best[5] ?? -1, stale: false };
 }
 
 /**

@@ -29,7 +29,7 @@ import AnalysisPanel from "../components/AnalysisPanel";
 import RosterPanel from "../components/RosterPanel";
 import TimelinePanel from "@/components/TimelinePanel";
 import ReplayPanel from "@/components/ReplayPanel";
-import type { ReplayData } from "@/lib/replay/ffxiv-replay";
+import { playerVitalsAt, type ReplayData } from "@/lib/replay/ffxiv-replay";
 import { enrichReplayData } from "@/lib/replay/action-shapes";
 import StrategyDialog from "@/components/StrategyDialog";
 import MitigationDialog from "@/components/MitigationDialog";
@@ -410,6 +410,9 @@ export default function Home() {
   // reads a replay saved by scripts/fetch-ff-replay.js first.
   const [centerView, setCenterView] = useState<"video" | "replay">("video");
   const [replays, setReplays] = useState<Record<string, ReplayData>>({});
+  // The replay's own clock (it can run without a VOD); the roster's HP and
+  // MP bars read it while the replay shows.
+  const [replayTimeMs, setReplayTimeMs] = useState(0);
   const [replayLoad, setReplayLoad] = useState<{ key: string; progress: number | null; error: string | null } | null>(null);
   const replayKey = activePull ? `${activePull.reportCode}:${activePull.fightId}` : null;
 
@@ -1567,6 +1570,9 @@ export default function Home() {
               key={selectedPullId ?? "none"}
               players={activePull?.players ?? []}
               playbackTimeMs={timeline.playbackTimeMs}
+              vitals={replayKey && replays[replayKey]
+                ? playerVitalsAt(replays[replayKey], centerView === "replay" ? replayTimeMs : timeline.playbackTimeMs)
+                : undefined}
             />
           </Panel>
 
@@ -1614,6 +1620,7 @@ export default function Home() {
                   vodPlaying={vodPlaying}
                   onVodPlay={() => setPlayToken((n) => n + 1)}
                   onVodPause={() => setPauseToken((n) => n + 1)}
+                  onTimeChange={setReplayTimeMs}
                 />
               ) : undefined}
               vod={selectedVod}
