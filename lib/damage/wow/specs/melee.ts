@@ -79,6 +79,7 @@ import { finding } from "../../checks";
 import { forcedPart } from "../../timeline";
 import { burstGcdFindings, k, observedWindowBonus, primaryResourceCapFindings, spenderSnapshotWaste, spentCooldownDrift } from "./shared";
 import { WINDWALKER_CHECKS } from "./windwalker";
+import { HAVOC_CHECKS } from "./havoc";
 
 const window = (statusId: number, name: string): JobCheck => (ctx) => burstGcdFindings(ctx, {
   statusId, name,
@@ -169,7 +170,7 @@ const holyPowerWaste: JobCheck = (ctx) => spenderSnapshotWaste(ctx, { type: 9, n
 export const MELEE_CHECKS: Record<string, JobCheck[]> = Object.fromEntries(
   Object.entries(MELEE_WINDOWS).map(([spec, [id, name]]) => [spec, [
     window(id, name), primaryResourceCapFindings, ...(spec === "Arms Warrior" ? ARMS_SPENT : []),
-    ...(spec === "Havoc Demon Hunter" ? [eternalHunt] : []),
+    ...(spec === "Havoc Demon Hunter" ? [eternalHunt, ...HAVOC_CHECKS] : []),
     ...(spec === "Retribution Paladin" ? [holyPowerWaste] : []),
     ...(spec === "Windwalker Monk" ? WINDWALKER_CHECKS : []),
   ]]),
