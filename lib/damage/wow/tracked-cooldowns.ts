@@ -28,6 +28,7 @@ import { pillarOfFrostValue } from "./specs/frostdk";
 import { sigilValue } from "./specs/vengeance";
 import { trueshotValue } from "./specs/marksmanship";
 import { convokeValue, feralFrenzyValue, feralWindowValue } from "./specs/feral";
+import { dragonrageValue } from "./specs/devastation";
 
 /**
  * One Vanish's worth to an Assassination Rogue: the damage of a Garrote cast
@@ -276,7 +277,16 @@ export const WOW_TRACKED_COOLDOWNS: Record<string, TrackedCooldown[]> = {
     { name: "Soul Fire", actionIds: [6353], cooldownMs: 46_000, charges: 1, firstUseOffsetMs: 1_000, prePullEvidenceIds: [6353] },  // 46.7 / 52.3s, 0.4s
   ],
   "Devastation Evoker": [
-    { name: "Dragonrage", actionIds: [375087], cooldownMs: 120_000, charges: 1, firstUseOffsetMs: 3_000 },     // 120.0 / 122.5s, 2.8s
+    // Dragonrage deals nothing under its own id, so a use was worth 0 and its
+    // drift never reported; valued since the WoWAnalyzer audit's phase 3
+    // (2026-10-17) by its extra Essence Bursts and Pyres (specs/devastation.ts),
+    // and seen when pressed before the pull (Mythvoker vRPGT4MN6VALQWFh,
+    // Vashnik: first removal at 0:09, first cast 2:01.9).
+    { name: "Dragonrage", actionIds: [375087], cooldownMs: 120_000, charges: 1, firstUseOffsetMs: 3_000,   // 120.0 / 122.5s, 2.8s
+      prePullStatusIds: [375087], burstHold: true, valuePerUse: dragonrageValue },
+    // Worth 0 a use (no hits of its own) and left so: it makes one empower
+    // instant at full rank, and the top players release theirs at 0.6–1.1s
+    // on average, so a use saves about half a GCD (devastation.ts header).
     { name: "Tip the Scales", actionIds: [370553], cooldownMs: 120_000, charges: 1, firstUseOffsetMs: 4_000 }, // 120.7 / 123.4s, 3.0s
   ],
   // Augmentation's Breath of Eons and Time Skip moved to

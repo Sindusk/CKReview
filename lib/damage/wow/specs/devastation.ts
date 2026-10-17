@@ -55,10 +55,36 @@
 // pull on the top players (median 6), 7–24 on the weaker (median 14).
 // WoWAnalyzer grades the same ticks (its tick efficiency; Bragontix
 // 340 / 385 against 380 / 415 here, chains counted as carried).
+//
+// ── Dragonrage drift: a use's worth (dragonrageValue) ─────────────────
+// Dragonrage (375087) is tracked at 120s (tracked-cooldowns.ts) but deals
+// nothing under its own id, so a lost use was worth 0 and its drift never
+// reported. What a window adds, measured: Essence Burst (359618) gains run
+// 0.15–0.39 a second inside it against 0.06–0.15 outside, 3–8 extra a use
+// over its ~25–33s window (Animosity re-applications merged); each makes a
+// Disintegrate free, worth one over the Living Flame it displaces
+// (Disintegrate 370–503k a cast, Living Flame 45–87k); plus the Pyres the
+// cast exhales (98–227k on one target, 0.4–0.7M on Vashnik's adds). Per
+// use: 1.0–3.3M. The window's per-hit bonus is small (3–25% on most), and
+// the raw damage rate inside vs outside (2.4–9.3M a use) carries the
+// empowers, lust and potions lined up with it, so neither is used.
+// Ready time in the fight's hold windows isn't held (burstHold), and a
+// Dragonrage pressed before the pull counts (prePullStatusIds: Mythvoker,
+// Vashnik, first removal 0:09, first cast 2:01.9).
+// Measured: no top player loses a use. Qiyue 1.22M (ready 6:22, kill
+// 6:35: room for a fourth), Emerie 783k (2:01 → 2:42 outside Stasis);
+// Meatbulb's 23s at 4:15 falls in Vashnik's hold window.
+//
+// Tip the Scales (370553) stays tracked and unvalued: it makes one
+// empower instant at full rank, and every player here releases theirs
+// early (0.5–1.1s of charge on average), so a use saves about half a GCD,
+// ~0.1–0.2M. Its drift (Qiyue, Emerie, Elfuêgo, Mythvoker's 48s at
+// 2:27–3:15 on Vashnik) is left unpriced.
 
+import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { JobCheck, Moment } from "../../types";
 import { finding } from "../../checks";
-import { inWindows, mergeWindows } from "../../timeline";
+import { inWindows, mergeWindows, statusWindows } from "../../timeline";
 import { k } from "./shared";
 
 // Ids from the sample logs' masterData (dG8D9y6WxrfmtgXp, fcj1YgaCJBT2kXFm).
@@ -136,5 +162,47 @@ const ticksClipped: JobCheck = (ctx) => {
     moments,
   })];
 };
+
+// ── Dragonrage, a use's worth (dragonrageValue) ───────────────────────
+
+const DRAGONRAGE = 375087;
+const ESSENCE_BURST = 359618;
+const DR_PYRE_MS = 1_500;
+
+/** Damage per cast of an ability, its hits matched by name. */
+function perCast(p: PlayerInfo, name: string, endMs: number): number {
+  const n = p.casts.filter((c) => !c.fake && c.abilityName === name && c.timestamp < endMs).length;
+  if (n === 0) return 0;
+  return p.damageDone.filter((e) => !e.pet && e.abilityName === name && e.timestamp < endMs).reduce((a, e) => a + (e.amount ?? 0), 0) / n;
+}
+
+/**
+ * One Dragonrage (tracked-cooldowns.ts): the Essence Bursts it adds (gains
+ * a second inside its windows less outside, × its average window) each
+ * worth a Disintegrate over the Living Flame it replaces, plus the Pyres
+ * the cast exhales.
+ */
+export function dragonrageValue(p: PlayerInfo, endMs: number): { value: number; basis: string } | undefined {
+  const wins = statusWindows(p, new Set([DRAGONRAGE]), endMs).filter((w) => w.startMs < endMs);
+  const casts = p.casts.filter((c) => !c.fake && c.abilityId === DRAGONRAGE && c.timestamp < endMs).map((c) => c.timestamp);
+  if (wins.length === 0 || casts.length === 0) return undefined;
+  const inMs = wins.reduce((a, w) => a + Math.min(w.endMs, endMs) - w.startMs, 0);
+  const outMs = endMs - inMs;
+  if (inMs <= 0 || outMs <= 0) return undefined;
+  const gains = (p.buffs ?? []).filter((b) => b.abilityId === ESSENCE_BURST && b.source === p.name && b.timestamp < endMs &&
+    (b.buffStatus === "applied" || b.buffStatus === "stack"));
+  const gIn = gains.filter((b) => inWindows(b.timestamp, wins)).length;
+  const avgLen = inMs / wins.length;
+  const extra = Math.max(0, (gIn / inMs - (gains.length - gIn) / outMs) * avgLen);
+  const each = Math.max(0, perCast(p, "Disintegrate", endMs) - perCast(p, "Living Flame", endMs));
+  const pyre = p.damageDone.filter((e) => !e.pet && e.abilityName === "Pyre" && casts.some((t) => e.timestamp >= t && e.timestamp <= t + DR_PYRE_MS))
+    .reduce((a, e) => a + (e.amount ?? 0), 0) / casts.length;
+  const value = extra * each + pyre;
+  if (!(value > 0)) return undefined;
+  return {
+    value,
+    basis: `${k(value)} a use: ${extra.toFixed(1)} extra Essence Bursts (gains a second inside its ${(avgLen / 1000).toFixed(0)}s windows less outside) × ${k(each)} (a Disintegrate − a Living Flame) + ${k(pyre)} of Pyres at the cast`,
+  };
+}
 
 export const DEVASTATION_CHECKS: JobCheck[] = [ticksClipped];
