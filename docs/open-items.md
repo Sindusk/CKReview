@@ -459,8 +459,18 @@ and delete them from the header.
     player, and it read casts that generate nothing (row proposed
     `wrong`). Left unbuilt with numbers: rune overcap, Arcane Torrent.
     Kept `wrong`: Breath average duration, Empower Rune Weapon efficiency.
-  - [demonhunter-vengeance.md](wowa-audit/demonhunter-vengeance.md): tank,
-    17; Fury at the cap (wire the existing check).
+  - [demonhunter-vengeance.md](wowa-audit/demonhunter-vengeance.md): phase
+    3 done 2026-10-17 against six top parses and three weaker players (24
+    player-pulls, all Annihilator). No spec check built; the tracked
+    sigils now have a value per use (they hit under other ids, so their
+    drift never showed) and measured cooldowns (vengeance.ts,
+    tracked-cooldowns.ts); engine fix: Sigil of Chains is an on-GCD press
+    (game.ts). Proposed `wrong` for the user's review: Fury at the cap
+    (Fury isn't what limits the spenders), Spirit Bomb fragments,
+    Felblade efficiency. Left unbuilt with numbers: fragments at a
+    Fracture, Fel Devastation rows, Fiery Brand and Immolation Aura
+    efficiency, zero-hit casts. Lead: Metamorphosis (×1.8–3.2 damage
+    rate) and its Untethered Rage proc.
   - [druid-guardian.md](wowa-audit/druid-guardian.md): tank, 4; offensive
     cooldown drift. WoWAnalyzer's own spec is rough.
   - [rogue-assassination.md](wowa-audit/rogue-assassination.md): stale

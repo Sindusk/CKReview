@@ -5,7 +5,8 @@
 // by WoWAnalyzer's spec modules (read, not copied: AGPL); every id and number
 // here is from our own logs (lib/damage/wow/spell-data.ts and the pulls
 // named below). Specs in the samples: Blood (15 players), Protection Paladin
-// (8), Brewmaster (2) and Vengeance (1); the last two are unverified.
+// (8), Brewmaster (2, unverified) and Vengeance (24 player-pulls since its
+// WoWAnalyzer audit pass).
 // Guardian Druid and Protection Warrior aren't in any sample yet.
 //
 // ── Blood Death Knight ─────────────────────────────────────────────────
@@ -46,7 +47,18 @@
 //   loss. Its 20.9s "gap" at 4:56–5:17 had a cast every second (melee
 //   range on the slime). One combat potion of two (0.90M).
 //
-// ── Brewmaster Monk, Vengeance Demon Hunter (unverified) ───────────────
+// ── Vengeance Demon Hunter ─────────────────────────────────────────────
+// No spec check (WoWAnalyzer audit phase 3, 2026-10-17; specs/vengeance.ts
+// holds the model and every number). Tracked: Sigil of Flame (30s) and
+// Sigil of Spite (60s), each use valued by its own hits (they log under
+// other ids than the casts) less the GCD it took, held for Vashnik's
+// Venoms allowed (burstHold). Not judged, measured: Fury at the cap (the
+// spenders are GCD-bound: top players cast Soul Cleave at 120 Fury back
+// to back), Soul Fragment waste and Spirit Bomb fragment counts (top
+// players as weak), the Metamorphosis window (6–338k a pull, top as weak).
+// Sigil of Chains is a GCD press (game.ts).
+//
+// ── Brewmaster Monk (unverified) ───────────────────────────────────────
 // Tracked cooldowns only (tracked-cooldowns.ts). Brewmaster's energy is at
 // 100 on 39 of 183 casts (xKP1M6gwC8WpnrBc pull 14), but how long it sat
 // there isn't in the log: not judged yet.
