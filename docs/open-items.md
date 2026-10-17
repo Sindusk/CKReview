@@ -606,8 +606,19 @@ and delete them from the header.
     Thunder Blast stacks (negligible), Whirlwind stacks (fires on top
     players as much), Bladestorm's cooldown (no model fits). Proposed
     `wrong`: Slayer Execute overuse.
-  - [deathknight-blood.md](wowa-audit/deathknight-blood.md): tank, 7;
-    Death and Decay with Crimson Scourge.
+  - [deathknight-blood.md](wowa-audit/deathknight-blood.md): phase 3 done
+    2026-10-17 on the 97 Blood player-pulls on disk (no fetch; 82
+    San'layn, 15 Deathbringer). Built (specs/blood.ts): Dancing Rune Weapon
+    drift valued by the Rune Weapon's hits (was worth 0; 0.6–2.5M a use,
+    fires on 15 weaker player-pulls, no top one), Reaper's Mark tracked
+    for Deathbringer, "Free Death and Decay held" (Crimson Scourge held
+    with none down: top 1–36k, weak up to 346k). **Removed for the user's
+    review:** the Runic Power cap check for Blood (0.34–1.56M on top
+    players, pricing Blood Boil and Death Grip, which generate none; a
+    rebuild doesn't separate). Proposed `wrong`: Runic Power waste,
+    Marrowrend overuse (Bone Shield stacks to 12; top players refresh at
+    9–12), Exterminate stacks. Open lead: Blood Boil presses (no recharge
+    model).
   - [deathknight-unholy.md](wowa-audit/deathknight-unholy.md): 7;
     Virulent / Dread Plague uptime.
   - [demonhunter-devourer.md](wowa-audit/demonhunter-devourer.md): 7;
