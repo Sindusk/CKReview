@@ -209,17 +209,27 @@
 //   the white mage didn't go to the red dot. The crystal players form a
 //   clean four-corner box in every pull (D16 too; that healer had no
 //   crystal), so the orb route is the likely meaning; still unreadable.
+// VOD review 2026-10-17 (user): report E (all 31 pulls now on disk, full
+//   captures) pulls 2, 4, 14, 30, rulings in expectations/rulings.json.
+//   E2: #1's sword into the group was the holder's. E4: the near-pair
+//   player off the line (answers old question 4 for E4). E14: #4 didn't
+//   use knockback resist (Major, not the cutoff: raised), and #5 walked
+//   into the charge after their own sword (answers old question 3 for
+//   E14: the odd number's). E30: the no-debuff player should have been
+//   north of Cruise Chaser. The user reads Stasis positions as compass
+//   points with a bearing, so the cone descriptions give those. Apocalyptic
+//   Ray aims at the player farthest from Brute Justice, not the jump
+//   baiter (user; NAUR's red dot); E9 (#4 in it) the VOD couldn't show.
 // OPEN QUESTIONS:
 // 1. Electromagnetic Burst names nobody (C27, D5, D16): can the orbs'
 //    paths be read from anything the log keeps?
 // 2. Wormhole #3's sword into the waiting group (D13, D19, F2, F7; D10
 //    was fallout of an earlier death): #3's facing, or #1/#5/#7 standing
 //    in its path?
-// 3. Charges hitting the odd number before them (D17, E14, E31, F11) name
-//    the odd number: did they face wrong, or should the even have moved?
-// 4. Stasis near-pair players 0.8-1.6y off the line (C13, C27, E4): the
-//    user called C12 the near player's (not baited cleanly south); same
-//    for the others?
+// 3. Charges hitting the odd number before them (D17, E31, F11) name the
+//    odd number: E14 was theirs (walked into the dash); the others?
+// 4. Stasis near-pair players 0.8-1.6y off the line (C13, C27): C12 and
+//    E4 were the near player's; same for the others?
 //
 // -- GUIDE-DERIVED MODEL (2026-10-15) --
 // Research only: no detector, live-report verification or VOD rulings.
@@ -637,7 +647,7 @@ const ENUMERATION_MARKER = 65;
 type Avoidable = { name: string; advice: string };
 // Never in a clean Wormhole (B, C, D, E, F); no Damage Down (Shadowbringers).
 const AVOIDABLE: Record<number, Avoidable> = {
-  18508: { name: "Apocalyptic Ray", advice: "after landing, Brute Justice fires five pulses toward the center: the jump baiter steps toward the wall, everyone else stays off its line" },
+  18508: { name: "Apocalyptic Ray", advice: "after landing, Brute Justice fires five pulses at the player farthest from it (not the jump baiter; NAUR's red dot): everyone else steps out of that line" },
   18517: { name: "Eye of the Chakram", advice: "bait the chakrams in the center together, then leave along the wall before they fire" },
 };
 
@@ -676,6 +686,14 @@ const dist = (a: { x?: number; y?: number }, b: { x?: number; y?: number }) =>
   a.x === undefined || a.y === undefined || b.x === undefined || b.y === undefined ? NaN : Math.hypot(a.x - b.x, a.y - b.y) / 100;
 const fromCenter = (e: { x?: number; y?: number }) => dist(e, { x: 10000, y: 10000 });
 const yd = (n: number) => `~${n.toFixed(1)}y`;
+const COMPASS = ["north", "north-northeast", "northeast", "east-northeast", "east", "east-southeast", "southeast", "south-southeast",
+  "south", "south-southwest", "southwest", "west-southwest", "west", "west-northwest", "northwest", "north-northwest"];
+/** "northwest (bearing 318°), ~2.1y" of a player from a boss: the user reads positions as compass points (2026-10-17). */
+const whereFrom = (e: { x?: number; y?: number } | undefined, boss: { x?: number; y?: number }) => {
+  if (!e || e.x === undefined || e.y === undefined || boss.x === undefined || boss.y === undefined) return undefined;
+  const b = (Math.atan2(e.x - boss.x, -(e.y - boss.y)) * 180 / Math.PI + 360) % 360;
+  return `${yd(dist(e, boss))} ${COMPASS[Math.round(b / 22.5) % 16]} of it (bearing ${b.toFixed(0)}°)`;
+};
 const side = (x: number | undefined) => (x === undefined ? "?" : x > 10000 ? "E" : "W");
 
 /** Hits of one ability on living players in [a, b]. */
@@ -906,20 +924,19 @@ function detectStasis(c: Ctx, t0: number) {
     const available = k.owners.filter((p) => life.alive(p, k.cast.timestamp) && !earlier.includes(p));
     if (!victims.some((p) => k.owners.includes(p)) && available.length) {
       for (const p of available) {
-        const d = dist(pos.get(p) ?? {}, k.cast);
+        const at = whereFrom(pos.get(p), k.cast);
         const v = victims.map((q) => dist(pos.get(q) ?? {}, k.cast)).filter((x) => !isNaN(x));
         push(p, "Temporal Stasis: Missed Bait",
-          `${coneName} was theirs (${roleName(p)}), but they were frozen ${isNaN(d) ? "too far" : yd(d)} from it${v.length ? `, no closer than ${namesOf(victims)} (${yd(Math.min(...v))})` : ""}: the cone went to the nearest players instead${outcome(victims)}. ${k.idx === 2 ? "The Restraining Order on Cruise Chaser's side stands at its inner marker, closer than the far boss's pair." : "Stand right beside your boss, north or south of it."}`);
+          `${coneName} was theirs (${roleName(p)}), but they were frozen ${at ?? "too far from it"}${v.length ? `, no closer than ${namesOf(victims)} (${yd(Math.min(...v))})` : ""}: the cone went to the nearest players instead${outcome(victims)}. ${k.idx === 2 ? "The Restraining Order on Cruise Chaser's side stands at its inner marker, closer than the far boss's pair." : "Stand right beside your boss, north or south of it."}`);
       }
       continue;
     }
     // (c) The owner's cone ran through someone else.
     const owner = victims.filter((p) => k.owners.includes(p)).sort((a, b) => dist(pos.get(a) ?? {}, k.cast) - dist(pos.get(b) ?? {}, k.cast))[0];
     if (!owner) continue;
-    const e = pos.get(owner);
-    const off = e && k.cast.x !== undefined ? Math.abs(e.x! - k.cast.x) / 100 : NaN;
+    const at = whereFrom(pos.get(owner), k.cast);
     push(owner, "Temporal Stasis: Cone Through Others",
-      `${coneName}, their bait, also hit ${namesOf(victims.filter((v) => v !== owner))}${severe ? `; ${namesOf(deaths)} died under its vulnerability` : ""}. They stood ${isNaN(off) ? "off" : yd(off)} east-west of the boss rather than straight north or south, so the cone ran toward the wall spots behind it.`);
+      `${coneName}, their bait, also hit ${namesOf(victims.filter((v) => v !== owner))}${severe ? `; ${namesOf(deaths)} died under its vulnerability` : ""}. They were frozen ${at ?? "off the line"}, not straight north or south of it (bearing 0° or 180°), so the cone ran toward the wall spots behind them.`);
   }
   // Frozen on the wrong side with no cone reaching them: still the plan
   // broken (user, 2026-10-16, C10 +5:11: the Paladin's Assault at Cruise
@@ -1190,7 +1207,7 @@ function detectWormhole(c: Ctx, wh: number, headMarkers: HeadMarker[], end: numb
       const off = ownHit ? knockedOff(c.deaths, h, ownHit.e.timestamp) : undefined;
       if (off && !victims.some((p) => p !== h)) {
         push(h, AP_WH_KNOCKBACK_RULE_ID, "Major", "Knocked Off by Own Attack",
-          `Their own ${label} knocked them off the arena; they died ${((off.timestamp - ownHit!.e.timestamp) / 1000).toFixed(1)}s later. Take it with Cruise Chaser between you and the center, so the knockback carries you along the edge, not over it.`, a);
+          `Their own ${label} knocked them off the arena; they died ${((off.timestamp - ownHit!.e.timestamp) / 1000).toFixed(1)}s later. Use knockback immunity (Arm's Length / Surecast) for it, or take it with Cruise Chaser between you and the center so the knockback carries you along the edge.`, a);
       }
       prev = a;
       continue;

@@ -157,6 +157,16 @@
 //   cone went to others); ffxiv-bjcc-severe-contamination (Raid).
 // ffxiv-bjcc-shield (Raid): the Whirlwind after the shield with a median
 //   hit of 24k+ on four or more.
+// ffxiv-bjcc-tank-dead (Raid): a tank's death between J Kick and Gavel,
+//   not a called-wipe reset (user, 2026-10-17, E18 +3:59 the Warrior to
+//   autos: "the moment the tank dies, the mechanic becomes unresolvable";
+//   E22 +2:41.7). It yields to a Nisi-death or penalty marker within 3s
+//   (B31, B36 the color it held; B38 Shrapnel; D8, B19 Punishing). Moved
+//   B11, B30, B44, C24 earlier.
+// ffxiv-bjcc-chakram-bait (player-less Minor): Eye of the Chakram on a
+//   tank is a bad bait by someone unnamed, not the tank's avoidable (user,
+//   E22: the tank "didn't make a mistake - the Chakram was baited incorrectly";
+//   also B31, D26).
 // Generic, BJ/CC wipes only (no Temporal Stasis, ended 30s+ after J Kick),
 //   without a mechanic Raid: ffxiv-bjcc-called-wipe (3+ no-killing-blow
 //   deaths in 10s or any within 12s of the end; Photon-tick deaths
@@ -167,9 +177,9 @@
 //   carry Nisi).
 // Not built: Enumeration (its one failure, B13, followed three deaths);
 //   Super Jump / Apocalyptic Ray extras (no failure on disk); Water/Lightning
-//   hits under their own Resistance Down (none on disk); tank deaths to
-//   autos (C6, C24, B19, B44: mitigation; their Punishing / Gavel is the
-//   cutoff); the enrage (never reached).
+//   hits under their own Resistance Down (none on disk); who is at fault
+//   for a tank's death to autos (C6, C24, B19, B44, E18: mitigation; the
+//   death itself is now the cutoff); the enrage (never reached).
 // VOD review 2026-10-16 (user): report B pulls 1, 11, 14, 22, 24, 25, 31,
 //   36, 37, 43 and report C pulls 4, 8, 11, 19 (the mine tank's first
 //   puddle dropped out of position hid the mine: confirmed), 22 (the black
@@ -179,11 +189,18 @@
 //   answered above; pass 3's wrong color (B31) turned out fallout, and the
 //   pass-4 wrong color (B22) was the support running into the DPS, with
 //   the user unsure, so both stay named.
+// VOD review 2026-10-17 (user): report E = AHw6VfLrZ97Gj1Dn (all 31 pulls
+//   on disk) pulls 18, 22, 24, rulings in expectations/rulings.json. E24
+//   +4:17.4 pass 4: the white mage (donor) walked into the dancer, who was
+//   correct; both still named (see question 3).
 // OPEN QUESTIONS:
 // 1. Collisions name both players. Who moved (B37 pass 4, B43 +63 two
 //    melee in the west Enumeration; C22 +101.5 two ranged at pass 3)?
 // 2. A drop at passes 1-3 held by a support with no single free receiver
 //    now names nobody (the DPS who should have come is unknown).
+// 3. Pass-4 wrong colors: the support ran into the DPS in both reviewed
+//    cases (B22, E24). Position samples are too sparse to show who moved.
+//    Do the supports move at the fourth pass, so the support is named?
 //
 // -- GUIDE-DERIVED MODEL (2026-10-15) --
 // Research only, no detector and no claims verified against local logs.
@@ -489,7 +506,7 @@ import type { DeathEvent } from "@/types/DeathEvent";
 import type { PullError, EnemyEvent } from "@/types/PullError";
 import type { ReportedOccurrence } from "@/lib/mechanics/occurrences";
 import { FF_JOB_BY_NAME } from "@/lib/ffl-job-data";
-import { kFmt, joinNames, playerError, raidMarker } from "@/lib/mechanics/wow/common";
+import { kFmt, joinNames, playerError, playerlessMinor, raidMarker } from "@/lib/mechanics/wow/common";
 import {
   DEATH_EVENT_LAG_MS, type Life, bodyHit, buildLife, castsOf, uniq, namesOf, realAmount, resetCluster, isTank,
 } from "@/lib/mechanics/ffxiv/fru/common";
@@ -515,6 +532,8 @@ export const BJCC_CONTAMINATION_RULE_ID   = "ffxiv-bjcc-severe-contamination";
 export const BJCC_SHIELD_RULE_ID          = "ffxiv-bjcc-shield";
 export const BJCC_CALLED_WIPE_RULE_ID     = "ffxiv-bjcc-called-wipe";
 export const BJCC_COLLAPSE_RULE_ID        = "ffxiv-bjcc-collapse";
+export const BJCC_TANK_DEAD_RULE_ID       = "ffxiv-bjcc-tank-dead";
+export const BJCC_CHAKRAM_BAIT_RULE_ID    = "ffxiv-bjcc-chakram-bait";
 
 const J_KICK          = 18516;
 const JUDGMENT_NISI   = 18494;
@@ -539,6 +558,7 @@ const SEVERE_CONTAMINATION = 18891; // a tornado left alive
 const WHIRLWIND       = 18882;
 const BJ_ATTACK       = 18811;
 const PHOTON          = 18487;
+const CHAKRAM         = 18517;     // Eye of the Chakram
 
 const NISI: Record<number, string> = { 1002222: "α", 1002223: "β", 1002137: "γ", 1002138: "δ" };
 const JUDGMENT: Record<number, string> = { 1002224: "α", 1002225: "β", 1002139: "γ", 1002140: "δ" };
@@ -672,6 +692,17 @@ export function detectBjccErrors(
   const arena = detectArena(players, life, casts, mt, occurrences);
   errors.push(...arena.errors);
   raids.push(...arena.raids);
+  // A tank dying before Gavel ends the pull: each tank holds a boss and
+  // carries a Lightning helper and the mines (user, 2026-10-17, E18 +3:59:
+  // "the moment the tank dies, the mechanic becomes unresolvable"; E22
+  // +2:41.7 the Warrior's chakram death). Not on a Limit Cut wipe.
+  const gavelT = casts.find((c) => c.abilityId === GAVEL)?.timestamp ?? end;
+  const tankDeath = deathEvents.filter((d) => tanks.some((p) => p.name === d.player) && !resets.has(d)
+    && d.timestamp - DEATH_EVENT_LAG_MS >= start && d.timestamp - DEATH_EVENT_LAG_MS < gavelT)
+    .sort((a, b) => a.timestamp - b.timestamp)[0];
+  if (tankDeath && end - start > LC_HANDOFF_MS) raids.push(raidMarker(BJCC_TANK_DEAD_RULE_ID, "Tank Died",
+    `${tankDeath.player} died (${causeOf(players, tankDeath)}) before Gavel. Each tank holds a boss and has duties (Lightning, mines, Flarethrower, Decree Nisi): the phase can't be resolved without them. Treated as the cutoff point.`,
+    tankDeath.timestamp - DEATH_EVENT_LAG_MS, tankDeath.killingAbilityGameId, tankDeath.cause || "Death"));
 
   // Only the earliest mechanic Raid marker; generic cutoffs only without one,
   // and only for this phase's own wipes.
@@ -679,9 +710,14 @@ export function detectBjccErrors(
   let firstRaid = raids[0];
   // A death that also set off Punishing (its carrier) or another mechanic
   // penalty within 3s: that penalty names the same death more precisely.
-  if (firstRaid?.ruleId === BJCC_NISI_DEATH_RULE_ID) {
-    const same = raids.find((r) => r !== firstRaid && r.timestamp - firstRaid!.timestamp <= NISI_DEATH_YIELD_MS);
-    if (same) firstRaid = same;
+  // A tank's death yields the same way, and to the Nisi color it took with
+  // it (B31, B36) or a penalty it caused (B38 Shrapnel, D8 Punishing).
+  const rank = (r: PullError) => (r.ruleId === BJCC_TANK_DEAD_RULE_ID ? 0 : r.ruleId === BJCC_NISI_DEATH_RULE_ID ? 1 : 2);
+  while (firstRaid && rank(firstRaid) < 2) {
+    const from = firstRaid;
+    const same = raids.find((r) => r.timestamp >= from.timestamp && r.timestamp - from.timestamp <= NISI_DEATH_YIELD_MS && rank(r) > rank(from));
+    if (!same) break;
+    firstRaid = same;
   }
   if (firstRaid) errors.push(firstRaid);
   else if (!stasis && lastEvent - start > LC_HANDOFF_MS) {
@@ -709,6 +745,15 @@ function detectAvoidables(players: PlayerInfo[], life: Life, deaths: DeathEvent[
       if (!died && realAmount(e) <= 0) continue;   // an invulnerability
       last = { id: e.abilityId, t: e.timestamp };
       const k = AVOIDABLE[e.abilityId];
+      // A chakram on a tank: the tanks hold the bosses where they must, so
+      // it was baited wrongly, by someone the log can't name (user,
+      // 2026-10-17, E22 +2:41.7: the Warrior "didn't make a mistake").
+      if (e.abilityId === CHAKRAM && isTank(p)) {
+        out.push(playerlessMinor(BJCC_CHAKRAM_BAIT_RULE_ID, "Chakram Baited Into a Tank",
+          `Eye of the Chakram ran through ${p.name}, a tank holding a boss (${kFmt(realAmount(e))})${died ? ", who died" : ""}: the chakrams were baited onto the tanks' line. The log can't say who baited them; the stack baits them through the center, away from both bosses' tanks.`,
+          e.timestamp, CHAKRAM, k.name));
+        continue;
+      }
       out.push(playerError(p, {
         ruleId: BJCC_AVOIDABLE_RULE_ID, severity: died ? "Major" : "Minor", name: `Hit by ${k.name}`,
         description: `Hit by ${k.name}${realAmount(e) > 0 ? ` (${kFmt(realAmount(e))})` : ""}${wall ? ", knocked into the wall and died" : died ? " and died" : ""}: ${k.advice}.`,

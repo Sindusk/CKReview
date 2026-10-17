@@ -78,7 +78,11 @@
 //   that hit someone else while pointing more than 60 degrees off the
 //   clockwise track (its extras aren't flagged), or a charge that hit two
 //   or more players outside the pair (its extras are flagged too: README
-//   philosophy 3, the log can't say who moved).
+//   philosophy 3, the log can't say who moved). A charge whose holder stood
+//   15y+ from Cruise Chaser's strike point (clean 0.4-6.4y, p90 5y, 449
+//   charges) and hit anyone: "Charge Taken From the Wrong Side", the
+//   holder's alone (user, E7 +1:57.9: #2 on the wrong side of the arena;
+//   also A40 #2), its victims not flagged.
 // ffxiv-lc-knockback (Major), on the holder: knocked off the arena by their
 //   own sword/charge, no stray hit on them in the 3s before.
 // ffxiv-lc-hawk-blaster (Minor; Major if it killed). Not flagged within
@@ -100,6 +104,10 @@
 //   LxAVFd29kwPm8HnB (now all 30 pulls on disk, full captures) pulls 1, 3,
 //   7, rulings in expectations/rulings.json. Questions 2 and 3 below were asked (B3, B8)
 //   and the VOD couldn't show either.
+// VOD review 2026-10-17 (user): report E = AHw6VfLrZ97Gj1Dn (all 31 pulls
+//   on disk) pull 7, rulings in expectations/rulings.json. NAUR's 1256
+//   group starts on the north-west half, 3478 on the south-east (the user's
+//   cheat sheet).
 // OPEN QUESTIONS:
 // 1. A charge through two or more players names the even holder and the
 //    players hit (A45 #2, A50 #8, B9 #2). Which was it?
@@ -314,6 +322,10 @@ const KNOCKOFF_MAX_MS = 3_600;
 // Physical Vulnerability Up from each numbered hit lasts 17s: any second
 // numbered hit inside it kills.
 const VULN_MS = 17_000;
+// The even holder stands 0.4-6.4y from Cruise Chaser's strike point in
+// clean charges (p90 5y, 449 single-hit charges); E7's #2 on the wrong side
+// of the arena was 27y away.
+const WRONG_SIDE_YALMS = 15;
 // A Hawk Blaster hit this soon after a stray sword/charge is the knockback
 // carrying the player into it (B11 +18.3).
 const DISPLACED_MS = 2_500;
@@ -438,6 +450,22 @@ function detectNumberedAttacks(attacks: Attack[], deaths: DeathEvent[], kickT: n
         ruleId: LC_AIM_RULE_ID, severity: killed.length ? "Major" : "Minor", name: "Alpha Sword Aimed Into the Party",
         description: `Their Alpha Sword (#${a.n}) pointed ${Math.abs(dev).toFixed(0)} degrees off the route (clean swords stay within ~20) and hit ${namesOf(a.extras)}.${deadText} Cruise Chaser strikes from behind you along your facing: keep facing clockwise along the route so the cone runs ahead of you, away from your partner.`,
         timestamp: t, abilityId: ALPHA_SWORD, abilityName: "Alpha Sword",
+      }));
+      return;
+    }
+    // A charge whose holder stood across the arena from Cruise Chaser's
+    // strike point: the holder was on the wrong side (user, 2026-10-17, E7
+    // +1:57.9: "#2 was on the wrong side of the arena"), and whoever the
+    // line crossed is theirs, not a stray.
+    const ownerDist = ownerHit && ownerHit.x !== undefined && ownerHit.y !== undefined && a.cast.x !== undefined && a.cast.y !== undefined
+      ? yalms(ownerHit.x - a.cast.x, ownerHit.y - a.cast.y) : undefined;
+    if (!a.sword && ownerDist !== undefined && ownerDist >= WRONG_SIDE_YALMS) {
+      const ownDeath = nextDeath(owner, ownerHit!.timestamp);
+      const ownKnock = knockedOff(ownDeath, ownerHit!.timestamp);
+      errors.push(playerError(owner, {
+        ruleId: LC_AIM_RULE_ID, severity: killed.length || ownKnock ? "Major" : "Minor", name: "Charge Taken From the Wrong Side",
+        description: `As #${a.n} they stood ~${ownerDist.toFixed(0)}y from where Cruise Chaser struck, across the arena from their partner (clean charges: within ~6y), so the charge ran through ${namesOf(a.extras)}.${deadText}${ownKnock ? " Its knockback also carried them off the arena." : ""} Stay on your group's half beside #${a.n - 1}, ahead of them on the route.`,
+        timestamp: t, abilityId: CHARGE, abilityName: "Super Blassty Charge",
       }));
       return;
     }

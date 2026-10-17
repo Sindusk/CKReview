@@ -135,6 +135,11 @@
 //   of Pain and a Drainage tether: mitigation, user) and 28. Report D =
 //   6pzyKv8fnYBZ2XGa pulls 3, 6, 14 (a Throttle expiring after Living
 //   Liquid died: now read with every death), 22.
+// VOD review 2026-10-17 (user): report E = AHw6VfLrZ97Gj1Dn pulls 1, 12,
+//   15, 17, all as detected. E1 / E19: the Living Liquid tank died to
+//   autos after Cascade, out of cooldowns and heals (mitigation, no error;
+//   the called wipe stays the cutoff). E12: the Paladin had tank stance on
+//   at the pull and stole the first Fluid Swing (ffxiv-ll-threat).
 // OPEN QUESTIONS:
 // 1. roles.ts names the paladin MT (opening auto) but the warrior holds
 //    Living Liquid and does the opening invulnerability every pull, NAUR's

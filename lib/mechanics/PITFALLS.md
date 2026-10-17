@@ -27,6 +27,10 @@ philosophy and the data semantics this list assumes.
   still has every death, so bound the module's window by the last damage
   or cast event, not the last death (Usurper of Frost, Ultimate Kefka,
   Enter the Dragon).
+- **A sample report used for a late phase is a partial capture.** Before
+  a VOD review of it, check each pull's stream windows and refetch the
+  pulls with `--refetch` (TEA: a report fetched `--from-minutes 4.6` held
+  no P1/P2 data for its long pulls).
 - **Before building the next phase, check where the earlier capture
   stopped.** Omega P4's `--to-minutes 9.5` left P5's first 60s on disk,
   and six Delta wipes died 4-6s past the cut: their deaths were there, the
@@ -156,6 +160,14 @@ philosophy and the data semantics this list assumes.
 - **An assignment by party-list order isn't in the log.** Healer cleanse
   splits follow it, so "the healer who cleansed fewer" is usually the
   wrong one; keep such misses player-less (TEA Throttle; user).
+- **A hit on a player whose spot is fixed by duty isn't theirs.** A tank
+  holding a boss can't step out of a baited line: the chakram that killed
+  TEA's tank was a bad bait by someone the log can't name (user). Keep it
+  player-less rather than an avoidable on the tank.
+- **A partner far from where the attack started set its path.** TEA Limit
+  Cut's even holder stands within ~6y of Cruise Chaser's strike point; at
+  27y they were on the wrong half, and the charge's victims across the
+  arena were theirs, not strays (user).
 - **An add's owner is its auto-attack target.** TEA's dolls fixate their
   first attacker; the autos named the owner every pull, and the one DPS
   without a doll owned the one fed before it ever swung.
