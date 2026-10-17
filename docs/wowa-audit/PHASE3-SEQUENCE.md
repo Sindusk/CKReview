@@ -63,7 +63,7 @@ damage rows are measured.
 | 19 | Feral | [druid-feral.md](druid-feral.md) | done 2026-10-17: tracked cooldowns valued (Tiger's Fury, Berserk, Incarnation, Convoke 120s, Feral Frenzy), Rip off every enemy, Ferocious Bite below 5 points, Incarnation window (feral.ts); Moonfire / Frantic Frenzy / Stampeding Roar presses (game.ts); Clearcasting and Apex Predator's Craving expiries (procs.ts); verified by the main session |
 | 20 | Augmentation | [evoker-augmentation.md](evoker-augmentation.md) | done 2026-10-17: support hits (Ebon Might, Prescience) no longer GCD damage (game.ts: GCDs were priced ~3× high); cooldown recovery model with Time Skip; Ebon Might down while ready, Prescience charges capped, Breath of Eons / Time Skip held, Breath never exploded (augmentation.ts); verified by the main session |
 | 21 | Devastation | [evoker-devastation.md](evoker-devastation.md) | done 2026-10-17: Disintegrate ticks clipped, Fire Breath / Eternity Surge held, Dragonrage valued (devastation.ts); clipped Disintegrate is channel time (timeline.ts channelTicks); pre-pull tracked cooldowns seen from their buff (checks.ts); Essence Burst expiry (procs.ts); verified by the main session (clip margins checked: no jitter cluster) |
-| 22 | Brewmaster | [monk-brewmaster.md](monk-brewmaster.md) | |
+| 22 | Brewmaster | [monk-brewmaster.md](monk-brewmaster.md) | done 2026-10-17: Breath of Fire reset lost (brewmaster.ts); Exploding Keg valued with its later hits and `burstHold`; Invoke Niuzao tracked at 120s; verified by the main session |
 | 23 | Shadow | [priest-shadow.md](priest-shadow.md) | |
 | 24 | Subtlety | [rogue-subtlety.md](rogue-subtlety.md) | |
 | 25 | Enhancement | [shaman-enhancement.md](shaman-enhancement.md) | |
@@ -385,6 +385,9 @@ measured for it.
   Kept `wrong`: per-empower count, Mass Disintegrate ticks, channel
   cancel, fight-end procs. Evidence in
   [evoker-devastation.md](evoker-devastation.md).
+- Brewmaster (2026-10-17): proposed `wrong`: Wisdom of the Wall count,
+  Blackout Combo on Keg Smash. Evidence in
+  [monk-brewmaster.md](monk-brewmaster.md).
 
 - Elemental (2026-10-17): `CallOfTheAncestors/other-checks`,
   `statistics` (and whether "Stormkeeper before Ascendance" should be
