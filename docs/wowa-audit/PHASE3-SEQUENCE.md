@@ -51,7 +51,7 @@ damage rows are measured.
 | 9 | Restoration Druid | [druid-restoration.md](druid-restoration.md) | done 2026-10-17 (healer pass): no candidates; Convoke the Spirits locks the GCD (game.ts) |
 | 10 | Restoration Shaman | [shaman-restoration.md](shaman-restoration.md) | done 2026-10-17 (healer pass): no candidates |
 | 11 | Beast Mastery | [hunter-beastmastery.md](hunter-beastmastery.md) | done 2026-10-17: Bestial Wrath held, Kill Command without Nature's Ally, Wild Thrash on one enemy (beastmastery.ts); BM GCD value counts the press's pet hits, Font of Venomous Rage is a 2s channel (game.ts); verified by the main session |
-| 12 | Balance | [druid-balance.md](druid-balance.md) | |
+| 12 | Balance | [druid-balance.md](druid-balance.md) | done 2026-10-17: Eclipse charges capped, Fury of Elune held, Starfall on one enemy, spenders outside Eclipse reworked (balance.ts); verified by the main session |
 | 13 | Retribution | [paladin-retribution.md](paladin-retribution.md) | |
 | 14 | Frost DK | [deathknight-frost.md](deathknight-frost.md) | |
 | 15 | Vengeance | [demonhunter-vengeance.md](demonhunter-vengeance.md) | |
@@ -226,6 +226,12 @@ measured for it.
   `isGcdDamage` counts those pet hits (game.ts `PET_PRESS_HITS`; Beast
   Mastery's Kill Command). Check a pet spec's GCD value against its
   presses' pet hits.
+- **Re-run the spec's existing checks on the top players** too, not only
+  the new ones: Balance's verified "spenders outside Eclipse" read
+  1.2–2.3M on them and had to be rewritten.
+- **Talents move abilities between "passive" and "pressed"**: Balance's
+  Eclipse is now a pressed spell with two charges, which phase 2 didn't
+  know. Read the cast list before trusting the ledger's model.
 - **Buffs that lock the player go in `LOCK_STATUSES`** (game.ts): a
   channel whose spells log as their own casts (Convoke the Spirits) or an
   on-use item that roots the player (Soulcoiler Ritual Vessel) reads as
@@ -288,6 +294,13 @@ measured for it.
   players (Koralie 154k); each hold is 2–4s. Kept as a small real loss.
   The phase-2 `wrong` Beast Cleave row was overturned (Beast Cleave now
   comes only from Wild Thrash, so a hit-less window is a wasted press).
+- Balance (2026-10-17): proposed `wrong` Starfire target count; kept
+  `wrong` Starfire outside Eclipse with Lunar Calling and spenders per
+  Eclipse; the phase-2 `wrong` Starfall targets overturned (one-enemy
+  Starfall does 0.40–0.46× a Starsurge per Astral Power). The existing
+  "spenders outside Eclipse" check was rewritten: it read 1.2–2.3M on top
+  players (free procs, Incarnation in its price, spends holding would
+  have capped). Evidence in [druid-balance.md](druid-balance.md).
 
 - Elemental (2026-10-17): `CallOfTheAncestors/other-checks`,
   `statistics` (and whether "Stormkeeper before Ascendance" should be
