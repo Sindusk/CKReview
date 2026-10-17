@@ -84,6 +84,20 @@
 //   gVDPhzp61Zm29HMw Entombed Sentinels Pull 1 0:45 and Ula'tek 5:28), max
 //   10.03s of 691; every other removal is beside a Mangle. Worth one Mangle
 //   (47–50k own hits).
+// - Moonlight Chakram 17s (Marksmanship, Sentinel; added in its phase 3,
+//   2026-10-17): each Trueshot grants the buff (1264946), and the press
+//   (1264949) is only possible while it's up: 108–120s between presses on
+//   every player, one 10–15s after each Trueshot. 11 at D on 61 MM
+//   player-pulls (16.99–17.03s), max 17.03s of 178; every other removal is
+//   beside the press or a new Trueshot. Run out: Storcken
+//   (6qVxPcBdCgXrkG8a, Entombed Sentinels 2:25), Teinaras
+//   (8AFnLQKdrcgawzDC 0:22), Válï ×2 and Shadhunt (LCFp3wbHvQqNP4my),
+//   丶郑兮 (VbAHWZDdPwJBajmx 4:35), Aaragondelta (a4kX1DNT27yHGvqJ 4:32),
+//   Pazsmilkies ×2 (wWx8B1GPZMLghAyz), 非常人贩 (J3ckBVtrZNfWv1h7),
+//   Braktixx (xN9cWhzbvqTVfrG8, 2s before the kill); none on the
+//   99th-percentile and better players (Qenjua, Traviexx, Leevilh,
+//   Taewoos, Tdyipce). Worth a whole Chakram: its hits (1266081, matched
+//   by name) are 0.3–1.4M a press, against a GCD of ~0.25M.
 //
 // ── Measured and left out ──────────────────────────────────────────────
 // - Lava Surge (77762) 10s, clean, but 75 of 657 run out on the top
@@ -146,4 +160,5 @@ export const WOW_MEASURED_PROCS = new Map<number, MeasuredProc>([
   [1262830, { durationMs: 20_000, consumerIds: [187874] }],                       // Storm Unleashed → Crash Lightning
   [264571,  { durationMs: 12_000, consumerIds: [686, 198590, 1261153] }],         // Nightfall → Shadow Bolt, Drain Soul, Malefic Grasp
   [93622,   { durationMs: 10_000, consumerIds: [33917] }],                        // Gore → Mangle
+  [1264946, { durationMs: 17_000, consumerIds: [1264949] }],                      // Moonlight Chakram (from Trueshot) → Moonlight Chakram
 ]);
