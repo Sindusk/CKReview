@@ -41,13 +41,15 @@
 // (outside Incarnation), pooled medians over the 50: in Lunar, Starfire
 // ×1.85, Moonfire ×1.32, Shooting Stars ×1.29, Meteorites ×1.30, Sunfire
 // ×1.07; in Solar, Wrath ×1.80, Sunfire ×1.29, Shooting Stars ×1.28,
-// Moonfire ×1.09. Each charge that sits full is a recharge lost: time at
-// two charges ÷ 30s is that share of an Eclipse not pressed. One Eclipse is
-// worth 15s of the player's non-spender damage outside Eclipse and
-// Incarnation, each ability × (its own inside ÷ outside non-crit median −
-// 1), in the Eclipse the player presses (their Lunar / Solar mix).
-// Starsurge and Starfall are left out: a spender cast outside Eclipse is
-// already spenderOutsideEclipse's (ranged.ts).
+// Moonfire ×1.09; the spenders ×1.43 (Starsurge) and ×1.49 (Starfall).
+// Each charge that sits full is a recharge lost: time at two charges ÷ 30s
+// is that share of an Eclipse not pressed. One Eclipse is worth 15s of the
+// player's damage outside Eclipse and Incarnation, each ability × (its own
+// inside ÷ outside non-crit median − 1, at most ECL_RATIO_CAP: Pondzsi's own
+// Starfall read ×2.32), in the Eclipse the player presses (their Lunar /
+// Solar mix). The spenders are in it: what the player spent outside
+// because no Eclipse came is this check's, not spenderOutsideEclipse's
+// (below), which judges a spend given the player's own Eclipses.
 // Time at two charges isn't held in forced time, inside Incarnation, in
 // the context's hold windows, in the first ECL_OPENER_MS (the opener
 // Incarnation comes at 0:02–0:07), in the pull's last ECL_TAIL_MS, or when
@@ -59,14 +61,47 @@
 // Lazerbares 20.8s; Sylmigron 84.8s on the case study (0:25–0:43, 4:22–5:22:
 // 2.8 Eclipses), 10–57s on his static's Elune pulls (Entombed Sentinels
 // Pull 1: 0:25–0:59, the whole gap between his first two Incarnations).
-// An Eclipse was worth 0.3–0.6M by the hits; the plain in-vs-out damage
-// rate reads 0.6–1.6M, inflated by what lines up with Eclipse.
-// Lost (a pull): the top players above none on 12 of 25, else 10–81k
-// (Новеон 81k, Arzenal 64k: 0:22–0:28 after his opener); Copingway 208k,
-// Boomtoast 165k, Mortychen 135k, Lazerbares 85k; Sylmigron 685k on the
-// case study (4:23–5:23: 36s at two charges, 351k) and 0–409k on each of
-// his static's 16 pulls, 3.3M in all (Entombed Sentinels Pull 1 409k:
-// 0:25–1:36; Ula'tek 400k).
+// An Eclipse was worth 0.3–0.6M by the hits (Sylmigron 452k on the case
+// study); the plain in-vs-out damage rate reads 0.6–1.6M, inflated by what
+// lines up with Eclipse.
+// Lost (a pull): the top players above none on 12 of 25, else 18–123k
+// (Новеон 123k, Skress 107k, Arzenal 84k: 0:22–0:28 after his opener);
+// Copingway 258k, Boomtoast 202k, Lazerbares 184k, Mortychen 172k; Sylmigron
+// 1.06M on the case study (4:23–5:23: 36s at two charges, 546k) and 0–931k
+// on each of his static's 16 pulls (Ula'tek 931k; Entombed Sentinels Pull 1
+// 506k: 0:25–1:36).
+//
+// ── Spenders outside Eclipse (spenderOutsideEclipse) ───────────────────
+// Built 2026-10-13 in ranged.ts on the case study (Sylmigron 26 vs Kadss's
+// 4 there, WoWAnalyzer 28 vs 4), moved here and reworked in this pass. As
+// built, a paid or free Starsurge / Starfall cast outside Eclipse and
+// Incarnation under 20 Astral Power from the cap was priced at the
+// player's inside − outside average per cast; the top players read
+// 1.2–2.3M (Delvkin 2.32M for 18 spends, Lappe 1.48M) against Sylmigron's
+// 1.69M, for three reasons, each measured:
+// - 40 of 87 such spends on the top players checked were free (Starweaver's
+//   Weft / Warp up: Delvkin 13 of 18), a proc used, not a choice;
+// - "inside" took in Incarnation and the enemies a Starfall found
+//   (Kihmarhi's Starfall 510k inside vs 60k outside, Vashnik's adds): read
+//   per hit instead, Eclipse adds ×1.43 to a Starsurge and ×1.49 to a
+//   Starfall (pooled; the player's own with SPENDER_MIN_HITS each side);
+// - the top players keep one Eclipse charge back and still spend outside
+//   Eclipse, because holding would cap: at 6.5–9.6 Astral Power a second
+//   outside, 60 Astral Power fills in 5s.
+// So now: a paid spend outside Eclipse and Incarnation is a loss only when
+// its Astral Power, plus the player's own gain rate outside (from the
+// casts' logged amounts), would have stayed under the cap until their
+// next Eclipse or Incarnation started; priced at its hits that landed
+// outside × (the bonus − 1) (a Starfall pressed just before an Eclipse
+// mostly lands in it). A spend forced by a late Eclipse is excused here:
+// the late Eclipse is eclipseCapped's.
+// Lost (a pull): the top players above none on 9 of 25, else 5–277k
+// (Новеон 277k, Arzenal 263k, Alcorria 251k: 1:42, 2:03 and 3:31, each
+// 1–3s before her Eclipse); weaker Mortychen 149k, Boomtoast 78k; Sylmigron
+// 182k on the case study (0:38, 3:06, 5:19; 20 more excused) and 0–217k on
+// his static's pulls. With eclipseCapped, the pair reads 0–400k on the top
+// players (Lappe, Birdlet, Delvkin, Boltxb, Pondzsi none) and 1.25M on the
+// case study.
 //
 // ── Fury of Elune held (furyHeld) ──────────────────────────────────────
 // Fury of Elune (202770, Elune's Chosen) is an 8s beam: its hits (211545,
@@ -145,6 +180,7 @@ const ECL_OPENER_MS = 8_000;
 const ECL_TAIL_MS = 5_000;
 const ECL_ALLOW_MS = 2_000;
 const ECL_MIN_HITS = 5;
+const ECL_RATIO_CAP = 2;
 const STEP_MS = 250;
 const MIN_HELD_MS = 500;
 
@@ -172,6 +208,12 @@ const STARFALL = 191034;      // the cast and the player's buff
 const STARSURGE = 78674;
 const STARFALL_MS = 8_000;
 const SURGE_HIT_MS = 2_000;
+// Eclipse's bonus to the spenders' hits, pooled over the 50 (Lunar), for a player with too few of their own.
+const BALANCE_SPENDERS: { id: number; name: string; spanMs: number; bonus: number }[] = [
+  { id: STARSURGE, name: "Starsurge", spanMs: SURGE_HIT_MS, bonus: 1.43 },
+  { id: STARFALL, name: "Starfall", spanMs: STARFALL_MS, bonus: 1.49 },
+];
+const SPENDER_MIN_HITS = 5;
 
 const clock = (ms: number) => {
   const t = Math.max(0, Math.round(ms / 1000));
@@ -217,7 +259,7 @@ function fullStretches(times: number[], charges: number, rechargeMs: number, end
 
 // ── Eclipse charges capped ─────────────────────────────────────────────
 
-/** What one Eclipse of a kind adds: ECL_MS × the player's non-spender damage per ms outside it × each ability's measured bonus. */
+/** What one Eclipse of a kind adds: ECL_MS × the player's damage per ms outside it × each ability's measured bonus (capped at ECL_RATIO_CAP). */
 function eclipseWorth(ctx: PlayerCheckContext, buff: number, excluded: Window[]): { value: number; parts: string[] } | undefined {
   const ecl = statusWindows(ctx.player, new Set([buff]), ctx.endMs);
   const anyEcl = statusWindows(ctx.player, new Set([ECLIPSE_LUNAR_BUFF, ECLIPSE_SOLAR_BUFF]), ctx.endMs);
@@ -226,7 +268,7 @@ function eclipseWorth(ctx: PlayerCheckContext, buff: number, excluded: Window[])
   if (outMs <= 0) return undefined;
   const by = new Map<string, { inside: number[]; outside: number[]; outDamage: number }>();
   for (const e of ctx.player.damageDone) {
-    if (e.pet || e.timestamp >= ctx.endMs || SPENDER.test(e.abilityName) || inside(excluded, e.timestamp)) continue;
+    if (e.pet || e.timestamp >= ctx.endMs || inside(excluded, e.timestamp)) continue;
     const g = by.get(e.abilityName) ?? { inside: [], outside: [], outDamage: 0 };
     const inE = inside(ecl, e.timestamp);
     if (!inE && inside(anyEcl, e.timestamp)) continue;   // the other Eclipse
@@ -238,7 +280,7 @@ function eclipseWorth(ctx: PlayerCheckContext, buff: number, excluded: Window[])
   const parts: { name: string; v: number; r: number }[] = [];
   for (const [name, g] of by) {
     if (g.inside.length < ECL_MIN_HITS || g.outside.length < ECL_MIN_HITS) continue;
-    const r = median(g.inside) / median(g.outside);
+    const r = Math.min(ECL_RATIO_CAP, median(g.inside) / median(g.outside));
     if (!(r > 1)) continue;
     perMs += g.outDamage / outMs * (r - 1);
     parts.push({ name, v: g.outDamage / outMs * (r - 1) * ECL_MS, r });
@@ -285,7 +327,7 @@ const eclipseCapped: JobCheck = (ctx) => {
     label: "Eclipse charges capped",
     lostDamage: heldMs / ECL_RECHARGE_MS * value,
     basis: `${s(heldMs)} at two charges (past ${s(ECL_ALLOW_MS)} a stretch, outside forced time and Incarnation) ÷ ${s(ECL_RECHARGE_MS)} recharge × ${k(value)} an Eclipse: ` +
-      `${s(ECL_MS)} of the player's non-spender damage outside Eclipse × each ability's bonus inside, from its hits; ${kinds.join("; ")}`,
+      `${s(ECL_MS)} of the player's damage outside Eclipse × each ability's bonus inside, from its hits; ${kinds.join("; ")}`,
     detail: `Eclipse sat at two charges for ${s(heldMs)} (${(heldMs / ECL_RECHARGE_MS).toFixed(1)} Eclipses not pressed)`,
     moments,
   })];
@@ -466,4 +508,82 @@ const starfallOneTarget: JobCheck = (ctx) => {
   })];
 };
 
-export const BALANCE_CHECKS: JobCheck[] = [eclipseCapped, furyHeld, starfallOneTarget];
+// ── Spenders outside Eclipse ───────────────────────────────────────────
+
+/** Eclipse's bonus to one spender's hits: non-crit median inside an Eclipse (not Incarnation) ÷ outside both. */
+function spenderEclipseBonus(ctx: PlayerCheckContext, name: string, fallback: number): { bonus: number; own: boolean } {
+  const ecl = statusWindows(ctx.player, new Set([ECLIPSE_LUNAR_BUFF, ECLIPSE_SOLAR_BUFF]), ctx.endMs);
+  const inc = statusWindows(ctx.player, new Set([INCARNATION]), ctx.endMs);
+  const inE: number[] = [], out: number[] = [];
+  for (const h of ctx.player.damageDone) {
+    if (h.pet || h.abilityName !== name || h.hitType !== 1 || !h.unmitigatedAmount || h.timestamp >= ctx.endMs || inside(inc, h.timestamp)) continue;
+    (inside(ecl, h.timestamp) ? inE : out).push(h.unmitigatedAmount);
+  }
+  if (inE.length < SPENDER_MIN_HITS || out.length < SPENDER_MIN_HITS) return { bonus: fallback, own: false };
+  return { bonus: Math.min(ECL_RATIO_CAP, median(inE) / median(out)), own: true };
+}
+
+/** Astral Power the player gains per ms outside the windows, from the casts' logged amounts. */
+function astralGainPerMs(ctx: PlayerCheckContext, windows: Window[]): number | undefined {
+  const casts = ctx.player.casts.filter((c) => !c.fake && c.timestamp < ctx.endMs && c.resources?.some((r) => r.type === ASTRAL_POWER))
+    .sort((a, b) => a.timestamp - b.timestamp);
+  let g = 0, ms = 0;
+  for (let i = 0; i + 1 < casts.length; i++) {
+    const a = casts[i].resources!.find((r) => r.type === ASTRAL_POWER)!, b = casts[i + 1].resources!.find((r) => r.type === ASTRAL_POWER)!;
+    const dt = casts[i + 1].timestamp - casts[i].timestamp;
+    if (dt <= 0 || dt > AP_PAIR_MS || b.amount >= b.max - AP_NEAR_CAP || inside(windows, casts[i].timestamp) || inside(windows, casts[i + 1].timestamp)) continue;
+    g += b.amount - (a.amount - (a.cost ?? 0)); ms += dt;
+  }
+  return ms >= 10_000 ? Math.max(0, g / ms) : undefined;
+}
+
+const spenderOutsideEclipse: JobCheck = (ctx) => {
+  const p = ctx.player;
+  const ecl = statusWindows(p, new Set([ECLIPSE_LUNAR_BUFF, ECLIPSE_SOLAR_BUFF, INCARNATION]), ctx.endMs);
+  const forced = mergeWindows(ctx.forced);
+  const gain = astralGainPerMs(ctx, ecl);
+  if (gain === undefined) return [];
+  let lost = 0, n = 0, excused = 0;
+  const parts: string[] = [];
+  const moments: Moment[] = [];
+  for (const sp of BALANCE_SPENDERS) {
+    const casts = p.casts.filter((c) => !c.fake && c.abilityId === sp.id && c.timestamp < ctx.endMs).sort((a, b) => a.timestamp - b.timestamp);
+    const hits = p.damageDone.filter((h) => !h.pet && h.abilityName === sp.name);
+    const { bonus, own } = spenderEclipseBonus(ctx, sp.name, sp.bonus);
+    if (!(bonus > 1)) continue;
+    let spDmg = 0, spN = 0;
+    casts.forEach((c, i) => {
+      const r = c.resources?.find((x) => x.type === ASTRAL_POWER);
+      if (!r || (r.cost ?? 0) <= 0 || inside(ecl, c.timestamp) || inside(forced, c.timestamp)) return;
+      // Could it have waited? The Astral Power held to the player's next Eclipse or Incarnation without capping.
+      const nextWindow = ecl.find((w) => w.startMs > c.timestamp)?.startMs ?? Infinity;
+      const atNext = r.amount + gain * (nextWindow - c.timestamp);
+      if (!(atNext <= r.max) || nextWindow >= ctx.endMs) { excused++; return; }
+      // Its hits that landed outside Eclipse and Incarnation (a Starfall pressed just before one runs into it).
+      const until = Math.min(c.timestamp + sp.spanMs, casts[i + 1]?.timestamp ?? Infinity);
+      const outside = hits.filter((h) => h.timestamp >= c.timestamp && h.timestamp < until && !inside(ecl, h.timestamp)).reduce((a, h) => a + (h.amount ?? 0), 0);
+      const loss = outside * (bonus - 1);
+      if (loss <= 0) return;
+      spDmg += outside; spN++;
+      moments.push({ startMs: c.timestamp, endMs: c.timestamp, lostDamage: loss,
+        detail: `${sp.name} at ${clock(c.timestamp)} outside Eclipse (${k(outside)} of it outside) at ${Math.round(r.amount / 10)} Astral Power: ` +
+          `the next Eclipse came ${s(nextWindow - c.timestamp)} later, ~${Math.round(atNext / 10)} of ${Math.round(r.max / 10)} by then` });
+    });
+    if (spN === 0) continue;
+    lost += spDmg * (bonus - 1); n += spN;
+    parts.push(`${spN} ${sp.name} (${k(spDmg)} of hits outside) × ${Math.round((bonus - 1) * 100)}% (${own ? "Eclipse's bonus to the player's own non-crit hits" : "pooled Eclipse bonus"})`);
+  }
+  if (n === 0) return [];
+  moments.sort((a, b) => a.startMs - b.startMs);
+  return [finding(ctx, {
+    kind: "burst-window", startMs: moments[0].startMs, endMs: moments[moments.length - 1].startMs, forced: false, inference: true,
+    label: "Spenders outside Eclipse",
+    lostDamage: lost,
+    basis: parts.join(" + ") + `; paid spends only, when the Astral Power would have kept to the player's next Eclipse or Incarnation without capping (${(gain * 100).toFixed(1)} a second gained outside them)` +
+      (excused ? `; ${excused} more excused: holding would have capped before the next Eclipse` : ""),
+    detail: `${n} paid Astral Power spender${n > 1 ? "s" : ""} cast outside Eclipse and Incarnation that could have waited for one`,
+    moments,
+  })];
+};
+
+export const BALANCE_CHECKS: JobCheck[] = [spenderOutsideEclipse, eclipseCapped, furyHeld, starfallOneTarget];

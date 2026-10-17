@@ -36,6 +36,16 @@
 //   waste 5.0% vs 4.4%. Fury of Elune 66% vs 73% (holds mostly Stasis).
 // - Not adopted: Eclipse uptime 53% vs 69% and Starlord at 3 stacks 52%
 //   vs 63%: the spenders above carry most of it.
+// - The WoWAnalyzer audit's phase 3 (2026-10-17; docs/wowa-audit/
+//   druid-balance.md, 50 player-pulls) moved Balance's own checks to
+//   balance.ts. Eclipse is a press now (two charges, 30s), and Sylmigron's
+//   low uptime was Eclipses not pressed: Eclipse charges capped reads 1.06M
+//   here. The spenders check above fired on the top players as much as on
+//   him (Delvkin 2.32M: free procs, Incarnation and Starfall's enemy count
+//   in its price), so it now counts only paid spends that could have waited
+//   for the player's next Eclipse without capping (182k here). Also built:
+//   Fury of Elune held (its cooldown fitted: 45s less 1.5s per arcane
+//   cast) and Starfall on one enemy.
 //
 // Elemental, checked against WoWAnalyzer on qpZx3mWaG7gcDdYB pull 3
 // (Cocroach; reference JZjf9x3mK76NzabP fight 9's Nickshockz, 99th
@@ -328,62 +338,9 @@ const strafingRun: JobCheck = (ctx) => {
 // Barbed Shot gain happened to measure, Matcheh's didn't).
 const BARBED_SHOT = 217200;
 
-// Balance spenders (Starsurge 78674, Starfall 191034) cast outside Eclipse
-// (Solar 48517, Lunar 48518) and Incarnation (102560), with Astral Power
-// (type 8, logged ×10) under NEAR_CAP of its max (spending to avoid
-// capping is right). Measured on qpZx3mWaG7gcDdYB pull 3 (2026-10-13):
-// Sylmigron cast 38 such spenders outside forced time, the 100th-
-// percentile Kadss (dBxtMyAc1zYHXQnK) 13; inside vs outside, Sylmigron's
-// Starsurge 151k vs 100k, Starfall (its hits over 8s) 145k vs 94k;
-// WoWAnalyzer counts 28 vs 4 "outside Eclipse not near AP cap". Lost per
-// spend: the player's own inside − outside average for that spell (both
-// measured; none when there's no inside one to compare). Inference.
-const BALANCE_SPENDERS: { id: number; name: string; spanMs: number }[] = [
-  { id: 78674, name: "Starsurge", spanMs: 2_000 },
-  { id: 191034, name: "Starfall", spanMs: 8_000 },
-];
-const ECLIPSE_IDS = new Set([48517, 48518, 102560]);
-const NEAR_CAP = 200;   // 20 Astral Power, logged ×10
-const spenderOutsideEclipse: JobCheck = (ctx) => {
-  const ecl = statusWindows(ctx.player, ECLIPSE_IDS, ctx.endMs);
-  const forced = mergeWindows(ctx.forced);
-  let lost = 0, n = 0, first = Infinity, last = 0;
-  const parts: string[] = [];
-  const moments: Moment[] = [];
-  for (const sp of BALANCE_SPENDERS) {
-    const casts = ctx.player.casts.filter((c) => c.abilityId === sp.id && c.timestamp < ctx.endMs).sort((a, b) => a.timestamp - b.timestamp);
-    const hits = ctx.player.damageDone.filter((h) => !h.pet && h.abilityName === sp.name);
-    const rows = casts.map((c, i) => {
-      const r = c.resources?.find((x) => x.type === 8);
-      return {
-        t: c.timestamp,
-        inE: inWindows(c.timestamp, ecl),
-        nearCap: r !== undefined && r.amount >= r.max - NEAR_CAP,
-        dmg: hits.filter((h) => h.timestamp >= c.timestamp && h.timestamp < Math.min(c.timestamp + sp.spanMs, casts[i + 1]?.timestamp ?? Infinity))
-          .reduce((a, h) => a + (h.amount ?? 0), 0),
-      };
-    }).filter((r) => !inWindows(r.t, forced));
-    const avg = (xs: number[]) => xs.reduce((a, x) => a + x, 0) / xs.length;
-    const inside = rows.filter((r) => r.inE), outside = rows.filter((r) => !r.inE);
-    if (inside.length < 3 || outside.length === 0) continue;
-    const per = avg(inside.map((r) => r.dmg)) - avg(outside.map((r) => r.dmg));
-    const bad = outside.filter((r) => !r.nearCap);
-    if (per <= 0 || bad.length === 0) continue;
-    lost += bad.length * per; n += bad.length;
-    first = Math.min(first, bad[0].t); last = Math.max(last, bad[bad.length - 1].t);
-    for (const r of bad) moments.push({ startMs: r.t, endMs: r.t, lostDamage: per, detail: `${sp.name} outside Eclipse` });
-    parts.push(`${bad.length} ${sp.name} × ${k(per)} (${k(avg(inside.map((r) => r.dmg)))} inside − ${k(avg(outside.map((r) => r.dmg)))} outside)`);
-  }
-  if (n === 0) return [];
-  return [finding(ctx, {
-    kind: "burst-window", startMs: first, endMs: last, forced: false, inference: true,
-    label: "Spenders outside Eclipse",
-    lostDamage: lost,
-    basis: parts.join(" + "),
-    detail: `${n} Astral Power spenders cast outside Eclipse and Incarnation, not near the cap`,
-    moments: moments.sort((a, b) => a.startMs - b.startMs),
-  })];
-};
+// Balance's spenders outside Eclipse (built 2026-10-13 on qpZx3mWaG7gcDdYB
+// pull 3) moved to balance.ts in the WoWAnalyzer audit's phase 3
+// (2026-10-17), with its rule and price reworked; its header has why.
 
 const window = (statusId: number, name: string): JobCheck => (ctx) => burstGcdFindings(ctx, {
   statusId, name,
@@ -397,7 +354,7 @@ export const RANGED_CHECKS: Record<string, JobCheck[]> = {
   "Arcane Mage":          [window(365362, "Arcane Surge"), ...ARCANE_CHECKS],
   "Fire Mage":            [window(190319, "Combustion")],
   "Frost Mage":           [],
-  "Balance Druid":        [window(102560, "Incarnation"), primaryResourceCapFindings, dot("Moonfire", 164812), dot("Sunfire", 164815), spenderOutsideEclipse, ...BALANCE_CHECKS],
+  "Balance Druid":        [window(102560, "Incarnation"), primaryResourceCapFindings, dot("Moonfire", 164812), dot("Sunfire", 164815), ...BALANCE_CHECKS],
   "Beast Mastery Hunter": [window(19574, "Bestial Wrath"), (ctx) => primaryResourceCapFindings(ctx, [BARBED_SHOT]), ...BEAST_MASTERY_CHECKS],
   "Marksmanship Hunter":  [window(288613, "Trueshot"), primaryResourceCapFindings],
   "Shadow Priest":        [window(194249, "Voidform"), primaryResourceCapFindings, dot("Shadow Word: Pain", 589), dot("Vampiric Touch", 34914)],
