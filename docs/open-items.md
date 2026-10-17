@@ -305,8 +305,9 @@ and delete them from the header.
     phase 3 done 2026-10-16 against seven top parses, re-measured as
     damage lost the same day. Built and verified: non-overload casts in
     Ascendance, Lava Burst without Flame Shock, idle with the Ancestors
-    out (lib/damage/wow/specs/elemental.ts). Left to build, by value:
-    unbuffed spenders (~6.5% each), one-target Chain Lightning (~35k),
+    out, spenders before an instant Lava Burst
+    (lib/damage/wow/specs/elemental.ts). Left to build, by value:
+    one-target Chain Lightning (~35k),
     early Flame Shock refreshes (5-62k a pull). Stormkeeper drift built (60s
     less 3s per Ancestor summoned; Vashnik holds for the Venoms after
     Imbibe allowed). Open: Ascendance spenders (low value).

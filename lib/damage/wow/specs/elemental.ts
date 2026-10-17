@@ -65,6 +65,20 @@
 // (forced time included). An earlier per-second split (58.4k/s casting vs
 // 25.7k/s idle, top seven) undercounted: the last cast's echo lands in the
 // idle that follows it.
+//
+// ── Spender before an instant Lava Burst (spenderWithoutMote) ──────────
+// Each Lava Burst grants Master of the Elements (260734), which the next
+// spell takes: an Elemental Blast (117014) or Earthquake (61882), but also
+// a Lightning Bolt, Chain Lightning, Voltaic Blaze or Flame Shock (Elemeta:
+// 25 Elemental Blasts, 16 Lightning Bolts, 8 Earthquakes, 8 Chain
+// Lightnings). It's never wasted, only spent on a weaker spell. So a
+// spender cast without it while an instant Lava Burst was ready (Lava Surge
+// 77762, outside Ascendance) loses the bonus on the difference: the
+// spender − the cast that took the next buff instead (nothing when a
+// spender took it). Two spenders in a row lost one buff, not two. The bonus is
+// MOTE_BONUS. Excused when a Lava Burst first would have capped Maelstrom
+// (its gain measured from the casts' Maelstrom, ~9). WoWAnalyzer counts the
+// whole spender; this is ~5–35k each, 0–123k a pull on the eight players.
 
 import type { PlayerEvent } from "@/types/PlayerInfo";
 import type { DamageFinding, JobCheck, Moment } from "../../types";
@@ -88,6 +102,16 @@ const UNSHOCKED_DIES_MS = 5_000;
 const CALL_OF_THE_ANCESTORS = 447244;
 const ANCESTOR_LAG_MS = 1_500;
 const ANCESTOR_MIN_CASTS = 10;
+const MASTER_OF_THE_ELEMENTS = 260734;
+const LAVA_SURGE = 77762;
+const MAELSTROM = 11;   // WCL classResources type
+const SPENDERS = new Set(["Elemental Blast", "Earthquake"]);
+// Non-crit Elemental Blast hits, buffed vs unbuffed at the cast, pooled over
+// the eight players' pulls above (212 vs 82 hits, 192.6k vs 180.9k). A pull
+// has too few to read it: the hits' aura snapshot gave 0.35–1.14.
+const MOTE_BONUS = 0.065;
+// Lava Surge that appeared this soon before the spender wasn't seen in time.
+const SURGE_REACT_MS = 500;
 
 const clock = (ms: number) => {
   const t = Math.max(0, Math.round(ms / 1000));
@@ -364,4 +388,64 @@ const ancestorIdle: JobCheck = (ctx) => {
   })];
 };
 
-export const ELEMENTAL_CHECKS: JobCheck[] = [ascendanceNonOverload, lavaBurstUnshocked, ancestorIdle];
+// ── Spender without Master of the Elements, Lava Surge up ──────────────
+
+/** The player's average damage per cast of a spell, its overloads included (Earthquake's hits run 6s+ and overlap). */
+function perCast(ctx: PlayerCheckContext, name: string): number {
+  const n = presses(ctx).filter((c) => c.abilityName === name).length;
+  const dmg = ctx.player.damageDone.filter((e) => !e.pet && e.timestamp < ctx.endMs && baseName(e.abilityName) === name).reduce((a, e) => a + (e.amount ?? 0), 0);
+  return n > 0 ? dmg / n : 0;
+}
+
+const spenderWithoutMote: JobCheck = (ctx) => {
+  const T = tools(ctx);
+  const asc = statusWindows(ctx, ASCENDANCE);
+  const mote = statusWindows(ctx, MASTER_OF_THE_ELEMENTS);
+  const surge = statusWindows(ctx, LAVA_SURGE);
+  const moteUsed = (ctx.player.buffs ?? []).filter((b) => b.abilityId === MASTER_OF_THE_ELEMENTS && b.buffStatus === "removed").map((b) => b.timestamp).sort((a, b) => a - b);
+  // Lava Burst's Maelstrom, measured: the next cast's amount (within 3s) − this one's after its cost, median.
+  const res = (c: PlayerEvent) => c.resources?.find((r) => r.type === MAELSTROM);
+  const gains = T.casts.flatMap((c, i) => {
+    const a = res(c), next = T.casts[i + 1], b = next && res(next);
+    if (c.abilityId !== LAVA_BURST || !a || !b || next.timestamp - c.timestamp > 3_000 || a.amount > a.max * 0.75) return [];
+    const g = b.amount - (a.amount - (a.cost ?? 0));
+    return g > 0 ? [g] : [];
+  }).sort((a, b) => a - b);
+  const lvbGain = gains.length >= 3 ? gains[Math.floor(gains.length / 2)] : undefined;
+  const eqAvg = perCast(ctx, "Earthquake");
+  const value = (c: PlayerEvent) => (c.abilityName === "Earthquake" ? eqAvg : T.damage(c, c.abilityName === "Chain Lightning" ? 1_500 : 1_200));
+  const moments: Moment[] = [];
+  let capped = 0;
+  const takers = new Set<PlayerEvent>();
+  for (const c of T.casts.filter((c) => SPENDERS.has(c.abilityName))) {
+    const t = c.timestamp;
+    if (inside(asc, t) || inside(mote, t)) continue;
+    if (!surge.some((w) => t >= w.startMs + SURGE_REACT_MS && t <= w.endMs)) continue;
+    const r = res(c);
+    if (r && lvbGain !== undefined && r.amount + lvbGain > r.max) { capped++; continue; }
+    // The buff it skipped went to whatever took the next one instead.
+    const usedAt = moteUsed.find((x) => x > t + 100);
+    const taker = usedAt === undefined ? undefined : T.casts.filter((x) => Math.abs(x.timestamp - usedAt) <= 150 && x.abilityName !== "Lava Burst" && ctx.game.action(x.abilityId)?.onGcd)[0];
+    // One Lava Burst buffs one spender: two spenders in a row lost one buff.
+    if (taker && (SPENDERS.has(taker.abilityName) || takers.has(taker))) continue;
+    if (taker) takers.add(taker);
+    const takerValue = taker ? value(taker) : 0;
+    const loss = MOTE_BONUS * Math.max(0, value(c) - takerValue);
+    if (loss < 1) continue;
+    moments.push({ startMs: t, endMs: t, lostDamage: loss,
+      detail: `${c.abilityName} at ${clock(t)} without Master of the Elements, Lava Surge up: the buff went to ${taker ? `${taker.abilityName} (${k(takerValue)})` : "nothing"} instead of ${k(value(c))}` });
+  }
+  if (moments.length === 0) return [];
+  const lost = moments.reduce((a, m) => a + m.lostDamage, 0);
+  return [finding(ctx, {
+    kind: "wrong-gcd", startMs: moments[0].startMs, endMs: moments[moments.length - 1].startMs, forced: false, inference: true,
+    label: "Spender before an instant Lava Burst",
+    lostDamage: lost,
+    basis: `${moments.length} × ${(MOTE_BONUS * 100).toFixed(1)}% (Master of the Elements, measured on Elemental Blast) × (the spender − the cast that took the buff instead)` +
+      (capped ? `; ${capped} more excused: a Lava Burst first (+${lvbGain} Maelstrom) would have capped` : ""),
+    detail: `${moments.length} Elemental Blast / Earthquake cast outside Ascendance with an instant Lava Burst ready and no Master of the Elements`,
+    moments,
+  })];
+};
+
+export const ELEMENTAL_CHECKS: JobCheck[] = [ascendanceNonOverload, lavaBurstUnshocked, ancestorIdle, spenderWithoutMote];
