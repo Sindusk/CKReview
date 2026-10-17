@@ -80,6 +80,20 @@ export const WOW_TRACKED_COOLDOWNS: Record<string, TrackedCooldown[]> = {
     { name: "Sigil of Spite", actionIds: [390163], cooldownMs: 60_000, charges: 1, firstUseOffsetMs: 5_000, prePullEvidenceIds: [389860], burstHold: true, valuePerUse: sigilValue("Sigil of Spite", 390163) },
     { name: "Sigil of Flame", actionIds: [204596], cooldownMs: 30_000, charges: 1, firstUseOffsetMs: 5_000, prePullEvidenceIds: [204598], burstHold: true, valuePerUse: sigilValue("Sigil of Flame", 204596) },
   ],
+  // Guardian (the WoWAnalyzer audit's phase 3, 2026-10-17; tank.ts's
+  // Guardian notes have the numbers): Lunar Beam (cast 204066, a fake
+  // 1270292 cast beside it) shortest 40.0s, median 42–44s over 27
+  // player-pulls; its hits log as 1270292 and 414613 (masterData of
+  // aZ6NnwL8g9PdpGJ1, mNkHXhaD6Y2tqQTg), 340–470k a use. burstHold: the
+  // top Vashnik tanks hold it for the Venoms after Imbibe (Shasta
+  // Ndh2H6Qw4Pp1qaMk 4:28 → 5:45). Not tracked: Red Moon (30.0s shortest)
+  // is pressed every 40s right after each Lunar Beam by two of the top
+  // players, an even trade (its ticks hit ×1.36 inside the beam), so its
+  // drift flagged them and nobody weaker; Incarnation is 180s less 1s per
+  // 25 Rage spent and every top tank holds one use 40–67s.
+  "Guardian Druid": [
+    { name: "Lunar Beam", actionIds: [204066], damageIds: [1270292, 414613], prePullEvidenceIds: [1270292, 414613], cooldownMs: 40_000, charges: 1, firstUseOffsetMs: 6_000, burstHold: true },
+  ],
 
   // ── Melee (shortest / median interval, first use median) ─────────────
   // Arms: Avatar 51s / 64s and Colossus Smash 24.5s / 32s spread too far

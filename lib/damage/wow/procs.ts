@@ -77,6 +77,13 @@
 //   3 of them in forced time), Fluffalicous 2 and Pigson 1
 //   (a4kX1DNT27yHGvqJ), Zachx 1 (Kag91qVZ2YJ7MQAb, 98.9th), the other six
 //   players none.
+// - Gore 10s (Guardian; added in its phase 3, 2026-10-17): a Mangle reset
+//   from Thrash (22–27% of casts), Swipe (21%) and Maul (5–18%). 4 at D on
+//   27 Guardian player-pulls (10.00–10.03s, gained at: 주황양배추
+//   aZ6NnwL8g9PdpGJ1 0:45, Mêrùem LCFp3wbHvQqNP4my 4:16, Diggersby
+//   gVDPhzp61Zm29HMw Entombed Sentinels Pull 1 0:45 and Ula'tek 5:28), max
+//   10.03s of 691; every other removal is beside a Mangle. Worth one Mangle
+//   (47–50k own hits).
 //
 // ── Measured and left out ──────────────────────────────────────────────
 // - Lava Surge (77762) 10s, clean, but 75 of 657 run out on the top
@@ -106,7 +113,9 @@
 //   overwrite: specs/frostdk.ts "Rime overwritten".
 // - No duration in the samples (no clean cluster, or never run out):
 //   Sudden Doom, Essence Burst, Fingers of Frost, Brain Freeze,
-//   Galactic Guardian, Prismatic Bolt!, Tempest, Art of War. Power of the
+//   Galactic Guardian (0 of 85 removals unconsumed on the three Guardians
+//   who take it, J3ckBVtrZNfWv1h7, JvQpZk3CXj78Dx2f, LCFp3wbHvQqNP4my;
+//   max span 12.75s), Prismatic Bolt!, Tempest, Art of War. Power of the
 //   Maelstrom loses stacks without a timer (Rakkt LckJC7GMhQvD6rdw: a
 //   stack spent at 1:06.47 with no cast, the other 1.4s later), so no
 //   duration fits it. A spec pass adds a row once a weaker log shows the
@@ -136,4 +145,5 @@ export const WOW_MEASURED_PROCS = new Map<number, MeasuredProc>([
   [408458,  { durationMs: 12_000, consumerIds: [383328, 53385] }],                // Divine Purpose → Final Verdict, Divine Storm
   [1262830, { durationMs: 20_000, consumerIds: [187874] }],                       // Storm Unleashed → Crash Lightning
   [264571,  { durationMs: 12_000, consumerIds: [686, 198590, 1261153] }],         // Nightfall → Shadow Bolt, Drain Soul, Malefic Grasp
+  [93622,   { durationMs: 10_000, consumerIds: [33917] }],                        // Gore → Mangle
 ]);

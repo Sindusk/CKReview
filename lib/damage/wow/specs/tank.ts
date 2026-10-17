@@ -5,9 +5,43 @@
 // by WoWAnalyzer's spec modules (read, not copied: AGPL); every id and number
 // here is from our own logs (lib/damage/wow/spell-data.ts and the pulls
 // named below). Specs in the samples: Blood (15 players), Protection Paladin
-// (8), Brewmaster (2, unverified) and Vengeance (24 player-pulls since its
-// WoWAnalyzer audit pass).
-// Guardian Druid and Protection Warrior aren't in any sample yet.
+// (8), Brewmaster (2, unverified), Vengeance (24 player-pulls since its
+// WoWAnalyzer audit pass) and Guardian Druid (27 since its pass).
+// Protection Warrior isn't in any sample yet.
+//
+// ── Guardian Druid ─────────────────────────────────────────────────────
+// No spec check (WoWAnalyzer audit phase 3, 2026-10-17;
+// docs/wowa-audit/druid-guardian.md has every number). Measured on 27
+// Guardian player-pulls, all Mythic: the top Sol (mNkHXhaD6Y2tqQTg,
+// Vashnik 100th), Shasta (Ndh2H6Qw4Pp1qaMk, 99.7th), 주황양배추
+// (aZ6NnwL8g9PdpGJ1, Entombed Sentinels 100th), Thwash (L8yGzCABtm6Zx1YR,
+// 99.3rd); Gowownage, 失落的桃子, Worthtwo, Kirabearr, Zhorxanina; the weak
+// Экстраособь (7L3RKpavDA8T4MjY) and Mêrùem (LCFp3wbHvQqNP4my); the
+// static's Diggersby (16 pulls on seven bosses, gVDPhzp61Zm29HMw).
+// Talents (casts and buffs): everyone plays Incarnation: Guardian of Ursoc
+// (102558, which casts Wild Guardian 1269658), Gore, and Elune's Chosen
+// (Lunar Beam 204066, Fury of Elune procs); Red Moon (1252871) on all but
+// three (失落的桃子, Kirabearr and Mêrùem press Moonfire). Nobody casts
+// Berserk or Convoke; Tooth and Claw shows nowhere; Galactic Guardian on
+// those three.
+// - Presses: none of the bear presses were in the spell survey, so every
+//   Mangle and Thrash read as idle (4.5% GCD uptime on 주황양배추); game.ts
+//   GUARDIAN_PRESSES. Top players now 86–93%, Diggersby 66–81%: he casts
+//   no Swipe and waits on Mangle / Thrash (Entombed Sentinels Pull 5
+//   2:51, 3.3s after a Mangle).
+// - Gap price runs high: an idle Guardian GCD is priced at the average
+//   GCD (86–113k, Thrash's bleed and Moonfire / Red Moon ticks counted by
+//   name), but the free press is a Swipe: 10k of hits plus a 21% Gore
+//   chance on a ~50k Mangle. Not changed here (a role-wide valuation).
+// - Tracked: Lunar Beam (tracked-cooldowns.ts), valued by its hits.
+//   Gore expires in procs.ts (all four expiries in forced time).
+// - Measured, not built: Incarnation drift (180s less 1s per 25 Rage
+//   spent, fitted on 49 intervals with none under the line; every top
+//   tank holds one use 40–67s, Diggersby 63–85s, so it doesn't separate;
+//   no whole use is lost on anyone); idle inside Incarnation (0–6 GCDs
+//   short a window, top as weak); Red Moon drift (fires only on the two
+//   top players who sync it with Lunar Beam); Rage at the cap (0–4 casts
+//   a pull on top players, 21–23 on the weakest, ~150k at most).
 //
 // ── Blood Death Knight ─────────────────────────────────────────────────
 // - Dancing Rune Weapon (buff 81256): the Rune Weapon copies the DK's
