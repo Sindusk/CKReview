@@ -55,8 +55,10 @@
 // - Penalties: no Venomous Abyss damage-dealt penalty is known.
 // - Defensives, disengages: empty until the role batches.
 // - Augmentation's support damage (Ebon Might, Prescience) isn't in the
-//   rDPS split: WCL credits it in its own way, and our streams don't
-//   carry it.
+//   rDPS split as buffs given: Warcraft Logs writes it as the Evoker's own
+//   hits under the buffs' ids (about three quarters of an Augmentation's
+//   damage), so it
+//   counts as their damage done already (AUG_SUPPORT_HITS below).
 
 import type { PlayerEvent, PlayerInfo } from "@/types/PlayerInfo";
 import { SPEC_DATA } from "../../spec-data";
@@ -404,6 +406,20 @@ const PISTOL_FOLLOW_MS = 500;
 // and Beast Cleave keep going while the player idles and stay out.
 const PET_PRESS_HITS = new Set([83381, 1232922, 389448, 344572, 1264355, 201754]);
 
+// Augmentation's support damage (the WoWAnalyzer audit's phase 3,
+// 2026-10-17): Warcraft Logs writes what Ebon Might and Prescience add to
+// allies as the Evoker's own hits, under the buffs' ids (Ebon Might 395152,
+// Prescience 410089; also Shifting Sands, Fate Mirror and Inferno's
+// Blessing, which match no press). Ebon Might's id is its cast's and
+// Prescience's name is its cast's, so isGcdDamage counted 25–40% of the
+// Evoker's damage as GCD damage, though it keeps landing while the Evoker
+// idles (92–94k/s against 103k/s whole-pull on 第十九个布丁 K4x8cMZYVpGCDbJH
+// in his 1.5s+ gaps; 56k/s against 68k/s on Имродорми 7L3RKpavDA8T4MjY).
+// Counted, an Augmentation GCD read 148–221k on 31 player-pulls against
+// 45–92k for its own presses, pricing every gap ~3× high. Ebon Might down
+// and Prescience held are judged by their own checks (specs/augmentation.ts).
+const AUG_SUPPORT_HITS = new Set([395152, 410089]);
+
 // Taunts (spell-data.ts): Dark Command, Hand of Reckoning, Provoke, Torment.
 // Warrior Taunt and Growl weren't cast often enough to appear; add them
 // from a log.
@@ -562,10 +578,11 @@ export const WOW_DAMAGE: DamageGame = {
   // Strike, Annihilation and Eye Beam hit under other ids than their casts,
   // and by id alone Mythnarra's average GCD read 7k of a real ~219k
   // (qpZx3mWaG7gcDdYB pull 3), pricing every gap at a thirtieth.
-  // A Beast Mastery press's pet hits too (PET_PRESS_HITS).
+  // A Beast Mastery press's pet hits too (PET_PRESS_HITS). Never
+  // Augmentation's support hits (AUG_SUPPORT_HITS).
   isGcdDamage: (e, gcdNames) => e.pet
     ? PET_PRESS_HITS.has(e.abilityId)
-    : ACTIONS.get(e.abilityId)?.onGcd === true || gcdNames.has(e.abilityName),
+    : !AUG_SUPPORT_HITS.has(e.abilityId) && (ACTIONS.get(e.abilityId)?.onGcd === true || gcdNames.has(e.abilityName)),
   compareFromPullStart: true,
   compareRolesPerPlayer: true,
 };
