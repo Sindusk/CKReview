@@ -13,8 +13,10 @@
 // lib/replay/ffxiv-replay.ts; page.tsx loads them only when the user
 // clicks Load replay (one FFLogs fetch per pull, never on navigation).
 //
-// WoW pulls (lib/replay/wow-replay.ts, same ReplayData) draw on a blank
-// arena: WCL has no map art, and no tethers or hitboxes yet. AoEs come
+// WoW pulls (lib/replay/wow-replay.ts, same ReplayData) draw on the zone's
+// in-game map, which this app's server builds from Blizzard's tiles
+// (lib/wow-map-art.ts), or a blank arena when it can't. No tethers or
+// hitboxes yet. AoEs come
 // from lib/replay/wow-shapes.ts (db2 radii placed by hits), and raid-wide
 // hits show as labels top right. Players get spec icons, enemies WCL's own
 // icon; units read as yards.
@@ -191,6 +193,7 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
   const unit = wow ? "yards" : "yalms";
   const playerColor = (a: ReplayActor) => getClassColor(game, players.get(a.name)?.className ?? a.job ?? "");
   const mapUrl = data.map ? ffMapImageUrl(data.map.filename) : null;
+  const wowMap = wow ? data.wowMap : undefined;
   const mapBox = data.map ? mapImageBounds(data.map) : null;
 
   // Enemy casts in progress, one bar per ability.
@@ -239,6 +242,10 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
             {showMap && mapUrl && mapBox && (
               <image href={mapUrl} x={toX(mapBox.x)} y={toY(mapBox.y)} width={mapBox.size * scale} height={mapBox.size * scale}
                 preserveAspectRatio="none" />
+            )}
+            {showMap && wowMap && (
+              <image href={`/api/wow-map/${wowMap.uiMapId}/image`} x={toX(wowMap.x)} y={toY(wowMap.y)}
+                width={wowMap.width * scale} height={wowMap.height * scale} preserveAspectRatio="none" />
             )}
             {showGrid && <Grid cx={cx} cy={cy} half={half} toX={toX} toY={toY} S={S} />}
             {showRings && <Rings cx={cx} cy={cy} half={half} toX={toX} toY={toY} scale={scale} />}
@@ -387,6 +394,7 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
           <div className="ck-menu" style={{ position: "absolute", right: 10, bottom: "100%", marginBottom: 4, zIndex: 5, padding: "6px 10px", display: "flex", flexDirection: "column", gap: 4 }}>
             <Toggle label="AoEs" title={wow ? "Enemy AoEs at their game-data size, placed where they hit" : "Enemy AoEs at their game-data size"} checked={showAoes} onChange={setShowAoes} />
             {mapUrl && <Toggle label="Map" title={`In-game map: ${data.map!.name}`} checked={showMap} onChange={setShowMap} />}
+            {wowMap && <Toggle label="Map" title={`In-game map: ${data.mapName ?? "zone map"} (Blizzard's art, about 1px per yard)`} checked={showMap} onChange={setShowMap} />}
             <Toggle label="5y rings" title={`Rings every 5 ${unit} from the ${wow ? "party's median position" : "arena centre"}`} checked={showRings} onChange={setShowRings} />
             <Toggle label="5y grid" title={`A 5-${unit.slice(0, -1)} grid with 0,0 at the ${wow ? "party's median position" : "arena centre"}`} checked={showGrid} onChange={setShowGrid} />
             <Toggle label="Helper actors" title="Untargetable actors that place AoEs" checked={showHelpers} onChange={setShowHelpers} />

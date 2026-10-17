@@ -276,8 +276,14 @@ file's header comment. Mechanic detection has its own guide:
     axes were checked against Blizzard's UiMap bounds, the facing formula
     (same as FFLogs') against player casts and boss auto-attacks; the
     header has the numbers. A VOD check is still open.
-  - blank arena: WCL has no map art or calibration, so the rings and grid
-    centre on the party's median position
+  - map art: WCL's API names the fight's UiMap but has no art. The app's
+    server builds it from Blizzard's tiles (`lib/wow-map-art.ts`, served
+    by `/api/wow-map/<id>` and `/api/wow-map/<id>/image`). The first
+    request per map downloads ~15 files from wago.tools; after that the
+    map is read from `data/wow-maps/` (gitignored, since the art is
+    Blizzard's). Raid maps are about 1px per yard, so it's soft at replay
+    zoom. When it can't be built, the arena is blank. The rings and grid
+    centre on the party's median position.
   - spec icons for players and WCL's own icon for enemies (ability icons
     from `assets.rpglogs.com/img/warcraft/abilities/`; there is no WoW
     Boss.png)

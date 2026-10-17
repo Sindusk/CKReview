@@ -4,7 +4,7 @@ The WoW replay works (built 2026-10-17): Load replay on a WoW pull fetches
 or reads the tracks (`lib/replay/wow-replay.ts`, `fetchWowReplayData`,
 `scripts/fetch-wow-replay.js`), and the shared panel draws players, enemies,
 facing, cast bars, basic AoE circles and the roster's HP / power bars on
-a blank arena. How it
+the zone's in-game map. How it
 works is in the "Top-down replay" section of
 [app-architecture.md](app-architecture.md); the units, axes and facing
 evidence are in the header of `wow-replay.ts`. Sample: Vashnik kill,
@@ -42,12 +42,16 @@ describe", fetch-only-what-you-need).
 
    Licensing: db2 data are game facts; don't port GPL/AGPL code
    (docs/wow-sim-plan.md, clean-room rule).
-3. **Map art.** WCL's API has only a map id and name, and
-   `assets.rpglogs.com/img/warcraft/maps/…` guesses return 403. The
-   calibration exists: wago.tools `UiMapAssignment` gives the world bounds
-   per UiMap (2608 The Venomous Abyss: X 265–885, Y −802.5–127.5; WCL x =
-   −Y, y = X). The art itself is BLP tiles (UiMapArt → UiMapArtTile) that
-   would need converting and hosting; check licensing before shipping any.
+3. **Map art: done, low resolution.** `lib/wow-map-art.ts` builds it on
+   the server from Blizzard's BLP tiles (2026-10-17). On the Vashnik kill
+   the party stands inside the room's walls. Left:
+   - **Sharper art.** The Venomous Abyss map is 1002×668px over 930×620
+     yards. A higher-detail source would need the game's minimap or terrain
+     textures, which aren't calibrated the same way.
+   - **Multi-floor zones.** The fight's first `fights.maps` entry is used.
+     A boss on a different floor would need the UiMap per position.
+   - **Hosting.** The art is built at request time, never committed. If
+     the production server can't reach wago.tools, the arena stays blank.
 4. **Hitboxes.** Creature id → display → model bounds in db2, or measured
    from melee players' median distance (as FFXIV's were checked). Until
    then the target ring is a fixed size.

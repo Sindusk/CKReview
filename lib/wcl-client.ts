@@ -869,7 +869,8 @@ export async function fetchWowReplayData(
   const fight = fightsData.reportData.report.fights[0];
   if (!fight) throw new Error(`Fight ${fightId} not found in report ${reportCode}`);
 
-  // WCL gives a map only an id and a name: no art or calibration.
+  // WCL gives a map only an id (a UiMap id) and a name; the art and its
+  // calibration come from Blizzard's data (lib/wow-map-art.ts).
   let mapName: string | undefined;
   const mapId = fight.maps?.[0]?.id;
   if (mapId !== undefined) {
@@ -899,5 +900,5 @@ export async function fetchWowReplayData(
     cursor = next;
     onProgress?.((next - fight.startTime) / Math.max(1, fight.endTime - fight.startTime));
   }
-  return buildWowReplayData(reportCode, fightId, fight.startTime, fight.endTime, events, actors, abilityNames, mapName);
+  return buildWowReplayData(reportCode, fightId, fight.startTime, fight.endTime, events, actors, abilityNames, mapName, mapId);
 }

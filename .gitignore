@@ -7,6 +7,8 @@
 .env*.local
 asset-builder/node_modules/
 data/sessions/
+# WoW map art built from Blizzard's tiles (lib/wow-map-art.ts): not ours to publish.
+data/wow-maps/
 node_modules/
 public/
 sampledata/

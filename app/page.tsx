@@ -435,6 +435,12 @@ export default function Home() {
       }
       // AoE shapes and hitboxes (XIVAPI, FFXIV only); saved sample tracks may have them.
       if (!wow && !data.actionGeometry) data = await enrichReplayData(data);
+      // WoW map art, built by this app's server from Blizzard's tiles; a
+      // failure leaves the blank arena.
+      if (wow && data.mapId !== undefined && !data.wowMap) {
+        const res = await fetch(`/api/wow-map/${data.mapId}`).catch(() => null);
+        if (res?.ok) data = { ...data, wowMap: await res.json() };
+      }
       setReplays((prev) => ({ ...prev, [key]: data! }));
       setReplayLoad(null);
     } catch (err) {

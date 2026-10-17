@@ -105,6 +105,7 @@ export function buildWowReplayData(
   actors:       WowReplayActorInfo[],
   abilityNames: Map<number, string> = new Map(),
   mapName?:     string,
+  mapId?:       number,
 ): ReplayData {
   const actorById = new Map(actors.map((a) => [a.id, a]));
   const isPlayer = (a: WowReplayActorInfo | undefined) => a?.type === "Player";
@@ -238,6 +239,6 @@ export function buildWowReplayData(
 
   return {
     version: 1, game: "wow", reportCode, fightId, durationMs: fightEndMs - fightStartMs,
-    actors: out, map: null, mapName, enemyCasts, enemyHits, abilityNames: hitNames, enemyAuras,
+    actors: out, map: null, mapName, mapId, enemyCasts, enemyHits, abilityNames: hitNames, enemyAuras,
   };
 }

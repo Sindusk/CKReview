@@ -33,6 +33,7 @@
 
 import type { FFLActor } from "@/lib/ffl-client";
 import type { ActionGeometry } from "@/lib/replay/action-shapes";
+import type { WowMapArt } from "@/lib/wow-map-art";
 
 /** Server-side filter for the replay fetch: event types that carry resources. */
 export const REPLAY_EVENT_FILTER =
@@ -128,7 +129,11 @@ export type ReplayData = {
   // Absent = FFXIV. WoW tracks come from lib/replay/wow-replay.ts, already
   // turned into this file's units and axes (+x east, +y south, centi-yards).
   game?:       "wow";
-  mapName?:    string;  // WoW: the zone's name (WCL has no map art or calibration)
+  mapName?:    string;  // WoW: the zone's name
+  mapId?:      number;  // WoW: the fight's UiMap id (WCL `fights.maps`)
+  // WoW: Blizzard's map art for mapId, attached after the fetch (page.tsx,
+  // from /api/wow-map). Absent when it couldn't be built.
+  wowMap?:     WowMapArt;
   reportCode:  string;
   fightId:     number;
   durationMs:  number;
