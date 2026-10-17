@@ -531,8 +531,15 @@ and delete them from the header.
     Kept `wrong`: per-empower count, Mass Disintegrate ticks, channel
     cancels, fight-end procs. Tip the Scales left unvalued (half a GCD a
     use).
-  - [monk-brewmaster.md](wowa-audit/monk-brewmaster.md): tank, 9; Niuzao
-    window count.
+  - [monk-brewmaster.md](wowa-audit/monk-brewmaster.md): phase 3 done
+    2026-10-17 (9 player-pulls, 4 fetched). Built (specs/brewmaster.ts):
+    Breath of Fire reset lost (a Keg Smash pressed while the last one's
+    Breath of Fire was unpressed). Exploding Keg valued by its later hits
+    and Fuel on the Fire, `burstHold` for Vashnik's Venoms; Invoke Niuzao
+    tracked at 120s (talent not in the log), valued with its Flurry
+    Strikes. Proposed `wrong`: Breath of Fire count per Niuzao, Blackout
+    Combo on Keg Smash (top players as weak). Touch of Death, Chi Burst,
+    Stomp count left unbuilt; Keg Smash charges unverifiable.
   - [priest-shadow.md](wowa-audit/priest-shadow.md): 11; Insidious Ire
     coverage.
   - [rogue-subtlety.md](wowa-audit/rogue-subtlety.md): 16; Ancient Arts

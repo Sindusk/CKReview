@@ -5,7 +5,7 @@
 // by WoWAnalyzer's spec modules (read, not copied: AGPL); every id and number
 // here is from our own logs (lib/damage/wow/spell-data.ts and the pulls
 // named below). Specs in the samples: Blood (15 players), Protection Paladin
-// (8), Brewmaster (2, unverified), Vengeance (24 player-pulls since its
+// (8), Brewmaster (9 player-pulls since its WoWAnalyzer audit pass), Vengeance (24 player-pulls since its
 // WoWAnalyzer audit pass) and Guardian Druid (27 since its pass).
 // Protection Warrior isn't in any sample yet.
 //
@@ -92,10 +92,18 @@
 // players as weak), the Metamorphosis window (6–338k a pull, top as weak).
 // Sigil of Chains is a GCD press (game.ts).
 //
-// ── Brewmaster Monk (unverified) ───────────────────────────────────────
-// Tracked cooldowns only (tracked-cooldowns.ts). Brewmaster's energy is at
-// 100 on 39 of 183 casts (xKP1M6gwC8WpnrBc pull 14), but how long it sat
-// there isn't in the log: not judged yet.
+// ── Brewmaster Monk ────────────────────────────────────────────────────
+// WoWAnalyzer audit phase 3, 2026-10-17 (docs/wowa-audit/monk-brewmaster.md;
+// specs/brewmaster.ts holds the model and every number, 9 player-pulls).
+// - Breath of Fire reset lost (brewmaster.ts): each Keg Smash resets
+//   Breath of Fire; a second Keg Smash before the Breath of Fire wastes
+//   one (37–52k a press). Top players 1 a pull (Fluffytail 5), the weaker
+//   6–15 (Qywsi 656k).
+// - Tracked: Exploding Keg (60s, now with its later hits and Fuel on the
+//   Fire, burstHold for Vashnik's Venoms) and Invoke Niuzao (120s, valued
+//   by its hits and the Flurry Strikes its window adds).
+// - Not judged: Energy (17–25% of the top players' casts at 100, the
+//   weaker 10–28%), Blackout Combo on Keg Smash, Touch of Death, Chi Burst.
 
 import type { JobCheck } from "../../types";
 import { burstGcdFindings, dotUptimeFindings, observedWindowBonus, resourceCapFindings } from "./shared";
@@ -131,5 +139,6 @@ const protPalSentinel: JobCheck = (ctx) => burstGcdFindings(ctx, {
   inference: true,
 });
 
+export { BREWMASTER_CHECKS } from "./brewmaster";
 export const BLOOD_CHECKS: JobCheck[] = [bloodDrw, bloodPlague, bloodRunicPower];
 export const PROT_PALADIN_CHECKS: JobCheck[] = [protPalSentinel];

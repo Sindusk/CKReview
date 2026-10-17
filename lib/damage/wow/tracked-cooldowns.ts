@@ -29,6 +29,7 @@ import { sigilValue } from "./specs/vengeance";
 import { trueshotValue } from "./specs/marksmanship";
 import { convokeValue, feralFrenzyValue, feralWindowValue } from "./specs/feral";
 import { dragonrageValue } from "./specs/devastation";
+import { niuzaoValue } from "./specs/brewmaster";
 
 /**
  * One Vanish's worth to an Assassination Rogue: the damage of a Garrote cast
@@ -81,9 +82,24 @@ export const WOW_TRACKED_COOLDOWNS: Record<string, TrackedCooldown[]> = {
     // min 60.0s (47 casts), first use median 8.5s (25 players across specs)
     { name: "Divine Toll", actionIds: [375576], cooldownMs: 60_000, charges: 1, firstUseOffsetMs: 10_000 },
   ],
-  // Unverified (2 players): min 60.0s (9 casts), first use 6.0s.
+  // Brewmaster (the WoWAnalyzer audit's phase 3, 2026-10-17; 9 player-pulls,
+  // specs/brewmaster.ts has the numbers):
+  // - Exploding Keg: shortest 60.0–61.3s on seven players, median 62–70s.
+  //   A use was valued by its first hit only (325153); its later hits
+  //   (388867) and the Fuel on the Fire hits its buff gives Keg Smash
+  //   (1262159, every one within 12s of a Keg) count now: 59–131k plus
+  //   49–269k a use. burstHold: Melstout (PCMfNtnbrVxpwYhk, 99.7th) and
+  //   Lootchi press it at the end of each Vashnik hold window (0:27, 1:54,
+  //   3:19, 4:42, 6:03), when the Venoms give its Fuel on the Fire three
+  //   targets; read as drift it was 2 lost uses on him.
+  // - Invoke Niuzao: 95s with a talent (seven Shado-Pan players, shortest
+  //   95.0–97.1s), 120s without (Master of Harmony: 121.0, 120.4); the
+  //   talent isn't in the log, so 120s, lenient. Its first press: median
+  //   4.5s. Valued by niuzaoValue (Niuzao's hits and the Flurry Strikes its
+  //   window adds).
   "Brewmaster Monk": [
-    { name: "Exploding Keg", actionIds: [325153], cooldownMs: 60_000, charges: 1, firstUseOffsetMs: 7_000 },
+    { name: "Exploding Keg", actionIds: [325153], damageIds: [325153, 388867, 1262159], cooldownMs: 60_000, charges: 1, firstUseOffsetMs: 7_000, burstHold: true },
+    { name: "Invoke Niuzao", actionIds: [132578], cooldownMs: 120_000, charges: 1, firstUseOffsetMs: 5_000, valuePerUse: niuzaoValue },
   ],
   // Vengeance (the WoWAnalyzer audit's phase 3, 2026-10-17; 24
   // player-pulls on nine reports, specs/vengeance.ts has the numbers):

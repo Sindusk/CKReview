@@ -7,7 +7,7 @@
 // Rules may be informed by WoWAnalyzer, never copied from it (AGPL).
 
 import type { JobCheck } from "../../types";
-import { BLOOD_CHECKS, PROT_PALADIN_CHECKS } from "./tank";
+import { BLOOD_CHECKS, BREWMASTER_CHECKS, PROT_PALADIN_CHECKS } from "./tank";
 import { HEALER_CHECKS } from "./healer";
 import { MELEE_CHECKS } from "./melee";
 import { RANGED_CHECKS } from "./ranged";
@@ -17,6 +17,7 @@ export const WOW_SPEC_CHECKS: Record<string, JobCheck[]> = {
   ...RANGED_CHECKS,
   "Blood Death Knight":  BLOOD_CHECKS,
   "Protection Paladin":  PROT_PALADIN_CHECKS,
+  "Brewmaster Monk":     BREWMASTER_CHECKS,
   "Holy Priest":         HEALER_CHECKS,
   "Discipline Priest":   HEALER_CHECKS,
   "Restoration Druid":   HEALER_CHECKS,
