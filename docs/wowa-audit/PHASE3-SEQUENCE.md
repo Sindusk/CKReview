@@ -50,7 +50,7 @@ damage rows are measured.
 | 8 | Mistweaver | [monk-mistweaver.md](monk-mistweaver.md) | done 2026-10-17: Celestial Conduit drift (tracked-cooldowns.ts); Mistweaver presses, channels and short GCDs (game.ts, haste.ts); status locks up to 10s (timeline.ts, WoW-only in effect: FFXIV has no lockStatus); healer filler never Touch of Death; verified by the main session, which also gave Windwalker's Conduit its hit id |
 | 9 | Restoration Druid | [druid-restoration.md](druid-restoration.md) | done 2026-10-17 (healer pass): no candidates; Convoke the Spirits locks the GCD (game.ts) |
 | 10 | Restoration Shaman | [shaman-restoration.md](shaman-restoration.md) | done 2026-10-17 (healer pass): no candidates |
-| 11 | Beast Mastery | [hunter-beastmastery.md](hunter-beastmastery.md) | |
+| 11 | Beast Mastery | [hunter-beastmastery.md](hunter-beastmastery.md) | done 2026-10-17: Bestial Wrath held, Kill Command without Nature's Ally, Wild Thrash on one enemy (beastmastery.ts); BM GCD value counts the press's pet hits, Font of Venomous Rage is a 2s channel (game.ts); verified by the main session |
 | 12 | Balance | [druid-balance.md](druid-balance.md) | |
 | 13 | Retribution | [paladin-retribution.md](paladin-retribution.md) | |
 | 14 | Frost DK | [deathknight-frost.md](deathknight-frost.md) | |
@@ -220,8 +220,12 @@ measured for it.
   armor or damage-taken debuff.
 - **A tracked cooldown whose hits log under another id needs
   `damageIds`**, or a use is worth 0 and its drift never shows
-  (Celestial Conduit: cast 443028, hits 443038). Check each tracked
-  cooldown of the spec has a non-zero value per use.
+  (Celestial Conduit: cast 443028, hits 443038; Bestial Wrath, all pet).
+  Check each tracked cooldown of the spec has a non-zero value per use.
+- **A press whose damage lands through a pet is priced at half** unless
+  `isGcdDamage` counts those pet hits (game.ts `PET_PRESS_HITS`; Beast
+  Mastery's Kill Command). Check a pet spec's GCD value against its
+  presses' pet hits.
 - **Buffs that lock the player go in `LOCK_STATUSES`** (game.ts): a
   channel whose spells log as their own casts (Convoke the Spirits) or an
   on-use item that roots the player (Soulcoiler Ritual Vessel) reads as
@@ -278,6 +282,12 @@ measured for it.
   press; 3 of 5 top players press it, Abuki 1 of 7 kills). Should a
   healer be judged on a damage execute? Evidence in
   [monk-mistweaver.md](monk-mistweaver.md).
+- Beast Mastery (2026-10-17): `low-focus-early-cast` kept `wrong`.
+  Worth a look: Bestial Wrath held fires on the 100th-percentile 爹丶爹
+  (RbhPKYWd6t1nAC3f, 229k, 2.4s at 3:44) about as much as on weaker
+  players (Koralie 154k); each hold is 2–4s. Kept as a small real loss.
+  The phase-2 `wrong` Beast Cleave row was overturned (Beast Cleave now
+  comes only from Wild Thrash, so a hit-less window is a wasted press).
 
 - Elemental (2026-10-17): `CallOfTheAncestors/other-checks`,
   `statistics` (and whether "Stormkeeper before Ascendance" should be
