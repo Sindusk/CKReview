@@ -586,11 +586,21 @@ function droppedCombos(ctx: PlayerCheckContext, minBonus: Map<number, number>, b
 export function checkCooldownDrift(ctx: PlayerCheckContext): DamageFinding[] {
   const out: DamageFinding[] = [];
   const forcedMerged = mergeWindows(ctx.forced);
-  const withDeciding = ctx.decidingPhaseStart !== undefined
-    ? mergeWindows([...ctx.forced, { startMs: 0, endMs: ctx.decidingPhaseStart, cause: "held for the deciding phase" }])
-    : forcedMerged;
+  // A cooldown marked burstHold isn't held while ready inside the context's
+  // cooldownHoldWindows (Vashnik: the 99.8th-percentile Retribution
+  // Pçpaladin, 1NL29tyvbzGhZgPK fight 18, pressed Avenging Wrath, Execution
+  // Sentence, Divine Toll and Wake of Ashes 2-3s after each of the five
+  // Imbibes, 84s apart; counted as holds, they read 10.3M lost). Opt-in per
+  // cooldown: other specs' short cooldowns weren't measured against it.
+  // The windows don't block the room: the cooldown could be pressed there.
+  const holds = ctx.context?.cooldownHoldWindows?.(ctx.pull) ?? [];
+  const holdMerged = holds.length ? mergeWindows([...ctx.forced, ...holds]) : forcedMerged;
 
   for (const tracked of ctx.game.trackedCooldowns(ctx.job)) {
+    const notHeld = tracked.burstHold ? holdMerged : forcedMerged;
+    const withDeciding = ctx.decidingPhaseStart !== undefined
+      ? mergeWindows([...notHeld, { startMs: 0, endMs: ctx.decidingPhaseStart, cause: "held for the deciding phase" }])
+      : notHeld;
     if (ctx.patch && tracked.notOnPatches?.includes(ctx.patch)) continue;
     // Synced below the cap: not judged when learned above the sync level,
     // or when it has charges (they come with traits, and the vendored data
@@ -636,7 +646,7 @@ export function checkCooldownDrift(ctx: PlayerCheckContext): DamageFinding[] {
             chargesAt(casts, cd.cooldownMs, cd.charges, f.startMs) >= 1)
           .reduce((a, f) => a + Math.min(f.endMs, w.endMs) - w.startMs, 0)
         : 0;
-      const plain = overlapMs(w.startMs, w.endMs, forcedMerged) - avoidable;
+      const plain = overlapMs(w.startMs, w.endMs, notHeld) - avoidable;
       // Holding into the deciding phase only counts when the use lands in it.
       const forced = ctx.decidingPhaseStart !== undefined && w.endMs >= ctx.decidingPhaseStart
         ? overlapMs(w.startMs, w.endMs, withDeciding) - avoidable : plain;
@@ -651,7 +661,7 @@ export function checkCooldownDrift(ctx: PlayerCheckContext): DamageFinding[] {
       // a Dream ready 5:15 with 36s of targetable boss before P2's
       // downtime, used 6:20; ready 12:45 with 10s before P4's, used 14:22;
       // xivanalysis's 15/17).
-      const blockers = ctx.decidingPhaseStart !== undefined && w.endMs >= ctx.decidingPhaseStart ? withDeciding : forcedMerged;
+      const blockers = ctx.decidingPhaseStart !== undefined && w.endMs >= ctx.decidingPhaseStart ? withDeciding : notHeld;
       const first = avoidable > 0 ? w.startMs : firstPressable(w.startMs, w.endMs, cd.landDelayMs ?? 0, blockers);
       const lost = first === undefined ? 0 : Math.floor(Math.max(0, w.endMs - first - allowance) / cd.cooldownMs);
       stretchLost += lost;

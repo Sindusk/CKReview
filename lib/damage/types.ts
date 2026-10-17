@@ -242,6 +242,9 @@ export type TrackedCooldown = {
   // Its recast or charges on these patches, where they differ from the
   // vendored 7.4 data (Bloodfest was 120s before 7.4, not 60s).
   recastOnPatches?: Record<string, { cooldownMs?: number; charges?: number }>;
+  // Ready time inside the fight's cooldownHoldWindows isn't held (the
+  // spec holds it for the burst the fight sets up; checks.ts).
+  burstHold?: boolean;
 };
 
 // ── Fight context (per boss)───────────────────────────────────────────
@@ -278,7 +281,8 @@ export type DamageContext = {
   // Windows a cooldown may be held into for a burst the fight sets up
   // (Vashnik's Venoms after each Imbibe): ready time inside them isn't held.
   // Only the drift checks that read it (wow/specs/shared.ts
-  // spentCooldownDrift); never excuses a GCD gap.
+  // spentCooldownDrift, some spec checks, and checkCooldownDrift for a
+  // tracked cooldown marked burstHold); never excuses a GCD gap.
   cooldownHoldWindows?(pull: Pull): ForcedWindow[];
   // A name for a mechanic occurrence key, used to say what was happening
   // during a gap ("during Towers (P5)"). Labels only; never excuses a gap.
