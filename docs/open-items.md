@@ -446,8 +446,19 @@ and delete them from the header.
     missed), Execution Sentence before Wake (≤0.18M), melee swings missed
     (1.12M on the 100th-percentile Pipala). `unverifiable`: Art of War
     (its removals don't sit at a duration). No `wrong` rows.
-  - [deathknight-frost.md](wowa-audit/deathknight-frost.md): 5;
-    Frostscythe targets per cast.
+  - [deathknight-frost.md](wowa-audit/deathknight-frost.md): phase 3
+    done 2026-10-17 on the 31 Frost DK player-pulls on disk (one top
+    Vashnik kill fetched: 眼口补偿器 78hvzrVRXKn6NYMa). Built in
+    lib/damage/wow/specs/frostdk.ts: Killing Machine lost (expiries and
+    Empower Rune Weapon at two stacks, valued as an Obliterate with it
+    less one without; moved from procs.ts), Rime overwritten, Frostscythe
+    on one enemy, and Breath of Sindragosa / Frostwyrm's Fury held with
+    the wait for a Pillar excused (out of tracked-cooldowns.ts). Pillar of
+    Frost and Reaper's Mark drift now have a value per use. The shared
+    Runic Power cap check is off for Frost: a 10–27% floor on every
+    player, and it read casts that generate nothing (row proposed
+    `wrong`). Left unbuilt with numbers: rune overcap, Arcane Torrent.
+    Kept `wrong`: Breath average duration, Empower Rune Weapon efficiency.
   - [demonhunter-vengeance.md](wowa-audit/demonhunter-vengeance.md): tank,
     17; Fury at the cap (wire the existing check).
   - [druid-guardian.md](wowa-audit/druid-guardian.md): tank, 4; offensive
