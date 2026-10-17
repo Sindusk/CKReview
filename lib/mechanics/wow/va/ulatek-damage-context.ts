@@ -66,4 +66,23 @@ export const ULATEK_DAMAGE_CONTEXT: DamageContext = {
     out.push(...debuffWindows(pull, [DOOMSCALE_SHELL], "carrying the Doomscale egg", { who: isMelee, maxMs: 22_000 }));
     return out;
   },
+  // Cooldowns held for a Heart window (+200%) are fine: 30s before each
+  // Heart (1299526 on the enemy) to 5s after, and in P2 from its start,
+  // since the adds before the Heart don't move the pool. Measured
+  // 2026-10-17 on gVDPhzp61Zm29HMw Ula'tek Pull 1 (the WoWAnalyzer
+  // audit's Retribution pass): both Retribution Paladins pressed Avenging
+  // Wrath and Execution Sentence at 2:17 and 4:46 (Hearts at 2:16 and
+  // 4:45); Polpo held his from 3:17 through the P2 adds (read 4.8M lost
+  // before this window), Jgwentworth spent one on the adds at 3:40 and was
+  // back for the Heart.
+  cooldownHoldWindows: (pull) => {
+    const out: ForcedWindow[] = [];
+    const p2 = phaseSpans(pull, 2);
+    for (const e of pull.enemyBuffs ?? []) {
+      if (e.abilityId !== HEART_EXPOSED) continue;
+      const inP2 = p2.find((s) => e.timestamp >= s.startMs && e.timestamp <= s.endMs);
+      out.push({ startMs: Math.min(e.timestamp - 30_000, inP2?.startMs ?? Infinity), endMs: e.timestamp + 5_000, cause: "held for the Heart window" });
+    }
+    return out;
+  },
 };
