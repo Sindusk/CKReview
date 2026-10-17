@@ -26,7 +26,8 @@
 //   pull; one speed factor per player read lust GCDs as normal and every
 //   later GCD as slow.
 // - isChannel: channels log no end; their lock runs to their last tick.
-// - lockStatus: Deep Breath's lock runs to its flight buff's removal.
+// - lockStatus: Deep Breath's lock runs to its flight buff's removal
+//   (Convoke the Spirits and Soulcoiler Ritual Vessel to theirs).
 // - isGcdDamage: a gap is priced at the player's own on-GCD abilities only.
 //   Counting every DoT tick and pet hit (FFXIV's rule) valued one
 //   Assassination Rogue gap on JZp82Rm7TzycM94a pull 25 at 1.7M per GCD,
@@ -96,8 +97,22 @@ const CHANNEL_IDS = new Set([
 // Deep Breath flies 1.3–2.4s (its 433874 buff; qpZx3mWaG7gcDdYB pull 3,
 // Bragontix's next GCD came 0.0–0.4s after each removal). Read as a plain
 // GCD, every flight was a ~1.1s gap.
+// Two more from the healer pass of the WoWAnalyzer audit (2026-10-17), each
+// read as ~1–2s of idle per press before:
+// - Convoke the Spirits (391528, Restoration Druid): a 3.0s channel whose
+//   buff (same id) runs cast to removal (2.97–3.04s); its spells log as
+//   casts of their own, nothing under Convoke's name, so isChannel can't
+//   time it. Next GCD 2.8–4.4s after the cast (median 3.5s, 32 Convokes,
+//   six Resto Druids on Vr8dLPtFYWA4G1yg, LckJC7GMhQvD6rdw,
+//   GndQ9VFWtLzNjKpk, dG8D9y6WxrfmtgXp, VbAHWZDdPwJBajmx, gVDPhzp61Zm29HMw).
+// - Soulcoiler Ritual Vessel (1291894, a healer on-use item): a 2.0s buff
+//   (same id, 1.96–2.03s) that locks the player; the next GCD came 2.02s
+//   or later after every one of 27 uses (Resto Shamans, Preservation,
+//   Resto Druid on the same reports).
 const LOCK_STATUSES = new Map<number, number>([
-  [433874, 433874],   // Deep Breath
+  [433874, 433874],     // Deep Breath
+  [391528, 391528],     // Convoke the Spirits
+  [1291894, 1291894],   // Soulcoiler Ritual Vessel
 ]);
 
 // Arms' Bladestorm: a ~4.5s channel that casts Mortal Strike by itself,
