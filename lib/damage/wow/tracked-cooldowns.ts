@@ -90,7 +90,7 @@ export const WOW_TRACKED_COOLDOWNS: Record<string, TrackedCooldown[]> = {
   // is pressed every 40s right after each Lunar Beam by two of the top
   // players, an even trade (its ticks hit ×1.36 inside the beam), so its
   // drift flagged them and nobody weaker; Incarnation is 180s less 1s per
-  // 25 Rage spent and every top tank holds one use 40–67s.
+  // 25 Rage spent and most top tanks hold one use 32–67s.
   "Guardian Druid": [
     { name: "Lunar Beam", actionIds: [204066], damageIds: [1270292, 414613], prePullEvidenceIds: [1270292, 414613], cooldownMs: 40_000, charges: 1, firstUseOffsetMs: 6_000, burstHold: true },
   ],

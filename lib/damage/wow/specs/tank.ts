@@ -36,9 +36,9 @@
 // - Tracked: Lunar Beam (tracked-cooldowns.ts), valued by its hits.
 //   Gore expires in procs.ts (all four expiries in forced time).
 // - Measured, not built: Incarnation drift (180s less 1s per 25 Rage
-//   spent, fitted on 49 intervals with none under the line; every top
-//   tank holds one use 40–67s, Diggersby 63–85s, so it doesn't separate;
-//   no whole use is lost on anyone); idle inside Incarnation (0–6 GCDs
+//   spent, fitted on 49 intervals with none under the line; seven of nine
+//   top and middle tanks hold one use 32–67s, the weak 1–12s, Diggersby
+//   63–85s, so it doesn't separate; no whole use is lost on anyone); idle inside Incarnation (0–6 GCDs
 //   short a window, top as weak); Red Moon drift (fires only on the two
 //   top players who sync it with Lunar Beam); Rage at the cap (0–4 casts
 //   a pull on top players, 21–23 on the weakest, ~150k at most).

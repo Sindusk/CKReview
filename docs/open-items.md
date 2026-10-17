@@ -471,8 +471,15 @@ and delete them from the header.
     Fracture, Fel Devastation rows, Fiery Brand and Immolation Aura
     efficiency, zero-hit casts. Lead: Metamorphosis (×1.8–3.2 damage
     rate) and its Untethered Rage proc.
-  - [druid-guardian.md](wowa-audit/druid-guardian.md): tank, 4; offensive
-    cooldown drift. WoWAnalyzer's own spec is rough.
+  - [druid-guardian.md](wowa-audit/druid-guardian.md): phase 3 done
+    2026-10-17. Engine fix: Guardian's bear presses weren't in the spell
+    survey, so every press read as idle (game.ts). Lunar Beam tracked,
+    Gore expiry (procs.ts); no spec check (Incarnation drift and window,
+    Red Moon drift and Rage at the cap measured, not built). Kept
+    `wrong`: Mangle / Thrash efficiency, Swipe discipline, Berserk
+    per-use. Galactic Guardian now `unverifiable` (never runs out). Open
+    for the user: Guardian GCD gaps are priced at the average GCD
+    (86–113k) though the free press is a ~20k Swipe.
   - [rogue-assassination.md](wowa-audit/rogue-assassination.md): stale
     (12.0.0), 11; Rupture and Garrote clip and uptime.
   - [hunter-marksmanship.md](wowa-audit/hunter-marksmanship.md): stale
