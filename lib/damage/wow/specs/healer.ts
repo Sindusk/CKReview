@@ -32,7 +32,12 @@
 //
 // Not judged: DoTs (WoW healers aren't expected to keep them up) and Power
 // Infusion's recast (its casts log in pairs 1ms apart; the measured median
-// interval, 23s, is no recast).
+// interval, 23s, is no recast). Preservation's Echo (364343, from
+// VWMbYPRyxCAmhZFj's masterData) isn't judged either: its own small heal
+// isn't its value, the copy of the next heal is, and that logs under the
+// copied spell's name. Judged by its own heal it read 0.8–2.0M a kill on
+// three top Preservations (Drizzy VWMbYPRyxCAmhZFj, Tsonge and
+// Pelinmerkkii baRCnPv62YQ1dJZN; WoWAnalyzer audit, 2026-10-17).
 //
 // Mistweaver's observed GCD in the survey (spell-data.ts observedGcdMs) is
 // 740ms, which is suspect (from docs/open-items.md 2026-10-15): check it on
@@ -46,6 +51,7 @@ import { k } from "./shared";
 export const HEAL_WASTE_SHARE = 0.2;
 const HEAL_LAND_MS = 1_500;
 const HOT_MAX_MS = 30_000;
+const NOT_JUDGED = new Set([364343]);   // Echo: its value is the copied heal
 
 function filler(ctx: PlayerCheckContext): { name: string; value: number } {
   const kinds = gcdKinds(ctx.player, ctx.pull, ctx.uses);
@@ -62,7 +68,7 @@ function filler(ctx: PlayerCheckContext): { name: string; value: number } {
 
 const healGcds: JobCheck = (ctx): DamageFinding[] => {
   const kinds = gcdKinds(ctx.player, ctx.pull, ctx.uses);
-  const healUses = ctx.uses.filter((u) => u.startMs < ctx.endMs && kinds.get(u.action.id) === "heal");
+  const healUses = ctx.uses.filter((u) => u.startMs < ctx.endMs && kinds.get(u.action.id) === "heal" && !NOT_JUDGED.has(u.action.id));
   if (healUses.length === 0) return [];
   const byName = new Map<string, typeof ctx.player.healing>();
   for (const h of ctx.player.healing) {
