@@ -47,7 +47,20 @@
 //   isn't in the log).
 // - A floor: GCD gaps. Assassination waits on Energy; Nearby presses 45.9
 //   GCDs a minute to Auxeus's 46.1 and reads 15.6k/s estimated loss to
-//   Auxeus's 23.4k/s.
+//   Auxeus's 23.4k/s. The four top parses fetched in the audit sit at
+//   73–80% GCD uptime too.
+// - WoWAnalyzer audit phase 3 (2026-10-17, docs/wowa-audit/
+//   rogue-assassination.md; WoWAnalyzer's Assassination is stale):
+//   "Rupture off every enemy", "Garrote off every enemy" and "Rupture
+//   refreshed early" are in assassination.ts, whose header has the bleed
+//   durations, the models and the numbers (top players 0–111k a pull,
+//   weaker up to 457k). Vanish drift now prices a player with no Vanish
+//   Garrote at 2× their ordinary one (tracked-cooldowns.ts; Hofix read 0).
+//   Re-run on the top players: Vanish, Deathmark, Energy at the cap and
+//   the Kingsbane window fire little or not at all; Kingsbane drift reads
+//   777k on Ireath (z8rQ23NBy4LwM6PZ, burst opened at 0:19). Combo points
+//   at the cap and low-point Envenoms fire on the top players as much and
+//   aren't built.
 //
 // Retribution, checked against WoWAnalyzer on qpZx3mWaG7gcDdYB pull 3
 // (Polpo; reference ACmXHMFtaPLR9k8w fight 15's Yenvenger, 99th

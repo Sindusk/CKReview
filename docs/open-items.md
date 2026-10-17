@@ -481,7 +481,15 @@ and delete them from the header.
     for the user: Guardian GCD gaps are priced at the average GCD
     (86–113k) though the free press is a ~20k Swipe.
   - [rogue-assassination.md](wowa-audit/rogue-assassination.md): stale
-    (12.0.0), 11; Rupture and Garrote clip and uptime.
+    (12.0.0). Phase 3 done 2026-10-17: Rupture / Garrote off every enemy
+    and Rupture refreshed early (specs/assassination.ts); Vanish drift
+    priced for a player who never Vanishes. Proposed `wrong`: combo-point
+    waste (four rows) and low-point finishers (fire on the top players as
+    much). Kept `wrong`: Crimson Tempest spread, Mutilate after Vanish,
+    the two Deathmark / Kingsbane alignment rows. Not built: Improved
+    Garrote overwritten (priced by Deathmark), Fan of Knives on one enemy.
+    For the user: Kingsbane drift reads 777k on the 99.8th Ireath, who
+    opened his whole burst at 0:19.
   - [hunter-marksmanship.md](wowa-audit/hunter-marksmanship.md): stale
     (declares 11.0.5, active 2026), 8; Precise Shots use.
   - [druid-feral.md](wowa-audit/druid-feral.md): 14; Rip uptime and
