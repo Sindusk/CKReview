@@ -520,6 +520,7 @@ export default function Home() {
   };
 
   const [pauseToken, setPauseToken] = useState(0);
+  const [playToken, setPlayToken] = useState(0);   // the replay's play button
   useEffect(() => {
     if (showDamage || showMitigation) setPauseToken((t) => t + 1);
   }, [showDamage, showMitigation]);
@@ -1603,6 +1604,8 @@ export default function Home() {
                   onLoad={handleLoadReplay}
                   syncedTimeMs={videoUsable ? timeline.playbackTimeMs : undefined}
                   onSeekMs={videoUsable ? handleSeekToMs : undefined}
+                  onVodPlay={() => setPlayToken((n) => n + 1)}
+                  onVodPause={() => setPauseToken((n) => n + 1)}
                 />
               </div>
             )}
@@ -1611,6 +1614,7 @@ export default function Home() {
               vod={selectedVod}
               seekRequest={timeline.seekRequest}
               pauseRequest={pauseToken}
+              playRequest={playToken}
               onCurrentTimeChange={handleVideoTimeUpdate}
               onUnsync={handleUnsyncVod}
               onResync={resyncFromPull}

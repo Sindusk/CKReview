@@ -91,6 +91,9 @@ type VideoPanelProps = {
   // ONE-TIME PAUSE COMMAND: each new value pauses the player once (the
   // Damage and Mitigation dialogs cover the video while open). 0 does nothing.
   pauseRequest?: number;
+  // ONE-TIME PLAY COMMAND, same shape: the replay's play button while the
+  // video is hidden under it. Ignored while the no-coverage hold is up.
+  playRequest?: number;
 
   // continuous playback reporting
   onCurrentTimeChange?: (time: number) => void;
@@ -153,6 +156,7 @@ export default function VideoPanel({
   vod,
   seekRequest,
   pauseRequest = 0,
+  playRequest = 0,
   onCurrentTimeChange,
   onUnsync,
   onResync,
@@ -415,6 +419,10 @@ export default function VideoPanel({
   useEffect(() => {
     if (pauseRequest && playerReadyRef.current) playerRef.current?.pause();
   }, [pauseRequest]);
+
+  useEffect(() => {
+    if (playRequest && playerReadyRef.current && !holdRef.current) playerRef.current?.play();
+  }, [playRequest]);
 
   // Pause when the no-coverage card goes up. The seek that lifts it (a
   // new pull or VOD) starts playback again through the effect above.

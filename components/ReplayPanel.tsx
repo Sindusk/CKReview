@@ -38,6 +38,8 @@ type Props = {
   onLoad:        () => void;
   syncedTimeMs?: number;          // VOD playback time; undefined = own clock
   onSeekMs?:     (ms: number) => void;
+  onVodPlay?:    () => void;        // play/pause drive the hidden video when synced
+  onVodPause?:   () => void;
 };
 
 const SPEEDS = [0.5, 1, 2, 4];
@@ -48,7 +50,7 @@ const MAX_EXTRAPOLATE_MS = 350;
 // readable on both.
 const LABEL = { stroke: "rgba(0,0,0,0.75)", strokeWidth: 4, paintOrder: "stroke" } as const;
 
-export default function ReplayPanel({ pull, data, loading, progress, error, onLoad, syncedTimeMs, onSeekMs }: Props) {
+export default function ReplayPanel({ pull, data, loading, progress, error, onLoad, syncedTimeMs, onSeekMs, onVodPlay, onVodPause }: Props) {
   const synced = syncedTimeMs !== undefined;
   const durationMs = data?.durationMs ?? (pull ? (pull.endTime - pull.startTime) * 1000 : 0);
 
@@ -63,10 +65,16 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
   const [showHits, setShowHits] = useState(true);
 
   const extRef = useRef<{ value: number; at: number; moving: boolean }>({ value: 0, at: 0, moving: false });
+  // Whether the synced video is playing, read from its time reports: it
+  // reports ~5 times a second whether playing or not, so a report that
+  // repeats the last time means paused.
+  const [vodPlaying, setVodPlaying] = useState(false);
   useEffect(() => {
     if (syncedTimeMs === undefined) return;
     const prev = extRef.current;
-    extRef.current = { value: syncedTimeMs, at: performance.now(), moving: syncedTimeMs !== prev.value && Math.abs(syncedTimeMs - prev.value) < 2000 };
+    const moving = syncedTimeMs !== prev.value && Math.abs(syncedTimeMs - prev.value) < 2000;
+    extRef.current = { value: syncedTimeMs, at: performance.now(), moving };
+    setVodPlaying(moving);
   }, [syncedTimeMs]);
 
   useEffect(() => { setOwnTimeMs(0); setPlaying(false); }, [pull?.id]);
@@ -185,10 +193,14 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
             const b = (facingToBearing(p.facing) * Math.PI) / 180;
             return (
               <g key={a.key} opacity={a.targetable ? 1 : 0.5}>
+                {a.targetable && (
+                  // A faint 90° front arc: which way the boss faces at a glance.
+                  <path d={arcPath(x, y, r + 46, b, Math.PI / 4)} fill="#e06c6c" fillOpacity={0.22} stroke="none" />
+                )}
                 <circle cx={x} cy={y} r={r} fill="#8a2d2d" stroke="#e06c6c" strokeWidth={2} />
                 {a.targetable && (
                   <>
-                    <line x1={x} y1={y} x2={x + Math.sin(b) * (r + 12)} y2={y - Math.cos(b) * (r + 12)} stroke="#e06c6c" strokeWidth={3} />
+                    <FacingWedge x={x} y={y} r={r} b={b} color="#e06c6c" size={11} />
                     <text x={x} y={y - r - 8} textAnchor="middle" fill="#e8a0a0" fontSize={20} {...LABEL}>{a.name}</text>
                   </>
                 )}
@@ -204,6 +216,7 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
             const color = getClassColor("ffxiv", a.job ?? "");
             return (
               <g key={a.key} opacity={dead ? 0.45 : p.stale ? 0.7 : 1}>
+                {!dead && <FacingWedge x={x} y={y} r={14} b={(facingToBearing(p.facing) * Math.PI) / 180} color={color} size={9} />}
                 <circle cx={x} cy={y} r={14} fill={color} stroke={getRoleColor(roleByName.get(a.name))} strokeWidth={4} />
                 {dead && (
                   <path d={`M${x - 9} ${y - 9} L${x + 9} ${y + 9} M${x + 9} ${y - 9} L${x - 9} ${y + 9}`} stroke="#111" strokeWidth={4} />
@@ -230,7 +243,12 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 10px 8px", flexShrink: 0 }}>
-        {!synced && (
+        {synced ? (
+          <button className="ck-btn" onClick={() => (vodPlaying ? onVodPause?.() : onVodPlay?.())} style={{ minWidth: 64 }}
+            title="Plays and pauses the synced VOD">
+            {vodPlaying ? "Pause" : "Play"}
+          </button>
+        ) : (
           <>
             <button className="ck-btn" onClick={() => { if (ownTimeMs >= durationMs) setOwnTimeMs(0); setPlaying((v) => !v); }} style={{ minWidth: 64 }}>
               {playing ? "Pause" : "Play"}
@@ -267,6 +285,19 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
       </div>
     </div>
   );
+}
+
+/** A small triangle just outside a dot, pointing along compass bearing `b` (radians, 0 = N). */
+function FacingWedge({ x, y, r, b, color, size }: { x: number; y: number; r: number; b: number; color: string; size: number }) {
+  const at = (dist: number, ang: number) => `${x + Math.sin(ang) * dist} ${y - Math.cos(ang) * dist}`;
+  const spread = size / (r + 2);
+  return <path d={`M${at(r + size + 4, b)} L${at(r + 1, b - spread)} L${at(r + 1, b + spread)} Z`} fill={color} stroke="rgba(0,0,0,0.7)" strokeWidth={1.5} />;
+}
+
+/** Pie slice of radius `rad` centred on bearing `b`, `half` radians either side. */
+function arcPath(x: number, y: number, rad: number, b: number, half: number): string {
+  const p = (ang: number) => `${x + Math.sin(ang) * rad} ${y - Math.cos(ang) * rad}`;
+  return `M${x} ${y} L${p(b - half)} A${rad} ${rad} 0 0 1 ${p(b + half)} Z`;
 }
 
 /** One overlay shape (lib/replay/dancing-mad-overlays.ts), in SVG units. */
