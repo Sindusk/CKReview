@@ -62,6 +62,15 @@
 //   Final Verdict or Divine Storm.
 // - Storm Unleashed 20s: 2 at D (gVDPhzp61Zm29HMw, v8bmgMAdcnBCj9Ya; three
 //   Enhancement players on the samples), max 20.02s of 78.
+// - Nightfall 12s (Affliction; added in its phase 3, 2026-10-17): 14 at D
+//   on 18 Affliction player-pulls, max 12.03s of 424; stacks to 2. Spent
+//   by Shadow Bolt, Drain Soul or Malefic Grasp. It empowers the press
+//   (Shadow Bolt with it 45–101k vs 37–59k without; Drain Soul 119–163k vs
+//   60–86k), so the whole consumer press is an upper bound. Unused
+//   expiries: the static's Wyrmtongues 12 in 9 pulls (gVDPhzp61Zm29HMw,
+//   3 of them in forced time), Fluffalicous 2 and Pigson 1
+//   (a4kX1DNT27yHGvqJ), Zachx 1 (Kag91qVZ2YJ7MQAb, 98.9th), the other six
+//   players none.
 //
 // ── Measured and left out ──────────────────────────────────────────────
 // - Lava Surge (77762) 10s, clean, but 75 of 657 run out on the top
@@ -109,4 +118,5 @@ export const WOW_MEASURED_PROCS = new Map<number, MeasuredProc>([
   [194594,  { durationMs: 15_000, consumerIds: [19434] }],                        // Lock and Load → Aimed Shot
   [408458,  { durationMs: 12_000, consumerIds: [383328, 53385] }],                // Divine Purpose → Final Verdict, Divine Storm
   [1262830, { durationMs: 20_000, consumerIds: [187874] }],                       // Storm Unleashed → Crash Lightning
+  [264571,  { durationMs: 12_000, consumerIds: [686, 198590, 1261153] }],         // Nightfall → Shadow Bolt, Drain Soul, Malefic Grasp
 ]);
