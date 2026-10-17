@@ -95,7 +95,7 @@
 // Temporal Wound's explosion (409632) lands 12.1–14.7s after every Breath
 // cast. A Breath 16s+ before the end with none after it banked nothing
 // (it missed the targets, or they died or left): lost = the player's
-// average explosion. 3 of ~120 Breaths: Yùkîï and Snarkareth's Vashnik
+// average explosion. 3 of the 106 such Breaths: Yùkîï and Snarkareth's Vashnik
 // openers (0:04, 941k and 1.11M) and Dreamsweet's 3:02 on Entombed
 // Sentinels (971k; every enemy kept being hit through 3:20, so not an
 // early death). A Breath in the last 16s of a kill never explodes either

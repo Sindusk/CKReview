@@ -509,8 +509,17 @@ and delete them from the header.
     Tiger's Fury Energy waste (TF grants no Energy now). Kept `wrong`:
     Chomp efficiency (nobody takes it), Sudden Ambush on Rake. Sudden
     Ambush expiry `unverifiable` (no duration).
-  - [evoker-augmentation.md](wowa-audit/evoker-augmentation.md): 7;
-    Breath of Eons on an enemy that died early.
+  - [evoker-augmentation.md](wowa-audit/evoker-augmentation.md): phase 3
+    done 2026-10-17 (31 player-pulls, 3 fetched; no case study): the
+    support damage is in the Evoker's own hits, so it was priced as GCD
+    damage (gaps ~3× high; game.ts). Built (specs/augmentation.ts, on a
+    fitted Time Skip / Temporal Burst recovery model): Ebon Might down
+    while ready, Prescience charges capped, Breath of Eons and Time Skip
+    held (replacing tracked cooldowns worth 0 a use), Breath of Eons that
+    never exploded. Proposed `wrong`: empowers inside the Breath window,
+    Essence at the cap. Overturned `wrong`: Fire Breath held (top players
+    cast more; left unbuilt, no cooldown model fits), potion in the Breath
+    window (negligible).
   - [evoker-devastation.md](wowa-audit/evoker-devastation.md): 11;
     Disintegrate tick efficiency.
   - [monk-brewmaster.md](wowa-audit/monk-brewmaster.md): tank, 9; Niuzao
