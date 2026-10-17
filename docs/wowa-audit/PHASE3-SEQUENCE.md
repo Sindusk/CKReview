@@ -41,7 +41,8 @@ damage rows are measured.
 |---|---|---|---|
 | 1 | Windwalker | [monk-windwalker.md](monk-windwalker.md) | done 2026-10-17: Fists of Fury held, Zenith Stomp unused (windwalker.ts); verified by the main session |
 | 2 | Havoc | [demonhunter-havoc.md](demonhunter-havoc.md) | done 2026-10-17: Eye Beam held, Death Sweep reset unused (havoc.ts); Reaver's Glaive added as a GCD press (game.ts); verified by the main session |
-| 3 | Arcane | [mage-arcane.md](mage-arcane.md) | |
+| 3 | Arcane | [mage-arcane.md](mage-arcane.md) | done 2026-10-17: Touch of the Magi window (arcane.ts; `burstGcdFindings` takes a `windows()` override); verified by the main session |
+| 3a | Engine: WoW proc expiries | 18 ledgers cite `checkProcs` | `checkProcs` never fires on WoW (no buff durations in the log; confirmed on LckJC7GMhQvD6rdw: 0 of 36,543 buff events carry one). Fixed before Demonology, then the done ledgers' proc rows rechecked |
 | 4 | Demonology | [warlock-demonology.md](warlock-demonology.md) | |
 | 5 | Affliction | [warlock-affliction.md](warlock-affliction.md) | |
 | 6 | Arms | [warrior-arms.md](warrior-arms.md) | |
@@ -186,6 +187,15 @@ measured for it.
 - **A trial check that fires on the top players about as much as on the
   weak ones is dropped**, with its numbers in the ledger (Havoc's Essence
   Break window).
+- **Don't trust a "covered" row until the covering check has fired on a
+  WoW pull.** Arcane found `checkProcs` had never produced a WoW expiry.
+  Run the app's findings (`validate.js damage-analysis-wow <folder>
+  --all-findings`) and look for the label.
+- **Value a hit by its own events, not a total divided by presses**
+  (Arcane Orb: 294k claimed, 47–63k a pressed Orb).
+- **Class resources not in the fetch** (Arcane Charges) make a rule
+  `unverifiable` until the fetch carries resource events; say so in the
+  row.
 
 ## Held for the user's review
 
@@ -201,6 +211,13 @@ measured for it.
   Open, not a decision: Blade Dance / Death Sweep presses (9.5 per
   unforced minute against the top players' 10.8–12.7) is the largest
   unpriced Havoc loss; its cooldown couldn't be rebuilt from the log.
+- Arcane (2026-10-17): proposed `wrong` for the Barrage tier rows
+  (`sunfury-perfect`, `good-tier`, `ok-tier`), `ArcaneMissiles/ok-tier`
+  and `CastEfficiency/arcane-orb`, plus the re-checked `wrong` rows
+  (`surge-ready-soon` and others), evidence in
+  [mage-arcane.md](mage-arcane.md). Open: Arcane Charges aren't fetched,
+  so the charge-count rules can't be checked; fetching resource events
+  would settle them.
 
 - Elemental (2026-10-17): `CallOfTheAncestors/other-checks`,
   `statistics` (and whether "Stormkeeper before Ascendance" should be
