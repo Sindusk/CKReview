@@ -1,5 +1,10 @@
 # Handoff: build Elemental's measured checks (WoWAnalyzer audit, phase 3)
 
+**Status 2026-10-17:** all six checks are built (`lib/damage/wow/specs/elemental.ts`),
+plus a seventh found in the approval step (Overcharge overwritten). Left:
+the user's answers on the three remaining `no-damage` rows (Call of the
+Ancestors other checks, statistics, shaman utility), then Windwalker.
+
 For the session that continues the WoWAnalyzer audit. Written 2026-10-16.
 Phases 1–2 are done for every spec, and Elemental's phase 3 measurements
 are done. None of Elemental's six candidates is built yet. This session

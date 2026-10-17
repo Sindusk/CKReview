@@ -84,9 +84,12 @@ Lava Burst 171k, early Flame Shock refreshes 77k. The timeline question
 changed three of them while building: Purging Flames pays back about
 half of a two-target Voltaic Blaze in Ascendance; Master of the Elements
 is never wasted, only spent on a weaker spell; a one-target Chain
-Lightning also gets a weaker answer from the Ancestors.
+Lightning also gets a weaker answer from the Ancestors. Checking the
+`no-damage` rows for approval turned up a seventh: the season 2 tier
+set's Overcharge, overwritten while up (Cocroach 1.69M over 12 pulls).
 
-Left: **window-spenders**, low value, not measured.
+Left: **window-spenders**, low value, not measured. The other three
+`no-damage` rows are waiting on the user's approval (asked 2026-10-17).
 
 Lesson from the re-measure: value a rule as damage lost first. Top
 players doing the same thing is evidence about the premise, not proof
