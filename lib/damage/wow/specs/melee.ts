@@ -119,6 +119,7 @@
 // weak Cheezywizzy, Chesteria, Lylyvienne, Munchkinz, Tyger). feral.ts
 // holds the models and numbers: "Rip off every enemy" (top none, weak up
 // to 241k), "Ferocious Bite below 5 points" (top 0–37k, weak up to 332k),
+// the window check for Incarnation players (the one here is Berserk's),
 // and the tracked cooldowns' values per use (Tiger's Fury, Berserk,
 // Incarnation, Convoke, Feral Frenzy were all worth 0, so their drift
 // never showed; Convoke is 120s, Incarnation newly tracked). Clearcasting

@@ -98,6 +98,12 @@
 // Tyger 4 (84k), Cheezywizzy 5 on Entombed Sentinels (69k), Munchkinz 1
 // (12k), Lylyvienne none.
 //
+// ── Incarnation window (incarnationWindow) ─────────────────────────────
+// melee.ts's window check for Feral is keyed to Berserk's buff, so the
+// three Incarnation players had none. The same burstGcdFindings on
+// Incarnation's buff (102543): Vydal 15k, 小奶酱丶 56k, Lylyvienne 44k
+// (and 278k in the forced opener), as small as Berserk's on the others.
+//
 // ── Measured and not built ─────────────────────────────────────────────
 // - Rip refreshed early (past the 30% carry-over), valued like Rupture
 //   (assassination.ts): top players clip as much as the weak. Vydal 13
@@ -133,9 +139,10 @@ import type { PlayerEvent, PlayerInfo } from "@/types/PlayerInfo";
 import type { DamageFinding, JobCheck, Moment } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";
 import { mergeWindows, overlapMs, statusWindows, type Window } from "../../timeline";
-import { k, s } from "./shared";
+import { burstGcdFindings, k, observedWindowBonus, s } from "./shared";
 
 const RIP = 1079;
+const INCARNATION = 102543;
 const RAKE = 155722;         // the bleed
 const BITE = 22568;
 const RAMPANT_FEROCITY = 391710;
@@ -405,4 +412,14 @@ const biteLowPoints: JobCheck = (ctx) => {
   })];
 };
 
-export const FERAL_CHECKS: JobCheck[] = [ripOff, biteLowPoints];
+// ── Incarnation window ─────────────────────────────────────────────────
+// melee.ts keys Feral's window to Berserk's buff; a player on Incarnation
+// (102543, its own buff) got no window check at all.
+const incarnationWindow: JobCheck = (ctx) => burstGcdFindings(ctx, {
+  statusId: INCARNATION, name: "Incarnation",
+  bonus: observedWindowBonus,
+  bonusBasis: "the window's bonus read from the player's own hits, inside vs outside, capped at 30%",
+  inference: true,
+});
+
+export const FERAL_CHECKS: JobCheck[] = [ripOff, biteLowPoints, incarnationWindow];
