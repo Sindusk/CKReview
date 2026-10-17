@@ -31,8 +31,14 @@ import { sigilValue } from "./specs/vengeance";
  * One Vanish's worth to an Assassination Rogue: the damage of a Garrote cast
  * within 6s after a Vanish (to its next Garrote on that target, up to 24s)
  * less the player's average ordinary Garrote (ones that ran 15s+). Both from
- * this player's hits; undefined without one of each.
+ * this player's hits; undefined without one of each, except a player with
+ * no Vanish Garrote at all, priced at VANISH_GARROTE_RATIO × their ordinary
+ * one. The ratio: the player's own Vanish Garrote ÷ ordinary on 43 of 46
+ * player-pulls (2026-10-17) ran 0.5–5.6, median 2.6, quartile 1.9 (a Vanish
+ * outside Deathmark ~1.0–1.3: 遗伤, Калимист, Morllinor); 2.0 is taken
+ * as the low, lenient side.
  */
+const VANISH_GARROTE_RATIO = 2;
 function vanishGarroteValue(player: PlayerInfo, endMs: number): { value: number; basis: string } | undefined {
   const vanish = player.casts.filter((c) => c.abilityName === "Vanish").map((c) => c.timestamp);
   const gar = player.casts.filter((c) => c.abilityName === "Garrote" && c.timestamp < endMs).sort((a, b) => a.timestamp - b.timestamp);
@@ -46,8 +52,15 @@ function vanishGarroteValue(player: PlayerInfo, endMs: number): { value: number;
   const avg = (xs: number[]) => xs.reduce((a, x) => a + x, 0) / xs.length;
   const v = rows.filter((r) => r.fromVanish && r.len >= 15_000).map((r) => r.dmg);
   const o = rows.filter((r) => !r.fromVanish && r.len >= 15_000).map((r) => r.dmg);
-  if (v.length === 0 || o.length === 0) return undefined;
   const k = (n: number) => `${Math.round(n / 1000)}k`;
+  // A player who never Vanished (or whose every Vanish Garrote was cut
+  // short) has nothing of their own to price a use with: take
+  // VANISH_GARROTE_RATIO × their ordinary Garrote (WoWAnalyzer audit phase
+  // 3, 2026-10-17: Hofix JvQpZk3CXj78Dx2f pressed none in 5:22 and read 0).
+  if (v.length === 0 && o.length > 0 && !rows.some((r) => r.fromVanish)) {
+    return { value: avg(o) * (VANISH_GARROTE_RATIO - 1), basis: `(${VANISH_GARROTE_RATIO}× ${k(avg(o))}, an ordinary Garrote, from Vanish − ${k(avg(o))}; no Vanish Garrote of the player's own)` };
+  }
+  if (v.length === 0 || o.length === 0) return undefined;
   return { value: avg(v) - avg(o), basis: `(${k(avg(v))} Garrote from Vanish − ${k(avg(o))} ordinary Garrote)` };
 }
 
