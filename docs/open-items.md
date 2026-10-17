@@ -294,11 +294,11 @@ and delete them from the header.
     uptime, pandemic refreshes, AoE hits per cast); every percentage
     there divides by the whole fight.
   - [shaman-elemental.md](wowa-audit/shaman-elemental.md): Elemental,
-    7 candidates (spender before a ready Lava Burst with Master of the
-    Elements, Stormkeeper tracked through Offering From Beyond, non-overload
-    casts in Ascendance, Lava Burst without Flame Shock, one-target Chain
-    Lightning, Flame Shock refreshes, Ascendance spenders), Call of the
-    Ancestors active time `wrong` (double-graded idle).
+    phase 3 done 2026-10-16 against seven top parses: five candidates
+    failed the premise check, Call of the Ancestors active time `wrong`
+    (double-graded idle). Open: Stormkeeper (60s less 3s per Ancestor
+    summoned, measured), blocked on the top players' shared holds on
+    Vashnik; Ascendance spenders (low value).
 - [wow-sim-plan.md](wow-sim-plan.md): WoW simulation pipeline (talent
   effects, budget model, simc as a dev-only oracle). Four questions for
   the user before stage 0.

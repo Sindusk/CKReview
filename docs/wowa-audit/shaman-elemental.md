@@ -17,6 +17,19 @@
   Case study: qpZx3mWaG7gcDdYB pull 3 (Cocroach, 30th percentile) against
   JZjf9x3mK76NzabP fight 9 (Nickshockz, 99th), both pages saved; the
   header of ranged.ts records what matched.
+- **Phase 3 (2026-10-16):** measured on Cocroach's 11 Elemental pulls of
+  gVDPhzp61Zm29HMw (2026-10-13; he played Enhancement on the other 5)
+  and seven top Mythic parses (Entombed Sentinels: Vr8dLPtFYWA4G1yg
+  fight 39 Malegusxd, baRCnPv62YQ1dJZN fight 32 Fauni, JvQpZk3CXj78Dx2f
+  fight 67 Kullingen and Spongêbob; Vashnik the Malignant:
+  r9CX1kpRGLmKJH4M fight 56 Elemeta and Unlucky, 9w3bK4qhrRC82gVX fight
+  29 Shaziggla). Every player had Master of the Elements, Farseer,
+  Elemental Blast, Stormkeeper and Ascendance; Power of the Maelstrom on
+  some. The app's checks gave the top seven no Ascendance, Maelstrom or
+  Flame Shock finding (one 8k Ascendance window on Shaziggla) and fired
+  on Cocroach (potions, Flame Shock 18.2s at Coiled Altar 2:56, short
+  Ascendance windows). Five candidates failed the premise check: the top
+  players do the same as often or more.
 - **Core rules** (active time, cast efficiency, potions, cancelled casts)
   are in [core.md](core.md); rows below cover only what Elemental sets or
   adds.
@@ -29,19 +42,19 @@
 | shaman-elemental/CancelledCasts/rate | covered | `checkInterrupts` | none | a cast cut by movement | Above 5 / 7.5 / 10%. Not shown in the guide. |
 | shaman-elemental/MaelstromDetails/waste | verified | `primaryResourceCapFindings` | none | Maelstrom generated into a full bar | Wasted ÷ generated, above 0 / 2 / 5%. Case study 2.7% vs 2.2%, both pages matched. WoWAnalyzer's cap leaves out Primordial Capacity; the app reads the max from the log. |
 | shaman-elemental/MaelstromSpenders/waste-since-last | covered | `primaryResourceCapFindings` | none | capping between spenders | The same waste, scored per spender (worst at 25+ wasted). |
-| shaman-elemental/MaelstromSpenders/spender-before-lava-burst | candidate | — | Master of the Elements | a spender cast without Master of the Elements while Lava Burst sat ready | Scored from ready time (worst at 10s+). "Missed opportunity" at 5s+; any one fails the overview counter. Log-visible: Lava Burst casts and Lava Surge buffs are logged, so the charges can be rebuilt from casts. Lost = the spender's Master of the Elements bonus, measured from the player's buffed vs unbuffed spenders. Doubts: its ready clock starts at the pull and resets only when the last charge is spent, so the first spender and spenders between two charges can read late. Movement where only an instant spender fits isn't excused. Premise check needed on top parses. |
-| shaman-elemental/FlameShock/uptime | verified | `dotUptimeFindings` (Flame Shock) | none | Flame Shock left off | Under 99 / 95 / 85% of the whole fight, pooled over enemies. Shown, not graded, in Elemental's guide. Case study 99.5% both. |
-| shaman-elemental/FlameShock/early-refresh | candidate | — | none | Flame Shock refreshed with more than 30% left | Bad casts over 10 / 20 / 30% of Flame Shock casts. The shared core pandemic rule (core.md). Fixed 18s duration, so a talent that changes it is misjudged. Value the duration lost, not a share. |
-| shaman-elemental/FlameShock/lava-burst-unshocked | candidate | — | none | Lava Burst landing on an enemy without Flame Shock | Counted, no tier. Lava Burst only crits for certain on a Flame Shocked target. Log-visible (the target's debuffs at the hit). Lost = the player's Lava Burst crit vs non-crit, times the share that didn't crit. Doubt: it judges at the hit, not the cast; a fresh add or travel time can flip it. |
-| shaman-elemental/SubOptimalChainLightning/one-target | candidate | — | none | Chain Lightning hitting one target | Above 0 / 1 / 2 a minute; a timeline note, not in the guide. Lost = Lightning Bolt's average minus that Chain Lightning. Doubts: it flags every Chain Lightning on a single-target boss, including Stormkeeper-buffed or moving casts. Premise check: whether top players ever cast it into one target. |
+| shaman-elemental/MaelstromSpenders/spender-before-lava-burst | wrong | — | Master of the Elements | a spender cast without Master of the Elements while Lava Burst sat ready | Scored from ready time (worst at 10s+). "Missed opportunity" at 5s+; any one fails the overview counter. **Fight-blind:** measured as an unbuffed spender with Lava Surge up (an instant Lava Burst ready, outside Ascendance). On Vashnik the top three did it 8, 9 and 10 times (mostly Earthquake chains on adds; 19-27 unbuffed spenders each), more than Cocroach (2-7). On Entombed Sentinels the top four did it 0-2 times, Cocroach 0. The bonus itself didn't measure: too few unbuffed Elemental Blasts outside Ascendance (0-3 a pull). |
+| shaman-elemental/FlameShock/uptime | verified | `dotUptimeFindings` (Flame Shock) | none | Flame Shock left off | Under 99 / 95 / 85% of the whole fight, pooled over enemies. Shown, not graded, in Elemental's guide. Case study 99.5% both. Phase 3: none on the top seven; Cocroach Coiled Altar 2:56 (18.2s, 200k), Kith'ix 0:38 and 1:36, Nek'zali 2:01 and 3:30. |
+| shaman-elemental/FlameShock/early-refresh | wrong | — | none | Flame Shock refreshed with more than 30% left | Bad casts over 10 / 20 / 30% of Flame Shock casts; the core pandemic rule (core.md). Duration confirmed 18s in the log. **Fight-blind:** on Entombed Sentinels (two bosses) the top four refreshed early 1, 4, 4 and 2 times; Cocroach 0-2 a pull. WoWAnalyzer itself marks Flame Shock a movement filler. |
+| shaman-elemental/FlameShock/lava-burst-unshocked | wrong | — | none | Lava Burst landing on an enemy without Flame Shock | Counted, no tier. Measured as player Lava Bursts that didn't crit (certain crit on a Flame Shocked target): top seven 0-3 (Unlucky 3 on Vashnik itself), Cocroach 0-3 (new adds: Burning Venom, Spiteful Soulcoiler, Hex Lord Malacrass). ~75k each. No difference between top and weaker players, and it comes from target swaps. |
+| shaman-elemental/SubOptimalChainLightning/one-target | wrong | — | none | Chain Lightning hitting one target | Above 0 / 1 / 2 a minute; a timeline note, not in the guide. Top seven 0-5 a pull; on Vashnik their one-target Chain Lightnings averaged the same as their Lightning Bolts (Elemeta 65k vs 65k, Unlucky 67k vs 69k), so no loss there. Cocroach 0-3 a pull, ~30k short of a Lightning Bolt each. |
 | shaman-elemental/Ascendance/window-downtime | covered | `burstGcdFindings` (Ascendance) + `checkGcdGaps` | Ascendance | idle in Ascendance | Under 0.5 / 1.25 / 2s per window. Counts forced movement and windows cut by death or the kill; the app values the missing GCDs at the window's bonus, less forced time. |
 | shaman-elemental/Ascendance/window-spenders | candidate | — | Ascendance | Maelstrom held through Ascendance | Spenders cast vs what the starting Maelstrom plus what was generated could pay for; 0 / 1 / 2 / 3+ missed. Unspent Maelstrom isn't lost (it's spent later, or capped, which the cap check counts), so the loss is only the Ascendance bonus on a spender moved out. Low value; build only if a page and a log disagree with the cap check. |
-| shaman-elemental/Ascendance/window-non-overload | candidate | — | Ascendance | Flame Shock, Frost Shock or other GCDs that can't overload, cast inside Ascendance | 0 / 1 / 2 / 3+ per window; a Voltaic Blaze hitting 2+ targets is excused (Purging Flames). Lost = the window's average overload GCD minus that cast. Doubts: a Flame Shock forced by a new target or an instant forced by movement is still counted. |
+| shaman-elemental/Ascendance/window-non-overload | wrong | — | Ascendance | Flame Shock, Frost Shock or other GCDs that can't overload, cast inside Ascendance | 0 / 1 / 2 / 3+ per window; a Voltaic Blaze hitting 2+ targets is excused (Purging Flames). **Fight-blind:** the top seven cast 0-6 a pull (Voltaic Blaze on Vashnik, Flame Shock and Stormkeeper on Entombed Sentinels), Cocroach 0-4. Top players do it as often. |
 | shaman-elemental/Ascendance/window-overall | superseded | — | Ascendance | — | The average of the three marks above, rounded down. |
 | shaman-elemental/CallOfTheAncestors/active-time | wrong | `checkGcdGaps` | Call of the Ancestors (Farseer) | idle while Ancestors are out | Above 95 / 85 / 75% active per window. The same idle the gap check counts, graded a second time (case study: 24 of 41 "bad" vs 8 of 38, all idle). Counts forced time too. |
 | shaman-elemental/CallOfTheAncestors/other-checks | no-damage | — | Call of the Ancestors | — | What summoned them, damage per Ancestor, a timeline; always "perfect". |
 | shaman-elemental/Abilities/ascendance-efficiency | verified | `checkCooldownDrift` (Ascendance, 120s) | Ascendance; First Ascendant (180 → 120s) | Ascendance held | 90% target, whole-fight. Case study matched on both players. |
-| shaman-elemental/Abilities/stormkeeper-efficiency | candidate | — | Stormkeeper; Herald of the Storms, Rolling Thunder (−15s each); Offering From Beyond | Stormkeeper held | 90% target. Not tracked: its intervals spread too far (38.2 / 48.9s, tracked-cooldowns.ts). Offering From Beyond takes 3s off per Ancestor summoned, which may explain the spread. Summons are in the log, so a fit of interval against summons (like `spentCooldownDrift`) could track it. The case study's Stormkeeper matched by count. |
+| shaman-elemental/Abilities/stormkeeper-efficiency | candidate | — | Stormkeeper; Herald of the Storms, Rolling Thunder (−15s each); Offering From Beyond | Stormkeeper held | 90% target. Not tracked: its intervals spread too far (38.2 / 48.9s, tracked-cooldowns.ts). **Model measured:** 60s, less 3s per Ancestor summoned (Call of the Ancestors applied or stacked) before it's ready. On the four Entombed Sentinels top players, 22 intervals were never shorter than that and were held 0.7-12s past it (median ~1.8s, the cast time and reaction). Cocroach held 38s unforced at Coiled Altar 2:32-3:21 and 34.5s at Ula'tek 1:42-2:17. **Blocker:** all three Vashnik top players held it 15-26s at the same two moments (about 1:24-1:49 and 5:46-6:02, no forced time), which looks like a strategic hold. A check would flag them unless the Vashnik context marks those holds. |
 | shaman-elemental/Abilities/elemental-blast-efficiency | superseded | `primaryResourceCapFindings` | Elemental Blast | — | 60% target with no cooldown declared; in Midnight it's a Maelstrom spender, so how often it's cast is set by Maelstrom. Unspent Maelstrom is the cap check's. |
 | shaman-elemental/PowerOfTheMaelstrom/stacks | covered | `checkProcs` (expiries) | Power of the Maelstrom | stacks left to expire | A statistic only, no grade. Stacks gained at the max aren't in the log (unverifiable part). Whether `checkProcs` picks it up as a proc on an Elemental pull: phase 3. |
 | shaman-elemental/S2TierSet/overcharge | no-damage | — | Midnight season 2 tier set | — | Credited damage and "Overcharge refreshed" counts in a tooltip, no grade. Revisit if a page shows it mattering. |
@@ -53,16 +66,15 @@ Not rules (models the rules above rest on): Maelstrom tracker and costs
 reordering, the pre-pull Ancestor normalizer (fixed 6s, +4s with Heed My
 Call), Ancestor window merging. An unregistered Haste file is dead code.
 
-## Candidates, by expected value
+## Candidates left
 
-1. **spender-before-lava-burst**: the spec's main rotation rule and the
-   one WoWAnalyzer grades hardest; log-visible. Needs the charge rebuild
-   and a premise check on top parses.
-2. **stormkeeper-efficiency**: one cooldown the app doesn't track, if
-   Offering From Beyond explains the spread.
-3. **window-non-overload**, **lava-burst-unshocked**, **one-target**
-   Chain Lightning: small per cast; build only if they fire on weaker
-   logs.
-4. **early-refresh**: generic; better done once in shared.ts for every
-   spec with DoTs.
-5. **window-spenders**: low value (see row).
+1. **stormkeeper-efficiency**: model measured (row above); open on the
+   Vashnik holds.
+2. **window-spenders**: low value, not measured.
+
+The five other candidates failed phase 3 (`wrong` above). Measured with
+a scratch script, not kept: per player and pull it counted unbuffed
+spenders with Lava Surge up, non-crit Lava Bursts and whether the target
+had the player's Flame Shock, Chain Lightning targets per cast,
+non-overload casts in Ascendance, early Flame Shock refreshes and
+Stormkeeper intervals against Ancestor summons.
