@@ -188,6 +188,18 @@
 // - Open: Fire Breath / Eternity Surge "sat ready" (86% / 82%): their
 //   recharge is cut by Disintegrate ticks (Causality) and the rule isn't
 //   pinned from one player; Disintegrate tick efficiency (340/385).
+// - The WoWAnalyzer audit's phase 3 (2026-10-17; docs/wowa-audit/
+//   evoker-devastation.md, 19 player-pulls) closed both: a clipped
+//   Disintegrate had read as ~0.4s of idle a clip (the lock ran to its last
+//   tick; timeline.ts channelLocks now runs it to the next press), and
+//   devastation.ts prices the ticks a clip drops (Disintegrate ticks
+//   clipped) and Fire Breath / Eternity Surge held on a recharge fitted to
+//   the Disintegrate ticks and Pyre hits. Dragonrage's tracked drift was
+//   worth 0 a use (no hits of its own): valued now by its extra Essence
+//   Bursts and Pyres. Essence Burst expires in procs.ts. The Dragonrage
+//   window fires on the top players about as on the weak (0–663k), on
+//   real sub-second delays: kept. Strafing Run expired fires on no top
+//   player.
 
 import type { JobCheck, Moment } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";

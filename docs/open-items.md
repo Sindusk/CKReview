@@ -520,8 +520,17 @@ and delete them from the header.
     Essence at the cap. Overturned `wrong`: Fire Breath held (top players
     cast more; left unbuilt, no cooldown model fits), potion in the Breath
     window (negligible).
-  - [evoker-devastation.md](wowa-audit/evoker-devastation.md): 11;
-    Disintegrate tick efficiency.
+  - [evoker-devastation.md](wowa-audit/evoker-devastation.md): phase 3
+    done 2026-10-17 (19 player-pulls, 3 fetched): a clipped Disintegrate
+    read as idle (timeline.ts channel lock fixed). Built
+    (specs/devastation.ts): Disintegrate ticks clipped, Fire Breath and
+    Eternity Surge held (fitted Causality recharge), Dragonrage drift
+    valued (it was worth 0 a use; pre-pull uses seen by their status);
+    Essence Burst expiry (procs.ts). Proposed `wrong`: Essence at the cap
+    (rebuilt from spends: 9–17% waste on top players, 4–24% on weak).
+    Kept `wrong`: per-empower count, Mass Disintegrate ticks, channel
+    cancels, fight-end procs. Tip the Scales left unvalued (half a GCD a
+    use).
   - [monk-brewmaster.md](wowa-audit/monk-brewmaster.md): tank, 9; Niuzao
     window count.
   - [priest-shadow.md](wowa-audit/priest-shadow.md): 11; Insidious Ire
