@@ -140,6 +140,13 @@
 // - Not counted (user's choice): most of his idle fell inside movement
 //   windows he carried (Murk 52%, Miasma 40%, slime switch 29% idle;
 //   the reference 0–1%). Shown as movement, 3.15M.
+// - The WoWAnalyzer audit's phase 3 (2026-10-17; docs/wowa-audit/
+//   hunter-marksmanship.md, 61 player-pulls) added marksmanship.ts:
+//   Precise Shots lost (an Aimed Shot over a held one outside Trueshot;
+//   the top players 0–95k a pull, the weaker up to 746k), and a value for
+//   the tracked Trueshot (worth 0 before: it has no hits; now its Moonlight
+//   Chakram and window bonus, 0.9–2.9M a use). The Moonlight Chakram
+//   Trueshot grants is in procs.ts (17s; a lost one is a whole Chakram).
 //
 // Devastation, checked against WoWAnalyzer on qpZx3mWaG7gcDdYB pull 3
 // (Bragontix, Scalecommander; log 2026-10-02, checked 2026-10-13):
@@ -169,6 +176,7 @@ import { BALANCE_CHECKS } from "./balance";
 import { BEAST_MASTERY_CHECKS } from "./beastmastery";
 import { DEMONOLOGY_CHECKS } from "./demonology";
 import { ELEMENTAL_CHECKS } from "./elemental";
+import { MARKSMANSHIP_CHECKS } from "./marksmanship";
 import { burstGcdFindings, castTimeProcFindings, dotUptimeFindings, k, observedWindowBonus, primaryResourceCapFindings, spentCooldownDrift } from "./shared";
 
 // Backdraft (117828): Conflagrate (17962) adds a stack, max 2; Chaos Bolt
@@ -356,7 +364,7 @@ export const RANGED_CHECKS: Record<string, JobCheck[]> = {
   "Frost Mage":           [],
   "Balance Druid":        [window(102560, "Incarnation"), primaryResourceCapFindings, dot("Moonfire", 164812), dot("Sunfire", 164815), ...BALANCE_CHECKS],
   "Beast Mastery Hunter": [window(19574, "Bestial Wrath"), (ctx) => primaryResourceCapFindings(ctx, [BARBED_SHOT]), ...BEAST_MASTERY_CHECKS],
-  "Marksmanship Hunter":  [window(288613, "Trueshot"), primaryResourceCapFindings],
+  "Marksmanship Hunter":  [window(288613, "Trueshot"), primaryResourceCapFindings, ...MARKSMANSHIP_CHECKS],
   "Shadow Priest":        [window(194249, "Voidform"), primaryResourceCapFindings, dot("Shadow Word: Pain", 589), dot("Vampiric Touch", 34914)],
   "Elemental Shaman":     [window(1219480, "Ascendance"), primaryResourceCapFindings, dot("Flame Shock", 188389), stormkeeper, ...ELEMENTAL_CHECKS],
   "Affliction Warlock":   [window(442726, "Malevolence"), dot("Agony", 980), dot("Unstable Affliction", 1259790), dot("Wither / Corruption", 445474, 146739), ...AFFLICTION_CHECKS],

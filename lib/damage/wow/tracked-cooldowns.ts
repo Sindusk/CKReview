@@ -26,6 +26,7 @@ import type { TrackedCooldown } from "../types";
 import { avengingWrathValue, divineTollValue } from "./specs/retribution";
 import { pillarOfFrostValue } from "./specs/frostdk";
 import { sigilValue } from "./specs/vengeance";
+import { trueshotValue } from "./specs/marksmanship";
 
 /**
  * One Vanish's worth to an Assassination Rogue: the damage of a Garrote cast
@@ -209,9 +210,23 @@ export const WOW_TRACKED_COOLDOWNS: Record<string, TrackedCooldown[]> = {
   // pet), so priced by the cast id a use was worth 0 and its drift never
   // showed. wow/specs/beastmastery.ts judges it now (held time, with
   // Vashnik's hold windows read).
+  // Marksmanship, from the WoWAnalyzer audit's phase 3 (2026-10-17; specs/
+  // marksmanship.ts has the measurements):
+  // - Trueshot has no hits of its own, so a use was worth 0 and its drift
+  //   never showed. trueshotValue prices it: the Moonlight Chakram it
+  //   unlocks plus its window's bonus, 0.9–2.9M a use on the samples. It
+  //   fires on none of the 61 player-pulls on disk: every player presses it
+  //   within a use of on time.
+  // - Volley's hits log as 260247, so it is worth 0 here and never fires.
+  //   Valued by them (damageIds) it read 227–424k on top players
+  //   (Heppishunt MLy7nw8kaW1D394Y 73s held, Storcken 6qVxPcBdCgXrkG8a,
+  //   期末考第二 K4x8cMZYVpGCDbJH, Pisslizard ACmXHMFtaPLR9k8w) as on the weaker
+  //   (Ákamé 735k, Bechhunt 419k, Shadowmeld 53–320k): top players hold it
+  //   to pair with Trueshot (Heppishunt 3:13 → 4:38 with Trueshot 4:38) or
+  //   an add wave. Left unvalued; docs/wowa-audit/hunter-marksmanship.md.
   "Marksmanship Hunter": [
     { name: "Volley", actionIds: [260243], cooldownMs: 45_000, charges: 1, firstUseOffsetMs: 4_000 },     // 45.0 / 51.5s, 3.7s
-    { name: "Trueshot", actionIds: [288613], cooldownMs: 120_000, charges: 1, firstUseOffsetMs: 4_000 },  // 120.3 / 132.5s, 4.0s
+    { name: "Trueshot", actionIds: [288613], cooldownMs: 120_000, charges: 1, firstUseOffsetMs: 4_000, burstHold: true, valuePerUse: trueshotValue },  // 120.3 / 132.5s, 4.0s
   ],
   "Shadow Priest": [
     { name: "Halo", actionIds: [120644], cooldownMs: 60_000, charges: 1, firstUseOffsetMs: 6_000 },           // 60.6 / 62.9s, 6.0s
