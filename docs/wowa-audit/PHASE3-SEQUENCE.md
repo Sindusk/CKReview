@@ -52,7 +52,8 @@ damage rows are measured.
 | 10 | Restoration Shaman | [shaman-restoration.md](shaman-restoration.md) | done 2026-10-17 (healer pass): no candidates |
 | 11 | Beast Mastery | [hunter-beastmastery.md](hunter-beastmastery.md) | done 2026-10-17: Bestial Wrath held, Kill Command without Nature's Ally, Wild Thrash on one enemy (beastmastery.ts); BM GCD value counts the press's pet hits, Font of Venomous Rage is a 2s channel (game.ts); verified by the main session |
 | 12 | Balance | [druid-balance.md](druid-balance.md) | done 2026-10-17: Eclipse charges capped, Fury of Elune held, Starfall on one enemy, spenders outside Eclipse reworked (balance.ts); verified by the main session |
-| 13 | Retribution | [paladin-retribution.md](paladin-retribution.md) | |
+| 13 | Retribution | [paladin-retribution.md](paladin-retribution.md) | done 2026-10-17: Avenging Wrath, Execution Sentence, Wake of Ashes valued and Divine Toll tracked (all `burstHold`); Divine Arbiter expiry (procs); Hammer of Light a GCD press; Ula'tek Heart hold windows (context); verified by the main session |
+| 13a | Engine: hold windows capped per cooldown | readers of `cooldownHoldWindows` | Every reader excused a whole hold window whatever the cooldown (a 15s Implosion got 30–90s on Ula'tek). Capped at one recharge before the window's end; running 2026-10-17 |
 | 14 | Frost DK | [deathknight-frost.md](deathknight-frost.md) | |
 | 15 | Vengeance | [demonhunter-vengeance.md](demonhunter-vengeance.md) | |
 | 16 | Guardian | [druid-guardian.md](druid-guardian.md) | |
@@ -301,6 +302,11 @@ measured for it.
   "spenders outside Eclipse" check was rewritten: it read 1.2–2.3M on top
   players (free procs, Incarnation in its price, spends holding would
   have capped). Evidence in [druid-balance.md](druid-balance.md).
+- Retribution (2026-10-17): **asked the user** whether Ula'tek's
+  cooldown hold window should start at P2's start (commit 4d92a42: from
+  P2's start to 5s after the second Heart, ~90s; Polpo held Avenging
+  Wrath through the P2 adds to the Heart at 4:46). Art of War moved to
+  `unverifiable` (no duration separates its expiries).
 
 - Elemental (2026-10-17): `CallOfTheAncestors/other-checks`,
   `statistics` (and whether "Stormkeeper before Ascendance" should be
