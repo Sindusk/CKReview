@@ -32,6 +32,7 @@
 //   Counting every DoT tick and pet hit (FFXIV's rule) valued one
 //   Assassination Rogue gap on JZp82Rm7TzycM94a pull 25 at 1.7M per GCD,
 //   ~2.6× their average: in WoW procs, trinkets and pets keep going.
+//   Except a Beast Mastery press's own pet hits (PET_PRESS_HITS below).
 //
 // ── Raid buffs ─────────────────────────────────────────────────────────
 // The burst windows (raidBuffStatusIds) are the lust family and Power
@@ -164,6 +165,19 @@ const REAVERS_GLAIVE = 442294;
 const DRAIN_SOUL = 198590;
 const CRUSADING_STRIKES = 408385;
 
+// Beast Mastery's presses land through the pet (the WoWAnalyzer audit's
+// phase 3, 2026-10-17): Kill Command's attack is the pet's (83381; 1232922
+// from the Pack Leader beasts, Kill Cleave 389448 on other enemies), and so
+// are Bestial Wrath's hit (344572), Wild Thrash's (1264355) and the Stomp
+// (201754) that lands within a second of a Barbed Shot or Bestial Wrath
+// (tcdpmV7MBHK1jGYk Yaji: 88 of 88 Kill Command bursts <1s after the cast,
+// Stomp 48 of 58 after Barbed Shot / Bestial Wrath). Priced at the player's
+// own hits only, a BM GCD read about half its worth (Deathstriker
+// qpZx3mWaG7gcDdYB pull 3: 71k of 150k; ×1.8–3.3 on all 37 BM player-pulls
+// on disk), so every BM gap was priced at half. Pet melee, Bloodshed's DoT
+// and Beast Cleave keep going while the player idles and stay out.
+const PET_PRESS_HITS = new Set([83381, 1232922, 389448, 344572, 1264355, 201754]);
+
 // Taunts (spell-data.ts): Dark Command, Hand of Reckoning, Provoke, Torment.
 // Warrior Taunt and Growl weren't cast often enough to appear; add them
 // from a log.
@@ -273,7 +287,10 @@ export const WOW_DAMAGE: DamageGame = {
   // Strike, Annihilation and Eye Beam hit under other ids than their casts,
   // and by id alone Mythnarra's average GCD read 7k of a real ~219k
   // (qpZx3mWaG7gcDdYB pull 3), pricing every gap at a thirtieth.
-  isGcdDamage: (e, gcdNames) => !e.pet && (ACTIONS.get(e.abilityId)?.onGcd === true || gcdNames.has(e.abilityName)),
+  // A Beast Mastery press's pet hits too (PET_PRESS_HITS).
+  isGcdDamage: (e, gcdNames) => e.pet
+    ? PET_PRESS_HITS.has(e.abilityId)
+    : ACTIONS.get(e.abilityId)?.onGcd === true || gcdNames.has(e.abilityName),
   compareFromPullStart: true,
   compareRolesPerPlayer: true,
 };
