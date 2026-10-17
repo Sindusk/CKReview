@@ -58,9 +58,20 @@
 //   finds his base GCD 1.15s against 1.02s from Yenvenger (3.06M).
 // - Cooldowns: Avenging Wrath, Execution Sentence 100%; Wake of Ashes 89%
 //   (its holds were in Stasis; no lost use). Divine Toll 90%: ~27s of holds
-//   outside Stasis cost at most a cast just before the kill; it isn't
-//   tracked (resets).
+//   outside Stasis cost at most a cast just before the kill (tracked since
+//   the audit: 132k here).
 // - Not adopted: Expurgation 88% vs 92% (small).
+// - WoWAnalyzer audit phase 3 (2026-10-17, docs/wowa-audit/
+//   paladin-retribution.md): retribution.ts holds the models and numbers.
+//   The tracked cooldowns now have a value per use (Avenging Wrath and
+//   Execution Sentence were worth 0, so their drift never showed), Divine
+//   Toll is tracked (a clean 60s on Retribution), and all four honor the
+//   fight's hold windows (Vashnik's Imbibes, Ula'tek's Hearts). New:
+//   "Divine Arbiter expired unused". Re-run on the top players: Holy Power
+//   capped reads 3–13% of generation on them (0.36–3.29M; Pipala, 100th on
+//   Vashnik, the most) against 19–33% on the weaker (Polpo 5.62M here), as
+//   WoWAnalyzer has it (Yenvenger 12.9%): a real, common loss, kept. The
+//   window and pace checks fire on the top players little or not at all.
 //
 // Arms, WoWAnalyzer audit phase 3 (2026-10-17, docs/wowa-audit/
 // warrior-arms.md; WoWAnalyzer's Arms is "Foundation" support and grades
@@ -101,6 +112,7 @@ import { burstGcdFindings, k, observedWindowBonus, primaryResourceCapFindings, s
 import { WINDWALKER_CHECKS } from "./windwalker";
 import { HAVOC_CHECKS } from "./havoc";
 import { ARMS_CHECKS } from "./arms";
+import { RETRIBUTION_CHECKS } from "./retribution";
 
 const window = (statusId: number, name: string): JobCheck => (ctx) => burstGcdFindings(ctx, {
   statusId, name,
@@ -193,7 +205,7 @@ export const MELEE_CHECKS: Record<string, JobCheck[]> = Object.fromEntries(
   Object.entries(MELEE_WINDOWS).map(([spec, [id, name]]) => [spec, [
     window(id, name), primaryResourceCapFindings, ...(spec === "Arms Warrior" ? [...ARMS_SPENT, ...ARMS_CHECKS] : []),
     ...(spec === "Havoc Demon Hunter" ? [eternalHunt, ...HAVOC_CHECKS] : []),
-    ...(spec === "Retribution Paladin" ? [holyPowerWaste] : []),
+    ...(spec === "Retribution Paladin" ? [holyPowerWaste, ...RETRIBUTION_CHECKS] : []),
     ...(spec === "Windwalker Monk" ? WINDWALKER_CHECKS : []),
   ]]),
 );
