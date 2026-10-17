@@ -77,6 +77,7 @@ import type { JobCheck } from "../../types";
 import { finding } from "../../checks";
 import { forcedPart } from "../../timeline";
 import { burstGcdFindings, k, observedWindowBonus, primaryResourceCapFindings, spenderSnapshotWaste, spentCooldownDrift } from "./shared";
+import { WINDWALKER_CHECKS } from "./windwalker";
 
 const window = (statusId: number, name: string): JobCheck => (ctx) => burstGcdFindings(ctx, {
   statusId, name,
@@ -169,5 +170,6 @@ export const MELEE_CHECKS: Record<string, JobCheck[]> = Object.fromEntries(
     window(id, name), primaryResourceCapFindings, ...(spec === "Arms Warrior" ? ARMS_SPENT : []),
     ...(spec === "Havoc Demon Hunter" ? [eternalHunt] : []),
     ...(spec === "Retribution Paladin" ? [holyPowerWaste] : []),
+    ...(spec === "Windwalker Monk" ? WINDWALKER_CHECKS : []),
   ]]),
 );
