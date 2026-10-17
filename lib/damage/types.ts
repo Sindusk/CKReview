@@ -165,6 +165,11 @@ export type DamageGame = {
   // Casts the game fires by itself, logged like presses (Arms' Bladestorm
   // casts Mortal Strike during its channel): not GCD uses.
   isAutoCast?(player: PlayerInfo): (cast: PlayerEvent) => boolean;
+  // Presses the log never writes as casts, read from the traces they leave
+  // (WoW Devourer's Eradicate and Void Metamorphosis: a buff spent or
+  // applied): GCD uses like any cast (timeline.ts gcdUses). A returned
+  // event's `durationMs` is its lock when that isn't the action's GCD.
+  unloggedPresses?(player: PlayerInfo): PlayerEvent[];
   // Which damage events make up the player's average GCD value (the price
   // of a GCD gap). Default: on-GCD actions' hits plus every DoT tick.
   // WoW: only the player's own on-GCD abilities (hits and their DoT ticks);

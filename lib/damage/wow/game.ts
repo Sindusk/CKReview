@@ -31,6 +31,8 @@
 // - isAutoCast: casts the log writes for a press that fired them
 //   (Bladestorm's Mortal Strikes, Windstrike's spells, Pistol Shot's
 //   extra shots) aren't presses.
+// - unloggedPresses: presses the log never writes as casts (Devourer's
+//   Eradicate and Void Metamorphosis, read from their buffs).
 // - Presses the survey missed: SWEEP_PRESSES, from one sweep over every
 //   WoW report on disk (rerun: sampledata/wow/_scratch/survey-sweep.js).
 // - isGcdDamage: a gap is priced at the player's own on-GCD abilities only.
@@ -160,11 +162,9 @@ const LOCK_STATUSES = new Map<number, number>([
   // free (cast → removal p10–p90; next GCD p10–p50 after the cast):
   // - Void Ray (Devourer): 1.64–2.21s; next GCD 2.2–3.1s (121 casts,
   //   Konudh 8kVQMJ4rmpnyRjBH, Jexro and Chelx a4kX1DNT27yHGvqJ). Read as a
-  //   plain GCD it preceded 286s of their "idle". Open: its hits (Void Ray
-  //   1213649 / 1214595) also end by 2.1–2.2s, yet the next press still
-  //   comes 0.84–1.11s after the removal on 23 of 25 on Konudh, whatever
-  //   it is; unexplained, so still read as delay (Devourer's top players
-  //   sit at 80–82% uptime).
+  //   plain GCD it preceded 286s of their "idle". The ~1s after its removal
+  //   that the sweep left open is an Eradicate press the log doesn't write
+  //   (devourerUnlogged below).
   // - Dark Harvest (Affliction): 1.48–2.10s; next 1.7–2.2s (27 casts on
   //   6kHtGaQXCMWYxFpZ, 7B1wQbjNhgXJDaHC, a4kX1DNT27yHGvqJ).
   // - Breath of Eons (Augmentation, a flight like Deep Breath): 1.60–2.75s;
@@ -379,6 +379,58 @@ const SWEEP_PRESSES: { spec: string; specId: number; ids: SweepPress[] }[] = [
   { spec: "Mistweaver Monk", specId: 270, ids: [[388615, "Restoral"], [325197, "Invoke Chi-Ji, the Red Crane"]] },
 ];
 
+// Devourer's presses the log never writes as casts (the WoWAnalyzer audit's
+// phase 3, 2026-10-17; 40 Devourer player-pulls on disk, docs/wowa-audit/
+// demonhunter-devourer.md). Both were idle GCDs before, ~30s a pull.
+// - Eradicate (1239524), the empowered Reap / Cull a Void Ray leaves (32 of
+//   40 player-pulls take it): its buff is applied as the Void Ray ends and
+//   removed when the player presses it, but no cast is logged. 1,287
+//   removals: 1,210 with an Eradicate (Cull) 1279200 or Eradicate (Reap)
+//   1225827 hit 0.23–0.27s later (p10–p90) and no Reap or Cull cast within
+//   0.2s (5 had one); the next logged press came 0.68s (p01), 0.72s (p10),
+//   0.81s (median) after the removal: a hasted GCD. The other 72 have no
+//   hit: the buff dropped and came back as Void Metamorphosis began or
+//   ended (Ribblez 8AFnLQKdrcgawzDC 1:48.50), not a press. Without the
+//   press, the next press after a Void Ray came 1.12s after it ended
+//   (median, 742 Void Rays) against 0.18s when no Eradicate sat between
+//   (743): the sweep's unexplained gap.
+// - Void Metamorphosis (1217607), the transformation: pressed (5–7 a
+//   pull), never logged as a cast; the buff is applied at the press and the
+//   next press comes 1.07s (p01), 1.13s (p10), 1.22s (median) after it, the
+//   same inside lust (p05 1.09s, 38) and outside (1.10s, 163) while an
+//   instant GCD there runs 0.75s+: a fixed lock of DEVOURER_META_LOCK_MS.
+//   A re-application within 0.1s of its removal is the same window.
+const ERADICATE = 1239524;
+const ERADICATE_HITS = new Set([1279200, 1225827]);
+const REAP = 1226019;
+const CULL = 1245453;
+const VOID_META = 1217607;
+const DEVOURER_META_LOCK_MS = 1_050;
+const ERADICATE_HIT_MS = 800;
+const ERADICATE_LOGGED_MS = 200;
+
+function devourerUnlogged(player: PlayerInfo): PlayerEvent[] {
+  const buffs = (player.buffs ?? []).filter((b) => b.abilityId === ERADICATE || b.abilityId === VOID_META);
+  if (buffs.length === 0) return [];
+  const hits = player.damageDone.filter((e) => !e.pet && ERADICATE_HITS.has(e.abilityId)).map((e) => e.timestamp);
+  const logged = player.casts.filter((c) => !c.fake && (c.abilityId === REAP || c.abilityId === CULL)).map((c) => c.timestamp);
+  const out: PlayerEvent[] = [];
+  let metaEnd = -Infinity;
+  for (const b of [...buffs].sort((x, y) => x.timestamp - y.timestamp)) {
+    if (b.abilityId === ERADICATE && b.buffStatus === "removed") {
+      if (!hits.some((t) => t >= b.timestamp - 50 && t <= b.timestamp + ERADICATE_HIT_MS)) continue;
+      if (logged.some((t) => Math.abs(t - b.timestamp) <= ERADICATE_LOGGED_MS)) continue;
+      out.push({ timestamp: b.timestamp, abilityId: ERADICATE, abilityName: "Eradicate" });
+    } else if (b.abilityId === VOID_META) {
+      if (b.buffStatus === "removed") metaEnd = b.timestamp;
+      else if (b.buffStatus === "applied" && b.timestamp - metaEnd > 100) {
+        out.push({ timestamp: b.timestamp, abilityId: VOID_META, abilityName: "Void Metamorphosis", durationMs: DEVOURER_META_LOCK_MS });
+      }
+    }
+  }
+  return out;
+}
+
 // Felblade (Havoc and Vengeance) has a 0.5s GCD of its own, not hasted:
 // the nearest press sat 0.48–0.50s away at p05–p25 (87 casts on four
 // Havocs LckJC7GMhQvD6rdw, tcdpmV7MBHK1jGYk, K4x8cMZYVpGCDbJH,
@@ -518,7 +570,8 @@ const ACTIONS = new Map<number, GameAction>();
     id: DRAIN_SOUL, name: "Drain Soul", onGcd: true, recastMs: HASTED_GCD_MS, cooldownMs: HASTED_GCD_MS,
     charges: 1, speedScaled: true, appliesStatusIds: [DRAIN_SOUL],
   });
-  for (const [id, name] of [[SHEILUNS_GIFT, "Sheilun's Gift"], [DETOX, "Detox"], [REVIVAL, "Revival"], [CRACKLING_JADE_LIGHTNING, "Crackling Jade Lightning"], [SIGIL_OF_CHAINS, "Sigil of Chains"], ...GUARDIAN_PRESSES] as const) {
+  for (const [id, name] of [[SHEILUNS_GIFT, "Sheilun's Gift"], [DETOX, "Detox"], [REVIVAL, "Revival"], [CRACKLING_JADE_LIGHTNING, "Crackling Jade Lightning"], [SIGIL_OF_CHAINS, "Sigil of Chains"], ...GUARDIAN_PRESSES,
+    [ERADICATE, "Eradicate"], [VOID_META, "Void Metamorphosis"]] as const) {
     if (!ACTIONS.has(id)) ACTIONS.set(id, {
       id, name, onGcd: true, recastMs: HASTED_GCD_MS, cooldownMs: HASTED_GCD_MS,
       charges: 1, speedScaled: true, appliesStatusIds: [id],
@@ -625,6 +678,7 @@ export const WOW_DAMAGE: DamageGame = {
   channelTicks: (id) => CHANNEL_TICKS.get(id),
   lockStatus: (id) => LOCK_STATUSES.get(id),
   isAutoCast: autoCasts,
+  unloggedPresses: devourerUnlogged,
   // WCL buff events carry no duration: the procs checkProcs can see run
   // out, with durations measured from our logs (procs.ts).
   measuredProcs: WOW_MEASURED_PROCS,
@@ -635,11 +689,12 @@ export const WOW_DAMAGE: DamageGame = {
   // and by id alone Mythnarra's average GCD read 7k of a real ~219k
   // (qpZx3mWaG7gcDdYB pull 3), pricing every gap at a thirtieth.
   // A Beast Mastery or Unholy press's pet hits too (PET_PRESS_HITS), and
-  // Unholy's plague Erupts (UNHOLY_PRESS_HITS). Never Augmentation's support
+  // Unholy's plague Erupts (UNHOLY_PRESS_HITS), and Devourer's Eradicate hits
+  // (its press is unlogged: devourerUnlogged). Never Augmentation's support
   // hits (AUG_SUPPORT_HITS).
   isGcdDamage: (e, gcdNames) => e.pet
     ? PET_PRESS_HITS.has(e.abilityId)
-    : !AUG_SUPPORT_HITS.has(e.abilityId) && (UNHOLY_PRESS_HITS.has(e.abilityId) || ACTIONS.get(e.abilityId)?.onGcd === true || gcdNames.has(e.abilityName)),
+    : !AUG_SUPPORT_HITS.has(e.abilityId) && (UNHOLY_PRESS_HITS.has(e.abilityId) || ERADICATE_HITS.has(e.abilityId) || ACTIONS.get(e.abilityId)?.onGcd === true || gcdNames.has(e.abilityName)),
   compareFromPullStart: true,
   compareRolesPerPlayer: true,
 };

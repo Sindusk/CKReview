@@ -234,6 +234,15 @@ export function gcdUses(player: PlayerInfo, game: DamageGame): GcdUse[] {
     if (b) used.add(b);
     out.push({ startMs: b?.timestamp ?? c.timestamp, castMs: b?.durationMs ?? 0, action, abilityName: c.abilityName, target: c.target });
   }
+  // Presses the log doesn't write (DamageGame.unloggedPresses): no begin-cast,
+  // their lock from the event when it isn't the plain GCD (a fixed lock, not
+  // a hasted cast time: statusLock keeps it out of the haste fit).
+  for (const c of game.unloggedPresses?.(player) ?? []) {
+    const action = game.action(c.abilityId);
+    if (!action?.onGcd) continue;
+    out.push({ startMs: c.timestamp, castMs: c.durationMs ?? 0, action, abilityName: c.abilityName, target: c.target,
+      ...(c.durationMs ? { statusLock: true } : {}) });
+  }
   out.sort((a, b) => a.startMs - b.startMs);
   if (game.isChannel) channelLocks(player, game, out);
   if (game.lockStatus) statusLocks(player, game, out);
