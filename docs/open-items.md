@@ -540,8 +540,17 @@ and delete them from the header.
     Strikes. Proposed `wrong`: Breath of Fire count per Niuzao, Blackout
     Combo on Keg Smash (top players as weak). Touch of Death, Chi Burst,
     Stomp count left unbuilt; Keg Smash charges unverifiable.
-  - [priest-shadow.md](wowa-audit/priest-shadow.md): 11; Insidious Ire
-    coverage.
+  - [priest-shadow.md](wowa-audit/priest-shadow.md): phase 3 done
+    2026-10-17 on the 45 Shadow player-pulls on disk (none fetched; all
+    Archon, so the Voidweaver rows can't be measured). Engine fix:
+    clipped Mind Flay / Mind Flay: Insanity read as idle (game.ts tick
+    counts; Kleenonean's delays 2.22M → 0.91M). Halo and Voidform were
+    worth 0 a use: Halo now has its hit id, Voidform a value from the
+    presses its window adds (specs/shadow.ts); both `burstHold`. No spec
+    check built: Insidious Ire coverage and Madness uptime fire on the
+    top players as much; Voidform extension, Void Volley charges,
+    Tentacle Slam misses negligible. Lead: Mind Blast presses (weak 3.6
+    a minute, top 4.7–7.8), no cooldown model fits. No `wrong` rows.
   - [rogue-subtlety.md](wowa-audit/rogue-subtlety.md): 16; Ancient Arts
     pairing (Deathstalker); 3 `wrong`.
   - [shaman-enhancement.md](wowa-audit/shaman-enhancement.md): 16; Doom
