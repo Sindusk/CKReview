@@ -306,8 +306,8 @@ and delete them from the header.
     damage lost the same day. Four real losses to build, by value:
     non-overload casts in Ascendance (130-590k each), Lava Burst without
     Flame Shock (~120k), unbuffed spenders (~6.5% each), one-target Chain
-    Lightning (~35k). Early Flame Shock refreshes and Call of the
-    Ancestors active time stay `wrong`. Stormkeeper drift built (60s
+    Lightning (~35k); early Flame Shock refreshes are a fifth, low
+    (5-62k a pull). Call of the Ancestors active time stays `wrong`. Stormkeeper drift built (60s
     less 3s per Ancestor summoned; Vashnik holds for the Venoms after
     Imbibe allowed). Open: Ascendance spenders (low value).
   - [monk-windwalker.md](wowa-audit/monk-windwalker.md): 12 candidates;
