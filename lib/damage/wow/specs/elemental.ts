@@ -89,6 +89,17 @@
 // Lightning of their own, at once, after a Chain Lightning (~16k on one
 // enemy). The Maelstrom difference isn't counted (too few casts to measure
 // it). ~20–110k each; top players 0–4 a pull.
+//
+// ── Flame Shock refreshed early (flameShockEarly) ──────────────────────
+// Flame Shock lasts 18s (measured), and a refresh carries up to 30% over
+// (pandemic). The DoT ticks either way, so clipping only brings the next
+// Flame Shock GCD sooner: each clipped second is that share of a GCD,
+// worth a Lightning Bolt with overloads less the Flame Shock hit. A
+// refresh the enemy (or the pull) didn't outlive the old DoT for costs the
+// whole GCD. Only Flame Shock casts count, standing: Voltaic Blaze
+// spreading Flame Shock costs nothing, and while moving no cast-time
+// spell fits (position from the hits the player took, over 2 yd/s).
+// Measured 5–64k a pull; more for a player who refreshes often or early.
 
 import type { PlayerEvent } from "@/types/PlayerInfo";
 import type { DamageFinding, JobCheck, Moment } from "../../types";
@@ -125,6 +136,9 @@ const SURGE_REACT_MS = 500;
 const STORMKEEPER = 191634;
 // The Ancestors' casts that answer one of the player's land this soon after it.
 const ECHO_MS = 1_700;
+const MOVING_YD_S = 2;
+// A refresh this close to the pandemic point is press timing.
+const CLIP_SLACK_MS = 500;
 
 const clock = (ms: number) => {
   const t = Math.max(0, Math.round(ms / 1000));
@@ -511,4 +525,58 @@ const chainLightningOneTarget: JobCheck = (ctx) => {
   })];
 };
 
-export const ELEMENTAL_CHECKS: JobCheck[] = [ascendanceNonOverload, lavaBurstUnshocked, ancestorIdle, spenderWithoutMote, chainLightningOneTarget];
+// ── Flame Shock refreshed early ────────────────────────────────────────
+
+/** Whether the player was moving at t, from the positions on hits they took (yards ÷ 100 per second). */
+function movingAt(ctx: PlayerCheckContext, t: number): boolean | undefined {
+  const pos = (ctx.player.damageTaken ?? []).filter((e) => e.x != null && e.y != null && Math.abs(e.timestamp - t) < 2_000)
+    .sort((a, b) => a.timestamp - b.timestamp);
+  if (pos.length < 2) return undefined;
+  const a = pos[0], b = pos[pos.length - 1];
+  const dt = (b.timestamp - a.timestamp) / 1000;
+  if (dt <= 0.4) return undefined;
+  return Math.hypot(b.x! - a.x!, b.y! - a.y!) / 100 / dt > MOVING_YD_S;
+}
+
+const flameShockEarly: JobCheck = (ctx) => {
+  const T = tools(ctx);
+  const fsCasts = T.casts.filter((c) => c.abilityId === FLAME_SHOCK);
+  if (fsCasts.length === 0) return [];
+  const vb = T.casts.filter((c) => c.abilityId === VOLTAIC_BLAZE).map((c) => c.timestamp);
+  const fsHit = avg(ctx.player.damageDone.filter((e) => !e.pet && !e.isDoT && e.abilityId === FLAME_SHOCK).map((e) => e.amount ?? 0));
+  const lb = avg(T.casts.filter((c) => c.abilityName === "Lightning Bolt").map((c) => T.damage(c, 1_200)));
+  const gcdWorth = Math.max(0, lb - (fsHit || 0));
+  if (!(gcdWorth > 0)) return [];
+  const removals = (ctx.pull.bossDebuffs ?? []).filter((e) => FLAME_SHOCK_DEBUFFS.has(e.statusId) && e.sourceName === ctx.player.name && e.status === "removed");
+  const moments: Moment[] = [];
+  let moving = 0;
+  const seen = new Set<PlayerEvent>();
+  for (const r of flameShockRefreshes(ctx)) {
+    if (r.applied || r.remainingMs <= PANDEMIC_MS + CLIP_SLACK_MS || r.t >= ctx.endMs) continue;
+    const cast = fsCasts.find((c) => Math.abs(c.timestamp - r.t) <= 250);
+    if (!cast || seen.has(cast) || vb.some((t) => Math.abs(t - r.t) <= 250)) continue;
+    seen.add(cast);
+    if (movingAt(ctx, r.t) === true) { moving++; continue; }
+    // Never needed: the enemy (or the pull) was gone before the old DoT ran out.
+    const gone = removals.find((e) => `${e.targetActorId}.${e.targetInstance ?? 1}` === r.key && e.timestamp > r.t)?.timestamp ?? ctx.endMs;
+    const unneeded = gone <= r.t + r.remainingMs + 500;
+    const clipped = r.remainingMs - PANDEMIC_MS;
+    const loss = unneeded ? gcdWorth : clipped / FLAME_SHOCK_MS * gcdWorth;
+    moments.push({ startMs: r.t, endMs: r.t, lostDamage: loss,
+      detail: unneeded
+        ? `Flame Shock on ${r.target} at ${clock(r.t)} with ${s(r.remainingMs)} left, gone ${s(gone - r.t)} later: a whole GCD`
+        : `Flame Shock on ${r.target} at ${clock(r.t)} with ${s(r.remainingMs)} left: ${s(clipped)} clipped past the pandemic` });
+  }
+  if (moments.length === 0) return [];
+  return [finding(ctx, {
+    kind: "dot-clip", startMs: moments[0].startMs, endMs: moments[moments.length - 1].startMs, forced: false, inference: true,
+    label: "Flame Shock refreshed early",
+    lostDamage: moments.reduce((a, m) => a + m.lostDamage, 0),
+    basis: `clipped seconds past the ${s(PANDEMIC_MS)} pandemic ÷ ${s(FLAME_SHOCK_MS)} × ${k(gcdWorth)} (a Lightning Bolt with overloads − the Flame Shock hit); the whole of it when the enemy or pull was gone before the old DoT ran out` +
+      (moving ? `; ${moving} more while moving, not counted` : ""),
+    detail: `${moments.length} Flame Shock cast${moments.length > 1 ? "s" : ""} with more than ${s(PANDEMIC_MS)} left, standing`,
+    moments,
+  })];
+};
+
+export const ELEMENTAL_CHECKS: JobCheck[] = [ascendanceNonOverload, lavaBurstUnshocked, ancestorIdle, spenderWithoutMote, chainLightningOneTarget, flameShockEarly];

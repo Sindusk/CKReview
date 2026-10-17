@@ -306,8 +306,8 @@ and delete them from the header.
     damage lost the same day. Built and verified: non-overload casts in
     Ascendance, Lava Burst without Flame Shock, idle with the Ancestors
     out, spenders before an instant Lava Burst, one-target Chain
-    Lightning (lib/damage/wow/specs/elemental.ts). Left to build:
-    early Flame Shock refreshes (5-62k a pull). Stormkeeper drift built (60s
+    Lightning, early Flame Shock refreshes
+    (lib/damage/wow/specs/elemental.ts). Stormkeeper drift built (60s
     less 3s per Ancestor summoned; Vashnik holds for the Venoms after
     Imbibe allowed). Open: Ascendance spenders (low value).
   - [monk-windwalker.md](wowa-audit/monk-windwalker.md): 12 candidates;
