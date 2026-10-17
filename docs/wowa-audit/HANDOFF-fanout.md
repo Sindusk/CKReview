@@ -1,5 +1,8 @@
 # Handoff: WoWAnalyzer audit fan-out, phases 1–2 for every spec
 
+**Done 2026-10-16** (commit 742b3de). Kept for the record; the next
+handoff is [HANDOFF-elemental-build.md](HANDOFF-elemental-build.md).
+
 For the session that runs the fan-out. Written 2026-10-16, after the
 Elemental pilot ([shaman-elemental.md](shaman-elemental.md)) and the core
 ledger ([core.md](core.md)) went through phases 0–3. The plan is
