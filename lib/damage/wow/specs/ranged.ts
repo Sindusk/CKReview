@@ -119,9 +119,9 @@
 //   pinned from one player; Disintegrate tick efficiency (340/385).
 
 import type { JobCheck, Moment } from "../../types";
-import { finding } from "../../checks";
+import { finding, type PlayerCheckContext } from "../../checks";
 import { inWindows, mergeWindows, overlapMs, statusWindows } from "../../timeline";
-import { burstGcdFindings, castTimeProcFindings, dotUptimeFindings, k, observedWindowBonus, primaryResourceCapFindings } from "./shared";
+import { burstGcdFindings, castTimeProcFindings, dotUptimeFindings, k, observedWindowBonus, primaryResourceCapFindings, spentCooldownDrift } from "./shared";
 
 // Backdraft (117828): Conflagrate (17962) adds a stack, max 2; Chaos Bolt
 // (116858), Incinerate (29722) and Soul Fire (6353) each take one. Ids and
@@ -130,6 +130,61 @@ import { burstGcdFindings, castTimeProcFindings, dotUptimeFindings, k, observedW
 const backdraft: JobCheck = (ctx) => castTimeProcFindings(ctx, {
   statusId: 117828, name: "Backdraft", maxStacks: 2,
   generatorIds: [17962], consumerIds: [116858, 29722, 6353],
+});
+
+// Stormkeeper (191634, the cast and the buff): 60s less 3s per Ancestor
+// summoned (Call of the Ancestors 447244 applied or stacked; Offering From
+// Beyond), measured on seven top Mythic parses 2026-10-16
+// (docs/wowa-audit/shaman-elemental.md). Often cast before the pull: the
+// buff drops at 0:02–0:05 with no cast. A fixed recast can't track it
+// (tracked-cooldowns.ts).
+// A use is worth the Ancestor it summons (one within 1.5s of every cast on
+// Malegusxd and Cocroach; ~300k each) plus what its ~2 empowered Lightning
+// Bolts / Chain Lightnings add over the player's ordinary ones. The buff is
+// spent at the cast, so its hits don't carry it: each consumer is a cast
+// between Stormkeeper and the buff's removal, its damage its own and its
+// overload's hits until the next cast.
+const LB_CL: Record<number, number[]> = { 188196: [188196, 45284], 188443: [188443, 45297] };
+function stormkeeperUse(ctx: PlayerCheckContext): { value: number; basis: string } | undefined {
+  const p = ctx.player;
+  const own = (p.buffs ?? []).filter((b) => b.source === p.name);
+  const summons = own.filter((b) => b.abilityId === 447244 && (b.buffStatus === "applied" || b.buffStatus === "stack")).length;
+  const ancestor = p.damageDone.filter((e) => e.pet === "Ancestor").reduce((a, e) => a + (e.amount ?? 0), 0);
+  const perSummon = summons > 0 ? ancestor / summons : 0;
+  const casts = p.casts.filter((c) => c.timestamp < ctx.endMs).sort((a, b) => a.timestamp - b.timestamp);
+  const castDamage = (i: number) => {
+    const ids = LB_CL[casts[i].abilityId];
+    const until = casts[i + 1]?.timestamp ?? ctx.endMs;
+    return p.damageDone.filter((e) => !e.pet && ids.includes(e.abilityId) && e.timestamp >= casts[i].timestamp && e.timestamp < until)
+      .reduce((a, e) => a + (e.amount ?? 0), 0);
+  };
+  const removals = own.filter((b) => b.abilityId === 191634 && b.buffStatus === "removed").map((b) => b.timestamp);
+  const empowered = new Set<number>();
+  for (const c of casts.filter((x) => x.abilityId === 191634)) {
+    const end = removals.find((t) => t > c.timestamp) ?? c.timestamp;
+    casts.forEach((x, i) => { if (LB_CL[x.abilityId] && x.timestamp > c.timestamp && x.timestamp <= end + 100) empowered.add(i); });
+  }
+  let added = 0, uses = 0;
+  for (const id of Object.keys(LB_CL).map(Number)) {
+    const idx = casts.map((x, i) => (x.abilityId === id ? i : -1)).filter((i) => i >= 0);
+    const plain = idx.filter((i) => !empowered.has(i)).map(castDamage);
+    if (plain.length === 0) continue;
+    const avg = plain.reduce((a, x) => a + x, 0) / plain.length;
+    for (const i of idx.filter((i) => empowered.has(i))) { added += castDamage(i) - avg; uses++; }
+  }
+  const skCasts = casts.filter((x) => x.abilityId === 191634).length;
+  const perUse = perSummon + (skCasts > 0 ? Math.max(0, added) / skCasts : 0);
+  if (perUse <= 0) return undefined;
+  return {
+    value: perUse,
+    basis: `${k(perUse)} a use: an Ancestor (${k(perSummon)}, the player's Ancestor damage ÷ ${summons} summons) + ${k(Math.max(0, added) / Math.max(1, skCasts))} from its empowered casts (${uses} over ${skCasts} uses, against the player's ordinary Lightning Bolt / Chain Lightning)`,
+  };
+}
+const stormkeeper: JobCheck = (ctx) => spentCooldownDrift(ctx, {
+  name: "Stormkeeper", actionIds: [191634], baseMs: 60_000,
+  reduceOn: { buffId: 447244, ms: 3_000, label: "3s per Ancestor summoned" },
+  firstUseOffsetMs: 3_000, prePullFromBuff: true, window: { buffId: 191634 },
+  valuePerUse: stormkeeperUse,
 });
 
 // Havoc (80240, a debuff on an enemy, 20s here) copies the player's
@@ -308,7 +363,7 @@ export const RANGED_CHECKS: Record<string, JobCheck[]> = {
   "Beast Mastery Hunter": [window(19574, "Bestial Wrath"), (ctx) => primaryResourceCapFindings(ctx, [BARBED_SHOT])],
   "Marksmanship Hunter":  [window(288613, "Trueshot"), primaryResourceCapFindings],
   "Shadow Priest":        [window(194249, "Voidform"), primaryResourceCapFindings, dot("Shadow Word: Pain", 589), dot("Vampiric Touch", 34914)],
-  "Elemental Shaman":     [window(1219480, "Ascendance"), primaryResourceCapFindings, dot("Flame Shock", 188389)],
+  "Elemental Shaman":     [window(1219480, "Ascendance"), primaryResourceCapFindings, dot("Flame Shock", 188389), stormkeeper],
   "Affliction Warlock":   [window(442726, "Malevolence"), dot("Agony", 980), dot("Unstable Affliction", 1259790), dot("Wither / Corruption", 445474, 146739)],
   "Demonology Warlock":   [window(265187, "Demonic Tyrant")],
   "Destruction Warlock":  [window(442726, "Malevolence"), dot("Wither", 445474), backdraft, havocTarget],

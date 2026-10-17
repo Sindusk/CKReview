@@ -20,15 +20,22 @@
 //   (44–68% of raid damage); the Burning Venoms are cleaved beside the boss.
 //   Not modelled: PhaseContext.multiTarget is per phase, and Vashnik has no
 //   phases.
+// - Cooldowns held for that burst are fine: on r9CX1kpRGLmKJH4M and
+//   9w3bK4qhrRC82gVX all three top Elementals held Stormkeeper 15–26s
+//   and pressed it 0–2s after Imbibe at 1:48 and 6:00 (docs/wowa-audit/
+//   shaman-elemental.md, 2026-10-16). Hold window: 30s before each Imbibe
+//   to 5s after (the Venoms spawn 3–4s after it).
 // - Enrage unobserved: no Berserk in a 468s wipe.
 
 import type { DamageContext } from "../../../damage/types";
-import { debuffWindows, isMelee } from "../../../damage/wow/context-helpers";
+import { castWindows, debuffWindows, isMelee } from "../../../damage/wow/context-helpers";
 
 const PLAGUE_FROTH = 1281913;
+const IMBIBE = 1284663;
 
 export const VASHNIK_DAMAGE_CONTEXT: DamageContext = {
   encounter: "Vashnik the Malignant",
   phases: {},
   forcedWindows: (pull) => debuffWindows(pull, [PLAGUE_FROTH], "carrying Plague Froth", { who: isMelee, maxMs: 8_000, tailMs: 2_000 }),
+  cooldownHoldWindows: (pull) => castWindows(pull, [IMBIBE], 35_000, "held for the Venoms after Imbibe", { offsetMs: -30_000 }),
 };

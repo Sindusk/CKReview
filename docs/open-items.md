@@ -296,9 +296,9 @@ and delete them from the header.
   - [shaman-elemental.md](wowa-audit/shaman-elemental.md): Elemental,
     phase 3 done 2026-10-16 against seven top parses: five candidates
     failed the premise check, Call of the Ancestors active time `wrong`
-    (double-graded idle). Open: Stormkeeper (60s less 3s per Ancestor
-    summoned, measured), blocked on the top players' shared holds on
-    Vashnik; Ascendance spenders (low value).
+    (double-graded idle). Stormkeeper drift built (60s less 3s per
+    Ancestor summoned; Vashnik holds for the Venoms after Imbibe allowed).
+    Open: Ascendance spenders (low value).
 - [wow-sim-plan.md](wow-sim-plan.md): WoW simulation pipeline (talent
   effects, budget model, simc as a dev-only oracle). Four questions for
   the user before stage 0.

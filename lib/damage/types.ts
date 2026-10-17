@@ -259,6 +259,11 @@ export type DamageContext = {
   // is movement: tracked apart, not counted against them (checks.ts
   // checkGcdGaps). Unlike forced time, the player's usual share still counts.
   movementWindows?(pull: Pull): ForcedWindow[];
+  // Windows a cooldown may be held into for a burst the fight sets up
+  // (Vashnik's Venoms after each Imbibe): ready time inside them isn't held.
+  // Only the drift checks that read it (wow/specs/shared.ts
+  // spentCooldownDrift); never excuses a GCD gap.
+  cooldownHoldWindows?(pull: Pull): ForcedWindow[];
   // A name for a mechanic occurrence key, used to say what was happening
   // during a gap ("during Towers (P5)"). Labels only; never excuses a gap.
   mechanicLabel?(mechanicKey: string): string | undefined;

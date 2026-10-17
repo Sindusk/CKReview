@@ -129,7 +129,8 @@ export const WOW_TRACKED_COOLDOWNS: Record<string, TrackedCooldown[]> = {
 
   // ── Ranged and casters ─────────────────────────────────────────────
   // Not tracked: Balance's Fury of Elune (19.7 / 25.9s) and Incarnation
-  // (20.8 / 104.7s), Elemental's Stormkeeper (38.2 / 48.9s), Fire's Meteor
+  // (20.8 / 104.7s), Elemental's Stormkeeper (38.2 / 48.9s: Ancestors cut
+  // it, so wow/specs/ranged.ts judges it with spentCooldownDrift), Fire's Meteor
   // (53.9 / 68.7s), Augmentation's Tip the Scales (47.8 / 64.0s): spread too
   // far. Demonology's Call Dreadstalkers costs Soul Shards.
   "Arcane Mage": [

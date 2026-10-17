@@ -262,15 +262,30 @@ export function castTimeProcFindings(ctx: PlayerCheckContext, spec: CastTimeProc
 // per window, averaged) × their damage rate outside the windows × the
 // average window. Inference: the recharge rule and the window's value are
 // both measured, not known.
+// The same check takes a fixed reduction per event instead (`reduceOn`):
+// Elemental's Stormkeeper is 60s less 3s per Ancestor summoned (Offering
+// From Beyond; docs/wowa-audit/shaman-elemental.md, measured on seven top
+// parses 2026-10-16: never back sooner, usually pressed ~1.8s after).
+// Ready time inside the context's cooldownHoldWindows isn't held (Vashnik:
+// the top players keep Stormkeeper for the Venom burst after Imbibe). A
+// window buff seen before the first cast means it was cast before the pull.
 
 export type SpentCooldownSpec = {
   name:          string;
   actionIds:     number[];
   baseMs:        number;
-  resourceType:  number;     // WCL classResources type (1 Rage)
-  scale:         number;     // logged units per displayed unit (Rage ×10)
-  unitsPerSecond: number;    // displayed units spent per 1s of recharge
+  // Recharged by spending a resource...
+  resourceType?:  number;    // WCL classResources type (1 Rage)
+  scale?:         number;    // logged units per displayed unit (Rage ×10)
+  unitsPerSecond?: number;   // displayed units spent per 1s of recharge
+  // ...or by a fixed amount each time the player's own buff is applied or stacks.
+  reduceOn?:     { buffId: number; ms: number; label: string };
   firstUseOffsetMs: number;
+  // The window buff before the first cast means a cast before the pull.
+  prePullFromBuff?: boolean;
+  // One use's worth when the window bonus can't read it (Stormkeeper's buff
+  // is spent at the cast, so its hits don't carry it): overrides the window.
+  valuePerUse?(ctx: PlayerCheckContext): { value: number; basis: string } | undefined;
   // The cooldown's effect window, for its value: the player's own buff,
   // or a debuff the player puts on enemies.
   window: { buffId: number } | { debuffId: number };
@@ -282,22 +297,30 @@ export function spentCooldownDrift(ctx: PlayerCheckContext, spec: SpentCooldownS
   const ids = new Set(spec.actionIds);
   const casts = ctx.player.casts.filter((c) => ids.has(c.abilityId) && c.timestamp < ctx.endMs).map((c) => c.timestamp).sort((a, b) => a - b);
   if (casts.length < 2) return [];
-  const spends = ctx.player.casts
-    .map((c) => ({ t: c.timestamp, units: (c.resources?.find((r) => r.type === spec.resourceType)?.cost ?? 0) / spec.scale }))
-    .filter((x) => x.units > 0)
-    .sort((a, b) => a.t - b.t);
-  const msPerUnit = 1000 / spec.unitsPerSecond;
+  const own = (ctx.player.buffs ?? []).filter((b) => b.source === ctx.player.name);
+  const windowBuff = "buffId" in spec.window ? spec.window.buffId : undefined;
+  const prePull = spec.prePullFromBuff === true && windowBuff !== undefined && own.some((b) => b.abilityId === windowBuff && b.timestamp < casts[0]);
+  if (prePull) casts.unshift(0);
+  // Each reduction: when it happened and how much recharge it's worth (ms).
+  const reductions = spec.reduceOn
+    ? own.filter((b) => b.abilityId === spec.reduceOn!.buffId && (b.buffStatus === "applied" || b.buffStatus === "stack"))
+        .map((b) => ({ t: b.timestamp, ms: spec.reduceOn!.ms }))
+    : ctx.player.casts
+        .map((c) => ({ t: c.timestamp, ms: (c.resources?.find((r) => r.type === spec.resourceType)?.cost ?? 0) / spec.scale! * 1000 / spec.unitsPerSecond! }))
+        .filter((x) => x.ms > 0);
+  reductions.sort((a, b) => a.t - b.t);
   const readyAfter = (t: number) => {
     let reduced = 0;
-    for (const s of spends) {
+    for (const s of reductions) {
       if (s.t <= t) continue;
       if (s.t - t + reduced >= spec.baseMs) break;
-      reduced += s.units * msPerUnit;
+      reduced += s.ms;
     }
     return Math.max(t, t + spec.baseMs - reduced);
   };
   const forced = mergeWindows(ctx.forced);
-  const stretches: Window[] = [{ startMs: spec.firstUseOffsetMs, endMs: casts[0] }];
+  const notHeld = mergeWindows([...ctx.forced, ...(ctx.context?.cooldownHoldWindows?.(ctx.pull) ?? [])]);
+  const stretches: Window[] = prePull ? [] : [{ startMs: spec.firstUseOffsetMs, endMs: casts[0] }];
   const recharges: number[] = [];
   for (let i = 0; i < casts.length; i++) {
     const ready = readyAfter(casts[i]);
@@ -308,13 +331,23 @@ export function spentCooldownDrift(ctx: PlayerCheckContext, spec: SpentCooldownS
   let longest: Window | undefined, longestHeld = 0;
   for (const w of stretches) {
     if (w.endMs <= w.startMs) continue;
-    const h = Math.max(0, w.endMs - w.startMs - overlapMs(w.startMs, w.endMs, forced) - SPENT_HOLD_MS);
+    const h = Math.max(0, w.endMs - w.startMs - overlapMs(w.startMs, w.endMs, notHeld) - SPENT_HOLD_MS);
     held += h;
     if (h > longestHeld) { longestHeld = h; longest = w; }
   }
   const avgRecharge = recharges.reduce((a, x) => a + x, 0) / recharges.length;
   const lost = Math.floor(held / avgRecharge);
   if (lost < 1 || !longest) return [];
+  const detail = `${spec.name} sat ready for ${s(held)} in total (${casts.length} uses${prePull ? ", one before the pull" : ""}; recharge ${s(spec.baseMs)} − ${spec.reduceOn ? spec.reduceOn.label : `1s per ${spec.unitsPerSecond} spent`}, ${s(avgRecharge)} on average here): about ${lost} use${lost > 1 ? "s" : ""} lost`;
+  if (spec.valuePerUse) {
+    const v = spec.valuePerUse(ctx);
+    if (!v || v.value <= 0) return [];
+    return [finding(ctx, {
+      kind: "cooldown-drift", startMs: longest.startMs, endMs: longest.endMs, forced: false,
+      label: `${spec.name} drift`, lostDamage: lost * v.value, inference: true,
+      basis: `${lost} use${lost > 1 ? "s" : ""} × ${v.basis}`, detail,
+    })];
+  }
 
   // What one use is worth.
   const wins: Window[] = "buffId" in spec.window
@@ -346,7 +379,7 @@ export function spentCooldownDrift(ctx: PlayerCheckContext, spec: SpentCooldownS
     lostDamage: lost * perUse,
     inference: true,
     basis: `${lost} use${lost > 1 ? "s" : ""} × ${s(avgLen)} window × ${Math.round(bonus * 100)}% bonus (read from the player's hits) × ${k(outsideDmg / outsideMs * 1000)}/s outside it`,
-    detail: `${spec.name} sat ready for ${s(held)} in total (${casts.length} uses; recharge ${s(spec.baseMs)} − 1s per ${spec.unitsPerSecond} spent, ${s(avgRecharge)} on average here): about ${lost} use${lost > 1 ? "s" : ""} lost`,
+    detail,
   })];
 }
 
