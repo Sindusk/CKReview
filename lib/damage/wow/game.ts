@@ -170,6 +170,15 @@ const REAVERS_GLAIVE = 442294;
 // its own id: 4 ticks, the last 1.4s after the cast, the next cast 0.2–0.6s
 // after that (median; Fluffalicous, and 八十參 on 7B1wQbjNhgXJDaHC).
 const DRAIN_SOUL = 198590;
+// Templar Retribution's Hammer of Light (427453; the WoWAnalyzer audit's
+// phase 3, 2026-10-17) isn't in the survey (53 of 58 Retribution
+// player-pulls are Herald of the Sun), so each press read as idle. It's an
+// on-GCD press, pressed after every Wake of Ashes and on each Light's
+// Deliverance: the next GCD came 0.76s+ after it (median 1.00–1.03s;
+// Yenvenger ACmXHMFtaPLR9k8w 22 a pull, Polpo gVDPhzp61Zm29HMw Nek'zali
+// 17 and 25). The Empyrean Hammers, Divine Hammers and Sacrosanct Crusade
+// it logs as casts are procs, not presses.
+const HAMMER_OF_LIGHT = 427453;
 const CRUSADING_STRIKES = 408385;
 
 // Beast Mastery's presses land through the pet (the WoWAnalyzer audit's
@@ -228,6 +237,10 @@ const ACTIONS = new Map<number, GameAction>();
   if (!ACTIONS.has(REAVERS_GLAIVE)) ACTIONS.set(REAVERS_GLAIVE, {
     id: REAVERS_GLAIVE, name: "Reaver's Glaive", onGcd: true, recastMs: HASTED_GCD_MS, cooldownMs: HASTED_GCD_MS,
     charges: 1, speedScaled: true, appliesStatusIds: [REAVERS_GLAIVE],
+  });
+  if (!ACTIONS.has(HAMMER_OF_LIGHT)) ACTIONS.set(HAMMER_OF_LIGHT, {
+    id: HAMMER_OF_LIGHT, name: "Hammer of Light", onGcd: true, recastMs: HASTED_GCD_MS, cooldownMs: HASTED_GCD_MS,
+    charges: 1, speedScaled: true, appliesStatusIds: [HAMMER_OF_LIGHT],
   });
   if (!ACTIONS.has(DRAIN_SOUL)) ACTIONS.set(DRAIN_SOUL, {
     id: DRAIN_SOUL, name: "Drain Soul", onGcd: true, recastMs: HASTED_GCD_MS, cooldownMs: HASTED_GCD_MS,
