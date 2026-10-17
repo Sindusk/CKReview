@@ -91,7 +91,9 @@ export const WOW_TRACKED_COOLDOWNS: Record<string, TrackedCooldown[]> = {
   ],
   "Windwalker Monk": [
     { name: "Invoke Xuen", actionIds: [123904], cooldownMs: 90_000, charges: 1, firstUseOffsetMs: 3_000 },          // 90.2 / 100.0s, 2.6s
-    { name: "Celestial Conduit", actionIds: [443028], cooldownMs: 90_000, charges: 1, firstUseOffsetMs: 13_000 },   // 90.2 / 95.8s, 12.6s
+    // Its hits log as 443038 (LckJC7GMhQvD6rdw), not the cast's id: without
+    // damageIds a use was worth 0 and the drift never showed (2026-10-17).
+    { name: "Celestial Conduit", actionIds: [443028], damageIds: [443038], cooldownMs: 90_000, charges: 1, firstUseOffsetMs: 13_000 },   // 90.2 / 95.8s, 12.6s
   ],
   "Frost Death Knight": [   // unverified (2 players)
     { name: "Pillar of Frost", actionIds: [51271], cooldownMs: 45_000, charges: 1, firstUseOffsetMs: 3_000 },       // 45.0 / 49.8s, 2.4s
