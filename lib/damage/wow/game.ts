@@ -187,6 +187,22 @@ const CRUSADING_STRIKES = 408385;
 // Chajinadh Ftj4vwHf9RazPcqV, Misohornie gVDPhzp61Zm29HMw; 1–5 a pull on
 // 11 of 24 Vengeance player-pulls).
 const SIGIL_OF_CHAINS = 202138;
+// Guardian Druid (the WoWAnalyzer audit's phase 3, 2026-10-17): no Guardian
+// was in the survey, so none of its bear presses were actions and every
+// one read as idle (the 100th-percentile 주황양배추 aZ6NnwL8g9PdpGJ1: 4.5%
+// GCD uptime, 19.0M "lost"). On-GCD presses, the next cast of any
+// candidate press coming 0.82s+ after each (p05; median 1.09–1.10s; 25
+// player-pulls of 9 Guardians on aZ6NnwL8g9PdpGJ1, mNkHXhaD6Y2tqQTg,
+// Ndh2H6Qw4Pp1qaMk, L8yGzCABtm6Zx1YR, hjHXmdnJFwTPpMtK, J3ckBVtrZNfWv1h7,
+// JvQpZk3CXj78Dx2f): Mangle (916 casts), Thrash (720), Swipe (180), Maul
+// (64), Lunar Beam (63; its 1270292 cast is a fake twin), Red Moon (56),
+// Raze (38). Off the GCD (next press under 0.3s on 8–111 casts each):
+// Ironfur, Incarnation: Guardian of Ursoc and the Wild Guardian it casts,
+// Growl, Barkskin, Survival Instincts.
+const GUARDIAN_PRESSES: [number, string][] = [
+  [33917, "Mangle"], [77758, "Thrash"], [213771, "Swipe"], [6807, "Maul"],
+  [204066, "Lunar Beam"], [1252871, "Red Moon"], [400254, "Raze"],
+];
 
 // Beast Mastery's presses land through the pet (the WoWAnalyzer audit's
 // phase 3, 2026-10-17): Kill Command's attack is the pet's (83381; 1232922
@@ -253,7 +269,7 @@ const ACTIONS = new Map<number, GameAction>();
     id: DRAIN_SOUL, name: "Drain Soul", onGcd: true, recastMs: HASTED_GCD_MS, cooldownMs: HASTED_GCD_MS,
     charges: 1, speedScaled: true, appliesStatusIds: [DRAIN_SOUL],
   });
-  for (const [id, name] of [[SHEILUNS_GIFT, "Sheilun's Gift"], [DETOX, "Detox"], [REVIVAL, "Revival"], [CRACKLING_JADE_LIGHTNING, "Crackling Jade Lightning"], [SIGIL_OF_CHAINS, "Sigil of Chains"]] as const) {
+  for (const [id, name] of [[SHEILUNS_GIFT, "Sheilun's Gift"], [DETOX, "Detox"], [REVIVAL, "Revival"], [CRACKLING_JADE_LIGHTNING, "Crackling Jade Lightning"], [SIGIL_OF_CHAINS, "Sigil of Chains"], ...GUARDIAN_PRESSES] as const) {
     if (!ACTIONS.has(id)) ACTIONS.set(id, {
       id, name, onGcd: true, recastMs: HASTED_GCD_MS, cooldownMs: HASTED_GCD_MS,
       charges: 1, speedScaled: true, appliesStatusIds: [id],
