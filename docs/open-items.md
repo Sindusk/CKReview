@@ -368,8 +368,15 @@ and delete them from the header.
     rows stay `wrong` (Haunt cast efficiency, Dark Harvest empty cast).
     Open: one-target DoT uptime during Seed of Corruption AoE stretches
     (the 100th-percentile Soul Harvester's Unstable Affliction gaps).
-  - [warrior-arms.md](wowa-audit/warrior-arms.md): 11; Bladestorm drift
-    with Executioner; the priority list folded into one candidate.
+  - [warrior-arms.md](wowa-audit/warrior-arms.md): phase 3 done
+    2026-10-17. Built Bladestorm outside Colossus Smash and revalued
+    Colossus Smash drift by its armor window (lib/damage/wow/specs/
+    arms.ts). Left unbuilt with numbers: Bladestorm's cooldown and the
+    Mortal Strike readiness rows (`unverifiable`), Rend and Deep Wounds
+    uptime, the priority list; Demolish, Ravager and Champion's Spear fire
+    on nothing (every sample player is Slayer). Three `wrong` rows kept
+    (Sweeping Strikes, Deep Wounds refresh, Cleave efficiency), Rend early
+    refresh proposed `wrong`.
   - [evoker-preservation.md](wowa-audit/evoker-preservation.md): healer,
     0 candidates.
   - [monk-mistweaver.md](wowa-audit/monk-mistweaver.md): healer, 6
