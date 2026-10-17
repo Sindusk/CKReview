@@ -6,17 +6,18 @@
 // posts the window and keeps only the reply to its latest request.
 
 import { buildTankingPlan, type TankWindowPull, type TankingPlan } from "./tanking-plan";
-import { FFXIV_MITIGATION } from "./ffxiv-catalog";
+import { ffxivMitigationAt } from "./ffxiv-catalog";
 
-export type TankingRequest = { id: number; window: TankWindowPull[] };
+// `level`: the boss's sync level (lib/damage/ffxiv/patches.ts levelOf).
+export type TankingRequest = { id: number; window: TankWindowPull[]; level?: number };
 export type TankingReply = { id: number; plan?: TankingPlan; error?: string };
 
 const ctx = self as unknown as { onmessage: ((e: MessageEvent<TankingRequest>) => void) | null; postMessage: (m: TankingReply) => void };
 
 ctx.onmessage = (e) => {
-  const { id, window } = e.data;
+  const { id, window, level } = e.data;
   try {
-    ctx.postMessage({ id, plan: buildTankingPlan(window, FFXIV_MITIGATION) });
+    ctx.postMessage({ id, plan: buildTankingPlan(window, ffxivMitigationAt(level)) });
   } catch (err) {
     ctx.postMessage({ id, error: err instanceof Error ? err.message : String(err) });
   }

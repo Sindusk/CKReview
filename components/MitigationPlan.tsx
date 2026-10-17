@@ -31,7 +31,7 @@ import {
   type PlanLetter, type StackedFinding, type UnderFinding, type UnusedFinding,
 } from "@/lib/mitigation/findings";
 import type { DebuffReach } from "@/lib/mitigation/debuff-reach";
-import { FFXIV_MITIGATION } from "@/lib/mitigation/ffxiv-catalog";
+import { useMitigationGame } from "./MitigationGameContext";
 import { VERDICT_STYLE, afterColor, fmtTime } from "./MitigationTimeline";
 import AnalysisTimeline from "./MitigationAnalysisTimeline";
 import { CdChip, FINDING_COLOR, FindingGlyph, SkillIcon, type FindingGlyphKind } from "./ui/MitigationGlyphs";
@@ -419,8 +419,9 @@ export function PlanView({ plan, pending, error, window, reach, onAnalyze, onOpe
 }) {
   // A plan counts only for the window it was searched over.
   const matches = plan !== null && plan.windowPulls.length === window.length && plan.windowPulls.every((id, i) => window[i]?.pullId === id);
-  const base = useMemo(() => buildAnalysisFindings(window, null, FFXIV_MITIGATION, reach), [window, reach]);
-  const analyzed = useMemo(() => (plan && matches ? buildAnalysisFindings(window, plan, FFXIV_MITIGATION, reach) : null), [plan, matches, window, reach]);
+  const game = useMitigationGame();
+  const base = useMemo(() => buildAnalysisFindings(window, null, game, reach), [window, reach, game]);
+  const analyzed = useMemo(() => (plan && matches ? buildAnalysisFindings(window, plan, game, reach) : null), [plan, matches, window, reach, game]);
   const f = analyzed ?? base;
   const [filter, setFilter] = useState<GroupKey | null>(null);
   const [closed, setClosed] = useState<Set<GroupKey>>(() => new Set(["other"]));

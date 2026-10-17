@@ -16,7 +16,7 @@ import type { AggregatedHit } from "@/lib/mitigation/aggregate";
 import { MARGIN_UNDER, judged } from "@/lib/mitigation/analyze";
 import { addOptions, aggregateAddOptions, type AddOption } from "@/lib/mitigation/notes";
 import type { DebuffReach } from "@/lib/mitigation/debuff-reach";
-import { FFXIV_MITIGATION } from "@/lib/mitigation/ffxiv-catalog";
+import { useMitigationGame } from "./MitigationGameContext";
 import { FULL_HEALTH, MechanicLabel, VERDICT_STYLE, afterColor, fmtTime, pctHp } from "./MitigationTimeline";
 
 const PANEL_WIDTH = 340;
@@ -103,6 +103,7 @@ function Panel({ title, onClose, children }: { title: ReactNode; onClose: () => 
 }
 
 export function HitDetails({ hit, reach, onClose }: { hit: MitigationHit; reach?: DebuffReach; onClose: () => void }) {
+  const game = useMitigationGame();
   const before = lowestBy(hit.targets, beforeOf);
   const after = lowestBy(hit.targets, (t) => t.margin);
   const dead = hit.targets.filter((t) => t.died);
@@ -146,12 +147,13 @@ export function HitDetails({ hit, reach, onClose }: { hit: MitigationHit; reach?
       <div style={heading}>What could change</div>
       {hit.verdict === "over" ? <Droppable hit={hit} />
         : hit.verdict === "good" ? <div style={line}>Nothing: it landed Good.</div>
-        : <Options options={addOptions(hit, FFXIV_MITIGATION, reach)} />}
+        : <Options options={addOptions(hit, game, reach)} />}
     </Panel>
   );
 }
 
 export function AggregateDetails({ row, reach, onClose }: { row: AggregatedHit; reach?: DebuffReach; onClose: () => void }) {
+  const game = useMitigationGame();
   const first = row.byPull[0].hit;
   return (
     <Panel onClose={onClose} title={<MechanicLabel name={first.abilityNames.join(" + ")} occurrence={row.occurrence}
@@ -178,7 +180,7 @@ export function AggregateDetails({ row, reach, onClose }: { row: AggregatedHit; 
       <div style={heading}>What could change</div>
       {row.verdict === "over" ? <Droppable hit={row} />
         : row.verdict === "good" ? <div style={line}>Nothing on the median{row.worstMargin < MARGIN_UNDER ? "; the worst pull is worth a look" : ""}.</div>
-        : <Options options={aggregateAddOptions(row, FFXIV_MITIGATION, reach)} perPull={row.pulls} />}
+        : <Options options={aggregateAddOptions(row, game, reach)} perPull={row.pulls} />}
 
       <div style={heading}>Per pull</div>
       {row.byPull.map(({ pullNumber, hit }) => {

@@ -50,7 +50,8 @@ import { useEffect, useRef, useState, type CSSProperties, type MouseEvent as Rea
 import { createPortal } from "react-dom";
 import { Panel } from "./ui/Panel";
 import type { Pull } from "@/types/Pull";
-import { FFXIV_MITIGATION } from "@/lib/mitigation/ffxiv-catalog";
+import type { MitigationGame } from "@/lib/mitigation/types";
+import { useMitigationGame } from "./MitigationGameContext";
 import { phaseSpans } from "@/lib/mitigation/analyze";
 import { CAST_LEAD_MS } from "@/lib/mitigation/optimize";
 import { PLAN_MAX_CHANGES, PLAN_WINDOW_DEFAULT } from "@/lib/mitigation/plan";
@@ -112,8 +113,8 @@ type Lane = { player: string; job: string; up: boolean };
 type Row = { label: string; key: string; casts: TankCast[]; dots?: boolean; co?: boolean; healer?: boolean };
 
 /** Where a change puts a cooldown, on whose lane, and the use it replaces. */
-function placement(c: TankChange) {
-  const entry = FFXIV_MITIGATION.catalog.find((e) => e.key === c.key);
+function placement(c: TankChange, game: MitigationGame) {
+  const entry = game.catalog.find((e) => e.key === c.key);
   const on = c.receiver ?? (entry?.reach === "self" ? c.player : c.to.tank ?? c.player);
   return {
     on, durationMs: entry?.durationMs ?? 10_000,
@@ -123,12 +124,12 @@ function placement(c: TankChange) {
 }
 
 /** A tank's cooldown rows: own cooldowns, the co-tank's on them, then short ones as dots; plus rows for proposed changes. */
-function rowsFor(pull: Pull, tank: string, changes: TankChange[]): Row[] {
-  const casts = tankCasts(pull, FFXIV_MITIGATION, tank);
+function rowsFor(pull: Pull, tank: string, changes: TankChange[], game: MitigationGame): Row[] {
+  const casts = tankCasts(pull, game, tank);
   const rank = (key: string) => (ROW_ORDER.indexOf(key) + 1 || ROW_ORDER.length + 1);
   const rows: Row[] = [];
   const own = casts.filter((c) => c.kind !== "short" && c.by === tank);
-  const keys = [...new Set([...own.map((c) => c.key), ...changes.filter((c) => placement(c).on === tank && c.player === tank).map((c) => c.key)])]
+  const keys = [...new Set([...own.map((c) => c.key), ...changes.filter((c) => placement(c, game).on === tank && c.player === tank).map((c) => c.key)])]
     .sort((a, b) => rank(a) - rank(b));
   for (const key of keys) {
     const name = own.find((c) => c.key === key)?.name ?? changes.find((c) => c.key === key)!.name;
@@ -147,7 +148,7 @@ function rowsFor(pull: Pull, tank: string, changes: TankChange[]): Row[] {
       rows.push({ label: `${xs[0].name} ← ${firstName(by)}`, key, casts: xs, co: true, healer: true });
     }
   }
-  for (const c of changes.filter((c) => placement(c).on === tank && c.player !== tank)) {
+  for (const c of changes.filter((c) => placement(c, game).on === tank && c.player !== tank)) {
     if (!rows.some((r) => r.co && r.key === c.key)) rows.push({ label: `${c.name} ← ${firstName(c.player)}`, key: c.key, casts: [], co: true });
   }
   const shorts = casts.filter((c) => c.kind === "short");
@@ -180,6 +181,7 @@ const TICK_STEPS = [5, 10, 15, 30, 60, 120].map((s) => s * 1000);
 function Clock({ pull, tanking, lanes, changes, hover }: {
   pull: Pull; tanking: PullTanking; lanes: Lane[]; changes: TankChange[]; hover: Set<TankChange>;
 }) {
+  const game = useMitigationGame();
   const dur = pull.fightDuration;
   // Zoom: the visible span of the fight clock. Drag across the chart to
   // zoom to that span, Ctrl/⌘ + wheel to zoom at the cursor, Shift + wheel
@@ -252,8 +254,8 @@ function Clock({ pull, tanking, lanes, changes, hover }: {
   }, [dur]);
   const upper = lanes.find((l) => l.up);
   const lower = lanes.find((l) => !l.up);
-  const upperRows = upper ? rowsFor(pull, upper.player, changes) : [];
-  const lowerRows = lower ? rowsFor(pull, lower.player, changes) : [];
+  const upperRows = upper ? rowsFor(pull, upper.player, changes, game) : [];
+  const lowerRows = lower ? rowsFor(pull, lower.player, changes, game) : [];
   const upperRowsY = PHASE_H + 6;
   const upperBase = upperRowsY + upperRows.length * ROW_H + 6 + (upper ? BAR_H : 0);
   const axis = upperBase + (upper ? 10 : 30);
@@ -335,8 +337,8 @@ function Clock({ pull, tanking, lanes, changes, hover }: {
                   {...tipProps(`${c.name}${r.co ? ` from ${firstName(c.by)}` : ""} ${fmtTime(c.atMs)}–${fmtTime(c.atMs + c.durationMs)}` +
                     (c.kind === "healer" ? "\nA healer's cooldown on this tank: plan around it" : ""))} />
               ))}
-              {!r.dots && changes.filter((c) => c.key === r.key && placement(c).on === l.player && (c.player === l.player) !== !!r.co).map((c, i) => {
-                const p = placement(c);
+              {!r.dots && changes.filter((c) => c.key === r.key && placement(c, game).on === l.player && (c.player === l.player) !== !!r.co).map((c, i) => {
+                const p = placement(c, game);
                 const lit = hover.has(c);
                 if (!visible(p.atMs, p.atMs + p.durationMs) && !(lit && p.fromMs !== undefined && visible(p.fromMs, p.fromMs + p.durationMs))) return null;
                 return (

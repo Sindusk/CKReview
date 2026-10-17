@@ -8,19 +8,20 @@
 // the group sends its hits (shield size estimates).
 
 import { buildMitigationPlan, type OptimizedPlan, type WindowPull } from "./plan";
-import { FFXIV_MITIGATION } from "./ffxiv-catalog";
+import { ffxivMitigationAt } from "./ffxiv-catalog";
 import type { MitigationHit } from "./types";
 import type { DebuffReach } from "./debuff-reach";
 
-export type PlanRequest = { id: number; window: WindowPull[]; allHits: MitigationHit[][]; reach?: DebuffReach };
+// `level`: the boss's sync level (lib/damage/ffxiv/patches.ts levelOf).
+export type PlanRequest = { id: number; window: WindowPull[]; allHits: MitigationHit[][]; reach?: DebuffReach; level?: number };
 export type PlanReply = { id: number; plan?: OptimizedPlan; error?: string };
 
 const ctx = self as unknown as { onmessage: ((e: MessageEvent<PlanRequest>) => void) | null; postMessage: (m: PlanReply) => void };
 
 ctx.onmessage = (e) => {
-  const { id, window, allHits, reach } = e.data;
+  const { id, window, allHits, reach, level } = e.data;
   try {
-    ctx.postMessage({ id, plan: buildMitigationPlan(window, allHits, FFXIV_MITIGATION, reach) });
+    ctx.postMessage({ id, plan: buildMitigationPlan(window, allHits, ffxivMitigationAt(level), reach) });
   } catch (err) {
     ctx.postMessage({ id, error: err instanceof Error ? err.message : String(err) });
   }

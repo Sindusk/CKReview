@@ -23,6 +23,7 @@ const { ROOT, requireTsFromRoot } = require('./lib/require-ts');
 
 const cat = requireTsFromRoot('lib/mitigation/ffxiv-catalog.ts');
 const { FFXIV_MITIGATION_CATALOG: CATALOG, FFXIV_STATUS_INDEX: STATUS, FFXIV_DAMAGE_TYPE: DT } = cat;
+const { levelOf } = requireTsFromRoot('lib/damage/ffxiv/patches.ts');
 
 const dirs = process.argv.slice(2).length
   ? process.argv.slice(2).map((d) => path.resolve(d))
@@ -46,12 +47,16 @@ for (const dir of dirs) {
     const j = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
     const r = j.json.data.reportData.report;
     const fight = j.variables.fightIDs[0];
+    // Sections 2 and 3 judge a hit by the catalog at the fight's sync level
+    // (ffxivMitigationAt): a TEA hit is level 80's values.
+    const level = levelOf({ name: meta.fights.find((x) => x.id === fight)?.name });
+    const LEVEL_STATUS = cat.ffxivMitigationAt(level).statusIndex;
     for (const e of r.casts.data) {
       if (e.type !== 'cast') continue;
       const entry = cat.FFXIV_ACTION_INDEX.get(e.abilityGameID);
       if (!entry) continue;
       seenAction.set(e.abilityGameID, abil.get(e.abilityGameID)?.name);
-      const k = `${code}|${fight}|${e.sourceID}|${entry.key}`;
+      const k = `${code}|${fight}|${e.sourceID}|${entry.key}|${level ?? ''}`;
       (castTimes.get(k) || castTimes.set(k, []).get(k)).push(e.timestamp);
     }
     for (const e of r.healing.data) {
@@ -80,7 +85,7 @@ for (const dir of dirs) {
       let product = 1;
       const names = [];
       for (const id of ids) {
-        const s = STATUS.get(id);
+        const s = LEVEL_STATUS.get(id);
         if (!s || s.status.shield || s.entry.kind === 'invuln') continue;
         if (s.status[col] > 0) { product *= 1 - s.status[col]; names.push(s.status.name); }
       }
@@ -88,17 +93,17 @@ for (const dir of dirs) {
       // Per status: the factor this hit implies for it, given the catalog
       // values of everything else on the hit.
       for (const id of new Set(ids)) {
-        const s = STATUS.get(id);
+        const s = LEVEL_STATUS.get(id);
         if (!s || s.status.shield || s.entry.kind === 'invuln' || !(s.status[col] > 0)) continue;
         const implied = e.multiplier / (product / (1 - s.status[col]));
-        const k = `${s.status.name}(${id}) ${col}`;
+        const k = `${s.status.name}(${id}) ${col}${level ? ` @${level}` : ''}`;
         const h = implied2.get(k) || implied2.set(k, { expected: 1 - s.status[col], bins: new Map() }).get(k);
         const bin = Math.round(implied * 20) / 20;
         h.bins.set(bin, (h.bins.get(bin) || 0) + 1);
       }
       const ok = Math.abs(product - e.multiplier) <= 0.011;
       if (!ok) multBad++;
-      const key = `${col}: ${names.sort().join(' + ') || '(none)'}`;
+      const key = `${col}${level ? ` @${level}` : ''}: ${names.sort().join(' + ') || '(none)'}`;
       const g = multGroups.get(key) || multGroups.set(key, { n: 0, bad: 0, product, logged: new Map() }).get(key);
       g.n++;
       if (!ok) { g.bad++; g.logged.set(e.multiplier, (g.logged.get(e.multiplier) || 0) + 1); }
@@ -143,22 +148,24 @@ for (const [k, h] of [...implied2].sort()) {
 
 console.log('\n== 3. Shortest cast gap per player (upper bound on cooldown)');
 const gapByEntry = new Map();
+// Per entry and sync level, against that level's version of the entry.
 for (const [k, times] of castTimes) {
-  const key = k.split('|')[3];
-  const entry = CATALOG.find((e) => e.key === key);
+  const [, , , key, lv] = k.split('|');
+  const entry = cat.ffxivCatalogAt(lv ? Number(lv) : undefined).find((e) => e.key === key);
+  if (!entry) continue;
   const c = entry.charges || 1;
   times.sort((a, b) => a - b);
   for (let i = c; i < times.length; i++) {
     const gap = times[i] - times[i - c];
-    if (!gapByEntry.has(key) || gap < gapByEntry.get(key)) gapByEntry.set(key, gap);
+    const g = gapByEntry.get(`${key}|${lv}`);
+    if (!g || gap < g.gap) gapByEntry.set(`${key}|${lv}`, { gap, entry, lv });
   }
 }
-for (const entry of CATALOG) {
-  const gap = gapByEntry.get(entry.key);
-  if (gap === undefined || entry.cooldownMs === 0) continue;
+for (const { gap, entry, lv } of [...gapByEntry.values()].sort((a, b) => a.entry.key.localeCompare(b.entry.key) || String(a.lv).localeCompare(String(b.lv)))) {
+  if (entry.cooldownMs === 0) continue;
   const flag = entry.gated ? `  (gated: ${entry.gated})`
     : gap < entry.cooldownMs - 1000 ? '  <-- shorter than catalog cooldown' : '';
-  console.log(`  ${entry.key}: catalog ${entry.cooldownMs / 1000}s, shortest seen ${(gap / 1000).toFixed(1)}s${flag}`);
+  console.log(`  ${entry.key}${lv ? ` @${lv} (${entry.name})` : ''}: catalog ${entry.cooldownMs / 1000}s, shortest seen ${(gap / 1000).toFixed(1)}s${flag}`);
 }
 
 // A shield scaling with the target's max HP (The Blackest Night: 25%)

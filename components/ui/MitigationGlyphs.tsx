@@ -7,7 +7,7 @@
 
 import type { CSSProperties, ReactNode } from "react";
 import { getFFAbilityIconUrl } from "@/lib/ability-icons";
-import { FFXIV_MITIGATION } from "@/lib/mitigation/ffxiv-catalog";
+import { useMitigationGame } from "../MitigationGameContext";
 import { getPlayerClassIcon } from "@/lib/player-display";
 import { AbilityHoverTip } from "./AbilityHoverTip";
 
@@ -65,17 +65,17 @@ const PATHS: Record<FindingGlyphKind, ReactNode> = {
 
 // ── Skill and job icons (user, 2026-10-14: icons over names) ─────────────
 
-const iconOf = new Map(FFXIV_MITIGATION.catalog.map((e) => [e.key, getFFAbilityIconUrl(e.icon)]));
-const entryOf = new Map(FFXIV_MITIGATION.catalog.map((e) => [e.key, e]));
+// Per key, from the catalog at the dialog's sync level (Vengeance's icon
+// and tooltip in TEA, Damnation's at 100).
 const hideBroken = (e: React.SyntheticEvent<HTMLImageElement>) => { e.currentTarget.style.visibility = "hidden"; };
 
 /** Hover tooltip for a catalog mitigation: its name, `label` when that
  *  says more (e.g. who cast it), and the XIVAPI description. */
 export function SkillTip({ entryKey, label, children, style }: { entryKey: string; label?: string; children: ReactNode; style?: CSSProperties }) {
-  const entry = entryOf.get(entryKey);
+  const entry = useMitigationGame().catalog.find((e) => e.key === entryKey);
   if (!entry) return <span title={label} style={style}>{children}</span>;
   return (
-    <AbilityHoverTip game="ffxiv" id={entry.actionIds[0]} name={entry.name} icon={iconOf.get(entryKey)}
+    <AbilityHoverTip game="ffxiv" id={entry.actionIds[0]} name={entry.name} icon={getFFAbilityIconUrl(entry.icon)}
       lines={label && label !== entry.name ? [label] : []} style={style}>
       {children}
     </AbilityHoverTip>
@@ -84,7 +84,7 @@ export function SkillTip({ entryKey, label, children, style }: { entryKey: strin
 
 /** A mitigation's icon from the catalog (a blank square when it has none). */
 export function SkillIcon({ entryKey, name, size = 18, style }: { entryKey: string; name: string; size?: number; style?: CSSProperties }) {
-  const src = iconOf.get(entryKey);
+  const src = getFFAbilityIconUrl(useMitigationGame().catalog.find((e) => e.key === entryKey)?.icon);
   const box: CSSProperties = { width: size, height: size, borderRadius: 3, flex: "0 0 auto", display: "inline-block", verticalAlign: "middle", ...style };
   return (
     <SkillTip entryKey={entryKey} label={name} style={{ display: "inline-flex", flex: "0 0 auto", verticalAlign: "middle" }}>

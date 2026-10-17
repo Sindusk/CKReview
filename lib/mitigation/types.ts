@@ -61,10 +61,22 @@ export type CatalogEntry = {
   inSheet?:   false;
   // True once the action and status IDs were seen in a real log.
   verified:   boolean;
+  // Older ultimates sync players below the level cap
+  // (lib/damage/ffxiv/patches.ts levelOf). `minLevel`: the level the action
+  // is learned at, so a pull synced below it can't use it. `belowLevel`:
+  // what the entry was before a trait upgraded it, applied when the pull is
+  // synced below `below` (Damnation is Vengeance below 92; Reprisal lasts
+  // 10s below 98). The key stays the same at every level, so code naming a
+  // key (tanking.ts SHORT_COOLDOWNS) follows the downgrade.
+  minLevel?:   number;
+  belowLevel?: { below: number; as: LevelVariant }[];
   // The log site's icon filename for the action (FFLogs "000000-000806.png"),
   // so a column has its icon even when nobody cast it in the loaded pulls.
   icon?:      string;
 };
+
+export type LevelVariant = Partial<Pick<CatalogEntry,
+  "name" | "actionIds" | "statuses" | "durationMs" | "cooldownMs" | "charges" | "gated" | "verified" | "icon" | "minLevel">>;
 
 // What the analysis needs from a game: its catalog and how to read a
 // hit's damage type. FFXIV's lives in ffxiv-catalog.ts.

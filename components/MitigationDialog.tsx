@@ -49,7 +49,9 @@ import { AnalysisWindowControls, PlanView } from "./MitigationPlan";
 import { TankingView, chipsFromAggregate, chipsFromPull } from "./MitigationTanking";
 import { PlayerPicker } from "./MitigationPlayerPicker";
 import { AggregateDetails, HitDetails } from "./MitigationHitDetails";
-import { FFXIV_MITIGATION } from "@/lib/mitigation/ffxiv-catalog";
+import { ffxivMitigationAt } from "@/lib/mitigation/ffxiv-catalog";
+import { levelOf } from "@/lib/damage/ffxiv/patches";
+import { MitigationGameContext } from "./MitigationGameContext";
 import { withDeploymentShields } from "@/lib/mitigation/ffxiv-deployment";
 import { useFFPullSelector } from "@/hooks/useFFPullSelector";
 import {
@@ -116,6 +118,10 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId, 
   const bosses = useMemo(() => [...new Set(ffPulls.map((p) => p.name))], [ffPulls]);
   const boss = selectedPull?.name ?? bosses[0];
   const bossPulls = useMemo(() => ffPulls.filter((p) => p.name === boss), [ffPulls, boss]);
+  // The catalog at the boss's sync level: an older ultimate plans with the
+  // actions its level has (Vengeance in TEA, not Damnation).
+  const level = bossPulls[0] ? levelOf(bossPulls[0]) : undefined;
+  const game = ffxivMitigationAt(level);
   const pickBoss = (name: string) => {
     const pulls = ffPulls.filter((p) => p.name === name);
     if (pulls.length) setSelectedPullId(pulls[pulls.length - 1].id);
@@ -137,17 +143,17 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId, 
 
   // Boss-debuff reach is learned from every loaded pull of the boss, any
   // group (lib/mitigation/debuff-reach.ts): more attempts, fewer unknowns.
-  const reach = useMemo(() => (open ? buildDebuffReach(bossPulls.filter(hasMitigationData), FFXIV_MITIGATION) : undefined),
-    [open, bossPulls]);
+  const reach = useMemo(() => (open ? buildDebuffReach(bossPulls.filter(hasMitigationData), game) : undefined),
+    [open, bossPulls, game]);
   // Only computed while open; the analysis reads every damage event.
   const perPull = useMemo(() => {
     if (!open) return [];
     return analyzable.map((p) => ({
       pullId: p.id, pullNumber: p.pullNumber, durationMs: p.fightDuration,
-      hits: analyzePullMitigation(p, FFXIV_MITIGATION, reach),
+      hits: analyzePullMitigation(p, game, reach),
     }));
-  }, [open, analyzable, reach]);
-  const aggregate = useMemo(() => (allPulls ? aggregateMitigation(perPull, FFXIV_MITIGATION, reach) : []), [allPulls, perPull, reach]);
+  }, [open, analyzable, reach, game]);
+  const aggregate = useMemo(() => (allPulls ? aggregateMitigation(perPull, game, reach) : []), [allPulls, perPull, reach, game]);
   const view: View = viewPick ?? (perPull.length > 0 ? "analysis" : "timeline");
 
   // The Analysis searches the group's last N pulls (lib/mitigation/plan.ts),
@@ -177,7 +183,7 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId, 
     const id = ++requestId.current;
     setPlanResult((r) => ({ ...r, pending: true }));
     if (typeof Worker === "undefined") {
-      setPlanResult({ plan: buildMitigationPlan(window, allHits, FFXIV_MITIGATION, reach), pending: false });
+      setPlanResult({ plan: buildMitigationPlan(window, allHits, game, reach), pending: false });
       return;
     }
     if (!worker.current) {
@@ -187,9 +193,9 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId, 
         setPlanResult({ plan: e.data.plan ?? null, pending: false, error: e.data.error });
       };
     }
-    const request: PlanRequest = { id, window, allHits, reach };
+    const request: PlanRequest = { id, window, allHits, reach, level };
     worker.current.postMessage(request);
-  }, [planWanted, planWin, perPull, reach]);
+  }, [planWanted, planWin, perPull, reach, game, level]);
   // The Tanking view (components/MitigationTanking.tsx): each pull's tank
   // streams and busters, only while that view is open; its changes are
   // searched over the window of pulls with the latest tank jobs, in a
@@ -200,9 +206,9 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId, 
     const byId = new Map(analyzable.map((p) => [p.id, p]));
     return perPull.map((p) => {
       const pull = byId.get(p.pullId)!;
-      return { ...p, pull, tanking: analyzePullTanking(pull, p.hits, FFXIV_MITIGATION) };
+      return { ...p, pull, tanking: analyzePullTanking(pull, p.hits, game) };
     });
-  }, [tankingWanted, perPull, analyzable]);
+  }, [tankingWanted, perPull, analyzable, game]);
   const tankWin = useMemo(() => tankWindow(tankingPerPull, windowSize), [tankingPerPull, windowSize]);
   const [tankResult, setTankResult] = useState<{ plan: TankingPlan | null; pending: boolean; error?: string }>({ plan: null, pending: false });
   const tankWorker = useRef<Worker | null>(null);
@@ -215,7 +221,7 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId, 
     const id = ++tankRequestId.current;
     setTankResult((r) => ({ ...r, pending: true }));
     if (typeof Worker === "undefined") {
-      setTankResult({ plan: buildTankingPlan(tankWin, FFXIV_MITIGATION), pending: false });
+      setTankResult({ plan: buildTankingPlan(tankWin, game), pending: false });
       return;
     }
     if (!tankWorker.current) {
@@ -225,9 +231,9 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId, 
         setTankResult({ plan: e.data.plan ?? null, pending: false, error: e.data.error });
       };
     }
-    const request: TankingRequest = { id, window: tankWin };
+    const request: TankingRequest = { id, window: tankWin, level };
     tankWorker.current.postMessage(request);
-  }, [tankingWanted, allPulls, tankWin]);
+  }, [tankingWanted, allPulls, tankWin, game, level]);
   const tankShown = useMemo(() => {
     if (!tankingWanted) return undefined;
     if (!allPulls) return tankingPerPull.find((p) => p.pullId === selectedPull?.id);
@@ -250,8 +256,8 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId, 
     tankWorker.current = null;
   }, [open]);
 
-  const groups = useMemo(() => buildPlayerGroups(allPulls ? analyzable : selectedPull ? [selectedPull] : []),
-    [allPulls, analyzable, selectedPull]);
+  const groups = useMemo(() => buildPlayerGroups(allPulls ? analyzable : selectedPull ? [selectedPull] : [], game),
+    [allPulls, analyzable, selectedPull, game]);
   const focusGroup = groups.find((g) => g.player === focus);
   const shownFocus = focusGroup ? focus : null;
   // A picked player shows only their columns, personal ones open.
@@ -278,6 +284,7 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId, 
   const quiet = allPulls ? quietRows : quietHits;
 
   return (
+    <MitigationGameContext.Provider value={game}>
     <Dialog
       title="Mitigation"
       resizeKey="mitigation"
@@ -410,5 +417,6 @@ export default function MitigationDialog({ open, onClose, pulls, currentPullId, 
         </>
       )}
     </Dialog>
+    </MitigationGameContext.Provider>
   );
 }

@@ -827,17 +827,20 @@ MECHANICS['mitigation-analysis'] = {
     ...requireTsFromRoot('lib/mitigation/ffxiv-catalog.ts'),
     ...requireTsFromRoot('lib/mitigation/tanking.ts'),
     ...requireTsFromRoot('lib/mitigation/tanking-plan.ts'),
+    ...requireTsFromRoot('lib/damage/ffxiv/patches.ts'),
   }),
   async run({ mod, dir }) {
     const pulls = await loadThroughRealPipeline(mod, dir);
     if (!pulls) return;
+    // The catalog at the boss's sync level, as the dialog uses it.
+    const gameOf = (name) => mod.ffxivMitigationAt(mod.levelOf({ name }));
     const pctOf = (x) => `${Math.round(x * 100)}%`;
     const mmss = (ms) => `${Math.floor(ms / 60000)}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}`;
     // Boss-debuff reach evidence (lib/mitigation/debuff-reach.ts), per boss
     // over every pull of it in this report, as the dialog does.
     const reachByBoss = new Map();
     for (const boss of new Set(pulls.map((p) => p.name))) {
-      const reach = mod.buildDebuffReach(pulls.filter((p) => p.name === boss), mod.FFXIV_MITIGATION);
+      const reach = mod.buildDebuffReach(pulls.filter((p) => p.name === boss), gameOf(boss));
       reachByBoss.set(boss, reach);
       if (reach.evidence.size === 0) continue;
       console.log('='.repeat(70));
@@ -851,7 +854,7 @@ MECHANICS['mitigation-analysis'] = {
     // Aggregated like the dialog: per boss and exact roster.
     const groups = new Map();
     for (const pull of pulls) {
-      const hits = mod.analyzePullMitigation(pull, mod.FFXIV_MITIGATION, reachByBoss.get(pull.name));
+      const hits = mod.analyzePullMitigation(pull, gameOf(pull.name), reachByBoss.get(pull.name));
       const key = `${pull.name} | ${pull.players.map((p) => p.name.split(' ')[0]).sort().join(', ')}`;
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key).push({ pullId: pull.id, pullNumber: pull.pullNumber, durationMs: pull.fightDuration, hits, pull });
@@ -883,7 +886,8 @@ MECHANICS['mitigation-analysis'] = {
     console.log('='.repeat(70));
     console.log(`ALL PULLS: ${group} (${perPull.length} pulls)`);
     const reach = reachByBoss.get(perPull[0].pull.name);
-    for (const a of mod.aggregateMitigation(perPull, mod.FFXIV_MITIGATION, reach)) {
+    const game = gameOf(perPull[0].pull.name);
+    for (const a of mod.aggregateMitigation(perPull, game, reach)) {
       const usual = a.active.filter((m) => m.pulls * 2 >= a.pulls).map((m) => m.name).join(', ');
       const free = a.free.filter((f) => f.pulls * 2 >= a.pulls).map((f) => `${f.name}(${f.player.split(' ')[0]})`).join(', ');
       console.log(`  ${(a.medianMs / 1000).toFixed(0).padStart(4)}s ${a.phase ?? '-'} | ${a.abilityName} #${a.occurrence} pulls=${a.pulls}/${a.reached}${a.rare ? ' RARE' : ''} ` +
@@ -901,7 +905,7 @@ MECHANICS['mitigation-analysis'] = {
     // each buster per pull (kind, per-tank margin from full HP after the
     // follow-up, logged HP before, invuln), then matched across pulls.
     const tankingPulls = perPull.map((p) => ({ pullId: p.pullId, pullNumber: p.pullNumber, durationMs: p.durationMs,
-      tanking: mod.analyzePullTanking(p.pull, p.hits, mod.FFXIV_MITIGATION) }));
+      tanking: mod.analyzePullTanking(p.pull, p.hits, game) }));
     console.log(`  TANKING (margin = from full HP, buster + ${mod.FOLLOW_UP_MS / 1000}s follow-up, no healing; [before] = logged HP before)`);
     for (const { pullNumber, tanking } of tankingPulls) {
       const holders = tanking.tanking.filter((s) => s.autos >= 3)
@@ -934,7 +938,7 @@ MECHANICS['mitigation-analysis'] = {
     if (!tw.length) console.log(`  TANK PLAN: fewer than ${mod.TANK_MIN_PULLS} pulls with the latest pull's tank jobs`);
     if (tw.length) {
       const t0 = Date.now();
-      const tplan = mod.buildTankingPlan(tw, mod.FFXIV_MITIGATION);
+      const tplan = mod.buildTankingPlan(tw, game);
       const s = tplan.summary;
       console.log(`  TANK PLAN (pulls ${tw.map((p) => p.pullNumber).join(', ')}; ${tplan.evaluated} plans, ${Date.now() - t0}ms): ` +
         `failing ${s.before.failing} -> ${s.after.failing}, tight ${s.before.tight} -> ${s.after.tight}, ` +
@@ -957,7 +961,7 @@ MECHANICS['mitigation-analysis'] = {
     if (perPull.length >= mod.PLAN_MIN_PULLS) {
       const window = mod.planWindow(perPull);
       const t0 = Date.now();
-      const opt = mod.buildMitigationPlan(window, perPull.map((p) => p.hits), mod.FFXIV_MITIGATION, reach);
+      const opt = mod.buildMitigationPlan(window, perPull.map((p) => p.hits), game, reach);
       const ms = Date.now() - t0;
       const href = (h) => `${h.name} #${h.occurrence} (${mmss(h.medianMs)})`;
       const nChanges = opt.groups.reduce((s, g) => s + g.changes.length, 0);

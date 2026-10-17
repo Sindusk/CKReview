@@ -26,7 +26,7 @@
 
 import type { CSSProperties, ReactNode } from "react";
 import type { Pull } from "@/types/Pull";
-import type { HitVerdict, MitigationHit, MitigationKind, MitigationState, PlayerMitigation } from "@/lib/mitigation/types";
+import type { HitVerdict, MitigationGame, MitigationHit, MitigationKind, MitigationState, PlayerMitigation } from "@/lib/mitigation/types";
 import type { AggregatedHit } from "@/lib/mitigation/aggregate";
 import { MARGIN_OVER, MARGIN_UNDER, verdictFor } from "@/lib/mitigation/analyze";
 import { FFXIV_MITIGATION } from "@/lib/mitigation/ffxiv-catalog";
@@ -102,12 +102,12 @@ export const rowUneventful = (row: AggregatedHit) => row.byPull.every((b) => une
  * players only seen in earlier pulls go last), each split into party-wide
  * and personal columns.
  */
-export function buildPlayerGroups(pulls: Pull[]): PlayerGroup[] {
+export function buildPlayerGroups(pulls: Pull[], game: MitigationGame = FFXIV_MITIGATION): PlayerGroup[] {
   const groups = new Map<string, PlayerGroup>();
   for (const pull of pulls) {
     for (const player of pull.players) {
       const g = groups.get(player.name) ?? { player: player.name, job: player.className, party: [], personal: [] };
-      for (const entry of FFXIV_MITIGATION.catalog) {
+      for (const entry of game.catalog) {
         if (!entry.jobs.includes(player.className) || entry.inSheet === false) continue;
         if (entry.cooldownMs === 0 || entry.kind === "invuln" || entry.kind === "limitBreak") continue;
         const list = entry.reach === "party" ? g.party : g.personal;
