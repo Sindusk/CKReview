@@ -44,7 +44,7 @@ damage rows are measured.
 | 3 | Arcane | [mage-arcane.md](mage-arcane.md) | done 2026-10-17: Touch of the Magi window (arcane.ts; `burstGcdFindings` takes a `windows()` override); verified by the main session |
 | 3a | Engine: WoW proc expiries | 18 ledgers cite `checkProcs` | `checkProcs` never fired on WoW (no buff durations in the log; confirmed on LckJC7GMhQvD6rdw: 0 of 36,543 buff events carry one). Done 2026-10-17: measured durations for ten procs (lib/damage/wow/procs.ts, `DamageGame.measuredProcs`); Windwalker, Elemental and Arcane proc rows rechecked |
 | 4 | Demonology | [warlock-demonology.md](warlock-demonology.md) | done 2026-10-17: Implosion held (the phase-2 `wrong` overturned: To Hell and Back), Call Dreadstalkers held (demonology.ts); verified by the main session |
-| 5 | Affliction | [warlock-affliction.md](warlock-affliction.md) | |
+| 5 | Affliction | [warlock-affliction.md](warlock-affliction.md) | done 2026-10-17: Haunt dropped (affliction.ts), Nightfall expiry (procs.ts), Drain Soul added as a GCD channel (game.ts); verified by the main session |
 | 6 | Arms | [warrior-arms.md](warrior-arms.md) | |
 | 7 | Preservation | [evoker-preservation.md](evoker-preservation.md) | |
 | 8 | Mistweaver | [monk-mistweaver.md](monk-mistweaver.md) | |
@@ -177,9 +177,10 @@ measured for it.
   outside, against a held second's value), never past one recharge.
 - **Forced time explains much of WoWAnalyzer's efficiency gap**
   (Vitriolic Stasis): measure outside it before calling a loss real.
-- **Check the spell survey for the spec's hero-talent presses.** Havoc's
-  Reaver's Glaive wasn't in it, so every press read as an idle GCD and
-  doubled the top players' GCD delays. If the top players' delays look
+- **Check the spell survey for the spec's hero-talent presses and
+  channels.** Havoc's Reaver's Glaive and Affliction's Drain Soul weren't
+  in it, so every press read as an idle GCD and doubled the top players'
+  GCD delays (Fluffalicous: 57% → 74% GCD uptime). If the top players' delays look
   high, list the casts that precede the "idle" gaps.
 - **Fit a cooldown to the log before trusting a modelled cut.** Havoc's
   Eye Beam sat at exactly 20.0s whatever the spender count, so the
@@ -194,7 +195,8 @@ measured for it.
 - **`checkProcs` fires on WoW only for the procs in
   lib/damage/wow/procs.ts** (2026-10-17): Combo Breaker, Rushing Wind
   Kick, Dance of Chi-Ji, Killing Machine, Sudden Death, Demonic Core,
-  Infernal Bolt, Lock and Load, Divine Purpose, Storm Unleashed. A row
+  Infernal Bolt, Lock and Load, Divine Purpose, Storm Unleashed, and
+  since Affliction's pass Nightfall. A row
   marked "covered by `checkProcs` (expiries)" for any other proc is
   uncovered until you measure its duration (gain → removal spans at one
   whole second with a consumer nowhere near, from a log where it runs
@@ -244,6 +246,13 @@ measured for it.
   for two other top Vashnik players; WoWAnalyzer flags him too). Does
   Vashnik need an exception? No Vashnik-specific reason was found.
   Evidence in [warlock-demonology.md](warlock-demonology.md).
+- Affliction (2026-10-17): the two `wrong` rows kept (Haunt cast
+  efficiency, Dark Harvest empty cast), evidence in
+  [warlock-affliction.md](warlock-affliction.md). Open: the shared DoT
+  uptime check isn't cleave-aware. The 100th-percentile Soul Harvester
+  lets Unstable Affliction drop while spamming Seed of Corruption on adds
+  and reads 423k; Haunt dropped excuses those gaps (2+ Seeds), the shared
+  check doesn't.
 
 - Elemental (2026-10-17): `CallOfTheAncestors/other-checks`,
   `statistics` (and whether "Stormkeeper before Ascendance" should be
