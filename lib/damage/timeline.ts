@@ -263,16 +263,35 @@ function statusLocks(player: PlayerInfo, game: DamageGame, uses: GcdUse[]): void
  * another id (Arcane Missiles 5143 → 7268, Eye Beam 198013 → 198030, Fists
  * of Fury 113656 → 117418 on kGVX7tafBT2pM1N3 pull 19). A channel with no
  * ticks keeps the plain GCD lock.
+ *
+ * A channel with a known full tick count (DamageGame.channelTicks) whose
+ * next GCD starts before its last tick was clipped: its lock runs to that
+ * next GCD, not to the last tick seen. Devastation's Disintegrate ticks at
+ * its start and every T after, 5 ticks over 4T; the k-th tick lands only
+ * when the next GCD starts past (k − 1)T (19 player-pulls, 2026-10-17:
+ * next start at 3.5T → 4 ticks 36 of 38; at 4.25T → 5 ticks 155 of 168).
+ * Read to the last tick, a press at 3.75–4T left T (~0.4–0.5s) of idle
+ * that was channel time: 5–9s a pull on the top players. Chaining it onto
+ * itself before the end carries one tick into the new channel (after a
+ * chain that dropped one, 10 of 22 ran to six ticks), so that one runs a
+ * tick longer.
  */
 function channelLocks(player: PlayerInfo, game: DamageGame, uses: GcdUse[]): void {
   const ticks = new Map<string, number[]>();
+  const onTarget = new Map<string, number[]>();
   for (const e of [...player.damageDone, ...player.healing]) {
     if (e.pet) continue;
     const list = ticks.get(e.abilityName) ?? [];
     list.push(e.timestamp);
     ticks.set(e.abilityName, list);
+    const key = `${e.abilityName}|${e.target ?? ""}`;
+    const tl = onTarget.get(key) ?? [];
+    tl.push(e.timestamp);
+    onTarget.set(key, tl);
   }
   for (const list of ticks.values()) list.sort((a, b) => a - b);
+  for (const list of onTarget.values()) list.sort((a, b) => a - b);
+  let carryFrom: GcdUse | undefined;
   for (let i = 0; i < uses.length; i++) {
     const u = uses[i];
     if (!game.isChannel!(u.action.id)) continue;
@@ -284,8 +303,31 @@ function channelLocks(player: PlayerInfo, game: DamageGame, uses: GcdUse[]): voi
       last = t;
     }
     if (last !== undefined) u.castMs = Math.max(u.castMs, last - u.startMs);
+    const full = game.channelTicks?.(u.action.id);
+    if (full === undefined) continue;
+    // This use's ticks on its own target (distinct instants), up to the next GCD.
+    const own: number[] = [];
+    for (const t of onTarget.get(`${u.abilityName}|${u.target ?? ""}`) ?? []) {
+      if (t < u.startMs - CHANNEL_TICK_SLACK_MS) continue;
+      if (t >= until - CHANNEL_TICK_SLACK_MS) break;
+      if (own.length === 0 || t - own[own.length - 1] > CHANNEL_TICK_SLACK_MS) own.push(t);
+    }
+    const carry = carryFrom !== undefined && carryFrom === uses[i - 1] ? 1 : 0;
+    carryFrom = undefined;
+    if (own.length < 2) continue;
+    const T = (own[own.length - 1] - own[0]) / (own.length - 1);
+    const end = own[0] + (full - 1 + carry) * T;
+    // A next GCD past the end with ticks missing: cancelled (movement, the
+    // target gone), so the time after the last tick stays idle.
+    if (until < end) {
+      u.castMs = Math.max(u.castMs, until - u.startMs);
+      if (uses[i + 1]?.action.id === u.action.id) carryFrom = u;
+    }
   }
 }
+
+// Ticks of one channel on one target within this of each other are one.
+const CHANNEL_TICK_SLACK_MS = 25;
 
 // A limit break locks the player out for roughly this long after it goes
 // off (tank and melee LB3 animations run ~3.5–4s; xivanalysis treats LBs

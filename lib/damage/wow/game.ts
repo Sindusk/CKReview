@@ -113,6 +113,14 @@ const CHANNEL_IDS = new Set([
   234153,  // Drain Life (SWEEP_PRESSES)
 ]);
 
+// Channels whose next GCD can clip their last ticks: the full tick count
+// (timeline.ts channelLocks). Disintegrate ticks at the cast and every T
+// after, 5 in a full channel (Devastation, the WoWAnalyzer audit's phase 3,
+// 2026-10-17; specs/devastation.ts prices the ticks a clip drops).
+const CHANNEL_TICKS = new Map<number, number>([
+  [356995, 5],   // Disintegrate
+]);
+
 // GCDs that lock the player for as long as a buff of their own: Scalecommander
 // Deep Breath flies 1.3–2.4s (its 433874 buff; qpZx3mWaG7gcDdYB pull 3,
 // Bragontix's next GCD came 0.0–0.4s after each removal). Read as a plain
@@ -567,6 +575,7 @@ export const WOW_DAMAGE: DamageGame = {
   // Haste procs and gear (haste.ts): the GCD follows them through the pull.
   speedModels: (pull, usesOf, endMs) => wowSpeedModels(pull, usesOf, endMs, [...LUST_IDS, POWER_INFUSION, ...WOW_HASTE_STATUS_IDS]),
   isChannel: (id) => CHANNEL_IDS.has(id),
+  channelTicks: (id) => CHANNEL_TICKS.get(id),
   lockStatus: (id) => LOCK_STATUSES.get(id),
   isAutoCast: autoCasts,
   // WCL buff events carry no duration: the procs checkProcs can see run

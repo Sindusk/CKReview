@@ -153,6 +153,11 @@ export type DamageGame = {
   // Channelled GCDs: they log no end, so their lock runs to their last
   // tick before the next GCD (timeline.ts gcdUses).
   isChannel?(actionId: number): boolean;
+  // A channel's ticks in a full channel, one at its start included, when a
+  // clip drops the last ones (Devastation's Disintegrate: 5). Its lock then
+  // runs to where the full channel ends, or to the next GCD if that starts
+  // first: the player was channelling, not idle (timeline.ts channelLocks).
+  channelTicks?(actionId: number): number | undefined;
   // GCDs that lock the player while a status of their own is up (WoW
   // Devastation's Deep Breath: the flight's buff): the lock runs to that
   // status's removal (timeline.ts gcdUses).
