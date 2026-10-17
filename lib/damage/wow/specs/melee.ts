@@ -62,6 +62,16 @@
 //   tracked (resets).
 // - Not adopted: Expurgation 88% vs 92% (small).
 //
+// Arms, WoWAnalyzer audit phase 3 (2026-10-17, docs/wowa-audit/
+// warrior-arms.md; WoWAnalyzer's Arms is "Foundation" support and grades
+// almost nothing): "Colossus Smash drift" revalued by the window's armor
+// (it had read 10–24% from unmitigated hits; the after-armor ratio is
+// ×1.3–1.6) and "Bladestorm outside Colossus Smash" are in arms.ts, whose
+// header has the models and numbers. Every sample player is Slayer with
+// Colossus Smash; the Colossus, Demolish, Ravager and Champion's Spear
+// rules fire on nothing. Rend and Deep Wounds uptime measured and not
+// built (Rend ~3k/s; Deep Wounds fires on the top players as much).
+//
 // Havoc, checked against WoWAnalyzer on qpZx3mWaG7gcDdYB pull 3
 // (Mythnarra; reference 3Vz6Qt2RyTPXwpJn's Hawkerton, 100th percentile,
 // page saved; checked 2026-10-13):
@@ -90,6 +100,7 @@ import { forcedPart } from "../../timeline";
 import { burstGcdFindings, k, observedWindowBonus, primaryResourceCapFindings, spenderSnapshotWaste, spentCooldownDrift } from "./shared";
 import { WINDWALKER_CHECKS } from "./windwalker";
 import { HAVOC_CHECKS } from "./havoc";
+import { ARMS_CHECKS } from "./arms";
 
 const window = (statusId: number, name: string): JobCheck => (ctx) => burstGcdFindings(ctx, {
   statusId, name,
@@ -117,16 +128,16 @@ const MELEE_WINDOWS: Record<string, [number, string]> = {
 // Arms: Avatar and Colossus Smash recharge with Rage spent (shared.ts
 // spentCooldownDrift has the measurement). Colossus Smash's window is a
 // buff on the Warrior (208086, 13 on Cocomber's 13 casts), not an enemy
-// debuff; Bladestorm resets (15–20s comebacks) and stays unjudged.
+// debuff, and it lowers armor rather than raising damage, so its drift
+// lives in arms.ts with its own value per use. Bladestorm's cooldown
+// can't be rebuilt (11–20s comebacks); its placement against Colossus
+// Smash is arms.ts's.
 const ARMS_SPENT: JobCheck[] = [
   (ctx) => spentCooldownDrift(ctx, {
     name: "Avatar", actionIds: [107574], baseMs: 90_000, resourceType: 1, scale: 10, unitsPerSecond: 20,
     firstUseOffsetMs: 3_000, window: { buffId: 107574 },
   }),
-  (ctx) => spentCooldownDrift(ctx, {
-    name: "Colossus Smash", actionIds: [167105], baseMs: 45_000, resourceType: 1, scale: 10, unitsPerSecond: 20,
-    firstUseOffsetMs: 3_000, window: { buffId: 208086 },
-  }),
+  // Colossus Smash's drift is in arms.ts, valued by its armor window.
 ];
 
 // Havoc's Eternal Hunt: The Hunt (370965) grants Empowered Eye Beam
@@ -180,7 +191,7 @@ const holyPowerWaste: JobCheck = (ctx) => spenderSnapshotWaste(ctx, { type: 9, n
 
 export const MELEE_CHECKS: Record<string, JobCheck[]> = Object.fromEntries(
   Object.entries(MELEE_WINDOWS).map(([spec, [id, name]]) => [spec, [
-    window(id, name), primaryResourceCapFindings, ...(spec === "Arms Warrior" ? ARMS_SPENT : []),
+    window(id, name), primaryResourceCapFindings, ...(spec === "Arms Warrior" ? [...ARMS_SPENT, ...ARMS_CHECKS] : []),
     ...(spec === "Havoc Demon Hunter" ? [eternalHunt, ...HAVOC_CHECKS] : []),
     ...(spec === "Retribution Paladin" ? [holyPowerWaste] : []),
     ...(spec === "Windwalker Monk" ? WINDWALKER_CHECKS : []),
