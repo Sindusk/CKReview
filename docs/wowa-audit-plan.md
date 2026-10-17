@@ -156,8 +156,13 @@ The FFXIV plan's premise and firing checks, plus:
   either matches WoWAnalyzer's page for that player (a real, common loss)
   or is wrong.
 - **`wrong` and `no-damage` need the user's approval** (user,
-  2026-10-16), spec by spec as phase 3 reaches it. These are the two
-  statuses that drop a rule. Before marking one:
+  2026-10-16). These are the two statuses that drop a rule. The review
+  waits until every spec has had its phase 3 pass (user, 2026-10-17): the
+  user then goes through the unbuilt rows spec by spec. Until then, phase 3
+  keeps each proposal with its evidence in the ledger and doesn't ask.
+  The passes run one spec at a time, as in
+  [wowa-audit/PHASE3-SEQUENCE.md](wowa-audit/PHASE3-SEQUENCE.md).
+  Before marking one:
   - check the verdict yourself: measure the loss in the log, or show
     why the rule's premise fails;
   - then bring the user the evidence, one numbered item per row, with
