@@ -28,8 +28,11 @@
   some. The app's checks gave the top seven no Ascendance, Maelstrom or
   Flame Shock finding (one 8k Ascendance window on Shaziggla) and fired
   on Cocroach (potions, Flame Shock 18.2s at Coiled Altar 2:56, short
-  Ascendance windows). Five candidates failed the premise check: the top
-  players do the same as often or more.
+  Ascendance windows). Four candidates were marked `wrong` because the
+  top players did the same as often or more. That is weak evidence on
+  its own (top players also lose damage). The fifth, one-target Chain
+  Lightning, was re-measured as a real loss (overloads included) and is
+  a candidate again.
 - **Core rules** (active time, cast efficiency, potions, cancelled casts)
   are in [core.md](core.md); rows below cover only what Elemental sets or
   adds.
@@ -46,7 +49,7 @@
 | shaman-elemental/FlameShock/uptime | verified | `dotUptimeFindings` (Flame Shock) | none | Flame Shock left off | Under 99 / 95 / 85% of the whole fight, pooled over enemies. Shown, not graded, in Elemental's guide. Case study 99.5% both. Phase 3: none on the top seven; Cocroach Coiled Altar 2:56 (18.2s, 200k), Kith'ix 0:38 and 1:36, Nek'zali 2:01 and 3:30. |
 | shaman-elemental/FlameShock/early-refresh | wrong | — | none | Flame Shock refreshed with more than 30% left | Bad casts over 10 / 20 / 30% of Flame Shock casts; the core pandemic rule (core.md). Duration confirmed 18s in the log. **Fight-blind:** on Entombed Sentinels (two bosses) the top four refreshed early 1, 4, 4 and 2 times; Cocroach 0-2 a pull. WoWAnalyzer itself marks Flame Shock a movement filler. |
 | shaman-elemental/FlameShock/lava-burst-unshocked | wrong | — | none | Lava Burst landing on an enemy without Flame Shock | Counted, no tier. Measured as player Lava Bursts that didn't crit (certain crit on a Flame Shocked target): top seven 0-3 (Unlucky 3 on Vashnik itself), Cocroach 0-3 (new adds: Burning Venom, Spiteful Soulcoiler, Hex Lord Malacrass). ~75k each. No difference between top and weaker players, and it comes from target swaps. |
-| shaman-elemental/SubOptimalChainLightning/one-target | wrong | — | none | Chain Lightning hitting one target | Above 0 / 1 / 2 a minute; a timeline note, not in the guide. Top seven 0-5 a pull; on Vashnik their one-target Chain Lightnings averaged the same as their Lightning Bolts (Elemeta 65k vs 65k, Unlucky 67k vs 69k), so no loss there. Cocroach 0-3 a pull, ~30k short of a Lightning Bolt each. |
+| shaman-elemental/SubOptimalChainLightning/one-target | candidate | — | none | Chain Lightning hitting one target | Above 0 / 1 / 2 a minute; a timeline note, not in the guide. Top seven 0-5 a pull, Cocroach 0-3. **A real loss, top players included.** Re-measured 2026-10-16 on r9CX1kpRGLmKJH4M fight 56 (Vashnik): a one-target Chain Lightning did 51.9k (Elemeta, 5 casts) and 67.2k (Unlucky, 1 cast), against a Lightning Bolt's 87.9k and 104.4k once its overloads count (23-35k a cast; none of the one-target Chain Lightnings overloaded). Non-crit direct hits 17.6k vs 25.8k, the 116 / 170 spell power ratio. The first pass compared direct damage only, on five mostly-crit casts, and wrongly found no loss. Value: each one-target cast at the player's own Lightning Bolt average, overloads included, less the cast; ~35k each, small per pull. Excuse casts where a second target was in range but out of reach of the bounce (unclear from the log). |
 | shaman-elemental/Ascendance/window-downtime | covered | `burstGcdFindings` (Ascendance) + `checkGcdGaps` | Ascendance | idle in Ascendance | Under 0.5 / 1.25 / 2s per window. Counts forced movement and windows cut by death or the kill; the app values the missing GCDs at the window's bonus, less forced time. |
 | shaman-elemental/Ascendance/window-spenders | candidate | — | Ascendance | Maelstrom held through Ascendance | Spenders cast vs what the starting Maelstrom plus what was generated could pay for; 0 / 1 / 2 / 3+ missed. Unspent Maelstrom isn't lost (it's spent later, or capped, which the cap check counts), so the loss is only the Ascendance bonus on a spender moved out. Low value; build only if a page and a log disagree with the cap check. |
 | shaman-elemental/Ascendance/window-non-overload | wrong | — | Ascendance | Flame Shock, Frost Shock or other GCDs that can't overload, cast inside Ascendance | 0 / 1 / 2 / 3+ per window; a Voltaic Blaze hitting 2+ targets is excused (Purging Flames). **Fight-blind:** the top seven cast 0-6 a pull (Voltaic Blaze on Vashnik, Flame Shock and Stormkeeper on Entombed Sentinels), Cocroach 0-4. Top players do it as often. |
@@ -68,9 +71,11 @@ Call), Ancestor window merging. An unregistered Haste file is dead code.
 
 ## Candidates left
 
+- **one-target Chain Lightning**: ~35k a cast against the player's own
+  Lightning Bolt with overloads, top players 0-5 a pull. Cheap to build.
 - **window-spenders**: low value, not measured.
 
-The five other candidates failed phase 3 (`wrong` above). Measured with
+The four other candidates were marked `wrong` in phase 3 (above). Measured with
 a scratch script, not kept: per player and pull it counted unbuffed
 spenders with Lava Surge up, non-crit Lava Bursts and whether the target
 had the player's Flame Shock, Chain Lightning targets per cast,
