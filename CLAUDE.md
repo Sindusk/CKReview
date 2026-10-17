@@ -34,6 +34,8 @@ sampling it.
 | Tanking panel (tank streams, busters, tank optimizer, Tanking view) | Headers of `lib/mitigation/tanking.ts`, `tanking-plan.ts`, `buster-kinds.ts`, `components/MitigationTanking.tsx`; test: `node scripts/check-tanking-example.js`. Design record: [docs/archive/tanking-panel-plan.md](docs/archive/tanking-panel-plan.md) |
 | Per-player exposure, assigned duties, the Adjusted / pull headline | Headers of `lib/mechanics/rule-meta.ts`, `occurrences.ts`, `assignments.ts` and `lib/static-analysis.ts`; the working method in lib/mechanics/README.md. Design record: [docs/archive/exposure-plan.md](docs/archive/exposure-plan.md) |
 | Local video files as VOD sources (build plan) | [docs/local-vod-plan.md](docs/local-vod-plan.md) |
+| Top-down replay: how the FFXIV one works | the "Top-down replay" section of [docs/app-architecture.md](docs/app-architecture.md), then the headers of `lib/replay/*.ts` and `components/ReplayPanel.tsx` |
+| Building the WoW replay (handoff) | [docs/wow-replay-plan.md](docs/wow-replay-plan.md) |
 | What's unfinished or waiting on a user decision | [docs/open-items.md](docs/open-items.md) |
 | Which ports are taken locally and in production | [PORTS.md](PORTS.md) |
 
