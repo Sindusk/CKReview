@@ -27,6 +27,7 @@ import { avengingWrathValue, divineTollValue } from "./specs/retribution";
 import { pillarOfFrostValue } from "./specs/frostdk";
 import { sigilValue } from "./specs/vengeance";
 import { trueshotValue } from "./specs/marksmanship";
+import { convokeValue, feralFrenzyValue, feralWindowValue } from "./specs/feral";
 
 /**
  * One Vanish's worth to an Assassination Rogue: the damage of a Garrote cast
@@ -175,11 +176,24 @@ export const WOW_TRACKED_COOLDOWNS: Record<string, TrackedCooldown[]> = {
     { name: "Shadow Blades", actionIds: [121471], cooldownMs: 90_000, charges: 1, firstUseOffsetMs: 5_000 },  // 90.5 / 97.2s, 5.0s
     { name: "Goremaw's Bite", actionIds: [426591], cooldownMs: 45_000, charges: 1, firstUseOffsetMs: 5_000 }, // 45.0 / 47.5s, 4.7s
   ],
-  "Feral Druid": [   // unverified (1 player)
-    { name: "Tiger's Fury", actionIds: [5217], cooldownMs: 30_000, charges: 1, firstUseOffsetMs: 3_000 },          // 30.0 / 30.0s, 2.7s
-    { name: "Feral Frenzy", actionIds: [274837], cooldownMs: 30_000, charges: 1, firstUseOffsetMs: 6_000 },        // 30.0 / 31.2s, 5.1s
-    { name: "Convoke the Spirits", actionIds: [391528], cooldownMs: 61_000, charges: 1, firstUseOffsetMs: 9_000 }, // 61.4 / 62.7s, 8.1s
-    { name: "Berserk", actionIds: [106951], cooldownMs: 120_000, charges: 1, firstUseOffsetMs: 2_000 },            // 120.0 / 120.2s, 1.6s
+  // Feral, re-measured in the WoWAnalyzer audit's phase 3 (2026-10-17;
+  // specs/feral.ts's header) on 14 player-pulls of 13 players: shortest /
+  // median interval Tiger's Fury 30.0 / 30.8s, Feral Frenzy 30.0 / 32.4s,
+  // Convoke the Spirits 120.0 / 125.5s (pressed with Berserk; the survey's
+  // 61s was one player on another build), Berserk 120.5 / 124.2s,
+  // Incarnation 91.1 / 92.1s. None of them had a value per use: Tiger's
+  // Fury, Berserk and Incarnation deal nothing themselves, Convoke's hits
+  // log under the spells it casts, and Feral Frenzy's under 274838 (the
+  // masterData of X618LRt7hPqzbVJj), so their drift never showed.
+  "Feral Druid": [
+    { name: "Tiger's Fury", actionIds: [5217], cooldownMs: 30_000, charges: 1, firstUseOffsetMs: 3_000,
+      valuePerUse: feralWindowValue(5217, "Tiger's Fury", [106951, 102543]) },
+    { name: "Feral Frenzy", actionIds: [274837], cooldownMs: 30_000, charges: 1, firstUseOffsetMs: 6_000, valuePerUse: feralFrenzyValue },
+    { name: "Convoke the Spirits", actionIds: [391528], cooldownMs: 120_000, charges: 1, firstUseOffsetMs: 9_000, valuePerUse: convokeValue },
+    { name: "Berserk", actionIds: [106951], cooldownMs: 120_000, charges: 1, firstUseOffsetMs: 3_000,
+      valuePerUse: feralWindowValue(106951, "Berserk", [5217]) },
+    { name: "Incarnation: Avatar of Ashamane", actionIds: [102543], cooldownMs: 91_000, charges: 1, firstUseOffsetMs: 3_000,
+      valuePerUse: feralWindowValue(102543, "Incarnation", [5217]) },
   ],
   "Survival Hunter": [   // unverified (1 player)
     { name: "Takedown", actionIds: [1250646], cooldownMs: 61_000, charges: 1, firstUseOffsetMs: 36_000 },  // 61.4 / 62.5s, 35.6s
