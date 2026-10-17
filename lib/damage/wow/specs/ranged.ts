@@ -147,6 +147,7 @@ import { finding, type PlayerCheckContext } from "../../checks";
 import { inWindows, mergeWindows, overlapMs, statusWindows } from "../../timeline";
 import { AFFLICTION_CHECKS } from "./affliction";
 import { ARCANE_CHECKS } from "./arcane";
+import { BEAST_MASTERY_CHECKS } from "./beastmastery";
 import { DEMONOLOGY_CHECKS } from "./demonology";
 import { ELEMENTAL_CHECKS } from "./elemental";
 import { burstGcdFindings, castTimeProcFindings, dotUptimeFindings, k, observedWindowBonus, primaryResourceCapFindings, spentCooldownDrift } from "./shared";
@@ -388,7 +389,7 @@ export const RANGED_CHECKS: Record<string, JobCheck[]> = {
   "Fire Mage":            [window(190319, "Combustion")],
   "Frost Mage":           [],
   "Balance Druid":        [window(102560, "Incarnation"), primaryResourceCapFindings, dot("Moonfire", 164812), dot("Sunfire", 164815), spenderOutsideEclipse],
-  "Beast Mastery Hunter": [window(19574, "Bestial Wrath"), (ctx) => primaryResourceCapFindings(ctx, [BARBED_SHOT])],
+  "Beast Mastery Hunter": [window(19574, "Bestial Wrath"), (ctx) => primaryResourceCapFindings(ctx, [BARBED_SHOT]), ...BEAST_MASTERY_CHECKS],
   "Marksmanship Hunter":  [window(288613, "Trueshot"), primaryResourceCapFindings],
   "Shadow Priest":        [window(194249, "Voidform"), primaryResourceCapFindings, dot("Shadow Word: Pain", 589), dot("Vampiric Touch", 34914)],
   "Elemental Shaman":     [window(1219480, "Ascendance"), primaryResourceCapFindings, dot("Flame Shock", 188389), stormkeeper, ...ELEMENTAL_CHECKS],

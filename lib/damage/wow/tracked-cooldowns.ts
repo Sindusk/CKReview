@@ -148,9 +148,12 @@ export const WOW_TRACKED_COOLDOWNS: Record<string, TrackedCooldown[]> = {
     { name: "Comet Storm", actionIds: [153595], cooldownMs: 43_000, charges: 1, firstUseOffsetMs: 7_000 }, // 43.0 / 46.3s, 6.8s
     { name: "Ray of Frost", actionIds: [205021], cooldownMs: 44_000, charges: 1, firstUseOffsetMs: 3_000 },// 44.8 / 47.5s, 2.7s
   ],
-  "Beast Mastery Hunter": [
-    { name: "Bestial Wrath", actionIds: [19574], cooldownMs: 30_000, charges: 1, firstUseOffsetMs: 3_000 },  // 30.0 / 31.0s, 2.4s
-  ],
+  // Beast Mastery's Bestial Wrath (30.0 / 31.0s, 2.4s) was tracked here
+  // until the WoWAnalyzer audit's phase 3 (2026-10-17): its damage is the
+  // pet's (its hit 344572, the Bloodshed it casts, the window's bonus to the
+  // pet), so priced by the cast id a use was worth 0 and its drift never
+  // showed. wow/specs/beastmastery.ts judges it now (held time, with
+  // Vashnik's hold windows read).
   "Marksmanship Hunter": [
     { name: "Volley", actionIds: [260243], cooldownMs: 45_000, charges: 1, firstUseOffsetMs: 4_000 },     // 45.0 / 51.5s, 3.7s
     { name: "Trueshot", actionIds: [288613], cooldownMs: 120_000, charges: 1, firstUseOffsetMs: 4_000 },  // 120.3 / 132.5s, 4.0s
