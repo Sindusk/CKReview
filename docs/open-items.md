@@ -403,8 +403,19 @@ and delete them from the header.
     phase 3 done 2026-10-17: nothing built. `checkGcdGaps` and
     `healGcds` (Chain Heal) fire; the survey covers every press (the
     vessel lock above adds about a point of uptime).
-  - [hunter-beastmastery.md](wowa-audit/hunter-beastmastery.md): 4; Cobra
-    Shot over Barbed Shot.
+  - [hunter-beastmastery.md](wowa-audit/hunter-beastmastery.md): phase 3
+    done 2026-10-17 on 40 BM player-pulls (all Pack Leader; Luumu, Yaji
+    and the 100th-percentile 爹丶爹 on top, Koralie at the 20th,
+    Deathstriker's 16 static pulls). Built in lib/damage/wow/specs/
+    beastmastery.ts: Bestial Wrath held (valued by the pet: the tracked
+    drift was worth 0 a use and never fired), Kill Command without
+    Nature's Ally, and Wild Thrash on one enemy (the phase-2 `wrong` Beast
+    Cleave row overturned; Deathstriker 0.64–0.78M a pull on single-target
+    bosses). Engine (game.ts): a BM GCD now counts the press's pet hits
+    (it read half its worth), and Font of Venomous Rage is a 2s channel
+    (every spec). `unverifiable`: Kill Command and Barbed Shot efficiency
+    (their recharges can't be rebuilt). Macro'd pet basic attacks
+    negligible. `wrong` kept: Cobra Shot at low Focus.
   - [druid-balance.md](wowa-audit/druid-balance.md): 9; Fury of Elune
     drift with Lunation.
   - [paladin-retribution.md](wowa-audit/paladin-retribution.md): 5; Divine

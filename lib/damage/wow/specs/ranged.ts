@@ -60,6 +60,14 @@
 // isn't waste (BARBED_SHOT below). Left: pace 1.22s vs 1.11s from the
 // reference kill's other BM (1.63M); 39.9 vs 43.2 GCDs a minute; a 3.9s
 // gap in Aspect of the Turtle at 5:02 (a survival call, counted).
+// The WoWAnalyzer audit's phase 3 (2026-10-17; docs/wowa-audit/
+// hunter-beastmastery.md, 40 player-pulls) found the pet behind most of
+// BM's numbers: a BM GCD had been priced at the player's own hits, half its
+// worth (game.ts now counts Kill Command's and the other presses' pet
+// hits), and the tracked Bestial Wrath was worth 0 a use (its damage is the
+// pet's), so its drift never fired. beastmastery.ts judges Bestial Wrath
+// held time (Vashnik's hold windows read), Kill Commands without Nature's
+// Ally, and Wild Thrash on one enemy.
 //
 // Demonology, checked against WoWAnalyzer on qpZx3mWaG7gcDdYB pull 3
 // (Fwîî; reference MAkCVqHfwx1vnDW8 fight 9's Killulock, 99th percentile;
