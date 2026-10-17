@@ -562,7 +562,16 @@ function autoCasts(player: PlayerInfo): (c: PlayerEvent) => boolean {
   };
 }
 
-/** Mortal Strikes inside the player's own Bladestorm buff. */
+/**
+ * Mortal Strikes (Arms) and Bloodthirst / Bloodbath (Fury) inside the
+ * player's own Bladestorm buff. Fury's Slayer Bladestorm (the same 446035,
+ * a ~2.4s channel) casts a Bloodthirst, or Bloodbath in Recklessness, every
+ * ~0.73s by itself: 3–4 a channel, 22–38 of the 26–38 Bloodbaths a top Fury
+ * presses (WoWAnalyzer audit phase 3, 2026-10-17; Naxxio zBb3HQpZCkxAfvqn,
+ * Golgatron dp6am4TQhG3cKFxR). Read as presses they padded the GCD count
+ * and made up most of Fury's "Bloodbath at full Rage".
+ */
+const BLADESTORM_AUTO = new Set([MORTAL_STRIKE, 23881, 335096]);
 function bladestormAutoCasts(player: PlayerInfo): (c: PlayerEvent) => boolean {
   const wins: [number, number][] = [];
   let open: number | undefined;
@@ -571,7 +580,7 @@ function bladestormAutoCasts(player: PlayerInfo): (c: PlayerEvent) => boolean {
     else if (e.buffStatus === "removed" && open !== undefined) { wins.push([open, e.timestamp]); open = undefined; }
   }
   if (wins.length === 0) return () => false;
-  return (c) => c.abilityId === MORTAL_STRIKE && wins.some(([s, e]) => c.timestamp > s && c.timestamp <= e);
+  return (c) => BLADESTORM_AUTO.has(c.abilityId) && wins.some(([s, e]) => c.timestamp > s && c.timestamp <= e);
 }
 
 export function wowJobOf(player: Pick<PlayerInfo, "specId" | "className">): string {
