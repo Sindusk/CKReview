@@ -100,6 +100,20 @@
 // spreading Flame Shock costs nothing, and while moving no cast-time
 // spell fits (position from the hits the player took, over 2 yd/s).
 // Measured 5–64k a pull; more for a player who refreshes often or early.
+//
+// ── Overcharge overwritten (overchargeRefreshed) ───────────────────────
+// The Midnight season 2 tier set's Overcharge! (1300222) makes the next
+// spender free: Elemental Blasts with it paid 0.4 Maelstrom on average,
+// without it 90 (247 vs 240 casts, outside Ascendance); it doesn't raise
+// the hit (170k vs 170k non-crit). It doesn't stack: after a refresh
+// while up, one free Elemental Blast follows and the next pays 90
+// (Cocroach Entombed Sentinels Pull 3, 2:19–2:25). So a refresh while up
+// loses a free spender, worth the next spender that paid Maelstrom
+// (its damage with overloads; Earthquake at the player's average). Not
+// counted: a refresh landing within OVERCHARGE_SEEN_MS of the proc or by a
+// cast begun before it, and one with no paid spender left in the pull.
+// WoWAnalyzer only counts the refreshes. Cocroach 6 in 12 pulls (1.69M);
+// top players none (Shaziggla's one was a cast already under way).
 
 import type { PlayerEvent } from "@/types/PlayerInfo";
 import type { DamageFinding, JobCheck, Moment } from "../../types";
@@ -139,6 +153,11 @@ const ECHO_MS = 1_700;
 const MOVING_YD_S = 2;
 // A refresh this close to the pandemic point is press timing.
 const CLIP_SLACK_MS = 500;
+const OVERCHARGE = 1300222;
+// A refresh by a cast begun within OVERCHARGE_REACT_MS of the proc, or
+// landing within OVERCHARGE_SEEN_MS of it, came before the player could react.
+const OVERCHARGE_REACT_MS = 300;
+const OVERCHARGE_SEEN_MS = 700;
 
 const clock = (ms: number) => {
   const t = Math.max(0, Math.round(ms / 1000));
@@ -579,4 +598,45 @@ const flameShockEarly: JobCheck = (ctx) => {
   })];
 };
 
-export const ELEMENTAL_CHECKS: JobCheck[] = [ascendanceNonOverload, lavaBurstUnshocked, ancestorIdle, spenderWithoutMote, chainLightningOneTarget, flameShockEarly];
+// ── Overcharge refreshed ───────────────────────────────────────────────
+
+const overchargeRefreshed: JobCheck = (ctx) => {
+  const ev = (ctx.player.buffs ?? []).filter((b) => b.abilityId === OVERCHARGE && b.timestamp < ctx.endMs).sort((a, b) => a.timestamp - b.timestamp);
+  if (!ev.some((b) => b.buffStatus === "refreshed")) return [];
+  const T = tools(ctx);
+  const begins = ctx.player.beginCasts ?? [];
+  const eqAvg = perCast(ctx, "Earthquake");
+  const value = (c: PlayerEvent) => (c.abilityName === "Earthquake" ? eqAvg : T.damage(c, 1_200));
+  const costed = T.casts.filter((c) => SPENDERS.has(c.abilityName) && (c.resources?.find((r) => r.type === MAELSTROM)?.cost ?? 0) > 0);
+  const moments: Moment[] = [];
+  let since: number | undefined, late = 0;
+  for (const b of ev) {
+    if (b.buffStatus === "applied") { since = b.timestamp; continue; }
+    if (b.buffStatus === "removed") { since = undefined; continue; }
+    if (b.buffStatus !== "refreshed" || since === undefined) continue;
+    // The cast that refreshed it began before the proc could be seen.
+    const by = T.casts.find((c) => Math.abs(c.timestamp - b.timestamp) <= 150 && ctx.game.action(c.abilityId)?.onGcd);
+    const began = by && begins.filter((x) => x.abilityId === by.abilityId && x.timestamp <= by.timestamp && by.timestamp - x.timestamp < 5_000).pop()?.timestamp;
+    if (b.timestamp - since < OVERCHARGE_SEEN_MS || (began !== undefined && began < since + OVERCHARGE_REACT_MS)) { late++; since = b.timestamp; continue; }
+    // Worth the spender it would have paid for: the next one that paid
+    // Maelstrom. None after it (the pull ended): nothing to buy.
+    const paid = costed.find((c) => c.timestamp > b.timestamp);
+    const v = paid ? value(paid) : 0;
+    if (!(v > 0)) { since = b.timestamp; continue; }
+    moments.push({ startMs: since, endMs: b.timestamp, lostDamage: v,
+      detail: `Overcharge from ${clock(since)} refreshed at ${clock(b.timestamp)} by ${by?.abilityName ?? "a cast"} before a spender took it: a free ${paid?.abilityName ?? "spender"} lost (${k(v)})` });
+    since = b.timestamp;
+  }
+  if (moments.length === 0) return [];
+  return [finding(ctx, {
+    kind: "proc-lost", startMs: moments[0].startMs, endMs: moments[moments.length - 1].endMs, forced: false, inference: true,
+    label: "Overcharge overwritten",
+    lostDamage: moments.reduce((a, m) => a + m.lostDamage, 0),
+    basis: `${moments.length} × the spender the lost proc would have paid for (the next one that cost Maelstrom: its damage with overloads; an Earthquake at the player's average)` +
+      (late ? `; ${late} more refreshed by a cast already under way when it came, not counted` : ""),
+    detail: `Overcharge (a free spender) refreshed ${moments.length} time${moments.length > 1 ? "s" : ""} while up`,
+    moments,
+  })];
+};
+
+export const ELEMENTAL_CHECKS: JobCheck[] = [ascendanceNonOverload, lavaBurstUnshocked, ancestorIdle, spenderWithoutMote, chainLightningOneTarget, flameShockEarly, overchargeRefreshed];

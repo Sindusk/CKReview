@@ -64,7 +64,7 @@
 | shaman-elemental/Abilities/stormkeeper-efficiency | covered | `stormkeeper` (ranged.ts, through `spentCooldownDrift`) | Stormkeeper; Herald of the Storms, Rolling Thunder (−15s each); Offering From Beyond | Stormkeeper held | 90% target. Not tracked: its intervals spread too far (38.2 / 48.9s, tracked-cooldowns.ts). **Model measured:** 60s, less 3s per Ancestor summoned (Call of the Ancestors applied or stacked) before it's ready. On the four Entombed Sentinels top players, 22 intervals were never shorter than that and were held 0.7-12s past it (median ~1.8s, the cast time and reaction). Cocroach held 38s unforced at Coiled Altar 2:32-3:21 and 34.5s at Ula'tek 1:42-2:17. All three Vashnik top players held it 15-26s and pressed it 0-2s after Imbibe (1:48, 6:00; 3:12 for two): kept for the Venom burst, now a `cooldownHoldWindows` in the Vashnik context (30s before each Imbibe to 5s after). Built 2026-10-16: pre-pull casts read from the buff dropping before the first cast (three of the top players); a use is worth its Ancestor (~300-325k, one summoned by every cast) plus what its ~2 empowered casts add. Fires once on disk: Cocroach Ula'tek 1:42 (49.4s held, 1 use, 524k); none of the top seven. |
 | shaman-elemental/Abilities/elemental-blast-efficiency | superseded | `primaryResourceCapFindings` | Elemental Blast | — | 60% target with no cooldown declared; in Midnight it's a Maelstrom spender, so how often it's cast is set by Maelstrom. Unspent Maelstrom is the cap check's. |
 | shaman-elemental/PowerOfTheMaelstrom/stacks | covered | `checkProcs` (expiries) | Power of the Maelstrom | stacks left to expire | A statistic only, no grade. Stacks gained at the max aren't in the log (unverifiable part). Whether `checkProcs` picks it up as a proc on an Elemental pull: phase 3. |
-| shaman-elemental/S2TierSet/overcharge | no-damage | — | Midnight season 2 tier set | — | Credited damage and "Overcharge refreshed" counts in a tooltip, no grade. Revisit if a page shows it mattering. |
+| shaman-elemental/S2TierSet/overcharge | verified | `overchargeRefreshed` (elemental.ts) | Midnight season 2 tier set | Overcharge refreshed while up | Credited damage and "Overcharge refreshed" counts in a tooltip, no grade. Marked `no-damage` in phase 2; **the approval check found a loss (2026-10-16)**. Overcharge! makes the next spender free: Elemental Blasts with it paid 0.4 Maelstrom on average, without it 90 (247 vs 240 casts outside Ascendance), and it doesn't raise the hit (170k vs 170k non-crit). It doesn't stack: after a refresh while up, one free Elemental Blast follows and the next pays 90 (Cocroach Entombed Sentinels Pull 3, 2:19-2:25). So each refresh while up loses a free spender, valued at the next spender that paid Maelstrom. Excused: a refresh within 0.7s of the proc or by a cast begun before it; one with no paid spender left in the pull. Built: Cocroach 6 in 12 pulls (1.69M), none on the top seven (Shaziggla's one was a cast already under way). |
 | shaman-elemental/statistics | no-damage | — | — | — | Display only: Master of the Elements buffed-cast table, Stormkeeper damage while buffed, Aftershock refunds, Offering From Beyond effective CDR, Maelstrom graph, cooldown graphs, the Ascendance advice text (Stormkeeper before Ascendance, no Flame Shock inside). |
 | shaman-shared/utility | no-damage | — | — | — | Astral Shift, Earth Shield, Earthen Harmony, Elemental Orbit, Mana Spring, Nature's Guardian, Spirit Wolf, Static Charge, Spiritwalker's Grace (case study: 4 vs 6, movement), Earth Elemental, Lightning Shield (0% target, inert). Utility and defensives aren't judged. |
 
@@ -75,24 +75,18 @@ Call), Ancestor window merging. An unregistered Haste file is dead code.
 
 ## Candidates left
 
-By expected value, all measured on the pulls above as damage lost:
+The six measured candidates were built 2026-10-16 in
+`lib/damage/wow/specs/elemental.ts` (its header holds each model). On
+Cocroach's 12 pulls they find, by value: idle with the Ancestors out
+15.4M, non-overload casts in Ascendance 1.73M, Lava Burst without Flame
+Shock 936k, one-target Chain Lightning 800k, spenders before an instant
+Lava Burst 171k, early Flame Shock refreshes 77k. The timeline question
+changed three of them while building: Purging Flames pays back about
+half of a two-target Voltaic Blaze in Ascendance; Master of the Elements
+is never wasted, only spent on a weaker spell; a one-target Chain
+Lightning also gets a weaker answer from the Ancestors.
 
-- **Call of the Ancestors idle**: ~33k of Ancestor damage a second on
-  top of the gap check's GCD value; a premium inside the window, like
-  Ascendance's. Measure per player before building (85s of idle on the
-  top seven).
-- **window-non-overload**: 130-590k a cast, top players up to 1.3M a
-  pull, Cocroach 3.8M over 12 pulls. Net out a lost Voltaic Blaze use.
-- **lava-burst-unshocked**: ~120k each, cheap and exact (crit is
-  certain on a shocked target). Cocroach 1.86M over 12 pulls.
-- **spender-before-lava-burst**: ~6.5% of the spender, top players lose
-  more than Cocroach; build only with the Maelstrom-cap exception.
-- **one-target Chain Lightning**: ~35k a cast against the player's own
-  Lightning Bolt with overloads, top players 0-5 a pull. Cheap to build.
-- **early-refresh**: clipped seconds ÷ 18s of a Lightning Bolt less the
-  Flame Shock hit, standing only; 5-62k a pull here, more for a player
-  who refreshes often or early.
-- **window-spenders**: low value, not measured.
+Left: **window-spenders**, low value, not measured.
 
 Lesson from the re-measure: value a rule as damage lost first. Top
 players doing the same thing is evidence about the premise, not proof
