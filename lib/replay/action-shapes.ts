@@ -139,7 +139,7 @@ const OVERRIDES: Record<number, { angle?: number; style?: AoeShape["style"]; hid
 };
 
 const RAIDWIDE_RANGE = 30;
-const FLASH_BEFORE_MS = 900;     // instant casts: shown this long before resolving
+const FLASH_BEFORE_MS = 300;     // an AoE fades in this long before its cast lands
 const HIT_WINDOW_MS = 1500;      // a cast's hits land within this of it
 const STANDARD_ANGLES = [30, 45, 60, 90, 120, 150, 180, 270];
 
@@ -176,11 +176,17 @@ export function buildAoeShapes(data: ReplayData): AoeShape[] {
     const targetPose = target && target.kind === "player" ? poseAt(target, t) : undefined;
     if (!casterPose && !(isCircle && targetPose)) continue;
 
-    // The telegraph: this caster's begincast that ends at this resolution.
+    // AoEs flash on the cast that lands them, not across the castbar: a
+    // shape fixed at castbar start points where the target WAS (Revolting
+    // Ruin sat at the top of the arena while the tank walked into place;
+    // user, 2026-10-17). Towers are objects on the floor, so they show
+    // from their begincast.
     let start = t - FLASH_BEFORE_MS;
-    for (let j = i - 1; j >= 0 && t - casts[j][0] < 15000; j--) {
-      const b = casts[j];
-      if (b[1] === key && b[3] > 0 && Math.abs(b[0] + b[3] - t) < 800) { start = b[0]; break; }
+    if (style === "tower") {
+      for (let j = i - 1; j >= 0 && t - casts[j][0] < 15000; j--) {
+        const b = casts[j];
+        if (b[1] === key && b[3] > 0 && Math.abs(b[0] + b[3] - t) < 800) { start = b[0]; break; }
+      }
     }
 
     const base = { name, start, resolve: t, width: g.width * 100, range: g.range * 100, angle: 0, inner: 0, estimated: false, style };
@@ -248,7 +254,7 @@ export function buildTethers(data: ReplayData): TetherSpan[] {
   });
 }
 
-const AFTER_MS = 500;
+const AFTER_MS = 800;             // and fades out over this after it
 
 /** Shapes showing at `t`, with opacity: telegraph ramps up, flash fades out. */
 export function aoesAt(shapes: AoeShape[], t: number): { s: AoeShape; opacity: number; resolving: boolean }[] {
