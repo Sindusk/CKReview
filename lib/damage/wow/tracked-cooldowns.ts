@@ -196,4 +196,17 @@ export const WOW_TRACKED_COOLDOWNS: Record<string, TrackedCooldown[]> = {
   "Devourer Demon Hunter": [   // unverified (2 players)
     { name: "The Hunt", actionIds: [1246167], cooldownMs: 91_000, charges: 1, firstUseOffsetMs: 11_000 },  // 91.6 / 105.6s, 10.7s
   ],
+
+  // ── Healers ─────────────────────────────────────────────────────────
+  // Mistweaver's Celestial Conduit (Conduit of the Celestials), from the
+  // WoWAnalyzer audit's phase 3 (2026-10-17): shortest interval 90.0s
+  // (Abuki gVDPhzp61Zm29HMw, many times; 89 casts of 12 players), first use
+  // median 13s (25 player-pulls). Its hits log as 443038 (masterData of
+  // the same reports), 52–541k a cast; the five top players
+  // (K4x8cMZYVpGCDbJH, 8kVQMJ4rmpnyRjBH, J3ckBVtrZNfWv1h7,
+  // MaWQwnygjkh1czL8, 7L3RKpavDA8T4MjY, Vashnik) pressed it every
+  // 90–105s. Players on Master of Harmony never cast it and get nothing.
+  "Mistweaver Monk": [
+    { name: "Celestial Conduit", actionIds: [443028], damageIds: [443038], cooldownMs: 90_000, charges: 1, firstUseOffsetMs: 13_000 },
+  ],
 };
