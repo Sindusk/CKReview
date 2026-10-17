@@ -50,6 +50,8 @@ export type ReplayRawEvent = {
   amount?:         number;
   abilityGameID?:  number;
   duration?:       number;   // begincast: cast time in ms
+  unpaired?:       boolean;  // calculateddamage with no landed "damage" event
+  packetID?:       number;
   sourceResources?: ReplayRawResources;
   targetResources?: ReplayRawResources;
 };
@@ -93,10 +95,21 @@ export type ReplayMap = {
 
 /**
  * One enemy cast: [ms from pull start, actor key, ability name, cast time
- * in ms (0 = instant)]. A begincast and its matching cast are both kept;
- * the panel draws a bar for the first and a flash for the second.
+ * in ms (0 = instant), abilityGameID, target actor key ("" = none)]. A
+ * begincast and its matching cast are both kept; the panel draws a bar for
+ * the first and a flash for the second. Tracks saved before 2026-10-17
+ * have only the first four fields.
  */
-export type ReplayCast = [number, string, string, number];
+export type ReplayCast = [number, string, string, number, number?, string?];
+
+/**
+ * One enemy hit that landed on a player: [ms from pull start, abilityGameID,
+ * source actor key, target player key, source x, source y, target x,
+ * target y]. Positions are the snapshot FFLogs attaches to the hit; a
+ * missing one is null. The source is often an invisible helper standing
+ * where the AoE is anchored (a tower centre, a Limit Cut clone).
+ */
+export type ReplayHit = [number, number, string, string, number | null, number | null, number | null, number | null];
 
 export type ReplayData = {
   version:     1;
@@ -104,9 +117,11 @@ export type ReplayData = {
   fightId:     number;
   durationMs:  number;
   actors:      ReplayActor[];
-  // Absent on tracks saved before the map and casts were added.
+  // Absent on tracks saved before the map, casts and hits were added.
   map?:        ReplayMap | null;
   enemyCasts?: ReplayCast[];
+  enemyHits?:  ReplayHit[];
+  abilityNames?: Record<number, string>;   // names of the abilities in enemyHits
 };
 
 /** XIVAPI v2 URL of a map texture from its FFLogs filename, or null if the name doesn't parse. */
@@ -142,6 +157,9 @@ export function buildReplayData(
 ): ReplayData {
   const actorById = new Map(actors.map((a) => [a.id, a]));
   const enemyCasts: ReplayCast[] = [];
+  const enemyHits: ReplayHit[] = [];
+  const hitNames: Record<number, string> = {};
+  const previewSource = new Map<number, ReplayRawResources>();
   const byKey = new Map<string, ReplayActor>();
   const damagedEnemies = new Set<string>();
 
@@ -184,12 +202,33 @@ export function buildReplayData(
         if (name && !/^(attack|\d+)$/i.test(name)) {
           const t = e.timestamp - fightStartMs;
           const dur = e.type === "begincast" ? e.duration ?? 0 : 0;
-          const last = enemyCasts[enemyCasts.length - 1];
-          // Several helpers often cast the same ability together: keep one.
-          if (!(last && last[2] === name && last[3] === dur && t - last[0] < 200)) {
-            enemyCasts.push([t, keyFor(e.sourceID, e.sourceInstance, false), name, dur]);
-          }
+          // Every caster is kept: simultaneous helpers each place their
+          // own AoE. The panel merges same-name bars.
+          const target = e.targetID !== undefined && e.targetID >= 0 ? actorById.get(e.targetID) : undefined;
+          enemyCasts.push([t, keyFor(e.sourceID, e.sourceInstance, false), name, dur, e.abilityGameID,
+            target ? keyFor(e.targetID!, e.targetInstance, target.type === "Player") : ""]);
         }
+      }
+    }
+    if (e.type === "calculateddamage" && e.packetID !== undefined && e.sourceResources?.x !== undefined) {
+      previewSource.set(e.packetID, e.sourceResources);
+    }
+    // Landed hits only: FFLogs previews each hit as "calculateddamage" and
+    // lands it as "damage"; an unpaired preview never got a landed event
+    // (see fetchFFightData's onlyLanded).
+    if ((e.type === "damage" || (e.type === "calculateddamage" && e.unpaired)) &&
+        e.sourceID !== undefined && e.targetID !== undefined && e.abilityGameID !== undefined) {
+      const source = actorById.get(e.sourceID);
+      const target = actorById.get(e.targetID);
+      if (source && source.type !== "Player" && source.type !== "Pet" && target?.type === "Player") {
+        // The landed event usually drops sourceResources; its preview in
+        // the same packet carries them.
+        const s = e.sourceResources?.x !== undefined ? e.sourceResources : (e.packetID !== undefined ? previewSource.get(e.packetID) : undefined);
+        const d = e.targetResources;
+        enemyHits.push([e.timestamp - fightStartMs, e.abilityGameID, keyFor(e.sourceID, e.sourceInstance, false), String(e.targetID),
+          s?.x ?? null, s?.y ?? null, d?.x ?? null, d?.y ?? null]);
+        const name = abilityNames.get(e.abilityGameID);
+        if (name) hitNames[e.abilityGameID] = name;
       }
     }
     if (e.type === "damage" && e.sourceID !== undefined && e.targetID !== undefined) {
@@ -219,7 +258,7 @@ export function buildReplayData(
   }
   out.sort((a, b) => (a.kind === b.kind ? a.actorId - b.actorId : a.kind === "player" ? -1 : 1));
 
-  return { version: 1, reportCode, fightId, durationMs: fightEndMs - fightStartMs, actors: out, map, enemyCasts };
+  return { version: 1, reportCode, fightId, durationMs: fightEndMs - fightStartMs, actors: out, map, enemyCasts, enemyHits, abilityNames: hitNames };
 }
 
 export type ReplayPose = {
@@ -257,6 +296,36 @@ export function poseAt(actor: ReplayActor, t: number): ReplayPose | undefined {
   }
   const f = (t - a[0]) / (b[0] - a[0]);
   return { x: a[1] + (b[1] - a[1]) * f, y: a[2] + (b[2] - a[2]) * f, facing: a[3], hp: a[4], stale: false };
+}
+
+/**
+ * Compass bearing (0 = N, 90 = E) an actor faces, from FFLogs' raw
+ * `facing` (centi-radians). Measured, not derived: on Dancing Mad kill
+ * yBKPqGwHparm7Tk4 fight 5, 34 of 37 boss auto-attacks (Kefka, Chaos,
+ * Exdeath) land on a target at raw*180/(100π) + 90 degrees, ±15°.
+ * lib/mechanics/geometry.ts's facingToCompassBearing adds 270 instead,
+ * 180° from this; it feeds detection, so it's left alone here (see
+ * docs/open-items.md).
+ */
+export function facingToBearing(raw: number): number {
+  return (((raw * 180) / (100 * Math.PI) + 90) % 360 + 360) % 360;
+}
+
+/**
+ * The actor's position nearest `t` within `windowMs` either side, with no
+ * interpolation. For AoE origins: a begincast carries no resources, and
+ * the helper that casts it usually only reports a position on the cast
+ * that resolves it, a few seconds later, without having moved.
+ */
+export function sampleNear(actor: ReplayActor, t: number, windowMs: number): ReplayPose | undefined {
+  const s = actor.samples;
+  const i = sampleIndexAt(s, t);
+  let best: ReplaySample | undefined;
+  for (const j of [i, i + 1]) {
+    const c = s[j];
+    if (c && Math.abs(c[0] - t) <= windowMs && (!best || Math.abs(c[0] - t) < Math.abs(best[0] - t))) best = c;
+  }
+  return best && { x: best[1], y: best[2], facing: best[3], hp: best[4], stale: false };
 }
 
 /**

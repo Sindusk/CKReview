@@ -259,8 +259,16 @@ file's header comment. Mechanic detection has its own guide:
 
 - **FFXIV only,** behind a Video | Replay toggle in the center panel:
   player and boss dots on the fight's in-game map, yalm rings, a cast bar
-  for enemy casts in progress, and a flash at the caster when a cast
-  resolves. No AoE shapes or WoW yet.
+  for enemy casts in progress, a ring on each player an enemy hit, and AoE
+  overlays (`lib/replay/dancing-mad-overlays.ts`). No WoW yet.
+- **AoE overlays draw only verified geometry.** The Dancing Mad modules
+  pin origins (tower spawns, Limit Cut clones, black holes, Flood edge),
+  almost never sizes, because detection counts who was hit. A shape whose
+  size nobody measured is dashed. Add a mechanic there with its source
+  module cited, the same way.
+- **Boss facing:** the replay uses its own measured `facingToBearing`.
+  The shared `facingToCompassBearing` reads 180° off on boss auto-attacks
+  (docs/open-items.md).
 - **Map art** comes from FFLogs' `fights.maps` + `gameData.map` (filename,
   sizeFactor, offsets). The browser loads the texture from XIVAPI v2
   (`v2.xivapi.com/api/asset/map/<id>/<index>`), not from FFLogs' CDN. The

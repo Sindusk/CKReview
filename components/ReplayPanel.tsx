@@ -4,8 +4,9 @@
 //
 // Top-down replay of the selected pull: player and enemy dots on the
 // fight's in-game map (XIVAPI's copy of the texture) with yalm rings, a
-// cast bar for enemy casts in progress, and a flash at the caster when a
-// cast resolves. No AoE shapes yet. Tracks come
+// cast bar for enemy casts in progress, AoE overlays for the mechanics
+// lib/replay/dancing-mad-overlays.ts knows (dashed = position only, size
+// unknown), and a ring on each player an enemy hit. Tracks come
 // from lib/replay/ffxiv-replay.ts; page.tsx loads them only when the user
 // clicks Load replay (one FFLogs fetch per pull, never on navigation).
 //
@@ -19,8 +20,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Pull } from "@/types/Pull";
-import { ffMapImageUrl, fitReplayView, mapImageBounds, poseAt, type ReplayData } from "@/lib/replay/ffxiv-replay";
-import { facingToCompassBearing } from "@/lib/mechanics/geometry";
+import { facingToBearing, ffMapImageUrl, fitReplayView, mapImageBounds, poseAt, type ReplayData } from "@/lib/replay/ffxiv-replay";
+import { indexOverlays, overlaysAt, type OverlayShape } from "@/lib/replay/dancing-mad-overlays";
 import { getClassColor, getRoleColor } from "@/lib/player-display";
 
 function formatMs(ms: number): string {
@@ -43,8 +44,6 @@ const SPEEDS = [0.5, 1, 2, 4];
 // How far past the last VOD report the panel extrapolates. A little over
 // the report interval: if reports stop (paused, buffering), the dots stop.
 const MAX_EXTRAPOLATE_MS = 350;
-// How long a resolved enemy cast flashes at its caster.
-const RESOLVE_FLASH_MS = 1500;
 // Labels sit on a light map or a dark background: a dark halo keeps them
 // readable on both.
 const LABEL = { stroke: "rgba(0,0,0,0.75)", strokeWidth: 4, paintOrder: "stroke" } as const;
@@ -60,6 +59,8 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
   const [frameMs, setFrameMs] = useState(0);
   const [showHelpers, setShowHelpers] = useState(false);
   const [showMap, setShowMap] = useState(true);
+  const [showAoes, setShowAoes] = useState(true);
+  const [showHits, setShowHits] = useState(true);
 
   const extRef = useRef<{ value: number; at: number; moving: boolean }>({ value: 0, at: 0, moving: false });
   useEffect(() => {
@@ -98,6 +99,7 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
   // ── Geometry ─────────────────────────────────────────────────────────────
   const view = useMemo(() => (data ? fitReplayView(data) : null), [data]);
   const roleByName = useMemo(() => new Map((pull?.players ?? []).map((p) => [p.name, p.role])), [pull]);
+  const overlayIndex = useMemo(() => (data ? indexOverlays(data) : null), [data]);
 
   if (!pull) return <Empty>Select a pull to see its replay.</Empty>;
   if (pull.game !== "ffxiv") return <Empty>Replay is FFXIV-only for now.</Empty>;
@@ -129,19 +131,20 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
   const mapUrl = data.map ? ffMapImageUrl(data.map.filename) : null;
   const mapBox = data.map ? mapImageBounds(data.map) : null;
 
-  // Casts in progress (bars) and casts that just resolved (a flash at the
-  // caster: often an invisible helper standing where the AoE lands).
+  // Enemy casts in progress, one bar per ability.
   const casts = data.enemyCasts ?? [];
-  const actorByKey = new Map(data.actors.map((a) => [a.key, a]));
+  const actorByKey = overlayIndex!.actorByKey;
   let ci = casts.length;
   { let lo = 0, hi = casts.length; while (lo < hi) { const m = (lo + hi) >> 1; if (casts[m][0] <= t) lo = m + 1; else hi = m; } ci = lo; }
   const casting: { name: string; actor: string; f: number; key: string }[] = [];
-  const resolved: { name: string; key: string; age: number; id: string }[] = [];
   for (let i = ci - 1; i >= 0 && t - casts[i][0] < 12000; i--) {
     const [ct, key, name, dur] = casts[i];
-    if (dur > 0 && t < ct + dur) casting.push({ name, actor: actorByKey.get(key)?.name ?? "", f: (t - ct) / dur, key: `${i}` });
-    else if (dur === 0 && t - ct < RESOLVE_FLASH_MS) resolved.push({ name, key, age: t - ct, id: `${i}` });
+    if (dur > 0 && t < ct + dur && !casting.some((c) => c.name === name)) {
+      casting.push({ name, actor: actorByKey.get(key)?.name.replace(/ \d+$/, "") ?? "", f: (t - ct) / dur, key: `${i}` });
+    }
   }
+
+  const shapes = overlaysAt(overlayIndex!, t, showHits).filter((s) => showAoes || s.hit);
 
   const seek = (ms: number) => {
     const clamped = Math.max(0, Math.min(durationMs, ms));
@@ -165,18 +168,7 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
             {rings.map((r) => (
               <circle key={r} cx={toX(cx)} cy={toY(cy)} r={r * scale} fill="none" stroke={showMap && mapUrl ? "rgba(0,0,0,0.18)" : "var(--ck-line)"} strokeWidth={1} />
             ))}
-            {resolved.map((c) => {
-              const a = actorByKey.get(c.key);
-              const p = a && poseAt(a, t);
-              if (!p) return null;
-              const k = c.age / RESOLVE_FLASH_MS;
-              return (
-                <g key={c.id} opacity={1 - k}>
-                  <circle cx={toX(p.x)} cy={toY(p.y)} r={10 + 30 * k} fill="none" stroke="#ffb347" strokeWidth={3} />
-                  <text x={toX(p.x)} y={toY(p.y) - 16 - 30 * k} textAnchor="middle" fill="#ffd28a" fontSize={16} {...LABEL}>{c.name}</text>
-                </g>
-              );
-            })}
+            {shapes.map((s, i) => <Shape key={i} s={s} toX={toX} toY={toY} scale={scale} />)}
           </g>
           <line x1={toX(cx)} y1={0} x2={toX(cx)} y2={S} stroke="var(--ck-line)" strokeWidth={1} strokeDasharray="4 6" />
           <line x1={0} y1={toY(cy)} x2={S} y2={toY(cy)} stroke="var(--ck-line)" strokeWidth={1} strokeDasharray="4 6" />
@@ -190,7 +182,7 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
             if (!p || (p.stale && a.samples[a.samples.length - 1][0] < t)) return null;
             const x = toX(p.x), y = toY(p.y);
             const r = a.targetable ? 16 : 6;
-            const b = (facingToCompassBearing(p.facing) * Math.PI) / 180;
+            const b = (facingToBearing(p.facing) * Math.PI) / 180;
             return (
               <g key={a.key} opacity={a.targetable ? 1 : 0.5}>
                 <circle cx={x} cy={y} r={r} fill="#8a2d2d" stroke="#e06c6c" strokeWidth={2} />
@@ -260,6 +252,12 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
         <label style={{ color: "var(--ck-text-3)", fontSize: 12, whiteSpace: "nowrap" }} title="Untargetable actors that place AoEs">
           <input type="checkbox" checked={showHelpers} onChange={(e) => setShowHelpers(e.target.checked)} /> helpers
         </label>
+        <label style={{ color: "var(--ck-text-3)", fontSize: 12, whiteSpace: "nowrap" }} title="Mechanic shapes. Dashed: position known, size not measured">
+          <input type="checkbox" checked={showAoes} onChange={(e) => setShowAoes(e.target.checked)} /> AoEs
+        </label>
+        <label style={{ color: "var(--ck-text-3)", fontSize: 12, whiteSpace: "nowrap" }} title="A ring on each player an enemy ability hit">
+          <input type="checkbox" checked={showHits} onChange={(e) => setShowHits(e.target.checked)} /> hits
+        </label>
         {mapUrl && (
           <label style={{ color: "var(--ck-text-3)", fontSize: 12, whiteSpace: "nowrap" }} title={`In-game map: ${data.map!.name}`}>
             <input type="checkbox" checked={showMap} onChange={(e) => setShowMap(e.target.checked)} /> map
@@ -268,6 +266,32 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
         {synced && <span style={{ color: "var(--ck-text-3)", fontSize: 12 }}>following VOD</span>}
       </div>
     </div>
+  );
+}
+
+/** One overlay shape (lib/replay/dancing-mad-overlays.ts), in SVG units. */
+function Shape({ s, toX, toY, scale }: { s: OverlayShape; toX: (x: number) => number; toY: (y: number) => number; scale: number }) {
+  const dash = s.dashed ? "10 7" : undefined;
+  if (s.kind === "circle") {
+    const x = toX(s.x), y = toY(s.y), r = Math.max(4, s.r * scale);
+    return (
+      <g opacity={s.opacity}>
+        <circle cx={x} cy={y} r={r} fill={s.fill ? s.color : "none"} fillOpacity={s.fill ? 0.25 : 0} stroke={s.color} strokeWidth={3} strokeDasharray={dash} />
+        {s.label && <text x={x} y={y - r - 6} textAnchor="middle" fill={s.color} fontSize={16} {...LABEL}>{s.label}</text>}
+      </g>
+    );
+  }
+  const x1 = toX(s.x1), y1 = toY(s.y1), x2 = toX(s.x2), y2 = toY(s.y2);
+  const a = Math.atan2(y2 - y1, x2 - x1);
+  const head = 16;
+  return (
+    <g opacity={s.opacity}>
+      <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={s.color} strokeWidth={s.width} strokeDasharray={dash} strokeLinecap="round" />
+      {s.arrow && (
+        <path d={`M${x2} ${y2} L${x2 - head * Math.cos(a - 0.45)} ${y2 - head * Math.sin(a - 0.45)} L${x2 - head * Math.cos(a + 0.45)} ${y2 - head * Math.sin(a + 0.45)} Z`} fill={s.color} />
+      )}
+      {s.label && <text x={(x1 + x2) / 2} y={(y1 + y2) / 2 - 10} textAnchor="middle" fill={s.color} fontSize={16} {...LABEL}>{s.label}</text>}
+    </g>
   );
 }
 
