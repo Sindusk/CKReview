@@ -111,6 +111,20 @@
 //   Not added: Sudden Ambush (1244483) has no duration in the samples
 //   (longest spans 5.0–7.3s, one 13.6s; its 43 press-less removals come
 //   0.2–3.4s after the gain); Predatory Swiftness (12s) is a free heal.
+// - Essence Burst 15s (Devastation; added in its phase 3, 2026-10-17, 19
+//   player-pulls): makes the next Disintegrate or Pyre free. 557
+//   removals of 753 gains, 6 with no consumer beside them, 2 at D (15.00,
+//   15.01s: Millzd NvX17Tb9yMY8QrDf 4:26 in Stasis, Qiyue
+//   VbAHWZDdPwJBajmx 6:16 after he stopped casting at 5:59); the next
+//   longest are 13.99s and under, each beside a Disintegrate. Worth a whole
+//   Disintegrate here (an upper bound: what it saved is 3 Essence, a
+//   Disintegrate over a Living Flame). Measured for Devastation and left
+//   out: Burnout 15s (28 at D on 14 of 19 players, top ones too; it makes a
+//   Living Flame instant, see below), Imminent Destruction 30s (42 at D on
+//   15 of 19, every top player 2–4 times a pull: a timed buff whose stacks
+//   lapse, not a proc), Mass Disintegrate 15s (2 at D; it widens a
+//   Disintegrate, a whole one overstates it), Leaping Flames (no duration:
+//   unused spans 6–41s), Unbound Flame (1 unused in 21 gains).
 //
 // ── Measured and left out ──────────────────────────────────────────────
 // - Lava Surge (77762) 10s, clean, but 75 of 657 run out on the top
@@ -139,7 +153,7 @@
 //   player-pulls, max span 14.4s), so no duration. Its loss is the
 //   overwrite: specs/frostdk.ts "Rime overwritten".
 // - No duration in the samples (no clean cluster, or never run out):
-//   Sudden Doom, Essence Burst, Fingers of Frost, Brain Freeze,
+//   Sudden Doom, Fingers of Frost, Brain Freeze,
 //   Galactic Guardian (0 of 85 removals unconsumed on the three Guardians
 //   who take it, J3ckBVtrZNfWv1h7, JvQpZk3CXj78Dx2f, LCFp3wbHvQqNP4my;
 //   max span 12.75s), Prismatic Bolt!, Tempest, Art of War. Power of the
@@ -176,4 +190,5 @@ export const WOW_MEASURED_PROCS = new Map<number, MeasuredProc>([
   [1264946, { durationMs: 17_000, consumerIds: [1264949] }],                      // Moonlight Chakram (from Trueshot) → Moonlight Chakram
   [135700,  { durationMs: 15_000, consumerIds: [5221, 106785] }],                 // Clearcasting (Feral) → Shred, Swipe
   [391882,  { durationMs: 15_000, consumerIds: [22568, 441591] }],                // Apex Predator's Craving → Ferocious Bite, Ravage
+  [359618,  { durationMs: 15_000, consumerIds: [356995, 357211] }],               // Essence Burst → Disintegrate, Pyre
 ]);
