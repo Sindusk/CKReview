@@ -117,8 +117,20 @@ const CHANNEL_IDS = new Set([
 // (timeline.ts channelLocks). Disintegrate ticks at the cast and every T
 // after, 5 in a full channel (Devastation, the WoWAnalyzer audit's phase 3,
 // 2026-10-17; specs/devastation.ts prices the ticks a clip drops).
+// Shadow Priest's Mind Flay and Mind Flay: Insanity tick at T, 2T, ... (no
+// tick at the cast), 6 and 4 ticks in a full channel; the same formula
+// (first tick + (full − 1)·T) gives their end. Mind Flay is the filler and
+// is clipped for whatever comes up: on the 45 Shadow player-pulls on disk
+// (the WoWAnalyzer audit's phase 3, 2026-10-17) 1,083 of 1,516 Mind Flays
+// ran under 4 ticks (T 0.41–0.61s, hasted), the next press 0.25s after the
+// last tick at the median, up to 0.55s (p90); Mind Flay: Insanity (T
+// 0.21–0.31s) 282 of 971 under 4. Read to the last tick, each clip was
+// idle: the 99.9th-percentile Kleenonean (fh6bLKy12gzWvGCH) carried ~30
+// "late after Mind Flay" delays a pull.
 const CHANNEL_TICKS = new Map<number, number>([
   [356995, 5],   // Disintegrate
+  [15407, 6],    // Mind Flay
+  [391403, 4],   // Mind Flay: Insanity
 ]);
 
 // GCDs that lock the player for as long as a buff of their own: Scalecommander
