@@ -193,6 +193,10 @@ export type FFLActor = {
   // reports fetched before 2026-10-12; log-transforms.ts falls back to the
   // pet's job then.
   petOwner?: number | null;
+  // Only requested by the replay fetch: the game's BNpcBase id for NPCs
+  // (hitbox lookup) and FFLogs' icon name ("Boss", "NPC", a job).
+  gameID?: number;
+  icon?: string;
 };
 
 // A single ability/action used anywhere in the report. Fetched once per
@@ -968,7 +972,7 @@ const REPLAY_EVENTS_QUERY = `
     reportData {
       report(code: $code) {
         masterData(translate: true) @include(if: $withActors) {
-          actors { id name type subType petOwner }
+          actors { id name type subType petOwner gameID icon }
           abilities { gameID name }
         }
         events(

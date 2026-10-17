@@ -257,18 +257,27 @@ file's header comment. Mechanic detection has its own guide:
 
 ## Top-down replay (`components/ReplayPanel.tsx`, `lib/replay/ffxiv-replay.ts`)
 
-- **FFXIV only,** behind a Video | Replay toggle in the center panel:
-  player and boss dots on the fight's in-game map, yalm rings, a cast bar
-  for enemy casts in progress, a ring on each player an enemy hit, and AoE
-  overlays (`lib/replay/dancing-mad-overlays.ts`). No WoW yet.
-- **AoE overlays draw only verified geometry.** The Dancing Mad modules
-  pin origins (tower spawns, Limit Cut clones, black holes, Flood edge),
-  almost never sizes, because detection counts who was hit. A shape whose
-  size nobody measured is dashed. Add a mechanic there with its source
-  module cited, the same way.
-- **Facing:** players get a wedge, bosses a wedge and a front arc, from
-  geometry.ts's `facingToCompassBearing`. The replay's auto-attack check
-  is what showed that helper returned the back until 2026-10-17.
+- **FFXIV only,** behind a Video | Replay toggle in the center panel,
+  styled after strategy-guide diagrams: the in-game map, job icons in
+  role-coloured rings, FFLogs' Boss icon (`assets.rpglogs.com/img/ff/
+  icons/Boss.png`, the CDN `lib/ability-icons.ts` already uses) with its
+  hitbox ring and front notch, enemy AoEs as blue shapes with white rims,
+  and a cast bar. Hover shows name, strategy slot (`detectFFRoles`),
+  coordinates and HP; click pins a hitbox ring. No WoW yet.
+- **AoE shapes come from game data, not per-boss models**
+  (`lib/replay/action-shapes.ts`): XIVAPI's Action sheet gives CastType,
+  EffectRange and XAxisModifier for every ability, so every enemy AoE is
+  drawn at its real size from its cast, hit or miss. Cone angles and donut
+  holes aren't in the data for new rows; they're estimated from who was
+  hit and drawn dashed.
+- **Hitboxes** are the game's: BNpcBase (FFLogs actor `gameID`) gives the
+  model and Scale, ModelSkeleton the Radius; radius × scale.
+- **Waymarks: not available yet.** FFLogs' API has no marker field or
+  event. Tomestone shows them from its own copy of each log.
+- **Facing:** players get a wedge, bosses a front notch on their hitbox
+  ring, from geometry.ts's `facingToCompassBearing`. The replay's
+  auto-attack check is what showed that helper returned the back until
+  2026-10-17.
 - **Play/pause with a synced VOD** drives the hidden video through
   VideoPanel's `playRequest` / `pauseRequest` tokens. The button's state
   comes from the player (`onPlayingChange`, polled with the time), never
@@ -286,10 +295,9 @@ file's header comment. Mechanic detection has its own guide:
   the session. Positions arrive about 1 to 2 per player per second and stop
   for 25 to 35s at phase transitions; the module header explains the
   interpolation.
-- **Clock.** With a synced VOD the replay follows the video, and its
-  scrubber seeks the video. The video stays mounted (hidden) under the
-  replay so its clock keeps running. Without a VOD the panel has its own
-  play/pause and speed.
+- **Clock.** With a synced VOD the replay follows the video. The video
+  stays mounted (hidden) under the replay so its clock keeps running.
+  Without a VOD the panel has its own play/pause, speed and scrubber.
 
 ## Design sources
 

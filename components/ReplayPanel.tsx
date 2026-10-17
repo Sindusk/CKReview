@@ -2,12 +2,15 @@
 
 // components/ReplayPanel.tsx
 //
-// Top-down replay of the selected pull: player and enemy dots on the
-// fight's in-game map (XIVAPI's copy of the texture) with yalm rings, a
-// cast bar for enemy casts in progress, AoE overlays for the mechanics
-// lib/replay/dancing-mad-overlays.ts knows (dashed = position only, size
-// unknown), and a ring on each player an enemy hit. Tracks come
-// from lib/replay/ffxiv-replay.ts; page.tsx loads them only when the user
+// Top-down replay of the selected pull, styled after strategy-guide
+// diagrams: the fight's in-game map (XIVAPI's copy of the texture), job
+// icons for players, FFLogs' Boss icon for bosses with their hitbox ring
+// and front marker, and every enemy AoE at its game-data size as a blue
+// shape with a white rim (lib/replay/action-shapes.ts; dashed = cone angle
+// or donut hole estimated). Hovering an actor shows its name, strategy
+// slot (MT, OT, H1 ... from lib/mechanics/ffxiv/roles.ts), coordinates and
+// HP; clicking one pins its hitbox ring. Tracks come from
+// lib/replay/ffxiv-replay.ts; page.tsx loads them only when the user
 // clicks Load replay (one FFLogs fetch per pull, never on navigation).
 //
 // Two clocks:
@@ -22,10 +25,11 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Pull } from "@/types/Pull";
-import { ffMapImageUrl, fitReplayView, mapImageBounds, poseAt, type ReplayData } from "@/lib/replay/ffxiv-replay";
+import { ffMapImageUrl, fitReplayView, mapImageBounds, poseAt, type ReplayActor, type ReplayData, type ReplayPose } from "@/lib/replay/ffxiv-replay";
+import { aoesAt, buildAoeShapes, type AoeShape } from "@/lib/replay/action-shapes";
 import { facingToCompassBearing } from "@/lib/mechanics/geometry";
-import { indexOverlays, overlaysAt, type OverlayShape } from "@/lib/replay/dancing-mad-overlays";
-import { getClassColor, getRoleColor } from "@/lib/player-display";
+import { detectFFRoles } from "@/lib/mechanics/ffxiv/roles";
+import { getClassColor, getPlayerClassIcon, getRoleColor } from "@/lib/player-display";
 
 function formatMs(ms: number): string {
   const s = Math.max(0, Math.floor(ms / 1000));
@@ -40,8 +44,8 @@ type Props = {
   error:         string | null;
   onLoad:        () => void;
   syncedTimeMs?: number;          // VOD playback time; undefined = own clock
-  vodPlaying?:   boolean;           // the synced video's own play state
-  onVodPlay?:    () => void;        // play/pause drive the hidden video when synced
+  vodPlaying?:   boolean;         // the synced video's own play state
+  onVodPlay?:    () => void;      // play/pause drive the hidden video when synced
   onVodPause?:   () => void;
 };
 
@@ -49,9 +53,14 @@ const SPEEDS = [0.5, 1, 2, 4];
 // How far past the last VOD report the panel extrapolates. A little over
 // the report interval: if reports stop (paused, buffering), the dots stop.
 const MAX_EXTRAPOLATE_MS = 350;
-// Labels sit on a light map or a dark background: a dark halo keeps them
-// readable on both.
-const LABEL = { stroke: "rgba(0,0,0,0.75)", strokeWidth: 4, paintOrder: "stroke" } as const;
+// FFLogs' own actor icons ("Boss", "NPC"), the CDN the app already uses
+// for ability icons (lib/ability-icons.ts).
+const FFLOGS_ICON = (name: string) => `https://assets.rpglogs.com/img/ff/icons/${name}.png`;
+// Guide-style AoE colours: translucent blue fill, white rim.
+const AOE_FILL = "#2f5bff";
+const AOE_RIM = "#ffffff";
+const PLAYER_ICON = 34;   // SVG units
+const BOSS_ICON = 46;
 
 export default function ReplayPanel({ pull, data, loading, progress, error, onLoad, syncedTimeMs, vodPlaying = false, onVodPlay, onVodPause }: Props) {
   const synced = syncedTimeMs !== undefined;
@@ -62,10 +71,14 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [frameMs, setFrameMs] = useState(0);
-  const [showHelpers, setShowHelpers] = useState(false);
+
+  // ── Layers and interaction ───────────────────────────────────────────────
   const [showMap, setShowMap] = useState(true);
   const [showAoes, setShowAoes] = useState(true);
-  const [showHits, setShowHits] = useState(true);
+  const [showHelpers, setShowHelpers] = useState(false);
+  const [layersOpen, setLayersOpen] = useState(false);
+  const [hoverKey, setHoverKey] = useState<string | null>(null);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
   // The last VOD time report and when it arrived. Whether the video plays
   // comes from the player itself (`vodPlaying`): a paused player's repeated
@@ -78,7 +91,7 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
     extRef.current = { value: syncedTimeMs, at: performance.now() };
   }, [syncedTimeMs]);
 
-  useEffect(() => { setOwnTimeMs(0); setPlaying(false); }, [pull?.id]);
+  useEffect(() => { setOwnTimeMs(0); setPlaying(false); setSelectedKey(null); }, [pull?.id]);
 
   useEffect(() => {
     if (!data) return;
@@ -105,10 +118,16 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
 
   const t = synced ? frameMs : ownTimeMs;
 
-  // ── Geometry ─────────────────────────────────────────────────────────────
+  // ── Per-pull precomputation ──────────────────────────────────────────────
   const view = useMemo(() => (data ? fitReplayView(data) : null), [data]);
-  const roleByName = useMemo(() => new Map((pull?.players ?? []).map((p) => [p.name, p.role])), [pull]);
-  const overlayIndex = useMemo(() => (data ? indexOverlays(data) : null), [data]);
+  const aoes = useMemo(() => (data ? buildAoeShapes(data) : []), [data]);
+  const players = useMemo(() => new Map((pull?.players ?? []).map((p) => [p.name, p])), [pull]);
+  const slotByName = useMemo(() => {
+    const m = new Map<string, string>();
+    if (pull?.game === "ffxiv") for (const r of detectFFRoles(pull.players)) if (r.player) m.set(r.player.name, r.slot + (r.tentative ? "?" : ""));
+    return m;
+  }, [pull]);
+  const actorByKey = useMemo(() => new Map((data?.actors ?? []).map((a) => [a.key, a])), [data]);
 
   if (!pull) return <Empty>Select a pull to see its replay.</Empty>;
   if (pull.game !== "ffxiv") return <Empty>Replay is FFXIV-only for now.</Empty>;
@@ -129,20 +148,12 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
   const toX = (x: number) => ((x - (cx - half)) / (2 * half)) * S;
   const toY = (y: number) => ((y - (cy - half)) / (2 * half)) * S;
   const scale = S / (2 * half);              // svg units per centi-yalm
-  const ringStep = half > 2500 ? 1000 : 500; // 10y or 5y rings
-
-  const rings: number[] = [];
-  for (let r = ringStep; r <= half * 1.42; r += ringStep) rings.push(r);
-
-  const enemies = data.actors.filter((a) => a.kind === "enemy" && (a.targetable || showHelpers));
-  const players = data.actors.filter((a) => a.kind === "player");
 
   const mapUrl = data.map ? ffMapImageUrl(data.map.filename) : null;
   const mapBox = data.map ? mapImageBounds(data.map) : null;
 
   // Enemy casts in progress, one bar per ability.
   const casts = data.enemyCasts ?? [];
-  const actorByKey = overlayIndex!.actorByKey;
   let ci = casts.length;
   { let lo = 0, hi = casts.length; while (lo < hi) { const m = (lo + hi) >> 1; if (casts[m][0] <= t) lo = m + 1; else hi = m; } ci = lo; }
   const casting: { name: string; actor: string; f: number; key: string }[] = [];
@@ -153,76 +164,93 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
     }
   }
 
-  const shapes = overlaysAt(overlayIndex!, t, showHits).filter((s) => showAoes || s.hit);
+  // Who is on the field now. An enemy past its last sample has left (a
+  // phase's Kefka replaced by the next one), so it isn't drawn.
+  const live: { a: ReplayActor; p: ReplayPose }[] = [];
+  for (const a of data.actors) {
+    if (a.kind === "enemy" && !(a.targetable || showHelpers)) continue;
+    const p = poseAt(a, t);
+    if (!p) continue;
+    if (a.kind === "enemy" && p.stale && a.samples[a.samples.length - 1][0] < t) continue;
+    live.push({ a, p });
+  }
+  const hovered = live.find((l) => l.a.key === hoverKey);
+  const selected = live.find((l) => l.a.key === selectedKey);
 
   const seek = (ms: number) => setOwnTimeMs(Math.max(0, Math.min(durationMs, ms)));
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
       <div style={{ flex: 1, minHeight: 0, display: "flex", justifyContent: "center", alignItems: "center", padding: 8, position: "relative" }}>
-        <svg viewBox={`0 0 ${S} ${S}`} style={{ width: "100%", height: "100%" }}>
+        <svg viewBox={`0 0 ${S} ${S}`} style={{ width: "100%", height: "100%" }} onClick={() => setSelectedKey(null)}>
           <defs>
             <clipPath id="replay-clip"><rect x={0} y={0} width={S} height={S} rx={8} /></clipPath>
+            <filter id="replay-gray"><feColorMatrix type="saturate" values="0" /></filter>
           </defs>
           <rect x={0} y={0} width={S} height={S} rx={8} fill="var(--ck-bg-deep)" />
           <g clipPath="url(#replay-clip)">
             {showMap && mapUrl && mapBox && (
               <image href={mapUrl} x={toX(mapBox.x)} y={toY(mapBox.y)} width={mapBox.size * scale} height={mapBox.size * scale}
-                preserveAspectRatio="none" opacity={0.85} />
+                preserveAspectRatio="none" />
             )}
-            {rings.map((r) => (
-              <circle key={r} cx={toX(cx)} cy={toY(cy)} r={r * scale} fill="none" stroke={showMap && mapUrl ? "rgba(0,0,0,0.18)" : "var(--ck-line)"} strokeWidth={1} />
+            {showAoes && aoesAt(aoes, t).map(({ s, opacity, resolving }, i) => (
+              <Aoe key={i} s={s} opacity={opacity} resolving={resolving} toX={toX} toY={toY} scale={scale} />
             ))}
-            {shapes.map((s, i) => <Shape key={i} s={s} toX={toX} toY={toY} scale={scale} />)}
           </g>
-          <line x1={toX(cx)} y1={0} x2={toX(cx)} y2={S} stroke="var(--ck-line)" strokeWidth={1} strokeDasharray="4 6" />
-          <line x1={0} y1={toY(cy)} x2={S} y2={toY(cy)} stroke="var(--ck-line)" strokeWidth={1} strokeDasharray="4 6" />
-          <text x={S / 2} y={22} textAnchor="middle" fill="var(--ck-text-3)" fontSize={18}>N</text>
-          <text x={S - 14} y={toY(cy) - 6} textAnchor="end" fill="var(--ck-text-3)" fontSize={14}>{ringStep / 100}y rings</text>
+          <text x={S / 2} y={24} textAnchor="middle" fill="#fff" fontSize={20} fontWeight={700} {...LABEL}>N</text>
 
-          {enemies.map((a) => {
-            const p = poseAt(a, t);
-            // An enemy past its last sample has left the fight (a phase's
-            // Kefka replaced by the next one); don't leave it standing.
-            if (!p || (p.stale && a.samples[a.samples.length - 1][0] < t)) return null;
+          {/* Bosses: hitbox ring with a front marker, FFLogs' Boss icon. */}
+          {live.filter((l) => l.a.kind === "enemy").map(({ a, p }) => {
             const x = toX(p.x), y = toY(p.y);
-            const r = a.targetable ? 16 : 6;
             const b = (facingToCompassBearing(p.facing) * Math.PI) / 180;
+            const ring = Math.max(BOSS_ICON / 2 + 6, (a.hitbox ?? 0) * scale);
+            const size = a.targetable ? BOSS_ICON : 18;
             return (
-              <g key={a.key} opacity={a.targetable ? 1 : 0.5}>
-                {a.targetable && (
-                  // A faint 90° front arc: which way the boss faces at a glance.
-                  <path d={arcPath(x, y, r + 46, b, Math.PI / 4)} fill="#e06c6c" fillOpacity={0.22} stroke="none" />
-                )}
-                <circle cx={x} cy={y} r={r} fill="#8a2d2d" stroke="#e06c6c" strokeWidth={2} />
-                {a.targetable && (
-                  <>
-                    <FacingWedge x={x} y={y} r={r} b={b} color="#e06c6c" size={11} />
-                    <text x={x} y={y - r - 8} textAnchor="middle" fill="#e8a0a0" fontSize={20} {...LABEL}>{a.name}</text>
-                  </>
-                )}
+              <g key={a.key} style={{ cursor: "pointer" }} opacity={a.targetable ? 1 : 0.55}
+                onMouseEnter={() => setHoverKey(a.key)} onMouseLeave={() => setHoverKey((k) => (k === a.key ? null : k))}
+                onClick={(e) => { e.stopPropagation(); setSelectedKey(a.key); }}>
+                {a.targetable && <TargetRing x={x} y={y} r={ring} b={b} color="#ff6b5e" strong={selectedKey === a.key} />}
+                <image href={FFLOGS_ICON(a.icon === "Boss" ? "Boss" : "NPC")} x={x - size / 2} y={y - size / 2} width={size} height={size} />
               </g>
             );
           })}
 
-          {players.map((a) => {
-            const p = poseAt(a, t);
-            if (!p) return null;
+          {/* Players: job icon in a role-coloured ring, facing wedge. */}
+          {live.filter((l) => l.a.kind === "player").map(({ a, p }) => {
             const x = toX(p.x), y = toY(p.y);
             const dead = p.hp === 0;
-            const color = getClassColor("ffxiv", a.job ?? "");
+            const info = players.get(a.name);
+            const roleColor = getRoleColor(info?.role);
+            const b = (facingToCompassBearing(p.facing) * Math.PI) / 180;
+            const r = PLAYER_ICON / 2;
             return (
-              <g key={a.key} opacity={dead ? 0.45 : p.stale ? 0.7 : 1}>
-                {!dead && <FacingWedge x={x} y={y} r={14} b={(facingToCompassBearing(p.facing) * Math.PI) / 180} color={color} size={9} />}
-                <circle cx={x} cy={y} r={14} fill={color} stroke={getRoleColor(roleByName.get(a.name))} strokeWidth={4} />
+              <g key={a.key} style={{ cursor: "pointer" }} opacity={dead ? 0.5 : p.stale ? 0.75 : 1}
+                onMouseEnter={() => setHoverKey(a.key)} onMouseLeave={() => setHoverKey((k) => (k === a.key ? null : k))}
+                onClick={(e) => { e.stopPropagation(); setSelectedKey(a.key); }}>
+                {selectedKey === a.key && <TargetRing x={x} y={y} r={Math.max(r + 8, (a.hitbox ?? 50) * scale)} b={b} color="#ffd34d" strong />}
+                {!dead && <FacingWedge x={x} y={y} r={r + 2} b={b} color={roleColor} size={9} />}
+                <circle cx={x} cy={y} r={r + 2} fill="#10131a" stroke={roleColor} strokeWidth={4} />
+                <image href={getPlayerClassIcon("ffxiv", info?.className ?? a.job ?? "")} x={x - r} y={y - r} width={PLAYER_ICON} height={PLAYER_ICON}
+                  filter={dead ? "url(#replay-gray)" : undefined} />
                 {dead && (
-                  <path d={`M${x - 9} ${y - 9} L${x + 9} ${y + 9} M${x + 9} ${y - 9} L${x - 9} ${y + 9}`} stroke="#111" strokeWidth={4} />
+                  <path d={`M${x - 10} ${y - 10} L${x + 10} ${y + 10} M${x + 10} ${y - 10} L${x - 10} ${y + 10}`} stroke="#ff4d4d" strokeWidth={4} strokeLinecap="round" />
                 )}
-                <text x={x} y={y + 36} textAnchor="middle" fill="#f2efe6" fontSize={20} {...LABEL}>{a.name.split(" ")[0]}</text>
               </g>
             );
           })}
+
+          {hovered && (
+            <Tooltip x={toX(hovered.p.x)} y={toY(hovered.p.y)} S={S}
+              lines={tooltipLines(hovered.a, hovered.p, slotByName, players)}
+              color={hovered.a.kind === "player" ? getClassColor("ffxiv", players.get(hovered.a.name)?.className ?? hovered.a.job ?? "") : "#ff8a80"} />
+          )}
+          {selected && !hovered && (
+            <Tooltip x={toX(selected.p.x)} y={toY(selected.p.y)} S={S}
+              lines={tooltipLines(selected.a, selected.p, slotByName, players)}
+              color={selected.a.kind === "player" ? getClassColor("ffxiv", players.get(selected.a.name)?.className ?? selected.a.job ?? "") : "#ff8a80"} />
+          )}
         </svg>
+
         {casting.length > 0 && (
           <div style={{ position: "absolute", top: 14, left: 14, display: "flex", flexDirection: "column", gap: 4, pointerEvents: "none", maxWidth: "45%" }}>
             {casting.slice(0, 4).map((c) => (
@@ -239,7 +267,7 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
         )}
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 10px 8px", flexShrink: 0 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 10px 8px", flexShrink: 0, position: "relative" }}>
         {synced ? (
           <button className="ck-btn" onClick={() => (vodPlaying ? onVodPause?.() : onVodPlay?.())} style={{ minWidth: 64 }}
             title="Plays and pauses the synced VOD">
@@ -268,63 +296,111 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
             />
           </>
         )}
-        <label style={{ color: "var(--ck-text-3)", fontSize: 12, whiteSpace: "nowrap" }} title="Untargetable actors that place AoEs">
-          <input type="checkbox" checked={showHelpers} onChange={(e) => setShowHelpers(e.target.checked)} /> helpers
-        </label>
-        <label style={{ color: "var(--ck-text-3)", fontSize: 12, whiteSpace: "nowrap" }} title="Mechanic shapes. Dashed: position known, size not measured">
-          <input type="checkbox" checked={showAoes} onChange={(e) => setShowAoes(e.target.checked)} /> AoEs
-        </label>
-        <label style={{ color: "var(--ck-text-3)", fontSize: 12, whiteSpace: "nowrap" }} title="A ring on each player an enemy ability hit">
-          <input type="checkbox" checked={showHits} onChange={(e) => setShowHits(e.target.checked)} /> hits
-        </label>
-        {mapUrl && (
-          <label style={{ color: "var(--ck-text-3)", fontSize: 12, whiteSpace: "nowrap" }} title={`In-game map: ${data.map!.name}`}>
-            <input type="checkbox" checked={showMap} onChange={(e) => setShowMap(e.target.checked)} /> map
-          </label>
+        <button className="ck-btn" onClick={() => setLayersOpen((v) => !v)} aria-expanded={layersOpen}>Layers ▾</button>
+        {layersOpen && (
+          <div className="ck-menu" style={{ position: "absolute", right: 10, bottom: "100%", marginBottom: 4, zIndex: 5, padding: "6px 10px", display: "flex", flexDirection: "column", gap: 4 }}>
+            <Toggle label="AoEs" title="Enemy AoEs at their game-data size. Dashed: cone angle or donut hole estimated" checked={showAoes} onChange={setShowAoes} />
+            {mapUrl && <Toggle label="Map" title={`In-game map: ${data.map!.name}`} checked={showMap} onChange={setShowMap} />}
+            <Toggle label="Helper actors" title="Untargetable actors that place AoEs" checked={showHelpers} onChange={setShowHelpers} />
+          </div>
         )}
       </div>
     </div>
   );
 }
 
+/** Name, slot, job, coordinates (yalms) and HP for the hover card. */
+function tooltipLines(a: ReplayActor, p: ReplayPose, slots: Map<string, string>, players: Map<string, { className: string }>): string[] {
+  const where = `X ${(p.x / 100).toFixed(1)}  Y ${(p.y / 100).toFixed(1)}`;
+  const hp = p.hp >= 0 ? `HP ${Math.round(p.hp * 100)}%` : "";
+  if (a.kind === "player") {
+    const slot = slots.get(a.name);
+    return [a.name, [slot, players.get(a.name)?.className ?? a.job].filter(Boolean).join(" · "), [where, hp].filter(Boolean).join("   ")];
+  }
+  return [a.name, [where, a.hitbox ? `hitbox ${(a.hitbox / 100).toFixed(1)}y` : ""].filter(Boolean).join("   "), hp].filter(Boolean);
+}
+
+function Tooltip({ x, y, S, lines, color }: { x: number; y: number; S: number; lines: string[]; color: string }) {
+  const w = Math.max(...lines.map((l) => l.length)) * 10.5 + 24;
+  const h = lines.length * 24 + 14;
+  const left = Math.min(S - w - 6, Math.max(6, x + 24));
+  const top = Math.min(S - h - 6, Math.max(6, y - h - 18));
+  return (
+    <g pointerEvents="none">
+      <rect x={left} y={top} width={w} height={h} rx={6} fill="rgba(12,14,20,0.92)" stroke={color} strokeWidth={2} />
+      {lines.map((l, i) => (
+        <text key={i} x={left + 12} y={top + 26 + i * 24} fill={i === 0 ? color : "#e8e6df"} fontSize={i === 0 ? 19 : 17} fontWeight={i === 0 ? 700 : 400}>{l}</text>
+      ))}
+    </g>
+  );
+}
+
+/** An in-game style target ring: the hitbox circle with a front notch. */
+function TargetRing({ x, y, r, b, color, strong }: { x: number; y: number; r: number; b: number; color: string; strong?: boolean }) {
+  const fx = x + Math.sin(b) * r, fy = y - Math.cos(b) * r;
+  const n = 11;
+  return (
+    <g pointerEvents="none">
+      <circle cx={x} cy={y} r={r} fill={color} fillOpacity={strong ? 0.14 : 0.06} stroke={color} strokeWidth={strong ? 4 : 3} strokeOpacity={strong ? 1 : 0.75} />
+      <path d={`M${fx + Math.sin(b) * n} ${fy - Math.cos(b) * n} L${fx + Math.cos(b) * n * 0.8} ${fy + Math.sin(b) * n * 0.8} L${fx - Math.cos(b) * n * 0.8} ${fy - Math.sin(b) * n * 0.8} Z`}
+        fill={color} stroke="rgba(0,0,0,0.6)" strokeWidth={1.5} />
+    </g>
+  );
+}
+
+/** One AoE in guide style: blue fill, white rim; brighter as it resolves. */
+function Aoe({ s, opacity, resolving, toX, toY, scale }: { s: AoeShape; opacity: number; resolving: boolean; toX: (x: number) => number; toY: (y: number) => number; scale: number }) {
+  const x = toX(s.x), y = toY(s.y);
+  const r = s.range * scale;
+  const b = (s.bearing * Math.PI) / 180;
+  const fill = resolving ? "#7fa2ff" : AOE_FILL;
+  const common = { fill, fillOpacity: resolving ? 0.8 : 0.62, stroke: AOE_RIM, strokeWidth: 3.5, strokeDasharray: s.estimated ? "12 8" : undefined } as const;
+  let d: string;
+  if (s.kind === "circle") {
+    return <g opacity={opacity} pointerEvents="none"><circle cx={x} cy={y} r={r} {...common} /></g>;
+  } else if (s.kind === "donut") {
+    const ri = s.inner * scale;
+    d = `M${x - r} ${y} a${r} ${r} 0 1 0 ${2 * r} 0 a${r} ${r} 0 1 0 ${-2 * r} 0 Z M${x - ri} ${y} a${ri} ${ri} 0 1 1 ${2 * ri} 0 a${ri} ${ri} 0 1 1 ${-2 * ri} 0 Z`;
+    return <g opacity={opacity} pointerEvents="none"><path d={d} fillRule="evenodd" {...common} /></g>;
+  } else if (s.kind === "cone") {
+    const h = ((s.angle / 2) * Math.PI) / 180;
+    if (s.angle >= 360) return <g opacity={opacity} pointerEvents="none"><circle cx={x} cy={y} r={r} {...common} /></g>;
+    const p = (a: number) => `${x + Math.sin(a) * r} ${y - Math.cos(a) * r}`;
+    d = `M${x} ${y} L${p(b - h)} A${r} ${r} 0 ${s.angle > 180 ? 1 : 0} 1 ${p(b + h)} Z`;
+  } else if (s.kind === "cross") {
+    const w = (s.width * scale) / 2;
+    const arm = (a: number) => {
+      const ux = Math.sin(a), uy = -Math.cos(a), px = -uy, py = ux;
+      return `M${x - ux * r + px * w} ${y - uy * r + py * w} L${x + ux * r + px * w} ${y + uy * r + py * w} L${x + ux * r - px * w} ${y + uy * r - py * w} L${x - ux * r - px * w} ${y - uy * r - py * w} Z`;
+    };
+    d = `${arm(b)} ${arm(b + Math.PI / 2)}`;
+  } else {
+    // Rectangle from the caster along the bearing.
+    const w = (s.width * scale) / 2;
+    const ux = Math.sin(b), uy = -Math.cos(b), px = -uy, py = ux;
+    d = `M${x + px * w} ${y + py * w} L${x + ux * r + px * w} ${y + uy * r + py * w} L${x + ux * r - px * w} ${y + uy * r - py * w} L${x - px * w} ${y - py * w} Z`;
+  }
+  return <g opacity={opacity} pointerEvents="none"><path d={d} {...common} /></g>;
+}
+
 /** A small triangle just outside a dot, pointing along compass bearing `b` (radians, 0 = N). */
 function FacingWedge({ x, y, r, b, color, size }: { x: number; y: number; r: number; b: number; color: string; size: number }) {
   const at = (dist: number, ang: number) => `${x + Math.sin(ang) * dist} ${y - Math.cos(ang) * dist}`;
   const spread = size / (r + 2);
-  return <path d={`M${at(r + size + 4, b)} L${at(r + 1, b - spread)} L${at(r + 1, b + spread)} Z`} fill={color} stroke="rgba(0,0,0,0.7)" strokeWidth={1.5} />;
+  return <path d={`M${at(r + size + 4, b)} L${at(r + 1, b - spread)} L${at(r + 1, b + spread)} Z`} fill={color} stroke="rgba(0,0,0,0.7)" strokeWidth={1.5} pointerEvents="none" />;
 }
 
-/** Pie slice of radius `rad` centred on bearing `b`, `half` radians either side. */
-function arcPath(x: number, y: number, rad: number, b: number, half: number): string {
-  const p = (ang: number) => `${x + Math.sin(ang) * rad} ${y - Math.cos(ang) * rad}`;
-  return `M${x} ${y} L${p(b - half)} A${rad} ${rad} 0 0 1 ${p(b + half)} Z`;
-}
-
-/** One overlay shape (lib/replay/dancing-mad-overlays.ts), in SVG units. */
-function Shape({ s, toX, toY, scale }: { s: OverlayShape; toX: (x: number) => number; toY: (y: number) => number; scale: number }) {
-  const dash = s.dashed ? "10 7" : undefined;
-  if (s.kind === "circle") {
-    const x = toX(s.x), y = toY(s.y), r = Math.max(4, s.r * scale);
-    return (
-      <g opacity={s.opacity}>
-        <circle cx={x} cy={y} r={r} fill={s.fill ? s.color : "none"} fillOpacity={s.fill ? 0.25 : 0} stroke={s.color} strokeWidth={3} strokeDasharray={dash} />
-        {s.label && <text x={x} y={y - r - 6} textAnchor="middle" fill={s.color} fontSize={16} {...LABEL}>{s.label}</text>}
-      </g>
-    );
-  }
-  const x1 = toX(s.x1), y1 = toY(s.y1), x2 = toX(s.x2), y2 = toY(s.y2);
-  const a = Math.atan2(y2 - y1, x2 - x1);
-  const head = 16;
+function Toggle({ label, title, checked, onChange }: { label: string; title: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
-    <g opacity={s.opacity}>
-      <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={s.color} strokeWidth={s.width} strokeDasharray={dash} strokeLinecap="round" />
-      {s.arrow && (
-        <path d={`M${x2} ${y2} L${x2 - head * Math.cos(a - 0.45)} ${y2 - head * Math.sin(a - 0.45)} L${x2 - head * Math.cos(a + 0.45)} ${y2 - head * Math.sin(a + 0.45)} Z`} fill={s.color} />
-      )}
-      {s.label && <text x={(x1 + x2) / 2} y={(y1 + y2) / 2 - 10} textAnchor="middle" fill={s.color} fontSize={16} {...LABEL}>{s.label}</text>}
-    </g>
+    <label title={title} style={{ color: "var(--ck-text-2)", fontSize: 13, whiteSpace: "nowrap", cursor: "pointer" }}>
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} /> {label}
+    </label>
   );
 }
+
+// Labels sit on a light map or a dark background: a dark halo keeps them
+// readable on both.
+const LABEL = { stroke: "rgba(0,0,0,0.75)", strokeWidth: 4, paintOrder: "stroke" } as const;
 
 function Empty({ children }: { children: React.ReactNode }) {
   return (

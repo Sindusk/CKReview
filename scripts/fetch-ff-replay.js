@@ -40,9 +40,11 @@ async function main() {
   });
 
   const started = Date.now();
-  const data = await fflClient.fetchFFReplayData(code, fightId, (f) =>
+  const raw = await fflClient.fetchFFReplayData(code, fightId, (f) =>
     process.stdout.write(`\r  ${Math.round(f * 100)}%`));
   process.stdout.write('\n');
+  // AoE geometry and hitboxes from XIVAPI, saved with the tracks.
+  const data = await requireTsFromRoot('lib/replay/action-shapes.ts').enrichReplayData(raw);
 
   // A subfolder, like dps/: every report-folder loader reads each top-level
   // *.json except meta.json as a fight file.
@@ -60,6 +62,8 @@ async function main() {
     const maxGap = gaps.length ? Math.max(...gaps) : 0;
     console.log(`  ${p.name.padEnd(24)} ${p.job.padEnd(14)} ${p.samples.length} samples (${(p.samples.length / durS).toFixed(2)}/s, longest gap ${(maxGap / 1000).toFixed(1)}s)`);
   }
+  console.log(`  ${Object.keys(data.actionGeometry).length} ability shapes; hitboxes: ` +
+    enemies.filter((e) => e.targetable && e.hitbox).map((e) => `${e.name} ${e.hitbox / 100}y`).join(', '));
   console.log(`  map: ${data.map ? `${data.map.name} (${data.map.filename}, sizeFactor ${data.map.sizeFactor})` : 'none'}; ${data.enemyCasts.length} enemy casts`);
   console.log(`  ${enemies.length} enemy tracks, ${enemies.filter((e) => e.targetable).length} targetable: ` +
     enemies.filter((e) => e.targetable).map((e) => e.name).join(', '));

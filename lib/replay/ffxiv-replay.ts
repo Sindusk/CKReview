@@ -32,6 +32,7 @@
 // dot across it would draw a path nobody walked.
 
 import type { FFLActor } from "@/lib/ffl-client";
+import type { ActionGeometry } from "@/lib/replay/action-shapes";
 
 /** Server-side filter for the replay fetch: event types that carry resources. */
 export const REPLAY_EVENT_FILTER =
@@ -75,6 +76,9 @@ export type ReplayActor = {
   // that never take damage are mostly invisible helper actors that place
   // AoEs; the panel hides them by default.
   targetable?: boolean;
+  gameId?:  number;     // enemies: BNpcBase id (FFLActor.gameID)
+  icon?:    string;     // FFLogs' icon name: "Boss", "NPC", ...
+  hitbox?:  number;     // radius in centi-yalms (action-shapes.ts's enrichReplayData)
   samples:  ReplaySample[];
 };
 
@@ -123,6 +127,8 @@ export type ReplayData = {
   enemyCasts?: ReplayCast[];
   enemyHits?:  ReplayHit[];
   abilityNames?: Record<number, string>;   // names of the abilities in enemyHits
+  // Game data looked up after the fetch (lib/replay/action-shapes.ts).
+  actionGeometry?: Record<number, ActionGeometry>;
 };
 
 /** XIVAPI v2 URL of a map texture from its FFLogs filename, or null if the name doesn't parse. */
@@ -181,7 +187,7 @@ export function buildReplayData(
         key, actorId: id,
         name: instance && instance > 1 && !isPlayer ? `${actor.name} ${instance}` : actor.name,
         kind: isPlayer ? "player" : "enemy",
-        ...(isPlayer ? { job: actor.subType } : {}),
+        ...(isPlayer ? { job: actor.subType } : { gameId: actor.gameID, icon: actor.icon }),
         samples: [],
       };
       byKey.set(key, track);

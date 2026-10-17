@@ -30,6 +30,7 @@ import RosterPanel from "../components/RosterPanel";
 import TimelinePanel from "@/components/TimelinePanel";
 import ReplayPanel from "@/components/ReplayPanel";
 import type { ReplayData } from "@/lib/replay/ffxiv-replay";
+import { enrichReplayData } from "@/lib/replay/action-shapes";
 import StrategyDialog from "@/components/StrategyDialog";
 import MitigationDialog from "@/components/MitigationDialog";
 import DamageDialog from "@/components/DamageDialog";
@@ -426,6 +427,8 @@ export default function Home() {
         data = await fetchFFReplayData(activePull.reportCode, activePull.fightId,
           (progress) => setReplayLoad({ key, progress, error: null }));
       }
+      // AoE shapes and hitboxes (XIVAPI); saved sample tracks may have them.
+      if (!data.actionGeometry) data = await enrichReplayData(data);
       setReplays((prev) => ({ ...prev, [key]: data! }));
       setReplayLoad(null);
     } catch (err) {
