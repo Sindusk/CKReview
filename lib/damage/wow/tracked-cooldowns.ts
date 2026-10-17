@@ -34,6 +34,7 @@ import { niuzaoValue } from "./specs/brewmaster";
 import { voidformValue } from "./specs/shadow";
 import { shadowDanceValue } from "./specs/subtlety";
 import { ascendanceValue, voltaicBlazeValue } from "./specs/enhancement";
+import { infernalValue, malevolenceValue } from "./specs/destruction";
 
 /**
  * One Vanish's worth to an Assassination Rogue: the damage of a Garrote cast
@@ -315,9 +316,15 @@ export const WOW_TRACKED_COOLDOWNS: Record<string, TrackedCooldown[]> = {
   // landings stays. Havoc (30s) isn't tracked: its value
   // is the damage it copies, not hits of its own, and it was pressed before
   // the pull too (on the enemy at 0:00).
+  // Summon Infernal and Malevolence were worth 0 a use until the WoWAnalyzer
+  // audit's phase 3 (2026-10-17): neither has hits under its cast id, so
+  // their drift never reported. Valued in specs/destruction.ts (the
+  // Infernal pet, Awakening and Crashing Chaos; Malevolence's hit and its
+  // Chaos Bolt bonus). 34 player-pulls: shortest Infernal interval 90.0s,
+  // Malevolence 60.0s.
   "Destruction Warlock": [
-    { name: "Summon Infernal", actionIds: [1122], cooldownMs: 90_000, charges: 1, firstUseOffsetMs: 2_000 },   // 90.2s here, 1.8s
-    { name: "Malevolence", actionIds: [442726], cooldownMs: 60_000, charges: 1, firstUseOffsetMs: 3_000 },     // 60.0s (bars), 2.8s
+    { name: "Summon Infernal", actionIds: [1122], cooldownMs: 90_000, charges: 1, firstUseOffsetMs: 2_000, valuePerUse: infernalValue },   // 90.2s here, 1.8s
+    { name: "Malevolence", actionIds: [442726], cooldownMs: 60_000, charges: 1, firstUseOffsetMs: 3_000, valuePerUse: malevolenceValue },  // 60.0s (bars), 2.8s
     { name: "Soul Fire", actionIds: [6353], cooldownMs: 46_000, charges: 1, firstUseOffsetMs: 1_000, prePullEvidenceIds: [6353] },  // 46.7 / 52.3s, 0.4s
   ],
   "Devastation Evoker": [

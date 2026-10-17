@@ -59,7 +59,11 @@
 //   3:57.2 with no cast). 0.16–0.56M a use (top 0.41–0.51M). Its haste
 //   isn't counted.
 // Both are GCD presses: a lost use freed a GCD, so the player's average
-// GCD comes off.
+// GCD comes off: 0.56–1.41M an Infernal, 3–294k a Malevolence. Neither
+// drift fires on the 34 player-pulls (nobody lost a whole use: the longest
+// holds were Crittybity's Infernals, 94.7 / 105.7 / 122.4s apart in 6:06,
+// four casts where five fit only by the kill's last seconds); the values
+// are there for the pull that does.
 //
 // ── Havoc on the main target (havocTarget) ─────────────────────────────
 // Unchanged from the case study but for one thing: a cast aimed at the
