@@ -140,7 +140,7 @@ export const WOW_TRACKED_COOLDOWNS: Record<string, TrackedCooldown[]> = {
   // recharges with Rage spent (72s less 1s per 40 Rage fits the log; the
   // fixed 41s sat above the 36.9s shortest interval) and does no damage
   // itself, so a lost use here was worth 0 and never reported. Odyn's Fury
-  // is a clean 45s (shortest 45.0s on three players). Each press logs four
+  // is a clean 45s (shortest 45.0–45.9s on four players). Each press logs four
   // casts (385059, then 385060 / 385061 / 385062 within 0.3s); the survey
   // took 385062 for the GCD press, so it's the tracked id, and the lost use
   // is its hits (385060 / 385061 / 385062, 0.2–0.4M a press) less the GCD

@@ -595,8 +595,17 @@ and delete them from the header.
     `wrong`: Shadowburn efficiency and kill reset (no cooldown). Kept
     `wrong`: Havoc window grades, Soul Fire shard cut. Left: Immolate,
     Channel Demonfire and Grimoire of Sacrifice rows, for want of a log.
-  - [warrior-fury.md](wowa-audit/warrior-fury.md): 11; Avatar drift (the
-    Arms Anger Management model).
+  - [warrior-fury.md](wowa-audit/warrior-fury.md): phase 3 done
+    2026-10-17 on 18 player-pulls (eight fights fetched; 16 Slayer, 2
+    Thane). Built (specs/fury.ts): Rampage held while unenraged (top
+    0–116k, weak up to 575k), Recklessness drift (72s less 1s per 40 Rage,
+    valued by its window; the tracked 41s was worth 0), Fury's own Rage
+    cap check outside Recklessness and Bladestorm (the shared one read
+    0.47–1.01M on top players); Odyn's Fury drift valued with burstHold;
+    Bladestorm's own Bloodthirsts aren't presses (game.ts). Not built:
+    Thunder Blast stacks (negligible), Whirlwind stacks (fires on top
+    players as much), Bladestorm's cooldown (no model fits). Proposed
+    `wrong`: Slayer Execute overuse.
   - [deathknight-blood.md](wowa-audit/deathknight-blood.md): tank, 7;
     Death and Decay with Crimson Scourge.
   - [deathknight-unholy.md](wowa-audit/deathknight-unholy.md): 7;
