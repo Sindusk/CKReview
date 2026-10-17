@@ -105,6 +105,12 @@ const LOCK_STATUSES = new Map<number, number>([
 // once. It's an on-GCD channel, and its Mortal Strikes aren't presses.
 const BLADESTORM = 446035;
 const MORTAL_STRIKE = 12294;
+// Aldrachi Reaver's Reaver's Glaive (442294; Havoc, the WoWAnalyzer audit's
+// phase 3, 2026-10-17) isn't in the survey, so each press read as an idle
+// GCD. It's an on-GCD press: the next GCD came 0.75s+ after it (median
+// 0.99–1.15s; Poetry LckJC7GMhQvD6rdw, Ldh baRCnPv62YQ1dJZN, Mythnarra
+// qpZx3mWaG7gcDdYB, 20–26 a pull).
+const REAVERS_GLAIVE = 442294;
 const CRUSADING_STRIKES = 408385;
 
 // Taunts (spell-data.ts): Dark Command, Hand of Reckoning, Provoke, Torment.
@@ -147,6 +153,10 @@ const ACTIONS = new Map<number, GameAction>();
 {
   const bs = ACTIONS.get(BLADESTORM);
   if (bs) ACTIONS.set(BLADESTORM, { ...bs, onGcd: true, recastMs: HASTED_GCD_MS, cooldownMs: HASTED_GCD_MS, speedScaled: true });
+  if (!ACTIONS.has(REAVERS_GLAIVE)) ACTIONS.set(REAVERS_GLAIVE, {
+    id: REAVERS_GLAIVE, name: "Reaver's Glaive", onGcd: true, recastMs: HASTED_GCD_MS, cooldownMs: HASTED_GCD_MS,
+    charges: 1, speedScaled: true, appliesStatusIds: [REAVERS_GLAIVE],
+  });
   // Retribution's Crusading Strikes replaces the auto-attack and logs a
   // cast per swing (Polpo, 172 of them on gVDPhzp61Zm29HMw Kith'ix pull 2):
   // read as presses, every swing was a weave in gap labels and the
