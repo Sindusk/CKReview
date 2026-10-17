@@ -304,13 +304,10 @@ and delete them from the header.
   - [shaman-elemental.md](wowa-audit/shaman-elemental.md): Elemental,
     phase 3 done 2026-10-16 against seven top parses, re-measured as
     damage lost the same day. Built and verified: non-overload casts in
-    Ascendance and Lava Burst without Flame Shock
-    (lib/damage/wow/specs/elemental.ts). Left to build, by value: unbuffed
-    spenders (~6.5% each), one-target Chain
-    Lightning (~35k); early Flame Shock refreshes are a fifth, low
-    (5-62k a pull). Idle in a Call of the Ancestors window is a sixth:
-    the Ancestors lose ~33k a second while the player is idle, on top of
-    the GCD the gap check prices. Stormkeeper drift built (60s
+    Ascendance, Lava Burst without Flame Shock, idle with the Ancestors
+    out (lib/damage/wow/specs/elemental.ts). Left to build, by value:
+    unbuffed spenders (~6.5% each), one-target Chain Lightning (~35k),
+    early Flame Shock refreshes (5-62k a pull). Stormkeeper drift built (60s
     less 3s per Ancestor summoned; Vashnik holds for the Venoms after
     Imbibe allowed). Open: Ascendance spenders (low value).
   - [monk-windwalker.md](wowa-audit/monk-windwalker.md): 12 candidates;

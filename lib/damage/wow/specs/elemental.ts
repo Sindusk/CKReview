@@ -50,11 +50,26 @@
 // excused: a Flame Shock first costs a GCD its DoT can't pay back.
 // Measured: top seven 0–4 a pull, Cocroach 15 in 12 pulls (5 on one add at
 // Coiled Altar 2:48–3:11).
+//
+// ── Idle with the Ancestors out (ancestorIdle) ─────────────────────────
+// Call of the Ancestors (447244 on the player; the pet is "Ancestor")
+// mirrors the player: each cast makes every Ancestor out cast once, ~1s
+// later (two Lava Bursts after each Lightning Bolt at two stacks, Elemeta
+// 1:07–1:12). 75–93% of their damage lands 0.6–1.7s after a player GCD, and
+// almost none more than 1.6s after the last one, so idle stops them too.
+// Each idle GCD in a window loses a round of their casts: unforced idle
+// (the gap check's stretches of DELAY_FINDING_MS+, inside the window, less
+// forced time and movement) ÷ GCD × the player's Ancestor damage per GCD
+// in the windows (54–90k). That's on top of checkGcdGaps, which prices the
+// player's own GCD. WoWAnalyzer grades active time per window instead
+// (forced time included). An earlier per-second split (58.4k/s casting vs
+// 25.7k/s idle, top seven) undercounted: the last cast's echo lands in the
+// idle that follows it.
 
 import type { PlayerEvent } from "@/types/PlayerInfo";
 import type { DamageFinding, JobCheck, Moment } from "../../types";
-import { finding, type PlayerCheckContext } from "../../checks";
-import type { Window } from "../../timeline";
+import { DELAY_FINDING_MS, GCD_TOLERANCE_MS, finding, type PlayerCheckContext } from "../../checks";
+import { gcdLockMs, mergeWindows, overlapMs, type Window } from "../../timeline";
 import { k, s, statusWindows } from "./shared";
 
 const ASCENDANCE = 1219480;
@@ -70,6 +85,9 @@ const NO_OVERLOAD: Record<number, string> = { 188389: "Flame Shock", 196840: "Fr
 const VB_RECHARGE_MS = 7_500;
 const FILLER_AFTER_MS = 30_000;
 const UNSHOCKED_DIES_MS = 5_000;
+const CALL_OF_THE_ANCESTORS = 447244;
+const ANCESTOR_LAG_MS = 1_500;
+const ANCESTOR_MIN_CASTS = 10;
 
 const clock = (ms: number) => {
   const t = Math.max(0, Math.round(ms / 1000));
@@ -304,4 +322,46 @@ const lavaBurstUnshocked: JobCheck = (ctx) => {
   })];
 };
 
-export const ELEMENTAL_CHECKS: JobCheck[] = [ascendanceNonOverload, lavaBurstUnshocked];
+// ── Idle with the Ancestors out ────────────────────────────────────────
+
+const ancestorIdle: JobCheck = (ctx) => {
+  const wins = mergeWindows(statusWindows(ctx, CALL_OF_THE_ANCESTORS).filter((w) => w.startMs < ctx.endMs)
+    .map((w) => ({ startMs: w.startMs, endMs: Math.min(w.endMs, ctx.endMs) })));
+  if (wins.length === 0) return [];
+  const uses = ctx.uses.filter((u) => u.startMs < ctx.endMs);
+  const castsIn = uses.filter((u) => inside(wins, u.startMs)).length;
+  // The Ancestors' casts land ~1s after the player's: count their hits to ANCESTOR_LAG_MS past the window.
+  const ancestor = ctx.player.damageDone.filter((e) => e.pet === "Ancestor" && wins.some((w) => e.timestamp >= w.startMs && e.timestamp <= w.endMs + ANCESTOR_LAG_MS))
+    .reduce((a, e) => a + (e.amount ?? 0), 0);
+  if (castsIn < ANCESTOR_MIN_CASTS || ancestor <= 0) return [];
+  const perCast = ancestor / castsIn;
+  const excluded = mergeWindows([...ctx.forced, ...(ctx.movement ?? [])]);
+  const moments: Moment[] = [];
+  let idleMs = 0, lost = 0;
+  for (let i = 0; i + 1 < uses.length; i++) {
+    const from = uses[i].startMs + gcdLockMs(uses[i], ctx.factorAt(uses[i].startMs));
+    const to = uses[i + 1].startMs - GCD_TOLERANCE_MS;
+    if (to - from < DELAY_FINDING_MS) continue;
+    let ms = 0;
+    for (const w of wins) {
+      const a = Math.max(from, w.startMs), b = Math.min(to, w.endMs);
+      if (b > a) ms += b - a - overlapMs(a, b, excluded);
+    }
+    if (ms < DELAY_FINDING_MS) continue;
+    const gcd = ctx.baseGcdMs / ctx.factor * ctx.factorAt(from);
+    const v = ms / gcd * perCast;
+    idleMs += ms; lost += v;
+    moments.push({ startMs: from, endMs: to, lostDamage: v, detail: `${s(ms)} idle after ${uses[i].abilityName} at ${clock(from)} with the Ancestors out` });
+  }
+  if (moments.length === 0) return [];
+  return [finding(ctx, {
+    kind: "burst-window", startMs: moments[0].startMs, endMs: moments[moments.length - 1].endMs, forced: false, inference: true,
+    label: "Idle with the Ancestors out",
+    lostDamage: lost,
+    basis: `${s(idleMs)} idle in Call of the Ancestors windows (outside forced time and movement) ÷ GCD × ${k(perCast)} of Ancestor damage per player GCD in the windows (${castsIn} GCDs); on top of the gap check's own GCD value`,
+    detail: `${s(idleMs)} idle while the Ancestors were out (${moments.length} gaps): each GCD not cast is a round of Ancestor casts not cast`,
+    moments,
+  })];
+};
+
+export const ELEMENTAL_CHECKS: JobCheck[] = [ascendanceNonOverload, lavaBurstUnshocked, ancestorIdle];
