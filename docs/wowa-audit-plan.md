@@ -122,7 +122,10 @@ file, `shared.ts`, `potion.ts`), `lib/damage/wow/tracked-cooldowns.ts` and
 inputs to the `wrong` status:
 - the WoWAnalyzer errors already found (dps-analysis.md and the spec
   headers): Stasis as ready time, Soul Fire's ~41s cooldown model,
-  pre-pull casts missed, double-graded idle;
+  pre-pull casts missed. (Idle inside a damage window is *not* a double
+  count of `checkGcdGaps`: it costs more than a normal GCD. It's
+  `covered` where the app has `burstGcdFindings` on that window,
+  otherwise a candidate.);
 - the user's leniency rules: a rule that grades what the user chose not to
   judge (movement idle, utility, defensives) is `no-damage`, not a
   candidate.
@@ -137,11 +140,36 @@ The FFXIV plan's premise and firing checks, plus:
 - **Talent check first.** Read the player's talents from the pull's
   CombatantInfo. A rule for a talent they didn't take neither holds nor
   fails on that pull; skip it there.
+- **Value every candidate as damage lost first** (user, 2026-10-16).
+  Measure what the action cost against what the player would have done
+  instead, overloads, procs and DoTs included. Top players doing the same
+  thing is evidence about the premise, not proof that it costs nothing:
+  Elemental's first pass marked five real losses `wrong` that way.
+- **Ask what it costs on the timeline** (user, 2026-10-16): would doing
+  this here cost something later in the fight (a cooldown pushed out of
+  a burst window, a resource or charge not there when the window opens,
+  a DoT or buff due again sooner)? Count that in the loss, and in the
+  case for `wrong` or `no-damage`.
 - **References are the check when there's no VOD**, as in the case
   studies: run every new or covered check on a 99th/100th-percentile
   log of the spec on the same boss. A check that fires on the top player
   either matches WoWAnalyzer's page for that player (a real, common loss)
   or is wrong.
+- **`wrong` and `no-damage` need the user's approval** (user,
+  2026-10-16), spec by spec as phase 3 reaches it. These are the two
+  statuses that drop a rule. Before marking one:
+  - check the verdict yourself: measure the loss in the log, or show
+    why the rule's premise fails;
+  - then bring the user the evidence, one numbered item per row, with
+    pull, MM:SS and numbers they can check;
+  - mark the row only after the user agrees, and add "Approved by the
+    user YYYY-MM-DD." to its notes;
+  - an approved row isn't raised again.
+
+  A row the user rejects goes back to `candidate`. `covered` and
+  `superseded` need no approval. Phase 2's `wrong` and `no-damage` rows
+  in the fan-out ledgers are proposals until their spec's phase 3 has
+  this review.
 - **Firing needs a weaker log.** The top parses rarely make the mistake.
   Look in lower-percentile logs of the spec on WCL rankings, fetching only
   the one fight (`fetch-wow-report.js <code> --fight <id>`).

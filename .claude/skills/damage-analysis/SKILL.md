@@ -147,6 +147,18 @@ Classify each claim, and report it in a table (claim | verdict | app):
   - windows keyed on a cast that came one GCD after the burst opened
     (VPR Serpent's Ire after the first Reawaken);
   - its GCD estimate against the app's (GNB's 8-or-9 No Mercy rule).
+- **Ask what it costs on the timeline** (user, 2026-10-16), for every
+  claim, adopted or not: does doing this action here cost something later
+  in the fight that lowers damage? Some cases:
+  - a cooldown pressed now that won't be back for the next burst window;
+  - a resource, charge or proc spent now that the window needs;
+  - a GCD in a window spent on something that could have waited;
+  - a refresh or recast that brings the next one due sooner.
+
+  Planning the timeline around big cooldowns and burst windows is core to
+  MMO play. A claim that looks free in the moment can cost damage a
+  minute later, and a "loss" in the moment can be the right call for the
+  window it sets up. Value the claim over the timeline, not just the cast.
 - Check the app's side too: the app's findings can be wrong where
   xivanalysis is right (a pre-pull buff the app didn't see, a proc expiry
   hidden by a cast beside it, a window cut by the kill). Before agreeing
