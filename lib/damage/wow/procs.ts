@@ -98,6 +98,19 @@
 //   99th-percentile and better players (Qenjua, Traviexx, Leevilh,
 //   Taewoos, Tdyipce). Worth a whole Chakram: its hits (1266081, matched
 //   by name) are 0.3–1.4M a press, against a GCD of ~0.25M.
+// - Clearcasting 15s and Apex Predator's Craving 15s (Feral; added in its
+//   phase 3, 2026-10-17, 14 player-pulls of 13 players). Clearcasting
+//   (135700) makes the next Shred or Swipe free: 754 of 892 removals
+//   beside a Shred, 129 a Swipe; 4 at D (15.02–15.03s), all on the weaker
+//   players (Cheezywizzy ZvrLTQfk1zbAXMwB 0:50, 2:40, 4:03; Tyger
+//   RwxWC6PF2pJ7Zd9H 0:58), max 15.03s of 683. Worth a whole Shred (its
+//   40 Energy). Apex Predator's Craving (391882) is a free Ferocious Bite
+//   (Ravage 441591 for Druid of the Claw): 165 removals beside a Bite, 7 a
+//   Ravage; 3 at D (14.99–15.02s: Scaricat 6Bpq1FmA9aH4WQxc 2:50 and 4:39,
+//   Cheezywizzy 0:49), max 15.02s of 175. Worth a whole Bite.
+//   Not added: Sudden Ambush (1244483) has no duration in the samples
+//   (longest spans 5.0–7.3s, one 13.6s; its 43 press-less removals come
+//   0.2–3.4s after the gain); Predatory Swiftness (12s) is a free heal.
 //
 // ── Measured and left out ──────────────────────────────────────────────
 // - Lava Surge (77762) 10s, clean, but 75 of 657 run out on the top
@@ -161,4 +174,6 @@ export const WOW_MEASURED_PROCS = new Map<number, MeasuredProc>([
   [264571,  { durationMs: 12_000, consumerIds: [686, 198590, 1261153] }],         // Nightfall → Shadow Bolt, Drain Soul, Malefic Grasp
   [93622,   { durationMs: 10_000, consumerIds: [33917] }],                        // Gore → Mangle
   [1264946, { durationMs: 17_000, consumerIds: [1264949] }],                      // Moonlight Chakram (from Trueshot) → Moonlight Chakram
+  [135700,  { durationMs: 15_000, consumerIds: [5221, 106785] }],                 // Clearcasting (Feral) → Shred, Swipe
+  [391882,  { durationMs: 15_000, consumerIds: [22568, 441591] }],                // Apex Predator's Craving → Ferocious Bite, Ravage
 ]);
