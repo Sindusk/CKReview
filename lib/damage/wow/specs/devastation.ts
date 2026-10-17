@@ -53,6 +53,14 @@
 // too, but each moment is a tick paid for and dropped for no time gained,
 // and the habit separates them: a clip of the last tick alone 3–13 times a
 // pull on the top players (median 6), 7–24 on the weaker (median 14).
+// No jitter tolerance (checked for the main session, 2026-10-17): the
+// margin from the clipping press to the first dropped tick's due time
+// (last tick + T) is spread the same on the top players and the weak, so
+// a near-miss isn't a top-player habit. Top 125 clips: under 0 (tick
+// missing though due before the press: log timing) 10, 0–50ms 21,
+// 50–100ms 20, 100–150ms 17, 150–300ms 38, 300ms+ 19 (54% under 150ms);
+// weak 166: 14, 25, 14, 28, 48, 37 (49% under 150ms). A 150ms tolerance
+// would cut both alike.
 // WoWAnalyzer grades the same ticks (its tick efficiency; Bragontix
 // 340 / 385 against 380 / 415 here, chains counted as carried).
 //
