@@ -21,7 +21,24 @@
   Augmentation are keyed there), and no potion check for healers
   (`potion.ts` returns early for the Healer role). Preservation has 9
   survey players and no case study.
-- **Phase 3:** not started.
+- **Phase 3:** done 2026-10-17, a short healer pass; nothing built. Run on
+  Drizzy (VWMbYPRyxCAmhZFj), Ysaeryn (LckJC7GMhQvD6rdw), Drcornman
+  (GndQ9VFWtLzNjKpk), Acrojr (Kag91qVZ2YJ7MQAb), Althai and Treshpleyer
+  (xN9cWhzbvqTVfrG8), Tsonge and Pelinmerkkii (baRCnPv62YQ1dJZN) and
+  Cococaines (gVDPhzp61Zm29HMw Ula'tek). `checkGcdGaps` fires on every
+  one (GCD uptime 57–92%; Drizzy 84%, 30s unforced idle). Spell survey:
+  the casts before the idle gaps are ordinary presses (Echo, Emerald
+  Blossom, Temporal Anomaly, Fire Breath, Living Flame); Fire and Dream
+  Breath take their charge time from the begin-cast, Disintegrate is a
+  channel, and the off-GCD Dream Breath (355941) inside gaps is a Stasis
+  release. The only missing lock was Soulcoiler Ritual Vessel, a healer
+  on-use item (2.0s; game.ts, fe490c2). Hidden damage: only Essence Burst
+  (below), and it doesn't run out. Not a WoWAnalyzer rule, but for the
+  user: `healGcds` judges Echo by Echo's own direct heal, while its value
+  is the copy of the next heal (logged under that spell's name: Reversion
+  367364, Dream Breath 376788 on Drizzy). It flags 7 of 37 Echoes on
+  Drizzy (816k), 14 of 52 on Tsonge (2.04M), 10 of 49 on Pelinmerkkii
+  (1.26M).
 - **Core rules** (active time, cast efficiency, cancelled casts) are in
   [core.md](core.md); rows below cover only what Preservation sets or adds.
   The Evoker class layer (Fire Breath efficiency, Devastation and
@@ -32,21 +49,21 @@
 
 | id | status | app check | talents | fires-on | notes |
 |---|---|---|---|---|---|
-| evoker-preservation/AlwaysBeCasting/downtime-pct | superseded | `checkGcdGaps` | none | idle time | Above 40 / 55% of the whole fight idle (the third step, 100%, can't be reached). Far looser than the DPS default, and healer idle is partly forced. The whole-fight denominator counts Stasis-like time. Shown only as a statistic. |
+| evoker-preservation/AlwaysBeCasting/downtime-pct | superseded | `checkGcdGaps` | none | idle time | Above 40 / 55% of the whole fight idle (the third step, 100%, can't be reached). Far looser than the DPS default, and healer idle is partly forced. The whole-fight denominator counts Stasis-like time. Shown only as a statistic. Phase 3: `checkGcdGaps` fires on all nine sample players (gaps, small delays, drift). |
 | evoker-preservation/AlwaysBeCasting/non-healing-time | no-damage | — | Energy Loop, Life-Giver's Flame | time not on a healing cast | Above 40 / 50 / 55% of the fight. Grades healing as the work, with a hand-kept list (Disintegrate and Fire Breath count as healing only under those talents), so a player damaging in a quiet spell window is marked down. The app goes the other way (damage filler is the healer's choice, not judged). Not shown in the guide. |
 | evoker-preservation/Abilities/reversion-efficiency | no-damage | — | Reversion | Reversion cast under 60% of possible charges | A healing cooldown with a lowered 60% target. Whole-fight, forced time counted as ready, no cooldown reduction modelled. Not tracked in the app. |
 | evoker-preservation/Abilities/dream-breath-efficiency | no-damage | — | Spiritual Clarity, Instability Matrix, Legacy of the Lifebinder, Font of Magic | Dream Breath cast under 80% of possible uses | A heal. Whole-fight denominator; its cooldown model depends on talent values hand-set in the code plus runtime reductions (Nozdormu's Teachings, Temporal Burst), so a missed reduction skews it both ways. Not tracked in the app. |
 | evoker-preservation/Abilities/dream-flight-efficiency | no-damage | — | Dream Flight | Dream Flight cast under 80% of possible uses | A heal; the guide wants it on clumped damage, which efficiency doesn't check. Whole-fight, last use expected even if the fight ends first. |
 | evoker-preservation/Abilities/stasis-efficiency | no-damage | — | Stasis | Stasis or its release under 80% | Two entries on one 90s model, so one Stasis and its release can be judged twice, and a Stasis held for a late release reads as a miss. Held time counts as ready. |
 | evoker-preservation/Abilities/no-target-spells | no-damage | — | Nozdormu Adept, Temporal Artificer | — | Echo, Time Dilation, Temporal Anomaly, Rewind and Merithra's Blessing are declared with no target. Never grades. |
-| evoker-preservation/Guide/cast-efficiency-bars | superseded | — | per spell | as the spellbook rows | Guide bars for Dream Breath, Dream Flight, Stasis and Temporal Anomaly redraw the same efficiency numbers, with gap highlighting that marks forced time as available. |
+| evoker-preservation/Guide/cast-efficiency-bars | superseded | — | per spell | as the spellbook rows | Guide bars for Dream Breath, Dream Flight, Stasis and Temporal Anomaly redraw the same efficiency numbers, with gap highlighting that marks forced time as available. Phase 3: no app check to fire; the bars restate the efficiency rows above, all `no-damage`. |
 | evoker-preservation/DreamBreath/targets-per-cast | no-damage | — | none | a cast hitting fewer than 5 targets | Full group is 6 if the log shows more than 5 combatants, so in a 20-player raid the cap is still one party. Healing coverage. |
 | evoker-preservation/DreamBreath/average-targets | no-damage | — | none | average under 5 | A getter nothing displays. |
 | evoker-preservation/DreamFlight/targets-hit | no-damage | — | Dream Flight | under 75% of players hit | The denominator is every combatant in the report; a spread-out boss makes it unfixable. Healing coverage. |
 | evoker-preservation/DreamFlight/overhealing | no-damage | — | Dream Flight | over 40% overheal on a cast | Raid damage decides it, not the player. The app's `healGcds` is the nearest check, but it grades heal GCDs, not this ability's casts, and values them as the damage filler. |
 | evoker-preservation/DreamFlight/average-group-hit | no-damage | — | Dream Flight | average under 70% | A getter nothing displays. |
 | evoker-preservation/EmeraldBlossom/per-cast | no-damage | — | Essence Burst, Fluttering Seedlings | a Blossom cast without an Essence Burst, or hitting under 5 targets | Healing. Fails a Blossom the raid damage may have needed. |
-| evoker-preservation/EssenceBurst/consumption | no-damage | — | Essence Burst, Twin Echoes, Energy Loop, Essence Attunement | a proc expiring unspent or refreshed | A wasted proc is a lost free heal. The one damage reading, a proc spent on Disintegrate, is graded Fail by this rule unless Energy Loop is taken, so the rule counts damage as the wrong spend. Pre-pull procs are not seeded. |
+| evoker-preservation/EssenceBurst/consumption | no-damage | — | Essence Burst, Twin Echoes, Energy Loop, Essence Attunement | a proc expiring unspent or refreshed | A wasted proc is a lost free heal. The one damage reading, a proc spent on Disintegrate, is graded Fail by this rule unless Energy Loop is taken, so the rule counts damage as the wrong spend. Pre-pull procs are not seeded. Phase 3, the one damage reading checked: of 538 Essence Burst removals on seven sample players, every one but one sat beside a spender (Emerald Blossom, Echo, Disintegrate); Althai's one unspent removal was 12.5s after the gain. No proc runs out, so no damage is lost. |
 | evoker-preservation/EssenceBurst/expired-count | no-damage | — | Essence Burst | any expired proc, or fewer than 3 procs | Getters nothing displays; a short pull would trip the fewer-than-3 limit. |
 | evoker-preservation/Stasis/stored-spells | no-damage | — | Stasis | Stasis holding anything but Temporal Anomaly, Emerald Blossom, Merithra's Blessing or Dream Breath | Healing setup. Pre-pull Stasis is inferred from the buff, but its spells show as unknown and fail. |
 | evoker-preservation/InnerFlame/window | no-damage | — | Inner Flame | — | Always Good with an empty checklist; nothing is checked. |

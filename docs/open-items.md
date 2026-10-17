@@ -378,13 +378,23 @@ and delete them from the header.
     (Sweeping Strikes, Deep Wounds refresh, Cleave efficiency), Rend early
     refresh proposed `wrong`.
   - [evoker-preservation.md](wowa-audit/evoker-preservation.md): healer,
-    0 candidates.
+    phase 3 done 2026-10-17: nothing built. `checkGcdGaps` fires; the
+    survey covers every press (empowers time from their begin-casts);
+    Essence Burst never runs out on the sample players. Open for the
+    user: `healGcds` flags Echo by Echo's own small heal (0.8–2.0M a
+    pull on top players), though its value is the echoed copy.
   - [monk-mistweaver.md](wowa-audit/monk-mistweaver.md): healer, 6
     damage candidates; Celestial Conduit as a tracked cooldown.
-  - [druid-restoration.md](wowa-audit/druid-restoration.md): healer, 0
-    candidates.
-  - [shaman-restoration.md](wowa-audit/shaman-restoration.md): healer, 0
-    candidates.
+  - [druid-restoration.md](wowa-audit/druid-restoration.md): healer,
+    phase 3 done 2026-10-17: nothing built. Convoke the Spirits (3.0s)
+    and Soulcoiler Ritual Vessel (2.0s) now lock the GCD (game.ts), which
+    read as idle: GCD uptime +3–4 points. `checkGcdGaps` and `healGcds`
+    (Regrowth, Wild Growth) fire. Open for the user: `healGcds` prices
+    overhealed Rejuvenations at 1.4–3.0M a pull on top players.
+  - [shaman-restoration.md](wowa-audit/shaman-restoration.md): healer,
+    phase 3 done 2026-10-17: nothing built. `checkGcdGaps` and
+    `healGcds` (Chain Heal) fire; the survey covers every press (the
+    vessel lock above adds about a point of uptime).
   - [hunter-beastmastery.md](wowa-audit/hunter-beastmastery.md): 4; Cobra
     Shot over Barbed Shot.
   - [druid-balance.md](wowa-audit/druid-balance.md): 9; Fury of Elune

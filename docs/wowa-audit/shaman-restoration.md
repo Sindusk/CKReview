@@ -26,7 +26,19 @@
   case-study pages are all damage specs), so nothing here is `verified`.
   Healers are scored by what a heal GCD healed and what idle cost; DoTs are
   deliberately not judged on them (healer.ts header).
-- **Phase 3:** not started.
+- **Phase 3:** done 2026-10-17, a short healer pass; nothing built. Run on
+  Xhottie (dG8D9y6WxrfmtgXp), Akhsjdfgahkj (GndQ9VFWtLzNjKpk),
+  Honeythunder (PAgdKqkXDTRfLnJy), Please (Kag91qVZ2YJ7MQAb),
+  Harimahunter and Cousinbalin (ZjVtM1vFcrp7w3WC), Shoomon and Aleshaman
+  (VWMbYPRyxCAmhZFj), Morcq (wWx8B1GPZMLghAyz), Cocovid and Neptune
+  (qpZx3mWaG7gcDdYB). Spell survey: the casts before the idle gaps are
+  ordinary presses (Chain Heal and Healing Wave with their begin-casts,
+  Riptide, Lava Burst, Flame Shock, Surging Totem); Healing Stream Totem,
+  Nature's Swiftness and Spiritwalker's Grace are off the GCD. The only
+  missing lock was Soulcoiler Ritual Vessel (2.0s; game.ts, fe490c2):
+  GCD uptime up about a point (Xhottie 73 → 74%, Harimahunter 71 → 72%).
+  No hidden damage effect in the `no-damage` rows: none grades a damage
+  spell, and Nature's Swiftness spent on damage isn't a loss.
 - **Core rules** (active time, cast efficiency, potions, cancelled casts)
   are in [core.md](core.md); rows below cover only what Restoration sets or
   adds. Shaman class-layer records are reconciled in
@@ -41,7 +53,7 @@ and say so; where one could inform `lib/mitigation/`, the note says it.
 
 | id | status | app check | talents | fires-on | notes |
 |---|---|---|---|---|---|
-| shaman-restoration/AlwaysBeCasting/healing-gcd-list | superseded | `checkGcdGaps` | Surging Totem, Ascendance, Stormstream Totem counted | idle time | Only supplies which abilities count as healing GCDs (heals, totems, Ascendance, Earth Shield, Downpour, dispels); the panel is core's, whole fight, 5 / 10 / 15% idle. The app takes active time from the log's own casts and subtracts forced time. WoWAnalyzer counts dispels and totem drops as active casting, which hides idle; the app counts any GCD cast. |
+| shaman-restoration/AlwaysBeCasting/healing-gcd-list | superseded | `checkGcdGaps` | Surging Totem, Ascendance, Stormstream Totem counted | idle time | Only supplies which abilities count as healing GCDs (heals, totems, Ascendance, Earth Shield, Downpour, dispels); the panel is core's, whole fight, 5 / 10 / 15% idle. The app takes active time from the log's own casts and subtracts forced time. WoWAnalyzer counts dispels and totem drops as active casting, which hides idle; the app counts any GCD cast. Phase 3: `checkGcdGaps` fires on all ten sample players (GCD uptime 68–88%). |
 | shaman-restoration/Guide/riptide-cast-efficiency | no-damage | — | Riptide; Echo of the Elements, Elemental Reverb (charges); Rip Current; Offering from Beyond, Mystic Knowledge (modelled reductions) | Riptide left off cooldown a full recharge | Default 80% bar, whole fight. Not tracked: charges and modelled reductions spread the intervals too far (survey 1.2s shortest, 5.2s median). A skipped Riptide is healing throughput; the GCD it would fill is not idle, so there is no damage to value. What `healGcds` does cover is a Riptide that was cast and mostly overhealed. |
 | shaman-restoration/Guide/healing-stream-totem-cast-efficiency | no-damage | — | Surging Totem raises the target to 90%; charges; Totemic Momentum, Water Totem Mastery, Totemic Surge | totem charges sitting full | 80% (90% with Surging Totem), whole fight, forced time counted as ready. Charge-gated and off the GCD (survey 2.6s shortest, 16.9s median), so not trackable by the drift rule either. Healing. |
 | shaman-restoration/Guide/healing-rain-cast-efficiency | no-damage | — | Healing Rain (shown only without Surging Totem) | not recast near its 12s cooldown | 80% target, average 70, major 50. Healing. |
@@ -56,7 +68,7 @@ and say so; where one could inform `lib/mitigation/`, the note says it.
 | shaman-restoration/WaterShield/uptime-unconsumed | no-damage | — | Resurgence, Reactive Warding, Therazane's Resilience | nothing graded | Uptime over the whole fight drawn as a bar; the 95 / 90 / 85% getter and the pre-pull flag are read by nothing. Mana. |
 | shaman-restoration/EarthShield/uptime-unconsumed | no-damage | — | Earth Shield; Elemental Orbit, Earthen Harmony | nothing graded | Spec getter 90 / 85 / 80% (shared 95 / 90 / 80%), unread. Summed over players, so two shields can read over 100% and hide a gap. Mitigation and healing. |
 | shaman-restoration/TidalWaves/unused-rate-unconsumed | no-damage | — | Tidal Waves; Primordial Capacity (cap 2 to 3) | nothing graded; Riptide cast at the cap | The unused-rate getter (50 / 80 / 90%) is unread; the guide prints generated, consumed and overcapped counts. Healing throughput. |
-| shaman-restoration/Targets/chain-heal-healing-rain-targets-unconsumed | superseded | `healGcds` | Ancestral Reach, Flow of the Tides (Chain Heal targets) | nothing graded | Average targets per Chain Heal (minor below 97% of the maximum) and per rain or totem tick; shown in statistic boxes only. `healGcds` measures what a Chain Heal actually healed against its overheal, which is the effect of too few targets. The core hits-per-cast candidate (core.md) would not add to it here. |
+| shaman-restoration/Targets/chain-heal-healing-rain-targets-unconsumed | superseded | `healGcds` | Ancestral Reach, Flow of the Tides (Chain Heal targets) | nothing graded | Average targets per Chain Heal (minor below 97% of the maximum) and per rain or totem tick; shown in statistic boxes only. `healGcds` measures what a Chain Heal actually healed against its overheal, which is the effect of too few targets. The core hits-per-cast candidate (core.md) would not add to it here. Phase 3: fires as "Chain Heal mostly overhealed" on all ten sample players (Xhottie 1.36M on dG8D9y6WxrfmtgXp; 0 on Cocovid, who cast no damage GCD to price it by). |
 | shaman-shared/utility | no-damage | — | — | — | Class-layer utility and defensives used by this spec: Astral Shift, Earth Elemental, Spirit Wolf, Static Charge, Elemental Orbit, Earthen Harmony, Mana Spring, Nature's Guardian, Wind Shear, Capacitor, Tremor, Spiritwalker's Grace and the other spellbook-only entries. Utility and defensives aren't judged (dps-analysis.md). |
 | shaman-restoration/statistics | no-damage | — | — | — | Display only: mastery effectiveness by spell, healing efficiency and HPM, mana charts, cooldown throughput, Undercurrent and Coalescing Water graphs, Earth Shield breakdown, the talent and hero-talent boxes (Deluge, Downpour, Torrent, Ancestral Vigor, Healing Rain position, Spirit Link damage reduction and the like), Nature's Swiftness mana saved, Water Shield passive mana, Unleash Life healing. |
 

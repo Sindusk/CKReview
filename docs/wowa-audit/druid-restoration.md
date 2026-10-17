@@ -23,7 +23,25 @@
   in `tracked-cooldowns.ts`.** Case study: none for this spec; the header of
   healer.ts records only the healer survey (10 Restoration Druid sample
   players) and no WoWAnalyzer comparison, so nothing here is `verified`.
-- **Phase 3:** not started.
+- **Phase 3:** done 2026-10-17, a short healer pass; nothing built in the
+  spec. Run on Папайяфан (Vr8dLPtFYWA4G1yg), Ææåæäææàæâææ
+  (LckJC7GMhQvD6rdw), Mumzee (GndQ9VFWtLzNjKpk), Fknbum
+  (dG8D9y6WxrfmtgXp), Ddruid (VbAHWZDdPwJBajmx) and Saelska
+  (gVDPhzp61Zm29HMw Ula'tek). Spell survey: Convoke the Spirits preceded
+  27 of the idle gaps (73s): it's a 3.0s channel whose buff runs cast to
+  removal, and its spells log as their own casts, so it read as ~1.5–2s
+  of idle per press. It now locks the GCD to its buff's removal, as does
+  Soulcoiler Ritual Vessel (2.0s), in game.ts (fe490c2). GCD uptime
+  before → after: Папайяфан 84 → 89%, Ææåæäææàæâææ 85 → 88%, Mumzee
+  88 → 92%, Fknbum 85 → 89%, Ddruid 71 → 75%, Saelska 77 → 81%; Mumzee's
+  unforced gap idle 16 → 5s. Left as is: a Germination Rejuvenation logs
+  a second cast (155777) beside the Rejuvenation press; 0–3 a pull come
+  alone, about 1s of false idle each. No hidden damage effect in the
+  `no-damage` rows (Convoke's damage spells are part of a healing
+  cooldown). Not a WoWAnalyzer rule, but for the user: `healGcds` prices
+  overhealed Rejuvenations at 1.4–3.0M a pull on these players (Mumzee
+  2.33M, Ddruid 3.02M), though Rejuvenation is also pre-placed for
+  Abundance and Swiftmend.
 - **Core rules** (active time, cast efficiency, potions, cancelled casts)
   are in [core.md](core.md); rows below cover only what Restoration sets or
   adds. The class layer (druid shared) adds one graded rule, Innervate
@@ -38,13 +56,13 @@ healing, mitigation, mana or utility in this analysis, so those rows are
 
 | id | status | app check | talents | fires-on | notes |
 |---|---|---|---|---|---|
-| druid-restoration/Guide/always-be-casting | superseded | `checkGcdGaps` | Master Shapeshifter, Abundance (advice text only) | idle GCDs | The core downtime panel (5 / 10 / 15% of the whole fight idle, forced time counted) plus text advising Wrath in real downtime for mana, but not while waiting on Abundance to drop. The app counts and values the idle itself, less forced time. The advice is mana, not damage. |
+| druid-restoration/Guide/always-be-casting | superseded | `checkGcdGaps` | Master Shapeshifter, Abundance (advice text only) | idle GCDs | The core downtime panel (5 / 10 / 15% of the whole fight idle, forced time counted) plus text advising Wrath in real downtime for mana, but not while waiting on Abundance to drop. The app counts and values the idle itself, less forced time. The advice is mana, not damage. Phase 3: `checkGcdGaps` fires on all six sample players; Convoke the Spirits now locks the GCD for its 3.0s channel (game.ts), which had read as idle. |
 | druid-restoration/AlwaysBeCasting/healing-ability-list | no-damage | — | none | — | Configuration: which heals count as healing GCDs for the non-healing-time statistic. Flourish is listed although it is passive on Tranquility now. The app sorts GCDs by kind itself (`gcdKinds`). |
 | druid-restoration/Abilities/swiftmend-efficiency | no-damage | — | Soul of the Forest, Verdant Infusion, Reforestation (switch the grade on); Early Spring, Prosperity, Renewing Surge, Dryad's Dance | Swiftmend held past ready | Target 80%, whole-fight, hard-coded 15s with the reductions modelled in code. A heal, and not tracked: its recharge is reduced by talents the log does not show. If it ever mattered for mitigation planning, `lib/mitigation/` is where it belongs. |
 | druid-restoration/Abilities/tranquility-efficiency | no-damage | — | Tranquility | Tranquility used fewer times than a 180s cadence allows | Target 70% (lower than other majors because it answers raid damage). Hard-coded 180s, forced time counted as ready. Healing cooldown, assigned to raid damage; not judged here. Useful at most as a mitigation-plan check. |
 | druid-restoration/Abilities/natures-swiftness-efficiency | no-damage | — | Nature's Swiftness; Passing Seasons (−15s per rank); Control of the Dream (class layer) | held | Target 80%, whole-fight, cooldown written from the talent rank. Utility for instant heals. |
 | druid-restoration/Abilities/tree-of-life-efficiency | no-damage | — | Incarnation: Tree of Life; Cenarius Guidance (−5s per Grove Guardian); Control of the Dream | Tree not used on cooldown | Target 80%, hard-coded 180s, reductions modelled (the guardian-fade timing is approximate). A healing throughput cooldown; the app tracks none for this spec. |
-| druid-restoration/Abilities/convoke-efficiency | no-damage | — | Convoke the Spirits; Cenarius Guidance (60s instead of 120s); Control of the Dream | Convoke held | Target 80%, whole-fight. Convoke does deal some damage, but its value on a healer is healing; the app has no way to price it as a damage GCD. Feral's Convoke is tracked at 61s in `tracked-cooldowns.ts` (that measures a Feral player, not this spec). |
+| druid-restoration/Abilities/convoke-efficiency | no-damage | — | Convoke the Spirits; Cenarius Guidance (60s instead of 120s); Control of the Dream | Convoke held | Target 80%, whole-fight. Convoke does deal some damage, but its value on a healer is healing; the app has no way to price it as a damage GCD. Feral's Convoke is tracked at 61s in `tracked-cooldowns.ts` (that measures a Feral player, not this spec). Phase 3: no damage logs under Convoke's name; its spells log as their own casts. Its 3.0s channel now locks the GCD (game.ts); before, each press read as ~1.5–2s idle. |
 | druid-restoration/Abilities/innervate-efficiency | no-damage | — | Innervate | Innervate not cast on cooldown | Target 80%, hard-coded 180s, whole-fight; restated from the class layer. A self mana cooldown after the 12.1 change. Mana, not damage. |
 | druid-restoration/Guide/cooldown-graph | no-damage | — | the four cooldowns' talents | long gaps between uses | A display of the four efficiency bars with full-cooldown gaps in red. No adjustment for the pull start or a fight that ends early. |
 | druid-restoration/Lifebloom/cast-grade | no-damage | — | Everbloom, Verdancy, Overgrowth | moving Lifebloom, letting it drop, refreshing before the last 4.5s | Per-cast grade on a fixed 15s duration. Healing upkeep; hidden unless Advanced is on. |
@@ -56,11 +74,11 @@ healing, mitigation, mana or utility in this analysis, so those rows are
 | druid-restoration/Regrowth/cast-grade | no-damage | — | Abundance, Nature's Bounty, Rampant Growth, Overgrowth | full-price Regrowth with no cheap window and no one under 30% | A mana-price grade (cast at full price is "bad"); health under 30% counts as triage but may be unknown. |
 | druid-restoration/Regrowth/abundance-cast-rate | no-damage | — | Abundance | Regrowth spam while Abundance is down | Share of casts under Abundance: perfect 70%, good 50%, ok 30%. Cast-count based, so short pulls skew it. |
 | druid-restoration/Regrowth/mastery-stacks | no-damage | — | Nature's Bounty | Regrowth onto targets with no HoTs | Average HoT stacks on the target, rebuilt from a hand-kept HoT model. |
-| druid-restoration/Regrowth/overheal-stats | covered | `healGcds` | Nature's Bounty (cleave) | casting into full-health targets | Direct and average overheal at or under 30% is perfect, up to 70% ok. The app's `healGcds` already flags a Regrowth cast whose healing (tick window up to 30s) was under 20% effective and values it at the healer's damage filler, marked inference. The two overheal measures differ, so the numbers will not match. |
+| druid-restoration/Regrowth/overheal-stats | covered | `healGcds` | Nature's Bounty (cleave) | casting into full-health targets | Direct and average overheal at or under 30% is perfect, up to 70% ok. The app's `healGcds` already flags a Regrowth cast whose healing (tick window up to 30s) was under 20% effective and values it at the healer's damage filler, marked inference. The two overheal measures differ, so the numbers will not match. Phase 3: fires as "Regrowth mostly overhealed" on all six sample players (Ææåæäææàæâææ 1.08M, Mumzee 301k on LckJC7GMhQvD6rdw / GndQ9VFWtLzNjKpk). |
 | druid-restoration/WildGrowth/target-count | no-damage | — | Improved Wild Growth, Incarnation: Tree of Life | Wild Growth hitting fewer than the 5 (+2, +2) expected | Hits versus a fixed expected count; Grove Guardian copies not considered. A healing efficiency grade. |
 | druid-restoration/WildGrowth/pre-cooldown | no-damage | — | Tranquility, Convoke | Wild Growth not out when a major cooldown starts | Retags the most recent Wild Growth only; changes perfect versus good. |
 | druid-restoration/WildGrowth/full-target-rate | no-damage | — | as target-count | repeated short-target casts | Share of casts hitting every available target (perfect 90%). |
-| druid-restoration/WildGrowth/early-overheal | covered | `healGcds` | none | casting into a healthy raid | Overheal in the first 3s after each cast; the text itself says overheal alone does not fail a cast. `healGcds` counts a Wild Growth whose whole-cast healing was under 20% effective, over a longer window, and prices it as a lost damage filler. |
+| druid-restoration/WildGrowth/early-overheal | covered | `healGcds` | none | casting into a healthy raid | Overheal in the first 3s after each cast; the text itself says overheal alone does not fail a cast. `healGcds` counts a Wild Growth whose whole-cast healing was under 20% effective, over a longer window, and prices it as a lost damage filler. Phase 3: fires as "Wild Growth mostly overhealed" on four of six sample players (Ææåæäææàæâææ 271k, Ddruid 366k, Fknbum 60k). |
 | druid-restoration/WildGrowth/leftover-mana | no-damage | — | none | finishing a kill with a large mana pool | Boss kills only: ending mana ÷ average Wild Growth cost, perfect at 0. Assumes more casts would have been useful and off cooldown (Wild Growth is on a 10s recharge). Mana, not damage. |
 | druid-restoration/Rejuvenation/clip-grade | no-damage | — | Photosynthesis, Germination, Soul of the Forest, Abundance | refreshing Rejuvenation with much time left | A pandemic grade on a healing HoT. Advanced only. |
 | druid-restoration/Rejuvenation/abundance-uptime | no-damage | — | Abundance | letting Rejuvenation fall below 5 | Whole-fight Abundance uptime, perfect 95%; forced downtime counted as lost. |
