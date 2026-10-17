@@ -73,6 +73,16 @@
 // - A floor, not his mistake: Fury at the cap (2.24M, mostly Reaver's
 //   Glaive) and small GCD delays (2.64M); Hawkerton shows 2.32M and 3.64M.
 //   WoWAnalyzer rates both players' Fury waste good (13.7% / 17.5%).
+// - WoWAnalyzer audit phase 3 (2026-10-17, docs/wowa-audit/
+//   demonhunter-havoc.md): "Eye Beam held" (cooldown rebuilt from Cycle of
+//   Hatred stacks and the Metamorphosis reset) and "Death Sweep reset
+//   unused" (the Blade Dance / Death Sweep reset each Eye Beam leaves) are in
+//   havoc.ts, whose header has the models and numbers. Reaver's Glaive
+//   (442294) wasn't in the spell survey, so each press read as an idle
+//   GCD; game.ts now marks it on-GCD. Most of the delays above were that:
+//   Mythnarra's GCD delays went from 6.27M to 3.29M, Poetry's (99.9th) from
+//   4.79M to 2.29M. Left unbuilt: Blade Dance / Death Sweep held, for want of
+//   a cooldown model (9.5 presses an unforced minute against 10.8–12.7).
 
 import type { JobCheck } from "../../types";
 import { finding } from "../../checks";
@@ -120,7 +130,8 @@ const ARMS_SPENT: JobCheck[] = [
 ];
 
 // Havoc's Eternal Hunt: The Hunt (370965) grants Empowered Eye Beam
-// (1271144, not in our buff stream), consumed by the next Eye Beam. On
+// (1271144; in the buff stream since 2026-10-17, 12s: Poetry's from the
+// 4:29 Hunt on LckJC7GMhQvD6rdw ran out at 4:41), consumed by the next Eye Beam. On
 // 3Vz6Qt2RyTPXwpJn the 100th-percentile Hawkerton pressed Eye Beam 0.3–4.2s
 // after every Hunt, for 1.8–2.6× an ordinary Eye Beam (median ~2.1×).
 // Mythnarra (qpZx3mWaG7gcDdYB pull 3) pressed Eye Beam just before four of

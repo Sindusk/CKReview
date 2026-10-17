@@ -27,7 +27,8 @@
 // casts after four stacks came 20.0–32.3s apart, the shortest exactly 20.0s
 // whether 4 or 14 spenders came between, and haste doesn't move it; the
 // second Eye Beam (three stacks) came 25.1–29.4s after the first. A
-// Metamorphosis cast (200166) resets it (a talent, Chaotic Transformation):
+// Metamorphosis cast (200166) resets it (a talent, Chaotic Transformation
+// by its effect; the log can't name it):
 // the Aldrachi players pressed Eye Beam 0.3–3.7s after one, but Hertydh
 // never did (cast at 0:09.8, next beam 0:39.6), so the reset applies only
 // for a player whose log shows an early beam after a Metamorphosis cast.

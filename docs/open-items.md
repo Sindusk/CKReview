@@ -323,8 +323,17 @@ and delete them from the header.
     Sun Kick and chi waste (`unverifiable`), Whirling Dragon Punch, Combo
     Strikes, Touch of Death, Fists clips, Zenith charges. Proposed `wrong`
     for the user's review: the filler order, Conduit targets.
-  - [demonhunter-havoc.md](wowa-audit/demonhunter-havoc.md): 11; Eye
-    Beam drift with Cycle of Hatred.
+  - [demonhunter-havoc.md](wowa-audit/demonhunter-havoc.md): phase 3
+    done 2026-10-17 against five top parses (plus nine more Havoc players
+    on disk) and Mythnarra's 16 pulls. Built: Eye Beam held (cooldown
+    rebuilt from Cycle of Hatred stacks, not WoWAnalyzer's per-spender
+    cut) and Death Sweep reset unused (lib/damage/wow/specs/havoc.ts);
+    engine fix: Reaver's Glaive is an on-GCD press (game.ts). Left
+    unbuilt with numbers: Blade Dance efficiency (a real gap, no cooldown
+    model yet), the Essence Break window (top players do the same), and
+    the Inertia / Unbound Chaos / Demonsurge rows (no top player takes
+    them). Kept `wrong` for the user's review: Blade Dance targets, the
+    two Inertia window rows.
   - [mage-arcane.md](wowa-audit/mage-arcane.md): 18; Arcane Barrage
     ladder (Salvo stacks at the cast); 5 `wrong`.
   - [warlock-demonology.md](wowa-audit/warlock-demonology.md): 10; Call
