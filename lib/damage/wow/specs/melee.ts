@@ -138,7 +138,8 @@
 // weak 棉花糖丨, Djamyth, Nami, Nýn, Mystôgân, Västolord). subtlety.ts holds
 // the models and numbers: "Big finisher without Ancient Arts" (Secret
 // Technique, Coup de Grace or a Darkest Night Eviscerate pressed without
-// the buff that echoes it; top 0–0.53M but Zikli 4.57M, weak 1.3–6.4M),
+// the buff that echoes it, net of a builder first and a GCD's delay; top
+// 0–0.87M but Zikli 2.58M, weak 0.27–4.37M),
 // "Secret Technique just before Shadow Dance" (top none but Zikli 142k,
 // weak up to 646k) and the Shadow Dance window (top 0–39k, weak up to
 // 222k). Its Energy cap check skips the clones' Secret Technique casts

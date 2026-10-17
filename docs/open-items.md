@@ -555,8 +555,8 @@ and delete them from the header.
     2026-10-17 on 41 player-pulls (four top kills fetched). Built
     (specs/subtlety.ts): "Big finisher without Ancient Arts" (Secret
     Technique, Coup de Grace or a Darkest Night Eviscerate without the
-    buff that echoes it: top 0–0.53M but Zikli 4.57M and 小胖啵 2.10M,
-    weak 1.3–6.4M), "Secret Technique just before Shadow Dance", the
+    buff that echoes it, net of a builder first and a GCD's delay: top
+    0–0.87M but Zikli 2.58M, weak 0.27–4.37M), "Secret Technique just before Shadow Dance", the
     Shadow Dance window; Shadow Dance tracked (two charges, 20s);
     Shadow Blades and Goremaw's Bite valued by their hits (were 0); the
     Energy cap without the clones' Secret Technique casts (top players

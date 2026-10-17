@@ -52,23 +52,32 @@
 // buff goes to an ordinary finisher instead. Lost per press = its own hits
 // × the player's echo ratio for that finisher (their presses with the buff,
 // 5 or more; else their plain Eviscerate's ratio, the lower) − the
-// player's average ordinary echo. Pressing a builder first costs its
-// points at the cap (~2–4, ~30–60k), not counted (lenient); nor is the
-// finisher's own extra crit when Cold Blood rode with the buff.
+// player's average ordinary echo − what getting the buff first would have
+// cost (main session's timeline question, 2026-10-17): a builder pressed
+// at the cap (the player's combo points spent ÷ builders pressed, at their
+// plain Eviscerate's damage a point), the finisher a GCD later (that GCD ÷
+// the player's average interval for that finisher × its average hits:
+// every later one comes that much later), and for a Secret Technique
+// whose dance ends within a GCD of it, the player's in-dance − outside
+// average. Together 100–170k a press. A press whose echo doesn't beat
+// that is a trade and isn't counted. The finisher's own extra crit when
+// Cold Blood rode with the buff isn't counted (lenient).
+// Zikli's dance-entry Secret Techniques stay losses under this: the dance
+// lasts ~8s, so one builder first still lands them in it.
 // Premise: top players pair them (Secret Technique with the buff 13 of 14,
 // 18/18, 16/16, 16/17, 17/18), Deathstalkers their Darkest Night
 // Eviscerates (Nickledon 3 of 32 without, Esra 1 of 35, Кагэбист 0 of 44).
-// Measured (lost a pull): top 绯弹的亚莉亚 and Charrend none, 唐宋不吃糖
-// 282k, Amirmur 366k, Messerknecht 464k, 志命韓吉 529k, 水知我 1.05M,
-// 小胖啵 2.10M (6 Secret Techniques, 6 Coups de Grace), Zikli 4.57M (10 of
-// 17 Secret Techniques: he presses it the instant he dances, at 7 points
-// Shadow Techniques filled, 0:31, 1:16, 2:19); Nickledon 1.34M / 2.03M.
-// Weaker: Rogued 6.36M (14 of 15 Secret Techniques), Feyxd
-// (6kHtGaQXCMWYxFpZ) 6.20M (25 of 37 Darkest Night Eviscerates, 0:12,
-// 0:36 …), Derrieretoi (7pFPAqzc2NHLXjwZ, 85th) 6.03M (16 of 19), Shade
-// 4.07M, Västolord 3.27M, Mystôgân 3.21M, Nami 2.60M, 棉花糖丨 2.43M, Nýn
-// 1.38M, Djamyth 1.28M. Two top players read high: a real loss they make,
-// not a model error (the others show it can be avoided).
+// Measured (lost a pull, netted; before the netting in brackets): top
+// 绯弹的亚莉亚, Charrend, Amirmur none, Messerknecht 31k (464k), 唐宋不吃糖
+// 90k (282k), 志命韓吉 355k (529k), 小胖啵 621k (2.10M), 水知我 873k
+// (1.05M), Zikli 2.58M (4.57M: 9 Secret Techniques, pressed the instant he
+// dances at 7 points Shadow Techniques filled, 0:31, 1:16, 2:19);
+// Nickledon 0.45M / 1.16M. Weaker: Rogued 4.37M (6.36M; 13 Secret
+// Techniques), Feyxd (6kHtGaQXCMWYxFpZ) 2.99M (6.20M; Darkest Night
+// Eviscerates from 0:12), Derrieretoi (7pFPAqzc2NHLXjwZ, 85th) 3.39M, Shade
+// 2.07M, Mystôgân 1.72M, 棉花糖丨 1.20M, Västolord 1.10M, Nami 1.10M,
+// Кагэбист 930k, Nýn 595k, Milkiz 333k, Djamyth 265k. Zikli is the one top
+// player who reads high: a real loss, not a trade.
 //
 // ── Secret Technique just before Shadow Dance (secretTechniqueBeforeDance)
 // A Secret Technique in a dance did 342–778k, one outside 23–652k (median
@@ -156,6 +165,10 @@ const OWN_HITS = new Map<number, Set<number>>([
   [COUP_DE_GRACE, new Set([462241, 462242, 462243, 462244, 462247, 462248])],
 ]);
 
+const BUILDERS = new Set([53, 185438, 197835, 426591, 200758, 114014]);   // Backstab, Shadowstrike, Shuriken Storm, Goremaw's Bite, Gloomblade, Shuriken Toss
+const CP = 4;
+const MAX_CP = 7;
+const LAND_MS = 300;
 const ECHO_MS = 1_200;
 const OWN_MS = 400;
 const ST_HIT_MS = 3_000;
@@ -225,17 +238,36 @@ const ancientArtsMissed: JobCheck = (ctx) => {
   const ordEcho = avg(ordinary.map((r) => r.echo));
   const fallback = ratio(plainEvis);
   const forced = mergeWindows(ctx.forced);
+  // What getting the buff first would have cost: a builder pressed at the
+  // cap (its points wasted) and the finisher a GCD later (every later one
+  // of its kind that much later; a Secret Technique pushed out of its dance
+  // does the outside average instead).
+  const builders = presses(ctx, BUILDERS).length;
+  const cpSpent = fins.reduce((a, c) => a + (c.resources?.find((r) => r.type === CP)?.cost ?? 0), 0);
+  const cpPerBuilder = builders > 0 ? Math.min(MAX_CP, cpSpent / builders) : 0;
+  const perCp = avg(rows.filter((r) => r.c.abilityId === EVISCERATE && r.kind !== "dn").map((r) => r.own)) / MAX_CP;
+  const builderCost = cpPerBuilder * (perCp || 0);
+  const gcd = ctx.baseGcdMs;
+  const dances = statusWindows(ctx, SHADOW_DANCE);
+  const stIn = rows.filter((r) => r.kind === "st" && inAny(dances, r.c.timestamp + 5)).map((r) => r.own);
+  const stOut = rows.filter((r) => r.kind === "st" && !inAny(dances, r.c.timestamp + 5)).map((r) => r.own);
+  const stDrop = stIn.length >= MIN_SAMPLES && stOut.length > 0 ? Math.max(0, avg(stIn) - avg(stOut)) : 0;
   const moments: Moment[] = [];
   const per: string[] = [];
   let lost = 0;
   for (const kind of ["dn", "st", "cdg"] as Kind[]) {
-    const withAA = rows.filter((r) => r.kind === kind && r.aa);
+    const all = rows.filter((r) => r.kind === kind);
+    const withAA = all.filter((r) => r.aa);
     const own = withAA.length >= RATIO_SAMPLES;
     const r = own ? ratio(withAA) : fallback;
+    const interval = all.length > 1 ? (all[all.length - 1].c.timestamp - all[0].c.timestamp) / (all.length - 1) : Infinity;
+    const delayCost = gcd / interval * avg(all.map((x) => x.own));
     const missed = rows.filter((x) => x.kind === kind && !x.aa && !inAny(forced, x.c.timestamp));
     let n = 0, sub = 0;
     for (const x of missed) {
-      const each = r * x.own - ordEcho;
+      const dance = dances.find((w) => x.c.timestamp + 5 >= w.startMs && x.c.timestamp <= w.endMs);
+      const outOfDance = kind === "st" && dance !== undefined && dance.endMs < x.c.timestamp + gcd + LAND_MS ? stDrop : 0;
+      const each = r * x.own - ordEcho - builderCost - delayCost - outOfDance;
       if (each <= 0) continue;
       n++; sub += each;
       moments.push({ startMs: x.c.timestamp, endMs: x.c.timestamp, lostDamage: each,
@@ -243,7 +275,7 @@ const ancientArtsMissed: JobCheck = (ctx) => {
     }
     if (n === 0) continue;
     lost += sub;
-    per.push(`${n} ${KIND_NAME[kind]} × its own hits × ${r.toFixed(2)} (${own ? `the echo ÷ hits of its ${withAA.length} with Ancient Arts` : "the plain Eviscerate's echo ratio"}) − ${k(ordEcho)}`);
+    per.push(`${n} ${KIND_NAME[kind]} × (its own hits × ${r.toFixed(2)} (${own ? `the echo ÷ hits of its ${withAA.length} with Ancient Arts` : "the plain Eviscerate's echo ratio"}) − ${k(ordEcho)} − ${k(builderCost + delayCost)} for a builder first and the finisher a GCD later)`);
   }
   if (moments.length === 0 || lost < MIN_LOST) return [];
   moments.sort((a, b) => a.startMs - b.startMs);
