@@ -70,7 +70,7 @@ damage rows are measured.
 | 26 | Destruction | [warlock-destruction.md](warlock-destruction.md) | done 2026-10-17: checks moved to destruction.ts (Havoc on the main target now needs another enemy up), Summon Infernal / Malevolence valued, Havoc held (from a `no-damage` row); verified by the main session |
 | 27 | Fury | [warrior-fury.md](warrior-fury.md) | done 2026-10-17: Rampage held while unenraged, Recklessness drift (rebuilt 72s less 1s per 40 Rage), Rage cap outside Recklessness / Bladestorm, Odyn's Fury valued (fury.ts); Slayer Bladestorm's Bloodthirsts aren't presses (game.ts); verified by the main session |
 | 28 | Blood | [deathknight-blood.md](deathknight-blood.md) | done 2026-10-17: Dancing Rune Weapon drift valued (its pet's hits), Reaper's Mark tracked, free Death and Decay held (Crimson Scourge), Runic Power cap removed for Blood (blood.ts); verified by the main session (Reaper's Mark checked: off the GCD, median 0.43s to the next cast) |
-| 29 | Unholy | [deathknight-unholy.md](deathknight-unholy.md) | |
+| 29 | Unholy | [deathknight-unholy.md](deathknight-unholy.md) | done 2026-10-17: plague off every enemy, strike without a Lesser Ghoul, Sudden Doom lost, Dark Transformation / Army valued, Runic Power cap removed for Unholy (unholy.ts); Unholy GCD counts the Erupts and Orders its presses set off (game.ts); verified by the main session |
 | 30 | Devourer | [demonhunter-devourer.md](demonhunter-devourer.md) | |
 | 31 | Survival | [hunter-survival.md](hunter-survival.md) | |
 | 32 | Fire | [mage-fire.md](mage-fire.md) | |
@@ -426,6 +426,13 @@ measured for it.
   `wrong`: spells inside Dancing Rune Weapon. Death Strike is 20–30% of
   a top Blood DK's damage, not "mostly a heal". Evidence in
   [deathknight-blood.md](deathknight-blood.md).
+- Unholy (2026-10-17): **an existing app check removed, for the user to
+  approve or reject:** the Runic Power cap check for Unholy (41–507k a
+  pull on top and weak alike; every cast it saw at full Runic Power
+  generates none). Proposed `wrong`: Runic Power waste; kept `wrong`:
+  Soul Reaper outside the window, Sudden Doom spend speed. Lead, unpriced:
+  Lesser Ghoul charges lost to the cap of 8 (two weaker players ~100–134
+  a pull vs 5–18). Evidence in [deathknight-unholy.md](deathknight-unholy.md).
 
 - Elemental (2026-10-17): `CallOfTheAncestors/other-checks`,
   `statistics` (and whether "Stormkeeper before Ascendance" should be
