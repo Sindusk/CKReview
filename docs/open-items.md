@@ -499,8 +499,16 @@ and delete them from the header.
     efficiency (top players hold it as much), Volley efficiency (held for
     Trueshot by top players), Focus at the cap. Black Arrow, Wailing
     Arrow and Sentinel's Mark `unverifiable` (no sample player has them).
-  - [druid-feral.md](wowa-audit/druid-feral.md): 14; Rip uptime and
-    refreshes.
+  - [druid-feral.md](wowa-audit/druid-feral.md): phase 3 done
+    2026-10-17 (14 player-pulls fetched; no case study): Rip off every
+    enemy and Ferocious Bite below 5 points (specs/feral.ts); the five
+    tracked cooldowns valued per use (all were worth 0; Convoke 120s,
+    Incarnation tracked); Clearcasting and Apex Predator's Craving expire
+    (procs.ts); Lunar Inspiration's Moonfire a GCD press (game.ts).
+    Proposed `wrong`: Rip refreshed early (the top players clip as much),
+    Tiger's Fury Energy waste (TF grants no Energy now). Kept `wrong`:
+    Chomp efficiency (nobody takes it), Sudden Ambush on Rake. Sudden
+    Ambush expiry `unverifiable` (no duration).
   - [evoker-augmentation.md](wowa-audit/evoker-augmentation.md): 7;
     Breath of Eons on an enemy that died early.
   - [evoker-devastation.md](wowa-audit/evoker-devastation.md): 11;
