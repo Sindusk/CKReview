@@ -75,6 +75,35 @@
 // 6:35: room for a fourth), Emerie 783k (2:01 → 2:42 outside Stasis);
 // Meatbulb's 23s at 4:15 falls in Vashnik's hold window.
 //
+// ── Fire Breath and Eternity Surge held (empowersHeld) ────────────────
+// The two empowers (Font of Magic: Fire Breath 382266, Eternity Surge
+// 382411; base 357208 / 359073) recharge faster with every Disintegrate
+// tick (Causality) and Pyre hit. Fitted on the 18 Scalecommander
+// player-pulls (sampledata/wow/_scratch/dev-emp.js; a re-press within 5s
+// after a cancel is one press): Fire Breath 29.5s less 0.6s a Disintegrate
+// tick instant and 0.3s a Pyre hit (1 of 287 intervals under the line,
+// most 1–3s over it: a Disintegrate channel finishing), Eternity Surge
+// 26.0s less 0.55s and 0.3s (3 of 319 under). Recharges run 14–18s in
+// practice. A player with more than a tenth of their intervals under the
+// line isn't judged for that empower (Emerie's Flameshaper Fire Breath:
+// 19 of 26).
+// Held = ready → next press, less forced, dead, movement and hold-window
+// time (one recharge before its target) and 3s a cycle; a hold that ends
+// in the first 6s of a Dragonrage window, begun before it and shorter
+// than a recharge, is excused (lined up: each empower extends the window
+// through Animosity); the time after the player's last press of the pull
+// is the gap check's. A held second costs that share of a press: held ÷
+// the average modelled recharge × (the player's press, its hits and burn
+// by name, 180–585k − a Living Flame, the filler in its place, 45–87k).
+// Measured (lost a pull): top Tëemo 156k (Fire Breath ready 0:55, pressed
+// 1:04), Fistlad 84k, Elfuêgo 83k, Galakrussy 82k, Millzd 51k / 15k,
+// Mythvoker 17k / 0, Aqrippae 11k; weaker Emerie 613k (Eternity Surge;
+// 0:57, 2:58, 3:43, 5:45), Jorblóx 305k (Eternity Surge ready 2:27,
+// pressed 3:00), Bragontix 301k, Meatbulb 207k, Lanidra 196k, Qiyue 118k,
+// Skysong 104k, 夜漪微澜 67k, Asuia 52k. Small next to the other losses;
+// the per-window empower count (WoWAnalyzer's Dragonrage rows) is mostly
+// this hold, seen inside the window.
+//
 // Tip the Scales (370553) stays tracked and unvalued: it makes one
 // empower instant at full rank, and every player here releases theirs
 // early (0.5–1.1s of charge on average), so a use saves about half a GCD,
@@ -84,8 +113,8 @@
 import type { PlayerInfo } from "@/types/PlayerInfo";
 import type { JobCheck, Moment } from "../../types";
 import { finding } from "../../checks";
-import { inWindows, mergeWindows, statusWindows } from "../../timeline";
-import { k } from "./shared";
+import { holdWindowsFor, inWindows, mergeWindows, overlapMs, statusWindows } from "../../timeline";
+import { k, s } from "./shared";
 
 // Ids from the sample logs' masterData (dG8D9y6WxrfmtgXp, fcj1YgaCJBT2kXFm).
 const DISINTEGRATE = 356995;
@@ -205,4 +234,83 @@ export function dragonrageValue(p: PlayerInfo, endMs: number): { value: number; 
   };
 }
 
-export const DEVASTATION_CHECKS: JobCheck[] = [ticksClipped];
+// ── Fire Breath and Eternity Surge held (empowersHeld) ────────────────
+
+type Empower = { name: string; ids: Set<number>; baseMs: number; perTickMs: number; perPyreMs: number };
+const EMPOWERS: Empower[] = [
+  { name: "Fire Breath", ids: new Set([382266, 357208]), baseMs: 29_500, perTickMs: 600, perPyreMs: 300 },
+  { name: "Eternity Surge", ids: new Set([382411, 359073]), baseMs: 26_000, perTickMs: 550, perPyreMs: 300 },
+];
+const EMP_REPRESS_MS = 5_000;     // a press this soon after the last is a re-press after a cancel
+const EMP_ALLOW_MS = 3_000;       // a cycle's press timing (a Disintegrate channel can hold it ~2s)
+const EMP_MISFIT_SHARE = 0.1;     // more of the player's intervals than this under the model: not judged
+const EMP_DR_GRACE_MS = 6_000;    // a hold ending this early in a Dragonrage window, begun before it, is lined up
+const EMP_TAIL_MS = 3_000;
+
+const empowersHeld: JobCheck = (ctx) => {
+  const p = ctx.player;
+  const ticks: number[] = [];
+  for (const t of p.damageDone.filter((e) => !e.pet && e.abilityName === "Disintegrate").map((e) => e.timestamp).sort((a, b) => a - b)) {
+    if (ticks.length === 0 || t - ticks[ticks.length - 1] > TICK_SLACK_MS) ticks.push(t);
+  }
+  const pyre = p.damageDone.filter((e) => !e.pet && e.abilityName === "Pyre").map((e) => e.timestamp).sort((a, b) => a - b);
+  const dr = statusWindows(p, new Set([DRAGONRAGE]), ctx.endMs);
+  const filler = perCast(p, "Living Flame", ctx.endMs);
+  // After the player's last press nothing was cast at all: the idle is the
+  // gap check's, not a held empower's (Qiyue stopped at 5:59 of 6:35).
+  const lastPress = Math.max(0, ...ctx.uses.filter((u) => u.startMs < ctx.endMs).map((u) => u.startMs));
+  const out = [];
+  for (const E of EMPOWERS) {
+    const presses: number[] = [];
+    for (const u of ctx.uses.filter((x) => E.ids.has(x.action.id) && x.startMs < ctx.endMs)) {
+      if (presses.length && u.startMs - presses[presses.length - 1] < EMP_REPRESS_MS) presses[presses.length - 1] = u.startMs;
+      else presses.push(u.startMs);
+    }
+    if (presses.length < 3) continue;
+    const cuts = [...ticks.map((t) => ({ t, ms: E.perTickMs })), ...pyre.map((t) => ({ t, ms: E.perPyreMs }))].sort((a, b) => a.t - b.t);
+    const readyAfter = (t0: number) => {
+      let cut = 0;
+      for (const c of cuts) {
+        if (c.t <= t0) continue;
+        if (c.t - t0 + cut >= E.baseMs) break;
+        cut += c.ms;
+      }
+      return Math.max(t0, t0 + E.baseMs - cut);
+    };
+    const readies = presses.map(readyAfter);
+    const below = presses.slice(1).filter((t, i) => t < readies[i] - 300).length;
+    if (below > EMP_MISFIT_SHARE * (presses.length - 1)) continue;
+    const avgRecharge = readies.slice(0, -1).reduce((a, r, i) => a + r - presses[i], 0) / (presses.length - 1);
+    const casts = p.casts.filter((c) => !c.fake && E.ids.has(c.abilityId) && c.timestamp < ctx.endMs).length;
+    const press = perCast(p, E.name, ctx.endMs) * casts / presses.length;
+    const value = press - filler;
+    if (!(value > 0) || !(avgRecharge > 0)) continue;
+    const notHeld = mergeWindows([...ctx.forced, ...ctx.dead, ...(ctx.movement ?? []),
+      ...holdWindowsFor(ctx.context?.cooldownHoldWindows?.(ctx.pull), avgRecharge)]);
+    const moments: Moment[] = [];
+    let heldMs = 0;
+    for (let i = 0; i < presses.length; i++) {
+      const from = readies[i], to = presses[i + 1] ?? Math.min(ctx.endMs, lastPress) - EMP_TAIL_MS;
+      if (to <= from) continue;
+      if (dr.some((w) => from < w.startMs && to >= w.startMs && to <= w.startMs + EMP_DR_GRACE_MS && to - from <= avgRecharge)) continue;
+      const h = to - from - overlapMs(from, to, notHeld) - EMP_ALLOW_MS;
+      if (h <= 0) continue;
+      heldMs += h;
+      moments.push({ startMs: from, endMs: to, lostDamage: h / avgRecharge * value,
+        detail: `${E.name} ready ${clock(from)}, pressed ${presses[i + 1] !== undefined ? clock(to) : "never again"}: ${s(h)} held` });
+    }
+    if (moments.length === 0) continue;
+    out.push(finding(ctx, {
+      kind: "cooldown-drift", startMs: moments[0].startMs, endMs: moments[moments.length - 1].endMs, forced: false, inference: true,
+      label: `${E.name} held`,
+      lostDamage: heldMs / avgRecharge * value,
+      basis: `${s(heldMs)} held ÷ ${s(avgRecharge)} average recharge (${s(E.baseMs)} less ${E.perTickMs}ms a Disintegrate tick and ${E.perPyreMs}ms a Pyre hit) × ` +
+        `(${k(press)} a ${E.name} − ${k(filler)} a Living Flame in its place); forced, dead, movement and hold-window time, ${s(EMP_ALLOW_MS)} a cycle and holds into Dragonrage excused`,
+      detail: `${E.name} sat ready ${s(heldMs)} past its press timing (${presses.length} presses)`,
+      moments,
+    }));
+  }
+  return out;
+};
+
+export const DEVASTATION_CHECKS: JobCheck[] = [ticksClipped, empowersHeld];
