@@ -71,6 +71,12 @@
 // it ~42s of holds (1:52–2:13, 5:21–5:42), and Implosion needs Wild Imps,
 // so not judged. The rest of the DPS gap is talents: Killulock's Shadow
 // Nova (2.8M) and bigger demon Mind Sear / Greater Felbolt shares.
+// The WoWAnalyzer audit's phase 3 (2026-10-17) overturned the Implosion
+// call: with To Hell and Back each press brings back ~0.5M of imps, the
+// top players press it every ~16.5s, and the holds cost Fwîî 1.99M on
+// this pull. demonology.ts now judges Implosion and Call Dreadstalkers held
+// time (a Tyrant line-up excused to its break-even);
+// docs/wowa-audit/warlock-demonology.md.
 //
 // Arcane, checked against WoWAnalyzer on qpZx3mWaG7gcDdYB pull 3
 // (Neximage; reference 3Vz6Qt2RyTPXwpJn's Màzz, 100th percentile, page
@@ -130,6 +136,7 @@ import type { JobCheck, Moment } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";
 import { inWindows, mergeWindows, overlapMs, statusWindows } from "../../timeline";
 import { ARCANE_CHECKS } from "./arcane";
+import { DEMONOLOGY_CHECKS } from "./demonology";
 import { ELEMENTAL_CHECKS } from "./elemental";
 import { burstGcdFindings, castTimeProcFindings, dotUptimeFindings, k, observedWindowBonus, primaryResourceCapFindings, spentCooldownDrift } from "./shared";
 
@@ -375,7 +382,7 @@ export const RANGED_CHECKS: Record<string, JobCheck[]> = {
   "Shadow Priest":        [window(194249, "Voidform"), primaryResourceCapFindings, dot("Shadow Word: Pain", 589), dot("Vampiric Touch", 34914)],
   "Elemental Shaman":     [window(1219480, "Ascendance"), primaryResourceCapFindings, dot("Flame Shock", 188389), stormkeeper, ...ELEMENTAL_CHECKS],
   "Affliction Warlock":   [window(442726, "Malevolence"), dot("Agony", 980), dot("Unstable Affliction", 1259790), dot("Wither / Corruption", 445474, 146739)],
-  "Demonology Warlock":   [window(265187, "Demonic Tyrant")],
+  "Demonology Warlock":   [window(265187, "Demonic Tyrant"), ...DEMONOLOGY_CHECKS],
   "Destruction Warlock":  [window(442726, "Malevolence"), dot("Wither", 445474), backdraft, havocTarget],
   "Devastation Evoker":   [window(375087, "Dragonrage"), strafingRun],
   "Augmentation Evoker":  [],

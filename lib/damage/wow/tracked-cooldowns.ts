@@ -132,7 +132,8 @@ export const WOW_TRACKED_COOLDOWNS: Record<string, TrackedCooldown[]> = {
   // (20.8 / 104.7s), Elemental's Stormkeeper (38.2 / 48.9s: Ancestors cut
   // it, so wow/specs/ranged.ts judges it with spentCooldownDrift), Fire's Meteor
   // (53.9 / 68.7s), Augmentation's Tip the Scales (47.8 / 64.0s): spread too
-  // far. Demonology's Call Dreadstalkers costs Soul Shards.
+  // far. Demonology's Call Dreadstalkers and Implosion are judged in
+  // wow/specs/demonology.ts (held time with a Tyrant line-up excused).
   "Arcane Mage": [
     { name: "Touch of the Magi", actionIds: [321507], cooldownMs: 45_000, charges: 1, firstUseOffsetMs: 4_000 }, // 45.0 / 46.8s, 3.2s
     { name: "Arcane Surge", actionIds: [365350], cooldownMs: 91_000, charges: 1, firstUseOffsetMs: 2_000 },      // 91.0 / 94.4s, 0.9s
