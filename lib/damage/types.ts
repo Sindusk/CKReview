@@ -218,7 +218,9 @@ export type TrackedCooldown = {
   // A cooldown whose worth is what it does to another spell (Assassination's
   // Vanish: the empowered Garrote it allows): the value of one use, with
   // the basis to print. Overrides damageIds / petDamage / own damage.
-  valuePerUse?(player: PlayerInfo, endMs: number): { value: number; basis: string } | undefined;
+  // gcdValue: the player's average GCD, for a GCD cooldown whose lost use
+  // still had its GCD filled (Retribution's Divine Toll).
+  valuePerUse?(player: PlayerInfo, endMs: number, gcdValue: number): { value: number; basis: string } | undefined;
   // Party buffs a use leads to that its action doesn't apply itself
   // (Technical Step → Technical Finish): valued as the buff's average
   // window (checks.ts checkCooldownDrift).

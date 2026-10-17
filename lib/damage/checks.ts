@@ -695,7 +695,7 @@ export function checkCooldownDrift(ctx: PlayerCheckContext): DamageFinding[] {
     const atKill = killLost > Math.max(stretchLost, Math.floor(unforced / cd.cooldownMs), openerLost)
       ? "; without the holds, one more would have landed before the kill" : "";
     const heldText = unforced > 0 ? `sat ready for ${s(unforced)} in total` : "had a charge back and unused at the kill";
-    const custom = cd.valuePerUse?.(ctx.player, ctx.endMs);
+    const custom = cd.valuePerUse?.(ctx.player, ctx.endMs, ctx.values.gcdValue(undefined, false));
     if (cd.valuePerUse) {
       if (!custom || custom.value <= 0) continue;
       const uses = (n: number) => `${n} use${n === 1 ? "" : "s"}`;
