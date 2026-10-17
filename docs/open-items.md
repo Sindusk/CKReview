@@ -309,7 +309,11 @@ and delete them from the header.
     Lightning, early Flame Shock refreshes
     (lib/damage/wow/specs/elemental.ts). Stormkeeper drift built (60s
     less 3s per Ancestor summoned; Vashnik holds for the Venoms after
-    Imbibe allowed). Open: Ascendance spenders (low value).
+    Imbibe allowed). Overcharge overwritten built too (found in the
+    approval step). Open: the user's approval of three `no-damage` rows
+    (asked 2026-10-17; questions in
+    [HANDOFF-elemental-build.md](wowa-audit/HANDOFF-elemental-build.md)),
+    Ascendance spenders (low value). Windwalker is next.
   - [monk-windwalker.md](wowa-audit/monk-windwalker.md): 12 candidates;
     Fists of Fury cadence (reduction model).
   - [demonhunter-havoc.md](wowa-audit/demonhunter-havoc.md): 11; Eye

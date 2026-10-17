@@ -1,150 +1,132 @@
-# Handoff: build Elemental's measured checks (WoWAnalyzer audit, phase 3)
+# Handoff: Elemental approval step, then Windwalker (WoWAnalyzer audit, phase 3)
 
-**Status 2026-10-17:** all six checks are built (`lib/damage/wow/specs/elemental.ts`),
-plus a seventh found in the approval step (Overcharge overwritten). Left:
-the user's answers on the three remaining `no-damage` rows (Call of the
-Ancestors other checks, statistics, shaman utility), then Windwalker.
+For the session that continues the WoWAnalyzer audit. Updated 2026-10-17.
 
-For the session that continues the WoWAnalyzer audit. Written 2026-10-16.
-Phases 1–2 are done for every spec, and Elemental's phase 3 measurements
-are done. None of Elemental's six candidates is built yet. This session
-builds them, then brings Elemental's remaining `no-damage` rows to the
-user for approval. Windwalker phase 3 comes after.
+## Where it stands
 
-## Read first
+Elemental's phase 3 build is done. Seven checks are in
+`lib/damage/wow/specs/elemental.ts`, wired in from ranged.ts's
+`"Elemental Shaman"` entry. The six from the measurements were built,
+plus Overcharge overwritten, which turned up while checking the tier-set
+row's `no-damage` proposal. The file's header holds each model, the
+ledger rows ([shaman-elemental.md](shaman-elemental.md)) are `verified`,
+and the open-items.md pointer is updated. All of it is committed and
+pushed (last commit 4dcda4e).
 
-1. [../wowa-audit-plan.md](../wowa-audit-plan.md), phase 3. Three rules
-   added on 2026-10-16 that this session must follow:
-   - value every candidate as damage lost first;
-   - ask what an action costs later on the timeline;
-   - `wrong` and `no-damage` need the user's approval, with evidence,
-     before a row is marked.
-2. [shaman-elemental.md](shaman-elemental.md), **in full**. Each
-   candidate row holds its measurement and how to value it. The
-   "Candidates left" list orders them by value.
-3. The `/damage-analysis` skill: step 4, "Building what's missing", and
-   the WoW section. These say where checks live and how they're valued.
-   The skill's verifying step now asks the timeline question.
-4. The headers of `lib/damage/wow/specs/ranged.ts` (the Elemental entry:
-   Ascendance window, Maelstrom cap, Flame Shock uptime, `stormkeeper`)
-   and `lib/damage/wow/specs/shared.ts` (`burstGcdFindings`,
-   `spentCooldownDrift`, `dotUptimeFindings`), plus `lib/damage/checks.ts`.
-5. [../dev-tooling.md](../dev-tooling.md), "Damage analysis (WoW)": the
-   no-UI runner and reference compare.
+What's left for Elemental:
+- the user's answers on three `no-damage` rows (below);
+- `Ascendance/window-spenders`: low value, not measured. Leave it unless
+  a page and a log disagree with the cap check.
 
-## What to build, in order
+Then Windwalker.
 
-All numbers come from the pulls on disk (list below). Spell ids come
-from r9CX1kpRGLmKJH4M's `masterData` (WCL), not WoWAnalyzer. Confirm
-each id in the log before using it, and comment its source log.
+## 1. Elemental: the open approval questions
 
-1. **Non-overload casts in Ascendance** (largest). These are casts
-   inside the Ascendance buff (1219480; the log also names 114050 and
-   114052) of spells with no "… Overload" ability: Flame Shock, Frost
-   Shock, Voltaic Blaze. Leave out Stormkeeper (it's the drift check's).
-   - Such a cast is moved, not lost. Value it as (the window's rate for
-     overloading casts − the player's Lightning Bolt rate outside the
-     window) × the cast's GCD. Measured: 246–477k/s vs 62–107k/s, so
-     130–590k a cast.
-   - Timeline: Voltaic Blaze recharges in ~7.5s (shortest interval;
-     medians 9–17s). When the player casts it on recharge, holding it
-     through the window costs a use: subtract a Voltaic Blaze's value
-     less a Lightning Bolt.
-   - Decide with evidence whether a 2+ target Voltaic Blaze is excused,
-     as WoWAnalyzer excuses it. Two-target casts still measured as
-     losses before netting.
-2. **Lava Burst without Flame Shock.** A non-crit Lava Burst (51505,
-   285452, 447419) on a target without the player's own Flame Shock
-   (188389, 470411). Read the debuff from enemy debuff events, by target
-   and instance.
-   - Every shocked Lava Burst crit (1,487 of 1,487).
-   - Value: the player's shocked Lava Burst average, overloads included
-     (77451, 285466), less the hit. About 120k each.
-   - Excuse an add that dies within a few seconds: a Flame Shock first
-     would cost a GCD it can't pay back.
-3. **Idle in a Call of the Ancestors window.** The window is the Call of
-   the Ancestors buff on the player (445624, 447244); the pet is named
-   "Ancestor". Ancestors did 58.4k/s while the player cast and 25.7k/s
-   while idle (top seven, 85s of idle).
-   - Measure per player before building, and exclude forced time (the
-     boss out of reach stops the Ancestors too).
-   - Build it as a premium on idle inside the window, the way
-     `burstGcdFindings` handles Ascendance, not as WoWAnalyzer's
-     active-time grade.
-4. **Spender without Master of the Elements while Lava Surge is up.**
-   The buffs are Master of the Elements (260734) and Lava Surge (77762),
-   checked outside Ascendance. Spenders: Elemental Blast (117014, 465717)
-   and Earthquake (61882, 77478, 77505, 462620); Earthquake consumes the
-   buff too.
-   - The bonus measured ×1.065 on non-crit Elemental Blast hits, pooled.
-   - Exception to measure: a Lava Burst first would have capped
-     Maelstrom (Maelstrom is on cast events).
-   - Low value; top players lose more here than Cocroach.
-5. **One-target Chain Lightning** (188443, 195897, 447425; overloads
-   45297, 218558). Value each cast against the player's own Lightning
-   Bolt (188196, 214815; overloads 45284, 214816), overloads included.
-   About 35k each.
-6. **Early Flame Shock refresh** (lowest). Duration 18s, 30% pandemic
-   carry. Charge the clipped share of a GCD (clipped seconds ÷ 18 × (a
-   Lightning Bolt − the Flame Shock hit)), standing only. Charge the
-   whole GCD for a refresh that was never needed (the target died or the
-   fight ended before the old DoT ran out). Refreshes from Voltaic Blaze
-   are free.
+These were asked on 2026-10-17 and are still unanswered. Ask again in
+this form if the user hasn't replied, and don't re-measure first: the
+evidence is below. An approved row gets "Approved by the user
+YYYY-MM-DD." in its notes, and a row the user rejects goes back to
+`candidate` (docs/wowa-audit-plan.md, phase 3).
 
-Before building, check that every aura above reaches the app. The WoW
-fetch filters auras (`lib/damage/wow/buff-stream.ts` follows
-`spell-data.ts`), so a check can be blind to a buff that the raw sample
-file has. The measuring scripts read the raw streams.
+1. **CallOfTheAncestors/other-checks** (what summoned each Ancestor,
+   damage per Ancestor, a timeline; WoWAnalyzer always grades them
+   "perfect"). What drives Ancestor damage is already checked: how many
+   get summoned is Stormkeeper's drift check (`stormkeeper` in ranged.ts),
+   and what the player does while they're out is `ancestorIdle` and
+   `chainLightningOneTarget`. For scale, Elemeta on Vashnik Pull 3 had 23
+   summons and the Ancestors did 21.8M. Proposed: `no-damage`.
+2. **statistics** (display only): the Master of the Elements table,
+   Stormkeeper damage, Aftershock refunds, Offering From Beyond, the
+   Maelstrom and cooldown graphs. Its advice "no Flame Shock in
+   Ascendance" is now `ascendanceNonOverload`. Its other advice,
+   "Stormkeeper before Ascendance", is **not valued**. Every player,
+   top seven included, presses Stormkeeper about 2s before Ascendance,
+   and its two boosted casts are gone when Ascendance starts. Only
+   Kullingen at 4:28 and Unlucky at 4:14 had it up at an Ascendance
+   start (`_scratch/skasc.js`). Holding Stormkeeper for Ascendance would
+   cost Stormkeeper uses (it comes back in under 60s, Ascendance every
+   120s). Asked: approve `no-damage` for the display parts, and should
+   that advice be measured separately or dropped?
+3. **shaman-shared/utility** (Astral Shift, Earth Shield, Earth
+   Elemental, Lightning Shield, Spiritwalker's Grace, …). The user's rule
+   is that utility, defensives and movement aren't judged. Spiritwalker's
+   Grace only matters for movement, which isn't counted, and none of
+   these delays a damage cooldown. Proposed: `no-damage`.
 
-## Data on disk
+If the user wants the Stormkeeper-before-Ascendance advice measured,
+value it the same way as the rest: the boosted casts' extra damage
+inside the window, against the Stormkeeper uses lost by holding it
+(`spentCooldownDrift`'s model).
 
-`sampledata/wow/`:
-- Cocroach's 12 Elemental pulls of gVDPhzp61Zm29HMw (he played
-  Enhancement on the other pulls);
-- top parses: Vr8dLPtFYWA4G1yg (Malegusxd), baRCnPv62YQ1dJZN (Fauni),
-  JvQpZk3CXj78Dx2f (Kullingen, Spongêbob), r9CX1kpRGLmKJH4M (Elemeta,
-  Unlucky), 9w3bK4qhrRC82gVX (Shaziggla).
+## 2. Then: Windwalker phase 3
 
-The measuring scripts are kept locally, gitignored, in
-`sampledata/wow/_scratch/`. Run them from `sampledata/wow`; read-only:
+12 candidates, ledger [monk-windwalker.md](monk-windwalker.md), case
+study qpZx3mWaG7gcDdYB pull 3. Its `wrong` and `no-damage` rows from the
+fan-out are proposals, so review them with the user as above. Follow
+the same method as Elemental:
+1. Talent check from CombatantInfo.
+2. Value each candidate as damage lost, overloads, procs, pets and DoTs
+   included.
+3. Ask what it costs on the timeline.
+4. Fetch top parses of the spec (ask the user for logs; fetch only the
+   fight).
+5. Build in order of value, committing after each check.
 
-```
-node _scratch/ele-rules2.js . "Vr8dLPtFYWA4G1yg:Malegusxd" "baRCnPv62YQ1dJZN:Fauni" "JvQpZk3CXj78Dx2f:Kullingen,Spongêbob" "r9CX1kpRGLmKJH4M:Elemeta,Unlucky" "9w3bK4qhrRC82gVX:Shaziggla" "gVDPhzp61Zm29HMw:Cocroach"
-node _scratch/cl-vs-lb.js r9CX1kpRGLmKJH4M/meta.json "r9CX1kpRGLmKJH4M/Vashnik the Malignant_Pull3.json" 25 20
-```
+## Lessons from the Elemental build (apply them to Windwalker)
 
-Each built check should reproduce its script's numbers on these pulls.
+- **Ask the timeline question while building, not only while
+  measuring.** It changed four of seven models:
+  - Purging Flames pays back half a Voltaic Blaze in Ascendance;
+  - Master of the Elements is taken by any next spell, so it's never
+    wasted;
+  - the Ancestors copy each player cast, so idle and Chain Lightning
+    cost their copies too;
+  - Overcharge, a "no-damage" tooltip, is a free spender.
+- **Check what consumes a buff before valuing a rule about it.** List
+  the casts at each removal, e.g. `_scratch/motewaste.js`.
+- **Check what a proc changes:** the hit, the overloads, the resource
+  cost, the pet. Overcharge doesn't change the hit at all, it zeroes the
+  cost (`_scratch/ocov.js`).
+- **Pet copies of a player's casts land at different lags per spell.**
+  The Ancestors' Chain Lightning lands with the player's, their Lava
+  Burst ~1s later, so a fixed window misses one of them.
+- **An instant costs one GCD,** not the gap to the next cast: idle after
+  it belongs to the gap check.
+- **A fixed span can count overloads twice** when casts come ~1s apart.
+  Attribute each overload to the latest cast on its target.
+- **Hits taken carry x/y for WoW in the app** (`player.damageTaken`), so
+  "standing only" rules can be checked.
 
-## Validate and commit
+## Tools (gitignored, `sampledata/wow/_scratch/`, read-only)
 
+They load pulls through the app's transform, from an absolute path to
+`scripts/lib/load-sample-pull.js` (edit the path if the repo moves).
+Run them from the repo root.
+- `ele-findings.js "<label regex>" code:Name,Name ...`: one check's
+  findings with their moments, and a total per player. This is the
+  quickest way to test a check change.
+- `cota.js`, `mirror.js`: Ancestor damage while busy vs idle, and how
+  long after the player's casts it lands.
+- `pfcleave.js`: the Purging Flames cleave inside vs outside Ascendance.
+- `motewaste.js`, `ocov.js`: which casts consume Master of the Elements,
+  and what Overcharge changes on a spender.
+- `skasc.js`: Stormkeeper vs Ascendance alignment (approval item 2).
+- `ele-rules2.js`, `cl-vs-lb.js`: the original measurements (raw
+  streams).
+
+Sample data:
+- Cocroach's 12 Elemental pulls in `gVDPhzp61Zm29HMw`;
+- top parses `Vr8dLPtFYWA4G1yg` (Malegusxd), `baRCnPv62YQ1dJZN` (Fauni),
+  `JvQpZk3CXj78Dx2f` (Kullingen, Spongêbob), `r9CX1kpRGLmKJH4M` (Elemeta,
+  Unlucky) and `9w3bK4qhrRC82gVX` (Shaziggla).
+
+The WoWAnalyzer pages are not on disk (`sampledata/damage-wow/` is
+empty).
+
+## Validate
+
+- `node scripts/validate.js --check` scoped to the folders above, and
+  `npx tsc --noEmit`. Damage findings aren't baselined, so `--check`
+  only guards the mechanics.
 - `node scripts/validate.js damage-analysis-wow sampledata/wow/<code>
-  --all-findings` on each folder above: the new findings, with their
-  basis.
-- `node scripts/validate.js damage-compare-wow` against the top-parse
-  folders: a check that fires on a top player must be a real loss there
-  too (it often is, see the ledger).
-- `node scripts/validate.js --check --game wow`, scoped to these folders
-  where possible, and `npx tsc --noEmit`. For an intended change,
-  confirm the diff is exactly the new findings, then `--update`.
-- Commit and push after each check works, per CLAUDE.md. Update the
-  Elemental row (status `verified` once a check matches its measurement
-  on disk), the ranged.ts header and the open-items.md pointer together.
-
-## Then: the approval step
-
-Elemental has no `wrong` rows left. Its `no-damage` rows need the user's
-approval before they stand:
-- Call of the Ancestors other checks;
-- the season 2 tier set (Overcharge);
-- statistics;
-- shaman utility.
-
-Check each one first, including the timeline question. Then bring the
-user one numbered item per row with the evidence, and add "Approved by
-the user YYYY-MM-DD." only after they agree.
-
-## After Elemental
-
-Windwalker phase 3 (12 candidates, case study qpZx3mWaG7gcDdYB pull 3),
-with the same method. Its `wrong` and `no-damage` rows from the fan-out
-are proposals; review them with the user as above.
+  --all-findings` shows the findings in context.
