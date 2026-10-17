@@ -87,6 +87,19 @@ export async function loadSampleReportMeta(source: SampleSource, code: string): 
   }
 }
 
+/**
+ * One pull's replay tracks saved by scripts/fetch-ff-replay.js
+ * (<code>/replay/fight<N>.json, already in ReplayData shape), or null.
+ */
+export async function loadSampleReplay(source: SampleSource, code: string, fightId: number): Promise<string | null> {
+  if (!Number.isInteger(fightId) || fightId < 0) return null;
+  try {
+    return await fs.readFile(path.join(reportDir(source, code), "replay", `fight${fightId}.json`), "utf-8");
+  } catch {
+    return null;
+  }
+}
+
 export async function loadSampleReport(source: SampleSource, code: string): Promise<SampleReportPayload> {
   const dir  = reportDir(source, code);
   const meta = JSON.parse(await fs.readFile(path.join(dir, "meta.json"), "utf-8"));

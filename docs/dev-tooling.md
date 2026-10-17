@@ -10,6 +10,12 @@ validation harness (`scripts/validate.js`, `expectations/`), see
   (or `fetch-ff-report.js`). `--boss` matches any fight name containing the
   text; `fetch-ff-report.js --boss-exact "<name>"` matches the whole name
   (`Lindwurm` without `Lindwurm II`).
+- **Replay tracks (FFXIV):** `node scripts/fetch-ff-replay.js <code-or-URL> --fight <N>`
+  saves one pull's top-down replay positions to
+  `sampledata/ff/<code>/replay/fight<N>.json` (~1MB, a few requests).
+  A sample-data load's Load replay reads it instead of fetching live.
+  It sits in a subfolder because every report-folder loader reads each
+  top-level `*.json` except `meta.json` as a fight file.
 - **Output:** writes `sampledata/{wow,ff}/<code>/meta.json` plus one
   `<Boss>_Pull<N>.json` per fight. Pull numbers match the app's per-boss
   numbering. A pasted full URL works.

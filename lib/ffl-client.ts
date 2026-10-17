@@ -20,6 +20,7 @@ import {
 } from "./rate-limit";
 import { attachEncounterPhases, type EncounterPhase, type ReportEncounterPhases } from "./pull-phases";
 import { PLAYER_BUFF_FILTER } from "./damage/ffxiv/buff-stream";
+import { REPLAY_EVENT_FILTER, buildReplayData, type ReplayData, type ReplayRawEvent } from "./replay/ffxiv-replay";
 
 const GQL_ENDPOINT = "https://www.fflogs.com/api/v2/user";
 
@@ -950,6 +951,70 @@ export async function fetchFFightData(
     headMarkerEvents:  collected.headMarkers,
     playerBuffEvents:  collected.playerBuffs,
   };
+}
+
+// ─── Query: Replay positions (lib/replay/ffxiv-replay.ts) ───────────────────
+//
+// Every resource-carrying event of ONE fight, for the top-down replay.
+// Separate from fetchFFightData on purpose: it is several times larger
+// (both actors' resources on every cast, damage and heal event) and only
+// runs when the user clicks Load replay. Actors come with it so the replay
+// doesn't depend on report-level masterData being in memory (sample-data
+// loads don't keep it).
+
+const REPLAY_EVENTS_QUERY = `
+  query($code: String!, $fightIDs: [Int]!, $startTime: Float!, $endTime: Float!, $filter: String!, $withActors: Boolean!) {
+    rateLimitData { limitPerHour pointsSpentThisHour pointsResetIn }
+    reportData {
+      report(code: $code) {
+        masterData(translate: true) @include(if: $withActors) {
+          actors { id name type subType petOwner }
+        }
+        events(
+          fightIDs: $fightIDs, startTime: $startTime, endTime: $endTime,
+          dataType: All, includeResources: true, filterExpression: $filter, limit: 10000
+        ) { data nextPageTimestamp }
+      }
+    }
+  }
+`;
+
+type ReplayEventsQueryResult = {
+  reportData: { report: {
+    masterData?: { actors: FFLActor[] };
+    events: { data: ReplayRawEvent[]; nextPageTimestamp: number | null };
+  } };
+};
+
+export async function fetchFFReplayData(
+  reportCode: string,
+  fightId:    number,
+  onProgress?: (fraction: number) => void,
+): Promise<ReplayData> {
+  const fightsData = await gql<{ reportData: { report: { fights: { id: number; startTime: number; endTime: number }[] } } }>(
+    `query($code: String!, $fightIDs: [Int]!) { reportData { report(code: $code) { fights(fightIDs: $fightIDs) { id startTime endTime } } } }`,
+    { code: reportCode, fightIDs: [fightId] }, false,
+  );
+  const fight = fightsData.reportData.report.fights[0];
+  if (!fight) throw new Error(`Fight ${fightId} not found in report ${reportCode}`);
+
+  let actors: FFLActor[] = [];
+  const events: ReplayRawEvent[] = [];
+  let cursor = fight.startTime;
+  for (let page = 0; page < MAX_PAGES_PER_FIGHT; page++) {
+    const data = await gql<ReplayEventsQueryResult>(REPLAY_EVENTS_QUERY, {
+      code: reportCode, fightIDs: [fightId], startTime: cursor, endTime: fight.endTime,
+      filter: REPLAY_EVENT_FILTER, withActors: page === 0,
+    }, false);
+    const report = data.reportData.report;
+    if (report.masterData) actors = report.masterData.actors;
+    events.push(...report.events.data);
+    const next = report.events.nextPageTimestamp;
+    if (!next || next >= fight.endTime) break;
+    cursor = next;
+    onProgress?.((next - fight.startTime) / Math.max(1, fight.endTime - fight.startTime));
+  }
+  return buildReplayData(reportCode, fightId, fight.startTime, fight.endTime, events, actors);
 }
 
 // ─── Query: Interrupts table ─────────────────────────────────────────────────

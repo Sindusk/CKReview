@@ -255,6 +255,22 @@ file's header comment. Mechanic detection has its own guide:
     repeated word runs.
   - **Decode HTML entities** in the returned text.
 
+## Top-down replay (`components/ReplayPanel.tsx`, `lib/replay/ffxiv-replay.ts`)
+
+- **Stage 1 prototype, FFXIV only:** player and boss dots on a blank arena
+  (yalm rings), behind a Video | Replay toggle in the center panel. No map
+  art, AoE shapes or WoW yet.
+- **Its own fetch, on click only.** The pull's normal streams keep too few
+  positions, so Load replay pages `dataType: All, includeResources: true`
+  for that one fight (`fetchFFReplayData`). Tracks are cached per pull for
+  the session. Positions arrive about 1 to 2 per player per second and stop
+  for 25 to 35s at phase transitions; the module header explains the
+  interpolation.
+- **Clock.** With a synced VOD the replay follows the video, and its
+  scrubber seeks the video. The video stays mounted (hidden) under the
+  replay so its clock keeps running. Without a VOD the panel has its own
+  play/pause and speed.
+
 ## Design sources
 
 The severity icons and the banner/favicon were designed in Claude Design

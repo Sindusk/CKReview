@@ -28,6 +28,8 @@ import TranscriptDialog from "../components/TranscriptDialog";
 import AnalysisPanel from "../components/AnalysisPanel";
 import RosterPanel from "../components/RosterPanel";
 import TimelinePanel from "@/components/TimelinePanel";
+import ReplayPanel from "@/components/ReplayPanel";
+import type { ReplayData } from "@/lib/replay/ffxiv-replay";
 import StrategyDialog from "@/components/StrategyDialog";
 import MitigationDialog from "@/components/MitigationDialog";
 import DamageDialog from "@/components/DamageDialog";
@@ -60,7 +62,7 @@ import {
   buildFFLAbilityMap,
   renumberPullsByBoss,
 } from "@/lib/log-transforms";
-import { fetchFFReport, fetchFFightData, buildFFFightLogLabels, getFFLRateLimitStatus, isFFLQuotaExhausted, beginFFLImportMeasure, endFFLImportMeasure, type FFLReport } from "@/lib/ffl-client";
+import { fetchFFReport, fetchFFightData, fetchFFReplayData, buildFFFightLogLabels, getFFLRateLimitStatus, isFFLQuotaExhausted, beginFFLImportMeasure, endFFLImportMeasure, type FFLReport } from "@/lib/ffl-client";
 import { formatWaitTime, type RateLimitStatus } from "@/lib/rate-limit";
 import { tryFetchSampleReportMeta, fetchSampleReport, type SampleReportMeta, type SampleReportPayload } from "@/lib/sample-report-client";
 import {
@@ -401,6 +403,35 @@ export default function Home() {
 
   const selectedVod = vods.find(v => v.id === selectedVodId) ?? null;
   const activePull  = displayPulls.find(p => p.id === selectedPullId) ?? null;
+
+  // Top-down replay (components/ReplayPanel.tsx). Tracks are fetched only
+  // on Load replay, cached per pull for the session. A sample-data load
+  // reads a replay saved by scripts/fetch-ff-replay.js first.
+  const [centerView, setCenterView] = useState<"video" | "replay">("video");
+  const [replays, setReplays] = useState<Record<string, ReplayData>>({});
+  const [replayLoad, setReplayLoad] = useState<{ key: string; progress: number | null; error: string | null } | null>(null);
+  const replayKey = activePull ? `${activePull.reportCode}:${activePull.fightId}` : null;
+
+  async function handleLoadReplay() {
+    if (!activePull || !replayKey) return;
+    const key = replayKey;
+    setReplayLoad({ key, progress: null, error: null });
+    try {
+      let data: ReplayData | null = null;
+      if (loadedFromSampleData) {
+        const res = await fetch(`/api/sample-report/ffl/${activePull.reportCode}/replay/${activePull.fightId}`);
+        if (res.ok) data = await res.json();
+      }
+      if (!data) {
+        data = await fetchFFReplayData(activePull.reportCode, activePull.fightId,
+          (progress) => setReplayLoad({ key, progress, error: null }));
+      }
+      setReplays((prev) => ({ ...prev, [key]: data! }));
+      setReplayLoad(null);
+    } catch (err) {
+      setReplayLoad({ key, progress: null, error: err instanceof Error ? err.message : String(err) });
+    }
+  }
 
   const handlePullDetected = useCallback((pullId: number) => {
     setSelectedPullId(pullId);
@@ -1553,7 +1584,29 @@ export default function Home() {
         <ResizeHandle orientation="col" size={GAP} onReset={layout.resetColumns} onDrag={(d) => dragColumn(0, d)} />
 
         <Panel diamondBottom>
-          <div style={{ flex: 1, minHeight: 0 }}>
+          <div style={{ display: "flex", gap: 4, padding: "6px 8px 4px", flexShrink: 0 }}>
+            <button className={`ck-tab ck-tab--sm${centerView === "video" ? " ck-tab--active" : ""}`} onClick={() => setCenterView("video")}>Video</button>
+            <button className={`ck-tab ck-tab--sm${centerView === "replay" ? " ck-tab--active" : ""}`} onClick={() => setCenterView("replay")}
+              title="Top-down positions from the log, following the VOD when one is synced">Replay</button>
+          </div>
+          {/* The video stays mounted under the replay so its clock keeps
+              driving the timeline (and the replay) while hidden. */}
+          <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
+            {centerView === "replay" && (
+              <div style={{ position: "absolute", inset: 0, zIndex: 1, background: "var(--ck-bg-panel)" }}>
+                <ReplayPanel
+                  pull={activePull}
+                  data={replayKey ? replays[replayKey] ?? null : null}
+                  loading={replayLoad?.key === replayKey && !replayLoad?.error}
+                  progress={replayLoad?.key === replayKey ? replayLoad.progress : null}
+                  error={replayLoad?.key === replayKey ? replayLoad.error : null}
+                  onLoad={handleLoadReplay}
+                  syncedTimeMs={videoUsable ? timeline.playbackTimeMs : undefined}
+                  onSeekMs={videoUsable ? handleSeekToMs : undefined}
+                />
+              </div>
+            )}
+          <div style={{ position: "absolute", inset: 0, visibility: centerView === "replay" ? "hidden" : "visible" }}>
             <VideoPanel
               vod={selectedVod}
               seekRequest={timeline.seekRequest}
@@ -1569,9 +1622,12 @@ export default function Home() {
               onDurationKnown={handleVodDuration}
             />
           </div>
-          <div style={{ flexShrink: 0 }}>
-            {videoBottom}
           </div>
+          {centerView === "video" && (
+            <div style={{ flexShrink: 0 }}>
+              {videoBottom}
+            </div>
+          )}
         </Panel>
 
         <ResizeHandle orientation="col" size={GAP} onReset={layout.resetColumns} onDrag={(d) => dragColumn(1, d)} />
