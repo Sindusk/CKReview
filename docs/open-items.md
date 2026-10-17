@@ -334,8 +334,19 @@ and delete them from the header.
     the Inertia / Unbound Chaos / Demonsurge rows (no top player takes
     them). Kept `wrong` for the user's review: Blade Dance targets, the
     two Inertia window rows.
-  - [mage-arcane.md](wowa-audit/mage-arcane.md): 18; Arcane Barrage
-    ladder (Salvo stacks at the cast); 5 `wrong`.
+  - [mage-arcane.md](wowa-audit/mage-arcane.md): phase 3 done
+    2026-10-17 on 31 Arcane Mages already on disk (all Sunfury; 17 top
+    parses, Acegoblain's 14 pulls). Built: Touch of the Magi window
+    (lib/damage/wow/specs/arcane.ts; small, 0 on every top Entombed
+    Sentinels player). Proposed `wrong` for the user's review: the Barrage
+    / Missiles Salvo ladder (Barrage damage is proportional to its stacks,
+    top players fire it as often), Orb efficiency (a pressed Orb hits for
+    47–63k; top players press it 0–15 times). Left unbuilt with numbers:
+    Prismatic Bolt munched, Cumulative Power, Orb no-targets, Missiles
+    clips; Presence of Mind and Spellslinger rows (nobody takes them).
+    Found: `checkProcs` never sees a WoW expiry (WoW buff events carry no
+    duration), so "covered by checkProcs (expiries)" rows need a second
+    look in every WoW ledger.
   - [warlock-demonology.md](wowa-audit/warlock-demonology.md): 10; Call
     Dreadstalkers cadence with Demonic Calling.
   - [warlock-affliction.md](wowa-audit/warlock-affliction.md): 5; Dark
