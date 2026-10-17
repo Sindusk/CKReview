@@ -78,6 +78,16 @@
 // time (a Tyrant line-up excused to its break-even);
 // docs/wowa-audit/warlock-demonology.md.
 //
+// Affliction has no case study. The WoWAnalyzer audit's phase 3
+// (2026-10-17; docs/wowa-audit/warlock-affliction.md) measured it on 18
+// player-pulls (five top parses, four weaker, the static's Wyrmtongues)
+// and added Haunt dropped in affliction.ts (a Haunt recast late loses a
+// share of a Haunt), the Nightfall expiry (procs.ts) and Drain Soul as a
+// channel (game.ts: its channels had read as idle). The DoT checks here
+// fire on top and weak players alike for Unstable Affliction (top 0.1–0.9M
+// a pull); its gaps end on a cast with 3–5 Soul Shards banked, so they're
+// delays, not shard starvation. Dark Harvest held measured negligible.
+//
 // Arcane, checked against WoWAnalyzer on qpZx3mWaG7gcDdYB pull 3
 // (Neximage; reference 3Vz6Qt2RyTPXwpJn's Màzz, 100th percentile, page
 // saved; checked 2026-10-13):
@@ -135,6 +145,7 @@
 import type { JobCheck, Moment } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";
 import { inWindows, mergeWindows, overlapMs, statusWindows } from "../../timeline";
+import { AFFLICTION_CHECKS } from "./affliction";
 import { ARCANE_CHECKS } from "./arcane";
 import { DEMONOLOGY_CHECKS } from "./demonology";
 import { ELEMENTAL_CHECKS } from "./elemental";
@@ -381,7 +392,7 @@ export const RANGED_CHECKS: Record<string, JobCheck[]> = {
   "Marksmanship Hunter":  [window(288613, "Trueshot"), primaryResourceCapFindings],
   "Shadow Priest":        [window(194249, "Voidform"), primaryResourceCapFindings, dot("Shadow Word: Pain", 589), dot("Vampiric Touch", 34914)],
   "Elemental Shaman":     [window(1219480, "Ascendance"), primaryResourceCapFindings, dot("Flame Shock", 188389), stormkeeper, ...ELEMENTAL_CHECKS],
-  "Affliction Warlock":   [window(442726, "Malevolence"), dot("Agony", 980), dot("Unstable Affliction", 1259790), dot("Wither / Corruption", 445474, 146739)],
+  "Affliction Warlock":   [window(442726, "Malevolence"), dot("Agony", 980), dot("Unstable Affliction", 1259790), dot("Wither / Corruption", 445474, 146739), ...AFFLICTION_CHECKS],
   "Demonology Warlock":   [window(265187, "Demonic Tyrant"), ...DEMONOLOGY_CHECKS],
   "Destruction Warlock":  [window(442726, "Malevolence"), dot("Wither", 445474), backdraft, havocTarget],
   "Devastation Evoker":   [window(375087, "Dragonrage"), strafingRun],
