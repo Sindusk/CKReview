@@ -135,9 +135,20 @@ export const WOW_TRACKED_COOLDOWNS: Record<string, TrackedCooldown[]> = {
   // ── Melee (shortest / median interval, first use median) ─────────────
   // Arms: Avatar 51s / 64s and Colossus Smash 24.5s / 32s spread too far
   // (cooldown reduction): not tracked.
-  "Fury Warrior": [   // unverified (2 players)
-    { name: "Recklessness", actionIds: [1719], cooldownMs: 41_000, charges: 1, firstUseOffsetMs: 2_000 },     // 41.5 / 49.3s, 0.4s
-    { name: "Odyn's Fury", actionIds: [385062], cooldownMs: 45_000, charges: 1, firstUseOffsetMs: 3_000 },    // 45.0 / 47.8s, 1.2s
+  // Fury (the WoWAnalyzer audit's phase 3, 2026-10-17; 18 player-pulls,
+  // specs/fury.ts has the numbers). Recklessness moved to fury.ts: it
+  // recharges with Rage spent (72s less 1s per 40 Rage fits the log; the
+  // fixed 41s sat above the 36.9s shortest interval) and does no damage
+  // itself, so a lost use here was worth 0 and never reported. Odyn's Fury
+  // is a clean 45s (shortest 45.0s on three players). Each press logs four
+  // casts (385059, then 385060 / 385061 / 385062 within 0.3s); the survey
+  // took 385062 for the GCD press, so it's the tracked id, and the lost use
+  // is its hits (385060 / 385061 / 385062, 0.2–0.4M a press) less the GCD
+  // that filled its place. burstHold: the top Vashnik players press it
+  // with Recklessness after each Imbibe, 77–85s apart (Golgatron
+  // dp6am4TQhG3cKFxR, 沐川內枯 19WyTrzgQRvdc4Z8, Øuranøse C4Kxpn3FtrvjWMAP).
+  "Fury Warrior": [
+    { name: "Odyn's Fury", actionIds: [385062], damageIds: [385060, 385061, 385062], cooldownMs: 45_000, charges: 1, firstUseOffsetMs: 3_000, burstHold: true },
   ],
   // Retribution (values per use and burstHold: specs/retribution.ts's
   // header, WoWAnalyzer audit phase 3, 2026-10-17). Divine Toll on

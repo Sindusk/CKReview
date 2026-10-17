@@ -482,6 +482,12 @@ export type ResourceCapSpec = {
   // Generators whose cast at the cap isn't waste (their gain arrives later,
   // or they run on charges that must be spent): Beast Mastery's Barbed Shot.
   ignoreIds?:  number[];
+  // Casts at the cap that aren't judged, by time or id (Fury: inside
+  // Recklessness, where builders out-hit the spender, and inside Bladestorm,
+  // whose Bloodthirsts aren't presses). Their gain still counts for the fit.
+  skipAtCap?:  (c: { abilityId: number; timestamp: number }) => boolean;
+  // How the finding names what was skipped ("outside Recklessness").
+  skipNote?:   string;
 };
 
 // WCL classResources types logged on every cast (builders included) in the
@@ -503,12 +509,13 @@ export const PRIMARY_RESOURCES: Record<number, { name: string; scale: number }> 
 };
 
 /** The player's most-logged resource among PRIMARY_RESOURCES, capped (resourceCapFindings). */
-export function primaryResourceCapFindings(ctx: PlayerCheckContext, ignoreIds?: number[]): DamageFinding[] {
+export function primaryResourceCapFindings(ctx: PlayerCheckContext, ignoreIds?: number[],
+  skip?: Pick<ResourceCapSpec, "skipAtCap" | "skipNote">): DamageFinding[] {
   const counts = new Map<number, number>();
   for (const c of ctx.player.casts) for (const r of c.resources ?? []) if (PRIMARY_RESOURCES[r.type]) counts.set(r.type, (counts.get(r.type) ?? 0) + 1);
   const type = [...counts].sort((a, b) => b[1] - a[1])[0]?.[0];
   if (type === undefined) return [];
-  return resourceCapFindings(ctx, { type, ...PRIMARY_RESOURCES[type], spenderIds: "auto", ignoreIds });
+  return resourceCapFindings(ctx, { type, ...PRIMARY_RESOURCES[type], spenderIds: "auto", ignoreIds, ...skip });
 }
 
 const GAIN_PAIR_MS = 3_000;
@@ -562,6 +569,7 @@ export function resourceCapFindings(ctx: PlayerCheckContext, spec: ResourceCapSp
   const byPhase = new Map<number | undefined, { units: number; n: number; start: number; end: number; names: Map<string, number>; moments: Moment[] }>();
   for (const x of casts) {
     if (spenderIds.has(x.c.abilityId) || x.r.amount < max || spec.ignoreIds?.includes(x.c.abilityId)) continue;
+    if (spec.skipAtCap?.(x.c)) continue;
     const gain = gainOf(x.c.abilityId);
     if (!gain || inWindows(x.c.timestamp, forced)) continue;
     const ph = ctx.phaseOf(x.c.timestamp);
@@ -581,7 +589,7 @@ export function resourceCapFindings(ctx: PlayerCheckContext, spec: ResourceCapSp
       label: `${spec.name} capped`,
       lostDamage: g.units * perUnit,
       basis: `${Math.round(shown)} ${spec.name} generated at the cap (each ability's gain measured from the pull) × ${k(perUnit * spec.scale)} per ${spec.name} from its spenders`,
-      detail: `${g.n} casts at full ${spec.name} in ${ctx.phaseName(ph) ?? "the pull"}, ~${Math.round(shown)} lost: ${names}`,
+      detail: `${g.n} casts at full ${spec.name}${spec.skipNote ? ` ${spec.skipNote}` : ""} in ${ctx.phaseName(ph) ?? "the pull"}, ~${Math.round(shown)} lost: ${names}`,
       moments: g.moments,
     }));
   }

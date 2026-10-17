@@ -5,7 +5,8 @@
 // by WoWAnalyzer (read, not copied: AGPL); every id is from our own logs
 // (lib/damage/wow/spell-data.ts, the status the spec's cooldown puts on
 // them). Sample players per spec: Arms 19, Windwalker 10, Havoc 9,
-// Retribution 8, Assassination 6, Subtlety 4, Unholy 3, Frost DK 2, Fury 2,
+// Retribution 8, Assassination 6, Subtlety 4, Unholy 3, Frost DK 2, Fury 2
+// (18 player-pulls since its audit pass, below),
 // Feral, Survival and Outlaw 1 each (fewer than 3: unverified; Feral has
 // 14 player-pulls since its audit pass, below).
 //
@@ -96,6 +97,23 @@
 // Colossus Smash; the Colossus, Demolish, Ravager and Champion's Spear
 // rules fire on nothing. Rend and Deep Wounds uptime measured and not
 // built (Rend ~3k/s; Deep Wounds fires on the top players as much).
+//
+// Fury, WoWAnalyzer audit phase 3 (2026-10-17, docs/wowa-audit/
+// warrior-fury.md; WoWAnalyzer's Fury is "Foundation" support and grades
+// almost nothing; no case study). Measured on 18 player-pulls (top Naxxio,
+// Toýmaker, Golgatron, 沐川內枯; weak Grogrin, Tenebrionnu, Thimfury,
+// Celex), 16 Slayer and 2 Mountain Thane. fury.ts holds the models and
+// numbers: "Rampage held while unenraged" (top 0–116k, Mauleon 285k; weak
+// up to 575k), Recklessness drift (72s less 1s per 40 Rage spent, valued
+// by its window at 1.7–4.0M a use; fires on none of the 18) in place of
+// the tracked fixed 41s that was worth 0 a use, and Fury's own Rage cap
+// check: the shared one read 0.47–1.01M on the top players from casts
+// inside Recklessness (where Crushing Blow and Bloodbath out-hit Rampage
+// ~2×) and Bladestorm's own Bloodthirsts (game.ts now reads those as the
+// channel's, not presses); outside both it reads top 0–81k, weak 19–294k.
+// Odyn's Fury drift is now valued by its hits under all three ids with
+// burstHold (tracked-cooldowns.ts; top none, Mauleon 103k, Tenebrionnu
+// 338k). The Recklessness window stays (top 0–79k, weak 18–252k).
 //
 // Frost Death Knight, WoWAnalyzer audit phase 3 (2026-10-17, docs/wowa-audit/
 // deathknight-frost.md; WoWAnalyzer's Frost lags a patch and grades only a
@@ -205,6 +223,7 @@ import { ASSASSINATION_CHECKS } from "./assassination";
 import { FERAL_CHECKS } from "./feral";
 import { SUBTLETY_CHECKS } from "./subtlety";
 import { ENHANCEMENT_CHECKS } from "./enhancement";
+import { FURY_CHECKS } from "./fury";
 
 const window = (statusId: number, name: string): JobCheck => (ctx) => burstGcdFindings(ctx, {
   statusId, name,
@@ -298,7 +317,9 @@ export const MELEE_CHECKS: Record<string, JobCheck[]> = {
     window(id, name),
     // Frost DK: no Runic Power cap check (see the header's Frost Death Knight notes).
     // Subtlety: its own Energy cap check, without the clones' Secret Technique casts (subtlety.ts).
-    ...(spec === "Frost Death Knight" ? FROST_DK_CHECKS : spec === "Subtlety Rogue" ? SUBTLETY_CHECKS : [primaryResourceCapFindings]),
+    // Fury: its own Rage cap check, outside Recklessness (fury.ts).
+    ...(spec === "Frost Death Knight" ? FROST_DK_CHECKS : spec === "Subtlety Rogue" ? SUBTLETY_CHECKS
+      : spec === "Fury Warrior" ? FURY_CHECKS : [primaryResourceCapFindings]),
     ...(spec === "Arms Warrior" ? [...ARMS_SPENT, ...ARMS_CHECKS] : []),
     ...(spec === "Havoc Demon Hunter" ? [eternalHunt, ...HAVOC_CHECKS] : []),
     ...(spec === "Retribution Paladin" ? [holyPowerWaste, ...RETRIBUTION_CHECKS] : []),
