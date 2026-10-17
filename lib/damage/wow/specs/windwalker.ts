@@ -36,10 +36,13 @@
 // forced time, movement windows, the part of another channel (Celestial
 // Conduit, Spinning Crane Kick) past its GCD, and HOLD_ALLOW_MS a cycle
 // (the GCD it came back in, a combo step). Each held second loses that
-// share of a Fists: held ÷ the cycle's rebuilt recharge × (the player's
+// share of a Fists: held ÷ the player's average rebuilt recharge × (their
 // average Fists − the Tiger Palm / Blackout Kick GCDs its channel took),
 // with the Fists average inside the burst (Zenith or Invoke Xuen,
-// 123904) for held time inside it.
+// 123904) for held time inside it. The average, not the cycle's own: a
+// held second pushes every later Fists back, and a burst cycle can
+// rebuild in 3–4s (Spiritbound, Vashnik 4:44), which priced one held
+// second at a third of a Fists.
 //
 // Held into the burst: a Fists inside Zenith / Xuen did 1.5–2.4× one
 // outside (one target, medians; e.g. Styphi 373k → 586k, Blkphnx 228k →
@@ -51,18 +54,35 @@
 // could have been pressed and been back in time. The top players all do
 // this: Styphi 7s into 4:32, Neyha 4.5s into 4:36, Krylest 4s into 1:30.
 //
-// Measured (Entombed Sentinels; held past the allowance, lost):
-// - top: Styphi, Neyha, Chumfu (GndQ9VFWtLzNjKpk) none; Krexonaut
-//   (dG8D9y6WxrfmtgXp) 18k; Krylest 31k; Chijing (MLy7nw8kaW1D394Y) 64k;
-//   Jordomonk 216k, 169k of it one cycle: ready in Stasis at 4:19, then
-//   9s of other spenders after it (4:34–4:43) before his 4:47 Zenith.
-// - weaker: Blkphnx 488k (343k at 4:32–4:45: Tiger Palm / Blackout Kick
-//   for 13s after Stasis with it ready, into Xuen at 4:45; 8.1s of it
-//   excused); ßacardi (Shado-Pan, no Heart) 892k, 268k of it 2:46–3:44,
-//   a minute of Tiger Palm / Blackout Kick into Zenith; Leluu 111k;
-//   Shoccemnk 9k. Most of the weaker players' long holds (Leluu 0:45–1:05
-//   and 6:09–6:28, Shoccemnk's 4:15) sit in Vitriolic Stasis and aren't
-//   counted; WoWAnalyzer counts them, hence its 65% vs 84%.
+// Measured (lost a pull):
+// - top, Entombed Sentinels: Styphi, Neyha, Chumfu (GndQ9VFWtLzNjKpk),
+//   Kreemoncow (baRCnPv62YQ1dJZN) none; Krexonaut (dG8D9y6WxrfmtgXp) 21k;
+//   Elevatedhota (JvQpZk3CXj78Dx2f) 30k; Krylest 35k; Candybrew
+//   (Vr8dLPtFYWA4G1yg) 44k; Chijing (MLy7nw8kaW1D394Y) 63k; Jordomonk
+//   233k, 190k of it one cycle: ready in Stasis at 4:19, then 9s of other
+//   spenders (4:34–4:43) before his 4:47 Zenith. Vashnik: Spiritbound
+//   (hjHXmdnJFwTPpMtK, 98th) 224k.
+// - weaker: Blkphnx 394k (240k at 4:32–4:45: Tiger Palm / Blackout Kick
+//   for 13s after Stasis with it ready, into Xuen at 4:45; 9.9s of it
+//   excused), and 8.08M over his static's 14 pulls (gVDPhzp61Zm29HMw;
+//   up to 1.62M, Coiled Altar 2:38–3:12); ßacardi (Shado-Pan, no Heart)
+//   1.17M, 613k of it 2:46–3:44, a minute of Tiger Palm / Blackout Kick
+//   into Zenith; Omzo (9w3bK4qhrRC82gVX, Vashnik 20th) 384k; Leluu 93k;
+//   Shoccemnk 15k. Most of the weaker players' long holds (Leluu
+//   0:45–1:05 and 6:09–6:28, Shoccemnk's 4:15) sit in Vitriolic Stasis and
+//   aren't counted; WoWAnalyzer counts them, hence its 65% vs 84%.
+//
+// ── Zenith Stomp unused (zenithStompUnused) ────────────────────────────
+// With the talent that grants them, Zenith puts STOMPS_GRANTED Zenith
+// Stomp casts (1291484, the buff; cast and hits 1272696) on the player
+// for the window: Gransonn and Spiritbound (Vashnik, 99th / 98th) pressed
+// 12 for 6 Zeniths and let none run out. A window that ends with no stomp
+// pressed at its end lost the ones not pressed, each worth the player's
+// Zenith Stomp (its hits within STOMP_HIT_MS) less a Tiger Palm / Blackout
+// Kick GCD (it takes a GCD). A window mostly in forced time isn't counted.
+// Measured: ßacardi 7 of 16 unused (0:20, 1:04, 2:12, 4:37, 6:15): 7 ×
+// (188k − 51k) = 964k; Blkphnx 1 each on Kith'ix Pull 2 and Nek'zali
+// Pull 2 of 14 pulls; the other players don't take the talent.
 
 import type { PlayerEvent } from "@/types/PlayerInfo";
 import type { DamageFinding, JobCheck, Moment } from "../../types";
@@ -83,6 +103,10 @@ const CRIT_CUTS = new Set([185099, 468179, 392959]);   // Rising Sun Kick, Rushi
 const SPINNING_CRANE_KICK = 101546;
 const SCK_HIT = 107270;
 const CELESTIAL_CONDUIT = 443028;
+const STOMP_GRANT = 1291484;   // the Zenith Stomp casts Zenith grants (buff)
+const ZENITH_STOMP = 1272696;  // cast and hit
+const STOMPS_GRANTED = 2;
+const STOMP_HIT_MS = 1_000;
 
 const FISTS_BASE_MS = 24_000;
 const HASTE_RATING_PER_PCT = 44;
@@ -115,6 +139,14 @@ function presses(ctx: PlayerCheckContext, id: number): PlayerEvent[] {
     out.push(c);
   }
   return out;
+}
+
+/** The player's filler GCD: their Tiger Palm and Blackout Kick damage ÷ those presses. */
+function fillerPerGcd(ctx: PlayerCheckContext): number {
+  const n = presses(ctx, TIGER_PALM).length + presses(ctx, BLACKOUT_KICK).length;
+  const dmg = ctx.player.damageDone.filter((e) => !e.pet && e.timestamp < ctx.endMs && (e.abilityId === TIGER_PALM || e.abilityId === BLACKOUT_KICK))
+    .reduce((a, e) => a + (e.amount ?? 0), 0);
+  return n > 0 ? dmg / n : 0;
 }
 
 type Cycle = { prev: number; cast: number; ready: number; rechargeMs: number };
@@ -195,9 +227,7 @@ const fistsHeld: JobCheck = (ctx) => {
   const inV = inList.length >= 3 ? avg(inList) : outV;
   if (!(outV > 0)) return [];
   // What the channel's GCDs would have done instead: the player's Tiger Palm / Blackout Kick.
-  const fillers = [...presses(ctx, TIGER_PALM), ...presses(ctx, BLACKOUT_KICK)].length;
-  const fillerDmg = ctx.player.damageDone.filter((e) => !e.pet && (e.abilityId === TIGER_PALM || e.abilityId === BLACKOUT_KICK)).reduce((a, e) => a + (e.amount ?? 0), 0);
-  const filler = fillers > 0 ? fillerDmg / fillers : 0;
+  const filler = fillerPerGcd(ctx);
   const channel = statusWindows(ctx, FISTS).filter((w) => w.endMs <= ctx.endMs).map((w) => w.endMs - w.startMs);
   const channelGcds = channel.length >= 3 ? avg(channel) / ctx.baseGcdMs : 4;
   const worth = (v: number) => Math.max(0, v - channelGcds * filler);
@@ -211,7 +241,13 @@ const fistsHeld: JobCheck = (ctx) => {
 
   const moments: Moment[] = [];
   let heldMs = 0, excusedMs = 0, lost = 0;
-  for (const c of fistsCycles(ctx, fists)) {
+  // A held second pushes every later Fists back: it costs that share of
+  // the player's average recharge, not of the cycle's (a burst cycle can
+  // rebuild in 3–4s, which would price one held second at a third of a Fists).
+  const cycles = fistsCycles(ctx, fists);
+  const recharge = avg(cycles.filter((c) => c.cast < ctx.endMs).map((c) => c.rechargeMs));
+  if (!(recharge > 0)) return [];
+  for (const c of cycles) {
     if (c.cast <= c.ready) continue;
     const span = c.cast - c.ready - overlapMs(c.ready, c.cast, excluded);
     let held = span - HOLD_ALLOW_MS;
@@ -220,31 +256,66 @@ const fistsHeld: JobCheck = (ctx) => {
     const into = burst.find((w) => c.ready < w.startMs && c.cast >= w.startMs && c.cast <= w.startMs + BURST_GRACE_MS);
     let excused = 0;
     if (into && inV > outV) {
-      const perMs = worth(outV) / c.rechargeMs;
-      excused = Math.min(held, (inV - outV) / perMs, c.rechargeMs);
+      const perMs = worth(outV) / recharge;
+      excused = Math.min(held, (inV - outV) / perMs, recharge);
       held -= excused;
     }
     excusedMs += excused;
     if (held < MIN_HELD_MS) continue;
     // Held time inside the burst is worth a burst Fists.
     const inMs = Math.min(held, overlapMs(c.ready, c.cast, burst));
-    const v = (inMs * worth(inV) + (held - inMs) * worth(outV)) / c.rechargeMs;
+    const v = (inMs * worth(inV) + (held - inMs) * worth(outV)) / recharge;
     heldMs += held; lost += v;
     moments.push({ startMs: c.ready, endMs: c.cast, lostDamage: v,
       detail: `Fists of Fury ready at ${clock(c.ready)}, ${c.cast >= ctx.endMs ? "not pressed again" : `pressed at ${clock(c.cast)}`}: ${s(held)} held` +
         (excused > 0 ? ` (${s(excused)} more excused: held into ${inside(statusWindows(ctx, ZENITH), into!.startMs + 1) ? "Zenith" : "Invoke Xuen"} at ${clock(into!.startMs)})` : "") +
-        ` of a ${s(c.rechargeMs)} recharge` });
+        ` (this cycle's rebuilt recharge ${s(c.rechargeMs)})` });
   }
   if (moments.length === 0 || lost < 1) return [];
   return [finding(ctx, {
     kind: "cooldown-drift", startMs: moments[0].startMs, endMs: moments[moments.length - 1].endMs, forced: false, inference: true,
     label: "Fists of Fury held",
     lostDamage: lost,
-    basis: `held time (past ${s(HOLD_ALLOW_MS)} a cycle, outside forced time and movement) ÷ the rebuilt recharge × (the player's Fists, ${k(outV)} outside Zenith / Xuen and ${k(inV)} inside, − ${channelGcds.toFixed(1)} GCDs of Tiger Palm / Blackout Kick at ${k(filler)})` +
+    basis: `held time (past ${s(HOLD_ALLOW_MS)} a cycle, outside forced time and movement) ÷ ${s(recharge)}, the player's average rebuilt recharge, × (their Fists, ${k(outV)} outside Zenith / Xuen and ${k(inV)} inside, − ${channelGcds.toFixed(1)} GCDs of Tiger Palm / Blackout Kick at ${k(filler)})` +
       (excusedMs > 0 ? `; ${s(excusedMs)} held into a burst window excused up to its break-even` : ""),
     detail: `Fists of Fury sat ready ${s(heldMs)} past the allowance in ${moments.length} cycle${moments.length > 1 ? "s" : ""} (cooldown rebuilt from haste, Heart of the Jade Serpent, Blackout Kicks and critical kicks)`,
     moments,
   })];
 };
 
-export const WINDWALKER_CHECKS: JobCheck[] = [fistsHeld];
+// ── Zenith Stomp casts left unused ─────────────────────────────────────
+
+const zenithStompUnused: JobCheck = (ctx) => {
+  const wins = statusWindows(ctx, STOMP_GRANT).filter((w) => w.endMs <= ctx.endMs);
+  if (wins.length === 0) return [];
+  const stomps = presses(ctx, ZENITH_STOMP).map((c) => c.timestamp);
+  // A stomp's worth: its hits within STOMP_HIT_MS of the press.
+  const hits = ctx.player.damageDone.filter((e) => !e.pet && e.abilityId === ZENITH_STOMP);
+  const per = avg(stomps.map((t) => hits.filter((e) => e.timestamp >= t && e.timestamp < t + STOMP_HIT_MS).reduce((a, e) => a + (e.amount ?? 0), 0)));
+  const filler = fillerPerGcd(ctx);
+  if (!(per > filler)) return [];
+  const forced = mergeWindows(ctx.forced);
+  const moments: Moment[] = [];
+  let unusedN = 0, forcedN = 0;
+  for (const w of wins) {
+    const used = stomps.filter((t) => t >= w.startMs - 100 && t <= w.endMs + 100).length;
+    const unused = STOMPS_GRANTED - used;
+    if (unused <= 0 || stomps.some((t) => Math.abs(t - w.endMs) <= 300)) continue;
+    if (overlapMs(w.startMs, w.endMs, forced) >= (w.endMs - w.startMs) / 2) { forcedN += unused; continue; }
+    unusedN += unused;
+    moments.push({ startMs: w.startMs, endMs: w.endMs, lostDamage: unused * (per - filler),
+      detail: `Zenith at ${clock(w.startMs)}: ${used} of ${STOMPS_GRANTED} Zenith Stomps used, ${unused} ran out at ${clock(w.endMs)}` });
+  }
+  if (moments.length === 0) return [];
+  return [finding(ctx, {
+    kind: "proc-lost", startMs: moments[0].startMs, endMs: moments[moments.length - 1].endMs, forced: false, inference: true,
+    label: "Zenith Stomp unused",
+    lostDamage: moments.reduce((a, m) => a + (m.lostDamage ?? 0), 0),
+    basis: `${unusedN} × (${k(per)}, the player's Zenith Stomp − ${k(filler)}, their Tiger Palm / Blackout Kick GCD)` +
+      (forcedN ? `; ${forcedN} more in windows mostly forced, not counted` : ""),
+    detail: `${unusedN} of the Zenith Stomps that Zenith grants ran out unused (${moments.length} window${moments.length > 1 ? "s" : ""})`,
+    moments,
+  })];
+};
+
+export const WINDWALKER_CHECKS: JobCheck[] = [fistsHeld, zenithStompUnused];
