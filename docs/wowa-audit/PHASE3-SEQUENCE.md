@@ -55,7 +55,7 @@ damage rows are measured.
 | 13 | Retribution | [paladin-retribution.md](paladin-retribution.md) | done 2026-10-17: Avenging Wrath, Execution Sentence, Wake of Ashes valued and Divine Toll tracked (all `burstHold`); Divine Arbiter expiry (procs); Hammer of Light a GCD press; Ula'tek Heart hold windows (context); verified by the main session |
 | 13a | Engine: hold windows capped per cooldown | readers of `cooldownHoldWindows` | Every reader excused a whole hold window whatever the cooldown (a 15s Implosion got 30–90s on Ula'tek). Done 2026-10-17 (7d97590): `holdWindowsFor` trims each window to one recharge before its target (Imbibe, Heart); all seven readers use it; verified by the main session. Ula'tek's P2-start extension waits on the user's answer |
 | 14 | Frost DK | [deathknight-frost.md](deathknight-frost.md) | done 2026-10-17: Killing Machine lost, Rime overwritten, Frostscythe on one enemy, Breath / Frostwyrm's Fury held; Pillar and Reaper's Mark valued; Runic Power cap removed for Frost (frostdk.ts); verified by the main session |
-| 15 | Vengeance | [demonhunter-vengeance.md](demonhunter-vengeance.md) | |
+| 15 | Vengeance | [demonhunter-vengeance.md](demonhunter-vengeance.md) | done 2026-10-17: Sigil of Flame / Spite drift valued by their hits (vengeance.ts, tracked-cooldowns.ts); Sigil of Chains a GCD press (game.ts); verified by the main session |
 | 16 | Guardian | [druid-guardian.md](druid-guardian.md) | |
 | 17 | Assassination | [rogue-assassination.md](rogue-assassination.md) | |
 | 18 | Marksmanship | [hunter-marksmanship.md](hunter-marksmanship.md) | |
@@ -319,6 +319,14 @@ measured for it.
   `wrong`: Breath duration, Empower Rune Weapon efficiency. A lead: Breath
   length tracks Runic Power spent in it (r = 0.95), unpriced. Evidence in
   [deathknight-frost.md](deathknight-frost.md).
+- Vengeance (2026-10-17): proposed `wrong`: Fury at the cap, Spirit Bomb
+  fragments consumed, Felblade efficiency. Worth a look: Sigil of Flame
+  drift fires more on top tanks (Supadh atJRCq3YM8P4KGpD 560k, held 3:42
+  → 6:09; Elruth 407k) than on the static's tank (64–101k on 4 of 16
+  pulls), like Bestial Wrath held; kept as whole lost uses. A lead in a
+  `no-damage` row: Metamorphosis is a 1.8–3.2× damage window (Untethered
+  Rage), but a trial window check read the top players as weak, so it
+  was dropped. Evidence in [demonhunter-vengeance.md](demonhunter-vengeance.md).
 
 - Elemental (2026-10-17): `CallOfTheAncestors/other-checks`,
   `statistics` (and whether "Stormkeeper before Ascendance" should be
