@@ -54,7 +54,7 @@ damage rows are measured.
 | 12 | Balance | [druid-balance.md](druid-balance.md) | done 2026-10-17: Eclipse charges capped, Fury of Elune held, Starfall on one enemy, spenders outside Eclipse reworked (balance.ts); verified by the main session |
 | 13 | Retribution | [paladin-retribution.md](paladin-retribution.md) | done 2026-10-17: Avenging Wrath, Execution Sentence, Wake of Ashes valued and Divine Toll tracked (all `burstHold`); Divine Arbiter expiry (procs); Hammer of Light a GCD press; Ula'tek Heart hold windows (context); verified by the main session |
 | 13a | Engine: hold windows capped per cooldown | readers of `cooldownHoldWindows` | Every reader excused a whole hold window whatever the cooldown (a 15s Implosion got 30–90s on Ula'tek). Done 2026-10-17 (7d97590): `holdWindowsFor` trims each window to one recharge before its target (Imbibe, Heart); all seven readers use it; verified by the main session. Ula'tek's P2-start extension waits on the user's answer |
-| 14 | Frost DK | [deathknight-frost.md](deathknight-frost.md) | |
+| 14 | Frost DK | [deathknight-frost.md](deathknight-frost.md) | done 2026-10-17: Killing Machine lost, Rime overwritten, Frostscythe on one enemy, Breath / Frostwyrm's Fury held; Pillar and Reaper's Mark valued; Runic Power cap removed for Frost (frostdk.ts); verified by the main session |
 | 15 | Vengeance | [demonhunter-vengeance.md](demonhunter-vengeance.md) | |
 | 16 | Guardian | [druid-guardian.md](druid-guardian.md) | |
 | 17 | Assassination | [rogue-assassination.md](rogue-assassination.md) | |
@@ -311,6 +311,14 @@ measured for it.
   P2's start to 5s after the second Heart, ~90s; Polpo held Avenging
   Wrath through the P2 adds to the Heart at 4:46). Art of War moved to
   `unverifiable` (no duration separates its expiries).
+- Frost DK (2026-10-17): **an existing app check removed, for the user
+  to approve or reject:** the shared Runic Power cap check for Frost. It
+  read 1.6–2.5M on top players (Vildk 2.01M) by pricing casts that
+  generate no Runic Power; rebuilt, overflow is 10–27% of generation on
+  every player, top included. Proposed `wrong`: Runic Power waste; kept
+  `wrong`: Breath duration, Empower Rune Weapon efficiency. A lead: Breath
+  length tracks Runic Power spent in it (r = 0.95), unpriced. Evidence in
+  [deathknight-frost.md](deathknight-frost.md).
 
 - Elemental (2026-10-17): `CallOfTheAncestors/other-checks`,
   `statistics` (and whether "Stormkeeper before Ascendance" should be
