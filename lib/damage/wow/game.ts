@@ -310,8 +310,16 @@ const SWEEP_PRESSES: { spec: string; specId: number; ids: SweepPress[] }[] = [
   // "idle" sat around it). Voidblade 1245414 (13, near 1.02s; the 1245412
   // twin and Pierce the Veil log with it) and Reaper's Toll (17 on Kraa
   // LCFp3wbHvQqNP4my, near 0.74s) are presses. Void Ray: LOCK_STATUSES.
+  // Devourer's phase 3 (2026-10-17, 47 player-pulls, 9 of them taking The
+  // Hunt): Hungering Slash 1239123 (29 casts, 8 players; the next press
+  // 0.90s+ after it, p05) and The Hunt 1246167 (23 casts, 9 players: a
+  // 0.77s cast, median; the next press 0.26s+ after it lands, p05, so ~1.0s
+  // from its begin) are presses; both sat inside "idle" gaps as weaves
+  // (Limofans VbAHWZDdPwJBajmx 0:11, 4:23). The Hunt's 1246169 twin, logged
+  // ~0.27s after it, stays off. Voidblade's own GCD is DEVOURER_VOIDBLADE_MS.
   { spec: "Devourer Demon Hunter", specId: 1480, ids: [
     [1221150, "Collapsing Star"], [1245414, "Voidblade"], [1245470, "Reaper's Toll"],
+    [1239123, "Hungering Slash"], [1246167, "The Hunt"],
   ] },
   // Frost Mage (Babymage hjHXmdnJFwTPpMtK, Noribert NvX17Tb9yMY8QrDf,
   // Huggmark PAgdKqkXDTRfLnJy): Frostbolt, a 1.35s cast (94, near p05
@@ -445,6 +453,8 @@ function devourerUnlogged(player: PlayerInfo): PlayerEvent[] {
 const FELBLADE = 232893;
 const FELBLADE_GCD_MS = 500;
 const FELBLADE_WEAVE_MS = 700;
+const DEVOURER_VOIDBLADE = 1245414;
+const DEVOURER_VOIDBLADE_MS = 500;
 
 // Casts the log writes in the same instant as a press (within 30ms), fired
 // by it: the press's own GCD covers them (isAutoCast).
@@ -594,6 +604,12 @@ const ACTIONS = new Map<number, GameAction>();
     ...(fb ?? { id: FELBLADE, name: "Felblade", charges: 1, appliesStatusIds: [FELBLADE] }),
     onGcd: true, recastMs: FELBLADE_GCD_MS, cooldownMs: FELBLADE_GCD_MS, speedScaled: false,
   });
+  // Devourer's Voidblade (1245414; phase 3, 2026-10-17) has a 0.5s GCD of
+  // its own, not hasted, like Felblade: the next press came 0.48s (p05),
+  // 0.51s (median) after it (134 casts, 13 players), while it waits on the
+  // previous GCD (0.83s+ after it, p05). Its Pierce the Veil twin logs with it.
+  const vb = ACTIONS.get(DEVOURER_VOIDBLADE);
+  if (vb) ACTIONS.set(DEVOURER_VOIDBLADE, { ...vb, recastMs: DEVOURER_VOIDBLADE_MS, cooldownMs: DEVOURER_VOIDBLADE_MS, speedScaled: false });
   // Retribution's Crusading Strikes replaces the auto-attack and logs a
   // cast per swing (Polpo, 172 of them on gVDPhzp61Zm29HMw Kith'ix pull 2):
   // read as presses, every swing was a weave in gap labels and the
