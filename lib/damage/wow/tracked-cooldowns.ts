@@ -30,6 +30,7 @@ import { trueshotValue } from "./specs/marksmanship";
 import { convokeValue, feralFrenzyValue, feralWindowValue } from "./specs/feral";
 import { dragonrageValue } from "./specs/devastation";
 import { niuzaoValue } from "./specs/brewmaster";
+import { voidformValue } from "./specs/shadow";
 
 /**
  * One Vanish's worth to an Assassination Rogue: the damage of a Garrote cast
@@ -261,8 +262,12 @@ export const WOW_TRACKED_COOLDOWNS: Record<string, TrackedCooldown[]> = {
     { name: "Trueshot", actionIds: [288613], cooldownMs: 120_000, charges: 1, firstUseOffsetMs: 4_000, burstHold: true, valuePerUse: trueshotValue },  // 120.3 / 132.5s, 4.0s
   ],
   "Shadow Priest": [
-    { name: "Halo", actionIds: [120644], cooldownMs: 60_000, charges: 1, firstUseOffsetMs: 6_000 },           // 60.6 / 62.9s, 6.0s
-    { name: "Voidform", actionIds: [228260], cooldownMs: 120_000, charges: 1, firstUseOffsetMs: 8_000 },      // 120.6 / 126.9s, 7.2s
+    // Halo hits under 390964 and Voidform deals nothing of its own, so both
+    // were worth 0 a use and their drift never showed (the WoWAnalyzer
+    // audit's phase 3, 2026-10-17; specs/shadow.ts). Both are pressed at
+    // Vashnik's Imbibes by the top players: burstHold.
+    { name: "Halo", actionIds: [120644], damageIds: [390964], prePullEvidenceIds: [390964], cooldownMs: 60_000, charges: 1, firstUseOffsetMs: 6_000, burstHold: true },           // 60.6 / 62.9s, 6.0s
+    { name: "Voidform", actionIds: [228260], cooldownMs: 120_000, charges: 1, firstUseOffsetMs: 8_000, burstHold: true, valuePerUse: voidformValue },      // 120.6 / 126.9s, 7.2s
     { name: "Void Torrent", actionIds: [263165], cooldownMs: 30_000, charges: 1, firstUseOffsetMs: 11_000 },  // 30.0 / 33.5s, 10.8s
   ],
   "Elemental Shaman": [

@@ -28,6 +28,18 @@
 //   rDPS split as buffs given.
 // Tracked cooldowns are in tracked-cooldowns.ts.
 //
+// Shadow has no case study. The WoWAnalyzer audit's phase 3 (2026-10-17;
+// docs/wowa-audit/priest-shadow.md, 45 player-pulls, every one Archon)
+// found clipped Mind Flays read as idle (game.ts now times both Mind Flays
+// by their ticks: the 99.9th-percentile Kleenonean's GCD delays 2.22M →
+// 0.91M), and the tracked Halo and Voidform worth 0 a use (Halo hits under
+// another id; Voidform is valued in shadow.ts by the presses its window
+// adds). Re-run on the top players: the Voidform window reads 0–0.44M on
+// them (Флоусенх 6:01, 5 of 40 GCDs short) against up to 1.35M on the
+// weak (Lulousek's opener, 19 of 35); Insanity at the cap 0–53k; the DoT
+// checks 0–96k. All kept. No new check: every candidate measured
+// negligible or fired on the top players as much (shadow.ts).
+//
 // Augmentation has no case study. The WoWAnalyzer audit's phase 3
 // (2026-10-17; docs/wowa-audit/evoker-augmentation.md, 31 player-pulls)
 // found its support counted as GCD damage, pricing every gap ~3× high
@@ -213,6 +225,7 @@ import { DEMONOLOGY_CHECKS } from "./demonology";
 import { DEVASTATION_CHECKS } from "./devastation";
 import { ELEMENTAL_CHECKS } from "./elemental";
 import { MARKSMANSHIP_CHECKS } from "./marksmanship";
+import { SHADOW_CHECKS } from "./shadow";
 import { burstGcdFindings, castTimeProcFindings, dotUptimeFindings, k, observedWindowBonus, primaryResourceCapFindings, spentCooldownDrift } from "./shared";
 
 // Backdraft (117828): Conflagrate (17962) adds a stack, max 2; Chaos Bolt
@@ -401,7 +414,7 @@ export const RANGED_CHECKS: Record<string, JobCheck[]> = {
   "Balance Druid":        [window(102560, "Incarnation"), primaryResourceCapFindings, dot("Moonfire", 164812), dot("Sunfire", 164815), ...BALANCE_CHECKS],
   "Beast Mastery Hunter": [window(19574, "Bestial Wrath"), (ctx) => primaryResourceCapFindings(ctx, [BARBED_SHOT]), ...BEAST_MASTERY_CHECKS],
   "Marksmanship Hunter":  [window(288613, "Trueshot"), ...MARKSMANSHIP_CHECKS],
-  "Shadow Priest":        [window(194249, "Voidform"), primaryResourceCapFindings, dot("Shadow Word: Pain", 589), dot("Vampiric Touch", 34914)],
+  "Shadow Priest":        [window(194249, "Voidform"), primaryResourceCapFindings, dot("Shadow Word: Pain", 589), dot("Vampiric Touch", 34914), ...SHADOW_CHECKS],
   "Elemental Shaman":     [window(1219480, "Ascendance"), primaryResourceCapFindings, dot("Flame Shock", 188389), stormkeeper, ...ELEMENTAL_CHECKS],
   "Affliction Warlock":   [window(442726, "Malevolence"), dot("Agony", 980), dot("Unstable Affliction", 1259790), dot("Wither / Corruption", 445474, 146739), ...AFFLICTION_CHECKS],
   "Demonology Warlock":   [window(265187, "Demonic Tyrant"), ...DEMONOLOGY_CHECKS],
