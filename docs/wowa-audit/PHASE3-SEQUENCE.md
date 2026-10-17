@@ -58,7 +58,7 @@ damage rows are measured.
 | 15 | Vengeance | [demonhunter-vengeance.md](demonhunter-vengeance.md) | done 2026-10-17: Sigil of Flame / Spite drift valued by their hits (vengeance.ts, tracked-cooldowns.ts); Sigil of Chains a GCD press (game.ts); verified by the main session |
 | 16 | Guardian | [druid-guardian.md](druid-guardian.md) | done 2026-10-17: Guardian's bear presses added to the survey (game.ts: the 100th-percentile tank read 4.5% GCD uptime, now 92.6%); Lunar Beam tracked; Gore in procs.ts; verified by the main session |
 | 16a | Engine: spell-survey sweep, every spec | game.ts / spell-data.ts | Four passes found presses or channels missing from the survey (Reaver's Glaive, Drain Soul, Sigil of Chains, Guardian's kit). One sweep over every spec on disk. Done 2026-10-17 (13104a3, `SWEEP_PRESSES`): Protection Warrior, Enhancement and Discipline had no survey data at all (top players 1–39% GCD uptime, now 83–92%); Devourer, Frost Mage, Outlaw, Destruction and others gained too; verified by the main session |
-| 17 | Assassination | [rogue-assassination.md](rogue-assassination.md) | |
+| 17 | Assassination | [rogue-assassination.md](rogue-assassination.md) | done 2026-10-17: Rupture / Garrote off every enemy (replaces the shared uptime check for the spec), Rupture refreshed early, Vanish drift priced for players who never Vanish (assassination.ts, tracked-cooldowns.ts); verified by the main session |
 | 18 | Marksmanship | [hunter-marksmanship.md](hunter-marksmanship.md) | |
 | 19 | Feral | [druid-feral.md](druid-feral.md) | |
 | 20 | Augmentation | [evoker-augmentation.md](evoker-augmentation.md) | |
@@ -345,6 +345,14 @@ measured for it.
   filler rather than the average press, for every spec? Kept `wrong`:
   Mangle, Thrash, Swipe, Berserk per-use. Evidence in
   [druid-guardian.md](druid-guardian.md).
+- Assassination (2026-10-17): Kingsbane drift reads 777k on Ireath
+  (z8rQ23NBy4LwM6PZ, 99.8th): he opened his burst at 0:19–0:22 while the
+  raid started at 0:01, so a sixth Kingsbane missed the 5:35 kill. Should
+  a deliberately delayed opener count? Kept as a real lost use. Proposed
+  `wrong`: the four combo-point-waste rows and two low-point-finisher
+  rows; kept `wrong`: Crimson Tempest spread, Mutilate after Vanish, both
+  Deathmark/Kingsbane alignment rows. Evidence in
+  [rogue-assassination.md](rogue-assassination.md).
 
 - Elemental (2026-10-17): `CallOfTheAncestors/other-checks`,
   `statistics` (and whether "Stormkeeper before Ascendance" should be
