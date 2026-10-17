@@ -358,9 +358,11 @@ const SWEEP_PRESSES: { spec: string; specId: number; ids: SweepPress[] }[] = [
   // 0.99s), Gloomblade (Subtlety, Nickledon, 49, 0.99s), Pistol Shot
   // (Outlaw Buffoutlaw a4kX1DNT27yHGvqJ, Loktark Kag91qVZ2YJ7MQAb: 294
   // casts, two thirds of them the extra shots logged 0.1–0.3s after the
-  // first: COINCIDENT_AUTO's follow-up rule).
+  // first: COINCIDENT_AUTO's follow-up rule). Subtlety's Shuriken Toss
+  // (Subtlety phase 3, 2026-10-17: 12 casts on 3 of 41 player-pulls, near
+  // p05 0.99s).
   { spec: "Assassination Rogue", specId: 259, ids: [[185565, "Poisoned Knife"]] },
-  { spec: "Subtlety Rogue", specId: 261, ids: [[200758, "Gloomblade"]] },
+  { spec: "Subtlety Rogue", specId: 261, ids: [[200758, "Gloomblade"], [114014, "Shuriken Toss"]] },
   { spec: "Outlaw Rogue", specId: 260, ids: [[185763, "Pistol Shot"]] },
   // Healers: Holy Priest Mass Dispel (19 casts, 13 players, 1.23s cast,
   // near p05 0.99s) and Prayer of Healing (11, 1.06s); Paladins' Hammer of
