@@ -115,6 +115,11 @@ export type DamageGame = {
   // as `ratio` × the player's average of `refId`, a ratio measured on the
   // samples (Primal Wrath ≈ 1.20 Fell Cleave).
   procConsumerFallback?: Map<number, { refId: number; ratio: number }>;
+  // Procs whose buff events carry no duration (Warcraft Logs logs none, so
+  // checkProcs could never see one run out): each proc's natural duration
+  // and the presses that spend it, measured from our logs
+  // (lib/damage/wow/procs.ts). Only these can expire unused on such a log.
+  measuredProcs?: Map<number, MeasuredProc>;
   // Channelled mitigation (Passage of Arms), by action id: from the cast
   // to the player's next action, at most maxMs, is forced (the raid plan,
   // not play).
@@ -170,6 +175,14 @@ export type DamageGame = {
 };
 
 export type JobCheck = (ctx: PlayerCheckContext) => DamageFinding[];
+
+// DamageGame.measuredProcs: a proc's natural duration, and the presses that
+// spend it (the player's most-pressed one is valued; any of them beside the
+// removal used it).
+export type MeasuredProc = {
+  durationMs:  number;
+  consumerIds: number[];
+};
 
 export type PartyBuff = {
   name:       string;

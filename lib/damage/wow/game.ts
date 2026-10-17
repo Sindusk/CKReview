@@ -58,6 +58,7 @@ import { WOW_TRACKED_COOLDOWNS } from "./tracked-cooldowns";
 import { WOW_SPEC_CHECKS } from "./specs";
 import { combatPotion, potionWindows } from "./specs/potion";
 import { WOW_HASTE_STATUS_IDS, wowSpeedModels } from "./haste";
+import { WOW_MEASURED_PROCS } from "./procs";
 import type { DamageGame, GameAction, PartyBuff } from "../types";
 
 // Rogue (Assassination, Outlaw, Subtlety), Feral, Brewmaster, Windwalker.
@@ -203,6 +204,9 @@ export const WOW_DAMAGE: DamageGame = {
   isChannel: (id) => CHANNEL_IDS.has(id),
   lockStatus: (id) => LOCK_STATUSES.get(id),
   isAutoCast: bladestormAutoCasts,
+  // WCL buff events carry no duration: the procs checkProcs can see run
+  // out, with durations measured from our logs (procs.ts).
+  measuredProcs: WOW_MEASURED_PROCS,
   // DoT ticks share their spell's id (Agony 980, Shadow Word: Pain 589), so
   // an on-GCD action's ticks count too.
   // Or a hit named like an on-GCD action the player cast: Havoc's Chaos

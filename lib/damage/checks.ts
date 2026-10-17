@@ -62,6 +62,16 @@
 // job (a Dancer opener refreshes Last Dance Ready on purpose). Lost damage
 // = the consumer's average damage (an upper bound: the GCD used instead did
 // some damage too, so this is marked inference).
+//
+// WoW (DamageGame.measuredProcs, lib/damage/wow/procs.ts): Warcraft Logs
+// buff events carry no duration, so until 2026-10-17 no WoW proc ever
+// "expired". Only the procs listed there can now, each with a duration
+// measured from our logs and its consumers declared. Their timer restarts
+// on a gain (applied, a stack, a re-proc), not on the "refreshed" logged
+// beside a stackRemoved when one stack is spent; any listed consumer beside
+// the removal used it; a consumer whose hits log under another id
+// (Execute, Obliterate) is valued by its hits' name. procs.ts holds the
+// measurements, the procs left out and why, and what the check found.
 
 import type { Pull } from "@/types/Pull";
 import type { PlayerEvent, PlayerInfo } from "@/types/PlayerInfo";
@@ -85,6 +95,8 @@ export const PROC_MIN_REMOVALS = 3;
 export const PROC_CONSUMED_SHARE = 0.6;
 // A second consumer (Holy Circle beside Holy Spirit) that took this share of the status's removals.
 export const PROC_CONSUMER_ALT_SHARE = 0.1;
+// A measured proc's "refreshed" this close to a stackRemoved is the spend of one stack, not a gain.
+const MEASURED_PAIR_MS = 5;
 // A double weave is normal; a third oGCD between two GCDs clips.
 export const CLIP_WEAVES = 3;
 export const CLIP_FINDING_MS = 500;
@@ -990,6 +1002,23 @@ export function checkProcs(ctx: PlayerCheckContext): DamageFinding[] {
     .sort((a, b) => a.timestamp - b.timestamp);
   const casts = player.casts;
   const castNear = (t: number) => casts.find((c) => Math.abs(c.timestamp - t) <= PROC_CONSUME_MS);
+  // A measured proc (a log with no buff durations, WoW): its timer restarts
+  // on a gain (applied, a stack, a re-proc while held), not on the
+  // "refreshed" logged beside a stackRemoved when one of two stacks is spent.
+  const measured = ctx.game.measuredProcs;
+  const measuredOf = (e: PlayerEvent) => (e.durationMs ? undefined : measured?.get(e.abilityId));
+  const restarts = (e: PlayerEvent) => e.buffStatus === "applied" || e.buffStatus === "stack" ||
+    e.buffStatus === "refreshed" && !own.some((x) => x.abilityId === e.abilityId && x.buffStatus === "stackRemoved" &&
+      Math.abs(x.timestamp - e.timestamp) <= MEASURED_PAIR_MS);
+  // A measured proc's consumer whose hits log under another id than its
+  // cast (Execute, Obliterate, Rushing Wind Kick): its own hits by name,
+  // per cast, as isGcdDamage matches them.
+  const byNamePerUse = (consumerId: number, name: string) => {
+    const n = casts.filter((c) => c.abilityId === consumerId && c.timestamp < ctx.endMs).length;
+    if (n === 0) return 0;
+    return player.damageDone.filter((x) => !x.pet && !x.isDoT && x.abilityName === name && x.timestamp < ctx.endMs)
+      .reduce((a, x) => a + (x.amount ?? 0), 0) / n;
+  };
 
   // Which statuses one ability consistently consumes.
   // A removal at the status's natural expiry isn't a consumption, even
@@ -999,6 +1028,11 @@ export function checkProcs(ctx: PlayerCheckContext): DamageFinding[] {
   const consumedBy = new Map<number, Map<number, number>>();
   const expiry = new Map<number, number>();
   for (const e of own) {
+    const m = measuredOf(e);
+    if (m && (e.buffStatus === "applied" || e.buffStatus === "refreshed" || e.buffStatus === "stack")) {
+      if (restarts(e)) expiry.set(e.abilityId, e.timestamp + m.durationMs);
+      continue;
+    }
     if (e.buffStatus === "applied" || e.buffStatus === "refreshed") {
       if (e.durationMs) expiry.set(e.abilityId, e.timestamp + e.durationMs);
       continue;
@@ -1019,6 +1053,13 @@ export function checkProcs(ctx: PlayerCheckContext): DamageFinding[] {
     if (n >= PROC_MIN_REMOVALS && top && top[1] >= n * PROC_CONSUMED_SHARE) consumer.set(statusId, top[0]);
   }
   for (const [statusId, consumerId] of ctx.game.procConsumers ?? []) consumer.set(statusId, consumerId);
+  // A measured proc's consumer is declared: the listed press the player
+  // used most (Fury's Execute isn't Arms').
+  for (const [statusId, m] of measured ?? []) {
+    if (!own.some((e) => e.abilityId === statusId)) continue;
+    const pressed = (id: number) => casts.filter((c) => c.abilityId === id).length;
+    consumer.set(statusId, [...m.consumerIds].sort((a, b) => pressed(b) - pressed(a))[0]);
+  }
 
   const state = new Map<number, { expiresAt?: number; stacks: number; lastAt: number }>();
   for (const e of own) {
@@ -1045,10 +1086,11 @@ export function checkProcs(ctx: PlayerCheckContext): DamageFinding[] {
       // Never pressed in the pull: priced from a sibling action by a ratio
       // measured on the samples (24C9awg1fKhFjBPt's Warrior let 6 Wrathful
       // run out and never pressed Primal Wrath, so nothing showed).
-      const measured = ctx.values.perUse(consumerId) + ticksPerCast;
-      const fb = measured > 0 ? undefined : ctx.game.procConsumerFallback?.get(consumerId);
+      const measuredUse = ctx.values.perUse(consumerId) + ticksPerCast ||
+        (measured?.has(e.abilityId) ? byNamePerUse(consumerId, consumerName) : 0);
+      const fb = measuredUse > 0 ? undefined : ctx.game.procConsumerFallback?.get(consumerId);
       const fbRef = fb ? ctx.values.perUse(fb.refId) : 0;
-      const consumerValue = measured > 0 ? measured : fb ? fb.ratio * fbRef : 0;
+      const consumerValue = measuredUse > 0 ? measuredUse : fb ? fb.ratio * fbRef : 0;
       const fbNote = fb && fbRef > 0
         ? `; never pressed in the pull, so ${fb.ratio.toFixed(2)} × ${k(fbRef)} average ${ctx.game.action(fb.refId)?.name ?? "its sibling"} (the ratio on the samples)` : "";
       const avgWord = fb ? "estimated" : "average";
@@ -1081,9 +1123,14 @@ export function checkProcs(ctx: PlayerCheckContext): DamageFinding[] {
           !casts.some((c) => c.abilityId === consumerId && c.timestamp > st.lastAt + PROC_CONSUME_MS && c.timestamp <= e.timestamp + PROC_CONSUME_MS)) {
         lose(e.timestamp, 1, `overwritten by ${castNear(e.timestamp)?.abilityName ?? "a new one"}`);
       }
-      state.set(e.abilityId, { expiresAt: e.durationMs ? e.timestamp + e.durationMs : undefined, stacks: e.stack ?? st?.stacks ?? 1, lastAt: e.timestamp });
+      const m = measuredOf(e);
+      const expiresAt = m ? (restarts(e) ? e.timestamp + m.durationMs : st?.expiresAt)
+        : e.durationMs ? e.timestamp + e.durationMs : undefined;
+      state.set(e.abilityId, { expiresAt, stacks: e.stack ?? st?.stacks ?? 1, lastAt: e.timestamp });
     } else if (e.buffStatus === "stack" || e.buffStatus === "stackRemoved") {
       if (st) { st.stacks = e.stack ?? st.stacks; st.lastAt = e.timestamp; }
+      const m = measuredOf(e);
+      if (st && m && e.buffStatus === "stack") st.expiresAt = e.timestamp + m.durationMs;
     } else if (e.buffStatus === "removed") {
       // Only a consumer pressed beside the expiry used it: qjCMx4bRfgNKwX9T
       // fight 16's Paladin let Divine Might run out 0.17s before a Blade
@@ -1098,8 +1145,10 @@ export function checkProcs(ctx: PlayerCheckContext): DamageFinding[] {
       // nothing about either).
       const pressedWhileHeld = st !== undefined && ctx.game.procConsumers?.get(e.abilityId) === consumerId && casts.some((c) => c.abilityId === consumerId &&
         c.timestamp > st.lastAt + PROC_CONSUME_MS && c.timestamp < e.timestamp - PROC_CONSUME_MS);
+      const listed = measured?.get(e.abilityId)?.consumerIds;
       const usedIt = pressedWhileHeld || near !== undefined && (near.abilityId === consumerId ||
-        (consumedBy.get(e.abilityId)?.get(near.abilityId) ?? 0) >= (removals.get(e.abilityId) ?? 0) * PROC_CONSUMER_ALT_SHARE);
+        (consumedBy.get(e.abilityId)?.get(near.abilityId) ?? 0) >= (removals.get(e.abilityId) ?? 0) * PROC_CONSUMER_ALT_SHARE) ||
+        listed !== undefined && casts.some((c) => listed.includes(c.abilityId) && Math.abs(c.timestamp - e.timestamp) <= PROC_CONSUME_MS);
       const consumerBeside = casts.some((c) => c.abilityId === consumerId && Math.abs(c.timestamp - e.timestamp) <= PROC_CONSUME_MS);
       if (st?.expiresAt !== undefined && !usedIt &&
           e.timestamp >= st.expiresAt - PROC_EXPIRY_EARLY_MS && e.timestamp <= st.expiresAt + PROC_EXPIRY_LATE_MS) {
