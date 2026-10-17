@@ -39,7 +39,7 @@ damage rows are measured.
 
 | # | Spec | Ledger | Status |
 |---|---|---|---|
-| 1 | Windwalker | [monk-windwalker.md](monk-windwalker.md) | |
+| 1 | Windwalker | [monk-windwalker.md](monk-windwalker.md) | done 2026-10-17: Fists of Fury held, Zenith Stomp unused (windwalker.ts); verified by the main session |
 | 2 | Havoc | [demonhunter-havoc.md](demonhunter-havoc.md) | |
 | 3 | Arcane | [mage-arcane.md](mage-arcane.md) | |
 | 4 | Demonology | [warlock-demonology.md](warlock-demonology.md) | |
@@ -92,7 +92,8 @@ measured for it.
 > **Read first, in full:** CLAUDE.md; docs/wowa-audit-plan.md (licence,
 > statuses, phase 3); docs/wowa-audit/PHASE3-SEQUENCE.md (this process);
 > the ledger; docs/wowa-audit/HANDOFF-elemental-build.md, "Lessons from
-> the Elemental build"; docs/dps-analysis.md, "Analyzing a WoW kill";
+> the Elemental build", and this file's "Lessons from earlier passes";
+> docs/dps-analysis.md, "Analyzing a WoW kill";
 > the header of lib/damage/wow/specs/elemental.ts (the model for how a
 > built check is documented); the spec's role file in
 > lib/damage/wow/specs/ and the headers of shared.ts, potion.ts,
@@ -157,7 +158,33 @@ measured for it.
 > whose status changed and why; the logs fetched; anything only the user
 > can decide.
 
+## Lessons from earlier passes (passed to every agent)
+
+- **A cooldown the server cuts can still be rebuilt from the log**
+  (Windwalker's Fists of Fury): base ÷ haste from rating, rate changes
+  from buffs, flat cuts from casts and crit hits. Check the direction of
+  its error on top players: their casts should come at or *before* the
+  rebuilt ready time (lenient), never after it by habit.
+- **Check which resource the shared cap check reads** before calling a
+  resource-waste row `covered`: `primaryResourceCapFindings` picks the
+  resource the player's casts log most (Energy, not Chi, for Windwalker).
+- **Price held time by the player's average recharge**, not the cycle's
+  own: a burst cycle can be 3–4s long and would price one second at a
+  third of a cast.
+- **Holding a button into a burst can pay**: excuse a hold that ends early
+  in the window up to its break-even (the button's damage inside minus
+  outside, against a held second's value), never past one recharge.
+- **Forced time explains much of WoWAnalyzer's efficiency gap**
+  (Vitriolic Stasis): measure outside it before calling a loss real.
+
 ## Held for the user's review
+
+- Windwalker (2026-10-17): the two `wrong` rows kept after the re-check
+  (filler order, Celestial Conduit targets) and the Unity Within half of
+  the Heart of the Jade Serpent window grade, evidence in
+  [monk-windwalker.md](monk-windwalker.md). Also an unvalued lead outside
+  any WoWAnalyzer rule: Blkphnx casts 4.9 paid Blackout Kicks a minute
+  against the top players' 1.0–3.0.
 
 - Elemental (2026-10-17): `CallOfTheAncestors/other-checks`,
   `statistics` (and whether "Stormkeeper before Ascendance" should be
