@@ -165,3 +165,27 @@ guesses.
 5. Pull 17, 7:08.9 to 7:19.0: the boss's monitor on its east side, the SCH's
    on the left, the WAR's and PCT's on the right. Do the monitors face
    that way?
+
+## Phase 4: Blue Screen (7:27 to 8:37)
+
+### What's drawn
+- **Proteans** (31614) flash along each helper's facing as they land
+  (the game data's lanes fit: each holds its own player). They have no
+  telegraph in game, as far as the guides say.
+- **Afterimages** (31616) show their ground telegraph for the whole 5s
+  cast, on the round's lanes.
+- **Line stacks:** from the marks (8s before) the engine's line-stack
+  chevrons ride on the two marked players, then the two orange 6y lines
+  flash from the middle.
+- **Wave Repeater:** P3's rings, twice.
+
+### Fit check
+All lanes and stacks hold exactly their own players (the tool lumps the
+three "Wave Cannon" ids together, so its counts read as misses).
+
+### VOD checks: Pull 17 (bNcrLh7Y4dkHxM9q)
+1. Pull 17, 7:46.5: stack marks on the DRK and SCH. Is that who was marked,
+   and did the SCH's group take the south-west line?
+2. Pull 17, 7:49.5: two of the eight protean lanes are drawn from 10y north
+   of the middle (where those helpers sit, as the header found). Do all
+   eight lanes come from the boss in game?

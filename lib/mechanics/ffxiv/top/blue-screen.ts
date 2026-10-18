@@ -72,6 +72,9 @@
 // once 3 (C23 G1 K19). The 42 passes have none; the kill has no P4 error.
 // P4's remaining unexplained deaths are fallout (doubles and short stacks
 // after a death) or a full stack's raw damage (D42 R1).
+// Replay (2026-10-18, L16 = bNcrLh7Y4dkHxM9q fight 17, 31559 at 7:27.5):
+// the 22393 casts name the marked players 8s before their stacks; each
+// stack's hits share one helper, which places its line. Built in replay.ts.
 //
 // -- RULES IMPLEMENTED --
 // ffxiv-top4-ring (Major on death or Damage Down, else Minor).

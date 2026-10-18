@@ -509,10 +509,50 @@ function p3Monitors(data: ReplayData): CasterEffect[] {
   return out;
 }
 
+// ── P4 Blue Screen (blue-screen.ts) ─────────────────────────────────────────
+
+const AFTERIMAGE = 31616, P4_STACK = 31615, P4_STACK_MARK = 22393;
+
+Object.assign(OVERRIDES, {
+  // Afterimages: the round's protean lanes again 5s later, with a ground
+  // telegraph (omen general02f) for the whole cast. Fight 17: 8 per round,
+  // none hit anyone. The proteans themselves (31614) have no telegraph and
+  // flash as they land, from the helper along its facing (header).
+  [AFTERIMAGE]: { telegraph: true },
+  // The two line stacks per round: 100 x 6y, shared by four.
+  [P4_STACK]: { style: "stack" },
+} satisfies Record<number, Override>);
+
+// The line stacks from their marks (22393, one cast per marked player 8s
+// before: fight 17 7:46.5 -> 7:54.5) until they fire: a line stack from
+// the middle, aimed where its group took it.
+function p4Stacks(data: ReplayData): AoeShape[] {
+  const casts = data.enemyCasts ?? [];
+  const hits = data.enemyHits ?? [];
+  const out: AoeShape[] = [];
+  for (const m of casts) {
+    if (m[4] !== P4_STACK_MARK || m[3] !== 0 || !m[5]) continue;
+    const land = casts.find((c) => c[4] === P4_STACK && c[3] === 0 && c[0] > m[0] && c[0] - m[0] < 10000);
+    if (!land) continue;
+    // This mark's line: the stack hit on the marked player, and the group
+    // that shared it (the same caster's hits).
+    const own = hits.find((h) => h[1] === P4_STACK && h[3] === m[5] && Math.abs(h[0] - land[0]) <= 1500 && h[4] !== null);
+    if (!own) continue;
+    const group = hits.filter((h) => h[1] === P4_STACK && h[2] === own[2] && Math.abs(h[0] - own[0]) <= 500);
+    const ax = group.reduce((s, h) => s + h[6]!, 0) / group.length, ay = group.reduce((s, h) => s + h[7]!, 0) / group.length;
+    const bearing = ((Math.atan2(ax - own[4]!, -(ay - own[5]!)) * 180) / Math.PI + 360) % 360;
+    out.push(shape({
+      kind: "rect", x: own[4]!, y: own[5]!, bearing, range: 10000, width: 600, name: "Wave Cannon",
+      start: m[0], resolve: land[0], noFlash: true, style: "stack", lineStack: true, marked: [m[5]],
+    }));
+  }
+  return out;
+}
+
 function buildShapes(data: ReplayData): AoeShape[] {
   return [
     ...p1Towers(data), ...p1Puddles(data), ...p1Sets(data), ...p2Clones(data), ...p2Stacks(data),
-    ...p3Rings(data), ...p3Towers(data), ...p3Marks(data),
+    ...p3Rings(data), ...p3Towers(data), ...p3Marks(data), ...p4Stacks(data),
   ];
 }
 
