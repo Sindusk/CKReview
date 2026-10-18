@@ -356,11 +356,15 @@ export type FFLDamageEvent = {
   // hitType 2 = crit; `directHit` is separate. On damageDone, `multiplier`
   // holds only damage-% modifiers, not crit/DH-rate buffs. `bonusPercent`
   // appears on combo and positional actions. Simulated DoT ticks carry
-  // FFLogs' own damage-per-potency estimate, `actorPotencyRatio`.
+  // FFLogs' own damage-per-potency estimate, `actorPotencyRatio`, and the
+  // game's crit chance (`expectedCritRate`, thousandths) and direct-hit
+  // chance (`directHitPercentage`, 0-1) at the tick, buffs included.
   directHit?:    boolean;
   bonusPercent?: number;
   simulated?:    boolean;
   actorPotencyRatio?: number;
+  expectedCritRate?: number;
+  directHitPercentage?: number;
   targetInstance?: number;
 };
 

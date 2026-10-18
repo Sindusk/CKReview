@@ -29,7 +29,7 @@ export type HitRates = {
   directHit: number;   // 0-1
   critMult:  number;   // e.g. 1.594
   hits:      number;   // hits the rates came from
-  source:    "stats" | "estimate";
+  source:    "stats" | "ticks" | "estimate";
 };
 
 // Level 100 stat formulas (sub 420, div 2780).
@@ -48,7 +48,44 @@ export function ratesFromStats(criticalHit: number, directHit: number): Omit<Hit
 // About 8-10 pulls.
 export const MIN_ESTIMATE_HITS = 2_000;
 
-export const reliableRates = (r: HitRates) => r.source === "stats" || r.hits >= MIN_ESTIMATE_HITS;
+export const reliableRates = (r: HitRates) => r.source === "stats" || r.source === "ticks" || r.hits >= MIN_ESTIMATE_HITS;
+
+// The game's own rates, from FFLogs' simulated DoT ticks: each carries the
+// crit chance (`expectedCritRate`) and direct-hit chance
+// (`directHitPercentage`) at the tick, crit / direct-hit buffs in its
+// snapshot included. Those buffs (the game's party-buff table) are taken
+// back out and the most common value is the player's rate, as partnercalc
+// does (src/simulator/modules/estimators, MIT; dnc-partner.ts). The crit
+// multiplier follows from the crit rate by the level-100 formulas (both
+// are linear in the crit stat: multiplier = 1.35 + rate). Exact where it
+// applies; players with no DoT, and samples fetched before 2026-10-18
+// (the fetch dropped both fields), fall back to the estimate.
+const MIN_TICKS = 5;
+export function tickHitRates(players: PlayerInfo[], game: DamageGame): HitRates | undefined {
+  const crit = new Map<number, number>(), dh = new Map<number, number>();
+  let n = 0;
+  for (const e of players.flatMap((p) => p.damageDone)) {
+    if (e.tickCritRate === undefined || e.pet) continue;
+    let cb = 0, db = 0;
+    for (const id of new Set(e.statusIds ?? [])) {
+      const b = game.partyBuff(id);
+      cb += b?.crit ?? 0;
+      db += b?.directHit ?? 0;
+    }
+    const c = Math.round((e.tickCritRate - cb) * 1000);
+    crit.set(c, (crit.get(c) ?? 0) + 1);
+    if (e.tickDirectHitRate !== undefined) {
+      const d = Math.round((e.tickDirectHitRate - db) * 1000);
+      dh.set(d, (dh.get(d) ?? 0) + 1);
+    }
+    n++;
+  }
+  if (n < MIN_TICKS) return undefined;
+  const mode = (m: Map<number, number>) => [...m].sort((a, b) => b[1] - a[1])[0]?.[0];
+  const c = mode(crit)! / 1000, d = (mode(dh) ?? 0) / 1000;
+  if (c <= 0 || c >= 1 || d < 0 || d >= 1) return undefined;
+  return { crit: c, directHit: d, critMult: Math.round((1.35 + c) * 1000) / 1000, hits: n, source: "ticks" };
+}
 
 /** The log recorder's real stats when the log has them, else the estimate. */
 export function playerHitRates(players: PlayerInfo[], game: DamageGame, guaranteedStatusIds: Set<number>): HitRates | undefined {
@@ -68,6 +105,8 @@ const MIN_MEAN_HIT = 100;
  * direct hit on the hit carrying them.
  */
 export function estimateHitRates(players: PlayerInfo[], game: DamageGame, guaranteedStatusIds: Set<number>): HitRates | undefined {
+  const fromTicks = tickHitRates(players, game);
+  if (fromTicks) return fromTicks;
   const rateBuff = (id: number) => {
     const b = game.partyBuff(id);
     return b !== undefined && ((b.crit ?? 0) > 0 || (b.directHit ?? 0) > 0);

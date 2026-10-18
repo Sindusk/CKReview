@@ -215,8 +215,10 @@ and delete them from the header.
   - [dnc.md](xiva-audit/dnc.md): Dancer, 0 candidates, 9 covered (dance
     checks, Devilment outside Technical Finish and no dance partner
     built, awaiting xivanalysis pages). Partner value from partnercalc's
-    model (dnc-partner.ts), not yet matched against partnercalc.app on a
-    7.4+ log. Partner swaps judged since
+    model (dnc-partner.ts), matched against partnercalc.app on one Enuo
+    kill (tanks within 1% without auto-attacks, others within ~10%).
+    Crit / direct-hit rates from DoT ticks need samples fetched since
+    2026-10-18 (`--refetch` for older ones). Partner swaps judged since
     2026-10-18 (late swap after a death, weaker swap partner); the 5s
     swap grace and the partner-choice threshold are unconfirmed.
   - [pct.md](xiva-audit/pct.md): Pictomancer, 1 candidate

@@ -958,6 +958,8 @@ function fflDamageDoneToPlayerEvent(
     directHit:         event.directHit,
     bonusPercent:      event.bonusPercent,
     actorPotencyRatio: event.actorPotencyRatio,
+    tickCritRate:      event.expectedCritRate !== undefined ? event.expectedCritRate / 1000 : undefined,
+    tickDirectHitRate: event.directHitPercentage,
     targetActorId:     event.targetID,
     targetInstance:    event.targetInstance,
   };

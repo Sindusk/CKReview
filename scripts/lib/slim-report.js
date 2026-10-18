@@ -132,7 +132,7 @@ const FFL_PROJECTORS = {
   // (lib/damage/); see docs/archive/damage-analysis-plan.md "Data check findings".
   damageDone: (e) => ({
     ...pick(e, ['timestamp', 'type', 'sourceID', 'targetID', 'sourceInstance', 'targetInstance', 'abilityGameID', 'amount', 'overkill', 'buffs', 'unpaired',
-      'hitType', 'directHit', 'multiplier', 'bonusPercent', 'tick', 'simulated', 'actorPotencyRatio']),
+      'hitType', 'directHit', 'multiplier', 'bonusPercent', 'tick', 'simulated', 'actorPotencyRatio', 'expectedCritRate', 'directHitPercentage']),
     targetResources: pickNested(e, 'targetResources', FF_RESOURCE_SUBKEYS),
   }),
   // The mitigation breakdown fields (unmitigatedAmount ... hitType) are read

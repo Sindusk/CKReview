@@ -21,13 +21,24 @@
 //     and Fan Dance, partnercalc's potencyRatio). Not counted under
 //     Technical Finish (it gives Esprit anyway); hits within 200ms are one
 //     event (AoEs, Barrage).
-// Differences from partnercalc: crit and direct-hit rates come from
-// crit-rates.ts (the player's own hits, or their logged gear); the
-// Standard Finish bonus is the ledger's measured share (5% by default);
-// "weaponskill or spell" is any on-GCD action; actions that always crit or
-// always direct-hit are valued as normal rolls (partnercalc treats
-// Devilment there as a flat crit-rate multiplier). Not checked against
-// partnercalc's output on a 7.4+ log yet.
+// Hits that always crit or direct-hit (an action at 95%+ of 5+ hits, or
+// Life Surge / Inner Release / Reassembled) keep their real value, and
+// Devilment raises them by rate × (multiplier − 1), as partnercalc does.
+// Rates come from crit-rates.ts: the game's own chances on the player's
+// DoT ticks where they have one (partnercalc's source), else the logged
+// gear or the estimate from hits.
+// Differences from partnercalc: the Standard Finish bonus is the ledger's
+// measured share (5% by default); "weaponskill or spell" is any on-GCD
+// action; auto-attacks count (both buffs apply to them in game;
+// partnercalc reads only damage with a cast snapshot, so it leaves them
+// out).
+// Checked against partnercalc.app on Xk2DKZwVp4Ar6d7y fight 3 (Enuo kill,
+// Chauzey Solstice, 2026-10-18; the saved page in sampledata/damage-ff):
+// same best partner (Tsuki Hoshino, 2039k here, 1973k there); without
+// auto-attacks the tanks match within 1% (Kade Kansado Standard Finish
+// 659k / 656k, Devilment 530k / 527k); others within about 10% either way.
+// Its 8:08-9:10 window has Apollo Tomyris ahead of Apollo Avrani (141k /
+// 79k), as `partnerChoice` found for the 8:04 swap.
 //
 //   Copyright (c) 2022 hintxiv
 //   MIT License; full text in THIRD_PARTY_NOTICES.md.
@@ -37,6 +48,7 @@ import type { PlayerCheckContext } from "../../checks";
 import { estimateHitRates } from "../../crit-rates";
 import { inWindows, type Window } from "../../timeline";
 import { XIVA_ACTIONS as A, XIVA_STATUSES as S } from "../xiva-data";
+import { GUARANTEED_HIT_STATUS_IDS } from "../game";
 
 const ESPRIT_PER_GCD = 10;
 const POTENCY_PER_ESPRIT = 3.56;
@@ -52,6 +64,7 @@ const DNC_POTENCY: [key: string, potency: number][] = [
 ];
 const DH_MULT = 1.25;
 const DEVILMENT_RATE = 0.2;
+const AUTO_MIN_HITS = 5, AUTO_SHARE = 0.95;
 
 export type PartnerValue = { standard: number; devilment: number; esprit: number; total: number };
 
@@ -86,7 +99,27 @@ export function partnerModel(ctx: PlayerCheckContext): PartnerModel {
   const stdCopy = S.STANDARD_FINISH_PARTNER?.id;
   const devilId = S.DEVILMENT?.id;
   const techId = S.TECHNICAL_FINISH?.id;
-  const expect = (cr: number, dr: number, cm: number) => (1 + Math.min(1, cr) * (cm - 1)) * (1 + Math.min(1, dr) * (DH_MULT - 1));
+  // Actions that always crit / always direct-hit, per player: 95%+ of 5+
+  // hits, as crit-rates.ts judges them.
+  const autoOf = (pick: (e: PlayerInfo["damageDone"][number]) => boolean) => {
+    const cache = new Map<PlayerInfo, Set<number>>();
+    return (p: PlayerInfo) => {
+      let s = cache.get(p);
+      if (!s) {
+        const by = new Map<number, { n: number; yes: number }>();
+        for (const e of p.damageDone) {
+          if (e.isDoT || (e.amount ?? 0) <= 0) continue;
+          const x = by.get(e.abilityId) ?? { n: 0, yes: 0 };
+          x.n++; if (pick(e)) x.yes++;
+          by.set(e.abilityId, x);
+        }
+        s = new Set([...by].filter(([, x]) => x.n >= AUTO_MIN_HITS && x.yes / x.n >= AUTO_SHARE).map(([id]) => id));
+        cache.set(p, s);
+      }
+      return s;
+    };
+  };
+  const autoCrit = autoOf((e) => e.hitType === 2), autoDH = autoOf((e) => !!e.directHit);
 
   return {
     value(p, from, to, stdWins, devilWins) {
@@ -102,23 +135,32 @@ export function partnerModel(ctx: PlayerCheckContext): PartnerModel {
         const std = inWindows(e.timestamp, stdWins), dev = inWindows(e.timestamp, devilWins);
         if (!std && !dev) continue;
         const ids = e.statusIds ?? [];
-        // Crit / direct-hit buffs the hit already carried (Devilment left
-        // out: it's what's being valued).
-        let cr = r.crit, dr = r.dh;
+        // Crit / direct-hit rate buffs the hit already carried (Devilment
+        // left out: it's what's being valued).
+        let bc = 0, bd = 0;
         for (const id of new Set(ids)) {
           if (id === devilId) continue;
           const b = ctx.game.partyBuff(id);
-          cr += b?.crit ?? 0;
-          dr += b?.directHit ?? 0;
+          bc += b?.crit ?? 0;
+          bd += b?.directHit ?? 0;
         }
-        const hadDevil = devilId !== undefined && ids.includes(devilId);
+        const hd = devilId !== undefined && ids.includes(devilId) ? DEVILMENT_RATE : 0;
+        // A guaranteed crit / direct hit (an action that always does, or
+        // Life Surge, Inner Release, Reassembled) doesn't roll: rate buffs
+        // raise its damage instead, by rate × (multiplier − 1). partnercalc
+        // keeps such hits at their real value and applies Devilment as that
+        // flat bonus (rdps.ts, the 'auto' cases).
+        const guaranteed = ids.some((id) => GUARANTEED_HIT_STATUS_IDS.has(id));
+        const aC = !e.isDoT && e.hitType === 2 && (guaranteed || autoCrit(p).has(e.abilityId));
+        const aD = !e.isDoT && !!e.directHit && (guaranteed || autoDH(p).has(e.abilityId));
+        const critF = (buff: number) => aC ? r.critMult * (1 + buff * (r.critMult - 1)) : 1 + Math.min(1, r.crit + buff) * (r.critMult - 1);
+        const dhF = (buff: number) => aD ? DH_MULT * (1 + buff * (DH_MULT - 1)) : 1 + Math.min(1, r.dh + buff) * (DH_MULT - 1);
         // The hit without its own crit / direct-hit luck (a DoT tick is
         // already at its expected value).
-        const rolled = expect(cr + (hadDevil ? DEVILMENT_RATE : 0), dr + (hadDevil ? DEVILMENT_RATE : 0), r.critMult);
-        let base = e.isDoT ? e.amount! / rolled
-          : e.amount! / (e.hitType === 2 ? r.critMult : 1) / (e.directHit ? DH_MULT : 1);
+        let base = e.isDoT ? e.amount! / (critF(bc + hd) * dhF(bd + hd))
+          : e.amount! / (aC ? critF(bc + hd) : e.hitType === 2 ? r.critMult : 1) / (aD ? dhF(bd + hd) : e.directHit ? DH_MULT : 1);
         if (stdCopy !== undefined && ids.includes(stdCopy)) base /= 1 + fStd;
-        const withDevil = expect(cr + DEVILMENT_RATE, dr + DEVILMENT_RATE, r.critMult), without = expect(cr, dr, r.critMult);
+        const withDevil = critF(bc + DEVILMENT_RATE) * dhF(bd + DEVILMENT_RATE), without = critF(bc) * dhF(bd);
         if (std) out.standard += base * (dev ? withDevil : without) * fStd;
         if (dev) out.devilment += base * (std ? 1 + fStd : 1) * (withDevil - without);
         if (std && perPotency > 0 && ctx.game.action(e.abilityId)?.onGcd && !e.pet &&

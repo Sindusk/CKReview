@@ -37,7 +37,9 @@ SOFTWARE.
 `lib/damage/ffxiv/jobs/dnc-partner.ts` ports the Dance Partner value model
 (Standard Finish, Devilment and Esprit per partner, the per-job Esprit
 rates, the Esprit potency value and the Dancer potency table) from
-[partnercalc](https://github.com/hintxiv/ts-partnercalc).
+[partnercalc](https://github.com/hintxiv/ts-partnercalc), and
+`lib/damage/crit-rates.ts` follows its way of reading crit and direct-hit
+rates from DoT ticks (`tickHitRates`).
 
 ```
 MIT License

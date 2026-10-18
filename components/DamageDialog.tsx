@@ -584,6 +584,8 @@ function PlayerDetail({ summary, analysis, colorFor, iconFor, pull, pulls, onSee
   const rolled = luck && "percentile" in luck ? luck : undefined;
   const ratesNote = luck?.rates.source === "stats"
     ? `Rates from this player's gear in the log (they recorded it): crit ${(luck.rates.crit * 100).toFixed(1)}% ×${luck.rates.critMult.toFixed(3)}, direct hit ${(luck.rates.directHit * 100).toFixed(1)}%.`
+    : luck?.rates.source === "ticks"
+    ? `Rates from the game's own chances on ${luck.rates.hits} DoT ticks: crit ${(luck.rates.crit * 100).toFixed(1)}% ×${luck.rates.critMult.toFixed(3)}, direct hit ${(luck.rates.directHit * 100).toFixed(1)}%.`
     : luck ? `Rates estimated from ${luck.rates.hits} unbuffed hits in ${luck.pulls} loaded pulls: crit ${(luck.rates.crit * 100).toFixed(1)}% ` +
       `×${luck.rates.critMult.toFixed(2)}, direct hit ${(luck.rates.directHit * 100).toFixed(1)}%.` : "";
   return (

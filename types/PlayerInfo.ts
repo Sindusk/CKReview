@@ -75,6 +75,10 @@ export type PlayerEvent = {
   directHit?:         boolean;
   bonusPercent?:      number;  // combo/positional actions only
   actorPotencyRatio?: number;  // simulated DoT ticks: FFLogs' damage per potency
+  // Simulated DoT ticks: the game's crit and direct-hit chance (0-1) at
+  // the tick, crit / direct-hit buffs included (crit-rates.ts).
+  tickCritRate?:      number;
+  tickDirectHitRate?: number;
   targetActorId?:     number;
   targetInstance?:    number;
 
