@@ -73,7 +73,7 @@ damage rows are measured.
 | 29 | Unholy | [deathknight-unholy.md](deathknight-unholy.md) | done 2026-10-17: plague off every enemy, strike without a Lesser Ghoul, Sudden Doom lost, Dark Transformation / Army valued, Runic Power cap removed for Unholy (unholy.ts); Unholy GCD counts the Erupts and Orders its presses set off (game.ts); verified by the main session |
 | 30 | Devourer | [demonhunter-devourer.md](demonhunter-devourer.md) | done 2026-10-17: the Void Ray "gap" is an unlogged Eradicate press (new optional `unloggedPresses` hook: Eradicate and Void Metamorphosis; top players 82% → 91–94% GCD uptime); The Hunt / Hungering Slash presses, Voidblade 0.5s GCD (game.ts); Void Metamorphosis window, Eradicate overwritten (devourer.ts); verified by the main session |
 | 31 | Survival | [hunter-survival.md](hunter-survival.md) | done 2026-10-17: Tip of the Spear wasted, spender without Tip of the Spear, Takedown held (per-player cooldown), Focus cap removed for Survival (survival.ts); Kill Command pet hit counts as GCD damage (game.ts); Moonlight Chakram expiry at 15s for Survival (procs.ts); verified by the main session |
-| 32 | Fire | [mage-fire.md](mage-fire.md) | |
+| 32 | Fire | [mage-fire.md](mage-fire.md) | done 2026-10-17: Fire Blast under Hot Streak, Combustion window valued per press, tracked Combustion valued with `burstHold` (fire.ts); verified by the main session |
 | 33 | Frost Mage | [mage-frost.md](mage-frost.md) | |
 | 34 | Holy Paladin | [paladin-holy.md](paladin-holy.md) | |
 | 35 | Discipline | [priest-discipline.md](priest-discipline.md) | |
@@ -219,7 +219,10 @@ measured for it.
 - **A window that lowers armor isn't seen by `observedWindowBonus`**,
   which reads unmitigated hits (×1.0). Arms' Colossus Smash read 10–24%;
   after armor it's ×1.3–1.6. Compare hits after mitigation for any
-  armor or damage-taken debuff.
+  armor or damage-taken debuff. It also misses a crit window: it reads
+  non-crit hits only and caps at 30% (Fire's Combustion is +72–280% per
+  press); value such a window by the player's damage per press inside
+  vs outside.
 - **A tracked cooldown whose hits log under another id needs
   `damageIds`**, or a use is worth 0 and its drift never shows
   (Celestial Conduit: cast 443028, hits 443038; Bestial Wrath, all pet).
@@ -449,6 +452,11 @@ measured for it.
   top players; Focus never limits the spec). Proposed `wrong`: the three
   Focus cap rows; kept `wrong`: Kill Command efficiency. Evidence in
   [hunter-survival.md](hunter-survival.md).
+- Fire (2026-10-17): four `wrong` rows kept after the re-check. A wasted
+  Fire Blast inside Combustion is priced at half a Hot Streak (the
+  lenient value; a full one is arguable when charges run short). All top
+  samples are Sunfury; the one Frostfire player can't be judged against a
+  top Frostfire log. Evidence in [mage-fire.md](mage-fire.md).
 
 - Elemental (2026-10-17): `CallOfTheAncestors/other-checks`,
   `statistics` (and whether "Stormkeeper before Ascendance" should be
