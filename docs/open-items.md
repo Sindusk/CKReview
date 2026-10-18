@@ -701,8 +701,15 @@ and delete them from the header.
     is off for Holy Priest, for the user to approve or reject** (top
     players 1.3–4.3M at Smite, ~9× their damage). Power Infusion drift
     added.
-  - [rogue-outlaw.md](wowa-audit/rogue-outlaw.md): 9; Adrenaline Rush
-    recharge with Restless Blades.
+  - [rogue-outlaw.md](wowa-audit/rogue-outlaw.md): phase 3 done
+    2026-10-17 (17 player-pulls, top Nøwyouseemee, Scoreboard, Âv,
+    Decapre, 저는싸이코입니다, 云梦默). Built: finisher below 6 combo points
+    (outlaw.ts), Opportunity expiry (procs.ts), Preparation a GCD press
+    (game.ts). **The Energy cap check is off for Outlaw, for the user to
+    approve or reject** (Energy never limits it; top players read
+    0.07–1.32M). Proposed `wrong`: the two Energy waste rows, Sinister
+    Strike with Opportunity up. Adrenaline Rush recharge left unbuilt: no
+    Restless Blades rule fits the log.
   - [warrior-protection.md](wowa-audit/warrior-protection.md): tank, 5;
     survey its cooldowns first.
   - [paladin-protection.md](wowa-audit/paladin-protection.md): stale

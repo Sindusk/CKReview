@@ -143,6 +143,16 @@
 //   Lance's own hits here (an under-count: its Shatter isn't matched by
 //   name). A gain at two stacks loses one too: specs/frostmage.ts
 //   "Fingers of Frost wasted".
+// - Opportunity 12s (Outlaw; added in its phase 3, 2026-10-17, 17
+//   player-pulls): three Pistol Shot stacks a proc (the shots log as casts),
+//   spent by Pistol Shot. 8 removals with no Pistol Shot beside them at
+//   11.99–12.03s, the next longest 6.37s; never re-procs while held. Run
+//   out: Âv 9XD63Z1tFWKmvCAG 1:03, Decapre VJgMTWKFBA7n1j3p 1:02 (the other
+//   four top players none), Soulsick PzG3QDc4g7AKdJw8 3 (two in forced
+//   time), Loktark Kag91qVZ2YJ7MQAb, Lobotomi RFh1Cp4xdL6aY9qt, Ilikesneakin
+//   nhbCYHXRf1T2qAv9 1. Worth the stacks × a Pistol Shot (95–210k). Fang
+//   Strike (1301405, a free finisher) has no duration (press-less removals
+//   4.7–9.3s and one 15.0s, most beside a free Coup de Grace): not added.
 //
 // ── Measured and left out ──────────────────────────────────────────────
 // - Lava Surge (77762) 10s, clean, but 75 of 657 run out on the top
@@ -233,4 +243,5 @@ export const WOW_MEASURED_PROCS = new Map<number, MeasuredProc>([
   [359618,  { durationMs: 15_000, consumerIds: [356995, 357211] }],               // Essence Burst → Disintegrate, Pyre
   [201846,  { durationMs: 12_000, consumerIds: [17364, 115356] }],                // Stormsurge → Stormstrike, Windstrike
   [44544,   { durationMs: 15_000, consumerIds: [30455] }],                        // Fingers of Frost → Ice Lance
+  [195627,  { durationMs: 12_000, consumerIds: [185763] }],                       // Opportunity (Outlaw) → Pistol Shot
 ]);

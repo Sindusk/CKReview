@@ -9,7 +9,8 @@
 // since its audit pass, below), Frost DK 2, Fury 2
 // (18 player-pulls since its audit pass, below),
 // Feral, Survival and Outlaw 1 each (fewer than 3: unverified; Feral has
-// 14 player-pulls and Survival 13 since their audit passes, below).
+// 14 player-pulls, Survival 13 and Outlaw 17 since their audit passes,
+// below).
 //
 // Every melee spec gets:
 // - its main cooldown's window (burstGcdFindings): GCDs that fit vs GCDs
@@ -224,6 +225,21 @@
 // The Kill Command's pet hit is now its press's damage (game.ts). The
 // Takedown window stays (top none, weak 0–45k).
 //
+// Outlaw Rogue, WoWAnalyzer audit phase 3 (2026-10-17, docs/wowa-audit/
+// rogue-outlaw.md; WoWAnalyzer's Outlaw lags a patch and grades only a
+// guide; no case study, not in the user's raids). Measured on 17
+// player-pulls (top Nøwyouseemee, Scoreboard, Âv, Decapre, 저는싸이코입니다,
+// 云梦默; weak Nicsterkins, Lobotomi, 步玎, Soulsick), all Trickster.
+// outlaw.ts holds the models and numbers: "Finisher below 6 combo points"
+// (after a builder, without Opportunity; top 0–159k, weak up to 342k).
+// Outlaw gets no Energy cap check: Energy never limits it, and the shared
+// one read 0.07–1.32M on the top players (Blade Rush at the cap, Adrenaline
+// Rush at 200, which raises the cap). Opportunity's expiry is in procs.ts,
+// and Preparation is a GCD press (game.ts: ~0.3M of the top players'
+// "gaps"). Adrenaline Rush, Killing Spree and Blade Rush stay untracked: no
+// Restless Blades rule fits the log. The Adrenaline Rush window stays (one
+// finding in 17, Soulsick 66k).
+//
 // Havoc, checked against WoWAnalyzer on qpZx3mWaG7gcDdYB pull 3
 // (Mythnarra; reference 3Vz6Qt2RyTPXwpJn's Hawkerton, 100th percentile,
 // page saved; checked 2026-10-13):
@@ -262,6 +278,7 @@ import { ENHANCEMENT_CHECKS } from "./enhancement";
 import { FURY_CHECKS } from "./fury";
 import { UNHOLY_CHECKS } from "./unholy";
 import { SURVIVAL_CHECKS } from "./survival";
+import { OUTLAW_CHECKS } from "./outlaw";
 
 const window = (statusId: number, name: string): JobCheck => (ctx) => burstGcdFindings(ctx, {
   statusId, name,
@@ -358,9 +375,11 @@ export const MELEE_CHECKS: Record<string, JobCheck[]> = {
     // Fury: its own Rage cap check, outside Recklessness (fury.ts).
     // Unholy DK: no Runic Power cap check either (unholy.ts header).
     // Survival: no Focus cap check; Focus never limits it (survival.ts header).
+    // Outlaw: no Energy cap check; Energy never limits it (outlaw.ts header).
     ...(spec === "Frost Death Knight" ? FROST_DK_CHECKS : spec === "Subtlety Rogue" ? SUBTLETY_CHECKS
       : spec === "Fury Warrior" ? FURY_CHECKS : spec === "Unholy Death Knight" ? UNHOLY_CHECKS
-      : spec === "Survival Hunter" ? SURVIVAL_CHECKS : [primaryResourceCapFindings]),
+      : spec === "Survival Hunter" ? SURVIVAL_CHECKS : spec === "Outlaw Rogue" ? OUTLAW_CHECKS
+      : [primaryResourceCapFindings]),
     ...(spec === "Arms Warrior" ? [...ARMS_SPENT, ...ARMS_CHECKS] : []),
     ...(spec === "Havoc Demon Hunter" ? [eternalHunt, ...HAVOC_CHECKS] : []),
     ...(spec === "Retribution Paladin" ? [holyPowerWaste, ...RETRIBUTION_CHECKS] : []),
