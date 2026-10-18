@@ -91,6 +91,11 @@
 // (A11, A15 x2, B8, B18); A15 +347 died to it. Steady Strikes (Nama, 1291929)
 // ran to 54 stacks in the kill and 85 in a wipe — not flagged.
 //
+// Shell Spin (cast 1296062, its target in the cast event; stun 1291918) is
+// not a static cone: in kill nHavrDhPVtBYkMXA f37 players standing right
+// on the Nama->target line weren't stunned, 3 stuns in 8 casts (replay,
+// 2026-10-18).
+//
 // Not flagged: United Defense (1297646) flickers in most pulls and the kill
 // had 4.7s windows; Shell Spin stuns (1291918, 14 in the kill); Burning
 // Flames / Piercing Frost / patch ticks; Haunting Spirits debuffs (wipes
