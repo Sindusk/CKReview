@@ -106,6 +106,18 @@ stage until the previous one passes for the specs it covers.
   - `haste.ts` / `pace.ts`: passive talent haste becomes a known factor in
     the fit, and pace compares players with their talent haste divided out.
   - cast-time and GCD changes from talents feed `game.ts`.
+  - **Crit rates for every player** (noted 2026-10-18, the user agreed):
+    unlike FFXIV, whose DoT ticks carry the game's crit chance
+    (`tickHitRates` in `lib/damage/crit-rates.ts`), WCL hits don't. But
+    CombatantInfo gives every player's ratings at the pull (`critMelee`,
+    `critSpell`, `hasteMelee`, `mastery`, `versatilityDamageDone`; FFXIV has
+    stats only for the logger). Rating → percent needs the level's
+    rating-per-% constants and diminishing-returns bands (game data, per
+    build, so part of the sync), plus base crit and stage 0's talent crit.
+    That gives a `"stats"`-source `HitRates` for each WoW player, which
+    unblocks crit luck for WoW (open-items.md) and anything that values a
+    crit buff. Check it against each spec's observed crit share on
+    unbuffed hits before using it.
 
 ### Stage 1: the budget model, calibrated from the log
 
