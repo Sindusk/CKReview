@@ -100,6 +100,7 @@ const AOE_COLORS: Record<AoeShape["style"], { fill: string; flash: string; rim: 
   drop:       { fill: "#ffd84a", flash: "#fff2a8", rim: "#ffe680", glow: "#ffcc33" },   // DropRing only
   light:      { fill: "#ffc95a", flash: "#fff3c4", rim: "#fffaf0", glow: "#ffdf8a" },   // FRU House of Light
   ice:        { fill: "#a8dcff", flash: "#ffffff", rim: "#ffffff", glow: "#cfeeff" },   // FRU Icicle Impact (IceCircle until it lands)
+  puddle:     { fill: "#fff1b8", flash: "#ffffff", rim: "#fff8dc", glow: "#ffe27a" },   // Puddle only
 };
 // Status icons under each player: at most this many, mechanic statuses
 // before the common ones (vulnerabilities, Weakness) that a raid carries
@@ -733,6 +734,31 @@ function IceCircle({ x, y, r, t, s, opacity }: { x: number; y: number; r: number
   );
 }
 
+/**
+ * A glowing puddle left on the floor (FRU Sinbound Holy's Bleeding): a
+ * soft white-gold pool, brightest at its edge, shimmering slightly, fading
+ * out over its last half second.
+ */
+function Puddle({ x, y, r, t, s, uid }: { x: number; y: number; r: number; t: number; s: AoeShape; uid: string }) {
+  const c = AOE_COLORS.puddle;
+  const fade = Math.max(0, Math.min(1, (t - s.start) / 200, (s.resolve - t) / 500));
+  const shimmer = 0.5 + 0.5 * Math.sin(t / 220 + x);
+  const grad = `pd-${uid}`;
+  return (
+    <g opacity={fade} pointerEvents="none">
+      <defs>
+        <radialGradient id={grad} gradientUnits="userSpaceOnUse" cx={x} cy={y} r={Math.max(1, r)}>
+          <stop offset="0%" stopColor={c.fill} stopOpacity={0.18} />
+          <stop offset="75%" stopColor={c.fill} stopOpacity={0.32 + 0.1 * shimmer} />
+          <stop offset="100%" stopColor={c.glow} stopOpacity={0.6} />
+        </radialGradient>
+      </defs>
+      <circle cx={x} cy={y} r={r} fill={`url(#${grad})`} stroke={c.glow} strokeWidth={8} strokeOpacity={0.3 + 0.15 * shimmer} filter="url(#replay-glow)" />
+      <circle cx={x} cy={y} r={r} fill="none" stroke={c.rim} strokeWidth={1.5} strokeOpacity={0.8} />
+    </g>
+  );
+}
+
 function Aoe({ s, opacity, resolving, toX, toY, scale, uid, t }: { s: AoeShape; opacity: number; resolving: boolean; toX: (x: number) => number; toY: (y: number) => number; scale: number; uid: string; t: number }) {
   const x = toX(s.x), y = toY(s.y);
   const r = s.range * scale;
@@ -741,6 +767,7 @@ function Aoe({ s, opacity, resolving, toX, toY, scale, uid, t }: { s: AoeShape; 
   if (s.style === "knockback") return <Knockback s={s} x={x} y={y} r={r} scale={scale} opacity={opacity} />;
   if (s.kind === "cross" && s.star && !resolving) return <StarPoints s={s} x={x} y={y} r={r} scale={scale} opacity={opacity} />;
   if (s.style === "drop") return <DropRing x={x} y={y} r={r} t={t} />;
+  if (s.style === "puddle") return <Puddle x={x} y={y} r={r} t={t} s={s} uid={uid} />;
   if (s.style === "ice" && s.kind === "circle" && !resolving) return <IceCircle x={x} y={y} r={r} t={t} s={s} opacity={opacity} />;
   const c = AOE_COLORS[s.style];
   const base = resolving ? c.flash : c.fill;

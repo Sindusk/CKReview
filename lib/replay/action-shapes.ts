@@ -123,7 +123,7 @@ export type AoeShape = {
   angle: number;                 // cone full angle, degrees
   inner: number;                 // donut inner radius, centi-yalms
   estimated: boolean;            // angle or inner radius guessed (not drawn differently)
-  style: "aoe" | "tower" | "tankbuster" | "stack" | "knockback" | "lightning" | "drop" | "light" | "ice";
+  style: "aoe" | "tower" | "tankbuster" | "stack" | "knockback" | "lightning" | "drop" | "light" | "ice" | "puddle";
   soakers?: number;              // towers: players it needs, when the ability says
   name: string;
   start: number; resolve: number; // ms from pull start: telegraph start, resolution
@@ -169,10 +169,13 @@ type Override = {
   // Starts where the caster of the latest of these abilities (within 8s)
   // stood: the boss these cones really come from, not the helper casting.
   originCaster?: number[];
+  // Leaves a puddle where it landed for this long (ms).
+  puddleMs?: number;
 };
 
 // Futures Rewritten (lib/mechanics/ffxiv/fru/*.ts headers; ids and
 // placements checked on JZ1KXhDbqkNH3jxR fight 24, 2026-10-17).
+const PUDDLE_GUESS_MS = 6000;   // FRU P2 Bleeding puddles: not in the log, unchecked
 const FRU_STACKS = [
   40147, 40167,      // Sinsmoke: Cyclonic Break pairs, Utopian tether stacks
   40159,             // Sinbound Fire III (Utopian Sky)
@@ -250,6 +253,13 @@ const FRU_OVERRIDES: Record<number, Override> = {
   // Axe Kick at (100, 100) just before (both pulls). Golden light, as in
   // game.
   40206: { originCaster: [40202, 40203], style: "light" },
+  // Glowing Bleeding puddles left where these land (user, 2026-10-17, for
+  // Sinbound Holy; the P2 header names Luminous Hammer and Hiemal Ray too).
+  // The log has no puddle actor and no Bleeding unless someone stands in
+  // one, so the lifetime is a guess until checked on VOD.
+  40209: { style: "stack", puddleMs: PUDDLE_GUESS_MS },
+  40218: { puddleMs: PUDDLE_GUESS_MS },
+  40257: { puddleMs: PUDDLE_GUESS_MS },
   // Frigid Needle: each dropped stone shows an 8-way star through its 4.7s
   // cast, pointing where its lines will shoot (user, 2026-10-17): two
   // 40201 crosses per stone (one cardinal, one diagonal: casters face 180
@@ -411,6 +421,10 @@ export function buildAoeShapes(data: ReplayData): AoeShape[] {
       // CastType 5 grows with the caster's hitbox; the hitbox is unknown
       // for helpers, so it's drawn at the listed range.
       out.push({ ...base, kind: "circle", x: o.x, y: o.y, bearing: 0 });
+      if (over.puddleMs) {
+        out.push({ ...base, kind: "circle", x: o.x, y: o.y, bearing: 0, style: "puddle", name: `${name} puddle`,
+          start: t, resolve: t + over.puddleMs, noFlash: true });
+      }
       continue;
     }
     const cp = casterPose!;
