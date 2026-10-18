@@ -23,7 +23,7 @@ Memory's End). Look from the NAUR P3 guide (naurffxiv.com); no VOD yet.
 | Fires, Unholy, Blizzard, the rewind's Eruptions and Water | The game data was already right: each was exact once simultaneous casts are compared together. The fit-check script compares each circle with every hit of the same name, so it reported 0 of 12 Eruptions exact. |
 | Return | New cue: a blue clock face on each player's recorded spot, from when Spell-in-Waiting: Return runs out (7:56.5 / 8:06.5) until the rewind (8:20.5). |
 | Shadoweye | New cue: a red-violet eye and a pulsing ring on the three holders for the last 5s before it goes off (8:23.6). |
-| Apocalypse explosions (40297) | Now built in the spec: wave k explodes the ring points max(0, k-3)..k-1 of two opposite arms (14y out, turning 45° a wave), plus the centre in waves 1 and 2. The helpers match it in waves 1, 2 and 4-6. Each circle shows as a thin white ring 10.4s before it explodes (the guide's +10 appear / +21 explode), filling in over its last 2s. |
+| Apocalypse explosions (40297) | Now built in the spec: wave k explodes the ring points max(0, k-3)..k-1 of two opposite arms (14y out, turning 45° a wave). The start axis and turn are fitted to every ring point the helpers logged; some waves log stale (100, 100) (Pull 24 wave 3; the DWbAwTGQrYznK1jL clear's waves 1 and 6). There's no centre explosion: waves 1-2's two extra casts log the centre, but a player stood 2-6y from it through both untouched in the clear. Each circle shows as a thin white ring 10.4s before it explodes (the guide's +10 appear / +21 explode), filling in over its last 2s. |
 | Apocalypse lights | New cue: on each side one light starts on the ring and two leave the centre 2s apart, all running round 45° every 2s, with "Apocalypse: lights turn (counter)clockwise" under the arena. Its start and turn are worked out from waves 1 and 2. |
 | Shell Crusher, Black Halo, Darkest Dance jump, Spirit Taker | Game data was right. |
 
@@ -68,9 +68,11 @@ the check's 0.5y hitbox). Spirit Taker: one player drawn at its edge.
 5. **8:18.6 to 8:23.6:** an eye shows on the three Shadoweye holders (the
    Warrior, Scholar and Dancer) for the last 5s. Is there an eye over them in
    game, and from when?
-6. **9:12.4:** the first Apocalypse circles (centre, NW, SE) appear 10.4s
-   before they explode at 9:22.8, then a wave every 2s. Does the first circle
-   appear about here?
+6. **9:12.4:** the first Apocalypse circles (NW and SE) appear 10.4s before
+   they explode at 9:22.8, then a wave every 2s. Does the first circle appear
+   about here? The guide says wave 1 has a third circle in the middle; the
+   replay draws none there, since nobody standing in the middle was ever hit.
+   Is there a circle in the middle in game?
 7. **9:12.4 to 9:22.4:** the replay runs two lights round the ring
    counterclockwise from NW and SE, plus two pairs leaving the centre. Does
    that match the lights in game?

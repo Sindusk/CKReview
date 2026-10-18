@@ -110,8 +110,10 @@
 //   fake stack markers); 40272 at +96.4 gives them their Waters, and
 //   status 1002458 (unnamed) ends with each Water's 184 marker, 5s ahead.
 // - Apocalypse: wave k explodes ring points max(0,k-3)..k-1 of two
-//   opposite arms 14y out turning 45° a wave, plus the centre in waves 1-2;
-//   waves 1, 2, 4-6 match the helpers exactly; wave 3's logged (100, 100).
+//   opposite arms 14y out turning 45° a wave; every non-stale helper
+//   position fits (JZ1KXhDbqkNH3jxR 24, DWbAwTGQrYznK1jL 18). Waves 1-2's
+//   two extra casts log (100, 100) but hit nobody standing 2-6y from the
+//   centre (DWbAwTGQrYznK1jL 18), so the centre doesn't explode.
 //
 // -- RULES IMPLEMENTED --
 // ffxiv-ood-fire: a Relativity fire that caught others (Major on a death):

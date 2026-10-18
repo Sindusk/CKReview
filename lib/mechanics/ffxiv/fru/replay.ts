@@ -482,13 +482,18 @@ function relativityEffects(data: ReplayData): CasterEffect[] {
 // Two lights start on the ring at opposite points (A0, B0) and run the
 // same way round, 45° a wave; two leave the centre along that axis in
 // wave 1 and two more in wave 2, following them. So wave k explodes the
-// ring points A/B max(0, k-3) .. k-1, and the centre in waves 1 and 2.
+// ring points A/B max(0, k-3) .. k-1. Waves 1 and 2 also have two casts
+// logged at (100, 100), but no explosion there: in DWbAwTGQrYznK1jL 18 a
+// player stood 2-6y from the centre through both untouched (nobody was
+// hit by Apocalypse all pull), so no centre circle is drawn.
 // Fight 24 (40297, 9:22.8 to 9:32.9 every ~2s): wave 1 centre, NW, SE;
 // wave 2 centre, NW, W, SE, E; waves 4-6 exactly three a side turning
 // counterclockwise. Wave 3's helpers all logged (100, 100), stale: by the
 // model it's NW/W/SW and SE/E/NE (two of its three hits fit; one hit
 // player's logged spot sits 11y off, likely lagging their run in).
-// Helpers' positions decide only the start (wave 1) and turn (wave 2).
+// DWbAwTGQrYznK1jL 18 (a clear): waves 2-5 fit exactly from NE/SW turning
+// counterclockwise; waves 1 and 6 logged stale. So the start axis and turn
+// are fitted to every ring point the helpers did log, nothing else.
 const APOCALYPSE_HIT = 40297;
 const APOCALYPSE_WAVE_GAP_MS = 1000;
 const APOCALYPSE_SHOW_MS = 10400;     // a wave's circle shows this long before it explodes
@@ -506,20 +511,38 @@ function apocalypseModel(data: ReplayData): ApocalypseModel | undefined {
     const w = waves[waves.length - 1];
     if (w && c[0] - w[0][0] <= APOCALYPSE_WAVE_GAP_MS) w.push(c); else waves.push([c]);
   }
-  if (waves.length < 2) return undefined;
-  const ringOf = (w: typeof casts) => w.flatMap((c) => {
+  // The ring points the helpers logged at their casts (a stale (100, 100)
+  // drops out as not on the ring), then the start axis and turn that
+  // explain most of them.
+  const logged = waves.map((w) => w.flatMap((c) => {
     const a = actorByKey.get(c[1]);
     const p = a && sampleNear(a, c[0], 300);
     const r = p ? Math.hypot(p.x - ARENA_CENTRE, p.y - ARENA_CENTRE) : 0;
     return p && r >= RING_MIN ? [{ b: bearingTo(ARENA_CENTRE, ARENA_CENTRE, p.x, p.y), r }] : [];
-  });
-  const w1 = ringOf(waves[0]), w2 = ringOf(waves[1]);
-  if (!w1.length) return undefined;
-  const a0 = w1[0].b;
-  const step = w2.map((p) => wrap(p.b - a0)).find((d) => Math.abs(d) > 20 && Math.abs(d) < 70);
-  if (step === undefined) return undefined;
-  const ring = w1.reduce((s, p) => s + p.r, 0) / w1.length;
-  return { a0, dir: step > 0 ? 1 : -1, ring, waves: waves.map((w) => w[0][0]) };
+  }));
+  const all = logged.flat();
+  if (all.length < 4) return undefined;
+  let best: { a0: number; dir: 1 | -1; score: number } | undefined;
+  for (let a0 = 0; a0 < 180; a0 += 45) {
+    for (const dir of [1, -1] as const) {
+      let score = 0;
+      logged.forEach((pts, i) => {
+        const want = apocalypseRing(a0, dir, i + 1);
+        for (const p of pts) score += want.some((b) => Math.abs(wrap(p.b - b)) < 10) ? 1 : -1;
+      });
+      if (!best || score > best.score) best = { a0, dir, score };
+    }
+  }
+  if (!best || best.score < all.length / 2) return undefined;
+  const ring = all.map((p) => p.r).sort((x, y) => x - y)[Math.floor(all.length / 2)];
+  return { a0: best.a0, dir: best.dir, ring, waves: waves.map((w) => w[0][0]) };
+}
+
+/** Wave k's ring bearings: both arms' points max(0, k-3) .. k-1. */
+function apocalypseRing(a0: number, dir: 1 | -1, k: number): number[] {
+  const out: number[] = [];
+  for (let j = Math.max(0, k - 3); j <= k - 1; j++) for (const side of [0, 180]) out.push((a0 + side + dir * 45 * j + 720) % 360);
+  return out;
 }
 
 function apocalypseShapes(data: ReplayData): AoeShape[] {
@@ -529,12 +552,10 @@ function apocalypseShapes(data: ReplayData): AoeShape[] {
   const out: AoeShape[] = [];
   m.waves.forEach((t, i) => {
     const k = i + 1;
-    const spots: { x: number; y: number }[] = k <= 2 ? [{ x: ARENA_CENTRE, y: ARENA_CENTRE }] : [];
-    for (let j = Math.max(0, k - 3); j <= k - 1; j++) {
-      for (const side of [0, 180]) {
-        const b = ((m.a0 + side + m.dir * 45 * j) * Math.PI) / 180;
-        spots.push({ x: ARENA_CENTRE + Math.sin(b) * m.ring, y: ARENA_CENTRE - Math.cos(b) * m.ring });
-      }
+    const spots: { x: number; y: number }[] = [];
+    for (const deg of apocalypseRing(m.a0, m.dir, k)) {
+      const b = (deg * Math.PI) / 180;
+      spots.push({ x: ARENA_CENTRE + Math.sin(b) * m.ring, y: ARENA_CENTRE - Math.cos(b) * m.ring });
     }
     for (const p of spots) {
       out.push({
