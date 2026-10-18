@@ -327,9 +327,9 @@ file's header comment. Mechanic detection has its own guide:
 - **Boss cues** (`lib/replay/ffxiv-effects.ts`, art in
   `components/ReplayEffects.tsx`): effects the game shows on a boss to say
   what's coming, drawn from the cast id. FRU's element dragon circles the
-  caster in fire or lightning: Cyclonic Break (pairs / spread, cast to last
-  repeat), Utopian Sky (stacks / spread) and the clone's Turn of the
-  Heavens (which halos explode). Turn of the Heavens' eight halos show as
+  caster in fire or lightning for the length of the cast bar: Cyclonic
+  Break (pairs / spread), Utopian Sky (stacks / spread) and the clone's
+  Turn of the Heavens (which halos explode). Turn of the Heavens' eight halos show as
   element rings at their Brightfire size from when they appear. Shown with
   the AoEs layer.
 - **Head markers** show as a label over the marked actor. The log gives

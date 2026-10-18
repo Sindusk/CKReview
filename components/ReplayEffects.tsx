@@ -13,7 +13,8 @@
 
 import type { CasterEffect } from "@/lib/replay/ffxiv-effects";
 
-const LAP_MS = 2600;          // one lap around the boss
+const LAP_MS = 2600;          // one lap around the boss, counterclockwise (user, 2026-10-17)
+const K = 0.6;                // body, flame and glow thickness (user: the first cut was too large)
 const SEGMENTS = 40;
 const SPAN = Math.PI * 1.55;  // how much of the circle the body covers
 const FADE_MS = 500;
@@ -32,14 +33,15 @@ export function ElementDragon({ e, x, y, r, t }: { e: CasterEffect; x: number; y
   const opacity = Math.max(0, Math.min(1, (t - e.start) / FADE_MS, (e.end - t) / FADE_MS));
   if (opacity <= 0) return null;
 
-  // Body points, head first, running clockwise and weaving in and out.
-  const head = ((t - e.start) / LAP_MS) * Math.PI * 2;
+  // Body points, head first, running counterclockwise (decreasing compass
+  // angle, the tail behind at larger angles) and weaving in and out.
+  const head = -((t - e.start) / LAP_MS) * Math.PI * 2;
   const pts: { x: number; y: number; w: number; a: number }[] = [];
   for (let i = 0; i <= SEGMENTS; i++) {
     const u = i / SEGMENTS;
-    const a = head - u * SPAN;
+    const a = head + u * SPAN;
     const rho = r * (1 + 0.11 * Math.sin(u * Math.PI * 4 - (t / 300)));
-    pts.push({ x: x + Math.sin(a) * rho, y: y - Math.cos(a) * rho, w: (1 - u) * 13 + 3, a });
+    pts.push({ x: x + Math.sin(a) * rho, y: y - Math.cos(a) * rho, w: ((1 - u) * 13 + 3) * K, a });
   }
   const line = pts.map((p, i) => `${i ? "L" : "M"}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(" ");
   const frame = Math.floor(t / BOLT_FRAME_MS);
@@ -47,16 +49,16 @@ export function ElementDragon({ e, x, y, r, t }: { e: CasterEffect; x: number; y
   return (
     <g opacity={opacity} pointerEvents="none">
       {/* Elemental aura along the body. */}
-      <path d={line} fill="none" stroke={c.glow} strokeWidth={46} strokeOpacity={0.5} strokeLinecap="round" filter="url(#replay-glow)" />
-      <path d={line} fill="none" stroke={c.hot} strokeWidth={24} strokeOpacity={0.45} strokeLinecap="round" filter="url(#replay-glow)" />
+      <path d={line} fill="none" stroke={c.glow} strokeWidth={46 * K} strokeOpacity={0.5} strokeLinecap="round" filter="url(#replay-glow)" />
+      <path d={line} fill="none" stroke={c.hot} strokeWidth={24 * K} strokeOpacity={0.45} strokeLinecap="round" filter="url(#replay-glow)" />
 
       {e.kind === "fire-dragon" && pts.map((p, i) => {
         if (i % 2 !== 1) return null;
         // A flame licking off the body and back, alternating outside and
         // inside the circle, flickering.
         const flick = 0.7 + 0.5 * rand(i * 7.3 + Math.floor(t / 70));
-        const len = (26 + (1 - i / SEGMENTS) * 26) * flick;
-        const out = (i % 4 === 1 ? p.a : p.a + Math.PI) - (i % 4 === 1 ? 0.8 : -0.8);   // trailing (travel is +a)
+        const len = (26 + (1 - i / SEGMENTS) * 26) * flick * K;
+        const out = i % 4 === 1 ? p.a + 0.8 : p.a + Math.PI - 0.8;   // trailing (travel is -a)
         const tipX = p.x + Math.sin(out) * len, tipY = p.y - Math.cos(out) * len;
         const side = p.w * 0.9;
         const nx = Math.cos(out) * side, ny = Math.sin(out) * side;   // across the flame
@@ -72,8 +74,8 @@ export function ElementDragon({ e, x, y, r, t }: { e: CasterEffect; x: number; y
       {e.kind === "fire-dragon" && Array.from({ length: 10 }, (_, k) => {
         // Embers drifting off the tail half.
         const p = pts[Math.floor(SEGMENTS * (0.35 + 0.6 * rand(k * 3.1 + Math.floor(t / 400))))];
-        const drift = ((t / 400) % 1) * 18;
-        return <circle key={`e${k}`} cx={p.x + (rand(k + 1.7) - 0.5) * 20} cy={p.y - drift - rand(k) * 8} r={1.5 + rand(k * 5.5) * 2} fill={c.hot} fillOpacity={0.9 - drift / 24} />;
+        const f = (t / 400) % 1;
+        return <circle key={`e${k}`} cx={p.x + (rand(k + 1.7) - 0.5) * 20 * K} cy={p.y - (f * 18 + rand(k) * 8) * K} r={(1.5 + rand(k * 5.5) * 2) * K + 0.5} fill={c.hot} fillOpacity={0.9 - f * 0.75} />;
       })}
 
       {e.kind === "lightning-dragon" && Array.from({ length: 6 }, (_, k) => {
@@ -85,13 +87,13 @@ export function ElementDragon({ e, x, y, r, t }: { e: CasterEffect; x: number; y
         let d = `M${p.x} ${p.y}`;
         for (let s = 1; s <= 5; s++) {
           const along = (len * s) / 5;
-          const jag = (rand(seed + s * 3.3) - 0.5) * 16;
+          const jag = (rand(seed + s * 3.3) - 0.5) * 16 * K;
           d += ` L${p.x + Math.sin(dir) * along + Math.cos(dir) * jag} ${p.y - Math.cos(dir) * along + Math.sin(dir) * jag}`;
         }
         return (
           <g key={`b${k}`}>
-            <path d={d} fill="none" stroke={c.glow} strokeWidth={10} strokeOpacity={0.7} strokeLinejoin="round" filter="url(#replay-glow)" />
-            <path d={d} fill="none" stroke={c.hot} strokeWidth={3} strokeLinejoin="round" />
+            <path d={d} fill="none" stroke={c.glow} strokeWidth={10 * K} strokeOpacity={0.7} strokeLinejoin="round" filter="url(#replay-glow)" />
+            <path d={d} fill="none" stroke={c.hot} strokeWidth={2} strokeLinejoin="round" />
           </g>
         );
       })}
@@ -114,7 +116,7 @@ export function ElementDragon({ e, x, y, r, t }: { e: CasterEffect; x: number; y
 
       <DragonHead p={pts[0]} c={c} />
 
-      <text x={x} y={y + r * 1.15 + 26} textAnchor="middle" fill={c.text} fontSize={16} fontWeight={800}
+      <text x={x} y={y + r * 1.15 + 20} textAnchor="middle" fill={c.text} fontSize={14} fontWeight={800}
         stroke="rgba(0,0,0,0.8)" strokeWidth={4} paintOrder="stroke">{e.label}</text>
     </g>
   );
@@ -151,8 +153,8 @@ export function ElementHalo({ e, x, y, r, t }: { e: CasterEffect; x: number; y: 
 
 /** The head: a horned wedge pointing along the direction of travel. */
 function DragonHead({ p, c }: { p: { x: number; y: number; w: number; a: number }; c: (typeof COLORS)[keyof typeof COLORS] }) {
-  // Travel is clockwise: the head faces along +a's tangent.
-  const deg = (p.a * 180) / Math.PI + 90;
+  // Travel is counterclockwise: the head faces along -a's tangent.
+  const deg = (p.a * 180) / Math.PI - 90;
   const s = (p.w / 13) * 1.3;
   return (
     <g transform={`translate(${p.x} ${p.y}) rotate(${deg}) scale(${s})`}>

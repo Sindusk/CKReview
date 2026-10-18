@@ -6,7 +6,9 @@
 // components/ReplayEffects.tsx.
 //
 // Futures Rewritten P1, Cyclonic Break (fatebreaker.ts header): a fire or
-// lightning dragon circles Fatebreaker through the cast. Fire = 40144
+// lightning dragon circles Fatebreaker counterclockwise during the cast and
+// is gone when the cast bar ends, before the cones go out (user,
+// 2026-10-17; the same for every dragon below). Fire = 40144
 // (boss) / 40329 (image, second set): Sinsmoke pairs. Lightning = 40148 /
 // 40330: Sinsmite spreads. Checked 2026-10-17: JZ1KXhDbqkNH3jxR fight 24
 // (40144 then Sinsmoke 0:17.8; 40330 then Sinsmite 0:59.8) and
@@ -16,8 +18,8 @@
 // centres on the bait cones' origin (40145), and with no cast logged its
 // element comes from the Sinsmoke / Sinsmite hits after the cones.
 //
-// The same dragon shows through two more casts (user, 2026-10-17), drawn
-// for the cast only (CAST_DRAGONS):
+// The same dragon shows through two more casts (user, 2026-10-17;
+// CAST_DRAGONS):
 // - Utopian Sky on Fatebreaker: 40154 fire = Sinbound Fire III stacks,
 //   40155 lightning = Sinbound Thunder III spreads (both pulls: 40155, then
 //   Thunder at 0:50.7).
@@ -44,11 +46,9 @@ export type CasterEffect = {
 const CYCLONIC_FIRE = [40144, 40329];
 const CYCLONIC_LIGHTNING = [40148, 40330];
 const CYCLONIC_BAIT = 40145;
-const CYCLONIC_REPEAT = 40146;
 const SINSMOKE = 40147, SINSMITE = 40149;
 const CYCLONIC_CAST_MS = 6700;        // the second set's cast; the first is 6200
 const BAIT_AFTER_CAST_MS = 600;       // bait cones land this long after the cast ends
-const REPEATS_WITHIN_MS = 8000;
 
 const LABELS = { "fire-dragon": "Fire: pairs", "lightning-dragon": "Lightning: spread" };
 
@@ -78,7 +78,7 @@ export function buildCasterEffects(data: ReplayData): CasterEffect[] {
     const p = caster && sampleNear(caster, c[0] + c[3], CASTER_HOLD_MS);
     if (!caster || !p) continue;
     if (dragon) {
-      out.push({ ...dragon, actor: caster.samples.length > 20 ? caster.key : undefined, x: p.x, y: p.y, start: c[0], end: c[0] + c[3] + 300 });
+      out.push({ ...dragon, actor: caster.samples.length > 20 ? caster.key : undefined, x: p.x, y: p.y, start: c[0], end: c[0] + c[3] });
       continue;
     }
     const element = /flame|fire/i.test(caster.name) ? "fire-halo" : /levin|lightning|thunder/i.test(caster.name) ? "lightning-halo" : undefined;
@@ -106,7 +106,6 @@ export function buildCasterEffects(data: ReplayData): CasterEffect[] {
     const origin = actorByKey.get(v[1]);
     const o = origin && sampleNear(origin, t, 1500);
     if (!o) continue;
-    const lastRepeat = casts.filter((c) => c[4] === CYCLONIC_REPEAT && c[3] === 0 && c[0] > t && c[0] - t <= REPEATS_WITHIN_MS).pop();
     // Follow the caster only when it's tracked well (the boss, not an image).
     const caster = begin ? actorByKey.get(begin[1]) : undefined;
     out.push({
@@ -114,7 +113,8 @@ export function buildCasterEffects(data: ReplayData): CasterEffect[] {
       actor: caster && caster.samples.length > 20 ? caster.key : undefined,
       x: o.x, y: o.y,
       start: begin ? begin[0] : t - BAIT_AFTER_CAST_MS - CYCLONIC_CAST_MS,
-      end: lastRepeat ? lastRepeat[0] + 400 : t + 3000,
+      // Gone when the cast bar ends, before the cones go out (user, 2026-10-17).
+      end: end ? end[0] : t - BAIT_AFTER_CAST_MS,
     });
   }
   return out.sort((a, b) => a.start - b.start);
