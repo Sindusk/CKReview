@@ -710,8 +710,15 @@ and delete them from the header.
     0.07–1.32M). Proposed `wrong`: the two Energy waste rows, Sinister
     Strike with Opportunity up. Adrenaline Rush recharge left unbuilt: no
     Restless Blades rule fits the log.
-  - [warrior-protection.md](wowa-audit/warrior-protection.md): tank, 5;
-    survey its cooldowns first.
+  - [warrior-protection.md](wowa-audit/warrior-protection.md): phase 3
+    done 2026-10-17 (23 player-pulls, top Boost, Graf, Enàver, Sense).
+    Built (protwarrior.ts): Avatar held (90s less 1s per 20 Rage, fires
+    on none), Shield Slam held (the "Shield Slam!" ready buff run out;
+    top none, weak 23–97k), Rage at the cap (the shared check, wired:
+    top 0–27k, weak up to 637k). Thunder Blast and Burst of Power
+    expiries (procs.ts), Demolish a GCD press with a lock (game.ts).
+    Proposed `wrong`: Ravager ticks (never pressed). Thunderlord
+    `unverifiable`.
   - [paladin-protection.md](wowa-audit/paladin-protection.md): stale
     (unmaintained), tank, 8; Avenger's Shield after a Grand Crusader
     reset.

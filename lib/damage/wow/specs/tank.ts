@@ -6,8 +6,25 @@
 // here is from our own logs (lib/damage/wow/spell-data.ts and the pulls
 // named below). Specs in the samples: Blood (15 players), Protection Paladin
 // (8), Brewmaster (9 player-pulls since its WoWAnalyzer audit pass), Vengeance (24 player-pulls since its
-// WoWAnalyzer audit pass) and Guardian Druid (27 since its pass).
-// Protection Warrior isn't in any sample yet.
+// WoWAnalyzer audit pass), Guardian Druid (27 since its pass) and
+// Protection Warrior (23 since its pass).
+//
+// ── Protection Warrior ─────────────────────────────────────────────────
+// WoWAnalyzer audit phase 3, 2026-10-17 (docs/wowa-audit/warrior-protection.md;
+// specs/protwarrior.ts holds the model and every number, 23 player-pulls).
+// The spec had no presses in the survey until the sweep (game.ts), so it
+// had no checks of its own before this pass.
+// - Avatar held: 90s less 1s per 20 Rage spent (exact on 124 intervals),
+//   valued by its window; fires on none of the 23.
+// - Shield Slam held: "Shield Slam!" (Shield Slam ready) ran out while
+//   Revenge / Thunder Clap went out instead. Top players none, the weaker
+//   23–97k.
+// - Rage at the cap (the shared check): top 0–27k, the weaker up to 637k
+//   (Kilwen cpdvJRj9g3WAThzx, 38 casts at full Rage).
+// - Thunder Blast and Burst of Power expire in procs.ts; Demolish
+//   (Colossus) is a GCD press with a lock (game.ts).
+// - Not judged: idle inside Avatar, Shield Charge and Demolish drift,
+//   Revenge! expiries (top as weak), Ravager (never pressed).
 //
 // ── Guardian Druid ─────────────────────────────────────────────────────
 // No spec check (WoWAnalyzer audit phase 3, 2026-10-17;
@@ -144,5 +161,6 @@ const protPalSentinel: JobCheck = (ctx) => burstGcdFindings(ctx, {
 });
 
 export { BREWMASTER_CHECKS } from "./brewmaster";
+export { PROT_WARRIOR_CHECKS } from "./protwarrior";
 export const BLOOD_CHECKS: JobCheck[] = [bloodDrw, bloodPlague, ...BLOOD_SPEC_CHECKS];
 export const PROT_PALADIN_CHECKS: JobCheck[] = [protPalSentinel];

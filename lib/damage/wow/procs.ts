@@ -153,6 +153,21 @@
 //   nhbCYHXRf1T2qAv9 1. Worth the stacks × a Pistol Shot (95–210k). Fang
 //   Strike (1301405, a free finisher) has no duration (press-less removals
 //   4.7–9.3s and one 15.0s, most beside a free Coup de Grace): not added.
+// - Thunder Blast 15s and Burst of Power 15s (Protection Warrior, Mountain
+//   Thane; added in its phase 3, 2026-10-17, 23 player-pulls). Thunder
+//   Blast (435615, two stacks) is spent by the Thunder Blast press
+//   (435222): 8 run out at 14.87–15.07s of 868 gains, the next longest
+//   13.28s; seven in Entombed Sentinels' transitions (forced), one
+//   unforced (积塔 v6NnRz4KDtYCJ3Mw 6:16); none on the top players (Boost,
+//   Graf, Enàver, Sense). Burst of Power (437121, two stacks: the next
+//   Shield Slams have no cooldown) is spent by Shield Slam: 3 at
+//   14.98–15.03s (积塔 0:39 and 5:45, 饭炒蛋 6y7k1CLj3ABbmVJK 2:41 forced),
+//   the next longest 14.24s. Worth a whole Thunder Blast (108–188k) or
+//   Shield Slam (67–134k) a stack, an upper bound. Revenge! (5302, 6.0s)
+//   was measured and left out (specs/protwarrior.ts). Fury's Mountain
+//   Thane players get the same Thunder Blast: one run out on 残乁梦
+//   (yrFd7CYZvt6XAz3T, 1:17.8, 15.0s after his second stack; one spent at
+//   1:12.6, Rampage and Bloodbath pressed after), none on Celex.
 //
 // ── Measured and left out ──────────────────────────────────────────────
 // - Lava Surge (77762) 10s, clean, but 75 of 657 run out on the top
@@ -244,4 +259,6 @@ export const WOW_MEASURED_PROCS = new Map<number, MeasuredProc>([
   [201846,  { durationMs: 12_000, consumerIds: [17364, 115356] }],                // Stormsurge → Stormstrike, Windstrike
   [44544,   { durationMs: 15_000, consumerIds: [30455] }],                        // Fingers of Frost → Ice Lance
   [195627,  { durationMs: 12_000, consumerIds: [185763] }],                       // Opportunity (Outlaw) → Pistol Shot
+  [435615,  { durationMs: 15_000, consumerIds: [435222] }],                       // Thunder Blast (Protection Warrior, Mountain Thane)
+  [437121,  { durationMs: 15_000, consumerIds: [23922] }],                        // Burst of Power → Shield Slam
 ]);

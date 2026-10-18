@@ -181,6 +181,7 @@ const LOCK_STATUSES = new Map<number, number>([
   [404977, 404977],     // Time Skip
   [51690, 51690],       // Killing Spree
   [1261193, 1261193],   // Boomstick
+  [436358, 436358],     // Demolish (Protection Warrior, Colossus; SWEEP_PRESSES)
 ]);
 
 // Mistweaver (the WoWAnalyzer audit's phase 3, 2026-10-17; seven
@@ -280,9 +281,15 @@ const SWEEP_PRESSES: { spec: string; specId: number; ids: SweepPress[] }[] = [
   // 278, Demoralizing Shout 59, Shield Charge 41, Execute 30, Heroic Throw
   // 10). Off the GCD (near p05 0.07–0.14s): Ignore Pain, Shield Block,
   // Avatar, Shield Wall, Taunt.
+  // Demolish (Colossus; Protection Warrior's phase 3, 2026-10-17): no
+  // sample had it; 31 casts on Kilwen cpdvJRj9g3WAThzx and Sense
+  // mNkHXhaD6Y2tqQTg, next press p05 0.81s, median 1.50s. A ~1.4s channel
+  // whose buff (same id) runs cast to removal (median 1.36s; its hits
+  // 440884 / 440886 / 440888 end ~1.16s in): LOCK_STATUSES.
   { spec: "Protection Warrior", specId: 73, ids: [
     [23922, "Shield Slam"], [6572, "Revenge"], [6343, "Thunder Clap"], [435222, "Thunder Blast"],
     [163201, "Execute"], [1160, "Demoralizing Shout"], [385952, "Shield Charge"], [57755, "Heroic Throw"],
+    [436358, "Demolish"],
   ] },
   // 7 Enhancement Shamans (6kHtGaQXCMWYxFpZ, 8kVQMJ4rmpnyRjBH,
   // mNkHXhaD6Y2tqQTg, hjHXmdnJFwTPpMtK and 3 more): near p05 0.76–0.91s

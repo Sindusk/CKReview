@@ -143,6 +143,16 @@ export const WOW_TRACKED_COOLDOWNS: Record<string, TrackedCooldown[]> = {
     { name: "Lunar Beam", actionIds: [204066], damageIds: [1270292, 414613], prePullEvidenceIds: [1270292, 414613], cooldownMs: 40_000, charges: 1, firstUseOffsetMs: 6_000, burstHold: true },
   ],
 
+  // Protection Warrior (the WoWAnalyzer audit's phase 3, 2026-10-17; 23
+  // player-pulls, specs/protwarrior.ts has the numbers): nothing tracked.
+  // Avatar recharges with Rage spent (protwarrior.ts judges it). Shield
+  // Charge is a clean 45s (shortest 45.0s, median 47.5s) but a use is
+  // worth 0–20k (its hits 47–106k a press against the GCD it takes):
+  // tracked, it read 2–99k a pull. Demolish (Colossus, 30.0s shortest) is
+  // pressed at 10 Colossal Might stacks: tracked, it read a lost use
+  // (495k) on the 99.7th-percentile Sense (mNkHXhaD6Y2tqQTg) and none on
+  // the weaker Kilwen.
+
   // ── Melee (shortest / median interval, first use median) ─────────────
   // Arms: Avatar 51s / 64s and Colossus Smash 24.5s / 32s spread too far
   // (cooldown reduction): not tracked.
