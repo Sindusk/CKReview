@@ -62,6 +62,8 @@ type Props = {
   // The replay's current time, reported a few times a second (the roster
   // shows HP and MP for this moment).
   onTimeChange?: (ms: number) => void;
+  // Moves the panel's own clock (no VOD synced): a new `n` seeks to `ms`.
+  seekRequest?:  { ms: number; n: number };
 };
 
 const SPEEDS = [0.5, 1, 2, 4];
@@ -86,7 +88,7 @@ const TETHER_COLOR = "#ff5fd2";
 const TETHER_LOOKUP_MS = 20000;
 const GRID_STEP = 500;    // 5y, centi-yalms
 
-export default function ReplayPanel({ pull, data, loading, progress, error, onLoad, syncedTimeMs, vodPlaying = false, onVodPlay, onVodPause, onTimeChange }: Props) {
+export default function ReplayPanel({ pull, data, loading, progress, error, onLoad, syncedTimeMs, vodPlaying = false, onVodPlay, onVodPause, onTimeChange, seekRequest }: Props) {
   const synced = syncedTimeMs !== undefined;
   const durationMs = data?.durationMs ?? (pull ? (pull.endTime - pull.startTime) * 1000 : 0);
 
@@ -120,6 +122,14 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
 
   useEffect(() => { setOwnTimeMs(0); setPlaying(false); setSelectedKey(null); }, [pull?.id]);
 
+  // Only a new request seeks: the panel remounting with an old one doesn't.
+  const lastSeekRef = useRef(seekRequest?.n ?? 0);
+  useEffect(() => {
+    if (!seekRequest || seekRequest.n === lastSeekRef.current) return;
+    lastSeekRef.current = seekRequest.n;
+    setOwnTimeMs(Math.max(0, Math.min(durationMs, seekRequest.ms)));
+  }, [seekRequest, durationMs]);
+
   useEffect(() => {
     if (!data) return;
     let raf = 0;
@@ -145,15 +155,18 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
 
   const t = synced ? frameMs : ownTimeMs;
 
-  // Report the time at most every 200ms: the roster doesn't need 60fps.
+  // Report the time at most every 200ms: the roster and analysis panels
+  // don't need 60fps. A skipped report is sent when the 200ms is up, so a
+  // small seek while paused still lands.
   const lastReportRef = useRef({ at: 0, value: -1 });
   useEffect(() => {
     if (!onTimeChange) return;
-    const now = performance.now();
+    const send = () => { lastReportRef.current = { at: performance.now(), value: t }; onTimeChange(t); };
     const last = lastReportRef.current;
-    if (now - last.at < 200 && Math.abs(t - last.value) < 2000) return;
-    lastReportRef.current = { at: now, value: t };
-    onTimeChange(t);
+    const wait = 200 - (performance.now() - last.at);
+    if (wait <= 0 || Math.abs(t - last.value) >= 2000) { send(); return; }
+    const id = setTimeout(send, wait);
+    return () => clearTimeout(id);
   }, [t, onTimeChange]);
 
   // ── Per-pull precomputation ──────────────────────────────────────────────

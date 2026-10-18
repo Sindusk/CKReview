@@ -413,6 +413,8 @@ export default function Home() {
   // The replay's own clock (it can run without a VOD); the roster's HP and
   // MP bars read it while the replay shows.
   const [replayTimeMs, setReplayTimeMs] = useState(0);
+  // Seeks the replay's own clock (an analysis-panel click with no VOD).
+  const [replaySeek, setReplaySeek] = useState({ ms: 0, n: 0 });
   const [replayLoad, setReplayLoad] = useState<{ key: string; progress: number | null; error: string | null } | null>(null);
   const replayKey = activePull ? `${activePull.reportCode}:${activePull.fightId}` : null;
 
@@ -1405,6 +1407,11 @@ export default function Home() {
   // Synced and showing footage of the selected pull (not the no-coverage
   // card), so playback time means something for that pull.
   const videoUsable = isCalibrated && coverageGap === null;
+  // With no usable VOD, a showing replay runs its own clock: the roster and
+  // analysis panels follow it (highlighting what has happened), and clicking
+  // an event seeks the replay instead of the video.
+  const replayClock = !videoUsable && centerView === "replay" && !!replayKey && !!replays[replayKey];
+  const panelTimeMs = replayClock ? replayTimeMs : timeline.playbackTimeMs;
 
   const syncPointLabels = selectedVod
     ? syncPointPulls(selectedVod, displayPulls).map(p => (p ? String(p.pullNumber) : "?"))
@@ -1578,7 +1585,7 @@ export default function Home() {
             <RosterPanel
               key={selectedPullId ?? "none"}
               players={activePull?.players ?? []}
-              playbackTimeMs={timeline.playbackTimeMs}
+              playbackTimeMs={panelTimeMs}
               vitals={replayKey && replays[replayKey]
                 ? playerVitalsAt(replays[replayKey], centerView === "replay" ? replayTimeMs : timeline.playbackTimeMs)
                 : undefined}
@@ -1591,8 +1598,8 @@ export default function Home() {
           <Panel style={{ flex: "1 1 0" }}>
             <AnalysisPanel
               pull={activePull}
-              playbackTimeMs={timeline.playbackTimeMs}
-              onSeekToTime={videoUsable ? handleSeekToMs : undefined}
+              playbackTimeMs={panelTimeMs}
+              onSeekToTime={videoUsable ? handleSeekToMs : replayClock ? (ms) => setReplaySeek((s) => ({ ms, n: s.n + 1 })) : undefined}
               onCallWipe={handleCallWipe}
               onAddError={handleAddError}
               onRemoveError={handleRemoveError}
@@ -1630,6 +1637,7 @@ export default function Home() {
                   onVodPlay={() => setPlayToken((n) => n + 1)}
                   onVodPause={() => setPauseToken((n) => n + 1)}
                   onTimeChange={setReplayTimeMs}
+                  seekRequest={replaySeek}
                 />
               ) : undefined}
               vod={selectedVod}
