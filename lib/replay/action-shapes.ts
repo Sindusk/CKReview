@@ -175,7 +175,10 @@ type Override = {
 
 // Futures Rewritten (lib/mechanics/ffxiv/fru/*.ts headers; ids and
 // placements checked on JZ1KXhDbqkNH3jxR fight 24, 2026-10-17).
-const PUDDLE_GUESS_MS = 6000;   // FRU P2 Bleeding puddles: not in the log, unchecked
+// FRU P2 Bleeding puddles, not in the log: Sinbound Holy's last about 6s
+// (user, VOD of M9Nagmnw2LzHZPVq 1, 2026-10-17); Luminous Hammer's and
+// Hiemal Ray's are assumed the same, unchecked.
+const PUDDLE_GUESS_MS = 6000;
 const FRU_STACKS = [
   40147, 40167,      // Sinsmoke: Cyclonic Break pairs, Utopian tether stacks
   40159,             // Sinbound Fire III (Utopian Sky)
@@ -256,7 +259,7 @@ const FRU_OVERRIDES: Record<number, Override> = {
   // Glowing Bleeding puddles left where these land (user, 2026-10-17, for
   // Sinbound Holy; the P2 header names Luminous Hammer and Hiemal Ray too).
   // The log has no puddle actor and no Bleeding unless someone stands in
-  // one, so the lifetime is a guess until checked on VOD.
+  // one; the lifetime is PUDDLE_GUESS_MS (Holy's checked on VOD).
   40209: { style: "stack", puddleMs: PUDDLE_GUESS_MS },
   40218: { puddleMs: PUDDLE_GUESS_MS },
   40257: { puddleMs: PUDDLE_GUESS_MS },

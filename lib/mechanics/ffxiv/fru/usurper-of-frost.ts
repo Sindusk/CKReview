@@ -52,7 +52,8 @@
 //   Bleeding 1003077/1003078 (puddles after Holy, Luminous Hammer and
 //   Hiemal Ray) ticks for ~90-230k and is logged as damage only when lethal.
 //   The puddles glow on the floor in game (user, 2026-10-17); the log has
-//   no actor for them, so their lifetime is unknown (the replay guesses 6s).
+//   no actor for them. Sinbound Holy's last about 6s (user, VOD of
+//   M9Nagmnw2LzHZPVq 1); Hammer's and Hiemal Ray's are unchecked.
 // - Shining Armor 40185 hits everyone for 0; looking at it gives Stun
 //   1004163 + Damage Down (10 pulls). Thin Ice 1000911 +48.8 to ~+60.
 //   Twin Stillness 40193 (first) / 40196 (second), Twin Silence 40195 /
