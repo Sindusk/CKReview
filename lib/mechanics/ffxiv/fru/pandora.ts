@@ -92,6 +92,15 @@
 //   that follow (Akh Morn under the resistance); a death from a teammate's
 //   early mistake (F5 after the wing-1 tank's) makes the rest of the pull fallout; a
 //   Damage Down reset death (F16) is intentional.
+// Replay build 2026-10-18 (DWbAwTGQrYznK1jL 18, a clear; no VOD;
+// fru/replay.ts):
+// - Exalines: the first cast 40307 / 40118 (6.7s cast bar) is the omen;
+//   seven pulses follow ~2.1s apart, 5y further each.
+// - Wing cleaves aim at the cast's target; everyone else stood 58°+
+//   clockwise of it for 40314 and 26°+ counterclockwise for 40315.
+// - Distance tethers: 2 = light (farthest, buster 39879), 1 = dark
+//   (nearest, 39880), re-logged on every retarget.
+// - Cruel Path's lanes 40119 / 40120 explode ~2.1s after their stack.
 //
 // -- RULES IMPLEMENTED --
 // ffxiv-pan-exaline (Major, Damage Down): every exaline hit, one per player

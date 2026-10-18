@@ -125,3 +125,48 @@ Pull used: DWbAwTGQrYznK1jL Pull 18, a clear. P4 runs from Materialization
 5. **12:01.1 to 12:16.4:** Tidal Light is drawn as four bands from the west
    wall, then four from the south, each lit for its cast bar. Does the wave
    in game start from those walls, in that order?
+
+## P5 Pandora (2026-10-18)
+
+Pull used: DWbAwTGQrYznK1jL Pull 18, a clear. P5 runs from the first
+Fulgent Blade (14:21.9) to the kill (18:46). No VOD.
+
+### What's drawn
+
+| Mechanic | How |
+|---|---|
+| Akh Morn stacks, Paradise Regained towers, tether busters, Cruel Path line stacks | The game data was right (all exact). |
+| Fulgent Blade exalines | Now built in the spec, with a new look. Each line's omen (its first cast, a 6.7s cast bar) is a thin gold or violet line across the arena with chevrons pointing where it will travel. Each of its seven pulses flashes as a 5y band, 5y further on each time. The helpers' logged positions lag or skip pulses (one at 18:08.7 was 10y ahead), so pulses are placed by count from the first cast. That cut players drawn inside a band from 87 to 35 (nobody was hit all pull); what's left is the party walking through right behind a pulse. |
+| Wing cleaves (40314 / 40315) | Now built in the spec: 225° cones aimed at the cast's target (the tank). Everyone else stood on one side of the tank (58°+ clockwise for 40314, 26°+ counterclockwise for 40315), so each cone runs 202.5° away from that side and 22.5° past the tank. The 22.5° is a guess. The game data drew 30-90° cones on Pandora's stale facing. |
+| Distance tethers 2 / 1 | New look: light (farthest, gold) and dark (nearest, violet), with an orb in the middle. Each new tether of an id ends the last, using the engine's `passed`. |
+| Polarizing afterblasts (40119 / 40120) | Now built in the spec: each lane drawn on its line stack's lane, from the stack until it explodes ~2.1s later. The logged facing drew one 42° off (17:29.1), and the first cycle's weren't drawn at all. |
+| Pandora's Box, Fulgent Blade, Paradise Lost | Raidwides, not drawn (unchanged). |
+
+### Couldn't find out / not drawn
+
+- **The wing cones' far edge:** no player stood there, so the 225° from the
+  header and the 22.5° past the tank are unchecked.
+- **Which wing glows first:** Pandora's wing cast (40313 / 40233) says which
+  side goes first, but there's no cue for it. The log doesn't say which wing
+  is which.
+- **Polarizing lane width:** the guide says the lane is wider than it looks,
+  but the log shows players 3.2-3.5y from a lane's centre unhit, 2s after
+  their stack.
+
+### VOD checks: Pull 18 (DWbAwTGQrYznK1jL)
+
+1. **14:31.9 to 14:38.9:** the first two exaline pairs' omens are drawn as
+   lines with chevrons: gold moving east and violet moving west from x=83,
+   plus the diagonal pair. Do the omens in game sit there and point that
+   way?
+2. **14:38.9 to 14:53.4:** each line pulses every ~2.1s, 5y further on. Does
+   the wave in game move 5y a pulse, starting on the omen?
+3. **15:13.4:** the first wing cleave is drawn as 225°, from the tank
+   (Gunbreaker) 202.5° counterclockwise and 22.5° clockwise. Which side of
+   the tank does the cleave really cover, and how far past them?
+4. **15:06.0 to 15:17.9:** the light tether (gold) jumps between the
+   farthest players, the dark (violet) between the nearest. Do the colours
+   match the game's?
+5. **15:35.1 to 15:51.0:** each Polarizing lane is drawn red from its stack
+   until it explodes 2.1s later. Does the lane show in game before it
+   explodes?

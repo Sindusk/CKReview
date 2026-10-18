@@ -411,6 +411,42 @@ function ApocalypseCircle({ s, x, y, r, t, opacity, resolving }: ShapeArtProps) 
   );
 }
 
+// ── P5 Pandora ──────────────────────────────────────────────────────────────
+
+const EXA_COLORS = {
+  "fru-exa-light": { line: "#e8a21a", glow: "#ffdf8a", fill: "#ffc95a" },
+  "fru-exa-dark":  { line: "#6a2fd0", glow: "#8a4fff", fill: "#5a2a9e" },
+};
+
+/**
+ * A Fulgent Blade exaline. Telegraphed (its omen, the first pulse only):
+ * a bright line across the arena with chevrons pointing the way it will
+ * travel, so six crossing omens stay readable. Each pulse: a filled 5y
+ * band flashing where it goes off.
+ */
+function Exaline({ s, x, y, r, scale, t, opacity, resolving }: ShapeArtProps) {
+  const c = EXA_COLORS[s.style as keyof typeof EXA_COLORS] ?? EXA_COLORS["fru-exa-light"];
+  const b = (s.bearing * Math.PI) / 180, ux = Math.sin(b), uy = -Math.cos(b), px = -uy, py = ux;
+  const w = (s.width * scale) / 2;
+  if (resolving) {
+    const d = `M${x + px * w} ${y + py * w} L${x + ux * r + px * w} ${y + uy * r + py * w} L${x + ux * r - px * w} ${y + uy * r - py * w} L${x - px * w} ${y - py * w} Z`;
+    return <path d={d} opacity={opacity} fill={c.fill} fillOpacity={0.55} stroke={c.line} strokeWidth={1.5} pointerEvents="none" />;
+  }
+  const shift = ((t / 60) % 24);
+  const chevrons = Array.from({ length: Math.floor((2 * w) / 48) }, (_, i) => -w + 24 + i * 48 + (shift - 12));
+  return (
+    <g opacity={Math.min(1, opacity + 0.15)} pointerEvents="none">
+      <line x1={x + px * w} y1={y + py * w} x2={x - px * w} y2={y - py * w} stroke={c.glow} strokeWidth={9} strokeOpacity={0.45} filter="url(#replay-glow)" />
+      <line x1={x + px * w} y1={y + py * w} x2={x - px * w} y2={y - py * w} stroke={c.line} strokeWidth={2.5} />
+      {chevrons.map((o, i) => {
+        const cx = x + px * o + ux * r * 0.6, cy = y + py * o + uy * r * 0.6, k = 6;
+        return <path key={i} d={`M${cx - px * k - ux * k} ${cy - py * k - uy * k} L${cx} ${cy} L${cx + px * k - ux * k} ${cy + py * k - uy * k}`}
+          fill="none" stroke={c.line} strokeWidth={2} strokeOpacity={0.85} />;
+      })}
+    </g>
+  );
+}
+
 /** Speed's tethers: yellow (Quicken) or purple (Slow) with a bright orb in the middle. */
 function speedTether(col: string) {
   return function SpeedTether({ x1, y1, x2, y2, t }: TetherArtProps) {
@@ -419,7 +455,7 @@ function speedTether(col: string) {
     return (
       <g pointerEvents="none">
         <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={col} strokeWidth={9} strokeOpacity={0.4} filter="url(#replay-glow)" />
-        <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={col} strokeWidth={2.5} />
+        <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={col} strokeWidth={3.5} />
         <circle cx={mx} cy={my} r={9 * pulse} fill={col} fillOpacity={0.6} filter="url(#replay-glow)" />
         <circle cx={mx} cy={my} r={4} fill="#ffffff" />
       </g>
@@ -502,8 +538,14 @@ export const FRU_ART: FightArt = {
     "fru-wanderer-cw": Wanderer, "fru-wanderer-ccw": Wanderer, "fru-wanderer-cw-small": Wanderer, "fru-wanderer-ccw-small": Wanderer,
     "fru-beacon": Beacon,
   },
-  shapes: { "fru-apocalypse": ApocalypseCircle },
+  shapes: { "fru-apocalypse": ApocalypseCircle, "fru-exa-light": Exaline, "fru-exa-dark": Exaline },
   // Tidal Light's bands: sea-green water light.
-  colors: { "fru-tidal": { fill: "#2fb3c8", flash: "#b8f4ff", rim: "#e6fcff", glow: "#4fd6e8" } },
-  tethers: { "fru-quicken": speedTether("#ffd23a"), "fru-slow": speedTether("#b45cff") },
+  colors: {
+    "fru-tidal": { fill: "#2fb3c8", flash: "#b8f4ff", rim: "#e6fcff", glow: "#4fd6e8" },
+  },
+  tethers: {
+    "fru-quicken": speedTether("#ffd23a"), "fru-slow": speedTether("#b45cff"),
+    // P5's distance tethers: light (farthest) gold, dark (nearest) violet.
+    "fru-light": speedTether("#e8a21a"), "fru-dark": speedTether("#7a3fe8"),
+  },
 };

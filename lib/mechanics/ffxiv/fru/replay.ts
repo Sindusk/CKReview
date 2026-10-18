@@ -128,6 +128,11 @@ const OVERRIDES: Record<number, Override> = {
   // from W, 12:30.2 from S); it hit all eight both times, ranked by
   // distance, and knocks back (enter-the-dragon.ts).
   40332: { style: "knockback" },
+  // P5: Fulgent Blade's exalines, Paradise Regained's wing cleaves and
+  // Polarizing's afterblasts are placed by pandoraShapes below.
+  40118: { hidden: true }, 40307: { hidden: true }, 40308: { hidden: true }, 40309: { hidden: true },
+  40314: { hidden: true }, 40315: { hidden: true },
+  40119: { hidden: true }, 40120: { hidden: true },
   // Tank busters.
   40290: { style: "tankbuster" },                   // Black Halo
   40182: { style: "tankbuster" },                   // Darkest Dance jump
@@ -180,6 +185,13 @@ const TETHERS: Record<number, TetherKind> = {
   // 8:17.7. Nothing logs their end: shown the default 15s.
   134: { element: "fru-quicken", payoff: [] },
   133: { element: "fru-slow", payoff: [] },
+  // P5 Paradise Regained: Pandora's distance tethers, light on the
+  // farthest player, dark on the nearest, jumping as distances change
+  // (pandora.ts). DWbAwTGQrYznK1jL 18: tether 2 paid off by 39879 on a
+  // player 14.4y out (15:14.9), tether 1 by 39880 on one 1.1y out
+  // (17:11.9); each new tether of an id ends the last.
+  2: { element: "fru-light", payoff: [39879], passed: 1 },
+  1: { element: "fru-dark", payoff: [39880], passed: 1 },
 };
 
 // ── Boss cues ───────────────────────────────────────────────────────────────
@@ -640,7 +652,7 @@ function halfRoomWings(data: ReplayData): AoeShape[] {
       kind: "rect", bearing: b, range: len, width: g.width * 100, angle: 0, inner: 0, estimated: false, style: "aoe",
       // From half its length behind her, offset half its width to the side.
       x: p.x + Math.sin(s) * half - Math.sin(r) * len / 2, y: p.y - Math.cos(s) * half + Math.cos(r) * len / 2,
-      name: data.abilityNames?.[c[4]!] ?? "Hallowed Wings", start: c[0] - 300, resolve: c[0],
+      name: c[2], start: c[0] - 300, resolve: c[0],
     });
   }
   return out;
@@ -732,6 +744,132 @@ function dragonHeads(data: ReplayData): CasterEffect[] {
   return out;
 }
 
+// ── P5 Pandora ──────────────────────────────────────────────────────────────
+//
+// Built 2026-10-18 on DWbAwTGQrYznK1jL fight 18 (a clear; P5 from the first
+// Fulgent Blade 14:21.9 to the kill), no VOD yet. Akh Morn, the towers,
+// the tether busters and Cruel Path's line stacks were exact from the game
+// data; the rest is placed here.
+
+// Fulgent Blade's exalines (pandora.ts): each line starts with a cast
+// 40307 (light) / 40118 (dark) after a 6.7s cast bar, the omen the game
+// shows, then seven pulses 40308 / 40309 ~2.1s apart, each 5y further on
+// along the line's facing; only the pulses deal damage. A line's helper
+// logs its position late or not at all on many pulses (fight 18, 18:08.7
+// put a pulse 10y ahead), so pulse k is drawn at the first cast's spot + k
+// × 5y, as a 5y band ahead of that spot. Nobody was hit all pull; with the
+// logged spots 87 player-pulses fell inside a band, with this 35, mostly
+// the party walking through right behind a pulse at 1-2 samples a second.
+// Drawn by the art file as a line with chevrons while telegraphed, a band
+// as each pulse goes off; light gold, dark violet.
+const EXALINE_FIRST: Record<number, string> = { 40307: "fru-exa-light", 40118: "fru-exa-dark" };
+const EXALINE_PULSE: Record<number, string> = { 40308: "fru-exa-light", 40309: "fru-exa-dark" };
+
+function exalines(data: ReplayData): AoeShape[] {
+  const casts = data.enemyCasts ?? [];
+  const actorByKey = new Map(data.actors.map((a) => [a.key, a]));
+  const out: AoeShape[] = [];
+  const lines = new Map<string, { x: number; y: number; b: number; k: number }>();
+  for (const c of casts) {
+    if (c[3] !== 0 || c[4] === undefined) continue;
+    const firstStyle = EXALINE_FIRST[c[4]], pulseStyle = EXALINE_PULSE[c[4]];
+    if (!firstStyle && !pulseStyle) continue;
+    const g = data.actionGeometry?.[c[4]];
+    if (!g) continue;
+    let start = c[0] - 300;
+    if (firstStyle) {
+      const a = actorByKey.get(c[1]);
+      const p = a && sampleNear(a, c[0], 1500);
+      if (!p) { lines.delete(c[1]); continue; }
+      lines.set(c[1], { x: p.x, y: p.y, b: facingToCompassBearing(p.facing), k: 0 });
+      const begin = casts.find((b) => b[1] === c[1] && b[4] === c[4] && b[3] > 0 && Math.abs(b[0] + b[3] - c[0]) < 800);
+      if (begin) start = begin[0];
+    }
+    const L = lines.get(c[1]);
+    if (!L) continue;
+    if (pulseStyle) L.k++;
+    const r = (L.b * Math.PI) / 180, step = g.range * 100 * L.k;
+    out.push({
+      kind: "rect", x: L.x + Math.sin(r) * step, y: L.y - Math.cos(r) * step, bearing: L.b,
+      range: g.range * 100, width: g.width * 100, angle: 0, inner: 0, estimated: false,
+      style: firstStyle ?? pulseStyle, name: c[2],
+      start, resolve: c[0],
+    });
+  }
+  return out;
+}
+
+// Paradise Regained's wing cleaves (40314 / 40315): 225° from Pandora at
+// her top-enmity tank (the cast's target). Fight 18, every party member not
+// hit stood on one side of the tank: 58°+ clockwise of the aim for 40314
+// (15:13.4, 17:14.3), 26°+ counterclockwise for 40315 (15:17.1, 17:10.6).
+// So 40314 runs 202.5° counterclockwise of its tank and 22.5° past them,
+// 40315 the mirror; the 22.5° is a guess inside those bounds.
+const WING_CLEAVES: Record<number, 1 | -1> = { 40314: -1, 40315: 1 };
+const WING_ANGLE = 225, WING_PAST_TANK = 22.5;
+
+function wingCleaves(data: ReplayData): AoeShape[] {
+  const out: AoeShape[] = [];
+  const actorByKey = new Map(data.actors.map((a) => [a.key, a]));
+  for (const c of data.enemyCasts ?? []) {
+    const side = c[4] !== undefined && c[3] === 0 ? WING_CLEAVES[c[4]] : undefined;
+    const g = side && data.actionGeometry?.[c[4]!];
+    const a = actorByKey.get(c[1]);
+    const o = a && sampleNear(a, c[0], 1500);
+    const target = c[5] ? actorByKey.get(c[5]) : undefined;
+    const tp = target && poseAt(target, c[0]);
+    if (!side || !g || !o || !tp) continue;
+    const aim = bearingTo(o.x, o.y, tp.x, tp.y);
+    out.push({
+      kind: "cone", x: o.x, y: o.y, bearing: (aim + side * (WING_ANGLE / 2 - WING_PAST_TANK) + 360) % 360,
+      range: Math.min(g.range * 100, 4000), width: 0, angle: WING_ANGLE, inner: 0, estimated: true, style: "aoe",
+      name: c[2], start: c[0] - 300, resolve: c[0],
+    });
+  }
+  return out;
+}
+
+// Polarizing Strikes / Paths: each line stack (Cruel Path of Light 40317 /
+// Darkness 40318) is followed ~2.1s later by its lane exploding (40119 /
+// 40120) where the stack went, as everyone dodges out. The logged facing
+// for the explosions is stale (fight 18 17:29.1 drew one 42° off its
+// stack); the first cycle's had no position at all and weren't drawn. So
+// each is drawn on its stack's lane, shown from the stack until it goes.
+const AFTERBLAST_OF: Record<number, number> = { 40119: 40317, 40120: 40318 };
+const AFTERBLAST_WITHIN_MS = 3000;
+
+function cruelAfterblasts(data: ReplayData): AoeShape[] {
+  const casts = data.enemyCasts ?? [];
+  const hits = data.enemyHits ?? [];
+  const actorByKey = new Map(data.actors.map((a) => [a.key, a]));
+  const out: AoeShape[] = [];
+  for (const c of casts) {
+    const of = c[4] !== undefined && c[3] === 0 ? AFTERBLAST_OF[c[4]] : undefined;
+    const g = of && data.actionGeometry?.[c[4]!];
+    if (!of || !g) continue;
+    const stack = [...casts].reverse().find((s) => s[4] === of && s[3] === 0 && s[0] < c[0] && c[0] - s[0] <= AFTERBLAST_WITHIN_MS);
+    const a = stack && actorByKey.get(stack[1]);
+    const o = a && sampleNear(a, stack![0], 1500);
+    if (!stack || !o) continue;
+    // The stack's lane: from its caster through its target (the front
+    // player), else through the players it hit.
+    const target = stack[5] ? actorByKey.get(stack[5]) : undefined;
+    let aim = target?.kind === "player" ? poseAt(target, stack[0]) : undefined;
+    if (!aim) {
+      const own = hits.filter((h) => h[1] === of && h[2] === stack[1] && h[0] >= stack[0] - 200 && h[0] - stack[0] <= 1500 && h[6] !== null
+        && Math.hypot(h[6]! - o.x, h[7]! - o.y) > 100);
+      if (!own.length) continue;
+      aim = { x: own.reduce((s, h) => s + h[6]!, 0) / own.length, y: own.reduce((s, h) => s + h[7]!, 0) / own.length } as typeof aim;
+    }
+    out.push({
+      kind: "rect", x: o.x, y: o.y, bearing: bearingTo(o.x, o.y, aim!.x, aim!.y),
+      range: g.range * 100, width: g.width * 100, angle: 0, inner: 0, estimated: false, style: "aoe",
+      name: c[2], start: stack[0] + 200, resolve: c[0],
+    });
+  }
+  return out;
+}
+
 export const FRU_REPLAY: FightReplay = {
   key: "fru",
   game: "ffxiv",
@@ -742,7 +880,8 @@ export const FRU_REPLAY: FightReplay = {
   markerAoes: MARKER_AOES,
   tethers: TETHERS,
   effects: buildEffects,
-  shapes: (data) => [...relativityShapes(data), ...apocalypseShapes(data), ...halfRoomWings(data)],
+  shapes: (data) => [...relativityShapes(data), ...apocalypseShapes(data), ...halfRoomWings(data),
+    ...exalines(data), ...wingCleaves(data), ...cruelAfterblasts(data)],
   floorStatuses: FLOOR_STATUSES,
   jailStatuses: JAIL_STATUSES,
 };
