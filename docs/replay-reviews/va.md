@@ -219,3 +219,44 @@ VOD checks, Pull 1 (nHavrDhPVtBYkMXA fight 37):
 5. Pull 1, 3:06-3:21: three soak circles for Mighty Thud, the leaps at
    3:16.9, 3:18.9 and 3:20.8, and Aftershock pools after. Check the leap
    targets and pool spots.
+
+## Nek'zali the Soulcoiler
+
+Pull: Nek'zali kill, Pull 1 (vRPGT4MN6VALQWFh fight 7, 4:22).
+
+Drawn:
+- **Soulcoil Well**: a dark teal pool all pull, glowing open while
+  Grasping Depths ticks (0:43-1:25, 2:10-2:45, 3:14-4:21). The well has no
+  actor; its centre is the middle of the four Ritual Drummers, which
+  matches the Amani that reached it at 2:38 (standing at the same spot).
+  Its 8y radius is a guess.
+- **Restless Amani corpses**: a corpse where each Amani died, until a
+  Slithering Flame ends within 4y of it (Cremation), it rises again, or the
+  pull ends.
+- **Hungering Pyre**: the orange 10y soak where it landed, from the 7.5s
+  cast. **Slithering Flame**: an orange ring on each carrier.
+- **Soul Transfer**: a 10y-wide teal beam from the Echo to the well for
+  its 15s cast (the 4 players it killed stood 0-6.4y off that line).
+- **Latent Cultist pools**: a purple 6y pool where each Essence Rend
+  knockback ended, until the next Invoke moves them (where to isn't logged).
+- **Possession Barrage**: a pale blue ring on the tank for the 6s cast.
+
+Not drawn: the Drowned Echo and Soulcoiler's Curse (inside the well, no
+positions), pools after an Invoke, the Ritual Drummers.
+
+Open questions:
+- The well's real size, and is the Echo's beam really aimed at the well?
+- Where do Latent Cultist pools go when Invoke pulls them?
+
+VOD checks, Pull 1 (vRPGT4MN6VALQWFh fight 7):
+1. Pull 1, 0:43: the well lights up for Grasping Depths. Check its centre
+   and size against the in-game well, and that it opens then.
+2. Pull 1, 1:00-1:15: corpses where the first Amani wave died (west).
+   Check the corpse spots.
+3. Pull 1, 1:35-1:50: Soul Transfer's beam from the Echo (east) to the
+   well; it fires at 1:50. Check the beam's direction and width.
+4. Pull 1, 1:53-2:01: Hungering Pyre's soak circle, then Slithering Flame
+   rings at 2:01. Check where the Pyre landed and which corpses the flame
+   carriers burned at 2:09.
+5. Pull 1, 3:04: Invoke; the purple pools vanish from the replay. Check
+   where the pools actually moved.

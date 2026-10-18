@@ -172,6 +172,44 @@ function Fish({ e, x, y, t }: EffectArtProps) {
 const LE_BLINK = ring({ color: "#6fd3ff", glow: "#1f7fd9", motes: 5, spinMs: 1400 });
 const LE_BURNING = ring({ color: "#ff7a2a", glow: "#d94a00", motes: 3, spinMs: 2200 });
 const LE_PIERCING = ring({ color: "#bfe8ff", glow: "#3fa0e0", motes: 3, spinMs: 2600 });
+// ── Nek'zali ──
+
+/** The Soulcoil Well: a dark teal pool with a slow swirl; brighter and rimmed while Grasping Depths has it open. */
+function SoulcoilWell({ e, x, y, t, scale }: EffectArtProps) {
+  const r = (e.radius ?? 800) * scale;
+  const open = e.kind === "va-nekzali-well-open";
+  const spin = (t / 40) % 360;
+  if (open) {
+    return (
+      <g pointerEvents="none">
+        <circle cx={x} cy={y} r={r} fill="#3fe0c8" fillOpacity={0.18} stroke="#7dffe9" strokeWidth={3} strokeOpacity={0.6 + 0.3 * Math.sin(t / 250)} filter="url(#replay-glow)" />
+        <circle cx={x} cy={y} r={r} fill="none" stroke="#bffff4" strokeWidth={1.5} strokeDasharray="6 6" transform={`rotate(${-spin} ${x} ${y})`} />
+      </g>
+    );
+  }
+  return (
+    <g pointerEvents="none">
+      <circle cx={x} cy={y} r={r} fill="#0e3b3a" fillOpacity={0.55} stroke="#1f6e66" strokeWidth={2} />
+      <path d={`M${x - r * 0.6} ${y} A${r * 0.6} ${r * 0.6} 0 0 1 ${x + r * 0.6} ${y}`} fill="none" stroke="#2fa597" strokeWidth={2} strokeOpacity={0.6}
+        transform={`rotate(${spin} ${x} ${y})`} />
+    </g>
+  );
+}
+
+/** A Vessel of Awakening: an Amani corpse, a dark mound with a faint green soul glow, until burned or risen. */
+function Corpse({ e, x, y, t }: EffectArtProps) {
+  const opacity = Math.max(0, Math.min(1, (t - e.start) / 400, (e.end - t) / 400));
+  return (
+    <g opacity={opacity} pointerEvents="none">
+      <ellipse cx={x} cy={y} rx={10} ry={6} fill="#3a2f28" stroke="#7fe08a" strokeWidth={1} strokeOpacity={0.35 + 0.25 * Math.sin(t / 400 + x)} />
+      <path d={`M${x - 5} ${y - 1} L${x + 5} ${y + 1} M${x - 4} ${y + 2} L${x + 4} ${y - 2}`} stroke="#c8b8a0" strokeWidth={1.2} />
+    </g>
+  );
+}
+
+const NEK_FLAME = ring({ color: "#ff9a3a", glow: "#e05a00", motes: 4, spinMs: 1800 });
+const NEK_BARRAGE = ring({ color: "#9ad7ff", glow: "#3b7fc4", motes: 5, spinMs: 1200 });
+
 // Shell Spin: Nama's target (sea green, three shells circling) and a stun (grey).
 const LE_SHELL = ring({ color: "#3fd6b0", glow: "#1a8f74", motes: 3, spinMs: 900 });
 const LE_STUN = ring({ color: "#d8d8d8", glow: "#7a7a7a", motes: 4, spinMs: 700 });
@@ -194,12 +232,18 @@ export const VA_ART: FightArt = {
     "va-lost-explorers-piercing": LE_PIERCING,
     "va-lost-explorers-shell": LE_SHELL,
     "va-lost-explorers-stun": LE_STUN,
+    "va-nekzali-well": SoulcoilWell,
+    "va-nekzali-well-open": SoulcoilWell,
+    "va-nekzali-corpse": Corpse,
+    "va-nekzali-flame": NEK_FLAME,
+    "va-nekzali-barrage": NEK_BARRAGE,
   },
   shapes: {
     "va-entombed-sentinels-pool": BloodPool,
     "va-lost-explorers-fire-patch": pool("#c2410c", "#ff8a3d"),
     "va-lost-explorers-frost-patch": pool("#1d5f9e", "#9fd8ff"),
     "va-lost-explorers-aftershock": pool("#6b4a2a", "#c99a5e"),
+    "va-nekzali-cultist": pool("#3a1f5e", "#9b6bff"),
   },
   colors: {
     "va-vashnik-bile": VASHNIK_BILE,
@@ -212,5 +256,7 @@ export const VA_ART: FightArt = {
     "va-entombed-sentinels-venom": { fill: "#6fe03a", flash: "#c8ff8a", rim: "#e4ffc8", glow: "#3a9e1a" },
     // Frostfire Volley's fire missiles (the frost ones use the built-in ice).
     "va-lost-explorers-fire": { fill: "#ff6a1a", flash: "#ffc070", rim: "#ffe0b0", glow: "#d94a00" },
+    // Soul Transfer: the Echo's spirit beam.
+    "va-nekzali-beam": { fill: "#59e0d0", flash: "#c8fff6", rim: "#e0fffa", glow: "#1fa597" },
   },
 };
