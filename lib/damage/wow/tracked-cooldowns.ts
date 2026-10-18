@@ -278,10 +278,32 @@ export const WOW_TRACKED_COOLDOWNS: Record<string, TrackedCooldown[]> = {
   "Fire Mage": [
     { name: "Combustion", actionIds: [190319], cooldownMs: 60_000, charges: 1, firstUseOffsetMs: 23_000, burstHold: true, valuePerUse: combustionValue },  // 60.0 / 60.9s, 22.4s
   ],
-  "Frost Mage": [   // unverified (1 player)
-    { name: "Frozen Orb", actionIds: [84714], cooldownMs: 60_000, charges: 1, firstUseOffsetMs: 2_000 },   // 60.3 / 62.2s, 1.8s
+  // Frost Mage (the WoWAnalyzer audit's phase 3, 2026-10-17; 21
+  // player-pulls, specs/frostmage.ts has the numbers):
+  // - Frozen Orb hits under 84721, not its cast id, so a use was worth 0
+  //   and its drift never showed: damageIds. A flat 60s for Frostfire
+  //   (60.0–64.6s) but 17–27s at the shortest for Spellslinger, median
+  //   27–43s (Frost Splinter hits cut it;
+  //   no fit was clean enough to judge it), so the 60s judges Frostfire
+  //   and never fires on Spellslinger. burstHold: on Vashnik Pheanixx
+  //   (dp6am4TQhG3cKFxR, 87th) presses it once per Imbibe, for the Venoms.
+  // - Ray of Frost: a second charge for Spellslinger (5.7–16s apart); one
+  //   44s charge stays lenient. burstHold: on Vashnik every Frostfire
+  //   player holds it to reset Comet Storm into the Venoms (Comet Storm,
+  //   Ray of Frost, Comet Storm, the two Comet Storms 2–18s apart, after each
+  //   Imbibe); read as
+  //   drift it was a lost use on the 100th-percentile 夏夜椿湫
+  //   (3ZYVyGkBqpDhKLFt, 308k).
+  // - Comet Storm stays worth 0 a use (its hits are 153596): valued, it
+  //   fired on all three Frostfire players (夏夜椿湫 725k, Choechoi 329k,
+  //   Pheanixx 129k). They press it once per Imbibe (84s apart) plus once
+  //   after the Ray of Frost reset, holding ~40s a cycle for the Venoms,
+  //   more than Vashnik's 30s hold window covers; the Ray reset also makes
+  //   a fixed recast wrong. No Frostfire sample on another boss.
+  "Frost Mage": [
+    { name: "Frozen Orb", actionIds: [84714], damageIds: [84721], cooldownMs: 60_000, charges: 1, firstUseOffsetMs: 2_000, burstHold: true },   // 60.3 / 62.2s, 1.8s
     { name: "Comet Storm", actionIds: [153595], cooldownMs: 43_000, charges: 1, firstUseOffsetMs: 7_000 }, // 43.0 / 46.3s, 6.8s
-    { name: "Ray of Frost", actionIds: [205021], cooldownMs: 44_000, charges: 1, firstUseOffsetMs: 3_000 },// 44.8 / 47.5s, 2.7s
+    { name: "Ray of Frost", actionIds: [205021], cooldownMs: 44_000, charges: 1, firstUseOffsetMs: 3_000, burstHold: true },// 44.8 / 47.5s, 2.7s
   ],
   // Beast Mastery's Bestial Wrath (30.0 / 31.0s, 2.4s) was tracked here
   // until the WoWAnalyzer audit's phase 3 (2026-10-17): its damage is the

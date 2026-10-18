@@ -7,14 +7,15 @@
 // 19, Elemental 13, Beast Mastery 11, Balance 11, Shadow 9, Demonology 9,
 // Marksmanship 8, Devastation 7, Affliction 6; Augmentation 3, Fire 2,
 // Devourer 2, Frost Mage 1, Destruction 1 (under 3: unverified;
-// Destruction since measured on 34 in its phase 3, Fire on 12, below).
+// Destruction since measured on 34 in its phase 3, Fire on 12, Frost Mage
+// on 21, below).
 //
 // - Main cooldown window (burstGcdFindings, bonus read from the hits,
 //   inference): Arcane Surge, Combustion, Incarnation, Bestial Wrath,
 //   Trueshot, Voidform, Ascendance, Malevolence, Demonic Tyrant,
-//   Dragonrage (Combustion's is fire.ts's since 2026-10-17). Frost Mage and Augmentation have none here (Icy Veins
-//   wasn't cast in the samples; Augmentation has no burst window of its
-//   own: augmentation.ts). Devourer's Void Metamorphosis window is in
+//   Dragonrage (Combustion's is fire.ts's since 2026-10-17). Frost Mage and Augmentation have none here (nobody
+//   presses Icy Veins on 21 Frost player-pulls; Augmentation has no burst
+//   window of its own: augmentation.ts). Devourer's Void Metamorphosis window is in
 //   devourer.ts (its bonus is the window's GCD value, not the hits').
 // - Main resource at the cap (primaryResourceCapFindings): Maelstrom,
 //   Insanity, Astral Power, Focus (Beast Mastery only since 2026-10-17;
@@ -186,6 +187,21 @@
 // 0–304k, weak up to 1.60M). Hot Streak never runs out, so it isn't in
 // procs.ts. Mages log only mana: no resource check.
 //
+// Frost Mage has no case study. The WoWAnalyzer audit's phase 3
+// (2026-10-17; docs/wowa-audit/mage-frost.md, 21 player-pulls, four of
+// them 99.6–100th) found Spellslinger on every Entombed Sentinels player and
+// Frostfire on three Vashnik players, nobody pressing Icy Veins. Built in
+// frostmage.ts: Fingers of Frost wasted (a proc gained at two stacks after
+// a press made holding them, mostly a Ray of Frost entered with one; top
+// 0–199k a pull, others up to 2.94M). Fingers of Frost expires in procs.ts
+// (15s). The tracked Frozen Orb was worth 0 a use (hits under 84721): valued
+// now, burstHold, and its 60s judges only Frostfire (Spellslinger's Frost
+// Splinters cut it to 17–43s; no fit clean enough). Ray of Frost is
+// burstHold (Vashnik's Frostfire players hold it to reset Comet Storm into
+// the Venoms). Comet Storm stays worth 0 a use: valued, it fired on all
+// three Frostfire players. Freezing stacks (behind Shatter, ~40% of the
+// damage) aren't fetched.
+//
 // Marksmanship, checked against WoWAnalyzer on qpZx3mWaG7gcDdYB pull 3
 // (Shadowmeld; reference: 3Vz6Qt2RyTPXwpJn's Imnotanorc, 100th
 // percentile, page saved too; checked 2026-10-13):
@@ -261,6 +277,7 @@ import { DEVASTATION_CHECKS } from "./devastation";
 import { DEVOURER_CHECKS } from "./devourer";
 import { ELEMENTAL_CHECKS } from "./elemental";
 import { FIRE_CHECKS } from "./fire";
+import { FROST_MAGE_CHECKS } from "./frostmage";
 import { MARKSMANSHIP_CHECKS } from "./marksmanship";
 import { SHADOW_CHECKS } from "./shadow";
 import { burstGcdFindings, dotUptimeFindings, k, observedWindowBonus, primaryResourceCapFindings, spentCooldownDrift } from "./shared";
@@ -390,7 +407,7 @@ const dot = (name: string, ...statusIds: number[]): JobCheck => (ctx) => dotUpti
 export const RANGED_CHECKS: Record<string, JobCheck[]> = {
   "Arcane Mage":          [window(365362, "Arcane Surge"), ...ARCANE_CHECKS],
   "Fire Mage":            [...FIRE_CHECKS],   // the Combustion window is fire.ts's (its bonus per press)
-  "Frost Mage":           [],
+  "Frost Mage":           [...FROST_MAGE_CHECKS],
   "Balance Druid":        [window(102560, "Incarnation"), primaryResourceCapFindings, dot("Moonfire", 164812), dot("Sunfire", 164815), ...BALANCE_CHECKS],
   "Beast Mastery Hunter": [window(19574, "Bestial Wrath"), (ctx) => primaryResourceCapFindings(ctx, [BARBED_SHOT]), ...BEAST_MASTERY_CHECKS],
   "Marksmanship Hunter":  [window(288613, "Trueshot"), ...MARKSMANSHIP_CHECKS],
