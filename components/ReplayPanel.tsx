@@ -40,10 +40,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Pull } from "@/types/Pull";
 import { ffMapImageUrl, fitReplayView, mapImageBounds, poseAt, type ReplayActor, type ReplayData, type ReplayPose } from "@/lib/replay/ffxiv-replay";
-import { aoesAt, buildAoeShapes, buildHeadMarkers, buildTethers, type AoeShape } from "@/lib/replay/action-shapes";
+import { aoesAt, buildAoeShapes, buildHeadMarkers, buildTethers, tetherEndAt, type AoeShape } from "@/lib/replay/action-shapes";
 import { getFFAbilityIconUrl } from "@/lib/ability-icons";
 import { buildCasterEffects } from "@/lib/replay/ffxiv-effects";
-import { ElementDragon, ElementHalo } from "@/components/ReplayEffects";
+import { ElementDragon, ElementHalo, ElementTether } from "@/components/ReplayEffects";
 import { sampleNear } from "@/lib/replay/ffxiv-replay";
 import { facingToCompassBearing } from "@/lib/mechanics/geometry";
 import { detectFFRoles } from "@/lib/mechanics/ffxiv/roles";
@@ -313,10 +313,11 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
             })}
             {tethers.filter((tt) => t >= tt.start && t <= tt.end).map((tt, i) => {
               const src = actorByKey.get(tt.source), dst = actorByKey.get(tt.target);
-              const a = src && (poseAt(src, t) ?? sampleNear(src, t, TETHER_LOOKUP_MS));
-              const b = dst && (poseAt(dst, t) ?? sampleNear(dst, t, TETHER_LOOKUP_MS));
+              const a = src && tetherEndAt(src, tt, t, TETHER_LOOKUP_MS);
+              const b = dst && tetherEndAt(dst, tt, t, TETHER_LOOKUP_MS);
               if (!a || !b) return null;
               const line = { x1: toX(a.x), y1: toY(a.y), x2: toX(b.x), y2: toY(b.y) };
+              if (tt.element) return <ElementTether key={i} {...line} element={tt.element} t={t} />;
               return (
                 <g key={i} pointerEvents="none">
                   <line {...line} stroke={TETHER_COLOR} strokeWidth={12} strokeOpacity={0.35} strokeLinecap="round" filter="url(#replay-glow)" />

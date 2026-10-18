@@ -58,6 +58,11 @@
 //   Mark of Mortality 1004372 to its members. A holder's death sets off
 //   Fated Burn Mark 40331 ~0.7s later: Damage Down to everyone near
 //   (27 pulls ended there).
+// - Tethers (replay, user 2026-10-17): id 249 fire (Utopian Sky's tether
+//   stacks, Fall of Faith's Sinblaze), 287 lightning (Sinsmite). Fall of
+//   Faith's tethers 2-4 come from clones on the north wall (NW, N, NE in
+//   order; JZ1KXhDbqkNH3jxR 24 and M9Nagmnw2LzHZPVq 1), the same clones
+//   that held the Utopian tethers from the SE/SW.
 // - Fall of Faith 40137/40140: Prey order = tether order, Floating Fetters
 //   1002304 on the carrier ~4s before its hit (Solemn Charge 40138/40141/
 //   40166). Fire = Sinblaze 40156 on four (fewer: Mark of Mortality);

@@ -151,6 +151,54 @@ export function ElementHalo({ e, x, y, r, t }: { e: CasterEffect; x: number; y: 
   );
 }
 
+/**
+ * A tether in its element (lib/replay/action-shapes.ts's TETHER_KINDS):
+ * fire burns with a flickering orange core and sparks drifting toward the
+ * player; lightning is a white-hot jagged arc in blue glow, re-forked every
+ * few frames. Source end at (x1, y1).
+ */
+export function ElementTether({ x1, y1, x2, y2, element, t }: { x1: number; y1: number; x2: number; y2: number; element: "fire" | "lightning"; t: number }) {
+  const c = COLORS[element === "fire" ? "fire-dragon" : "lightning-dragon"];
+  const len = Math.hypot(x2 - x1, y2 - y1);
+  if (len < 1) return null;
+  const ux = (x2 - x1) / len, uy = (y2 - y1) / len;   // along
+  const px = -uy, py = ux;                              // across
+  const at = (f: number, off: number) => `${x1 + ux * len * f + px * off} ${y1 + uy * len * f + py * off}`;
+  if (element === "lightning") {
+    const frame = Math.floor(t / BOLT_FRAME_MS);
+    const n = Math.max(6, Math.round(len / 22));
+    const arc = (seed: number, amp: number) => {
+      let d = `M${x1} ${y1}`;
+      for (let s = 1; s < n; s++) d += ` L${at(s / n, (rand(seed + s * 1.7) - 0.5) * amp)}`;
+      return `${d} L${x2} ${y2}`;
+    };
+    return (
+      <g pointerEvents="none">
+        <path d={arc(frame * 7, 18)} fill="none" stroke={c.glow} strokeWidth={10} strokeOpacity={0.55} strokeLinejoin="round" filter="url(#replay-glow)" />
+        <path d={arc(frame * 7 + 50, 14)} fill="none" stroke={c.glow} strokeWidth={1.5} strokeOpacity={0.8} strokeLinejoin="round" />
+        <path d={arc(frame * 7, 18)} fill="none" stroke={c.hot} strokeWidth={2.5} strokeLinejoin="round" />
+        <circle cx={x1} cy={y1} r={6} fill={c.hot} stroke={c.glow} strokeWidth={2} />
+      </g>
+    );
+  }
+  const flicker = 0.8 + 0.2 * Math.sin(t / 45);
+  return (
+    <g pointerEvents="none">
+      <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={c.glow} strokeWidth={20 * flicker} strokeOpacity={0.55} strokeLinecap="round" filter="url(#replay-glow)" />
+      <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={c.deep} strokeWidth={7} strokeLinecap="round" />
+      <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={c.hot} strokeWidth={3} strokeLinecap="round"
+        strokeDasharray="14 8" strokeDashoffset={-(t / 8) % 22} />
+      {Array.from({ length: 5 }, (_, k) => {
+        // Sparks running from the source to the player.
+        const f = ((t / 900) + k / 5) % 1;
+        return <circle key={k} cx={x1 + ux * len * f + px * (rand(k + Math.floor(t / 900)) - 0.5) * 8} cy={y1 + uy * len * f + py * (rand(k * 3 + Math.floor(t / 900)) - 0.5) * 8}
+          r={2.2} fill={c.hot} fillOpacity={0.9} />;
+      })}
+      <circle cx={x1} cy={y1} r={6} fill={c.hot} stroke={c.deep} strokeWidth={2} />
+    </g>
+  );
+}
+
 /** The head: a horned wedge pointing along the direction of travel. */
 function DragonHead({ p, c }: { p: { x: number; y: number; w: number; a: number }; c: (typeof COLORS)[keyof typeof COLORS] }) {
   // Travel is counterclockwise: the head faces along -a's tangent.

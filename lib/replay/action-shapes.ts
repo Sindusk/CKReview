@@ -37,7 +37,7 @@
 // (buildHeadMarkers).
 
 import { facingToCompassBearing } from "@/lib/mechanics/geometry";
-import { poseAt, sampleNear, type ReplayData } from "@/lib/replay/ffxiv-replay";
+import { poseAt, sampleNear, type ReplayActor, type ReplayData } from "@/lib/replay/ffxiv-replay";
 
 export type ActionGeometry = { castType: number; range: number; width: number; omen: string };
 
@@ -396,28 +396,74 @@ export function buildAoeShapes(data: ReplayData): AoeShape[] {
   return out.sort((a, b) => a.start - b.start);
 }
 
-export type TetherSpan = { source: string; target: string; id: number; start: number; end: number };
+export type TetherSpan = {
+  source: string; target: string; id: number; start: number; end: number;
+  element?: "fire" | "lightning";   // drawn in its element (TETHER_KINDS)
+};
 
 const TETHER_MAX_MS = 15000;
 const TETHER_GRACE_MS = 500;
 
 /**
+ * Tether ids with a known meaning: their element, and the abilities that
+ * resolve them on the tethered player (cast by another actor, so the
+ * source's own payoff cast never comes). FRU P1, checked on
+ * JZ1KXhDbqkNH3jxR 24 and M9Nagmnw2LzHZPVq 1 (user, 2026-10-17: Fall of
+ * Faith's tethers are fire or lightning): 249 fire, paid off by Sinblaze
+ * 40156 (Fall of Faith) or Sinsmoke 40167 (Utopian Sky's tether stacks);
+ * 287 lightning, by Sinsmite 40142.
+ */
+const TETHER_KINDS: Record<number, { element: "fire" | "lightning"; payoff: number[] }> = {
+  249: { element: "fire", payoff: [40156, 40167] },
+  287: { element: "lightning", payoff: [40142] },
+};
+
+/**
  * When each tether shows. The log marks only when a tether forms, so it
  * ends at its source's next cast on the tethered actor (Dancing Mad's
- * Graven Image tethers pay off with Pulse Wave), else at the source's next
+ * Graven Image tethers pay off with Pulse Wave), or at a known payoff
+ * hitting the tethered player (TETHER_KINDS), else at the source's next
  * tether, else after 15s.
  */
 export function buildTethers(data: ReplayData): TetherSpan[] {
   const casts = data.enemyCasts ?? [];
+  const hits = data.enemyHits ?? [];
   const tethers = data.tethers ?? [];
   return tethers.map(([t, source, target, id]) => {
     let end = t + TETHER_MAX_MS;
+    const kind = TETHER_KINDS[id];
+    if (kind) {
+      // Only its own payoff ends it: the boss's other casts on the player
+      // (Fall of Faith's first tether) and the clones' are unrelated.
+      const hit = hits.find((h) => h[3] === target && h[0] > t && h[0] < end && kind.payoff.includes(h[1]));
+      if (hit) end = hit[0] + TETHER_GRACE_MS;
+      return { source, target, id, start: t, end, element: kind.element };
+    }
     const next = tethers.find((o) => o[1] === source && o[0] > t);
     if (next) end = Math.min(end, next[0]);
     const payoff = casts.find((c) => c[1] === source && c[0] > t && c[3] === 0 && c[5] === target);
     if (payoff) end = Math.min(end, payoff[0] + TETHER_GRACE_MS);
     return { source, target, id, start: t, end };
   });
+}
+
+/**
+ * Where a tether's end sits at `t`. A sparse actor (a parked clone) is
+ * placed by its sample nearest `t` within the tether's own span: FRU's
+ * clones hold the Utopian Sky tethers from the south, move to the north
+ * wall for Fall of Faith, and log nothing between, so plain
+ * interpolation kept them in the south for the whole tether.
+ */
+export function tetherEndAt(actor: ReplayActor, span: TetherSpan, t: number, lookupMs: number): { x: number; y: number } | undefined {
+  if (actor.kind === "enemy") {
+    let best: (typeof actor.samples)[number] | undefined;
+    for (const s of actor.samples) {
+      if (s[0] < span.start - 500 || s[0] > span.end + 3000) continue;
+      if (!best || Math.abs(s[0] - t) < Math.abs(best[0] - t)) best = s;
+    }
+    if (best) return { x: best[1], y: best[2] };
+  }
+  return poseAt(actor, t) ?? sampleNear(actor, t, lookupMs);
 }
 
 export type HeadMarkerSpan = { target: string; id: number; start: number; end: number; label: string };

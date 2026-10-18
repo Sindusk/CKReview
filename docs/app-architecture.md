@@ -338,7 +338,12 @@ file's header comment. Mechanic detection has its own guide:
   unknown marker reads "Marker <id>" for 5s.
 - **Tethers** come from the API's `tether` events (fetched with the
   replay). The log marks only when one forms, so each lasts until its
-  source's next cast on that player, capped at 15s.
+  source's next cast on that player, capped at 15s. Tether ids with a known
+  meaning (`TETHER_KINDS`: FRU's 249 fire, 287 lightning) draw in their
+  element and end at the hit that resolves them. A parked clone at a
+  tether's end sits where it logged a position during the tether: FRU's
+  clones move from the south (Utopian Sky) to the north wall (Fall of Faith)
+  with nothing logged between.
 - **Layers menu:** AoEs, map, 5y rings, 5y grid (0,0 at the arena centre),
   helper actors, statuses and head markers (FFXIV), and an icon-size slider.
 - **Roster HP / MP bars.** Once a pull's replay is loaded, each roster
