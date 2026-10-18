@@ -132,6 +132,11 @@
 //   11 (donut: didn't reach the circle before the snapshot; question 4's
 //   circle size answered) and 12 (stack short, above). B11's escaped dark
 //   follower probably started in the wrong place; the VOD can't show it.
+// Replay findings (2026-10-18, tea/replay.ts, B4 the kill): each Almighty
+//   Judgment explosion is cast by the helper that revealed it 6.6s before,
+//   and only 26 of 50 explosions log a position (44 of 50 reveals); α's
+//   preview crosses 18591 come from the same clones and facings as the real
+//   Sacraments; Plaint of Obloquy is a 30y circle on its holder.
 // OPEN QUESTIONS:
 // 1. B3 light beacon in the group: as A28 and A31 (the beacon didn't go
 //    to the wall)?

@@ -251,3 +251,60 @@ Hallowed Ground (header).
 22. **Pull 4, 7:17-7:37** — the Repentance puddles drawn east (111,
     105) and west (89, 95) from Void's cast at 7:17. Are the puddles there
     from 7:17, and the right size as they shrink?
+
+## Phase 4: Perfect Alexander (10:42 to 15:46 on the kill)
+
+Checked on the kill only.
+
+### What's drawn
+- **The Final Word / Fate Calibration β marches:** the light beacon a
+  large gold ring ("Light beacon"), the dark beacon a large violet one;
+  followers a small ring in their colour with chevrons in (light: march
+  toward) or out (dark: march away). Fate Calibration β logs the roles
+  only on the beacons.
+- **Ordained Motion / Stillness:** a white sword ("Motion: keep moving")
+  or black sword ("Stillness: stand still") over Perfect Alexander, for
+  the Final Word's cast bars, and for 3s before each of Fate Calibration
+  α's two checks, which have no cast bar (the players remember them from
+  the preview).
+- **Optical Sight:** marker 62 reads "Stack" on the two stack targets,
+  139 "Spread" on all eight, each with its 6y ring riding on them until
+  it lands.
+- **Fate Calibration α:** the three preview Sacrament crosses flash pale
+  grey as the clones play them (12:04-12:05), then the real ones flash red
+  at 12:22-12:23 from the same clones. Plaint of Obloquy (Defamation) as
+  a violet 30y circle on its holder (the engine treats 30y+ circles as
+  raidwides and had dropped it).
+- **Fate Calibration β:** tethers as in Stasis, J Jumps on their three
+  baiters, Radiant Sacrament as a donut with its 8y safe middle (the
+  estimate without hits drew 20y).
+- **Busters:** Capital Punishment and Punishment purple; Irresistible
+  Grace a stack through its cast.
+- **Almighty Judgment:** each 6y circle from its reveal until it explodes,
+  the three sets shaded in the order they go off (red, orange, yellow).
+  The game shows them alike; the shading is there because, once all three
+  are out, nothing else tells them apart in a still frame.
+
+### Fit check
+Almighty Judgment 49 of 49, Obloquy, Solidarity, Radiant Sacrament,
+Grace, busters exact. The rest is the script's grouping (eight
+Individual Reprobations, two Collective, three J Jumps at once) and the
+preview crosses (players stand in previews by design).
+
+### Not known
+- Fate Calibration α's clones (where the four stand, which one doesn't
+  fire) are drawn only through their crosses.
+- One Almighty Judgment explosion (of 50) has no position from either cast.
+
+### VOD checks: Q9zqJb4VLmjhd1B6 Pull 4
+23. **Pull 4, 10:57-11:15** — the monk drawn as light beacon, the warrior
+    as dark beacon. Right?
+24. **Pull 4, 12:04-12:06** — the preview crosses drawn from the clones
+    at west-north-west, north-north-west and east-north-east, the
+    north-north-east clone not firing. Does that match the preview?
+25. **Pull 4, 12:15-12:23** — the replay labels Motion at 12:18 and
+    Stillness at 12:22 over the boss. Is that the order the preview
+    showed?
+26. **Pull 4, 14:39-14:52** — Almighty Judgment shaded red / orange /
+    yellow by explosion order. Is that easier to follow than one colour,
+    or should it match the game's single colour?

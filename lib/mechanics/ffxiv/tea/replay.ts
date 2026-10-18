@@ -704,19 +704,181 @@ function crystals(data: ReplayData): CasterEffect[] {
   return out;
 }
 
+// ── Phase 4: Perfect Alexander ──────────────────────────────────────────────
+//
+// Ids from perfect-alexander.ts's header; checked on Q9zqJb4VLmjhd1B6 4
+// (10:42 to 15:46).
+
+const ORDAINED_MOTION = [18558, 18859], ORDAINED_STILLNESS = [18559, 18860];
+const COLLECTIVE_REPROBATION = 18573, INDIVIDUAL_REPROBATION = 18572;
+const PLAINT_OF_OBLOQUY = 18528;
+const PREVIEW_SACRAMENT = 18591, PA_SACRAMENT = 18569;
+const RADIANT_SACRAMENT = 18566;
+const CAPITAL_PUNISHMENT = 18579, ORDAINED_PUNISHMENT = 18577;
+const ALMIGHTY_PREVIEW = 18575, ALMIGHTY_JUDGMENT = 18576;
+const IRRESISTIBLE_GRACE = 18580;
+
+// Optical Sight: Collective Reprobation is the two 6y stacks.
+OVERRIDES[COLLECTIVE_REPROBATION] = { style: "stack" };
+// Capital Punishment (three shared 4y hits) and Punishment on the tanks.
+OVERRIDES[CAPITAL_PUNISHMENT] = { style: "tankbuster" };
+OVERRIDES[ORDAINED_PUNISHMENT] = { style: "tankbuster" };
+// Irresistible Grace: the 6y stack all eight share after each trine,
+// through its 4.7s cast.
+OVERRIDES[IRRESISTIBLE_GRACE] = { style: "stack", telegraph: true };
+// Almighty Judgment: drawn by almightyJudgment() from each circle's reveal.
+OVERRIDES[ALMIGHTY_PREVIEW] = { hidden: true };
+OVERRIDES[ALMIGHTY_JUDGMENT] = { hidden: true };
+// Radiant Sacrament: drawn by radiantSacrament() (the donut's 8y safe
+// middle isn't in the data; with nobody hit the estimate made it 20y).
+OVERRIDES[RADIANT_SACRAMENT] = { hidden: true };
+
+/** Optical Sight markers: 62 on the two stack targets, 139 on all eight for the spread (kill 11:21.9 / 11:28.1). */
+const PA_MARKERS = {
+  62: { label: "Stack", abilities: [COLLECTIVE_REPROBATION] },
+  139: { label: "Spread", abilities: [INDIVIDUAL_REPROBATION] },
+};
+const PA_MARKER_AOES = {
+  62: { ability: COLLECTIVE_REPROBATION, name: "Stack" },
+  139: { ability: INDIVIDUAL_REPROBATION, name: "Spread" },
+};
+
+// The Final Word's and Fate Calibration β's march roles (status ids, the
+// word and its Ordained replacement for the march itself): light beacon,
+// light follower (marches toward it), dark beacon, dark follower (marches
+// away from it).
+const MARCH: Record<number, string> = {
+  1002153: "tea-light-beacon", 1003056: "tea-light-beacon",
+  1002152: "tea-light-follower", 1003055: "tea-light-follower",
+  1002155: "tea-dark-beacon", 1003058: "tea-dark-beacon",
+  1002154: "tea-dark-follower", 1003057: "tea-dark-follower",
+};
+const ORDAINED_CUE_MS = 3000;      // α's checks have no cast bar: label them this long before
+
+/**
+ * Almighty Judgment: three sets of 6y circles revealed 2s apart (preview
+ * 18575, 1.2s) and exploding in the same order 6.6s later (18576), each
+ * shown from its reveal. Each explosion is cast by the helper that
+ * revealed it 6.6s before (kill: helper 42 reveals (84, 100) at 14:40.6
+ * and explodes it at 14:47.2); only 26 of the 50 explosions log a
+ * position against 44 of 50 reveals, so either places it.
+ */
+const ALMIGHTY_DELAY_MS = 6600;
+function almightyJudgment(data: ReplayData): AoeShape[] {
+  const out: AoeShape[] = [];
+  const casts = data.enemyCasts ?? [];
+  const at = (c: (typeof casts)[number]) => {
+    const a = data.actors.find((x) => x.key === c[1]);
+    return a && sampleNear(a, c[0], 1500);
+  };
+  const reveals = casts.filter((c) => c[4] === ALMIGHTY_PREVIEW && c[3] === 0).map((c) => ({ t: c[0], key: c[1], p: at(c) }));
+  for (const c of casts) {
+    if (c[4] !== ALMIGHTY_JUDGMENT || c[3] !== 0) continue;
+    const reveal = reveals.find((r) => r.key === c[1] && Math.abs(c[0] - r.t - ALMIGHTY_DELAY_MS) < 800);
+    const p = reveal?.p ?? at(c);
+    if (!p) continue;
+    // Which of its trine's three sets: by the explosions 2s apart. Once all
+    // three are out they overlap, so each set gets its own shade (first
+    // red, second orange, third yellow) to show the order to walk.
+    const first = casts.find((x) => x[4] === ALMIGHTY_JUDGMENT && x[3] === 0 && c[0] - x[0] >= 0 && c[0] - x[0] < 5000)!;
+    const set = Math.min(2, Math.round((c[0] - first[0]) / 2000));
+    out.push({ kind: "circle", x: p.x, y: p.y, bearing: 0, range: (data.actionGeometry?.[ALMIGHTY_JUDGMENT]?.range ?? 6) * 100,
+      width: 0, angle: 0, inner: 0, estimated: false, style: `tea-trine-${set + 1}`, name: "Almighty Judgment", start: reveal ? reveal.t : c[0] - 300, resolve: c[0] });
+  }
+  return out;
+}
+
+/** Fate Calibration β's Radiant Sacrament: a donut from its clone, safe within 8y ([BM]; the header: safe circle ~6y+). */
+function radiantSacrament(data: ReplayData): AoeShape[] {
+  const out: AoeShape[] = [];
+  for (const c of data.enemyCasts ?? []) {
+    if (c[4] !== RADIANT_SACRAMENT || c[3] !== 0) continue;
+    const a = data.actors.find((x) => x.key === c[1]);
+    const p = a && sampleNear(a, c[0], 1500);
+    if (!p) continue;
+    out.push({ kind: "donut", x: p.x, y: p.y, bearing: 0, range: (data.actionGeometry?.[RADIANT_SACRAMENT]?.range ?? 60) * 100,
+      width: 0, angle: 0, inner: 800, estimated: false, style: "aoe", name: "Radiant Sacrament", start: c[0] - 300, resolve: c[0] });
+  }
+  return out;
+}
+
+/**
+ * Plaint of Obloquy (Defamation): a 30y circle on its holder, which the
+ * engine skips as a raidwide (30y+). Kill: on the warrior at (107.2, 83.6),
+ * 12:21.4, hitting only them. Fate Calibration α's preview crosses (18591)
+ * flash on the three firing clones, faint, as the game plays them.
+ */
+function phaseFourShapes(data: ReplayData): AoeShape[] {
+  const out: AoeShape[] = [];
+  const g = data.actionGeometry ?? {};
+  for (const c of data.enemyCasts ?? []) {
+    if (c[3] !== 0) continue;
+    if (c[4] === PLAINT_OF_OBLOQUY) {
+      const hit = (data.enemyHits ?? []).find((h) => h[1] === PLAINT_OF_OBLOQUY && h[0] >= c[0] && h[0] - c[0] < 1500 && h[6] !== null);
+      const who = c[5] ? data.actors.find((a) => a.key === c[5]) : undefined;
+      const p = (who && poseAt(who, c[0])) ?? (hit ? { x: hit[6]!, y: hit[7]! } : undefined);
+      if (!p) continue;
+      out.push({ kind: "circle", x: p.x, y: p.y, bearing: 0, range: (g[PLAINT_OF_OBLOQUY]?.range ?? 30) * 100, width: 0, angle: 0, inner: 0,
+        estimated: false, style: "tea-defamation", name: "Plaint of Obloquy", start: c[0] - 300, resolve: c[0] });
+    } else if (c[4] === PREVIEW_SACRAMENT) {
+      const a = data.actors.find((x) => x.key === c[1]);
+      const p = a && sampleNear(a, c[0], 15000);
+      const real = g[PA_SACRAMENT];
+      if (!p || !real) continue;
+      out.push({ kind: "cross", x: p.x, y: p.y, bearing: facingToCompassBearing(p.facing), range: real.range * 100, width: real.width * 100,
+        angle: 0, inner: 0, estimated: false, style: "tea-preview", name: "Sacrament (preview)", start: c[0] - 300, resolve: c[0] });
+    }
+  }
+  return out;
+}
+
+function phaseFourEffects(data: ReplayData): CasterEffect[] {
+  const out: CasterEffect[] = [];
+  const casts = data.enemyCasts ?? [];
+  const pa = data.actors.find((a) => a.kind === "enemy" && a.targetable && a.name === "Perfect Alexander");
+
+  // March roles on their players.
+  for (const [start, end, target, id] of data.playerAuras ?? []) {
+    const kind = MARCH[id];
+    if (!kind) continue;
+    const who = data.actors.find((a) => a.key === target);
+    const p = who && poseAt(who, start);
+    if (!p) continue;
+    const label = kind.endsWith("beacon") ? (kind.includes("light") ? "Light beacon" : "Dark beacon") : "";
+    out.push({ kind, label, actor: target, x: p.x, y: p.y, start, end });
+  }
+
+  // Ordained Motion / Stillness: the Final Word's two checks have cast
+  // bars (kill 11:03.6 Motion, 11:14.7 Stillness); Fate Calibration α's
+  // two are cast by clones with none (12:18.3 Motion, 12:22.5 Stillness),
+  // remembered from the preview. Labelled over Perfect Alexander.
+  for (const c of casts) {
+    if (c[4] === undefined || c[3] !== 0) continue;
+    const motion = ORDAINED_MOTION.includes(c[4]);
+    if (!motion && !ORDAINED_STILLNESS.includes(c[4])) continue;
+    const begin = casts.find((b) => b[4] === c[4] && b[3] > 0 && Math.abs(b[0] + b[3] - c[0]) < 800);
+    const anchor = pa && (poseAt(pa, c[0]) ?? sampleNear(pa, c[0], 30000));
+    if (!anchor) continue;
+    out.push({ kind: motion ? "tea-motion" : "tea-stillness", label: motion ? "Motion: keep moving" : "Stillness: stand still",
+      actor: pa!.key, x: anchor.x, y: anchor.y, start: begin ? begin[0] : c[0] - ORDAINED_CUE_MS, end: c[0] + 300 });
+  }
+  return out;
+}
+
 export const TEA_REPLAY: FightReplay = {
   key: "tea",
   game: "ffxiv",
   name: "The Epic of Alexander",
   signature: [FLUID_SWING, CASCADE, WAVE_BOSS_VISIBLE, WAVE_TORNADO_VISIBLE],
   overrides: OVERRIDES,
-  headMarkers: { ...LIMIT_CUT_MARKERS, ...BJCC_MARKERS, ...AP_MARKERS },
-  markerAoes: { ...MARKER_AOES, ...AP_MARKER_AOES },
+  headMarkers: { ...LIMIT_CUT_MARKERS, ...BJCC_MARKERS, ...AP_MARKERS, ...PA_MARKERS },
+  markerAoes: { ...MARKER_AOES, ...AP_MARKER_AOES, ...PA_MARKER_AOES },
   tethers: { ...TETHERS, ...AP_TETHERS },
-  effects: (data) => [...phaseOneEffects(data), ...phaseTwoEffects(data), ...crystals(data)],
+  effects: (data) => [...phaseOneEffects(data), ...phaseTwoEffects(data), ...crystals(data), ...phaseFourEffects(data)],
   shapes: (data) => [
     ...protean(data), ...sluice(data), ...hawkBlaster(data),
     ...opticalSight(data), ...spinCrusher(data), ...mines(data), ...carriers(data), ...propellerShadow(data),
     ...repentance(data),
+    ...almightyJudgment(data), ...radiantSacrament(data), ...phaseFourShapes(data),
   ],
 };

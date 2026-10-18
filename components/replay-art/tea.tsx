@@ -235,6 +235,66 @@ function NisiRing({ e, x, y, t }: EffectArtProps) {
   );
 }
 
+/**
+ * Final Word / Fate Calibration β march roles on their players: a beacon is
+ * a large glowing ring in its colour (light gold, dark violet) with its
+ * name; a follower a small solid ring with chevrons pointing toward
+ * (light) or away from (dark) the middle of its ring.
+ */
+function MarchRole({ e, x, y, t }: EffectArtProps) {
+  const o = fade(t, e.start, e.end, 200);
+  if (o <= 0) return null;
+  const light = e.kind.includes("light");
+  const col = light ? { ring: "#ffd36b", glow: "#ffb020", text: "#ffe29a" } : { ring: "#c08cff", glow: "#8a3dff", text: "#d9b8ff" };
+  if (e.kind.endsWith("beacon")) {
+    const r = 30 + 3 * Math.sin(t / 180);
+    return (
+      <g opacity={o} pointerEvents="none">
+        <circle cx={x} cy={y} r={r} fill={col.glow} fillOpacity={0.12} stroke={col.glow} strokeWidth={10} strokeOpacity={0.35} filter="url(#replay-glow)" />
+        <circle cx={x} cy={y} r={r} fill="none" stroke={col.ring} strokeWidth={3} />
+        <text x={x} y={y + r + 15} textAnchor="middle" fill={col.text} fontSize={12} fontWeight={800}
+          stroke="rgba(0,0,0,0.8)" strokeWidth={3} paintOrder="stroke">{e.label}</text>
+      </g>
+    );
+  }
+  const r = 18;
+  const chev = (a: number) => {
+    const cx = x + Math.sin(a) * (r + 6), cy = y - Math.cos(a) * (r + 6);
+    const d = light ? -1 : 1;   // toward the middle (light) or away (dark)
+    const tip = { x: cx + Math.sin(a) * 5 * d, y: cy - Math.cos(a) * 5 * d };
+    return `M${cx - Math.cos(a) * 5} ${cy - Math.sin(a) * 5} L${tip.x} ${tip.y} L${cx + Math.cos(a) * 5} ${cy + Math.sin(a) * 5}`;
+  };
+  return (
+    <g opacity={o} pointerEvents="none">
+      <circle cx={x} cy={y} r={r} fill="none" stroke={col.ring} strokeWidth={2.5} strokeOpacity={0.9} />
+      {[0, 1, 2, 3].map((k) => <path key={k} d={chev((k * Math.PI) / 2 + Math.PI / 4)} fill="none" stroke={col.ring} strokeWidth={2} strokeLinecap="round" />)}
+    </g>
+  );
+}
+
+/**
+ * Ordained Motion (white sword: keep moving) / Stillness (black sword:
+ * stand still) over Perfect Alexander, with its meaning.
+ */
+function OrdainedSword({ e, x, y, t }: EffectArtProps) {
+  const o = fade(t, e.start, e.end, 250);
+  if (o <= 0) return null;
+  const motion = e.kind === "tea-motion";
+  const fill = motion ? "#f6f6ff" : "#1b1b24", rim = motion ? "#9fb6ff" : "#c08cff";
+  const sy = y - 70;
+  return (
+    <g opacity={o} pointerEvents="none">
+      <g transform={`translate(${x} ${sy})`}>
+        <path d="M0 -26 L5 -18 L5 10 L-5 10 L-5 -18 Z" fill={fill} stroke={rim} strokeWidth={2} filter="url(#replay-glow)" />
+        <rect x={-12} y={10} width={24} height={4} rx={2} fill={rim} />
+        <rect x={-2.5} y={14} width={5} height={10} rx={2} fill={rim} />
+      </g>
+      <text x={x} y={sy - 34} textAnchor="middle" fill={motion ? "#e6ecff" : "#d9b8ff"} fontSize={15} fontWeight={800}
+        stroke="rgba(0,0,0,0.85)" strokeWidth={4} paintOrder="stroke">{e.label}</text>
+    </g>
+  );
+}
+
 const NISI_ART = Object.fromEntries(["a", "b", "g", "d"].flatMap((k) => [[`tea-nisi-${k}`, NisiRing], [`tea-judgment-${k}`, NisiRing]]));
 
 export const TEA_ART: FightArt = {
@@ -246,6 +306,9 @@ export const TEA_ART: FightArt = {
     "tea-shield-front": ShieldFront,
     "tea-crystal": Crystal,
     ...NISI_ART,
+    "tea-light-beacon": MarchRole, "tea-light-follower": MarchRole,
+    "tea-dark-beacon": MarchRole, "tea-dark-follower": MarchRole,
+    "tea-motion": OrdainedSword, "tea-stillness": OrdainedSword,
   },
   colors: {
     // Compressed Water's stack: sea blue. Flarethrower: fire orange.
@@ -255,6 +318,14 @@ export const TEA_ART: FightArt = {
     "tea-safe":  { fill: "#2fbf6a", flash: "#8ff0b4", rim: "#d8ffe6", glow: "#4ad88a" },
     // Enumeration: a stack, in the built-in stack orange.
     "tea-enum":  { fill: "#f08a24", flash: "#ffc070", rim: "#fff0d8", glow: "#ffa040" },
+    // Defamation's 30y circle: violet, faint enough over the whole arena.
+    "tea-defamation": { fill: "#7a3dd9", flash: "#c9a0ff", rim: "#efe2ff", glow: "#9a5cff" },
+    // Almighty Judgment's three sets, in the order they explode.
+    "tea-trine-1": { fill: "#d9342b", flash: "#ff7a70", rim: "#ffe1dc", glow: "#ff5a4a" },
+    "tea-trine-2": { fill: "#e8781e", flash: "#ffb36b", rim: "#ffe8d0", glow: "#ff9a40" },
+    "tea-trine-3": { fill: "#e0c020", flash: "#fff08a", rim: "#fffbe0", glow: "#ffe060" },
+    // Fate Calibration's preview crosses: a pale grey ghost of the real one.
+    "tea-preview": { fill: "#b8b8c8", flash: "#e8e8f4", rim: "#ffffff", glow: "#d0d0e0" },
   },
   tethers: { "tea-water": WaterTether, "tea-close": CloseTether, "tea-far": FarTether },
 };
