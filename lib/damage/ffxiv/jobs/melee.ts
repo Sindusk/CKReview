@@ -102,10 +102,9 @@
 //     overcap its 20 on K6qfMamL7rN8yz2Q Vamp Fatale and 110 on
 //     cBZXM6kayd7Tf9Fg, the Reawaken left at the kill on cBZXM6kayd7Tf9Fg
 //     and jXG76ba43VDLAvYz. The coils' Bites (`viperBites`, from that
-//     jXG76ba43VDLAvYz page's third dropped proc). Not built: a coil
-//     skipped after Vicewinder (Vices.tsx; 22 of 1,043 on disk, most at a
-//     death or a wipe's end, and when a coil stops being available isn't
-//     known).
+//     jXG76ba43VDLAvYz page's third dropped proc). A coil skipped after
+//     Vicewinder (Vices.tsx, 2026-10-18): `viperCoils`, with when a coil
+//     stops being available measured on disk.
 // Monk (checked against xivanalysis on qjCMx4bRfgNKwX9T fight 16, 7.5,
 // 2026-10-13, the first Monk sample):
 //   - Riddle of Fire (RiddleOfFire.tsx): 11 GCDs; +15% (FFLogs multiplier
@@ -1550,8 +1549,68 @@ const viperBites: JobCheck = (ctx) => {
   return out;
 };
 
+// A coil skipped after Vicewinder, or a den after Vicepit (xivanalysis
+// Vices.tsx). The coils are combo actions: on disk (2026-10-18, 1,043
+// Vices) the only GCDs ever pressed between a Vice and both its coils are
+// Uncoiled Fury (150) and Writhing Snap (8), neither of which breaks a
+// combo; a dual-wield combo GCD, Reawaken or the next Vice ends them, and
+// the longest Vice-to-coil gap is 24.8s. Each coil missing loses its
+// average less her average GCD (the GCD that took its place) and the Bite
+// it would have unlocked; the 5 Serpent Offerings it gives aren't counted.
+// A death, the pull's end, or forced or movement time before the breaking
+// GCD: shown, not counted. Seen: CABrk9zXLfJG8h6R and K6qfMamL7rN8yz2Q
+// Lindwurm II (Mocha Dreams, Reawaken right after the 2:13-2:15
+// Vicewinder), cZ42C1y3JRNGXWLH 0:48.9, Fz72hLDPtrv8Wq1M pull 12 7:03.0.
+const VICE_COILS: [vice: string, coils: string[], bites: string[]][] = [
+  ["VICEWINDER", ["HUNTERS_COIL", "SWIFTSKINS_COIL"], ["TWINFANG_BITE", "TWINBLOOD_BITE"]],
+  ["VICEPIT", ["HUNTERS_DEN", "SWIFTSKINS_DEN"], ["TWINFANG_THRESH", "TWINBLOOD_THRESH"]],
+];
+const VICE_COMBO_MS = 30_000;
+const viperCoils: JobCheck = (ctx) => {
+  const out: DamageFinding[] = [];
+  const keep = new Set(ids("UNCOILED_FURY", "WRITHING_SNAP"));
+  const gcds = ctx.player.casts.filter((c) => ctx.game.action(c.abilityId)?.onGcd).sort((a, b) => a.timestamp - b.timestamp);
+  for (const [viceKey, coilKeys, biteKeys] of VICE_COILS) {
+    if (!A[viceKey] || coilKeys.some((x) => !A[x])) continue;
+    const coilIds = new Set(ids(...coilKeys));
+    const coilAvg = Math.max(...coilKeys.map((x) => ctx.values.perUse(id(x))));
+    const perCoil = Math.max(0, coilAvg - ctx.values.gcdValue(undefined, false)) + Math.max(0, ...biteKeys.filter((x) => A[x]).map((x) => ctx.values.perUse(id(x))));
+    if (perCoil <= 0) continue;
+    for (const [i, v] of gcds.entries()) {
+      if (v.abilityId !== A[viceKey].id || v.timestamp >= ctx.endMs) continue;
+      const seen = new Set<number>();
+      let breaker: (typeof gcds)[number] | undefined;
+      for (const g of gcds.slice(i + 1)) {
+        if (g.timestamp - v.timestamp > VICE_COMBO_MS) break;
+        if (coilIds.has(g.abilityId)) { seen.add(g.abilityId); if (seen.size === coilIds.size) break; continue; }
+        if (keep.has(g.abilityId)) continue;
+        breaker = g;
+        break;
+      }
+      const missing = coilIds.size - seen.size;
+      if (missing <= 0) continue;
+      const until = breaker?.timestamp ?? Math.min(v.timestamp + VICE_COMBO_MS, ctx.endMs);
+      const atEnd = !breaker && v.timestamp + VICE_COMBO_MS >= ctx.endMs;
+      const died = ctx.dead.some((d) => d.startMs >= v.timestamp && d.startMs <= until + 1_000);
+      const during = forcedPart(v.timestamp, until, ctx.forced);
+      const moving = ctx.movement?.some((w) => w.startMs < until && w.endMs > v.timestamp) ?? false;
+      out.push(finding(ctx, {
+        kind: "missed-followup", startMs: v.timestamp, endMs: until, forced: atEnd || died || during.ms > 0 || moving,
+        movement: (moving && !during.ms && !died && !atEnd) || undefined,
+        cause: atEnd ? "the pull ended" : died ? "dead" : during.ms > 0 ? during.cause : undefined,
+        label: `${missing} ${viceKey === "VICEPIT" ? "den" : "coil"}${missing > 1 ? "s" : ""} skipped`,
+        lostDamage: missing * perCoil,
+        basis: `${missing} × (${k(coilAvg)} her average coil − her average GCD, plus the Bite it unlocks)`,
+        detail: `${A[viceKey].name} at ${clock(v.timestamp)}, ` +
+          (breaker ? `${breaker.abilityName} at ${clock(breaker.timestamp)} ended the coils` : "the coils ran out") + ` with ${seen.size} of ${coilIds.size} pressed`,
+      }));
+    }
+  }
+  return out;
+};
+
 export const VPR_CHECKS: JobCheck[] = [uptime("HUNTERS_INSTINCT", 0.1, "Hunter's Instinct is +10%, FFLogs multiplier"), fromLevel(100, reawaken), venoms,
-  fromLevel(92, rattlingCoils), fromLevel(90, serpentOfferingsCheck), serpentsTail, viperBites, vprAoe];
+  fromLevel(92, rattlingCoils), fromLevel(90, serpentOfferingsCheck), serpentsTail, viperBites, vprAoe, viperCoils];
 // xivanalysis AoE.tsx: each form's AoE against that form's three
 // single-target GCDs (their cast-weighted average), Enlightenment against
 // The Forbidden Chakra.

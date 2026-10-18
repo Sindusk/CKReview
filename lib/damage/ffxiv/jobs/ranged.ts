@@ -91,12 +91,13 @@
 //   (9zQqtBRL41XhADxG 9:06: 4 presses for a 3-step finish).
 //   Devilment outside Technical Finish (Technicalities.tsx "bad
 //   Devilments", 2026-10-16): `devilmentMisaligned` below. Not matched
-//   against a page yet. Not adopted: Flourishing Starfall / Finish
-//   overwrites (both last under their 120s source's cooldown: never
-//   refreshed on 442 pulls), Closed Position uptime (never down past a
-//   2s partner swap).
+//   against a page yet. No dance partner (Closed Position uptime,
+//   2026-10-18): `dancePartnerLost` below, found in weak parses. Not
+//   adopted: Flourishing Starfall / Finish overwrites (both last under
+//   their 120s source's cooldown: never refreshed on 442 pulls).
 // Bard: Caustic Bite / Stormbite (below), Hawk's Eye overwrites, AoE on
-//   one target, the burst window, cooldowns (OGCDDowntime.ts).
+//   one target, the burst window, a burst buff that never met the other
+//   two (`bardBuffMisaligned`, 2026-10-18), cooldowns (OGCDDowntime.ts).
 //   Rechecked on dDar482XvFKBPJYh FRU kill (7.1, 2026-10-12): its 17
 //   Hawk's Eye overwrites match by time; Empyreal Arrow 55/59 is 3 by
 //   drift; Battle Voice / Radiant Finale / Raging Strikes / Barrage 9/10
@@ -161,7 +162,7 @@ import type { DamageFinding, GaugeTrack, JobCheck } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";
 import { aoeComboOnOneTarget, baseValue, burstWindowFindings, clock, critMultOf, dotFindings, fromLevel, gaugeFindings, k, rollGainOf, s, statusWindows, type ExpectedAction, type GaugeEvent, type GaugeSpec } from "./shared";
 import { comboLanded } from "./gnb";
-import { forcedPart, inWindows, mergeWindows } from "../../timeline";
+import { deadWindows, forcedPart, inWindows, mergeWindows, type Window } from "../../timeline";
 import { espritGauge, featherGauge } from "./gauges";
 import { estimateHitRates } from "../../crit-rates";
 
@@ -787,9 +788,133 @@ const devilmentMisaligned: JobCheck = (ctx): DamageFinding[] => {
   return out;
 };
 
+// No dance partner (xivanalysis DirtyDancing.tsx, Closed Position
+// uptime): the partner's Standard Finish and Devilment are lost while the
+// Dancer has theirs up and no party member carries the partner copy from
+// them. Read from the partner side: FFLogs doesn't always log Closed
+// Position's removal on the Dancer (9d6QnCr7gzhyHfta The Tyrant, Co Coa
+// died 4:40.9; her Closed Position refreshes just stop), while the
+// partner's Dance Partner and Standard Finish are removed. This also
+// counts the wait after re-partnering: the new partner gets Standard
+// Finish only at the next finish. Valued on the partner the Dancer would
+// have had (the last one if alive, else the next, else the party's top
+// damage dealer alive then) × the buff's measured share. A stretch that
+// starts at the partner's death is forced: the new partner can't get
+// Standard Finish before the next finish. Not valued: the Esprit the
+// partner's GCDs would have given. Found 2026-10-18 in the 50
+// lowest Lindwurm II and The Tyrant Dancers: J2xNa9WqfQKgrMFw fight 9
+// (Ari Zubz pressed Ending at 3:50.0 and never re-partnered: three
+// Devilments and every Standard Finish after it alone), 9d6QnCr7gzhyHfta
+// fight 3 (no partner from her 4:40.9 death to 7:28.3), RPj21aAXFkTf7hZt
+// fight 4 (Ending 1:55.2, Closed Position 2:04.9).
+const PARTNER_GAP_MIN_MS = 3_000;
+const PARTNER_DEATH_LAG_MS = 3_000;
+const PARTNER_SWAP_MS = 15_000;
+const dancePartnerLost: JobCheck = (ctx): DamageFinding[] => {
+  const out: DamageFinding[] = [];
+  const me = ctx.player;
+  const sourceWindows = (p: PlayerInfo, statusId: number): Window[] => {
+    const ws: Window[] = [];
+    let open: number | undefined;
+    for (const e of [...(p.buffs ?? [])].filter((x) => x.abilityId === statusId && x.source === me.name).sort((a, b) => a.timestamp - b.timestamp)) {
+      if (e.buffStatus === "applied" || e.buffStatus === "refreshed") open ??= e.buffStatus === "refreshed" && !ws.length ? 0 : e.timestamp;
+      else if (e.buffStatus === "removed") { ws.push({ startMs: open ?? 0, endMs: e.timestamp }); open = undefined; }
+    }
+    if (open !== undefined) ws.push({ startMs: open, endMs: ctx.endMs });
+    return ws;
+  };
+  const others = ctx.pull.players.filter((p) => p !== me);
+  const partnerWins = others.map((p) => ({ p, ws: sourceWindows(p, S.DANCE_PARTNER.id) }));
+  const dmgIn = (p: PlayerInfo, from: number, to: number) =>
+    p.damageDone.filter((e) => e.timestamp >= from && e.timestamp < to && (e.amount ?? 0) > 0).reduce((a, e) => a + (e.amount ?? 0), 0);
+  const wouldBe = (from: number, to: number): PlayerInfo | undefined => {
+    const before = partnerWins.flatMap(({ p, ws }) => ws.filter((w) => w.startMs <= from).map((w) => ({ p, t: w.endMs }))).sort((a, b) => b.t - a.t)[0]?.p;
+    const after = partnerWins.flatMap(({ p, ws }) => ws.filter((w) => w.startMs >= to).map((w) => ({ p, t: w.startMs }))).sort((a, b) => a.t - b.t)[0]?.p;
+    const alive = (p: PlayerInfo) => dmgIn(p, from, to) > 0;
+    return [before, after].find((p) => p && alive(p)) ??
+      [...others].sort((a, b) => dmgIn(b, from, to) - dmgIn(a, from, to)).find(alive);
+  };
+  // Stretches where no one carried Dance Partner from this Dancer. A
+  // partner copy stripped while Dance Partner stayed (AYQm9Kd8Ct4FxcGp
+  // Lindwurm II pull 1: Standard Finish off the Reaper at 1:02.5, 2s
+  // before a wipe death) isn't a lost partner.
+  // A dead partner keeps Dance Partner (r4qDkR9btJCXnKWd Doomtrain pull
+  // 16: the Dragoon died at 5:42.1, the Dancer swapped at 6:11.8). That
+  // time isn't counted: counting it gave 185 findings on disk, mostly
+  // 1-30k in wipes where the partner was raised, and whether to swap or
+  // wait for the raise is the user's call (asked 2026-10-18).
+  const partnered = mergeWindows(partnerWins.flatMap(({ ws }) => ws));
+  const alone: Window[] = [];
+  let at = 0;
+  for (const w of partnered) {
+    if (w.startMs - at >= PARTNER_GAP_MIN_MS) alone.push({ startMs: at, endMs: w.startMs });
+    at = Math.max(at, w.endMs);
+  }
+  if (ctx.endMs - at >= PARTNER_GAP_MIN_MS) alone.push({ startMs: at, endMs: ctx.endMs });
+  const buffs = [
+    { own: S.STANDARD_FINISH, copy: S.STANDARD_FINISH_PARTNER, name: "Standard Finish" },
+    { own: S.DEVILMENT, copy: S.DEVILMENT, name: "Devilment" },
+  ].filter((b) => b.own && b.copy).map((b) => ({
+    ...b, ownWins: statusWindows(ctx, b.own.id), covered: mergeWindows(others.flatMap((p) => sourceWindows(p, b.copy.id))),
+  }));
+  const stdCopies = buffs.find((b) => b.name === "Standard Finish")?.covered ?? [];
+  for (const st of alone) {
+    // Through the wait for the next finish after re-partnering, at most a
+    // Standard Finish's length.
+    const nextCopy = stdCopies.find((c) => c.startMs >= st.endMs)?.startMs;
+    const until = st.endMs >= ctx.endMs ? ctx.endMs : Math.min(nextCopy ?? Infinity, st.endMs + 60_000, ctx.endMs);
+    let lost = 0;
+    const secsBy = new Map<string, number>();
+    const partners = new Set<string>();
+    for (const b of buffs) {
+      for (const w of b.ownWins) {
+        const from = Math.max(w.startMs, st.startMs), to = Math.min(w.endMs, until);
+        if (to - from < PARTNER_GAP_MIN_MS) continue;
+        // The parts no partner copy covered.
+        let cur = from;
+        const gaps: Window[] = [];
+        for (const c of b.covered.filter((c) => c.endMs > from && c.startMs < to)) {
+          if (c.startMs > cur) gaps.push({ startMs: cur, endMs: c.startMs });
+          cur = Math.max(cur, c.endMs);
+        }
+        if (cur < to) gaps.push({ startMs: cur, endMs: to });
+        for (const g of gaps) {
+          if (g.endMs - g.startMs < PARTNER_GAP_MIN_MS) continue;
+          const partner = wouldBe(g.startMs, g.endMs);
+          if (!partner) continue;
+          const sh = ctx.ledger?.share(b.copy.id, partner) ?? 0;
+          if (sh <= 0 || sh >= 1) continue;
+          lost += dmgIn(partner, g.startMs, g.endMs) * (sh / (1 - sh));
+          secsBy.set(b.name, (secsBy.get(b.name) ?? 0) + g.endMs - g.startMs);
+          partners.add(partner.name);
+        }
+      }
+    }
+    if (lost <= 0) continue;
+    const from = st.startMs, to = until;
+    const names = [...partners].join(" / ");
+    const parts = [...secsBy].map(([n, ms]) => `${n} ${s(ms)}`).join(", ");
+    // A partner who died, replaced quickly: the wait for the next finish
+    // was the death's.
+    const lastPartner = partnerWins.filter(({ ws }) => ws.some((w) => w.startMs < from && w.endMs >= from - PARTNER_DEATH_LAG_MS))
+      .map(({ p }) => p).find((p) => deadWindows(p, ctx.pull, ctx.endMs).some((d) => Math.abs(d.startMs - from) <= PARTNER_DEATH_LAG_MS));
+    const partnerDied = lastPartner !== undefined && st.endMs - st.startMs <= PARTNER_SWAP_MS;
+    out.push(finding(ctx, {
+      kind: "buff-coverage", startMs: from, endMs: to, inference: true,
+      forced: partnerDied, cause: partnerDied ? `${lastPartner.name} died` : undefined,
+      label: "No dance partner",
+      lostDamage: lost,
+      basis: `the partner's Standard Finish and Devilment at their measured share on what ${names} dealt while the Dancer's own were up ` +
+        `and no one had the partner copy; the Esprit a partner gives isn't counted`,
+      detail: `No partner buff from ${clock(from)} to ${clock(to)} (${parts})`,
+    }));
+  }
+  return out;
+};
+
 // fromLevel (shared.ts): the level each rule needs, for synced ultimates.
 export const DNC_CHECKS: JobCheck[] = [technical, fromLevel(100, technicalFillers), dancerOverwrites, dancerGaugeEstimates, dancerAoe, dancerDances,
-  fromLevel(90, devilmentMisaligned)];
+  fromLevel(90, devilmentMisaligned), dancePartnerLost];
 // The burst window (xivanalysis BuffWindows/BurstWindow.tsx): where
 // Raging Strikes, Battle Voice and Radiant Finale are all up. 7 GCDs, 8
 // when Army's Muse covers 2+ of them; Barrage consumed in it (a Refulgent
@@ -844,7 +969,75 @@ const bardBurst: JobCheck = (ctx) => {
   });
 };
 
-export const BRD_CHECKS: JobCheck[] = [bardDots, bardOverwrites, bardAoe, bardBurst];
+// A burst buff that never overlapped the other two (xivanalysis
+// BuffWindows/BurstWindow.tsx "failed overlap"): bardBurst sees only
+// windows where all three are up, so a Radiant Finale pressed 30s before
+// Raging Strikes and Battle Voice was invisible. Valued as Devilment is:
+// the buff's share on what it would have covered in the nearest window
+// where the other two overlap (within BRD_ALIGN_REACH_MS) minus what it
+// added where it was pressed. Party-wide for Radiant Finale and Battle
+// Voice (the ledger's measured share per recipient), the Bard's own hits
+// for Raging Strikes. xivanalysis counts only a buff removed while one of
+// the others was up; the app judges any press with an overlap in reach.
+// Found 2026-10-18 in the 50 lowest Lindwurm II and The Tyrant Bards
+// (ff-rankings.js): KzamJYNWgqx3TLdw fight 27 (Radiant Finale 1:35.8,
+// 3:37.6, 5:39.4, ended before Raging Strikes 2:06.6 / 4:09.2 / 6:10.0),
+// Hy87F2VJhBqkLnt1 fight 1 (Radiant Finale on its own 110s cooldown,
+// 12-53s ahead of the others), Mj87XzgcQm3HBTGR fight 3 (12-40s late).
+const BRD_ALIGN_REACH_MS = 60_000;
+const bardBuffMisaligned: JobCheck = (ctx): DamageFinding[] => {
+  const out: DamageFinding[] = [];
+  const buffs = [
+    { action: A.RAGING_STRIKES, status: S.RAGING_STRIKES, party: false },
+    { action: A.BATTLE_VOICE, status: S.BATTLE_VOICE, party: true },
+    { action: A.RADIANT_FINALE, status: S.RADIANT_FINALE, party: true },
+  ].filter((b) => b.action && b.status);
+  const windows = new Map(buffs.map((b) => [b.status.id, statusWindows(ctx, b.status.id)]));
+  const overlaps = (a: { startMs: number; endMs: number }, b: { startMs: number; endMs: number }) =>
+    a.startMs < b.endMs && b.startMs < a.endMs;
+  for (const b of buffs) {
+    const [o1, o2] = buffs.filter((x) => x !== b).map((x) => windows.get(x.status.id) ?? []);
+    const pairs = o1.flatMap((w1) => o2.filter((w2) => overlaps(w1, w2))
+      .map((w2) => ({ startMs: Math.max(w1.startMs, w2.startMs), endMs: Math.min(w1.endMs, w2.endMs) })));
+    const spanMs = b.status.duration ?? 20_000;
+    for (const c of ctx.player.casts.filter((x) => x.abilityId === b.action.id && x.timestamp < ctx.endMs)) {
+      const t = c.timestamp;
+      const own = { startMs: t, endMs: t + spanMs };
+      if (pairs.some((p) => overlaps(own, p))) continue;
+      const near = pairs.filter((p) => Math.abs(p.startMs - t) <= BRD_ALIGN_REACH_MS && p.startMs < ctx.endMs)
+        .sort((x, y) => Math.abs(x.startMs - t) - Math.abs(y.startMs - t))[0];
+      if (!near) continue;
+      const len = Math.min(spanMs, ctx.endMs - t, ctx.endMs - near.startMs);
+      if (len <= 0) continue;
+      let lost = 0;
+      for (const p of b.party ? ctx.pull.players : [ctx.player]) {
+        const sh = b.party ? (ctx.ledger?.share(b.status.id, p) ?? 0) : 1 - 1 / (1 + (b.status.amount ?? 0.15));
+        if (sh <= 0 || sh >= 1) continue;
+        const inRange = (from: number) => p.damageDone.filter((e) => e.timestamp >= from && e.timestamp < from + len && (e.amount ?? 0) > 0);
+        const would = inRange(near.startMs).reduce((a, e) => a + (e.amount ?? 0), 0) * (sh / (1 - sh));
+        const added = inRange(t).filter((e) => e.statusIds?.includes(b.status.id)).reduce((a, e) => a + (e.amount ?? 0), 0) * sh;
+        lost += would - added;
+      }
+      if (lost <= 0) continue;
+      // Nothing forces a buff out of the burst; a burst that was itself
+      // forced (held past a phase's check) is.
+      const during = forcedPart(near.startMs, near.startMs + len, ctx.forced);
+      const forced = during.ms >= 1_500;
+      const others = buffs.filter((x) => x !== b).map((x) => x.status.name).join(" and ");
+      out.push(finding(ctx, {
+        kind: "burst-window", startMs: t, endMs: t, forced, cause: forced ? during.cause : undefined, inference: true,
+        label: `${b.status.name} outside the burst window`,
+        lostDamage: lost,
+        basis: `${b.status.name}'s share on what ${b.party ? "the party" : "the Bard"} dealt in the ${s(len)} from ${clock(near.startMs)}, ` +
+          `where ${others} overlapped, minus what it added where it was pressed`,
+        detail: `${b.status.name} at ${clock(t)}, ${others} together from ${clock(near.startMs)}`,
+      }));
+    }
+  }
+  return out;
+};
+
+export const BRD_CHECKS: JobCheck[] = [bardDots, bardOverwrites, bardAoe, bardBurst, fromLevel(90, bardBuffMisaligned)];
 // xivanalysis MultiHitSkills. Bioblaster shares Drill's charges; its DoT
 // ticks count toward what it dealt. Scattergun stands in for any step of
 // the Heated combo, so it's judged against their average.

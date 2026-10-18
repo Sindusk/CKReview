@@ -960,6 +960,21 @@ function despairSkipped(ctx: PlayerCheckContext, gauge: BlmGauge, cycle: number)
     return false;
   };
   for (const [i, { cast: c, before, after }] of gauge.casts.entries()) {
+    // Manafont before Despair (xivanalysis ManafontTiming): the refill
+    // throws away the 800+ MP a Despair would have spent. ymbRNcMgaKqB86Zj
+    // The Tyrant pull 1 (Yuui Kobayashi, a 0.1-percentile kill, 2026-10-18):
+    // Manafont at 1200 MP at 2:21.4, 8:13.8 and 10:08.9.
+    if (c.abilityId === A.MANAFONT.id && before.af > 0 && !despaired && since !== undefined &&
+        c.mp !== undefined && c.mp >= DESPAIR_MIN_MP && c.timestamp >= 0) {
+      const gcdMs = ctx.baseGcdMs * ctx.factorAt(c.timestamp);
+      const during = forcedPart(c.timestamp - gcdMs, c.timestamp + gcdMs, ctx.forced);
+      out.push(finding(ctx, {
+        kind: "wrong-gcd", startMs: c.timestamp, endMs: c.timestamp, forced: during.ms > 0, cause: during.ms > 0 ? during.cause : undefined,
+        label: "Despair skipped", lostDamage: Math.max(0, despair - cycle),
+        basis: `${k(despair)} average Despair − ${k(cycle)} her average rotation GCD (the GCD it adds)`,
+        detail: `Manafont at ${c.mp} MP with no Despair since ${clock(since)}: the refill threw away a Despair's MP`,
+      }));
+    }
     if (after.af > 0 && (before.af === 0 || c.abilityId === A.MANAFONT.id)) { since = c.timestamp; despaired = false; }
     if (c.abilityId === A.DESPAIR.id) despaired = true;
     if (!(before.af > 0 && after.af === 0)) continue;

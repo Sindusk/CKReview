@@ -209,15 +209,18 @@ and delete them from the header.
     buffs of one job overlapping, rare in a fixed static; Bard's
     BuffGroupWindow); procs on an invulnerable target are
     `noDamageCasts`'s (2026-10-16).
-  - [brd.md](xiva-audit/brd.md): Bard, 1 candidate (failed buff
-    overlap, never seen on 322 applications), 4 covered.
-  - [dnc.md](xiva-audit/dnc.md): Dancer, 1 candidate (Closed Position,
-    never seen), 8 covered (dance checks and Devilment outside Technical
-    Finish built, awaiting xivanalysis pages).
+  - [brd.md](xiva-audit/brd.md): Bard, 0 candidates, 5 covered (a
+    burst buff that never met the other two built 2026-10-18 from weak
+    Lindwurm II / The Tyrant parses).
+  - [dnc.md](xiva-audit/dnc.md): Dancer, 0 candidates, 9 covered (dance
+    checks, Devilment outside Technical Finish and no dance partner
+    built, awaiting xivanalysis pages). Open: whether dead-partner time
+    should count (swap vs. wait for the raise).
   - [pct.md](xiva-audit/pct.md): Pictomancer, 1 candidate
     (Hyperphantasia, only lost at deaths on disk), 6 covered (portrait
     overwrites built 2026-10-16; Striking Muse not judged on 7.2).
-  - [ast.md](xiva-audit/ast.md): Astrologian, 0 candidates, 4 covered.
+  - [ast.md](xiva-audit/ast.md): Astrologian, 1 candidate (Macrocosmos
+    underuse: the user, 2026-10-18, it's an AoE, so not `no-damage`), 4 covered.
     Early Earthly Star detonations built 2026-10-16 (the user: a mistake
     worth a finding); 99 on disk; matched xivanalysis's Stellar Burst
     count (2) on K6qfMamL7rN8yz2Q (its suggestion can't fire: bug).
@@ -239,10 +242,11 @@ and delete them from the header.
     fire since 2026-10-16 (the next GCD clears them; the check only looked
     at expiries), awaiting a page.
   - [drg.md](xiva-audit/drg.md): Dragoon, 3 covered.
-  - [vpr.md](xiva-audit/vpr.md): Viper, 1 candidate (Vices, rare), 5
-    covered (Serpent Offerings overcap and Reawaken left at a kill, Death
-    Rattle / Last Lash, the coils' Bites built 2026-10-16; all but the
-    wrong-Bite case matched xivanalysis pages).
+  - [vpr.md](xiva-audit/vpr.md): Viper, 0 candidates, 6 covered (Serpent
+    Offerings overcap and Reawaken left at a kill, Death Rattle / Last
+    Lash, the coils' Bites built 2026-10-16; all but the wrong-Bite case
+    matched xivanalysis pages; coils skipped after Vicewinder built
+    2026-10-18, the coil rule measured on disk).
   - [rpr.md](xiva-audit/rpr.md): Reaper, 0 candidates, 9 covered
     (Soul Reaver / Executioner drops and Enhanced overwrites built
     2026-10-16; the drops matched two pages, overwrites untested on a
@@ -255,15 +259,16 @@ and delete them from the header.
     (ninjutsu, Kassatsu and Raiju checks verified 2026-10-15; Kazematoi
     left at the kill and Armor Crush in Kunai's Bane built 2026-10-16;
     Ninki gains read at the cast, no simulation underflow left on disk).
-  - [sam.md](xiva-audit/sam.md): Samurai, 2 candidates, 18 covered
+  - [sam.md](xiva-audit/sam.md): Samurai, 0 candidates (Ready proc
+    overwrite proposed `wrong` 2026-10-18: 30s procs, 120s Ikishoten), 18 covered
     (Higanbana and Kenki / Meditation / Sen gauges built 2026-10-15 and
     matched on 3 xivanalysis pages).
   - [mch.md](xiva-audit/mch.md): Machinist, 0 candidates, 17 covered
     (Double Check / Checkmate charge simulation and lanes 2026-10-15; Heat / Battery
     overcap, Reassemble and the rebuilt Wildfire count verified on 3
     pages 2026-10-15; Queen without Collider not adopted).
-  - [blm.md](xiva-audit/blm.md): Black Mage, 2 candidates (pre-7.2
-    Firestarter; Manafont timing, never seen), 16 covered (full gauge
+  - [blm.md](xiva-audit/blm.md): Black Mage, 1 candidate (pre-7.2
+    Firestarter), 17 covered (Manafont before Despair built 2026-10-18; full gauge
     simulation and lanes; Polyglot, Paradox, cold Fire III, Ley Lines,
     Fire I, Umbral Soul, lukewarm Fire IV verified on 10 xivanalysis
     pages 2026-10-15; Despair skipped built 2026-10-16 from the logged MP

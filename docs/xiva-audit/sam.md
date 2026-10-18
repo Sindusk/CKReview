@@ -37,7 +37,7 @@
 | sam/Positionals/gekko-kasha | verified | `checkPositionals` | a missed Gekko / Kasha positional | Generic. Matched xivanalysis 2026-10-16 time for time: Alexia Renzella 10 + 8, Genichiro Ashina 3 + 10, Alison Octavious 8 + 6 against its 8 + 7. Its extra Kasha (1:46.4) never landed (FFLogs previewed it as Deep Blue left; xivanalysis reads the preview). |
 | sam/Interrupts/iaijutsu-cancel | verified | `checkInterrupts` | a cancelled Iaijutsu | Its tiers start at 2; the app counts each. Genichiro Ashina 7 = 7 (2026-10-16). |
 | sam/ReadyProcs/dropped | verified | `checkProcs` | Ogi Namikiri / Kaeshi / Tendo / Tsubame / Zanshin Ready expiring | Minor 1, Medium 2, Major 3. Three of its statuses are id 0 (bug). Matched 2026-10-16: Alexia Renzella's Tendo (4:27.5) and Genichiro Ashina's Ogi Namikiri Ready (4:44.3), 1 each. Genichiro's Tendo checklist 10 / 11 isn't reported here (not traced). Searched 2026-10-16 (10 lowest Red Hot and Deep Blue Samurai): VhyrDATFKNGt8f6M fight 6 (Heddy Donc) let Ogi Namikiri Ready run out 4 times and never pressed Ogi Namikiri, so it has no average and shows nothing (the never-pressed-consumer gap in open-items). Closed 2026-10-16: fight 6 fetched, Ogi Namikiri Ready declared (→ Ogi Namikiri) and priced at 1.75 × the player's Midare Setsugekka when never pressed (measured on disk): 4 show, 193k each (upper bound: its Kaeshi is lost too, the GCD in its slot isn't subtracted), 2:44 forced. Page: "Use Your Ogis 0 / 10" (Ogi and Kaeshi from 5 Ikishotens); the fifth Ogi Namikiri Ready was still up at the kill. Its Meikyo 11 / 12 = the app's 1 lost (the app counts 10 casts; the opener's is pressed before the pull). Tendo 20 / 22 was missing: Tendo's removals split 5 Tendo Setsugekka / 5 Tendo Goken, under the 60% the consumer inference needs. Declared 2026-10-16 (Tendo → Tendo Setsugekka, Goken accepted; priced against Midare Setsugekka, its Kaeshi's upgrade not counted): the 5:13.1 expiry now shows (63k). 9 on disk, each checked in the log (Tendo out 30s after Meikyo, a plain Midare 1-4s later): P6bRcxfmwqAda3NB 5:23.9, 7:17.4, 9:21.0 (Moira Ideon spent those Meikyos on two Higanbanas), Xk2DKZwVp4Ar6d7y pulls 6 and 10 3:03.9, gNBGDwLzva1JdHXA 4:14.2, pG319BgHTnPJc6Ft pull 10 5:54.4, at2GMBcywChApnfY 4:27.5 (already matched). |
-| sam/ReadyProcs/overwritten | candidate | — | Ikishoten with Ogi / Zanshin Ready held | Minor 1, Medium 2, Major 3. Counts one overwrite twice (both statuses). Not seen: 0 of 202 Ikishotens on disk (2026-10-15); build when a pull has one. |
+| sam/ReadyProcs/overwritten | wrong | — | Ikishoten with Ogi / Zanshin Ready held | Minor 1, Medium 2, Major 3. Counts one overwrite twice (both statuses). Proposed 2026-10-18, awaiting the user's approval: it can't happen in 7.x. Ogi Namikiri Ready and Zanshin Ready last 30s (logged duration 30000 on every application; longest lifetime on disk 30.6s) and Ikishoten's shortest recast on disk is 119.98s (160 intervals), so nothing it gave is still up at the next press. 0 of 228 Ikishotens on disk, no refreshbuff of either status. |
 | sam/ReadyProcs/ogi-checklist | covered | `checkProcs` | Ogi Namikiri or Kaeshi: Namikiri not pressed | Checklist. |
 | sam/ReadyProcs/tendo-checklist | covered | `checkProcs` | Tendo or its Kaeshi not pressed | Checklist. |
 | sam/ReadyProcs/tsubame-checklist | covered | `checkProcs` | a Tsubame-gaeshi not pressed | Broken in xivanalysis (id-0 statuses). |
@@ -76,10 +76,8 @@ Weaving, AlwaysBeCasting and Death run unconfigured (covered by
 In priority order (biggest damage cost first). Three pages compared
 2026-10-16 (at2GMBcywChApnfY, 7zwpcLxk2Fd1h6Vr, kNQKG6yHmvZTJ2hf).
 
-1. **sam/ReadyProcs/overwritten** (candidate): not seen on disk, nor in
-   the 6 lowest Vamp Fatale Samurai (ff-probe, 2026-10-16), whose lost
-   Ready procs were all expiries (Tendo, Ogi Namikiri, Zanshin; the
-   app's checkProcs judges those) or deaths.
+1. **sam/ReadyProcs/overwritten** (proposed `wrong` 2026-10-18): 30s
+   procs against a 120s Ikishoten; awaiting the user's approval.
 2. Fuko on too few targets: built 2026-10-16 (`samFukoAoe`), the chain
    per GCD against the single-target rate with Sen valued. 14 on
    LmwgxA7B4d1NzqWH (Jena Steel), 14-41k each; 1 on 7jtwv9aVpJmDbCXk.
