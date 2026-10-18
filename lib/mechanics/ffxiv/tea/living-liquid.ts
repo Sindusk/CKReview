@@ -140,6 +140,13 @@
 //   autos after Cascade, out of cooldowns and heals (mitigation, no error;
 //   the called wipe stays the cutoff). E12: the Paladin had tank stance on
 //   at the pull and stole the first Fluid Swing (ffxiv-ll-threat).
+// Replay findings (2026-10-18, tea/replay.ts): the visible boss waves aim at
+//   all eight players where they stood at the begincast and each tornado's
+//   at its nearest player (nobody hit in Q9zqJb4VLmjhd1B6 4 or A35, fight 36); the
+//   18468 helpers' facings don't carry the direction. Embolus drifts ~0.9y/s
+//   toward the bosses (B21: burst 10.0y along that line 11.2s after
+//   Pressurize). Tornadoes sit where the "liquid rage" helpers log their
+//   casts; the Hand's Prayer/Parting has no begincast.
 // OPEN QUESTIONS:
 // 1. roles.ts names the paladin MT (opening auto) but the warrior holds
 //    Living Liquid and does the opening invulnerability every pull, NAUR's
