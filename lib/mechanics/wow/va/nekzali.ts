@@ -79,6 +79,10 @@
 // not flagged. The closed well (1290390, ~90k/s) hit a few players who
 // walked in outside a window or stayed after it closed.
 //
+// Well position (replay, 2026-10-18, kill vRPGT4MN6VALQWFh f7): the well
+// has no actor, but the four Ritual Drummers stand symmetrically around it
+// and an Amani that reached it stood at their middle (0, -207).
+//
 // Soul Transfer (hit 1295085): the Echo's transfer beam toward the well
 // one-shot anyone in its path (4 +277.0, 5 +199.6; 812-816k).
 //
