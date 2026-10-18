@@ -54,7 +54,9 @@
 //
 // Catalytic Bile: 1282602 = a soaker's hit; 1282616 = an unsoaked impact's
 // raid-wide penalty (~200-500k each). Every Catalyst in the kill had 4-5
-// soakers; pull 10's had none and the penalty killed 14.
+// soakers; pull 10's had none and the penalty killed 14. Impacts land
+// 7.0-7.1s after the 1282516 cast (15 volleys, kills 19WyTrzgQRvdc4Z8 f5
+// and phzkLrdNBgtfCmW9 f54; replay, 2026-10-18).
 //
 // Malignant Burst (1280189, cast by a Burning or Shrouded Venom reaching the
 // cavity) killed 5-10 players every time (pulls 4/5/6/9/11).
