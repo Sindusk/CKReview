@@ -42,12 +42,14 @@ import { WOW_AURA_SHAPES } from "@/lib/replay/wow-shapes";
 
 /**
  * Server-side filter for the replay fetch: the event types that carry
- * resources, plus casts and deaths, plus the few debuffs the replay draws
- * as shapes (wow-shapes.ts).
+ * resources, plus casts and deaths, plus every debuff on a player (a few
+ * thousand events a pull), so a boss's spec can draw any of its debuffs
+ * (WOW_AURA_SHAPES, a spec's `shapes`) without a refetch. Replays saved
+ * before 2026-10-18 carry only the WOW_AURA_SHAPES debuffs.
  */
 export const WOW_REPLAY_EVENT_FILTER =
   `type in ("cast", "begincast", "damage", "heal", "resourcechange", "death")` +
-  ` or (type in ("applydebuff", "removedebuff") and ability.id in (${Object.keys(WOW_AURA_SHAPES).join(", ")}))`;
+  ` or (type in ("applydebuff", "removedebuff") and target.type = "player")`;
 
 const ENEMY_SAMPLE_MS = 200;
 // A begincast with no matching cast within this is an interrupted or
@@ -168,7 +170,9 @@ export function buildWowReplayData(
     if (e.type === "death" && dst && e.targetID !== undefined) {
       deaths.push([t, keyFor(e.targetID, e.targetInstance, isPlayer(dst))]);
     }
-    if ((e.type === "applydebuff" || e.type === "removedebuff") && dst && e.abilityGameID !== undefined && e.abilityGameID in WOW_AURA_SHAPES) {
+    // Debuffs enemies (or the environment: no source) put on players.
+    if ((e.type === "applydebuff" || e.type === "removedebuff") && isPlayer(dst) && e.abilityGameID !== undefined
+        && (e.abilityGameID in WOW_AURA_SHAPES || !src || isEnemy(src))) {
       enemyAuras.push([t, e.abilityGameID, keyFor(dst.id, e.targetInstance, isPlayer(dst)), e.type === "applydebuff" ? 1 : 0]);
     }
 

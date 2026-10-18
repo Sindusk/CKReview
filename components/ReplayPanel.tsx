@@ -224,7 +224,7 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
     return m;
   }, [pull]);
   const actorByKey = useMemo(() => new Map((data?.actors ?? []).map((a) => [a.key, a])), [data]);
-  const casterEffects = useMemo(() => (data && data.game !== "wow" ? buildCasterEffects(data) : []), [data]);
+  const casterEffects = useMemo(() => (data ? buildCasterEffects(data) : []), [data]);
   const headMarkers = useMemo(() => (data && data.game !== "wow" ? buildHeadMarkers(data, HEAD_MARKER_PLAIN_MS) : []), [data]);
   const aurasByKey = useMemo(() => {
     const m = new Map<string, NonNullable<ReplayData["playerAuras"]>>();
@@ -314,7 +314,7 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
             {/* Floor effects (FRU Thin Ice) under everything else. */}
             {showAoes && casterEffects.filter((e) => e.layer === "floor" && t >= e.start && t <= e.end).map((e) => {
               const Art = EFFECT_ART[e.kind];
-              return Art ? <Art key={`floor-${e.kind}-${e.start}`} e={e} x={toX(e.x)} y={toY(e.y)} t={t} scale={scale} cx={toX(cx)} cy={toY(cy)} /> : null;
+              return Art ? <Art key={`floor-${e.kind}-${e.start}-${e.x}-${e.y}`} e={e} x={toX(e.x)} y={toY(e.y)} t={t} scale={scale} cx={toX(cx)} cy={toY(cy)} /> : null;
             })}
             {showAoes && aoesAt(aoes, t).map(({ s, opacity, resolving }, i) => {
               // An aura shape rides on its actor (WoW Plague Froth).
@@ -351,7 +351,7 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
               const follow = e.actor ? actorByKey.get(e.actor) : undefined;
               const p = follow && poseAt(follow, t);
               const at = p && !p.stale ? p : e;
-              return <Art key={`${e.kind}-${e.start}-${e.x}-${e.y}`} e={e} x={toX(at.x)} y={toY(at.y)} t={t} scale={scale} cx={toX(cx)} cy={toY(cy)} actor={follow} />;
+              return <Art key={`${e.kind}-${e.start}-${e.x}-${e.y}-${e.actor ?? ""}`} e={e} x={toX(at.x)} y={toY(at.y)} t={t} scale={scale} cx={toX(cx)} cy={toY(cy)} actor={follow} />;
             })}
           </g>
           <text x={S / 2} y={24} textAnchor="middle" fill="#fff" fontSize={20} fontWeight={700} {...LABEL}>N</text>
