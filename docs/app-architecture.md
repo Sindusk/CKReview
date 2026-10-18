@@ -313,11 +313,26 @@ file's header comment. Mechanic detection has its own guide:
   Targetless stacks cast by a parked helper are centred on the players
   they hit; a beam whose caster has no nearby sample starts where its hit
   says the caster stood.
+  Per-ability options cover the rest: towers with their soaker count,
+  stacks (orange), knockbacks (pale blue), lines through their caster,
+  cones aimed behind or at the players hit, and origins taken from another
+  cast's target or a Spell-in-Waiting's holder. Futures Rewritten has the
+  most entries (Fall of Faith cones, the towers' Burnt Strike, the twin
+  cleaves, Relativity's spells), checked on JZ1KXhDbqkNH3jxR fight 24.
+- **Statuses** (FFXIV): the replay fetch also takes debuffs. Every status
+  an enemy or the environment put on a player shows under their icon, like
+  the game's party list (icon, seconds left, stacks), and is listed in the
+  hover card. Up to five, with vulnerabilities and Weakness last. Tracks
+  saved before 2026-10-17 have none: refetch them.
+- **Head markers** show as a label over the marked actor. The log gives
+  only a number, so `buildHeadMarkers` names the ones it knows (FRU's) when
+  the ability they announce follows. The label stays until that hit; an
+  unknown marker reads "Marker <id>" for 5s.
 - **Tethers** come from the API's `tether` events (fetched with the
   replay). The log marks only when one forms, so each lasts until its
   source's next cast on that player, capped at 15s.
 - **Layers menu:** AoEs, map, 5y rings, 5y grid (0,0 at the arena centre),
-  helper actors, and an icon-size slider.
+  helper actors, statuses and head markers (FFXIV), and an icon-size slider.
 - **Roster HP / MP bars.** Once a pull's replay is loaded, each roster
   tile shows thin HP and MP bars for the replay's moment
   (`playerVitalsAt`; the replay reports its clock via `onTimeChange`, the

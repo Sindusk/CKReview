@@ -9,7 +9,9 @@
 // shape with a white rim (lib/replay/action-shapes.ts; dashed = cone angle
 // or donut hole estimated). Hovering an actor shows its name, strategy
 // slot (MT, OT, H1 ... from lib/mechanics/ffxiv/roles.ts), coordinates and
-// HP; clicking one pins its hitbox ring. Tracks come from
+// HP; clicking one pins its hitbox ring. FFXIV players carry their
+// statuses in a row underneath (icon, seconds left, stacks) and head
+// markers as a label above. Tracks come from
 // lib/replay/ffxiv-replay.ts; page.tsx loads them only when the user
 // clicks Load replay (one FFLogs fetch per pull, never on navigation).
 //
@@ -38,7 +40,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Pull } from "@/types/Pull";
 import { ffMapImageUrl, fitReplayView, mapImageBounds, poseAt, type ReplayActor, type ReplayData, type ReplayPose } from "@/lib/replay/ffxiv-replay";
-import { aoesAt, buildAoeShapes, buildTethers, type AoeShape } from "@/lib/replay/action-shapes";
+import { aoesAt, buildAoeShapes, buildHeadMarkers, buildTethers, type AoeShape } from "@/lib/replay/action-shapes";
+import { getFFAbilityIconUrl } from "@/lib/ability-icons";
 import { sampleNear } from "@/lib/replay/ffxiv-replay";
 import { facingToCompassBearing } from "@/lib/mechanics/geometry";
 import { detectFFRoles } from "@/lib/mechanics/ffxiv/roles";
@@ -82,13 +85,25 @@ const MAX_EXTRAPOLATE_MS = 350;
 // for ability icons (lib/ability-icons.ts).
 const FFLOGS_ICON = (name: string) => `https://assets.rpglogs.com/img/ff/icons/${name}.png`;
 // AoE colours by kind: red AoEs (user, 2026-10-17; were guide-style
-// blue), yellow towers, purple tankbusters; light rims. `flash` is the
-// fill as it resolves.
+// blue), yellow towers, purple tankbusters, orange stacks (shared hits:
+// stand in them), pale blue knockbacks; light rims. `flash` is the fill as
+// it resolves.
 const AOE_COLORS: Record<AoeShape["style"], { fill: string; flash: string; rim: string; glow: string }> = {
   aoe:        { fill: "#d9342b", flash: "#ff7a70", rim: "#ffe1dc", glow: "#ff5a4a" },
   tower:      { fill: "#f2c230", flash: "#ffe27a", rim: "#fff6c8", glow: "#ffb84a" },   // non-circle towers only; circles use Tower
   tankbuster: { fill: "#8a3dff", flash: "#c99bff", rim: "#f1e2ff", glow: "#b47bff" },
+  stack:      { fill: "#f08a24", flash: "#ffc070", rim: "#fff0d8", glow: "#ffa040" },
+  knockback:  { fill: "#5fb4e8", flash: "#a8dcff", rim: "#e6f6ff", glow: "#7cc8ff" },
 };
+// Status icons under each player: at most this many, mechanic statuses
+// before the common ones (vulnerabilities, Weakness) that a raid carries
+// all the time.
+const MAX_STATUS_ICONS = 5;
+const COMMON_STATUSES = new Set([1002941, 1002940, 1004162, 1000043, 1000044]);
+// Head markers show from the marker until the hit it announced
+// (action-shapes.ts's buildHeadMarkers), or this long when unknown.
+const HEAD_MARKER_PLAIN_MS = 5000;
+const STATUS_W = 15, STATUS_H = 20;   // SVG units at icon scale 1 (the game's icons are 24x32)
 const PLAYER_ICON = 34;   // SVG units, at icon scale 1
 const BOSS_ICON = 46;
 const TETHER_COLOR = "#ff5fd2";
@@ -114,6 +129,7 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
   const [showHelpers, setShowHelpers] = useState(false);
   const [showRings, setShowRings] = useState(false);
   const [showGrid, setShowGrid] = useState(false);
+  const [showStatuses, setShowStatuses] = useState(true);
   const [iconScale, setIconScale] = useState(1);
   const [layersOpen, setLayersOpen] = useState(false);
   const [hoverKey, setHoverKey] = useState<string | null>(null);
@@ -199,6 +215,12 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
     return m;
   }, [pull]);
   const actorByKey = useMemo(() => new Map((data?.actors ?? []).map((a) => [a.key, a])), [data]);
+  const headMarkers = useMemo(() => (data && data.game !== "wow" ? buildHeadMarkers(data, HEAD_MARKER_PLAIN_MS) : []), [data]);
+  const aurasByKey = useMemo(() => {
+    const m = new Map<string, NonNullable<ReplayData["playerAuras"]>>();
+    for (const s of data?.playerAuras ?? []) m.set(s[2], [...(m.get(s[2]) ?? []), s]);
+    return m;
+  }, [data]);
 
   if (!pull) return <Empty>Select a pull to see its replay.</Empty>;
   if (!data) {
@@ -348,18 +370,29 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
                 {dead && (
                   <path d={`M${x - r * 0.6} ${y - r * 0.6} L${x + r * 0.6} ${y + r * 0.6} M${x + r * 0.6} ${y - r * 0.6} L${x - r * 0.6} ${y + r * 0.6}`} stroke="#ff4d4d" strokeWidth={4} strokeLinecap="round" />
                 )}
+                {showStatuses && !dead && (
+                  <StatusRow x={x} y={y + r + 3} t={t} scale={iconScale} spans={activeStatuses(aurasByKey.get(a.key), t, data.durationMs)} info={data.auraInfo ?? {}} />
+                )}
               </g>
             );
           })}
 
+          {/* Head markers: a label over the marked actor. */}
+          {showStatuses && headMarkers.filter((m) => t >= m.start && t <= m.end).map((m, i) => {
+            const at = live.find((l) => l.a.key === m.target);
+            if (!at) return null;
+            const top = toY(at.p.y) - (at.a.kind === "player" ? PLAYER_ICON * iconScale / 2 : BOSS_ICON / 2) - 8;
+            return <MarkerLabel key={`${m.target}-${m.start}-${i}`} x={toX(at.p.x)} y={top} label={m.label} known={!m.label.startsWith("Marker ")} />;
+          })}
+
           {hovered && (
             <Tooltip x={toX(hovered.p.x)} y={toY(hovered.p.y)} S={S}
-              lines={tooltipLines(hovered.a, hovered.p, slotByName, players, wow)}
+              lines={[...tooltipLines(hovered.a, hovered.p, slotByName, players, wow), ...statusLines(aurasByKey.get(hovered.a.key), t, data)]}
               color={hovered.a.kind === "player" ? playerColor(hovered.a) : "#ff8a80"} />
           )}
           {selected && !hovered && (
             <Tooltip x={toX(selected.p.x)} y={toY(selected.p.y)} S={S}
-              lines={tooltipLines(selected.a, selected.p, slotByName, players, wow)}
+              lines={[...tooltipLines(selected.a, selected.p, slotByName, players, wow), ...statusLines(aurasByKey.get(selected.a.key), t, data)]}
               color={selected.a.kind === "player" ? playerColor(selected.a) : "#ff8a80"} />
           )}
         </svg>
@@ -428,6 +461,7 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
             <Toggle label="5y rings" title={`Rings every 5 ${unit} from the ${wow ? "party's median position" : "arena centre"}`} checked={showRings} onChange={setShowRings} />
             <Toggle label="5y grid" title={`A 5-${unit.slice(0, -1)} grid with 0,0 at the ${wow ? "party's median position" : "arena centre"}`} checked={showGrid} onChange={setShowGrid} />
             <Toggle label="Helper actors" title="Untargetable actors that place AoEs" checked={showHelpers} onChange={setShowHelpers} />
+            {!wow && <Toggle label="Statuses" title="Debuffs enemies put on each player, with time left and stacks, and head markers" checked={showStatuses} onChange={setShowStatuses} />}
             <label style={{ color: "var(--ck-text-2)", fontSize: 13, whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 6 }} title="Size of the player icons">
               Icons
               <input type="range" min={0.5} max={2} step={0.1} value={iconScale} onChange={(e) => setIconScale(Number(e.target.value))} style={{ width: 90 }} />
@@ -542,7 +576,7 @@ function Aoe({ s, opacity, resolving, toX, toY, scale, uid }: { s: AoeShape; opa
   const x = toX(s.x), y = toY(s.y);
   const r = s.range * scale;
   const b = (s.bearing * Math.PI) / 180;
-  if (s.style === "tower" && s.kind === "circle") return <Tower x={x} y={y} r={r} opacity={opacity} resolving={resolving} uid={uid} />;
+  if (s.style === "tower" && s.kind === "circle") return <Tower x={x} y={y} r={r} opacity={opacity} resolving={resolving} uid={uid} soakers={s.soakers} />;
   const c = AOE_COLORS[s.style];
   const base = resolving ? c.flash : c.fill;
   const grad = `aoe-${uid}`;
@@ -605,7 +639,7 @@ function Aoe({ s, opacity, resolving, toX, toY, scale, uid }: { s: AoeShape; opa
  * of light rising from its middle (seen from above, leaning north as in
  * strategy-guide art). Flares white as it resolves.
  */
-function Tower({ x, y, r, opacity, resolving, uid }: { x: number; y: number; r: number; opacity: number; resolving: boolean; uid: string }) {
+function Tower({ x, y, r, opacity, resolving, uid, soakers }: { x: number; y: number; r: number; opacity: number; resolving: boolean; uid: string; soakers?: number }) {
   const floor = `tw-floor-${uid}`, beam = `tw-beam-${uid}`;
   const pw = Math.max(6, r * 0.3);        // pillar width
   const ph = r * 1.05;                     // pillar length (toward north)
@@ -633,6 +667,68 @@ function Tower({ x, y, r, opacity, resolving, uid }: { x: number; y: number; r: 
       <rect x={x - pw * 0.9} y={y - ph} width={pw * 1.8} height={ph} rx={pw * 0.9} fill="#a65cff" fillOpacity={0.25} />
       <rect x={x - pw / 2} y={y - ph} width={pw} height={ph} rx={pw / 2} fill={`url(#${beam})`} />
       <circle cx={x} cy={y} r={pw * 0.75} fill="#ffffff" fillOpacity={resolving ? 1 : 0.9} stroke="#d6b0ff" strokeWidth={3} />
+      {/* Soakers needed, beside the pillar (FRU P1's Explosion ids say). */}
+      {soakers !== undefined && (
+        <text x={x + r * 0.45} y={y + r * 0.55} textAnchor="middle" fill="#fff" fontSize={Math.max(16, r * 0.7)} fontWeight={800} {...LABEL}>{soakers}</text>
+      )}
+    </g>
+  );
+}
+
+type AuraSpan = NonNullable<ReplayData["playerAuras"]>[number];
+
+/** Hover-card lines naming every status up at `t`: "Prey", "Lightsteeped ×3  12s". */
+function statusLines(spans: AuraSpan[] | undefined, t: number, data: ReplayData): string[] {
+  return activeStatuses(spans, t, data.durationMs).map(({ s, open }) =>
+    `${data.auraInfo?.[s[3]]?.name ?? `Status ${s[3]}`}${s[4] > 0 ? ` ×${s[4]}` : ""}${open ? "" : `  ${Math.ceil((s[1] - t) / 1000)}s`}`);
+}
+
+/** The statuses up at `t`, mechanic ones first (newest first), at most MAX_STATUS_ICONS. */
+function activeStatuses(spans: AuraSpan[] | undefined, t: number, durationMs: number): { s: AuraSpan; open: boolean }[] {
+  if (!spans) return [];
+  const up = spans.filter((s) => s[0] <= t && t < s[1]);
+  up.sort((p, q) => Number(COMMON_STATUSES.has(p[3])) - Number(COMMON_STATUSES.has(q[3])) || q[0] - p[0]);
+  // A span running to the pull's end has no real end: no timer.
+  return up.slice(0, MAX_STATUS_ICONS).map((s) => ({ s, open: s[1] >= durationMs }));
+}
+
+/**
+ * A player's statuses in a row under their icon, like the game's party
+ * list: the status icon, seconds left under it (to the status's end in the
+ * log, which is its real expiry or removal), stacks in its corner.
+ */
+function StatusRow({ x, y, t, scale, spans, info }: { x: number; y: number; t: number; scale: number; spans: { s: AuraSpan; open: boolean }[]; info: Record<number, { name: string; icon?: string }> }) {
+  if (!spans.length) return null;
+  const w = STATUS_W * Math.max(0.8, scale), h = STATUS_H * Math.max(0.8, scale), gap = 2;
+  const left = x - (spans.length * w + (spans.length - 1) * gap) / 2;
+  return (
+    <g pointerEvents="none">
+      {spans.map(({ s, open }, i) => {
+        const ix = left + i * (w + gap);
+        const url = getFFAbilityIconUrl(info[s[3]]?.icon);
+        const left_s = Math.ceil((s[1] - t) / 1000);
+        return (
+          <g key={`${s[0]}-${s[3]}`}>
+            {url ? <image href={url} x={ix} y={y} width={w} height={h} preserveAspectRatio="xMidYMid meet" />
+              : <rect x={ix} y={y} width={w} height={h} rx={2} fill="#3a3f4a" stroke="#888" />}
+            {s[4] > 0 && <text x={ix + w - 1} y={y + h - 2} textAnchor="end" fill="#fff" fontSize={11 * Math.max(0.8, scale)} fontWeight={800} {...LABEL}>{s[4]}</text>}
+            {!open && left_s <= 99 && (
+              <text x={ix + w / 2} y={y + h + 10 * Math.max(0.8, scale)} textAnchor="middle" fill="#fff" fontSize={10 * Math.max(0.8, scale)} {...LABEL}>{left_s}</text>
+            )}
+          </g>
+        );
+      })}
+    </g>
+  );
+}
+
+/** A head marker's name in a pill above the marked actor; unknown ids show dimmer. */
+function MarkerLabel({ x, y, label, known }: { x: number; y: number; label: string; known: boolean }) {
+  const w = label.length * 8.2 + 14, h = 20;
+  return (
+    <g pointerEvents="none" opacity={known ? 1 : 0.8}>
+      <rect x={x - w / 2} y={y - h} width={w} height={h} rx={10} fill={known ? "rgba(255,214,90,0.92)" : "rgba(40,40,48,0.88)"} stroke={known ? "#7a5200" : "#aaa"} strokeWidth={1.5} />
+      <text x={x} y={y - 5.5} textAnchor="middle" fill={known ? "#2a1a00" : "#eee"} fontSize={13} fontWeight={700}>{label}</text>
     </g>
   );
 }

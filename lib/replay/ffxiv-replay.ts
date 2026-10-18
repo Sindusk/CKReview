@@ -15,8 +15,11 @@
 // `dataType: All, includeResources: true` — the same stream FFLogs' and
 // Tomestone's own replays draw from. A player casting on the boss gives
 // their own position about once per GCD and on every oGCD, so the replay
-// gets its own fetch instead of reusing the pull's streams. Buffs, debuffs
-// and markers carry no resources and are filtered out server-side.
+// gets its own fetch instead of reusing the pull's streams. Buffs carry no
+// resources and are filtered out server-side. Debuffs carry none either but
+// are fetched for the status icons under each player (`playerAuras`): the
+// builder keeps only those an enemy or the environment (sourceID -1: Prey,
+// Fated Burn Mark) put on a player, which is what a mechanic hands out.
 //
 // Units are the log's: centi-yalms, +x east, +y SOUTH (see
 // lib/mechanics/geometry.ts). `facing` is centi-radians; convert with
@@ -37,7 +40,8 @@ import type { WowMapArt } from "@/lib/wow-map-art";
 
 /** Server-side filter for the replay fetch: event types that carry resources. */
 export const REPLAY_EVENT_FILTER =
-  `type in ("cast", "begincast", "damage", "calculateddamage", "heal", "calculatedheal", "death", "tether", "headmarker")`;
+  `type in ("cast", "begincast", "damage", "calculateddamage", "heal", "calculatedheal", "death", "tether", "headmarker", ` +
+  `"applydebuff", "applydebuffstack", "removedebuffstack", "removedebuff")`;
 
 const MAX_INTERP_GAP_MS = 4000;
 
@@ -54,7 +58,8 @@ export type ReplayRawEvent = {
   abilityGameID?:  number;
   tetherID?:       number;   // tether: the tether's kind
   markerID?:       number;   // headmarker: the marker's kind
-  duration?:       number;   // begincast: cast time in ms
+  duration?:       number;   // begincast: cast time in ms; applydebuff: the status's timer
+  stack?:          number;   // applydebuffstack / removedebuffstack: the new count
   unpaired?:       boolean;  // calculateddamage with no landed "damage" event
   packetID?:       number;
   sourceResources?: ReplayRawResources;
@@ -151,6 +156,13 @@ export type ReplayData = {
   // the debuffs lib/replay/wow-shapes.ts draws (WOW_AURA_SHAPES).
   enemyAuras?: [number, number, string, 0 | 1][];
   abilityNames?: Record<number, string>;   // names of the abilities in enemyHits
+  // FFXIV: statuses enemies put on players, one span per stack count:
+  // [start ms, end ms, player key, status id (FFLogs' 1000000 + game id),
+  // stacks (0 = not a stacking status)]. A status still up at the pull's
+  // end runs to durationMs. Absent on tracks saved before 2026-10-17.
+  playerAuras?: [number, number, string, number, number][];
+  // Name and icon file (lib/ability-icons.ts's getFFAbilityIconUrl) per status id.
+  auraInfo?:   Record<number, { name: string; icon?: string }>;
   // Game data looked up after the fetch (lib/replay/action-shapes.ts).
   actionGeometry?: Record<number, ActionGeometry>;
 };
@@ -185,8 +197,20 @@ export function buildReplayData(
   actors:     FFLActor[],
   abilityNames: Map<number, string> = new Map(),
   map:        ReplayMap | null = null,
+  abilityIcons: Map<number, string> = new Map(),
 ): ReplayData {
   const actorById = new Map(actors.map((a) => [a.id, a]));
+  const playerAuras: [number, number, string, number, number][] = [];
+  const auraInfo: Record<number, { name: string; icon?: string }> = {};
+  // Open status spans by "player key|status id".
+  const openAuras = new Map<string, { start: number; stacks: number }>();
+  const closeAura = (k: string, end: number) => {
+    const o = openAuras.get(k);
+    if (!o) return;
+    openAuras.delete(k);
+    const [target, id] = k.split("|");
+    if (end > o.start) playerAuras.push([o.start, end, target, Number(id), o.stacks]);
+  };
   const enemyCasts: ReplayCast[] = [];
   const enemyHits: ReplayHit[] = [];
   const hitNames: Record<number, string> = {};
@@ -256,6 +280,23 @@ export function buildReplayData(
       const m = id !== undefined ? actorById.get(id) : undefined;
       if (m) headMarkers.push([e.timestamp - fightStartMs, keyFor(id!, inst, m.type === "Player"), e.markerID]);
     }
+    if ((e.type === "applydebuff" || e.type === "applydebuffstack" || e.type === "removedebuffstack" || e.type === "removedebuff") &&
+        e.targetID !== undefined && e.abilityGameID !== undefined) {
+      const target = actorById.get(e.targetID);
+      const source = e.sourceID !== undefined && e.sourceID >= 0 ? actorById.get(e.sourceID) : undefined;
+      // Statuses an enemy or the environment put on a player. A raise's
+      // Weakness counts as environment and shows too.
+      if (target?.type === "Player" && !(source && (source.type === "Player" || source.type === "Pet"))) {
+        const t = e.timestamp - fightStartMs;
+        const k = `${e.targetID}|${e.abilityGameID}`;
+        if (e.type === "removedebuff") closeAura(k, t);
+        else if (e.type === "applydebuff") { closeAura(k, t); openAuras.set(k, { start: t, stacks: 0 }); }
+        else { closeAura(k, t); openAuras.set(k, { start: t, stacks: e.stack ?? 0 }); }
+        if (!auraInfo[e.abilityGameID]) {
+          auraInfo[e.abilityGameID] = { name: abilityNames.get(e.abilityGameID) ?? `Status ${e.abilityGameID}`, icon: abilityIcons.get(e.abilityGameID) };
+        }
+      }
+    }
     if (e.type === "calculateddamage" && e.packetID !== undefined && e.sourceResources?.x !== undefined) {
       previewSource.set(e.packetID, e.sourceResources);
     }
@@ -304,7 +345,14 @@ export function buildReplayData(
   }
   out.sort((a, b) => (a.kind === b.kind ? a.actorId - b.actorId : a.kind === "player" ? -1 : 1));
 
-  return { version: 1, reportCode, fightId, durationMs: fightEndMs - fightStartMs, actors: out, map, enemyCasts, enemyHits, abilityNames: hitNames, tethers, headMarkers };
+  for (const k of [...openAuras.keys()]) closeAura(k, fightEndMs - fightStartMs);
+  playerAuras.sort((a, b) => a[0] - b[0]);
+  // The applydebuff of a stacking status carries no count: it is the first
+  // stack (Lightsteeped went apply -> 2 -> 3 in FRU's Light Rampant).
+  const stacking = new Set(playerAuras.filter((a) => a[4] > 0).map((a) => a[3]));
+  for (const a of playerAuras) if (a[4] === 0 && stacking.has(a[3])) a[4] = 1;
+
+  return { version: 1, reportCode, fightId, durationMs: fightEndMs - fightStartMs, actors: out, map, enemyCasts, enemyHits, abilityNames: hitNames, tethers, headMarkers, playerAuras, auraInfo };
 }
 
 export type ReplayPose = {

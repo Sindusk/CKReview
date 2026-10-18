@@ -21,10 +21,20 @@
 // - Donut inner radius (same): the nearest player the donut hit, else a
 //   third of the outer radius.
 //
+// Cone angles in the omen's art name ("gl_fan20_...") are read as given.
+//
 // Placement: a circle sits on its target player when the cast names one,
 // else on the caster. Cones and rectangles start at the caster and point at
 // the targeted player, else along the caster's facing. Circles of 30y or
 // more are raidwides and aren't drawn.
+//
+// OVERRIDES fixes what that gets wrong, per ability: an angle, the style
+// (stack, tower with its soaker count, tank buster, knockback), a line
+// through its caster, a cone pointing behind, an origin taken from another
+// cast's target or from a Spell-in-Waiting's holder (playerAuras). Futures
+// Rewritten's entries (FRU_OVERRIDES) were checked on JZ1KXhDbqkNH3jxR
+// fight 24; each says what it fixed. Head marker names live here too
+// (buildHeadMarkers).
 
 import { facingToCompassBearing } from "@/lib/mechanics/geometry";
 import { poseAt, sampleNear, type ReplayData } from "@/lib/replay/ffxiv-replay";
@@ -113,7 +123,8 @@ export type AoeShape = {
   angle: number;                 // cone full angle, degrees
   inner: number;                 // donut inner radius, centi-yalms
   estimated: boolean;            // angle or inner radius guessed (not drawn differently)
-  style: "aoe" | "tower" | "tankbuster";
+  style: "aoe" | "tower" | "tankbuster" | "stack" | "knockback";
+  soakers?: number;              // towers: players it needs, when the ability says
   name: string;
   start: number; resolve: number; // ms from pull start: telegraph start, resolution
   // WoW: the shape rides on this actor (an aura around a debuffed player)
@@ -125,7 +136,85 @@ export type AoeShape = {
  * Per-ability corrections the game data can't give, each from a log or the
  * user's VOD review. Keyed by ability id.
  */
-const OVERRIDES: Record<number, { angle?: number; style?: AoeShape["style"]; hidden?: boolean }> = {
+type Override = {
+  angle?:   number;
+  style?:   AoeShape["style"];
+  hidden?:  boolean;
+  soakers?: number;          // towers: the number drawn in the middle
+  twoWay?:  boolean;         // a line through its caster, not from it
+  flip?:    boolean;         // a cone pointing behind the caster
+  // The caster is a parked helper with no sample near the cast: use its
+  // last one within HOLD_CASTER_MS.
+  holdCaster?: boolean;
+  aim?:     "hits";          // a cone aimed at the players it hit, not the caster's facing
+  // Starts at the target of the latest cast of this ability within 1.5s
+  // (the caster's own position is stale).
+  originAt?: number;
+  // Centred on the player whose status (FFLogs id) ended at the cast:
+  // a Spell-in-Waiting resolving on its holder. Needs playerAuras.
+  holder?:  number;
+};
+
+// Futures Rewritten (lib/mechanics/ffxiv/fru/*.ts headers; ids and
+// placements checked on JZ1KXhDbqkNH3jxR fight 24, 2026-10-17).
+const FRU_STACKS = [
+  40147, 40167,      // Sinsmoke: Cyclonic Break pairs, Utopian tether stacks
+  40159,             // Sinbound Fire III (Utopian Sky)
+  40209, 40211,      // Sinbound Holy, Hallowed Ray (line stack)
+  40222, 40217,      // Banish III pairs, Powerful Light
+  40287,             // Shell Crusher
+  40250,             // Morn Afah (P4)
+  40311, 40312,      // P5 Akh Morn light / dark
+  40317, 40318,      // Cruel Path of Light / Darkness (line stacks)
+];
+const FRU_OVERRIDES: Record<number, Override> = {
+  ...Object.fromEntries(FRU_STACKS.map((id) => [id, { style: "stack" as const }])),
+  // Cyclonic Break: eight narrow baited cones and their repeats. The data
+  // has no angle; in fight 24 the third repeat's nearest players stood
+  // 15-29° off its lanes, so under 30°. Half the 45° lane spacing is used.
+  40145: { angle: 22.5 }, 40146: { angle: 22.5 },
+  // Fall of Faith fire: Sinblaze, a 90° cone from the carrier toward the
+  // nearest helper, shared by four. The helper casting it sits elsewhere;
+  // its hit carries the carrier's spot, and it's aimed at the others hit.
+  40156: { angle: 90, style: "stack", aim: "hits" },
+  // Fall of Faith lightning: three 120° Bow Shock cones from the carrier
+  // (the Sinsmite 40142 target) through each helper. The helpers' own
+  // samples lag a tether behind (1:52.6 put one at the previous carrier).
+  40143: { angle: 120, originAt: 40142 },
+  // Towers: Burnt Strike towers' Explosion id is the soaker count
+  // (lightning 40131/40122/40123/40124, fire 40135/40125/40126/40127).
+  40131: { style: "tower", soakers: 1 }, 40122: { style: "tower", soakers: 2 }, 40123: { style: "tower", soakers: 3 }, 40124: { style: "tower", soakers: 4 },
+  40135: { style: "tower", soakers: 1 }, 40125: { style: "tower", soakers: 2 }, 40126: { style: "tower", soakers: 3 }, 40127: { style: "tower", soakers: 4 },
+  40213: { style: "tower" },              // Bright Hunger: Light Rampant (one each), Darklit (two each)
+  40320: { style: "tower", soakers: 2 },  // P5 Paradise Regained Explosion
+  // The towers' Burnt Strike and its Blastburn: Fatebreaker stands in the
+  // middle and the line runs through her (she faced N at 2:22.5; drawn
+  // from her it covered only the north half).
+  40129: { twoWay: true }, 40133: { twoWay: true }, 40130: { twoWay: true, style: "knockback" },
+  40162: { style: "knockback" },          // Utopian Sky Blastburn (no damage, a knockback)
+  // Twin Stillness (270° front, then 90° back) and Twin Silence (90° back,
+  // then 270° front), per usurper-of-frost.ts's model; first/second as cast
+  // in fight 24 (40194 at 3:50.1, 40195 at 3:52.2). The reflection casting
+  // them has one sample 12s earlier and stands still.
+  40193: { angle: 270, holdCaster: true }, 40196: { angle: 90, flip: true, holdCaster: true },
+  40194: { angle: 90, flip: true, holdCaster: true }, 40195: { angle: 270, holdCaster: true },
+  // Spell-in-Waiting resolutions on their holders (P3 Relativity and
+  // Refrain, P4 Crystallize Time). Dark Blizzard III's donut hit nobody and
+  // its caster has no position, so it wasn't drawn at all.
+  40276: { holder: 1002455 },                       // Dark Fire III
+  40277: { holder: 1002454, style: "stack" },       // Unholy Darkness
+  40279: { holder: 1002462 },                       // Dark Blizzard III
+  40271: { holder: 1002461, style: "stack" },       // Dark Water III
+  40274: { holder: 1002460 },                       // Dark Eruption
+  40280: { holder: 1002463, style: "knockback" },   // Dark Aero III (P4)
+  // Tank busters.
+  40290: { style: "tankbuster" },                   // Black Halo
+  40182: { style: "tankbuster" },                   // Darkest Dance jump
+  40284: { style: "tankbuster" }, 40285: { style: "tankbuster" },  // Somber Dance
+};
+
+const OVERRIDES: Record<number, Override> = {
+  ...FRU_OVERRIDES,
   // Dancing Mad Revolting Ruin III, both hits: a 90° tankbuster cone (user,
   // VOD review 2026-10-17). The game data has the cone but not its angle.
   50179: { angle: 90, style: "tankbuster" },
@@ -145,6 +234,15 @@ const RAIDWIDE_RANGE = 30;
 const FLASH_BEFORE_MS = 300;     // an AoE fades in this long before its cast lands
 const HIT_WINDOW_MS = 1500;      // a cast's hits land within this of it
 const STANDARD_ANGLES = [30, 45, 60, 90, 120, 150, 180, 270];
+const HOLD_CASTER_MS = 20000;
+const HOLDER_WINDOW_MS = 1200;   // a Spell-in-Waiting ends within this of its cast
+
+/** A cone omen's angle from its art name ("gl_fan20_1bwf_v" = 20°), else undefined. */
+function omenAngle(omen: string): number | undefined {
+  const m = omen.match(/fan(\d{2,3})/i);
+  const a = m ? Number(m[1]) : NaN;
+  return a > 0 && a <= 360 ? a : undefined;
+}
 
 const bearingTo = (ax: number, ay: number, bx: number, by: number) =>
   ((Math.atan2(bx - ax, -(by - ay)) * 180) / Math.PI + 360) % 360;
@@ -156,6 +254,8 @@ export function buildAoeShapes(data: ReplayData): AoeShape[] {
   const casts = data.enemyCasts ?? [];
   const hits = data.enemyHits ?? [];
   const actorByKey = new Map(data.actors.map((a) => [a.key, a]));
+  const auras = data.playerAuras ?? [];
+  const usedHolder = new Set<(typeof auras)[number]>();
   const out: AoeShape[] = [];
 
   for (let i = 0; i < casts.length; i++) {
@@ -174,9 +274,26 @@ export function buildAoeShapes(data: ReplayData): AoeShape[] {
 
     const caster = actorByKey.get(key);
     let casterPose: { x: number; y: number; facing: number } | undefined = caster && sampleNear(caster, t, 1500);
+    if (!casterPose && over.holdCaster && caster) casterPose = sampleNear(caster, t, HOLD_CASTER_MS);
     if (!casterPose && own[0]?.[4] != null) casterPose = { x: own[0][4]!, y: own[0][5]!, facing: 0 };
+    if (over.originAt !== undefined) {
+      for (let j = i; j >= 0 && t - casts[j][0] <= 1500; j--) {
+        const c = casts[j];
+        const who = c[4] === over.originAt && c[3] === 0 && c[5] ? actorByKey.get(c[5]) : undefined;
+        const p = who && poseAt(who, t);
+        if (p) { casterPose = { x: p.x, y: p.y, facing: casterPose?.facing ?? 0 }; break; }
+      }
+    }
     const target = targetKey ? actorByKey.get(targetKey) : undefined;
-    const targetPose = target && target.kind === "player" ? poseAt(target, t) : undefined;
+    let targetPose = target && target.kind === "player" ? poseAt(target, t) : undefined;
+    // A Spell-in-Waiting lands on the player whose status just ended.
+    if (over.holder !== undefined && !targetPose) {
+      const ended = auras.filter((a) => a[3] === over.holder && Math.abs(a[1] - t) <= HOLDER_WINDOW_MS && !usedHolder.has(a));
+      const pick = ended.find((a) => own.some((h) => h[3] === a[2])) ?? ended[0];
+      const holder = pick && actorByKey.get(pick[2]);
+      const p = holder && poseAt(holder, t);
+      if (p) { usedHolder.add(pick); targetPose = p; casterPose = { x: p.x, y: p.y, facing: 0 }; }
+    }
     if (!casterPose && !(isCircle && targetPose)) continue;
 
     // AoEs flash on the cast that lands them, not across the castbar: a
@@ -192,7 +309,7 @@ export function buildAoeShapes(data: ReplayData): AoeShape[] {
       }
     }
 
-    const base = { name, start, resolve: t, width: g.width * 100, range: g.range * 100, angle: 0, inner: 0, estimated: false, style };
+    const base = { name, start, resolve: t, width: g.width * 100, range: g.range * 100, angle: 0, inner: 0, estimated: false, style, soakers: over.soakers };
     if (isCircle) {
       let o: { x: number; y: number } = targetPose ?? casterPose!;
       // A stack or knockback cast by a helper parked elsewhere (Flagrant
@@ -209,16 +326,22 @@ export function buildAoeShapes(data: ReplayData): AoeShape[] {
       continue;
     }
     const cp = casterPose!;
-    const bearing = targetPose ? bearingTo(cp.x, cp.y, targetPose.x, targetPose.y)
+    // Aimed at the players hit: their centre, leaving out anyone standing
+    // on the origin (Sinblaze's carrier).
+    const aimed = over.aim === "hits" ? own.filter((h) => Math.hypot(h[6]! - cp.x, h[7]! - cp.y) > 100) : [];
+    let bearing = targetPose && over.holder === undefined ? bearingTo(cp.x, cp.y, targetPose.x, targetPose.y)
+      : aimed.length ? bearingTo(cp.x, cp.y, aimed.reduce((s, h) => s + h[6]!, 0) / aimed.length, aimed.reduce((s, h) => s + h[7]!, 0) / aimed.length)
       : own.length && !caster?.samples.length ? bearingTo(cp.x, cp.y, own[0][6]!, own[0][7]!)
       : facingToCompassBearing(cp.facing);
+    if (over.flip) bearing = (bearing + 180) % 360;
     if (g.castType === 3 || g.castType === 13) {
-      // Angle: the override, else the narrowest standard one holding every
-      // player it hit, else 90°.
+      // Angle: the override, else the omen art's, else the narrowest
+      // standard one holding every player it hit, else 90°.
       let widest = 0;
       for (const h of own) widest = Math.max(widest, angDiff(bearingTo(cp.x, cp.y, h[6]!, h[7]!), bearing) * 2);
-      const angle = over.angle ?? (own.length ? STANDARD_ANGLES.find((a) => a >= widest - 3) ?? 360 : 90);
-      out.push({ ...base, kind: "cone", x: cp.x, y: cp.y, bearing, angle, estimated: over.angle === undefined });
+      const known = over.angle ?? omenAngle(g.omen);
+      const angle = known ?? (own.length ? STANDARD_ANGLES.find((a) => a >= widest - 3) ?? 360 : 90);
+      out.push({ ...base, kind: "cone", x: cp.x, y: cp.y, bearing, angle, estimated: known === undefined });
     } else if (g.castType === 10) {
       let nearest = Infinity;
       for (const h of own) nearest = Math.min(nearest, Math.hypot(h[6]! - cp.x, h[7]! - cp.y));
@@ -226,6 +349,10 @@ export function buildAoeShapes(data: ReplayData): AoeShape[] {
       out.push({ ...base, kind: "donut", x: cp.x, y: cp.y, bearing: 0, inner, estimated: true });
     } else if (g.castType === 11) {
       out.push({ ...base, kind: "cross", x: cp.x, y: cp.y, bearing });
+    } else if (over.twoWay) {
+      // Start a range behind the caster and run twice its length.
+      const b = (bearing * Math.PI) / 180;
+      out.push({ ...base, kind: "rect", x: cp.x - Math.sin(b) * base.range, y: cp.y + Math.cos(b) * base.range, bearing, range: base.range * 2 });
     } else {
       out.push({ ...base, kind: "rect", x: cp.x, y: cp.y, bearing });
     }
@@ -255,6 +382,53 @@ export function buildTethers(data: ReplayData): TetherSpan[] {
     if (payoff) end = Math.min(end, payoff[0] + TETHER_GRACE_MS);
     return { source, target, id, start: t, end };
   });
+}
+
+export type HeadMarkerSpan = { target: string; id: number; start: number; end: number; label: string };
+
+/**
+ * Head marker ids and the abilities they announce. Marker ids are the
+ * game's icons and may mean something else in another fight, so a label
+ * applies only when one of its abilities then hits the marked player.
+ * FRU, from the module headers and JZ1KXhDbqkNH3jxR fight 24 (marker ->
+ * hit): 218 0:20 -> Powder Mark Trail 0:24, 2:49 -> Quadruple Slap 2:54;
+ * 345 -> Frigid Stone 8s later; 259 8:39 -> Black Halo 8:44; 184 ~5s
+ * before each Refrain Water; 139 on all eight 5s before Apocalypse's
+ * Eruptions; 525 on Shiva herself, 6s before her Hallowed Ray. 62 (six
+ * players at 8:56) is unplaced.
+ */
+const HEAD_MARKERS: Record<number, { label: string; abilities: number[] }> = {
+  218: { label: "Tank buster", abilities: [40168, 40191] },
+  345: { label: "Frigid Stone", abilities: [40199] },
+  525: { label: "Hallowed Ray", abilities: [40211] },
+  375: { label: "Luminous Hammer", abilities: [40218] },
+  259: { label: "Black Halo", abilities: [40290] },
+  184: { label: "Dark Water III", abilities: [40271] },
+  139: { label: "Dark Eruption", abilities: [40274] },
+};
+const HEAD_MARKER_LOOKAHEAD_MS = 12000;
+
+/**
+ * When each head marker shows and what it reads: a known marker until the
+ * hit it announced, else "Marker <id>" for `plainMs`. Once one of a
+ * marker's hits is seen in the pull, its other instances keep the label
+ * even when theirs is missing (an invulnerable tank's Quadruple Slap, a
+ * dodged Hallowed Ray target, a dead player).
+ */
+export function buildHeadMarkers(data: ReplayData, plainMs: number): HeadMarkerSpan[] {
+  const hits = data.enemyHits ?? [];
+  const casts = data.enemyCasts ?? [];
+  const soon = (at: number, t: number) => at > t && at - t <= HEAD_MARKER_LOOKAHEAD_MS;
+  const spans = (data.headMarkers ?? []).map(([t, target, id]) => {
+    const known = HEAD_MARKERS[id];
+    // The marked player takes the hit, or (Hallowed Ray's 525 sits on
+    // Shiva herself) the marked enemy casts it.
+    const at = known && (hits.find((h) => h[3] === target && soon(h[0], t) && known.abilities.includes(h[1]))?.[0]
+      ?? casts.find((c) => c[1] === target && c[3] === 0 && soon(c[0], t) && known.abilities.includes(c[4] ?? 0))?.[0]);
+    return { target, id, start: t, end: at ?? t + plainMs, matched: at !== undefined };
+  });
+  const confirmed = new Set(spans.filter((s) => s.matched).map((s) => s.id));
+  return spans.map(({ target, id, start, end }) => ({ target, id, start, end, label: confirmed.has(id) ? HEAD_MARKERS[id].label : `Marker ${id}` }));
 }
 
 const AFTER_MS = 800;             // and fades out over this after it

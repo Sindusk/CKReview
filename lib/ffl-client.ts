@@ -973,7 +973,7 @@ const REPLAY_EVENTS_QUERY = `
       report(code: $code) {
         masterData(translate: true) @include(if: $withActors) {
           actors { id name type subType petOwner gameID icon }
-          abilities { gameID name }
+          abilities { gameID name icon }
         }
         events(
           fightIDs: $fightIDs, startTime: $startTime, endTime: $endTime,
@@ -986,7 +986,7 @@ const REPLAY_EVENTS_QUERY = `
 
 type ReplayEventsQueryResult = {
   reportData: { report: {
-    masterData?: { actors: FFLActor[]; abilities: { gameID: number; name: string }[] };
+    masterData?: { actors: FFLActor[]; abilities: { gameID: number; name: string; icon?: string }[] };
     events: { data: ReplayRawEvent[]; nextPageTimestamp: number | null };
   } };
 };
@@ -1021,6 +1021,7 @@ export async function fetchFFReplayData(
 
   let actors: FFLActor[] = [];
   let abilityNames = new Map<number, string>();
+  let abilityIcons = new Map<number, string>();
   const events: ReplayRawEvent[] = [];
   let cursor = fight.startTime;
   for (let page = 0; page < MAX_PAGES_PER_FIGHT; page++) {
@@ -1032,6 +1033,7 @@ export async function fetchFFReplayData(
     if (report.masterData) {
       actors = report.masterData.actors;
       abilityNames = new Map(report.masterData.abilities.map((a) => [a.gameID, a.name]));
+      abilityIcons = new Map(report.masterData.abilities.filter((a) => a.icon).map((a) => [a.gameID, a.icon!]));
     }
     events.push(...report.events.data);
     const next = report.events.nextPageTimestamp;
@@ -1039,7 +1041,7 @@ export async function fetchFFReplayData(
     cursor = next;
     onProgress?.((next - fight.startTime) / Math.max(1, fight.endTime - fight.startTime));
   }
-  return buildReplayData(reportCode, fightId, fight.startTime, fight.endTime, events, actors, abilityNames, map);
+  return buildReplayData(reportCode, fightId, fight.startTime, fight.endTime, events, actors, abilityNames, map, abilityIcons);
 }
 
 // ─── Query: Interrupts table ─────────────────────────────────────────────────
