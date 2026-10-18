@@ -292,3 +292,47 @@ VOD checks, Pull 2 (Kag91qVZ2YJ7MQAb fight 22):
    each and where the Lingering Frost appears.
 3. Pull 2, 0:27-0:36 and 0:49-0:58: Water Jet from Nymrissa through the
    tank. Check the jet's direction and that the tank is pushed along it.
+
+## Sszorak
+
+Pull: Sszorak kill, Pull 1 (nHavrDhPVtBYkMXA fight 43, 4:55).
+
+Drawn:
+- **Serpent's Fury**: an orange 8y stack circle on the mark until the
+  charge.
+- **Mutilate**: an orange soak cone from Sszorak toward the tank for the 3s
+  cast, 70° and 25y: every soaker hit in the kill (96) stood within 36° of
+  the boss-to-tank line, 5-25y out.
+- **Ravage**: a tankbuster ring on its tank for the 3s cast.
+- **Raging Crosswinds**: a 6y blast circle on each of the 8 holders for
+  8s, white for one pair of directions (1297096 / 1297111) and teal for the
+  other (1285425 / 1285453), so partners can be read off.
+- **Venomous Surge** (green ring) and **Virulence** (yellow-green ring) on
+  their carriers.
+- **Viscous Cysts**: a green sac where each Surge ended, until a pop is
+  matched to it (the live cyst with a player nearest it at the pop).
+- **Tempest**: a swirl where a tornado struck a player.
+- **Caustic Residue**: a pool where Caustic Claws landed, until the last
+  player stepped in it.
+
+Not drawn: tornadoes between hits, the Maelstrom's gale order (no
+events), which way each Crosswinds aura throws its holder: the holders'
+movement after the blast doesn't settle it, since partners collide
+midair.
+
+Open questions:
+- Which Crosswinds aura points which way? If the arrows are fixed per id,
+  the replay could draw them.
+- Mutilate's real cone angle.
+
+VOD checks, Pull 1 (nHavrDhPVtBYkMXA fight 43):
+1. Pull 1, 0:05-0:08: Mutilate's soak cone toward the tank. Check its
+   width against where the soak group stood.
+2. Pull 1, 0:00-0:26: Serpent's Fury's circle on the mark; the charge at
+   0:26. Check the stack formed on that player.
+3. Pull 1, 0:40-0:48: Crosswinds circles on eight players in two colours.
+   Check that same-colour players were the ones meant to meet midair.
+4. Pull 1, 0:29-0:42: Venomous Surge rings, then cysts where they ended.
+   Check the cyst spots against the in-game drops.
+5. Pull 1, 1:40-2:08: the Maelstrom; cysts vanish one by one as they pop.
+   Check each pop's cyst and order.

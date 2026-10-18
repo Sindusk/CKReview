@@ -228,6 +228,41 @@ function FrostOrb({ e, x, y, t, scale }: EffectArtProps) {
 
 const NYM_CHILL = ring({ color: "#cfefff", glow: "#4aa8e0", motes: 3, spinMs: 2400 });
 
+// ── Sszorak ──
+
+/** A Viscous Cyst: a lumpy green sac on the floor, the Maelstrom's bumper. */
+function Cyst({ e, x, y, t, scale }: EffectArtProps) {
+  const opacity = Math.max(0, Math.min(1, (t - e.start) / FADE_MS, (e.end - t) / 150));
+  if (opacity <= 0) return null;
+  const r = Math.max(8, 150 * scale);
+  const w = 1 + 0.05 * Math.sin(t / 300 + x);
+  return (
+    <g opacity={opacity} pointerEvents="none">
+      <circle cx={x} cy={y} r={r * 1.6} fill="#9cff5a" fillOpacity={0.18} filter="url(#replay-glow)" />
+      <ellipse cx={x} cy={y} rx={r * w} ry={r * 0.85 / w} fill="#5f9e2a" stroke="#d4ff9a" strokeWidth={1.5} />
+      <circle cx={x - r * 0.35} cy={y - r * 0.2} r={r * 0.25} fill="#b8ff7a" fillOpacity={0.8} />
+      <circle cx={x + r * 0.3} cy={y + r * 0.25} r={r * 0.18} fill="#b8ff7a" fillOpacity={0.6} />
+    </g>
+  );
+}
+
+/** Where a Tempest tornado struck a player: a green-grey swirl. */
+function Tornado({ e, x, y, t }: EffectArtProps) {
+  const opacity = Math.max(0, Math.min(1, (t - e.start) / 250, (e.end - t) / 400));
+  if (opacity <= 0) return null;
+  const a = (t / 3) % 360;
+  return (
+    <g opacity={opacity} pointerEvents="none" transform={`rotate(${a} ${x} ${y})`}>
+      {[14, 10, 6].map((r, i) => (
+        <path key={i} d={`M${x - r} ${y} A${r} ${r} 0 1 1 ${x} ${y + r}`} fill="none" stroke={i === 1 ? "#9fd88a" : "#cfe8c8"} strokeWidth={2.5 - i * 0.5} />
+      ))}
+    </g>
+  );
+}
+
+const SSZ_SURGE = ring({ color: "#9cff5a", glow: "#3f9e1a", motes: 4, spinMs: 2000 });
+const SSZ_VIRULENCE = ring({ color: "#d6ff3a", glow: "#7a9e00", motes: 6, spinMs: 900 });
+
 // Shell Spin: Nama's target (sea green, three shells circling) and a stun (grey).
 const LE_SHELL = ring({ color: "#3fd6b0", glow: "#1a8f74", motes: 3, spinMs: 900 });
 const LE_STUN = ring({ color: "#d8d8d8", glow: "#7a7a7a", motes: 4, spinMs: 700 });
@@ -257,6 +292,10 @@ export const VA_ART: FightArt = {
     "va-nekzali-barrage": NEK_BARRAGE,
     "va-nymrissa-orb": FrostOrb,
     "va-nymrissa-chill": NYM_CHILL,
+    "va-sszorak-cyst": Cyst,
+    "va-sszorak-tornado": Tornado,
+    "va-sszorak-surge": SSZ_SURGE,
+    "va-sszorak-virulence": SSZ_VIRULENCE,
   },
   shapes: {
     "va-entombed-sentinels-pool": BloodPool,
@@ -265,6 +304,7 @@ export const VA_ART: FightArt = {
     "va-lost-explorers-aftershock": pool("#6b4a2a", "#c99a5e"),
     "va-nekzali-cultist": pool("#3a1f5e", "#9b6bff"),
     "va-nymrissa-frost": pool("#7fc8f0", "#e8f8ff"),
+    "va-sszorak-residue": pool("#4a6b12", "#a8d43a"),
   },
   colors: {
     "va-vashnik-bile": VASHNIK_BILE,
@@ -281,5 +321,8 @@ export const VA_ART: FightArt = {
     "va-nekzali-beam": { fill: "#59e0d0", flash: "#c8fff6", rim: "#e0fffa", glow: "#1fa597" },
     // Water Jet: sea blue.
     "va-nymrissa-jet": { fill: "#1f8fe0", flash: "#9fd8ff", rim: "#d8f0ff", glow: "#0a5fa8" },
+    // Raging Crosswinds holders, by the pair whose Gusts clear each other.
+    "va-sszorak-wind-a": { fill: "#e0e8f0", flash: "#ffffff", rim: "#ffffff", glow: "#9fb4c8" },
+    "va-sszorak-wind-b": { fill: "#7fe0d0", flash: "#d0fff8", rim: "#e8fffb", glow: "#2fa597" },
   },
 };
