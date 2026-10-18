@@ -12,7 +12,7 @@
 // that grows on a clock, Vashnik's Exploding Infection).
 
 import { rand } from "@/components/ReplayEffects";
-import type { AoeColors, EffectArtProps, FightArt } from "./types";
+import type { AoeColors, EffectArtProps, FightArt, ShapeArtProps } from "./types";
 
 const FADE_MS = 300;
 const RING = 24;   // SVG units around a 1000-unit arena: just outside a player icon
@@ -88,6 +88,34 @@ function Axe({ e, x, y, t }: EffectArtProps) {
 
 const CA_FIXATE = ring({ color: "#c7b6ff", glow: "#5b3fbf", motes: 2, spinMs: 1600 });
 
+// ── Entombed Sentinels ──
+
+/** A Toxic Droplet: a small green bead, until a player collects it. */
+function Droplet({ e, x, y, t, scale }: EffectArtProps) {
+  const opacity = Math.max(0, Math.min(1, (t - e.start) / FADE_MS, (e.end - t) / 150));
+  if (opacity <= 0) return null;
+  const r = Math.max(5, 70 * scale);
+  return (
+    <g opacity={opacity} pointerEvents="none">
+      <circle cx={x} cy={y} r={r * 1.8} fill="#7dff5a" fillOpacity={0.25} filter="url(#replay-glow)" />
+      <path d={`M${x} ${y - r * 1.4} Q${x + r} ${y} ${x} ${y + r} Q${x - r} ${y} ${x} ${y - r * 1.4} Z`} fill="#4fd14a" stroke="#d6ffc4" strokeWidth={1} />
+    </g>
+  );
+}
+
+/** A Blood Venom pool: a dark red puddle that stays put. */
+function BloodPool({ s, x, y, r, t }: ShapeArtProps) {
+  const fade = Math.max(0, Math.min(1, (t - s.start) / 400, (s.resolve - t) / 800));
+  const shimmer = 0.5 + 0.5 * Math.sin(t / 300 + x);
+  return (
+    <g opacity={fade} pointerEvents="none">
+      <circle cx={x} cy={y} r={r} fill="#8a0f1c" fillOpacity={0.35 + 0.08 * shimmer} stroke="#d4283a" strokeWidth={1.5} strokeOpacity={0.8} />
+    </g>
+  );
+}
+
+const ES_PROTOVENOM = ring({ color: "#e05cff", glow: "#8a1fb0", motes: 3, spinMs: 2000 });
+
 export const VA_ART: FightArt = {
   effects: {
     "va-vashnik-exploding": VASHNIK_EXPLODING,
@@ -96,6 +124,11 @@ export const VA_ART: FightArt = {
     "va-coiled-altar-mutation": VenomOrb,
     "va-coiled-altar-axe": Axe,
     "va-coiled-altar-fixate": CA_FIXATE,
+    "va-entombed-sentinels-droplet": Droplet,
+    "va-entombed-sentinels-protovenom": ES_PROTOVENOM,
+  },
+  shapes: {
+    "va-entombed-sentinels-pool": BloodPool,
   },
   colors: {
     "va-vashnik-bile": VASHNIK_BILE,
@@ -104,5 +137,7 @@ export const VA_ART: FightArt = {
     "va-coiled-altar-mutagenic": { fill: "#8a3dff", flash: "#c99bff", rim: "#e2ccff", glow: "#6a2bd9" },
     // Gloombomb: Malacrass's shadow bomb.
     "va-coiled-altar-gloombomb": { fill: "#3b2a6b", flash: "#8f6bff", rim: "#b9a6ff", glow: "#2a1a5e" },
+    // Living Venom: the acid line back to Breath.
+    "va-entombed-sentinels-venom": { fill: "#6fe03a", flash: "#c8ff8a", rim: "#e4ffc8", glow: "#3a9e1a" },
   },
 };
