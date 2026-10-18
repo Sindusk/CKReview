@@ -123,7 +123,7 @@ export type AoeShape = {
   angle: number;                 // cone full angle, degrees
   inner: number;                 // donut inner radius, centi-yalms
   estimated: boolean;            // angle or inner radius guessed (not drawn differently)
-  style: "aoe" | "tower" | "tankbuster" | "stack" | "knockback" | "lightning";
+  style: "aoe" | "tower" | "tankbuster" | "stack" | "knockback" | "lightning" | "drop";
   soakers?: number;              // towers: players it needs, when the ability says
   name: string;
   start: number; resolve: number; // ms from pull start: telegraph start, resolution
@@ -437,7 +437,8 @@ export function buildAoeShapes(data: ReplayData): AoeShape[] {
     if (!drop || !actorByKey.get(target)) continue;
     out.push({
       kind: "circle", x: 0, y: 0, bearing: 0, range: g.range * 100, width: 0, angle: 0, inner: 0, estimated: false,
-      style: "aoe", name: m.name, start: mt, resolve: drop[0], follow: target, noFlash: true,
+      // A drop to place, not a hit being taken (user, 2026-10-17).
+      style: "drop", name: m.name, start: mt, resolve: drop[0], follow: target, noFlash: true,
     });
   }
   return out.sort((a, b) => a.start - b.start);

@@ -97,6 +97,7 @@ const AOE_COLORS: Record<AoeShape["style"], { fill: string; flash: string; rim: 
   stack:      { fill: "#f08a24", flash: "#ffc070", rim: "#fff0d8", glow: "#ffa040" },
   knockback:  { fill: "#5fb4e8", flash: "#a8dcff", rim: "#e6f6ff", glow: "#7cc8ff" },
   lightning:  { fill: "#2f7dff", flash: "#9fd0ff", rim: "#eaf6ff", glow: "#4aa8ff" },   // FRU Bow Shock
+  drop:       { fill: "#ffd84a", flash: "#fff2a8", rim: "#ffe680", glow: "#ffcc33" },   // DropRing only
 };
 // Status icons under each player: at most this many, mechanic statuses
 // before the common ones (vulnerabilities, Weakness) that a raid carries
@@ -314,7 +315,7 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
               const rider = s.follow ? actorByKey.get(s.follow) : undefined;
               const at = rider && poseAt(rider, t);
               if (s.follow && !at) return null;
-              return <Aoe key={i} uid={`${i}-${s.resolve}`} s={at ? { ...s, x: at.x, y: at.y } : s} opacity={opacity} resolving={resolving} toX={toX} toY={toY} scale={scale} />;
+              return <Aoe key={i} uid={`${i}-${s.resolve}`} s={at ? { ...s, x: at.x, y: at.y } : s} opacity={opacity} resolving={resolving} toX={toX} toY={toY} scale={scale} t={t} />;
             })}
             {tethers.filter((tt) => t >= tt.start && t <= tt.end).map((tt, i) => {
               const src = actorByKey.get(tt.source), dst = actorByKey.get(tt.target);
@@ -677,13 +678,31 @@ function StarPoints({ s, x, y, r, scale, opacity }: { s: AoeShape; x: number; y:
   );
 }
 
-function Aoe({ s, opacity, resolving, toX, toY, scale, uid }: { s: AoeShape; opacity: number; resolving: boolean; toX: (x: number) => number; toY: (y: number) => number; scale: number; uid: string }) {
+/**
+ * A drop someone is carrying (FRU Frigid Stone): a yellow outline around
+ * the player that pulses gently, so it doesn't read as damage being taken
+ * (user, 2026-10-17). Full strength from the start, unlike a telegraph.
+ */
+function DropRing({ x, y, r, t }: { x: number; y: number; r: number; t: number }) {
+  const c = AOE_COLORS.drop;
+  const pulse = 0.5 + 0.5 * Math.sin(t / 160);   // ~1 beat a second
+  return (
+    <g pointerEvents="none">
+      <circle cx={x} cy={y} r={r * (1 + 0.04 * pulse)} fill={c.fill} fillOpacity={0.06 + 0.06 * pulse}
+        stroke={c.glow} strokeWidth={8} strokeOpacity={0.25 + 0.25 * pulse} filter="url(#replay-glow)" />
+      <circle cx={x} cy={y} r={r * (1 + 0.04 * pulse)} fill="none" stroke={c.rim} strokeWidth={2.5} strokeOpacity={0.75 + 0.25 * pulse} />
+    </g>
+  );
+}
+
+function Aoe({ s, opacity, resolving, toX, toY, scale, uid, t }: { s: AoeShape; opacity: number; resolving: boolean; toX: (x: number) => number; toY: (y: number) => number; scale: number; uid: string; t: number }) {
   const x = toX(s.x), y = toY(s.y);
   const r = s.range * scale;
   const b = (s.bearing * Math.PI) / 180;
   if (s.style === "tower" && s.kind === "circle") return <Tower x={x} y={y} r={r} opacity={opacity} resolving={resolving} uid={uid} soakers={s.soakers} />;
   if (s.style === "knockback") return <Knockback s={s} x={x} y={y} r={r} scale={scale} opacity={opacity} />;
   if (s.kind === "cross" && s.star && !resolving) return <StarPoints s={s} x={x} y={y} r={r} scale={scale} opacity={opacity} />;
+  if (s.style === "drop") return <DropRing x={x} y={y} r={r} t={t} />;
   const c = AOE_COLORS[s.style];
   const base = resolving ? c.flash : c.fill;
   const grad = `aoe-${uid}`;
