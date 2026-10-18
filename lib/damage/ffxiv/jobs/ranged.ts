@@ -164,6 +164,7 @@ import { aoeComboOnOneTarget, baseValue, burstWindowFindings, clock, critMultOf,
 import { comboLanded } from "./gnb";
 import { deadWindows, forcedPart, inWindows, mergeWindows, type Window } from "../../timeline";
 import { espritGauge, featherGauge } from "./gauges";
+import { partnerModel, type PartnerModel } from "./dnc-partner";
 import { estimateHitRates } from "../../crit-rates";
 
 const ids = (...keys: string[]) => keys.filter((key) => A[key]).map((key) => A[key].id);
@@ -884,6 +885,9 @@ const dancePartnerLost: JobCheck = (ctx): DamageFinding[] => {
     ...b, ownWins: statusWindows(ctx, b.own.id), covered: mergeWindows(others.flatMap((p) => sourceWindows(p, b.copy.id))),
   }));
   const stdCopies = buffs.find((b) => b.name === "Standard Finish")?.covered ?? [];
+  const ownStd = buffs.find((b) => b.name === "Standard Finish")?.ownWins ?? [];
+  const ownDevil = buffs.find((b) => b.name === "Devilment")?.ownWins ?? [];
+  const model = partnerModel(ctx);
   for (const st of alone) {
     // What started it: a partner's death, the Dancer's own (back from a
     // raise with no partner), or a choice (Ending, or never partnering).
@@ -904,7 +908,7 @@ const dancePartnerLost: JobCheck = (ctx): DamageFinding[] => {
     // Standard Finish's length.
     const nextCopy = stdCopies.find((c) => c.startMs >= st.endMs)?.startMs;
     const until = st.endMs >= ctx.endMs ? ctx.endMs : Math.min(nextCopy ?? Infinity, st.endMs + 60_000, ctx.endMs);
-    let lost = 0;
+    let lost = 0, espritLost = 0;
     const secsBy = new Map<string, number>();
     const partners = new Set<string>();
     for (const b of buffs) {
@@ -924,9 +928,16 @@ const dancePartnerLost: JobCheck = (ctx): DamageFinding[] => {
           if (g.endMs - g.startMs < PARTNER_GAP_MIN_MS) continue;
           const partner = wouldBe(g.startMs, g.endMs);
           if (!partner) continue;
-          const sh = ctx.ledger?.share(b.copy.id, partner) ?? 0;
-          if (sh <= 0 || sh >= 1) continue;
-          lost += dmgIn(partner, g.startMs, g.endMs) * (sh / (1 - sh));
+          // partnercalc's value (dnc-partner.ts): Standard Finish with its
+          // Esprit, at Devilment's rates where the Dancer's was up; or
+          // Devilment, with Standard Finish where the Dancer's was up.
+          const v = b.name === "Standard Finish"
+            ? model.value(partner, g.startMs, g.endMs, [g], ownDevil)
+            : model.value(partner, g.startMs, g.endMs, ownStd, [g]);
+          const add = b.name === "Standard Finish" ? v.standard + v.esprit : v.devilment;
+          if (add <= 0) continue;
+          lost += add;
+          if (b.name === "Standard Finish") espritLost += v.esprit;
           secsBy.set(b.name, (secsBy.get(b.name) ?? 0) + g.endMs - g.startMs);
           partners.add(partner.name);
         }
@@ -945,39 +956,34 @@ const dancePartnerLost: JobCheck = (ctx): DamageFinding[] => {
       kind: "buff-coverage", startMs: from, endMs: to, inference: true, forced: false,
       label: diedPartner || raised ? "Partner swap late" : "No dance partner",
       lostDamage: lost,
-      basis: `the partner's Standard Finish and Devilment at their measured share on what ${names} dealt while the Dancer's own were up ` +
-        `and no one had the partner copy` + (diedPartner || raised ? `, from ${s(PARTNER_SWAP_GRACE_MS)} after Closed Position was ready` : "") +
-        `; the Esprit a partner gives isn't counted`,
+      basis: `what ${names} would have added as partner while the Dancer's Standard Finish and Devilment were up and no one had the ` +
+        `partner copy (partnercalc's model: Standard Finish and Devilment on their expected hits, ${k(espritLost)} of it Esprit)` +
+        (diedPartner || raised ? `, from ${s(PARTNER_SWAP_GRACE_MS)} after Closed Position was ready` : ""),
       detail: `${why} (${parts} without a partner copy)`,
     }));
   }
-  out.push(...partnerChoice(ctx, partnerWins, buffs, aliveIn, dmgIn));
+  out.push(...partnerChoice(ctx, partnerWins, model, ownStd, ownDevil, aliveIn));
   return out;
 };
 
 // The partner picked in a swap after a death, against the best other
-// living player: what each would have added under the Dancer's Standard
-// Finish and Devilment from the swap, for as long as the pick stayed
-// partner (at most PARTNER_CHOICE_SPAN_MS). Judged in hindsight from the
-// damage they dealt, so only a clear gap counts (PARTNER_CHOICE_MIN and
-// PARTNER_CHOICE_SHARE of the pick's value). The pre-pull partner isn't
-// judged: that's the static's plan.
+// living player: what each would have added as partner (partnercalc's
+// model, dnc-partner.ts: Standard Finish, Devilment and Esprit) from the
+// swap, for as long as the pick stayed partner (at most
+// PARTNER_CHOICE_SPAN_MS). Judged in hindsight from the damage they dealt,
+// so only a clear gap counts (PARTNER_CHOICE_MIN and PARTNER_CHOICE_SHARE
+// of the pick's value). The pre-pull partner isn't judged: that's the
+// static's plan.
 function partnerChoice(
   ctx: PlayerCheckContext,
   partnerWins: { p: PlayerInfo; ws: Window[] }[],
-  buffs: { name: string; copy: { id: number }; ownWins: Window[] }[],
+  model: PartnerModel,
+  ownStd: Window[],
+  ownDevil: Window[],
   aliveIn: (p: PlayerInfo, from: number, to: number) => boolean,
-  dmgIn: (p: PlayerInfo, from: number, to: number) => number,
 ): DamageFinding[] {
   const out: DamageFinding[] = [];
-  const valueOf = (p: PlayerInfo, from: number, to: number) => buffs.reduce((a, b) => {
-    const sh = ctx.ledger?.share(b.copy.id, p) ?? 0;
-    if (sh <= 0 || sh >= 1) return a;
-    return a + b.ownWins.reduce((x, w) => {
-      const f = Math.max(w.startMs, from), t = Math.min(w.endMs, to);
-      return t > f ? x + dmgIn(p, f, t) * (sh / (1 - sh)) : x;
-    }, 0);
-  }, 0);
+  const valueOf = (p: PlayerInfo, from: number, to: number) => model.value(p, from, to, ownStd, ownDevil).total;
   const starts = partnerWins.flatMap(({ p, ws }) => ws.map((w) => ({ p, w }))).filter(({ w }) => w.startMs > 0).sort((a, b) => a.w.startMs - b.w.startMs);
   for (const { p, w } of starts) {
     // Only swaps after a death: the previous partner died before this.
@@ -993,8 +999,8 @@ function partnerChoice(
       kind: "buff-coverage", startMs: w.startMs, endMs: to, inference: true, forced: false,
       label: "Weaker swap partner",
       lostDamage: best.v - picked,
-      basis: `what ${best.q.name} would have added under the Dancer's Standard Finish and Devilment from the swap to ${clock(to)} ` +
-        `minus what ${p.name} added (their damage then × each buff's measured share; hindsight, so only a clear gap counts)`,
+      basis: `what ${best.q.name} would have added as partner from the swap to ${clock(to)} minus what ${p.name} added ` +
+        `(partnercalc's model: Standard Finish, Devilment and Esprit on their expected hits; hindsight, so only a clear gap counts)`,
       detail: `Swapped to ${p.name} at ${clock(w.startMs)} after ${prev!.p.name} died; ${best.q.name} would have added ${k(best.v)} against ${k(picked)}`,
     }));
   }
