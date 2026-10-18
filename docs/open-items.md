@@ -643,8 +643,18 @@ and delete them from the header.
     short, Voidstep (negligible), Reap / Cull counts (no model), The Hunt's
     value (fires on every top player). Proposed `wrong`: smuggled Reaper's
     Toll, Fury at the cap.
-  - [hunter-survival.md](wowa-audit/hunter-survival.md): 11; Tip of the
-    Spear stack waste.
+  - [hunter-survival.md](wowa-audit/hunter-survival.md): phase 3 done
+    2026-10-17 on 13 Survival player-pulls (top Joeexotíc, Дэсака,
+    Calemba, Glemon; 20th-percentile Fugginmoo, Imjustpika, Huntâbow).
+    Built in lib/damage/wow/specs/survival.ts: Tip of the Spear wasted,
+    spender without Tip, Takedown held (60/75/90s by talent, replacing the
+    tracked Takedown worth 0 a use), Moonlight Chakram expired (15s on
+    Survival). Engine (game.ts): the Kill Command's pet hit is its press's
+    damage. **An existing check removed, for the user to approve:** the
+    Focus cap check for Survival (read 0.61–1.30M on the top players;
+    Focus never limits the spec). Unbuilt with numbers: Boomstick ticks
+    (no clip found), Swipe misses, Takedown stacks at cast; unverifiable:
+    Sentinel's Mark (not fetched), bomb recharge.
   - [mage-fire.md](wowa-audit/mage-fire.md): 8; Hot Streak expiry.
   - [mage-frost.md](wowa-audit/mage-frost.md): 4; Fingers of Frost
     overcap.

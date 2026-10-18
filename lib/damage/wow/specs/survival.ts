@@ -5,28 +5,31 @@
 // (docs/wowa-audit/hunter-survival.md), every rule valued as damage lost.
 // WoWAnalyzer's Survival is `lagging` (12.0.7 against the game's 12.1.0) and
 // its priority checker is switched off, so each rule was tested against the
-// log first. Measured 2026-10-17 on the 10 Survival player-pulls on disk, all
-// Mythic kills: the top parses Joeexotíc (kyjBDGFrv3M2HJ6p fight 44,
+// log first. Measured 2026-10-17 on 13 Survival player-pulls, all Mythic
+// kills (the pooled ratios below on the first 10): the top parses Joeexotíc (kyjBDGFrv3M2HJ6p fight 44,
 // Entombed Sentinels, 100th), Дэсака (61GjZcKngrFwvJCp fight 20, Entombed
 // Sentinels, 99.2th), Calemba (zqaGQTgWXkmfvnVN fight 25, Vashnik, 100th)
 // and Glemon (qTFxBHJKANCR48zD fight 23, Vashnik, 98.9th), all four
 // fetched for this pass; the weaker Ajunlucky (9w3bK4qhrRC82gVX), Katilena
 // (PCMfNtnbrVxpwYhk), Benethir (wWx8B1GPZMLghAyz), Reggienoble
 // (zQq63GHTRwPgt2Bp) and Nhymz (ZvrLTQfk1zbAXMwB, Entombed Sentinels and
-// Vashnik), 172–238k/s against the top players' 214–266k/s. Spell ids are
-// from those logs' masterData.
+// Vashnik), 172–238k/s against the top players' 214–266k/s, and the
+// 16th–20th percentile Fugginmoo (HahcwNqy7AJzTmgW fight 19), Imjustpika and
+// Huntâbow (mtv6nZTcXF4RDWaf fight 22), fetched for it. Spell ids are from
+// those logs' masterData.
 //
 // Talents (from casts, buffs and CombatantInfo): every player takes
 // Boomstick (1261193), Raptor Swipe (1262293) and the two-stack Kill Command
-// (Primal Surge: each Kill Command takes Tip of the Spear from 0 to 2). Seven
-// are Sentinel (Moonlight Chakram pressed once after each Takedown, Lunar
-// Storm), three Pack Leader (Calemba, Reggienoble, Nhymz on Vashnik: Howl of
-// the Pack Leader beasts, Stampede, Hogstrider). Nobody presses Mongoose
-// Bite, Butchery, Flanking Strike, Coordinated Assault or Spearhead: none is
-// in any log. Takedown's cooldown is a talent choice: 60s for the six who
-// take one talent-tree entry (135511) at rank 2, ~75s for Glemon at rank 1,
-// 90s for Joeexotíc and Katilena without it (shortest intervals 60.0–64.1s,
-// 82.6s, 91.8–92.2s).
+// (Primal Surge: each Kill Command takes Tip of the Spear from 0 to 2). Ten
+// player-pulls are Sentinel (Moonlight Chakram pressed once after each
+// Takedown, Lunar Storm), three Pack Leader (Calemba, Reggienoble, Nhymz on
+// Vashnik: Howl of the Pack Leader beasts, Stampede, Hogstrider). Nobody
+// presses Mongoose Bite, Butchery, Flanking Strike, Coordinated Assault or
+// Spearhead: none is in any log. Takedown's cooldown is a talent choice: 60s
+// for the nine who take one talent-tree entry (135511) at rank 2, ~75s for
+// Glemon at rank 1, 90s for Joeexotíc and Katilena without it (shortest
+// intervals 60.0–71.1s, 82.6s, 91.8–92.2s). The three 20th-percentile
+// players were fetched after the first ten and are in the numbers below.
 //
 // What Survival's buttons do, read from the log:
 // - Kill Command (259489) is the pet's attack (259277, 36–87k; game.ts counts
@@ -37,9 +40,9 @@
 //   stack were followed by a stack's removal within 1s (the bomb's at its
 //   impact, 0.2–0.6s after the cast).
 // - Focus never limits the spec: casts under 30 Focus (a Raptor Strike's
-//   cost) are 0–11 of 285–347 a pull, nearly all bombs (10) or off-GCD
-//   casts, and 11–43% of casts come at the 125 cap on every player, top
-//   included. So Survival gets no Focus cap check (melee.ts): it read
+//   cost) are 0–11 of 244–347 a pull, nearly all bombs (10) or off-GCD
+//   casts, and 11–43% of casts come at the cap (125 for most, 100
+//   for Reggienoble) on each of the first ten, top included. So Survival gets no Focus cap check (melee.ts): it read
 //   0.61–1.30M on the four top players (Glemon 1.30M, 13 Kill Commands at the
 //   cap) by pricing the Kill Command's Focus at 7–12k a point, when no
 //   spender ever waited for Focus. The Kill Command's real cost at the cap is
@@ -127,7 +130,7 @@
 // does for Marksmanship. On Survival it runs out at 15.0s, not
 // Marksmanship's 17s (Imjustpika mtv6nZTcXF4RDWaf 2:22.21 → 2:37.21,
 // Huntâbow beside him 15.01s, no press beside either; every other span on
-// the 12 Sentinel player-pulls ends at a press, max 11.4s), so procs.ts's
+// the 10 Sentinel player-pulls ends at a press, max 11.4s), so procs.ts's
 // 17s entry never sees a Survival expiry. A Chakram is 0.68–0.95M a press
 // on the Sentinel players (Glemon's 57k, his hits absorbed on Vashnik), so
 // a lost one is priced at the player's average Chakram less their average

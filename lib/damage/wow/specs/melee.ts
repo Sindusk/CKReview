@@ -216,7 +216,9 @@
 // the Spear" (top 0–151k, weak up to 334k) and "Takedown held" (cooldown 60,
 // 75 or 90s by talent, read per player; valued by its hits and window,
 // 0.70–1.58M a use; top 0–215k, weak up to 910k), which replaces the tracked
-// Takedown (worth 0 a use). Survival gets no Focus cap check: Focus never
+// Takedown (worth 0 a use), and "Moonlight Chakram expired unused" (15s on
+// Survival, against Marksmanship's 17s in procs.ts; Imjustpika 535k, top
+// none). Survival gets no Focus cap check: Focus never
 // limits it (0–11 casts a pull under a Raptor Strike's 30), and the shared
 // check read 0.61–1.30M on the top players from Kill Commands at the cap.
 // The Kill Command's pet hit is now its press's damage (game.ts). The
