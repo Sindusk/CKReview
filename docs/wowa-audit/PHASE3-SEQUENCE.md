@@ -72,7 +72,7 @@ damage rows are measured.
 | 28 | Blood | [deathknight-blood.md](deathknight-blood.md) | done 2026-10-17: Dancing Rune Weapon drift valued (its pet's hits), Reaper's Mark tracked, free Death and Decay held (Crimson Scourge), Runic Power cap removed for Blood (blood.ts); verified by the main session (Reaper's Mark checked: off the GCD, median 0.43s to the next cast) |
 | 29 | Unholy | [deathknight-unholy.md](deathknight-unholy.md) | done 2026-10-17: plague off every enemy, strike without a Lesser Ghoul, Sudden Doom lost, Dark Transformation / Army valued, Runic Power cap removed for Unholy (unholy.ts); Unholy GCD counts the Erupts and Orders its presses set off (game.ts); verified by the main session |
 | 30 | Devourer | [demonhunter-devourer.md](demonhunter-devourer.md) | done 2026-10-17: the Void Ray "gap" is an unlogged Eradicate press (new optional `unloggedPresses` hook: Eradicate and Void Metamorphosis; top players 82% → 91–94% GCD uptime); The Hunt / Hungering Slash presses, Voidblade 0.5s GCD (game.ts); Void Metamorphosis window, Eradicate overwritten (devourer.ts); verified by the main session |
-| 31 | Survival | [hunter-survival.md](hunter-survival.md) | |
+| 31 | Survival | [hunter-survival.md](hunter-survival.md) | done 2026-10-17: Tip of the Spear wasted, spender without Tip of the Spear, Takedown held (per-player cooldown), Focus cap removed for Survival (survival.ts); Kill Command pet hit counts as GCD damage (game.ts); Moonlight Chakram expiry at 15s for Survival (procs.ts); verified by the main session |
 | 32 | Fire | [mage-fire.md](mage-fire.md) | |
 | 33 | Frost Mage | [mage-frost.md](mage-frost.md) | |
 | 34 | Holy Paladin | [paladin-holy.md](paladin-holy.md) | |
@@ -444,6 +444,11 @@ measured for it.
   0; pressed 1–3 times a pull, top players hold it 146–210s, so a valued
   check would fire on them as much.) Evidence in
   [demonhunter-devourer.md](demonhunter-devourer.md).
+- Survival (2026-10-17): **an existing app check removed, for the user to
+  approve or reject:** the Focus cap check for Survival (0.61–1.30M on
+  top players; Focus never limits the spec). Proposed `wrong`: the three
+  Focus cap rows; kept `wrong`: Kill Command efficiency. Evidence in
+  [hunter-survival.md](hunter-survival.md).
 
 - Elemental (2026-10-17): `CallOfTheAncestors/other-checks`,
   `statistics` (and whether "Stormkeeper before Ascendance" should be
