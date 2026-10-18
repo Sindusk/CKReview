@@ -135,6 +135,14 @@
 //   Stormstrike (36–50k with the off-hand; an upper bound). Its 6–21
 //   refreshes a pull come within 1s of the gain (two resets at once) on
 //   every player, top included: not a loss.
+// - Fingers of Frost 15s (Frost Mage; added in its phase 3, 2026-10-17, 21
+//   player-pulls): spent by Ice Lance, two stacks. 2 at D (14.97s Voxdeii
+//   p4G1xa2yMqCDznZT 1:08, 15.00s Supertitis X618LRt7hPqzbVJj 1:38), max
+//   15.00s of ~1,400 gains; the next longest span is 13.67s, ending at an
+//   Ice Lance. Every other removal is beside an Ice Lance. Worth an Ice
+//   Lance's own hits here (an under-count: its Shatter isn't matched by
+//   name). A gain at two stacks loses one too: specs/frostmage.ts
+//   "Fingers of Frost wasted".
 //
 // ── Measured and left out ──────────────────────────────────────────────
 // - Lava Surge (77762) 10s, clean, but 75 of 657 run out on the top
@@ -184,7 +192,8 @@
 //   Metamorphosis transition); its loss is the overwrite, in
 //   specs/devourer.ts. Its press isn't logged (game.ts devourerUnlogged).
 // - No duration in the samples (no clean cluster, or never run out):
-//   Fingers of Frost, Brain Freeze,
+//   Brain Freeze (Frost Mage phase 3: 0 of ~600 removals on 21
+//   player-pulls without a Flurry beside them, held up to 26.0s),
 //   Galactic Guardian (0 of 85 removals unconsumed on the three Guardians
 //   who take it, J3ckBVtrZNfWv1h7, JvQpZk3CXj78Dx2f, LCFp3wbHvQqNP4my;
 //   max span 12.75s), Prismatic Bolt!, Tempest, Art of War. Power of the
@@ -223,4 +232,5 @@ export const WOW_MEASURED_PROCS = new Map<number, MeasuredProc>([
   [391882,  { durationMs: 15_000, consumerIds: [22568, 441591] }],                // Apex Predator's Craving → Ferocious Bite, Ravage
   [359618,  { durationMs: 15_000, consumerIds: [356995, 357211] }],               // Essence Burst → Disintegrate, Pyre
   [201846,  { durationMs: 12_000, consumerIds: [17364, 115356] }],                // Stormsurge → Stormstrike, Windstrike
+  [44544,   { durationMs: 15_000, consumerIds: [30455] }],                        // Fingers of Frost → Ice Lance
 ]);
