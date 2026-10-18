@@ -30,9 +30,13 @@
 //
 // Between two samples an actor moves in a straight line, the same guess
 // FFLogs' replay makes. Past MAX_INTERP_GAP_MS between samples the actor
-// is held at the earlier sample instead: a long gap usually means a stretch
-// with no casts (a knockback, a cutscene, a dead player), and sliding the
-// dot across it would draw a path nobody walked.
+// is held at the earlier sample instead: a gap that long is a cutscene or
+// phase transition (25-35s), and sliding the dot across it would draw a
+// path nobody walked. A dead player is never slid (their body doesn't
+// walk to where they're raised). The limit was 4s until 2026-10-17: FRU's
+// Utopian Sky fog leaves 4-5s with nothing to cast on, and runners froze,
+// then jumped 14-18y (M9Nagmnw2LzHZPVq fight 1, the NIN 0:46.4-0:50.7 and
+// the DNC 0:43.5-0:48.6; user: "desync then teleport").
 
 import type { FFLActor } from "@/lib/ffl-client";
 import type { ActionGeometry } from "@/lib/replay/action-shapes";
@@ -43,7 +47,10 @@ export const REPLAY_EVENT_FILTER =
   `type in ("cast", "begincast", "damage", "calculateddamage", "heal", "calculatedheal", "death", "tether", "headmarker", ` +
   `"applydebuff", "applydebuffstack", "removedebuffstack", "removedebuff")`;
 
-const MAX_INTERP_GAP_MS = 4000;
+const MAX_INTERP_GAP_MS = 12000;
+// An actor this long past its last sample reads as stale; the panel takes
+// such an enemy as gone (a phase's Kefka replaced by the next one).
+const LAST_SAMPLE_STALE_MS = 4000;
 
 /** The fields of a raw FFLogs event the replay reads. */
 export type ReplayRawEvent = {
@@ -369,7 +376,7 @@ export type ReplayPose = {
   x: number; y: number; facing: number;
   hp: number;          // 0..1, -1 unknown
   mp: number;          // 0..1, -1 unknown
-  stale: boolean;      // held across a gap longer than MAX_INTERP_GAP_MS
+  stale: boolean;      // held: across a gap longer than MAX_INTERP_GAP_MS, dead, or past the last sample
 };
 
 /** Index of the last sample at or before `t`, or -1. */
@@ -396,8 +403,8 @@ export function poseAt(actor: ReplayActor, t: number): ReplayPose | undefined {
   }
   const a = s[i];
   const b = s[i + 1];
-  if (!b || b[0] - a[0] > MAX_INTERP_GAP_MS) {
-    return { x: a[1], y: a[2], facing: a[3], hp: a[4], mp: a[5] ?? -1, stale: !b ? t - a[0] > MAX_INTERP_GAP_MS : true };
+  if (!b || b[0] - a[0] > MAX_INTERP_GAP_MS || (actor.kind === "player" && a[4] === 0)) {
+    return { x: a[1], y: a[2], facing: a[3], hp: a[4], mp: a[5] ?? -1, stale: !b ? t - a[0] > LAST_SAMPLE_STALE_MS : true };
   }
   const f = (t - a[0]) / (b[0] - a[0]);
   return { x: a[1] + (b[1] - a[1]) * f, y: a[2] + (b[2] - a[2]) * f, facing: a[3], hp: a[4], mp: a[5] ?? -1, stale: false };
