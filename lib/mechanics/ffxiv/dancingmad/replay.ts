@@ -236,6 +236,40 @@ const SPRAY_HOLE = 600;
 const SPRAY_MERGE = 300;
 const SHRIEK_SHOW_MS = 5000;
 
+// ── P5 Ultimate Kefka (ultimate-kefka.ts) ───────────────────────────────────
+
+// Flood (49471): four waves of two lines each. Every line is first cast as
+// a 1.2s telegraph (49539, omen c1401_laser) and lands 4.6s later as 49769
+// from the same helper spot (fight 10: telegraphs 15:20.5-15:23.6, lines
+// 15:25.1-15:28.2, every pair at the same coordinates). Drawn as the
+// telegraph for its cast, then again as its line lands; the telegraph cast
+// alone flashed over players who were never hit, and the lines weren't
+// drawn.
+const FLOOD_TELEGRAPH = 49539, FLOOD_LINE = 49769;
+const FLOOD_DELAY_MS = 4600;
+
+// Maddening Orchestra's delayed resolutions on the Surprise holders
+// (ultimate-kefka.ts): Flare Diffusion (47957, 25y) on Surprise Flare
+// (1005350), Chaotic Holy (47958, a 6y stack) on Surprise Holy (1005351).
+// Their helpers sit at (100, 100), where Diffusion drew over all eight.
+
+// Celestriad: nine towers, three waves of four, Fire III / Blizzard III /
+// Thunder III (47939-47941); two soak each. A wave is lit from the last
+// one's resolution (the first from Celestriad's cast), in its element's
+// colour. Catastrophic Choice (49742 / 49743) doesn't name its element;
+// the cast that resolves it does: Quake (47946, stand in the towers' outer
+// half) or Tornado (47947, the inner half).
+const CELESTRIAD = 47938;
+const TOWER_ELEMENT: Record<number, string> = { 47939: "fire", 47940: "ice", 47941: "thunder" };
+const CHOICES = [49742, 49743];
+const CHOICE_RESULT: Record<number, string> = { 47946: "Quake: outer half of the towers", 47947: "Tornado: inner half of the towers" };
+
+// Forsaken: each round baits a large AoE (47928) and drops two persistent
+// dark grounds (47927, 8y, omen m0531_dark) that remove whoever touches
+// them, until Forsaken Null (47930) ends the fight.
+const FORSAKEN_GROUND = 47927, FORSAKEN_NULL = 47930;
+const GROUND_MAX_MS = 60000;
+
 const OVERRIDES: Record<number, Override> = {
   // Revolting Ruin III, both hits: a 90° tankbuster cone (user, VOD review
   // 2026-10-17). The game data has the cone but not its angle.
@@ -257,9 +291,8 @@ const OVERRIDES: Record<number, Override> = {
   [THUNDER_REAL]: { style: "lightning" },
   // Flagrant Fire III: two role stacks (47779) or eight spreads (47778).
   [FIRE_STACK]: { style: "stack" },
-  // Towers whose rows carry no omen to say so (Forsaken's The Path of
-  // Light 47806 is drawn by forsakenShapes).
-  47939: { style: "tower" }, 47940: { style: "tower" }, 47941: { style: "tower" },  // Celestriad
+  // Towers whose rows carry no omen (Forsaken's The Path of Light 47806,
+  // Celestriad's 47939-47941) are drawn by forsakenShapes / p5Shapes.
   // Wave Cannon's towers: one soaker each (phase1.ts).
   47786: { style: "tower", soakers: 1 },
   // Drawn by trapShapes, on the holder.
@@ -326,6 +359,22 @@ const OVERRIDES: Record<number, Override> = {
   // through the cast; Stray Spray: p4Shapes.
   47906: { telegraph: true },
   [P4_STRAY_SPRAY]: { hidden: true },
+  // P5. Fell Forces: role stacks (tank 50771 3y, healer 50772 and DPS
+  // 50773 5y, split among who stands in them).
+  50771: { style: "tankbuster" }, 50772: { style: "stack" }, 50773: { style: "stack" },
+  [FLOOD_TELEGRAPH]: { hidden: true }, [FLOOD_LINE]: { hidden: true },
+  47951: { style: "stack" },                         // Chaotic Flood
+  47954: { style: "tankbuster" },                    // Flare on the top two
+  47955: { style: "tankbuster" },                    // Chaotic Flare, shared
+  47957: { holder: 1005350 },                        // Flare Diffusion
+  47958: { holder: 1005351, style: "stack" },        // Chaotic Holy
+  // Celestriad's towers: p5Shapes, in their element's colour.
+  47939: { hidden: true }, 47940: { hidden: true }, 47941: { hidden: true },
+  // Forsaken: the bait shows through its cast; the grounds stay (p5Shapes);
+  // Bonds is the stack.
+  47928: { telegraph: true },
+  [FORSAKEN_GROUND]: { hidden: true },
+  47929: { style: "stack" },
 };
 
 /**
@@ -357,7 +406,8 @@ const HEAD_MARKERS: Record<number, HeadMarkerDef> = {
   ...Object.fromEntries(Object.entries(LC_NUMBERS).map(([id, n]) => [id, { label: String(n), abilities: [LC_DASH, LC_PULSE] }])),
   // 161: Knock Down's stack marker (fight 10 11:42.1 -> 11:47.2, 11:47.6
   // -> 11:52.7).
-  161: { label: "Stack", abilities: [47875] },
+  // P5 too: on the Forsaken Bonds stack (17:39.0 -> 17:44.1).
+  161: { label: "Stack", abilities: [47875, 47929] },
   // The ring markers on Kefka (ringEffects draws the rings).
   ...Object.fromEntries(Object.keys(RINGS).map((id) => [id, { label: "Mystery Magic", abilities: RING_RESOLVE }])),
 };
@@ -736,6 +786,73 @@ function p4Effects(data: ReplayData): CasterEffect[] {
   return out;
 }
 
+function p5Shapes(data: ReplayData): AoeShape[] {
+  const casts = data.enemyCasts ?? [];
+  const geo = data.actionGeometry ?? {};
+  const actorByKey = new Map(data.actors.map((a) => [a.key, a]));
+  const fresh = (c: (typeof casts)[number]) => {
+    const a = actorByKey.get(c[1]);
+    const s = a && nearestSample(a, c[0]);
+    return s && Math.abs(s[0] - c[0]) <= 300 ? s : undefined;
+  };
+  const out: AoeShape[] = [];
+  // Flood lines from their telegraph until they land.
+  const lines = casts.filter((c) => c[4] === FLOOD_LINE && c[3] === 0);
+  for (const c of casts) {
+    if (c[4] !== FLOOD_TELEGRAPH || c[3] !== 0) continue;
+    const s = fresh(c);
+    const g = geo[FLOOD_LINE] ?? geo[FLOOD_TELEGRAPH];
+    if (!s || !g) continue;
+    const land = lines.find((l) => l[0] > c[0] && l[0] - c[0] < FLOOD_DELAY_MS + 1500 && (() => {
+      const q = fresh(l);
+      return q && Math.hypot(q[1] - s[1], q[2] - s[2]) < 100;
+    })());
+    const begin = casts.find((b) => b[4] === FLOOD_TELEGRAPH && b[1] === c[1] && b[3] > 0 && Math.abs(b[0] + b[3] - c[0]) < 800);
+    const line = { ...blank, kind: "rect" as const, x: s[1], y: s[2], bearing: facingBearing(s[3]), range: g.range * 100, width: g.width * 100, style: "aoe", name: "Flood" };
+    // The laser telegraph for its own 1.2s cast (only the telegraph has an
+    // omen), then the line where it lands.
+    out.push({ ...line, start: begin?.[0] ?? c[0] - 1200, resolve: c[0], noFlash: true });
+    const at = land?.[0] ?? c[0] + FLOOD_DELAY_MS;
+    out.push({ ...line, start: at - 300, resolve: at });
+  }
+  // Celestriad's towers, each wave from the last one's resolution.
+  const towers = casts.filter((c) => TOWER_ELEMENT[c[4] ?? 0] && c[3] === 0);
+  const waves = [...new Set(towers.map((c) => c[0]))].filter((t, i, all) => i === 0 || t - all[i - 1] > 2000);
+  for (const c of towers) {
+    const s = fresh(c);
+    if (!s) continue;
+    const wave = waves.filter((t) => t <= c[0] + 100).pop()!;
+    const prev = waves.filter((t) => t < wave).pop();
+    const cel = casts.filter((x) => x[4] === CELESTRIAD && x[3] === 0 && x[0] < c[0]).pop()?.[0];
+    out.push({ ...blank, kind: "circle", x: s[1], y: s[2], range: (geo[c[4]!]?.range ?? 3) * 100, soakers: 2,
+      style: `dm-tower-${TOWER_ELEMENT[c[4]!]}`, name: c[2], start: prev ?? cel ?? c[0] - 6000, resolve: c[0] });
+  }
+  // Forsaken's dark grounds, until Forsaken Null.
+  const nullAt = casts.find((c) => c[4] === FORSAKEN_NULL)?.[0];
+  for (const c of casts) {
+    if (c[4] !== FORSAKEN_GROUND || c[3] !== 0) continue;
+    const s = fresh(c);
+    if (!s) continue;
+    const begin = casts.find((b) => b[4] === FORSAKEN_GROUND && b[1] === c[1] && b[3] > 0 && Math.abs(b[0] + b[3] - c[0]) < 800);
+    out.push({ ...blank, kind: "circle", x: s[1], y: s[2], range: (geo[FORSAKEN_GROUND]?.range ?? 8) * 100, style: "dm-dark-ground",
+      name: "Forsaken Ground", start: begin?.[0] ?? c[0], resolve: Math.min(nullAt !== undefined && nullAt > c[0] ? nullAt + 26000 : Infinity, c[0] + GROUND_MAX_MS), noFlash: true });
+  }
+  return out;
+}
+
+function p5Effects(data: ReplayData): CasterEffect[] {
+  const casts = data.enemyCasts ?? [];
+  const out: CasterEffect[] = [];
+  // Catastrophic Choice: what its resolving cast says, on Kefka through the cast.
+  for (const c of casts) {
+    if (!CHOICES.includes(c[4] ?? 0) || c[3] <= 0) continue;
+    const res = casts.find((r) => CHOICE_RESULT[r[4] ?? 0] && r[3] === 0 && r[0] >= c[0] && r[0] - (c[0] + c[3]) < 3000);
+    if (!res) continue;
+    out.push({ kind: res[4] === 47946 ? "dm-choice-quake" : "dm-choice-tornado", label: CHOICE_RESULT[res[4]!], actor: c[1], x: CENTRE.x, y: CENTRE.y, start: c[0], end: res[0] });
+  }
+  return out;
+}
+
 function halfRoomShapes(data: ReplayData): AoeShape[] {
   return (data.enemyCasts ?? []).filter((c) => c[3] === 0 && HALF_ROOM[c[4] ?? 0] !== undefined).map((c) => ({
     ...blank, kind: "cone" as const, x: CENTRE.x, y: CENTRE.y, bearing: HALF_ROOM[c[4]!], angle: 180, range: ARENA_R + 500,
@@ -751,9 +868,9 @@ export const DANCING_MAD_REPLAY: FightReplay = {
   overrides: OVERRIDES,
   headMarkers: HEAD_MARKERS,
   tethers: TETHERS,
-  effects: (data) => [...ringEffects(data), ...gazeEffects(data), ...endsEffects(data), ...p3Effects(data), ...p4Effects(data)],
+  effects: (data) => [...ringEffects(data), ...gazeEffects(data), ...endsEffects(data), ...p3Effects(data), ...p4Effects(data), ...p5Effects(data)],
   shapes: (data) => [
     ...trapShapes(data), ...wellShapes(data), ...arrowShapes(data), ...halfRoomShapes(data),
-    ...forsakenShapes(data), ...trineShapes(data), ...wingShapes(data), ...aeroShapes(data), ...p3Shapes(data), ...p4Shapes(data),
+    ...forsakenShapes(data), ...trineShapes(data), ...wingShapes(data), ...aeroShapes(data), ...p3Shapes(data), ...p4Shapes(data), ...p5Shapes(data),
   ],
 };

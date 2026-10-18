@@ -293,6 +293,55 @@ function ShriekEye({ e, x, y, t }: EffectArtProps) {
   );
 }
 
+/** A Celestriad tower in its element's colour, with its soaker count. */
+function ElementTower({ s, x, y, r, t, opacity, resolving, element }: ShapeArtProps & { element: "fire" | "ice" | "thunder" }) {
+  const c = element === "fire" ? { ring: "#ff6a1a", core: "#5a1a08", text: "#ffd36b" }
+    : element === "ice" ? { ring: "#9fdcff", core: "#0e2a40", text: "#e6f6ff" } : { ring: "#b06bff", core: "#24103e", text: "#efe0ff" };
+  const pulse = 0.5 + 0.5 * Math.sin((t - s.start) / 300);
+  return (
+    <g opacity={opacity} pointerEvents="none">
+      <circle cx={x} cy={y} r={r} fill={c.core} fillOpacity={resolving ? 0.5 : 0.65} stroke={c.ring} strokeWidth={8} strokeOpacity={0.3 + 0.2 * pulse} filter="url(#replay-glow)" />
+      <circle cx={x} cy={y} r={r} fill="none" stroke={resolving ? "#ffffff" : c.ring} strokeWidth={3} />
+      {s.soakers !== undefined && <text x={x} y={y + 6} fontSize={17} fill={c.text} {...LABEL} strokeWidth={3}>{s.soakers}</text>}
+    </g>
+  );
+}
+
+/** Forsaken's dark ground: a black pool with a violet rim that stays. */
+function DarkGround({ s, x, y, r, t }: ShapeArtProps) {
+  const o = fade(t, s.start, s.resolve, 400);
+  if (o <= 0) return null;
+  // Relative to each circle's own box, so every copy of the id is the same
+  // gradient (the panel's uids repeat between shapes).
+  const g = "dm-dark-ground";
+  return (
+    <g opacity={o} pointerEvents="none">
+      <defs>
+        <radialGradient id={g}>
+          <stop offset="0%" stopColor="#05020a" stopOpacity={0.85} />
+          <stop offset="85%" stopColor="#1a0a2e" stopOpacity={0.8} />
+          <stop offset="100%" stopColor="#6a3aa8" stopOpacity={0.9} />
+        </radialGradient>
+      </defs>
+      <circle cx={x} cy={y} r={r} fill={`url(#${g})`} stroke="#8a5ad0" strokeWidth={2} />
+    </g>
+  );
+}
+
+/** Catastrophic Choice's staff on Kefka: yellow earth (Quake) or green wind (Tornado), with what to do. */
+function ChoiceStaff({ e, x, y, t, quake }: EffectArtProps & { quake: boolean }) {
+  const o = fade(t, e.start, e.end, 300);
+  if (o <= 0) return null;
+  const c = quake ? { glow: "#e8b83a", text: "#ffe48a" } : { glow: "#3fd08a", text: "#c8ffe0" };
+  return (
+    <g opacity={o} pointerEvents="none">
+      <circle cx={x} cy={y} r={34} fill="none" stroke={c.glow} strokeWidth={8} strokeOpacity={0.45} filter="url(#replay-glow)" />
+      <circle cx={x} cy={y} r={34} fill="none" stroke={c.glow} strokeWidth={2.5} strokeDasharray={quake ? undefined : "8 5"} />
+      <text x={x} y={y + 58} fontSize={14} fill={c.text} {...LABEL}>{e.label}</text>
+    </g>
+  );
+}
+
 const ring = (element: Element, inverted: boolean) => (p: EffectArtProps) => <MysteryRing {...p} element={element} inverted={inverted} />;
 
 export const DANCING_MAD_ART: FightArt = {
@@ -311,6 +360,8 @@ export const DANCING_MAD_ART: FightArt = {
     "dm-lc-number": LimitCutNumber,
     "dm-black-hole": BlackHole,
     "dm-shriek": ShriekEye,
+    "dm-choice-quake": (p) => <ChoiceStaff {...p} quake />,
+    "dm-choice-tornado": (p) => <ChoiceStaff {...p} quake={false} />,
   },
   // Flood of Naught's Antilights.
   colors: {
@@ -323,6 +374,10 @@ export const DANCING_MAD_ART: FightArt = {
     "dm-well": GravityWell,
     "dm-arrow": ArrowSigil,
     "dm-trine": TrineTip,
+    "dm-tower-fire": (p) => <ElementTower {...p} element="fire" />,
+    "dm-tower-ice": (p) => <ElementTower {...p} element="ice" />,
+    "dm-tower-thunder": (p) => <ElementTower {...p} element="thunder" />,
+    "dm-dark-ground": DarkGround,
   },
   tethers: {
     "dm-yellow": (p) => <StatueTether {...p} color="#ffd23a" />,

@@ -278,3 +278,56 @@ read "hit 6, drawn 3" (two stacks compared together).
 4. **13:35.2 and 13:59.2:** violet eyes over the Cursed Shriek holders
    for 5s before their gaze. Do the eyes sit on the holders in game?
 
+## Phase 5: Ultimate Kefka (15:00 to the end)
+
+The mechanics from ultimate-kefka.ts (its model is from four guides; both
+kills here are the first P5 kills on disk).
+
+### What's drawn
+
+| Mechanic | How |
+|---|---|
+| Fell Forces | Role stacks: tank purple (3y), healer and DPS orange (5y). |
+| Flood | Now built in the spec: each line shows as its 1.2s laser telegraph (49539), then again as it lands 4.6s later (49769) from the same spot. The telegraph cast alone flashed over players who were never hit, and the lines weren't drawn at all. Chaotic Flood draws as a stack. |
+| Maddening Orchestra | Flare and Chaotic Flare as tankbusters. Flare Diffusion (25y) and Chaotic Holy (a 6y stack) now land on the Surprise Flare / Surprise Holy holders. Their helpers sit at (100, 100), where Diffusion drew over all eight. |
+| Celestriad towers | Now built in the spec: each tower in its element's colour (fire orange, ice pale blue, thunder violet) with "2", each wave from the previous wave's resolution (the first from Celestriad's cast). The rows have no omen, so the towers drew only as they resolved. Towers whose helper logged no position at their own cast aren't drawn (one in Pull 9). |
+| Catastrophic Choice | New cue: a yellow (Quake) or green (Tornado) ring on Kefka through the cast, labelled "Tornado: inner half of the towers". The text comes from the cast that resolves it, since the Choice's own id doesn't name the element. |
+| Stray Apocalypse, Stray Entropy | Game data was right. |
+| Forsaken | The bait (47928) shows through its cast. The dark grounds (47927) now stay as black pools with a violet rim until Forsaken Null. Bonds is a stack, and marker 161 reads "Stack". |
+
+### Fit check after the changes
+
+Flood, Chaotic Flood, Chaotic Flare, Tornado, Forsaken and Bonds are exact
+in both kills; Stray Apocalypse is 63 of 64 (Pull 9) and 61 of 70 (Pull 5),
+with the misses at its end (16:55-16:59 in Pull 5) where helpers log stale
+spots. Fell Forces, Holy, Stray Entropy and the towers read "hit N, drawn
+2-4": one shape per target, compared with every hit of that name. Chaotic
+Holy shows on the invulnerable holder with no hit logged.
+
+### Couldn't find out / not drawn
+
+- **Whether Flood's lines show between telegraph and landing:** the
+  replay hides them for those 4.6s, since the landing cast has no omen.
+- **Catastrophic Choice's staff colour** is inferred from the resolving cast.
+  Neither kill has a Quake.
+- **Celestriad's other five towers** (nine visible, four lit a wave) aren't
+  drawn: only lit towers that resolved are in the log.
+- **Ultima Repeater, Forsaken pulses, Forsaken Null** are raidwide: not drawn.
+
+### VOD checks: Pull 9 (2T1HzdPKgbhM43am)
+
+1. **15:19.1 to 15:28.2:** each Flood line flashes as a short telegraph,
+   then nothing until it lands 4.6s later. Does the game keep the lines
+   on the floor in between?
+2. **15:44.7:** Flare Diffusion draws as a 25y circle on the Surprise
+   Flare tank at the north edge. Right size and spot?
+3. **15:58.9 to 16:20.1:** the lit towers in fire / ice / thunder colours,
+   one wave at a time. Do the colours match the game's towers?
+4. **16:03.1 to 16:08.2 (and 16:15.2 to 16:20.3):** a green ring on Kefka
+   with "Tornado: inner half of the towers". Is Kefka's staff green for
+   both Choices?
+5. **17:44.1 onward:** the Forsaken grounds stay as dark pools until the
+   end. Do they look and last like that in game, and is the first one in
+   the middle?
+
+

@@ -102,6 +102,12 @@
 // - Pull-over threshold: no pull that reached 4 dead (net of raises)
 //   mid-phase recovered; several ran 25-45s at 5+ dead before wiping.
 //
+// - For the replay (2026-10-18, kills 2T1HzdPKgbhM43am 10 and
+//   yBKPqGwHparm7Tk4 5): each Flood line is first cast as a 1.2s telegraph
+//   (49539, laser omen) from the same helper spot it lands from 4.6s later
+//   (49769). Flare Diffusion / Chaotic Holy's helpers sit at (100, 100);
+//   the holders' Surprise statuses place them.
+//
 // -- RULES IMPLEMENTED --
 // Major unless noted; a hit that neither killed nor applied Damage Down is
 // Minor. Damage Down counts as Major, matching ffxiv-damage-down.
