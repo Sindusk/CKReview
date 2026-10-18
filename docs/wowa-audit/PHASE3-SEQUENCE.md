@@ -74,7 +74,7 @@ damage rows are measured.
 | 30 | Devourer | [demonhunter-devourer.md](demonhunter-devourer.md) | done 2026-10-17: the Void Ray "gap" is an unlogged Eradicate press (new optional `unloggedPresses` hook: Eradicate and Void Metamorphosis; top players 82% → 91–94% GCD uptime); The Hunt / Hungering Slash presses, Voidblade 0.5s GCD (game.ts); Void Metamorphosis window, Eradicate overwritten (devourer.ts); verified by the main session |
 | 31 | Survival | [hunter-survival.md](hunter-survival.md) | done 2026-10-17: Tip of the Spear wasted, spender without Tip of the Spear, Takedown held (per-player cooldown), Focus cap removed for Survival (survival.ts); Kill Command pet hit counts as GCD damage (game.ts); Moonlight Chakram expiry at 15s for Survival (procs.ts); verified by the main session |
 | 32 | Fire | [mage-fire.md](mage-fire.md) | done 2026-10-17: Fire Blast under Hot Streak, Combustion window valued per press, tracked Combustion valued with `burstHold` (fire.ts); verified by the main session |
-| 33 | Frost Mage | [mage-frost.md](mage-frost.md) | |
+| 33 | Frost Mage | [mage-frost.md](mage-frost.md) | done 2026-10-17: Fingers of Frost wasted, Frozen Orb valued, Ray of Frost `burstHold` (frostmage.ts); Fingers of Frost expiry (procs.ts); verified by the main session |
 | 34 | Holy Paladin | [paladin-holy.md](paladin-holy.md) | |
 | 35 | Discipline | [priest-discipline.md](priest-discipline.md) | |
 | 36 | Holy Priest | [priest-holy.md](priest-holy.md) | |
@@ -457,6 +457,14 @@ measured for it.
   lenient value; a full one is arguable when charges run short). All top
   samples are Sunfury; the one Frostfire player can't be judged against a
   top Frostfire log. Evidence in [mage-fire.md](mage-fire.md).
+- Frost Mage (2026-10-17), two fetch / context questions:
+  - Should the WoW fetch keep the Freezing debuff (1221389)? Likely Frost's
+    biggest lever (shatter is ~40% of a top player's damage). A change to
+    the shared fetch, so both games' checks and a refetch of the samples.
+  - Vashnik's hold window (30s before each Imbibe) is shorter than the
+    ~40s Frostfire players hold Comet Storm a cycle. Lengthen it?
+  Kept `wrong`: Ray of Frost ticks, Comet Storm targets. Evidence in
+  [mage-frost.md](mage-frost.md).
 
 - Elemental (2026-10-17): `CallOfTheAncestors/other-checks`,
   `statistics` (and whether "Stormkeeper before Ascendance" should be
