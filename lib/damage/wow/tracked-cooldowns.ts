@@ -374,7 +374,14 @@ export const WOW_TRACKED_COOLDOWNS: Record<string, TrackedCooldown[]> = {
   // 30%, so Breath's 120s came back in 71–122s and its 74s here invented
   // holds. Neither was worth anything a use here either (Breath's damage
   // logs under 409632, Time Skip has none), so neither ever reported.
-  "Devourer Demon Hunter": [   // unverified (2 players)
+  // Devourer's phase 3 (2026-10-17, 9 player-pulls that take it): worth 0 a
+  // use, and left so. Its hits log under 1246169 / 1246168, but every
+  // player, the 99.9–100th ones too, presses it only 1–3 times a pull (a
+  // Void Metamorphosis resets it: shortest interval 43.6s, Felstalker
+  // JQVkMCb8T324yWca), holding it 146–210s (Felstalker, Limofans
+  // VbAHWZDdPwJBajmx, Vathiondh); valued, it would fire on the top players
+  // as on the weak. specs/devourer.ts.
+  "Devourer Demon Hunter": [
     { name: "The Hunt", actionIds: [1246167], cooldownMs: 91_000, charges: 1, firstUseOffsetMs: 11_000 },  // 91.6 / 105.6s, 10.7s
   ],
 

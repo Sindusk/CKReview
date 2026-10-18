@@ -174,6 +174,15 @@
 //   specs/unholy.ts "Sudden Doom lost" judges it. Reaping (1242654, 30s, a
 //   Soul Reaper per Dark Transformation) is measured there and worth ~0.
 //   Blightfall's ready buff (1271975) never runs out (held up to 44s).
+// - Voidstep (1223157, Devourer's Void-Scarred) 6.0s (phase 3, 2026-10-17,
+//   9 player-pulls): spent by Vengeful Retreat, but worth ~14k a use (its
+//   Voidstep hit, 1239526: Influka PYaN4FW3VXKDThmL 321k over 23), and the
+//   100th-percentile Limofans (VbAHWZDdPwJBajmx) lets all 22 run out
+//   (闹米的揪揪 18 of 20, Felstalker 7 of 19). Not added.
+// - Eradicate (1239524, Devourer): never runs out (1,287 removals on 40
+//   player-pulls, each beside its hit, a 0.02s flicker or a Void
+//   Metamorphosis transition); its loss is the overwrite, in
+//   specs/devourer.ts. Its press isn't logged (game.ts devourerUnlogged).
 // - No duration in the samples (no clean cluster, or never run out):
 //   Fingers of Frost, Brain Freeze,
 //   Galactic Guardian (0 of 85 removals unconsumed on the three Guardians

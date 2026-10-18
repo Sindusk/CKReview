@@ -46,10 +46,11 @@
 // the window's GCD value over the player's average GCD at that moment (the
 // gap check prices the rest). Lenient: idle there also costs Fury, which
 // can end the window sooner; not counted.
-// Measured (lost a pull): top Vathiondh, Influka, Felstalker none (their
-// short windows are all in Vitriolic Stasis or movement, forced), Likdh
-// 25k, Freakerino 38k, Ercege 60k, Pve 80k, Limofans 188k (3 windows, 1–2
-// GCDs short each), Konudh 215k, Caukyy 217k (2:59, 42 of 44 GCDs);
+// Measured (lost a pull): top Vathiondh, Influka none, Likdh 25k,
+// Freakerino 38k, Ercege 60k, Pve 80k, Felstalker 109k (2:44, 28 of 33;
+// his other windows mostly Vitriolic Stasis, forced), Konudh 215k, Caukyy
+// 217k (2:59, 42 of 44 GCDs), Limofans 374k (1–2 GCDs short a window at
+// 432k a GCD inside, 330k average: Reaper's Toll's hits count);
 // weaker 稳重不失奔放 1.70M, Nyxh 1.38M (4:35, 27 of 36), Hoodh 1.34M,
 // Burningpain 1.22M, 月满夜丶 1.20M, Vargona 1.19M (4:05, 8 of 15), Jexro
 // 552k, Daimian 492k; 氺蘭斯氺 none (forced).
@@ -67,8 +68,11 @@
 // one replaced it at 0:16.12. Each is a lost Eradicate press for the GCD it
 // would have taken: the player's Eradicate (its hits ÷ its presses,
 // 341–623k) less their average GCD there.
-// Measured: Xaêro 5 a pull; Goodlookin 2; Caukyy (99.9th, 6:19), Purekenny,
-// Ribblez, Promidh, 紫色小猪 1; the other 29 Eradicate players none.
+// An overwrite whose held span was mostly forced isn't counted (Promidh
+// JvQpZk3CXj78Dx2f 0:57, a Void Ray through Vitriolic Stasis).
+// Measured: Xaêro 5 a pull, 1.01M; Goodlookin (6Bpq1FmA9aH4WQxc) 2, 336k;
+// one each for Caukyy (99.9th, 6:19) 207k, 紫色小猪 269k, Ribblez 229k,
+// Purekenny 160k; the other 29 Eradicate players none.
 //
 // ── Measured and not built (numbers in the ledger) ─────────────────────
 // - Void Ray cut short: 1,502 of ~1,650 channels land 20 tick instants on
@@ -89,10 +93,10 @@
 //   spends none of 22.
 // - The Hunt (tracked, 91s): worth 0 a use (its hits log under 1246169
 //   and 1246168), so it never reports, and left so: every one of the 9
-//   players who take it presses it only 1–3 times a pull, just before a
-//   transformation, the top ones too (Felstalker 3 in 5:17, holds of 146s;
-//   Limofans 3 in 6:21, 181s), so valued it would fire on them as on the
-//   weak (Kraa 2 in 7:00).
+//   players who take it presses it only 1–3 times a pull, the top ones too
+//   (Felstalker 3 in 5:17, a 146s hold; Limofans 3 in 6:21, 181s), 9 of
+//   the 23 presses just before a transformation (which resets it), so
+//   valued it would fire on them as on the weak (Kraa 2 in 7:00).
 
 import type { JobCheck, Moment } from "../../types";
 import { finding, type PlayerCheckContext } from "../../checks";

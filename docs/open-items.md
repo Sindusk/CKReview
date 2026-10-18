@@ -632,9 +632,17 @@ and delete them from the header.
     Reaper outside the window, Sudden Doom speed. Not built: Putrefy
     charges (no model fits), Reaping run out (~0), Festering Scythe buff
     (no visible effect). Lead: Lesser Ghoul charges lost to the cap.
-  - [demonhunter-devourer.md](wowa-audit/demonhunter-devourer.md): 7;
-    Void Metamorphosis window. WoWAnalyzer says its own Reap / Cull data
-    is bugged.
+  - [demonhunter-devourer.md](wowa-audit/demonhunter-devourer.md): phase 3
+    done 2026-10-17 on 47 player-pulls (four fights fetched, 99.9–100th).
+    The ~1s after each Void Ray was an Eradicate press the log never
+    writes; Void Metamorphosis isn't logged either (both added as presses,
+    game.ts), and The Hunt, Hungering Slash and Voidblade's 0.5s GCD were
+    survey misses: top players 82% → 91–94% GCD uptime. Built
+    (specs/devourer.ts): Void Metamorphosis window (top 0–374k, weak up to
+    1.70M), Eradicate overwritten (Xaêro 1.01M). Not built: Void Ray cut
+    short, Voidstep (negligible), Reap / Cull counts (no model), The Hunt's
+    value (fires on every top player). Proposed `wrong`: smuggled Reaper's
+    Toll, Fury at the cap.
   - [hunter-survival.md](wowa-audit/hunter-survival.md): 11; Tip of the
     Spear stack waste.
   - [mage-fire.md](wowa-audit/mage-fire.md): 8; Hot Streak expiry.
