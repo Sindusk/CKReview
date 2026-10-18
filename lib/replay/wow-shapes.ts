@@ -16,7 +16,10 @@
 //    close enough to share it). So an impact that hit nobody isn't drawn,
 //    and the shape shows LEAD_MS before its hit lands: the log has no
 //    telegraph. These are `estimated`.
-// 3. PER-BOSS TABLES, for what the data can't link (below).
+// 3. PER-BOSS SPECS, for what the data can't link: each boss's replay file
+//    beside its detection module (lib/mechanics/wow/va/<boss>-replay.ts,
+//    lib/replay/fight-spec.ts): debuff circles (`wowAuraShapes`), hits
+//    drawn some other way (`hiddenHits`), extra shapes (`shapes`).
 //
 // Spells with a radius of RAIDWIDE_YARDS or more hit the whole room; they
 // get a label (wowRaidwideAt), not a circle.
@@ -26,6 +29,8 @@
 import * as geometry from "./wow-spell-geometry.json";
 import type { AoeShape } from "./action-shapes";
 import { poseAt, sampleNear, type ReplayData } from "./ffxiv-replay";
+import type { WowAuraShape } from "./fight-spec";
+import { allWowAuraShapes, fightReplaysFor } from "./fights";
 
 type SpellGeometry = { r: number; t: number[] };
 const GEOMETRY = geometry as unknown as Record<string, SpellGeometry>;
@@ -44,21 +49,10 @@ const RAIDWIDE_MIN_PLAYERS = 5;
 /**
  * Debuffs drawn as a circle around the debuffed player while it lasts,
  * keyed by debuff id: `spell` is the area spell whose radius applies. The
- * replay fetch asks for these debuffs only (wow-replay.ts's filter).
+ * replay fetch asks for these debuffs only (wow-replay.ts's filter), from
+ * every boss's spec.
  */
-export const WOW_AURA_SHAPES: Record<number, { spell: number; name: string; onRemove?: "axis-lanes" }> = {
-  // Vashnik Plague Froth: the 6s debuff 1281913 is a scripted aura with no
-  // db2 link to its tick 1281925 (4.5y, centred on the carrier). At expiry
-  // the carrier sends Plague Waves along the four world axes, ~2.5y either
-  // side of the lane, travelling ~13y/s (vashnik.ts header).
-  1281913: { spell: 1281925, name: "Plague Froth", onRemove: "axis-lanes" },
-};
-
-// Hits drawn some other way, so not as hit circles.
-const HIDDEN_HITS = new Set([
-  1281925,   // Plague Froth ticks: the carrier's aura circle
-  1295798,   // Plague Wave: the lanes
-]);
+export const WOW_AURA_SHAPES: Record<number, WowAuraShape> = allWowAuraShapes();
 
 const LANE_LENGTH = 4000;   // centi-yards: the waves cross the play area
 const LANE_WIDTH = 500;
@@ -75,6 +69,9 @@ export function buildWowAoeShapes(data: ReplayData): AoeShape[] {
   const out: AoeShape[] = [];
   const shape = (s: Omit<AoeShape, "bearing" | "width" | "angle" | "inner" | "estimated" | "style"> & Partial<AoeShape>): AoeShape =>
     ({ bearing: 0, width: 0, angle: 0, inner: 0, estimated: false, style: "aoe", ...s });
+  const specs = fightReplaysFor(data);
+  const auraShapes: Record<number, WowAuraShape> = Object.assign({}, ...specs.map((f) => f.wowAuraShapes ?? {}));
+  const HIDDEN_HITS = new Set(specs.flatMap((f) => f.hiddenHits ?? []));
 
   // ── Debuff auras ──
   const open = new Map<string, number>();   // "id:target" -> applied at
@@ -83,7 +80,7 @@ export function buildWowAoeShapes(data: ReplayData): AoeShape[] {
     if (applied) { open.set(key, t); continue; }
     const from = open.get(key);
     open.delete(key);
-    const def = WOW_AURA_SHAPES[id];
+    const def = auraShapes[id];
     if (from === undefined || !def) continue;
     const r = wowSpellRadius(def.spell) * 100;
     const actor = actorByKey.get(target);
@@ -138,6 +135,8 @@ export function buildWowAoeShapes(data: ReplayData): AoeShape[] {
   }
   for (const id of [...groups.keys()]) flush(id);
 
+  // Shapes a boss builds itself, for what the tables can't express.
+  for (const f of specs) if (f.shapes) out.push(...f.shapes(data));
   return out.sort((a, b) => a.start - b.start);
 }
 

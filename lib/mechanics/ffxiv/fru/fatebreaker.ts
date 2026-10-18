@@ -30,7 +30,7 @@
 //   by the Sinsmoke/Sinsmite after them in JZ1KXhDbqkNH3jxR 24 and
 //   M9Nagmnw2LzHZPVq 1). In game a fire or lightning dragon circles the
 //   boss through the cast: fire = pairs, lightning = spread (user,
-//   2026-10-17; the replay draws it, lib/replay/ffxiv-effects.ts). The
+//   2026-10-17; the replay draws it, ./replay.ts). The
 //   repeats go bait lanes, gaps, lanes (user, 2026-10-17: players dodge
 //   into the gaps, back, and out again). Initial cones 40145, one cast per
 //   player with that player as target; follow-ups 40146 (Damage Down).

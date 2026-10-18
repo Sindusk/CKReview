@@ -28,16 +28,19 @@
 // the targeted player, else along the caster's facing. Circles of 30y or
 // more are raidwides and aren't drawn.
 //
-// OVERRIDES fixes what that gets wrong, per ability: an angle, the style
-// (stack, tower with its soaker count, tank buster, knockback), a line
-// through its caster, a cone pointing behind, an origin taken from another
-// cast's target or from a Spell-in-Waiting's holder (playerAuras). Futures
-// Rewritten's entries (FRU_OVERRIDES) were checked on JZ1KXhDbqkNH3jxR
-// fight 24; each says what it fixed. Head marker names live here too
-// (buildHeadMarkers).
+// Each fight's replay spec (lib/replay/fight-spec.ts, one file per fight
+// beside its detection modules) fixes what that gets wrong, per ability
+// (`overrides`): an angle, the style (stack, tower with its soaker count,
+// tank buster, knockback), a line through its caster, a cone pointing
+// behind, an origin taken from another cast's target or from a
+// Spell-in-Waiting's holder (playerAuras). Its head marker names, marker
+// circles and tether meanings are read here too (buildHeadMarkers,
+// buildTethers); only the specs whose abilities show up in the pull apply.
 
 import { facingToCompassBearing } from "@/lib/mechanics/geometry";
 import { poseAt, sampleNear, type ReplayActor, type ReplayData, type ReplayHit } from "@/lib/replay/ffxiv-replay";
+import type { HeadMarkerDef, MarkerAoe, TetherKind } from "@/lib/replay/fight-spec";
+import { fightReplaysFor, overridesFor } from "@/lib/replay/fights";
 
 export type ActionGeometry = { castType: number; range: number; width: number; omen: string };
 
@@ -123,7 +126,9 @@ export type AoeShape = {
   angle: number;                 // cone full angle, degrees
   inner: number;                 // donut inner radius, centi-yalms
   estimated: boolean;            // angle or inner radius guessed (not drawn differently)
-  style: "aoe" | "tower" | "tankbuster" | "stack" | "knockback" | "lightning" | "drop" | "light" | "ice" | "puddle";
+  // The built-in looks (ReplayPanel's AOE_COLORS and art); a fight can add
+  // its own, with colours or art in its components/replay-art file.
+  style: "aoe" | "tower" | "tankbuster" | "stack" | "knockback" | "lightning" | "drop" | "light" | "ice" | "puddle" | (string & {});
   soakers?: number;              // towers: players it needs, when the ability says
   name: string;
   start: number; resolve: number; // ms from pull start: telegraph start, resolution
@@ -136,164 +141,6 @@ export type AoeShape = {
   star?: boolean;                // cross: star points while telegraphed (FRU Frigid Needle)
   lineStack?: boolean;           // rect: a line stack, its marker shown until it fires (marker 525)
   marked?: string[];             // line stack: the marked player, or the group it sits in the middle of
-};
-
-/**
- * Per-ability corrections the game data can't give, each from a log or the
- * user's VOD review. Keyed by ability id.
- */
-type Override = {
-  angle?:   number;
-  style?:   AoeShape["style"];
-  hidden?:  boolean;
-  soakers?: number;          // towers: the number drawn in the middle
-  twoWay?:  boolean;         // a line through its caster, not from it
-  flip?:    boolean;         // a cone pointing behind the caster
-  // The caster is a parked helper with no sample near the cast: use its
-  // last one within HOLD_CASTER_MS.
-  holdCaster?: boolean;
-  aim?:     "hits";          // a cone aimed at the players it hit, not the caster's facing
-  // Starts at the target of the latest cast of this ability within 1.5s
-  // (the caster's own position is stale).
-  originAt?: number;
-  // Centred on the player whose status (FFLogs id) ended at the cast:
-  // a Spell-in-Waiting resolving on its holder. Needs playerAuras.
-  holder?:  number;
-  // A repeat of the same caster's earlier baited cast `of`: it fires from
-  // the bait's origin, alternating between the bait's lane (1st, 3rd
-  // repeat) and the lane turned by `gap` degrees (2nd). The caster's logged
-  // facing follows the players instead.
-  repeats?: { of: number; gap: number };
-  // A ground telegraph shown for its whole cast bar, not just as it lands:
-  // a fixed spot the players read ahead of time.
-  telegraph?: boolean;
-  star?:    boolean;         // a cross telegraphed as star points until it fires
-  // Starts where the caster of the latest of these abilities (within 8s)
-  // stood: the boss these cones really come from, not the helper casting.
-  originCaster?: number[];
-  // Leaves a puddle where it landed for this long (ms).
-  puddleMs?: number;
-};
-
-// Futures Rewritten (lib/mechanics/ffxiv/fru/*.ts headers; ids and
-// placements checked on JZ1KXhDbqkNH3jxR fight 24, 2026-10-17).
-// FRU P2 Bleeding puddles, not in the log: Sinbound Holy's last about 6s
-// (user, VOD of M9Nagmnw2LzHZPVq 1, 2026-10-17); Luminous Hammer's and
-// Hiemal Ray's are assumed the same, unchecked.
-const PUDDLE_GUESS_MS = 6000;
-const FRU_STACKS = [
-  40147, 40167,      // Sinsmoke: Cyclonic Break pairs, Utopian tether stacks
-  40159,             // Sinbound Fire III (Utopian Sky)
-  40209, 40211,      // Sinbound Holy, Hallowed Ray (line stack)
-  40222, 40217,      // Banish III pairs, Powerful Light
-  40287,             // Shell Crusher
-  40250,             // Morn Afah (P4)
-  40311, 40312,      // P5 Akh Morn light / dark
-  40317, 40318,      // Cruel Path of Light / Darkness (line stacks)
-];
-const FRU_OVERRIDES: Record<number, Override> = {
-  ...Object.fromEntries(FRU_STACKS.map((id) => [id, { style: "stack" as const }])),
-  // Cyclonic Break: eight narrow cones baited on the players, then three
-  // repeats where they no longer stand: the bait lanes, the gaps between,
-  // the lanes again (user, 2026-10-17: players dodge into the gaps, back
-  // to their spots, then out again). Fight 24 agrees: every player stood
-  // ±20-24° off their lane at the 1st and 3rd repeats and on it at the 2nd.
-  // The helpers' facing points at the players, which drew each repeat
-  // onto them. No angle in the data; under 30° by those positions, so half
-  // the 45° lane spacing is used.
-  40145: { angle: 22.5 }, 40146: { angle: 22.5, repeats: { of: 40145, gap: 22.5 } },
-  // Fall of Faith fire: Sinblaze, a 90° cone from the carrier toward the
-  // nearest helper, shared by four. The helper casting it sits elsewhere;
-  // its hit carries the carrier's spot, and it's aimed at the others hit.
-  40156: { angle: 90, style: "stack", aim: "hits" },
-  // Fall of Faith lightning: three 120° Bow Shock cones from the carrier
-  // (the Sinsmite 40142 target) through each helper. The helpers' own
-  // samples lag a tether behind (1:52.6 put one at the previous carrier).
-  // Lightning blue, as in game (user, 2026-10-17).
-  40143: { angle: 120, originAt: 40142, style: "lightning" },
-  // Towers: Burnt Strike towers' Explosion id is the soaker count
-  // (lightning 40131/40122/40123/40124, fire 40135/40125/40126/40127).
-  40131: { style: "tower", soakers: 1 }, 40122: { style: "tower", soakers: 2 }, 40123: { style: "tower", soakers: 3 }, 40124: { style: "tower", soakers: 4 },
-  40135: { style: "tower", soakers: 1 }, 40125: { style: "tower", soakers: 2 }, 40126: { style: "tower", soakers: 3 }, 40127: { style: "tower", soakers: 4 },
-  40213: { style: "tower" },              // Bright Hunger: Light Rampant (one each), Darklit (two each)
-  40320: { style: "tower", soakers: 2 },  // P5 Paradise Regained Explosion
-  // The towers' Burnt Strike and what follows it: Fatebreaker stands in
-  // the middle and the line runs through her, cutting the arena in half
-  // (she faced N at 2:22.5; drawn from her it covered only the north half;
-  // user, 2026-10-17, for Burnout). Fire 40129 then the Blastburn 40130
-  // knockback; lightning 40133 then the wide Burnout 40134.
-  40129: { twoWay: true }, 40130: { twoWay: true, style: "knockback" },
-  40133: { twoWay: true, style: "lightning" }, 40134: { twoWay: true, style: "lightning" },
-  40162: { style: "knockback" },          // Utopian Sky Blastburn (no damage, a knockback)
-  // Lightning in blue wherever it falls (user: "a common trend through the
-  // fight"): Utopian Sky's lightning Burnt Strike and Burnout from the west
-  // wall, Sinbound Thunder III and Cyclonic Break's Sinsmite spreads.
-  40163: { style: "lightning" }, 40164: { style: "lightning" },
-  40160: { style: "lightning" }, 40149: { style: "lightning" },
-  // Twin Stillness (270° front, then 90° back) and Twin Silence (90° back,
-  // then 270° front), per usurper-of-frost.ts's model; first/second as cast
-  // in fight 24 (40194 at 3:50.1, 40195 at 3:52.2). The reflection casting
-  // them has one sample 12s earlier and stands still.
-  40193: { angle: 270, holdCaster: true }, 40196: { angle: 90, flip: true, holdCaster: true },
-  40194: { angle: 90, flip: true, holdCaster: true }, 40195: { angle: 270, holdCaster: true },
-  // Spell-in-Waiting resolutions on their holders (P3 Relativity and
-  // Refrain, P4 Crystallize Time). Dark Blizzard III's donut hit nobody and
-  // its caster has no position, so it wasn't drawn at all.
-  40276: { holder: 1002455 },                       // Dark Fire III
-  40277: { holder: 1002454, style: "stack" },       // Unholy Darkness
-  40279: { holder: 1002462 },                       // Dark Blizzard III
-  40271: { holder: 1002461, style: "stack" },       // Dark Water III
-  40274: { holder: 1002460 },                       // Dark Eruption
-  40280: { holder: 1002463, style: "knockback" },   // Dark Aero III (P4)
-  // Diamond Dust's Icicle Impact: 10y circles at the arena edge, shown
-  // from their cast bars as the game does (user, 2026-10-17): 2, then 4
-  // about 4s later, then the last 2 as the Frigid Stones drop; each lands
-  // 8.7s after it begins (both pulls).
-  // In white with a turning snowflake until they land (user, 2026-10-17).
-  40198: { telegraph: true, style: "ice" },
-  // Diamond Dust's House of Light: four cones from Shiva in the middle out
-  // through the four nearest players (user, 2026-10-17: two drew from the
-  // north and west walls). The helpers casting them last logged a position
-  // at the walls in Fall of Faith; Shiva's reflection casts the Scythe /
-  // Axe Kick at (100, 100) just before (both pulls). Golden light, as in
-  // game.
-  // In Mirror, Mirror the same cones come from Shiva and the blue mirror
-  // (with her Scythe Kick), then from the two red mirrors (with their
-  // Reflected Scythe Kicks 40204/40205), four nearest players each.
-  40206: { originCaster: [40202, 40203, 40204, 40205], style: "light" },
-  // Glowing Bleeding puddles left where these land (user, 2026-10-17, for
-  // Sinbound Holy; the P2 header names Luminous Hammer and Hiemal Ray too).
-  // The log has no puddle actor and no Bleeding unless someone stands in
-  // one; the lifetime is PUDDLE_GUESS_MS (Holy's checked on VOD).
-  40209: { style: "stack", puddleMs: PUDDLE_GUESS_MS },
-  40218: { puddleMs: PUDDLE_GUESS_MS },
-  40257: { puddleMs: PUDDLE_GUESS_MS },
-  // Frigid Needle: each dropped stone shows an 8-way star through its 4.7s
-  // cast, pointing where its lines will shoot (user, 2026-10-17): two
-  // 40201 crosses per stone (one cardinal, one diagonal: casters face 180
-  // and 225 in both pulls) and the 5y 40200 circle under it.
-  40201: { telegraph: true, star: true }, 40200: { telegraph: true },
-  // Tank busters.
-  40290: { style: "tankbuster" },                   // Black Halo
-  40182: { style: "tankbuster" },                   // Darkest Dance jump
-  40284: { style: "tankbuster" }, 40285: { style: "tankbuster" },  // Somber Dance
-};
-
-const OVERRIDES: Record<number, Override> = {
-  ...FRU_OVERRIDES,
-  // Dancing Mad Revolting Ruin III, both hits: a 90° tankbuster cone (user,
-  // VOD review 2026-10-17). The game data has the cone but not its angle.
-  50179: { angle: 90, style: "tankbuster" },
-  50401: { angle: 90, style: "tankbuster" },
-  // Dancing Mad Blizzard III Blowout 47771 damages nobody: in Mystery Magic
-  // II, players stood 16° inside its facing untouched (2T1HzdPKgbhM43am
-  // fight 10, 0:54) while 47774, cast with it, hit a player 36° off its
-  // facing (yBKPqGwHparm7Tk4 fight 3, 0:55). Drawing it covered the safe
-  // quadrant.
-  47771: { hidden: true },
-  // Towers whose rows carry no omen to say so.
-  47806: { style: "tower" },   // The Path of Light (Forsaken)
-  47939: { style: "tower" }, 47940: { style: "tower" }, 47941: { style: "tower" },  // Celestriad
 };
 
 const RAIDWIDE_RANGE = 30;
@@ -323,6 +170,9 @@ export function buildAoeShapes(data: ReplayData): AoeShape[] {
   const auras = data.playerAuras ?? [];
   const usedHolder = new Set<(typeof auras)[number]>();
   const out: AoeShape[] = [];
+  const OVERRIDES = overridesFor(data);
+  const specs = fightReplaysFor(data);
+  const MARKER_AOES: Record<number, MarkerAoe> = Object.assign({}, ...specs.map((f) => f.markerAoes ?? {}));
 
   for (let i = 0; i < casts.length; i++) {
     const [t, key, name, dur, id, targetKey] = casts[i];
@@ -501,19 +351,10 @@ export function buildAoeShapes(data: ReplayData): AoeShape[] {
       style: "drop", name: m.name, start: mt, resolve: drop[0], follow: target, noFlash: true,
     });
   }
+  // Shapes a fight builds itself, for what the overrides can't express.
+  for (const f of specs) if (f.shapes) out.push(...f.shapes(data));
   return out.sort((a, b) => a.start - b.start);
 }
-
-/**
- * Head markers that put a circle on their player until it drops (the
- * drop itself is the ability's own cast, drawn where it lands). FRU P2
- * Diamond Dust: 345 on the four Frigid Stone players 8s before their
- * 5y stones 40199 drop at their feet (user, 2026-10-17; M9Nagmnw2LzHZPVq 1
- * marker 3:21.1, stones 3:29.2; JZ1KXhDbqkNH3jxR 24 3:18.8 / 3:26.9).
- */
-const MARKER_AOES: Record<number, { ability: number; name: string }> = {
-  345: { ability: 40199, name: "Frigid Stone" },
-};
 
 /**
  * Where a line stack's marker sits. In game it's on a player (user,
@@ -529,37 +370,26 @@ function lineStackTarget(markedKey: string, hits: ReplayHit[], actorByKey: Map<s
 
 export type TetherSpan = {
   source: string; target: string; id: number; start: number; end: number;
-  element?: "fire" | "lightning";   // drawn in its element (TETHER_KINDS)
+  element?: string;   // drawn in its element (the fight spec's `tethers`)
 };
 
 const TETHER_MAX_MS = 15000;
 const TETHER_GRACE_MS = 500;
 
 /**
- * Tether ids with a known meaning: their element, and the abilities that
- * resolve them on the tethered player (cast by another actor, so the
- * source's own payoff cast never comes). FRU P1, checked on
- * JZ1KXhDbqkNH3jxR 24 and M9Nagmnw2LzHZPVq 1 (user, 2026-10-17: Fall of
- * Faith's tethers are fire or lightning): 249 fire, paid off by Sinblaze
- * 40156 (Fall of Faith) or Sinsmoke 40167 (Utopian Sky's tether stacks);
- * 287 lightning, by Sinsmite 40142.
- */
-const TETHER_KINDS: Record<number, { element: "fire" | "lightning"; payoff: number[] }> = {
-  249: { element: "fire", payoff: [40156, 40167] },
-  287: { element: "lightning", payoff: [40142] },
-};
-
-/**
  * When each tether shows. The log marks only when a tether forms, so it
  * ends at its source's next cast on the tethered actor (Dancing Mad's
  * Graven Image tethers pay off with Pulse Wave), or at a known payoff
- * hitting the tethered player (TETHER_KINDS), else at the source's next
- * tether, else after 15s.
+ * hitting the tethered player (a fight spec's `tethers`: ids with a known
+ * meaning, their element and the abilities that resolve them on the
+ * tethered player, cast by another actor so the source's own payoff cast
+ * never comes), else at the source's next tether, else after 15s.
  */
 export function buildTethers(data: ReplayData): TetherSpan[] {
   const casts = data.enemyCasts ?? [];
   const hits = data.enemyHits ?? [];
   const tethers = data.tethers ?? [];
+  const TETHER_KINDS: Record<number, TetherKind> = Object.assign({}, ...fightReplaysFor(data).map((f) => f.tethers ?? {}));
   return tethers.map(([t, source, target, id]) => {
     let end = t + TETHER_MAX_MS;
     const kind = TETHER_KINDS[id];
@@ -599,26 +429,6 @@ export function tetherEndAt(actor: ReplayActor, span: TetherSpan, t: number, loo
 
 export type HeadMarkerSpan = { target: string; id: number; start: number; end: number; label: string };
 
-/**
- * Head marker ids and the abilities they announce. Marker ids are the
- * game's icons and may mean something else in another fight, so a label
- * applies only when one of its abilities then hits the marked player.
- * FRU, from the module headers and JZ1KXhDbqkNH3jxR fight 24 (marker ->
- * hit): 218 0:20 -> Powder Mark Trail 0:24, 2:49 -> Quadruple Slap 2:54;
- * 345 -> Frigid Stone 8s later; 259 8:39 -> Black Halo 8:44; 184 ~5s
- * before each Refrain Water; 139 on all eight 5s before Apocalypse's
- * Eruptions; 525 on Shiva herself, 6s before her Hallowed Ray. 62 (six
- * players at 8:56) is unplaced.
- */
-const HEAD_MARKERS: Record<number, { label: string; abilities: number[] }> = {
-  218: { label: "Tank buster", abilities: [40168, 40191] },
-  345: { label: "Frigid Stone", abilities: [40199] },
-  525: { label: "Line stack", abilities: [40211] },
-  375: { label: "Luminous Hammer", abilities: [40218] },
-  259: { label: "Black Halo", abilities: [40290] },
-  184: { label: "Dark Water III", abilities: [40271] },
-  139: { label: "Dark Eruption", abilities: [40274] },
-};
 const HEAD_MARKER_LOOKAHEAD_MS = 12000;
 // The game's standard line-stack marker, used in many fights (user,
 // 2026-10-17). FRU puts it on Shiva herself 5.5s before Hallowed Ray's
@@ -626,15 +436,19 @@ const HEAD_MARKER_LOOKAHEAD_MS = 12000;
 const LINE_STACK_MARKER = 525;
 
 /**
- * When each head marker shows and what it reads: a known marker until the
- * hit it announced, else "Marker <id>" for `plainMs`. Once one of a
- * marker's hits is seen in the pull, its other instances keep the label
- * even when theirs is missing (an invulnerable tank's Quadruple Slap, a
- * dodged Hallowed Ray target, a dead player).
+ * When each head marker shows and what it reads: a known marker (the
+ * fight spec's `headMarkers`) until the hit it announced, else "Marker
+ * <id>" for `plainMs`. Marker ids are the game's icons and may mean
+ * something else in another fight, so a label applies only when one of
+ * its abilities then hits the marked player. Once one of a marker's hits
+ * is seen in the pull, its other instances keep the label even when
+ * theirs is missing (an invulnerable tank's Quadruple Slap, a dodged
+ * Hallowed Ray target, a dead player).
  */
 export function buildHeadMarkers(data: ReplayData, plainMs: number): HeadMarkerSpan[] {
   const hits = data.enemyHits ?? [];
   const casts = data.enemyCasts ?? [];
+  const HEAD_MARKERS: Record<number, HeadMarkerDef> = Object.assign({}, ...fightReplaysFor(data).map((f) => f.headMarkers ?? {}));
   const soon = (at: number, t: number) => at > t && at - t <= HEAD_MARKER_LOOKAHEAD_MS;
   const spans = (data.headMarkers ?? []).map(([t, target, id]) => {
     const known = HEAD_MARKERS[id];

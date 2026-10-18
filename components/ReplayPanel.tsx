@@ -42,8 +42,10 @@ import type { Pull } from "@/types/Pull";
 import { ffMapImageUrl, fitReplayView, mapImageBounds, poseAt, type ReplayActor, type ReplayData, type ReplayPose } from "@/lib/replay/ffxiv-replay";
 import { aoesAt, buildAoeShapes, buildHeadMarkers, buildTethers, tetherEndAt, type AoeShape } from "@/lib/replay/action-shapes";
 import { getFFAbilityIconUrl } from "@/lib/ability-icons";
-import { buildCasterEffects, SLIDE_STATUSES } from "@/lib/replay/ffxiv-effects";
-import { ElementDragon, ElementHalo, ElementTether, FrozenMirror, IceFloor, JailCage } from "@/components/ReplayEffects";
+import { buildCasterEffects, JAIL_STATUSES, SLIDE_STATUSES } from "@/lib/replay/ffxiv-effects";
+import { ElementTether, JailCage } from "@/components/ReplayEffects";
+import { EFFECT_ART, EXTRA_COLORS, SHAPE_ART, TETHER_ART } from "@/components/replay-art";
+import { BOSS_ICON, type AoeColors } from "@/components/replay-art/types";
 import { sampleNear } from "@/lib/replay/ffxiv-replay";
 import { facingToCompassBearing } from "@/lib/mechanics/geometry";
 import { detectFFRoles } from "@/lib/mechanics/ffxiv/roles";
@@ -89,8 +91,9 @@ const FFLOGS_ICON = (name: string) => `https://assets.rpglogs.com/img/ff/icons/$
 // AoE colours by kind: red AoEs (user, 2026-10-17; were guide-style
 // blue), yellow towers, purple tankbusters, orange stacks (shared hits:
 // stand in them), pale blue knockbacks; light rims. `flash` is the fill as
-// it resolves. Lightning-element cleaves are blue.
-const AOE_COLORS: Record<AoeShape["style"], { fill: string; flash: string; rim: string; glow: string }> = {
+// it resolves. Lightning-element cleaves are blue. A fight's own styles
+// take their colours from its art file (components/replay-art).
+const AOE_COLORS: Record<string, AoeColors> = {
   aoe:        { fill: "#d9342b", flash: "#ff7a70", rim: "#ffe1dc", glow: "#ff5a4a" },
   tower:      { fill: "#f2c230", flash: "#ffe27a", rim: "#fff6c8", glow: "#ffb84a" },   // non-circle towers only; circles use Tower
   tankbuster: { fill: "#8a3dff", flash: "#c99bff", rim: "#f1e2ff", glow: "#b47bff" },
@@ -110,14 +113,8 @@ const COMMON_STATUSES = new Set([1002941, 1002940, 1004162, 1000043, 1000044]);
 // Head markers show from the marker until the hit it announced
 // (action-shapes.ts's buildHeadMarkers), or this long when unknown.
 const HEAD_MARKER_PLAIN_MS = 5000;
-const MIRROR_SIZE = 600;   // centi-yalms across: FRU's frozen mirrors
-// Statuses that lift a player into a cage: FRU Floating Fetters, 4s on
-// each tethered carrier before their hit (user, 2026-10-17). Lift and
-// cage last the whole status (user: a last-second-only cage was wrong).
-const JAIL_STATUSES = new Set([1002304]);
 const STATUS_W = 15, STATUS_H = 20;   // SVG units at icon scale 1 (the game's icons are 24x32)
 const PLAYER_ICON = 34;   // SVG units, at icon scale 1
-const BOSS_ICON = 46;
 const TETHER_COLOR = "#ff5fd2";
 // A tether's source is often a helper with sparse samples; take its
 // nearest one within this window.
@@ -315,9 +312,10 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
             {showGrid && <Grid cx={cx} cy={cy} half={half} toX={toX} toY={toY} S={S} />}
             {showRings && <Rings cx={cx} cy={cy} half={half} toX={toX} toY={toY} scale={scale} />}
             {/* Floor effects (FRU Thin Ice) under everything else. */}
-            {showAoes && casterEffects.filter((e) => e.kind === "ice-floor" && t >= e.start && t <= e.end).map((e) => (
-              <IceFloor key={`floor-${e.start}`} e={e} x={toX(e.x)} y={toY(e.y)} r={(e.radius ?? 2000) * scale} t={t} />
-            ))}
+            {showAoes && casterEffects.filter((e) => e.layer === "floor" && t >= e.start && t <= e.end).map((e) => {
+              const Art = EFFECT_ART[e.kind];
+              return Art ? <Art key={`floor-${e.kind}-${e.start}`} e={e} x={toX(e.x)} y={toY(e.y)} t={t} scale={scale} cx={toX(cx)} cy={toY(cy)} /> : null;
+            })}
             {showAoes && aoesAt(aoes, t).map(({ s, opacity, resolving }, i) => {
               // An aura shape rides on its actor (WoW Plague Froth).
               const rider = s.follow ? actorByKey.get(s.follow) : undefined;
@@ -335,7 +333,9 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
               const b = dst && tetherEndAt(dst, tt, t, TETHER_LOOKUP_MS);
               if (!a || !b) return null;
               const line = { x1: toX(a.x), y1: toY(a.y), x2: toX(b.x), y2: toY(b.y) };
-              if (tt.element) return <ElementTether key={i} {...line} element={tt.element} t={t} />;
+              if (tt.element === "fire" || tt.element === "lightning") return <ElementTether key={i} {...line} element={tt.element} t={t} />;
+              const Art = tt.element ? TETHER_ART[tt.element] : undefined;
+              if (Art) return <Art key={i} {...line} t={t} />;
               return (
                 <g key={i} pointerEvents="none">
                   <line {...line} stroke={TETHER_COLOR} strokeWidth={12} strokeOpacity={0.35} strokeLinecap="round" filter="url(#replay-glow)" />
@@ -344,17 +344,14 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
                 </g>
               );
             })}
-            {/* Boss cues (FRU Cyclonic Break's dragon), around the caster. */}
-            {showAoes && casterEffects.filter((e) => e.kind !== "ice-floor" && t >= e.start && t <= e.end).map((e) => {
+            {/* Boss cues (FRU Cyclonic Break's dragon), drawn by each fight's art (components/replay-art). */}
+            {showAoes && casterEffects.filter((e) => e.layer !== "floor" && t >= e.start && t <= e.end).map((e) => {
+              const Art = EFFECT_ART[e.kind];
+              if (!Art) return null;
               const follow = e.actor ? actorByKey.get(e.actor) : undefined;
               const p = follow && poseAt(follow, t);
               const at = p && !p.stale ? p : e;
-              if (e.radius !== undefined) return <ElementHalo key={`${e.kind}-${e.start}-${e.x}-${e.y}`} e={e} x={toX(e.x)} y={toY(e.y)} r={e.radius * scale} t={t} />;
-              if (e.kind === "blue-mirror" || e.kind === "red-mirror") {
-                return <FrozenMirror key={`${e.kind}-${e.x}-${e.y}`} e={e} x={toX(e.x)} y={toY(e.y)} cx={toX(cx)} cy={toY(cy)} size={MIRROR_SIZE * scale} t={t} />;
-              }
-              const hitbox = follow?.hitbox ?? 500;
-              return <ElementDragon key={`${e.kind}-${e.start}-${e.x}`} e={e} x={toX(at.x)} y={toY(at.y)} r={Math.max(BOSS_ICON / 2 + 20, hitbox * scale * 0.6)} t={t} />;
+              return <Art key={`${e.kind}-${e.start}-${e.x}-${e.y}`} e={e} x={toX(at.x)} y={toY(at.y)} t={t} scale={scale} cx={toX(cx)} cy={toY(cy)} actor={follow} />;
             })}
           </g>
           <text x={S / 2} y={24} textAnchor="middle" fill="#fff" fontSize={20} fontWeight={700} {...LABEL}>N</text>
@@ -817,6 +814,9 @@ function Aoe({ s, opacity, resolving, toX, toY, scale, uid, t, marked }: { s: Ao
   const x = toX(s.x), y = toY(s.y);
   const r = s.range * scale;
   const b = (s.bearing * Math.PI) / 180;
+  // A fight's own art for this style (components/replay-art).
+  const Art = SHAPE_ART[s.style];
+  if (Art) return <Art s={s} x={x} y={y} r={r} scale={scale} t={t} opacity={opacity} resolving={resolving} uid={uid} marked={marked} />;
   if (s.style === "tower" && s.kind === "circle") return <Tower x={x} y={y} r={r} opacity={opacity} resolving={resolving} uid={uid} soakers={s.soakers} />;
   if (s.style === "knockback") return <Knockback s={s} x={x} y={y} r={r} scale={scale} opacity={opacity} />;
   if (s.kind === "cross" && s.star && !resolving) return <StarPoints s={s} x={x} y={y} r={r} scale={scale} opacity={opacity} />;
@@ -824,7 +824,7 @@ function Aoe({ s, opacity, resolving, toX, toY, scale, uid, t, marked }: { s: Ao
   if (s.kind === "rect" && s.lineStack && !resolving) return <LineStackMarker s={s} x={x} y={y} r={r} scale={scale} t={t} opacity={opacity} marked={marked} />;
   if (s.style === "puddle") return <Puddle x={x} y={y} r={r} t={t} s={s} uid={uid} />;
   if (s.style === "ice" && s.kind === "circle" && !resolving) return <IceCircle x={x} y={y} r={r} t={t} s={s} opacity={opacity} />;
-  const c = AOE_COLORS[s.style];
+  const c = AOE_COLORS[s.style] ?? EXTRA_COLORS[s.style] ?? AOE_COLORS.aoe;
   const base = resolving ? c.flash : c.fill;
   const grad = `aoe-${uid}`;
   // Radial shapes shade outward from their origin; lines across their width.

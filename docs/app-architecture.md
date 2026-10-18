@@ -302,13 +302,23 @@ file's header comment. Mechanic detection has its own guide:
     60y+) get a label top right instead of a circle, unless they land
     every few seconds (ambient damage). No cones, tethers or hitboxes yet:
     see [wow-replay-plan.md](wow-replay-plan.md).
+- **One file per fight** (`lib/replay/fight-spec.ts`): everything a fight
+  adds to the replay lives in its own spec beside its detection modules
+  (`lib/mechanics/ffxiv/fru/replay.ts`, `lib/mechanics/wow/va/<boss>-replay.ts`)
+  and its art in `components/replay-art/<fight>.tsx` (one `va.tsx` for the
+  raid). Shape overrides, head markers, tethers, boss cues, floor and cage
+  statuses, WoW debuff circles. A spec applies to a pull when its abilities
+  show up in it (`lib/replay/fights.ts`). Every fight is registered in
+  `fights.ts` and `components/replay-art/index.ts` already, so fights can be
+  built in parallel without touching shared files. The `/build-replay`
+  skill is the workflow.
 - **AoE shapes come from game data, not per-boss models**
   (`lib/replay/action-shapes.ts`): XIVAPI's Action sheet gives CastType,
   EffectRange and XAxisModifier for every ability, so every enemy AoE is
   drawn at its real size from its cast, hit or miss. Cone angles and donut
   holes aren't in the data for new rows; they're estimated from who was
-  hit. What the data gets wrong is fixed per ability in `OVERRIDES` there,
-  each with its evidence (Revolting Ruin 90° purple tankbuster; Blowout
+  hit. What the data gets wrong is fixed per ability in the fight spec's
+  `overrides`, each with its evidence (Revolting Ruin 90° purple tankbuster; Blowout
   47771 deals no damage; towers without a "trap" omen are yellow).
   Targetless stacks cast by a parked helper are centred on the players
   they hit; a beam whose caster has no nearby sample starts where its hit
@@ -324,8 +334,9 @@ file's header comment. Mechanic detection has its own guide:
   the game's party list (icon, seconds left, stacks), and is listed in the
   hover card. Up to five, with vulnerabilities and Weakness last. Tracks
   saved before 2026-10-17 have none: refetch them.
-- **Boss cues** (`lib/replay/ffxiv-effects.ts`, art in
-  `components/ReplayEffects.tsx`): effects the game shows on a boss to say
+- **Boss cues** (the fight spec's `effects`, gathered by
+  `lib/replay/ffxiv-effects.ts`; art in `components/replay-art/<fight>.tsx`,
+  shared pieces in `components/ReplayEffects.tsx`): effects the game shows on a boss to say
   what's coming, drawn from the cast id. FRU's element dragon circles the
   caster in fire or lightning for the length of the cast bar: Cyclonic
   Break (pairs / spread), Utopian Sky (stacks / spread) and the clone's
@@ -338,19 +349,19 @@ file's header comment. Mechanic detection has its own guide:
   line stack: orange chevrons along the beam, pointing back at the caster,
   from the marker until it fires, aimed where it hit.
 - **Head markers** show as a label over the marked actor. The log gives
-  only a number, so `buildHeadMarkers` names the ones it knows (FRU's) when
+  only a number, so `buildHeadMarkers` names the ones the fight spec knows when
   the ability they announce follows. The label stays until that hit; an
   unknown marker reads "Marker <id>" for 5s.
 - **Tethers** come from the API's `tether` events (fetched with the
   replay). The log marks only when one forms, so each lasts until its
   source's next cast on that player, capped at 15s. Tether ids with a known
-  meaning (`TETHER_KINDS`: FRU's 249 fire, 287 lightning) draw in their
+  meaning (the spec's `tethers`: FRU's 249 fire, 287 lightning) draw in their
   element and end at the hit that resolves them. A parked clone at a
   tether's end sits where it logged a position during the tether: FRU's
   clones move from the south (Utopian Sky) to the north wall (Fall of Faith)
   with nothing logged between.
-- **Jailed players** (FRU Floating Fetters, `JAIL_STATUSES` in
-  ReplayPanel): the icon lifts off its spot, leaving a shadow, inside a
+- **Jailed players** (FRU Floating Fetters, the spec's `jailStatuses`):
+  the icon lifts off its spot, leaving a shadow, inside a
   cage for the status's 4s.
 - **Layers menu:** AoEs, map, 5y rings, 5y grid (0,0 at the arena centre),
   helper actors, statuses and head markers (FFXIV), and an icon-size slider.
