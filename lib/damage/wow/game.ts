@@ -502,7 +502,13 @@ const PISTOL_FOLLOW_MS = 500;
 // after a Vampiric / Scourge Strike, Necrotic Coil, Graveyard or Soul Reaper
 // (71% in the first 100ms against 10% for a random instant, 553 instants on
 // four kills). See UNHOLY_PRESS_HITS for the player's own.
-const PET_PRESS_HITS = new Set([83381, 1232922, 389448, 344572, 1264355, 201754, 1294264, 1300330]);
+// Survival's Kill Command too (phase 3, 2026-10-17): the cast (259489) hits
+// nothing itself; its attack is the pet's (259277), within 30ms of every one
+// of 940 casts on 10 Survival player-pulls. Without it a Survival GCD counted
+// a third of its presses at 0 (Reggienoble zQq63GHTRwPgt2Bp: 133k a GCD).
+// The pet's Strike As One, Sic 'Em and basic attacks don't follow a press
+// (0–14 of 224–518 within 1s of a Kill Command) and stay out.
+const PET_PRESS_HITS = new Set([83381, 1232922, 389448, 344572, 1264355, 201754, 1294264, 1300330, 259277]);
 
 // Unholy Death Knight's plague Erupts (Virulent 1241167, Dread 1241171) are
 // the player's own hits a press causes, under ids no cast has: 99% of
