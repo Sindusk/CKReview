@@ -89,10 +89,8 @@ row, its Open list, the job header and the open-items line together.
   Astrologian ×2, Black Mage 7.1 ×4; see each ledger row). Pages are in
   `sampledata/damage-ff/`; read them with
   `.claude/skills/damage-analysis/tools/xiva-html.js`.
-- **Dancer thresholds**, builder's choices not yet confirmed: the 5s
-  swap grace after Closed Position is ready (`PARTNER_SWAP_GRACE_MS`) and
-  the weaker-partner bar (20k and 20%, `PARTNER_CHOICE_*`), in
-  `lib/damage/ffxiv/jobs/ranged.ts`.
+- ~~Dancer thresholds~~: settled 2026-10-18 (5s grace confirmed by the
+  user; the 20k / 20% bar kept from the measure, see `partnerChoice`).
 
 ## Tools
 

@@ -977,7 +977,14 @@ const dancePartnerLost: JobCheck = (ctx): DamageFinding[] => {
 // PARTNER_CHOICE_SPAN_MS). Judged in hindsight from the damage they dealt,
 // so only a clear gap counts (PARTNER_CHOICE_MIN and PARTNER_CHOICE_SHARE
 // of the pick's value). The pre-pull partner isn't judged: that's the
-// static's plan.
+// static's plan. The bar was measured 2026-10-18 and the user left it to
+// the measure: of the 21 swaps after a death on disk, 13 picked the best
+// partner and the best alternative beat the other 8 by either 1-7%
+// (2-33k: within the model's ~10% error against partnercalc for
+// non-tanks) or 51-144% (65-148k: Xk2DKZwVp4Ar6d7y Enuo pull 3 8:04 and
+// pull 4 7:21, pnLBzfbH8NjGAJRg Enuo pull 10 7:55). Nothing fell between,
+// so 20% (twice the model error) splits them, and 20k keeps out small
+// windows. The 5s swap grace was confirmed by the user the same day.
 function partnerChoice(
   ctx: PlayerCheckContext,
   partnerWins: { p: PlayerInfo; ws: Window[] }[],

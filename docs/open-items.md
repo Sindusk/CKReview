@@ -222,7 +222,8 @@ and delete them from the header.
     Crit / direct-hit rates from DoT ticks need samples fetched since
     2026-10-18 (`--refetch` for older ones). Partner swaps judged since
     2026-10-18 (late swap after a death, weaker swap partner); the 5s
-    swap grace and the partner-choice threshold are unconfirmed.
+    swap grace confirmed by the user and the partner-choice bar (20k,
+    20%) settled from the 21 swaps on disk, 2026-10-18.
   - [pct.md](xiva-audit/pct.md): Pictomancer, 0 candidates, 7 covered
     (Hyperphantasia covered 2026-10-16, only lost at deaths on disk) (portrait
     overwrites built 2026-10-16; Striking Muse not judged on 7.2).

@@ -93,5 +93,7 @@ In priority order (biggest damage cost first):
    it fails to give isn't valued.
 2. **dnc/DirtyDancing/closed-position-uptime** (covered 2026-10-18,
    `dancePartnerLost`, swaps judged since the user's call the same
-   day). The swap grace (5s) and the partner-choice threshold are
-   builder's choices, unconfirmed.
+   day). The 5s swap grace was confirmed by the user 2026-10-18; the
+   weaker-partner bar (20k and 20%) was left to the measure and kept:
+   the 21 swaps on disk split into gaps of 1-7% and 51-144% (the header
+   of `partnerChoice` in ranged.ts).
