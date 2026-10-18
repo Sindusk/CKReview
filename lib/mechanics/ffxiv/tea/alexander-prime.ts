@@ -232,6 +232,11 @@
 //   along the wall); F7: #3 aimed into the group (answers question 2 for
 //   F7); F11 #7 caught by the charge after their sword. Facing Cruise
 //   Chaser shortens its knockback a lot (user).
+// Replay findings (2026-10-18, tea/replay.ts, F4 the kill): Repentance's
+//   helpers sit on the puddle centres (soakers 6.3 / 5.3 / 2.2y from the
+//   east one, inside 8 / 6 / 3y); the third Stasis sword and the party's
+//   Inception fire have no cast target (aimed at who they hit); Plasmasphere
+//   paths and the orb tethers are not in the replay data either.
 // OPEN QUESTIONS:
 // 1. Electromagnetic Burst names nobody (C27, D5, D16): can the orbs'
 //    paths be read from anything the log keeps?

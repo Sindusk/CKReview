@@ -167,6 +167,49 @@ function ShieldFront({ e, x, y, t, scale, actor }: EffectArtProps) {
   );
 }
 
+/** A Judgment Crystal on the floor: a violet-white diamond with a soft glow and a slow pulse. */
+function Crystal({ e, x, y, t }: EffectArtProps) {
+  const o = fade(t, e.start, e.end, 250);
+  if (o <= 0) return null;
+  const s = 13 * (1 + 0.06 * Math.sin(t / 200));
+  return (
+    <g opacity={o} pointerEvents="none">
+      <circle cx={x} cy={y} r={s * 1.7} fill="#c9a8ff" fillOpacity={0.22} filter="url(#replay-glow)" />
+      <path d={`M${x} ${y - s * 1.3} L${x + s * 0.75} ${y} L${x} ${y + s * 1.3} L${x - s * 0.75} ${y} Z`} fill="#efe6ff" stroke="#9b6bff" strokeWidth={2} />
+      <path d={`M${x} ${y - s * 1.3} L${x} ${y + s * 1.3} M${x - s * 0.75} ${y} L${x + s * 0.75} ${y}`} stroke="#b998ff" strokeWidth={1} />
+    </g>
+  );
+}
+
+/**
+ * Temporal Stasis tethers: House Arrest (stay close) a short taut double
+ * line in teal; Restraining Order (stay far) a dashed amber line with
+ * outward arrows at both ends.
+ */
+function CloseTether({ x1, y1, x2, y2 }: TetherArtProps) {
+  return (
+    <g pointerEvents="none">
+      <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#3fe0c8" strokeWidth={9} strokeOpacity={0.35} strokeLinecap="round" filter="url(#replay-glow)" />
+      <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#bffff4" strokeWidth={2.5} strokeLinecap="round" />
+    </g>
+  );
+}
+function FarTether({ x1, y1, x2, y2, t }: TetherArtProps) {
+  const len = Math.hypot(x2 - x1, y2 - y1);
+  if (len < 1) return null;
+  const ux = (x2 - x1) / len, uy = (y2 - y1) / len;
+  const head = (x: number, y: number, dx: number, dy: number) =>
+    `M${x + dx * 10} ${y + dy * 10} L${x - dy * 6} ${y + dx * 6} M${x + dx * 10} ${y + dy * 10} L${x + dy * 6} ${y - dx * 6}`;
+  return (
+    <g pointerEvents="none">
+      <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#ffb340" strokeWidth={8} strokeOpacity={0.3} strokeLinecap="round" filter="url(#replay-glow)" />
+      <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#ffe0a0" strokeWidth={2} strokeDasharray="10 7" strokeDashoffset={-(t / 30) % 17} />
+      <path d={head(x1 - ux * 14, y1 - uy * 14, -ux, -uy)} stroke="#ffe0a0" strokeWidth={2.5} fill="none" strokeLinecap="round" />
+      <path d={head(x2 + ux * 14, y2 + uy * 14, ux, uy)} stroke="#ffe0a0" strokeWidth={2.5} fill="none" strokeLinecap="round" />
+    </g>
+  );
+}
+
 // Decree Nisi colours, the BPOG line (bj-cc.ts).
 const NISI_COLORS: Record<string, string> = { a: "#3d8bff", b: "#ff9a2e", g: "#b45cff", d: "#3fd46a" };
 
@@ -201,6 +244,7 @@ export const TEA_ART: FightArt = {
     "tea-hand-fist": HandGesture, "tea-hand-palm": HandGesture,
     "tea-ice-pillar": IcePillar,
     "tea-shield-front": ShieldFront,
+    "tea-crystal": Crystal,
     ...NISI_ART,
   },
   colors: {
@@ -212,5 +256,5 @@ export const TEA_ART: FightArt = {
     // Enumeration: a stack, in the built-in stack orange.
     "tea-enum":  { fill: "#f08a24", flash: "#ffc070", rim: "#fff0d8", glow: "#ffa040" },
   },
-  tethers: { "tea-water": WaterTether },
+  tethers: { "tea-water": WaterTether, "tea-close": CloseTether, "tea-far": FarTether },
 };

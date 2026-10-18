@@ -592,18 +592,131 @@ function phaseTwoEffects(data: ReplayData): CasterEffect[] {
   return out;
 }
 
+// ── Phase 3: Alexander Prime (with Temporal Stasis) ─────────────────────────
+//
+// Ids from alexander-prime.ts's header; checked on Q9zqJb4VLmjhd1B6 4
+// (Stasis 4:38, Alexander Prime 5:04 to 10:42).
+
+const STASIS_SWORD = 18539, STASIS_FIRE = 18540;
+const PLAINT_OF_SURETY = 18531, PLAINT_OF_SOLIDARITY = 18530;
+const CHASTENING_HEAT = 19072, DIVINE_SPEAR = 19074;
+const INCEPTION = 18526, SACRAMENT_INCEPTION = 18527, SACRAMENT_WORMHOLE = 18519;
+const JUDGMENT_CRYSTAL = 18524, TETRASHATTER = 19080;
+const WORMHOLE_CHARGE = 18883;
+const VOID_OF_REPENTANCE = 18534;
+const REPENTANCE = [18537, 18536, 18535];   // first, second, third soak (8y, 6y, 3y)
+const INCINERATING_HEAT = 19025;
+const APOCALYPTIC_RAY = 18508;
+
+// Temporal Stasis: Cruise Chaser's three swords at its three nearest, Brute
+// Justice's two fires at its two nearest, frozen players baiting them. 90°
+// ([BM]); the data has no angle, and the estimate from who was hit spread
+// to 180-360° on the kill (4:58.1-5:00.3, two or three hit each, the
+// Aggravated Assault holder on Cruise Chaser's side: header).
+// A cast with no target (the third sword, 5:00.3, hit the sage and paladin
+// at the west wall; facing said south) is aimed at who it hit.
+OVERRIDES[STASIS_SWORD] = { angle: 90, aim: "hits" };
+// The same fire cone in Stasis and Inception (three at 6:02.7-6:07.0; the
+// third, the party's, has no target and hit six north-east of Brute
+// Justice at bearings 30-45° while its facing pointed east).
+OVERRIDES[STASIS_FIRE] = { angle: 90, style: "tea-fire", aim: "hits" };
+// The shared stack on the Shared Sentence player (Inception).
+OVERRIDES[PLAINT_OF_SOLIDARITY] = { style: "stack" };
+// Chastening Heat (5y on the tank) and its three Divine Spears.
+OVERRIDES[CHASTENING_HEAT] = { style: "tankbuster" };
+OVERRIDES[DIVINE_SPEAR] = { style: "tankbuster" };
+// Inception 18526 is the control cast for Sacrament 18527 (the cross that
+// hits, exact): its own cross drew at Alexander Prime's old spot.
+OVERRIDES[INCEPTION] = { hidden: true };
+// Wormhole's Sacrament: a 5.7s cast; the 16y cross shown through it.
+OVERRIDES[SACRAMENT_WORMHOLE] = { telegraph: true };
+// Inception's crystals: drawn by crystals() (the drop circles are the
+// game data's, on the marked players).
+// Void of Repentance: drawn by repentance() as the puddles' three soaks.
+for (const id of REPENTANCE) OVERRIDES[id] = { hidden: true };
+// Incinerating Heat: the stack everyone shares (marker 93), its 4.7s cast.
+OVERRIDES[INCINERATING_HEAT] = { style: "stack", telegraph: true };
+// Wormhole's Limit Cut charge has its own id; the numbers' markers name it.
+for (const n of [80, 82, 84, 86]) (LIMIT_CUT_MARKERS[n] as { abilities: number[] }).abilities.push(WORMHOLE_CHARGE);
+
+const AP_MARKERS = {
+  96: { label: "Crystal", abilities: [JUDGMENT_CRYSTAL] },
+  93: { label: "Stack", abilities: [INCINERATING_HEAT] },
+};
+/** The crystal's 5y drop rides on each marked player (marker 96, 5:46.3 -> 5:51.4 on the kill). */
+const AP_MARKER_AOES = { 96: { ability: JUDGMENT_CRYSTAL, name: "Crystal" } };
+
+/** House Arrest (28: stay within ~5y) and Restraining Order (29: stay ~30y apart), checked by Plaint of Surety. */
+const AP_TETHERS: Record<number, TetherKind> = {
+  28: { element: "tea-close", payoff: [PLAINT_OF_SURETY] },
+  29: { element: "tea-far", payoff: [PLAINT_OF_SURETY] },
+};
+
+/**
+ * Void of Repentance: two puddles, each soaked three times by one player,
+ * shrinking 8y -> 6y -> 3y. Each soak shows as a one-soaker tower from the
+ * previous check (the first from Void's cast) until it lands, at the spot
+ * its helper logs on landing (kill: E (115.9, 100.5) / W (82.5, 98.7) at
+ * 7:28.8, then 7:33.1 and 7:37.3). The game data's circle flashed only as
+ * each landed.
+ */
+function repentance(data: ReplayData): AoeShape[] {
+  const out: AoeShape[] = [];
+  const casts = data.enemyCasts ?? [];
+  for (const v of casts.filter((c) => c[4] === VOID_OF_REPENTANCE && c[3] === 0)) {
+    let prev = new Map<number, number>();   // side (-1 west, 1 east) -> last check time
+    REPENTANCE.forEach((id, k) => {
+      const checks = casts.filter((c) => c[4] === id && c[3] === 0 && c[0] > v[0] && c[0] - v[0] < 40000);
+      const next = new Map<number, number>();
+      for (const c of checks) {
+        const a = data.actors.find((x) => x.key === c[1]);
+        const hit = (data.enemyHits ?? []).find((h) => h[1] === id && h[2] === c[1] && h[4] !== null);
+        const p = (a && sampleNear(a, c[0], 1500)) ?? (hit ? { x: hit[4]!, y: hit[5]! } : undefined);
+        if (!p) continue;
+        const side = p.x < 10000 ? -1 : 1;
+        const range = (data.actionGeometry?.[id]?.range ?? [8, 6, 3][k]) * 100;
+        out.push({ kind: "circle", x: p.x, y: p.y, bearing: 0, range, width: 0, angle: 0, inner: 0, estimated: false,
+          style: "tower", soakers: 1, name: "Repentance", start: prev.get(side) ?? v[0], resolve: c[0] });
+        next.set(side, c[0]);
+      }
+      prev = next;
+    });
+  }
+  return out;
+}
+
+/**
+ * Inception's Judgment Crystals: each sits where it dropped until the True
+ * Heart reaches it and it shatters (Tetrashatter). The crystal actors log
+ * one sample, as they shatter (kill: drops 5:51.4, shatters 5:57.4-5:58.1).
+ */
+function crystals(data: ReplayData): CasterEffect[] {
+  const out: CasterEffect[] = [];
+  const casts = data.enemyCasts ?? [];
+  const drop = casts.find((c) => c[4] === JUDGMENT_CRYSTAL && c[3] === 0);
+  if (!drop) return out;
+  for (const c of casts) {
+    if (c[4] !== TETRASHATTER || c[3] !== 0 || c[0] < drop[0] || c[0] - drop[0] > 20000) continue;
+    const a = data.actors.find((x) => x.key === c[1]);
+    const p = a && sampleNear(a, c[0], 1500);
+    if (p) out.push({ kind: "tea-crystal", label: "", x: p.x, y: p.y, start: drop[0], end: c[0] + 300 });
+  }
+  return out;
+}
+
 export const TEA_REPLAY: FightReplay = {
   key: "tea",
   game: "ffxiv",
   name: "The Epic of Alexander",
   signature: [FLUID_SWING, CASCADE, WAVE_BOSS_VISIBLE, WAVE_TORNADO_VISIBLE],
   overrides: OVERRIDES,
-  headMarkers: { ...LIMIT_CUT_MARKERS, ...BJCC_MARKERS },
-  markerAoes: MARKER_AOES,
-  tethers: TETHERS,
-  effects: (data) => [...phaseOneEffects(data), ...phaseTwoEffects(data)],
+  headMarkers: { ...LIMIT_CUT_MARKERS, ...BJCC_MARKERS, ...AP_MARKERS },
+  markerAoes: { ...MARKER_AOES, ...AP_MARKER_AOES },
+  tethers: { ...TETHERS, ...AP_TETHERS },
+  effects: (data) => [...phaseOneEffects(data), ...phaseTwoEffects(data), ...crystals(data)],
   shapes: (data) => [
     ...protean(data), ...sluice(data), ...hawkBlaster(data),
     ...opticalSight(data), ...spinCrusher(data), ...mines(data), ...carriers(data), ...propellerShadow(data),
+    ...repentance(data),
   ],
 };

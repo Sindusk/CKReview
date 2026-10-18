@@ -196,3 +196,58 @@ Lightning 3, missiles 3, Minefield 2, mines 2, Flarethrower 1.
     Cruise Chaser on screen, and is the party hiding east of the block?
 18. **Pull 4, 4:04-4:24** — the third tornado drawn NE until Gavel at
     4:24. When does it disappear?
+
+## Phase 3: Alexander Prime, with Temporal Stasis (4:38 to 10:42 on the kill)
+
+Checked on the kill only.
+
+### What's drawn
+- **Temporal Stasis:** House Arrest tethers (stay close) as a short teal
+  line, Restraining Order (stay apart) as a dashed amber line with
+  outward arrows, both until Plaint of Surety. Cruise Chaser's three
+  swords and Brute Justice's two fires as 90° cones (fire orange) on the
+  frozen players they hit. The third sword logs no target; it's aimed at
+  who it hit (the sage and paladin at the west wall), not the boss's
+  logged facing (south).
+- **Chastening Heat / Divine Spear:** purple tank busters.
+- **Inception:** marker 96 reads "Crystal", the 5y drop rides on each
+  marked player, then each crystal sits on the floor as a violet diamond
+  until it shatters. The three Flarethrowers as fire cones (the party's
+  aimed at who it hit). Inception's own cast (the control) no longer
+  draws a cross at the boss's old spot; Sacrament's cross flashes.
+  Plaint of Solidarity is a stack.
+- **Wormhole:** numbers 1-8 as in Limit Cut (its charge has its own id,
+  now included). Void of Repentance's two puddles as one-soaker towers,
+  shrinking 8y, 6y, 3y, each shown from the previous check (the first
+  from Void's cast). Sacrament telegraphed through its 5.7s cast;
+  chakrams as before.
+- **Incinerating Heat:** the stack marker (93) reads "Stack", the stack
+  shown through its 4.7s cast. Enumeration as in Phase 2.
+- The final check (J Storm, J Waves, Divine Judgment) is raidwide only:
+  nothing to place; its cast bars show.
+
+### Fit check
+Everything exact except the script's grouping (simultaneous casts of one
+name compared with each other's hits: Stasis swords 1.1s apart, the four
+Aetheroplasms, the two puddles of each Repentance check, the four
+crystals). Divine Spear's first set draws on the paladin with no hit:
+Hallowed Ground (header).
+
+### Not known
+- The Plasmaspheres (Inception's orbs) and their tethers: the replay data
+  has neither, only each orb's burst.
+- When the True Heart reveals Alexander Prime's new spot (the cue for
+  Sacrament's safe side): nothing in the log before the cross lands.
+
+### VOD checks: Q9zqJb4VLmjhd1B6 Pull 4
+19. **Pull 4, 4:45-4:56** — House Arrest drawn between the warrior and
+    dancer, Restraining Order between the paladin and dragoon. Right
+    pairs?
+20. **Pull 4, 5:00.3** — Cruise Chaser's third sword drawn west, through
+    the sage and paladin at the west wall. Is that where it went?
+21. **Pull 4, 5:51-5:58** — four crystals drawn south in a box where the
+    marked players dropped them, gone as the heart reaches each. Same
+    spots?
+22. **Pull 4, 7:17-7:37** — the Repentance puddles drawn east (111,
+    105) and west (89, 95) from Void's cast at 7:17. Are the puddles there
+    from 7:17, and the right size as they shrink?
