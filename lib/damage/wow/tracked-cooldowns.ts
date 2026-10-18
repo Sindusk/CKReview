@@ -252,9 +252,10 @@ export const WOW_TRACKED_COOLDOWNS: Record<string, TrackedCooldown[]> = {
     { name: "Incarnation: Avatar of Ashamane", actionIds: [102543], cooldownMs: 91_000, charges: 1, firstUseOffsetMs: 3_000,
       valuePerUse: feralWindowValue(102543, "Incarnation", [5217]) },
   ],
-  "Survival Hunter": [   // unverified (1 player)
-    { name: "Takedown", actionIds: [1250646], cooldownMs: 61_000, charges: 1, firstUseOffsetMs: 36_000 },  // 61.4 / 62.5s, 35.6s
-  ],
+  // Survival: Takedown isn't tracked here since the WoWAnalyzer audit's
+  // phase 3 (2026-10-17). A use was worth 0 (its hits log under 1253859 and
+  // the pet's 1253862) and its cooldown is 60, 75 or 90s by talent;
+  // specs/survival.ts "Takedown held" judges it per player.
 
   // ── Ranged and casters ─────────────────────────────────────────────
   // Not tracked: Balance's Fury of Elune (19.7 / 25.9s) and Incarnation

@@ -9,7 +9,7 @@
 // since its audit pass, below), Frost DK 2, Fury 2
 // (18 player-pulls since its audit pass, below),
 // Feral, Survival and Outlaw 1 each (fewer than 3: unverified; Feral has
-// 14 player-pulls since its audit pass, below).
+// 14 player-pulls and Survival 13 since their audit passes, below).
 //
 // Every melee spec gets:
 // - its main cooldown's window (burstGcdFindings): GCDs that fit vs GCDs
@@ -205,6 +205,23 @@
 // (procs.ts). game.ts: a Stormstrike's Thorim's spender and Storm
 // Unleashed's Crash Lightning are its twins (one GCD, not two).
 //
+// Survival Hunter, WoWAnalyzer audit phase 3 (2026-10-17, docs/wowa-audit/
+// hunter-survival.md; WoWAnalyzer's Survival lags a patch and its priority
+// checker is off; no case study, not in the user's raids). Measured on 13
+// player-pulls of 12 players (top Joeexotíc, Дэсака, Calemba, Glemon,
+// fetched for it; weak Ajunlucky, Katilena, Benethir, Reggienoble, Nhymz,
+// and the 20th-percentile Fugginmoo, Imjustpika, Huntâbow). survival.ts
+// holds the models and numbers: "Tip of the Spear wasted" (a Kill Command at
+// two stacks or more; top 0–66k, weak up to 319k), "Spender without Tip of
+// the Spear" (top 0–151k, weak up to 334k) and "Takedown held" (cooldown 60,
+// 75 or 90s by talent, read per player; valued by its hits and window,
+// 0.70–1.58M a use; top 0–215k, weak up to 910k), which replaces the tracked
+// Takedown (worth 0 a use). Survival gets no Focus cap check: Focus never
+// limits it (0–11 casts a pull under a Raptor Strike's 30), and the shared
+// check read 0.61–1.30M on the top players from Kill Commands at the cap.
+// The Kill Command's pet hit is now its press's damage (game.ts). The
+// Takedown window stays (top none, weak 0–45k).
+//
 // Havoc, checked against WoWAnalyzer on qpZx3mWaG7gcDdYB pull 3
 // (Mythnarra; reference 3Vz6Qt2RyTPXwpJn's Hawkerton, 100th percentile,
 // page saved; checked 2026-10-13):
@@ -242,6 +259,7 @@ import { SUBTLETY_CHECKS } from "./subtlety";
 import { ENHANCEMENT_CHECKS } from "./enhancement";
 import { FURY_CHECKS } from "./fury";
 import { UNHOLY_CHECKS } from "./unholy";
+import { SURVIVAL_CHECKS } from "./survival";
 
 const window = (statusId: number, name: string): JobCheck => (ctx) => burstGcdFindings(ctx, {
   statusId, name,
@@ -337,8 +355,10 @@ export const MELEE_CHECKS: Record<string, JobCheck[]> = {
     // Subtlety: its own Energy cap check, without the clones' Secret Technique casts (subtlety.ts).
     // Fury: its own Rage cap check, outside Recklessness (fury.ts).
     // Unholy DK: no Runic Power cap check either (unholy.ts header).
+    // Survival: no Focus cap check; Focus never limits it (survival.ts header).
     ...(spec === "Frost Death Knight" ? FROST_DK_CHECKS : spec === "Subtlety Rogue" ? SUBTLETY_CHECKS
-      : spec === "Fury Warrior" ? FURY_CHECKS : spec === "Unholy Death Knight" ? UNHOLY_CHECKS : [primaryResourceCapFindings]),
+      : spec === "Fury Warrior" ? FURY_CHECKS : spec === "Unholy Death Knight" ? UNHOLY_CHECKS
+      : spec === "Survival Hunter" ? SURVIVAL_CHECKS : [primaryResourceCapFindings]),
     ...(spec === "Arms Warrior" ? [...ARMS_SPENT, ...ARMS_CHECKS] : []),
     ...(spec === "Havoc Demon Hunter" ? [eternalHunt, ...HAVOC_CHECKS] : []),
     ...(spec === "Retribution Paladin" ? [holyPowerWaste, ...RETRIBUTION_CHECKS] : []),
