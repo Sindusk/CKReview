@@ -71,7 +71,7 @@ damage rows are measured.
 | 27 | Fury | [warrior-fury.md](warrior-fury.md) | done 2026-10-17: Rampage held while unenraged, Recklessness drift (rebuilt 72s less 1s per 40 Rage), Rage cap outside Recklessness / Bladestorm, Odyn's Fury valued (fury.ts); Slayer Bladestorm's Bloodthirsts aren't presses (game.ts); verified by the main session |
 | 28 | Blood | [deathknight-blood.md](deathknight-blood.md) | done 2026-10-17: Dancing Rune Weapon drift valued (its pet's hits), Reaper's Mark tracked, free Death and Decay held (Crimson Scourge), Runic Power cap removed for Blood (blood.ts); verified by the main session (Reaper's Mark checked: off the GCD, median 0.43s to the next cast) |
 | 29 | Unholy | [deathknight-unholy.md](deathknight-unholy.md) | done 2026-10-17: plague off every enemy, strike without a Lesser Ghoul, Sudden Doom lost, Dark Transformation / Army valued, Runic Power cap removed for Unholy (unholy.ts); Unholy GCD counts the Erupts and Orders its presses set off (game.ts); verified by the main session |
-| 30 | Devourer | [demonhunter-devourer.md](demonhunter-devourer.md) | |
+| 30 | Devourer | [demonhunter-devourer.md](demonhunter-devourer.md) | done 2026-10-17: the Void Ray "gap" is an unlogged Eradicate press (new optional `unloggedPresses` hook: Eradicate and Void Metamorphosis; top players 82% → 91–94% GCD uptime); The Hunt / Hungering Slash presses, Voidblade 0.5s GCD (game.ts); Void Metamorphosis window, Eradicate overwritten (devourer.ts); verified by the main session |
 | 31 | Survival | [hunter-survival.md](hunter-survival.md) | |
 | 32 | Fire | [mage-fire.md](mage-fire.md) | |
 | 33 | Frost Mage | [mage-frost.md](mage-frost.md) | |
@@ -238,6 +238,9 @@ measured for it.
 - **Talents move abilities between "passive" and "pressed"**: Balance's
   Eclipse is now a pressed spell with two charges, which phase 2 didn't
   know. Read the cast list before trusting the ledger's model.
+- **A press the log never writes** can hide behind a regular "gap"
+  (Devourer's Eradicate: its buff is spent and its hit lands, no cast).
+  `DamageGame.unloggedPresses` adds such presses from their traces.
 - **Buffs that lock the player go in `LOCK_STATUSES`** (game.ts): a
   channel whose spells log as their own casts (Convoke the Spirits) or an
   on-use item that roots the player (Soulcoiler Ritual Vessel) reads as
@@ -433,6 +436,11 @@ measured for it.
   Soul Reaper outside the window, Sudden Doom spend speed. Lead, unpriced:
   Lesser Ghoul charges lost to the cap of 8 (two weaker players ~100–134
   a pull vs 5–18). Evidence in [deathknight-unholy.md](deathknight-unholy.md).
+- Devourer (2026-10-17): proposed `wrong`: Smuggled Reaper's Toll, Fury
+  at the cap. Should The Hunt stay unvalued? (Its tracked drift is worth
+  0; pressed 1–3 times a pull, top players hold it 146–210s, so a valued
+  check would fire on them as much.) Evidence in
+  [demonhunter-devourer.md](demonhunter-devourer.md).
 
 - Elemental (2026-10-17): `CallOfTheAncestors/other-checks`,
   `statistics` (and whether "Stormkeeper before Ascendance" should be
