@@ -37,7 +37,7 @@
 // (buildHeadMarkers).
 
 import { facingToCompassBearing } from "@/lib/mechanics/geometry";
-import { poseAt, sampleNear, type ReplayActor, type ReplayData } from "@/lib/replay/ffxiv-replay";
+import { poseAt, sampleNear, type ReplayActor, type ReplayData, type ReplayHit } from "@/lib/replay/ffxiv-replay";
 
 export type ActionGeometry = { castType: number; range: number; width: number; omen: string };
 
@@ -134,7 +134,8 @@ export type AoeShape = {
   // player, whose drop is drawn by its own cast (FRU Frigid Stone).
   noFlash?: boolean;
   star?: boolean;                // cross: star points while telegraphed (FRU Frigid Needle)
-  lineStack?: boolean;           // rect: a line stack, chevrons until it fires (marker 525)
+  lineStack?: boolean;           // rect: a line stack, its marker shown until it fires (marker 525)
+  marked?: string;               // line stack: the player carrying the marker
 };
 
 /**
@@ -482,7 +483,7 @@ export function buildAoeShapes(data: ReplayData): AoeShape[] {
       out.push({ ...base, kind: "rect", x: cp.x - Math.sin(b) * base.range, y: cp.y + Math.cos(b) * base.range, bearing, range: base.range * 2 });
     } else {
       out.push(lineStack
-        ? { ...base, kind: "rect", x: cp.x, y: cp.y, bearing, start: Math.min(base.start, lineStack[0]), style: "stack", lineStack: true }
+        ? { ...base, kind: "rect", x: cp.x, y: cp.y, bearing, start: Math.min(base.start, lineStack[0]), style: "stack", lineStack: true, marked: lineStackTarget(lineStack[1], own, actorByKey) }
         : { ...base, kind: "rect", x: cp.x, y: cp.y, bearing });
     }
   }
@@ -513,6 +514,18 @@ export function buildAoeShapes(data: ReplayData): AoeShape[] {
 const MARKER_AOES: Record<number, { ability: number; name: string }> = {
   345: { ability: 40199, name: "Frigid Stone" },
 };
+
+/**
+ * Who carries a line stack's marker. In game it's on a player (user,
+ * 2026-10-17); FRU's log puts it on Shiva instead, so then it's the player
+ * in the middle of the party the beam hit (nearest their centre).
+ */
+function lineStackTarget(markedKey: string, hits: ReplayHit[], actorByKey: Map<string, ReplayActor>): string | undefined {
+  if (actorByKey.get(markedKey)?.kind === "player") return markedKey;
+  if (!hits.length) return undefined;
+  const mx = hits.reduce((s, h) => s + h[6]!, 0) / hits.length, my = hits.reduce((s, h) => s + h[7]!, 0) / hits.length;
+  return hits.reduce((b, h) => (Math.hypot(h[6]! - mx, h[7]! - my) < Math.hypot(b[6]! - mx, b[7]! - my) ? h : b))[3];
+}
 
 export type TetherSpan = {
   source: string; target: string; id: number; start: number; end: number;

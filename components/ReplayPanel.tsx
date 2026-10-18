@@ -323,7 +323,11 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
               const rider = s.follow ? actorByKey.get(s.follow) : undefined;
               const at = rider && poseAt(rider, t);
               if (s.follow && !at) return null;
-              return <Aoe key={i} uid={`${i}-${s.resolve}`} s={at ? { ...s, x: at.x, y: at.y } : s} opacity={opacity} resolving={resolving} toX={toX} toY={toY} scale={scale} t={t} />;
+              // A line stack's marker rides on its player.
+              const carrier = s.marked ? actorByKey.get(s.marked) : undefined;
+              const cp = carrier && poseAt(carrier, t);
+              return <Aoe key={i} uid={`${i}-${s.resolve}`} s={at ? { ...s, x: at.x, y: at.y } : s} opacity={opacity} resolving={resolving} toX={toX} toY={toY} scale={scale} t={t}
+                marked={cp ? { x: toX(cp.x), y: toY(cp.y) } : undefined} />;
             })}
             {tethers.filter((tt) => t >= tt.start && t <= tt.end).map((tt, i) => {
               const src = actorByKey.get(tt.source), dst = actorByKey.get(tt.target);
@@ -744,35 +748,42 @@ function IceCircle({ x, y, r, t, s, opacity }: { x: number; y: number; r: number
 }
 
 /**
- * A line stack while it's coming, as the game's standard marker: orange
- * chevrons in a row along the beam, all pointing back at the caster and
- * drifting toward it, inside a faint outline of the beam's width (marker
- * 525; user, 2026-10-17). The beam itself flashes as a stack when it fires.
+ * A line stack while it's coming, as the game's standard marker on its
+ * player (user, 2026-10-17): three chevrons on each side of them, all
+ * pointing in at the line the beam will take (> > > | < < <), set along
+ * that line and pulsing gently inward. A faint dashed outline runs from the
+ * caster through the player at the beam's width. The beam itself flashes
+ * as a stack when it fires. Without a known player, the marker sits at
+ * the beam's midpoint.
  */
-const CHEVRON_STEP = 300;   // centi-yalms between chevrons
-function LineStackChevrons({ s, x, y, r, scale, t, opacity }: { s: AoeShape; x: number; y: number; r: number; scale: number; t: number; opacity: number }) {
+function LineStackMarker({ s, x, y, r, scale, t, opacity, marked }: { s: AoeShape; x: number; y: number; r: number; scale: number; t: number; opacity: number; marked?: { x: number; y: number } }) {
   const c = AOE_COLORS.stack;
-  const b = (s.bearing * Math.PI) / 180;
-  const ux = Math.sin(b), uy = -Math.cos(b), px = -uy, py = ux;
+  const m = marked ?? { x: x + Math.sin((s.bearing * Math.PI) / 180) * r * 0.3, y: y - Math.cos((s.bearing * Math.PI) / 180) * r * 0.3 };
+  // Along the line from the caster through the player.
+  const len = Math.hypot(m.x - x, m.y - y) || 1;
+  const ux = (m.x - x) / len, uy = (m.y - y) / len, px = -uy, py = ux;
   const half = Math.max(8, (s.width * scale) / 2);
-  const step = CHEVRON_STEP * scale;
-  const drift = ((t / 600) % 1) * step;      // flowing toward the caster
-  const out: React.ReactNode[] = [];
-  for (let d = step - drift; d < r; d += step) {
-    const cx = x + ux * d, cy = y + uy * d;
-    if (Math.hypot(cx - 500, cy - 500) > 440) continue;   // over the arena only
-    const tip = { x: cx - ux * half * 0.6, y: cy - uy * half * 0.6 };
-    out.push(
-      <path key={d.toFixed(1)} d={`M${cx + px * half} ${cy + py * half} L${tip.x} ${tip.y} L${cx - px * half} ${cy - py * half}`}
-        fill="none" stroke={c.fill} strokeWidth={Math.max(3, half * 0.35)} strokeLinecap="round" strokeLinejoin="round" />,
-    );
-  }
   const end = { x: x + ux * r, y: y + uy * r };
   const edge = (k: number) => `M${x + px * half * k} ${y + py * half * k} L${end.x + px * half * k} ${end.y + py * half * k}`;
+  const size = 9;                                       // chevron half-height, SVG units
+  const gap = 22 + 3 * Math.sin(t / 180);               // distance from the line, pulsing in
+  const chevron = (side: 1 | -1, along: number, k: string) => {
+    // On `side` of the line, pointing back across it (toward -side).
+    const cx = m.x + px * gap * side + ux * along, cy = m.y + py * gap * side + uy * along;
+    const tip = { x: cx - px * size * side, y: cy - py * size * side };
+    const d = `M${cx + ux * size} ${cy + uy * size} L${tip.x} ${tip.y} L${cx - ux * size} ${cy - uy * size}`;
+    return (
+      <g key={k}>
+        <path d={d} fill="none" stroke="#5a2a00" strokeWidth={7} strokeLinecap="round" strokeLinejoin="round" strokeOpacity={0.6} />
+        <path d={d} fill="none" stroke={c.fill} strokeWidth={4.5} strokeLinecap="round" strokeLinejoin="round" />
+        <path d={d} fill="none" stroke="#ffe0a0" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+      </g>
+    );
+  };
   return (
-    <g opacity={Math.max(0.7, opacity)} pointerEvents="none">
-      <path d={`${edge(1)} ${edge(-1)}`} stroke={c.rim} strokeOpacity={0.35} strokeWidth={1.5} strokeDasharray="6 6" fill="none" />
-      <g filter="url(#replay-shadow)">{out}</g>
+    <g opacity={Math.max(0.75, opacity)} pointerEvents="none">
+      <path d={`${edge(1)} ${edge(-1)}`} stroke={c.rim} strokeOpacity={0.3} strokeWidth={1.5} strokeDasharray="6 6" fill="none" />
+      {[-1, 1].flatMap((side) => [-16, 0, 16].map((a) => chevron(side as 1 | -1, a, `${side}${a}`)))}
     </g>
   );
 }
@@ -802,7 +813,7 @@ function Puddle({ x, y, r, t, s, uid }: { x: number; y: number; r: number; t: nu
   );
 }
 
-function Aoe({ s, opacity, resolving, toX, toY, scale, uid, t }: { s: AoeShape; opacity: number; resolving: boolean; toX: (x: number) => number; toY: (y: number) => number; scale: number; uid: string; t: number }) {
+function Aoe({ s, opacity, resolving, toX, toY, scale, uid, t, marked }: { s: AoeShape; opacity: number; resolving: boolean; toX: (x: number) => number; toY: (y: number) => number; scale: number; uid: string; t: number; marked?: { x: number; y: number } }) {
   const x = toX(s.x), y = toY(s.y);
   const r = s.range * scale;
   const b = (s.bearing * Math.PI) / 180;
@@ -810,7 +821,7 @@ function Aoe({ s, opacity, resolving, toX, toY, scale, uid, t }: { s: AoeShape; 
   if (s.style === "knockback") return <Knockback s={s} x={x} y={y} r={r} scale={scale} opacity={opacity} />;
   if (s.kind === "cross" && s.star && !resolving) return <StarPoints s={s} x={x} y={y} r={r} scale={scale} opacity={opacity} />;
   if (s.style === "drop") return <DropRing x={x} y={y} r={r} t={t} />;
-  if (s.kind === "rect" && s.lineStack && !resolving) return <LineStackChevrons s={s} x={x} y={y} r={r} scale={scale} t={t} opacity={opacity} />;
+  if (s.kind === "rect" && s.lineStack && !resolving) return <LineStackMarker s={s} x={x} y={y} r={r} scale={scale} t={t} opacity={opacity} marked={marked} />;
   if (s.style === "puddle") return <Puddle x={x} y={y} r={r} t={t} s={s} uid={uid} />;
   if (s.style === "ice" && s.kind === "circle" && !resolving) return <IceCircle x={x} y={y} r={r} t={t} s={s} opacity={opacity} />;
   const c = AOE_COLORS[s.style];
