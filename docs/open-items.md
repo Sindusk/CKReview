@@ -655,7 +655,18 @@ and delete them from the header.
     Focus never limits the spec). Unbuilt with numbers: Boomstick ticks
     (no clip found), Swipe misses, Takedown stacks at cast; unverifiable:
     Sentinel's Mark (not fetched), bomb recharge.
-  - [mage-fire.md](wowa-audit/mage-fire.md): 8; Hot Streak expiry.
+  - [mage-fire.md](wowa-audit/mage-fire.md): phase 3 done 2026-10-17 on
+    12 Fire player-pulls (top Émptinêss, Tinghao, 小鸟游小埋 ×2, Broadum,
+    Экседо, Reinyy; weak Katbelle, Splean, Wardaalsahra, Sikeyzlol,
+    Portalscroll), 11 Sunfury, 1 Frostfire. Built in
+    lib/damage/wow/specs/fire.ts: Fire Blast under Hot Streak (top 0–304k,
+    weak up to 1.60M), Combustion window repriced by its own premium per
+    press (top none, weak up to 2.25M), a value for the tracked Combustion
+    (worth 0 a use before; fires on none of the 12). Unbuilt with numbers:
+    Hot Streak expiry (never happens), hardcast Fireball in Combustion,
+    Heating Up conversions, Fire Blast charges (no recharge model), Heat
+    Shimmer, precast delay, Meteor held. Kept `wrong` (four rows) for the
+    user's review.
   - [mage-frost.md](wowa-audit/mage-frost.md): 4; Fingers of Frost
     overcap.
   - [paladin-holy.md](wowa-audit/paladin-holy.md): healer, 5; Avenging
