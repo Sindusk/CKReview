@@ -23,6 +23,7 @@ sampling it.
 | Refining a module with a reviewed log / VOD answers | the `/refine-module` skill |
 | A damage case study of a kill against xivanalysis / WoWAnalyzer feedback | the `/damage-analysis` skill; unfinished studies resume from [docs/damage-case-studies/](docs/damage-case-studies/) |
 | A boss's damage context (pools, checks, holds) | the `/build-fight-context` skill |
+| A fight's top-down replay visuals (one phase or boss at a time) | the `/build-replay` skill; the per-fight contract is the header of `lib/replay/fight-spec.ts` |
 | App features, UI, data flow, VOD playback (incl. local files), FFXIV top-down replay | [docs/app-architecture.md](docs/app-architecture.md), then the headers of the files each section names |
 | Sample data, auth tokens, scripts, browser checks, deploy pipeline | [docs/dev-tooling.md](docs/dev-tooling.md) |
 | Damage output / rotation analysis, or tooling for it | [docs/dps-analysis.md](docs/dps-analysis.md) |

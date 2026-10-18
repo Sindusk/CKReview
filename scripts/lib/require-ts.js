@@ -24,7 +24,12 @@ const moduleCache = new Map(); // absolute .ts path -> exports
 function transpile(absPath) {
   const src = fs.readFileSync(absPath, 'utf8');
   return ts.transpileModule(src, {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+    compilerOptions: {
+      module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020,
+      // .tsx components too (scripts/render-replay.js renders the replay panel).
+      ...(absPath.endsWith('.tsx') ? { jsx: ts.JsxEmit.ReactJSX } : {}),
+    },
+    fileName: absPath,
   }).outputText;
 }
 

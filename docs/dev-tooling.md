@@ -10,6 +10,13 @@ validation harness (`scripts/validate.js`, `expectations/`), see
   (or `fetch-ff-report.js`). `--boss` matches any fight name containing the
   text; `fetch-ff-report.js --boss-exact "<name>"` matches the whole name
   (`Lindwurm` without `Lindwurm II`).
+- **Replay tools** (read-only, any saved replay): `replay-inventory.js`
+  (every ability, tether, marker, status and actor in a time range),
+  `replay-fitcheck.js` (drawn shapes against who was really hit) and
+  `render-replay.js` (the real panel at chosen moments, as one PNG, via
+  headless Chrome or Edge; run with `ALLOW_SHELL_EDITS=1`, the shell
+  gate's override, since it writes the PNG). Usage in each header; the
+  `/build-replay` skill uses all three.
 - **Replay tracks:** `node scripts/fetch-ff-replay.js <code-or-URL> --fight <N>`
   (FFXIV) or `fetch-wow-replay.js` (WoW) saves one pull's top-down replay
   positions to `sampledata/{ff,wow}/<code>/replay/fight<N>.json` (FFXIV
