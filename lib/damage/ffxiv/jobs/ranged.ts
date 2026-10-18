@@ -798,10 +798,19 @@ const devilmentMisaligned: JobCheck = (ctx): DamageFinding[] => {
 // counts the wait after re-partnering: the new partner gets Standard
 // Finish only at the next finish. Valued on the partner the Dancer would
 // have had (the last one if alive, else the next, else the party's top
-// damage dealer alive then) × the buff's measured share. A stretch that
-// starts at the partner's death is forced: the new partner can't get
-// Standard Finish before the next finish. Not valued: the Esprit the
-// partner's GCDs would have given. Found 2026-10-18 in the 50
+// damage dealer alive then) × the buff's measured share. Not valued: the
+// Esprit the partner's GCDs would have given.
+// Partner swaps (the user, 2026-10-18: a Dancer whose partner dies should
+// swap, and the app should judge the swapping). A dead partner keeps Dance
+// Partner, so their dead time counts as no partner. After a death (the
+// partner's, or the Dancer's own raise) the Dancer has PARTNER_SWAP_GRACE_MS
+// from when Closed Position is off its 30s recast; only time past that is
+// lost, and the new partner's Standard Finish only from the first finish
+// after it (a swap doesn't pass on a running Standard Finish:
+// r4qDkR9btJCXnKWd Doomtrain pull 16, the Bard partnered at 6:15.3 had
+// none). A swap to a partner who then added clearly less under the
+// Dancer's buffs than the best other living player would have is its own
+// finding (`partnerChoice`). Found 2026-10-18 in the 50
 // lowest Lindwurm II and The Tyrant Dancers: J2xNa9WqfQKgrMFw fight 9
 // (Ari Zubz pressed Ending at 3:50.0 and never re-partnered: three
 // Devilments and every Standard Finish after it alone), 9d6QnCr7gzhyHfta
@@ -809,7 +818,10 @@ const devilmentMisaligned: JobCheck = (ctx): DamageFinding[] => {
 // fight 4 (Ending 1:55.2, Closed Position 2:04.9).
 const PARTNER_GAP_MIN_MS = 3_000;
 const PARTNER_DEATH_LAG_MS = 3_000;
-const PARTNER_SWAP_MS = 15_000;
+const PARTNER_SWAP_GRACE_MS = 5_000;
+const CLOSED_POSITION_RECAST_MS = 30_000;
+const PARTNER_CHOICE_SPAN_MS = 120_000;
+const PARTNER_CHOICE_MIN = 20_000, PARTNER_CHOICE_SHARE = 0.2;
 const dancePartnerLost: JobCheck = (ctx): DamageFinding[] => {
   const out: DamageFinding[] = [];
   const me = ctx.player;
@@ -824,25 +836,39 @@ const dancePartnerLost: JobCheck = (ctx): DamageFinding[] => {
     return ws;
   };
   const others = ctx.pull.players.filter((p) => p !== me);
-  const partnerWins = others.map((p) => ({ p, ws: sourceWindows(p, S.DANCE_PARTNER.id) }));
+  const deadOf = new Map(ctx.pull.players.map((p) => [p, deadWindows(p, ctx.pull, ctx.endMs)]));
+  const minus = (ws: Window[], cut: Window[]): Window[] => ws.flatMap((w) => {
+    const parts: Window[] = [];
+    let cur = w.startMs;
+    for (const d of cut.filter((d) => d.endMs > w.startMs && d.startMs < w.endMs)) {
+      if (d.startMs > cur) parts.push({ startMs: cur, endMs: d.startMs });
+      cur = Math.max(cur, d.endMs);
+    }
+    if (cur < w.endMs) parts.push({ startMs: cur, endMs: w.endMs });
+    return parts;
+  });
+  // A dead partner keeps Dance Partner (r4qDkR9btJCXnKWd Doomtrain pull
+  // 16: the Dragoon died at 5:42.1, the Dancer swapped at 6:11.8), so
+  // their dead time is cut out of their partner windows.
+  const partnerWins = others.map((p) => ({ p, ws: minus(sourceWindows(p, S.DANCE_PARTNER.id), deadOf.get(p) ?? []) }));
   const dmgIn = (p: PlayerInfo, from: number, to: number) =>
     p.damageDone.filter((e) => e.timestamp >= from && e.timestamp < to && (e.amount ?? 0) > 0).reduce((a, e) => a + (e.amount ?? 0), 0);
+  const aliveIn = (p: PlayerInfo, from: number, to: number) =>
+    !(deadOf.get(p) ?? []).some((d) => d.startMs <= from && d.endMs >= to) && dmgIn(p, from, to) > 0;
   const wouldBe = (from: number, to: number): PlayerInfo | undefined => {
     const before = partnerWins.flatMap(({ p, ws }) => ws.filter((w) => w.startMs <= from).map((w) => ({ p, t: w.endMs }))).sort((a, b) => b.t - a.t)[0]?.p;
     const after = partnerWins.flatMap(({ p, ws }) => ws.filter((w) => w.startMs >= to).map((w) => ({ p, t: w.startMs }))).sort((a, b) => a.t - b.t)[0]?.p;
-    const alive = (p: PlayerInfo) => dmgIn(p, from, to) > 0;
-    return [before, after].find((p) => p && alive(p)) ??
-      [...others].sort((a, b) => dmgIn(b, from, to) - dmgIn(a, from, to)).find(alive);
+    return [before, after].find((p) => p && aliveIn(p, from, to)) ??
+      [...others].sort((a, b) => dmgIn(b, from, to) - dmgIn(a, from, to)).find((p) => aliveIn(p, from, to));
   };
-  // Stretches where no one carried Dance Partner from this Dancer. A
-  // partner copy stripped while Dance Partner stayed (AYQm9Kd8Ct4FxcGp
-  // Lindwurm II pull 1: Standard Finish off the Reaper at 1:02.5, 2s
-  // before a wipe death) isn't a lost partner.
-  // A dead partner keeps Dance Partner (r4qDkR9btJCXnKWd Doomtrain pull
-  // 16: the Dragoon died at 5:42.1, the Dancer swapped at 6:11.8). That
-  // time isn't counted: counting it gave 185 findings on disk, mostly
-  // 1-30k in wipes where the partner was raised, and whether to swap or
-  // wait for the raise is the user's call (asked 2026-10-18).
+  const cpCasts = me.casts.filter((c) => c.abilityId === A.CLOSED_POSITION?.id).map((c) => c.timestamp);
+  const cpReadyAt = (t: number) => Math.max(t, ...cpCasts.filter((c) => c <= t).map((c) => c + CLOSED_POSITION_RECAST_MS));
+  const finishes = (me.buffs ?? []).filter((e) => e.abilityId === S.STANDARD_FINISH?.id && (e.buffStatus === "applied" || e.buffStatus === "refreshed"))
+    .map((e) => e.timestamp).sort((a, b) => a - b);
+  // Stretches where no living player carried Dance Partner from this
+  // Dancer. A partner copy stripped while Dance Partner stayed
+  // (AYQm9Kd8Ct4FxcGp Lindwurm II pull 1: Standard Finish off the Reaper at
+  // 1:02.5, 2s before a wipe death) isn't a lost partner.
   const partnered = mergeWindows(partnerWins.flatMap(({ ws }) => ws));
   const alone: Window[] = [];
   let at = 0;
@@ -859,6 +885,21 @@ const dancePartnerLost: JobCheck = (ctx): DamageFinding[] => {
   }));
   const stdCopies = buffs.find((b) => b.name === "Standard Finish")?.covered ?? [];
   for (const st of alone) {
+    // What started it: a partner's death, the Dancer's own (back from a
+    // raise with no partner), or a choice (Ending, or never partnering).
+    const diedPartner = others.find((p) => (deadOf.get(p) ?? []).some((d) => Math.abs(d.startMs - st.startMs) <= PARTNER_DEATH_LAG_MS) &&
+      sourceWindows(p, S.DANCE_PARTNER.id).some((w) => w.startMs < st.startMs && w.endMs >= st.startMs));
+    // The Dancer's own death: dead windows end at the first cast back, which
+    // can come after the partner's Dance Partner drops (Co Coa: 4:40.9
+    // death, Dance Partner off at 4:50.3).
+    const ownDeath = ctx.dead.find((d) => d.startMs <= st.startMs + PARTNER_DEATH_LAG_MS && d.endMs >= st.startMs - 15_000);
+    const raised = ownDeath !== undefined;
+    const swapReady = diedPartner || raised ? cpReadyAt(Math.max(st.startMs, ownDeath?.endMs ?? 0)) : st.startMs;
+    const countFrom = diedPartner || raised ? swapReady + PARTNER_SWAP_GRACE_MS : st.startMs;
+    if (countFrom >= st.endMs) continue; // swapped in time
+    // The new partner's Standard Finish: after a death, from the first
+    // finish after the swap could have happened.
+    const stdFrom = diedPartner ? finishes.find((t) => t >= countFrom) ?? Infinity : countFrom;
     // Through the wait for the next finish after re-partnering, at most a
     // Standard Finish's length.
     const nextCopy = stdCopies.find((c) => c.startMs >= st.endMs)?.startMs;
@@ -867,8 +908,9 @@ const dancePartnerLost: JobCheck = (ctx): DamageFinding[] => {
     const secsBy = new Map<string, number>();
     const partners = new Set<string>();
     for (const b of buffs) {
+      const bFrom = b.name === "Standard Finish" ? Math.max(countFrom, stdFrom) : countFrom;
       for (const w of b.ownWins) {
-        const from = Math.max(w.startMs, st.startMs), to = Math.min(w.endMs, until);
+        const from = Math.max(w.startMs, bFrom), to = Math.min(w.endMs, until);
         if (to - from < PARTNER_GAP_MIN_MS) continue;
         // The parts no partner copy covered.
         let cur = from;
@@ -894,23 +936,71 @@ const dancePartnerLost: JobCheck = (ctx): DamageFinding[] => {
     const from = st.startMs, to = until;
     const names = [...partners].join(" / ");
     const parts = [...secsBy].map(([n, ms]) => `${n} ${s(ms)}`).join(", ");
-    // A partner who died, replaced quickly: the wait for the next finish
-    // was the death's.
-    const lastPartner = partnerWins.filter(({ ws }) => ws.some((w) => w.startMs < from && w.endMs >= from - PARTNER_DEATH_LAG_MS))
-      .map(({ p }) => p).find((p) => deadWindows(p, ctx.pull, ctx.endMs).some((d) => Math.abs(d.startMs - from) <= PARTNER_DEATH_LAG_MS));
-    const partnerDied = lastPartner !== undefined && st.endMs - st.startMs <= PARTNER_SWAP_MS;
+    const swapped = st.endMs < ctx.endMs ? `swapped at ${clock(st.endMs)}` : "never swapped";
+    const why = diedPartner ? `${diedPartner.name} died at ${clock(st.startMs)}; Closed Position ready at ${clock(swapReady)}, ${swapped}`
+      : raised ? `died at ${clock(ownDeath.startMs)}, acting again at ${clock(ownDeath.endMs)} with no partner` +
+        `${swapReady > ownDeath.endMs ? `; Closed Position ready at ${clock(swapReady)}` : ""}, ${swapped}`
+      : `no partner from ${clock(st.startMs)}, ${swapped}`;
     out.push(finding(ctx, {
-      kind: "buff-coverage", startMs: from, endMs: to, inference: true,
-      forced: partnerDied, cause: partnerDied ? `${lastPartner.name} died` : undefined,
-      label: "No dance partner",
+      kind: "buff-coverage", startMs: from, endMs: to, inference: true, forced: false,
+      label: diedPartner || raised ? "Partner swap late" : "No dance partner",
       lostDamage: lost,
       basis: `the partner's Standard Finish and Devilment at their measured share on what ${names} dealt while the Dancer's own were up ` +
-        `and no one had the partner copy; the Esprit a partner gives isn't counted`,
-      detail: `No partner buff from ${clock(from)} to ${clock(to)} (${parts})`,
+        `and no one had the partner copy` + (diedPartner || raised ? `, from ${s(PARTNER_SWAP_GRACE_MS)} after Closed Position was ready` : "") +
+        `; the Esprit a partner gives isn't counted`,
+      detail: `${why} (${parts} without a partner copy)`,
+    }));
+  }
+  out.push(...partnerChoice(ctx, partnerWins, buffs, aliveIn, dmgIn));
+  return out;
+};
+
+// The partner picked in a swap after a death, against the best other
+// living player: what each would have added under the Dancer's Standard
+// Finish and Devilment from the swap, for as long as the pick stayed
+// partner (at most PARTNER_CHOICE_SPAN_MS). Judged in hindsight from the
+// damage they dealt, so only a clear gap counts (PARTNER_CHOICE_MIN and
+// PARTNER_CHOICE_SHARE of the pick's value). The pre-pull partner isn't
+// judged: that's the static's plan.
+function partnerChoice(
+  ctx: PlayerCheckContext,
+  partnerWins: { p: PlayerInfo; ws: Window[] }[],
+  buffs: { name: string; copy: { id: number }; ownWins: Window[] }[],
+  aliveIn: (p: PlayerInfo, from: number, to: number) => boolean,
+  dmgIn: (p: PlayerInfo, from: number, to: number) => number,
+): DamageFinding[] {
+  const out: DamageFinding[] = [];
+  const valueOf = (p: PlayerInfo, from: number, to: number) => buffs.reduce((a, b) => {
+    const sh = ctx.ledger?.share(b.copy.id, p) ?? 0;
+    if (sh <= 0 || sh >= 1) return a;
+    return a + b.ownWins.reduce((x, w) => {
+      const f = Math.max(w.startMs, from), t = Math.min(w.endMs, to);
+      return t > f ? x + dmgIn(p, f, t) * (sh / (1 - sh)) : x;
+    }, 0);
+  }, 0);
+  const starts = partnerWins.flatMap(({ p, ws }) => ws.map((w) => ({ p, w }))).filter(({ w }) => w.startMs > 0).sort((a, b) => a.w.startMs - b.w.startMs);
+  for (const { p, w } of starts) {
+    // Only swaps after a death: the previous partner died before this.
+    const prev = partnerWins.find(({ p: q, ws }) => q !== p && ws.some((x) => x.endMs <= w.startMs && x.endMs >= w.startMs - 60_000));
+    const prevDied = prev && (deadWindowsOf(ctx, prev.p)).some((d) => d.startMs <= w.startMs && d.startMs >= w.startMs - 60_000);
+    if (!prevDied) continue;
+    const to = Math.min(w.endMs, w.startMs + PARTNER_CHOICE_SPAN_MS, ctx.endMs);
+    const picked = valueOf(p, w.startMs, to);
+    const best = ctx.pull.players.filter((q) => q !== ctx.player && q !== p && aliveIn(q, w.startMs, to))
+      .map((q) => ({ q, v: valueOf(q, w.startMs, to) })).sort((a, b) => b.v - a.v)[0];
+    if (!best || best.v - picked < Math.max(PARTNER_CHOICE_MIN, picked * PARTNER_CHOICE_SHARE)) continue;
+    out.push(finding(ctx, {
+      kind: "buff-coverage", startMs: w.startMs, endMs: to, inference: true, forced: false,
+      label: "Weaker swap partner",
+      lostDamage: best.v - picked,
+      basis: `what ${best.q.name} would have added under the Dancer's Standard Finish and Devilment from the swap to ${clock(to)} ` +
+        `minus what ${p.name} added (their damage then × each buff's measured share; hindsight, so only a clear gap counts)`,
+      detail: `Swapped to ${p.name} at ${clock(w.startMs)} after ${prev!.p.name} died; ${best.q.name} would have added ${k(best.v)} against ${k(picked)}`,
     }));
   }
   return out;
-};
+}
+const deadWindowsOf = (ctx: PlayerCheckContext, p: PlayerInfo) => deadWindows(p, ctx.pull, ctx.endMs);
 
 // fromLevel (shared.ts): the level each rule needs, for synced ultimates.
 export const DNC_CHECKS: JobCheck[] = [technical, fromLevel(100, technicalFillers), dancerOverwrites, dancerGaugeEstimates, dancerAoe, dancerDances,

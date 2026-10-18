@@ -214,8 +214,9 @@ and delete them from the header.
     Lindwurm II / The Tyrant parses).
   - [dnc.md](xiva-audit/dnc.md): Dancer, 0 candidates, 9 covered (dance
     checks, Devilment outside Technical Finish and no dance partner
-    built, awaiting xivanalysis pages). Open: whether dead-partner time
-    should count (swap vs. wait for the raise).
+    built, awaiting xivanalysis pages). Partner swaps judged since
+    2026-10-18 (late swap after a death, weaker swap partner); the 5s
+    swap grace and the partner-choice threshold are unconfirmed.
   - [pct.md](xiva-audit/pct.md): Pictomancer, 1 candidate
     (Hyperphantasia, only lost at deaths on disk), 6 covered (portrait
     overwrites built 2026-10-16; Striking Muse not judged on 7.2).
