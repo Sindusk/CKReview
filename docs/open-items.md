@@ -375,9 +375,11 @@ and delete them from the header.
     arms.ts). Left unbuilt with numbers: Bladestorm's cooldown and the
     Mortal Strike readiness rows (`unverifiable`), Rend and Deep Wounds
     uptime, the priority list; Demolish, Ravager and Champion's Spear fire
-    on nothing (every sample player is Slayer). Three `wrong` rows kept
-    (Sweeping Strikes, Deep Wounds refresh, Cleave efficiency), Rend early
-    refresh proposed `wrong`.
+    on nothing (every sample player is Slayer). Two `wrong` rows kept
+    (Deep Wounds refresh, Cleave efficiency), Rend early refresh proposed
+    `wrong`. A player account (2026-10-17) reopened Sweeping Strikes in
+    the Colossus Smash window as a candidate (Smash grants 6 stacks
+    itself) and added a Rend-through-Bladestorm lead.
   - [evoker-preservation.md](wowa-audit/evoker-preservation.md): healer,
     phase 3 done 2026-10-17: nothing built. `checkGcdGaps` fires; the
     survey covers every press (empowers time from their begin-casts);

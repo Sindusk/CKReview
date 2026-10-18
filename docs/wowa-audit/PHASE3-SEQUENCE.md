@@ -305,8 +305,9 @@ measured for it.
   lets Unstable Affliction drop while spamming Seed of Corruption on adds
   and reads 423k; Haunt dropped excuses those gaps (2+ Seeds), the shared
   check doesn't.
-- Arms (2026-10-17): kept `wrong` (Sweeping Strikes with Colossus Smash,
-  Deep Wounds refresh, Cleave efficiency) and proposed `wrong` (Rend
+- Arms (2026-10-17): kept `wrong` (Deep Wounds refresh, Cleave
+  efficiency; Sweeping Strikes with Colossus Smash was reopened as a
+  candidate by a player account the same day) and proposed `wrong` (Rend
   early refresh: Rend is pressed by name twice in 44 pulls), evidence in
   [warrior-arms.md](warrior-arms.md).
 - Restoration Druid (2026-10-17), about the app's own heal-GCD check,
