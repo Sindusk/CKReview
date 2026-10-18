@@ -8,7 +8,7 @@
 
 import type { JobCheck } from "../../types";
 import { BLOOD_CHECKS, BREWMASTER_CHECKS, PROT_PALADIN_CHECKS } from "./tank";
-import { HEALER_CHECKS } from "./healer";
+import { HEALER_CHECKS, HOLY_PRIEST_CHECKS } from "./healer";
 import { MELEE_CHECKS } from "./melee";
 import { RANGED_CHECKS } from "./ranged";
 
@@ -18,7 +18,7 @@ export const WOW_SPEC_CHECKS: Record<string, JobCheck[]> = {
   "Blood Death Knight":  BLOOD_CHECKS,
   "Protection Paladin":  PROT_PALADIN_CHECKS,
   "Brewmaster Monk":     BREWMASTER_CHECKS,
-  "Holy Priest":         HEALER_CHECKS,
+  "Holy Priest":         HOLY_PRIEST_CHECKS,
   "Discipline Priest":   HEALER_CHECKS,
   "Restoration Druid":   HEALER_CHECKS,
   "Holy Paladin":        HEALER_CHECKS,

@@ -261,6 +261,10 @@ export type TrackedCooldown = {
   // Ready time inside the fight's cooldownHoldWindows isn't held (the
   // spec holds it for the burst the fight sets up; checks.ts).
   burstHold?: boolean;
+  // Casts within this long of the one before are the same press logged
+  // twice (Power Infusion with Twins of the Sun Priestess: one cast on the
+  // ally, one on the priest, 0–50ms apart).
+  twinCastMs?: number;
 };
 
 // ── Fight context (per boss)───────────────────────────────────────────

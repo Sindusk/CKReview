@@ -681,11 +681,26 @@ and delete them from the header.
     shattered (Freezing 1221389 isn't fetched; Shatter is ~40% of the
     damage). Kept `wrong` (Ray of Frost ticks, Comet Storm targets) for
     the user's review.
-  - [paladin-holy.md](wowa-audit/paladin-holy.md): healer, 5; Avenging
-    Wrath and Divine Toll drift.
-  - [priest-discipline.md](wowa-audit/priest-discipline.md): healer, 3;
-    Shadow Word: Pain uptime (a question first).
-  - [priest-holy.md](wowa-audit/priest-holy.md): healer, 0 candidates.
+  - [paladin-holy.md](wowa-audit/paladin-holy.md): phase 3 done
+    2026-10-17 (18 player-pulls, top 三系精通骑, Stillw, Clarius). No
+    check built: every damage press has a cooldown, so the heal-GCD
+    check's Judgment filler is gone (heal GCDs price at 0, or at a Shield
+    of the Righteous near the paladin's own; top 0.25–2.27M → 0–20k).
+    Proposed `no-damage`: Holy Power waste, Holy Shock efficiency,
+    Avenging Wrath / Divine Toll drift, Imbued Infusions; `wrong`:
+    Crusader's Might.
+  - [priest-discipline.md](wowa-audit/priest-discipline.md): phase 3 done
+    2026-10-17 (10 player-pulls, top Jennerpriest, Busiekk, Pigie). Built:
+    Power Infusion drift (tracked-cooldowns.ts, Twins pairs merged; fires
+    on Busiekk 1.58M). Radiance and Flash Heal no longer judged by their
+    own heal (Atonement applicators). Proposed `no-damage`: Ultimate
+    Penitence; Penance bolts `unverifiable`; Shadow Word: Pain uptime is
+    full on everyone.
+  - [priest-holy.md](wowa-audit/priest-holy.md): phase 3 done 2026-10-17
+    (20 player-pulls, top Jakbcastin, Chai, Tobii). **The heal-GCD check
+    is off for Holy Priest, for the user to approve or reject** (top
+    players 1.3–4.3M at Smite, ~9× their damage). Power Infusion drift
+    added.
   - [rogue-outlaw.md](wowa-audit/rogue-outlaw.md): 9; Adrenaline Rush
     recharge with Restless Blades.
   - [warrior-protection.md](wowa-audit/warrior-protection.md): tank, 5;

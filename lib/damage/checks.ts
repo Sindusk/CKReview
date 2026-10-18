@@ -619,7 +619,8 @@ export function checkCooldownDrift(ctx: PlayerCheckContext): DamageFinding[] {
     const casts = ctx.player.casts
       .filter((c) => ids.has(c.abilityId) && c.timestamp < ctx.endMs)
       .map((c) => c.timestamp)
-      .sort((a, b) => a - b);
+      .sort((a, b) => a - b)
+      .filter((t, i, all) => !cd.twinCastMs || i === 0 || t - all[i - 1] > cd.twinCastMs);
     // Used before the pull (Dancer's Standard Step, shown by a Standard
     // Finish before the first Step): still recharging until the first use.
     const evidence = new Set(cd.prePullEvidenceIds ?? []);

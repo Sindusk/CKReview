@@ -32,7 +32,11 @@
   adds. Class-layer rules (Defensives, Twins of the Sun Priestess,
   Translucent Image, Protective Light, Benevolence) come from the Priest
   shared extract and are folded into the utility rows.
-- **Phase 3:** not started.
+- **Phase 3:** done 2026-10-17 (healer pass with Holy Paladin and
+  Discipline). **An existing app check removed, for the user to approve
+  or reject:** the heal-GCD check is off for Holy Priest (healer.ts).
+  Power Infusion drift added (tracked-cooldowns.ts). Evidence in "Phase 3
+  (2026-10-17)" below.
 
 ## Ledger
 
@@ -51,7 +55,7 @@
 | priest-holy/HolyNova/targets | no-damage | — | Holy Nova | Holy Nova cast with few allies in range | Friendly-target count; no guide consumer. Returns a pass with no casts. |
 | priest-holy/SpiritOfRedemption/time | unverifiable | — | Spirit of Redemption | dying with the buff up | Unit and direction of the comparison look inconsistent (milliseconds against second-sized numbers) and nothing consumes it. Not worth reading. |
 | priest-holy/Guide/defensives | no-damage | — | Desperate Prayer, Fade; Translucent Image, Protective Light | — | Utility, defensives and mitigation: Desperate Prayer value and died-with-ready, Fade, Protective Light, Power Word: Shield, Twins of the Sun Priestess self-cast of Power Infusion (the app does not judge Power Infusion recasts either). The user does not judge these. Desperate Prayer's use rating and the Protective Light window values are the nearest to `lib/mitigation/` material, if a defensives view ever wants a rating of what a use absorbed. |
-| priest-shared/ShadowWordPain/uptime | covered | `dotUptimeFindings` | none | the DoT absent from every enemy for over 10% of the fight | Shadow and Discipline only, not loaded by Holy. Listed because the class layer is shared; Holy Priests are not expected to keep DoTs up (healer.ts says so). |
+| priest-shared/ShadowWordPain/uptime | no-damage | — | none | the DoT absent from every enemy for over 10% of the fight | Shadow and Discipline only, not loaded by Holy. Listed because the class layer is shared; Holy Priests are not expected to keep DoTs up (healer.ts says so). |
 | priest-holy/statistics | no-damage | — | many | — | Display only: Echo of Light attribution, Holy Word reduction by source, Divine Hymn and Guardian Spirit totals, healing efficiency and mana charts, healing received, and talent boxes (Oracle and Archon trees, Prayerful Litany, Prismatic Echoes, Divine Image, Cosmic Ripple and others). |
 
 Not rules (models the rules above rest on): the `SpellUsable` cooldown and
@@ -61,7 +65,46 @@ Light flashes), the Echo of Light and Hymn amplification models, the mana
 tracker. Dead code: AngelicFeather and BodyAndSoul (not registered), the
 stat-weight files, an empty Ultimate Serenity file.
 
-## Candidates left
+## Phase 3 (2026-10-17)
+
+Samples: 20 Holy Priest player-pulls on disk measured (of 128 on 102
+reports), plus three top Vashnik kills fetched from the HPS rankings:
+Jakbcastin HfLB17FvWJbCA4yM fight 30 (100th; Mirÿn in the same kill),
+Chai 1ZtTkMm4qfF9KBPw fight 33 (100th), Tobii Z7gYXjnQzR6JkpD8 fight 26
+(99.9th).
+
+- **Damage:** top Holy Priests barely deal any: Jakbcastin 0.46M and Chai
+  0.53M in ~6 minutes, Smite 0.5 a minute; Tobii 3.1M (Smite 7.6 a
+  minute). Every Holy Priest presses Benediction 11–14 a minute.
+- **The app's heal-GCD check, removed for the spec (pending the user):**
+  its filler was the most-cast damage GCD, which for Holy Priests was
+  Holy Nova (204k: Vermouth yrFd7CYZvt6XAz3T read 14.1M against 0.65M of
+  damage), Holy Fire (106k) or Shadow Word: Pain. At Smite, the right
+  filler, it still fired on the top players as much as on the weak:
+  Jakbcastin 4.24M and Chai 4.31M (about 9× their own damage), Tobii
+  1.31M, Mirÿn 1.62M; weaker players 0–3.6M. Benediction was the largest
+  part (38 of 83 casts under 20% on Jakbcastin), and Echo of Light, a
+  Holy Priest's top heal source, logs under its own name, so each heal's
+  own effective share reads low. healer.ts keeps the Smite filler for
+  when the check comes back.
+- **Power Infusion (no WoWAnalyzer row for Holy):** added as tracked
+  drift with Discipline's (same talent, 120s; priest-discipline.md). The
+  top Holy Priests pressed it within 0–35s of ready; it fires on two
+  weaker ones on VbAHWZDdPwJBajmx (安西香三号 2 uses lost, 1.14M; Irusanm
+  1 lost, 604k).
+- **Shadow Word: Pain uptime → `no-damage` (proposed):** Holy doesn't load
+  the module, and `dotUptimeFindings` doesn't run for healers, so
+  "covered" was wrong; nothing judges it here.
+- **Active time (superseded):** `checkGcdGaps` fires on every Holy Priest
+  pull; gaps on the top players are 0–1k each, none after a press missing
+  from the survey.
+- **Unverifiable rows:** unchanged (the Holy Word reductions aren't in the
+  log).
+- For `lib/mitigation/` (not built): Guardian Spirit and Divine Hymn are
+  pressed on most pulls; their timing against damage could feed a
+  raid-cooldown view.
+
+## Candidates left (phase 2, kept for the record)
 
 None. Holy Priest has no damage rotation in the extract, so no rule is a
 candidate. Honest expected value of building anything from this spec is

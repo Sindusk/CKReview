@@ -426,4 +426,20 @@ export const WOW_TRACKED_COOLDOWNS: Record<string, TrackedCooldown[]> = {
   "Mistweaver Monk": [
     { name: "Celestial Conduit", actionIds: [443028], damageIds: [443038], cooldownMs: 90_000, charges: 1, firstUseOffsetMs: 13_000 },
   ],
+  // Power Infusion (10060) for both healing Priests, from the WoWAnalyzer
+  // audit's phase 3 (2026-10-17; specs/healer.ts's header). Shortest
+  // interval 120.4s (Indeed hjHXmdnJFwTPpMtK); first use median 5s on 10
+  // Discipline and 13 Holy player-pulls (latest 44s, Tobii
+  // Z7gYXjnQzR6JkpD8). With Twins of the Sun Priestess each press logs
+  // twice, on the ally and on the priest, 0–50ms apart (twinCastMs). Worth
+  // what an average use added to the party's hits (BuffLedger). Of the top
+  // players (99–100th on Vashnik) only Busiekk Yz4PLrZ2CcAdMVxG lost one
+  // (2 of room 3: the second at 3:09, held 65s); the rest pressed it within
+  // 0–35s of ready.
+  "Discipline Priest": [
+    { name: "Power Infusion", actionIds: [10060], partyBuffStatusIds: [10060], cooldownMs: 120_000, charges: 1, firstUseOffsetMs: 10_000, twinCastMs: 500 },
+  ],
+  "Holy Priest": [
+    { name: "Power Infusion", actionIds: [10060], partyBuffStatusIds: [10060], cooldownMs: 120_000, charges: 1, firstUseOffsetMs: 10_000, twinCastMs: 500 },
+  ],
 };
