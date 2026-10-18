@@ -94,6 +94,13 @@
 // C11 C25), the two Arrows (A50 B23) and B18's H1 in a Bladedance cone.
 // Pulls where the log names one glitch partner: A27 A33 B14 B34 B48 B49
 // (Fire), A19 B16 B19 B57 B64 C6 (Spotlight); B5 and C27 stay pairs.
+// Replay (2026-10-18, bNcrLh7Y4dkHxM9q fight 17, a kill; Firewall 2:09.9):
+// the clones log a position only at their attack; Superliminal Steel hits
+// 4-40y to either side of Omega-F's line (BossMod; the game data's 80 x 36
+// rect, unoffset, drew over the strip all eight stood in); the unit logs
+// one sample, 45y out, at its laser; the partner tethers (222) form with
+// the symbols; Bladedance tethers (84) are taken from the clones by the
+// tanks. Built in replay.ts.
 //
 // -- RULES IMPLEMENTED --
 // ffxiv-top2-avoidable (Major on death, else Minor: no Damage Down in P2):
