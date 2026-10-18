@@ -25,8 +25,14 @@
 // +2:26.5, third Burnished Glory (40128) cast +2:41.6. P1 clears show the
 // first Usurper of Frost cast at +2:49-2:58.
 // Log IDs (cactbot's candidates were right wherever checked):
-// - Cyclonic Break casts 40144 fire / 40148 lightning (boss), 40329/40330
-//   (image, second set; often not logged). Initial cones 40145, one cast per
+// - Cyclonic Break casts 40144 fire / 40148 lightning (boss), 40329 fire /
+//   40330 lightning (image, second set; often not logged; element confirmed
+//   by the Sinsmoke/Sinsmite after them in JZ1KXhDbqkNH3jxR 24 and
+//   M9Nagmnw2LzHZPVq 1). In game a fire or lightning dragon circles the
+//   boss through the cast: fire = pairs, lightning = spread (user,
+//   2026-10-17; the replay draws it, lib/replay/ffxiv-effects.ts). The
+//   repeats go bait lanes, gaps, lanes (user, 2026-10-17: players dodge
+//   into the gaps, back, and out again). Initial cones 40145, one cast per
 //   player with that player as target; follow-ups 40146 (Damage Down).
 //   Elements: Sinsmoke 40147 (four pairs), Sinsmite 40149 (eight spreads).
 //   Pairs in clean resolutions: MT/R1, OT/R2, H1/M1, H2/M2 (B, C).

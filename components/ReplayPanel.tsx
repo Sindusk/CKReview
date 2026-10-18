@@ -42,6 +42,8 @@ import type { Pull } from "@/types/Pull";
 import { ffMapImageUrl, fitReplayView, mapImageBounds, poseAt, type ReplayActor, type ReplayData, type ReplayPose } from "@/lib/replay/ffxiv-replay";
 import { aoesAt, buildAoeShapes, buildHeadMarkers, buildTethers, type AoeShape } from "@/lib/replay/action-shapes";
 import { getFFAbilityIconUrl } from "@/lib/ability-icons";
+import { buildCasterEffects } from "@/lib/replay/ffxiv-effects";
+import { ElementDragon } from "@/components/ReplayEffects";
 import { sampleNear } from "@/lib/replay/ffxiv-replay";
 import { facingToCompassBearing } from "@/lib/mechanics/geometry";
 import { detectFFRoles } from "@/lib/mechanics/ffxiv/roles";
@@ -215,6 +217,7 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
     return m;
   }, [pull]);
   const actorByKey = useMemo(() => new Map((data?.actors ?? []).map((a) => [a.key, a])), [data]);
+  const casterEffects = useMemo(() => (data && data.game !== "wow" ? buildCasterEffects(data) : []), [data]);
   const headMarkers = useMemo(() => (data && data.game !== "wow" ? buildHeadMarkers(data, HEAD_MARKER_PLAIN_MS) : []), [data]);
   const aurasByKey = useMemo(() => {
     const m = new Map<string, NonNullable<ReplayData["playerAuras"]>>();
@@ -321,6 +324,14 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
                   <circle cx={line.x1} cy={line.y1} r={7} fill={TETHER_COLOR} stroke="#fff" strokeWidth={2} />
                 </g>
               );
+            })}
+            {/* Boss cues (FRU Cyclonic Break's dragon), around the caster. */}
+            {showAoes && casterEffects.filter((e) => t >= e.start && t <= e.end).map((e) => {
+              const follow = e.actor ? actorByKey.get(e.actor) : undefined;
+              const p = follow && poseAt(follow, t);
+              const at = p && !p.stale ? p : e;
+              const hitbox = follow?.hitbox ?? 500;
+              return <ElementDragon key={`${e.kind}-${e.start}`} e={e} x={toX(at.x)} y={toY(at.y)} r={Math.max(BOSS_ICON / 2 + 34, hitbox * scale * 1.05)} t={t} />;
             })}
           </g>
           <text x={S / 2} y={24} textAnchor="middle" fill="#fff" fontSize={20} fontWeight={700} {...LABEL}>N</text>

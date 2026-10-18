@@ -324,6 +324,11 @@ file's header comment. Mechanic detection has its own guide:
   the game's party list (icon, seconds left, stacks), and is listed in the
   hover card. Up to five, with vulnerabilities and Weakness last. Tracks
   saved before 2026-10-17 have none: refetch them.
+- **Boss cues** (`lib/replay/ffxiv-effects.ts`, art in
+  `components/ReplayEffects.tsx`): effects the game shows on a boss to say
+  what's coming, drawn from the cast id. FRU's Cyclonic Break dragon circles
+  Fatebreaker in fire (pairs) or lightning (spread) from the cast to the
+  last repeat. Shown with the AoEs layer.
 - **Head markers** show as a label over the marked actor. The log gives
   only a number, so `buildHeadMarkers` names the ones it knows (FRU's) when
   the ability they announce follows. The label stays until that hit; an
