@@ -130,6 +130,9 @@ export type AoeShape = {
   // WoW: the shape rides on this actor (an aura around a debuffed player)
   // instead of staying at x/y.
   follow?: string;
+  // Gone at `resolve` with no flash: a marker's circle riding on its
+  // player, whose drop is drawn by its own cast (FRU Frigid Stone).
+  noFlash?: boolean;
 };
 
 /**
@@ -158,6 +161,9 @@ type Override = {
   // repeat) and the lane turned by `gap` degrees (2nd). The caster's logged
   // facing follows the players instead.
   repeats?: { of: number; gap: number };
+  // A ground telegraph shown for its whole cast bar, not just as it lands:
+  // a fixed spot the players read ahead of time.
+  telegraph?: boolean;
 };
 
 // Futures Rewritten (lib/mechanics/ffxiv/fru/*.ts headers; ids and
@@ -226,6 +232,11 @@ const FRU_OVERRIDES: Record<number, Override> = {
   40271: { holder: 1002461, style: "stack" },       // Dark Water III
   40274: { holder: 1002460 },                       // Dark Eruption
   40280: { holder: 1002463, style: "knockback" },   // Dark Aero III (P4)
+  // Diamond Dust's Icicle Impact: 10y circles at the arena edge, shown
+  // from their cast bars as the game does (user, 2026-10-17): 2, then 4
+  // about 4s later, then the last 2 as the Frigid Stones drop; each lands
+  // 8.7s after it begins (both pulls).
+  40198: { telegraph: true },
   // Tank busters.
   40290: { style: "tankbuster" },                   // Black Halo
   40182: { style: "tankbuster" },                   // Darkest Dance jump
@@ -345,6 +356,13 @@ export function buildAoeShapes(data: ReplayData): AoeShape[] {
         const b = casts[j];
         if (b[1] === key && b[3] > 0 && Math.abs(b[0] + b[3] - t) < 800) { start = b[0]; break; }
       }
+    } else if (over.telegraph) {
+      // From its begincast: the same ability's cast bar ending now, by any
+      // caster (Icicle Impact begins on one helper and lands from another).
+      for (let j = i - 1; j >= 0 && t - casts[j][0] < 15000; j--) {
+        const b = casts[j];
+        if (b[4] === id && b[3] > 0 && Math.abs(b[0] + b[3] - t) < 800) { start = b[0]; break; }
+      }
     }
 
     const base = { name, start, resolve: t, width: g.width * 100, range: g.range * 100, angle: 0, inner: 0, estimated: false, style, soakers: over.soakers };
@@ -402,8 +420,32 @@ export function buildAoeShapes(data: ReplayData): AoeShape[] {
       out.push({ ...base, kind: "rect", x: cp.x, y: cp.y, bearing });
     }
   }
+  // A head marker that puts an AoE on its player: the circle rides on them
+  // from the marker until it drops.
+  for (const [mt, target, markerId] of data.headMarkers ?? []) {
+    const m = MARKER_AOES[markerId];
+    const g = m && geo[m.ability];
+    if (!m || !g || g.range <= 0) continue;
+    const drop = casts.find((c) => c[4] === m.ability && c[3] === 0 && c[0] > mt && c[0] - mt <= 12000);
+    if (!drop || !actorByKey.get(target)) continue;
+    out.push({
+      kind: "circle", x: 0, y: 0, bearing: 0, range: g.range * 100, width: 0, angle: 0, inner: 0, estimated: false,
+      style: "aoe", name: m.name, start: mt, resolve: drop[0], follow: target, noFlash: true,
+    });
+  }
   return out.sort((a, b) => a.start - b.start);
 }
+
+/**
+ * Head markers that put a circle on their player until it drops (the
+ * drop itself is the ability's own cast, drawn where it lands). FRU P2
+ * Diamond Dust: 345 on the four Frigid Stone players 8s before their
+ * 5y stones 40199 drop at their feet (user, 2026-10-17; M9Nagmnw2LzHZPVq 1
+ * marker 3:21.1, stones 3:29.2; JZ1KXhDbqkNH3jxR 24 3:18.8 / 3:26.9).
+ */
+const MARKER_AOES: Record<number, { ability: number; name: string }> = {
+  345: { ability: 40199, name: "Frigid Stone" },
+};
 
 export type TetherSpan = {
   source: string; target: string; id: number; start: number; end: number;
@@ -529,7 +571,7 @@ export function aoesAt(shapes: AoeShape[], t: number): { s: AoeShape; opacity: n
   const out: { s: AoeShape; opacity: number; resolving: boolean }[] = [];
   for (const s of shapes) {
     if (s.start > t) break;
-    if (t > s.resolve + AFTER_MS) continue;
+    if (t > s.resolve + AFTER_MS || (s.noFlash && t >= s.resolve)) continue;
     if (t >= s.resolve) out.push({ s, opacity: 1 - (t - s.resolve) / AFTER_MS, resolving: true });
     else out.push({ s, opacity: 0.45 + 0.4 * ((t - s.start) / Math.max(1, s.resolve - s.start)), resolving: false });
   }
