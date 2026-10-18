@@ -512,9 +512,11 @@ export function buildHeadMarkers(data: ReplayData, plainMs: number): HeadMarkerS
     const known = HEAD_MARKERS[id];
     const soon = (at: number, t: number) => at > t && at - t <= (known?.lookaheadMs ?? HEAD_MARKER_LOOKAHEAD_MS);
     // The marked player takes the hit, or (Hallowed Ray's 525 sits on
-    // Shiva herself) the marked enemy casts it.
+    // Shiva herself) the marked enemy casts it, or it's cast at the marked
+    // player with no damage (FRU's 62 ends at the cast handing out the
+    // Waters it announced).
     const at = known && (hits.find((h) => h[3] === target && soon(h[0], t) && known.abilities.includes(h[1]))?.[0]
-      ?? casts.find((c) => c[1] === target && c[3] === 0 && soon(c[0], t) && known.abilities.includes(c[4] ?? 0))?.[0]);
+      ?? casts.find((c) => (c[1] === target || c[5] === target) && c[3] === 0 && soon(c[0], t) && known.abilities.includes(c[4] ?? 0))?.[0]);
     return { target, id, start: t, end: at ?? t + plainMs, matched: at !== undefined };
   });
   const confirmed = new Set(spans.filter((s) => s.matched).map((s) => s.id));
