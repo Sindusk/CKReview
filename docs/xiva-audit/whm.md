@@ -19,7 +19,7 @@
 | id | status | app check | fires-on | notes |
 |---|---|---|---|---|
 | whm/DoTs/uptime | covered | Dia `dot` | Dia off the target | Checklist 95%. |
-| whm/DoTs/clipping | wrong | — | Dia refreshed early (6s / 9s / 12s a minute) | Target-blind, as for every healer DoT. |
+| whm/DoTs/clipping | superseded | Dia `dot` ("refreshed early", per target) | Dia refreshed early (6s / 9s / 12s a minute) | Target-blind, as for every healer DoT. Rechecked 2026-10-18 on 24C9awg1fKhFjBPt Red Hot and Deep Blue Pull 1 (Lady Ceilia): 242s target-blind (25s a minute, Major), 51s per target (3:05.7, 3:44.4, 5:18.8 on Deep Blue read 22-25s with 0s left on it); the app's finding there: 3:43, 27.6s, 30k. Proposed `wrong`; the user chose `superseded` 2026-10-18, as for Combust. |
 | whm/DoTs/applied-into-invuln | superseded | Dia `dot` | Dia shortly before invulnerability | Table only. |
 | whm/GlareFlare/dropped-glare-iv | covered | `checkProcs` | Sacred Sight stacks unused (Glare IV) | Medium 1, Major 2. Scanned 2026-10-16 on every level-100 White Mage pull on disk: 2 Sacred Sights lost, both at the player's death (mgTQJjX2nW6ANkP7 8:41, ZVCqpA8DPJgMK2Yr 8:41). Synced ultimates (TEA) have no Glare IV. |
 | whm/Lilies/bloodlily-overcap | covered | `bloodLily` | Blood Lily gained at 3 | Built 2026-10-16 as a gauge from casts with Lily and Blood Lily lanes: full at the start from 7.4, empty before (52 of 52 level-100 7.4+ pulls pressed Misery before any Lily; no Misery ever went out under 3); a death empties it. A third of (Misery − Glare III) each. 33 counted on disk, 6 forced. FFLogs top 37: 2. Matched Kai Dazkar's page (fGjA9DKLQbRa2q1k): 4 over the cap here (3 counted, 1 forced) = its "1 Blood Lily did not bloom" (it floors to whole Miseries). |
