@@ -103,18 +103,78 @@ function Droplet({ e, x, y, t, scale }: EffectArtProps) {
   );
 }
 
-/** A Blood Venom pool: a dark red puddle that stays put. */
-function BloodPool({ s, x, y, r, t }: ShapeArtProps) {
+/** A ground pool that stays put: a flat shimmering disc in its colours, no flash. */
+const pool = (fill: string, rim: string) => function Pool({ s, x, y, r, t }: ShapeArtProps) {
   const fade = Math.max(0, Math.min(1, (t - s.start) / 400, (s.resolve - t) / 800));
   const shimmer = 0.5 + 0.5 * Math.sin(t / 300 + x);
   return (
     <g opacity={fade} pointerEvents="none">
-      <circle cx={x} cy={y} r={r} fill="#8a0f1c" fillOpacity={0.35 + 0.08 * shimmer} stroke="#d4283a" strokeWidth={1.5} strokeOpacity={0.8} />
+      <circle cx={x} cy={y} r={r} fill={fill} fillOpacity={0.35 + 0.08 * shimmer} stroke={rim} strokeWidth={1.5} strokeOpacity={0.8} />
+    </g>
+  );
+};
+
+/** A Blood Venom pool: dark red. */
+const BloodPool = pool("#8a0f1c", "#d4283a");
+
+const ES_PROTOVENOM = ring({ color: "#e05cff", glow: "#8a1fb0", motes: 3, spinMs: 2000 });
+
+// ── The Lost Explorers ──
+
+/**
+ * Mor'zahi's Final Ascension clock: a ring around him that fills clockwise
+ * over the 60s charge, then flashes red through the 5s cast. It ends when a
+ * fed explorer's Command stops it.
+ */
+function AscensionClock({ e, x, y, t, scale }: EffectArtProps) {
+  const r = Math.max(18, (e.radius ?? 400) * scale);
+  const f = Math.min(1, (t - e.start) / 60000);
+  const casting = t - e.start > 60000;
+  const a = f * Math.PI * 2;
+  const end = { x: x + Math.sin(a) * r, y: y - Math.cos(a) * r };
+  const color = casting ? "#ff3b3b" : f > 0.85 ? "#ffb02e" : "#c9a8ff";
+  return (
+    <g pointerEvents="none">
+      <circle cx={x} cy={y} r={r} fill="none" stroke="#000" strokeOpacity={0.45} strokeWidth={6} />
+      {f >= 1 ? <circle cx={x} cy={y} r={r} fill="none" stroke={color} strokeWidth={5} opacity={casting ? 0.6 + 0.4 * Math.sin(t / 80) : 1} />
+        : <path d={`M${x} ${y - r} A${r} ${r} 0 ${a > Math.PI ? 1 : 0} 1 ${end.x} ${end.y}`} fill="none" stroke={color} strokeWidth={5} />}
+      <text x={x} y={y + r + 14} textAnchor="middle" fill={color} fontSize={12} fontWeight={700} stroke="#000" strokeWidth={3} paintOrder="stroke">
+        {casting ? "Final Ascension!" : `${Math.max(0, Math.ceil(60 - (t - e.start) / 1000))}s`}
+      </text>
     </g>
   );
 }
 
-const ES_PROTOVENOM = ring({ color: "#e05cff", glow: "#8a1fb0", motes: 3, spinMs: 2000 });
+/** A Creepy Statue: a small stone pillar with two glowing eyes. */
+function Statue({ x, y }: EffectArtProps) {
+  return (
+    <g pointerEvents="none">
+      <rect x={x - 6} y={y - 8} width={12} height={16} rx={2} fill="#5d5a52" stroke="#2c2a26" strokeWidth={1} />
+      <circle cx={x - 2.5} cy={y - 3} r={1.6} fill="#7dffb0" />
+      <circle cx={x + 2.5} cy={y - 3} r={1.6} fill="#7dffb0" />
+    </g>
+  );
+}
+
+/** The Disgusting Fish, where its crate was opened. */
+function Fish({ e, x, y, t }: EffectArtProps) {
+  const opacity = Math.max(0, Math.min(1, (t - e.start) / 200, (e.end - t) / 600));
+  const bob = Math.sin(t / 200) * 2;
+  return (
+    <g opacity={opacity} pointerEvents="none" transform={`translate(${x} ${y + bob})`}>
+      <ellipse cx={0} cy={0} rx={11} ry={6} fill="#9fb86a" stroke="#3c4a22" strokeWidth={1.2} />
+      <path d="M10 0 L17 -6 L17 6 Z" fill="#7e9650" stroke="#3c4a22" strokeWidth={1} />
+      <circle cx={-6} cy={-1.5} r={1.5} fill="#1a1a1a" />
+    </g>
+  );
+}
+
+const LE_BLINK = ring({ color: "#6fd3ff", glow: "#1f7fd9", motes: 5, spinMs: 1400 });
+const LE_BURNING = ring({ color: "#ff7a2a", glow: "#d94a00", motes: 3, spinMs: 2200 });
+const LE_PIERCING = ring({ color: "#bfe8ff", glow: "#3fa0e0", motes: 3, spinMs: 2600 });
+// Shell Spin: Nama's target (sea green, three shells circling) and a stun (grey).
+const LE_SHELL = ring({ color: "#3fd6b0", glow: "#1a8f74", motes: 3, spinMs: 900 });
+const LE_STUN = ring({ color: "#d8d8d8", glow: "#7a7a7a", motes: 4, spinMs: 700 });
 
 export const VA_ART: FightArt = {
   effects: {
@@ -126,9 +186,20 @@ export const VA_ART: FightArt = {
     "va-coiled-altar-fixate": CA_FIXATE,
     "va-entombed-sentinels-droplet": Droplet,
     "va-entombed-sentinels-protovenom": ES_PROTOVENOM,
+    "va-lost-explorers-clock": AscensionClock,
+    "va-lost-explorers-statue": Statue,
+    "va-lost-explorers-fish": Fish,
+    "va-lost-explorers-blink": LE_BLINK,
+    "va-lost-explorers-burning": LE_BURNING,
+    "va-lost-explorers-piercing": LE_PIERCING,
+    "va-lost-explorers-shell": LE_SHELL,
+    "va-lost-explorers-stun": LE_STUN,
   },
   shapes: {
     "va-entombed-sentinels-pool": BloodPool,
+    "va-lost-explorers-fire-patch": pool("#c2410c", "#ff8a3d"),
+    "va-lost-explorers-frost-patch": pool("#1d5f9e", "#9fd8ff"),
+    "va-lost-explorers-aftershock": pool("#6b4a2a", "#c99a5e"),
   },
   colors: {
     "va-vashnik-bile": VASHNIK_BILE,
@@ -139,5 +210,7 @@ export const VA_ART: FightArt = {
     "va-coiled-altar-gloombomb": { fill: "#3b2a6b", flash: "#8f6bff", rim: "#b9a6ff", glow: "#2a1a5e" },
     // Living Venom: the acid line back to Breath.
     "va-entombed-sentinels-venom": { fill: "#6fe03a", flash: "#c8ff8a", rim: "#e4ffc8", glow: "#3a9e1a" },
+    // Frostfire Volley's fire missiles (the frost ones use the built-in ice).
+    "va-lost-explorers-fire": { fill: "#ff6a1a", flash: "#ffc070", rim: "#ffe0b0", glow: "#d94a00" },
   },
 };

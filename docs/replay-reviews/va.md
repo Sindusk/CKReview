@@ -170,3 +170,52 @@ VOD checks, Pull 1 (nHavrDhPVtBYkMXA fight 48):
    (0:32). Check the pools' spots and size, and note when they disappear.
 5. Pull 1, 0:36-0:40: magenta rings on the eight Protovenom players.
    Check the marked players and that each ring ends as a pair meets.
+
+## The Lost Explorers
+
+Pull: Lost Explorers kill, Pull 1 (nHavrDhPVtBYkMXA fight 37, 4:17; Iku
+fed at 0:59, Nama at 3:00, the explorers died before a Gebbo window).
+
+Drawn:
+- **Final Ascension clock**: a ring around Mor'zahi filling over the 60s
+  charge with a countdown, amber in the last 9s, red through the 5s cast;
+  it stops when a fed explorer's Command lands.
+- **Creepy Statues**: the seven statues (where Evil Eyes come from), all
+  pull. Evil Eyes stay as their 3y hit circles.
+- **Disgusting Fish**: a fish where its crate was opened, for 4s.
+- **Blink Nova**: a blue ring on the player Iku will blink to (7s mark).
+- **Shell Spin**: a sea-green ring on the player the cast names (4s), and
+  a grey ring on stunned players. Not a cone: in the kill, players right on
+  the line from Nama to the target weren't stunned (0:53: five within 7°),
+  and only 3 stuns landed in 8 casts.
+- **Frostfire Volley**: a 10y fire (orange) or frost (ice) circle on each
+  struck player for the missile's 2s flight (each missile hit exactly one
+  player in the kill); then a fire or frost patch there until the last
+  player standing in it, at least 3s; orange / pale blue rings on Burning
+  Flames / Piercing Frost carriers.
+- **Mighty Thud**: an orange soak circle (6y, the journal's) on each of
+  the three leap targets from the 10s cast to their leap, then a brown
+  Aftershock pool where Nama landed until the last player stood in it.
+
+Not drawn: crates (no actors; a landing shows only as Throw Junk's 3y hit
+circle on whoever it hit), who stomped them, the fish's carrier, United
+Defense's range, Gebbo's bombs and mushrooms (not in this kill).
+
+Open questions:
+- How does Shell Spin really travel (three lines, bouncing shells)?
+- The Mighty Thud marks: are all three players marked from the start of
+  the 10s cast (as drawn), or one at a time?
+
+VOD checks, Pull 1 (nHavrDhPVtBYkMXA fight 37):
+1. Pull 1, 0:00-0:59: Mor'zahi's clock counts down from 60 and stops at
+   0:59 when Iku is fed. Check the fish lands on Iku at about 0:55.
+2. Pull 1, 0:34-0:38: a sea-green ring on Shell Spin's target, and a grey
+   stun ring at 0:38. Check where the shells went and who got stunned.
+3. Pull 1, 0:41-0:48: Blink Nova's ring on its target. Check Iku blinks to
+   that player at 0:48.
+4. Pull 1, 1:15-1:18: five fire, then five frost circles on single
+   players, then patches. Check the missiles' size and that the patches
+   stay until players clear them.
+5. Pull 1, 3:06-3:21: three soak circles for Mighty Thud, the leaps at
+   3:16.9, 3:18.9 and 3:20.8, and Aftershock pools after. Check the leap
+   targets and pool spots.
