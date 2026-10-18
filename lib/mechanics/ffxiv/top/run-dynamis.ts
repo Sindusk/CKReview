@@ -120,6 +120,13 @@
 // (H24), both healers dead 1 (L2, ffxiv/common.ts: the glitch towers
 // killed the SCH, then the WHM walked into the wall). The passes have
 // none; the kill's only P5 error is a Superliminal Steel Damage Down.
+// Replay (2026-10-18, L16 = bNcrLh7Y4dkHxM9q fight 17, 31621 at 8:36.8):
+// arm and rear-unit head markers 156 = clockwise, 157 = counterclockwise
+// (the lines' bearings); Sigma's arms tether (17) their farthest player
+// and retarget as players move (19 times in 12s); Delta's tethers are
+// 200/201 then 224/225 as in P3, ended by this phase's own Code Smell /
+// Regression ids; Sigma's tower helpers log no position (towers placed on
+// their soakers); 31638 is the boss monitor firing right. Built in replay.ts.
 //
 // -- RULES IMPLEMENTED --
 // ffxiv-top5-avoidable (Major on Damage Down or death, else Minor): Optical

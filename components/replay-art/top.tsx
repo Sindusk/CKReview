@@ -154,16 +154,21 @@ function GlitchTether({ x1, y1, x2, y2, t }: TetherArtProps) {
   );
 }
 
-/** Limitless Synergy's tank tether (84) from an outer clone to the tank who will take its Bladedance cone. */
-function BladedanceTether({ x1, y1, x2, y2, t }: TetherArtProps) {
+/**
+ * A beam-style tether: Limitless Synergy's tank tether (84, purple) from an
+ * outer clone to the tank taking its Bladedance; Sigma's arm tether (17,
+ * amber) to the player its Hyper Pulse is aimed at.
+ */
+const beamTether = (glow: string, core: string) => function BeamTether({ x1, y1, x2, y2, t }: TetherArtProps) {
   const flick = 0.85 + 0.15 * Math.sin(t / 60);
   return (
     <g pointerEvents="none">
-      <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#b04dff" strokeWidth={12 * flick} strokeOpacity={0.4} strokeLinecap="round" filter="url(#replay-glow)" />
-      <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#f0dcff" strokeWidth={2.5} strokeLinecap="round" />
+      <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={glow} strokeWidth={12 * flick} strokeOpacity={0.4} strokeLinecap="round" filter="url(#replay-glow)" />
+      <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={core} strokeWidth={2.5} strokeLinecap="round" />
     </g>
   );
-}
+};
+const BladedanceTether = beamTether("#b04dff", "#f0dcff");
 
 // ── P3 Hello World ──────────────────────────────────────────────────────────
 
@@ -212,6 +217,18 @@ function SpreadRing({ x, y, r, t }: ShapeArtProps) {
     </g>
   );
 }
+
+/**
+ * P5's World origins on their holders (8y): Near in teal, Distant in
+ * violet, so the two chains read apart. Colours are a pick.
+ */
+const worldRing = (color: string) => function WorldRing({ x, y, r, t }: ShapeArtProps) {
+  return (
+    <g pointerEvents="none">
+      <circle cx={x} cy={y} r={r} fill={color} fillOpacity={0.1} stroke={color} strokeWidth={2.5} strokeDasharray="10 7" strokeDashoffset={-(t / 40) % 17} />
+    </g>
+  );
+};
 
 /** Hello World's Local (green) and Remote (blue) tethers; their preparation versions are thin and dashed. */
 const REGRESSION = { local: "#4ef07a", remote: "#4da3ff" };
@@ -264,6 +281,7 @@ export const TOP_ART: FightArt = {
   },
   tethers: {
     "top-blaster": BlasterTether, "top-glitch": GlitchTether, "top-bladedance": BladedanceTether,
+    "top-arm": beamTether("#ffaa33", "#fff0d0"),
     "top-local": regressionTether(REGRESSION.local, false), "top-remote": regressionTether(REGRESSION.remote, false),
     "top-local-prep": regressionTether(REGRESSION.local, true), "top-remote-prep": regressionTether(REGRESSION.remote, true),
   },
@@ -273,5 +291,6 @@ export const TOP_ART: FightArt = {
     "top-rot-red-held": RotHeld, "top-rot-blue-held": RotHeld,
     "top-rot-red": RotBurst, "top-rot-blue": RotBurst,
     "top-spread": SpreadRing,
+    "top-world-near": worldRing("#3de0c0"), "top-world-far": worldRing("#b07aff"),
   },
 };

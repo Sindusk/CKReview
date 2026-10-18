@@ -189,3 +189,51 @@ three "Wave Cannon" ids together, so its counts read as misses).
 2. Pull 17, 7:49.5: two of the eight protean lanes are drawn from 10y north
    of the middle (where those helpers sit, as the header found). Do all
    eight lanes come from the boss in game?
+
+## Phase 5: Run: Dynamis (8:37 to 13:32)
+
+### What's drawn
+- **Solar Rays:** "Tank buster" on the marked tank, purple 5y busters.
+- **Delta:** the Local / Remote tethers and their dashed preparation, as
+  in P3 (P5 has its own status ids; both are handled). Fist Explosions
+  telegraphed for their 2.7s cast. Arm markers read "Clockwise" (156) or
+  "Counterclockwise" (157) over each arm, then the Hyper Pulse lines from
+  game data. Monitors as in P3 (31638 = the boss's, firing right). Beyond
+  Defense / Pile Pitch as in P2. Swivel Cannon's 210° cone telegraphed for
+  its 9.7s cast. World origins as dashed 8y rings on their holders for
+  their last 5s, Near in teal, Distant in violet (my colours).
+- **Sigma:** PlayStation symbols and partner tethers until the glitch ends;
+  "Prey" on the six marked players; amber arm tethers that jump to whoever
+  is farthest; towers (single "1", double "2") from Looper on, placed where
+  their soakers stood (the helpers log no position here); Discharger
+  knockback; Omega-F's staff stance shown as its clone; Rear Lasers'
+  first sweep telegraphed ("Counterclockwise" over the unit).
+- **Omega:** the clone pairs with their weapons (as in P2), Diffuse Wave
+  Cannon's 120° cones, monitors, Blaster tethers passed to the holders.
+
+### Fit check
+Clean except same-name pairs, two of 40 Hyper Pulse lines, three Rear
+Laser repeats near the ends of their sweep, and Omega-F's leg sweep at
+12:20.2: three players drawn in the side she hit were not hit, the DNC
+was (Damage Down). Her logged facing may be stale there.
+
+### Couldn't find out
+- Prey beams' angle (31604, a cone with no angle in the data; drawn at the
+  fitted 30°).
+- The fists' colours and owners (not in the log), so their pairing isn't
+  drawn.
+- Whether 31639 is the boss monitor firing left (not seen).
+
+### VOD checks: Pull 17 (bNcrLh7Y4dkHxM9q)
+1. Pull 17, 9:29.1: "Clockwise" over three arms, "Counterclockwise" over the
+   other three. Do the arms' arrows match?
+2. Pull 17, 9:47.5 to 9:57.2: Swivel Cannon's 210° cone. Which side was
+   safe, and is the cone that wide?
+3. Pull 17, 10:36 to 10:54: the amber arm tethers jump between players.
+   Does the game show these tethers moving to the farthest player?
+4. Pull 17, 10:52 to 11:07.5: towers drawn from Looper at their soakers'
+   spots. When do the towers appear, and where?
+5. Pull 17, 11:11.7 to 11:29: Rear Lasers sweep counterclockwise from the
+   south-west. Right direction?
+6. Pull 17, 12:15 to 12:20.2: Omega-F with legs in the south-west; the DNC
+   took the leg sweep. Where was the safe strip, and where was the DNC?

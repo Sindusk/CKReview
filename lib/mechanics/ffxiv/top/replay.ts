@@ -219,10 +219,10 @@ Object.assign(HEAD_MARKERS, {
 } satisfies Record<number, HeadMarkerDef>);
 
 Object.assign(TETHERS, {
-  // Party Synergy partners (222, between the two players of each symbol,
-  // with the symbols at +27.6). Ended by the Fire spreads, where the
-  // pair's distance first counts (fight 17 2:37.5 -> 2:51.3).
-  222: { element: "top-glitch", payoff: [FIRE_III] },
+  // Party Synergy's and Sigma's partners (222, between the two players of
+  // each symbol), for as long as their glitch lasts (fight 17 2:37.5 ->
+  // 3:04.5, 10:35.7 -> 11:07.7).
+  222: { element: "top-glitch", payoff: [], endStatus: [MID_GLITCH, REMOTE_GLITCH] },
   // Limitless Synergy's tank tethers (84) from the two outer clones, taken
   // by the tanks (fight 17: 3:31.7 to the SCH and the DRK, the WAR takes
   // the SCH's at 3:34.2), paid off by Bladedance at 3:39.9.
@@ -295,11 +295,14 @@ function p2Effects(data: ReplayData): CasterEffect[] {
   const fires = casts.filter((c) => c[4] === FIRE_III && c[3] === 0);
   for (const [t, key, id] of markers) {
     if (!SYMBOL_MARKERS.includes(id)) continue;
+    // Until P2's Fire spreads, else (P5 Sigma: no Fire) until the
+    // player's glitch runs out at the towers.
     const fire = fires.find((c) => c[0] > t && c[0] - t < 20000);
+    const glitch = (data.playerAuras ?? []).find((s) => s[2] === key && (s[3] === MID_GLITCH || s[3] === REMOTE_GLITCH) && Math.abs(s[0] - t) < 2000);
     const who = actorByKey.get(key);
     const p = who && poseAt(who, t);
     if (!p) continue;
-    out.push({ kind: `top-symbol-${id}`, label: "", actor: key, x: p.x, y: p.y, start: t, end: fire ? fire[0] : t + 14000 });
+    out.push({ kind: `top-symbol-${id}`, label: "", actor: key, x: p.x, y: p.y, start: t, end: fire ? fire[0] : glitch ? glitch[1] : t + 14000 });
   }
   return out;
 }
@@ -318,6 +321,10 @@ function p2Clones(data: ReplayData): AoeShape[] {
       // AOEShapeRect(40, 40, -4) turned ±90° off Omega-F's facing: each
       // side from 4y off her line out to 40y, 80y along it, leaving an 8y
       // strip through her (BossMod; the data's 80 x 36 is the same rect).
+      // The two always fire together, so which id is which side doesn't
+      // show. P5 (fight 17 12:20.2): the DNC, hit, stood 4.2y right of her
+      // logged line, but three players drawn on that side weren't hit:
+      // her logged facing may be stale there.
       const side = (bearingOf(p.facing) + (c[4] === LEGS_SIDES[0] ? 270 : 90)) % 360;
       const o = along(p.x, p.y, side, 400);
       out.push({ ...base, kind: "rect", x: o.x, y: o.y, bearing: side, range: 3600, width: 8000, name: "Superliminal Steel", start: c[0] - 300, resolve: c[0] });
@@ -369,7 +376,9 @@ const STACK_BUG = 31574, DEFAMATION_BUG = 31575;
 const STACK_STATUS = 1003524, DEFAMATION_STATUS = 1003525;
 const ROT_RED = 31578, ROT_BLUE = 31579;
 const ROT_RED_STATUS = 1003526, ROT_BLUE_STATUS = 1003429;
-const MONITOR_BOSS: Record<number, "right" | "left"> = { 31595: "right", 31596: "left" };
+// P5's boss monitors are 31638 / 31639 (fight 17 12:37.4: 31638 facing
+// north picked two players east). 31639 = left is assumed.
+const MONITOR_BOSS: Record<number, "right" | "left"> = { 31595: "right", 31596: "left", 31638: "right", 31639: "left" };
 const MONITOR_STATUS: Record<number, "right" | "left"> = { 1003452: "right", 1003453: "left" };
 const MARK_LEAD_MS = 5000;   // spreads, stacks and defamations shown on their owner this long before they go off
 
@@ -402,10 +411,12 @@ Object.assign(TETHERS, {
   // 200 / 201 the Local / Remote pair's 20s preparation, 224 / 225 the live
   // Local (green) / Remote (blue) tether, broken by closing in / moving
   // apart, which the log shows only as Local / Remote Regression ending.
-  200: { element: "top-local-prep", payoff: [], endStatus: [1003503] },
-  201: { element: "top-remote-prep", payoff: [], endStatus: [1003441] },
-  224: { element: "top-local", payoff: [], endStatus: [1003529] },
-  225: { element: "top-remote", payoff: [], endStatus: [1003530] },
+  // P5 Delta reuses them with its own status ids (Code Smells 1003440 /
+  // 1003504, Regression 1001672 / 1001673; 9:13.8 and 9:31.8 in fight 17).
+  200: { element: "top-local-prep", payoff: [], endStatus: [1003503, 1003440] },
+  201: { element: "top-remote-prep", payoff: [], endStatus: [1003441, 1003504] },
+  224: { element: "top-local", payoff: [], endStatus: [1003529, 1001672] },
+  225: { element: "top-remote", payoff: [], endStatus: [1003530, 1001673] },
 } satisfies Record<number, TetherKind>);
 
 const shape = (o: Partial<AoeShape> & Pick<AoeShape, "kind" | "x" | "y" | "range" | "name" | "start" | "resolve" | "style">): AoeShape =>
@@ -549,10 +560,100 @@ function p4Stacks(data: ReplayData): AoeShape[] {
   return out;
 }
 
+// ── P5 Run: Dynamis (run-dynamis.ts) ────────────────────────────────────────
+
+const P5_SOLAR_RAY = [33196, 33197, 31489, 31490];
+const FIST = 31482, SWIVEL = 31636, REAR_LASERS = 31631;
+const HYPER_PULSE = [31600, 31601, 31602], PREY_BEAM = 31604;
+const LOOPER = 1003456, DOUBLE_TOWER = 31493;
+const NEAR_WORLD = 1003442, DISTANT_WORLD = 1003443, NEAR_ORIGIN = 31625, DISTANT_ORIGIN = 33040;
+
+Object.assign(OVERRIDES, {
+  // Two-hit Solar Rays on the tanks before each trio (marker 343).
+  ...Object.fromEntries(P5_SOLAR_RAY.map((id) => [id, { style: "tankbuster" as const }])),
+  // Delta's fists: 3y Explosions where each pair met, shown for their
+  // 2.7s cast (omen general_1bf). Fight 17 9:34.3-9:37.0, none hit.
+  [FIST]: { telegraph: true },
+  // Swivel Cannon: a 210° cone from the Beetle (omen gl_fan210), shown
+  // for its 9.7s cast; the caster logs no sample near it.
+  [SWIVEL]: { telegraph: true, holdCaster: true },
+  // Rear Lasers' first sweep shows its 2.7s telegraph; the 13 repeats
+  // turn 9-10° each (fight 17 11:22.5-11:29.4, counterclockwise per its
+  // 157 marker) and flash.
+  [REAR_LASERS]: { telegraph: true },
+  [DOUBLE_TOWER]: { hidden: true },   // drawn by p5Towers
+} satisfies Record<number, Override>);
+
+Object.assign(HEAD_MARKERS, {
+  343: { label: "Tank buster", abilities: [...SOLAR_RAY, ...P5_SOLAR_RAY] },
+  // Rotation markers on Delta's arms (9:29.1) and Sigma's rear power unit
+  // (11:11.7): 156 clockwise, 157 counterclockwise, read off the lines'
+  // bearings in fight 17 (156 arms' repeats +19-20° each, 157's -20° /
+  // -9°). The arms fire 12.7s after.
+  156: { label: "Clockwise", abilities: HYPER_PULSE, lookaheadMs: 15000 },
+  157: { label: "Counterclockwise", abilities: [...HYPER_PULSE, REAR_LASERS, 31632], lookaheadMs: 15000 },
+  // Sigma's prey marks: six players, 9s before their beams (10:46.0 ->
+  // 10:55.1).
+  244: { label: "Prey", abilities: [PREY_BEAM] },
+} satisfies Record<number, HeadMarkerDef>);
+
+Object.assign(TETHERS, {
+  // Sigma's two arms tether (17) whoever is farthest, re-tethering as
+  // players move (fight 17: 19 retargets 10:36.4-10:48.4), until their
+  // Hyper Pulse 31602 fires at that player.
+  17: { element: "top-arm", payoff: [31602], passed: 2 },
+} satisfies Record<number, TetherKind>);
+
+// Sigma's towers (Storage Violation single 31492, double 31493, empty
+// 31494): shown from Looper, which the towers clean (fight 17 10:52.2 ->
+// 11:07.5), with their soaker count. Their helpers log no position here
+// (last samples 12s earlier at the middle), so each tower sits where its
+// soakers stood as it landed. P1's towers are p1Towers'.
+function p5Towers(data: ReplayData): AoeShape[] {
+  const casts = data.enemyCasts ?? [];
+  const hits = data.enemyHits ?? [];
+  const actorByKey = new Map(data.actors.map((a) => [a.key, a]));
+  const loop = casts.find((c) => c[4] === PROGRAM_LOOP && c[3] === 0);
+  const out: AoeShape[] = [];
+  for (const c of casts) {
+    if (c[3] !== 0 || ![STORAGE_VIOLATION, DOUBLE_TOWER, OBLITERATION].includes(c[4] ?? 0)) continue;
+    if (loop && c[0] >= loop[0] && c[0] - loop[0] <= LOOP_SPAN_MS) continue;
+    const looper = (data.playerAuras ?? []).filter((a) => a[3] === LOOPER && a[0] < c[0] && c[0] - a[0] < 20000).map((a) => a[0]);
+    const a = actorByKey.get(c[1]);
+    const own = hits.filter((h) => h[2] === c[1] && h[1] === c[4] && h[0] >= c[0] && h[0] - c[0] <= 1500 && h[6] !== null);
+    const p = (a && sampleNear(a, c[0], 1500))
+      ?? (own.length ? { x: own.reduce((s, h) => s + h[6]!, 0) / own.length, y: own.reduce((s, h) => s + h[7]!, 0) / own.length } : undefined);
+    if (!p) continue;
+    out.push(shape({
+      kind: "circle", x: p.x, y: p.y, range: 300, soakers: c[4] === DOUBLE_TOWER ? 2 : 1, name: "Storage Violation",
+      start: looper.length ? Math.min(...looper) : c[0] - 3000, resolve: c[0], style: "tower",
+    }));
+  }
+  return out;
+}
+
+// The World origins (Near / Distant, 8y) on their holders for the last
+// 5s, when the origin then went off.
+function p5Worlds(data: ReplayData): AoeShape[] {
+  const casts = data.enemyCasts ?? [];
+  const out: AoeShape[] = [];
+  for (const [start, end, key, id] of data.playerAuras ?? []) {
+    if (id !== NEAR_WORLD && id !== DISTANT_WORLD) continue;
+    const origin = id === NEAR_WORLD ? NEAR_ORIGIN : DISTANT_ORIGIN;
+    if (!casts.some((c) => c[4] === origin && c[3] === 0 && Math.abs(c[0] - end) <= 1500)) continue;
+    out.push(shape({
+      kind: "circle", x: 0, y: 0, range: 800, name: id === NEAR_WORLD ? "Hello, Near World" : "Hello, Distant World",
+      start: Math.max(start, end - MARK_LEAD_MS), resolve: end, follow: key, noFlash: true, style: id === NEAR_WORLD ? "top-world-near" : "top-world-far",
+    }));
+  }
+  return out;
+}
+
 function buildShapes(data: ReplayData): AoeShape[] {
   return [
     ...p1Towers(data), ...p1Puddles(data), ...p1Sets(data), ...p2Clones(data), ...p2Stacks(data),
     ...p3Rings(data), ...p3Towers(data), ...p3Marks(data), ...p4Stacks(data),
+    ...p5Towers(data), ...p5Worlds(data),
   ];
 }
 
