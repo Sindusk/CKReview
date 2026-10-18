@@ -8,7 +8,9 @@
 // each entry says what it fixed. Built for P1-P2; P3 onward to come.
 
 import type { CasterEffect, FightReplay, FloorStatus, HeadMarkerDef, MarkerAoe, Override, TetherKind } from "@/lib/replay/fight-spec";
-import { sampleNear, type ReplayData } from "@/lib/replay/ffxiv-replay";
+import type { AoeShape } from "@/lib/replay/action-shapes";
+import { poseAt, sampleNear, type ReplayData } from "@/lib/replay/ffxiv-replay";
+import { facingToCompassBearing } from "@/lib/mechanics/geometry";
 
 // ── Shape overrides ─────────────────────────────────────────────────────────
 
@@ -108,6 +110,10 @@ const OVERRIDES: Record<number, Override> = {
   // 40201 crosses per stone (one cardinal, one diagonal: casters face 180
   // and 225 in both pulls) and the 5y 40200 circle under it.
   40201: { telegraph: true, star: true }, 40200: { telegraph: true },
+  // P3's Sinbound Meltdown follow-ups and Apocalypse's explosions are
+  // placed by relativityShapes / apocalypseShapes below: the helpers'
+  // logged facing and positions are stale for both.
+  40292: { hidden: true }, 40297: { hidden: true },
   // Tank busters.
   40290: { style: "tankbuster" },                   // Black Halo
   40182: { style: "tankbuster" },                   // Darkest Dance jump
@@ -152,6 +158,14 @@ const MARKER_AOES: Record<number, MarkerAoe> = {
 const TETHERS: Record<number, TetherKind> = {
   249: { element: "fire", payoff: [40156, 40167] },
   287: { element: "lightning", payoff: [40142] },
+  // P3 Ultimate Relativity: Speed's tethers from the boss to the
+  // hourglasses, three yellow in a Y (Quicken, fire first) and two purple
+  // (Slow, fire last), each with a bright orb in the middle (NAUR guide).
+  // JZ1KXhDbqkNH3jxR 24 7:43.8: 134 on the three that took Quicken 40294
+  // and fired at 7:56.7, 133 on the two that took Slow 40295 and fired at
+  // 8:17.7. Nothing logs their end: shown the default 15s.
+  134: { element: "fru-quicken", payoff: [] },
+  133: { element: "fru-slow", payoff: [] },
 };
 
 // ── Boss cues ───────────────────────────────────────────────────────────────
@@ -299,7 +313,251 @@ function buildEffects(data: ReplayData): CasterEffect[] {
       if (kind && p) out.push({ kind, label: "", x: p.x, y: p.y, start: mm[0], end: c[0] + MIRROR_AFTER_MS });
     }
   }
+  out.push(...relativityEffects(data), ...apocalypseEffects(data));
   return out;
+}
+
+// ── P3 Oracle of Darkness ───────────────────────────────────────────────────
+//
+// Built 2026-10-18 on JZ1KXhDbqkNH3jxR fight 24 (P3 7:21-10:02), no VOD
+// yet; the look is from the NAUR P3 guide (oracle-of-darkness.ts [N]).
+// Fit check after: Dark Fire III, Unholy Darkness, Dark Blizzard III, the
+// rewind's Eruptions and Waters, Shell Crusher, Black Halo and Darkest
+// Dance all exact once simultaneous casts are compared together (the fit
+// check script compares each circle with every same-name hit and so
+// reports four exact Eruptions as 0 of 12).
+
+const ARENA_CENTRE = 10000;           // FRU's arena centre (100, 100), centi-yalms
+
+const bearingTo = (ax: number, ay: number, bx: number, by: number) =>
+  ((Math.atan2(bx - ax, -(by - ay)) * 180) / Math.PI + 360) % 360;
+const wrap = (d: number) => ((d % 360) + 540) % 360 - 180;
+
+// Ultimate Relativity (oracle-of-darkness.ts, "EIGHT HOURGLASSES"): eight
+// green hourglasses on the principal directions 9.5y out. Speed tethers
+// three yellow (Quicken, fire first) and two purple (Slow, fire third);
+// the three untethered fire second. Each fires Sinbound Meltdown: a 3.7s
+// begincast 40291 on the hourglass, then the first beam 40235 through the
+// nearest player and nine follow-ups 40292 ~1.1s apart, each turned 15° in
+// the direction its hourglass shows (yellow arrow clockwise, blue counter-
+// clockwise; NAUR guide).
+// The hourglass bodies (actors casting 40291) log one sample; the shots
+// come from other "delight's hourglass" actors that are reused between
+// hourglasses (fight 24's 47.2 fires from SE at 7:56.7 and from E at
+// 8:17.7), matched to their hourglass by position.
+// Follow-ups: the shooters' logged facing lags or glitches (fight 24, the
+// first follow-up at 7:58.8 pointed all three back through the middle and
+// "hit" six players who took nothing). Their samples otherwise move 0.26
+// rad (15°) a shot, in one direction per hourglass, so each follow-up is
+// drawn at the first beam's bearing + k × 15° that way. No follow-up hit
+// anyone in fight 24; the first beams were all exact.
+const RELATIVITY = 40266;
+const QUICKEN = 40294, SLOW = 40295;
+const QUICKEN_TETHER = 134, SLOW_TETHER = 133;
+const MELTDOWN_BEGIN = 40291, MELTDOWN_FIRST = 40235, MELTDOWN_NEXT = 40292;
+const MELTDOWN_STEP = 15;             // degrees per follow-up
+const MELTDOWN_SPAN_MS = 12000;       // first beam to last follow-up (~10.6s)
+const SAME_SPOT = 100;                // centi-yalms: a shooter on its hourglass
+
+type MeltdownVolley = {
+  key: string; x: number; y: number;  // shooter and where it stands
+  t: number; bearing: number;         // first beam
+  spin: 1 | -1;                       // +1 clockwise
+  follow: number[];                   // follow-up cast times
+};
+
+function meltdownVolleys(data: ReplayData): MeltdownVolley[] {
+  const casts = data.enemyCasts ?? [];
+  const hits = data.enemyHits ?? [];
+  const actorByKey = new Map(data.actors.map((a) => [a.key, a]));
+  const out: MeltdownVolley[] = [];
+  for (const c of casts) {
+    if (c[4] !== MELTDOWN_FIRST || c[3] !== 0) continue;
+    const a = actorByKey.get(c[1]);
+    const o = a && sampleNear(a, c[0], 1500);
+    if (!a || !o) continue;
+    const hit = hits.find((h) => h[1] === MELTDOWN_FIRST && h[2] === c[1] && h[0] >= c[0] && h[0] - c[0] <= 1500 && h[6] !== null);
+    const target = c[5] ? actorByKey.get(c[5]) : undefined;
+    const tp = hit ? { x: hit[6]!, y: hit[7]! } : target && poseAt(target, c[0]);
+    if (!tp) continue;
+    const bearing = bearingTo(o.x, o.y, tp.x, tp.y);
+    const next = casts.find((n) => n[1] === c[1] && n[4] === MELTDOWN_FIRST && n[3] === 0 && n[0] > c[0]);
+    const until = Math.min(c[0] + MELTDOWN_SPAN_MS, next ? next[0] - 1 : Infinity);
+    const follow = casts.filter((n) => n[1] === c[1] && n[4] === MELTDOWN_NEXT && n[3] === 0 && n[0] > c[0] && n[0] <= until).map((n) => n[0]);
+    // Spin: the majority turn of the shooter's samples from the first beam.
+    let vote = 0;
+    for (const s of a.samples) {
+      if (s[0] <= c[0] + 1500 || s[0] > until) continue;
+      const d = wrap(facingToCompassBearing(s[3]) - bearing);
+      if (Math.abs(d) >= 10 && Math.abs(d) <= 170) vote += Math.sign(d);
+    }
+    out.push({ key: c[1], x: o.x, y: o.y, t: c[0], bearing, spin: vote < 0 ? -1 : 1, follow });
+  }
+  return out;
+}
+
+function relativityShapes(data: ReplayData): AoeShape[] {
+  const g = data.actionGeometry?.[MELTDOWN_NEXT];
+  if (!g) return [];
+  const out: AoeShape[] = [];
+  for (const v of meltdownVolleys(data)) {
+    v.follow.forEach((t, i) => {
+      out.push({
+        kind: "rect", x: v.x, y: v.y, bearing: (v.bearing + v.spin * MELTDOWN_STEP * (i + 1) + 360) % 360,
+        range: g.range * 100, width: g.width * 100, angle: 0, inner: 0, estimated: false, style: "aoe",
+        name: data.abilityNames?.[MELTDOWN_NEXT] ?? "Sinbound Meltdown", start: t - 300, resolve: t,
+      });
+    });
+  }
+  return out;
+}
+
+// Spell-in-Waiting: Return records each player's spot when it runs out
+// (a blue marker in game, NAUR guide) and pulls them back there at the
+// Stun. Fight 24: five at 7:56.5, three at 8:06.5, all back at 8:20.5.
+const RETURN_WAITING = 1002464, RETURN = 1002452;
+// Shadoweye: a gaze from its three holders as the Stun lands (8:23.6 in
+// fight 24); anyone facing one gets Doom. Shown on the holder for its
+// last seconds, while everyone has to face out.
+const SHADOWEYE = 1002456;
+const SHADOWEYE_SHOW_MS = 5000;
+
+function relativityEffects(data: ReplayData): CasterEffect[] {
+  const casts = data.enemyCasts ?? [];
+  const tethers = data.tethers ?? [];
+  const auras = data.playerAuras ?? [];
+  const actorByKey = new Map(data.actors.map((a) => [a.key, a]));
+  const out: CasterEffect[] = [];
+  const volleys = meltdownVolleys(data);
+
+  // The hourglasses, from their tethers (or Relativity's cast) to their
+  // last shot.
+  const relativity = casts.find((c) => c[4] === RELATIVITY && c[3] === 0);
+  const bodies = [...new Set(casts.filter((c) => c[4] === MELTDOWN_BEGIN && c[3] > 0).map((c) => c[1]))];
+  const firstTether = tethers.find((tt) => bodies.includes(tt[1]) || bodies.includes(tt[2]));
+  for (const key of bodies) {
+    const a = actorByKey.get(key);
+    const p = a?.samples[0];
+    const begin = casts.find((c) => c[1] === key && c[4] === MELTDOWN_BEGIN && c[3] > 0);
+    if (!p || !begin) continue;
+    const v = volleys.find((q) => Math.hypot(q.x - p[1], q.y - p[2]) <= SAME_SPOT && q.t >= begin[0] && q.t - begin[0] <= 6000);
+    const last = v ? (v.follow[v.follow.length - 1] ?? v.t) : begin[0] + begin[3];
+    const start = firstTether?.[0] ?? (relativity ? relativity[0] + 4000 : begin[0] - 9000);
+    const tether = tethers.find((tt) => (tt[1] === key || tt[2] === key) && (tt[3] === QUICKEN_TETHER || tt[3] === SLOW_TETHER));
+    const speed = casts.find((c) => c[5] === key && (c[4] === QUICKEN || c[4] === SLOW) && c[3] === 0);
+    const kind = tether?.[3] === QUICKEN_TETHER || speed?.[4] === QUICKEN ? "fru-hourglass-yellow"
+      : tether?.[3] === SLOW_TETHER || speed?.[4] === SLOW ? "fru-hourglass-purple" : "fru-hourglass";
+    out.push({ kind, layer: "floor", label: "", x: p[1], y: p[2], start, end: last + 600 });
+    // Its turning arrow, from the begincast until the last shot.
+    if (v) out.push({ kind: v.spin > 0 ? "fru-spin-cw" : "fru-spin-ccw", layer: "floor", label: "", x: p[1], y: p[2], start: begin[0], end: last + 300 });
+  }
+
+  // Return's recorded spots.
+  for (const w of auras) {
+    if (w[3] !== RETURN_WAITING) continue;
+    const ret = auras.find((r) => r[3] === RETURN && r[2] === w[2] && Math.abs(r[0] - w[1]) <= 1000);
+    const player = actorByKey.get(w[2]);
+    const p = player && poseAt(player, w[1]);
+    if (!ret || !p) continue;
+    out.push({ kind: "fru-return", layer: "floor", label: "", x: p.x, y: p.y, start: w[1], end: ret[1] + 400 });
+  }
+
+  // Shadoweye on its holders.
+  for (const s of auras) {
+    if (s[3] !== SHADOWEYE || s[1] - s[0] < SHADOWEYE_SHOW_MS) continue;
+    const player = actorByKey.get(s[2]);
+    const p = player && poseAt(player, s[1]);
+    if (!p) continue;
+    out.push({ kind: "fru-shadoweye", label: "", actor: s[2], x: p.x, y: p.y, start: s[1] - SHADOWEYE_SHOW_MS, end: s[1] + 300 });
+  }
+  return out;
+}
+
+// Apocalypse (oracle-of-darkness.ts, "SIX APOCALYPSE WAVES"; NAUR guide):
+// lights run along the floor's axis lines and outer ring; each time one
+// reaches a crossing a circle appears there, a wave every 2s, and the
+// waves explode in the same order 2s apart, each ~10.4s after it appeared
+// (guide: waves at +10..+20, explosions from +21; Darkest Dance begins at
+// +26, which puts +0 at 9:02.4 in fight 24 and the first hits at 9:23.4).
+// Two lights start on the ring at opposite points (A0, B0) and run the
+// same way round, 45° a wave; two leave the centre along that axis in
+// wave 1 and two more in wave 2, following them. So wave k explodes the
+// ring points A/B max(0, k-3) .. k-1, and the centre in waves 1 and 2.
+// Fight 24 (40297, 9:22.8 to 9:32.9 every ~2s): wave 1 centre, NW, SE;
+// wave 2 centre, NW, W, SE, E; waves 4-6 exactly three a side turning
+// counterclockwise. Wave 3's helpers all logged (100, 100), stale: by the
+// model it's NW/W/SW and SE/E/NE (two of its three hits fit; one hit
+// player's logged spot sits 11y off, likely lagging their run in).
+// Helpers' positions decide only the start (wave 1) and turn (wave 2).
+const APOCALYPSE_HIT = 40297;
+const APOCALYPSE_WAVE_GAP_MS = 1000;
+const APOCALYPSE_SHOW_MS = 10400;     // a wave's circle shows this long before it explodes
+const APOCALYPSE_STEP_MS = 2000;
+const RING_MIN = 700;                 // centi-yalms from the centre: a ring point
+
+type ApocalypseModel = { a0: number; dir: 1 | -1; ring: number; waves: number[] };
+
+function apocalypseModel(data: ReplayData): ApocalypseModel | undefined {
+  const casts = (data.enemyCasts ?? []).filter((c) => c[4] === APOCALYPSE_HIT && c[3] === 0);
+  if (casts.length < 2) return undefined;
+  const actorByKey = new Map(data.actors.map((a) => [a.key, a]));
+  const waves: (typeof casts)[] = [];
+  for (const c of casts) {
+    const w = waves[waves.length - 1];
+    if (w && c[0] - w[0][0] <= APOCALYPSE_WAVE_GAP_MS) w.push(c); else waves.push([c]);
+  }
+  if (waves.length < 2) return undefined;
+  const ringOf = (w: typeof casts) => w.flatMap((c) => {
+    const a = actorByKey.get(c[1]);
+    const p = a && sampleNear(a, c[0], 300);
+    const r = p ? Math.hypot(p.x - ARENA_CENTRE, p.y - ARENA_CENTRE) : 0;
+    return p && r >= RING_MIN ? [{ b: bearingTo(ARENA_CENTRE, ARENA_CENTRE, p.x, p.y), r }] : [];
+  });
+  const w1 = ringOf(waves[0]), w2 = ringOf(waves[1]);
+  if (!w1.length) return undefined;
+  const a0 = w1[0].b;
+  const step = w2.map((p) => wrap(p.b - a0)).find((d) => Math.abs(d) > 20 && Math.abs(d) < 70);
+  if (step === undefined) return undefined;
+  const ring = w1.reduce((s, p) => s + p.r, 0) / w1.length;
+  return { a0, dir: step > 0 ? 1 : -1, ring, waves: waves.map((w) => w[0][0]) };
+}
+
+function apocalypseShapes(data: ReplayData): AoeShape[] {
+  const m = apocalypseModel(data);
+  const g = data.actionGeometry?.[APOCALYPSE_HIT];
+  if (!m || !g) return [];
+  const out: AoeShape[] = [];
+  m.waves.forEach((t, i) => {
+    const k = i + 1;
+    const spots: { x: number; y: number }[] = k <= 2 ? [{ x: ARENA_CENTRE, y: ARENA_CENTRE }] : [];
+    for (let j = Math.max(0, k - 3); j <= k - 1; j++) {
+      for (const side of [0, 180]) {
+        const b = ((m.a0 + side + m.dir * 45 * j) * Math.PI) / 180;
+        spots.push({ x: ARENA_CENTRE + Math.sin(b) * m.ring, y: ARENA_CENTRE - Math.cos(b) * m.ring });
+      }
+    }
+    for (const p of spots) {
+      out.push({
+        kind: "circle", x: p.x, y: p.y, bearing: 0, range: g.range * 100, width: 0, angle: 0, inner: 0, estimated: false,
+        style: "fru-apocalypse", name: data.abilityNames?.[APOCALYPSE_HIT] ?? "Apocalypse", start: t - APOCALYPSE_SHOW_MS, resolve: t,
+      });
+    }
+  });
+  return out;
+}
+
+/** The lights running round: one cue at A0, its turn in the kind. */
+function apocalypseEffects(data: ReplayData): CasterEffect[] {
+  const m = apocalypseModel(data);
+  if (!m) return [];
+  const start = m.waves[0] - APOCALYPSE_SHOW_MS;
+  const b = (m.a0 * Math.PI) / 180;
+  return [{
+    kind: m.dir > 0 ? "fru-apocalypse-cw" : "fru-apocalypse-ccw", layer: "floor",
+    label: m.dir > 0 ? "Apocalypse: lights turn clockwise" : "Apocalypse: lights turn counterclockwise",
+    radius: m.ring, x: ARENA_CENTRE + Math.sin(b) * m.ring, y: ARENA_CENTRE - Math.cos(b) * m.ring,
+    start, end: start + 5 * APOCALYPSE_STEP_MS + 1000,
+  }];
 }
 
 export const FRU_REPLAY: FightReplay = {
@@ -312,6 +570,7 @@ export const FRU_REPLAY: FightReplay = {
   markerAoes: MARKER_AOES,
   tethers: TETHERS,
   effects: buildEffects,
+  shapes: (data) => [...relativityShapes(data), ...apocalypseShapes(data)],
   floorStatuses: FLOOR_STATUSES,
   jailStatuses: JAIL_STATUSES,
 };

@@ -13,7 +13,7 @@
 
 import type { CasterEffect } from "@/lib/replay/fight-spec";
 import { ELEMENT_COLORS as COLORS, BOLT_FRAME_MS, rand } from "@/components/ReplayEffects";
-import { BOSS_ICON, type EffectArtProps, type FightArt } from "./types";
+import { BOSS_ICON, type EffectArtProps, type FightArt, type ShapeArtProps, type TetherArtProps } from "./types";
 
 const LAP_MS = 2600;          // one lap around the boss, counterclockwise (user, 2026-10-17)
 const K = 0.6;                // body, flame and glow thickness (user: the first cut was too large)
@@ -242,6 +242,191 @@ function DragonHead({ p, c }: { p: { x: number; y: number; w: number; a: number 
   );
 }
 
+// ── P3 Oracle of Darkness ───────────────────────────────────────────────────
+
+const fade = (e: CasterEffect, t: number, inMs: number, outMs: number) =>
+  Math.max(0, Math.min(1, (t - e.start) / inMs, (e.end - t) / outMs));
+
+const SPEED_COLORS = {
+  "fru-hourglass-yellow": { glow: "#ffd23a", rim: "#fff1a8" },
+  "fru-hourglass-purple": { glow: "#b45cff", rim: "#e6c8ff" },
+  "fru-hourglass":        { glow: "#5fd16a", rim: "#d6ffd9" },
+} as const;
+const HOURGLASS_SIZE = 130;    // centi-yalms, body radius
+
+/**
+ * Ultimate Relativity's hourglass seen from above: three green glass lobes
+ * round a dark core, ringed in its Speed colour (yellow fires first,
+ * purple last, plain green in between), sand trickling in the middle.
+ */
+function Hourglass({ e, x, y, t, scale }: EffectArtProps) {
+  const opacity = fade(e, t, 500, 400);
+  if (opacity <= 0) return null;
+  const c = SPEED_COLORS[e.kind as keyof typeof SPEED_COLORS] ?? SPEED_COLORS["fru-hourglass"];
+  const r = HOURGLASS_SIZE * scale;
+  const pulse = 0.75 + 0.25 * Math.sin(t / 260);
+  return (
+    <g opacity={opacity} pointerEvents="none">
+      <circle cx={x} cy={y} r={r * 1.25} fill={c.glow} fillOpacity={0.18} stroke={c.glow} strokeWidth={6} strokeOpacity={0.55 * pulse} filter="url(#replay-glow)" />
+      {[0, 120, 240].map((a) => {
+        const b = (a * Math.PI) / 180;
+        return <ellipse key={a} cx={x + Math.sin(b) * r * 0.5} cy={y - Math.cos(b) * r * 0.5} rx={r * 0.42} ry={r * 0.55}
+          transform={`rotate(${a} ${x + Math.sin(b) * r * 0.5} ${y - Math.cos(b) * r * 0.5})`}
+          fill="#7fe08a" fillOpacity={0.55} stroke="#d6ffd9" strokeWidth={1.5} />;
+      })}
+      <circle cx={x} cy={y} r={r * 0.22} fill="#2a3a2c" stroke={c.rim} strokeWidth={1.5} />
+      <circle cx={x} cy={y} r={r * 1.25} fill="none" stroke={c.rim} strokeWidth={2} />
+    </g>
+  );
+}
+
+/**
+ * The hourglass's turn: an arrow circling it, yellow clockwise or blue
+ * counterclockwise as in game, crawling the way its beam will sweep.
+ */
+function SpinArrow({ e, x, y, t, scale }: EffectArtProps) {
+  const opacity = fade(e, t, 300, 300);
+  if (opacity <= 0) return null;
+  const cw = e.kind === "fru-spin-cw";
+  const col = cw ? "#ffd23a" : "#4aa8ff";
+  const r = HOURGLASS_SIZE * scale * 1.8;
+  const turn = (((t - e.start) / 1800) * 360 * (cw ? 1 : -1)) % 360;
+  const span = 250;   // degrees of arc
+  const p = (deg: number) => { const b = (deg * Math.PI) / 180; return `${x + Math.sin(b) * r} ${y - Math.cos(b) * r}`; };
+  const a0 = cw ? 0 : span, a1 = cw ? span : 0;
+  // Head at a1, pointing along the turn.
+  const hb = (a1 * Math.PI) / 180, tx = Math.cos(hb) * (cw ? 1 : -1), ty = Math.sin(hb) * (cw ? 1 : -1);
+  const hx = x + Math.sin(hb) * r, hy = y - Math.cos(hb) * r, s = 9;
+  return (
+    <g opacity={opacity} pointerEvents="none" transform={`rotate(${turn} ${x} ${y})`}>
+      <path d={`M${p(a0)} A${r} ${r} 0 1 ${cw ? 1 : 0} ${p(a1)}`} fill="none" stroke={col} strokeWidth={8} strokeOpacity={0.4} filter="url(#replay-glow)" />
+      <path d={`M${p(a0)} A${r} ${r} 0 1 ${cw ? 1 : 0} ${p(a1)}`} fill="none" stroke={col} strokeWidth={3} strokeLinecap="round" />
+      <path d={`M${hx + tx * s} ${hy + ty * s} L${hx - ty * s * 0.7} ${hy + tx * s * 0.7} L${hx + ty * s * 0.7} ${hy - tx * s * 0.7} Z`} fill={col} />
+    </g>
+  );
+}
+
+/** Return's recorded spot: a blue clock face on the floor, hands ticking. */
+function ReturnMarker({ e, x, y, t, scale }: EffectArtProps) {
+  const opacity = fade(e, t, 300, 400);
+  if (opacity <= 0) return null;
+  const r = 90 * scale;
+  const a = ((t - e.start) / 1000) * 30;   // the hand: 30° a second
+  const hand = (deg: number, len: number) => { const b = (deg * Math.PI) / 180; return `M${x} ${y} L${x + Math.sin(b) * len} ${y - Math.cos(b) * len}`; };
+  return (
+    <g opacity={opacity} pointerEvents="none">
+      <circle cx={x} cy={y} r={r} fill="#2f7dff" fillOpacity={0.25} stroke="#4aa8ff" strokeWidth={6} strokeOpacity={0.5} filter="url(#replay-glow)" />
+      <circle cx={x} cy={y} r={r} fill="none" stroke="#bfe0ff" strokeWidth={2} />
+      <path d={hand(a, r * 0.8)} stroke="#eaf6ff" strokeWidth={2} strokeLinecap="round" />
+      <path d={hand(a / 12, r * 0.5)} stroke="#eaf6ff" strokeWidth={2.5} strokeLinecap="round" />
+    </g>
+  );
+}
+
+/**
+ * Shadoweye about to go off on its holder: a red-violet eye beside the
+ * player and a pulsing ring around them (anyone facing it gets Doom).
+ */
+function Shadoweye({ e, x, y, t }: EffectArtProps) {
+  const opacity = fade(e, t, 400, 300);
+  if (opacity <= 0) return null;
+  const pulse = 0.6 + 0.4 * Math.sin(t / 180);
+  const ex = x + 30, ey = y - 22, w = 13, h = 8;
+  return (
+    <g opacity={opacity} pointerEvents="none">
+      <circle cx={x} cy={y} r={24} fill="none" stroke="#d1305f" strokeWidth={3} strokeOpacity={0.5 + 0.4 * pulse} filter="url(#replay-glow)" />
+      <path d={`M${ex - w} ${ey} Q${ex} ${ey - h * 1.6} ${ex + w} ${ey} Q${ex} ${ey + h * 1.6} ${ex - w} ${ey} Z`} fill="#1a0610" stroke="#ff5a8a" strokeWidth={2} />
+      <circle cx={ex} cy={ey} r={h * 0.75} fill="#ff2d6a" />
+      <circle cx={ex} cy={ey} r={h * 0.3} fill="#1a0610" />
+    </g>
+  );
+}
+
+/**
+ * Apocalypse's lights: on each side one starts on the ring at A0/B0 and
+ * two leave the centre along that axis (one at the start, one 2s later),
+ * all running round 45° every 2s until the sixth wave appears.
+ */
+const APOC_STEP_MS = 2000;
+function ApocalypseLights({ e, x, y, t, scale, cx, cy }: EffectArtProps) {
+  const opacity = fade(e, t, 300, 800);
+  if (opacity <= 0) return null;
+  const dir = e.kind === "fru-apocalypse-cw" ? 1 : -1;
+  const ring = (e.radius ?? 1400) * scale;
+  const a0 = Math.atan2(x - cx, -(y - cy));
+  const run = Math.min(t - e.start, 5 * APOC_STEP_MS);
+  const orbs: { x: number; y: number }[] = [];
+  for (const side of [0, Math.PI]) {
+    for (let i = 0; i < 3; i++) {
+      const arrive = i * APOC_STEP_MS;           // reaches the ring at A0
+      const leave = (i - 1) * APOC_STEP_MS;      // leaves the centre (the lead starts on the ring)
+      if (run < Math.max(0, leave)) continue;
+      let px: number, py: number;
+      if (run < arrive) {
+        const f = (run - leave) / APOC_STEP_MS;
+        px = cx + Math.sin(a0 + side) * ring * f; py = cy - Math.cos(a0 + side) * ring * f;
+      } else {
+        const b = a0 + side + dir * (Math.PI / 4) * ((run - arrive) / APOC_STEP_MS);
+        px = cx + Math.sin(b) * ring; py = cy - Math.cos(b) * ring;
+      }
+      orbs.push({ x: px, y: py });
+    }
+  }
+  return (
+    <g opacity={opacity} pointerEvents="none">
+      {orbs.map((o, k) => (
+        <g key={k}>
+          <circle cx={o.x} cy={o.y} r={22} fill="#fff6d0" fillOpacity={0.6} filter="url(#replay-glow)" />
+          <circle cx={o.x} cy={o.y} r={8} fill="#ffffff" stroke="#ffc94a" strokeWidth={2.5} />
+        </g>
+      ))}
+      <text x={cx} y={cy + ring + 70 * scale + 18} textAnchor="middle" fill="#fff3c4" fontSize={14} fontWeight={800}
+        stroke="rgba(0,0,0,0.8)" strokeWidth={4} paintOrder="stroke">{e.label}</text>
+    </g>
+  );
+}
+
+/**
+ * An Apocalypse circle: in game a white circle expanding from where a
+ * light crossed, shown ~10s before it explodes. Drawn as a thin pale ring
+ * so six waves of them don't bury the party, filling in over its last 2s,
+ * then a white-gold flash.
+ */
+function ApocalypseCircle({ s, x, y, r, t, opacity, resolving }: ShapeArtProps) {
+  if (resolving) {
+    return (
+      <g opacity={opacity} pointerEvents="none">
+        <circle cx={x} cy={y} r={r} fill="#fff1b8" fillOpacity={0.7} stroke="#ffe27a" strokeWidth={10} strokeOpacity={0.5} filter="url(#replay-glow)" />
+        <circle cx={x} cy={y} r={r} fill="none" stroke="#ffffff" strokeWidth={2.5} />
+      </g>
+    );
+  }
+  const left = s.resolve - t;
+  const grow = Math.min(1, (t - s.start) / 600);           // expands in as it appears
+  const soon = Math.max(0, 1 - left / 2000);              // its last 2s
+  return (
+    <g pointerEvents="none">
+      <circle cx={x} cy={y} r={r * grow} fill="#fff8e0" fillOpacity={0.3 * soon} stroke="#ffffff" strokeWidth={1.5 + 1.5 * soon} strokeOpacity={0.4 + 0.5 * soon} />
+    </g>
+  );
+}
+
+/** Speed's tethers: yellow (Quicken) or purple (Slow) with a bright orb in the middle. */
+function speedTether(col: string) {
+  return function SpeedTether({ x1, y1, x2, y2, t }: TetherArtProps) {
+    const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+    const pulse = 0.8 + 0.2 * Math.sin(t / 150);
+    return (
+      <g pointerEvents="none">
+        <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={col} strokeWidth={9} strokeOpacity={0.4} filter="url(#replay-glow)" />
+        <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={col} strokeWidth={2.5} />
+        <circle cx={mx} cy={my} r={9 * pulse} fill={col} fillOpacity={0.6} filter="url(#replay-glow)" />
+        <circle cx={mx} cy={my} r={4} fill="#ffffff" />
+      </g>
+    );
+  };
+}
+
 // The dragon circles just outside the boss's hitbox (the boss icon when
 // the hitbox is small or unknown).
 const Dragon = ({ e, x, y, t, scale, actor }: EffectArtProps) =>
@@ -256,5 +441,12 @@ export const FRU_ART: FightArt = {
     "fire-halo": Halo, "lightning-halo": Halo,
     "blue-mirror": Mirror, "red-mirror": Mirror,
     "ice-floor": Ice,
+    "fru-hourglass": Hourglass, "fru-hourglass-yellow": Hourglass, "fru-hourglass-purple": Hourglass,
+    "fru-spin-cw": SpinArrow, "fru-spin-ccw": SpinArrow,
+    "fru-return": ReturnMarker,
+    "fru-shadoweye": Shadoweye,
+    "fru-apocalypse-cw": ApocalypseLights, "fru-apocalypse-ccw": ApocalypseLights,
   },
+  shapes: { "fru-apocalypse": ApocalypseCircle },
+  tethers: { "fru-quicken": speedTether("#ffd23a"), "fru-slow": speedTether("#b45cff") },
 };

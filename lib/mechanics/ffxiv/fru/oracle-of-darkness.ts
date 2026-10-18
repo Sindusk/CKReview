@@ -101,6 +101,17 @@
 //   16.8y (clean far spots 17.6-17.7y) but the WAR's 8.4y matches clean
 //   middle spots (8.7-9.0y) and their own spot isn't logged, so both stay
 //   named.
+// Replay build 2026-10-18 (JZ1KXhDbqkNH3jxR 24, no VOD; fru/replay.ts):
+// - Speed's tethers 134 (three, Quicken 40294, fire first) and 133 (two,
+//   Slow 40295, fire third) at +18.4; the hourglass bodies are the 40291
+//   casters, the shots come from reused "delight's hourglass" actors.
+// - Meltdown follow-ups turn 15° (0.26 rad) a shot, one way per hourglass.
+// - Head marker 62 at +91.2 on the six Refrain Water holders (the guide's
+//   fake stack markers); 40272 at +96.4 gives them their Waters, and
+//   status 1002458 (unnamed) ends with each Water's 184 marker, 5s ahead.
+// - Apocalypse: wave k explodes ring points max(0,k-3)..k-1 of two
+//   opposite arms 14y out turning 45° a wave, plus the centre in waves 1-2;
+//   waves 1, 2, 4-6 match the helpers exactly; wave 3's logged (100, 100).
 //
 // -- RULES IMPLEMENTED --
 // ffxiv-ood-fire: a Relativity fire that caught others (Major on a death):
