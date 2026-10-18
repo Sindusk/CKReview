@@ -198,11 +198,19 @@ const FRU_OVERRIDES: Record<number, Override> = {
   40135: { style: "tower", soakers: 1 }, 40125: { style: "tower", soakers: 2 }, 40126: { style: "tower", soakers: 3 }, 40127: { style: "tower", soakers: 4 },
   40213: { style: "tower" },              // Bright Hunger: Light Rampant (one each), Darklit (two each)
   40320: { style: "tower", soakers: 2 },  // P5 Paradise Regained Explosion
-  // The towers' Burnt Strike and its Blastburn: Fatebreaker stands in the
-  // middle and the line runs through her (she faced N at 2:22.5; drawn
-  // from her it covered only the north half).
-  40129: { twoWay: true }, 40133: { twoWay: true }, 40130: { twoWay: true, style: "knockback" },
+  // The towers' Burnt Strike and what follows it: Fatebreaker stands in
+  // the middle and the line runs through her, cutting the arena in half
+  // (she faced N at 2:22.5; drawn from her it covered only the north half;
+  // user, 2026-10-17, for Burnout). Fire 40129 then the Blastburn 40130
+  // knockback; lightning 40133 then the wide Burnout 40134.
+  40129: { twoWay: true }, 40130: { twoWay: true, style: "knockback" },
+  40133: { twoWay: true, style: "lightning" }, 40134: { twoWay: true, style: "lightning" },
   40162: { style: "knockback" },          // Utopian Sky Blastburn (no damage, a knockback)
+  // Lightning in blue wherever it falls (user: "a common trend through the
+  // fight"): Utopian Sky's lightning Burnt Strike and Burnout from the west
+  // wall, Sinbound Thunder III and Cyclonic Break's Sinsmite spreads.
+  40163: { style: "lightning" }, 40164: { style: "lightning" },
+  40160: { style: "lightning" }, 40149: { style: "lightning" },
   // Twin Stillness (270° front, then 90° back) and Twin Silence (90° back,
   // then 270° front), per usurper-of-frost.ts's model; first/second as cast
   // in fight 24 (40194 at 3:50.1, 40195 at 3:52.2). The reflection casting

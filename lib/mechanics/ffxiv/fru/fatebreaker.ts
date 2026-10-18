@@ -73,9 +73,14 @@
 //   lightning = Sinsmite 40142 on the carrier + Bow Shock 40143 on three.
 //   Every clean resolution hits exactly its group's four, groups alternate
 //   1/3 and 2/4 (all three groups).
-// - Towers: Burnt Strike 40129 lightning / 40133 fire through the middle;
-//   Explosion ID = soakers needed: lightning 40131/40122/40123/40124, fire
-//   40135/40125/40126/40127 = 1/2/3/4. A short tower casts Unmitigated
+// - Towers: Burnt Strike 40129 fire (then the Blastburn 40130 knockback) /
+//   40133 lightning (then the wide Burnout 40134) through the middle,
+//   cutting the arena in half; Fatebreaker shows the element as Cyclonic
+//   Break's dragon during the cast, fire = in, lightning = out (user,
+//   2026-10-17; JZ1KXhDbqkNH3jxR 24 fire, M9Nagmnw2LzHZPVq 1 lightning;
+//   this line read the elements the other way round until then).
+//   Explosion ID = soakers needed: with the fire line 40131/40122/40123/
+//   40124, with lightning 40135/40125/40126/40127 = 1/2/3/4. A short tower casts Unmitigated
 //   Explosion 40132/40136 at its spot (Damage Down raid-wide). Towers sit at
 //   y~9082 (N), 10000 (middle), 10918 (S) on x 8400-8689 (W) or 11311-11600
 //   (E). Clean fills match NAUR (H1 N, R2 middle, H2 S, then M1/M2/R1) in C;

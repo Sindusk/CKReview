@@ -28,6 +28,9 @@
 //   40150 = fire: the flame halos' Brightfire was the 10y 40153, levin the
 //   5y 40152 (JZ1KXhDbqkNH3jxR 24); 40151 = lightning: the reverse
 //   (M9Nagmnw2LzHZPVq 1). Both parties stood among the small halos.
+// - Burnt Strike at the towers (~2:16) on Fatebreaker: 40129 fire = in
+//   (the Blastburn knockback follows), 40133 lightning = out (the wide
+//   Burnout follows).
 // The halos themselves (four "halo of flame", four "halo of levin") show
 // as element rings at their Brightfire size from their begincast, 8s
 // before they go off (HALO).
@@ -58,6 +61,8 @@ const CAST_DRAGONS: Record<number, { kind: "fire-dragon" | "lightning-dragon"; l
   40155: { kind: "lightning-dragon", label: "Lightning: spread" },
   40150: { kind: "fire-dragon", label: "Fire halos explode: lightning side safe" },   // Turn of the Heavens
   40151: { kind: "lightning-dragon", label: "Lightning halos explode: fire side safe" },
+  40129: { kind: "fire-dragon", label: "Fire: in" },                     // the towers' Burnt Strike
+  40133: { kind: "lightning-dragon", label: "Lightning: out" },
 };
 const CASTER_HOLD_MS = 20000;         // parked clones log one sample, often well before the cast
 
