@@ -21,7 +21,7 @@
 | drg/Buffs/life-surge-bad-consumer | verified | `lifeSurge` | Life Surge on a weak GCD (or Coerthan Torment under 3 targets) | Minor 1, Medium 2, Major 4. qjCMx4bRfgNKwX9T 14:13 (Lance Barrage) matched. |
 | drg/Buffs/life-surge-chart | no-damage | — | — | Chart. |
 | drg/Debuffs/chaotic-spring-uptime | verified | `chaoticSpring` | Chaotic Spring off the target | Checklist 90%. Red Hot's 62.2% is its denominator; the 20.2s gap from 6:39 (a wrong combo route) is counted. |
-| drg/Debuffs/chaotic-spring-clipping | wrong | — | Chaotic Spring refreshed early (5s / 10s / 15s a minute) | Target-blind sum, and Chaotic Spring is a combo step, refreshed when the combo comes round. |
+| drg/Debuffs/chaotic-spring-clipping | superseded | `chaoticSpring` (`dotFindings`, per target, combo-aware) | Chaotic Spring refreshed early (5s / 10s / 15s a minute) | Target-blind sum, and Chaotic Spring is a combo step, refreshed when the combo comes round. The app's per-target finding: 36 on 617 Dragoon pulls on disk (d3vRbwfpNBLzJ2Xh Red Hot and Deep Blue Pull 3, Sayacissa Morsaelth, 3:27: 8.7s, 15k). Proposed `wrong`; the user chose `superseded` 2026-10-18. |
 | drg/Debuffs/applied-into-invuln | wrong | — | Chaotic Spring shortly before invulnerability | Table only. It's a combo step, not an optional DoT GCD. |
 | drg/Gauge/fmf-overcap | verified | `firstmindsFocus` | Firstminds' Focus over 2 | Medium 1, Major 2. Red Hot 8:46 matched; Vamp 0 lost in both. |
 | drg/Weaving/too-many | verified | `checkGcdGaps` | triple weaves (Stardiver counts double) | Red Hot 6:39 matched. |
