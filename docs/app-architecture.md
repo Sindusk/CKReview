@@ -321,9 +321,10 @@ file's header comment. Mechanic detection has its own guide:
 - **Roster HP / MP bars.** Once a pull's replay is loaded, each roster
   tile shows thin HP and MP bars for the replay's moment
   (`playerVitalsAt`; the replay reports its clock via `onTimeChange`, the
-  VOD's timeline when the video view shows). They sit in the tile's
-  bottom padding: the FFXIV roster is a fixed 300px, and taller tiles
-  clipped its last row.
+  VOD's timeline when the video view shows). They are vertical bars in
+  their own side gutters, HP on the left edge and MP / power on the right,
+  filling upward (user's pick, 2026-10-17). They add width, not height:
+  the FFXIV roster is a fixed 300px, and taller tiles clipped its last row.
 - **Hitboxes** are the game's: BNpcBase (FFLogs actor `gameID`) gives the
   model and Scale, ModelSkeleton the Radius; radius × scale.
 - **Waymarks: not available yet.** FFLogs' API has no marker field or

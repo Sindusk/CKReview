@@ -142,7 +142,10 @@ function PlayerButton({
         flexDirection: "row",
         alignItems: "center",
         gap: large ? "8px" : "6px",
-        padding: large ? "5px 8px" : "4px 5px",
+        // With vitals, the side padding makes room for the edge bars.
+        padding: vitals
+          ? (large ? `5px ${VITAL_GUTTER + 2}px` : `4px ${VITAL_GUTTER}px`)
+          : (large ? "5px 8px" : "4px 5px"),
         minWidth: 0,
         width: "100%",
       }}
@@ -177,24 +180,31 @@ function PlayerButton({
           {roleSlot && <span style={{ color: "var(--ck-text-3)", fontWeight: 700, flexShrink: 0 }}>{roleSlot}</span>}
         </span>
       </div>
-      {/* HP / MP strip along the tile's bottom edge, inside its padding,
-          so the tiles keep the height the fixed roster panel is sized for. */}
+      {/* HP up the left edge, MP / power up the right, each in its own
+          gutter: no text under them, and no extra height (the FFXIV roster
+          is a fixed 300px, and taller tiles clipped its last row). */}
       {vitals && (
-        <span style={{ position: "absolute", left: 6, right: 6, bottom: 2, display: "flex", flexDirection: "column", gap: 1 }}
-          title={`HP ${vitals.hp >= 0 ? Math.round(vitals.hp * 100) + "%" : "?"} · ${vitals.powerType !== undefined ? "Power" : "MP"} ${vitals.mp >= 0 ? Math.round(vitals.mp * 100) + "%" : "?"}`}>
-          <VitalBar value={vitals.hp} color={vitals.hp > 0.5 ? "#5fd36a" : vitals.hp > 0.25 ? "#e3c44a" : "#e5534b"} height={3} />
-          <VitalBar value={vitals.mp} color={vitals.powerType !== undefined ? WOW_POWER_COLORS[vitals.powerType] ?? "#d36ad8" : "#d36ad8"} height={2} />
-        </span>
+        <>
+          <VitalBar side="left" value={vitals.hp} color={vitals.hp > 0.5 ? "#5fd36a" : vitals.hp > 0.25 ? "#e3c44a" : "#e5534b"}
+            title={`HP ${vitals.hp >= 0 ? Math.round(vitals.hp * 100) + "%" : "?"}`} />
+          <VitalBar side="right" value={vitals.mp} color={vitals.powerType !== undefined ? WOW_POWER_COLORS[vitals.powerType] ?? "#d36ad8" : "#d36ad8"}
+            title={`${vitals.powerType !== undefined ? "Power" : "MP"} ${vitals.mp >= 0 ? Math.round(vitals.mp * 100) + "%" : "?"}`} />
+        </>
       )}
     </button>
   );
 }
 
-/** A thin resource bar; an unknown value (-1) draws an empty track. */
-function VitalBar({ value, color, height }: { value: number; color: string; height: number }) {
+const VITAL_WIDTH = 4;
+const VITAL_INSET = 3;   // from the tile's edge
+// Side padding with vitals: inset + bar + a gap before the content.
+const VITAL_GUTTER = VITAL_INSET + VITAL_WIDTH + 3;
+
+/** A thin vertical resource bar on one edge of a tile, filling upward; an unknown value (-1) draws an empty track. */
+function VitalBar({ value, color, side, title }: { value: number; color: string; side: "left" | "right"; title: string }) {
   return (
-    <span style={{ display: "block", width: "100%", height, background: "rgba(0,0,0,0.55)", borderRadius: 2, overflow: "hidden", boxShadow: "0 0 0 1px rgba(255,255,255,0.06)" }}>
-      {value >= 0 && <span style={{ display: "block", width: `${Math.round(value * 100)}%`, height: "100%", background: color, transition: "width 0.2s linear" }} />}
+    <span title={title} style={{ position: "absolute", [side]: VITAL_INSET, top: 4, bottom: 4, width: VITAL_WIDTH, background: "rgba(0,0,0,0.55)", borderRadius: 2, overflow: "hidden", boxShadow: "0 0 0 1px rgba(255,255,255,0.06)" }}>
+      {value >= 0 && <span style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: `${Math.round(value * 100)}%`, background: color, transition: "height 0.2s linear" }} />}
     </span>
   );
 }
