@@ -368,10 +368,12 @@ const SWEEP_PRESSES: { spec: string; specId: number; ids: SweepPress[] }[] = [
   // casts, two thirds of them the extra shots logged 0.1–0.3s after the
   // first: COINCIDENT_AUTO's follow-up rule). Subtlety's Shuriken Toss
   // (Subtlety phase 3, 2026-10-17: 12 casts on 3 of 41 player-pulls, near
-  // p05 0.99s).
+  // p05 0.99s). Outlaw's Preparation (Outlaw phase 3, 2026-10-17: 22 casts
+  // on 10 players, two a pull; the next press 0.97s after it, p05, 1.01s
+  // median: a GCD, read as a second of idle each time).
   { spec: "Assassination Rogue", specId: 259, ids: [[185565, "Poisoned Knife"]] },
   { spec: "Subtlety Rogue", specId: 261, ids: [[200758, "Gloomblade"], [114014, "Shuriken Toss"]] },
-  { spec: "Outlaw Rogue", specId: 260, ids: [[185763, "Pistol Shot"]] },
+  { spec: "Outlaw Rogue", specId: 260, ids: [[185763, "Pistol Shot"], [1277933, "Preparation"]] },
   // Healers: Holy Priest Mass Dispel (19 casts, 13 players, 1.23s cast,
   // near p05 0.99s) and Prayer of Healing (11, 1.06s); Paladins' Hammer of
   // Justice (32 across Holy, Protection and Retribution, near p05
