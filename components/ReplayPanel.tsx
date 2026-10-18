@@ -43,7 +43,7 @@ import { ffMapImageUrl, fitReplayView, mapImageBounds, poseAt, type ReplayActor,
 import { aoesAt, buildAoeShapes, buildHeadMarkers, buildTethers, tetherEndAt, type AoeShape } from "@/lib/replay/action-shapes";
 import { getFFAbilityIconUrl } from "@/lib/ability-icons";
 import { buildCasterEffects, SLIDE_STATUSES } from "@/lib/replay/ffxiv-effects";
-import { ElementDragon, ElementHalo, ElementTether, IceFloor, JailCage } from "@/components/ReplayEffects";
+import { ElementDragon, ElementHalo, ElementTether, FrozenMirror, IceFloor, JailCage } from "@/components/ReplayEffects";
 import { sampleNear } from "@/lib/replay/ffxiv-replay";
 import { facingToCompassBearing } from "@/lib/mechanics/geometry";
 import { detectFFRoles } from "@/lib/mechanics/ffxiv/roles";
@@ -110,6 +110,7 @@ const COMMON_STATUSES = new Set([1002941, 1002940, 1004162, 1000043, 1000044]);
 // Head markers show from the marker until the hit it announced
 // (action-shapes.ts's buildHeadMarkers), or this long when unknown.
 const HEAD_MARKER_PLAIN_MS = 5000;
+const MIRROR_SIZE = 600;   // centi-yalms across: FRU's frozen mirrors
 // Statuses that lift a player into a cage: FRU Floating Fetters, 4s on
 // each tethered carrier before their hit (user, 2026-10-17). Lift and
 // cage last the whole status (user: a last-second-only cage was wrong).
@@ -345,6 +346,9 @@ export default function ReplayPanel({ pull, data, loading, progress, error, onLo
               const p = follow && poseAt(follow, t);
               const at = p && !p.stale ? p : e;
               if (e.radius !== undefined) return <ElementHalo key={`${e.kind}-${e.start}-${e.x}-${e.y}`} e={e} x={toX(e.x)} y={toY(e.y)} r={e.radius * scale} t={t} />;
+              if (e.kind === "blue-mirror" || e.kind === "red-mirror") {
+                return <FrozenMirror key={`${e.kind}-${e.x}-${e.y}`} e={e} x={toX(e.x)} y={toY(e.y)} cx={toX(cx)} cy={toY(cy)} size={MIRROR_SIZE * scale} t={t} />;
+              }
               const hitbox = follow?.hitbox ?? 500;
               return <ElementDragon key={`${e.kind}-${e.start}-${e.x}`} e={e} x={toX(at.x)} y={toY(at.y)} r={Math.max(BOSS_ICON / 2 + 20, hitbox * scale * 0.6)} t={t} />;
             })}

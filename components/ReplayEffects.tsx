@@ -284,6 +284,31 @@ export function IceFloor({ e, x, y, r, t }: { e: CasterEffect; x: number; y: num
   );
 }
 
+/**
+ * One of Mirror, Mirror's frozen mirrors on the arena edge, seen from
+ * above: a tall slab of ice standing across the line to the centre, with
+ * a frosted face, a glowing outline in its colour (blue fires first, with
+ * Shiva; red after) and a slow glint. `cx, cy` is the arena centre it faces.
+ */
+export function FrozenMirror({ e, x, y, cx, cy, size, t }: { e: CasterEffect; x: number; y: number; cx: number; cy: number; size: number; t: number }) {
+  const opacity = Math.max(0, Math.min(1, (t - e.start) / 500, (e.end - t) / 300));
+  if (opacity <= 0) return null;
+  const col = e.kind === "blue-mirror" ? { glow: "#3d9bff", rim: "#bfe3ff" } : { glow: "#ff4d5e", rim: "#ffc4cb" };
+  const deg = (Math.atan2(cx - x, -(cy - y)) * 180) / Math.PI;   // facing the centre
+  const w = size, h = size * 0.34;
+  const glint = ((t - e.start) % 2200) / 2200;
+  return (
+    <g opacity={opacity} pointerEvents="none" transform={`rotate(${deg} ${x} ${y})`}>
+      <path d={`M${x - w / 2} ${y} L${x - w / 2 + h * 0.6} ${y - h / 2} L${x + w / 2 - h * 0.6} ${y - h / 2} L${x + w / 2} ${y} L${x + w / 2 - h * 0.6} ${y + h / 2} L${x - w / 2 + h * 0.6} ${y + h / 2} Z`}
+        fill={col.glow} fillOpacity={0.35} stroke={col.glow} strokeWidth={12} strokeOpacity={0.45} filter="url(#replay-glow)" />
+      <path d={`M${x - w / 2} ${y} L${x - w / 2 + h * 0.6} ${y - h / 2} L${x + w / 2 - h * 0.6} ${y - h / 2} L${x + w / 2} ${y} L${x + w / 2 - h * 0.6} ${y + h / 2} L${x - w / 2 + h * 0.6} ${y + h / 2} Z`}
+        fill="#e9f6ff" fillOpacity={0.55} stroke={col.rim} strokeWidth={3} strokeLinejoin="round" />
+      <line x1={x - w / 2 + h * 0.6} y1={y} x2={x + w / 2 - h * 0.6} y2={y} stroke="#ffffff" strokeOpacity={0.6} strokeWidth={1.5} />
+      <line x1={x - w / 2 + w * glint} y1={y - h / 2 + 2} x2={x - w / 2 + w * glint - h * 0.5} y2={y + h / 2 - 2} stroke="#ffffff" strokeOpacity={0.8 * Math.sin(glint * Math.PI)} strokeWidth={3} strokeLinecap="round" />
+    </g>
+  );
+}
+
 /** The head: a horned wedge pointing along the direction of travel. */
 function DragonHead({ p, c }: { p: { x: number; y: number; w: number; a: number }; c: (typeof COLORS)[keyof typeof COLORS] }) {
   // Travel is counterclockwise: the head faces along -a's tangent.

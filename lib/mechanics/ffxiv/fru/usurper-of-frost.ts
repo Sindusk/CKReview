@@ -62,6 +62,12 @@
 //   40194: every hit lethal. No twin casts are logged.
 // - Hallowed Ray 40211: 8 of 8 in all 138 resolutions with everyone alive
 //   (target head marker 525).
+// - Mirror, Mirror's three "frozen mirror" actors (BNpc 17825) log a
+//   position only on their kick: the blue one's Reflected Scythe Kick 40204
+//   lands with Shiva's Scythe Kick, the two red ones' 40205 (9.7s cast)
+//   10s later; each then gets four House of Light cones (M9Nagmnw2LzHZPVq
+//   1: blue NE, red N and W, as on VOD; JZ1KXhDbqkNH3jxR 24: blue NE, red
+//   NW and SW). The cones' own casters sit at stale spots.
 // - Mirror, Mirror: eight single cones per volley (258 clean volleys);
 //   Reflected Scythe Kick 40204/40205 hits give Damage Down. Banish III
 //   pairs 40222 (cast 40220), spreads 40223 Banish III Divided (cast 40221).

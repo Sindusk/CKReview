@@ -38,7 +38,7 @@
 import { sampleNear, type ReplayData } from "@/lib/replay/ffxiv-replay";
 
 export type CasterEffect = {
-  kind:    "fire-dragon" | "lightning-dragon" | "fire-halo" | "lightning-halo" | "ice-floor";
+  kind:    "fire-dragon" | "lightning-dragon" | "fire-halo" | "lightning-halo" | "ice-floor" | "blue-mirror" | "red-mirror";
   radius?: number;              // halos: the Brightfire it will cast (centi-yalms)
   label:   string;              // what it means, under the boss
   actor?:  string;              // follows this actor while it has samples
@@ -74,6 +74,16 @@ const CASTER_HOLD_MS = 20000;         // parked clones log one sample, often wel
 const FLOOR_STATUSES: Record<number, { kind: "ice-floor"; label: string; radius: number }> = {
   1000911: { kind: "ice-floor", label: "Thin Ice: players slide", radius: 2000 },
 };
+
+// FRU P2 Mirror, Mirror 40179: three frozen mirrors on the edge (user,
+// 2026-10-17). The blue one fires its Reflected Scythe Kick 40204 with
+// Shiva's kick, the two red ones 40205 ten seconds later, each followed by
+// four House of Light cones. M9Nagmnw2LzHZPVq 1: blue NE (114, 86), red N
+// and W; JZ1KXhDbqkNH3jxR 24: blue NE, red NW and SW.
+const MIRROR_MIRROR = 40179;
+const BLUE_MIRROR_KICK = 40204, RED_MIRROR_KICK = 40205;
+const MIRRORS_WITHIN_MS = 40000;
+const MIRROR_AFTER_MS = 900;          // past the kick, through its cones
 
 // Turn of the Heavens' halos: Brightfire casts, element from the actor's name.
 const HALO_BRIGHTFIRE = [40152, 40153];
@@ -131,6 +141,20 @@ export function buildCasterEffects(data: ReplayData): CasterEffect[] {
       end: end ? end[0] : t - BAIT_AFTER_CAST_MS,
     });
   }
+  // Mirror, Mirror's frozen mirrors, from the cast until each one's kick
+  // and cones have gone off. Their positions are logged only on those
+  // kicks; they don't move.
+  for (const mm of casts.filter((c) => c[4] === MIRROR_MIRROR && c[3] === 0)) {
+    for (const c of casts) {
+      const kind = c[3] === 0 && c[0] > mm[0] && c[0] - mm[0] <= MIRRORS_WITHIN_MS
+        ? c[4] === BLUE_MIRROR_KICK ? "blue-mirror" as const : c[4] === RED_MIRROR_KICK ? "red-mirror" as const : undefined
+        : undefined;
+      const a = kind && actorByKey.get(c[1]);
+      const p = a && sampleNear(a, c[0], 1500);
+      if (kind && p) out.push({ kind, label: "", x: p.x, y: p.y, start: mm[0], end: c[0] + MIRROR_AFTER_MS });
+    }
+  }
+
   // Floor statuses: one effect per burst of applications (within 2s), from
   // the first to the last one ending.
   const cx = data.map ? -data.map.offsetX * 100 : 10000, cy = data.map ? -data.map.offsetY * 100 : 10000;

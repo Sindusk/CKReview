@@ -256,7 +256,10 @@ const FRU_OVERRIDES: Record<number, Override> = {
   // at the walls in Fall of Faith; Shiva's reflection casts the Scythe /
   // Axe Kick at (100, 100) just before (both pulls). Golden light, as in
   // game.
-  40206: { originCaster: [40202, 40203], style: "light" },
+  // In Mirror, Mirror the same cones come from Shiva and the blue mirror
+  // (with her Scythe Kick), then from the two red mirrors (with their
+  // Reflected Scythe Kicks 40204/40205), four nearest players each.
+  40206: { originCaster: [40202, 40203, 40204, 40205], style: "light" },
   // Glowing Bleeding puddles left where these land (user, 2026-10-17, for
   // Sinbound Holy; the P2 header names Luminous Hammer and Hiemal Ray too).
   // The log has no puddle actor and no Bleeding unless someone stands in
@@ -339,12 +342,23 @@ export function buildAoeShapes(data: ReplayData): AoeShape[] {
     if (!casterPose && over.holdCaster && caster) casterPose = sampleNear(caster, t, HOLD_CASTER_MS);
     if (!casterPose && own[0]?.[4] != null) casterPose = { x: own[0][4]!, y: own[0][5]!, facing: 0 };
     if (over.originCaster) {
+      // Several sources at once (Shiva and a mirror in Mirror, Mirror): the
+      // one nearest the targeted player, among those that just fired.
+      const tp = targetKey ? actorByKey.get(targetKey) : undefined;
+      const tpos = tp && poseAt(tp, t);
+      const recent: { x: number; y: number; facing: number }[] = [];
       for (let j = i; j >= 0 && t - casts[j][0] <= 8000; j--) {
         const c = casts[j];
-        const who = c[4] !== undefined && over.originCaster.includes(c[4]) ? actorByKey.get(c[1]) : undefined;
+        const who = c[3] === 0 && c[4] !== undefined && over.originCaster.includes(c[4]) ? actorByKey.get(c[1]) : undefined;
         const p = who && sampleNear(who, c[0], 4000);
-        if (p) { casterPose = { x: p.x, y: p.y, facing: p.facing }; break; }
+        if (!p) continue;
+        if (recent.length && casts[j][0] < t - 1500) break;   // the latest burst only
+        recent.push({ x: p.x, y: p.y, facing: p.facing });
       }
+      const pick = tpos && recent.length > 1
+        ? recent.reduce((b, p) => (Math.hypot(p.x - tpos.x, p.y - tpos.y) < Math.hypot(b.x - tpos.x, b.y - tpos.y) ? p : b))
+        : recent[0];
+      if (pick) casterPose = pick;
     }
     if (over.originAt !== undefined) {
       for (let j = i; j >= 0 && t - casts[j][0] <= 1500; j--) {
