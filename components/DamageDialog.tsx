@@ -27,6 +27,7 @@ import type { Pull } from "@/types/Pull";
 import { analyzePullDamage } from "@/lib/damage/analyze";
 import { aggregateDamage, type PlayerDamageAggregate } from "@/lib/damage/aggregate";
 import { getDamageContext } from "@/lib/damage/contexts";
+import { moduleNamesFor } from "@/lib/mechanics/module-names";
 import { FFXIV_DAMAGE, GUARANTEED_HIT_STATUS_IDS } from "@/lib/damage/ffxiv/game";
 import { MIN_ESTIMATE_HITS, playerHitRates, reliableRates } from "@/lib/damage/crit-rates";
 import { critLuck } from "@/lib/damage/crit-luck";
@@ -246,7 +247,13 @@ export default function DamageDialog({ open, onClose, pulls, currentPullId, onSe
                   content={<PhaseTable phases={analysis.phases} />} />
               )}
               {contextName && (hasContext ? (
-                <InfoTip label="Fight context loaded for this encounter." content="Fight context loaded for this encounter."
+                <InfoTip label={`Fight context loaded: ${contextName}.`}
+                  content={
+                    <>
+                      <div style={{ fontWeight: 700 }}>Context Loaded:</div>
+                      {(moduleNamesFor(contextName).length ? moduleNamesFor(contextName) : [contextName]).map((n) => <div key={n}>{n}</div>)}
+                    </>
+                  }
                   trigger={<span className="ck-badge" style={{ color: BADGE_GOOD, fontSize: 11 }}>{contextName}</span>} />
               ) : (
                 <InfoTip label="No fight context found for this encounter. Only untargetable time read from the log counts as forced, and nothing counts as movement."

@@ -425,7 +425,9 @@ through four stages, plus a fifth for the damage analysis:
    module with one line in `wow/registry.ts`; that wires it into the app and
    gives it a `scripts/validate.js` mechanic of the same name. Add the
    boss's fight name to `COVERED_ENCOUNTERS` in `fallback.ts` so the
-   fallback model stops running on it. Then pass
+   fallback model stops running on it, and its display name(s) to
+   `module-names.ts` (the analysis panel's "Modules Loaded" tip; a fight
+   missing there shows the "no module detected" alert). Then pass
    the regression bar (below). Commit and push. Then tell the user
    what each wipe's cutoff was, and list the attribution calls you were
    unsure of as explicit questions. Their VOD review answers them (principle

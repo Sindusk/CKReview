@@ -12,7 +12,7 @@ import AddErrorDialog from "./AddErrorDialog";
 import { SeverityIcon, SEVERITY_COLOR, type SeverityKind } from "./SeverityIcon";
 import { PanelHeader } from "./ui/Panel";
 import { InfoTip } from "./ui/InfoTip";
-import { hasEncounterModule } from "@/lib/mechanics/fallback";
+import { moduleNamesFor } from "@/lib/mechanics/module-names";
 
 type AnalysisPanelProps = {
   pull: Pull | null;
@@ -438,6 +438,9 @@ export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime, onCa
     onSeekToTime?.(ms);
   }
 
+  // The encounter modules behind these findings, for the "i" tip.
+  const moduleNames = moduleNamesFor(pull.name);
+
   const feed: FeedEntry[] = (() => {
     switch (activeTab) {
       case "Overall":
@@ -508,8 +511,17 @@ export default function AnalysisPanel({ pull, playbackTimeMs, onSeekToTime, onCa
 
           {/* Accuracy reminder; a red "!" when no encounter module covers
               this boss (only generic or fallback detection ran). */}
-          {hasEncounterModule(pull) ? (
-            <InfoTip label="Findings here can be inaccurate." content="Findings here can be inaccurate." />
+          {moduleNames.length > 0 ? (
+            <InfoTip
+              label={`Findings here can be inaccurate. Modules loaded: ${moduleNames.join(", ")}.`}
+              content={
+                <>
+                  Findings here can be inaccurate.
+                  <div style={{ marginTop: 8, fontWeight: 700 }}>Modules Loaded:</div>
+                  {moduleNames.map((n) => <div key={n}>{n}</div>)}
+                </>
+              }
+            />
           ) : (
             <InfoTip
               tone="alert"
