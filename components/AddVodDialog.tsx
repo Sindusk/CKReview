@@ -5,7 +5,7 @@ import { Dialog, Field } from "./ui/Dialog";
 
 // A YouTube link, or a video file from the user's disk. The file is only
 // handed back to the page, which plays it through an object URL; it is
-// never uploaded (see docs/local-vod-plan.md).
+// never uploaded (see docs/archive/local-vod-plan.md).
 export type AddVodSource =
   | { kind: "youtube"; url: string }
   | { kind: "local"; file: File };

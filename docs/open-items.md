@@ -1,7 +1,7 @@
 # Open Items
 
-Decisions waiting on the user, concrete todos, and pointers to plans not yet
-started. Ask the user before picking an item up, and delete it here once
+Decisions waiting on the user, concrete todos, and pointers to plans in
+progress or not yet started. Ask the user before picking an item up, and delete it here once
 it's resolved.
 
 What doesn't go here (trimmed 2026-10-15):
@@ -166,7 +166,7 @@ and delete them from the header.
 | Dancing Mad P5 Ultimate Kefka | `lib/mechanics/ffxiv/dancingmad/ultimate-kefka.ts` | |
 | FFXIV roles | `lib/mechanics/ffxiv/roles.ts` | 1 [STALE?] |
 
-## Plans not started
+## Plans in progress or not started
 
 - [xiva-audit-plan.md](xiva-audit-plan.md): audit every xivanalysis
   module job by job against the FFXIV damage checks. Phases 1 and 2 done
@@ -290,8 +290,9 @@ and delete them from the header.
   `0ffe845` (12.1.0): phase 0 marked 20 specs current, 17 lagging (12.0.x),
   3 stale (Marksmanship declares 11.0.5, Protection Paladin unmaintained,
   Assassination untouched since 2025). Phases 1–2 done for all 40 specs
-  (fan-out 2026-10-16). Phase 3 (top-parse checks, building) is next, one
-  spec at a time in the plan's order. Phase 3 values each candidate as
+  (fan-out 2026-10-16). Phase 3 done for every spec 2026-10-17; next is
+  the user's review of the `wrong` / `no-damage` rows and the held
+  questions (wowa-audit/PHASE3-SEQUENCE.md). Phase 3 values each candidate as
   damage lost in the log first: top players doing the same thing is
   evidence about the premise, not proof it costs nothing (Elemental's
   re-measure turned four `wrong` calls back into candidates). Below,
@@ -732,6 +733,9 @@ and delete them from the header.
 - [wow-sim-plan.md](wow-sim-plan.md): WoW simulation pipeline (talent
   effects, budget model, simc as a dev-only oracle). Four questions for
   the user before stage 0.
+- [wow-replay-plan.md](wow-replay-plan.md): the WoW replay works
+  (2026-10-17). Open: a VOD check of facing, AoE cones and lines and the
+  other bosses' shape tables, sharper map art, hitboxes, fetch size.
 - Mitigation: what-if sandbox, a published plan to compare against, a WoW
   port (`lib/mitigation/plan.ts` header).
 - Damage: automatic search for comparable clears

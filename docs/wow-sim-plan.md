@@ -3,7 +3,8 @@
 Plan for an in-app simulation layer for WoW damage analysis: our own code,
 built in stages, that says what a player's pull could have looked like,
 so findings can be measured against it. Written 2026-10-15 for the agents
-that build it. Not started.
+that build it. **Not started:** waiting on the user's answers to
+"Questions for the user before stage 0" at the bottom.
 
 ## Why
 

@@ -1,5 +1,11 @@
 # Local VOD Files Plan
 
+> **Archived 2026-10-18.** Built 2026-10-06, all six items; the user
+> confirmed item 6. Kept as the design record; the headers of
+> `components/VideoPanel.tsx`, `components/AddVodDialog.tsx`,
+> `types/Vod.ts` and `lib/local-vod-sync.ts` are authoritative for
+> current behaviour.
+
 Let a user load a video file from their own disk as a VOD source,
 alongside YouTube VODs. The file is played in the browser and **never
 leaves the user's machine**: no upload, nothing stored on the server, gone

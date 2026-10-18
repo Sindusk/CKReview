@@ -2,8 +2,12 @@
 
 The WoW counterpart of [xiva-audit-plan.md](xiva-audit-plan.md): a
 spec-by-spec audit of WoWAnalyzer's rules against the app's WoW damage
-analysis. Written 2026-10-15 for the agent that runs it. Not started; run
-it after the FFXIV pilot has settled the ledger format.
+analysis. Written 2026-10-15 for the agent that runs it.
+
+**Status (2026-10-17):** phases 0–3 done for all 40 specs. What's left
+is the user's spec-by-spec review of the `wrong` and `no-damage` rows
+and of the questions held in
+[wowa-audit/PHASE3-SEQUENCE.md](wowa-audit/PHASE3-SEQUENCE.md).
 
 Read the FFXIV plan first. This file keeps its method (extract, reconcile,
 verify) and its statuses, and only spells out what's different for WoW.

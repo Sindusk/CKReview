@@ -126,7 +126,7 @@ async function mapWithConcurrency<T, R>(
 // The ONE place VODs are chosen for sending to the server (persistSession's
 // app/api/sessions payload). Local-file VODs are dropped: they exist only
 // in this tab, and neither the file nor a placeholder entry may reach the
-// server (docs/local-vod-plan.md). Anything new that sends VODs anywhere
+// server (docs/archive/local-vod-plan.md). Anything new that sends VODs anywhere
 // must go through this too.
 function serverSavableVods(vods: Vod[]): Vod[] {
   return vods.filter(v => !isLocalVod(v));

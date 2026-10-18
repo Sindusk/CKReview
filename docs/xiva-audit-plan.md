@@ -2,7 +2,12 @@
 
 Plan for a one-time, job-by-job audit of every xivanalysis module against
 the app's FFXIV damage analysis. Written 2026-10-15 for the agent that
-runs the audit. Not started yet.
+runs the audit.
+
+**Status (2026-10-16):** phases 1 and 2 done for all 21 jobs
+(2026-10-15). Phase 3 is ongoing: each ledger's "Open" list in
+[xiva-audit/](xiva-audit/) is its work, and the proposed `wrong` and
+`no-damage` rows still need the user's approval, job by job.
 
 ## Why
 
@@ -113,7 +118,7 @@ Write the result to `docs/xiva-audit/<job>.md`, one file per job:
 - an "Open" list at the bottom: every `covered` without a firing test and
   every `candidate`, in priority order (biggest damage cost first).
 
-Add one line per job to [open-items.md](open-items.md) under "Plans not
+Add one line per job to [open-items.md](open-items.md) under "Plans in progress or not
 started" (later "Todos") pointing at its ledger and giving its open count. Don't copy the
 records into open-items.md; at 15–25 rules per job they'd bury everything
 else.

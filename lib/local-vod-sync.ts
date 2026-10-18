@@ -1,4 +1,4 @@
-// Remembered sync for local-file VODs (docs/local-vod-plan.md item 6).
+// Remembered sync for local-file VODs (docs/archive/local-vod-plan.md item 6).
 //
 // A local VOD is gone after a refresh, so its calibration would be lost
 // with it. This keeps its sync points and video length (lib/vod-sync.ts)
