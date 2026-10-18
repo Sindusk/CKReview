@@ -47,7 +47,9 @@
 //   the four "halo of flame" cast the 10y Brightfire 40153 and the four
 //   "halo of levin" the 5y 40152 (JZ1KXhDbqkNH3jxR 24); 40151 = lightning,
 //   the reverse (M9Nagmnw2LzHZPVq 1). The safe side is the other element's
-//   (small) halos: both parties stood there at the Brightfire.
+//   (small) halos: both parties stood there at the Brightfire. The VOD of
+//   M9Nagmnw2LzHZPVq 1 shows the clone glowing lightning on 40151 (user,
+//   2026-10-17), so the dragon's element is the side that explodes.
 // - Turn of the Heavens 40150/40151: Brightfire 40152/40153 (halos), Burnt
 //   Strike 40163 + Burnout 40164 (lightning), Burnt Strike 40161 + Blastburn
 //   40162 (fire; no damage, a knockback). All of them give Damage Down.
