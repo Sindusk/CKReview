@@ -78,7 +78,7 @@ damage rows are measured.
 | 34 | Holy Paladin | [paladin-holy.md](paladin-holy.md) | done 2026-10-17 (healer pass with 35, 36): no check built; heal GCDs worth 0 except a Holy Power heal near the paladin's own Shield of the Righteous (healer.ts); verified by the main session |
 | 35 | Discipline | [priest-discipline.md](priest-discipline.md) | done 2026-10-17: Power Infusion drift (tracked, `twinCastMs` merges Twins of the Sun Priestess pairs: checks.ts, types.ts); Radiance and Flash Heal not judged by their own heal; filler Void Blast / Smite (healer.ts) |
 | 36 | Holy Priest | [priest-holy.md](priest-holy.md) | done 2026-10-17: Power Infusion drift; heal-GCD check turned off for Holy Priest, pending the user |
-| 37 | Outlaw | [rogue-outlaw.md](rogue-outlaw.md) | |
+| 37 | Outlaw | [rogue-outlaw.md](rogue-outlaw.md) | done 2026-10-17: finisher below 6 combo points (outlaw.ts); Opportunity expiry (procs.ts); Preparation a GCD press (game.ts); Energy cap removed for Outlaw; verified by the main session |
 | 38 | Protection Warrior | [warrior-protection.md](warrior-protection.md) | |
 | 39 | Protection Paladin | [paladin-protection.md](paladin-protection.md) | |
 
@@ -481,6 +481,12 @@ measured for it.
   efficiency, Imbued Infusions, Avenging Wrath / Divine Toll drift;
   Discipline's Ultimate Penitence; Holy Priest's Shadow Word: Pain.
   Proposed `wrong`: Crusader's Might. Evidence in the three ledgers.
+- Outlaw (2026-10-17): **an existing app check removed, for the user to
+  approve or reject:** the Energy cap check for Outlaw (0.07–1.32M on top
+  players; Energy never limits the spec). Proposed `wrong`: the two
+  Energy waste rows, Sinister Strike with Opportunity up; kept `wrong`:
+  Blade Rush / Killing Spree efficiency. Evidence in
+  [rogue-outlaw.md](rogue-outlaw.md).
 
 - Elemental (2026-10-17): `CallOfTheAncestors/other-checks`,
   `statistics` (and whether "Stormkeeper before Ascendance" should be
