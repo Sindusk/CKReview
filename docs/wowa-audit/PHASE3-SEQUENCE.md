@@ -53,7 +53,7 @@ damage rows are measured.
 | 11 | Beast Mastery | [hunter-beastmastery.md](hunter-beastmastery.md) | done 2026-10-17: Bestial Wrath held, Kill Command without Nature's Ally, Wild Thrash on one enemy (beastmastery.ts); BM GCD value counts the press's pet hits, Font of Venomous Rage is a 2s channel (game.ts); verified by the main session |
 | 12 | Balance | [druid-balance.md](druid-balance.md) | done 2026-10-17: Eclipse charges capped, Fury of Elune held, Starfall on one enemy, spenders outside Eclipse reworked (balance.ts); verified by the main session |
 | 13 | Retribution | [paladin-retribution.md](paladin-retribution.md) | done 2026-10-17: Avenging Wrath, Execution Sentence, Wake of Ashes valued and Divine Toll tracked (all `burstHold`); Divine Arbiter expiry (procs); Hammer of Light a GCD press; Ula'tek Heart hold windows (context); verified by the main session |
-| 13a | Engine: hold windows capped per cooldown | readers of `cooldownHoldWindows` | Every reader excused a whole hold window whatever the cooldown (a 15s Implosion got 30–90s on Ula'tek). Done 2026-10-17 (7d97590): `holdWindowsFor` trims each window to one recharge before its target (Imbibe, Heart); all seven readers use it; verified by the main session. Ula'tek's P2-start extension waits on the user's answer |
+| 13a | Engine: hold windows capped per cooldown | readers of `cooldownHoldWindows` | Every reader excused a whole hold window whatever the cooldown (a 15s Implosion got 30–90s on Ula'tek). Done 2026-10-17 (7d97590): `holdWindowsFor` trims each window to one recharge before its target (Imbibe, Heart); all seven readers use it; verified by the main session. Ula'tek's P2-start extension kept as is (the user doesn't know the raid's plan; see the held list) |
 | 14 | Frost DK | [deathknight-frost.md](deathknight-frost.md) | done 2026-10-17: Killing Machine lost, Rime overwritten, Frostscythe on one enemy, Breath / Frostwyrm's Fury held; Pillar and Reaper's Mark valued; Runic Power cap removed for Frost (frostdk.ts); verified by the main session |
 | 15 | Vengeance | [demonhunter-vengeance.md](demonhunter-vengeance.md) | done 2026-10-17: Sigil of Flame / Spite drift valued by their hits (vengeance.ts, tracked-cooldowns.ts); Sigil of Chains a GCD press (game.ts); verified by the main session |
 | 16 | Guardian | [druid-guardian.md](druid-guardian.md) | done 2026-10-17: Guardian's bear presses added to the survey (game.ts: the 100th-percentile tank read 4.5% GCD uptime, now 92.6%); Lunar Beam tracked; Gore in procs.ts; verified by the main session |
@@ -323,11 +323,14 @@ measured for it.
   "spenders outside Eclipse" check was rewritten: it read 1.2–2.3M on top
   players (free procs, Incarnation in its price, spends holding would
   have capped). Evidence in [druid-balance.md](druid-balance.md).
-- Retribution (2026-10-17): **asked the user** whether Ula'tek's
-  cooldown hold window should start at P2's start (commit 4d92a42: from
-  P2's start to 5s after the second Heart, ~90s; Polpo held Avenging
-  Wrath through the P2 adds to the Heart at 4:46). Art of War moved to
-  `unverifiable` (no duration separates its expiries).
+- Retribution (2026-10-17): Ula'tek's P2 hold window. The user doesn't
+  know the raid's plan there (2026-10-17), so it stays as built: the
+  window starts at P2, and the per-cooldown cap (13a) excuses at most one
+  recharge before the Heart. Evidence for that: Jgwentworth used Avenging
+  Wrath on the P2 adds at 3:40 and had it back for the Heart at 4:46, so
+  Polpo's 90s hold of a 60s cooldown did lose a use. Revisit if the
+  raid's plan says to save cooldowns through the adds. Art of War moved
+  to `unverifiable` (no duration separates its expiries).
 - Frost DK (2026-10-17): **an existing app check removed, for the user
   to approve or reject:** the shared Runic Power cap check for Frost. It
   read 1.6–2.5M on top players (Vildk 2.01M) by pricing casts that
