@@ -77,6 +77,12 @@
 // Cutoffs (first Raid error): collapse 50, empty tower 26, called wipe 17,
 // enrage 4; the 14 P1 clears have none. Every wipe has a mechanic error
 // before its generic cutoff.
+// Replay (2026-10-18, bNcrLh7Y4dkHxM9q fight 17, a kill): the tower
+// helpers log a sample at each tower's resolution, where the tower stood;
+// Blaster tethers (89) form at each take (three at once at +0:21.1 for two
+// holders); Ballistic Impact's helpers log only the boss's spot; Diffuse
+// fits 120° aimed at the tanks it hit (10 of 10). Storage Violation 31492
+// returns at 11:07.5 in that pull. Built in replay.ts.
 //
 // -- RULES IMPLEMENTED --
 // ffxiv-top1-avoidable (Major on Damage Down or death, else Minor): Flame
