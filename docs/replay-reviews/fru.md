@@ -39,10 +39,10 @@ the check's 0.5y hitbox). Spirit Taker: one player drawn at its edge.
   it at NW/W/SW and SE/E/NE. Two of its three hits fit; the third player's
   logged spot (9:27.5) is 11y away, probably lagging their run in.
 - **Head marker 62** (8:56.6, six players): the Refrain's fake stack markers
-  on the six Water holders (40272 gives them Waters at 9:01.8). It still
-  reads "Marker 62" for 5s. A label needs a small engine change, since the
-  marker is confirmed only by a cast *at* the player. The TOP session was
-  mid-edit on `action-shapes.ts`, so it's deferred.
+  on the six Water holders. It now reads "Dark Water III (later)" until
+  40272 hands out their Waters at 9:01.8. That took a small engine change:
+  a marker is also confirmed by a cast *at* the marked player. It's in its
+  own commit; the other fights' markers are unchanged.
 - **Speed tethers' end:** not logged. They might end at Speed's resolution
   (7:49.4) instead of after 15s.
 - **The Darkest Dance knockback** (40183, 9:36.3) is raidwide-sized, so the
@@ -102,8 +102,9 @@ Pull used: DWbAwTGQrYznK1jL Pull 18, a clear. P4 runs from Materialization
 
 ### Couldn't find out / not drawn
 
-- **Marker 62** (10:35.9) on the two Darklit Water holders still reads
-  "Marker 62". The same engine change as in P3 is pending.
+- **Marker 62** (10:35.9) on the two Darklit Water holders reads "Dark Water
+  III (later)" for 5s, once P3's marker 62 has been seen in the pull. Nothing
+  logs when it goes away.
 - **The heads' look and lap:** the fit says one lap takes ~30s. The model's
   "a head finishing its lap wipes" wasn't seen.
 - **Hallowed Wings 40227** (left) is unseen in any pull on disk.

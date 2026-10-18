@@ -157,6 +157,11 @@ const HEAD_MARKERS: Record<number, HeadMarkerDef> = {
   259: { label: "Black Halo", abilities: [40290] },
   184: { label: "Dark Water III", abilities: [40271] },
   139: { label: "Dark Eruption", abilities: [40274] },
+  // The Water stack markers that don't go off yet (NAUR guide: fake-outs):
+  // P3 Refrain's six holders at 8:56.6 until 40272 hands out their Waters
+  // at 9:01.8 (JZ1KXhDbqkNH3jxR 24); P4 Darklit's two at 10:35.9
+  // (DWbAwTGQrYznK1jL 18), labelled once the P3 one is seen.
+  62: { label: "Dark Water III (later)", abilities: [40272] },
 };
 
 /**
