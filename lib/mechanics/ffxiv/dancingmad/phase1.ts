@@ -1217,6 +1217,19 @@
 // mistake). It's cross-pull/learned-per-report instead, same reason
 // blackhole-strategy.ts is split out from blackhole.ts.
 //
+// ── LOG IDS FOUND FOR THE REPLAY (2026-10-18, 2T1HzdPKgbhM43am 10, ──────────
+// ── yBKPqGwHparm7Tk4 5; replay.ts has the evidence) ───────────────────────
+//   - Mystery Magic's rings are head markers on Kefka: 673 fire inverted,
+//     674 fire, 675 ice inverted, 676 ice, 677 thunder inverted, 678
+//     thunder. 128 = the stack marker (one support, one DPS), 127 = spread.
+//   - An inverted ice or thunder casts the shown telegraph (47771 / 47776,
+//     hits nobody) plus the unshown real one (47774 / 47777); a normal one
+//     casts only 47768 / 47775. Fire: 47779 = stacks, 47778 = spreads.
+//   - Gravitational Wave hits the west half, Intemperate Will the east
+//     (3 casts; the statue helper's facing is a placeholder in fight 5).
+//   - Statue tethers are all id 45; yellow pays off with Vitrophyre /
+//     Indulgent Will, purple with Gravitas / Idyllic Will.
+//
 // ── OPEN QUESTIONS (VOD needed; moved from docs/open-items.md 2026-10-15) ──
 //   - Graven 2 Puddle Linger (report h2JvDkntZCaBgmLF pull 41): the user
 //     flags only one player, but every metric ranks that player mid-pack.
