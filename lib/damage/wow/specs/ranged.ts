@@ -12,9 +12,10 @@
 // - Main cooldown window (burstGcdFindings, bonus read from the hits,
 //   inference): Arcane Surge, Combustion, Incarnation, Bestial Wrath,
 //   Trueshot, Voidform, Ascendance, Malevolence, Demonic Tyrant,
-//   Dragonrage. Frost Mage, Augmentation and Devourer have none here
-//   (Icy Veins wasn't cast in the samples; Augmentation has no burst
-//   window of its own: augmentation.ts).
+//   Dragonrage. Frost Mage and Augmentation have none here (Icy Veins
+//   wasn't cast in the samples; Augmentation has no burst window of its
+//   own: augmentation.ts). Devourer's Void Metamorphosis window is in
+//   devourer.ts (its bonus is the window's GCD value, not the hits').
 // - Main resource at the cap (primaryResourceCapFindings): Maelstrom,
 //   Insanity, Astral Power, Focus (Beast Mastery only since 2026-10-17;
 //   see Marksmanship below). Mages log only mana; Soul Shards and
@@ -28,6 +29,16 @@
 //   their hits (about three quarters of their damage), so it isn't in the
 //   rDPS split as buffs given.
 // Tracked cooldowns are in tracked-cooldowns.ts.
+//
+// Devourer has no case study. The WoWAnalyzer audit's phase 3 (2026-10-17;
+// docs/wowa-audit/demonhunter-devourer.md, 47 player-pulls, four of them
+// 99.9–100th) found two presses the log never writes as casts, Eradicate
+// and Void Metamorphosis, and three the survey missed (The Hunt, Hungering
+// Slash; Voidblade's 0.5s GCD): game.ts. Top players' GCD uptime 82% → 91–
+// 94%. devourer.ts judges idle inside Void Metamorphosis (top 0–374k a
+// pull, weak up to 1.70M) and Eradicates overwritten by the next Void Ray.
+// Fury at the cap isn't wired: top players cast at 120 as often as the
+// weak. The tracked The Hunt stays worth 0 a use (devourer.ts says why).
 //
 // Shadow has no case study. The WoWAnalyzer audit's phase 3 (2026-10-17;
 // docs/wowa-audit/priest-shadow.md, 45 player-pulls, every one Archon)
@@ -235,6 +246,7 @@ import { BEAST_MASTERY_CHECKS } from "./beastmastery";
 import { DEMONOLOGY_CHECKS } from "./demonology";
 import { DESTRUCTION_CHECKS } from "./destruction";
 import { DEVASTATION_CHECKS } from "./devastation";
+import { DEVOURER_CHECKS } from "./devourer";
 import { ELEMENTAL_CHECKS } from "./elemental";
 import { MARKSMANSHIP_CHECKS } from "./marksmanship";
 import { SHADOW_CHECKS } from "./shadow";
@@ -376,5 +388,5 @@ export const RANGED_CHECKS: Record<string, JobCheck[]> = {
   "Destruction Warlock":  [window(442726, "Malevolence"), dot("Wither", 445474), ...DESTRUCTION_CHECKS],
   "Devastation Evoker":   [window(375087, "Dragonrage"), strafingRun, ...DEVASTATION_CHECKS],
   "Augmentation Evoker":  [...AUGMENTATION_CHECKS],
-  "Devourer Demon Hunter": [],
+  "Devourer Demon Hunter": [...DEVOURER_CHECKS],
 };
