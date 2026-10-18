@@ -5,6 +5,11 @@ spec. The method itself is in [../wowa-audit-plan.md](../wowa-audit-plan.md),
 phase 3. This file holds the process, the order and where each spec
 stands; the main session keeps the status table current.
 
+**Status (2026-10-17): every spec has had its pass.** Next is the
+user's review, spec by spec, of the `wrong` and `no-damage` rows and of
+the questions in "Held for the user's review" at the bottom of this file
+(including the removed resource-cap checks to approve or restore).
+
 ## The process
 
 1. The main session sends **one subagent** (Opus 5.5) for the next spec
@@ -80,7 +85,7 @@ damage rows are measured.
 | 36 | Holy Priest | [priest-holy.md](priest-holy.md) | done 2026-10-17: Power Infusion drift; heal-GCD check turned off for Holy Priest, pending the user |
 | 37 | Outlaw | [rogue-outlaw.md](rogue-outlaw.md) | done 2026-10-17: finisher below 6 combo points (outlaw.ts); Opportunity expiry (procs.ts); Preparation a GCD press (game.ts); Energy cap removed for Outlaw; verified by the main session |
 | 38 | Protection Warrior | [warrior-protection.md](warrior-protection.md) | done 2026-10-17: Avatar held, Shield Slam held, Rage at the cap wired (it separates top from weak here) (protwarrior.ts); Thunder Blast and Burst of Power expiries (procs.ts); Demolish a GCD press (game.ts); verified by the main session |
-| 39 | Protection Paladin | [paladin-protection.md](paladin-protection.md) | |
+| 39 | Protection Paladin | [paladin-protection.md](paladin-protection.md) | done 2026-10-17: Avenger's Shield held (Grand Crusader run-outs), Sentinel and Divine Toll valued with `burstHold` (protpaladin.ts); Divine Purpose expiry for the spec (procs.ts); verified by the main session |
 
 ## The agent prompt
 
@@ -492,6 +497,12 @@ measured for it.
   every Protection Warrior pull (Light's Potential's bonus can't be
   measured there), a limit of the shared potion check. Evidence in
   [warrior-protection.md](warrior-protection.md).
+- Protection Paladin (2026-10-17): proposed `wrong`: Holy Power waste,
+  the Hammer of Wrath window; proposed `no-damage`: cast-hit ratio. Two
+  small judgement calls: Sentinel's window bonus capped at 20% (the
+  median melee bonus), and Thatapaddlin's kill-based lost Sentinel use
+  (16s held, one more use would have landed before the 6:36 kill; 597k).
+  Evidence in [paladin-protection.md](paladin-protection.md).
 
 - Elemental (2026-10-17): `CallOfTheAncestors/other-checks`,
   `statistics` (and whether "Stormkeeper before Ascendance" should be
